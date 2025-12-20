@@ -3,7 +3,7 @@ import { ProjectModel, createProject } from '@core/project';
 import { HistoryStack } from '@core/history';
 import { ToolId } from '@tools/types';
 import { loadProject, saveProject, listProjects, deleteProject, getLastProjectId } from '@core/persistence';
-import { v4 as uuidv4 } from 'uuid';
+import { generateId } from '@core/id';
 
 export type AutosaveState = 'idle' | 'saving' | 'error';
 
@@ -101,7 +101,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const { project, projects } = get();
     const copy: ProjectModel = {
       ...project,
-      id: uuidv4(),
+      id: generateId(),
       name: `${project.name} Copy`,
       createdAt: Date.now(),
       updatedAt: Date.now(),

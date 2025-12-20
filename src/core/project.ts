@@ -1,5 +1,5 @@
-import { v4 as uuidv4 } from 'uuid';
 import { DEFAULT_MATERIAL, MaterialId } from './materials';
+import { generateId } from './id';
 
 export interface TankDimensions {
   widthCm: number;
@@ -72,7 +72,7 @@ export function materialFromIndex(idx: number): MaterialId {
 export function createProject(name = 'Aquascape'): ProjectModel {
   const now = Date.now();
   return {
-    id: uuidv4(),
+    id: generateId(),
     name,
     createdAt: now,
     updatedAt: now,

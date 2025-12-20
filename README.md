@@ -23,7 +23,7 @@ Open the printed local URL (Vite dev server). The app targets modern browsers ov
 ### Scripts
 - `npm run dev` – Vite dev server
 - `npm run build` – Type-check + production build
-- `npm run test` – Vitest unit tests (mapping, serialization, slump invariants)
+- `npm run test` – Node built-in tests (mapping, serialization roundtrip, slump invariants)
 
 ## Controls & keybinds
 - Orbit/pan/zoom via mouse/trackpad (OrbitControls).
