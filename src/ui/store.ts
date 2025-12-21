@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { ProjectModel, createProject } from '@core/project';
+import { ProjectModel, createProject, ensureTerrainVolumetric } from '@core/project';
 import { HistoryStack } from '@core/history';
 import { ToolId } from '@tools/types';
 import { loadProject, saveProject, listProjects, deleteProject, getLastProjectId } from '@core/persistence';
@@ -39,7 +39,10 @@ export const useStore = create<StoreState>((set, get) => ({
   helpOpen: false,
   async loadInitial() {
     const lastId = await getLastProjectId();
-    const projects = await listProjects();
+    const projects = (await listProjects()).map((p) => ({
+      ...p,
+      terrain: ensureTerrainVolumetric(p.terrain)
+    }));
     let project = projects.find((p) => p.id === lastId);
     if (!project) {
       project = createProject('Aquascape Lab');
@@ -53,12 +56,13 @@ export const useStore = create<StoreState>((set, get) => ({
   setProject(project) {
     set((state) => {
       const exists = state.projects.find((p) => p.id === project.id);
-      return { project, projects: exists ? state.projects : [...state.projects, project] };
+      const normalized = { ...project, terrain: ensureTerrainVolumetric(project.terrain) };
+      return { project: normalized, projects: exists ? state.projects : [...state.projects, normalized] };
     });
   },
   updateProject(updater) {
     set((state) => {
-      const draft = { ...state.project, terrain: { ...state.project.terrain } } as ProjectModel;
+      const draft = { ...state.project, terrain: ensureTerrainVolumetric({ ...state.project.terrain }) } as ProjectModel;
       updater(draft);
       draft.updatedAt = Date.now();
       const projects = state.projects.map((p) => (p.id === draft.id ? draft : p));
@@ -108,7 +112,9 @@ export const useStore = create<StoreState>((set, get) => ({
       terrain: {
         ...project.terrain,
         heightGrid: new Float32Array(project.terrain.heightGrid),
-        materialGrid: new Uint8Array(project.terrain.materialGrid)
+        materialGrid: new Uint8Array(project.terrain.materialGrid),
+        lateralOffsetX: new Float32Array(project.terrain.lateralOffsetX),
+        lateralOffsetZ: new Float32Array(project.terrain.lateralOffsetZ)
       }
     };
     set((state) => ({ project: copy, projects: [...projects, copy], history: new HistoryStack() }));
