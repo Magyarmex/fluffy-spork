@@ -1,5 +1,6 @@
+import * as THREE from 'three';
 import { Tool, ToolContext, PointerState } from './types';
-import { applyBrush, getFalloff } from './brushMath';
+import { applyBrush, applySurfaceDisplacement, getFalloff } from './brushMath';
 import { indexFor, worldToGrid } from '@core/grid';
 import { materialIndex } from '@core/project';
 import { recordDebug } from '@core/debug';
@@ -7,12 +8,14 @@ import { recordDebug } from '@core/debug';
 export function createPaintMaterialTool(): Tool {
   const strokeMask = new Set<number>();
   let paintedCells = 0;
+  let displacedCount = 0;
   return {
     id: 'paintMaterial',
     name: 'Paint Material',
     onPointerDown(ctx: ToolContext, pointer: PointerState) {
       strokeMask.clear();
       paintedCells = 0;
+      displacedCount = 0;
       this.onPointerMove?.(ctx, { ...pointer, isDragging: true });
     },
     onPointerMove(ctx, pointer) {
@@ -27,6 +30,18 @@ export function createPaintMaterialTool(): Tool {
         recordDebug('error', 'Unknown material selected for painting', project.settings.selectedMaterial);
         return;
       }
+      // Volumetric displacement along the hit normal for overhangs.
+      const displaced = applySurfaceDisplacement(
+        project,
+        { x: pointer.worldX, y: pointer.worldY ?? 0, z: pointer.worldZ },
+        radius,
+        project.settings.brushStrengthMm,
+        pointer.dt,
+        pointer.worldNormal ? new THREE.Vector3(...pointer.worldNormal) : undefined,
+        project.settings.falloff
+      );
+      displacedCount += displaced;
+
       for (let dj = -radiusCells; dj <= radiusCells; dj++) {
         for (let di = -radiusCells; di <= radiusCells; di++) {
           const i = center.i + di;
@@ -54,7 +69,7 @@ export function createPaintMaterialTool(): Tool {
       recordDebug(
         'info',
         'Completed paint stroke',
-        `cells:${paintedCells} radius:${ctx.project.settings.brushRadiusCm} falloff:${ctx.project.settings.falloff}`
+        `cells:${paintedCells} displaced:${displacedCount} radius:${ctx.project.settings.brushRadiusCm} falloff:${ctx.project.settings.falloff}`
       );
     }
   } as Tool;
