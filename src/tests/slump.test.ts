@@ -58,4 +58,31 @@ describe('slump solver', () => {
     expect(terrain.heightGrid[fineIdx]).toBeGreaterThanOrEqual(project.terrain.baseDepthCm);
     expect(terrain.heightGrid[gravelIdx]).toBeGreaterThanOrEqual(project.terrain.baseDepthCm);
   });
+
+  it('caps grain generation to keep settle responsive', () => {
+    const project = createProject('Cap');
+    project.terrain = createDefaultTerrain(128);
+    project.terrain.heightGrid.fill(18);
+
+    const diag = runSlumpStep(project);
+
+    expect(diag.grainCount).toBeLessThanOrEqual(8000);
+    expect(diag.grainsMoved).toBeGreaterThanOrEqual(0);
+  });
+
+  it('preserves overall terrain mass after settling', () => {
+    const project = createProject('Mass');
+    project.terrain = createDefaultTerrain(64);
+    project.terrain.heightGrid.fill(12);
+
+    const beforeAvg =
+      project.terrain.heightGrid.reduce((sum, v) => sum + v, 0) / project.terrain.heightGrid.length;
+
+    const diag = runSlumpStep(project);
+
+    const afterAvg =
+      project.terrain.heightGrid.reduce((sum, v) => sum + v, 0) / project.terrain.heightGrid.length;
+    expect(afterAvg).toBeGreaterThan(beforeAvg - 1);
+    expect(diag.totalTransferCm).toBeGreaterThan(0);
+  });
 });
