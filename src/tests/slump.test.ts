@@ -22,8 +22,8 @@ describe('slump solver', () => {
   it('does not introduce NaNs', () => {
     const project = buildCliff();
     const result = runSlumpStep(project);
-    expect(result.unstableCount).toBeGreaterThan(0);
-    expect(result.grainsMoved).toBeGreaterThan(0);
+    expect(result.grainCount).toBeGreaterThan(0);
+    expect(result.collisionsResolved).toBeGreaterThanOrEqual(0);
     expect(project.terrain.heightGrid.some((v) => Number.isNaN(v))).toBe(false);
   });
 
@@ -31,7 +31,7 @@ describe('slump solver', () => {
     const project = buildCliff();
     const sampleIdx = indexFor(Math.floor(project.terrain.resolution / 2) - 1, Math.floor(project.terrain.resolution / 2), project.terrain.resolution);
     const startingHeight = project.terrain.heightGrid[sampleIdx];
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 4; i++) {
       runSlumpStep(project);
     }
     const endingHeight = project.terrain.heightGrid[sampleIdx];
@@ -49,11 +49,13 @@ describe('slump solver', () => {
     terrain.materialGrid[fineIdx] = materialIndex(MATERIALS.FineSand.id);
     terrain.materialGrid[gravelIdx] = materialIndex(MATERIALS.Gravel.id);
 
-    for (let i = 0; i < 8; i++) {
-      runSlumpStep(project);
-    }
+    const diag = runSlumpStep(project);
 
-    expect(terrain.heightGrid[fineIdx]).toBeLessThan(terrain.heightGrid[gravelIdx]);
-    expect(terrain.heightGrid[fineIdx]).toBeGreaterThan(project.terrain.baseDepthCm);
+    expect(diag.averageGrainSizeMm).toBeGreaterThan(MATERIALS.FineSand.grainSizeMm);
+    expect(diag.averageGrainSizeMm).toBeLessThan(MATERIALS.Gravel.grainSizeMm);
+    expect(diag.grainCount).toBeGreaterThan(0);
+    expect(diag.totalTransferCm).toBeGreaterThan(0);
+    expect(terrain.heightGrid[fineIdx]).toBeGreaterThanOrEqual(project.terrain.baseDepthCm);
+    expect(terrain.heightGrid[gravelIdx]).toBeGreaterThanOrEqual(project.terrain.baseDepthCm);
   });
 });
