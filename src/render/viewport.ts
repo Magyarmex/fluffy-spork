@@ -17,7 +17,7 @@ export class ViewportRenderer {
   private tankLines: THREE.LineSegments;
   private defaultLeftAction: THREE.MOUSE | undefined;
   private defaultEnableRotate = true;
-  private paintingGuard = false;
+  private hoveringGuard = false;
 
   constructor(private canvas: HTMLCanvasElement, private project: ProjectModel) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -141,21 +141,21 @@ export class ViewportRenderer {
     this.terrain.update(project);
   }
 
-  setPaintingActive(active: boolean) {
+  setHoveringTerrain(active: boolean) {
     if (!this.controls.mouseButtons) {
-      recordDebug('warn', 'OrbitControls mouseButtons unavailable; cannot toggle painting mode');
+      recordDebug('warn', 'OrbitControls mouseButtons unavailable; cannot toggle hover mode');
       return;
     }
-    if (this.paintingGuard === active) return;
-    this.paintingGuard = active;
+    if (this.hoveringGuard === active) return;
+    this.hoveringGuard = active;
     if (active) {
       this.controls.enableRotate = false;
       this.controls.mouseButtons.LEFT = undefined as unknown as THREE.MOUSE;
-      recordDebug('info', 'Disabled left-button camera controls while painting');
+      recordDebug('info', 'Disabled left-button camera controls while hovering terrain');
     } else {
       this.controls.enableRotate = this.defaultEnableRotate;
       this.controls.mouseButtons.LEFT = this.defaultLeftAction ?? THREE.MOUSE.ROTATE;
-      recordDebug('info', 'Restored left-button camera controls after painting');
+      recordDebug('info', 'Restored left-button camera controls after leaving terrain hover');
     }
   }
 

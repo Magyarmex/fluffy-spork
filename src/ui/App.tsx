@@ -158,7 +158,6 @@ export default function App() {
       paintLoopRef.current = null;
     }
     if (paintingRef.current) {
-      rendererRef.current?.setPaintingActive(false);
       recordDebug('info', 'Stopped continuous paint loop');
     }
     paintingRef.current = false;
@@ -167,7 +166,7 @@ export default function App() {
 
   const startPaintingLoop = () => {
     if (!paintingRef.current || !lastPaintHitRef.current) return;
-    rendererRef.current?.setPaintingActive(true);
+    rendererRef.current?.setHoveringTerrain(true);
     const run = () => {
       if (!paintingRef.current || !lastPaintHitRef.current) return;
       const now = performance.now();
@@ -192,19 +191,18 @@ export default function App() {
     const hit = getPointerHit(e);
     if (!hit) {
       recordDebug('warn', 'Pointer down without terrain hit');
+      rendererRef.current?.setHoveringTerrain(false);
       stopPaintingLoop();
       return;
     }
+    rendererRef.current?.setHoveringTerrain(true);
     draggingRef.current = true;
     lastTimeRef.current = performance.now();
     stopPaintingLoop();
     if (tool === 'paintMaterial') {
-      rendererRef.current?.setPaintingActive(true);
       paintingRef.current = true;
       lastPaintHitRef.current = hit;
       startPaintingLoop();
-    } else {
-      rendererRef.current?.setPaintingActive(false);
     }
     pushHistory();
     const pointerState = {
@@ -222,15 +220,16 @@ export default function App() {
     if (!hit) {
       setOverlay(null);
       recordDebug('warn', 'Pointer move without hit result');
+      rendererRef.current?.setHoveringTerrain(false);
       stopPaintingLoop();
       return;
     }
+    rendererRef.current?.setHoveringTerrain(true);
     const now = performance.now();
     const dt = Math.min(0.1, (now - lastTimeRef.current) / 1000);
     lastTimeRef.current = now;
     if (draggingRef.current) {
       if (tool === 'paintMaterial') {
-        rendererRef.current?.setPaintingActive(true);
         paintingRef.current = true;
         lastPaintHitRef.current = hit;
       }
@@ -250,11 +249,16 @@ export default function App() {
     );
   };
 
+  const handlePointerLeave = () => {
+    rendererRef.current?.setHoveringTerrain(false);
+    stopPaintingLoop();
+  };
+
   const handlePointerUp = (e: React.PointerEvent) => {
     if (!draggingRef.current) return;
     draggingRef.current = false;
     stopPaintingLoop();
-    rendererRef.current?.setPaintingActive(false);
+    rendererRef.current?.setHoveringTerrain(false);
     const hit = getPointerHit(e);
     tools[tool]?.onPointerUp?.(
       { project, commitStroke, requestRender, setHud },
@@ -575,6 +579,7 @@ export default function App() {
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
+          onPointerLeave={handlePointerLeave}
         />
       </div>
       <div className="right-panel">
