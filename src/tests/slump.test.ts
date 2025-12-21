@@ -58,4 +58,15 @@ describe('slump solver', () => {
     expect(terrain.heightGrid[fineIdx]).toBeGreaterThanOrEqual(project.terrain.baseDepthCm);
     expect(terrain.heightGrid[gravelIdx]).toBeGreaterThanOrEqual(project.terrain.baseDepthCm);
   });
+
+  it('caps grain generation to keep settle responsive', () => {
+    const project = createProject('Cap');
+    project.terrain = createDefaultTerrain(128);
+    project.terrain.heightGrid.fill(18);
+
+    const diag = runSlumpStep(project);
+
+    expect(diag.grainCount).toBeLessThanOrEqual(8000);
+    expect(diag.grainsMoved).toBeGreaterThanOrEqual(0);
+  });
 });
