@@ -1,5 +1,6 @@
 import { DEFAULT_MATERIAL, MaterialId } from './materials';
 import { generateId } from './id';
+import { recordDebug } from './debug';
 
 export interface TankDimensions {
   widthCm: number;
@@ -64,18 +65,39 @@ export function createDefaultTerrain(resolution = DEFAULT_RESOLUTION): TerrainDa
   return { resolution, heightGrid, materialGrid, lateralOffsetX, lateralOffsetZ, baseDepthCm: -6 };
 }
 
+export function ensureTerrainIntegrity(terrain: TerrainData): TerrainData {
+  const resolution = terrain?.resolution ?? DEFAULT_RESOLUTION;
+  const size = resolution * resolution;
+  const safeHeight =
+    terrain?.heightGrid && terrain.heightGrid.length === size ? terrain.heightGrid : new Float32Array(size);
+  const safeMaterial =
+    terrain?.materialGrid && terrain.materialGrid.length === size ? terrain.materialGrid : new Uint8Array(size);
+  if (safeHeight !== terrain.heightGrid || safeMaterial !== terrain.materialGrid) {
+    recordDebug('warn', 'Repaired terrain arrays missing or incorrect size', `expected:${size}`);
+  }
+  return {
+    resolution,
+    heightGrid: safeHeight,
+    materialGrid: safeMaterial,
+    lateralOffsetX: terrain.lateralOffsetX,
+    lateralOffsetZ: terrain.lateralOffsetZ,
+    baseDepthCm: terrain.baseDepthCm
+  };
+}
+
 export function ensureTerrainVolumetric(terrain: TerrainData): TerrainData {
+  const base = ensureTerrainIntegrity(terrain);
+  const { resolution, heightGrid } = base;
   const size = terrain.heightGrid?.length ?? terrain.resolution * terrain.resolution;
   const safeLateralX =
-    terrain.lateralOffsetX && terrain.lateralOffsetX.length === size
-      ? terrain.lateralOffsetX
-      : new Float32Array(size);
+    base.lateralOffsetX && base.lateralOffsetX.length === size ? base.lateralOffsetX : new Float32Array(size);
   const safeLateralZ =
-    terrain.lateralOffsetZ && terrain.lateralOffsetZ.length === size
-      ? terrain.lateralOffsetZ
-      : new Float32Array(size);
-  const baseDepthCm = terrain.baseDepthCm ?? -6;
-  return { ...terrain, lateralOffsetX: safeLateralX, lateralOffsetZ: safeLateralZ, baseDepthCm };
+    base.lateralOffsetZ && base.lateralOffsetZ.length === size ? base.lateralOffsetZ : new Float32Array(size);
+  const baseDepthCm = base.baseDepthCm ?? -6;
+  if (safeLateralX !== base.lateralOffsetX || safeLateralZ !== base.lateralOffsetZ || base.baseDepthCm === undefined) {
+    recordDebug('warn', 'Filled missing volumetric offsets', `size:${size}`);
+  }
+  return { ...base, heightGrid, lateralOffsetX: safeLateralX, lateralOffsetZ: safeLateralZ, baseDepthCm };
 }
 
 export function materialIndex(material: MaterialId): number {

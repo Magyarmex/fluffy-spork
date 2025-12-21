@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ProjectModel, materialFromIndex } from '@core/project';
+import { ProjectModel, materialFromIndex, ensureTerrainVolumetric } from '@core/project';
 import { MATERIALS } from '@core/materials';
 import { gridToWorld, indexFor } from '@core/grid';
 import { recordDebug } from '@core/debug';
@@ -83,7 +83,9 @@ export class TerrainMesh {
   }
 
   update(project: ProjectModel) {
-    const { resolution, heightGrid, materialGrid, lateralOffsetX, lateralOffsetZ, baseDepthCm } = project.terrain;
+    const safeTerrain = ensureTerrainVolumetric(project.terrain);
+    project.terrain = safeTerrain;
+    const { resolution, heightGrid, materialGrid, lateralOffsetX, lateralOffsetZ, baseDepthCm } = safeTerrain;
     const { widthCm, depthCm } = project.tank;
     const tintCache: Record<number, THREE.Color> = {};
     let ptr = 0;
