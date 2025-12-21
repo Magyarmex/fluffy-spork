@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { ProjectModel } from '@core/project';
-import { MATERIALS, materialFromIndex } from '@core/materials';
+import { ProjectModel, materialFromIndex } from '@core/project';
+import { MATERIALS } from '@core/materials';
 import { indexFor } from '@core/grid';
 
 export class TerrainMesh {

@@ -19,9 +19,10 @@
     "@types/node": "20.14.11",
     "@types/react": "18.2.15",
     "@types/react-dom": "18.2.7",
-    "@types/three": "0.166.1",
+    "@types/three": "0.166.0",
     "@vitejs/plugin-react": "4.4.1",
     "typescript": "5.5.4",
-    "vite": "5.4.2"
+    "vite": "5.4.2",
+    "vitest": "2.0.5"
   }
 }
