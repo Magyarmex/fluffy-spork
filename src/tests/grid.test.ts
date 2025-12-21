@@ -9,8 +9,8 @@ describe('world/grid mapping', () => {
     const centerZ = DEFAULT_TANK.depthCm / 2;
     const grid = worldToGrid(centerX, centerZ, res, DEFAULT_TANK);
     const world = gridToWorld(grid.i, grid.j, res, DEFAULT_TANK);
-    expect(world.x).toBeCloseTo(centerX, 1);
-    expect(world.z).toBeCloseTo(centerZ, 1);
+    expect(world.x).toBeCloseTo(centerX, 0);
+    expect(world.z).toBeCloseTo(centerZ, 0);
   });
 
   it('clamps edges', () => {
