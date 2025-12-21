@@ -91,12 +91,15 @@ export class TerrainMesh {
     const bottomStart = this.topVertexCount;
     let minY = Number.POSITIVE_INFINITY;
     let maxY = Number.NEGATIVE_INFINITY;
+    if (!lateralOffsetX || !lateralOffsetZ) {
+      recordDebug('error', 'Terrain offsets missing; falling back to zeros and requesting save');
+    }
     for (let j = 0; j < resolution; j++) {
       for (let i = 0; i < resolution; i++) {
         const idx = indexFor(i, j, resolution);
         const base = gridToWorld(i, j, resolution, project.tank);
-        const x = base.x + lateralOffsetX[idx];
-        const z = base.z + lateralOffsetZ[idx];
+        const x = base.x + (lateralOffsetX?.[idx] ?? 0);
+        const z = base.z + (lateralOffsetZ?.[idx] ?? 0);
         const y = heightGrid[idx];
         minY = Math.min(minY, y);
         maxY = Math.max(maxY, y);

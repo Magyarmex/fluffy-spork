@@ -64,6 +64,20 @@ export function createDefaultTerrain(resolution = DEFAULT_RESOLUTION): TerrainDa
   return { resolution, heightGrid, materialGrid, lateralOffsetX, lateralOffsetZ, baseDepthCm: -6 };
 }
 
+export function ensureTerrainVolumetric(terrain: TerrainData): TerrainData {
+  const size = terrain.heightGrid?.length ?? terrain.resolution * terrain.resolution;
+  const safeLateralX =
+    terrain.lateralOffsetX && terrain.lateralOffsetX.length === size
+      ? terrain.lateralOffsetX
+      : new Float32Array(size);
+  const safeLateralZ =
+    terrain.lateralOffsetZ && terrain.lateralOffsetZ.length === size
+      ? terrain.lateralOffsetZ
+      : new Float32Array(size);
+  const baseDepthCm = terrain.baseDepthCm ?? -6;
+  return { ...terrain, lateralOffsetX: safeLateralX, lateralOffsetZ: safeLateralZ, baseDepthCm };
+}
+
 export function materialIndex(material: MaterialId): number {
   const order: MaterialId[] = ['FineSand', 'CoarseSand', 'Gravel', 'Soil'];
   return order.indexOf(material);
