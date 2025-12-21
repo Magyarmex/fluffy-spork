@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { ProjectModel } from '@core/project';
+import { ProjectModel, ensureTerrainVolumetric } from '@core/project';
 import { recordDebug } from '@core/debug';
 import { TerrainMesh } from './terrain';
 import { ToolOverlay } from '@tools/types';
@@ -121,8 +121,9 @@ export class ViewportRenderer {
   }
 
   updateProject(project: ProjectModel) {
-    this.project = project;
-    this.terrain.update(project);
+    const normalized = { ...project, terrain: ensureTerrainVolumetric(project.terrain) };
+    this.project = normalized;
+    this.terrain.update(this.project);
     this.scene.remove(this.tankLines);
     this.scene.remove(this.waterPlane);
     this.tankLines = this.buildTankOutline();

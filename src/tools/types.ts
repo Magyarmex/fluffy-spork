@@ -11,7 +11,9 @@ export type ToolId =
 
 export interface PointerState {
   worldX: number;
+  worldY?: number;
   worldZ: number;
+  worldNormal?: [number, number, number];
   dt: number;
   isDragging: boolean;
 }
