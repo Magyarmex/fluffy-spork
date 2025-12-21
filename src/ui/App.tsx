@@ -8,6 +8,8 @@ import { runSlumpAsync } from '@sim/slump';
 import { exportProject, importProject } from '@core/serialization';
 import { materialList } from '@core/materials';
 import { worldToGrid, indexFor, gridToWorld } from '@core/grid';
+import { attachGlobalErrorHooks, recordDebug } from '@core/debug';
+import { DebugPanel } from './DebugPanel';
 
 const tools = buildTools();
 
@@ -44,11 +46,14 @@ export default function App() {
   const [slumpProgress, setSlumpProgress] = useState<string | null>(null);
   const slumpCancelRef = useRef(false);
   const lastCameraUpdate = useRef(0);
+  const [debugOpen, setDebugOpen] = useState(false);
   const draggingRef = useRef(false);
   const lastTimeRef = useRef<number>(0);
 
   useEffect(() => {
     loadInitial();
+    attachGlobalErrorHooks();
+    recordDebug('info', 'App bootstrapped');
   }, [loadInitial]);
 
   useEffect(() => {
@@ -64,6 +69,7 @@ export default function App() {
         });
       }
     };
+    recordDebug('info', 'Viewport initialized');
     rendererRef.current = renderer;
     let frameId: number;
 
@@ -80,6 +86,7 @@ export default function App() {
       cancelAnimationFrame(frameId);
       window.removeEventListener('resize', handleResize);
       renderer.dispose();
+      recordDebug('info', 'Viewport disposed');
     };
   }, []);
 
@@ -144,7 +151,10 @@ export default function App() {
 
   const handlePointerDown = (e: React.PointerEvent) => {
     const hit = getPointerHit(e);
-    if (!hit) return;
+    if (!hit) {
+      recordDebug('warn', 'Pointer down without terrain hit');
+      return;
+    }
     const requestRender = () => {
       rendererRef.current?.updateTerrain(project);
       rendererRef.current?.render();
@@ -164,7 +174,11 @@ export default function App() {
 
   const handlePointerMove = (e: React.PointerEvent) => {
     const hit = getPointerHit(e);
-    if (!hit) return;
+    if (!hit) {
+      setOverlay(null);
+      recordDebug('warn', 'Pointer move without hit result');
+      return;
+    }
     const requestRender = () => {
       rendererRef.current?.updateTerrain(project);
       rendererRef.current?.render();
@@ -588,6 +602,9 @@ export default function App() {
           <span className="badge">Aquascape Lab MVP</span>
           <span className="small">Autosave: {autosave}</span>
           {lastSavedAt && <span className="small">Last saved {new Date(lastSavedAt).toLocaleTimeString()}</span>}
+          <button onClick={() => setDebugOpen(true)} style={{ padding: '6px 10px' }}>
+            Debug
+          </button>
         </div>
       </div>
       {renderTabContent()}
@@ -596,6 +613,7 @@ export default function App() {
         <div>{hud}</div>
       </div>
       {helpOpen && <HelpOverlay onClose={() => toggleHelp(false)} />}
+      {debugOpen && <DebugPanel onClose={() => setDebugOpen(false)} />}
     </div>
   );
 }
