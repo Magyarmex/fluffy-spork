@@ -351,6 +351,7 @@ export function runSlumpStep(project: ProjectModel): SlumpDiagnostics {
       const idx = indexFor(i, j, resolution);
       const h = heightGrid[idx];
       const nbrs = neighbors8(i, j, resolution);
+      const candidates: Array<{ idx: number; drop: number; weight: number }> = [];
       for (const n of nbrs) {
         const drop = h - heightGrid[indexFor(n.i, n.j, resolution)];
         if (drop > 0) {
