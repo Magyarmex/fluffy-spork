@@ -4,6 +4,7 @@ import { ProjectModel, ensureTerrainVolumetric } from '@core/project';
 import { recordDebug } from '@core/debug';
 import { TerrainMesh } from './terrain';
 import { ToolOverlay } from '@tools/types';
+import { gridToWorld, indexFor, worldToGrid } from '@core/grid';
 
 export class ViewportRenderer {
   onCameraChange?: (pos: [number, number, number], target: [number, number, number]) => void;
@@ -166,18 +167,56 @@ export class ViewportRenderer {
     if (overlay.type === 'brush' && overlay.center && overlay.radius) {
       const circleGeo = new THREE.RingGeometry(overlay.radius - 0.1, overlay.radius + 0.1, 64);
       circleGeo.rotateX(-Math.PI / 2);
-      const mat = new THREE.MeshBasicMaterial({ color: '#5af2c4', transparent: true, opacity: 0.8, side: THREE.DoubleSide });
+      const mat = new THREE.MeshBasicMaterial({
+        color: '#5af2c4',
+        transparent: true,
+        opacity: 0.8,
+        side: THREE.DoubleSide,
+        depthTest: false,
+        depthWrite: false
+      });
       const mesh = new THREE.Mesh(circleGeo, mat);
-      mesh.position.set(overlay.center[0], 0.05, overlay.center[1]);
+      const y = this.sampleTerrainHeight(overlay.center[0], overlay.center[1]) + 0.35;
+      mesh.position.set(overlay.center[0], y, overlay.center[1]);
       this.overlayGroup.add(mesh);
     }
     if (overlay.type === 'ramp' && overlay.rampPoints) {
       const [a, b] = overlay.rampPoints;
-      const pts = [new THREE.Vector3(a[0], 0.05, a[1]), new THREE.Vector3(b[0], 0.05, b[1])];
+      const pts = [
+        new THREE.Vector3(a[0], this.sampleTerrainHeight(a[0], a[1]) + 0.35, a[1]),
+        new THREE.Vector3(b[0], this.sampleTerrainHeight(b[0], b[1]) + 0.35, b[1])
+      ];
       const geo = new THREE.BufferGeometry().setFromPoints(pts);
-      const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: '#f2d95a' }));
+      const line = new THREE.Line(
+        geo,
+        new THREE.LineBasicMaterial({ color: '#f2d95a', depthTest: false, depthWrite: false })
+      );
       this.overlayGroup.add(line);
     }
+  }
+
+  private sampleTerrainHeight(x: number, z: number) {
+    const { terrain, tank } = this.project;
+    const { resolution, heightGrid, lateralOffsetX, lateralOffsetZ, baseDepthCm } = terrain;
+    const grid = worldToGrid(x, z, resolution, tank);
+    let bestHeight = baseDepthCm;
+    let bestDistSq = Number.POSITIVE_INFINITY;
+    for (let dj = -1; dj <= 1; dj++) {
+      for (let di = -1; di <= 1; di++) {
+        const gi = Math.max(0, Math.min(resolution - 1, grid.i + di));
+        const gj = Math.max(0, Math.min(resolution - 1, grid.j + dj));
+        const idx = indexFor(gi, gj, resolution);
+        const base = gridToWorld(gi, gj, resolution, tank);
+        const vx = base.x + (lateralOffsetX?.[idx] ?? 0);
+        const vz = base.z + (lateralOffsetZ?.[idx] ?? 0);
+        const distSq = (vx - x) * (vx - x) + (vz - z) * (vz - z);
+        if (distSq < bestDistSq) {
+          bestDistSq = distSq;
+          bestHeight = heightGrid[idx];
+        }
+      }
+    }
+    return bestHeight;
   }
 
   resize() {
