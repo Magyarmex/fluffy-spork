@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { ProjectModel } from '@core/project';
+import { recordDebug } from '@core/debug';
 import { TerrainMesh } from './terrain';
 import { ToolOverlay } from '@tools/types';
 
@@ -14,6 +15,8 @@ export class ViewportRenderer {
   private overlayGroup: THREE.Group;
   private waterPlane: THREE.Mesh;
   private tankLines: THREE.LineSegments;
+  private defaultLeftAction: THREE.MOUSE | undefined;
+  private paintingGuard = false;
 
   constructor(private canvas: HTMLCanvasElement, private project: ProjectModel) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -26,6 +29,7 @@ export class ViewportRenderer {
     this.camera.position.set(...project.camera.position);
 
     this.controls = new OrbitControls(this.camera, canvas);
+    this.defaultLeftAction = this.controls.mouseButtons?.LEFT ?? THREE.MOUSE.ROTATE;
     this.controls.target.set(...project.camera.target);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
@@ -133,6 +137,22 @@ export class ViewportRenderer {
   updateTerrain(project: ProjectModel) {
     this.project = project;
     this.terrain.update(project);
+  }
+
+  setPaintingActive(active: boolean) {
+    if (!this.controls.mouseButtons) {
+      recordDebug('warn', 'OrbitControls mouseButtons unavailable; cannot toggle painting mode');
+      return;
+    }
+    if (this.paintingGuard === active) return;
+    this.paintingGuard = active;
+    if (active) {
+      this.controls.mouseButtons.LEFT = undefined as unknown as THREE.MOUSE;
+      recordDebug('info', 'Disabled left-button camera controls while painting');
+    } else {
+      this.controls.mouseButtons.LEFT = this.defaultLeftAction ?? THREE.MOUSE.ROTATE;
+      recordDebug('info', 'Restored left-button camera controls after painting');
+    }
   }
 
   updateOverlay(overlay: ToolOverlay | null) {
