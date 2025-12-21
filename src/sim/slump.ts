@@ -45,6 +45,7 @@ interface Grain {
 interface GrainBuildResult {
   grains: Grain[];
   estimatedVolume: number;
+  actualVolume: number;
   dropCount: number;
   totalGrainSizeMm: number;
   grainCount: number;
@@ -90,8 +91,7 @@ function buildGrainsFromTerrain(project: ProjectModel, maxGrains: number): Grain
 
   let estimatedGrains = 0;
   let totalVolume = 0;
-  let totalGrainSizeMm = 0;
-  let grainCount = 0;
+  let estimatedGrainSizeMm = 0;
   for (let j = 0; j < resolution; j++) {
     for (let i = 0; i < resolution; i++) {
       const idx = indexFor(i, j, resolution);
@@ -105,27 +105,49 @@ function buildGrainsFromTerrain(project: ProjectModel, maxGrains: number): Grain
       const count = Math.max(1, Math.floor(volume / Math.max(volPerGrain, 1e-6)));
       estimatedGrains += count;
       totalVolume += volume;
-      totalGrainSizeMm += count * mat.grainSizeMm;
-      grainCount += count;
+      estimatedGrainSizeMm += count * mat.grainSizeMm;
     }
   }
 
   const scaling = Math.min(1, maxGrains / Math.max(1, estimatedGrains));
   const grains: Grain[] = [];
+  let remainingCapacity = Math.max(1, maxGrains);
+  let zeroSpawnColumns = 0;
+  let cappedColumns = 0;
+  let actualGrainSizeMm = 0;
+  let sampledColumns = 0;
+  let actualVolume = 0;
 
-  for (let j = 0; j < resolution; j++) {
+  outer: for (let j = 0; j < resolution; j++) {
     for (let i = 0; i < resolution; i++) {
+      if (remainingCapacity <= 0) break outer;
       const idx = indexFor(i, j, resolution);
       const height = heightGrid[idx];
       if (!Number.isFinite(height) || height <= baseDepthCm) continue;
       const matIdx = materialGrid[idx];
       const mat = MATERIALS[materialFromIndex(matIdx)];
       const columnHeight = Math.max(0, height - baseDepthCm);
+      if (columnHeight <= 0) {
+        zeroSpawnColumns++;
+        continue;
+      }
       const volume = columnHeight * cellArea;
       const radius = Math.max(mat.grainSizeMm / 20, MIN_GRAIN_CM / 2);
       const volPerGrain = sphereVolume(radius);
-      const count = Math.max(1, Math.floor((volume / Math.max(volPerGrain, 1e-6)) * scaling));
-      for (let k = 0; k < count; k++) {
+      const grainVolume = Math.max(volPerGrain, 1e-6);
+      const rawCount = (volume / Math.max(volPerGrain, 1e-6)) * scaling;
+      let spawn = Math.floor(rawCount);
+      const fractional = rawCount - spawn;
+      if (rand() < fractional) spawn += 1;
+      if (spawn <= 0) {
+        zeroSpawnColumns++;
+        continue;
+      }
+      if (spawn > remainingCapacity) {
+        cappedColumns++;
+        spawn = remainingCapacity;
+      }
+      for (let k = 0; k < spawn; k++) {
         const base = gridToWorld(i, j, resolution, tank);
         const jitterX = (rand() - 0.5) * dx * 0.8;
         const jitterZ = (rand() - 0.5) * dz * 0.8;
@@ -141,24 +163,34 @@ function buildGrainsFromTerrain(project: ProjectModel, maxGrains: number): Grain
           mass: Math.max(0.001, mat.density * sphereVolume(radius) * 0.01),
           matIdx
         });
-        grainCount++;
+        actualGrainSizeMm += mat.grainSizeMm;
+        actualVolume += grainVolume;
       }
+      remainingCapacity -= spawn;
+      sampledColumns++;
     }
   }
 
-  if (grains.length === 0) {
-    recordDebug('warn', 'No grains produced for settle', `estimated:${estimatedGrains}`);
-  }
-
+  const capped = remainingCapacity <= 0;
+  const estimatedAvgSize = estimatedGrains === 0 ? 0 : estimatedGrainSizeMm / Math.max(1, estimatedGrains);
+  const level = capped ? 'warn' : grains.length === 0 ? 'warn' : 'info';
+  const avgSize = grains.length === 0 ? 0 : actualGrainSizeMm / Math.max(1, grains.length);
   recordDebug(
-    'info',
-    'Generated grain cloud',
-    `grains:${grains.length} scaling:${scaling.toFixed(2)} est:${estimatedGrains} volume:${totalVolume.toFixed(
+    level,
+    capped ? 'Grain cloud capped by max' : 'Generated grain cloud',
+    `grains:${grains.length}/${maxGrains} scaling:${scaling.toFixed(4)} est:${estimatedGrains} volumeEst:${totalVolume.toFixed(
       2
-    )}cm3 avgSize:${grainCount === 0 ? 0 : (totalGrainSizeMm / grainCount).toFixed(2)}mm`
+    )}cm3 actual:${actualVolume.toFixed(2)}cm3 sampled:${sampledColumns} zeroed:${zeroSpawnColumns} cappedColumns:${cappedColumns} avgSize:${avgSize.toFixed(2)}mm estAvg:${estimatedAvgSize.toFixed(2)}mm`
   );
 
-  return { grains, estimatedVolume: totalVolume, dropCount: estimatedGrains, totalGrainSizeMm, grainCount };
+  return {
+    grains,
+    estimatedVolume: totalVolume,
+    actualVolume,
+    dropCount: estimatedGrains,
+    totalGrainSizeMm: actualGrainSizeMm,
+    grainCount: grains.length
+  };
 }
 
 function applyTerrainRoll(grain: Grain, project: ProjectModel, originalHeights: Float32Array) {
@@ -338,7 +370,7 @@ function bakeGrainsToTerrain(grains: Grain[], project: ProjectModel) {
 
 export function runSlumpStep(project: ProjectModel): SlumpDiagnostics {
   const originalHeights = new Float32Array(project.terrain.heightGrid);
-  const { grains, estimatedVolume, dropCount, totalGrainSizeMm, grainCount } = buildGrainsFromTerrain(project, MAX_GRAINS);
+  const { grains, estimatedVolume, actualVolume, dropCount, totalGrainSizeMm, grainCount } = buildGrainsFromTerrain(project, MAX_GRAINS);
   const { collisions, peakSpeed, grainsTouchedFloor } = simulateGrains(grains, project, originalHeights);
   bakeGrainsToTerrain(grains, project);
 
@@ -367,7 +399,7 @@ export function runSlumpStep(project: ProjectModel): SlumpDiagnostics {
     peakSlope,
     unstableCount,
     grainsMoved: grainsTouchedFloor,
-    totalTransferCm: estimatedVolume,
+    totalTransferCm: actualVolume,
     averageGrainSizeMm: grainCount === 0 ? 0 : totalGrainSizeMm / Math.max(1, grainCount),
     collisionsResolved: collisions,
     grainCount: grains.length
