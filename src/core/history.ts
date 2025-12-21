@@ -3,6 +3,8 @@ import { ProjectModel } from './project';
 export interface HistoryEntry {
   heightGrid: Float32Array;
   materialGrid: Uint8Array;
+  lateralOffsetX: Float32Array;
+  lateralOffsetZ: Float32Array;
 }
 
 const HISTORY_LIMIT = 50;
@@ -14,7 +16,9 @@ export class HistoryStack {
   push(project: ProjectModel) {
     this.undoStack.push({
       heightGrid: new Float32Array(project.terrain.heightGrid),
-      materialGrid: new Uint8Array(project.terrain.materialGrid)
+      materialGrid: new Uint8Array(project.terrain.materialGrid),
+      lateralOffsetX: new Float32Array(project.terrain.lateralOffsetX),
+      lateralOffsetZ: new Float32Array(project.terrain.lateralOffsetZ)
     });
     if (this.undoStack.length > HISTORY_LIMIT) {
       this.undoStack.shift();
@@ -27,10 +31,14 @@ export class HistoryStack {
     const state = this.undoStack.pop()!;
     this.redoStack.push({
       heightGrid: new Float32Array(project.terrain.heightGrid),
-      materialGrid: new Uint8Array(project.terrain.materialGrid)
+      materialGrid: new Uint8Array(project.terrain.materialGrid),
+      lateralOffsetX: new Float32Array(project.terrain.lateralOffsetX),
+      lateralOffsetZ: new Float32Array(project.terrain.lateralOffsetZ)
     });
     project.terrain.heightGrid = state.heightGrid;
     project.terrain.materialGrid = state.materialGrid;
+    project.terrain.lateralOffsetX = state.lateralOffsetX;
+    project.terrain.lateralOffsetZ = state.lateralOffsetZ;
     return true;
   }
 
@@ -39,10 +47,14 @@ export class HistoryStack {
     const state = this.redoStack.pop()!;
     this.undoStack.push({
       heightGrid: new Float32Array(project.terrain.heightGrid),
-      materialGrid: new Uint8Array(project.terrain.materialGrid)
+      materialGrid: new Uint8Array(project.terrain.materialGrid),
+      lateralOffsetX: new Float32Array(project.terrain.lateralOffsetX),
+      lateralOffsetZ: new Float32Array(project.terrain.lateralOffsetZ)
     });
     project.terrain.heightGrid = state.heightGrid;
     project.terrain.materialGrid = state.materialGrid;
+    project.terrain.lateralOffsetX = state.lateralOffsetX;
+    project.terrain.lateralOffsetZ = state.lateralOffsetZ;
     return true;
   }
 }
