@@ -49,6 +49,9 @@ export default function App() {
   const [debugOpen, setDebugOpen] = useState(false);
   const draggingRef = useRef(false);
   const lastTimeRef = useRef<number>(0);
+  const paintingRef = useRef(false);
+  const paintLoopRef = useRef<number | null>(null);
+  const lastPaintHitRef = useRef<{ x: number; z: number; y: number } | null>(null);
 
   useEffect(() => {
     loadInitial();
@@ -144,6 +147,42 @@ export default function App() {
     return { x: point.x, z: point.z, y: point.y };
   };
 
+  const requestRender = () => {
+    rendererRef.current?.updateTerrain(project);
+    rendererRef.current?.render();
+  };
+
+  const stopPaintingLoop = () => {
+    if (paintLoopRef.current !== null) {
+      cancelAnimationFrame(paintLoopRef.current);
+      paintLoopRef.current = null;
+    }
+    if (paintingRef.current) {
+      rendererRef.current?.setPaintingActive(false);
+      recordDebug('info', 'Stopped continuous paint loop');
+    }
+    paintingRef.current = false;
+    lastPaintHitRef.current = null;
+  };
+
+  const startPaintingLoop = () => {
+    if (!paintingRef.current || !lastPaintHitRef.current) return;
+    rendererRef.current?.setPaintingActive(true);
+    const run = () => {
+      if (!paintingRef.current || !lastPaintHitRef.current) return;
+      const now = performance.now();
+      const dt = Math.min(0.1, (now - lastTimeRef.current) / 1000 || 1 / 60);
+      lastTimeRef.current = now;
+      tools[tool]?.onPointerMove?.(
+        { project, commitStroke, requestRender, setHud },
+        { worldX: lastPaintHitRef.current.x, worldZ: lastPaintHitRef.current.z, dt, isDragging: true }
+      );
+      paintLoopRef.current = requestAnimationFrame(run);
+    };
+    paintLoopRef.current = requestAnimationFrame(run);
+    recordDebug('info', 'Started continuous paint loop');
+  };
+
   const commitStroke = () => {
     updateProject(() => {});
     saveNow();
@@ -153,14 +192,20 @@ export default function App() {
     const hit = getPointerHit(e);
     if (!hit) {
       recordDebug('warn', 'Pointer down without terrain hit');
+      stopPaintingLoop();
       return;
     }
-    const requestRender = () => {
-      rendererRef.current?.updateTerrain(project);
-      rendererRef.current?.render();
-    };
     draggingRef.current = true;
     lastTimeRef.current = performance.now();
+    stopPaintingLoop();
+    if (tool === 'paintMaterial') {
+      rendererRef.current?.setPaintingActive(true);
+      paintingRef.current = true;
+      lastPaintHitRef.current = hit;
+      startPaintingLoop();
+    } else {
+      rendererRef.current?.setPaintingActive(false);
+    }
     pushHistory();
     const pointerState = {
       worldX: hit.x,
@@ -177,16 +222,18 @@ export default function App() {
     if (!hit) {
       setOverlay(null);
       recordDebug('warn', 'Pointer move without hit result');
+      stopPaintingLoop();
       return;
     }
-    const requestRender = () => {
-      rendererRef.current?.updateTerrain(project);
-      rendererRef.current?.render();
-    };
     const now = performance.now();
     const dt = Math.min(0.1, (now - lastTimeRef.current) / 1000);
     lastTimeRef.current = now;
     if (draggingRef.current) {
+      if (tool === 'paintMaterial') {
+        rendererRef.current?.setPaintingActive(true);
+        paintingRef.current = true;
+        lastPaintHitRef.current = hit;
+      }
       tools[tool]?.onPointerMove?.(
         { project, commitStroke, requestRender, setHud },
         { worldX: hit.x, worldZ: hit.z, dt, isDragging: true }
@@ -206,11 +253,9 @@ export default function App() {
   const handlePointerUp = (e: React.PointerEvent) => {
     if (!draggingRef.current) return;
     draggingRef.current = false;
+    stopPaintingLoop();
+    rendererRef.current?.setPaintingActive(false);
     const hit = getPointerHit(e);
-    const requestRender = () => {
-      rendererRef.current?.updateTerrain(project);
-      rendererRef.current?.render();
-    };
     tools[tool]?.onPointerUp?.(
       { project, commitStroke, requestRender, setHud },
       { worldX: hit?.x ?? 0, worldZ: hit?.z ?? 0, dt: 0, isDragging: false }
