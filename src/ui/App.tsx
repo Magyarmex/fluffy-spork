@@ -51,7 +51,7 @@ export default function App() {
   const lastTimeRef = useRef<number>(0);
   const paintingRef = useRef(false);
   const paintLoopRef = useRef<number | null>(null);
-  const lastPaintHitRef = useRef<{ x: number; z: number; y: number } | null>(null);
+  const lastPaintHitRef = useRef<{ x: number; z: number; y: number; normal?: [number, number, number] } | null>(null);
 
   useEffect(() => {
     loadInitial();
@@ -131,7 +131,7 @@ export default function App() {
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
 
-  const getPointerHit = (event: React.PointerEvent): { x: number; z: number; y: number } | null => {
+  const getPointerHit = (event: React.PointerEvent): { x: number; z: number; y: number; normal?: [number, number, number] } | null => {
     const canvas = canvasRef.current;
     const renderer = rendererRef.current;
     if (!canvas || !renderer) return null;
@@ -144,7 +144,12 @@ export default function App() {
     const intersects = raycaster.intersectObject(renderer.getTerrainMesh());
     if (intersects.length === 0) return null;
     const point = intersects[0].point;
-    return { x: point.x, z: point.z, y: point.y };
+    const faceNormal = intersects[0].face?.normal?.clone();
+    let worldNormal: THREE.Vector3 | undefined;
+    if (faceNormal) {
+      worldNormal = faceNormal.clone().transformDirection(renderer.getTerrainMesh().matrixWorld).normalize();
+    }
+    return { x: point.x, z: point.z, y: point.y, normal: worldNormal?.toArray() as [number, number, number] | undefined };
   };
 
   const requestRender = () => {
@@ -174,7 +179,14 @@ export default function App() {
       lastTimeRef.current = now;
       tools[tool]?.onPointerMove?.(
         { project, commitStroke, requestRender, setHud },
-        { worldX: lastPaintHitRef.current.x, worldZ: lastPaintHitRef.current.z, dt, isDragging: true }
+        {
+          worldX: lastPaintHitRef.current.x,
+          worldY: lastPaintHitRef.current.y,
+          worldZ: lastPaintHitRef.current.z,
+          worldNormal: lastPaintHitRef.current.normal,
+          dt,
+          isDragging: true
+        }
       );
       paintLoopRef.current = requestAnimationFrame(run);
     };
@@ -207,7 +219,9 @@ export default function App() {
     pushHistory();
     const pointerState = {
       worldX: hit.x,
+      worldY: hit.y,
       worldZ: hit.z,
+      worldNormal: hit.normal,
       dt: 1 / 60,
       isDragging: true
     };
@@ -235,7 +249,7 @@ export default function App() {
       }
       tools[tool]?.onPointerMove?.(
         { project, commitStroke, requestRender, setHud },
-        { worldX: hit.x, worldZ: hit.z, dt, isDragging: true }
+        { worldX: hit.x, worldY: hit.y, worldZ: hit.z, worldNormal: hit.normal, dt, isDragging: true }
       );
     }
     const slope = getSlopeInfo(hit.x, hit.z);
@@ -262,7 +276,7 @@ export default function App() {
     const hit = getPointerHit(e);
     tools[tool]?.onPointerUp?.(
       { project, commitStroke, requestRender, setHud },
-      { worldX: hit?.x ?? 0, worldZ: hit?.z ?? 0, dt: 0, isDragging: false }
+      { worldX: hit?.x ?? 0, worldY: hit?.y ?? 0, worldZ: hit?.z ?? 0, worldNormal: hit?.normal, dt: 0, isDragging: false }
     );
     if (project.settings.autoSettle) {
       triggerSettle();

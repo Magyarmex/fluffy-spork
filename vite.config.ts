@@ -8,7 +8,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig(({ mode }) => ({
   plugins: [react()],
-  base: process.env.GITHUB_PAGES === 'true' ? repoBase : '/',
+  base: process.env.GITHUB_PAGES === 'true' ? repoBase : './',
   build: {
     sourcemap: true
   },
