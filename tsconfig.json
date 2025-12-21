@@ -13,7 +13,7 @@
     "jsx": "react-jsx",
     "strict": true,
     "baseUrl": "./src",
-    "types": ["vite/client", "node"],
+    "types": ["vite/client", "node", "vitest"],
     "paths": {
       "@core/*": ["core/*"],
       "@render/*": ["render/*"],

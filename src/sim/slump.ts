@@ -1,6 +1,6 @@
 import { neighbors8, indexFor } from '@core/grid';
-import { MATERIALS, materialFromIndex } from '@core/materials';
-import { ProjectModel } from '@core/project';
+import { MATERIALS } from '@core/materials';
+import { ProjectModel, materialFromIndex } from '@core/project';
 
 export interface SlumpConfig {
   maxIterations: number;

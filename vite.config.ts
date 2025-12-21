@@ -1,8 +1,10 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import path from 'path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const repoBase = '/fluffy-spork/';
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig(({ mode }) => ({
   plugins: [react()],
@@ -12,11 +14,11 @@ export default defineConfig(({ mode }) => ({
   },
   resolve: {
     alias: {
-      '@core': path.resolve(__dirname, 'src/core'),
-      '@render': path.resolve(__dirname, 'src/render'),
-      '@sim': path.resolve(__dirname, 'src/sim'),
-      '@tools': path.resolve(__dirname, 'src/tools'),
-      '@ui': path.resolve(__dirname, 'src/ui')
+      '@core': resolve(__dirname, 'src/core'),
+      '@render': resolve(__dirname, 'src/render'),
+      '@sim': resolve(__dirname, 'src/sim'),
+      '@tools': resolve(__dirname, 'src/tools'),
+      '@ui': resolve(__dirname, 'src/ui')
     }
   },
   define: {
