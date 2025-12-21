@@ -14,8 +14,10 @@ function createDefaultTerrain(resolution = DEFAULT_RESOLUTION) {
   const size = resolution * resolution;
   const heightGrid = new Float32Array(size);
   const materialGrid = new Uint8Array(size);
+  const lateralOffsetX = new Float32Array(size);
+  const lateralOffsetZ = new Float32Array(size);
   materialGrid.fill(materialIndex(DEFAULT_MATERIAL.id));
-  return { resolution, heightGrid, materialGrid };
+  return { resolution, heightGrid, materialGrid, lateralOffsetX, lateralOffsetZ, baseDepthCm: -6 };
 }
 
 function materialIndex(material) {

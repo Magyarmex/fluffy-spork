@@ -108,7 +108,9 @@ export const useStore = create<StoreState>((set, get) => ({
       terrain: {
         ...project.terrain,
         heightGrid: new Float32Array(project.terrain.heightGrid),
-        materialGrid: new Uint8Array(project.terrain.materialGrid)
+        materialGrid: new Uint8Array(project.terrain.materialGrid),
+        lateralOffsetX: new Float32Array(project.terrain.lateralOffsetX),
+        lateralOffsetZ: new Float32Array(project.terrain.lateralOffsetZ)
       }
     };
     set((state) => ({ project: copy, projects: [...projects, copy], history: new HistoryStack() }));
