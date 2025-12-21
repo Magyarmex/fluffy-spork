@@ -339,7 +339,7 @@ function simulateGrains(grains: Grain[], project: ProjectModel, originalHeights:
   return { collisions, peakSpeed, grainsTouchedFloor: touchedFloor };
 }
 
-function bakeGrainsToTerrain(grains: Grain[], project: ProjectModel) {
+function bakeGrainsToTerrain(grains: Grain[], project: ProjectModel, estimatedVolume: number, actualVolume: number) {
   const { terrain, tank } = project;
   const { resolution, baseDepthCm } = terrain;
   const dx = tank.widthCm / (resolution - 1);
@@ -347,10 +347,33 @@ function bakeGrainsToTerrain(grains: Grain[], project: ProjectModel) {
   const cellArea = dx * dz;
   const volumeGrid = new Float32Array(resolution * resolution);
 
+  if (grains.length === 0) {
+    recordDebug('warn', 'No grains to bake; terrain left unchanged');
+    return;
+  }
+
   for (const g of grains) {
     const grid = worldToGrid(g.x, g.z, resolution, tank);
     const idx = indexFor(grid.i, grid.j, resolution);
     volumeGrid[idx] += sphereVolume(g.radius);
+  }
+
+  let accumulatedVolume = 0;
+  for (let k = 0; k < volumeGrid.length; k++) {
+    accumulatedVolume += volumeGrid[k];
+  }
+
+  const targetVolume = Math.max(0, estimatedVolume);
+  const sourceVolume = Math.max(1e-6, actualVolume || accumulatedVolume);
+  const renormScale = targetVolume > 0 ? targetVolume / sourceVolume : 1;
+  if (!Number.isFinite(renormScale) || renormScale <= 0) {
+    recordDebug('error', 'Invalid renormalization scale for terrain bake', `target:${targetVolume} source:${sourceVolume}`);
+  } else if (renormScale !== 1) {
+    recordDebug(
+      'warn',
+      'Rescaled grain volume to preserve terrain mass',
+      `scale:${renormScale.toFixed(4)} target:${targetVolume.toFixed(2)} source:${sourceVolume.toFixed(2)}`
+    );
   }
 
   let minH = Number.POSITIVE_INFINITY;
@@ -358,7 +381,7 @@ function bakeGrainsToTerrain(grains: Grain[], project: ProjectModel) {
   for (let j = 0; j < resolution; j++) {
     for (let i = 0; i < resolution; i++) {
       const idx = indexFor(i, j, resolution);
-      const h = baseDepthCm + volumeGrid[idx] / cellArea;
+      const h = baseDepthCm + (volumeGrid[idx] * renormScale) / cellArea;
       const clamped = Math.min(project.tank.tankHeightCm, Math.max(baseDepthCm, h));
       terrain.heightGrid[idx] = clamped;
       minH = Math.min(minH, clamped);
@@ -372,7 +395,7 @@ export function runSlumpStep(project: ProjectModel): SlumpDiagnostics {
   const originalHeights = new Float32Array(project.terrain.heightGrid);
   const { grains, estimatedVolume, actualVolume, dropCount, totalGrainSizeMm, grainCount } = buildGrainsFromTerrain(project, MAX_GRAINS);
   const { collisions, peakSpeed, grainsTouchedFloor } = simulateGrains(grains, project, originalHeights);
-  bakeGrainsToTerrain(grains, project);
+  bakeGrainsToTerrain(grains, project, estimatedVolume, actualVolume);
 
   let peakSlope = 0;
   let unstableCount = 0;

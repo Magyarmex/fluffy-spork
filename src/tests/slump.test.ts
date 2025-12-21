@@ -69,4 +69,20 @@ describe('slump solver', () => {
     expect(diag.grainCount).toBeLessThanOrEqual(8000);
     expect(diag.grainsMoved).toBeGreaterThanOrEqual(0);
   });
+
+  it('preserves overall terrain mass after settling', () => {
+    const project = createProject('Mass');
+    project.terrain = createDefaultTerrain(64);
+    project.terrain.heightGrid.fill(12);
+
+    const beforeAvg =
+      project.terrain.heightGrid.reduce((sum, v) => sum + v, 0) / project.terrain.heightGrid.length;
+
+    const diag = runSlumpStep(project);
+
+    const afterAvg =
+      project.terrain.heightGrid.reduce((sum, v) => sum + v, 0) / project.terrain.heightGrid.length;
+    expect(afterAvg).toBeGreaterThan(beforeAvg - 1);
+    expect(diag.totalTransferCm).toBeGreaterThan(0);
+  });
 });
