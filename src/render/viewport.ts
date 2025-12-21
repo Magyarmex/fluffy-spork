@@ -16,6 +16,7 @@ export class ViewportRenderer {
   private waterPlane: THREE.Mesh;
   private tankLines: THREE.LineSegments;
   private defaultLeftAction: THREE.MOUSE | undefined;
+  private defaultEnableRotate = true;
   private paintingGuard = false;
 
   constructor(private canvas: HTMLCanvasElement, private project: ProjectModel) {
@@ -30,6 +31,7 @@ export class ViewportRenderer {
 
     this.controls = new OrbitControls(this.camera, canvas);
     this.defaultLeftAction = this.controls.mouseButtons?.LEFT ?? THREE.MOUSE.ROTATE;
+    this.defaultEnableRotate = this.controls.enableRotate;
     this.controls.target.set(...project.camera.target);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
@@ -147,9 +149,11 @@ export class ViewportRenderer {
     if (this.paintingGuard === active) return;
     this.paintingGuard = active;
     if (active) {
+      this.controls.enableRotate = false;
       this.controls.mouseButtons.LEFT = undefined as unknown as THREE.MOUSE;
       recordDebug('info', 'Disabled left-button camera controls while painting');
     } else {
+      this.controls.enableRotate = this.defaultEnableRotate;
       this.controls.mouseButtons.LEFT = this.defaultLeftAction ?? THREE.MOUSE.ROTATE;
       recordDebug('info', 'Restored left-button camera controls after painting');
     }

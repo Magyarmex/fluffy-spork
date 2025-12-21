@@ -199,6 +199,7 @@ export default function App() {
     lastTimeRef.current = performance.now();
     stopPaintingLoop();
     if (tool === 'paintMaterial') {
+      rendererRef.current?.setPaintingActive(true);
       paintingRef.current = true;
       lastPaintHitRef.current = hit;
       startPaintingLoop();
@@ -229,6 +230,7 @@ export default function App() {
     lastTimeRef.current = now;
     if (draggingRef.current) {
       if (tool === 'paintMaterial') {
+        rendererRef.current?.setPaintingActive(true);
         paintingRef.current = true;
         lastPaintHitRef.current = hit;
       }
@@ -252,6 +254,7 @@ export default function App() {
     if (!draggingRef.current) return;
     draggingRef.current = false;
     stopPaintingLoop();
+    rendererRef.current?.setPaintingActive(false);
     const hit = getPointerHit(e);
     tools[tool]?.onPointerUp?.(
       { project, commitStroke, requestRender, setHud },
