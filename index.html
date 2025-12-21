@@ -5,6 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="%BASE_URL%" />
     <title>Aquascape Lab</title>
+    <script>
+      // Redirect to the repo-scoped base when accidentally opened from github.io root,
+      // preventing 404s that try to load /src/main.tsx instead of the built bundle.
+      (function () {
+        const repoBase = '/fluffy-spork/';
+        const onGitHubPages = location.hostname.endsWith('.github.io');
+        if (onGitHubPages && !location.pathname.startsWith(repoBase)) {
+          console.warn('[AquascapeLab] Redirecting to repo base to load compiled assets');
+          location.replace(`${location.origin}${repoBase}`);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
