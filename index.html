@@ -1,25 +1,52 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <base href="%BASE_URL%" />
-    <title>Aquascape Lab</title>
-    <script>
-      // Redirect to the repo-scoped base when accidentally opened from github.io root,
-      // preventing 404s that try to load /src/main.tsx instead of the built bundle.
-      (function () {
-        const repoBase = '/fluffy-spork/';
-        const onGitHubPages = location.hostname.endsWith('.github.io');
-        if (onGitHubPages && !location.pathname.startsWith(repoBase)) {
-          console.warn('[AquascapeLab] Redirecting to repo base to load compiled assets');
-          location.replace(`${location.origin}${repoBase}`);
-        }
-      })();
-    </script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#04060d">
+  <title>NOVA TANKS · Loading…</title>
+  <style>
+    html,body{margin:0;height:100%;background:#04060d;color:#bfe9ff;font-family:system-ui,sans-serif}
+    body{display:grid;place-items:center}
+    #s{padding:24px;text-align:center;letter-spacing:.08em}
+  </style>
+</head>
+<body>
+<div id="s">Loading NOVA TANKS…</div>
+<script>
+(async () => {
+  const parts = Array.from({length:6}, (_, i) => `nova-gz/${String(i).padStart(2,'0')}.b64`);
+  try {
+    const texts = await Promise.all(parts.map(async p => {
+      const r = await fetch(p, {cache:'no-store'});
+      if (!r.ok) throw new Error(`${p}: ${r.status}`);
+      return r.text();
+    }));
+    const b64 = texts.join('').replace(/\s+/g,'');
+    const bin = atob(b64);
+    const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+    let html;
+    if ('DecompressionStream' in window) {
+      const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+      html = await new Response(stream).text();
+    } else {
+      await new Promise((resolve,reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js';
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+      html = new TextDecoder().decode(window.pako.ungzip(bytes));
+    }
+    document.open();
+    document.write(html);
+    document.close();
+  } catch (e) {
+    document.getElementById('s').textContent = 'NOVA TANKS failed to load. Refresh and try again.';
+    console.error(e);
+  }
+})();
+</script>
+</body>
 </html>
