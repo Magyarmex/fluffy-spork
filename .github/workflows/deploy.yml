@@ -1,42 +1,43 @@
-name: Deploy to GitHub Pages
+name: Materialize NOVA TANKS
 
 on:
   push:
     branches: [main]
+    paths:
+      - 'nova-gz/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: 'pages'
-  cancel-in-progress: true
+  contents: write
 
 jobs:
-  build:
+  unpack:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: npm install
-      - run: npm run build
-        env:
-          GITHUB_PAGES: 'true'
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
+      - name: Checkout
+        uses: actions/checkout@v4
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Rebuild plain HTML from the tested NOVA payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat nova-gz/*.b64 | tr -d '\r\n\t ' | base64 --decode | gzip --decompress > index.html.new
+          test -s index.html.new
+          grep -q 'NOVA TANKS' index.html.new
+          mv index.html.new index.html
+          echo "Materialized $(wc -c < index.html) bytes into index.html"
+
+      - name: Commit the plain page
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- index.html; then
+            echo 'index.html is already materialized; nothing to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git commit -m 'Materialize NOVA TANKS for GitHub Pages'
+          git push
