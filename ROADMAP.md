@@ -1,15 +1,69 @@
 # NOVA TANKS — Development Roadmap
 
-This roadmap is intentionally lightweight. It records high-value weaknesses and larger projects so autonomous development can continue them across multiple scheduled runs instead of forgetting discoveries between releases.
+This roadmap records high-value weaknesses and larger projects so autonomous development can continue them across multiple runs without losing context.
 
 ## Active priorities
 
+### P0 — Sniper reconnaissance, AI and counterplay validation
+**Status:** major AI/reconnaissance correction shipped in **v1.4.0 · Forward Observer**; live mobile playtesting remains required
+
+**Problem addressed:** Silent Horizon established the intended focus/counterplay rules, but the original AI implementation could retain a wall-clock focus timestamp after losing firing intent. An AI sniper could therefore reacquire a target with effectively banked charge and release almost immediately. Generic AI vision also let ranged/elite AI acquire targets at distances that did not respect the intended sniper information game.
+
+**Design objective:** A sniper may have extraordinary weapon reach, but not supernatural awareness. Long-range lethality should require a vulnerable reconnaissance chain and continuous execution.
+
+**Long-range interaction:**
+
+**Observer searches → contact acquired → sniper tracks → focus warnings → committed shot → recovery/reposition.**
+
+**Defender counterplay:**
+
+**Avoid/destroy observer → break contact → manipulate aim → suppress/intercept → exploit recovery → advance.**
+
+### Shipped in v1.4.0
+- Dedicated sniper-lineage AI rather than the generic brawler/ranged firing loop.
+- Ordinary bounded direct hull vision for sniper AI; no special elite long-range sight entitlement.
+- Remote targets require a live Forward Observer contact.
+- One real sniper drone becomes a destructible Forward Observer with extended patrol leash and independent field-of-view scanning.
+- Observer patrol behavior retains autonomous shape farming while searching.
+- Short-lived contact memory instead of permanent remote lock-on.
+- Sampled target motion and finite turret tracking rather than frame-perfect aim knowledge.
+- AI Rail charge accumulates only while a qualified firing solution is continuously maintained.
+- Lost alignment, lost target authorization, suppression, or lost spotter contact clears stored Rail focus.
+- Approximate full-focus requirements of 0.82 s normal / 0.70 s elite, followed by 1.60 s / 1.35 s post-shot recovery floors.
+- SPOTTED observer-contact cue.
+- Two-stage directional enemy Rail focus warning before release.
+- Actual in-flight Rail flyby audio based on projectile trajectory near the player.
+- Evolution menus clear hostile Rail focus before pause.
+- Evolution/perk/gene completion and dismissal clear stale fire input, grant short safety grace, force hostile Rail reacquisition, and collapse the large stat-upgrade tray.
+- Deployment CI now syntax-checks all runtime overlays and validates the release ledger JSON.
+
+### Next sniper work
+1. Playtest v1.4.0 specifically on mobile and measure whether SPOTTED → focus warning → shot is consistently perceptible in noisy fights.
+2. Tune observer patrol radius, FOV range/angle, contact memory and survivability so killing/evading reconnaissance is valuable without making the sniper helpless.
+3. Tune normal/elite focus and recovery timing from actual encounters rather than theoretical lethality.
+4. Verify that ordinary direct sight feels consistent with other tanks and that no other path grants remote target authorization.
+5. Improve observer sweep motion to be fully frame-rate-independent and tune its movement/search personality.
+6. Add terrain/line-of-sight systems that make observer positioning and sniper relocation more strategically interesting.
+7. Validate sniper-vs-Controller interactions: Controllers should be able to pressure/recon the firing area without receiving free exact-position information.
+8. Continue testing suppression and projectile interception under real frame pacing and mobile touch input.
+
+**Acceptance criteria:**
+- no AI Rail shot can be fired from banked focus after target/alignment loss;
+- remote sniper acquisition requires a living observer contact;
+- destroying or escaping the observer reliably breaks remote authorization after a short memory window;
+- a player has perceptible warning before an off-screen committed Rail attack;
+- elite AI is stronger through decisions/prediction, not extra omniscience or instant execution;
+- a successful defensive read creates usable time/space to advance;
+- evolution UI transitions cannot hand the player directly into an already-charged sniper shot.
+
+---
+
 ### P0 — Controller second-body playtesting and refinement
-**Status:** first full implementation shipped in **v1.3.0 · Second Body**
+**Status:** full implementation shipped in **v1.3.0 · Second Body**, polish in **v1.3.1**, defensive state repair added in **v1.4.0**
 
-**Problem addressed:** Controller combat previously delegated too much of PvP to autonomous nearest-target drones. The player largely supplied proximity while the swarm made targeting, pursuit and attack decisions, producing low-expression “walk into an enemy and hope the swarm wins” encounters.
+**Problem addressed:** Controller combat previously delegated too much PvP to autonomous nearest-target drones. The player supplied proximity while the swarm made most combat decisions.
 
-**Design objective:** Keep Controller farming convenient while making PvP about multitasking, geometry, formation control, target manipulation, sequencing, commitment and recall — all through NOVA's existing twin-stick controls.
+**Design objective:** Keep Controller farming convenient while making PvP about multitasking, geometry, formation control, target manipulation, sequencing, commitment and recall through NOVA's existing twin-stick controls.
 
 **Core principle:** **Autonomy handles chores. The player handles violence.**
 
@@ -17,104 +71,40 @@ This roadmap is intentionally lightweight. It records high-value weaknesses and 
 
 **Place command → establish geometry → designate/read → wind up → commit attack → recover/recall → reposition.**
 
-### Shipped in v1.3.0
-- Right-stick Swarm Vectoring for the true Controller lineage.
-- Analog command depth: stick displacement determines deployment distance rather than acting as a binary attack toggle.
-- Release-to-recall with real travel time and commitment.
-- Autonomous neutral-shape farming retained while idle.
-- Serious PvP pursuit removed from idle Controller autopilot.
-- Short-lived gun-hit DESIGNATE system.
-- Formation-first Controller PvP instead of nearest-target contact chasing.
-- Telegraph → late trajectory lock → committed dive → overshoot → recovery attack sequence.
-- Movement-feint and post-lock dodge counterplay.
-- Wind-up interruption by shooting the attacking drone.
-- Swept collision for high-speed drone dives.
-- Real drone HP, destruction and normal respawn consequences retained.
-- Distinct formation identities:
-  - Carrier wedge;
-  - Overlord far-side crescent;
-  - Warden phalanx;
-  - Hivemind rotating ring;
-  - Broodmother twin claws / calculated sacrifice;
-  - Citadel fortress wall;
-  - Valkyrie cavalry wing.
-- Existing Swarm and Bulwark abilities integrated into command behavior.
-- AI Controllers routed through the same command/formation/commitment/recovery rules.
-- Command Node, engagement zone, off-screen command marker, designation reticle, wind-up ring, locked dive vector, dash trail and phalanx-link presentation.
-- Procedural command, recall, designation, wind-up and launch SFX.
-- Brief in-game Controller control tutorial after evolution.
+### Shipped
+- Right-stick Swarm Vectoring and analog command depth.
+- Release-to-recall with real travel/commitment.
+- Autonomous neutral-shape farming while idle; active command for serious PvP.
+- Gun-hit DESIGNATE system.
+- Formation-first PvP and readable attack runs.
+- Movement-feint / post-lock dodge counterplay.
+- Interruptible wind-ups, destructible drones, swept dive collision.
+- Distinct Wedge, Crescent, Phalanx, Ring, Claw, Fortress Wall and Cavalry Wing identities.
+- Swarm/Bulwark integration.
+- AI Controller command/formation/commitment parity.
+- Command/formation/status visual language plus procedural SFX.
+- v1.4.0 invariant repair for invalid positions, stale targets, broken dash vectors, impossible phases and corrupt Command Nodes.
 
 ### Next Controller work
-1. Playtest on actual mobile hardware and tune command-depth mapping, Command Node legibility and how much thumb travel is comfortable during simultaneous hull movement.
-2. Tune wind-up/lock timing per lineage so attacks are readable without becoming trivial to dodge.
-3. Measure drone survival/respawn economics: losing a unit should matter but should not leave a Controller nonfunctional for excessive periods.
-4. Test whether designation duration and engagement-zone expansion reward hull aim without turning into disguised hard lock-on.
-5. Validate formation weaknesses in real combat:
-   - Overlord should be punishable if the crescent is pulled too far around a target;
-   - Warden/Citadel should be strong only when their wall is oriented correctly;
-   - Hivemind should lose meaningful coverage when it cascades too many attacks;
-   - Valkyrie should gain tempo at the cost of high-speed overcommitment;
-   - Broodmother sacrifice should create meaningful attrition decisions rather than free disposable damage.
-6. Improve enemy-controller readable information if a player cannot tell which drone is about to attack on a small phone screen.
-7. Explore terrain/obstacles that let skilled Controllers bend formations around cover while defenders break line geometry.
-8. Test Controller-vs-Sniper interaction: scouting pressure should force relocation or information, not grant free exact-position tracking.
-9. Profile Hivemind and large multi-Controller fights for mobile CPU/render cost.
-10. Keep the foreign Controller gene as a simpler autonomous support package unless testing suggests a lightweight command interaction can be added without hijacking another lineage's primary controls.
+1. Playtest command-depth mapping and simultaneous two-thumb control on actual mobile hardware.
+2. Tune wind-up/lock timing per lineage.
+3. Measure drone survival/respawn economics.
+4. Validate DESIGNATE duration and engagement-zone behavior.
+5. Validate real formation weaknesses and overextension punishability.
+6. Test large Hivemind/multi-Controller encounters for CPU/render cost and visual readability.
+7. Add terrain interactions that reward bending formations around obstacles and breaking enemy geometry.
+8. Continue adversarial testing of drone lifecycle/state transitions after evolutions, owner death, ability expiry and target destruction.
 
 **Acceptance criteria:**
-- an expert Controller can make the same drone count dramatically more effective than a novice;
-- a skilled defender can survive attacks that kill a stationary/predictable defender;
-- right-stick depth matters continuously and intuitively;
-- hull and swarm can be controlled in different directions at the same time;
-- Controller gun aim has strategic value through designation;
-- attack runs are readable and dodgeable after commitment;
-- movement feints before lock can alter attack prediction;
-- shooting a winding-up drone can reliably interrupt it;
-- overextending the swarm creates a punishable hull vulnerability;
-- formation rotation/redeployment takes enough time to make positioning matter;
-- each Controller evolution creates a visibly different geometric mastery problem;
-- idle shape farming remains low-friction;
-- AI Controllers obey the same interaction language;
-- real mobile play remains understandable without extra buttons or RTS-style UI.
-
-See [`DESIGN_PRINCIPLES.md`](./DESIGN_PRINCIPLES.md) for the Controller case study and governing second-body doctrine.
-
-See [`RELEASES.md`](./RELEASES.md) for the v1.3.0 implementation record.
+- expert Controllers substantially outperform novices with the same drone count;
+- skilled defenders can read, manipulate and evade attack runs;
+- right-stick depth remains intuitive;
+- hull and swarm can operate in different directions simultaneously;
+- overextension is punishable;
+- no invalid drone state can permanently strand or corrupt a squadron;
+- idle farming remains low-friction.
 
 ---
-
-### P1 — Sniper counterplay and skill duel
-**Status:** first implementation shipped in **v1.2.0 · Silent Horizon**; ongoing playtest/map refinement
-
-**Problem:** Sniper/Railgun combat previously had insufficient counterplay. Hypervelocity, high-damage, high-penetration shots could become effectively unavoidable, and the old projectile-interception system was not robust enough to support deliberate defense against them.
-
-On mobile, the sniper can be completely outside the player's field of view. The target may see only the incoming projectile, so counterplay cannot depend on visually tracking the sniper tank itself.
-
-**Design objective:** Preserve sniper lethality and the fantasy of a silent killer beyond visual range while turning sniper encounters into high-skill duels for both sides. Approaching classes should have mechanics that let good defensive reads translate into territory gained.
-
-**Core interaction loop:**
-
-**Detect bearing → manipulate aim → survive/intercept the shot → exploit recovery → take territory → repeat.**
-
-### Shipped in v1.2.0
-- Swept / continuous projectile-vs-projectile collision for hypervelocity rounds.
-- Explicit Rail projectile integrity decoupled from tank penetration.
-- Full-power Rail focus with approximately 520 ms commitment.
-- Progressive turret-aim commitment during deep focus.
-- Charge-scaled quick-shots when the player releases before full focus.
-- Directional off-screen glint for deeply focused enemy Rail snipers threatening the player lane.
-- Directional charge, incoming/flyby, full-discharge, and quick-shot procedural SFX.
-- Brief post-shot bearing reveal / visual cue for committed shots.
-- Accurate direct/near-miss suppression that can break deep focus.
-- AI Rail snipers routed through the same focus/commitment interaction rather than instant full-power fire.
-
-### Next sniper work
-1. Playtest/tune focus duration, aim-turn limits, suppression radius, quick-shot curves, and interception integrity on actual mobile combat.
-2. Measure whether successful defenses create enough practical territory gain without an artificial movement buff.
-3. Improve future map geometry around alternating exposed/protected spaces, flank routes, firing lanes, and non-permanent sniper positions.
-4. Add stronger firing-line/tracer persistence only if current bearing cues remain too ambiguous in practice.
-5. Continue improving sniper AI prediction, counter-baiting, relocation, and decision quality while preserving human-like execution constraints.
-6. Validate with actual gameplay that expert snipers and expert defenders both gain substantial mastery paths.
 
 ## Standing design requirement
 
