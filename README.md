@@ -8,7 +8,7 @@
 
 No install required — play directly in a modern browser on desktop or mobile.
 
-**Current release: v1.7.0 · Three Disciplines** — Gunner, Cannon and Guardian now have lineage-wide mastery systems built around cadence/recoil, programmable blast placement, and directional defense/committed momentum.
+**Current release: v1.7.1 · Apex Doctrine** — Tier-3 Gunner, Cannon and Guardian evolutions now turn the shared v1.7 disciplines into distinct mastery problems, while Cannon siege specialization finally interacts correctly with Battlefield cover.
 
 ---
 
@@ -22,9 +22,33 @@ NOVA TANKS should be a game **riddled with skill expression**. Powerful mechanic
 
 Every major system is expected to be evaluated for skill ceiling, readability, counterplay, positioning, prediction, timing, execution, punish windows, and two-sided mastery.
 
+### v1.7.1 · Apex Doctrine
+
+The Tier-3 descendants of the Three Disciplines no longer behave mainly like larger versions of their parents.
+
+**Gunner Apexes**
+- **Tempest:** broad high-output redline; overshooting it causes harsh recoil/recovery.
+- **Needle Storm:** narrow heat + stability precision gate for harder, faster ranged needles.
+- **Breachlord:** settled brace volley followed by a short punishable movement-recovery window.
+- **Flakmaster:** stability converts into tighter, faster, longer-lived ranged flak.
+
+**Cannon Apexes**
+- **Cluster King:** fuse depth controls child-bomb sector width as well as burst distance.
+- **Siege Bomber:** true structural pressure against destructible Battlefield cover.
+- **Annihilator:** deep fuse commitment buys stronger blast authority but increases the reload opening.
+- **Quake Cannon:** deeper programming increases displacement and shock geometry rather than simply inflating damage.
+
+**Guardian Apexes**
+- **Bastion:** nearly stationary frontal anchoring; moving or flanking breaks the posture.
+- **Aegis:** a successful Perfect Guard creates a brief mobility-flow window for repositioning.
+- **Meteor:** highest straight-line Stampede peak and harsh steering loss.
+- **Ravager:** lower peak impact but greater momentum retention through moderate steering.
+
+The patch also repairs a v1.7.0 integration gap: Cannon projectiles already carried structural specialization metadata, but Battlefield had not been consuming it. Siege pressure now reaches destructible cover while the normal Battlefield breach/rubble/feedback path remains authoritative.
+
 ### v1.7.0 · Three Disciplines
 
-The three legacy combat lineages have begun the same transformation already applied to Sniper and Controller.
+The three legacy combat lineages received the same skill-expression treatment already applied to Sniper and Controller.
 
 **Gunner — Fire Discipline**
 - Gunner weapons build heat while firing and cool when released.
@@ -35,7 +59,7 @@ The three legacy combat lineages have begun the same transformation already appl
 
 **Cannon — Fire Control**
 - Right-stick direction still aims normally.
-- Right-stick depth now programs the shell's detonation distance; mouse distance is the desktop equivalent.
+- Right-stick depth programs the shell's detonation distance; mouse distance is the desktop equivalent.
 - A visible **FUSE** reticle previews the burst point.
 - If a Cannon projectile reaches that point without colliding first, it airbursts while preserving its native splash or cluster behavior.
 - Battlefield cover makes blast placement and breach decisions part of Cannon mastery instead of merely an obstacle to shooting.
@@ -106,10 +130,9 @@ Browse release history: **[`RELEASES.md`](./RELEASES.md)**
 - Real line-of-sight for targeting, AI firing and Forward Observer contacts
 - Swept projectile-vs-terrain collision for hypervelocity rounds
 - Breachable cover, projectile punch-through rules and persistent rubble
-- Gunner heat, cadence, deterministic recoil and stability discipline
-- Cannon analog programmable fuses and visible airburst placement
-- Guardian directional armor, directional defensive abilities, Perfect Guard and Countershot
-- Juggernaut-line committed Stampede momentum
+- Gunner heat, cadence, deterministic recoil and Apex redline/precision/brace specializations
+- Cannon analog programmable fuses, visible airburst placement and Apex sector/siege/commitment specializations
+- Guardian directional armor, Perfect Guard, Countershot, anchoring and differentiated ram momentum
 - Branching tank lineages and late-game Apex evolutions
 - Cross-lineage gene splicing / hybridization
 - Expandable 36-class **Tank Intelligence & Showroom**
@@ -135,7 +158,7 @@ Browse release history: **[`RELEASES.md`](./RELEASES.md)**
 - Desktop and mobile browser play
 - GitHub Pages deployment
 - In-lobby version history and ongoing versioned development
-- Runtime JavaScript, release-data, Battlefield and Three Disciplines regression validation in CI
+- Runtime JavaScript, release-data, Battlefield, Three Disciplines and Apex Doctrine regression validation in CI
 
 ## Live game
 
@@ -147,15 +170,20 @@ The `main` branch is the canonical development branch. GitHub Pages serves the c
 
 NOVA TANKS uses semantic-style version numbers (`MAJOR.MINOR.PATCH`).
 
-### Latest — v1.7.0 · Three Disciplines
+### Latest — v1.7.1 · Apex Doctrine
+- Tempest redline, Needle Storm precision gate, Breachlord brace/recovery and Flakmaster ranged stability
+- Cluster King programmable child-bomb sectors, Siege structural pressure, Annihilator commitment/reload trade and Quake displacement programming
+- Bastion lane anchoring, Aegis Perfect Guard mobility flow, Meteor peak commitment and Ravager flexible momentum
+- repaired Cannon structural specialization against Battlefield cover
+- ten new Apex regression tests; complete 26-test Node suite and production build passing
+
+### v1.7.0 · Three Disciplines
 - Gunner heat/cadence/recoil/stability discipline
 - Cannon right-stick-depth fuse programming and visible airburst placement
 - Guardian frontal armor and directional BULWARK / IRON WILL
 - Perfect Guard → Countershot punish loop
 - Juggernaut-line straight-line Stampede momentum
 - AI parity for all three combat languages
-- lineage-specific audiovisual state feedback
-- dedicated v1.7 regression tests
 
 ### v1.6.0 · Battlefield
 - Crossfire, Split Horizon and Four Gates tactical layouts
@@ -166,7 +194,6 @@ NOVA TANKS uses semantic-style version numbers (`MAJOR.MINOR.PATCH`).
 - AI anti-stuck/path response around fortifications
 - Controller attack-run and Sniper reconnaissance integration
 - terrain-aware spawns, cover visuals and procedural SFX
-- Battlefield geometry regression tests
 
 ### v1.5.1 · Swarm Discipline
 - Blackglass mobile polish, coordinated drones, intelligent Observer search and lobby/showroom music
