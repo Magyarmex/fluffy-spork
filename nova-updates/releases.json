@@ -1,6 +1,42 @@
 {
-  "currentVersion": "1.3.1",
+  "currentVersion": "1.4.0",
   "releases": [
+    {
+      "version": "1.4.0",
+      "codename": "Forward Observer",
+      "date": "2026-08-07",
+      "headline": "Snipers need eyes before they can kill beyond sight.",
+      "groups": {
+        "Sniper AI": [
+          "Replaced the sniper lineage's generic AI combat loop with a dedicated tracking/firing model that uses sampled target motion, finite turret turn rates, aim commitment, and continuous focus instead of instant reacquisition.",
+          "Rail focus can no longer remain banked while an AI loses alignment or target intent; losing aim, target authorization, suppression, or spotter contact cancels the stored charge.",
+          "AI Railguns now need roughly 0.82 seconds of continuous qualified focus for a normal full shot (0.70 seconds for elite AI) and receive a post-shot recovery floor before another full attack cycle.",
+          "Long-range sniper targeting is no longer granted through the generic AI vision bonus. Sniper hull vision is deliberately limited; distant targets require a live spotter contact."
+        ],
+        "Spotter Drones": [
+          "The first drone in each sniper squad becomes a Forward Observer with an extended patrol leash, deliberate wide orbit, and its own rotating field-of-view cone.",
+          "Spotters patrol away from the sniper, opportunistically destroy nearby map shapes, and independently scan tanks inside their own field of view.",
+          "A valid spotter sighting grants only a short-lived contact relay; destroy the spotter or leave its view and the sniper loses distant target authorization after the contact memory expires.",
+          "Player snipers receive readable SPOT contact information from their observer without automatic aiming; enemy spotters are visually identifiable and therefore attackable counterplay."
+        ],
+        "Warning and Counterplay": [
+          "Being acquired by an enemy spotter now produces a distinct SPOTTED cue before the sniper firing sequence begins.",
+          "Enemy Rail focus against the player now has two directional pre-shot warning stages, a stronger mobile-readable edge glint, and a RAIL FOCUS cue before full release.",
+          "Rail rounds now trigger an actual near-player flyby crack based on their flight path, so the in-flight sound is no longer only a firing-time effect.",
+          "Sniper AI must rotate and maintain its committed aim before firing, preserving movement feints and suppression as real counterplay."
+        ],
+        "Evolution and Safety": [
+          "Opening an evolution milestone clears hostile banked Rail focus before the game pauses.",
+          "Completing or dismissing an evolution/perk/gene choice grants a short spawn-shield grace period, clears stale firing input, and forces enemy snipers to reacquire rather than firing immediately as the menu disappears.",
+          "The stat-upgrade tray is automatically minimized after evolution choices so it cannot strand the player behind a large mobile UI panel when combat resumes."
+        ],
+        "Drone and Stability Fixes": [
+          "Controller drone state now receives a defensive invariant pass for invalid positions, stale targets, broken dash vectors, impossible phases, and corrupt Command Nodes.",
+          "Invalid Controller drone states recover to a safe formation state instead of remaining stuck or propagating NaN movement through the swarm.",
+          "Runtime JavaScript syntax checks and release-JSON validation are now part of the GitHub materialization workflow before the playable page is regenerated."
+        ]
+      }
+    },
     {
       "version": "1.3.1",
       "codename": "Signal Bloom",
