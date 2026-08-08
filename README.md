@@ -1,89 +1,58 @@
-# Aquascape Lab
+# NOVA TANKS
 
-Aquascape Lab is a professional 3D substrate modeling workbench for designing aquariums in centimeter-accurate space. The MVP focuses on a deterministic heightfield terrain editor with material-aware settling, scaffolded Simulate/Analyze navigation, and GitHub Pages hosting.
+**An evolving browser-based tank arena game.** Build your tank, choose a lineage, evolve into increasingly specialized forms, splice traits across lineages, and survive an arena that keeps getting more dangerous.
 
-## Features
-- **Model tab** with orbit/pan/zoom 3D viewport, tank wireframe, waterline toggle, grid and axis helpers.
-- **Terrain**: 256×256 heightfield, real-world units (cm), precise world↔grid mapping, vertex-normal recompute on edits.
-- **Tools**: Raise, Lower, Smooth, Flatten-to-sampled, Flatten-to-absolute, Ramp, and Paint Material with brush radius/strength and linear/smoothstep falloff.
-- **Materials**: Fine Sand, Coarse Sand, Gravel, Soil with repose/cohesion presets and optional tint overlay.
-- **Slump solver**: Deterministic, incremental relaxation with cancel + progress indicator and auto-settle toggle.
-- **Undo/Redo**: Stroke-based history with hotkeys and capped depth.
-- **Projects**: Create, duplicate, rename, delete, select, autosave (IndexedDB), export/import full snapshot, camera persistence.
-- **Navigation**: View presets (Top/Front/Isometric), help overlay (`?`), status HUD with slope/position/height and terrain diagnostics.
-- **Scaffolding** for future Simulate (water flow, sediment) and Analyze (slope maps, volume, lighting) modules.
+## ▶️ PLAY NOW
 
-## Getting started
-```bash
-npm install
-npm run dev
-```
-Open the printed local URL (Vite dev server). The app targets modern browsers over HTTPS and is optimized for GitHub Pages hosting.
+### **[Launch NOVA TANKS →](https://magyarmex.github.io/fluffy-spork/)**
 
-### Scripts
-- `npm run dev` – Vite dev server
-- `npm run build` – Type-check + production build
-- `npm run test` – Node built-in tests (mapping, serialization roundtrip, slump invariants)
+No install required — play directly in a modern browser on desktop or mobile.
 
-## Controls & keybinds
-- Orbit/pan/zoom via mouse/trackpad (OrbitControls).
-- Tool hotkeys: `[1]` Raise, `[2]` Lower, `[3]` Smooth, `[4]` Flatten sampled, `[5]` Flatten absolute, `[6]` Ramp.
-- Undo: `Ctrl/Cmd+Z`; Redo: `Ctrl/Cmd+Shift+Z` or `Ctrl/Cmd+Y`.
-- `?` toggles the help overlay with quick references.
-- View presets on the right panel: Top, Front, Isometric.
+---
 
-## Tank sizing
-Use the **Tank** sliders/inputs (width, depth, tank height, waterline). Click **Reset to default tank** to restore 78×33×44cm with a 22cm waterline. Geometry, waterline, and world↔grid mapping update immediately.
+## About
 
-## Sculpting workflow
-1. Pick a tool in the left palette.
-2. Set brush radius (cm), strength (mm/s), falloff (linear/smoothstep), and absolute flatten height if needed.
-3. Click-drag on the terrain; strokes are dt-based and saved atomically. Brush preview shows radius; HUD shows X/Z/height/slope.
-4. Use **Settle terrain** to relax unstable slopes; toggle **Auto-settle after strokes** for continuous relaxation.
+NOVA TANKS is a fast browser arena game built around progression, specialization, hybridization, and increasingly powerful tank builds.
 
-## Materials
-Select a substrate preset (Fine Sand, Coarse Sand, Gravel, Soil) and use **Paint Material**. Enable **Debug tint overlay** to view subtle material coloration with a legend. Material strokes are undoable and captured per stroke.
+The game is also a **living project**: it is designed to continue evolving over time with new releases spanning gameplay, AI, maps, graphics, performance, quality of life, balance, controls, progression, and larger multi-update systems.
 
-## Substrate settling
-- Deterministic neighbor relaxation uses repose angle and cohesion per material.
-- Runs incrementally per frame with a progress indicator and cancel control.
-- Auto-saves on completion; auto-settle can run after each stroke.
+## Current systems
 
-## Projects, autosave, persistence
-- Projects store tank dimensions, terrain, materials, camera, settings, and resolution.
-- Autosaves after strokes and after settling. Manual **Save now** is available.
-- IndexedDB schema with last-project pointer; the last session restores automatically.
-- **Projects** panel: new, duplicate, delete, rename, picker dropdown.
-- **Export/Import**: saves a portable JSON bundle (versioned); importing creates/loads a new project.
+- Branching tank lineages and evolutions
+- Late-game Apex evolutions
+- Cross-lineage gene splicing / hybridization
+- Distinct weapon and combat archetypes
+- AI-controlled enemy tanks that progress alongside the player
+- Desktop and mobile browser play
+- GitHub Pages deployment
+- Ongoing versioned development and release history
 
-## Export/Import format
-Exports include metadata plus base64-encoded height/material grids. Imports validate the version and recreate arrays byte-for-byte.
+## Live game
 
-## Architecture overview
-```
-src/
-  core/    # project model, materials, grid mapping, serialization, persistence
-  render/  # three.js setup, terrain mesh, overlays, waterline/tank outline
-  sim/     # slump solver (deterministic), future simulation stubs
-  tools/   # tool interfaces, brush math, sculpt/material/ramp tools
-  ui/      # React UI, store (Zustand), navigation, panels, help overlay
-```
-- React + Vite + TypeScript + three.js, Zustand for app state.
-- Separation between simulation/modeling logic and UI rendering; tools mutate terrain via shared project model; renderer reads model.
+**Play:** https://magyarmex.github.io/fluffy-spork/
 
-## GitHub Pages deployment
-- Workflow `.github/workflows/deploy.yml` builds with `GITHUB_PAGES=true` base and deploys to GitHub Pages on pushes to `main`.
-- Enable Pages in repository settings using the **GitHub Actions** source; the published URL will be `https://<user>.github.io/fluffy-spork/`.
+The `main` branch is the canonical development branch. GitHub Pages serves the current playable release.
 
-## CI
-- `.github/workflows/ci.yml` runs install, build, and vitest on pushes/PRs.
+## Development direction
 
-## Manual QA checklist
-- ✅ Hosted on GitHub Pages URL loads with no console errors (after enabling Pages).
-- ✅ Sculpt 10 strokes → undo all → redo all restores terrain.
-- ✅ Material paint strokes undo/redo correctly.
-- ✅ Create extreme cliff → Settle → collapses into stable terrain.
-- ✅ FineSand settles more aggressively than Gravel/Soil (material-dependent).
-- ✅ Autosave restores work after refresh; last project restored on return.
-- ✅ Export project → import as new project → identical terrain/materials.
-- ✅ Sculpting at N=256 remains responsive (dt-based brush updates and incremental settling).
+NOVA TANKS is intended to improve across the entire game rather than only accumulate mechanics. Development may target:
+
+- Gameplay and game feel
+- Tank classes, evolutions and hybrids
+- Enemy AI and encounter design
+- Maps and environmental systems
+- Graphics, animation and visual feedback
+- UI, lobby and quality of life
+- Mobile controls and accessibility
+- Performance and rendering efficiency
+- Balance and progression
+- Bug fixes and deployment reliability
+- Larger multi-release projects
+
+## Releases
+
+NOVA TANKS uses semantic-style version numbers (`MAJOR.MINOR.PATCH`). New releases are intended to maintain a persistent changelog and browsable version history so the game's evolution remains visible over time.
+
+---
+
+### **[▶ PLAY NOVA TANKS](https://magyarmex.github.io/fluffy-spork/)**
