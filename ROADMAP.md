@@ -24,43 +24,40 @@ The lobby Evolution Tree expands into a complete 36-class animated dossier libra
 
 The arena has real tactical geometry instead of a featureless open field: Crossfire, Split Horizon and Four Gates; permanent walls/pillars; destructible cover; terrain-aware spawning and movement; swept projectile collision; real line-of-sight; AI cover response; Observer occlusion; Controller terrain constraints; and explicit battlefield presentation/SFX.
 
-### v1.7.0 — Three Disciplines
-**Status:** initial full lineage mechanics shipped; real-device tuning and deeper Apex differentiation next
+### v1.7.0–v1.7.1 — Three Disciplines / Apex Doctrine
+**Status:** lineage mechanics and Apex specialization shipped; real-device balance validation remains
 
-Gunner, Cannon and Guardian now have distinct mastery languages instead of remaining primarily aim/stat/cooldown classes.
+Gunner, Cannon and Guardian now have distinct mastery languages instead of remaining primarily aim/stat/cooldown classes, and their Tier-3 Apex forms now push those languages into different mastery problems rather than simply amplifying parent stats.
 
 #### Gunner — Fire Discipline
 - explicit heat accumulation/cooling;
-- sustainable mid-heat cadence window;
-- deterministic recoil/dispersion rather than random jams;
-- aim-turn stability and recovery;
-- physical hull recoil;
-- stable shotgun cone tightening;
-- AI heat parity and forced venting at excessive heat;
-- cyan heat/cadence/overheat presentation and procedural SFX.
+- sustainable cadence windows and deterministic recoil;
+- physical hull recoil and aim-turn stability;
+- shotgun bracing and controlled re-engagement;
+- **Tempest:** broad high-output redline with severe overshoot punishment;
+- **Needle Storm:** narrow heat/stability precision gate;
+- **Breachlord:** settled brace volley followed by a punishable recovery window;
+- **Flakmaster:** stability-driven ranged shotgun discipline;
+- AI obeys the same heat/recoil rules and must vent excessive heat.
 
 #### Cannon — Fire Control
 - right-stick direction aims while right-stick depth programs detonation distance;
 - desktop mouse distance uses the same fuse grammar;
-- visible FUSE/impact reticle;
-- direct collision takes precedence over programmed detonation;
-- surviving projectiles airburst at the chosen distance;
-- splash/cluster behavior survives the airburst;
-- very short fuses are less efficient than properly armed placement;
-- AI hunt fuses derive from legitimate target distance;
-- Battlefield cover/breach interaction makes blast placement a map-control decision.
+- visible FUSE/impact reticle and real airburst behavior;
+- **Cluster King:** fuse depth also controls child-bomb sector width;
+- **Siege Bomber:** true structural specialization against destructible cover;
+- **Annihilator:** deep-fuse blast authority traded for a larger reload opening;
+- **Quake Cannon:** deep programs increase displacement/shock geometry rather than raw damage;
+- repaired the previously unused structural-damage metadata so Cannon siege specialization now reaches Battlefield cover correctly.
 
 #### Guardian — Facing and Counterplay
-- frontal armor is directional and follows aim orientation;
-- defensive arc width/strength differs by evolution;
-- BULWARK / IRON WILL are directional rather than legacy omnidirectional protection;
-- short Perfect Guard activation window;
-- successful Perfect Guard stores Countercharge;
-- next projectile consumes Countercharge for a stronger/faster punish shot;
-- Juggernaut/Meteor/Ravager Stampede builds impact through straight-line commitment;
-- sharp turns and terrain impacts drain/dump charge;
-- body damage scales with earned Stampede momentum;
-- pink facing/counter/charge presentation and procedural SFX.
+- directional frontal armor and directional BULWARK / IRON WILL;
+- Perfect Guard timing stores Countercharge;
+- Stampede impact depends on earned straight-line momentum;
+- **Bastion:** stationary frontal lane anchoring, still vulnerable to movement/flanks;
+- **Aegis:** successful Perfect Guard creates a brief repositioning-flow window;
+- **Meteor:** highest straight-line peak with harsh steering loss;
+- **Ravager:** more flexible route control with a lower peak impact ceiling.
 
 See [`THREE_DISCIPLINES.md`](./THREE_DISCIPLINES.md) for the mechanic doctrine.
 
@@ -68,20 +65,22 @@ See [`THREE_DISCIPLINES.md`](./THREE_DISCIPLINES.md) for the mechanic doctrine.
 
 ## Active priorities
 
-### P0 — Three Disciplines real-device validation
-1. Tune Gunner heat gain/cooling so the cadence window is discoverable but not trivial to hold indefinitely.
-2. Tune physical recoil by chassis; Breachlord should feel violent without making mobile aiming unusable.
-3. Verify deterministic recoil feels learnable rather than merely noisy.
-4. Validate shotgun tightening against the original random pellet spread and prevent over-accurate long-range Breachlord behavior.
+### P0 — v1.7 real-device combat validation
+1. Tune Gunner heat gain/cooling so cadence bands are discoverable but not trivial to hold indefinitely.
+2. Verify Tempest redline punishment remains readable rather than merely frustrating on touch aim.
+3. Tune Breachlord physical recoil and its short recovery so the volley feels violent without making mobile control unusable.
+4. Validate Needle Storm and Flakmaster precision rewards do not erase their intended range weaknesses.
 5. Tune Cannon right-stick-depth mapping on actual phone hardware; minimum/mid/max fuse placement should all feel intentional.
-6. Validate airburst timing against Battlefield walls and destructible cover, especially large splash Apex forms.
-7. Make sure farming with Cannon remains comfortable enough despite manual fuse depth.
-8. Tune Guardian passive frontal reduction and active guard factors by branch.
-9. Tune Perfect Guard windows for touch latency while preserving bait/punish counterplay.
-10. Test Countershot reward strength versus low-reload Guardian forms and foreign Gunner/Sniper grafts.
-11. Tune Juggernaut/Meteor/Ravager charge build/drain around corners and terrain impacts.
-12. Improve elite AI discipline: better burst timing, fuse prediction and guard activation decisions without hidden knowledge.
-13. Validate all three lineages against Sniper/Controller on every Battlefield layout.
+6. Validate Cluster King sector-width control, especially around narrow Battlefield exits and Controller formations.
+7. Validate Siege Bomber structural pressure versus barricade HP so it opens routes without deleting cover as a system.
+8. Tune Annihilator deep-commit reward/reload risk and Quake displacement against fast/mobile builds.
+9. Tune Guardian passive frontal reduction and active guard factors by branch.
+10. Tune Perfect Guard windows for touch latency while preserving bait/punish counterplay.
+11. Validate Bastion anchor strength in choke points; flank pressure must remain meaningful.
+12. Validate Aegis flow duration so a good guard earns repositioning rather than a free escape.
+13. Tune Meteor/Ravager charge build and steering loss around real Battlefield corners.
+14. Validate all three lineages and their Apex forms against Sniper/Controller on every Battlefield layout.
+15. Improve elite AI discipline: better burst timing, fuse prediction, guard activation and route commitment without hidden knowledge.
 
 ### P0 — Real-device Battlefield validation
 1. Play Crossfire, Split Horizon and Four Gates on portrait mobile and verify obstacle density never overwhelms the touch camera.
@@ -93,33 +92,16 @@ See [`THREE_DISCIPLINES.md`](./THREE_DISCIPLINES.md) for the mechanic doctrine.
 7. Tune the number/placement of destructible barricades based on actual lane flow.
 8. Add explicit terrain-performance profiling for large Hivemind + projectile-heavy encounters.
 
-### P1 — v1.7 Apex specialization pass
-The lineage-wide mechanics are now present, but Tier-3 identity should push them in different directions rather than only sharing the parent discipline.
-
-Candidate targets:
-- **Tempest:** widest sustained cadence band but brutal recoil beyond it.
-- **Needle Storm:** narrow precision cadence with unusually high stability reward.
-- **Breachlord:** maximum recoil/brace cycle and devastating reset timing.
-- **Flakmaster:** longer-range stability mastery.
-- **Cluster King:** multi-stage sector programming.
-- **Siege Bomber:** deliberate breach/siege fuse identity.
-- **Annihilator:** maximum commitment and punish window around one programmed blast.
-- **Quake Cannon:** cover/lane shock interaction.
-- **Bastion:** narrow maximum-strength lane ownership.
-- **Aegis:** widest mobile defensive arc / strongest timing specialization.
-- **Meteor:** maximum straight-line momentum burst.
-- **Ravager:** more flexible aggressive momentum without becoming free steering.
-
 ### P1 — Living Arena
-**Target:** after v1.7
+**Target:** after v1.7 validation
 
 Upgrade neutral shapes from passive XP rocks into a low-stakes mechanical ecosystem and add an Arena Director that creates announced contested events instead of relying mainly on random powerups and periodic elites.
 
-### P1 — Apex identity pass beyond v1.7
-Ensure every Tier-3 Apex evolution across all five lineages changes mastery rather than only amplifying parent stats/geometry.
+### P1 — Apex identity pass beyond the Three Disciplines
+Ensure Tier-3 evolutions across the purple Sniper and green Controller lineages reach the same standard: mastery should change through geometry, information, timing, commitment or sequencing rather than only through larger stats.
 
 ### P1 — Runtime consolidation
-The canonical enhanced game is currently materialized from the stable compressed payload plus versioned runtime overlays. This has enabled safe incremental evolution, but the stack is now deep. Consolidate the shipped v1.2–v1.7 systems into a new canonical source baseline with regression coverage before hook ordering becomes a development hazard.
+The canonical enhanced game is currently materialized from the stable compressed payload plus versioned runtime overlays. This enabled safe incremental evolution, but the stack is now deep. Consolidate the shipped v1.2–v1.7 systems into a new canonical source baseline with regression coverage before hook ordering becomes a development hazard.
 
 ---
 
