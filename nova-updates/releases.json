@@ -1,6 +1,22 @@
 {
-  "currentVersion": "1.7.2",
+  "currentVersion": "1.7.3",
   "releases": [
+    {
+      "version": "1.7.3",
+      "codename": "Blackglass Fit",
+      "date": "2026-08-08",
+      "headline": "Portrait Blackglass gets a properly proportioned simulator and collision-free guidance.",
+      "groups": {
+        "Blackglass Fit": [
+          "Portrait Blackglass keeps the v1.7.2 single-column containment but replaces the fixed-height simulator with a responsive 4:3 display bay.",
+          "The mobile steering hint moves to a compact top-corner chip and reads DRAG TO STEER, separating it from the canvas-drawn LIVE CHASSIS SIMULATION footer.",
+          "Very narrow phones receive a slightly taller display ratio so the chassis stays visually spacious without reintroducing horizontal overflow."
+        ],
+        "Validation": [
+          "Added regression coverage for responsive simulator geometry, non-overlapping touch guidance, and stylesheet ordering after the containment layer."
+        ]
+      }
+    },
     {
       "version": "1.7.2",
       "codename": "Combined Arms",
