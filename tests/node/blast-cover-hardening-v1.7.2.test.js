@@ -44,3 +44,11 @@ test('edge exposure can produce partial rather than binary blast damage',()=>{
   g.splashAt(0,0,120,.5,2,0,'#fff',100);
   assert.ok(t.hp>50&&t.hp<100,`expected weighted partial exposure, hp=${t.hp}`);
 });
+
+test('blast context is recycled across explosions instead of allocated per splash',()=>{
+  const {Game}=load(),g=new Game(),t=tank();g.tanks=[t];g.firstTerrainHit=()=>null;
+  g.splashAt(0,0,120,.5,2,0,'#fff',1);const first=g.__v172HardBlast;
+  assert.ok(first);assert.equal(first.active,false);
+  g.splashAt(20,10,90,.5,2,0,'#fff',1);
+  assert.equal(g.__v172HardBlast,first);assert.equal(first.active,false);
+});
