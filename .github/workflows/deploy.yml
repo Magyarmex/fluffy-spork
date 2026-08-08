@@ -34,9 +34,8 @@ jobs:
           path = Path('index.html.new')
           html = path.read_text(encoding='utf-8')
 
-          # Expose the bundle registry just before boot so versioned runtime
-          # updates can wrap existing game modules without rebuilding or
-          # replacing the tested enhanced NOVA payload.
+          # Expose the bundle registry so versioned runtime modules can wrap
+          # tested game modules without rebuilding the canonical payload.
           define_marker = "  window.__defineModule = function (id, factory) {"
           if 'window.__novaModules = modules;' not in html:
               if define_marker not in html:
@@ -48,21 +47,21 @@ jobs:
               )
               html = html.replace(define_marker, exposed + define_marker, 1)
 
-          # Load the current runtime update after all bundled factories have
-          # registered but before main boots, allowing safe module wrapping.
-          script_path = './nova-updates/sniper-v1.2.0.js'
-          if script_path not in html:
-              pattern = r"window\.__bootModule\((['\"])main\1\);"
-              match = re.search(pattern, html)
-              if not match:
-                  raise SystemExit('NOVA boot marker not found')
-              boot = match.group(0)
-              injection = (
-                  '</script>\n'
-                  f'<script src="{script_path}"></script>\n'
-                  '<script>\n'
-                  + boot
-              )
+          # Runtime releases are ordered deliberately: gameplay patches first,
+          # then lobby/release UI. All load after module registration but before
+          # main boots.
+          scripts = [
+              './nova-updates/sniper-v1.2.0.js',
+              './nova-updates/lobby-history.js',
+          ]
+          pattern = r"window\.__bootModule\((['\"])main\1\);"
+          match = re.search(pattern, html)
+          if not match:
+              raise SystemExit('NOVA boot marker not found')
+          boot = match.group(0)
+          tags = ''.join(f'<script src="{s}"></script>\n' for s in scripts if s not in html)
+          if tags:
+              injection = '</script>\n' + tags + '<script>\n' + boot
               html = html[:match.start()] + injection + html[match.end():]
 
           path.write_text(html, encoding='utf-8')
@@ -70,6 +69,7 @@ jobs:
 
           grep -q '__novaModules' index.html.new
           grep -q 'nova-updates/sniper-v1.2.0.js' index.html.new
+          grep -q 'nova-updates/lobby-history.js' index.html.new
           mv index.html.new index.html
           echo "Materialized $(wc -c < index.html) bytes into index.html"
 
