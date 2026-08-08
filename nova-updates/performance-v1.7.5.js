@@ -77,7 +77,7 @@ function ensureIndex(g){
   var terrain=g.__novaTerrain;if(!terrain)return null;
   var ix=g.__novaPerfTerrainIndex;
   if(ix&&ix.terrain===terrain&&ix.length===terrain.length)return ix;
-  ix={terrain:terrain,length:terrain.length,cells:Object.create(null),stamp:0,cell:CELL};
+  ix={terrain:terrain,length:terrain.length,cells:Object.create(null),stamp:0,cell:CELL,scratch:[]};
   for(var i=0;i<terrain.length;i++){
     var s=terrain[i],b=bounds(s,0),x0=Math.floor(b.x0/CELL),x1=Math.floor(b.x1/CELL),y0=Math.floor(b.y0/CELL),y1=Math.floor(b.y1/CELL);
     for(var x=x0;x<=x1;x++)for(var y=y0;y<=y1;y++){
@@ -92,7 +92,7 @@ function segmentCandidates(g,ax,ay,bx,by,pad){
   pad=pad||0;
   var x0=Math.floor((Math.min(ax,bx)-pad)/CELL),x1=Math.floor((Math.max(ax,bx)+pad)/CELL),y0=Math.floor((Math.min(ay,by)-pad)/CELL),y1=Math.floor((Math.max(ay,by)+pad)/CELL);
   var cells=(x1-x0+1)*(y1-y0+1);if(cells>80)return ix.terrain;
-  var out=[],stamp=++ix.stamp;if(stamp>0x3fffffff){ix.stamp=stamp=1;for(var r=0;r<ix.terrain.length;r++)ix.terrain[r].__novaPerfStamp=0;}
+  var out=ix.scratch;out.length=0;var stamp=++ix.stamp;if(stamp>0x3fffffff){ix.stamp=stamp=1;for(var r=0;r<ix.terrain.length;r++)ix.terrain[r].__novaPerfStamp=0;}
   for(var x=x0;x<=x1;x++)for(var y=y0;y<=y1;y++){
     var bucket=ix.cells[cellKey(x,y)];if(!bucket)continue;
     for(var i=0;i<bucket.length;i++){var s=bucket[i];if(s.__novaPerfStamp===stamp)continue;s.__novaPerfStamp=stamp;out.push(s);}
@@ -118,6 +118,16 @@ function callWithoutFirstHit(g,fn,a,b,c,d){
   var own=Object.prototype.hasOwnProperty.call(g,'firstTerrainHit'),prev=g.firstTerrainHit;
   g.firstTerrainHit=null;
   try{return fn.call(g,a,b,c,d);}finally{if(own)g.firstTerrainHit=prev;else delete g.firstTerrainHit;}
+}
+function moveWithCachedWaypoint(g,fn,t,vx,vy,dt){
+  var a=t&&t.ai,sp=Math.hypot(vx||0,vy||0),wp=a&&a.__v172Waypoint,now=g.time||0;
+  if(wp&&((a.__v172WaypointUntil||0)<now||d2(t.x,t.y,wp.x,wp.y)<34*34))wp=null;
+  if(wp&&sp>18){
+    var ux=vx/sp,uy=vy/sp,dx=wp.x-t.x,dy=wp.y-t.y,m=Math.hypot(dx,dy)||1,qx=dx/m,qy=dy/m;
+    var sx=ux*.42+qx*.58,sy=uy*.42+qy*.58,sm=Math.hypot(sx,sy)||1;
+    vx=sx/sm*sp;vy=sy/sm*sp;a.__v172Routing=true;a.wanderA=Math.atan2(vy,vx);
+  }else if(a)a.__v172Routing=false;
+  return callWithoutFirstHit(g,fn,t,vx,vy,dt);
 }
 
 wrap('game/engine',function(engine,require){
@@ -147,8 +157,8 @@ wrap('game/engine',function(engine,require){
   if(oldMove)Game.prototype.moveTank=function(t,vx,vy,dt){
     if(!t||t.isPlayer||!t.ai||!this.firstTerrainHit)return oldMove.call(this,t,vx,vy,dt);
     var a=t.ai,now=this.time||0,next=a.__novaPerfRouteProbeAt;
-    if(next==null){a.__novaPerfRouteProbeAt=now+.018+((Math.abs(t.id||0)%6)*.011);perfState(this).aiRouteFramesSkipped++;return callWithoutFirstHit(this,oldMove,t,vx,vy,dt);}
-    if(now+1e-6<next){perfState(this).aiRouteFramesSkipped++;return callWithoutFirstHit(this,oldMove,t,vx,vy,dt);}
+    if(next==null){a.__novaPerfRouteProbeAt=now+.018+((Math.abs(t.id||0)%6)*.011);perfState(this).aiRouteFramesSkipped++;return moveWithCachedWaypoint(this,oldMove,t,vx,vy,dt);}
+    if(now+1e-6<next){perfState(this).aiRouteFramesSkipped++;return moveWithCachedWaypoint(this,oldMove,t,vx,vy,dt);}
     a.__novaPerfRouteProbeAt=now+AI_ROUTE_STEP+((Math.abs(t.id||0)%3)*.004);perfState(this).aiRouteFramesPlanned++;
     return oldMove.call(this,t,vx,vy,dt);
   };
