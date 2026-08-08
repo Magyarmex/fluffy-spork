@@ -72,17 +72,29 @@ wrap('game/input',function(input){
     return null;
   };
 
+  function resolveStickDom(self){
+    var dom=self.__novaStickDom||(self.__novaStickDom={moveBase:null,moveKnob:null,aimBase:null,aimKnob:null});
+    var moveOk=dom.moveBase&&dom.moveBase.isConnected,aimOk=dom.aimBase&&dom.aimBase.isConnected;
+    if((!self.move.active||moveOk)&&(!self.aim.active||aimOk))return dom;
+    var root=self.canvas&&(self.canvas.parentElement||document),bases=root&&root.querySelectorAll?root.querySelectorAll('.stick-base'):[];
+    for(var i=0;i<bases.length;i++){
+      var base=bases[i],w=parseFloat(base.style.width)||0;
+      if(w>=120){dom.moveBase=base;dom.moveKnob=base.querySelector?base.querySelector('.stick-knob'):null;}
+      else{dom.aimBase=base;dom.aimKnob=base.querySelector?base.querySelector('.stick-knob'):null;}
+    }
+    return dom;
+  }
+  function paintOne(base,knob,s,radius,knobBase){
+    if(!base||!base.isConnected)return false;
+    base.style.left=(s.ox-radius)+'px';base.style.top=(s.oy-radius)+'px';
+    if(knob){knob.style.left=(knobBase+s.dx)+'px';knob.style.top=(knobBase+s.dy)+'px';}
+    return true;
+  }
   function paintSticks(self){
     if(typeof document==='undefined'||!self.canvas)return;
-    var root=self.canvas.parentElement||document,bases=root.querySelectorAll?root.querySelectorAll('.stick-base'):[];
-    for(var i=0;i<bases.length;i++){
-      var base=bases[i],w=parseFloat(base.style.width)||0,kind=w>=120?'move':'aim',s=kind==='move'?self.move:self.aim;
-      if(!s||!s.active)continue;
-      var radius=kind==='move'?62:58,knobBase=kind==='move'?36:34;
-      base.style.left=(s.ox-radius)+'px';base.style.top=(s.oy-radius)+'px';
-      var knob=base.querySelector&&base.querySelector('.stick-knob');
-      if(knob){knob.style.left=(knobBase+s.dx)+'px';knob.style.top=(knobBase+s.dy)+'px';}
-    }
+    var dom=resolveStickDom(self);
+    if(self.move.active&&!paintOne(dom.moveBase,dom.moveKnob,self.move,62,36)){dom.moveBase=null;dom.moveKnob=null;}
+    if(self.aim.active&&!paintOne(dom.aimBase,dom.aimKnob,self.aim,58,34)){dom.aimBase=null;dom.aimKnob=null;}
   }
   function ensurePainter(self){
     if(self.__novaStickPaintRaf||typeof requestAnimationFrame!=='function')return;
@@ -99,7 +111,7 @@ wrap('game/input',function(input){
     /* React only owns mount/unmount of the stick layer. Position is painted
        directly from the live Input state, avoiding an App-wide render at
        pointer frequency while preserving one visual update per display frame. */
-    if(flags[kind]!==active){flags[kind]=active;if(this.onStickChange)this.onStickChange(kind,s);}
+    if(flags[kind]!==active){flags[kind]=active;if(this.__novaStickDom){if(kind==='move'){this.__novaStickDom.moveBase=null;this.__novaStickDom.moveKnob=null;}else{this.__novaStickDom.aimBase=null;this.__novaStickDom.aimKnob=null;}}if(this.onStickChange)this.onStickChange(kind,s);}
     if(active)ensurePainter(this);
   };
 
@@ -127,7 +139,7 @@ wrap('game/input',function(input){
     if(canvas&&this.__novaRectOriginal)canvas.getBoundingClientRect=this.__novaRectOriginal;
     if(typeof window!=='undefined'&&refresh){window.removeEventListener('resize',refresh);window.removeEventListener('scroll',refresh,true);if(window.visualViewport)window.visualViewport.removeEventListener('resize',refresh);}
     if(this.__novaRectObserver){try{this.__novaRectObserver.disconnect();}catch(_){}this.__novaRectObserver=null;}
-    this.__novaRectOriginal=null;this.__novaCachedRect=null;this.__novaRectRefresh=null;
+    this.__novaRectOriginal=null;this.__novaCachedRect=null;this.__novaRectRefresh=null;this.__novaStickDom=null;
     return oldDetach.call(this);
   };
 });
@@ -162,6 +174,19 @@ wrap('game/engine',function(engine){
     }
     for(var j=0;j<this.shapes.length;j++){var z=this.shapes[j],qq=d2(x,y,z.x,z.y);if(qq<bd){bd=qq;best=z;}}
     return best;
+  };
+
+  var oldPerfSnapshot=Base.prototype.novaPerfSnapshot;
+  if(oldPerfSnapshot)Base.prototype.novaPerfSnapshot=function(){
+    var out=oldPerfSnapshot.call(this),p=this.__novaPerf||{},q=p.battlefieldQueries||0;
+    out.battlefieldQueries=q;out.battlefieldCandidates=p.battlefieldCandidates||0;out.battlefieldAvgCandidates=q?(p.battlefieldCandidates||0)/q:0;out.entityHashBucketCreates=this.hash&&this.hash.__novaBucketCreates||0;
+    return out;
+  };
+  var oldUpdate=Base.prototype.update;
+  if(oldUpdate)Base.prototype.update=function(dt){
+    var out=oldUpdate.call(this,dt),last=window.__NOVA_PERF_LAST__;
+    if(last&&last!==this.__novaPerf2LastGlobal){this.__novaPerf2LastGlobal=last;var p=this.__novaPerf||{},q=p.battlefieldQueries||0;last.battlefieldQueries=q;last.battlefieldAvgCandidates=q?+((p.battlefieldCandidates||0)/q).toFixed(2):0;last.entityHashBucketCreates=this.hash&&this.hash.__novaBucketCreates||0;}
+    return out;
   };
 
   /* Constructor work (seedShapes) happens before a subclass can initialize
