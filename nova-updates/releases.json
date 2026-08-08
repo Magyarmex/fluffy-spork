@@ -1,6 +1,44 @@
 {
-  "currentVersion": "1.5.1",
+  "currentVersion": "1.6.0",
   "releases": [
+    {
+      "version": "1.6.0",
+      "codename": "Battlefield",
+      "date": "2026-08-08",
+      "headline": "The arena becomes terrain: cover, lanes, line-of-sight and breachable ground.",
+      "groups": {
+        "Battlefield Geometry": [
+          "Each run now uses one of three mirrored tactical battlefield layouts: Crossfire, Split Horizon, or Four Gates.",
+          "Permanent walls and pillars create real firing lanes, protected crossings, flank routes, choke points, side pockets and contested approaches without turning the arena into a maze.",
+          "Destructible barricades create temporary cover that can be cracked, breached and permanently converted into non-blocking rubble during the run.",
+          "Tank, AI, shape and powerup spawn placement is terrain-aware so entities do not materialize inside solid geometry."
+        ],
+        "Line of Sight and Projectile Physics": [
+          "Solid terrain blocks automatic target acquisition and AI firing authorization; targets behind cover are not valid free aim-assist or AI shots.",
+          "Forward Observers also require unobstructed terrain line-of-sight before a remote sniper contact remains valid.",
+          "Projectile-to-terrain collision uses swept segment tests, so fast Rail and precision rounds cannot tunnel through thin walls between frames.",
+          "Permanent fortifications stop projectiles. Destructible cover absorbs projectile damage and splash, with shells dealing extra structural damage.",
+          "A high-penetration projectile may punch through a barricade only when that impact actually destroys it and the projectile retains enough penetration/integrity."
+        ],
+        "Movement, Drones and AI": [
+          "Tanks, drones and neutral shapes physically collide with battlefield geometry and slide along it instead of ghosting through walls.",
+          "AI loses firing permission through occlusion and changes path/strafe intent after repeated terrain bumps instead of continuously pushing into a wall.",
+          "Controller drones remain terrain-constrained during farming, defense, formation and manual command. A committed drone dash that hits a wall aborts into recovery rather than dealing impossible through-wall damage.",
+          "Controller Command Nodes can still be placed tactically beyond cover, but the squad must physically reach the space rather than teleporting its threat through geometry."
+        ],
+        "Sniper and Observer Tactics": [
+          "Cover can now break a sniper reconnaissance chain without killing the Observer: suspicion may guide the scout toward activity, but actual contact requires a clear cone and clear terrain sight.",
+          "Sniper hulls retain ordinary direct sight, so walls create genuine approach windows, relocation choices and Observer-positioning decisions.",
+          "The result is a real detect → acquire → line up → fire interaction layered on top of Silent Horizon and Violet Doctrine rather than simple long-range visibility."
+        ],
+        "Presentation and Validation": [
+          "Fortifications use layered shadows, neon rim lighting, damage cracks, impact flashes and persistent rubble so collision geometry is visually explicit.",
+          "A compact battlefield strip names the current layout and reports remaining destructible cover without adding another control surface.",
+          "Added procedural cover impact, breach and terrain-scrape SFX with restrained particles/camera response.",
+          "Node regression tests cover Battlefield release wiring, line-of-sight blocking, swept thin-wall collision and terrain-aware spawn safety."
+        ]
+      }
+    },
     {
       "version": "1.5.1",
       "codename": "Swarm Discipline",
