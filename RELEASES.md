@@ -2,6 +2,53 @@
 
 This file is the durable source-controlled release ledger for the living NOVA TANKS game. Public versions use `MAJOR.MINOR.PATCH` numbering and are never reused.
 
+## v1.4.1 — Violet Doctrine
+**Released:** 2026-08-07  
+**Theme:** Full purple-lineage sniper doctrine, non-beam precision commitment, observer-denial counterplay
+
+### Lineage-wide reconnaissance
+- **Marksman, Railgun, Ghost, Singularity, Prism Rail, Specter, and Assassin** now explicitly share the same Forward Observer doctrine.
+- Every purple AI tank is limited to ordinary **720-unit direct hull vision**. Targets outside that distance require a valid observer contact.
+- Forward Observer information remains approximate combat authorization rather than automatic aim for the player.
+- The shared sniper identity is now reconnaissance, information control, finite acquisition, readable commitment, and punishability — not simply “has a Rail beam.”
+
+### Non-beam precision commitment
+The non-beam purple tanks no longer fire instantly when generic aim alignment happens to pass. They build a short continuous precision solution before long-range shots:
+
+- **Marksman:** 0.42 s remote sight dwell; deliberate baseline precision rifle.
+- **Ghost:** 0.34 s remote ambush dwell; faster commitment and shorter reveal to preserve cloak/phase identity.
+- **Specter:** 0.24 s remote hunt dwell; fastest precision cycle and shortest recovery for repeated angle creation.
+- **Assassin:** 0.54 s remote execution dwell; longest commitment and strongest reveal/recovery cost to support its heavy alpha strike.
+
+Within direct sight these dwell times shorten, so successfully closing distance changes the matchup instead of simply disabling the purple tank.
+
+- Switching targets resets preparation.
+- A meaningful gap in firing intent resets preparation.
+- Losing remote observer authorization resets preparation.
+- Accurate hits or close threatening suppression can break preparation.
+- Each successful shot has a class-specific minimum recovery and brief firing-bearing reveal.
+
+### Warning and projectile language
+- Marksman, Ghost, Specter, and Assassin receive two-stage directional pre-shot warning SFX when preparing dangerous distant attacks against the player.
+- Late commitment uses class-flavored **SIGHT LOCK**, **AMBUSH LOCK**, **HUNT LOCK**, and **EXEC LOCK** cues.
+- Off-screen preparation gets restrained purple edge indicators without revealing exact coordinates.
+- Non-beam sniper projectiles receive readable violet motion trails.
+- A precision round passing close to the player produces a true trajectory-based flyby sound.
+- Committed non-beam shots briefly expose their firing bearing, preserving the **read → survive → take initiative** loop established by Silent Horizon.
+
+### Forward Observer denial
+- Destroying the active Forward Observer now causes approximately **3.4 seconds of observer-relay downtime**.
+- A spare escort may physically continue operating, but the sniper cannot consume remote contacts during relay reboot.
+- The sniper remains fully capable inside ordinary direct sight, so destroying the observer removes remote information rather than switching the weapon off.
+- Player purple tanks receive **OBSERVER DOWN · LOCAL SIGHT ONLY**, a relay countdown, and **OBSERVER LINK RESTORED** feedback.
+- Shooting the observer therefore creates a genuine approach/repositioning window instead of merely causing another escort to inherit the SPOT label immediately.
+
+### Rail identity preserved
+- **Railgun, Singularity, and Prism Rail** keep the deeper beam-specific mechanics from Silent Horizon and Forward Observer: focus-to-fire, charge-scaled quick shots, beam aim commitment, explicit Rail projectile integrity, swept interception, Rail-denial feedback, and Rail-specific warning/flyby behavior.
+- Violet Doctrine deliberately does **not** make every purple class a Railgun. It spreads the information/counterplay doctrine while keeping weapon cadence and class mastery distinct.
+
+---
+
 ## v1.4.0 — Forward Observer
 **Released:** 2026-08-07  
 **Theme:** Sniper AI correction, reconnaissance, evolution safety, drone stability
