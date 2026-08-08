@@ -8,7 +8,7 @@
 
 No install required — play directly in a modern browser on desktop or mobile.
 
-**Current release: v1.7.1 · Apex Doctrine** — Tier-3 Gunner, Cannon and Guardian evolutions now turn the shared v1.7 disciplines into distinct mastery problems, while Cannon siege specialization finally interacts correctly with Battlefield cover.
+**Current release: v1.7.2 · Combined Arms** — Battlefield and Three Disciplines now interact as one system: explosions respect cover, AI routes around terrain and remembers only legitimately seen positions, Cannons preview real wall impacts and can intentionally breach, Controller drones route around corners, and Blackglass is hard-contained on portrait phones.
 
 ---
 
@@ -21,6 +21,32 @@ NOVA TANKS is a fast browser arena game built around progression, specialization
 NOVA TANKS should be a game **riddled with skill expression**. Powerful mechanics should create opportunities to read, respond, outplay, and punish rather than producing unavoidable stat-check outcomes.
 
 Every major system is expected to be evaluated for skill ceiling, readability, counterplay, positioning, prediction, timing, execution, punish windows, and two-sided mastery.
+
+### v1.7.2 · Combined Arms
+
+This patch continues both the v1.6 Battlefield and v1.7 Three Disciplines tracks by making the systems interact instead of behaving as separate overlays.
+
+**Battlefield intelligence**
+- AI tanks predict short-range terrain collisions and choose local corner waypoints before grinding into walls.
+- AI remembers the last position where it actually had line-of-sight to an opponent, investigates that location briefly, and does **not** update hidden coordinates until legitimate reacquisition.
+- Controller drones use the same short-horizon corner routing during formation, farming, defense and recall. Locked attack dives remain committed and still crash into cover.
+- Cannons can deliberately fire at a destructible barricade blocking a recent legitimate contact instead of pretending they can target through it.
+
+**Cover physics**
+- Hard cover now occludes splash damage as well as direct projectiles and sight.
+- Hull exposure is sampled across the target so a tank peeking around a wall can receive partial blast damage without taking full explosion damage through solid cover.
+- Guardian Countershots gain modest structural pressure, allowing a successful defensive read to convert into limited map-opening pressure without replacing Cannon breach identity.
+
+**Cannon × Battlefield**
+- The orange fuse display now distinguishes the desired **FUSE** point from the actual earlier **IMPACT** point when terrain blocks the programmed distance.
+- Destructible-cover impact previews include current cover integrity.
+- Apex Cannon structural specialization continues through Battlefield's canonical cover break, rubble, XP and audiovisual feedback systems.
+
+**Blackglass containment**
+- Fixed the portrait regression shown on real Android hardware where the old three-column desktop dossier could reappear and overflow beyond the phone screen.
+- The root cause was stylesheet order: the historical mobile polish loaded before the base showroom stylesheet was injected at DOMContentLoaded, allowing the base rules to win later.
+- Portrait/coarse-pointer devices now force a true bounded single-column layout: dossier rail → animated chassis → identity → telemetry → trait graft lab.
+- Hard width/min-width/overflow constraints keep cards, stats, descriptions and graft rows inside the viewport, and the containment stylesheet automatically reasserts itself after the base showroom stylesheet appears.
 
 ### v1.7.1 · Apex Doctrine
 
@@ -128,10 +154,13 @@ Browse release history: **[`RELEASES.md`](./RELEASES.md)**
 - Three tactical Battlefield layouts with permanent terrain and destructible cover
 - Terrain-aware tank/drone/shape movement and spawn safety
 - Real line-of-sight for targeting, AI firing and Forward Observer contacts
+- Predictive short-horizon AI and drone corner routing around visible Battlefield geometry
+- Legitimate last-seen AI memory without hidden-coordinate tracking
 - Swept projectile-vs-terrain collision for hypervelocity rounds
+- Blast occlusion and partial hull exposure around hard cover
 - Breachable cover, projectile punch-through rules and persistent rubble
 - Gunner heat, cadence, deterministic recoil and Apex redline/precision/brace specializations
-- Cannon analog programmable fuses, visible airburst placement and Apex sector/siege/commitment specializations
+- Cannon analog programmable fuses, terrain-aware IMPACT previews and Apex sector/siege/commitment specializations
 - Guardian directional armor, Perfect Guard, Countershot, anchoring and differentiated ram momentum
 - Branching tank lineages and late-game Apex evolutions
 - Cross-lineage gene splicing / hybridization
@@ -139,7 +168,7 @@ Browse release history: **[`RELEASES.md`](./RELEASES.md)**
 - Animated class previews generated from canonical hull/barrel/weapon/drone data
 - Per-class catchphrases, evolution paths, tactical descriptions and telemetry
 - Foreign Trait Graft Lab with build-specific before → after effects
-- Responsive desktop/mobile Blackglass inspection layout
+- Hard-contained desktop/mobile Blackglass inspection layout with portrait touch fallback
 - Full purple-lineage Forward Observer reconnaissance doctrine
 - Suspicion-driven intelligent Observer search and long-range relay visualization
 - Class-specific non-beam precision preparation and staged warning language
@@ -158,7 +187,7 @@ Browse release history: **[`RELEASES.md`](./RELEASES.md)**
 - Desktop and mobile browser play
 - GitHub Pages deployment
 - In-lobby version history and ongoing versioned development
-- Runtime JavaScript, release-data, Battlefield, Three Disciplines and Apex Doctrine regression validation in CI
+- Runtime JavaScript, release-data, Battlefield, Three Disciplines, Apex Doctrine, Combined Arms and Blackglass containment regression validation in CI
 
 ## Live game
 
@@ -170,12 +199,20 @@ The `main` branch is the canonical development branch. GitHub Pages serves the c
 
 NOVA TANKS uses semantic-style version numbers (`MAJOR.MINOR.PATCH`).
 
-### Latest — v1.7.1 · Apex Doctrine
+### Latest — v1.7.2 · Combined Arms
+- predictive local terrain routing for AI tanks and Controller drones
+- short legitimate last-seen investigation memory without hidden target tracking
+- splash damage occluded by hard cover with partial exposure sampling
+- terrain-aware Cannon FUSE → IMPACT preview and intentional cover breaching
+- Guardian Countershots receive limited structural pressure
+- definitive portrait Blackglass containment and stylesheet-order repair
+- new Combined Arms and showroom-containment regression tests
+
+### v1.7.1 · Apex Doctrine
 - Tempest redline, Needle Storm precision gate, Breachlord brace/recovery and Flakmaster ranged stability
 - Cluster King programmable child-bomb sectors, Siege structural pressure, Annihilator commitment/reload trade and Quake displacement programming
 - Bastion lane anchoring, Aegis Perfect Guard mobility flow, Meteor peak commitment and Ravager flexible momentum
 - repaired Cannon structural specialization against Battlefield cover
-- ten new Apex regression tests; complete 26-test Node suite and production build passing
 
 ### v1.7.0 · Three Disciplines
 - Gunner heat/cadence/recoil/stability discipline
