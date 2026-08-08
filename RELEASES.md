@@ -53,5 +53,24 @@ This file is the durable source-controlled release ledger for the living NOVA TA
 
 ---
 
-## v1.1.x — Enhanced Evolution Arena
-Established the enhanced NOVA TANKS progression line: branching lineages, Tier-2 ultimate forms, Tier-3 Apex descendants, Gene Splicing, mastery, AI evolution parity, hybridization, and the expanded late-game progression architecture that v1.2.0 builds upon.
+## v1.1.0 — Drone Age
+**Theme:** Drones and the expanded evolution arena
+
+### Player-facing highlights
+- **Combat drones entered NOVA TANKS**, establishing hunter and escort units as persistent arena entities.
+- Controller builds gained drone swarms as their defining combat identity.
+- Drones gained their own health, targeting, respawning, movement and combat behavior.
+- The enhanced evolution line expanded into branching Tier-2 ultimates and Tier-3 Apex descendants.
+- Gene Splicing, mastery and AI evolution parity established the late-game progression architecture used by later releases.
+
+---
+
+## v1.0.0 — First Deployment
+**Theme:** Game start
+
+### Player-facing highlights
+- Initial playable release of **NOVA TANKS**.
+
+---
+
+The in-game lobby reads the canonical version history from `nova-updates/releases.json`, while this file keeps the fuller durable release ledger for development and future autonomous updates.
