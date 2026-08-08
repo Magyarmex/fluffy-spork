@@ -6,6 +6,10 @@ on:
     paths:
       - 'nova-gz/**'
       - 'nova-updates/**'
+      - 'manifest.webmanifest'
+      - 'nova-icon.svg'
+      - 'pwa-register.js'
+      - 'sw.js'
       - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
@@ -26,7 +30,10 @@ jobs:
           for f in nova-updates/*.js; do
             node --check "$f"
           done
+          node --check pwa-register.js
+          node --check sw.js
           python3 -m json.tool nova-updates/releases.json >/dev/null
+          python3 -m json.tool manifest.webmanifest >/dev/null
 
       - name: Rebuild tested NOVA payload and apply versioned runtime updates
         shell: bash
@@ -42,6 +49,16 @@ jobs:
 
           path = Path('index.html.new')
           html = path.read_text(encoding='utf-8')
+
+          pwa_head = '''    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./nova-icon.svg" type="image/svg+xml" />
+    <meta name="application-name" content="NOVA TANKS" />
+    <script defer src="./pwa-register.js"></script>
+'''
+          if './manifest.webmanifest' not in html:
+              if '</head>' not in html:
+                  raise SystemExit('NOVA head marker not found')
+              html = html.replace('</head>', pwa_head + '  </head>', 1)
 
           define_marker = "  window.__defineModule = function (id, factory) {"
           if 'window.__novaModules = modules;' not in html:
@@ -90,6 +107,8 @@ jobs:
           PY
 
           grep -q '__novaModules' index.html.new
+          grep -q 'manifest.webmanifest' index.html.new
+          grep -q 'pwa-register.js' index.html.new
           grep -q 'nova-updates/sniper-v1.2.0.js' index.html.new
           grep -q 'nova-updates/controller-v1.3.0.js' index.html.new
           grep -q 'nova-updates/polish-v1.3.1.js' index.html.new
