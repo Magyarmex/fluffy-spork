@@ -2,6 +2,58 @@
 
 This file is the durable source-controlled release ledger for the living NOVA TANKS game. Public versions use `MAJOR.MINOR.PATCH` numbering and are never reused.
 
+## v1.4.0 — Forward Observer
+**Released:** 2026-08-07  
+**Theme:** Sniper AI correction, reconnaissance, evolution safety, drone stability
+
+### Root-cause fix
+- The original Silent Horizon AI focus implementation used wall-clock time beginning on the first Rail firing attempt. If an AI stopped maintaining firing intent or alignment, that timestamp could survive. Reacquiring the player later could therefore jump straight to a fully charged Rail shot.
+- v1.4.0 replaces sniper-lineage combat AI with a dedicated tracking/firing loop whose charge is accumulated only while a valid firing solution is continuously maintained.
+- Losing aim, suppression, target authorization, or remote spotter contact resets the stored Rail focus instead of banking it invisibly.
+
+### Sniper AI
+- Sniper-lineage AI now uses sampled target motion rather than frame-perfect continuous target knowledge.
+- Turret tracking has finite turn rates that become more restrictive during deeper Rail focus.
+- Normal AI Railguns require roughly **0.82 s** of continuous qualified focus for a full combat shot; elite AI uses roughly **0.70 s**.
+- After firing, normal AI receives at least **1.60 s** of recovery before another full cycle; elite AI receives at least **1.35 s**.
+- AI must remain sufficiently aligned throughout the focus sequence. A sustained loss of alignment cancels the attempt.
+- Elite snipers gain better sampling/prediction and faster but still finite execution rather than extra information or instantaneous lock-on.
+
+### Forward Observer reconnaissance
+- Sniper hulls no longer receive exceptional long-range sight through the generic AI vision bonus. Their direct target acquisition is intentionally bounded to ordinary combat distance.
+- One real drone in every sniper squad becomes a **Forward Observer**.
+- The observer receives an extended patrol leash and wide roaming orbit, allowing it to search away from the sniper.
+- It has its own rotating field-of-view cone and independently detects tanks inside that cone.
+- It opportunistically attacks nearby map shapes while scouting, preserving useful autonomous farming behavior.
+- A successful sighting produces only a short-lived contact relay. Remote target authorization expires if the observer loses the target and is immediately lost if the observer is destroyed.
+- Player snipers can use observer contacts as information, but the spotter does not aim or fire the player's weapon for them.
+- Spotters are visually identifiable and destructible, making remote sniper vision itself contestable gameplay.
+
+### Warning / counterplay
+- Being acquired by a hostile Forward Observer produces a **SPOTTED** cue before the Rail firing sequence begins.
+- Rail focus aimed at the player now produces two distinct directional warning stages instead of relying on a warning that could coincide with the shot.
+- The stronger second stage includes a mobile-readable edge indicator and **RAIL FOCUS** cue before release.
+- An actual Rail projectile passing near the player produces an in-flight flyby crack based on its trajectory rather than only a sound at firing time.
+- Movement feints, suppression, breaking observer contact, destroying the observer, projectile interception, and pressure all participate in the same counterplay chain.
+
+### Evolution / UI safety
+- Opening an evolution milestone clears hostile banked Rail focus before the game pauses.
+- Applying a class evolution, mastery perk, gene splice, or dismissing the choice clears stale firing input and forces enemy Rail snipers to reacquire.
+- Combat resumes with approximately **1.8 s** of temporary player protection so a menu transition cannot become an unavoidable Rail hit.
+- The large stat-upgrade tray is automatically minimized after an evolution choice so mobile players are not returned to combat behind an obstructive upgrade panel.
+
+### Controller / drone stability
+- Controller drones now receive an invariant repair pass for invalid position/HP values, impossible phases, dead/stale attack targets, invalid dash vectors, and corrupt Command Node coordinates.
+- Broken states recover into a safe formation/recovery state rather than remaining stuck or propagating invalid movement.
+- The Second Body command/formation/attack-run mechanics are otherwise preserved.
+
+### Deployment validation
+- The materialization workflow now runs `node --check` against every `nova-updates/*.js` runtime overlay before rebuilding the playable page.
+- `nova-updates/releases.json` is JSON-validated during deployment.
+- The v1.4.0 runtime materialized successfully after these gates.
+
+---
+
 ## v1.3.1 — Signal Bloom
 **Released:** 2026-08-07  
 **Theme:** Sniper/Controller polish, graphics, SFX, mobile readability, mastery feedback
@@ -15,22 +67,16 @@ This file is the durable source-controlled release ledger for the living NOVA TA
 
 ### Controller polish
 - Active **Command Nodes preview the current formation geometry** rather than behaving only as destination markers.
-- The node now includes a compact live squad-state display showing linked drone count and whether drones are forming, arming, diving, or recovering.
+- The node includes a compact live squad-state display showing linked drone count and whether drones are forming, arming, diving, or recovering.
 - Committed hostile drone attacks against the player receive a restrained extended trajectory cue to improve readability on mobile after commitment has already occurred; pre-commit prediction remains hidden.
-- Hitting an enemy drone during interruptible wind-up now produces distinct **DIVE BROKEN** audiovisual confirmation.
+- Hitting an enemy drone during interruptible wind-up produces distinct **DIVE BROKEN** audiovisual confirmation.
 - Correctly evading a close committed AI drone pass produces restrained **EVADED** feedback, a near-miss flyby, ring, and tiny haptic confirmation.
 - Successful drone impacts gain heavier procedural impact audio, flash response, and context-sensitive camera feedback.
 
 ### Audio / feel
-- Added new procedural stereo-capable SFX for focus readiness, Rail interception, drone impact, drone interruption, and committed-dive near misses.
+- Added procedural stereo-capable SFX for focus readiness, Rail interception, drone impact, drone interruption, and committed-dive near misses.
 - High-frequency events are throttled so swarm battles remain readable rather than becoming continuous audio clutter.
-- Mobile haptics remain deliberately short and selective: full focus readiness, successful Rail denial, hostile drone impact, and close committed-dive evasion.
-
-### Technical
-- Signal Bloom is a **PATCH** release: it preserves the Silent Horizon and Second Body mechanics and adds no new control surface.
-- Runtime JavaScript passed syntax validation before deployment.
-- Materialization workflow completed successfully with the runtime order **Silent Horizon → Second Body → Signal Bloom → lobby history → game boot**.
-- GitHub Pages completed the release build with no reported deployment error.
+- Mobile haptics remain deliberately short and selective.
 
 ---
 
@@ -39,63 +85,32 @@ This file is the durable source-controlled release ledger for the living NOVA TA
 **Theme:** Controller skill expression, twin-stick swarm command, formation tactics, readable drone combat
 
 ### Player-facing highlights
-- The Controller lineage now treats its drone swarm as a **second body** rather than a collection of autonomous pets.
+- The Controller lineage treats its drone swarm as a **second body** rather than autonomous pets.
 - **Right-stick direction commands swarm bearing; right-stick depth sets deployment distance; releasing the stick recalls the squadron.** The hull remains on the left stick.
 - Desktop follows the same grammar: hold fire to command toward the cursor, cursor distance controls deployment depth, release recalls.
-- A visible **Command Node**, tether and engagement zone communicate where the swarm is being asked to operate.
 - Autonomous behavior remains for farming map shapes, while serious PvP pressure requires player command.
-- Controller gun hits briefly **DESIGNATE** a target, rewarding aim with stronger swarm coordination without creating permanent lock-on.
+- Controller gun hits briefly **DESIGNATE** a target.
 
 ### Drone combat / counterplay
-- Controller hunters no longer simply select the nearest player, fly directly into them and repeat contact damage.
-- PvP attack runs now use a readable sequence: **form → wind up → commit trajectory → dive → overshoot → recover**.
+- PvP attack runs use **form → wind up → commit trajectory → dive → overshoot → recover**.
 - Before trajectory commitment, defenders can manipulate the dive with movement feints.
 - After commitment, the attacker stops perfectly tracking, creating an execution-based dodge window.
 - Shooting a drone during wind-up cancels the attack and forces recovery.
-- Once a drone launches, recall cannot erase the commitment; the attack must resolve before the drone returns.
-- Drone dash collision uses swept path checks so high-speed hits are determined by geometry rather than frame alignment.
-- Drones retain real hull HP, can be shot down, and take time to respawn, so careless deployment has persistent cost.
-- Extending the swarm leaves the Controller hull less protected, creating a natural punish window for opponents who break through the formation.
+- Once a drone launches, recall cannot erase the commitment.
+- Drone dash collision uses swept path checks.
+- Drones retain real hull HP and respawn delay.
 
 ### Lineage mastery
-- **Drone Carrier — Wedge:** three responsive hunters teach command depth, spacing, timing, recall and designation.
-- **Overlord — Crescent:** six hunters establish far-side pressure around a target; attack scheduling alternates sides to create encirclement and escape-lane decisions.
-- **Warden — Phalanx:** four armored hunters form a movable line that can physically screen firing lanes; correct orientation matters more than passive HP.
-- **Hivemind — Ring:** nine hunters arrange into a rotating surround, creating a high ceiling around spacing, cascading attacks and avoiding overextension.
-- **Broodmother — Claws:** twin attack arcs and sacrificial logic preferentially commit temporary or damaged brood, making attrition itself a tactical resource.
-- **Citadel — Fortress Wall:** six heavy drones produce a slower, denser defensive screen with strong lane control and deliberate repositioning.
-- **Valkyrie — Cavalry Wing:** five very fast hunters have the shortest wind-up and recovery and the fastest committed dives, rewarding rapid command changes while making bad commits punishable.
-
-### Existing abilities integrated
-- **Swarm** still creates temporary hunters, while also extending command reach, improving repositioning and tightening attack cadence.
-- Temporary Swarm drones are preferentially used for dangerous attack commitments where appropriate.
-- **Bulwark** improves Warden/Citadel phalanx response and tightness rather than existing as an unrelated defensive button.
-
-### AI parity
-- AI Controllers use the same Command Node, formation placement, wind-up, late trajectory lock, committed dive, recovery, drone HP and recall language as players.
-- Normal Controller AI uses less prediction and slower command tracking.
-- Elite Controller AI gains strength through better prediction and positioning rather than impossible instant execution.
-- Fleeing Controller AI can place its swarm as a defensive screen instead of merely running with six autonomous attackers attached.
-
-### Audio / presentation
-- New procedural command chirp, recall tone, designation ping, drone wind-up and launch/whip SFX.
-- Command Node and engagement zone are visible without adding another control surface.
-- Off-screen Command Nodes receive a screen-edge marker.
-- Winding-up drones show a charge ring; late commitment shows the fixed dive vector; launched drones leave a readable dash trail.
-- Designated targets receive a temporary reticle, and a player designated by an AI Controller receives readable warning feedback.
-- Warden/Citadel drone walls receive subtle formation links to make their orientation legible.
-- Evolving into the Controller lineage briefly teaches the full input grammar in-game.
-
-### Validation
-- Runtime JavaScript syntax validation passed.
-- Mocked-engine tests verified analog command depth, recall behavior, autonomous shape farming without autonomous PvP, gun-hit designation, wind-up interruption and Controller-gene compatibility.
-- A simulated duel produced roughly **207 damage against a stationary defender versus 44 damage against a defender that reacted only after the visible trajectory commitment**, confirming that the attack-run model creates meaningful post-read counterplay in the test harness.
-- Full browser/mobile playfeel still requires live playtesting and tuning; the numbers above are behavior tests, not a balance guarantee.
+- **Drone Carrier — Wedge**
+- **Overlord — Crescent**
+- **Warden — Phalanx**
+- **Hivemind — Ring**
+- **Broodmother — Claws**
+- **Citadel — Fortress Wall**
+- **Valkyrie — Cavalry Wing**
 
 ### Design principle
 **Autonomy handles chores. The player handles violence.**
-
-The Controller's mastery problem is intentionally different from ordinary aim classes: multitasking, geometry, formation placement, target manipulation, attack sequencing, risk management and controlling two positions at once.
 
 ---
 
@@ -104,49 +119,18 @@ The Controller's mastery problem is intentionally different from ordinary aim cl
 **Theme:** Sniper counterplay, off-screen readability, skill expression, combat audio
 
 ### Player-facing highlights
-- Railgun, Singularity, and Prism Rail now use a **focus-to-fire** interaction for full-power shots.
-- Releasing early produces a weaker **quick-shot**, preserving close-range and counter-bait skill expression.
-- Deep focus progressively limits turret agility, so movement feints can beat committed aim and skilled snipers can counter-predict those feints.
-- Off-screen enemy rail snipers can produce a restrained **directional screen-edge glint** when deeply focused near the player's firing lane.
-- Full rail attacks gain new **directional charge, rail-crack, flyby, and firing SFX**, synthesized in Web Audio with no external sound assets.
-- Supported mobile devices receive a very short restrained vibration cue for a dangerous off-screen committed rail shot.
-- Full-power shots briefly reveal their firing bearing, creating an earned advance window after a successful dodge or interception.
-- Accurate direct or near-miss **suppression** can break deep focus; random distant spam is not intended to be an effective counter.
+- Railgun, Singularity, and Prism Rail use a **focus-to-fire** interaction for full-power shots.
+- Releasing early produces a weaker **quick-shot**.
+- Deep focus progressively limits turret agility.
+- Off-screen enemy Rail snipers can produce a restrained directional screen-edge glint.
+- Full Rail attacks gain directional charge, rail-crack, flyby, and firing SFX.
+- Full-power shots briefly reveal their firing bearing.
+- Accurate direct or near-miss **suppression** can break deep focus.
 
 ### Counterplay / physics
-- Rail projectiles now use explicit interception integrity rather than inheriting extreme durability from their tank-penetration stat.
-- Full normal rail integrity is 20; supercharged full rails use 27; quick-shot integrity scales with charge.
-- Projectile-vs-projectile collision now uses swept relative-motion collision, preventing hypervelocity rounds from tunneling through a correctly placed defensive bullet stream between frames.
-- Surviving a committed shot is intended to create tempo: **detect → manipulate → survive/intercept → exploit recovery → advance**.
-
-### Sniper skill expression
-- Full focus takes approximately 520 ms.
-- Early focus retains high aim freedom; deeper focus progressively commits the barrel direction.
-- Quick-shots scale damage, velocity, penetration, projectile integrity, and recovery according to charge.
-- A rushed sniper retains outplay routes through prediction, quick-shot timing, repositioning, and terrain rather than being disabled by a hard anti-sniper mechanic.
-
-### AI
-- AI rail snipers use the same focus pipeline as the player and therefore inherit focus time and aim commitment rather than bypassing the interaction with instant full-power fire.
-- Off-screen AI attacks use the same directional warning language intended for human-readable counterplay.
-
-### Audio / presentation
-- New procedural stereo charge cue.
-- New layered full Railgun discharge: low impulse, metallic rail crack, high-frequency snap, and noise transient.
-- New quick-shot report.
-- New directional incoming/flyby crack.
-- Glint and post-shot bearing cues scale subtly with focus/reveal state instead of showing exact sniper coordinates.
-
-### Validation
-- JavaScript syntax validation passed for the runtime update.
-- Mocked-engine behavior tests passed for full-focus timing, quick-shot scaling, explicit rail integrity, and swept projectile interception.
-- NOVA materialization workflow completed successfully.
-- GitHub Pages build completed with no reported deployment error.
-
-### Known follow-up work
-- Playtest and tune focus duration, suppression radius, quick-shot curves, and rail integrity against real mobile combat.
-- Add richer arena geometry, line-of-sight breaks, and flank routes so approaching a sniper gains more map-level skill expression.
-- Expand lineage-specific approach tools only where they create soft counterplay rather than hard class counters.
-- Continue improving sniper AI prediction/repositioning so elite difficulty comes from decisions instead of impossible execution.
+- Rail projectiles use explicit interception integrity rather than inheriting extreme durability from tank penetration.
+- Projectile-vs-projectile collision uses swept relative-motion collision.
+- Intended tempo: **detect → manipulate → survive/intercept → exploit recovery → advance**.
 
 ---
 
