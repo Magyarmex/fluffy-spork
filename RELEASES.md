@@ -2,6 +2,60 @@
 
 NOVA TANKS uses semantic-style versions and never reuses a released number. The lobby reads `nova-updates/releases.json`; this file is the fuller durable development ledger.
 
+## v1.6.0 — Battlefield
+**Released:** 2026-08-08  
+**Theme:** Tactical terrain, line-of-sight, destructible cover, physical lanes, terrain-aware AI
+
+### Battlefield geometry
+- The previously open arena now instantiates one of three mirrored tactical layouts: **Crossfire**, **Split Horizon**, or **Four Gates**.
+- Permanent rectangular fortifications and circular pillars create long sightlines, protected crossings, flank routes, side pockets, choke points and contested approaches without turning the arena into a corridor maze.
+- Each layout also contains destructible barricades whose presence changes lane geometry during the run.
+- Tank, shape and powerup spawning is terrain-aware and retries positions that would overlap solids.
+
+### Real line-of-sight
+- Automatic nearest-target selection ignores tanks hidden behind solid terrain.
+- AI firing is denied when its current target is occluded by a wall or surviving barricade.
+- Generic AI drops sustained occluded targets and rethinks instead of maintaining impossible through-wall pressure.
+- Forward Observer relays are invalidated when terrain breaks the physical sightline between the active Observer and its reported target.
+- Observer suspicion/search behavior is preserved: terrain hides an actual target without erasing the scout's reason to investigate that sector.
+
+### Projectile / cover physics
+- Projectiles test their full frame-to-frame segment against terrain before ordinary entity collision, preventing fast Rail and precision rounds from tunneling through narrow cover.
+- Permanent terrain stops projectiles.
+- Destructible barricades have explicit HP and absorb projectile and splash damage.
+- Shells deal increased structural damage.
+- A high-penetration shot can punch through only if **that same impact destroys the barricade**, costs additional penetration, and leaves projectile integrity remaining.
+- Destroyed barricades become persistent non-blocking rubble rather than disappearing without feedback.
+- Breaching cover awards a small XP reward to the responsible tank.
+
+### Movement and pathing
+- Player tanks, AI tanks, drones and moving neutral shapes resolve collisions against battlefield solids.
+- Tank collision keeps tangential velocity so movement naturally **slides along cover** instead of feeling like an invisible hard stop.
+- AI detects repeated terrain contact, flips/changes strafe intent and forces a rethink rather than endlessly driving into geometry.
+- Controller drones remain terrain-bound during farming, defense, formation and manual Swarm Vectoring.
+- A committed drone dash that contacts solid terrain is cancelled into recovery, preventing through-wall attack-run damage.
+- Drones receive a small deterministic tangent deflection after terrain impact to help them route around corners instead of entering a new jitter loop.
+
+### Sniper / Controller interaction
+- Sniper hull sight, Observer sight and actual projectile path are now three distinct physical constraints.
+- Cover can break a remote sniper information chain without requiring the Observer to die, creating real approach and relocation windows.
+- Controller Command Nodes may still be placed beyond terrain, preserving the simple right-stick grammar, but the swarm must physically reach that space.
+- Terrain therefore turns Controller formation placement and Sniper reconnaissance into map-geometry skills rather than purely radial-distance skills.
+
+### Battlefield presentation
+- Permanent structures and barricades use layered dark construction materials, shadows and neon rim lighting.
+- Barricades develop visible crack patterns as HP falls, flash on impact, burst into particles/rings when breached and leave rubble footprints.
+- Heavy terrain impacts can apply restrained camera feedback.
+- Added procedural cover-hit, cover-breach and terrain-scrape SFX.
+- A compact HUD strip names the current battlefield layout and reports remaining destructible cover.
+
+### Validation
+- Added `tests/node/battlefield-v1.6.test.js`.
+- Tests verify v1.6 runtime wiring, rectangle line-of-sight blocking, swept thin-wall projectile collision, and terrain-aware safe-position queries.
+- Deployment continues to syntax-check every runtime overlay and validate the release JSON before materialization.
+
+---
+
 ## v1.5.1 — Swarm Discipline
 **Released:** 2026-08-08  
 **Theme:** Blackglass finish, coordinated drone autonomy, intelligent Forward Observers, lobby music, presentation fixes
