@@ -2,6 +2,41 @@
 
 NOVA TANKS uses semantic-style versions and never reuses a released number. The lobby reads `nova-updates/releases.json`; this file is the fuller durable development ledger.
 
+## v1.7.1 — Apex Doctrine
+**Released:** 2026-08-08  
+**Theme:** Tier-3 identity, deeper mastery, and repaired Cannon/Battlefield integration
+
+### Gunner Apex doctrine
+- **Tempest** gains a broad high-output redline cadence band, but overshooting it creates the strongest recoil/recovery punishment in the cyan tree.
+- **Needle Storm** gains a narrow precision gate: exact heat plus high stability accelerates, strengthens and hardens its needle stream.
+- **Breachlord** rewards a settled, cooled brace volley, then creates a short movement-recovery opening that opponents can punish.
+- **Flakmaster** turns stability into true ranged shotgun discipline through tighter, faster and longer-lived pellets.
+
+### Cannon Apex doctrine
+- **Cluster King** fuse depth controls child-bomb sector width as well as burst distance: short programs spread wide; deep programs focus forward.
+- **Siege Bomber** now applies its intended extra structural pressure to destructible Battlefield cover.
+- **Annihilator** gains more blast authority from deep programmed commitments, but pays with a longer reload punish window.
+- **Quake Cannon** turns deeper fuse programming into stronger displacement and slightly broader shock geometry instead of simple damage inflation.
+- Fixed a v1.7.0 integration defect where Cannon projectiles carried structural-damage metadata that Battlefield never consumed. The extra structural damage is now applied before the normal Battlefield impact while Battlefield remains responsible for the actual breach, rubble, score and feedback path.
+
+### Guardian Apex doctrine
+- **Bastion** can build an Anchor posture while nearly stationary, strengthening only its correctly faced frontal lane; movement and flanks still break the advantage.
+- **Aegis** converts a successful Perfect Guard into a brief mobility-flow window, encouraging protect → reposition rather than passive tanking.
+- **Meteor** becomes the highest-commitment rammer: straight lines build the greatest peak impact and steering burns charge aggressively.
+- **Ravager** preserves more momentum through moderate steering, trading Meteor's peak for a more flexible attack route.
+
+### Skill expression / counterplay
+- Apex power comes from cadence control, precision gates, brace/recovery timing, fuse geometry, reload commitment, directional anchoring, Perfect Guard conversion and route commitment rather than hidden flat multipliers alone.
+- Each strong state leaves an opponent-facing answer: force Tempest overheat, pressure Breachlord recovery, cross Cluster King's chosen sector, punish an Annihilator reload, flank an anchored Bastion, bait Aegis timing, or sidestep a committed Meteor line.
+- AI inherits the same class mechanics because specialization is applied through the same runtime class paths rather than player-only privileges.
+
+### Validation
+- Added `tests/node/apex-disciplines-v1.7.1.test.js` with ten Apex-specific regression tests.
+- A first run correctly exposed an over-strict structural test expectation; investigation showed the mechanic was applying exactly the intended *extra* structural component while the test stub intentionally lacked Battlefield's normal impact component. The assertion was corrected rather than changing working combat code.
+- Production build and the complete **26-test Node suite** pass before deployment.
+
+---
+
 ## v1.7.0 — Three Disciplines
 **Released:** 2026-08-08  
 **Theme:** Skill-expression rework for Gunner, Cannon and Guardian
