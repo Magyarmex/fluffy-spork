@@ -25,7 +25,7 @@ v1.7.5 established four rules:
 3. **No hot-path allocation churn.** Spatial-query scratch storage is reused instead of allocating a new candidate array per trace.
 4. **Measure continuously.** Update/render CPU time and terrain-query counters are exposed through `NovaPerf.snapshot(game)` and periodically mirrored to `window.__NOVA_PERF_LAST__`.
 
-## v1.7.6 — Zero Churn
+## v1.7.8 — Zero Churn
 
 The second campaign follows work beneath the public terrain API and into the rest of the frame loop. Its principle is simple: if the answer, picture, or input is unchanged, do not allocate, scan, compile, rerender, or force layout again to obtain it.
 
@@ -95,13 +95,13 @@ Any feature that enters `Game.update`, `moveTank`, `updateDrones`, projectile up
 
 Performance changes must keep the normal build, production CSS build and full Node suite green.
 
-## Optimization boundary after v1.7.6
+## Optimization boundary after v1.7.8
 
 The major high-confidence structural costs identified by source inspection are now removed or bounded. Remaining opportunities are deliberately not automatic work items:
 
 1. **Terrain visual raster caching.** Battlefield still creates gradients and uses large Canvas shadows for visible fortifications. Pre-rendered sprites could be faster, but camera zoom, DPR and dynamic damage/flash/crack state make exact visual equivalence non-trivial. Do not trade sharpness or lighting fidelity for an assumed gain; require render telemetry and image-diff validation first.
 2. **Historical runtime-layer consolidation.** The versioned patch architecture adds parse/request surface. The service worker already stages dependencies in parallel and caches complete builds. Consolidation may improve cold startup but is a larger architectural migration whose real benefit must be measured after static Tailwind removes the dominant avoidable browser-side compilation step.
-3. **Small helper allocations in legacy lineage code.** A few older AI/presentation helpers still return tiny temporary vectors. Their bounded entity counts make them lower-order costs. Touch them only if an allocation profile shows meaningful GC pressure after the v1.7.6 changes.
+3. **Small helper allocations in legacy lineage code.** A few older AI/presentation helpers still return tiny temporary vectors. Their bounded entity counts make them lower-order costs. Touch them only if an allocation profile shows meaningful GC pressure after the v1.7.8 changes.
 4. **Canvas drawing itself.** Tanks, projectiles, particles, text and effects fundamentally require drawing. Any next reduction must come from demonstrated redundant work, not fewer effects or lower visual quality.
 
-The stop condition is therefore evidence-based: once v1.7.6 is deployed, do not continue changing hot paths merely because code can be made cleverer. Resume only when real-device telemetry, a browser performance trace, or a reproducible stress scene identifies a remaining material bottleneck whose optimization can preserve the exact gameplay and visual contract.
+The stop condition is therefore evidence-based: once v1.7.8 is deployed, do not continue changing hot paths merely because code can be made cleverer. Resume only when real-device telemetry, a browser performance trace, or a reproducible stress scene identifies a remaining material bottleneck whose optimization can preserve the exact gameplay and visual contract.
