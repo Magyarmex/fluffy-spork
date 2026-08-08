@@ -2,6 +2,38 @@
 
 This file is the durable source-controlled release ledger for the living NOVA TANKS game. Public versions use `MAJOR.MINOR.PATCH` numbering and are never reused.
 
+## v1.5.0 — Blackglass Showroom
+**Released:** 2026-08-08  
+**Theme:** Lobby intelligence, animated class library, real telemetry, trait-graft simulation
+
+### Tank Intelligence & Showroom
+- The compact lobby **Evolution Tree** now expands in place into a full intelligence/showroom section instead of opening a disconnected encyclopedia screen.
+- The library covers all **36 tanks**, with filters for Gunner, Cannon, Sniper, Controller, and Guardian lineages.
+- Every dossier includes the tank's name, lineage/evolution breadcrumb, tier, unique catchphrase, canonical short description, combat-role tags, and ability information.
+- The selected chassis is rendered on a live canvas using the actual runtime class definition: hull scale, barrel geometry, weapon mode, projectile behavior, and drone count all come from canonical game data.
+- Moving the pointer across the display steers the showroom turret; the preview continuously demonstrates the selected weapon profile and orbiting drone presence.
+
+### Combat telemetry
+- Dossiers expose normalized comparison bars and exact base values for damage, projectile speed, effective range, reload/cadence, penetration, hull HP, mobility, body damage, and drone presence.
+- The showroom reads the same `CLASSES`, `ABILITIES`, and lineage registries used by the game, so later stat changes flow into inspection automatically rather than requiring duplicate hard-coded balance data.
+
+### Foreign Trait Graft Lab
+- Each evolved build can preview any legal **foreign lineage gene** without entering a run.
+- Graft inspection computes build-specific before → after effects rather than only repeating the generic gene description.
+- Hyperdense Slugs shows exact damage, projectile-speed, penetration, range, and reload changes for the selected chassis.
+- Volatile Payload shows splash radius/fraction, knockback, and reload consequences.
+- Echo Chamber reports echo-round damage and reload cost.
+- Parasite Brood reports added roaming hunter pressure.
+- Reactive Plating reports HP, body damage, mobility, and incoming-damage changes.
+- Scout remains available as a pre-lineage sandbox preview; normal foreign-lineage restrictions remain intact for evolved builds.
+
+### Responsive lobby UX
+- Desktop uses a three-column **library → animated stage → intelligence** composition.
+- Mobile collapses into a horizontal dossier rail followed by the animated stage and telemetry/graft stack.
+- The existing lineage section itself widens when opened and collapses cleanly back into the normal lobby.
+
+---
+
 ## v1.4.1 — Violet Doctrine
 **Released:** 2026-08-07  
 **Theme:** Full purple-lineage sniper doctrine, non-beam precision commitment, observer-denial counterplay
@@ -201,4 +233,4 @@ Within direct sight these dwell times shorten, so successfully closing distance 
 
 ---
 
-The in-game lobby reads the canonical version history from `nova-updates/releases.json`, while this file keeps the fuller durable release ledger for development and future autonomous updates.
+The in-game lobby loads the canonical historical ledger from `nova-updates/releases.json` and merges the currently loaded versioned runtime release when a freshly deployed feature ships ahead of the next data-ledger compaction. This file keeps the fuller durable release history for development and future autonomous updates.
