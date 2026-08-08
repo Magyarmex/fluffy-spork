@@ -8,7 +8,7 @@
 
 No install required — play directly in a modern browser on desktop or mobile.
 
-**Current release: v1.2.0 · Silent Horizon** — skill-based sniper counterplay, off-screen threat cues, focus/quick-shot Railgun play, swept projectile interception, suppression, and new procedural spatial SFX.
+**Current release: v1.3.0 · Second Body** — Controllers become true twin-stick swarm commanders with analog formation placement, target designation, readable attack runs, recall/commitment decisions, distinct lineage formations, AI parity and new procedural swarm SFX.
 
 ---
 
@@ -31,9 +31,19 @@ Every major system is expected to be evaluated for:
 - punish windows for mistakes
 - soft interactive counters rather than binary hard-counter matchups
 
+### Second Body: Controller skill duel
+
+v1.3.0 rebuilds the Controller lineage around the existing NOVA twin-stick controls. The left stick still moves the hull. The right stick now also commands the swarm: **direction chooses the command bearing, analog stick depth chooses deployment distance, and release recalls the formation.**
+
+Controller drones retain convenient autonomous shape farming, but PvP is no longer primarily nearest-target autopilot. Serious pressure is created by player decisions: position the Command Node, establish formation geometry, land the Controller gun to DESIGNATE a target, sequence readable attack runs, decide how deeply to commit the swarm, and recall before the hull becomes exposed.
+
+Drone attacks use **form → wind up → commit trajectory → dive → overshoot → recover**. Opponents can read a wind-up, manipulate the pre-lock prediction, dodge after commitment, shoot down or interrupt drones, break through a weak formation, or punish the Controller while its swarm is overextended.
+
+**Autonomy handles chores. The player handles violence.**
+
 ### Silent Horizon: sniper skill duel
 
-v1.2.0 turns Railgun combat into a more interactive long-range duel while preserving the sniper fantasy. Full-power Rail shots require focus and progressively commit aim; early release produces a weaker quick-shot. Off-screen snipers communicate restrained bearing/timing information through directional glint and spatial audio rather than revealing exact coordinates. Correctly placed defensive fire can now intercept Rail rounds through swept collision, and accurate suppression can break deep focus.
+v1.2.0 turns Railgun combat into a more interactive long-range duel while preserving the sniper fantasy. Full-power Rail shots require focus and progressively commit aim; early release produces a weaker quick-shot. Off-screen snipers communicate restrained bearing/timing information through directional glint and spatial audio rather than revealing exact coordinates. Correctly placed defensive fire can intercept Rail rounds through swept collision, and accurate suppression can break deep focus.
 
 The intended anti-sniper rhythm is:
 
@@ -49,15 +59,19 @@ Browse release history: **[`RELEASES.md`](./RELEASES.md)**
 - Late-game Apex evolutions
 - Cross-lineage gene splicing / hybridization
 - Distinct weapon and combat archetypes
+- Twin-stick Controller **Swarm Vectoring** and analog Command Nodes
+- Controller target designation and formation-driven attack sequencing
+- Distinct Wedge, Crescent, Phalanx, Ring, Claw, Fortress Wall and Cavalry Wing drone identities
+- Telegraph → commitment → dodge/punish drone attack runs
 - Focus / quick-shot Railgun skill system
 - Off-screen directional sniper threat cues
 - Projectile interception with swept collision for hypervelocity rounds
 - Skill-based sniper suppression and advance windows
-- Procedural stereo combat SFX
-- AI-controlled enemy tanks that progress alongside the player
+- Procedural stereo combat and swarm SFX
+- AI-controlled enemy tanks that progress alongside the player and obey the same major combat-language constraints
 - Desktop and mobile browser play
 - GitHub Pages deployment
-- Ongoing versioned development and release history
+- In-lobby version history and ongoing versioned development
 
 ## Live game
 
@@ -83,9 +97,21 @@ NOVA TANKS is intended to improve across the entire game rather than only accumu
 
 ## Releases
 
-NOVA TANKS uses semantic-style version numbers (`MAJOR.MINOR.PATCH`) and maintains a durable release ledger in [`RELEASES.md`](./RELEASES.md).
+NOVA TANKS uses semantic-style version numbers (`MAJOR.MINOR.PATCH`) and maintains a durable release ledger in [`RELEASES.md`](./RELEASES.md). The lobby contains a browsable version history sourced from `nova-updates/releases.json`.
 
-### Latest — v1.2.0 · Silent Horizon
+### Latest — v1.3.0 · Second Body
+- right-stick Swarm Vectoring with analog deployment depth and release-to-recall
+- autonomous shape farming, actively commanded PvP
+- short-lived gun-hit DESIGNATE system
+- formation establishment before attack instead of nearest-target chasing
+- readable wind-up, late trajectory lock, committed dive, overshoot and recovery
+- interruptible wind-ups and destructible drones
+- swept high-speed dive collision
+- unique Controller lineage formation geometries
+- same Controller combat rules for AI, with skill expressed through decision quality
+- command/recall/designation/wind-up/launch procedural SFX and visual language
+
+### v1.2.0 · Silent Horizon
 - full-power Rail focus and weaker charge-scaled quick-shots
 - progressive aim commitment during deep focus
 - off-screen directional glint and incoming audio
