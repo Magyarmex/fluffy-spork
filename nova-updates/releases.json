@@ -1,6 +1,36 @@
 {
-  "currentVersion": "1.3.0",
+  "currentVersion": "1.3.1",
   "releases": [
+    {
+      "version": "1.3.1",
+      "codename": "Signal Bloom",
+      "date": "2026-08-07",
+      "headline": "Sniper and Controller mastery gets a full feedback pass.",
+      "groups": {
+        "Sniper Polish": [
+          "Rail focus now gains a segmented reticle, live charge percentage, a clear FOCUS READY state, a restrained lock-ready sound, and tiny supported-device haptic confirmation.",
+          "Rail projectiles receive longer luminous motion trails and brighter spear-like cores so hypervelocity shots are easier to read without slowing them down.",
+          "Projectile interception now produces dedicated metallic/electromagnetic impact feedback, brighter collision blooms, and a RAIL DENIED confirmation when the player successfully destroys an incoming Rail round."
+        ],
+        "Controller Polish": [
+          "The active Command Node now previews the current formation geometry instead of behaving as only a destination marker.",
+          "A compact node status ring shows how many drones are linked and whether the squad is forming, arming, diving, or recovering.",
+          "Committed hostile drone dives aimed at the player gain a longer restrained trajectory cue for better small-screen readability without exposing pre-commit prediction.",
+          "Breaking a winding-up enemy dive now gives a distinct DIVE BROKEN confirmation and dedicated interruption sound.",
+          "Successful near-miss dodges against committed AI drone runs now produce a restrained EVADED cue, flyby sound, ring, and tiny haptic confirmation.",
+          "Successful drone impacts gain heavier impact audio, flash feedback, and small context-sensitive camera response."
+        ],
+        "Sound and Feel": [
+          "Added layered focus-ready, Rail interception, drone impact, drone interruption, and drone near-miss procedural SFX with stereo placement where applicable.",
+          "Feedback is deliberately event-driven and throttled so the richer soundscape communicates important combat state without turning swarm battles into constant noise.",
+          "Mobile haptics remain short and selective: full focus readiness, Rail denial, hostile drone impact, and close committed-dive evasion."
+        ],
+        "Technical": [
+          "Signal Bloom is a presentation/QoL patch layered after Silent Horizon and Second Body, preserving their mechanics and existing two-stick control grammar.",
+          "The polish runtime passes JavaScript syntax validation before deployment."
+        ]
+      }
+    },
     {
       "version": "1.3.0",
       "codename": "Second Body",
