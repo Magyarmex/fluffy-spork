@@ -2,6 +2,46 @@
 
 NOVA TANKS uses semantic-style versions and never reuses a released number. The lobby reads `nova-updates/releases.json`; this file is the fuller durable development ledger.
 
+## v1.7.2 — Combined Arms
+**Released:** 2026-08-08  
+**Theme:** Battlefield intelligence, discipline/terrain integration, hard-cover physics, Blackglass containment
+
+### Battlefield intelligence
+- AI tanks now use short predictive terrain probes and local corner waypoints, so they begin going around nearby walls before physically grinding into them.
+- Route selection is intentionally local rather than omniscient global pathfinding. It uses visible terrain and the destination the AI is legitimately acting on.
+- AI records a target's position only while it has legitimate terrain line-of-sight. After contact breaks, it may investigate that frozen last-seen position briefly; hidden target movement is not updated.
+- Once the memory window expires, the stale contact is discarded and normal legitimate reacquisition is required.
+- Cannon AI can deliberately attack a destructible barricade that blocks a recent legitimate contact, converting cover destruction into an explicit tactical choice instead of through-wall pressure.
+- Controller drones reuse the local corner-routing helper during formation, farming, defense and recall. Committed attack dives remain excluded: after trajectory lock, they still crash into cover and recover rather than steering magically around it.
+
+### Hard-cover blast physics
+- Explosions now respect surviving hard cover as well as bullets and sight.
+- Blast exposure samples the target center and lateral hull edges instead of applying a single binary radius test.
+- A tank fully protected by a wall receives no splash damage from the opposite side.
+- A tank partially peeking around an edge can receive proportional blast damage through its exposed hull without taking the full explosion through solid geometry.
+- Significant fully absorbed player-facing blasts can produce restrained **COVERED** feedback.
+
+### Three Disciplines × Battlefield
+- Cannon fuse presentation distinguishes the programmed **FUSE** point from a physically earlier **IMPACT** against terrain.
+- A blocked preview reports actual collision distance and, for destructible barricades, current cover integrity.
+- Apex Cannon structural multipliers continue through the existing Battlefield break/rubble/XP/SFX path rather than introducing a parallel destruction system.
+- Guardian Countershots gain modest structural authority. A well-timed defensive read can therefore contribute to opening damaged cover, while dedicated Cannon forms remain substantially better breachers.
+- Meteor/Ravager may use improved AI routing toward their intended route but still obey v1.7 turning and collision momentum losses.
+
+### Blackglass portrait containment
+- Fixed the portrait overflow shown on real Android hardware where the intelligence column could escape the phone viewport and text could render over neighboring sections.
+- Root cause: the historical v1.5.1 polish stylesheet executed before the v1.5.0 base showroom stylesheet was injected during `DOMContentLoaded`, allowing the late base rules to restore the desktop three-column grid.
+- A dedicated containment layer now runs after the shipped gameplay overlays and automatically re-appends itself after the base showroom stylesheet appears.
+- Portrait/coarse-pointer devices force a true bounded one-column layout: horizontal dossier rail → animated tank → identity/description → telemetry → trait graft lab.
+- `min-width:0`, `max-width:100%`, explicit grid sizing and horizontal-overflow containment are enforced across cards, stage, intelligence, stat values, descriptions, gene controls and delta rows.
+
+### Validation
+- Added `tests/node/combined-arms-v1.7.2.test.js` covering release wiring, blast occlusion, partial exposure weighting, local route waypoints, Cannon terrain-impact preview, deliberate structural fire and frozen last-seen memory.
+- Added `tests/node/showroom-containment-v1.7.2.test.js` covering portrait touch activation, bounded one-column containment rules and the exact late-stylesheet-order regression.
+- Runtime syntax validation and release JSON validation remain mandatory before materialization.
+
+---
+
 ## v1.7.1 — Apex Doctrine
 **Released:** 2026-08-08  
 **Theme:** Tier-3 identity, deeper mastery, and repaired Cannon/Battlefield integration
