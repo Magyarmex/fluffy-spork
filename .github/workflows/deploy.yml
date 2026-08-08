@@ -50,11 +50,12 @@ jobs:
           path = Path('index.html.new')
           html = path.read_text(encoding='utf-8')
 
-          pwa_head = '''    <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="icon" href="./nova-icon.svg" type="image/svg+xml" />
-    <meta name="application-name" content="NOVA TANKS" />
-    <script defer src="./pwa-register.js"></script>
-'''
+          pwa_head = (
+              '    <link rel="manifest" href="./manifest.webmanifest" />\n'
+              '    <link rel="icon" href="./nova-icon.svg" type="image/svg+xml" />\n'
+              '    <meta name="application-name" content="NOVA TANKS" />\n'
+              '    <script defer src="./pwa-register.js"></script>\n'
+          )
           if './manifest.webmanifest' not in html:
               if '</head>' not in html:
                   raise SystemExit('NOVA head marker not found')
