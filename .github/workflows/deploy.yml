@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'nova-gz/**'
+      - 'nova-updates/**'
       - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
@@ -18,13 +19,53 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Rebuild plain HTML from the tested NOVA payload
+      - name: Rebuild tested NOVA payload and apply versioned runtime updates
         shell: bash
         run: |
           set -euo pipefail
           cat nova-gz/*.b64 | tr -d '\r\n\t ' | base64 --decode | gzip --decompress > index.html.new
           test -s index.html.new
           grep -q 'NOVA TANKS' index.html.new
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('index.html.new')
+          html = path.read_text(encoding='utf-8')
+
+          # Expose the bundle registry just before boot so versioned runtime
+          # updates can wrap existing game modules without rebuilding or
+          # replacing the tested enhanced NOVA payload.
+          define_marker = "  window.__defineModule = function (id, factory) {"
+          if 'window.__novaModules = modules;' not in html:
+              if define_marker not in html:
+                  raise SystemExit('NOVA module registry marker not found')
+              exposed = (
+                  "  window.__novaModules = modules;\n"
+                  "  window.__novaCache = cache;\n"
+                  "  window.__novaMakeRequire = makeRequire;\n\n"
+              )
+              html = html.replace(define_marker, exposed + define_marker, 1)
+
+          # Load the current runtime update after all bundled factories have
+          # registered but before main boots, allowing safe module wrapping.
+          boot_marker = 'window.__bootModule("main");'
+          if './nova-updates/sniper-v1.2.0.js' not in html:
+              if boot_marker not in html:
+                  raise SystemExit('NOVA boot marker not found')
+              injection = (
+                  '</script>\n'
+                  '<script src="./nova-updates/sniper-v1.2.0.js"></script>\n'
+                  '<script>\n'
+                  + boot_marker
+              )
+              html = html.replace(boot_marker, injection, 1)
+
+          path.write_text(html, encoding='utf-8')
+          PY
+
+          grep -q '__novaModules' index.html.new
+          grep -q 'nova-updates/sniper-v1.2.0.js' index.html.new
           mv index.html.new index.html
           echo "Materialized $(wc -c < index.html) bytes into index.html"
 
@@ -39,5 +80,5 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add index.html
-          git commit -m 'Materialize NOVA TANKS for GitHub Pages'
+          git commit -m 'Materialize NOVA TANKS runtime release'
           git push
