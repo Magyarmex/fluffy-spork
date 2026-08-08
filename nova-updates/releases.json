@@ -1,6 +1,37 @@
 {
-  "currentVersion": "1.7.0",
+  "currentVersion": "1.7.1",
   "releases": [
+    {
+      "version": "1.7.1",
+      "codename": "Apex Doctrine",
+      "date": "2026-08-08",
+      "headline": "Apex tanks stop being bigger parents and become distinct mastery problems.",
+      "groups": {
+        "Gunner Apex Doctrine": [
+          "Tempest gains a broad redline cadence band with top sustained throughput, but overshooting it adds severe recoil and recovery.",
+          "Needle Storm gains a narrow precision gate where exact heat plus stable tracking accelerates, strengthens, and hardens needles.",
+          "Breachlord rewards a settled cooled brace volley, then exposes a short movement-recovery punish window.",
+          "Flakmaster turns stability into tighter, faster, longer-lived pellets for deliberate ranged shotgun play."
+        ],
+        "Cannon Apex Doctrine": [
+          "Cluster King fuse depth now controls child-bomb sector width as well as detonation distance: short programs spread wide, deep programs focus forward.",
+          "Siege Bomber's structural specialization now actually converts into extra destructible-cover damage while Battlefield keeps ownership of breach and rubble feedback.",
+          "Annihilator gains stronger deep-fuse blast commitment at the cost of a larger reload opening.",
+          "Quake Cannon converts deeper fuse programs into stronger displacement and wider shock geometry rather than raw damage inflation."
+        ],
+        "Guardian Apex Doctrine": [
+          "Bastion can anchor nearly stationary for extra frontal lane efficiency; moving or flanking breaks the advantage.",
+          "Aegis converts successful Perfect Guards into a brief mobility-flow window for repositioning.",
+          "Meteor builds the highest straight-line Stampede peak but loses momentum rapidly when steering.",
+          "Ravager keeps more charge through moderate steering, trading Meteor's peak impact for flexible routes."
+        ],
+        "Fixes and Validation": [
+          "Repaired the unused Cannon structural multiplier so v1.7 siege mechanics now interact correctly with destructible Battlefield cover.",
+          "Added ten Apex regression tests covering cadence, precision, brace recovery, sector geometry, blast commitment, structural pressure, anchoring, Perfect Guard flow, and ram identities.",
+          "Production build and the complete Node test suite pass before deployment."
+        ]
+      }
+    },
     {
       "version": "1.7.0",
       "codename": "Three Disciplines",
@@ -22,7 +53,7 @@
         "Guardian — Facing and Counterplay": [
           "The pink lineage gains directional frontal armor: aim direction now also determines the tank's strongest defensive facing.",
           "BULWARK and IRON WILL become directional guard states instead of legacy 360-degree invulnerability or universal reduction.",
-          "The opening fraction of a defensive activation is a Perfect Guard window. Reading an incoming attack correctly negates it and stores a Countercharge for the Guardian's next projectile.",
+          "The opening fraction of a second after a defensive activation is a Perfect Guard window. Reading an incoming attack correctly negates it and stores a Countercharge for the Guardian's next projectile.",
           "Juggernaut, Meteor and Ravager build Stampede impact by maintaining a clean straight line; sharp turns and terrain collisions dump stored charge."
         ],
         "Readability and AI Parity": [
