@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="NOVA TANKS">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07101f"/>
+      <stop offset="1" stop-color="#02040a"/>
+    </linearGradient>
+    <linearGradient id="tank" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7df3ff"/>
+      <stop offset="1" stop-color="#2bc9f5"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="10" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="174" fill="none" stroke="#173457" stroke-width="10"/>
+  <circle cx="256" cy="256" r="142" fill="none" stroke="#0e2038" stroke-width="4" stroke-dasharray="12 16"/>
+  <g filter="url(#glow)" fill="url(#tank)">
+    <path d="M147 306h218l28 44-28 44H147l-28-44 28-44Z"/>
+    <rect x="183" y="237" width="146" height="92" rx="30"/>
+    <circle cx="256" cy="283" r="42" fill="#04101a" stroke="#7df3ff" stroke-width="12"/>
+    <rect x="246" y="105" width="20" height="150" rx="10"/>
+    <path d="M256 91l22 38h-44l22-38Z"/>
+  </g>
+  <g fill="#04060d">
+    <circle cx="173" cy="350" r="18"/>
+    <circle cx="224" cy="350" r="18"/>
+    <circle cx="288" cy="350" r="18"/>
+    <circle cx="339" cy="350" r="18"/>
+  </g>
+</svg>
