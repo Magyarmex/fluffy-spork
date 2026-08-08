@@ -311,6 +311,10 @@ canvas {
     };
   }
 
+  window.__novaModules = modules;
+  window.__novaCache = cache;
+  window.__novaMakeRequire = makeRequire;
+
   window.__defineModule = function (id, factory) {
     modules[id] = factory;
   };
@@ -5334,6 +5338,9 @@ function lsSet(key, value) {
 }
 
 });
+</script>
+<script src="./nova-updates/sniper-v1.2.0.js"></script>
+<script>
 window.__bootModule('main');
 
     </script>
