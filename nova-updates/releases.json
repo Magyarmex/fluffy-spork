@@ -1,0 +1,52 @@
+{
+  "currentVersion": "1.2.0",
+  "releases": [
+    {
+      "version": "1.2.0",
+      "codename": "Silent Horizon",
+      "date": "2026-08-07",
+      "headline": "Snipers become lethal, readable skill duels.",
+      "groups": {
+        "Sniper Gameplay": [
+          "Railgun, Singularity and Prism Rail focus before a full-power shot.",
+          "Release early for a weaker quick-shot under pressure.",
+          "Deep focus increasingly commits turret aim, enabling movement feints and counter-baits.",
+          "Committed shots create recovery windows opponents can use to take ground."
+        ],
+        "Counterplay": [
+          "Off-screen committed snipers reveal approximate bearing through a restrained edge glint and directional audio, not exact coordinates.",
+          "Accurate suppression can break deep focus while random distant spray remains inefficient.",
+          "Rail rounds use explicit interception durability instead of inheriting excessive toughness from penetration.",
+          "Swept projectile collision prevents hypervelocity Rail rounds tunneling through correctly placed defensive fire."
+        ],
+        "Sound and Feedback": [
+          "Synthesized focus whine, Rail discharge, quick-shot report and incoming sonic crack.",
+          "Restrained mobile haptics for dangerous off-screen committed shots where supported.",
+          "AI snipers obey the same focus and commitment language as players."
+        ]
+      }
+    },
+    {
+      "version": "1.1.0",
+      "codename": "Drone Age",
+      "headline": "Drones enter the arena.",
+      "groups": {
+        "Drones": [
+          "Introduced combat drones as persistent arena entities.",
+          "Controller builds gained hunter swarms as a distinct combat identity.",
+          "Drones gained their own hull health, targeting, respawning and combat behavior."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "codename": "First Deployment",
+      "headline": "NOVA TANKS begins.",
+      "groups": {
+        "Foundation": [
+          "Initial playable release of NOVA TANKS."
+        ]
+      }
+    }
+  ]
+}
