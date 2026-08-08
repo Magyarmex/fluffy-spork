@@ -225,8 +225,6 @@ async function notifyClients(payload) {
 
 async function cleanupCaches(activeState) {
   const keep = new Set([
-    META_CACHE,
-    RUNTIME_CACHE,
     activeState && activeState.cacheName,
     activeState && activeState.previousCacheName,
   ].filter(Boolean));
@@ -234,12 +232,20 @@ async function cleanupCaches(activeState) {
   const keys = await caches.keys();
   await Promise.all(
     keys
+      .filter((key) => key.startsWith(BUILD_PREFIX) && !keep.has(key))
+      .map((key) => caches.delete(key)),
+  );
+}
+
+async function cleanupLegacyCaches() {
+  const keys = await caches.keys();
+  await Promise.all(
+    keys
       .filter((key) => {
-        const ours =
-          key.startsWith(BUILD_PREFIX) ||
-          key.startsWith(LEGACY_PREFIX) ||
-          /^nova-tanks-(?:meta|runtime)-v\d+$/.test(key);
-        return ours && !keep.has(key);
+        if (key.startsWith(LEGACY_PREFIX)) return true;
+        if (/^nova-tanks-meta-v\d+$/.test(key)) return key !== META_CACHE;
+        if (/^nova-tanks-runtime-v\d+$/.test(key)) return key !== RUNTIME_CACHE;
+        return false;
       })
       .map((key) => caches.delete(key)),
   );
@@ -307,6 +313,10 @@ async function stageLatest({ force = false } = {}) {
         promotedAt: Date.now(),
       };
       await writeActiveState(nextState);
+
+      // Only v3 candidate caches are pruned here. Caches owned by the currently
+      // active older worker survive until v3 has formally activated and claimed
+      // the clients, preventing migration from pulling the floor out mid-load.
       await cleanupCaches(nextState);
       await notifyClients({
         type: 'NOVA_UPDATE_READY',
@@ -415,7 +425,10 @@ self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     await self.clients.claim();
     const state = await readActiveState();
-    if (state) await cleanupCaches(state);
+    if (state) {
+      await cleanupCaches(state);
+      await cleanupLegacyCaches();
+    }
   })());
 });
 
