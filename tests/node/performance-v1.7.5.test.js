@@ -102,3 +102,12 @@ test('drone route planning is decimated while physics/update still executes',()=
   assert.ok(p.droneRouteFramesSkipped>=10);
   assert.equal(p.terrainQueries,q);
 });
+
+test('cached AI waypoint steering remains live on skipped planning frames',()=>{
+  const {Game}=loadPerformance(),g=new Game(),t={id:3,x:0,y:0,isPlayer:false,ai:{__v172Waypoint:{x:0,y:200},__v172WaypointUntil:1}};
+  g.__novaTerrain=[rect(1,900,900,40,40)];
+  g.moveTank(t,100,0,1/60);
+  assert.ok(t.y>0,`expected cached waypoint to bend movement, y=${t.y}`);
+  assert.equal(g.novaPerfSnapshot().terrainQueries,0);
+  assert.equal(t.ai.__v172Routing,true);
+});
