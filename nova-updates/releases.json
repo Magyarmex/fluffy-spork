@@ -1,6 +1,40 @@
 {
-  "currentVersion": "1.7.1",
+  "currentVersion": "1.7.2",
   "releases": [
+    {
+      "version": "1.7.2",
+      "codename": "Combined Arms",
+      "date": "2026-08-08",
+      "headline": "The new disciplines learn to fight the battlefield instead of merely colliding with it.",
+      "groups": {
+        "Battlefield Intelligence": [
+          "AI tanks use predictive short-horizon terrain probes and local corner waypoints to route around nearby fortifications before grinding into them.",
+          "AI may investigate the last position where it legitimately saw a target for a short time, but hidden target movement is never updated until real reacquisition.",
+          "Controller drones reuse local corner routing while forming, farming, defending and recalling; locked attack dives remain committed and crash into cover instead of cheating around it.",
+          "Cannon AI can intentionally fire on destructible cover blocking a recent legitimate contact, turning breaching into a real tactical choice rather than through-wall pressure."
+        ],
+        "Cover and Explosions": [
+          "Hard cover now occludes blast damage as well as bullets and sight.",
+          "Partial exposure around an edge is sampled across the target hull, so peeking out of cover can receive partial blast damage without explosions applying full damage through solid walls.",
+          "Countercharged Guardian shots gain modest structural authority, letting a successful read convert into limited map pressure without replacing Cannon as the dedicated breaching lineage."
+        ],
+        "Three Disciplines × Battlefield": [
+          "The Cannon fuse display now distinguishes the programmed FUSE point from an earlier physical IMPACT against terrain.",
+          "Blocked fuse paths identify actual collision distance and remaining destructible-cover integrity instead of pretending the programmed airburst is reachable.",
+          "Apex Cannon structural specialization continues to flow through Battlefield's canonical break, rubble, score and feedback systems."
+        ],
+        "Blackglass Containment": [
+          "Fixed the real portrait-mobile showroom regression where the late-injected base stylesheet could override the earlier mobile polish and restore the three-column desktop grid.",
+          "Portrait/coarse-pointer devices now receive an explicit bounded single-column showroom: dossier rail, animated stage, identity, telemetry and graft lab all remain inside the phone viewport.",
+          "Hard min-width/max-width/overflow rules prevent intelligence text, stat values, graft deltas and library cards from leaking beyond the screen or drawing over adjacent sections.",
+          "The containment stylesheet reasserts itself after the base showroom stylesheet appears, making the fix resilient to DOMContentLoaded load order."
+        ],
+        "Validation": [
+          "Added regression tests for blast occlusion, partial exposure, local waypoint routing, Cannon impact preview, intentional structural fire and legitimate last-seen AI memory.",
+          "The production materializer syntax-checks every runtime layer and now loads Combined Arms plus the Blackglass containment layer after Apex Doctrine."
+        ]
+      }
+    },
     {
       "version": "1.7.1",
       "codename": "Apex Doctrine",
