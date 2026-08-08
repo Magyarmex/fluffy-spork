@@ -8,6 +8,8 @@
 
 No install required — play directly in a modern browser on desktop or mobile.
 
+**Current release: v1.2.0 · Silent Horizon** — skill-based sniper counterplay, off-screen threat cues, focus/quick-shot Railgun play, swept projectile interception, suppression, and new procedural spatial SFX.
+
 ---
 
 ## About
@@ -29,11 +31,17 @@ Every major system is expected to be evaluated for:
 - punish windows for mistakes
 - soft interactive counters rather than binary hard-counter matchups
 
-The current highest-priority combat-design issue is sniper/Railgun counterplay: preserving lethal long-range play while making sniper duels interactive and skill-based for both the shooter and the target.
+### Silent Horizon: sniper skill duel
 
-Read the full doctrine: **[`DESIGN_PRINCIPLES.md`](./DESIGN_PRINCIPLES.md)**
+v1.2.0 turns Railgun combat into a more interactive long-range duel while preserving the sniper fantasy. Full-power Rail shots require focus and progressively commit aim; early release produces a weaker quick-shot. Off-screen snipers communicate restrained bearing/timing information through directional glint and spatial audio rather than revealing exact coordinates. Correctly placed defensive fire can now intercept Rail rounds through swept collision, and accurate suppression can break deep focus.
 
-See active development priorities: **[`ROADMAP.md`](./ROADMAP.md)**
+The intended anti-sniper rhythm is:
+
+**Detect bearing → manipulate aim → survive/intercept → exploit recovery → take territory → repeat.**
+
+Read the full doctrine: **[`DESIGN_PRINCIPLES.md`](./DESIGN_PRINCIPLES.md)**  
+See active development priorities: **[`ROADMAP.md`](./ROADMAP.md)**  
+Browse release history: **[`RELEASES.md`](./RELEASES.md)**
 
 ## Current systems
 
@@ -41,6 +49,11 @@ See active development priorities: **[`ROADMAP.md`](./ROADMAP.md)**
 - Late-game Apex evolutions
 - Cross-lineage gene splicing / hybridization
 - Distinct weapon and combat archetypes
+- Focus / quick-shot Railgun skill system
+- Off-screen directional sniper threat cues
+- Projectile interception with swept collision for hypervelocity rounds
+- Skill-based sniper suppression and advance windows
+- Procedural stereo combat SFX
 - AI-controlled enemy tanks that progress alongside the player
 - Desktop and mobile browser play
 - GitHub Pages deployment
@@ -70,7 +83,17 @@ NOVA TANKS is intended to improve across the entire game rather than only accumu
 
 ## Releases
 
-NOVA TANKS uses semantic-style version numbers (`MAJOR.MINOR.PATCH`). New releases are intended to maintain a persistent changelog and browsable version history so the game's evolution remains visible over time.
+NOVA TANKS uses semantic-style version numbers (`MAJOR.MINOR.PATCH`) and maintains a durable release ledger in [`RELEASES.md`](./RELEASES.md).
+
+### Latest — v1.2.0 · Silent Horizon
+- full-power Rail focus and weaker charge-scaled quick-shots
+- progressive aim commitment during deep focus
+- off-screen directional glint and incoming audio
+- explicit Rail interception integrity
+- swept projectile-vs-projectile collision
+- accurate suppression that can break focus
+- post-shot bearing/recovery windows for skilled advancement
+- synthesized charge, rail-crack, flyby, and quick-shot SFX
 
 ---
 
