@@ -29,6 +29,7 @@ jobs:
 
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           path = Path('index.html.new')
           html = path.read_text(encoding='utf-8')
@@ -49,17 +50,20 @@ jobs:
 
           # Load the current runtime update after all bundled factories have
           # registered but before main boots, allowing safe module wrapping.
-          boot_marker = 'window.__bootModule("main");'
-          if './nova-updates/sniper-v1.2.0.js' not in html:
-              if boot_marker not in html:
+          script_path = './nova-updates/sniper-v1.2.0.js'
+          if script_path not in html:
+              pattern = r"window\.__bootModule\((['\"])main\1\);"
+              match = re.search(pattern, html)
+              if not match:
                   raise SystemExit('NOVA boot marker not found')
+              boot = match.group(0)
               injection = (
                   '</script>\n'
-                  '<script src="./nova-updates/sniper-v1.2.0.js"></script>\n'
+                  f'<script src="{script_path}"></script>\n'
                   '<script>\n'
-                  + boot_marker
+                  + boot
               )
-              html = html.replace(boot_marker, injection, 1)
+              html = html[:match.start()] + injection + html[match.end():]
 
           path.write_text(html, encoding='utf-8')
           PY
