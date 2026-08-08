@@ -93,6 +93,7 @@ jobs:
               './nova-updates/showroom-containment-v1.7.2.js',
               './nova-updates/showroom-fit-v1.7.3.js',
               './nova-updates/auto-update-test-v1.7.4.js',
+              './nova-updates/performance-v1.7.5.js',
               './nova-updates/lobby-history.js',
           ]
           pattern = r"window\.__bootModule\((['\"])main\1\);"
@@ -131,6 +132,7 @@ jobs:
           grep -q 'nova-updates/showroom-containment-v1.7.2.js' index.html.new
           grep -q 'nova-updates/showroom-fit-v1.7.3.js' index.html.new
           grep -q 'nova-updates/auto-update-test-v1.7.4.js' index.html.new
+          grep -q 'nova-updates/performance-v1.7.5.js' index.html.new
           grep -q 'nova-updates/lobby-history.js' index.html.new
           mv index.html.new index.html
           echo "Materialized $(wc -c < index.html) bytes into index.html"
