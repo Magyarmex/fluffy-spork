@@ -1,12 +1,13 @@
 /* NOVA TANKS v1.6.0 — Battlefield
  * Terrain, line-of-sight, destructible cover, tactical lanes, AI pathing,
  * spawn safety, drone/spotter terrain interaction, battlefield rendering and SFX.
+ * Performance hardening: exact spatial broad-phase for every private terrain hot path.
  */
 (function(){
 'use strict';
 var mods=window.__novaModules;
 if(!mods){console.error('[NOVA v1.6.0] module registry unavailable');return;}
-var VERSION='1.6.0', CODENAME='Battlefield', MAP_LIMIT=2250, TAU=Math.PI*2;
+var VERSION='1.6.0', CODENAME='Battlefield', MAP_LIMIT=2250, TAU=Math.PI*2, TERRAIN_CELL=360;
 window.__NOVA_BATTLEFIELD_RELEASE__={
   version:VERSION,codename:CODENAME,date:'2026-08-08',
   headline:'The arena becomes a battlefield: cover, lanes, line-of-sight and breachable ground.',
@@ -44,8 +45,8 @@ window.__NOVA_BATTLEFIELD_RELEASE__={
 function wrap(id,after){var old=mods[id];if(!old)return;mods[id]=function(module,exports,require){old(module,exports,require);after(module.exports,require);};}
 function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
 function d2(ax,ay,bx,by){var x=bx-ax,y=by-ay;return x*x+y*y;}
-function segRectHit(ax,ay,bx,by,r){
-  var minx=r.x-r.w*.5,maxx=r.x+r.w*.5,miny=r.y-r.h*.5,maxy=r.y+r.h*.5;
+function segRectHit(ax,ay,bx,by,s,pad){
+  pad=pad||0;var minx=s.x-s.w*.5-pad,maxx=s.x+s.w*.5+pad,miny=s.y-s.h*.5-pad,maxy=s.y+s.h*.5+pad;
   var dx=bx-ax,dy=by-ay,t0=0,t1=1;
   function slab(p,q){if(Math.abs(p)<1e-9)return q>=0;var z=q/p;if(p<0){if(z>t1)return false;if(z>t0)t0=z;}else{if(z<t0)return false;if(z<t1)t1=z;}return true;}
   if(!slab(-dx,ax-minx)||!slab(dx,maxx-ax)||!slab(-dy,ay-miny)||!slab(dy,maxy-ay))return null;
@@ -53,12 +54,12 @@ function segRectHit(ax,ay,bx,by,r){
   if(Math.abs(x-minx)<eps)nx=-1;else if(Math.abs(x-maxx)<eps)nx=1;else if(Math.abs(y-miny)<eps)ny=-1;else if(Math.abs(y-maxy)<eps)ny=1;
   return {t:t,x:x,y:y,nx:nx,ny:ny};
 }
-function segCircleHit(ax,ay,bx,by,c){
-  var dx=bx-ax,dy=by-ay,fx=ax-c.x,fy=ay-c.y,A=dx*dx+dy*dy,B=2*(fx*dx+fy*dy),C=fx*fx+fy*fy-c.r*c.r,D=B*B-4*A*C;if(D<0||A<1e-9)return null;D=Math.sqrt(D);var t=(-B-D)/(2*A);if(t<0||t>1){t=(-B+D)/(2*A);if(t<0||t>1)return null;}var x=ax+dx*t,y=ay+dy*t,l=Math.hypot(x-c.x,y-c.y)||1;return{t:t,x:x,y:y,nx:(x-c.x)/l,ny:(y-c.y)/l};
+function segCircleHit(ax,ay,bx,by,s,pad){
+  var r=s.r+(pad||0),dx=bx-ax,dy=by-ay,fx=ax-s.x,fy=ay-s.y,A=dx*dx+dy*dy,B=2*(fx*dx+fy*dy),C=fx*fx+fy*fy-r*r,D=B*B-4*A*C;if(D<0||A<1e-9)return null;D=Math.sqrt(D);var t=(-B-D)/(2*A);if(t<0||t>1){t=(-B+D)/(2*A);if(t<0||t>1)return null;}var x=ax+dx*t,y=ay+dy*t,l=Math.hypot(x-s.x,y-s.y)||1;return{t:t,x:x,y:y,nx:(x-s.x)/l,ny:(y-s.y)/l};
 }
 function solidAlive(s){return !!s&&s.solid!==false&&(!s.destructible||s.hp>0);}
-function solidHit(s,ax,ay,bx,by,pad){if(!solidAlive(s))return null;if(s.shape==='circle'){var c={x:s.x,y:s.y,r:s.r+(pad||0)};return segCircleHit(ax,ay,bx,by,c);}var rr={x:s.x,y:s.y,w:s.w+(pad||0)*2,h:s.h+(pad||0)*2};return segRectHit(ax,ay,bx,by,rr);}
-function pointInsideSolid(s,x,y,pad){if(!solidAlive(s))return false;pad=pad||0;if(s.shape==='circle')return d2(x,y,s.x,s.y)<=Math.pow(s.r+pad,2);return Math.abs(x-s.x)<=s.w*.5+pad&&Math.abs(y-s.y)<=s.h*.5+pad;}
+function solidHit(s,ax,ay,bx,by,pad){if(!solidAlive(s))return null;return s.shape==='circle'?segCircleHit(ax,ay,bx,by,s,pad||0):segRectHit(ax,ay,bx,by,s,pad||0);}
+function pointInsideSolid(s,x,y,pad){if(!solidAlive(s))return false;pad=pad||0;if(s.shape==='circle'){var r=s.r+pad;return d2(x,y,s.x,s.y)<=r*r;}return Math.abs(x-s.x)<=s.w*.5+pad&&Math.abs(y-s.y)<=s.h*.5+pad;}
 function addRect(a,id,x,y,w,h,type,hp){a.push({id:id,kind:'terrain',shape:'rect',x:x,y:y,w:w,h:h,type:type,destructible:type==='cover',hp:hp||0,maxHp:hp||0,solid:true,flash:0,brokenAt:0});}
 function addCircle(a,id,x,y,r,type,hp){a.push({id:id,kind:'terrain',shape:'circle',x:x,y:y,r:r,type:type,destructible:type==='cover',hp:hp||0,maxHp:hp||0,solid:true,flash:0,brokenAt:0});}
 function txPoint(p,rot,mirror){var x=p[0]*(mirror?-1:1),y=p[1];for(var i=0;i<rot;i++){var q=x;x=-y;y=q;}return[x,y];}
@@ -66,7 +67,7 @@ function txRect(x,y,w,h,rot,mirror){var p=txPoint([x,y],rot,mirror);if(rot%2){va
 var TEMPLATES=[
  {name:'CROSSFIRE',desc:'Four fortified approaches surround an exposed central crossing.',build:function(a,rot,mir){var id=1,r;
    [[0,-690,520,92],[0,690,520,92],[-690,0,92,520],[690,0,92,520],[-1180,-470,82,520],[-1180,470,82,520],[1180,-470,82,520],[1180,470,82,520]].forEach(function(v){r=txRect(v[0],v[1],v[2],v[3],rot,mir);addRect(a,id++,r[0],r[1],r[2],r[3],'wall');});
-   [[-470,-470,92], [470,-470,92],[-470,470,92],[470,470,92]].forEach(function(v){var p=txPoint(v,rot,mir);addCircle(a,id++,p[0],p[1],v[2],'pillar');});
+   [[-470,-470,92],[470,-470,92],[-470,470,92],[470,470,92]].forEach(function(v){var p=txPoint(v,rot,mir);addCircle(a,id++,p[0],p[1],v[2],'pillar');});
    [[-250,-250,180,60],[250,-250,180,60],[-250,250,180,60],[250,250,180,60],[-920,0,65,210],[920,0,65,210],[0,-920,210,65],[0,920,210,65]].forEach(function(v){r=txRect(v[0],v[1],v[2],v[3],rot,mir);addRect(a,id++,r[0],r[1],r[2],r[3],'cover',300);});
  }},
  {name:'SPLIT HORIZON',desc:'Two long spines create dangerous sightlines with wide exterior flanks.',build:function(a,rot,mir){var id=1,r;
@@ -85,32 +86,56 @@ function ensureTerrain(g){
  var raw=((Date.now()>>>8)^(Math.random()*0x7fffffff))>>>0,idx=raw%TEMPLATES.length,rot=(raw>>>3)%4,mir=((raw>>>5)&1)!==0,a=[];
  TEMPLATES[idx].build(a,rot,mir);
  for(var i=0;i<a.length;i++)a[i].id=-(i+1000);
- g.__novaTerrain=a;g.__novaTerrainRubble=[];g.__novaBattlefield={name:TEMPLATES[idx].name,desc:TEMPLATES[idx].desc,seed:raw,announced:false,coverTotal:a.filter(function(s){return s.destructible;}).length,coverBroken:0};
+ var total=0;for(var j=0;j<a.length;j++)if(a[j].destructible)total++;
+ g.__novaTerrain=a;g.__novaTerrainRubble=[];g.__novaBattlefield={name:TEMPLATES[idx].name,desc:TEMPLATES[idx].desc,seed:raw,announced:false,coverTotal:total,coverBroken:0};
  return a;
 }
-function safePoint(g,x,y,pad){var a=ensureTerrain(g);for(var i=0;i<a.length;i++)if(pointInsideSolid(a[i],x,y,pad||40))return false;return true;}
-function lineOfSight(g,ax,ay,bx,by,pad){var a=ensureTerrain(g),best=1.01;for(var i=0;i<a.length;i++){var s=a[i];if(!solidAlive(s))continue;var h=solidHit(s,ax,ay,bx,by,pad||1);if(h&&h.t>0.015&&h.t<best)best=h.t;}return best>1;}
-function firstSolidHit(g,ax,ay,bx,by,pad){var a=ensureTerrain(g),best=null;for(var i=0;i<a.length;i++){var s=a[i],h=solidHit(s,ax,ay,bx,by,pad||0);if(h&&(!best||h.t<best.hit.t))best={solid:s,hit:h};}return best;}
+
+/* Exact broad phase. Terrain itself is static in position; destroyed cover only
+ * toggles solidity, so the cell index is built once and stays valid all run. */
+function terrainIndex(g){
+ var a=ensureTerrain(g),ix=g.__novaBattlefieldIndex;if(ix&&ix.terrain===a&&ix.length===a.length)return ix;
+ ix={terrain:a,length:a.length,cells:new Map(),scratch:[],stamp:0};
+ for(var i=0;i<a.length;i++){
+   var s=a[i],r=s.shape==='circle'?s.r:0,x0=s.shape==='circle'?s.x-r:s.x-s.w*.5,x1=s.shape==='circle'?s.x+r:s.x+s.w*.5,y0=s.shape==='circle'?s.y-r:s.y-s.h*.5,y1=s.shape==='circle'?s.y+r:s.y+s.h*.5;
+   var cx0=Math.floor(x0/TERRAIN_CELL),cx1=Math.floor(x1/TERRAIN_CELL),cy0=Math.floor(y0/TERRAIN_CELL),cy1=Math.floor(y1/TERRAIN_CELL);
+   for(var cx=cx0;cx<=cx1;cx++)for(var cy=cy0;cy<=cy1;cy++){var k=cx*10000+cy,b=ix.cells.get(k);if(!b){b=[];ix.cells.set(k,b);}b.push(s);}
+ }
+ g.__novaBattlefieldIndex=ix;return ix;
+}
+function terrainCandidates(g,x0,y0,x1,y1,pad){
+ var ix=terrainIndex(g),p=pad||0,cx0=Math.floor((Math.min(x0,x1)-p)/TERRAIN_CELL),cx1=Math.floor((Math.max(x0,x1)+p)/TERRAIN_CELL),cy0=Math.floor((Math.min(y0,y1)-p)/TERRAIN_CELL),cy1=Math.floor((Math.max(y0,y1)+p)/TERRAIN_CELL);
+ if((cx1-cx0+1)*(cy1-cy0+1)>80)return ix.terrain;
+ var out=ix.scratch;out.length=0;var stamp=++ix.stamp;if(stamp>0x3fffffff){ix.stamp=stamp=1;for(var z=0;z<ix.terrain.length;z++)ix.terrain[z].__novaBattlefieldStamp=0;}
+ for(var cx=cx0;cx<=cx1;cx++)for(var cy=cy0;cy<=cy1;cy++){var b=ix.cells.get(cx*10000+cy);if(!b)continue;for(var i=0;i<b.length;i++){var s=b[i];if(s.__novaBattlefieldStamp===stamp)continue;s.__novaBattlefieldStamp=stamp;out.push(s);}}
+ var perf=g.__novaPerf;if(perf){perf.battlefieldQueries=(perf.battlefieldQueries||0)+1;perf.battlefieldCandidates=(perf.battlefieldCandidates||0)+out.length;}
+ return out;
+}
+function safePoint(g,x,y,pad){pad=pad||40;var a=terrainCandidates(g,x,y,x,y,pad);for(var i=0;i<a.length;i++)if(pointInsideSolid(a[i],x,y,pad))return false;return true;}
+function lineOfSight(g,ax,ay,bx,by,pad){pad=pad||1;var a=terrainCandidates(g,ax,ay,bx,by,pad);for(var i=0;i<a.length;i++){var h=solidHit(a[i],ax,ay,bx,by,pad);if(h&&h.t>0.015&&h.t<1.01)return false;}return true;}
+function firstSolidHit(g,ax,ay,bx,by,pad){pad=pad||0;var a=terrainCandidates(g,ax,ay,bx,by,pad),bestS=null,bestH=null;for(var i=0;i<a.length;i++){var s=a[i],h=solidHit(s,ax,ay,bx,by,pad);if(h&&(!bestH||h.t<bestH.t)){bestS=s;bestH=h;}}return bestH?{solid:bestS,hit:bestH}:null;}
 function circleResolve(g,e,r){
- var a=ensureTerrain(g),hitAny=false,lastN={x:0,y:0};
- for(var pass=0;pass<2;pass++)for(var i=0;i<a.length;i++){var s=a[i];if(!solidAlive(s))continue;
-   if(s.shape==='circle'){
-     var dx=e.x-s.x,dy=e.y-s.y,dist=Math.hypot(dx,dy),min=s.r+r;if(dist<min){if(dist<1e-4){dx=1;dy=0;dist=1;}var nx=dx/dist,ny=dy/dist,p=min-dist+0.35;e.x+=nx*p;e.y+=ny*p;lastN={x:nx,y:ny};hitAny=true;}
-   }else{
-     var minx=s.x-s.w*.5-r,maxx=s.x+s.w*.5+r,miny=s.y-s.h*.5-r,maxy=s.y+s.h*.5+r;if(e.x<=minx||e.x>=maxx||e.y<=miny||e.y>=maxy)continue;
-     var dl=e.x-minx,dr=maxx-e.x,dt=e.y-miny,db=maxy-e.y,m=Math.min(dl,dr,dt,db),nx=0,ny=0;if(m===dl){e.x=minx;nx=-1;}else if(m===dr){e.x=maxx;nx=1;}else if(m===dt){e.y=miny;ny=-1;}else{e.y=maxy;ny=1;}lastN={x:nx,y:ny};hitAny=true;
+ var hitAny=false,lastNx=0,lastNy=0;
+ for(var pass=0;pass<2;pass++){
+   var a=terrainCandidates(g,e.x,e.y,e.x,e.y,r);
+   for(var i=0;i<a.length;i++){var s=a[i];if(!solidAlive(s))continue;
+     if(s.shape==='circle'){
+       var dx=e.x-s.x,dy=e.y-s.y,dist=Math.hypot(dx,dy),min=s.r+r;if(dist<min){if(dist<1e-4){dx=1;dy=0;dist=1;}var nx=dx/dist,ny=dy/dist,p=min-dist+0.35;e.x+=nx*p;e.y+=ny*p;lastNx=nx;lastNy=ny;hitAny=true;}
+     }else{
+       var minx=s.x-s.w*.5-r,maxx=s.x+s.w*.5+r,miny=s.y-s.h*.5-r,maxy=s.y+s.h*.5+r;if(e.x<=minx||e.x>=maxx||e.y<=miny||e.y>=maxy)continue;
+       var dl=e.x-minx,dr=maxx-e.x,dt=e.y-miny,db=maxy-e.y,m=Math.min(dl,dr,dt,db),rx=0,ry=0;if(m===dl){e.x=minx;rx=-1;}else if(m===dr){e.x=maxx;rx=1;}else if(m===dt){e.y=miny;ry=-1;}else{e.y=maxy;ry=1;}lastNx=rx;lastNy=ry;hitAny=true;
+     }
    }
  }
- if(hitAny){var dot=(e.vx||0)*lastN.x+(e.vy||0)*lastN.y;if(dot<0){e.vx-=lastN.x*dot;e.vy-=lastN.y*dot;}e.__novaTerrainBump=lastN;e.__novaTerrainBumpT=.22;}
+ if(hitAny){var dot=(e.vx||0)*lastNx+(e.vy||0)*lastNy;if(dot<0){e.vx-=lastNx*dot;e.vy-=lastNy*dot;}var n=e.__novaTerrainBump||(e.__novaTerrainBump={x:0,y:0});n.x=lastNx;n.y=lastNy;e.__novaTerrainBumpT=.22;}
  return hitAny;
 }
 function damageCover(g,s,dmg,ownerId,x,y,bullet){if(!s||!s.destructible||s.hp<=0)return false;var mult=bullet&&bullet.shell?1.35:bullet&&bullet.beam?.92:1;s.hp-=dmg*mult;s.flash=.16;if(g.addImpactDebris)g.addImpactDebris(x,y,bullet?bullet.vx:0,bullet?bullet.vy:0,'#8fd4ff',4);if(g.sfx&&g.sfx.novaCoverHit)g.sfx.novaCoverHit((x-(g.player?g.player.x:x))/700,Math.min(1,dmg/70));if(s.hp<=0){s.hp=0;s.solid=false;s.brokenAt=g.time;(g.__novaTerrainRubble||(g.__novaTerrainRubble=[])).push({x:s.x,y:s.y,w:s.w||s.r*2,h:s.h||s.r*2,r:s.r||0,shape:s.shape,life:999});if(g.addParticles)g.addParticles(s.x,s.y,'#8fd4ff',16,180,'spark');if(g.addRing)g.addRing(s.x,s.y,'#8fd4ff',Math.min(100,(s.w||s.r*2)*.45));if(g.sfx&&g.sfx.novaCoverBreak)g.sfx.novaCoverBreak((s.x-(g.player?g.player.x:s.x))/700);if(g.__novaBattlefield)g.__novaBattlefield.coverBroken++;var killer=ownerId>=0&&g.getTank?g.getTank(ownerId):null;if(killer&&killer.alive){if(g.gainXP)g.gainXP(killer,18);if(killer.isPlayer&&g.addText)g.addText(s.x,s.y-24,'BREACHED +18','#9fe8ff',10);}return true;}return false;}
 function terrainRadiusForTank(t,classes){return ((classes[t.cls]&&classes[t.cls].size)||15)+3;}
-function worldToScreen(g,x,y){var z=(g.cam&&g.cam.zoom)||1;return{x:(x-g.cam.x)*z+g.w*.5,y:(y-g.cam.y)*z+g.h*.5,z:z};}
-function drawTerrain(ctx,g,w,h){var a=ensureTerrain(g),z=(g.cam&&g.cam.zoom)||1;
+function drawTerrain(ctx,g,w,h){var a=ensureTerrain(g),z=(g.cam&&g.cam.zoom)||1,camx=g.cam.x,camy=g.cam.y,hw=g.w*.5,hhw=g.h*.5;
  ctx.save();ctx.setTransform(g.dpr||1,0,0,g.dpr||1,0,0);
- for(var i=0;i<a.length;i++){var s=a[i];if(!solidAlive(s))continue;var p=worldToScreen(g,s.x,s.y),ww=(s.w||s.r*2)*z,hh=(s.h||s.r*2)*z;if(p.x+ww*.6<-30||p.x-ww*.6>w+30||p.y+hh*.6<-30||p.y-hh*.6>h+30)continue;var frac=s.destructible?clamp(s.hp/s.maxHp,0,1):1;
-   ctx.save();ctx.translate(p.x,p.y);ctx.globalAlpha=.98;
+ for(var i=0;i<a.length;i++){var s=a[i];if(!solidAlive(s))continue;var px=(s.x-camx)*z+hw,py=(s.y-camy)*z+hhw,ww=(s.w||s.r*2)*z,hh=(s.h||s.r*2)*z;if(px+ww*.6<-30||px-ww*.6>w+30||py+hh*.6<-30||py-hh*.6>h+30)continue;var frac=s.destructible?clamp(s.hp/s.maxHp,0,1):1;
+   ctx.save();ctx.translate(px,py);ctx.globalAlpha=.98;
    ctx.shadowColor='rgba(0,0,0,.75)';ctx.shadowBlur=18*z;ctx.shadowOffsetY=8*z;
    var grad=ctx.createLinearGradient(-ww*.5,-hh*.5,ww*.5,hh*.5);if(s.destructible){grad.addColorStop(0,'rgba(19,50,69,.97)');grad.addColorStop(1,'rgba(8,22,34,.99)');}else{grad.addColorStop(0,'rgba(24,33,53,.99)');grad.addColorStop(1,'rgba(7,12,24,.99)');}ctx.fillStyle=grad;ctx.strokeStyle=s.destructible?'rgba(111,220,255,'+(0.24+0.36*frac)+')':'rgba(142,165,210,.34)';ctx.lineWidth=Math.max(1,1.4*z);
    if(s.shape==='circle'){ctx.beginPath();ctx.arc(0,0,s.r*z,0,TAU);ctx.fill();ctx.stroke();}else{var rr=Math.min(12*z,Math.min(ww,hh)*.16);ctx.beginPath();ctx.roundRect(-ww*.5,-hh*.5,ww,hh,rr);ctx.fill();ctx.stroke();}
@@ -119,7 +144,7 @@ function drawTerrain(ctx,g,w,h){var a=ensureTerrain(g),z=(g.cam&&g.cam.zoom)||1;
    if(s.flash>0){ctx.globalCompositeOperation='lighter';ctx.fillStyle='rgba(180,235,255,'+clamp(s.flash*3,0,.6)+')';if(s.shape==='circle'){ctx.beginPath();ctx.arc(0,0,s.r*z,0,TAU);ctx.fill();}else ctx.fillRect(-ww*.5,-hh*.5,ww,hh);}
    ctx.restore();
  }
- var rubble=g.__novaTerrainRubble||[];for(var j=0;j<rubble.length;j++){var rb=rubble[j],rp=worldToScreen(g,rb.x,rb.y),rw=(rb.w||rb.r*2)*z,rh=(rb.h||rb.r*2)*z;ctx.save();ctx.translate(rp.x,rp.y);ctx.globalAlpha=.46;ctx.strokeStyle='rgba(98,156,177,.28)';ctx.fillStyle='rgba(15,28,38,.38)';if(rb.shape==='circle'){ctx.beginPath();ctx.arc(0,0,rb.r*z*.9,0,TAU);ctx.fill();ctx.stroke();}else{ctx.fillRect(-rw*.47,-rh*.40,rw*.94,rh*.80);ctx.strokeRect(-rw*.47,-rh*.40,rw*.94,rh*.80);}ctx.restore();}
+ var rubble=g.__novaTerrainRubble||[];for(var j=0;j<rubble.length;j++){var rb=rubble[j],rpx=(rb.x-camx)*z+hw,rpy=(rb.y-camy)*z+hhw,rw=(rb.w||rb.r*2)*z,rh=(rb.h||rb.r*2)*z;if(rpx+rw*.6<-25||rpx-rw*.6>w+25||rpy+rh*.6<-25||rpy-rh*.6>h+25)continue;ctx.save();ctx.translate(rpx,rpy);ctx.globalAlpha=.46;ctx.strokeStyle='rgba(98,156,177,.28)';ctx.fillStyle='rgba(15,28,38,.38)';if(rb.shape==='circle'){ctx.beginPath();ctx.arc(0,0,rb.r*z*.9,0,TAU);ctx.fill();ctx.stroke();}else{ctx.fillRect(-rw*.47,-rh*.40,rw*.94,rh*.80);ctx.strokeRect(-rw*.47,-rh*.40,rw*.94,rh*.80);}ctx.restore();}
  if(g.__novaBattlefield){var b=g.__novaBattlefield,remaining=Math.max(0,b.coverTotal-b.coverBroken);ctx.save();ctx.globalAlpha=.88;ctx.fillStyle='rgba(3,9,18,.70)';ctx.strokeStyle='rgba(125,243,255,.25)';ctx.lineWidth=1;var sw=Math.min(218,w*.56),sx=w*.5-sw*.5,sy=44;ctx.beginPath();ctx.roundRect(sx,sy,sw,22,8);ctx.fill();ctx.stroke();ctx.fillStyle='#9fdff0';ctx.font='700 8px Orbitron,system-ui';ctx.textAlign='center';ctx.fillText('BATTLEFIELD · '+b.name+'   COVER '+remaining+'/'+b.coverTotal,w*.5,sy+14);ctx.restore();}
  ctx.restore();
 }
@@ -147,15 +172,17 @@ wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.
 
  var oldTryFire=Game.prototype.tryFire;Game.prototype.tryFire=function(t){if(t&&!t.isPlayer&&t.ai&&t.ai.targetId>=0){var target=this.getTank(t.ai.targetId);if(target&&target.alive&&!lineOfSight(this,t.x,t.y,target.x,target.y,4)){t.__novaTerrainDeniedFire=true;t.__novaTerrainDeniedUntil=this.time+.15;return;}}return oldTryFire.apply(this,arguments);};
 
- var oldUpdateBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){ensureTerrain(this);for(var i=0;i<this.bullets.length;i++){var b=this.bullets[i];if(!b||b.dead)continue;var nx=b.x+(b.vx||0)*dt,ny=b.y+(b.vy||0)*dt,fh=firstSolidHit(this,b.x,b.y,nx,ny,(b.r||2)*.45);if(!fh)continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);b.x=h.x+(b.vx||0)*.003;b.y=h.y+(b.vy||0)*.003;continue;}}
+ var oldUpdateBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var terrain=ensureTerrain(this);for(var i=0;i<this.bullets.length;i++){var b=this.bullets[i];if(!b||b.dead)continue;var nx=b.x+(b.vx||0)*dt,ny=b.y+(b.vy||0)*dt,fh=firstSolidHit(this,b.x,b.y,nx,ny,(b.r||2)*.45);if(!fh)continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);b.x=h.x+(b.vx||0)*.003;b.y=h.y+(b.vy||0)*.003;continue;}}
    if(b.shell&&this.clusterBurst)this.clusterBurst(b);if(b.splash&&this.splashAt)this.splashAt(h.x,h.y,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.dead=true;if(this.addFlash)this.addFlash(h.x,h.y,s.destructible?'#8fd4ff':'#b9c7e7',Math.min(46,14+(b.dmg||0)*.24));if(this.cam&&b.dmg>42)this.cam.shake=Math.max(this.cam.shake,.08);
  }
- var out=oldUpdateBullets.call(this,dt);for(var j=0;j<ensureTerrain(this).length;j++){var q=ensureTerrain(this)[j];if(q.flash>0)q.flash=Math.max(0,q.flash-dt);}return out;};
+ var out=oldUpdateBullets.call(this,dt);for(var j=0;j<terrain.length;j++){var q=terrain[j];if(q.flash>0)q.flash=Math.max(0,q.flash-dt);}return out;};
 
- var oldSplash=Game.prototype.splashAt;Game.prototype.splashAt=function(x,y,radius,frac,ownerId,knock,color,dmg){var out=oldSplash.apply(this,arguments),a=ensureTerrain(this);for(var i=0;i<a.length;i++){var s=a[i];if(!s.destructible||s.hp<=0)continue;var dx=Math.max(Math.abs(x-s.x)-(s.shape==='rect'?s.w*.5:s.r),0),dy=Math.max(Math.abs(y-s.y)-(s.shape==='rect'?s.h*.5:s.r),0),dist=Math.hypot(dx,dy);if(dist>radius)continue;var fall=1-clamp(dist/Math.max(1,radius),0,1)*.55;damageCover(this,s,(dmg||0)*(frac||.4)*fall,ownerId,x,y,{shell:true,beam:false,vx:0,vy:0});}return out;};
+ var splashBullet={shell:true,beam:false,vx:0,vy:0};
+ var oldSplash=Game.prototype.splashAt;Game.prototype.splashAt=function(x,y,radius,frac,ownerId,knock,color,dmg){var out=oldSplash.apply(this,arguments),a=terrainCandidates(this,x,y,x,y,radius);for(var i=0;i<a.length;i++){var s=a[i];if(!s.destructible||s.hp<=0)continue;var dx=Math.max(Math.abs(x-s.x)-(s.shape==='rect'?s.w*.5:s.r),0),dy=Math.max(Math.abs(y-s.y)-(s.shape==='rect'?s.h*.5:s.r),0),dist=Math.hypot(dx,dy);if(dist>radius)continue;var fall=1-clamp(dist/Math.max(1,radius),0,1)*.55;damageCover(this,s,(dmg||0)*(frac||.4)*fall,ownerId,x,y,splashBullet);}return out;};
 
- var oldUpdateDrones=Game.prototype.updateDrones;Game.prototype.updateDrones=function(dt){ensureTerrain(this);var out=oldUpdateDrones.call(this,dt);for(var j=0;j<this.drones.length;j++){var d=this.drones[j],hit=circleResolve(this,d,(d.r||8)+1);if(hit){if(d.__novaPhase==='dash'){d.__novaPhase='recover';d.__novaPhaseT=Math.max(.28,d.__novaPhaseT||0);d.__novaCommitted=false;d.__novaTarget=null;if(this.addParticles)this.addParticles(d.x,d.y,d.color,4,65,'spark');}var n=d.__novaTerrainBump||{x:0,y:0},side=d.__novaTerrainBias||(((d.id||0)&1)?1:-1);d.__novaTerrainBias=side;d.x+=-n.y*side*28*dt;d.y+=n.x*side*28*dt;circleResolve(this,d,(d.r||8)+1);}}
-   for(var ti=0;ti<this.tanks.length;ti++){var o=this.tanks[ti];if(!o||!o.alive||o.__novaSpotterContactId==null||o.__novaSpotterContactId<0)continue;var target=this.getTank(o.__novaSpotterContactId),spot=null;for(var di=0;di<this.drones.length;di++){var sd=this.drones[di];if(sd.ownerId===o.id&&sd.__novaSpotter){spot=sd;break;}}if(target&&spot&&!lineOfSight(this,spot.x,spot.y,target.x,target.y,2)){o.__novaSpotterContactId=-1;o.__novaSpotterContactUntil=0;o.__novaSpotterDroneId=-1;}}
+ var oldUpdateDrones=Game.prototype.updateDrones;Game.prototype.updateDrones=function(dt){ensureTerrain(this);var out=oldUpdateDrones.call(this,dt);for(var j=0;j<this.drones.length;j++){var d=this.drones[j],hit=circleResolve(this,d,(d.r||8)+1);if(hit){if(d.__novaPhase==='dash'){d.__novaPhase='recover';d.__novaPhaseT=Math.max(.28,d.__novaPhaseT||0);d.__novaCommitted=false;d.__novaTarget=null;if(this.addParticles)this.addParticles(d.x,d.y,d.color,4,65,'spark');}var n=d.__novaTerrainBump,side=d.__novaTerrainBias||(((d.id||0)&1)?1:-1);d.__novaTerrainBias=side;if(n){d.x+=-n.y*side*28*dt;d.y+=n.x*side*28*dt;}circleResolve(this,d,(d.r||8)+1);}}
+   var spotMap=this.__novaSpotterByOwner||(this.__novaSpotterByOwner=new Map());spotMap.clear();for(var di=0;di<this.drones.length;di++){var sd=this.drones[di];if(sd&&sd.__novaSpotter&&!spotMap.has(sd.ownerId))spotMap.set(sd.ownerId,sd);}
+   for(var ti=0;ti<this.tanks.length;ti++){var o=this.tanks[ti];if(!o||!o.alive||o.__novaSpotterContactId==null||o.__novaSpotterContactId<0)continue;var target=this.getTank(o.__novaSpotterContactId),spot=spotMap.get(o.id)||null;if(target&&spot&&!lineOfSight(this,spot.x,spot.y,target.x,target.y,2)){o.__novaSpotterContactId=-1;o.__novaSpotterContactUntil=0;o.__novaSpotterDroneId=-1;}}
  return out;};
 
  var oldUpdate=Game.prototype.update;Game.prototype.update=function(dt){ensureTerrain(this);if(this.__novaBattlefield&&!this.__novaBattlefield.announced&&this.status==='playing'&&this.time>.1){this.__novaBattlefield.announced=true;if(this.toast)this.toast('▦ BATTLEFIELD · '+this.__novaBattlefield.name+' — COVER CHANGES THE FIGHT','info');}
@@ -166,5 +193,6 @@ wrap('game/ai',function(ai){var old=ai.updateAI;if(!old||old.__novaBattlefieldAI
 
 wrap('game/render',function(render){var old=render.render;if(!old||old.__novaBattlefieldRender)return;function patched(g,w,h){old(g,w,h);if(g&&g.ctx)drawTerrain(g.ctx,g,w,h);}patched.__novaBattlefieldRender=true;render.render=patched;});
 
+window.__NOVA_BATTLEFIELD_PERF_TEST__={candidateCount:function(g,x,y,pad){return terrainCandidates(g,x,y,x,y,pad||0).length;},circleResolve:circleResolve};
 console.info('[NOVA TANKS] v'+VERSION+' '+CODENAME+' terrain and line-of-sight online');
 })();

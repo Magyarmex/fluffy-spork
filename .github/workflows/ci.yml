@@ -11,7 +11,17 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      - run: npm install
+          node-version: 24
+      - run: npm install --no-audit --no-fund --no-package-lock
       - run: npm run build
       - run: npm run test
+      - name: Validate production Tailwind compilation
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp index.html index.html.new
+          npx @tailwindcss/cli -i .github/nova-tailwind.css -o /tmp/nova-tailwind.css --minify
+          test -s /tmp/nova-tailwind.css
+          grep -Fq '.pointer-events-none' /tmp/nova-tailwind.css
+          grep -Fq '.font-display' /tmp/nova-tailwind.css
+          rm -f index.html.new /tmp/nova-tailwind.css

@@ -2,6 +2,7 @@
  * Battlefield refinement + Three Disciplines integration.
  * Predictive terrain routing, blast occlusion, cover-aware cannon previews,
  * legitimate last-seen AI memory, intentional breaching, and Controller corner routing.
+ * Performance hardening: tactical math reuses state and avoids transient objects.
  */
 (function(){
 'use strict';
@@ -43,11 +44,15 @@ window.__NOVA_COMBINED_ARMS_RELEASE__={
 function wrap(id,after){var old=mods[id];if(!old)return;mods[id]=function(module,exports,require){old(module,exports,require);after(module.exports,require);};}
 function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
 function d2(ax,ay,bx,by){var dx=bx-ax,dy=by-ay;return dx*dx+dy*dy;}
-function norm(x,y){var d=Math.hypot(x,y)||1;return{x:x/d,y:y/d};}
 function lineage(classes,t){try{return t?classes.lineageForClass(t.cls):null;}catch(_){return null;}}
-function world(g,x,y){var z=(g.cam&&g.cam.zoom)||1;return{x:(x-g.cam.x)*z+g.w*.5,y:(y-g.cam.y)*z+g.h*.5,z:z};}
+function world(g,x,y,out){var z=(g.cam&&g.cam.zoom)||1,p=out||{};p.x=(x-g.cam.x)*z+g.w*.5;p.y=(y-g.cam.y)*z+g.h*.5;p.z=z;return p;}
 function classSize(C,t){return ((t&&C[t.cls]&&C[t.cls].size)||15);}
 function solidPointSafe(g,x,y,pad){return !g.isTerrainSafe||g.isTerrainSafe(x,y,pad||8);}
+function candidateScore(g,x,y,gx,gy,pad,cx,cy,side,tie){
+  if(!solidPointSafe(g,cx,cy,pad*.55))return Infinity;
+  if(g.hasLineOfSight&&!g.hasLineOfSight(x,y,cx,cy,Math.max(1,pad*.28)))return Infinity;
+  var score=Math.sqrt(d2(x,y,cx,cy))+Math.sqrt(d2(cx,cy,gx,gy));if(side===tie)score-=3;return score;
+}
 
 /* Pick one visible local waypoint around the first blocking solid. This is not
  * global pathfinding: it is deliberately short-horizon, readable navigation. */
@@ -57,43 +62,31 @@ function chooseWaypoint(g,x,y,gx,gy,pad,seed){
   if(g.hasLineOfSight&&g.hasLineOfSight(x,y,gx,gy,Math.max(2,pad*.35)))return null;
   var fh=g.firstTerrainHit(x,y,gx,gy,Math.max(2,pad*.45));
   if(!fh||!fh.solid)return null;
-  var s=fh.solid,cands=[],extra=pad+14;
+  var s=fh.solid,extra=pad+14,tie=((seed||0)&1)?1:-1,bx=0,by=0,bs=0,bestScore=Infinity,score;
   if(s.shape==='circle'){
-    var base=Math.atan2(y-s.y,x-s.x),rr=(s.r||40)+extra;
-    cands.push({x:s.x+Math.cos(base+1.05)*rr,y:s.y+Math.sin(base+1.05)*rr,side:1});
-    cands.push({x:s.x+Math.cos(base-1.05)*rr,y:s.y+Math.sin(base-1.05)*rr,side:-1});
+    var base=Math.atan2(y-s.y,x-s.x),rr=(s.r||40)+extra,cx=s.x+Math.cos(base+1.05)*rr,cy=s.y+Math.sin(base+1.05)*rr;
+    score=candidateScore(g,x,y,gx,gy,pad,cx,cy,1,tie);if(score<bestScore){bestScore=score;bx=cx;by=cy;bs=1;}
+    cx=s.x+Math.cos(base-1.05)*rr;cy=s.y+Math.sin(base-1.05)*rr;
+    score=candidateScore(g,x,y,gx,gy,pad,cx,cy,-1,tie);if(score<bestScore){bestScore=score;bx=cx;by=cy;bs=-1;}
   }else{
     var hx=(s.w||80)*.5+extra,hy=(s.h||80)*.5+extra;
-    cands.push({x:s.x-hx,y:s.y-hy,side:-1});
-    cands.push({x:s.x-hx,y:s.y+hy,side:1});
-    cands.push({x:s.x+hx,y:s.y-hy,side:1});
-    cands.push({x:s.x+hx,y:s.y+hy,side:-1});
+    score=candidateScore(g,x,y,gx,gy,pad,s.x-hx,s.y-hy,-1,tie);if(score<bestScore){bestScore=score;bx=s.x-hx;by=s.y-hy;bs=-1;}
+    score=candidateScore(g,x,y,gx,gy,pad,s.x-hx,s.y+hy,1,tie);if(score<bestScore){bestScore=score;bx=s.x-hx;by=s.y+hy;bs=1;}
+    score=candidateScore(g,x,y,gx,gy,pad,s.x+hx,s.y-hy,1,tie);if(score<bestScore){bestScore=score;bx=s.x+hx;by=s.y-hy;bs=1;}
+    score=candidateScore(g,x,y,gx,gy,pad,s.x+hx,s.y+hy,-1,tie);if(score<bestScore){bestScore=score;bx=s.x+hx;by=s.y+hy;bs=-1;}
   }
-  var best=null,bestScore=Infinity,tie=((seed||0)&1)?1:-1;
-  for(var i=0;i<cands.length;i++){
-    var c=cands[i];
-    if(!solidPointSafe(g,c.x,c.y,pad*.55))continue;
-    if(g.hasLineOfSight&&!g.hasLineOfSight(x,y,c.x,c.y,Math.max(1,pad*.28)))continue;
-    var score=Math.sqrt(d2(x,y,c.x,c.y))+Math.sqrt(d2(c.x,c.y,gx,gy));
-    if(c.side===tie)score-=3;
-    if(score<bestScore){bestScore=score;best=c;}
-  }
-  if(best)return{x:best.x,y:best.y,solidId:s.id,side:best.side};
-  var h=fh.hit||{nx:0,ny:0,x:x,y:y},n=norm(h.nx||0,h.ny||0),side=tie;
-  var tx=-n.y*side,ty=n.x*side;
-  return{x:(h.x==null?x:h.x)+n.x*(pad+8)+tx*(pad+46),y:(h.y==null?y:h.y)+n.y*(pad+8)+ty*(pad+46),solidId:s.id,side:side};
+  if(bestScore<Infinity)return{x:bx,y:by,solidId:s.id,side:bs};
+  var h=fh.hit,nx=0,ny=0,hx0=x,hy0=y;if(h){hx0=h.x==null?x:h.x;hy0=h.y==null?y:h.y;var nl=Math.hypot(h.nx||0,h.ny||0)||1;nx=(h.nx||0)/nl;ny=(h.ny||0)/nl;}
+  var tx=-ny*tie,ty=nx*tie;
+  return{x:hx0+nx*(pad+8)+tx*(pad+46),y:hy0+ny*(pad+8)+ty*(pad+46),solidId:s.id,side:tie};
 }
 
 function blastExposure(g,C,t,x,y){
   if(!g.hasLineOfSight||!t)return 1;
-  var dx=t.x-x,dy=t.y-y,dir=norm(dx,dy),px=-dir.y,py=dir.x,r=classSize(C,t)*.58;
-  var samples=[
-    {x:t.x,y:t.y,w:.56},
-    {x:t.x+px*r,y:t.y+py*r,w:.22},
-    {x:t.x-px*r,y:t.y-py*r,w:.22}
-  ];
-  var e=0;
-  for(var i=0;i<samples.length;i++)if(g.hasLineOfSight(x,y,samples[i].x,samples[i].y,1.5))e+=samples[i].w;
+  var dx=t.x-x,dy=t.y-y,len=Math.hypot(dx,dy)||1,px=-dy/len,py=dx/len,r=classSize(C,t)*.58,e=0;
+  if(g.hasLineOfSight(x,y,t.x,t.y,1.5))e+=.56;
+  if(g.hasLineOfSight(x,y,t.x+px*r,t.y+py*r,1.5))e+=.22;
+  if(g.hasLineOfSight(x,y,t.x-px*r,t.y-py*r,1.5))e+=.22;
   return clamp(e,0,1);
 }
 
@@ -124,18 +117,18 @@ wrap('game/engine',function(engine,require){
   Game.prototype.novaBattlefieldWaypoint=function(x,y,gx,gy,pad,seed){return chooseWaypoint(this,x,y,gx,gy,pad,seed);};
   Game.prototype.novaBlastExposure=function(t,x,y){return blastExposure(this,C,t,x,y);};
 
-  /* Blast damage respects surviving solid geometry. We wrap splashAt only to
-   * mark synchronous splash damage calls; direct projectile hits are untouched. */
+  /* Reuse one blast context object. Primitive state is restored after the
+   * synchronous splash call, so nested/re-entrant behavior remains correct. */
   var oldSplash=Game.prototype.splashAt;
   Game.prototype.splashAt=function(x,y,radius){
-    var prev=this.__v172BlastContext;
-    this.__v172BlastContext={x:x,y:y,radius:radius||0};
-    try{return oldSplash.apply(this,arguments);}finally{this.__v172BlastContext=prev;}
+    var c=this.__v172BlastContext||(this.__v172BlastContext={active:false,x:0,y:0,radius:0}),pa=c.active,px=c.x,py=c.y,pr=c.radius;
+    c.active=true;c.x=x;c.y=y;c.radius=radius||0;
+    try{return oldSplash.apply(this,arguments);}finally{c.active=pa;c.x=px;c.y=py;c.radius=pr;}
   };
   var oldDamage=Game.prototype.damageTank;
   Game.prototype.damageTank=function(t,dmg,srcId,kx,ky){
     var c=this.__v172BlastContext;
-    if(c&&t&&t.alive){
+    if(c&&c.active&&t&&t.alive){
       var e=blastExposure(this,C,t,c.x,c.y);
       if(e<=.001){
         if(t.isPlayer&&dmg>18&&this.time-(t.__v172CoveredAt||-99)>.45){
@@ -150,8 +143,6 @@ wrap('game/engine',function(engine,require){
     return oldDamage.call(this,t,dmg,srcId,kx,ky);
   };
 
-  /* Countercharge can open weakened cover, but Cannon remains the dedicated
-   * structural lineage. This only annotates the already-earned countershot. */
   var oldTry=Game.prototype.tryFire;
   Game.prototype.tryFire=function(t){
     var before=this.bullets?this.bullets.length:0,out=oldTry.call(this,t);
@@ -170,26 +161,20 @@ wrap('game/engine',function(engine,require){
     return t.__v17FuseDist||range*.72;
   }
   function updateFusePreview(g,t){
-    var dist=liveFuseDist(g,t),ex=t.x+Math.cos(t.angle)*dist,ey=t.y+Math.sin(t.angle)*dist,hit=g.firstTerrainHit?g.firstTerrainHit(t.x,t.y,ex,ey,4):null;
-    if(hit&&hit.hit){
-      t.__v172FusePreview={blocked:true,x:hit.hit.x,y:hit.hit.y,programX:ex,programY:ey,programDist:dist,solid:hit.solid,actualDist:Math.hypot(hit.hit.x-t.x,hit.hit.y-t.y)};
-    }else t.__v172FusePreview={blocked:false,x:ex,y:ey,programX:ex,programY:ey,programDist:dist,solid:null,actualDist:dist};
-    return t.__v172FusePreview;
+    var dist=liveFuseDist(g,t),ex=t.x+Math.cos(t.angle)*dist,ey=t.y+Math.sin(t.angle)*dist,hit=g.firstTerrainHit?g.firstTerrainHit(t.x,t.y,ex,ey,4):null,p=t.__v172FusePreview||(t.__v172FusePreview={});
+    if(hit&&hit.hit){p.blocked=true;p.x=hit.hit.x;p.y=hit.hit.y;p.programX=ex;p.programY=ey;p.programDist=dist;p.solid=hit.solid;p.actualDist=Math.hypot(hit.hit.x-t.x,hit.hit.y-t.y);}
+    else{p.blocked=false;p.x=ex;p.y=ey;p.programX=ex;p.programY=ey;p.programDist=dist;p.solid=null;p.actualDist=dist;}
+    return p;
   }
   Game.prototype.novaFusePreview=function(t){return updateFusePreview(this,t);};
 
-  /* Predictive short-horizon steering for AI tanks. Battlefield v1.6 still
-   * owns physical collision; this layer merely stops AI waiting for impact
-   * before deciding to go around the obstacle. */
   var oldMove=Game.prototype.moveTank;
   Game.prototype.moveTank=function(t,vx,vy,dt){
     if(t&&!t.isPlayer&&t.ai&&this.firstTerrainHit){
       var sp=Math.hypot(vx||0,vy||0);
       if(sp>18){
-        var now=this.time||0,pad=classSize(C,t)+8,look=clamp(55+sp*.46,72,170);
-        var ux=vx/sp,uy=vy/sp,ax=t.x+ux*look,ay=t.y+uy*look;
-        var probe=this.firstTerrainHit(t.x,t.y,ax,ay,pad*.62);
-        var wp=t.ai.__v172Waypoint;
+        var now=this.time||0,pad=classSize(C,t)+8,look=clamp(55+sp*.46,72,170),ux=vx/sp,uy=vy/sp,ax=t.x+ux*look,ay=t.y+uy*look;
+        var probe=this.firstTerrainHit(t.x,t.y,ax,ay,pad*.62),wp=t.ai.__v172Waypoint;
         if(wp&&now>(t.ai.__v172WaypointUntil||0))wp=null;
         if(wp&&d2(t.x,t.y,wp.x,wp.y)<34*34)wp=null;
         if(probe&&!wp){
@@ -199,16 +184,14 @@ wrap('game/engine',function(engine,require){
           if(wp){t.ai.__v172Waypoint=wp;t.ai.__v172WaypointUntil=now+.95;}
         }
         if(wp){
-          var q=norm(wp.x-t.x,wp.y-t.y),blend=probe?.82:.58;
-          var sx=ux*(1-blend)+q.x*blend,sy=uy*(1-blend)+q.y*blend,n=norm(sx,sy);
-          vx=n.x*sp;vy=n.y*sp;t.ai.__v172Routing=true;t.ai.wanderA=Math.atan2(n.y,n.x);
+          var qx=wp.x-t.x,qy=wp.y-t.y,ql=Math.hypot(qx,qy)||1;qx/=ql;qy/=ql;var blend=probe?.82:.58,sx=ux*(1-blend)+qx*blend,sy=uy*(1-blend)+qy*blend,nl=Math.hypot(sx,sy)||1,snx=sx/nl,sny=sy/nl;
+          vx=snx*sp;vy=sny*sp;t.ai.__v172Routing=true;t.ai.wanderA=Math.atan2(sny,snx);
         }else t.ai.__v172Routing=false;
       }
     }
     return oldMove.call(this,t,vx,vy,dt);
   };
 
-  /* Intentional Cannon breaching based only on a remembered visible contact. */
   Game.prototype.novaBreachCover=function(t,hit){
     if(!t||lineage(classes,t)!=='cannon'||!hit||!hit.solid||!hit.solid.destructible||hit.solid.hp<=0||t.fireCd>0)return false;
     var hx=hit.hit&&hit.hit.x!=null?hit.hit.x:hit.solid.x,hy=hit.hit&&hit.hit.y!=null?hit.hit.y:hit.solid.y;
@@ -227,8 +210,6 @@ wrap('game/engine',function(engine,require){
     return (this.bullets?this.bullets.length:0)>before;
   };
 
-  /* Controller corner routing works by biasing Second Body's velocity memory
-   * toward a local waypoint. Locked dives are intentionally excluded. */
   var oldDrones=Game.prototype.updateDrones;
   Game.prototype.updateDrones=function(dt){
     var out=oldDrones.call(this,dt);
@@ -236,19 +217,19 @@ wrap('game/engine',function(engine,require){
     for(var i=0;i<this.drones.length;i++){
       var d=this.drones[i];if(!d||d.hp<=0||d.__novaSpotter||d.__novaPhase==='dash')continue;
       var owner=this.getTank&&this.getTank(d.ownerId);if(!owner||!owner.alive||!owner.__novaSwarm)continue;
-      var goal=null,tr=d.__novaTarget||d.targetRef;
-      if(tr&&typeof tr==='object'&&tr.x!=null)goal={x:tr.x,y:tr.y};
-      else if(typeof tr==='number'){var e=this.getTank&&this.getTank(tr);if(e&&e.alive)goal={x:e.x,y:e.y};}
-      if(!goal&&owner.__novaSwarm.active)goal={x:owner.__novaSwarm.nodeX,y:owner.__novaSwarm.nodeY};
-      if(!goal)goal={x:owner.x,y:owner.y};
+      var gx,gy,tr=d.__novaTarget||d.targetRef;
+      if(tr&&typeof tr==='object'&&tr.x!=null){gx=tr.x;gy=tr.y;}
+      else if(typeof tr==='number'){var e=this.getTank&&this.getTank(tr);if(e&&e.alive){gx=e.x;gy=e.y;}}
+      if(gx==null&&owner.__novaSwarm.active){gx=owner.__novaSwarm.nodeX;gy=owner.__novaSwarm.nodeY;}
+      if(gx==null){gx=owner.x;gy=owner.y;}
       var pad=(d.r||8)+5;
-      if(this.hasLineOfSight&&this.hasLineOfSight(d.x,d.y,goal.x,goal.y,Math.max(2,pad*.35))){d.__v172Waypoint=null;continue;}
+      if(this.hasLineOfSight&&this.hasLineOfSight(d.x,d.y,gx,gy,Math.max(2,pad*.35))){d.__v172Waypoint=null;continue;}
       var wp=d.__v172Waypoint;
-      if(!wp||this.time>(d.__v172WaypointUntil||0)||d2(d.x,d.y,wp.x,wp.y)<24*24){wp=chooseWaypoint(this,d.x,d.y,goal.x,goal.y,pad,d.id);d.__v172Waypoint=wp;d.__v172WaypointUntil=this.time+.72;}
+      if(!wp||this.time>(d.__v172WaypointUntil||0)||d2(d.x,d.y,wp.x,wp.y)<24*24){wp=chooseWaypoint(this,d.x,d.y,gx,gy,pad,d.id);d.__v172Waypoint=wp;d.__v172WaypointUntil=this.time+.72;}
       if(!wp)continue;
-      var q=norm(wp.x-d.x,wp.y-d.y),speed=Math.max(80,Math.hypot(d.__novaVX||0,d.__novaVY||0));
-      d.__novaVX=(d.__novaVX||0)*.42+q.x*speed*.58;d.__novaVY=(d.__novaVY||0)*.42+q.y*speed*.58;
-      d.x+=q.x*22*dt;d.y+=q.y*22*dt;d.__v172Routing=true;
+      var qx=wp.x-d.x,qy=wp.y-d.y,ql=Math.hypot(qx,qy)||1;qx/=ql;qy/=ql;var speed=Math.max(80,Math.hypot(d.__novaVX||0,d.__novaVY||0));
+      d.__novaVX=(d.__novaVX||0)*.42+qx*speed*.58;d.__novaVY=(d.__novaVY||0)*.42+qy*speed*.58;
+      d.x+=qx*22*dt;d.y+=qy*22*dt;d.__v172Routing=true;
     }
     return out;
   };
@@ -261,8 +242,6 @@ wrap('game/engine',function(engine,require){
   };
 });
 
-/* Legitimate memory + tactical reaction lives in the AI layer so the generic
- * engine stays usable for the player and neutral systems. */
 wrap('game/ai',function(ai,require){
   var old=ai.updateAI;if(!old||old.__novaCombinedArmsAI)return;
   var classes=require('./classes'),C=classes.CLASSES||{};
@@ -293,12 +272,12 @@ wrap('game/ai',function(ai,require){
 
 wrap('game/render',function(renderMod,require){
   var old=renderMod.render;if(!old||old.__novaCombinedArms)return;
-  var classes=require('./classes');
+  var classes=require('./classes'),screen={x:0,y:0,z:1};
   function patched(g,w,h){
     old(g,w,h);
     if(!g||!g.ctx||!g.player||!g.player.alive||lineage(classes,g.player)!=='cannon')return;
     var p=g.player.__v172FusePreview;if(!p||!p.blocked)return;
-    var ctx=g.ctx,a=world(g,p.x,p.y),solid=p.solid;
+    var ctx=g.ctx,a=world(g,p.x,p.y,screen),solid=p.solid;
     ctx.save();ctx.setTransform(g.dpr||1,0,0,g.dpr||1,0,0);ctx.globalCompositeOperation='lighter';
     ctx.strokeStyle='rgba(255,238,204,.94)';ctx.fillStyle='rgba(255,167,94,.12)';ctx.lineWidth=1.4;
     var r=9+2*Math.sin((g.time||0)*8);ctx.beginPath();ctx.moveTo(a.x-r,a.y-r);ctx.lineTo(a.x+r,a.y+r);ctx.moveTo(a.x+r,a.y-r);ctx.lineTo(a.x-r,a.y+r);ctx.stroke();

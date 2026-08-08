@@ -16,11 +16,13 @@
     "zustand": "4.5.2"
   },
   "devDependencies": {
+    "@tailwindcss/cli": "4.3.2",
     "@types/node": "20.14.11",
     "@types/react": "18.2.15",
     "@types/react-dom": "18.2.7",
     "@types/three": "0.166.0",
     "@vitejs/plugin-react": "4.4.1",
+    "tailwindcss": "4.3.2",
     "typescript": "5.5.4",
     "vite": "5.4.2",
     "vitest": "2.0.5"
