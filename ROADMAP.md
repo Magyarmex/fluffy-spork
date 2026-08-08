@@ -14,20 +14,33 @@ The Sniper lineage now operates through ordinary direct hull sight, Forward Obse
 
 Controllers use the right stick as a second-body command vector: bearing controls direction, analog depth controls deployment distance, release recalls. PvP uses designation, formation geometry, readable wind-up, trajectory commitment, dive, overshoot and recovery. Idle farming remains autonomous. v1.5.1 added stable idle navigation, distributed farming and defensive drone-vs-drone interception.
 
-### v1.5.0–v1.5.1 — Blackglass intelligence showroom
-**Status:** shipped
+### v1.5.0–v1.7.2 — Blackglass intelligence showroom
+**Status:** shipped; portrait containment repaired in v1.7.2
 
-The lobby Evolution Tree expands into a complete 36-class animated dossier library with canonical telemetry, catchphrases, abilities, evolution context and a build-specific foreign Trait Graft Lab. Portrait-mobile layout received a rendered QA/polish pass in v1.5.1.
+The lobby Evolution Tree expands into a complete 36-class animated dossier library with canonical telemetry, catchphrases, abilities, evolution context and a build-specific foreign Trait Graft Lab.
 
-### v1.6.0 — Battlefield
-**Status:** shipped; live balance validation ongoing
+A real-device portrait failure revealed that the historical mobile polish stylesheet could be overtaken by the late-injected base showroom stylesheet. v1.7.2 adds a dedicated containment layer that explicitly recognizes portrait/coarse-pointer devices, forces a bounded one-column layout and reasserts itself after the base style appears. Future UI work must preserve the rule that no Blackglass child may exceed the containing phone viewport.
 
-The arena has real tactical geometry instead of a featureless open field: Crossfire, Split Horizon and Four Gates; permanent walls/pillars; destructible cover; terrain-aware spawning and movement; swept projectile collision; real line-of-sight; AI cover response; Observer occlusion; Controller terrain constraints; and explicit battlefield presentation/SFX.
+### v1.6.0–v1.7.2 — Battlefield / Combined Arms
+**Status:** core geometry and first intelligence integration shipped; live balance validation ongoing
 
-### v1.7.0–v1.7.1 — Three Disciplines / Apex Doctrine
-**Status:** lineage mechanics and Apex specialization shipped; real-device balance validation remains
+The arena has real tactical geometry instead of a featureless open field: Crossfire, Split Horizon and Four Gates; permanent walls/pillars; destructible cover; terrain-aware spawning and movement; swept projectile collision; real line-of-sight; Observer occlusion; Controller terrain constraints; and explicit battlefield presentation/SFX.
 
-Gunner, Cannon and Guardian now have distinct mastery languages instead of remaining primarily aim/stat/cooldown classes, and their Tier-3 Apex forms now push those languages into different mastery problems rather than simply amplifying parent stats.
+v1.7.2 extends Battlefield from collision into tactical intelligence:
+- AI predicts short-range terrain collisions and chooses local corner waypoints before contact;
+- AI keeps only short frozen last-seen memory from legitimate sight and never updates hidden coordinates;
+- Controller formation/farm/defense/recall travel uses local corner routing while committed dives remain locked;
+- explosions respect hard cover and can apply partial damage to partially exposed hulls;
+- wall-surface blast origins are hardened against near-zero LoS ambiguity;
+- Cannon fuse UI distinguishes programmed FUSE from earlier physical IMPACT;
+- Cannon AI can deliberately breach destructible cover only when doing so follows from recent legitimate information.
+
+See [`BATTLEFIELD.md`](./BATTLEFIELD.md) and [`COMBINED_ARMS.md`](./COMBINED_ARMS.md).
+
+### v1.7.0–v1.7.2 — Three Disciplines / Apex Doctrine / Combined Arms
+**Status:** lineage mechanics, Apex specialization and first Battlefield integration shipped; real-device balance validation remains
+
+Gunner, Cannon and Guardian now have distinct mastery languages instead of remaining primarily aim/stat/cooldown classes, and their Tier-3 Apex forms push those languages into different mastery problems rather than simply amplifying parent stats.
 
 #### Gunner — Fire Discipline
 - explicit heat accumulation/cooling;
@@ -43,23 +56,25 @@ Gunner, Cannon and Guardian now have distinct mastery languages instead of remai
 #### Cannon — Fire Control
 - right-stick direction aims while right-stick depth programs detonation distance;
 - desktop mouse distance uses the same fuse grammar;
-- visible FUSE/impact reticle and real airburst behavior;
+- visible FUSE programming, terrain-aware IMPACT preview and real airburst behavior;
 - **Cluster King:** fuse depth also controls child-bomb sector width;
 - **Siege Bomber:** true structural specialization against destructible cover;
 - **Annihilator:** deep-fuse blast authority traded for a larger reload opening;
 - **Quake Cannon:** deep programs increase displacement/shock geometry rather than raw damage;
-- repaired the previously unused structural-damage metadata so Cannon siege specialization now reaches Battlefield cover correctly.
+- AI can intentionally breach destructible cover when acting on a recent legitimate last-seen contact;
+- structural specialization continues to use Battlefield's single authoritative cover-break path.
 
 #### Guardian — Facing and Counterplay
 - directional frontal armor and directional BULWARK / IRON WILL;
 - Perfect Guard timing stores Countercharge;
+- Countershots gain modest structural pressure in v1.7.2 without approaching Cannon breach efficiency;
 - Stampede impact depends on earned straight-line momentum;
 - **Bastion:** stationary frontal lane anchoring, still vulnerable to movement/flanks;
 - **Aegis:** successful Perfect Guard creates a brief repositioning-flow window;
 - **Meteor:** highest straight-line peak with harsh steering loss;
 - **Ravager:** more flexible route control with a lower peak impact ceiling.
 
-See [`THREE_DISCIPLINES.md`](./THREE_DISCIPLINES.md) for the mechanic doctrine.
+See [`THREE_DISCIPLINES.md`](./THREE_DISCIPLINES.md) and [`COMBINED_ARMS.md`](./COMBINED_ARMS.md).
 
 ---
 
@@ -71,26 +86,38 @@ See [`THREE_DISCIPLINES.md`](./THREE_DISCIPLINES.md) for the mechanic doctrine.
 3. Tune Breachlord physical recoil and its short recovery so the volley feels violent without making mobile control unusable.
 4. Validate Needle Storm and Flakmaster precision rewards do not erase their intended range weaknesses.
 5. Tune Cannon right-stick-depth mapping on actual phone hardware; minimum/mid/max fuse placement should all feel intentional.
-6. Validate Cluster King sector-width control, especially around narrow Battlefield exits and Controller formations.
-7. Validate Siege Bomber structural pressure versus barricade HP so it opens routes without deleting cover as a system.
-8. Tune Annihilator deep-commit reward/reload risk and Quake displacement against fast/mobile builds.
-9. Tune Guardian passive frontal reduction and active guard factors by branch.
-10. Tune Perfect Guard windows for touch latency while preserving bait/punish counterplay.
-11. Validate Bastion anchor strength in choke points; flank pressure must remain meaningful.
-12. Validate Aegis flow duration so a good guard earns repositioning rather than a free escape.
-13. Tune Meteor/Ravager charge build and steering loss around real Battlefield corners.
-14. Validate all three lineages and their Apex forms against Sniper/Controller on every Battlefield layout.
-15. Improve elite AI discipline: better burst timing, fuse prediction, guard activation and route commitment without hidden knowledge.
+6. Validate the new FUSE → IMPACT distinction is readable at phone scale and does not create duplicate/cluttered orange markers.
+7. Validate Cluster King sector-width control, especially around narrow Battlefield exits and Controller formations.
+8. Validate Siege Bomber structural pressure versus barricade HP so it opens routes without deleting cover as a system.
+9. Tune Annihilator deep-commit reward/reload risk and Quake displacement against fast/mobile builds.
+10. Tune Guardian passive frontal reduction and active guard factors by branch.
+11. Tune Perfect Guard windows for touch latency while preserving bait/punish counterplay.
+12. Validate Bastion anchor strength in choke points; flank pressure must remain meaningful.
+13. Validate Aegis flow duration so a good guard earns repositioning rather than a free escape.
+14. Tune Meteor/Ravager charge build and steering loss around real Battlefield corners.
+15. Validate all three lineages and their Apex forms against Sniper/Controller on every Battlefield layout.
+16. Improve elite AI discipline: better burst timing, fuse prediction, guard activation and route commitment without hidden knowledge.
 
-### P0 — Real-device Battlefield validation
+### P0 — Battlefield / Combined Arms real-device validation
 1. Play Crossfire, Split Horizon and Four Gates on portrait mobile and verify obstacle density never overwhelms the touch camera.
 2. Tune barricade HP against Cannon shells, Rail shots, Gunner pressure and drone attacks.
 3. Validate whether the cover HUD strip is informative without occupying scarce vertical space.
-4. Test AI route recovery around long walls and exact-perpendicular approaches for repeated wall-push edge cases.
-5. Test Controller formations around corners, especially Hivemind/Citadel and deep Command Nodes behind long walls.
-6. Test Observer patrol positions so scouts do not spend excessive time pinned against exterior fortifications.
-7. Tune the number/placement of destructible barricades based on actual lane flow.
-8. Add explicit terrain-performance profiling for large Hivemind + projectile-heavy encounters.
+4. Stress-test predictive AI corner routing on long walls, narrow gates and exact-perpendicular approaches; avoid waypoint oscillation.
+5. Ensure last-seen investigation feels intelligent without making hidden movement seem tracked.
+6. Test splash occlusion at wall faces, corners, pillars and destructible barricades; fully protected targets must not receive leak damage.
+7. Tune partial blast exposure so small peeks create fair chip pressure rather than arbitrary immunity or near-full damage.
+8. Test Controller formations around corners, especially Hivemind/Citadel and deep Command Nodes behind long walls.
+9. Validate ordinary drone routing does not interfere with committed Second Body attack runs or recreate idle vibration.
+10. Test Observer patrol positions so scouts do not spend excessive time pinned against exterior fortifications.
+11. Tune the number/placement of destructible barricades based on actual lane flow.
+12. Add explicit terrain-performance profiling for large Hivemind + projectile-heavy encounters.
+
+### P0 — Blackglass device QA
+1. Re-test the exact Android portrait configuration that exposed the three-column overflow.
+2. Verify 320–430 CSS-pixel portrait widths never create horizontal page scrolling or clipped intelligence content.
+3. Test long class descriptions, long ability names and the largest graft-delta values for wrap behavior.
+4. Verify landscape/tablet still uses the richer multi-column presentation where space genuinely permits it.
+5. Keep runtime style-order regression coverage whenever Blackglass CSS is refactored.
 
 ### P1 — Living Arena
 **Target:** after v1.7 validation
