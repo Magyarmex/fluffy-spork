@@ -8,7 +8,7 @@
 
 No install required — play directly in a modern browser on desktop or mobile.
 
-**Current release: v1.6.0 · Battlefield** — terrain, cover, line-of-sight, destructible barricades, tactical lanes, terrain-aware AI and full Sniper/Controller integration turn the old open field into an actual battlefield.
+**Current release: v1.7.0 · Three Disciplines** — Gunner, Cannon and Guardian now have lineage-wide mastery systems built around cadence/recoil, programmable blast placement, and directional defense/committed momentum.
 
 ---
 
@@ -22,9 +22,37 @@ NOVA TANKS should be a game **riddled with skill expression**. Powerful mechanic
 
 Every major system is expected to be evaluated for skill ceiling, readability, counterplay, positioning, prediction, timing, execution, punish windows, and two-sided mastery.
 
+### v1.7.0 · Three Disciplines
+
+The three legacy combat lineages have begun the same transformation already applied to Sniper and Controller.
+
+**Gunner — Fire Discipline**
+- Gunner weapons build heat while firing and cool when released.
+- The middle of the heat range is a sustainable **cadence window**; stable aim there produces the best ballistic control.
+- Excessive heat creates deterministic dispersion and physical recoil instead of random weapon failure.
+- Shotgun descendants tighten their existing pellet distribution when fired from a stable state, while panic-spam pushes the hull and cone farther off line.
+- AI Gunners obey the same heat/recoil model and must vent after exceeding a sustainable state.
+
+**Cannon — Fire Control**
+- Right-stick direction still aims normally.
+- Right-stick depth now programs the shell's detonation distance; mouse distance is the desktop equivalent.
+- A visible **FUSE** reticle previews the burst point.
+- If a Cannon projectile reaches that point without colliding first, it airbursts while preserving its native splash or cluster behavior.
+- Battlefield cover makes blast placement and breach decisions part of Cannon mastery instead of merely an obstacle to shooting.
+
+**Guardian — Facing and Counterplay**
+- Guardian aim direction also determines its strongest frontal armor facing.
+- BULWARK and IRON WILL are directional defensive states rather than legacy 360-degree immunity/reduction.
+- The opening fraction of a defensive activation is a **Perfect Guard** window. A correctly faced/timed block negates the attack and stores a **Countercharge** for the next shot.
+- Juggernaut, Meteor and Ravager build Stampede impact by maintaining a clean straight movement line; sharp turns and terrain impacts dump momentum.
+
+The rework uses the existing control budget. There are no extra combat buttons.
+
+See the full system reference in **[`THREE_DISCIPLINES.md`](./THREE_DISCIPLINES.md)**.
+
 ### v1.6.0 · Battlefield
 
-NOVA no longer takes place in a nearly featureless open square. Each run now uses one of three mirrored tactical layouts — **Crossfire, Split Horizon, or Four Gates** — built from permanent fortifications, pillars and destructible barricades.
+NOVA no longer takes place in a nearly featureless open square. Each run uses one of three mirrored tactical layouts — **Crossfire, Split Horizon, or Four Gates** — built from permanent fortifications, pillars and destructible barricades.
 
 Battlefield geometry is mechanical, not cosmetic:
 
@@ -36,13 +64,7 @@ Battlefield geometry is mechanical, not cosmetic:
 - sufficiently penetrating rounds may punch through only when their own impact actually destroys the cover and enough projectile integrity remains;
 - tank, shape and powerup spawn locations avoid solid terrain.
 
-**Line-of-sight is now a game system.** Automatic target acquisition and AI firing authorization respect cover. A tank hidden behind a wall is not a free aim-assist or AI target. Generic AI changes strafe/path intent after repeated terrain contact instead of simply grinding into a wall.
-
-Snipers inherit the same physical information rules. Ordinary hull sight cannot see through terrain, and a Forward Observer contact is invalidated when the Observer does not have an unobstructed view. Suspicion still tells a scout where to investigate; it does not let the scout report a target through concrete. Cover therefore creates real approach windows and makes Observer placement part of sniper mastery.
-
-Controllers can still place a Command Node beyond cover, but their drones must physically occupy that space. Formation, farming, defense and attack runs are terrain-constrained; a committed dive that hits a wall aborts into recovery instead of applying impossible through-wall pressure.
-
-Fortifications receive explicit shadows, neon rim lighting, damage cracks, impact flashes, breach debris/rubble and procedural terrain SFX. A compact battlefield strip names the current layout and reports remaining destructible cover.
+**Line-of-sight is a game system.** Automatic target acquisition and AI firing authorization respect cover. Sniper hull sight and Forward Observer contacts also obey terrain LoS. Controllers can command beyond cover, but their drones must physically occupy the space.
 
 See the full system reference in **[`BATTLEFIELD.md`](./BATTLEFIELD.md)**.
 
@@ -84,6 +106,10 @@ Browse release history: **[`RELEASES.md`](./RELEASES.md)**
 - Real line-of-sight for targeting, AI firing and Forward Observer contacts
 - Swept projectile-vs-terrain collision for hypervelocity rounds
 - Breachable cover, projectile punch-through rules and persistent rubble
+- Gunner heat, cadence, deterministic recoil and stability discipline
+- Cannon analog programmable fuses and visible airburst placement
+- Guardian directional armor, directional defensive abilities, Perfect Guard and Countershot
+- Juggernaut-line committed Stampede momentum
 - Branching tank lineages and late-game Apex evolutions
 - Cross-lineage gene splicing / hybridization
 - Expandable 36-class **Tank Intelligence & Showroom**
@@ -103,13 +129,13 @@ Browse release history: **[`RELEASES.md`](./RELEASES.md)**
 - Telegraph → commitment → dodge/punish drone attack runs
 - Distributed autonomous shape harvesting
 - Automatic defensive drone-vs-drone interception with spotter exemption
-- Procedural stereo combat, sniper, observer, swarm, terrain and lobby/showroom audio
+- Procedural stereo combat, sniper, observer, swarm, terrain, discipline and lobby/showroom audio
 - Selective mobile haptics for high-value combat events
 - AI-controlled enemy tanks that progress alongside the player while obeying major combat-language constraints
 - Desktop and mobile browser play
 - GitHub Pages deployment
 - In-lobby version history and ongoing versioned development
-- Runtime JavaScript, release-data and Battlefield regression validation in CI
+- Runtime JavaScript, release-data, Battlefield and Three Disciplines regression validation in CI
 
 ## Live game
 
@@ -121,7 +147,17 @@ The `main` branch is the canonical development branch. GitHub Pages serves the c
 
 NOVA TANKS uses semantic-style version numbers (`MAJOR.MINOR.PATCH`).
 
-### Latest — v1.6.0 · Battlefield
+### Latest — v1.7.0 · Three Disciplines
+- Gunner heat/cadence/recoil/stability discipline
+- Cannon right-stick-depth fuse programming and visible airburst placement
+- Guardian frontal armor and directional BULWARK / IRON WILL
+- Perfect Guard → Countershot punish loop
+- Juggernaut-line straight-line Stampede momentum
+- AI parity for all three combat languages
+- lineage-specific audiovisual state feedback
+- dedicated v1.7 regression tests
+
+### v1.6.0 · Battlefield
 - Crossfire, Split Horizon and Four Gates tactical layouts
 - permanent walls/pillars plus destructible cover and rubble
 - real line-of-sight for AI, aim acquisition and Observer relay
