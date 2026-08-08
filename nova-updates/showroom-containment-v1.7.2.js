@@ -26,9 +26,6 @@ var CSS=`
 /* Portrait/coarse-pointer mode is also applied by JS. This deliberately does
    not depend solely on CSS pixel width, because some Android WebViews report
    a wide layout viewport even while physically portrait. */
-html.nvs-portrait-mobile .nvs-host.nvs-open,
-@media(max-width:760px){.nvs-host.nvs-open{}}
-
 html.nvs-portrait-mobile .nvs-host.nvs-open{
   position:relative!important;
   left:auto!important;
