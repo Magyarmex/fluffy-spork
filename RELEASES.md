@@ -2,6 +2,55 @@
 
 NOVA TANKS uses semantic-style versions and never reuses a released number. The lobby reads `nova-updates/releases.json`; this file is the fuller durable development ledger.
 
+## v1.7.0 — Three Disciplines
+**Released:** 2026-08-08  
+**Theme:** Skill-expression rework for Gunner, Cannon and Guardian
+
+### Gunner — Fire Discipline
+- Gunner firing now builds explicit weapon heat instead of treating sustained fire as a flat optimum.
+- A sustainable mid-heat **cadence window** rewards smooth tracking and controlled bursts.
+- Large aim corrections lower stability; releasing and settling restores it.
+- Excessive heat creates deterministic dispersion and stronger physical recoil rather than random jams/misses.
+- Rotary weapons reward sustained but controlled cadence; shotgun descendants tighten their existing pellet pattern when fired from a stable state.
+- AI Gunners accumulate the same heat/recoil and deliberately vent instead of receiving infinite perfect sustained fire.
+
+### Cannon — Fire Control
+- Cannon-line right-stick direction continues aiming normally while **right-stick depth programs detonation distance**.
+- Desktop mouse distance maps to the same fuse concept.
+- A visible orange FUSE reticle previews the programmed detonation point.
+- Surviving Cannon projectiles airburst at their programmed distance while preserving native splash and cluster behavior.
+- Direct collision still takes precedence over the fuse.
+- Very short fuses are less efficient than properly armed space-control shots.
+- Cannon blast placement compounds Battlefield's destructible-cover system and turns breach timing into a tactical choice.
+- AI Cannon forms derive combat fuse distance from legitimate hunt-target distance and do not receive hidden future-position information.
+
+### Guardian — Facing and Counterplay
+- Guardian aim direction now also defines the tank's strongest **frontal armor arc**.
+- Different Guardian descendants receive different defensive arc widths/strengths rather than a universal hidden reduction.
+- Legacy BULWARK / IRON WILL 360-degree protection is replaced for Guardian forms with directional mitigation.
+- The opening fraction of a defensive activation is a **Perfect Guard** timing window.
+- A correctly faced/timed Perfect Guard negates the incoming attack and stores a **Countercharge**.
+- The next Guardian projectile consumes Countercharge for a stronger/faster countershot, creating a read → defend → punish loop.
+- Juggernaut, Meteor and Ravager gain Stampede momentum by preserving a significant straight-line movement commitment.
+- Sharp turns drain momentum; Battlefield impacts dump most of it; body damage scales with earned charge.
+
+### Presentation / controls
+- No new combat button was added.
+- Cyan heat/cadence arcs expose Gunner state.
+- Orange fuse markers expose Cannon detonation programming.
+- Pink frontal arcs expose actual Guardian facing/guard coverage.
+- Countercharge and Stampede momentum are visible around the chassis.
+- Added procedural cadence-lock, overheat, fuse-airburst, Perfect Guard, Countershot and charge-break sounds.
+
+### Validation
+- Added `tests/node/disciplines-v1.7.test.js`.
+- Tests cover release wiring, deterministic Gunner cadence, Guardian directional arcs, Cannon fuse annotation, frontal-vs-rear Guardian mitigation, Perfect Guard counter storage, and Gunner heat/projectile state.
+- Full project CI passed after integration on top of Battlefield and all earlier Sniper/Controller runtime layers.
+
+See [`THREE_DISCIPLINES.md`](./THREE_DISCIPLINES.md) for the full design doctrine and tuning priorities.
+
+---
+
 ## v1.6.0 — Battlefield
 **Released:** 2026-08-08  
 **Theme:** Tactical terrain, line-of-sight, destructible cover, physical lanes, terrain-aware AI
