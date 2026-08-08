@@ -1,6 +1,43 @@
 {
-  "currentVersion": "1.4.0",
+  "currentVersion": "1.4.1",
   "releases": [
+    {
+      "version": "1.4.1",
+      "codename": "Violet Doctrine",
+      "date": "2026-08-07",
+      "headline": "The full sniper doctrine now belongs to every purple tank.",
+      "groups": {
+        "Lineage-Wide Sniper Doctrine": [
+          "Marksman, Railgun, Ghost, Singularity, Prism Rail, Specter and Assassin all use the Forward Observer reconnaissance model for long-range target authorization.",
+          "All purple AI tanks are restricted to ordinary 720-unit direct hull vision; targets beyond that require a live observer relay rather than privileged sniper sight.",
+          "The non-beam purple classes now require continuous class-specific precision dwell before long-range fire instead of firing immediately when generic aim alignment succeeds.",
+          "Losing the target, breaking the firing cadence, losing remote authorization, or suffering accurate suppression cancels non-beam precision preparation."
+        ],
+        "Distinct Purple Mastery": [
+          "Marksman uses a deliberate sight picture with a 0.42-second remote precision dwell and a meaningful post-shot reveal/recovery window.",
+          "Ghost uses a faster 0.34-second ambush dwell and shorter reveal, preserving cloak-and-relocate identity rather than becoming a slower Railgun.",
+          "Specter uses the fastest 0.24-second precision cycle and short recovery, rewarding rapid phase positioning and repeated angle creation.",
+          "Assassin uses the longest 0.54-second precision commitment and strongest non-beam reveal/recovery cost to support its brutal alpha-strike identity.",
+          "Within direct sight, non-beam precision dwell is shorter so purple tanks remain responsive when opponents successfully close distance."
+        ],
+        "Warning, Suppression and Projectiles": [
+          "Marksman, Ghost, Specter and Assassin now provide two-stage directional pre-shot audio and screen-edge threat cues when preparing distant attacks against the player.",
+          "Class-flavored SIGHT LOCK, AMBUSH LOCK, HUNT LOCK and EXEC LOCK cues communicate late commitment without exposing exact shooter coordinates.",
+          "Accurate hits or near-miss suppression can break non-beam sniper preparation, extending the same read/respond/punish principle beyond Rail weapons.",
+          "Non-beam sniper rounds receive restrained violet motion trails and real near-player flyby audio so fast precision fire remains readable while in flight.",
+          "Committed non-beam shots briefly reveal their firing bearing, creating an earned advance or punish window."
+        ],
+        "Observer Counterplay": [
+          "Destroying the active Forward Observer now disables long-range observer relay for about 3.4 seconds instead of allowing another escort to restore remote targeting immediately.",
+          "During observer-relay reboot, the sniper can still fight through ordinary direct sight but cannot use spare-drone remote contacts for distant target authorization.",
+          "Player purple tanks receive OBSERVER DOWN / OBSERVER LINK RESTORED feedback and a short relay-reboot countdown."
+        ],
+        "Rail-Specific Identity Preserved": [
+          "Railgun, Singularity and Prism Rail retain their deeper focus-to-fire and quick-shot mechanics, explicit Rail projectile integrity, swept projectile interception and beam-specific feedback.",
+          "Violet Doctrine deliberately shares reconnaissance, finite acquisition, warning, suppression and punishability across the lineage without homogenizing every purple weapon into a Railgun."
+        ]
+      }
+    },
     {
       "version": "1.4.0",
       "codename": "Forward Observer",
