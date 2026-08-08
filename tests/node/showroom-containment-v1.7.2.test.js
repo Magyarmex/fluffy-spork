@@ -56,6 +56,7 @@ test('containment CSS forces a bounded one-column portrait layout',()=>{
   assert.match(css,/overflow-x:hidden!important/);
   assert.match(css,/\.nvs-intel/);
   assert.match(css,/\.nvs-delta/);
+  assert.doesNotMatch(css,/,[\s\n]*@media/,'media rules must not be embedded in a selector list');
 });
 
 test('late base showroom stylesheet cannot overtake containment CSS',()=>{
