@@ -105,6 +105,7 @@ jobs:
               './nova-updates/showroom-fit-v1.7.3.js',
               './nova-updates/auto-update-test-v1.7.4.js',
               './nova-updates/performance-v1.7.5.js',
+              './nova-updates/drone-allegiance-glow-v1.7.6.js',
               './nova-updates/performance-v1.7.6.js',
               './nova-updates/lobby-history.js',
           ]
@@ -174,6 +175,7 @@ jobs:
           grep -q 'nova-updates/showroom-fit-v1.7.3.js' index.html.new
           grep -q 'nova-updates/auto-update-test-v1.7.4.js' index.html.new
           grep -q 'nova-updates/performance-v1.7.5.js' index.html.new
+          grep -q 'nova-updates/drone-allegiance-glow-v1.7.6.js' index.html.new
           grep -q 'nova-updates/performance-v1.7.6.js' index.html.new
           grep -q 'nova-updates/lobby-history.js' index.html.new
           grep -q 'id="nova-tailwind-static"' index.html.new
