@@ -1,40 +1,62 @@
 {
-  "currentVersion": "1.4.1",
+  "currentVersion": "1.5.1",
   "releases": [
+    {
+      "version": "1.5.1",
+      "codename": "Swarm Discipline",
+      "date": "2026-08-08",
+      "headline": "Blackglass is polished, drones coordinate properly, and reconnaissance learns to search.",
+      "groups": {
+        "Blackglass Polish": [
+          "Portrait-mobile showroom layout was rebuilt for narrow phones with a horizontal dossier rail, shorter animated stage, safe text wrapping, aligned telemetry, and non-overlapping graft rows.",
+          "Long class-role labels truncate intentionally inside library cards while the selected dossier retains complete information."
+        ],
+        "Drone Discipline": [
+          "Idle Controller drones use persistent steering plus separate return/resume thresholds instead of vibrating between farm and home decisions.",
+          "Friendly drones reserve different harvest shapes whenever alternatives exist.",
+          "Defensive drones automatically intercept nearby hostile combat drones; Forward Observer spotters are exempt from automatic defense.",
+          "Manually directed Controller swarms can attack any hostile drone, including spotters."
+        ],
+        "Forward Observer Intelligence": [
+          "Observer search uses a roughly 700-unit, ~149-degree cone plus short point-blank awareness.",
+          "Recent contacts and nearby hostile projectile trajectories create decaying suspicion bearings that rotate the cone and bias patrol movement toward likely activity without granting magical unseen target coordinates.",
+          "Observers continue purposeful sector searches after losing contact and still harvest shapes encountered while scouting.",
+          "Player snipers receive clear cyan target relays and off-screen CONTACT markers with distance; hostile observer relays provide readable SPOTTED / OBSERVER information."
+        ],
+        "Music and Presentation": [
+          "Added a distinct procedural NOVA lobby theme with a repeatable syncopated motif and neon bass pulse.",
+          "Opening Blackglass smoothly morphs the lobby score into a crystalline intelligence-room variation while respecting SOUND OFF, MUSIC OFF, and autoplay restrictions.",
+          "The precision SHOT edge callout now remains screen-upright."
+        ]
+      }
+    },
+    {
+      "version": "1.5.0",
+      "codename": "Blackglass Showroom",
+      "date": "2026-08-08",
+      "headline": "The Evolution Tree becomes a living tank intelligence archive.",
+      "groups": {
+        "Tank Intelligence Showroom": [
+          "The lobby lineage section expands in place into a complete 36-class dossier library.",
+          "Every tank gets lineage context, evolution breadcrumbs, a unique catchphrase, tactical description, ability information, runtime telemetry, and an animated preview generated from canonical class data."
+        ],
+        "Trait Graft Lab": [
+          "Foreign lineage genes can be previewed on the selected build with exact base before → after changes to relevant weapon, hull, mobility, body, splash, drone, and reduction stats."
+        ]
+      }
+    },
     {
       "version": "1.4.1",
       "codename": "Violet Doctrine",
       "date": "2026-08-07",
-      "headline": "The full sniper doctrine now belongs to every purple tank.",
+      "headline": "The full sniper doctrine belongs to every purple tank.",
       "groups": {
-        "Lineage-Wide Sniper Doctrine": [
-          "Marksman, Railgun, Ghost, Singularity, Prism Rail, Specter and Assassin all use the Forward Observer reconnaissance model for long-range target authorization.",
-          "All purple AI tanks are restricted to ordinary 720-unit direct hull vision; targets beyond that require a live observer relay rather than privileged sniper sight.",
-          "The non-beam purple classes now require continuous class-specific precision dwell before long-range fire instead of firing immediately when generic aim alignment succeeds.",
-          "Losing the target, breaking the firing cadence, losing remote authorization, or suffering accurate suppression cancels non-beam precision preparation."
-        ],
-        "Distinct Purple Mastery": [
-          "Marksman uses a deliberate sight picture with a 0.42-second remote precision dwell and a meaningful post-shot reveal/recovery window.",
-          "Ghost uses a faster 0.34-second ambush dwell and shorter reveal, preserving cloak-and-relocate identity rather than becoming a slower Railgun.",
-          "Specter uses the fastest 0.24-second precision cycle and short recovery, rewarding rapid phase positioning and repeated angle creation.",
-          "Assassin uses the longest 0.54-second precision commitment and strongest non-beam reveal/recovery cost to support its brutal alpha-strike identity.",
-          "Within direct sight, non-beam precision dwell is shorter so purple tanks remain responsive when opponents successfully close distance."
-        ],
-        "Warning, Suppression and Projectiles": [
-          "Marksman, Ghost, Specter and Assassin now provide two-stage directional pre-shot audio and screen-edge threat cues when preparing distant attacks against the player.",
-          "Class-flavored SIGHT LOCK, AMBUSH LOCK, HUNT LOCK and EXEC LOCK cues communicate late commitment without exposing exact shooter coordinates.",
-          "Accurate hits or near-miss suppression can break non-beam sniper preparation, extending the same read/respond/punish principle beyond Rail weapons.",
-          "Non-beam sniper rounds receive restrained violet motion trails and real near-player flyby audio so fast precision fire remains readable while in flight.",
-          "Committed non-beam shots briefly reveal their firing bearing, creating an earned advance or punish window."
+        "Purple Lineage": [
+          "Marksman, Railgun, Ghost, Singularity, Prism Rail, Specter and Assassin all use Forward Observer authorization beyond ordinary direct sight.",
+          "Non-beam purple forms gained class-specific precision dwell, staged warning cues, suppression, projectile readability, and punishable post-shot reveal while Rail forms retained beam-specific focus/interception mechanics."
         ],
         "Observer Counterplay": [
-          "Destroying the active Forward Observer now disables long-range observer relay for about 3.4 seconds instead of allowing another escort to restore remote targeting immediately.",
-          "During observer-relay reboot, the sniper can still fight through ordinary direct sight but cannot use spare-drone remote contacts for distant target authorization.",
-          "Player purple tanks receive OBSERVER DOWN / OBSERVER LINK RESTORED feedback and a short relay-reboot countdown."
-        ],
-        "Rail-Specific Identity Preserved": [
-          "Railgun, Singularity and Prism Rail retain their deeper focus-to-fire and quick-shot mechanics, explicit Rail projectile integrity, swept projectile interception and beam-specific feedback.",
-          "Violet Doctrine deliberately shares reconnaissance, finite acquisition, warning, suppression and punishability across the lineage without homogenizing every purple weapon into a Railgun."
+          "Destroying the active Forward Observer temporarily disables remote relay while leaving normal direct-sight combat intact."
         ]
       }
     },
@@ -45,32 +67,12 @@
       "headline": "Snipers need eyes before they can kill beyond sight.",
       "groups": {
         "Sniper AI": [
-          "Replaced the sniper lineage's generic AI combat loop with a dedicated tracking/firing model that uses sampled target motion, finite turret turn rates, aim commitment, and continuous focus instead of instant reacquisition.",
-          "Rail focus can no longer remain banked while an AI loses alignment or target intent; losing aim, target authorization, suppression, or spotter contact cancels the stored charge.",
-          "AI Railguns now need roughly 0.82 seconds of continuous qualified focus for a normal full shot (0.70 seconds for elite AI) and receive a post-shot recovery floor before another full attack cycle.",
-          "Long-range sniper targeting is no longer granted through the generic AI vision bonus. Sniper hull vision is deliberately limited; distant targets require a live spotter contact."
+          "Fixed banked AI Rail focus and replaced instant reacquisition with finite tracking, continuous focus, sampled target motion, and post-shot recovery.",
+          "Sniper hull sight is ordinary-range; distant target authorization comes from a destructible Forward Observer."
         ],
-        "Spotter Drones": [
-          "The first drone in each sniper squad becomes a Forward Observer with an extended patrol leash, deliberate wide orbit, and its own rotating field-of-view cone.",
-          "Spotters patrol away from the sniper, opportunistically destroy nearby map shapes, and independently scan tanks inside their own field of view.",
-          "A valid spotter sighting grants only a short-lived contact relay; destroy the spotter or leave its view and the sniper loses distant target authorization after the contact memory expires.",
-          "Player snipers receive readable SPOT contact information from their observer without automatic aiming; enemy spotters are visually identifiable and therefore attackable counterplay."
-        ],
-        "Warning and Counterplay": [
-          "Being acquired by an enemy spotter now produces a distinct SPOTTED cue before the sniper firing sequence begins.",
-          "Enemy Rail focus against the player now has two directional pre-shot warning stages, a stronger mobile-readable edge glint, and a RAIL FOCUS cue before full release.",
-          "Rail rounds now trigger an actual near-player flyby crack based on their flight path, so the in-flight sound is no longer only a firing-time effect.",
-          "Sniper AI must rotate and maintain its committed aim before firing, preserving movement feints and suppression as real counterplay."
-        ],
-        "Evolution and Safety": [
-          "Opening an evolution milestone clears hostile banked Rail focus before the game pauses.",
-          "Completing or dismissing an evolution/perk/gene choice grants a short spawn-shield grace period, clears stale firing input, and forces enemy snipers to reacquire rather than firing immediately as the menu disappears.",
-          "The stat-upgrade tray is automatically minimized after evolution choices so it cannot strand the player behind a large mobile UI panel when combat resumes."
-        ],
-        "Drone and Stability Fixes": [
-          "Controller drone state now receives a defensive invariant pass for invalid positions, stale targets, broken dash vectors, impossible phases, and corrupt Command Nodes.",
-          "Invalid Controller drone states recover to a safe formation state instead of remaining stuck or propagating NaN movement through the swarm.",
-          "Runtime JavaScript syntax checks and release-JSON validation are now part of the GitHub materialization workflow before the playable page is regenerated."
+        "Safety": [
+          "Evolution transitions clear hostile banked focus, collapse the upgrade tray, and grant a brief re-entry grace period.",
+          "Controller drone state receives invariant repair for broken positions, phases, targets, dash vectors, and Command Nodes."
         ]
       }
     },
@@ -80,27 +82,8 @@
       "date": "2026-08-07",
       "headline": "Sniper and Controller mastery gets a full feedback pass.",
       "groups": {
-        "Sniper Polish": [
-          "Rail focus now gains a segmented reticle, live charge percentage, a clear FOCUS READY state, a restrained lock-ready sound, and tiny supported-device haptic confirmation.",
-          "Rail projectiles receive longer luminous motion trails and brighter spear-like cores so hypervelocity shots are easier to read without slowing them down.",
-          "Projectile interception now produces dedicated metallic/electromagnetic impact feedback, brighter collision blooms, and a RAIL DENIED confirmation when the player successfully destroys an incoming Rail round."
-        ],
-        "Controller Polish": [
-          "The active Command Node now previews the current formation geometry instead of behaving as only a destination marker.",
-          "A compact node status ring shows how many drones are linked and whether the squad is forming, arming, diving, or recovering.",
-          "Committed hostile drone dives aimed at the player gain a longer restrained trajectory cue for better small-screen readability without exposing pre-commit prediction.",
-          "Breaking a winding-up enemy dive now gives a distinct DIVE BROKEN confirmation and dedicated interruption sound.",
-          "Successful near-miss dodges against committed AI drone runs now produce a restrained EVADED cue, flyby sound, ring, and tiny haptic confirmation.",
-          "Successful drone impacts gain heavier impact audio, flash feedback, and small context-sensitive camera response."
-        ],
-        "Sound and Feel": [
-          "Added layered focus-ready, Rail interception, drone impact, drone interruption, and drone near-miss procedural SFX with stereo placement where applicable.",
-          "Feedback is deliberately event-driven and throttled so the richer soundscape communicates important combat state without turning swarm battles into constant noise.",
-          "Mobile haptics remain short and selective: full focus readiness, Rail denial, hostile drone impact, and close committed-dive evasion."
-        ],
-        "Technical": [
-          "Signal Bloom is a presentation/QoL patch layered after Silent Horizon and Second Body, preserving their mechanics and existing two-stick control grammar.",
-          "The polish runtime passes JavaScript syntax validation before deployment."
+        "Polish": [
+          "Added segmented Rail focus feedback, enhanced projectile trails, RAIL DENIED, formation previews, swarm-state visualization, DIVE BROKEN / EVADED feedback, richer procedural SFX, and selective haptics."
         ]
       }
     },
@@ -110,34 +93,9 @@
       "date": "2026-08-07",
       "headline": "Controllers become twin-stick swarm commanders.",
       "groups": {
-        "Controls and Command": [
-          "Controller aim now commands a visible Swarm Command Node while the hull remains on the movement stick.",
-          "Right-stick direction chooses the swarm bearing, stick depth controls deployment distance, and releasing aim recalls the squadron.",
-          "Desktop uses the same language: hold fire to command toward the cursor, cursor distance controls deployment depth, and release recalls.",
-          "Autonomy handles shape farming; serious PvP pressure now requires active command instead of nearest-target autopilot."
-        ],
-        "Combat and Counterplay": [
-          "Controller gun hits DESIGNATE an enemy for a short coordination window, rewarding aim without creating permanent lock-on.",
-          "Commanded drones establish formation geometry before attacking instead of walking directly into the nearest enemy.",
-          "Attack runs now have readable wind-up, a late trajectory commitment, high-speed dive, overshoot, and recovery phases.",
-          "A defender can movement-feint before commitment, dodge after the dive locks, shoot a winding-up drone to cancel its run, destroy drones, or exploit the Controller hull while the swarm is overextended.",
-          "A launched dive cannot be recalled mid-flight; pre-launch attacks can be recalled, making commitment meaningful for both sides.",
-          "Drone dashes use swept collision so high-speed attack runs do not miss solely because of frame alignment."
-        ],
-        "Lineage Mastery": [
-          "Drone Carrier uses a responsive three-drone wedge for learning command depth and attack timing.",
-          "Overlord establishes a six-drone far-side crescent to create encirclement pressure and alternating attack angles.",
-          "Warden and Citadel form movable phalanx lines whose real drone hulls can physically screen firing lanes; Bulwark tightens their response.",
-          "Hivemind arranges nine hunters in a rotating ring, turning spacing and cascading attack timing into its mastery problem.",
-          "Broodmother forms twin attack claws and preferentially commits damaged or temporary brood, making attrition and sacrifice tactically useful.",
-          "Valkyrie uses a fast cavalry wing with the shortest wind-up, fastest dives, and shortest recovery, increasing both execution ceiling and punishability."
-        ],
-        "AI and Feedback": [
-          "AI Controllers use the same Command Node, formation, wind-up, trajectory lock, dive, recovery, and drone-health rules as the player.",
-          "Normal AI uses less prediction and slower command tracking while elite AI earns strength through better positioning rather than impossible execution.",
-          "New procedural command, recall, designation, drone wind-up, and launch sounds make swarm intent easier to read.",
-          "The player sees a command tether, engagement zone, off-screen command marker, designation reticle, attack wind-up rings, committed dive vectors, and dash trails.",
-          "A short Controller tutorial appears on evolution: command direction, analog deployment depth, recall, and designation all use the existing NOVA controls."
+        "Controller Combat": [
+          "Right-stick direction commands swarm bearing, analog depth sets deployment distance, and release recalls the squad while the left stick continues moving the hull.",
+          "Controller PvP uses designation, formation geometry, readable wind-up, trajectory commitment, dive, overshoot and recovery instead of autonomous nearest-target ramming."
         ]
       }
     },
@@ -148,21 +106,7 @@
       "headline": "Snipers become lethal, readable skill duels.",
       "groups": {
         "Sniper Gameplay": [
-          "Railgun, Singularity and Prism Rail focus before a full-power shot.",
-          "Release early for a weaker quick-shot under pressure.",
-          "Deep focus increasingly commits turret aim, enabling movement feints and counter-baits.",
-          "Committed shots create recovery windows opponents can use to take ground."
-        ],
-        "Counterplay": [
-          "Off-screen committed snipers reveal approximate bearing through a restrained edge glint and directional audio, not exact coordinates.",
-          "Accurate suppression can break deep focus while random distant spray remains inefficient.",
-          "Rail rounds use explicit interception durability instead of inheriting excessive toughness from penetration.",
-          "Swept projectile collision prevents hypervelocity Rail rounds tunneling through correctly placed defensive fire."
-        ],
-        "Sound and Feedback": [
-          "Synthesized focus whine, Rail discharge, quick-shot report and incoming sonic crack.",
-          "Restrained mobile haptics for dangerous off-screen committed shots where supported.",
-          "AI snipers obey the same focus and commitment language as players."
+          "Rail forms gained focus-to-fire, weaker quick-shots, aim commitment, off-screen directional warnings, suppression, post-shot reveal, explicit interception integrity, and swept projectile collision."
         ]
       }
     },
@@ -172,9 +116,8 @@
       "headline": "Drones enter the arena.",
       "groups": {
         "Drones": [
-          "Introduced combat drones as persistent arena entities.",
-          "Controller builds gained hunter swarms as a distinct combat identity.",
-          "Drones gained their own hull health, targeting, respawning and combat behavior."
+          "Introduced combat drones as persistent arena entities with health, targeting, respawning and combat behavior.",
+          "Controller builds gained hunter swarms as their defining combat identity."
         ]
       }
     },
