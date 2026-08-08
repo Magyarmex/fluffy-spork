@@ -8,7 +8,7 @@
 
 No install required — play directly in a modern browser on desktop or mobile.
 
-**Current release: v1.4.1 · Violet Doctrine** — the full reconnaissance, readable commitment, suppression, recovery, and off-screen counterplay doctrine now applies across every purple Sniper-lineage tank, not only Rail weapons.
+**Current release: v1.5.0 · Blackglass Showroom** — the lobby Evolution Tree now expands into a full animated Tank Intelligence archive for all 36 classes, with real runtime telemetry, evolution context, tactical dossiers, and a per-build foreign-gene graft simulator.
 
 ---
 
@@ -31,9 +31,27 @@ Every major system is expected to be evaluated for:
 - punish windows for mistakes
 - soft interactive counters rather than binary hard-counter matchups
 
+### Blackglass Showroom: know what you are building
+
+v1.5.0 turns the old compact lobby Evolution Tree into an expandable **Tank Intelligence & Showroom** section. The section stays embedded in the lobby, but can widen into a full intelligence bay with lineage filters and a complete 36-class dossier library.
+
+Selecting a tank opens a live animated chassis simulation generated from the actual class definition: hull scale, barrel geometry, weapon type, projectile behavior and drone presence all come from the same runtime data used by the arena. The display turret tracks pointer movement, fires its weapon profile, and animates drones around the selected chassis.
+
+Every dossier includes the tank name, lineage/evolution breadcrumb, a unique catchphrase, its canonical short description, combat-role tags, ability information and normalized telemetry for damage, projectile speed, effective range, cadence, penetration, hull HP, mobility, body damage and drone presence.
+
+The **Foreign Trait Graft Lab** lets you choose any legal foreign lineage gene and inspect what it does to that specific build. Instead of merely repeating the generic gene description, the lobby computes build-specific before → after changes such as:
+
+- primary damage, projectile speed, penetration, range and reload
+- splash radius, splash fraction and knockback
+- echo-round damage per trigger cycle
+- added hunter drones
+- HP, body damage, mobility and passive damage reduction
+
+The simulator uses base class values; in-match level, stat and perk scaling stacks separately. Scout is available as a pre-lineage sandbox preview while evolved tanks preserve normal foreign-lineage restrictions.
+
 ### Violet Doctrine: purple means sniper doctrine
 
-v1.4.1 closes the remaining asymmetry in the Sniper lineage. **Marksman, Railgun, Ghost, Singularity, Prism Rail, Specter, and Assassin** now all live inside the same information-war rules: ordinary direct hull sight, Forward Observer reconnaissance for distant targets, finite acquisition, readable long-range commitment, suppressible firing preparation, projectile/flyby readability, and a punish window after committed attacks.
+v1.4.1 closes the remaining asymmetry in the Sniper lineage. **Marksman, Railgun, Ghost, Singularity, Prism Rail, Specter, and Assassin** all live inside the same information-war rules: ordinary direct hull sight, Forward Observer reconnaissance for distant targets, finite acquisition, readable long-range commitment, suppressible firing preparation, projectile/flyby readability, and a punish window after committed attacks.
 
 The non-beam forms keep distinct mastery profiles instead of becoming Railgun copies. Marksman has a deliberate sight dwell, Ghost prepares ambush shots faster and reveals itself for less time, Specter has the fastest precision cycle for aggressive phase-driven angle creation, and Assassin makes the largest non-beam commitment for its heavy alpha strike. Inside ordinary direct sight, their dwell is shorter so closing distance genuinely changes the duel.
 
@@ -45,9 +63,7 @@ Railgun, Singularity, and Prism Rail retain their unique beam mechanics: deeper 
 
 v1.4.0 fixed the original Silent Horizon AI reacquisition failure. Sniper AI now uses sampled target motion, finite turret tracking and qualified continuous firing preparation rather than banking a hidden firing solution while not actively tracking a target.
 
-Sniper hulls no longer receive exceptional long-range vision simply because they are snipers or elite AI. They use ordinary direct sight. **Targets beyond that range must first be found by a Forward Observer drone.**
-
-The spotter is a real, destructible drone with an extended patrol leash and its own rotating field-of-view cone. It ranges away from its sniper, opportunistically farms map shapes, and searches for tanks independently.
+Sniper hulls use ordinary direct sight. **Targets beyond that range must first be found by a Forward Observer drone.**
 
 The intended long-range kill chain is:
 
@@ -55,11 +71,9 @@ The intended long-range kill chain is:
 
 ### Second Body: Controller skill duel
 
-v1.3.0 rebuilds the Controller lineage around the existing NOVA twin-stick controls. The left stick still moves the hull. The right stick also commands the swarm: **direction chooses the command bearing, analog stick depth chooses deployment distance, and release recalls the formation.**
+v1.3.0 rebuilds the Controller lineage around the existing NOVA twin-stick controls. The left stick moves the hull. The right stick commands the swarm: **direction chooses the command bearing, analog stick depth chooses deployment distance, and release recalls the formation.**
 
 Controller drones retain convenient autonomous shape farming, but serious PvP pressure requires player decisions: position the Command Node, establish formation geometry, DESIGNATE targets with the hull gun, sequence readable attack runs, decide how deeply to commit the swarm, and recall before the hull becomes exposed.
-
-Drone attacks use **form → wind up → commit trajectory → dive → overshoot → recover**. Opponents can manipulate the pre-lock prediction, dodge after commitment, interrupt drones, break through a weak formation, or punish an overextended Controller.
 
 **Autonomy handles chores. The player handles violence.**
 
@@ -76,6 +90,12 @@ Browse release history: **[`RELEASES.md`](./RELEASES.md)**
 - Branching tank lineages and evolutions
 - Late-game Apex evolutions
 - Cross-lineage gene splicing / hybridization
+- Expandable 36-class **Tank Intelligence & Showroom** in the lobby
+- Live animated class previews generated from canonical hull/barrel/weapon/drone data
+- Per-class catchphrases, tactical descriptions, evolution breadcrumbs and combat-role tags
+- Runtime-derived combat telemetry and normalized stat comparison bars
+- Foreign Trait Graft Lab with build-specific before → after gene effects
+- Responsive desktop/mobile intelligence layout embedded in the existing Evolution Tree section
 - Distinct weapon and combat archetypes
 - Full purple-lineage Forward Observer reconnaissance doctrine
 - Ordinary 720-unit direct sniper hull sight; distant targets require observer contact
@@ -87,13 +107,11 @@ Browse release history: **[`RELEASES.md`](./RELEASES.md)**
 - Segmented Rail focus/readiness reticle and enhanced Rail trails
 - Projectile interception with swept collision for hypervelocity Rail rounds
 - Dedicated Rail interception / denial feedback
-- Evolution-transition sniper reset, short safety grace, and automatic stat-tray collapse
 - Twin-stick Controller **Swarm Vectoring** and analog Command Nodes
 - Formation previews and live swarm-state visualization
 - Controller target designation and formation-driven attack sequencing
 - Distinct Wedge, Crescent, Phalanx, Ring, Claw, Fortress Wall and Cavalry Wing drone identities
 - Telegraph → commitment → dodge/punish drone attack runs
-- Readable drone interruption, impact and evasion feedback
 - Defensive Controller/drone state invariant repair
 - Procedural stereo combat, sniper, observer and swarm SFX
 - Selective mobile haptics for high-value combat events
@@ -115,25 +133,26 @@ NOVA TANKS is intended to improve across the entire game rather than only accumu
 
 ## Releases
 
-NOVA TANKS uses semantic-style version numbers (`MAJOR.MINOR.PATCH`) and maintains a durable release ledger in [`RELEASES.md`](./RELEASES.md). The lobby contains a browsable version history sourced from `nova-updates/releases.json`.
+NOVA TANKS uses semantic-style version numbers (`MAJOR.MINOR.PATCH`) and maintains a durable release ledger in [`RELEASES.md`](./RELEASES.md). The lobby combines the source-controlled release history with the currently loaded versioned runtime layer.
 
-### Latest — v1.4.1 · Violet Doctrine
+### Latest — v1.5.0 · Blackglass Showroom
+- existing Evolution Tree expands in place into a full intelligence/showroom section
+- complete 36-class searchable-by-lineage dossier library
+- animated tank canvas driven by actual class geometry, fire mode and drone count
+- unique catchphrases, descriptions, evolution paths, role tags and ability inspection
+- real telemetry for weapon, mobility, hull, body and drone characteristics
+- foreign-gene simulator computes build-specific before → after changes
+- responsive three-column desktop layout and stacked/horizontal mobile layout
+- future class/stat changes flow automatically from the canonical class registry
+
+### v1.4.1 · Violet Doctrine
 - Forward Observer doctrine applies to all seven purple classes
-- all purple AI uses ordinary direct sight; remote targets require observer contact
-- Marksman/Ghost/Specter/Assassin gain class-specific continuous precision dwell before distant shots
-- two-stage directional precision warnings and SIGHT / AMBUSH / HUNT / EXEC lock language
-- accurate suppression can break non-beam precision preparation
-- non-beam precision projectile trails and actual flyby SFX
-- committed non-beam shots briefly expose their firing bearing
-- killing the active Observer causes ~3.4 seconds of remote-relay denial
-- Railgun/Singularity/Prism retain unique focus, quick-shot and interception mechanics
+- class-specific precision preparation and staged warning language
+- suppression and meaningful Observer relay denial
+- Rail-specific focus/interception identity preserved
 
 ### v1.4.0 · Forward Observer
-- dedicated sniper AI instead of generic instant-reacquisition behavior
-- continuous AI Rail focus and finite tracking
-- destructible Forward Observer drones with independent FOV search and shape farming
-- SPOTTED → staged Rail-warning → shot information chain
-- evolution safety and Controller/drone stability fixes
+- dedicated sniper AI, destructible reconnaissance and evolution safety
 
 ### v1.3.1 · Signal Bloom
 - sniper/controller readability, graphics, SFX and mastery feedback polish
