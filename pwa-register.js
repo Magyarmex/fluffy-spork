@@ -3,17 +3,57 @@
 
   if (!('serviceWorker' in navigator)) return;
 
-  const UPDATE_INTERVAL_MS = 15 * 60 * 1000;
+  const UPDATE_INTERVAL_MS = 10 * 60 * 1000;
+  const MESSAGE_TIMEOUT_MS = 15000;
+  let syncPromise = null;
 
-  async function askForLatest(registration) {
+  function postWithReply(worker, message) {
+    return new Promise((resolve) => {
+      if (!worker) return resolve({ ok: false, error: 'no-active-worker' });
+
+      const channel = new MessageChannel();
+      const timer = window.setTimeout(() => {
+        channel.port1.close();
+        resolve({ ok: false, error: 'worker-message-timeout' });
+      }, MESSAGE_TIMEOUT_MS);
+
+      channel.port1.onmessage = (event) => {
+        window.clearTimeout(timer);
+        channel.port1.close();
+        resolve(event.data || { ok: false, error: 'empty-worker-response' });
+      };
+
+      worker.postMessage(message, [channel.port2]);
+    });
+  }
+
+  async function syncLatest(registration) {
+    if (syncPromise) return syncPromise;
+
+    syncPromise = (async () => {
+      try {
+        // updateViaCache:none on registration plus this explicit check lets a
+        // newer updater replace itself independently of game-content updates.
+        await registration.update();
+      } catch (_) {
+        // Offline is an expected state for an installed NOVA client.
+      }
+
+      const ready = await navigator.serviceWorker.ready.catch(() => registration);
+      const worker = ready.active || registration.active || registration.waiting || registration.installing;
+      const result = await postWithReply(worker, { type: 'NOVA_SYNC_LATEST' });
+
+      if (result && result.ok) {
+        window.__NOVA_UPDATE_STATUS = result;
+      }
+      return result;
+    })();
+
     try {
-      await registration.update();
-    } catch (_) {
-      // Being offline is normal for an installed NOVA TANKS client.
+      return await syncPromise;
+    } finally {
+      syncPromise = null;
     }
-
-    const worker = registration.active || registration.waiting || registration.installing;
-    if (worker) worker.postMessage({ type: 'NOVA_SYNC_LATEST' });
   }
 
   async function registerPeriodicUpdate(registration) {
@@ -26,10 +66,10 @@
       }
 
       await registration.periodicSync.register('nova-update', {
-        minInterval: 12 * 60 * 60 * 1000,
+        minInterval: 6 * 60 * 60 * 1000,
       });
     } catch (_) {
-      // Periodic Background Sync is opportunistic and browser-controlled.
+      // Periodic Background Sync remains browser-controlled/opportunistic.
     }
   }
 
@@ -41,18 +81,35 @@
       });
 
       await navigator.serviceWorker.ready;
-      askForLatest(registration);
-      registerPeriodicUpdate(registration);
+      void syncLatest(registration);
+      void registerPeriodicUpdate(registration);
 
-      window.addEventListener('online', () => askForLatest(registration));
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (!event.data || event.data.type !== 'NOVA_UPDATE_READY') return;
+        window.__NOVA_UPDATE_READY = event.data;
+        try {
+          localStorage.setItem('nova:lastUpdateReadyAt', String(Date.now()));
+          if (event.data.fingerprint) {
+            localStorage.setItem('nova:lastUpdateFingerprint', event.data.fingerprint);
+          }
+        } catch (_) {}
+      });
+
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        // A newer updater has taken control. Give activation a moment, then
+        // immediately let that updater reconcile the latest game build.
+        window.setTimeout(() => void syncLatest(registration), 250);
+      });
+
+      window.addEventListener('online', () => void syncLatest(registration));
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible' && navigator.onLine) {
-          askForLatest(registration);
+          void syncLatest(registration);
         }
       });
 
       window.setInterval(() => {
-        if (navigator.onLine) askForLatest(registration);
+        if (navigator.onLine) void syncLatest(registration);
       }, UPDATE_INTERVAL_MS);
     } catch (error) {
       console.warn('[NOVA PWA] Offline runtime registration failed:', error);
