@@ -5,11 +5,11 @@ This roadmap is intentionally lightweight. It records high-value weaknesses and 
 ## Active priorities
 
 ### P0 — Sniper counterplay and skill duel
-**Status:** planned / highest-priority combat-design issue
+**Status:** active — first implementation shipped in **v1.2.0 · Silent Horizon**
 
-**Problem:** Sniper/Railgun combat currently has insufficient counterplay. Hypervelocity, high-damage, high-penetration shots can become effectively unavoidable, and the existing projectile-interception system is not robust enough to support deliberate defense against them.
+**Problem:** Sniper/Railgun combat previously had insufficient counterplay. Hypervelocity, high-damage, high-penetration shots could become effectively unavoidable, and the old projectile-interception system was not robust enough to support deliberate defense against them.
 
-On mobile, the sniper can be completely outside the player's field of view. The target often sees only the incoming projectile, so counterplay cannot depend on visually tracking the sniper tank itself.
+On mobile, the sniper can be completely outside the player's field of view. The target may see only the incoming projectile, so counterplay cannot depend on visually tracking the sniper tank itself.
 
 **Design objective:** Preserve sniper lethality and the fantasy of a silent killer beyond visual range while turning sniper encounters into high-skill duels for both sides. Approaching classes should have mechanics that let good defensive reads translate into territory gained.
 
@@ -17,25 +17,30 @@ On mobile, the sniper can be completely outside the player's field of view. The 
 
 **Detect bearing → manipulate aim → survive/intercept the shot → exploit recovery → take territory → repeat.**
 
-**Preferred workstream:**
-1. Implement robust swept/continuous projectile-vs-projectile collision for fast rounds.
-2. Decouple tank penetration from projectile interception durability (`interceptHP` or equivalent).
-3. Add an off-screen threat language for mobile and desktop:
-   - restrained directional scope glint at the screen edge when a deeply focused sniper is aiming near the player's lane;
-   - subtle directional charge sound before a highly committed shot;
-   - short in-flight sonic crack / whip for nearby Railgun rounds;
-   - brief persistent tracer/rail trail after firing so attentive players can infer bearing;
-   - stronger temporary origin information after a missed full-power shot, without permanently revealing exact position.
-4. Prototype readable sniper focus/charge with aim commitment rather than a simplistic damage nerf.
-5. Preserve weaker quick-shots so rushed snipers still have execution options.
-6. Create meaningful post-shot recovery so a successful dodge/interception produces an **earned advance window**.
-7. Make movement deception a real approach skill: cadence changes, feints, diagonal advancement, retreat-to-bait, timed lane crossing, and cover transitions.
-8. Prototype skill-based suppression: accurate near-miss fire and direct hits can interfere with deep focus, while random distant spam has little effect.
-9. Make close-range pressure and range compression matter mechanically rather than through arbitrary damage penalties.
-10. Build future map geometry around alternating exposed/protected spaces, flank routes, firing lanes, and non-permanent sniper positions.
-11. Make sniper AI obey the same focus, tracking, reaction, cue, relocation, and recovery constraints as players.
-12. Validate that both the sniper and target gain meaningful skill expression.
-13. Tune damage/reload numbers only after the interaction model and collision model work reliably.
+### Shipped in v1.2.0
+- Swept / continuous projectile-vs-projectile collision for hypervelocity rounds.
+- Explicit Rail projectile integrity decoupled from tank penetration.
+- Full-power Rail focus with approximately 520 ms commitment.
+- Progressive turret-aim commitment during deep focus.
+- Charge-scaled quick-shots when the player releases before full focus.
+- Directional off-screen glint for deeply focused enemy Rail snipers threatening the player lane.
+- Directional charge, incoming/flyby, full-discharge, and quick-shot procedural SFX.
+- Brief post-shot bearing reveal / visual cue for committed shots.
+- Accurate direct/near-miss suppression that can break deep focus.
+- AI Rail snipers routed through the same focus/commitment interaction rather than instant full-power fire.
+
+### Next sniper work
+1. Playtest/tune focus duration, aim-turn limits, suppression radius, quick-shot curves, and interception integrity on actual mobile combat.
+2. Measure whether successful defenses create enough practical territory gain without an artificial movement buff.
+3. Improve future map geometry around alternating exposed/protected spaces, flank routes, firing lanes, and non-permanent sniper positions.
+4. Add stronger firing-line/tracer persistence only if current bearing cues remain too ambiguous in practice.
+5. Continue improving sniper AI prediction, counter-baiting, relocation, and decision quality while preserving human-like execution constraints.
+6. Explore lineage-specific approach tools where they create soft counterplay:
+   - Gunner: accurate suppression and lane pressure;
+   - Cannon: deliberate heavy-projectile interception / lane denial;
+   - Controller: scouting pressure and forced relocation;
+   - Guardian: timed protective advancement without reducing the matchup to raw HP.
+7. Validate with actual gameplay that expert snipers and expert defenders both gain substantial mastery paths.
 
 **Acceptance criteria:**
 - expert defensive fire can intentionally intercept or weaken sniper rounds;
@@ -53,6 +58,8 @@ On mobile, the sniper can be completely outside the player's field of view. The 
 - deaths generally feel attributable to a readable mistake rather than unavoidable damage.
 
 See [`DESIGN_PRINCIPLES.md`](./DESIGN_PRINCIPLES.md) for the full skill-expression doctrine and expanded sniper case study.
+
+See [`RELEASES.md`](./RELEASES.md) for the v1.2.0 implementation record.
 
 ## Standing design requirement
 
