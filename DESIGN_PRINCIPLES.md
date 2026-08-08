@@ -45,6 +45,8 @@ When adding or changing a system, ask:
 
 7. **Do maps and presentation support the mechanic?** Line-of-sight, cover, effects, audio, camera, UI, and arena geometry are part of balance.
 
+8. **Can simple inputs produce complex mastery?** NOVA should avoid adding control clutter when an existing input can acquire richer context. Depth should come from consequences, timing, geometry, commitment and interaction—not from requiring a keyboard of abilities.
+
 ## Avoid
 
 - effectively unavoidable burst damage with no pre-shot information
@@ -55,6 +57,167 @@ When adding or changing a system, ask:
 - excessive randomness replacing execution
 - mechanics whose only answer is “have more HP”
 - reducing an overpowered mechanic into blandness when richer counterplay could preserve its fantasy
+- autonomous combat systems that make the important PvP decisions for the player
+
+---
+
+# Case study: Controller skill expression
+
+## Governing rule
+
+**Autonomy handles chores. The player handles violence.**
+
+Passive helpers are useful for repetitive farming, collection and low-stakes maintenance. They should not perform the core PvP decisions that define whether an encounter is won. A Controller should feel powerful because the player is managing another spatial organism well, not because six pets happened to select the correct target.
+
+The Controller mastery problem is deliberately different from ordinary gun aim:
+
+**multitasking + geometry + formation control + target manipulation + attack sequencing + commitment + recall + risk management.**
+
+The player effectively controls **two positions at once**: the hull and the swarm.
+
+## Simple control grammar, deep consequences
+
+Controller mechanics must preserve NOVA's existing twin-stick language.
+
+- **Left stick:** move the tank hull.
+- **Right-stick direction:** command the swarm's bearing while also aiming the Controller's gun.
+- **Right-stick depth:** determine how deeply the swarm is deployed.
+- **Release:** recall the swarm toward the hull.
+- **Gun hit:** temporarily DESIGNATE the struck target for improved coordination.
+- **Existing ultimate button:** modifies the current command system rather than adding a separate RTS interface.
+
+Desktop equivalents should preserve the same mental model with mouse direction/distance and fire hold/release.
+
+No individual-drone selection, command radial, extra virtual buttons or tactical menu should be required for the fundamental Controller game.
+
+## The swarm is a second body
+
+The player's input should define a **Command Node** rather than directly teleporting drones or issuing a binary target lock.
+
+Drones accelerate toward formation positions around that node. Their existing velocity and distance matter, so moving the command from one side of an encounter to the other creates real repositioning time. This produces swarm momentum and makes overextension punishable.
+
+A small right-stick deflection naturally creates a close defensive formation. A full deflection creates deep deployment. This gives analog precision a strategic meaning without changing the controls.
+
+## PvP requires command
+
+Controller drones may autonomously farm neutral shapes when the player is not issuing a combat command. Against enemy tanks, however, the swarm should not conduct a complete lethal pursuit by itself.
+
+The player must establish useful geometry by placing the Command Node near or around the opponent. This makes deliberate pressure visibly different from passive proximity.
+
+The intended Controller PvP loop is:
+
+**Place → shape formation → designate/read target → sequence attack → commit → recover/recall → reposition.**
+
+## Designation rewards ordinary aim
+
+The Controller's weak hull gun remains strategically important. Landing it on an opponent should briefly **DESIGNATE** that target.
+
+Designation is not permanent lock-on and should not erase positioning requirements. Instead it can:
+
+- make that target preferred while it remains reasonably near the commanded engagement area;
+- modestly improve attack sequencing/cadence;
+- communicate the Controller's intent to both players;
+- reward a Controller who can manage hull aim while simultaneously positioning the swarm.
+
+This makes right-stick mastery genuinely multitasking rather than replacing conventional aim altogether.
+
+## Attack runs, not contact DPS
+
+A serious PvP drone attack should be a discrete readable commitment:
+
+**Formation → Wind-up → Trajectory commitment → Dive → Overshoot → Recovery.**
+
+### Formation
+The drone first earns a useful attacking position. Better Controller geometry creates better attack angles and escape denial.
+
+### Wind-up
+The chosen attacker visibly and audibly prepares. The opponent knows *which* unit may strike, but the trajectory can still respond to movement during the early wind-up.
+
+### Trajectory commitment
+Late in the wind-up, the drone's dive vector locks. This is the decisive mind-game boundary.
+
+Before lock, the defender can feint movement to poison the Controller/drone prediction. After lock, the defender can execute a real dodge because the drone no longer tracks perfectly.
+
+### Dive
+The drone accelerates along the committed vector. High-speed collision must use swept path geometry so correct hits/misses are not determined by simulation-frame luck.
+
+### Overshoot
+A missed drone travels through the lane rather than snapping back onto the target. The defender gains space; the Controller has lost local coverage.
+
+### Recovery
+The drone must return/re-form before becoming fully threatening again. Attack timing therefore matters, and dumping the whole swarm at once can create a dangerous vulnerability.
+
+## Interruptibility and destruction
+
+Drones are real combatants with real hull HP.
+
+- A winding-up drone can be shot to interrupt its run and force recovery.
+- A destroyed drone stays gone until its normal respawn completes.
+- Once a dive launches, recall does not magically cancel its commitment.
+- Defensive fire may therefore choose between shooting the Controller, killing an attacker, or exploiting the opening created elsewhere in the formation.
+
+This creates meaningful target-selection decisions for the opponent.
+
+## Formation identity by evolution
+
+Different Controller descendants should create different geometry rather than simply changing drone count/damage.
+
+- **Drone Carrier — Wedge:** responsive fundamentals; teaches command depth, timing and recall.
+- **Overlord — Crescent:** establishes pressure on the far side of a target; specializes in encirclement and alternating attack angles.
+- **Warden — Phalanx:** armored hunters form an oriented movable line. Properly placed real drone bodies can screen projectiles; incorrect orientation leaves another lane open.
+- **Hivemind — Ring:** a large rotating surround whose ceiling is maintaining spatial control while cascading attacks without stripping the ring.
+- **Broodmother — Claws:** twin assault arcs with calculated expendability; damaged/temporary brood can be deliberately committed into dangerous attacks.
+- **Citadel — Fortress Wall:** slower, denser phalanx with strong lane control and significant reposition cost.
+- **Valkyrie — Cavalry Wing:** fast sweeping formation with short wind-ups, high dive velocity and short recovery; it gains tempo but makes mistakes at high speed.
+
+These identities should remain understandable from watching the drones, not require memorizing hidden modifiers.
+
+## Counterplay against Controllers
+
+An opponent should have several overlapping answers rather than one hard anti-drone class:
+
+- move before trajectory lock to manipulate the predicted dive;
+- dodge after commitment;
+- shoot or destroy the winding-up drone;
+- pressure through a weak side of the formation;
+- bait the swarm far from the hull and then attack the Controller;
+- force recall and use the resulting loss of map pressure;
+- use projectiles/terrain to make a desired command position expensive;
+- exploit recovery after several drones commit in quick succession;
+- identify formation-specific weaknesses, such as attacking a Warden from a poorly screened angle.
+
+Likewise, a skilled Controller should be able to counter these responses through delayed attacks, target designation, formation rotation, partial commitment, sacrificial units, repositioning and hull movement.
+
+## AI Controllers
+
+AI must use the same second-body vocabulary.
+
+AI strength may come from:
+
+- better Command Node placement;
+- more intelligent flanking geometry;
+- improved target selection;
+- better sequencing of dives;
+- more disciplined recall;
+- predicting movement somewhat better at elite difficulty.
+
+It must not come from drones that ignore wind-up, trajectory commitment, recovery, leash, HP, formation travel time or visibility/counterplay rules.
+
+## Controller validation questions
+
+- Can an expert Controller make the same drone count dramatically more effective than an average player?
+- Can an expert defender survive attacks that kill a stationary or predictable defender?
+- Does right-stick depth matter continuously rather than acting like a hidden binary switch?
+- Can the player meaningfully control hull and swarm in different directions at once?
+- Does landing the Controller gun matter without becoming mandatory lock-on?
+- Can attack runs be read and dodged after commitment?
+- Can pre-lock movement feints alter the attacker's prediction?
+- Can shooting the attacking drone interrupt the threat?
+- Does overextending the swarm expose the Controller hull?
+- Do recalls and redeployments take enough time to create commitment?
+- Do Controller evolutions create different geometric mastery problems rather than only stronger stats?
+- Does idle play remain comfortable for shape farming?
+- Does the class remain intuitive after a brief in-game explanation?
 
 ---
 
