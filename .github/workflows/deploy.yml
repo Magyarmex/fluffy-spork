@@ -10,6 +10,8 @@ on:
       - 'nova-icon.svg'
       - 'pwa-register.js'
       - 'sw.js'
+      - 'package.json'
+      - '.github/nova-tailwind.css'
       - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
@@ -22,6 +24,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install pinned production CSS compiler
+        shell: bash
+        run: npm install --no-audit --no-fund --no-package-lock
 
       - name: Validate runtime release files
         shell: bash
@@ -95,6 +106,7 @@ jobs:
               './nova-updates/performance-v1.7.5.js',
               './nova-updates/drone-allegiance-glow-v1.7.6.js',
               './nova-updates/settings-v1.7.7.js',
+              './nova-updates/performance-v1.7.8.js',
               './nova-updates/lobby-history.js',
               './nova-updates/menu-debug-motion-v1.7.8.js',
               './nova-updates/menu-slot-compat-v1.7.8.js',
@@ -111,6 +123,34 @@ jobs:
 
           path.write_text(html, encoding='utf-8')
           PY
+
+          # Tailwind stays a release-time tool. Production receives ordinary
+          # minified CSS and does no utility compilation in the player browser.
+          npx @tailwindcss/cli -i .github/nova-tailwind.css -o nova-tailwind.generated.css --minify
+          test -s nova-tailwind.generated.css
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('index.html.new')
+          html = path.read_text(encoding='utf-8')
+          css = Path('nova-tailwind.generated.css').read_text(encoding='utf-8')
+
+          browser = re.compile(r'\s*<script\b[^>]*src=["\'][^"\']*tailwindcss-browser[^"\']*["\'][^>]*>\s*</script>', re.I)
+          html, browser_count = browser.subn('', html)
+          if browser_count != 1:
+              raise SystemExit(f'Expected exactly one Tailwind browser runtime, found {browser_count}')
+
+          tw_style = re.compile(r'\s*<style\s+type=["\']text/tailwindcss["\']\s*>.*?</style>', re.I | re.S)
+          match = tw_style.search(html)
+          if not match:
+              raise SystemExit('Tailwind theme style marker not found')
+          static = '\n    <style id="nova-tailwind-static">' + css + '</style>'
+          html = html[:match.start()] + static + html[match.end():]
+          path.write_text(html, encoding='utf-8')
+          PY
+          rm -f nova-tailwind.generated.css
 
           grep -q '__novaModules' index.html.new
           grep -q 'manifest.webmanifest' index.html.new
@@ -137,12 +177,24 @@ jobs:
           grep -q 'nova-updates/performance-v1.7.5.js' index.html.new
           grep -q 'nova-updates/drone-allegiance-glow-v1.7.6.js' index.html.new
           grep -q 'nova-updates/settings-v1.7.7.js' index.html.new
+          grep -q 'nova-updates/performance-v1.7.8.js' index.html.new
           grep -q 'nova-updates/lobby-history.js' index.html.new
           grep -q 'nova-updates/menu-debug-motion-v1.7.8.js' index.html.new
           grep -q 'nova-updates/menu-slot-compat-v1.7.8.js' index.html.new
           ! grep -q 'nova-updates/auto-update-test-v1.7.4.js' index.html.new
+          grep -q 'id="nova-tailwind-static"' index.html.new
+          grep -Fq '.pointer-events-none' index.html.new
+          grep -Fq '.font-display' index.html.new
+          if grep -q 'tailwindcss-browser' index.html.new; then
+            echo 'Tailwind browser runtime unexpectedly survived production materialization' >&2
+            exit 1
+          fi
+          if grep -q 'text/tailwindcss' index.html.new; then
+            echo 'Runtime Tailwind source style unexpectedly survived production materialization' >&2
+            exit 1
+          fi
           mv index.html.new index.html
-          echo "Materialized $(wc -c < index.html) bytes into index.html"
+          echo "Materialized $(wc -c < index.html) bytes into index.html with static Tailwind CSS"
 
       - name: Commit the plain page
         shell: bash
