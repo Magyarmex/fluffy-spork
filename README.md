@@ -8,7 +8,7 @@
 
 No install required — play directly in a modern browser on desktop or mobile.
 
-**Current release: v1.3.1 · Signal Bloom** — a presentation, SFX, readability and game-feel polish pass for the skill-based Sniper and Controller systems introduced in Silent Horizon and Second Body.
+**Current release: v1.4.0 · Forward Observer** — sniper AI now requires continuous readable focus, long-range acquisition is earned through destructible spotter-drone reconnaissance, evolution transitions are protected from instant Rail punishment, and Controller drone state receives additional stability safeguards.
 
 ---
 
@@ -31,15 +31,19 @@ Every major system is expected to be evaluated for:
 - punish windows for mistakes
 - soft interactive counters rather than binary hard-counter matchups
 
-### Signal Bloom: mastery should feel good
+### Forward Observer: information is part of sniper skill
 
-v1.3.1 does not add another control surface or replace the underlying combat systems. It makes the newer skill mechanics easier to read and more satisfying to execute on small screens and desktop alike.
+v1.4.0 fixes a major failure in the original Silent Horizon AI implementation. AI Rail focus could previously remain banked while the sniper stopped actively maintaining a firing solution, allowing a later reacquisition to jump almost immediately to a full shot. Sniper AI now has a dedicated combat loop: sampled target motion, finite turret tracking, continuous qualified focus, focus cancellation when aim/contact is lost, two-stage warning cues, and a real post-shot recovery floor.
 
-Sniper focus gains a segmented charge reticle, live charge feedback, a distinct **FOCUS READY** state, improved Rail motion trails, and dedicated audiovisual feedback for projectile interception. Destroying an incoming Rail shot through correctly placed defensive fire now produces a clear **RAIL DENIED** reward cue.
+Sniper hulls no longer receive exceptional long-range vision simply because they are snipers or elite AI. They use ordinary direct sight at close/medium range. **Targets beyond that range must first be found by a Forward Observer drone.**
 
-Controller Command Nodes now preview formation geometry and show a compact live squad-state ring. Players can see whether drones are forming, arming, diving or recovering without visually tracking every unit. Committed hostile dives get a restrained extended trajectory cue; interrupting a wind-up produces **DIVE BROKEN**, and correctly evading a close committed pass produces **EVADED** feedback.
+The spotter is a real, destructible drone with an extended patrol leash and its own rotating field-of-view cone. It ranges away from its sniper, opportunistically farms map shapes, and searches for tanks independently. A sighting creates only a short-lived contact relay. Destroy the spotter, leave its field of view, or outlast the contact memory and the sniper loses authorization to keep targeting you at remote range.
 
-The richer procedural SFX and selective mobile haptics are event-driven and throttled so important combat information stands out instead of becoming noise.
+The intended long-range kill chain is now:
+
+**Spotter searches → contact acquired → sniper turns and tracks → focus warnings → committed shot → recovery/reposition.**
+
+That means information warfare itself becomes counterplay: notice the observer, evade its cone, destroy it, force the sniper to reacquire, suppress the firing position, or manipulate the committed aim.
 
 ### Second Body: Controller skill duel
 
@@ -51,13 +55,9 @@ Drone attacks use **form → wind up → commit trajectory → dive → overshoo
 
 **Autonomy handles chores. The player handles violence.**
 
-### Silent Horizon: sniper skill duel
+### Silent Horizon + Signal Bloom
 
-v1.2.0 turns Railgun combat into a more interactive long-range duel while preserving the sniper fantasy. Full-power Rail shots require focus and progressively commit aim; early release produces a weaker quick-shot. Off-screen snipers communicate restrained bearing/timing information through directional glint and spatial audio rather than revealing exact coordinates. Correctly placed defensive fire can intercept Rail rounds through swept collision, and accurate suppression can break deep focus.
-
-The intended anti-sniper rhythm is:
-
-**Detect bearing → manipulate aim → survive/intercept → exploit recovery → take territory → repeat.**
+v1.2.0 established the focus/quick-shot Railgun duel, off-screen glint/audio language, suppression, explicit Rail interception integrity, and swept projectile collision. v1.3.1 then added the segmented focus reticle, FOCUS READY feedback, enhanced Rail trails, RAIL DENIED confirmation, Controller formation previews, swarm-state visualization, DIVE BROKEN / EVADED feedback, richer procedural SFX, and selective mobile haptics.
 
 Read the full doctrine: **[`DESIGN_PRINCIPLES.md`](./DESIGN_PRINCIPLES.md)**  
 See active development priorities: **[`ROADMAP.md`](./ROADMAP.md)**  
@@ -69,24 +69,30 @@ Browse release history: **[`RELEASES.md`](./RELEASES.md)**
 - Late-game Apex evolutions
 - Cross-lineage gene splicing / hybridization
 - Distinct weapon and combat archetypes
+- Dedicated sniper AI with continuous focus and finite tracking
+- Forward Observer spotter drones with independent field-of-view reconnaissance
+- SPOTTED → focus-warning → Rail-shot information chain
+- Focus / quick-shot Railgun skill system
+- Segmented focus/readiness reticle and enhanced Rail trails
+- Off-screen directional sniper threat cues and actual in-flight flyby SFX
+- Projectile interception with swept collision for hypervelocity rounds
+- Skill-based sniper suppression and advance windows
+- Dedicated Rail interception / denial feedback
+- Evolution-transition Rail reset, short safety grace, and automatic stat-tray collapse
 - Twin-stick Controller **Swarm Vectoring** and analog Command Nodes
 - Formation previews and live swarm-state visualization
 - Controller target designation and formation-driven attack sequencing
 - Distinct Wedge, Crescent, Phalanx, Ring, Claw, Fortress Wall and Cavalry Wing drone identities
 - Telegraph → commitment → dodge/punish drone attack runs
 - Readable drone interruption, impact and evasion feedback
-- Focus / quick-shot Railgun skill system
-- Segmented focus/readiness reticle and enhanced Rail trails
-- Off-screen directional sniper threat cues
-- Projectile interception with swept collision for hypervelocity rounds
-- Skill-based sniper suppression and advance windows
-- Dedicated Rail interception / denial feedback
+- Defensive Controller/drone state invariant repair
 - Procedural stereo combat and swarm SFX
 - Selective mobile haptics for high-value combat events
-- AI-controlled enemy tanks that progress alongside the player and obey the same major combat-language constraints
+- AI-controlled enemy tanks that progress alongside the player while obeying major combat-language constraints
 - Desktop and mobile browser play
 - GitHub Pages deployment
 - In-lobby version history and ongoing versioned development
+- Runtime JavaScript and release-data validation in deployment CI
 
 ## Live game
 
@@ -96,57 +102,42 @@ The `main` branch is the canonical development branch. GitHub Pages serves the c
 
 ## Development direction
 
-NOVA TANKS is intended to improve across the entire game rather than only accumulate mechanics. Development may target:
-
-- Gameplay and game feel
-- Tank classes, evolutions and hybrids
-- Enemy AI and encounter design
-- Maps and environmental systems
-- Graphics, animation and visual feedback
-- UI, lobby and quality of life
-- Mobile controls and accessibility
-- Performance and rendering efficiency
-- Balance and progression
-- Bug fixes and deployment reliability
-- Larger multi-release projects
+NOVA TANKS is intended to improve across the entire game rather than only accumulate mechanics. Development may target gameplay/game feel, tank classes and hybrids, AI and encounters, maps and environments, graphics/animation, UI/QoL, mobile controls, performance, balance/progression, deployment reliability, and larger multi-release projects.
 
 ## Releases
 
 NOVA TANKS uses semantic-style version numbers (`MAJOR.MINOR.PATCH`) and maintains a durable release ledger in [`RELEASES.md`](./RELEASES.md). The lobby contains a browsable version history sourced from `nova-updates/releases.json`.
 
-### Latest — v1.3.1 · Signal Bloom
+### Latest — v1.4.0 · Forward Observer
+- dedicated sniper AI instead of generic instant-reacquisition behavior
+- continuous AI Rail focus: losing aim/contact cancels charge
+- normal/elite AI focus times of roughly 0.82s / 0.70s plus post-shot recovery floors
+- ordinary sniper hull sight; remote targets require spotter contact
+- destructible Forward Observer drones with independent FOV search and shape farming
+- short-lived contact relay rather than permanent remote lock-on
+- **SPOTTED** cue followed by two-stage directional Rail focus warning
+- actual in-flight Rail flyby crack near the player
+- evolution menus clear hostile Rail focus before pause
+- post-evolution safety grace and automatic stat-tray minimization
+- Controller/drone state invariant repair
+- deployment now syntax-checks every runtime overlay and validates release JSON
+
+### v1.3.1 · Signal Bloom
 - segmented Rail focus/readiness reticle and lock-ready SFX
-- brighter, longer hypervelocity Rail trails
-- dedicated Rail interception effects and **RAIL DENIED** skill confirmation
-- Command Node formation previews
-- live linked/forming/arming/diving/recovering swarm-state display
-- improved hostile committed-dive readability for mobile
-- **DIVE BROKEN** interruption feedback
-- **EVADED** near-miss feedback for correctly dodged committed drone runs
-- heavier drone-impact audiovisual response
-- new focus-ready, Rail-intercept, drone-impact, drone-break and drone-near-miss procedural SFX
-- selective, short haptic confirmation for high-value mobile events
+- brighter Rail trails and RAIL DENIED feedback
+- Command Node formation previews and live swarm-state display
+- DIVE BROKEN / EVADED feedback and improved drone-impact feel
 
 ### v1.3.0 · Second Body
 - right-stick Swarm Vectoring with analog deployment depth and release-to-recall
 - autonomous shape farming, actively commanded PvP
-- short-lived gun-hit DESIGNATE system
-- formation establishment before attack instead of nearest-target chasing
-- readable wind-up, late trajectory lock, committed dive, overshoot and recovery
-- interruptible wind-ups and destructible drones
-- swept high-speed dive collision
-- unique Controller lineage formation geometries
-- same Controller combat rules for AI, with skill expressed through decision quality
+- target designation and formation-driven attack runs
+- unique Controller lineage formations and AI parity
 
 ### v1.2.0 · Silent Horizon
-- full-power Rail focus and weaker charge-scaled quick-shots
-- progressive aim commitment during deep focus
-- off-screen directional glint and incoming audio
-- explicit Rail interception integrity
-- swept projectile-vs-projectile collision
-- accurate suppression that can break focus
-- post-shot bearing/recovery windows for skilled advancement
-- synthesized charge, rail-crack, flyby, and quick-shot SFX
+- focus / quick-shot Railgun system
+- off-screen sniper threat cues
+- suppression, explicit Rail integrity, and swept projectile interception
 
 ---
 
