@@ -33,6 +33,7 @@ function loadBattlefield() {
     performance: { now: () => 0 },
     Date,
     Math,
+    Map,
   };
   const src = fs.readFileSync(path.join(__dirname, '../../nova-updates/battlefield-v1.6.0.js'), 'utf8');
   vm.runInNewContext(src, context, { filename: 'battlefield-v1.6.0.js' });
@@ -74,4 +75,34 @@ test('Battlefield spawn safety rejects positions inside solid cover', () => {
   g.__novaTerrain = [{ id: -1, shape: 'circle', x: 40, y: -20, r: 80, solid: true, destructible: false }];
   assert.equal(g.isTerrainSafe(40, -20, 10), false);
   assert.equal(g.isTerrainSafe(300, 300, 10), true);
+});
+
+test('Battlefield broad-phase rejects distant solids before exact collision math', () => {
+  const { context, Game } = loadBattlefield();
+  const g = new Game();
+  g.__novaTerrain = [];
+  let id = -1;
+  for (let y = -5; y <= 5; y++) {
+    for (let x = -5; x <= 5; x++) {
+      g.__novaTerrain.push({ id: id--, shape: 'rect', x: x * 500, y: y * 500, w: 60, h: 60, solid: true, destructible: false });
+    }
+  }
+  const count = context.window.__NOVA_BATTLEFIELD_PERF_TEST__.candidateCount(g, 0, 0, 20);
+  assert.ok(count < g.__novaTerrain.length / 5, `expected strong pruning; candidates=${count}, total=${g.__novaTerrain.length}`);
+  assert.equal(g.hasLineOfSight(-40, 100, 40, 100, 2), true);
+  assert.equal(g.hasLineOfSight(-40, 0, 40, 0, 2), false);
+});
+
+test('Battlefield circle resolver preserves collision response with spatial candidates', () => {
+  const { context, Game } = loadBattlefield();
+  const g = new Game();
+  g.__novaTerrain = [
+    { id: -1, shape: 'rect', x: 0, y: 0, w: 100, h: 100, solid: true, destructible: false },
+    { id: -2, shape: 'rect', x: 1800, y: 1800, w: 100, h: 100, solid: true, destructible: false },
+  ];
+  const e = { x: 45, y: 0, vx: -80, vy: 15 };
+  const hit = context.window.__NOVA_BATTLEFIELD_PERF_TEST__.circleResolve(g, e, 20);
+  assert.equal(hit, true);
+  assert.ok(e.x >= 70, `expected entity outside padded wall, x=${e.x}`);
+  assert.ok(e.__novaTerrainBump);
 });
