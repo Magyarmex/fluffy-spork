@@ -8,7 +8,7 @@
 
 No install required — play directly in a modern browser on desktop or mobile.
 
-**Current release: v1.3.0 · Second Body** — Controllers become true twin-stick swarm commanders with analog formation placement, target designation, readable attack runs, recall/commitment decisions, distinct lineage formations, AI parity and new procedural swarm SFX.
+**Current release: v1.3.1 · Signal Bloom** — a presentation, SFX, readability and game-feel polish pass for the skill-based Sniper and Controller systems introduced in Silent Horizon and Second Body.
 
 ---
 
@@ -31,9 +31,19 @@ Every major system is expected to be evaluated for:
 - punish windows for mistakes
 - soft interactive counters rather than binary hard-counter matchups
 
+### Signal Bloom: mastery should feel good
+
+v1.3.1 does not add another control surface or replace the underlying combat systems. It makes the newer skill mechanics easier to read and more satisfying to execute on small screens and desktop alike.
+
+Sniper focus gains a segmented charge reticle, live charge feedback, a distinct **FOCUS READY** state, improved Rail motion trails, and dedicated audiovisual feedback for projectile interception. Destroying an incoming Rail shot through correctly placed defensive fire now produces a clear **RAIL DENIED** reward cue.
+
+Controller Command Nodes now preview formation geometry and show a compact live squad-state ring. Players can see whether drones are forming, arming, diving or recovering without visually tracking every unit. Committed hostile dives get a restrained extended trajectory cue; interrupting a wind-up produces **DIVE BROKEN**, and correctly evading a close committed pass produces **EVADED** feedback.
+
+The richer procedural SFX and selective mobile haptics are event-driven and throttled so important combat information stands out instead of becoming noise.
+
 ### Second Body: Controller skill duel
 
-v1.3.0 rebuilds the Controller lineage around the existing NOVA twin-stick controls. The left stick still moves the hull. The right stick now also commands the swarm: **direction chooses the command bearing, analog stick depth chooses deployment distance, and release recalls the formation.**
+v1.3.0 rebuilds the Controller lineage around the existing NOVA twin-stick controls. The left stick still moves the hull. The right stick also commands the swarm: **direction chooses the command bearing, analog stick depth chooses deployment distance, and release recalls the formation.**
 
 Controller drones retain convenient autonomous shape farming, but PvP is no longer primarily nearest-target autopilot. Serious pressure is created by player decisions: position the Command Node, establish formation geometry, land the Controller gun to DESIGNATE a target, sequence readable attack runs, decide how deeply to commit the swarm, and recall before the hull becomes exposed.
 
@@ -60,14 +70,19 @@ Browse release history: **[`RELEASES.md`](./RELEASES.md)**
 - Cross-lineage gene splicing / hybridization
 - Distinct weapon and combat archetypes
 - Twin-stick Controller **Swarm Vectoring** and analog Command Nodes
+- Formation previews and live swarm-state visualization
 - Controller target designation and formation-driven attack sequencing
 - Distinct Wedge, Crescent, Phalanx, Ring, Claw, Fortress Wall and Cavalry Wing drone identities
 - Telegraph → commitment → dodge/punish drone attack runs
+- Readable drone interruption, impact and evasion feedback
 - Focus / quick-shot Railgun skill system
+- Segmented focus/readiness reticle and enhanced Rail trails
 - Off-screen directional sniper threat cues
 - Projectile interception with swept collision for hypervelocity rounds
 - Skill-based sniper suppression and advance windows
+- Dedicated Rail interception / denial feedback
 - Procedural stereo combat and swarm SFX
+- Selective mobile haptics for high-value combat events
 - AI-controlled enemy tanks that progress alongside the player and obey the same major combat-language constraints
 - Desktop and mobile browser play
 - GitHub Pages deployment
@@ -99,7 +114,20 @@ NOVA TANKS is intended to improve across the entire game rather than only accumu
 
 NOVA TANKS uses semantic-style version numbers (`MAJOR.MINOR.PATCH`) and maintains a durable release ledger in [`RELEASES.md`](./RELEASES.md). The lobby contains a browsable version history sourced from `nova-updates/releases.json`.
 
-### Latest — v1.3.0 · Second Body
+### Latest — v1.3.1 · Signal Bloom
+- segmented Rail focus/readiness reticle and lock-ready SFX
+- brighter, longer hypervelocity Rail trails
+- dedicated Rail interception effects and **RAIL DENIED** skill confirmation
+- Command Node formation previews
+- live linked/forming/arming/diving/recovering swarm-state display
+- improved hostile committed-dive readability for mobile
+- **DIVE BROKEN** interruption feedback
+- **EVADED** near-miss feedback for correctly dodged committed drone runs
+- heavier drone-impact audiovisual response
+- new focus-ready, Rail-intercept, drone-impact, drone-break and drone-near-miss procedural SFX
+- selective, short haptic confirmation for high-value mobile events
+
+### v1.3.0 · Second Body
 - right-stick Swarm Vectoring with analog deployment depth and release-to-recall
 - autonomous shape farming, actively commanded PvP
 - short-lived gun-hit DESIGNATE system
@@ -109,7 +137,6 @@ NOVA TANKS uses semantic-style version numbers (`MAJOR.MINOR.PATCH`) and maintai
 - swept high-speed dive collision
 - unique Controller lineage formation geometries
 - same Controller combat rules for AI, with skill expressed through decision quality
-- command/recall/designation/wind-up/launch procedural SFX and visual language
 
 ### v1.2.0 · Silent Horizon
 - full-power Rail focus and weaker charge-scaled quick-shots
