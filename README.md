@@ -16,6 +16,25 @@ NOVA TANKS is a fast browser arena game built around progression, specialization
 
 The game is also a **living project**: it is designed to continue evolving over time with new releases spanning gameplay, AI, maps, graphics, performance, quality of life, balance, controls, progression, and larger multi-update systems.
 
+## Core design philosophy: skill expression
+
+NOVA TANKS should be a game **riddled with skill expression**. Powerful mechanics should create opportunities to read, respond, outplay, and punish rather than producing unavoidable stat-check outcomes.
+
+Every major system is expected to be evaluated for:
+
+- skill ceiling and opportunities for mastery
+- readability and understandable feedback
+- meaningful counterplay for both sides
+- positioning, prediction, timing and execution
+- punish windows for mistakes
+- soft interactive counters rather than binary hard-counter matchups
+
+The current highest-priority combat-design issue is sniper/Railgun counterplay: preserving lethal long-range play while making sniper duels interactive and skill-based for both the shooter and the target.
+
+Read the full doctrine: **[`DESIGN_PRINCIPLES.md`](./DESIGN_PRINCIPLES.md)**
+
+See active development priorities: **[`ROADMAP.md`](./ROADMAP.md)**
+
 ## Current systems
 
 - Branching tank lineages and evolutions
