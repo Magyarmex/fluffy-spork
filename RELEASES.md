@@ -2,6 +2,38 @@
 
 This file is the durable source-controlled release ledger for the living NOVA TANKS game. Public versions use `MAJOR.MINOR.PATCH` numbering and are never reused.
 
+## v1.3.1 — Signal Bloom
+**Released:** 2026-08-07  
+**Theme:** Sniper/Controller polish, graphics, SFX, mobile readability, mastery feedback
+
+### Sniper polish
+- Rail focus now shows a **segmented charge reticle**, live charge percentage, and a distinct **FOCUS READY** state.
+- Reaching full focus gives a restrained procedural lock-ready sound and tiny supported-device haptic confirmation.
+- Hypervelocity Rail projectiles gain brighter, longer luminous trails and a sharper spear-like core so their motion is easier to read without making the projectile slower.
+- Rail interception gains dedicated electromagnetic/metallic collision SFX, brighter impact blooms, and stronger destruction feedback.
+- When the player successfully destroys an incoming Rail round through projectile interception, NOVA displays **RAIL DENIED** as explicit skill confirmation.
+
+### Controller polish
+- Active **Command Nodes preview the current formation geometry** rather than behaving only as destination markers.
+- The node now includes a compact live squad-state display showing linked drone count and whether drones are forming, arming, diving, or recovering.
+- Committed hostile drone attacks against the player receive a restrained extended trajectory cue to improve readability on mobile after commitment has already occurred; pre-commit prediction remains hidden.
+- Hitting an enemy drone during interruptible wind-up now produces distinct **DIVE BROKEN** audiovisual confirmation.
+- Correctly evading a close committed AI drone pass produces restrained **EVADED** feedback, a near-miss flyby, ring, and tiny haptic confirmation.
+- Successful drone impacts gain heavier procedural impact audio, flash response, and context-sensitive camera feedback.
+
+### Audio / feel
+- Added new procedural stereo-capable SFX for focus readiness, Rail interception, drone impact, drone interruption, and committed-dive near misses.
+- High-frequency events are throttled so swarm battles remain readable rather than becoming continuous audio clutter.
+- Mobile haptics remain deliberately short and selective: full focus readiness, successful Rail denial, hostile drone impact, and close committed-dive evasion.
+
+### Technical
+- Signal Bloom is a **PATCH** release: it preserves the Silent Horizon and Second Body mechanics and adds no new control surface.
+- Runtime JavaScript passed syntax validation before deployment.
+- Materialization workflow completed successfully with the runtime order **Silent Horizon → Second Body → Signal Bloom → lobby history → game boot**.
+- GitHub Pages completed the release build with no reported deployment error.
+
+---
+
 ## v1.3.0 — Second Body
 **Released:** 2026-08-07  
 **Theme:** Controller skill expression, twin-stick swarm command, formation tactics, readable drone combat
