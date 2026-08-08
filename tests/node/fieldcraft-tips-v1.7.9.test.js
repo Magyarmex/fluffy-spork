@@ -16,7 +16,8 @@ test('Fieldcraft ships exactly 50 unique reviewed base tips', () => {
 
 test('tip dwell time is exactly double the legacy rotation', () => {
   assert.match(fieldcraft, /var DISPLAY_MS=10400; \/\/ exactly 2x the legacy 5200ms rotation/);
-  assert.match(fieldcraft, /setInterval\([^)]*rotateContexts|setInterval\(rotateContexts,DISPLAY_MS\)/s);
+  assert.match(fieldcraft, /setInterval\(rotateContexts,DISPLAY_MS\)/);
+  assert.match(fieldcraft, /},DISPLAY_MS\);/);
 });
 
 test('rotation uses a shuffle bag rather than sequential indexes', () => {
@@ -32,7 +33,7 @@ test('legacy five-second writer is neutralized on the live Tips line', () => {
 });
 
 test('tips are distributed through relevant menu contexts', () => {
-  assert.match(fieldcraft, /data-nova-slot=\\"utility\\"/);
+  assert.match(fieldcraft, /data-nova-slot="utility"/);
   assert.match(fieldcraft, /\.nvs-panel/);
   assert.match(fieldcraft, /nova-pilot-panel/);
   assert.match(fieldcraft, /\['blackglass','graft','lineage','apex','discipline'\]/);
@@ -54,7 +55,7 @@ test('tip copy is mechanic-aware rather than generic filler', () => {
     'Forward Observer',
     'destructible cover',
     'deployment distance',
-    'screen shake is scaled only for rendering'.toLowerCase(),
+    'screen shake is scaled only for rendering',
   ]) {
     assert.ok(fieldcraft.toLowerCase().includes(phrase.toLowerCase()), `missing mechanic phrase: ${phrase}`);
   }
