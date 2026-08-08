@@ -1,0 +1,14 @@
+@import "tailwindcss" source(none);
+@source "../index.html.new";
+@source "../nova-updates";
+
+@theme {
+  --font-display: "Orbitron", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Rajdhani", ui-sans-serif, system-ui, sans-serif;
+  --color-void: #04060d;
+  --color-panel: #0a1122;
+  --color-neon: #4de3ff;
+  --color-neon2: #b06bff;
+  --color-danger: #ff4d6d;
+  --color-gold: #ffc94d;
+}
