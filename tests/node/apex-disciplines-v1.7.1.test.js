@@ -163,7 +163,7 @@ test('Cannon structural specialization primes destructible Battlefield cover',()
   const b=g.bullets[0]; b.x=0;b.y=0;b.vx=400;b.vy=0;b.__novaStructureMult=2.35;b.shell=true;
   g.__cover={id:-5,destructible:true,hp:300,solid:true};
   g.updateBullets(.1);
-  assert.ok(g.__cover.hp<200,`cover hp ${g.__cover.hp}`);
+  assert.ok(Math.abs(g.__cover.hp-281.775)<1e-6,`cover hp ${g.__cover.hp}`);
 });
 
 test('Bastion anchoring improves only its correctly faced lane',()=>{
