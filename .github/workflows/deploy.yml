@@ -19,6 +19,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate runtime release files
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in nova-updates/*.js; do
+            node --check "$f"
+          done
+          python3 -m json.tool nova-updates/releases.json >/dev/null
+
       - name: Rebuild tested NOVA payload and apply versioned runtime updates
         shell: bash
         run: |
@@ -34,8 +43,6 @@ jobs:
           path = Path('index.html.new')
           html = path.read_text(encoding='utf-8')
 
-          # Expose the bundle registry so versioned runtime modules can wrap
-          # tested game modules without rebuilding the canonical payload.
           define_marker = "  window.__defineModule = function (id, factory) {"
           if 'window.__novaModules = modules;' not in html:
               if define_marker not in html:
@@ -47,12 +54,14 @@ jobs:
               )
               html = html.replace(define_marker, exposed + define_marker, 1)
 
-          # Runtime releases are ordered deliberately: foundational gameplay
-          # patches first, then presentation polish, then lobby/release UI.
+          # Foundational systems first, then presentation/stability overlays,
+          # then the data-driven lobby UI. Later modules intentionally harden
+          # earlier releases instead of replacing the canonical payload.
           scripts = [
               './nova-updates/sniper-v1.2.0.js',
               './nova-updates/controller-v1.3.0.js',
               './nova-updates/polish-v1.3.1.js',
+              './nova-updates/stability-v1.4.0.js',
               './nova-updates/lobby-history.js',
           ]
           pattern = r"window\.__bootModule\((['\"])main\1\);"
@@ -72,6 +81,7 @@ jobs:
           grep -q 'nova-updates/sniper-v1.2.0.js' index.html.new
           grep -q 'nova-updates/controller-v1.3.0.js' index.html.new
           grep -q 'nova-updates/polish-v1.3.1.js' index.html.new
+          grep -q 'nova-updates/stability-v1.4.0.js' index.html.new
           grep -q 'nova-updates/lobby-history.js' index.html.new
           mv index.html.new index.html
           echo "Materialized $(wc -c < index.html) bytes into index.html"
