@@ -1,6 +1,43 @@
 {
-  "currentVersion": "1.2.0",
+  "currentVersion": "1.3.0",
   "releases": [
+    {
+      "version": "1.3.0",
+      "codename": "Second Body",
+      "date": "2026-08-07",
+      "headline": "Controllers become twin-stick swarm commanders.",
+      "groups": {
+        "Controls and Command": [
+          "Controller aim now commands a visible Swarm Command Node while the hull remains on the movement stick.",
+          "Right-stick direction chooses the swarm bearing, stick depth controls deployment distance, and releasing aim recalls the squadron.",
+          "Desktop uses the same language: hold fire to command toward the cursor, cursor distance controls deployment depth, and release recalls.",
+          "Autonomy handles shape farming; serious PvP pressure now requires active command instead of nearest-target autopilot."
+        ],
+        "Combat and Counterplay": [
+          "Controller gun hits DESIGNATE an enemy for a short coordination window, rewarding aim without creating permanent lock-on.",
+          "Commanded drones establish formation geometry before attacking instead of walking directly into the nearest enemy.",
+          "Attack runs now have readable wind-up, a late trajectory commitment, high-speed dive, overshoot, and recovery phases.",
+          "A defender can movement-feint before commitment, dodge after the dive locks, shoot a winding-up drone to cancel its run, destroy drones, or exploit the Controller hull while the swarm is overextended.",
+          "A launched dive cannot be recalled mid-flight; pre-launch attacks can be recalled, making commitment meaningful for both sides.",
+          "Drone dashes use swept collision so high-speed attack runs do not miss solely because of frame alignment."
+        ],
+        "Lineage Mastery": [
+          "Drone Carrier uses a responsive three-drone wedge for learning command depth and attack timing.",
+          "Overlord establishes a six-drone far-side crescent to create encirclement pressure and alternating attack angles.",
+          "Warden and Citadel form movable phalanx lines whose real drone hulls can physically screen firing lanes; Bulwark tightens their response.",
+          "Hivemind arranges nine hunters in a rotating ring, turning spacing and cascading attack timing into its mastery problem.",
+          "Broodmother forms twin attack claws and preferentially commits damaged or temporary brood, making attrition and sacrifice tactically useful.",
+          "Valkyrie uses a fast cavalry wing with the shortest wind-up, fastest dives, and shortest recovery, increasing both execution ceiling and punishability."
+        ],
+        "AI and Feedback": [
+          "AI Controllers use the same Command Node, formation, wind-up, trajectory lock, dive, recovery, and drone-health rules as the player.",
+          "Normal AI uses less prediction and slower command tracking while elite AI earns strength through better positioning rather than impossible execution.",
+          "New procedural command, recall, designation, drone wind-up, and launch sounds make swarm intent easier to read.",
+          "The player sees a command tether, engagement zone, off-screen command marker, designation reticle, attack wind-up rings, committed dive vectors, and dash trails.",
+          "A short Controller tutorial appears on evolution: command direction, analog deployment depth, recall, and designation all use the existing NOVA controls."
+        ]
+      }
+    },
     {
       "version": "1.2.0",
       "codename": "Silent Horizon",
