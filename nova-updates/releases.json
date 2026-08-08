@@ -1,6 +1,37 @@
 {
-  "currentVersion": "1.6.0",
+  "currentVersion": "1.7.0",
   "releases": [
+    {
+      "version": "1.7.0",
+      "codename": "Three Disciplines",
+      "date": "2026-08-08",
+      "headline": "Gunners master cadence, Cannons program space, and Guardians fight with facing.",
+      "groups": {
+        "Gunner — Fire Discipline": [
+          "The cyan lineage gains deterministic recoil, weapon heat and a readable cadence window instead of flat hold-to-win sustained fire.",
+          "Stable aim and controlled bursts tighten fire; excessive heat increases predictable dispersion and physically pushes the hull backward.",
+          "Miniguns reward maintaining a sustainable mid-heat cadence while shotgun descendants reward bracing, recovery and deliberate re-engagement.",
+          "AI Gunners use the same heat/recoil model and deliberately vent after exceeding a sustainable firing state."
+        ],
+        "Cannon — Fire Control": [
+          "The orange lineage can program detonation distance directly with right-stick depth while right-stick direction continues to aim normally.",
+          "A projected fuse/impact reticle shows the programmed burst point; desktop mouse distance follows the same interaction grammar.",
+          "Surviving Cannon projectiles airburst at the chosen distance while preserving their normal splash and cluster behavior, rewarding prediction and area placement rather than direct-hit aim alone.",
+          "Fuse placement compounds Battlefield cover and breach play because Cannon shells and splash can deliberately damage destructible barricades."
+        ],
+        "Guardian — Facing and Counterplay": [
+          "The pink lineage gains directional frontal armor: aim direction now also determines the tank's strongest defensive facing.",
+          "BULWARK and IRON WILL become directional guard states instead of legacy 360-degree invulnerability or universal reduction.",
+          "The opening fraction of a defensive activation is a Perfect Guard window. Reading an incoming attack correctly negates it and stores a Countercharge for the Guardian's next projectile.",
+          "Juggernaut, Meteor and Ravager build Stampede impact by maintaining a clean straight line; sharp turns and terrain collisions dump stored charge."
+        ],
+        "Readability and AI Parity": [
+          "Cyan heat/cadence arcs, orange fuse markers and pink frontal-guard/charge visuals expose the new mechanics without adding buttons.",
+          "Procedural cadence, overheat, fuse-burst, Perfect Guard, Countershot and charge-break sounds reinforce important state changes.",
+          "AI uses the same heat, programmable-fuse authorization, directional defense and momentum constraints rather than receiving simplified privileged versions of the systems."
+        ]
+      }
+    },
     {
       "version": "1.6.0",
       "codename": "Battlefield",
