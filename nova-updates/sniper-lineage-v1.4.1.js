@@ -33,7 +33,7 @@
   window.__NOVA_SNIPER_LINEAGE_RELEASE__ = {
     version: VERSION,
     codename: CODENAME,
-    date: '2026-08-08',
+    date: '2026-08-07',
     headline: 'Every purple tank now fights through the same reconnaissance and counterplay doctrine.'
   };
 
@@ -178,6 +178,21 @@
     };
   });
 
+  wrapModule('game/ai', function (aiMod) {
+    var oldUpdateAI=aiMod.updateAI;
+    if(!oldUpdateAI||oldUpdateAI.__novaVioletDoctrine)return;
+    function patchedUpdateAI(t,g,dt){
+      if(!t||!isPurple(t)||!(t.__novaSpotterDownUntil&&t.__novaSpotterDownUntil>g.time))return oldUpdateAI(t,g,dt);
+      var id=t.__novaSpotterContactId,until=t.__novaSpotterContactUntil;
+      t.__novaSpotterContactId=-1;t.__novaSpotterContactUntil=0;
+      var out=oldUpdateAI(t,g,dt);
+      t.__novaSpotterContactId=id;t.__novaSpotterContactUntil=until;
+      return out;
+    }
+    patchedUpdateAI.__novaVioletDoctrine=true;
+    aiMod.updateAI=patchedUpdateAI;
+  });
+
   wrapModule('game/engine', function (engine, require) {
     var Game=engine.Game;
     if(!Game||Game.prototype.__novaVioletDoctrine)return;
@@ -270,7 +285,8 @@
       for(var i=0;i<this.tanks.length;i++){
         var t=this.tanks[i];if(!t||!t.alive||!isPurple(t))continue;
         if(t.__novaSpotterDownUntil&&t.__novaSpotterDownUntil>this.time){
-          t.__novaSpotterContactId=-1;t.__novaSpotterContactUntil=0;
+          // A spare escort may already be scanning, but AI ignores its remote
+          // contact until the relay reboot completes. Direct sight still works.
         }else if(t.__novaSpotterDownUntil){
           t.__novaSpotterDownUntil=0;
           if(t.isPlayer&&this.addText)this.addText(t.x,t.y-32,'OBSERVER LINK RESTORED','#b9e7ff',9);
