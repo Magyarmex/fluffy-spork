@@ -1,0 +1,1 @@
+NOVA updater v3 hardening note: legacy cache deletion must occur only after the new worker activates and takes control; candidate staging must never invalidate the currently active worker's cache.
