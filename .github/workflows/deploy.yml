@@ -68,6 +68,7 @@ jobs:
               './nova-updates/ui-fixes-v1.5.1.js',
               './nova-updates/lobby-music-v1.5.1.js',
               './nova-updates/battlefield-v1.6.0.js',
+              './nova-updates/disciplines-v1.7.0.js',
               './nova-updates/lobby-history.js',
           ]
           pattern = r"window\.__bootModule\((['\"])main\1\);"
@@ -97,6 +98,7 @@ jobs:
           grep -q 'nova-updates/ui-fixes-v1.5.1.js' index.html.new
           grep -q 'nova-updates/lobby-music-v1.5.1.js' index.html.new
           grep -q 'nova-updates/battlefield-v1.6.0.js' index.html.new
+          grep -q 'nova-updates/disciplines-v1.7.0.js' index.html.new
           grep -q 'nova-updates/lobby-history.js' index.html.new
           mv index.html.new index.html
           echo "Materialized $(wc -c < index.html) bytes into index.html"
