@@ -64,7 +64,7 @@ function clampNode(owner,x,y,maxR){
   return{x:clamp(x,-MAP_LIMIT+40,MAP_LIMIT-40),y:clamp(y,-MAP_LIMIT+40,MAP_LIMIT-40)};
 }
 function commandState(t){
-  if(!t.__novaCommandWeave)t.__novaCommandWeave={active:false,mode:'recall',x:t.x,y:t.y,targetId:-1,preview:false,changedAt:0,lastTapAt:-99};
+  if(!t.__novaCommandWeave)t.__novaCommandWeave={active:false,mode:'recall',x:t.x,y:t.y,targetId:-1,preview:false,changedAt:0,lastTapAt:-99,tutorialUntil:0};
   return t.__novaCommandWeave;
 }
 function fakeAimFor(owner,def,cmd){
@@ -85,9 +85,6 @@ function isLegacyUltimate(button){
   return button.classList.contains('h-[68px]')&&button.classList.contains('w-[68px]')&&holder&&holder.classList&&holder.classList.contains('bottom-6')&&holder.classList.contains('right-4');
 }
 
-/* All touch/pen buttons get an immediate, independent activation path. The
- * existing ultimate hotfix remains owner of the ultimate itself to avoid a
- * duplicate capture listener on that one control. */
 (function installButtonBridge(){
   if(typeof document==='undefined'||!document||!document.addEventListener)return;
   var guarded=typeof WeakMap!=='undefined'?new WeakMap():null,dispatchDepth=0;
@@ -113,8 +110,6 @@ function isLegacyUltimate(button){
   window.__NOVA_COMMAND_WEAVE_BUTTON_TEST__={pointerDown:pointerDown,clickCapture:clickCapture,isLegacyUltimate:isLegacyUltimate};
 })();
 
-/* Replace only the pointer plumbing of the existing Input instance. Keyboard
- * handlers and the rest of the input API remain unchanged. */
 wrap('game/input',function(inputMod){
   var Input=inputMod.Input;if(!Input||Input.prototype.__novaCommandWeaveInput)return;
   Input.prototype.__novaCommandWeaveInput=true;
@@ -268,8 +263,6 @@ wrap('game/engine',function(engine,require){
     pad.style.display=visibleControllerPlayer(g)?'flex':'none';return pad;
   }
 
-  /* AI Controller planning happens after ordinary AI has thought, but before
-   * the Controller v1.3 swarm command consumes ai.targetId/state. */
   function sensorSees(g,owner,target){
     if(!target||!target.alive)return false;
     if(dist2(owner.x,owner.y,target.x,target.y)<=850*850&&(!g.hasLineOfSight||g.hasLineOfSight(owner.x,owner.y,target.x,target.y,3)))return true;
@@ -285,7 +278,7 @@ wrap('game/engine',function(engine,require){
     var best=null,score=Infinity;
     for(var i=0;i<g.tanks.length;i++){
       var t=g.tanks[i];if(!t||!t.alive||t.id===owner.id||t.spawnShieldT>0||!sensorSees(g,owner,t))continue;
-      var s=dist2(owner.x,owner.y,t.x,t.y)*(t.isPlayer?.88:1);if(s<score){score=s;best=t;}
+      var s=dist2(owner.x,owner.y,t.x,t.y)*(t.isPlayer ? .88 : 1);if(s<score){score=s;best=t;}
     }
     return best;
   }
@@ -296,12 +289,12 @@ wrap('game/engine',function(engine,require){
       var p=owner.__novaCommandAI||(owner.__novaCommandAI={thinkAt:0,commitUntil:0,targetId:-1,flankSide:(owner.id&1)?1:-1,pressure:'probe',lastCueAt:-99,cueUntil:0,lastProgressAt:now,lastOwnHp:owner.hp});
       if(owner.hp<p.lastOwnHp-1)p.lastProgressAt=now;p.lastOwnHp=owner.hp;
       if(now<p.thinkAt)continue;
-      p.thinkAt=now+(owner.ai.isElite?.22:.34)+((owner.id%3)*.025);
+      p.thinkAt=now+(owner.ai.isElite ? .22 : .34)+((owner.id%3)*.025);
       var current=p.targetId>=0&&g.getTank?g.getTank(p.targetId):null,target=bestObservedTank(g,owner,current);
       if(!target){p.targetId=-1;owner.ai.targetId=-1;if(owner.ai.state!=='flee')owner.ai.state='wander';continue;}
       var changed=target.id!==p.targetId;
       if(changed||now>=p.commitUntil){
-        p.targetId=target.id;p.commitUntil=now+(owner.ai.isElite?.78:1.02);p.flankSide*=-1;
+        p.targetId=target.id;p.commitUntil=now+(owner.ai.isElite ? .78 : 1.02);p.flankSide*=-1;
         var sw=target.__novaSwarm;
         if(sw&&sw.active){
           var vx=target.x-owner.x,vy=target.y-owner.y,px=-vy,py=vx,side=(sw.nodeX-target.x)*px+(sw.nodeY-target.y)*py;
@@ -349,7 +342,7 @@ wrap('game/engine',function(engine,require){
   }
   function peelScreen(g,group,owner,threat,dt){
     if(!threat)return;
-    var count=Math.max(1,Math.ceil(group.length*(owner.isPlayer?.36:.28)));
+    var count=Math.max(1,Math.ceil(group.length*(owner.isPlayer ? .36 : .28)));
     var tx=threat.x+(threat.__novaVX||0)*.18,ty=threat.y+(threat.__novaVY||0)*.18;
     for(var i=0;i<count&&i<group.length;i++){
       var d=group[i];if(!d||d.hp<=0||d.__cwRepairing||d.__novaPhase==='dash')continue;
@@ -431,7 +424,8 @@ wrap('game/engine',function(engine,require){
   if(oldSetClass)Game.prototype.setClass=function(t,id){
     var was=isController(t),out=oldSetClass.call(this,t,id),now=isController(t);ensureCommandPad(this);
     if(t&&t.isPlayer&&now&&!was){
-      var c=commandState(t);c.active=false;c.mode='recall';c.x=t.x;c.y=t.y;c.targetId=-1;
+      var c=commandState(t);c.active=false;c.mode='recall';c.x=t.x;c.y=t.y;c.targetId=-1;c.tutorialUntil=(this.time||0)+9.5;
+      if(t.__novaSwarm)t.__novaSwarm.tutorialUntil=0;
       if(this.toast)this.toast('❖ CONTROLLER LINK — CANNON AIM IS INDEPENDENT · TAP CMD TO STAMP · DRAG TO PLACE · DOUBLE-TAP RECALL','info');
       setPadStatus(this,'CMD',false);
     }else if(t&&t.isPlayer&&!now)setPadStatus(this,'CMD',false);
@@ -452,6 +446,14 @@ wrap('game/render',function(renderMod,require){
   function patched(g,w,h){
     old(g,w,h);if(!g||!g.ctx||!g.player||!g.player.alive)return;
     var ctx=g.ctx,now=g.time||0;
+    if(isController(g.player)){
+      var pc=commandState(g.player);
+      if((pc.tutorialUntil||0)>now){
+        ctx.save();ctx.setTransform(g.dpr||1,0,0,g.dpr||1,0,0);ctx.textAlign='center';ctx.font='800 9px Orbitron,system-ui';ctx.fillStyle='rgba(207,255,224,.90)';ctx.shadowBlur=10;ctx.shadowColor='#75f0a3';
+        ctx.fillText('RIGHT STICK: CANNON · TAP CMD: STAMP · DRAG CMD: PLACE · DOUBLE-TAP: RECALL',g.w*.5,g.h*.72);
+        ctx.font='700 10px Rajdhani,system-ui';ctx.fillStyle='rgba(170,220,190,.80)';ctx.shadowBlur=0;ctx.fillText('Drag a command close to your hull for SCREEN · explicit orders persist while you aim elsewhere',g.w*.5,g.h*.72+15);ctx.restore();
+      }
+    }
     for(var i=0;i<g.tanks.length;i++){
       var t=g.tanks[i],p=t&&t.__novaCommandAI;if(!t||!t.alive||t.isPlayer||!p||p.cueUntil<=now||p.targetId!==g.player.id||lineage(classes,t)!=='controller')continue;
       var sx=(t.x-g.cam.x)*(g.cam.zoom||1)+g.w*.5,sy=(t.y-g.cam.y)*(g.cam.zoom||1)+g.h*.5;
