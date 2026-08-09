@@ -69,18 +69,23 @@ test('the existing ultimate pointer owner is not double-bridged', () => {
   assert.equal(window.__NOVA_COMMAND_WEAVE_BUTTON_TEST__.isLegacyUltimate(button), true);
 });
 
-test('source hardens pointer ownership and restores real cannon aim after swarm update', () => {
+test('source hardens pointer ownership and fully isolates live cannon input from swarm translation', () => {
   assert.match(source, /__novaPointerOwners=new Map\(\)/);
   assert.match(source, /canvas\.setPointerCapture\(e\.pointerId\)/);
   assert.match(source, /input\.aim=fakeAimFor\(player,C\[player\.cls\],c\)/);
-  assert.match(source, /finally\{if\(restore\)input\.aim=realAim;\}/);
+  assert.match(source, /input\.mouseActive=false/);
+  assert.match(source, /input\.aim=realAim;input\.mouseActive=realMouse/);
 });
 
-test('combat pass includes reflex screens, repair, cannon disruption and legitimate AI sensing', () => {
+test('combat pass includes screens, repair, disruption, sensed AI, real reserves, and committed-dive preservation', () => {
   assert.match(source, /function peelScreen\(/);
   assert.match(source, /function repairDrone\(/);
   assert.match(source, /function directControllerBullet\(/);
   assert.match(source, /function sensorSees\(/);
+  assert.match(source, /function maintainAIScreen\(/);
+  assert.match(source, /plan\.pressure==='probe' \? \.58 : \.30/);
+  assert.match(source, /if\(d\.__novaPhase==='dash'\)return false/);
+  assert.match(source, /novaBattlefieldWaypoint/);
   assert.match(source, /SWARM FORMING/);
   assert.match(source, /commitUntil/);
 });
