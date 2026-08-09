@@ -320,7 +320,10 @@ wrap('game/engine',function(engine,require){
     }
     return best;
   }
-  function steerToward(d,x,y,speed,dt){
+  function steerToward(g,d,x,y,speed,dt){
+    if(g.hasLineOfSight&&!g.hasLineOfSight(d.x,d.y,x,y,Math.max(2,(d.r||8)*.45))&&g.novaBattlefieldWaypoint){
+      var wp=g.novaBattlefieldWaypoint(d.x,d.y,x,y,(d.r||8)+5,d.id);if(wp){x=wp.x;y=wp.y;}
+    }
     var dx=x-d.x,dy=y-d.y,m=Math.hypot(dx,dy)||1,ux=dx/m,uy=dy/m;
     d.__novaVX=(d.__novaVX||0)*.30+ux*speed*.70;d.__novaVY=(d.__novaVY||0)*.30+uy*speed*.70;
     d.x+=ux*Math.min(m,speed*dt*.52);d.y+=uy*Math.min(m,speed*dt*.52);d.angle=Math.atan2(uy,ux);
@@ -331,10 +334,11 @@ wrap('game/engine',function(engine,require){
     d.__cwLastHp=d.hp;var f=d.hp/max;
     if(f<.36)d.__cwRepairing=true;else if(f>.84)d.__cwRepairing=false;
     if(!d.__cwRepairing)return false;
-    if(d.__novaPhase!=='dash'&&d.__novaPhase!=='windup'){d.__novaPhase='recover';d.__novaTarget=null;d.targetRef=null;}
-    steerToward(d,owner.x,owner.y,Math.max(150,(d.speed||180)*1.08),dt);
-    var near=dist2(d.x,d.y,owner.x,owner.y)<145*145;
-    if(near&&(d.__cwRepairWait||0)<=0){
+    if(d.__novaPhase==='dash')return false;
+    if(d.__novaPhase==='windup'||d.__novaPhase!=='recover'){d.__novaPhase='recover';d.__novaCommitted=false;d.__novaTarget=null;d.targetRef=null;}
+    steerToward(g,d,owner.x,owner.y,Math.max(150,(d.speed||180)*1.08),dt);
+    var near=dist2(d.x,d.y,owner.x,owner.y)<145*145,combat=!!hostileDroneNear(g,owner,225);
+    if(near&&!combat&&(d.__cwRepairWait||0)<=0){
       d.hp=Math.min(max,d.hp+max*.105*dt);
       if((g.time||0)>(d.__cwRepairFxAt||0)){d.__cwRepairFxAt=(g.time||0)+.34;if(g.addRing)g.addRing(d.x,d.y,'#8fffd0',10);}
     }
@@ -346,12 +350,24 @@ wrap('game/engine',function(engine,require){
     var tx=threat.x+(threat.__novaVX||0)*.18,ty=threat.y+(threat.__novaVY||0)*.18;
     for(var i=0;i<count&&i<group.length;i++){
       var d=group[i];if(!d||d.hp<=0||d.__cwRepairing||d.__novaPhase==='dash')continue;
-      steerToward(d,tx,ty,Math.max(190,(d.speed||190)*1.12),dt);d.__cwPeelUntil=(g.time||0)+.16;
+      steerToward(g,d,tx,ty,Math.max(190,(d.speed||190)*1.12),dt);d.__cwPeelUntil=(g.time||0)+.16;
       var rr=(d.r||8)+(threat.r||8)+9;
       if(dist2(d.x,d.y,threat.x,threat.y)<rr*rr&&(d.attackCd||0)<=0){
-        if(g.damageDrone)g.damageDrone(threat,Math.max(5,(d.damage||8)*.75),owner.id);d.attackCd=.38;
+        if(g.damageDrone){var prevOwner=g.__novaDroneDamageOwner;g.__novaDroneDamageOwner=owner.id;try{g.damageDrone(threat,Math.max(5,(d.damage||8)*.75),owner.id);}finally{g.__novaDroneDamageOwner=prevOwner;}}d.attackCd=.38;
         d.__novaVX*=.45;d.__novaVY*=.45;
       }
+    }
+  }
+  function maintainAIScreen(g,group,owner,dt){
+    if(owner.isPlayer||!owner.__novaCommandAI||!group.length)return;
+    var plan=owner.__novaCommandAI,target=plan.targetId>=0&&g.getTank?g.getTank(plan.targetId):null;
+    var fraction=plan.pressure==='probe' ? .58 : .30,count=Math.max(1,Math.ceil(group.length*fraction));
+    var face=target?Math.atan2(target.y-owner.y,target.x-owner.x):(owner.angle||0),px=-Math.sin(face),py=Math.cos(face);
+    for(var i=0;i<count&&i<group.length;i++){
+      var d=group[i];if(!d||d.hp<=0||d.__cwRepairing||d.__novaPhase==='dash')continue;
+      if(d.__novaPhase==='windup'){d.__novaPhase='recover';d.__novaPhaseT=.16;d.__novaCommitted=false;d.__novaTarget=null;d.targetRef=null;}
+      var lane=i-(count-1)*.5,depth=58+(i%2)*18,sx=owner.x+Math.cos(face)*depth+px*lane*34,sy=owner.y+Math.sin(face)*depth+py*lane*34;
+      steerToward(g,d,sx,sy,Math.max(150,(d.speed||180)*.92),dt);
     }
   }
   function flankPressure(g,group,owner,dt){
@@ -361,7 +377,7 @@ wrap('game/engine',function(engine,require){
     var start=Math.floor(group.length*.72),fx=target.x+px*side*115,fy=target.y+py*side*115;
     for(var i=start;i<group.length;i++){
       var d=group[i];if(!d||d.hp<=0||d.__cwRepairing||d.__novaPhase==='dash'||d.__novaPhase==='windup')continue;
-      steerToward(d,fx,fy,Math.max(170,(d.speed||180)*1.04),dt);
+      steerToward(g,d,fx,fy,Math.max(170,(d.speed||180)*1.04),dt);
     }
   }
   function postProcessControllers(g,dt){
@@ -374,10 +390,10 @@ wrap('game/engine',function(engine,require){
     }
     Object.keys(groups).forEach(function(key){
       var owner=g.getTank(+key),group=groups[key];if(!owner)return;
-      group.sort(function(a,b){return (a.__novaSlot||0)-(b.__novaSlot||0);});
+      group.sort(function(a,b){return ((a.slot==null?a.__novaSlot:a.slot)||0)-((b.slot==null?b.__novaSlot:b.slot)||0);});
       for(var j=0;j<group.length;j++)repairDrone(g,group[j],owner,dt);
       var threat=hostileDroneNear(g,owner,owner.isPlayer?285:245);
-      peelScreen(g,group,owner,threat,dt);flankPressure(g,group,owner,dt);
+      maintainAIScreen(g,group,owner,dt);peelScreen(g,group,owner,threat,dt);flankPressure(g,group,owner,dt);
     });
   }
 
@@ -408,14 +424,14 @@ wrap('game/engine',function(engine,require){
   var oldDrones=Game.prototype.updateDrones;
   if(oldDrones)Game.prototype.updateDrones=function(dt){
     planAIControllers(this);
-    var input=this.input,realAim=input&&input.aim,player=this.player,restore=false;
+    var input=this.input,realAim=input&&input.aim,realMouse=input&&input.mouseActive,player=this.player,restore=false;
     if(input&&player&&player.alive&&isController(player)){
       var c=commandState(player),target=c.targetId>=0&&this.getTank?this.getTank(c.targetId):null;
       if(c.mode==='target'){if(target&&target.alive){c.x=target.x;c.y=target.y;}else{c.mode='point';c.targetId=-1;}}
-      input.aim=fakeAimFor(player,C[player.cls],c);restore=true;
+      input.aim=fakeAimFor(player,C[player.cls],c);input.mouseActive=false;restore=true;
     }
     var out;
-    try{out=oldDrones.call(this,dt);}finally{if(restore)input.aim=realAim;}
+    try{out=oldDrones.call(this,dt);}finally{if(restore){input.aim=realAim;input.mouseActive=realMouse;}}
     postProcessControllers(this,dt);
     return out;
   };
