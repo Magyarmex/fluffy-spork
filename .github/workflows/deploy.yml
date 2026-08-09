@@ -114,6 +114,7 @@ jobs:
               './nova-updates/living-archive-runtime-cleanup-v1.7.9.js',
               './nova-updates/predator-doctrine-v1.8.0.js',
               './nova-updates/battle-sense-v1.8.1.js',
+              './nova-updates/reliability-v1.8.2.js',
           ]
           pattern = r"window\.__bootModule\((['\"])main\1\);"
           match = re.search(pattern, html)
@@ -189,6 +190,7 @@ jobs:
           grep -q 'nova-updates/living-archive-runtime-cleanup-v1.7.9.js' index.html.new
           grep -q 'nova-updates/predator-doctrine-v1.8.0.js' index.html.new
           grep -q 'nova-updates/battle-sense-v1.8.1.js' index.html.new
+          grep -q 'nova-updates/reliability-v1.8.2.js' index.html.new
           ! grep -q 'nova-updates/auto-update-test-v1.7.4.js' index.html.new
           grep -q 'id="nova-tailwind-static"' index.html.new
           grep -Fq '.pointer-events-none' index.html.new
