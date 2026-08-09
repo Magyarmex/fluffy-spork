@@ -1,0 +1,61 @@
+/* NOVA TANKS v1.8.1 — Battle Sense
+ * Strategic awareness above Predator Doctrine: contested resources, local force/risk
+ * reading, observed reload punishment, third-party geometry, and safer lane choice.
+ */
+(function(){
+'use strict';
+var mods=window.__novaModules;if(!mods){console.error('[NOVA v1.8.1] module registry unavailable');return;}
+var VERSION='1.8.1',CODENAME='Battle Sense',TAU=Math.PI*2;
+window.__NOVA_VERSION=VERSION;
+window.__NOVA_BATTLE_SENSE_RELEASE__={version:VERSION,codename:CODENAME,date:'2026-08-08',headline:'Rivals read the whole fight, not just the tank in their crosshair.',groups:{
+ 'Situational Awareness':['AI now evaluates local crowding, crossfire exposure, wounded combatants, nearby neutral resources and observed weapon commitments before deciding how hard to enter a fight.','Rivals can recognize a dangerous multi-tank brawl and skirt it, or identify a vulnerable duel and attack from a useful third angle instead of joining the same firing line.','Observed long-reload shots create short punish windows; the AI infers the opening from a shot it could legitimately witness rather than reading hidden cooldown state.'],
+ 'Strategic Resources':['Powerups become genuinely neutral battlefield resources: AI tanks can collect the same heal, shield, triple-shot, haste and nuke pickups the player can.','Powerup interest is contextual: wounded tanks value healing, pressured tanks value shields, active attackers value offensive buffs, and clustered fights make nukes strategically valuable.','Resource pursuit is abandoned when immediate projectile danger or local enemy pressure makes greed suicidal.'],
+ 'Positioning Intelligence':['Approach vectors are biased away from projectile-dense lanes and overcrowded sectors.','When a target is already fighting another visible tank, opportunistic rivals prefer a different attack bearing, producing natural crossfires without team communication.','Low-health ranged classes value escape lanes and healing resources; healthy Guardians remain much more willing to convert openings into pressure.'],
+ 'Fair Play':['Battle Sense uses only visible tanks, nearby public pickups, visible projectile traffic and witnessed shots.','No team hive mind, hidden cooldown reads, hidden target coordinates, stat buffs or through-wall target updates are introduced.']}};
+function wrap(id,after){var old=mods[id];if(!old)return;mods[id]=function(module,exports,require){old(module,exports,require);after(module.exports,require);};}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function d2(ax,ay,bx,by){var x=bx-ax,y=by-ay;return x*x+y*y;}
+function lineage(classes,t){try{return t?classes.lineageForClass(t.cls):null;}catch(_){return null;}}
+function visible(g,a,b){return !!b&&b.alive!==false&&(!g.hasLineOfSight||g.hasLineOfSight(a.x,a.y,b.x,b.y,3));}
+function localCount(g,t,r){var n=0,rr=r*r,ts=g.tanks||[];for(var i=0;i<ts.length;i++){var q=ts[i];if(!q||q.id===t.id||q.alive===false)continue;if(d2(t.x,t.y,q.x,q.y)<rr&&visible(g,t,q))n++;}return n;}
+function laneRisk(g,x,y){var s=0,bs=g.bullets||[];for(var i=0;i<bs.length;i++){var b=bs[i];if(!b||b.dead)continue;var q=d2(x,y,b.x,b.y);if(q<150*150)s+=(1-Math.sqrt(q)/150)*(Math.hypot(b.vx||0,b.vy||0)>450?1.2:1);}return s;}
+function resourceValue(t,pu,pressure){var hp=clamp(t.hp/Math.max(1,t.maxHp||t.hp||1),0,1),v=.1;
+ if(pu.type==='heal')v=(1-hp)*2.5;
+ else if(pu.type==='shield')v=.65+pressure*.38+(1-hp)*.45;
+ else if(pu.type==='nuke')v=.45+pressure*.7;
+ else if(pu.type==='triple')v=.62+(hp>.45?.25:0);
+ else if(pu.type==='haste')v=.55+(hp>.4?.25:0);
+ return v;}
+function chooseResource(g,t){var ps=g.powerups||[],best=null,bs=-99,pressure=localCount(g,t,600);for(var i=0;i<ps.length;i++){var p=ps[i],dist=Math.hypot(p.x-t.x,p.y-t.y);if(dist>760)continue;var v=resourceValue(t,p,pressure)-dist/900;var risk=laneRisk(g,p.x,p.y)*.18;if(g.hasLineOfSight&&!g.hasLineOfSight(t.x,t.y,p.x,p.y,8))v-=.28;v-=risk;if(v>bs){bs=v;best=p;}}return bs>.42?best:null;}
+function witnessedOpening(g,classes,t,target,now){if(!target||!visible(g,t,target))return 0;var fired=target.__v181FiredAt;if(fired==null)return 0;var def=classes.CLASSES&&classes.CLASSES[target.cls],reload=def&&def.bullet&&def.bullet.reload||.5;if(reload<.78)return 0;var age=now-fired;if(age<.03||age>reload*.82)return 0;return clamp(1-age/(reload*.82),0,1);}
+function thirdPartyVector(g,t,target,out){out=out||{};out.x=0;out.y=0;out.weight=0;if(!target)return out;var ts=g.tanks||[],best=null,bd=430*430;for(var i=0;i<ts.length;i++){var q=ts[i];if(!q||q.id===t.id||q.id===target.id||q.alive===false)continue;var dd=d2(target.x,target.y,q.x,q.y);if(dd<bd&&visible(g,t,q)){bd=dd;best=q;}}if(!best)return out;var vx=target.x-best.x,vy=target.y-best.y,m=Math.hypot(vx,vy)||1;out.x=vx/m;out.y=vy/m;out.weight=.62;return out;}
+function strategicBias(g,classes,t,a,now,out){out=out||{};out.x=0;out.y=0;out.weight=0;out.mode='none';var target=a.__v180TargetId>=0&&g.getTank?g.getTank(a.__v180TargetId):null;var pressure=localCount(g,t,560),hp=clamp(t.hp/Math.max(1,t.maxHp||t.hp||1),0,1),ln=lineage(classes,t),pu=chooseResource(g,t);
+ if(pu&&((hp<.58&&pu.type==='heal')||pressure<2||pu.type==='shield')){var rx=pu.x-t.x,ry=pu.y-t.y,rm=Math.hypot(rx,ry)||1;out.x=rx/rm;out.y=ry/rm;out.weight=hp<.38?1.05:.72;out.mode='resource';a.__v181ResourceId=pu.id;return out;}
+ if(target&&visible(g,t,target)){
+   var open=witnessedOpening(g,classes,t,target,now),dx=target.x-t.x,dy=target.y-t.y,dm=Math.hypot(dx,dy)||1;
+   if(open>.08&&pressure<=3){out.x=dx/dm;out.y=dy/dm;out.weight=.45+.45*open;out.mode='punish';return out;}
+   var tp=thirdPartyVector(g,t,target,a.__v181Third||(a.__v181Third={}));if(tp.weight){out.x=tp.x;out.y=tp.y;out.weight=tp.weight;out.mode='crossfire';return out;}
+ }
+ if(pressure>=3&&(hp<.68||ln==='sniper'||ln==='cannon')){var sx=0,sy=0,ts=g.tanks||[];for(var j=0;j<ts.length;j++){var q=ts[j];if(!q||q.id===t.id||q.alive===false||!visible(g,t,q))continue;var dd=d2(t.x,t.y,q.x,q.y);if(dd>560*560)continue;var m=Math.sqrt(dd)||1;sx+=(t.x-q.x)/m;sy+=(t.y-q.y)/m;}var sm=Math.hypot(sx,sy)||1;out.x=sx/sm;out.y=sy/sm;out.weight=.72;out.mode='decompress';}
+ return out;}
+function saferSide(g,t,vx,vy){var m=Math.hypot(vx,vy)||1,ux=vx/m,uy=vy/m,px=-uy,py=ux;var l=laneRisk(g,t.x+ux*110+px*115,t.y+uy*110+py*115),r=laneRisk(g,t.x+ux*110-px*115,t.y+uy*110-py*115);return l+0.08<r?1:r+0.08<l?-1:0;}
+
+wrap('game/engine',function(engine){var Game=engine.Game;if(!Game||Game.prototype.__novaBattleSense)return;Game.prototype.__novaBattleSense=true;
+ var oldFire=Game.prototype.tryFire;if(oldFire)Game.prototype.tryFire=function(t){var n=this.bullets?this.bullets.length:0,out=oldFire.apply(this,arguments);if(t&&this.bullets&&this.bullets.length>n)t.__v181FiredAt=this.time||0;return out;};
+ var oldPower=Game.prototype.updatePowerups;if(oldPower)Game.prototype.updatePowerups=function(dt){
+   if(this.status==='playing'&&this.powerups&&this.tanks){for(var i=this.powerups.length-1;i>=0;i--){var p=this.powerups[i],winner=null,bd=46*46;for(var j=0;j<this.tanks.length;j++){var t=this.tanks[j];if(!t||t.isPlayer||t.alive===false)continue;var q=d2(t.x,t.y,p.x,p.y);if(q<bd){bd=q;winner=t;}}if(winner){this.applyPowerup(winner,p.type);this.powerups.splice(i,1);if(window.__NOVA_BATTLE_SENSE__)window.__NOVA_BATTLE_SENSE__.aiPowerups++;}}}
+   return oldPower.apply(this,arguments);
+ };
+});
+
+wrap('game/ai',function(ai,require){var old=ai.updateAI;if(!old||old.__novaBattleSense)return;var classes=require('./classes');
+ function patched(t,g,dt){if(!t||!t.ai)return old(t,g,dt);var a=t.ai,now=g.time||0;a.__v181Think=(a.__v181Think||0)-dt;if(a.__v181Think<=0){a.__v181Think=.16+((t.id||0)%5)*.018;var b=strategicBias(g,classes,t,a,now,a.__v181Bias||(a.__v181Bias={}));a.__v181BiasX=b.x||0;a.__v181BiasY=b.y||0;a.__v181BiasW=b.weight||0;a.__v181Mode=b.mode||'none';if(window.__NOVA_BATTLE_SENSE__)window.__NOVA_BATTLE_SENSE__.plans++;}
+   var move=g.moveTank,own=Object.prototype.hasOwnProperty.call(g,'moveTank');if(move&&a.__v181BiasW>0)g.moveTank=function(tt,vx,vy,dd){if(tt!==t)return move.apply(g,arguments);var sp=Math.hypot(vx||0,vy||0)||((g.tankSpeed&&g.tankSpeed(tt))||1),bx=vx/sp,by=vy/sp,w=clamp(a.__v181BiasW,0,1.15),x=bx*(1-w*.72)+a.__v181BiasX*w,y=by*(1-w*.72)+a.__v181BiasY*w;var side=saferSide(g,t,x,y);if(side){var mm=Math.hypot(x,y)||1,px=-y/mm,py=x/mm;x+=px*side*.28;y+=py*side*.28;}var m=Math.hypot(x,y)||1;return move.call(g,tt,x/m*sp,y/m*sp,dd);};
+   try{return old(t,g,dt);}finally{if(move){if(own)g.moveTank=move;else delete g.moveTank;}}
+ }
+ patched.__novaBattleSense=true;ai.updateAI=patched;
+});
+window.__NOVA_BATTLE_SENSE__={version:VERSION,plans:0,aiPowerups:0,fairPlay:{hiddenCooldownReads:false,teamHiveMind:false,hiddenTracking:false,statBuffs:false}};
+window.__NOVA_BATTLE_SENSE_TEST__={localCount:localCount,laneRisk:laneRisk,resourceValue:resourceValue,chooseResource:chooseResource,witnessedOpening:witnessedOpening,thirdPartyVector:thirdPartyVector,saferSide:saferSide};
+console.info('[NOVA TANKS] v'+VERSION+' '+CODENAME+' strategic layer online');
+})();
