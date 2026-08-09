@@ -117,6 +117,7 @@ jobs:
               './nova-updates/tactical-framing-v1.8.2.js',
               './nova-updates/precision-contact-v1.8.3.js',
               './nova-updates/visual-overhaul-v1.9.0.js',
+              './nova-updates/upgrade-dwell-v1.9.2.js',
           ]
           pattern = r"window\.__bootModule\((['\"])main\1\);"
           match = re.search(pattern, html)
@@ -195,6 +196,7 @@ jobs:
           grep -q 'nova-updates/tactical-framing-v1.8.2.js' index.html.new
           grep -q 'nova-updates/precision-contact-v1.8.3.js' index.html.new
           grep -q 'nova-updates/visual-overhaul-v1.9.0.js' index.html.new
+          grep -q 'nova-updates/upgrade-dwell-v1.9.2.js' index.html.new
           ! grep -q 'nova-updates/auto-update-test-v1.7.4.js' index.html.new
           grep -q 'id="nova-tailwind-static"' index.html.new
           grep -Fq '.pointer-events-none' index.html.new
