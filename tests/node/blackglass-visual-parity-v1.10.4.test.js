@@ -105,10 +105,16 @@ test('projectile profile follows real bullet radius, damage scaling and special 
   assert.ok(beam.radius>6.8);
 });
 
-test('rendered shots attach to visible tube tips and beams cannot trail backward through the tank',()=>{
+test('rendered shots attach to physical tube tips while projectile spread remains independent',()=>{
   const {src}=load();
-  assert.match(src,/var m=visualMuzzleLocal\(br,a,S\),origin=/);
-  assert.doesNotMatch(src,/var m=muzzleLocal\(br,a,S\),origin=/);
+  assert.match(src,/var muzzleA=aim\+\(br\.off\|\|0\),m=visualMuzzleLocal\(br,muzzleA,S\),origin=/);
+  assert.match(src,/drawMuzzleFlash\(x,origin\.x,origin\.y,muzzleA,/);
+  assert.match(src,/drawProjectile\(x,c,projectileProfile\(c,sp\.dmgMul,sp\.rMul\),origin,a,/);
+  assert.doesNotMatch(src,/visualMuzzleLocal\(br,a,S\)/);
+});
+
+test('beam trail cannot extend behind its physical muzzle before the round has travelled that distance',()=>{
+  const {src}=load();
   assert.match(src,/var len=Math\.min\(dist,clamp\(profile\.speed\*\.075,80,235\)\)/);
 });
 
