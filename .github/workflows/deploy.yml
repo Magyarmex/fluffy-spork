@@ -67,6 +67,7 @@ jobs:
 
           python3 - <<'PY'
           from pathlib import Path
+          import hashlib
           import re
 
           path = Path('index.html.new')
@@ -114,6 +115,7 @@ jobs:
               './nova-updates/blast-cover-hardening-v1.7.2.js',
               './nova-updates/showroom-containment-v1.7.2.js',
               './nova-updates/showroom-fit-v1.7.3.js',
+              './nova-updates/blackglass-mirror-v1.10.6.js',
               './nova-updates/performance-v1.7.5.js',
               './nova-updates/drone-allegiance-glow-v1.7.6.js',
               './nova-updates/settings-v1.7.7.js',
@@ -138,12 +140,44 @@ jobs:
               './nova-updates/shared-battlefield-view-v1.10.5.js',
           ]
           missing = []
+          script_paths = []
           for script in scripts:
               script_path = script[2:] if script.startswith('./') else script
+              script_paths.append(script_path)
               if not Path(script_path).is_file():
                   missing.append(script)
           if missing:
               raise SystemExit('Missing runtime update files: ' + ', '.join(missing))
+
+          # The service worker fingerprints the materialized HTML. Stamp that
+          # shell from the bytes of every local runtime input so a same-URL file
+          # change cannot look like a no-op to returning/offline clients.
+          runtime_inputs = [
+              *script_paths,
+              'pwa-register.js',
+              'sw.js',
+              'manifest.webmanifest',
+              'nova-icon.svg',
+              'nova-updates/releases.json',
+          ]
+          digest = hashlib.sha256()
+          for value in runtime_inputs:
+              input_path = Path(value)
+              if not input_path.is_file():
+                  raise SystemExit('Missing runtime fingerprint input: ' + value)
+              digest.update(value.encode('utf-8'))
+              digest.update(b'\0')
+              digest.update(input_path.read_bytes())
+              digest.update(b'\0')
+          runtime_build = digest.hexdigest()[:24]
+          runtime_meta = f'    <meta name="nova-runtime-build" content="{runtime_build}" />\n'
+          meta_pattern = re.compile(r'<meta\s+name=["\']nova-runtime-build["\'][^>]*>', re.I)
+          if meta_pattern.search(html):
+              html = meta_pattern.sub(runtime_meta.rstrip('\n').strip(), html, count=1)
+          else:
+              if '</head>' not in html:
+                  raise SystemExit('NOVA head marker not found for runtime build stamp')
+              html = html.replace('</head>', runtime_meta + '  </head>', 1)
 
           pattern = r"window\.__bootModule\((['\"])main\1\);"
           match = re.search(pattern, html)
@@ -187,6 +221,7 @@ jobs:
           grep -q '__novaModules' index.html.new
           grep -q 'manifest.webmanifest' index.html.new
           grep -q 'pwa-register.js' index.html.new
+          grep -q 'name="nova-runtime-build"' index.html.new
           grep -q 'nova-updates/sniper-v1.2.0.js' index.html.new
           grep -q 'nova-updates/controller-v1.3.0.js' index.html.new
           grep -q 'nova-updates/polish-v1.3.1.js' index.html.new
@@ -206,6 +241,7 @@ jobs:
           grep -q 'nova-updates/blast-cover-hardening-v1.7.2.js' index.html.new
           grep -q 'nova-updates/showroom-containment-v1.7.2.js' index.html.new
           grep -q 'nova-updates/showroom-fit-v1.7.3.js' index.html.new
+          grep -q 'nova-updates/blackglass-mirror-v1.10.6.js' index.html.new
           grep -q 'nova-updates/performance-v1.7.5.js' index.html.new
           grep -q 'nova-updates/drone-allegiance-glow-v1.7.6.js' index.html.new
           grep -q 'nova-updates/settings-v1.7.7.js' index.html.new
