@@ -219,7 +219,7 @@ Any meaningful AI change should test the relevant subset of:
 - no AI-only stat writes;
 - compatibility with Battlefield routing, Three Disciplines, Apex Doctrine, Combined Arms, Controller/Observer systems, Terrain Intelligence, and Frame Budget.
 
-## v1.10.4 — Shared Battlefield View baseline
+## v1.10.5 — Shared Battlefield View baseline
 
 Shared Battlefield View supersedes the old v1.8.0 “no wall vision / frozen last-seen memory” information model.
 
