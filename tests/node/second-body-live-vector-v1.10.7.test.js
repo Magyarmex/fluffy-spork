@@ -95,8 +95,9 @@ test('runtime exposes constant-memory Controller telemetry for diagnostics', () 
   assert.match(source, /nodeSpeed/);
 });
 
-test('production materializer retires Command Weave and loads Live Vector', () => {
-  assert.doesNotMatch(deploy, /scripts = \[[\s\S]*controller-command-weave-v1\.10\.0\.js[\s\S]*\]/);
-  assert.match(deploy, /nova-updates\/second-body-live-vector-v1\.10\.7\.js/);
+test('production materializer retires Command Weave and loads Live Vector last', () => {
+  assert.doesNotMatch(deploy, /'\.\/nova-updates\/controller-command-weave-v1\.10\.0\.js'/);
+  assert.match(deploy, /'\.\/nova-updates\/shared-battlefield-view-v1\.10\.5\.js',\n\s*'\.\/nova-updates\/second-body-live-vector-v1\.10\.7\.js'/);
   assert.match(deploy, /grep -q 'nova-updates\/second-body-live-vector-v1\.10\.7\.js'/);
+  assert.match(deploy, /! grep -q 'nova-updates\/controller-command-weave-v1\.10\.0\.js'/);
 });
