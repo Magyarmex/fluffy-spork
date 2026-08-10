@@ -195,10 +195,10 @@ function drawShots(x,c,aim,t,S,cx,cy,w,h){
   var b=c.bullet||{},reload=Math.max(.055,b.reload||.7),ttl=b.ttl==null?1.05:b.ttl,windowT=clamp(ttl*.62,.24,1.15),idx=Math.floor(t/reload),count=Math.min(20,Math.ceil(windowT/reload)+1);
   for(var j=count-1;j>=0;j--){var shotIdx=idx-j,shotT=shotIdx*reload,age=t-shotT;if(age<0||age>windowT)continue;var plan=shotPlan(c,shotIdx);
     for(var p=0;p<plan.length;p++){var sp=plan[p],br=(c.barrels&&c.barrels[sp.barrel])||(c.barrels&&c.barrels[0])||{off:0,len:24,w:6,x:0,y:0};var a=aim+sp.off;
-      /* Shotgun plan offsets replace the barrel's fixed angle; all other modes
-       * already carry the canonical barrel.off in shotPlan. */
-      if(c.fireMode==='shotgun')a=aim+sp.off;
-      var m=visualMuzzleLocal(br,a,S),origin={x:cx+m.x,y:cy+m.y};drawMuzzleFlash(x,origin.x,origin.y,a,c.color||'#7df3ff',age,S);drawProjectile(x,c,projectileProfile(c,sp.dmgMul,sp.rMul),origin,a,age,windowT,S,w,h);
+      /* Projectile spread changes flight angle, not where the visible tube ends.
+       * This matters most for shotguns: every pellet shares one physical muzzle
+       * and fans out only after leaving it. */
+      var muzzleA=aim+(br.off||0),m=visualMuzzleLocal(br,muzzleA,S),origin={x:cx+m.x,y:cy+m.y};drawMuzzleFlash(x,origin.x,origin.y,muzzleA,c.color||'#7df3ff',age,S);drawProjectile(x,c,projectileProfile(c,sp.dmgMul,sp.rMul),origin,a,age,windowT,S,w,h);
     }
   }
 }
