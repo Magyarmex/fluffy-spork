@@ -18,6 +18,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: nova-materialize-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   unpack:
     runs-on: ubuntu-latest
@@ -45,6 +49,13 @@ jobs:
           node --check sw.js
           python3 -m json.tool nova-updates/releases.json >/dev/null
           python3 -m json.tool manifest.webmanifest >/dev/null
+
+      - name: Run production build and regression suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run build
+          npm run test
 
       - name: Rebuild tested NOVA payload and apply versioned runtime updates
         shell: bash
@@ -121,6 +132,14 @@ jobs:
               './nova-updates/spotter-comms-v1.9.3.js',
               './nova-updates/controller-command-weave-v1.10.0.js',
           ]
+          missing = []
+          for script in scripts:
+              script_path = script[2:] if script.startswith('./') else script
+              if not Path(script_path).is_file():
+                  missing.append(script)
+          if missing:
+              raise SystemExit('Missing runtime update files: ' + ', '.join(missing))
+
           pattern = r"window\.__bootModule\((['\"])main\1\);"
           match = re.search(pattern, html)
           if not match:
@@ -222,6 +241,11 @@ jobs:
           set -euo pipefail
           if git diff --quiet -- index.html; then
             echo 'index.html is already materialized; nothing to commit.'
+            exit 0
+          fi
+          git fetch origin main
+          if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
+            echo 'A newer source commit reached main; the newer materializer run owns index.html.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
