@@ -128,9 +128,12 @@ jobs:
               './nova-updates/tactical-framing-v1.8.2.js',
               './nova-updates/precision-contact-v1.8.3.js',
               './nova-updates/visual-overhaul-v1.9.0.js',
+              './nova-updates/sensory-feedback-v1.9.1.js',
               './nova-updates/upgrade-dwell-v1.9.2.js',
               './nova-updates/spotter-comms-v1.9.3.js',
               './nova-updates/controller-command-weave-v1.10.0.js',
+              './nova-updates/drone-field-service-v1.10.1.js',
+              './nova-updates/lobby-war-room-v1.10.2.js',
           ]
           missing = []
           for script in scripts:
@@ -217,9 +220,12 @@ jobs:
           grep -q 'nova-updates/tactical-framing-v1.8.2.js' index.html.new
           grep -q 'nova-updates/precision-contact-v1.8.3.js' index.html.new
           grep -q 'nova-updates/visual-overhaul-v1.9.0.js' index.html.new
+          grep -q 'nova-updates/sensory-feedback-v1.9.1.js' index.html.new
           grep -q 'nova-updates/upgrade-dwell-v1.9.2.js' index.html.new
           grep -q 'nova-updates/spotter-comms-v1.9.3.js' index.html.new
           grep -q 'nova-updates/controller-command-weave-v1.10.0.js' index.html.new
+          grep -q 'nova-updates/drone-field-service-v1.10.1.js' index.html.new
+          grep -q 'nova-updates/lobby-war-room-v1.10.2.js' index.html.new
           ! grep -q 'nova-updates/auto-update-test-v1.7.4.js' index.html.new
           grep -q 'id="nova-tailwind-static"' index.html.new
           grep -Fq '.pointer-events-none' index.html.new
