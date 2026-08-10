@@ -27,6 +27,19 @@ test('every runtime script named by the materializer must exist before HTML inje
   assert.match(workflow,/Missing runtime update files/);
 });
 
+test('completion releases are injected in wrapper-safe chronological order',()=>{
+  const names=['visual-overhaul-v1.9.0.js','sensory-feedback-v1.9.1.js','upgrade-dwell-v1.9.2.js','spotter-comms-v1.9.3.js','controller-command-weave-v1.10.0.js','drone-field-service-v1.10.1.js','lobby-war-room-v1.10.2.js'];
+  let previous=-1;
+  for(const name of names){const at=workflow.indexOf(name);assert.ok(at>previous,name+' missing or out of order');previous=at;}
+});
+
+test('new completion layers are explicit materialization assertions',()=>{
+  for(const name of ['sensory-feedback-v1.9.1.js','drone-field-service-v1.10.1.js','lobby-war-room-v1.10.2.js']){
+    const hits=workflow.split(name).length-1;
+    assert.ok(hits>=2,name+' should appear in scripts and post-materialization verification');
+  }
+});
+
 test('stale materializer run refuses to push over a newer main commit',()=>{
   assert.match(workflow,/git fetch origin main/);
   assert.match(workflow,/git rev-parse HEAD/);
