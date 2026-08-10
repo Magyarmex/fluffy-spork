@@ -4,6 +4,9 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 
+const mirrorPath = path.join(__dirname,'../../nova-updates/blackglass-mirror-v1.10.6.js');
+const fitPath = path.join(__dirname,'../../nova-updates/showroom-fit-v1.7.3.js');
+
 function load(){
   const head={appendChild(){}};
   const document={
@@ -17,8 +20,8 @@ function load(){
   const classes={CLASSES:{scout:{id:'scout',name:'Scout',barrels:[{off:0,len:26,w:7,x:0,y:0}],fireMode:'single',bullet:{dmg:12,speed:440,r:5,pen:1,reload:.5},size:14,color:'#7dd3fc'}}};
   const window={__novaMakeRequire(){return function(){return classes;};},devicePixelRatio:1};
   const context={window,document,MutationObserver,requestAnimationFrame(){return 0;},console,Math};
-  const src=fs.readFileSync(path.join(__dirname,'../../nova-updates/showroom-fit-v1.7.3.js'),'utf8');
-  vm.runInNewContext(src,context,{filename:'showroom-fit-v1.7.3.js'});
+  const src=fs.readFileSync(mirrorPath,'utf8');
+  vm.runInNewContext(src,context,{filename:'blackglass-mirror-v1.10.6.js'});
   return {api:window.__NOVA_BLACKGLASS_VISUAL_PARITY__,release:window.__NOVA_SHOWROOM_RELEASE__,src};
 }
 
@@ -28,6 +31,16 @@ test('Blackglass publishes the current Mirror release and parity helpers',()=>{
   assert.equal(release.version,'1.10.6');
   assert.equal(release.codename,'Blackglass Mirror');
   assert.equal(typeof api.visualMuzzleLocal,'function');
+});
+
+test('historical Blackglass Fit remains immutable and Mirror is a separate release layer',()=>{
+  const fit=fs.readFileSync(fitPath,'utf8');
+  const mirror=fs.readFileSync(mirrorPath,'utf8');
+  assert.match(fit,/NOVA TANKS v1\.7\.3 — Blackglass Fit/);
+  assert.match(fit,/version:'1\.7\.3',codename:'Blackglass Fit'/);
+  assert.doesNotMatch(fit,/__NOVA_BLACKGLASS_VISUAL_PARITY__/);
+  assert.match(mirror,/NOVA TANKS v1\.10\.6 — Blackglass Mirror/);
+  assert.match(mirror,/blackglass-mirror-v1106/);
 });
 
 test('logical gameplay muzzle retains len + 8 and rotated lateral-offset math',()=>{
