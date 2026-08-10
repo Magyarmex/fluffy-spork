@@ -35,16 +35,17 @@ function game(ctx,owners,drones,player={id:1,alive:true}){
   };
 }
 
-test('IFF Halo publishes a subtle visual-only release',()=>{
+test('IFF Halo publishes a reinforced but still secondary visual-only release',()=>{
   const {context}=loadLayer();
   const r=context.window.__NOVA_DRONE_IFF_RELEASE__;
   const t=context.window.__NOVA_DRONE_IFF_TEST__;
   assert.equal(r.version,'1.7.6');
   assert.equal(r.codename,'IFF Halo');
-  assert.ok(t.alpha>0&&t.alpha<0.2,'halo should remain deliberately faint');
+  assert.ok(t.alpha>=0.16&&t.alpha<=0.2,'outer halo should be visibly reinforced but remain background-level');
+  assert.ok(t.coreAlpha>t.alpha&&t.coreAlpha<0.4,'core-light should carry the fast IFF read without becoming an outline');
 });
 
-test('owned drones draw blue while hostile drones draw red',()=>{
+test('owned drones draw two blue passes while hostile drones draw two red passes',()=>{
   const h=loadLayer();
   const owners=[{id:1,alive:true},{id:2,alive:true}];
   const drones=[
@@ -53,8 +54,9 @@ test('owned drones draw blue while hostile drones draw red',()=>{
   ];
   h.render.render(game(h.ctx,owners,drones),200,120);
   assert.equal(h.getBaseRenders(),1,'base renderer must still execute exactly once');
-  assert.deepEqual(h.draws.map(d=>d.color),['#4da8ff','#ff4d62']);
-  assert.ok(h.draws.every(d=>d.alpha===0.13));
+  assert.deepEqual(h.draws.map(d=>d.color),['#4da8ff','#4da8ff','#ff4d62','#ff4d62']);
+  assert.deepEqual(h.draws.map(d=>d.alpha),[0.18,0.30,0.18,0.30]);
+  assert.ok(h.draws[0].w>h.draws[1].w,'outer pass should remain broader than the core-light');
 });
 
 test('same-team drones are friendly and different-team drones are hostile',()=>{
@@ -66,7 +68,7 @@ test('same-team drones are friendly and different-team drones are hostile',()=>{
     {ownerId:3,x:15,y:0,hp:10,role:'escort'},
   ];
   h.render.render(game(h.ctx,owners,drones,player),200,120);
-  assert.deepEqual(h.draws.map(d=>d.color),['#4da8ff','#ff4d62']);
+  assert.deepEqual(h.draws.map(d=>d.color),['#4da8ff','#4da8ff','#ff4d62','#ff4d62']);
 });
 
 test('non-hostile relation hooks stay neutral instead of being painted red',()=>{
@@ -79,7 +81,7 @@ test('non-hostile relation hooks stay neutral instead of being painted red',()=>
   assert.equal(h.draws.length,0);
 });
 
-test('off-screen drones are culled before glow drawing',()=>{
+test('off-screen drones are culled before both IFF passes',()=>{
   const h=loadLayer();
   const owners=[{id:1,alive:true},{id:2,alive:true}];
   const drones=[
@@ -87,6 +89,6 @@ test('off-screen drones are culled before glow drawing',()=>{
     {ownerId:2,x:5000,y:5000,hp:10,role:'hunter'},
   ];
   h.render.render(game(h.ctx,owners,drones),200,120);
-  assert.equal(h.draws.length,1);
-  assert.equal(h.draws[0].color,'#4da8ff');
+  assert.equal(h.draws.length,2);
+  assert.ok(h.draws.every(d=>d.color==='#4da8ff'));
 });
