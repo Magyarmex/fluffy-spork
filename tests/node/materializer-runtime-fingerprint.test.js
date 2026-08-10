@@ -25,8 +25,8 @@ test('materialized HTML fingerprint changes when a local runtime input changes',
   assert.match(deploy,/'nova-updates\/releases\.json'/);
   assert.match(deploy,/digest\.update\(input_path\.read_bytes\(\)\)/);
   assert.match(deploy,/runtime_build = digest\.hexdigest\(\)\[:24\]/);
-  assert.match(deploy,/name=\\"nova-runtime-build\\"/);
-  assert.match(deploy,/grep -q 'name=\"nova-runtime-build\"' index\.html\.new/);
+  assert.match(deploy,/name="nova-runtime-build"/);
+  assert.match(deploy,/grep -q 'name="nova-runtime-build"' index\.html\.new/);
 });
 
 test('runtime fingerprint stamp is produced before the service-worker-visible shell is committed',()=>{
