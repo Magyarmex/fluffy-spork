@@ -1,4 +1,4 @@
-/* NOVA TANKS v1.10.4 — Blackglass Mirror
+/* NOVA TANKS v1.10.6 — Blackglass Mirror
  * Full Blackglass visual parity pass. The historical v1.7.3 containment anchor
  * remains in this runtime slot so old materialized builds keep their stylesheet
  * ordering guarantees, while the simulator itself now mirrors canonical tank,
@@ -7,8 +7,8 @@
 (function(){
 'use strict';
 var FIT_ID='nova-showroom-fit-v173';
-var PARITY_ID='nova-blackglass-mirror-v1104';
-var VERSION='1.10.4';
+var PARITY_ID='nova-blackglass-mirror-v1106';
+var VERSION='1.10.6';
 var CODENAME='Blackglass Mirror';
 var TAU=Math.PI*2;
 var CSS=`
@@ -67,12 +67,22 @@ function poly(ctx,r,n,a){
   ctx.beginPath();for(var i=0;i<n;i++){var q=a+i*TAU/n,px=Math.cos(q)*r,py=Math.sin(q)*r;i?ctx.lineTo(px,py):ctx.moveTo(px,py);}ctx.closePath();
 }
 
-/* Exact gameplay muzzle math, scaled into the showroom. Gameplay intentionally
- * uses barrel.x as the lateral offset and barrel.len + 8 as the muzzle reach. */
+/* Gameplay's logical projectile spawn intentionally lives slightly beyond the
+ * rendered tube and rotates barrel.x as a lateral offset. Keep that semantic
+ * available for parity tests, but do not use it as the Blackglass visual source. */
 function muzzleLocal(barrel,angle,scale){
   barrel=barrel||{len:24,x:0};scale=scale||1;
   var side=(barrel.x||0)*scale,reach=((barrel.len||24)+8)*scale;
   return {x:Math.cos(angle)*reach-Math.sin(angle)*side,y:Math.sin(angle)*reach+Math.cos(angle)*side,angle:angle};
+}
+/* The visible barrel is rendered by translating to (barrel.x,barrel.y), then
+ * rotating the tube and drawing exactly barrel.len forward. Blackglass fire
+ * starts at that visible tip so every animated round is optically attached to
+ * the cannon the player is looking at, including offset Twin/Prism/Ravager guns. */
+function visualMuzzleLocal(barrel,angle,scale){
+  barrel=barrel||{len:24,x:0,y:0};scale=scale||1;
+  var len=(barrel.len||24)*scale;
+  return {x:(barrel.x||0)*scale+Math.cos(angle)*len,y:(barrel.y||0)*scale+Math.sin(angle)*len,angle:angle};
 }
 function shotPlan(def,shotIndex){
   def=def||{};var bs=def.barrels&&def.barrels.length?def.barrels:[{off:0,len:24,w:6,x:0,y:0}],b=def.bullet||{},out=[],i;
@@ -95,7 +105,7 @@ function projectileProfile(def,dmgMul,rMul){
     pellets:b.pellets||0,spread:b.spread||0,knock:b.knock||0,damage:d
   };
 }
-window.__NOVA_BLACKGLASS_VISUAL_PARITY__={version:VERSION,codename:CODENAME,muzzleLocal:muzzleLocal,shotPlan:shotPlan,projectileProfile:projectileProfile};
+window.__NOVA_BLACKGLASS_VISUAL_PARITY__={version:VERSION,codename:CODENAME,muzzleLocal:muzzleLocal,visualMuzzleLocal:visualMuzzleLocal,shotPlan:shotPlan,projectileProfile:projectileProfile};
 
 function installFit(){
   var style=document.getElementById(FIT_ID);
@@ -106,7 +116,7 @@ function installFit(){
 }
 
 var req=window.__novaMakeRequire,classes=null,CLASSES={};
-try{classes=req&&req('blackglass-mirror')('./game/classes');CLASSES=classes&&classes.CLASSES||{};}catch(e){console.error('[NOVA v1.10.4] canonical class registry unavailable',e);}
+try{classes=req&&req('blackglass-mirror')('./game/classes');CLASSES=classes&&classes.CLASSES||{};}catch(e){console.error('[NOVA v1.10.6] canonical class registry unavailable',e);}
 var nameToId={};Object.keys(CLASSES).forEach(function(id){nameToId[String(CLASSES[id].name||id).trim().toUpperCase()]=id;});
 var state={canvas:null,ctx:null,aim:null,raf:0,lastId:'scout',wrap:null};
 
@@ -171,7 +181,7 @@ function drawProjectile(x,c,profile,origin,a,age,maxAge,S,w,h){
   if(px<-40||px>w+40||py<-40||py>h+40)return;
   var rad=Math.max(2.2,profile.radius*S*.72);x.save();x.translate(px,py);x.rotate(a);x.globalCompositeOperation='lighter';
   if(profile.mode==='beam'){
-    var len=clamp(profile.speed*.075,80,235),fade=clamp(1-age/Math.min(maxAge,.24),0,1),grad=x.createLinearGradient(-len,0,12,0);grad.addColorStop(0,'rgba(255,255,255,0)');grad.addColorStop(.66,hexA(col,.46*fade));grad.addColorStop(1,'rgba(255,255,255,'+(.95*fade)+')');x.strokeStyle=grad;x.lineWidth=Math.max(2.2,rad*1.1);x.beginPath();x.moveTo(-len,0);x.lineTo(8,0);x.stroke();
+    var len=Math.min(dist,clamp(profile.speed*.075,80,235)),fade=clamp(1-age/Math.min(maxAge,.24),0,1),grad=x.createLinearGradient(-len,0,12,0);grad.addColorStop(0,'rgba(255,255,255,0)');grad.addColorStop(.66,hexA(col,.46*fade));grad.addColorStop(1,'rgba(255,255,255,'+(.95*fade)+')');x.strokeStyle=grad;x.lineWidth=Math.max(2.2,rad*1.1);x.beginPath();x.moveTo(-len,0);x.lineTo(8,0);x.stroke();
   }else{
     var trail=clamp(profile.speed*.035,10,45);x.strokeStyle=hexA(col,.34);x.lineWidth=Math.max(1.2,rad*.54);x.beginPath();x.moveTo(-trail,0);x.lineTo(-rad*.3,0);x.stroke();
     if(profile.pen>=3){x.fillStyle=hexA(col,.78);rr(x,-rad*1.35,-rad*.55,rad*2.7,rad*1.1,rad*.45);x.fill();x.fillStyle='#fff';rr(x,-rad*.66,-rad*.25,rad*1.32,rad*.5,rad*.22);x.fill();}
@@ -185,10 +195,10 @@ function drawShots(x,c,aim,t,S,cx,cy,w,h){
   var b=c.bullet||{},reload=Math.max(.055,b.reload||.7),ttl=b.ttl==null?1.05:b.ttl,windowT=clamp(ttl*.62,.24,1.15),idx=Math.floor(t/reload),count=Math.min(20,Math.ceil(windowT/reload)+1);
   for(var j=count-1;j>=0;j--){var shotIdx=idx-j,shotT=shotIdx*reload,age=t-shotT;if(age<0||age>windowT)continue;var plan=shotPlan(c,shotIdx);
     for(var p=0;p<plan.length;p++){var sp=plan[p],br=(c.barrels&&c.barrels[sp.barrel])||(c.barrels&&c.barrels[0])||{off:0,len:24,w:6,x:0,y:0};var a=aim+sp.off;
-      /* Shotgun plan offsets replace the barrel's fixed angle; all other modes
-       * already carry the canonical barrel.off in shotPlan. */
-      if(c.fireMode==='shotgun')a=aim+sp.off;
-      var m=muzzleLocal(br,a,S),origin={x:cx+m.x,y:cy+m.y};drawMuzzleFlash(x,origin.x,origin.y,a,c.color||'#7df3ff',age,S);drawProjectile(x,c,projectileProfile(c,sp.dmgMul,sp.rMul),origin,a,age,windowT,S,w,h);
+      /* Projectile spread changes flight angle, not where the visible tube ends.
+       * This matters most for shotguns: every pellet shares one physical muzzle
+       * and fans out only after leaving it. */
+      var muzzleA=aim+(br.off||0),m=visualMuzzleLocal(br,muzzleA,S),origin={x:cx+m.x,y:cy+m.y};drawMuzzleFlash(x,origin.x,origin.y,muzzleA,c.color||'#7df3ff',age,S);drawProjectile(x,c,projectileProfile(c,sp.dmgMul,sp.rMul),origin,a,age,windowT,S,w,h);
     }
   }
 }
@@ -213,10 +223,10 @@ function loop(t){state.raf=0;if(!visible())return;draw(t);state.raf=requestAnima
 function wake(){installFit();ensureCanvas();if(visible()&&!state.raf)state.raf=requestAnimationFrame(loop);}
 
 installFit();
-window.__NOVA_SHOWROOM_RELEASE__={version:VERSION,codename:CODENAME,date:'2026-08-10',headline:'Blackglass now mirrors live tank silhouettes, weapon geometry and projectile behavior instead of approximating them.'};
+window.__NOVA_SHOWROOM_RELEASE__={version:VERSION,codename:CODENAME,date:'2026-08-10',headline:'Blackglass now mirrors live tank silhouettes, weapon geometry and projectile behavior, with visually exact muzzle attachment.'};
 window.__NOVA_SHOWROOM_FIT_RELEASE__=window.__NOVA_SHOWROOM_RELEASE__;
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){wake();requestAnimationFrame(wake);},{once:true});else wake();
 var headObs=new MutationObserver(function(m){for(var i=0;i<m.length;i++){var n=m[i].addedNodes||[];for(var j=0;j<n.length;j++){var id=n[j]&&n[j].id;if(id==='nova-showroom-css'||id==='nova-showroom-containment-v172'){installFit();break;}}}});headObs.observe(document.head,{childList:true});
 var root=document.getElementById&&document.getElementById('root');if(root){var obs=new MutationObserver(wake);obs.observe(root,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});}
-console.info('[NOVA TANKS] v1.10.4 Blackglass Mirror linked');
+console.info('[NOVA TANKS] v1.10.6 Blackglass Mirror linked');
 })();

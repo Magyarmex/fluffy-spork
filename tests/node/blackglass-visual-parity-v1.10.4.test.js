@@ -24,12 +24,13 @@ function load(){
 
 test('Blackglass publishes the current Mirror release and parity helpers',()=>{
   const {api,release}=load();
-  assert.equal(api.version,'1.10.4');
-  assert.equal(release.version,'1.10.4');
+  assert.equal(api.version,'1.10.6');
+  assert.equal(release.version,'1.10.6');
   assert.equal(release.codename,'Blackglass Mirror');
+  assert.equal(typeof api.visualMuzzleLocal,'function');
 });
 
-test('muzzle origin uses the same len + 8 and rotated lateral-offset math as gameplay',()=>{
+test('logical gameplay muzzle retains len + 8 and rotated lateral-offset math',()=>{
   const {api}=load();
   const br={len:26,x:6};
   const straight=api.muzzleLocal(br,0,1);
@@ -38,6 +39,20 @@ test('muzzle origin uses the same len + 8 and rotated lateral-offset math as gam
   const up=api.muzzleLocal(br,Math.PI/2,1);
   assert.ok(Math.abs(up.x+6)<1e-9);
   assert.ok(Math.abs(up.y-34)<1e-9);
+});
+
+test('visual muzzle is exactly the visible barrel tip after renderer translate then rotate',()=>{
+  const {api}=load();
+  const br={len:26,x:6,y:-2};
+  const straight=api.visualMuzzleLocal(br,0,1);
+  assert.equal(straight.x,32);
+  assert.equal(straight.y,-2);
+  const up=api.visualMuzzleLocal(br,Math.PI/2,1);
+  assert.ok(Math.abs(up.x-6)<1e-9);
+  assert.ok(Math.abs(up.y-24)<1e-9);
+  const scaled=api.visualMuzzleLocal(br,0,2);
+  assert.equal(scaled.x,64);
+  assert.equal(scaled.y,-4);
 });
 
 test('Twin and Minigun cycle their real barrel list instead of firing from a generic center muzzle',()=>{
@@ -88,6 +103,19 @@ test('projectile profile follows real bullet radius, damage scaling and special 
   assert.equal(beam.pen,18);
   assert.equal(beam.speed,3100);
   assert.ok(beam.radius>6.8);
+});
+
+test('rendered shots attach to physical tube tips while projectile spread remains independent',()=>{
+  const {src}=load();
+  assert.match(src,/var muzzleA=aim\+\(br\.off\|\|0\),m=visualMuzzleLocal\(br,muzzleA,S\),origin=/);
+  assert.match(src,/drawMuzzleFlash\(x,origin\.x,origin\.y,muzzleA,/);
+  assert.match(src,/drawProjectile\(x,c,projectileProfile\(c,sp\.dmgMul,sp\.rMul\),origin,a,/);
+  assert.doesNotMatch(src,/visualMuzzleLocal\(br,a,S\)/);
+});
+
+test('beam trail cannot extend behind its physical muzzle before the round has travelled that distance',()=>{
+  const {src}=load();
+  assert.match(src,/var len=Math\.min\(dist,clamp\(profile\.speed\*\.075,80,235\)\)/);
 });
 
 test('legacy approximation is visually suppressed and the parity canvas owns steering',()=>{
