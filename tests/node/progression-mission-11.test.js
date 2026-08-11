@@ -52,9 +52,9 @@ test('Mission 11 preserves XP thresholds, wealth gain, level points and pity pro
     assert.equal(p.pityStartLevel(3), 1);
     assert.equal(p.pityStartLevel(30), 9);
     const sys = new p.ProgressionSystem();
-    const result = sys.gainXp(state(p, { level: 29, perkId: 'wealth' }), p.xpForLevel(29));
-    assert.equal(result.awardedXp, p.xpForLevel(29) * 1.3);
-    assert.equal(result.state.level, 30);
+    const result = sys.gainXp(state(p, { level: 30, perkId: 'wealth' }), p.xpForLevel(30));
+    assert.equal(result.awardedXp, p.xpForLevel(30) * 1.3);
+    assert.equal(result.state.level, 31);
     assert.equal(result.state.statPoints, 1);
   } finally { dispose(); }
 });
