@@ -5,6 +5,7 @@ export type FireMode = 'single' | 'twin' | 'minigun' | 'shotgun' | 'shell' | 'be
 export type DroneRole = 'escort' | 'hunter';
 export type TerrainShape = 'rect' | 'circle';
 export type TerrainType = 'wall' | 'pillar' | 'cover';
+export type StatUpgradeId = 'damage' | 'reload' | 'bulletspeed' | 'penetration' | 'maxhp' | 'regen' | 'speed' | 'body';
 
 export interface BarrelDefinition {
   readonly off: number;
@@ -101,6 +102,12 @@ export interface MasteryPerkDefinition {
   readonly name: string;
   readonly icon: string;
   readonly description: string;
+}
+
+export interface StatUpgradeDefinition {
+  readonly id: StatUpgradeId;
+  readonly name: string;
+  readonly maxRank: number;
 }
 
 export interface EvolutionDefinition {
