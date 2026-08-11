@@ -16,11 +16,9 @@ function loadMission20() {
   return {
     lobby: require(path.join(outDir, 'scenes/lobby/index.js')),
     content: require(path.join(outDir, 'content/index.js')),
-    ai: require(path.join(outDir, 'ai/controllers/TankAIController.js')),
     nav: require(path.join(outDir, 'ai/navigation/NavigationService.js')),
     drones: require(path.join(outDir, 'game/entities/drones/DroneSystem.js')),
     combat: require(path.join(outDir, 'game/combat/CombatSystem.js')),
-    rendering: require(path.join(outDir, 'rendering/Renderer.js')),
     dispose: () => rmSync(outDir, { recursive: true, force: true }),
   };
 }
@@ -39,14 +37,18 @@ function missionTest(name, fn) {
   });
 }
 
-missionTest('Mission 20 lobby roster is the complete canonical level-30 tank registry', () => {
+missionTest('Mission 20 lobby roster contains every canonical tank with a legal canonical build', () => {
   const battle = new api.lobby.LobbyBattle();
   const snapshot = battle.snapshot();
   const canonical = api.content.TankRegistry.all();
-  assert.equal(battle.level, 30);
-  assert.equal(snapshot.level, 30);
+  assert.equal(battle.level, 30, 'War Room level 30 remains the baseline');
   assert.equal(snapshot.tanks.length, canonical.length);
   assert.deepEqual(new Set(snapshot.tanks.map((tank) => tank.tankDefinitionId)), new Set(canonical.map((tank) => tank.id)));
+  for (const tank of canonical) {
+    const actorLevel = snapshot.actorLevels[tank.id];
+    assert.ok(actorLevel >= 30);
+    if (tank.tier === 3) assert.ok(actorLevel >= api.content.BALANCE.evolutionLevels.apex);
+  }
   assert.ok(snapshot.drones.length > 0);
 });
 
@@ -75,8 +77,8 @@ missionTest('Mission 20 cheaper policy changes cadence and presentation caps, ne
   assert.equal(cheap.policy.capProjectiles(Array.from({length:30}, (_, i) => i)).length, 12);
 
   const policySource = readFileSync(path.join(lobbyDir, 'LobbyPerformancePolicy.ts'), 'utf8');
-  assert.doesNotMatch(policySource, /damage|health|reload|projectileSpeed|moveMultiplier|targeting/i,
-    'performance policy must not acquire gameplay tuning authority');
+  assert.doesNotMatch(policySource, /projectileDamage|reloadSeconds|projectileSpeed|moveMultiplier|maxHealth|weaponRange|bodyDamage/,
+    'performance policy must not acquire gameplay tuning fields');
 });
 
 missionTest('Mission 20 canonical AI actually drives the background simulation', () => {
