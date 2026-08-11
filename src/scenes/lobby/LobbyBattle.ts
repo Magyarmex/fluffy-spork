@@ -1,4 +1,4 @@
-import { TankRegistry, WeaponRegistry } from '../../content';
+import { BALANCE, TankRegistry, WeaponRegistry } from '../../content';
 import type { TankDefinition } from '../../content';
 import { TankAIController } from '../../ai/controllers/TankAIController';
 import { NavigationService } from '../../ai/navigation/NavigationService';
@@ -20,7 +20,7 @@ import { PerceptionCore } from '../../game/targeting/PerceptionCore';
 import type { CommandEnvelope } from '../../input/commands/GameCommand';
 import { LobbyPerformancePolicy } from './LobbyPerformancePolicy';
 
-const LEVEL = 30;
+const BASELINE_LEVEL = 30;
 const ZERO_STATS = Object.freeze({ damage:0, reload:0, bulletspeed:0, penetration:0, maxhp:0, regen:0, speed:0, body:0 });
 const TEAMS = Object.freeze([
   Object.freeze({ teamId:'lobby-blue', allegiance:'friendly' }),
@@ -41,7 +41,9 @@ interface ProjectileRuntime { spec: ProjectileSpawnSpec; kinematics: ProjectileK
 export interface LobbyBattleSnapshot {
   readonly tick: number;
   readonly elapsedMs: number;
+  /** Historical War Room baseline. Apex actors use their canonical minimum unlock level when higher. */
   readonly level: number;
+  readonly actorLevels: Readonly<Record<string, number>>;
   readonly tanks: readonly TankState[];
   readonly drones: readonly DroneState[];
   readonly projectiles: readonly ProjectileState[];
@@ -57,14 +59,18 @@ export interface LobbyBattleOptions {
 /**
  * Canonical background battle used by the lobby.
  *
- * The scene owns orchestration and cheaper scheduling only. Every actor is a
- * canonical tank definition with the level-30 build resolver, TankAIController,
- * Mission 15 navigation, Mission 12 perception, Mission 17 drones, Mission 09
- * movement, Mission 10 weapon spawning/projectile kinematics, and Battlefield
- * geometry. No lobby-only combat or class rules live here.
+ * The old decorative War Room labeled every form level 30 even though current
+ * canonical progression makes Tier 3 impossible at that level. Mission 20 may
+ * not keep an impossible fake state: level 30 remains the baseline and only a
+ * form whose legal unlock is later is raised to that canonical minimum.
+ *
+ * Apart from orchestration and cheaper scheduling, all behavior is delegated:
+ * TankAIController, Mission 15 navigation, Mission 12 perception, Mission 17
+ * drones, Mission 09 movement, Mission 10 combat/projectile kinematics, and
+ * Mission 07 Battlefield geometry. No lobby-only class or combat rules live here.
  */
 export class LobbyBattle {
-  readonly level = LEVEL;
+  readonly level = BASELINE_LEVEL;
   readonly policy: LobbyPerformancePolicy;
   readonly battlefield: Battlefield;
   readonly navigation: NavigationService;
@@ -111,7 +117,8 @@ export class LobbyBattle {
     const drones = Object.freeze(this.#drones.map((entry) => freezeDrone(entry.state)));
     const projectiles = Object.freeze(this.policy.capProjectiles(this.#projectiles.map((entry) => freezeProjectile(entry.state))));
     const entities: readonly EntityState[] = Object.freeze([...tanks, ...drones, ...projectiles]);
-    return Object.freeze({ tick:this.#tick, elapsedMs:this.#elapsedMs, level:LEVEL, tanks, drones, projectiles, entities, events:Object.freeze([...this.#events]) });
+    const actorLevels = Object.freeze(Object.fromEntries(this.#tanks.map((entry) => [entry.definition.id, entry.build.level])));
+    return Object.freeze({ tick:this.#tick, elapsedMs:this.#elapsedMs, level:BASELINE_LEVEL, actorLevels, tanks, drones, projectiles, entities, events:Object.freeze([...this.#events]) });
   }
 
   private seedCanonicalRoster(): void {
@@ -119,7 +126,8 @@ export class LobbyBattle {
     const definitions = TankRegistry.all();
     this.#tanks = definitions.map((definition, index) => {
       const position = this.spawnPoint(index, definitions.length);
-      const build = resolver.resolve({ level:LEVEL, xp:0, statPoints:0, stats:ZERO_STATS, tankId:definition.id });
+      const level = legalLobbyLevel(definition);
+      const build = resolver.resolve({ level, xp:0, statPoints:0, stats:ZERO_STATS, tankId:definition.id });
       const maxHealth = build.maxHealth;
       const state: TankState = {
         id: entityId(`lobby:tank:${definition.id}`), kind:'tank', lifecycle:'active', position, rotation:0,
@@ -257,6 +265,9 @@ export class LobbyBattle {
   }
 }
 
+function legalLobbyLevel(definition: TankDefinition): number {
+  return definition.tier === 3 ? Math.max(BASELINE_LEVEL, BALANCE.evolutionLevels.apex) : BASELINE_LEVEL;
+}
 function freezeTank(state: TankState): TankState { return Object.freeze({ ...state, position:Object.freeze({ ...state.position }), team:Object.freeze({ ...state.team }), ...(state.health ? { health:Object.freeze({ ...state.health }) } : {}) }); }
 function freezeDrone(state: DroneState): DroneState { return Object.freeze({ ...state, position:Object.freeze({ ...state.position }), team:Object.freeze({ ...state.team }), ...(state.health ? { health:Object.freeze({ ...state.health }) } : {}) }); }
 function freezeProjectile(state: ProjectileState): ProjectileState { return Object.freeze({ ...state, position:Object.freeze({ ...state.position }), velocity:Object.freeze({ ...state.velocity }), team:Object.freeze({ ...state.team }) }); }
