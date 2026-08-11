@@ -22,6 +22,15 @@ function between(source, startNeedle, endNeedle) {
   return source.slice(start + startNeedle.length, end);
 }
 
+function same(actual, expected, label) {
+  const a = JSON.stringify(plain(actual));
+  const e = JSON.stringify(plain(expected));
+  if (a !== e) {
+    console.log(`::error title=Mission 05 parity drift::${label} actual=${a} expected=${e}`);
+  }
+  assert.equal(a, e, label);
+}
+
 function evalLegacyClasses() {
   const escortLiteral = between(legacyIndex, 'const ESCORT = ', ';\nexports.GENES =');
   const classesLiteral = between(legacyIndex, 'exports.CLASSES = ', ';\n// ================= ULTIMATE ABILITIES');
@@ -37,26 +46,26 @@ function evalCanonicalRawTanks() {
   return plain(sandbox.result);
 }
 
-function normalizedLegacyTank(raw, classes) {
-  const value = classes[raw.id];
-  return {
+function normalizedLegacyTank(id, classes) {
+  const value = classes[id];
+  return plain({
     id:value.id,name:value.name,tier:value.tier,parent:value.parent,color:value.color,icon:value.icon,
     barrels:value.barrels,fireMode:value.fireMode,bullet:value.bullet,hpMult:value.hpMult,moveMult:value.moveMult,
     bodyMult:value.bodyMult,size:value.size,ability:value.ability,aura:value.aura,droneCount:value.droneCount,
     droneRole:value.droneRole,droneDmg:value.droneDmg,droneHp:value.droneHp,droneSpeed:value.droneSpeed,
     droneLeash:value.droneLeash,droneRespawnMult:value.droneRespawnMult,
-  };
+  });
 }
 
 function normalizedCanonicalTank(raw, escort) {
-  return {
+  return plain({
     id:raw.id,name:raw.name,tier:raw.tier,parent:raw.parent,color:raw.color,icon:raw.icon,
     barrels:raw.barrels,fireMode:raw.fireMode,bullet:raw.bullet,hpMult:raw.hpMult,moveMult:raw.moveMult,
     bodyMult:raw.bodyMult,size:raw.size,ability:raw.ability,aura:raw.aura,droneCount:raw.droneCount,
     droneRole:raw.droneRole ?? escort.droneRole,droneDmg:raw.droneDmg ?? escort.droneDmg,
     droneHp:raw.droneHp ?? escort.droneHp,droneSpeed:raw.droneSpeed ?? escort.droneSpeed,
     droneLeash:raw.droneLeash ?? escort.droneLeash,droneRespawnMult:raw.droneRespawnMult,
-  };
+  });
 }
 
 test('Mission 05 canonical tank/weapon/drone balance is exact to materialized game/classes', () => {
@@ -64,10 +73,8 @@ test('Mission 05 canonical tank/weapon/drone balance is exact to materialized ga
   const canonical = evalCanonicalRawTanks();
   assert.equal(Object.keys(classes).length, 36);
   assert.equal(canonical.length, 36);
-  assert.deepEqual(canonical.map((x) => x.id).sort(), Object.keys(classes).sort());
-  for (const raw of canonical) {
-    assert.deepEqual(normalizedCanonicalTank(raw, escort), normalizedLegacyTank(raw, classes), `legacy parity drift: ${raw.id}`);
-  }
+  same(canonical.map((x) => x.id).sort(), Object.keys(classes).sort(), 'class id set');
+  for (const raw of canonical) same(normalizedCanonicalTank(raw, escort), normalizedLegacyTank(raw.id, classes), `tank ${raw.id}`);
 });
 
 test('effective doctrine descriptions are used where active class patch actually overrides them', () => {
@@ -78,8 +85,6 @@ test('effective doctrine descriptions are used where active class patch actually
   for (const [id, description] of Object.entries(overrides)) {
     if (classes[id]) assert.equal(canonical.get(id).desc, description, `effective description drift: ${id}`);
   }
-  // v1.7.1 spells this key "quakecannon" while the actual class id is "quake".
-  // Mission 05 records the defect but must not pretend the failed override took effect.
   assert.equal(classes.quake.id, 'quake');
   assert.equal(overrides.quakecannon !== undefined, true);
 });
@@ -114,10 +119,10 @@ test('BattlefieldRegistry preserves all three legacy geometry templates', () => 
   const legacy = evalLegacyBattlefields();
   const canonical = evalCanonicalBattlefields();
   assert.equal(canonical.length, 3);
-  assert.deepEqual(canonical.map((x) => x.name), legacy.map((x) => x.name));
+  same(canonical.map((x) => x.name), legacy.map((x) => x.name), 'battlefield names');
   for (let i = 0; i < canonical.length; i++) {
     assert.equal(canonical[i].description, legacy[i].description);
-    assert.deepEqual(canonical[i].terrain, legacy[i].terrain, `terrain drift: ${canonical[i].name}`);
+    same(canonical[i].terrain, legacy[i].terrain, `battlefield ${canonical[i].name}`);
     assert.equal(canonical[i].mapLimit, 2250);
     assert.equal(canonical[i].terrainCell, 360);
   }
@@ -125,9 +130,7 @@ test('BattlefieldRegistry preserves all three legacy geometry templates', () => 
 
 test('canonical catalogs expose the complete legacy genes, abilities, perks and evolution tree', () => {
   const { classes } = evalLegacyClasses();
-  for (const marker of ['GENE_DEFINITIONS','ABILITY_DEFINITIONS','MASTERY_PERK_DEFINITIONS','EVOLUTION_DEFINITIONS']) {
-    assert.match(catalogSource, new RegExp(marker));
-  }
+  for (const marker of ['GENE_DEFINITIONS','ABILITY_DEFINITIONS','MASTERY_PERK_DEFINITIONS','EVOLUTION_DEFINITIONS']) assert.match(catalogSource, new RegExp(marker));
   for (const id of ['gunner','cannon','sniper','controller','guardian']) assert.match(catalogSource, new RegExp(`id:'${id}'`));
   for (const id of ['ragnarok','overheat','pointblank','supercharge','phase','swarm','bulwark','taunt','stampede']) assert.match(catalogSource, new RegExp(`id:'${id}'`));
   for (const id of ['dmg','speed','vitality','alacrity','thorns','wealth']) assert.match(catalogSource, new RegExp(`id:'${id}'`));
@@ -137,9 +140,7 @@ test('canonical catalogs expose the complete legacy genes, abilities, perks and 
 });
 
 test('public content boundary exports canonical registries and no scene-specific duplicate catalogs', () => {
-  for (const name of ['TankRegistry','WeaponRegistry','DroneRegistry','LineageRegistry','EvolutionRegistry','BattlefieldRegistry','GeneRegistry','AbilityRegistry','MasteryPerkRegistry']) {
-    assert.match(publicSource, new RegExp(name));
-  }
+  for (const name of ['TankRegistry','WeaponRegistry','DroneRegistry','LineageRegistry','EvolutionRegistry','BattlefieldRegistry','GeneRegistry','AbilityRegistry','MasteryPerkRegistry']) assert.match(publicSource, new RegExp(name));
   assert.doesNotMatch(catalogSource, /BlackglassRegistry|LobbyRegistry|ShowroomRegistry/);
   assert.match(publicSource, /CONTENT_SPECIMEN = 'main@52009c406b948a7b9a9402bb56495f20b3918ba6'/);
 });
