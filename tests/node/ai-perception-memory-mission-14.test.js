@@ -63,7 +63,7 @@ test('Mission 14 hidden targets become stale bounded memory and cannot leak hidd
       lineOfSight: { hasLineOfSight() { return visible; } },
       policy: { publicTankTracking: false, lastKnownTtlTicks: 1 },
     });
-    const knowledge = new ai.AIKnowledge({ memoryTtlTicks: 10 });
+    const knowledge = new ai.AIKnowledge({ memoryTtlTicks: 10, staleConfidenceFloor: 0.25 });
     knowledge.ingest(core.perceive({ tick: 1, elapsedMs: 16, observerId: self, entities: [tank(self, 'blue', 0, 0), tank(hostile, 'red', 100, 10, 75)] }));
     knowledge.rememberTarget(hostile, 1);
     visible = false;
@@ -75,7 +75,7 @@ test('Mission 14 hidden targets become stale bounded memory and cannot leak hidd
     assert.equal(memory.publiclyTracked, false);
     assert.equal(memory.healthFraction, undefined);
     assert.equal(memory.rotation, undefined);
-    assert.ok(memory.confidence < 1 && memory.confidence > 0);
+    assert.ok(memory.confidence < 1 && memory.confidence >= 0.25);
     assert.ok(knowledge.memory.target().confidence < 1);
     knowledge.ingest(core.perceive({ tick: 12, elapsedMs: 192, observerId: self, entities: [tank(self, 'blue', 0, 0), tank(hostile, 'red', 999, 999, 1)] }));
     assert.equal(knowledge.memory.get(hostile), undefined);
