@@ -139,6 +139,7 @@ jobs:
               './nova-updates/shared-battlefield-view-v1.10.5.js',
               './nova-updates/second-body-live-vector-v1.10.7.js',
               './nova-updates/applied-power-parity-v1.10.8.js',
+              './nova-updates/visual-language-v1.10.9.js',
           ]
           missing = []
           script_paths = []
@@ -266,6 +267,7 @@ jobs:
           grep -q 'nova-updates/shared-battlefield-view-v1.10.5.js' index.html.new
           grep -q 'nova-updates/second-body-live-vector-v1.10.7.js' index.html.new
           grep -q 'nova-updates/applied-power-parity-v1.10.8.js' index.html.new
+          grep -q 'nova-updates/visual-language-v1.10.9.js' index.html.new
           ! grep -q 'nova-updates/controller-command-weave-v1.10.0.js' index.html.new
           ! grep -q 'nova-updates/auto-update-test-v1.7.4.js' index.html.new
           grep -q 'id="nova-tailwind-static"' index.html.new
