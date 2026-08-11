@@ -17,6 +17,24 @@ function domReady(): Promise<void> {
   return new Promise((resolve) => document.addEventListener('DOMContentLoaded', () => resolve(), { once: true }));
 }
 
+function ensureApplicationRoot(): HTMLElement {
+  const existing = document.getElementById('root');
+  if (existing) return existing;
+
+  const root = document.createElement('div');
+  root.id = 'root';
+  document.body.prepend(root);
+  return root;
+}
+
+function ensureManifestLink(): void {
+  if (document.querySelector('link[rel="manifest"]')) return;
+  const link = document.createElement('link');
+  link.rel = 'manifest';
+  link.href = './manifest.webmanifest';
+  document.head.append(link);
+}
+
 function postWithReply(worker: ServiceWorker | null, message: unknown): Promise<unknown> {
   return new Promise((resolve) => {
     if (!worker) {
@@ -153,12 +171,8 @@ export async function bootstrapApplication(): Promise<void> {
   markBooting();
   await domReady();
 
-  const root = document.getElementById('root');
-  if (!root) {
-    const error = new Error('Application root #root is missing.');
-    markFailed(error);
-    throw error;
-  }
+  const root = ensureApplicationRoot();
+  ensureManifestLink();
 
   try {
     const app = new GameApp(root);
