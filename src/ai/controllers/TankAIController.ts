@@ -24,9 +24,9 @@ export interface TankAIControllerOptions {
 }
 
 /**
- * Canonical tank controller. It has no GameWorld/EntityStore/renderer access: dynamic
- * hostile knowledge enters only through PerceivedWorld and all execution leaves as
- * the same GameCommand language used by human controllers.
+ * Canonical tank controller. It has no raw simulation-state or presentation access:
+ * dynamic hostile knowledge enters only through PerceivedWorld and all execution
+ * leaves as the same GameCommand language used by human controllers.
  */
 export class TankAIController implements CommandController {
   readonly knowledge: AIKnowledge;
