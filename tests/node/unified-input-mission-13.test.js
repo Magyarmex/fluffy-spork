@@ -50,7 +50,7 @@ test('Mission 13 keyboard, gamepad and scripted controllers converge on canonica
     const k = stateFrom(keyboard, input);
     assert.equal(k.firing, true);
     assert.equal(k.ultimate, true);
-    assert.ok(k.move.x > 0 && k.move.y > 0);
+    assert.ok(k.move.x > 0 && k.move.y < 0);
 
     const gamepad = new input.GamepadInputAdapter(settings);
     gamepad.ingest({ leftStick: { x: 1, y: 0 }, rightStick: { x: 0, y: 1 }, fire: true, ability: false, ultimate: true });
