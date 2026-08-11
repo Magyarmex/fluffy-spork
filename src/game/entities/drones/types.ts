@@ -34,6 +34,7 @@ export interface DroneBehaviorIntent {
   readonly destination?: Vector2State;
   readonly desiredDirection: Vector2State;
   readonly speedScale: number;
+  readonly minimumSpeed?: number;
   readonly targetId?: EntityId;
   readonly attack: boolean;
   readonly repairFraction: number;
@@ -49,10 +50,13 @@ export interface DroneSystemFrame {
   readonly dtSeconds: number;
   readonly owner: TankState;
   readonly ownerLineage?: string;
+  readonly commandLeash?: number;
   readonly drones: readonly DroneState[];
   readonly perceivedWorld: PerceivedWorld;
   readonly order: DroneSwarmOrder;
   readonly dynamicObstacles?: readonly DynamicObstacle[];
+  /** Mission 10 may report drones whose weapon is still recovering; Field Service must not repair them. */
+  readonly weaponRecoveringDroneIds?: readonly EntityId[];
 }
 
 export interface DroneSystemResult {
@@ -63,14 +67,17 @@ export interface DroneSystemResult {
 }
 
 export interface DroneSystemConfig {
-  readonly repairDelaySeconds?: number;
-  readonly repairRateFractionPerSecond?: number;
-  readonly repairRadius?: number;
-  readonly repairThreatRadius?: number;
+  readonly controllerRepairDelaySeconds?: number;
+  readonly controllerRepairRateFractionPerSecond?: number;
+  readonly controllerRepairRadius?: number;
+  readonly controllerRepairThreatRadius?: number;
   readonly activeRepairThreshold?: number;
   readonly broodmotherRepairThreshold?: number;
   readonly recallRepairThreshold?: number;
   readonly repairStopThreshold?: number;
+  readonly fieldRepairDelaySeconds?: number;
+  readonly fieldRepairRateFractionPerSecond?: number;
+  readonly fieldRepairThreatRadius?: number;
   readonly deepDefenseCutoff?: number;
   readonly maxPeelFraction?: number;
   readonly droneClearance?: number;

@@ -30,14 +30,17 @@ interface DroneMemory {
 }
 
 interface ResolvedConfig {
-  repairDelaySeconds: number;
-  repairRateFractionPerSecond: number;
-  repairRadius: number;
-  repairThreatRadius: number;
+  controllerRepairDelaySeconds: number;
+  controllerRepairRateFractionPerSecond: number;
+  controllerRepairRadius: number;
+  controllerRepairThreatRadius: number;
   activeRepairThreshold: number;
   broodmotherRepairThreshold: number;
   recallRepairThreshold: number;
   repairStopThreshold: number;
+  fieldRepairDelaySeconds: number;
+  fieldRepairRateFractionPerSecond: number;
+  fieldRepairThreatRadius: number;
   deepDefenseCutoff: number;
   maxPeelFraction: number;
   droneClearance: number;
@@ -46,20 +49,25 @@ interface ResolvedConfig {
 }
 
 const DEFAULT_CONFIG: ResolvedConfig = Object.freeze({
-  repairDelaySeconds: 2.6,
-  repairRateFractionPerSecond: 0.11,
-  repairRadius: 145,
-  repairThreatRadius: 225,
+  controllerRepairDelaySeconds: 2.6,
+  controllerRepairRateFractionPerSecond: 0.11,
+  controllerRepairRadius: 145,
+  controllerRepairThreatRadius: 225,
   activeRepairThreshold: 0.18,
   broodmotherRepairThreshold: 0.12,
   recallRepairThreshold: 0.62,
   repairStopThreshold: 0.84,
+  fieldRepairDelaySeconds: 4.6,
+  fieldRepairRateFractionPerSecond: 0.045,
+  fieldRepairThreatRadius: 310,
   deepDefenseCutoff: 0.58,
   maxPeelFraction: 0.36,
   droneClearance: 18,
   interceptRadius: 250,
   attackContactRadius: 28,
 });
+
+const CONTROLLER_LINEAGES = new Set(['controller', 'carrier', 'overlord', 'warden', 'hivemind', 'broodmother', 'citadel', 'valkyrie']);
 
 function distance(a: Vector2State, b: Vector2State): number {
   return Math.hypot(b.x - a.x, b.y - a.y);
@@ -76,6 +84,10 @@ function roleFor(drone: DroneState): DroneRole {
 
 function isOperational(drone: DroneState): boolean {
   return drone.lifecycle === 'active' && Boolean(drone.health && drone.health.current > 0);
+}
+
+function isControllerLineage(lineage?: string): boolean {
+  return lineage !== undefined && CONTROLLER_LINEAGES.has(lineage.toLowerCase());
 }
 
 function zero(): Vector2State { return { x: 0, y: 0 }; }
@@ -97,6 +109,7 @@ export class DroneSystem {
     memory.committed = true;
     memory.targetId = targetId;
     memory.mode = 'attack-run';
+    memory.repairing = false;
     this.memory.set(droneId, memory);
   }
 
@@ -123,11 +136,12 @@ export class DroneSystem {
     const attackTarget = frame.order.targetId
       ? frame.perceivedWorld.getContact(frame.order.targetId as EntityId)
       : selected.contact;
-    const threat = this.closestLocalDroneThreat(frame.owner, frame.perceivedWorld.hostileContacts(), this.config.interceptRadius);
+    const threat = this.closestLocalDroneThreat(frame.owner.position, frame.perceivedWorld.hostileContacts(), this.config.interceptRadius);
     const pressureTarget = attackTarget?.position;
-    const depth = commandDepth(frame.owner.position, pressureTarget, 650);
+    const depth = commandDepth(frame.owner.position, pressureTarget, frame.commandLeash ?? 650);
     const localFraction = localDefenseFraction(depth, this.config.deepDefenseCutoff, this.config.maxPeelFraction);
     const defenderCount = frame.order.order === 'attack' && threat ? Math.ceil(drones.length * localFraction) : 0;
+    const recoveringWeapons = new Set(frame.weaponRecoveringDroneIds ?? []);
     const intents: DroneBehaviorIntent[] = [];
     const states: DroneOperationalState[] = [];
     const relayObserverIds: EntityId[] = [];
@@ -141,8 +155,10 @@ export class DroneSystem {
       this.observeHealth(drone, memory, frame.tick, frame.elapsedMs);
 
       if (role === 'observer') relayObserverIds.push(drone.id);
-      const repair = this.repairDecision(drone, memory, frame);
-      const canIntercept = !memory.committed && !repair.active && threat !== undefined && index < defenderCount;
+      const controller = isControllerLineage(frame.ownerLineage);
+      const controllerRepair = controller ? this.controllerRepairDecision(drone, memory, frame) : { active: false, healNow: false };
+      const fieldRepairFraction = controller ? 0 : this.fieldRepairFraction(drone, memory, frame, recoveringWeapons.has(drone.id));
+      const canIntercept = !memory.committed && !controllerRepair.active && threat !== undefined && index < defenderCount;
       let target = memory.committed && memory.targetId
         ? frame.perceivedWorld.getContact(memory.targetId)
         : attackTarget;
@@ -157,8 +173,8 @@ export class DroneSystem {
         mode = 'attack-run';
         destination = target?.position;
         attack = Boolean(target?.live && target.targetable && target.visibility.directSight);
-      } else if (repair.active) {
-        mode = repair.healNow ? 'repair' : 'recover';
+      } else if (controllerRepair.active) {
+        mode = controllerRepair.healNow ? 'repair' : 'recover';
         destination = frame.owner.position;
       } else if (canIntercept && threat) {
         mode = 'intercept';
@@ -170,6 +186,7 @@ export class DroneSystem {
         if (target.visibility.directSight && distance(drone.position, target.position) <= this.config.attackContactRadius) {
           memory.committed = true;
           memory.targetId = target.id;
+          memory.repairing = false;
           mode = 'attack-run';
           attack = true;
         }
@@ -193,12 +210,15 @@ export class DroneSystem {
         ...(memory.lastDamagedTick !== undefined ? { lastDamagedTick: memory.lastDamagedTick } : {}), iff,
       });
       states.push(state);
+      const repairFraction = controllerRepair.healNow
+        ? this.config.controllerRepairRateFractionPerSecond * frame.dtSeconds
+        : fieldRepairFraction;
       intents.push(Object.freeze({
         droneId: drone.id, mode, ...(destination ? { destination } : {}), desiredDirection: movement.direction,
-        speedScale: repair.active ? 1.08 : (mode === 'intercept' ? 1.12 : 1),
+        speedScale: controllerRepair.active ? 1.08 : (mode === 'intercept' ? 1.12 : 1),
+        ...(controllerRepair.active ? { minimumSpeed: 150 } : {}),
         ...(target && (mode === 'attack-run' || mode === 'intercept') ? { targetId: target.id } : {}),
-        attack, repairFraction: repair.healNow ? this.config.repairRateFractionPerSecond * frame.dtSeconds : 0,
-        observer: role === 'observer', harvest, replan: movement.replan, iff,
+        attack, repairFraction, observer: role === 'observer', harvest, replan: movement.replan, iff,
       }));
       this.memory.set(drone.id, memory);
     });
@@ -238,28 +258,42 @@ export class DroneSystem {
     memory.lastHealth = current;
   }
 
-  private repairDecision(drone: DroneState, memory: DroneMemory, frame: DroneSystemFrame): { active: boolean; healNow: boolean } {
+  /** Dedicated Controller recycling path from v1.10.7 Command Weave / Second Body. */
+  private controllerRepairDecision(drone: DroneState, memory: DroneMemory, frame: DroneSystemFrame): { active: boolean; healNow: boolean } {
     if (memory.committed || !drone.health || drone.health.max <= 0) return { active: false, healNow: false };
     const healthFraction = drone.health.current / drone.health.max;
     const pressureActive = frame.order.order === 'attack';
     const threshold = pressureActive
-      ? (frame.ownerLineage === 'broodmother' ? this.config.broodmotherRepairThreshold : this.config.activeRepairThreshold)
+      ? (frame.ownerLineage?.toLowerCase() === 'broodmother' ? this.config.broodmotherRepairThreshold : this.config.activeRepairThreshold)
       : this.config.recallRepairThreshold;
     if (healthFraction < threshold) memory.repairing = true;
     if (healthFraction > this.config.repairStopThreshold || (pressureActive && healthFraction > threshold + 0.10)) memory.repairing = false;
     if (!memory.repairing) return { active: false, healNow: false };
-    const delayElapsed = memory.lastDamagedMs === undefined || frame.elapsedMs - memory.lastDamagedMs >= this.config.repairDelaySeconds * 1000;
-    const nearOwner = distance(drone.position, frame.owner.position) < this.config.repairRadius;
-    const localThreat = this.closestLocalDroneThreat(frame.owner, frame.perceivedWorld.hostileContacts(), this.config.repairThreatRadius);
+    const delayElapsed = memory.lastDamagedMs === undefined || frame.elapsedMs - memory.lastDamagedMs >= this.config.controllerRepairDelaySeconds * 1000;
+    const nearOwner = distance(drone.position, frame.owner.position) < this.config.controllerRepairRadius;
+    const localThreat = this.closestLocalDroneThreat(frame.owner.position, frame.perceivedWorld.hostileContacts(), this.config.controllerRepairThreatRadius);
     return { active: true, healNow: delayElapsed && nearOwner && localThreat === undefined };
   }
 
-  private closestLocalDroneThreat(owner: TankState, contacts: readonly PerceivedContact[], radius: number): PerceivedContact | undefined {
+  /** Universal v1.10.3 Field Service for surviving non-Controller drones. It repairs in place and never owns routing. */
+  private fieldRepairFraction(drone: DroneState, memory: DroneMemory, frame: DroneSystemFrame, weaponRecovering: boolean): number {
+    if (memory.committed || weaponRecovering || !drone.health || drone.health.max <= 0 || drone.health.current >= drone.health.max - 0.01) return 0;
+    if (memory.lastDamagedMs !== undefined && frame.elapsedMs - memory.lastDamagedMs < this.config.fieldRepairDelaySeconds * 1000) return 0;
+    if (this.hasVisibleThreat(drone.position, frame.perceivedWorld.hostileContacts(), this.config.fieldRepairThreatRadius)) return 0;
+    return this.config.fieldRepairRateFractionPerSecond * frame.dtSeconds;
+  }
+
+  private hasVisibleThreat(origin: Vector2State, contacts: readonly PerceivedContact[], radius: number): boolean {
+    return contacts.some((contact) => contact.live && contact.targetable && contact.visibility.directSight
+      && (contact.kind === 'tank' || contact.kind === 'drone') && distance(origin, contact.position) <= radius);
+  }
+
+  private closestLocalDroneThreat(origin: Vector2State, contacts: readonly PerceivedContact[], radius: number): PerceivedContact | undefined {
     let best: PerceivedContact | undefined;
     let bestDistance = radius;
     for (const contact of contacts) {
       if (contact.kind !== 'drone' || !contact.live || !contact.targetable || !contact.visibility.directSight) continue;
-      const d = distance(owner.position, contact.position);
+      const d = distance(origin, contact.position);
       if (d < bestDistance) { best = contact; bestDistance = d; }
     }
     return best;

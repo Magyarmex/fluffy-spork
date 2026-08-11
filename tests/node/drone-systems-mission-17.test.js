@@ -73,7 +73,7 @@ test('Mission 17 formations and local-defense cost are deterministic and preserv
   } finally { api.dispose(); }
 });
 
-test('Mission 17 out-of-combat repair preserves delay, radius, threat suppression, and 11%/second rate', () => {
+test('Mission 17 Controller repair preserves delay, radius, threat suppression, 11%/second rate and recovery speed floor', () => {
   const api = loadMission17();
   try {
     const system = new api.drones.DroneSystem(fakeNavigation());
@@ -81,11 +81,31 @@ test('Mission 17 out-of-combat repair preserves delay, radius, threat suppressio
     const damaged = system.update(frame({ tick:2, elapsedMs:100, drones:[drone('d1',{x:20,y:0},10)], order:{type:'swarm-order',order:'attack'} }));
     assert.equal(damaged.intents[0].mode, 'recover');
     assert.equal(damaged.intents[0].repairFraction, 0);
+    assert.equal(damaged.intents[0].minimumSpeed, 150);
     const healed = system.update(frame({ tick:3, elapsedMs:2800, drones:[drone('d1',{x:20,y:0},10)], order:{type:'swarm-order',order:'attack'} }));
     assert.equal(healed.intents[0].mode, 'repair');
     assert.ok(Math.abs(healed.intents[0].repairFraction - .011) < 1e-9);
     const threatened = system.update(frame({ tick:4, elapsedMs:3000, drones:[drone('d1',{x:20,y:0},10)], order:{type:'swarm-order',order:'attack'}, perceivedWorld:world([contact('enemy-drone','drone','hostile',{x:100,y:0})],4) }));
     assert.equal(threatened.intents[0].repairFraction, 0);
+  } finally { api.dispose(); }
+});
+
+test('Mission 17 non-Controller Field Service preserves slower 4.6s / 4.5% repair and visible-threat/weapon-recovery blocks', () => {
+  const api = loadMission17();
+  try {
+    const system = new api.drones.DroneSystem(fakeNavigation());
+    system.update(frame({ tick:1, elapsedMs:0, ownerLineage:'sniper', drones:[drone('d1',{x:500,y:0},70)] }));
+    const damaged = system.update(frame({ tick:2, elapsedMs:100, ownerLineage:'sniper', drones:[drone('d1',{x:500,y:0},50)] }));
+    assert.equal(damaged.intents[0].repairFraction, 0);
+    const early = system.update(frame({ tick:3, elapsedMs:4600, ownerLineage:'sniper', drones:[drone('d1',{x:500,y:0},50)] }));
+    assert.equal(early.intents[0].repairFraction, 0);
+    const healed = system.update(frame({ tick:4, elapsedMs:4800, ownerLineage:'sniper', drones:[drone('d1',{x:500,y:0},50)] }));
+    assert.ok(Math.abs(healed.intents[0].repairFraction - .0045) < 1e-9);
+    assert.notEqual(healed.intents[0].mode, 'repair', 'Field Service heals in place and does not seize routing');
+    const threatened = system.update(frame({ tick:5, elapsedMs:5000, ownerLineage:'sniper', drones:[drone('d1',{x:500,y:0},50)], perceivedWorld:world([contact('enemy-tank','tank','hostile',{x:760,y:0})],5) }));
+    assert.equal(threatened.intents[0].repairFraction, 0);
+    const recovering = system.update(frame({ tick:6, elapsedMs:5200, ownerLineage:'sniper', drones:[drone('d1',{x:500,y:0},50)], weaponRecoveringDroneIds:['d1'] }));
+    assert.equal(recovering.intents[0].repairFraction, 0);
   } finally { api.dispose(); }
 });
 
@@ -112,11 +132,11 @@ test('Mission 17 shallow pressure allows physical local interception while deep 
   try {
     const shallowSystem = new api.drones.DroneSystem(fakeNavigation());
     const shallowContacts = [contact('tank','tank','hostile',{x:120,y:0}), contact('breach','drone','hostile',{x:80,y:0})];
-    const shallow = shallowSystem.update(frame({ drones:[drone('d1',{x:10,y:0}),drone('d2',{x:15,y:0}),drone('d3',{x:20,y:0})], perceivedWorld:world(shallowContacts), order:{type:'swarm-order',order:'attack',targetId:'tank'} }));
+    const shallow = shallowSystem.update(frame({ commandLeash:650, drones:[drone('d1',{x:10,y:0}),drone('d2',{x:15,y:0}),drone('d3',{x:20,y:0})], perceivedWorld:world(shallowContacts), order:{type:'swarm-order',order:'attack',targetId:'tank'} }));
     assert.ok(shallow.intents.some((intent)=>intent.mode==='intercept' && intent.targetId==='breach'));
     const deepSystem = new api.drones.DroneSystem(fakeNavigation());
     const deepContacts = [contact('tank','tank','hostile',{x:620,y:0}), contact('breach','drone','hostile',{x:80,y:0})];
-    const deep = deepSystem.update(frame({ drones:[drone('d1',{x:10,y:0}),drone('d2',{x:15,y:0}),drone('d3',{x:20,y:0})], perceivedWorld:world(deepContacts), order:{type:'swarm-order',order:'attack',targetId:'tank'} }));
+    const deep = deepSystem.update(frame({ commandLeash:650, drones:[drone('d1',{x:10,y:0}),drone('d2',{x:15,y:0}),drone('d3',{x:20,y:0})], perceivedWorld:world(deepContacts), order:{type:'swarm-order',order:'attack',targetId:'tank'} }));
     assert.equal(deep.intents.some((intent)=>intent.mode==='intercept'), false);
   } finally { api.dispose(); }
 });
