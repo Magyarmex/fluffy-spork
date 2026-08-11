@@ -5,6 +5,7 @@ export interface CombatantState {
   readonly id: string;
   readonly teamId: string;
   readonly position: Vec2;
+  readonly velocity?: Vec2;
   readonly radius: number;
   readonly health: number;
   readonly maxHealth: number;
@@ -38,6 +39,7 @@ export interface ProjectileSpawnSpec {
   readonly angle: number;
   readonly damage: number;
   readonly speed: number;
+  readonly inheritedVelocity: Vec2;
   readonly radius: number;
   readonly penetrationRemaining: number;
   readonly ttlSeconds: number;
