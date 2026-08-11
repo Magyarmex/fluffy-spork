@@ -1,4 +1,5 @@
 import type { BattlefieldDefinition } from '../content/schema';
+import type { BattlefieldBounds, RubbleState, TerrainState } from '../game/battlefield/types';
 import type { EntityState } from '../game/entities/types';
 import type { GameEvent } from '../game/simulation/types';
 
@@ -15,6 +16,7 @@ export interface TextCommand extends BaseCommand { readonly kind:'text'; readonl
 export type RenderCommand = CircleCommand | RectCommand | LineCommand | GlowCommand | TextCommand;
 
 export interface VisualIntentSpec { readonly id:string; readonly intent:VisualIntent; readonly channel:VisualChannel; readonly question:string; readonly reason:string; readonly duration:'event'|'transient'|'while-active'|'while-critical'|'while-commanded'|'persistent'; }
-export interface RenderFrameInput { readonly tick:number; readonly elapsedMs:number; readonly entities:readonly EntityState[]; readonly battlefield?:BattlefieldDefinition; readonly events?:readonly GameEvent[]; }
+export interface BattlefieldRenderSnapshot { readonly bounds: BattlefieldBounds; readonly terrain: readonly Readonly<TerrainState>[]; readonly rubble: readonly RubbleState[]; }
+export interface RenderFrameInput { readonly tick:number; readonly elapsedMs:number; readonly entities:readonly EntityState[]; readonly battlefield?:BattlefieldDefinition; readonly battlefieldState?:BattlefieldRenderSnapshot; readonly events?:readonly GameEvent[]; }
 export interface RenderMetrics { readonly entitiesVisited:number; readonly entitiesRendered:number; readonly commandsBuilt:number; readonly effectsBuilt:number; }
 export interface RenderFrame { readonly tick:number; readonly elapsedMs:number; readonly commands:readonly RenderCommand[]; readonly metrics:RenderMetrics; }

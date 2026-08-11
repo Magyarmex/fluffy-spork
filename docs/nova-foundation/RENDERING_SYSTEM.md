@@ -4,13 +4,17 @@ Mission 18 establishes `src/rendering/` as NOVA TANKS' presentation boundary.
 
 ## Authority boundary
 
-Rendering consumes canonical content definitions, entity snapshots and semantic game events. It emits deterministic render commands. It does not move entities, resolve collisions, choose targets, decide allegiance, apply gameplay outcomes, or mutate simulation state. The simulation can therefore be tested and replayed without a canvas, while presentation can be replaced without changing game rules.
+Rendering consumes canonical content definitions, authoritative entity/battlefield snapshots and semantic game events. It emits deterministic render commands. It does not move entities, resolve collisions, choose targets, decide allegiance, apply gameplay outcomes, or mutate simulation state. The simulation can therefore be tested and replayed without a canvas, while presentation can be replaced without changing game rules.
 
 `CanonicalVisualFactory` is the single adapter from canonical content metadata to presentation descriptors. Tank color, icon, size, barrel geometry, drone role and projectile weapon identity come from the Mission 05 registries rather than renderer-local class tables.
 
 ## Muzzle geometry
 
 Barrel geometry uses canonical `BarrelDefinition`. Tank turret rotation owns the local lateral/forward transform; each barrel's `off` rotates its visible axis and `len` terminates at the visible muzzle. This geometry is presentation-only; spawning and collision remain outside rendering.
+
+## Battlefield state
+
+`BattlefieldRenderer` accepts the Mission 07 runtime terrain/rubble snapshot in addition to the static content definition. Runtime state takes precedence: broken cover is no longer rendered as solid, persistent rubble is rendered from the authoritative rubble geometry, destructible-cover wear is derived from authoritative health, and arena bounds come from the runtime snapshot. This prevents static map metadata from visually resurrecting destroyed cover.
 
 ## Drone IFF
 
@@ -24,4 +28,4 @@ The canonical intent registry carries forward v1.10.9's one-signal/one-job doctr
 
 `Renderer.render()` returns a stable layer-sorted command frame plus allocation-facing counts (`entitiesVisited`, `entitiesRendered`, command count and effect count). These expose the obvious per-entity construction hot path without prematurely starting Mission 22's performance campaign.
 
-Canvas/backend execution is downstream of this command boundary. Mission 18 proves gameplay presentation can be described entirely from canonical definitions, snapshots and semantic events before later orchestration and scene cutovers wire it into the shipping runtime.
+Canvas/backend execution is downstream of this command boundary. Mission 18 proves gameplay presentation can be described entirely from canonical definitions, authoritative snapshots and semantic events before later orchestration and scene cutovers wire it into the shipping runtime.
