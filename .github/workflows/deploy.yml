@@ -133,11 +133,11 @@ jobs:
               './nova-updates/sensory-feedback-v1.9.1.js',
               './nova-updates/upgrade-dwell-v1.9.2.js',
               './nova-updates/spotter-comms-v1.9.3.js',
-              './nova-updates/controller-command-weave-v1.10.0.js',
               './nova-updates/lobby-battlefield-v1.10.1.js',
               './nova-updates/terrain-intelligence-v1.10.2.js',
               './nova-updates/drone-field-service-v1.10.3.js',
               './nova-updates/shared-battlefield-view-v1.10.5.js',
+              './nova-updates/second-body-live-vector-v1.10.7.js',
           ]
           missing = []
           script_paths = []
@@ -259,11 +259,12 @@ jobs:
           grep -q 'nova-updates/sensory-feedback-v1.9.1.js' index.html.new
           grep -q 'nova-updates/upgrade-dwell-v1.9.2.js' index.html.new
           grep -q 'nova-updates/spotter-comms-v1.9.3.js' index.html.new
-          grep -q 'nova-updates/controller-command-weave-v1.10.0.js' index.html.new
           grep -q 'nova-updates/lobby-battlefield-v1.10.1.js' index.html.new
           grep -q 'nova-updates/terrain-intelligence-v1.10.2.js' index.html.new
           grep -q 'nova-updates/drone-field-service-v1.10.3.js' index.html.new
           grep -q 'nova-updates/shared-battlefield-view-v1.10.5.js' index.html.new
+          grep -q 'nova-updates/second-body-live-vector-v1.10.7.js' index.html.new
+          ! grep -q 'nova-updates/controller-command-weave-v1.10.0.js' index.html.new
           ! grep -q 'nova-updates/auto-update-test-v1.7.4.js' index.html.new
           grep -q 'id="nova-tailwind-static"' index.html.new
           grep -Fq '.pointer-events-none' index.html.new
