@@ -2,7 +2,14 @@ import { ContentRegistry } from './registry';
 import type { AbilityDefinition, BalanceDefinition, BattlefieldDefinition, CombatLineageId, DroneDefinition, EvolutionDefinition, GeneDefinition, LineageDefinition, MasteryPerkDefinition, TankDefinition, TerrainPrimitiveDefinition, WeaponDefinition } from './schema';
 import { TANK_DEFINITIONS } from './tanks/catalog';
 
-const classes = (lineage: TankDefinition['lineage']) => TANK_DEFINITIONS.filter((tank) => tank.lineage === lineage).map((tank) => tank.id);
+// Apex Doctrine v1.7.1 writes its Quake description to the nonexistent
+// `quakecannon` key. Preserve the actually effective legacy metadata instead of
+// silently repairing that historical patch while canonicalizing definitions.
+const EFFECTIVE_TANK_DEFINITIONS: readonly TankDefinition[] = Object.freeze(TANK_DEFINITIONS.map((tank) => tank.id === 'quake'
+  ? Object.freeze({ ...tank, description: 'Trades some peak blast for much faster heavy-shell cadence.' })
+  : tank));
+
+const classes = (lineage: TankDefinition['lineage']) => EFFECTIVE_TANK_DEFINITIONS.filter((tank) => tank.lineage === lineage).map((tank) => tank.id);
 
 export const LINEAGE_DEFINITIONS: readonly LineageDefinition[] = Object.freeze([
   { id: 'origin', name: 'ORIGIN', color: '#dce9ff', icon: '◇', classIds: classes('origin') },
@@ -90,10 +97,10 @@ export const BALANCE: BalanceDefinition = Object.freeze({
   evolutionLevels: Object.freeze({ tier1:10, tier2:20, mastery:30, gene:35, apex:40 }),
 });
 
-const weaponDefinitions: readonly WeaponDefinition[] = Object.freeze(TANK_DEFINITIONS.map((tank) => ({id:`${tank.id}:weapon`,ownerTankId:tank.id,...tank.weapon})));
-const droneDefinitions: readonly DroneDefinition[] = Object.freeze(TANK_DEFINITIONS.map((tank) => ({id:`${tank.id}:drone`,ownerTankId:tank.id,...tank.drone})));
+const weaponDefinitions: readonly WeaponDefinition[] = Object.freeze(EFFECTIVE_TANK_DEFINITIONS.map((tank) => ({id:`${tank.id}:weapon`,ownerTankId:tank.id,...tank.weapon})));
+const droneDefinitions: readonly DroneDefinition[] = Object.freeze(EFFECTIVE_TANK_DEFINITIONS.map((tank) => ({id:`${tank.id}:drone`,ownerTankId:tank.id,...tank.drone})));
 
-export const TankRegistry = new ContentRegistry(TANK_DEFINITIONS);
+export const TankRegistry = new ContentRegistry(EFFECTIVE_TANK_DEFINITIONS);
 export const WeaponRegistry = new ContentRegistry(weaponDefinitions);
 export const DroneRegistry = new ContentRegistry(droneDefinitions);
 export const LineageRegistry = new ContentRegistry(LINEAGE_DEFINITIONS);
