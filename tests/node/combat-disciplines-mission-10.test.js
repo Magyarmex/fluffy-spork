@@ -48,7 +48,7 @@ test('Apex Gunner gates preserve Tempest, Needle Storm, Breachlord and Flakmaste
     const redline = api.applyGunnerFireDiscipline({ classId: 'tempest', fireMode: 'minigun', angle: 0, velocity: { x: 0, y: 0 }, maxSpeed: 100, projectiles: [projectile()], state: { heat: 1, stability: 1, shotIndex: 0 } });
     assert.ok(redline.redlinePenaltySeconds > 0);
 
-    const needle = api.applyGunnerFireDiscipline({ classId: 'needlestorm', fireMode: 'minigun', angle: 0, velocity: { x: 0, y: 0 }, maxSpeed: 100, projectiles: [projectile()], state: { heat: 0.462, stability: 1, shotIndex: 0 } });
+    const needle = api.applyGunnerFireDiscipline({ classId: 'needlestorm', fireMode: 'minigun', angle: 0, velocity: { x: 0, y: 0 }, maxSpeed: 100, projectiles: [projectile()], state: { heat: 0.51, stability: 1, shotIndex: 0 } });
     assert.ok(needle.projectiles[0].penetrationRemaining >= 2);
     assert.ok(needle.projectiles[0].speed > 400);
 
