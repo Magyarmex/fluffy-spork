@@ -46,8 +46,22 @@ export class AIMemory {
     for (const [id, memory] of this.#contacts) {
       if (seen.has(id)) continue;
       const confidence = this.confidenceForAge(tick - memory.observedAtTick);
-      if (confidence <= 0) this.#contacts.delete(id);
-      else this.#contacts.set(id, Object.freeze({ ...memory, confidence }));
+      if (confidence <= 0) {
+        this.#contacts.delete(id);
+        continue;
+      }
+      this.#contacts.set(id, Object.freeze({
+        ...memory,
+        source: 'last-known',
+        freshness: 'remembered',
+        directSight: false,
+        publiclyTracked: false,
+        relayed: false,
+        designated: false,
+        rotation: undefined,
+        healthFraction: undefined,
+        confidence,
+      }));
     }
 
     if (this.#target) {
