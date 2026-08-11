@@ -22,6 +22,9 @@ export class AIMemory {
   constructor(policy: Partial<AIKnowledgePolicy> = {}) {
     this.#policy = Object.freeze({ ...DEFAULT_AI_KNOWLEDGE_POLICY, ...policy });
     if (this.#policy.memoryTtlTicks < 1) throw new Error('memoryTtlTicks must be positive');
+    if (this.#policy.staleConfidenceFloor < 0 || this.#policy.staleConfidenceFloor >= 1) {
+      throw new Error('staleConfidenceFloor must be in [0, 1)');
+    }
   }
 
   ingest(observations: readonly AIObservation[], tick: number): void {
@@ -93,8 +96,8 @@ export class AIMemory {
 
   private confidenceForAge(ageTicks: number): number {
     if (ageTicks <= 0) return 1;
-    if (ageTicks >= this.#policy.memoryTtlTicks) return this.#policy.staleConfidenceFloor;
-    const span = 1 - this.#policy.staleConfidenceFloor;
-    return this.#policy.staleConfidenceFloor + span * (1 - ageTicks / this.#policy.memoryTtlTicks);
+    if (ageTicks >= this.#policy.memoryTtlTicks) return 0;
+    const linear = 1 - ageTicks / this.#policy.memoryTtlTicks;
+    return Math.max(this.#policy.staleConfidenceFloor, linear);
   }
 }
