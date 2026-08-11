@@ -1,5 +1,4 @@
 export { EntityStore } from './EntityStore';
-export * from './drones';
 export type {
   DroneState,
   EntityBaseState,
