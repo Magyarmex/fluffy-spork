@@ -1,24 +1,18 @@
-declare global {
-  interface Window {
-    __bootModule?: (id: string) => void;
-  }
-}
+import { LegacyRuntime } from '@legacy/LegacyRuntime';
 
 export class GameApp {
   readonly root: HTMLElement;
 
-  constructor(root: HTMLElement) {
+  constructor(
+    root: HTMLElement,
+    private readonly legacyRuntime: LegacyRuntime = LegacyRuntime.fromWindow(),
+  ) {
     this.root = root;
   }
 
   start(): void {
-    if (typeof window.__bootModule !== 'function') {
-      throw new Error('Legacy NOVA boot bridge is unavailable. The materialized runtime did not register __bootModule.');
-    }
-
-    // Mission 03 owns application startup, but gameplay still intentionally
-    // crosses this one explicit temporary seam. Mission 04 contains the rest
-    // of the legacy access behind src/legacy/.
-    window.__bootModule('main');
+    // Gameplay is still intentionally legacy-owned at this stage, but the
+    // application shell no longer understands its browser-global boot seam.
+    this.legacyRuntime.boot('main');
   }
 }
