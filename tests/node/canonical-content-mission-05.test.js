@@ -25,15 +25,16 @@ function between(source, startNeedle, endNeedle) {
 function same(actual, expected, label) {
   const a = JSON.stringify(plain(actual));
   const e = JSON.stringify(plain(expected));
-  if (a !== e) {
-    console.log(`::error title=Mission 05 parity drift::${label} actual=${a} expected=${e}`);
-  }
+  if (a !== e) console.log(`::error title=Mission 05 parity drift::${label} actual=${a} expected=${e}`);
   assert.equal(a, e, label);
 }
 
 function evalLegacyClasses() {
-  const escortLiteral = between(legacyIndex, 'const ESCORT = ', ';\nexports.GENES =');
-  const classesLiteral = between(legacyIndex, 'exports.CLASSES = ', ';\n// ================= ULTIMATE ABILITIES');
+  const registryAnchor = legacyIndex.indexOf('const ESCORT = ');
+  assert.notEqual(registryAnchor, -1, 'missing game/classes ESCORT anchor');
+  const registrySource = legacyIndex.slice(registryAnchor);
+  const escortLiteral = between(registrySource, 'const ESCORT = ', ';\nexports.GENES =');
+  const classesLiteral = between(registrySource, 'exports.CLASSES = ', ';\n// ================= ULTIMATE ABILITIES');
   const sandbox = { result: null };
   vm.runInNewContext(`const ESCORT=${escortLiteral}; result=${classesLiteral};`, sandbox);
   return { classes: plain(sandbox.result), escort: plain(vm.runInNewContext(`(${escortLiteral})`)) };
