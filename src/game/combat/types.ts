@@ -58,6 +58,11 @@ export interface WeaponFireRequest {
   readonly projectileId: (ordinal: number) => string;
   readonly reloadMultiplier?: number;
   readonly damageMultiplier?: number;
+  readonly projectileSpeedMultiplier?: number;
+  /** Minigun spool, 0..1. The legacy spread narrows as this approaches 1. */
+  readonly fireSpin?: number;
+  /** Deterministic replacement for legacy rnd(-1, 1); callers may inject the world RNG. */
+  readonly spreadSample?: () => number;
 }
 
 export interface WeaponFireResult {
@@ -85,6 +90,7 @@ export interface DamageResult {
 
 export interface SplashTarget {
   readonly combatant: CombatantState;
+  /** 0..1 hull exposure after blast/cover sampling. */
   readonly exposure?: number;
 }
 
@@ -105,12 +111,25 @@ export interface AbilityActivationRequest {
   readonly actor: CombatantState;
   readonly ability: AbilityDefinition;
   readonly atSeconds: number;
+  readonly aimRadians?: number;
+  readonly weapon?: WeaponDefinition;
+  readonly projectileId?: (ordinal: number) => string;
+  readonly damageMultiplier?: number;
+  readonly projectileSpeedMultiplier?: number;
+  readonly battlefieldHalfExtent?: number;
 }
+
+export type CombatAbilityAction =
+  | { readonly type: 'spawn-projectiles'; readonly projectiles: readonly ProjectileSpawnSpec[]; readonly weaponLockSeconds?: number }
+  | { readonly type: 'blink'; readonly destination: Vec2; readonly cloakSeconds: number }
+  | { readonly type: 'temporary-drone-capacity'; readonly additionalDrones: number; readonly durationSeconds: number; readonly frenzy: boolean }
+  | { readonly type: 'status-effect'; readonly effect: CombatStatusEffect };
 
 export interface AbilityActivationResult {
   readonly activated: boolean;
   readonly cooldownRemainingSeconds: number;
   readonly effects: readonly CombatStatusEffect[];
+  readonly actions: readonly CombatAbilityAction[];
   readonly events: readonly CombatSemanticEvent[];
 }
 
