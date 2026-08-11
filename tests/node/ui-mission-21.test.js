@@ -11,10 +11,20 @@ const uiDir = path.join(root, 'src/ui');
 function loadMission21() {
   const outDir = mkdtempSync(path.join(tmpdir(), 'nova-ui-'));
   const tsc = require.resolve('typescript/bin/tsc');
-  const entry = path.join(uiDir, 'index.ts');
-  execFileSync(process.execPath, [tsc, '--target', 'ES2022', '--module', 'commonjs', '--moduleResolution', 'node', '--jsx', 'react-jsx', '--skipLibCheck', '--strict', '--esModuleInterop', '--outDir', outDir, entry], { cwd: root, stdio: 'pipe' });
+  const entries = [
+    path.join(uiDir, 'store/UIStore.ts'),
+    path.join(uiDir, 'actions/UIController.ts'),
+    path.join(uiDir, 'settings/LiveSettings.ts'),
+    path.join(uiDir, 'messages/MessageFeed.ts'),
+    path.join(root, 'src/input/touch/TouchInputAdapter.ts'),
+  ];
+  execFileSync(process.execPath, [tsc, '--target', 'ES2022', '--module', 'commonjs', '--moduleResolution', 'node', '--skipLibCheck', '--strict', '--outDir', outDir, ...entries], { cwd: root, stdio: 'pipe' });
+  const store = require(path.join(outDir, 'ui/store/UIStore.js'));
+  const actions = require(path.join(outDir, 'ui/actions/UIController.js'));
+  const settings = require(path.join(outDir, 'ui/settings/LiveSettings.js'));
+  const messages = require(path.join(outDir, 'ui/messages/MessageFeed.js'));
   return {
-    ui: require(path.join(outDir, 'ui/index.js')),
+    ui: { ...store, ...actions, ...settings, ...messages },
     touch: require(path.join(outDir, 'input/touch/TouchInputAdapter.js')),
     dispose: () => rmSync(outDir, { recursive: true, force: true }),
   };
