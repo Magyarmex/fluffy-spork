@@ -13,15 +13,17 @@ function novaApplicationShell(): Plugin {
     enforce: 'pre',
     transformIndexHtml(html) {
       // Mission 03 deliberately leaves the materialized gameplay runtime and
-      // ordered patch scripts in the historical page. Vite now owns only the
-      // application boot seam; Mission 04 will contain the remaining legacy
-      // access behind src/legacy/ instead of pretending it disappeared here.
-      const withoutLegacyPwaBoot = html
+      // ordered patch scripts in the historical page. Vite now owns the app
+      // boot seam, root, manifest, and PWA startup; Mission 04 contains the
+      // remaining legacy access behind src/legacy/.
+      const withoutHistoricalAppBoot = html
+        .replace(/\s*<link\s+rel=["']manifest["']\s+href=["']\.\/manifest\.webmanifest["']\s*\/?>/, '')
         .replace(/\s*<script\s+defer\s+src=["']\.\/pwa-register\.js["']><\/script>/, '')
+        .replace(/\s*<div\s+id=["']root["']><\/div>/, '')
         .replace(/\s*<script>\s*window\.__bootModule\(['"]main['"]\);\s*<\/script>/, '');
 
       return {
-        html: withoutLegacyPwaBoot,
+        html: withoutHistoricalAppBoot,
         tags: [
           {
             tag: 'script',
