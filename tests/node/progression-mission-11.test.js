@@ -1,23 +1,39 @@
 const assert = require('node:assert/strict');
 const { execFileSync } = require('node:child_process');
-const { mkdtempSync, readdirSync, rmSync } = require('node:fs');
+const { mkdtempSync, readdirSync, rmSync, statSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 
 const root = path.resolve(__dirname, '..', '..');
+const srcDir = path.join(root, 'src');
+
+function walkTs(dir) {
+  return readdirSync(dir).flatMap((name) => {
+    const file = path.join(dir, name);
+    if (statSync(file).isDirectory()) return walkTs(file);
+    return name.endsWith('.ts') ? [file] : [];
+  });
+}
 
 function loadProgression() {
   const outDir = mkdtempSync(path.join(tmpdir(), 'nova-progression-'));
   const tsc = require.resolve('typescript/bin/tsc');
-  const contentDir = path.join(root, 'src', 'content');
-  const progressionDir = path.join(root, 'src', 'game', 'progression');
   const sources = [
-    ...readdirSync(contentDir).filter((n) => n.endsWith('.ts')).map((n) => path.join(contentDir, n)),
-    ...readdirSync(path.join(contentDir, 'upgrades')).filter((n) => n.endsWith('.ts')).map((n) => path.join(contentDir, 'upgrades', n)),
-    ...readdirSync(progressionDir).filter((n) => n.endsWith('.ts')).map((n) => path.join(progressionDir, n)),
+    ...walkTs(path.join(srcDir, 'content')),
+    ...walkTs(path.join(srcDir, 'game', 'progression')),
   ];
-  execFileSync(process.execPath, [tsc, '--target', 'ES2022', '--module', 'commonjs', '--moduleResolution', 'node', '--skipLibCheck', '--strict', '--outDir', outDir, ...sources], { cwd: root, stdio: 'pipe' });
+  execFileSync(process.execPath, [
+    tsc,
+    '--target', 'ES2022',
+    '--module', 'commonjs',
+    '--moduleResolution', 'node',
+    '--skipLibCheck',
+    '--strict',
+    '--rootDir', srcDir,
+    '--outDir', outDir,
+    ...sources,
+  ], { cwd: root, stdio: 'pipe' });
   return { progression: require(path.join(outDir, 'game', 'progression', 'index.js')), dispose: () => rmSync(outDir, { recursive: true, force: true }) };
 }
 
