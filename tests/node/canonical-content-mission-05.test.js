@@ -6,6 +6,7 @@ const vm = require('node:vm');
 
 const root = path.resolve(__dirname, '../..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
+const plain = (value) => JSON.parse(JSON.stringify(value));
 const legacyIndex = read('index.html');
 const tanksSource = read('src/content/tanks/catalog.ts');
 const catalogSource = read('src/content/catalog.ts');
@@ -26,18 +27,17 @@ function evalLegacyClasses() {
   const classesLiteral = between(legacyIndex, 'exports.CLASSES = ', ';\n// ================= ULTIMATE ABILITIES');
   const sandbox = { result: null };
   vm.runInNewContext(`const ESCORT=${escortLiteral}; result=${classesLiteral};`, sandbox);
-  return { classes: sandbox.result, escort: vm.runInNewContext(`(${escortLiteral})`) };
+  return { classes: plain(sandbox.result), escort: plain(vm.runInNewContext(`(${escortLiteral})`)) };
 }
 
 function evalCanonicalRawTanks() {
   const body = between(tanksSource, 'const RAW_TANKS: readonly RawTank[] = ', ';\n\nexport const TANK_DEFINITIONS');
   const sandbox = { result: null };
   vm.runInNewContext(`const b=(off,len,w,x=0,y=0)=>({off,len,w,x,y}); const t=(value)=>value; result=${body};`, sandbox);
-  return sandbox.result;
+  return plain(sandbox.result);
 }
 
-function normalizedLegacyTank(raw) {
-  const { classes } = evalLegacyClasses();
+function normalizedLegacyTank(raw, classes) {
   const value = classes[raw.id];
   return {
     id:value.id,name:value.name,tier:value.tier,parent:value.parent,color:value.color,icon:value.icon,
@@ -66,14 +66,14 @@ test('Mission 05 canonical tank/weapon/drone balance is exact to materialized ga
   assert.equal(canonical.length, 36);
   assert.deepEqual(canonical.map((x) => x.id).sort(), Object.keys(classes).sort());
   for (const raw of canonical) {
-    assert.deepEqual(normalizedCanonicalTank(raw, escort), normalizedLegacyTank(raw), `legacy parity drift: ${raw.id}`);
+    assert.deepEqual(normalizedCanonicalTank(raw, escort), normalizedLegacyTank(raw, classes), `legacy parity drift: ${raw.id}`);
   }
 });
 
 test('effective doctrine descriptions are used where active class patch actually overrides them', () => {
   const canonical = new Map(evalCanonicalRawTanks().map((x) => [x.id, x]));
   const textLiteral = between(apexPatch, 'var C=c.CLASSES||{},text=', ';\n  Object.keys(text)');
-  const overrides = vm.runInNewContext(`(${textLiteral})`);
+  const overrides = plain(vm.runInNewContext(`(${textLiteral})`));
   const { classes } = evalLegacyClasses();
   for (const [id, description] of Object.entries(overrides)) {
     if (classes[id]) assert.equal(canonical.get(id).desc, description, `effective description drift: ${id}`);
@@ -95,7 +95,7 @@ function evalLegacyBattlefields() {
     const templates=${templateLiteral};
     result=templates.map((template)=>{const terrain=[];template.build(terrain,0,false);return {name:template.name,description:template.desc,terrain};});
   `, sandbox);
-  return sandbox.result;
+  return plain(sandbox.result);
 }
 
 function evalCanonicalBattlefields() {
@@ -107,7 +107,7 @@ function evalCanonicalBattlefields() {
     const battlefield=(id,name,description,terrain)=>({id,name,description,mapLimit:2250,terrainCell:360,terrain});
     result=${expression};
   `, sandbox);
-  return sandbox.result;
+  return plain(sandbox.result);
 }
 
 test('BattlefieldRegistry preserves all three legacy geometry templates', () => {
