@@ -13,6 +13,7 @@ export {
   BALANCE,
   GENE_OPTIONS,
 } from './catalog';
+export { UpgradeRegistry, STAT_UPGRADE_DEFINITIONS } from './upgrades/catalog';
 
 /**
  * Public consumers should import from @content (this module) rather than
