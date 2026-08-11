@@ -30,13 +30,16 @@ test('Vite owns the boot seam without changing the materialized gameplay runtime
   assert.match(index, /window\.__bootModule\('main'\)/);
 });
 
-test('typed shell exposes one explicit temporary legacy boot seam', () => {
+test('typed shell keeps one explicit temporary legacy boot seam through the compatibility boundary', () => {
   const gameApp = read('src/app/GameApp.ts');
+  const legacyRuntime = read('src/legacy/LegacyRuntime.ts');
   const bootstrap = read('src/app/bootstrap.ts');
   const lifecycle = read('src/app/lifecycle.ts');
 
-  assert.match(gameApp, /window\.__bootModule\('main'\)/);
-  assert.match(gameApp, /Mission 04/);
+  assert.match(gameApp, /@legacy\/LegacyRuntime/);
+  assert.match(gameApp, /legacyRuntime\.boot\('main'\)/);
+  assert.doesNotMatch(gameApp, /window\.__bootModule/);
+  assert.match(legacyRuntime, /__bootModule/);
   assert.match(bootstrap, /serviceWorker\.register\('\.\/sw\.js'/);
   assert.match(bootstrap, /renderStartupFailure/);
   assert.match(lifecycle, /__NOVA_STARTUP_STATUS/);
