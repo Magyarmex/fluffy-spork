@@ -17,9 +17,10 @@ export class TouchInputAdapter extends BufferedCommandController {
 
   ingest(sample: TouchInputSample): void {
     const s = this.settings();
+    const moveSensitivity = s.moveSensitivity ?? 1;
     const move = normalizeStick({
-      x: applyDeadzone(sample.moveStick.x, s.stickDeadzone),
-      y: applyDeadzone(sample.moveStick.y, s.stickDeadzone),
+      x: applyDeadzone(sample.moveStick.x * moveSensitivity, s.stickDeadzone),
+      y: applyDeadzone(sample.moveStick.y * moveSensitivity, s.stickDeadzone),
     });
     const aim = normalizeStick({
       x: applyDeadzone(sample.aimStick.x * s.aimSensitivity, s.stickDeadzone),
