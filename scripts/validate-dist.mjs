@@ -22,7 +22,9 @@ const html = await readFile(new URL('index.html', root), 'utf8');
 for (const forbidden of ['nova-updates/', 'nova-gz/', '__novaModules', '__bootModule']) {
   if (html.includes(forbidden)) fail(`Legacy production dependency survived build: ${forbidden}`);
 }
-if (!html.includes('manifest.webmanifest')) fail('Production shell is missing manifest linkage');
+if (!/<link\b[^>]*\brel=["']manifest["'][^>]*\bhref=["'][^"']*manifest\.webmanifest["']/i.test(html)) {
+  fail('Production shell is missing manifest linkage');
+}
 if (!html.includes('assets/')) fail('Production shell is not linked to bundled canonical assets');
 
 const manifest = JSON.parse(await readFile(new URL('manifest.webmanifest', root), 'utf8'));
@@ -33,6 +35,12 @@ if (manifest.name !== 'NOVA TANKS' || manifest.start_url !== './' || manifest.sc
 const worker = await readFile(new URL('sw.js', root), 'utf8');
 if (!worker.includes('NOVA_SYNC_LATEST') || !worker.includes('BUILD_PREFIX')) {
   fail('Atomic offline-update worker was not preserved');
+}
+for (const forbidden of ['__bootModule', 'nova-updates/', 'pwa-register.js']) {
+  if (worker.includes(forbidden)) fail(`Offline worker still depends on retired production runtime: ${forbidden}`);
+}
+if (!worker.includes('isCanonicalShell') || !worker.includes('assets\\/')) {
+  fail('Offline worker is not validating the canonical Vite shell');
 }
 
 const assetsDir = new URL('assets/', root);
