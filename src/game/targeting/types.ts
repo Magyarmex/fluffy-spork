@@ -25,6 +25,8 @@ export interface PerceivedContact {
   readonly targetable: boolean;
   readonly rotation?: number;
   readonly health?: HealthState;
+  /** Neutral identity is visible only when normal perception exposes entity details. */
+  readonly shapeType?: string;
 }
 
 export interface LastKnownContact {
