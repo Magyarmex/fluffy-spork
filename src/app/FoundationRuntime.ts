@@ -58,7 +58,8 @@ export class FoundationRuntime implements UIApplicationPort {
   redeploy(){this.persistRun();this.#gameplay.stop();this.#gameplay=new GameplayScene({bestRunLevel:Math.max(this.#save.progression.bestLevel,this.#gameplay.battle.bestRunLevel)});this.#deathPersisted=false;}
   settingsChanged(settings:UISettingsState){this.#save={...this.#save,preferences:{...this.#save.preferences,pilot:{aimSensitivity:settings.input.aimSensitivity,moveSensitivity:settings.input.moveSensitivity??1,stickDeadzone:settings.input.stickDeadzone,stickSize:settings.presentation.stickSize,stickOpacity:settings.presentation.stickOpacity,screenShake:settings.presentation.screenShake,reducedMotion:settings.presentation.reducedMotion}}};this.#persistence?.save(this.#save);}
 
-  private readonly frame=(now:number)=>{if(!this.#running)return;const elapsed=Math.min(100,Math.max(0,now-this.#lastTime));this.#lastTime=now;this.#screen=this.#uiStore.getSnapshot().screen;this.refreshTip(now);
+  private readonly frame=(now:number)=>{if(!this.#running)return;const elapsed=Math.min(100,Math.max(0,now-this.#lastTime));this.#lastTime=now;const nextScreen=this.#uiStore.getSnapshot().screen;if(nextScreen!==this.#screen)this.#accumulator=0;this.#screen=nextScreen;this.refreshTip(now);
+    if(this.#screen==='debug'){this.#animation=requestAnimationFrame(this.frame);return;}
     if(this.#screen==='blackglass')this.renderBlackglass(now);else if(this.#screen==='match')this.renderGameplay(elapsed);else this.renderLobby(elapsed);
     this.#animation=requestAnimationFrame(this.frame);
   };
