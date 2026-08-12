@@ -16,13 +16,7 @@ function sourceFiles(directory) {
 }
 
 test('Mission 04 installs the complete typed compatibility boundary', () => {
-  for (const relativePath of [
-    'src/legacy/LegacyRuntime.ts',
-    'src/legacy/LegacyModules.ts',
-    'src/legacy/LegacyEvents.ts',
-    'src/legacy/LegacyStateAdapter.ts',
-    'src/legacy/README.md',
-  ]) {
+  for (const relativePath of ['src/legacy/LegacyRuntime.ts','src/legacy/LegacyModules.ts','src/legacy/LegacyEvents.ts','src/legacy/LegacyStateAdapter.ts','src/legacy/README.md']) {
     assert.equal(fs.existsSync(path.join(root, relativePath)), true, `${relativePath} should exist`);
   }
 });
@@ -33,25 +27,27 @@ test('legacy runtime globals are prohibited outside src/legacy', () => {
     .filter((absolute) => !absolute.startsWith(path.join(srcRoot, 'legacy') + path.sep))
     .filter((absolute) => legacyNames.test(fs.readFileSync(absolute, 'utf8')))
     .map((absolute) => path.relative(root, absolute));
-
   assert.deepEqual(violations, [], `legacy runtime globals escaped boundary: ${violations.join(', ')}`);
 });
 
-test('application shell boots through LegacyRuntime instead of browser internals', () => {
+test('Mission 25 production app is Foundation-owned and legacy boot stays behind the development selector', () => {
   const gameApp = read('src/app/GameApp.ts');
-  assert.match(gameApp, /@legacy\/LegacyRuntime/);
-  assert.match(gameApp, /legacyRuntime\.boot\('main'\)/);
+  const bootstrap = read('src/app/bootstrap.ts');
+  assert.match(gameApp, /FoundationRuntime/);
+  assert.doesNotMatch(gameApp, /LegacyRuntime|legacyRuntime\.boot/);
   assert.doesNotMatch(gameApp, legacyNames);
+  assert.match(bootstrap, /runtime\.selected === 'legacy'/);
+  assert.match(bootstrap, /import\.meta\.env\.DEV/);
+  assert.match(bootstrap, /await import\('@legacy\/LegacyRuntime'\)/);
 });
 
-test('LegacyRuntime is the explicit owner of historical module-wrapper access', () => {
+test('LegacyRuntime remains the explicit owner of historical module-wrapper access until Mission 26', () => {
   const runtime = read('src/legacy/LegacyRuntime.ts');
   assert.match(runtime, /__novaModules/);
   assert.match(runtime, /__novaCache/);
   assert.match(runtime, /__novaMakeRequire/);
   assert.match(runtime, /__bootModule/);
   assert.match(runtime, /snapshot\(\)/);
-
   const docs = read('src/legacy/README.md');
   assert.match(docs, /temporary deletion target/i);
   assert.match(docs, /must not be implemented here/i);
