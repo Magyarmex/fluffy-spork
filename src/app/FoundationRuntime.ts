@@ -31,7 +31,7 @@ export class FoundationRuntime implements UIApplicationPort {
   readonly #touchChannels:Record<TouchChannel,boolean>={move:false,aim:false,fire:false,ability:false,ultimate:false};
   readonly #tips=new TipDeck(); readonly #audio=new AudioEngine(DEFAULT_FEEDBACK_MIX); readonly #audioOut=new WebAudioPresenter();
   readonly #persistence?:PersistenceService; #save:SaveFile;
-  #screen:UIScreen='lobby'; #animation=0; #lastTime=0; #accumulator=0; #pointerClient={x:0,y:0}; #pointerDown=false; #view:CanvasView={worldSpan:5000}; #running=false; #gamepadWasActive=false;
+  #screen:UIScreen='lobby'; #animation=0; #lastTime=0; #accumulator=0; #pointerClient={x:0,y:0}; #pointerDown=false; #view:CanvasView={worldSpan:5000}; #running=false; #disposed=false; #gamepadWasActive=false;
   #tip=''; #tipNextAt=0; #tipKey=''; #deathPersisted=false;
 
   constructor(host:HTMLElement){
@@ -47,8 +47,8 @@ export class FoundationRuntime implements UIApplicationPort {
     this.#reactRoot=createRoot(this.#uiHost);this.#reactRoot.render(createElement(CanonicalUI,{store:this.#uiStore,controller:this.#uiController}));this.installInput();this.refreshTip(performance.now(),true);
   }
 
-  start(){if(this.#running)return;this.#running=true;this.#lastTime=performance.now();this.#animation=requestAnimationFrame(this.frame);}
-  stop(){if(!this.#running)return;this.#running=false;cancelAnimationFrame(this.#animation);this.#lobby.stop();this.#gameplay.stop();this.#blackglass.stop();this.#reactRoot.unmount();this.#audioOut.dispose();this.removeInput();}
+  start(){if(this.#running||this.#disposed)return;this.#running=true;this.#lastTime=performance.now();this.#animation=requestAnimationFrame(this.frame);}
+  stop(){if(this.#disposed)return;this.#disposed=true;if(this.#running){this.#running=false;cancelAnimationFrame(this.#animation);}this.#lobby.stop();this.#gameplay.stop();this.#blackglass.stop();this.#reactRoot.unmount();this.#audioOut.dispose();this.removeInput();}
   issue(command:GameCommand){if(this.#screen!=='match')return;this.trackTouchActivity(command);this.#gameplay.battle.issuePlayerCommand(command,'touch');}
   chooseEvolution(tankId:string){this.#gameplay.battle.chooseEvolution(tankId);}
   chooseMastery(perkId:MasteryPerkId){this.#gameplay.battle.chooseMastery(perkId);}
