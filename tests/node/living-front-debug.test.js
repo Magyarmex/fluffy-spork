@@ -105,3 +105,11 @@ test('runtime teardown works before start and remains idempotent', () => {
   assert.match(runtime, /stop\(\)\{if\(this\.#disposed\)return;this\.#disposed=true;if\(this\.#running\)\{this\.#running=false;cancelAnimationFrame\(this\.#animation\);\}this\.#lobby\.stop\(\);this\.#gameplay\.stop\(\);this\.#blackglass\.stop\(\);this\.#reactRoot\.unmount\(\);this\.#audioOut\.dispose\(\);this\.removeInput\(\);\}/,
     'stop must release scenes, UI, audio, and listeners even if animation never started, and only once');
 });
+
+test('lost pointer capture releases touch stick and action ownership', () => {
+  const controls = readFileSync(path.join(root, 'src/ui/controls/TouchControls.tsx'), 'utf8');
+  assert.match(controls, /onLostPointerCapture=\{\(event\) => endStick\(name, event\)\}/,
+    'a stick must return to neutral if the browser revokes pointer capture without a normal pointerup');
+  assert.match(controls, /onLostPointerCapture=\{\(event\) => setActionPointer\(action, event\.pointerId, false\)\}/,
+    'an action must drop only the pointer whose capture was lost');
+});
