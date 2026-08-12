@@ -21,6 +21,7 @@ export interface AIObservation {
   readonly targetable: boolean;
   readonly rotation?: number;
   readonly healthFraction?: number;
+  readonly shapeType?: string;
 }
 
 /** Inputs that later tactical controllers may score. This layer does not choose actions. */

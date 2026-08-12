@@ -2,6 +2,7 @@ export interface ReleaseRecord { readonly version:string; readonly title:string;
 
 /** Canonical replacement for the v1.7.9 Living Archive runtime panel. */
 export const RELEASE_HISTORY: readonly ReleaseRecord[] = Object.freeze([
+  {version:'1.11.0',title:'Living Front',date:'2026-08-12',family:'1.11',summary:'Neutral ecology turns farming, migration, predators and rare opportunities into one readable battlefield loop.'},
   {version:'1.10.9',title:'Visual Language',date:'2026-08-10',family:'1.10',summary:'Canonical visual-language pass and disciplined battlefield signals.'},
   {version:'1.10.8',title:'Applied Power Parity',date:'2026-08-10',family:'1.10',summary:'Rival power follows spent upgrades rather than banked points.'},
   {version:'1.10.7',title:'Second Body / Live Vector',date:'2026-08-10',family:'1.10',summary:'Controller logistics, recovery and live command-vector behavior.'},
