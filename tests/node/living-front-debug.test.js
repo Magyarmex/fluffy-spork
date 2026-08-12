@@ -47,3 +47,13 @@ test('redeploy starts a clean simulation run without inherited time or held cont
   assert.match(runtime, /redeploy\(\)\{this\.persistRun\(\);this\.#gameplay\.stop\(\);this\.#accumulator=0;this\.resetTransientInput\(\);this\.#gameplay=new GameplayScene/,
     'replacing a dead gameplay scene must clear fixed-step residue and transient input ownership first');
 });
+
+test('runtime teardown works before start and remains idempotent', () => {
+  const runtime = readFileSync(path.join(root, 'src/app/FoundationRuntime.ts'), 'utf8');
+  assert.match(runtime, /#running=false; #disposed=false;/,
+    'runtime needs a disposal guard independent from animation-loop state');
+  assert.match(runtime, /start\(\)\{if\(this\.#running\|\|this\.#disposed\)return;/,
+    'a disposed runtime must not be restarted after its React root and presenters are torn down');
+  assert.match(runtime, /stop\(\)\{if\(this\.#disposed\)return;this\.#disposed=true;if\(this\.#running\)\{this\.#running=false;cancelAnimationFrame\(this\.#animation\);\}this\.#lobby\.stop\(\);this\.#gameplay\.stop\(\);this\.#blackglass\.stop\(\);this\.#reactRoot\.unmount\(\);this\.#audioOut\.dispose\(\);this\.removeInput\(\);\}/,
+    'stop must release scenes, UI, audio, and listeners even if animation never started, and only once');
+});
