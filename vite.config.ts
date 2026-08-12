@@ -49,7 +49,6 @@ export default defineConfig(({ mode, command }) => {
         '@persistence': fromSrc('persistence'),
         '@diagnostics': fromSrc('diagnostics'),
         '@shared': fromSrc('shared'),
-        '@legacy': fromSrc('legacy'),
       },
     },
     define: {
