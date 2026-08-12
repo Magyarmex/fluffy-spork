@@ -66,7 +66,7 @@ export function CanonicalUI({ store, controller }: CanonicalUIProps) {
     </>}
 
     {ui.screen==='evolution'&&evolution&&<section aria-label="Evolution"><h2>{evolution.milestone??'EVOLUTION'}</h2>{evolution.choices.map((id)=><button key={id} onClick={()=>choose(id)}>{choiceLabel(id,evolution.milestone)}</button>)}</section>}
-    {ui.screen==='blackglass'&&<section aria-label="Blackglass UI"><h2>BLACKGLASS</h2>{ui.tip&&<aside>{ui.tip}</aside>}</section>}
+    {ui.screen==='blackglass'&&<section aria-label="Blackglass UI"><h2>BLACKGLASS</h2>{ui.tip&&<aside>{ui.tip}</aside>}<button onClick={()=>controller.open('lobby')}>WAR ROOM</button></section>}
     {ui.screen==='settings'&&<section aria-label="Pilot settings">
       <label>Aim sensitivity <input type="range" min="60" max="160" value={Math.round(settings.input.aimSensitivity*100)} onChange={(event)=>controller.updateSettings({aimSensitivity:Number(event.currentTarget.value)/100})}/></label>
       <label>Move sensitivity <input type="range" min="60" max="160" value={Math.round((settings.input.moveSensitivity??1)*100)} onChange={(event)=>controller.updateSettings({moveSensitivity:Number(event.currentTarget.value)/100})}/></label>

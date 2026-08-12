@@ -109,3 +109,9 @@ test('Production composition keeps gameplay, War Room and Blackglass as distinct
   assert.match(runtime, /WebAudioPresenter/);
   assert.match(runtime, /TipDeck/);
 });
+
+test('Blackglass provides an explicit return path to the War Room', () => {
+  const ui = readFileSync(path.join(root, 'src/ui/CanonicalUI.tsx'), 'utf8');
+  assert.match(ui, /controller\.open\('blackglass'\)/, 'Blackglass must remain reachable from the lobby');
+  assert.match(ui, /ui\.screen==='blackglass'[\s\S]{0,400}controller\.open\('lobby'\)[\s\S]{0,100}WAR ROOM/, 'Blackglass must expose a direct return to the War Room');
+});
