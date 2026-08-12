@@ -5,6 +5,7 @@ import type { UIController } from '../actions/UIController';
 import type { UISettingsState } from '../types';
 
 type StickName = 'move' | 'aim';
+type ActionName = 'fire' | 'ability' | 'ultimate';
 
 interface StickAnchor {
   readonly pointerId: number;
@@ -35,6 +36,11 @@ export function TouchControls({ controller, settings }: { readonly controller: U
   if (!adapterRef.current) adapterRef.current = new TouchInputAdapter(() => settingsRef.current);
 
   const anchors = useRef<Record<StickName, StickAnchor | null>>({ move: null, aim: null });
+  const actionPointers = useRef<Record<ActionName, Set<number>>>({
+    fire: new Set<number>(),
+    ability: new Set<number>(),
+    ultimate: new Set<number>(),
+  });
   const state = useRef<TouchState>({
     moveStick: { ...ZERO },
     aimStick: { ...ZERO },
@@ -52,6 +58,7 @@ export function TouchControls({ controller, settings }: { readonly controller: U
 
   const resetLocalTouchState = () => {
     anchors.current = { move: null, aim: null };
+    for (const pointers of Object.values(actionPointers.current)) pointers.clear();
     state.current = {
       moveStick: { ...ZERO },
       aimStick: { ...ZERO },
@@ -101,10 +108,14 @@ export function TouchControls({ controller, settings }: { readonly controller: U
     emit();
   };
 
-  const setAction = (action: 'fire' | 'ability' | 'ultimate', active: boolean) => {
-    if (action === 'fire') state.current.firing = active;
-    else if (action === 'ability') state.current.abilities[0] = active;
-    else state.current.ultimate = active;
+  const setActionPointer = (action: ActionName, pointerId: number, active: boolean) => {
+    const pointers = actionPointers.current[action];
+    if (active) pointers.add(pointerId);
+    else pointers.delete(pointerId);
+    const held = pointers.size > 0;
+    if (action === 'fire') state.current.firing = held;
+    else if (action === 'ability') state.current.abilities[0] = held;
+    else state.current.ultimate = held;
     emit();
   };
 
@@ -118,10 +129,10 @@ export function TouchControls({ controller, settings }: { readonly controller: U
     onPointerCancel={(event) => endStick(name, event)}
   >{label}</div>;
 
-  const actionButton = (action: 'fire' | 'ability' | 'ultimate', label: string) => <button
-    onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); setAction(action, true); }}
-    onPointerUp={() => setAction(action, false)}
-    onPointerCancel={() => setAction(action, false)}
+  const actionButton = (action: ActionName, label: string) => <button
+    onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); setActionPointer(action, event.pointerId, true); }}
+    onPointerUp={(event) => setActionPointer(action, event.pointerId, false)}
+    onPointerCancel={(event) => setActionPointer(action, event.pointerId, false)}
   >{label}</button>;
 
   return <section aria-label="Touch controls" data-touch-controls="true"
