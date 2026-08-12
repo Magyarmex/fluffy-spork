@@ -1,9 +1,10 @@
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { GamepadInputAdapter } from '../input/gamepad/GamepadInputAdapter';
+import { normalizeStick } from '../input/commands/GameCommand';
+import type { GameCommand } from '../input/commands/GameCommand';
 import { BlackglassScene } from '../scenes/blackglass/BlackglassScene';
 import { LobbyScene } from '../scenes/lobby/LobbyScene';
-import type { GameCommand } from '../input/commands/GameCommand';
-import { normalizeStick } from '../input/commands/GameCommand';
 import { CanonicalUI } from '../ui/CanonicalUI';
 import { UIController, type UIApplicationPort } from '../ui/actions/UIController';
 import { UIStore } from '../ui/store/UIStore';
@@ -12,6 +13,8 @@ import { CanvasPresenter, type CanvasView } from './CanvasPresenter';
 
 const ZERO_STATS = Object.freeze({ damage:0, reload:0, bulletspeed:0, penetration:0, maxhp:0, regen:0, speed:0, body:0 });
 const PLAYER_TANK = 'gunner';
+
+type TouchChannel = 'move' | 'aim' | 'fire' | 'ability' | 'ultimate';
 
 /**
  * Browser composition root for the Foundation production path.
@@ -29,6 +32,8 @@ export class FoundationRuntime implements UIApplicationPort {
   readonly #lobby = new LobbyScene();
   readonly #blackglass = new BlackglassScene();
   readonly #pressed = new Set<string>();
+  readonly #gamepad = new GamepadInputAdapter(() => this.#uiStore.getSnapshot().settings.input);
+  readonly #touchChannels: Record<TouchChannel, boolean> = { move:false, aim:false, fire:false, ability:false, ultimate:false };
   #screen: UIScreen = 'lobby';
   #animation = 0;
   #lastTime = 0;
@@ -37,6 +42,7 @@ export class FoundationRuntime implements UIApplicationPort {
   #pointerDown = false;
   #view: CanvasView = { worldSpan:5000 };
   #running = false;
+  #gamepadWasActive = false;
 
   constructor(host: HTMLElement) {
     this.#host = host;
@@ -52,7 +58,7 @@ export class FoundationRuntime implements UIApplicationPort {
     this.#presenter = new CanvasPresenter(this.#worldHost);
 
     const style = document.createElement('style');
-    style.textContent = '[data-nova-layer="canonical-ui"] button,[data-nova-layer="canonical-ui"] input{pointer-events:auto}[data-nova-ui]{display:grid;gap:8px;padding:10px;border:1px solid rgba(77,227,255,.28);border-radius:10px;background:rgba(4,6,13,.70);backdrop-filter:blur(5px)}[data-nova-ui] nav,[data-nova-ui] section{display:flex;gap:8px;flex-wrap:wrap;align-items:center}[data-nova-ui] button{border:1px solid rgba(77,227,255,.38);background:#091525;color:#dff8ff;padding:8px 12px;border-radius:7px;font:700 13px Orbitron,sans-serif}[data-nova-ui] output{padding:4px 7px;background:rgba(0,0,0,.35);border-radius:5px}';
+    style.textContent = '[data-nova-layer="canonical-ui"] button,[data-nova-layer="canonical-ui"] input,[data-touch-stick]{pointer-events:auto}[data-nova-ui]{display:grid;gap:8px;padding:10px;border:1px solid rgba(77,227,255,.28);border-radius:10px;background:rgba(4,6,13,.70);backdrop-filter:blur(5px)}[data-nova-ui] nav,[data-nova-ui] section{display:flex;gap:8px;flex-wrap:wrap;align-items:center}[data-nova-ui] button{border:1px solid rgba(77,227,255,.38);background:#091525;color:#dff8ff;padding:8px 12px;border-radius:7px;font:700 13px Orbitron,sans-serif}[data-nova-ui] output{padding:4px 7px;background:rgba(0,0,0,.35);border-radius:5px}[data-touch-controls]{display:none;position:fixed;inset:auto 16px 18px 16px;justify-content:space-between;align-items:flex-end;background:none!important;border:0!important;padding:0!important}[data-touch-stick]{width:124px;height:124px;border-radius:50%;display:grid;place-items:center;touch-action:none;user-select:none;border:1px solid rgba(77,227,255,.55);background:rgba(5,17,32,.38);opacity:var(--nova-stick-opacity,.72)}[data-touch-actions]{display:grid;gap:6px}@media (hover:none),(pointer:coarse){[data-touch-controls]{display:flex!important}}';
     host.append(style);
 
     this.#reactRoot = createRoot(this.#uiHost);
@@ -79,6 +85,7 @@ export class FoundationRuntime implements UIApplicationPort {
 
   issue(command: GameCommand): void {
     if (this.#screen !== 'match') return;
+    this.trackTouchActivity(command);
     this.#lobby.battle.issuePlayerCommand(command, 'touch');
   }
 
@@ -112,7 +119,7 @@ export class FoundationRuntime implements UIApplicationPort {
         ...(player ? { playerId:String(player.id), progression:{ level:scene.battle.actorLevels[player.tankDefinitionId] ?? scene.battle.level, xp:0, statPoints:0, stats:ZERO_STATS, tankId:player.tankDefinitionId } } : {}),
         entities:{ version:1, entities:scene.battle.entities },
         score:0,
-        tip:this.#screen === 'match' ? 'WASD to move · pointer to aim · hold primary fire' : 'Canonical Foundation runtime',
+        tip:this.#screen === 'match' ? 'Move with WASD or the left stick · aim with pointer/right stick · fire with primary action' : 'Canonical Foundation runtime',
         debug:{ scene:this.#screen, render:scene.render.metrics, simulationHz:this.#lobby.battle.policy.simulationHz },
       });
     }
@@ -134,7 +141,9 @@ export class FoundationRuntime implements UIApplicationPort {
   }
 
   private sampleInputs(): void {
-    if (this.#screen !== 'match') return;
+    if (this.#screen !== 'match' || this.hasActiveTouchInput()) return;
+    if (this.sampleGamepad()) return;
+
     const move = normalizeStick({
       x:(this.#pressed.has('KeyD') ? 1 : 0) - (this.#pressed.has('KeyA') ? 1 : 0),
       y:(this.#pressed.has('KeyS') ? 1 : 0) - (this.#pressed.has('KeyW') ? 1 : 0),
@@ -145,16 +154,54 @@ export class FoundationRuntime implements UIApplicationPort {
       const pointer = this.#presenter.worldPoint(this.#pointerClient.x, this.#pointerClient.y, this.#view);
       this.#lobby.battle.issuePlayerCommand({ type:'aim', vector:normalizeStick({ x:pointer.x-player.position.x, y:pointer.y-player.position.y }) }, 'mouse');
     }
-    this.#lobby.battle.issuePlayerCommand({ type:'fire', active:this.#pointerDown || this.#pressed.has('Space') }, 'mouse');
+    this.#lobby.battle.issuePlayerCommand({ type:'fire', active:this.#pointerDown || this.#pressed.has('Space') }, this.#pointerDown ? 'mouse' : 'keyboard');
     this.#lobby.battle.issuePlayerCommand({ type:'ability', slot:0, active:this.#pressed.has('KeyE') }, 'keyboard');
     this.#lobby.battle.issuePlayerCommand({ type:'ultimate', active:this.#pressed.has('KeyQ') }, 'keyboard');
   }
 
+  private sampleGamepad(): boolean {
+    const pads = typeof navigator.getGamepads === 'function' ? navigator.getGamepads() : [];
+    const pad = Array.from(pads).find((candidate): candidate is Gamepad => Boolean(candidate?.connected));
+    if (!pad) { this.#gamepadWasActive = false; return false; }
+    const left = { x:pad.axes[0] ?? 0, y:pad.axes[1] ?? 0 };
+    const right = { x:pad.axes[2] ?? 0, y:pad.axes[3] ?? 0 };
+    const fire = Boolean(pad.buttons[7]?.pressed || pad.buttons[0]?.pressed);
+    const ability = Boolean(pad.buttons[1]?.pressed);
+    const ultimate = Boolean(pad.buttons[3]?.pressed || pad.buttons[4]?.pressed);
+    const active = Math.hypot(left.x, left.y) > 0.12 || Math.hypot(right.x, right.y) > 0.12 || fire || ability || ultimate;
+    if (!active && !this.#gamepadWasActive) return false;
+    this.#gamepad.ingest({ leftStick:left, rightStick:right, fire, ability, ultimate });
+    for (const envelope of this.#gamepad.poll()) this.#lobby.battle.issuePlayerCommand(envelope.command, envelope.source);
+    this.#gamepadWasActive = active;
+    return true;
+  }
+
+  private trackTouchActivity(command: GameCommand): void {
+    switch (command.type) {
+      case 'move': this.#touchChannels.move = Math.hypot(command.vector.x, command.vector.y) > 0.001; break;
+      case 'aim': this.#touchChannels.aim = Math.hypot(command.vector.x, command.vector.y) > 0.001; break;
+      case 'fire': this.#touchChannels.fire = command.active; break;
+      case 'ability': this.#touchChannels.ability = command.active; break;
+      case 'ultimate': this.#touchChannels.ultimate = command.active; break;
+      default: break;
+    }
+  }
+
+  private hasActiveTouchInput(): boolean {
+    return Object.values(this.#touchChannels).some(Boolean);
+  }
+
   private readonly onKeyDown = (event: KeyboardEvent): void => { this.#pressed.add(event.code); };
   private readonly onKeyUp = (event: KeyboardEvent): void => { this.#pressed.delete(event.code); };
-  private readonly onPointerMove = (event: PointerEvent): void => { this.#pointerClient = { x:event.clientX, y:event.clientY }; };
-  private readonly onPointerDown = (event: PointerEvent): void => { this.#pointerDown = event.button === 0; this.#pointerClient = { x:event.clientX, y:event.clientY }; };
-  private readonly onPointerUp = (): void => { this.#pointerDown = false; };
+  private readonly onPointerMove = (event: PointerEvent): void => {
+    if (event.pointerType !== 'touch') this.#pointerClient = { x:event.clientX, y:event.clientY };
+  };
+  private readonly onPointerDown = (event: PointerEvent): void => {
+    if (event.pointerType === 'touch') return;
+    this.#pointerDown = event.button === 0;
+    this.#pointerClient = { x:event.clientX, y:event.clientY };
+  };
+  private readonly onPointerUp = (event: PointerEvent): void => { if (event.pointerType !== 'touch') this.#pointerDown = false; };
 
   private installInput(): void {
     window.addEventListener('keydown', this.onKeyDown);

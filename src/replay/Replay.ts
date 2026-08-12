@@ -1,7 +1,7 @@
 import type { CommandEnvelope } from '../input/commands/GameCommand';
 import type { GameEvent } from '../game/simulation/types';
 
-export type RuntimeKind = 'legacy' | 'foundation';
+export type RuntimeKind = 'foundation';
 
 export interface ReplayCommand {
   readonly tick: number;

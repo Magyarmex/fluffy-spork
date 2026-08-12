@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import type { UIController } from './actions/UIController';
+import { TouchControls } from './controls/TouchControls';
 import type { UIStore } from './store/UIStore';
 
 export interface CanonicalUIProps {
@@ -32,10 +33,7 @@ export function CanonicalUI({ store, controller }: CanonicalUIProps) {
         {(['follow', 'attack', 'defend', 'recall'] as const).map((order) =>
           <button key={order} onClick={() => controller.swarm(order)}>{order.toUpperCase()}</button>)}
       </section>
-      <section aria-label="Touch controls" data-stick-size={settings.presentation.stickSize} data-stick-opacity={settings.presentation.stickOpacity}>
-        <button onPointerDown={() => controller.issue({ type: 'ultimate', active: true })}
-          onPointerUp={() => controller.issue({ type: 'ultimate', active: false })}>ULTIMATE</button>
-      </section>
+      <TouchControls controller={controller} settings={settings}/>
     </>}
 
     {ui.screen === 'evolution' && ui.evolution && <section aria-label="Evolution">
