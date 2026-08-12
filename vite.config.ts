@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
-const repoBase = '/fluffy-spork/';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fromSrc = (path: string) => resolve(__dirname, 'src', path);
 
@@ -30,7 +29,10 @@ export default defineConfig(({ mode, command }) => {
 
   return {
     plugins: [react(), canonicalPwaAssets()],
-    base: isProdBuild || process.env.GITHUB_PAGES === 'true' ? repoBase : '/',
+    // Production artifacts must be relocatable. A repository-absolute base
+    // makes previews or packaged hosts request bundles from the wrong path,
+    // leaving the HTML shell visible while NOVA's JavaScript never boots.
+    base: isProdBuild ? './' : '/',
     build: {
       sourcemap: true,
       target: 'es2022',
