@@ -26,11 +26,11 @@ test('Mission 25 deployment publishes dist rather than materializing index.html'
   assert.doesNotMatch(workflow, /nova-gz|nova-updates|Materialize|index\.html\.new|git push/);
 });
 
-test('Mission 25 build emits the preserved PWA contract and validates legacy absence', () => {
+test('Mission 25 build emits the preserved PWA contract and validates retired-runtime absence', () => {
   const vite = read('vite.config.ts');
   const validator = read('scripts/validate-dist.mjs');
   for (const asset of ['manifest.webmanifest', 'nova-icon.svg', 'sw.js']) assert.match(vite, new RegExp(asset.replace('.', '\\.')));
-  assert.match(validator, /Legacy production dependency survived build/);
+  assert.match(validator, /Retired production dependency survived build/);
   assert.match(validator, /NOVA_SYNC_LATEST/);
   assert.match(validator, /32 \* 1024/);
 });
