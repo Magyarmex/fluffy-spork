@@ -18,7 +18,7 @@ function compile(entries, prefix) {
   return { out, dispose: () => rmSync(out, { recursive: true, force: true }) };
 }
 
-test('Mission 26 main game starts the canonical Scout run, not the War Room roster', () => {
+test('Mission 26 main game starts the canonical Scout run under the Living Front age ceiling', () => {
   const compiled = compile(['src/scenes/gameplay/GameplayBattle.ts'], 'nova-main-game-');
   try {
     const { GameplayBattle } = require(path.join(compiled.out, 'scenes/gameplay/GameplayBattle.js'));
@@ -30,7 +30,9 @@ test('Mission 26 main game starts the canonical Scout run, not the War Room rost
     assert.equal(snapshot.tanks.length, 9, 'player plus eight rivals');
     assert.equal(snapshot.tanks.find((tank) => tank.id === snapshot.playerId).tankDefinitionId, 'scout');
     const counts = Object.fromEntries(['circle','triangle','square','pentagon','hexagon','star'].map((kind) => [kind, snapshot.shapes.filter((shape) => shape.shapeType === kind).length]));
-    assert.deepEqual(counts, { circle:62, triangle:30, square:16, pentagon:8, hexagon:4, star:1 });
+    assert.deepEqual(counts, { circle:69, triangle:35, square:16, pentagon:0, hexagon:0, star:0 });
+    assert.equal(snapshot.shapes.length, 120, 'Living Front preserves neutral availability while delaying high-value saturation');
+    assert.equal(snapshot.livingFront.maturityCeiling, 0);
     assert.equal(snapshot.powerups.length, 0);
     assert.equal(snapshot.status, 'playing');
   } finally { compiled.dispose(); }
