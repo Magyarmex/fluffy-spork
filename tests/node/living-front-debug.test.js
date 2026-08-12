@@ -20,6 +20,24 @@ test('Debug preserves the last authoritative diagnostics instead of routing thro
 
 test('scene changes discard fixed-step time accumulated by the previous scene', () => {
   const runtime = readFileSync(path.join(root, 'src/app/FoundationRuntime.ts'), 'utf8');
-  assert.match(runtime, /if\(nextScreen!==this\.#screen\)this\.#accumulator=0;/,
+  assert.match(runtime, /if\(nextScreen!==this\.#screen\)\{this\.#accumulator=0;this\.resetTransientInput\(\);\}/,
     'switching between lobby, gameplay, Blackglass, and Debug must not inherit stale simulation time');
+});
+
+test('scene changes clear touch, keyboard, pointer, and gamepad transient input state', () => {
+  const runtime = readFileSync(path.join(root, 'src/app/FoundationRuntime.ts'), 'utf8');
+  assert.match(runtime, /private resetTransientInput\(\)\{this\.#pressed\.clear\(\);this\.#pointerDown=false;this\.#gamepadWasActive=false;/,
+    'transitioning away from gameplay must not leave held inputs latched');
+  assert.match(runtime, /for\(const channel of Object\.keys\(this\.#touchChannels\) as TouchChannel\[\]\)this\.#touchChannels\[channel\]=false;/,
+    'touch ownership must be released when its controls unmount during a screen change');
+});
+
+test('browser focus loss clears transient controls and installs/removes the blur listener symmetrically', () => {
+  const runtime = readFileSync(path.join(root, 'src/app/FoundationRuntime.ts'), 'utf8');
+  assert.match(runtime, /private readonly onBlur=\(\)=>\{this\.resetTransientInput\(\);\};/,
+    'focus loss should release controls even if keyup or pointerup never arrives');
+  assert.match(runtime, /window\.addEventListener\('blur',this\.onBlur\)/,
+    'runtime should listen for focus loss');
+  assert.match(runtime, /window\.removeEventListener\('blur',this\.onBlur\)/,
+    'runtime teardown should remove the focus-loss listener');
 });
