@@ -5,7 +5,7 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '../..');
 const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
-const register = fs.readFileSync(path.join(root, 'pwa-register.js'), 'utf8');
+const bootstrap = fs.readFileSync(path.join(root, 'src/app/bootstrap.ts'), 'utf8');
 
 function position(source, needle) {
   const index = source.indexOf(needle);
@@ -29,6 +29,15 @@ test('new builds are immutable candidates and promote only after critical stagin
   assert.ok(critical < htmlWrite, 'critical dependencies must stage before HTML');
   assert.ok(htmlWrite < validation, 'HTML must exist before final staged-build validation');
   assert.ok(validation < promotion, 'active pointer must move only after full validation');
+});
+
+test('canonical updater validates the Vite module shell and has no production patch dependency', () => {
+  assert.match(sw, /function isCanonicalShell\(html\)/);
+  assert.match(sw, /type=\["'\]module/);
+  assert.match(sw, /assets\\\//);
+  assert.doesNotMatch(sw, /__bootModule/);
+  assert.doesNotMatch(sw, /nova-updates\//);
+  assert.doesNotMatch(sw, /pwa-register\.js/);
 });
 
 test('partial candidates are deleted instead of poisoning the active build', () => {
@@ -59,10 +68,10 @@ test('updater preserves a rollback build and removes old NOVA caches only after 
   assert.ok(cleanup > promotion);
 });
 
-test('page-side updater can observe worker completion and self-update independently', () => {
-  assert.match(register, /updateViaCache: 'none'/);
-  assert.match(register, /new MessageChannel\(\)/);
-  assert.match(register, /NOVA_SYNC_LATEST/);
-  assert.match(register, /controllerchange/);
-  assert.match(register, /worker-message-timeout/);
+test('canonical bootstrap owns updater observation and self-update behavior', () => {
+  assert.match(bootstrap, /navigator\.serviceWorker\.register\('\.\/sw\.js', \{ scope: '\.\/', updateViaCache: 'none' \}\)/);
+  assert.match(bootstrap, /new MessageChannel\(\)/);
+  assert.match(bootstrap, /NOVA_SYNC_LATEST/);
+  assert.match(bootstrap, /controllerchange/);
+  assert.match(bootstrap, /worker-message-timeout/);
 });
