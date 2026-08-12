@@ -42,6 +42,20 @@ test('browser focus loss clears transient controls and installs/removes the blur
     'runtime teardown should remove the focus-loss listener');
 });
 
+test('page hiding and pointer cancellation release transient controls', () => {
+  const runtime = readFileSync(path.join(root, 'src/app/FoundationRuntime.ts'), 'utf8');
+  assert.match(runtime, /private readonly onVisibilityChange=\(\)=>\{if\(document\.hidden\)this\.resetTransientInput\(\);\};/,
+    'mobile/background visibility transitions must release controls even when blur is skipped');
+  assert.match(runtime, /document\.addEventListener\('visibilitychange',this\.onVisibilityChange\)/,
+    'runtime should observe page visibility changes');
+  assert.match(runtime, /document\.removeEventListener\('visibilitychange',this\.onVisibilityChange\)/,
+    'runtime teardown should remove the visibility listener');
+  assert.match(runtime, /window\.addEventListener\('pointercancel',this\.onPointerUp\)/,
+    'cancelled mouse pointers must release held fire state');
+  assert.match(runtime, /window\.removeEventListener\('pointercancel',this\.onPointerUp\)/,
+    'runtime teardown should remove the pointer cancellation listener');
+});
+
 test('redeploy starts a clean simulation run without inherited time or held controls', () => {
   const runtime = readFileSync(path.join(root, 'src/app/FoundationRuntime.ts'), 'utf8');
   assert.match(runtime, /redeploy\(\)\{this\.persistRun\(\);this\.#gameplay\.stop\(\);this\.#accumulator=0;this\.resetTransientInput\(\);this\.#gameplay=new GameplayScene/,
