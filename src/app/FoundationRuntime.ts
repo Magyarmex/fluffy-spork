@@ -55,7 +55,7 @@ export class FoundationRuntime implements UIApplicationPort {
   chooseGene(geneId:CombatLineageId){this.#gameplay.battle.chooseGene(geneId);}
   spendStat(statId:StatUpgradeId){this.#gameplay.battle.spendStat(statId);}
   togglePause(){this.#gameplay.battle.togglePause();}
-  redeploy(){this.persistRun();this.#gameplay.stop();this.#gameplay=new GameplayScene({bestRunLevel:Math.max(this.#save.progression.bestLevel,this.#gameplay.battle.bestRunLevel)});this.#deathPersisted=false;}
+  redeploy(){this.persistRun();this.#gameplay.stop();this.#accumulator=0;this.resetTransientInput();this.#gameplay=new GameplayScene({bestRunLevel:Math.max(this.#save.progression.bestLevel,this.#gameplay.battle.bestRunLevel)});this.#deathPersisted=false;}
   settingsChanged(settings:UISettingsState){this.#save={...this.#save,preferences:{...this.#save.preferences,pilot:{aimSensitivity:settings.input.aimSensitivity,moveSensitivity:settings.input.moveSensitivity??1,stickDeadzone:settings.input.stickDeadzone,stickSize:settings.presentation.stickSize,stickOpacity:settings.presentation.stickOpacity,screenShake:settings.presentation.screenShake,reducedMotion:settings.presentation.reducedMotion}}};this.#persistence?.save(this.#save);}
 
   private readonly frame=(now:number)=>{if(!this.#running)return;const elapsed=Math.min(100,Math.max(0,now-this.#lastTime));this.#lastTime=now;const nextScreen=this.#uiStore.getSnapshot().screen;if(nextScreen!==this.#screen){this.#accumulator=0;this.resetTransientInput();}this.#screen=nextScreen;this.refreshTip(now);
