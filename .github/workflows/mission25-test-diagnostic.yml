@@ -1,0 +1,27 @@
+name: Mission 25 regression diagnostic
+on:
+  push:
+    branches: [novastar/mission-25-performance-cutover]
+    paths: ['.github/workflows/mission25-test-diagnostic.yml']
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - shell: bash
+        run: |
+          set +e
+          npm test > mission25-test-output.txt 2>&1
+          echo $? > mission25-test-exit.txt
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mission25-test-diagnostic
+          path: |
+            mission25-test-output.txt
+            mission25-test-exit.txt
