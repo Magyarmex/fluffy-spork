@@ -46,6 +46,12 @@ CI is authoritative. Do not weaken tests merely to make a change green; fix the 
 
 ## Integration and release
 
-During NOVASTAR finalization, `NOVASTAR-INITIATIVE` is the canonical integration branch. Production `main` must not receive Foundation work until an explicit promotion action is authorized after the final acceptance marker is green. Reconcile any newer production behavior before integration rather than overwriting it.
+`main` is the normal destination for completed NOVA TANKS work. Agents own their changes through integration: implement on a focused branch, reconcile concurrent repository changes, run the required validation, and once the branch is green, merge their own completed update into `main` and verify the integrated branch. An ordinary task is not complete merely because a pull request is open or ready for review, and agents must not leave routine work awaiting human merge approval.
+
+Only an explicitly designated special integration/design initiative may use a different canonical integration branch or require a separate promotion approval before reaching `main`. Such an exception must be stated in the governing task or initiative specification; do not infer one from historical branch names or old workflows. When a special integration branch is active, agents should still merge their own assigned work into that branch once green unless its specification explicitly says otherwise.
+
+Before any merge, reconcile newer canonical behavior rather than overwriting it. After merging, verify the destination branch CI/status where available and fix integration failures rather than treating the feature-branch result as sufficient.
+
+The historical `NOVASTAR-INITIATIVE` branch was a temporary special integration branch during the Foundation migration. Its former promotion gate no longer applies to ordinary development.
 
 The pre-retirement runtime is preserved by Git history and the archival ref `archive/pre-mission-26-legacy-runtime`; it is historical evidence, not an alternative implementation to revive.
