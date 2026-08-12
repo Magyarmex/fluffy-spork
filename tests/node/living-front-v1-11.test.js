@@ -43,7 +43,6 @@ function tank(id,x,y,healthFraction=1,radius=30){return{state:{id,kind:'tank',li
 function projectile(id,x,y,vx,vy,radius=4){return{state:{id,kind:'projectile',lifecycle:'active',position:{x,y},rotation:0,team:{teamId:'p'},ownerId:'owner',spawnedAtTick:0,projectileDefinitionId:'test',velocity:{x:vx,y:vy}},radius};}
 function step(system,tick,shapes=[],tanks=[],projectiles=[]){return system.step({tick,elapsedMs:tick*1000/60,dtSeconds:1/60,shapes,tanks,projectiles});}
 
-// Stage I — Ecology Core.
 test('Living Front maturity rises in calm sectors, pressure disrupts it, and pressure decays', () => {
   const {compiled,system:{LivingFrontSystem},Battlefield,SeededRandom}=loadLivingFront();
   try{
@@ -88,13 +87,12 @@ test('Living Front spawn selection never returns solid terrain and mature calm s
     for(let i=0;i<80;i++){
       const p=ecology.chooseSpawnPoint('hexagon',()=>({x:1700,y:1700}));
       assert.equal(battlefield.isSpawnSafe(p,42),true,'high-value recovery cannot spawn inside solids');
-      if(p.x>=0&&p.y>=0&&p.x>1250&&p.y>1250)matureHits++;
+      if(p.x>1250&&p.y>1250)matureHits++;
     }
     assert.ok(matureHits>=20,'mature calm space receives a strong high-value weighting');
   }finally{compiled.dispose();}
 });
 
-// Stage II — Wild Instincts.
 test('Triangle evasion has a reaction floor and cannot chain infinite dodges', () => {
   const {compiled,system:{LivingFrontSystem},Battlefield,SeededRandom}=loadLivingFront();
   try{
@@ -126,10 +124,9 @@ test('Crasher telegraph commits a locked charge, overshoots misses, recovers, an
   try{
     const battlefield=new Battlefield({template:'crossfire'}),ecology=new LivingFrontSystem({battlefield,random:new SeededRandom(17),directorEnabled:false});
     const crasher=shape('crasher',1800,0),victim=tank('victim',2300,0,.2);
-    let locked;
-    let sawTelegraph=false,sawCharge=false,sawRecover=false;
+    let locked;let sawTelegraph=false,sawCharge=false,sawRecover=false;
     for(let tick=1;tick<=220;tick++){
-      if(sawCharge){victim.state={...victim.state,position:{x:2300,y:900}};}
+      if(sawCharge)victim.state={...victim.state,position:{x:2300,y:900}};
       step(ecology,tick,[crasher],[victim]);
       const phase=crasher.state.livingFront?.crasherPhase;
       if(phase==='telegraph')sawTelegraph=true;
@@ -167,7 +164,6 @@ test('Star roaming stays traversable instead of chasing like a boss', () => {
   }finally{compiled.dispose();}
 });
 
-// Stage III — Director and strategic AI.
 test('Bloom recognizes real ecological value and never manufactures it', () => {
   const {compiled,system:{LivingFrontSystem},Battlefield,SeededRandom}=loadLivingFront();
   try{
@@ -191,7 +187,6 @@ test('Migration signal requires actual cross-sector movement and Rogue Star is c
     herd.forEach((s,i)=>{s.state={...s.state,position:{x:-900+i*8,y:-1700}};});
     for(let tick=13;tick<=30;tick++)step(ecology,tick,herd);
     assert.equal(ecology.snapshot().signal?.type,'migration','signal follows physical sector crossings');
-
     const quiet=new LivingFrontSystem({battlefield:new Battlefield({template:'crossfire'}),random:new SeededRandom(37),directorEnabled:true});
     let first=false,second=false;
     for(let tick=1;tick<=8000;tick++){const r=step(quiet,tick);if(r.spawnRogueStar){if(!first)first=true;else second=true;}}
@@ -230,14 +225,23 @@ test('AI receives shape identity only through direct sight; ecology code contain
   }finally{compiled.dispose();}
 });
 
-// Performance and architecture contracts.
-test('Living Front planning stays decimated, spatially indexed, allocation-bounded, and entity growth capped', () => {
-  const source=readFileSync(path.join(root,'src/game/entities/shapes/LivingFrontSystem.ts'),'utf8');
+test('Controller automation remains local and never receives a strategic ecology command channel', () => {
   const battle=readFileSync(path.join(root,'src/scenes/gameplay/GameplayBattle.ts'),'utf8');
-  assert.match(source,/SECTOR_HZ_TICKS = 12/);assert.match(source,/BEHAVIOR_HZ_TICKS = 6/);assert.match(source,/DIRECTOR_HZ_TICKS = 30/);
-  assert.match(source,/class SpatialHash/);assert.match(source,/#projectileHash\.query/);assert.doesNotMatch(source,/for \(const projectile of frame\.projectiles\)/,'Triangles must not perform a global projectile scan');
+  const drones=readFileSync(path.join(root,'src/game/entities/drones/DroneSystem.ts'),'utf8');
+  assert.doesNotMatch(drones,/LivingFront|bloom|migration|rogue.?star/i);
+  assert.doesNotMatch(battle,/swarm-order[^\n]+bloom|swarm-order[^\n]+migration/i);
+  assert.match(battle,/executeDroneHarvest/,'existing local harvest automation remains integrated');
+});
+
+test('Living Front planning stays decimated, spatially indexed, allocation-bounded, and entity growth capped', () => {
+  const source=readFileSync(path.join(root,'src/game/entities/shapes/LivingFrontCore.ts'),'utf8');
+  const facade=readFileSync(path.join(root,'src/game/entities/shapes/LivingFrontSystem.ts'),'utf8');
+  const battle=readFileSync(path.join(root,'src/scenes/gameplay/GameplayBattle.ts'),'utf8');
+  assert.match(facade,/export \* from '.\/LivingFrontCore'/,'one canonical public owner is retained');
+  assert.match(source,/SECTOR_HZ_TICKS=12/);assert.match(source,/BEHAVIOR_HZ_TICKS=6/);assert.match(source,/DIRECTOR_HZ_TICKS=30/);
+  assert.match(source,/class SpatialHash/);assert.match(source,/#projectileHash\.query/);assert.doesNotMatch(source,/for\(const p of frame\.projectiles\)/,'Triangles must not perform a global projectile scan');
   assert.match(battle,/MAX_NORMAL_SHAPES=132/);assert.match(battle,/this\.normalShapeCount\(\)<MAX_NORMAL_SHAPES/);
-  assert.match(source,/#scratch: T\[\] = \[\]/,'query scratch storage is reused');
+  assert.match(source,/#scratch:T\[\]=\[\]/,'query scratch storage is reused');
 });
 
 test('Production Living Front planning remains inside a generous CI-safe frame budget', () => {
@@ -251,4 +255,12 @@ test('Production Living Front planning remains inside a generous CI-safe frame b
     const metrics=ecology.snapshot().telemetry;
     assert.ok(Number.isFinite(metrics.planningWorkEmaMs));assert.ok(metrics.planningWorkPeakMs<50,`planning peak ${metrics.planningWorkPeakMs.toFixed(2)}ms exceeded CI-safe budget`);
   }finally{compiled.dispose();}
+});
+
+test('Director and neutral presentation stay restrained and world-readable without a permanent ecology panel', () => {
+  const scene=readFileSync(path.join(root,'src/scenes/gameplay/GameplayScene.ts'),'utf8');
+  const renderer=readFileSync(path.join(root,'src/rendering/shapes/ShapeRenderer.ts'),'utf8');
+  assert.match(scene,/SHAPE BLOOM/);assert.match(scene,/MIGRATION/);assert.match(scene,/ROGUE STAR/);
+  assert.match(renderer,/crasherPhase/);assert.match(renderer,/bountyFraction/);assert.match(renderer,/triangleEvading/);
+  assert.doesNotMatch(scene,/maturity meter|capture bar|quest log/i);
 });
