@@ -2,7 +2,9 @@ import type { EntityState } from '../game/entities/types';
 import { BattlefieldRenderer } from './battlefield/BattlefieldRenderer';
 import { DroneRenderer } from './drones/DroneRenderer';
 import { EffectRenderer } from './effects/EffectRenderer';
+import { PowerupRenderer } from './powerups/PowerupRenderer';
 import { ProjectileRenderer } from './projectiles/ProjectileRenderer';
+import { ShapeRenderer } from './shapes/ShapeRenderer';
 import { TankRenderer } from './tanks/TankRenderer';
 import type { RenderCommand, RenderFrame, RenderFrameInput } from './types';
 
@@ -15,6 +17,8 @@ export class Renderer {
     private readonly tanks = new TankRenderer(),
     private readonly drones = new DroneRenderer(),
     private readonly projectiles = new ProjectileRenderer(),
+    private readonly shapes = new ShapeRenderer(),
+    private readonly powerups = new PowerupRenderer(),
     private readonly battlefield = new BattlefieldRenderer(),
     private readonly effects = new EffectRenderer(),
   ) {}
@@ -50,6 +54,8 @@ export class Renderer {
       case 'tank': return this.tanks.build(entity);
       case 'drone': return this.drones.build(entity);
       case 'projectile': return this.projectiles.build(entity);
+      case 'shape': return this.shapes.build(entity);
+      case 'powerup': return this.powerups.build(entity);
       default: return [];
     }
   }
