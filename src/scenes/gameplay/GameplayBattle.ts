@@ -445,7 +445,7 @@ export class GameplayBattle {
 
   private awardPlayerXp(amount: number): void {
     const before=this.#player.progression.level;
-    this.#player.progression=this.progressionSystem.gainXp(this.#player.progression,amount);
+    this.#player.progression=this.progressionSystem.gainXp(this.#player.progression,amount).state;
     this.#player.score+=amount;
     if(this.#player.progression.level!==before){
       this.#bestRunLevel=Math.max(this.#bestRunLevel,this.#player.progression.level);
@@ -463,7 +463,7 @@ export class GameplayBattle {
         if(target){const dx=target.state.position.x-runtime.state.position.x,dy=target.state.position.y-runtime.state.position.y,len=Math.hypot(dx,dy)||1;runtime.velocity={x:dx/len*SHAPE_DEFS.crasher.speed,y:dy/len*SHAPE_DEFS.crasher.speed};}
       }
       let next={x:runtime.state.position.x+runtime.velocity.x*dtSeconds,y:runtime.state.position.y+runtime.velocity.y*dtSeconds};
-      if(!this.battlefield.isInsideBounds(next,runtime.radius)){runtime.velocity={x:-runtime.velocity.x,y:-runtime.velocity.y};next={x:runtime.state.position.x+runtime.velocity.x*dtSeconds,y:runtime.state.position.y+runtime.velocity.y*dtSeconds};}
+      if(!this.battlefield.contains(next,runtime.radius)){runtime.velocity={x:-runtime.velocity.x,y:-runtime.velocity.y};next={x:runtime.state.position.x+runtime.velocity.x*dtSeconds,y:runtime.state.position.y+runtime.velocity.y*dtSeconds};}
       runtime.state={...runtime.state,position:next,rotation:runtime.state.rotation+runtime.spin*dtSeconds};
     }
   }
