@@ -129,12 +129,14 @@ export function TouchControls({ controller, settings }: { readonly controller: U
     onPointerMove={(event) => moveStick(name, event)}
     onPointerUp={(event) => endStick(name, event)}
     onPointerCancel={(event) => endStick(name, event)}
+    onLostPointerCapture={(event) => endStick(name, event)}
   >{label}</div>;
 
   const actionButton = (action: ActionName, label: string) => <button
     onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); setActionPointer(action, event.pointerId, true); }}
     onPointerUp={(event) => setActionPointer(action, event.pointerId, false)}
     onPointerCancel={(event) => setActionPointer(action, event.pointerId, false)}
+    onLostPointerCapture={(event) => setActionPointer(action, event.pointerId, false)}
   >{label}</button>;
 
   return <section aria-label="Touch controls" data-touch-controls="true"
