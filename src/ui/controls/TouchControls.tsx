@@ -82,6 +82,8 @@ export function TouchControls({ controller, settings }: { readonly controller: U
 
   const beginStick = (name: StickName, event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
+    const activeAnchor = anchors.current[name];
+    if (activeAnchor && activeAnchor.pointerId !== event.pointerId) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     anchors.current[name] = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
     state.current[`${name}Stick`] = { ...ZERO };
