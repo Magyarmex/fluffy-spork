@@ -1,0 +1,35 @@
+name: Mission 25 lockfile bootstrap
+
+on:
+  push:
+    branches: [novastar/mission-25-performance-cutover]
+    paths:
+      - '.github/workflows/mission25-lockfile.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: novastar/mission-25-performance-cutover
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Commit lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package-lock.json
+          if git diff --cached --quiet; then
+            echo 'package-lock.json already current'
+            exit 0
+          fi
+          git commit -m 'Mission 25: pin canonical production dependencies'
+          git push origin HEAD:novastar/mission-25-performance-cutover
