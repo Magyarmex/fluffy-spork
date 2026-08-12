@@ -26,8 +26,14 @@ for (const forbidden of [
 ]) {
   if (html.includes(forbidden)) fail(`Retired production dependency survived build: ${forbidden}`);
 }
-if (!/<link\b[^>]*\brel=["']manifest["'][^>]*\bhref=["'][^"']*manifest\.webmanifest["']/i.test(html)) {
+
+const manifestTag = html.match(/<link\b[^>]*\brel=["'][^"']*\bmanifest\b[^"']*["'][^>]*>/i)?.[0];
+const manifestHref = manifestTag?.match(/\bhref=["']([^"']+)["']/i)?.[1];
+if (!manifestHref || !/\.webmanifest(?:[?#].*)?$/i.test(manifestHref)) {
   fail('Production shell is missing manifest linkage');
+}
+if (manifestHref.startsWith('/')) {
+  fail(`Production manifest link is not relocatable: ${manifestHref}`);
 }
 if (!html.includes('assets/')) fail('Production shell is not linked to bundled canonical assets');
 
@@ -71,4 +77,4 @@ if (indexBytes > 32 * 1024) fail(`Canonical shell regressed above 32 KiB: ${inde
 
 let totalBytes = 0;
 for (const file of assets) totalBytes += (await stat(join(assetsDir.pathname, file))).size;
-console.log(JSON.stringify({ ok: true, indexBytes, assetCount: assets.length, assetBytes: totalBytes, moduleEntry }));
+console.log(JSON.stringify({ ok: true, indexBytes, assetCount: assets.length, assetBytes: totalBytes, moduleEntry, manifestHref }));
