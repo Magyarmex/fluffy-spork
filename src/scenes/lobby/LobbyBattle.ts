@@ -15,9 +15,9 @@ import { stepTankMovement } from '../../game/movement/TankMovement';
 import { stepProjectile, type ProjectileKinematicState } from '../../game/entities/projectiles/ProjectileKinematics';
 import { BuildResolver } from '../../game/progression/BuildResolver';
 import type { TankBuild } from '../../game/progression/types';
-import { entityId } from '../../game/simulation/types';
+import { entityId, type EntityId } from '../../game/simulation/types';
 import { PerceptionCore } from '../../game/targeting/PerceptionCore';
-import type { CommandEnvelope } from '../../input/commands/GameCommand';
+import type { CommandEnvelope, CommandSource, GameCommand } from '../../input/commands/GameCommand';
 import { LobbyPerformancePolicy } from './LobbyPerformancePolicy';
 
 const BASELINE_LEVEL = 30;
@@ -49,6 +49,7 @@ export interface LobbyBattleSnapshot {
   readonly projectiles: readonly ProjectileState[];
   readonly entities: readonly EntityState[];
   readonly events: readonly CombatSemanticEvent[];
+  readonly playerId?: EntityId;
 }
 
 export interface LobbyBattleOptions {
@@ -57,17 +58,12 @@ export interface LobbyBattleOptions {
 }
 
 /**
- * Canonical background battle used by the lobby.
+ * Canonical background battle used by the lobby and, in Mission 25, as the
+ * production arena host when player control is explicitly enabled.
  *
- * The old decorative War Room labeled every form level 30 even though current
- * canonical progression makes Tier 3 impossible at that level. Mission 20 may
- * not keep an impossible fake state: level 30 remains the baseline and only a
- * form whose legal unlock is later is raised to that canonical minimum.
- *
- * Apart from orchestration and cheaper scheduling, all behavior is delegated:
- * TankAIController, Mission 15 navigation, Mission 12 perception, Mission 17
- * drones, Mission 09 movement, Mission 10 combat/projectile kinematics, and
- * Mission 07 Battlefield geometry. No lobby-only class or combat rules live here.
+ * Player mode changes orchestration only: movement, perception, navigation,
+ * drones, weapons, projectiles, damage and terrain remain owned by their
+ * canonical systems. Normal lobby mode retains the Mission 20 AI-only behavior.
  */
 export class LobbyBattle {
   readonly level = BASELINE_LEVEL;
@@ -81,10 +77,13 @@ export class LobbyBattle {
   #tick = 0;
   #elapsedMs = 0;
   #shotSerial = 0;
+  #commandSequence = 0;
   #tanks: TankRuntime[] = [];
   #drones: DroneRuntime[] = [];
   #projectiles: ProjectileRuntime[] = [];
   #events: CombatSemanticEvent[] = [];
+  #playerTankId: EntityId | null = null;
+  #playerCommands = new Map<string, CommandEnvelope>();
 
   constructor(options: LobbyBattleOptions = {}) {
     this.policy = options.policy ?? new LobbyPerformancePolicy();
@@ -97,6 +96,26 @@ export class LobbyBattle {
 
   get tankCount(): number { return this.#tanks.length; }
   get canonicalTankCount(): number { return TankRegistry.size; }
+  get playerTankId(): EntityId | null { return this.#playerTankId; }
+
+  setPlayerTank(tankDefinitionId: string | null): EntityId | null {
+    if (tankDefinitionId === null) {
+      this.#playerTankId = null;
+      this.#playerCommands.clear();
+      return null;
+    }
+    const runtime = this.#tanks.find((entry) => entry.definition.id === tankDefinitionId);
+    if (!runtime) throw new Error(`Lobby battle has no canonical tank ${tankDefinitionId}`);
+    this.#playerTankId = runtime.state.id;
+    this.#playerCommands.clear();
+    return runtime.state.id;
+  }
+
+  issuePlayerCommand(command: GameCommand, source: CommandSource = 'keyboard'): void {
+    if (!this.#playerTankId) return;
+    const key = command.type === 'ability' ? `${command.type}:${command.slot}` : command.type;
+    this.#playerCommands.set(key, Object.freeze({ source, sequence:this.#commandSequence++, command }));
+  }
 
   step(steps = 1): LobbyBattleSnapshot {
     if (!Number.isInteger(steps) || steps < 0) throw new Error('Lobby battle steps must be a non-negative integer');
@@ -118,7 +137,7 @@ export class LobbyBattle {
     const projectiles = Object.freeze(this.policy.capProjectiles(this.#projectiles.map((entry) => freezeProjectile(entry.state))));
     const entities: readonly EntityState[] = Object.freeze([...tanks, ...drones, ...projectiles]);
     const actorLevels = Object.freeze(Object.fromEntries(this.#tanks.map((entry) => [entry.definition.id, entry.build.level])));
-    return Object.freeze({ tick:this.#tick, elapsedMs:this.#elapsedMs, level:BASELINE_LEVEL, actorLevels, tanks, drones, projectiles, entities, events:Object.freeze([...this.#events]) });
+    return Object.freeze({ tick:this.#tick, elapsedMs:this.#elapsedMs, level:BASELINE_LEVEL, actorLevels, tanks, drones, projectiles, entities, events:Object.freeze([...this.#events]), ...(this.#playerTankId ? { playerId:this.#playerTankId } : {}) });
   }
 
   private seedCanonicalRoster(): void {
@@ -156,7 +175,9 @@ export class LobbyBattle {
     this.#tanks.forEach((runtime, index) => {
       if (runtime.state.lifecycle !== 'active') return;
       const world = this.perception.perceive({ tick:this.#tick, elapsedMs:this.#elapsedMs, observerId:runtime.state.id, entities:frameEntities });
-      if (this.policy.shouldThink(this.#tick, index)) {
+      if (runtime.state.id === this.#playerTankId) {
+        runtime.commands = Object.freeze([...this.#playerCommands.values()].sort((a,b) => a.sequence - b.sequence));
+      } else if (this.policy.shouldThink(this.#tick, index)) {
         runtime.commands = runtime.ai.update({
           world, build:runtime.build, lineage:runtime.definition.lineage,
           selfHealthFraction:(runtime.state.health?.current ?? 0) / Math.max(1, runtime.state.health?.max ?? 1),
@@ -246,9 +267,29 @@ export class LobbyBattle {
       }
       runtime.kinematics = result.state;
       runtime.state = { ...runtime.state, position:result.state.position, velocity:result.state.velocity, rotation:Math.atan2(result.state.velocity.y, result.state.velocity.x) };
+
+      if (this.#playerTankId && this.resolveArenaHit(runtime)) continue;
       survivors.push(runtime);
     }
     this.#projectiles = survivors;
+  }
+
+  private resolveArenaHit(projectile: ProjectileRuntime): boolean {
+    const target = this.#tanks.find((entry) => {
+      if (entry.state.lifecycle !== 'active' || entry.state.id === projectile.state.ownerId) return false;
+      if (entry.state.team.teamId === projectile.spec.ownerTeamId) return false;
+      return Math.hypot(entry.state.position.x - projectile.state.position.x, entry.state.position.y - projectile.state.position.y) <= entry.definition.size + projectile.spec.radius;
+    });
+    if (!target) return false;
+    const health = target.state.health ?? { current:1, max:1 };
+    const hit = this.combat.resolveDirectHit({
+      projectile:projectile.spec,
+      target:{ id:String(target.state.id), teamId:target.state.team.teamId, position:target.state.position, velocity:target.velocity, radius:target.definition.size, health:health.current, maxHealth:health.max, alive:true },
+      atSeconds:this.#elapsedMs / 1000,
+    });
+    this.#events.push(...hit.events);
+    target.state = { ...target.state, health:{ current:hit.target.health, max:health.max }, ...(hit.destroyed ? { lifecycle:'destroyed', destroyedAtTick:this.#tick } : {}) };
+    return true;
   }
 
   private activeEntities(): readonly EntityState[] {

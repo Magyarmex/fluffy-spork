@@ -1,37 +1,26 @@
-import { defineConfig, type Plugin } from 'vite';
-import react from '@vitejs/plugin-react';
+import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { defineConfig, type Plugin } from 'vite';
+import react from '@vitejs/plugin-react';
 
 const repoBase = '/fluffy-spork/';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fromSrc = (path: string) => resolve(__dirname, 'src', path);
 
-function novaApplicationShell(): Plugin {
+function canonicalPwaAssets(): Plugin {
+  const assets = ['manifest.webmanifest', 'nova-icon.svg', 'sw.js'] as const;
   return {
-    name: 'nova-application-shell',
-    enforce: 'pre',
-    transformIndexHtml(html) {
-      // Mission 03 deliberately leaves the materialized gameplay runtime and
-      // ordered patch scripts in the historical page. Vite now owns the app
-      // boot seam, root, manifest, and PWA startup; Mission 04 contains the
-      // remaining legacy access behind src/legacy/.
-      const withoutHistoricalAppBoot = html
-        .replace(/\s*<link\s+rel=["']manifest["']\s+href=["']\.\/manifest\.webmanifest["']\s*\/?>/, '')
-        .replace(/\s*<script\s+defer\s+src=["']\.\/pwa-register\.js["']><\/script>/, '')
-        .replace(/\s*<div\s+id=["']root["']><\/div>/, '')
-        .replace(/\s*<script>\s*window\.__bootModule\(['"]main['"]\);\s*<\/script>/, '');
-
-      return {
-        html: withoutHistoricalAppBoot,
-        tags: [
-          {
-            tag: 'script',
-            attrs: { type: 'module', src: '/src/main.ts' },
-            injectTo: 'body',
-          },
-        ],
-      };
+    name: 'nova-canonical-pwa-assets',
+    apply: 'build',
+    generateBundle() {
+      for (const fileName of assets) {
+        this.emitFile({
+          type: 'asset',
+          fileName,
+          source: readFileSync(resolve(__dirname, fileName)),
+        });
+      }
     },
   };
 }
@@ -40,10 +29,11 @@ export default defineConfig(({ mode, command }) => {
   const isProdBuild = command === 'build' || mode === 'production';
 
   return {
-    plugins: [novaApplicationShell(), react()],
+    plugins: [react(), canonicalPwaAssets()],
     base: isProdBuild || process.env.GITHUB_PAGES === 'true' ? repoBase : '/',
     build: {
       sourcemap: true,
+      target: 'es2022',
     },
     resolve: {
       alias: {

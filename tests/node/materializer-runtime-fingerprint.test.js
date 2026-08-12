@@ -3,35 +3,28 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const deployPath = path.join(__dirname,'../../.github/workflows/deploy.yml');
-const deploy = fs.readFileSync(deployPath,'utf8');
+const root = path.join(__dirname, '../..');
+const deploy = fs.readFileSync(path.join(root, '.github/workflows/deploy.yml'), 'utf8');
+const validator = fs.readFileSync(path.join(root, 'scripts/validate-dist.mjs'), 'utf8');
 
-test('materializer loads Blackglass Mirror after the historical showroom fit layer',()=>{
-  const fit="'./nova-updates/showroom-fit-v1.7.3.js'";
-  const mirror="'./nova-updates/blackglass-mirror-v1.10.6.js'";
-  assert.ok(deploy.includes(fit),'historical showroom fit must remain materialized');
-  assert.ok(deploy.includes(mirror),'Blackglass Mirror v1.10.6 must be materialized');
-  assert.ok(deploy.indexOf(mirror)>deploy.indexOf(fit),'Mirror must load after the historical fit layer');
-  assert.match(deploy,/grep -q 'nova-updates\/blackglass-mirror-v1\.10\.6\.js' index\.html\.new/);
+test('Mission 25 retires materialization from the production workflow', () => {
+  for (const legacy of ['nova-gz/', 'nova-updates/', 'index.html.new', 'Materialize NOVA TANKS', 'git push']) {
+    assert.equal(deploy.includes(legacy), false, `${legacy} must not remain in production deployment`);
+  }
+  assert.match(deploy, /path: dist/);
+  assert.match(deploy, /actions\/deploy-pages@v4/);
 });
 
-test('materialized HTML fingerprint changes when a local runtime input changes',()=>{
-  assert.match(deploy,/import hashlib/);
-  assert.match(deploy,/runtime_inputs = \[/);
-  assert.match(deploy,/\*script_paths/);
-  assert.match(deploy,/'pwa-register\.js'/);
-  assert.match(deploy,/'sw\.js'/);
-  assert.match(deploy,/'manifest\.webmanifest'/);
-  assert.match(deploy,/'nova-updates\/releases\.json'/);
-  assert.match(deploy,/digest\.update\(input_path\.read_bytes\(\)\)/);
-  assert.match(deploy,/runtime_build = digest\.hexdigest\(\)\[:24\]/);
-  assert.match(deploy,/name="nova-runtime-build"/);
-  assert.match(deploy,/grep -q 'name="nova-runtime-build"' index\.html\.new/);
+test('legacy payload and patch assets remain repository validation artifacts until Mission 26', () => {
+  assert.ok(fs.existsSync(path.join(root, 'nova-gz')));
+  assert.ok(fs.existsSync(path.join(root, 'nova-updates', 'blackglass-mirror-v1.10.6.js')));
+  assert.ok(fs.existsSync(path.join(root, 'nova-updates', 'showroom-fit-v1.7.3.js')));
 });
 
-test('runtime fingerprint stamp is produced before the service-worker-visible shell is committed',()=>{
-  const stamp=deploy.indexOf('runtime_build = digest.hexdigest()[:24]');
-  const write=deploy.indexOf("path.write_text(html, encoding='utf-8')");
-  const commit=deploy.indexOf('- name: Commit the plain page');
-  assert.ok(stamp>=0 && write>stamp && commit>write);
+test('canonical artifact validation rejects production dependencies on the legacy runtime', () => {
+  assert.match(validator, /nova-updates\//);
+  assert.match(validator, /nova-gz\//);
+  assert.match(validator, /__novaModules/);
+  assert.match(validator, /__bootModule/);
+  assert.match(validator, /Legacy production dependency survived build/);
 });
