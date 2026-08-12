@@ -1,119 +1,100 @@
-# NOVA Foundation — Final Audit
+# NOVA Foundation — Final Acceptance Audit
 
 **Mission:** 26 — Legacy Retirement, Enforcement & Final Foundation Audit  
-**Audit date:** 2026-08-11 (America/Mexico_City)  
+**Audit date:** 2026-08-11 / 2026-08-12 boundary (America/Mexico_City)  
 **Mission 25 integration base:** `6a73ee8f2515f3a3ef02541dcea4e49c7410f580`  
-**Frozen production baseline / unchanged `main`:** `52009c406b948a7b9a9402bb56495f20b3918ba6`  
+**Production `main` baseline:** `52009c406b948a7b9a9402bb56495f20b3918ba6`  
 **Pre-retirement archival ref:** `archive/pre-mission-26-legacy-runtime` → `6a73ee8f2515f3a3ef02541dcea4e49c7410f580`  
-**Green implementation head:** `8362a7a622acf681a4b152c5298ea97a4d5de6c0`  
-**Green implementation CI:** run `31557136921`
+**Final green implementation head:** `c718126aae61f2322e535ffe25a16468df14ae2f`  
+**Final green implementation CI:** `31559781592`
 
-## 1. Final finding
+## 1. Disposition
 
-NOVA Foundation has reached the architectural end state defined by the mother specification. The active product is now described by the conventional TypeScript/Vite source tree rather than assembled from historical payloads and runtime patches. The legacy runtime is preserved as history, not as a second executable architecture.
+NOVA Foundation has reached the architectural end state required by the mother specification. The active game is now a conventional TypeScript/Vite product whose gameplay, AI, input, rendering, scenes, UI, audio, persistence, diagnostics, replay, PWA and release machinery live in explicit source-owned domains.
 
-The implementation gate at `8362a7a622acf681a4b152c5298ea97a4d5de6c0` passed `npm ci`, TypeScript typecheck, the complete Node regression suite, production build, `validate:dist`, and production Tailwind validation. The final completion marker is not eligible for canonical integration until the sealed documentation head independently passes the same CI gate.
+The final audit did more than prove that legacy files were deleted. It intentionally challenged whether the resulting Foundation build still represented **NOVA TANKS itself**. That review found several composition/product surfaces that earlier migration gates had not fully connected. Mission 26 corrected them before certification rather than accepting a mechanically green but functionally incomplete cutover.
 
-## 2. Legacy retirement inventory
+The final implementation head `c718126aae61f2322e535ffe25a16468df14ae2f` passed the complete repository gate in CI run `31559781592`: locked install, TypeScript typecheck, the full Node regression suite (including executable Mission 26 product tests), production build, hardened `validate:dist`, and production Tailwind validation.
 
-The active tree no longer contains or depends on:
+## 2. Legacy runtime retirement
 
-- `nova-gz/`;
-- `nova-payload/`;
-- `nova-updates/`;
-- the legacy materializer/reconstruction path;
-- standalone `pwa-register.js`;
-- `src/legacy/`;
-- `src/app/runtimeSelector.ts`;
-- the development dual-runtime switch;
-- `src/replay/ParityHarness.ts`;
-- historical module-registry globals such as `__novaModules`, `__novaCache`, `__novaMakeRequire`, and `__bootModule`;
-- runtime release-script injection;
-- patch-presence tests that only proved a historical JavaScript file had been injected.
+The active tree no longer contains or depends on `nova-gz/`, `nova-payload/`, `nova-updates/`, the historical materializer/reconstruction pipeline, standalone `pwa-register.js`, `src/legacy/`, `src/app/runtimeSelector.ts`, the development dual-runtime switch, migration-only `src/replay/ParityHarness.ts`, historical module-registry globals, versioned runtime script injection, or patch-presence tests whose only purpose was to prove a historical JavaScript patch was present.
 
-History is intentionally preserved by Git and by `archive/pre-mission-26-legacy-runtime`, whose target is the last canonical initiative commit before destructive retirement. Mission 01's baseline map/patch register and Mission 24's parity report remain documentary evidence only.
+The last pre-retirement state remains available only as history at `archive/pre-mission-26-legacy-runtime` → `6a73ee8f2515f3a3ef02541dcea4e49c7410f580`.
 
 ## 3. Single production architecture
 
-The active production flow is:
+The production flow is now `index.html → src/main.ts → src/app/bootstrap.ts → GameApp / FoundationRuntime → canonical scenes/systems → Vite dist/`. `index.html` is only a small host shell. Deployment builds and validates `dist/`; it no longer materializes a giant runtime HTML file, reconstructs payload chunks, injects release scripts, or commits generated runtime HTML.
 
-```text
-index.html
-  → src/main.ts
-  → src/app/bootstrap.ts
-  → GameApp / FoundationRuntime
-  → canonical game, input, AI, rendering, UI, audio, persistence and diagnostics
-```
+The PWA worker validates and stages the canonical Vite shell/assets atomically and retains previous complete builds for rollback without depending on retired runtime markers.
 
-`index.html` is a small Vite host shell. Production deployment builds and validates `dist/`; it does not mutate or commit generated runtime HTML. The service worker validates and stages the canonical bundled shell atomically.
+## 4. Final-audit corrections required before certification
 
-## 4. Final audit correction: browser input composition
+### 4.1 Real browser input composition
 
-The final audit found one integration gap that earlier migration evidence did not make visible enough: the production composition root sampled keyboard/mouse directly but had not yet connected the already-canonical Mission 13 touch and gamepad adapters to live browser composition.
+Mission 26 wires independent movement/aim touch sticks through `TouchInputAdapter`, fire/ability/ultimate through canonical `GameCommand`s, gamepad polling through `GamepadInputAdapter`, and keyboard/mouse through the same player-command boundary. Touch activity cannot be overwritten by desktop sampling. No gameplay authority moved into React or browser presentation.
 
-Mission 26 fixed this instead of accepting a paper-only parity claim:
+### 4.2 Main gameplay scene restored as the real game
 
-- `TouchControls.tsx` presents independent movement/aim twin sticks plus fire, ability and ultimate actions;
-- touch gestures are translated by the canonical `TouchInputAdapter` and forwarded as `GameCommand`s through `UIController`;
-- `FoundationRuntime` polls the canonical `GamepadInputAdapter` through `navigator.getGamepads()`;
-- touch pointer activity cannot be overwritten by simultaneous desktop pointer sampling;
-- canvas pointer handlers ignore touch pointers so presentation does not create a second control path;
-- no gameplay, movement, damage or targeting rule moved into React or the browser shell.
+The audit found that the production match surface had been reusing `LobbyBattle`, which is intentionally the War Room exhibition/background battle. Mission 26 created a distinct canonical `GameplayScene` / `GameplayBattle` which composes the systems migrated in Missions 05–18.
 
-The final acceptance regression now explicitly guards desktop command wiring, twin-stick touch wiring and gamepad wiring.
+The player-facing run now restores the core NOVA TANKS loop: Scout start, pity-start level from saved best run, eight AI rivals, the 121-neutral initial shape population (62 circles, 30 triangles, 16 squares, 8 pentagons, 4 hexagons, 1 star), crashers, powerups, XP, stat points, effective builds, Tier 1/Tier 2/mastery/gene/apex decisions, score/kills, death/redeploy, persistent best score/best level, and canonical rendering for shapes/powerups. Lobby War Room and Blackglass remain distinct canonical scenes.
 
-## 5. Architectural enforcement
+Executable Mission 26 tests instantiate the actual main-game session and verify Scout start, player + eight rivals, exact neutral seed, pity start, stat spending and deterministic identical-seed command streams.
 
-Mission 26 adds durable agent-facing ownership rules at:
+### 4.3 Fieldcraft restored as canonical content
 
-- `AGENTS.md`;
-- `src/game/AGENTS.md`;
-- `src/ai/AGENTS.md`;
-- `src/rendering/AGENTS.md`;
-- `src/content/AGENTS.md`;
-- `src/ui/AGENTS.md`.
+All 50 reviewed v1.7.9 Fieldcraft tips survive in `src/content/tips/FieldcraftTips.ts`, with the 10.4-second dwell contract, tags, non-repeating shuffle-bag rotation and deprecation support. Regression tests verify exact count, dwell, uniqueness and non-repeating selection.
 
-The final acceptance suite enforces the important boundaries mechanically:
+### 4.4 Living Archive restored canonically
 
-- simulation has no DOM/browser/presentation dependency;
-- rendering cannot import or invoke gameplay-authority systems;
-- AI cannot reacquire raw `GameWorld`/`EntityStore` hostile-state authority;
-- canonical registries have one declaration and live under `src/content/`;
-- retired module-registry and dual-runtime identifiers cannot reappear in active source/toolchain paths;
-- retired legacy directories/files must remain physically absent;
-- production artifact validation rejects old runtime dependencies if they reappear in output.
+Release history survives as canonical content/UI, including latest-release summary, expandable history, release-family metadata and reduced-motion-compatible presentation. The old runtime implementation is gone; the player-facing feature remains.
 
-The updated repository map makes the authoritative location of each subsystem explicit so a future agent does not need to reconstruct ownership from historical releases.
+### 4.5 Browser audio becomes an actual downstream consumer
 
-## 6. Definition of Done audit
+A browser-only `WebAudioPresenter` now sits downstream of Mission 22's `AudioEngine`. Combat semantic events map to restrained audio cues/music without granting audio any simulation authority. Mute/music-off persistence remains data driven.
 
-The mother specification defines 21 completion conditions. Their final disposition is:
+### 4.6 Drone attack/harvest intents receive their canonical consumer
 
-| # | Mother-spec requirement | Result | Evidence |
-|---:|---|---|---|
-| 1 | `index.html` is only a web entry shell | PASS | small Vite shell; Mission 26 shell regression and `validate:dist` |
-| 2 | `src/` is entirely NOVA | PASS | final repository map, retirement of `src/legacy/`, domain ownership guards |
-| 3 | `npm run build` produces the playable game from canonical source | PASS | implementation CI run `31557136921`; production Vite build |
-| 4 | No gameplay implementation lives in HTML | PASS | shell regression; artifact validator |
-| 5 | No `nova-gz` reconstruction exists | PASS | physical absence test and deployment guard |
-| 6 | No versioned release JS is injected at runtime | PASS | `nova-updates/` removed; deployment/artifact guards |
-| 7 | No `window.__novaModules` modification remains | PASS | runtime globals removed and forbidden by final acceptance test |
-| 8 | All tanks come from one registry | PASS | one `TankRegistry` declaration under `src/content/`; canonical-content regression |
-| 9 | Gameplay, Blackglass and lobby share canonical definitions | PASS | Mission 19/20 regressions remain green; final registry guard |
-| 10 | Human and AI tanks operate through common command and simulation systems | PASS | Mission 13/16 regressions plus final browser input wiring |
-| 11 | AI dynamic knowledge passes through explicit perception | PASS | Mission 12/14/16 regressions; final AI authority guard |
-| 12 | Simulation can run without DOM or rendering | PASS | Mission 06 headless tests; final simulation dependency guard |
-| 13 | Deterministic headless scenarios work | PASS | seeded simulation, battlefield, combat, navigation, AI and replay regressions |
-| 14 | Existing saves migrate correctly | PASS | Mission 23 migration/round-trip/rollback compatibility regressions remain green |
-| 15 | Desktop, mobile, touch, keyboard, mouse and gamepad regressions pass | PASS | Mission 13 + Mission 21 + Mission 24 coverage matrix + Mission 26 live composition wiring regressions |
-| 16 | Lobby simulation uses real gameplay entities | PASS | Mission 20 canonical lobby battle regressions |
-| 17 | Blackglass uses real rendering definitions | PASS | Mission 19 canonical scene/rendering regressions |
-| 18 | Debug diagnostics operate on structured subsystem data | PASS | Mission 23 structured diagnostic regressions |
-| 19 | Production deployment serves the Vite build | PASS | Mission 25 deployment workflow and final release-pipeline tests |
-| 20 | Legacy materialization code is deleted from the active tree | PASS | physical retirement + artifact/workflow guards |
-| 21 | An unfamiliar agent can locate authoritative mechanics without reverse-engineering releases | PASS | root/domain `AGENTS.md`, `src/README.md`, final `repository-map.md` |
+Mission 17 intentionally made `DroneSystem` responsible for formation, routing, target choice, recovery and attack/harvest intent while reserving damage and reward accounting for combat/progression ownership. Mission 26 found that main-game composition initially moved/repaired drones without consuming those attack/harvest intents.
 
-Final scoreboard values required by the mother specification are therefore:
+This is now closed correctly: `DroneSystem` still chooses intent; `DroneContactCombat` lives under `src/game/combat/` and delegates contact damage through canonical `CombatSystem.resolveDirectHit()`; `GameplayBattle` consumes attack/harvest intents; hostile tanks/drones can receive combat-owned drone damage; neutral shapes/player powerups can be harvested; and XP/score/resource credit remains progression/session owned. A dedicated Mission 26 regression protects this handoff.
+
+### 4.7 Persistence composition
+
+The live Foundation runtime loads/saves canonical best score, best run level and Pilot settings through the versioned Mission 23 persistence service. Historical localStorage compatibility remains only as a data-migration/rollback aid, not executable legacy architecture.
+
+## 5. Durable architectural enforcement
+
+Mission 26 adds root/domain `AGENTS.md` ownership contracts, final source/repository maps and mechanical guards for headless simulation, AI perception authority, rendering authority, canonical registry uniqueness, physical legacy retirement, forbidden legacy identifiers, production artifact cleanliness, live touch/gamepad command composition, distinct Gameplay/Lobby/Blackglass scenes, and executable product-level behavior.
+
+## 6. Mother-spec Definition of Done
+
+All 21 final requirements are audited PASS:
+
+1. `index.html` is only a web entry shell — PASS.
+2. `src/` is entirely NOVA — PASS.
+3. `npm run build` produces the playable game from canonical source — PASS.
+4. No gameplay implementation lives in HTML — PASS.
+5. No `nova-gz` reconstruction exists — PASS.
+6. No versioned release JS is injected at runtime — PASS.
+7. No module-registry global mutation remains — PASS.
+8. All tanks come from one canonical registry — PASS.
+9. Gameplay, Blackglass and lobby share canonical definitions — PASS.
+10. Human and AI tanks operate through common command/simulation systems — PASS.
+11. AI dynamic knowledge passes through explicit perception — PASS.
+12. Simulation can run without DOM/rendering — PASS.
+13. Deterministic headless scenarios work — PASS.
+14. Existing saves migrate correctly — PASS.
+15. Desktop/mobile/touch/keyboard/mouse/gamepad regression paths pass — PASS.
+16. Lobby simulation uses real gameplay entities — PASS.
+17. Blackglass uses real rendering definitions — PASS.
+18. Diagnostics use structured subsystem data — PASS.
+19. Production deployment serves the Vite build — PASS.
+20. Legacy materialization code is deleted from the active tree — PASS.
+21. An unfamiliar agent can locate authoritative mechanics without reverse-engineering releases — PASS.
+
+Final migration scoreboard:
 
 ```text
 legacy patches = 0
@@ -121,48 +102,30 @@ legacy gameplay logic in index.html = 0
 legacy runtime globals = 0
 ```
 
-## 7. Parity evidence and its limits
+## 7. Parity evidence — precise interpretation
 
-Mission 24 remains the migration parity evidence set. Its required matrix records desktop, portrait/landscape mobile, touch, mouse, keyboard, gamepad, five major combat lineages, major evolutions, representative Battlefield layouts, Blackglass, lobby, settings and PWA as covered by its harness gate plus the cumulative regression suite.
+Mission 24 remains the formal migration parity evidence set covering desktop/mobile orientations, touch/mouse/keyboard/gamepad, major lineages/evolutions, Battlefield layouts, Blackglass, lobby, settings and PWA. This audit does **not** overstate Mission 24 as a full live-browser two-complete-runtime E2E certification. Mission 26 found composition gaps those gates did not expose, corrected them, and added executable product-level regressions before permanent legacy deletion. No gameplay discrepancy discovered by the final audit was accepted as a migration exception.
 
-The final audit deliberately does **not** reinterpret that document as a full browser-to-browser end-to-end execution of two complete production runtimes. Mission 24 established deterministic replay contracts, a dual-runtime comparison boundary and required coverage gates while the legacy bridge still existed. That was useful migration evidence, but the final audit found that browser composition itself needed one additional check: touch/gamepad adapters had to be connected to `FoundationRuntime`. Mission 26 made that integration explicit and added regressions for it before legacy deletion was certified.
+## 8. Performance evidence — precise interpretation
 
-No gameplay discrepancy was accepted as an exception during this audit. Where stale tests were found, they were corrected only when the test encoded an obsolete implementation detail (historical patch presence, old component location, pre-retirement wording, or invalid registry fixture); canonical gameplay/content was not altered to satisfy those fixtures.
+Mission 25 remains the quantitative cutover/performance evidence: the materialized 265,431-byte production shell and 44-script runtime patch chain are gone in favor of a small Vite shell and bundled assets, bounded subsystem policies and artifact validation. Mission 26 does not invent unmeasured mobile FPS, thermal, battery or physical-device results.
 
-## 8. Performance evidence and its limits
+## 9. Persistence, PWA and rollback continuity
 
-Mission 25's performance report remains the quantitative cutover evidence. The verified architectural gain was removal of the 265,431-byte materialized production shell and 44 injected runtime patches in favor of a small Vite shell and normal bundled assets. Existing bounded simulation, AI, navigation, drone, rendering and lobby policies remain protected by their subsystem tests.
-
-Mission 26 did not invent mobile FPS, memory, thermal or device-lab measurements that were never collected. Final acceptance relies on the measured/CI evidence that exists and on architectural performance budgets already established by earlier missions.
-
-## 9. Persistence, offline and rollback continuity
-
-Mission 23's versioned save service and migration regressions remain green. Legacy key compatibility needed for existing users is data compatibility, not legacy runtime architecture, and therefore remains intentionally supported by persistence migration code.
-
-Mission 25's service-worker v4 remains the canonical offline updater. It stages immutable candidate builds, validates the Vite shell/assets, promotes complete builds atomically, and retains the previous complete build as rollback reserve. It no longer depends on historical module markers, patch resources or the standalone page-side PWA registration script.
+Mission 23's versioned save schema/migrations remain authoritative. Mission 25's service-worker v4 remains the canonical offline updater, staging complete immutable candidates, promoting atomically and keeping the previous complete build as rollback reserve.
 
 ## 10. Production-main reconciliation
 
-Production `main` was checked before Mission 26 and remained at the Mission 01 frozen production baseline `52009c406b948a7b9a9402bb56495f20b3918ba6`; therefore there was no newer production behavior to reconcile into Mission 26.
+Production `main` remained at `52009c406b948a7b9a9402bb56495f20b3918ba6`; there was no newer behavior to reconcile. Mission 26 integrates only into `NOVASTAR-INITIATIVE` and does **not** authorize or perform production promotion.
 
-Mission 26 must merge only into `NOVASTAR-INITIATIVE`. This audit does **not** authorize promotion to `main` and does not modify the live production branch.
+## 11. Final acceptance
 
-## 11. Historical retention
+**Implementation result:** PASS  
+**Final green implementation:** `c718126aae61f2322e535ffe25a16468df14ae2f`  
+**Implementation CI:** PASS — `31559781592`  
+**Legacy runtime:** retired from active tree  
+**Historical recovery:** preserved at `archive/pre-mission-26-legacy-runtime`  
+**Gameplay/product audit:** PASS after Mission 26 restoration work  
+**Production `main`:** unchanged
 
-The final pre-retirement Foundation initiative state is preserved at:
-
-```text
-archive/pre-mission-26-legacy-runtime
-→ 6a73ee8f2515f3a3ef02541dcea4e49c7410f580
-```
-
-This is the recovery/reference point for historical runtime archaeology. Future development must not revive it as an alternative active architecture. The canonical source tree and its domain contracts are the product authority.
-
-## 12. Readiness disposition
-
-Implementation audit: **PASS**.  
-Implementation CI: **PASS — run `31557136921` on `8362a7a622acf681a4b152c5298ea97a4d5de6c0`**.  
-Final sealed documentation CI: **required before merge**.  
-Production `main`: **unchanged / not promoted by Mission 26**.
-
-Once the sealed Mission 26 head passes the same full CI gate and is integrated into `NOVASTAR-INITIATIVE` with green post-merge CI, NOVA Foundation is **READY FOR MAIN PROMOTION**. Promotion itself remains a separate explicit action.
+After the documentation-sealed Mission 26 head passes the same complete CI gate and the resulting merge commit on `NOVASTAR-INITIATIVE` passes exact post-merge CI, the initiative disposition is **READY FOR MAIN PROMOTION**. Promotion remains a separate explicit action.
