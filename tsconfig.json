@@ -26,8 +26,7 @@
       "@ui/*": ["src/ui/*"],
       "@persistence/*": ["src/persistence/*"],
       "@diagnostics/*": ["src/diagnostics/*"],
-      "@shared/*": ["src/shared/*"],
-      "@legacy/*": ["src/legacy/*"]
+      "@shared/*": ["src/shared/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
