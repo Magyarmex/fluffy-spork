@@ -3,11 +3,17 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const zlib = require('node:zlib');
 
 const root = path.resolve(__dirname, '../..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const plain = (value) => JSON.parse(JSON.stringify(value));
-const legacyIndex = read('index.html');
+function legacySpecimen() {
+  const directory = path.join(root, 'nova-gz');
+  const encoded = fs.readdirSync(directory).filter((name) => /^\d+\.b64$/.test(name)).sort().map((name) => fs.readFileSync(path.join(directory, name), 'utf8').trim()).join('');
+  return zlib.gunzipSync(Buffer.from(encoded, 'base64')).toString('utf8');
+}
+const legacyIndex = legacySpecimen();
 const tanksSource = read('src/content/tanks/catalog.ts');
 const catalogSource = read('src/content/catalog.ts');
 const publicSource = read('src/content/index.ts');
@@ -69,7 +75,7 @@ function normalizedCanonicalTank(raw, escort) {
   });
 }
 
-test('Mission 05 canonical tank/weapon/drone balance is exact to materialized game/classes', () => {
+test('Mission 05 canonical tank/weapon/drone balance remains exact to the frozen legacy specimen', () => {
   const { classes, escort } = evalLegacyClasses();
   const canonical = evalCanonicalRawTanks();
   assert.equal(Object.keys(classes).length, 36);
