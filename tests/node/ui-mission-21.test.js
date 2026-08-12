@@ -125,7 +125,7 @@ missionTest('Mission 21 controller emits canonical commands and delegates progre
 
 missionTest('Mission 21 React remains a presentation shell with no gameplay authority imports', () => {
   const sources = [
-    'CanonicalUI.tsx', 'selectors.ts', 'store/UIStore.ts', 'actions/UIController.ts', 'settings/LiveSettings.ts', 'messages/MessageFeed.ts',
+    'CanonicalUI.tsx', 'controls/TouchControls.tsx', 'selectors.ts', 'store/UIStore.ts', 'actions/UIController.ts', 'settings/LiveSettings.ts', 'messages/MessageFeed.ts',
   ].map((file) => readFileSync(path.join(uiDir, file), 'utf8')).join('\n');
   assert.doesNotMatch(sources, /GameWorld|CombatSystem|EntityStore|stepTankMovement|applyDamage|spawnProjectile/);
   assert.doesNotMatch(sources, /\.evolve\(state|chooseMastery\(state|chooseGene\(state/);
@@ -135,7 +135,10 @@ missionTest('Mission 21 React remains a presentation shell with no gameplay auth
 });
 
 missionTest('Mission 21 covers required presentation surfaces without redesigning controls', () => {
-  const source = readFileSync(path.join(uiDir, 'CanonicalUI.tsx'), 'utf8');
+  const source = [
+    readFileSync(path.join(uiDir, 'CanonicalUI.tsx'), 'utf8'),
+    readFileSync(path.join(uiDir, 'controls/TouchControls.tsx'), 'utf8'),
+  ].join('\n');
   for (const token of ['HUD', 'NOVA menu', 'Evolution', 'Pilot settings', 'Blackglass UI', 'Debug data', 'Touch controls', 'Swarm commands']) {
     assert.match(source, new RegExp(token));
   }

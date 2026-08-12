@@ -4,6 +4,10 @@ import type { PerceivedContact } from '../game/targeting/types';
 import type { InputSettings } from '../input/commands/InputSettings';
 
 export type UIScreen = 'lobby' | 'match' | 'evolution' | 'blackglass' | 'settings' | 'debug';
+export type MatchStatus = 'playing' | 'paused' | 'dead';
+
+export interface LeaderboardEntry { readonly name:string; readonly score:number; readonly level:number; readonly isPlayer:boolean; }
+export interface MatchEffects { readonly shieldSeconds:number; readonly tripleSeconds:number; readonly hasteSeconds:number; }
 
 export interface AuthoritativeUIFrame {
   readonly tick: number;
@@ -12,6 +16,11 @@ export interface AuthoritativeUIFrame {
   readonly progression?: ProgressionState;
   readonly contacts?: readonly PerceivedContact[];
   readonly score?: number;
+  readonly kills?: number;
+  readonly bestScore?: number;
+  readonly matchStatus?: MatchStatus;
+  readonly leaderboard?: readonly LeaderboardEntry[];
+  readonly effects?: MatchEffects;
   readonly tip?: string;
   readonly debug?: Readonly<Record<string, unknown>>;
 }
@@ -24,9 +33,14 @@ export interface HUDViewModel {
   readonly xp?: number;
   readonly statPoints?: number;
   readonly score?: number;
+  readonly kills?: number;
+  readonly bestScore?: number;
+  readonly matchStatus?: MatchStatus;
   readonly tankId?: string;
   readonly hostileContacts: number;
   readonly friendlyContacts: number;
+  readonly leaderboard: readonly LeaderboardEntry[];
+  readonly effects?: MatchEffects;
 }
 
 export interface EvolutionViewModel {

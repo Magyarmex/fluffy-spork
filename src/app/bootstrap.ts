@@ -1,6 +1,5 @@
 import { GameApp } from '@app/GameApp';
 import { markBooting, markFailed, markRunning } from '@app/lifecycle';
-import { resolveDevelopmentRuntime } from '@app/runtimeSelector';
 
 declare global {
   interface Window {
@@ -124,15 +123,6 @@ export async function bootstrapApplication(): Promise<void> {
   const root = ensureApplicationRoot();
   ensureManifestLink();
   try {
-    const runtime = resolveDevelopmentRuntime(window.location.search, import.meta.env.DEV);
-    if (runtime.selected === 'legacy') {
-      if (!import.meta.env.DEV) throw new Error('Legacy runtime is development-only');
-      const { LegacyRuntime } = await import('@legacy/LegacyRuntime');
-      LegacyRuntime.fromWindow().boot('main');
-      markRunning();
-      void registerPwaRuntime();
-      return;
-    }
     const app = new GameApp(root);
     app.start();
     markRunning();
