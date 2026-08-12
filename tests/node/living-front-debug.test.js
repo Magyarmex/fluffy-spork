@@ -70,6 +70,18 @@ test('touch UI forgets stale held state on blur and page hide', () => {
     'touch-control visibility listeners must be cleaned up on unmount');
 });
 
+test('touch action buttons preserve ownership across multiple simultaneous pointers', () => {
+  const controls = readFileSync(path.join(root, 'src/ui/controls/TouchControls.tsx'), 'utf8');
+  assert.match(controls, /const actionPointers = useRef<Record<ActionName, Set<number>>>/,
+    'touch action state should track pointer ownership rather than one shared boolean');
+  assert.match(controls, /const held = pointers\.size > 0;/,
+    'releasing one pointer must not release an action while another pointer remains held');
+  assert.match(controls, /onPointerUp=\{\(event\) => setActionPointer\(action, event\.pointerId, false\)\}/,
+    'action release must remove only the pointer that actually ended');
+  assert.match(controls, /onPointerCancel=\{\(event\) => setActionPointer\(action, event\.pointerId, false\)\}/,
+    'cancelled pointers must release only their own action ownership');
+});
+
 test('redeploy starts a clean simulation run without inherited time or held controls', () => {
   const runtime = readFileSync(path.join(root, 'src/app/FoundationRuntime.ts'), 'utf8');
   assert.match(runtime, /redeploy\(\)\{this\.persistRun\(\);this\.#gameplay\.stop\(\);this\.#accumulator=0;this\.resetTransientInput\(\);this\.#gameplay=new GameplayScene/,
