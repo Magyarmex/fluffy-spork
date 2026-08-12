@@ -41,3 +41,9 @@ test('browser focus loss clears transient controls and installs/removes the blur
   assert.match(runtime, /window\.removeEventListener\('blur',this\.onBlur\)/,
     'runtime teardown should remove the focus-loss listener');
 });
+
+test('redeploy starts a clean simulation run without inherited time or held controls', () => {
+  const runtime = readFileSync(path.join(root, 'src/app/FoundationRuntime.ts'), 'utf8');
+  assert.match(runtime, /redeploy\(\)\{this\.persistRun\(\);this\.#gameplay\.stop\(\);this\.#accumulator=0;this\.resetTransientInput\(\);this\.#gameplay=new GameplayScene/,
+    'replacing a dead gameplay scene must clear fixed-step residue and transient input ownership first');
+});
