@@ -129,6 +129,7 @@ export class PerceptionCore {
       live: true,
       targetable: targetable(entity, rel),
       ...(detailed ? { rotation: entity.rotation, health: entity.health ? { ...entity.health } : undefined } : {}),
+      ...(detailed && directSight && entity.kind === 'shape' ? { shapeType: entity.shapeType } : {}),
     };
   }
 

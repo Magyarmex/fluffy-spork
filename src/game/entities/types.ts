@@ -51,9 +51,21 @@ export interface ProjectileState extends EntityBaseState {
   readonly velocity: Vector2State;
 }
 
+export interface LivingFrontShapeState {
+  /** Coarse ecological sector. Exposed for debug/telemetry, not gameplay UI. */
+  readonly sector: number;
+  /** Readable Crasher attack grammar. */
+  readonly crasherPhase?: 'track' | 'telegraph' | 'charge' | 'overshoot' | 'recover';
+  /** 0..1 visual energy level for fed Crasher bounty. */
+  readonly bountyFraction: number;
+  /** Presentation hint for the Triangle's short committed dodge. */
+  readonly triangleEvading: boolean;
+}
+
 export interface ShapeState extends EntityBaseState {
   readonly kind: 'shape';
   readonly shapeType: string;
+  readonly livingFront?: LivingFrontShapeState;
 }
 
 export interface PowerupState extends EntityBaseState {

@@ -33,6 +33,7 @@ function toObservation(contact: PerceivedContact): AIObservation {
     targetable: contact.targetable,
     ...(contact.rotation !== undefined ? { rotation: contact.rotation } : {}),
     ...(healthFraction(contact) !== undefined ? { healthFraction: healthFraction(contact) } : {}),
+    ...(contact.shapeType !== undefined ? { shapeType: contact.shapeType } : {}),
   });
 }
 

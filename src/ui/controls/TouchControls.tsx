@@ -1,10 +1,11 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { TouchInputAdapter } from '../../input/touch/TouchInputAdapter';
 import type { UIController } from '../actions/UIController';
 import type { UISettingsState } from '../types';
 
 type StickName = 'move' | 'aim';
+type ActionName = 'fire' | 'ability' | 'ultimate';
 
 interface StickAnchor {
   readonly pointerId: number;
@@ -35,6 +36,11 @@ export function TouchControls({ controller, settings }: { readonly controller: U
   if (!adapterRef.current) adapterRef.current = new TouchInputAdapter(() => settingsRef.current);
 
   const anchors = useRef<Record<StickName, StickAnchor | null>>({ move: null, aim: null });
+  const actionPointers = useRef<Record<ActionName, Set<number>>>({
+    fire: new Set<number>(),
+    ability: new Set<number>(),
+    ultimate: new Set<number>(),
+  });
   const state = useRef<TouchState>({
     moveStick: { ...ZERO },
     aimStick: { ...ZERO },
@@ -50,8 +56,34 @@ export function TouchControls({ controller, settings }: { readonly controller: U
     for (const envelope of adapter.poll()) controller.issue(envelope.command);
   };
 
+  const resetLocalTouchState = () => {
+    anchors.current = { move: null, aim: null };
+    for (const pointers of Object.values(actionPointers.current)) pointers.clear();
+    state.current = {
+      moveStick: { ...ZERO },
+      aimStick: { ...ZERO },
+      firing: false,
+      abilities: {},
+      ultimate: false,
+    };
+    emit();
+  };
+
+  useEffect(() => {
+    const onBlur = () => resetLocalTouchState();
+    const onVisibilityChange = () => { if (document.hidden) resetLocalTouchState(); };
+    window.addEventListener('blur', onBlur);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.removeEventListener('blur', onBlur);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [controller]);
+
   const beginStick = (name: StickName, event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
+    const activeAnchor = anchors.current[name];
+    if (activeAnchor && activeAnchor.pointerId !== event.pointerId) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     anchors.current[name] = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
     state.current[`${name}Stick`] = { ...ZERO };
@@ -78,10 +110,14 @@ export function TouchControls({ controller, settings }: { readonly controller: U
     emit();
   };
 
-  const setAction = (action: 'fire' | 'ability' | 'ultimate', active: boolean) => {
-    if (action === 'fire') state.current.firing = active;
-    else if (action === 'ability') state.current.abilities[0] = active;
-    else state.current.ultimate = active;
+  const setActionPointer = (action: ActionName, pointerId: number, active: boolean) => {
+    const pointers = actionPointers.current[action];
+    if (active) pointers.add(pointerId);
+    else pointers.delete(pointerId);
+    const held = pointers.size > 0;
+    if (action === 'fire') state.current.firing = held;
+    else if (action === 'ability') state.current.abilities[0] = held;
+    else state.current.ultimate = held;
     emit();
   };
 
@@ -93,12 +129,14 @@ export function TouchControls({ controller, settings }: { readonly controller: U
     onPointerMove={(event) => moveStick(name, event)}
     onPointerUp={(event) => endStick(name, event)}
     onPointerCancel={(event) => endStick(name, event)}
+    onLostPointerCapture={(event) => endStick(name, event)}
   >{label}</div>;
 
-  const actionButton = (action: 'fire' | 'ability' | 'ultimate', label: string) => <button
-    onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); setAction(action, true); }}
-    onPointerUp={() => setAction(action, false)}
-    onPointerCancel={() => setAction(action, false)}
+  const actionButton = (action: ActionName, label: string) => <button
+    onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); setActionPointer(action, event.pointerId, true); }}
+    onPointerUp={(event) => setActionPointer(action, event.pointerId, false)}
+    onPointerCancel={(event) => setActionPointer(action, event.pointerId, false)}
+    onLostPointerCapture={(event) => setActionPointer(action, event.pointerId, false)}
   >{label}</button>;
 
   return <section aria-label="Touch controls" data-touch-controls="true"
