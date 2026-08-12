@@ -54,10 +54,11 @@ A real npm lockfile is present so `npm ci` is reproducible rather than ceremonia
 `scripts/validate-dist.mjs` fails the build unless:
 
 - `dist/index.html`, `manifest.webmanifest`, `nova-icon.svg`, and `sw.js` exist and are non-empty;
-- the production shell links bundled assets and the manifest;
+- the production shell links bundled assets and the stable manifest;
 - no `nova-updates/`, `nova-gz/`, `__novaModules`, or `__bootModule` dependency survives in production HTML;
 - the manifest preserves NOVA TANKS scope/start behavior;
 - the atomic offline-update service worker contract remains present;
+- the worker validates the canonical Vite module shell and contains no dependency on `__bootModule`, `nova-updates/`, or the retired page-side `pwa-register.js` path;
 - at least one canonical JavaScript bundle is emitted;
 - the production HTML shell remains below 32 KiB.
 
@@ -65,7 +66,9 @@ The root legacy assets remain in the repository only as development/parity evide
 
 ## PWA/offline behavior
 
-The existing updater v3 remains the production service worker. Vite emits `sw.js`, `manifest.webmanifest`, and `nova-icon.svg` into `dist/`; application bootstrap still registers `./sw.js` with `updateViaCache: none`, synchronizes the latest complete build, preserves atomic staging/promotion, and retains the prior complete build as rollback reserve.
+Mission 25 advances the transactional updater to v4 for the canonical cutover. The prior v3 worker correctly staged immutable builds atomically but still validated the historical `__bootModule` marker and opportunistically requested legacy patch/update resources; that would have rejected the new canonical shell offline even though the normal build passed. The v4 worker instead validates the bundled module shell, stages its discovered canonical assets, preserves atomic staging/promotion and the previous complete build as rollback reserve, and retains legacy-cache fallback only as a migration safety net during worker replacement.
+
+Vite emits `sw.js`, `manifest.webmanifest`, and `nova-icon.svg` into `dist/`. Canonical application bootstrap owns registration and synchronization through `./sw.js` with `updateViaCache: none`, `NOVA_SYNC_LATEST`, online/visibility checks, controller changes, and optional periodic sync; the legacy standalone registration script is no longer a production dependency.
 
 ## Cutover result
 
