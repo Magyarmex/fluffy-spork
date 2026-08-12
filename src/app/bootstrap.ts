@@ -1,5 +1,7 @@
 import { GameApp } from '@app/GameApp';
 import { markBooting, markFailed, markRunning } from '@app/lifecycle';
+import { resolveDevelopmentRuntime } from '@app/runtimeSelector';
+import { LegacyRuntime } from '@legacy/LegacyRuntime';
 
 declare global {
   interface Window {
@@ -175,6 +177,14 @@ export async function bootstrapApplication(): Promise<void> {
   ensureManifestLink();
 
   try {
+    const runtime = resolveDevelopmentRuntime(window.location.search, import.meta.env.DEV);
+    if (runtime.selected === 'legacy') {
+      LegacyRuntime.fromWindow().boot('main');
+      markRunning();
+      void registerPwaRuntime();
+      return;
+    }
+
     const app = new GameApp(root);
     app.start();
     markRunning();
