@@ -31,6 +31,18 @@ if (!/<link\b[^>]*\brel=["']manifest["'][^>]*\bhref=["'][^"']*manifest\.webmanif
 }
 if (!html.includes('assets/')) fail('Production shell is not linked to bundled canonical assets');
 
+const moduleEntry = html.match(/<script\b[^>]*\btype=["']module["'][^>]*\bsrc=["']([^"']+)["']/i)?.[1];
+if (!moduleEntry) fail('Production shell is missing its canonical module entry');
+if (!moduleEntry.startsWith('./assets/')) {
+  fail(`Production module entry is not relocatable: ${moduleEntry}`);
+}
+for (const match of html.matchAll(/\b(?:src|href)=["']([^"']+)["']/gi)) {
+  const value = match[1];
+  if (/^\/(?:fluffy-spork\/)?assets\//.test(value)) {
+    fail(`Production shell contains a deployment-path-coupled asset URL: ${value}`);
+  }
+}
+
 const manifest = JSON.parse(await readFile(new URL('manifest.webmanifest', root), 'utf8'));
 if (manifest.name !== 'NOVA TANKS' || manifest.start_url !== './' || manifest.scope !== './') {
   fail('PWA manifest contract changed during Foundation finalization');
@@ -59,4 +71,4 @@ if (indexBytes > 32 * 1024) fail(`Canonical shell regressed above 32 KiB: ${inde
 
 let totalBytes = 0;
 for (const file of assets) totalBytes += (await stat(join(assetsDir.pathname, file))).size;
-console.log(JSON.stringify({ ok: true, indexBytes, assetCount: assets.length, assetBytes: totalBytes }));
+console.log(JSON.stringify({ ok: true, indexBytes, assetCount: assets.length, assetBytes: totalBytes, moduleEntry }));
