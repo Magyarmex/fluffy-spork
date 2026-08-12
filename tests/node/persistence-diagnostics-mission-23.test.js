@@ -146,6 +146,6 @@ missionTest('Mission 23 persistence remains offline/PWA-safe and does not own ga
     readFileSync(path.join(root, 'src/persistence/migrations.ts'), 'utf8'),
   ].join('\n');
   assert.doesNotMatch(source, /fetch\(|XMLHttpRequest|GameWorld|CombatSystem|applyDamage|TargetingService|EntityStore/);
-  assert.match(readFileSync(path.join(root, 'pwa-register.js'), 'utf8'), /serviceWorker/);
+  assert.match(readFileSync(path.join(root, 'src/app/bootstrap.ts'), 'utf8'), /serviceWorker\.register/);
   assert.match(readFileSync(path.join(root, 'sw.js'), 'utf8'), /caches\./);
 });
