@@ -24,7 +24,7 @@ test('Mission 26 resolves drone contact damage through canonical CombatSystem', 
       sourceId:'drone:a', sourceTeamId:'blue', position:{x:0,y:0}, damage:24, atSeconds:1,
       target:{ id:'tank:b', teamId:'red', position:{x:1,y:0}, velocity:{x:0,y:0}, radius:20, health:100, maxHealth:100, alive:true },
     });
-    assert.equal(result.applied, 24);
+    assert.equal(result.appliedDamage, 24);
     assert.equal(result.target.health, 76);
     assert.equal(result.destroyed, false);
   } finally { compiled.dispose(); }
