@@ -1,18 +1,14 @@
-import { LegacyRuntime } from '@legacy/LegacyRuntime';
+import { FoundationRuntime } from './FoundationRuntime';
 
 export class GameApp {
   readonly root: HTMLElement;
+  readonly runtime: FoundationRuntime;
 
-  constructor(
-    root: HTMLElement,
-    private readonly legacyRuntime: LegacyRuntime = LegacyRuntime.fromWindow(),
-  ) {
+  constructor(root: HTMLElement, runtime?: FoundationRuntime) {
     this.root = root;
+    this.runtime = runtime ?? new FoundationRuntime(root);
   }
 
-  start(): void {
-    // Gameplay is still intentionally legacy-owned at this stage, but the
-    // application shell no longer understands its browser-global boot seam.
-    this.legacyRuntime.boot('main');
-  }
+  start(): void { this.runtime.start(); }
+  stop(): void { this.runtime.stop(); }
 }
