@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { TouchInputAdapter } from '../../input/touch/TouchInputAdapter';
 import type { UIController } from '../actions/UIController';
@@ -49,6 +49,29 @@ export function TouchControls({ controller, settings }: { readonly controller: U
     adapter.ingest(state.current);
     for (const envelope of adapter.poll()) controller.issue(envelope.command);
   };
+
+  const resetLocalTouchState = () => {
+    anchors.current = { move: null, aim: null };
+    state.current = {
+      moveStick: { ...ZERO },
+      aimStick: { ...ZERO },
+      firing: false,
+      abilities: {},
+      ultimate: false,
+    };
+    emit();
+  };
+
+  useEffect(() => {
+    const onBlur = () => resetLocalTouchState();
+    const onVisibilityChange = () => { if (document.hidden) resetLocalTouchState(); };
+    window.addEventListener('blur', onBlur);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.removeEventListener('blur', onBlur);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [controller]);
 
   const beginStick = (name: StickName, event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
