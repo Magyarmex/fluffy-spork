@@ -56,6 +56,20 @@ test('page hiding and pointer cancellation release transient controls', () => {
     'runtime teardown should remove the pointer cancellation listener');
 });
 
+test('touch UI forgets stale held state on blur and page hide', () => {
+  const controls = readFileSync(path.join(root, 'src/ui/controls/TouchControls.tsx'), 'utf8');
+  assert.match(controls, /const resetLocalTouchState = \(\) => \{[\s\S]*anchors\.current = \{ move: null, aim: null \};[\s\S]*firing: false,[\s\S]*abilities: \{\},[\s\S]*ultimate: false,[\s\S]*emit\(\);/,
+    'touch presentation state must be neutralized instead of resurrecting a stale held command on the next touch event');
+  assert.match(controls, /window\.addEventListener\('blur', onBlur\)/,
+    'touch controls should clear their own local state when focus is lost');
+  assert.match(controls, /document\.addEventListener\('visibilitychange', onVisibilityChange\)/,
+    'touch controls should clear their own local state when the page is hidden');
+  assert.match(controls, /window\.removeEventListener\('blur', onBlur\)/,
+    'touch-control focus listeners must be cleaned up on unmount');
+  assert.match(controls, /document\.removeEventListener\('visibilitychange', onVisibilityChange\)/,
+    'touch-control visibility listeners must be cleaned up on unmount');
+});
+
 test('redeploy starts a clean simulation run without inherited time or held controls', () => {
   const runtime = readFileSync(path.join(root, 'src/app/FoundationRuntime.ts'), 'utf8');
   assert.match(runtime, /redeploy\(\)\{this\.persistRun\(\);this\.#gameplay\.stop\(\);this\.#accumulator=0;this\.resetTransientInput\(\);this\.#gameplay=new GameplayScene/,
