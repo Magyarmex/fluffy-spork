@@ -90,7 +90,7 @@ test('Living Archive survives as canonical release content with current release 
   try {
     const archive = require(path.join(compiled.out, 'content/releases/ReleaseHistory.js'));
     assert.ok(archive.RELEASE_HISTORY.length >= 25);
-    assert.equal(archive.LATEST_RELEASE.version, '1.10.9');
+    assert.equal(archive.LATEST_RELEASE.version, '1.11.0');
     assert.equal(archive.RELEASE_HISTORY[0], archive.LATEST_RELEASE);
     assert.ok(archive.RELEASE_HISTORY.some((entry) => entry.version === '1.7.9'));
     assert.ok(archive.RELEASE_HISTORY.some((entry) => entry.version === '1.2.0'));
