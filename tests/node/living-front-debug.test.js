@@ -82,6 +82,14 @@ test('touch action buttons preserve ownership across multiple simultaneous point
     'cancelled pointers must release only their own action ownership');
 });
 
+test('touch sticks keep their original pointer owner until it releases', () => {
+  const controls = readFileSync(path.join(root, 'src/ui/controls/TouchControls.tsx'), 'utf8');
+  assert.match(controls, /const activeAnchor = anchors\.current\[name\];[\s\S]*if \(activeAnchor && activeAnchor\.pointerId !== event\.pointerId\) return;/,
+    'a second finger landing on an occupied stick must not steal ownership or zero the first pointer movement');
+  assert.match(controls, /if \(!anchor \|\| anchor\.pointerId !== event\.pointerId\) return;/,
+    'only the owning pointer may move or release a touch stick');
+});
+
 test('redeploy starts a clean simulation run without inherited time or held controls', () => {
   const runtime = readFileSync(path.join(root, 'src/app/FoundationRuntime.ts'), 'utf8');
   assert.match(runtime, /redeploy\(\)\{this\.persistRun\(\);this\.#gameplay\.stop\(\);this\.#accumulator=0;this\.resetTransientInput\(\);this\.#gameplay=new GameplayScene/,
