@@ -1,4 +1,5 @@
 import { FIELDCRAFT_TIPS, type FieldcraftTip } from '../../content/tips/FieldcraftTips';
+import { LIVING_FRONT_TIPS } from '../../content/tips/LivingFrontTips';
 
 export interface TipDeckOptions { readonly random?:()=>number; readonly tips?:readonly FieldcraftTip[]; }
 
@@ -9,7 +10,7 @@ export class TipDeck {
   readonly #bags=new Map<string,string[]>();
   readonly #last=new Map<string,string>();
 
-  constructor(options:TipDeckOptions={}) { this.#random=options.random??Math.random; this.#tips=[...(options.tips??FIELDCRAFT_TIPS)]; }
+  constructor(options:TipDeckOptions={}) { this.#random=options.random??Math.random; this.#tips=[...(options.tips??[...FIELDCRAFT_TIPS,...LIVING_FRONT_TIPS])]; }
   current(tags?:readonly string[]):readonly FieldcraftTip[]{const active=this.#tips.filter((entry)=>entry.active);return Object.freeze(tags?.length?active.filter((entry)=>tags.some((tag)=>entry.tags.includes(tag))):active);}
   register(entry:FieldcraftTip):void{const index=this.#tips.findIndex((tip)=>tip.id===entry.id);if(index>=0)this.#tips[index]=entry;else this.#tips.push(entry);this.reset();}
   deprecate(id:string):boolean{const index=this.#tips.findIndex((tip)=>tip.id===id);if(index<0)return false;this.#tips[index]=Object.freeze({...this.#tips[index],active:false});this.reset();return true;}
