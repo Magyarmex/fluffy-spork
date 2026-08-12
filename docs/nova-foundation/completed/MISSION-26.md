@@ -1,91 +1,87 @@
 # Mission 26 — Legacy Retirement, Enforcement & Final Foundation Audit
 
-**Status:** SEALED — AWAITING SEALED-HEAD CI
+**Status: COMPLETE**
 
 ## Sequence gate
 
-- Predecessor: Mission 25 — COMPLETE.
 - Mission 25 canonical integration: `6a73ee8f2515f3a3ef02541dcea4e49c7410f580`.
-- Mission 25 integrated CI: PASS (`31554356510`).
+- Mission 25 post-merge CI: PASS (`31554356510`).
 - Production `main` before Mission 26: `52009c406b948a7b9a9402bb56495f20b3918ba6`.
 - No newer production commit required reconciliation.
 
 ## Completed scope
 
-Mission 26 removes the migration baseplate from the active product and enforces the final Foundation ownership model.
+Mission 26 retires the migration baseplate and leaves one conventional TypeScript/Vite NOVA TANKS architecture.
 
-Retired from the active tree/runtime:
+Removed from the active tree/runtime:
 
-- `nova-gz/`;
-- `nova-payload/`;
-- `nova-updates/` and versioned runtime injection;
+- `nova-gz/` and `nova-payload/`;
+- `nova-updates/` and runtime release-script injection;
 - legacy materializer/reconstruction machinery;
-- `pwa-register.js` standalone registration path;
+- standalone `pwa-register.js`;
 - `src/legacy/`;
-- the dual-runtime application selector;
-- migration-only `ParityHarness`;
+- dual-runtime selector / `runtime=legacy`;
+- migration-only parity runtime bridge;
 - historical module-registry globals and bootstrap hooks;
-- obsolete tests whose only purpose was to prove historical patch presence.
+- obsolete patch-presence tests.
 
-Preserved historical recovery point:
+Historical recovery is retained at `archive/pre-mission-26-legacy-runtime` → `6a73ee8f2515f3a3ef02541dcea4e49c7410f580`.
 
-- `archive/pre-mission-26-legacy-runtime` → `6a73ee8f2515f3a3ef02541dcea4e49c7410f580`.
+## Final audit corrections
 
-Added final architecture enforcement:
+The final audit refused to treat legacy deletion alone as success and corrected real product/composition gaps before certification:
 
-- root and domain `AGENTS.md` contracts;
-- final repository/source ownership maps;
-- retirement and forbidden-identifier tests;
-- simulation/headless dependency guard;
-- AI raw-state authority guard;
-- rendering gameplay-authority guard;
-- canonical-registry uniqueness guard;
-- hardened production artifact validation.
+1. Live twin-stick touch and gamepad adapters are wired into the canonical command path alongside keyboard/mouse.
+2. The playable match is now a distinct canonical `GameplayScene` rather than the War Room `LobbyBattle`; it restores Scout/pity start, eight rivals, neutral shapes, powerups, XP/upgrades/evolutions/mastery/gene/apex, score/kills, death/redeploy and persisted best-run state.
+3. All 50 reviewed Fieldcraft tips survive canonically with 10.4-second dwell, non-repeating rotation and deprecation support.
+4. Living Archive release history survives as canonical content/UI.
+5. Mission 22 semantic audio has a concrete downstream browser WebAudio presenter without gameplay authority.
+6. Mission 17 attack/harvest intents are consumed in the main game; drone contact damage is resolved through canonical `CombatSystem` via `DroneContactCombat`, with progression/session ownership retaining rewards.
+7. Canonical persistence is wired into the live runtime for best score, best level and Pilot settings.
 
-## Final audit correction
+## Enforcement
 
-The final audit identified one legitimate production-composition gap before certification: canonical Mission 13 touch/gamepad adapters existed, but the browser composition root still sampled only keyboard/mouse directly.
-
-Mission 26 closes that gap without moving gameplay into presentation:
-
-- canonical twin-stick touch UI feeds `TouchInputAdapter` and `GameCommand`s;
-- gamepad polling feeds `GamepadInputAdapter` and the same command path;
-- touch activity cannot be overwritten by desktop sampling;
-- touch pointer events do not create a second canvas-control implementation.
+Mission 26 adds root/domain agent contracts, final repository/source ownership maps and CI guards preventing reintroduction of the retired runtime, raw AI state authority, rendering gameplay authority, duplicate registries or browser dependencies in simulation.
 
 ## Validation
 
-Green implementation head:
+Final green implementation head prior to this marker seal:
 
-- commit: `8362a7a622acf681a4b152c5298ea97a4d5de6c0`
-- CI run: `31557136921`
-- `npm ci`: PASS
-- `npm run typecheck`: PASS
-- full Node regression suite: PASS (156 tests)
-- `npm run build`: PASS
-- `npm run validate:dist`: PASS
+- `c718126aae61f2322e535ffe25a16468df14ae2f`
+- CI run `31559781592`
+- locked install: PASS
+- TypeScript typecheck: PASS
+- complete Node regression suite: PASS
+- production build: PASS
+- `validate:dist`: PASS
 - production Tailwind validation: PASS
 
-The final audit is recorded in `docs/nova-foundation/FOUNDATION_FINAL_AUDIT.md`.
+The complete Definition-of-Done audit and evidence disclosure are in `docs/nova-foundation/FOUNDATION_FINAL_AUDIT.md`.
 
-## Parity / performance disposition
+This marker is `COMPLETE` because implementation and all Mission 26 acceptance work are finished. The marker-sealed branch head must still pass the same CI gate before merge, and the exact integration commit on `NOVASTAR-INITIATIVE` must pass post-merge CI before canonical closure is announced.
 
-Mission 24 parity evidence and all retained canonical subsystem regressions remain the migration evidence. Mission 26 does not overstate Mission 24 as a full live-browser two-runtime E2E exercise; the final browser input-composition gap found by this audit was fixed and regression-covered before retirement was certified.
+## Parity/performance disclosure
 
-Mission 25 remains the measured production-cutover/performance evidence. Mission 26 introduces no invented mobile FPS, thermal or memory measurements and performs no balance redesign.
+Mission 24 remains the migration parity evidence but is not misrepresented as a full browser-to-browser two-runtime E2E certification. Mission 26 found and fixed composition gaps before final deletion and added executable product-level regressions.
 
-## Gameplay and data preservation
+Mission 25 remains the quantitative cutover/performance evidence. No unmeasured mobile FPS, thermal, battery or physical-device results are invented.
 
-No balance, lineage, progression, Battlefield, Controller/Sniper doctrine, Blackglass model, lobby gameplay rule, combat rule, graphics language, audio language or intended persistent user preference was intentionally redesigned by this mission.
+## Final scoreboard
 
-Versioned persistence migrations and legacy-key data compatibility remain because they protect user saves; the executable legacy runtime does not.
+```text
+legacy patches = 0
+legacy gameplay logic in index.html = 0
+legacy runtime globals = 0
+```
 
-## Mainline reconciliation
+All 21 mother-spec final requirements are audited PASS.
 
-`main` was unchanged from the frozen production SHA, so no source reconciliation was necessary. Mission 26 does not promote Foundation to `main`.
+## Mainline disposition
 
-## Completion gate
+Mission 26 does **not** merge or promote Foundation to production `main`.
 
-This marker is intentionally not `COMPLETE` until the documentation-sealed branch head independently passes the complete CI gate. After that result is recorded, this marker will be advanced to `Status: COMPLETE`, revalidated, merged only into `NOVASTAR-INITIATIVE`, and the exact post-merge integration CI must pass.
+After sealed-head CI and exact post-merge `NOVASTAR-INITIATIVE` CI are green, the project disposition is:
 
-Final successful canonical disposition after those gates: **READY FOR MAIN PROMOTION**. Promotion to `main` remains a separate explicit action.
+**READY FOR MAIN PROMOTION**
+
+Production promotion remains a separate explicit user-authorized action.
