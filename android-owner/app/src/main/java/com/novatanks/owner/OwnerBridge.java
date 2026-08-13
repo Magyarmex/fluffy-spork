@@ -17,11 +17,12 @@ final class OwnerBridge {
     @JavascriptInterface
     public String getOwnerStateJson() {
         try {
+            boolean enrolled = OwnerEnrollment.isEnrolled(activity.getApplicationContext());
             JSONObject state = new JSONObject();
-            state.put("owner", true);
-            state.put("phoneBound", true);
-            state.put("bindingId", OwnerIdentity.bindingId());
-            state.put("capability", "nova.owner.operations.v1");
+            state.put("owner", enrolled);
+            state.put("phoneBound", enrolled);
+            state.put("bindingId", enrolled ? OwnerIdentity.bindingId() : "");
+            state.put("capability", enrolled ? "nova.owner.operations.v1" : "");
             return state.toString();
         } catch (Exception error) {
             return "{}";
@@ -30,16 +31,13 @@ final class OwnerBridge {
 
     @JavascriptInterface
     public String getWorkItemsJson() {
+        if (!OwnerEnrollment.isEnrolled(activity.getApplicationContext())) return "[]";
         return OperationStore.itemsJson(activity.getApplicationContext());
     }
 
     @JavascriptInterface
-    public String signChallenge(String challenge) {
-        return OwnerIdentity.signChallenge(challenge == null ? "" : challenge);
-    }
-
-    @JavascriptInterface
     public void openWorkItem(String id, String source) {
+        if (!OwnerEnrollment.isEnrolled(activity.getApplicationContext())) return;
         String pkg = packageFor(source);
         activity.runOnUiThread(() -> {
             try {

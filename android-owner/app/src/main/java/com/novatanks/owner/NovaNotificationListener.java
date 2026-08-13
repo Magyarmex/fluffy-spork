@@ -14,6 +14,7 @@ public final class NovaNotificationListener extends NotificationListenerService 
 
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
+        if (!OwnerEnrollment.isEnrolled(getApplicationContext())) return;
         if (sbn == null || sbn.getNotification() == null) return;
         Bundle extras = sbn.getNotification().extras;
         String title = extras == null ? "" : String.valueOf(extras.getCharSequence(Notification.EXTRA_TITLE, ""));
@@ -22,11 +23,8 @@ public final class NovaNotificationListener extends NotificationListenerService 
             CharSequence big = extras.getCharSequence(Notification.EXTRA_BIG_TEXT, "");
             if (big != null) text = big.toString();
         }
-
-        JSONObject item = OperationStore.record(
-                getApplicationContext(), sbn.getKey(), sbn.getPackageName(), title, text, sbn.getPostTime());
+        JSONObject item = OperationStore.record(getApplicationContext(), sbn.getKey(), sbn.getPackageName(), title, text, sbn.getPostTime());
         if (item == null) return;
-
         Intent intent = new Intent(ACTION_OPERATION);
         intent.setPackage(getPackageName());
         intent.putExtra(EXTRA_OPERATION, item.toString());
