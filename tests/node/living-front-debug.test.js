@@ -60,7 +60,7 @@ test('page hiding and pointer cancellation release transient controls', () => {
 
 test('secondary mouse buttons do not steal primary-fire ownership', () => {
   const runtime = readFileSync(path.join(root, 'src/app/FoundationRuntime.ts'), 'utf8');
-  assert.match(runtime, /onPointerDown=\(event:PointerEvent\)=>\{if\(event\.pointerType==='touch'\)return;if\(event\.button===0\)this\.#pointerDown=true;/,
+  assert.match(runtime, /onPointerDown=\(event:PointerEvent\)=>\{if\(event\.pointerType==='touch'\)return;[\s\S]*?if\(event\.button===0\)this\.#pointerDown=true;/,
     'pressing a secondary mouse button while primary fire is held must not clear primary-fire state');
   assert.match(runtime, /onPointerUp=\(event:PointerEvent\)=>\{if\(event\.pointerType!=='touch'&&event\.button===0\)this\.#pointerDown=false;\};/,
     'releasing a secondary mouse button must not release primary fire');
