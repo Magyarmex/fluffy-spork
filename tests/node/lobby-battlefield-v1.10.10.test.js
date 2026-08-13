@@ -71,6 +71,16 @@ test('decorative world freezes only progression and restores real class-owned dr
   assert.match(source, /g\.shapeTimer=1e9;g\.powerupTimer=1e9;g\.eliteTimer=1e9/);
 });
 
+test('Live War Room remounts if React removes injected presentation nodes', () => {
+  assert.match(source, /current=new LiveWorld\(c,m\);current\.atmosphere=a;current\.start\(\)/);
+  assert.match(source, /!current\.canvas\.isConnected/);
+  assert.match(source, /current\.canvas\.parentElement!==current\.menu/);
+  assert.match(source, /!current\.atmosphere\.isConnected/);
+  assert.match(source, /current\.atmosphere\.parentElement!==current\.menu/);
+  assert.match(source, /if\(current&&\(!m\|\|current\.menu!==m\|\|!m\.isConnected\|\|detached\)\)\{current\.destroy\(\);current=null;\}/);
+  assert.match(source, /if\(m&&!current\)mount\(m\)/);
+});
+
 test('Live War Room obeys Signal Discipline and loads after it', () => {
   const oldRuntime = "'./nova-updates/lobby-battlefield-v1.10.1.js',";
   const parity = "'./nova-updates/applied-power-parity-v1.10.8.js',";
