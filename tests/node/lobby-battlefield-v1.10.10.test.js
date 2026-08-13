@@ -81,6 +81,14 @@ test('Live War Room remounts if React removes injected presentation nodes', () =
   assert.match(source, /if\(m&&!current\)mount\(m\)/);
 });
 
+test('Live War Room clears stale owned nodes before remounting', () => {
+  assert.match(source, /function removeStalePresentation\(m\)/);
+  assert.match(source, /querySelectorAll\('\.nv-lobby-battlefield,\.nv-lobby-atmosphere'\)/);
+  assert.match(source, /if\(stale\[i\]\.parentElement===m\)m\.removeChild\(stale\[i\]\)/);
+  assert.match(source, /function mount\(m\)\{\s*if\(!m\)return;\s*removeStalePresentation\(m\);/);
+  assert.doesNotMatch(source, /if\(!m\|\|m\.querySelector\('\.nv-lobby-battlefield'\)\)return/);
+});
+
 test('Live War Room obeys Signal Discipline and loads after it', () => {
   const oldRuntime = "'./nova-updates/lobby-battlefield-v1.10.1.js',";
   const parity = "'./nova-updates/applied-power-parity-v1.10.8.js',";
