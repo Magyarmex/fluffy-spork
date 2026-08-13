@@ -1,6 +1,7 @@
 @import "tailwindcss" source(none);
-@source "../src";
-@source inline("pointer-events-none font-display");
+@source "../index.html";
+@source "../index.html.new";
+@source "../nova-updates";
 
 @theme {
   --font-display: "Orbitron", ui-sans-serif, system-ui, sans-serif;

@@ -1,60 +1,34 @@
-import { readFileSync } from 'node:fs';
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { defineConfig, type Plugin } from 'vite';
-import react from '@vitejs/plugin-react';
 
+const repoBase = '/fluffy-spork/';
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const fromSrc = (path: string) => resolve(__dirname, 'src', path);
-
-function canonicalPwaAssets(): Plugin {
-  const assets = ['manifest.webmanifest', 'nova-icon.svg', 'sw.js'] as const;
-  return {
-    name: 'nova-canonical-pwa-assets',
-    apply: 'build',
-    generateBundle() {
-      for (const fileName of assets) {
-        this.emitFile({
-          type: 'asset',
-          fileName,
-          source: readFileSync(resolve(__dirname, fileName)),
-        });
-      }
-    },
-  };
-}
 
 export default defineConfig(({ mode, command }) => {
+  // Always emit production bundles with the Pages base so static hosts never request source files.
   const isProdBuild = command === 'build' || mode === 'production';
-
   return {
-    plugins: [react(), canonicalPwaAssets()],
-    // Production artifacts must be relocatable. A repository-absolute base
-    // makes previews or packaged hosts request bundles from the wrong path,
-    // leaving the HTML shell visible while NOVA's JavaScript never boots.
-    base: isProdBuild ? './' : '/',
+    plugins: [react()],
+    base: isProdBuild || process.env.GITHUB_PAGES === 'true' ? repoBase : '/',
     build: {
-      sourcemap: true,
-      target: 'es2022',
+      sourcemap: true
     },
     resolve: {
       alias: {
-        '@app': fromSrc('app'),
-        '@game': fromSrc('game'),
-        '@ai': fromSrc('ai'),
-        '@input': fromSrc('input'),
-        '@content': fromSrc('content'),
-        '@rendering': fromSrc('rendering'),
-        '@scenes': fromSrc('scenes'),
-        '@audio': fromSrc('audio'),
-        '@ui': fromSrc('ui'),
-        '@persistence': fromSrc('persistence'),
-        '@diagnostics': fromSrc('diagnostics'),
-        '@shared': fromSrc('shared'),
-      },
+        '@core': resolve(__dirname, 'src/core'),
+        '@render': resolve(__dirname, 'src/render'),
+        '@sim': resolve(__dirname, 'src/sim'),
+        '@tools': resolve(__dirname, 'src/tools'),
+        '@ui': resolve(__dirname, 'src/ui')
+      }
     },
     define: {
-      __BUILD_MODE__: JSON.stringify(mode),
+      __BUILD_MODE__: JSON.stringify(mode)
     },
+    test: {
+      environment: 'jsdom'
+    }
   };
 });

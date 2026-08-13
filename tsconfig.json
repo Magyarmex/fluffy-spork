@@ -12,23 +12,17 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "strict": true,
-    "baseUrl": ".",
-    "types": ["vite/client", "node"],
+    "baseUrl": "./src",
+    "types": ["vite/client", "node", "vitest"],
+    "typeRoots": ["./types", "./node_modules/@types", "./node_modules"],
     "paths": {
-      "@app/*": ["src/app/*"],
-      "@game/*": ["src/game/*"],
-      "@ai/*": ["src/ai/*"],
-      "@input/*": ["src/input/*"],
-      "@content/*": ["src/content/*"],
-      "@rendering/*": ["src/rendering/*"],
-      "@scenes/*": ["src/scenes/*"],
-      "@audio/*": ["src/audio/*"],
-      "@ui/*": ["src/ui/*"],
-      "@persistence/*": ["src/persistence/*"],
-      "@diagnostics/*": ["src/diagnostics/*"],
-      "@shared/*": ["src/shared/*"]
+      "@core/*": ["core/*"],
+      "@render/*": ["render/*"],
+      "@tools/*": ["tools/*"],
+      "@sim/*": ["sim/*"],
+      "@ui/*": ["ui/*"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "include": ["src"],
   "references": [{ "path": "tsconfig.node.json" }]
 }

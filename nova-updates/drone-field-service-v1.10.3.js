@@ -1,0 +1,38 @@
+/* NOVA TANKS v1.10.3 — Field Service
+ * Universal slow out-of-combat repair for surviving non-Controller drones.
+ * Terrain Intelligence owns routing; Command Weave keeps the Controller lineage's faster repair advantage.
+ */
+(function(){
+'use strict';
+if(window.__NOVA_FIELD_SERVICE__)return;
+var mods=window.__novaModules;if(!mods){console.error('[NOVA v1.10.3] module registry unavailable');return;}
+var VERSION='1.10.3',CODENAME='Field Service';
+var CONTROLLER={carrier:1,overlord:1,warden:1,hivemind:1,broodmother:1,citadel:1,valkyrie:1};
+var REPAIR_DELAY=4.6,REPAIR_RATE=.045,THREAT_INTERVAL=.34,THREAT_RADIUS=310;
+window.__NOVA_VERSION=VERSION;
+window.__NOVA_FIELD_SERVICE_RELEASE__={version:VERSION,codename:CODENAME,date:'2026-08-09',headline:'Drones that survive a fight can recover for the next one instead of carrying chip damage forever.',groups:{
+ 'Field Repair':['Every surviving non-Controller drone slowly repairs after 4.6 seconds without taking damage, but only after nearby visible hostility has genuinely cleared.','Fresh damage, a committed attack phase, or active weapon recovery immediately prevents repair.','Controller drones stay on Command Weave\'s faster logistics path, preserving the lineage advantage requested for dedicated swarm commanders.'],
+ 'Readability':['Actual healing emits sparse mint service particles and a soft ring; healthy drones never carry a permanent repair effect.','Two tactical Tips explain the repair break and the Controller recycling advantage without turning healing into another HUD panel.'],
+ 'Performance and Ownership':['Healthy drones exit before any threat work. Damaged repair candidates refresh danger on a staggered interval instead of scanning every frame.','Terrain Intelligence remains the sole advanced routing owner; Field Service does not steer, teleport, replan, or modify drone targets.']
+}};
+function wrap(id,after){var old=mods[id];if(!old)return;mods[id]=function(module,exports,require){old(module,exports,require);after(module.exports,require);};}
+function now(g){return g&&Number.isFinite(g.time)?g.time:0;}
+function isController(t){return !!(t&&CONTROLLER[t.cls]);}
+function ownerOf(g,d){if(!g||!d)return null;if(g.tankById&&g.tankById.get)return g.tankById.get(d.ownerId)||null;if(g.getTank)return g.getTank(d.ownerId)||null;return null;}
+function stateFor(g,d){var hp=Math.max(0,Number(d.hp)||0),declared=Math.max(0,Number(d.maxHp)||0),s=d.__novaFieldService;if(!s)s=d.__novaFieldService={maxHp:Math.max(hp,declared),lastDamageAt:-99,nextThreatAt:0,threat:false,fxAt:0};if(declared>s.maxHp)s.maxHp=declared;if(hp>s.maxHp)s.maxHp=hp;return s;}
+function hostile(g,owner,t){if(!owner||!t||t.id===owner.id||t.alive===false)return false;if(typeof g.areAllies==='function'&&g.areAllies(owner,t))return false;if(typeof g.areHostile==='function')return !!g.areHostile(owner,t);var keys=['teamId','team','factionId','faction','side'];for(var i=0;i<keys.length;i++){var k=keys[i];if(owner[k]!=null&&t[k]!=null)return owner[k]!==t[k];}return true;}
+function lineClear(g,ax,ay,bx,by){return !g.hasLineOfSight||g.hasLineOfSight(ax,ay,bx,by,2);}
+function visibleThreat(g,d,owner){var r2=THREAT_RADIUS*THREAT_RADIUS,ts=g.tanks||[],i,t,dx,dy;for(i=0;i<ts.length;i++){t=ts[i];if(!hostile(g,owner,t))continue;dx=t.x-d.x;dy=t.y-d.y;if(dx*dx+dy*dy<=r2&&lineClear(g,d.x,d.y,t.x,t.y))return true;}var ds=g.drones||[];for(i=0;i<ds.length;i++){t=ds[i];if(!t||t===d||t.hp<=0||t.ownerId===d.ownerId)continue;var other=ownerOf(g,t);if(!other||!hostile(g,owner,other))continue;dx=t.x-d.x;dy=t.y-d.y;if(dx*dx+dy*dy<=r2&&lineClear(g,d.x,d.y,t.x,t.y))return true;}return false;}
+function committed(d){return !!(d&&(d.__novaPhase==='dash'||d.__novaPhase==='windup'||d.__novaCommitted));}
+function canRepair(g,d,owner,s){if(!d||d.hp<=0||!owner||owner.alive===false||isController(owner))return false;var max=Math.max(s.maxHp,Number(d.maxHp)||0);if(max<=0||d.hp>=max-.01)return false;if(committed(d)||(d.attackCd||0)>.05)return false;var tm=now(g);if(tm-s.lastDamageAt<REPAIR_DELAY)return false;if(tm>=s.nextThreatAt){s.nextThreatAt=tm+THREAT_INTERVAL+((Math.abs(Number(d.id)||0)%5)*.017);s.threat=visibleThreat(g,d,owner);}return !s.threat;}
+function heal(g,d,s,dt){var max=Math.max(s.maxHp,Number(d.maxHp)||0),before=d.hp;d.hp=Math.min(max,d.hp+max*REPAIR_RATE*Math.max(0,Number(dt)||0));if(d.hp<=before+.0001)return false;var tm=now(g);if(tm>=s.fxAt){s.fxAt=tm+.38+((Math.abs(Number(d.id)||0)%3)*.025);if(g.addParticles)g.addParticles(d.x,d.y,'#8fffd0',2,22,'glow');if(g.addRing)g.addRing(d.x,d.y,'#8fffd0',8);}return true;}
+function registerTips(){var api=window.NOVATips;if(!api||typeof api.registerMany!=='function'||window.__NOVA_FIELD_SERVICE_TIPS__)return;window.__NOVA_FIELD_SERVICE_TIPS__=true;api.registerMany([
+ {id:'drone-field-repair',contexts:['gameplay','controller'],text:'A damaged drone self-repairs only after combat genuinely breaks. Fresh damage or a nearby visible hostile resets the recovery window.',reviewed:'2026-08-09'},
+ {id:'controller-repair-advantage',contexts:['gameplay','controller'],text:'Controller drones recycle much faster than ordinary drones. Pull damaged hunters out before the screen collapses instead of trading every hull to zero.',reviewed:'2026-08-09'}
+]);}
+wrap('game/engine',function(engine){var Game=engine.Game;if(!Game||Game.prototype.__novaFieldService)return;Game.prototype.__novaFieldService=true;var oldDamage=Game.prototype.damageDrone;if(oldDamage)Game.prototype.damageDrone=function(d){var before=d?Number(d.hp)||0:0,s=d?stateFor(this,d):null,out=oldDamage.apply(this,arguments);if(d&&s&&(Number(d.hp)||0)<before-.001){s.lastDamageAt=now(this);s.threat=true;s.nextThreatAt=now(this)+THREAT_INTERVAL;}return out;};var oldUpdate=Game.prototype.updateDrones;if(oldUpdate)Game.prototype.updateDrones=function(dt){var out=oldUpdate.apply(this,arguments),ds=this.drones||[];for(var i=0;i<ds.length;i++){var d=ds[i];if(!d||d.hp<=0)continue;var s=stateFor(this,d),owner=ownerOf(this,d);if(canRepair(this,d,owner,s))heal(this,d,s,dt);}registerTips();return out;};});
+registerTips();
+window.__NOVA_FIELD_SERVICE__={version:VERSION,codename:CODENAME,repairDelay:REPAIR_DELAY,repairRate:REPAIR_RATE,controllerUsesCommandWeave:true,routingOwner:'Terrain Intelligence'};
+window.__NOVA_FIELD_SERVICE_TEST__={isController:isController,stateFor:stateFor,visibleThreat:visibleThreat,committed:committed,canRepair:canRepair,heal:heal,repairDelay:REPAIR_DELAY,repairRate:REPAIR_RATE,threatRadius:THREAT_RADIUS};
+console.info('[NOVA TANKS] v'+VERSION+' '+CODENAME+' drone repair online');
+})();

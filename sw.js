@@ -1,4 +1,4 @@
-/* NOVA TANKS offline runtime v4.
+/* NOVA TANKS offline runtime v3.
  *
  * The updater treats every published game build as immutable:
  * 1. Fetch a cache-busted GitHub Pages shell.
@@ -10,7 +10,7 @@
  * A failed/partial download never mutates the currently active offline build.
  */
 
-const UPDATER_VERSION = 4;
+const UPDATER_VERSION = 3;
 const META_CACHE = `nova-tanks-meta-v${UPDATER_VERSION}`;
 const RUNTIME_CACHE = `nova-tanks-runtime-v${UPDATER_VERSION}`;
 const BUILD_PREFIX = `nova-tanks-build-v${UPDATER_VERSION}-`;
@@ -147,11 +147,6 @@ function discoverAssets(html, baseURL) {
   };
 }
 
-function isCanonicalShell(html) {
-  return html.includes('NOVA TANKS') &&
-    /<script\b[^>]*\btype=["']module["'][^>]*\bsrc=["'][^"']*assets\//i.test(html);
-}
-
 async function cacheRequired(cache, value) {
   const response = await fetchFresh(value);
   await ensureNonEmpty(response, value);
@@ -265,8 +260,8 @@ async function stageLatest({ force = false } = {}) {
     await ensureNonEmpty(indexResponse, 'NOVA index');
 
     const html = await indexResponse.clone().text();
-    if (!isCanonicalShell(html)) {
-      throw new Error('Latest page failed NOVA canonical-shell validation');
+    if (!html.includes('NOVA TANKS') || !html.includes('__bootModule')) {
+      throw new Error('Latest page failed NOVA identity/boot validation');
     }
 
     const buildFingerprint = await fingerprint(html);
@@ -297,6 +292,8 @@ async function stageLatest({ force = false } = {}) {
       await runPool([
         './manifest.webmanifest',
         './nova-icon.svg',
+        './pwa-register.js',
+        './nova-updates/releases.json',
         ...optional,
       ], (value) => cacheOptional(stage, value));
 
@@ -317,9 +314,9 @@ async function stageLatest({ force = false } = {}) {
       };
       await writeActiveState(nextState);
 
-      // Only current-version candidate caches are pruned here. Caches owned by
-      // the currently active older worker survive until this worker has claimed
-      // clients, preventing migration from pulling the floor out mid-load.
+      // Only v3 candidate caches are pruned here. Caches owned by the currently
+      // active older worker survive until v3 has formally activated and claimed
+      // the clients, preventing migration from pulling the floor out mid-load.
       await cleanupCaches(nextState);
       await notifyClients({
         type: 'NOVA_UPDATE_READY',
@@ -350,8 +347,8 @@ async function activeIndex() {
     if (response) return response;
   }
 
-  // Migration fallback: an older worker may still own a complete shell while
-  // this worker is installing. Never strand an existing user during cutover.
+  // Migration fallback: v2/v1 may still own a complete shell while v3 is
+  // installing. Never strand an existing user because updater migration failed.
   const keys = await caches.keys();
   const legacy = keys
     .filter((key) => key.startsWith(LEGACY_PREFIX))
@@ -417,8 +414,8 @@ async function assetResponse(request) {
 
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
-    // Installation is intentionally transactional. If a complete build cannot
-    // be staged, this worker does not replace the existing worker.
+    // Installation is intentionally transactional. If a complete v3 build
+    // cannot be staged, this worker does not replace the existing worker.
     await stageLatest({ force: true });
     await self.skipWaiting();
   })());
