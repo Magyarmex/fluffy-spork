@@ -116,8 +116,9 @@ export class BlackglassScene {
       projectileId: (ordinal) => `blackglass:${this.#tankId}:shot-${this.#shotSerial}:${ordinal}`,
     });
     this.#shotSerial += 1;
-    this.#projectiles = Object.freeze(result.projectiles.map((projectile) => this.projectileState(projectile, atSeconds)));
-    return Object.freeze({ result, projectiles: this.#projectiles, visualMuzzles: snapshot.visualMuzzles });
+    const projectiles = Object.freeze(result.projectiles.map((projectile) => this.projectileState(projectile, atSeconds)));
+    if (result.fired) this.#projectiles = projectiles;
+    return Object.freeze({ result, projectiles, visualMuzzles: snapshot.visualMuzzles });
   }
 
   clearProjectiles(): void { this.#projectiles = Object.freeze([]); }

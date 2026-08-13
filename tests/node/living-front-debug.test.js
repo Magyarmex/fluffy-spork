@@ -50,10 +50,20 @@ test('page hiding and pointer cancellation release transient controls', () => {
     'runtime should observe page visibility changes');
   assert.match(runtime, /document\.removeEventListener\('visibilitychange',this\.onVisibilityChange\)/,
     'runtime teardown should remove the visibility listener');
-  assert.match(runtime, /window\.addEventListener\('pointercancel',this\.onPointerUp\)/,
-    'cancelled mouse pointers must release held fire state');
-  assert.match(runtime, /window\.removeEventListener\('pointercancel',this\.onPointerUp\)/,
+  assert.match(runtime, /private readonly onPointerCancel=\(event:PointerEvent\)=>\{if\(event\.pointerType!==?'touch'\)this\.#pointerDown=false;\};/,
+    'cancelled mouse pointers must release held fire state regardless of pointerup button semantics');
+  assert.match(runtime, /window\.addEventListener\('pointercancel',this\.onPointerCancel\)/,
+    'runtime should listen for cancelled mouse pointers');
+  assert.match(runtime, /window\.removeEventListener\('pointercancel',this\.onPointerCancel\)/,
     'runtime teardown should remove the pointer cancellation listener');
+});
+
+test('secondary mouse buttons do not steal primary-fire ownership', () => {
+  const runtime = readFileSync(path.join(root, 'src/app/FoundationRuntime.ts'), 'utf8');
+  assert.match(runtime, /onPointerDown=\(event:PointerEvent\)=>\{if\(event\.pointerType==='touch'\)return;[\s\S]*?if\(event\.button===0\)this\.#pointerDown=true;/,
+    'pressing a secondary mouse button while primary fire is held must not clear primary-fire state');
+  assert.match(runtime, /onPointerUp=\(event:PointerEvent\)=>\{if\(event\.pointerType!=='touch'&&event\.button===0\)this\.#pointerDown=false;\};/,
+    'releasing a secondary mouse button must not release primary fire');
 });
 
 test('touch UI forgets stale held state on blur and page hide', () => {
