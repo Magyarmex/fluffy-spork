@@ -13,55 +13,56 @@ function position(source, needle) {
   return index;
 }
 
-test('updater uses cache-busted network checks with explicit timeouts', () => {
-  assert.match(sw, /const CACHE_BUSTER = '__nova_update'/);
+test('recovery worker refuses Foundation/Vite shells and requires real-game markers', () => {
+  assert.match(sw, /const UPDATER_VERSION = 4/);
+  assert.match(sw, /'__bootModule'/);
+  assert.match(sw, /'nova-updates\/'/);
+  assert.match(sw, /'\/src\/main\.ts'/);
+  assert.match(sw, /'%BASE_URL%'/);
+  assert.match(sw, /Rejected Foundation\/NOVASTAR shell/);
+});
+
+test('real build is staged transactionally before it can take control', () => {
+  const install = position(sw, "self.addEventListener('install'");
+  const stage = sw.indexOf('await stageLatest({ force: true })', install);
+  const skip = sw.indexOf('await self.skipWaiting()', install);
+  assert.ok(stage > install);
+  assert.ok(skip > stage);
+
+  const critical = position(sw, 'await runPool(critical');
+  const htmlWrite = position(sw, 'await stage.put(indexURL');
+  const stagedValidation = position(sw, 'await validateShellResponse(staged)');
+  const promotion = position(sw, 'await writeActiveState(nextState)');
+  assert.ok(critical < htmlWrite);
+  assert.ok(htmlWrite < stagedValidation);
+  assert.ok(stagedValidation < promotion);
+});
+
+test('activation purges older NOVA caches instead of keeping legacy build fallbacks', () => {
+  assert.match(sw, /key\.startsWith\('nova-tanks-'\)/);
+  assert.match(sw, /await purgeNonCanonicalNovaCaches\(state\)/);
+  assert.doesNotMatch(sw, /LEGACY_PREFIX/);
+  assert.doesNotMatch(sw, /nova-tanks-offline-/);
+  assert.doesNotMatch(sw, /Migration fallback/);
+});
+
+test('online navigation can only return a freshly or previously validated real shell', () => {
+  assert.match(sw, /await stageLatest\(\)/);
+  assert.match(sw, /await cachedRealShell\(\)/);
+  assert.match(sw, /Fail closed to the last validated real-game shell/);
+  assert.match(sw, /cannot verify a canonical real-game build/);
+});
+
+test('network checks bypass browser caches and remain timeout-bounded', () => {
+  assert.match(sw, /const CACHE_BUSTER = '__nova_real_recovery'/);
   assert.match(sw, /new AbortController\(\)/);
   assert.match(sw, /cache: 'no-store'/);
   assert.match(sw, /Cache-Control': 'no-cache'/);
 });
 
-test('new builds are immutable candidates and promote only after critical staging + validation', () => {
-  assert.match(sw, /const BUILD_PREFIX = `nova-tanks-build-v\$\{UPDATER_VERSION\}-`/);
-  const critical = position(sw, 'await runPool(critical');
-  const htmlWrite = position(sw, 'await stage.put(indexURL');
-  const validation = position(sw, 'await validateStagedBuild(stage');
-  const promotion = position(sw, 'await writeActiveState(nextState)');
-  assert.ok(critical < htmlWrite, 'critical dependencies must stage before HTML');
-  assert.ok(htmlWrite < validation, 'HTML must exist before final staged-build validation');
-  assert.ok(validation < promotion, 'active pointer must move only after full validation');
-});
-
-test('partial candidates are deleted instead of poisoning the active build', () => {
-  assert.match(sw, /await caches\.delete\(cacheName\);\s*throw error;/s);
-  assert.match(sw, /previousCacheName:/);
-});
-
-test('matching fingerprints are not trusted when their cache is incomplete', () => {
-  const sameFingerprint = position(sw, 'current.fingerprint === buildFingerprint');
-  const validation = sw.indexOf('await validateStagedBuild(currentCache', sameFingerprint);
-  const corruptionComment = sw.indexOf('matching-but-incomplete cache is corruption', sameFingerprint);
-  assert.ok(validation > sameFingerprint);
-  assert.ok(corruptionComment > validation);
-});
-
-test('worker installation is transactional', () => {
-  const install = position(sw, "self.addEventListener('install'");
-  const stage = sw.indexOf('await stageLatest({ force: true })', install);
-  const skip = sw.indexOf('await self.skipWaiting()', install);
-  assert.ok(stage > install);
-  assert.ok(skip > stage, 'worker must not replace its predecessor until a complete build is staged');
-});
-
-test('updater preserves a rollback build and removes old NOVA caches only after promotion', () => {
-  assert.match(sw, /activeState && activeState\.previousCacheName/);
-  const promotion = position(sw, 'await writeActiveState(nextState)');
-  const cleanup = sw.indexOf('await cleanupCaches(nextState)', promotion);
-  assert.ok(cleanup > promotion);
-});
-
-test('page-side updater can observe worker completion and self-update independently', () => {
+test('page-side updater aggressively checks for a newer worker', () => {
   assert.match(register, /updateViaCache: 'none'/);
-  assert.match(register, /new MessageChannel\(\)/);
+  assert.match(register, /registration\.update\(\)/);
   assert.match(register, /NOVA_SYNC_LATEST/);
   assert.match(register, /controllerchange/);
   assert.match(register, /worker-message-timeout/);

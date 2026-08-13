@@ -1,24 +1,19 @@
-/* NOVA TANKS offline runtime v3.
+/* NOVA TANKS real-game recovery service worker v4.
  *
- * The updater treats every published game build as immutable:
- * 1. Fetch a cache-busted GitHub Pages shell.
- * 2. Discover and fully stage every critical dependency into a fresh cache.
- * 3. Validate the staged build.
- * 4. Atomically switch a tiny metadata pointer to the new cache.
- * 5. Keep the previous complete build as a rollback reserve.
- *
- * A failed/partial download never mutates the currently active offline build.
+ * This worker exists to make the pre-NOVASTAR playable game fail closed:
+ * - only shells with the real legacy module runtime + versioned nova-updates are promotable;
+ * - Vite/Foundation shells are rejected even if they say "NOVA TANKS";
+ * - all older NOVA caches are purged after a validated real build is staged;
+ * - online navigations prefer a freshly validated network shell;
+ * - offline fallback can only come from the last validated real-game cache.
  */
 
-const UPDATER_VERSION = 3;
-const META_CACHE = `nova-tanks-meta-v${UPDATER_VERSION}`;
-const RUNTIME_CACHE = `nova-tanks-runtime-v${UPDATER_VERSION}`;
-const BUILD_PREFIX = `nova-tanks-build-v${UPDATER_VERSION}-`;
-const LEGACY_PREFIX = 'nova-tanks-offline-';
-const ACTIVE_STATE_URL = new URL('./__nova_active_build__.json', self.registration.scope).href;
-const CACHE_BUSTER = '__nova_update';
+const UPDATER_VERSION = 4;
+const META_CACHE = `nova-tanks-real-meta-v${UPDATER_VERSION}`;
+const BUILD_PREFIX = `nova-tanks-real-build-v${UPDATER_VERSION}-`;
+const ACTIVE_STATE_URL = new URL('./__nova_real_active__.json', self.registration.scope).href;
+const CACHE_BUSTER = '__nova_real_recovery';
 const NETWORK_TIMEOUT_MS = 10000;
-const LAUNCH_UPDATE_BUDGET_MS = 3500;
 const STAGE_CONCURRENCY = 6;
 
 let syncInFlight = null;
@@ -44,10 +39,6 @@ function networkURL(value) {
   return url.href;
 }
 
-function timeout(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function isCacheable(response) {
   return Boolean(response) && (response.ok || response.type === 'opaque');
 }
@@ -59,109 +50,64 @@ async function fetchFresh(value, timeoutMs = NETWORK_TIMEOUT_MS) {
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const base = {
+    const response = await fetch(new Request(target, {
       cache: 'no-store',
       signal: controller.signal,
-    };
-
-    if (canonical.origin !== self.location.origin) {
-      try {
-        return await fetch(new Request(target, {
-          ...base,
-          mode: 'cors',
-          credentials: 'omit',
-        }));
-      } catch (error) {
-        if (controller.signal.aborted) throw error;
-        return fetch(new Request(target, {
-          ...base,
-          mode: 'no-cors',
-          credentials: 'omit',
-        }));
-      }
-    }
-
-    return await fetch(new Request(target, {
-      ...base,
-      credentials: 'same-origin',
-      headers: {
+      credentials: canonical.origin === self.location.origin ? 'same-origin' : 'omit',
+      headers: canonical.origin === self.location.origin ? {
         'Cache-Control': 'no-cache',
         Pragma: 'no-cache',
-      },
+      } : undefined,
     }));
+    return response;
   } finally {
     clearTimeout(timer);
   }
 }
 
-async function ensureNonEmpty(response, label) {
-  if (!isCacheable(response)) {
-    throw new Error(`Uncacheable response for ${label}`);
+function assertRealGameHTML(html) {
+  const required = ['NOVA TANKS', '__bootModule', 'nova-updates/'];
+  const forbidden = ['/src/main.ts', '/src/main.tsx', '%BASE_URL%'];
+
+  for (const marker of required) {
+    if (!html.includes(marker)) {
+      throw new Error(`Rejected non-canonical NOVA shell: missing ${marker}`);
+    }
   }
-  if (response.type === 'opaque') return;
-  const bytes = await response.clone().arrayBuffer();
-  if (bytes.byteLength === 0) {
-    throw new Error(`Empty response for ${label}`);
+  for (const marker of forbidden) {
+    if (html.includes(marker)) {
+      throw new Error(`Rejected Foundation/NOVASTAR shell: found ${marker}`);
+    }
   }
 }
 
-async function fingerprint(text) {
-  const bytes = new TextEncoder().encode(text);
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return [...new Uint8Array(digest)]
-    .slice(0, 16)
-    .map((value) => value.toString(16).padStart(2, '0'))
-    .join('');
+async function validateShellResponse(response) {
+  if (!response || !response.ok) {
+    throw new Error('Real NOVA shell was not fetchable');
+  }
+  const html = await response.clone().text();
+  assertRealGameHTML(html);
+  return html;
 }
 
-function discoverAssets(html, baseURL) {
-  const critical = new Set();
-  const optional = new Set();
-
+function discoverCriticalAssets(html, baseURL) {
+  const urls = new Set();
   for (const match of html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi)) {
-    critical.add(new URL(match[1], baseURL).href);
+    const url = new URL(match[1], baseURL);
+    if (url.origin === self.location.origin) urls.add(url.href);
   }
-
   for (const match of html.matchAll(/<link\b([^>]*)>/gi)) {
     const attrs = match[1];
     const hrefMatch = attrs.match(/\bhref=["']([^"']+)["']/i);
     if (!hrefMatch) continue;
-
-    const href = new URL(hrefMatch[1], baseURL).href;
     const relMatch = attrs.match(/\brel=["']([^"']+)["']/i);
     const rel = relMatch ? relMatch[1].toLowerCase() : '';
-
-    if (rel.split(/\s+/).includes('stylesheet') && !href.includes('fonts.googleapis.com')) {
-      critical.add(href);
-    } else if (
-      /\.(?:css|svg|png|webp|ico|woff2?)(?:[?#].*)?$/i.test(href) ||
-      href.includes('fonts.googleapis.com')
-    ) {
-      optional.add(href);
+    const url = new URL(hrefMatch[1], baseURL);
+    if (url.origin === self.location.origin && rel.split(/\s+/).includes('stylesheet')) {
+      urls.add(url.href);
     }
   }
-
-  return {
-    critical: [...critical],
-    optional: [...optional],
-  };
-}
-
-async function cacheRequired(cache, value) {
-  const response = await fetchFresh(value);
-  await ensureNonEmpty(response, value);
-  await cache.put(canonicalURL(value), response.clone());
-}
-
-async function cacheOptional(cache, value) {
-  try {
-    const response = await fetchFresh(value);
-    if (isCacheable(response)) {
-      await cache.put(canonicalURL(value), response.clone());
-    }
-  } catch (_) {
-    // Optional presentation resources must never block an otherwise valid build.
-  }
+  return [...urls];
 }
 
 async function runPool(values, worker, concurrency = STAGE_CONCURRENCY) {
@@ -174,6 +120,15 @@ async function runPool(values, worker, concurrency = STAGE_CONCURRENCY) {
     }
   });
   await Promise.all(runners);
+}
+
+async function fingerprint(text) {
+  const bytes = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)]
+    .slice(0, 16)
+    .map((value) => value.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 async function readActiveState() {
@@ -207,46 +162,21 @@ async function activeBuildCache() {
   return { state, cache: await caches.open(state.cacheName) };
 }
 
-async function validateStagedBuild(cache, html, baseURL) {
-  const { critical } = discoverAssets(html, baseURL);
-  const required = [baseURL, absoluteURL('./index.html'), ...critical];
-  for (const value of required) {
-    const response = await cache.match(canonicalURL(value));
-    if (!response || !isCacheable(response)) {
-      throw new Error(`Staged NOVA build is missing ${value}`);
-    }
-  }
+async function cacheRequired(cache, value) {
+  const response = await fetchFresh(value);
+  if (!isCacheable(response)) throw new Error(`Failed to stage ${value}`);
+  await cache.put(canonicalURL(value), response.clone());
 }
 
-async function notifyClients(payload) {
-  const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-  for (const client of clients) client.postMessage(payload);
-}
-
-async function cleanupCaches(activeState) {
-  const keep = new Set([
-    activeState && activeState.cacheName,
-    activeState && activeState.previousCacheName,
-  ].filter(Boolean));
-
+async function purgeNonCanonicalNovaCaches(activeState) {
+  const keep = new Set([META_CACHE, activeState && activeState.cacheName].filter(Boolean));
   const keys = await caches.keys();
   await Promise.all(
     keys
-      .filter((key) => key.startsWith(BUILD_PREFIX) && !keep.has(key))
-      .map((key) => caches.delete(key)),
-  );
-}
-
-async function cleanupLegacyCaches() {
-  const keys = await caches.keys();
-  await Promise.all(
-    keys
-      .filter((key) => {
-        if (key.startsWith(LEGACY_PREFIX)) return true;
-        if (/^nova-tanks-meta-v\d+$/.test(key)) return key !== META_CACHE;
-        if (/^nova-tanks-runtime-v\d+$/.test(key)) return key !== RUNTIME_CACHE;
-        return false;
-      })
+      .filter((key) => (
+        (key.startsWith('nova-tanks-') || key.startsWith('nova-tanks-real-')) &&
+        !keep.has(key)
+      ))
       .map((key) => caches.delete(key)),
   );
 }
@@ -257,24 +187,16 @@ async function stageLatest({ force = false } = {}) {
   syncInFlight = (async () => {
     const indexURL = absoluteURL('./');
     const indexResponse = await fetchFresh(indexURL);
-    await ensureNonEmpty(indexResponse, 'NOVA index');
-
-    const html = await indexResponse.clone().text();
-    if (!html.includes('NOVA TANKS') || !html.includes('__bootModule')) {
-      throw new Error('Latest page failed NOVA identity/boot validation');
-    }
-
+    const html = await validateShellResponse(indexResponse);
     const buildFingerprint = await fingerprint(html);
     const current = await readActiveState();
 
     if (!force && current && current.fingerprint === buildFingerprint) {
-      const currentCache = await caches.open(current.cacheName);
-      try {
-        await validateStagedBuild(currentCache, html, indexURL);
+      const cache = await caches.open(current.cacheName);
+      const cached = await cache.match(indexURL);
+      if (cached) {
+        await validateShellResponse(cached);
         return { changed: false, fingerprint: buildFingerprint };
-      } catch (_) {
-        // A matching-but-incomplete cache is corruption, not a valid no-op.
-        // Restage it below instead of trusting the fingerprint alone.
       }
     }
 
@@ -282,50 +204,30 @@ async function stageLatest({ force = false } = {}) {
     const stage = await caches.open(cacheName);
 
     try {
-      const { critical, optional } = discoverAssets(html, indexURL);
-
-      // Critical dependencies are fully downloaded before HTML is promotable.
+      const critical = discoverCriticalAssets(html, indexURL);
       await runPool(critical, (value) => cacheRequired(stage, value));
-
-      // These resources improve installability/presentation but are not allowed
-      // to invalidate a playable build if a font/icon endpoint is unavailable.
-      await runPool([
-        './manifest.webmanifest',
-        './nova-icon.svg',
-        './pwa-register.js',
-        './nova-updates/releases.json',
-        ...optional,
-      ], (value) => cacheOptional(stage, value));
-
-      // HTML is written only after every critical dependency is local.
       await stage.put(indexURL, indexResponse.clone());
       await stage.put(absoluteURL('./index.html'), indexResponse.clone());
 
-      await validateStagedBuild(stage, html, indexURL);
+      const staged = await stage.match(indexURL);
+      await validateShellResponse(staged);
 
-      // This metadata write is the atomic promotion point. Until it succeeds,
-      // all navigations continue using the previous complete build cache.
       const nextState = {
         updaterVersion: UPDATER_VERSION,
         cacheName,
         fingerprint: buildFingerprint,
-        previousCacheName: current && current.cacheName !== cacheName ? current.cacheName : current && current.previousCacheName,
         promotedAt: Date.now(),
       };
       await writeActiveState(nextState);
+      await purgeNonCanonicalNovaCaches(nextState);
 
-      // Only v3 candidate caches are pruned here. Caches owned by the currently
-      // active older worker survive until v3 has formally activated and claimed
-      // the clients, preventing migration from pulling the floor out mid-load.
-      await cleanupCaches(nextState);
-      await notifyClients({
-        type: 'NOVA_UPDATE_READY',
-        fingerprint: buildFingerprint,
-      });
+      const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      for (const client of clients) {
+        client.postMessage({ type: 'NOVA_UPDATE_READY', fingerprint: buildFingerprint });
+      }
 
       return { changed: true, fingerprint: buildFingerprint };
     } catch (error) {
-      // A partially populated candidate is never eligible for serving.
       await caches.delete(cacheName);
       throw error;
     }
@@ -338,84 +240,57 @@ async function stageLatest({ force = false } = {}) {
   }
 }
 
-async function activeIndex() {
+async function cachedRealShell() {
   const { cache } = await activeBuildCache();
-  if (cache) {
-    const response =
-      (await cache.match(absoluteURL('./'))) ||
-      (await cache.match(absoluteURL('./index.html')));
-    if (response) return response;
+  if (!cache) return null;
+  const response =
+    (await cache.match(absoluteURL('./'))) ||
+    (await cache.match(absoluteURL('./index.html')));
+  if (!response) return null;
+  try {
+    await validateShellResponse(response);
+    return response;
+  } catch (_) {
+    return null;
   }
-
-  // Migration fallback: v2/v1 may still own a complete shell while v3 is
-  // installing. Never strand an existing user because updater migration failed.
-  const keys = await caches.keys();
-  const legacy = keys
-    .filter((key) => key.startsWith(LEGACY_PREFIX))
-    .sort()
-    .reverse();
-  for (const key of legacy) {
-    const cache = await caches.open(key);
-    const response =
-      (await cache.match(absoluteURL('./'))) ||
-      (await cache.match(absoluteURL('./index.html')));
-    if (response) return response;
-  }
-
-  return null;
 }
 
-async function navigationResponse(stagePromise) {
-  if (stagePromise) {
-    // Fast networks can update before launch; slow/unreliable networks never
-    // hold the game hostage. Staging continues under event.waitUntil().
-    await Promise.race([
-      stagePromise.catch(() => undefined),
-      timeout(LAUNCH_UPDATE_BUDGET_MS),
-    ]);
+async function navigationResponse() {
+  if (self.navigator.onLine) {
+    try {
+      await stageLatest();
+      const fresh = await cachedRealShell();
+      if (fresh) return fresh;
+    } catch (_) {
+      // Fail closed to the last validated real-game shell.
+    }
   }
 
-  const cached = await activeIndex();
+  const cached = await cachedRealShell();
   if (cached) return cached;
 
-  // First-ever uncontrolled bootstrap fallback.
-  try {
-    return await fetchFresh('./');
-  } catch (_) {
-    return new Response(
-      '<!doctype html><meta name="viewport" content="width=device-width"><body style="background:#04060d;color:#bfe9ff;font-family:sans-serif;padding:24px">NOVA TANKS has no complete offline build yet. Connect once and reopen the game.</body>',
-      { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
-    );
-  }
+  return new Response(
+    '<!doctype html><meta name="viewport" content="width=device-width"><body style="background:#04060d;color:#bfe9ff;font-family:sans-serif;padding:24px">NOVA TANKS cannot verify a canonical real-game build. Connect to the network and reopen the game.</body>',
+    { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
+  );
 }
 
 async function assetResponse(request) {
-  const key = canonicalURL(request.url);
-  const { cache } = await activeBuildCache();
-  if (cache) {
-    const response = await cache.match(key);
-    if (response) return response;
-  }
-
-  const runtime = await caches.open(RUNTIME_CACHE);
-  const cached = await runtime.match(key);
-  if (cached) return cached;
-
   try {
     const response = await fetchFresh(request.url);
-    if (isCacheable(response)) {
-      await runtime.put(key, response.clone());
-    }
-    return response;
-  } catch (_) {
-    return Response.error();
+    if (isCacheable(response)) return response;
+  } catch (_) {}
+
+  const { cache } = await activeBuildCache();
+  if (cache) {
+    const cached = await cache.match(canonicalURL(request.url));
+    if (cached) return cached;
   }
+  return Response.error();
 }
 
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
-    // Installation is intentionally transactional. If a complete v3 build
-    // cannot be staged, this worker does not replace the existing worker.
     await stageLatest({ force: true });
     await self.skipWaiting();
   })());
@@ -423,26 +298,20 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
-    await self.clients.claim();
     const state = await readActiveState();
-    if (state) {
-      await cleanupCaches(state);
-      await cleanupLegacyCaches();
-    }
+    await purgeNonCanonicalNovaCaches(state);
+    await self.clients.claim();
   })());
 });
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
-
   const url = new URL(request.url);
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
 
   if (request.mode === 'navigate') {
-    const stagePromise = navigator.onLine ? stageLatest().catch(() => undefined) : null;
-    if (stagePromise) event.waitUntil(stagePromise);
-    event.respondWith(navigationResponse(stagePromise));
+    event.respondWith(navigationResponse());
     return;
   }
 
@@ -480,9 +349,4 @@ self.addEventListener('message', (event) => {
       }
     })());
   }
-});
-
-self.addEventListener('periodicsync', (event) => {
-  if (event.tag !== 'nova-update') return;
-  event.waitUntil(stageLatest().catch(() => undefined));
 });
