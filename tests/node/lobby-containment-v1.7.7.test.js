@@ -31,3 +31,11 @@ test('future lobby extensions have hard capacity budgets', () => {
   assert.match(src, /feature-card budget exceeded/);
   assert.match(src, /scrollPolicy:'viewport-only-except-deep-inspection'/);
 });
+
+test('lobby current release follows the latest loaded runtime release', () => {
+  assert.match(src, /return\{currentVersion:latest\.version,releases:rs\}/);
+  assert.match(src, /function current\(\)\{return data&&data\.releases&&data\.releases\[0\]\|\|window\.__NOVA_LOBBY_RELEASE__\}/);
+  assert.match(src, /ft\.textContent='NOVA TANKS v'\+latest\.version/);
+  assert.match(src, /window\.NOVALobby\.version=data\.currentVersion/);
+  assert.doesNotMatch(src, /return\{currentVersion:VERSION,releases:rs\}/);
+});
