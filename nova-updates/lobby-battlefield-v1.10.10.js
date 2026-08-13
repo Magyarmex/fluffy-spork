@@ -261,11 +261,12 @@ function mount(m){
   var c=document.createElement('canvas');c.className='nv-lobby-battlefield';c.setAttribute('aria-hidden','true');
   var a=document.createElement('div');a.className='nv-lobby-atmosphere';a.setAttribute('aria-hidden','true');
   m.insertBefore(c,m.firstChild);m.insertBefore(a,c.nextSibling);
-  current=new LiveWorld(c,m);current.start();
+  current=new LiveWorld(c,m);current.atmosphere=a;current.start();
 }
 function reconcile(){
   var m=menu();
-  if(current&&(!m||current.menu!==m||!m.isConnected)){current.destroy();current=null;}
+  var detached=current&&(!current.canvas.isConnected||current.canvas.parentElement!==current.menu||!current.atmosphere||!current.atmosphere.isConnected||current.atmosphere.parentElement!==current.menu);
+  if(current&&(!m||current.menu!==m||!m.isConnected||detached)){current.destroy();current=null;}
   if(m&&!current)mount(m);
 }
 var mo=new MutationObserver(reconcile);mo.observe(document.documentElement,{childList:true,subtree:true});
