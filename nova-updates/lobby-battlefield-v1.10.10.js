@@ -257,7 +257,7 @@ var current=null;
 function removeStalePresentation(m){
   if(!m)return;
   var stale=m.querySelectorAll('.nv-lobby-battlefield,.nv-lobby-atmosphere');
-  for(var i=0;i<stale.length;i++)if(stale[i].parentElement===m)m.removeChild(stale[i]);
+  for(var i=0;i<stale.length;i++)if(stale[i]&&stale[i].parentElement)stale[i].parentElement.removeChild(stale[i]);
 }
 function mount(m){
   if(!m)return;
