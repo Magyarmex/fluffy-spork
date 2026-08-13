@@ -93,8 +93,10 @@ async function validateShellResponse(response) {
 function discoverCriticalAssets(html, baseURL) {
   const urls = new Set();
   for (const match of html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi)) {
-    const url = new URL(match[1], baseURL);
-    if (url.origin === self.location.origin) urls.add(url.href);
+    // Script dependencies are critical regardless of origin. The real game
+    // still boots React/ReactDOM from CDN URLs, so omitting cross-origin
+    // scripts here creates a "validated" installation that cannot boot offline.
+    urls.add(new URL(match[1], baseURL).href);
   }
   for (const match of html.matchAll(/<link\b([^>]*)>/gi)) {
     const attrs = match[1];
