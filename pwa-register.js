@@ -1,6 +1,23 @@
 (() => {
   'use strict';
 
+  function loadOwnerOperations() {
+    if (window.__NOVA_OWNER_OPERATIONS_LOADER__) return;
+    window.__NOVA_OWNER_OPERATIONS_LOADER__ = true;
+
+    const script = document.createElement('script');
+    script.src = './nova-updates/owner-operations-v1.11.1.js';
+    script.async = false;
+    script.dataset.novaOwnerOperations = '1.11.1';
+    script.addEventListener('error', () => {
+      window.__NOVA_OWNER_OPERATIONS_LOADER__ = false;
+      console.warn('[NOVA Owner Operations] private HUD runtime could not be loaded');
+    }, { once: true });
+    document.head.appendChild(script);
+  }
+
+  loadOwnerOperations();
+
   if (!('serviceWorker' in navigator)) return;
 
   const UPDATE_INTERVAL_MS = 10 * 60 * 1000;
