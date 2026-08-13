@@ -1,0 +1,285 @@
+{
+  "currentVersion": "1.7.3",
+  "releases": [
+    {
+      "version": "1.7.3",
+      "codename": "Blackglass Fit",
+      "date": "2026-08-08",
+      "headline": "Portrait Blackglass gets a properly proportioned simulator and collision-free guidance.",
+      "groups": {
+        "Blackglass Fit": [
+          "Portrait Blackglass keeps the v1.7.2 single-column containment but replaces the fixed-height simulator with a responsive 4:3 display bay.",
+          "The mobile steering hint moves to a compact top-corner chip and reads DRAG TO STEER, separating it from the canvas-drawn LIVE CHASSIS SIMULATION footer.",
+          "Very narrow phones receive a slightly taller display ratio so the chassis stays visually spacious without reintroducing horizontal overflow."
+        ],
+        "Validation": [
+          "Added regression coverage for responsive simulator geometry, non-overlapping touch guidance, and stylesheet ordering after the containment layer."
+        ]
+      }
+    },
+    {
+      "version": "1.7.2",
+      "codename": "Combined Arms",
+      "date": "2026-08-08",
+      "headline": "The new disciplines learn to fight the battlefield instead of merely colliding with it.",
+      "groups": {
+        "Battlefield Intelligence": [
+          "AI tanks use predictive short-horizon terrain probes and local corner waypoints to route around nearby fortifications before grinding into them.",
+          "AI may investigate the last position where it legitimately saw a target for a short time, but hidden target movement is never updated until real reacquisition.",
+          "Controller drones reuse local corner routing while forming, farming, defending and recalling; locked attack dives remain committed and crash into cover instead of cheating around it.",
+          "Cannon AI can intentionally fire on destructible cover blocking a recent legitimate contact, turning breaching into a real tactical choice rather than through-wall pressure."
+        ],
+        "Cover and Explosions": [
+          "Hard cover now occludes blast damage as well as bullets and sight.",
+          "Partial exposure around an edge is sampled across the target hull, so peeking out of cover can receive partial blast damage without explosions applying full damage through solid walls.",
+          "Countercharged Guardian shots gain modest structural authority, letting a successful read convert into limited map pressure without replacing Cannon as the dedicated breaching lineage."
+        ],
+        "Three Disciplines × Battlefield": [
+          "The Cannon fuse display now distinguishes the programmed FUSE point from an earlier physical IMPACT against terrain.",
+          "Blocked fuse paths identify actual collision distance and remaining destructible-cover integrity instead of pretending the programmed airburst is reachable.",
+          "Apex Cannon structural specialization continues to flow through Battlefield's canonical break, rubble, score and feedback systems."
+        ],
+        "Blackglass Containment": [
+          "Fixed the real portrait-mobile showroom regression where the late-injected base stylesheet could override the earlier mobile polish and restore the three-column desktop grid.",
+          "Portrait/coarse-pointer devices now receive an explicit bounded single-column showroom: dossier rail, animated stage, identity, telemetry and graft lab all remain inside the phone viewport.",
+          "Hard min-width/max-width/overflow rules prevent intelligence text, stat values, graft deltas and library cards from leaking beyond the screen or drawing over adjacent sections.",
+          "The containment stylesheet reasserts itself after the base showroom stylesheet appears, making the fix resilient to DOMContentLoaded load order."
+        ],
+        "Validation": [
+          "Added regression tests for blast occlusion, partial exposure, local waypoint routing, Cannon impact preview, intentional structural fire and legitimate last-seen AI memory.",
+          "The production materializer syntax-checks every runtime layer and now loads Combined Arms plus the Blackglass containment layer after Apex Doctrine."
+        ]
+      }
+    },
+    {
+      "version": "1.7.1",
+      "codename": "Apex Doctrine",
+      "date": "2026-08-08",
+      "headline": "Apex tanks stop being bigger parents and become distinct mastery problems.",
+      "groups": {
+        "Gunner Apex Doctrine": [
+          "Tempest gains a broad redline cadence band with top sustained throughput, but overshooting it adds severe recoil and recovery.",
+          "Needle Storm gains a narrow precision gate where exact heat plus stable tracking accelerates, strengthens, and hardens needles.",
+          "Breachlord rewards a settled cooled brace volley, then exposes a short movement-recovery punish window.",
+          "Flakmaster turns stability into tighter, faster, longer-lived pellets for deliberate ranged shotgun play."
+        ],
+        "Cannon Apex Doctrine": [
+          "Cluster King fuse depth now controls child-bomb sector width as well as detonation distance: short programs spread wide, deep programs focus forward.",
+          "Siege Bomber's structural specialization now actually converts into extra destructible-cover damage while Battlefield keeps ownership of breach and rubble feedback.",
+          "Annihilator gains stronger deep-fuse blast commitment at the cost of a larger reload opening.",
+          "Quake Cannon converts deeper fuse programs into stronger displacement and wider shock geometry rather than raw damage inflation."
+        ],
+        "Guardian Apex Doctrine": [
+          "Bastion can anchor nearly stationary for extra frontal lane efficiency; moving or flanking breaks the advantage.",
+          "Aegis converts successful Perfect Guards into a brief mobility-flow window for repositioning.",
+          "Meteor builds the highest straight-line Stampede peak but loses momentum rapidly when steering.",
+          "Ravager keeps more charge through moderate steering, trading Meteor's peak impact for flexible routes."
+        ],
+        "Fixes and Validation": [
+          "Repaired the unused Cannon structural multiplier so v1.7 siege mechanics now interact correctly with destructible Battlefield cover.",
+          "Added ten Apex regression tests covering cadence, precision, brace recovery, sector geometry, blast commitment, structural pressure, anchoring, Perfect Guard flow, and ram identities.",
+          "Production build and the complete Node test suite pass before deployment."
+        ]
+      }
+    },
+    {
+      "version": "1.7.0",
+      "codename": "Three Disciplines",
+      "date": "2026-08-08",
+      "headline": "Gunners master cadence, Cannons program space, and Guardians fight with facing.",
+      "groups": {
+        "Gunner — Fire Discipline": [
+          "The cyan lineage gains deterministic recoil, weapon heat and a readable cadence window instead of flat hold-to-win sustained fire.",
+          "Stable aim and controlled bursts tighten fire; excessive heat increases predictable dispersion and physically pushes the hull backward.",
+          "Miniguns reward maintaining a sustainable mid-heat cadence while shotgun descendants reward bracing, recovery and deliberate re-engagement.",
+          "AI Gunners use the same heat/recoil model and deliberately vent after exceeding a sustainable firing state."
+        ],
+        "Cannon — Fire Control": [
+          "The orange lineage can program detonation distance directly with right-stick depth while right-stick direction continues to aim normally.",
+          "A projected fuse/impact reticle shows the programmed burst point; desktop mouse distance follows the same interaction grammar.",
+          "Surviving Cannon projectiles airburst at the chosen distance while preserving their normal splash and cluster behavior, rewarding prediction and area placement rather than direct-hit aim alone.",
+          "Fuse placement compounds Battlefield cover and breach play because Cannon shells and splash can deliberately damage destructible barricades."
+        ],
+        "Guardian — Facing and Counterplay": [
+          "The pink lineage gains directional frontal armor: aim direction now also determines the tank's strongest defensive facing.",
+          "BULWARK and IRON WILL become directional guard states instead of legacy 360-degree invulnerability or universal reduction.",
+          "The opening fraction of a second after a defensive activation is a Perfect Guard window. Reading an incoming attack correctly negates it and stores a Countercharge for the Guardian's next projectile.",
+          "Juggernaut, Meteor and Ravager build Stampede impact by maintaining a clean straight line; sharp turns and terrain collisions dump stored charge."
+        ],
+        "Readability and AI Parity": [
+          "Cyan heat/cadence arcs, orange fuse markers and pink frontal-guard/charge visuals expose the new mechanics without adding buttons.",
+          "Procedural cadence, overheat, fuse-burst, Perfect Guard, Countershot and charge-break sounds reinforce important state changes.",
+          "AI uses the same heat, programmable-fuse authorization, directional defense and momentum constraints rather than receiving simplified privileged versions of the systems."
+        ]
+      }
+    },
+    {
+      "version": "1.6.0",
+      "codename": "Battlefield",
+      "date": "2026-08-08",
+      "headline": "The arena becomes terrain: cover, lanes, line-of-sight and breachable ground.",
+      "groups": {
+        "Battlefield Geometry": [
+          "Each run now uses one of three mirrored tactical battlefield layouts: Crossfire, Split Horizon, or Four Gates.",
+          "Permanent walls and pillars create real firing lanes, protected crossings, flank routes, choke points, side pockets and contested approaches without turning the arena into a maze.",
+          "Destructible barricades create temporary cover that can be cracked, breached and permanently converted into non-blocking rubble during the run.",
+          "Tank, AI, shape and powerup spawn placement is terrain-aware so entities do not materialize inside solid geometry."
+        ],
+        "Line of Sight and Projectile Physics": [
+          "Solid terrain blocks automatic target acquisition and AI firing authorization; targets behind cover are not valid free aim-assist or AI shots.",
+          "Forward Observers also require unobstructed terrain line-of-sight before a remote sniper contact remains valid.",
+          "Projectile-to-terrain collision uses swept segment tests, so fast Rail and precision rounds cannot tunnel through thin walls between frames.",
+          "Permanent fortifications stop projectiles. Destructible cover absorbs projectile damage and splash, with shells dealing extra structural damage.",
+          "A high-penetration projectile may punch through a barricade only when that impact actually destroys it and the projectile retains enough penetration/integrity."
+        ],
+        "Movement, Drones and AI": [
+          "Tanks, drones and neutral shapes physically collide with battlefield geometry and slide along it instead of ghosting through walls.",
+          "AI loses firing permission through occlusion and changes path/strafe intent after repeated terrain bumps instead of continuously pushing into a wall.",
+          "Controller drones remain terrain-constrained during farming, defense, formation and manual command. A committed drone dash that hits a wall aborts into recovery rather than dealing impossible through-wall damage.",
+          "Controller Command Nodes can still be placed tactically beyond cover, but the squad must physically reach the space rather than teleporting its threat through geometry."
+        ],
+        "Sniper and Observer Tactics": [
+          "Cover can now break a sniper reconnaissance chain without killing the Observer: suspicion may guide the scout toward activity, but actual contact requires a clear cone and clear terrain sight.",
+          "Sniper hulls retain ordinary direct sight, so walls create genuine approach windows, relocation choices and Observer-positioning decisions.",
+          "The result is a real detect → acquire → line up → fire interaction layered on top of Silent Horizon and Violet Doctrine rather than simple long-range visibility."
+        ],
+        "Presentation and Validation": [
+          "Fortifications use layered shadows, neon rim lighting, damage cracks, impact flashes and persistent rubble so collision geometry is visually explicit.",
+          "A compact battlefield strip names the current layout and reports remaining destructible cover without adding another control surface.",
+          "Added procedural cover impact, breach and terrain-scrape SFX with restrained particles/camera response.",
+          "Node regression tests cover Battlefield release wiring, line-of-sight blocking, swept thin-wall collision and terrain-aware spawn safety."
+        ]
+      }
+    },
+    {
+      "version": "1.5.1",
+      "codename": "Swarm Discipline",
+      "date": "2026-08-08",
+      "headline": "Blackglass is polished, drones coordinate properly, and reconnaissance learns to search.",
+      "groups": {
+        "Blackglass Polish": [
+          "Portrait-mobile showroom layout was rebuilt for narrow phones with a horizontal dossier rail, shorter animated stage, safe text wrapping, aligned telemetry, and non-overlapping graft rows.",
+          "Long class-role labels truncate intentionally inside library cards while the selected dossier retains complete information."
+        ],
+        "Drone Discipline": [
+          "Idle Controller drones use persistent steering plus separate return/resume thresholds instead of vibrating between farm and home decisions.",
+          "Friendly drones reserve different harvest shapes whenever alternatives exist.",
+          "Defensive drones automatically intercept nearby hostile combat drones; Forward Observer spotters are exempt from automatic defense.",
+          "Manually directed Controller swarms can attack any hostile drone, including spotters."
+        ],
+        "Forward Observer Intelligence": [
+          "Observer search uses a roughly 700-unit, ~149-degree cone plus short point-blank awareness.",
+          "Recent contacts and nearby hostile projectile trajectories create decaying suspicion bearings that rotate the cone and bias patrol movement toward likely activity without granting magical unseen target coordinates.",
+          "Observers continue purposeful sector searches after losing contact and still harvest shapes encountered while scouting.",
+          "Player snipers receive clear cyan target relays and off-screen CONTACT markers with distance; hostile observer relays provide readable SPOTTED / OBSERVER information."
+        ],
+        "Music and Presentation": [
+          "Added a distinct procedural NOVA lobby theme with a repeatable syncopated motif and neon bass pulse.",
+          "Opening Blackglass smoothly morphs the lobby score into a crystalline intelligence-room variation while respecting SOUND OFF, MUSIC OFF, and autoplay restrictions.",
+          "The precision SHOT edge callout now remains screen-upright."
+        ]
+      }
+    },
+    {
+      "version": "1.5.0",
+      "codename": "Blackglass Showroom",
+      "date": "2026-08-08",
+      "headline": "The Evolution Tree becomes a living tank intelligence archive.",
+      "groups": {
+        "Tank Intelligence Showroom": [
+          "The lobby lineage section expands in place into a complete 36-class dossier library.",
+          "Every tank gets lineage context, evolution breadcrumbs, a unique catchphrase, tactical description, ability information, runtime telemetry, and an animated preview generated from canonical class data."
+        ],
+        "Trait Graft Lab": [
+          "Foreign lineage genes can be previewed on the selected build with exact base before → after changes to relevant weapon, hull, mobility, body, splash, drone, and reduction stats."
+        ]
+      }
+    },
+    {
+      "version": "1.4.1",
+      "codename": "Violet Doctrine",
+      "date": "2026-08-07",
+      "headline": "The full sniper doctrine belongs to every purple tank.",
+      "groups": {
+        "Purple Lineage": [
+          "Marksman, Railgun, Ghost, Singularity, Prism Rail, Specter and Assassin all use Forward Observer authorization beyond ordinary direct sight.",
+          "Non-beam purple forms gained class-specific precision dwell, staged warning cues, suppression, projectile readability, and punishable post-shot reveal while Rail forms retained beam-specific focus/interception mechanics."
+        ],
+        "Observer Counterplay": [
+          "Destroying the active Forward Observer temporarily disables remote relay while leaving normal direct-sight combat intact."
+        ]
+      }
+    },
+    {
+      "version": "1.4.0",
+      "codename": "Forward Observer",
+      "date": "2026-08-07",
+      "headline": "Snipers need eyes before they can kill beyond sight.",
+      "groups": {
+        "Sniper AI": [
+          "Fixed banked AI Rail focus and replaced instant reacquisition with finite tracking, continuous focus, sampled target motion, and post-shot recovery.",
+          "Sniper hull sight is ordinary-range; distant target authorization comes from a destructible Forward Observer."
+        ],
+        "Safety": [
+          "Evolution transitions clear hostile banked focus, collapse the upgrade tray, and grant a brief re-entry grace period.",
+          "Controller drone state receives invariant repair for broken positions, phases, targets, dash vectors, and Command Nodes."
+        ]
+      }
+    },
+    {
+      "version": "1.3.1",
+      "codename": "Signal Bloom",
+      "date": "2026-08-07",
+      "headline": "Sniper and Controller mastery gets a full feedback pass.",
+      "groups": {
+        "Polish": [
+          "Added segmented Rail focus feedback, enhanced projectile trails, RAIL DENIED, formation previews, swarm-state visualization, DIVE BROKEN / EVADED feedback, richer procedural SFX, and selective haptics."
+        ]
+      }
+    },
+    {
+      "version": "1.3.0",
+      "codename": "Second Body",
+      "date": "2026-08-07",
+      "headline": "Controllers become twin-stick swarm commanders.",
+      "groups": {
+        "Controller Combat": [
+          "Right-stick direction commands swarm bearing, analog depth sets deployment distance, and release recalls the squad while the left stick continues moving the hull.",
+          "Controller PvP uses designation, formation geometry, readable wind-up, trajectory commitment, dive, overshoot and recovery instead of autonomous nearest-target ramming."
+        ]
+      }
+    },
+    {
+      "version": "1.2.0",
+      "codename": "Silent Horizon",
+      "date": "2026-08-07",
+      "headline": "Snipers become lethal, readable skill duels.",
+      "groups": {
+        "Sniper Gameplay": [
+          "Rail forms gained focus-to-fire, weaker quick-shots, aim commitment, off-screen directional warnings, suppression, post-shot reveal, explicit interception integrity, and swept projectile collision."
+        ]
+      }
+    },
+    {
+      "version": "1.1.0",
+      "codename": "Drone Age",
+      "headline": "Drones enter the arena.",
+      "groups": {
+        "Drones": [
+          "Introduced combat drones as persistent arena entities with health, targeting, respawning and combat behavior.",
+          "Controller builds gained hunter swarms as their defining combat identity."
+        ]
+      }
+    },
+    {
+      "version": "1.0.0",
+      "codename": "First Deployment",
+      "headline": "NOVA TANKS begins.",
+      "groups": {
+        "Foundation": [
+          "Initial playable release of NOVA TANKS."
+        ]
+      }
+    }
+  ]
+}
