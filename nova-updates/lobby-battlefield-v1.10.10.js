@@ -254,8 +254,14 @@ LiveWorld.prototype.destroy=function(){
 };
 
 var current=null;
+function removeStalePresentation(m){
+  if(!m)return;
+  var stale=m.querySelectorAll('.nv-lobby-battlefield,.nv-lobby-atmosphere');
+  for(var i=0;i<stale.length;i++)if(stale[i].parentElement===m)m.removeChild(stale[i]);
+}
 function mount(m){
-  if(!m||m.querySelector('.nv-lobby-battlefield'))return;
+  if(!m)return;
+  removeStalePresentation(m);
   installCss();m.classList.add('nv-war-room');
   var existing=Array.prototype.slice.call(m.children);for(var i=0;i<existing.length;i++)existing[i].classList.add('nv-lobby-foreground');
   var c=document.createElement('canvas');c.className='nv-lobby-battlefield';c.setAttribute('aria-hidden','true');
