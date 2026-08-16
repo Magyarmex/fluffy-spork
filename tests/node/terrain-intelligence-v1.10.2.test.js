@@ -94,3 +94,34 @@ test('route search and anti-stuck work are explicitly bounded',()=>{
   assert.match(source,/ROUTE_TTL_TANK=1\.28/);
   assert.match(source,/__v1102SpotterPlanAt=now\+\.125/);
 });
+
+test('idle Controller movement that would cross terrain is redirected through a safe waypoint without gaining speed',()=>{
+  const T=boot();
+  const wall={x:10,y:0,w:8,h:80};
+  const g=game([wall]);
+  g.firstTerrainHit=(ax,ay,bx,by,pad)=>segRect(ax,ay,bx,by,wall,pad||0)?{hit:{nx:-1,ny:0}}:null;
+  g.novaBattlefieldWaypoint=()=>({x:0,y:60});
+  const d={id:12,x:20,y:0,r:8,__novaIdleMode:'farm',__novaIdleShape:{x:100,y:0,hp:20},__novaVX:200,__novaVY:0,__novaIdleVX:200,__novaIdleVY:0};
+  const rerouted=T.preserveIdleDroneTerrain(g,d,{x:0,y:0},.1,13);
+  assert.equal(rerouted,true);
+  assert.ok(Math.abs(d.x)<1e-9,'reroute should not cross the wall');
+  assert.ok(d.y>0&&d.y<=20.001,'reroute must preserve the original step budget');
+  assert.ok(Math.hypot(d.__novaVX,d.__novaVY)<=200.001,'reroute must not add movement speed');
+  assert.equal(d.__v172Routing,true);
+});
+
+test('unobstructed idle Controller movement is left untouched',()=>{
+  const T=boot(),g=game([]);
+  g.firstTerrainHit=()=>null;
+  g.novaBattlefieldWaypoint=()=>{throw new Error('planner should not run for a clear step');};
+  const d={id:13,x:18,y:4,r:8,__novaIdleMode:'return',__novaHomePoint:{x:120,y:0},__novaVX:180,__novaVY:40};
+  const changed=T.preserveIdleDroneTerrain(g,d,{x:0,y:0},.1,13);
+  assert.equal(changed,false);
+  assert.equal(d.x,18);assert.equal(d.y,4);
+});
+
+test('idle Controller terrain correction remains scoped away from active commands and committed attack phases',()=>{
+  assert.match(source,/po&&po\.alive&&isController\(po\)&&po\.__novaSwarm&&!po\.__novaSwarm\.active/);
+  assert.match(source,/pd\.__novaPhase==='dash'\|\|pd\.__novaPhase==='windup'/);
+  assert.doesNotMatch(source,/owner\.__novaSwarm\.active\)preserveIdleDroneTerrain/);
+});
