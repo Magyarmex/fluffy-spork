@@ -14,7 +14,7 @@ var CONTROLLER_IDS={carrier:1,overlord:1,warden:1,hivemind:1,broodmother:1,citad
 
 window.__NOVA_VERSION=VERSION;
 window.__NOVA_TERRAIN_INTELLIGENCE__={
-  version:VERSION,codename:CODENAME,plans:0,cacheHits:0,stuckRecoveries:0,spotterReroutes:0,idleDroneReroutes:0,
+  version:VERSION,codename:CODENAME,plans:0,cacheHits:0,stuckRecoveries:0,spotterReroutes:0,idleDroneReroutes:0,idleDroneReplans:0,
   guarantees:{hiddenTracking:false,teleportRecovery:false,dashSteering:false,globalNavmesh:false}
 };
 window.__NOVA_TERRAIN_INTELLIGENCE_RELEASE__={
@@ -200,14 +200,21 @@ function blockedDroneStep(g,ax,ay,bx,by,pad){
   if(g.firstTerrainHit&&g.firstTerrainHit(ax,ay,bx,by,Math.max(3,(pad||8)*.58)))return true;
   return false;
 }
+function idleRouteStep(g,pre,goal,step,pad,seed){
+  if(!goal||!g.novaBattlefieldWaypoint)return null;var wp=g.novaBattlefieldWaypoint(pre.x,pre.y,goal.x,goal.y,pad,seed);if(!wp)return null;
+  var dx=wp.x-pre.x,dy=wp.y-pre.y,m=Math.hypot(dx,dy);if(m<.001)return null;var travel=Math.min(step,m),nx=pre.x+dx/m*travel,ny=pre.y+dy/m*travel;
+  if(blockedDroneStep(g,pre.x,pre.y,nx,ny,pad))return null;return{x:nx,y:ny,ux:dx/m,uy:dy/m,seed:seed};
+}
+function stopIdleDrone(d){d.__novaVX=(d.__novaVX||0)*.2;d.__novaVY=(d.__novaVY||0)*.2;d.__novaIdleVX=d.__novaVX;d.__novaIdleVY=d.__novaVY;}
 function preserveIdleDroneTerrain(g,d,pre,dt,pad){
   if(!g||!d||!pre)return false;var px=d.x,py=d.y,step=dist(pre.x,pre.y,px,py);if(step<.001||!blockedDroneStep(g,pre.x,pre.y,px,py,pad))return false;
-  var goal=idleControllerGoal(d),wp=goal&&g.novaBattlefieldWaypoint?g.novaBattlefieldWaypoint(pre.x,pre.y,goal.x,goal.y,pad,d.id):null;
+  var goal=idleControllerGoal(d),baseSeed=Number(d.id)||0,preferredSeed=baseSeed+(d.__v1102IdleRouteFlip?1:0),route=idleRouteStep(g,pre,goal,step,pad,preferredSeed);
   d.x=pre.x;d.y=pre.y;
-  if(!wp){d.__novaVX=(d.__novaVX||0)*.2;d.__novaVY=(d.__novaVY||0)*.2;d.__novaIdleVX=d.__novaVX;d.__novaIdleVY=d.__novaVY;return true;}
-  var dx=wp.x-pre.x,dy=wp.y-pre.y,m=Math.hypot(dx,dy);if(m<.001)return true;var travel=Math.min(step,m),nx=pre.x+dx/m*travel,ny=pre.y+dy/m*travel;
-  if(blockedDroneStep(g,pre.x,pre.y,nx,ny,pad))return true;
-  d.x=nx;d.y=ny;var speed=step/Math.max(.001,Number(dt)||.016);d.__novaVX=dx/m*speed;d.__novaVY=dy/m*speed;d.__novaIdleVX=d.__novaVX;d.__novaIdleVY=d.__novaVY;d.angle=Math.atan2(d.__novaVY,d.__novaVX);d.__v172Routing=true;window.__NOVA_TERRAIN_INTELLIGENCE__.idleDroneReroutes++;return true;
+  if(!route){
+    invalidateRoute(g,preferredSeed,pad);var altSeed=baseSeed+(preferredSeed===baseSeed?1:0);route=idleRouteStep(g,pre,goal,step,pad,altSeed);window.__NOVA_TERRAIN_INTELLIGENCE__.idleDroneReplans++;
+    if(!route){invalidateRoute(g,altSeed,pad);d.__v1102IdleRouteFlip=preferredSeed===baseSeed?1:0;d.__v172Waypoint=null;stopIdleDrone(d);return true;}
+  }
+  d.__v1102IdleRouteFlip=0;d.x=route.x;d.y=route.y;var speed=step/Math.max(.001,Number(dt)||.016);d.__novaVX=route.ux*speed;d.__novaVY=route.uy*speed;d.__novaIdleVX=d.__novaVX;d.__novaIdleVY=d.__novaVY;d.angle=Math.atan2(d.__novaVY,d.__novaVX);d.__v172Routing=true;window.__NOVA_TERRAIN_INTELLIGENCE__.idleDroneReroutes++;return true;
 }
 
 wrap('game/engine',function(engine,require){
@@ -263,7 +270,7 @@ wrap('game/engine',function(engine,require){
 window.__NOVA_TERRAIN_INTELLIGENCE_TEST__={
   obstacleNodes:obstacleNodes,planVisibilityRoute:planVisibilityRoute,seedSide:seedSide,segDistanceSq:segDistanceSq,
   controllerSenses:controllerSenses,observedPoint:observedPoint,tangentEscape:tangentEscape,applyEscape:applyEscape,
-  idleControllerGoal:idleControllerGoal,blockedDroneStep:blockedDroneStep,preserveIdleDroneTerrain:preserveIdleDroneTerrain,
+  idleControllerGoal:idleControllerGoal,blockedDroneStep:blockedDroneStep,idleRouteStep:idleRouteStep,preserveIdleDroneTerrain:preserveIdleDroneTerrain,
   isControllerId:function(id){return !!CONTROLLER_IDS[id];},limits:{maxObstacles:MAX_OBSTACLES,maxNodes:MAX_NODES}
 };
 console.info('[NOVA TANKS] v'+VERSION+' '+CODENAME+' linked');
