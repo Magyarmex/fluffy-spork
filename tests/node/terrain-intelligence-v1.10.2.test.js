@@ -110,6 +110,40 @@ test('idle Controller movement that would cross terrain is redirected through a 
   assert.equal(d.__v172Routing,true);
 });
 
+test('blocked idle detour is invalidated and opposite-side route is attempted in the same frame',()=>{
+  const T=boot();
+  const wall={x:20,y:0,w:8,h:80};
+  const g=game([wall]),seeds=[];
+  g.firstTerrainHit=(ax,ay,bx,by,pad)=>segRect(ax,ay,bx,by,wall,pad||0)?{hit:{nx:-1,ny:0}}:null;
+  g.__v1102Routes={'12:3':{stale:true}};
+  g.novaBattlefieldWaypoint=(x,y,gx,gy,pad,seed)=>{seeds.push(seed);return seed===12?{x:80,y:0}:{x:0,y:80};};
+  const d={id:12,x:40,y:0,r:8,__novaIdleMode:'farm',__novaIdleShape:{x:120,y:0,hp:20},__novaVX:400,__novaVY:0,__novaIdleVX:400,__novaIdleVY:0};
+  const rerouted=T.preserveIdleDroneTerrain(g,d,{x:0,y:0},.1,13);
+  assert.equal(rerouted,true);
+  assert.deepEqual(seeds,[12,13]);
+  assert.equal(g.__v1102Routes['12:3'],undefined,'blocked cached route must be invalidated immediately');
+  assert.ok(Math.abs(d.x)<1e-9&&d.y>0,'alternate route should recover around the wall this frame');
+  assert.ok(Math.hypot(d.__novaVX,d.__novaVY)<=400.001,'alternate recovery must preserve the original speed budget');
+  assert.equal(d.__v1102IdleRouteFlip,0);
+});
+
+test('when both idle detours are blocked the drone stops safely and alternates preferred route next frame',()=>{
+  const T=boot();
+  const g=game([]),seeds=[];
+  g.isTerrainSafe=()=>false;
+  g.firstTerrainHit=()=>({hit:{nx:-1,ny:0}});
+  g.__v1102Routes={'12:3':{stale:true},'13:3':{stale:true}};
+  g.novaBattlefieldWaypoint=(x,y,gx,gy,pad,seed)=>{seeds.push(seed);return{x:80,y:0};};
+  const d={id:12,x:40,y:0,r:8,__novaIdleMode:'return',__novaHomePoint:{x:120,y:0},__novaVX:400,__novaVY:0,__novaIdleVX:400,__novaIdleVY:0};
+  const corrected=T.preserveIdleDroneTerrain(g,d,{x:0,y:0},.1,13);
+  assert.equal(corrected,true);
+  assert.deepEqual(seeds,[12,13]);
+  assert.equal(d.x,0);assert.equal(d.y,0);
+  assert.ok(Math.hypot(d.__novaVX,d.__novaVY)<=80.001,'failed detours should damp movement instead of pushing into cover');
+  assert.equal(d.__v1102IdleRouteFlip,1,'next correction should prefer the opposite routing side');
+  assert.equal(g.__v1102Routes['12:3'],undefined);assert.equal(g.__v1102Routes['13:3'],undefined);
+});
+
 test('unobstructed idle Controller movement is left untouched',()=>{
   const T=boot(),g=game([]);
   g.firstTerrainHit=()=>null;
