@@ -123,5 +123,5 @@ test('unobstructed idle Controller movement is left untouched',()=>{
 test('idle Controller terrain correction remains scoped away from active commands and committed attack phases',()=>{
   assert.match(source,/po&&po\.alive&&isController\(po\)&&po\.__novaSwarm&&!po\.__novaSwarm\.active/);
   assert.match(source,/pd\.__novaPhase==='dash'\|\|pd\.__novaPhase==='windup'/);
-  assert.doesNotMatch(source,/owner\.__novaSwarm\.active\)preserveIdleDroneTerrain/);
+  assert.match(source,/before\[d\.id\]&&owner\.__novaSwarm&&!owner\.__novaSwarm\.active\)preserveIdleDroneTerrain/);
 });
