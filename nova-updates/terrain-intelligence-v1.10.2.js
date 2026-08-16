@@ -14,7 +14,7 @@ var CONTROLLER_IDS={carrier:1,overlord:1,warden:1,hivemind:1,broodmother:1,citad
 
 window.__NOVA_VERSION=VERSION;
 window.__NOVA_TERRAIN_INTELLIGENCE__={
-  version:VERSION,codename:CODENAME,plans:0,cacheHits:0,stuckRecoveries:0,spotterReroutes:0,
+  version:VERSION,codename:CODENAME,plans:0,cacheHits:0,stuckRecoveries:0,spotterReroutes:0,idleDroneReroutes:0,
   guarantees:{hiddenTracking:false,teleportRecovery:false,dashSteering:false,globalNavmesh:false}
 };
 window.__NOVA_TERRAIN_INTELLIGENCE_RELEASE__={
@@ -187,6 +187,28 @@ function separateSwarm(group){
     if(n){var sm=Math.hypot(sx,sy)||1,speed=Math.max(80,Math.hypot(a.__novaVX||0,a.__novaVY||0));a.__novaVX=(a.__novaVX||0)+sx/sm*speed*.075;a.__novaVY=(a.__novaVY||0)+sy/sm*speed*.075;}
   }
 }
+function idleControllerGoal(d){
+  if(!d)return null;var mode=d.__novaIdleMode,t=null;
+  if(mode==='defend')t=d.__novaDefenseTarget;
+  else if(mode==='farm')t=d.__novaIdleShape;
+  else if(mode==='return'||mode==='guard')t=d.__novaHomePoint;
+  if(!t||!Number.isFinite(t.x)||!Number.isFinite(t.y)||t.hp===0)return null;
+  return{x:t.x,y:t.y};
+}
+function blockedDroneStep(g,ax,ay,bx,by,pad){
+  if(!safe(g,bx,by,pad))return true;
+  if(g.firstTerrainHit&&g.firstTerrainHit(ax,ay,bx,by,Math.max(3,(pad||8)*.58)))return true;
+  return false;
+}
+function preserveIdleDroneTerrain(g,d,pre,dt,pad){
+  if(!g||!d||!pre)return false;var px=d.x,py=d.y,step=dist(pre.x,pre.y,px,py);if(step<.001||!blockedDroneStep(g,pre.x,pre.y,px,py,pad))return false;
+  var goal=idleControllerGoal(d),wp=goal&&g.novaBattlefieldWaypoint?g.novaBattlefieldWaypoint(pre.x,pre.y,goal.x,goal.y,pad,d.id):null;
+  d.x=pre.x;d.y=pre.y;
+  if(!wp){d.__novaVX=(d.__novaVX||0)*.2;d.__novaVY=(d.__novaVY||0)*.2;d.__novaIdleVX=d.__novaVX;d.__novaIdleVY=d.__novaVY;return true;}
+  var dx=wp.x-pre.x,dy=wp.y-pre.y,m=Math.hypot(dx,dy);if(m<.001)return true;var travel=Math.min(step,m),nx=pre.x+dx/m*travel,ny=pre.y+dy/m*travel;
+  if(blockedDroneStep(g,pre.x,pre.y,nx,ny,pad))return true;
+  d.x=nx;d.y=ny;var speed=step/Math.max(.001,Number(dt)||.016);d.__novaVX=dx/m*speed;d.__novaVY=dy/m*speed;d.__novaIdleVX=d.__novaVX;d.__novaIdleVY=d.__novaVY;d.angle=Math.atan2(d.__novaVY,d.__novaVX);d.__v172Routing=true;window.__NOVA_TERRAIN_INTELLIGENCE__.idleDroneReroutes++;return true;
+}
 
 wrap('game/engine',function(engine,require){
   var Game=engine.Game;if(!Game||Game.prototype.__novaTerrainIntelligence)return;Game.prototype.__novaTerrainIntelligence=true;
@@ -212,12 +234,19 @@ wrap('game/engine',function(engine,require){
 
   var oldDrones=Game.prototype.updateDrones;
   if(oldDrones)Game.prototype.updateDrones=function(dt){
+    var before=Object.create(null),preDs=this.drones||[],pi;
+    for(pi=0;pi<preDs.length;pi++){
+      var pd=preDs[pi];if(!pd||pd.hp<=0||pd.__novaPhase==='dash'||pd.__novaPhase==='windup')continue;var po=this.getTank&&this.getTank(pd.ownerId);
+      if(po&&po.alive&&isController(po)&&po.__novaSwarm&&!po.__novaSwarm.active)before[pd.id]={x:pd.x,y:pd.y};
+    }
     var out=oldDrones.call(this,dt),now=this.time||0,groups=Object.create(null),ds=this.drones||[];
     for(var i=0;i<ds.length;i++){
       var d=ds[i];if(!d||d.hp<=0)continue;var owner=this.getTank&&this.getTank(d.ownerId);if(!owner||!owner.alive)continue;
       if(isController(owner)) (groups[owner.id]||(groups[owner.id]=[])).push(d);
       if(d.__novaPhase==='dash'||d.__novaPhase==='windup')continue;
-      var intent=droneIntent(d),sp=Math.hypot(intent.x,intent.y),pad=(d.r||8)+5,st=sampleStuck(this,d,intent.x,intent.y,pad,d.id,d.__v1102Nav||(d.__v1102Nav={}));
+      var pad=(d.r||8)+5;
+      if(before[d.id]&&owner.__novaSwarm&&!owner.__novaSwarm.active)preserveIdleDroneTerrain(this,d,before[d.id],dt,pad);
+      var intent=droneIntent(d),sp=Math.hypot(intent.x,intent.y),st=sampleStuck(this,d,intent.x,intent.y,pad,d.id,d.__v1102Nav||(d.__v1102Nav={}));
       if(st.escapeUntil>now&&sp>1){var e=applyEscape(st,intent.x,intent.y);if(d.__novaSpotter){d.__novaScoutVX=e.x;d.__novaScoutVY=e.y;}else{d.__novaVX=e.x;d.__novaVY=e.y;}}
       if(d.__novaSpotter&&sp>28&&now>=(d.__v1102SpotterPlanAt||0)){
         d.__v1102SpotterPlanAt=now+.125+((Math.abs(d.id||0)%3)*.014);var ux=intent.x/sp,uy=intent.y/sp,gx=d.x+ux*360,gy=d.y+uy*360;
@@ -234,6 +263,7 @@ wrap('game/engine',function(engine,require){
 window.__NOVA_TERRAIN_INTELLIGENCE_TEST__={
   obstacleNodes:obstacleNodes,planVisibilityRoute:planVisibilityRoute,seedSide:seedSide,segDistanceSq:segDistanceSq,
   controllerSenses:controllerSenses,observedPoint:observedPoint,tangentEscape:tangentEscape,applyEscape:applyEscape,
+  idleControllerGoal:idleControllerGoal,blockedDroneStep:blockedDroneStep,preserveIdleDroneTerrain:preserveIdleDroneTerrain,
   isControllerId:function(id){return !!CONTROLLER_IDS[id];},limits:{maxObstacles:MAX_OBSTACLES,maxNodes:MAX_NODES}
 };
 console.info('[NOVA TANKS] v'+VERSION+' '+CODENAME+' linked');
