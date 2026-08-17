@@ -28,7 +28,6 @@ window.__NOVA_COMMAND_WEAVE_RELEASE__={
       'The right aim stick exclusively controls the cannon. It no longer doubles as a live swarm leash.',
       'A dedicated CMD pad can stamp the current cannon sightline with a tap, place a command directly in world space by dragging, enter a defensive screen near the Controller, or recall on a double tap.',
       'Orders persist after the command gesture, so the player can immediately return to aiming and shooting.',
-      'Command stamps and autonomous Controller doctrine respect the game\'s alliance/hostility rules instead of treating every other tank or drone as an enemy.',
       'Command-pad pointer capture is independent of both joysticks and every other held screen touch.'
     ],
     'No Input Clogging':[
@@ -57,8 +56,6 @@ function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
 function dist2(ax,ay,bx,by){var x=bx-ax,y=by-ay;return x*x+y*y;}
 function angleDiff(a,b){var d=(a-b+Math.PI)%TAU;if(d<0)d+=TAU;return d-Math.PI;}
 function isController(t){return !!(t&&CONTROLLER_IDS[t.cls]);}
-function sameSide(a,b){var keys=['teamId','team','factionId','faction','side'];for(var i=0;i<keys.length;i++){var k=keys[i];if(a&&b&&a[k]!=null&&b[k]!=null)return a[k]===b[k];}return null;}
-function hostile(g,owner,t){if(!owner||!t||t.id===owner.id||t.alive===false)return false;if(typeof g.areAllies==='function'&&g.areAllies(owner,t))return false;if(typeof g.areHostile==='function')return !!g.areHostile(owner,t);var side=sameSide(owner,t);if(side!==null)return !side;return true;}
 function lineage(classes,t){try{return t?classes.lineageForClass(t.cls):null;}catch(_){return null;}}
 function maxCommandRange(owner,def){var leash=(def&&def.droneLeash)||650;return Math.max(170,leash*.88*(owner&&owner.swarmT>0?1.12:1));}
 function clampNode(owner,x,y,maxR){
@@ -203,7 +200,7 @@ wrap('game/engine',function(engine,require){
   function aimStampTarget(g,owner){
     var a=owner.angle||0,maxR=maxCommandRange(owner,C[owner.cls]),best=null,bestScore=Infinity;
     for(var i=0;i<g.tanks.length;i++){
-      var t=g.tanks[i];if(!t||!hostile(g,owner,t)||t.spawnShieldT>0)continue;
+      var t=g.tanks[i];if(!t||!t.alive||t.id===owner.id||t.spawnShieldT>0)continue;
       var dx=t.x-owner.x,dy=t.y-owner.y,d=Math.hypot(dx,dy);if(d>maxR*1.08||d<1)continue;
       var ad=Math.abs(angleDiff(Math.atan2(dy,dx),a));if(ad>.18)continue;
       var score=ad*700+d*.09;if(score<bestScore){best=t;bestScore=score;}
@@ -277,10 +274,10 @@ wrap('game/engine',function(engine,require){
     return false;
   }
   function bestObservedTank(g,owner,current){
-    if(current&&hostile(g,owner,current)&&sensorSees(g,owner,current))return current;
+    if(current&&sensorSees(g,owner,current))return current;
     var best=null,score=Infinity;
     for(var i=0;i<g.tanks.length;i++){
-      var t=g.tanks[i];if(!t||!hostile(g,owner,t)||t.spawnShieldT>0||!sensorSees(g,owner,t))continue;
+      var t=g.tanks[i];if(!t||!t.alive||t.id===owner.id||t.spawnShieldT>0||!sensorSees(g,owner,t))continue;
       var s=dist2(owner.x,owner.y,t.x,t.y)*(t.isPlayer ? .88 : 1);if(s<score){score=s;best=t;}
     }
     return best;
@@ -318,7 +315,7 @@ wrap('game/engine',function(engine,require){
     var best=null,score=radius*radius;
     for(var i=0;i<g.drones.length;i++){
       var d=g.drones[i];if(!d||d.hp<=0||d.ownerId===owner.id)continue;
-      var hostileOwner=g.getTank&&g.getTank(d.ownerId);if(!hostileOwner||!hostile(g,owner,hostileOwner))continue;
+      var hostileOwner=g.getTank&&g.getTank(d.ownerId);if(!hostileOwner||!hostileOwner.alive)continue;
       var dd=dist2(owner.x,owner.y,d.x,d.y);if(dd<score){score=dd;best=d;}
     }
     return best;
@@ -418,7 +415,6 @@ wrap('game/engine',function(engine,require){
     disrupt(victim);
     for(var i=0;i<this.drones.length;i++){
       var d=this.drones[i];if(!d||d===victim||d.hp<=0||d.ownerId===killer.id||dist2(victim.x,victim.y,d.x,d.y)>r2)continue;
-      var otherOwner=this.getTank&&this.getTank(d.ownerId);if(!otherOwner||!hostile(this,killer,otherOwner))continue;
       oldDamageDrone.call(this,d,secondary,killerId);disrupt(d);
     }
     if(this.addRing)this.addRing(victim.x,victim.y,'#d8f8ff',radius);
@@ -431,7 +427,7 @@ wrap('game/engine',function(engine,require){
     var input=this.input,realAim=input&&input.aim,realMouse=input&&input.mouseActive,player=this.player,restore=false;
     if(input&&player&&player.alive&&isController(player)){
       var c=commandState(player),target=c.targetId>=0&&this.getTank?this.getTank(c.targetId):null;
-      if(c.mode==='target'){if(target&&target.alive&&hostile(this,player,target)){c.x=target.x;c.y=target.y;}else{c.mode='point';c.targetId=-1;}}
+      if(c.mode==='target'){if(target&&target.alive){c.x=target.x;c.y=target.y;}else{c.mode='point';c.targetId=-1;}}
       input.aim=fakeAimFor(player,C[player.cls],c);input.mouseActive=false;restore=true;
     }
     var out;
@@ -489,8 +485,6 @@ wrap('game/render',function(renderMod,require){
 window.__NOVA_COMMAND_WEAVE__={version:VERSION,codename:CODENAME,date:'2026-08-08'};
 window.__NOVA_COMMAND_WEAVE_TEST__={
   isControllerId:function(id){return !!CONTROLLER_IDS[id];},
-  hostile:hostile,
-  sameSide:sameSide,
   maxCommandRange:maxCommandRange,
   fakeAimFor:fakeAimFor,
   doubleTapMs:DOUBLE_TAP_MS,
