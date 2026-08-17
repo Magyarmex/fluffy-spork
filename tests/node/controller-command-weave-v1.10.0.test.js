@@ -37,6 +37,22 @@ test('persistent swarm command is translated into a synthetic aim vector without
   assert.equal(T.fakeAimFor(owner, def, { active: false, mode: 'recall', x: 0, y: 0 }).active, false);
 });
 
+test('Controller hostility respects game alliance APIs while preserving free-for-all fallback', () => {
+  const { window } = boot();
+  const T = window.__NOVA_COMMAND_WEAVE_TEST__;
+  const owner = { id: 1, alive: true, teamId: 'blue' };
+  const ally = { id: 2, alive: true, teamId: 'blue' };
+  const enemy = { id: 3, alive: true, teamId: 'red' };
+  const alliedGame = {
+    areAllies(a, b) { return a.teamId === b.teamId; },
+    areHostile(a, b) { return a.teamId !== b.teamId; }
+  };
+  assert.equal(T.hostile(alliedGame, owner, ally), false);
+  assert.equal(T.hostile(alliedGame, owner, enemy), true);
+  assert.equal(T.hostile({}, owner, ally), false, 'shared side metadata should remain allied without game helpers');
+  assert.equal(T.hostile({}, owner, { id: 4, alive: true }), true, 'unknown relation preserves historical FFA behavior');
+});
+
 test('all touch buttons get a capture-phase independent activation bridge', () => {
   const { window, listeners } = boot();
   assert.equal(listeners.get('pointerdown').capture, true);
@@ -75,6 +91,14 @@ test('source hardens pointer ownership and fully isolates live cannon input from
   assert.match(source, /input\.aim=fakeAimFor\(player,C\[player\.cls\],c\)/);
   assert.match(source, /input\.mouseActive=false/);
   assert.match(source, /input\.aim=realAim;input\.mouseActive=realMouse/);
+});
+
+test('manual stamps, AI targets, defense screens and disruption all use the same hostility gate', () => {
+  assert.match(source, /function aimStampTarget[\s\S]*?!hostile\(g,owner,t\)/);
+  assert.match(source, /function bestObservedTank[\s\S]*?hostile\(g,owner,current\)[\s\S]*?!hostile\(g,owner,t\)/);
+  assert.match(source, /function hostileDroneNear[\s\S]*?!hostile\(g,owner,hostileOwner\)/);
+  assert.match(source, /otherOwner=this\.getTank&&this\.getTank\(d\.ownerId\);if\(!otherOwner\|\|!hostile\(this,killer,otherOwner\)\)continue/);
+  assert.match(source, /target&&target\.alive&&hostile\(this,player,target\)/);
 });
 
 test('combat pass includes screens, repair, disruption, sensed AI, real reserves, and committed-dive preservation', () => {
