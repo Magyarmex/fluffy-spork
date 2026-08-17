@@ -58,6 +58,14 @@ function lineage(classes,t){try{return t?classes.lineageForClass(t.cls):null;}ca
 function sizeOf(C,t){return (t&&C[t.cls]&&C[t.cls].size)||15;}
 function abilityOf(C,t){return t&&C[t.cls]&&C[t.cls].ability||null;}
 function alive(t){return !!t&&t.alive!==false&&t.hp>0;}
+function sameSide(a,b){var keys=['teamId','team','factionId','faction','side'];for(var i=0;i<keys.length;i++){var k=keys[i];if(a&&b&&a[k]!=null&&b[k]!=null)return a[k]===b[k];}return null;}
+function hostile(g,a,b){
+  if(!a||!b||a.id===b.id||!alive(b))return false;
+  if(typeof g.areAllies==='function'&&g.areAllies(a,b))return false;
+  if(typeof g.areHostile==='function')return !!g.areHostile(a,b);
+  var side=sameSide(a,b);if(side!==null)return !side;
+  return true;
+}
 function visible(g,a,b,pad){
   if(!alive(b))return false;
   return !g.hasLineOfSight||g.hasLineOfSight(a.x,a.y,b.x,b.y,pad==null?3:pad);
@@ -98,7 +106,7 @@ function targetDanger(classes,t){
   return clamp(x,0,1);
 }
 function scoreTarget(g,classes,t,a,q,vision,now){
-  if(!alive(q)||q.id===t.id)return -Infinity;
+  if(!hostile(g,t,q))return -Infinity;
   var dx=q.x-t.x,dy=q.y-t.y,dist=Math.hypot(dx,dy);
   if(dist>vision)return -Infinity;
   var seen=visible(g,t,q,3);
@@ -351,7 +359,7 @@ window.__NOVA_AI_DIRECTOR__={
 };
 window.__NOVA_PREDATOR_TEST__={
   solveIntercept:solveIntercept,threatVector:threatVector,reactionFor:reactionFor,preferredRange:preferredRange,
-  saturation:saturation,scoreTarget:scoreTarget,seekCover:seekCover,fireTolerance:fireTolerance
+  saturation:saturation,scoreTarget:scoreTarget,seekCover:seekCover,fireTolerance:fireTolerance,hostile:hostile,sameSide:sameSide
 };
 console.info('[NOVA TANKS] v'+VERSION+' '+CODENAME+' hunting intelligently');
 })();
