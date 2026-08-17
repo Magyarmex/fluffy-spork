@@ -20,7 +20,7 @@ function boot(nativeTarget) {
   return { Game: module.exports.Game, hooks: window.__NOVA_DRONE_TARGET_FILTER_TEST__ };
 }
 
-function baseGame(Game, nativeTarget) {
+function baseGame(Game) {
   const g = new Game();
   g.tanks = [];
   g.drones = [];
@@ -57,17 +57,30 @@ test('combat fallback respects visibility and preserves the historical neutral-s
   assert.equal(g.acquireDroneTarget(drone, owner, 500), shape);
 });
 
-test('allied tanks are never introduced as fallback targets', () => {
-  const { Game } = boot(spotter);
+test('allied tank returned by the native selector is rejected in favor of a visible hostile', () => {
+  const ally = { id: 4, kind: 'tank', team: 'blue', alive: true, x: 60, y: 0 };
+  const { Game } = boot(ally);
   const g = baseGame(Game);
-  const ally = { id: 4, kind: 'tank', team: 'blue', alive: true, x: 80, y: 0 };
-  const shape = { id: 3, kind: 'shape', hp: 20, x: 140, y: 0 };
-  g.tanks = [owner, ally];
+  const hostile = { id: 2, kind: 'tank', team: 'red', alive: true, x: 150, y: 0 };
+  g.tanks = [owner, ally, hostile];
+  assert.equal(g.acquireDroneTarget(drone, owner, 500), hostile);
+});
+
+test('allied non-spotter drone returned by the native selector is rejected', () => {
+  const allyOwner = { id: 5, kind: 'tank', team: 'blue', alive: true, x: 250, y: 0 };
+  const allyDrone = { id: 6, kind: 'drone', ownerId: 5, hp: 12, x: 70, y: 0 };
+  const shape = { id: 3, kind: 'shape', hp: 20, x: 110, y: 0 };
+  const { Game } = boot(allyDrone);
+  const g = baseGame(Game);
+  g.tanks = [owner, allyOwner];
+  g.tankById.set(1, owner);
+  g.tankById.set(5, allyOwner);
+  g.drones = [drone, allyDrone];
   g.shapes = [shape];
   assert.equal(g.acquireDroneTarget(drone, owner, 500), shape);
 });
 
-test('nearest visible hostile non-spotter drone can take over from a spotter', () => {
+test('nearest visible hostile non-spotter drone can take over from a protected target', () => {
   const { Game } = boot(spotter);
   const g = baseGame(Game);
   const enemyOwner = { id: 5, kind: 'tank', team: 'red', alive: true, x: 300, y: 0 };
@@ -79,9 +92,20 @@ test('nearest visible hostile non-spotter drone can take over from a spotter', (
   assert.equal(g.acquireDroneTarget(drone, owner, 500), enemyDrone);
 });
 
-test('native non-spotter selection is returned unchanged', () => {
-  const native = { id: 7, kind: 'tank', team: 'red', alive: true, x: 50, y: 0 };
-  const { Game } = boot(native);
-  const g = baseGame(Game);
-  assert.equal(g.acquireDroneTarget(drone, owner, 500), native);
+test('native hostile and neutral targets are returned unchanged', () => {
+  const hostile = { id: 7, kind: 'tank', team: 'red', alive: true, x: 50, y: 0 };
+  let booted = boot(hostile);
+  let g = baseGame(booted.Game);
+  assert.equal(g.acquireDroneTarget(drone, owner, 500), hostile);
+
+  const shape = { id: 8, kind: 'shape', hp: 20, x: 35, y: 0 };
+  booted = boot(shape);
+  g = baseGame(booted.Game);
+  assert.equal(g.acquireDroneTarget(drone, owner, 500), shape);
+});
+
+test('unknown relationship data preserves historical FFA hostility', () => {
+  const { hooks } = boot(null);
+  const unknown = { id: 11, kind: 'tank', alive: true };
+  assert.equal(hooks.hostile({}, owner, unknown), true);
 });
