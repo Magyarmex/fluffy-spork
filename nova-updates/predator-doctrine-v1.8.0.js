@@ -146,6 +146,7 @@ function threatVector(g,C,t,out){
     var rx=b.x-t.x,ry=b.y-t.y,v2=(b.vx||0)*(b.vx||0)+(b.vy||0)*(b.vy||0);if(v2<100)continue;
     var tc=-(rx*(b.vx||0)+ry*(b.vy||0))/v2;if(tc<0||tc>.82)continue;
     var cx=rx+(b.vx||0)*tc,cy=ry+(b.vy||0)*tc,cd=Math.hypot(cx,cy);if(cd>safe*1.75)continue;
+    if(g.hasLineOfSight&&!g.hasLineOfSight(b.x,b.y,t.x,t.y,3))continue;
     var w=(1-clamp(cd/(safe*1.75),0,1))*(1-clamp(tc/.82,0,1));
     var l=Math.hypot(cx,cy);
     if(l>2){vx-=cx/l*w;vy-=cy/l*w;}
