@@ -33,6 +33,8 @@ function loadPredator(){
   Game.prototype.tankSpeed=function(){return 120;};
   Game.prototype.weaponRange=function(t){return t.cls==='marksman'?1000:650;};
   Game.prototype.bulletSpeed=function(t){return CLASSES[t.cls].bullet.speed;};
+  Game.prototype.areAllies=function(a,b){return a.teamId!=null&&b.teamId!=null&&a.teamId===b.teamId;};
+  Game.prototype.areHostile=function(a,b){return a.teamId!=null&&b.teamId!=null?a.teamId!==b.teamId:true;};
   Game.prototype.hasLineOfSight=function(ax,ay,bx,by){
     if(this.coverMode && ax>0 && bx<1)return false;
     return !this.blockAll;
@@ -109,6 +111,32 @@ test('target saturation lowers dogpile priority',()=>{
   for(let i=0;i<5;i++)g.tanks.push(tank(20+i,'twin',{ai:brain({state:'hunt',targetId:7})}));
   const crowded=helper.scoreTarget(g,{lineageForClass:(id)=>id==='guard'?'guardian':'gunner'},hunter,hunter.ai,player,1000,g.time);
   assert.ok(crowded<base-.6,`expected saturation penalty: ${base} -> ${crowded}`);
+});
+
+test('Predator target scoring rejects allied tanks even when they are tempting targets',()=>{
+  const {context,Game}=loadPredator(),g=new Game(),hunter=tank(1,'twin',{teamId:4,ai:brain()}),ally=tank(2,'guard',{teamId:4,x:75,hp:8,maxHp:100,isPlayer:true});
+  g.tanks=[hunter,ally];
+  const score=context.window.__NOVA_PREDATOR_TEST__.scoreTarget(g,{lineageForClass:()=> 'guardian'},hunter,hunter.ai,ally,1000,g.time);
+  assert.equal(score,-Infinity);
+  assert.equal(context.window.__NOVA_PREDATOR_TEST__.hostile(g,hunter,ally),false);
+});
+
+test('Predator planner skips a closer ally and hunts a visible hostile instead',()=>{
+  const {Game,ai}=loadPredator(),g=new Game();
+  const hunter=tank(1,'twin',{teamId:1,ai:brain({__v180PlanT:0})});
+  const ally=tank(2,'guard',{teamId:1,x:90,hp:12,maxHp:100,isPlayer:true});
+  const enemy=tank(3,'guard',{teamId:2,x:310});
+  g.tanks=[hunter,ally,enemy];g.player=ally;
+  ai.updateAI(hunter,g,.16);
+  assert.equal(hunter.ai.__v180TargetId,enemy.id);
+  assert.equal(hunter.ai.targetId,enemy.id);
+});
+
+test('Predator preserves free-for-all targeting when no relationship metadata exists',()=>{
+  const {context,Game}=loadPredator(),g=new Game(),hunter=tank(1,'twin',{ai:brain()}),enemy=tank(7,'guard',{x:240});
+  g.tanks=[hunter,enemy];
+  const score=context.window.__NOVA_PREDATOR_TEST__.scoreTarget(g,{lineageForClass:()=> 'guardian'},hunter,hunter.ai,enemy,1000,g.time);
+  assert.ok(Number.isFinite(score),'legacy FFA targets should remain valid without team metadata');
 });
 
 test('recent damage never authorizes hidden live-coordinate targeting',()=>{
