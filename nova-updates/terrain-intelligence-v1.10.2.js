@@ -184,7 +184,7 @@ function droneIntent(d){
 function separateSwarm(group){
   for(var i=0;i<group.length;i++){var a=group[i];if(!a||a.hp<=0||a.__novaPhase==='dash'||a.__novaPhase==='windup')continue;var sx=0,sy=0,n=0;
     for(var j=0;j<group.length;j++){if(i===j)continue;var b=group[j];if(!b||b.hp<=0)continue;var dd=d2(a.x,a.y,b.x,b.y);if(dd<=1||dd>30*30)continue;var m=Math.sqrt(dd);sx+=(a.x-b.x)/m*(1-m/30);sy+=(a.y-b.y)/m*(1-m/30);n++;}
-    if(n){var sm=Math.hypot(sx,sy)||1,speed=Math.max(80,Math.hypot(a.__novaVX||0,a.__novaVY||0));a.__novaVX=(a.__novaVX||0)+sx/sm*speed*.075;a.__novaVY=(a.__novaVY||0)+sy/sm*speed*.075;}
+    if(n){var vx=a.__novaVX||0,vy=a.__novaVY||0,speed=Math.hypot(vx,vy);if(speed>1e-6){var sm=Math.hypot(sx,sy)||1,nx=vx+sx/sm*speed*.075,ny=vy+sy/sm*speed*.075,nm=Math.hypot(nx,ny);if(nm>1e-6){a.__novaVX=nx/nm*speed;a.__novaVY=ny/nm*speed;}}}
   }
 }
 function idleControllerGoal(d){
