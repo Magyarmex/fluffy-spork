@@ -1,4 +1,5 @@
 /* NOVA TANKS v1.12.0 — Living Front / Stage II: Wild Instincts */
+/* NOVA_VISUAL_INTENT: world telegraphs only — Crasher commitment/bounty, Star direction, Hexagon anchoring, and Triangle evasion communicate immediate spatial decisions. */
 (function(){'use strict';
 var LF=window.__NOVA_LIVING_FRONT_INTERNAL__,mods=window.__novaModules;if(!LF||!mods){console.error('[NOVA v1.12.0] Living Front core missing');return;}if(LF.instincts)return;LF.instincts=true;
 var clamp=LF.clamp,lerp=LF.lerp,d2=LF.d2,alive=LF.alive,query=LF.query,speed=LF.speed,xp=LF.xp,sectorIndex=LF.sectorIndex,sectorCenter=LF.sectorCenter,neighbors=LF.neighbors,TAU=LF.TAU,ARENA=LF.ARENA,BOUNTY_CAP=LF.BOUNTY_CAP,STAR_SPEED_MULT=1.95;
