@@ -45,10 +45,10 @@ test('v1.11 shipping owners remain wired while v1.12 stays after Fair Engagement
 
   assert.match(pwa, /owner-operations-v1\.11\.1\.js/);
 
-  const fair = deploy.indexOf("'\.\/nova-updates\/fair-engagement-v1.11.2.js'".replace(/\\/g, ''));
-  const core = deploy.indexOf("'\.\/nova-updates\/living-front-core-v1.12.0.js'".replace(/\\/g, ''));
-  const instincts = deploy.indexOf("'\.\/nova-updates\/living-front-instincts-v1.12.0.js'".replace(/\\/g, ''));
-  const director = deploy.indexOf("'\.\/nova-updates\/living-front-director-v1.12.0.js'".replace(/\\/g, ''));
+  const fair = deploy.indexOf("'./nova-updates/fair-engagement-v1.11.2.js'");
+  const core = deploy.indexOf("'./nova-updates/living-front-core-v1.12.0.js'");
+  const instincts = deploy.indexOf("'./nova-updates/living-front-instincts-v1.12.0.js'");
+  const director = deploy.indexOf("'./nova-updates/living-front-director-v1.12.0.js'");
 
   assert.ok(fair >= 0, 'Fair Engagement must be materialized');
   assert.ok(core > fair, 'Living Front Core must load after Fair Engagement');
