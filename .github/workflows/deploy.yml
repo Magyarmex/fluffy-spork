@@ -141,6 +141,9 @@ jobs:
               './nova-updates/visual-language-v1.10.9.js',
               './nova-updates/lobby-battlefield-v1.10.10.js',
               './nova-updates/fair-engagement-v1.11.2.js',
+              './nova-updates/living-front-core-v1.12.0.js',
+              './nova-updates/living-front-instincts-v1.12.0.js',
+              './nova-updates/living-front-director-v1.12.0.js',
           ]
           missing = []
           script_paths = []
@@ -270,6 +273,9 @@ jobs:
           grep -q 'nova-updates/visual-language-v1.10.9.js' index.html.new
           grep -q 'nova-updates/lobby-battlefield-v1.10.10.js' index.html.new
           grep -q 'nova-updates/fair-engagement-v1.11.2.js' index.html.new
+          grep -q 'nova-updates/living-front-core-v1.12.0.js' index.html.new
+          grep -q 'nova-updates/living-front-instincts-v1.12.0.js' index.html.new
+          grep -q 'nova-updates/living-front-director-v1.12.0.js' index.html.new
           ! grep -q 'nova-updates/lobby-battlefield-v1.10.1.js' index.html.new
           ! grep -q 'nova-updates/lobby-battlefield-v1.10.9.js' index.html.new
           ! grep -q 'nova-updates/controller-command-weave-v1.10.0.js' index.html.new
