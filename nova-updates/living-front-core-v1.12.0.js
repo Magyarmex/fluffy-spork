@@ -1,4 +1,5 @@
 /* NOVA TANKS v1.12.0 — Living Front / Stage I: Ecology Core */
+/* NOVA_VISUAL_INTENT: minimap spatial signals only — BLOOM, MIGRATION, and ROGUE STAR help the player decide where to rotate; no decorative player-state visuals. */
 (function(){'use strict';
 if(window.__NOVA_LIVING_FRONT_INTERNAL__)return;
 var mods=window.__novaModules;if(!mods){console.error('[NOVA v1.12.0] module registry unavailable');return;}
