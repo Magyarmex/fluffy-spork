@@ -136,7 +136,7 @@ test('legacy AI chain receives only the fairly selected perceived rival', () => 
   const nearby = tank(3, 120, 0);
   const g = game(800, 600, 1); g.tanks = [observer, human, nearby]; g.player = human;
   ai.updateAI(observer, g, 0.016);
-  assert.deepEqual(g.__legacyVisibleIds, [1, 3]);
+  assert.equal(Array.from(g.__legacyVisibleIds).join(','), '1,3');
   assert.equal(g.__legacyPlayerId, -1, 'AI-vs-AI target must not be passed through the legacy player handle');
   assert.equal(observer.ai.__v1112TargetId, 3);
   assert.equal(g.tanks.length, 3, 'full world list is restored after AI thinking');
