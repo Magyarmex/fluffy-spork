@@ -16,6 +16,7 @@
 8. **Optimized-path parity:** fallback behavior was compared against the actual Zero Churn spatial-index path so an optimization could not silently remove information a mechanic depends on.
 9. **Cross-release governance:** Living Front was checked against standing post-v1.10 contracts such as Signal Discipline instead of treating a new major update as exempt from prior design law.
 10. **System ownership:** player-facing integrations were checked for use of canonical owners (Fieldcraft, Living Archive, Debug, materializer) rather than parallel DOM/runtime mechanisms that merely look correct on screen.
+11. **External review:** automated PR review findings were rechecked against the current production owners, not dismissed merely because the focused suite was green.
 
 ## Misses found and corrected
 
@@ -77,13 +78,19 @@ Zero Churn's canonical spatial hash intentionally indexes shapes and living tank
 
 Repository-wide CI caught a release-integration problem the focused gameplay suite did not: post-v1.10.9 runtime files that directly draw player-facing visuals must declare `NOVA_VISUAL_INTENT`. Living Front registered its individual world effects with `NOVAVisuals`, but the Stage I minimap owner and Stage II world-telegraph owner did not carry the required file-level declarations.
 
-**Correction:** Stage I now declares its minimap spatial-navigation intent and Stage II declares its world-telegraph intent. The standing Signal Discipline test was preserved unchanged, and Living Front now has its own focused visual-intent regressions so future edits cannot silently drop the declaration.
+**Correction:** Stage I now declares its minimap spatial-navigation intent and Stage II declares its world-telegraph intent. The standing Signal Discipline test was preserved unchanged, and Living Front has its own focused visual-intent regressions so future edits cannot silently drop the declaration.
 
 ### 11. Tactical tips bypassed Fieldcraft and rewrote the rendered tip line
 
 The first Stage III implementation stored seven useful tactical tips but inserted them by observing `.nv-tip-line` and replacing every third rendered tip. This looked functional while bypassing Fieldcraft's stable IDs, tags, freshness metadata, randomized shuffle bags, anti-repeat behavior, and canonical 10.4-second cadence.
 
 **Correction:** all seven Living Front tips are now registered through `window.NOVATips.registerMany` with stable `living-front-*` IDs, relevant tags, reviewed date, and release source. Fieldcraft exclusively owns rendering, randomization, and cadence. Living Front no longer queries, observes, or rewrites the rendered tip line. Focused tests inject a fake Fieldcraft registry, verify exactly seven valid registrations, and forbid the old DOM interception patterns.
+
+### 12. Crasher terrain collision state could poison every future charge
+
+Automated PR review found a cross-owner lifecycle mismatch that the prior Living Front tests did not model. Battlefield's `circleResolve()` writes `__novaTerrainBumpT = .22` on any colliding shape, while Battlefield's built-in decrement occurs only in its AI-tank wrapper. Neutral shapes therefore retain the marker indefinitely after leaving terrain. Living Front correctly checked the marker to make a wall collision interrupt a committed Crasher charge, but the stale value could make every later charge abort instantly as well.
+
+**Correction:** Wild Instincts now decays the Battlefield bump marker for Crashers at the same decimated behavior cadence, before charge evaluation. A marker freshly refreshed by the just-finished physics step remains positive and still interrupts the current charge; if terrain no longer refreshes it, the next behavior tick expires it to zero, allowing later charges to work normally. `living-front-crasher-terrain-v1.12.0.test.js` verifies both the `.22 → positive → 0` lifecycle and execution order.
 
 ## Verified contracts
 
@@ -102,6 +109,7 @@ The first Stage III implementation stored seven useful tactical tips but inserte
 | Hexagon keystone | Bounded 310-radius, 18-neighbor, terrain-visible attraction |
 | Star interception | Fixed ~152 cruise, route/terrain behavior, bounded lifetime, no boss phases |
 | Crasher predator grammar | Explicit Track/Telegraph/Charge/Overshoot/Recover, locked commitment, terrain collision |
+| Crasher terrain lifecycle | Fresh Battlefield bump interrupts current commitment; stale shape marker decays before future charge evaluation |
 | Fed Crasher reward only | Capped bounty modifies eventual XP only; no HP/damage/speed growth |
 | Physical migration | Neighbor bias + actual boundary-crossing records; no teleportation |
 | Bounded herding | Local proximity/fire/blast response + resistance + diminishing returns |
@@ -124,13 +132,14 @@ The first Stage III implementation stored seven useful tactical tips but inserte
 
 ## Automated audit result
 
-Living Front now carries **24 focused tests across three test files**:
+Living Front now carries **26 focused tests across four test files**:
 
 - 20 gameplay/runtime/integration tests in `living-front-v1.12.0.test.js`;
 - 2 Signal Discipline declaration tests in `living-front-visual-intent-v1.12.0.test.js`;
-- 2 Fieldcraft ownership tests in `living-front-fieldcraft-v1.12.0.test.js`.
+- 2 Fieldcraft ownership tests in `living-front-fieldcraft-v1.12.0.test.js`;
+- 2 Crasher terrain-lifecycle tests in `living-front-crasher-terrain-v1.12.0.test.js`.
 
-They cover distribution semantics, ecological age, terrain visibility, optimized projectile-query parity, bounded disturbance, explicit Crasher overshoot, Star chase geometry, Director truthfulness, AI information/route fairness, neutral-vs-PvP XP attribution, performance cadence, Debug lifecycle, canonical `Game` integration, visual-governance declarations, and canonical tactical-tip registration.
+They cover distribution semantics, ecological age, terrain visibility, optimized projectile-query parity, bounded disturbance, explicit Crasher overshoot, Crasher terrain-marker expiry, Star chase geometry, Director truthfulness, AI information/route fairness, neutral-vs-PvP XP attribution, performance cadence, Debug lifecycle, canonical `Game` integration, visual-governance declarations, and canonical tactical-tip registration.
 
 The three runtime files pass `node --check`. Repository-wide CI remains the authoritative integration gate.
 
@@ -152,9 +161,10 @@ These are deliberately instrumented so real play can tune them without inventing
 Living Front counts as structurally complete only after:
 
 1. the frozen candidate head passes the repository-wide build/test CI;
-2. it is merged into authoritative `main`;
-3. the production materializer emits `index.html` with all three v1.12.0 runtime stages after Fair Engagement;
-4. the materialized runtime is smoke-verified, including Living Archive recognition of v1.12.0;
-5. real-device play validates/tunes the empirical gates above.
+2. all current review findings are resolved against that head;
+3. it is merged into authoritative `main`;
+4. the production materializer emits `index.html` with all three v1.12.0 runtime stages after Fair Engagement;
+5. the materialized runtime is smoke-verified, including Living Archive recognition of v1.12.0;
+6. real-device play validates/tunes the empirical gates above.
 
 Until those repository integration steps occur, implementation is complete on the feature branch but the release is not yet legitimately called live.
