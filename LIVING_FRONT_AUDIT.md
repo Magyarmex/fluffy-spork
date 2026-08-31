@@ -1,8 +1,8 @@
 # NOVA TANKS v1.12.0 — Living Front Completion Audit
 
-**Audit date:** 2026-08-30  
+**Audit date:** 2026-08-31  
 **Purpose:** adversarial design-to-runtime verification after initial implementation.  
-**Standard:** a design point does not count as complete merely because a helper, comment, release flag, or regex exists. It must be reachable through the canonical runtime, preserve NOVA fairness/performance contracts, and have regression evidence where deterministic verification is possible.
+**Standard:** a design point does not count as complete merely because a helper, comment, release flag, or regex exists. It must be reachable through the canonical runtime, preserve NOVA fairness/performance/governance contracts, and have regression evidence where deterministic verification is possible.
 
 ## Audit perspectives
 
@@ -14,6 +14,8 @@
 6. **Test-the-test:** the strengthened suite was executed from a repository-shaped filesystem so CI-relative paths and module lifecycle assumptions were verified.
 7. **Semantic accounting:** telemetry and reward bookkeeping were checked against the actual shared engine containers rather than assuming an array represents only one reward source.
 8. **Optimized-path parity:** fallback behavior was compared against the actual Zero Churn spatial-index path so an optimization could not silently remove information a mechanic depends on.
+9. **Cross-release governance:** Living Front was checked against standing post-v1.10 contracts such as Signal Discipline instead of treating a new major update as exempt from prior design law.
+10. **System ownership:** player-facing integrations were checked for use of canonical owners (Fieldcraft, Living Archive, Debug, materializer) rather than parallel DOM/runtime mechanisms that merely look correct on screen.
 
 ## Misses found and corrected
 
@@ -71,6 +73,18 @@ Zero Churn's canonical spatial hash intentionally indexes shapes and living tank
 
 **Correction:** Wild Instincts now builds one reusable bullet spatial index per decimated behavior tick. Living Front merges nearby bullets from that index into canonical local hash queries, preserving optimized locality without reintroducing shape×all-projectile scans. A dedicated regression supplies a canonical-style hash that omits bullets and verifies the incoming projectile still reaches Triangle threat logic.
 
+### 10. Living Front visuals initially violated Signal Discipline metadata governance
+
+Repository-wide CI caught a release-integration problem the focused gameplay suite did not: post-v1.10.9 runtime files that directly draw player-facing visuals must declare `NOVA_VISUAL_INTENT`. Living Front registered its individual world effects with `NOVAVisuals`, but the Stage I minimap owner and Stage II world-telegraph owner did not carry the required file-level declarations.
+
+**Correction:** Stage I now declares its minimap spatial-navigation intent and Stage II declares its world-telegraph intent. The standing Signal Discipline test was preserved unchanged, and Living Front now has its own focused visual-intent regressions so future edits cannot silently drop the declaration.
+
+### 11. Tactical tips bypassed Fieldcraft and rewrote the rendered tip line
+
+The first Stage III implementation stored seven useful tactical tips but inserted them by observing `.nv-tip-line` and replacing every third rendered tip. This looked functional while bypassing Fieldcraft's stable IDs, tags, freshness metadata, randomized shuffle bags, anti-repeat behavior, and canonical 10.4-second cadence.
+
+**Correction:** all seven Living Front tips are now registered through `window.NOVATips.registerMany` with stable `living-front-*` IDs, relevant tags, reviewed date, and release source. Fieldcraft exclusively owns rendering, randomization, and cadence. Living Front no longer queries, observes, or rewrites the rendered tip line. Focused tests inject a fake Fieldcraft registry, verify exactly seven valid registrations, and forbid the old DOM interception patterns.
+
 ## Verified contracts
 
 | Design contract | Runtime evidence |
@@ -98,7 +112,10 @@ Zero Churn's canonical spatial hash intentionally indexes shapes and living tank
 | AI anti-dogpile | Opportunity saturation penalty + deterministic damping + fight/health gates |
 | AI difficulty by judgment | Elite cadence/judgment differs without extra information or stats |
 | Controller strategy remains player-owned | No ecology command/autonomous cross-map Controller objective layer added |
-| UI restraint | Short minimap signals, world telegraphs, integrated tactical tips, no permanent ecology HUD |
+| Signal Discipline | Stage I/II visual owners declare `NOVA_VISUAL_INTENT`; existing cross-release governance remains green |
+| UI restraint | Short minimap signals, world telegraphs, no permanent ecology HUD |
+| Fieldcraft ownership | Seven stable tagged tips register through `NOVATips`; no rendered-tip DOM interception |
+| Living Archive ownership | Stage III exposes a normal `__NOVA_*_RELEASE__` object for the existing archive collector instead of creating a second history UI |
 | Debug observability | Copyable full snapshot + compact behavior/sector metrics + player neutral XP/min |
 | Neutral XP attribution | Shape/bounty orbs are tagged and distinguished from tank-death reward orbs |
 | Performance cadence | ~4.55 Hz sectors, ~8.33 Hz shape intent, ~1.39 Hz Director, ~3.57 Hz AI |
@@ -107,9 +124,15 @@ Zero Churn's canonical spatial hash intentionally indexes shapes and living tank
 
 ## Automated audit result
 
-The strengthened Living Front suite contains **20 focused tests**. It covers distribution semantics, ecological age, terrain visibility, optimized projectile-query parity, bounded disturbance, explicit Crasher overshoot, Star chase geometry, Director truthfulness, AI information/route fairness, neutral-vs-PvP XP attribution, performance cadence, UI lifecycle behavior, and canonical `Game` integration.
+Living Front now carries **24 focused tests across three test files**:
 
-The three runtime files pass `node --check`. The test suite passes when executed from a repository-shaped directory with repository-relative paths.
+- 20 gameplay/runtime/integration tests in `living-front-v1.12.0.test.js`;
+- 2 Signal Discipline declaration tests in `living-front-visual-intent-v1.12.0.test.js`;
+- 2 Fieldcraft ownership tests in `living-front-fieldcraft-v1.12.0.test.js`.
+
+They cover distribution semantics, ecological age, terrain visibility, optimized projectile-query parity, bounded disturbance, explicit Crasher overshoot, Star chase geometry, Director truthfulness, AI information/route fairness, neutral-vs-PvP XP attribution, performance cadence, Debug lifecycle, canonical `Game` integration, visual-governance declarations, and canonical tactical-tip registration.
+
+The three runtime files pass `node --check`. Repository-wide CI remains the authoritative integration gate.
 
 ## What automation cannot truthfully certify
 
@@ -128,10 +151,10 @@ These are deliberately instrumented so real play can tune them without inventing
 
 Living Front counts as structurally complete only after:
 
-1. the hardened branch passes the repository-wide build/test CI;
+1. the frozen candidate head passes the repository-wide build/test CI;
 2. it is merged into authoritative `main`;
 3. the production materializer emits `index.html` with all three v1.12.0 runtime stages after Fair Engagement;
-4. the materialized runtime is smoke-verified;
+4. the materialized runtime is smoke-verified, including Living Archive recognition of v1.12.0;
 5. real-device play validates/tunes the empirical gates above.
 
 Until those repository integration steps occur, implementation is complete on the feature branch but the release is not yet legitimately called live.
