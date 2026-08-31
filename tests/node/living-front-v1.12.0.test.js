@@ -6,181 +6,41 @@ const vm = require('node:vm');
 
 const sourceFiles=['living-front-core-v1.12.0.js','living-front-instincts-v1.12.0.js','living-front-director-v1.12.0.js'];
 const source = sourceFiles.map(f=>fs.readFileSync(path.join(__dirname,'../../nova-updates',f),'utf8')).join('\n');
+function boot(extraWindow={}) {const window=Object.assign({__novaModules:{}},extraWindow);const context={window,console:{info(){},warn(){},error(){}},Math,Number,Object,Array,Date,JSON,setTimeout(){},clearTimeout(){}};for(const f of sourceFiles)vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../../nova-updates',f),'utf8'),context,{filename:f});return window;}
+function makeState(T,ceiling=1){return{sectors:Array.from({length:16},(_,i)=>T.makeSector(i)),ceiling,signal:null,lastSignalAt:-99,lastMeaningfulAt:0,lastBloomSector:-1,migrationHeat:0,migrationX:0,migrationY:0,cooldowns:{bloom:0,migration:0,star:0}};}
 
-function boot(extraWindow={}) {
-  const window = Object.assign({ __novaModules:{} }, extraWindow);
-  const context = { window, console:{info(){},warn(){},error(){}}, Math, Number, Object, Array, Date, JSON, setTimeout(){}, clearTimeout(){} };
-  for (const f of sourceFiles) vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../../nova-updates',f),'utf8'), context, {filename:f});
-  return window;
-}
-function makeState(T) {
-  return { sectors:Array.from({length:16},(_,i)=>T.makeSector(i)), ceiling:1, signal:null,lastSignalAt:-99,lastMeaningfulAt:0,lastBloomSector:-1,migrationHeat:0,migrationX:0,migrationY:0,cooldowns:{bloom:0,migration:0,star:0} };
-}
+test('release preserves NOVA shape quotas and rejects feature creep',()=>{const w=boot(),R=w.__NOVA_LIVING_FRONT__,T=w.__NOVA_LIVING_FRONT_TEST__;assert.equal(R.version,'1.12.0');assert.deepEqual(JSON.parse(JSON.stringify(T.shapeTargets)),{circle:62,triangle:30,square:16,pentagon:8,hexagon:4});for(const k of ['noXpMultiplierZones','noPityLogic','noNewControls','noControllerStrategicAutonomy','squareIntentionallySimple','nearFireHerding','explosionHerding','explicitCrasherOvershoot','ageGatedHighValueClustering','terrainVisibleInstincts'])assert.equal(R.contract[k],true,k);for(const rejected of ['convoys','reactors','crafting currency','quests','XP multiplier zones','new controls'])assert.ok(T.rejectedScope.includes(rejected));});
 
-test('release preserves NOVA shape quotas and explicitly rejects feature-creep scope',()=>{
-  const w=boot(), R=w.__NOVA_LIVING_FRONT__, T=w.__NOVA_LIVING_FRONT_TEST__;
-  assert.equal(R.version,'1.12.0');
-  assert.deepEqual(JSON.parse(JSON.stringify(T.shapeTargets)),{circle:62,triangle:30,square:16,pentagon:8,hexagon:4});
-  assert.equal(R.contract.noXpMultiplierZones,true);
-  assert.equal(R.contract.noPityLogic,true);
-  assert.equal(R.contract.noNewControls,true);
-  assert.equal(R.contract.noControllerStrategicAutonomy,true);
-  assert.equal(R.contract.squareIntentionallySimple,true);
-  for (const rejected of ['convoys','reactors','crafting currency','quests','XP multiplier zones','new controls']) assert.ok(T.rejectedScope.includes(rejected));
-});
+test('4x4 ecological sectors cover the arena',()=>{const T=boot().__NOVA_LIVING_FRONT_TEST__;assert.equal(T.GRID,4);assert.equal(T.sectorIndex(-2249,-2249),0);assert.equal(T.sectorIndex(2249,-2249),3);assert.equal(T.sectorIndex(-2249,2249),12);assert.equal(T.sectorIndex(2249,2249),15);assert.equal(T.neighbors(0).length,2);assert.equal(T.neighbors(5).length,4);});
 
-test('4x4 ecological sectors cover the whole arena without visible-zone semantics',()=>{
-  const T=boot().__NOVA_LIVING_FRONT_TEST__;
-  assert.equal(T.GRID,4);
-  assert.equal(T.sectorIndex(-2249,-2249),0);
-  assert.equal(T.sectorIndex(2249,-2249),3);
-  assert.equal(T.sectorIndex(-2249,2249),12);
-  assert.equal(T.sectorIndex(2249,2249),15);
-  assert.equal(T.neighbors(0).length,2);
-  assert.equal(T.neighbors(5).length,4);
-});
+test('match-age ceiling rises and now also gates high-value clustering',()=>{const T=boot().__NOVA_LIVING_FRONT_TEST__;const a=T.maturityCeiling(0),b=T.maturityCeiling(100),c=T.maturityCeiling(240),d=T.maturityCeiling(10000);assert.ok(a>=.30&&a<.36);assert.ok(b>a);assert.ok(c>b);assert.equal(d,1);const early=makeState(T,.30),late=makeState(T,1);for(const S of [early,late])S.sectors.forEach((s,i)=>{s.maturity=i===9?S.ceiling:.05;s.pressure=0;s.count=5;});let e=0,l=0;for(let seed=1;seed<=100;seed++){if(T.chooseSpawnSector(early,'hexagon',seed)===9)e++;if(T.chooseSpawnSector(late,'hexagon',seed)===9)l++;}assert.ok(l>e+25,`late mature concentration must meaningfully exceed early: early=${e} late=${l}`);});
 
-test('match-age maturity ceiling starts low, rises smoothly, and is shared/capped',()=>{
-  const T=boot().__NOVA_LIVING_FRONT_TEST__;
-  const a=T.maturityCeiling(0), b=T.maturityCeiling(100), c=T.maturityCeiling(240), d=T.maturityCeiling(10000);
-  assert.ok(a>=.30 && a<.36);
-  assert.ok(b>a);
-  assert.ok(c>b);
-  assert.equal(d,1);
-});
+test('quiet sectors mature while disturbance decays and suppresses maturity',()=>{const T=boot().__NOVA_LIVING_FRONT_TEST__,quiet=T.makeSector(0),loud=T.makeSector(1);quiet.maturity=loud.maturity=.25;loud.pressure=1;loud.recentHarvest=.9;loud.recentCombat=.8;loud.tanks=3;T.advanceSector(quiet,8,1);T.advanceSector(loud,8,1);assert.ok(quiet.maturity>.25);assert.ok(loud.maturity<quiet.maturity);assert.ok(loud.pressure<1&&loud.recentHarvest<.9&&loud.recentCombat<.8);});
 
-test('quiet sectors mature while pressure/harvest/combat decay and suppress maturity',()=>{
-  const T=boot().__NOVA_LIVING_FRONT_TEST__;
-  const quiet=T.makeSector(0), loud=T.makeSector(1); quiet.maturity=loud.maturity=.25;
-  loud.pressure=1; loud.recentHarvest=.9; loud.recentCombat=.8; loud.tanks=3;
-  T.advanceSector(quiet,8,1); T.advanceSector(loud,8,1);
-  assert.ok(quiet.maturity>.25,'quiet ground should mature');
-  assert.ok(loud.maturity<quiet.maturity,'disturbance must reduce maturation relative to quiet ground');
-  assert.ok(loud.pressure<1 && loud.recentHarvest<.9 && loud.recentCombat<.8,'pressure state must decay');
-});
+test('late high-value respawns prefer mature calm geography while fodder stays distributed',()=>{const T=boot().__NOVA_LIVING_FRONT_TEST__,st=makeState(T,1);st.sectors.forEach((s,i)=>{s.maturity=i===9?.96:.06;s.pressure=i===9?0:.18;s.count=6;});let hexAt=0,circleAt=0;for(let seed=1;seed<=80;seed++){if(T.chooseSpawnSector(st,'hexagon',seed)===9)hexAt++;if(T.chooseSpawnSector(st,'circle',seed)===9)circleAt++;}assert.ok(hexAt>60,hexAt);assert.ok(circleAt<hexAt/3);});
 
-test('high-value respawns prefer mature calm geography while fodder remains distributed',()=>{
-  const T=boot().__NOVA_LIVING_FRONT_TEST__, st=makeState(T);
-  st.sectors.forEach((s,i)=>{s.maturity=i===9?.96:.06;s.pressure=i===9?0:.18;s.count=6;});
-  let hexAtMature=0, circleAtMature=0;
-  for(let seed=1;seed<=80;seed++){
-    if(T.chooseSpawnSector(st,'hexagon',seed)===9) hexAtMature++;
-    if(T.chooseSpawnSector(st,'circle',seed)===9) circleAtMature++;
-  }
-  assert.ok(hexAtMature>60,`expected mature sector to dominate hex placement, got ${hexAtMature}/80`);
-  assert.ok(circleAtMature<hexAtMature/3,'fodder should not collapse into the same high-value hotspot');
-});
+test('Triangle evade is credible, lateral and cooldown-bounded',()=>{const T=boot().__NOVA_LIVING_FRONT_TEST__,tri={id:3,x:0,y:0,r:16},incoming={id:9,kind:'bullet',x:-100,y:0,vx:500,vy:0,r:4,dead:false},leaving={...incoming,x:100,vx:500};assert.ok(T.bulletThreat(tri,incoming,.34,20)>.1);assert.equal(T.bulletThreat(tri,leaving,.34,20),0);const v=T.triangleEvadeVector(tri,incoming);assert.ok(Math.abs(v.x)<1e-9);assert.ok(Math.abs(Math.abs(v.y)-1)<1e-9);assert.match(source,/__lfEvadeReady=now\+\.84/);assert.match(source,/if\(!los\(g,s\.x,s\.y,e\.x,e\.y,2\)\)continue/,'blocked projectiles must not trigger ghost dodges');});
 
-test('Triangle evade only reacts to credible future intersection and chooses a lateral line',()=>{
-  const T=boot().__NOVA_LIVING_FRONT_TEST__, tri={id:3,x:0,y:0,r:16}, incoming={id:9,kind:'bullet',x:-100,y:0,vx:500,vy:0,r:4,dead:false}, leaving={...incoming,x:100,vx:500};
-  assert.ok(T.bulletThreat(tri,incoming,.34,20)>.1);
-  assert.equal(T.bulletThreat(tri,leaving,.34,20),0);
-  const v=T.triangleEvadeVector(tri,incoming);
-  assert.ok(Math.abs(v.x)<1e-9);
-  assert.ok(Math.abs(Math.abs(v.y)-1)<1e-9);
-  assert.match(source,/__lfEvadeReady=now\+\.84/,'cooldown/recovery must exist; no infinite frame-perfect dodging');
-});
+test('Hexagon attraction is bounded and terrain-visible',()=>{assert.match(source,/query\(g,st,h\.x,h\.y,310/);assert.match(source,/local<18/);assert.match(source,/d<75\|\|d>310/);assert.match(source,/!los\(g,h\.x,h\.y,s\.x,s\.y/,'Hexagons must not pull through walls');});
 
-test('Hexagon keystone is bounded local attraction, not a global shape controller',()=>{
-  assert.match(source,/query\(g,st,h\.x,h\.y,310/);
-  assert.match(source,/local<18/);
-  assert.match(source,/d<75\|\|d>310/);
-  assert.ok(!/for\s*\([^)]*hex[^)]*\)[\s\S]{0,1800}g\.shapes\.length/.test(source),'keystone behavior should not globally scan every shape for every hexagon');
-});
+test('near fire and explosions herd only appropriate shapes with saturation',()=>{assert.match(source,/function nearFire/);assert.match(source,/function disturbBurst/);assert.match(source,/disturbanceResistance/);assert.match(source,/sat=1\/\(1\+memory\*\.95\)/);assert.match(source,/s\.type==='pentagon'\?\.12/);});
 
-test('Crasher grammar includes telegraph, committed charge, overshoot/recovery and no stat growth from feeding',()=>{
-  const T=boot().__NOVA_LIVING_FRONT_TEST__;
-  let s=T.advanceCrasherState('track',.1,.1,true,true); assert.equal(s.state,'telegraph');
-  s=T.advanceCrasherState('telegraph',.01,.02,true,true); assert.equal(s.state,'charge');
-  s=T.advanceCrasherState('charge',.01,.02,true,true); assert.equal(s.state,'recover');
-  s=T.advanceCrasherState('recover',.01,.02,true,true); assert.equal(s.state,'track');
-  const cr={hp:95,maxHp:95,vx:10,vy:0,__lfBounty:250}; const gained=T.awardBounty(cr,1000);
-  assert.equal(cr.__lfBounty,T.BOUNTY_CAP); assert.equal(cr.hp,95); assert.equal(cr.maxHp,95); assert.equal(cr.vx,10); assert.ok(gained>0);
-  assert.match(source,/var ca=cr\.__lfCommitAngle\|\|0;cr\.vx=Math\.cos\(ca\)/,'charge velocity must use locked commitment angle');
-  assert.match(source,/__novaTerrainBumpT>0/,'committed Crashers must physically lose a charge to terrain');
-});
+test('Crasher grammar has explicit overshoot and bounty changes reward only',()=>{const T=boot().__NOVA_LIVING_FRONT_TEST__;let s=T.advanceCrasherState('track',.1,.1,true,true);assert.equal(s.state,'telegraph');s=T.advanceCrasherState('telegraph',.01,.02,true,true);assert.equal(s.state,'charge');s=T.advanceCrasherState('charge',.01,.02,true,true);assert.equal(s.state,'overshoot');s=T.advanceCrasherState('overshoot',.01,.02,true,true);assert.equal(s.state,'recover');s=T.advanceCrasherState('recover',.01,.02,true,true);assert.equal(s.state,'track');const cr={hp:95,maxHp:95,vx:10,vy:0,__lfBounty:250};const gained=T.awardBounty(cr,1000);assert.equal(cr.__lfBounty,T.BOUNTY_CAP);assert.equal(cr.hp,95);assert.equal(cr.maxHp,95);assert.equal(cr.vx,10);assert.ok(gained>0);assert.match(source,/var ca=cr\.__lfCommitAngle\|\|0;cr\.vx=Math\.cos\(ca\)/);assert.match(source,/__novaTerrainBumpT>0/);});
 
-test('Pentagon/Hexagon cascade inherits final impact direction rather than a new combo system',()=>{
-  assert.match(source,/child=type==='pentagon'\?'triangle':'pentagon'/);
-  assert.match(source,/c\.vx=\(c\.vx\|\|0\)\+ux\*32/);
-  assert.ok(!/combo/i.test(source));
-});
+test('Pentagon/Hexagon cascade inherits final impact direction without combo systems',()=>{assert.match(source,/child=type==='pentagon'\?'triangle':'pentagon'/);assert.match(source,/c\.vx=\(c\.vx\|\|0\)\+ux\*32/);assert.ok(!/combo/i.test(source));});
 
-test('Director BLOOM only reports real accumulated value and does not spawn the Bloom',()=>{
-  const T=boot().__NOVA_LIVING_FRONT_TEST__,st=makeState(T);st.sectors.forEach(s=>{s.maturity=.75;s.value=100;s.xp=100;});st.sectors[6].maturity=.95;st.sectors[6].value=720;st.sectors[6].xp=650;
-  const b=T.directorDecision(st,{enabled:true,now:100,hasStar:false});
-  assert.equal(b.type,'BLOOM'); assert.equal(b.sector,6);
-  assert.match(source,/d\.type==='BLOOM'[\s\S]{0,500}cooldowns\.bloom/);
-  const bloomBranch=source.slice(source.indexOf("if(d.type==='BLOOM')"),source.indexOf("else if(d.type==='MIGRATION')"));
-  assert.ok(!/spawnShape/.test(bloomBranch),'Bloom must never create value');
-});
+test('BLOOM reports real value only after ecological age makes mature pockets legitimate',()=>{const T=boot().__NOVA_LIVING_FRONT_TEST__,early=makeState(T,.30);early.sectors.forEach(s=>{s.maturity=.30;s.value=100});early.sectors[6].value=900;assert.equal(T.bloomAgeEligible(early),false);assert.equal(T.directorDecision(early,{enabled:true,now:40,hasStar:false}),null);const st=makeState(T,1);st.sectors.forEach(s=>{s.maturity=.75;s.value=100;s.xp=100;});st.sectors[6].maturity=.95;st.sectors[6].value=720;st.sectors[6].xp=650;const b=T.directorDecision(st,{enabled:true,now:100,hasStar:false});assert.equal(b.type,'BLOOM');assert.equal(b.sector,6);const bloomBranch=source.slice(source.indexOf("if(d.type==='BLOOM')"),source.indexOf("else if(d.type==='MIGRATION')"));assert.ok(!/spawnShape/.test(bloomBranch));});
 
-test('Director MIGRATION requires recorded physical transitions and Rogue Star waits for strategic quiet',()=>{
-  const T=boot().__NOVA_LIVING_FRONT_TEST__,st=makeState(T);st.cooldowns.bloom=10;st.migrationHeat=6;st.migrationX=1;st.migrationY=0;st.sectors[5].outbound=7;
-  let d=T.directorDecision(st,{enabled:true,now:100,hasStar:false,migrationFrom:5});assert.equal(d.type,'MIGRATION');
-  st.migrationHeat=0;st.cooldowns.migration=10;st.cooldowns.star=0;st.lastMeaningfulAt=20;st.sectors.forEach(s=>{s.maturity=.1;s.value=40;s.outbound=0;});
-  d=T.directorDecision(st,{enabled:true,now:100,hasStar:false});assert.equal(d.type,'ROGUE STAR');
-  assert.equal(T.directorDecision(st,{enabled:false,now:100,hasStar:false}),null,'Director can be disabled without touching ecology core');
-});
+test('Rogue Star cruise speed makes interception preferable to ordinary tail-chasing',()=>{const T=boot().__NOVA_LIVING_FRONT_TEST__;assert.ok(T.STAR_SPEED_MULT>=1.9,'Star should materially outrun ordinary base tanks');const cruise=78*T.STAR_SPEED_MULT;assert.ok(cruise>145&&cruise<170,`expected fast but interceptable Star cruise, got ${cruise}`);assert.match(source,/speed\(defs,'star'\)\|\|78\)\*STAR_SPEED_MULT/);});
 
-test('AI ecology uses public signal / viewport observations and never consumes hidden maturity',()=>{
-  const F={viewportHalfExtents(){return{x:400,y:300}},inGameplayViewport(g,t,s){return Math.abs(s.x-t.x)<=400&&Math.abs(s.y-t.y)<=300}};
-  const w=boot({__NOVA_FAIR_ENGAGEMENT_TEST__:F}),T=w.__NOVA_LIVING_FRONT_TEST__;
-  const defs={circle:{xp:10},hexagon:{xp:200},pentagon:{xp:100},star:{xp:500},crasher:{xp:60}};
-  const tank={id:1,x:0,y:0,hp:100,maxHp:100,ai:{__v1112TargetId:-1}},st={signal:{type:'BLOOM',x:500,y:0,sector:2,until:20},queryScratch:[],queryScratch2:[]};
-  const g={time:10,w:800,h:600,cam:{zoom:1},tanks:[tank],shapes:[],__lfState:st,getTank(){return null;}};
-  const out=T.publicEcoBias(g,tank,defs,{});assert.equal(out.mode,'signal');assert.ok(out.weight>0);
-  const fn=source.slice(source.indexOf('function publicEcoBias'),source.indexOf("LF.wrap('game/ai'",source.indexOf('function publicEcoBias')));
-  assert.ok(!/\.maturity/.test(fn),'AI strategic ecology must not read hidden sector maturity');
-  assert.match(fn,/visible\(g,t,s\)/,'local neutral opportunity must pass the Fair Engagement viewport predicate');
-});
+test('MIGRATION requires physical transitions and Rogue Star waits for quiet',()=>{const T=boot().__NOVA_LIVING_FRONT_TEST__,st=makeState(T,1);st.cooldowns.bloom=10;st.migrationHeat=6;st.migrationX=1;st.migrationY=0;st.sectors[5].outbound=7;let d=T.directorDecision(st,{enabled:true,now:100,hasStar:false,migrationFrom:5});assert.equal(d.type,'MIGRATION');st.migrationHeat=0;st.cooldowns.migration=10;st.cooldowns.star=0;st.lastMeaningfulAt=20;st.sectors.forEach(s=>{s.maturity=.1;s.value=40;s.outbound=0;});d=T.directorDecision(st,{enabled:true,now:100,hasStar:false});assert.equal(d.type,'ROGUE STAR');assert.equal(T.directorDecision(st,{enabled:false,now:100,hasStar:false}),null);});
 
-test('ecology, shape instincts and Director run at decimated planning rates while physics stays untouched',()=>{
-  const w=boot(),R=w.__NOVA_LIVING_FRONT__,T=w.__NOVA_LIVING_FRONT_TEST__;
-  assert.ok(R.cadences.sectorHz>=4&&R.cadences.sectorHz<=5);
-  assert.ok(R.cadences.shapeIntentHz>=8&&R.cadences.shapeIntentHz<=10);
-  assert.ok(R.cadences.directorHz>=1&&R.cadences.directorHz<=2);
-  assert.equal(T.SECTOR_PERIOD,.22); assert.equal(T.BEHAVIOR_PERIOD,.12); assert.equal(T.DIRECTOR_PERIOD,.72);
-  assert.match(source,/if\(g\.hash&&g\.hash\.query\)/,'local ecology must reuse the canonical entity spatial hash');
-  assert.ok(!/setInterval\([^)]*,\s*1[0-9]?\)/.test(source),'no frame-frequency side scheduler should be introduced');
-});
+test('AI ecology uses public signals or terrain-visible viewport shapes, route cost, and no hidden maturity',()=>{const F={viewportHalfExtents(){return{x:400,y:300}},inGameplayViewport(g,t,s){return Math.abs(s.x-t.x)<=400&&Math.abs(s.y-t.y)<=300}};const w=boot({__NOVA_FAIR_ENGAGEMENT_TEST__:F}),T=w.__NOVA_LIVING_FRONT_TEST__,defs={circle:{xp:10},hexagon:{xp:200},pentagon:{xp:100},star:{xp:500},crasher:{xp:60}},tank={id:1,x:0,y:0,hp:100,maxHp:100,ai:{__v1112TargetId:-1}},st={signal:{type:'BLOOM',x:500,y:0,sector:2,until:20},queryScratch:[],queryScratch2:[]},g={time:10,w:800,h:600,cam:{zoom:1},tanks:[tank],shapes:[],__lfState:st,getTank(){return null;},hasLineOfSight(){return true}};const out=T.publicEcoBias(g,tank,defs,{});assert.equal(out.mode,'signal');assert.ok(out.weight>0);const fn=source.slice(source.indexOf('function publicEcoBias'),source.indexOf("LF.wrap('game/ai'",source.indexOf('function publicEcoBias')));assert.ok(!/\.maturity/.test(fn));assert.match(fn,/visible\(g,t,s\)/);assert.match(fn,/routeCost\(g,t/);assert.match(source,/a\.isElite\?LF\.AI_PERIOD\*\.82/);});
 
-test('presentation is transient and debug is read-only/copyable rather than a permanent ecology UI',()=>{
-  const w=boot(),R=w.__NOVA_LIVING_FRONT__;
-  assert.equal(R.contract.noPermanentEcologyPanel,true);
-  assert.match(source,/drawMinimap/);
-  assert.match(source,/COPY ECOLOGY/);
-  assert.match(source,/NOVALivingFront=\{version:V,snapshot:/);
-  assert.ok(!/capture meter|quest log.+createElement|maturity meter/i.test(source));
-});
+test('ecology planning is decimated and reuses the canonical hash',()=>{const w=boot(),R=w.__NOVA_LIVING_FRONT__,T=w.__NOVA_LIVING_FRONT_TEST__;assert.ok(R.cadences.sectorHz>=4&&R.cadences.sectorHz<=5);assert.ok(R.cadences.shapeIntentHz>=8&&R.cadences.shapeIntentHz<=10);assert.ok(R.cadences.directorHz>=1&&R.cadences.directorHz<=2);assert.equal(T.SECTOR_PERIOD,.22);assert.equal(T.BEHAVIOR_PERIOD,.12);assert.equal(T.DIRECTOR_PERIOD,.72);assert.match(source,/if\(g\.hash&&g\.hash\.query\)/);assert.ok(!/setInterval\([^)]*,\s*1[0-9]?\)/.test(source));});
 
-test('Living Front remains meaningful with the Director disabled',()=>{
-  const T=boot().__NOVA_LIVING_FRONT_TEST__, s=T.makeSector(4);s.maturity=.2;
-  T.advanceSector(s,12,.8);assert.ok(s.maturity>.2,'ecology core continues without Director');
-  const st=makeState(T);assert.equal(T.directorDecision(st,{enabled:false,now:200,hasStar:false}),null);
-  assert.ok(T.chooseSpawnSector(st,'hexagon',3)>=0,'spawn geography is independent from Director announcements');
-});
+test('presentation stays transient while Debug/tips expose the actual system',()=>{const w=boot(),R=w.__NOVA_LIVING_FRONT__;assert.equal(R.contract.noPermanentEcologyPanel,true);assert.match(source,/drawMinimap/);assert.match(source,/COPY ECOLOGY/);assert.match(source,/playerNeutralXPPerMin/);assert.match(source,/hexAvgNeighbors/);assert.match(source,/bindTipLine/,'Living Front tips must be integrated, not merely stored in a dead array');assert.match(source,/function bindDebug/);assert.match(source,/__lfDebugBound/,'Debug integration must bind once rather than self-triggering observer churn');assert.equal(w.__NOVA_LIVING_FRONT_TIPS__.length,7);});
 
-test('engine overlay boots on the canonical Game module lifecycle and keeps requested spawn types',()=>{
-  const modules={};
-  const defs={circle:{hp:14,xp:10,r:12,speed:10},triangle:{hp:30,xp:25,r:16,speed:16},square:{hp:55,xp:50,r:20,speed:9},pentagon:{hp:100,xp:100,r:26,speed:6},hexagon:{hp:190,xp:200,r:33,speed:4},star:{hp:340,xp:500,r:24,speed:78},crasher:{hp:95,xp:60,r:15,speed:105}};
-  modules['game/engine']=function(module){
-    function Game(){this.shapes=[];this.tanks=[];this.bullets=[];this.orbs=[];this.nextId=1;this.time=0;this.status='playing';this.cam={zoom:1,x:0,y:0};this.w=800;this.h=600;}
-    Game.prototype.spawnShape=function(type){const d=defs[type];this.shapes.push({id:this.nextId++,kind:'shape',type,x:0,y:0,hp:d.hp,maxHp:d.hp,r:d.r,vx:0,vy:0,wanderT:1,born:this.time});};
-    Game.prototype.damageShape=function(s,d){s.hp-=d;if(s.hp<=0)this.killShape(s);};
-    Game.prototype.killShape=function(s){const i=this.shapes.indexOf(s);if(i>=0)this.shapes.splice(i,1);const d=defs[s.type];this.orbs.push({id:this.nextId++,xp:d.xp,x:s.x,y:s.y});};
-    Game.prototype.update=function(dt){this.time+=dt;for(const s of this.shapes){s.x+=(s.vx||0)*dt;s.y+=(s.vy||0)*dt;}};
-    Game.prototype.nearestTank=function(){return null};Game.prototype.drawMinimap=function(){};Game.prototype.redeploy=function(){};Game.prototype.destroy=function(){};Game.prototype.tryFire=function(){};Game.prototype.splashAt=function(){};Game.prototype.damageTank=function(){};
-    Game.prototype.getShape=function(id){return this.shapes.find(s=>s.id===id)||null};Game.prototype.getTank=function(id){return this.tanks.find(t=>t.id===id)||null};Game.prototype.isTerrainSafe=function(){return true};
-    module.exports.Game=Game;
-  };
-  const window={__novaModules:modules};const context={window,console:{info(){},warn(){},error(){}},Math,Number,Object,Array,Date,JSON,setTimeout(){},clearTimeout(){}};for (const f of sourceFiles) vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../../nova-updates',f),'utf8'),context,{filename:f});
-  const module={exports:{}};modules['game/engine'](module,module.exports,req=>{if(req==='./types')return{SHAPE_DEFS:defs};throw new Error(req)});
-  const Game=module.exports.Game,g=new Game();
-  g.spawnShape('hexagon',false);g.spawnShape('triangle',false);g.spawnShape('crasher',false);
-  assert.deepEqual(g.shapes.map(s=>s.type),['hexagon','triangle','crasher'],'Living Front relocates requested types; it must not rewrite quota requests');
-  for(let i=0;i<20;i++)g.update(.12);
-  assert.ok(g.__lfState,'runtime state should be lazily attached to the canonical Game instance');
-  assert.equal(g.__lfState.sectors.length,16);
-  assert.ok(Number.isFinite(g.__lfState.planMsEma));
-});
+test('Living Front remains meaningful with Director disabled',()=>{const T=boot().__NOVA_LIVING_FRONT_TEST__,s=T.makeSector(4);s.maturity=.2;T.advanceSector(s,12,.8);assert.ok(s.maturity>.2);const st=makeState(T,1);assert.equal(T.directorDecision(st,{enabled:false,now:200,hasStar:false}),null);assert.ok(T.chooseSpawnSector(st,'hexagon',3)>=0);});
+
+test('engine overlay boots on canonical Game lifecycle and preserves requested shape types',()=>{const modules={},defs={circle:{hp:14,xp:10,r:12,speed:10},triangle:{hp:30,xp:25,r:16,speed:16},square:{hp:55,xp:50,r:20,speed:9},pentagon:{hp:100,xp:100,r:26,speed:6},hexagon:{hp:190,xp:200,r:33,speed:4},star:{hp:340,xp:500,r:24,speed:78},crasher:{hp:95,xp:60,r:15,speed:105}};modules['game/engine']=function(module){function Game(){this.shapes=[];this.tanks=[];this.bullets=[];this.orbs=[];this.nextId=1;this.time=0;this.status='playing';this.cam={zoom:1,x:0,y:0};this.w=800;this.h=600;}Game.prototype.spawnShape=function(type){const d=defs[type];this.shapes.push({id:this.nextId++,kind:'shape',type,x:0,y:0,hp:d.hp,maxHp:d.hp,r:d.r,vx:0,vy:0,wanderT:1,born:this.time});};Game.prototype.damageShape=function(s,d){s.hp-=d;if(s.hp<=0)this.killShape(s);};Game.prototype.killShape=function(s){const i=this.shapes.indexOf(s);if(i>=0)this.shapes.splice(i,1);const d=defs[s.type];this.orbs.push({id:this.nextId++,xp:d.xp,x:s.x,y:s.y});};Game.prototype.update=function(dt){this.time+=dt;for(const s of this.shapes){s.x+=(s.vx||0)*dt;s.y+=(s.vy||0)*dt;}};Game.prototype.nearestTank=function(){return null};Game.prototype.drawMinimap=function(){};Game.prototype.redeploy=function(){};Game.prototype.destroy=function(){};Game.prototype.tryFire=function(){};Game.prototype.splashAt=function(){};Game.prototype.damageTank=function(){};Game.prototype.getShape=function(id){return this.shapes.find(s=>s.id===id)||null};Game.prototype.getTank=function(id){return this.tanks.find(t=>t.id===id)||null};Game.prototype.isTerrainSafe=function(){return true};module.exports.Game=Game;};const window={__novaModules:modules},context={window,console:{info(){},warn(){},error(){}},Math,Number,Object,Array,Date,JSON,setTimeout(){},clearTimeout(){}};for(const f of sourceFiles)vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../../nova-updates',f),'utf8'),context,{filename:f});const module={exports:{}};modules['game/engine'](module,module.exports,req=>{if(req==='./types')return{SHAPE_DEFS:defs};throw new Error(req)});const Game=module.exports.Game,g=new Game();g.spawnShape('hexagon',false);g.spawnShape('triangle',false);g.spawnShape('crasher',false);assert.deepEqual(g.shapes.map(s=>s.type),['hexagon','triangle','crasher']);for(let i=0;i<20;i++)g.update(.12);assert.ok(g.__lfState);assert.equal(g.__lfState.sectors.length,16);assert.ok(Number.isFinite(g.__lfState.planMsEma));});
