@@ -56,7 +56,7 @@ function relocate(g,s,i,min){for(var k=0;k<18;k++){var p=point(i,s.id||1,k);if(s
 function initShape(g,s){if(!s)return;s.__lfSector=sectorIndex(s.x,s.y);s.__lfSpawnAt=g.time||0;if(s.type==='crasher'){s.__lfPredatorState='track';s.__lfPredatorT=.35+hash01(s.id,3)*.35;s.__lfTargetId=-1;s.__lfTargetKind='';s.__lfBounty=s.__lfBounty||0;s.wanderT=999;}if(s.type==='star'){s.__lfStarBorn=g.time||0;s.wanderT=999;}}
 function awardBounty(cr,v){var b=Number(cr&&cr.__lfBounty)||0,a=clamp(b+Math.max(0,Number(v)||0)*.65,0,BOUNTY_CAP);if(cr)cr.__lfBounty=a;return a-b;}
 function query(g,st,x,y,r,alt){
-  var out=alt?st.queryScratch2:st.queryScratch;out.length=0;if(g.hash&&g.hash.query){g.hash.query(x,y,r,out);return out;}
+  var out=alt?st.queryScratch2:st.queryScratch;out.length=0;if(g.hash&&g.hash.query){g.hash.query(x,y,r,out);if(LF&&LF.queryBullets)LF.queryBullets(g,x,y,r,out);return out;}
   var rr=r*r,i,e,a=g.shapes||[];for(i=0;i<a.length;i++){e=a[i];if(d2(x,y,e.x,e.y)<=rr)out.push(e);}a=g.bullets||[];for(i=0;i<a.length;i++){e=a[i];if(e&&!e.dead&&d2(x,y,e.x,e.y)<=rr)out.push(e);}a=g.tanks||[];for(i=0;i<a.length;i++){e=a[i];if(alive(e)&&d2(x,y,e.x,e.y)<=rr)out.push(e);}return out;
 }
 function sectorTick(g,st,defs,dt){
