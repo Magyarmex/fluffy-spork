@@ -12,6 +12,7 @@
 4. **Information fairness:** shape instincts and AI ecology were checked for through-cover or hidden-sector information leaks.
 5. **Performance/lifecycle:** decimated work, spatial queries, DOM observers, scratch reuse, and update ownership were inspected for hidden churn.
 6. **Test-the-test:** the strengthened suite was executed from a repository-shaped filesystem so CI-relative paths and module lifecycle assumptions were verified.
+7. **Semantic accounting:** telemetry and reward bookkeeping were checked against the actual shared engine containers rather than assuming an array represents only one reward source.
 
 ## Misses found and corrected
 
@@ -57,6 +58,12 @@ The adversarial test harness briefly used `/tmp/lf` paths, which proved local lo
 
 **Correction:** all test inputs are repository-relative (`../../nova-updates/...`) and the suite was rerun from a repo-shaped temporary tree.
 
+### 8. Neutral XP/min telemetry was contaminated by tank-kill orbs
+
+NOVA intentionally uses the same `orbs` array for neutral-shape XP and a fraction of defeated-tank rewards. The first Living Front farming telemetry wrapper counted every player XP gain occurring during `updateOrbs`, so PvP reward orbs could inflate the metric intended to evaluate ecological farming skill.
+
+**Correction:** Living Front marks only shape/bounty orbs as neutral and associates the player XP delta with the exact orb being removed. A player can collect a neutral orb and an equal-value tank-kill orb in the same update; total XP correctly includes both while `playerNeutralXP` includes only the neutral one. This keeps the intended 15–25% skilled-farming validation metric meaningful.
+
 ## Verified contracts
 
 | Design contract | Runtime evidence |
@@ -85,13 +92,14 @@ The adversarial test harness briefly used `/tmp/lf` paths, which proved local lo
 | Controller strategy remains player-owned | No ecology command/autonomous cross-map Controller objective layer added |
 | UI restraint | Short minimap signals, world telegraphs, integrated tactical tips, no permanent ecology HUD |
 | Debug observability | Copyable full snapshot + compact behavior/sector metrics + player neutral XP/min |
+| Neutral XP attribution | Shape/bounty orbs are tagged and distinguished from tank-death reward orbs |
 | Performance cadence | ~4.55 Hz sectors, ~8.33 Hz shape intent, ~1.39 Hz Director, ~3.57 Hz AI |
 | Spatial reuse | Canonical entity hash used when available; bounded local queries/scratch arrays |
 | Director-off acceptance | Ecology/spawn geography/instincts remain active with Director disabled |
 
 ## Automated audit result
 
-The strengthened Living Front suite contains **18 focused tests**. It covers distribution semantics, ecological age, terrain visibility, bounded disturbance, explicit Crasher overshoot, Star chase geometry, Director truthfulness, AI information/route fairness, performance cadence, UI lifecycle behavior, and canonical `Game` integration.
+The strengthened Living Front suite contains **19 focused tests**. It covers distribution semantics, ecological age, terrain visibility, bounded disturbance, explicit Crasher overshoot, Star chase geometry, Director truthfulness, AI information/route fairness, neutral-vs-PvP XP attribution, performance cadence, UI lifecycle behavior, and canonical `Game` integration.
 
 The three runtime files pass `node --check`. The test suite passes when executed from a repository-shaped directory with repository-relative paths.
 
