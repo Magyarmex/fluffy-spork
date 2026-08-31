@@ -1,0 +1,106 @@
+/* NOVA TANKS v1.12.0 — Living Front / Stage I: Ecology Core */
+/* NOVA_VISUAL_INTENT: minimap spatial signals only — BLOOM, MIGRATION, and ROGUE STAR help the player decide where to rotate; no decorative player-state visuals. */
+(function(){'use strict';
+if(window.__NOVA_LIVING_FRONT_INTERNAL__)return;
+var mods=window.__novaModules;if(!mods){console.error('[NOVA v1.12.0] module registry unavailable');return;}
+var VERSION='1.12.0',TAU=Math.PI*2,GRID=4,ARENA=2250,SECTOR_PERIOD=.22,BEHAVIOR_PERIOD=.12,DIRECTOR_PERIOD=.72,AI_PERIOD=.28,BOUNTY_CAP=260;
+var TARGETS={circle:62,triangle:30,square:16,pentagon:8,hexagon:4},HIGH={pentagon:1,hexagon:1};
+var activeGame=null,lastSnapshot=null;
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function lerp(a,b,t){return a+(b-a)*t;}
+function smooth(t){t=clamp(t,0,1);return t*t*(3-2*t);}
+function d2(ax,ay,bx,by){var x=bx-ax,y=by-ay;return x*x+y*y;}
+function alive(e){return!!e&&e.alive!==false&&(e.hp==null||e.hp>0);}
+function ms(){return typeof performance!=='undefined'&&performance.now?performance.now():Date.now();}
+function wrap(id,after){var old=mods[id];if(!old)return;mods[id]=function(module,exports,require){old(module,exports,require);after(module.exports,require);};}
+function hash01(a,b){var x=Math.sin((Number(a)||1)*12.9898+(Number(b)||1)*78.233)*43758.5453;return x-Math.floor(x);}
+function xp(defs,type){var d=defs&&defs[type];return d&&Number(d.xp)||0;}
+function speed(defs,type){var d=defs&&defs[type];return d&&Number(d.speed)||0;}
+function sectorSize(){return ARENA*2/GRID;}
+function coords(i){return{x:i%GRID,y:Math.floor(i/GRID)};}
+function sectorIndex(x,y){var s=sectorSize(),sx=clamp(Math.floor((x+ARENA)/s),0,GRID-1),sy=clamp(Math.floor((y+ARENA)/s),0,GRID-1);return sy*GRID+sx;}
+function sectorCenter(i){var c=coords(i),s=sectorSize();return{x:-ARENA+s*(c.x+.5),y:-ARENA+s*(c.y+.5)};}
+function sectorBounds(i,p){var c=coords(i),s=sectorSize();p=p||0;return{x0:-ARENA+c.x*s+p,x1:-ARENA+(c.x+1)*s-p,y0:-ARENA+c.y*s+p,y1:-ARENA+(c.y+1)*s-p};}
+function neighbors(i){var c=coords(i),a=[];if(c.x>0)a.push(i-1);if(c.x<GRID-1)a.push(i+1);if(c.y>0)a.push(i-GRID);if(c.y<GRID-1)a.push(i+GRID);return a;}
+function maturityCeiling(t){return clamp(.30+.70*smooth(((Number(t)||0)-18)/215),.30,1);}
+function ageProgress(st){return clamp(((st&&st.ceiling)||.30)-.30,0,.70)/.70;}
+function makeSector(i){return{index:i,maturity:.10+hash01(i,17)*.12,pressure:0,count:0,xp:0,value:0,tanks:0,recentHarvest:0,recentCombat:0,inbound:0,outbound:0,flowX:0,flowY:0};}
+function advanceSector(s,dt,ceiling){
+  s.pressure*=Math.exp(-dt*.34);s.recentHarvest*=Math.exp(-dt*.22);s.recentCombat*=Math.exp(-dt*.25);s.inbound*=Math.exp(-dt*.48);s.outbound*=Math.exp(-dt*.48);s.flowX*=Math.exp(-dt*.42);s.flowY*=Math.exp(-dt*.42);
+  var dis=clamp(s.pressure*.72+s.recentHarvest*.34+s.recentCombat*.28+Math.max(0,s.tanks-1)*.045,0,1.3),grow=.0058+.0078*(1-clamp(dis,0,1)),loss=.014*s.pressure+.009*s.recentHarvest+.006*s.recentCombat+.0012*Math.max(0,s.tanks-1);
+  s.maturity=clamp(s.maturity+dt*(grow-loss),0,ceiling);return s;
+}
+function ensure(g,defs){
+  if(g.__lfState)return g.__lfState;var a=[];for(var i=0;i<16;i++)a.push(makeSector(i));
+  return g.__lfState={version:VERSION,defs:defs,sectors:a,sectorT:0,behaviorT:0,directorT:0,age:0,ceiling:maturityCeiling(0),signal:null,lastSignal:'none',lastSignalAt:-99,lastMeaningfulAt:0,cooldowns:{bloom:0,migration:0,star:0},lastBloomSector:-1,migrationHeat:0,migrationX:0,migrationY:0,migrationTransitions:0,directorEnabled:true,stats:{triangleEvasions:0,crasherCharges:0,crasherHits:0,crasherMisses:0,crasherOvershoots:0,bountyAbsorbed:0,bountyReleased:0,starsSpawned:0,starsIntercepted:0,starsExpired:0,starLifetimeTotal:0,blooms:0,migrations:0,aiRotations:0,hexSamples:0,hexNeighbors:0,nearFireHerds:0,burstHerds:0,playerNeutralXP:0},planMsEma:0,planMsPeak:0,queryScratch:[],queryScratch2:[],tutorial:{ecology:false}};
+}
+function planSample(st,n){st.planMsEma=st.planMsEma?lerp(st.planMsEma,n,.16):n;st.planMsPeak=Math.max(n,st.planMsPeak*.992);}
+function addPressure(g,x,y,n){var st=ensure(g,LF.defs||{}),s=st.sectors[sectorIndex(x,y)];s.pressure=clamp(s.pressure+(n||0),0,1.5);s.recentCombat=clamp(s.recentCombat+(n||0)*1.7,0,2);}
+function chooseSpawnSector(st,type,seed){
+  var best=0,bk=-1e9,high=!!HIGH[type],basic=type==='circle'||type==='triangle',age=ageProgress(st);
+  for(var i=0;i<16;i++){
+    var s=st.sectors[i],calm=1-clamp(s.pressure,0,1),relative=clamp(s.maturity/Math.max(.05,st.ceiling),0,1),absolute=clamp(s.maturity,0,1),m=relative*(.24+.76*age),w;
+    if(type==='hexagon')w=.34+age*(2.45*m*m+.36*calm)+absolute*.18;
+    else if(type==='pentagon')w=.38+age*(1.55*m*m+.28*calm)+absolute*.14;
+    else if(type==='square')w=.52+.42*m+.18*calm;
+    else if(type==='crasher')w=.24+.0035*s.xp+.20*(1-calm);
+    else w=.60+.48*(1-m)+.16*calm;
+    if(high)w/=1+s.count*(.02+.035*(1-age));else if(basic)w/=1+s.count*.012;
+    var k=w*(.84+.32*hash01(seed||1,i+31));if(k>bk){bk=k;best=i;}
+  }
+  return best;
+}
+function safe(g,x,y,p){return!g.isTerrainSafe||g.isTerrainSafe(x,y,p||28);}
+function tankSafe(g,x,y,m){var ts=g.tanks||[],rr=(m||220)*(m||220);for(var i=0;i<ts.length;i++)if(alive(ts[i])&&d2(x,y,ts[i].x,ts[i].y)<rr)return false;return true;}
+function point(i,seed,k){var b=sectorBounds(i,90);return{x:lerp(b.x0,b.x1,hash01(seed+k*13,i+7)),y:lerp(b.y0,b.y1,hash01(seed+k*29,i+41))};}
+function relocate(g,s,i,min){for(var k=0;k<18;k++){var p=point(i,s.id||1,k);if(safe(g,p.x,p.y,(s.r||12)+15)&&tankSafe(g,p.x,p.y,min||220)){s.x=p.x;s.y=p.y;s.__lfSector=sectorIndex(p.x,p.y);return true;}}return false;}
+function initShape(g,s){if(!s)return;s.__lfSector=sectorIndex(s.x,s.y);s.__lfSpawnAt=g.time||0;if(s.type==='crasher'){s.__lfPredatorState='track';s.__lfPredatorT=.35+hash01(s.id,3)*.35;s.__lfTargetId=-1;s.__lfTargetKind='';s.__lfBounty=s.__lfBounty||0;s.wanderT=999;}if(s.type==='star'){s.__lfStarBorn=g.time||0;s.wanderT=999;}}
+function awardBounty(cr,v){var b=Number(cr&&cr.__lfBounty)||0,a=clamp(b+Math.max(0,Number(v)||0)*.65,0,BOUNTY_CAP);if(cr)cr.__lfBounty=a;return a-b;}
+function query(g,st,x,y,r,alt){
+  var out=alt?st.queryScratch2:st.queryScratch;out.length=0;if(g.hash&&g.hash.query){g.hash.query(x,y,r,out);if(LF&&LF.queryBullets)LF.queryBullets(g,x,y,r,out);return out;}
+  var rr=r*r,i,e,a=g.shapes||[];for(i=0;i<a.length;i++){e=a[i];if(d2(x,y,e.x,e.y)<=rr)out.push(e);}a=g.bullets||[];for(i=0;i<a.length;i++){e=a[i];if(e&&!e.dead&&d2(x,y,e.x,e.y)<=rr)out.push(e);}a=g.tanks||[];for(i=0;i<a.length;i++){e=a[i];if(alive(e)&&d2(x,y,e.x,e.y)<=rr)out.push(e);}return out;
+}
+function sectorTick(g,st,defs,dt){
+  var t0=ms(),i,s,ss=st.sectors;st.age=Number(g.time)||st.age+dt;st.ceiling=maturityCeiling(st.age);for(i=0;i<16;i++){ss[i].count=0;ss[i].xp=0;ss[i].value=0;ss[i].tanks=0;}
+  var sh=g.shapes||[];for(i=0;i<sh.length;i++){s=sh[i];if(!s||s.hp<=0)continue;var q=ss[sectorIndex(s.x,s.y)],v=xp(defs,s.type)+(s.type==='crasher'?(Number(s.__lfBounty)||0):0);q.count++;q.xp+=v;q.value+=v+(s.type==='hexagon'?80:s.type==='star'?170:s.type==='pentagon'?22:0);}
+  var ts=g.tanks||[];for(i=0;i<ts.length;i++)if(alive(ts[i]))ss[sectorIndex(ts[i].x,ts[i].y)].tanks++;
+  for(i=0;i<16;i++)advanceSector(ss[i],dt,st.ceiling);st.migrationHeat*=Math.exp(-dt*.42);st.migrationX*=Math.exp(-dt*.33);st.migrationY*=Math.exp(-dt*.33);for(var k in st.cooldowns)st.cooldowns[k]=Math.max(0,st.cooldowns[k]-dt);
+  if(!st.tutorial.ecology&&st.age>14&&g.player&&g.toast){st.tutorial.ecology=true;g.toast('LIVING FRONT · quiet ground matures; fighting and harvesting move the farm','info');}
+  lastSnapshot=snapshot(g);window.__NOVA_LIVING_FRONT_LAST__=lastSnapshot;planSample(st,ms()-t0);
+}
+function snapshot(g){
+  var st=g&&g.__lfState;if(!st)return{active:false,version:VERSION};var counts={circle:0,triangle:0,square:0,pentagon:0,hexagon:0,star:0,crasher:0},total=0,defs=st.defs||{},sh=g.shapes||[],i;
+  for(i=0;i<sh.length;i++){var s=sh[i];if(!s||s.hp<=0)continue;counts[s.type]=(counts[s.type]||0)+1;total+=xp(defs,s.type)+(s.type==='crasher'?(Number(s.__lfBounty)||0):0);}
+  var sectors=[];for(i=0;i<16;i++){var q=st.sectors[i];sectors.push({i:i,m:+q.maturity.toFixed(3),p:+q.pressure.toFixed(3),n:q.count,xp:Math.round(q.xp),value:Math.round(q.value),harvest:+q.recentHarvest.toFixed(3),combat:+q.recentCombat.toFixed(3),in:+q.inbound.toFixed(2),out:+q.outbound.toFixed(2),flowX:+q.flowX.toFixed(2),flowY:+q.flowY.toFixed(2)});}
+  var stats=Object.assign({},st.stats),age=Math.max(0.001,st.age),hexAvg=stats.hexSamples?stats.hexNeighbors/stats.hexSamples:0,starEnded=stats.starsIntercepted+stats.starsExpired,starAvg=starEnded?stats.starLifetimeTotal/starEnded:0;
+  return{active:true,version:VERSION,age:+st.age.toFixed(1),ceiling:+st.ceiling.toFixed(3),counts:counts,totalXP:Math.round(total),director:st.signal?st.signal.type:'idle',lastSignal:st.lastSignal,planMsEma:+st.planMsEma.toFixed(3),planMsPeak:+st.planMsPeak.toFixed(3),playerNeutralXP:+stats.playerNeutralXP.toFixed(1),playerNeutralXPPerMin:+(stats.playerNeutralXP/(age/60)).toFixed(1),hexAvgNeighbors:+hexAvg.toFixed(2),starAvgLifetime:+starAvg.toFixed(2),starInterceptionRate:stats.starsSpawned?+(stats.starsIntercepted/stats.starsSpawned).toFixed(3):0,stats:stats,sectors:sectors};
+}
+var LF=window.__NOVA_LIVING_FRONT_INTERNAL__={VERSION:VERSION,TAU:TAU,GRID:GRID,ARENA:ARENA,SECTOR_PERIOD:SECTOR_PERIOD,BEHAVIOR_PERIOD:BEHAVIOR_PERIOD,DIRECTOR_PERIOD:DIRECTOR_PERIOD,AI_PERIOD:AI_PERIOD,BOUNTY_CAP:BOUNTY_CAP,TARGETS:TARGETS,defs:null,clamp:clamp,lerp:lerp,d2:d2,alive:alive,ms:ms,wrap:wrap,xp:xp,speed:speed,sectorIndex:sectorIndex,sectorCenter:sectorCenter,sectorBounds:sectorBounds,neighbors:neighbors,maturityCeiling:maturityCeiling,ageProgress:ageProgress,makeSector:makeSector,advanceSector:advanceSector,ensure:ensure,planSample:planSample,addPressure:addPressure,chooseSpawnSector:chooseSpawnSector,relocate:relocate,initShape:initShape,awardBounty:awardBounty,query:query,snapshot:snapshot,getActive:function(){return activeGame;},getLast:function(){return lastSnapshot;},setLast:function(v){lastSnapshot=v;}};
+
+wrap('game/engine',function(engine,require){
+  var Game=engine.Game;if(!Game||Game.prototype.__novaLivingFrontCore)return;Game.prototype.__novaLivingFrontCore=true;var defs=(require('./types')||{}).SHAPE_DEFS||{};LF.defs=defs;
+  var oldSpawn=Game.prototype.spawnShape;if(oldSpawn)Game.prototype.spawnShape=function(type,anywhere){
+    var st=ensure(this,defs),n=this.shapes?this.shapes.length:0,out=oldSpawn.apply(this,arguments);if(this.shapes&&this.shapes.length>n)for(var i=n;i<this.shapes.length;i++){var s=this.shapes[i];initShape(this,s);var high=!!HIGH[s.type],early=ageProgress(st)<.34;if((!anywhere||high&&early)&&s.type!=='star')relocate(this,s,chooseSpawnSector(st,s.type,s.id),s.type==='crasher'?290:230);}return out;
+  };
+  var oldDS=Game.prototype.damageShape;if(oldDS)Game.prototype.damageShape=function(s,dmg,kx,ky){if(s){s.__lfLastImpactX=Number(kx)||0;s.__lfLastImpactY=Number(ky)||0;if(this.__lfState){this.__lfState.sectors[sectorIndex(s.x,s.y)].recentCombat=clamp(this.__lfState.sectors[sectorIndex(s.x,s.y)].recentCombat+.012,0,2);addPressure(this,s.x,s.y,.006);}}return oldDS.apply(this,arguments);};
+  var oldKill=Game.prototype.killShape;if(oldKill)Game.prototype.killShape=function(s){
+    if(!s)return oldKill.apply(this,arguments);var st=ensure(this,defs),before=this.nextId||0,orbs=this.orbs?this.orbs.length:0,type=s.type,x=s.x,y=s.y,ix=s.__lfLastImpactX||0,iy=s.__lfLastImpactY||0,pred=s.__lfPredatorKiller||-1,bounty=type==='crasher'?(Number(s.__lfBounty)||0):0,starBorn=s.__lfStarBorn,out=oldKill.apply(this,arguments);
+    if(pred>=0){if(this.orbs&&this.orbs.length>orbs)this.orbs.length=orbs;var cr=this.getShape&&this.getShape(pred);if(cr&&cr.type==='crasher')st.stats.bountyAbsorbed+=awardBounty(cr,xp(defs,type));}
+    else{var sec=st.sectors[sectorIndex(x,y)];sec.recentHarvest=clamp(sec.recentHarvest+xp(defs,type)/420,0,2);addPressure(this,x,y,.012+Math.min(.05,xp(defs,type)/4500));}
+    if(bounty>0&&this.orbs){this.orbs.push({id:this.nextId++,x:x,y:y,vx:0,vy:-42,xp:bounty,life:7,color:'#ffe066',__lfNeutral:true});st.stats.bountyReleased+=bounty;}
+    if(this.orbs)for(var oi=orbs;oi<this.orbs.length;oi++)if(this.orbs[oi])this.orbs[oi].__lfNeutral=true;
+    if((type==='pentagon'||type==='hexagon')&&this.shapes){var m=Math.hypot(ix,iy),ux=m?ix/m:0,uy=m?iy/m:0,child=type==='pentagon'?'triangle':'pentagon';for(var j=0;j<this.shapes.length;j++){var c=this.shapes[j];if(!c||c.id<before||c.type!==child)continue;c.vx=(c.vx||0)+ux*32;c.vy=(c.vy||0)+uy*32;initShape(this,c);}}
+    if(type==='star'&&starBorn!=null){st.stats.starsIntercepted++;st.stats.starLifetimeTotal+=Math.max(0,(this.time||0)-starBorn);}return out;
+  };
+  var oldFire=Game.prototype.tryFire;if(oldFire)Game.prototype.tryFire=function(t){var n=this.bullets?this.bullets.length:0,out=oldFire.apply(this,arguments);if(t&&this.bullets&&this.bullets.length>n)addPressure(this,t.x,t.y,.006);return out;};
+  var oldSplash=Game.prototype.splashAt;if(oldSplash)Game.prototype.splashAt=function(x,y,radius){addPressure(this,x,y,.075);if(LF.disturbBurst)LF.disturbBurst(this,x,y,Number(radius)||120,.72);return oldSplash.apply(this,arguments);};
+  var oldDT=Game.prototype.damageTank;if(oldDT)Game.prototype.damageTank=function(t){var hp=t&&t.hp,out=oldDT.apply(this,arguments);if(t)addPressure(this,t.x,t.y,hp>0&&t.hp<=0?.20:.035);return out;};
+  var oldNear=Game.prototype.nearestTank;if(oldNear)Game.prototype.nearestTank=function(x,y,max,exclude){if(this.__lfSuppressBaseCrasher&&max===780&&exclude===-1){var sh=this.shapes||[];for(var i=0;i<sh.length;i++){var s=sh[i];if(s&&s.hp>0&&s.type==='crasher'&&Math.abs(s.x-x)<.01&&Math.abs(s.y-y)<.01)return null;}}return oldNear.apply(this,arguments);};
+  var oldOrbs=Game.prototype.updateOrbs;if(oldOrbs)Game.prototype.updateOrbs=function(dt){var self=this,oldGain=this.gainXP,own=Object.prototype.hasOwnProperty.call(this,'gainXP'),arr=this.orbs,oldSplice=arr&&arr.splice,ownSplice=arr&&Object.prototype.hasOwnProperty.call(arr,'splice'),pending=0,pendingAmt=0;if(typeof oldGain!=='function'||!arr||typeof oldSplice!=='function')return oldOrbs.apply(this,arguments);this.gainXP=function(t,amt){var before=t&&Number(t.xp)||0,out=oldGain.apply(self,arguments);pending=t&&t.isPlayer?Math.max(0,(Number(t.xp)||0)-before):0;pendingAmt=Number(amt)||0;return out;};arr.splice=function(start,count){var idx=Number(start)||0;if(idx<0)idx=Math.max(0,arr.length+idx);var o=arr[idx];if(pending>0&&o&&o.__lfNeutral&&Math.abs((Number(o.xp)||0)-pendingAmt)<1e-6&&self.__lfState)self.__lfState.stats.playerNeutralXP+=pending;pending=0;pendingAmt=0;return oldSplice.apply(arr,arguments);};try{return oldOrbs.apply(this,arguments);}finally{if(own)this.gainXP=oldGain;else delete this.gainXP;if(ownSplice)arr.splice=oldSplice;else delete arr.splice;}};
+  var oldUpdate=Game.prototype.update;if(oldUpdate)Game.prototype.update=function(dt){activeGame=this;var st=ensure(this,defs),out;this.__lfSuppressBaseCrasher=true;try{out=oldUpdate.call(this,dt);}finally{this.__lfSuppressBaseCrasher=false;}if(this.status==='playing'){st.sectorT-=dt;st.behaviorT-=dt;st.directorT-=dt;if(st.sectorT<=0){var sd=SECTOR_PERIOD-st.sectorT;st.sectorT=SECTOR_PERIOD;sectorTick(this,st,defs,clamp(sd,SECTOR_PERIOD,SECTOR_PERIOD*2));}if(st.behaviorT<=0){var bd=BEHAVIOR_PERIOD-st.behaviorT;st.behaviorT=BEHAVIOR_PERIOD;if(LF.behaviorTick)LF.behaviorTick(this,st,defs,clamp(bd,BEHAVIOR_PERIOD,BEHAVIOR_PERIOD*2));}if(st.directorT<=0){st.directorT=DIRECTOR_PERIOD;if(LF.directorTick)LF.directorTick(this,st);}}return out;};
+  var oldMap=Game.prototype.drawMinimap;if(oldMap)Game.prototype.drawMinimap=function(){var out=oldMap.apply(this,arguments),st=this.__lfState,ctx=this.mmCtx;if(!st||!ctx||!st.signal)return out;var sig=st.signal,tm=this.time||0;if(tm>=sig.until)return out;var S=216,sc=S/(ARENA*2),px=function(x){return(x+ARENA)*sc;},py=function(y){return(y+ARENA)*sc;};ctx.save();ctx.globalAlpha=.68;ctx.lineWidth=1.5;if(sig.type==='BLOOM'){var c=sectorCenter(sig.sector);ctx.strokeStyle='#ffc94d';ctx.beginPath();ctx.arc(px(c.x),py(c.y),17+Math.sin(tm*5)*2,0,TAU);ctx.stroke();}else if(sig.type==='MIGRATION'){var a=sectorCenter(sig.from),b=sectorCenter(sig.to),ax=px(a.x),ay=py(a.y),bx=px(b.x),by=py(b.y),an=Math.atan2(by-ay,bx-ax);ctx.strokeStyle='#7df3ff';ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.lineTo(bx-Math.cos(an-.6)*7,by-Math.sin(an-.6)*7);ctx.moveTo(bx,by);ctx.lineTo(bx-Math.cos(an+.6)*7,by-Math.sin(an+.6)*7);ctx.stroke();}else if(sig.type==='ROGUE STAR'){var rs=this.getShape&&this.getShape(sig.starId),rx=rs?rs.x:sig.x,ry=rs?rs.y:sig.y;ctx.fillStyle='#ffe066';ctx.beginPath();ctx.arc(px(rx),py(ry),4,0,TAU);ctx.fill();}ctx.restore();return out;};
+  var oldRedeploy=Game.prototype.redeploy;if(oldRedeploy)Game.prototype.redeploy=function(){this.__lfState=null;return oldRedeploy.apply(this,arguments);};
+  var oldDestroy=Game.prototype.destroy;if(oldDestroy)Game.prototype.destroy=function(){if(this.__lfState){lastSnapshot=snapshot(this);window.__NOVA_LIVING_FRONT_LAST__=lastSnapshot;}if(activeGame===this)activeGame=null;return oldDestroy.apply(this,arguments);};
+});
+console.info('[NOVA TANKS] v'+VERSION+' Living Front ecology core online');
+})();
