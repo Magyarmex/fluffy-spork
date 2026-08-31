@@ -13,6 +13,7 @@
 5. **Performance/lifecycle:** decimated work, spatial queries, DOM observers, scratch reuse, and update ownership were inspected for hidden churn.
 6. **Test-the-test:** the strengthened suite was executed from a repository-shaped filesystem so CI-relative paths and module lifecycle assumptions were verified.
 7. **Semantic accounting:** telemetry and reward bookkeeping were checked against the actual shared engine containers rather than assuming an array represents only one reward source.
+8. **Optimized-path parity:** fallback behavior was compared against the actual Zero Churn spatial-index path so an optimization could not silently remove information a mechanic depends on.
 
 ## Misses found and corrected
 
@@ -64,6 +65,12 @@ NOVA intentionally uses the same `orbs` array for neutral-shape XP and a fractio
 
 **Correction:** Living Front marks only shape/bounty orbs as neutral and associates the player XP delta with the exact orb being removed. A player can collect a neutral orb and an equal-value tank-kill orb in the same update; total XP correctly includes both while `playerNeutralXP` includes only the neutral one. This keeps the intended 15–25% skilled-farming validation metric meaningful.
 
+### 9. The optimized entity hash silently omitted bullets
+
+Zero Churn's canonical spatial hash intentionally indexes shapes and living tanks, not projectiles. Living Front's fallback local query scanned bullets, but the optimized path returned immediately after `g.hash.query`. On the real production path this could therefore remove bullets from Triangle threat recognition and near-fire herding while the simpler test harness still passed.
+
+**Correction:** Wild Instincts now builds one reusable bullet spatial index per decimated behavior tick. Living Front merges nearby bullets from that index into canonical local hash queries, preserving optimized locality without reintroducing shape×all-projectile scans. A dedicated regression supplies a canonical-style hash that omits bullets and verifies the incoming projectile still reaches Triangle threat logic.
+
 ## Verified contracts
 
 | Design contract | Runtime evidence |
@@ -75,6 +82,7 @@ NOVA intentionally uses the same `orbs` array for neutral-shape XP and a fractio
 | No XP multiplier zones | Value remains physical entities/orbs only |
 | Circle schooling | Stage II local, terrain-visible alignment and danger drift |
 | Triangle committed evade | Threat intersection + LOS + cooldown + committed lateral displacement |
+| Projectile optimized-path parity | Canonical entity hash is augmented by a reused local bullet index |
 | Square negative space | No bespoke Square combat mechanic; only weak physical disturbance susceptibility |
 | Cascade geometry | Final impact direction biases Pentagon/Hexagon child velocity |
 | Hexagon keystone | Bounded 310-radius, 18-neighbor, terrain-visible attraction |
@@ -94,12 +102,12 @@ NOVA intentionally uses the same `orbs` array for neutral-shape XP and a fractio
 | Debug observability | Copyable full snapshot + compact behavior/sector metrics + player neutral XP/min |
 | Neutral XP attribution | Shape/bounty orbs are tagged and distinguished from tank-death reward orbs |
 | Performance cadence | ~4.55 Hz sectors, ~8.33 Hz shape intent, ~1.39 Hz Director, ~3.57 Hz AI |
-| Spatial reuse | Canonical entity hash used when available; bounded local queries/scratch arrays |
+| Spatial reuse | Canonical entity hash + reusable bullet buckets; bounded local queries/scratch arrays |
 | Director-off acceptance | Ecology/spawn geography/instincts remain active with Director disabled |
 
 ## Automated audit result
 
-The strengthened Living Front suite contains **19 focused tests**. It covers distribution semantics, ecological age, terrain visibility, bounded disturbance, explicit Crasher overshoot, Star chase geometry, Director truthfulness, AI information/route fairness, neutral-vs-PvP XP attribution, performance cadence, UI lifecycle behavior, and canonical `Game` integration.
+The strengthened Living Front suite contains **20 focused tests**. It covers distribution semantics, ecological age, terrain visibility, optimized projectile-query parity, bounded disturbance, explicit Crasher overshoot, Star chase geometry, Director truthfulness, AI information/route fairness, neutral-vs-PvP XP attribution, performance cadence, UI lifecycle behavior, and canonical `Game` integration.
 
 The three runtime files pass `node --check`. The test suite passes when executed from a repository-shaped directory with repository-relative paths.
 
