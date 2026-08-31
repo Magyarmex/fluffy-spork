@@ -1,6 +1,67 @@
 {
-  "currentVersion": "1.7.3",
+  "currentVersion": "1.12.0",
   "releases": [
+    {
+      "version": "1.12.0",
+      "codename": "Living Front",
+      "date": "2026-08-31",
+      "headline": "Fighting changes the farm, and farming changes where fights happen.",
+      "groups": {
+        "Ecology Core": [
+          "Sixteen invisible ecological sectors track maturity, pressure, neutral value, harvest/combat disturbance, and physical migration.",
+          "The canonical 62/30/16/8/4 Circle/Triangle/Square/Pentagon/Hexagon population contract remains unchanged.",
+          "Late-match mature calm geography can concentrate better farming without player-relative pity or hidden XP multipliers."
+        ],
+        "Wild Instincts": [
+          "Circles school gently, Triangles make readable committed evasions, Squares remain simple, Pentagon/Hexagon cascades reward positioning, Hexagons act as bounded keystones, and Rogue Stars become interception prey.",
+          "Crashers use Track → Telegraph → Charge → Overshoot → Recover, obey terrain, target vulnerability, and gain only capped reward bounty rather than hidden combat stats.",
+          "Near fire, explosions, and combat pressure can physically herd appropriate neutral prey with bounded diminishing response."
+        ],
+        "Front Director and AI": [
+          "BLOOM reports real mature value, MIGRATION requires physical sector crossings, and ROGUE STAR is the sole rare deliberately created opportunity.",
+          "AI ecology planning uses only public Director signals and Fair Engagement-legal visible information with route, health, fight, and saturation gates.",
+          "Seven tactical Living Front tips register through canonical Fieldcraft and visual telegraphs obey Signal Discipline."
+        ],
+        "Validation": [
+          "Living Front shipped after an adversarial audit corrected twelve concrete gameplay, runtime, fairness, ownership, and governance defects.",
+          "The shipping chain validates the ordered Ecology Core → Wild Instincts → Front Director runtime after v1.11.2 Fair Engagement before boot."
+        ]
+      }
+    },
+    {
+      "version": "1.11.2",
+      "codename": "Fair Engagement",
+      "date": "2026-08-30",
+      "headline": "Enemy intelligence follows the same battlefield information language the player can reason about.",
+      "groups": {
+        "Fair Information": [
+          "Enemy hull perception follows the gameplay viewport and camera projection instead of an arbitrary privileged vision radius.",
+          "Forward Observer relay remains the deliberate off-viewport exception while physical line-of-sight still governs firing and terrain interactions.",
+          "Target scoring is identity-neutral and does not prioritize a tank merely because it is the human player."
+        ],
+        "Engagement Discipline": [
+          "Soft saturation spreads equivalent fights without forbidding legitimate gangs.",
+          "Legacy AI receives only the fairly selected perceived rival and bounded reaction cadence remains authoritative.",
+          "Controller held-aim repair preserves the two-stick contract without fabricating a released command."
+        ]
+      }
+    },
+    {
+      "version": "1.11.1",
+      "codename": "Owner Operations",
+      "date": "2026-08-30",
+      "headline": "Authorized owner task state reaches NOVA without becoming public gameplay authority.",
+      "groups": {
+        "Owner Surface": [
+          "The private owner HUD is loaded through pwa-register.js rather than the combat patch chain.",
+          "Owner operations fail closed unless the authorized phone bridge is present and events match the active phone binding.",
+          "The queue covers supported task/agent states while remaining separate from normal public gameplay."
+        ],
+        "Companion": [
+          "The Android NOVA Owner companion is compiled in CI and preserves explicit authorization rather than browser fingerprint identity."
+        ]
+      }
+    },
     {
       "version": "1.7.3",
       "codename": "Blackglass Fit",
