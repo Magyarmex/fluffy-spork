@@ -8,37 +8,75 @@ This file is the **human-facing milestone ledger**, not a promise to reproduce e
 **Released:** 2026-08-31  
 **Theme:** Dynamic neutral battlefield ecology
 
-Living Front realizes the historic Living Arena direction without turning NOVA into a quest/capture-zone/resource-management game.
+Living Front realizes the historic Living Arena direction without turning NOVA into a quest, capture-zone, or resource-management game. The central rule is simple: **fighting changes the farm, and farming changes where fights happen.**
 
-### Ecology Core
-- The arena is divided into sixteen invisible ecological sectors tracking maturity, pressure, neutral value, harvest/combat disturbance, and physical migration.
-- The canonical **62 / 30 / 16 / 8 / 4** Circle/Triangle/Square/Pentagon/Hexagon population contract remains unchanged.
-- Quiet territory can mature into better late-match farming geography; harvesting and combat disturb it.
-- High-value concentration is gated by match age rather than player-relative pity or hidden XP boosts.
+### Dynamic resource geography
+- The arena now runs a **4×4 grid of sixteen invisible ecological sectors** tracking maturity, pressure, real neutral XP value, recent harvest/combat disturbance, and physical migration flow.
+- Quiet territory can mature into richer farming geography; heavily exploited or fought-over territory becomes temporarily poorer and recovers over time.
+- A shared match-age maturity ceiling prevents maximum-value concentrations from appearing immediately and lets the world itself support richer late-run farming.
+- The canonical **62 / 30 / 16 / 8 / 4** Circle/Triangle/Square/Pentagon/Hexagon population contract remains unchanged. Living Front redistributes value rather than simply spawning more entities.
+- Valuable regions contain physically valuable shapes. There are no hidden XP-zone multipliers, player-relative catch-up bonuses, or pity logic.
 
-### Wild Instincts
-- Circles school gently and remain basic fodder.
-- Triangles make readable cooldown-bounded evasions against legitimate nearby fire.
-- Squares remain intentionally simple.
-- Pentagon/Hexagon deaths can create directional cascades that reward positioning.
-- Hexagons act as bounded terrain-visible keystones rather than global magnets.
-- Rogue Stars are tuned as interception prey instead of slow chase bosses.
-- Crashers use **Track → Telegraph → Charge → Overshoot → Recover**, obey terrain, target vulnerability, and carry only capped reward bounty rather than hidden combat growth.
-- Near fire, explosions, and combat presence can physically herd appropriate neutral prey with bounded diminishing response.
+### Neutral shape instincts
+- **Circles** remain easy baseline fodder but now loosely school and gently drift away from visible local danger.
+- **Triangles** can make one readable, cooldown-bounded lateral evade against a credible visible projectile. They cannot chain perfect dodges, so baiting and leading remain reliable counterplay.
+- **Squares** intentionally remain simple and resist disturbance much more strongly than Circles or Triangles.
+- **Pentagon and Hexagon cascades** now inherit useful directional momentum from the kill geometry, rewarding pre-kill positioning and cleanup planning.
+- **Hexagons** become bounded ecological keystones, weakly gathering nearby lower-value shapes into loose terrain-visible pockets instead of acting as global magnets.
+- Shape instincts obey Battlefield line-of-sight and collision rules rather than sensing or influencing entities magically through solid cover.
 
-### Front Director and Strategic AI
-- **BLOOM** reports real mature value already present in the world.
-- **MIGRATION** requires actual physical sector crossings.
-- **ROGUE STAR** is the one event allowed to deliberately create a rare opportunity, and only after strategic quiet.
-- AI may reason about ecology through public signals and Fair Engagement-legal visible information; no hidden maturity map is exposed.
-- Route cost, health/fight state, and saturation gates prevent ecology from becoming a dogpile magnet.
-- Seven tactical Living Front tips register through canonical Fieldcraft rather than writing directly to the rendered tip line.
-- World/minimap signals obey Signal Discipline.
+### Crashers and Rogue Stars
+- Crashers were rebuilt around **Track → Telegraph → Charge → Overshoot → Recover**.
+- Committed charges mostly lock their bearing, collide with real terrain, continue through a miss into an explicit overshoot, and expose a recovery window before another attack.
+- Crashers can prey on neutral shapes and convert part of that lost value into **capped reward bounty**. Brighter cores mean more XP when destroyed, never extra HP, damage, or speed.
+- Rogue Stars are fast roaming prizes, not mini-bosses. Their cruise speed outruns ordinary unbuffed tanks so route prediction and interception beat simple tail-chasing.
+- Stars remain vulnerable to ordinary combat, respect terrain, and do not gain boss phases or hidden stat inflation.
+
+### Disturbance, herding, and migration
+- Gunfire, explosions, tank presence, damage, deaths, and rapid harvesting all contribute to local ecological pressure.
+- Nearby visible fire and blasts can physically herd susceptible Circles and Triangles.
+- Squares resist strongly, Pentagons resist almost entirely, and Hexagons/Stars/Crashers do not become player-controlled herding units.
+- Per-shape disturbance memory creates diminishing response so repeated empty firing does not become optimal farming.
+- Neutral populations can bias movement away from sustained hot ground toward calmer neighboring territory.
+- Migration is physical and terrain-constrained: entities cross the actual battlefield instead of teleporting between sectors.
+
+### Front Director
+- **BLOOM** reports a naturally matured high-value pocket that already exists; it does not spawn value or activate an XP multiplier.
+- **MIGRATION** is announced only after enough real neutral entities have physically crossed sector boundaries in a coherent direction.
+- **ROGUE STAR** is the sole deliberately created Director opportunity and appears only after strategic quiet under bounded cooldown/state rules.
+- Director signals stay restrained to short world/minimap/audio communication rather than capture bars, objective trackers, or permanent ecology HUD.
+- The ecology remains active with the Director disabled. The Director communicates a living world; it does not manufacture the entire loop.
+
+### Strategic AI and class interaction
+- AI may reason about Blooms, Migrations, Rogue Stars, and locally visible neutral concentrations, but ecology remains only one strategic utility among combat, survival, route cost, and role behavior.
+- AI receives public Director information plus **Fair Engagement-legal visible ecology only**. Hidden maturity and unseen neutral positions are not exposed as privileged data.
+- Health/fight gates, route cost, deterministic damping, and opportunity saturation keep ecological hotspots from turning into universal AI dogpiles.
+- Controller drones remain strong **local** autonomous farmers but do not independently abandon the player to chase distant ecological objectives.
+- No class gains a bespoke ecology stat bonus. Existing weapons, mobility, range, splash, terrain interaction, and drone tools determine how each class exploits Living Front.
+
+### Progression and mastery
+- Farming mastery now includes reading mature ground, rotating early, positioning before cascades, intercepting Stars, judging whether rich ground is worth contesting, and exploiting terrain funnels.
+- Ordinary nearby farming remains viable; skill is intended to improve efficiency rather than make the previous farming loop nonfunctional.
+- Later-match world maturity supports richer opportunities as progression costs increase without checking whether any specific player is behind.
+- Living Front deliberately adds no crafting currency, territory ownership, event questing, ecology tree, combo meter, or hidden catch-up multiplier.
+
+### Readability, Fieldcraft, and observability
+- Crasher charge telegraphs, overshoot residue, fed-core brightness, Rogue Star motion, and restrained Director signals communicate actionable state without permanent clutter.
+- Seven tactical Living Front tips register through canonical Fieldcraft: quiet-ground maturity, Hexagon pockets, Triangle baiting, Crasher bounty, Bloom choices, Star interception, and bounded herding.
+- Living Front visuals obey Signal Discipline rather than bypassing the established visual-governance contract.
+- Debug exposes copyable ecological telemetry for all sixteen sectors plus neutral value, migration, shape counts, Triangle evasions, Crasher outcomes, bounty flow, Stars, Blooms, AI rotations, planning cost, and player neutral XP/min.
+- Neutral farming telemetry distinguishes shape/bounty XP from PvP tank-drop orbs.
+
+### Performance, fairness, and reliability
+- Ecology uses bounded decimated planning: sectors roughly **4–5 Hz**, shape instincts **8–10 Hz**, the Front Director **1–2 Hz**, and strategic ecology AI at a similarly bounded cadence while movement/collision/combat remain frame-exact.
+- Living Front reuses the canonical spatial hash and adds one reusable local projectile index per instinct tick so projectile-aware neutral behavior remains efficient.
+- Entity counts stay bounded: smarter arrangement is preferred over simply adding more neutral objects.
+- A cross-system Crasher fix expires Battlefield terrain-bump state correctly so one wall impact cancels the current commitment without poisoning every later charge.
 
 ### Completion audit
-Living Front was repeatedly re-audited against gameplay intent, optimized-runtime behavior, AI information fairness, system ownership, visual governance, Fieldcraft ownership, and external PR review. Twelve concrete misses were corrected before release, including optimized projectile-awareness parity and the stale Battlefield terrain-bump marker that could otherwise poison future Crasher charges.
+Living Front was repeatedly re-audited against gameplay intent, optimized-runtime behavior, AI information fairness, system ownership, visual governance, Fieldcraft ownership, telemetry accounting, and external PR review. **Twelve concrete misses were corrected before release**, including projectile-awareness parity on the optimized hash path and the stale Battlefield terrain-bump marker that could otherwise break future Crasher charges.
 
-See [`LIVING_FRONT.md`](./LIVING_FRONT.md) and [`LIVING_FRONT_AUDIT.md`](./LIVING_FRONT_AUDIT.md).
+See [`CURRENT_RELEASE.md`](./CURRENT_RELEASE.md), [`LIVING_FRONT.md`](./LIVING_FRONT.md), and [`LIVING_FRONT_AUDIT.md`](./LIVING_FRONT_AUDIT.md).
 
 ---
 

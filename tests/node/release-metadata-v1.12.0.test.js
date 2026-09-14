@@ -17,6 +17,50 @@ test('canonical release metadata identifies v1.12.0 Living Front as current', ()
   assert.ok(versions.has('1.11.1'), 'Owner Operations must remain represented');
 });
 
+test('Living Front structured patch notes cover the actual shipped feature set', () => {
+  const data = JSON.parse(read('nova-updates/releases.json'));
+  const release = data.releases.find((item) => item.version === '1.12.0');
+  assert.ok(release, 'v1.12.0 release metadata must exist');
+
+  const expectedGroups = [
+    'World Ecology',
+    'Neutral Shape Behaviors',
+    'Crashers and Rogue Stars',
+    'Disturbance, Herding and Migration',
+    'Front Director',
+    'AI and Class Integration',
+    'Progression and Skill',
+    'Readability, Tips and Debugging',
+    'Performance, Fairness and Reliability',
+  ];
+
+  for (const group of expectedGroups) {
+    assert.ok(Array.isArray(release.groups?.[group]), `missing Living Front patch-note group: ${group}`);
+    assert.ok(release.groups[group].length >= 3, `${group} must describe the shipped content rather than collapse to a label`);
+  }
+
+  const notes = Object.values(release.groups).flat().join('\n');
+  for (const required of [
+    /sixteen invisible ecological sectors/i,
+    /62\s*\/\s*30\s*\/\s*16\s*\/\s*8\s*\/\s*4/i,
+    /Triangles.*evade/i,
+    /Hexagons.*keystone/i,
+    /Track.*Telegraph.*Charge.*Overshoot.*Recover/i,
+    /capped bounty/i,
+    /Rogue Stars?.*interception/i,
+    /BLOOM/i,
+    /MIGRATION/i,
+    /public Director signals/i,
+    /Controller drones.*local/i,
+    /no hidden XP-zone multipliers/i,
+    /Seven tactical Living Front tips/i,
+    /projectile index/i,
+    /twelve concrete/i,
+  ]) {
+    assert.match(notes, required);
+  }
+});
+
 test('human-facing current/latest surfaces cannot regress behind Living Front', () => {
   const readme = read('README.md');
   const current = read('CURRENT_RELEASE.md');
