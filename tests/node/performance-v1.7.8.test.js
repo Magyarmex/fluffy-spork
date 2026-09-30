@@ -26,7 +26,8 @@ function loadLayer(){
     killShape(s){const i=this.shapes.indexOf(s);if(i>=0)this.shapes.splice(i,1);}
     getShape(id){return this.shapes.find(s=>s.id===id)||null;}
     nearestShape(x,y,max){let best=null,bd=max*max;for(const s of this.shapes){const dx=x-s.x,dy=y-s.y,q=dx*dx+dy*dy;if(q<bd){bd=q;best=s;}}return best;}
-    redeploy(){this.shapes=[];this.spawnShape('c',20,20);}
+    seedShapes(){this.spawnShape('a',0,0);this.spawnShape('b',100,0);}
+    redeploy(){this.seedShapes();}
   }
   const modules={
     'game/input':(module)=>{module.exports={Input};},
@@ -56,12 +57,29 @@ test('spatial hash buckets survive clear/rebuild cycles instead of reallocating'
   h.insert(a);assert.equal(h.map.get(key),bucket);assert.equal(h.__novaBucketCreates,created,'same cell must not allocate another bucket');
 });
 
-test('shape id map stays synchronized through spawn, kill and redeploy',()=>{
+test('shape id map stays synchronized while redeploy preserves the existing arena',()=>{
   const {Game}=loadLayer(),g=new Game();
-  assert.equal(g.getShape(1),g.shapes[0]);
+  const first=g.shapes[0],second=g.shapes[1];
+  assert.equal(g.getShape(first.id),first);
   g.spawnShape('x',40,40);const spawned=g.shapes[g.shapes.length-1];assert.equal(g.getShape(spawned.id),spawned);
   g.killShape(spawned);assert.equal(g.getShape(spawned.id),null);
-  const oldId=g.shapes[0].id;g.redeploy();assert.equal(g.getShape(oldId),null);assert.equal(g.getShape(g.shapes[0].id),g.shapes[0]);
+  g.redeploy();
+  assert.equal(g.shapes.length,2,'redeploy must not append another full ecology');
+  assert.equal(g.getShape(first.id),first);
+  assert.equal(g.getShape(second.id),second);
+  for(let i=0;i<4;i++)g.redeploy();
+  assert.equal(g.shapes.length,2,'repeated redeploys must keep population stable');
+});
+
+test('redeploy seed loop tops up a missing type without duplicating survivors',()=>{
+  const {Game}=loadLayer(),g=new Game(),survivor=g.shapes[1];
+  g.killShape(g.shapes[0]);
+  assert.equal(g.shapes.length,1);
+  g.redeploy();
+  assert.equal(g.shapes.length,2);
+  assert.equal(g.getShape(survivor.id),survivor);
+  assert.equal(g.shapes.filter(s=>s.type==='a').length,1);
+  assert.equal(g.shapes.filter(s=>s.type==='b').length,1);
 });
 
 test('nearestShape uses the exact spatial hash result after the hash is ready',()=>{
