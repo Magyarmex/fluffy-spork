@@ -163,7 +163,25 @@ wrap('game/engine',function(engine){
   Base.prototype.getShape=function(id){return this.shapeById?this.shapeById.get(id)||null:null;};
 
   var oldRedeploy=Base.prototype.redeploy;
-  if(oldRedeploy)Base.prototype.redeploy=function(){if(this.shapeById)this.shapeById.clear();return oldRedeploy.apply(this,arguments);};
+  if(oldRedeploy)Base.prototype.redeploy=function(){
+    /* The base game deliberately preserves the arena across lives, but its
+       redeploy() calls seedShapes() as if the shape array were empty. Without
+       this guard every death adds another full ecology population. Let the
+       existing seed loop top up only missing types, then rebuild the id index
+       from the authoritative surviving array. */
+    var counts=Object.create(null),shapes=this.shapes||[];
+    for(var i=0;i<shapes.length;i++){var s=shapes[i];if(s&&s.hp>0)counts[s.type]=(counts[s.type]||0)+1;}
+    var spawn=this.spawnShape,self=this;
+    if(typeof spawn==='function')this.spawnShape=function(type){
+      if((counts[type]||0)>0){counts[type]--;return null;}
+      return spawn.apply(self,arguments);
+    };
+    var out;
+    try{out=oldRedeploy.apply(this,arguments);}
+    finally{if(typeof spawn==='function')this.spawnShape=spawn;}
+    if(this.shapeById){this.shapeById.clear();for(var j=0;j<this.shapes.length;j++){var q=this.shapes[j];if(q)this.shapeById.set(q.id,q);}}
+    return out;
+  };
 
   Base.prototype.nearestShape=function(x,y,max){
     var hash=this.hash,limit=max*max,best=null,bd=limit;
