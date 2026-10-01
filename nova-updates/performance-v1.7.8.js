@@ -160,7 +160,13 @@ wrap('game/engine',function(engine){
   if(oldKillShape)Base.prototype.killShape=function(s){
     var out=oldKillShape.apply(this,arguments);if(this.shapeById&&s)this.shapeById.delete(s.id);return out;
   };
-  Base.prototype.getShape=function(id){return this.shapeById?this.shapeById.get(id)||null:null;};
+  var oldGetShape=Base.prototype.getShape;
+  Base.prototype.getShape=function(id){
+    var map=this.shapeById||(this.shapeById=new Map()),hit=map.get(id);if(hit)return hit;
+    /* Some base-game cascade spawns append directly to shapes instead of using
+       spawnShape(). Heal that rare index miss once without sacrificing O(1) hits. */
+    var found=oldGetShape?oldGetShape.call(this,id):null;if(found)map.set(id,found);return found||null;
+  };
 
   var oldRedeploy=Base.prototype.redeploy;
   if(oldRedeploy)Base.prototype.redeploy=function(){
