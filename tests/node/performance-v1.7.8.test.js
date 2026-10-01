@@ -82,6 +82,19 @@ test('redeploy seed loop tops up a missing type without duplicating survivors',(
   assert.equal(g.shapes.filter(s=>s.type==='b').length,1);
 });
 
+test('getShape self-heals an authoritative shape missed by the id index',()=>{
+  const {Game}=loadLayer(),g=new Game();
+  const direct={id:999,kind:'shape',type:'triangle',x:20,y:20,hp:10};
+  g.shapes.push(direct);
+  assert.equal(g.shapeById.has(direct.id),false,'fixture must reproduce a direct cascade append that bypasses spawnShape');
+  assert.equal(g.getShape(direct.id),direct,'authoritative shapes array must recover the missed entity');
+  assert.equal(g.shapeById.get(direct.id),direct,'first miss must repair the O(1) index');
+  const original=g.shapes.find;
+  g.shapes.find=()=>{throw new Error('linear fallback should not run after repair');};
+  assert.equal(g.getShape(direct.id),direct,'subsequent lookup must be served from the repaired map');
+  g.shapes.find=original;
+});
+
 test('nearestShape uses the exact spatial hash result after the hash is ready',()=>{
   const {Game}=loadLayer(),g=new Game();
   g.shapes=[];g.shapeById.clear();g.spawnShape('far',150,0);g.spawnShape('near',35,0);
