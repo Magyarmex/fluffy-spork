@@ -454,6 +454,7 @@
         var dd=dist2(d.x,d.y,t.x,t.y);if(dd>bestD)continue;
         var a=Math.atan2(t.y-d.y,t.x-d.x);
         if(Math.abs(angleDelta(a,d.angle||0))>SPOTTER_FOV_HALF)continue;
+        if(g.hasLineOfSight&&!g.hasLineOfSight(d.x,d.y,t.x,t.y,2))continue;
         best=t;bestD=dd;
       }
       if(best){
