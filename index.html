@@ -3723,8 +3723,9 @@ class Game {
                 continue;
             }
             const ax = b.px == null ? b.x : b.px, ay = b.py == null ? b.y : b.py;
-            const travel = Math.hypot(b.x - ax, b.y - ay);
-            this.hash.query((ax + b.x) * 0.5, (ay + b.y) * 0.5, travel * 0.5 + b.r + 46, this.tmp);
+            const ex = b.x, ey = b.y;
+            const travel = Math.hypot(ex - ax, ey - ay);
+            this.hash.query((ax + ex) * 0.5, (ay + ey) * 0.5, travel * 0.5 + b.r + 46, this.tmp);
             let first = null;
             for (const e of this.tmp) {
                 let er = 0;
@@ -3732,7 +3733,7 @@ class Game {
                 else if (e.kind === 'tank' && e.id !== b.ownerId && e.alive) er = classes_1.CLASSES[e.cls].size + 3;
                 else if (e.kind === 'drone' && e.ownerId !== b.ownerId && e.hp > 0) er = e.r + 1;
                 else continue;
-                const rr = b.r + er, dx = b.x - ax, dy = b.y - ay, fx = ax - e.x, fy = ay - e.y;
+                const rr = b.r + er, dx = ex - ax, dy = ey - ay, fx = ax - e.x, fy = ay - e.y;
                 const A = dx * dx + dy * dy, B = 2 * (fx * dx + fy * dy), C = fx * fx + fy * fy - rr * rr;
                 let t = null;
                 if (A < 1e-9) { if ((0, types_1.dist2)(b.x, b.y, e.x, e.y) < rr * rr) t = 1; }
@@ -3740,8 +3741,8 @@ class Game {
                 if (t != null && (!first || t < first.t)) first = { e, t };
             }
             if (first) for (const e of [first.e]) {
-                b.x = ax + (b.x - ax) * first.t;
-                b.y = ay + (b.y - ay) * first.t;
+                b.x = ax + (ex - ax) * first.t;
+                b.y = ay + (ey - ay) * first.t;
                 if (e.kind === 'shape') {
                     const rr = b.r + e.r;
                     if ((0, types_1.dist2)(b.x, b.y, e.x, e.y) < rr * rr) {
@@ -3784,6 +3785,10 @@ class Game {
                         break;
                     }
                 }
+            }
+            if (!b.dead && first) {
+                b.x = ex;
+                b.y = ey;
             }
             if (b.dead)
                 this.bullets.splice(i, 1);
