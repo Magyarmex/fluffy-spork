@@ -8,6 +8,7 @@ const html = fs.readFileSync(path.resolve(__dirname, '../../index.html'), 'utf8'
 function sweep(ax, ay, ex, ey, cx, cy, rr) {
   const dx = ex - ax, dy = ey - ay, fx = ax - cx, fy = ay - cy;
   const A = dx * dx + dy * dy, B = 2 * (fx * dx + fy * dy), C = fx * fx + fy * fy - rr * rr;
+  if (C <= 0) return 0;
   if (A < 1e-9) return (fx * fx + fy * fy < rr * rr) ? 1 : null;
   const D = B * B - 4 * A * C;
   if (D < 0) return null;
@@ -37,4 +38,8 @@ test('near miss stays a miss and nearest contact wins', () => {
 
 test('surviving penetration preserves the original frame endpoint', () => {
   assert.match(html, /if \(!b\.dead && first\) \{\s*b\.x = ex;\s*b\.y = ey;/);
+});
+
+test('point-blank overlap resolves immediately rather than at the exit edge', () => {
+  assert.equal(sweep(0, 0, 100, 0, 0, 0, 20), 0);
 });
