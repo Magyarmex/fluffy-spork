@@ -118,6 +118,7 @@ test('Battlefield breach preserves the projectile frame time budget', () => {
   const { Game } = loadBattlefield();
   const g = new Game();
   g.time = 1;
+  g.__novaBattlefield = { coverBroken: 0, coverTotal: 1, name: 'TEST' };
   g.bullets = [{ x: -100, y: 0, vx: 1000, vy: 0, r: 4, dmg: 400, maxHp: 400, ownerId: -1, pen: 3, dead: false }];
   g.__novaTerrain = [{ id: -1, shape: 'rect', x: 0, y: 0, w: 20, h: 160, solid: true, destructible: true, hp: 100, maxHp: 100 }];
   g.weakenBullet = function () {};
