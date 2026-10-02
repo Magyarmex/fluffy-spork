@@ -12,7 +12,13 @@ function loadBattlefield() {
   Game.prototype.spawnPowerup = function () {};
   Game.prototype.moveTank = function (t, vx, vy, dt) { t.x += vx * dt; t.y += vy * dt; t.vx = vx; t.vy = vy; };
   Game.prototype.tryFire = function () {};
-  Game.prototype.updateBullets = function (dt) {\n    for (const b of this.bullets || []) {\n      if (!b || b.dead) continue;\n      b.px = b.x; b.py = b.y;\n      b.x += (b.vx || 0) * dt; b.y += (b.vy || 0) * dt;\n    }\n  };
+  Game.prototype.updateBullets = function (dt) {
+    for (const b of this.bullets || []) {
+      if (!b || b.dead) continue;
+      b.px = b.x; b.py = b.y;
+      b.x += (b.vx || 0) * dt; b.y += (b.vy || 0) * dt;
+    }
+  };
   Game.prototype.splashAt = function () {};
   Game.prototype.updateDrones = function () {};
   Game.prototype.update = function () {};
