@@ -5,13 +5,16 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 function loadBattlefield() {
-  function Game() {}
+  function Game() { this.hash = { query(x, y, r, out) { out.length = 0; } }; this.tmp = []; }
   Game.prototype.spawnPlayer = function () {};
   Game.prototype.randSpawnPos = function () { return { x: 1500, y: 1500 }; };
   Game.prototype.spawnShape = function () {};
   Game.prototype.spawnPowerup = function () {};
   Game.prototype.moveTank = function (t, vx, vy, dt) { t.x += vx * dt; t.y += vy * dt; t.vx = vx; t.vy = vy; };
   Game.prototype.tryFire = function () {};
+  Game.prototype.initBulletIntegrity = function () {};
+  Game.prototype.resolveBulletCollisions = function () {};
+  Game.prototype.addParticles = function () {};
   Game.prototype.updateBullets = function (dt) {
     for (const b of this.bullets || []) {
       if (!b || b.dead) continue;
@@ -135,14 +138,15 @@ test('Battlefield resolves a spent breaching projectile at the cover impact', ()
   const g = new Game();
   g.time = 1;
   g.__novaBattlefield = { coverBroken: 0, coverTotal: 1, name: 'TEST' };
-  g.bullets = [{ x: -100, y: 0, vx: 1000, vy: 0, r: 4, dmg: 400, maxHp: 400, ownerId: -1, pen: 3, dead: false, shell: true }];
+  const spent = { x: -100, y: 0, vx: 1000, vy: 0, r: 4, dmg: 400, maxHp: 400, ownerId: -1, pen: 3, dead: false, shell: true };
+  g.bullets = [spent];
   g.__novaTerrain = [{ id: -1, shape: 'rect', x: 0, y: 0, w: 20, h: 160, solid: true, destructible: true, hp: 100, maxHp: 100 }];
   g.weakenBullet = function (b) { b.dead = true; };
   let burst = null;
   g.clusterBurst = function (b) { burst = { x: b.x, y: b.y }; };
   g.updateBullets(0.2);
   assert.equal(g.__novaTerrain[0].solid, false, 'cover should still be breached');
-  assert.equal(g.bullets[0].dead, true, 'spent projectile should remain dead');
+  assert.equal(spent.dead, true, 'spent projectile should remain dead');
   assert.ok(burst, 'spent shell should resolve its impact burst');
   assert.ok(burst.x < 0 && burst.x > -20, `burst should resolve at the cover impact, got x=${burst.x}`);
 });
