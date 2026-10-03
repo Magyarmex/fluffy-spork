@@ -59,5 +59,5 @@ test('resolved swept contact is nudged infinitesimally inside before strict lega
 
 
 test('swept entity collision is owned by a materialized runtime update', () => {
-  assert.match(html, /Core entity CCD lives inside Battlefield/);
+  assert.match(html, /oldEntityBullets=Game\.prototype\.updateBullets/);
 });
