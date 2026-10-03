@@ -19,8 +19,8 @@ function sweep(ax, ay, ex, ey, cx, cy, rr) {
 }
 
 test('shipping collision path broad-phases the full projectile segment', () => {
-  assert.match(html, /const travel = Math\.hypot\(ex - ax, ey - ay\)/);
-  assert.match(html, /this\.hash\.query\(\(ax \+ ex\) \* 0\.5, \(ay \+ ey\) \* 0\.5, travel \* 0\.5 \+ b\.r \+ 46/);
+  assert.match(html, /travel=Math\.hypot\(ex-ax,ey-ay\)/);
+  assert.match(html, /this\.hash\.query\(\(ax\+ex\)\*\.5,\(ay\+ey\)\*\.5,travel\*\.5\+b\.r\+46/);
 });
 
 test('hypervelocity crossing registers even when endpoint misses', () => {
@@ -37,7 +37,7 @@ test('near miss stays a miss and nearest contact wins', () => {
 });
 
 test('surviving penetration preserves the original frame endpoint', () => {
-  assert.match(html, /if \(!b\.dead && first\) \{\s*b\.x = ex;\s*b\.y = ey;/);
+  assert.match(html, /if\(!b\.dead\)\{b\.x=ex;b\.y=ey;\}/);
 });
 
 test('point-blank overlap resolves immediately rather than at the exit edge', () => {
@@ -50,7 +50,7 @@ test('exact tangency remains a miss under strict collision semantics', () => {
 });
 
 test('resolved swept contact is nudged infinitesimally inside before strict legacy hit checks', () => {
-  assert.match(html, /const hitT = first\.t === 0 \? 0 : Math\.min\(1, first\.t \+ 1e-9\)/);
+  assert.match(html, /hitT=first\.t===0\?0:Math\.min\(1,first\.t\+1e-9\)/);
   const t = sweep(-100, 0, 100, 0, 0, 0, 20);
   const hitT = Math.min(1, t + 1e-9);
   const x = -100 + 200 * hitT;
