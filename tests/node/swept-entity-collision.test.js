@@ -8,10 +8,10 @@ const html = fs.readFileSync(path.resolve(__dirname, '../../index.html'), 'utf8'
 function sweep(ax, ay, ex, ey, cx, cy, rr) {
   const dx = ex - ax, dy = ey - ay, fx = ax - cx, fy = ay - cy;
   const A = dx * dx + dy * dy, B = 2 * (fx * dx + fy * dy), C = fx * fx + fy * fy - rr * rr;
-  if (C <= 0) return 0;
+  if (C < 0) return 0;
   if (A < 1e-9) return (fx * fx + fy * fy < rr * rr) ? 1 : null;
   const D = B * B - 4 * A * C;
-  if (D < 0) return null;
+  if (D <= 0) return null;
   const root = Math.sqrt(D), t0 = (-B - root) / (2 * A), t1 = (-B + root) / (2 * A);
   if (t0 >= 0 && t0 <= 1) return t0;
   if (t1 >= 0 && t1 <= 1) return t1;
@@ -42,4 +42,17 @@ test('surviving penetration preserves the original frame endpoint', () => {
 
 test('point-blank overlap resolves immediately rather than at the exit edge', () => {
   assert.equal(sweep(0, 0, 100, 0, 0, 0, 20), 0);
+});
+
+
+test('exact tangency remains a miss under strict collision semantics', () => {
+  assert.equal(sweep(-100, 20, 100, 20, 0, 0, 20), null);
+});
+
+test('resolved swept contact is nudged infinitesimally inside before strict legacy hit checks', () => {
+  assert.match(html, /const hitT = first\.t === 0 \? 0 : Math\.min\(1, first\.t \+ 1e-9\)/);
+  const t = sweep(-100, 0, 100, 0, 0, 0, 20);
+  const hitT = Math.min(1, t + 1e-9);
+  const x = -100 + 200 * hitT;
+  assert.ok(x * x < 20 * 20, `expected strict interior contact, got x=${x}`);
 });

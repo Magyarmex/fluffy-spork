@@ -3742,8 +3742,9 @@ class Game {
                 if (t != null && (!first || t < first.t)) first = { e, t };
             }
             if (first) for (const e of [first.e]) {
-                b.x = ax + (ex - ax) * first.t;
-                b.y = ay + (ey - ay) * first.t;
+                const hitT = first.t === 0 ? 0 : Math.min(1, first.t + 1e-9);
+                b.x = ax + (ex - ax) * hitT;
+                b.y = ay + (ey - ay) * hitT;
                 if (e.kind === 'shape') {
                     const rr = b.r + e.r;
                     if ((0, types_1.dist2)(b.x, b.y, e.x, e.y) < rr * rr) {
