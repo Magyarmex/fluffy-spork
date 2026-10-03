@@ -150,3 +150,22 @@ test('Battlefield resolves a spent breaching projectile at the cover impact', ()
   assert.ok(burst, 'spent shell should resolve its impact burst');
   assert.ok(burst.x < 0 && burst.x > -20, `burst should resolve at the cover impact, got x=${burst.x}`);
 });
+
+
+test('Battlefield runtime catches a hypervelocity tank crossing missed by endpoint collision', () => {
+  const { Game } = loadBattlefield();
+  const g = new Game();
+  g.time = 1;
+  g.__novaBattlefield = { coverBroken: 0, coverTotal: 0, name: 'TEST' };
+  g.__novaTerrain = [];
+  const target = { kind: 'tank', id: 2, alive: true, cls: 'scout', x: 0, y: 0 };
+  const bullet = { x: -100, y: 0, vx: 1000, vy: 0, r: 4, dmg: 20, maxHp: 20, ownerId: 1, pen: 0, hits: 0, dead: false };
+  g.bullets = [bullet];
+  g.hash.query = function (x, y, r, out) { out.length = 0; out.push(target); };
+  let damaged = null;
+  g.damageTank = function (e) { damaged = e; };
+  g.updateBullets(0.2);
+  assert.equal(damaged, target);
+  assert.equal(bullet.dead, true);
+  assert.ok(bullet.x < 0 && bullet.x > -30, `expected first-contact impact, got x=${bullet.x}`);
+});
