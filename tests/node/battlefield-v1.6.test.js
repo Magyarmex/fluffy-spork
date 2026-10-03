@@ -47,6 +47,7 @@ function loadBattlefield() {
   const engineModule = { exports: {} };
   modules['game/engine'](engineModule, engineModule.exports, (spec) => {
     if (spec === './classes') return { CLASSES: { scout: { size: 14 } } };
+    if (spec === './types') return { ARENA_HALF: 2250 };
     throw new Error(`unexpected require ${spec}`);
   });
   return { context, Game: engineModule.exports.Game };
