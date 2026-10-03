@@ -3722,29 +3722,8 @@ class Game {
                 this.bullets.splice(i, 1);
                 continue;
             }
-            const ax = b.px == null ? b.x : b.px, ay = b.py == null ? b.y : b.py;
-            const ex = b.x, ey = b.y;
-            const travel = Math.hypot(ex - ax, ey - ay);
-            this.hash.query((ax + ex) * 0.5, (ay + ey) * 0.5, travel * 0.5 + b.r + 46, this.tmp);
-            let first = null;
+            this.hash.query(b.x, b.y, b.r + 46, this.tmp);
             for (const e of this.tmp) {
-                let er = 0;
-                if (e.kind === 'shape') er = e.r;
-                else if (e.kind === 'tank' && e.id !== b.ownerId && e.alive) er = classes_1.CLASSES[e.cls].size + 3;
-                else if (e.kind === 'drone' && e.ownerId !== b.ownerId && e.hp > 0) er = e.r + 1;
-                else continue;
-                const rr = b.r + er, dx = ex - ax, dy = ey - ay, fx = ax - e.x, fy = ay - e.y;
-                const A = dx * dx + dy * dy, B = 2 * (fx * dx + fy * dy), C = fx * fx + fy * fy - rr * rr;
-                let t = null;
-                if (C < 0) t = 0;
-                else if (A < 1e-9) { if ((0, types_1.dist2)(b.x, b.y, e.x, e.y) < rr * rr) t = 1; }
-                else { const D = B * B - 4 * A * C; if (D > 0) { const root = Math.sqrt(D), t0 = (-B - root) / (2 * A), t1 = (-B + root) / (2 * A); if (t0 >= 0 && t0 <= 1) t = t0; else if (t1 >= 0 && t1 <= 1) t = t1; } }
-                if (t != null && (!first || t < first.t)) first = { e, t };
-            }
-            if (first) for (const e of [first.e]) {
-                const hitT = first.t === 0 ? 0 : Math.min(1, first.t + 1e-9);
-                b.x = ax + (ex - ax) * hitT;
-                b.y = ay + (ey - ay) * hitT;
                 if (e.kind === 'shape') {
                     const rr = b.r + e.r;
                     if ((0, types_1.dist2)(b.x, b.y, e.x, e.y) < rr * rr) {
@@ -3787,10 +3766,8 @@ class Game {
                         break;
                     }
                 }
-            }
-            if (!b.dead && first) {
-                b.x = ex;
-                b.y = ey;
+                if (b.dead)
+                    break;
             }
             if (b.dead)
                 this.bullets.splice(i, 1);

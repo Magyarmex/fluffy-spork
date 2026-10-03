@@ -157,6 +157,18 @@ wrap('game/audio',function(audio){var Sfx=audio.Sfx;if(!Sfx||Sfx.prototype.__nov
 });
 
 wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.prototype.__novaBattlefield)return;Game.prototype.__novaBattlefield=true;var CLASSES=require('./classes').CLASSES;
+ var TYPES=require('./types'),M=TYPES.ARENA_HALF;
+ /* Core entity CCD lives inside Battlefield so materialization cannot erase it. */
+ Game.prototype.updateBullets=function(dt){
+  for(var i=this.bullets.length-1;i>=0;i--){var b=this.bullets[i];this.initBulletIntegrity(b);b.px=b.x;b.py=b.y;b.x+=b.vx*dt;b.y+=b.vy*dt;b.ttl-=dt;if(b.beam&&Math.random()<.85)this.addParticles(b.x,b.y,b.color,1,30,'glow');else if(Math.random()<.22)this.addParticles(b.x,b.y,b.color,1,20,'glow');if(b.ttl<=0||b.x<-M+20||b.x>M-20||b.y<-M+20||b.y>M-20){if(b.shell)this.clusterBurst(b);b.dead=true;}}
+  this.resolveBulletCollisions();
+  for(var i=this.bullets.length-1;i>=0;i--){var b=this.bullets[i];if(b.dead){this.bullets.splice(i,1);continue;}var ax=b.px==null?b.x:b.px,ay=b.py==null?b.y:b.py,ex=b.x,ey=b.y,travel=Math.hypot(ex-ax,ey-ay);this.hash.query((ax+ex)*.5,(ay+ey)*.5,travel*.5+b.r+46,this.tmp);var first=null;
+   for(var j=0;j<this.tmp.length;j++){var e=this.tmp[j],er=0;if(e.kind==='shape')er=e.r;else if(e.kind==='tank'&&e.id!==b.ownerId&&e.alive)er=CLASSES[e.cls].size+3;else if(e.kind==='drone'&&e.ownerId!==b.ownerId&&e.hp>0)er=e.r+1;else continue;var rr=b.r+er,dx=ex-ax,dy=ey-ay,fx=ax-e.x,fy=ay-e.y,A=dx*dx+dy*dy,B=2*(fx*dx+fy*dy),C=fx*fx+fy*fy-rr*rr,t=null;if(C<0)t=0;else if(A<1e-9){if(d2(b.x,b.y,e.x,e.y)<rr*rr)t=1;}else{var D=B*B-4*A*C;if(D>0){var root=Math.sqrt(D),t0=(-B-root)/(2*A),t1=(-B+root)/(2*A);if(t0>=0&&t0<=1)t=t0;else if(t1>=0&&t1<=1)t=t1;}}if(t!=null&&(!first||t<first.t))first={e:e,t:t};}
+   if(first){var e=first.e,hitT=first.t===0?0:Math.min(1,first.t+1e-9);b.x=ax+(ex-ax)*hitT;b.y=ay+(ey-ay)*hitT;if(e.kind==='shape'){var rr=b.r+e.r;if(d2(b.x,b.y,e.x,e.y)<rr*rr){if(b.shell)this.clusterBurst(b);this.damageShape(e,b.dmg,b.vx,b.vy);if(b.splash)this.splashAt(b.x,b.y,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.hits++;b.pen--;if(b.pen<0)b.dead=true;}}else if(e.kind==='tank'&&e.id!==b.ownerId&&e.alive){var rr=b.r+CLASSES[e.cls].size+3;if(d2(b.x,b.y,e.x,e.y)<rr*rr){if(b.shell)this.clusterBurst(b);var ang=Math.atan2(b.vy,b.vx);this.damageTank(e,b.dmg,b.ownerId,Math.cos(ang)*(b.knock||0)*.006,Math.sin(ang)*(b.knock||0)*.006);if(b.splash)this.splashAt(b.x,b.y,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.hits++;b.pen--;if(b.pen<0)b.dead=true;}}else if(e.kind==='drone'&&e.ownerId!==b.ownerId&&e.hp>0){var rr=b.r+e.r+1;if(d2(b.x,b.y,e.x,e.y)<rr*rr){this.damageDrone(e,b.dmg,b.ownerId);b.hits++;b.pen--;if(b.pen<0)b.dead=true;}}if(!b.dead){b.x=ex;b.y=ey;}}
+   if(b.dead)this.bullets.splice(i,1);
+  }
+ };
+
  Game.prototype.hasLineOfSight=function(ax,ay,bx,by,pad){return lineOfSight(this,ax,ay,bx,by,pad||2);};
  Game.prototype.firstTerrainHit=function(ax,ay,bx,by,pad){return firstSolidHit(this,ax,ay,bx,by,pad||0);};
  Game.prototype.isTerrainSafe=function(x,y,pad){return safePoint(this,x,y,pad||40);};
