@@ -5,7 +5,6 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const core = fs.readFileSync(path.join(__dirname, '../../nova-updates/living-front-core-v1.12.0.js'), 'utf8');
-const index = fs.readFileSync(path.join(__dirname, '../../index.html'), 'utf8');
 const current = fs.readFileSync(path.join(__dirname, '../../CURRENT_RELEASE.md'), 'utf8');
 
 function loadCore() {
