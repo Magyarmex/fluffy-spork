@@ -62,8 +62,8 @@ test('AI Controller swarm cannot reacquire a different tank outside Fair Engagem
   g.getTank = id => g.tankById.get(id) || null;
 
   // With dt=1 the legacy command node converges near (190, 59.4).
-  // hidden is closer to that node than fair, but x=210 can be outside a
-  // 400px-wide Fair Engagement viewport while fair x=190 remains visible.
+  // hidden is closer to that node than fair, while x=240 lies beyond a
+  // 400px-wide viewport plus the 33px tank margin; fair x=190 remains visible.
   g.updateDrones(1);
 
   assert.equal(owner.__novaSwarm.targetId, fair.id,
