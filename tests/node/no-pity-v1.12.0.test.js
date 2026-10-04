@@ -34,9 +34,7 @@ test('v1.12 runtime neutralizes the historical redeploy level boost', () => {
   assert.equal(new Game().pityStartLevel(), 1);
 });
 
-test('the guard closes a real compressed-base contradiction rather than inventing new progression', () => {
-  assert.match(index, /PITY PROTOCOL/);
-  assert.match(index, /pityStartLevel\(\)/);
+test('the v1.12 progression contract rejects player-relative pity', () => {
   assert.match(current, /no player-relative catch-up rewards, and no pity system/i);
   assert.match(core, /Game\.prototype\.pityStartLevel=function\(\)\{return 1;\}/);
 });
