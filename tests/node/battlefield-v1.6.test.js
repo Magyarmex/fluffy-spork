@@ -169,3 +169,42 @@ test('Battlefield runtime catches a hypervelocity tank crossing missed by endpoi
   assert.equal(bullet.dead, true);
   assert.ok(bullet.x < 0 && bullet.x > -30, `expected first-contact impact, got x=${bullet.x}`);
 });
+
+
+test('Battlefield CCD resolves projectile motion relative to a moving tank', () => {
+  const { Game } = loadBattlefield();
+  const g = new Game();
+  g.time = 1; g.__novaBattlefield = { coverBroken: 0, coverTotal: 0, name: 'TEST' }; g.__novaTerrain = [];
+  const target = { kind: 'tank', id: 2, alive: true, cls: 'scout', x: 0, y: -20 };
+  g.hash.query = function (x, y, r, out) { out.length = 0; out.push(target); };
+  g.moveTank(target, 0, 40, 1);
+  const bullet = { x: -100, y: 0, vx: 200, vy: 0, r: 4, dmg: 20, maxHp: 20, ownerId: 1, pen: 0, hits: 0, dead: false };
+  g.bullets = [bullet]; let damaged = null; g.damageTank = e => { damaged = e; };
+  g.updateBullets(1);
+  assert.equal(damaged, target);
+  assert.equal(bullet.dead, true);
+  assert.ok(bullet.x < 0 && bullet.x > -30, `expected moving-target first contact, got x=${bullet.x}`);
+});
+
+test('Battlefield CCD ignores stale tank motion history', () => {
+  const { Game } = loadBattlefield();
+  const g = new Game();
+  g.time = 1; g.__novaBattlefield = { coverBroken: 0, coverTotal: 0, name: 'TEST' }; g.__novaTerrain = [];
+  const target = { kind: 'tank', id: 2, alive: true, cls: 'scout', x: 0, y: -20 };
+  g.moveTank(target, 0, 40, 1); g.time = 2;
+  g.hash.query = function (x, y, r, out) { out.length = 0; out.push(target); };
+  const bullet = { x: -100, y: -20, vx: 200, vy: 0, r: 4, dmg: 20, maxHp: 20, ownerId: 1, pen: 0, hits: 0, dead: false };
+  g.bullets = [bullet]; let damaged = null; g.damageTank = e => { damaged = e; };
+  g.updateBullets(1);
+  assert.equal(damaged, null);
+});
+
+test('Battlefield CCD preserves the first tank position across same-tick movement corrections', () => {
+  const { Game } = loadBattlefield();
+  const g = new Game();
+  g.time = 1; g.__novaTerrain = [];
+  const target = { kind: 'tank', id: 2, alive: true, cls: 'scout', x: 0, y: -20 };
+  g.moveTank(target, 0, 20, 1); g.moveTank(target, 0, 20, 1);
+  assert.equal(target.__novaSweepPrevY, -20);
+  assert.equal(target.__novaSweepMoveTime, 1);
+});
