@@ -369,5 +369,7 @@
     renderMod.render=patchedRender;
   });
 
+  window.__NOVA_SNIPER_LINEAGE_TEST__={authorizedLongRange:authorizedLongRange,suppressedBySkill:suppressedBySkill};
+
   console.info('[NOVA TANKS] v'+VERSION+' '+CODENAME+' all-purple sniper doctrine online');
 })();
