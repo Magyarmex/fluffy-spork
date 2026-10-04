@@ -46,7 +46,7 @@ function tank(id, x, y, extra = {}) {
 test('AI Controller swarm cannot reacquire a different tank outside Fair Engagement', () => {
   const Game = boot(), g = new Game();
   const fair = tank(2, 190, 0);
-  const hidden = tank(3, 210, 10);
+  const hidden = tank(3, 240, 35);
   const owner = tank(1, 0, 0, {
     cls: 'carrier', angle: 0,
     ai: { state: 'hunt', targetId: fair.id, __v1112TargetId: fair.id, isElite: false, strafe: 1 }
