@@ -418,13 +418,22 @@
     function controllerTarget(g, owner, state, profile) {
       if (!state.active) return null;
       var def = CLASSES[owner.cls], leash = ((def && def.droneLeash) || 650) * (owner.swarmT > 0 ? 1.25 : 1);
-      var marked = state.markId >= 0 && state.markUntil > g.time ? g.getTank(state.markId) : null;
+      var fairTankOnly = !owner.isPlayer && owner.ai && Number.isFinite(owner.ai.__v1112TargetId);
+      if (fairTankOnly && owner.ai.__v1112TargetId >= 0) {
+        var fair = g.getTank ? g.getTank(owner.ai.__v1112TargetId) : null;
+        if (fair && fair.alive && fair.spawnShieldT <= 0 &&
+            dist2(owner.x, owner.y, fair.x, fair.y) <= leash * leash) {
+          var fr = profile.engage * (owner.swarmT > 0 ? 1.15 : 1);
+          if (dist2(state.nodeX, state.nodeY, fair.x, fair.y) <= fr * fr) return fair;
+        }
+      }
+      var marked = !fairTankOnly && state.markId >= 0 && state.markUntil > g.time ? g.getTank(state.markId) : null;
       if (marked && marked.alive && dist2(owner.x, owner.y, marked.x, marked.y) <= leash * leash) {
         var mr = profile.engage * 1.85;
         if (dist2(state.nodeX, state.nodeY, marked.x, marked.y) <= mr * mr) return marked;
       }
       var best = null, bestScore = Infinity, r = profile.engage * (owner.swarmT > 0 ? 1.15 : 1), r2 = r * r;
-      for (var i = 0; i < g.tanks.length; i++) {
+      for (var i = 0; !fairTankOnly && i < g.tanks.length; i++) {
         var t = g.tanks[i];
         if (!t || !t.alive || t.id === owner.id || t.spawnShieldT > 0) continue;
         var nd = dist2(state.nodeX, state.nodeY, t.x, t.y);
