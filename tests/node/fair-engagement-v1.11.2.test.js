@@ -6,6 +6,7 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '../../nova-updates/fair-engagement-v1.11.2.js'), 'utf8');
 const deploy = fs.readFileSync(path.join(__dirname, '../../.github/workflows/deploy.yml'), 'utf8');
+const doctrine = fs.readFileSync(path.join(__dirname, '../../AI_DOCTRINE.md'), 'utf8');
 
 function classes() {
   const lineages = {
@@ -159,4 +160,13 @@ test('held Controller aim inside the old dead zone is repaired, but actual relea
 test('production materializer wires Fair Engagement after all earlier gameplay layers', () => {
   assert.match(deploy, /'\.\/nova-updates\/lobby-battlefield-v1\.10\.10\.js',\n\s*'\.\/nova-updates\/fair-engagement-v1\.11\.2\.js'/);
   assert.match(deploy, /grep -q 'nova-updates\/fair-engagement-v1\.11\.2\.js' index\.html\.new/);
+});
+
+
+test('AI doctrine cannot regress to global minimap radar or player-priority targeting', () => {
+  assert.match(doctrine, /Fair Engagement perception is authoritative/);
+  assert.match(doctrine, /minimap is not global AI radar/);
+  assert.match(doctrine, /Player identity contributes no target-score bonus/);
+  assert.doesNotMatch(doctrine, /every living tank’s current world position is legal AI knowledge/);
+  assert.doesNotMatch(doctrine, /The player remains an attractive target/);
 });

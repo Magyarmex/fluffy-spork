@@ -79,6 +79,7 @@ var LF=window.__NOVA_LIVING_FRONT_INTERNAL__={VERSION:VERSION,TAU:TAU,GRID:GRID,
 
 wrap('game/engine',function(engine,require){
   var Game=engine.Game;if(!Game||Game.prototype.__novaLivingFrontCore)return;Game.prototype.__novaLivingFrontCore=true;var defs=(require('./types')||{}).SHAPE_DEFS||{};LF.defs=defs;
+  Game.prototype.pityStartLevel=function(){return 1;};
   var oldSpawn=Game.prototype.spawnShape;if(oldSpawn)Game.prototype.spawnShape=function(type,anywhere){
     var st=ensure(this,defs),n=this.shapes?this.shapes.length:0,out=oldSpawn.apply(this,arguments);if(this.shapes&&this.shapes.length>n)for(var i=n;i<this.shapes.length;i++){var s=this.shapes[i];initShape(this,s);var high=!!HIGH[s.type],early=ageProgress(st)<.34;if((!anywhere||high&&early)&&s.type!=='star')relocate(this,s,chooseSpawnSector(st,s.type,s.id),s.type==='crasher'?290:230);}return out;
   };

@@ -8,9 +8,9 @@ The target experience is **scary competence with readable counterplay**: the pla
 
 ## Non-negotiable fair-play contract
 
-1. **Player-information parity is authoritative.** If the normal player presentation exposes a fact, AI may use that fact. Today the minimap plots every living tank globally, so living tank position is public battlefield information even through cover and beyond the local camera.
+1. **Fair Engagement perception is authoritative.** Rival hull target selection is limited to the live gameplay viewport in world space, adapting to current canvas size, orientation, and zoom. Sniper Forward Observer relay is the one deliberate remote-sight exception. The minimap is not global AI radar.
 2. **Knowledge is not execution permission.** Knowing a tank’s live position does not let AI shoot, move, dash, explode, or apply an ability through terrain when the corresponding player mechanic cannot. Physical line-of-fire, collision, projectile, range, fuse, guard, drone, Observer, and cooldown rules stay authoritative.
-3. **Cover blocks weapons, not awareness.** Terrain occlusion must not delete a tank from AI target selection, freeze its coordinates, or start a fake memory-expiry timer while that tank remains publicly tracked by the player UI.
+3. **Cover blocks weapons; the viewport bounds awareness.** Terrain does not make an on-screen tank invisible by itself, but an off-viewport tank is not a legal live hull target unless a class mechanic explicitly provides remote sight. Physical line-of-fire remains a separate gate.
 4. **Future stealth must be symmetric.** If a future mechanic genuinely removes an entity from the player’s view/map or intentionally obscures its state, the shared-awareness predicate must hide the same information from AI. Do not special-case AI around that system.
 5. **No AI-only combat stats.** Intelligence updates do not add damage, HP, movement speed, reload, projectile speed, penetration, cooldown, or evolution advantages. Explicit elite rules remain a separate balance system and must not be smuggled into AI code.
 6. **Reaction time is real.** Public information can be sampled continuously, but tactical decisions are made at bounded intervals and cached between plans. Global awareness must not become frame-perfect target switching or impossible projectile reactions.
@@ -24,15 +24,15 @@ The target experience is **scary competence with readable counterplay**: the pla
 
 Perception answers “what information does the player already have?” before any tactical layer runs.
 
-For tanks, the current canonical answer is simple: the player minimap renders every living tank, so every living tank’s current world position is legal AI knowledge. This applies through permanent walls, destructible cover, and distances larger than a tank’s weapon range.
+For tanks, the current canonical answer is the Fair Engagement viewport contract: a rival may select a tank whose live position falls inside its gameplay-view rectangle. That rectangle follows the same live width, height, orientation, and zoom used by play. Sniper Forward Observer relay may extend sight to its valid relayed contact; ordinary rivals do not receive global tank coordinates from the minimap.
 
 That does **not** mean every tank should chase every other tank. Awareness and attention are separate:
 
-- all public tanks may be considered;
+- only currently perceived legal targets may enter live target scoring;
 - distance, vulnerability, danger, current commitment, role suitability, and target saturation decide relevance;
-- public knowledge may be refreshed while a plan remains reaction-limited;
-- target motion can support pre-aim, interception, flanking, and route planning;
-- no “last seen” expiry should be used for information that never became hidden to the player.
+- perceived knowledge may be refreshed while a plan remains reaction-limited;
+- target motion can support pre-aim, interception, flanking, and route planning while perception remains legal;
+- class-specific remote sensing must be explicit, bounded, and symmetric with the player-facing mechanic.
 
 Other information remains system-specific. A rival may reason about projectiles it can legitimately observe, public powerups, visible structural state, and class behavior exposed by gameplay. It may not read player input, private UI intent, or state deliberately hidden from the player.
 
@@ -65,7 +65,7 @@ Known targets are scored instead of selected solely by distance. Useful inputs i
 - role suitability;
 - whether cover suggests a flank, hold, breach, or disengage instead of a direct approach.
 
-The player remains an attractive target, but excessive dogpiling is penalized. Difficulty should emerge from different rivals creating crossfire, pressure, denial, interception, and flanks rather than every bot receiving the same “kill player” order.
+Player identity contributes no target-score bonus. Soft target saturation discourages unnecessary dogpiling without forbidding gangs when one opponent is genuinely the strongest tactical target. Difficulty should emerge from crossfire, pressure, denial, interception, and flanks rather than a hidden “kill player” preference.
 
 ### 4. Role doctrine
 
@@ -73,7 +73,7 @@ Every lineage should solve combat differently.
 
 - **Sniper:** preserve useful firing geometry, pre-aim likely exits, kite bad spacing, relocate around blocked lanes, respect Observer/remote-fire rules, and punish predictable movement.
 - **Cannon:** own medium-long lanes, exploit programmed space, pressure cover, predict exits, and intentionally breach destructible terrain when the public target position makes that structural decision useful.
-- **Controller:** fight through swarm geometry, keep the hull at a useful command distance, track threats with the same public map information as the player, and make drones physically reach their pressure angles.
+- **Controller:** fight through swarm geometry, keep the hull at a useful command distance, inherit the same Fair Engagement target identity as the hull, and make drones physically reach their pressure angles. The swarm must not reacquire an off-viewport tank from the full world list.
 - **Gunner:** maintain pressure range, control heat/cadence, cut off repeated strafes, pre-position for exits, and exploit short openings rather than holding fire blindly.
 - **Guardian:** accept closer ranges, face danger correctly, force movement, use defensive timing under credible pressure, and convert openings into committed body/Stampede pressure.
 
@@ -86,7 +86,7 @@ Prediction should be strong but bounded.
 - Solve linear projectile interception from the latest public target sample.
 - A small acceleration term may be estimated from consecutive public observations.
 - Prediction horizon is limited by projectile lifetime / practical weapon range.
-- AI may maintain aim on a covered target or expected exit, because a player can do the same from the overhead view.
+- AI may maintain aim on a covered target or expected exit only while that target remains legal under the current perception/memory contract; cover does not authorize off-viewport live tracking.
 - Firing remains separately authorized by physical line-of-fire and class mechanics.
 - Aim error is persistent across a planning interval so the tank appears to track rather than vibrate.
 - High-skill rivals reduce error but never reach mathematical zero.
@@ -106,11 +106,11 @@ This makes advanced players able to bait dodges, create crossfire, or fire where
 
 ### 7. Cover, route planning, and flanking
 
-Cover is tactical terrain, not an invisibility switch.
+Cover is tactical terrain, not an invisibility switch; Fair Engagement still bounds live target knowledge by gameplay-view perception.
 
 - Wounded ranged units may search reachable positions that physically occlude incoming fire.
-- A covered target remains live knowledge; AI may route around the wall, take another lane, pre-aim an exit, hold a choke, or decide to disengage.
-- Route goals may use the target’s current public position instead of a frozen historical coordinate.
+- A covered target that remains legally perceived may still be routed around, pre-aimed, flanked, held at a choke, or disengaged from.
+- Route goals may use current coordinates only while the target remains legally perceived; otherwise they must use whatever bounded last-seen/search state the active AI contract permits.
 - Repeated peeking or circular movement can influence flank side.
 - Edge-hugging targets should be pressured from an inward angle instead of chased single-file against the boundary.
 - Cannons may attack destructible cover when structural pressure is tactically useful.
