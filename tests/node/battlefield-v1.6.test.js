@@ -169,3 +169,42 @@ test('Battlefield runtime catches a hypervelocity tank crossing missed by endpoi
   assert.equal(bullet.dead, true);
   assert.ok(bullet.x < 0 && bullet.x > -30, `expected first-contact impact, got x=${bullet.x}`);
 });
+
+
+test('Battlefield CCD catches a moving tank omitted by final-position broad phase', () => {
+  const { Game } = loadBattlefield();
+  const g = new Game();
+  g.time = 1; g.__novaBattlefield = { coverBroken: 0, coverTotal: 0, name: 'TEST' }; g.__novaTerrain = [];
+  const target = { kind: 'tank', id: 2, alive: true, cls: 'scout', x: 0, y: -300 };
+  g.tanks = [target]; g.tmp = [];
+  g.hash.query = function (x, y, r, out) { out.length = 0; };
+  g.moveTank(target, 0, 600, 1);
+  const bullet = { x: -100, y: 0, vx: 200, vy: 0, r: 4, dmg: 20, maxHp: 20, ownerId: 1, pen: 0, hits: 0, dead: false };
+  g.bullets = [bullet]; let damaged = null; g.damageTank = e => { damaged = e; };
+  g.updateBullets(1);
+  assert.equal(damaged, target);
+  assert.equal(bullet.dead, true);
+});
+
+test('Battlefield CCD ignores stale tank motion from a previous tick', () => {
+  const { Game } = loadBattlefield();
+  const g = new Game();
+  g.time = 1; g.__novaBattlefield = { coverBroken: 0, coverTotal: 0, name: 'TEST' }; g.__novaTerrain = [];
+  const target = { kind: 'tank', id: 2, alive: true, cls: 'scout', x: 0, y: -300 };
+  g.tanks = [target]; g.tmp = []; g.moveTank(target, 0, 600, 1); g.time = 2;
+  g.hash.query = function (x, y, r, out) { out.length = 0; };
+  const bullet = { x: -100, y: 0, vx: 200, vy: 0, r: 4, dmg: 20, maxHp: 20, ownerId: 1, pen: 0, hits: 0, dead: false };
+  g.bullets = [bullet]; let damaged = null; g.damageTank = e => { damaged = e; };
+  g.updateBullets(1);
+  assert.equal(damaged, null);
+});
+
+test('Battlefield CCD preserves first movement origin across same-tick corrections', () => {
+  const { Game } = loadBattlefield();
+  const g = new Game();
+  g.time = 1; g.__novaTerrain = [];
+  const target = { kind: 'tank', id: 2, alive: true, cls: 'scout', x: 0, y: -300 };
+  g.tanks = [target]; g.moveTank(target, 0, 300, 1); g.moveTank(target, 0, 300, 1);
+  assert.equal(target.__novaSweepPrevY, -300);
+  assert.equal(target.__novaSweepMoveTime, 1);
+});
