@@ -424,6 +424,7 @@
         if (fair && fair.alive && fair.spawnShieldT <= 0 &&
             dist2(owner.x, owner.y, fair.x, fair.y) <= leash * leash) {
           var fr = profile.engage * (owner.swarmT > 0 ? 1.15 : 1);
+          if (fair.id === state.markId && state.markUntil > g.time) fr *= 1.85;
           if (dist2(state.nodeX, state.nodeY, fair.x, fair.y) <= fr * fr) return fair;
         }
       }
