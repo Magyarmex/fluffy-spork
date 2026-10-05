@@ -12,9 +12,7 @@ test('Apex rails expose class-specific focus durations', () => {
   const context = { window: { __novaModules: {} }, console, Math, navigator: {}, performance: { now: () => 0 } };
   vm.runInNewContext(source('sniper-v1.2.0.js'), context, { filename: 'sniper-v1.2.0.js' });
   const focusMs = context.window.__NOVA_RAIL_FOCUS_MS;
-  const charge = context.window.__NOVA_RAIL_CHARGE;
   assert.equal(typeof focusMs, 'function');
-  assert.equal(typeof charge, 'function');
   assert.equal(focusMs({ cls: 'prism' }), 400);
   assert.equal(focusMs({ cls: 'railgun' }), 520);
   assert.equal(focusMs({ cls: 'singularity' }), 650);
@@ -22,11 +20,6 @@ test('Apex rails expose class-specific focus durations', () => {
   assert.equal(200 / focusMs({ cls: 'prism' }), 0.5);
   assert.equal(260 / focusMs({ cls: 'railgun' }), 0.5);
   assert.equal(325 / focusMs({ cls: 'singularity' }), 0.5);
-  assert.equal(charge({ cls: 'prism' }, 200), 0.5);
-  assert.equal(charge({ cls: 'railgun' }, 260), 0.5);
-  assert.equal(charge({ cls: 'singularity' }, 325), 0.5);
-  assert.equal(charge({ cls: 'prism' }, 10, 0.05, 0.96), 0.05);
-  assert.equal(charge({ cls: 'singularity' }, 650, 0.05, 0.96), 0.96);
 });
 
 test('Forward Observer reconstructs normalized focus through the shared class clock', () => {

@@ -21,7 +21,6 @@
     return clamp(elapsed / railFocusMs(t), lo == null ? 0 : lo, hi == null ? 1 : hi);
   }
   window.__NOVA_RAIL_FOCUS_MS = railFocusMs;
-  window.__NOVA_RAIL_CHARGE = railCharge;
   var SUPPRESS_RADIUS = 34;
   var TAU = Math.PI * 2;
 
