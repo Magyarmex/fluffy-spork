@@ -31,6 +31,8 @@ test('Apex rails expose class-specific focus durations', () => {
 
 test('Forward Observer reconstructs normalized focus through the shared class clock', () => {
   const src = source('stability-v1.4.0.js');
+  assert.match(src, /var AI_RAIL_CHARGE = 0\.82;/);
+  assert.match(src, /var ELITE_RAIL_CHARGE = 0\.70;/);
   assert.match(src, /__novaFocusStart=now-q\*railFocusMs\(t\)/);
   assert.match(src, /__novaFocusStart=performance\.now\(\)-railFocusMs\(t\);t\.__novaFocus=1/);
   assert.match(src, /t\.__novaFocusStart=performance\.now\(\)-railFocusMs\(t\)/);
