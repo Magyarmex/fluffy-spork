@@ -140,6 +140,7 @@ test('a stat cannot exceed the eight pips shown by the player HUD', () => {
   const { Game } = load('game/engine');
   const game = new Game();
   assert.equal(window.__NOVA_APPLIED_POWER_PARITY_TEST__.statCap, 8);
+  game.player.level = 45;
   game.player.stats.damage = 8;
   const points = game.statPoints;
   game.upgradeStat('damage');
