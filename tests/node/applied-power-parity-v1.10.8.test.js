@@ -133,3 +133,21 @@ test('production materializer loads Applied Power Parity after every existing co
   assert.match(deploy, /'\.\/nova-updates\/second-body-live-vector-v1\.10\.7\.js',\n\s*'\.\/nova-updates\/applied-power-parity-v1\.10\.8\.js'/);
   assert.match(deploy, /grep -q 'nova-updates\/applied-power-parity-v1\.10\.8\.js' index\.html\.new/);
 });
+
+
+test('a stat cannot exceed the eight pips shown by the player HUD', () => {
+  const { load } = boot();
+  const { Game } = load('game/engine');
+  const game = new Game();
+  game.player.stats.damage = 8;
+  const points = game.statPoints;
+  game.upgradeStat('damage');
+  assert.equal(game.player.stats.damage, 8);
+  assert.equal(game.statPoints, points, 'maxed stat must not consume a point');
+  assert.equal(game.syncCount, 0, 'rejected upgrade must not advance rival power');
+  game.player.stats.damage = 7;
+  game.upgradeStat('damage');
+  assert.equal(game.player.stats.damage, 8);
+  assert.equal(game.statPoints, points - 1);
+  assert.equal(game.syncCount, 1);
+});

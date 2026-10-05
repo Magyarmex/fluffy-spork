@@ -111,6 +111,8 @@ wrap('game/engine',function(engine,require){
   var oldUpgradeStat=Game.prototype.upgradeStat;
   if(typeof oldUpgradeStat==='function'){
     Game.prototype.upgradeStat=function(key){
+      var stats=this.player&&this.player.stats;
+      if(stats&&Number(stats[key])>=8){if(typeof this.addText==='function')this.addText(this.player.x,this.player.y-24,String(key).toUpperCase()+' MAX','#9fb6c8',11);return;}
       var before=this.appliedPowerLevel(),pointsBefore=this.statPoints;
       var result=oldUpgradeStat.apply(this,arguments);
       var after=this.appliedPowerLevel();
