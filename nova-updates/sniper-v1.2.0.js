@@ -17,7 +17,11 @@
   function railFocusMs(t) {
     return t && t.cls === 'prism' ? 400 : t && t.cls === 'singularity' ? 650 : FULL_CHARGE_MS;
   }
+  function railCharge(t, elapsed, lo, hi) {
+    return clamp(elapsed / railFocusMs(t), lo == null ? 0 : lo, hi == null ? 1 : hi);
+  }
   window.__NOVA_RAIL_FOCUS_MS = railFocusMs;
+  window.__NOVA_RAIL_CHARGE = railCharge;
   var SUPPRESS_RADIUS = 34;
   var TAU = Math.PI * 2;
 
@@ -266,7 +270,7 @@
         t.__novaFocusStart = now; t.__novaFocusLast = now; t.__novaFocusAngle = t.angle;
         t.__novaFocus = 0.001; t.__novaChargeCue = false; return;
       }
-      var elapsed = now - t.__novaFocusStart, q = clamp(elapsed / railFocusMs(t), 0, 1);
+      var elapsed = now - t.__novaFocusStart, q = railCharge(t, elapsed, 0, 1);
       var dt = clamp((now - (t.__novaFocusLast || now)) / 1000, 0, 0.05);
       t.__novaFocusLast = now; t.__novaFocus = q;
       if (q >= 0.38) {
@@ -325,7 +329,7 @@
       var pl = this.player;
       var heldAfter = !!(this.input && (this.input.firing || this.input.autofire));
       if (pl && pl.alive && focusBefore && focusBefore.rail && wasHeld && !heldAfter && pl.fireCd <= 0 && pl.__novaFocusStart) {
-        var q = clamp((performance.now() - pl.__novaFocusStart) / railFocusMs(pl), 0.05, 0.96);
+        var q = railCharge(pl, performance.now() - pl.__novaFocusStart, 0.05, 0.96);
         resetFocus(pl); fireRail(this, pl, false, q);
       }
       this.__novaPlayerHeldFire = heldAfter;
