@@ -54,6 +54,11 @@
     };
   }
 
+  function railFocusMs(t) {
+    var f = window.__NOVA_RAIL_FOCUS_MS;
+    return typeof f === 'function' ? f(t) : 520;
+  }
+
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
   function dist2(ax, ay, bx, by) { var dx = bx - ax, dy = by - ay; return dx * dx + dy * dy; }
   function angleDelta(target, current) {
@@ -264,7 +269,7 @@
       q=clamp(q+dt/fullTime,0,1);
       t.__novaAICharge=q;
       t.__novaFocus=q;
-      t.__novaFocusStart=now-q*520;
+      t.__novaFocusStart=now-q*railFocusMs(t);
       t.__novaFocusLast=now;
       t.__novaRailTargetId=target.id;
 
@@ -334,7 +339,7 @@
           // Rail farm uses a normal fire attempt only after a deliberate short aim dwell.
           ai.__novaFarmAim=(ai.__novaFarmAim||0)+dt;
           if(ai.__novaFarmAim>0.42&&sd<g.weaponRange(t)&&Math.abs(angleDelta(want,t.angle))<0.15){
-            t.__novaAIRailReady=true;t.__novaChargeCue=true;t.__novaFocusStart=performance.now()-520;t.__novaFocus=1;
+            t.__novaAIRailReady=true;t.__novaChargeCue=true;t.__novaFocusStart=performance.now()-railFocusMs(t);t.__novaFocus=1;
             g.tryFire(t);ai.__novaFarmAim=0;
           }
           t.__novaSpotterContactId=oldAuth;
@@ -400,7 +405,7 @@
       if(!t||t.isPlayer||!isRail(t,CLASSES))return prevTryFire.call(this,t);
       if(!t.__novaAIRailReady)return;
       var before=this.bullets?this.bullets.length:0;
-      t.__novaFocusStart=performance.now()-530;
+      t.__novaFocusStart=performance.now()-railFocusMs(t);
       t.__novaFocus=1;
       t.__novaChargeCue=true;
       var out=prevTryFire.call(this,t);

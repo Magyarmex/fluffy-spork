@@ -14,6 +14,10 @@
   var VERSION = '1.2.0';
   var CODENAME = 'Silent Horizon';
   var FULL_CHARGE_MS = 520;
+  function railFocusMs(t) {
+    return t && t.cls === 'prism' ? 400 : t && t.cls === 'singularity' ? 650 : FULL_CHARGE_MS;
+  }
+  window.__NOVA_RAIL_FOCUS_MS = railFocusMs;
   var SUPPRESS_RADIUS = 34;
   var TAU = Math.PI * 2;
 
@@ -262,7 +266,7 @@
         t.__novaFocusStart = now; t.__novaFocusLast = now; t.__novaFocusAngle = t.angle;
         t.__novaFocus = 0.001; t.__novaChargeCue = false; return;
       }
-      var elapsed = now - t.__novaFocusStart, q = clamp(elapsed / FULL_CHARGE_MS, 0, 1);
+      var elapsed = now - t.__novaFocusStart, q = clamp(elapsed / railFocusMs(t), 0, 1);
       var dt = clamp((now - (t.__novaFocusLast || now)) / 1000, 0, 0.05);
       t.__novaFocusLast = now; t.__novaFocus = q;
       if (q >= 0.38) {
@@ -321,7 +325,7 @@
       var pl = this.player;
       var heldAfter = !!(this.input && (this.input.firing || this.input.autofire));
       if (pl && pl.alive && focusBefore && focusBefore.rail && wasHeld && !heldAfter && pl.fireCd <= 0 && pl.__novaFocusStart) {
-        var q = clamp((performance.now() - pl.__novaFocusStart) / FULL_CHARGE_MS, 0.05, 0.96);
+        var q = clamp((performance.now() - pl.__novaFocusStart) / railFocusMs(pl), 0.05, 0.96);
         resetFocus(pl); fireRail(this, pl, false, q);
       }
       this.__novaPlayerHeldFire = heldAfter;
