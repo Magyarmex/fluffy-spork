@@ -10,7 +10,7 @@ var mods=window.__novaModules;
 if(!mods){console.error('[NOVA v1.10.8] module registry unavailable');return;}
 
 var VERSION='1.10.8',CODENAME='Applied Power Parity';
-var STAT_KEYS=['damage','reload','bulletspeed','penetration','maxhp','regen','speed','body'];
+var STAT_KEYS=['damage','reload','bulletspeed','penetration','maxhp','regen','speed','body'],STAT_CAP=8;
 
 function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
 function spentStatPoints(player){
@@ -46,7 +46,8 @@ window.__NOVA_APPLIED_POWER_PARITY__={
 window.__NOVA_APPLIED_POWER_PARITY_TEST__={
   statKeys:STAT_KEYS.slice(),
   spentStatPoints:spentStatPoints,
-  appliedPowerLevel:appliedPowerLevel
+  appliedPowerLevel:appliedPowerLevel,
+  statCap:STAT_CAP
 };
 
 /* Predator/legacy AI compares player.level against rival level for threat posture.
@@ -111,6 +112,8 @@ wrap('game/engine',function(engine,require){
   var oldUpgradeStat=Game.prototype.upgradeStat;
   if(typeof oldUpgradeStat==='function'){
     Game.prototype.upgradeStat=function(key){
+      var stats=this.player&&this.player.stats;
+      if(stats&&Number(stats[key])>=STAT_CAP){if(typeof this.addText==='function')this.addText(this.player.x,this.player.y-24,String(key).toUpperCase()+' MAX','#9fb6c8',11);return;}
       var before=this.appliedPowerLevel(),pointsBefore=this.statPoints;
       var result=oldUpgradeStat.apply(this,arguments);
       var after=this.appliedPowerLevel();
