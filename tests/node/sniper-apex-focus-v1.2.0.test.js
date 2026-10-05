@@ -115,3 +115,20 @@ test('Silent Horizon fires each Apex rail at its own full commitment',()=>{
     assert.ok(g.bullets.every(b=>b.__novaFullRail===true),cls);
   }
 });
+
+
+test('Released quick-shots preserve equal normalized charge across Apex rails',()=>{
+  for(const [cls,half,count] of [['prism',200,2],['railgun',260,1],['singularity',325,1]]){
+    const {Game,setNow}=loadSilentHorizonRuntime(),g=new Game();
+    const t={id:1,cls,isPlayer:true,alive:true,fireCd:0,angle:0,hitFlash:0};
+    g.player=t;g.tanks=[t];
+    setNow(100);g.tryFire(t);
+    g.__novaPlayerHeldFire=true;
+    g.input.firing=false;g.input.autofire=false;
+    setNow(100+half);g.update(.016);
+    assert.equal(g.bullets.length,count,cls);
+    assert.ok(g.bullets.every(b=>b.__novaFullRail===false),cls);
+    assert.ok(g.bullets.every(b=>Math.abs(b.__novaCharge-.5)<1e-9),cls);
+    assert.ok(g.bullets.every(b=>Math.abs(b.dmg-6)<1e-9),cls);
+  }
+});
