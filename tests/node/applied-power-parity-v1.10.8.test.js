@@ -136,7 +136,7 @@ test('production materializer loads Applied Power Parity after every existing co
 
 
 test('a stat cannot exceed the eight pips shown by the player HUD', () => {
-  const { load } = boot();
+  const { load, window } = boot();
   const { Game } = load('game/engine');
   const game = new Game();
   assert.equal(window.__NOVA_APPLIED_POWER_PARITY_TEST__.statCap, 8);
