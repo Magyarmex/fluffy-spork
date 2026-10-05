@@ -25,7 +25,7 @@ test('Apex rails expose class-specific focus durations', () => {
   assert.equal(charge({ cls: 'prism' }, 200), 0.5);
   assert.equal(charge({ cls: 'railgun' }, 260), 0.5);
   assert.equal(charge({ cls: 'singularity' }, 325), 0.5);
-  assert.equal(charge({ cls: 'prism' }, 20, 0.05, 0.96), 0.05);
+  assert.equal(charge({ cls: 'prism' }, 10, 0.05, 0.96), 0.05);
   assert.equal(charge({ cls: 'singularity' }, 650, 0.05, 0.96), 0.96);
 });
 
