@@ -185,6 +185,16 @@ wrap('game/engine',function(engine,require){
     var out=callWithoutFirstHit(this,oldDrones,dt);steerCachedDrones(this,dt);return out;
   };
 
+  /* redeploy() resets the Game clock to zero while reusing this Game instance.
+   * Keep the drone planner deadline in the same clock domain so a long previous
+   * run cannot suppress proactive route planning for the start of the next run. */
+  var oldRedeploy=Game.prototype.redeploy;
+  if(oldRedeploy)Game.prototype.redeploy=function(){
+    var out=oldRedeploy.apply(this,arguments);
+    this.__novaPerfDronePlanAt=null;
+    return out;
+  };
+
   var oldUpdate=Game.prototype.update;
   if(oldUpdate)Game.prototype.update=function(dt){var st=performance.now(),out=oldUpdate.call(this,dt);record(this,'updateMs',performance.now()-st);return out;};
 
