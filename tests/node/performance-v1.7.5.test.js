@@ -20,6 +20,7 @@ function loadPerformance(){
     for(const d of this.drones)this.firstTerrainHit(d.x,d.y,d.x+20*dt,d.y,5);
   };
   Game.prototype.update=function(){};
+  Game.prototype.redeploy=function(){this.time=0;};
   const modules={
     'game/engine':function(module){module.exports={Game};},
     'game/render':function(module){module.exports={render(){}};}
@@ -110,4 +111,14 @@ test('cached AI waypoint steering remains live on skipped planning frames',()=>{
   assert.ok(t.y>0,`expected cached waypoint to bend movement, y=${t.y}`);
   assert.equal(g.novaPerfSnapshot().terrainQueries,0);
   assert.equal(t.ai.__v172Routing,true);
+});
+
+
+test('redeploy resets drone planner deadline',()=>{
+  const {Game}=loadPerformance(),g=new Game();
+  g.__novaTerrain=[rect(1,500,0,40,100)];g.drones=[{id:1,x:0,y:0,hp:10}];g.time=180;g.updateDrones(1/60);
+  const before=g.novaPerfSnapshot().droneRouteFramesPlanned;g.redeploy();
+  assert.equal(g.__novaPerfDronePlanAt,null);g.updateDrones(1/60);
+  assert.equal(g.novaPerfSnapshot().droneRouteFramesPlanned,before+1);
+  assert.ok(g.__novaPerfDronePlanAt>0&&g.__novaPerfDronePlanAt<0.1);
 });
