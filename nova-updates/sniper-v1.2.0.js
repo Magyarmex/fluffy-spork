@@ -222,6 +222,21 @@
       t.__novaFocusStart = 0; t.__novaFocus = 0; t.__novaFocusAngle = null;
       t.__novaFocusLast = 0; t.__novaChargeCue = false;
     }
+
+    // Simulation is paused, but wall-clock rail focus must not continue.
+    // Enemy focus is simulation-dt driven; preserve its commitment.
+    var oldSetPaused = Game.prototype.setPaused;
+    if (typeof oldSetPaused === 'function') {
+      Game.prototype.setPaused = function (paused) {
+        var enteringPause = !!paused && !this.paused;
+        var result = oldSetPaused.apply(this, arguments);
+        if (enteringPause && this.paused && this.player && isRailTank(this.player)) {
+          resetFocus(this.player);
+          this.__novaPlayerHeldFire = false;
+        }
+        return result;
+      };
+    }
     function annotateNewRails(g, t, before, profile) {
       var q = profile.charge == null ? 1 : profile.charge;
       for (var i = before; i < g.bullets.length; i++) {
