@@ -327,14 +327,23 @@
       if (input && input.aim && input.aim.active) {
         var dx = input.aim.dx || 0, dy = input.aim.dy || 0;
         var m = Math.hypot(dx, dy);
+        // Held input never recalls. Preserve depth as well as bearing.
+        active = true;
         if (m > 4) {
-          active = true;
           ang = Math.atan2(dy, dx);
           power = clamp((m - 4) / 47, 0.04, 1);
           var r = 58 + power * (maxR - 58);
-          x = owner.x + Math.cos(ang) * r;
-          y = owner.y + Math.sin(ang) * r;
+        } else {
+          ang = Number.isFinite(state.angle) ? state.angle : (owner.angle || 0);
+          power = state.wasActive ? clamp(Number(state.power) || 0.04, 0.04, 1) : 0.04;
+          var lx = Number.isFinite(state.nodeX) ? state.nodeX : owner.x;
+          var ly = Number.isFinite(state.nodeY) ? state.nodeY : owner.y;
+          var r = Number.isFinite(state.__novaHeldRange) ? state.__novaHeldRange :
+            (state.wasActive ? Math.hypot(lx - owner.x, ly - owner.y) : 58);
+          if (!(r > 0)) r = 58;
         }
+        x = owner.x + Math.cos(ang) * r;
+        y = owner.y + Math.sin(ang) * r;
       } else if (input && input.mouseActive && input.firing) {
         var rect = g.canvas.getBoundingClientRect();
         var wx = g.cam.x + (input.mouseX - rect.left - g.w * 0.5) / (g.zoom || 1);
@@ -345,11 +354,26 @@
           ang = Math.atan2(mdy, mdx);
           power = clamp(md / maxR, 0.04, 1);
           x = wx; y = wy;
+        } else {
+          // Crossing the hull with held fire must not recall the squad.
+          active = true;
+          ang = Number.isFinite(state.angle) ? state.angle : (owner.angle || 0);
+          var lx = Number.isFinite(state.nodeX) ? state.nodeX : owner.x;
+          var ly = Number.isFinite(state.nodeY) ? state.nodeY : owner.y;
+          var lr = Number.isFinite(state.__novaHeldRange) ? state.__novaHeldRange :
+            (state.wasActive ? Math.hypot(lx - owner.x, ly - owner.y) : 58);
+          if (!(lr > 0)) lr = 58;
+          power = state.wasActive ? clamp(Number(state.power) || 0.04, 0.04, 1) : 0.04;
+          x = owner.x + Math.cos(ang) * lr;
+          y = owner.y + Math.sin(ang) * lr;
         }
       }
       if (active) {
         var p = clampNode(owner, x, y, maxR);
         state.nodeX = p.x; state.nodeY = p.y; state.angle = ang; state.power = power;
+        // Cache the post-clamp radius every valid frame; owner motion during
+        // the first center frame must not shorten a deep command.
+        state.__novaHeldRange = Math.hypot(p.x - owner.x, p.y - owner.y);
         if (!state.wasActive) {
           state.strikeAt = Math.min(state.strikeAt || g.time, g.time + 0.08);
           if (g.time - state.lastCommandCue > 0.2 && g.sfx.novaSwarmCommand) {
@@ -357,6 +381,7 @@
           }
         }
       } else {
+        if (state.__novaHeldRange != null) state.__novaHeldRange = null;
         state.nodeX = owner.x; state.nodeY = owner.y; state.power = 0;
         if (state.wasActive) {
           state.recallUntil = g.time + 0.78;
