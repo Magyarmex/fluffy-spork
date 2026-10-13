@@ -246,6 +246,7 @@
     var Game = engine.Game;
     if (!Game || Game.prototype.__novaSecondBody) return;
     Game.prototype.__novaSecondBody = true;
+    Game.prototype.__novaControllerHeldDeadzoneSafe = true;
 
     var classMod = require('./classes');
     var CLASSES = classMod.CLASSES;
@@ -327,23 +328,26 @@
       if (input && input.aim && input.aim.active) {
         var dx = input.aim.dx || 0, dy = input.aim.dy || 0;
         var m = Math.hypot(dx, dy);
-        // Held input never recalls. Preserve depth as well as bearing.
-        active = true;
+        // A centered stick with no prior command has no bearing. Once a
+        // command exists, crossing center must not recall or jump its depth.
+        active = m > 4 || !!state.wasActive;
         if (m > 4) {
           ang = Math.atan2(dy, dx);
           power = clamp((m - 4) / 47, 0.04, 1);
           var r = 58 + power * (maxR - 58);
-        } else {
+        } else if (active) {
           ang = Number.isFinite(state.angle) ? state.angle : (owner.angle || 0);
-          power = state.wasActive ? clamp(Number(state.power) || 0.04, 0.04, 1) : 0.04;
+          power = clamp(Number(state.power) || 0.04, 0.04, 1);
           var lx = Number.isFinite(state.nodeX) ? state.nodeX : owner.x;
           var ly = Number.isFinite(state.nodeY) ? state.nodeY : owner.y;
           var r = Number.isFinite(state.__novaHeldRange) ? state.__novaHeldRange :
             (state.wasActive ? Math.hypot(lx - owner.x, ly - owner.y) : 58);
           if (!(r > 0)) r = 58;
         }
-        x = owner.x + Math.cos(ang) * r;
-        y = owner.y + Math.sin(ang) * r;
+        if (active) {
+          x = owner.x + Math.cos(ang) * r;
+          y = owner.y + Math.sin(ang) * r;
+        }
       } else if (input && input.mouseActive && input.firing) {
         var rect = g.canvas.getBoundingClientRect();
         var wx = g.cam.x + (input.mouseX - rect.left - g.w * 0.5) / (g.zoom || 1);
@@ -355,8 +359,9 @@
           power = clamp(md / maxR, 0.04, 1);
           x = wx; y = wy;
         } else {
-          // Crossing the hull with held fire must not recall the squad.
-          active = true;
+          // No new command without a bearing; preserve an existing one.
+          active = !!state.wasActive;
+          if (active) {
           ang = Number.isFinite(state.angle) ? state.angle : (owner.angle || 0);
           var lx = Number.isFinite(state.nodeX) ? state.nodeX : owner.x;
           var ly = Number.isFinite(state.nodeY) ? state.nodeY : owner.y;
@@ -366,6 +371,7 @@
           power = state.wasActive ? clamp(Number(state.power) || 0.04, 0.04, 1) : 0.04;
           x = owner.x + Math.cos(ang) * lr;
           y = owner.y + Math.sin(ang) * lr;
+          }
         }
       }
       if (active) {
