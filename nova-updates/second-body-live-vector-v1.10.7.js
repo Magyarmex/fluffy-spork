@@ -247,7 +247,19 @@ wrap('game/engine',function(engine,require){
     var vx=ux*Math.min(speed,m*4.4),vy=uy*Math.min(speed,m*4.4);
     d.__lvVX=(d.__lvVX==null?(d.__novaVX||0):d.__lvVX)+(vx-(d.__lvVX==null?(d.__novaVX||0):d.__lvVX))*k;
     d.__lvVY=(d.__lvVY==null?(d.__novaVY||0):d.__lvVY)+(vy-(d.__lvVY==null?(d.__novaVY||0):d.__lvVY))*k;
-    d.x+=d.__lvVX*dt;d.y+=d.__lvVY*dt;d.__novaVX=d.__lvVX;d.__novaVY=d.__lvVY;
+    // Terrain Intelligence already resolved the base drone step. This extra
+    // repair/peel steering runs AFTER that resolver: do not tunnel through cover.
+    var nx=d.x+d.__lvVX*dt,ny=d.y+d.__lvVY*dt,pad=(d.r||8)+5;
+    var startSafe=!g.isTerrainSafe||g.isTerrainSafe(d.x,d.y,pad);
+    var endSafe=!g.isTerrainSafe||g.isTerrainSafe(nx,ny,pad);
+    var blocked=(startSafe&&(!endSafe||
+      (g.firstTerrainHit&&g.firstTerrainHit(d.x,d.y,nx,ny,Math.max(3,pad*.58)))))||
+      (!startSafe&&!endSafe);
+    if(blocked){
+      d.__lvVX=0;d.__lvVY=0;d.__novaVX=0;d.__novaVY=0;
+      return;
+    }
+    d.x=nx;d.y=ny;d.__novaVX=d.__lvVX;d.__novaVY=d.__lvVY;
     if(Math.abs(d.__lvVX)+Math.abs(d.__lvVY)>3)d.angle=Math.atan2(d.__lvVY,d.__lvVX);
   }
   function repairDrone(g,d,owner,state,dt){
