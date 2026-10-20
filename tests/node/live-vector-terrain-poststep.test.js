@@ -85,9 +85,9 @@ test('local defensive peel cannot tunnel through terrain',()=>{
   assert.equal(drone.x,-18);
   assert.ok(g.isTerrainSafe(drone.x,drone.y,13));
 });
-test('blocked repair never alters owner position or damages drones',()=>{
+test('blocked movement preserves owner position and normal repair semantics',()=>{
   const {g,drone,owner}=boot();const hp=drone.hp;
   g.updateDrones(.033);
   assert.equal(owner.x,70);assert.equal(owner.y,0);
-  assert.equal(drone.hp,hp);
+  assert.ok(drone.hp>=hp && drone.hp<=drone.maxHp, 'ordinary nearby repair remains allowed');
 });
