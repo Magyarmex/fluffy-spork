@@ -91,3 +91,20 @@ test('blocked movement preserves owner position and normal repair semantics',()=
   assert.equal(owner.x,70);assert.equal(owner.y,0);
   assert.ok(drone.hp>=hp && drone.hp<=drone.maxHp, 'ordinary nearby repair remains allowed');
 });
+
+test('five thousand deterministic repair impulses never penetrate a blocked wall',()=>{
+  const {g,drone}=boot();
+  let seed=0x234a1ce,blocked=0;
+  function rnd(){seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;return(seed>>>0)/4294967296;}
+  for(let i=0;i<5000;i++){
+    const x=-13.01-rnd()*70,y=(rnd()-.5)*220;
+    drone.x=x;drone.y=y;drone.hp=10;drone.__lvLastHp=10;
+    drone.__lvRepairing=true;drone.__lvRepairWait=0;
+    drone.__lvVX=(rnd()-.5)*900;drone.__lvVY=(rnd()-.5)*900;
+    drone.__novaVX=drone.__lvVX;drone.__novaVY=drone.__lvVY;
+    g.updateDrones(.008+rnd()*.025);
+    assert.ok(g.isTerrainSafe(drone.x,drone.y,13),'terrain overlap at impulse '+i);
+    if(drone.x===x&&drone.y===y)blocked++;
+  }
+  assert.ok(blocked>0,'stress case must actually exercise blocked movement');
+});
