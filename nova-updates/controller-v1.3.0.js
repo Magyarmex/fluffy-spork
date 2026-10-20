@@ -246,6 +246,7 @@
     var Game = engine.Game;
     if (!Game || Game.prototype.__novaSecondBody) return;
     Game.prototype.__novaSecondBody = true;
+    Game.prototype.__novaControllerHeldDeadzoneSafe = true;
 
     var classMod = require('./classes');
     var CLASSES = classMod.CLASSES;
@@ -327,11 +328,23 @@
       if (input && input.aim && input.aim.active) {
         var dx = input.aim.dx || 0, dy = input.aim.dy || 0;
         var m = Math.hypot(dx, dy);
+        // A centered stick with no prior command has no bearing. Once a
+        // command exists, crossing center must not recall or jump its depth.
+        active = m > 4 || !!state.wasActive;
         if (m > 4) {
-          active = true;
           ang = Math.atan2(dy, dx);
           power = clamp((m - 4) / 47, 0.04, 1);
           var r = 58 + power * (maxR - 58);
+        } else if (active) {
+          ang = Number.isFinite(state.angle) ? state.angle : (owner.angle || 0);
+          power = clamp(Number(state.power) || 0.04, 0.04, 1);
+          var lx = Number.isFinite(state.nodeX) ? state.nodeX : owner.x;
+          var ly = Number.isFinite(state.nodeY) ? state.nodeY : owner.y;
+          var r = Number.isFinite(state.__novaHeldRange) ? state.__novaHeldRange :
+            (state.wasActive ? Math.hypot(lx - owner.x, ly - owner.y) : 58);
+          if (!(r > 0)) r = 58;
+        }
+        if (active) {
           x = owner.x + Math.cos(ang) * r;
           y = owner.y + Math.sin(ang) * r;
         }
@@ -345,11 +358,28 @@
           ang = Math.atan2(mdy, mdx);
           power = clamp(md / maxR, 0.04, 1);
           x = wx; y = wy;
+        } else {
+          // No new command without a bearing; preserve an existing one.
+          active = !!state.wasActive;
+          if (active) {
+          ang = Number.isFinite(state.angle) ? state.angle : (owner.angle || 0);
+          var lx = Number.isFinite(state.nodeX) ? state.nodeX : owner.x;
+          var ly = Number.isFinite(state.nodeY) ? state.nodeY : owner.y;
+          var lr = Number.isFinite(state.__novaHeldRange) ? state.__novaHeldRange :
+            (state.wasActive ? Math.hypot(lx - owner.x, ly - owner.y) : 58);
+          if (!(lr > 0)) lr = 58;
+          power = state.wasActive ? clamp(Number(state.power) || 0.04, 0.04, 1) : 0.04;
+          x = owner.x + Math.cos(ang) * lr;
+          y = owner.y + Math.sin(ang) * lr;
+          }
         }
       }
       if (active) {
         var p = clampNode(owner, x, y, maxR);
         state.nodeX = p.x; state.nodeY = p.y; state.angle = ang; state.power = power;
+        // Cache the post-clamp radius every valid frame; owner motion during
+        // the first center frame must not shorten a deep command.
+        state.__novaHeldRange = Math.hypot(p.x - owner.x, p.y - owner.y);
         if (!state.wasActive) {
           state.strikeAt = Math.min(state.strikeAt || g.time, g.time + 0.08);
           if (g.time - state.lastCommandCue > 0.2 && g.sfx.novaSwarmCommand) {
@@ -357,6 +387,7 @@
           }
         }
       } else {
+        if (state.__novaHeldRange != null) state.__novaHeldRange = null;
         state.nodeX = owner.x; state.nodeY = owner.y; state.power = 0;
         if (state.wasActive) {
           state.recallUntil = g.time + 0.78;
