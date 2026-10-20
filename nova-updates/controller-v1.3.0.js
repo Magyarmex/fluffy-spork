@@ -93,6 +93,41 @@
     };
   }
 
+
+  // Release stale touch ownership after OS interruptions or tab backgrounding.
+  // Keep this in the loaded Second Body module, not retired Command Weave.
+  wrapModule('game/input', function (inputMod) {
+    var Input = inputMod.Input;
+    if (!Input || Input.prototype.__novaBlurStickReset) return;
+    var oldAttach = Input.prototype.attach, oldDetach = Input.prototype.detach;
+    if (typeof oldAttach !== 'function') return;
+    Input.prototype.__novaBlurStickReset = true;
+    Input.prototype.attach = function (canvas) {
+      oldAttach.call(this, canvas);
+      var self = this;
+      function reset() {
+        var held = self.move.active || self.aim.active ||
+          self.stickId.move !== -1 || self.stickId.aim !== -1;
+        self.stickId.move = self.stickId.aim = -1;
+        self.move.active = self.aim.active = false;
+        self.move.dx = self.move.dy = self.aim.dx = self.aim.dy = 0;
+        self.keyboard.up = self.keyboard.down = self.keyboard.left = self.keyboard.right = false;
+        self.firing = false; self.mouseActive = false; self.abilityQueued = false;
+        // The Performance/Zero Churn layer wraps emit and caches UI activity.
+        if (held) { self.emit('move'); self.emit('aim'); }
+      }
+      this.__novaBlurReset = reset;
+      this.__novaVisibilityReset = function () { if (document.hidden) reset(); };
+      window.addEventListener('blur', reset);
+      document.addEventListener('visibilitychange', this.__novaVisibilityReset);
+    };
+    if (typeof oldDetach === 'function') Input.prototype.detach = function () {
+      if (this.__novaBlurReset) window.removeEventListener('blur', this.__novaBlurReset);
+      if (this.__novaVisibilityReset) document.removeEventListener('visibilitychange', this.__novaVisibilityReset);
+      this.__novaBlurReset = this.__novaVisibilityReset = null;
+      return oldDetach.apply(this, arguments);
+    };
+  });
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
   function lerp(a, b, t) { return a + (b - a) * t; }
   function dist2(ax, ay, bx, by) { var x = bx - ax, y = by - ay; return x * x + y * y; }
