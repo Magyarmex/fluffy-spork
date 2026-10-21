@@ -96,7 +96,7 @@ test('detach removes new visibility and blur listeners', () => {
   assert.equal(events.document.get('visibilitychange')?.size, 1);
   input.detach();
   assert.equal(events.document.get('visibilitychange')?.size, 0);
-  assert.equal(events.window.get('blur')?.size, 1);
+  assert.equal(events.window.get('blur')?.size, 0);
 });
 test('single movement stick does not produce phantom aim', () => {
   const { input, down, move, fire } = boot();
@@ -123,4 +123,22 @@ test('reattach after detach registers exactly one active visibility listener', (
   input.attach(canvas);
   assert.equal(events.document.get('visibilitychange')?.size, 1);
   input.detach(); assert.equal(events.document.get('visibilitychange')?.size, 0);
+});
+
+test('twenty attach/detach cycles release both legacy and new blur listeners', () => {
+  const { input, events } = boot();
+  const canvas = {
+    getBoundingClientRect() { return { left: 0, top: 0, width: 800, height: 600 }; },
+    addEventListener() {},
+    removeEventListener() {},
+  };
+  for (let cycle = 0; cycle < 20; cycle++) {
+    assert.equal(events.window.get('blur')?.size, 2, 'exactly two blur handlers while attached');
+    input.detach();
+    assert.equal(events.window.get('blur')?.size, 0, 'no orphaned blur handlers after detach');
+    input.attach(canvas);
+  }
+  input.detach();
+  assert.equal(events.window.get('blur')?.size, 0);
+  assert.equal(events.document.get('visibilitychange')?.size, 0);
 });
