@@ -78,7 +78,7 @@ for (const hz of [30, 60, 120, 240]) {
 }
 
 test('initially hidden cached drone never supplies an unobserved pursuit point', () => {
-  const s = harness(); s.see(false);
+  const s = harness(); s.see(false); s.d.orbitA = Math.PI;
   s.tick();
   assert.ok(s.d.x < 0.5, 'no movement toward unknown enemy position');
 });
@@ -126,7 +126,7 @@ test('target replacement discards the previous target last-seen position', () =>
   s.tick();
   s.target.x = -100;
   const second = { ...s.target, id: 21, x: -200 };
-  s.d.targetRef = second; s.d.retargetT = 1;
+  s.d.targetRef = second; s.d.retargetT = 1; s.d.orbitA = Math.PI;
   s.see(false);
   const first = s.d.x;
   s.tick();
@@ -138,6 +138,7 @@ test('no LOS API with live solids fails closed for hostile drone pursuit', () =>
   const s = harness();
   delete s.g.hasLineOfSight;
   s.g.__novaTerrain = [{ solid: true, destructible: false, hp: 100 }];
+  s.d.orbitA = Math.PI;
   s.tick();
   assert.ok(s.d.x < .5);
 });
@@ -155,6 +156,7 @@ test('real Battlefield + Performance cover blocks cached drone pursuit', () => {
     x: 45, y: 0, w: 12, h: 70, type: 'wall',
     destructible: false, hp: 100, solid: true }];
   assert.equal(s.g.hasLineOfSight(0, 0, 100, 0, 2), false);
+  s.d.orbitA = Math.PI;
   s.tick();
   assert.ok(s.d.x < .5, 'no hidden pursuit through actual Battlefield wall');
   s.g.__novaTerrain = [];
