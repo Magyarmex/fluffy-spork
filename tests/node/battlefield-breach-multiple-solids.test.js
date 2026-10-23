@@ -172,3 +172,24 @@ for (const optimized of [false, true]) {
     assert.ok(tank.hp < 100);
   });
 }
+
+for (const optimized of [false, true]) {
+  const Game = boot(optimized);
+  for (const fps of [30, 60, 120, 240]) {
+    test((optimized ? 'Battlefield + Performance' : 'Battlefield') +
+      ' ' + fps + 'Hz: hostile bullets crossing between endpoints must intercept', () => {
+      const g = new Game();
+      g.__novaTerrain = [];
+      g.targets = [];
+      g.bullets = [
+        { id: 1, x: -100, y: 0, vx: 12000, vy: 0, r: 3,
+          dmg: 10, pen: 0, ttl: 2, ownerId: 1, dead: false },
+        { id: 2, x: 100, y: 0, vx: -12000, vy: 0, r: 3,
+          dmg: 10, pen: 0, ttl: 2, ownerId: 2, dead: false },
+      ];
+      for (let frame = 0; frame < fps / 30; frame++) g.updateBullets(1 / fps);
+      assert.equal(g.bullets.length, 0,
+        'relative-motion interception must not depend on frame rate');
+    });
+  }
+}
