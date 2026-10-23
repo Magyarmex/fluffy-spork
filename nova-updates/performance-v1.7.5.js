@@ -151,14 +151,13 @@ wrap('game/engine',function(engine,require){
       /* Match Battlefield's physical-origin policy after candidate pruning.
        * Only true interior is blocked at t=0: outward/tangent face travel
        * remains legal while movement collision recovery runs. */
-      if(pointInsideSolid(s,ax,ay,-1e-6))return false;
       if(pointInsideSolid(s,ax,ay,0)){
-        if(exactHit(s,ax,ay,bx,by,-1e-6))return false;
+        if(pointInsideSolid(s,ax,ay,-1e-6)||exactHit(s,ax,ay,bx,by,-1e-6))return false;
         continue;
       }
       var h=exactHit(s,ax,ay,bx,by,pad||2);
       if(h&&h.t>0.015&&h.t<1.01)return false;
-      if(((h&&h.t<=0.015)||(!h&&(pointInsideSolid(s,ax,ay,pad||2)||pointInsideSolid(s,bx,by,pad||2))))&&exactHit(s,ax,ay,bx,by,-1e-6))return false;
+      if(((h&&h.t<=0.015)||(!h&&s.shape==='circle'&&(pointInsideSolid(s,ax,ay,pad||2)||pointInsideSolid(s,bx,by,pad||2))))&&exactHit(s,ax,ay,bx,by,-1e-6))return false;
     }
     return true;
   };
