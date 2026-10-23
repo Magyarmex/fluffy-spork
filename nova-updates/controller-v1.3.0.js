@@ -1031,26 +1031,66 @@
       d.retargetT -= dt;
       var target = d.targetRef;
       if (target && (target.hp <= 0 || (target.kind === 'tank' && !target.alive))) target = null;
-      if (target && dist2(owner.x, owner.y, target.x, target.y) > leash * leash) target = null;
-      if (!target) d.targetRef = null;
+      // Enemy drone coordinates are not on the public minimap. Unlike tanks
+      // and farm shapes, a cached drone must be leashed by its last sighting,
+      // not its live position after it disappears behind cover.
+      if (target && target.kind !== 'drone' && dist2(owner.x, owner.y, target.x, target.y) > leash * leash) target = null;
+      if (!target) {
+        d.targetRef = null;
+        d.__novaLegacySeenTarget = null;
+      }
       if (d.retargetT <= 0) {
         d.retargetT = 0.22 + (d.slot % 4) * 0.03;
         target = g.acquireDroneTarget(d, owner, leash);
         d.targetRef = target; d.targetId = target ? target.id : -1;
+        // Reacquisition is the only way to extend a hidden-drone pursuit.
+        // A fresh LOS sample is required even if the selector chose the same id.
+        d.__novaLegacySeenTarget = null;
+      }
+      if (target && target.kind === 'drone') {
+        if (d.__novaLegacySeenTarget !== target) {
+          d.__novaLegacySeenTarget = target;
+          d.__novaLegacySeenX = null;
+          d.__novaLegacySeenY = null;
+          d.__novaLegacyVisionT = 0;
+        }
+        // Bound expensive visibility queries independently of FPS. Movement
+        // uses only coordinates sampled on a positive LOS check; it never
+        // reads the target's updated hidden position between checks.
+        d.__novaLegacyVisionT -= dt;
+        if (d.__novaLegacyVisionT <= 0) {
+          d.__novaLegacyVisionT = 0.085 + (d.slot % 4) * 0.015;
+          if (contactClear(g, d, target)) {
+            d.__novaLegacySeenX = target.x;
+            d.__novaLegacySeenY = target.y;
+          }
+        }
+        if (d.__novaLegacySeenX == null || d.__novaLegacySeenY == null ||
+            dist2(owner.x, owner.y, d.__novaLegacySeenX, d.__novaLegacySeenY) > leash * leash) {
+          target = null;
+          d.targetRef = null; d.targetId = -1;
+          d.__novaLegacySeenTarget = null;
+        }
       }
       if (target) {
-        var dx = target.x - d.x, dy = target.y - d.y, dd = Math.hypot(dx, dy) || 1;
+        var followX = target.kind === 'drone' ? d.__novaLegacySeenX : target.x;
+        var followY = target.kind === 'drone' ? d.__novaLegacySeenY : target.y;
+        var dx = followX - d.x, dy = followY - d.y, dd = Math.hypot(dx, dy) || 1;
+        // Actual contact distance is separate from remembered pursuit position.
+        // Otherwise a drone could damage an unseen enemy at a stale location.
+        var hitDx = target.x - d.x, hitDy = target.y - d.y;
+        var hitDist = Math.hypot(hitDx, hitDy) || 1;
         var sp = d.speed * (swarming ? 1.45 : 1);
         if (dd > 12) { d.x += dx / dd * sp * dt; d.y += dy / dd * sp * dt; }
         if (d.attackCd <= 0 && target.hp > 0) {
           var tr = target.kind === 'shape' ? target.r : target.kind === 'drone' ? target.r + 2 : ((CLASSES[target.cls] && CLASSES[target.cls].size) || 15) + 4;
-          if (dd < tr + d.r + 5 && (typeof contactClear !== 'function' || contactClear(g, d, target))) {
+          if (hitDist < tr + d.r + 5 && contactClear(g, d, target)) {
             d.attackCd = d.role === 'hunter' ? 0.36 : 0.5;
             var dmg = d.dmg * (swarming ? 1.3 : 1);
-            if (target.kind === 'shape') g.damageShape(target, dmg, dx, dy);
+            if (target.kind === 'shape') g.damageShape(target, dmg, hitDx, hitDy);
             else if (target.kind === 'drone') g.damageDrone(target, dmg, owner.id);
             else g.damageTank(target, dmg, owner.id);
-            if (g.addImpactDebris) g.addImpactDebris(target.x, target.y, dx, dy, d.color, 3);
+            if (g.addImpactDebris) g.addImpactDebris(target.x, target.y, hitDx, hitDy, d.color, 3);
           }
         }
       } else {
