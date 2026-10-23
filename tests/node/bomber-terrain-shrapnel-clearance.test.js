@@ -91,7 +91,7 @@ function fire(Game, shape, fps, opts = {}) {
   if (opts.apex) g.__testOwner = { id: 1, cls: 'clusterking', angle: 0,
     __v17FuseDepth: 0, stats: { damage: 0 }, level: 1, alive: true };
   g.bullets = [{
-    id: 1, x: -120, y: opts.corner ? -120 : 0,
+    id: 1, x: -120, y: opts.corner ? -120 : (opts.nearCorner ? -79 : 0),
     vx: opts.natural ? 0 : 12000, vy: opts.corner ? 12000 : 0,
     r: 2, dmg: 12, ttl: opts.natural ? 0.001 : 2,
     shell: true, ownerId: 1, pen: 0, hits: 0, dead: false,
@@ -149,4 +149,14 @@ for (const optimized of [false, true]) {
     g.updateBullets(1 / 60);
     assert.equal(g.bullets.length, 0);
   });
+}
+
+for (const optimized of [false, true]) {
+  for (const fps of [30, 60, 120, 240]) {
+    test((optimized ? 'optimized' : 'base') + ': near-corner face must not teleport inward children through cover at ' + fps + 'Hz', () => {
+      const g = fire(boot(optimized), 'rect', fps, { nearCorner: true });
+      assert.equal(g.bullets.length, 3, 'only the three left-facing fragments clear the left face');
+      assert.ok(g.bullets.every(b => b.vx < 0));
+    });
+  }
 }
