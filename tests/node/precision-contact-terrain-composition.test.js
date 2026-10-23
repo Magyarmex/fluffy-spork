@@ -106,3 +106,26 @@ for(const perf of [false,true]){
   });
  }
 }
+
+
+for(const perf of [false,true]){
+ test((perf?'Performance':'Battlefield')+
+  ': 1,200 seeded wall positions agree with independent viewport-contact ordering',()=>{
+  const Game=boot(perf);
+  let seed=3061023;
+  const random=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+  for(let i=0;i<1200;i++){
+   const g=new Game();
+   const x=100+random()*800,y=(random()-.5)*300;
+   g.__novaTerrain=[{...wall(x),y}];
+   g.tryFire({id:7,x:1000,y:0,isPlayer:false,alive:true});
+   g.updateBullets(1);
+   // The projectile's center enters the viewport at x=395.
+   // Its padded wall contact occurs at x=wall center + 10 + 3*.45.
+   const wallInPath=Math.abs(y)<100+3*.45;
+   const blocked=wallInPath&&x+10+3*.45>=395;
+   assert.equal(g.__v183Contact.sparks.length,blocked?0:1,
+    'unexpected spark for wall '+x+','+y+' case '+i);
+  }
+ });
+}
