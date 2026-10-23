@@ -138,3 +138,43 @@ test('exception restores spatial query, tank radii and blast context', () => {
   assert.equal(Object.hasOwn(tank, 'r'), false);
   assert.equal(g.__v172HardBlast.active, false);
 });
+
+test('mixed splash contacts retain original spatial order: shape, tank, drone', () => {
+  const { Game, SHash } = load(false), g = new Game(), events = [];
+  g.__novaTerrain = []; g.hash = new SHash(); g.tmp = []; g.kills = [];
+  g.cam = { shake: 0 }; g.sfx = { explode() {} };
+  const shape = { kind: 'shape', id: 3, type: 'circle', r: 12,
+    x: 20, y: 0, hp: 1, flash: 0 };
+  const tank = { kind: 'tank', id: 2, cls: 'scout', x: 20, y: 0,
+    hp: 100, alive: true };
+  const drone = { kind: 'drone', id: 4, r: 10, ownerId: 2,
+    x: 20, y: 0, hp: 100 };
+  g.tanks = [tank];
+  for (const e of [shape, tank, drone]) g.hash.insert(e);
+  g.killShape = () => { events.push('shape'); };
+  g.damageTank = (t, d) => { events.push('tank'); t.hp -= d; };
+  g.damageDrone = (d, n) => { events.push('drone'); d.hp -= n; };
+  g.splashAt(0, 0, 72, .4, 1, 0, '#fff', 20);
+  assert.deepEqual(events, ['shape', 'tank', 'drone']);
+});
+test('nested same-origin splashes isolate their spatial query and restore state', () => {
+  const { Game, SHash } = load(false), g = new Game();
+  g.__novaTerrain = []; g.hash = new SHash(); g.tmp = []; g.tanks = [];
+  g.kills = []; g.cam = { shake: 0 }; g.sfx = { explode() {} };
+  const shape = { kind: 'shape', id: 3, type: 'circle', r: 12,
+    x: 20, y: 0, hp: 100, flash: 0 };
+  g.hash.insert(shape);
+  let nested = false;
+  g.addRing = () => {
+    if (nested) return;
+    nested = true;
+    g.splashAt(0, 0, 72, .4, 1, 0, '#fff', 20);
+  };
+  const originalQuery = g.hash.query;
+  g.splashAt(0, 0, 72, .4, 1, 0, '#fff', 20);
+  const one = 20 * .4 * (1 - 20 / 72 * .5);
+  assert.ok(Math.abs(shape.hp - (100 - 2 * one)) < 1e-9,
+    'each blast must independently apply exactly one contact');
+  assert.equal(g.hash.query, originalQuery);
+  assert.equal(g.__v172HardBlast.active, false);
+});
