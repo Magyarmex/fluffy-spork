@@ -141,3 +141,37 @@ for (const optimized of [false, true]) {
     assert.ok(angles[0] < angles[5], 'Cluster King sector still spreads its children');
   });
 }
+
+for (const optimized of [false, true]) {
+  const label = optimized ? 'optimized' : 'base';
+  for (const fps of [30, 60, 120, 240]) {
+    test(label + ': a piercing shell hits a shape, then a wall, without a second burst at ' + fps + 'Hz', () => {
+      const g = new (boot(optimized))();
+      g.time = 1;
+      g.__novaBattlefield = { coverBroken: 0 };
+      g.__novaTerrain = [{ id: -1, shape: 'rect', x: 100, y: 0,
+        w: 20, h: 160, solid: true, destructible: false }];
+      g.targets = [{ kind: 'shape', id: 10, x: 0, y: 0, r: 12, hp: 100 }];
+      const b = shell(-100, 100 * fps, { pen: 3 });
+      g.bullets = [b];
+      g.updateBullets(1 / fps);
+      assert.deepEqual(g.damageEvents, [10]);
+      assert.equal(g.bursts, 1);
+      assert.equal(b.dead, false);
+      g.time += 1 / fps;
+      g.updateBullets(1 / fps);
+      assert.equal(g.bursts, 1, 'terrain contact after a direct hit cannot spawn a second cluster');
+      assert.equal(b.dead, true);
+      assert.equal(g.__novaTerrain[0].solid, true);
+    });
+  }
+  test(label + ': two separate shells each retain their own one-time burst', () => {
+    const g = new (boot(optimized))();
+    g.time = 1; g.__novaTerrain = [];
+    g.targets = [{ kind: 'shape', id: 10, x: 0, y: 0, r: 12, hp: 100 }];
+    g.bullets = [shell(0, 0, { pen: 0 }), shell(0, 0, { pen: 0 })];
+    g.updateBullets(.016);
+    assert.equal(g.bursts, 2, 'a global burst flag would incorrectly silence another shell');
+    assert.deepEqual(g.damageEvents, [10, 10]);
+  });
+}
