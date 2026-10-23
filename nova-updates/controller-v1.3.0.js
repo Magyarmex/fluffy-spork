@@ -721,26 +721,80 @@
       return e.r || 12;
     }
 
-    function findDashHit(g, owner, d, ax, ay, bx, by) {
-      var best = null, bestD = Infinity;
+    function findDashHit(g, owner, d, ax, ay, bx, by, strictEnd, frameFraction) {
+      var best = null, bestT = Infinity;
+      var validClock = Number.isFinite(g.time);
+      var dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
+      var minX = Math.min(ax, bx), maxX = Math.max(ax, bx);
+      var minY = Math.min(ay, by), maxY = Math.max(ay, by);
+      function narrow(t) {
+        var stopX = ax + dx * t, stopY = ay + dy * t;
+        minX = Math.min(ax, stopX); maxX = Math.max(ax, stopX);
+        minY = Math.min(ay, stopY); maxY = Math.max(ay, stopY);
+      }
+      function firstContact(e, rr) {
+        if (e.x < minX - rr || e.x > maxX + rr ||
+            e.y < minY - rr || e.y > maxY + rr) return Infinity;
+        // Preserve the shipping collision acceptance exactly, including
+        // floating-point tangencies and very short dash segments.
+        if (pointSegmentDist2(e.x, e.y, ax, ay, bx, by) > rr * rr) return Infinity;
+        var fx = e.x - ax, fy = e.y - ay;
+        if (fx * fx + fy * fy <= rr * rr) return 0;
+        if (len2 < 1e-8) return Infinity;
+        var projection = (fx * dx + fy * dy) / len2;
+        var px = ax + projection * dx, py = ay + projection * dy;
+        var sx = e.x - px, sy = e.y - py;
+        var chord = Math.sqrt(Math.max(0, rr * rr - sx * sx - sy * sy) / len2);
+        return Math.max(0, Math.min(1, projection - chord));
+      }
+      // Battlefield captures the first tank position before movement in this
+      // simulation tick. Only consume same-tick, finite snapshots; older
+      // positions are not evidence of motion and would cause phantom hits.
+      function movingTankContact(t, rr, sx, sy) {
+        var f = Number.isFinite(frameFraction) ? Math.max(0, Math.min(1, frameFraction)) : 1;
+        var ex = sx + (t.x - sx) * f, ey = sy + (t.y - sy) * f;
+        // Both paths occupy the same time interval. Broad-phase must include
+        // the moving tank's entire swept range, not just its final position.
+        var rx = ax - sx, ry = ay - sy;
+        var vx = dx - (ex - sx), vy = dy - (ey - sy);
+        var a = vx * vx + vy * vy, c = rx * rx + ry * ry - rr * rr;
+        if (c <= 0) return 0;
+        if (a === 0) return Infinity;
+        var dot = rx * vx + ry * vy;
+        if (dot >= 0) return Infinity; // separating from an initial miss
+        // The closest-point test avoids a fixed small-motion cutoff: even a
+        // subpixel target crossing must count if it reaches the collision disk.
+        var closestT = Math.max(0, Math.min(1, -dot / a));
+        var nearX = rx + vx * closestT, nearY = ry + vy * closestT;
+        if (nearX * nearX + nearY * nearY > rr * rr) return Infinity;
+        var b = 2 * dot, disc = Math.max(0, b * b - 4 * a * c);
+        // Stable small-root form avoids cancellation near first contact.
+        var denominator = -b + Math.sqrt(disc);
+        var hitT = denominator > 0 ? 2 * c / denominator : Infinity;
+        return hitT >= 0 && hitT <= 1 ? hitT : Infinity;
+      }
       for (var i = 0; i < g.tanks.length; i++) {
         var t = g.tanks[i];
         if (!t || !t.alive || t.id === owner.id || t.spawnShieldT > 0) continue;
         var rr = d.r + entityRadius(t);
-        if (pointSegmentDist2(t.x, t.y, ax, ay, bx, by) <= rr * rr) {
-          var dd = dist2(ax, ay, t.x, t.y);
-          if (dd < bestD) { bestD = dd; best = t; }
-        }
+        var sx = t.__novaSweepPrevX, sy = t.__novaSweepPrevY;
+        var hasMotion = validClock && t.__novaSweepMoveTime === g.time &&
+          (sx !== t.x || sy !== t.y) &&
+          Number.isFinite(sx) && Number.isFinite(sy) &&
+          Number.isFinite(t.x) && Number.isFinite(t.y);
+        if (hasMotion && ((sx < minX - rr && t.x < minX - rr) ||
+            (sx > maxX + rr && t.x > maxX + rr) ||
+            (sy < minY - rr && t.y < minY - rr) ||
+            (sy > maxY + rr && t.y > maxY + rr))) continue;
+        var hitT = hasMotion ? movingTankContact(t, rr, sx, sy) : firstContact(t, rr);
+        if (hitT < bestT && (!strictEnd || hitT < 1)) { bestT = hitT; best = t; narrow(bestT); }
       }
-      if (best) return best;
+      if (bestT === 0) return best;
       for (var j = 0; j < g.drones.length; j++) {
         var od = g.drones[j];
         if (!od || od === d || od.hp <= 0 || od.ownerId === owner.id) continue;
-        var rr2 = d.r + entityRadius(od);
-        if (pointSegmentDist2(od.x, od.y, ax, ay, bx, by) <= rr2 * rr2) {
-          var d2v = dist2(ax, ay, od.x, od.y);
-          if (d2v < bestD) { bestD = d2v; best = od; }
-        }
+        var droneT = firstContact(od, d.r + entityRadius(od));
+        if (droneT < bestT && (!strictEnd || droneT < 1)) { bestT = droneT; best = od; narrow(bestT); }
       }
       return best;
     }
@@ -838,7 +892,63 @@
         d.x += (d.__novaVX || 0) * dt; d.y += (d.__novaVY || 0) * dt;
         d.angle = Math.atan2(d.__novaVY || 0, d.__novaVX || 1);
         d.__novaPhaseT -= dt;
-        var hit = !d.__novaHitRun ? findDashHit(g, owner, d, ax, ay, d.x, d.y) : null;
+        // Collision decisions happen here, before Battlefield's later endpoint
+        // resolver. Performance temporarily masks the instance terrain probe on
+        // route-planning-skip frames; its current prototype method remains the
+        // authoritative physical collision implementation.
+        var bx = d.x, by = d.y, terrainHit = null, terrainFn = g.firstTerrainHit;
+        if (typeof terrainFn !== 'function') {
+          var proto = Object.getPrototypeOf(g);
+          terrainFn = proto && proto.firstTerrainHit;
+        }
+        if (typeof terrainFn === 'function') {
+          terrainHit = terrainFn.call(g, ax, ay, bx, by, (d.r || 8) + 1);
+        }
+        var wallT = terrainHit && terrainHit.hit && terrainHit.hit.t;
+        // Missing collision authority with live solids must not grant a free hit.
+        if (g.__novaTerrain && g.__novaTerrain.length && typeof terrainFn !== 'function') wallT = 0;
+        var pad = (d.r || 8) + 1;
+        if (g.isTerrainSafe && !g.isTerrainSafe(ax, ay, pad)) {
+          // At a wall's exact boundary, the segment solver reports t=0 even
+          // when the drone is departing into open space. Permit outward escape
+          // only after a tiny safe probe, then query the remaining segment.
+          var travel = Math.hypot(bx - ax, by - ay);
+          var probeT = travel > 1e-9 ? Math.min(1, 0.001 / travel) : 0;
+          var px = ax + (bx - ax) * probeT, py = ay + (by - ay) * probeT;
+          if (probeT > 0 && g.isTerrainSafe(px, py, pad) && typeof terrainFn === 'function') {
+            var remaining = terrainFn.call(g, px, py, bx, by, pad);
+            wallT = remaining && remaining.hit ? probeT + (1 - probeT) * remaining.hit.t : null;
+          } else {
+            // A perfectly tangent run along a wall face is also legal. The
+            // current hit's outward normal distinguishes it from entry; use a
+            // tiny outward offset only to resolve the t=0 boundary ambiguity.
+            var face = terrainHit && terrainHit.hit;
+            var nx = face && face.nx, ny = face && face.ny;
+            var normalOK = Number.isFinite(nx) && Number.isFinite(ny) && nx * nx + ny * ny > 0.5;
+            var outward = normalOK && (bx - ax) * nx + (by - ay) * ny >= -1e-8;
+            var touching = wallT === 0 && g.isTerrainSafe(ax, ay, Math.max(0.001, pad - 0.001));
+            if (touching && outward && typeof terrainFn === 'function') {
+              var offset = 0.001;
+              var skim = terrainFn.call(g, ax + nx * offset, ay + ny * offset,
+                bx + nx * offset, by + ny * offset, pad);
+              wallT = skim && skim.hit ? skim.hit.t : null;
+            } else wallT = 0;
+          }
+        }
+        var wall = Number.isFinite(wallT) && wallT >= 0 && wallT <= 1;
+        if (wall) {
+          // Keep the swept hit query and the drone's final position strictly
+          // before the solid boundary, with no extra projectile-like damage.
+          var legalT = Math.max(0, wallT - 1e-9);
+          d.x = ax + (bx - ax) * legalT;
+          d.y = ay + (by - ay) * legalT;
+        }
+        // Query contact up to the true wall boundary, excluding only an
+        // entity whose first contact is exactly simultaneous with the wall.
+        // Physical placement stays just outside solid terrain.
+        var hitX = wall ? ax + (bx - ax) * wallT : d.x;
+        var hitY = wall ? ay + (by - ay) * wallT : d.y;
+        var hit = !d.__novaHitRun && (!wall || wallT > 0) ? findDashHit(g, owner, d, ax, ay, hitX, hitY, wall, wall ? wallT : 1) : null;
         if (hit) {
           d.__novaHitRun = true;
           var dmg = d.dmg * profile.diveDamage * (swarming ? 1.28 : 1);
@@ -852,7 +962,15 @@
           d.__novaVX *= 0.55; d.__novaVY *= 0.55;
           d.__novaPhaseT = Math.min(d.__novaPhaseT, 0.08);
         }
-        if (d.__novaPhaseT <= 0) {
+        if (wall) {
+          // A committed strike cannot continue through solid cover. Do not
+          // steer the dive around it: the player must create a clear lane.
+          d.__novaPhase = 'recover';
+          d.__novaPhaseT = Math.max(0.28, profile.recover * 0.62);
+          d.__novaCommitted = false;
+          d.__novaTarget = null;
+          if (g.addParticles) g.addParticles(d.x, d.y, d.color, 4, 65, 'spark');
+        } else if (d.__novaPhaseT <= 0) {
           d.__novaPhase = 'recover'; d.__novaPhaseT = profile.recover; d.__novaCommitted = false;
           d.__novaTarget = null;
         }
