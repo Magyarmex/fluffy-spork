@@ -82,7 +82,7 @@ for (const optimized of [false, true]) {
       const Game = boot(optimized), g = arena(Game, shape);
       for (const [ax, ay, bx, by] of [
         [80, 0, 0, 0], [79, 0, 120, 0], [0, 0, 120, 0],
-        [80, 80, 0, 0],
+        [shape === 'circle' ? 80 / Math.sqrt(2) : 80, shape === 'circle' ? 80 / Math.sqrt(2) : 80, 0, 0],
       ]) {
         const hit = g.firstTerrainHit(ax, ay, bx, by, 0);
         assert.ok(hit, 'missed actual solid');
@@ -95,7 +95,8 @@ for (const optimized of [false, true]) {
     });
     test(label + ': padded outward escape preserves incoming contact', () => {
       const Game = boot(optimized), g = arena(Game, shape);
-      assert.equal(g.firstTerrainHit(82, 0, 120, 0, 4), null);
+      assert.ok(g.firstTerrainHit(82, 0, 120, 0, 4), 'padded-only overlap remains a collision');
+      assert.equal(g.firstTerrainHit(80, 0, 120, 0, 4), null);
       const hit = g.firstTerrainHit(82, 0, 0, 0, 4);
       assert.ok(hit);
       assert.equal(hit.hit.t, 0);
