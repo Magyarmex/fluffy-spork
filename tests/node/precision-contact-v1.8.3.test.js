@@ -76,3 +76,56 @@ test('offscreen hostile precision volley gets one contact spark and one swoosh',
   g.updateBullets(1.3);
   assert.equal(g.sfx.swoosh,1,'same volley cannot replay combat onset');
 });
+
+
+test('incoming precision contact does not signal a shot stopped by permanent cover before the viewport',()=>{
+  const {Game}=load(),g=new Game(),enemy={id:7,isPlayer:false,alive:true,x:1000,y:0};
+  let checks=0;
+  g.firstTerrainHit=(ax,ay,bx,by,pad)=>{
+    checks++;
+    assert.equal(ax,1000); assert.equal(bx,350);
+    return {solid:{shape:'rect',destructible:false,solid:true},hit:{t:.5}};
+  };
+  g.tryFire(enemy);
+  g.updateBullets(1.3);
+  assert.equal(checks,1,'only a crossing shot needs a terrain check');
+  assert.equal(g.__v183Contact.sparks.length,0,'wall must suppress the false edge spark');
+  assert.equal(g.sfx.swoosh,0,'wall must suppress the false incoming swoosh');
+});
+
+test('precision contact still announces a shot reaching the viewport before later permanent cover',()=>{
+  const {Game}=load(),g=new Game(),enemy={id:7,isPlayer:false,alive:true,x:1000,y:0};
+  g.firstTerrainHit=()=>({solid:{destructible:false,solid:true},hit:{t:.99}});
+  g.tryFire(enemy);g.updateBullets(1.3);
+  assert.equal(g.__v183Contact.sparks.length,1);
+  assert.equal(g.sfx.swoosh,1);
+});
+
+for(const [name,cover,shouldEnter] of [
+  ['unbroken barricade',{destructible:true,solid:true,hp:100},false],
+  ['spent penetration',{destructible:true,solid:true,hp:10},false],
+  ['breached barricade',{destructible:true,solid:true,hp:10},true],
+]){
+  test('precision contact handles '+name+' before screen entry',()=>{
+    const {Game}=load(),g=new Game(),enemy={id:7,isPlayer:false,alive:true,x:1000,y:0};
+    g.firstTerrainHit=()=>({solid:cover,hit:{t:.5}});
+    g.tryFire(enemy);
+    const b=g.bullets[0];b.dmg=20;b.pen=name==='spent penetration'?1:3;
+    g.updateBullets(1.3);
+    assert.equal(g.__v183Contact.sparks.length,shouldEnter?1:0);
+    assert.equal(g.sfx.swoosh,shouldEnter?1:0);
+  });
+}
+
+test('terrain check is skipped when incoming shot does not approach the viewport this frame',()=>{
+  const {Game}=load(),g=new Game(),enemy={id:7,isPlayer:false,alive:true,x:1000,y:0};
+  g.firstTerrainHit=()=>{throw new Error('unnecessary terrain check');};
+  g.tryFire(enemy);g.updateBullets(.1);
+  assert.equal(g.__v183Contact.sparks.length,0);
+});
+
+test('precision contact without Battlefield terrain API retains original edge behavior',()=>{
+  const {Game}=load(),g=new Game(),enemy={id:7,isPlayer:false,alive:true,x:1000,y:0};
+  g.tryFire(enemy);g.updateBullets(1.3);
+  assert.equal(g.__v183Contact.sparks.length,1);
+});
