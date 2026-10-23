@@ -29,7 +29,7 @@ const types = {
 const coreUpdate = realCoreMethod('updateBullets', types);
 const coreCluster = realCoreMethod('clusterBurst', types);
 
-function boot(optimized) {
+function boot(optimized, apex = false) {
   function Game() {
     this.hash = { query(_x, _y, _r, out) { out.length = 0; } };
     this.tmp = [];
@@ -44,13 +44,14 @@ function boot(optimized) {
   }
   Game.prototype.randSpawnPos = () => ({ x: 1500, y: 1500 });
   Game.prototype.moveTank = function (t, vx, vy, dt) { t.x += vx * dt; t.y += vy * dt; };
-  Game.prototype.getTank = () => null;
+  Game.prototype.getTank = function () { return this.__testOwner || null; };
   Game.prototype.updateBullets = coreUpdate;
   Game.prototype.clusterBurst = coreCluster;
   function Sfx() {}
   Sfx.prototype.resume = function () {};
   const modules = {
     'game/audio': m => { m.exports = { Sfx }; },
+    'game/classes': m => { m.exports = { CLASSES: { scout: { size: 14 }, clusterking: { size: 14 } } }; },
     'game/engine': m => { m.exports = { Game }; },
     'game/ai': m => { m.exports = { updateAI() {} }; },
     'game/render': m => { m.exports = { render() {} }; },
@@ -59,6 +60,7 @@ function boot(optimized) {
     performance: { now: () => 0 } };
   const files = ['battlefield-v1.6.0.js'];
   if (optimized) files.push('performance-v1.7.5.js');
+  if (apex) files.push('apex-disciplines-v1.7.1.js');
   for (const file of files) vm.runInNewContext(
     fs.readFileSync(path.join(__dirname, '../../nova-updates', file), 'utf8'),
     ctx, { filename: file });
@@ -86,9 +88,11 @@ function fire(Game, shape, fps, opts = {}) {
     });
   }
   g.__novaTerrain = opts.natural ? [] : terrain;
+  if (opts.apex) g.__testOwner = { id: 1, cls: 'clusterking', angle: 0,
+    __v17FuseDepth: 0, stats: { damage: 0 }, level: 1, alive: true };
   g.bullets = [{
-    id: 1, x: opts.natural ? -120 : -120, y: 0,
-    vx: opts.natural ? 0 : 12000, vy: 0,
+    id: 1, x: -120, y: opts.corner ? -120 : 0,
+    vx: opts.natural ? 0 : 12000, vy: opts.corner ? 12000 : 0,
     r: 2, dmg: 12, ttl: opts.natural ? 0.001 : 2,
     shell: true, ownerId: 1, pen: 0, hits: 0, dead: false,
     color: '#aef', clusterDmg: 8,
@@ -117,5 +121,32 @@ for (const optimized of [false, true]) {
   test(label + ': neighboring solid still blocks outward shrapnel', () => {
     const g = fire(boot(optimized), 'rect', 60, { neighbor: true });
     assert.equal(g.bullets.length, 1, 'flanking cover must stop the diagonal children');
+  });
+}
+
+for (const optimized of [false, true]) {
+  const label = optimized ? 'Battlefield + Performance' : 'Battlefield';
+  for (const fps of [30, 60, 120, 240]) {
+    test(label + ': corner exit retains five legal shrapnel directions at ' + fps + 'Hz', () => {
+      const g = fire(boot(optimized), 'rect', fps, { corner: true });
+      assert.equal(g.bullets.length, 5, 'corner must allow exit via either exposed face');
+      assert.ok(g.bullets.every(b => !b.dead));
+      assert.ok(g.bullets.every(b => b.x < -80 || b.y < -80));
+    });
+  }
+  test(label + ': Apex Cluster King retains forward-sector shaping against cover', () => {
+    const g = fire(boot(optimized, true), 'rect', 60, { apex: true });
+    assert.equal(g.bullets.length, 0, 'forward-directed sector hits the wall');
+  });
+  test(label + ': shell spawned inside solid does not teleport its shrapnel outside', () => {
+    const g = new (boot(optimized))();
+    g.time = 1;
+    g.__novaTerrain = [{ id: -1, shape: 'rect', x: 0, y: 0,
+      w: 160, h: 160, solid: true, destructible: false }];
+    g.bullets = [{ id: 1, x: 0, y: 0, vx: 12000, vy: 0,
+      r: 2, dmg: 12, ttl: 2, shell: true, ownerId: 1,
+      pen: 0, hits: 0, dead: false, color: '#aef' }];
+    g.updateBullets(1 / 60);
+    assert.equal(g.bullets.length, 0);
   });
 }
