@@ -185,3 +185,41 @@ for (const optimized of [false, true]) {
     assert.equal(g.burstRings, 2);
   });
 }
+
+for (const optimized of [false, true]) {
+  const label = optimized ? 'optimized' : 'base';
+  for (const cls of ['bomber', 'clusterking', 'siegebomber']) {
+    for (const fps of [30, 60, 120, 240]) {
+      test(label + ': ' + cls + ' shrapnel respects a permanent wall at ' + fps + 'Hz', () => {
+        const { g, parent } = setup(boot(optimized), cls);
+        g.__novaBattlefield = { coverBroken: 0 };
+        g.__novaTerrain = [{ id: -1, shape: 'rect', x: 0, y: 0,
+          w: 160, h: 160, solid: true, destructible: false }];
+        Object.assign(parent, { x: -120, y: 0, px: -120, py: 0,
+          vx: 12000, vy: 0, r: 2, ttl: 2 });
+        g.updateBullets(1 / fps);
+        const kids = g.bullets.filter(b => !b.shell && !b.dead);
+        const expected = cls === 'clusterking' ? 0 : cls === 'siegebomber' ? 2 : 3;
+        assert.equal(kids.length, expected,
+          'wall must block inward fragments, not outward fragments');
+        assert.ok(kids.every(b => b.vx < 0 && b.x < -80));
+        assert.equal(g.__novaTerrain[0].solid, true);
+      });
+    }
+  }
+  for (const cls of ['bomber', 'clusterking', 'siegebomber']) {
+    test(label + ': AI and human shells use identical ' + cls + ' fragment counts', () => {
+      const { g, t, parent } = setup(boot(optimized), cls);
+      g.clusterBurst(parent);
+      const humanCount = g.bullets.filter(b => !b.shell).length;
+      t.isPlayer = false; t.ai = { state: 'farm', targetId: -1 };
+      t.fireCd = 0;
+      g.tryFire(t);
+      const aiParent = g.bullets.find(b => b.shell && b.id !== parent.id);
+      assert.ok(aiParent);
+      g.clusterBurst(aiParent);
+      assert.equal(g.bullets.filter(b => !b.shell).length - humanCount,
+        CLASSES[cls].bullet.cluster);
+    });
+  }
+}
