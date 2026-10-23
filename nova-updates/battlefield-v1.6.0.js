@@ -152,7 +152,7 @@ function lineOfSight(g,ax,ay,bx,by,pad){
   }
   return true;
 }
-function firstSolidHit(g,ax,ay,bx,by,pad,ignored){pad=pad||0;var a=terrainCandidates(g,ax,ay,bx,by,pad),bestS=null,bestH=null;for(var i=0;i<a.length;i++){var s=a[i];if(ignored&&ignored.has(s))continue;var h=s.shape==='circle'&&pointInsideSolid(s,ax,ay,pad)?{t:0,x:ax,y:ay,nx:0,ny:0}:solidHit(s,ax,ay,bx,by,pad);if(h&&h.t===0&&outwardFaceTravel(s,ax,ay,bx,by,pad))continue;if(h&&(!bestH||h.t<bestH.t)){bestS=s;bestH=h;}}return bestH?{solid:bestS,hit:bestH}:null;}
+function firstSolidHit(g,ax,ay,bx,by,pad){pad=pad||0;var a=terrainCandidates(g,ax,ay,bx,by,pad),bestS=null,bestH=null;for(var i=0;i<a.length;i++){var s=a[i],h=s.shape==='circle'&&pointInsideSolid(s,ax,ay,pad)?{t:0,x:ax,y:ay,nx:0,ny:0}:solidHit(s,ax,ay,bx,by,pad);if(h&&h.t===0&&outwardFaceTravel(s,ax,ay,bx,by,pad))continue;if(h&&(!bestH||h.t<bestH.t)){bestS=s;bestH=h;}}return bestH?{solid:bestS,hit:bestH}:null;}
 function circleResolve(g,e,r){
  var hitAny=false,lastNx=0,lastNy=0;
  for(var pass=0;pass<2;pass++){
@@ -249,8 +249,7 @@ wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.
    };
  }
  Game.prototype.hasLineOfSight=function(ax,ay,bx,by,pad){return lineOfSight(this,ax,ay,bx,by,pad||2);};
- /* Optional ignored solids let read-only presentation predict a sequence of cover breaches without mutating live terrain. */
- Game.prototype.firstTerrainHit=function(ax,ay,bx,by,pad,ignored){return firstSolidHit(this,ax,ay,bx,by,pad||0,ignored);};
+ Game.prototype.firstTerrainHit=function(ax,ay,bx,by,pad){return firstSolidHit(this,ax,ay,bx,by,pad||0);};
  Game.prototype.isTerrainSafe=function(x,y,pad){return safePoint(this,x,y,pad||40);};
 
  var oldSpawnPlayer=Game.prototype.spawnPlayer;Game.prototype.spawnPlayer=function(){ensureTerrain(this);var out=oldSpawnPlayer.apply(this,arguments);var p=this.player;if(p&&!safePoint(this,p.x,p.y,terrainRadiusForTank(p,CLASSES)+32)){for(var i=0;i<40;i++){var a=Math.random()*TAU,r=700+Math.random()*1100,x=Math.cos(a)*r,y=Math.sin(a)*r;if(safePoint(this,x,y,terrainRadiusForTank(p,CLASSES)+45)){p.x=x;p.y=y;break;}}}return out;};
