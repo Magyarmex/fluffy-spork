@@ -195,3 +195,37 @@ for (const perf of [false, true]) {
       'later explosion sees the now-open route');
   });
 }
+
+for (const perf of [false, true]) {
+  test((perf ? 'Performance' : 'Battlefield') +
+    ': conservative blast corridor culling matches exact three-ray exposure', () => {
+    const { Game } = load(perf), g = new Game();
+    let seed = 0x9e3779b9;
+    const rand = () => { seed ^= seed << 13; seed ^= seed >>> 17;
+      seed ^= seed << 5; return (seed >>> 0) / 4294967296; };
+    for (let i = 0; i < 2000; i++) {
+      const circle = i % 2 === 0, sourceX = (rand() - .5) * 160,
+        sourceY = (rand() - .5) * 160;
+      const target = { kind: 'shape', x: (rand() - .5) * 220,
+        y: (rand() - .5) * 220, r: 4 + rand() * 30 };
+      g.__novaTerrain = [{
+        id: -1, shape: circle ? 'circle' : 'rect',
+        x: (rand() - .5) * 220, y: (rand() - .5) * 220,
+        r: 5 + rand() * 45, w: 10 + rand() * 80,
+        h: 10 + rand() * 80, solid: true, destructible: false,
+      }];
+      const dx = target.x - sourceX, dy = target.y - sourceY;
+      const d = Math.hypot(dx, dy) || 1, px = -dy / d, py = dx / d;
+      const rad = target.r * .58;
+      const expected = (g.firstTerrainHit(sourceX, sourceY,
+        target.x, target.y, .001) ? 0 : .56) +
+        (g.firstTerrainHit(sourceX, sourceY,
+          target.x + px * rad, target.y + py * rad, .001) ? 0 : .22) +
+        (g.firstTerrainHit(sourceX, sourceY,
+          target.x - px * rad, target.y - py * rad, .001) ? 0 : .22);
+      const actual = g.novaHardBlastExposure(target, sourceX, sourceY);
+      assert.ok(Math.abs(actual - expected) < 1e-10,
+        'corridor false negative at sample ' + i + ': ' + actual + ' vs ' + expected);
+    }
+  });
+}
