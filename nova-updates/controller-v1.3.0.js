@@ -699,6 +699,19 @@
       return best;
     }
 
+    // Contact damage cannot reach across solid cover, even at melee range.
+    function contactClear(g, d, target) {
+      var fn = g && g.hasLineOfSight;
+      if (typeof fn !== 'function') { var proto = g && Object.getPrototypeOf(g); fn = proto && proto.hasLineOfSight; }
+      if (typeof fn === 'function') return !!fn.call(g, d.x, d.y, target.x, target.y, 2);
+      var solids = g && g.__novaTerrain || [];
+      for (var i = 0; i < solids.length; i++) {
+        var s = solids[i];
+        if (s && s.solid !== false && (!s.destructible || s.hp > 0)) return false;
+      }
+      return true;
+    }
+
     function simulateFarm(g, owner, d, squad, profile, dt, recalling) {
       if (d.__novaPhase === 'dash') return false;
       if (d.__novaPhase === 'windup') {
@@ -727,7 +740,8 @@
       }
       steerDrone(d, target.x, target.y, d.speed * (owner.swarmT > 0 ? 1.35 : 1), profile.response, dt);
       var rr = target.r + d.r + 5;
-      if (d.attackCd <= 0 && dist2(d.x, d.y, target.x, target.y) <= rr * rr) {
+      if (d.attackCd <= 0 && dist2(d.x, d.y, target.x, target.y) <= rr * rr &&
+          (typeof contactClear !== 'function' || contactClear(g, d, target))) {
         d.attackCd = 0.36;
         var dmg = d.dmg * (owner.swarmT > 0 ? 1.3 : 1);
         g.damageShape(target, dmg, target.x - d.x, target.y - d.y);
@@ -1030,7 +1044,7 @@
         if (dd > 12) { d.x += dx / dd * sp * dt; d.y += dy / dd * sp * dt; }
         if (d.attackCd <= 0 && target.hp > 0) {
           var tr = target.kind === 'shape' ? target.r : target.kind === 'drone' ? target.r + 2 : ((CLASSES[target.cls] && CLASSES[target.cls].size) || 15) + 4;
-          if (dd < tr + d.r + 5) {
+          if (dd < tr + d.r + 5 && (typeof contactClear !== 'function' || contactClear(g, d, target))) {
             d.attackCd = d.role === 'hunter' ? 0.36 : 0.5;
             var dmg = d.dmg * (swarming ? 1.3 : 1);
             if (target.kind === 'shape') g.damageShape(target, dmg, dx, dy);
