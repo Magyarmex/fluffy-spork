@@ -178,3 +178,19 @@ test('nested same-origin splashes isolate their spatial query and restore state'
   assert.equal(g.hash.query, originalQuery);
   assert.equal(g.__v172HardBlast.active, false);
 });
+
+for (const perf of [false, true]) {
+  test((perf ? 'Performance' : 'Battlefield') +
+    ': splash that breaks cover does not damage entities behind it in same event', () => {
+    const { g, tank, shape, drone } = scene(perf, [{
+      shape: 'rect', x: 20, y: 0, w: 8, h: 150,
+      destructible: true, solid: true, hp: 1, maxHp: 1,
+    }]);
+    assert.equal(g.__novaTerrain[0].solid, false, 'blast breaches cover');
+    assert.deepEqual([tank.hp, shape.hp, drone.hp], [100, 100, 100],
+      'exposure is captured before the same blast destroys cover');
+    g.splashAt(0, 0, 72, .4, 1, 0, '#fff', 20);
+    assert.ok(tank.hp < 100 && shape.hp < 100 && drone.hp < 100,
+      'later explosion sees the now-open route');
+  });
+}
