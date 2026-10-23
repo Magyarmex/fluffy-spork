@@ -57,6 +57,7 @@ function scene(perf, terrain, blast = [0, 0], target = [50, 0], radius = 72, dam
     id: -i - 1, solid: true, destructible: false, ...s,
   }));
   g.hash = new SHash(); g.tmp = []; g.tanks = []; g.kills = [];
+  g.__novaBattlefield = { coverBroken: 0, coverTotal: terrain.length, name: 'TEST' };
   g.cam = { shake: 0 }; g.sfx = { explode() {} };
   const tank = { kind: 'tank', id: 2, cls: 'scout', x: target[0],
     y: target[1], hp: 100, alive: true };
