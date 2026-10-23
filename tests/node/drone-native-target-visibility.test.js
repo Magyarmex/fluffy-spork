@@ -93,3 +93,54 @@ test('no visibility API in an open arena preserves ordinary hostile acquisition'
   delete s.g.hasLineOfSight; s.g.__novaTerrain = [];
   assert.equal(s.acquire(), visible);
 });
+
+
+test('actual Battlefield wall hides a native tank until the cover is destroyed', () => {
+  const battlefield = fs.readFileSync(path.join(__dirname,
+    '../../nova-updates/battlefield-v1.6.0.js'), 'utf8');
+  const hidden = tank(2, 90);
+  class Game {
+    constructor() {
+      this.tanks = []; this.drones = []; this.shapes = [];
+      this.tankById = new Map(); this.time = 10;
+      this.__novaTerrain = [{ id: -1000, kind: 'terrain', shape: 'rect',
+        x: 45, y: 0, w: 10, h: 70, type: 'cover',
+        destructible: true, hp: 100, maxHp: 100, solid: true }];
+    }
+    acquireDroneTarget() { return hidden; }
+    updateDrones() {} updateBullets() {} update() {} moveTank() {}
+    spawnPlayer() {} spawnShape() {} spawnPowerup() {} tryFire() {}
+    randSpawnPos() { return { x: 0, y: 0 }; }
+  }
+  const mods = {
+    'game/engine': m => { m.exports.Game = Game; },
+    'game/ai': m => { m.exports.updateAI = () => {}; },
+    'game/render': m => { m.exports.render = () => {}; },
+    'game/audio': m => { m.exports.Sfx = class {}; }
+  };
+  const win = { __novaModules: mods };
+  for (const src of [source, battlefield]) {
+    vm.runInNewContext(src, { window: win,
+      console: { info() {}, warn() {}, error() {} },
+      Math, Map, Set, Number, Object, Date,
+      performance: { now: () => 0 } });
+  }
+  const m = { exports: {} };
+  mods['game/engine'](m, m.exports, name => name.includes('classes')
+    ? { CLASSES: { carrier: { size: 15 }, marksman: { size: 15 } } } : {});
+  const g = new Game();
+  const owner = { id: 1, kind: 'tank', cls: 'carrier', alive: true,
+    team: 'blue', x: 0, y: 0 };
+  const visible = { ...tank(3, 90), y: 130 };
+  const drone = { id: 10, kind: 'drone', ownerId: 1,
+    hp: 30, x: 0, y: 0, leash: 500 };
+  g.tanks = [owner, hidden, visible]; g.drones = [drone];
+  g.tankById = new Map(g.tanks.map(t => [t.id, t]));
+  g.areAllies = (a, b) => a.team === b.team;
+  g.areHostile = (a, b) => a.team !== b.team;
+  assert.equal(g.hasLineOfSight(0, 0, hidden.x, hidden.y, 2), false);
+  assert.equal(g.hasLineOfSight(0, 0, visible.x, visible.y, 2), true);
+  assert.equal(g.acquireDroneTarget(drone, owner, 500), visible);
+  g.__novaTerrain[0].hp = 0; g.__novaTerrain[0].solid = false;
+  assert.equal(g.acquireDroneTarget(drone, owner, 500), hidden);
+});
