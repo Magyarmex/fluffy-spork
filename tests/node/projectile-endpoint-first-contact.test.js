@@ -177,3 +177,32 @@ for (const perf of [false, true]) {
       'splash query must not inherit direct-hit contact sorting');
   });
 }
+
+for (const perf of [false, true]) {
+  test((perf ? 'Battlefield + Performance' : 'Battlefield') +
+    ': 800 seeded endpoint overlaps agree with independent horizontal surface geometry', () => {
+    const Game = boot(perf), g = new Game();
+    let seed = 305174;
+    const rand = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
+    let checked = 0;
+    while (checked < 800) {
+      const a = body('shape', 2, -10 + rand() * 30);
+      const b = body('shape', 3, -10 + rand() * 30);
+      a.y = (rand() - .5) * 18; b.y = (rand() - .5) * 18;
+      a.r = 14 + rand() * 20; b.r = 14 + rand() * 20;
+      const ar = a.r + 3, br = b.r + 3;
+      if ((15 - a.x) ** 2 + a.y ** 2 >= ar * ar ||
+          (15 - b.x) ** 2 + b.y ** 2 >= br * br) continue;
+      const aEntry = a.x - Math.sqrt(ar * ar - a.y * a.y);
+      const bEntry = b.x - Math.sqrt(br * br - b.y * b.y);
+      if (Math.abs(aEntry - bEntry) < 1e-5) continue;
+      const expected = aEntry < bEntry ? 2 : 3;
+      g.contacts = []; g.hash.targets = checked % 2 ? [a, b] : [b, a];
+      g.bullets = [shot()]; g.time++;
+      g.updateBullets(1);
+      assert.deepEqual(g.contacts, [expected],
+        'first surface mismatch in seeded scenario ' + checked);
+      checked++;
+    }
+  });
+}
