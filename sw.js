@@ -198,7 +198,17 @@ async function stageLatest({ force = false } = {}) {
       const cached = await cache.match(indexURL);
       if (cached) {
         await validateShellResponse(cached);
-        return { changed: false, fingerprint: buildFingerprint };
+        // A valid HTML shell is not enough for offline play: an evicted or
+        // partially cleared script leaves the same build fingerprint but an
+        // unusable game. Verify the locally cached dependencies before taking
+        // the unchanged-build fast path. Missing assets trigger an atomic
+        // restage below, retaining the previous active cache until promotion.
+        const critical = discoverCriticalAssets(html, indexURL);
+        const stored = await Promise.all(critical.map((url) =>
+          cache.match(canonicalURL(url))));
+        if (stored.every(Boolean)) {
+          return { changed: false, fingerprint: buildFingerprint };
+        }
       }
     }
 
