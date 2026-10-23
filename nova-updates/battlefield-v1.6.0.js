@@ -265,7 +265,55 @@ wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.
 
  /* The core bullet loop can retain killed shapes in its same-tick spatial hash.
   * Filter dead shapes only while it queries; restore the original method even on failure. */
- var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){for(var m=0;m<this.bullets.length;m++){var mb=this.bullets[m];if(mb)mb.__novaSweepHitsBefore=mb.hits||0;}var hash=this.hash,query=hash&&hash.query,hadOwn=hash&&Object.prototype.hasOwnProperty.call(hash,'query'),out;if(query)hash.query=function(x,y,r,candidates){var value=query.call(this,x,y,r,candidates),write=0;for(var scan=0;scan<candidates.length;scan++){var candidate=candidates[scan];if(candidate&&(candidate.kind!=='shape'||candidate.hp>0))candidates[write++]=candidate;}candidates.length=write;return value;};try{out=oldEntityBullets.call(this,dt);}finally{if(query){if(hadOwn)hash.query=query;else delete hash.query;}}for(var i=this.bullets.length-1;i>=0;i--){var b=this.bullets[i];if(!b||b.dead||(b.hits||0)!==b.__novaSweepHitsBefore)continue;var ax=b.px==null?b.x:b.px,ay=b.py==null?b.y:b.py,ex=b.x,ey=b.y,travel=Math.hypot(ex-ax,ey-ay);if(travel<1e-6)continue;this.hash.query((ax+ex)*.5,(ay+ey)*.5,travel*.5+b.r+46,this.tmp);var first=null;for(var j=0;j<this.tmp.length;j++){var e=this.tmp[j],er=0;if(e.kind==='shape'&&e.hp>0)er=e.r;else if(e.kind==='tank'&&e.id!==b.ownerId&&e.alive)er=CLASSES[e.cls].size+3;else if(e.kind==='drone'&&e.ownerId!==b.ownerId&&e.hp>0)er=e.r+1;else continue;var rr=b.r+er,dx=ex-ax,dy=ey-ay,tx=e.x,ty=e.y;if(e.kind==='tank'&&e.__novaSweepMoveTime===this.time){dx-=e.x-e.__novaSweepPrevX;dy-=e.y-e.__novaSweepPrevY;tx=e.__novaSweepPrevX;ty=e.__novaSweepPrevY;}var fx=ax-tx,fy=ay-ty,A=dx*dx+dy*dy,B=2*(fx*dx+fy*dy),C=fx*fx+fy*fy-rr*rr,t=null;if(C<0)t=0;else{var D=B*B-4*A*C;if(D>0){var root=Math.sqrt(D),t0=(-B-root)/(2*A),t1=(-B+root)/(2*A);if(t0>=0&&t0<=1)t=t0;else if(t1>=0&&t1<=1)t=t1;}}if(t!=null&&(!first||t<first.t))first={e:e,t:t};}if(!first)continue;var e=first.e,hitT=first.t===0?0:Math.min(1,first.t+1e-9),hx=ax+(ex-ax)*hitT,hy=ay+(ey-ay)*hitT;b.x=hx;b.y=hy;if(e.kind==='shape'){if(b.shell)this.clusterBurst(b);this.damageShape(e,b.dmg,b.vx,b.vy);}else if(e.kind==='tank'){if(b.shell)this.clusterBurst(b);var ang=Math.atan2(b.vy,b.vx);this.damageTank(e,b.dmg,b.ownerId,Math.cos(ang)*(b.knock||0)*.006,Math.sin(ang)*(b.knock||0)*.006);}else this.damageDrone(e,b.dmg,b.ownerId);if(b.splash&&e.kind!=='drone')this.splashAt(hx,hy,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.hits++;b.pen--;if(b.pen<0)b.dead=true;if(!b.dead){b.x=ex;b.y=ey;}else this.bullets.splice(i,1);}return out;};
+ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){for(var m=0;m<this.bullets.length;m++){var mb=this.bullets[m];if(mb)mb.__novaSweepHitsBefore=mb.hits||0;}var hash=this.hash,query=hash&&hash.query,hadOwn=hash&&Object.prototype.hasOwnProperty.call(hash,'query'),out,self=this,cursor=-1,started=false,generation=(this.__novaDirectQueryGeneration||0)+1,pending=[],splashDepth=0;
+ this.__novaDirectQueryGeneration=generation;
+ var oldSplashForContacts=this.splashAt,hadOwnSplash=Object.prototype.hasOwnProperty.call(this,'splashAt');
+ /* A penetrating shot must contact each physical victim only once, even
+  * across many rendered frames. The core queries live bullets in reverse
+  * order. A generation marker survives array splices without cloning the
+  * entire bullet array each frame. Splash queries are never direct hits. */
+ if(oldSplashForContacts)this.splashAt=function(){splashDepth++;try{return oldSplashForContacts.apply(this,arguments);}finally{splashDepth--;}};
+ if(query)hash.query=function(x,y,r,candidates){
+   var value=query.call(this,x,y,r,candidates),b=null;
+   if(!splashDepth&&candidates===self.tmp){
+     if(!started){started=true;cursor=self.bullets.length-1;}
+     while(cursor>=0&&(!self.bullets[cursor]||self.bullets[cursor].dead||self.bullets[cursor].__novaDirectQueryGeneration===generation))cursor--;
+     var next=cursor>=0?self.bullets[cursor]:null;
+     if(next&&x===next.x&&y===next.y&&r===next.r+46){
+       b=next;b.__novaDirectQueryGeneration=generation;cursor--;
+     }
+   }
+   var victims=b&&b.__novaDirectVictims,write=0;
+   for(var scan=0;scan<candidates.length;scan++){
+     var candidate=candidates[scan];
+     if(candidate&&(candidate.kind!=='shape'||candidate.hp>0)&&!(victims&&victims.has(candidate)))candidates[write++]=candidate;
+   }
+   candidates.length=write;
+   /* Single-contact rounds expire immediately; only penetrating bullets
+    * need the extra geometric prediction and hit-identity bookkeeping. */
+   if(b&&b.pen>0){
+     for(var j=0;j<candidates.length;j++){
+       var e=candidates[j],rr=0;
+       if(e.kind==='shape')rr=b.r+e.r;
+       else if(e.kind==='tank'&&e.id!==b.ownerId&&e.alive)rr=b.r+CLASSES[e.cls].size+3;
+       else if(e.kind==='drone'&&e.ownerId!==b.ownerId&&e.hp>0)rr=b.r+e.r+1;
+       if(rr>0&&d2(b.x,b.y,e.x,e.y)<rr*rr){
+         pending.push([b,e,b.hits||0]);break;
+       }
+     }
+   }
+   return value;
+ };
+ try{out=oldEntityBullets.call(this,dt);}finally{
+   if(query){if(hadOwn)hash.query=query;else delete hash.query;}
+   if(oldSplashForContacts){if(hadOwnSplash)this.splashAt=oldSplashForContacts;else delete this.splashAt;}
+   for(var pi=0;pi<pending.length;pi++){
+     var item=pending[pi],pb=item[0];
+     if((pb.hits||0)>item[2]){
+       (pb.__novaDirectVictims||(pb.__novaDirectVictims=new Set())).add(item[1]);
+     }
+   }
+ }for(var i=this.bullets.length-1;i>=0;i--){var b=this.bullets[i];if(!b||b.dead||(b.hits||0)!==b.__novaSweepHitsBefore)continue;var ax=b.px==null?b.x:b.px,ay=b.py==null?b.y:b.py,ex=b.x,ey=b.y,travel=Math.hypot(ex-ax,ey-ay);if(travel<1e-6)continue;this.hash.query((ax+ex)*.5,(ay+ey)*.5,travel*.5+b.r+46,this.tmp);var first=null;for(var j=0;j<this.tmp.length;j++){var e=this.tmp[j],er=0;if(b.__novaDirectVictims&&b.__novaDirectVictims.has(e))continue;if(e.kind==='shape'&&e.hp>0)er=e.r;else if(e.kind==='tank'&&e.id!==b.ownerId&&e.alive)er=CLASSES[e.cls].size+3;else if(e.kind==='drone'&&e.ownerId!==b.ownerId&&e.hp>0)er=e.r+1;else continue;var rr=b.r+er,dx=ex-ax,dy=ey-ay,tx=e.x,ty=e.y;if(e.kind==='tank'&&e.__novaSweepMoveTime===this.time){dx-=e.x-e.__novaSweepPrevX;dy-=e.y-e.__novaSweepPrevY;tx=e.__novaSweepPrevX;ty=e.__novaSweepPrevY;}var fx=ax-tx,fy=ay-ty,A=dx*dx+dy*dy,B=2*(fx*dx+fy*dy),C=fx*fx+fy*fy-rr*rr,t=null;if(C<0)t=0;else{var D=B*B-4*A*C;if(D>0){var root=Math.sqrt(D),t0=(-B-root)/(2*A),t1=(-B+root)/(2*A);if(t0>=0&&t0<=1)t=t0;else if(t1>=0&&t1<=1)t=t1;}}if(t!=null&&(!first||t<first.t))first={e:e,t:t};}if(!first)continue;var e=first.e,hitT=first.t===0?0:Math.min(1,first.t+1e-9),hx=ax+(ex-ax)*hitT,hy=ay+(ey-ay)*hitT;b.x=hx;b.y=hy;if(e.kind==='shape'){if(b.shell)this.clusterBurst(b);this.damageShape(e,b.dmg,b.vx,b.vy);}else if(e.kind==='tank'){if(b.shell)this.clusterBurst(b);var ang=Math.atan2(b.vy,b.vx);this.damageTank(e,b.dmg,b.ownerId,Math.cos(ang)*(b.knock||0)*.006,Math.sin(ang)*(b.knock||0)*.006);}else this.damageDrone(e,b.dmg,b.ownerId);if(b.splash&&e.kind!=='drone')this.splashAt(hx,hy,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.hits++;b.pen--;if(b.pen<0)b.dead=true;else (b.__novaDirectVictims||(b.__novaDirectVictims=new Set())).add(e);if(!b.dead){b.x=ex;b.y=ey;}else this.bullets.splice(i,1);}return out;};
 
  var oldUpdateBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var terrain=ensureTerrain(this);for(var i=0;i<this.bullets.length;i++){var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,nx=ox+(b.vx||0)*dt,ny=oy+(b.vy||0)*dt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
    /* The core still advances a dead bullet before removing it; a shell may
