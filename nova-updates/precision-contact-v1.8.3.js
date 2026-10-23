@@ -53,6 +53,29 @@ function triggerEntry(g,state,v,hit,b){
  pushCapped(state.sparks,{x:hit.x,y:hit.y,ang:ang,born:now,until:now+.24,mix:v.mix},12);
  if(shouldSwoosh(state.lastSwoosh,now,1.35)){state.lastSwoosh=now;if(g.sfx&&g.sfx.novaPrecisionContactSwoosh)g.sfx.novaPrecisionContactSwoosh(clamp((hit.x-g.w*.5)/Math.max(1,g.w*.5),-1,1),.48+.52*v.mix);}
 }
+/* Incoming-fire cues should describe a shot that can actually reach the
+ * viewport, not one that collides with solid terrain beforehand. Check only
+ * when a tracked trajectory would enter the screen. Use Battlefield's exact
+ * swept terrain contact and the same barricade breach contract as its bullet
+ * pass; a visual hint must not alter projectile or cover state. */
+function terrainStopsViewportEntry(g,b,dt,entryT){
+ if(typeof g.firstTerrainHit!=='function')return false;
+ var collision;
+ try{
+  collision=g.firstTerrainHit(b.x,b.y,b.x+(b.vx||0)*dt,b.y+(b.vy||0)*dt,(b.r||2)*.45);
+ }catch(err){
+  /* A best-effort visual cue must never interrupt the combat simulation. */
+  if(!g.__novaContactTerrainWarning){g.__novaContactTerrainWarning=true;console.warn('[NOVA Contact Spark] terrain cue check unavailable',err);}
+  return false;
+ }
+ if(!collision||!collision.hit||!collision.solid||collision.hit.t>entryT+1e-9)return false;
+ var s=collision.solid;
+ if(!s.destructible)return true;
+ var mult=b.shell?1.35:b.beam?.92:1;
+ /* A shot continues only if it breaches the cover with enough penetration.
+  * Do not suppress a legitimate incoming cue for a breaching round. */
+ return !(s.hp>0&&s.hp<=(b.dmg||0)*mult&&b.pen>=2);
+}
 function scanEntries(g,dt){
  var state=g.__v183Contact;if(!state||!state.volleys.length)return;var now=g.time||0,out={x:0,y:0,t:0};
  for(var i=state.volleys.length-1;i>=0;i--){
@@ -62,7 +85,7 @@ function scanEntries(g,dt){
    var b=v.bullets[j];if(!b||b.dead)continue;live=true;
    var p0=worldToScreen(g,b.x,b.y);if(inside(p0,g.w,g.h,5)){triggerEntry(g,state,v,p0,b);break;}
    var p1=worldToScreen(g,b.x+(b.vx||0)*dt,b.y+(b.vy||0)*dt),hit=segmentRectEntry(p0.x,p0.y,p1.x,p1.y,g.w,g.h,5,out);
-   if(hit){triggerEntry(g,state,v,hit,b);break;}
+   if(hit&&!terrainStopsViewportEntry(g,b,dt,hit.t)){triggerEntry(g,state,v,hit,b);break;}
   }
   if(v.entered||!live)state.volleys.splice(i,1);
  }
