@@ -82,8 +82,8 @@ function run(options = {}) {
   const g = new Game();
   const owner = { id: 1, swarmT: 0, cls: 'carrier', alive: true };
   const target = {
-    id: 2, kind: 'tank', cls: 'medium', x: options.tx ?? 80, y: options.ty ?? 0,
-    alive: true, hp: 100, spawnShieldT: 0,
+    id: options.targetId ?? 2, kind: 'tank', cls: 'medium', x: options.tx ?? 80, y: options.ty ?? 0,
+    alive: true, hp: 100, spawnShieldT: options.shield ?? 0,
     __novaSweepPrevX: options.px, __novaSweepPrevY: options.py,
     __novaSweepMoveTime: options.stamp ?? 7,
   };
@@ -145,8 +145,7 @@ test('six actual shipping overlays: enemy drone screens a tank', () => {
   assert.deepEqual(damage(result), ['drone:3']);
 });
 test('six actual shipping overlays: owner immunity and spawn shield', () => {
-  const result = run({ tx: 24 });
-  assert.deepEqual(damage(result), ['tank:2']);
-  const shield = run({ tx: 24, terrain: [rect(55)] });
-  assert.deepEqual(damage(shield), ['tank:2']);
+  assert.deepEqual(damage(run({ tx: 24, targetId: 1 })), []);
+  assert.deepEqual(damage(run({ tx: 24, shield: 1 })), []);
+  assert.deepEqual(damage(run({ tx: 24 })), ['tank:2']);
 });
