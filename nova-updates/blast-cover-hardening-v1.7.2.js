@@ -29,7 +29,35 @@ wrap('game/engine',function(engine,require){
   Game.prototype.splashAt=function(x,y,radius){
     var c=this.__v172HardBlast||(this.__v172HardBlast={active:false,x:0,y:0,radius:0}),pa=c.active,px=c.x,py=c.y,pr=c.radius;
     c.active=true;c.x=x;c.y=y;c.radius=radius||0;
-    try{return oldSplash.apply(this,arguments);}finally{c.active=pa;c.x=px;c.y=py;c.radius=pr;}
+    /* The compressed core's splash broad phase indexes entity CENTERS.
+     * Querying only the blast radius drops overlapping large shapes when
+     * their centers fall across a spatial-cell boundary. Also, core tanks
+     * have no .r property, so its d > radius + e.r check becomes NaN and
+     * can apply negative damage (healing!) to distant tanks in the same cell.
+     * Fix both locally without replacing the core or bypassing cover hooks. */
+    var hash=this.hash,oldQuery=hash&&hash.query,hadQuery=hash&&Object.prototype.hasOwnProperty.call(hash,'query');
+    var expanded=false,self=this,temporary=[];
+    var ts=this.tanks||[];
+    for(var i=0;i<ts.length;i++){
+      var t=ts[i];
+      if(t&&t.r==null){t.r=size(t);temporary.push(t);}
+    }
+    if(hash&&typeof oldQuery==='function'){
+      hash.query=function(qx,qy,qr,out){
+        if(!expanded&&out===self.tmp&&qx===x&&qy===y&&qr===radius){
+          expanded=true;
+          return oldQuery.call(this,qx,qy,qr+33,out);
+        }
+        return oldQuery.apply(this,arguments);
+      };
+    }
+    try{return oldSplash.apply(this,arguments);}finally{
+      if(hash&&typeof oldQuery==='function'){
+        if(hadQuery)hash.query=oldQuery;else delete hash.query;
+      }
+      for(var j=0;j<temporary.length;j++)delete temporary[j].r;
+      c.active=pa;c.x=px;c.y=py;c.radius=pr;
+    }
   };
   var oldDamage=Game.prototype.damageTank;
   Game.prototype.damageTank=function(t,dmg,srcId,kx,ky){
