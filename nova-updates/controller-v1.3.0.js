@@ -102,8 +102,64 @@
     var oldAttach = Input.prototype.attach, oldDetach = Input.prototype.detach;
     if (typeof oldAttach !== 'function') return;
     Input.prototype.__novaBlurStickReset = true;
+    // Return mouse control after touch/pen ends on hybrid devices.
+    function inputClockMs() {
+      return typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+    }
+    function installHybridPointerHandoff(input) {
+      if (input.__novaHybridPointerHandoff) return;
+      input.__novaHybridPointerHandoff = true;
+      input.__novaLastTouchMs = -Infinity;
+      ['pd', 'pm', 'pu'].forEach(function (method) {
+        var original = input[method];
+        if (typeof original !== 'function') return;
+        input[method] = function (event) {
+          if (event && (event.pointerType === 'touch' || event.pointerType === 'pen')) {
+            if (!(event.pointerType === 'pen' && method === 'pm' && event.buttons === 0))
+              input.__novaLastTouchMs = inputClockMs();
+            if (method === 'pd' && input.mouseActive) {
+              input.mouseActive = false;
+              input.firing = false;
+            }
+          } else if (event && event.pointerType === 'mouse' && input.touchSeen &&
+                     input.stickId.move === -1 && input.stickId.aim === -1 &&
+                     ((event.sourceCapabilities && event.sourceCapabilities.firesTouchEvents === false) ||
+                      inputClockMs() - input.__novaLastTouchMs >= 900)) {
+            input.touchSeen = false;
+          }
+          return original.call(input, event);
+        };
+      });
+    }
     Input.prototype.attach = function (canvas) {
-      oldAttach.call(this, canvas);
+      installHybridPointerHandoff(this);
+      // Capture the legacy anonymous blur listener only during synchronous attach.
+      if (this.__novaBlurReset && typeof this.detach === 'function') {
+        this.__novaBlurReset(); this.detach();
+      }
+      var originalAdd = window.addEventListener;
+      var hadOwnAdd = Object.prototype.hasOwnProperty.call(window, 'addEventListener');
+      var legacyBlur = [];
+      var intercept = function (kind, callback) {
+        if (kind === 'blur') legacyBlur.push({ callback: callback, options: arguments[2] });
+        return originalAdd.apply(this, arguments);
+      };
+      var intercepted = false;
+      try { window.addEventListener = intercept; intercepted = window.addEventListener === intercept; }
+      catch (ignored) { /* Some hosts disallow replacement. */ }
+      try { oldAttach.call(this, canvas); }
+      catch (error) {
+        legacyBlur.forEach(function (entry) { window.removeEventListener('blur', entry.callback, entry.options); });
+        try { if (typeof oldDetach === 'function') oldDetach.call(this); } catch (ignored) {}
+        throw error;
+      }
+      finally {
+        if (intercepted) {
+          if (hadOwnAdd) window.addEventListener = originalAdd;
+          else delete window.addEventListener;
+        }
+      }
+      this.__novaCoreBlurListeners = legacyBlur;
       var self = this;
       function reset() {
         var held = self.move.active || self.aim.active ||
@@ -125,7 +181,25 @@
       if (this.__novaBlurReset) window.removeEventListener('blur', this.__novaBlurReset);
       if (this.__novaVisibilityReset) document.removeEventListener('visibilitychange', this.__novaVisibilityReset);
       this.__novaBlurReset = this.__novaVisibilityReset = null;
+      if (this.__novaCoreBlurListeners) {
+        this.__novaCoreBlurListeners.forEach(function (entry) {
+          window.removeEventListener('blur', entry.callback, entry.options);
+        });
+        this.__novaCoreBlurListeners = null;
+      }
       return oldDetach.apply(this, arguments);
+    };
+  });
+  // New lives must not inherit pointer ownership from the previous life.
+  wrapModule('game/engine', function (engineMod) {
+    var Game = engineMod.Game;
+    if (!Game || Game.prototype.__novaRedeployInputReset) return;
+    var oldRedeploy = Game.prototype.redeploy;
+    if (typeof oldRedeploy !== 'function') return;
+    Game.prototype.__novaRedeployInputReset = true;
+    Game.prototype.redeploy = function () {
+      if (this.input && typeof this.input.__novaBlurReset === 'function') this.input.__novaBlurReset();
+      return oldRedeploy.apply(this, arguments);
     };
   });
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
