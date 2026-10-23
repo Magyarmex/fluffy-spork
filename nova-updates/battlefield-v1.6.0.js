@@ -121,7 +121,7 @@ function lineOfSight(g,ax,ay,bx,by,pad){
   var a=terrainCandidates(g,ax,ay,bx,by,pad);
   for(var i=0;i<a.length;i++){
     var s=a[i];
-    if(pointInsideSolid(s,ax,ay,0)){
+    if(pointInsideSolid(s,ax,ay,1e-6)){
       if(pointInsideSolid(s,ax,ay,-1e-6)||solidHit(s,ax,ay,bx,by,-1e-6))return false;
       continue;
     }
