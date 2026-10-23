@@ -152,3 +152,29 @@ for(const perf of [false,true]){
   });
  }
 }
+
+
+for(const perf of [false,true]){
+ for(const fps of [30,60,120,240]){
+  test((perf?'Performance':'Battlefield')+': '+fps+
+   ' Hz core-expired precision shot has no phantom arrival',()=>{
+   const Game=boot(perf),g=new Game();
+   g.tryFire({id:7,x:1000,y:0,isPlayer:false,alive:true});
+   const b=g.bullets[0];b.vx=-650*fps;b.ttl=.5/fps;
+   g.updateBullets(1/fps);
+   assert.equal(g.__v183Contact.sparks.length,0);
+   assert.equal(g.sfx.swoosh,0);
+   assert.equal(g.bullets.length,0,'core must actually remove the expired projectile');
+  });
+  test((perf?'Performance':'Battlefield')+': '+fps+
+   ' Hz surviving precision shot retains its arrival cue',()=>{
+   const Game=boot(perf),g=new Game();
+   g.tryFire({id:7,x:1000,y:0,isPlayer:false,alive:true});
+   const b=g.bullets[0];b.vx=-650*fps;b.ttl=2/fps;
+   g.updateBullets(1/fps);
+   assert.equal(g.__v183Contact.sparks.length,1);
+   assert.equal(g.sfx.swoosh,1);
+   assert.equal(g.bullets.length,1);
+  });
+ }
+}
