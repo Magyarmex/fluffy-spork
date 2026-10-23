@@ -82,7 +82,7 @@ function boot(optimized) {
 }
 function fire(Game, fps, order, opts = {}) {
   const g = new Game();
-  const start = -150, speed = 18000, dt = 1 / fps;
+  const start = -150, speed = opts.speed ?? 18000, dt = 1 / fps;
   const travel = speed * dt, end = start + travel;
   const solid = (kind, x, id) => ({
     id, kind: 'terrain', shape: 'rect', x, y: 0,
@@ -94,7 +94,7 @@ function fire(Game, fps, order, opts = {}) {
   g.__novaTerrain = order.map((kind, i) =>
     solid(kind === 'cover2' ? 'cover' : kind, xs[kind], -i - 1));
   const tank = { kind: 'tank', id: 2, cls: 'scout',
-    x: end, y: 0, r: 14, alive: true, hp: 100 };
+    x: start + travel * (opts.targetFraction ?? 1), y: 0, r: 14, alive: true, hp: 100 };
   g.targets = [tank];
   g.bullets = [{ id: 1, x: start, y: 0, vx: speed, vy: 0,
     r: 2, dmg: 60, ttl: 2, pen: opts.pen ?? 8,
@@ -139,6 +139,14 @@ for (const optimized of [false, true]) {
       assert.equal(g.__novaTerrain[1].hp, 5);
       assert.equal(g.directHits || 0, 0);
       assert.equal(tank.hp, 100);
+    });
+    test(label + ' ' + fps + 'Hz: target before the later wall must retain its legitimate hit', () => {
+      const { g, tank } = fire(Game, fps, ['cover', 'wall'],
+        { speed: 36000, targetFraction: .45 });
+      assert.equal(g.__novaTerrain[0].hp, 0);
+      assert.equal(g.directHits, 1,
+        'regression: later wall must not erase earlier tank contact');
+      assert.ok(tank.hp < 100);
     });
     test(label + ' ' + fps + 'Hz: a shell detonates only once at the final wall', () => {
       const { g, tank } = fire(Game, fps, ['cover', 'wall'], { shell: true });
