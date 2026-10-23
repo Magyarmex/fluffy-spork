@@ -289,6 +289,35 @@ wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.
      if(candidate&&(candidate.kind!=='shape'||candidate.hp>0)&&!(victims&&victims.has(candidate)))candidates[write++]=candidate;
    }
    candidates.length=write;
+   /* The materialized core takes the first endpoint-overlapping body in hash
+    * order. When two bodies overlap the same bullet endpoint, select the one
+    * whose surface was crossed first. Keep this restricted to the recognized
+    * direct bullet query: splash and other spatial queries retain their order.
+    * In particular, reorder BEFORE piercing's pending victim ledger is built. */
+   if(b&&candidates.length>1&&b.px!=null&&(b.px!==b.x||b.py!==b.y)){
+     var px=b.px,py=b.py,dx=b.x-px,dy=b.y-py,firstIndex=-1,firstTime=2;
+     for(var ci=0;ci<candidates.length;ci++){
+       var ce=candidates[ci],rr=0;
+       if(ce.kind==='shape'&&ce.hp>0)rr=b.r+ce.r;
+       else if(ce.kind==='tank'&&ce.id!==b.ownerId&&ce.alive)rr=b.r+CLASSES[ce.cls].size+3;
+       else if(ce.kind==='drone'&&ce.ownerId!==b.ownerId&&ce.hp>0)rr=b.r+ce.r+1;
+       if(!rr||d2(b.x,b.y,ce.x,ce.y)>=rr*rr)continue;
+       var rx=dx,ry=dy,tx=ce.x,ty=ce.y;
+       if(ce.kind==='tank'&&ce.__novaSweepMoveTime===self.time){
+         rx-=ce.x-ce.__novaSweepPrevX;ry-=ce.y-ce.__novaSweepPrevY;
+         tx=ce.__novaSweepPrevX;ty=ce.__novaSweepPrevY;
+       }
+       var fx=px-tx,fy=py-ty,A=rx*rx+ry*ry,B=2*(fx*rx+fy*ry),C=fx*fx+fy*fy-rr*rr,t=0;
+       if(C>=0){
+         var D=B*B-4*A*C;
+         if(A<1e-12||D<=0)continue;
+         t=(-B-Math.sqrt(D))/(2*A);
+         if(t<0||t>1)continue;
+       }
+       if(t<firstTime-1e-10){firstTime=t;firstIndex=ci;}
+     }
+     if(firstIndex>0){var swap=candidates[0];candidates[0]=candidates[firstIndex];candidates[firstIndex]=swap;}
+   }
    /* Single-contact rounds expire immediately; only penetrating bullets
     * need the extra geometric prediction and hit-identity bookkeeping. */
    if(b&&b.pen>0){
