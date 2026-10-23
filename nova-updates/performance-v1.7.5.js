@@ -146,7 +146,7 @@ wrap('game/engine',function(engine,require){
     if(!this.__novaTerrain){var init=oldFirst.call(this,ax,ay,bx,by,pad);if(!this.__novaTerrain)return init;}
     var list=segmentCandidates(this,ax,ay,bx,by,pad||0);if(!list)return oldFirst.call(this,ax,ay,bx,by,pad);
     var p=perfState(this),best=null;p.terrainQueries++;p.terrainCandidates+=list.length;
-    for(var i=0;i<list.length;i++){p.terrainNarrowTests++;var s=list[i],h=exactHit(s,ax,ay,bx,by,pad||0);if(h&&(!best||h.t<best.hit.t))best={solid:s,hit:h};}
+    for(var i=0;i<list.length;i++){p.terrainNarrowTests++;var s=list[i],rr=s.shape==='circle'?s.r+(pad||0):0,h=s.shape==='circle'&&solidAlive(s)&&d2(ax,ay,s.x,s.y)<=rr*rr?{t:0,x:ax,y:ay,nx:0,ny:0}:exactHit(s,ax,ay,bx,by,pad||0);if(h&&(!best||h.t<best.hit.t))best={solid:s,hit:h};}
     return best;
   };
 
