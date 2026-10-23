@@ -180,3 +180,23 @@ test('independent physical-interior oracle: no transparent solid crossings at 30
   }
   assert.ok(physicalCrossings > 3000, 'randomized test must cover meaningful physical intersections');
 });
+
+
+test('translated circular pillar boundaries preserve outward/tangent rays under floating-point rounding', () => {
+  const Base = boot(), Optimized = boot({ optimized: true });
+  let seed = 28457;
+  const rnd = () => { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5; return (seed >>> 0) / 0x100000000; };
+  for (const Game of [Base, Optimized]) {
+    const g = new Game();
+    for (let i = 0; i < 2500; i++) {
+      const x = (rnd() - .5) * 2000, y = (rnd() - .5) * 2000;
+      const r = 5 + rnd() * 110, angle = rnd() * Math.PI * 2;
+      const ux = Math.cos(angle), uy = Math.sin(angle), ax = x + r * ux, ay = y + r * uy;
+      const distance = 10 + rnd() * 100;
+      g.__novaTerrain = [{ id: -1, shape: 'circle', x, y, r, solid: true, destructible: false }];
+      assert.equal(g.hasLineOfSight(ax, ay, ax + ux * distance, ay + uy * distance, 2), true, 'outward ' + i);
+      assert.equal(g.hasLineOfSight(ax, ay, ax - ux * distance, ay - uy * distance, 2), false, 'inward ' + i);
+      assert.equal(g.hasLineOfSight(ax, ay, ax - uy * distance, ay + ux * distance, 2), true, 'tangent ' + i);
+    }
+  }
+});
