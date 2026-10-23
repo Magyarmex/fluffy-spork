@@ -129,3 +129,26 @@ for(const perf of [false,true]){
   }
  });
 }
+
+
+for(const perf of [false,true]){
+ const mode=perf?'Battlefield + Performance':'Battlefield';
+ for(const [name,solid,pen,expected] of [
+  ['pillar before viewport',{id:-2,kind:'terrain',shape:'circle',x:600,y:0,r:40,solid:true,destructible:false},0,0],
+  ['pillar after viewport',{id:-2,kind:'terrain',shape:'circle',x:200,y:0,r:40,solid:true,destructible:false},0,1],
+  ['pillar lateral miss',{id:-2,kind:'terrain',shape:'circle',x:600,y:90,r:40,solid:true,destructible:false},0,1],
+  ['intact barricade',{...wall(600),type:'cover',destructible:true,hp:100,maxHp:100},3,0],
+  ['breached barricade with insufficient penetration',{...wall(600),type:'cover',destructible:true,hp:10,maxHp:10},1,0],
+  ['breached barricade with surviving penetration',{...wall(600),type:'cover',destructible:true,hp:10,maxHp:10},3,1]
+ ]){
+  test(mode+': actual terrain and core honor '+name+' for incoming cues',()=>{
+   const Game=boot(perf),g=new Game();
+   g.__novaTerrain=[{...solid}];
+   g.tryFire({id:7,x:1000,y:0,isPlayer:false,alive:true});
+   g.bullets[0].pen=pen;
+   g.updateBullets(1);
+   assert.equal(g.__v183Contact.sparks.length,expected,name);
+   assert.equal(g.sfx.swoosh,expected,name);
+  });
+ }
+}
