@@ -58,7 +58,9 @@ for (let i = 0; i < overlays.length; i++) {
     : fs.readFileSync(path.join(root, 'nova-updates', overlays[i]), 'utf8');
   // Test-only observation hook. No runtime file is edited or committed with it.
   if (i === 0) source = source.replace(anchor,
-    '    window.__testControllerDash = simulateControllerDrone;\n' + anchor);
+    '    window.__testControllerDash = simulateControllerDrone;\n' +
+    '    window.__testControllerTarget = controllerTarget;\n' +
+    '    window.__testLegacyDrone = simulateLegacyDrone;\n' + anchor);
   new Function('window', 'console', 'performance', 'document', source)(
     win, logger, { now: () => 0 }, {}
   );
@@ -165,4 +167,54 @@ test('six shipping overlays: no damage when both possible contacts are allies', 
 });
 test('six shipping overlays: wall still blocks enemy behind an allied screen', () => {
   assert.deepEqual(damage(run({ screen: true, screenTeam: 'blue', terrain: [rect(55)] })), []);
+});
+
+
+test('materialized shipping page loads Controller before its fairness overlays', () => {
+  const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  const controllerIndex = html.indexOf('./nova-updates/controller-v1.3.0.js');
+  const liveIndex = html.indexOf('./nova-updates/second-body-live-vector-v1.10.7.js');
+  const fairIndex = html.indexOf('./nova-updates/fair-engagement-v1.11.2.js');
+  assert.ok(controllerIndex >= 0 && liveIndex > controllerIndex && fairIndex > liveIndex);
+});
+
+test('six shipping overlays: marked spawn-protected tank yields to hostile drone', () => {
+  const g = new Game();
+  const owner = { id: 1, kind: 'tank', cls: 'carrier', x: 0, y: 0,
+    alive: true, isPlayer: true, team: 'blue', swarmT: 0 };
+  const tank = { id: 2, kind: 'tank', cls: 'medium', x: 40, y: 0,
+    alive: true, hp: 100, team: 'red', spawnShieldT: 2 };
+  const otherOwner = { id: 3, kind: 'tank', alive: true, team: 'red' };
+  const drone = { id: 30, kind: 'drone', ownerId: 3, x: 28, y: 0, hp: 20, r: 5 };
+  g.tanks = [owner, tank]; g.drones = [drone];
+  g.tankById = new Map([[1, owner], [2, tank], [3, otherOwner]]);
+  g.getTank = id => g.tankById.get(id) || null;
+  g.areAllies = (a, b) => a.team === b.team;
+  g.areHostile = (a, b) => a.team !== b.team;
+  const state = { active: true, nodeX: 0, nodeY: 0, markId: 2, markUntil: 100 };
+  assert.equal(win.__testControllerTarget(g, owner, state, { engage: 155 }), drone);
+  tank.spawnShieldT = 0;
+  assert.equal(win.__testControllerTarget(g, owner, state, { engage: 155 }), tank);
+});
+
+test('six shipping overlays: cached legacy target cannot bypass newly gained spawn shield', () => {
+  const g = new Game();
+  const owner = { id: 1, kind: 'tank', cls: 'medium', alive: true, x: 0, y: 0,
+    swarmT: 0, team: 'blue' };
+  const target = { id: 2, kind: 'tank', cls: 'medium', alive: true, x: 10, y: 0,
+    hp: 100, team: 'red', spawnShieldT: 2 };
+  const drone = { id: 10, kind: 'drone', ownerId: 1, x: 0, y: 0, hp: 20, r: 5,
+    speed: 0, dmg: 10, attackCd: 0, retargetT: 1, leash: 500,
+    targetRef: target, targetId: 2, slot: 0, role: 'hunter', orbitA: 0, orbitR: 40 };
+  g.tanks = [owner, target]; g.drones = [drone];
+  g.tankById = new Map([[1, owner], [2, target]]);
+  g.getTank = id => g.tankById.get(id) || null;
+  g.areAllies = (a, b) => a.team === b.team;
+  g.areHostile = (a, b) => a.team !== b.team;
+  g.hasLineOfSight = () => true;
+  let hits = 0;
+  g.damageTank = () => { hits++; };
+  win.__testLegacyDrone(g, owner, drone, 1 / 60);
+  assert.equal(hits, 0);
+  assert.equal(drone.targetRef, null);
 });
