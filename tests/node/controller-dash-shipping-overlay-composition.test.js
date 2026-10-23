@@ -80,10 +80,10 @@ const pillar = x => ({
 });
 function run(options = {}) {
   const g = new Game();
-  const owner = { id: 1, swarmT: 0, cls: 'carrier', alive: true };
+  const owner = { id: 1, swarmT: 0, cls: 'carrier', alive: true, team: 'blue' };
   const target = {
     id: options.targetId ?? 2, kind: 'tank', cls: 'medium', x: options.tx ?? 80, y: options.ty ?? 0,
-    alive: true, hp: 100, spawnShieldT: options.shield ?? 0,
+    alive: true, hp: 100, team: options.targetTeam ?? 'red', spawnShieldT: options.shield ?? 0,
     __novaSweepPrevX: options.px, __novaSweepPrevY: options.py,
     __novaSweepMoveTime: options.stamp ?? 7,
   };
@@ -98,7 +98,10 @@ function run(options = {}) {
     : null;
   g.__novaTerrain = options.terrain ?? [];
   g.tanks = [target]; g.drones = screen ? [drone, screen] : [drone];
-  g.tankById = new Map([[1, owner], [2, target]]);
+  const screenOwner = { id: 3, alive: true, team: options.screenTeam ?? 'red' };
+  g.tankById = new Map([[1, owner], [2, target], [3, screenOwner]]);
+  g.areAllies = (a, b) => a.team === b.team;
+  g.areHostile = (a, b) => a.team !== b.team;
   const hits = [];
   g.damageTank = (t, n, id) => hits.push(['tank', t.id, n, id]);
   g.damageDrone = (t, n, id) => hits.push(['drone', t.id, n, id]);
@@ -148,4 +151,18 @@ test('six actual shipping overlays: owner immunity and spawn shield', () => {
   assert.deepEqual(damage(run({ tx: 24, targetId: 1 })), []);
   assert.deepEqual(damage(run({ tx: 24, shield: 1 })), []);
   assert.deepEqual(damage(run({ tx: 24 })), ['tank:2']);
+});
+
+// Exercise the real six-overlay shipping chain with team-aware contact rules.
+test('six shipping overlays: allied drone is transparent to committed dash', () => {
+  assert.deepEqual(damage(run({ screen: true, screenTeam: 'blue' })), ['tank:2']);
+});
+test('six shipping overlays: allied tank is transparent while hostile drone screens', () => {
+  assert.deepEqual(damage(run({ screen: true, targetTeam: 'blue' })), ['drone:3']);
+});
+test('six shipping overlays: no damage when both possible contacts are allies', () => {
+  assert.deepEqual(damage(run({ screen: true, screenTeam: 'blue', targetTeam: 'blue' })), []);
+});
+test('six shipping overlays: wall still blocks enemy behind an allied screen', () => {
+  assert.deepEqual(damage(run({ screen: true, screenTeam: 'blue', terrain: [rect(55)] })), []);
 });
