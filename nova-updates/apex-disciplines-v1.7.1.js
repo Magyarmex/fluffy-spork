@@ -89,6 +89,22 @@ wrap('game/engine',function(engine,require){
   Game.prototype.tryFire=function(t){
     var before=this.bullets?this.bullets.length:0;
     oldTry.call(this,t);
+    /* The core shell builder copies clusterDmg but not cluster. Freeze the
+       class's fragment count and fuse program on the projectile at fire time:
+       an evolution or death before impact must not rewrite a shell in flight. */
+    if(t&&this.bullets&&this.bullets.length>before){
+      var def=C[t.cls],count=def&&def.bullet&&def.bullet.cluster;
+      if(Number.isInteger(count)&&count>=3&&count<=12){
+        for(var k=before;k<this.bullets.length;k++){
+          var shell=this.bullets[k];
+          if(shell&&shell.shell&&shell.ownerId===t.id){
+            shell.cluster=count;
+            shell.__novaClusterClass=t.cls;
+            shell.__novaClusterFuseDepth=t.__v17FuseDepth||0;
+          }
+        }
+      }
+    }
     if(!t||!isApex(t.cls)||!this.bullets||this.bullets.length<=before)return;
     var st=gunState(t),i,b;
 
@@ -135,17 +151,46 @@ wrap('game/engine',function(engine,require){
     Game.prototype.clusterBurst=function(parent){
       var before=this.bullets?this.bullets.length:0,owner=parent?tankByOwner(this,parent.ownerId):null;
       var out=oldCluster.apply(this,arguments);
-      if(!owner||owner.cls!=='clusterking'||!this.bullets)return out;
+      if(!parent||!this.bullets)return out;
+      var spawned=this.bullets.length-before;
+      var sourceClass=parent.__novaClusterClass||(owner&&owner.cls);
+      var def=sourceClass&&C[sourceClass],fallback=def&&def.bullet&&def.bullet.cluster;
+      var desired=Number.isInteger(parent.cluster)?parent.cluster:fallback;
+      /* Only adapt the real six-child core burst. A consumed shell produces
+         zero children, and an independent replacement implementation must
+         not be duplicated or trimmed by this compatibility repair. */
+      if(spawned===6&&(desired===5||desired===10)){
+        var original=this.bullets.slice(before);
+        if(desired===5){
+          this.bullets.splice(before+5,1);
+          for(var i=0;i<5;i++){
+            var kid=original[i],speed=Math.hypot(kid.vx||0,kid.vy||0);
+            var jitter=ad(Math.atan2(kid.vy||0,kid.vx||0),i*TAU/6);
+            var angle=i*TAU/5+jitter;
+            kid.vx=Math.cos(angle)*speed;kid.vy=Math.sin(angle)*speed;
+          }
+        }else{
+          for(var i=6;i<10;i++){
+            var seed=original[i-6];
+            this.bullets.push(Object.assign({},seed,{id:this.nextId++}));
+          }
+        }
+      }
+      if(sourceClass!=='clusterking')return out;
       var kids=[];
-      for(var i=before;i<this.bullets.length;i++){var b=this.bullets[i];if(b&&b.ownerId===owner.id)kids.push(b);}
+      for(var i=before;i<this.bullets.length;i++){
+        var b=this.bullets[i];if(b&&b.ownerId===parent.ownerId)kids.push(b);
+      }
       if(!kids.length)return out;
-      var center=Math.atan2(parent.vy||Math.sin(owner.angle),parent.vx||Math.cos(owner.angle));
-      var width=clusterWidth(owner.__v17FuseDepth||0),n=kids.length;
+      var heading=owner?owner.angle:0;
+      var center=Math.atan2(parent.vy||Math.sin(heading),parent.vx||Math.cos(heading));
+      var depth=parent.__novaClusterFuseDepth==null?(owner&&owner.__v17FuseDepth||0):parent.__novaClusterFuseDepth;
+      var width=clusterWidth(depth),n=kids.length;
       for(var j=0;j<n;j++){
         var u=n===1?.5:j/(n-1),a=center-width*.5+width*u;
         setSpeedAngle(kids[j],a,1);kids[j].__v171SectorChild=true;
       }
-      owner.__v171ApexMeter=1-width/1.92;
+      if(owner)owner.__v171ApexMeter=1-width/1.92;
       return out;
     };
   }
