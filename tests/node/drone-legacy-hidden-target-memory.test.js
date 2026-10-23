@@ -160,6 +160,7 @@ test('real Battlefield + Performance cover blocks cached drone pursuit', () => {
   s.tick();
   assert.ok(s.d.x < .5, 'no hidden pursuit through actual Battlefield wall');
   s.g.__novaTerrain = [];
-  for (let i = 0; i < 12; i++) s.tick();
-  assert.ok(s.d.x > 0, 'restored visibility resumes pursuit');
+  for (let i = 0; i < 30; i++) s.tick();
+  assert.equal(s.d.__novaLegacySeenX, 100, 'restored visibility refreshes the sighting');
+  assert.equal(s.d.targetRef, s.target);
 });
