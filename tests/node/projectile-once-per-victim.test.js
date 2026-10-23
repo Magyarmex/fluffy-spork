@@ -132,3 +132,39 @@ for (const perf of [false, true]) {
     assert.notEqual(g.damageTank, damage);
   });
 }
+
+for (const perf of [false, true]) {
+  const mode = perf ? 'Battlefield + Performance' : 'Battlefield';
+  test(mode + ': identical projectile coordinates do not confuse nested splash queries', () => {
+    const Game = boot(perf), g = new Game(), e = target('tank', 2);
+    g.hash.targets = [e];
+    const b1 = bullet(1), b2 = bullet(2);
+    // A splash query deliberately has the same x/y/r as the next core bullet
+    // query (r = 3 + 46), but it is not another direct projectile contact.
+    b1.splash = b2.splash = 49;
+    g.splashAt = function(x, y, radius) {
+      this.splashQueries = (this.splashQueries || 0) + 1;
+      this.hash.query(x, y, radius, this.tmp);
+    };
+    const splash = g.splashAt, query = g.hash.query;
+    g.bullets = [b1, b2];
+    for (let i = 0; i < 12; i++) {
+      g.time += 1 / 120; g.updateBullets(1 / 120);
+    }
+    assert.equal(e.hits, 2, 'each physical projectile may contact once');
+    assert.equal(g.splashQueries, 2);
+    assert.equal(b1.__novaDirectVictims.size, 1);
+    assert.equal(b2.__novaDirectVictims.size, 1);
+    assert.equal(g.splashAt, splash, 'existing own splash method restored');
+    assert.equal(g.hash.query, query);
+  });
+  test(mode + ': single-contact rounds do not allocate piercing ledgers', () => {
+    const Game = boot(perf), g = new Game(), e = target('tank', 2);
+    g.hash.targets = [e]; g.bullets = [bullet(1, -17, 60)];
+    const b = g.bullets[0]; b.pen = 0;
+    g.updateBullets(1 / 60);
+    assert.equal(e.hits, 1);
+    assert.equal(g.bullets.length, 0);
+    assert.equal(b.__novaDirectVictims, undefined);
+  });
+}
