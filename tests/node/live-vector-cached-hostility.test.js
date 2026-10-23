@@ -91,3 +91,13 @@ test('selector rejects a cached ally even when its coordinates are still sensed'
  const w=boot();w.enemy.team='blue';
  assert.equal(w.win.__testLiveVectorBestObserved(w.g,w.owner,w.enemy),w.other);
 });
+
+test('the corrected Live Vector module is wired into the materialized game',()=>{
+ const html=fs.readFileSync(path.join(__dirname,'../../index.html'),'utf8');
+ const base=html.indexOf('src="./nova-updates/controller-v1.3.0.js"');
+ const live=html.indexOf('src="./nova-updates/second-body-live-vector-v1.10.7.js"');
+ const fair=html.indexOf('src="./nova-updates/fair-engagement-v1.11.2.js"');
+ assert.ok(base>=0&&live>base&&fair>live,'production overlay order');
+ assert.equal(html.includes('src="./nova-updates/controller-command-weave-v1.10.0.js"'),false,
+   'retired Command Weave must not be mistaken for the shipping path');
+});
