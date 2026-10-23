@@ -169,3 +169,17 @@ test('actual Battlefield visibility controls defensive pursuit across cover dest
   g.updateDrones(1 / 60);
   assert.equal(d.__novaDefenseTarget, null);
 });
+
+
+test('defense visibility queries are bounded to actual nearby hostile drones', () => {
+  const { g, owner, d, visible } = scenario();
+  const remote = { id: 22, kind: 'drone', ownerId: 2, hp: 30,
+    r: 8, x: 900, y: 0 };
+  const ally = { id: 23, kind: 'drone', ownerId: 1, hp: 30,
+    r: 8, x: 20, y: 0 };
+  g.drones = [d, remote, ally, visible];
+  let queries = 0;
+  g.hasLineOfSight = () => { queries++; return true; };
+  assert.equal(g.acquireDroneTarget(d, owner, 650), visible);
+  assert.equal(queries, 1, 'only the in-range hostile needs a terrain ray');
+});
