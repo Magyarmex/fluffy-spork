@@ -34,6 +34,12 @@ function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
 function d2(ax,ay,bx,by){var x=bx-ax,y=by-ay;return x*x+y*y;}
 function norm(x,y){var m=Math.hypot(x,y)||1;return{x:x/m,y:y/m};}
 function solidAlive(s){return !!s&&s.solid!==false&&(!s.destructible||s.hp>0);}
+function pointInsideSolid(s,x,y,pad){
+  if(!solidAlive(s))return false;
+  pad=pad||0;
+  if(s.shape==='circle'){var r=s.r+pad;return d2(x,y,s.x,s.y)<=r*r;}
+  return Math.abs(x-s.x)<=s.w*.5+pad&&Math.abs(y-s.y)<=s.h*.5+pad;
+}
 
 function segRectHit(ax,ay,bx,by,s,pad){
   pad=pad||0;
@@ -139,7 +145,20 @@ wrap('game/engine',function(engine,require){
     if(!this.__novaTerrain){var init=oldLOS.call(this,ax,ay,bx,by,pad);if(!this.__novaTerrain)return init;}
     var list=segmentCandidates(this,ax,ay,bx,by,pad||2);if(!list)return oldLOS.call(this,ax,ay,bx,by,pad);
     var p=perfState(this);p.terrainQueries++;p.terrainCandidates+=list.length;
-    for(var i=0;i<list.length;i++){p.terrainNarrowTests++;var h=exactHit(list[i],ax,ay,bx,by,pad||2);if(h&&h.t>0.015&&h.t<1.01)return false;}
+    for(var i=0;i<list.length;i++){
+      p.terrainNarrowTests++;
+      var s=list[i];
+      /* Match Battlefield's physical-origin policy after candidate pruning.
+       * Only true interior is blocked at t=0: outward/tangent face travel
+       * remains legal while movement collision recovery runs. */
+      if(pointInsideSolid(s,ax,ay,1e-6)){
+        if(pointInsideSolid(s,ax,ay,-1e-6)||exactHit(s,ax,ay,bx,by,-1e-6))return false;
+        continue;
+      }
+      var h=exactHit(s,ax,ay,bx,by,pad||2);
+      if(h&&h.t>0.015&&h.t<1.01)return false;
+      if(((h&&h.t<=0.015)||(!h&&s.shape==='circle'&&(pointInsideSolid(s,ax,ay,pad||2)||pointInsideSolid(s,bx,by,pad||2))))&&exactHit(s,ax,ay,bx,by,-1e-6))return false;
+    }
     return true;
   };
   if(oldFirst)Game.prototype.firstTerrainHit=function(ax,ay,bx,by,pad){

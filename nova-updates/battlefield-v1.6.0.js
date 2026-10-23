@@ -112,7 +112,28 @@ function terrainCandidates(g,x0,y0,x1,y1,pad){
  return out;
 }
 function safePoint(g,x,y,pad){pad=pad||40;var a=terrainCandidates(g,x,y,x,y,pad);for(var i=0;i<a.length;i++)if(pointInsideSolid(a[i],x,y,pad))return false;return true;}
-function lineOfSight(g,ax,ay,bx,by,pad){pad=pad||1;var a=terrainCandidates(g,ax,ay,bx,by,pad);for(var i=0;i<a.length;i++){var h=solidHit(a[i],ax,ay,bx,by,pad);if(h&&h.t>0.015&&h.t<1.01)return false;}return true;}
+/* An entity may start inside cover before its movement collision recovery.
+ * Physical interior always occludes; a point exactly on the physical face may
+ * look outward or along the face, but not through it. The tiny inset is solely
+ * for distinguishing a boundary touch from travel through actual solid space. */
+function lineOfSight(g,ax,ay,bx,by,pad){
+  pad=pad||1;
+  var a=terrainCandidates(g,ax,ay,bx,by,pad);
+  for(var i=0;i<a.length;i++){
+    var s=a[i];
+    if(pointInsideSolid(s,ax,ay,1e-6)){
+      if(pointInsideSolid(s,ax,ay,-1e-6)||solidHit(s,ax,ay,bx,by,-1e-6))return false;
+      continue;
+    }
+    var h=solidHit(s,ax,ay,bx,by,pad);
+    if(h&&h.t>0.015&&h.t<1.01)return false;
+    /* A padded hit near the origin was historically ignored. It can still
+     * cross physical cover. A circle with both endpoints inside its padded
+     * radius may have no padded boundary crossing at all. */
+    if(((h&&h.t<=0.015)||(!h&&s.shape==='circle'&&(pointInsideSolid(s,ax,ay,pad)||pointInsideSolid(s,bx,by,pad))))&&solidHit(s,ax,ay,bx,by,-1e-6))return false;
+  }
+  return true;
+}
 function firstSolidHit(g,ax,ay,bx,by,pad){pad=pad||0;var a=terrainCandidates(g,ax,ay,bx,by,pad),bestS=null,bestH=null;for(var i=0;i<a.length;i++){var s=a[i],h=s.shape==='circle'&&pointInsideSolid(s,ax,ay,pad)?{t:0,x:ax,y:ay,nx:0,ny:0}:solidHit(s,ax,ay,bx,by,pad);if(h&&(!bestH||h.t<bestH.t)){bestS=s;bestH=h;}}return bestH?{solid:bestS,hit:bestH}:null;}
 function circleResolve(g,e,r){
  var hitAny=false,lastNx=0,lastNy=0;
