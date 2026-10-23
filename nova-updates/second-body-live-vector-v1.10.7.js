@@ -171,7 +171,8 @@ wrap('game/engine',function(engine,require){
     return false;
   }
   function bestObservedTank(g,owner,current){
-    if(current&&sensorSees(g,owner,current))return current;
+    /* Cached contacts must still obey hostility and spawn protection after relations change. */
+    if(current&&!(current.spawnShieldT>0)&&hostileOwners(g,owner,current)&&sensorSees(g,owner,current))return current;
     var best=null,score=Infinity,ts=g.tanks||[];
     for(var i=0;i<ts.length;i++){
       var t=ts[i];if(!t||!t.alive||t.id===owner.id||t.spawnShieldT>0||!hostileOwners(g,owner,t)||!sensorSees(g,owner,t))continue;
