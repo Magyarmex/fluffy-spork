@@ -11,14 +11,31 @@ function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
 wrap('game/engine',function(engine,require){
   var Game=engine.Game;if(!Game||Game.prototype.__novaBlastHardening)return;Game.prototype.__novaBlastHardening=true;
   var C=require('./classes').CLASSES||{};
-  function size(t){return ((t&&C[t.cls]&&C[t.cls].size)||15);}
+  function size(t){return t&&t.kind!=='tank'&&t.r>0?t.r:((t&&C[t.cls]&&C[t.cls].size)||15);}
   function clear(g,x,y,tx,ty){
     if(!g.firstTerrainHit)return true;
-    var dx=tx-x,dy=ty-y,d=Math.hypot(dx,dy)||1,sx=x-dx/d*3.5,sy=y-dy/d*3.5;
-    return !g.firstTerrainHit(sx,sy,tx,ty,1.35);
+    /* Physical face-exit handling lives in Battlefield; backing away from
+     * the source can move outward explosions inside their impact wall. */
+    return !g.firstTerrainHit(x,y,tx,ty,.001);
+  }
+  /* Cheap conservative broad phase: if no solid bounding box intersects
+   * the blast-to-hull corridor, all three exposure rays are necessarily clear.
+   * The hull sample offset and collision padding are included in the margin. */
+  function mayOcclude(g,x,y,tx,ty,margin){
+    var solids=g.__novaTerrain;if(!solids)return true;
+    var minx=Math.min(x,tx)-margin-2,maxx=Math.max(x,tx)+margin+2;
+    var miny=Math.min(y,ty)-margin-2,maxy=Math.max(y,ty)+margin+2;
+    for(var i=0;i<solids.length;i++){
+      var s=solids[i];if(!s||s.solid===false||(s.destructible&&s.hp<=0))continue;
+      var rx=s.shape==='circle'?s.r:s.w*.5,ry=s.shape==='circle'?s.r:s.h*.5;
+      if(!(rx>=0&&ry>=0))return true;
+      if(s.x+rx>=minx&&s.x-rx<=maxx&&s.y+ry>=miny&&s.y-ry<=maxy)return true;
+    }
+    return false;
   }
   function exposure(g,t,x,y){
     var dx=t.x-x,dy=t.y-y,d=Math.hypot(dx,dy)||1,px=-dy/d,py=dx/d,r=size(t)*.58,e=0;
+    if(!mayOcclude(g,x,y,t.x,t.y,r))return 1;
     if(clear(g,x,y,t.x,t.y))e+=.56;
     if(clear(g,x,y,t.x+px*r,t.y+py*r))e+=.22;
     if(clear(g,x,y,t.x-px*r,t.y-py*r))e+=.22;
@@ -27,14 +44,14 @@ wrap('game/engine',function(engine,require){
   Game.prototype.novaHardBlastExposure=function(t,x,y){return exposure(this,t,x,y);};
   var oldSplash=Game.prototype.splashAt;
   Game.prototype.splashAt=function(x,y,radius){
-    var c=this.__v172HardBlast||(this.__v172HardBlast={active:false,x:0,y:0,radius:0}),pa=c.active,px=c.x,py=c.y,pr=c.radius;
+    var c=this.__v172HardBlast||(this.__v172HardBlast={active:false,x:0,y:0,radius:0,targets:[]}),pa=c.active,px=c.x,py=c.y,pr=c.radius,previousWeights=c.weights;
     c.active=true;c.x=x;c.y=y;c.radius=radius||0;
-    /* The compressed core's splash broad phase indexes entity CENTERS.
-     * Querying only the blast radius drops overlapping large shapes when
-     * their centers fall across a spatial-cell boundary. Also, core tanks
-     * have no .r property, so its d > radius + e.r check becomes NaN and
-     * can apply negative damage (healing!) to distant tanks in the same cell.
-     * Fix both locally without replacing the core or bypassing cover hooks. */
+    /* Core splash directly subtracts shape HP, bypassing damageTank cover.
+     * Divert all combat candidates, preserve their original query order and
+     * exact core falloff, and reuse damageTank's existing cover wrapper.
+     * Core retains its audio, visual and screen-shake effects. */
+    var targets=pa?[]:(c.targets||(c.targets=[]));targets.length=0;
+    var weights=pa?new Map():(c.weights||(c.weights=new Map()));weights.clear();c.weights=weights;
     var hash=this.hash,oldQuery=hash&&hash.query,hadQuery=hash&&Object.prototype.hasOwnProperty.call(hash,'query');
     var expanded=false,self=this,temporary=[];
     var ts=this.tanks||[];
@@ -43,26 +60,63 @@ wrap('game/engine',function(engine,require){
       if(t&&t.r==null){t.r=size(t);temporary.push(t);}
     }
     if(hash&&typeof oldQuery==='function'){
-      hash.query=function(qx,qy,qr,out){
-        if(!expanded&&out===self.tmp&&qx===x&&qy===y&&qr===radius){
+      var hook=function(qx,qy,qr,out){
+        if(hash.query===hook&&!expanded&&out===self.tmp&&qx===x&&qy===y&&qr===radius){
           expanded=true;
-          return oldQuery.call(this,qx,qy,qr+33,out);
+          var result=oldQuery.call(this,qx,qy,qr+33,out),write=0;
+          for(var k=0;k<out.length;k++){
+            var e=out[k];
+            if(e&&(e.kind==='shape'||e.kind==='tank'||e.kind==='drone')){
+              targets.push(e);
+              /* Snapshot exposure BEFORE Battlefield applies splash damage
+               * to destructible cover after the core splash method returns. */
+              if(Math.hypot(e.x-x,e.y-y)<=radius+(e.r||0))weights.set(e,exposure(self,e,x,y));
+            }else out[write++]=e;
+          }
+          out.length=write;
+          return result;
         }
         return oldQuery.apply(this,arguments);
       };
+      hash.query=hook;
     }
-    try{return oldSplash.apply(this,arguments);}finally{
+    try{
+      var result=oldSplash.apply(this,arguments),frac=arguments[3],ownerId=arguments[4],dmg=arguments[7];
+      for(var j=0;j<targets.length;j++){
+        var e=targets[j];
+        if(!e)continue;
+        var d=Math.hypot(e.x-x,e.y-y);
+        if(d>radius+e.r)continue;
+        var fall=1-(d/radius)*.5,sd=dmg*frac*fall;
+        if(e.kind==='shape'&&e.hp<=0)continue;
+        if(e.kind==='shape'){
+          var se=weights.get(e);
+          if(se<=.001)continue;
+          e.hp-=sd*se;e.flash=Math.max(e.flash,0.12);
+          if(e.hp<=0)this.killShape(e);
+        }else if(e.kind==='tank'&&e.id!==ownerId&&e.alive){
+          /* Existing damageTank wrapper applies tank exposure exactly once. */
+          var ang=Math.atan2(e.y-y,e.x-x);
+          this.damageTank(e,sd,ownerId,Math.cos(ang)*(arguments[5]||0)*fall*.01,Math.sin(ang)*(arguments[5]||0)*fall*.01);
+        }else if(e.kind==='drone'&&e.ownerId!==ownerId&&e.hp>0){
+          var de=weights.get(e);
+          if(de>.001)this.damageDrone(e,sd*de,ownerId);
+        }
+      }
+      return result;
+    }finally{
       if(hash&&typeof oldQuery==='function'){
         if(hadQuery)hash.query=oldQuery;else delete hash.query;
       }
-      for(var j=0;j<temporary.length;j++)delete temporary[j].r;
+      for(var k=0;k<temporary.length;k++)delete temporary[k].r;
+      targets.length=0;weights.clear();c.weights=pa?previousWeights:weights;
       c.active=pa;c.x=px;c.y=py;c.radius=pr;
     }
   };
   var oldDamage=Game.prototype.damageTank;
   Game.prototype.damageTank=function(t,dmg,srcId,kx,ky){
     var c=this.__v172HardBlast;if(!c||!c.active||!t||!t.alive)return oldDamage.apply(this,arguments);
-    var e=exposure(this,t,c.x,c.y);if(e<=.001)return 0;
+    var e=c.weights&&c.weights.has(t)?c.weights.get(t):exposure(this,t,c.x,c.y);if(e<=.001)return 0;
     var soft=this.__v172BlastContext,softActive=soft&&soft.active;if(soft)soft.active=false;
     try{return oldDamage.call(this,t,dmg*e,srcId,(kx||0)*e,(ky||0)*e);}finally{if(soft)soft.active=softActive;}
   };
