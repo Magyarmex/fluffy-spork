@@ -171,7 +171,8 @@ wrap('game/engine',function(engine,require){
     return false;
   }
   function bestObservedTank(g,owner,current){
-    if(current&&sensorSees(g,owner,current))return current;
+    /* Cached contacts must still obey hostility and spawn protection after relations change. */
+    if(current&&!(current.spawnShieldT>0)&&hostileOwners(g,owner,current)&&sensorSees(g,owner,current))return current;
     var best=null,score=Infinity,ts=g.tanks||[];
     for(var i=0;i<ts.length;i++){
       var t=ts[i];if(!t||!t.alive||t.id===owner.id||t.spawnShieldT>0||!hostileOwners(g,owner,t)||!sensorSees(g,owner,t))continue;
@@ -198,6 +199,13 @@ wrap('game/engine',function(engine,require){
       var p=aiPlan(owner,now);p.now=now;
       if(owner.hp<p.lastOwnHp-1&&owner.hp/Math.max(1,owner.maxHp)<.20)p.releaseUntil=Math.max(p.releaseUntil,now+.42);
       p.lastOwnHp=owner.hp;
+      /* Hostility and spawn protection are safety gates, not delayed sensory
+       * discoveries. Release an invalid committed target even between AI thinks. */
+      if(p.targetId>=0&&g.getTank){var held=g.getTank(p.targetId);
+        if(!held||!held.alive||held.spawnShieldT>0||!hostileOwners(g,owner,held)){
+          p.targetId=-1;p.active=false;p.commandPower=0;owner.ai.targetId=-1;
+        }
+      }
       if(now<p.thinkAt)continue;
       p.thinkAt=now+(owner.ai.isElite?AI_ELITE_THINK:AI_NORMAL_THINK)+((Math.abs(owner.id||0)%3)*.025);
       var current=p.targetId>=0&&g.getTank?g.getTank(p.targetId):null,target=bestObservedTank(g,owner,current);

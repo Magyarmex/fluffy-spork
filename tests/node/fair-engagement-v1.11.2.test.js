@@ -170,3 +170,26 @@ test('AI doctrine cannot regress to global minimap radar or player-priority targ
   assert.doesNotMatch(doctrine, /every living tank’s current world position is legal AI knowledge/);
   assert.doesNotMatch(doctrine, /The player remains an attractive target/);
 });
+
+test('Fair Engagement cached Controller target cannot bypass a new spawn shield',()=>{
+  const {load}=boot(),Game=load('game/engine').Game;
+  const g=Object.assign(new Game(),game(800,600,1));
+  const owner=tank(1,0,0,{cls:'carrier',ai:{state:'hunt',targetId:2,__v1112TargetId:2}});
+  const shielded=tank(2,100,0,{spawnShieldT:2});
+  const alternate=tank(3,180,0,{spawnShieldT:0});
+  g.tanks=[owner,shielded,alternate];
+  g.updateDrones(1/60);
+  assert.equal(owner.__novaLiveVectorAI.targetId,alternate.id,
+    'cached shielded target must not be re-injected by the outer Fair Engagement wrapper');
+  assert.equal(owner.ai.__v1112TargetId,alternate.id);
+});
+test('Fair Engagement preserves a legitimate unshielded cached Controller target',()=>{
+  const {load}=boot(),Game=load('game/engine').Game;
+  const g=Object.assign(new Game(),game(800,600,1));
+  const owner=tank(1,0,0,{cls:'carrier',ai:{state:'hunt',targetId:2,__v1112TargetId:2}});
+  const current=tank(2,100,0,{spawnShieldT:0});
+  const alternate=tank(3,180,0,{spawnShieldT:0});
+  g.tanks=[owner,current,alternate];
+  g.updateDrones(1/60);
+  assert.equal(owner.__novaLiveVectorAI.targetId,current.id);
+});

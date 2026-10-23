@@ -98,7 +98,7 @@ function chooseTarget(g,classes,observer,a,now){
 function replanDelay(t){return (t&&t.ai&&t.ai.isElite?ELITE_REPLAN:NORMAL_REPLAN)+(Math.abs(Number(t&&t.id)||0)%4)*.009;}
 function fairTarget(g,classes,t,now){
   var a=t.ai||{},cur=a.__v1112TargetId>=0&&g.getTank?g.getTank(a.__v1112TargetId):null;
-  var valid=cur&&alive(cur)&&hostile(g,t,cur)&&canPerceive(g,classes,t,cur)&&cur.spawnShieldT<=0;
+  var valid=cur&&alive(cur)&&hostile(g,t,cur)&&canPerceive(g,classes,t,cur)&&!(cur.spawnShieldT>0);
   if(!valid||now>=Number(a.__v1112NextThink||0)){
     cur=chooseTarget(g,classes,t,a,now);
     a.__v1112TargetId=cur?cur.id:-1;
@@ -210,7 +210,8 @@ wrap('game/engine',function(engine,require){
   function targetFor(owner,g){
     var id=owner&&owner.ai&&owner.ai.__v1112TargetId;
     var t=id>=0&&g.getTank?g.getTank(id):null;
-    return t&&alive(t)&&hostile(g,owner,t)&&canPerceive(g,classes,owner,t)?t:null;
+    /* The fast cached Controller slot must enforce the same spawn-shield gate as scoreTarget. */
+    return t&&alive(t)&&hostile(g,owner,t)&&!(t.spawnShieldT>0)&&canPerceive(g,classes,owner,t)?t:null;
   }
   function syncControllerPlans(g){
     var now=Number(g.time)||0,ts=g.tanks||[];
