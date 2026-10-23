@@ -25,7 +25,7 @@ function shippingUpdater() {
 }
 const coreUpdate = shippingUpdater();
 
-function boot(optimized) {
+function boot(optimized, apex = false) {
   function Game() {
     this.hash = { query: (_x, _y, _r, out) => {
       out.length = 0; out.push(...this.targets);
@@ -40,9 +40,13 @@ function boot(optimized) {
   }
   Game.prototype.randSpawnPos = () => ({ x: 1500, y: 1500 });
   Game.prototype.moveTank = function (t, vx, vy, dt) { t.x += vx * dt; t.y += vy * dt; };
-  Game.prototype.getTank = () => null;
+  Game.prototype.getTank = function () { return this.__testOwner || null; };
   Game.prototype.updateBullets = coreUpdate;
-  Game.prototype.clusterBurst = function () { this.bursts++; };
+  Game.prototype.clusterBurst = function (parent) {
+    this.bursts++;
+    if (this.__testChildren) for (let i = 0; i < 6; i++)
+      this.bullets.push({ ownerId: parent.ownerId, vx: 100, vy: 0 });
+  };
   Game.prototype.damageShape = function (e, dmg) {
     this.damageEvents.push(e.id); e.hp -= dmg;
   };
@@ -56,9 +60,10 @@ function boot(optimized) {
   };
   const ctx = { window: { __novaModules: modules }, console, Math, Map, Date,
     performance: { now: () => 0 } };
-  for (const file of optimized ?
-    ['battlefield-v1.6.0.js', 'performance-v1.7.5.js'] :
-    ['battlefield-v1.6.0.js']) {
+  const files = ['battlefield-v1.6.0.js'];
+  if (apex) files.push('apex-disciplines-v1.7.1.js');
+  if (optimized) files.push('performance-v1.7.5.js');
+  for (const file of files) {
     vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../nova-updates', file), 'utf8'),
       ctx, { filename: file });
   }
@@ -115,5 +120,24 @@ for (const optimized of [false, true]) {
     g.bullets = [shell(-100, 0, { ttl: .001 })];
     g.updateBullets(.016);
     assert.equal(g.bursts, 1);
+  });
+}
+
+for (const optimized of [false, true]) {
+  test((optimized ? 'optimized' : 'base') +
+    ': Apex Cluster King reshapes the first burst but not phantom later bursts', () => {
+    const g = new (boot(optimized, true))();
+    g.time = 1; g.__novaTerrain = [];
+    g.__testChildren = true;
+    g.__testOwner = { id: 1, cls: 'clusterking', angle: 0, __v17FuseDepth: .7 };
+    const parent = shell(0, 100, { pen: 2 });
+    g.clusterBurst(parent);
+    g.clusterBurst(parent);
+    assert.equal(g.bursts, 1);
+    assert.equal(g.bullets.length, 6);
+    assert.ok(g.bullets.every(child => child.__v171SectorChild),
+      'the legitimate first burst must retain Apex sector shaping');
+    const angles = g.bullets.map(b => Math.atan2(b.vy, b.vx));
+    assert.ok(angles[0] < angles[5], 'Cluster King sector still spreads its children');
   });
 }
