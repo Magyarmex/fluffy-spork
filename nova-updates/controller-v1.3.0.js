@@ -1030,7 +1030,11 @@
       var leash = d.leash * (swarming ? 1.35 : 1);
       d.retargetT -= dt;
       var target = d.targetRef;
-      if (target && (target.hp <= 0 || (target.kind === 'tank' && !target.alive))) target = null;
+      // Cached targets are not exemptions from spawn safety or current
+      // allegiance. Recheck these gates every tick, not only on acquisition.
+      if (target && (target.hp <= 0 ||
+          (target.kind === 'tank' && (!target.alive || target.spawnShieldT > 0)) ||
+          ((target.kind === 'tank' || target.kind === 'drone') && !combatHostile(g, owner, target)))) target = null;
       // Enemy drone coordinates are not on the public minimap. Unlike tanks
       // and farm shapes, a cached drone must be leashed by its last sighting,
       // not its live position after it disappears behind cover.
