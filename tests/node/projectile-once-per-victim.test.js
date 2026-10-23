@@ -168,3 +168,40 @@ for (const perf of [false, true]) {
     assert.equal(b.__novaDirectVictims, undefined);
   });
 }
+
+test('direct-contact query signature is still present in the canonical shipping core', () => {
+  assert.ok(html.includes('this.hash.query(b.x, b.y, b.r + 46, this.tmp)'),
+    'core query ordering changed: review Battlefield contact-ledger integration');
+});
+for (const perf of [false, true]) {
+  test((perf ? 'Performance' : 'Battlefield') +
+    ': dead bullet splices do not misattribute the next projectile contact', () => {
+    const Game = boot(perf), g = new Game(), e = target('tank', 2);
+    g.hash.targets = [e];
+    const first = bullet(1), dead = bullet(2), last = bullet(3);
+    dead.dead = true;
+    g.bullets = [first, dead, last];
+    for (let i = 0; i < 12; i++) {
+      g.time += 1 / 120; g.updateBullets(1 / 120);
+    }
+    assert.equal(e.hits, 2, 'dead middle entry must not steal the next query');
+    assert.equal(first.__novaDirectVictims.size, 1);
+    assert.equal(last.__novaDirectVictims.size, 1);
+    assert.equal(g.bullets.length, 2);
+  });
+  test((perf ? 'Performance' : 'Battlefield') +
+    ': a non-piercing projectile removed between two piercing shots preserves identity', () => {
+    const Game = boot(perf), g = new Game(), e = target('tank', 2);
+    g.hash.targets = [e];
+    const first = bullet(1), consumed = bullet(2), last = bullet(3);
+    consumed.pen = 0;
+    g.bullets = [first, consumed, last];
+    for (let i = 0; i < 12; i++) {
+      g.time += 1 / 120; g.updateBullets(1 / 120);
+    }
+    assert.equal(e.hits, 3, 'all three distinct projectiles get one direct hit');
+    assert.equal(first.__novaDirectVictims.size, 1);
+    assert.equal(last.__novaDirectVictims.size, 1);
+    assert.equal(g.bullets.length, 2);
+  });
+}
