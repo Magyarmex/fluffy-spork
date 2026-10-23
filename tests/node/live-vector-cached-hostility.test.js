@@ -126,3 +126,57 @@ test('AI Controller retains valid hostile commitment between think ticks',()=>{
  assert.equal(p.active,true);
  assert.equal(p.thinkAt,scheduled);
 });
+
+function bootShippingComposition(){
+ class Game{
+  constructor(){this.time=10;this.w=800;this.h=600;this.cam={zoom:1};
+   this.tanks=[];this.drones=[];this.tankById=new Map();this.player=null;}
+  getTank(id){return this.tankById.get(id)||null;}
+  updateDrones(){}
+ }
+ const mods={'game/engine':m=>{m.exports.Game=Game;}};
+ const win={__novaModules:mods,NOVATips:{registerMany(){}}};
+ const ctx={window:win,document:{addEventListener(){}},
+  console:{info(){},warn(){},error(){}},Math,Number,Map,Set,Date,Object,Array,WeakMap};
+ for(const file of ['second-body-live-vector-v1.10.7.js','fair-engagement-v1.11.2.js']){
+  const src=fs.readFileSync(path.join(__dirname,'../../nova-updates',file),'utf8');
+  vm.runInNewContext(src,ctx,{filename:file});
+ }
+ const m={exports:{}};
+ mods['game/engine'](m,m.exports,()=>({
+  CLASSES:{carrier:{droneLeash:650}},
+  lineageForClass:()=> 'controller'
+ }));
+ const g=new m.exports.Game();
+ const owner={id:1,cls:'carrier',kind:'tank',alive:true,isPlayer:false,
+  team:'blue',x:0,y:0,angle:0,hp:100,maxHp:100,swarmT:0,
+  ai:{state:'hunt',targetId:2,__v1112TargetId:2,isElite:false,strafe:1}};
+ const enemy={id:2,cls:'carrier',kind:'tank',alive:true,team:'red',
+  x:120,y:0,hp:100,maxHp:100,spawnShieldT:0};
+ const other={id:3,cls:'carrier',kind:'tank',alive:true,team:'red',
+  x:180,y:0,hp:100,maxHp:100,spawnShieldT:0};
+ g.tanks=[owner,enemy,other];g.tankById=new Map(g.tanks.map(t=>[t.id,t]));
+ g.areAllies=(a,b)=>a.team===b.team;g.areHostile=(a,b)=>a.team!==b.team;
+ g.hasLineOfSight=()=>true;
+ return{g,owner,enemy,other};
+}
+test('shipping Live Vector + Fair Engagement redirects newly shielded cached target',()=>{
+ const w=bootShippingComposition();w.g.updateDrones(1/60);
+ assert.equal(w.owner.__novaLiveVectorAI.targetId,w.enemy.id);
+ w.enemy.spawnShieldT=2;w.g.time+=.05;w.g.updateDrones(1/60);
+ assert.equal(w.owner.__novaLiveVectorAI.targetId,w.other.id);
+ assert.equal(w.owner.ai.__v1112TargetId,w.other.id);
+});
+test('shipping Live Vector + Fair Engagement redirects newly allied cached target',()=>{
+ const w=bootShippingComposition();w.g.updateDrones(1/60);
+ w.enemy.team='blue';w.g.time+=.05;w.g.updateDrones(1/60);
+ assert.equal(w.owner.__novaLiveVectorAI.targetId,w.other.id);
+ assert.equal(w.owner.ai.__v1112TargetId,w.other.id);
+});
+test('shipping Live Vector + Fair Engagement releases when all targets become protected',()=>{
+ const w=bootShippingComposition();w.g.updateDrones(1/60);
+ w.enemy.spawnShieldT=2;w.other.spawnShieldT=2;w.g.time+=.05;
+ w.g.updateDrones(1/60);
+ assert.equal(w.owner.__novaLiveVectorAI.targetId,-1);
+ assert.equal(w.owner.__novaLiveVectorAI.active,false);
+});
