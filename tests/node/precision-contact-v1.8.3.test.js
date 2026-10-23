@@ -171,3 +171,15 @@ test('precision contact still announces a projectile with sufficient lifetime',(
   assert.equal(g.__v183Contact.sparks.length,1);
   assert.equal(g.sfx.swoosh,1);
 });
+
+
+test('precision contact TTL equality matches core expiration semantics exactly',()=>{
+  const {Game}=load(),enemy={id:7,isPlayer:false,alive:true,x:1000,y:0};
+  for(const [ttl,expected] of [[1.3,0],[1.300001,1],[0,0]]){
+    const g=new Game();
+    g.tryFire(enemy);
+    g.bullets[0].ttl=ttl;
+    g.updateBullets(1.3);
+    assert.equal(g.__v183Contact.sparks.length,expected,'ttl='+ttl);
+  }
+});
