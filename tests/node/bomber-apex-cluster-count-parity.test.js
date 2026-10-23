@@ -223,3 +223,42 @@ for (const optimized of [false, true]) {
     });
   }
 }
+
+for (const optimized of [false, true]) {
+  const label = optimized ? 'optimized' : 'base';
+  for (const cls of ['bomber', 'clusterking', 'siegebomber']) {
+    for (const fps of [30, 60, 120, 240]) {
+      test(label + ': ' + cls + ' programmable Cannon airburst retains child count at ' + fps + 'Hz', () => {
+        const { g, parent } = setup(boot(optimized), cls);
+        Object.assign(parent, {
+          vx: 12000, vy: 0, ttl: 2,
+          __v17Cannon: true, __v17FuseDist: 40,
+          __v17FuseArmed: true, __v17SpawnX: parent.x, __v17SpawnY: parent.y,
+        });
+        g.updateBullets(1 / fps);
+        const kids = g.bullets.filter(b => !b.shell && !b.dead);
+        assert.equal(kids.length, CLASSES[cls].bullet.cluster);
+        assert.ok(kids.every(b => b.ownerId === parent.ownerId));
+        assert.ok(!g.bullets.includes(parent), 'fused parent must be removed');
+        g.clusterBurst(parent);
+        assert.equal(g.bullets.length, kids.length, 'fuse must not allow a second burst');
+      });
+      test(label + ': ' + cls + ' breaching shell retains full child count at ' + fps + 'Hz', () => {
+        const { g, parent } = setup(boot(optimized), cls);
+        g.__novaBattlefield = { coverBroken: 0 };
+        g.__novaTerrain = [{ id: -1, shape: 'rect', x: 0, y: 0,
+          w: 160, h: 160, solid: true, destructible: true, hp: 5 }];
+        Object.assign(parent, {
+          x: -120, y: 0, px: -120, py: 0,
+          vx: 12000, vy: 0, r: 2, ttl: .001, pen: 3,
+        });
+        g.updateBullets(1 / fps);
+        assert.equal(g.__novaTerrain[0].solid, false, 'cover must actually break');
+        const kids = g.bullets.filter(b => !b.shell && !b.dead);
+        assert.equal(kids.length, CLASSES[cls].bullet.cluster,
+          'broken cover must not discard fragments');
+        assert.ok(kids.every(b => b.ownerId === parent.ownerId));
+      });
+    }
+  }
+}
