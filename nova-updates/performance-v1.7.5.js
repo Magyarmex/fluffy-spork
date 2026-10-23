@@ -78,13 +78,18 @@ function exactHit(s,ax,ay,bx,by,pad){
 function outwardFaceTravel(s,ax,ay,bx,by,pad){
  if(!solidAlive(s)||pointInsideSolid(s,ax,ay,-1e-6))return false;
  var dx=bx-ax,dy=by-ay;if(dx*dx+dy*dy<1e-18)return false;
+ /* Preserve the existing padded-origin contract: overlap *near* a wall
+  * still collides. Only the exact physical face may release outward. */
+ var eps=1e-7;
  if(s.shape==='circle'){
-   var fx=ax-s.x,fy=ay-s.y,r=s.r+(pad||0);
-   return fx*fx+fy*fy<=(r+1e-7)*(r+1e-7)&&fx*dx+fy*dy>=0;
+   var fx=ax-s.x,fy=ay-s.y;
+   return Math.abs(Math.hypot(fx,fy)-s.r)<=eps&&fx*dx+fy*dy>=0;
  }
  var hx=s.w*.5,hy=s.h*.5;
- return (ax>=s.x+hx-1e-7&&dx>=0)||(ax<=s.x-hx+1e-7&&dx<=0)||
-        (ay>=s.y+hy-1e-7&&dy>=0)||(ay<=s.y-hy+1e-7&&dy<=0);
+ return (Math.abs(ax-(s.x+hx))<=eps&&dx>=0)||
+        (Math.abs(ax-(s.x-hx))<=eps&&dx<=0)||
+        (Math.abs(ay-(s.y+hy))<=eps&&dy>=0)||
+        (Math.abs(ay-(s.y-hy))<=eps&&dy<=0);
 }
 function bounds(s,pad){
   pad=pad||0;
