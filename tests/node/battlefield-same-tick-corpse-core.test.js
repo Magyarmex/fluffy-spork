@@ -7,7 +7,24 @@ const vm = require('node:vm');
 
 // The original engine queries the same spatial hash for each bullet in reverse
 // order. A killed shape remains in that hash until the next rebuild.
-function boot(withPerformance = false) {
+function materializedCoreBulletUpdater() {
+  const html = fs.readFileSync(path.join(__dirname, '../../index.html'), 'utf8');
+  const marker = '    updateBullets(dt) {';
+  const start = html.indexOf(marker);
+  assert.ok(start >= 0, 'materialized canonical core bullet method missing');
+  let end = start + marker.length, depth = 1;
+  for (; end < html.length && depth; end++) {
+    if (html[end] === '{') depth++;
+    else if (html[end] === '}') depth--;
+  }
+  assert.equal(depth, 0, 'unbalanced canonical core bullet method');
+  const body = html.slice(start + marker.length, end - 1);
+  return new Function('types_1', 'classes_1', 'M', 'return function(dt){' + body + '}')(
+    { dist2: (ax, ay, bx, by) => (ax - bx) ** 2 + (ay - by) ** 2 },
+    { CLASSES: { scout: { size: 14 } } }, 2250);
+}
+
+function boot(withPerformance = false, realCore = false) {
   class Hash {
     constructor() { this.targets = []; }
     query(_x, _y, _r, out) { out.length = 0; out.push(...this.targets); }
@@ -50,6 +67,7 @@ function boot(withPerformance = false) {
       if (b.dead) this.bullets.splice(i, 1);
     }
   };
+  if (realCore) Game.prototype.updateBullets = materializedCoreBulletUpdater();
   function Sfx() {}
   Sfx.prototype.resume = function () {};
   const modules = {
@@ -120,5 +138,26 @@ for (const withPerformance of [false, true]) {
     assert.throws(() => g.updateBullets(.016), /injected query failure/);
     assert.equal(g.hash.query, failing);
     assert.notEqual(g.hash.query, original);
+  });
+}
+
+for (const withPerformance of [false, true]) {
+  test((withPerformance ? 'Battlefield + Performance' : 'Battlefield') +
+    ': materialized core does not repeat a same-tick neutral kill', () => {
+    const Game = boot(withPerformance, true), g = new Game();
+    g.time = 1; g.__novaTerrain = [];
+    const shape = { kind: 'shape', id: 7, x: 0, y: 0, r: 20, hp: 10 };
+    const tank = { kind: 'tank', id: 8, x: 0, y: 0, cls: 'scout', alive: true };
+    g.hash.targets = [shape, tank];
+    g.bullets = [0, 1].map(() => ({ x: 0, y: 0, vx: 0, vy: 0, ttl: 1,
+      r: 2, dmg: 15, pen: 0, hits: 0, ownerId: 1, dead: false }));
+    let shapeDamage = 0, tankDamage = 0;
+    g.damageShape = e => { shapeDamage++; e.hp -= 15; };
+    g.damageTank = e => { assert.equal(e, tank); tankDamage++; };
+    g.updateBullets(.016);
+    assert.equal(shapeDamage, 1);
+    assert.equal(tankDamage, 1);
+    assert.equal(g.bullets.length, 0);
+    assert.equal(Object.hasOwn(g.hash, 'query'), false);
   });
 }
