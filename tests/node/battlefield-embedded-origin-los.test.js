@@ -134,3 +134,49 @@ test('shipping Swarm → Battlefield → Performance composition denies embedded
   assert.deepEqual(g.hits, [], 'no damage should pass from embedded drone through wall');
   assert.equal(target.hp, 30);
 });
+
+
+function physicalInteriorCrossing(s, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay, epsilon = 1e-6;
+  if (s.shape === 'circle') {
+    const length2 = dx * dx + dy * dy;
+    const t = Math.max(0, Math.min(1, ((s.x - ax) * dx + (s.y - ay) * dy) / (length2 || 1)));
+    const x = ax + dx * t - s.x, y = ay + dy * t - s.y;
+    return x * x + y * y < (s.r - epsilon) ** 2;
+  }
+  let lo = 0, hi = 1;
+  for (const [origin, velocity, min, max] of [
+    [ax, dx, s.x - s.w / 2 + epsilon, s.x + s.w / 2 - epsilon],
+    [ay, dy, s.y - s.h / 2 + epsilon, s.y + s.h / 2 - epsilon]
+  ]) {
+    if (Math.abs(velocity) < 1e-12) {
+      if (origin <= min || origin >= max) return false;
+    } else {
+      let t0 = (min - origin) / velocity, t1 = (max - origin) / velocity;
+      if (t0 > t1) [t0, t1] = [t1, t0];
+      lo = Math.max(lo, t0); hi = Math.min(hi, t1);
+      if (hi <= lo) return false;
+    }
+  }
+  return hi >= 0 && lo <= 1;
+}
+
+test('independent physical-interior oracle: no transparent solid crossings at 30k deterministic segments', () => {
+  const Base = boot(), Optimized = boot({ optimized: true });
+  let seed = 0x75bcd15;
+  const rnd = () => { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5; return (seed >>> 0) / 0x100000000; };
+  let physicalCrossings = 0;
+  for (const shape of [rectangle(), { ...pillar(), r: 25 }]) {
+    const a = new Base(), b = new Optimized();
+    a.__novaTerrain = [{ ...shape }]; b.__novaTerrain = [{ ...shape }];
+    for (let i = 0; i < 15000; i++) {
+      const ax = (rnd() - .5) * 140, ay = (rnd() - .5) * 140;
+      const bx = (rnd() - .5) * 140, by = (rnd() - .5) * 140;
+      if (!physicalInteriorCrossing(shape, ax, ay, bx, by)) continue;
+      physicalCrossings++;
+      assert.equal(a.hasLineOfSight(ax, ay, bx, by, 2), false, 'Battlefield physical crossing ' + i);
+      assert.equal(b.hasLineOfSight(ax, ay, bx, by, 2), false, 'optimized physical crossing ' + i);
+    }
+  }
+  assert.ok(physicalCrossings > 3000, 'randomized test must cover meaningful physical intersections');
+});
