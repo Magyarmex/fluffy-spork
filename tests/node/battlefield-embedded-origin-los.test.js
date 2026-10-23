@@ -107,7 +107,7 @@ test('optimized spatial broad-phase preserves Battlefield LOS answers over 10,00
   const Base = boot(), Optimized = boot({ optimized: true });
   const a = new Base(), b = new Optimized();
   const terrain = [rectangle(), { ...pillar(), x: 50, y: 50, r: 25 }, { ...rectangle(), x: -80, y: 40 }];
-  a.__novaTerrain = terrain; b.__novaTerrain = terrain;
+  a.__novaTerrain = terrain.map(s => ({ ...s })); b.__novaTerrain = terrain.map(s => ({ ...s }));
   let seed = 0x12345678;
   const rnd = () => { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5; return (seed >>> 0) / 0x100000000; };
   for (let i = 0; i < 10000; i++) {
