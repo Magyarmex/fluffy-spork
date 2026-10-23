@@ -121,9 +121,8 @@ function lineOfSight(g,ax,ay,bx,by,pad){
   var a=terrainCandidates(g,ax,ay,bx,by,pad);
   for(var i=0;i<a.length;i++){
     var s=a[i];
-    if(pointInsideSolid(s,ax,ay,-1e-6))return false;
     if(pointInsideSolid(s,ax,ay,0)){
-      if(solidHit(s,ax,ay,bx,by,-1e-6))return false;
+      if(pointInsideSolid(s,ax,ay,-1e-6)||solidHit(s,ax,ay,bx,by,-1e-6))return false;
       continue;
     }
     var h=solidHit(s,ax,ay,bx,by,pad);
@@ -131,7 +130,7 @@ function lineOfSight(g,ax,ay,bx,by,pad){
     /* A padded hit near the origin was historically ignored. It can still
      * cross physical cover. A circle with both endpoints inside its padded
      * radius may have no padded boundary crossing at all. */
-    if(((h&&h.t<=0.015)||(!h&&(pointInsideSolid(s,ax,ay,pad)||pointInsideSolid(s,bx,by,pad))))&&solidHit(s,ax,ay,bx,by,-1e-6))return false;
+    if(((h&&h.t<=0.015)||(!h&&s.shape==='circle'&&(pointInsideSolid(s,ax,ay,pad)||pointInsideSolid(s,bx,by,pad))))&&solidHit(s,ax,ay,bx,by,-1e-6))return false;
   }
   return true;
 }
