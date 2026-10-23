@@ -151,7 +151,7 @@ wrap('game/engine',function(engine,require){
       /* Match Battlefield's physical-origin policy after candidate pruning.
        * Only true interior is blocked at t=0: outward/tangent face travel
        * remains legal while movement collision recovery runs. */
-      if(pointInsideSolid(s,ax,ay,0)){
+      if(pointInsideSolid(s,ax,ay,1e-6)){
         if(pointInsideSolid(s,ax,ay,-1e-6)||exactHit(s,ax,ay,bx,by,-1e-6))return false;
         continue;
       }
