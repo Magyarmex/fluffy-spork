@@ -60,6 +60,19 @@ function segCircleHit(ax,ay,bx,by,s,pad){
 function solidAlive(s){return !!s&&s.solid!==false&&(!s.destructible||s.hp>0);}
 function solidHit(s,ax,ay,bx,by,pad){if(!solidAlive(s))return null;return s.shape==='circle'?segCircleHit(ax,ay,bx,by,s,pad||0):segRectHit(ax,ay,bx,by,s,pad||0);}
 function pointInsideSolid(s,x,y,pad){if(!solidAlive(s))return false;pad=pad||0;if(s.shape==='circle'){var r=s.r+pad;return d2(x,y,s.x,s.y)<=r*r;}return Math.abs(x-s.x)<=s.w*.5+pad&&Math.abs(y-s.y)<=s.h*.5+pad;}
+/* A projectile spawned exactly on a wall/pillar face may leave or skim it.
+ * Never excuse a genuinely embedded origin or a segment entering solid space. */
+function outwardFaceTravel(s,ax,ay,bx,by,pad){
+ if(!solidAlive(s)||pointInsideSolid(s,ax,ay,-1e-6))return false;
+ var dx=bx-ax,dy=by-ay;if(dx*dx+dy*dy<1e-18)return false;
+ if(s.shape==='circle'){
+   var fx=ax-s.x,fy=ay-s.y,r=s.r+(pad||0);
+   return fx*fx+fy*fy<=(r+1e-7)*(r+1e-7)&&fx*dx+fy*dy>=0;
+ }
+ var hx=s.w*.5,hy=s.h*.5;
+ return (ax>=s.x+hx-1e-7&&dx>=0)||(ax<=s.x-hx+1e-7&&dx<=0)||
+        (ay>=s.y+hy-1e-7&&dy>=0)||(ay<=s.y-hy+1e-7&&dy<=0);
+}
 function addRect(a,id,x,y,w,h,type,hp){a.push({id:id,kind:'terrain',shape:'rect',x:x,y:y,w:w,h:h,type:type,destructible:type==='cover',hp:hp||0,maxHp:hp||0,solid:true,flash:0,brokenAt:0});}
 function addCircle(a,id,x,y,r,type,hp){a.push({id:id,kind:'terrain',shape:'circle',x:x,y:y,r:r,type:type,destructible:type==='cover',hp:hp||0,maxHp:hp||0,solid:true,flash:0,brokenAt:0});}
 function txPoint(p,rot,mirror){var x=p[0]*(mirror?-1:1),y=p[1];for(var i=0;i<rot;i++){var q=x;x=-y;y=q;}return[x,y];}
@@ -134,7 +147,7 @@ function lineOfSight(g,ax,ay,bx,by,pad){
   }
   return true;
 }
-function firstSolidHit(g,ax,ay,bx,by,pad){pad=pad||0;var a=terrainCandidates(g,ax,ay,bx,by,pad),bestS=null,bestH=null;for(var i=0;i<a.length;i++){var s=a[i],h=s.shape==='circle'&&pointInsideSolid(s,ax,ay,pad)?{t:0,x:ax,y:ay,nx:0,ny:0}:solidHit(s,ax,ay,bx,by,pad);if(h&&(!bestH||h.t<bestH.t)){bestS=s;bestH=h;}}return bestH?{solid:bestS,hit:bestH}:null;}
+function firstSolidHit(g,ax,ay,bx,by,pad){pad=pad||0;var a=terrainCandidates(g,ax,ay,bx,by,pad),bestS=null,bestH=null;for(var i=0;i<a.length;i++){var s=a[i],h=s.shape==='circle'&&pointInsideSolid(s,ax,ay,pad)?{t:0,x:ax,y:ay,nx:0,ny:0}:solidHit(s,ax,ay,bx,by,pad);if(h&&h.t===0&&outwardFaceTravel(s,ax,ay,bx,by,pad))continue;if(h&&(!bestH||h.t<bestH.t)){bestS=s;bestH=h;}}return bestH?{solid:bestS,hit:bestH}:null;}
 function circleResolve(g,e,r){
  var hitAny=false,lastNx=0,lastNy=0;
  for(var pass=0;pass<2;pass++){
