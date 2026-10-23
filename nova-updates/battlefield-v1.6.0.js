@@ -236,6 +236,18 @@ wrap('game/audio',function(audio){var Sfx=audio.Sfx;if(!Sfx||Sfx.prototype.__nov
 });
 
 wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.prototype.__novaBattlefield)return;Game.prototype.__novaBattlefield=true;var CLASSES=require('./classes').CLASSES;
+ /* A shell can retain penetration after a direct hit. The materialized core
+  * invokes clusterBurst again on later contacts or expiry; one physical shell
+  * must never create multiple six-child explosions. Preserve penetration,
+  * shell cover multipliers and later Apex child-sector shaping unchanged. */
+ if(Game.prototype.clusterBurst){
+   var oldClusterBurst=Game.prototype.clusterBurst;
+   Game.prototype.clusterBurst=function(parent){
+     if(parent&&parent.__novaClusterBurstConsumed)return;
+     if(parent)parent.__novaClusterBurstConsumed=true;
+     return oldClusterBurst.apply(this,arguments);
+   };
+ }
  Game.prototype.hasLineOfSight=function(ax,ay,bx,by,pad){return lineOfSight(this,ax,ay,bx,by,pad||2);};
  Game.prototype.firstTerrainHit=function(ax,ay,bx,by,pad){return firstSolidHit(this,ax,ay,bx,by,pad||0);};
  Game.prototype.isTerrainSafe=function(x,y,pad){return safePoint(this,x,y,pad||40);};
