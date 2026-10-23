@@ -116,3 +116,49 @@ test('destroyed cover is not a permanent combat blocker when LOS API is absent',
   assert.equal(swarm('shape', false, { noLos: true, terrain }).g.hits.length, 1);
   assert.equal(controller('controller', false, { noLos: true, terrain }).hits.length, 1);
 });
+
+test('actual Battlefield LOS and Swarm Discipline composition blocks wall-separated contact', () => {
+  const battlefield = fs.readFileSync(path.join(root, 'nova-updates/battlefield-v1.6.0.js'), 'utf8');
+  class Game {
+    constructor() {
+      this.time = 10; this.drones = []; this.tanks = []; this.shapes = [];
+      this.tankById = new Map(); this.droneCounts = new Map(); this.hits = [];
+      this.__novaTerrain = [{ id: -1000, kind: 'terrain', shape: 'rect', x: 4.5, y: 0,
+        w: 2, h: 40, type: 'wall', destructible: false, solid: true, hp: 0 }];
+    }
+    updateDrones() {} updateBullets() {} update() {} moveTank() {}
+    spawnPlayer() {} randSpawnPos() { return { x: 0, y: 0 }; }
+    acquireDroneTarget() { return null; }
+    damageDrone(d, n) { this.hits.push(['drone', d.id, n]); d.hp -= n; }
+    damageShape(d, n) { this.hits.push(['shape', d.id, n]); d.hp -= n; }
+    getTank(id) { return this.tankById.get(id); }
+  }
+  const modules = {
+    'game/engine': m => { m.exports.Game = Game; },
+    'game/ai': m => { m.exports.updateAI = () => {}; },
+    'game/render': m => { m.exports.render = () => {}; },
+    'game/audio': m => { m.exports.Sfx = class {}; }
+  };
+  const win = { __novaModules: modules };
+  for (const src of [swarmSource, battlefield]) {
+    vm.runInNewContext(src, { window: win, console: { info() {}, warn() {}, error() {} },
+      Math, Map, Set, Number, Object, Date, performance: { now: () => 0 } });
+  }
+  const m = { exports: {} };
+  modules['game/engine'](m, m.exports, name => name.includes('classes')
+    ? { CLASSES: { carrier: { size: 15 }, marksman: { size: 15 } } } : {});
+  const g = new Game();
+  const owner = { id: 1, cls: 'carrier', alive: true, x: 0, y: 0, team: 'blue',
+    swarmT: 0, __novaSwarm: { active: false, recallUntil: 0 } };
+  const enemy = { id: 2, cls: 'marksman', alive: true, x: 20, y: 0, team: 'red' };
+  const d = { id: 10, kind: 'drone', ownerId: 1, x: 0, y: 0, r: 8, hp: 30, dmg: 12,
+    speed: 0, attackCd: 0, leash: 650, role: 'hunter', slot: 0, __novaPhase: 'idle' };
+  const target = { id: 11, kind: 'drone', ownerId: 2, x: 9, y: 0, r: 8, hp: 30 };
+  g.tanks = [owner, enemy]; g.tankById = new Map(g.tanks.map(t => [t.id, t]));
+  g.drones = [d, target]; g.areAllies = (a, b) => a.team === b.team;
+  g.areHostile = (a, b) => a.team !== b.team;
+  assert.equal(g.hasLineOfSight(d.x, d.y, target.x, target.y, 2), false);
+  g.updateDrones(.016);
+  assert.deepEqual(g.hits, []);
+  assert.equal(target.hp, 30);
+});
