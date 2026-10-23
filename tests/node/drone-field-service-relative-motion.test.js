@@ -26,7 +26,7 @@ function boot(){
   const m={exports:{}};mods['game/engine'](m,m.exports,()=>({}));
   return{Game:m.exports.Game,hooks:win.__NOVA_FIELD_SERVICE_TEST__};
 }
-function scenario({bulletX=200,bulletY=0,bulletVX=200,bulletVY=0,moveVX=0,moveVY=0,dt=.05,ttl}={}){
+function scenario({bulletX=200,bulletY=0,bulletVX=200,bulletVY=0,moveVX=0,moveVY=0,dt=.05,ttl,shell=false}={}){
   const {Game}=boot(),g=new Game();
   const owner={id:1,team:'blue',cls:'marksman',alive:true,x:0,y:0};
   const enemy={id:2,team:'red',cls:'marksman',alive:true,x:1000,y:0};
@@ -34,7 +34,7 @@ function scenario({bulletX=200,bulletY=0,bulletVX=200,bulletVY=0,moveVX=0,moveVY
     attackCd:0,moveVX,moveVY}; // no __novaVX: core legacy movement
   g.tanks=[owner,enemy];g.tankById.set(1,owner);g.tankById.set(2,enemy);
   g.drones=[drone];g.damageDrone(drone,20);
-  g.bullets=[{ownerId:2,x:bulletX,y:bulletY,vx:bulletVX,vy:bulletVY,r:3,ttl}];
+  g.bullets=[{ownerId:2,x:bulletX,y:bulletY,vx:bulletVX,vy:bulletVY,r:3,ttl,shell}];
   g.time=7;g.updateDrones(dt);
   return {g,drone};
 }
@@ -172,4 +172,17 @@ test('5000 seeded lifetime-limited trajectories agree with independent relative-
     }
     assert.equal(hooks.projectileThreat(g,d,owner),expected,'trajectory '+i);
   }
+});
+
+test('expiring cluster shells still block repair because their burst spawns live shrapnel',()=>{
+  for(const ttl of [.04,0,-.001]){
+    const {drone}=scenario({bulletX:125,bulletVX:-200,ttl,shell:true});
+    assert.equal(drone.hp,80,'expiry-triggered cluster shell remains hazardous: '+ttl);
+  }
+});
+test('ordinary short-lived shots remain safely excluded next to hazardous shells',()=>{
+  const safe=scenario({bulletX:125,bulletVX:-200,ttl:.04,shell:false});
+  const shell=scenario({bulletX:125,bulletVX:-200,ttl:.04,shell:true});
+  assert.ok(safe.drone.hp>80);
+  assert.equal(shell.drone.hp,80);
 });
