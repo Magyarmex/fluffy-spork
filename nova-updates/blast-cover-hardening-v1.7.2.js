@@ -31,8 +31,9 @@ wrap('game/engine',function(engine,require){
     var c=this.__v172HardBlast||(this.__v172HardBlast={active:false,x:0,y:0,radius:0,targets:[]}),pa=c.active,px=c.x,py=c.y,pr=c.radius;
     c.active=true;c.x=x;c.y=y;c.radius=radius||0;
     /* Core splash directly subtracts shape HP, bypassing damageTank cover.
-     * Divert only shape/drone candidates; keep core tank, audio, and visual
-     * effects. Apply original falloff with sampled physical exposure. */
+     * Divert all combat candidates, preserve their original query order and
+     * exact core falloff, and reuse damageTank's existing cover wrapper.
+     * Core retains its audio, visual and screen-shake effects. */
     var targets=pa?[]:(c.targets||(c.targets=[]));targets.length=0;
     var hash=this.hash,oldQuery=hash&&hash.query,hadQuery=hash&&Object.prototype.hasOwnProperty.call(hash,'query');
     var expanded=false,self=this,temporary=[];
@@ -42,13 +43,13 @@ wrap('game/engine',function(engine,require){
       if(t&&t.r==null){t.r=size(t);temporary.push(t);}
     }
     if(hash&&typeof oldQuery==='function'){
-      hash.query=function(qx,qy,qr,out){
-        if(!expanded&&out===self.tmp&&qx===x&&qy===y&&qr===radius){
+      var hook=function(qx,qy,qr,out){
+        if(hash.query===hook&&!expanded&&out===self.tmp&&qx===x&&qy===y&&qr===radius){
           expanded=true;
           var result=oldQuery.call(this,qx,qy,qr+33,out),write=0;
           for(var k=0;k<out.length;k++){
             var e=out[k];
-            if(e&&(e.kind==='shape'||e.kind==='drone'))targets.push(e);
+            if(e&&(e.kind==='shape'||e.kind==='tank'||e.kind==='drone'))targets.push(e);
             else out[write++]=e;
           }
           out.length=write;
@@ -56,21 +57,30 @@ wrap('game/engine',function(engine,require){
         }
         return oldQuery.apply(this,arguments);
       };
+      hash.query=hook;
     }
     try{
       var result=oldSplash.apply(this,arguments),frac=arguments[3],ownerId=arguments[4],dmg=arguments[7];
       for(var j=0;j<targets.length;j++){
         var e=targets[j];
-        if(!e||e.hp<=0||(e.kind==='drone'&&e.ownerId===ownerId))continue;
+        if(!e)continue;
         var d=Math.hypot(e.x-x,e.y-y);
-        if(d>radius+(e.r||0))continue;
-        var visible=exposure(this,e,x,y);
-        if(visible<=.001)continue;
-        var sd=dmg*frac*(1-(d/radius)*.5)*visible;
+        if(d>radius+e.r)continue;
+        var fall=1-(d/radius)*.5,sd=dmg*frac*fall;
+        if(e.kind==='shape'&&e.hp<=0)continue;
         if(e.kind==='shape'){
-          e.hp-=sd;e.flash=Math.max(e.flash,0.12);
+          var se=exposure(this,e,x,y);
+          if(se<=.001)continue;
+          e.hp-=sd*se;e.flash=Math.max(e.flash,0.12);
           if(e.hp<=0)this.killShape(e);
-        }else this.damageDrone(e,sd,ownerId);
+        }else if(e.kind==='tank'&&e.id!==ownerId&&e.alive){
+          /* Existing damageTank wrapper applies tank exposure exactly once. */
+          var ang=Math.atan2(e.y-y,e.x-x);
+          this.damageTank(e,sd,ownerId,Math.cos(ang)*(arguments[5]||0)*fall*.01,Math.sin(ang)*(arguments[5]||0)*fall*.01);
+        }else if(e.kind==='drone'&&e.ownerId!==ownerId&&e.hp>0){
+          var de=exposure(this,e,x,y);
+          if(de>.001)this.damageDrone(e,sd*de,ownerId);
+        }
       }
       return result;
     }finally{
