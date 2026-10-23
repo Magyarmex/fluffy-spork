@@ -183,3 +183,18 @@ test('defense visibility queries are bounded to actual nearby hostile drones', (
   assert.equal(g.acquireDroneTarget(d, owner, 650), visible);
   assert.equal(queries, 1, 'only the in-range hostile needs a terrain ray');
 });
+
+
+test('dense defensive screens raycast only candidates capable of winning selection', () => {
+  const { g, owner, d, hidden } = scenario();
+  hidden.x = 20; hidden.y = 0;
+  const extras = Array.from({ length: 50 }, (_, i) => ({
+    id: 100 + i, kind: 'drone', ownerId: 2, hp: 30, r: 8,
+    x: 90 + i * 2, y: 30
+  }));
+  g.drones = [d, hidden, ...extras];
+  let rays = 0;
+  g.hasLineOfSight = () => { rays++; return true; };
+  assert.equal(g.acquireDroneTarget(d, owner, 650), hidden);
+  assert.equal(rays, 1, 'worse-ranked candidates need no expensive terrain rays');
+});
