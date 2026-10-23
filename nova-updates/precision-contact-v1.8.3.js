@@ -83,6 +83,9 @@ function scanEntries(g,dt){
   var live=false;
   for(var j=0;j<v.bullets.length;j++){
    var b=v.bullets[j];if(!b||b.dead)continue;live=true;
+   /* The core expires rounds before collision/render when ttl <= dt.
+    * Never predict a visible arrival for a round this frame will remove. */
+   if(b.ttl!=null&&b.ttl<=dt)continue;
    var p0=worldToScreen(g,b.x,b.y);if(inside(p0,g.w,g.h,5)){triggerEntry(g,state,v,p0,b);break;}
    var p1=worldToScreen(g,b.x+(b.vx||0)*dt,b.y+(b.vy||0)*dt),hit=segmentRectEntry(p0.x,p0.y,p1.x,p1.y,g.w,g.h,5,out);
    if(hit&&!terrainStopsViewportEntry(g,b,dt,hit.t)){triggerEntry(g,state,v,hit,b);break;}
