@@ -129,3 +129,27 @@ test('precision contact without Battlefield terrain API retains original edge be
   g.tryFire(enemy);g.updateBullets(1.3);
   assert.equal(g.__v183Contact.sparks.length,1);
 });
+
+
+test('a blocked first round does not suppress an unobstructed second round in the same volley',()=>{
+  const {Game}=load(),g=new Game(),enemy={id:7,isPlayer:false,alive:true,x:1000,y:0};
+  g.firstTerrainHit=(ax,ay)=>ay===0?
+   {solid:{destructible:false,solid:true},hit:{t:.4}}:null;
+  g.tryFire(enemy);
+  const second={...g.bullets[0],id:11,y:100};
+  g.bullets.push(second);
+  g.__v183Contact.volleys[0].bullets.push(second);
+  g.updateBullets(1.3);
+  assert.equal(g.__v183Contact.sparks.length,1);
+  assert.equal(g.sfx.swoosh,1);
+});
+
+test('terrain cue API errors fail open without interrupting combat',()=>{
+  const {Game}=load(),g=new Game(),enemy={id:7,isPlayer:false,alive:true,x:1000,y:0};
+  g.firstTerrainHit=()=>{throw Error('injected terrain error');};
+  g.tryFire(enemy);
+  assert.doesNotThrow(()=>g.updateBullets(1.3));
+  assert.equal(g.__v183Contact.sparks.length,1);
+  assert.equal(g.sfx.swoosh,1);
+  assert.equal(g.__novaContactTerrainWarning,true);
+});
