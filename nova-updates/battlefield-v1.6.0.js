@@ -170,6 +170,44 @@ function circleResolve(g,e,r){
  return hitAny;
 }
 function damageCover(g,s,dmg,ownerId,x,y,bullet){if(!s||!s.destructible||s.hp<=0)return false;var mult=bullet&&bullet.shell?1.35:bullet&&bullet.beam?.92:1;s.hp-=dmg*mult;s.flash=.16;if(g.addImpactDebris)g.addImpactDebris(x,y,bullet?bullet.vx:0,bullet?bullet.vy:0,'#8fd4ff',4);if(g.sfx&&g.sfx.novaCoverHit)g.sfx.novaCoverHit((x-(g.player?g.player.x:x))/700,Math.min(1,dmg/70));if(s.hp<=0){s.hp=0;s.solid=false;s.brokenAt=g.time;(g.__novaTerrainRubble||(g.__novaTerrainRubble=[])).push({x:s.x,y:s.y,w:s.w||s.r*2,h:s.h||s.r*2,r:s.r||0,shape:s.shape,life:999});if(g.addParticles)g.addParticles(s.x,s.y,'#8fd4ff',16,180,'spark');if(g.addRing)g.addRing(s.x,s.y,'#8fd4ff',Math.min(100,(s.w||s.r*2)*.45));if(g.sfx&&g.sfx.novaCoverBreak)g.sfx.novaCoverBreak((s.x-(g.player?g.player.x:s.x))/700);if(g.__novaBattlefield)g.__novaBattlefield.coverBroken++;var killer=ownerId>=0&&g.getTank?g.getTank(ownerId):null;if(killer&&killer.alive){if(g.gainXP)g.gainXP(killer,18);if(killer.isPlayer&&g.addText)g.addText(s.x,s.y-24,'BREACHED +18','#9fe8ff',10);}return true;}return false;}
+/* A terrain-triggered shell burst creates its children during the pre-core
+ * projectile pass. Only outward-facing children may clear the collision
+ * padding of the surface they were born against. Inward fragments still hit
+ * the wall; a later obstacle is tested normally in this same pass. */
+function clearTerrainBurstChildren(g,s,h,start){
+ if(!solidAlive(s)||!g.bullets)return;
+ var nx=h.nx||0,ny=h.ny||0;if(nx*nx+ny*ny<.5)return;
+ var cornerX=false,cornerY=false;
+ if(s.shape==='rect'){
+   cornerX=Math.abs(Math.abs(h.x-s.x)-s.w*.5)<=2.5;
+   cornerY=Math.abs(Math.abs(h.y-s.y)-s.h*.5)<=2.5;
+ }
+ for(var i=start;i<g.bullets.length;i++){
+   var child=g.bullets[i];if(!child||child.dead||child.shell)continue;
+   var cx=nx,cy=ny;
+   /* At a corner either exposed face can provide a legal exit. */
+   if(cornerX&&cornerY){
+     var sx=Math.sign(h.x-s.x),sy=Math.sign(h.y-s.y);
+     if((child.vx||0)*sx>=0){cx=sx;cy=0;}
+     else if((child.vy||0)*sy>=0){cx=0;cy=sy;}
+     else continue;
+   }
+   if((child.vx||0)*cx+(child.vy||0)*cy<0)continue;
+   var pad=(child.r||2)*.45;
+   if(!pointInsideSolid(s,child.x,child.y,pad))continue;
+   if(s.shape==='circle'){
+     var dx=child.x-s.x,dy=child.y-s.y,dist=Math.hypot(dx,dy);
+     if(dist<1e-9)continue;
+     var radius=s.r+pad+.01;
+     child.x=s.x+dx/dist*radius;child.y=s.y+dy/dist*radius;
+   }else if(cx){
+     child.x=s.x+cx*(s.w*.5+pad+.01);
+   }else{
+     child.y=s.y+cy*(s.h*.5+pad+.01);
+   }
+   child.px=child.x;child.py=child.y;
+ }
+}
 function terrainRadiusForTank(t,classes){return ((classes[t.cls]&&classes[t.cls].size)||15)+3;}
 function drawTerrain(ctx,g,w,h){var a=ensureTerrain(g),z=(g.cam&&g.cam.zoom)||1,camx=g.cam.x,camy=g.cam.y,hw=g.w*.5,hhw=g.h*.5;
  ctx.save();ctx.setTransform(g.dpr||1,0,0,g.dpr||1,0,0);
@@ -218,7 +256,7 @@ wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.
  var oldUpdateBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var terrain=ensureTerrain(this);for(var i=0;i<this.bullets.length;i++){var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,nx=ox+(b.vx||0)*dt,ny=oy+(b.vy||0)*dt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
    /* The core still advances a dead bullet before removing it; a shell may
      * expire or leave the arena in that pass. Consume its one-time burst now. */
-    if(b.shell&&this.clusterBurst){this.clusterBurst(b);b.shell=false;}if(b.splash&&this.splashAt)this.splashAt(h.x,h.y,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.dead=true;if(this.addFlash)this.addFlash(h.x,h.y,s.destructible?'#8fd4ff':'#b9c7e7',Math.min(46,14+(b.dmg||0)*.24));if(this.cam&&b.dmg>42)this.cam.shake=Math.max(this.cam.shake,.08);
+    if(b.shell&&this.clusterBurst){var childStart=this.bullets.length;this.clusterBurst(b);clearTerrainBurstChildren(this,s,h,childStart);b.shell=false;}if(b.splash&&this.splashAt)this.splashAt(h.x,h.y,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.dead=true;if(this.addFlash)this.addFlash(h.x,h.y,s.destructible?'#8fd4ff':'#b9c7e7',Math.min(46,14+(b.dmg||0)*.24));if(this.cam&&b.dmg>42)this.cam.shake=Math.max(this.cam.shake,.08);
  }
  var out=oldUpdateBullets.call(this,dt);for(var j=0;j<terrain.length;j++){var q=terrain[j];if(q.flash>0)q.flash=Math.max(0,q.flash-dt);}return out;};
 
