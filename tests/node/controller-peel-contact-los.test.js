@@ -13,10 +13,16 @@ assert.equal(raw.split(anchor).length, 2);
 const source = raw.replace(anchor, '  window.__testPeelScreen = peelScreen;\n' + anchor);
 
 function setup(blocked) {
-  const win = { __novaModules: {} };
+  class Game { updateDrones() {} setClass() {} }
+  const modules = { 'game/engine': m => { m.exports.Game = Game; } };
+  const win = { __novaModules: modules };
   const ctx = { window: win, Math, Number, Map, Set, WeakMap, Array, Object, Date,
     document: { addEventListener() {} }, console: { info() {}, warn() {}, error() {} } };
   vm.runInNewContext(source, ctx, { filename: 'second-body-live-vector-v1.10.7.js' });
+  // peelScreen is private to the engine wrapper; initialize the actual module.
+  const engine = { exports: {} };
+  modules['game/engine'](engine, engine.exports, () => ({ CLASSES: { carrier: { droneLeash: 650 } } }));
+  assert.equal(typeof win.__testPeelScreen, 'function');
   const owner = { id: 1, cls: 'carrier', x: 0, y: 60, alive: true };
   const drone = { id: 10, ownerId: 1, x: 90, y: 0, r: 8, hp: 20,
     speed: 200, dmg: 10, attackCd: 0, __novaPhase: 'form' };
