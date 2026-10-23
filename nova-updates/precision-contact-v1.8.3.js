@@ -60,21 +60,32 @@ function triggerEntry(g,state,v,hit,b){
  * pass; a visual hint must not alter projectile or cover state. */
 function terrainStopsViewportEntry(g,b,dt,entryT){
  if(typeof g.firstTerrainHit!=='function')return false;
- var collision;
- try{
-  collision=g.firstTerrainHit(b.x,b.y,b.x+(b.vx||0)*dt,b.y+(b.vy||0)*dt,(b.r||2)*.45);
- }catch(err){
-  /* A best-effort visual cue must never interrupt the combat simulation. */
-  if(!g.__novaContactTerrainWarning){g.__novaContactTerrainWarning=true;console.warn('[NOVA Contact Spark] terrain cue check unavailable',err);}
-  return false;
+ /* A single round can breach more than one barricade before the viewport.
+  * Query subsequent surfaces without changing live HP/solidity or the bullet.
+  * A single first-hit query wrongly announces rounds stopped by a later wall. */
+ var ignored=null,remainingPen=b.pen||0,damage=b.dmg||0;
+ for(var hop=0;hop<16;hop++){
+  var collision;
+  try{
+   collision=g.firstTerrainHit(b.x,b.y,b.x+(b.vx||0)*dt,b.y+(b.vy||0)*dt,(b.r||2)*.45,ignored);
+  }catch(err){
+   /* A best-effort visual cue must never interrupt the combat simulation. */
+   if(!g.__novaContactTerrainWarning){g.__novaContactTerrainWarning=true;console.warn('[NOVA Contact Spark] terrain cue check unavailable',err);}
+   return false;
+  }
+  if(!collision||!collision.hit||!collision.solid||collision.hit.t>entryT+1e-9)return false;
+  var s=collision.solid;
+  /* Fail open if an older firstTerrainHit implementation ignores exclusions. */
+  if(ignored&&ignored.has(s))return false;
+  if(!s.destructible)return true;
+  var mult=b.shell?1.35:b.beam?.92:1;
+  if(!(s.hp>0&&s.hp<=damage*mult&&remainingPen>=2))return true;
+  remainingPen-=2;
+  if(!ignored)ignored=new Set();
+  ignored.add(s);
  }
- if(!collision||!collision.hit||!collision.solid||collision.hit.t>entryT+1e-9)return false;
- var s=collision.solid;
- if(!s.destructible)return true;
- var mult=b.shell?1.35:b.beam?.92:1;
- /* A shot continues only if it breaches the cover with enough penetration.
-  * Do not suppress a legitimate incoming cue for a breaching round. */
- return !(s.hp>0&&s.hp<=(b.dmg||0)*mult&&b.pen>=2);
+ /* An implausibly long chain is safer without a false arrival signal. */
+ return true;
 }
 function scanEntries(g,dt){
  var state=g.__v183Contact;if(!state||!state.volleys.length)return;var now=g.time||0,out={x:0,y:0,t:0};
