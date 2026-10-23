@@ -73,6 +73,19 @@ function exactHit(s,ax,ay,bx,by,pad){
   if(!solidAlive(s))return null;
   return s.shape==='circle'?segCircleHit(ax,ay,bx,by,s,pad):segRectHit(ax,ay,bx,by,s,pad);
 }
+/* A projectile spawned exactly on a wall/pillar face may leave or skim it.
+ * Never excuse a genuinely embedded origin or a segment entering solid space. */
+function outwardFaceTravel(s,ax,ay,bx,by,pad){
+ if(!solidAlive(s)||pointInsideSolid(s,ax,ay,-1e-6))return false;
+ var dx=bx-ax,dy=by-ay;if(dx*dx+dy*dy<1e-18)return false;
+ if(s.shape==='circle'){
+   var fx=ax-s.x,fy=ay-s.y,r=s.r+(pad||0);
+   return fx*fx+fy*fy<=(r+1e-7)*(r+1e-7)&&fx*dx+fy*dy>=0;
+ }
+ var hx=s.w*.5,hy=s.h*.5;
+ return (ax>=s.x+hx-1e-7&&dx>=0)||(ax<=s.x-hx+1e-7&&dx<=0)||
+        (ay>=s.y+hy-1e-7&&dy>=0)||(ay<=s.y-hy+1e-7&&dy<=0);
+}
 function bounds(s,pad){
   pad=pad||0;
   if(s.shape==='circle'){var r=s.r+pad;return{x0:s.x-r,y0:s.y-r,x1:s.x+r,y1:s.y+r};}
@@ -165,7 +178,7 @@ wrap('game/engine',function(engine,require){
     if(!this.__novaTerrain){var init=oldFirst.call(this,ax,ay,bx,by,pad);if(!this.__novaTerrain)return init;}
     var list=segmentCandidates(this,ax,ay,bx,by,pad||0);if(!list)return oldFirst.call(this,ax,ay,bx,by,pad);
     var p=perfState(this),best=null;p.terrainQueries++;p.terrainCandidates+=list.length;
-    for(var i=0;i<list.length;i++){p.terrainNarrowTests++;var s=list[i],rr=s.shape==='circle'?s.r+(pad||0):0,h=s.shape==='circle'&&solidAlive(s)&&d2(ax,ay,s.x,s.y)<=rr*rr?{t:0,x:ax,y:ay,nx:0,ny:0}:exactHit(s,ax,ay,bx,by,pad||0);if(h&&(!best||h.t<best.hit.t))best={solid:s,hit:h};}
+    for(var i=0;i<list.length;i++){p.terrainNarrowTests++;var s=list[i],rr=s.shape==='circle'?s.r+(pad||0):0,h=s.shape==='circle'&&solidAlive(s)&&d2(ax,ay,s.x,s.y)<=rr*rr?{t:0,x:ax,y:ay,nx:0,ny:0}:exactHit(s,ax,ay,bx,by,pad||0);if(h&&h.t===0&&outwardFaceTravel(s,ax,ay,bx,by,pad))continue;if(h&&(!best||h.t<best.hit.t))best={solid:s,hit:h};}
     return best;
   };
 
