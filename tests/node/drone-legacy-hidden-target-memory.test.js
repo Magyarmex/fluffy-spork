@@ -179,3 +179,57 @@ test('real Battlefield + Performance cover blocks cached drone pursuit', () => {
   assert.equal(s.d.__novaLegacySeenX, 100, 'restored visibility refreshes the sighting');
   assert.equal(s.d.targetRef, s.target);
 });
+
+
+test('cached tank loses attack eligibility immediately when spawn protection begins', () => {
+  const s = harness('tank');
+  let hits = 0;
+  s.target.x = 12; s.target.spawnShieldT = 2;
+  s.d.speed = 0; s.d.attackCd = 0;
+  s.g.damageTank = () => { hits++; };
+  s.tick();
+  assert.equal(hits, 0, 'spawn protection must prevent an old cached contact attack');
+  assert.equal(s.d.targetRef, null, 'do not keep chasing a protected cached tank');
+});
+
+test('cached tank that becomes allied is dropped without waiting for retarget interval', () => {
+  const s = harness('tank');
+  let hits = 0;
+  s.owner.team = 'blue'; s.target.team = 'blue';
+  s.g.areAllies = (a, b) => a.team === b.team;
+  s.g.areHostile = (a, b) => a.team !== b.team;
+  s.target.x = 12; s.d.speed = 0; s.d.attackCd = 0;
+  s.g.damageTank = () => { hits++; };
+  s.tick();
+  assert.equal(hits, 0);
+  assert.equal(s.d.targetRef, null);
+});
+
+test('cached drone whose owner becomes allied is dropped before contact damage', () => {
+  const s = harness('drone');
+  let hits = 0;
+  s.owner.team = 'blue';
+  const otherOwner = { id: 2, kind: 'tank', team: 'blue', alive: true };
+  s.g.tankById = new Map([[1, s.owner], [2, otherOwner]]);
+  s.g.areAllies = (a, b) => a.team === b.team;
+  s.g.areHostile = (a, b) => a.team !== b.team;
+  s.target.x = 12; s.d.speed = 0; s.d.attackCd = 0;
+  s.g.damageDrone = () => { hits++; };
+  s.tick();
+  assert.equal(hits, 0);
+  assert.equal(s.d.targetRef, null);
+});
+
+test('cached hostile tank remains eligible after the new safety gate', () => {
+  const s = harness('tank');
+  let hits = 0;
+  s.owner.team = 'blue'; s.target.team = 'red';
+  s.g.areAllies = (a, b) => a.team === b.team;
+  s.g.areHostile = (a, b) => a.team !== b.team;
+  s.target.x = 12; s.target.spawnShieldT = 0;
+  s.d.speed = 0; s.d.attackCd = 0;
+  s.g.damageTank = () => { hits++; };
+  s.tick();
+  assert.equal(hits, 1);
+  assert.equal(s.d.targetRef, s.target);
+});
