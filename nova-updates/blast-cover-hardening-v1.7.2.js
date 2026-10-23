@@ -28,13 +28,14 @@ wrap('game/engine',function(engine,require){
   Game.prototype.novaHardBlastExposure=function(t,x,y){return exposure(this,t,x,y);};
   var oldSplash=Game.prototype.splashAt;
   Game.prototype.splashAt=function(x,y,radius){
-    var c=this.__v172HardBlast||(this.__v172HardBlast={active:false,x:0,y:0,radius:0,targets:[]}),pa=c.active,px=c.x,py=c.y,pr=c.radius;
+    var c=this.__v172HardBlast||(this.__v172HardBlast={active:false,x:0,y:0,radius:0,targets:[]}),pa=c.active,px=c.x,py=c.y,pr=c.radius,previousWeights=c.weights;
     c.active=true;c.x=x;c.y=y;c.radius=radius||0;
     /* Core splash directly subtracts shape HP, bypassing damageTank cover.
      * Divert all combat candidates, preserve their original query order and
      * exact core falloff, and reuse damageTank's existing cover wrapper.
      * Core retains its audio, visual and screen-shake effects. */
     var targets=pa?[]:(c.targets||(c.targets=[]));targets.length=0;
+    var weights=pa?new Map():(c.weights||(c.weights=new Map()));weights.clear();c.weights=weights;
     var hash=this.hash,oldQuery=hash&&hash.query,hadQuery=hash&&Object.prototype.hasOwnProperty.call(hash,'query');
     var expanded=false,self=this,temporary=[];
     var ts=this.tanks||[];
@@ -49,8 +50,12 @@ wrap('game/engine',function(engine,require){
           var result=oldQuery.call(this,qx,qy,qr+33,out),write=0;
           for(var k=0;k<out.length;k++){
             var e=out[k];
-            if(e&&(e.kind==='shape'||e.kind==='tank'||e.kind==='drone'))targets.push(e);
-            else out[write++]=e;
+            if(e&&(e.kind==='shape'||e.kind==='tank'||e.kind==='drone')){
+              targets.push(e);
+              /* Snapshot exposure BEFORE Battlefield applies splash damage
+               * to destructible cover after the core splash method returns. */
+              if(Math.hypot(e.x-x,e.y-y)<=radius+(e.r||0))weights.set(e,exposure(self,e,x,y));
+            }else out[write++]=e;
           }
           out.length=write;
           return result;
@@ -69,7 +74,7 @@ wrap('game/engine',function(engine,require){
         var fall=1-(d/radius)*.5,sd=dmg*frac*fall;
         if(e.kind==='shape'&&e.hp<=0)continue;
         if(e.kind==='shape'){
-          var se=exposure(this,e,x,y);
+          var se=weights.get(e);
           if(se<=.001)continue;
           e.hp-=sd*se;e.flash=Math.max(e.flash,0.12);
           if(e.hp<=0)this.killShape(e);
@@ -78,7 +83,7 @@ wrap('game/engine',function(engine,require){
           var ang=Math.atan2(e.y-y,e.x-x);
           this.damageTank(e,sd,ownerId,Math.cos(ang)*(arguments[5]||0)*fall*.01,Math.sin(ang)*(arguments[5]||0)*fall*.01);
         }else if(e.kind==='drone'&&e.ownerId!==ownerId&&e.hp>0){
-          var de=exposure(this,e,x,y);
+          var de=weights.get(e);
           if(de>.001)this.damageDrone(e,sd*de,ownerId);
         }
       }
@@ -88,13 +93,14 @@ wrap('game/engine',function(engine,require){
         if(hadQuery)hash.query=oldQuery;else delete hash.query;
       }
       for(var k=0;k<temporary.length;k++)delete temporary[k].r;
-      targets.length=0;c.active=pa;c.x=px;c.y=py;c.radius=pr;
+      targets.length=0;weights.clear();c.weights=pa?previousWeights:weights;
+      c.active=pa;c.x=px;c.y=py;c.radius=pr;
     }
   };
   var oldDamage=Game.prototype.damageTank;
   Game.prototype.damageTank=function(t,dmg,srcId,kx,ky){
     var c=this.__v172HardBlast;if(!c||!c.active||!t||!t.alive)return oldDamage.apply(this,arguments);
-    var e=exposure(this,t,c.x,c.y);if(e<=.001)return 0;
+    var e=c.weights&&c.weights.has(t)?c.weights.get(t):exposure(this,t,c.x,c.y);if(e<=.001)return 0;
     var soft=this.__v172BlastContext,softActive=soft&&soft.active;if(soft)soft.active=false;
     try{return oldDamage.call(this,t,dmg*e,srcId,(kx||0)*e,(ky||0)*e);}finally{if(soft)soft.active=softActive;}
   };
