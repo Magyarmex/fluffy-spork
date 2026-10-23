@@ -92,8 +92,8 @@ function fire(Game, shape, fps, opts = {}) {
   if (opts.apex) g.__testOwner = { id: 1, cls: 'clusterking', angle: 0,
     __v17FuseDepth: 0, stats: { damage: 0 }, level: 1, alive: true };
   g.bullets = [{
-    id: 1, x: -120, y: opts.corner ? -120 : (opts.nearCorner ? -79 : 0),
-    vx: (opts.natural || opts.expireNear) ? 0 : 12000, vy: opts.corner ? 12000 : 0,
+    id: 1, x: -120, y: opts.corner ? -120 : (opts.nearCorner ? -79 : (opts.offsetY || 0)),
+    vx: (opts.natural || opts.expireNear) ? 0 : (opts.speed || 12000), vy: opts.corner ? 12000 : 0,
     r: 2, dmg: 12, ttl: (opts.natural || opts.expireNear || opts.sameTick) ? 0.001 : 2,
     shell: true, ownerId: 1, pen: 0, hits: 0, dead: false,
     color: '#aef', clusterDmg: 8,
@@ -177,5 +177,38 @@ for (const optimized of [false, true]) {
     const g = fire(boot(optimized), 'rect', 60, { expireNear: true });
     assert.equal(g.bullets.length, 6);
     assert.ok(g.bullets.every(b => b.x < -100));
+  });
+}
+
+for (const optimized of [false, true]) {
+  test((optimized ? 'optimized' : 'base') + ': 960 randomized terrain bursts obey outward-contact geometry', () => {
+    const Game = boot(optimized);
+    let seed = 297;
+    function random() {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return seed / 0x100000000;
+    }
+    for (const shape of ['rect', 'circle']) {
+      for (const fps of [30, 60, 120, 240]) {
+        for (let n = 0; n < 120; n++) {
+          const y = (random() * 2 - 1) * 60;
+          const opts = { offsetY: y, speed: 24000 };
+          const g = fire(Game, shape, fps, opts);
+          const hit = g.firstTerrainHit(-120, y, -120 + 24000 / fps, y, 0.9);
+          assert.ok(hit, 'parent shell must strike terrain');
+          const normal = hit.hit;
+          const expected = Array.from({ length: 6 }, (_, i) => {
+            const a = i * Math.PI / 3;
+            return Math.cos(a) * normal.nx + Math.sin(a) * normal.ny >= 0;
+          }).filter(Boolean).length;
+          assert.equal(g.bullets.length, expected,
+            shape + ' ' + fps + 'Hz y=' + y.toFixed(4));
+          for (const b of g.bullets) {
+            assert.equal(g.firstTerrainHit(b.px, b.py, b.x, b.y, b.r * 0.45), null,
+              'surviving fragment crossed the impacted solid');
+          }
+        }
+      }
+    }
   });
 }
