@@ -52,7 +52,7 @@ function fixture(Game, targets) {
   const g = new Game();
   g.time = 1;
   g.__novaTerrain = [];
-  g.__targets = targets;
+  g.hash.__targets = targets;
   g.bullets = [{ x: -100, y: 0, vx: 1000, vy: 0, r: 2, dmg: 12,
     ownerId: 1, pen: 0, hits: 0, dead: false }];
   g.damageShape = () => { throw new Error('Unexpected shape damage'); };
