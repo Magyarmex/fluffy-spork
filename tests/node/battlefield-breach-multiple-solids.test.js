@@ -90,7 +90,8 @@ function fire(Game, fps, order, opts = {}) {
     hp: kind === 'cover' ? 5 : 0,
   });
   const xs = { cover: start + travel * .2,
-    cover2: start + travel * .42, wall: start + travel * .65 };
+    cover2: start + travel * .42,
+    wall: start + travel * (opts.wallFirst ? .1 : .65) };
   g.__novaTerrain = order.map((kind, i) =>
     solid(kind === 'cover2' ? 'cover' : kind, xs[kind], -i - 1));
   const tank = { kind: 'tank', id: 2, cls: 'scout',
@@ -135,7 +136,7 @@ for (const optimized of [false, true]) {
       assert.equal(g.bullets.length, 0);
     });
     test(label + ' ' + fps + 'Hz: terrain wall alone blocks without damage to cover', () => {
-      const { g, tank } = fire(Game, fps, ['wall', 'cover']);
+      const { g, tank } = fire(Game, fps, ['wall', 'cover'], { wallFirst: true });
       assert.equal(g.__novaTerrain[1].hp, 5);
       assert.equal(g.directHits || 0, 0);
       assert.equal(tank.hp, 100);
