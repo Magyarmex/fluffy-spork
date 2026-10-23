@@ -591,7 +591,7 @@
         }
       }
       var marked = !fairTankOnly && state.markId >= 0 && state.markUntil > g.time ? g.getTank(state.markId) : null;
-      if (marked && marked.alive && combatHostile(g, owner, marked) && dist2(owner.x, owner.y, marked.x, marked.y) <= leash * leash) {
+      if (marked && marked.alive && !(marked.spawnShieldT > 0) && combatHostile(g, owner, marked) && dist2(owner.x, owner.y, marked.x, marked.y) <= leash * leash) {
         var mr = profile.engage * 1.85;
         if (dist2(state.nodeX, state.nodeY, marked.x, marked.y) <= mr * mr) return marked;
       }
@@ -905,7 +905,7 @@
       if (d.__novaPhase === 'windup') {
         if (wasHit) { abortWindup(g, d, profile); return true; }
         var wt = d.__novaTarget;
-        if (!validEntity(wt) || (typeof combatHostile === 'function' && !combatHostile(g, owner, wt)) || !state.active) { abortWindup(g, d, profile); return true; }
+        if (!validEntity(wt) || (wt.kind === 'tank' && wt.spawnShieldT > 0) || (typeof combatHostile === 'function' && !combatHostile(g, owner, wt)) || !state.active) { abortWindup(g, d, profile); return true; }
         d.__novaPhaseT -= dt;
         var fpw = formationPoint(g, owner, d, squad, wt, state, profile);
         steerDrone(d, fpw.x, fpw.y, baseSpeed * 0.58, profile.response * 0.72, dt);

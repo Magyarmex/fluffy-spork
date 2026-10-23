@@ -134,3 +134,42 @@ test('windup aborts if previously hostile target becomes allied', () => {
   assert.equal(s.drone.__novaPhase, 'recover');
   assert.equal(s.drone.__novaTarget, null);
 });
+
+
+test('marked hostile tank that gains spawn protection is not reselected over a valid hostile drone', () => {
+  const s = scenario();
+  s.state.markId = s.enemy.id; s.state.markUntil = 100;
+  s.enemy.spawnShieldT = 1.5;
+  assert.equal(target(s), s.enemyDrone);
+});
+
+test('marked hostile tank under spawn protection is not a valid sole target', () => {
+  const s = scenario();
+  s.state.markId = s.enemy.id; s.state.markUntil = 100;
+  s.enemy.spawnShieldT = 1.5;
+  s.g.drones = [];
+  assert.equal(target(s), null);
+});
+
+test('marked hostile tank can be selected again when its spawn shield expires', () => {
+  const s = scenario();
+  s.state.markId = s.enemy.id; s.state.markUntil = 100;
+  s.enemy.spawnShieldT = 1.5;
+  s.g.drones = [];
+  assert.equal(target(s), null);
+  s.enemy.spawnShieldT = 0;
+  assert.equal(target(s), s.enemy);
+});
+
+test('Controller windup aborts when its previously valid target becomes spawn protected', () => {
+  const s = scenario();
+  s.drone.__novaPhase = 'windup';
+  s.drone.__novaPhaseT = .15;
+  s.drone.__novaTarget = s.enemy;
+  s.drone.__novaCommitted = false;
+  s.enemy.spawnShieldT = 2;
+  s.win.__testControllerDrone(s.g, s.owner, s.drone, [], s.enemy, s.state,
+    { recover: .6, response: 8, lock: .1, dash: .3, diveSpeed: 1.7 }, .016, false);
+  assert.equal(s.drone.__novaPhase, 'recover');
+  assert.equal(s.drone.__novaTarget, null);
+});
