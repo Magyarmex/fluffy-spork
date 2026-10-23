@@ -94,6 +94,21 @@ test('after reacquisition a visible drone can be followed in its new location', 
   assert.ok(s.d.__novaLegacySeenX < 0, 'new sighting refreshes the tracked location');
 });
 
+test('remembered close contact cannot damage a now-distant hostile drone', () => {
+  const s = harness();
+  let hits = 0;
+  s.g.damageDrone = () => { hits++; };
+  s.d.speed = 0; s.d.attackCd = 100;
+  s.target.x = 20; s.tick();
+  assert.equal(s.d.__novaLegacySeenX, 20);
+  // Still visible but moved out of range before the next LOS sample.
+  // A remembered position is a navigation hint, never a hitbox.
+  s.target.x = 200; s.d.attackCd = 0;
+  s.tick();
+  assert.equal(hits, 0);
+  assert.equal(s.d.attackCd, 0);
+});
+
 test('minimap-public tank targets keep immediate live pursuit', () => {
   const s = harness('tank');
   s.tick();
