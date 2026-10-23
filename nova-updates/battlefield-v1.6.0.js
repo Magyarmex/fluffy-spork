@@ -65,13 +65,18 @@ function pointInsideSolid(s,x,y,pad){if(!solidAlive(s))return false;pad=pad||0;i
 function outwardFaceTravel(s,ax,ay,bx,by,pad){
  if(!solidAlive(s)||pointInsideSolid(s,ax,ay,-1e-6))return false;
  var dx=bx-ax,dy=by-ay;if(dx*dx+dy*dy<1e-18)return false;
+ /* Preserve the existing padded-origin contract: overlap *near* a wall
+  * still collides. Only the exact physical face may release outward. */
+ var eps=1e-7;
  if(s.shape==='circle'){
-   var fx=ax-s.x,fy=ay-s.y,r=s.r+(pad||0);
-   return fx*fx+fy*fy<=(r+1e-7)*(r+1e-7)&&fx*dx+fy*dy>=0;
+   var fx=ax-s.x,fy=ay-s.y;
+   return Math.abs(Math.hypot(fx,fy)-s.r)<=eps&&fx*dx+fy*dy>=0;
  }
  var hx=s.w*.5,hy=s.h*.5;
- return (ax>=s.x+hx-1e-7&&dx>=0)||(ax<=s.x-hx+1e-7&&dx<=0)||
-        (ay>=s.y+hy-1e-7&&dy>=0)||(ay<=s.y-hy+1e-7&&dy<=0);
+ return (Math.abs(ax-(s.x+hx))<=eps&&dx>=0)||
+        (Math.abs(ax-(s.x-hx))<=eps&&dx<=0)||
+        (Math.abs(ay-(s.y+hy))<=eps&&dy>=0)||
+        (Math.abs(ay-(s.y-hy))<=eps&&dy<=0);
 }
 function addRect(a,id,x,y,w,h,type,hp){a.push({id:id,kind:'terrain',shape:'rect',x:x,y:y,w:w,h:h,type:type,destructible:type==='cover',hp:hp||0,maxHp:hp||0,solid:true,flash:0,brokenAt:0});}
 function addCircle(a,id,x,y,r,type,hp){a.push({id:id,kind:'terrain',shape:'circle',x:x,y:y,r:r,type:type,destructible:type==='cover',hp:hp||0,maxHp:hp||0,solid:true,flash:0,brokenAt:0});}
