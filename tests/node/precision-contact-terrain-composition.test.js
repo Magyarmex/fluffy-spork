@@ -35,7 +35,7 @@ function boot(perf){
    this.cam={x:0,y:0,zoom:1,shake:0};
    this.player={id:1,x:0,y:0,alive:true,isPlayer:true};
    this.bullets=[];this.hash=new Hash();this.tmp=[];
-   this.__novaTerrain=[];this.tanks=[];this.drones=[];this.shapes=[];
+   this.__novaTerrain=[];this.__novaBattlefield={name:'TEST',coverBroken:0,coverTotal:0};this.tanks=[];this.drones=[];this.shapes=[];
    this.sfx={shot:0,swoosh:0,novaPrecisionShotCue(){this.shot++;},
     novaPrecisionContactSwoosh(){this.swoosh++;}};
   }
