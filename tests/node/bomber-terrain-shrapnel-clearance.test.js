@@ -88,7 +88,7 @@ function fire(Game, shape, fps, opts = {}) {
   g.__novaTerrain = opts.natural ? [] : terrain;
   g.bullets = [{
     id: 1, x: opts.natural ? -120 : -120, y: 0,
-    vx: opts.natural ? 0 : 6000, vy: 0,
+    vx: opts.natural ? 0 : 12000, vy: 0,
     r: 2, dmg: 12, ttl: opts.natural ? 0.001 : 2,
     shell: true, ownerId: 1, pen: 0, hits: 0, dead: false,
     color: '#aef', clusterDmg: 8,
