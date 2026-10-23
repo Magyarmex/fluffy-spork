@@ -8,9 +8,13 @@ const vm = require('node:vm');
 // The original engine queries the same spatial hash for each bullet in reverse
 // order. A killed shape remains in that hash until the next rebuild.
 function boot(withPerformance = false) {
+  class Hash {
+    constructor() { this.targets = []; }
+    query(_x, _y, _r, out) { out.length = 0; out.push(...this.targets); }
+  }
   function Game() {
     this.tmp = [];
-    this.hash = { query(_x, _y, _r, out) { out.length = 0; out.push(...this.targets); }, targets: [] };
+    this.hash = new Hash();
   }
   for (const k of ['spawnPlayer', 'spawnShape', 'spawnPowerup', 'tryFire',
     'initBulletIntegrity', 'resolveBulletCollisions', 'addParticles',
@@ -89,6 +93,7 @@ for (const withPerformance of [false, true]) {
     assert.equal(tankDamage, 1, 'second bullet should contact the live tank');
     assert.equal(g.bullets.length, 0);
     assert.equal(g.hash.query, query, 'original hash method must be restored');
+    assert.equal(Object.hasOwn(g.hash, 'query'), false, 'production hash prototype method must remain inherited');
   });
 
   test(label + ': live shapes remain visible to core projectile queries', () => {
