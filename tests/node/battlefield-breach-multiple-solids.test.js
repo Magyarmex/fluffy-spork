@@ -89,7 +89,7 @@ function fire(Game, fps, order, opts = {}) {
     w: 8, h: 100, solid: true, destructible: kind === 'cover',
     hp: kind === 'cover' ? 5 : 0,
   });
-  const xs = { cover: start + travel * .2,
+  const xs = { cover: start + travel * (opts.coverFraction ?? .2),
     cover2: start + travel * .42,
     wall: start + travel * (opts.wallFirst ? .1 : .65) };
   g.__novaTerrain = order.map((kind, i) =>
@@ -140,6 +140,15 @@ for (const optimized of [false, true]) {
       assert.equal(g.__novaTerrain[1].hp, 5);
       assert.equal(g.directHits || 0, 0);
       assert.equal(tank.hp, 100);
+    });
+    test(label + ' ' + fps + 'Hz: target before cover must intercept the shot before cover damage', () => {
+      const { g, tank } = fire(Game, fps, ['cover'],
+        { speed: 36000, targetFraction: .2, coverFraction: .5, pen: 0 });
+      assert.equal(g.directHits, 1,
+        'chronological contact: front target must absorb the bullet');
+      assert.ok(tank.hp < 100);
+      assert.equal(g.__novaTerrain[0].hp, 5,
+        'cover behind the first body must not take this nonpenetrating shot');
     });
     test(label + ' ' + fps + 'Hz: target before the later wall must retain its legitimate hit', () => {
       const { g, tank } = fire(Game, fps, ['cover', 'wall'],
