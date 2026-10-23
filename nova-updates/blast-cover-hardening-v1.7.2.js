@@ -18,8 +18,24 @@ wrap('game/engine',function(engine,require){
      * the source can move outward explosions inside their impact wall. */
     return !g.firstTerrainHit(x,y,tx,ty,.001);
   }
+  /* Cheap conservative broad phase: if no solid bounding box intersects
+   * the blast-to-hull corridor, all three exposure rays are necessarily clear.
+   * The hull sample offset and collision padding are included in the margin. */
+  function mayOcclude(g,x,y,tx,ty,margin){
+    var solids=g.__novaTerrain;if(!solids)return true;
+    var minx=Math.min(x,tx)-margin-2,maxx=Math.max(x,tx)+margin+2;
+    var miny=Math.min(y,ty)-margin-2,maxy=Math.max(y,ty)+margin+2;
+    for(var i=0;i<solids.length;i++){
+      var s=solids[i];if(!s||s.solid===false||(s.destructible&&s.hp<=0))continue;
+      var rx=s.shape==='circle'?s.r:s.w*.5,ry=s.shape==='circle'?s.r:s.h*.5;
+      if(!(rx>=0&&ry>=0))return true;
+      if(s.x+rx>=minx&&s.x-rx<=maxx&&s.y+ry>=miny&&s.y-ry<=maxy)return true;
+    }
+    return false;
+  }
   function exposure(g,t,x,y){
     var dx=t.x-x,dy=t.y-y,d=Math.hypot(dx,dy)||1,px=-dy/d,py=dx/d,r=size(t)*.58,e=0;
+    if(!mayOcclude(g,x,y,t.x,t.y,r))return 1;
     if(clear(g,x,y,t.x,t.y))e+=.56;
     if(clear(g,x,y,t.x+px*r,t.y+py*r))e+=.22;
     if(clear(g,x,y,t.x-px*r,t.y-py*r))e+=.22;
