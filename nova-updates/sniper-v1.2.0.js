@@ -229,10 +229,25 @@
     if (typeof oldSetPaused === 'function') {
       Game.prototype.setPaused = function (paused) {
         var enteringPause = !!paused && !this.paused;
+        var leavingPause = !paused && !!this.paused;
         var result = oldSetPaused.apply(this, arguments);
-        if (enteringPause && this.paused && this.player && isRailTank(this.player)) {
-          resetFocus(this.player);
-          this.__novaPlayerHeldFire = false;
+        if (enteringPause && this.paused) {
+          this.__novaRailPauseAt = performance.now();
+          if (this.player && isRailTank(this.player)) {
+            resetFocus(this.player);
+            this.__novaPlayerHeldFire = false;
+          }
+        } else if (leavingPause && !this.paused && Number.isFinite(this.__novaRailPauseAt)) {
+          var stamp = this.__novaRailPauseAt;
+          this.__novaRailPauseAt = null;
+          var delta = Math.max(0, performance.now() - stamp);
+          var tanks = this.tanks || [];
+          for (var i = 0; i < tanks.length; i++) {
+            var t = tanks[i];
+            if (t && isRailTank(t) && t.__novaSuppressedUntil > stamp) {
+              t.__novaSuppressedUntil += delta;
+            }
+          }
         }
         return result;
       };
