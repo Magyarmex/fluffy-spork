@@ -73,3 +73,41 @@ test('relative-motion prediction preserves allegiance and solid-cover exclusions
   g.hasLineOfSight=()=>false;ally.team='red';d.hp=80;d.__novaFieldService.nextProjectileAt=0;
   g.time=8;g.updateDrones(.05);assert.ok(d.hp>80,'terrain-blocked projectile must not suppress repair');
 });
+
+test('relative danger classification is stable from 30 through 240 FPS',()=>{
+  for(const fps of [30,60,120,240]){
+    const into=scenario({bulletX:200,bulletVX:200,moveVX:600,dt:1/fps});
+    assert.equal(into.drone.hp,80,'overtaking at '+fps+' FPS');
+    const away=scenario({bulletX:125,bulletVX:-200,moveVX:-400,dt:1/fps});
+    assert.ok(away.drone.hp>80,'escaping at '+fps+' FPS');
+  }
+});
+test('relative projectile geometry agrees with independent closest-approach calculations',()=>{
+  const {hooks}=boot();
+  let seed=20261023;
+  const rnd=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+  const owner={id:1,team:'blue',alive:true},enemy={id:2,team:'red',alive:true};
+  const g={tanks:[owner,enemy],tankById:new Map([[1,owner],[2,enemy]]),
+    hasLineOfSight(){return true;},bullets:[]};
+  const d={id:7,ownerId:1,x:80,y:0,r:8,hp:80,maxHp:100,
+    __novaFieldService:{motionVX:0,motionVY:0}};
+  for(let i=0;i<6000;i++){
+    const b={ownerId:2,x:80+(rnd()-.5)*500,y:(rnd()-.5)*500,
+      vx:(rnd()-.5)*1800,vy:(rnd()-.5)*1800,r:1+rnd()*7};
+    d.__novaFieldService.motionVX=(rnd()-.5)*1000;
+    d.__novaFieldService.motionVY=(rnd()-.5)*1000;
+    g.bullets=[b];
+    const dx=b.x-d.x,dy=b.y-d.y,
+      vx=b.vx-d.__novaFieldService.motionVX,vy=b.vy-d.__novaFieldService.motionVY,
+      speed2=vx*vx+vy*vy,dot=dx*vx+dy*vy,
+      clearance=34,overlap=8+b.r+1,dist2=dx*dx+dy*dy;
+    let expected=false;
+    if(dist2<=(dot<0||speed2<1?clearance*clearance:overlap*overlap))expected=true;
+    else if(speed2>=1){
+      const t=-dot/speed2;
+      if(t>0){const tt=Math.min(t,.38);
+        expected=(dx+vx*tt)**2+(dy+vy*tt)**2<=clearance*clearance;}
+    }
+    assert.equal(hooks.projectileThreat(g,d,owner),expected,'trajectory '+i);
+  }
+});
