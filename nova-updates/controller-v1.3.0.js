@@ -555,13 +555,28 @@
       return state;
     }
 
+    // Keep autonomous designation and physical dash hits consistent with allegiance.
+    function combatHostile(g, owner, target) {
+      if (!g || !owner || !target) return false;
+      var other = target.kind === 'drone' ? (g.tankById && g.tankById.get ? g.tankById.get(target.ownerId) : g.getTank ? g.getTank(target.ownerId) : null) : target;
+      if (!other || other.id === owner.id || other.alive === false) return false;
+      if (typeof g.areAllies === 'function' && g.areAllies(owner, other)) return false;
+      if (typeof g.areHostile === 'function') return !!g.areHostile(owner, other);
+      var keys = ['teamId', 'team', 'factionId', 'faction', 'side'];
+      for (var k = 0; k < keys.length; k++) {
+        var key = keys[k];
+        if (owner[key] != null && other[key] != null) return owner[key] !== other[key];
+      }
+      return true;
+    }
+
     function controllerTarget(g, owner, state, profile) {
       if (!state.active) return null;
       var def = CLASSES[owner.cls], leash = ((def && def.droneLeash) || 650) * (owner.swarmT > 0 ? 1.25 : 1);
       var fairTankOnly = !owner.isPlayer && owner.ai && Number.isFinite(owner.ai.__v1112TargetId);
       if (fairTankOnly && owner.ai.__v1112TargetId >= 0) {
         var fair = g.getTank ? g.getTank(owner.ai.__v1112TargetId) : null;
-        if (fair && fair.alive && fair.spawnShieldT <= 0 &&
+        if (fair && fair.alive && combatHostile(g, owner, fair) && fair.spawnShieldT <= 0 &&
             dist2(owner.x, owner.y, fair.x, fair.y) <= leash * leash) {
           var fr = profile.engage * (owner.swarmT > 0 ? 1.15 : 1);
           if (fair.id === state.markId && state.markUntil > g.time) fr *= 1.85;
@@ -569,14 +584,14 @@
         }
       }
       var marked = !fairTankOnly && state.markId >= 0 && state.markUntil > g.time ? g.getTank(state.markId) : null;
-      if (marked && marked.alive && dist2(owner.x, owner.y, marked.x, marked.y) <= leash * leash) {
+      if (marked && marked.alive && combatHostile(g, owner, marked) && dist2(owner.x, owner.y, marked.x, marked.y) <= leash * leash) {
         var mr = profile.engage * 1.85;
         if (dist2(state.nodeX, state.nodeY, marked.x, marked.y) <= mr * mr) return marked;
       }
       var best = null, bestScore = Infinity, r = profile.engage * (owner.swarmT > 0 ? 1.15 : 1), r2 = r * r;
       for (var i = 0; !fairTankOnly && i < g.tanks.length; i++) {
         var t = g.tanks[i];
-        if (!t || !t.alive || t.id === owner.id || t.spawnShieldT > 0) continue;
+        if (!t || !t.alive || !combatHostile(g, owner, t) || t.spawnShieldT > 0) continue;
         var nd = dist2(state.nodeX, state.nodeY, t.x, t.y);
         if (nd > r2 || dist2(owner.x, owner.y, t.x, t.y) > leash * leash) continue;
         var score = nd;
@@ -587,7 +602,7 @@
       var dr = r * 0.78, dr2 = dr * dr;
       for (var j = 0; j < g.drones.length; j++) {
         var d = g.drones[j];
-        if (!d || d.hp <= 0 || d.ownerId === owner.id) continue;
+        if (!d || d.hp <= 0 || !combatHostile(g, owner, d)) continue;
         var dd = dist2(state.nodeX, state.nodeY, d.x, d.y);
         if (dd < dr2 && dd < bestScore) { bestScore = dd; best = d; }
       }
@@ -775,7 +790,7 @@
       }
       for (var i = 0; i < g.tanks.length; i++) {
         var t = g.tanks[i];
-        if (!t || !t.alive || t.id === owner.id || t.spawnShieldT > 0) continue;
+        if (!t || !t.alive || !combatHostile(g, owner, t) || t.spawnShieldT > 0) continue;
         var rr = d.r + entityRadius(t);
         var sx = t.__novaSweepPrevX, sy = t.__novaSweepPrevY;
         var hasMotion = validClock && t.__novaSweepMoveTime === g.time &&
@@ -792,7 +807,7 @@
       if (bestT === 0) return best;
       for (var j = 0; j < g.drones.length; j++) {
         var od = g.drones[j];
-        if (!od || od === d || od.hp <= 0 || od.ownerId === owner.id) continue;
+        if (!od || od === d || od.hp <= 0 || !combatHostile(g, owner, od)) continue;
         var droneT = firstContact(od, d.r + entityRadius(od));
         if (droneT < bestT && (!strictEnd || droneT < 1)) { bestT = droneT; best = od; narrow(bestT); }
       }
@@ -869,7 +884,7 @@
       if (d.__novaPhase === 'windup') {
         if (wasHit) { abortWindup(g, d, profile); return true; }
         var wt = d.__novaTarget;
-        if (!validEntity(wt) || !state.active) { abortWindup(g, d, profile); return true; }
+        if (!validEntity(wt) || !combatHostile(g, owner, wt) || !state.active) { abortWindup(g, d, profile); return true; }
         d.__novaPhaseT -= dt;
         var fpw = formationPoint(g, owner, d, squad, wt, state, profile);
         steerDrone(d, fpw.x, fpw.y, baseSpeed * 0.58, profile.response * 0.72, dt);
