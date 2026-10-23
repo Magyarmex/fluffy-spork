@@ -118,3 +118,62 @@ for (const perf of [false, true]) {
     assert.deepEqual(g.contacts, [3]);
   });
 }
+
+for (const perf of [false, true]) {
+  const mode = perf ? 'Battlefield + Performance' : 'Battlefield';
+  test(mode + ': endpoint ordering holds across 30-240 Hz', () => {
+    for (const fps of [30, 60, 120, 240]) {
+      const Game = boot(perf), g = new Game();
+      const near = body('tank', 2, 0), far = body('shape', 3, 16);
+      g.contacts = []; g.hash.targets = [far, near];
+      const b = shot(); b.vx = 115 * fps;
+      g.bullets = [b];
+      g.updateBullets(1 / fps);
+      assert.deepEqual(g.contacts, [2], 'incorrect first hit at ' + fps + ' Hz');
+    }
+  });
+  test(mode + ': moving tank entry time outranks its misleading endpoint', () => {
+    const Game = boot(perf), g = new Game();
+    const moving = body('tank', 2, 0), staticTarget = body('tank', 3, 16);
+    moving.__novaSweepMoveTime = g.time;
+    moving.__novaSweepPrevX = 100; moving.__novaSweepPrevY = 0;
+    g.contacts = []; g.hash.targets = [moving, staticTarget];
+    g.bullets = [shot()];
+    g.updateBullets(1);
+    assert.deepEqual(g.contacts, [3],
+      'moving body only arrives after the static target is struck');
+  });
+  test(mode + ': larger target surface may be hit before a nearer center', () => {
+    const Game = boot(perf), g = new Game();
+    const nearCenter = body('tank', 2, 0), larger = body('shape', 3, 20);
+    larger.r = 45;
+    g.contacts = []; g.hash.targets = [nearCenter, larger];
+    g.bullets = [shot()];
+    g.updateBullets(1);
+    assert.deepEqual(g.contacts, [3],
+      'surface entry time, not center distance, determines first hit');
+  });
+  test(mode + ': equal-time contacts retain stable hash order', () => {
+    const Game = boot(perf), g = new Game();
+    const a = body('tank', 2, 0), b = body('tank', 3, 0);
+    g.contacts = []; g.hash.targets = [b, a];
+    g.bullets = [shot()];
+    g.updateBullets(1);
+    assert.deepEqual(g.contacts, [3]);
+  });
+  test(mode + ': splash queries retain spatial hash ordering', () => {
+    const Game = boot(perf), g = new Game();
+    const near = body('tank', 2, 0), far = body('tank', 3, 16);
+    g.contacts = []; g.hash.targets = [far, near];
+    g.splashAt = function(x, y, radius) {
+      this.hash.query(x, y, radius, this.tmp);
+      this.splashSeen = this.tmp.map(e => e.id);
+    };
+    const b = shot(); b.splash = 49;
+    g.bullets = [b];
+    g.updateBullets(1);
+    assert.deepEqual(g.contacts, [2]);
+    assert.deepEqual(g.splashSeen, [3, 2],
+      'splash query must not inherit direct-hit contact sorting');
+  });
+}
