@@ -179,8 +179,10 @@ function clearTerrainBurstChildren(g,s,h,start){
  var nx=h.nx||0,ny=h.ny||0;if(nx*nx+ny*ny<.5)return;
  var cornerX=false,cornerY=false;
  if(s.shape==='rect'){
-   cornerX=Math.abs(Math.abs(h.x-s.x)-s.w*.5)<=2.5;
-   cornerY=Math.abs(Math.abs(h.y-s.y)-s.h*.5)<=2.5;
+   /* A nearby *interior* coordinate is not an exposed second face:
+    * clearing it would teleport fragments across solid cover. */
+   cornerX=Math.abs(Math.abs(h.x-s.x)-s.w*.5)<=2.5&&Math.abs(h.x-s.x)>=s.w*.5-1e-7;
+   cornerY=Math.abs(Math.abs(h.y-s.y)-s.h*.5)<=2.5&&Math.abs(h.y-s.y)>=s.h*.5-1e-7;
  }
  for(var i=start;i<g.bullets.length;i++){
    var child=g.bullets[i];if(!child||child.dead||child.shell)continue;
