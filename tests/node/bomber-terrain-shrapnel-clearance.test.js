@@ -77,8 +77,14 @@ function fire(Game, shape, fps, opts = {}) {
   g.__novaBattlefield = { coverBroken: 0 };
   const terrain = [{ id: -1, shape, x: 0, y: 0, w: 160, h: 160,
     r: 80, solid: true, destructible: false }];
-  if (opts.neighbor) terrain.push({ id: -2, shape: 'rect', x: -95,
-    y: 0, w: 8, h: 160, solid: true, destructible: false });
+  if (opts.neighbor) {
+    // Flanking cover does not intersect the parent at y=0, but catches
+    // upward/downward shrapnel after it exits the impact face.
+    for (const y of [-10, 10]) terrain.push({
+      id: y, shape: 'rect', x: -90, y, w: 20, h: 16,
+      solid: true, destructible: false,
+    });
+  }
   g.__novaTerrain = opts.natural ? [] : terrain;
   g.bullets = [{
     id: 1, x: opts.natural ? -120 : -120, y: 0,
@@ -110,6 +116,6 @@ for (const optimized of [false, true]) {
   });
   test(label + ': neighboring solid still blocks outward shrapnel', () => {
     const g = fire(boot(optimized), 'rect', 60, { neighbor: true });
-    assert.equal(g.bullets.length, 0, 'adjacent cover must not be bypassed');
+    assert.equal(g.bullets.length, 1, 'flanking cover must stop the diagonal children');
   });
 }
