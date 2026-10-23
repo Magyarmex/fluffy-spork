@@ -9,12 +9,14 @@ This document tracks what is actually shipped, what still needs physical-device 
 
 The Sniper lineage uses direct hull sight plus Forward Observer reconnaissance, finite acquisition, readable commitment, suppression, projectile/flyby cues and punishable recovery. Later Observer intelligence added suspicion-driven search and clearer relay visualization.
 
-### v1.3.0–v1.10.0 — Controller second body → Command Weave
-**Status:** shipped.
+### v1.3.0–v1.10.7 — Controller second body → Live Vector
+**Status:** shipped. The former Command Weave v1.10.0 command-pad implementation is **retired from the playable runtime**.
 
-Controller combat no longer asks one right-stick/thumb to do two jobs. **Command Weave v1.10.0** separates cannon aim from swarm designation through a dedicated command surface while preserving mobile multi-pointer ownership. Human Controllers gain readable defensive drone behavior and damaged-drone recycling; AI Controllers use the same sensed information constraints, defensive doctrine and commitment rules rather than hidden knowledge.
+The actual production module is **Second Body Live Vector v1.10.7**, layered over Controller v1.3.0. One right stick simultaneously controls cannon bearing and swarm bearing; analog stick depth controls Command Node range, and releasing recalls uncommitted drones. A dedicated CMD pad and persistent RTS cursor are **not** loaded. The production materializer explicitly rejects the retired `controller-command-weave-v1.10.0.js` script. Do not implement player fixes in that unused module and claim they shipped.
 
-Controller repair remains intentionally faster than generic drone repair.
+Human Controllers retain direct-fire designation, readable defensive drone behavior and damaged-drone recycling. AI Controllers use a sensed-target virtual polar stick, bounded reaction cadence, hostility/spawn-protection gates and the same depth/commitment tradeoffs rather than hidden coordinates. Controller repair remains intentionally faster than generic drone repair.
+
+For Controller changes, test `controller-v1.3.0.js` + `second-body-live-vector-v1.10.7.js` in the **materialized `index.html` order** and verify the actual deploy workflow before integration.
 
 ### v1.5.0–v1.7.9 — Blackglass showroom, menu systems and Living Archive
 **Status:** shipped; portrait-device QA remains.
