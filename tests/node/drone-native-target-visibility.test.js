@@ -1,7 +1,8 @@
 'use strict';
 // The canonical core's native acquireDroneTarget ranks combatants from a
-// spatial hash without checking terrain. The post-filter must not trust an
-// occluded native combat target while its fallback requires visibility.
+// spatial hash without checking terrain. Tank positions are public on the
+// minimap, but hostile drone coordinates are not; only hidden native drones
+// must be rejected. The fallback remains visibility-gated.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -36,11 +37,11 @@ function hostileDrone(id, x) {
   return { id, kind: 'drone', ownerId: 2, hp: 20, x, y: 0 };
 }
 
-test('occluded native tank yields to a visible hostile tank', () => {
+test('public-minimap tank remains a valid native pursuit target behind cover', () => {
   const hidden = tank(2, 40), visible = tank(3, 120), s = scenario(hidden);
   s.g.tanks.push(hidden, visible);
   s.g.hasLineOfSight = (ax, ay, bx) => bx !== 40;
-  assert.equal(s.acquire(), visible);
+  assert.equal(s.acquire(), hidden);
 });
 
 test('occluded native hostile drone yields to a visible combatant', () => {
@@ -52,10 +53,12 @@ test('occluded native hostile drone yields to a visible combatant', () => {
   assert.equal(s.acquire(), visible);
 });
 
-test('occluded native combatant cannot suppress legitimate neutral farming', () => {
-  const hidden = tank(2, 40), harvest = shape(9, 60), s = scenario(hidden);
-  s.g.tanks.push(hidden); s.g.shapes.push(harvest);
-  s.g.hasLineOfSight = (ax, ay, bx) => bx !== 40;
+test('occluded native drone cannot suppress legitimate neutral farming', () => {
+  const hidden = hostileDrone(20, 40), harvest = shape(9, 60), s = scenario(hidden);
+  const enemyOwner = tank(2, 400);
+  s.g.tanks.push(enemyOwner); s.g.tankById.set(2, enemyOwner);
+  s.g.drones.push(hidden); s.g.shapes.push(harvest);
+  s.g.hasLineOfSight = (ax, ay, bx) => bx !== 40 && bx !== 400;
   assert.equal(s.acquire(), harvest);
 });
 
@@ -79,9 +82,11 @@ test('native neutral-shape target remains valid through routing around cover', (
   assert.equal(s.acquire(), harvest, 'Terrain Intelligence may route farming around cover');
 });
 
-test('absent visibility API with live solid terrain cannot reveal hidden combatants', () => {
-  const hidden = tank(2, 40), s = scenario(hidden);
-  s.g.tanks.push(hidden);
+test('absent visibility API with solid terrain cannot reveal hidden drones', () => {
+  const hidden = hostileDrone(20, 40), s = scenario(hidden);
+  const enemyOwner = tank(2, 400);
+  s.g.tanks.push(enemyOwner); s.g.tankById.set(2, enemyOwner);
+  s.g.drones.push(hidden);
   delete s.g.hasLineOfSight;
   s.g.__novaTerrain = [{ solid: true, destructible: false }];
   assert.equal(s.acquire(), null);
@@ -95,10 +100,10 @@ test('no visibility API in an open arena preserves ordinary hostile acquisition'
 });
 
 
-test('actual Battlefield wall hides a native tank until the cover is destroyed', () => {
+test('actual Battlefield wall hides a native drone until cover destruction', () => {
   const battlefield = fs.readFileSync(path.join(__dirname,
     '../../nova-updates/battlefield-v1.6.0.js'), 'utf8');
-  const hidden = tank(2, 90);
+  const hidden = hostileDrone(20, 90);
   class Game {
     constructor() {
       this.tanks = []; this.drones = []; this.shapes = [];
@@ -134,7 +139,8 @@ test('actual Battlefield wall hides a native tank until the cover is destroyed',
   const visible = { ...tank(3, 90), y: 130 };
   const drone = { id: 10, kind: 'drone', ownerId: 1,
     hp: 30, x: 0, y: 0, leash: 500 };
-  g.tanks = [owner, hidden, visible]; g.drones = [drone];
+  const enemyOwner = tank(2, 400);
+  g.tanks = [owner, enemyOwner, visible]; g.drones = [drone, hidden];
   g.tankById = new Map(g.tanks.map(t => [t.id, t]));
   g.areAllies = (a, b) => a.team === b.team;
   g.areHostile = (a, b) => a.team !== b.team;
