@@ -286,7 +286,7 @@ wrap('game/engine',function(engine,require){
       if(dist2(owner.x,owner.y,d.x,d.y)>local2)continue;
       used++;steerToward(g,d,tx,ty,Math.max(190,(d.speed||190)*1.12),dt);d.__lvPeelUntil=Number(g.time||0)+.16;
       var rr=(d.r||8)+(threat.r||8)+9;
-      if(dist2(d.x,d.y,threat.x,threat.y)<rr*rr&&(d.attackCd||0)<=0){
+      if(dist2(d.x,d.y,threat.x,threat.y)<rr*rr&&(d.attackCd||0)<=0&&lineClear(g,d.x,d.y,threat.x,threat.y,2)){
         if(g.damageDrone){var prev=g.__novaDroneDamageOwner;g.__novaDroneDamageOwner=owner.id;try{g.damageDrone(threat,Math.max(5,(d.damage||d.dmg||8)*.75),owner.id);}finally{g.__novaDroneDamageOwner=prev;}}
         d.attackCd=.38;d.__novaVX=(d.__novaVX||0)*.45;d.__novaVY=(d.__novaVY||0)*.45;
       }
