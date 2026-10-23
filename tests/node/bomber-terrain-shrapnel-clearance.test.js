@@ -78,7 +78,8 @@ function fire(Game, shape, fps, opts = {}) {
   g.time = 1;
   g.__novaBattlefield = { coverBroken: 0 };
   const terrain = [{ id: -1, shape, x: 0, y: 0, w: 160, h: 160,
-    r: 80, solid: true, destructible: false }];
+    r: 80, solid: true, destructible: !!opts.destructible,
+    hp: opts.destructible ? 5 : 0 }];
   if (opts.neighbor) {
     // Flanking cover does not intersect the parent at y=0, but catches
     // upward/downward shrapnel after it exits the impact face.
@@ -92,8 +93,8 @@ function fire(Game, shape, fps, opts = {}) {
     __v17FuseDepth: 0, stats: { damage: 0 }, level: 1, alive: true };
   g.bullets = [{
     id: 1, x: -120, y: opts.corner ? -120 : (opts.nearCorner ? -79 : 0),
-    vx: opts.natural ? 0 : 12000, vy: opts.corner ? 12000 : 0,
-    r: 2, dmg: 12, ttl: opts.natural ? 0.001 : 2,
+    vx: (opts.natural || opts.expireNear) ? 0 : 12000, vy: opts.corner ? 12000 : 0,
+    r: 2, dmg: 12, ttl: (opts.natural || opts.expireNear || opts.sameTick) ? 0.001 : 2,
     shell: true, ownerId: 1, pen: 0, hits: 0, dead: false,
     color: '#aef', clusterDmg: 8,
   }];
@@ -159,4 +160,22 @@ for (const optimized of [false, true]) {
       assert.ok(g.bullets.every(b => b.vx < 0));
     });
   }
+}
+
+for (const optimized of [false, true]) {
+  const label = optimized ? 'optimized' : 'base';
+  test(label + ': breaching destructible cover keeps all six children in opened lane', () => {
+    const g = fire(boot(optimized), 'rect', 60, { destructible: true });
+    assert.equal(g.__novaTerrain[0].solid, false);
+    assert.equal(g.bullets.length, 6);
+  });
+  test(label + ': terrain impact plus same-tick TTL cannot create a second shrapnel burst', () => {
+    const g = fire(boot(optimized), 'rect', 60, { sameTick: true });
+    assert.equal(g.bullets.length, 3);
+  });
+  test(label + ': natural expiry near intact cover keeps original burst origin', () => {
+    const g = fire(boot(optimized), 'rect', 60, { expireNear: true });
+    assert.equal(g.bullets.length, 6);
+    assert.ok(g.bullets.every(b => b.x < -100));
+  });
 }
