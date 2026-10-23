@@ -65,6 +65,7 @@ function boot(performanceLayer) {
 function fire(Game, opts = {}) {
   const g = new Game();
   g.time = 1;
+  g.__novaBattlefield = { coverBroken: 0 };
   g.__novaTerrain = opts.terrain === false ? [] : [{
     id: -1, shape: 'rect', x: opts.wallX || 0, y: 0, w: 160, h: 160,
     solid: true, destructible: !!opts.destructible, hp: opts.destructible ? 5 : 0,
