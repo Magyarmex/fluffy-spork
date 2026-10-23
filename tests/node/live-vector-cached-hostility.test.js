@@ -101,3 +101,28 @@ test('the corrected Live Vector module is wired into the materialized game',()=>
  assert.equal(html.includes('src="./nova-updates/controller-command-weave-v1.10.0.js"'),false,
    'retired Command Weave must not be mistaken for the shipping path');
 });
+
+test('AI Controller releases newly allied target before the next scheduled think',()=>{
+ const w=boot(),p=tick(w),scheduled=p.thinkAt;
+ w.enemy.team='blue';w.g.time+=.05;
+ tick(w);
+ assert.equal(p.targetId,-1);
+ assert.equal(p.active,false);
+ assert.equal(p.thinkAt,scheduled,'release must not force an omniscient replan');
+});
+test('AI Controller releases newly shielded target before the next scheduled think',()=>{
+ const w=boot(),p=tick(w),scheduled=p.thinkAt;
+ w.enemy.spawnShieldT=2;w.g.time+=.05;
+ tick(w);
+ assert.equal(p.targetId,-1);
+ assert.equal(p.active,false);
+ assert.equal(p.thinkAt,scheduled);
+});
+test('AI Controller retains valid hostile commitment between think ticks',()=>{
+ const w=boot(),p=tick(w),scheduled=p.thinkAt;
+ w.g.time+=.05;
+ tick(w);
+ assert.equal(p.targetId,w.enemy.id);
+ assert.equal(p.active,true);
+ assert.equal(p.thinkAt,scheduled);
+});
