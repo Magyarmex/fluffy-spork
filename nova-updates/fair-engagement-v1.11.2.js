@@ -144,6 +144,7 @@ function prepareClosePlayerAim(g){
 window.__NOVA_VERSION=VERSION;
 window.__NOVA_FAIR_ENGAGEMENT__={
   version:VERSION,codename:CODENAME,date:'2026-08-30',closeNodeRescues:0,targetReplans:0,
+  inGameplayViewport:inGameplayViewport,
   contract:{gameplayViewportParity:true,adaptiveWidthHeight:true,adaptiveRotation:true,adaptiveZoom:true,globalMinimapRadar:false,spotterRelayException:true,playerPriorityBonus:false,saturationIsSoft:true,closeHeldAimRemainsCommand:true,releaseStillRecalls:true}
 };
 window.__NOVA_FAIR_ENGAGEMENT_TEST__={
