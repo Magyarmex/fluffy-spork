@@ -244,6 +244,13 @@ wrap('game/engine',function(engine,require){
         var stick=helper&&typeof helper.aiVirtualStick==='function'?helper.aiVirtualStick(owner,C[owner.cls],target,p,threat):null;
         if(stick){p.active=!!stick.active;p.commandAngle=stick.angle;p.commandPower=stick.power;}
         else{var ang=Math.atan2(target.y-owner.y,target.x-owner.x);p.active=true;p.commandAngle=ang;p.commandPower=clamp(Math.hypot(target.x-owner.x,target.y-owner.y)/700,.08,1);}
+        /* A deeper AI swarm commitment must remain readable to its human
+         * opponent. Reuse the original Live Vector cue and its cooldown. */
+        if(target.isPlayer&&p.pressure==='breach'&&p.active&&now-p.lastCueAt>4.5){
+          p.lastCueAt=now;p.cueUntil=now+1.12;
+          if(g.addRing)g.addRing(owner.x,owner.y,'#77ff9c',52);
+          if(g.sfx&&g.sfx.novaDroneWindup)g.sfx.novaDroneWindup(clamp((owner.x-target.x)/650,-1,1),true,false);
+        }
         owner.ai.targetId=id;if(owner.ai.state!=='flee')owner.ai.state='hunt';
       }else{p.active=false;p.commandPower=0;if(owner.ai.state!=='flee')owner.ai.targetId=-1;}
 
