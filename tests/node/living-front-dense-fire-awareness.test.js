@@ -83,6 +83,6 @@ test('flock cohesion still samples only eight neighbors', () => {
 });
 
 test('the fixed instinct layer is in the actual materialized game path', () => {
-  assert.match(html, /nova-updates\\/living-front-instincts-v1\\.12\\.0\\.js/);
-  assert.match(html, /nova-updates\\/living-front-core-v1\\.12\\.0\\.js/);
+  assert.ok(html.includes('nova-updates/living-front-instincts-v1.12.0.js'));
+  assert.ok(html.includes('nova-updates/living-front-core-v1.12.0.js'));
 });
