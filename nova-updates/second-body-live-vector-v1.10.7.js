@@ -237,7 +237,11 @@ wrap('game/engine',function(engine,require){
       var p=owner.__novaLiveVectorAI||null;
       saved.push({owner:owner,targetId:owner.ai.targetId,state:owner.ai.state,strafe:owner.ai.strafe});
       if(!p||!p.active){owner.ai.targetId=-1;owner.ai.state='wander';owner.ai.strafe=1e-6;continue;}
-      var point=virtualPoint(owner,C[owner.cls],p.commandAngle,p.commandPower),id=-900000-Math.abs(Number(owner.id)||i+1);
+      /* Canonical updateAICommand accepts only nonnegative target IDs. The
+       * synthetic point must therefore use an unused positive ID, and must
+       * never shadow a real tank or another Controller's virtual point. */
+      var point=virtualPoint(owner,C[owner.cls],p.commandAngle,p.commandPower),id=900000+Math.abs(Number(owner.id)||i+1);
+      while(fake[id] || realGet.call(g,id))id++;
       fake[id]={id:id,kind:'tank',alive:true,spawnShieldT:0,x:point.x,y:point.y,vx:0,vy:0};
       owner.ai.targetId=id;owner.ai.state='hunt';owner.ai.strafe=1e-6;
     }
