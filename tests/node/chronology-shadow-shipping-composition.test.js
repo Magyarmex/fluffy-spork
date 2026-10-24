@@ -364,7 +364,7 @@ test('opt-in shadow is combat-equivalent to disabled mode across 320 seeded worl
       const target = addScout(g, x, y);
       if (moving) {
         target.__novaSweepMoveTime = g.time;
-        target.__novaSweepPrevX = x + (random() - .5) * 0;
+        target.__novaSweepPrevX = x;
         target.__novaSweepPrevY = y + 15;
       }
       g.__novaTerrain = wall
