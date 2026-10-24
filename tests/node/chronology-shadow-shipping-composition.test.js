@@ -568,3 +568,32 @@ test('known hostile projectile still makes earlier interception ambiguous', () =
   assert.equal(s.interceptionAmbiguousBodyContacts, 1);
   assert.equal(s.predictedBodyContacts, 0);
 });
+
+/* Core damageTank rejects these two additional immunity states before HP
+ * damage. The optional chronology audit must not call them missing hits. */
+for (const protection of ['shieldT', 'bulwarkT']) {
+  test('short-TTL audit does not misreport core '+protection+' immunity', () => {
+    const { g } = boot(), target = addScout(g, 40);
+    target[protection] = 1;
+    g.bullets = [ordinaryShot(8400 + protection.length)];
+    g.updateBullets(1 / 30);
+    const s = g.novaChronoShadowSnapshot();
+    assert.equal(s.predictedBodyContacts, 0);
+    assert.equal(s.unregisteredBodyContacts, 0);
+  });
+  test(protection+' masks a vulnerable rear tank but not a vulnerable front tank', () => {
+    const { g } = boot(), protectedTank = addScout(g, 35);
+    protectedTank[protection] = 1;
+    g.tanks.push({ id: 3, kind: 'tank', cls: 'scout', x: 55, y: 0,
+      hp: 100, alive: true });
+    g.bullets = [ordinaryShot(8500 + protection.length)];
+    g.updateBullets(1 / 30);
+    assert.equal(g.novaChronoShadowSnapshot().predictedBodyContacts, 0);
+    const { g: second } = boot(), first = addScout(second, 35);
+    second.tanks.push({ id: 3, kind: 'tank', cls: 'scout', x: 55, y: 0,
+      hp: 100, alive: true, [protection]: 1 });
+    second.bullets = [ordinaryShot(8600 + protection.length)];
+    second.updateBullets(1 / 30);
+    assert.equal(second.novaChronoShadowSnapshot().predictedBodyContacts, 1);
+  });
+}
