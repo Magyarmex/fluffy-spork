@@ -250,12 +250,23 @@ function plan(t,g,classes,C,a,now){
 }
 function controllerPlan(g,classes,owner,now){
   if(!owner||!owner.ai||!CONTROLLER_IDS[owner.cls])return;
-  var target=chooseTarget(g,classes,owner,owner.ai,now),p=owner.__novaCommandAI||(owner.__novaCommandAI={thinkAt:0,commitUntil:0,targetId:-1,flankSide:(owner.id&1)?1:-1,pressure:'probe',lastCueAt:-99,cueUntil:0,lastProgressAt:now,lastOwnHp:owner.hp});
+  /* Fair Engagement is the later authoritative perception layer. Never let
+   * this older planner reacquire an offscreen, allied, or shielded tank after
+   * Fair Engagement explicitly cleared its contact. */
+  var fairId=owner.ai.__v1112TargetId;
+  var target=Number.isFinite(fairId)?(fairId>=0&&g.getTank?g.getTank(fairId):null):chooseTarget(g,classes,owner,owner.ai,now);
+  if(target&&(!target.alive||target.spawnShieldT>0))target=null;
+  var p=owner.__novaCommandAI||(owner.__novaCommandAI={thinkAt:0,commitUntil:0,targetId:-1,flankSide:(owner.id&1)?1:-1,pressure:'probe',lastCueAt:-99,cueUntil:0,lastProgressAt:now,lastOwnHp:owner.hp});
   if(!target){p.targetId=-1;p.thinkAt=now+.28;return;}
   var changed=p.targetId!==target.id;
   if(changed||now>=(p.commitUntil||0)){p.targetId=target.id;p.commitUntil=now+(owner.ai.isElite ? .78 : 1.02);if(changed)p.flankSide*=-1;p.pressure=changed?'probe':(p.pressure==='probe'?'breach':'probe');}
   p.thinkAt=now+(owner.ai.isElite ? .22 : .34)+((owner.id%3)*.025);
-  owner.ai.targetId=target.id;owner.ai.__v1105TargetId=target.id;if(owner.ai.state!=='flee')owner.ai.state='hunt';
+  /* Live Vector temporarily installs a virtual stick target before this
+   * older planner runs. Preserve that explicit synthetic target for the
+   * canonical Controller command, but keep the real sensed identity here. */
+  var current=owner.ai.targetId>=0&&g.getTank?g.getTank(owner.ai.targetId):null;
+  if(!current||current.__novaVirtualThumb!==true)owner.ai.targetId=target.id;
+  owner.ai.__v1105TargetId=target.id;if(owner.ai.state!=='flee')owner.ai.state='hunt';
   window.__NOVA_SHARED_BATTLEFIELD_VIEW__.controllerPlans++;
 }
 
