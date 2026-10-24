@@ -69,7 +69,7 @@ wrap('game/input',function(input){
     var out=this.__novaAimVec||(this.__novaAimVec={x:0,y:0}),x,y,l;
     if(this.aim.active){x=this.aim.dx;y=this.aim.dy;l=Math.hypot(x,y);if(l<4)return null;out.x=x/l;out.y=y/l;return out;}
     /* Core Game.update handles mouse world-coordinate aim only when this returns null. */
-    if(this.mouseActive)return null;
+    if(this.mouseActive&&!this.touchSeen)return null;
     if(this.move.active||this.keyboard.up||this.keyboard.down||this.keyboard.left||this.keyboard.right){x=move.x;y=move.y;l=Math.hypot(x,y);if(l<.2)return null;out.x=x/l;out.y=y/l;return out;}
     return null;
   };
