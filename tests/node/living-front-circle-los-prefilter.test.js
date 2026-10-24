@@ -51,13 +51,13 @@ test('out-of-range hash-bucket tank does not trigger Circle LOS ray', () => {
 
 test('in-range visible tank still causes Circle avoidance', () => {
   const s = scenario({ tankX: 50 });
-  assert.equal(s.rays.length, 1);
+  assert.equal(s.rays.length, 2); // Circle awareness and canonical local herding
   assert.ok(s.circle.vx < 0);
 });
 
 test('solid terrain still blocks in-range tank avoidance', () => {
   const s = scenario({ tankX: 50, blocked: true });
-  assert.equal(s.rays.length, 1);
+  assert.equal(s.rays.length, 2);
   assert.equal(s.circle.vx, 0);
 });
 
