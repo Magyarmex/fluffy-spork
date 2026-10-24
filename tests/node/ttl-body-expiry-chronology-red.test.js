@@ -143,3 +143,12 @@ for (const fps of [30, 60, 120, 240]) {
     assert.equal(simulate(Game, fps, 23, 500, .005, 1), 1);
   });
 }
+
+
+/* Exact TTL == frame step is also a missed hit: core checks <=0 before bodies.
+ * First contact at t=.004s, strictly before each 30/60/120/240Hz expiry. */
+for (const fps of [30, 60, 120, 240]) {
+  test('KNOWN RED #234: exact-frame TTL penetrating round hits at ' + fps + 'Hz', () => {
+    assert.equal(simulate(Game, fps, 23, 500, 1 / fps, 1), 1);
+  });
+}
