@@ -332,3 +332,17 @@ test('short-TTL shadow includes canonical penetrating rounds before first contac
     assert.equal(target.hp, 100);
   }
 });
+
+
+test('ordinary 500u/s round also loses a legitimate last-frame contact', () => {
+  const { g } = boot(), target = addScout(g, 23);
+  const b = ordinaryShot(2100, 0, 500, .005);
+  b.pen = 1;
+  g.bullets = [b];
+  g.updateBullets(1 / 60);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.predictedBodyContacts, 1);
+  assert.equal(s.unregisteredBodyContacts, 1);
+  assert.ok(Math.abs(s.events[0].expectedX - 2) < 1e-8);
+  assert.equal(target.hp, 100, 'known core defect remains unfixed by read-only audit');
+});
