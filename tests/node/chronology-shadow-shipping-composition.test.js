@@ -135,3 +135,279 @@ test('shipping Sniper interception: early physical burst is not an overshoot', (
   assert.equal(s.ttlOvershoots, 0);
   assert.equal(s.arenaOvershoots, 0);
 });
+
+
+/* Issue #234: the optional diagnostic must measure the real short-TTL
+ * body-first defect without changing hits, penetration, or shell behavior. */
+function ordinaryShot(id, x = 0, speed = 6000, ttl = .005) {
+  return { id, kind: 'bullet', ownerId: 1, x, y: 0, vx: speed, vy: 0,
+    r: 3, dmg: 20, pen: 0, ttl, hits: 0, dead: false, shell: false, beam: false };
+}
+function addScout(g, x = 40, y = 0) {
+  const t = { id: 2, kind: 'tank', cls: 'scout', x, y, hp: 100, alive: true };
+  g.tanks = [t];
+  g.hash.query = (_x, _y, _r, out) => { out.length = 0; out.push(t); };
+  g.damageTank = (target, damage) => {
+    target.hp -= damage;
+    g.hits = (g.hits || 0) + 1;
+  };
+  return t;
+}
+for (const fps of [30, 60, 120, 240]) {
+  test('shipping short-TTL shadow: physical scout contact at ' + fps + 'Hz', () => {
+    const { g } = boot(), target = addScout(g);
+    g.bullets = [ordinaryShot(101)];
+    g.updateBullets(1 / fps);
+    const s = g.novaChronoShadowSnapshot();
+    assert.equal(s.sampledShells, 0);
+    if (fps < 240) {
+      assert.equal(s.sampledShortShots, 1);
+      assert.equal(s.predictedBodyContacts, 1);
+      assert.equal(s.unregisteredBodyContacts, 1);
+      assert.equal(s.registeredBodyContacts, 0);
+      assert.equal(g.hits || 0, 0, 'audit must not repair the actual core miss');
+      assert.equal(target.hp, 100);
+      assert.equal(s.events[0].kind, 'unregistered-body-contact');
+      assert.equal(s.events[0].targetId, 2);
+      assert.equal(s.events[0].ttl, .005, 'report pre-frame lifetime, not mutated core TTL');
+      assert.ok(Math.abs(s.events[0].expectedX - 19) < 1e-8);
+    } else {
+      assert.equal(s.unregisteredBodyContacts, 0);
+      assert.equal(g.hits, 1, 'core already hits before expiry at 240Hz');
+      assert.equal(target.hp, 80);
+    }
+  });
+}
+for (const fps of [30, 60, 120]) {
+  test('shipping short-TTL shadow: moving scout contact at ' + fps + 'Hz', () => {
+    const { g } = boot(), t = addScout(g, 25, -20);
+    t.__novaSweepMoveTime = g.time;
+    t.__novaSweepPrevX = 25;
+    t.__novaSweepPrevY = 20;
+    g.bullets = [ordinaryShot(102)];
+    g.updateBullets(1 / fps);
+    const s = g.novaChronoShadowSnapshot();
+    assert.equal(s.predictedBodyContacts, 1);
+    assert.equal(s.unregisteredBodyContacts, 1);
+    assert.equal(g.hits || 0, 0);
+  });
+}
+test('short-TTL shadow rejects a target physically beyond expiry', () => {
+  const { g } = boot(), target = addScout(g, 100);
+  g.bullets = [ordinaryShot(103)];
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.sampledShortShots, 1);
+  assert.equal(s.predictedBodyContacts, 0);
+  assert.equal(s.unregisteredBodyContacts, 0);
+  assert.equal(target.hp, 100);
+});
+test('short-TTL shadow does not flag an owner hit', () => {
+  const { g } = boot(), target = addScout(g);
+  target.id = 1;
+  g.bullets = [ordinaryShot(104)];
+  g.updateBullets(1 / 30);
+  assert.equal(g.novaChronoShadowSnapshot().predictedBodyContacts, 0);
+  assert.equal(g.novaChronoShadowSnapshot().unregisteredBodyContacts, 0);
+});
+test('short-TTL shadow excludes cover before the body, even if destructible', () => {
+  const { g } = boot(), target = addScout(g);
+  g.__novaTerrain = [{ id: -3, shape: 'rect', x: 10, y: 0, w: 8, h: 80,
+    solid: true, destructible: true, hp: 1000 }];
+  g.bullets = [ordinaryShot(105)];
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.predictedBodyContacts, 0);
+  assert.equal(s.terrainOccludedBodyContacts, 1);
+  assert.equal(s.unregisteredBodyContacts, 0);
+  assert.equal(target.hp, 100);
+});
+test('short-TTL shadow does not mistake a wall beyond the body for occlusion', () => {
+  const { g } = boot(), target = addScout(g);
+  g.__novaTerrain = [{ id: -4, shape: 'rect', x: 100, y: 0, w: 8, h: 80,
+    solid: true, destructible: false }];
+  g.bullets = [ordinaryShot(106)];
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.predictedBodyContacts, 1);
+  assert.equal(s.unregisteredBodyContacts, 1);
+  assert.equal(s.terrainOccludedBodyContacts, 0);
+  assert.equal(target.hp, 100);
+});
+test('short-TTL shadow stays completely inactive when disabled', () => {
+  const { g, window } = boot();
+  window.__NOVA_CHRONO_SHADOW_ENABLED__ = false;
+  addScout(g);
+  g.bullets = [ordinaryShot(107)];
+  g.updateBullets(1 / 30);
+  assert.equal(g.__novaChronoShadow, undefined);
+  assert.equal(g.novaChronoShadowSnapshot().sampledShortShots, 0);
+});
+test('short-TTL diagnostic is bounded and cannot manufacture combat damage', () => {
+  const { g } = boot(), target = addScout(g);
+  g.bullets = Array.from({ length: 100 }, (_, i) => ordinaryShot(i + 200));
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.sampledShortShots, 12);
+  assert.equal(s.predictedBodyContacts, 12);
+  assert.equal(s.unregisteredBodyContacts, 12);
+  assert.equal(s.events.length, 12);
+  assert.equal(target.hp, 100);
+});
+
+test('short-TTL shadow excludes allied tanks without masking the core', () => {
+  const { g } = boot(), target = addScout(g);
+  const owner = { id: 1, teamId: 'blue' };
+  target.teamId = 'blue';
+  g.getTank = id => id === 1 ? owner : null;
+  g.areAllies = (a, b) => a.teamId === b.teamId;
+  g.bullets = [ordinaryShot(108)];
+  g.updateBullets(1 / 30);
+  assert.equal(g.novaChronoShadowSnapshot().predictedBodyContacts, 0);
+  assert.equal(g.novaChronoShadowSnapshot().unregisteredBodyContacts, 0);
+});
+test('short-TTL shadow failures never block the real projectile updater', () => {
+  const { g } = boot(), target = addScout(g);
+  g.firstTerrainHit = () => { throw new Error('diagnostic-only failure'); };
+  g.bullets = [ordinaryShot(109)];
+  assert.doesNotThrow(() => g.updateBullets(1 / 30));
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.bodyAuditErrors, 1);
+  assert.equal(s.predictedBodyContacts, 0);
+  assert.equal(target.hp, 100);
+});
+
+
+test('short-TTL shadow never predicts a body after the arena exit', () => {
+  const { g } = boot(), target = addScout(g, 2300);
+  g.bullets = [ordinaryShot(110, 2200, 6000, .005)];
+  g.updateBullets(1 / 30);
+  assert.equal(g.novaChronoShadowSnapshot().predictedBodyContacts, 0);
+  assert.equal(target.hp, 100);
+});
+test('short-TTL first-body comparator matches independent closest-approach oracle', () => {
+  const { g } = boot();
+  let seed = 0x2342026;
+  const random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
+  const dt = 1 / 30, ttl = .005, radius = 3 + 15 + 3;
+  for (let i = 0; i < 600; i++) {
+    const b = ordinaryShot(1000 + i, (random() - .5) * 150, (random() - .5) * 12000, ttl);
+    b.y = (random() - .5) * 150;
+    b.vy = (random() - .5) * 12000;
+    const moving = i % 2 === 0;
+    const px = (random() - .5) * 150, py = (random() - .5) * 150;
+    const t = addScout(g, px + (moving ? (random() - .5) * 60 : 0),
+      py + (moving ? (random() - .5) * 60 : 0));
+    if (moving) {
+      t.__novaSweepMoveTime = g.time;
+      t.__novaSweepPrevX = px;
+      t.__novaSweepPrevY = py;
+    }
+    const fx = b.x - px, fy = b.y - py;
+    const vx = b.vx - (t.x - px) / dt, vy = b.vy - (t.y - py) / dt;
+    const a = vx * vx + vy * vy, dot = fx * vx + fy * vy;
+    const closest = a > 0 ? Math.max(0, Math.min(ttl, -dot / a)) : 0;
+    const dx = fx + vx * closest, dy = fy + vy * closest;
+    const expected = dx * dx + dy * dy <= radius * radius;
+    const before = g.novaChronoShadowSnapshot().predictedBodyContacts;
+    g.bullets = [b];
+    g.updateBullets(dt);
+    const after = g.novaChronoShadowSnapshot().predictedBodyContacts;
+    assert.equal(after - before, expected ? 1 : 0,
+      'independent closest-approach disagreement at seeded world ' + i);
+  }
+});
+
+
+test('short-TTL shadow includes canonical penetrating rounds before first contact', () => {
+  for (const pen of [0, 1, 3, 10]) {
+    const { g } = boot(), target = addScout(g);
+    const b = ordinaryShot(2000 + pen);
+    b.pen = pen;
+    g.bullets = [b];
+    g.updateBullets(1 / 30);
+    const s = g.novaChronoShadowSnapshot();
+    assert.equal(s.predictedBodyContacts, 1, 'first body candidate with pen=' + pen);
+    assert.equal(s.unregisteredBodyContacts, 1, 'core expires before hit with pen=' + pen);
+    assert.equal(target.hp, 100);
+  }
+});
+
+
+test('ordinary 500u/s round also loses a legitimate last-frame contact', () => {
+  const { g } = boot(), target = addScout(g, 23);
+  const b = ordinaryShot(2100, 0, 500, .005);
+  b.pen = 1;
+  g.bullets = [b];
+  g.updateBullets(1 / 60);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.predictedBodyContacts, 1);
+  assert.equal(s.unregisteredBodyContacts, 1);
+  assert.ok(Math.abs(s.events[0].expectedX - 2) < 1e-8);
+  assert.equal(target.hp, 100, 'known core defect remains unfixed by read-only audit');
+});
+
+
+test('opt-in shadow is combat-equivalent to disabled mode across 320 seeded worlds', () => {
+  const active = boot(), inactive = boot();
+  inactive.window.__NOVA_CHRONO_SHADOW_ENABLED__ = false;
+  let seed = 0x3282026;
+  const random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
+  for (let i = 0; i < 320; i++) {
+    const fps = [30, 60, 120, 240][i % 4], dt = 1 / fps;
+    const speed = 300 + random() * 6500, ttl = .001 + random() * .022;
+    const x = 15 + random() * 100, y = (random() - .5) * 25;
+    const moving = i % 3 === 0, wall = i % 5 === 0;
+    const kind = i % 7 === 0 ? 'shell' : 'ordinary';
+    const results = [];
+    for (const { g } of [active, inactive]) {
+      const target = addScout(g, x, y);
+      if (moving) {
+        target.__novaSweepMoveTime = g.time;
+        target.__novaSweepPrevX = x;
+        target.__novaSweepPrevY = y + 15;
+      }
+      g.__novaTerrain = wall
+        ? [{ id: -1, shape: 'rect', x: 22, y: 0, w: 8, h: 100,
+             solid: true, destructible: false }]
+        : [];
+      const bullet = ordinaryShot(3000 + i, 0, speed, ttl);
+      bullet.pen = i % 3;
+      bullet.shell = kind === 'shell';
+      bullet.hp = 10; bullet.maxHp = 10;
+      g.bullets = [bullet];
+      g.burstOrigins = [];
+      g.hits = 0;
+      g.updateBullets(dt);
+      results.push({
+        hp: target.hp, hits: g.hits,
+        bursts: g.burstOrigins.map(v => [v.id, v.x, v.y]),
+        bullets: g.bullets.map(v => [v.id, v.x, v.y, v.vx, v.vy,
+          v.ttl, v.pen, v.hits, v.dead, v.shell]),
+        cover: g.__novaTerrain.map(v => [v.hp, v.solid])
+      });
+    }
+    assert.deepEqual(results[0], results[1],
+      'opt-in shadow changed shipping combat outcome in seeded world ' + i);
+  }
+});
+
+
+test('mixed fire retains independent bounded shell and ordinary audit coverage', () => {
+  const { g } = boot(), target = addScout(g);
+  g.bullets = Array.from({ length: 100 }, (_, i) => {
+    const b = ordinaryShot(5000 + i);
+    b.shell = i % 2 === 0;
+    b.hp = 10; b.maxHp = 10;
+    return b;
+  });
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.sampledShells, 12, 'ordinary fire cannot starve shell audit');
+  assert.equal(s.sampledShortShots, 12, 'shells cannot starve short-shot audit');
+  assert.equal(s.ttlOvershoots, 12);
+  assert.equal(s.predictedBodyContacts, 12);
+  assert.equal(s.unregisteredBodyContacts, 12);
+  assert.equal(s.events.length, 12, 'shared event ring remains bounded');
+  assert.equal(target.hp, 100);
+});
