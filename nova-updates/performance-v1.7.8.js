@@ -278,16 +278,23 @@ wrap('game/engine',function(engine,require){
     var samples=new Map(),shortShots=[],bullets=this.bullets,st=chronoState(this);
     st.frames++;
     /* Rotate a bounded scan window so crowded arenas do not starve late
-     * projectiles or make the diagnostic O(all bullets) each frame. */
+     * projectiles or make the diagnostic O(all bullets) each frame.
+     * Independent 12-shell and 12-short-shot budgets preserve the existing
+     * shell audit even during dense ordinary fire. */
     var count=bullets.length,scan=Math.min(count,64),start=count?(st.frames*CHRONO_SHADOW_LIMIT)%count:0;
-    for(var i=0;i<scan&&samples.size<CHRONO_SHADOW_LIMIT;i++){
+    var shellSampled=0,shortSampled=0;
+    for(var i=0;i<scan&&(shellSampled<CHRONO_SHADOW_LIMIT||shortSampled<CHRONO_SHADOW_LIMIT);i++){
       var b=bullets[(start+i)%count];
       if(!b||b.dead)continue;
       if(b.shell){
+        if(shellSampled>=CHRONO_SHADOW_LIMIT)continue;
+        shellSampled++;
         var s={id:b.id,x:b.x,y:b.y,vx:b.vx||0,vy:b.vy||0,ttl:b.ttl};
         s.exit=chronoExitTime(s);
         samples.set(b,s);st.sampledShells++;
       }else if(b.ttl>0&&b.ttl<dt&&!b.beam&&!(b.hits>0)){
+        if(shortSampled>=CHRONO_SHADOW_LIMIT)continue;
+        shortSampled++;
         var candidate=null;
         try{candidate=chronoFirstBody(this,b,dt);}
         catch(_){st.bodyAuditErrors++;}
