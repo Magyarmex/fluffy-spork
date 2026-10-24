@@ -259,7 +259,28 @@ wrap('game/engine',function(engine,require){
     var vx=ux*Math.min(speed,m*4.4),vy=uy*Math.min(speed,m*4.4);
     d.__lvVX=(d.__lvVX==null?(d.__novaVX||0):d.__lvVX)+(vx-(d.__lvVX==null?(d.__novaVX||0):d.__lvVX))*k;
     d.__lvVY=(d.__lvVY==null?(d.__novaVY||0):d.__lvVY)+(vy-(d.__lvVY==null?(d.__novaVY||0):d.__lvVY))*k;
-    d.x+=d.__lvVX*dt;d.y+=d.__lvVY*dt;d.__novaVX=d.__lvVX;d.__novaVY=d.__lvVY;
+    /* Battlefield resolves terrain inside the older updateDrones wrapper,
+     * before this post-update repair/peel movement. Sweep the extra movement
+     * so a returning or defending drone cannot cross a wall after that pass. */
+    var ox=d.x,oy=d.y,nx=ox+d.__lvVX*dt,ny=oy+d.__lvVY*dt;
+    if(g.firstTerrainHit&&dt>0){
+      var pad=(d.r||8)+1,contact=g.firstTerrainHit(ox,oy,nx,ny,pad);
+      if(contact&&contact.hit){
+        var h=contact.hit,t=clamp(Number(h.t)||0,0,1),travel=Math.max(0,t-.0001);
+        var ix=ox+(nx-ox)*travel,iy=oy+(ny-oy)*travel;
+        var nX=Number(h.nx)||0,nY=Number(h.ny)||0;
+        var inward=d.__lvVX*nX+d.__lvVY*nY;
+        if(inward<0){d.__lvVX-=inward*nX;d.__lvVY-=inward*nY;}
+        var remain=1-travel,sx=ix+d.__lvVX*dt*remain,sy=iy+d.__lvVY*dt*remain;
+        if(g.firstTerrainHit(ix,iy,sx,sy,pad)){
+          nx=ix;ny=iy;d.__lvVX=0;d.__lvVY=0;
+        }else{nx=sx;ny=sy;}
+      }
+      if(g.isTerrainSafe&&!g.isTerrainSafe(nx,ny,pad)){
+        nx=ox;ny=oy;d.__lvVX=0;d.__lvVY=0;
+      }
+    }
+    d.x=nx;d.y=ny;d.__novaVX=d.__lvVX;d.__novaVY=d.__lvVY;
     if(Math.abs(d.__lvVX)+Math.abs(d.__lvVY)>3)d.angle=Math.atan2(d.__lvVY,d.__lvVX);
   }
   function repairDrone(g,d,owner,state,dt){
