@@ -597,3 +597,24 @@ for (const protection of ['shieldT', 'bulwarkT']) {
     assert.equal(second.novaChronoShadowSnapshot().predictedBodyContacts, 1);
   });
 }
+
+test('bulwark defense is counted as ambiguous rather than proven immunity', () => {
+  const { g } = boot(), tank = addScout(g, 40);
+  tank.bulwarkT = 1;
+  tank.angle = Math.PI; // incoming projectile may be rear-side to the Guardian
+  g.bullets = [ordinaryShot(8701)];
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.defenseAmbiguousBodyContacts, 1,
+    'Guardian directional defense can reduce damage rather than make it zero');
+  assert.equal(s.unregisteredBodyContacts, 0);
+});
+test('unconditional core shield remains distinct from Guardian ambiguity', () => {
+  const { g } = boot(), tank = addScout(g, 40);
+  tank.shieldT = 1;
+  g.bullets = [ordinaryShot(8702)];
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.defenseAmbiguousBodyContacts, 0);
+  assert.equal(s.unregisteredBodyContacts, 0);
+});
