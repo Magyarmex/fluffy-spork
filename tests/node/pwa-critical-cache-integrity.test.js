@@ -38,6 +38,7 @@ function fixture({ missingScript = false, failAsset = false } = {}) {
   };
   const self = {
     registration: { scope: base },
+    navigator: { onLine: true },
     location: { origin: 'https://nova.example' },
     clients: { matchAll: async () => [] },
     skipWaiting: async () => {},
@@ -45,6 +46,7 @@ function fixture({ missingScript = false, failAsset = false } = {}) {
   };
   const fetch = async request => {
     calls.push(request.url);
+    if (!self.navigator.onLine) throw Error('simulated offline');
     if (request.url.includes('controller-v1.3.0.js')) {
       if (failAsset) throw Error('simulated missing asset');
       return new Response('console.info("Controller loaded")', { status: 200 });
@@ -61,6 +63,9 @@ function fixture({ missingScript = false, failAsset = false } = {}) {
   return {
     cache, caches, calls,
     stageLatest: options => vm.runInContext('stageLatest', sandbox)(options),
+    navigationResponse: () => vm.runInContext('navigationResponse', sandbox)(),
+    goOffline() { self.navigator.onLine = false; },
+    goOnline() { self.navigator.onLine = true; },
     async seed() {
       await cache(META).put(stateURL,
         new Response(JSON.stringify({ cacheName: OLD, fingerprint })));
@@ -102,4 +107,48 @@ test('failed repair preserves old active state and never promotes partial assets
   await assert.rejects(f.stageLatest(), /simulated missing asset/);
   assert.equal((await f.active()).cacheName, OLD);
   assert.deepEqual(await f.caches.keys(), [META, OLD]);
+});
+
+
+test('offline navigation fails closed when a critical game script was evicted', async () => {
+  const f = fixture({ missingScript: true });
+  await f.seed();
+  f.goOffline();
+  const response = await f.navigationResponse();
+  assert.equal(response.status, 503, 'a shell without its script cannot boot offline');
+  assert.match(await response.text(), /cannot verify a canonical real-game build/);
+  assert.equal((await f.active()).cacheName, OLD, 'no incomplete cache is promoted');
+});
+
+test('offline navigation still serves a complete validated game', async () => {
+  const f = fixture();
+  await f.seed();
+  f.goOffline();
+  const response = await f.navigationResponse();
+  assert.equal(response.status, 200);
+  assert.match(await response.text(), /__bootModule/);
+});
+
+test('optional Owner Operations absence does not block a complete offline game', async () => {
+  const f = fixture();
+  await f.seed(); // Only the critical game script is seeded; optional Owner HUD is absent.
+  f.goOffline();
+  const response = await f.navigationResponse();
+  assert.equal(response.status, 200);
+});
+
+test('online navigation repairs evicted scripts before serving the game', async () => {
+  const f = fixture({ missingScript: true });
+  await f.seed();
+  const response = await f.navigationResponse();
+  assert.equal(response.status, 200);
+  assert.notEqual((await f.active()).cacheName, OLD);
+  assert.ok(await f.cache((await f.active()).cacheName).match(scriptURL));
+});
+
+test('offline navigation without an active validated cache shows recovery', async () => {
+  const f = fixture();
+  f.goOffline();
+  const response = await f.navigationResponse();
+  assert.equal(response.status, 503);
 });
