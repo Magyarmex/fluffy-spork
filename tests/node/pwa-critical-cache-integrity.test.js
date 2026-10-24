@@ -11,7 +11,6 @@ const base = 'https://nova.example/';
 const shell = '<!doctype html><title>NOVA TANKS</title>' +
   '<script>window.__bootModule("main");</script>' +
   '<script src="./nova-updates/controller-v1.3.0.js"></script>';
-const fingerprint = createHash('sha256').update(shell).digest('hex').slice(0, 32);
 const META = 'nova-tanks-real-meta-v4';
 const OLD = 'nova-tanks-real-build-v4-old';
 const stateURL = base + '__nova_real_active__.json';
