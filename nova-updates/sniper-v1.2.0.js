@@ -364,12 +364,13 @@
      * tanks must not destroy each other's defensive fire or Bomber shells.
      * Resolve relationships only after geometric contact to keep the dense
      * projectile broad phase unchanged; unknown owners retain old behavior. */
-    function alliedProjectileOwners(g, a, b) {
+    function projectileOwner(g, b) {
       var byId = g.tankById;
-      var ownerA = byId && byId.get ? byId.get(a.ownerId) : null;
-      var ownerB = byId && byId.get ? byId.get(b.ownerId) : null;
-      if (!ownerA && typeof g.getTank === 'function') ownerA = g.getTank(a.ownerId);
-      if (!ownerB && typeof g.getTank === 'function') ownerB = g.getTank(b.ownerId);
+      var owner = byId && byId.get ? byId.get(b.ownerId) : null;
+      if (!owner && typeof g.getTank === 'function') owner = g.getTank(b.ownerId);
+      return owner || null;
+    }
+    function alliedTanks(g, ownerA, ownerB) {
       if (!ownerA || !ownerB) return false;
       if (typeof g.areAllies === 'function') return !!g.areAllies(ownerA, ownerB);
       var keys = ['teamId', 'team', 'factionId', 'faction', 'side'];
@@ -379,6 +380,12 @@
           return ownerA[key] === ownerB[key];
       }
       return false;
+    }
+    function alliedProjectileOwners(g, a, b) {
+      return alliedTanks(g, projectileOwner(g, a), projectileOwner(g, b));
+    }
+    function alliedProjectileTank(g, bullet, tank) {
+      return alliedTanks(g, projectileOwner(g, bullet), tank);
     }
 
     Game.prototype.resolveBulletCollisions = function () {
@@ -444,7 +451,7 @@
             if (!bullet.__novaSuppressed) bullet.__novaSuppressed = Object.create(null);
             if (bullet.__novaSuppressed[t.id]) continue;
             var rad = SUPPRESS_RADIUS + (bullet.r || 0);
-            if (pointSegmentDist2(t.x, t.y, bullet.px == null ? bullet.x : bullet.px, bullet.py == null ? bullet.y : bullet.py, bullet.x, bullet.y) <= rad * rad) {
+            if (pointSegmentDist2(t.x, t.y, bullet.px == null ? bullet.x : bullet.px, bullet.py == null ? bullet.y : bullet.py, bullet.x, bullet.y) <= rad * rad && !alliedProjectileTank(this, bullet, t)) {
               bullet.__novaSuppressed[t.id] = 1; broke = true; break;
             }
           }
