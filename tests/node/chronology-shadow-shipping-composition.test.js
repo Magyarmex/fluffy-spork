@@ -83,15 +83,16 @@ for (const fps of [30, 60, 120, 240]) {
   test('shipping overlay stack: TTL overshoot is observed at ' + fps + 'Hz', () => {
     const { g, window } = boot();
     g.bullets = [shell(1, 0, 6000, 0.005)];
-    g.updateBullets(1 / fps);
+    const frames = Math.ceil(0.005 * fps);
+    for (let i = 0; i < frames; i++) g.updateBullets(1 / fps);
     const s = g.novaChronoShadowSnapshot();
-    assert.equal(s.frames, 1);
-    assert.equal(s.sampledShells, 1);
+    assert.equal(s.frames, frames);
+    assert.equal(s.sampledShells, frames);
     assert.equal(s.ttlOvershoots, 1);
     assert.equal(s.arenaOvershoots, 0);
     assert.equal(window.__NOVA_CHRONO_SHADOW_LAST__, g.__novaChronoShadow);
     assert.equal(g.burstOrigins.length, 1);
-    assert.ok(Math.abs(g.burstOrigins[0].x - 6000 / fps) < 1e-8);
+    assert.ok(Math.abs(g.burstOrigins[0].x - 6000 * frames / fps) < 1e-8);
   });
 }
 
