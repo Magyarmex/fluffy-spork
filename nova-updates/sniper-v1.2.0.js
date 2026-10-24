@@ -342,6 +342,10 @@
           if (dx * dx + dy * dy > rr * rr && !sweptBulletHit(a, b, rr)) continue;
           var ah = a.hp || 0, bh = b.hp || 0;
           this.weakenBullet(a, bh); this.weakenBullet(b, ah);
+          /* Preserve the core's Cannon shell-on-interception contract. The
+           * Battlefield burst guard prevents repeated fragments per shell. */
+          if (a.dead && a.shell && this.clusterBurst) this.clusterBurst(a);
+          if (b.dead && b.shell && this.clusterBurst) this.clusterBurst(b);
           var mx = (a.x + b.x) * 0.5, my = (a.y + b.y) * 0.5;
           if (this.addParticles) this.addParticles(mx, my, '#d9f7ff', 3, 55, 'glow');
           if (a.dead) break;
