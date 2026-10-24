@@ -80,3 +80,19 @@ test('local defensive peel also respects cover after the canonical terrain pass'
  assert.equal(w.g.isTerrainSafe(w.drone.x,w.drone.y,9),true,
   'defensive peel may not bypass cover after the collision pass');
 });
+
+test('post-update repair slides tangentially along a rectangular wall instead of freezing',()=>{
+ const w=boot({ownerX:100,ownerY:100});
+ w.g.updateDrones(.2);
+ assert.equal(w.g.isTerrainSafe(w.drone.x,w.drone.y,9),true);
+ assert.ok(w.drone.x<=-19,'inward motion stops at the wall');
+ assert.ok(w.drone.y>0,'safe tangential motion is retained');
+});
+test('circular permanent pillars also bound post-update repair motion',()=>{
+ const w=boot({ownerX:100,ownerY:100});
+ w.g.__novaTerrain=[{id:-1,shape:'circle',x:0,y:0,r:10,solid:true,destructible:false}];
+ w.g.updateDrones(.2);
+ assert.equal(w.g.isTerrainSafe(w.drone.x,w.drone.y,9),true);
+ assert.ok(Math.hypot(w.drone.x,w.drone.y)>=19-1e-7,
+  'drone cannot enter a solid pillar after Battlefield already resolved collisions');
+});
