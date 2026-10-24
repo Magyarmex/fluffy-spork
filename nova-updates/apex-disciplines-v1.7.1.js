@@ -226,7 +226,7 @@ wrap('game/engine',function(engine,require){
 
   /* Bastion: an earned stationary posture strengthens only the already-correct frontal lane. */
   var oldDamage=Game.prototype.damageTank;
-  Game.prototype.damageTank=function(t,dmg,sourceId){
+  Game.prototype.damageTank=function(t,dmg,sourceId,kx,ky){
     var incoming=dmg;
     if(t&&t.cls==='bastion'&&(t.__v171Anchor||0)>.88&&sourceId!=null){
       var src=tankByOwner(this,sourceId);
@@ -236,7 +236,8 @@ wrap('game/engine',function(engine,require){
       }
     }
     var beforeCounter=t&&t.__v17CounterCharge||0;
-    var out=oldDamage.call(this,t,incoming,sourceId);
+    /* Preserve the core's directional impact impulse through Apex armor. */
+    var out=oldDamage.call(this,t,incoming,sourceId,kx,ky);
     if(t&&t.cls==='aegis'&&(t.__v17CounterCharge||0)>beforeCounter+.25)t.__v171FlowUntil=this.time+.72;
     return out;
   };
