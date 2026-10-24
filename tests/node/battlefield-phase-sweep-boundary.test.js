@@ -214,3 +214,77 @@ test('Phase Shift keeps its existing edge-clamped destination when clear', () =>
   assert.equal(t.x, 2220);
   assert.equal(t.abilityCd, 8);
 });
+
+
+test('shortened Phase Shift preserves the canonical ability sound and two-endpoint feedback', () => {
+  const Game = boot(), g = new Game(), t = tank();
+  g.__novaTerrain = [{ id: -1, shape: 'rect', x: 420, y: 0, w: 80, h: 100,
+    solid: true, destructible: false }];
+  const calls = { sound: 0, particles: [], rings: [], text: [] };
+  g.sfx.ability = () => calls.sound++;
+  g.addParticles = (x, y) => calls.particles.push([x, y]);
+  g.addRing = (x, y) => calls.rings.push([x, y]);
+  g.addText = (x, y, label) => calls.text.push(label);
+  g.useAbility(t);
+  assert.equal(calls.sound, 1);
+  assert.equal(calls.particles.length, 2);
+  assert.equal(calls.rings.length, 2);
+  assert.deepEqual(calls.particles[0], [0, 0]);
+  assert.deepEqual(calls.particles[1], [t.x, t.y]);
+  assert.deepEqual(calls.text, ['PHASE SHIFT!']);
+  assert.equal(t.abilityCd, 8);
+});
+test('cancelled Phase Shift does not create phantom arrival effects or consume cooldown', () => {
+  const Game = boot(), g = new Game(), t = tank();
+  g.__novaTerrain = [{ id: -1, shape: 'rect', x: 240, y: 0, w: 440, h: 100,
+    solid: true, destructible: false }];
+  t.isPlayer = true;
+  const calls = { sound: 0, particles: 0, rings: 0, text: [] };
+  g.sfx.ability = () => calls.sound++;
+  g.addParticles = () => calls.particles++;
+  g.addRing = () => calls.rings++;
+  g.addText = (_x, _y, label) => calls.text.push(label);
+  g.useAbility(t);
+  assert.equal(calls.sound, 0);
+  assert.equal(calls.particles, 0);
+  assert.equal(calls.rings, 0);
+  assert.deepEqual(calls.text, ['NO CLEAR LANDING']);
+  assert.equal(t.abilityCd, 0);
+});
+test('Phase Shift randomized destination-only clearance and no phantom sweep', () => {
+  const Game = boot();
+  let seed = 0x2252026;
+  const random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
+  for (let i = 0; i < 2500; i++) {
+    const g = new Game(), t = tank();
+    t.x = (random() - .5) * 3000;
+    t.y = (random() - .5) * 3000;
+    t.angle = random() * Math.PI * 2;
+    const ox = t.x, oy = t.y;
+    const intendedX = Math.max(-2220, Math.min(2220, ox + Math.cos(t.angle) * 420));
+    const intendedY = Math.max(-2220, Math.min(2220, oy + Math.sin(t.angle) * 420));
+    const cx = intendedX + (random() - .5) * 120;
+    const cy = intendedY + (random() - .5) * 120;
+    const circle = random() < .5;
+    g.__novaTerrain = [circle
+      ? { id: -1, shape: 'circle', x: cx, y: cy, r: 15 + random() * 110,
+          solid: true, destructible: false }
+      : { id: -1, shape: 'rect', x: cx, y: cy,
+          w: 25 + random() * 180, h: 25 + random() * 180,
+          solid: true, destructible: false }];
+    const wasClear = g.isTerrainSafe(intendedX, intendedY, 18.5);
+    g.useAbility(t);
+    if (t.abilityCd > 0) {
+      assert.equal(g.isTerrainSafe(t.x, t.y, 18.5), true, 'unsafe landing in world ' + i);
+      assert.equal(t.__novaSweepPrevX, t.x);
+      assert.equal(t.__novaSweepPrevY, t.y);
+      if (wasClear) {
+        assert.ok(Math.abs(t.x - intendedX) < 1e-9);
+        assert.ok(Math.abs(t.y - intendedY) < 1e-9);
+      }
+    } else {
+      assert.equal(t.x, ox, 'cancelled shift moved in world ' + i);
+      assert.equal(t.y, oy);
+    }
+  }
+});
