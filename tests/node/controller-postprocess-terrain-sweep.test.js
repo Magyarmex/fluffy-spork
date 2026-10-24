@@ -96,3 +96,23 @@ test('circular permanent pillars also bound post-update repair motion',()=>{
  assert.ok(Math.hypot(w.drone.x,w.drone.y)>=19-1e-7,
   'drone cannot enter a solid pillar after Battlefield already resolved collisions');
 });
+
+test('unobstructed defensive peel still advances toward a visible hostile drone',()=>{
+ const w=boot({droneX:-100,droneY:0,ownerX:-100,ownerY:100,damaged:false});
+ const rival={id:2,cls:'gunner',team:2,alive:true,isPlayer:false,x:-50,y:100,hp:100};
+ w.g.tanks.push(rival);w.g.tankById.set(2,rival);
+ w.g.drones.push({id:40,ownerId:2,x:-50,y:100,r:8,hp:100,maxHp:100});
+ const x0=w.drone.x;
+ w.g.updateDrones(.2);
+ assert.ok(w.drone.x>x0,'defensive peel still moves when the route is clear');
+ assert.equal(w.g.isTerrainSafe(w.drone.x,w.drone.y,9),true);
+});
+test('committed drone attacks are not rerouted by post-update repair/peel protection',()=>{
+ const w=boot({droneX:-100,ownerX:-50});
+ w.drone.__novaPhase='dash';w.drone.__novaCommitted=true;
+ const x0=w.drone.x,y0=w.drone.y;
+ w.g.updateDrones(.2);
+ assert.equal(w.drone.x,x0);
+ assert.equal(w.drone.y,y0);
+ assert.equal(w.drone.__novaPhase,'dash');
+});
