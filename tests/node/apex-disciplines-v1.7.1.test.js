@@ -45,7 +45,7 @@ function loadApex() {
     }
     t.fireCd=.2;
   };
-  Game.prototype.damageTank=function(t,dmg){ t.hp-=dmg; return dmg; };
+  Game.prototype.damageTank=function(t,dmg,srcId,kx=0,ky=0){ t.hp-=dmg; t.vx+=kx; t.vy+=ky; return dmg; };
   Game.prototype.useAbility=function(t){
     const ab=CLASSES[t.cls].ability;
     if(ab==='bulwark'){t.bulwarkT=4;t.abilityCd=14;}
@@ -188,3 +188,21 @@ test('Meteor keeps a higher peak impact ceiling than Ravager at equal charge',()
   const m=tank(1,'meteor',{stampedeT:2,__v17Charge:1}),r=tank(2,'ravager',{stampedeT:2,__v17Charge:1});
   assert.ok(g.bodyDamage(m)>g.bodyDamage(r));
 });
+
+
+/* Apex wraps the real damageTank call after Guardian directional defenses.
+ * It must not discard the core's projectile knockback arguments. Losing them
+ * silently erases Cannon displacement and other position-based counterplay. */
+for (const cls of ['tempest', 'cannon', 'bastion', 'aegis']) {
+  test('Apex ' + cls + ' damage preserves incoming X/Y knockback', () => {
+    const {Game}=loadApex(),g=new Game();
+    const target=tank(1,cls,{x:0,y:0,angle:0});
+    const shooter=tank(2,'tempest',{x:100,y:0});
+    g.tanks=[target,shooter];g.player=target;
+    const before=target.hp;
+    g.damageTank(target,25,shooter.id,3.5,-2.25);
+    assert.ok(target.hp<before, 'hit still deals class-appropriate damage');
+    assert.equal(target.vx,3.5, 'horizontal knockback reaches the core');
+    assert.equal(target.vy,-2.25, 'vertical knockback reaches the core');
+  });
+}
