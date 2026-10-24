@@ -45,7 +45,7 @@ test('hidden held target cannot suppress a public ecological rotation', () => {
 });
 
 test('hidden target current coordinates cannot change ecological decisions', () => {
-  const T = boot(), a = world(100), b = world(500);
+  const T = boot(), a = world(200), b = world(500);
   const one = bias(T, a), two = bias(T, b);
   assert.equal(one.mode, 'signal');
   assert.ok(Math.abs(one.weight - two.weight) < 1e-12,
