@@ -82,7 +82,7 @@ test('valid Circle flockmate still contributes cohesion', () => {
 });
 
 test('fallback exact-radius query retains Circle cohesion and nearby fire', () => {
-  const s = scenario({ indexed: false, nearbyCircle: true, bullets: [shot(5, -40)] });
+  const s = scenario({ indexed: false, nearbyCircle: true, bullets: [shot(5, 40)] });
   assert.ok(s.circle.vx < 0, 'fire disturbance should overcome gentle cohesion');
   assert.ok(s.st.stats.nearFireHerds > 0);
 });
