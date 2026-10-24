@@ -81,7 +81,9 @@ test('zooming out legitimately reveals and updates a Star route', () => {
   assert.equal(bias(T, w).x, 0);
   assert.equal(bias(T, w).y, 1);
   w.g.cam.zoom = 1;
-  assert.equal(bias(T, w).x, 1);
+  const remembered = bias(T, w);
+  assert.equal(remembered.x, 0);
+  assert.equal(remembered.y, 1, 'zooming back in preserves only the last visible observation');
 });
 
 test('portrait and landscape share the Fair Engagement visibility contract', () => {
@@ -112,7 +114,8 @@ test('the public signal position remains immutable during local observation', ()
   assert.equal(w.signal.y, 0);
   w.star.x = -500;
   const v = bias(T, w);
-  assert.equal(v.x, 1);
+  assert.equal(v.x, 0);
+  assert.equal(v.y, 1, 'last seen pursuit cannot mutate the public spawn signal');
   assert.equal(w.signal.x, 300);
 });
 
