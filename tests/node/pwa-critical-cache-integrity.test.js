@@ -64,6 +64,7 @@ function fixture({ missingScript = false, failAsset = false } = {}) {
     cache, caches, calls,
     stageLatest: options => vm.runInContext('stageLatest', sandbox)(options),
     navigationResponse: () => vm.runInContext('navigationResponse', sandbox)(),
+    assetResponse: url => vm.runInContext('assetResponse', sandbox)({ url }),
     goOffline() { self.navigator.onLine = false; },
     goOnline() { self.navigator.onLine = true; },
     async seed() {
@@ -151,4 +152,43 @@ test('offline navigation without an active validated cache shows recovery', asyn
   f.goOffline();
   const response = await f.navigationResponse();
   assert.equal(response.status, 503);
+});
+
+
+test('validated critical script bytes take precedence over unverified network bytes', async () => {
+  const f = fixture();
+  await f.seed();
+  const response = await f.assetResponse(scriptURL);
+  assert.equal(await response.text(), 'cached Controller',
+    'an active game must not mix a validated shell with unvalidated same-URL JS');
+  assert.equal(f.calls.length, 0, 'known validated scripts must not require a network round trip');
+});
+
+test('offline critical scripts load from validated cache without a network request', async () => {
+  const f = fixture();
+  await f.seed();
+  f.goOffline();
+  const response = await f.assetResponse(scriptURL);
+  assert.equal(response.status, 200);
+  assert.equal(await response.text(), 'cached Controller');
+  assert.equal(f.calls.length, 0);
+});
+
+test('validated cross-origin CDN dependencies use the same atomic asset policy', async () => {
+  const f = fixture();
+  await f.seed();
+  const cdn = 'https://cdn.example/react.js';
+  await f.cache(OLD).put(cdn, new Response('validated React'));
+  const response = await f.assetResponse(cdn);
+  assert.equal(await response.text(), 'validated React');
+  assert.equal(f.calls.length, 0);
+});
+
+test('non-staged assets retain a network fallback', async () => {
+  const f = fixture();
+  await f.seed();
+  const url = base + 'noncritical-image.png';
+  const response = await f.assetResponse(url);
+  assert.equal(response.status, 200);
+  assert.ok(f.calls.some(x => x.includes('noncritical-image.png')));
 });
