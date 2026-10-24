@@ -130,6 +130,64 @@ function terrainCandidates(g,x0,y0,x1,y1,pad){
  return out;
 }
 function safePoint(g,x,y,pad){pad=pad||40;var a=terrainCandidates(g,x,y,x,y,pad);for(var i=0;i<a.length;i++)if(pointInsideSolid(a[i],x,y,pad))return false;return true;}
+
+/* Find the first clear Phase landing on the chord from the blocked intended
+ * endpoint back toward departure. A fixed-distance scan can leap over a
+ * legitimate narrow gap between two padded solids. Intervals describe the
+ * exact blocked portion of this one chord, not the teleport travel path. */
+function nearestPhaseLanding(g,ax,ay,bx,by,pad){
+ var dx=bx-ax,dy=by-ay,len=Math.hypot(dx,dy);
+ if(!(len>=24))return null;
+ var solids=terrainCandidates(g,ax,ay,bx,by,pad),intervals=[];
+ for(var i=0;i<solids.length;i++){
+   var s=solids[i];if(!solidAlive(s))continue;
+   var a=0,b=1;
+   if(s.shape==='circle'){
+     var fx=ax-s.x,fy=ay-s.y,rr=s.r+pad,A=dx*dx+dy*dy;
+     var B=2*(fx*dx+fy*dy),C=fx*fx+fy*fy-rr*rr,D=B*B-4*A*C;
+     if(D<0)continue;
+     var root=Math.sqrt(D);
+     a=Math.max(0,(-B-root)/(2*A));
+     b=Math.min(1,(-B+root)/(2*A));
+   }else{
+     var minx=s.x-s.w*.5-pad,maxx=s.x+s.w*.5+pad;
+     var miny=s.y-s.h*.5-pad,maxy=s.y+s.h*.5+pad;
+     var p0,p1,tmp;
+     if(Math.abs(dx)<1e-12){if(ax<minx||ax>maxx)continue;}
+     else{
+       p0=(minx-ax)/dx;p1=(maxx-ax)/dx;
+       if(p0>p1){tmp=p0;p0=p1;p1=tmp;}
+       a=Math.max(a,p0);b=Math.min(b,p1);
+     }
+     if(Math.abs(dy)<1e-12){if(ay<miny||ay>maxy)continue;}
+     else{
+       p0=(miny-ay)/dy;p1=(maxy-ay)/dy;
+       if(p0>p1){tmp=p0;p0=p1;p1=tmp;}
+       a=Math.max(a,p0);b=Math.min(b,p1);
+     }
+   }
+   if(a<=b&&b>=0&&a<=1)intervals.push([Math.max(0,a),Math.min(1,b)]);
+ }
+ intervals.sort(function(a,b){return a[0]-b[0];});
+ var blockedUntil=0;
+ for(var k=0;k<=intervals.length;k++){
+   var next=k<intervals.length?intervals[k]:null;
+   if(next&&next[0]<=blockedUntil+1e-12){
+     if(next[1]>blockedUntil)blockedUntil=next[1];
+     continue;
+   }
+   var gapEnd=next?next[0]:1;
+   if(gapEnd>blockedUntil){
+     var f=blockedUntil+Math.min(.02/len,(gapEnd-blockedUntil)*.5);
+     if(len*(1-f)<24)return null;
+     var x=ax+dx*f,y=ay+dy*f;
+     if(safePoint(g,x,y,pad))return{x:x,y:y};
+   }
+   if(next&&next[1]>blockedUntil)blockedUntil=next[1];
+ }
+ return null;
+}
+
 /* An entity may start inside cover before its movement collision recovery.
  * Physical interior always occludes; a point exactly on the physical face may
  * look outward or along the face, but not through it. The tiny inset is solely
@@ -275,21 +333,7 @@ wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.
      var ny=clamp(oy+Math.sin(t.angle)*420,-MAP_LIMIT+30,MAP_LIMIT-30);
      var radius=terrainRadiusForTank(t,CLASSES)+.5;
      if(!safePoint(this,nx,ny,radius)){
-       var len=Math.hypot(nx-ox,ny-oy),steps=Math.max(1,Math.ceil(len/8)),landing=null;
-       for(var i=1;i<=steps;i++){
-         var f=i/steps,x=nx+(ox-nx)*f,y=ny+(oy-ny)*f;
-         if(!safePoint(this,x,y,radius))continue;
-         /* Refine the first clear point when searching backward from the
-          * intended landing; do not snap to an unrelated nearby pocket. */
-         var lo=(i-1)/steps,hi=f;
-         for(var j=0;j<9;j++){
-           var mid=(lo+hi)*.5,mx=nx+(ox-nx)*mid,my=ny+(oy-ny)*mid;
-           if(safePoint(this,mx,my,radius))hi=mid;else lo=mid;
-         }
-         x=nx+(ox-nx)*hi;y=ny+(oy-ny)*hi;
-         if(Math.hypot(x-ox)>=24)landing={x:x,y:y};
-         break;
-       }
+       var landing=nearestPhaseLanding(this,nx,ny,ox,oy,radius);
        if(!landing){
          if(t.isPlayer&&this.addText)this.addText(ox,oy-30,'NO CLEAR LANDING','#c9a0ff',11);
          return; /* no displacement, cloak, VFX, or cooldown to refund */
