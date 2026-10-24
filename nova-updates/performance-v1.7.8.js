@@ -255,7 +255,7 @@ wrap('game/engine',function(engine){
       for(var i=0;i<tmp.length;i++){var s=tmp[i];if(!s||s.kind!=='shape'||s.hp<=0)continue;var q=d2(x,y,s.x,s.y);if(q<bd){bd=q;best=s;}}
       return best;
     }
-    for(var j=0;j<this.shapes.length;j++){var z=this.shapes[j],qq=d2(x,y,z.x,z.y);if(qq<bd){bd=qq;best=z;}}
+    for(var j=0;j<this.shapes.length;j++){var z=this.shapes[j];if(!z||z.kind!=='shape'||z.hp<=0)continue;var qq=d2(x,y,z.x,z.y);if(qq<bd){bd=qq;best=z;}}
     return best;
   };
 
