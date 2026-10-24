@@ -154,3 +154,63 @@ test('materialized projectile path cannot hit the empty space crossed by Phase S
   assert.deepEqual(g.contacts, [], 'no damage anywhere along intangible teleport path');
   assert.equal(t.hp, 100);
 });
+
+
+/* Issue #225: a Phase Shift may cross terrain but may not materialize
+ * inside solid cover and then snap out during the following frame. */
+for (const fps of [30, 60, 120, 240]) {
+  for (const shape of ['rect', 'circle']) {
+    test('Phase Shift lands clear of a permanent ' + shape + ' at ' + fps + 'Hz', () => {
+      const Game = boot(), g = new Game(), t = tank();
+      g.__novaTerrain = [shape === 'rect'
+        ? { id: -1, shape, x: 420, y: 0, w: 80, h: 100, solid: true, destructible: false }
+        : { id: -1, shape, x: 420, y: 0, r: 40, solid: true, destructible: false }];
+      g.moveTank(t, 0, 0, 1 / fps);
+      g.useAbility(t);
+      assert.equal(g.isTerrainSafe(t.x, t.y, 18.5), true,
+        'Phase must finish outside tank-radius padded terrain');
+      assert.ok(t.x > 340 && t.x < 362, 'shorten only as far as the nearest clear landing');
+      assert.equal(t.abilityCd, 8, 'successful shortened blink spends its normal cooldown');
+      assert.equal(t.cloakT, .7);
+      assert.equal(t.__novaSweepPrevX, t.x, 'shortened teleport has no swept hitbox');
+      g.moveTank(t, 0, 0, 1 / fps);
+      assert.ok(Math.abs(t.x - t.__novaSweepPrevX) < .01,
+        'next frame must not snap the tank out of cover');
+    });
+  }
+}
+test('Phase Shift passes through intervening walls when its endpoint is clear', () => {
+  const Game = boot(), g = new Game(), t = tank();
+  g.__novaTerrain = [{ id: -1, shape: 'rect', x: 210, y: 0, w: 100, h: 150,
+    solid: true, destructible: false }];
+  g.useAbility(t);
+  assert.equal(t.x, 420);
+  assert.equal(t.abilityCd, 8);
+});
+test('Phase Shift can land on destroyed cover and respects intact destructible cover', () => {
+  const Game = boot(), g = new Game(), t = tank();
+  const cover = { id: -1, shape: 'rect', x: 420, y: 0, w: 80, h: 100,
+    solid: true, destructible: true, hp: 50 };
+  g.__novaTerrain = [cover];
+  g.useAbility(t);
+  assert.ok(t.x < 362);
+  t.x = 0; t.abilityCd = 0; t.cloakT = 0;
+  cover.hp = 0; cover.solid = false;
+  g.useAbility(t);
+  assert.equal(t.x, 420);
+});
+test('Phase Shift cancels without cooldown when no useful clear landing exists', () => {
+  const Game = boot(), g = new Game(), t = tank();
+  g.__novaTerrain = [{ id: -1, shape: 'rect', x: 240, y: 0, w: 440, h: 100,
+    solid: true, destructible: false }];
+  g.useAbility(t);
+  assert.equal(t.x, 0);
+  assert.equal(t.abilityCd, 0);
+  assert.equal(t.cloakT, undefined);
+});
+test('Phase Shift keeps its existing edge-clamped destination when clear', () => {
+  const Game = boot(), g = new Game(), t = tank('ghost', 2200);
+  g.useAbility(t);
+  assert.equal(t.x, 2220);
+  assert.equal(t.abilityCd, 8);
+});
