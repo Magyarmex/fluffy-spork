@@ -346,3 +346,48 @@ test('ordinary 500u/s round also loses a legitimate last-frame contact', () => {
   assert.ok(Math.abs(s.events[0].expectedX - 2) < 1e-8);
   assert.equal(target.hp, 100, 'known core defect remains unfixed by read-only audit');
 });
+
+
+test('opt-in shadow is combat-equivalent to disabled mode across 320 seeded worlds', () => {
+  const active = boot(), inactive = boot();
+  inactive.window.__NOVA_CHRONO_SHADOW_ENABLED__ = false;
+  let seed = 0x3282026;
+  const random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
+  for (let i = 0; i < 320; i++) {
+    const fps = [30, 60, 120, 240][i % 4], dt = 1 / fps;
+    const speed = 300 + random() * 6500, ttl = .001 + random() * .022;
+    const x = 15 + random() * 100, y = (random() - .5) * 25;
+    const moving = i % 3 === 0, wall = i % 5 === 0;
+    const kind = i % 7 === 0 ? 'shell' : 'ordinary';
+    const results = [];
+    for (const { g } of [active, inactive]) {
+      const target = addScout(g, x, y);
+      if (moving) {
+        target.__novaSweepMoveTime = g.time;
+        target.__novaSweepPrevX = x + (random() - .5) * 0;
+        target.__novaSweepPrevY = y + 15;
+      }
+      g.__novaTerrain = wall
+        ? [{ id: -1, shape: 'rect', x: 22, y: 0, w: 8, h: 100,
+             solid: true, destructible: false }]
+        : [];
+      const bullet = ordinaryShot(3000 + i, 0, speed, ttl);
+      bullet.pen = i % 3;
+      bullet.shell = kind === 'shell';
+      bullet.hp = 10; bullet.maxHp = 10;
+      g.bullets = [bullet];
+      g.burstOrigins = [];
+      g.hits = 0;
+      g.updateBullets(dt);
+      results.push({
+        hp: target.hp, hits: g.hits,
+        bursts: g.burstOrigins.map(v => [v.id, v.x, v.y]),
+        bullets: g.bullets.map(v => [v.id, v.x, v.y, v.vx, v.vy,
+          v.ttl, v.pen, v.hits, v.dead, v.shell]),
+        cover: g.__novaTerrain.map(v => [v.hp, v.solid])
+      });
+    }
+    assert.deepEqual(results[0], results[1],
+      'opt-in shadow changed shipping combat outcome in seeded world ' + i);
+  }
+});
