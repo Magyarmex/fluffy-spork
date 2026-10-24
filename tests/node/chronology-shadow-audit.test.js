@@ -184,6 +184,25 @@ test('bounded sampling rotates across projectile identities between frames', () 
   assert.ok(ids.size > 12, 'the same early shells were repeatedly sampled');
 });
 
+test('bounded scan covers all slots even when array length shares stride factors', () => {
+  const { g, window } = boot(function() {
+    for (const b of this.bullets) {
+      b.x = 200;
+      this.clusterBurst(b);
+      b.x = 0;
+    }
+  }, function() {});
+  window.__NOVA_CHRONO_SHADOW_ENABLED__ = true;
+  g.bullets = Array.from({ length: 134 }, (_, i) => shell(i, 0, 6000, 0.005));
+  const seen = new Set();
+  for (let i = 0; i < 67; i++) {
+    g.updateBullets(1 / 30);
+    for (const event of g.novaChronoShadowSnapshot().events) seen.add(event.id);
+  }
+  assert.equal(seen.size, 134,
+    'a stride coprimality trap permanently starved some projectiles');
+});
+
 test('diagnostics do not flag projectiles entering from outside the arena', () => {
   const { g, window } = boot();
   window.__NOVA_CHRONO_SHADOW_ENABLED__ = true;
