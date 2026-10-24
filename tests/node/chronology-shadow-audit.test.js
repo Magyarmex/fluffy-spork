@@ -193,14 +193,17 @@ test('bounded scan covers all slots even when array length shares stride factors
     }
   }, function() {});
   window.__NOVA_CHRONO_SHADOW_ENABLED__ = true;
-  g.bullets = Array.from({ length: 134 }, (_, i) => shell(i, 0, 6000, 0.005));
-  const seen = new Set();
-  for (let i = 0; i < 67; i++) {
-    g.updateBullets(1 / 30);
-    for (const event of g.novaChronoShadowSnapshot().events) seen.add(event.id);
+  for (const count of [128, 134]) {
+    g.bullets = Array.from({ length: count }, (_, i) => shell(i, 0, 6000, 0.005));
+    const seen = new Set();
+    const frames = count === 128 ? 32 : 67;
+    for (let i = 0; i < frames; i++) {
+      g.updateBullets(1 / 30);
+      for (const event of g.novaChronoShadowSnapshot().events) seen.add(event.id);
+    }
+    assert.equal(seen.size, count,
+      'stride residue trap starved some projectiles at length ' + count);
   }
-  assert.equal(seen.size, 134,
-    'a stride coprimality trap permanently starved some projectiles');
 });
 
 test('diagnostics do not flag projectiles entering from outside the arena', () => {
