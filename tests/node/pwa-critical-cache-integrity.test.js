@@ -16,7 +16,7 @@ const OLD = 'nova-tanks-real-build-v4-old';
 const stateURL = base + '__nova_real_active__.json';
 const scriptURL = base + 'nova-updates/controller-v1.3.0.js';
 
-function fixture({ missingScript = false, failAsset = false } = {}) {
+function fixture({ missingScript = false, failAsset = false, failPurge = false, failNotify = false } = {}) {
   const data = new Map();
   const calls = [];
   let remoteShell = shell;
@@ -35,13 +35,19 @@ function fixture({ missingScript = false, failAsset = false } = {}) {
   const caches = {
     open: async name => cache(name),
     keys: async () => [...data.keys()],
-    delete: async name => data.delete(name),
+    delete: async name => {
+      if (failPurge && name === OLD) throw Error('simulated old-cache purge failure');
+      return data.delete(name);
+    },
   };
   const self = {
     registration: { scope: base },
     navigator: { onLine: true },
     location: { origin: 'https://nova.example' },
-    clients: { matchAll: async () => [] },
+    clients: { matchAll: async () => {
+      if (failNotify) throw Error('simulated client notification failure');
+      return [];
+    } },
     skipWaiting: async () => {},
     addEventListener() {},
   };
@@ -271,4 +277,32 @@ test('unchanged-build validation restages a cached 404 instead of treating it as
   assert.notEqual(active.cacheName, OLD);
   const response = await f.cache(active.cacheName).match(scriptURL);
   assert.ok(response && response.ok);
+});
+
+
+test('cache purge failure after promotion cannot delete the newly active playable game', async () => {
+  const f = fixture({ failPurge: true });
+  await f.seed();
+  f.setRemoteBuild(shell + '<!-- newer build -->', 'new Controller');
+  const result = await f.stageLatest();
+  assert.equal(result.changed, true);
+  const state = await f.active();
+  assert.notEqual(state.cacheName, OLD);
+  assert.ok(await f.cache(state.cacheName).match(scriptURL));
+  assert.ok((await f.caches.keys()).includes(OLD), 'old cache may remain until later cleanup');
+  f.goOffline();
+  assert.equal((await f.navigationResponse()).status, 200);
+});
+
+test('client notification failure after promotion cannot delete the new active game', async () => {
+  const f = fixture({ failNotify: true });
+  await f.seed();
+  f.setRemoteBuild(shell + '<!-- newer build -->', 'new Controller');
+  const result = await f.stageLatest();
+  assert.equal(result.changed, true);
+  const state = await f.active();
+  assert.notEqual(state.cacheName, OLD);
+  assert.ok(await f.cache(state.cacheName).match(scriptURL));
+  f.goOffline();
+  assert.equal((await f.navigationResponse()).status, 200);
 });
