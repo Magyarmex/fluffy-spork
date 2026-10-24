@@ -136,13 +136,10 @@
     if (disc >= 0) {
       var denom = -halfB + Math.sqrt(disc);
       var entry = denom > 0 ? c / denom : null;
-      if (entry != null && entry >= 0 && entry <= 1) {
-        var ex = rx + vx * entry, ey = ry + vy * entry;
-        if (ex * ex + ey * ey <= rr * rr) return entry;
-      }
+      if (entry != null && entry >= 0 && entry <= 1) return entry;
     }
-    /* Only reached when the quadratic is numerically inconsistent with
-     * the confirmed swept hit. The first contact lies in [0, closest]. */
+    /* Only reached when the quadratic's discriminant or entry time is
+     * inconsistent with the confirmed swept hit. The first contact lies in [0, closest]. */
     var lo = 0, hi = closest;
     for (var i = 0; i < 44; i++) {
       var mid = (lo + hi) * .5, mx = rx + vx * mid, my = ry + vy * mid;
