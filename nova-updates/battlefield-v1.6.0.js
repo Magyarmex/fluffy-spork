@@ -259,6 +259,20 @@ wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.
 
  var oldMove=Game.prototype.moveTank;Game.prototype.moveTank=function(t,vx,vy,dt){ensureTerrain(this);var ox=t.x,oy=t.y;if(t.__novaSweepMoveTime!==this.time){t.__novaSweepMoveTime=this.time;t.__novaSweepPrevX=ox;t.__novaSweepPrevY=oy;}var out=oldMove.call(this,t,vx,vy,dt),r=terrainRadiusForTank(t,CLASSES),hit=circleResolve(this,t,r);if(hit){var moved=Math.hypot(t.x-ox,t.y-oy);if(!t.isPlayer&&t.ai){t.ai.__novaTerrainStuck=(t.ai.__novaTerrainStuck||0)+(moved<Math.hypot(vx,vy)*dt*.18?dt:0);if(t.ai.__novaTerrainStuck>.28){t.ai.strafe=(t.ai.strafe||1)*-1;t.ai.wanderA=(t.angle||0)+(t.ai.strafe||1)*(1.0+Math.random()*.65);t.ai.wanderT=.55+Math.random()*.7;t.ai.thinkT=0;t.ai.__novaTerrainStuck=0;}}else if(t.isPlayer&&this.sfx&&this.sfx.novaTerrainScrape&&Math.hypot(vx,vy)>45)this.sfx.novaTerrainScrape((t.x-(this.player?this.player.x:t.x))/600);}else if(t.ai)t.ai.__novaTerrainStuck=Math.max(0,(t.ai.__novaTerrainStuck||0)-dt*2);return out;};
 
+
+ /* Phase Shift relocates instantly after normal movement but before bullets
+  * update. Never turn the 420u teleport gap into a continuous swept hitbox. */
+ var oldAbility=Game.prototype.useAbility;
+ if(typeof oldAbility==='function')Game.prototype.useAbility=function(t){
+   var def=t&&CLASSES[t.cls],phase=!!(t&&t.alive&&def&&def.ability==='phase'&&!(t.abilityCd>0));
+   var ox=t&&t.x,oy=t&&t.y,out=oldAbility.apply(this,arguments);
+   if(phase&&(t.x!==ox||t.y!==oy)){
+     t.__novaSweepMoveTime=this.time;
+     t.__novaSweepPrevX=t.x;t.__novaSweepPrevY=t.y;
+   }
+   return out;
+ };
+
  Game.prototype.nearestTank=function(x,y,max,excludeId){var best=null,bd=max*max;for(var i=0;i<this.tanks.length;i++){var t=this.tanks[i];if(!t||!t.alive||t.id===excludeId)continue;var q=d2(x,y,t.x,t.y);if(q>=bd)continue;if(!lineOfSight(this,x,y,t.x,t.y,3))continue;bd=q;best=t;}return best;};
 
  var oldTryFire=Game.prototype.tryFire;Game.prototype.tryFire=function(t){if(t&&!t.isPlayer&&t.ai&&t.ai.targetId>=0){var target=this.getTank(t.ai.targetId);if(target&&target.alive&&!lineOfSight(this,t.x,t.y,target.x,target.y,4)){t.__novaTerrainDeniedFire=true;t.__novaTerrainDeniedUntil=this.time+.15;return;}}return oldTryFire.apply(this,arguments);};
