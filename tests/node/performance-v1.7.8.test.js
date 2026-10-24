@@ -143,3 +143,31 @@ test('unindexed and indexed nearestShape agree on living shape selection',()=>{
     assert.equal(fallback,indexed,'selection mismatch in world '+trial);
   }
 });
+
+
+test('nearestShape falls back to live shapes while the reusable spatial hash is cleared',()=>{
+  const {Game}=loadLayer(),g=new Game();
+  const [first,second]=g.shapes;
+  g.hash.insert(first);
+  g.hash.insert(second);
+  assert.equal(g.nearestShape(0,0,200),first,'indexed selection must work before clearing');
+  g.hash.clear();
+  assert.equal(g.hash.__novaReady,false,'cleared buckets must not be advertised as indexed');
+  assert.equal(g.nearestShape(0,0,200),first,
+    'a transient cleared hash must not make every living shape disappear');
+  assert.equal(g.nearestShape(0,0,20),first);
+});
+
+test('cleared spatial hash reenters indexed mode only after a new insertion',()=>{
+  const {Game}=loadLayer(),g=new Game();
+  g.hash.insert(g.shapes[0]);
+  g.hash.clear();
+  assert.equal(g.hash.__novaReady,false);
+  g.hash.insert(g.shapes[1]);
+  assert.equal(g.hash.__novaReady,true);
+  assert.equal(g.nearestShape(0,0,200),g.shapes[1],
+    'once indexed, use only the current-frame hash, not stale shapes');
+  g.hash.clear();
+  assert.equal(g.hash.__novaReady,false);
+  assert.equal(g.nearestShape(0,0,200),g.shapes[0]);
+});
