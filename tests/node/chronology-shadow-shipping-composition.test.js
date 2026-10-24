@@ -169,6 +169,7 @@ for (const fps of [30, 60, 120, 240]) {
       assert.equal(target.hp, 100);
       assert.equal(s.events[0].kind, 'unregistered-body-contact');
       assert.equal(s.events[0].targetId, 2);
+      assert.equal(s.events[0].ttl, .005, 'report pre-frame lifetime, not mutated core TTL');
       assert.ok(Math.abs(s.events[0].expectedX - 19) < 1e-8);
     } else {
       assert.equal(s.unregisteredBodyContacts, 0);
@@ -251,5 +252,27 @@ test('short-TTL diagnostic is bounded and cannot manufacture combat damage', () 
   assert.equal(s.predictedBodyContacts, 12);
   assert.equal(s.unregisteredBodyContacts, 12);
   assert.equal(s.events.length, 12);
+  assert.equal(target.hp, 100);
+});
+
+test('short-TTL shadow excludes allied tanks without masking the core', () => {
+  const { g } = boot(), target = addScout(g);
+  const owner = { id: 1, teamId: 'blue' };
+  target.teamId = 'blue';
+  g.getTank = id => id === 1 ? owner : null;
+  g.areAllies = (a, b) => a.teamId === b.teamId;
+  g.bullets = [ordinaryShot(108)];
+  g.updateBullets(1 / 30);
+  assert.equal(g.novaChronoShadowSnapshot().predictedBodyContacts, 0);
+  assert.equal(g.novaChronoShadowSnapshot().unregisteredBodyContacts, 0);
+});
+test('short-TTL shadow failures never block the real projectile updater', () => {
+  const { g } = boot(), target = addScout(g);
+  g.firstTerrainHit = () => { throw new Error('diagnostic-only failure'); };
+  g.bullets = [ordinaryShot(109)];
+  assert.doesNotThrow(() => g.updateBullets(1 / 30));
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.bodyAuditErrors, 1);
+  assert.equal(s.predictedBodyContacts, 0);
   assert.equal(target.hp, 100);
 });
