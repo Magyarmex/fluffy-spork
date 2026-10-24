@@ -160,6 +160,9 @@ jobs:
           # change cannot look like a no-op to returning/offline clients.
           runtime_inputs = [
               *script_paths,
+              # Dynamically loaded Owner HUD is optional for offline staging,
+              # but changes to it must still invalidate the validated shell.
+              'nova-updates/owner-operations-v1.11.1.js',
               'pwa-register.js',
               'sw.js',
               'manifest.webmanifest',
