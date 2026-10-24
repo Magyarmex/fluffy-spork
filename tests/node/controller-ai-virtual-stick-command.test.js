@@ -126,9 +126,12 @@ test('inactive AI Controller still releases its command instead of inventing a t
 test('actual Live Vector + Fair Engagement engine wrappers drive AI swarm through the shipping command gate', () => {
   const vm = require('node:vm');
   const fair = fs.readFileSync(path.join(root, 'nova-updates/fair-engagement-v1.11.2.js'), 'utf8');
+  const shared = fs.readFileSync(path.join(root, 'nova-updates/shared-battlefield-view-v1.10.5.js'), 'utf8');
   class Game {
     updateDrones(dt) {
       const state = {nodeX: 0, nodeY: 0, wasActive: false};
+      this.observedSyntheticTargetId = this.tanks[0].ai.targetId;
+      this.observedVirtualPoint = this.getTank(this.observedSyntheticTargetId);
       updateAICommand(this, this.tanks[0], state, {droneLeash: 650}, dt);
       this.observedCommand = state;
     }
@@ -143,16 +146,17 @@ test('actual Live Vector + Fair Engagement engine wrappers drive AI swarm throug
     console: {info() {}, warn() {}, error() {}},
     Date, Math, Map, Set, WeakMap, Number, Object, Array
   };
-  // The production materializer loads Live Vector before Fair Engagement.
+  // The production materializer loads Shared View, then Live Vector, then Fair Engagement.
+  vm.runInNewContext(shared, ctx);
   vm.runInNewContext(liveVector, ctx);
   vm.runInNewContext(fair, ctx);
   const m = {exports: {}};
   window.__novaModules['game/engine'](m, m.exports, id => id === './classes' ? classes : {});
   const a = owner(7), rival = {
     id: 8, cls: 'gunner', team: 2, x: 300, y: 0,
-    hp: 100, maxHp: 100, alive: true, isPlayer: false
+    hp: 100, maxHp: 100, vx: 0, vy: 0, alive: true, isPlayer: false
   };
-  a.team = 1;
+  a.vx = 0; a.vy = 0; a.team = 1;
   const g = new Game();
   Object.assign(g, {
     time: 1, w: 800, h: 600, cam: {zoom: 1},
@@ -161,9 +165,12 @@ test('actual Live Vector + Fair Engagement engine wrappers drive AI swarm throug
   });
   const originalGetTank = g.getTank;
   g.updateDrones(1 / 60);
+  assert.ok(g.observedSyntheticTargetId >= 900000,
+    'Shared Battlefield View must not overwrite the virtual stick with a real target');
+  assert.equal(g.observedVirtualPoint.__novaVirtualThumb, true);
   assert.equal(g.observedCommand.active, true,
-    'outer Fair Engagement plan and inner Live Vector bridge must compose');
-  assert.ok(g.observedCommand.nodeX > 0);
+    'Fair Engagement, Live Vector, and Shared Battlefield View must compose');
+  assert.ok(Number.isFinite(g.observedCommand.nodeX) && g.observedCommand.nodeX > 0);
   assert.equal(g.getTank, originalGetTank, 'temporary bridge restored after engine update');
   assert.equal(a.ai.targetId, 8, 'real AI target restored');
   assert.equal(a.ai.__v1112TargetId, 8, 'fair perception target not overwritten');
