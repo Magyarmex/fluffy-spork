@@ -242,7 +242,7 @@ wrap('game/engine',function(engine,require){
        * never shadow a real tank or another Controller's virtual point. */
       var point=virtualPoint(owner,C[owner.cls],p.commandAngle,p.commandPower),id=900000+Math.abs(Number(owner.id)||i+1);
       while(fake[id] || realGet.call(g,id))id++;
-      fake[id]={id:id,kind:'tank',alive:true,spawnShieldT:0,x:point.x,y:point.y,vx:0,vy:0};
+      fake[id]={id:id,kind:'tank',__novaVirtualThumb:true,alive:true,spawnShieldT:0,x:point.x,y:point.y,vx:0,vy:0};
       owner.ai.targetId=id;owner.ai.state='hunt';owner.ai.strafe=1e-6;
     }
     g.getTank=function(id){return fake[id]||realGet.call(this,id);};
