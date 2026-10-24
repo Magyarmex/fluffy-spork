@@ -70,10 +70,11 @@ function fixture({ missingScript = false, failAsset = false } = {}) {
     goOffline() { self.navigator.onLine = false; },
     goOnline() { self.navigator.onLine = true; },
     setRemoteBuild(html, script) { remoteShell = html; remoteScript = script; },
-    async seed() {
+    async seed({ html = shell } = {}) {
+      const hash = createHash('sha256').update(html).digest('hex').slice(0, 32);
       await cache(META).put(stateURL,
-        new Response(JSON.stringify({ cacheName: OLD, fingerprint })));
-      await cache(OLD).put(base, new Response(shell));
+        new Response(JSON.stringify({ cacheName: OLD, fingerprint: hash })));
+      await cache(OLD).put(base, new Response(html));
       if (!missingScript) await cache(OLD).put(scriptURL, new Response('cached Controller'));
     },
     async active() {
@@ -207,5 +208,26 @@ test('a validated newer release replaces cached old same-URL script bytes atomic
   assert.notEqual((await f.active()).cacheName, OLD);
   assert.equal(await (await f.assetResponse(scriptURL)).text(), 'new validated Controller');
   f.goOffline();
+  assert.equal((await f.navigationResponse()).status, 200);
+});
+
+
+test('offline navigation rejects a missing critical cross-origin script', async () => {
+  const f = fixture();
+  const cdn = 'https://cdn.example/react.js';
+  await f.seed({ html: shell + '<script src="' + cdn + '"></script>' });
+  f.goOffline();
+  assert.equal((await f.navigationResponse()).status, 503);
+  await f.cache(OLD).put(cdn, new Response('cached React'));
+  assert.equal((await f.navigationResponse()).status, 200);
+});
+
+test('offline navigation rejects missing same-origin critical stylesheet', async () => {
+  const f = fixture();
+  const css = base + 'nova-tailwind.css';
+  await f.seed({ html: shell + '<link rel="stylesheet" href="./nova-tailwind.css">' });
+  f.goOffline();
+  assert.equal((await f.navigationResponse()).status, 503);
+  await f.cache(OLD).put(css, new Response('body{background:#000}'));
   assert.equal((await f.navigationResponse()).status, 200);
 });
