@@ -10,7 +10,7 @@ const root=path.resolve(__dirname,'../..');
 const live=fs.readFileSync(path.join(root,'nova-updates/second-body-live-vector-v1.10.7.js'),'utf8');
 const fair=fs.readFileSync(path.join(root,'nova-updates/fair-engagement-v1.11.2.js'),'utf8');
 
-function boot({enemies=[[200,0]],damaged=false,player=false,w=300,h=600,zoom=1,dt=.2,withFair=true}={}){
+function boot({enemies=[[200,0]],damaged=false,player=false,w=300,h=600,zoom=1,dt=.2,withFair=true,beforeTick=null}={}){
   class Game{updateDrones(){}getTank(id){return this.tankById.get(id)||null;}}
   const modules={'game/engine':m=>{m.exports.Game=Game;}};
   const window={__novaModules:modules,NOVATips:{registerMany(){}}};
@@ -41,6 +41,7 @@ function boot({enemies=[[200,0]],damaged=false,player=false,w=300,h=600,zoom=1,d
     tankById:new Map([[1,owner],[2,rival]]),
     areAllies:(a,b)=>a.team===b.team,
     areHostile:(a,b)=>a.team!==b.team,hasLineOfSight:()=>true});
+  if(beforeTick)beforeTick({g,owner,window});
   g.updateDrones(dt);
   return {g,owner,rival,drone,window};
 }
@@ -99,4 +100,32 @@ test('viewport zoom, resize and frame rate determine AI sight consistently',()=>
 test('without Fair Engagement, legacy standalone Live Vector remains operational',()=>{
   const w=boot({withFair:false,enemies:[[200,0]]});
   assert.ok(w.drone.x>0,'no new dependency breaks legacy standalone operation');
+});
+
+test('out-of-range drones never incur a fair viewport or terrain query',()=>{
+  boot({enemies:Array.from({length:30},(_,i)=>[400+i*10,0]),
+    beforeTick:({g,owner,window})=>{
+      let views=0,rays=0;
+      const fair=window.__NOVA_FAIR_ENGAGEMENT__,original=fair.inGameplayViewport;
+      fair.inGameplayViewport=(...args)=>{views++;return original(...args);};
+      g.hasLineOfSight=()=>{rays++;return true;};
+      const found=window.__NOVA_LIVE_VECTOR_TEST__.hostileDroneNear(g,owner,265);
+      assert.equal(found,null);
+      assert.equal(views,0,'distance gate must precede viewport geometry');
+      assert.equal(rays,0,'irrelevant drones cannot request terrain rays');
+    }});
+});
+
+test('once a visible nearest threat wins, farther drones skip costly visibility',()=>{
+  boot({enemies:[[100,0],...Array.from({length:29},(_,i)=>[110+i*4,0])],
+    beforeTick:({g,owner,window})=>{
+      let views=0,rays=0;
+      const fair=window.__NOVA_FAIR_ENGAGEMENT__,original=fair.inGameplayViewport;
+      fair.inGameplayViewport=(...args)=>{views++;return original(...args);};
+      g.hasLineOfSight=()=>{rays++;return true;};
+      const found=window.__NOVA_LIVE_VECTOR_TEST__.hostileDroneNear(g,owner,265);
+      assert.equal(found.id,40);
+      assert.equal(views,1,'only the winning closest candidate needs a viewport check');
+      assert.equal(rays,1,'only the winning closest candidate needs a terrain ray');
+    }});
 });
