@@ -84,3 +84,24 @@ for (const cls of ['railgun', 'prism', 'singularity']) {
     });
   }
 }
+
+
+/* The same allegiance gate must protect AI Snipers without requiring a
+ * player-held fire input or a player rail-focus state. */
+for (const allied of [true, false]) {
+  test('AI railgun: ' + (allied ? 'allied' : 'enemy') +
+    ' projectile near focus respects allegiance', () => {
+    const { Game } = boot(), g = new Game();
+    const ai = rail(1, 'railgun', false, 0);
+    ai.team = 'blue'; ai.x = 0; ai.y = 0; ai.hitFlash = 0;
+    const shooter = { id: 2, cls: 'gunner', team: allied ? 'blue' : 'red', alive: true };
+    const player = { id: 3, cls: 'gunner', isPlayer: true, alive: true };
+    g.player = player; g.tanks = [ai, shooter, player];
+    g.tankById = new Map([[1, ai], [2, shooter], [3, player]]);
+    g.areAllies = (a, b) => a.team === b.team;
+    g.bullets = [{ ownerId: 2, x: 40, y: 0, px: -40, py: 0,
+      r: 2, dead: false }];
+    g.update(1 / 60);
+    assert.equal(ai.__novaFocusStart, allied ? 50 : 0);
+  });
+}
