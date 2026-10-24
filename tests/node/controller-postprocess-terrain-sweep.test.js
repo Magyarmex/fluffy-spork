@@ -9,8 +9,9 @@ const vm=require('node:vm');
 const root=path.resolve(__dirname,'../..');
 const battlefield=fs.readFileSync(path.join(root,'nova-updates/battlefield-v1.6.0.js'),'utf8');
 const live=fs.readFileSync(path.join(root,'nova-updates/second-body-live-vector-v1.10.7.js'),'utf8');
+const terrainIntelligence=fs.readFileSync(path.join(root,'nova-updates/terrain-intelligence-v1.10.2.js'),'utf8');
 const wall=()=>({id:-1,shape:'rect',x:0,y:0,w:20,h:200,solid:true,destructible:false});
-function boot({droneX=-20,droneY=0,ownerX=100,ownerY=0,damaged=true}={}){
+function boot({droneX=-20,droneY=0,ownerX=100,ownerY=0,damaged=true,withTerrainIntelligence=false}={}){
  class Game{updateDrones(){} getTank(id){return this.tankById.get(id)||null;}}
  const modules={
   'game/engine':m=>{m.exports.Game=Game;},
@@ -22,6 +23,7 @@ function boot({droneX=-20,droneY=0,ownerX=100,ownerY=0,damaged=true}={}){
  const ctx={window,document:{addEventListener(){}},console:{info(){},warn(){},error(){}},
   performance:{now:()=>0},Math,Date,Map,Set,Number,Object,Array,WeakMap};
  vm.runInNewContext(battlefield,ctx,{filename:'battlefield-v1.6.0.js'});
+ if(withTerrainIntelligence)vm.runInNewContext(terrainIntelligence,ctx,{filename:'terrain-intelligence-v1.10.2.js'});
  vm.runInNewContext(live,ctx,{filename:'second-body-live-vector-v1.10.7.js'});
  const m={exports:{}};
  modules['game/engine'](m,m.exports,()=>({CLASSES:{
@@ -115,4 +117,14 @@ test('committed drone attacks are not rerouted by post-update repair/peel protec
  assert.equal(w.drone.x,x0);
  assert.equal(w.drone.y,y0);
  assert.equal(w.drone.__novaPhase,'dash');
+});
+
+test('full Battlefield + Terrain Intelligence + Live Vector route remains collision-safe',()=>{
+ const w=boot({withTerrainIntelligence:true});
+ for(const hz of [30,60,120,240]){
+  w.g.time+=1/hz;w.g.updateDrones(1/hz);
+  assert.equal(w.g.isTerrainSafe(w.drone.x,w.drone.y,9),true,
+   hz+' Hz full routing composition must respect the wall');
+ }
+ assert.equal(w.drone.__lvRepairing,true);
 });
