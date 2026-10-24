@@ -191,3 +191,46 @@ for (const full of [false, true]) {
     assert.equal(g.burstOrigins[0].x, 0);
   });
 }
+
+for (const full of [false, true]) {
+  test((full ? 'full overlays' : 'Sniper/Battlefield') +
+    ': two shells burst at their own simultaneous contact positions', () => {
+    const g = boot(full);
+    const a = bullet(1, 1, 30, 0, 2, true);
+    const b = bullet(2, 2, -30, 0, 2, true);
+    a.px = -30; a.py = 0; b.px = 30; b.py = 0;
+    g.bullets = [a, b];
+    g.resolveBulletCollisions();
+    assert.equal(g.burstOrigins.length, 2);
+    const byId = new Map(g.burstOrigins.map(o => [o.id, o]));
+    assert.ok(Math.abs(byId.get(1).x + 3.75) < 1e-7);
+    assert.ok(Math.abs(byId.get(2).x - 3.75) < 1e-7);
+    assert.equal(a.x, 30);
+    assert.equal(b.x, -30);
+  });
+  test((full ? 'full overlays' : 'Sniper/Battlefield') +
+    ': a swept near miss never creates a phantom shell burst', () => {
+    const g = boot(full);
+    const a = bullet(1, 1, 30, 0, 1, true);
+    const b = bullet(2, 2, -30, 0, 3);
+    a.px = -30; a.py = 0; b.px = 30; b.py = 15;
+    b.y = 15;
+    g.bullets = [a, b];
+    g.resolveBulletCollisions();
+    assert.deepEqual(g.burstOrigins, []);
+    assert.equal(a.dead, false);
+  });
+  test((full ? 'full overlays' : 'Sniper/Battlefield') +
+    ': burst exceptions restore the physical shell endpoint', () => {
+    const g = boot(full);
+    const shell = bullet(1, 1, 30, 0, 1, true);
+    const other = bullet(2, 2, -30, 0, 3);
+    shell.px = -30; shell.py = 0;
+    other.px = 30; other.py = 0;
+    g.bullets = [shell, other];
+    g.clusterBurst = () => { throw new Error('injected burst failure'); };
+    assert.throws(() => g.resolveBulletCollisions(), /injected burst failure/);
+    assert.equal(shell.x, 30);
+    assert.equal(shell.y, 0);
+  });
+}
