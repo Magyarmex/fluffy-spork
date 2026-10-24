@@ -9,6 +9,7 @@ const { webcrypto } = require('node:crypto');
 const root = path.resolve(__dirname, '../..');
 const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
 const register = fs.readFileSync(path.join(root, 'pwa-register.js'), 'utf8');
+const deploy = fs.readFileSync(path.join(root, '.github/workflows/deploy.yml'), 'utf8');
 const base = 'https://nova.example/';
 const ownerPath = './nova-updates/owner-operations-v1.11.1.js';
 const ownerURL = new URL(ownerPath, base).href;
@@ -85,6 +86,8 @@ function fixture({ ownerUnavailable = false } = {}) {
 test('the optional offline asset matches the actual dynamic Owner loader', () => {
   assert.match(register, /script\.src = '\.\/nova-updates\/owner-operations-v1\.11\.1\.js'/);
   assert.match(sw, /owner-operations-v1\.11\.1\.js/);
+  assert.match(deploy, /'nova-updates\/owner-operations-v1\.11\.1\.js'/,
+    'an Owner script update must invalidate the materialized runtime fingerprint');
 });
 
 test('validated online install stages dynamically loaded Owner HUD for offline reload', async () => {
