@@ -36,6 +36,9 @@ function optimizeHash(hash){
   hash.clear=function(){
     for(var i=0;i<active.length;i++)active[i].length=0;
     active.length=0;
+    /* Until the next insertion, queries must use the live entity fallback.
+       Reused but empty buckets are not a populated current-frame index. */
+    hash.__novaReady=false;
   };
   hash.insert=function(e){
     var cell=this.cell||180,cx=Math.floor(e.x/cell)+2000,cy=Math.floor(e.y/cell)+2000,k=cx*10000+cy;
