@@ -165,10 +165,13 @@ wrap('game/engine',function(engine){
     return t>=0&&isFinite(t)?t:null;
   }
   function chronoState(g){
-    return g.__novaChronoShadow||(g.__novaChronoShadow={
+    var s=g.__novaChronoShadow||(g.__novaChronoShadow={
       frames:0,sampledShells:0,bursts:0,ttlOvershoots:0,arenaOvershoots:0,
       maxOvershootUnits:0,events:[]
     });
+    /* DevTools can inspect live counters without reaching into React game state. */
+    window.__NOVA_CHRONO_SHADOW_LAST__=s;
+    return s;
   }
   var oldChronoBurst=Base.prototype.clusterBurst;
   if(oldChronoBurst)Base.prototype.clusterBurst=function(shell){
