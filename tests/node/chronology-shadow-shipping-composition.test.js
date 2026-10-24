@@ -555,3 +555,16 @@ test('allied different-owner projectile cannot conceal a true short-TTL miss', (
   assert.equal(s.predictedBodyContacts, 1);
   assert.equal(s.unregisteredBodyContacts, 1);
 });
+
+test('known hostile projectile still makes earlier interception ambiguous', () => {
+  const { g } = boot(), target = addScout(g);
+  const owner = { id: 1, teamId: 'blue' }, enemy = { id: 9, teamId: 'red' };
+  target.teamId = 'red';
+  g.getTank = id => id === 1 ? owner : id === 9 ? enemy : null;
+  g.areAllies = (a, b) => a.teamId === b.teamId;
+  g.bullets = [ordinaryShot(8306), competingShot(8307, 10, 0, 1, 9)];
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.interceptionAmbiguousBodyContacts, 1);
+  assert.equal(s.predictedBodyContacts, 0);
+});
