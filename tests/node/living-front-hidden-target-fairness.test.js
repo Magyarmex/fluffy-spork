@@ -27,7 +27,7 @@ function world(targetX = 200) {
     alive: true, hp: 100, maxHp: 100, spawnShieldT: 0 };
   const owner = { id: 1, x: 0, y: 0, hp: 100, maxHp: 100,
     ai: { __v1112TargetId: 2 } };
-  const g = { time: 10, w: 100, h: 100, cam: { zoom: 1 },
+  const g = { time: 10, w: 360, h: 640, cam: { zoom: 1.2 },
     tanks: [owner, target], shapes: [],
     __lfState: { signal: { type: 'BLOOM', x: 500, y: 0,
       sector: 2, until: 20 }, queryScratch: [], queryScratch2: [] },
