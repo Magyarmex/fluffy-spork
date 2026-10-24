@@ -87,3 +87,27 @@ test('continuous pointer movement no longer emits React updates while active',()
   assert.equal(calls,1,'position changes are painted directly, not sent through React state');
   i.move.active=false;i.emit('move');assert.equal(calls,2,'deactivation must unmount the stick layer');
 });
+
+
+/* The shipping Game.update chooses mouse world-coordinate aim only when
+ * Input.aimVec returns null. Keyboard movement must not steal that branch
+ * while a mouse pointer is actively aiming. */
+test('keyboard movement does not override active mouse aiming',()=>{
+  const {Input}=loadLayer(),i=new Input();
+  i.mouseActive=true;i.keyboard.right=true;
+  const move=i.moveVec();
+  assert.equal(move.x,1);
+  assert.equal(i.aimVec(move),null,'mouse world aim must win over keyboard movement');
+});
+test('keyboard-only movement still supplies fallback aim without a mouse',()=>{
+  const {Input}=loadLayer(),i=new Input();
+  i.mouseActive=false;i.keyboard.up=true;
+  const move=i.moveVec(),aim=i.aimVec(move);
+  assert.ok(aim);assert.equal(aim.x,0);assert.equal(aim.y,-1);
+});
+test('active touch aim still overrides mouse state and keyboard movement',()=>{
+  const {Input}=loadLayer(),i=new Input();
+  i.mouseActive=true;i.keyboard.right=true;i.aim.active=true;i.aim.dx=0;i.aim.dy=30;
+  const aim=i.aimVec(i.moveVec());
+  assert.ok(aim);assert.equal(aim.x,0);assert.equal(aim.y,1);
+});
