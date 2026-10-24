@@ -222,7 +222,7 @@ async function stageLatest({ force = false } = {}) {
         const critical = discoverCriticalAssets(html, indexURL);
         const stored = await Promise.all(critical.map((url) =>
           cache.match(canonicalURL(url))));
-        if (stored.every(Boolean)) {
+        if (stored.every(isCacheable)) {
           await stageOptionalAssets(cache);
           return { changed: false, fingerprint: buildFingerprint };
         }
@@ -285,7 +285,7 @@ async function cachedRealShell() {
     const critical = discoverCriticalAssets(html, absoluteURL('./'));
     const stored = await Promise.all(critical.map((url) =>
       cache.match(canonicalURL(url))));
-    if (!stored.every(Boolean)) return null;
+    if (!stored.every(isCacheable)) return null;
     return response;
   } catch (_) {
     return null;
@@ -320,7 +320,7 @@ async function assetResponse(request) {
   const { cache } = await activeBuildCache();
   if (cache) {
     const cached = await cache.match(canonicalURL(request.url));
-    if (cached) return cached;
+    if (isCacheable(cached)) return cached;
   }
 
   try {
