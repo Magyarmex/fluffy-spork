@@ -508,3 +508,63 @@ test('dense opt-in audit skips unbounded interception scans safely', () => {
   assert.equal(s.unregisteredBodyContacts, 0);
   assert.equal(target.hp, 100);
 });
+
+
+/* Run 330: a spawn-shielded body is a real projectile obstacle, but it
+ * cannot be counted as an unregistered damage contact. Do not look through
+ * a nearer protected body to invent a miss on a farther vulnerable tank. */
+test('short-TTL audit excludes a spawn-shielded first body', () => {
+  const { g } = boot(), protectedTank = addScout(g, 40);
+  protectedTank.spawnShieldT = 1;
+  g.bullets = [ordinaryShot(8301)];
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.predictedBodyContacts, 0);
+  assert.equal(s.unregisteredBodyContacts, 0);
+});
+test('nearer spawn-shielded body masks a vulnerable body behind it', () => {
+  const { g } = boot(), protectedTank = addScout(g, 35);
+  protectedTank.spawnShieldT = 1;
+  const rear = { id: 3, kind: 'tank', cls: 'scout', x: 45, y: 0,
+    hp: 100, alive: true, spawnShieldT: 0 };
+  g.tanks.push(rear);
+  g.bullets = [ordinaryShot(8302)];
+  g.updateBullets(1 / 30);
+  assert.equal(g.novaChronoShadowSnapshot().predictedBodyContacts, 0);
+});
+test('vulnerable first body remains a valid diagnostic before a shielded rear body', () => {
+  const { g } = boot(), front = addScout(g, 35);
+  front.spawnShieldT = 0;
+  g.tanks.push({ id: 3, kind: 'tank', cls: 'scout', x: 55, y: 0,
+    hp: 100, alive: true, spawnShieldT: 1 });
+  g.bullets = [ordinaryShot(8303)];
+  g.updateBullets(1 / 30);
+  assert.equal(g.novaChronoShadowSnapshot().predictedBodyContacts, 1);
+  assert.equal(g.novaChronoShadowSnapshot().unregisteredBodyContacts, 1);
+});
+test('allied different-owner projectile cannot conceal a true short-TTL miss', () => {
+  const { g } = boot(), target = addScout(g);
+  const owner = { id: 1, teamId: 'blue' }, teammate = { id: 9, teamId: 'blue' };
+  target.teamId = 'red';
+  g.getTank = id => id === 1 ? owner : id === 9 ? teammate : null;
+  g.areAllies = (a, b) => a.teamId === b.teamId;
+  g.bullets = [ordinaryShot(8304), competingShot(8305, 10, 0, 1, 9)];
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.interceptionAmbiguousBodyContacts, 0);
+  assert.equal(s.predictedBodyContacts, 1);
+  assert.equal(s.unregisteredBodyContacts, 1);
+});
+
+test('known hostile projectile still makes earlier interception ambiguous', () => {
+  const { g } = boot(), target = addScout(g);
+  const owner = { id: 1, teamId: 'blue' }, enemy = { id: 9, teamId: 'red' };
+  target.teamId = 'red';
+  g.getTank = id => id === 1 ? owner : id === 9 ? enemy : null;
+  g.areAllies = (a, b) => a.teamId === b.teamId;
+  g.bullets = [ordinaryShot(8306), competingShot(8307, 10, 0, 1, 9)];
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.interceptionAmbiguousBodyContacts, 1);
+  assert.equal(s.predictedBodyContacts, 0);
+});

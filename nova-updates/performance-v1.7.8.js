@@ -182,11 +182,28 @@ wrap('game/engine',function(engine,require){
   function chronoPossibleInterception(g,b,bodyTime){
     if(!g.bullets)return false;
     if(g.bullets.length>256)return null;
+    var shotOwner=typeof g.getTank==='function'?g.getTank(b.ownerId):null;
     for(var i=0;i<g.bullets.length;i++){
       var other=g.bullets[i];
       if(!other||other===b||other.dead||other.ownerId===b.ownerId||
          !(other.ttl>0)||!Number.isFinite(other.x)||!Number.isFinite(other.y)||
          !Number.isFinite(other.vx)||!Number.isFinite(other.vy))continue;
+      /* Distinct owners can still be teammates. Friendly projectiles cannot
+       * intercept one another; unknown/dead shooters remain conservative. */
+      if(shotOwner&&typeof g.getTank==='function'){
+        var otherOwner=g.getTank(other.ownerId),allied=false;
+        if(otherOwner){
+          if(typeof g.areAllies==='function'&&g.areAllies(shotOwner,otherOwner))allied=true;
+          else if(typeof g.areHostile==='function'&&!g.areHostile(shotOwner,otherOwner))allied=true;
+          else for(var side=0;side<chronoSideKeys.length;side++){
+            var key=chronoSideKeys[side];
+            if(shotOwner[key]!=null&&otherOwner[key]!=null){
+              allied=shotOwner[key]===otherOwner[key];break;
+            }
+          }
+        }
+        if(allied)continue;
+      }
       var until=Math.min(bodyTime,other.ttl);
       if(!(until>=0))continue;
       var dx=b.x-other.x,dy=b.y-other.y;
@@ -241,9 +258,13 @@ wrap('game/engine',function(engine,require){
       }
       if(!Number.isFinite(hit)||hit<0||hit>b.ttl+1e-9)continue;
       if(!best||hit<best.time)best={targetId:t.id,time:hit,
+        shielded:t.spawnShieldT>0,
         x:b.x+(b.vx||0)*hit,y:b.y+(b.vy||0)*hit};
     }
     if(!best)return null;
+    /* The first physical tank may be spawn-protected. It still masks tanks
+     * behind it, but cannot be counted as a missing damage contact. */
+    if(best.shielded)return null;
     var exit=chronoExitTime({x:b.x,y:b.y,vx:b.vx,vy:b.vy});
     if(exit!=null&&best.time>exit+1e-9)return null;
     /* A solid hit before the body makes this candidate ambiguous, including
