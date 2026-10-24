@@ -98,6 +98,37 @@
     return dx * dx + dy * dy <= rr * rr;
   }
 
+  /* Only needed for a lethal shell interception: compute the first time two
+   * moving projectile discs touch, rather than using their frame endpoints. */
+  function firstProjectileContactTime(a, b, rr) {
+    var ax = a.px == null ? a.x : a.px, ay = a.py == null ? a.y : a.py;
+    var bx = b.px == null ? b.x : b.px, by = b.py == null ? b.y : b.py;
+    var rx = ax - bx, ry = ay - by;
+    var vx = (a.x - ax) - (b.x - bx), vy = (a.y - ay) - (b.y - by);
+    var c = rx * rx + ry * ry - rr * rr;
+    if (c <= 0) return 0;
+    var aa = vx * vx + vy * vy;
+    if (aa < 1e-9) return null;
+    var halfB = rx * vx + ry * vy, disc = halfB * halfB - aa * c;
+    if (disc < 0) return null;
+    var t = (-halfB - Math.sqrt(disc)) / aa;
+    return t >= 0 && t <= 1 ? t : null;
+  }
+
+  function burstShellAtContact(game, shell, time) {
+    var x = shell.x, y = shell.y;
+    if (time != null) {
+      var px = shell.px == null ? x : shell.px;
+      var py = shell.py == null ? y : shell.py;
+      shell.x = px + (x - px) * time;
+      shell.y = py + (y - py) * time;
+    }
+    /* Apex children and explosion effects inherit the physical origin.
+     * Restore the canonical projectile endpoint even if a burst throws. */
+    try { game.clusterBurst(shell); }
+    finally { shell.x = x; shell.y = y; }
+  }
+
   function worldToScreen(g, x, y) {
     var z = g.cam && g.cam.zoom ? g.cam.zoom : 1;
     return { x: (x - g.cam.x) * z + g.w * 0.5, y: (y - g.cam.y) * z + g.h * 0.5 };
@@ -344,8 +375,11 @@
           this.weakenBullet(a, bh); this.weakenBullet(b, ah);
           /* Preserve the core's Cannon shell-on-interception contract. The
            * Battlefield burst guard prevents repeated fragments per shell. */
-          if (a.dead && a.shell && this.clusterBurst) this.clusterBurst(a);
-          if (b.dead && b.shell && this.clusterBurst) this.clusterBurst(b);
+          if ((a.dead && a.shell || b.dead && b.shell) && this.clusterBurst) {
+            var firstTime = firstProjectileContactTime(a, b, rr);
+            if (a.dead && a.shell) burstShellAtContact(this, a, firstTime);
+            if (b.dead && b.shell) burstShellAtContact(this, b, firstTime);
+          }
           var mx = (a.x + b.x) * 0.5, my = (a.y + b.y) * 0.5;
           if (this.addParticles) this.addParticles(mx, my, '#d9f7ff', 3, 55, 'glow');
           if (a.dead) break;
