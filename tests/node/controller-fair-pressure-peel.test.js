@@ -133,3 +133,18 @@ test('portrait viewport prevents offscreen drone information from changing AI de
   w.g.time+=.05;tick(w);
   assert.ok(p.commandPower<=.25+1e-9,'visible drone can trigger defensive depth');
 });
+
+test('a fresh critical hit briefly recalls an AI Controller swarm without changing fair target',()=>{
+  const w=boot(),p=tick(w);
+  assert.equal(p.active,true);
+  w.owner.hp=19;
+  w.g.time=1.05;tick(w);
+  assert.equal(p.targetId,2,'the enemy remains a legitimate observed target');
+  assert.equal(p.active,false,'critical damage triggers the original temporary recall');
+  assert.ok(p.releaseUntil>1.46&&p.releaseUntil<1.48);
+  w.g.time=1.20;tick(w);
+  assert.equal(p.active,false,'recall persists across intermediate frames');
+  w.g.time=1.50;tick(w);
+  assert.equal(p.active,true,'surviving AI can re-engage after the bounded recovery');
+  assert.ok(p.commandPower<=.20+1e-9,'critical survivor deploys cautiously');
+});
