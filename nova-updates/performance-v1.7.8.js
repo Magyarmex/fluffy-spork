@@ -292,7 +292,7 @@ wrap('game/engine',function(engine,require){
         var s={id:b.id,x:b.x,y:b.y,vx:b.vx||0,vy:b.vy||0,ttl:b.ttl};
         s.exit=chronoExitTime(s);
         samples.set(b,s);st.sampledShells++;
-      }else if(b.ttl>0&&b.ttl<dt&&!b.beam&&!(b.hits>0)){
+      }else if(b.ttl>0&&b.ttl<=dt&&!b.beam&&!(b.hits>0)){
         if(shortSampled>=CHRONO_SHADOW_LIMIT)continue;
         shortSampled++;
         var candidate=null;
