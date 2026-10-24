@@ -153,6 +153,26 @@ test('sampling and diagnostic ring stay bounded in dense projectile frames', () 
   assert.equal(g.events.length, 100);
 });
 
+test('bounded sampling rotates across projectile identities between frames', () => {
+  const { g, window } = boot(function() {
+    for (const b of this.bullets) {
+      b.x = 200;
+      this.clusterBurst(b);
+      b.x = 0;
+    }
+  }, function() {});
+  window.__NOVA_CHRONO_SHADOW_ENABLED__ = true;
+  g.bullets = Array.from({ length: 100 }, (_, i) => shell(i, 0, 6000, 0.005));
+  const ids = new Set();
+  for (let i = 0; i < 5; i++) {
+    g.updateBullets(1 / 30);
+    const snap = g.novaChronoShadowSnapshot();
+    for (const event of snap.events) ids.add(event.id);
+  }
+  assert.equal(g.novaChronoShadowSnapshot().sampledShells, 60);
+  assert.ok(ids.size > 12, 'the same early shells were repeatedly sampled');
+});
+
 test('diagnostics do not flag projectiles entering from outside the arena', () => {
   const { g, window } = boot();
   window.__NOVA_CHRONO_SHADOW_ENABLED__ = true;
