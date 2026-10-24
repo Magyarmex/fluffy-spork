@@ -25,6 +25,7 @@ function routeCost(g,t,x,y,direct){direct=direct==null?Math.hypot(x-t.x,y-t.y):d
 /* Ecology AI may react to a held combat target only while that target is
  * actually within the same gameplay viewport as the player, or relayed by
  * a legitimate active Sniper Observer. A stale target id is not live radar. */
+var ECO_SNIPER_CLASSES={marksman:1,railgun:1,ghost:1,singularity:1,prism:1,specter:1,assassin:1};
 function fairEcoTarget(g,t,target){
  if(!target||!alive(target)||target.spawnShieldT>0)return false;
  if(typeof g.areAllies==='function'&&g.areAllies(t,target))return false;
@@ -32,7 +33,7 @@ function fairEcoTarget(g,t,target){
  var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
  var seen=F&&F.inGameplayViewport?F.inGameplayViewport(g,t,target):
   (function(){var z=(g.cam&&g.cam.zoom)||1,hx=(g.w||800)/(2*z),hy=(g.h||600)/(2*z);return Math.abs(target.x-t.x)<=hx&&Math.abs(target.y-t.y)<=hy;})();
- var relay=t.__novaSpotterContactId===target.id&&Number(t.__novaSpotterContactUntil)>Number(g.time||0);
+ var relay=!!ECO_SNIPER_CLASSES[t.cls]&&t.__novaSpotterContactId===target.id&&Number(t.__novaSpotterContactUntil)>Number(g.time||0);
  return !!seen||relay;
 }
 function publicEcoBias(g,t,defs,out){out=out||{};out.x=0;out.y=0;out.weight=0;out.key='none';out.mode='none';if(!g||!t||!t.ai)return out;var hp=clamp(t.hp/Math.max(1,t.maxHp||t.hp||1),0,1),a=t.ai,target=a.__v1112TargetId>=0&&g.getTank?g.getTank(a.__v1112TargetId):null;if(!fairEcoTarget(g,t,target))target=null;if(hp<.30||target&&d2(t.x,t.y,target.x,target.y)<330*330)return out;var st=g.__lfState,sig=st&&st.signal,now=g.time||0,bx=0,by=0,bw=0,key='none',mode='none',judgment=a.isElite?1.08:.94;if(sig&&now<sig.until){var sx=sig.x,sy=sig.y;if(sig.type==='ROGUE STAR'&&sig.starId&&g.getShape){var star=g.getShape(sig.starId);if(star){sx=star.x;sy=star.y;}else return out;}var direct=Math.hypot(sx-t.x,sy-t.y),dist=routeCost(g,t,sx,sy,direct),base=sig.type==='ROGUE STAR'?.87:sig.type==='BLOOM'?.68:.48,k=sig.type+':'+(sig.sector!=null?sig.sector:sig.to!=null?sig.to:sig.starId||0),score=base-dist/2300-saturation(g,k,t.id)*.13;if(score>.20){var dx=sx-t.x,dy=sy-t.y,m=Math.hypot(dx,dy)||1;bx=dx/m;by=dy/m;bw=clamp(score*(.72+.28*hp)*judgment,0,.48);key=k;mode='signal';}}
