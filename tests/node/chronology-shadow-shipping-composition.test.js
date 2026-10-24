@@ -135,3 +135,121 @@ test('shipping Sniper interception: early physical burst is not an overshoot', (
   assert.equal(s.ttlOvershoots, 0);
   assert.equal(s.arenaOvershoots, 0);
 });
+
+
+/* Issue #234: the optional diagnostic must measure the real short-TTL
+ * body-first defect without changing hits, penetration, or shell behavior. */
+function ordinaryShot(id, x = 0, speed = 6000, ttl = .005) {
+  return { id, kind: 'bullet', ownerId: 1, x, y: 0, vx: speed, vy: 0,
+    r: 3, dmg: 20, pen: 0, ttl, hits: 0, dead: false, shell: false, beam: false };
+}
+function addScout(g, x = 40, y = 0) {
+  const t = { id: 2, kind: 'tank', cls: 'scout', x, y, hp: 100, alive: true };
+  g.tanks = [t];
+  g.hash.query = (_x, _y, _r, out) => { out.length = 0; out.push(t); };
+  g.damageTank = (target, damage) => {
+    target.hp -= damage;
+    g.hits = (g.hits || 0) + 1;
+  };
+  return t;
+}
+for (const fps of [30, 60, 120, 240]) {
+  test('shipping short-TTL shadow: physical scout contact at ' + fps + 'Hz', () => {
+    const { g } = boot(), target = addScout(g);
+    g.bullets = [ordinaryShot(101)];
+    g.updateBullets(1 / fps);
+    const s = g.novaChronoShadowSnapshot();
+    assert.equal(s.sampledShells, 0);
+    if (fps < 240) {
+      assert.equal(s.sampledShortShots, 1);
+      assert.equal(s.predictedBodyContacts, 1);
+      assert.equal(s.unregisteredBodyContacts, 1);
+      assert.equal(s.registeredBodyContacts, 0);
+      assert.equal(g.hits || 0, 0, 'audit must not repair the actual core miss');
+      assert.equal(target.hp, 100);
+      assert.equal(s.events[0].kind, 'unregistered-body-contact');
+      assert.equal(s.events[0].targetId, 2);
+      assert.ok(Math.abs(s.events[0].expectedX - 19) < 1e-8);
+    } else {
+      assert.equal(s.unregisteredBodyContacts, 0);
+      assert.equal(g.hits, 1, 'core already hits before expiry at 240Hz');
+      assert.equal(target.hp, 80);
+    }
+  });
+}
+for (const fps of [30, 60, 120]) {
+  test('shipping short-TTL shadow: moving scout contact at ' + fps + 'Hz', () => {
+    const { g } = boot(), t = addScout(g, 25, -20);
+    t.__novaSweepMoveTime = g.time;
+    t.__novaSweepPrevX = 25;
+    t.__novaSweepPrevY = 20;
+    g.bullets = [ordinaryShot(102)];
+    g.updateBullets(1 / fps);
+    const s = g.novaChronoShadowSnapshot();
+    assert.equal(s.predictedBodyContacts, 1);
+    assert.equal(s.unregisteredBodyContacts, 1);
+    assert.equal(g.hits || 0, 0);
+  });
+}
+test('short-TTL shadow rejects a target physically beyond expiry', () => {
+  const { g } = boot(), target = addScout(g, 100);
+  g.bullets = [ordinaryShot(103)];
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.sampledShortShots, 1);
+  assert.equal(s.predictedBodyContacts, 0);
+  assert.equal(s.unregisteredBodyContacts, 0);
+  assert.equal(target.hp, 100);
+});
+test('short-TTL shadow does not flag an owner hit', () => {
+  const { g } = boot(), target = addScout(g);
+  target.id = 1;
+  g.bullets = [ordinaryShot(104)];
+  g.updateBullets(1 / 30);
+  assert.equal(g.novaChronoShadowSnapshot().predictedBodyContacts, 0);
+  assert.equal(g.novaChronoShadowSnapshot().unregisteredBodyContacts, 0);
+});
+test('short-TTL shadow excludes cover before the body, even if destructible', () => {
+  const { g } = boot(), target = addScout(g);
+  g.__novaTerrain = [{ id: -3, shape: 'rect', x: 10, y: 0, w: 8, h: 80,
+    solid: true, destructible: true, hp: 1000 }];
+  g.bullets = [ordinaryShot(105)];
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.predictedBodyContacts, 0);
+  assert.equal(s.terrainOccludedBodyContacts, 1);
+  assert.equal(s.unregisteredBodyContacts, 0);
+  assert.equal(target.hp, 100);
+});
+test('short-TTL shadow does not mistake a wall beyond the body for occlusion', () => {
+  const { g } = boot(), target = addScout(g);
+  g.__novaTerrain = [{ id: -4, shape: 'rect', x: 100, y: 0, w: 8, h: 80,
+    solid: true, destructible: false }];
+  g.bullets = [ordinaryShot(106)];
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.predictedBodyContacts, 1);
+  assert.equal(s.unregisteredBodyContacts, 1);
+  assert.equal(s.terrainOccludedBodyContacts, 0);
+  assert.equal(target.hp, 100);
+});
+test('short-TTL shadow stays completely inactive when disabled', () => {
+  const { g, window } = boot();
+  window.__NOVA_CHRONO_SHADOW_ENABLED__ = false;
+  addScout(g);
+  g.bullets = [ordinaryShot(107)];
+  g.updateBullets(1 / 30);
+  assert.equal(g.__novaChronoShadow, undefined);
+  assert.equal(g.novaChronoShadowSnapshot().sampledShortShots, 0);
+});
+test('short-TTL diagnostic is bounded and cannot manufacture combat damage', () => {
+  const { g } = boot(), target = addScout(g);
+  g.bullets = Array.from({ length: 100 }, (_, i) => ordinaryShot(i + 200));
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.sampledShortShots, 12);
+  assert.equal(s.predictedBodyContacts, 12);
+  assert.equal(s.unregisteredBodyContacts, 12);
+  assert.equal(s.events.length, 12);
+  assert.equal(target.hp, 100);
+});
