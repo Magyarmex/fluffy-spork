@@ -241,6 +241,10 @@ wrap('game/engine',function(engine,require){
          * hostility and terrain LoS. It cannot select or reveal a tank. */
         var helper=window.__NOVA_LIVE_VECTOR_TEST__;
         var threat=helper&&typeof helper.hostileDroneNear==='function'?helper.hostileDroneNear(g,owner,265):null;
+        /* On portrait/zoomed views, local physical range can exceed the
+         * visible screen. A drone outside the same fair viewport must not
+         * secretly pull the AI command inward. */
+        if(threat&&!inGameplayViewport(g,owner,threat))threat=null;
         var stick=helper&&typeof helper.aiVirtualStick==='function'?helper.aiVirtualStick(owner,C[owner.cls],target,p,threat):null;
         if(stick){p.active=!!stick.active;p.commandAngle=stick.angle;p.commandPower=stick.power;}
         else{var ang=Math.atan2(target.y-owner.y,target.x-owner.x);p.active=true;p.commandAngle=ang;p.commandPower=clamp(Math.hypot(target.x-owner.x,target.y-owner.y)/700,.08,1);}
