@@ -374,14 +374,24 @@
           var ah = a.hp || 0, bh = b.hp || 0;
           this.weakenBullet(a, bh); this.weakenBullet(b, ah);
           /* Preserve the core's Cannon shell-on-interception contract. The
-           * Battlefield burst guard prevents repeated fragments per shell. */
+           * Battlefield burst guard prevents repeated fragments per shell.
+           * The same first-contact instant also anchors the visible impact:
+           * endpoint midpoints can be far from high-speed interceptions. */
+          var firstTime = firstProjectileContactTime(a, b, rr);
           if ((a.dead && a.shell || b.dead && b.shell) && this.clusterBurst) {
-            var firstTime = firstProjectileContactTime(a, b, rr);
             if (a.dead && a.shell) burstShellAtContact(this, a, firstTime);
             if (b.dead && b.shell) burstShellAtContact(this, b, firstTime);
           }
-          var mx = (a.x + b.x) * 0.5, my = (a.y + b.y) * 0.5;
-          if (this.addParticles) this.addParticles(mx, my, '#d9f7ff', 3, 55, 'glow');
+          if (this.addParticles) {
+            var mx = (a.x + b.x) * 0.5, my = (a.y + b.y) * 0.5;
+            if (firstTime != null) {
+              var ax0 = a.px == null ? a.x : a.px, ay0 = a.py == null ? a.y : a.py;
+              var bx0 = b.px == null ? b.x : b.px, by0 = b.py == null ? b.y : b.py;
+              mx = (ax0 + (a.x - ax0) * firstTime + bx0 + (b.x - bx0) * firstTime) * 0.5;
+              my = (ay0 + (a.y - ay0) * firstTime + by0 + (b.y - by0) * firstTime) * 0.5;
+            }
+            this.addParticles(mx, my, '#d9f7ff', 3, 55, 'glow');
+          }
           if (a.dead) break;
         }
       }
