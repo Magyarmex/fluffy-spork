@@ -234,7 +234,7 @@ test('offline navigation rejects missing same-origin critical stylesheet', async
 
 test('actual materialized game: all 51 scripts are required for offline boot', async () => {
   const actual = fs.readFileSync(path.join(__dirname, '../../index.html'), 'utf8');
-  const urls = [...actual.matchAll(/<script\\b[^>]*\\bsrc=["']([^"']+)["'][^>]*>/gi)]
+  const urls = [...actual.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi)]
     .map(match => new URL(match[1], base).href);
   assert.equal(urls.length, 51, 'shipping script composition changed; review offline contract');
   const f = fixture();
