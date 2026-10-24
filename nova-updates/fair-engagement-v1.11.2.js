@@ -1,4 +1,7 @@
 /* NOVA TANKS v1.11.2 — Fair Engagement
+ * NOVA_VISUAL_INTENT: controller-breach | threat/commitment | world
+ * Reason: one cooldown-bounded ring/sound warns of a real AI swarm breach;
+ * no decorative per-frame cue or duplicate player HUD signal.
  * Three fairness/reliability corrections:
  * 1) Rival hull perception mirrors the live player gameplay viewport in world
  *    space, including current canvas dimensions, zoom and device rotation.
@@ -225,11 +228,41 @@ wrap('game/engine',function(engine,require){
        * drone sensor and a player score multiplier. Feed its virtual thumb from
        * the fair hull target and keep that private sensor planner asleep. */
       var p=owner.__novaLiveVectorAI||(owner.__novaLiveVectorAI={thinkAt:0,commitUntil:0,targetId:-1,flankSide:(owner.id&1)?1:-1,pressure:'probe',releaseUntil:0,cueUntil:0,lastCueAt:-99,lastOwnHp:owner.hp,commandAngle:owner.angle||0,commandPower:0,active:false,now:now});
+      /* The original private planner's low-health recall was also skipped
+       * by the fair target gate. Restore its damage-triggered 0.42s release
+       * without consulting any extra target information. */
+      if(owner.hp<p.lastOwnHp-1&&owner.hp/Math.max(1,owner.maxHp)<.20)
+        p.releaseUntil=Math.max(p.releaseUntil,now+.42);
+      p.lastOwnHp=owner.hp;
+      /* Keep the legacy private sensor asleep: only the Fair Engagement
+       * target is legal. Restore Live Vector's existing probe/breach rhythm
+       * using that same fair target, with no independent target search. */
+      var targetChanged=p.targetId!==id,period=owner.ai.isElite?.80:1.04;
+      if(id<0){p.pressure='probe';p.commitUntil=0;}
+      else if(targetChanged){p.pressure='probe';p.commitUntil=now+period;p.flankSide*=-1;}
+      else if(!(p.commitUntil>now)){
+        p.pressure=p.pressure==='probe'?'breach':'probe';
+        p.commitUntil=now+period;p.flankSide*=-1;
+      }
       p.now=now;p.thinkAt=now+.5;p.targetId=id;
       if(target){
-        var helper=window.__NOVA_LIVE_VECTOR_TEST__,stick=helper&&typeof helper.aiVirtualStick==='function'?helper.aiVirtualStick(owner,C[owner.cls],target,p,null):null;
+        /* The local drone-breach sensor uses physical proximity, owner
+         * hostility and terrain LoS. It cannot select or reveal a tank. */
+        var helper=window.__NOVA_LIVE_VECTOR_TEST__;
+        /* Filter each candidate before nearest selection: an offscreen
+         * drone must not hide a farther but genuinely visible threat. */
+        var threat=helper&&typeof helper.hostileDroneNear==='function'?
+          helper.hostileDroneNear(g,owner,265,function(d){return inGameplayViewport(g,owner,d);}):null;
+        var stick=helper&&typeof helper.aiVirtualStick==='function'?helper.aiVirtualStick(owner,C[owner.cls],target,p,threat):null;
         if(stick){p.active=!!stick.active;p.commandAngle=stick.angle;p.commandPower=stick.power;}
         else{var ang=Math.atan2(target.y-owner.y,target.x-owner.x);p.active=true;p.commandAngle=ang;p.commandPower=clamp(Math.hypot(target.x-owner.x,target.y-owner.y)/700,.08,1);}
+        /* A deeper AI swarm commitment must remain readable to its human
+         * opponent. Reuse the original Live Vector cue and its cooldown. */
+        if(target.isPlayer&&p.pressure==='breach'&&p.active&&now-p.lastCueAt>4.5){
+          p.lastCueAt=now;p.cueUntil=now+1.12;
+          if(g.addRing)g.addRing(owner.x,owner.y,'#77ff9c',52);
+          if(g.sfx&&g.sfx.novaDroneWindup)g.sfx.novaDroneWindup(clamp((owner.x-target.x)/650,-1,1),true,false);
+        }
         owner.ai.targetId=id;if(owner.ai.state!=='flee')owner.ai.state='hunt';
       }else{p.active=false;p.commandPower=0;if(owner.ai.state!=='flee')owner.ai.targetId=-1;}
 
