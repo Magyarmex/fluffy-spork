@@ -1,4 +1,7 @@
 /* NOVA TANKS v1.11.2 — Fair Engagement
+ * NOVA_VISUAL_INTENT: controller-breach | threat/commitment | world
+ * Reason: one cooldown-bounded ring/sound warns of a real AI swarm breach;
+ * no decorative per-frame cue or duplicate player HUD signal.
  * Three fairness/reliability corrections:
  * 1) Rival hull perception mirrors the live player gameplay viewport in world
  *    space, including current canvas dimensions, zoom and device rotation.
