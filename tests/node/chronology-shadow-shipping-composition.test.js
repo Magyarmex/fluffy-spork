@@ -427,3 +427,58 @@ for (const fps of [30, 60, 120, 240]) {
     assert.equal(target.hp, 100, 'core still kills exact-expiry shot before body check');
   });
 }
+
+
+/* An earlier hostile projectile contact makes the body-miss diagnostic
+ * inconclusive, even though the shipping engine may still tunnel it. */
+function competingShot(id, x, y = 0, ttl = 1, ownerId = 2) {
+  return { ...ordinaryShot(id, x, 0, ttl), y, ownerId, hp: 10, maxHp: 10 };
+}
+test('short-TTL shadow classifies an earlier hostile interception as ambiguous', () => {
+  const { g } = boot(), target = addScout(g);
+  g.bullets = [ordinaryShot(8001), competingShot(8002, 10)];
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.sampledShortShots, 1);
+  assert.equal(s.interceptionAmbiguousBodyContacts, 1);
+  assert.equal(s.predictedBodyContacts, 0);
+  assert.equal(s.unregisteredBodyContacts, 0);
+  assert.equal(target.hp, 100);
+});
+test('short-TTL shadow retains a first-body miss when interception is later', () => {
+  const { g } = boot();
+  addScout(g);
+  g.bullets = [ordinaryShot(8003), competingShot(8004, 25)];
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.interceptionAmbiguousBodyContacts, 0);
+  assert.equal(s.predictedBodyContacts, 1);
+  assert.equal(s.unregisteredBodyContacts, 1);
+});
+test('same-owner bullets do not create a false interception ambiguity', () => {
+  const { g } = boot();
+  addScout(g);
+  g.bullets = [ordinaryShot(8005), competingShot(8006, 10, 0, 1, 1)];
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.interceptionAmbiguousBodyContacts, 0);
+  assert.equal(s.unregisteredBodyContacts, 1);
+});
+test('competitor that expires before interception cannot hide a body miss', () => {
+  const { g } = boot();
+  addScout(g);
+  g.bullets = [ordinaryShot(8007), competingShot(8008, 10, 0, .0001)];
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.interceptionAmbiguousBodyContacts, 0);
+  assert.equal(s.unregisteredBodyContacts, 1);
+});
+test('spatially separated hostile projectile cannot hide a body miss', () => {
+  const { g } = boot();
+  addScout(g);
+  g.bullets = [ordinaryShot(8009), competingShot(8010, 10, 100)];
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.interceptionAmbiguousBodyContacts, 0);
+  assert.equal(s.unregisteredBodyContacts, 1);
+});
