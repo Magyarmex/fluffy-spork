@@ -200,7 +200,10 @@ wrap('game/engine',function(engine){
   };
   var oldChronoBullets=Base.prototype.updateBullets;
   if(oldChronoBullets)Base.prototype.updateBullets=function(dt){
-    if(!window.__NOVA_CHRONO_SHADOW_ENABLED__||!(dt>0)||!this.bullets)
+    /* The live War Room runs a decorative Game with spectator id -1000000.
+     * Never let it overwrite the playable match's diagnostic snapshot. */
+    if(!window.__NOVA_CHRONO_SHADOW_ENABLED__||!(dt>0)||!this.bullets||
+       this.player&&this.player.id===-1000000)
       return oldChronoBullets.apply(this,arguments);
     var samples=new Map(),bullets=this.bullets,st=chronoState(this);
     st.frames++;
