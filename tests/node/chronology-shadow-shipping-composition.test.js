@@ -448,7 +448,7 @@ test('short-TTL shadow classifies an earlier hostile interception as ambiguous',
 test('short-TTL shadow retains a first-body miss when interception is later', () => {
   const { g } = boot();
   addScout(g);
-  g.bullets = [ordinaryShot(8003), competingShot(8004, 25)];
+  g.bullets = [ordinaryShot(8003), competingShot(8004, 29)];
   g.updateBullets(1 / 30);
   const s = g.novaChronoShadowSnapshot();
   assert.equal(s.interceptionAmbiguousBodyContacts, 0);
