@@ -141,6 +141,19 @@ test('invulnerable shield does not consume a Guardian Perfect Guard read',()=>{
     assert.equal(t.__v17PerfectGuardUntil,-1);
   }
 });
+test('shielded hits cannot build countercharge after Perfect Guard window expires',()=>{
+  const {Game}=loadDisciplines(),g=new Game();
+  const t={id:1,cls:'guard',x:0,y:0,angle:0,hp:1000,bulwarkT:0,
+    tauntT:0,abilityCd:0,alive:true,spawnShieldT:0,shieldT:0};
+  const src={id:2,cls:'twin',x:100,y:0,alive:true};
+  g.tanks=[t,src];g.player=t;g.useAbility(t);
+  t.__v17PerfectGuardUntil=-1;
+  t.shieldT=1;
+  g.damageTank(t,100,src.id,0,0);
+  assert.equal(t.hp,1000);
+  assert.equal(t.__v17CounterCharge||0,0,
+    'an invulnerable hit cannot create countercharge outside Perfect Guard');
+});
 test('Gunner fire builds heat and marks projectiles',()=>{
   const {Game}=loadDisciplines(),g=new Game();
   const t={id:1,cls:'twin',x:0,y:0,angle:0,fireCd:0,vx:0,vy:0,isPlayer:true};
