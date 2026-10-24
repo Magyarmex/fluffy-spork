@@ -96,3 +96,24 @@ test('shielded or offscreen targets still cannot activate the virtual command',(
     assert.equal(p.targetId,-1);
   }
 });
+
+test('breach pressure signals its commitment to a human opponent without cue spam',()=>{
+  const w=boot(),rings=[],sounds=[];
+  w.rival.isPlayer=true;w.g.player=w.rival;
+  w.g.addRing=(...args)=>rings.push(args);
+  w.g.sfx={novaDroneWindup:(...args)=>sounds.push(args)};
+  const p=tick(w);
+  assert.equal(rings.length,0,'probe should not signal a committed breach');
+  w.g.time=2.5;tick(w);
+  assert.equal(p.pressure,'breach');
+  assert.ok(p.cueUntil>w.g.time,'the existing render cue must be active');
+  assert.equal(rings.length,1,'human receives the readable windup ring');
+  assert.equal(sounds.length,1,'human receives the existing windup audio');
+  w.g.time+=.05;tick(w);
+  assert.equal(rings.length,1,'same commitment must not spam effects');
+  w.g.time=4;tick(w);
+  assert.equal(p.pressure,'probe');
+  w.g.time=5.5;tick(w);
+  assert.equal(p.pressure,'breach');
+  assert.equal(rings.length,1,'the original 4.5s cooldown is preserved');
+});
