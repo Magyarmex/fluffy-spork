@@ -167,10 +167,61 @@ wrap('game/engine',function(engine){
     else if(s.vy<0)t=Math.min(t,(-CHRONO_ARENA_EDGE-s.y)/s.vy);
     return t>=0&&isFinite(t)?t:null;
   }
+
+  /* Conservative, opt-in first-body comparator for ordinary short-lived shots.
+   * Compare geometry BEFORE Battlefield's pre-pass and the core TTL removal.
+   * No combat writes: only count potential contacts not registered by the core.
+   * An intercepted projectile may be a false positive, so the counter is
+   * deliberately named "unregistered", not a proven missed hit. */
+  var chronoClasses=null;
+  try{chronoClasses=require('./classes').CLASSES||null;}catch(_){}
+  function chronoFirstBody(g,b,dt){
+    if(!g.tanks||g.tanks.length>64||!g.__novaTerrain)return null;
+    var best=null;
+    for(var i=0;i<g.tanks.length;i++){
+      var t=g.tanks[i];
+      if(!t||!t.alive||t.id===b.ownerId||
+         !Number.isFinite(t.x)||!Number.isFinite(t.y))continue;
+      var def=chronoClasses&&chronoClasses[t.cls];
+      var size=def&&def.size||t.r;
+      if(!(size>0))continue;
+      var moving=t.__novaSweepMoveTime===g.time&&
+        Number.isFinite(t.__novaSweepPrevX)&&Number.isFinite(t.__novaSweepPrevY);
+      var sx=moving?t.__novaSweepPrevX:t.x,sy=moving?t.__novaSweepPrevY:t.y;
+      var fx=b.x-sx,fy=b.y-sy;
+      var vx=(b.vx||0)-(t.x-sx)/dt,vy=(b.vy||0)-(t.y-sy)/dt;
+      var radius=(b.r||2)+size+3,C=fx*fx+fy*fy-radius*radius;
+      var hit=null;
+      if(C<=0)hit=0;
+      else{
+        var A=vx*vx+vy*vy,halfB=fx*vx+fy*vy;
+        if(!(A>1e-12)||halfB>=0)continue;
+        var D=halfB*halfB-A*C;
+        if(D<0)continue;
+        /* Stable entry root: avoids cancellation for fast shallow hits. */
+        hit=C/(-halfB+Math.sqrt(D));
+      }
+      if(hit==null||hit<0||hit>b.ttl+1e-9)continue;
+      if(!best||hit<best.time)best={targetId:t.id,time:hit,
+        x:b.x+(b.vx||0)*hit,y:b.y+(b.vy||0)*hit};
+    }
+    if(!best)return null;
+    /* A solid hit before the body makes this candidate ambiguous, including
+     * destructible cover: do not claim a direct body contact in that case. */
+    if(typeof g.firstTerrainHit==='function'&&
+       g.firstTerrainHit(b.x,b.y,best.x,best.y,(b.r||2)*.45))
+      return {occluded:true};
+    if(typeof g.firstTerrainHit!=='function'&&
+       g.__novaTerrain.some(function(t){return t&&t.solid!==false&&
+         (!t.destructible||t.hp>0);}))return null;
+    return best;
+  }
   function chronoState(g){
     var s=g.__novaChronoShadow||(g.__novaChronoShadow={
-      frames:0,sampledShells:0,bursts:0,ttlOvershoots:0,arenaOvershoots:0,
-      maxOvershootUnits:0,events:[]
+      frames:0,sampledShells:0,sampledShortShots:0,bursts:0,
+      ttlOvershoots:0,arenaOvershoots:0,predictedBodyContacts:0,
+      registeredBodyContacts:0,unregisteredBodyContacts:0,
+      terrainOccludedBodyContacts:0,maxOvershootUnits:0,events:[]
     });
     /* DevTools can inspect live counters without reaching into React game state. */
     window.__NOVA_CHRONO_SHADOW_LAST__=s;
@@ -208,31 +259,62 @@ wrap('game/engine',function(engine){
     if(!window.__NOVA_CHRONO_SHADOW_ENABLED__||!(dt>0)||!this.bullets||
        this.player&&this.player.id===-1000000)
       return oldChronoBullets.apply(this,arguments);
-    var samples=new Map(),bullets=this.bullets,st=chronoState(this);
+    var samples=new Map(),shortShots=[],bullets=this.bullets,st=chronoState(this);
     st.frames++;
     /* Rotate a bounded scan window so crowded arenas do not starve late
      * projectiles or make the diagnostic O(all bullets) each frame. */
     var count=bullets.length,scan=Math.min(count,64),start=count?(st.frames*CHRONO_SHADOW_LIMIT)%count:0;
     for(var i=0;i<scan&&samples.size<CHRONO_SHADOW_LIMIT;i++){
       var b=bullets[(start+i)%count];
-      if(!b||b.dead||!b.shell)continue;
-      var s={id:b.id,x:b.x,y:b.y,vx:b.vx||0,vy:b.vy||0,ttl:b.ttl};
-      s.exit=chronoExitTime(s);
-      samples.set(b,s);
+      if(!b||b.dead)continue;
+      if(b.shell){
+        var s={id:b.id,x:b.x,y:b.y,vx:b.vx||0,vy:b.vy||0,ttl:b.ttl};
+        s.exit=chronoExitTime(s);
+        samples.set(b,s);st.sampledShells++;
+      }else if(b.ttl>0&&b.ttl<dt&&!b.beam&&!(b.pen>0)&&!(b.hits>0)){
+        var candidate=chronoFirstBody(this,b,dt);
+        st.sampledShortShots++;
+        if(candidate&&candidate.occluded)st.terrainOccludedBodyContacts++;
+        else if(candidate){
+          st.predictedBodyContacts++;
+          shortShots.push({bullet:b,before:b.hits||0,contact:candidate});
+        }
+        samples.set(b,null);
+      }
     }
-    st.sampledShells+=samples.size;
     var previous=this.__novaChronoShadowFrame;
     this.__novaChronoShadowFrame={samples:samples,dt:dt};
-    try{return oldChronoBullets.apply(this,arguments);}
-    finally{this.__novaChronoShadowFrame=previous;}
+    var completed=false;
+    try{var result=oldChronoBullets.apply(this,arguments);completed=true;return result;}
+    finally{
+      if(completed)for(var k=0;k<shortShots.length;k++){
+        var shot=shortShots[k],c=shot.contact,b=shot.bullet;
+        if((b.hits||0)>shot.before)st.registeredBodyContacts++;
+        else{
+          st.unregisteredBodyContacts++;
+          st.events.push({kind:'unregistered-body-contact',id:b.id,
+            targetId:c.targetId,expectedX:c.x,expectedY:c.y,
+            contactTime:c.time,ttl:b.ttl});
+          if(st.events.length>12)st.events.shift();
+        }
+      }
+      this.__novaChronoShadowFrame=previous;
+    }
   };
   Base.prototype.novaChronoShadowSnapshot=function(){
     var s=this.__novaChronoShadow;
-    return s?{frames:s.frames,sampledShells:s.sampledShells,bursts:s.bursts,
+    return s?{frames:s.frames,sampledShells:s.sampledShells,
+      sampledShortShots:s.sampledShortShots,bursts:s.bursts,
       ttlOvershoots:s.ttlOvershoots,arenaOvershoots:s.arenaOvershoots,
+      predictedBodyContacts:s.predictedBodyContacts,
+      registeredBodyContacts:s.registeredBodyContacts,
+      unregisteredBodyContacts:s.unregisteredBodyContacts,
+      terrainOccludedBodyContacts:s.terrainOccludedBodyContacts,
       maxOvershootUnits:s.maxOvershootUnits,events:s.events.slice()}:
-      {frames:0,sampledShells:0,bursts:0,ttlOvershoots:0,arenaOvershoots:0,
-       maxOvershootUnits:0,events:[]};
+      {frames:0,sampledShells:0,sampledShortShots:0,bursts:0,
+       ttlOvershoots:0,arenaOvershoots:0,predictedBodyContacts:0,
+       registeredBodyContacts:0,unregisteredBodyContacts:0,
+       terrainOccludedBodyContacts:0,maxOvershootUnits:0,events:[]};
   };
 
   var oldSpawnShape=Base.prototype.spawnShape;
