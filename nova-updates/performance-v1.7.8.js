@@ -173,7 +173,7 @@ wrap('game/engine',function(engine){
   var oldChronoBurst=Base.prototype.clusterBurst;
   if(oldChronoBurst)Base.prototype.clusterBurst=function(shell){
     var frame=this.__novaChronoShadowFrame,s=frame&&frame.samples.get(shell);
-    if(s){
+    if(s&&!shell.__novaClusterBurstConsumed){
       var st=chronoState(this),v2=s.vx*s.vx+s.vy*s.vy;
       st.bursts++;
       if(v2>1e-9){
