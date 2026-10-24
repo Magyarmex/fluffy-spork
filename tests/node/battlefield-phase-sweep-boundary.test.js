@@ -28,6 +28,21 @@ function shippingAbility() {
     }, ABILITIES: { phase: { cd: 8 } } },
     { clamp: (x, lo, hi) => Math.max(lo, Math.min(hi, x)) }, 2250);
 }
+function shippingBullets() {
+  const marker = '    updateBullets(dt) {', start = html.indexOf(marker);
+  assert.ok(start >= 0, 'materialized bullet method must exist');
+  let pos = start + marker.length, depth = 1;
+  while (depth && pos < html.length) {
+    if (html[pos] === '{') depth++;
+    else if (html[pos] === '}') depth--;
+    pos++;
+  }
+  assert.equal(depth, 0);
+  return new Function('types_1', 'classes_1', 'M',
+    'return function(dt){' + html.slice(start + marker.length, pos - 1) + '}')(
+    { dist2: (ax, ay, bx, by) => (ax - bx) ** 2 + (ay - by) ** 2 },
+    { CLASSES: { ghost: { size: 15 } } }, 2250);
+}
 function boot() {
   class Game {
     constructor() {
@@ -43,6 +58,12 @@ function boot() {
     moveTank(t, vx, vy, dt) { t.x += vx * dt; t.y += vy * dt; }
     tryFire() {}
     updateBullets() {}
+    initBulletIntegrity() {}
+    resolveBulletCollisions() {}
+    clusterBurst() {}
+    damageTank(t, dmg) { this.contacts.push(t.id); t.hp -= dmg; }
+    damageShape() {}
+    damageDrone() {}
     updateDrones() {}
     update() {}
     splashAt() {}
@@ -54,6 +75,7 @@ function boot() {
     bulletSpeed() { return 400; }
   }
   Game.prototype.useAbility = shippingAbility();
+  Game.prototype.updateBullets = shippingBullets();
   const modules = {
     'game/engine': m => { m.exports.Game = Game; },
     'game/ai': m => { m.exports.updateAI = () => {}; },
@@ -114,4 +136,21 @@ test('phase activation without earlier movement still anchors to arrival', () =>
   assert.equal(t.x, 420);
   assert.equal(t.__novaSweepPrevX, 420);
   assert.equal(t.__novaSweepMoveTime, g.time);
+});
+
+test('materialized projectile path cannot hit the empty space crossed by Phase Shift', () => {
+  const Game = boot(), g = new Game(), t = tank();
+  g.contacts = []; g.tanks = [t];
+  g.moveTank(t, 0, 0, 1 / 60);
+  g.useAbility(t);
+  assert.equal(t.x, 420);
+  // Projectile travels vertically across the apparent teleport chord at
+  // x=380. The arrival hull is 40 units away, outside its 18-unit hit radius.
+  g.hash.query = (_x, _y, _r, out) => { out.length = 0; out.push(t); };
+  g.bullets = [{ id: 99, kind: 'bullet', ownerId: 1,
+    x: 380, y: -90, vx: 0, vy: 6000, r: 3, dmg: 5,
+    pen: 0, hits: 0, ttl: 1, dead: false, shell: false }];
+  g.updateBullets(1 / 60);
+  assert.deepEqual(g.contacts, [], 'no damage anywhere along intangible teleport path');
+  assert.equal(t.hp, 100);
 });
