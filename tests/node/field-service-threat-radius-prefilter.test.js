@@ -71,8 +71,8 @@ test('nearby visible hostile behind solid cover does not suppress repair',()=>{
 
 test('5,000 seeded mixed worlds preserve the independent repair-threat oracle',()=>{
   const s=setup();
-  // Use the actual module loaded in this fixture rather than an independent
-  // guessed viewport formula. The oracle preserves the old evaluation order.
+  // Independently restate the original scan order and Fair Engagement's
+  // documented viewport geometry; do not call the optimized batch helper.
   let seed=0x20261025;
   const rnd=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
   const r2=310*310;
@@ -106,8 +106,8 @@ test('5,000 seeded mixed worlds preserve the independent repair-threat oracle',(
     s.enemy.x=(rnd()-.5)*1400;
     s.enemy.y=(rnd()-.5)*900;
     s.enemy.alive=rnd()>.1;
-    s.g.hasLineOfSight=()=>rndBlocked===false;
     const rndBlocked=rnd()<.2;
+    s.g.hasLineOfSight=()=>!rndBlocked;
     for(let j=0;j<s.far.length;j++){
       const t=s.far[j];
       t.x=rnd()<.005?NaN:(rnd()-.5)*1400;
