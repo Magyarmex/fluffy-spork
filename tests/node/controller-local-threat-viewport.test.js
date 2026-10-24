@@ -129,3 +129,11 @@ test('once a visible nearest threat wins, farther drones skip costly visibility'
       assert.equal(rays,1,'only the winning closest candidate needs a terrain ray');
     }});
 });
+
+test('nonfinite drone positions never become a nearest defensive threat',()=>{
+  boot({enemies:[[Number.NaN,0],[100,0]],
+    beforeTick:({g,owner,window})=>{
+      const found=window.__NOVA_LIVE_VECTOR_TEST__.hostileDroneNear(g,owner,265);
+      assert.equal(found.id,41,'NaN cannot defeat a finite distance comparison');
+    }});
+});
