@@ -618,3 +618,25 @@ test('unconditional core shield remains distinct from Guardian ambiguity', () =>
   assert.equal(s.defenseAmbiguousBodyContacts, 0);
   assert.equal(s.unregisteredBodyContacts, 0);
 });
+
+test('Guardian taunt state is also uncertain under directional Perfect Guard', () => {
+  const { g } = boot(), tank = addScout(g, 40);
+  tank.tauntT = 1;
+  tank.angle = Math.PI;
+  g.bullets = [ordinaryShot(8801)];
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.defenseAmbiguousBodyContacts, 1);
+  assert.equal(s.unregisteredBodyContacts, 0);
+});
+test('terrain occlusion outranks Guardian taunt ambiguity', () => {
+  const { g } = boot(), tank = addScout(g, 40);
+  tank.tauntT = 1;
+  g.__novaTerrain = [{ id: -8802, shape: 'rect', x: 10, y: 0,
+    w: 8, h: 80, solid: true, destructible: false }];
+  g.bullets = [ordinaryShot(8802)];
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.terrainOccludedBodyContacts, 1);
+  assert.equal(s.defenseAmbiguousBodyContacts, 0);
+});
