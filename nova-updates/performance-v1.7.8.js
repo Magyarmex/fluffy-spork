@@ -177,11 +177,20 @@ wrap('game/engine',function(engine){
   try{chronoClasses=require('./classes').CLASSES||null;}catch(_){}
   function chronoFirstBody(g,b,dt){
     if(!g.tanks||g.tanks.length>64||!g.__novaTerrain)return null;
-    var best=null;
+    var best=null,owner=typeof g.getTank==='function'?g.getTank(b.ownerId):null;
     for(var i=0;i<g.tanks.length;i++){
       var t=g.tanks[i];
       if(!t||!t.alive||t.id===b.ownerId||
          !Number.isFinite(t.x)||!Number.isFinite(t.y))continue;
+      if(owner){
+        if(typeof g.areAllies==='function'&&g.areAllies(owner,t))continue;
+        var sideKeys=['teamId','team','factionId','faction','side'],allied=false;
+        for(var side=0;side<sideKeys.length;side++){
+          var key=sideKeys[side];
+          if(owner[key]!=null&&t[key]!=null){allied=owner[key]===t[key];break;}
+        }
+        if(allied)continue;
+      }
       var def=chronoClasses&&chronoClasses[t.cls];
       var size=def&&def.size||t.r;
       if(!(size>0))continue;
@@ -221,7 +230,8 @@ wrap('game/engine',function(engine){
       frames:0,sampledShells:0,sampledShortShots:0,bursts:0,
       ttlOvershoots:0,arenaOvershoots:0,predictedBodyContacts:0,
       registeredBodyContacts:0,unregisteredBodyContacts:0,
-      terrainOccludedBodyContacts:0,maxOvershootUnits:0,events:[]
+      terrainOccludedBodyContacts:0,bodyAuditErrors:0,
+      maxOvershootUnits:0,events:[]
     });
     /* DevTools can inspect live counters without reaching into React game state. */
     window.__NOVA_CHRONO_SHADOW_LAST__=s;
@@ -272,12 +282,14 @@ wrap('game/engine',function(engine){
         s.exit=chronoExitTime(s);
         samples.set(b,s);st.sampledShells++;
       }else if(b.ttl>0&&b.ttl<dt&&!b.beam&&!(b.pen>0)&&!(b.hits>0)){
-        var candidate=chronoFirstBody(this,b,dt);
+        var candidate=null;
+        try{candidate=chronoFirstBody(this,b,dt);}
+        catch(_){st.bodyAuditErrors++;}
         st.sampledShortShots++;
         if(candidate&&candidate.occluded)st.terrainOccludedBodyContacts++;
         else if(candidate){
           st.predictedBodyContacts++;
-          shortShots.push({bullet:b,before:b.hits||0,contact:candidate});
+          shortShots.push({bullet:b,before:b.hits||0,ttl:b.ttl,contact:candidate});
         }
         samples.set(b,null);
       }
@@ -294,7 +306,7 @@ wrap('game/engine',function(engine){
           st.unregisteredBodyContacts++;
           st.events.push({kind:'unregistered-body-contact',id:b.id,
             targetId:c.targetId,expectedX:c.x,expectedY:c.y,
-            contactTime:c.time,ttl:b.ttl});
+            contactTime:c.time,ttl:shot.ttl});
           if(st.events.length>12)st.events.shift();
         }
       }
@@ -310,11 +322,12 @@ wrap('game/engine',function(engine){
       registeredBodyContacts:s.registeredBodyContacts,
       unregisteredBodyContacts:s.unregisteredBodyContacts,
       terrainOccludedBodyContacts:s.terrainOccludedBodyContacts,
-      maxOvershootUnits:s.maxOvershootUnits,events:s.events.slice()}:
+      bodyAuditErrors:s.bodyAuditErrors,maxOvershootUnits:s.maxOvershootUnits,events:s.events.slice()}:
       {frames:0,sampledShells:0,sampledShortShots:0,bursts:0,
        ttlOvershoots:0,arenaOvershoots:0,predictedBodyContacts:0,
        registeredBodyContacts:0,unregisteredBodyContacts:0,
-       terrainOccludedBodyContacts:0,maxOvershootUnits:0,events:[]};
+       terrainOccludedBodyContacts:0,bodyAuditErrors:0,
+       maxOvershootUnits:0,events:[]};
   };
 
   var oldSpawnShape=Base.prototype.spawnShape;
