@@ -160,3 +160,22 @@ test('distant projectile never triggers a terrain visibility query', () => {
   assert.equal(pl.__novaFocusStart, 50);
   assert.equal(sightCalls.length, 0);
 });
+
+
+test('friendly near-miss skips terrain visibility work entirely', () => {
+  const { g, pl } = coveredRailScenario('railgun', false);
+  g.tankById.get(2).team = 'blue';
+  g.hasLineOfSight = () => { throw new Error('friendly shot queried terrain'); };
+  g.update(1 / 60);
+  assert.equal(pl.__novaFocusStart, 50);
+});
+test('stationary hostile projectile uses a finite line-of-sight endpoint', () => {
+  const { g, pl, sightCalls } = coveredRailScenario('railgun', false);
+  g.bullets[0].px = 10; g.bullets[0].x = 10;
+  g.bullets[0].py = 18; g.bullets[0].y = 18;
+  g.update(1 / 60);
+  assert.equal(pl.__novaFocusStart, 50);
+  assert.equal(sightCalls.length, 1);
+  assert.equal(sightCalls[0][2], 10);
+  assert.equal(sightCalls[0][3], 18);
+});
