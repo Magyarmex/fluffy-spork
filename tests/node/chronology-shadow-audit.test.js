@@ -80,6 +80,7 @@ test('opt-in detects actual materialized TTL overshoot without changing burst', 
   g.bullets = [shell(2, 0, 6000, 0.005)];
   g.updateBullets(1 / 30);
   const s = g.novaChronoShadowSnapshot();
+  assert.equal(window.__NOVA_CHRONO_SHADOW_LAST__, g.__novaChronoShadow);
   assert.equal(s.frames, 1);
   assert.equal(s.sampledShells, 1);
   assert.equal(s.bursts, 1);
