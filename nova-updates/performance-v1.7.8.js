@@ -151,6 +151,87 @@ wrap('game/engine',function(engine){
   var Base=engine.Game;if(!Base||Base.prototype.__novaZeroChurn)return;
   Base.prototype.__novaZeroChurn=true;
 
+  /* Opt-in, read-only projectile chronology diagnostics. Disabled in normal play.
+   * Sample at most 12 pre-existing shells per frame; never reorder or mutate them.
+   * This measures definite TTL/arena overshoots, not speculative hit outcomes. */
+  var CHRONO_SHADOW_LIMIT=12, CHRONO_ARENA_EDGE=2230;
+  function chronoExitTime(s){
+    if(Math.abs(s.x)>CHRONO_ARENA_EDGE||Math.abs(s.y)>CHRONO_ARENA_EDGE)return null;
+    var t=Infinity;
+    if(s.vx>0)t=Math.min(t,(CHRONO_ARENA_EDGE-s.x)/s.vx);
+    else if(s.vx<0)t=Math.min(t,(-CHRONO_ARENA_EDGE-s.x)/s.vx);
+    if(s.vy>0)t=Math.min(t,(CHRONO_ARENA_EDGE-s.y)/s.vy);
+    else if(s.vy<0)t=Math.min(t,(-CHRONO_ARENA_EDGE-s.y)/s.vy);
+    return t>=0&&isFinite(t)?t:null;
+  }
+  function chronoState(g){
+    var s=g.__novaChronoShadow||(g.__novaChronoShadow={
+      frames:0,sampledShells:0,bursts:0,ttlOvershoots:0,arenaOvershoots:0,
+      maxOvershootUnits:0,events:[]
+    });
+    /* DevTools can inspect live counters without reaching into React game state. */
+    window.__NOVA_CHRONO_SHADOW_LAST__=s;
+    return s;
+  }
+  var oldChronoBurst=Base.prototype.clusterBurst;
+  if(oldChronoBurst)Base.prototype.clusterBurst=function(shell){
+    var frame=this.__novaChronoShadowFrame,s=frame&&frame.samples.get(shell);
+    if(s&&!shell.__novaClusterBurstConsumed){
+      var st=chronoState(this),v2=s.vx*s.vx+s.vy*s.vy;
+      st.bursts++;
+      if(v2>1e-9){
+        var elapsed=((shell.x-s.x)*s.vx+(shell.y-s.y)*s.vy)/v2;
+        var ttlOver=s.ttl>=0&&s.ttl<frame.dt&&elapsed>s.ttl+1e-6;
+        var arenaOver=s.exit!=null&&s.exit<frame.dt&&elapsed>s.exit+1e-6;
+        if(ttlOver||arenaOver){
+          if(ttlOver)st.ttlOvershoots++;
+          if(arenaOver)st.arenaOvershoots++;
+          var limit=Math.min(ttlOver?s.ttl:Infinity,arenaOver?s.exit:Infinity);
+          var overshoot=Math.max(0,(elapsed-limit)*Math.sqrt(v2));
+          st.maxOvershootUnits=Math.max(st.maxOvershootUnits,overshoot);
+          st.events.push({id:s.id,ttl:ttlOver,arena:arenaOver,
+            expectedX:s.x+s.vx*limit,expectedY:s.y+s.vy*limit,
+            actualX:shell.x,actualY:shell.y,overshoot:overshoot});
+          if(st.events.length>12)st.events.shift();
+        }
+      }
+    }
+    return oldChronoBurst.apply(this,arguments);
+  };
+  var oldChronoBullets=Base.prototype.updateBullets;
+  if(oldChronoBullets)Base.prototype.updateBullets=function(dt){
+    /* The live War Room runs a decorative Game with spectator id -1000000.
+     * Never let it overwrite the playable match's diagnostic snapshot. */
+    if(!window.__NOVA_CHRONO_SHADOW_ENABLED__||!(dt>0)||!this.bullets||
+       this.player&&this.player.id===-1000000)
+      return oldChronoBullets.apply(this,arguments);
+    var samples=new Map(),bullets=this.bullets,st=chronoState(this);
+    st.frames++;
+    /* Rotate a bounded scan window so crowded arenas do not starve late
+     * projectiles or make the diagnostic O(all bullets) each frame. */
+    var count=bullets.length,scan=Math.min(count,64),start=count?(st.frames*67)%count:0;
+    for(var i=0;i<scan&&samples.size<CHRONO_SHADOW_LIMIT;i++){
+      var b=bullets[(start+i)%count];
+      if(!b||b.dead||!b.shell)continue;
+      var s={id:b.id,x:b.x,y:b.y,vx:b.vx||0,vy:b.vy||0,ttl:b.ttl};
+      s.exit=chronoExitTime(s);
+      samples.set(b,s);
+    }
+    st.sampledShells+=samples.size;
+    var previous=this.__novaChronoShadowFrame;
+    this.__novaChronoShadowFrame={samples:samples,dt:dt};
+    try{return oldChronoBullets.apply(this,arguments);}
+    finally{this.__novaChronoShadowFrame=previous;}
+  };
+  Base.prototype.novaChronoShadowSnapshot=function(){
+    var s=this.__novaChronoShadow;
+    return s?{frames:s.frames,sampledShells:s.sampledShells,bursts:s.bursts,
+      ttlOvershoots:s.ttlOvershoots,arenaOvershoots:s.arenaOvershoots,
+      maxOvershootUnits:s.maxOvershootUnits,events:s.events.slice()}:
+      {frames:0,sampledShells:0,bursts:0,ttlOvershoots:0,arenaOvershoots:0,
+       maxOvershootUnits:0,events:[]};
+  };
+
   var oldSpawnShape=Base.prototype.spawnShape;
   if(oldSpawnShape)Base.prototype.spawnShape=function(){
     var before=this.shapes?this.shapes.length:0,out=oldSpawnShape.apply(this,arguments);
