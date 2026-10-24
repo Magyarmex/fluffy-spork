@@ -31,7 +31,7 @@ const coreUpdate = shippingUpdater();
 function boot(full = false) {
   class Game {
     constructor() {
-      this.bullets = []; this.bursts = []; this.time = 1;
+      this.bullets = []; this.bursts = []; this.burstOrigins = []; this.time = 1;
       this.__novaTerrain = []; this.hash = { query(_x, _y, _r, out) { out.length = 0; } };
       this.tmp = []; this.tanks = []; this.drones = []; this.shapes = [];
       this.cam = { shake: 0 }; this.tankById = new Map();
@@ -50,6 +50,7 @@ function boot(full = false) {
   };
   Game.prototype.clusterBurst = function(b) {
     this.bursts.push(b.id);
+    this.burstOrigins.push({ id: b.id, x: b.x, y: b.y });
     if (this.__testSpawnChildren) for (let i = 0; i < 6; i++) {
       const a = i * Math.PI / 3;
       this.bullets.push({ id: this.nextId++, kind: 'bullet', ownerId: b.ownerId,
@@ -150,5 +151,43 @@ for (const [cls, count] of [['clusterking', 10], ['siegebomber', 5]]) {
     g.resolveBulletCollisions();
     assert.equal(g.bursts.filter(id => id === 1).length, 1,
       'intercepted parent shell may not generate another burst');
+  });
+}
+
+/* A swept collision happens before the endpoints. Fragment origin must be
+ * the physical first-contact location, not the end of a long 30Hz frame. */
+for (const full of [false, true]) {
+  const mode = full ? 'full production overlays' : 'Sniper/Battlefield';
+  for (const fps of [30, 60, 120, 240]) {
+    test(mode + ': intercepted shell fragments originate at first contact at ' +
+      fps + 'Hz', () => {
+      const g = boot(full);
+      g.bullets = [bullet(1, 1, -30, 60 * fps, 1, true),
+        bullet(2, 2, 30, -60 * fps, 3)];
+      g.updateBullets(1 / fps);
+      assert.equal(g.burstOrigins.length, 1);
+      assert.equal(g.burstOrigins[0].id, 1);
+      assert.ok(Math.abs(g.burstOrigins[0].x + 3.75) < 1e-7,
+        'expected first-contact x=-3.75, got ' + g.burstOrigins[0].x);
+      assert.equal(g.burstOrigins[0].y, 0);
+    });
+  }
+  test(mode + ': shell already overlapping at frame start bursts at start', () => {
+    const g = boot(full);
+    const shell = bullet(1, 1, 20, 0, 1, true);
+    const other = bullet(2, 2, -20, 0, 3);
+    shell.px = -1; shell.py = 0;
+    other.px = 1; other.py = 0;
+    g.bullets = [shell, other];
+    g.resolveBulletCollisions();
+    assert.equal(g.burstOrigins.length, 1);
+    assert.ok(Math.abs(g.burstOrigins[0].x + 1) < 1e-7);
+    assert.equal(shell.x, 20, 'temporary burst placement must restore endpoint');
+  });
+  test(mode + ': shell without a previous position bursts at its current point', () => {
+    const g = boot(full);
+    g.bullets = [bullet(1, 1, 0, 0, 1, true), bullet(2, 2, 0, 0, 3)];
+    g.resolveBulletCollisions();
+    assert.equal(g.burstOrigins[0].x, 0);
   });
 }
