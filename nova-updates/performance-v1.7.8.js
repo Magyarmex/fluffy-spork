@@ -258,7 +258,7 @@ wrap('game/engine',function(engine,require){
       }
       if(!Number.isFinite(hit)||hit<0||hit>b.ttl+1e-9)continue;
       if(!best||hit<best.time)best={targetId:t.id,time:hit,
-        immune:t.spawnShieldT>0||t.shieldT>0,guardAmbiguous:t.bulwarkT>0,
+        immune:t.spawnShieldT>0||t.shieldT>0,guardAmbiguous:t.bulwarkT>0||t.tauntT>0,
         x:b.x+(b.vx||0)*hit,y:b.y+(b.vy||0)*hit};
     }
     if(!best)return null;
@@ -275,7 +275,7 @@ wrap('game/engine',function(engine,require){
     if(typeof g.firstTerrainHit!=='function'&&
        g.__novaTerrain.some(function(t){return t&&t.solid!==false&&
          (!t.destructible||t.hp>0);}))return null;
-    /* Without the full directional Guardian/Perfect Guard resolution this
+    /* Without the full directional Guardian/Perfect Guard and taunt resolution this
      * contact is uncertain, not proven invulnerable and not a proven miss. */
     if(best.guardAmbiguous)return {defenseAmbiguous:true};
     var interception=chronoPossibleInterception(g,b,best.time);
