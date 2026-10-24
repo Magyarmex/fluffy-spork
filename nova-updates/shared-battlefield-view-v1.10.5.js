@@ -255,7 +255,12 @@ function controllerPlan(g,classes,owner,now){
   var changed=p.targetId!==target.id;
   if(changed||now>=(p.commitUntil||0)){p.targetId=target.id;p.commitUntil=now+(owner.ai.isElite ? .78 : 1.02);if(changed)p.flankSide*=-1;p.pressure=changed?'probe':(p.pressure==='probe'?'breach':'probe');}
   p.thinkAt=now+(owner.ai.isElite ? .22 : .34)+((owner.id%3)*.025);
-  owner.ai.targetId=target.id;owner.ai.__v1105TargetId=target.id;if(owner.ai.state!=='flee')owner.ai.state='hunt';
+  /* Live Vector temporarily installs a virtual stick target before this
+   * older planner runs. Preserve that explicit synthetic target for the
+   * canonical Controller command, but keep the real sensed identity here. */
+  var current=owner.ai.targetId>=0&&g.getTank?g.getTank(owner.ai.targetId):null;
+  if(!current||current.__novaVirtualThumb!==true)owner.ai.targetId=target.id;
+  owner.ai.__v1105TargetId=target.id;if(owner.ai.state!=='flee')owner.ai.state='hunt';
   window.__NOVA_SHARED_BATTLEFIELD_VIEW__.controllerPlans++;
 }
 
