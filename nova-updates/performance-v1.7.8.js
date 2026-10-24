@@ -150,7 +150,7 @@ wrap('game/input',function(input){
 });
 
 /* ---------------- game indexes ---------------- */
-wrap('game/engine',function(engine){
+wrap('game/engine',function(engine,require){
   var Base=engine.Game;if(!Base||Base.prototype.__novaZeroChurn)return;
   Base.prototype.__novaZeroChurn=true;
 
