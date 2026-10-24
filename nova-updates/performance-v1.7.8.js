@@ -258,13 +258,13 @@ wrap('game/engine',function(engine,require){
       }
       if(!Number.isFinite(hit)||hit<0||hit>b.ttl+1e-9)continue;
       if(!best||hit<best.time)best={targetId:t.id,time:hit,
-        shielded:t.spawnShieldT>0,
+        protected:t.spawnShieldT>0||t.shieldT>0||t.bulwarkT>0,
         x:b.x+(b.vx||0)*hit,y:b.y+(b.vy||0)*hit};
     }
     if(!best)return null;
-    /* The first physical tank may be spawn-protected. It still masks tanks
-     * behind it, but cannot be counted as a missing damage contact. */
-    if(best.shielded)return null;
+    /* The first physical tank may have spawn, shield, or bulwark immunity.
+     * It still masks tanks behind it, but cannot be counted as missing damage. */
+    if(best.protected)return null;
     var exit=chronoExitTime({x:b.x,y:b.y,vx:b.vx,vy:b.vy});
     if(exit!=null&&best.time>exit+1e-9)return null;
     /* A solid hit before the body makes this candidate ambiguous, including
