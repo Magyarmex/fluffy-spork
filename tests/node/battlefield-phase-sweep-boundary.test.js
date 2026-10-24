@@ -288,3 +288,25 @@ test('Phase Shift randomized destination-only clearance and no phantom sweep', (
     }
   }
 });
+
+
+test('Phase Shift selects the nearest narrow clear pocket between two walls', () => {
+  const Game = boot(), g = new Game(), t = tank();
+  g.__novaTerrain = [
+    { id: -1, shape: 'rect', x: 420.5, y: 0, w: 20, h: 100, solid: true, destructible: false },
+    { id: -2, shape: 'rect', x: 361.5, y: 0, w: 20, h: 100, solid: true, destructible: false }
+  ];
+  g.useAbility(t);
+  assert.ok(t.x > 390 && t.x < 392, 'a narrow valid pocket near the target must not be skipped: ' + t.x);
+  assert.equal(g.isTerrainSafe(t.x, t.y, 18.5), true);
+});
+test('Phase Shift selects the nearest narrow clear pocket between two pillars', () => {
+  const Game = boot(), g = new Game(), t = tank();
+  g.__novaTerrain = [
+    { id: -1, shape: 'circle', x: 426.5, y: 0, r: 20, solid: true, destructible: false },
+    { id: -2, shape: 'circle', x: 347.5, y: 0, r: 20, solid: true, destructible: false }
+  ];
+  g.useAbility(t);
+  assert.ok(t.x > 386 && t.x < 388, 'the circular clearance gap must not be skipped: ' + t.x);
+  assert.equal(g.isTerrainSafe(t.x, t.y, 18.5), true);
+});
