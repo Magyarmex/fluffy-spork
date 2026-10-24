@@ -111,3 +111,35 @@ test('active touch aim still overrides mouse state and keyboard movement',()=>{
   const aim=i.aimVec(i.moveVec());
   assert.ok(aim);assert.equal(aim.x,0);assert.equal(aim.y,1);
 });
+
+
+test('unindexed nearestShape never selects a destroyed shape over a living target',()=>{
+  const {Game}=loadLayer(),g=new Game();
+  g.hash.__novaReady=false;
+  g.shapes=[
+    {id:1,kind:'shape',x:0,y:0,hp:0},
+    {id:2,kind:'shape',x:25,y:0,hp:10}
+  ];
+  assert.equal(g.nearestShape(0,0,100),g.shapes[1]);
+  g.shapes[1].hp=0;
+  assert.equal(g.nearestShape(0,0,100),null);
+});
+
+test('unindexed and indexed nearestShape agree on living shape selection',()=>{
+  const {Game}=loadLayer(),g=new Game();
+  let seed=20261024;
+  const rnd=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+  for(let trial=0;trial<2000;trial++){
+    g.shapes=Array.from({length:12},(_,i)=>({
+      id:i+1,kind:'shape',x:(rnd()-.5)*500,y:(rnd()-.5)*500,
+      hp:rnd()<.35?0:10
+    }));
+    const x=(rnd()-.5)*500,y=(rnd()-.5)*500,range=30+rnd()*250;
+    g.hash.clear();
+    g.hash.__novaReady=false;
+    const fallback=g.nearestShape(x,y,range);
+    for(const s of g.shapes)g.hash.insert(s);
+    const indexed=g.nearestShape(x,y,range);
+    assert.equal(fallback,indexed,'selection mismatch in world '+trial);
+  }
+});
