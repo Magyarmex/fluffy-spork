@@ -74,7 +74,7 @@ function fire(Game, opts = {}) {
   g.clusterBurst = () => { bursts++; };
   g.weakenBullet = () => {};
   const b = { x: opts.x ?? -120, y: 0, vx: opts.vx ?? 6000, vy: 0,
-    r: 2, dmg: 12, ttl: opts.ttl ?? 0.005, shell: true, ownerId: 1,
+    r: 2, dmg: 12, ttl: opts.ttl ?? 0.005, shell: opts.shell ?? true, ownerId: 1,
     pen: opts.pen ?? 0, hits: 0, dead: false };
   g.bullets = [b];
   g.updateBullets(1 / 60);
@@ -112,5 +112,33 @@ for (const optimized of [false, true]) {
     assert.equal(g.__novaTerrain[0].solid, false);
     assert.equal(bursts, 1, 'penetrating shell must still burst at TTL');
     assert.equal(b.dead, true);
+  });
+}
+
+/* Battlefield stops a projectile at cover before invoking the materialized
+ * core updater. The core still advances dead projectiles in its first pass.
+ * Without a boundary fix, an impact at x=-80.9 moves to x=19.1 before
+ * spawning a possible trail, visibly leaking through solid cover. */
+for (const optimized of [false, true]) {
+  const label = optimized ? 'Battlefield + Performance' : 'Battlefield';
+  for (const shell of [false, true]) {
+    test(label + ': terrain-killed ' + (shell ? 'shell' : 'ordinary shot') +
+      ' remains at its first physical contact after core update', () => {
+      const { b, g } = fire(boot(optimized), { ttl: 2, shell });
+      assert.equal(b.dead, true);
+      assert.equal(g.bullets.length, 0);
+      assert.ok(b.x > -82 && b.x < -80,
+        'dead projectile must not advance beyond the wall; x=' + b.x);
+      assert.equal(b.vx, 0, 'dead projectile must not retain forward velocity');
+    });
+  }
+  test(label + ': shell that breaches cover retains forward velocity', () => {
+    const { b, g } = fire(boot(optimized), {
+      destructible: true, pen: 3, ttl: 2,
+    });
+    assert.equal(g.__novaTerrain[0].solid, false);
+    assert.equal(b.dead, false);
+    assert.equal(b.vx, 6000, 'legitimate cover penetration must keep velocity');
+    assert.ok(b.x > -30 && b.x < -10, 'breaching shot must advance normally');
   });
 }
