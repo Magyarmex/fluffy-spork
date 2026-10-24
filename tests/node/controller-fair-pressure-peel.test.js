@@ -148,3 +148,17 @@ test('a fresh critical hit briefly recalls an AI Controller swarm without changi
   assert.equal(p.active,true,'surviving AI can re-engage after the bounded recovery');
   assert.ok(p.commandPower<=.20+1e-9,'critical survivor deploys cautiously');
 });
+
+test('a closer offscreen drone cannot mask a farther visible local threat',()=>{
+  const w=boot();w.g.w=300;w.rival.x=130;
+  const p=tick(w);w.g.time=2.5;tick(w);
+  assert.equal(p.pressure,'breach');
+  const deep=p.commandPower;
+  w.g.drones=[
+    {id:40,ownerId:2,hp:20,r:8,x:151,y:0}, // nearer but offscreen
+    {id:41,ownerId:2,hp:20,r:8,x:140,y:140} // farther, on screen
+  ];
+  w.g.time+=.05;tick(w);
+  assert.ok(p.commandPower<=.25+1e-9,'visible threat still forces shallow defense');
+  assert.ok(p.commandPower<deep);
+});
