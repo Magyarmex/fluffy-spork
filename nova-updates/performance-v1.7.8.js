@@ -258,13 +258,13 @@ wrap('game/engine',function(engine,require){
       }
       if(!Number.isFinite(hit)||hit<0||hit>b.ttl+1e-9)continue;
       if(!best||hit<best.time)best={targetId:t.id,time:hit,
-        protected:t.spawnShieldT>0||t.shieldT>0||t.bulwarkT>0,
+        immune:t.spawnShieldT>0||t.shieldT>0,guardAmbiguous:t.bulwarkT>0,
         x:b.x+(b.vx||0)*hit,y:b.y+(b.vy||0)*hit};
     }
     if(!best)return null;
-    /* The first physical tank may have spawn, shield, or bulwark immunity.
-     * It still masks tanks behind it, but cannot be counted as missing damage. */
-    if(best.protected)return null;
+    /* Spawn and ordinary shields unconditionally block core damage. Guardian
+     * bulwark is different: its v1.7 directional wrapper can allow damage. */
+    if(best.immune)return null;
     var exit=chronoExitTime({x:b.x,y:b.y,vx:b.vx,vy:b.vy});
     if(exit!=null&&best.time>exit+1e-9)return null;
     /* A solid hit before the body makes this candidate ambiguous, including
@@ -275,6 +275,9 @@ wrap('game/engine',function(engine,require){
     if(typeof g.firstTerrainHit!=='function'&&
        g.__novaTerrain.some(function(t){return t&&t.solid!==false&&
          (!t.destructible||t.hp>0);}))return null;
+    /* Without the full directional Guardian/Perfect Guard resolution this
+     * contact is uncertain, not proven invulnerable and not a proven miss. */
+    if(best.guardAmbiguous)return {defenseAmbiguous:true};
     var interception=chronoPossibleInterception(g,b,best.time);
     if(interception===null)return {interceptionUnscanned:true};
     if(interception)return {interceptionAmbiguous:true};
@@ -285,7 +288,7 @@ wrap('game/engine',function(engine,require){
       frames:0,sampledShells:0,sampledShortShots:0,bursts:0,
       ttlOvershoots:0,arenaOvershoots:0,predictedBodyContacts:0,
       registeredBodyContacts:0,unregisteredBodyContacts:0,
-      terrainOccludedBodyContacts:0,interceptionAmbiguousBodyContacts:0,
+      terrainOccludedBodyContacts:0,defenseAmbiguousBodyContacts:0,interceptionAmbiguousBodyContacts:0,
       interceptionUnscannedBodyContacts:0,bodyAuditErrors:0,
       maxOvershootUnits:0,events:[]
     });
@@ -350,6 +353,7 @@ wrap('game/engine',function(engine,require){
         catch(_){st.bodyAuditErrors++;}
         st.sampledShortShots++;
         if(candidate&&candidate.occluded)st.terrainOccludedBodyContacts++;
+        else if(candidate&&candidate.defenseAmbiguous)st.defenseAmbiguousBodyContacts++;
         else if(candidate&&candidate.interceptionAmbiguous)st.interceptionAmbiguousBodyContacts++;
         else if(candidate&&candidate.interceptionUnscanned)st.interceptionUnscannedBodyContacts++;
         else if(candidate){
@@ -387,13 +391,14 @@ wrap('game/engine',function(engine,require){
       registeredBodyContacts:s.registeredBodyContacts,
       unregisteredBodyContacts:s.unregisteredBodyContacts,
       terrainOccludedBodyContacts:s.terrainOccludedBodyContacts,
+      defenseAmbiguousBodyContacts:s.defenseAmbiguousBodyContacts,
       interceptionAmbiguousBodyContacts:s.interceptionAmbiguousBodyContacts,
       interceptionUnscannedBodyContacts:s.interceptionUnscannedBodyContacts,
       bodyAuditErrors:s.bodyAuditErrors,maxOvershootUnits:s.maxOvershootUnits,events:s.events.slice()}:
       {frames:0,sampledShells:0,sampledShortShots:0,bursts:0,
        ttlOvershoots:0,arenaOvershoots:0,predictedBodyContacts:0,
        registeredBodyContacts:0,unregisteredBodyContacts:0,
-       terrainOccludedBodyContacts:0,interceptionAmbiguousBodyContacts:0,
+       terrainOccludedBodyContacts:0,defenseAmbiguousBodyContacts:0,interceptionAmbiguousBodyContacts:0,
        interceptionUnscannedBodyContacts:0,bodyAuditErrors:0,
        maxOvershootUnits:0,events:[]};
   };
