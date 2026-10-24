@@ -411,3 +411,19 @@ test('mixed fire retains independent bounded shell and ordinary audit coverage',
   assert.equal(s.events.length, 12, 'shared event ring remains bounded');
   assert.equal(target.hp, 100);
 });
+
+
+for (const fps of [30, 60, 120, 240]) {
+  test('exact-frame TTL expiry is still a short-shot first-body candidate at ' + fps + 'Hz', () => {
+    const { g } = boot(), target = addScout(g, 23);
+    const b = ordinaryShot(7000 + fps, 0, 500, 1 / fps);
+    b.pen = 1;
+    g.bullets = [b];
+    g.updateBullets(1 / fps);
+    const s = g.novaChronoShadowSnapshot();
+    assert.equal(s.sampledShortShots, 1);
+    assert.equal(s.predictedBodyContacts, 1);
+    assert.equal(s.unregisteredBodyContacts, 1);
+    assert.equal(target.hp, 100, 'core still kills exact-expiry shot before body check');
+  });
+}
