@@ -204,8 +204,11 @@ wrap('game/engine',function(engine){
       return oldChronoBullets.apply(this,arguments);
     var samples=new Map(),bullets=this.bullets,st=chronoState(this);
     st.frames++;
-    for(var i=0;i<bullets.length&&samples.size<CHRONO_SHADOW_LIMIT;i++){
-      var b=bullets[i];
+    /* Rotate a bounded scan window so crowded arenas do not starve late
+     * projectiles or make the diagnostic O(all bullets) each frame. */
+    var count=bullets.length,scan=Math.min(count,64),start=count?(st.frames*67)%count:0;
+    for(var i=0;i<scan&&samples.size<CHRONO_SHADOW_LIMIT;i++){
+      var b=bullets[(start+i)%count];
       if(!b||b.dead||!b.shell)continue;
       var s={id:b.id,x:b.x,y:b.y,vx:b.vx||0,vy:b.vy||0,ttl:b.ttl};
       s.exit=chronoExitTime(s);
