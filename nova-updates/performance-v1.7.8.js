@@ -209,7 +209,7 @@ wrap('game/engine',function(engine){
     st.frames++;
     /* Rotate a bounded scan window so crowded arenas do not starve late
      * projectiles or make the diagnostic O(all bullets) each frame. */
-    var count=bullets.length,scan=Math.min(count,64),start=count?(st.frames*67)%count:0;
+    var count=bullets.length,scan=Math.min(count,64),start=count?(st.frames*CHRONO_SHADOW_LIMIT)%count:0;
     for(var i=0;i<scan&&samples.size<CHRONO_SHADOW_LIMIT;i++){
       var b=bullets[(start+i)%count];
       if(!b||b.dead||!b.shell)continue;
