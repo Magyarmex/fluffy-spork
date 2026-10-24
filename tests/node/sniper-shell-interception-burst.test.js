@@ -48,7 +48,15 @@ function boot(full = false) {
     b.hp -= damage;
     if (b.hp <= 0) b.dead = true;
   };
-  Game.prototype.clusterBurst = function(b) { this.bursts.push(b.id); };
+  Game.prototype.clusterBurst = function(b) {
+    this.bursts.push(b.id);
+    if (this.__testSpawnChildren) for (let i = 0; i < 6; i++) {
+      const a = i * Math.PI / 3;
+      this.bullets.push({ id: this.nextId++, kind: 'bullet', ownerId: b.ownerId,
+        x: b.x, y: b.y, vx: Math.cos(a) * 250, vy: Math.sin(a) * 250,
+        dmg: 4, r: 3, pen: 1, ttl: .7, shell: false, dead: false });
+    }
+  };
   Game.prototype.randSpawnPos = () => ({ x: 1500, y: 1500 });
   class Sfx { resume() {} }
   const modules = {
@@ -123,4 +131,24 @@ for (const full of [false, true]) {
       assert.equal(g.bullets.some(b => b.id === 2), true);
     });
   }
+}
+
+for (const [cls, count] of [['clusterking', 10], ['siegebomber', 5]]) {
+  test('full shipping Apex: intercepted ' + cls + ' retains ' + count +
+    ' child fragments without duplicates', () => {
+    const g = boot(true);
+    g.nextId = 100; g.__testSpawnChildren = true;
+    const shell = bullet(1, 1, 0, 0, 1, true);
+    shell.cluster = count;
+    shell.__novaClusterClass = cls;
+    shell.__novaClusterFuseDepth = .4;
+    g.bullets = [shell, bullet(2, 2, 0, 0, 3)];
+    g.resolveBulletCollisions();
+    assert.deepEqual(g.bursts, [1]);
+    assert.equal(g.bullets.filter(b => b.id >= 100).length, count);
+    assert.ok(g.bullets.filter(b => b.id >= 100).every(b => !b.shell));
+    g.resolveBulletCollisions();
+    assert.equal(g.bursts.filter(id => id === 1).length, 1,
+      'intercepted parent shell may not generate another burst');
+  });
 }
