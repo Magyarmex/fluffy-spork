@@ -230,3 +230,22 @@ test('offline navigation rejects missing same-origin critical stylesheet', async
   await f.cache(OLD).put(css, new Response('body{background:#000}'));
   assert.equal((await f.navigationResponse()).status, 200);
 });
+
+
+test('actual materialized game: all 51 scripts are required for offline boot', async () => {
+  const actual = fs.readFileSync(path.join(__dirname, '../../index.html'), 'utf8');
+  const urls = [...actual.matchAll(/<script\\b[^>]*\\bsrc=["']([^"']+)["'][^>]*>/gi)]
+    .map(match => new URL(match[1], base).href);
+  assert.equal(urls.length, 51, 'shipping script composition changed; review offline contract');
+  const f = fixture();
+  await f.seed({ html: actual });
+  const cache = f.cache(OLD);
+  for (const url of urls) await cache.put(url, new Response('staged dependency'));
+  f.goOffline();
+  assert.equal((await f.navigationResponse()).status, 200);
+  const critical = urls.find(url => url.includes('living-front-director-v1.12.0.js'));
+  assert.ok(critical, 'real-game overlay missing');
+  cache.entries.delete(critical);
+  assert.equal((await f.navigationResponse()).status, 503,
+    'evicting one real gameplay overlay must not serve a broken playable shell');
+});
