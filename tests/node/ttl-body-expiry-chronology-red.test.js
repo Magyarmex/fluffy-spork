@@ -70,12 +70,12 @@ function boot() {
   return module.exports.Game;
 }
 
-function simulate(Game, fps, x, velocity, ttl) {
+function simulate(Game, fps, x, velocity, ttl, pen = 0) {
   const g = new Game();
   g.tanks = [{ kind: 'tank', id: 2, x, y: 0,
     cls: 'scout', hp: 100, alive: true }];
   g.bullets = [{ kind: 'bullet', id: 1, ownerId: 1, x: 0, y: 0,
-    vx: velocity, vy: 0, r: 3, dmg: 20, ttl, pen: 0,
+    vx: velocity, vy: 0, r: 3, dmg: 20, ttl, pen,
     hits: 0, dead: false, shell: false, beam: false }];
   for (let i = 0; i < 20 && g.bullets.length; i++) {
     g.updateBullets(1 / fps);
@@ -132,5 +132,14 @@ for (const fps of [30, 60, 120, 240]) {
     g.updateBullets(1 / fps);
     assert.equal(g.hits, 1,
       'moving body swept across reachable projectile segment before expiration');
+  });
+}
+
+/* A real-world-speed acceptance gate: ordinary NOVA weapons use speeds in
+ * this range and commonly have base penetration >=1. The first surface
+ * contact at x=2 occurs at 0.004s, before expiry at x=2.5. */
+for (const fps of [30, 60, 120, 240]) {
+  test('KNOWN RED #234: 500u/s penetrating round hits before TTL at ' + fps + 'Hz', () => {
+    assert.equal(simulate(Game, fps, 23, 500, .005, 1), 1);
   });
 }
