@@ -24,7 +24,11 @@ function loadDisciplines() {
     this.bullets.push({ownerId:t.id,x:t.x||0,y:t.y||0,vx:400,vy:0,dmg:10,pen:1,splash:70,splashDmg:.4,color:'#fff',dead:false});
     t.fireCd=.2;
   };
-  Game.prototype.damageTank=function(t,dmg){ t.hp-=dmg; return dmg; };
+  Game.prototype.damageTank=function(t,dmg){
+    // Preserve the shipping core's absolute shield gate in the test fixture.
+    if(t.spawnShieldT>0||t.shieldT>0||t.bulwarkT>0)return;
+    t.hp-=dmg;return dmg;
+  };
   Game.prototype.useAbility=function(t){
     const ab=CLASSES[t.cls].ability;
     if(ab==='bulwark'){t.bulwarkT=4;t.abilityCd=14;}
@@ -113,6 +117,42 @@ test('Perfect Guard stores a countershot and takes no damage',()=>{
   const hp=t.hp;g.damageTank(t,100,src.id,0,0);
   assert.equal(t.hp,hp);
   assert.equal(t.__v17CounterCharge,1);
+});
+test('invulnerable shield does not consume a Guardian Perfect Guard read',()=>{
+  for(const shield of ['spawnShieldT','shieldT']){
+    const {Game}=loadDisciplines(),g=new Game();
+    const t={id:1,cls:'guard',x:0,y:0,angle:0,hp:1000,bulwarkT:0,
+      tauntT:0,abilityCd:0,alive:true,spawnShieldT:0,shieldT:0};
+    const src={id:2,cls:'twin',x:100,y:0,alive:true};
+    g.tanks=[t,src];g.player=t;g.useAbility(t);
+    const windowEnd=t.__v17PerfectGuardUntil;
+    t[shield]=1;
+    g.damageTank(t,100,src.id,0,0);
+    assert.equal(t.hp,1000,'absolute shield still prevents damage');
+    assert.equal(t.__v17PerfectGuardUntil,windowEnd,
+      'an immune hit cannot spend a defensive timing read');
+    assert.equal(t.__v17CounterCharge||0,0,
+      'an immune hit cannot manufacture a countershot');
+    t[shield]=0;
+    g.damageTank(t,100,src.id,0,0);
+    assert.equal(t.hp,1000);
+    assert.equal(t.__v17CounterCharge,1,
+      'the next unshielded frontal hit can still earn Perfect Guard');
+    assert.equal(t.__v17PerfectGuardUntil,-1);
+  }
+});
+test('shielded hits cannot build countercharge after Perfect Guard window expires',()=>{
+  const {Game}=loadDisciplines(),g=new Game();
+  const t={id:1,cls:'guard',x:0,y:0,angle:0,hp:1000,bulwarkT:0,
+    tauntT:0,abilityCd:0,alive:true,spawnShieldT:0,shieldT:0};
+  const src={id:2,cls:'twin',x:100,y:0,alive:true};
+  g.tanks=[t,src];g.player=t;g.useAbility(t);
+  t.__v17PerfectGuardUntil=-1;
+  t.shieldT=1;
+  g.damageTank(t,100,src.id,0,0);
+  assert.equal(t.hp,1000);
+  assert.equal(t.__v17CounterCharge||0,0,
+    'an invulnerable hit cannot create countercharge outside Perfect Guard');
 });
 test('Gunner fire builds heat and marks projectiles',()=>{
   const {Game}=loadDisciplines(),g=new Game();
