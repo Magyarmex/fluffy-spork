@@ -56,3 +56,31 @@ test('seeded pause/deadline sweep preserves exactly the active remainder',()=>{
   assert.equal(ai.__novaSuppressedUntil,expected,'AI case '+k);
  }
 });
+
+
+/* Sniper suppression is hostile fire, not friendly fire. The rail focus
+ * should not be cancelled by another allied tank's projectile sweeping past. */
+for (const cls of ['railgun', 'prism', 'singularity']) {
+  for (const allied of [true, false]) {
+    test(cls + ': ' + (allied ? 'allied' : 'hostile') +
+      ' projectile crossing focus radius respects allegiance', () => {
+      const { Game } = boot(), g = new Game();
+      const pl = rail(1, cls, true, 0);
+      const shooter = { id: 2, cls: 'gunner', team: allied ? 'blue' : 'red', alive: true };
+      pl.team = 'blue'; pl.x = 0; pl.y = 0; pl.hitFlash = 0;
+      g.player = pl; g.tanks = [pl, shooter]; g.tankById = new Map([[1, pl], [2, shooter]]);
+      g.areAllies = (a, b) => a.team === b.team;
+      g.input.firing = true; g.__novaPlayerHeldFire = true;
+      g.bullets = [{ ownerId: 2, x: 40, y: 0, px: -40, py: 0,
+        r: 2, dead: false }];
+      g.update(1 / 60);
+      if (allied) {
+        assert.equal(pl.__novaFocusStart, 50, 'friendly shot cannot break focus');
+        assert.equal(pl.__novaSuppressedUntil, 0);
+      } else {
+        assert.equal(pl.__novaFocusStart, 0, 'hostile shot must break focus');
+        assert.ok(pl.__novaSuppressedUntil > 100);
+      }
+    });
+  }
+}
