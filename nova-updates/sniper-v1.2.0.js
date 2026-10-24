@@ -360,6 +360,27 @@
       return oldIntegrity.call(this, b);
     };
 
+    /* Projectile ownership is not the same as allegiance. Distinct allied
+     * tanks must not destroy each other's defensive fire or Bomber shells.
+     * Resolve relationships only after geometric contact to keep the dense
+     * projectile broad phase unchanged; unknown owners retain old behavior. */
+    function alliedProjectileOwners(g, a, b) {
+      var byId = g.tankById;
+      var ownerA = byId && byId.get ? byId.get(a.ownerId) : null;
+      var ownerB = byId && byId.get ? byId.get(b.ownerId) : null;
+      if (!ownerA && typeof g.getTank === 'function') ownerA = g.getTank(a.ownerId);
+      if (!ownerB && typeof g.getTank === 'function') ownerB = g.getTank(b.ownerId);
+      if (!ownerA || !ownerB) return false;
+      if (typeof g.areAllies === 'function') return !!g.areAllies(ownerA, ownerB);
+      var keys = ['teamId', 'team', 'factionId', 'faction', 'side'];
+      for (var i = 0; i < keys.length; i++) {
+        var key = keys[i];
+        if (ownerA[key] != null && ownerB[key] != null)
+          return ownerA[key] === ownerB[key];
+      }
+      return false;
+    }
+
     Game.prototype.resolveBulletCollisions = function () {
       for (var i = this.bullets.length - 1; i >= 0; i--) {
         var a = this.bullets[i];
@@ -371,6 +392,7 @@
           this.initBulletIntegrity(b);
           var rr = a.r + b.r + 1.5, dx = a.x - b.x, dy = a.y - b.y;
           if (dx * dx + dy * dy > rr * rr && !sweptBulletHit(a, b, rr)) continue;
+          if (alliedProjectileOwners(this, a, b)) continue;
           var ah = a.hp || 0, bh = b.hp || 0;
           this.weakenBullet(a, bh); this.weakenBullet(b, ah);
           /* Preserve the core's Cannon shell-on-interception contract. The
