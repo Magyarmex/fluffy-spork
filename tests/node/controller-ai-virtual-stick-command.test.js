@@ -136,9 +136,10 @@ test('actual Live Vector + Fair Engagement engine wrappers drive AI swarm throug
       this.observedCommand = state;
     }
   }
+  const controllerClasses = ['carrier','overlord','warden','hivemind','broodmother','citadel','valkyrie'];
   const classes = {
-    CLASSES: {carrier: {droneLeash: 650}},
-    lineageForClass: id => id === 'carrier' ? 'controller' : 'gunner'
+    CLASSES: Object.fromEntries(controllerClasses.map(id => [id, {droneLeash: 650, size: 15}])),
+    lineageForClass: id => controllerClasses.includes(id) ? 'controller' : 'gunner'
   };
   const window = {__novaModules: {'game/engine': module => {module.exports = {Game};}}};
   const ctx = {
@@ -174,4 +175,33 @@ test('actual Live Vector + Fair Engagement engine wrappers drive AI swarm throug
   assert.equal(g.getTank, originalGetTank, 'temporary bridge restored after engine update');
   assert.equal(a.ai.targetId, 8, 'real AI target restored');
   assert.equal(a.ai.__v1112TargetId, 8, 'fair perception target not overwritten');
+  // Shared View must never resurrect a target explicitly rejected by the
+  // later Fair Engagement contract, even though its old planner can see it.
+  for (const cls of controllerClasses) for (const hz of [30,60,120,240]) {
+    for (const mode of ['valid','offscreen','allied','spawn-shield']) {
+      const owner2 = owner(7), rival2 = {
+        id: 8, cls: 'gunner', team: mode === 'allied' ? 1 : 2,
+        x: mode === 'offscreen' ? 550 : 300, y: 0, vx: 0, vy: 0,
+        hp: 100, maxHp: 100, spawnShieldT: mode === 'spawn-shield' ? 1 : 0,
+        alive: true, isPlayer: false
+      };
+      owner2.cls = cls; owner2.team = 1; owner2.vx = 0; owner2.vy = 0;
+      const g2 = new Game();
+      Object.assign(g2, {
+        time: 1, w: 800, h: 600, cam: {zoom: 1},
+        tanks: [owner2,rival2], drones: [], player: null,
+        getTank(id) {return this.tanks.find(t => t.id === id) || null;}
+      });
+      g2.updateDrones(1/hz);
+      const expected = mode === 'valid';
+      assert.equal(g2.observedCommand.active, expected,
+        cls + '/' + hz + '/' + mode + ' must obey Fair Engagement');
+      if (expected) {
+        assert.ok(g2.observedSyntheticTargetId >= 900000);
+        assert.equal(g2.observedVirtualPoint.__novaVirtualThumb, true);
+      } else {
+        assert.equal(owner2.ai.__v1112TargetId, -1);
+      }
+    }
+  }
 });
