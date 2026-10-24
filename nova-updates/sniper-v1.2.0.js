@@ -360,6 +360,34 @@
       return oldIntegrity.call(this, b);
     };
 
+    /* Projectile ownership is not the same as allegiance. Distinct allied
+     * tanks must not destroy each other's defensive fire or Bomber shells.
+     * Resolve relationships only after geometric contact to keep the dense
+     * projectile broad phase unchanged; unknown owners retain old behavior. */
+    function projectileOwner(g, b) {
+      var byId = g.tankById;
+      var owner = byId && byId.get ? byId.get(b.ownerId) : null;
+      if (!owner && typeof g.getTank === 'function') owner = g.getTank(b.ownerId);
+      return owner || null;
+    }
+    function alliedTanks(g, ownerA, ownerB) {
+      if (!ownerA || !ownerB) return false;
+      if (typeof g.areAllies === 'function') return !!g.areAllies(ownerA, ownerB);
+      var keys = ['teamId', 'team', 'factionId', 'faction', 'side'];
+      for (var i = 0; i < keys.length; i++) {
+        var key = keys[i];
+        if (ownerA[key] != null && ownerB[key] != null)
+          return ownerA[key] === ownerB[key];
+      }
+      return false;
+    }
+    function alliedProjectileOwners(g, a, b) {
+      return alliedTanks(g, projectileOwner(g, a), projectileOwner(g, b));
+    }
+    function alliedProjectileTank(g, bullet, tank) {
+      return alliedTanks(g, projectileOwner(g, bullet), tank);
+    }
+
     Game.prototype.resolveBulletCollisions = function () {
       for (var i = this.bullets.length - 1; i >= 0; i--) {
         var a = this.bullets[i];
@@ -371,6 +399,7 @@
           this.initBulletIntegrity(b);
           var rr = a.r + b.r + 1.5, dx = a.x - b.x, dy = a.y - b.y;
           if (dx * dx + dy * dy > rr * rr && !sweptBulletHit(a, b, rr)) continue;
+          if (alliedProjectileOwners(this, a, b)) continue;
           var ah = a.hp || 0, bh = b.hp || 0;
           this.weakenBullet(a, bh); this.weakenBullet(b, ah);
           /* Preserve the core's Cannon shell-on-interception contract. The
@@ -422,7 +451,7 @@
             if (!bullet.__novaSuppressed) bullet.__novaSuppressed = Object.create(null);
             if (bullet.__novaSuppressed[t.id]) continue;
             var rad = SUPPRESS_RADIUS + (bullet.r || 0);
-            if (pointSegmentDist2(t.x, t.y, bullet.px == null ? bullet.x : bullet.px, bullet.py == null ? bullet.y : bullet.py, bullet.x, bullet.y) <= rad * rad) {
+            if (pointSegmentDist2(t.x, t.y, bullet.px == null ? bullet.x : bullet.px, bullet.py == null ? bullet.y : bullet.py, bullet.x, bullet.y) <= rad * rad && !alliedProjectileTank(this, bullet, t)) {
               bullet.__novaSuppressed[t.id] = 1; broke = true; break;
             }
           }

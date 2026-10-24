@@ -288,3 +288,71 @@ for (const full of [false, true]) {
       'initial overlap should draw at x=0, not endpoint midpoint x=50');
   });
 }
+
+
+/* Allied tanks share a side, not an ownerId. Friendly projectiles must not
+ * destroy each other (or burst friendly Bomber shells) just because the two
+ * owners are distinct. Keep the legacy fallback for genuinely unknown owners. */
+for (const full of [false, true]) {
+  const mode = full ? 'full production composition' : 'Sniper/Battlefield';
+  function scenario(teamB, resolveB = true) {
+    const g = boot(full);
+    const a = { id: 1, team: 'blue', alive: true };
+    const b = { id: 2, team: teamB, alive: true };
+    g.tankById = new Map([[1, a], ...(resolveB ? [[2, b]] : [])]);
+    g.areAllies = (x, y) => x.team === y.team;
+    g.areHostile = (x, y) => x.team !== y.team;
+    g.bullets = [bullet(11, 1, 0, 0, 1, true), bullet(12, 2, 0, 0, 3)];
+    return g;
+  }
+  test(mode + ': distinct allied owners cannot intercept each other or burst a shell', () => {
+    const g = scenario('blue');
+    g.resolveBulletCollisions();
+    assert.deepEqual(g.bursts, []);
+    assert.equal(g.bullets[0].dead, false);
+    assert.equal(g.bullets[1].dead, false);
+    assert.equal(g.bullets[0].hp, 1);
+    assert.equal(g.bullets[1].hp, 3);
+  });
+  test(mode + ': enemy-owned projectile still intercepts and bursts the shell', () => {
+    const g = scenario('red');
+    g.resolveBulletCollisions();
+    assert.deepEqual(g.bursts, [11]);
+    assert.equal(g.bullets[0].dead, true);
+  });
+  test(mode + ': new alliance prevents a subsequent interception', () => {
+    const g = scenario('red');
+    g.tankById.get(2).team = 'blue';
+    g.resolveBulletCollisions();
+    assert.deepEqual(g.bursts, []);
+    assert.equal(g.bullets[0].dead, false);
+  });
+  test(mode + ': unknown shooter preserves legacy hostile collision behavior', () => {
+    const g = scenario('blue', false);
+    g.resolveBulletCollisions();
+    assert.deepEqual(g.bursts, [11]);
+  });
+
+  test(mode + ': team fields protect allies without an alliance helper', () => {
+    const g = scenario('blue');
+    delete g.areAllies;
+    delete g.areHostile;
+    g.resolveBulletCollisions();
+    assert.deepEqual(g.bursts, []);
+    assert.equal(g.bullets[0].dead, false);
+  });
+  test(mode + ': fallback team fields still permit hostile interception', () => {
+    const g = scenario('red');
+    delete g.areAllies;
+    delete g.areHostile;
+    g.resolveBulletCollisions();
+    assert.deepEqual(g.bursts, [11]);
+  });
+  test(mode + ': non-contacting projectiles never resolve owner relationships', () => {
+    const g = scenario('blue');
+    g.bullets[1].x = 5000;
+    g.tankById = { get() { throw new Error('owner scan on non-contact'); } };
+    g.resolveBulletCollisions();
+    assert.deepEqual(g.bursts, []);
+  });
+}
