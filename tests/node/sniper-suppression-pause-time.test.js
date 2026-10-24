@@ -105,3 +105,77 @@ for (const allied of [true, false]) {
     assert.equal(ai.__novaFocusStart, allied ? 50 : 0);
   });
 }
+
+
+/* A hostile bullet moving behind permanent cover should not interrupt rail
+ * focus when its nearest physical path point is not visible to the Sniper.
+ * Cover is a real defensive option; the projectile itself may be visible
+ * even when its shooter is not. */
+function coveredRailScenario(cls, visible, withSight = true) {
+  const { Game } = boot(), g = new Game();
+  const pl = rail(1, cls, true, 0);
+  const enemy = { id: 2, cls: 'gunner', team: 'red', alive: true };
+  pl.team = 'blue'; pl.x = 0; pl.y = 0; pl.hitFlash = 0;
+  g.player = pl; g.tanks = [pl, enemy];
+  g.tankById = new Map([[1, pl], [2, enemy]]);
+  g.areAllies = (a, b) => a.team === b.team;
+  g.input.firing = true; g.__novaPlayerHeldFire = true;
+  g.bullets = [{ ownerId: 2, x: 40, y: 18, px: -40, py: 18,
+    r: 2, dead: false }];
+  const sightCalls = [];
+  if (withSight) g.hasLineOfSight = (...args) => {
+    sightCalls.push(args);
+    return visible;
+  };
+  return { g, pl, sightCalls };
+}
+for (const cls of ['railgun', 'prism', 'singularity']) {
+  test(cls + ': hostile near-miss hidden behind solid cover cannot suppress focus', () => {
+    const { g, pl, sightCalls } = coveredRailScenario(cls, false);
+    g.update(1 / 60);
+    assert.equal(pl.__novaFocusStart, 50, 'cover must protect focus from hidden fire');
+    assert.equal(pl.__novaSuppressedUntil, 0);
+    assert.equal(sightCalls.length, 1);
+    assert.ok(Math.abs(sightCalls[0][2]) < 1e-9,
+      'line of sight must target nearest projectile point, not endpoint');
+    assert.ok(Math.abs(sightCalls[0][3] - 18) < 1e-9);
+  });
+  test(cls + ': exposed hostile near-miss still suppresses focus', () => {
+    const { g, pl, sightCalls } = coveredRailScenario(cls, true);
+    g.update(1 / 60);
+    assert.equal(pl.__novaFocusStart, 0);
+    assert.ok(pl.__novaSuppressedUntil > 100);
+    assert.equal(sightCalls.length, 1);
+  });
+}
+test('suppression keeps legacy behavior without a terrain visibility method', () => {
+  const { g, pl } = coveredRailScenario('railgun', false, false);
+  g.update(1 / 60);
+  assert.equal(pl.__novaFocusStart, 0);
+});
+test('distant projectile never triggers a terrain visibility query', () => {
+  const { g, pl, sightCalls } = coveredRailScenario('railgun', false);
+  g.bullets[0].y = 500; g.bullets[0].py = 500;
+  g.update(1 / 60);
+  assert.equal(pl.__novaFocusStart, 50);
+  assert.equal(sightCalls.length, 0);
+});
+
+
+test('friendly near-miss skips terrain visibility work entirely', () => {
+  const { g, pl } = coveredRailScenario('railgun', false);
+  g.tankById.get(2).team = 'blue';
+  g.hasLineOfSight = () => { throw new Error('friendly shot queried terrain'); };
+  g.update(1 / 60);
+  assert.equal(pl.__novaFocusStart, 50);
+});
+test('stationary hostile projectile uses a finite line-of-sight endpoint', () => {
+  const { g, pl, sightCalls } = coveredRailScenario('railgun', false);
+  g.bullets[0].px = 10; g.bullets[0].x = 10;
+  g.bullets[0].py = 18; g.bullets[0].y = 18;
+  g.update(1 / 60);
+  assert.equal(pl.__novaFocusStart, 50);
+  assert.equal(sightCalls.length, 1);
+  assert.equal(sightCalls[0][2], 10);
+  assert.equal(sightCalls[0][3], 18);
+});

@@ -82,6 +82,20 @@
     return dx * dx + dy * dy;
   }
 
+  /* Suppression requires an exposed projectile path, not just proximity
+   * through a permanent wall. Only called after the cheap radius check:
+   * terrain visibility work must never run for every distant bullet. */
+  function suppressionPathClear(g, tank, bullet) {
+    if (typeof g.hasLineOfSight !== 'function') return true;
+    var ax = bullet.px == null ? bullet.x : bullet.px;
+    var ay = bullet.py == null ? bullet.y : bullet.py;
+    var dx = bullet.x - ax, dy = bullet.y - ay;
+    var length2 = dx * dx + dy * dy;
+    var q = length2 > 1e-8 ?
+      clamp(((tank.x - ax) * dx + (tank.y - ay) * dy) / length2, 0, 1) : 0;
+    return !!g.hasLineOfSight(tank.x, tank.y, ax + dx * q, ay + dy * q, 2);
+  }
+
   function sweptBulletHit(a, b, rr) {
     var a0x = a.px == null ? a.x : a.px;
     var a0y = a.py == null ? a.y : a.py;
@@ -451,7 +465,7 @@
             if (!bullet.__novaSuppressed) bullet.__novaSuppressed = Object.create(null);
             if (bullet.__novaSuppressed[t.id]) continue;
             var rad = SUPPRESS_RADIUS + (bullet.r || 0);
-            if (pointSegmentDist2(t.x, t.y, bullet.px == null ? bullet.x : bullet.px, bullet.py == null ? bullet.y : bullet.py, bullet.x, bullet.y) <= rad * rad && !alliedProjectileTank(this, bullet, t)) {
+            if (pointSegmentDist2(t.x, t.y, bullet.px == null ? bullet.x : bullet.px, bullet.py == null ? bullet.y : bullet.py, bullet.x, bullet.y) <= rad * rad && !alliedProjectileTank(this, bullet, t) && suppressionPathClear(this, t, bullet)) {
               bullet.__novaSuppressed[t.id] = 1; broke = true; break;
             }
           }
