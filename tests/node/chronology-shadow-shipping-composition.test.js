@@ -391,3 +391,23 @@ test('opt-in shadow is combat-equivalent to disabled mode across 320 seeded worl
       'opt-in shadow changed shipping combat outcome in seeded world ' + i);
   }
 });
+
+
+test('mixed fire retains independent bounded shell and ordinary audit coverage', () => {
+  const { g } = boot(), target = addScout(g);
+  g.bullets = Array.from({ length: 100 }, (_, i) => {
+    const b = ordinaryShot(5000 + i);
+    b.shell = i % 2 === 0;
+    b.hp = 10; b.maxHp = 10;
+    return b;
+  });
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.sampledShells, 12, 'ordinary fire cannot starve shell audit');
+  assert.equal(s.sampledShortShots, 12, 'shells cannot starve short-shot audit');
+  assert.equal(s.ttlOvershoots, 12);
+  assert.equal(s.predictedBodyContacts, 12);
+  assert.equal(s.unregisteredBodyContacts, 12);
+  assert.equal(s.events.length, 12, 'shared event ring remains bounded');
+  assert.equal(target.hp, 100);
+});
