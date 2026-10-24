@@ -117,3 +117,19 @@ test('breach pressure signals its commitment to a human opponent without cue spa
   assert.equal(p.pressure,'breach');
   assert.equal(rings.length,1,'the original 4.5s cooldown is preserved');
 });
+
+test('portrait viewport prevents offscreen drone information from changing AI depth',()=>{
+  const w=boot();
+  w.g.w=300;w.rival.x=130;
+  const p=tick(w);
+  assert.equal(p.targetId,2);
+  w.g.time=2.5;tick(w);
+  assert.equal(p.pressure,'breach');
+  const deployed=p.commandPower;
+  w.g.drones=[{id:40,ownerId:2,hp:20,r:8,x:200,y:0}];
+  w.g.time+=.05;tick(w);
+  assert.equal(p.commandPower,deployed,'offscreen drone cannot trigger hidden local peel');
+  w.g.drones[0].x=100;
+  w.g.time+=.05;tick(w);
+  assert.ok(p.commandPower<=.25+1e-9,'visible drone can trigger defensive depth');
+});
