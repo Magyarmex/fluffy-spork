@@ -36,7 +36,7 @@ function world(targetX) {
     ai: { state: 'hunt', __v1112TargetId: 2 } };
   const target = { id: 2, x: targetX, y: 0, alive: true, hp: 100,
     maxHp: 100, spawnShieldT: 0 };
-  const g = { time: 10, w: 100, h: 100, cam: { zoom: 1 },
+  const g = { time: 10, w: 360, h: 640, cam: { zoom: 1.2 },
     player: null, tanks: [owner, target], shapes: [],
     __lfState: { signal: { type: 'BLOOM', x: 500, y: 0,
       sector: 2, until: 20 }, stats: { aiRotations: 0 } },
