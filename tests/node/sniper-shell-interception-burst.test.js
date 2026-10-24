@@ -234,3 +234,57 @@ for (const full of [false, true]) {
     assert.equal(shell.y, 0);
   });
 }
+
+
+/* Interception feedback must appear where two moving projectile discs first
+ * touch, not halfway between their end-of-frame coordinates. The latter can
+ * be far from the actual fight for high-speed shells, especially at 30 Hz.
+ * Exercise the real materialized core + shipping overlay order. */
+for (const full of [false, true]) {
+  for (const shell of [false, true]) {
+    for (const fps of [30, 60, 120, 240]) {
+      test((full ? 'full shipping overlays' : 'Sniper/Battlefield') +
+        ': ' + (shell ? 'shell' : 'ordinary shot') +
+        ' interception feedback stays at physical contact at ' + fps + 'Hz', () => {
+        const g = boot(full);
+        const effects = [];
+        g.addParticles = (x, y, color) => {
+          if (color === '#d9f7ff') effects.push({ x, y });
+        };
+        g.bullets = [bullet(1, 1, -100, 6000, 1, shell),
+          bullet(2, 2, 40, -1200, 3)];
+        for (let frame = 0; frame < Math.ceil(fps / 30) + 2 && !effects.length; frame++)
+          g.updateBullets(1 / fps);
+        assert.equal(effects.length, 1, 'one interception should emit one contact effect');
+        // Shell: -100 -> 100, hostile bullet: 40 -> 0 in 1/30 second.
+        // First contact: shell x=10.41666..., hostile x=17.91666...
+        // The visual midpoint is 14.16666..., NOT endpoint midpoint 50.
+        assert.ok(Math.abs(effects[0].x - 14.166666666666666) < 1e-6,
+          'effect must use world-space first contact; got x=' + effects[0].x);
+        assert.equal(effects[0].y, 0);
+        if (shell) {
+          assert.equal(g.bursts.length, 1, 'intercepted shell still bursts once');
+          assert.ok(Math.abs(g.burstOrigins[0].x - 10.416666666666666) < 1e-6);
+        }
+      });
+    }
+  }
+}
+
+for (const full of [false, true]) {
+  test((full ? 'full shipping overlays' : 'Sniper/Battlefield') +
+    ': start-overlapping projectiles draw feedback at initial midpoint', () => {
+    const g = boot(full), effects = [];
+    g.addParticles = (x, y, color) => {
+      if (color === '#d9f7ff') effects.push({ x, y });
+    };
+    const a = bullet(1, 1, 100, 0, 1);
+    const b = bullet(2, 2, 0, 0, 3);
+    a.px = -1; a.py = 0; b.px = 1; b.py = 0;
+    g.bullets = [a, b];
+    g.resolveBulletCollisions();
+    assert.equal(effects.length, 1);
+    assert.ok(Math.abs(effects[0].x) < 1e-9,
+      'initial overlap should draw at x=0, not endpoint midpoint x=50');
+  });
+}
