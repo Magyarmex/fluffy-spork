@@ -15,6 +15,9 @@ const ACTIVE_STATE_URL = new URL('./__nova_real_active__.json', self.registratio
 const CACHE_BUSTER = '__nova_real_recovery';
 const NETWORK_TIMEOUT_MS = 10000;
 const STAGE_CONCURRENCY = 6;
+// Owner Operations is dynamically loaded by pwa-register.js, not an HTML script.
+// It is useful offline, but must never become a prerequisite for playable NOVA.
+const OPTIONAL_RUNTIME_ASSETS = ['./nova-updates/owner-operations-v1.11.1.js'];
 
 let syncInFlight = null;
 
@@ -170,6 +173,19 @@ async function cacheRequired(cache, value) {
   await cache.put(canonicalURL(value), response.clone());
 }
 
+async function stageOptionalAssets(cache) {
+  await runPool(OPTIONAL_RUNTIME_ASSETS, async (value) => {
+    const url = absoluteURL(value);
+    if (await cache.match(canonicalURL(url))) return;
+    try {
+      await cacheRequired(cache, url);
+    } catch (_) {
+      // A missing private HUD must not block the validated gameplay shell.
+      // Retry on a later successful sync if this optional asset is absent.
+    }
+  });
+}
+
 async function purgeNonCanonicalNovaCaches(activeState) {
   const keep = new Set([META_CACHE, activeState && activeState.cacheName].filter(Boolean));
   const keys = await caches.keys();
@@ -207,6 +223,7 @@ async function stageLatest({ force = false } = {}) {
         const stored = await Promise.all(critical.map((url) =>
           cache.match(canonicalURL(url))));
         if (stored.every(Boolean)) {
+          await stageOptionalAssets(cache);
           return { changed: false, fingerprint: buildFingerprint };
         }
       }
@@ -218,6 +235,7 @@ async function stageLatest({ force = false } = {}) {
     try {
       const critical = discoverCriticalAssets(html, indexURL);
       await runPool(critical, (value) => cacheRequired(stage, value));
+      await stageOptionalAssets(stage);
       await stage.put(indexURL, indexResponse.clone());
       await stage.put(absoluteURL('./index.html'), indexResponse.clone());
 
