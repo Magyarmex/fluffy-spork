@@ -180,10 +180,10 @@ wrap('game/engine',function(engine,require){
     }
     return best;
   }
-  function hostileDroneNear(g,owner,radius){
+  function hostileDroneNear(g,owner,radius,accept){
     var best=null,score=radius*radius,ds=g.drones||[];
     for(var i=0;i<ds.length;i++){
-      var d=ds[i];if(!d||d.hp<=0||d.ownerId===owner.id||d.__novaSpotter)continue;
+      var d=ds[i];if(!d||d.hp<=0||d.ownerId===owner.id||d.__novaSpotter||(accept&&!accept(d)))continue;
       var other=ownerOf(g,d);if(!other||!hostileOwners(g,owner,other))continue;
       var dd=dist2(owner.x,owner.y,d.x,d.y);if(dd<score&&lineClear(g,owner.x,owner.y,d.x,d.y,2)){score=dd;best=d;}
     }
