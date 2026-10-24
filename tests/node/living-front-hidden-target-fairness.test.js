@@ -60,12 +60,21 @@ test('visible nearby enemy remains a legitimate combat priority', () => {
 
 test('valid Sniper Observer relay permits remote combat priority', () => {
   const T = boot(), w = world(200);
+  w.owner.cls = 'railgun';
   w.owner.__novaSpotterContactId = 2;
   w.owner.__novaSpotterContactUntil = 20;
   assert.equal(bias(T, w).weight, 0);
   w.owner.__novaSpotterContactUntil = 9;
   assert.ok(bias(T, w).weight > 0.15,
     'expired Observer contact must not grant remote knowledge');
+});
+
+test('stale Observer fields on a non-Sniper never grant remote radar', () => {
+  const T = boot(), w = world(200);
+  w.owner.cls = 'carrier';
+  w.owner.__novaSpotterContactId = 2;
+  w.owner.__novaSpotterContactUntil = 20;
+  assert.ok(bias(T, w).weight > 0.15);
 });
 
 test('spawn-protected and allied former targets do not suppress ecology', () => {
