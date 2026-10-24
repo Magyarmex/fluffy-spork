@@ -317,3 +317,18 @@ test('short-TTL first-body comparator matches independent closest-approach oracl
       'independent closest-approach disagreement at seeded world ' + i);
   }
 });
+
+
+test('short-TTL shadow includes canonical penetrating rounds before first contact', () => {
+  for (const pen of [0, 1, 3, 10]) {
+    const { g } = boot(), target = addScout(g);
+    const b = ordinaryShot(2000 + pen);
+    b.pen = pen;
+    g.bullets = [b];
+    g.updateBullets(1 / 30);
+    const s = g.novaChronoShadowSnapshot();
+    assert.equal(s.predictedBodyContacts, 1, 'first body candidate with pen=' + pen);
+    assert.equal(s.unregisteredBodyContacts, 1, 'core expires before hit with pen=' + pen);
+    assert.equal(target.hp, 100);
+  }
+});
