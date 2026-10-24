@@ -324,6 +324,11 @@ wrap('game/engine',function(engine,require){
     var ds=g.drones||[];for(var i=0;i<ds.length;i++){var d=ds[i];if(!d||d.hp<=0||d.ownerId!==p.id)continue;var ph=d.__novaPhase||'form';if(ph==='windup')out.windup++;else if(ph==='dash')out.dash++;else if(ph==='recover')out.recover++;else out.form++;if(dist2(p.x,p.y,d.x,d.y)<220*220)out.localDefenders++;}
   }
 
+  /* Reuse this exact owner-aware, terrain-aware local sensor in the later
+   * Fair Engagement overlay. Fair Engagement owns tank identity; Live Vector
+   * still owns the local drone-breach response and its physical range. */
+  window.__NOVA_LIVE_VECTOR_TEST__.hostileDroneNear=hostileDroneNear;
+
   var oldDrones=Game.prototype.updateDrones;
   if(oldDrones)Game.prototype.updateDrones=function(dt){
     planAIControllers(this);
