@@ -332,4 +332,27 @@ for (const full of [false, true]) {
     g.resolveBulletCollisions();
     assert.deepEqual(g.bursts, [11]);
   });
+
+  test(mode + ': team fields protect allies without an alliance helper', () => {
+    const g = scenario('blue');
+    delete g.areAllies;
+    delete g.areHostile;
+    g.resolveBulletCollisions();
+    assert.deepEqual(g.bursts, []);
+    assert.equal(g.bullets[0].dead, false);
+  });
+  test(mode + ': fallback team fields still permit hostile interception', () => {
+    const g = scenario('red');
+    delete g.areAllies;
+    delete g.areHostile;
+    g.resolveBulletCollisions();
+    assert.deepEqual(g.bursts, [11]);
+  });
+  test(mode + ': non-contacting projectiles never resolve owner relationships', () => {
+    const g = scenario('blue');
+    g.bullets[1].x = 5000;
+    g.tankById = { get() { throw new Error('owner scan on non-contact'); } };
+    g.resolveBulletCollisions();
+    assert.deepEqual(g.bursts, []);
+  });
 }
