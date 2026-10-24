@@ -276,3 +276,44 @@ test('short-TTL shadow failures never block the real projectile updater', () => 
   assert.equal(s.predictedBodyContacts, 0);
   assert.equal(target.hp, 100);
 });
+
+
+test('short-TTL shadow never predicts a body after the arena exit', () => {
+  const { g } = boot(), target = addScout(g, 2300);
+  g.bullets = [ordinaryShot(110, 2200, 6000, .005)];
+  g.updateBullets(1 / 30);
+  assert.equal(g.novaChronoShadowSnapshot().predictedBodyContacts, 0);
+  assert.equal(target.hp, 100);
+});
+test('short-TTL first-body comparator matches independent closest-approach oracle', () => {
+  const { g } = boot();
+  let seed = 0x2342026;
+  const random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
+  const dt = 1 / 30, ttl = .005, radius = 3 + 15 + 3;
+  for (let i = 0; i < 600; i++) {
+    const b = ordinaryShot(1000 + i, (random() - .5) * 150, (random() - .5) * 12000, ttl);
+    b.y = (random() - .5) * 150;
+    b.vy = (random() - .5) * 12000;
+    const moving = i % 2 === 0;
+    const px = (random() - .5) * 150, py = (random() - .5) * 150;
+    const t = addScout(g, px + (moving ? (random() - .5) * 60 : 0),
+      py + (moving ? (random() - .5) * 60 : 0));
+    if (moving) {
+      t.__novaSweepMoveTime = g.time;
+      t.__novaSweepPrevX = px;
+      t.__novaSweepPrevY = py;
+    }
+    const fx = b.x - px, fy = b.y - py;
+    const vx = b.vx - (t.x - px) / dt, vy = b.vy - (t.y - py) / dt;
+    const a = vx * vx + vy * vy, dot = fx * vx + fy * vy;
+    const closest = a > 0 ? Math.max(0, Math.min(ttl, -dot / a)) : 0;
+    const dx = fx + vx * closest, dy = fy + vy * closest;
+    const expected = dx * dx + dy * dy <= radius * radius;
+    const before = g.novaChronoShadowSnapshot().predictedBodyContacts;
+    g.bullets = [b];
+    g.updateBullets(dt);
+    const after = g.novaChronoShadowSnapshot().predictedBodyContacts;
+    assert.equal(after - before, expected ? 1 : 0,
+      'independent closest-approach disagreement at seeded world ' + i);
+  }
+});
