@@ -122,3 +122,49 @@ test('inactive AI Controller still releases its command instead of inventing a t
   restore();
   assert.equal(a.ai.targetId, 8);
 });
+
+test('actual Live Vector + Fair Engagement engine wrappers drive AI swarm through the shipping command gate', () => {
+  const vm = require('node:vm');
+  const fair = fs.readFileSync(path.join(root, 'nova-updates/fair-engagement-v1.11.2.js'), 'utf8');
+  class Game {
+    updateDrones(dt) {
+      const state = {nodeX: 0, nodeY: 0, wasActive: false};
+      updateAICommand(this, this.tanks[0], state, {droneLeash: 650}, dt);
+      this.observedCommand = state;
+    }
+  }
+  const classes = {
+    CLASSES: {carrier: {droneLeash: 650}},
+    lineageForClass: id => id === 'carrier' ? 'controller' : 'gunner'
+  };
+  const window = {__novaModules: {'game/engine': module => {module.exports = {Game};}}};
+  const ctx = {
+    window, document: {addEventListener() {}},
+    console: {info() {}, warn() {}, error() {}},
+    Date, Math, Map, Set, WeakMap, Number, Object, Array
+  };
+  // The production materializer loads Live Vector before Fair Engagement.
+  vm.runInNewContext(liveVector, ctx);
+  vm.runInNewContext(fair, ctx);
+  const m = {exports: {}};
+  window.__novaModules['game/engine'](m, m.exports, id => id === './classes' ? classes : {});
+  const a = owner(7), rival = {
+    id: 8, cls: 'gunner', team: 2, x: 300, y: 0,
+    hp: 100, maxHp: 100, alive: true, isPlayer: false
+  };
+  a.team = 1;
+  const g = new Game();
+  Object.assign(g, {
+    time: 1, w: 800, h: 600, cam: {zoom: 1},
+    tanks: [a, rival], drones: [], player: null,
+    getTank(id) {return this.tanks.find(t => t.id === id) || null;}
+  });
+  const originalGetTank = g.getTank;
+  g.updateDrones(1 / 60);
+  assert.equal(g.observedCommand.active, true,
+    'outer Fair Engagement plan and inner Live Vector bridge must compose');
+  assert.ok(g.observedCommand.nodeX > 0);
+  assert.equal(g.getTank, originalGetTank, 'temporary bridge restored after engine update');
+  assert.equal(a.ai.targetId, 8, 'real AI target restored');
+  assert.equal(a.ai.__v1112TargetId, 8, 'fair perception target not overwritten');
+});
