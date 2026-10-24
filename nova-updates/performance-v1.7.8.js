@@ -176,7 +176,10 @@ wrap('game/engine',function(engine,require){
   var chronoClasses=null;
   try{chronoClasses=require('./classes').CLASSES||null;}catch(_){}
   function chronoFirstBody(g,b,dt){
-    if(!g.tanks||g.tanks.length>64||!g.__novaTerrain)return null;
+    if(!g.tanks||g.tanks.length>64||!g.__novaTerrain||
+       !Number.isFinite(b.x)||!Number.isFinite(b.y)||
+       !Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
+       Math.abs(b.x)>CHRONO_ARENA_EDGE||Math.abs(b.y)>CHRONO_ARENA_EDGE)return null;
     var best=null,owner=typeof g.getTank==='function'?g.getTank(b.ownerId):null;
     for(var i=0;i<g.tanks.length;i++){
       var t=g.tanks[i];
@@ -215,6 +218,8 @@ wrap('game/engine',function(engine,require){
         x:b.x+(b.vx||0)*hit,y:b.y+(b.vy||0)*hit};
     }
     if(!best)return null;
+    var exit=chronoExitTime({x:b.x,y:b.y,vx:b.vx,vy:b.vy});
+    if(exit!=null&&best.time>exit+1e-9)return null;
     /* A solid hit before the body makes this candidate ambiguous, including
      * destructible cover: do not claim a direct body contact in that case. */
     if(typeof g.firstTerrainHit==='function'&&
