@@ -249,11 +249,21 @@ async function stageLatest({ force = false } = {}) {
         promotedAt: Date.now(),
       };
       await writeActiveState(nextState);
-      await purgeNonCanonicalNovaCaches(nextState);
+      // The active pointer is now committed. Failure to remove old caches or
+      // notify tabs must never roll back/delete the newly promoted game.
+      try {
+        await purgeNonCanonicalNovaCaches(nextState);
+      } catch (error) {
+        console.warn('[NOVA PWA] Old-cache cleanup deferred:', error);
+      }
 
-      const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-      for (const client of clients) {
-        client.postMessage({ type: 'NOVA_UPDATE_READY', fingerprint: buildFingerprint });
+      try {
+        const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+        for (const client of clients) {
+          client.postMessage({ type: 'NOVA_UPDATE_READY', fingerprint: buildFingerprint });
+        }
+      } catch (error) {
+        console.warn('[NOVA PWA] Update notification deferred:', error);
       }
 
       return { changed: true, fingerprint: buildFingerprint };
