@@ -142,3 +142,38 @@ for (const optimized of [false, true]) {
     assert.ok(b.x > -30 && b.x < -10, 'breaching shot must advance normally');
   });
 }
+
+
+/* Regression: an ordinary bullet must not damage terrain that it could only
+ * reach AFTER its physical lifetime. Battlefield's pre-core terrain sweep
+ * must honor remaining TTL independently of the core's full-frame movement.
+ * This deliberately does not change the unresolved shell burst timing. */
+function ordinaryTTLCase(Game,fps,wallX,ttl=.005){
+  const g=new Game();
+  g.time=1;g.__novaBattlefield={coverBroken:0};
+  g.__novaTerrain=[{id:-99,shape:'rect',x:wallX,y:0,w:20,h:100,
+    solid:true,destructible:true,hp:100,maxHp:100}];
+  g.weakenBullet=()=>{};
+  const b={id:42,x:0,y:0,vx:6000,vy:0,r:3,dmg:10,ttl,
+    shell:false,ownerId:1,pen:0,hits:0,dead:false};
+  g.bullets=[b];
+  for(let frame=0;frame<4&&g.bullets.length;frame++)g.updateBullets(1/fps);
+  return {hp:g.__novaTerrain[0].hp,bullet:b,game:g};
+}
+for(const optimized of [false,true]){
+  const label=optimized?'Battlefield + Performance':'Battlefield';
+  for(const fps of [30,60,120,240]){
+    test(label+': ordinary bullet cannot damage cover beyond TTL at '+fps+'Hz',()=>{
+      const {hp}=ordinaryTTLCase(boot(optimized),fps,100);
+      assert.equal(hp,100,'wall contact at x≈88.65 occurs after expiry x=30');
+    });
+    test(label+': ordinary bullet still damages cover before TTL at '+fps+'Hz',()=>{
+      const {hp}=ordinaryTTLCase(boot(optimized),fps,20);
+      assert.equal(hp,90,'wall contact at x≈8.65 occurs before expiry x=30');
+    });
+  }
+  test(label+': already expired ordinary bullet cannot damage overlapping cover',()=>{
+    const {hp}=ordinaryTTLCase(boot(optimized),60,0,0);
+    assert.equal(hp,100);
+  });
+}
