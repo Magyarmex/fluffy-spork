@@ -154,3 +154,137 @@ test('materialized projectile path cannot hit the empty space crossed by Phase S
   assert.deepEqual(g.contacts, [], 'no damage anywhere along intangible teleport path');
   assert.equal(t.hp, 100);
 });
+
+
+/* Issue #225: a Phase Shift may cross terrain but may not materialize
+ * inside solid cover and then snap out during the following frame. */
+for (const fps of [30, 60, 120, 240]) {
+  for (const shape of ['rect', 'circle']) {
+    test('Phase Shift lands clear of a permanent ' + shape + ' at ' + fps + 'Hz', () => {
+      const Game = boot(), g = new Game(), t = tank();
+      g.__novaTerrain = [shape === 'rect'
+        ? { id: -1, shape, x: 420, y: 0, w: 80, h: 100, solid: true, destructible: false }
+        : { id: -1, shape, x: 420, y: 0, r: 40, solid: true, destructible: false }];
+      g.moveTank(t, 0, 0, 1 / fps);
+      g.useAbility(t);
+      assert.equal(g.isTerrainSafe(t.x, t.y, 18.5), true,
+        'Phase must finish outside tank-radius padded terrain');
+      assert.ok(t.x > 340 && t.x < 362, 'shorten only as far as the nearest clear landing');
+      assert.equal(t.abilityCd, 8, 'successful shortened blink spends its normal cooldown');
+      assert.equal(t.cloakT, .7);
+      assert.equal(t.__novaSweepPrevX, t.x, 'shortened teleport has no swept hitbox');
+      g.moveTank(t, 0, 0, 1 / fps);
+      assert.ok(Math.abs(t.x - t.__novaSweepPrevX) < .01,
+        'next frame must not snap the tank out of cover');
+    });
+  }
+}
+test('Phase Shift passes through intervening walls when its endpoint is clear', () => {
+  const Game = boot(), g = new Game(), t = tank();
+  g.__novaTerrain = [{ id: -1, shape: 'rect', x: 210, y: 0, w: 100, h: 150,
+    solid: true, destructible: false }];
+  g.useAbility(t);
+  assert.equal(t.x, 420);
+  assert.equal(t.abilityCd, 8);
+});
+test('Phase Shift can land on destroyed cover and respects intact destructible cover', () => {
+  const Game = boot(), g = new Game(), t = tank();
+  const cover = { id: -1, shape: 'rect', x: 420, y: 0, w: 80, h: 100,
+    solid: true, destructible: true, hp: 50 };
+  g.__novaTerrain = [cover];
+  g.useAbility(t);
+  assert.ok(t.x < 362);
+  t.x = 0; t.abilityCd = 0; t.cloakT = 0;
+  cover.hp = 0; cover.solid = false;
+  g.useAbility(t);
+  assert.equal(t.x, 420);
+});
+test('Phase Shift cancels without cooldown when no useful clear landing exists', () => {
+  const Game = boot(), g = new Game(), t = tank();
+  g.__novaTerrain = [{ id: -1, shape: 'rect', x: 240, y: 0, w: 440, h: 100,
+    solid: true, destructible: false }];
+  g.useAbility(t);
+  assert.equal(t.x, 0);
+  assert.equal(t.abilityCd, 0);
+  assert.equal(t.cloakT, undefined);
+});
+test('Phase Shift keeps its existing edge-clamped destination when clear', () => {
+  const Game = boot(), g = new Game(), t = tank('ghost', 2200);
+  g.useAbility(t);
+  assert.equal(t.x, 2220);
+  assert.equal(t.abilityCd, 8);
+});
+
+
+test('shortened Phase Shift preserves the canonical ability sound and two-endpoint feedback', () => {
+  const Game = boot(), g = new Game(), t = tank();
+  g.__novaTerrain = [{ id: -1, shape: 'rect', x: 420, y: 0, w: 80, h: 100,
+    solid: true, destructible: false }];
+  const calls = { sound: 0, particles: [], rings: [], text: [] };
+  g.sfx.ability = () => calls.sound++;
+  g.addParticles = (x, y) => calls.particles.push([x, y]);
+  g.addRing = (x, y) => calls.rings.push([x, y]);
+  g.addText = (x, y, label) => calls.text.push(label);
+  g.useAbility(t);
+  assert.equal(calls.sound, 1);
+  assert.equal(calls.particles.length, 2);
+  assert.equal(calls.rings.length, 2);
+  assert.deepEqual(calls.particles[0], [0, 0]);
+  assert.deepEqual(calls.particles[1], [t.x, t.y]);
+  assert.deepEqual(calls.text, ['PHASE SHIFT!']);
+  assert.equal(t.abilityCd, 8);
+});
+test('cancelled Phase Shift does not create phantom arrival effects or consume cooldown', () => {
+  const Game = boot(), g = new Game(), t = tank();
+  g.__novaTerrain = [{ id: -1, shape: 'rect', x: 240, y: 0, w: 440, h: 100,
+    solid: true, destructible: false }];
+  t.isPlayer = true;
+  const calls = { sound: 0, particles: 0, rings: 0, text: [] };
+  g.sfx.ability = () => calls.sound++;
+  g.addParticles = () => calls.particles++;
+  g.addRing = () => calls.rings++;
+  g.addText = (_x, _y, label) => calls.text.push(label);
+  g.useAbility(t);
+  assert.equal(calls.sound, 0);
+  assert.equal(calls.particles, 0);
+  assert.equal(calls.rings, 0);
+  assert.deepEqual(calls.text, ['NO CLEAR LANDING']);
+  assert.equal(t.abilityCd, 0);
+});
+test('Phase Shift randomized destination-only clearance and no phantom sweep', () => {
+  const Game = boot();
+  let seed = 0x2252026;
+  const random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
+  for (let i = 0; i < 2500; i++) {
+    const g = new Game(), t = tank();
+    t.x = (random() - .5) * 3000;
+    t.y = (random() - .5) * 3000;
+    t.angle = random() * Math.PI * 2;
+    const ox = t.x, oy = t.y;
+    const intendedX = Math.max(-2220, Math.min(2220, ox + Math.cos(t.angle) * 420));
+    const intendedY = Math.max(-2220, Math.min(2220, oy + Math.sin(t.angle) * 420));
+    const cx = intendedX + (random() - .5) * 120;
+    const cy = intendedY + (random() - .5) * 120;
+    const circle = random() < .5;
+    g.__novaTerrain = [circle
+      ? { id: -1, shape: 'circle', x: cx, y: cy, r: 15 + random() * 110,
+          solid: true, destructible: false }
+      : { id: -1, shape: 'rect', x: cx, y: cy,
+          w: 25 + random() * 180, h: 25 + random() * 180,
+          solid: true, destructible: false }];
+    const wasClear = g.isTerrainSafe(intendedX, intendedY, 18.5);
+    g.useAbility(t);
+    if (t.abilityCd > 0) {
+      assert.equal(g.isTerrainSafe(t.x, t.y, 18.5), true, 'unsafe landing in world ' + i);
+      assert.equal(t.__novaSweepPrevX, t.x);
+      assert.equal(t.__novaSweepPrevY, t.y);
+      if (wasClear) {
+        assert.ok(Math.abs(t.x - intendedX) < 1e-9);
+        assert.ok(Math.abs(t.y - intendedY) < 1e-9);
+      }
+    } else {
+      assert.equal(t.x, ox, 'cancelled shift moved in world ' + i);
+      assert.equal(t.y, oy);
+    }
+  }
+});

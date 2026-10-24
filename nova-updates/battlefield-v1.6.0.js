@@ -265,7 +265,52 @@ wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.
  var oldAbility=Game.prototype.useAbility;
  if(typeof oldAbility==='function')Game.prototype.useAbility=function(t){
    var def=t&&CLASSES[t.cls],phase=!!(t&&t.alive&&def&&def.ability==='phase'&&!(t.abilityCd>0));
-   var ox=t&&t.x,oy=t&&t.y,out=oldAbility.apply(this,arguments);
+   var ox=t&&t.x,oy=t&&t.y;
+   if(phase&&Number.isFinite(ox)&&Number.isFinite(oy)&&Number.isFinite(t.angle)){
+     /* Phase is a teleport, not a dash. Only its final position must be
+      * clear: walls along the intervening chord are intentionally ignored.
+      * Check before core ability side effects so a blocked shift cannot
+      * spend cooldown or draw an arrival flash inside permanent cover. */
+     var nx=clamp(ox+Math.cos(t.angle)*420,-MAP_LIMIT+30,MAP_LIMIT-30);
+     var ny=clamp(oy+Math.sin(t.angle)*420,-MAP_LIMIT+30,MAP_LIMIT-30);
+     var radius=terrainRadiusForTank(t,CLASSES)+.5;
+     if(!safePoint(this,nx,ny,radius)){
+       var len=Math.hypot(nx-ox,ny-oy),steps=Math.max(1,Math.ceil(len/8)),landing=null;
+       for(var i=1;i<=steps;i++){
+         var f=i/steps,x=nx+(ox-nx)*f,y=ny+(oy-ny)*f;
+         if(!safePoint(this,x,y,radius))continue;
+         /* Refine the first clear point when searching backward from the
+          * intended landing; do not snap to an unrelated nearby pocket. */
+         var lo=(i-1)/steps,hi=f;
+         for(var j=0;j<9;j++){
+           var mid=(lo+hi)*.5,mx=nx+(ox-nx)*mid,my=ny+(oy-ny)*mid;
+           if(safePoint(this,mx,my,radius))hi=mid;else lo=mid;
+         }
+         x=nx+(ox-nx)*hi;y=ny+(oy-ny)*hi;
+         if(Math.hypot(x-ox)>=24)landing={x:x,y:y};
+         break;
+       }
+       if(!landing){
+         if(t.isPlayer&&this.addText)this.addText(ox,oy-30,'NO CLEAR LANDING','#c9a0ff',11);
+         return; /* no displacement, cloak, VFX, or cooldown to refund */
+       }
+       /* Mirror the canonical phase case only for shortened landings.
+        * Clear destinations continue through the original core method. */
+       var abilityDefs=require('./classes').ABILITIES;
+       t.abilityCd=abilityDefs&&abilityDefs.phase?abilityDefs.phase.cd:8;
+       if(this.sfx&&this.sfx.ability)this.sfx.ability();
+       this.addParticles(ox,oy,'#b06bff',16,120,'glow');
+       this.addRing(ox,oy,'#b06bff',40);
+       t.x=landing.x;t.y=landing.y;t.cloakT=.7;
+       this.addParticles(t.x,t.y,'#b06bff',16,120,'glow');
+       this.addRing(t.x,t.y,'#b06bff',40);
+       this.addText(t.x,t.y-30,'PHASE SHIFT!','#c9a0ff',15);
+       t.__novaSweepMoveTime=this.time;
+       t.__novaSweepPrevX=t.x;t.__novaSweepPrevY=t.y;
+       return;
+     }
+   }
+   var out=oldAbility.apply(this,arguments);
    if(phase&&(t.x!==ox||t.y!==oy)){
      t.__novaSweepMoveTime=this.time;
      t.__novaSweepPrevX=t.x;t.__novaSweepPrevY=t.y;
