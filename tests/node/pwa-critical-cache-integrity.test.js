@@ -20,6 +20,8 @@ const scriptURL = base + 'nova-updates/controller-v1.3.0.js';
 function fixture({ missingScript = false, failAsset = false } = {}) {
   const data = new Map();
   const calls = [];
+  let remoteShell = shell;
+  let remoteScript = 'console.info("Controller loaded")';
   const cache = name => {
     if (!data.has(name)) {
       const entries = new Map();
@@ -49,9 +51,9 @@ function fixture({ missingScript = false, failAsset = false } = {}) {
     if (!self.navigator.onLine) throw Error('simulated offline');
     if (request.url.includes('controller-v1.3.0.js')) {
       if (failAsset) throw Error('simulated missing asset');
-      return new Response('console.info("Controller loaded")', { status: 200 });
+      return new Response(remoteScript, { status: 200 });
     }
-    return new Response(shell, { status: 200, headers: { 'Content-Type': 'text/html' } });
+    return new Response(remoteShell, { status: 200, headers: { 'Content-Type': 'text/html' } });
   };
   const sandbox = {
     self, caches, fetch, Request, Response, crypto: webcrypto,
@@ -67,6 +69,7 @@ function fixture({ missingScript = false, failAsset = false } = {}) {
     assetResponse: url => vm.runInContext('assetResponse', sandbox)({ url }),
     goOffline() { self.navigator.onLine = false; },
     goOnline() { self.navigator.onLine = true; },
+    setRemoteBuild(html, script) { remoteShell = html; remoteScript = script; },
     async seed() {
       await cache(META).put(stateURL,
         new Response(JSON.stringify({ cacheName: OLD, fingerprint })));
@@ -191,4 +194,18 @@ test('non-staged assets retain a network fallback', async () => {
   const response = await f.assetResponse(url);
   assert.equal(response.status, 200);
   assert.ok(f.calls.some(x => x.includes('noncritical-image.png')));
+});
+
+
+test('a validated newer release replaces cached old same-URL script bytes atomically', async () => {
+  const f = fixture();
+  await f.seed();
+  assert.equal(await (await f.assetResponse(scriptURL)).text(), 'cached Controller');
+  f.setRemoteBuild(shell + '<!-- new runtime fingerprint -->', 'new validated Controller');
+  const result = await f.stageLatest();
+  assert.equal(result.changed, true);
+  assert.notEqual((await f.active()).cacheName, OLD);
+  assert.equal(await (await f.assetResponse(scriptURL)).text(), 'new validated Controller');
+  f.goOffline();
+  assert.equal((await f.navigationResponse()).status, 200);
 });
