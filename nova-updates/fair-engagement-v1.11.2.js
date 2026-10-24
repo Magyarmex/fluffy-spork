@@ -40,10 +40,20 @@ function viewportHalfExtents(g){
   var z=Number(g&&g.cam&&g.cam.zoom);if(!(z>0))z=Number(g&&g.zoom);if(!(z>0))z=1;
   return{x:Math.max(0,Number(g&&g.w)||0)/(2*z),y:Math.max(0,Number(g&&g.h)||0)/(2*z),zoom:z};
 }
+function viewportContains(observer,target,e){
+  return !!observer&&!!target&&observer.id!==target.id&&alive(target)&&
+    Math.abs(target.x-observer.x)<=e.x&&Math.abs(target.y-observer.y)<=e.y;
+}
 function inGameplayViewport(g,observer,target){
   if(!g||!observer||!target||observer.id===target.id||!alive(target))return false;
+  return viewportContains(observer,target,viewportHalfExtents(g));
+}
+/* A single threat scan sees one camera frame. Share its extents across all
+ * candidates while keeping the exact per-target Fair Engagement predicate. */
+function gameplayViewportFilter(g,observer){
+  if(!g||!observer)return function(){return false;};
   var e=viewportHalfExtents(g);
-  return Math.abs(target.x-observer.x)<=e.x&&Math.abs(target.y-observer.y)<=e.y;
+  return function(target){return viewportContains(observer,target,e);};
 }
 function hasSpotterRelay(g,classes,observer,target){
   if(!g||!observer||!target||!isSniper(classes,observer))return false;
@@ -144,7 +154,7 @@ function prepareClosePlayerAim(g){
 window.__NOVA_VERSION=VERSION;
 window.__NOVA_FAIR_ENGAGEMENT__={
   version:VERSION,codename:CODENAME,date:'2026-08-30',closeNodeRescues:0,targetReplans:0,
-  inGameplayViewport:inGameplayViewport,
+  inGameplayViewport:inGameplayViewport,gameplayViewportFilter:gameplayViewportFilter,
   contract:{gameplayViewportParity:true,adaptiveWidthHeight:true,adaptiveRotation:true,adaptiveZoom:true,globalMinimapRadar:false,spotterRelayException:true,playerPriorityBonus:false,saturationIsSoft:true,closeHeldAimRemainsCommand:true,releaseStillRecalls:true}
 };
 window.__NOVA_FAIR_ENGAGEMENT_TEST__={
