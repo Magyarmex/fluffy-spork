@@ -117,3 +117,20 @@ test('KNOWN RED #234: seeded reachable-body parity across frame rates', () => {
   assert.ok(summary.every(s => s.missed === 0 && s.phantom === 0),
     'first-contact TTL violations: ' + JSON.stringify(summary));
 });
+
+
+for (const fps of [30, 60, 120, 240]) {
+  test('KNOWN RED #234: moving scout crossed before TTL is hit at ' + fps + 'Hz', () => {
+    const g = new Game();
+    g.tanks = [{ kind: 'tank', id: 2, x: 25, y: -20,
+      cls: 'scout', hp: 100, alive: true,
+      __novaSweepMoveTime: g.time,
+      __novaSweepPrevX: 25, __novaSweepPrevY: 20 }];
+    g.bullets = [{ kind: 'bullet', id: 1, ownerId: 1, x: 0, y: 0,
+      vx: 6000, vy: 0, r: 3, dmg: 20, ttl: .005, pen: 0,
+      hits: 0, dead: false, shell: false, beam: false }];
+    g.updateBullets(1 / fps);
+    assert.equal(g.hits, 1,
+      'moving body swept across reachable projectile segment before expiration');
+  });
+}
