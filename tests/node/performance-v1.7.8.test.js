@@ -111,3 +111,13 @@ test('active touch aim still overrides mouse state and keyboard movement',()=>{
   const aim=i.aimVec(i.moveVec());
   assert.ok(aim);assert.equal(aim.x,0);assert.equal(aim.y,1);
 });
+
+
+test('touch takeover ignores stale mouseActive and keeps movement-aim fallback',()=>{
+  const {Input}=loadLayer(),i=new Input();
+  i.mouseActive=true;i.touchSeen=true;
+  i.move.active=true;i.move.dx=0;i.move.dy=-30;
+  const aim=i.aimVec(i.moveVec());
+  assert.ok(aim,'touch takeover must not keep aiming at an obsolete mouse position');
+  assert.equal(aim.x,0);assert.equal(aim.y,-1);
+});
