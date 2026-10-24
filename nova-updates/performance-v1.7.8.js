@@ -175,6 +175,31 @@ wrap('game/engine',function(engine,require){
    * deliberately named "unregistered", not a proven missed hit. */
   var chronoClasses=null,chronoSideKeys=['teamId','team','factionId','faction','side'];
   try{chronoClasses=require('./classes').CLASSES||null;}catch(_){}
+  /* A short-lived shot can legitimately lose its body contact if it first
+   * intercepts a hostile projectile. This is a conservative geometry-only
+   * ambiguity check: it does not predict which projectile survives, and it
+   * never changes combat. Keep the optional audit bounded in dense fights. */
+  function chronoPossibleInterception(g,b,bodyTime){
+    if(!g.bullets)return false;
+    if(g.bullets.length>256)return null;
+    for(var i=0;i<g.bullets.length;i++){
+      var other=g.bullets[i];
+      if(!other||other===b||other.dead||other.ownerId===b.ownerId||
+         !(other.ttl>0)||!Number.isFinite(other.x)||!Number.isFinite(other.y)||
+         !Number.isFinite(other.vx)||!Number.isFinite(other.vy))continue;
+      var until=Math.min(bodyTime,other.ttl);
+      if(!(until>=0))continue;
+      var dx=b.x-other.x,dy=b.y-other.y;
+      var vx=b.vx-other.vx,vy=b.vy-other.vy;
+      var speed2=vx*vx+vy*vy;
+      if(!Number.isFinite(speed2))continue;
+      var t=speed2>1e-12?Math.max(0,Math.min(until,-(dx*vx+dy*vy)/speed2)):0;
+      var cx=dx+vx*t,cy=dy+vy*t;
+      var radius=(b.r||2)+(other.r||2)+1.5;
+      if(cx*cx+cy*cy<=radius*radius)return true;
+    }
+    return false;
+  }
   function chronoFirstBody(g,b,dt){
     if(!g.tanks||g.tanks.length>64||!g.__novaTerrain||
        !Number.isFinite(b.x)||!Number.isFinite(b.y)||
@@ -229,6 +254,9 @@ wrap('game/engine',function(engine,require){
     if(typeof g.firstTerrainHit!=='function'&&
        g.__novaTerrain.some(function(t){return t&&t.solid!==false&&
          (!t.destructible||t.hp>0);}))return null;
+    var interception=chronoPossibleInterception(g,b,best.time);
+    if(interception===null)return {interceptionUnscanned:true};
+    if(interception)return {interceptionAmbiguous:true};
     return best;
   }
   function chronoState(g){
@@ -236,7 +264,8 @@ wrap('game/engine',function(engine,require){
       frames:0,sampledShells:0,sampledShortShots:0,bursts:0,
       ttlOvershoots:0,arenaOvershoots:0,predictedBodyContacts:0,
       registeredBodyContacts:0,unregisteredBodyContacts:0,
-      terrainOccludedBodyContacts:0,bodyAuditErrors:0,
+      terrainOccludedBodyContacts:0,interceptionAmbiguousBodyContacts:0,
+      interceptionUnscannedBodyContacts:0,bodyAuditErrors:0,
       maxOvershootUnits:0,events:[]
     });
     /* DevTools can inspect live counters without reaching into React game state. */
@@ -300,6 +329,8 @@ wrap('game/engine',function(engine,require){
         catch(_){st.bodyAuditErrors++;}
         st.sampledShortShots++;
         if(candidate&&candidate.occluded)st.terrainOccludedBodyContacts++;
+        else if(candidate&&candidate.interceptionAmbiguous)st.interceptionAmbiguousBodyContacts++;
+        else if(candidate&&candidate.interceptionUnscanned)st.interceptionUnscannedBodyContacts++;
         else if(candidate){
           st.predictedBodyContacts++;
           shortShots.push({bullet:b,before:b.hits||0,ttl:b.ttl,contact:candidate});
@@ -335,11 +366,14 @@ wrap('game/engine',function(engine,require){
       registeredBodyContacts:s.registeredBodyContacts,
       unregisteredBodyContacts:s.unregisteredBodyContacts,
       terrainOccludedBodyContacts:s.terrainOccludedBodyContacts,
+      interceptionAmbiguousBodyContacts:s.interceptionAmbiguousBodyContacts,
+      interceptionUnscannedBodyContacts:s.interceptionUnscannedBodyContacts,
       bodyAuditErrors:s.bodyAuditErrors,maxOvershootUnits:s.maxOvershootUnits,events:s.events.slice()}:
       {frames:0,sampledShells:0,sampledShortShots:0,bursts:0,
        ttlOvershoots:0,arenaOvershoots:0,predictedBodyContacts:0,
        registeredBodyContacts:0,unregisteredBodyContacts:0,
-       terrainOccludedBodyContacts:0,bodyAuditErrors:0,
+       terrainOccludedBodyContacts:0,interceptionAmbiguousBodyContacts:0,
+       interceptionUnscannedBodyContacts:0,bodyAuditErrors:0,
        maxOvershootUnits:0,events:[]};
   };
 
