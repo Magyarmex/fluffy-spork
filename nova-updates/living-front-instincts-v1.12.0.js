@@ -45,7 +45,7 @@ function crasher(g,st,cr,defs,dt){
   var dx=target?target.x-cr.x:0,dy=target?target.y-cr.y:0,d=Math.hypot(dx,dy),ang=d?Math.atan2(dy,dx):(cr.angle||0),heading=Math.atan2(cr.vy||0,cr.vx||0),da=Math.atan2(Math.sin(ang-heading),Math.cos(ang-heading)),n=crasherState(state,cr.__lfPredatorT==null?.2:cr.__lfPredatorT,dt,!!target&&Math.abs(da)<.34,!!target&&d<390);
   if(n.state!==state){
     if(n.state==='telegraph'){cr.__lfCommitAngle=ang;cr.__lfChargeHit=false;if(g.sfx&&g.sfx.novaLivingCrasher&&g.player&&d2(cr.x,cr.y,g.player.x,g.player.y)<850*850)g.sfx.novaLivingCrasher((cr.x-g.player.x)/700);}
-    if(n.state==='charge'){cr.__lfCommitAngle=target?Math.atan2(target.y-cr.y,target.x-cr.x):(cr.__lfCommitAngle||heading);st.stats.crasherCharges++;}
+    if(n.state==='charge'){/* Commit to the last visible telegraph, never snap-aim on launch. */if(!Number.isFinite(cr.__lfCommitAngle))cr.__lfCommitAngle=heading;st.stats.crasherCharges++;}
     if(n.state==='overshoot'){st.stats.crasherOvershoots++;cr.__lfTargetId=-1;cr.__lfTargetKind='';}
     if(state==='overshoot'&&n.state==='recover'){if(cr.__lfChargeHit)st.stats.crasherHits++;else st.stats.crasherMisses++;}
     cr.__lfPredatorState=n.state;cr.__lfPredatorT=n.t;state=n.state;
