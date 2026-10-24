@@ -225,9 +225,23 @@ wrap('game/engine',function(engine,require){
        * drone sensor and a player score multiplier. Feed its virtual thumb from
        * the fair hull target and keep that private sensor planner asleep. */
       var p=owner.__novaLiveVectorAI||(owner.__novaLiveVectorAI={thinkAt:0,commitUntil:0,targetId:-1,flankSide:(owner.id&1)?1:-1,pressure:'probe',releaseUntil:0,cueUntil:0,lastCueAt:-99,lastOwnHp:owner.hp,commandAngle:owner.angle||0,commandPower:0,active:false,now:now});
+      /* Keep the legacy private sensor asleep: only the Fair Engagement
+       * target is legal. Restore Live Vector's existing probe/breach rhythm
+       * using that same fair target, with no independent target search. */
+      var targetChanged=p.targetId!==id,period=owner.ai.isElite?.80:1.04;
+      if(id<0){p.pressure='probe';p.commitUntil=0;}
+      else if(targetChanged){p.pressure='probe';p.commitUntil=now+period;p.flankSide*=-1;}
+      else if(!(p.commitUntil>now)){
+        p.pressure=p.pressure==='probe'?'breach':'probe';
+        p.commitUntil=now+period;p.flankSide*=-1;
+      }
       p.now=now;p.thinkAt=now+.5;p.targetId=id;
       if(target){
-        var helper=window.__NOVA_LIVE_VECTOR_TEST__,stick=helper&&typeof helper.aiVirtualStick==='function'?helper.aiVirtualStick(owner,C[owner.cls],target,p,null):null;
+        /* The local drone-breach sensor uses physical proximity, owner
+         * hostility and terrain LoS. It cannot select or reveal a tank. */
+        var helper=window.__NOVA_LIVE_VECTOR_TEST__;
+        var threat=helper&&typeof helper.hostileDroneNear==='function'?helper.hostileDroneNear(g,owner,265):null;
+        var stick=helper&&typeof helper.aiVirtualStick==='function'?helper.aiVirtualStick(owner,C[owner.cls],target,p,threat):null;
         if(stick){p.active=!!stick.active;p.commandAngle=stick.angle;p.commandPower=stick.power;}
         else{var ang=Math.atan2(target.y-owner.y,target.x-owner.x);p.active=true;p.commandAngle=ang;p.commandPower=clamp(Math.hypot(target.x-owner.x,target.y-owner.y)/700,.08,1);}
         owner.ai.targetId=id;if(owner.ai.state!=='flee')owner.ai.state='hunt';
