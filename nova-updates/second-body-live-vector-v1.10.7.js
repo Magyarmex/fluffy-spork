@@ -185,7 +185,7 @@ wrap('game/engine',function(engine,require){
     for(var i=0;i<ds.length;i++){
       var d=ds[i];if(!d||d.hp<=0||d.ownerId===owner.id||d.__novaSpotter||(accept&&!accept(d)))continue;
       /* Reject distant or already-outcompeted drones before viewport and terrain queries. */
-      var dd=dist2(owner.x,owner.y,d.x,d.y);if(dd>=score)continue;
+      var dd=dist2(owner.x,owner.y,d.x,d.y);if(!(dd<score))continue;
       /* AI local defense must obey the same live viewport as fair target selection.
        * Human Controllers retain nearby autonomous protection, including offscreen. */
       var fair=window.__NOVA_FAIR_ENGAGEMENT__;
