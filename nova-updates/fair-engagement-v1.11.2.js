@@ -228,6 +228,12 @@ wrap('game/engine',function(engine,require){
        * drone sensor and a player score multiplier. Feed its virtual thumb from
        * the fair hull target and keep that private sensor planner asleep. */
       var p=owner.__novaLiveVectorAI||(owner.__novaLiveVectorAI={thinkAt:0,commitUntil:0,targetId:-1,flankSide:(owner.id&1)?1:-1,pressure:'probe',releaseUntil:0,cueUntil:0,lastCueAt:-99,lastOwnHp:owner.hp,commandAngle:owner.angle||0,commandPower:0,active:false,now:now});
+      /* The original private planner's low-health recall was also skipped
+       * by the fair target gate. Restore its damage-triggered 0.42s release
+       * without consulting any extra target information. */
+      if(owner.hp<p.lastOwnHp-1&&owner.hp/Math.max(1,owner.maxHp)<.20)
+        p.releaseUntil=Math.max(p.releaseUntil,now+.42);
+      p.lastOwnHp=owner.hp;
       /* Keep the legacy private sensor asleep: only the Fair Engagement
        * target is legal. Restore Live Vector's existing probe/breach rhythm
        * using that same fair target, with no independent target search. */
