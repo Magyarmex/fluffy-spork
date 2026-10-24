@@ -58,6 +58,17 @@ test('visible nearby enemy remains a legitimate combat priority', () => {
   assert.equal(bias(T, w).weight, 0);
 });
 
+test('rotating a phone or changing zoom updates legitimate target visibility', () => {
+  const T = boot(), w = world(200);
+  assert.ok(bias(T, w).weight > 0.15, 'portrait: target should be offscreen');
+  w.g.w = 640; w.g.h = 360;
+  assert.equal(bias(T, w).weight, 0, 'landscape: same target should be visible');
+  w.g.w = 360; w.g.h = 640; w.g.cam.zoom = 0.5;
+  assert.equal(bias(T, w).weight, 0, 'zoomed out: target should be visible');
+  w.g.cam.zoom = 1.2;
+  assert.ok(bias(T, w).weight > 0.15, 'zoomed in: target should be hidden');
+});
+
 test('valid Sniper Observer relay permits remote combat priority', () => {
   const T = boot(), w = world(200);
   w.owner.cls = 'railgun';
