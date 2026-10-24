@@ -74,6 +74,17 @@ test('audit is disabled by default and does not allocate a frame or state', () =
   assert.equal(g.novaChronoShadowSnapshot().frames, 0);
 });
 
+test('decorative War Room spectator cannot overwrite playable diagnostics', () => {
+  const { g, window } = boot();
+  window.__NOVA_CHRONO_SHADOW_ENABLED__ = true;
+  g.player = { id: -1000000, isPlayer: true };
+  g.bullets = [shell(20, 0, 6000, 0.005)];
+  g.updateBullets(1 / 30);
+  assert.equal(g.__novaChronoShadow, undefined);
+  assert.equal(window.__NOVA_CHRONO_SHADOW_LAST__, undefined);
+  assert.deepEqual(g.events, [{ x: 200, y: 0, id: 20 }]);
+});
+
 test('opt-in detects actual materialized TTL overshoot without changing burst', () => {
   const { g, window } = boot();
   window.__NOVA_CHRONO_SHADOW_ENABLED__ = true;
