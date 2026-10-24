@@ -249,3 +249,26 @@ test('actual materialized game: all 51 scripts are required for offline boot', a
   assert.equal((await f.navigationResponse()).status, 503,
     'evicting one real gameplay overlay must not serve a broken playable shell');
 });
+
+
+test('a cached 404 is not a valid critical script for offline boot', async () => {
+  const f = fixture();
+  await f.seed();
+  await f.cache(OLD).put(scriptURL, new Response('Not found', { status: 404 }));
+  f.goOffline();
+  assert.equal((await f.navigationResponse()).status, 503);
+  assert.equal((await f.assetResponse(scriptURL)).status, 0,
+    'an invalid cached response cannot be served as a game module');
+});
+
+test('unchanged-build validation restages a cached 404 instead of treating it as healthy', async () => {
+  const f = fixture();
+  await f.seed();
+  await f.cache(OLD).put(scriptURL, new Response('Not found', { status: 404 }));
+  const result = await f.stageLatest();
+  assert.equal(result.changed, true);
+  const active = await f.active();
+  assert.notEqual(active.cacheName, OLD);
+  const response = await f.cache(active.cacheName).match(scriptURL);
+  assert.ok(response && response.ok);
+});
