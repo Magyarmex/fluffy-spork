@@ -482,3 +482,29 @@ test('spatially separated hostile projectile cannot hide a body miss', () => {
   assert.equal(s.interceptionAmbiguousBodyContacts, 0);
   assert.equal(s.unregisteredBodyContacts, 1);
 });
+
+
+test('crossing hostile projectile is an ambiguity before body contact', () => {
+  const { g } = boot();
+  addScout(g);
+  const other = competingShot(8011, 12, 20);
+  other.vy = -10000;
+  g.bullets = [ordinaryShot(8012), other];
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.interceptionAmbiguousBodyContacts, 1);
+  assert.equal(s.unregisteredBodyContacts, 0);
+});
+test('dense opt-in audit skips unbounded interception scans safely', () => {
+  const { g } = boot(), target = addScout(g);
+  g.bullets = Array.from({ length: 257 }, (_, i) =>
+    competingShot(9000 + i, 1000 + i, 200, 1, 1));
+  g.bullets[12] = ordinaryShot(9012);
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.sampledShortShots, 1);
+  assert.equal(s.interceptionUnscannedBodyContacts, 1);
+  assert.equal(s.predictedBodyContacts, 0);
+  assert.equal(s.unregisteredBodyContacts, 0);
+  assert.equal(target.hp, 100);
+});
