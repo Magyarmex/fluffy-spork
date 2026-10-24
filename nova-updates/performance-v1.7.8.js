@@ -173,7 +173,7 @@ wrap('game/engine',function(engine,require){
    * No combat writes: only count potential contacts not registered by the core.
    * An intercepted projectile may be a false positive, so the counter is
    * deliberately named "unregistered", not a proven missed hit. */
-  var chronoClasses=null;
+  var chronoClasses=null,chronoSideKeys=['teamId','team','factionId','faction','side'];
   try{chronoClasses=require('./classes').CLASSES||null;}catch(_){}
   function chronoFirstBody(g,b,dt){
     if(!g.tanks||g.tanks.length>64||!g.__novaTerrain||
@@ -187,9 +187,9 @@ wrap('game/engine',function(engine,require){
          !Number.isFinite(t.x)||!Number.isFinite(t.y))continue;
       if(owner){
         if(typeof g.areAllies==='function'&&g.areAllies(owner,t))continue;
-        var sideKeys=['teamId','team','factionId','faction','side'],allied=false;
-        for(var side=0;side<sideKeys.length;side++){
-          var key=sideKeys[side];
+        var allied=false;
+        for(var side=0;side<chronoSideKeys.length;side++){
+          var key=chronoSideKeys[side];
           if(owner[key]!=null&&t[key]!=null){allied=owner[key]===t[key];break;}
         }
         if(allied)continue;
@@ -203,17 +203,18 @@ wrap('game/engine',function(engine,require){
       var fx=b.x-sx,fy=b.y-sy;
       var vx=(b.vx||0)-(t.x-sx)/dt,vy=(b.vy||0)-(t.y-sy)/dt;
       var radius=(b.r||2)+size+3,C=fx*fx+fy*fy-radius*radius;
+      if(!Number.isFinite(C))continue;
       var hit=null;
       if(C<=0)hit=0;
       else{
         var A=vx*vx+vy*vy,halfB=fx*vx+fy*vy;
-        if(!(A>1e-12)||halfB>=0)continue;
+        if(!(A>1e-12)||!Number.isFinite(A)||halfB>=0)continue;
         var D=halfB*halfB-A*C;
-        if(D<0)continue;
+        if(!(D>=0)||!Number.isFinite(D))continue;
         /* Stable entry root: avoids cancellation for fast shallow hits. */
         hit=C/(-halfB+Math.sqrt(D));
       }
-      if(hit==null||hit<0||hit>b.ttl+1e-9)continue;
+      if(!Number.isFinite(hit)||hit<0||hit>b.ttl+1e-9)continue;
       if(!best||hit<best.time)best={targetId:t.id,time:hit,
         x:b.x+(b.vx||0)*hit,y:b.y+(b.vy||0)*hit};
     }
