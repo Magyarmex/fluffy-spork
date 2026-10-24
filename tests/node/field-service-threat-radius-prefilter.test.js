@@ -68,3 +68,52 @@ test('nearby visible hostile behind solid cover does not suppress repair',()=>{
   assert.equal(s.threat(),false);
   assert.equal(s.lookups(),1);
 });
+
+test('5,000 seeded mixed worlds preserve the independent repair-threat oracle',()=>{
+  const s=setup();
+  // Use the actual module loaded in this fixture rather than an independent
+  // guessed viewport formula. The oracle preserves the old evaluation order.
+  let seed=0x20261025;
+  const rnd=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+  const r2=310*310;
+  function reference(){
+    const g=s.g,d=s.d,owner=s.owner;
+    const hostile=(other)=>other&&other.id!==owner.id&&other.alive!==false&&
+      !g.areAllies(owner,other)&&g.areHostile(owner,other);
+    const seen=t=>owner.isPlayer||!owner.ai||
+      (Math.abs(t.x-owner.x)<=g.w/(2*g.cam.zoom)&&Math.abs(t.y-owner.y)<=g.h/(2*g.cam.zoom)&&
+        t.alive!==false&&(t.hp==null||t.hp>0));
+    for(const t of g.tanks){
+      if(!hostile(t))continue;
+      const dx=t.x-d.x,dy=t.y-d.y;
+      if(dx*dx+dy*dy<=r2&&seen(t)&&g.hasLineOfSight(d.x,d.y,t.x,t.y,2))return true;
+    }
+    for(const t of g.drones){
+      if(!t||t===d||t.hp<=0||t.ownerId===d.ownerId)continue;
+      const other=g.tankById.get(t.ownerId);
+      if(!hostile(other))continue;
+      const dx=t.x-d.x,dy=t.y-d.y;
+      if(dx*dx+dy*dy<=r2&&seen(t)&&g.hasLineOfSight(d.x,d.y,t.x,t.y,2))return true;
+    }
+    return false;
+  }
+  for(let i=0;i<5000;i++){
+    s.owner.isPlayer=rnd()<.3;
+    s.owner.ai=s.owner.isPlayer?null:{};
+    s.g.cam.zoom=.5+rnd()*2;
+    s.g.w=rnd()<.5?220:420;
+    s.g.h=rnd()<.5?380:220;
+    s.enemy.x=(rnd()-.5)*1400;
+    s.enemy.y=(rnd()-.5)*900;
+    s.enemy.alive=rnd()>.1;
+    s.g.hasLineOfSight=()=>rndBlocked===false;
+    const rndBlocked=rnd()<.2;
+    for(let j=0;j<s.far.length;j++){
+      const t=s.far[j];
+      t.x=rnd()<.005?NaN:(rnd()-.5)*1400;
+      t.y=rnd()<.005?Infinity:(rnd()-.5)*900;
+      t.hp=rnd()<.07?0:30;
+    }
+    assert.equal(s.threat(),reference(),'world '+i);
+  }
+});
