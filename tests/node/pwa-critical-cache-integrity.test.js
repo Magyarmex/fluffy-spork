@@ -19,6 +19,7 @@ const scriptURL = base + 'nova-updates/controller-v1.3.0.js';
 function fixture({ missingScript = false, failAsset = false, failPurge = false, failNotify = false } = {}) {
   const data = new Map();
   const calls = [];
+  let rejectNextMetaWrite = false;
   let remoteShell = shell;
   let remoteScript = 'console.info("Controller loaded")';
   const cache = name => {
@@ -27,7 +28,13 @@ function fixture({ missingScript = false, failAsset = false, failPurge = false, 
       data.set(name, {
         entries,
         async match(key) { const value = entries.get(String(key)); return value ? value.clone() : null; },
-        async put(key, response) { entries.set(String(key), response.clone()); },
+        async put(key, response) {
+          if (name === META && String(key) === stateURL && rejectNextMetaWrite) {
+            rejectNextMetaWrite = false;
+            throw Error('simulated active-pointer write failure');
+          }
+          entries.set(String(key), response.clone());
+        },
       });
     }
     return data.get(name);
@@ -75,6 +82,7 @@ function fixture({ missingScript = false, failAsset = false, failPurge = false, 
     goOffline() { self.navigator.onLine = false; },
     goOnline() { self.navigator.onLine = true; },
     setRemoteBuild(html, script) { remoteShell = html; remoteScript = script; },
+    failNextMetaWrite() { rejectNextMetaWrite = true; },
     async seed({ html = shell } = {}) {
       const hash = createHash('sha256').update(html).digest('hex').slice(0, 32);
       await cache(META).put(stateURL,
@@ -303,6 +311,20 @@ test('client notification failure after promotion cannot delete the new active g
   const state = await f.active();
   assert.notEqual(state.cacheName, OLD);
   assert.ok(await f.cache(state.cacheName).match(scriptURL));
+  f.goOffline();
+  assert.equal((await f.navigationResponse()).status, 200);
+});
+
+
+test('pre-promotion active-pointer write failure still rolls back the new stage', async () => {
+  const f = fixture();
+  await f.seed();
+  f.setRemoteBuild(shell + '<!-- newer build -->', 'new Controller');
+  f.failNextMetaWrite();
+  await assert.rejects(f.stageLatest(), /simulated active-pointer write failure/);
+  assert.equal((await f.active()).cacheName, OLD);
+  assert.deepEqual(await f.caches.keys(), [META, OLD],
+    'failed new stage must be removed without deleting the previous playable build');
   f.goOffline();
   assert.equal((await f.navigationResponse()).status, 200);
 });
