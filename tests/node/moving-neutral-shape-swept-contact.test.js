@@ -180,3 +180,16 @@ for(const y of [18,18.0001,18.1]){
   assert.equal(g.hits.length,0);
  });
 }
+
+for(const [label,x,vx,expected] of [
+ ['separating at start boundary',-18,-105,0],
+ ['arriving at end boundary',64.5,105,0],
+ ['crossing into overlap before end',69,-105,1]
+]){
+ test('strict moving-shape frame contact: '+label,()=>{
+  const g=boot(),s={id:5,kind:'shape',type:'crasher',x,y:0,
+   vx,vy:0,r:15,hp:20,maxHp:20};
+  g.shapes=[s];g.bullets=[bullet()];g.update(1/30);
+  assert.equal(g.hits.length,expected);
+ });
+}
