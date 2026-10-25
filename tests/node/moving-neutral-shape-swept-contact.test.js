@@ -325,3 +325,22 @@ test('grazing precision: near-tangent noncontact 3',()=>{
  assert.equal(g.hits.length,0,'strict physical moving-disc contact must be frame-order independent');
  assert.equal(s.hp,20);
 });
+
+/* Adversarial near-start contact: C is small and B is tiny, so a threshold
+ * based only on B^2+|4AC| underestimates subtraction error in C. */
+test('grazing precision: near-start genuine shallow contact',()=>{
+ const [ax,ay,ex,ey,sx,sy,sxe,sye]=[1780.53386695683,79.16820887476206,1780.5337616651466,79.16824642551835,1774.487335265908,62.2141693996643,1774.783816250872,62.10843374377317];
+ const g=boot(),s={id:701,kind:'shape',type:'crasher',x:sx,y:sy,
+  vx:0,vy:0,r:15,hp:20,maxHp:20};
+ g.shapes=[s];g.bullets=[{...bullet(),x:ax,y:ay,vx:ex-ax,vy:ey-ay,ttl:2}];
+ g.__testShapeMotion=()=>{s.x=sxe;s.y=sye;};g.update(1);
+ assert.equal(g.hits.length,1);assert.equal(s.hp,10);
+});
+test('grazing precision: near-start false positive with rounded discriminant',()=>{
+ const [ax,ay,ex,ey,sx,sy,sxe,sye]=[31.140925362706184,-206.93875011056662,31.14261145955044,-206.87346085356594,13.148610847143438,-206.40876529656498,13.145391129913339,-206.53343959770118];
+ const g=boot(),s={id:701,kind:'shape',type:'crasher',x:sx,y:sy,
+  vx:0,vy:0,r:15,hp:20,maxHp:20};
+ g.shapes=[s];g.bullets=[{...bullet(),x:ax,y:ay,vx:ex-ax,vy:ey-ay,ttl:2}];
+ g.__testShapeMotion=()=>{s.x=sxe;s.y=sye;};g.update(1);
+ assert.equal(g.hits.length,0);assert.equal(s.hp,20);
+});
