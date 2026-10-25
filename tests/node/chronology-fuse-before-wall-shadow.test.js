@@ -34,6 +34,7 @@ function boot(performance, enabled=true) {
   Game.prototype.randSpawnPos = () => ({x:1500,y:1500});
   Game.prototype.moveTank = function(t,vx,vy,dt) {t.x+=vx*dt;t.y+=vy*dt;};
   Game.prototype.getTank = () => null;
+  Game.prototype.clusterBurst = function(b) {this.bursts.push({x:b.x,y:b.y});};
   Game.prototype.updateBullets = coreUpdate;
   function Sfx() {}
   Sfx.prototype.resume = function(){};
@@ -44,7 +45,7 @@ function boot(performance, enabled=true) {
     'game/render': m => {m.exports={render(){}};}
   };
   const ctx = {window:{__novaModules:modules,__NOVA_CHRONO_SHADOW_ENABLED__:enabled},console:{info(){},warn(){},error(){}},
-    Math,Map,Date,performance:{now:()=>0}};
+    Math,Map,Set,Number,Object,Date,performance:{now:()=>0}};
   const files=['battlefield-v1.6.0.js','disciplines-v1.7.0.js'];
   if(performance)files.push('performance-v1.7.5.js');
   files.push('performance-v1.7.8.js');
@@ -65,7 +66,7 @@ function run(Game,hz,withWall=true,{startX=146,wallX=168,vx=380}={}){
   g.time=1;g.__novaBattlefield={coverBroken:0};
   g.__novaTerrain=withWall?[{id:-51,shape:'rect',x:wallX,y:0,w:20,h:80,
     solid:true,destructible:false}]:[];
-  g.clusterBurst=b=>bursts.push({x:b.x,y:b.y});
+  g.bursts=bursts;
   g.weakenBullet=()=>{};
   g.bullets=[{kind:'bullet',id:777,ownerId:1,x:startX,y:0,
     vx,vy:0,r:8.5,dmg:26,ttl:2,shell:true,pen:1,hits:0,dead:false,
