@@ -62,7 +62,7 @@ function boot(performance, enabled=true) {
   return m.exports.Game;
 }
 
-function run(Game,hz,withWall=true,{startX=146,wallX=168,vx=380}={}){
+function run(Game,hz,withWall=true,{startX=146,wallX=168,vx=380,ttl=2}={}){
   const g=new Game(),bursts=[];
   g.time=1;g.__novaBattlefield={coverBroken:0};
   g.__novaTerrain=withWall?[{id:-51,shape:'rect',x:wallX,y:0,w:20,h:80,
@@ -70,7 +70,7 @@ function run(Game,hz,withWall=true,{startX=146,wallX=168,vx=380}={}){
   g.bursts=bursts;
   g.weakenBullet=()=>{};
   g.bullets=[{kind:'bullet',id:777,ownerId:1,x:startX,y:0,
-    vx,vy:0,r:8.5,dmg:26,ttl:2,shell:true,pen:1,hits:0,dead:false,
+    vx,vy:0,r:8.5,dmg:26,ttl,shell:true,pen:1,hits:0,dead:false,
     __v17Cannon:true,__v17FuseDist:150,__v17SpawnX:0,__v17SpawnY:0,
     __v17FuseArmed:false,splash:72,splashDmg:.4,color:'#ffb45e'}];
   for(let frame=0;frame<10&&g.bullets.length;frame++){
@@ -176,3 +176,15 @@ test('diagonal Cannon trajectory is compared from muzzle, not X projection',()=>
   assert.ok(Math.abs(Math.hypot(event.expectedX,event.expectedY)-148)<1e-6);
   assert.ok(Math.hypot(bursts[0].x,bursts[0].y)>150);
 });
+
+for(const optimized of [false,true]){
+  test('TTL before fuse excludes fuse-before-wall candidate ('+
+       (optimized?'optimized':'baseline')+')',()=>{
+    const Game=boot(optimized),{g,bursts}=run(Game,30,true,{ttl:.001});
+    assert.equal(bursts.length,1,'existing terrain/expiry behavior is not changed');
+    const snap=g.novaChronoShadowSnapshot();
+    assert.equal(snap.fuseBeforeWallCandidates,0);
+    assert.equal(snap.fuseBeforeWallLateBursts,0);
+    assert.equal(snap.ttlOvershoots,1,'independent TTL defect remains visible');
+  });
+}
