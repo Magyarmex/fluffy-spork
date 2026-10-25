@@ -209,8 +209,10 @@ for (const kind of ['shape', 'drone']) {
 
 
 /* Canonical Minigun projectile configuration from materialized CLASSES:
- * speed=480, radius=3.8, pen=1, ttl=.8. A neutral shape at x=396, r=12
- * is physically reached at x=380.2 (t=.792083s) before expiry at x=384.
+ * speed=480, base radius=3.8, pen=1, ttl=.8. At level 1 the emitted
+ * damage is 7.084 and the physical radius is 3.8*(1+7.084*.0085).
+ * A canonical Circle at x=396, r=12 is reached at t=.791607s,
+ * before expiry at x=384.
  * This is a full-lifetime class-configuration regression, not a fabricated
  * initially short-TTL projectile. Existing 60Hz execution misses it. */
 for (const fps of [30, 60, 120, 240]) {
@@ -218,7 +220,7 @@ for (const fps of [30, 60, 120, 240]) {
     const g = new Game();
     g.shapes = [{ kind: 'shape', id: 2, x: 396, y: 0, r: 12, hp: 100 }];
     g.bullets = [{ kind: 'bullet', id: 1, ownerId: 1,
-      x: 0, y: 0, vx: 480, vy: 0, r: 3.8, dmg: 7,
+      x: 0, y: 0, vx: 480, vy: 0, r: 3.8 * (1 + 7.084 * 0.0085), dmg: 7.084,
       ttl: .8, pen: 1, hits: 0, dead: false,
       shell: false, beam: false }];
     for (let frame = 0; frame < 300 && g.bullets.length; frame++) {
@@ -226,13 +228,13 @@ for (const fps of [30, 60, 120, 240]) {
       g.time += 1 / fps;
     }
     assert.equal(g.hits, 1,
-      'physical first contact at .792083s must precede .8s expiry');
+      'physical first contact at .791607s must precede .8s expiry');
   });
   test('full-lifetime Minigun round cannot hit shape beyond TTL at ' + fps + 'Hz', () => {
     const g = new Game();
     g.shapes = [{ kind: 'shape', id: 2, x: 405, y: 0, r: 12, hp: 100 }];
     g.bullets = [{ kind: 'bullet', id: 1, ownerId: 1,
-      x: 0, y: 0, vx: 480, vy: 0, r: 3.8, dmg: 7,
+      x: 0, y: 0, vx: 480, vy: 0, r: 3.8 * (1 + 7.084 * 0.0085), dmg: 7.084,
       ttl: .8, pen: 1, hits: 0, dead: false,
       shell: false, beam: false }];
     for (let frame = 0; frame < 300 && g.bullets.length; frame++) {
