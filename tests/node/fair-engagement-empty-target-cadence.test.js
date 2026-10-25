@@ -135,3 +135,24 @@ test('Controller no-target sync also avoids a second full search every frame', (
   assert.ok(reads() < 150,
     'Controller should perform its ordinary owner iteration plus bounded scans: ' + reads());
 });
+
+test('a restarted match clock cannot strand an empty AI target slot', () => {
+  const { ai } = boot();
+  const owner = tank(1, 0), rival = tank(2, 100);
+  const g = world([owner, rival]);
+  owner.ai.__v1112TargetId = -1;
+  owner.ai.__v1112NextThink = 500;
+  g.time = 1;
+  ai.updateAI(owner, g, 1 / 60);
+  assert.equal(owner.ai.__v1112TargetId, rival.id);
+});
+
+test('a non-finite AI think timestamp cannot permanently suppress acquisition', () => {
+  const { ai } = boot();
+  const owner = tank(1, 0), rival = tank(2, 100);
+  const g = world([owner, rival]);
+  owner.ai.__v1112TargetId = -1;
+  owner.ai.__v1112NextThink = Number.NaN;
+  ai.updateAI(owner, g, 1 / 60);
+  assert.equal(owner.ai.__v1112TargetId, rival.id);
+});
