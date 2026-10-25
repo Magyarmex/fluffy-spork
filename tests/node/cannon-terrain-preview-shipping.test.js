@@ -152,3 +152,13 @@ test('low-penetration shells correctly predict an intact cover impact',()=>{
  assert.equal(p.mayBreach,false);assert.equal(p.blocked,true);
  assert.ok(render().some(x=>x.label.startsWith('IMPACT ')));
 });
+
+test('released touch aim hides both fuse and impact markers',()=>{
+ const {g,render}=boot('cannon');
+ g.__novaTerrain=[wall(180)];
+ assert.ok(render().some(x=>x.label.startsWith('IMPACT ')),'precondition: impact visible');
+ g.input.aim.active=false;g.input.mouseActive=false;
+ const labels=render().map(x=>x.label);
+ assert.ok(!labels.some(x=>x.startsWith('IMPACT ')||x.startsWith('FUSE ')),
+   'no aiming input should leave no persistent impact/fuse marker: '+labels);
+});
