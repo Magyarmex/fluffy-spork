@@ -132,7 +132,7 @@ wrap('game/input',function(input){
       if(typeof window!=='undefined'){
         window.addEventListener('resize',refresh,{passive:true});
         window.addEventListener('scroll',refresh,{passive:true,capture:true});
-        if(window.visualViewport)window.visualViewport.addEventListener('resize',refresh,{passive:true});
+        if(window.visualViewport){window.visualViewport.addEventListener('resize',refresh,{passive:true});window.visualViewport.addEventListener('scroll',refresh,{passive:true});}
       }
       if(typeof ResizeObserver!=='undefined')try{this.__novaRectObserver=new ResizeObserver(refresh);this.__novaRectObserver.observe(canvas);}catch(_){}
     }
@@ -142,7 +142,7 @@ wrap('game/input',function(input){
     if(this.__novaStickPaintRaf&&typeof cancelAnimationFrame==='function'){cancelAnimationFrame(this.__novaStickPaintRaf);this.__novaStickPaintRaf=0;}
     var canvas=this.canvas,refresh=this.__novaRectRefresh;
     if(canvas&&this.__novaRectOriginal)canvas.getBoundingClientRect=this.__novaRectOriginal;
-    if(typeof window!=='undefined'&&refresh){window.removeEventListener('resize',refresh);window.removeEventListener('scroll',refresh,true);if(window.visualViewport)window.visualViewport.removeEventListener('resize',refresh);}
+    if(typeof window!=='undefined'&&refresh){window.removeEventListener('resize',refresh);window.removeEventListener('scroll',refresh,true);if(window.visualViewport){window.visualViewport.removeEventListener('resize',refresh);window.visualViewport.removeEventListener('scroll',refresh);}}
     if(this.__novaRectObserver){try{this.__novaRectObserver.disconnect();}catch(_){}this.__novaRectObserver=null;}
     this.__novaRectOriginal=null;this.__novaCachedRect=null;this.__novaRectRefresh=null;this.__novaStickDom=null;
     return oldDetach.call(this);
