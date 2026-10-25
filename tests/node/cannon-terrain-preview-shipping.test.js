@@ -128,9 +128,10 @@ test('unobstructed preview remains the live fuse, including mouse depth',()=>{
  g.input.aim.active=false;g.input.mouseActive=true;
  const first=g.novaFusePreview(t);
  assert.equal(first.blocked,false);
+ const initialDistance=first.programDist; /* preview object is reused each frame */
  assert.ok(render().some(x=>x.label.startsWith('FUSE ')));
  g.input.mouseX+=170;const second=g.novaFusePreview(t);
- assert.ok(second.programDist>first.programDist+20,'mouse depth must refresh');
+ assert.ok(second.programDist>initialDistance+20,'mouse depth must refresh');
  g.tryFire(t);const b=g.bullets[0],mag=Math.hypot(b.vx,b.vy);
  near(second.programX,b.x+b.vx/mag*b.__v17FuseDist,'mouse shot x');
  near(second.programY,b.y+b.vy/mag*b.__v17FuseDist,'mouse shot y');
