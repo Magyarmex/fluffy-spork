@@ -612,7 +612,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    * contact if it might intercept BEFORE that candidate, not somewhere later
    * on the projectile's remaining TTL path. */
   var ax=b.x,ay=b.y;
-  var best=null,bestT=limit,tie=false,uncertain=false;
+  var best=null,bestT=limit,tie=false,uncertain=false,blockedT=Infinity;
   function consider(e,kind){
    if(!e)return;
    var rr=0,sx=e.x,sy=e.y,mx=0,my=0;
@@ -646,10 +646,15 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    /* Remote tanks cannot affect this shot's physical first contact, even
     * when protected or allied. Check defenses only after excluding their
     * complete observed movement corridor. Nearby cases still defer. */
+   var protectedTank=false;
    if(kind==='tank'){
-    if(e.spawnShieldT>0||e.shieldT>0||e.bulwarkT>0||e.tauntT>0){uncertain=true;return;}
     var owner=g.getTank&&g.getTank(b.ownerId);
-    if(typeof g.areAllies==='function'&&(!owner||g.areAllies(owner,e))){uncertain=true;return;}
+    protectedTank=e.spawnShieldT>0||e.shieldT>0||
+      e.bulwarkT>0||e.tauntT>0||
+      (typeof g.areAllies==='function'&&(!owner||g.areAllies(owner,e)));
+    /* Moving protected bodies have no certified subframe trajectory. Keep
+     * the existing conservative veto even when their endpoints look late. */
+    if(protectedTank&&e.__novaSweepMoveTime===g.time){uncertain=true;return;}
    }
    /* A child shape created by an earlier hit during this very frame has no
     * valid frame-start existence interval. Defer rather than backdate it. */
@@ -673,13 +678,16 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
     }
    }
    if(t==null||!(t<limit-1e-10))return;
+   /* A stationary shield/ally can veto only a contact at or before the
+    * first valid hit, not a physically later one. Never damage it here. */
+   if(protectedTank){blockedT=Math.min(blockedT,t);return;}
    if(best&&Math.abs(t-bestT)<1e-8){tie=true;return;}
    if(t<bestT){best={e:e,kind:kind};bestT=t;tie=false;}
   }
   var tanks=g.tanks||[],shapes=g.shapes||[];
   for(var ti=0;ti<tanks.length;ti++)consider(tanks[ti],'tank');
   for(var si=0;si<shapes.length;si++)consider(shapes[si],'shape');
-  if(!best||tie||uncertain)return false;
+  if(!best||tie||uncertain||blockedT<=bestT+1e-8)return false;
   var hx=ax+dx*bestT,hy=ay+dy*bestT;
   if(Math.abs(hx)>=MAP_LIMIT-20||Math.abs(hy)>=MAP_LIMIT-20)return false;
   /* Owned drones are transparent to their own projectiles in the shipping
