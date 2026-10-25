@@ -371,9 +371,16 @@ wrap('game/engine',function(engine,require){
       if(oldT>0&&front&&dmg>0&&!this.__v17ReflectingIronWill){
         var src=srcId>=0&&this.getTank?this.getTank(srcId):null;
         if(src&&src.alive&&src.id!==t.id){
+          /* Reflection is a new direct hit, not another target of the
+           * original Combined Arms splash exposure calculation. */
+          var blast=this.__v172BlastContext,wasBlast=!!(blast&&blast.active);
+          if(wasBlast)blast.active=false;
           this.__v17ReflectingIronWill=true;
           try{this.damageTank(src,dmg*.30,t.id);}
-          finally{this.__v17ReflectingIronWill=false;}
+          finally{
+            this.__v17ReflectingIronWill=false;
+            if(wasBlast)blast.active=true;
+          }
         }
       }
       r=oldDamage.call(this,t,dmg*factor,srcId,kx,ky);
