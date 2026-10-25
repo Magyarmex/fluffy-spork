@@ -667,7 +667,7 @@
 
     function formationPoint(g, owner, d, squad, target, state, profile) {
       var n = Math.max(1, squad.length), idx = Math.max(0, squad.indexOf(d));
-      var dir = state.angle || owner.angle || 0, ux = Math.cos(dir), uy = Math.sin(dir), px = -uy, py = ux;
+      var dir = Number.isFinite(state.angle) ? state.angle : (Number.isFinite(owner.angle) ? owner.angle : 0), ux = Math.cos(dir), uy = Math.sin(dir), px = -uy, py = ux;
       var cx = state.nodeX, cy = state.nodeY, mid = (n - 1) * 0.5;
       var slot = idx - mid;
       if (profile.formation === 'wall') {
