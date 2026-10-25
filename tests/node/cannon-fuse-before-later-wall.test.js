@@ -434,3 +434,19 @@ for(const optimized of [false,true]){
     g.__novaTerrain[0].hp);
  });
 }
+
+for(const optimized of [false,true]){
+ test((optimized?'optimized':'baseline')+
+  ' real Quake-style noncluster structural shot cannot pre-prime later cover',()=>{
+  const Game=boot(optimized,null,true);
+  const {g,bursts}=run(Game,30,true,{cover:true,shell:false,pen:1,extras:g=>{
+   g.bullets[0].__novaStructureMult=1.9;
+  }});
+  assert.equal(bursts.length,0);
+  assert.ok(g.rings.some(r=>Math.abs(r.x-150)<1e-6),
+   'noncluster Cannon must airburst at fuse before cover');
+  assert.ok(g.__novaTerrain[0].hp>80,
+   'Quake structural direct-hit bonus cannot reach wall beyond fuse; hp='+
+    g.__novaTerrain[0].hp);
+ });
+}
