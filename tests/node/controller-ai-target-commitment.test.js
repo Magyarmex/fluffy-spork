@@ -43,7 +43,7 @@ test('shielded, hidden, or allied challengers cannot steal commitment',()=>{
  }
 });
 test('shipping planner passes commitment state into the target selector',()=>{
- assert.match(source,/bestObservedTank\\(g,owner,current,now<p\\.commitUntil\\)/);
+ assert.match(source,/bestObservedTank\(g,owner,current,now<p\.commitUntil\)/);
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
  assert.ok(html.indexOf('nova-updates/second-body-live-vector-v1.10.7.js')>
    html.indexOf('nova-updates/controller-v1.3.0.js'));
