@@ -180,3 +180,21 @@ for (const optimized of [false,true]) {
     assert.ok(bursts[0].x>150);
   });
 }
+
+for(const optimized of [false,true]){
+ const Game=boot(optimized),prefix=optimized?'optimized':'baseline';
+ test(prefix+' a relocating neutral shape forces conservative event ordering',()=>{
+  const {bursts}=run(Game,30,true,{extras:g=>{
+   g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=3;
+   g.shapes=[{kind:'shape',id:12,x:2000,y:2000,r:10,hp:10,
+     __novaShapeSweepEpoch:3,__novaShapeSweepPrevX:1900,__novaShapeSweepPrevY:2000}];
+  }});
+  assert.equal(bursts.length,1);
+  assert.ok(bursts[0].x>150,'unknown relocation must not be backdated');
+ });
+ test(prefix+' near-boundary fuse start abstains from numerical speculation',()=>{
+  const {bursts}=run(Game,30,true,{startX:149.999999999});
+  assert.equal(bursts.length,1);
+  assert.ok(bursts[0].x>150);
+ });
+}
