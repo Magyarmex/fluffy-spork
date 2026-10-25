@@ -55,8 +55,8 @@ function boot(cls='cannon',angle=0,vx=0,vy=0){
  Game.prototype.damageDrone=function(){};Game.prototype.bodyDamage=function(){return 10;};
  Game.prototype.useAbility=function(){};
  Game.prototype.bulletDamageFor=(_t,d)=>d;
- Game.prototype.bulletSpeed=t=>CLASSES[t.cls].bullet.speed;
- Game.prototype.weaponRange=t=>CLASSES[t.cls].bullet.speed*(CLASSES[t.cls].bullet.ttl??1.05)+40;
+ Game.prototype.bulletSpeed=t=>CLASSES[t.cls].bullet.speed*(1+.085*t.stats.bulletspeed)*(t.gene==='sniper'?1.35:1);
+ Game.prototype.weaponRange=function(t){return this.bulletSpeed(t)*(CLASSES[t.cls].bullet.ttl??1.05)+40;};
  Game.prototype.addParticles=function(){};Game.prototype.addRing=function(){};
  Game.prototype.addFlash=function(){};Game.prototype.addText=function(){};
  Game.prototype.splashAt=function(x,y){bursts.push({x,y,kind:'splash'});};
@@ -219,3 +219,24 @@ test('upgraded projectile radius uses actual materialized collision padding',()=
  near(p.x,physical.hit.x,'upgraded contact x');
  near(p.y,physical.hit.y,'upgraded contact y');
 });
+
+/* Differential validation against the actual shipping fire implementation for
+ * every canonical Cannon descendant, varied velocity, upgrades and gene. */
+for(const cls of ['cannon','bomber','clusterking','siegebomber','annihilator','demolisher','quake']){
+ for(const [angle,vx,vy,depth] of [[0,0,0,25],[.82,135,-60,42],[-1.13,-90,210,65]]){
+  test(cls+' canonical shot/preview parity '+angle,()=>{
+   const {g,t}=boot(cls,angle,vx,vy);
+   t.level=17;t.stats.damage=4;t.stats.bulletspeed=3;t.stats.penetration=4;
+   t.gene='sniper';g.input.aim.dx=depth;g.input.aim.dy=0;
+   g.bulletDamageFor=(tank,base)=>base*(1+.13*tank.stats.damage)*
+     (1+Math.min(tank.level,30)*.012)*1.10;
+   const p=g.novaCannonShotPreview(t);
+   g.tryFire(t);const b=g.bullets[0],mag=Math.hypot(b.vx,b.vy);
+   near(p.ox,b.x,'muzzle x');near(p.oy,b.y,'muzzle y');
+   near(p.x,b.x+b.vx/mag*b.__v17FuseDist,'program x');
+   near(p.y,b.y+b.vy/mag*b.__v17FuseDist,'program y');
+   near(p.r,b.r,'projectile radius');
+   assert.equal(p.pen,b.pen,'projectile penetration');
+  });
+ }
+}
