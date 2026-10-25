@@ -956,7 +956,29 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
  var splashBullet={shell:true,beam:false,vx:0,vy:0};
  var oldSplash=Game.prototype.splashAt;Game.prototype.splashAt=function(x,y,radius,frac,ownerId,knock,color,dmg){var out=oldSplash.apply(this,arguments),a=terrainCandidates(this,x,y,x,y,radius);for(var i=0;i<a.length;i++){var s=a[i];if(!s.destructible||s.hp<=0)continue;var dx=Math.max(Math.abs(x-s.x)-(s.shape==='rect'?s.w*.5:s.r),0),dy=Math.max(Math.abs(y-s.y)-(s.shape==='rect'?s.h*.5:s.r),0),dist=Math.hypot(dx,dy);if(dist>radius)continue;var fall=1-clamp(dist/Math.max(1,radius),0,1)*.55;damageCover(this,s,(dmg||0)*(frac||.4)*fall,ownerId,x,y,splashBullet);}return out;};
 
- var oldUpdateDrones=Game.prototype.updateDrones;Game.prototype.updateDrones=function(dt){ensureTerrain(this);var out=oldUpdateDrones.call(this,dt);for(var j=0;j<this.drones.length;j++){var d=this.drones[j],hit=circleResolve(this,d,(d.r||8)+1);if(hit){if(d.__novaPhase==='dash'){d.__novaPhase='recover';d.__novaPhaseT=Math.max(.28,d.__novaPhaseT||0);d.__novaCommitted=false;d.__novaTarget=null;if(this.addParticles)this.addParticles(d.x,d.y,d.color,4,65,'spark');}var n=d.__novaTerrainBump,side=d.__novaTerrainBias||(((d.id||0)&1)?1:-1);d.__novaTerrainBias=side;if(n){d.x+=-n.y*side*28*dt;d.y+=n.x*side*28*dt;}circleResolve(this,d,(d.r||8)+1);}}
+ var oldUpdateDrones=Game.prototype.updateDrones;Game.prototype.updateDrones=function(dt){ensureTerrain(this);
+ /* Optional observation only: base drone motion and terrain correction are
+  * separate stages. These checkpoints are NOT time-stamped collision paths. */
+ var traceOn=this.__novaDroneChronoTraceEnabled===true&&this.__novaShapeSweepActive===true;
+ var out=oldUpdateDrones.call(this,dt);for(var j=0;j<this.drones.length;j++){
+ var d=this.drones[j];
+ var traced=traceOn&&d&&d.__novaChronoDroneEpoch===this.__novaShapeSweepEpoch;
+ if(traced){d.__novaChronoDroneBaseX=d.x;d.__novaChronoDroneBaseY=d.y;}
+ var hit=circleResolve(this,d,(d.r||8)+1);if(hit){if(d.__novaPhase==='dash'){d.__novaPhase='recover';d.__novaPhaseT=Math.max(.28,d.__novaPhaseT||0);d.__novaCommitted=false;d.__novaTarget=null;if(this.addParticles)this.addParticles(d.x,d.y,d.color,4,65,'spark');}var n=d.__novaTerrainBump,side=d.__novaTerrainBias||(((d.id||0)&1)?1:-1);d.__novaTerrainBias=side;if(n){d.x+=-n.y*side*28*dt;d.y+=n.x*side*28*dt;}circleResolve(this,d,(d.r||8)+1);
+  /* Rectangle/circle contact is inclusive in isTerrainSafe. The legacy
+   * resolver lands exactly on the padded face, which the later Live Vector
+   * repair/peel sweep interprets as embedded and can freeze there. Release
+   * only a confirmed terrain-contact drone by a tiny outward clearance,
+   * and only when the candidate point is actually terrain-safe. */
+  var pad=(d.r||8)+1,normal=d.__novaTerrainBump;
+  if(!safePoint(this,d.x,d.y,pad)&&normal&&
+     Number.isFinite(normal.x)&&Number.isFinite(normal.y)){
+    var nx=d.x+normal.x*.001,ny=d.y+normal.y*.001;
+    if(safePoint(this,nx,ny,pad)){d.x=nx;d.y=ny;}
+  }
+ }
+ if(traced){d.__novaChronoDroneTerrainX=d.x;d.__novaChronoDroneTerrainY=d.y;
+  d.__novaChronoDroneTraceEpoch=this.__novaShapeSweepEpoch;}}
    var spotMap=this.__novaSpotterByOwner||(this.__novaSpotterByOwner=new Map());spotMap.clear();for(var di=0;di<this.drones.length;di++){var sd=this.drones[di];if(sd&&sd.__novaSpotter&&!spotMap.has(sd.ownerId))spotMap.set(sd.ownerId,sd);}
    for(var ti=0;ti<this.tanks.length;ti++){var o=this.tanks[ti];if(!o||!o.alive||o.__novaSpotterContactId==null||o.__novaSpotterContactId<0)continue;var target=this.getTank(o.__novaSpotterContactId),spot=spotMap.get(o.id)||null;if(target&&spot&&!lineOfSight(this,spot.x,spot.y,target.x,target.y,2)){o.__novaSpotterContactId=-1;o.__novaSpotterContactUntil=0;o.__novaSpotterDroneId=-1;}}
  return out;};
@@ -968,6 +990,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   var cd=chronoDrones[di];if(!cd||!(cd.hp>0))continue;
   cd.__novaChronoDroneEpoch=epoch;
   cd.__novaChronoDronePrevX=cd.x;cd.__novaChronoDronePrevY=cd.y;
+  /* Start is recorded even without diagnostics for the existing conservative
+   * collision gate; optional stages are kept separate from this authority. */
+  if(this.__novaDroneChronoTraceEnabled===true){
+   cd.__novaChronoDroneTraceEpoch=-1;cd.__novaChronoDroneLiveEpoch=-1;
+  }
  }
  var shapes=this.shapes||[];for(var si=0;si<shapes.length;si++){var sh=shapes[si];if(!sh)continue;sh.__novaShapeSweepEpoch=epoch;sh.__novaShapeSweepPrevX=sh.x;sh.__novaShapeSweepPrevY=sh.y;}this.__novaShapeSweepActive=true;if(this.__novaBattlefield&&!this.__novaBattlefield.announced&&this.status==='playing'&&this.time>.1){this.__novaBattlefield.announced=true;if(this.toast)this.toast('¦ BATTLEFIELD · '+this.__novaBattlefield.name+'  COVER CHANGES THE FIGHT','info');}
    var out;try{out=oldUpdate.call(this,dt);}finally{this.__novaShapeSweepActive=false;}for(var i=0;i<this.shapes.length;i++){var s=this.shapes[i];if(!s||s.hp<=0)continue;circleResolve(this,s,(s.r||10)*.86);}return out;};
