@@ -437,9 +437,9 @@ for (const hz of [30,60,120,240]) {
  });
  test('remote allied tank does not suppress TTL hit at '+hz+'Hz',()=>{
   const g=isolatedWorld({x:28,vx:6000,ttl:.002,extraTanks:[{
-   kind:'tank',id:3,x:1000,y:1000,cls:'scout',hp:100,alive:true,teamId:'blue'
+   kind:'tank',id:3,x:1000,y:1000,cls:'scout',hp:100,alive:true,teamId:'red'
   }]});
-  g.tanks[0].teamId='red';
+  g.tanks[0].teamId='blue';
   g.getTank=()=>({id:1,teamId:'red'});
   g.areAllies=(a,b)=>a.teamId===b.teamId;
   g.updateBullets(1/hz);
