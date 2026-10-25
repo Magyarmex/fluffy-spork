@@ -15,7 +15,7 @@ function loadApex() {
     clusterking:{id:'clusterking',fireMode:'shell',bullet:{splash:58,splashDmg:.38},size:16},
     siegebomber:{id:'siegebomber',fireMode:'shell',bullet:{splash:92,splashDmg:.5},size:17},
     annihilator:{id:'annihilator',fireMode:'single',bullet:{splash:155,splashDmg:.68},size:18},
-    quakecannon:{id:'quakecannon',fireMode:'single',bullet:{splash:120,splashDmg:.55},size:18},
+    quake:{id:'quake',fireMode:'single',bullet:{splash:120,splashDmg:.55},size:18},
     guard:{id:'guard',fireMode:'single',bullet:{splash:0},size:16,ability:'bulwark'},
     bastion:{id:'bastion',fireMode:'single',bullet:{splash:0},size:21,ability:'taunt'},
     aegis:{id:'aegis',fireMode:'single',bullet:{splash:0},size:19,ability:'bulwark'},
@@ -24,7 +24,7 @@ function loadApex() {
     ravager:{id:'ravager',fireMode:'single',bullet:{splash:0},size:18,ability:'stampede'}
   };
   const gunner = new Set(['twin','tempest','needlestorm','breachlord','flakmaster']);
-  const cannon = new Set(['cannon','clusterking','siegebomber','annihilator','quakecannon']);
+  const cannon = new Set(['cannon','clusterking','siegebomber','annihilator','quake']);
   const guardian = new Set(['guard','bastion','aegis','juggernaut','meteor','ravager']);
   function lineageForClass(id){ return gunner.has(id)?'gunner':cannon.has(id)?'cannon':guardian.has(id)?'guardian':'scout'; }
 
@@ -206,3 +206,35 @@ for (const cls of ['tempest', 'cannon', 'bastion', 'aegis']) {
     assert.equal(target.vy,-2.25, 'vertical knockback reaches the core');
   });
 }
+
+
+/* The materialized class registry calls this playable Apex "quake".
+ * A stale "quakecannon" alias silently bypassed every Quake-specific branch. */
+test('canonical shipping Quake ID receives Apex displacement and fuse specialization',()=>{
+ const html=fs.readFileSync(path.join(__dirname,'../../index.html'),'utf8');
+ const marker='window.__defineModule("game/classes", function (module, exports, require) {';
+ const i=html.indexOf(marker),end=html.indexOf('\n});',i);
+ assert.ok(i>=0&&end>i,'shipping classes module exists');
+ const mod={exports:{}};
+ new Function('module','exports','require',html.slice(i+marker.length,end))(mod,mod.exports,()=>{});
+ assert.ok(mod.exports.CLASSES.quake,'canonical playable Quake class');
+ assert.equal(mod.exports.CLASSES.quakecannon,undefined,'no obsolete class alias');
+ assert.equal(mod.exports.lineageForClass('quake'),'cannon');
+ const {Game,CLASSES}=loadApex(),g=new Game(),t=tank(1,'quake');
+ g.player=t;g.tanks=[t];g.input.aim.dx=60;g.tryFire(t);
+ const b=g.bullets[0];
+ assert.ok(b.__v17Cannon,'Cannon fire control still applies');
+ assert.equal(b.__v17FuseHeavy,true,'Quake heavy airburst sound');
+ assert.ok(b.__novaStructureMult>=1.9,'Quake structural impact specialization');
+ assert.ok(b.__v171QuakeDepth>.9,'Apex Quake depth branch reached');
+ assert.ok(b.knock>200,'deep fuse gains real projectile displacement');
+ assert.ok(b.splash>120,'deep fuse gains actual blast width');
+ assert.ok(CLASSES.quake.desc.includes('Displacement artillery'),'Quake class description matches mechanic');
+});
+test('Quake low-depth shot preserves a smaller displacement effect than deep fuse',()=>{
+ const {Game}=loadApex(),g=new Game(),t=tank(1,'quake');
+ g.player=t;g.tanks=[t];g.input.aim.dx=10;g.tryFire(t);
+ const low=g.bullets[0].knock;
+ t.fireCd=0;g.input.aim.dx=60;g.tryFire(t);
+ assert.ok(g.bullets[1].knock>low*1.2);
+});
