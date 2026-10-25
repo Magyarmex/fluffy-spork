@@ -767,3 +767,15 @@ for(const hz of [30,60,120,240]){
   assert.equal(g.hits,0);
  });
 }
+
+
+test('distant discontinuous tank relocation does not veto an unrelated real hit',()=>{
+ const g=isolatedWorld({x:28,vx:12000,ttl:.004,extraTanks:[{
+  kind:'tank',id:3,x:1500,y:1500,cls:'scout',hp:100,alive:true,
+  __novaSweepPrevX:1200,__novaSweepPrevY:1200
+ }]});
+ g.tanks[1].__novaSweepMoveTime=g.time;
+ const victims=[];g.damageTank=e=>victims.push(e.id);
+ g.updateBullets(1/30);
+ assert.deepEqual(victims,[2],'remote discontinuity must not be a global veto');
+});
