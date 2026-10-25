@@ -246,8 +246,9 @@ for (const optimized of [false, true]) {
           'fragment may move only after birth at x=30');
         assert.ok(Math.abs(child.ttl - (.7 - remaining)) < 1e-8,
           'fragment lifetime must begin at physical birth');
-        assert.ok(Math.hypot(child.vx, child.vy) > 200,
-          'full fragment velocity must be restored after this frame');
+        assert.ok(Math.hypot(child.vx, child.vy) > 200 &&
+          Math.hypot(child.vx, child.vy) <= 360,
+          'full fragment velocity must be restored and remain within the proven clearance bound');
       }
     });
   }
