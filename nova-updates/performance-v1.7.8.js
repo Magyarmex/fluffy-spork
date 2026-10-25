@@ -360,10 +360,39 @@ wrap('game/engine',function(engine,require){
     if(interception)return {interceptionAmbiguous:true};
     return best;
   }
+  /* Opt-in, read-only Cannon first-event diagnostic. A permanent wall after
+   * the programmed fuse threshold must not win merely because Battlefield
+   * executes before Three Disciplines. No combat state is modified here. */
+  function chronoFuseBeforeWall(g,b,dt){
+    if(!b.shell||!b.__v17Cannon||!(b.__v17FuseDist>2)||
+       typeof g.firstTerrainHit!=='function'||!(b.ttl>0)||
+       !Number.isFinite(b.x)||!Number.isFinite(b.y)||
+       !Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
+       !Number.isFinite(b.__v17SpawnX)||!Number.isFinite(b.__v17SpawnY))return null;
+    var active=Math.min(dt,b.ttl),radius=b.__v17FuseDist-2;
+    if(!(active>0))return null;
+    var fx=b.x-b.__v17SpawnX,fy=b.y-b.__v17SpawnY;
+    var c=fx*fx+fy*fy-radius*radius;
+    if(!(c<0))return null; /* already at threshold: no new crossing */
+    var dx=b.vx*active,dy=b.vy*active,a=dx*dx+dy*dy;
+    if(!(a>1e-12)||!Number.isFinite(a))return null;
+    var ex=fx+dx,ey=fy+dy;
+    if(ex*ex+ey*ey<radius*radius)return null;
+    var halfB=fx*dx+fy*dy,disc=halfB*halfB-a*c;
+    if(!(disc>=0)||!Number.isFinite(disc))return null;
+    var root=Math.sqrt(disc);
+    var fraction=halfB>=0?-c/(halfB+root):(-halfB+root)/a;
+    if(!(fraction>=0&&fraction<=1))return null;
+    var wall=g.firstTerrainHit(b.x,b.y,b.x+dx,b.y+dy,(b.r||2)*.45);
+    if(!wall||!wall.solid||!wall.hit||wall.solid.destructible||
+       wall.solid.solid===false||!(wall.hit.t>fraction+1e-7))return null;
+    return {time:active*fraction,x:b.x+dx*fraction,y:b.y+dy*fraction,
+      wallTime:active*wall.hit.t,wallId:wall.solid.id};
+  }
   function chronoState(g){
     var s=g.__novaChronoShadow||(g.__novaChronoShadow={
       frames:0,sampledShells:0,sampledShortShots:0,bursts:0,
-      ttlOvershoots:0,arenaOvershoots:0,predictedBodyContacts:0,
+      ttlOvershoots:0,arenaOvershoots:0,fuseBeforeWallCandidates:0,fuseBeforeWallLateBursts:0,predictedBodyContacts:0,
       registeredBodyContacts:0,unregisteredBodyContacts:0,
       terrainOccludedBodyContacts:0,defenseAmbiguousBodyContacts:0,interceptionAmbiguousBodyContacts:0,
       interceptionUnscannedBodyContacts:0,bodyAuditErrors:0,
@@ -381,6 +410,15 @@ wrap('game/engine',function(engine,require){
       st.bursts++;
       if(v2>1e-9){
         var elapsed=((shell.x-s.x)*s.vx+(shell.y-s.y)*s.vy)/v2;
+        if(s.fuseFirst&&elapsed>s.fuseFirst.time+1e-6){
+          st.fuseBeforeWallLateBursts++;
+          st.events.push({kind:'fuse-before-wall-late-burst',id:s.id,
+            expectedX:s.fuseFirst.x,expectedY:s.fuseFirst.y,
+            actualX:shell.x,actualY:shell.y,
+            expectedTime:s.fuseFirst.time,wallTime:s.fuseFirst.wallTime,
+            wallId:s.fuseFirst.wallId});
+          if(st.events.length>12)st.events.shift();
+        }
         var ttlOver=s.ttl>=0&&s.ttl<frame.dt&&elapsed>s.ttl+1e-6;
         var arenaOver=s.exit!=null&&s.exit<frame.dt&&elapsed>s.exit+1e-6;
         if(ttlOver||arenaOver){
@@ -421,6 +459,8 @@ wrap('game/engine',function(engine,require){
         shellSampled++;
         var s={id:b.id,x:b.x,y:b.y,vx:b.vx||0,vy:b.vy||0,ttl:b.ttl};
         s.exit=chronoExitTime(s);
+        s.fuseFirst=chronoFuseBeforeWall(this,b,dt);
+        if(s.fuseFirst)st.fuseBeforeWallCandidates++;
         samples.set(b,s);st.sampledShells++;
       }else if(b.ttl>0&&b.ttl<=dt&&!b.beam&&!(b.hits>0)){
         if(shortSampled>=CHRONO_SHADOW_LIMIT)continue;
@@ -464,6 +504,8 @@ wrap('game/engine',function(engine,require){
     return s?{frames:s.frames,sampledShells:s.sampledShells,
       sampledShortShots:s.sampledShortShots,bursts:s.bursts,
       ttlOvershoots:s.ttlOvershoots,arenaOvershoots:s.arenaOvershoots,
+      fuseBeforeWallCandidates:s.fuseBeforeWallCandidates,
+      fuseBeforeWallLateBursts:s.fuseBeforeWallLateBursts,
       predictedBodyContacts:s.predictedBodyContacts,
       registeredBodyContacts:s.registeredBodyContacts,
       unregisteredBodyContacts:s.unregisteredBodyContacts,
@@ -473,7 +515,7 @@ wrap('game/engine',function(engine,require){
       interceptionUnscannedBodyContacts:s.interceptionUnscannedBodyContacts,
       bodyAuditErrors:s.bodyAuditErrors,maxOvershootUnits:s.maxOvershootUnits,events:s.events.slice()}:
       {frames:0,sampledShells:0,sampledShortShots:0,bursts:0,
-       ttlOvershoots:0,arenaOvershoots:0,predictedBodyContacts:0,
+       ttlOvershoots:0,arenaOvershoots:0,fuseBeforeWallCandidates:0,fuseBeforeWallLateBursts:0,predictedBodyContacts:0,
        registeredBodyContacts:0,unregisteredBodyContacts:0,
        terrainOccludedBodyContacts:0,defenseAmbiguousBodyContacts:0,interceptionAmbiguousBodyContacts:0,
        interceptionUnscannedBodyContacts:0,bodyAuditErrors:0,
