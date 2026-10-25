@@ -263,6 +263,18 @@ wrap('game/engine',function(engine,require){
       }
     }
     Object.keys(groups).forEach(function(k){separateSwarm(groups[k]);});
+    /* Optional checkpoint after routing/separation, between Battlefield's
+     * terrain stage and Live Vector's repair/peel stage. It is a position
+     * observation, NOT a time-stamped physical collision trajectory. */
+    if(this.__novaDroneChronoTraceEnabled===true&&this.__novaShapeSweepActive===true){
+      var epoch=this.__novaShapeSweepEpoch;
+      for(var ci=0;ci<ds.length;ci++){
+        var cd=ds[ci];
+        if(!cd||cd.__novaChronoDroneTraceEpoch!==epoch)continue;
+        cd.__novaChronoDroneRouteX=cd.x;cd.__novaChronoDroneRouteY=cd.y;
+        cd.__novaChronoDroneRouteEpoch=epoch;
+      }
+    }
     return out;
   };
 });
