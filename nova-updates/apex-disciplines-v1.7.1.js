@@ -205,6 +205,22 @@ wrap('game/engine',function(engine,require){
         var reach=Number.isFinite(b.ttl)?Math.min(dt,b.ttl):dt;if(!(reach>0))continue;var nx=b.x+(b.vx||0)*reach,ny=b.y+(b.vy||0)*reach;
         var hit=this.firstTerrainHit(b.x,b.y,nx,ny,(b.r||2)*.45);
         if(!hit||!hit.solid||!hit.solid.destructible||hit.solid.hp<=1)continue;
+        /* This is a DIRECT cover-hit bonus, not fuse splash. The Battlefield
+         * chronological guard can let a programmed Cannon fuse detonate before
+         * a later wall; never pre-damage that unreachable wall here. Restrict
+         * to the same bounded, unspent Cannon slice and leave uncertain
+         * near-threshold / penetrating histories on their existing path. */
+        if(b.__v17Cannon&&b.__v17FuseDist>0&&b.ttl>dt&&
+           (b.hits||0)===0&&b.pen>=0&&b.pen<2&&
+           b.__novaBreachAtTime!==this.time&&hit.hit&&
+           Number.isFinite(b.__v17SpawnX)&&Number.isFinite(b.__v17SpawnY)&&
+           Number.isFinite(b.x)&&Number.isFinite(b.y)&&
+           Number.isFinite(hit.hit.x)&&Number.isFinite(hit.hit.y)){
+          var fuse=b.__v17FuseDist,
+              from=Math.hypot(b.x-b.__v17SpawnX,b.y-b.__v17SpawnY),
+              contact=Math.hypot(hit.hit.x-b.__v17SpawnX,hit.hit.y-b.__v17SpawnY);
+          if(from+2<fuse&&contact>fuse+1e-7)continue;
+        }
         if(b.__v171PrimedCover===hit.solid.id)continue;
         b.__v171PrimedCover=hit.solid.id;
         var shellMult=b.shell?1.35:1;

@@ -24,7 +24,7 @@ function materializedCoreUpdater() {
 }
 const coreUpdate = materializedCoreUpdater();
 
-function boot(performance, updateImpl) {
+function boot(performance, updateImpl, apex) {
   function Game() {
     this.hash = { query(_x,_y,_r,out) { out.length = 0; } };
     this.tmp = []; this.cam = { shake: 0 };
@@ -48,6 +48,7 @@ function boot(performance, updateImpl) {
   const ctx = {window:{__novaModules:modules},console:{info(){},warn(){},error(){}},
     Math,Map,Date,performance:{now:()=>0}};
   const files=['battlefield-v1.6.0.js','disciplines-v1.7.0.js'];
+  if(apex)files.push('apex-disciplines-v1.7.1.js');
   if(performance)files.push('performance-v1.7.5.js');
   for(const file of files)vm.runInNewContext(
     fs.readFileSync(path.join(root,'nova-updates',file),'utf8'),ctx,{filename:file});
@@ -412,4 +413,71 @@ for(const optimized of [false,true]){
   assert.equal(bursts.length,1);
   assert.ok(bursts[0].x>150,'potential hostile interception retains authority');
  });
+}
+
+
+/* Run350: Apex's structural pre-pass must not apply direct-hit multiplier to
+ * a barricade physically beyond the Cannon fuse. Only legitimate splash
+ * should reach it; test the actual materialized Battlefield+Disciplines+Apex
+ * wrapper order rather than a synthetic damageCover calculation. */
+for(const optimized of [false,true]){
+ test((optimized?'optimized':'baseline')+
+  ' Quake structural pre-prime cannot damage cover beyond earlier fuse',()=>{
+  const Game=boot(optimized,null,true);
+  const {g,bursts}=run(Game,30,true,{cover:true,extras:g=>{
+   g.bullets[0].__novaStructureMult=2;
+  }});
+  assert.equal(bursts.length,1);
+  assert.ok(Math.abs(bursts[0].x-150)<1e-6);
+  assert.ok(g.__novaTerrain[0].hp>80,
+   'only fuse splash, not later direct structural damage, should reach cover; hp='+
+    g.__novaTerrain[0].hp);
+ });
+}
+
+for(const optimized of [false,true]){
+ test((optimized?'optimized':'baseline')+
+  ' real Quake-style noncluster structural shot cannot pre-prime later cover',()=>{
+  const Game=boot(optimized,null,true);
+  const {g,bursts}=run(Game,30,true,{cover:true,shell:false,pen:1,extras:g=>{
+   g.bullets[0].__novaStructureMult=1.9;
+  }});
+  assert.equal(bursts.length,0);
+  assert.ok(g.rings.some(r=>Math.abs(r.x-150)<1e-6),
+   'noncluster Cannon must airburst at fuse before cover');
+  assert.ok(g.__novaTerrain[0].hp>80,
+   'Quake structural direct-hit bonus cannot reach wall beyond fuse; hp='+
+    g.__novaTerrain[0].hp);
+ });
+}
+
+for(const optimized of [false,true]){
+ test((optimized?'optimized':'baseline')+
+  ' Apex structural bonus still applies when cover physically precedes fuse',()=>{
+  const Game=boot(optimized,null,true);
+  const {g,bursts}=run(Game,30,true,{cover:true,wallX:160,
+   shell:false,pen:1,extras:g=>{g.bullets[0].__novaStructureMult=1.9;}});
+  assert.equal(bursts.length,0);
+  assert.ok(g.__novaTerrain[0].hp<60,
+   'earlier direct cover contact must retain structural specialization; hp='+
+    g.__novaTerrain[0].hp);
+ });
+}
+
+for(const optimized of [false,true]){
+ const Game=boot(optimized,null,true);
+ for(const {hz,startX,wallX,vx} of [
+  {hz:60,startX:147.9,wallX:168,vx:380},
+  {hz:120,startX:147.9,wallX:164.625,vx:380},
+  {hz:240,startX:147.9,wallX:164.625,vx:861.84}
+ ]){
+  test((optimized?'optimized':'baseline')+
+   ' Quake fuse-first structural cover parity at '+hz+'Hz',()=>{
+   const {g}=run(Game,hz,true,{cover:true,shell:false,pen:1,
+    startX,wallX,vx,extras:g=>{g.bullets[0].__novaStructureMult=1.9;}});
+   assert.ok(g.rings.some(r=>Math.abs(r.x-150)<1e-6));
+   assert.ok(g.__novaTerrain[0].hp>80,
+    'later wall receives fuse splash only at '+hz+'Hz');
+  });
+ }
 }
