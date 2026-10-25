@@ -21,7 +21,10 @@ test('active overlays never compare tank class IDs against nonexistent classes',
  const classes=canonicalClasses(),ids=new Set(Object.keys(classes.CLASSES));
  const dir=path.join(root,'nova-updates'),failures=[];
  let inspected=0,comparisons=0;
- for(const name of fs.readdirSync(dir).filter(n=>n.endsWith('.js'))){
+ const active=[...html.matchAll(/<script\s+src="\.\/nova-updates\/([^"]+\.js)"/g)]
+   .map(match=>match[1]);
+ assert.equal(new Set(active).size,active.length,'no duplicate shipping overlays');
+ for(const name of active){
   const source=fs.readFileSync(path.join(dir,name),'utf8');
   const expressions=[
    /(?:\bt\.cls|\bcls|\bclassId)\s*===?\s*(['"])([a-z][a-z0-9_-]+)\1/g,
