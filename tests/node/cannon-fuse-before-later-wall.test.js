@@ -24,7 +24,7 @@ function materializedCoreUpdater() {
 }
 const coreUpdate = materializedCoreUpdater();
 
-function boot(performance) {
+function boot(performance, updateImpl) {
   function Game() {
     this.hash = { query(_x,_y,_r,out) { out.length = 0; } };
     this.tmp = []; this.cam = { shake: 0 };
@@ -32,6 +32,7 @@ function boot(performance) {
   for (const name of ['spawnPlayer','spawnShape','spawnPowerup','tryFire',
     'initBulletIntegrity','resolveBulletCollisions','addParticles','addFlash',
     'addRing','splashAt','updateDrones','update']) Game.prototype[name] = function(){};
+  if (typeof updateImpl === 'function') Game.prototype.update = updateImpl;
   Game.prototype.randSpawnPos = () => ({x:1500,y:1500});
   Game.prototype.moveTank = function(t,vx,vy,dt) {t.x+=vx*dt;t.y+=vy*dt;};
   Game.prototype.getTank = () => null;
@@ -252,3 +253,71 @@ for(const optimized of [false,true]){
   assert.ok(bursts[0].x>2204,'unsafe case retains existing wall burst');
  });
 }
+
+/* Run 347: a distant, observed drone must not globally veto a proven
+ * fuse-before-wall event. A nearby, stale, or discontinuously relocated
+ * drone remains a chronological ambiguity. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),prefix=optimized?'optimized':'baseline';
+ test(prefix+' observed distant drone allows earlier Cannon fuse',()=>{
+  const {bursts}=run(Game,30,true,{extras:g=>{
+   g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=5;
+   g.drones=[{id:4,kind:'drone',x:2000,y:2000,r:8,hp:50,
+     __novaChronoDroneEpoch:5,__novaChronoDronePrevX:1999,__novaChronoDronePrevY:2000}];
+  }});
+  assert.equal(bursts.length,1);
+  assert.ok(Math.abs(bursts[0].x-150)<1e-6,
+   'observed remote drone cannot force a physically later wall burst');
+ });
+ test(prefix+' observed nearby drone retains collision authority',()=>{
+  const {bursts}=run(Game,30,true,{extras:g=>{
+   g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=5;
+   g.drones=[{id:4,kind:'drone',x:152,y:28,r:8,hp:50,
+     __novaChronoDroneEpoch:5,__novaChronoDronePrevX:152,__novaChronoDronePrevY:28}];
+  }});
+  assert.equal(bursts.length,1);
+  assert.ok(bursts[0].x>150,'potential contact must retain existing ordering');
+ });
+ test(prefix+' stale drone history cannot authorize speculative fuse',()=>{
+  const {bursts}=run(Game,30,true,{extras:g=>{
+   g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=5;
+   g.drones=[{id:4,kind:'drone',x:2000,y:2000,r:8,hp:50,
+     __novaChronoDroneEpoch:4,__novaChronoDronePrevX:2000,__novaChronoDronePrevY:2000}];
+  }});
+  assert.equal(bursts.length,1);
+  assert.ok(bursts[0].x>150);
+ });
+ test(prefix+' discontinuous drone relocation cannot authorize fuse',()=>{
+  const {bursts}=run(Game,30,true,{extras:g=>{
+   g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=5;
+   g.drones=[{id:4,kind:'drone',x:2000,y:2000,r:8,hp:50,
+     __novaChronoDroneEpoch:5,__novaChronoDronePrevX:1800,__novaChronoDronePrevY:1800}];
+  }});
+  assert.equal(bursts.length,1);
+  assert.ok(bursts[0].x>150);
+ });
+}
+test('Battlefield Game.update captures live drone start before movement and bullets',()=>{
+ const Game=boot(false,function(dt){
+  this.time+=dt;
+  this.drones[0].x+=2;
+  this.updateBullets(dt);
+ });
+ const g=new Game(),bursts=[];
+ g.time=1;g.status='playing';g.tanks=[];g.shapes=[];g.drones=[
+  {id:4,kind:'drone',x:1998,y:2000,r:8,hp:50}];
+ g.__novaBattlefield={coverBroken:0};
+ g.__novaTerrain=[{id:-51,shape:'rect',x:168,y:0,w:20,h:80,
+   solid:true,destructible:false,hp:0}];
+ g.clusterBurst=b=>bursts.push({x:b.x,y:b.y});
+ g.weakenBullet=()=>{};g.rings=[];g.addRing=(x,y)=>g.rings.push({x,y});
+ g.bullets=[{kind:'bullet',id:777,ownerId:1,x:146,y:0,vx:380,vy:0,
+   r:8.5,dmg:26,ttl:2,shell:true,pen:1,hits:0,dead:false,
+   __v17Cannon:true,__v17FuseDist:150,__v17SpawnX:0,__v17SpawnY:0,
+   __v17FuseArmed:false,splash:72,splashDmg:.4,color:'#ffb45e'}];
+ g.update(1/30);
+ assert.equal(bursts.length,1);
+ assert.ok(Math.abs(bursts[0].x-150)<1e-6,
+   'full shipping update must preserve distant-drone chronology');
+ assert.equal(g.__novaShapeSweepActive,false);
+});
