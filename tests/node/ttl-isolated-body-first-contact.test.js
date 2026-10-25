@@ -492,3 +492,35 @@ for (const optimized of [false, true]) {
   });
  }
 }
+
+
+test('remote shield with witnessed small movement still permits TTL hit',()=>{
+ const g=isolatedWorld({x:28,vx:6000,ttl:.002,extraTanks:[{
+  kind:'tank',id:3,x:1000,y:1000,cls:'scout',hp:100,alive:true,spawnShieldT:1,
+  __novaSweepPrevX:999,__novaSweepPrevY:1000
+ }]});
+ g.tanks[1].__novaSweepMoveTime=g.time;
+ g.updateBullets(1/30);
+ assert.equal(g.hits,1);
+});
+test('shielded tank crossing the shot corridor remains ambiguous',()=>{
+ const g=isolatedWorld({x:28,vx:6000,ttl:.002,extraTanks:[{
+  kind:'tank',id:3,x:1000,y:1000,cls:'scout',hp:100,alive:true,spawnShieldT:1,
+  __novaSweepPrevX:20,__novaSweepPrevY:0
+ }]});
+ g.tanks[1].__novaSweepMoveTime=g.time;
+ g.updateBullets(1/30);
+ assert.equal(g.hits,0,'observed moving protected tank could have intercepted');
+});
+test('nonfinite moving-tank history cannot authorize speculative TTL damage',()=>{
+ for (const position of ['target','remote']) {
+  const g=isolatedWorld({x:28,vx:6000,ttl:.002,extraTanks:[{
+   kind:'tank',id:3,x:1000,y:1000,cls:'scout',hp:100,alive:true,spawnShieldT:1
+  }]});
+  const tank=position==='target'?g.tanks[0]:g.tanks[1];
+  tank.__novaSweepMoveTime=g.time;
+  tank.__novaSweepPrevX=NaN;tank.__novaSweepPrevY=0;
+  g.updateBullets(1/30);
+  assert.equal(g.hits,0,'invalid '+position+' movement must defer');
+ }
+});
