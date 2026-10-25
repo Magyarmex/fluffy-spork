@@ -424,7 +424,7 @@ function exactMovingShapeHitT(ax,ay,ex,ey,sx,sy,sxe,sye,rr){
   if(q<=0n)high=mid;else low=mid;
  }
  var t=Number(boundN)/Number(boundD)*(Number(high)/Number(den));
- return t<1?t:null;
+ return Number.isFinite(t)?Math.min(t,1-Number.EPSILON/2):null;
 }
 function movingShapeHitT(g,s,ax,ay,ex,ey,rr){
  var start=shapeSweepStart(g,s);if(!start)return null;
@@ -433,7 +433,7 @@ function movingShapeHitT(g,s,ax,ay,ex,ey,rr){
  var B=2*(fx*dx+fy*dy),C=fx*fx+fy*fy-rr*rr;
  if(!Number.isFinite(A)||!Number.isFinite(B)||!Number.isFinite(C))return null;
  if(C< -1e-9)return 0;
- var D=B*B-4*A*C,magnitude=B*B+4*Math.abs(A*C);
+ var D=B*B-4*A*C,magnitude=B*B+4*A*(fx*fx+fy*fy+rr*rr);
  if(Math.abs(C)<=1e-9||(A>0&&Number.isFinite(D)&&Math.abs(D)<=1e-12*magnitude))
   return exactMovingShapeHitT(ax,ay,ex,ey,start.x,start.y,s.x,s.y,rr);
  if(A<1e-12||!(D>0))return null;
