@@ -27,6 +27,8 @@ const update=new Function('classes_1','types_1','M','return function(dt){'+core(
 function boot(cls='cannon',angle=0,vx=0,vy=0){
  const labels=[],bursts=[],segments=[];
  const ctx={save(){},restore(){},setTransform(){},setLineDash(){},beginPath(){},
+ translate(){},roundRect(){},strokeRect(){},fillRect(){},
+ createLinearGradient(){return{addColorStop(){}};},
  moveTo(x,y){this.__start={x,y};},lineTo(x,y){segments.push({from:this.__start,to:{x,y}});},
  stroke(){},fill(){},arc(){},fillText(label,x,y){labels.push({label,x,y});}};
  function Game(){
