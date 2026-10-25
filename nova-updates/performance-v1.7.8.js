@@ -228,6 +228,8 @@ wrap('game/engine',function(engine,require){
     if(!(A>1e-12)||!Number.isFinite(A)||halfB>=0)return null;
     var D=halfB*halfB-A*C;
     if(!(D>=0)||!Number.isFinite(D))return null;
+    /* Floating-point cancellation near tangency makes contact uncertain. */
+    if(D<=64*Number.EPSILON*(Math.abs(halfB*halfB)+Math.abs(A*C)))return null;
     var hit=C/(-halfB+Math.sqrt(D));
     return Number.isFinite(hit)&&hit>=0?hit:null;
   }
@@ -279,10 +281,11 @@ wrap('game/engine',function(engine,require){
         if(!(A>1e-12)||!Number.isFinite(A)||halfB>=0)continue;
         var D=halfB*halfB-A*C;
         if(!(D>=0)||!Number.isFinite(D))continue;
+        if(D<=64*Number.EPSILON*(Math.abs(halfB*halfB)+Math.abs(A*C)))continue;
         /* Stable entry root: avoids cancellation for fast shallow hits. */
         hit=C/(-halfB+Math.sqrt(D));
       }
-      if(!Number.isFinite(hit)||hit<0||hit>b.ttl+1e-9)continue;
+      if(!Number.isFinite(hit)||hit<0||hit>b.ttl)continue;
       if(!best||hit<best.time)best={targetId:t.id,time:hit,
         immune:t.spawnShieldT>0||t.shieldT>0,guardAmbiguous:t.bulwarkT>0||t.tauntT>0,
         x:b.x+(b.vx||0)*hit,y:b.y+(b.vy||0)*hit};
@@ -294,7 +297,7 @@ wrap('game/engine',function(engine,require){
       if(!shape||shape.kind!=='shape'||!(shape.hp>0)||!(shape.r>0)||
          !Number.isFinite(shape.x)||!Number.isFinite(shape.y))continue;
       var shapeTime=chronoStaticBodyTime(b,shape,(b.r||2)+shape.r);
-      if(shapeTime===null||shapeTime>b.ttl+1e-9)continue;
+      if(shapeTime===null||shapeTime>b.ttl)continue;
       if(best&&Math.abs(shapeTime-best.time)<=1e-9)return null;
       if(!best||shapeTime<best.time)best={targetId:shape.id,kind:'shape',time:shapeTime,
         x:b.x+(b.vx||0)*shapeTime,y:b.y+(b.vy||0)*shapeTime};
@@ -307,7 +310,7 @@ wrap('game/engine',function(engine,require){
       if(owner&&typeof g.getTank==='function'&&
          chronoAlliedOwner(g,owner,g.getTank(drone.ownerId)))continue;
       var droneTime=chronoStaticBodyTime(b,drone,(b.r||2)+drone.r+1);
-      if(droneTime===null||droneTime>b.ttl+1e-9)continue;
+      if(droneTime===null||droneTime>b.ttl)continue;
       if(best&&Math.abs(droneTime-best.time)<=1e-9)return null;
       if(!best||droneTime<best.time)best={targetId:drone.id,kind:'drone',time:droneTime,
         x:b.x+(b.vx||0)*droneTime,y:b.y+(b.vy||0)*droneTime};
