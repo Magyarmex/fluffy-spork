@@ -346,16 +346,34 @@ wrap('game/engine',function(engine,require){
           continue;
         }
         var sx=drone.__novaChronoDronePrevX,sy=drone.__novaChronoDronePrevY;
-        if(sx!==drone.x||sy!==drone.y){
+        var minDX=Math.min(sx,drone.x),maxDX=Math.max(sx,drone.x),
+            minDY=Math.min(sy,drone.y),maxDY=Math.max(sy,drone.y);
+        /* Optional stage checkpoints can expose an excursion that ends back
+         * at its starting point. They are observations, NOT collision times. */
+        function includeStage(x,y){
+          if(!Number.isFinite(x)||!Number.isFinite(y))return;
+          minDX=Math.min(minDX,x);maxDX=Math.max(maxDX,x);
+          minDY=Math.min(minDY,y);maxDY=Math.max(maxDY,y);
+        }
+        var epoch=g.__novaShapeSweepEpoch;
+        if(drone.__novaChronoDroneTraceEpoch===epoch){
+          includeStage(drone.__novaChronoDroneBaseX,drone.__novaChronoDroneBaseY);
+          includeStage(drone.__novaChronoDroneTerrainX,drone.__novaChronoDroneTerrainY);
+        }
+        if(drone.__novaChronoDroneRouteEpoch===epoch)
+          includeStage(drone.__novaChronoDroneRouteX,drone.__novaChronoDroneRouteY);
+        if(drone.__novaChronoDroneLiveEpoch===epoch)
+          includeStage(drone.__novaChronoDroneLiveX,drone.__novaChronoDroneLiveY);
+        if(maxDX-minDX>1e-9||maxDY-minDY>1e-9){
           var horizon=Math.min(dt,b.ttl),ex=b.x+(b.vx||0)*horizon,
               ey=b.y+(b.vy||0)*horizon;
           var boundSpeed=drone.speed>0&&Number.isFinite(drone.speed)?
             Math.max(800,drone.speed*4):800;
           var pad=droneRadius+Math.max(30,dt*boundSpeed);
-          if(Math.max(b.x,ex)+pad>=Math.min(sx,drone.x)&&
-             Math.min(b.x,ex)-pad<=Math.max(sx,drone.x)&&
-             Math.max(b.y,ey)+pad>=Math.min(sy,drone.y)&&
-             Math.min(b.y,ey)-pad<=Math.max(sy,drone.y))return null;
+          if(Math.max(b.x,ex)+pad>=minDX&&
+             Math.min(b.x,ex)-pad<=maxDX&&
+             Math.max(b.y,ey)+pad>=minDY&&
+             Math.min(b.y,ey)-pad<=maxDY)return null;
           continue;
         }
       }
