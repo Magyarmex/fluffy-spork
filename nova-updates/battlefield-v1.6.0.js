@@ -643,6 +643,12 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    }
    if(!(rr>0)||!Number.isFinite(sx)||!Number.isFinite(sy)||
       !Number.isFinite(mx)||!Number.isFinite(my)){uncertain=true;return;}
+   /* Reject distant bodies before the more expensive swept-circle roots. */
+   var bx=ax+dx*limit,by=ay+dy*limit,tx1=sx+mx,ty1=sy+my;
+   if(Math.max(ax,bx)<Math.min(sx,tx1)-rr||
+      Math.min(ax,bx)>Math.max(sx,tx1)+rr||
+      Math.max(ay,by)<Math.min(sy,ty1)-rr||
+      Math.min(ay,by)>Math.max(sy,ty1)+rr)return;
    var fx=ax-sx,fy=ay-sy,rx=dx-mx,ry=dy-my;
    var A=rx*rx+ry*ry,B=2*(fx*rx+fy*ry),C=fx*fx+fy*fy-rr*rr;
    if(!Number.isFinite(A)||!Number.isFinite(B)||!Number.isFinite(C)){uncertain=true;return;}
