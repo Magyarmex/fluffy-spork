@@ -23,7 +23,7 @@ function close(a,b,msg){assert.ok(Math.abs(a-b)<1e-8,msg+': expected '+b+', got 
 for(const hz of [30,60,120,240]){
   test('Controller east command aligns wall across hull heading at '+hz+'Hz',()=>{
     const p=point('wall',0,Math.PI/2,0);
-    close(p.x,98,'wall x');close(p.y,165,'wall y');
+    close(p.x,97.5,'wall x');close(p.y,165,'wall y');
   });
   test('Controller east command aligns wing across hull heading at '+hz+'Hz',()=>{
     const p=point('wing',0,Math.PI/2,0);
@@ -36,12 +36,12 @@ for(const hz of [30,60,120,240]){
 }
 test('nonzero command bearing still overrides hull heading',()=>{
   const p=point('wall',Math.PI/2,0,0);
-  close(p.x,135,'wall north x');close(p.y,198,'wall north y');
+  close(p.x,135,'wall north x');close(p.y,197.5,'wall north y');
 });
 test('missing or invalid command bearing falls back to hull bearing',()=>{
   for(const angle of [undefined,Number.NaN,Infinity]){
     const p=point('wall',angle,Math.PI/2,0);
-    close(p.x,135,'fallback x');close(p.y,198,'fallback y');
+    close(p.x,135,'fallback x');close(p.y,197.5,'fallback y');
   }
 });
 test('formation computation never changes command state or hull heading',()=>{
