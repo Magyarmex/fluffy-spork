@@ -62,7 +62,7 @@ function boot(performance, enabled=true) {
   return m.exports.Game;
 }
 
-function run(Game,hz,withWall=true,{startX=146,wallX=168,vx=380,ttl=2}={}){
+function run(Game,hz,withWall=true,{startX=146,wallX=168,vx=380,ttl=2,probeThrows=false}={}){
   const g=new Game(),bursts=[];
   g.time=1;g.__novaBattlefield={coverBroken:0};
   g.__novaTerrain=withWall?[{id:-51,shape:'rect',x:wallX,y:0,w:20,h:80,
@@ -161,6 +161,7 @@ test('diagonal Cannon trajectory is compared from muzzle, not X projection',()=>
     x:154.175*unit+10+pad,y:0,w:20,h:300,
     solid:true,destructible:false}];
   g.bursts=bursts;g.weakenBullet=()=>{};
+  if(probeThrows)g.firstTerrainHit=()=>{throw new Error('synthetic terrain probe failure');};
   g.bullets=[{kind:'bullet',id:778,ownerId:1,
     x:146*unit,y:146*unit,vx:380*unit,vy:380*unit,
     r:8.5,dmg:26,ttl:2,shell:true,pen:1,hits:0,dead:false,
@@ -217,3 +218,17 @@ test('simultaneous fuse threshold and wall are not called a definite misorder',(
   assert.equal(snap.fuseBeforeWallCandidates,0);
   assert.equal(snap.fuseBeforeWallLateBursts,0);
 });
+
+for(const optimized of [false,true]){
+  test('optional Cannon probe failure cannot interrupt live combat ('+
+       (optimized?'optimized':'baseline')+')',()=>{
+    const Game=boot(optimized),{g,bursts}=run(Game,30,true,{probeThrows:true});
+    assert.equal(bursts.length,1,'normal Battlefield burst must still happen');
+    assert.ok(bursts[0].x>150,'original wall behavior is unchanged');
+    const snap=g.novaChronoShadowSnapshot();
+    assert.equal(snap.fuseWallAuditErrors,1);
+    assert.equal(snap.fuseBeforeWallCandidates,0);
+    assert.equal(snap.fuseBeforeWallLateBursts,0);
+    assert.equal(g.__novaChronoShadowFrame,undefined);
+  });
+}
