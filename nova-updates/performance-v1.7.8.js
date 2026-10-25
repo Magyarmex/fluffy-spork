@@ -393,7 +393,7 @@ wrap('game/engine',function(engine,require){
   function chronoState(g){
     var s=g.__novaChronoShadow||(g.__novaChronoShadow={
       frames:0,sampledShells:0,sampledShortShots:0,bursts:0,
-      ttlOvershoots:0,arenaOvershoots:0,fuseBeforeWallCandidates:0,fuseBeforeWallLateBursts:0,predictedBodyContacts:0,
+      ttlOvershoots:0,arenaOvershoots:0,fuseBeforeWallCandidates:0,fuseBeforeWallLateBursts:0,fuseWallAuditErrors:0,predictedBodyContacts:0,
       registeredBodyContacts:0,unregisteredBodyContacts:0,
       terrainOccludedBodyContacts:0,defenseAmbiguousBodyContacts:0,interceptionAmbiguousBodyContacts:0,
       interceptionUnscannedBodyContacts:0,bodyAuditErrors:0,
@@ -463,7 +463,9 @@ wrap('game/engine',function(engine,require){
         shellSampled++;
         var s={id:b.id,x:b.x,y:b.y,vx:b.vx||0,vy:b.vy||0,ttl:b.ttl};
         s.exit=chronoExitTime(s);
-        s.fuseFirst=chronoFuseBeforeWall(this,b,dt);
+        /* Diagnostics must fail open: terrain probes cannot interrupt combat. */
+        try{s.fuseFirst=chronoFuseBeforeWall(this,b,dt);}
+        catch(_){st.fuseWallAuditErrors++;s.fuseFirst=null;}
         if(s.fuseFirst)st.fuseBeforeWallCandidates++;
         samples.set(b,s);st.sampledShells++;
       }else if(b.ttl>0&&b.ttl<=dt&&!b.beam&&!(b.hits>0)){
@@ -510,6 +512,7 @@ wrap('game/engine',function(engine,require){
       ttlOvershoots:s.ttlOvershoots,arenaOvershoots:s.arenaOvershoots,
       fuseBeforeWallCandidates:s.fuseBeforeWallCandidates,
       fuseBeforeWallLateBursts:s.fuseBeforeWallLateBursts,
+      fuseWallAuditErrors:s.fuseWallAuditErrors,
       predictedBodyContacts:s.predictedBodyContacts,
       registeredBodyContacts:s.registeredBodyContacts,
       unregisteredBodyContacts:s.unregisteredBodyContacts,
@@ -519,7 +522,7 @@ wrap('game/engine',function(engine,require){
       interceptionUnscannedBodyContacts:s.interceptionUnscannedBodyContacts,
       bodyAuditErrors:s.bodyAuditErrors,maxOvershootUnits:s.maxOvershootUnits,events:s.events.slice()}:
       {frames:0,sampledShells:0,sampledShortShots:0,bursts:0,
-       ttlOvershoots:0,arenaOvershoots:0,fuseBeforeWallCandidates:0,fuseBeforeWallLateBursts:0,predictedBodyContacts:0,
+       ttlOvershoots:0,arenaOvershoots:0,fuseBeforeWallCandidates:0,fuseBeforeWallLateBursts:0,fuseWallAuditErrors:0,predictedBodyContacts:0,
        registeredBodyContacts:0,unregisteredBodyContacts:0,
        terrainOccludedBodyContacts:0,defenseAmbiguousBodyContacts:0,interceptionAmbiguousBodyContacts:0,
        interceptionUnscannedBodyContacts:0,bodyAuditErrors:0,
