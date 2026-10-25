@@ -252,3 +252,43 @@ for (const optimized of [false, true]) {
     });
   }
 }
+
+
+/* Independent 1D first-event oracle: the wall's padded entry plane is
+ * wallX - width/2 - shellRadius*.45. Compare that physical time to TTL,
+ * not to the rendered frame endpoint, across reproducible wall placements. */
+test('Bomber TTL versus wall first-event oracle across 800 shipping-core worlds', () => {
+  let seed = 1947;
+  function random() {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 0x100000000;
+  }
+  for (const optimized of [false, true]) {
+    const Game = boot(optimized);
+    for (const fps of [30, 60, 120, 240]) {
+      for (let n = 0; n < 100; n++) {
+        const earlier = n % 2 === 0;
+        const wallX = earlier ? 10 + random() * 15 : 45 + random() * 150;
+        const expectedX = earlier ? wallX - 2 - 3 * .45 : 30;
+        const g = new Game(), origins = [];
+        g.time = 1; g.__novaBattlefield = { coverBroken: 0 };
+        g.__novaTerrain = [{ id: -11, shape: 'rect', x: wallX, y: 0,
+          w: 4, h: 80, solid: true, destructible: true, hp: 100 }];
+        g.addRing = (x, y) => origins.push({ x, y });
+        g.bullets = [{ id: 777, x: 0, y: 0, vx: 6000, vy: 0,
+          r: 3, dmg: 26, ttl: .005, shell: true, ownerId: 1,
+          pen: 0, hits: 0, dead: false, color: '#aef', clusterDmg: 8 }];
+        for (let f = 0; f < 6 && !origins.length; f++) {
+          g.time += 1 / fps;
+          g.updateBullets(1 / fps);
+        }
+        assert.equal(origins.length, 1, 'one physical burst at world ' + n);
+        assert.ok(Math.abs(origins[0].x - expectedX) < 1e-6,
+          'wrong first event at ' + fps + 'Hz, wall ' + wallX +
+          ', expected ' + expectedX + ', got ' + origins[0].x);
+        if (!earlier) assert.equal(g.__novaTerrain[0].hp, 100,
+          'unreachable later cover must not receive shell damage');
+      }
+    }
+  }
+});
