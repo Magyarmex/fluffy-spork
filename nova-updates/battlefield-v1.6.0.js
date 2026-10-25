@@ -608,32 +608,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   var dx=b.vx*dt,dy=b.vy*dt,limit=b.ttl/dt;
   if(!Number.isFinite(dx)||!Number.isFinite(dy)||!(dx*dx+dy*dy>1e-12)||
      Math.abs(b.x)>=MAP_LIMIT-20||Math.abs(b.y)>=MAP_LIMIT-20)return false;
-  /* A live drone may intercept this projectile before the body. Only
-   * exclude a drone when its complete observed movement corridor is remote.
-   * Missing/newborn, nonfinite or discontinuous histories remain ambiguous. */
-  var ax=b.x,ay=b.y,ex=ax+dx*limit,ey=ay+dy*limit;
-  var drones=g.drones||[];
-  for(var di=0;di<drones.length;di++){
-   var dr=drones[di];if(!dr||!(dr.hp>0))continue;
-   if(!g.__novaShapeSweepActive||
-      dr.__novaChronoDroneEpoch!==g.__novaShapeSweepEpoch)return false;
-   var sx=dr.__novaChronoDronePrevX,sy=dr.__novaChronoDronePrevY;
-   if(!Number.isFinite(sx)||!Number.isFinite(sy)||
-      !Number.isFinite(dr.x)||!Number.isFinite(dr.y))return false;
-   var mx=dr.x-sx,my=dr.y-sy;
-   if(mx*mx+my*my>96*96)return false;
-   /* Canonical committed dives can exceed base drone speed. Bound any
-    * unobserved curved motion by four times the recorded speed; malformed
-    * speeds cannot authorize a speculative contact. */
-   if(dr.speed!=null&&!Number.isFinite(dr.speed))return false;
-   var motionBound=Math.max(800,(dr.speed>0?dr.speed*4:800));
-   var pad=Math.max(0,b.r||2)+Math.max(0,dr.r||8)+1+
-     Math.max(30,dt*motionBound);
-   if(Math.max(ax,ex)+pad>=Math.min(sx,dr.x)&&
-      Math.min(ax,ex)-pad<=Math.max(sx,dr.x)&&
-      Math.max(ay,ey)+pad>=Math.min(sy,dr.y)&&
-      Math.min(ay,ey)-pad<=Math.max(sy,dr.y))return false;
-  }
+  /* First resolve the earliest body candidate. A drone can only veto a
+   * contact if it might intercept BEFORE that candidate, not somewhere later
+   * on the projectile's remaining TTL path. */
+  var ax=b.x,ay=b.y;
   var best=null,bestT=limit,tie=false,uncertain=false;
   function consider(e,kind){
    if(!e)return;
@@ -704,6 +682,29 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   if(!best||tie||uncertain)return false;
   var hx=ax+dx*bestT,hy=ay+dy*bestT;
   if(Math.abs(hx)>=MAP_LIMIT-20||Math.abs(hy)>=MAP_LIMIT-20)return false;
+  /* Owned drones are transparent to their own projectiles in the shipping
+   * core. A hostile drone may still intercept earlier: only rule it out if
+   * the witnessed start/end corridor plus a conservative curved-motion pad
+   * is remote from the segment ending at the chosen FIRST body contact. */
+  var drones=g.drones||[];
+  for(var di=0;di<drones.length;di++){
+   var dr=drones[di];if(!dr||!(dr.hp>0)||dr.ownerId===b.ownerId)continue;
+   if(!g.__novaShapeSweepActive||
+      dr.__novaChronoDroneEpoch!==g.__novaShapeSweepEpoch)return false;
+   var sx=dr.__novaChronoDronePrevX,sy=dr.__novaChronoDronePrevY;
+   if(!Number.isFinite(sx)||!Number.isFinite(sy)||
+      !Number.isFinite(dr.x)||!Number.isFinite(dr.y))return false;
+   var mx=dr.x-sx,my=dr.y-sy;
+   if(mx*mx+my*my>96*96)return false;
+   if(dr.speed!=null&&!Number.isFinite(dr.speed))return false;
+   var motionBound=Math.max(800,(dr.speed>0?dr.speed*4:800));
+   var pad=Math.max(0,b.r||2)+Math.max(0,dr.r||8)+1+
+     Math.max(30,dt*motionBound);
+   if(Math.max(ax,hx)+pad>=Math.min(sx,dr.x)&&
+      Math.min(ax,hx)-pad<=Math.max(sx,dr.x)&&
+      Math.max(ay,hy)+pad>=Math.min(sy,dr.y)&&
+      Math.min(ay,hy)-pad<=Math.max(sy,dr.y))return false;
+  }
   /* A cover event at or before the body makes this lane ambiguous, including
    * destructible-cover penetration and exact-time ties. */
   if(firstSolidHit(g,ax,ay,hx,hy,(b.r||2)*.45))return false;
