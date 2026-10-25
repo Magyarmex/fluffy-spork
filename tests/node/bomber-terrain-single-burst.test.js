@@ -110,6 +110,7 @@ for (const optimized of [false, true]) {
       destructible: true, pen: 3, ttl: 0.005,
     });
     assert.equal(g.__novaTerrain[0].solid, false);
+    assert.equal(b.__novaBreachAtTime, g.time, 'surviving cover breach must be stamped');
     assert.equal(bursts, 1, 'penetrating shell must still burst at TTL');
     assert.equal(b.dead, true);
   });
