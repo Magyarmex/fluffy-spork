@@ -25,7 +25,7 @@ function shippingCoreBullets() {
     { CLASSES: { scout: { size: 15 } } }, 2250);
 }
 
-function boot() {
+function boot(updateImpl) {
   class Game {
     constructor() {
       this.time = 1;
@@ -45,6 +45,7 @@ function boot() {
     'splashAt', 'initBulletIntegrity', 'addRing', 'addFlash',
     'addImpactDebris', 'damageShape', 'damageDrone', 'weakenBullet',
     'clusterBurst']) Game.prototype[method] = function() {};
+  if (typeof updateImpl === 'function') Game.prototype.update = updateImpl;
   Game.prototype.randSpawnPos = () => ({ x: 1500, y: 1500 });
   Game.prototype.getTank = () => null;
   Game.prototype.resolveBulletCollisions = function() {};
@@ -342,4 +343,81 @@ test('distant same-frame child does not suppress an unrelated tank hit',()=>{
  g.shapes=[{id:9,kind:'shape',type:'circle',x:900,y:900,r:5,hp:20,born:g.time}];
  g.updateBullets(1/30);
  assert.equal(g.hits,1,'only newborn shapes in the swept corridor are ambiguous');
+});
+
+/* Run347: the observed drone-motion corridor can exclude remote drones.
+ * Unknown, near, stale or discontinuous drone motion remains a blocker. */
+for(const hz of [30,60,120,240]){
+ test('isolated TTL body contact survives witnessed distant drone at '+hz+'Hz',()=>{
+  const g=isolatedWorld({x:28,vx:6000,ttl:.002,drones:[{
+   kind:'drone',id:5,ownerId:3,x:1000,y:1000,r:8,hp:20,
+   __novaChronoDroneEpoch:7,__novaChronoDronePrevX:999,__novaChronoDronePrevY:1000
+  }]});
+  g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=7;
+  g.updateBullets(1/hz);
+  assert.equal(g.hits,1,'remote observed drone must not erase a physical hit');
+ });
+}
+test('nearby witnessed drone preserves authoritative interception order',()=>{
+ const g=isolatedWorld({drones:[{
+  kind:'drone',id:5,ownerId:3,x:12,y:0,r:8,hp:20,
+  __novaChronoDroneEpoch:7,__novaChronoDronePrevX:12,__novaChronoDronePrevY:0
+ }]});
+ g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=7;
+ g.updateBullets(1/30);
+ assert.equal(g.hits,0);
+});
+test('witnessed drone crossing the projectile corridor prevents shortcut',()=>{
+ const g=isolatedWorld({drones:[{
+  kind:'drone',id:5,ownerId:3,x:35,y:-15,r:8,hp:20,
+  __novaChronoDroneEpoch:7,__novaChronoDronePrevX:20,__novaChronoDronePrevY:15
+ }]});
+ g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=7;
+ g.updateBullets(1/30);
+ assert.equal(g.hits,0);
+});
+test('stale or discontinuous drone history cannot authorize TTL shortcut',()=>{
+ for(const drone of [
+  {__novaChronoDroneEpoch:6,__novaChronoDronePrevX:1000,__novaChronoDronePrevY:1000},
+  {__novaChronoDroneEpoch:7,__novaChronoDronePrevX:800,__novaChronoDronePrevY:800},
+  {__novaChronoDroneEpoch:7,__novaChronoDronePrevX:NaN,__novaChronoDronePrevY:1000}
+ ]){
+  const g=isolatedWorld({drones:[{kind:'drone',id:5,ownerId:3,
+   x:1000,y:1000,r:8,hp:20,...drone}]});
+  g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=7;
+  g.updateBullets(1/30);
+  assert.equal(g.hits,0);
+ }
+});
+test('real Battlefield Game.update snapshots distant drone before projectile TTL',()=>{
+ const FullGame=boot(function(dt){
+  this.time+=dt;
+  this.drones[0].x+=2;
+  this.updateBullets(dt);
+ });
+ const g=new FullGame();
+ g.tanks=[{kind:'tank',id:2,x:28,y:0,cls:'scout',hp:100,alive:true}];
+ g.drones=[{kind:'drone',id:5,ownerId:3,x:1000,y:1000,r:8,hp:20}];
+ g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,vx:6000,vy:0,
+  r:3,dmg:20,ttl:.002,pen:0,hits:0,dead:false,shell:false,beam:false}];
+ g.update(1/30);
+ assert.equal(g.hits,1,'materialized Game.update must allow remote-drone hit');
+ assert.equal(g.__novaShapeSweepActive,false);
+});
+
+test('extreme-speed remote drone cannot be ruled out by TTL shortcut',()=>{
+ const g=isolatedWorld({drones:[{kind:'drone',id:5,ownerId:3,
+  x:500,y:0,r:8,hp:20,speed:4000,
+  __novaChronoDroneEpoch:7,__novaChronoDronePrevX:500,__novaChronoDronePrevY:0}]});
+ g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=7;
+ g.updateBullets(1/30);
+ assert.equal(g.hits,0,'a high-speed drone can traverse this corridor');
+});
+test('nonfinite drone speed keeps TTL recovery conservative',()=>{
+ const g=isolatedWorld({drones:[{kind:'drone',id:5,ownerId:3,
+  x:1000,y:1000,r:8,hp:20,speed:NaN,
+  __novaChronoDroneEpoch:7,__novaChronoDronePrevX:1000,__novaChronoDronePrevY:1000}]});
+ g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=7;
+ g.updateBullets(1/30);
+ assert.equal(g.hits,0);
 });
