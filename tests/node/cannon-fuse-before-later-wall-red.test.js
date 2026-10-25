@@ -60,7 +60,7 @@ function boot(performance) {
   return m.exports.Game;
 }
 
-function run(Game,hz,withWall=true,{startX=146,wallX=168}={}){
+function run(Game,hz,withWall=true,{startX=146,wallX=168,vx=380}={}){
   const g=new Game(),bursts=[];
   g.time=1;g.__novaBattlefield={coverBroken:0};
   g.__novaTerrain=withWall?[{id:-51,shape:'rect',x:wallX,y:0,w:20,h:80,
@@ -68,7 +68,7 @@ function run(Game,hz,withWall=true,{startX=146,wallX=168}={}){
   g.clusterBurst=b=>bursts.push({x:b.x,y:b.y});
   g.weakenBullet=()=>{};
   g.bullets=[{kind:'bullet',id:777,ownerId:1,x:startX,y:0,
-    vx:380,vy:0,r:8.5,dmg:26,ttl:2,shell:true,pen:1,hits:0,dead:false,
+    vx,vy:0,r:8.5,dmg:26,ttl:2,shell:true,pen:1,hits:0,dead:false,
     __v17Cannon:true,__v17FuseDist:150,__v17SpawnX:0,__v17SpawnY:0,
     __v17FuseArmed:false,splash:72,splashDmg:.4,color:'#ffb45e'}];
   for(let frame=0;frame<10&&g.bullets.length;frame++){
@@ -106,12 +106,16 @@ for(const optimized of [false,true]){
  * earlier programmed fuse, even if it also crosses a wall later. */
 for(const optimized of [false,true]){
   const Game=boot(optimized),label=optimized?'Battlefield + Performance':'Battlefield';
-  for(const {hz,startX,wallX} of [
-    {hz:60,startX:147.9,wallX:168},
-    {hz:120,startX:147.9,wallX:164.625}
+  for(const {hz,startX,wallX,vx} of [
+    {hz:60,startX:147.9,wallX:168,vx:380},
+    {hz:120,startX:147.9,wallX:164.625,vx:380},
+    // 380*(1+0.085*8)*1.35 = 861.84u/s with 8 bullet-speed points
+    // and Sniper gene; a fast Cannon can encounter the same ordering defect
+    // even at 240Hz. Use the actual class-derived speed, not an arbitrary 1k.
+    {hz:240,startX:147.9,wallX:164.625,vx:380*(1+0.085*8)*1.35}
   ]){
     test(label+' reachable subframe phase: fuse beats later wall at '+hz+'Hz',()=>{
-      const {bursts}=run(Game,hz,true,{startX,wallX});
+      const {bursts}=run(Game,hz,true,{startX,wallX,vx});
       assert.equal(bursts.length,1);
       assert.ok(bursts[0].x>=148-1e-6&&bursts[0].x<=150+1e-6,
         'wall pre-pass must not override earlier fuse; burst x='+bursts[0].x);
