@@ -645,6 +645,9 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       Math.min(ax,bx)>Math.max(sx,tx1)+rr||
       Math.max(ay,by)<Math.min(sy,ty1)-rr||
       Math.min(ay,by)>Math.max(sy,ty1)+rr)return;
+   /* A child shape created by an earlier hit during this very frame has no
+    * valid frame-start existence interval. Defer rather than backdate it. */
+   if(kind==='shape'&&e.born===g.time){uncertain=true;return;}
    var fx=ax-sx,fy=ay-sy,rx=dx-mx,ry=dy-my;
    var A=rx*rx+ry*ry,B=2*(fx*rx+fy*ry),C=fx*fx+fy*fy-rr*rr;
    if(!Number.isFinite(A)||!Number.isFinite(B)||!Number.isFinite(C)){uncertain=true;return;}
