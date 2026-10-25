@@ -102,6 +102,18 @@
     var oldAttach = Input.prototype.attach, oldDetach = Input.prototype.detach;
     if (typeof oldAttach !== 'function') return;
     Input.prototype.__novaBlurStickReset = true;
+    /* The core checks aimVec() BEFORE its mouse-world-point branch.
+     * Keyboard/left-stick movement is a fallback bearing, not an override
+     * for an actively owned mouse cursor. Without this, WASD movement turns
+     * the gun in the movement direction even while the cursor aims elsewhere.
+     * Keep touch right-stick and touch-only movement semantics unchanged. */
+    var baseAimVec = Input.prototype.aimVec;
+    if (typeof baseAimVec === 'function') Input.prototype.aimVec = function (move) {
+      if (this.mouseActive && !this.touchSeen &&
+          !(this.aim && this.aim.active) &&
+          Number.isFinite(this.mouseX) && Number.isFinite(this.mouseY)) return null;
+      return baseAimVec.call(this, move);
+    };
     // Return mouse control after touch/pen ends on hybrid devices.
     function inputClockMs() {
       return typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
