@@ -1,5 +1,5 @@
 'use strict';
-// Opt-in, read-only fuse-before-wall chronology audit. The shipping defect remains intentionally unchanged.
+// Opt-in, read-only fuse-before-wall chronology audit with bounded production correction.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -89,10 +89,10 @@ for(const optimized of [false,true]){
       assert.equal(bursts.length,1);
       const s=g.novaChronoShadowSnapshot();
       if(hz===30){
-        assert.ok(bursts[0].x>150.1,'shipping misorder must be reproduced');
+        assert.ok(bursts[0].x>=148-1e-6&&bursts[0].x<=150+1e-6,'earlier fuse must win');
         assert.equal(s.fuseBeforeWallCandidates,1);
-        assert.equal(s.fuseBeforeWallLateBursts,1);
-        assert.equal(s.events.some(e=>e.kind==='fuse-before-wall-late-burst'),true);
+        assert.equal(s.fuseBeforeWallLateBursts,0);
+        assert.equal(s.events.some(e=>e.kind==='fuse-before-wall-late-burst'),false);
       }else{
         assert.ok(bursts[0].x>=148-1e-6&&bursts[0].x<=150+1e-6);
         assert.equal(s.fuseBeforeWallCandidates,0);
@@ -125,10 +125,10 @@ for(const optimized of [false,true]){
     test(label+' diagnostic catches reachable subframe phase at '+hz+'Hz',()=>{
       const {bursts,g}=run(Game,hz,true,{startX,wallX,vx});
       assert.equal(bursts.length,1);
-      assert.ok(bursts[0].x>150.1);
+      assert.ok(bursts[0].x>=148-1e-6&&bursts[0].x<=150+1e-6);
       const s=g.novaChronoShadowSnapshot();
       assert.equal(s.fuseBeforeWallCandidates,1);
-      assert.equal(s.fuseBeforeWallLateBursts,1);
+      assert.equal(s.fuseBeforeWallLateBursts,0);
     });
   }
 }
@@ -171,11 +171,9 @@ test('diagonal Cannon trajectory is compared from muzzle, not X projection',()=>
   const snap=g.novaChronoShadowSnapshot();
   assert.equal(bursts.length,1);
   assert.equal(snap.fuseBeforeWallCandidates,1);
-  assert.equal(snap.fuseBeforeWallLateBursts,1);
-  const event=snap.events.find(e=>e.kind==='fuse-before-wall-late-burst');
-  assert.ok(event);
-  assert.ok(Math.abs(Math.hypot(event.expectedX,event.expectedY)-148)<1e-6);
-  assert.ok(Math.hypot(bursts[0].x,bursts[0].y)>150);
+  assert.equal(snap.fuseBeforeWallLateBursts,0);
+  assert.equal(snap.events.some(e=>e.kind==='fuse-before-wall-late-burst'),false);
+  assert.ok(Math.abs(Math.hypot(bursts[0].x,bursts[0].y)-150)<1e-6);
 });
 
 for(const optimized of [false,true]){
@@ -224,7 +222,7 @@ for(const optimized of [false,true]){
        (optimized?'optimized':'baseline')+')',()=>{
     const Game=boot(optimized),{g,bursts}=run(Game,30,true,{probeThrows:true});
     assert.equal(bursts.length,1,'normal Battlefield burst must still happen');
-    assert.ok(bursts[0].x>150,'original wall behavior is unchanged');
+    assert.ok(bursts[0].x>=148-1e-6&&bursts[0].x<=150+1e-6,'gameplay fix survives diagnostic error');
     const snap=g.novaChronoShadowSnapshot();
     assert.equal(snap.fuseWallAuditErrors,1);
     assert.equal(snap.fuseBeforeWallCandidates,0);
