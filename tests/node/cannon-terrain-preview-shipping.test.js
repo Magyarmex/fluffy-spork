@@ -142,7 +142,7 @@ test('possible penetrating cover breach never promises a guaranteed IMPACT',()=>
  const p=g.novaFusePreview(t);
  assert.equal(p.mayBreach,true);assert.equal(p.blocked,false);
  const labels=render().map(x=>x.label);
- assert.ok(labels.some(x=>x.startsWith('COVER / BREACH? ')));
+ assert.ok(labels.some(x=>x.startsWith('BREACH? ')));
  assert.ok(labels.some(x=>x.startsWith('FUSE ')));
  assert.ok(!labels.some(x=>x.startsWith('IMPACT ')));
 });
