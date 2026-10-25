@@ -597,3 +597,20 @@ for(const optimized of [false,true]){
   assert.equal(g.__novaShapeSweepActive,false);
  });
 }
+
+for(const hz of [30,60,120,240]){
+ test('neutral first contact survives own and later hostile drones at '+hz+'Hz',()=>{
+  const g=isolatedWorld({x:200,vx:500,ttl:.002,pen:1,drones:[
+   {kind:'drone',id:5,ownerId:1,x:.3,y:0,r:8,hp:20},
+   {kind:'drone',id:6,ownerId:3,x:43,y:0,r:8,hp:20,
+    __novaChronoDroneEpoch:7,__novaChronoDronePrevX:43,__novaChronoDronePrevY:0}
+  ]});
+  const shape={kind:'shape',id:9,type:'circle',x:15.5,y:0,r:12,hp:100,born:g.time-1};
+  g.shapes=[shape];
+  g.damageShape=(target,damage)=>{target.hp-=damage;g.hits++;};
+  g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=7;
+  g.updateBullets(1/hz);
+  assert.equal(g.hits,1,'neutral farming hit must not depend on unrelated drones');
+  assert.equal(shape.hp,80);
+ });
+}
