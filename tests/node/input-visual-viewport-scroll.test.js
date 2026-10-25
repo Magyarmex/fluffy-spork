@@ -60,12 +60,13 @@ function boot(hasVisualViewport = true) {
     addEventListener(name, fn) { add('canvas', name, fn); },
     removeEventListener(name, fn) { remove('canvas', name, fn); }
   };
+  const originalRectMethod = canvas.getBoundingClientRect;
   input.attach(canvas);
   const touch = (id, x, y = 100) =>
     input.pd({ pointerType: 'touch', pointerId: id, clientX: x, clientY: y, target: null });
   const release = id => input.pu({ pointerType: 'touch', pointerId: id });
   return {
-    input, canvas, listeners, fire, touch, release,
+    input, canvas, originalRectMethod, listeners, fire, touch, release,
     setRect(x, y) { left = x; top = y; },
     rectReads: () => rectReads
   };
@@ -143,4 +144,30 @@ test('desktop input still attaches and detaches without visualViewport', () => {
   assert.equal(h.input.stickId.move, 5);
   h.input.detach();
   assert.equal(h.listeners.window.get('scroll')?.size || 0, 0);
+});
+
+test('detach restores the exact original canvas rect method across redeploys', () => {
+  const h = boot();
+  for (let cycle = 0; cycle < 40; cycle++) {
+    h.input.detach();
+    assert.equal(h.canvas.getBoundingClientRect, h.originalRectMethod,
+      'detach must not leave an extra bound function layer');
+    h.input.attach(h.canvas);
+  }
+  h.input.detach();
+  assert.equal(h.canvas.getBoundingClientRect, h.originalRectMethod);
+});
+
+test('detach removes an injected canvas rect method when originally inherited', () => {
+  const h = boot();
+  h.input.detach();
+  Object.setPrototypeOf(h.canvas, { getBoundingClientRect: h.originalRectMethod });
+  delete h.canvas.getBoundingClientRect;
+  assert.equal(Object.hasOwn(h.canvas, 'getBoundingClientRect'), false);
+  h.input.attach(h.canvas);
+  assert.equal(Object.hasOwn(h.canvas, 'getBoundingClientRect'), true);
+  h.input.detach();
+  assert.equal(Object.hasOwn(h.canvas, 'getBoundingClientRect'), false,
+    'real HTMLCanvasElement inherits getBoundingClientRect; do not leave an own property');
+  assert.equal(h.canvas.getBoundingClientRect, h.originalRectMethod);
 });

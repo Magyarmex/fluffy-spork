@@ -124,8 +124,9 @@ wrap('game/input',function(input){
   Input.prototype.attach=function(canvas){
     var out=oldAttach.call(this,canvas);
     if(canvas&&canvas.getBoundingClientRect&&!this.__novaRectOriginal){
-      var self=this,original=canvas.getBoundingClientRect.bind(canvas);
-      this.__novaRectOriginal=original;
+      var self=this,originalMethod=canvas.getBoundingClientRect,original=originalMethod.bind(canvas);
+      this.__novaRectOriginal=originalMethod;
+      this.__novaRectHadOwn=Object.prototype.hasOwnProperty.call(canvas,'getBoundingClientRect');
       function refresh(){try{var oldRect=self.__novaCachedRect,nextRect=original();if(oldRect){var shiftX=oldRect.left-nextRect.left,shiftY=oldRect.top-nextRect.top;if(Number.isFinite(shiftX)&&Number.isFinite(shiftY)&&(shiftX||shiftY)){/* Stick origins are canvas-relative. Preserve held-finger vectors when the viewport pans underneath them. */if(self.move&&self.move.active){self.move.ox+=shiftX;self.move.oy+=shiftY;}if(self.aim&&self.aim.active){self.aim.ox+=shiftX;self.aim.oy+=shiftY;}}}self.__novaCachedRect=nextRect;}catch(_){}}
       this.__novaRectRefresh=refresh;refresh();
       canvas.getBoundingClientRect=function(){return self.__novaCachedRect||original();};
@@ -141,10 +142,10 @@ wrap('game/input',function(input){
   Input.prototype.detach=function(){
     if(this.__novaStickPaintRaf&&typeof cancelAnimationFrame==='function'){cancelAnimationFrame(this.__novaStickPaintRaf);this.__novaStickPaintRaf=0;}
     var canvas=this.canvas,refresh=this.__novaRectRefresh;
-    if(canvas&&this.__novaRectOriginal)canvas.getBoundingClientRect=this.__novaRectOriginal;
+    if(canvas&&this.__novaRectOriginal){if(this.__novaRectHadOwn)canvas.getBoundingClientRect=this.__novaRectOriginal;else delete canvas.getBoundingClientRect;}
     if(typeof window!=='undefined'&&refresh){window.removeEventListener('resize',refresh);window.removeEventListener('scroll',refresh,true);if(window.visualViewport){window.visualViewport.removeEventListener('resize',refresh);window.visualViewport.removeEventListener('scroll',refresh);}}
     if(this.__novaRectObserver){try{this.__novaRectObserver.disconnect();}catch(_){}this.__novaRectObserver=null;}
-    this.__novaRectOriginal=null;this.__novaCachedRect=null;this.__novaRectRefresh=null;this.__novaStickDom=null;
+    this.__novaRectOriginal=null;this.__novaRectHadOwn=null;this.__novaCachedRect=null;this.__novaRectRefresh=null;this.__novaStickDom=null;
     return oldDetach.call(this);
   };
 });
