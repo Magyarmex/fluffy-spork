@@ -182,3 +182,27 @@ for (const kind of ['shape', 'drone']) {
     });
   }
 }
+
+
+// Negative controls: a future fix must not create hits past physical TTL.
+for (const kind of ['shape', 'drone']) {
+  for (const fps of [30, 60, 120, 240]) {
+    test('unreachable ' + kind + ' beyond TTL takes no phantom hit at ' + fps + 'Hz', () => {
+      const g = new Game();
+      const target = kind === 'shape'
+        ? { kind: 'shape', id: 2, x: 30, y: 0, r: 12, hp: 100 }
+        : { kind: 'drone', id: 2, ownerId: 2, x: 25, y: 0, r: 8, hp: 100 };
+      if (kind === 'shape') g.shapes = [target];
+      else g.drones = [target];
+      g.bullets = [{ kind: 'bullet', id: 1, ownerId: 1,
+        x: 0, y: 0, vx: 500, vy: 0, r: 3, dmg: 20,
+        ttl: .005, pen: 1, hits: 0, dead: false,
+        shell: false, beam: false }];
+      for (let frame = 0; frame < 20 && g.bullets.length; frame++) {
+        g.updateBullets(1 / fps);
+        g.time += 1 / fps;
+      }
+      assert.equal(g.hits, 0, 'expiration at x=2.5 precedes any contact');
+    });
+  }
+}
