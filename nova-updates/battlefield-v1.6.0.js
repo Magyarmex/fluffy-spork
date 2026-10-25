@@ -387,19 +387,59 @@ function shapeWasTeleported(g,s){
 }
 /* First entry of a projectile against a shape moving during this same
  * frame. Stable quadratic roots avoid cancellation on shallow crossings. */
+/* Exact binary64 geometry is used only when the fast swept-circle
+ * discriminant is too close to tangency to be trustworthy. No epsilon can
+ * turn a genuine miss into damage; exact equality is not an overlap.
+ * Ordinary collisions stay on the allocation-free fast path. */
+var shapeExactView=new DataView(new ArrayBuffer(8));
+function shapeDyadic(v){
+ if(!Number.isFinite(v))return null;
+ if(v===0)return [0n,0];
+ shapeExactView.setFloat64(0,v,false);
+ var hi=shapeExactView.getUint32(0,false),lo=shapeExactView.getUint32(4,false),exp=(hi>>>20)&2047;
+ var mant=(BigInt(hi&0xfffff)<<32n)|BigInt(lo);
+ return [(hi>>>31?-1n:1n)*(exp===0?mant:((1n<<52n)|mant)),exp===0?-1074:exp-1023-52];
+}
+function exactMovingShapeHitT(ax,ay,ex,ey,sx,sy,sxe,sye,rr){
+ var raw=[ax,ay,ex,ey,sx,sy,sxe,sye,rr],parts=[],minExp=0;
+ for(var i=0;i<raw.length;i++){var p=shapeDyadic(raw[i]);if(!p)return null;parts.push(p);if(p[1]<minExp)minExp=p[1];}
+ var v=[];for(i=0;i<parts.length;i++)v.push(parts[i][0]<<BigInt(parts[i][1]-minExp));
+ var fx=v[0]-v[4],fy=v[1]-v[5],dx=(v[2]-v[0])-(v[6]-v[4]),dy=(v[3]-v[1])-(v[7]-v[5]),r=v[8];
+ var A=dx*dx+dy*dy,H=fx*dx+fy*dy,C=fx*fx+fy*fy-r*r;
+ if(C<0n)return 0;
+ if(A===0n||H>=0n||H*H-A*C<=0n)return null;
+ var vertexBeforeEnd=-H<=A;
+ if(!vertexBeforeEnd){
+  var atEnd=A+2n*H+C;
+  if(atEnd>0n||(atEnd===0n&&A+H<=0n))return null;
+ }
+ /* Exact bisection of the entry root. The high bound is either the
+  * closest-approach time or the frame end, known to contain overlap. */
+ var boundN=vertexBeforeEnd?-H:1n,boundD=vertexBeforeEnd?A:1n;
+ var low=0n,high=1n,den=1n;
+ for(i=0;i<58;i++){
+  low*=2n;high*=2n;den*=2n;
+  var mid=(low+high)>>1n,n=boundN*mid,d=boundD*den;
+  var q=A*n*n+2n*H*n*d+C*d*d;
+  if(q<=0n)high=mid;else low=mid;
+ }
+ var t=Number(boundN)/Number(boundD)*(Number(high)/Number(den));
+ return Number.isFinite(t)?Math.min(t,1-Number.EPSILON/2):null;
+}
 function movingShapeHitT(g,s,ax,ay,ex,ey,rr){
  var start=shapeSweepStart(g,s);if(!start)return null;
  var dx=ex-ax-(s.x-start.x),dy=ey-ay-(s.y-start.y);
  var fx=ax-start.x,fy=ay-start.y,A=dx*dx+dy*dy;
  var B=2*(fx*dx+fy*dy),C=fx*fx+fy*fy-rr*rr;
- if(C<0)return 0;
- if(A<1e-12)return null;
- var D=B*B-4*A*C;if(!(D>0))return null;
+ if(!Number.isFinite(A)||!Number.isFinite(B)||!Number.isFinite(C))return null;
+ if(C< -1e-9)return 0;
+ var D=B*B-4*A*C,magnitude=B*B+4*A*(fx*fx+fy*fy+rr*rr);
+ if(Math.abs(C)<=1e-9||(A>0&&Number.isFinite(D)&&Math.abs(D)<=1e-12*magnitude))
+  return exactMovingShapeHitT(ax,ay,ex,ey,start.x,start.y,s.x,s.y,rr);
+ if(A<1e-12||!(D>0))return null;
  var root=Math.sqrt(D),q=-.5*(B+(B<0?-root:root));
  if(!q)return null;
  var t0=q/A,t1=C/q,entry=Math.min(t0,t1),exit=Math.max(t0,t1);
- /* Strict body overlap must exist within this frame. Merely touching the
-  * boundary at t=0 while separating, or first touching at t=1, is no hit. */
  if(exit<=0||entry>=1)return null;
  return entry<=0?0:entry;
 }
