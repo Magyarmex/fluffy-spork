@@ -238,3 +238,15 @@ test('Quake low-depth shot preserves a smaller displacement effect than deep fus
  t.fireCd=0;g.input.aim.dx=60;g.tryFire(t);
  assert.ok(g.bullets[1].knock>low*1.2);
 });
+
+
+test('canonical Quake structural multiplier damages actual destructible cover',()=>{
+ const {Game}=loadApex(),g=new Game(),t=tank(1,'quake');
+ g.player=t;g.tanks=[t];g.input.aim.dx=60;g.tryFire(t);
+ const b=g.bullets[0];b.x=0;b.y=0;b.vx=400;b.vy=0;
+ g.__cover={id:-8,destructible:true,hp:300,solid:true};
+ g.updateBullets(.1);
+ assert.ok(g.__cover.hp<=291+1e-8,
+   'Quake structural specialization must affect real cover HP, not only a projectile tag');
+ assert.equal(b.__v171PrimedCover,-8,'cover is primed only once per projectile');
+});
