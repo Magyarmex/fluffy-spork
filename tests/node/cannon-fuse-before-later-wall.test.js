@@ -359,3 +359,24 @@ for(const optimized of [false,true]){
   assert.ok(bursts[0].x>150);
  });
 }
+
+test('extreme-speed remote drone remains a conservative Cannon ambiguity',()=>{
+ const Game=boot(false);
+ const {bursts}=run(Game,30,true,{extras:g=>{
+  g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=11;
+  g.drones=[{id:6,kind:'drone',x:500,y:0,r:8,hp:50,speed:4000,
+   __novaChronoDroneEpoch:11,__novaChronoDronePrevX:500,__novaChronoDronePrevY:0}];
+ }});
+ assert.equal(bursts.length,1);
+ assert.ok(bursts[0].x>150,'a fast drone can traverse a remote corridor within a frame');
+});
+test('nonfinite drone speed cannot authorize Cannon fuse shortcut',()=>{
+ const Game=boot(false);
+ const {bursts}=run(Game,30,true,{extras:g=>{
+  g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=11;
+  g.drones=[{id:6,kind:'drone',x:2000,y:2000,r:8,hp:50,speed:NaN,
+   __novaChronoDroneEpoch:11,__novaChronoDronePrevX:2000,__novaChronoDronePrevY:2000}];
+ }});
+ assert.equal(bursts.length,1);
+ assert.ok(bursts[0].x>150);
+});
