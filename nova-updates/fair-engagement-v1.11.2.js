@@ -118,7 +118,10 @@ function fairTarget(g,classes,t,now){
    * A formerly valid target that dies, hides or gains spawn protection must
    * still be dropped and replaced immediately, even between think ticks. */
   if(!valid){cur=null;a.__v1112TargetId=-1;}
-  if(now>=Number(a.__v1112NextThink||0)||(previousId>=0&&!valid)){
+  var nextThink=Number(a.__v1112NextThink);
+  /* A reset match clock or corrupt/non-finite timestamp must not leave an
+   * AI blind indefinitely. The scheduled interval is always below 0.25s. */
+  if(!Number.isFinite(nextThink)||now>=nextThink||nextThink-now>1||(previousId>=0&&!valid)){
     cur=chooseTarget(g,classes,t,a,now);
     a.__v1112TargetId=cur?cur.id:-1;
     a.__v1112NextThink=now+replanDelay(t);
