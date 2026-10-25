@@ -137,8 +137,8 @@ test('shipping Sniper interception: early physical burst is not an overshoot', (
 });
 
 
-/* Issue #234: the optional diagnostic must measure the real short-TTL
- * body-first defect without changing hits, penetration, or shell behavior. */
+/* Issue #234: the optional diagnostic reports registered first contacts after
+ * the bounded gameplay fix, without changing combat when toggled. */
 function ordinaryShot(id, x = 0, speed = 6000, ttl = .005) {
   return { id, kind: 'bullet', ownerId: 1, x, y: 0, vx: speed, vy: 0,
     r: 3, dmg: 20, pen: 0, ttl, hits: 0, dead: false, shell: false, beam: false };
@@ -163,14 +163,11 @@ for (const fps of [30, 60, 120, 240]) {
     if (fps < 240) {
       assert.equal(s.sampledShortShots, 1);
       assert.equal(s.predictedBodyContacts, 1);
-      assert.equal(s.unregisteredBodyContacts, 1);
-      assert.equal(s.registeredBodyContacts, 0);
-      assert.equal(g.hits || 0, 0, 'audit must not repair the actual core miss');
-      assert.equal(target.hp, 100);
-      assert.equal(s.events[0].kind, 'unregistered-body-contact');
-      assert.equal(s.events[0].targetId, 2);
-      assert.equal(s.events[0].ttl, .005, 'report pre-frame lifetime, not mutated core TTL');
-      assert.ok(Math.abs(s.events[0].expectedX - 19) < 1e-8);
+      assert.equal(s.unregisteredBodyContacts, 0);
+      assert.equal(s.registeredBodyContacts, 1);
+      assert.equal(g.hits, 1, 'earlier physical contact must be applied once');
+      assert.equal(target.hp, 80);
+      assert.equal(s.events.some(e => e.kind === 'unregistered-body-contact'), false);
     } else {
       assert.equal(s.unregisteredBodyContacts, 0);
       assert.equal(g.hits, 1, 'core already hits before expiry at 240Hz');
@@ -188,8 +185,8 @@ for (const fps of [30, 60, 120]) {
     g.updateBullets(1 / fps);
     const s = g.novaChronoShadowSnapshot();
     assert.equal(s.predictedBodyContacts, 1);
-    assert.equal(s.unregisteredBodyContacts, 1);
-    assert.equal(g.hits || 0, 0);
+    assert.equal(s.registeredBodyContacts, 1);
+    assert.equal(g.hits, 1);
   });
 }
 test('short-TTL shadow rejects a target physically beyond expiry', () => {
@@ -230,9 +227,9 @@ test('short-TTL shadow does not mistake a wall beyond the body for occlusion', (
   g.updateBullets(1 / 30);
   const s = g.novaChronoShadowSnapshot();
   assert.equal(s.predictedBodyContacts, 1);
-  assert.equal(s.unregisteredBodyContacts, 1);
+  assert.equal(s.registeredBodyContacts, 1);
   assert.equal(s.terrainOccludedBodyContacts, 0);
-  assert.equal(target.hp, 100);
+  assert.equal(target.hp, 80);
 });
 test('short-TTL shadow stays completely inactive when disabled', () => {
   const { g, window } = boot();
@@ -274,7 +271,7 @@ test('short-TTL shadow failures never block the real projectile updater', () => 
   const s = g.novaChronoShadowSnapshot();
   assert.equal(s.bodyAuditErrors, 1);
   assert.equal(s.predictedBodyContacts, 0);
-  assert.equal(target.hp, 100);
+  assert.equal(target.hp, 80);
 });
 
 
@@ -328,8 +325,8 @@ test('short-TTL shadow includes canonical penetrating rounds before first contac
     g.updateBullets(1 / 30);
     const s = g.novaChronoShadowSnapshot();
     assert.equal(s.predictedBodyContacts, 1, 'first body candidate with pen=' + pen);
-    assert.equal(s.unregisteredBodyContacts, 1, 'core expires before hit with pen=' + pen);
-    assert.equal(target.hp, 100);
+    assert.equal(s.registeredBodyContacts, 1, 'physical first hit registered with pen=' + pen);
+    assert.equal(target.hp, 80);
   }
 });
 
@@ -342,9 +339,9 @@ test('ordinary 500u/s round also loses a legitimate last-frame contact', () => {
   g.updateBullets(1 / 60);
   const s = g.novaChronoShadowSnapshot();
   assert.equal(s.predictedBodyContacts, 1);
-  assert.equal(s.unregisteredBodyContacts, 1);
-  assert.ok(Math.abs(s.events[0].expectedX - 2) < 1e-8);
-  assert.equal(target.hp, 100, 'known core defect remains unfixed by read-only audit');
+  assert.equal(s.registeredBodyContacts, 1);
+  assert.equal(s.events.some(e => e.kind === 'unregistered-body-contact'), false);
+  assert.equal(target.hp, 80, 'earlier physical hit must survive TTL expiry');
 });
 
 
@@ -423,8 +420,8 @@ for (const fps of [30, 60, 120, 240]) {
     const s = g.novaChronoShadowSnapshot();
     assert.equal(s.sampledShortShots, 1);
     assert.equal(s.predictedBodyContacts, 1);
-    assert.equal(s.unregisteredBodyContacts, 1);
-    assert.equal(target.hp, 100, 'core still kills exact-expiry shot before body check');
+    assert.equal(s.registeredBodyContacts, 1);
+    assert.equal(target.hp, 80, 'contact precedes exact-frame expiration');
   });
 }
 
@@ -453,7 +450,7 @@ test('short-TTL shadow retains a first-body miss when interception is later', ()
   const s = g.novaChronoShadowSnapshot();
   assert.equal(s.interceptionAmbiguousBodyContacts, 0);
   assert.equal(s.predictedBodyContacts, 1);
-  assert.equal(s.unregisteredBodyContacts, 1);
+  assert.equal(s.registeredBodyContacts, 1);
 });
 test('same-owner bullets do not create a false interception ambiguity', () => {
   const { g } = boot();
@@ -480,7 +477,7 @@ test('spatially separated hostile projectile cannot hide a body miss', () => {
   g.updateBullets(1 / 30);
   const s = g.novaChronoShadowSnapshot();
   assert.equal(s.interceptionAmbiguousBodyContacts, 0);
-  assert.equal(s.unregisteredBodyContacts, 1);
+  assert.equal(s.registeredBodyContacts, 1);
 });
 
 
@@ -506,7 +503,7 @@ test('dense opt-in audit skips unbounded interception scans safely', () => {
   assert.equal(s.interceptionUnscannedBodyContacts, 1);
   assert.equal(s.predictedBodyContacts, 0);
   assert.equal(s.unregisteredBodyContacts, 0);
-  assert.equal(target.hp, 100);
+  assert.equal(target.hp, 80, 'one isolated expiring shot remains eligible in dense distant fire');
 });
 
 
@@ -655,15 +652,14 @@ for (const fps of [30, 60, 120]) {
   test('shadow first-contact ordering includes neutral shapes at ' + fps + 'Hz', () => {
     const { g } = boot(), tank = addScout(g, 40), shape = auditShape(51, 12);
     g.shapes = [shape];
+    g.damageShape = (victim, damage) => { victim.hp -= damage; };
     g.bullets = [ordinaryShot(9300 + fps)];
     g.updateBullets(1 / fps);
     const s = g.novaChronoShadowSnapshot();
     assert.equal(s.predictedBodyContacts, 1);
-    assert.equal(s.unregisteredBodyContacts, 1);
-    assert.equal(s.events[0].targetId, shape.id);
-    assert.equal(s.events[0].targetKind, 'shape');
-    assert.ok(Math.abs(s.events[0].expectedX - 4) < 1e-8);
-    assert.equal(shape.hp, 20);
+    assert.equal(s.registeredBodyContacts, 1);
+    assert.equal(s.events.some(e => e.kind === 'unregistered-body-contact'), false);
+    assert.equal(shape.hp, 0, 'neutral first contact receives canonical damage');
     assert.equal(tank.hp, 100);
   });
 }
@@ -762,13 +758,14 @@ for(const [label,fromY,toY,expected] of [
    r:15,hp:20,maxHp:20,__novaShapeSweepEpoch:7,
    __novaShapeSweepPrevX:10,__novaShapeSweepPrevY:fromY};
   g.shapes=[shape];g.__novaShapeSweepEpoch=7;g.__novaShapeSweepActive=true;
+   g.damageShape=(victim,damage)=>{victim.hp-=damage;};
   g.bullets=[{...ordinaryShot(338,0,1500,.005)}];
   g.updateBullets(1/30);
   const s=g.novaChronoShadowSnapshot();
   assert.equal(s.sampledShortShots,1);
   assert.equal(s.predictedBodyContacts,expected);
-  assert.equal(s.unregisteredBodyContacts,expected);
-  assert.equal(shape.hp,20,'diagnostic never changes authoritative damage');
+  assert.equal(s.registeredBodyContacts,expected);
+  assert.equal(shape.hp,20-20*expected,'physical crossing changes damage, phantom crossing does not');
  });
 }
 test('shipping short-TTL shadow refuses teleport-gap body prediction',()=>{
