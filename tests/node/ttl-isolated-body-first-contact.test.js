@@ -524,3 +524,76 @@ test('nonfinite moving-tank history cannot authorize speculative TTL damage',()=
   assert.equal(g.hits,0,'invalid '+position+' movement must defer');
  }
 });
+
+
+/* Run350: an owned drone is not a projectile interceptor. A hostile drone
+ * can only veto an earlier tank/shape contact if its observed movement could
+ * reach the bullet BEFORE that contact, not merely before projectile expiry.
+ * These tests execute the shipping core + Battlefield (and optimized update
+ * composition separately), not a stand-alone collision helper. */
+for (const hz of [30,60,120,240]) {
+ test('TTL contact ignores own drone on projectile corridor at '+hz+'Hz',()=>{
+  const g=isolatedWorld({x:28,vx:6000,ttl:.002,drones:[{
+   kind:'drone',id:5,ownerId:1,x:4,y:0,r:8,hp:20
+  }]});
+  // Owned drones do not require hostile-motion evidence.
+  g.updateBullets(1/hz);
+  assert.equal(g.hits,1,'own drone cannot veto a reachable enemy tank hit');
+ });
+ test('TTL contact precedes witnessed hostile drone beyond first body at '+hz+'Hz',()=>{
+  const g=isolatedWorld({x:28,vx:6000,ttl:.002,drones:[{
+   kind:'drone',id:5,ownerId:3,x:53,y:0,r:8,hp:20,
+   __novaChronoDroneEpoch:7,__novaChronoDronePrevX:53,__novaChronoDronePrevY:0
+  }]});
+  g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=7;
+  g.updateBullets(1/hz);
+  assert.equal(g.hits,1,'later remote drone must not erase earlier physical contact');
+ });
+ test('TTL contact still defers witnessed hostile drone ahead of body at '+hz+'Hz',()=>{
+  const g=isolatedWorld({x:28,vx:6000,ttl:.002,drones:[{
+   kind:'drone',id:5,ownerId:3,x:8,y:0,r:8,hp:20,
+   __novaChronoDroneEpoch:7,__novaChronoDronePrevX:8,__novaChronoDronePrevY:0
+  }]});
+  g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=7;
+  g.updateBullets(1/hz);
+  assert.equal(g.hits,0,'potential earlier drone contact must keep original authority');
+ });
+}
+test('moving hostile drone crossing the first-contact corridor remains ambiguous',()=>{
+ const g=isolatedWorld({x:28,vx:6000,ttl:.002,drones:[{
+  kind:'drone',id:5,ownerId:3,x:4,y:0,r:8,hp:20,
+  __novaChronoDroneEpoch:7,__novaChronoDronePrevX:30,__novaChronoDronePrevY:20
+ }]});
+ g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=7;
+ g.updateBullets(1/30);
+ assert.equal(g.hits,0);
+});
+test('stale hostile drone behind the first contact cannot authorize shortcut',()=>{
+ const g=isolatedWorld({x:28,vx:6000,ttl:.002,drones:[{
+  kind:'drone',id:5,ownerId:3,x:53,y:0,r:8,hp:20,
+  __novaChronoDroneEpoch:6,__novaChronoDronePrevX:53,__novaChronoDronePrevY:0
+ }]});
+ g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=7;
+ g.updateBullets(1/30);
+ assert.equal(g.hits,0);
+});
+for(const optimized of [false,true]){
+ test('materialized update permits own drone and later hostile drone ('+
+      (optimized?'optimized':'baseline')+')',()=>{
+  const FullGame=boot(function(dt){
+   this.time+=dt;
+   this.updateBullets(dt);
+  },optimized);
+  const g=new FullGame();
+  g.tanks=[{kind:'tank',id:2,x:28,y:0,cls:'scout',hp:100,alive:true}];
+  g.drones=[
+   {kind:'drone',id:5,ownerId:1,x:4,y:0,r:8,hp:20},
+   {kind:'drone',id:6,ownerId:3,x:53,y:0,r:8,hp:20}
+  ];
+  g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,vx:6000,vy:0,
+   r:3,dmg:20,ttl:.002,pen:0,hits:0,dead:false,shell:false,beam:false}];
+  g.update(1/30);
+  assert.equal(g.hits,1);
+  assert.equal(g.__novaShapeSweepActive,false);
+ });
+}
