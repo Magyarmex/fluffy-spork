@@ -233,6 +233,29 @@ wrap('game/engine',function(engine,require){
     var hit=C/(-halfB+Math.sqrt(D));
     return Number.isFinite(hit)&&hit>=0?hit:null;
   }
+  /* Shape motion is now captured by Battlefield's authoritative Game.update.
+   * The opt-in audit must not mistake a later shape endpoint for an earlier
+   * projectile contact, or miss a real moving crossing before expiration. */
+  function chronoShapeTime(g,b,s,radius,dt){
+    if(!g.__novaShapeSweepActive)return chronoStaticBodyTime(b,s,radius);
+    if(s.__novaShapeSweepEpoch!==g.__novaShapeSweepEpoch)return null;
+    var sx=s.__novaShapeSweepPrevX,sy=s.__novaShapeSweepPrevY;
+    if(!Number.isFinite(sx)||!Number.isFinite(sy)||!(dt>0))return null;
+    var mx=s.x-sx,my=s.y-sy;
+    if(mx*mx+my*my>96*96)return null; /* teleport: no physical sweep */
+    if(mx*mx+my*my<1e-16)return chronoStaticBodyTime(b,s,radius);
+    var fx=b.x-sx,fy=b.y-sy,vx=(b.vx||0)-mx/dt,vy=(b.vy||0)-my/dt;
+    var C=fx*fx+fy*fy-radius*radius;
+    if(!Number.isFinite(C))return null;
+    if(C<0)return 0;
+    var A=vx*vx+vy*vy,halfB=fx*vx+fy*vy;
+    if(!(A>1e-12)||!Number.isFinite(A)||halfB>=0)return null;
+    var D=halfB*halfB-A*C;
+    if(!(D>0)||!Number.isFinite(D))return null;
+    if(D<=64*Number.EPSILON*(Math.abs(halfB*halfB)+Math.abs(A*C)))return null;
+    var hit=C/(-halfB+Math.sqrt(D));
+    return Number.isFinite(hit)&&hit>=0&&hit<dt?hit:null;
+  }
   function chronoAlliedOwner(g,a,b){
     if(!a||!b)return false;
     if(typeof g.areAllies==='function'&&g.areAllies(a,b))return true;
@@ -296,7 +319,7 @@ wrap('game/engine',function(engine,require){
       var shape=shapes[j];
       if(!shape||shape.kind!=='shape'||!(shape.hp>0)||!(shape.r>0)||
          !Number.isFinite(shape.x)||!Number.isFinite(shape.y))continue;
-      var shapeTime=chronoStaticBodyTime(b,shape,(b.r||2)+shape.r);
+      var shapeTime=chronoShapeTime(g,b,shape,(b.r||2)+shape.r,dt);
       if(shapeTime===null||shapeTime>b.ttl)continue;
       if(best&&Math.abs(shapeTime-best.time)<=1e-9)return null;
       if(!best||shapeTime<best.time)best={targetId:shape.id,kind:'shape',time:shapeTime,
