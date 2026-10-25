@@ -37,22 +37,7 @@ function ownerSeesUnit(g,owner,unit){if(!owner||owner.isPlayer||!owner.ai)return
 /* Share one canonical Fair Engagement viewport snapshot per Field Service threat scan.\n * Reject by squared distance before owner/allegiance work; !(<=) also rejects NaN. */
 function visibleThreat(g,d,owner){var r2=THREAT_RADIUS*THREAT_RADIUS,ts=g.tanks||[],i,t,dx,dy; var fair=typeof window!=='undefined'&&window.__NOVA_FAIR_ENGAGEMENT__; var sees=owner&&!owner.isPlayer&&owner.ai&&fair&&typeof fair.gameplayViewportFilter==='function'? fair.gameplayViewportFilter(g,owner):null;for(i=0;i<ts.length;i++){t=ts[i];if(!t)continue;dx=t.x-d.x;dy=t.y-d.y;if(!(dx*dx+dy*dy<=r2)||!hostile(g,owner,t))continue;if((sees?sees(t):ownerSeesUnit(g,owner,t))&&lineClear(g,d.x,d.y,t.x,t.y))return true;}var ds=g.drones||[];for(i=0;i<ds.length;i++){t=ds[i];if(!t||t===d||t.hp<=0||t.ownerId===d.ownerId)continue;dx=t.x-d.x;dy=t.y-d.y;if(!(dx*dx+dy*dy<=r2))continue;var other=ownerOf(g,t);if(!other||!hostile(g,owner,other))continue;if((sees?sees(t):ownerSeesUnit(g,owner,t))&&lineClear(g,d.x,d.y,t.x,t.y))return true;}return false;}
 function committed(d){return !!(d&&(d.__novaPhase==='dash'||d.__novaPhase==='windup'||d.__novaCommitted));}
-function canRepair(g,d,owner,s){if(!d||d.hp<=0||!owner||owner.alive===false||isController(owner))return false;var max=Math.max(s.maxHp,Number(d.maxHp)||0);if(max<=0||d.hp>=max-.01)return false;if(committed(d)||(d.attackCd||0)>.05)return false;var tm=now(g);if(tm-s.lastDamageAt<REPAIR_DELAY)return false;if(tm>=s.nextThreatAt){s.nextThreatAt=tm+THREAT_INTERVAL+((Math.abs(Number(d.id)||0)%5)*.017);s.threat=visibleThreat(g,d,owner);}if(s.threat)return false;if(tm>=s.nextProjectileAt){
- s.nextProjectileAt=tm+PROJECTILE_INTERVAL+((Math.abs(Number(d.id)||0)%3)*.009);
- s.projectileThreat=projectileThreat(g,d,owner);
- /* After a discontinuity, the frame displacement is not future velocity.
-  * Check the new position at rest AND a separately reported finite velocity.
-  * Either credible intercept prevents healing; a remote/departing shot does not. */
- if(!s.projectileThreat&&s.motionDiscontinuous&&
-    (Number.isFinite(d.__novaVX)||Number.isFinite(d.__novaVY))&&
-    Math.abs(Number(d.__novaVX)||0)+Math.abs(Number(d.__novaVY)||0)>1){
-  var prevVX=s.motionVX,prevVY=s.motionVY;
-  s.motionVX=Number.isFinite(d.__novaVX)?d.__novaVX:0;
-  s.motionVY=Number.isFinite(d.__novaVY)?d.__novaVY:0;
-  try{s.projectileThreat=projectileThreat(g,d,owner);}
-  finally{s.motionVX=prevVX;s.motionVY=prevVY;}
- }
-}return !s.projectileThreat;}
+function canRepair(g,d,owner,s){if(!d||d.hp<=0||!owner||owner.alive===false||isController(owner))return false;var max=Math.max(s.maxHp,Number(d.maxHp)||0);if(max<=0||d.hp>=max-.01)return false;if(committed(d)||(d.attackCd||0)>.05)return false;var tm=now(g);if(tm-s.lastDamageAt<REPAIR_DELAY)return false;if(tm>=s.nextThreatAt){s.nextThreatAt=tm+THREAT_INTERVAL+((Math.abs(Number(d.id)||0)%5)*.017);s.threat=visibleThreat(g,d,owner);}if(s.threat)return false;if(tm>=s.nextProjectileAt){ s.nextProjectileAt=tm+PROJECTILE_INTERVAL+((Math.abs(Number(d.id)||0)%3)*.009); s.projectileThreat=projectileThreat(g,d,owner); /* After a discontinuity, the frame displacement is not future velocity. * Check the new position at rest AND a separately reported finite velocity. * Either credible intercept prevents healing; a remote/departing shot does not. */ if(!s.projectileThreat&&s.motionDiscontinuous&& (Number.isFinite(d.__novaVX)||Number.isFinite(d.__novaVY))&& Math.abs(Number(d.__novaVX)||0)+Math.abs(Number(d.__novaVY)||0)>1){ var prevVX=s.motionVX,prevVY=s.motionVY; s.motionVX=Number.isFinite(d.__novaVX)?d.__novaVX:0; s.motionVY=Number.isFinite(d.__novaVY)?d.__novaVY:0; try{s.projectileThreat=projectileThreat(g,d,owner);} finally{s.motionVX=prevVX;s.motionVY=prevVY;} } }return !s.projectileThreat;}
 function heal(g,d,s,dt){var max=Math.max(s.maxHp,Number(d.maxHp)||0),before=d.hp;d.hp=Math.min(max,d.hp+max*REPAIR_RATE*Math.max(0,Number(dt)||0));if(d.hp<=before+.0001)return false;var tm=now(g);if(tm>=s.fxAt){s.fxAt=tm+.38+((Math.abs(Number(d.id)||0)%3)*.025);if(g.addParticles)g.addParticles(d.x,d.y,'#8fffd0',2,22,'glow');if(g.addRing)g.addRing(d.x,d.y,'#8fffd0',8);}return true;}
 function registerTips(){var api=window.NOVATips;if(!api||typeof api.registerMany!=='function'||window.__NOVA_FIELD_SERVICE_TIPS__)return;window.__NOVA_FIELD_SERVICE_TIPS__=true;api.registerMany([
  {id:'drone-field-repair',contexts:['gameplay','controller'],text:'A damaged drone self-repairs only after combat genuinely breaks. Fresh damage, nearby visible hostility, or incoming fire resets the recovery window.',reviewed:'2026-08-17'},
