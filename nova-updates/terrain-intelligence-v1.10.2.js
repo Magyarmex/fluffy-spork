@@ -177,7 +177,7 @@ function sampleStuck(g,obj,vx,vy,pad,seed,state){
   }
   return state;
 }
-function applyEscape(state,vx,vy){var sp=Math.hypot(vx||0,vy||0);if(!state||sp<1||!state.escapeX)return{x:vx,y:vy};var ux=vx/sp,uy=vy/sp,x=ux*.24+state.escapeX*.76,y=uy*.24+state.escapeY*.76,m=Math.hypot(x,y)||1;return{x:x/m*sp,y:y/m*sp};}
+function applyEscape(state,vx,vy){var sp=Math.hypot(vx||0,vy||0);if(!state||sp<1||!Number.isFinite(state.escapeX)||!Number.isFinite(state.escapeY)||!(state.escapeX*state.escapeX+state.escapeY*state.escapeY>1e-12))return{x:vx,y:vy};var ux=vx/sp,uy=vy/sp,x=ux*.24+state.escapeX*.76,y=uy*.24+state.escapeY*.76,m=Math.hypot(x,y)||1;return{x:x/m*sp,y:y/m*sp};}
 function droneIntent(d){
   var vx=d.__novaVX||0,vy=d.__novaVY||0;if(d.__novaSpotter&&Math.hypot(d.__novaScoutVX||0,d.__novaScoutVY||0)>24){vx=d.__novaScoutVX||0;vy=d.__novaScoutVY||0;}return{x:vx,y:vy};
 }
