@@ -139,3 +139,16 @@ for (const hz of [30,60,120,240]) {
     assert.equal(bursts.length,1);
   });
 }
+
+for(const optimized of [false,true]){
+  const Game=boot(optimized);
+  test('earlier permanent wall is never misreported as a late-fuse ordering bug ('+
+       (optimized?'optimized':'baseline')+')',()=>{
+    const {g,bursts}=run(Game,30,true,{startX:146,wallX:160,vx:380});
+    assert.equal(bursts.length,1);
+    assert.ok(bursts[0].x<148,'earlier wall must remain authoritative');
+    const snap=g.novaChronoShadowSnapshot();
+    assert.equal(snap.fuseBeforeWallCandidates,0);
+    assert.equal(snap.fuseBeforeWallLateBursts,0);
+  });
+}
