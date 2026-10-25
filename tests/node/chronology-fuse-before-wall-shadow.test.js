@@ -69,6 +69,7 @@ function run(Game,hz,withWall=true,{startX=146,wallX=168,vx=380,ttl=2,probeThrow
     solid:true,destructible:false}]:[];
   g.bursts=bursts;
   g.weakenBullet=()=>{};
+  if(probeThrows)g.firstTerrainHit=()=>{throw new Error('synthetic terrain probe failure');};
   g.bullets=[{kind:'bullet',id:777,ownerId:1,x:startX,y:0,
     vx,vy:0,r:8.5,dmg:26,ttl,shell:true,pen:1,hits:0,dead:false,
     __v17Cannon:true,__v17FuseDist:150,__v17SpawnX:0,__v17SpawnY:0,
@@ -161,7 +162,6 @@ test('diagonal Cannon trajectory is compared from muzzle, not X projection',()=>
     x:154.175*unit+10+pad,y:0,w:20,h:300,
     solid:true,destructible:false}];
   g.bursts=bursts;g.weakenBullet=()=>{};
-  if(probeThrows)g.firstTerrainHit=()=>{throw new Error('synthetic terrain probe failure');};
   g.bullets=[{kind:'bullet',id:778,ownerId:1,
     x:146*unit,y:146*unit,vx:380*unit,vy:380*unit,
     r:8.5,dmg:26,ttl:2,shell:true,pen:1,hits:0,dead:false,
