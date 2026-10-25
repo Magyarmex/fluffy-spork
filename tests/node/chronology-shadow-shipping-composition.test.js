@@ -750,3 +750,33 @@ test('shadow abstains from mathematically tangent contacts but keeps clear grazi
       'near-tangent neutral body y=' + y);
   }
 });
+
+/* Run 338: the optional short-TTL audit must use Battlefield's frame-start
+ * shape history, rather than treating a moved Crasher as a static endpoint. */
+for(const [label,fromY,toY,expected] of [
+ ['physical crossing',17,20.5,1],
+ ['phantom endpoint',20.5,17,0]
+]){
+ test('shipping short-TTL shadow moving shape: '+label,()=>{
+  const {g}=boot(),shape={id:5,kind:'shape',type:'crasher',x:10,y:toY,
+   r:15,hp:20,maxHp:20,__novaShapeSweepEpoch:7,
+   __novaShapeSweepPrevX:10,__novaShapeSweepPrevY:fromY};
+  g.shapes=[shape];g.__novaShapeSweepEpoch=7;g.__novaShapeSweepActive=true;
+  g.bullets=[{...ordinaryShot(338,0,1500,.005)}];
+  g.updateBullets(1/30);
+  const s=g.novaChronoShadowSnapshot();
+  assert.equal(s.sampledShortShots,1);
+  assert.equal(s.predictedBodyContacts,expected);
+  assert.equal(s.unregisteredBodyContacts,expected);
+  assert.equal(shape.hp,20,'diagnostic never changes authoritative damage');
+ });
+}
+test('shipping short-TTL shadow refuses teleport-gap body prediction',()=>{
+ const {g}=boot(),shape={id:5,kind:'shape',type:'star',x:10,y:0,
+  r:15,hp:20,maxHp:20,__novaShapeSweepEpoch:7,
+  __novaShapeSweepPrevX:10,__novaShapeSweepPrevY:150};
+ g.shapes=[shape];g.__novaShapeSweepEpoch=7;g.__novaShapeSweepActive=true;
+ g.bullets=[{...ordinaryShot(339,0,1500,.005)}];
+ g.updateBullets(1/30);
+ assert.equal(g.novaChronoShadowSnapshot().predictedBodyContacts,0);
+});
