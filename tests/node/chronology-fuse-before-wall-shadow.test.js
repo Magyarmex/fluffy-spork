@@ -27,6 +27,7 @@ function boot(performance, enabled=true) {
   function Game() {
     this.hash = { query(_x,_y,_r,out) { out.length = 0; } };
     this.tmp = []; this.cam = { shake: 0 };
+    this.shapes=[]; this.tanks=[]; this.drones=[]; this.bullets=[];
   }
   for (const name of ['spawnPlayer','spawnShape','spawnPowerup','tryFire',
     'initBulletIntegrity','resolveBulletCollisions','addParticles','addFlash',
