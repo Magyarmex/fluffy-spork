@@ -593,7 +593,102 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    }
  }for(var i=this.bullets.length-1;i>=0;i--){var b=this.bullets[i];if(!b||b.dead||(b.hits||0)!==b.__novaSweepHitsBefore)continue;var ax=b.px==null?b.x:b.px,ay=b.py==null?b.y:b.py,ex=b.x,ey=b.y,travel=Math.hypot(ex-ax,ey-ay);if(travel<1e-6&&!(movingShapes&&movingShapes.all.length))continue;this.hash.query((ax+ex)*.5,(ay+ey)*.5,travel*.5+b.r+46,this.tmp);appendSweptShapes(movingShapes,b,ax,ay,ex,ey,this.tmp);var first=null;for(var j=0;j<this.tmp.length;j++){var e=this.tmp[j],er=0;if(b.__novaDirectVictims&&b.__novaDirectVictims.has(e))continue;if(e.kind==='shape'&&e.hp>0&&!shapeWasTeleported(this,e))er=e.r;else if(e.kind==='tank'&&e.id!==b.ownerId&&e.alive)er=CLASSES[e.cls].size+3;else if(e.kind==='drone'&&e.ownerId!==b.ownerId&&e.hp>0)er=e.r+1;else continue;var rr=b.r+er,dx=ex-ax,dy=ey-ay,tx=e.x,ty=e.y;if(e.kind==='shape'){var start=shapeSweepStart(this,e);if(start){dx-=e.x-start.x;dy-=e.y-start.y;tx=start.x;ty=start.y;}}if(e.kind==='tank'&&e.__novaSweepMoveTime===this.time){dx-=e.x-e.__novaSweepPrevX;dy-=e.y-e.__novaSweepPrevY;tx=e.__novaSweepPrevX;ty=e.__novaSweepPrevY;}var fx=ax-tx,fy=ay-ty,A=dx*dx+dy*dy,B=2*(fx*dx+fy*dy),C=fx*fx+fy*fy-rr*rr,t=null;if(e.kind==='shape'&&shapeSweepStart(this,e))t=movingShapeHitT(this,e,ax,ay,ex,ey,rr);else if(C<0)t=0;else{var D=B*B-4*A*C;if(D>0){var root=Math.sqrt(D),t0=(-B-root)/(2*A),t1=(-B+root)/(2*A);if(t0>=0&&t0<=1)t=t0;else if(t1>=0&&t1<=1)t=t1;}}if(t!=null&&(!first||t<first.t))first={e:e,t:t};}if(!first)continue;var e=first.e,hitT=first.t===0?0:Math.min(1,first.t+1e-9),hx=ax+(ex-ax)*hitT,hy=ay+(ey-ay)*hitT;b.x=hx;b.y=hy;if(e.kind==='shape'){if(b.shell)this.clusterBurst(b);this.damageShape(e,b.dmg,b.vx,b.vy);}else if(e.kind==='tank'){if(b.shell)this.clusterBurst(b);var ang=Math.atan2(b.vy,b.vx);this.damageTank(e,b.dmg,b.ownerId,Math.cos(ang)*(b.knock||0)*.006,Math.sin(ang)*(b.knock||0)*.006);}else this.damageDrone(e,b.dmg,b.ownerId);if(b.splash&&e.kind!=='drone')this.splashAt(hx,hy,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.hits++;b.pen--;if(b.pen<0)b.dead=true;else (b.__novaDirectVictims||(b.__novaDirectVictims=new Set())).add(e);if(!b.dead){b.x=ex;b.y=ey;}else this.bullets.splice(i,1);}return out;};
 
- var oldUpdateBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var terrain=ensureTerrain(this);for(var i=0;i<this.bullets.length;i++){var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,sweepDt=dt;/* Non-shell shots expire without spawning fragments: terrain after their remaining lifetime is unreachable. Shell expiry needs coupled chronological burst arbitration. */if(!b.shell&&Number.isFinite(b.ttl)){if(b.ttl<=0)continue;sweepDt=Math.min(dt,b.ttl);}var nx=ox+(b.vx||0)*sweepDt,ny=oy+(b.vy||0)*sweepDt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){b.__novaBreachAtTime=this.time;b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
+
+ /* Conservative physical-first-contact recovery for an expiring ordinary
+  * projectile. The materialized core kills TTL<=0 shots BEFORE body queries.
+  * Only settle an unambiguous earlier body contact: no shell/splash, no
+  * competing projectile corridor, no earlier terrain, no uncertain drone
+  * motion, and no simultaneous bodies. All ambiguous cases remain owned by
+  * the existing engine until the full chronological resolver is ready. */
+ function isolatedTTLBodyContact(g,b,dt){
+  if(!b||b.dead||b.shell||b.beam||b.splash||!(b.ttl>0)||
+     !(b.ttl<=dt)||!(dt>0)||!(b.pen>=0)||(b.hits||0)>0||
+     !Number.isFinite(b.x)||!Number.isFinite(b.y)||
+     !Number.isFinite(b.vx)||!Number.isFinite(b.vy))return false;
+  var dx=b.vx*dt,dy=b.vy*dt,limit=b.ttl/dt;
+  if(!Number.isFinite(dx)||!Number.isFinite(dy)||!(dx*dx+dy*dy>1e-12))return false;
+  /* Moving drones have no trustworthy same-tick start snapshot in this
+   * composition. Defer their battles instead of inventing static contacts. */
+  if(g.drones&&g.drones.some(function(d){return d&&d.hp>0;}))return false;
+  var best=null,bestT=limit,tie=false,uncertain=false,ax=b.x,ay=b.y;
+  function consider(e,kind){
+   if(!e)return;
+   var rr=0,sx=e.x,sy=e.y,mx=0,my=0;
+   if(kind==='tank'){
+    if(!e.alive||e.id===b.ownerId)return;
+    var def=CLASSES[e.cls];if(!def)return;
+    rr=b.r+def.size+3;
+    if(e.__novaSweepMoveTime===g.time){
+     if(!Number.isFinite(e.__novaSweepPrevX)||!Number.isFinite(e.__novaSweepPrevY))return;
+     sx=e.__novaSweepPrevX;sy=e.__novaSweepPrevY;
+     mx=e.x-sx;my=e.y-sy;
+    }
+   }else{
+    if(!(e.hp>0))return;
+    rr=b.r+e.r;
+    if(shapeWasTeleported(g,e)){
+     /* Unknown jump: even an apparent crossing is not proof of contact. */
+     uncertain=true;return;
+    }
+    var start=shapeSweepStart(g,e);
+    if(start){sx=start.x;sy=start.y;mx=e.x-sx;my=e.y-sy;}
+   }
+   if(!(rr>0)||![sx,sy,mx,my].every(Number.isFinite)){uncertain=true;return;}
+   var fx=ax-sx,fy=ay-sy,rx=dx-mx,ry=dy-my;
+   var A=rx*rx+ry*ry,B=2*(fx*rx+fy*ry),C=fx*fx+fy*fy-rr*rr;
+   if(!Number.isFinite(A)||!Number.isFinite(B)||!Number.isFinite(C)){uncertain=true;return;}
+   var t=null;
+   if(C<0)t=0;
+   else if(A>1e-12){
+    var D=B*B-4*A*C;
+    /* Ambiguous near-tangencies belong to the exact chronological solver,
+     * not an optimistic early damage path. */
+    if(Math.abs(D)<1e-10*(B*B+4*A*(fx*fx+fy*fy+rr*rr))){uncertain=true;return;}
+    if(D>0){
+     var root=Math.sqrt(D),q=-.5*(B+(B<0?-root:root));
+     if(q){
+      var enter=Math.min(q/A,C/q),leave=Math.max(q/A,C/q);
+      if(leave>0&&enter<1)t=Math.max(0,enter);
+     }
+    }
+   }
+   if(t==null||!(t<limit-1e-10))return;
+   if(best&&Math.abs(t-bestT)<1e-8){tie=true;return;}
+   if(t<bestT){best={e:e,kind:kind};bestT=t;tie=false;}
+  }
+  var tanks=g.tanks||[],shapes=g.shapes||[];
+  for(var ti=0;ti<tanks.length;ti++)consider(tanks[ti],'tank');
+  for(var si=0;si<shapes.length;si++)consider(shapes[si],'shape');
+  if(!best||tie||uncertain)return false;
+  var hx=ax+dx*bestT,hy=ay+dy*bestT;
+  if(Math.abs(hx)>=MAP_LIMIT-20||Math.abs(hy)>=MAP_LIMIT-20)return false;
+  /* A cover event at or before the body makes this lane ambiguous, including
+   * destructible-cover penetration and exact-time ties. */
+  if(firstSolidHit(g,ax,ay,hx,hy,(b.r||2)*.45))return false;
+  /* A projectile that could have intercepted before contact also excludes
+   * this bounded shortcut. AABB overlap is deliberately conservative. */
+  var others=g.bullets||[];
+  for(var bi=0;bi<others.length;bi++){
+   var o=others[bi];if(!o||o===b||o.dead)continue;
+   if(!Number.isFinite(o.x)||!Number.isFinite(o.y)||
+      !Number.isFinite(o.vx)||!Number.isFinite(o.vy))return false;
+   var ex=o.x+o.vx*dt*bestT,ey=o.y+o.vy*dt*bestT,pad=(b.r||0)+(o.r||0)+2;
+   if(Math.min(ax,hx)-pad<=Math.max(o.x,ex)&&
+      Math.max(ax,hx)+pad>=Math.min(o.x,ex)&&
+      Math.min(ay,hy)-pad<=Math.max(o.y,ey)&&
+      Math.max(ay,hy)+pad>=Math.min(o.y,ey))return false;
+  }
+  var vx=b.vx,vy=b.vy;
+  b.x=hx;b.y=hy;b.px=hx;b.py=hy;
+  if(best.kind==='tank'){
+   var ang=Math.atan2(vy,vx);
+   g.damageTank(best.e,b.dmg,b.ownerId,Math.cos(ang)*(b.knock||0)*.006,
+     Math.sin(ang)*(b.knock||0)*.006);
+  }else g.damageShape(best.e,b.dmg,vx,vy);
+  b.hits++;b.pen--;b.dead=true;b.vx=0;b.vy=0;
+  return true;
+ }
+ var oldUpdateBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var terrain=ensureTerrain(this);for(var pre=0;pre<this.bullets.length;pre++)isolatedTTLBodyContact(this,this.bullets[pre],dt);for(var i=0;i<this.bullets.length;i++){var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,sweepDt=dt;/* Non-shell shots expire without spawning fragments: terrain after their remaining lifetime is unreachable. Shell expiry needs coupled chronological burst arbitration. */if(!b.shell&&Number.isFinite(b.ttl)){if(b.ttl<=0)continue;sweepDt=Math.min(dt,b.ttl);}var nx=ox+(b.vx||0)*sweepDt,ny=oy+(b.vy||0)*sweepDt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){b.__novaBreachAtTime=this.time;b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
    /* The core still advances a dead bullet before removing it; a shell may
      * expire or leave the arena in that pass. Consume its one-time burst now. */
     if(b.shell&&this.clusterBurst){var childStart=this.bullets.length;this.clusterBurst(b);clearTerrainBurstChildren(this,s,h,childStart);b.shell=false;}if(b.splash&&this.splashAt)this.splashAt(h.x,h.y,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.dead=true;if(this.addFlash)this.addFlash(h.x,h.y,s.destructible?'#8fd4ff':'#b9c7e7',Math.min(46,14+(b.dmg||0)*.24));if(this.cam&&b.dmg>42)this.cam.shake=Math.max(this.cam.shake,.08);/* The materialized core still advances dead bullets before removing them. Freeze a terrain-killed projectile at its impact so its final trail cannot leak through cover. Breaching live shots keep their velocity above. */b.vx=0;b.vy=0;
