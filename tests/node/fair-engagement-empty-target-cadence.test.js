@@ -60,7 +60,7 @@ function countedWorld(tanks) {
   let reads = 0;
   const counted = new Proxy(tanks, {
     get(target, key, receiver) {
-      if (typeof key === 'string' && /^\\d+$/.test(key)) reads++;
+      if (typeof key === 'string' && Number.isInteger(+key) && String(+key) === key) reads++;
       return Reflect.get(target, key, receiver);
     }
   });
