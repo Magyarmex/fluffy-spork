@@ -170,13 +170,21 @@ wrap('game/engine',function(engine,require){
     }
     return false;
   }
-  function bestObservedTank(g,owner,current){
-    /* Cached contacts must still obey hostility and spawn protection after relations change. */
-    if(current&&!(current.spawnShieldT>0)&&hostileOwners(g,owner,current)&&sensorSees(g,owner,current))return current;
-    var best=null,score=Infinity,ts=g.tanks||[];
+  function bestObservedTank(g,owner,current,retain){
+    /* A legitimate commitment protects a current contact briefly, not forever.
+     * After that window, a substantially nearer visible hostile may win.
+     * The 0.81 squared-distance threshold is ~10% range hysteresis. */
+    var valid=current&&current.alive&&!(current.spawnShieldT>0)&&
+      hostileOwners(g,owner,current)&&sensorSees(g,owner,current);
+    if(valid&&retain)return current;
+    var best=valid?current:null,score=valid?
+      dist2(owner.x,owner.y,current.x,current.y)*.81:Infinity,ts=g.tanks||[];
     for(var i=0;i<ts.length;i++){
-      var t=ts[i];if(!t||!t.alive||t.id===owner.id||t.spawnShieldT>0||!hostileOwners(g,owner,t)||!sensorSees(g,owner,t))continue;
-      var s=dist2(owner.x,owner.y,t.x,t.y)*(t.isPlayer?.88:1);if(s<score){score=s;best=t;}
+      var t=ts[i];if(!t||!t.alive||t.id===owner.id||t.spawnShieldT>0||
+        !hostileOwners(g,owner,t)||!sensorSees(g,owner,t))continue;
+      /* Human identity does not improve target score. */
+      var s=dist2(owner.x,owner.y,t.x,t.y);
+      if(s<score){score=s;best=t;}
     }
     return best;
   }
@@ -214,7 +222,7 @@ wrap('game/engine',function(engine,require){
       }
       if(now<p.thinkAt)continue;
       p.thinkAt=now+(owner.ai.isElite?AI_ELITE_THINK:AI_NORMAL_THINK)+((Math.abs(owner.id||0)%3)*.025);
-      var current=p.targetId>=0&&g.getTank?g.getTank(p.targetId):null,target=bestObservedTank(g,owner,current);
+      var current=p.targetId>=0&&g.getTank?g.getTank(p.targetId):null,target=bestObservedTank(g,owner,current,now<p.commitUntil);
       if(!target){p.targetId=-1;p.active=false;p.commandPower=0;continue;}
       var changed=target.id!==p.targetId;
       if(changed||now>=p.commitUntil){
