@@ -332,7 +332,34 @@ wrap('game/engine',function(engine,require){
          !Number.isFinite(drone.x)||!Number.isFinite(drone.y))continue;
       if(owner&&typeof g.getTank==='function'&&
          chronoAlliedOwner(g,owner,g.getTank(drone.ownerId)))continue;
-      var droneTime=chronoStaticBodyTime(b,drone,(b.r||2)+drone.r+1);
+      var droneRadius=(b.r||2)+drone.r+1;
+      /* The shadow is read-only, but must not report a frame-end drone
+       * position as a proven earlier collision when the drone moved.
+       * Battlefield's observed endpoints do not certify a subframe path:
+       * if its conservative corridor can compete, abstain entirely. */
+      if(g.__novaShapeSweepActive){
+        var witnessed=drone.__novaChronoDroneEpoch===g.__novaShapeSweepEpoch&&
+          Number.isFinite(drone.__novaChronoDronePrevX)&&
+          Number.isFinite(drone.__novaChronoDronePrevY);
+        if(!witnessed){
+          if(chronoStaticBodyTime(b,drone,droneRadius)!==null)return null;
+          continue;
+        }
+        var sx=drone.__novaChronoDronePrevX,sy=drone.__novaChronoDronePrevY;
+        if(sx!==drone.x||sy!==drone.y){
+          var horizon=Math.min(dt,b.ttl),ex=b.x+(b.vx||0)*horizon,
+              ey=b.y+(b.vy||0)*horizon;
+          var boundSpeed=drone.speed>0&&Number.isFinite(drone.speed)?
+            Math.max(800,drone.speed*4):800;
+          var pad=droneRadius+Math.max(30,dt*boundSpeed);
+          if(Math.max(b.x,ex)+pad>=Math.min(sx,drone.x)&&
+             Math.min(b.x,ex)-pad<=Math.max(sx,drone.x)&&
+             Math.max(b.y,ey)+pad>=Math.min(sy,drone.y)&&
+             Math.min(b.y,ey)-pad<=Math.max(sy,drone.y))return null;
+          continue;
+        }
+      }
+      var droneTime=chronoStaticBodyTime(b,drone,droneRadius);
       if(droneTime===null||droneTime>b.ttl)continue;
       if(best&&Math.abs(droneTime-best.time)<=1e-9)return null;
       if(!best||droneTime<best.time)best={targetId:drone.id,kind:'drone',time:droneTime,
