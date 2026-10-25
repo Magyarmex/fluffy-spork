@@ -347,6 +347,27 @@ wrap('game/engine',function(engine,require){
       var b=this.bullets[i];if(!b||b.dead||!b.__v17Cannon||!b.__v17FuseDist)continue;
       var tr=Math.hypot(b.x-b.__v17SpawnX,b.y-b.__v17SpawnY);
       if(tr+2<b.__v17FuseDist)continue;
+      /* The core already resolved this frame's direct hits and terrain.
+       * For a surviving, non-breaching shot with no direct victims, place the
+       * airburst at the FIRST crossing of the programmed fuse circle rather
+       * than at the FPS-dependent frame endpoint. Never rewind a registered
+       * hit or a high-penetration cover-breach path: those require the wider
+       * chronological resolver. The historical 2u early-trigger tolerance
+       * remains unchanged when the fuse circle was not actually crossed. */
+      if((b.hits||0)===0&&(b.pen||0)<2&&tr>=b.__v17FuseDist&&
+         Number.isFinite(b.px)&&Number.isFinite(b.py)&&
+         Number.isFinite(b.__v17SpawnX)&&Number.isFinite(b.__v17SpawnY)){
+        var fx=b.px-b.__v17SpawnX,fy=b.py-b.__v17SpawnY;
+        var dx=b.x-b.px,dy=b.y-b.py,a=dx*dx+dy*dy;
+        var c=fx*fx+fy*fy-b.__v17FuseDist*b.__v17FuseDist;
+        if(a>1e-12&&c<0){
+          var h=fx*dx+fy*dy,disc=h*h-a*c;
+          if(disc>=0){
+            var root=Math.sqrt(disc),t=h>=0?-c/(h+root):(-h+root)/a;
+            if(t>=0&&t<=1){b.x=b.px+dx*t;b.y=b.py+dy*t;}
+          }
+        }
+      }
       var owner=this.getTank&&this.getTank(b.ownerId),frac=b.splashDmg||.36;
       if(!b.__v17FuseArmed)frac*=.72;
       if(b.shell&&this.clusterBurst)this.clusterBurst(b);
