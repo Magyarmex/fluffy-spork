@@ -1082,10 +1082,13 @@
         var dx = followX - d.x, dy = followY - d.y, dd = Math.hypot(dx, dy) || 1;
         // Actual contact distance is separate from remembered pursuit position.
         // Otherwise a drone could damage an unseen enemy at a stale location.
-        var hitDx = target.x - d.x, hitDy = target.y - d.y;
-        var hitDist = Math.hypot(hitDx, hitDy) || 1;
         var sp = d.speed * (swarming ? 1.45 : 1);
         if (dd > 12) { d.x += dx / dd * sp * dt; d.y += dy / dd * sp * dt; }
+        // The attack and LOS checks run after movement. Use the same physical
+        // position for reach and impact direction, including stale-sighting
+        // pursuit of enemy drones between bounded visibility samples.
+        var hitDx = target.x - d.x, hitDy = target.y - d.y;
+        var hitDist = Math.hypot(hitDx, hitDy) || 1;
         if (d.attackCd <= 0 && target.hp > 0) {
           var tr = target.kind === 'shape' ? target.r : target.kind === 'drone' ? target.r + 2 : ((CLASSES[target.cls] && CLASSES[target.cls].size) || 15) + 4;
           if (hitDist < tr + d.r + 5 && contactClear(g, d, target)) {

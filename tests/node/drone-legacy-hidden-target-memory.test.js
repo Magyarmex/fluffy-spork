@@ -233,3 +233,59 @@ test('cached hostile tank remains eligible after the new safety gate', () => {
   assert.equal(hits, 1);
   assert.equal(s.d.targetRef, s.target);
 });
+
+
+/* The legacy (non-Controller) drone moves before resolving melee damage.
+ * Reach and impact vectors must use the post-movement position. These
+ * regressions execute the actual shipping Controller overlay, not a copy. */
+for (const hz of [30, 60, 120, 240]) {
+  test('legacy hunter entering melee range attacks in the same tick at ' + hz + 'Hz', () => {
+    const s = harness('tank');
+    s.target.x = 32.4; // initial distance > 15+4+8+5 = 32
+    s.d.speed = 300;
+    s.d.attackCd = 0;
+    s.d.retargetT = 1;
+    let hits = 0;
+    s.g.damageTank = () => { hits++; };
+    s.tick(1 / hz);
+    assert.ok(s.target.x - s.d.x < 32, 'movement brought the hunter into reach');
+    assert.equal(hits, 1, 'post-movement melee reach must count this contact');
+  });
+}
+
+for (const hz of [30, 60, 120, 240]) {
+  test('legacy hunter moving away from a newly visible drone cannot hit out of range at ' + hz + 'Hz', () => {
+    const s = harness('drone');
+    s.target.x = 22.7; // inside 8+2+8+5 = 23 before movement
+    s.d.speed = 300;
+    s.d.attackCd = 0;
+    s.d.retargetT = 1;
+    // Sightings are intentionally sampled at a bounded cadence. The hunter
+    // can still be steering toward an older, opposite-side visible position.
+    s.d.__novaLegacySeenTarget = s.target;
+    s.d.__novaLegacySeenX = -100;
+    s.d.__novaLegacySeenY = 0;
+    s.d.__novaLegacyVisionT = 1;
+    let hits = 0;
+    s.g.damageDrone = () => { hits++; };
+    s.tick(1 / hz);
+    assert.ok(s.target.x - s.d.x > 23, 'hunter moved outside melee reach');
+    assert.equal(hits, 0, 'old pre-movement distance must not authorize remote damage');
+    assert.equal(s.d.attackCd, 0, 'no cooldown spent on a phantom attack');
+  });
+}
+
+test('legacy shape impact uses the actual post-movement contact direction', () => {
+  const s = harness('shape');
+  s.target.x = 20;
+  s.d.speed = 300;
+  s.d.attackCd = 0;
+  s.d.retargetT = 1;
+  let impact = null;
+  s.g.damageShape = (shape, dmg, dx, dy) => { impact = { shape, dmg, dx, dy }; };
+  s.tick(1 / 30);
+  assert.ok(impact, 'the shape is within reach after movement');
+  assert.equal(impact.dx, s.target.x - s.d.x,
+    'impact direction must reflect the real attacking position');
+  assert.equal(impact.dy, s.target.y - s.d.y);
+});

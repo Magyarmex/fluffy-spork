@@ -218,3 +218,53 @@ test('six shipping overlays: cached legacy target cannot bypass newly gained spa
   assert.equal(hits, 0);
   assert.equal(drone.targetRef, null);
 });
+
+
+// The real Controller module is followed by Battlefield, Performance,
+// Terrain Intelligence, Live Vector and Fair Engagement in production.
+for (const hz of [30, 60, 120, 240]) {
+  test('six shipping overlays: legacy hunter contact uses post-move reach at ' + hz + 'Hz', () => {
+    const g = new Game();
+    const owner = { id: 1, kind: 'tank', cls: 'medium', alive: true,
+      x: 0, y: 0, swarmT: 0, team: 'blue' };
+    const target = { id: 2, kind: 'tank', cls: 'medium', alive: true,
+      x: 29.4, y: 0, hp: 100, spawnShieldT: 0, team: 'red' };
+    const drone = { id: 10, kind: 'drone', ownerId: 1, x: 0, y: 0,
+      hp: 20, r: 5, speed: 300, dmg: 10, attackCd: 0, retargetT: 1,
+      leash: 500, targetRef: target, slot: 0, role: 'hunter' };
+    g.tanks = [owner, target]; g.drones = [drone];
+    g.tankById = new Map([[1, owner], [2, target]]);
+    g.areHostile = (a, b) => a.team !== b.team;
+    g.hasLineOfSight = () => true;
+    let hits = 0;
+    g.damageTank = () => { hits++; };
+    win.__testLegacyDrone(g, owner, drone, 1 / hz);
+    assert.ok(target.x - drone.x < 29, 'hunter reached physical contact');
+    assert.equal(hits, 1, 'must not defer a valid post-movement hit');
+  });
+}
+
+for (const hz of [30, 60, 120, 240]) {
+  test('six shipping overlays: stale drone sighting cannot extend melee reach at ' + hz + 'Hz', () => {
+    const g = new Game();
+    const owner = { id: 1, kind: 'tank', cls: 'medium', alive: true,
+      x: 0, y: 0, swarmT: 0, team: 'blue' };
+    const enemy = { id: 2, kind: 'tank', cls: 'medium', alive: true, team: 'red' };
+    const target = { id: 20, kind: 'drone', ownerId: 2, x: 16.7,
+      y: 0, r: 5, hp: 20 };
+    const drone = { id: 10, kind: 'drone', ownerId: 1, x: 0, y: 0,
+      hp: 20, r: 5, speed: 300, dmg: 10, attackCd: 0, retargetT: 1,
+      leash: 500, targetRef: target, slot: 0, role: 'hunter',
+      __novaLegacySeenTarget: target, __novaLegacySeenX: -100,
+      __novaLegacySeenY: 0, __novaLegacyVisionT: 1 };
+    g.tanks = [owner, enemy]; g.drones = [drone, target];
+    g.tankById = new Map([[1, owner], [2, enemy]]);
+    g.areHostile = (a, b) => a.team !== b.team;
+    g.hasLineOfSight = () => true;
+    let hits = 0;
+    g.damageDrone = () => { hits++; };
+    win.__testLegacyDrone(g, owner, drone, 1 / hz);
+    assert.ok(target.x - drone.x > 17, 'hunter moved out of physical reach');
+    assert.equal(hits, 0, 'visibility cannot authorize damage from stale distance');
+  });
+}
