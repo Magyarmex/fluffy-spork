@@ -289,7 +289,35 @@ wrap('game/engine',function(engine,require){
     d.x=nx;d.y=ny;d.__novaVX=d.__lvVX;d.__novaVY=d.__lvVY;
     if(Math.abs(d.__lvVX)+Math.abs(d.__lvVY)>3)d.angle=Math.atan2(d.__lvVY,d.__lvVX);
   }
-  function repairDrone(g,d,owner,state,dt){
+  /* Controller repair is faster than generic Field Service, not a combat heal.
+   * Only legitimately sensed hostile tanks close to the damaged drone interrupt
+   * service. Cache owner-visible candidates once per squad update; each drone
+   * still checks its own distance and unobstructed line of sight. */
+  function hostileTankNearRepair(g,owner,d,radius,cache){
+    var candidates=cache&&cache.candidates;
+    if(!candidates){
+      candidates=[];var ts=g.tanks||[],fair=window.__NOVA_FAIR_ENGAGEMENT__;
+      var ownerBound=(radius+145)*(radius+145);
+      for(var i=0;i<ts.length;i++){
+        var t=ts[i];
+        if(!t||t.id===owner.id||t.alive===false||(t.hp!=null&&t.hp<=0)||
+           t.spawnShieldT>0||!(dist2(owner.x,owner.y,t.x,t.y)<=ownerBound)||
+           !hostileOwners(g,owner,t))continue;
+        if(!owner.isPlayer&&owner.ai&&fair&&typeof fair.inGameplayViewport==='function'&&
+           !fair.inGameplayViewport(g,owner,t))continue;
+        candidates.push(t);
+      }
+      if(cache)cache.candidates=candidates;
+    }
+    var r2=radius*radius;
+    for(var j=0;j<candidates.length;j++){
+      var target=candidates[j];
+      if(dist2(d.x,d.y,target.x,target.y)<=r2&&
+         lineClear(g,d.x,d.y,target.x,target.y,2))return true;
+    }
+    return false;
+  }
+  function repairDrone(g,d,owner,state,dt,threatCache){
     var max=Math.max(1,d.maxHp||d.hp||1),f=d.hp/max,active=!!(state&&state.active),threshold=active?(owner.cls==='broodmother'?.12:.18):.62;
     if(d.__lvLastHp==null)d.__lvLastHp=d.hp;
     if(d.hp<d.__lvLastHp-.01)d.__lvRepairWait=REPAIR_DELAY;else d.__lvRepairWait=Math.max(0,(d.__lvRepairWait||0)-dt);
@@ -300,8 +328,10 @@ wrap('game/engine',function(engine,require){
     if(!d.__lvRepairing)return false;
     if(d.__novaPhase==='windup'||d.__novaPhase!=='recover'){d.__novaPhase='recover';d.__novaPhaseT=Math.max(d.__novaPhaseT||0,.22);d.__novaTarget=null;d.targetRef=null;}
     steerToward(g,d,owner.x,owner.y,Math.max(150,(d.speed||180)*1.08),dt);
-    var near=dist2(d.x,d.y,owner.x,owner.y)<145*145,combat=!!hostileDroneNear(g,owner,225);
-    if(near&&!combat&&(d.__lvRepairWait||0)<=0){
+    var near=dist2(d.x,d.y,owner.x,owner.y)<145*145;
+    if(near&&(d.__lvRepairWait||0)<=0&&
+       !hostileDroneNear(g,owner,225)&&
+       !hostileTankNearRepair(g,owner,d,225,threatCache)){
       var before=d.hp;d.hp=Math.min(max,d.hp+max*REPAIR_RATE*Math.max(0,dt));
       if(d.hp>before&&Number(g.time||0)>=(d.__lvRepairFxAt||0)){d.__lvRepairFxAt=Number(g.time||0)+.34;if(g.addParticles)g.addParticles(d.x,d.y,'#8fffd0',2,22,'glow');if(g.addRing)g.addRing(d.x,d.y,'#8fffd0',8);}
     }
@@ -335,7 +365,8 @@ wrap('game/engine',function(engine,require){
       var owner=g.getTank?g.getTank(+key):null;if(!owner&&g.tankById&&g.tankById.get)owner=g.tankById.get(+key);if(!owner)return;
       var group=groups[key],state=owner.__novaSwarm||null;
       group.sort(function(a,b){return ((a.slot==null?a.__novaSlot:a.slot)||0)-((b.slot==null?b.__novaSlot:b.slot)||0);});
-      for(var j=0;j<group.length;j++)repairDrone(g,group[j],owner,state,dt);
+      var repairThreatCache={candidates:null};
+      for(var j=0;j<group.length;j++)repairDrone(g,group[j],owner,state,dt,repairThreatCache);
       var threat=hostileDroneNear(g,owner,owner.isPlayer?285:250);
       peelScreen(g,group,owner,state,threat,dt);
     });

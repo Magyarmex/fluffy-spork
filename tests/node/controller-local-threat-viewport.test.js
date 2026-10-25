@@ -10,7 +10,7 @@ const root=path.resolve(__dirname,'../..');
 const live=fs.readFileSync(path.join(root,'nova-updates/second-body-live-vector-v1.10.7.js'),'utf8');
 const fair=fs.readFileSync(path.join(root,'nova-updates/fair-engagement-v1.11.2.js'),'utf8');
 
-function boot({enemies=[[200,0]],damaged=false,player=false,w=300,h=600,zoom=1,dt=.2,withFair=true,beforeTick=null}={}){
+function boot({enemies=[[200,0]],damaged=false,player=false,w=300,h=600,zoom=1,dt=.2,withFair=true,beforeTick=null,rivalX=130}={}){
   class Game{updateDrones(){}getTank(id){return this.tankById.get(id)||null;}}
   const modules={'game/engine':m=>{m.exports.Game=Game;}};
   const window={__novaModules:modules,NOVATips:{registerMany(){}}};
@@ -28,7 +28,7 @@ function boot({enemies=[[200,0]],damaged=false,player=false,w=300,h=600,zoom=1,d
     ai:player?null:{state:'hunt',targetId:-1,isElite:false,strafe:1},
     __novaSwarm:{active:false,power:0}};
   const rival={id:2,cls:'gunner',team:'red',alive:true,isPlayer:false,
-    x:130,y:0,hp:100,maxHp:100,spawnShieldT:0};
+    x:rivalX,y:0,hp:100,maxHp:100,spawnShieldT:0};
   const drone={id:11,ownerId:1,x:0,y:20,r:8,hp:damaged?10:100,
     maxHp:100,speed:200,__novaPhase:'form',attackCd:0,
     __lvRepairWait:0,__lvLastHp:damaged?10:100};
@@ -70,10 +70,16 @@ test('portrait AI ignores hidden drone but still intercepts visible local breach
 });
 
 test('offscreen hostile drone does not secretly suppress Controller repair',()=>{
-  const hidden=boot({damaged:true,enemies:[[200,0]]});
-  const visible=boot({damaged:true,enemies:[[100,0]]});
+  // Isolate hostile-drone visibility from the independent hostile-tank repair gate.
+  const hidden=boot({damaged:true,enemies:[[200,0]],rivalX:800});
+  const visible=boot({damaged:true,enemies:[[100,0]],rivalX:800});
   assert.ok(hidden.drone.hp>10,'hidden drone cannot suppress local recovery');
   assert.equal(visible.drone.hp,10,'visible drone still suppresses repair');
+});
+
+test('visible hostile tank suppresses repair even when its drone is offscreen',()=>{
+  const w=boot({damaged:true,enemies:[[200,0]],rivalX:130});
+  assert.equal(w.drone.hp,10,'an actually visible tank remains combat pressure');
 });
 
 test('nearer unseen drone cannot mask a farther visible drone in defensive peel',()=>{
