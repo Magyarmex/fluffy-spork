@@ -643,7 +643,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
     var def=CLASSES[e.cls];if(!def){uncertain=true;return;}
     rr=b.r+def.size+3;
     if(e.__novaSweepMoveTime===g.time){
-     if(!Number.isFinite(e.__novaSweepPrevX)||!Number.isFinite(e.__novaSweepPrevY))return;
+     if(!Number.isFinite(e.__novaSweepPrevX)||!Number.isFinite(e.__novaSweepPrevY)){uncertain=true;return;}
      sx=e.__novaSweepPrevX;sy=e.__novaSweepPrevY;
      mx=e.x-sx;my=e.y-sy;
     }
