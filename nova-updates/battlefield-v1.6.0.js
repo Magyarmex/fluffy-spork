@@ -397,9 +397,11 @@ function movingShapeHitT(g,s,ax,ay,ex,ey,rr){
  var D=B*B-4*A*C;if(!(D>0))return null;
  var root=Math.sqrt(D),q=-.5*(B+(B<0?-root:root));
  if(!q)return null;
- var t0=q/A,t1=C/q,t=Math.min(t0,t1);
- if(t>=0&&t<=1)return t;
- t=Math.max(t0,t1);return t>=0&&t<=1?t:null;
+ var t0=q/A,t1=C/q,entry=Math.min(t0,t1),exit=Math.max(t0,t1);
+ /* Strict body overlap must exist within this frame. Merely touching the
+  * boundary at t=0 while separating, or first touching at t=1, is no hit. */
+ if(exit<=0||entry>=1)return null;
+ return entry<=0?0:entry;
 }
 /* Only moving shapes require an additional swept broadphase: the canonical
  * hash already contains stationary shapes, tanks and drones. Index the shape
