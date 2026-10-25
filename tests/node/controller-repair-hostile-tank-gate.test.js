@@ -9,7 +9,7 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname,
   '../../nova-updates/second-body-live-vector-v1.10.7.js'), 'utf8');
-const anchor = '  function repairDrone(g,d,owner,state,dt){';
+const anchor = '  function repairDrone(g,d,owner,state,dt,threatCache){';
 assert.equal(source.split(anchor).length, 2, 'one canonical shipping repair path');
 const instrumented = source.replace(anchor,
   '  window.__NOVA_REPAIR_TEST__=repairDrone;\n' + anchor);
