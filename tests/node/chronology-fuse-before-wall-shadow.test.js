@@ -152,3 +152,27 @@ for(const optimized of [false,true]){
     assert.equal(snap.fuseBeforeWallLateBursts,0);
   });
 }
+
+test('diagonal Cannon trajectory is compared from muzzle, not X projection',()=>{
+  const Game=boot(false),g=new Game(),bursts=[];
+  const unit=Math.SQRT1_2,pad=8.5*.45;
+  g.time=1;g.__novaBattlefield={coverBroken:0};
+  g.__novaTerrain=[{id:-72,shape:'rect',
+    x:154.175*unit+10+pad,y:0,w:20,h:300,
+    solid:true,destructible:false}];
+  g.bursts=bursts;g.weakenBullet=()=>{};
+  g.bullets=[{kind:'bullet',id:778,ownerId:1,
+    x:146*unit,y:146*unit,vx:380*unit,vy:380*unit,
+    r:8.5,dmg:26,ttl:2,shell:true,pen:1,hits:0,dead:false,
+    __v17Cannon:true,__v17FuseDist:150,__v17SpawnX:0,__v17SpawnY:0,
+    __v17FuseArmed:false,splash:72,splashDmg:.4,color:'#ffb45e'}];
+  g.updateBullets(1/30);
+  const snap=g.novaChronoShadowSnapshot();
+  assert.equal(bursts.length,1);
+  assert.equal(snap.fuseBeforeWallCandidates,1);
+  assert.equal(snap.fuseBeforeWallLateBursts,1);
+  const event=snap.events.find(e=>e.kind==='fuse-before-wall-late-burst');
+  assert.ok(event);
+  assert.ok(Math.abs(Math.hypot(event.expectedX,event.expectedY)-148)<1e-6);
+  assert.ok(Math.hypot(bursts[0].x,bursts[0].y)>150);
+});
