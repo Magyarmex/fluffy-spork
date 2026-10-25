@@ -874,7 +874,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       childReach+(shape.r||15)+35+(start?0:dt*2000)))return null;
   }
   for(var k=0;k<drones.length;k++){
-   var d=drones[k];if(!d||!(d.hp>0))continue;
+   var d=drones[k];if(!d||!(d.hp>0)||d.ownerId===b.ownerId)continue;
    if(!g.__novaShapeSweepActive||
       d.__novaChronoDroneEpoch!==g.__novaShapeSweepEpoch)return null;
    var dx=d.__novaChronoDronePrevX,dy=d.__novaChronoDronePrevY;
