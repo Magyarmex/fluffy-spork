@@ -12,14 +12,18 @@ function core(name,arg){
  for(;depth&&p<html.length;p++){if(html[p]==='{')depth++;else if(html[p]==='}')depth--;}
  assert.equal(depth,0);return html.slice(start+marker.length,p-1);
 }
-const CLASSES={
- cannon:{id:'cannon',size:16,fireMode:'single',barrels:[{len:30,x:0,off:0}],
-  bullet:{dmg:20,speed:400,r:8,pen:0,reload:1,ttl:1.1,splash:70,splashDmg:.4},color:'#ffb45e'},
- bomber:{id:'bomber',size:15,fireMode:'shell',barrels:[{len:30,x:0,off:0}],
-  bullet:{dmg:20,speed:360,r:8,pen:0,reload:1,ttl:1.1,splash:45,splashDmg:.3},color:'#ffb45e'},
- siege:{id:'siege',size:17,fireMode:'shell',barrels:[{len:35,x:11,off:0}],
-  bullet:{dmg:30,speed:380,r:9,pen:2,reload:1,ttl:1.2,splash:70,splashDmg:.4},color:'#ffb45e'}
-};
+/* Parse the actual canonical class registry embedded in the shipping HTML.
+ * No synthetic Cannon speeds, barrels, radii or penetration budgets. */
+function shippingClasses(){
+ const marker='exports.CLASSES = {',start=html.indexOf(marker);
+ assert.ok(start>=0,'materialized class registry missing');
+ let p=start+marker.length,depth=1;
+ for(;depth&&p<html.length;p++){if(html[p]==='{')depth++;else if(html[p]==='}')depth--;}
+ assert.equal(depth,0,'class registry must close');
+ const statement=html.slice(start,p);
+ return new Function('ESCORT','exports',statement+';return exports.CLASSES;')({},{});
+}
+const CLASSES=shippingClasses();
 const types={clamp:(v,lo,hi)=>Math.max(lo,Math.min(hi,v)),
  dist2:(x,y,a,b)=>(x-a)**2+(y-b)**2,rnd:()=>0,TAU:Math.PI*2,ARENA_HALF:2250};
 const fire=new Function('classes_1','types_1','return function(t){'+core('tryFire','t')+'}')({CLASSES},types);
@@ -52,7 +56,7 @@ function boot(cls='cannon',angle=0,vx=0,vy=0){
  Game.prototype.useAbility=function(){};
  Game.prototype.bulletDamageFor=(_t,d)=>d;
  Game.prototype.bulletSpeed=t=>CLASSES[t.cls].bullet.speed;
- Game.prototype.weaponRange=t=>CLASSES[t.cls].bullet.speed*CLASSES[t.cls].bullet.ttl+40;
+ Game.prototype.weaponRange=t=>CLASSES[t.cls].bullet.speed*(CLASSES[t.cls].bullet.ttl??1.05)+40;
  Game.prototype.addParticles=function(){};Game.prototype.addRing=function(){};
  Game.prototype.addFlash=function(){};Game.prototype.addText=function(){};
  Game.prototype.splashAt=function(x,y){bursts.push({x,y,kind:'splash'});};
@@ -92,7 +96,7 @@ function wall(x=180,destructible=false,hp=300){
   destructible,hp,maxHp:hp};
 }
 for(const [cls,angle,vx,vy] of [
- ['cannon',0,0,0],['bomber',.41,85,-45],['siege',-.38,120,40]
+ ['cannon',0,0,0],['bomber',.41,85,-45],['siegebomber',-.38,120,40]
 ]){
  test(cls+' terrain preview traces the real materialized muzzle and velocity',()=>{
   const {g,t}=boot(cls,angle,vx,vy);
@@ -137,7 +141,7 @@ test('unobstructed preview remains the live fuse, including mouse depth',()=>{
  near(second.programY,b.y+b.vy/mag*b.__v17FuseDist,'mouse shot y');
 });
 test('possible penetrating cover breach never promises a guaranteed IMPACT',()=>{
- const {g,t,render}=boot('siege');
+ const {g,t,render}=boot('annihilator');
  g.__novaTerrain=[wall(180,true,10)];
  const p=g.novaFusePreview(t);
  assert.equal(p.mayBreach,true);assert.equal(p.blocked,false);
@@ -199,7 +203,7 @@ test('penetration upgrades switch cover cue from certain impact to possible brea
  t.stats.penetration=4; /* materialized core: floor(4 * 0.6) = 2 */
  const upgraded=g.novaFusePreview(t);
  assert.equal(upgraded.blocked,false);assert.equal(upgraded.mayBreach,true);
- g.tryFire(t);assert.equal(g.bullets[0].pen,2);
+ g.tryFire(t);assert.equal(g.bullets[0].pen,3);
 });
 test('upgraded projectile radius uses actual materialized collision padding',()=>{
  const {g,t}=boot('cannon');
