@@ -779,3 +779,52 @@ test('distant discontinuous tank relocation does not veto an unrelated real hit'
  g.updateBullets(1/30);
  assert.deepEqual(victims,[2],'remote discontinuity must not be a global veto');
 });
+
+
+/* RESEARCH / KNOWN-RED: hostile drone first contact before projectile TTL.
+ * The core expires shots before the drone body query; current bounded TTL
+ * recovery only handles tanks/shapes. Do not merge until the authoritative
+ * first-event resolver handles drone damage via the existing callbacks. */
+for(const hz of [30,60,120,240]){
+ test('[RED] stationary hostile drone receives physical TTL-first hit at '+hz+'Hz',()=>{
+  const g=isolatedWorld({x:100,vx:500,ttl:.004,drones:[{
+   kind:'drone',id:7,ownerId:2,x:12,y:0,r:8,hp:20
+  }]});
+  // Bullet radius 3 + drone radius 8 = 11. First contact x=1 at .002s,
+  // while expiration is x=2 at .004s.
+  g.updateBullets(1/hz);
+  assert.equal(g.hits,1);
+ });
+ test('unreachable hostile drone beyond TTL remains unharmed at '+hz+'Hz',()=>{
+  const g=isolatedWorld({x:100,vx:500,ttl:.004,drones:[{
+   kind:'drone',id:7,ownerId:2,x:100,y:0,r:8,hp:20
+  }]});
+  g.updateBullets(1/hz);
+  assert.equal(g.hits,0);
+ });
+ test('owned drone remains transparent to own projectile at '+hz+'Hz',()=>{
+  const g=isolatedWorld({x:100,vx:500,ttl:.004,drones:[{
+   kind:'drone',id:7,ownerId:1,x:12,y:0,r:8,hp:20
+  }]});
+  g.updateBullets(1/hz);
+  assert.equal(g.hits,0);
+ });
+ for(const optimized of [false,true]){
+  test('[RED] witnessed single-step moving hostile drone receives TTL-first hit ('+
+    (optimized?'optimized':'baseline')+', '+hz+'Hz)',()=>{
+   const FullGame=boot(function(dt){
+    this.time+=dt;
+    // One explicit continuous drone movement step this frame.
+    this.drones[0].y+=2;
+    this.updateBullets(dt);
+   },optimized);
+   const g=new FullGame();
+   g.tanks=[];g.drones=[{kind:'drone',id:7,ownerId:2,x:12,y:0,r:8,hp:20}];
+   g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+     vx:500,vy:0,r:3,dmg:20,ttl:.004,pen:0,hits:0,
+     dead:false,shell:false,beam:false}];
+   g.update(1/hz);
+   assert.equal(g.hits,1,'actual observed movement crosses projectile before TTL');
+  });
+ }
+}
