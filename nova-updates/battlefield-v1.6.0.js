@@ -993,7 +993,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   /* Start is recorded even without diagnostics for the existing conservative
    * collision gate; optional stages are kept separate from this authority. */
   if(this.__novaDroneChronoTraceEnabled===true){
-   cd.__novaChronoDroneTraceEpoch=-1;cd.__novaChronoDroneLiveEpoch=-1;
+   cd.__novaChronoDroneTraceEpoch=-1;cd.__novaChronoDroneRouteEpoch=-1;cd.__novaChronoDroneLiveEpoch=-1;
   }
  }
  var shapes=this.shapes||[];for(var si=0;si<shapes.length;si++){var sh=shapes[si];if(!sh)continue;sh.__novaShapeSweepEpoch=epoch;sh.__novaShapeSweepPrevX=sh.x;sh.__novaShapeSweepPrevY=sh.y;}this.__novaShapeSweepActive=true;if(this.__novaBattlefield&&!this.__novaBattlefield.announced&&this.status==='playing'&&this.time>.1){this.__novaBattlefield.announced=true;if(this.toast)this.toast('¦ BATTLEFIELD · '+this.__novaBattlefield.name+'  COVER CHANGES THE FIGHT','info');}
