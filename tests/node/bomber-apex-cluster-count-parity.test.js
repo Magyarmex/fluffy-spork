@@ -250,7 +250,7 @@ for (const optimized of [false, true]) {
           w: 160, h: 160, solid: true, destructible: true, hp: 5 }];
         Object.assign(parent, {
           x: -120, y: 0, px: -120, py: 0,
-          vx: 12000, vy: 0, r: 2, ttl: .001, pen: 3,
+          vx: 12000, vy: 0, r: 2, ttl: .004, pen: 3, // wall contact at ~.00326s precedes expiry
         });
         g.updateBullets(1 / fps);
         assert.equal(g.__novaTerrain[0].solid, false, 'cover must actually break');
