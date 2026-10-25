@@ -302,7 +302,7 @@ wrap('game/render',function(renderMod,require){
     ctx.strokeStyle='rgba(255,238,204,.94)';ctx.fillStyle='rgba(255,167,94,.12)';ctx.lineWidth=1.4;
     var r=9+2*Math.sin((g.time||0)*8);ctx.beginPath();ctx.moveTo(a.x-r,a.y-r);ctx.lineTo(a.x+r,a.y+r);ctx.moveTo(a.x+r,a.y-r);ctx.lineTo(a.x-r,a.y+r);ctx.stroke();
     ctx.beginPath();ctx.arc(a.x,a.y,r+5,0,TAU);ctx.stroke();
-    ctx.font='800 8px Orbitron,system-ui';ctx.textAlign='center';ctx.fillStyle='#ffe5c4';var label=(p.mayBreach?'COVER / BREACH? ':'IMPACT ')+Math.round(p.actualDist);
+    ctx.font='800 8px Orbitron,system-ui';ctx.textAlign='center';ctx.fillStyle='#ffe5c4';var label=(p.mayBreach?'BREACH? ':'IMPACT ')+Math.round(p.actualDist);
     if(solid&&solid.destructible&&solid.maxHp)label+=' · COVER '+Math.round(clamp(solid.hp/solid.maxHp,0,1)*100)+'%';
     ctx.fillText(label,a.x,a.y-17);
     ctx.restore();
