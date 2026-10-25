@@ -779,3 +779,44 @@ test('distant discontinuous tank relocation does not veto an unrelated real hit'
  g.updateBullets(1/30);
  assert.deepEqual(victims,[2],'remote discontinuity must not be a global veto');
 });
+
+
+/* First-contact contract: a hostile drone physically overlapping a projectile
+ * at the start of its bullet update is already a zero-time contact. The core
+ * currently expires a short-lived projectile before querying drone bodies.
+ * This slice requires no guessed drone motion or subframe timestamps. */
+function zeroTimeDroneWorld(fps, drones, terrain = [], otherBullets = []) {
+  const g = new Game();
+  g.drones = drones.map((d, i) => ({kind:'drone', id:10+i, ownerId:2,
+    x:8, y:0, r:8, hp:20, ...d}));
+  g.__novaTerrain = terrain;
+  g.bullets = [{kind:'bullet', id:1, ownerId:1, x:0, y:0,
+    vx:500, vy:0, r:3, dmg:20, ttl:.004, pen:0,
+    hits:0, dead:false, shell:false, beam:false}, ...otherBullets];
+  g.updateBullets(1/fps);
+  return g;
+}
+for (const fps of [30,60,120,240]) {
+  test('TTL-first hostile drone already overlapping at bullet-update entry is hit at '+fps+'Hz', () => {
+    const g=zeroTimeDroneWorld(fps,[{}]);
+    assert.equal(g.hits,1,'physical zero-time contact must precede projectile expiration');
+  });
+  test('TTL-first owned drone stays transparent at '+fps+'Hz', () => {
+    assert.equal(zeroTimeDroneWorld(fps,[{ownerId:1}]).hits,0);
+  });
+  test('TTL-first remote hostile drone is not hit at '+fps+'Hz', () => {
+    assert.equal(zeroTimeDroneWorld(fps,[{x:30}]).hits,0);
+  });
+  test('TTL-first simultaneous hostile drones defer rather than choose array order at '+fps+'Hz', () => {
+    assert.equal(zeroTimeDroneWorld(fps,[{},{id:99}]).hits,0);
+  });
+  test('TTL-first wall containing bullet origin vetoes drone contact at '+fps+'Hz', () => {
+    const terrain=[{id:-1,shape:'rect',x:0,y:0,w:4,h:50,solid:true,destructible:false}];
+    assert.equal(zeroTimeDroneWorld(fps,[{}],terrain).hits,0);
+  });
+  test('TTL-first competing projectile at origin vetoes speculative drone damage at '+fps+'Hz', () => {
+    const other=[{kind:'bullet',id:99,ownerId:3,x:0,y:0,
+      vx:0,vy:0,r:3,ttl:1,pen:0,hits:0,dead:false}];
+    assert.equal(zeroTimeDroneWorld(fps,[{}],[],other).hits,0);
+  });
+}
