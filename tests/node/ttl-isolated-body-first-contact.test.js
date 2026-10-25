@@ -302,3 +302,20 @@ test('splash projectiles retain original arbitration until unified solver',()=>{
  g.updateBullets(1/30);
  assert.equal(g.hits,0);
 });
+
+test('projected-work budget defers all dense simultaneous expirations',()=>{
+ const g=isolatedWorld();
+ g.bullets=Array.from({length:50},(_,i)=>({kind:'bullet',id:i+1,ownerId:1,
+  x:0,y:0,vx:6000,vy:0,r:3,dmg:20,ttl:.005,pen:0,hits:0,
+  dead:false,shell:false,beam:false}));
+ g.updateBullets(1/30);
+ assert.equal(g.hits,0,'no array-order subset may steal kill credit');
+});
+test('single isolated expiry still works among distant live projectiles',()=>{
+ const g=isolatedWorld();
+ g.bullets.push(...Array.from({length:200},(_,i)=>({kind:'bullet',id:i+2,
+  ownerId:3,x:1000+i*2,y:1000,vx:0,vy:0,r:3,dmg:8,
+  ttl:1,pen:0,hits:0,dead:false,shell:false,beam:false})));
+ g.updateBullets(1/30);
+ assert.equal(g.hits,1);
+});
