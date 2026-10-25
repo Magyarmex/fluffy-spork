@@ -89,12 +89,12 @@ function saturation(g,targetId,selfId){
  * Count pressure assignments once instead of rescanning every AI tank for
  * every candidate. The observer itself is excluded exactly as before. */
 function saturationSnapshot(g,selfId){
-  var counts=Object.create(null),ts=g&&g.tanks||[];
+  var counts=new Map(),ts=g&&g.tanks||[];
   for(var i=0;i<ts.length;i++){
     var q=ts[i];if(!q||q.id===selfId||!q.ai||!alive(q))continue;
     var a=q.ai,id=a.__v1112TargetId>=0?a.__v1112TargetId:(a.__v1105TargetId>=0?a.__v1105TargetId:(a.__v180TargetId>=0?a.__v180TargetId:a.targetId));
     if(a.state==='hunt'||a.__v180Posture==='pressure'||a.__v180Posture==='flank'||a.__v180Posture==='route')
-      counts[id]=(counts[id]||0)+1;
+      counts.set(id,(counts.get(id)||0)+1);
   }
   return counts;
 }
@@ -105,7 +105,7 @@ function scoreTarget(g,classes,observer,a,target,now,satCounts){
   var score=near*1.16+(1-hp)*.48+targetDanger(classes,target)*.30;
   if(a&&a.__v1112TargetId===target.id)score+=.16;
   if(a&&a.__v180LastAttacker===target.id&&now-Number(a.__v180HitAt||-99)<2.2)score+=.34;
-  score-=(satCounts?(satCounts[target.id]||0):saturation(g,target.id,observer.id))*SATURATION_PENALTY;
+  score-=(satCounts?(satCounts.get(target.id)||0):saturation(g,target.id,observer.id))*SATURATION_PENALTY;
   /* Tiny deterministic tie breaker prevents identical bots from synchronizing
    * onto one equal-distance target. It is identity-neutral: isPlayer is never read. */
   var seed=Math.sin((observer.id||1)*17.17+(target.id||1)*31.73)*43758.5453;
