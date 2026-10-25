@@ -84,3 +84,26 @@ test('shipping core explicitly prioritizes aimVec over the mouse fallback',()=>{
  assert.ok(html.indexOf('            if (aim) {',start)>start);
  assert.ok(html.indexOf('            else if (this.input.mouseActive) {',start)>start);
 });
+
+test('WASD plus mouse aligns the gun with the canonical Controller live command',()=>{
+ const Input=boot(),input=new Input();
+ const source=controller;
+ const a=source.indexOf('    function updatePlayerCommand(');
+ const b=source.indexOf('    function updateAICommand(',a);
+ assert.ok(a>=0&&b>a);
+ const updateCommand=new Function('clamp','maxCommandRange','clampNode',
+  'return ('+source.slice(a,b).trim()+')')(
+  (v,l,h)=>Math.min(h,Math.max(l,v)),()=>650,
+  (o,x,y,r)=>({x,y}));
+ const owner={id:1,cls:'carrier',x:0,y:0,angle:0,alive:true};
+ const state={wasActive:false,angle:0,nodeX:0,nodeY:0,power:0,lastCommandCue:-99,lastRecallCue:-99};
+ const g={input,player:owner,w:800,h:600,zoom:1,time:1,cam:{x:0,y:0},
+  canvas:{getBoundingClientRect(){return {left:0,top:0}}},
+  sfx:{novaSwarmCommand(){}},tankSpeed(){return 100},moveTank(){},
+  nearestTank(){return null},lerpAngle(a,b,t){return a+(b-a)*Math.min(1,t)}};
+ playerAim.call(g,1/60,{angleDiff:()=>0});
+ updateCommand(g,owner,state,{droneLeash:650},1/60);
+ assert.ok(Math.abs(owner.angle-state.angle)<1e-8,
+  'mouse pointer and live swarm command must share the same bearing');
+ assert.ok(owner.angle<0&&state.active,'northward mouse should command north despite eastward WASD');
+});
