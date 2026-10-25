@@ -615,7 +615,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    if(!e)return;
    var rr=0,sx=e.x,sy=e.y,mx=0,my=0;
    if(kind==='tank'){
-    if(!e.alive||e.id===b.ownerId||e.spawnShieldT>0)return;
+    if(!e.alive||e.id===b.ownerId)return;
+    if(e.spawnShieldT>0||e.shieldT>0||e.bulwarkT>0||e.tauntT>0){uncertain=true;return;}
     var owner=g.getTank&&g.getTank(b.ownerId);
     if(owner&&typeof g.areAllies==='function'&&g.areAllies(owner,e))return;
     var def=CLASSES[e.cls];if(!def)return;
