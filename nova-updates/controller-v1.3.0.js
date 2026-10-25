@@ -356,19 +356,19 @@
     if (!Game || Game.prototype.__novaSecondBody) return;
     Game.prototype.__novaSecondBody = true;
     Game.prototype.__novaControllerHeldDeadzoneSafe = true;
-    /* The materialized mouse fallback uses atan2(cursor - hull). At exact
-     * hull center atan2(0,0) is zero, an arbitrary eastward bearing. Live
-     * Vector deliberately HOLDS its last command inside a 5u deadzone; the
-     * gun must not rotate away from that command just because the cursor
-     * crosses the tank. Only intercept the first (player) aim interpolation
+    /* The shared materialized mouse fallback uses atan2(cursor - hull).
+     * At exact hull center atan2(0,0) invents an eastward bearing for EVERY
+     * class. Live Vector also holds Controller command depth at center, so
+     * keeping the actual cannon bearing is important for command parity.
+     * Only intercept the first (player) aim interpolation
      * of an actual mouse-fallback frame; AI and touch/keyboard aim stay native.
      * No per-frame closures or changes to mouse ownership/fire state. */
     if (typeof Game.prototype.update === 'function' &&
         typeof Game.prototype.lerpAngle === 'function') {
       var baseUpdate = Game.prototype.update, baseLerpAngle = Game.prototype.lerpAngle;
       Game.prototype.lerpAngle = function (a, b, t) {
-        if (this.__novaControllerCenterAimPending) {
-          this.__novaControllerCenterAimPending = false;
+        if (this.__novaMouseCenterAimPending) {
+          this.__novaMouseCenterAimPending = false;
           var input = this.input, pl = this.player, cam = this.cam;
           if (pl && input && cam && this.canvas &&
               typeof this.canvas.getBoundingClientRect === 'function' &&
@@ -385,15 +385,15 @@
       };
       Game.prototype.update = function (dt) {
         var input = this.input, key = input && input.keyboard, pl = this.player;
-        this.__novaControllerCenterAimPending = !!(
-          this.status === 'playing' && isController(pl) && pl.alive &&
+        this.__novaMouseCenterAimPending = !!(
+          this.status === 'playing' && pl && pl.alive &&
           input && input.mouseActive &&
           !(input.aim && input.aim.active) &&
           !(input.move && input.move.active) &&
           !(key && (key.up || key.down || key.left || key.right)) &&
           Number.isFinite(input.mouseX) && Number.isFinite(input.mouseY));
         try { return baseUpdate.apply(this, arguments); }
-        finally { this.__novaControllerCenterAimPending = false; }
+        finally { this.__novaMouseCenterAimPending = false; }
       };
     }
 
