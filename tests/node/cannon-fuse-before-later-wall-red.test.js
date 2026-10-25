@@ -1,5 +1,5 @@
 'use strict';
-// KNOWN-RED acceptance gate for #147/#193. Do NOT merge until a chronological
+// KNOWN-RED acceptance gate for #147/#193. Actual shipping overlay order is\n// Battlefield -> Three Disciplines -> Performance (when present).\n// Do NOT merge until a chronological
 // resolver orders Cannon fuse and terrain BEFORE applying either side effect.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -46,7 +46,7 @@ function boot(performance) {
   };
   const ctx = {window:{__novaModules:modules},console:{info(){},warn(){},error(){}},
     Math,Map,Date,performance:{now:()=>0}};
-  const files=['disciplines-v1.7.0.js','battlefield-v1.6.0.js'];
+  const files=['battlefield-v1.6.0.js','disciplines-v1.7.0.js'];
   if(performance)files.push('performance-v1.7.5.js');
   for(const file of files)vm.runInNewContext(
     fs.readFileSync(path.join(root,'nova-updates',file),'utf8'),ctx,{filename:file});
