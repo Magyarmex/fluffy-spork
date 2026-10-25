@@ -440,6 +440,17 @@ function appendSweptShapes(ix,b,ax,ay,ex,ey,out){
  * existing swept recovery, which chooses the first physical victim. */
 function needsMovingShapeRecovery(g,ix,b,candidates){
  if(!ix||!ix.all.length||!candidates.length||b.px==null)return false;
+ /* Only defer when the core would otherwise apply an endpoint body hit.
+  * The normal swept recovery already handles bullets with no endpoint hit. */
+ var endpoint=false;
+ for(var j=0;j<candidates.length;j++){
+  var e=candidates[j],rr=0;
+  if(e.kind==='shape'&&e.hp>0)rr=b.r+e.r;
+  else if(e.kind==='tank'&&e.alive&&e.id!==b.ownerId)rr=b.r+CLASSES[e.cls].size+3;
+  else if(e.kind==='drone'&&e.hp>0&&e.ownerId!==b.ownerId)rr=b.r+e.r+1;
+  if(rr&&d2(b.x,b.y,e.x,e.y)<rr*rr){endpoint=true;break;}
+ }
+ if(!endpoint)return false;
  var ax=b.px,ay=b.py,ex=b.x,ey=b.y,moving=[];
  appendSweptShapes(ix,b,ax,ay,ex,ey,moving);
  for(var i=0;i<moving.length;i++){
