@@ -463,3 +463,21 @@ for(const optimized of [false,true]){
     g.__novaTerrain[0].hp);
  });
 }
+
+for(const optimized of [false,true]){
+ const Game=boot(optimized,null,true);
+ for(const {hz,startX,wallX,vx} of [
+  {hz:60,startX:147.9,wallX:168,vx:380},
+  {hz:120,startX:147.9,wallX:164.625,vx:380},
+  {hz:240,startX:147.9,wallX:164.625,vx:861.84}
+ ]){
+  test((optimized?'optimized':'baseline')+
+   ' Quake fuse-first structural cover parity at '+hz+'Hz',()=>{
+   const {g}=run(Game,hz,true,{cover:true,shell:false,pen:1,
+    startX,wallX,vx,extras:g=>{g.bullets[0].__novaStructureMult=1.9;}});
+   assert.ok(g.rings.some(r=>Math.abs(r.x-150)<1e-6));
+   assert.ok(g.__novaTerrain[0].hp>80,
+    'later wall receives fuse splash only at '+hz+'Hz');
+  });
+ }
+}
