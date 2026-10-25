@@ -776,7 +776,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    * near either endpoint, or moving through the projectile AABB, must defer.
    * The extra movement pad covers non-linear steering inside the frame. */
   for(var di=0;di<drones.length;di++){
-   var dr=drones[di];if(!dr||!(dr.hp>0))continue;
+   var dr=drones[di];if(!dr||!(dr.hp>0)||dr.ownerId===b.ownerId)continue;
    if(!g.__novaShapeSweepActive||
       dr.__novaChronoDroneEpoch!==g.__novaShapeSweepEpoch)return false;
    var dsx=dr.__novaChronoDronePrevX,dsy=dr.__novaChronoDronePrevY;
@@ -874,7 +874,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       childReach+(shape.r||15)+35+(start?0:dt*2000)))return null;
   }
   for(var k=0;k<drones.length;k++){
-   var d=drones[k];if(!d||!(d.hp>0))continue;
+   var d=drones[k];if(!d||!(d.hp>0)||d.ownerId===b.ownerId)continue;
    if(!g.__novaShapeSweepActive||
       d.__novaChronoDroneEpoch!==g.__novaShapeSweepEpoch)return null;
    var dx=d.__novaChronoDronePrevX,dy=d.__novaChronoDronePrevY;

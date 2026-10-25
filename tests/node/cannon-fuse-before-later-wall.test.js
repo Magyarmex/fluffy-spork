@@ -380,3 +380,36 @@ test('nonfinite drone speed cannot authorize Cannon fuse shortcut',()=>{
  assert.equal(bursts.length,1);
  assert.ok(bursts[0].x>150);
 });
+
+
+/* Run350: a Cannon with Controller-gene drones must not let its own swarm
+ * change a provably earlier fuse into a later wall impact. The canonical
+ * projectile core explicitly ignores drones with the shooter's ownerId. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'optimized':'baseline';
+ for(const {hz,startX,wallX,vx} of [
+  {hz:30,startX:146,wallX:168,vx:380},
+  {hz:60,startX:147.9,wallX:168,vx:380},
+  {hz:120,startX:147.9,wallX:164.625,vx:380},
+  {hz:240,startX:147.9,wallX:164.625,vx:861.84}
+ ]){
+  test(label+' own drone does not veto earlier Cannon fuse at '+hz+'Hz',()=>{
+   const {bursts}=run(Game,hz,true,{startX,wallX,vx,extras:g=>{
+    // Deliberately no frame-start witness: own drones are transparent.
+    g.drones=[{id:4,kind:'drone',ownerId:1,x:152,y:0,r:8,hp:50}];
+   }});
+   assert.equal(bursts.length,1);
+   assert.ok(bursts[0].x>=148-1e-6&&bursts[0].x<=150+1e-6,
+    'own drone must not turn an earlier fuse into a later wall burst');
+  });
+ }
+ test(label+' hostile drone beside fuse remains an unresolved contender',()=>{
+  const {bursts}=run(Game,30,true,{extras:g=>{
+   g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=5;
+   g.drones=[{id:4,kind:'drone',ownerId:2,x:152,y:0,r:8,hp:50,
+    __novaChronoDroneEpoch:5,__novaChronoDronePrevX:152,__novaChronoDronePrevY:0}];
+  }});
+  assert.equal(bursts.length,1);
+  assert.ok(bursts[0].x>150,'potential hostile interception retains authority');
+ });
+}
