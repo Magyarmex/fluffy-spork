@@ -317,6 +317,37 @@ wrap('game/engine',function(engine,require){
     }
     return false;
   }
+  /* Controller repair is a local physical activity. A hostile drone beside
+   * the healer can interrupt it even when the hostile is beyond the hull's
+   * peel-screen radius; a drone near the hull but far from the healer cannot.
+   * Only consider candidates within radius + the existing 145u repair leash,
+   * preserving AI viewport fairness and avoiding full per-drone scans. */
+  function hostileDroneNearRepair(g,owner,d,radius,cache){
+    var candidates=cache&&cache.droneCandidates;
+    if(!candidates){
+      candidates=[];var ds=g.drones||[],fair=window.__NOVA_FAIR_ENGAGEMENT__;
+      var ownerBound=(radius+145)*(radius+145);
+      for(var i=0;i<ds.length;i++){
+        var threat=ds[i];
+        if(!threat||!(threat.hp>0)||threat.ownerId===owner.id||
+           threat.__novaSpotter||
+           !(dist2(owner.x,owner.y,threat.x,threat.y)<=ownerBound))continue;
+        var other=ownerOf(g,threat);
+        if(!other||!hostileOwners(g,owner,other))continue;
+        if(!owner.isPlayer&&fair&&typeof fair.inGameplayViewport==='function'&&
+           !fair.inGameplayViewport(g,owner,threat))continue;
+        candidates.push(threat);
+      }
+      if(cache)cache.droneCandidates=candidates;
+    }
+    var r2=radius*radius;
+    for(var j=0;j<candidates.length;j++){
+      var t=candidates[j];
+      if(t.hp>0&&dist2(d.x,d.y,t.x,t.y)<=r2&&
+         lineClear(g,d.x,d.y,t.x,t.y,2))return true;
+    }
+    return false;
+  }
   function repairDrone(g,d,owner,state,dt,threatCache){
     var max=Math.max(1,d.maxHp||d.hp||1),f=d.hp/max,active=!!(state&&state.active),threshold=active?(owner.cls==='broodmother'?.12:.18):.62;
     if(d.__lvLastHp==null)d.__lvLastHp=d.hp;
@@ -330,7 +361,7 @@ wrap('game/engine',function(engine,require){
     steerToward(g,d,owner.x,owner.y,Math.max(150,(d.speed||180)*1.08),dt);
     var near=dist2(d.x,d.y,owner.x,owner.y)<145*145;
     if(near&&(d.__lvRepairWait||0)<=0&&
-       !hostileDroneNear(g,owner,225)&&
+       !hostileDroneNearRepair(g,owner,d,225,threatCache)&&
        !hostileTankNearRepair(g,owner,d,225,threatCache)){
       var before=d.hp;d.hp=Math.min(max,d.hp+max*REPAIR_RATE*Math.max(0,dt));
       if(d.hp>before&&Number(g.time||0)>=(d.__lvRepairFxAt||0)){d.__lvRepairFxAt=Number(g.time||0)+.34;if(g.addParticles)g.addParticles(d.x,d.y,'#8fffd0',2,22,'glow');if(g.addRing)g.addRing(d.x,d.y,'#8fffd0',8);}

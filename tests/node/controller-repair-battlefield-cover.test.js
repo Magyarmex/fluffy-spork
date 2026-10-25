@@ -75,3 +75,22 @@ for(const destructible of [false,true])for(const ai of [false,true]){
     assert.equal(s.drone.hp,healed,'enemy now has a clear line; repair must stop');
   });
 }
+
+for(const destructible of [false,true])for(const ai of [false,true]){
+  test((ai?'AI':'human')+' Controller: cover between repairing drone and hostile drone earns real repair',()=>{
+    const s=boot({destructible,ai});
+    s.drone.x=140;s.drone.y=0;
+    s.enemy.x=1000;s.enemy.y=0; // Hostile tank itself is not local.
+    s.wall.x=230;s.wall.y=0;s.wall.w=12;s.wall.h=120;
+    s.g.drones.push({id:40,kind:'drone',ownerId:2,x:320,y:0,
+      r:8,hp:100,maxHp:100});
+    assert.equal(s.g.hasLineOfSight(s.drone.x,s.drone.y,320,0,2),false);
+    s.g.updateDrones(1/60);
+    const sheltered=s.drone.hp;
+    assert.ok(sheltered>30,'solid cover should allow repair from hostile drones');
+    s.wall.solid=false;s.wall.hp=0;
+    assert.equal(s.g.hasLineOfSight(s.drone.x,s.drone.y,320,0,2),true);
+    s.g.updateDrones(1/60);
+    assert.equal(s.drone.hp,sheltered,'opening the lane exposes the healer');
+  });
+}
