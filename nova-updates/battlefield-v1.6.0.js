@@ -615,6 +615,27 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   var best=null,bestT=limit,tie=false,uncertain=false,blockedT=Infinity;
   function consider(e,kind){
    if(!e)return;
+   /* A hostile drone already intersecting the bullet at the beginning of
+    * this projectile update has a physical zero-time contact. Do not infer
+    * a later crossing from endpoints: drone steering/dashes are multi-stage.
+    * Require a witnessed frame-start overlap as well as current overlap.
+    * Unknown/newborn movement retains the original collision authority. */
+   if(kind==='drone'){
+    if(!(e.hp>0)||e.ownerId===b.ownerId)return;
+    var drR=b.r+e.r+1;
+    if(!(drR>0)||!Number.isFinite(drR)||
+       !Number.isFinite(e.x)||!Number.isFinite(e.y)){uncertain=true;return;}
+    if(!(d2(ax,ay,e.x,e.y)<drR*drR))return;
+    if(!g.__novaShapeSweepActive||
+       e.__novaChronoDroneEpoch!==g.__novaShapeSweepEpoch||
+       !Number.isFinite(e.__novaChronoDronePrevX)||
+       !Number.isFinite(e.__novaChronoDronePrevY)||
+       !(d2(ax,ay,e.__novaChronoDronePrevX,e.__novaChronoDronePrevY)<drR*drR)){
+      uncertain=true;return;
+    }
+    if(best&&bestT<1e-8){tie=true;return;}
+    best={e:e,kind:'drone'};bestT=0;tie=false;return;
+   }
    var rr=0,sx=e.x,sy=e.y,mx=0,my=0,discontinuousTankMove=false;
    if(kind==='tank'){
     if(!e.alive||e.id===b.ownerId)return;
@@ -693,6 +714,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   var tanks=g.tanks||[],shapes=g.shapes||[];
   for(var ti=0;ti<tanks.length;ti++)consider(tanks[ti],'tank');
   for(var si=0;si<shapes.length;si++)consider(shapes[si],'shape');
+  var drones=g.drones||[];
+  for(var di=0;di<drones.length;di++)consider(drones[di],'drone');
   if(!best||tie||uncertain||blockedT<=bestT+1e-8)return false;
   var hx=ax+dx*bestT,hy=ay+dy*bestT;
   if(Math.abs(hx)>=MAP_LIMIT-20||Math.abs(hy)>=MAP_LIMIT-20)return false;
@@ -700,9 +723,9 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    * core. A hostile drone may still intercept earlier: only rule it out if
    * the witnessed start/end corridor plus a conservative curved-motion pad
    * is remote from the segment ending at the chosen FIRST body contact. */
-  var drones=g.drones||[];
   for(var di=0;di<drones.length;di++){
-   var dr=drones[di];if(!dr||!(dr.hp>0)||dr.ownerId===b.ownerId)continue;
+   var dr=drones[di];if(!dr||!(dr.hp>0)||dr.ownerId===b.ownerId||
+      (best.kind==='drone'&&dr===best.e))continue;
    if(!g.__novaShapeSweepActive||
       dr.__novaChronoDroneEpoch!==g.__novaShapeSweepEpoch)return false;
    var sx=dr.__novaChronoDronePrevX,sy=dr.__novaChronoDronePrevY;
@@ -721,6 +744,13 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   }
   /* A cover event at or before the body makes this lane ambiguous, including
    * destructible-cover penetration and exact-time ties. */
+  if(bestT===0){
+   /* Zero-length circle sweeps have no quadratic root. Check containment
+    * explicitly so a drone cannot be hit from inside a pillar or cover. */
+   var originSolids=terrainCandidates(g,ax,ay,ax,ay,(b.r||2)*.45);
+   for(var solidI=0;solidI<originSolids.length;solidI++)
+    if(pointInsideSolid(originSolids[solidI],ax,ay,(b.r||2)*.45))return false;
+  }
   if(firstSolidHit(g,ax,ay,hx,hy,(b.r||2)*.45))return false;
   /* A projectile that could have intercepted before contact also excludes
    * this bounded shortcut. AABB overlap is deliberately conservative. */
@@ -741,7 +771,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    var ang=Math.atan2(vy,vx);
    g.damageTank(best.e,b.dmg,b.ownerId,Math.cos(ang)*(b.knock||0)*.006,
      Math.sin(ang)*(b.knock||0)*.006);
-  }else g.damageShape(best.e,b.dmg,vx,vy);
+  }else if(best.kind==='shape')g.damageShape(best.e,b.dmg,vx,vy);
+  else g.damageDrone(best.e,b.dmg,b.ownerId);
   b.hits++;b.pen--;b.dead=true;b.vx=0;b.vy=0;
   return true;
  }

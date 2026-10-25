@@ -549,14 +549,18 @@ for (const hz of [30,60,120,240]) {
   g.updateBullets(1/hz);
   assert.equal(g.hits,1,'later remote drone must not erase earlier physical contact');
  });
- test('TTL contact still defers witnessed hostile drone ahead of body at '+hz+'Hz',()=>{
+ test('TTL contact awards witnessed zero-time hostile drone before later tank at '+hz+'Hz',()=>{
   const g=isolatedWorld({x:28,vx:6000,ttl:.002,drones:[{
    kind:'drone',id:5,ownerId:3,x:8,y:0,r:8,hp:20,
    __novaChronoDroneEpoch:7,__novaChronoDronePrevX:8,__novaChronoDronePrevY:0
   }]});
   g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=7;
+  let tankHits=0,droneHits=0;
+  g.damageTank=()=>{tankHits++;g.hits++;};
+  g.damageDrone=()=>{droneHits++;g.hits++;};
   g.updateBullets(1/hz);
-  assert.equal(g.hits,0,'potential earlier drone contact must keep original authority');
+  assert.equal(tankHits,0,'later tank must not steal the first physical contact');
+  assert.equal(droneHits,1,'witnessed hostile drone is the actual first victim');
  });
 }
 test('moving hostile drone crossing the first-contact corridor remains ambiguous',()=>{
@@ -779,3 +783,118 @@ test('distant discontinuous tank relocation does not veto an unrelated real hit'
  g.updateBullets(1/30);
  assert.deepEqual(victims,[2],'remote discontinuity must not be a global veto');
 });
+
+
+/* First-contact contract: a hostile drone physically overlapping a projectile
+ * at the start of its bullet update is already a zero-time contact. The core
+ * currently expires a short-lived projectile before querying drone bodies.
+ * This slice requires no guessed drone motion or subframe timestamps. */
+function zeroTimeDroneWorld(fps, drones, terrain = [], otherBullets = []) {
+  const g = new Game();
+  g.drones = drones.map((d, i) => ({kind:'drone', id:10+i, ownerId:2,
+    x:8, y:0, r:8, hp:20, ...d}));
+  g.__novaTerrain = terrain;
+  g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=42;
+  for (const d of g.drones) {
+    d.__novaChronoDroneEpoch=42;
+    d.__novaChronoDronePrevX=d.x;
+    d.__novaChronoDronePrevY=d.y;
+  }
+  g.bullets = [{kind:'bullet', id:1, ownerId:1, x:0, y:0,
+    vx:500, vy:0, r:3, dmg:20, ttl:.004, pen:0,
+    hits:0, dead:false, shell:false, beam:false}, ...otherBullets];
+  g.updateBullets(1/fps);
+  return g;
+}
+for (const fps of [30,60,120,240]) {
+  test('TTL-first hostile drone already overlapping at bullet-update entry is hit at '+fps+'Hz', () => {
+    const g=zeroTimeDroneWorld(fps,[{}]);
+    assert.equal(g.hits,1,'physical zero-time contact must precede projectile expiration');
+  });
+  test('TTL-first owned drone stays transparent at '+fps+'Hz', () => {
+    assert.equal(zeroTimeDroneWorld(fps,[{ownerId:1}]).hits,0);
+  });
+  test('TTL-first remote hostile drone is not hit at '+fps+'Hz', () => {
+    assert.equal(zeroTimeDroneWorld(fps,[{x:30}]).hits,0);
+  });
+  test('TTL-first simultaneous hostile drones defer rather than choose array order at '+fps+'Hz', () => {
+    assert.equal(zeroTimeDroneWorld(fps,[{},{id:99}]).hits,0);
+  });
+  test('TTL-first wall containing bullet origin vetoes drone contact at '+fps+'Hz', () => {
+    const terrain=[{id:-1,shape:'rect',x:0,y:0,w:4,h:50,solid:true,destructible:false}];
+    assert.equal(zeroTimeDroneWorld(fps,[{}],terrain).hits,0);
+  });
+  test('TTL-first competing projectile at origin vetoes speculative drone damage at '+fps+'Hz', () => {
+    const other=[{kind:'bullet',id:99,ownerId:3,x:-7,y:0,
+      vx:0,vy:0,r:3,ttl:1,pen:0,hits:0,dead:false}];
+    assert.equal(zeroTimeDroneWorld(fps,[{}],[],other).hits,0);
+  });
+}
+
+for (const fps of [30,60,120,240]) {
+  test('TTL-first uncertified drone history never authorizes an early hit at '+fps+'Hz',()=>{
+    const g=zeroTimeDroneWorld(fps,[{}]);
+    g.drones[0].__novaChronoDroneEpoch=-1;
+    g.hits=0;g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+      vx:500,vy:0,r:3,dmg:20,ttl:.004,pen:0,hits:0,dead:false}];
+    g.updateBullets(1/fps);
+    assert.equal(g.hits,0);
+  });
+  test('TTL-first drone entering origin after frame start cannot create a phantom hit at '+fps+'Hz',()=>{
+    const g=zeroTimeDroneWorld(fps,[{}]);
+    g.drones[0].__novaChronoDronePrevX=100;
+    g.hits=0;g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+      vx:500,vy:0,r:3,dmg:20,ttl:.004,pen:0,hits:0,dead:false}];
+    g.updateBullets(1/fps);
+    assert.equal(g.hits,0);
+  });
+}
+
+for (const fps of [30,60,120,240]) {
+  test('TTL-first hostile drone wins over a physically later permanent wall at '+fps+'Hz',()=>{
+    const terrain=[{id:-2,shape:'rect',x:30,y:0,w:4,h:50,solid:true,destructible:false}];
+    assert.equal(zeroTimeDroneWorld(fps,[{}],terrain).hits,1);
+  });
+  test('TTL-first circular pillar containing projectile origin prevents phantom drone hit at '+fps+'Hz',()=>{
+    const terrain=[{id:-3,shape:'circle',x:0,y:0,r:5,solid:true,destructible:false}];
+    assert.equal(zeroTimeDroneWorld(fps,[{}],terrain).hits,0);
+  });
+  test('TTL-first protected tank sharing projectile origin vetoes drone damage at '+fps+'Hz',()=>{
+    const g=zeroTimeDroneWorld(fps,[{}]);
+    g.hits=0;g.tanks=[{kind:'tank',id:3,cls:'scout',x:0,y:0,alive:true,hp:100,spawnShieldT:2}];
+    g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+      vx:500,vy:0,r:3,dmg:20,ttl:.004,pen:0,hits:0,dead:false}];
+    g.updateBullets(1/fps);
+    assert.equal(g.hits,0);
+  });
+}
+
+/* Production composition: Battlefield must capture the drone's start
+ * position through Game.update; direct helper tests alone are insufficient. */
+for (const optimized of [false,true]) {
+  for (const fps of [30,60,120,240]) {
+    test('shipping Game.update awards witnessed point-blank hostile drone before TTL ('+
+      (optimized?'optimized':'baseline')+', '+fps+'Hz)',()=>{
+      const FullGame=boot(function(dt){this.time+=dt;this.updateBullets(dt);},optimized);
+      const g=new FullGame();
+      g.tanks=[];g.drones=[{kind:'drone',id:7,ownerId:2,x:8,y:0,r:8,hp:20}];
+      g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+        vx:500,vy:0,r:3,dmg:20,ttl:.004,pen:0,hits:0,dead:false}];
+      g.update(1/fps);
+      assert.equal(g.hits,1);
+      assert.equal(g.__novaShapeSweepActive,false);
+    });
+    test('shipping Game.update refuses an uncertified moved-in drone ('+
+      (optimized?'optimized':'baseline')+', '+fps+'Hz)',()=>{
+      const FullGame=boot(function(dt){
+        this.drones[0].x=8;this.time+=dt;this.updateBullets(dt);
+      },optimized);
+      const g=new FullGame();
+      g.tanks=[];g.drones=[{kind:'drone',id:7,ownerId:2,x:100,y:0,r:8,hp:20}];
+      g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+        vx:500,vy:0,r:3,dmg:20,ttl:.004,pen:0,hits:0,dead:false}];
+      g.update(1/fps);
+      assert.equal(g.hits,0);
+    });
+  }
+}
