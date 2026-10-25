@@ -1,6 +1,6 @@
 'use strict';
 /* Production Game.tryFire/updateBullets + Battlefield + Three Disciplines +
- * Combined Arms, loaded in the materialized index.html order. */
+ * Apex + Combined Arms, loaded in the materialized index.html order. */
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const root=path.join(__dirname,'../..');
@@ -73,7 +73,7 @@ function boot(cls='cannon',angle=0,vx=0,vy=0){
  'game/render':m=>{m.exports={render(){}};}
  };
  const context={window:{__novaModules:modules},console,Math,Date,Map,Set,performance:{now:()=>0}};
- for(const name of ['battlefield-v1.6.0.js','disciplines-v1.7.0.js','combined-arms-v1.7.2.js']){
+ for(const name of ['battlefield-v1.6.0.js','disciplines-v1.7.0.js','apex-disciplines-v1.7.1.js','combined-arms-v1.7.2.js']){
   assert.ok(html.includes('nova-updates/'+name),'shipping overlay '+name+' must be materialized');
   vm.runInNewContext(fs.readFileSync(path.join(root,'nova-updates',name),'utf8'),context,{filename:name});
  }
