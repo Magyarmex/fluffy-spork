@@ -83,6 +83,8 @@ test('strict numeric versus string target IDs retain their distinct saturation c
     cam: { zoom: 1 }, time: 1 };
   assert.equal(T.chooseTarget(g, classes, observer, observer.ai, 1)?.id,
     naiveChoose(T, g, observer, 1)?.id);
+  assert.equal(T.chooseTarget(g, classes, observer, observer.ai, 1)?.id, '2',
+    'a numeric target assignment must not penalize a distinct string ID');
 });
 
 test('saturation changes between choices are observed rather than cached across frames', () => {
