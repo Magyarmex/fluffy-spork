@@ -126,7 +126,7 @@ wrap('game/input',function(input){
     if(canvas&&canvas.getBoundingClientRect&&!this.__novaRectOriginal){
       var self=this,original=canvas.getBoundingClientRect.bind(canvas);
       this.__novaRectOriginal=original;
-      function refresh(){try{self.__novaCachedRect=original();}catch(_){}}
+      function refresh(){try{var oldRect=self.__novaCachedRect,nextRect=original();if(oldRect){var shiftX=oldRect.left-nextRect.left,shiftY=oldRect.top-nextRect.top;if(Number.isFinite(shiftX)&&Number.isFinite(shiftY)&&(shiftX||shiftY)){/* Stick origins are canvas-relative. Preserve held-finger vectors when the viewport pans underneath them. */if(self.move&&self.move.active){self.move.ox+=shiftX;self.move.oy+=shiftY;}if(self.aim&&self.aim.active){self.aim.ox+=shiftX;self.aim.oy+=shiftY;}}}self.__novaCachedRect=nextRect;}catch(_){}}
       this.__novaRectRefresh=refresh;refresh();
       canvas.getBoundingClientRect=function(){return self.__novaCachedRect||original();};
       if(typeof window!=='undefined'){
