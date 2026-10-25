@@ -267,80 +267,88 @@ test('swept-shape index releases active references when the battlefield goes qui
  * keep both endpoints outside the shape; only the swept path can hit it. */
 test('grazing precision: genuine shallow moving Crasher contact 1',()=>{
  const [ax,ay,ex,ey,sx,sy,sxe,sye]=[1806.8924210965633,-1448.5023515298963,1896.2322791427555,-1488.9638600445567,1888.062145787248,-1465.5036768836706,1885.0422216023267,-1464.1359705676537];
+ for(const fps of [30,60,120,240]){const dt=1/fps;
  const g=boot(),s={id:700,kind:'shape',type:'crasher',x:sx,y:sy,
-  vx:0,vy:0,r:15,hp:20,maxHp:20};
- g.shapes=[s];g.bullets=[{...bullet(),x:ax,y:ay,vx:ex-ax,vy:ey-ay,ttl:2}];
- g.__testShapeMotion=()=>{s.x=sxe;s.y=sye;};
- g.update(1);
+  vx:(sxe-sx)*fps,vy:(sye-sy)*fps,r:15,hp:20,maxHp:20};
+ g.shapes=[s];g.bullets=[{...bullet(),x:ax,y:ay,vx:(ex-ax)*fps,vy:(ey-ay)*fps,ttl:2}];
+ 
+ g.update(dt);
  assert.equal(g.hits.length,1,'strict physical moving-disc contact must be frame-order independent');
- assert.equal(s.hp,10);
+ assert.equal(s.hp,10); }
 });
 test('grazing precision: genuine shallow moving Crasher contact 2',()=>{
  const [ax,ay,ex,ey,sx,sy,sxe,sye]=[425.71261897683144,-1758.6256982758641,512.5132621706505,-1718.172087500193,467.37055548466793,-1719.3520769633997,461.16862892063585,-1722.2424970576428];
+ for(const fps of [30,60,120,240]){const dt=1/fps;
  const g=boot(),s={id:700,kind:'shape',type:'crasher',x:sx,y:sy,
-  vx:0,vy:0,r:15,hp:20,maxHp:20};
- g.shapes=[s];g.bullets=[{...bullet(),x:ax,y:ay,vx:ex-ax,vy:ey-ay,ttl:2}];
- g.__testShapeMotion=()=>{s.x=sxe;s.y=sye;};
- g.update(1);
+  vx:(sxe-sx)*fps,vy:(sye-sy)*fps,r:15,hp:20,maxHp:20};
+ g.shapes=[s];g.bullets=[{...bullet(),x:ax,y:ay,vx:(ex-ax)*fps,vy:(ey-ay)*fps,ttl:2}];
+ 
+ g.update(dt);
  assert.equal(g.hits.length,1,'strict physical moving-disc contact must be frame-order independent');
- assert.equal(s.hp,10);
+ assert.equal(s.hp,10); }
 });
 test('grazing precision: genuine shallow moving Crasher contact 3',()=>{
  const [ax,ay,ex,ey,sx,sy,sxe,sye]=[1358.7517030537128,1122.797372750938,1436.8931394806789,1217.1272763839493,1408.2192022352415,1210.7291438500679,1403.0890303130552,1204.5361603938077];
+ for(const fps of [30,60,120,240]){const dt=1/fps;
  const g=boot(),s={id:700,kind:'shape',type:'crasher',x:sx,y:sy,
-  vx:0,vy:0,r:15,hp:20,maxHp:20};
- g.shapes=[s];g.bullets=[{...bullet(),x:ax,y:ay,vx:ex-ax,vy:ey-ay,ttl:2}];
- g.__testShapeMotion=()=>{s.x=sxe;s.y=sye;};
- g.update(1);
+  vx:(sxe-sx)*fps,vy:(sye-sy)*fps,r:15,hp:20,maxHp:20};
+ g.shapes=[s];g.bullets=[{...bullet(),x:ax,y:ay,vx:(ex-ax)*fps,vy:(ey-ay)*fps,ttl:2}];
+ 
+ g.update(dt);
  assert.equal(g.hits.length,1,'strict physical moving-disc contact must be frame-order independent');
- assert.equal(s.hp,10);
+ assert.equal(s.hp,10); }
 });
 test('grazing precision: near-tangent noncontact 1',()=>{
  const [ax,ay,ex,ey,sx,sy,sxe,sye]=[-1711.5245945751667,1468.4866620227695,-1761.5560889055323,1598.5130896787873,-1768.676435323737,1566.8945217507512,-1770.1755729126724,1570.7906177571383];
+ for(const fps of [30,60,120,240]){const dt=1/fps;
  const g=boot(),s={id:700,kind:'shape',type:'crasher',x:sx,y:sy,
-  vx:0,vy:0,r:15,hp:20,maxHp:20};
- g.shapes=[s];g.bullets=[{...bullet(),x:ax,y:ay,vx:ex-ax,vy:ey-ay,ttl:2}];
- g.__testShapeMotion=()=>{s.x=sxe;s.y=sye;};
- g.update(1);
+  vx:(sxe-sx)*fps,vy:(sye-sy)*fps,r:15,hp:20,maxHp:20};
+ g.shapes=[s];g.bullets=[{...bullet(),x:ax,y:ay,vx:(ex-ax)*fps,vy:(ey-ay)*fps,ttl:2}];
+ 
+ g.update(dt);
  assert.equal(g.hits.length,0,'strict physical moving-disc contact must be frame-order independent');
- assert.equal(s.hp,20);
+ assert.equal(s.hp,20); }
 });
 test('grazing precision: near-tangent noncontact 2',()=>{
  const [ax,ay,ex,ey,sx,sy,sxe,sye]=[1283.8673777878284,-1708.7158234789968,1263.40077874557,-1606.4848111239937,1250.8238944265452,-1635.3574614191966,1249.0250381514252,-1626.3721435504606];
+ for(const fps of [30,60,120,240]){const dt=1/fps;
  const g=boot(),s={id:700,kind:'shape',type:'crasher',x:sx,y:sy,
-  vx:0,vy:0,r:15,hp:20,maxHp:20};
- g.shapes=[s];g.bullets=[{...bullet(),x:ax,y:ay,vx:ex-ax,vy:ey-ay,ttl:2}];
- g.__testShapeMotion=()=>{s.x=sxe;s.y=sye;};
- g.update(1);
+  vx:(sxe-sx)*fps,vy:(sye-sy)*fps,r:15,hp:20,maxHp:20};
+ g.shapes=[s];g.bullets=[{...bullet(),x:ax,y:ay,vx:(ex-ax)*fps,vy:(ey-ay)*fps,ttl:2}];
+ 
+ g.update(dt);
  assert.equal(g.hits.length,0,'strict physical moving-disc contact must be frame-order independent');
- assert.equal(s.hp,20);
+ assert.equal(s.hp,20); }
 });
 test('grazing precision: near-tangent noncontact 3',()=>{
  const [ax,ay,ex,ey,sx,sy,sxe,sye]=[1658.739771693945,-1237.2492449358106,1719.8996091526515,-1157.028499015139,1681.0691552929975,-1178.271958643633,1686.3837409300604,-1171.3010437135154];
+ for(const fps of [30,60,120,240]){const dt=1/fps;
  const g=boot(),s={id:700,kind:'shape',type:'crasher',x:sx,y:sy,
-  vx:0,vy:0,r:15,hp:20,maxHp:20};
- g.shapes=[s];g.bullets=[{...bullet(),x:ax,y:ay,vx:ex-ax,vy:ey-ay,ttl:2}];
- g.__testShapeMotion=()=>{s.x=sxe;s.y=sye;};
- g.update(1);
+  vx:(sxe-sx)*fps,vy:(sye-sy)*fps,r:15,hp:20,maxHp:20};
+ g.shapes=[s];g.bullets=[{...bullet(),x:ax,y:ay,vx:(ex-ax)*fps,vy:(ey-ay)*fps,ttl:2}];
+ 
+ g.update(dt);
  assert.equal(g.hits.length,0,'strict physical moving-disc contact must be frame-order independent');
- assert.equal(s.hp,20);
+ assert.equal(s.hp,20); }
 });
 
 /* Adversarial near-start contact: C is small and B is tiny, so a threshold
  * based only on B^2+|4AC| underestimates subtraction error in C. */
 test('grazing precision: near-start genuine shallow contact',()=>{
  const [ax,ay,ex,ey,sx,sy,sxe,sye]=[1780.53386695683,79.16820887476206,1780.5337616651466,79.16824642551835,1774.487335265908,62.2141693996643,1774.783816250872,62.10843374377317];
+ for(const fps of [30,60,120,240]){const dt=1/fps;
  const g=boot(),s={id:701,kind:'shape',type:'crasher',x:sx,y:sy,
-  vx:0,vy:0,r:15,hp:20,maxHp:20};
- g.shapes=[s];g.bullets=[{...bullet(),x:ax,y:ay,vx:ex-ax,vy:ey-ay,ttl:2}];
- g.__testShapeMotion=()=>{s.x=sxe;s.y=sye;};g.update(1);
- assert.equal(g.hits.length,1);assert.equal(s.hp,10);
+  vx:(sxe-sx)*fps,vy:(sye-sy)*fps,r:15,hp:20,maxHp:20};
+ g.shapes=[s];g.bullets=[{...bullet(),x:ax,y:ay,vx:(ex-ax)*fps,vy:(ey-ay)*fps,ttl:2}];
+ g.update(dt);
+ assert.equal(g.hits.length,1);assert.equal(s.hp,10); }
 });
 test('grazing precision: near-start false positive with rounded discriminant',()=>{
  const [ax,ay,ex,ey,sx,sy,sxe,sye]=[31.140925362706184,-206.93875011056662,31.14261145955044,-206.87346085356594,13.148610847143438,-206.40876529656498,13.145391129913339,-206.53343959770118];
+ for(const fps of [30,60,120,240]){const dt=1/fps;
  const g=boot(),s={id:701,kind:'shape',type:'crasher',x:sx,y:sy,
-  vx:0,vy:0,r:15,hp:20,maxHp:20};
- g.shapes=[s];g.bullets=[{...bullet(),x:ax,y:ay,vx:ex-ax,vy:ey-ay,ttl:2}];
- g.__testShapeMotion=()=>{s.x=sxe;s.y=sye;};g.update(1);
- assert.equal(g.hits.length,0);assert.equal(s.hp,20);
+  vx:(sxe-sx)*fps,vy:(sye-sy)*fps,r:15,hp:20,maxHp:20};
+ g.shapes=[s];g.bullets=[{...bullet(),x:ax,y:ay,vx:(ex-ax)*fps,vy:(ey-ay)*fps,ttl:2}];
+ g.update(dt);
+ assert.equal(g.hits.length,0);assert.equal(s.hp,20); }
 });
