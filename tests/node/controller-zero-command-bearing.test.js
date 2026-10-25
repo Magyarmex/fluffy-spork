@@ -58,3 +58,40 @@ test('shipping game includes canonical Controller before Live Vector and Fair En
   const c=shipping.indexOf('nova-updates/fair-engagement-v1.11.2.js');
   assert.ok(a>=0&&b>a&&c>b);
 });
+
+/* Integration: call the actual Controller steering closure from its module
+ * wrapper, not a reimplementation of the formation formula. */
+const vm = require('node:vm');
+const anchor = '    function simulateLegacyDrone(';
+assert.equal(controller.split(anchor).length, 2, 'unique live Controller simulation anchor');
+const instrumented = controller.replace(anchor,
+  '    window.__testControllerFormationMotion = simulateControllerDrone;\\n' + anchor)
+  .replace('\\n    function simulateLegacyDrone(', '\n    function simulateLegacyDrone(');
+class Game { updateDrones(){} update(){} }
+const modules = {'game/engine':m=>{m.exports.Game=Game;}};
+const win = {__novaModules:modules};
+vm.runInNewContext(instrumented, {window:win,document:{addEventListener(){}},
+  console:{info(){},warn(){},error(){}},Math,Number,Map,Set,Date,Object,Array,WeakMap,
+  performance:{now:()=>0}});
+const m={exports:{}};
+modules['game/engine'](m,m.exports,()=>({CLASSES:{warden:{droneLeash:650},
+  citadel:{droneLeash:650},valkyrie:{droneLeash:650}},ABILITIES:{}}));
+assert.equal(typeof win.__testControllerFormationMotion,'function');
+function motion(cls,formation,dt){
+  const owner={id:1,cls,x:0,y:0,angle:Math.PI/2,swarmT:0,bulwarkT:0};
+  const squad=[{x:100,y:200,hp:100,speed:200,__novaPhase:'form',
+    __novaVX:0,__novaVY:0}, {x:100,y:200}, {x:100,y:200}];
+  const d=squad[0],state={active:true,nodeX:100,nodeY:200,angle:0,power:1};
+  win.__testControllerFormationMotion({time:1},owner,d,squad,null,state,
+    {formation,formationRadius:68,response:7,recover:.7},dt,false);
+  return d;
+}
+for(const hz of [30,60,120,240]){
+  for(const [cls,formation] of [['warden','wall'],['citadel','wall'],['valkyrie','wing']]){
+    test('real Controller '+cls+' steers left/down toward east-command formation at '+hz+'Hz',()=>{
+      const d=motion(cls,formation,1/hz);
+      assert.ok(d.x<100,'command east must not redirect drone toward hull north');
+      assert.ok(d.y<200,'left formation slot must be south of east command node');
+    });
+  }
+}
