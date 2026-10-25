@@ -200,3 +200,21 @@ for(const fps of [30,60,120,240]){
   assert.equal(g.bullets.length,0);
  });
 }
+
+test('shipping Cannon + Battlefield: earlier permanent wall wins over fuse',()=>{
+ const Game=boot(false,true),g=new Game(),origins=[];
+ g.time=1;g.__novaBattlefield={coverBroken:0};
+ g.__novaTerrain=[{id:-91,shape:'rect',x:80,y:0,w:20,h:80,
+  solid:true,destructible:false}];
+ g.clusterBurst=b=>origins.push(b.x);g.weakenBullet=()=>{};
+ g.bullets=[{kind:'bullet',id:991,ownerId:1,x:0,y:0,vx:380,vy:0,
+  r:8.5,dmg:26,ttl:2,shell:true,pen:1,hits:0,dead:false,
+  __v17Cannon:true,__v17FuseDist:150,__v17SpawnX:0,__v17SpawnY:0,
+  __v17FuseArmed:false,splash:72,splashDmg:.4,color:'#ffb45e'}];
+ for(let frame=0;frame<40&&g.bullets.length;frame++){
+  g.time+=1/30;g.updateBullets(1/30);
+ }
+ assert.equal(origins.length,1,'terrain impact must burst once');
+ assert.ok(origins[0]<80,'solid cover must win before the later fuse');
+ assert.equal(g.bullets.length,0);
+});
