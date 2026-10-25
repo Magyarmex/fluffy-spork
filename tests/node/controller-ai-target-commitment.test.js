@@ -48,3 +48,24 @@ test('shipping planner passes commitment state into the target selector',()=>{
  assert.ok(html.indexOf('nova-updates/second-body-live-vector-v1.10.7.js')>
    html.indexOf('nova-updates/controller-v1.3.0.js'));
 });
+
+test('actual shipping Controller AI planner releases fixation only after the commitment timer',()=>{
+ const a=source.indexOf('function planAIControllers('),b=source.indexOf('function prepareAIVirtualThumbs(',a);
+ assert.ok(a>=0&&b>a);
+ const plan=new Function('aiPlan','bestObservedTank','hostileDroneNear','aiVirtualStick',
+  'isController','C','clamp','window','AI_NORMAL_THINK','AI_ELITE_THINK',
+  'return ('+source.slice(a,b).trim()+')')(
+   owner=>owner.__novaLiveVectorAI,
+   choose,()=>null,()=>({active:true,angle:0,power:.4,shear:0}),
+   t=>t.cls==='carrier',{carrier:{}},(x,lo,hi)=>Math.max(lo,Math.min(hi,x)),{},.1,.1);
+ const s=world();s.owner.cls='carrier';s.owner.hp=100;s.owner.maxHp=100;
+ s.owner.isPlayer=false;s.owner.ai={state:'hunt',isElite:false,targetId:2};
+ s.owner.__novaLiveVectorAI={thinkAt:0,commitUntil:1,targetId:2,flankSide:1,
+   pressure:'probe',releaseUntil:0,lastOwnHp:100,lastCueAt:-99};
+ s.g.getTank=id=>s.g.tanks.find(t=>t.id===id)||null;
+ s.g.time=.5;plan(s.g);
+ assert.equal(s.owner.__novaLiveVectorAI.targetId,2,'committed target must not churn');
+ s.g.time=1.2;plan(s.g);
+ assert.equal(s.owner.__novaLiveVectorAI.targetId,3,'expired commitment must allow a nearer threat');
+ assert.equal(s.owner.ai.targetId,3,'canonical AI command must receive the new target');
+});
