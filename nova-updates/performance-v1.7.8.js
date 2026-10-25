@@ -218,7 +218,34 @@ wrap('game/engine',function(engine,require){
     }
     return false;
   }
+  /* Core shape/drone collision uses endpoint positions, not moving-tank history. */
+  function chronoStaticBodyTime(b,e,radius){
+    var fx=b.x-e.x,fy=b.y-e.y,vx=b.vx||0,vy=b.vy||0;
+    var C=fx*fx+fy*fy-radius*radius;
+    if(!Number.isFinite(C))return null;
+    if(C<=0)return 0;
+    var A=vx*vx+vy*vy,halfB=fx*vx+fy*vy;
+    if(!(A>1e-12)||!Number.isFinite(A)||halfB>=0)return null;
+    var D=halfB*halfB-A*C;
+    if(!(D>=0)||!Number.isFinite(D))return null;
+    /* Floating-point cancellation near tangency makes contact uncertain. */
+    if(D<=64*Number.EPSILON*(Math.abs(halfB*halfB)+Math.abs(A*C)))return null;
+    var hit=C/(-halfB+Math.sqrt(D));
+    return Number.isFinite(hit)&&hit>=0?hit:null;
+  }
+  function chronoAlliedOwner(g,a,b){
+    if(!a||!b)return false;
+    if(typeof g.areAllies==='function'&&g.areAllies(a,b))return true;
+    if(typeof g.areHostile==='function'&&!g.areHostile(a,b))return true;
+    for(var i=0;i<chronoSideKeys.length;i++){
+      var key=chronoSideKeys[i];
+      if(a[key]!=null&&b[key]!=null)return a[key]===b[key];
+    }
+    return false;
+  }
   function chronoFirstBody(g,b,dt){
+    /* Fail closed rather than attributing a tank hit behind an unscanned body. */
+    if(g.shapes&&g.shapes.length>160||g.drones&&g.drones.length>64)return null;
     if(!g.tanks||g.tanks.length>64||!g.__novaTerrain||
        !Number.isFinite(b.x)||!Number.isFinite(b.y)||
        !Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
@@ -254,13 +281,39 @@ wrap('game/engine',function(engine,require){
         if(!(A>1e-12)||!Number.isFinite(A)||halfB>=0)continue;
         var D=halfB*halfB-A*C;
         if(!(D>=0)||!Number.isFinite(D))continue;
+        if(D<=64*Number.EPSILON*(Math.abs(halfB*halfB)+Math.abs(A*C)))continue;
         /* Stable entry root: avoids cancellation for fast shallow hits. */
         hit=C/(-halfB+Math.sqrt(D));
       }
-      if(!Number.isFinite(hit)||hit<0||hit>b.ttl+1e-9)continue;
+      if(!Number.isFinite(hit)||hit<0||hit>b.ttl)continue;
       if(!best||hit<best.time)best={targetId:t.id,time:hit,
         immune:t.spawnShieldT>0||t.shieldT>0,guardAmbiguous:t.bulwarkT>0||t.tauntT>0,
         x:b.x+(b.vx||0)*hit,y:b.y+(b.vy||0)*hit};
+    }
+    /* The first victim may be a neutral shape or a hostile drone. */
+    var shapes=g.shapes||[];
+    for(var j=0;j<shapes.length;j++){
+      var shape=shapes[j];
+      if(!shape||shape.kind!=='shape'||!(shape.hp>0)||!(shape.r>0)||
+         !Number.isFinite(shape.x)||!Number.isFinite(shape.y))continue;
+      var shapeTime=chronoStaticBodyTime(b,shape,(b.r||2)+shape.r);
+      if(shapeTime===null||shapeTime>b.ttl)continue;
+      if(best&&Math.abs(shapeTime-best.time)<=1e-9)return null;
+      if(!best||shapeTime<best.time)best={targetId:shape.id,kind:'shape',time:shapeTime,
+        x:b.x+(b.vx||0)*shapeTime,y:b.y+(b.vy||0)*shapeTime};
+    }
+    var drones=g.drones||[];
+    for(var k=0;k<drones.length;k++){
+      var drone=drones[k];
+      if(!drone||!(drone.hp>0)||drone.ownerId===b.ownerId||!(drone.r>0)||
+         !Number.isFinite(drone.x)||!Number.isFinite(drone.y))continue;
+      if(owner&&typeof g.getTank==='function'&&
+         chronoAlliedOwner(g,owner,g.getTank(drone.ownerId)))continue;
+      var droneTime=chronoStaticBodyTime(b,drone,(b.r||2)+drone.r+1);
+      if(droneTime===null||droneTime>b.ttl)continue;
+      if(best&&Math.abs(droneTime-best.time)<=1e-9)return null;
+      if(!best||droneTime<best.time)best={targetId:drone.id,kind:'drone',time:droneTime,
+        x:b.x+(b.vx||0)*droneTime,y:b.y+(b.vy||0)*droneTime};
     }
     if(!best)return null;
     /* Spawn and ordinary shields unconditionally block core damage. Guardian
@@ -375,7 +428,7 @@ wrap('game/engine',function(engine,require){
         else{
           st.unregisteredBodyContacts++;
           st.events.push({kind:'unregistered-body-contact',id:b.id,
-            targetId:c.targetId,expectedX:c.x,expectedY:c.y,
+            targetId:c.targetId,targetKind:c.kind||'tank',expectedX:c.x,expectedY:c.y,
             contactTime:c.time,ttl:shot.ttl});
           if(st.events.length>12)st.events.shift();
         }
