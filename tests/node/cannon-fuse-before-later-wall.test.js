@@ -450,3 +450,16 @@ for(const optimized of [false,true]){
     g.__novaTerrain[0].hp);
  });
 }
+
+for(const optimized of [false,true]){
+ test((optimized?'optimized':'baseline')+
+  ' Apex structural bonus still applies when cover physically precedes fuse',()=>{
+  const Game=boot(optimized,null,true);
+  const {g,bursts}=run(Game,30,true,{cover:true,wallX:160,
+   shell:false,pen:1,extras:g=>{g.bullets[0].__novaStructureMult=1.9;}});
+  assert.equal(bursts.length,0);
+  assert.ok(g.__novaTerrain[0].hp<60,
+   'earlier direct cover contact must retain structural specialization; hp='+
+    g.__novaTerrain[0].hp);
+ });
+}
