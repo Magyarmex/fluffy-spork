@@ -319,3 +319,20 @@ test('single isolated expiry still works among distant live projectiles',()=>{
  g.updateBullets(1/30);
  assert.equal(g.hits,1);
 });
+
+test('same-frame child shape cannot receive backdated projectile contact',()=>{
+ const g=isolatedWorld({x:100});
+ const child={id:9,kind:'shape',type:'circle',x:12,y:0,r:5,hp:20,maxHp:20,born:g.time};
+ g.shapes=[child];
+ g.damageShape=(victim,damage)=>{victim.hp-=damage;};
+ g.updateBullets(1/30);
+ assert.equal(child.hp,20,'newborn has no proven earlier existence interval');
+});
+test('older neutral shape remains a valid isolated TTL contact',()=>{
+ const g=isolatedWorld({x:100});
+ const shape={id:9,kind:'shape',type:'circle',x:12,y:0,r:5,hp:20,maxHp:20,born:g.time-1};
+ g.shapes=[shape];
+ g.damageShape=(victim,damage)=>{victim.hp-=damage;};
+ g.updateBullets(1/30);
+ assert.equal(shape.hp,0,'older neutral must still receive physical contact');
+});
