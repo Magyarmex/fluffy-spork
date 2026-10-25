@@ -387,7 +387,8 @@ wrap('game/engine',function(engine,require){
     if(!wall||!wall.solid||!wall.hit||wall.solid.destructible||
        wall.solid.solid===false||!(wall.hit.t>fraction+1e-7))return null;
     return {time:active*fraction,x:b.x+dx*fraction,y:b.y+dy*fraction,
-      wallTime:active*wall.hit.t,wallId:wall.solid.id};
+      wallTime:active*wall.hit.t,wallId:wall.solid.id,
+      wallX:wall.hit.x,wallY:wall.hit.y};
   }
   function chronoState(g){
     var s=g.__novaChronoShadow||(g.__novaChronoShadow={
@@ -410,7 +411,10 @@ wrap('game/engine',function(engine,require){
       st.bursts++;
       if(v2>1e-9){
         var elapsed=((shell.x-s.x)*s.vx+(shell.y-s.y)*s.vy)/v2;
-        if(s.fuseFirst&&elapsed>s.fuseFirst.time+1e-6){
+        /* Only call it a wall-caused late burst when the observed burst is
+         * at that wall. A separate earlier body/interception is ambiguous. */
+        if(s.fuseFirst&&elapsed>s.fuseFirst.time+1e-6&&
+           Math.hypot(shell.x-s.fuseFirst.wallX,shell.y-s.fuseFirst.wallY)<1e-4){
           st.fuseBeforeWallLateBursts++;
           st.events.push({kind:'fuse-before-wall-late-burst',id:s.id,
             expectedX:s.fuseFirst.x,expectedY:s.fuseFirst.y,
