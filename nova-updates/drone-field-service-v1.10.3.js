@@ -44,10 +44,11 @@ function canRepair(g,d,owner,s){if(!d||d.hp<=0||!owner||owner.alive===false||isC
   * Check the new position at rest AND a separately reported finite velocity.
   * Either credible intercept prevents healing; a remote/departing shot does not. */
  if(!s.projectileThreat&&s.motionDiscontinuous&&
-    Number.isFinite(d.__novaVX)&&Number.isFinite(d.__novaVY)&&
-    Math.abs(d.__novaVX)+Math.abs(d.__novaVY)>1){
+    (Number.isFinite(d.__novaVX)||Number.isFinite(d.__novaVY))&&
+    Math.abs(Number(d.__novaVX)||0)+Math.abs(Number(d.__novaVY)||0)>1){
   var prevVX=s.motionVX,prevVY=s.motionVY;
-  s.motionVX=d.__novaVX;s.motionVY=d.__novaVY;
+  s.motionVX=Number.isFinite(d.__novaVX)?d.__novaVX:0;
+  s.motionVY=Number.isFinite(d.__novaVY)?d.__novaVY:0;
   try{s.projectileThreat=projectileThreat(g,d,owner);}
   finally{s.motionVX=prevVX;s.motionVY=prevVY;}
  }
