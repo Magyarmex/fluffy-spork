@@ -117,3 +117,19 @@ test('thrown player update cannot leave a stale aim interception for the next ti
  assert.equal(g.__novaMouseCenterAimPending,false);
  assert.equal(g.lerpAngle(1,2,.5),1.5);
 });
+
+test('shipping Zero Churn keeps mouse-center bearing even while WASD moves',()=>{
+ const Game=boot(),g=new Game();
+ g.input.__novaZeroChurn=true;
+ g.input.keyboard.right=true;
+ g.input.aimVec=()=>null; // authoritative optimized Input returns null for mouseActive
+ g.update(1/60);
+ assert.equal(g.player.angle,1.25);
+});
+test('baseline core movement fallback is not intercepted without Zero Churn',()=>{
+ const Game=boot(),g=new Game();
+ g.input.keyboard.right=true;
+ g.input.aimVec=()=>({x:0,y:1});
+ g.update(1/60);
+ assert.ok(g.player.angle>1.25);
+});
