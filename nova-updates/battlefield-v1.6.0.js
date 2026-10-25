@@ -366,9 +366,66 @@ wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.
 
  var oldTryFire=Game.prototype.tryFire;Game.prototype.tryFire=function(t){if(t&&!t.isPlayer&&t.ai&&t.ai.targetId>=0){var target=this.getTank(t.ai.targetId);if(target&&target.alive&&!lineOfSight(this,t.x,t.y,target.x,target.y,4)){t.__novaTerrainDeniedFire=true;t.__novaTerrainDeniedUntil=this.time+.15;return;}}return oldTryFire.apply(this,arguments);};
 
+/* Shape motion is resolved before projectiles in the canonical core. Keep a
+ * frame-local start position so collisions use relative motion, not the
+ * shape's later endpoint. Large jumps are relocations, never swept attacks. */
+var SHAPE_SWEEP_CELL=128,SHAPE_SWEEP_TELEPORT=96;
+function shapeSweepStart(g,s){
+ if(!g.__novaShapeSweepActive||s.__novaShapeSweepEpoch!==g.__novaShapeSweepEpoch)return null;
+ var x=s.__novaShapeSweepPrevX,y=s.__novaShapeSweepPrevY;
+ if(!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(s.x)||!Number.isFinite(s.y))return null;
+ var dx=s.x-x,dy=s.y-y;
+ if(dx*dx+dy*dy>SHAPE_SWEEP_TELEPORT*SHAPE_SWEEP_TELEPORT)return null;
+ if(dx*dx+dy*dy<1e-16)return null;
+ return{x:x,y:y};
+}
+function shapeContactTime(g,b,s,ax,ay,ex,ey,rr){
+ var start=shapeSweepStart(g,s),sx=start?start.x:s.x,sy=start?start.y:s.y;
+ var dx=ex-ax-(s.x-sx),dy=ey-ay-(s.y-sy),fx=ax-sx,fy=ay-sy;
+ var A=dx*dx+dy*dy,B=2*(fx*dx+fy*dy),C=fx*fx+fy*fy-rr*rr;
+ if(C<0)return 0;
+ if(A<1e-12)return null;
+ var D=B*B-4*A*C;
+ if(!(D>0))return null; /* exact tangency is not an impact */
+ var root=Math.sqrt(D),q=-.5*(B+(B<0?-root:root));
+ if(!q)return null;
+ var t0=q/A,t1=C/q,t=Math.min(t0,t1);
+ if(t>=0&&t<=1)return t;
+ t=Math.max(t0,t1);return t>=0&&t<=1?t:null;
+}
+/* Only moving shapes require an additional swept broadphase: the canonical
+ * hash already contains stationary shapes, tanks and drones. Index the shape
+ * movement corridor once per frame, not once per projectile. */
+function sweptShapeGrid(g){
+ if(!g.__novaShapeSweepActive)return null;
+ var cells=new Map(),all=[],a=g.shapes||[];
+ for(var i=0;i<a.length;i++){
+  var s=a[i];if(!s||!(s.hp>0))continue;
+  var start=shapeSweepStart(g,s);if(!start)continue;
+  all.push(s);
+  var r=Math.max(0,s.r||0),x0=Math.floor((Math.min(start.x,s.x)-r)/SHAPE_SWEEP_CELL),x1=Math.floor((Math.max(start.x,s.x)+r)/SHAPE_SWEEP_CELL),y0=Math.floor((Math.min(start.y,s.y)-r)/SHAPE_SWEEP_CELL),y1=Math.floor((Math.max(start.y,s.y)+r)/SHAPE_SWEEP_CELL);
+  for(var x=x0;x<=x1;x++)for(var y=y0;y<=y1;y++){
+   var k=x+','+y,arr=cells.get(k);if(!arr){arr=[];cells.set(k,arr);}arr.push(s);
+  }
+ }
+ return{cells:cells,all:all};
+}
+function appendSweptShapes(ix,b,ax,ay,ex,ey,out){
+ if(!ix||!ix.all.length)return;
+ var r=Math.max(0,b.r||0),x0=Math.floor((Math.min(ax,ex)-r)/SHAPE_SWEEP_CELL),x1=Math.floor((Math.max(ax,ex)+r)/SHAPE_SWEEP_CELL),y0=Math.floor((Math.min(ay,ey)-r)/SHAPE_SWEEP_CELL),y1=Math.floor((Math.max(ay,ey)+r)/SHAPE_SWEEP_CELL),seen=new Set(out);
+ if((x1-x0+1)*(y1-y0+1)>200){
+  for(var z=0;z<ix.all.length;z++)if(!seen.has(ix.all[z])){seen.add(ix.all[z]);out.push(ix.all[z]);}
+  return;
+ }
+ for(var x=x0;x<=x1;x++)for(var y=y0;y<=y1;y++){
+  var a=ix.cells.get(x+','+y);if(!a)continue;
+  for(var i=0;i<a.length;i++)if(!seen.has(a[i])){seen.add(a[i]);out.push(a[i]);}
+ }
+}
+
  /* The core bullet loop can retain killed shapes in its same-tick spatial hash.
   * Filter dead shapes only while it queries; restore the original method even on failure. */
- var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){for(var m=0;m<this.bullets.length;m++){var mb=this.bullets[m];if(mb)mb.__novaSweepHitsBefore=mb.hits||0;}var hash=this.hash,query=hash&&hash.query,hadOwn=hash&&Object.prototype.hasOwnProperty.call(hash,'query'),out,self=this,cursor=-1,started=false,generation=(this.__novaDirectQueryGeneration||0)+1,pending=[],splashDepth=0;
+ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var movingShapes=sweptShapeGrid(this);for(var m=0;m<this.bullets.length;m++){var mb=this.bullets[m];if(mb)mb.__novaSweepHitsBefore=mb.hits||0;}var hash=this.hash,query=hash&&hash.query,hadOwn=hash&&Object.prototype.hasOwnProperty.call(hash,'query'),out,self=this,cursor=-1,started=false,generation=(this.__novaDirectQueryGeneration||0)+1,pending=[],splashDepth=0;
  this.__novaDirectQueryGeneration=generation;
  var oldSplashForContacts=this.splashAt,hadOwnSplash=Object.prototype.hasOwnProperty.call(this,'splashAt');
  /* A penetrating shot must contact each physical victim only once, even
@@ -389,7 +446,11 @@ wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.
    var victims=b&&b.__novaDirectVictims,write=0;
    for(var scan=0;scan<candidates.length;scan++){
      var candidate=candidates[scan];
-     if(candidate&&(candidate.kind!=='shape'||candidate.hp>0)&&!(victims&&victims.has(candidate)))candidates[write++]=candidate;
+     if(!candidate||(candidate.kind==='shape'&&candidate.hp<=0)||(victims&&victims.has(candidate)))continue;
+     /* The core checks endpoint overlap: a moving shape cannot hit merely
+      * because it entered the bullet's old path after the shot passed. */
+     if(b&&candidate.kind==='shape'&&shapeSweepStart(self,candidate)&&shapeContactTime(self,b,candidate,b.px==null?b.x:b.px,b.py==null?b.y:b.py,b.x,b.y,b.r+candidate.r)==null)continue;
+     candidates[write++]=candidate;
    }
    candidates.length=write;
    /* The shipping core takes the first endpoint-overlapping body in hash
@@ -414,6 +475,7 @@ wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.
          else if(ce.kind==='drone'&&ce.ownerId!==b.ownerId&&ce.hp>0)rr=b.r+ce.r+1;
          if(!rr||d2(b.x,b.y,ce.x,ce.y)>=rr*rr)continue;
          var rx=dx,ry=dy,tx=ce.x,ty=ce.y;
+         if(ce.kind==='shape'){var sp=shapeSweepStart(self,ce);if(sp){rx-=ce.x-sp.x;ry-=ce.y-sp.y;tx=sp.x;ty=sp.y;}}
          if(ce.kind==='tank'&&ce.__novaSweepMoveTime===self.time){
            rx-=ce.x-ce.__novaSweepPrevX;ry-=ce.y-ce.__novaSweepPrevY;
            tx=ce.__novaSweepPrevX;ty=ce.__novaSweepPrevY;
@@ -455,7 +517,7 @@ wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.
        (pb.__novaDirectVictims||(pb.__novaDirectVictims=new Set())).add(item[1]);
      }
    }
- }for(var i=this.bullets.length-1;i>=0;i--){var b=this.bullets[i];if(!b||b.dead||(b.hits||0)!==b.__novaSweepHitsBefore)continue;var ax=b.px==null?b.x:b.px,ay=b.py==null?b.y:b.py,ex=b.x,ey=b.y,travel=Math.hypot(ex-ax,ey-ay);if(travel<1e-6)continue;this.hash.query((ax+ex)*.5,(ay+ey)*.5,travel*.5+b.r+46,this.tmp);var first=null;for(var j=0;j<this.tmp.length;j++){var e=this.tmp[j],er=0;if(b.__novaDirectVictims&&b.__novaDirectVictims.has(e))continue;if(e.kind==='shape'&&e.hp>0)er=e.r;else if(e.kind==='tank'&&e.id!==b.ownerId&&e.alive)er=CLASSES[e.cls].size+3;else if(e.kind==='drone'&&e.ownerId!==b.ownerId&&e.hp>0)er=e.r+1;else continue;var rr=b.r+er,dx=ex-ax,dy=ey-ay,tx=e.x,ty=e.y;if(e.kind==='tank'&&e.__novaSweepMoveTime===this.time){dx-=e.x-e.__novaSweepPrevX;dy-=e.y-e.__novaSweepPrevY;tx=e.__novaSweepPrevX;ty=e.__novaSweepPrevY;}var fx=ax-tx,fy=ay-ty,A=dx*dx+dy*dy,B=2*(fx*dx+fy*dy),C=fx*fx+fy*fy-rr*rr,t=null;if(C<0)t=0;else{var D=B*B-4*A*C;if(D>0){var root=Math.sqrt(D),t0=(-B-root)/(2*A),t1=(-B+root)/(2*A);if(t0>=0&&t0<=1)t=t0;else if(t1>=0&&t1<=1)t=t1;}}if(t!=null&&(!first||t<first.t))first={e:e,t:t};}if(!first)continue;var e=first.e,hitT=first.t===0?0:Math.min(1,first.t+1e-9),hx=ax+(ex-ax)*hitT,hy=ay+(ey-ay)*hitT;b.x=hx;b.y=hy;if(e.kind==='shape'){if(b.shell)this.clusterBurst(b);this.damageShape(e,b.dmg,b.vx,b.vy);}else if(e.kind==='tank'){if(b.shell)this.clusterBurst(b);var ang=Math.atan2(b.vy,b.vx);this.damageTank(e,b.dmg,b.ownerId,Math.cos(ang)*(b.knock||0)*.006,Math.sin(ang)*(b.knock||0)*.006);}else this.damageDrone(e,b.dmg,b.ownerId);if(b.splash&&e.kind!=='drone')this.splashAt(hx,hy,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.hits++;b.pen--;if(b.pen<0)b.dead=true;else (b.__novaDirectVictims||(b.__novaDirectVictims=new Set())).add(e);if(!b.dead){b.x=ex;b.y=ey;}else this.bullets.splice(i,1);}return out;};
+ }for(var i=this.bullets.length-1;i>=0;i--){var b=this.bullets[i];if(!b||b.dead||(b.hits||0)!==b.__novaSweepHitsBefore)continue;var ax=b.px==null?b.x:b.px,ay=b.py==null?b.y:b.py,ex=b.x,ey=b.y,travel=Math.hypot(ex-ax,ey-ay);if(travel<1e-6)continue;this.hash.query((ax+ex)*.5,(ay+ey)*.5,travel*.5+b.r+46,this.tmp);appendSweptShapes(movingShapes,b,ax,ay,ex,ey,this.tmp);var first=null;for(var j=0;j<this.tmp.length;j++){var e=this.tmp[j],er=0;if(b.__novaDirectVictims&&b.__novaDirectVictims.has(e))continue;if(e.kind==='shape'&&e.hp>0)er=e.r;else if(e.kind==='tank'&&e.id!==b.ownerId&&e.alive)er=CLASSES[e.cls].size+3;else if(e.kind==='drone'&&e.ownerId!==b.ownerId&&e.hp>0)er=e.r+1;else continue;var rr=b.r+er,dx=ex-ax,dy=ey-ay,tx=e.x,ty=e.y;if(e.kind==='shape'){var start=shapeSweepStart(this,e);if(start){dx-=e.x-start.x;dy-=e.y-start.y;tx=start.x;ty=start.y;}}if(e.kind==='tank'&&e.__novaSweepMoveTime===this.time){dx-=e.x-e.__novaSweepPrevX;dy-=e.y-e.__novaSweepPrevY;tx=e.__novaSweepPrevX;ty=e.__novaSweepPrevY;}var fx=ax-tx,fy=ay-ty,A=dx*dx+dy*dy,B=2*(fx*dx+fy*dy),C=fx*fx+fy*fy-rr*rr,t=null;if(C<0)t=0;else{var D=B*B-4*A*C;if(D>0){var root=Math.sqrt(D),t0=(-B-root)/(2*A),t1=(-B+root)/(2*A);if(t0>=0&&t0<=1)t=t0;else if(t1>=0&&t1<=1)t=t1;}}if(t!=null&&(!first||t<first.t))first={e:e,t:t};}if(!first)continue;var e=first.e,hitT=first.t===0?0:Math.min(1,first.t+1e-9),hx=ax+(ex-ax)*hitT,hy=ay+(ey-ay)*hitT;b.x=hx;b.y=hy;if(e.kind==='shape'){if(b.shell)this.clusterBurst(b);this.damageShape(e,b.dmg,b.vx,b.vy);}else if(e.kind==='tank'){if(b.shell)this.clusterBurst(b);var ang=Math.atan2(b.vy,b.vx);this.damageTank(e,b.dmg,b.ownerId,Math.cos(ang)*(b.knock||0)*.006,Math.sin(ang)*(b.knock||0)*.006);}else this.damageDrone(e,b.dmg,b.ownerId);if(b.splash&&e.kind!=='drone')this.splashAt(hx,hy,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.hits++;b.pen--;if(b.pen<0)b.dead=true;else (b.__novaDirectVictims||(b.__novaDirectVictims=new Set())).add(e);if(!b.dead){b.x=ex;b.y=ey;}else this.bullets.splice(i,1);}return out;};
 
  var oldUpdateBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var terrain=ensureTerrain(this);for(var i=0;i<this.bullets.length;i++){var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,sweepDt=dt;/* Non-shell shots expire without spawning fragments: terrain after their remaining lifetime is unreachable. Shell expiry needs coupled chronological burst arbitration. */if(!b.shell&&Number.isFinite(b.ttl)){if(b.ttl<=0)continue;sweepDt=Math.min(dt,b.ttl);}var nx=ox+(b.vx||0)*sweepDt,ny=oy+(b.vy||0)*sweepDt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
    /* The core still advances a dead bullet before removing it; a shell may
@@ -472,8 +534,8 @@ wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.
    for(var ti=0;ti<this.tanks.length;ti++){var o=this.tanks[ti];if(!o||!o.alive||o.__novaSpotterContactId==null||o.__novaSpotterContactId<0)continue;var target=this.getTank(o.__novaSpotterContactId),spot=spotMap.get(o.id)||null;if(target&&spot&&!lineOfSight(this,spot.x,spot.y,target.x,target.y,2)){o.__novaSpotterContactId=-1;o.__novaSpotterContactUntil=0;o.__novaSpotterDroneId=-1;}}
  return out;};
 
- var oldUpdate=Game.prototype.update;Game.prototype.update=function(dt){ensureTerrain(this);if(this.__novaBattlefield&&!this.__novaBattlefield.announced&&this.status==='playing'&&this.time>.1){this.__novaBattlefield.announced=true;if(this.toast)this.toast('¦ BATTLEFIELD · '+this.__novaBattlefield.name+'  COVER CHANGES THE FIGHT','info');}
-   var out=oldUpdate.call(this,dt);for(var i=0;i<this.shapes.length;i++){var s=this.shapes[i];if(!s||s.hp<=0)continue;circleResolve(this,s,(s.r||10)*.86);}return out;};
+ var oldUpdate=Game.prototype.update;Game.prototype.update=function(dt){ensureTerrain(this);var epoch=(this.__novaShapeSweepEpoch||0)+1;this.__novaShapeSweepEpoch=epoch;var shapes=this.shapes||[];for(var si=0;si<shapes.length;si++){var sh=shapes[si];if(!sh)continue;sh.__novaShapeSweepEpoch=epoch;sh.__novaShapeSweepPrevX=sh.x;sh.__novaShapeSweepPrevY=sh.y;}this.__novaShapeSweepActive=true;if(this.__novaBattlefield&&!this.__novaBattlefield.announced&&this.status==='playing'&&this.time>.1){this.__novaBattlefield.announced=true;if(this.toast)this.toast('¦ BATTLEFIELD · '+this.__novaBattlefield.name+'  COVER CHANGES THE FIGHT','info');}
+   var out;try{out=oldUpdate.call(this,dt);}finally{this.__novaShapeSweepActive=false;}for(var i=0;i<this.shapes.length;i++){var s=this.shapes[i];if(!s||s.hp<=0)continue;circleResolve(this,s,(s.r||10)*.86);}return out;};
 });
 
 wrap('game/ai',function(ai){var old=ai.updateAI;if(!old||old.__novaBattlefieldAI)return;function patched(t,g,dt){if(t&&t.ai&&t.ai.targetId>=0){var tar=g.getTank&&g.getTank(t.ai.targetId);if(tar&&tar.alive&&g.hasLineOfSight&&!g.hasLineOfSight(t.x,t.y,tar.x,tar.y,3)){t.ai.__novaOccluded=(t.ai.__novaOccluded||0)+dt;if(t.ai.__novaOccluded>.28){t.ai.targetId=-1;t.ai.state='wander';t.ai.thinkT=0;t.ai.fireHold=Math.max(t.ai.fireHold||0,.18);}}else t.ai.__novaOccluded=Math.max(0,(t.ai.__novaOccluded||0)-dt*2);}var out=old(t,g,dt);if(t&&t.__novaTerrainBumpT>0){t.__novaTerrainBumpT-=dt;if(t.ai&&t.__novaTerrainBumpT>0&&Math.random()<dt*4){t.ai.strafe=(t.ai.strafe||1)*-1;t.ai.thinkT=0;}}return out;}patched.__novaBattlefieldAI=true;ai.updateAI=patched;});
