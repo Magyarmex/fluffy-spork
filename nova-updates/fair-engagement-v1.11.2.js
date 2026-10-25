@@ -85,14 +85,29 @@ function saturation(g,targetId,selfId){
   }
   return n;
 }
-function scoreTarget(g,classes,observer,a,target,now){
+/* During one target choice the other tanks' target slots cannot change.
+ * Count pressure assignments once instead of rescanning every AI tank for
+ * every candidate. The observer itself is excluded exactly as before. */
+function saturationSnapshot(g,selfId){
+  var counts=new Map(),ts=g&&g.tanks||[];
+  for(var i=0;i<ts.length;i++){
+    var q=ts[i];if(!q||q.id===selfId||!q.ai||!alive(q))continue;
+    var a=q.ai,id=a.__v1112TargetId>=0?a.__v1112TargetId:(a.__v1105TargetId>=0?a.__v1105TargetId:(a.__v180TargetId>=0?a.__v180TargetId:a.targetId));
+    if(a.state==='hunt'||a.__v180Posture==='pressure'||a.__v180Posture==='flank'||a.__v180Posture==='route')
+      counts.set(id,(counts.get(id)||0)+1);
+  }
+  return counts;
+}
+function scoreTarget(g,classes,observer,a,target,now,satCache){
   if(!alive(target)||!hostile(g,observer,target)||target.spawnShieldT>0||!canPerceive(g,classes,observer,target))return-Infinity;
   var dist=Math.hypot(target.x-observer.x,target.y-observer.y),near=1/(1+dist/720);
   var hp=clamp(Number(target.hp)/Math.max(1,Number(target.maxHp)||Number(target.hp)||1),0,1);
   var score=near*1.16+(1-hp)*.48+targetDanger(classes,target)*.30;
   if(a&&a.__v1112TargetId===target.id)score+=.16;
   if(a&&a.__v180LastAttacker===target.id&&now-Number(a.__v180HitAt||-99)<2.2)score+=.34;
-  score-=saturation(g,target.id,observer.id)*SATURATION_PENALTY;
+  /* Hidden/shielded candidates need no saturation calculation at all. */
+  if(satCache&&!satCache.counts)satCache.counts=saturationSnapshot(g,observer.id);
+  score-=(satCache?(satCache.counts.get(target.id)||0):saturation(g,target.id,observer.id))*SATURATION_PENALTY;
   /* Tiny deterministic tie breaker prevents identical bots from synchronizing
    * onto one equal-distance target. It is identity-neutral: isPlayer is never read. */
   var seed=Math.sin((observer.id||1)*17.17+(target.id||1)*31.73)*43758.5453;
@@ -100,10 +115,10 @@ function scoreTarget(g,classes,observer,a,target,now){
   return score;
 }
 function chooseTarget(g,classes,observer,a,now){
-  var best=null,bs=-Infinity,ts=g&&g.tanks||[];
+  var best=null,bs=-Infinity,ts=g&&g.tanks||[],satCache={counts:null};
   for(var i=0;i<ts.length;i++){
     var q=ts[i];if(!q||q.id===observer.id)continue;
-    var s=scoreTarget(g,classes,observer,a,q,now);
+    var s=scoreTarget(g,classes,observer,a,q,now,satCache);
     if(s>bs){bs=s;best=q;}
   }
   return best;
