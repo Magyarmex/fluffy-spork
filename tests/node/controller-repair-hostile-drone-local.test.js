@@ -115,3 +115,29 @@ test('hostile owner beyond range cannot suppress repair on its own',()=>{
   s.tick();
   assert.ok(s.drone.hp>30);
 });
+
+test('actual shipping Live Vector Game.updateDrones applies the local gate',()=>{
+  const exposed=boot({droneX:140,enemyDroneX:320});
+  exposed.g.player=exposed.owner;
+  exposed.g.updateDrones(1/60);
+  assert.equal(exposed.drone.hp,30,'the wrapped game path must suppress unsafe repair');
+  const safe=boot({droneX:-140,enemyDroneX:200});
+  safe.g.player=safe.owner;
+  safe.g.updateDrones(1/60);
+  assert.ok(safe.drone.hp>30,'the wrapped game path must permit local safety');
+});
+
+test('repair threat cache avoids repeating owner lookups for multiple healers',()=>{
+  const s=boot({droneX:140,enemyDroneX:320});
+  const second={...s.drone,id:11,x:130,__lvLastHp:30};
+  s.g.drones.push(second);
+  const original=s.g.getTank;
+  let ownerLookups=0;
+  s.g.getTank=id=>{if(id===2)ownerLookups++;return original(id);};
+  const cache={candidates:null};
+  s.tick(1/60,cache);
+  s.window.__NOVA_REPAIR_TEST__(s.g,second,s.owner,{active:false},1/60,cache);
+  assert.equal(s.drone.hp,30);
+  assert.equal(second.hp,30);
+  assert.equal(ownerLookups,1,'one hostility scan for both repairing drones');
+});
