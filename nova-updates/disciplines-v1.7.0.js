@@ -354,7 +354,7 @@ wrap('game/engine',function(engine,require){
        * hit or a high-penetration cover-breach path: those require the wider
        * chronological resolver. The historical 2u early-trigger tolerance
        * remains unchanged when the fuse circle was not actually crossed. */
-      if((b.hits||0)===0&&(b.pen||0)<2&&tr>=b.__v17FuseDist&&
+      if((b.hits||0)===0&&(b.pen||0)<2&&b.__novaBreachAtTime!==this.time&&tr>=b.__v17FuseDist&&
          Number.isFinite(b.px)&&Number.isFinite(b.py)&&
          Number.isFinite(b.__v17SpawnX)&&Number.isFinite(b.__v17SpawnY)){
         var fx=b.px-b.__v17SpawnX,fy=b.py-b.__v17SpawnY;
