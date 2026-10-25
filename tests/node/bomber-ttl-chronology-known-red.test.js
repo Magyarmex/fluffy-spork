@@ -107,3 +107,24 @@ for(const optimized of [false,true]){
   assert.ok(Math.abs(bursts[0].x-100)<1e-6);
  });
 }
+
+test('[RED #193] expired Bomber children advance only the remaining subframe',()=>{
+ const Game=boot(false),g=new Game(),created=[];
+ g.time=1;g.__novaBattlefield={coverBroken:0};g.__novaTerrain=[];
+ g.weakenBullet=()=>{};
+ g.clusterBurst=function(shell){
+  const child={kind:'bullet',id:778,ownerId:1,x:shell.x,y:0,
+   vx:300,vy:0,r:3,dmg:2,ttl:1,pen:0,hits:0,dead:false,
+   shell:false,beam:false,splash:0};
+  created.push(child);this.bullets.push(child);
+ };
+ g.bullets=[{kind:'bullet',id:777,ownerId:1,x:0,y:0,
+  vx:6000,vy:0,r:3,dmg:26,ttl:.005,pen:1,hits:0,dead:false,
+  shell:true,beam:false,splash:0}];
+ g.updateBullets(1/30);
+ assert.equal(created.length,1,'one physical shell creates children once');
+ const expected=6000*.005+300*(1/30-.005);
+ assert.ok(Math.abs(created[0].x-expected)<1e-6,
+  'child should be born at x=30 and advance 0.028333s to x='+expected+
+  ', not start at the full-frame shell endpoint '+created[0].x);
+});
