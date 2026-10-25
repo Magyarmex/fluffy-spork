@@ -631,3 +631,103 @@ for(const hz of [30,60,120,240]){
   assert.equal(g.hits,1,'owner drone is transparent to Minigun neutral contact');
  });
 }
+
+
+/* Run351: an unrelated stationary shielded or allied tank PHYSICALLY AFTER
+ * an earlier unprotected contact must not veto that first contact. A blocker
+ * before or simultaneous with the hit remains authoritative/uncertain. */
+for (const hz of [30,60,120,240]) {
+ test('later stationary spawn shield does not erase earlier TTL hit at '+hz+'Hz',()=>{
+  const g=isolatedWorld({x:28,vx:12000,ttl:.004,extraTanks:[{
+   kind:'tank',id:3,x:60,y:0,cls:'scout',hp:100,alive:true,spawnShieldT:1
+  }]});
+  const victims=[];g.damageTank=e=>victims.push(e.id);
+  g.updateBullets(1/hz);
+  assert.deepEqual(victims,[2],'only the physically earlier unshielded tank is hit');
+ });
+ test('later stationary ally does not erase earlier TTL hit at '+hz+'Hz',()=>{
+  const g=isolatedWorld({x:28,vx:12000,ttl:.004,extraTanks:[{
+   kind:'tank',id:3,x:60,y:0,cls:'scout',hp:100,alive:true,teamId:'blue'
+  }]});
+  g.tanks[0].teamId='red';
+  g.getTank=()=>({id:1,teamId:'blue'});
+  g.areAllies=(a,b)=>a.teamId===b.teamId;
+  const victims=[];g.damageTank=e=>victims.push(e.id);
+  g.updateBullets(1/hz);
+  assert.deepEqual(victims,[2],'later ally cannot veto earlier enemy hit');
+ });
+ test('earlier stationary shield still vetoes TTL shortcut at '+hz+'Hz',()=>{
+  const g=isolatedWorld({x:60,vx:12000,ttl:.004,extraTanks:[{
+   kind:'tank',id:3,x:20,y:0,cls:'scout',hp:100,alive:true,spawnShieldT:1
+  }]});
+  g.updateBullets(1/hz);
+  assert.equal(g.hits,0);
+ });
+}
+test('moving protected tank beyond hit remains conservative',()=>{
+ const g=isolatedWorld({x:28,vx:12000,ttl:.004,extraTanks:[{
+  kind:'tank',id:3,x:60,y:0,cls:'scout',hp:100,alive:true,spawnShieldT:1,
+  __novaSweepPrevX:58,__novaSweepPrevY:0
+ }]});
+ g.tanks[1].__novaSweepMoveTime=g.time;
+ g.updateBullets(1/30);
+ assert.equal(g.hits,0,'moving shield chronology is not certified');
+});
+test('same-location shield and unshielded contact remains conservative',()=>{
+ const g=isolatedWorld({x:28,vx:12000,ttl:.004,extraTanks:[{
+  kind:'tank',id:3,x:28,y:0,cls:'scout',hp:100,alive:true,spawnShieldT:1
+ }]});
+ g.updateBullets(1/30);
+ assert.equal(g.hits,0);
+});
+
+
+/* Adjacent defenses and neutral farming share the same first-event rule. */
+for(const field of ['shieldT','bulwarkT','tauntT']){
+ test('later stationary '+field+' cannot erase earlier TTL hit',()=>{
+  const late={kind:'tank',id:3,x:60,y:0,cls:'scout',hp:100,alive:true};
+  late[field]=1;
+  const g=isolatedWorld({x:28,vx:12000,ttl:.004,extraTanks:[late]});
+  const victims=[];g.damageTank=e=>victims.push(e.id);
+  g.updateBullets(1/30);
+  assert.deepEqual(victims,[2]);
+ });
+}
+test('near-miss protected tank cannot veto earlier hit',()=>{
+ const g=isolatedWorld({x:28,vx:12000,ttl:.004,extraTanks:[{
+  kind:'tank',id:3,x:60,y:20,cls:'scout',hp:100,alive:true,spawnShieldT:1
+ }]});
+ const victims=[];g.damageTank=e=>victims.push(e.id);
+ g.updateBullets(1/30);
+ assert.deepEqual(victims,[2]);
+});
+test('multiple later protected tanks do not veto earliest valid hit',()=>{
+ const g=isolatedWorld({x:28,vx:12000,ttl:.004,extraTanks:[
+  {kind:'tank',id:3,x:60,y:0,cls:'scout',hp:100,alive:true,spawnShieldT:1},
+  {kind:'tank',id:4,x:65,y:0,cls:'scout',hp:100,alive:true,shieldT:1}
+ ]});
+ const victims=[];g.damageTank=e=>victims.push(e.id);
+ g.updateBullets(1/30);
+ assert.deepEqual(victims,[2]);
+});
+test('earlier neutral shape can be farmed ahead of later protected tank',()=>{
+ const g=isolatedWorld({x:100,vx:12000,ttl:.004,extraTanks:[{
+  kind:'tank',id:3,x:60,y:0,cls:'scout',hp:100,alive:true,spawnShieldT:1
+ }]});
+ const shape={kind:'shape',id:8,x:15,y:0,r:5,hp:20,born:g.time-1};
+ g.shapes=[shape];
+ const hits=[];g.damageShape=e=>hits.push(e.id);
+ g.updateBullets(1/30);
+ assert.deepEqual(hits,[8]);
+});
+test('moving allied tank in corridor still vetoes unproven contact order',()=>{
+ const g=isolatedWorld({x:28,vx:12000,ttl:.004,extraTanks:[{
+  kind:'tank',id:3,x:60,y:0,cls:'scout',hp:100,alive:true,teamId:'blue',
+  __novaSweepPrevX:58,__novaSweepPrevY:0
+ }]});
+ g.tanks[0].teamId='red';g.getTank=()=>({id:1,teamId:'blue'});
+ g.areAllies=(a,b)=>a.teamId===b.teamId;
+ g.tanks[1].__novaSweepMoveTime=g.time;
+ g.updateBullets(1/30);
+ assert.equal(g.hits,0);
+});
