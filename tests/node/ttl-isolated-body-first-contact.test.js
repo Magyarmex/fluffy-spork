@@ -845,3 +845,22 @@ for (const fps of [30,60,120,240]) {
     assert.equal(g.hits,0);
   });
 }
+
+for (const fps of [30,60,120,240]) {
+  test('TTL-first hostile drone wins over a physically later permanent wall at '+fps+'Hz',()=>{
+    const terrain=[{id:-2,shape:'rect',x:30,y:0,w:4,h:50,solid:true,destructible:false}];
+    assert.equal(zeroTimeDroneWorld(fps,[{}],terrain).hits,1);
+  });
+  test('TTL-first circular pillar containing projectile origin prevents phantom drone hit at '+fps+'Hz',()=>{
+    const terrain=[{id:-3,shape:'circle',x:0,y:0,r:5,solid:true,destructible:false}];
+    assert.equal(zeroTimeDroneWorld(fps,[{}],terrain).hits,0);
+  });
+  test('TTL-first protected tank sharing projectile origin vetoes drone damage at '+fps+'Hz',()=>{
+    const g=zeroTimeDroneWorld(fps,[{}]);
+    g.hits=0;g.tanks=[{kind:'tank',id:3,cls:'scout',x:0,y:0,alive:true,hp:100,spawnShieldT:2}];
+    g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+      vx:500,vy:0,r:3,dmg:20,ttl:.004,pen:0,hits:0,dead:false}];
+    g.updateBullets(1/fps);
+    assert.equal(g.hits,0);
+  });
+}
