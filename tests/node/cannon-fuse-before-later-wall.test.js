@@ -60,15 +60,16 @@ function boot(performance) {
   return m.exports.Game;
 }
 
-function run(Game,hz,withWall=true,{startX=146,wallX=168,vx=380,ttl=2,pen=1,cover=false,extras=null}={}){
+function run(Game,hz,withWall=true,{startX=146,wallX=168,vx=380,ttl=2,pen=1,cover=false,shell=true,extras=null}={}){
   const g=new Game(),bursts=[];
   g.time=1;g.__novaBattlefield={coverBroken:0};
   g.__novaTerrain=withWall?[{id:-51,shape:'rect',x:wallX,y:0,w:20,h:80,
     solid:true,destructible:cover,hp:cover?100:0}]:[];
   g.clusterBurst=b=>bursts.push({x:b.x,y:b.y});
+  g.rings=[];g.addRing=(x,y)=>g.rings.push({x,y});
   g.weakenBullet=()=>{};
   g.bullets=[{kind:'bullet',id:777,ownerId:1,x:startX,y:0,
-    vx,vy:0,r:8.5,dmg:26,ttl,shell:true,pen,hits:0,dead:false,
+    vx,vy:0,r:8.5,dmg:26,ttl,shell,pen,hits:0,dead:false,
     __v17Cannon:true,__v17FuseDist:150,__v17SpawnX:0,__v17SpawnY:0,
     __v17FuseArmed:false,splash:72,splashDmg:.4,color:'#ffb45e'}];
   if(extras)extras(g);
@@ -196,5 +197,45 @@ for(const optimized of [false,true]){
   const {bursts}=run(Game,30,true,{startX:149.999999999});
   assert.equal(bursts.length,1);
   assert.ok(bursts[0].x>150);
+ });
+}
+
+for(const optimized of [false,true]){
+ const Game=boot(optimized),prefix=optimized?'optimized':'baseline';
+ for(const hz of [30,60,120,240]){
+  test(prefix+' ordinary noncluster Cannon airburst precedes later wall at '+hz+'Hz',()=>{
+   const phase=hz===30?{startX:146,wallX:168,vx:380}:
+     hz===60?{startX:147.9,wallX:168,vx:380}:
+     hz===120?{startX:147.9,wallX:164.625,vx:380}:
+       {startX:147.9,wallX:164.625,vx:861.84};
+   const {g,bursts}=run(Game,hz,true,{...phase,shell:false,pen:0});
+   assert.equal(bursts.length,0,'ordinary Cannon does not cluster');
+   assert.equal(g.bullets.length,0);
+   assert.ok(g.rings.some(r=>Math.abs(r.x-150)<1e-6),
+     'ordinary Cannon must detonate at the programmed fuse');
+  });
+ }
+ test(prefix+' owner tank near the muzzle is not mistaken for an opponent',()=>{
+  const {bursts}=run(Game,30,true,{extras:g=>{
+   g.tanks=[{id:1,kind:'tank',cls:'cannon',x:130,y:0,alive:true}];
+  }});
+  assert.equal(bursts.length,1);
+  assert.ok(Math.abs(bursts[0].x-150)<1e-6);
+ });
+ test(prefix+' swept shape crossing the projectile corridor prevents speculative skipping',()=>{
+  const {bursts}=run(Game,30,true,{extras:g=>{
+   g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=5;
+   g.shapes=[{kind:'shape',id:16,x:180,y:80,r:10,hp:10,
+     __novaShapeSweepEpoch:5,__novaShapeSweepPrevX:150,__novaShapeSweepPrevY:0}];
+  }});
+  assert.equal(bursts.length,1);
+  assert.ok(bursts[0].x>150);
+ });
+ test(prefix+' distant ordinary shape does not block provable fuse',()=>{
+  const {bursts}=run(Game,30,true,{extras:g=>{
+   g.shapes=[{kind:'shape',id:17,x:1000,y:1000,r:12,hp:10}];
+  }});
+  assert.equal(bursts.length,1);
+  assert.ok(Math.abs(bursts[0].x-150)<1e-6);
  });
 }
