@@ -404,3 +404,20 @@ test('real Battlefield Game.update snapshots distant drone before projectile TTL
  assert.equal(g.hits,1,'materialized Game.update must allow remote-drone hit');
  assert.equal(g.__novaShapeSweepActive,false);
 });
+
+test('extreme-speed remote drone cannot be ruled out by TTL shortcut',()=>{
+ const g=isolatedWorld({drones:[{kind:'drone',id:5,ownerId:3,
+  x:500,y:0,r:8,hp:20,speed:4000,
+  __novaChronoDroneEpoch:7,__novaChronoDronePrevX:500,__novaChronoDronePrevY:0}]});
+ g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=7;
+ g.updateBullets(1/30);
+ assert.equal(g.hits,0,'a high-speed drone can traverse this corridor');
+});
+test('nonfinite drone speed keeps TTL recovery conservative',()=>{
+ const g=isolatedWorld({drones:[{kind:'drone',id:5,ownerId:3,
+  x:1000,y:1000,r:8,hp:20,speed:NaN,
+  __novaChronoDroneEpoch:7,__novaChronoDronePrevX:1000,__novaChronoDronePrevY:1000}]});
+ g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=7;
+ g.updateBullets(1/30);
+ assert.equal(g.hits,0);
+});
