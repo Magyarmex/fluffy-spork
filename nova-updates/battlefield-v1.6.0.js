@@ -606,7 +606,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      !Number.isFinite(b.x)||!Number.isFinite(b.y)||
      !Number.isFinite(b.vx)||!Number.isFinite(b.vy))return false;
   var dx=b.vx*dt,dy=b.vy*dt,limit=b.ttl/dt;
-  if(!Number.isFinite(dx)||!Number.isFinite(dy)||!(dx*dx+dy*dy>1e-12))return false;
+  if(!Number.isFinite(dx)||!Number.isFinite(dy)||!(dx*dx+dy*dy>1e-12)||
+     Math.abs(b.x)>=MAP_LIMIT-20||Math.abs(b.y)>=MAP_LIMIT-20)return false;
   /* Moving drones have no trustworthy same-tick start snapshot in this
    * composition. Defer their battles instead of inventing static contacts. */
   if(g.drones&&g.drones.some(function(d){return d&&d.hp>0;}))return false;
@@ -636,7 +637,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
     var start=shapeSweepStart(g,e);
     if(start){sx=start.x;sy=start.y;mx=e.x-sx;my=e.y-sy;}
    }
-   if(!(rr>0)||![sx,sy,mx,my].every(Number.isFinite)){uncertain=true;return;}
+   if(!(rr>0)||!Number.isFinite(sx)||!Number.isFinite(sy)||
+      !Number.isFinite(mx)||!Number.isFinite(my)){uncertain=true;return;}
    var fx=ax-sx,fy=ay-sy,rx=dx-mx,ry=dy-my;
    var A=rx*rx+ry*ry,B=2*(fx*rx+fy*ry),C=fx*fx+fy*fy-rr*rr;
    if(!Number.isFinite(A)||!Number.isFinite(B)||!Number.isFinite(C)){uncertain=true;return;}
@@ -691,7 +693,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   b.hits++;b.pen--;b.dead=true;b.vx=0;b.vy=0;
   return true;
  }
- var oldUpdateBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var terrain=ensureTerrain(this);for(var pre=0;pre<this.bullets.length;pre++)isolatedTTLBodyContact(this,this.bullets[pre],dt);for(var i=0;i<this.bullets.length;i++){var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,sweepDt=dt;/* Non-shell shots expire without spawning fragments: terrain after their remaining lifetime is unreachable. Shell expiry needs coupled chronological burst arbitration. */if(!b.shell&&Number.isFinite(b.ttl)){if(b.ttl<=0)continue;sweepDt=Math.min(dt,b.ttl);}var nx=ox+(b.vx||0)*sweepDt,ny=oy+(b.vy||0)*sweepDt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){b.__novaBreachAtTime=this.time;b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
+ var oldUpdateBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var terrain=ensureTerrain(this);for(var pre=this.bullets.length-1;pre>=0;pre--)isolatedTTLBodyContact(this,this.bullets[pre],dt);for(var i=0;i<this.bullets.length;i++){var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,sweepDt=dt;/* Non-shell shots expire without spawning fragments: terrain after their remaining lifetime is unreachable. Shell expiry needs coupled chronological burst arbitration. */if(!b.shell&&Number.isFinite(b.ttl)){if(b.ttl<=0)continue;sweepDt=Math.min(dt,b.ttl);}var nx=ox+(b.vx||0)*sweepDt,ny=oy+(b.vy||0)*sweepDt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){b.__novaBreachAtTime=this.time;b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
    /* The core still advances a dead bullet before removing it; a shell may
      * expire or leave the arena in that pass. Consume its one-time burst now. */
     if(b.shell&&this.clusterBurst){var childStart=this.bullets.length;this.clusterBurst(b);clearTerrainBurstChildren(this,s,h,childStart);b.shell=false;}if(b.splash&&this.splashAt)this.splashAt(h.x,h.y,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.dead=true;if(this.addFlash)this.addFlash(h.x,h.y,s.destructible?'#8fd4ff':'#b9c7e7',Math.min(46,14+(b.dmg||0)*.24));if(this.cam&&b.dmg>42)this.cam.shake=Math.max(this.cam.shake,.08);/* The materialized core still advances dead bullets before removing them. Freeze a terrain-killed projectile at its impact so its final trail cannot leak through cover. Breaching live shots keep their velocity above. */b.vx=0;b.vy=0;
