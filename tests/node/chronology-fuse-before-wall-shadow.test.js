@@ -82,14 +82,20 @@ for(const optimized of [false,true]){
   const label=optimized?'Battlefield + Performance':'Battlefield';
   const Game=boot(optimized);
   for(const hz of [30,60,120,240]){
-    test(label+' diagnostic records fuse-before-wall late burst at '+hz+'Hz',()=>{
+    test(label+' default phase: only 30Hz has a later wall in the same frame at '+hz+'Hz',()=>{
       const {bursts,g}=run(Game,hz,true);
       assert.equal(bursts.length,1);
-      assert.ok(bursts[0].x>150.1,'shipping bug must still be reproduced');
       const s=g.novaChronoShadowSnapshot();
-      assert.equal(s.fuseBeforeWallCandidates,1);
-      assert.equal(s.fuseBeforeWallLateBursts,1);
-      assert.equal(s.events.some(e=>e.kind==='fuse-before-wall-late-burst'),true);
+      if(hz===30){
+        assert.ok(bursts[0].x>150.1,'shipping misorder must be reproduced');
+        assert.equal(s.fuseBeforeWallCandidates,1);
+        assert.equal(s.fuseBeforeWallLateBursts,1);
+        assert.equal(s.events.some(e=>e.kind==='fuse-before-wall-late-burst'),true);
+      }else{
+        assert.ok(bursts[0].x>=148-1e-6&&bursts[0].x<=150+1e-6);
+        assert.equal(s.fuseBeforeWallCandidates,0);
+        assert.equal(s.fuseBeforeWallLateBursts,0);
+      }
     });
     test(label+' unobstructed Cannon fuse remains valid at '+hz+'Hz',()=>{
       const {bursts,g}=run(Game,hz,false);
