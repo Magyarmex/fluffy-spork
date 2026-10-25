@@ -215,3 +215,31 @@ for(const fps of [30,60,120,240]){
     assert.ok(drone.hp>80,'neither conservative motion hypothesis intersects');
   });
 }
+
+// A teleport also invalidates cached danger scans from the previous location.
+test('discontinuous relocation immediately refreshes previously safe projectile cache',()=>{
+  const {Game}=boot(),g=new Game();
+  const owner={id:1,team:'blue',cls:'marksman',alive:true,x:0,y:0};
+  const enemy={id:2,team:'red',cls:'marksman',alive:true,x:1000,y:0};
+  const d={id:7,kind:'drone',ownerId:1,x:80,y:0,hp:100,maxHp:100,r:8,attackCd:0};
+  g.tanks=[owner,enemy];g.tankById=new Map([[1,owner],[2,enemy]]);g.drones=[d];
+  g.damageDrone(d,20);g.time=7;g.updateDrones(.05);
+  const healed=d.hp;assert.ok(healed>80);
+  assert.ok(d.__novaFieldService.nextProjectileAt>7.02);
+  d.teleportX=-70;g.bullets=[{ownerId:2,x:-30,y:0,vx:-200,vy:0,r:3}];
+  g.time=7.02;g.updateDrones(1/60);
+  assert.equal(d.hp,healed,'new position must be rescanned before another repair tick');
+});
+
+test('discontinuous relocation immediately refreshes previously safe hostile-unit cache',()=>{
+  const {Game}=boot(),g=new Game();
+  const owner={id:1,team:'blue',cls:'marksman',alive:true,x:0,y:0};
+  const enemy={id:2,team:'red',cls:'marksman',alive:true,x:-60,y:0};
+  const d={id:7,kind:'drone',ownerId:1,x:500,y:0,hp:100,maxHp:100,r:8,attackCd:0};
+  g.tanks=[owner,enemy];g.tankById=new Map([[1,owner],[2,enemy]]);g.drones=[d];
+  g.damageDrone(d,20);g.time=7;g.updateDrones(.05);
+  const healed=d.hp;assert.ok(healed>80);
+  assert.ok(d.__novaFieldService.nextThreatAt>7.02);
+  d.teleportX=-70;g.time=7.02;g.updateDrones(1/60);
+  assert.equal(d.hp,healed,'nearby hostile at new location must interrupt repair');
+});
