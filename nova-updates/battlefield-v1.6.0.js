@@ -407,35 +407,38 @@ function movingShapeHitT(g,s,ax,ay,ex,ey,rr){
  * hash already contains stationary shapes, tanks and drones. Index the shape
  * movement corridor once per frame, not once per projectile. */
 function sweptShapeGrid(g){
+ var ix=g.__novaSweptShapeGrid;
+ if(ix){for(var z=0;z<ix.active.length;z++)ix.active[z].length=0;ix.active.length=0;ix.all.length=0;}
  if(!g.__novaShapeSweepActive||!g.bullets||!g.bullets.length)return null;
- var cells=new Map(),all=[],a=g.shapes||[];
+ if(!ix)ix=g.__novaSweptShapeGrid={cells:new Map(),active:[],all:[],scratch:[],stamp:0};
+ var a=g.shapes||[];
  for(var i=0;i<a.length;i++){
   var s=a[i];if(!s||!(s.hp>0))continue;
   var start=shapeSweepStart(g,s);if(!start)continue;
-  all.push(s);
+  ix.all.push(s);
   var r=Math.max(0,s.r||0),x0=Math.floor((Math.min(start.x,s.x)-r)/SHAPE_SWEEP_CELL),x1=Math.floor((Math.max(start.x,s.x)+r)/SHAPE_SWEEP_CELL),y0=Math.floor((Math.min(start.y,s.y)-r)/SHAPE_SWEEP_CELL),y1=Math.floor((Math.max(start.y,s.y)+r)/SHAPE_SWEEP_CELL);
   for(var x=x0;x<=x1;x++)for(var y=y0;y<=y1;y++){
-   var k=x+','+y,arr=cells.get(k);if(!arr){arr=[];cells.set(k,arr);}arr.push(s);
+   /* Arena cell coordinates are bounded to +/-19; numeric keys are unique. */
+   var k=x*10000+y,arr=ix.cells.get(k);
+   if(!arr){arr=[];ix.cells.set(k,arr);}
+   if(!arr.length)ix.active.push(arr);
+   arr.push(s);
   }
  }
- return{cells:cells,all:all};
+ return ix;
 }
 function appendSweptShapes(ix,b,ax,ay,ex,ey,out){
  if(!ix||!ix.all.length)return;
- var r=Math.max(0,b.r||0),x0=Math.floor((Math.min(ax,ex)-r)/SHAPE_SWEEP_CELL),x1=Math.floor((Math.max(ax,ex)+r)/SHAPE_SWEEP_CELL),y0=Math.floor((Math.min(ay,ey)-r)/SHAPE_SWEEP_CELL),y1=Math.floor((Math.max(ay,ey)+r)/SHAPE_SWEEP_CELL),seen=new Set(out);
- if((x1-x0+1)*(y1-y0+1)>200){
-  for(var z=0;z<ix.all.length;z++)if(!seen.has(ix.all[z])){seen.add(ix.all[z]);out.push(ix.all[z]);}
-  return;
- }
+ var r=Math.max(0,b.r||0),x0=Math.floor((Math.min(ax,ex)-r)/SHAPE_SWEEP_CELL),x1=Math.floor((Math.max(ax,ex)+r)/SHAPE_SWEEP_CELL),y0=Math.floor((Math.min(ay,ey)-r)/SHAPE_SWEEP_CELL),y1=Math.floor((Math.max(ay,ey)+r)/SHAPE_SWEEP_CELL);
+ var stamp=++ix.stamp;if(stamp>1000000000){ix.stamp=stamp=1;for(var z=0;z<ix.all.length;z++)ix.all[z].__novaShapeQueryStamp=0;}
+ function add(s){if(s.__novaShapeQueryStamp===stamp)return;s.__novaShapeQueryStamp=stamp;if(out.indexOf(s)<0)out.push(s);}
+ if((x1-x0+1)*(y1-y0+1)>200){for(var z=0;z<ix.all.length;z++)add(ix.all[z]);return;}
  for(var x=x0;x<=x1;x++)for(var y=y0;y<=y1;y++){
-  var a=ix.cells.get(x+','+y);if(!a)continue;
-  for(var i=0;i<a.length;i++)if(!seen.has(a[i])){seen.add(a[i]);out.push(a[i]);}
+  var a=ix.cells.get(x*10000+y);if(!a)continue;
+  for(var i=0;i<a.length;i++)add(a[i]);
  }
 }
-
- /* The core bullet loop can retain killed shapes in its same-tick spatial hash.
-  * Filter dead shapes only while it queries; restore the original method even on failure. */
- /* Core endpoint contact cannot win over a moving shape that was crossed
+/* Core endpoint contact cannot win over a moving shape that was crossed
  * earlier in the frame. Defer the whole bullet's direct body query to the
  * existing swept recovery, which chooses the first physical victim. */
 function needsMovingShapeRecovery(g,ix,b,candidates){
@@ -451,7 +454,7 @@ function needsMovingShapeRecovery(g,ix,b,candidates){
   if(rr&&d2(b.x,b.y,e.x,e.y)<rr*rr){endpoint=true;break;}
  }
  if(!endpoint)return false;
- var ax=b.px,ay=b.py,ex=b.x,ey=b.y,moving=[];
+ var ax=b.px,ay=b.py,ex=b.x,ey=b.y,moving=ix.scratch;moving.length=0;
  appendSweptShapes(ix,b,ax,ay,ex,ey,moving);
  for(var i=0;i<moving.length;i++){
   var s=moving[i];if(s.hp>0&&movingShapeHitT(g,s,ax,ay,ex,ey,b.r+s.r)!=null)return true;
