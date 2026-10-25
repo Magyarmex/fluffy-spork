@@ -828,3 +828,32 @@ for(const hz of [30,60,120,240]){
   });
  }
 }
+
+
+/* Additional red/green gates: hostile drone contact must be ordered against
+ * terrain and projectile interception, not awarded merely because its body
+ * intersects the TTL-limited segment. */
+for(const hz of [30,60,120,240]){
+ test('earlier permanent wall vetoes TTL-first drone hit at '+hz+'Hz',()=>{
+  const g=isolatedWorld({x:100,vx:12000,ttl:.004,drones:[{
+   kind:'drone',id:7,ownerId:2,x:30,y:0,r:8,hp:20
+  }],terrain:[{id:-1,shape:'rect',x:10,y:0,w:2,h:70,solid:true,destructible:false}]});
+  g.updateBullets(1/hz);
+  assert.equal(g.hits,0,'terrain at x≈9 occurs before drone contact x≈18');
+ });
+ test('[RED] drone contact precedes a later wall at '+hz+'Hz',()=>{
+  const g=isolatedWorld({x:100,vx:12000,ttl:.004,drones:[{
+   kind:'drone',id:7,ownerId:2,x:30,y:0,r:8,hp:20
+  }],terrain:[{id:-1,shape:'rect',x:40,y:0,w:2,h:70,solid:true,destructible:false}]});
+  g.updateBullets(1/hz);
+  assert.equal(g.hits,1,'drone at x≈18 must win over later wall x≈39');
+ });
+}
+test('earlier competing projectile vetoes speculative TTL drone contact',()=>{
+ const g=isolatedWorld({x:100,vx:12000,ttl:.004,drones:[{
+  kind:'drone',id:7,ownerId:2,x:30,y:0,r:8,hp:20
+ }],otherBullets:[{kind:'bullet',id:99,ownerId:3,x:10,y:0,
+  vx:0,vy:0,r:3,ttl:1,pen:0,hits:0,dead:false}]});
+ g.updateBullets(1/30);
+ assert.equal(g.hits,0);
+});
