@@ -7,6 +7,7 @@ const fs=require('node:fs'),path=require('node:path');
 const root=path.resolve(__dirname,'../..');
 const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const battlefield=fs.readFileSync(path.join(root,'nova-updates/battlefield-v1.6.0.js'),'utf8');
+const perf=fs.readFileSync(path.join(root,'nova-updates/performance-v1.7.8.js'),'utf8');
 function coreBullets(){
  const marker='    updateBullets(dt) {',at=html.indexOf(marker);
  assert.ok(at>=0,'materialized core method absent');
@@ -19,13 +20,13 @@ function coreBullets(){
    clamp:(x,lo,hi)=>Math.max(lo,Math.min(hi,x))},
   {CLASSES:{scout:{size:15}}},2250);
 }
-function boot(){
+function boot(withPerf=false){
  class Game{
   constructor(){
    this.bullets=[];this.shapes=[];this.tanks=[];this.drones=[];
    this.tmp=[];this.time=1;this.__novaTerrain=[];this.hits=[];
    this.cam={shake:0};this.sfx={explode(){}};
-   this.hash={query:(x,y,r,out)=>{
+   this.hash={cell:180,clear(){},insert(){},query:(x,y,r,out)=>{
     out.length=0;
     for(const e of this.shapes)
      if(Math.hypot(e.x-x,e.y-y)<=r+(e.r||0))out.push(e);
@@ -43,6 +44,7 @@ function boot(){
   this.time+=dt;
   if(this.__testShapeMotion)this.__testShapeMotion(dt);
   else for(const s of this.shapes){s.x+=(s.vx||0)*dt;s.y+=(s.vy||0)*dt;}
+  if(this.hash.clear&&this.hash.insert){this.hash.clear();for(const s of this.shapes)this.hash.insert(s);}
   this.updateBullets(dt);
  };
  Game.prototype.damageShape=function(s,dmg){s.hp-=dmg;this.hits.push(s.id);};
@@ -55,6 +57,7 @@ function boot(){
  };
  const window={__novaModules:modules};
  new Function('window','console',battlefield)(window,{info(){},warn(){},error(){}});
+ if(withPerf)new Function('window','console',perf)(window,{info(){},warn(){},error(){}});
  const m={exports:{}};
  modules['game/engine'](m,m.exports,id=>id.includes('classes')
   ?{CLASSES:{scout:{size:15}}}:{ARENA_HALF:2250});
@@ -63,8 +66,8 @@ function boot(){
 function bullet(){return{id:3,kind:'bullet',ownerId:1,
  x:0,y:0,vx:1500,vy:0,r:3,dmg:10,pen:0,ttl:1,
  hits:0,dead:false,shell:false,beam:false};}
-function world(fps,initialY,vy){
- const g=boot(),dt=1/fps;
+function world(fps,initialY,vy,withPerf=false){
+ const g=boot(withPerf),dt=1/fps;
  const s={id:5,kind:'shape',type:'crasher',x:10,y:initialY,
   vx:0,vy,r:15,hp:20,maxHp:20};
  g.shapes=[s];g.bullets=[bullet()];
@@ -151,3 +154,12 @@ test('seeded moving-shape contacts agree with independent relative-motion oracle
  assert.ok(checked>=995);
  assert.ok(expectedHits>100,'oracle exercised actual contacts');
 });
+
+for(const fps of [30,60,120,240]){
+ test('Zero Churn shipping composition: moving Crasher hit at '+fps+' Hz',()=>{
+  assert.equal(world(fps,17,105,true).hits,1);
+ });
+ test('Zero Churn shipping composition: no phantom at '+fps+' Hz',()=>{
+  assert.equal(world(fps,20.5,-105,true).hits,0);
+ });
+}
