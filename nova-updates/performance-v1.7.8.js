@@ -365,7 +365,7 @@ wrap('game/engine',function(engine,require){
    * executes before Three Disciplines. No combat state is modified here. */
   function chronoFuseBeforeWall(g,b,dt){
     if(!b.shell||!b.__v17Cannon||!(b.__v17FuseDist>2)||
-       typeof g.firstTerrainHit!=='function'||!(b.ttl>0)||
+       !g.__novaTerrain||typeof g.firstTerrainHit!=='function'||!(b.ttl>0)||
        !Number.isFinite(b.x)||!Number.isFinite(b.y)||
        !Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
        !Number.isFinite(b.__v17SpawnX)||!Number.isFinite(b.__v17SpawnY))return null;
