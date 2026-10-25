@@ -103,7 +103,9 @@ test('WASD plus mouse aligns the gun with the canonical Controller live command'
   nearestTank(){return null},lerpAngle(a,b,t){return a+(b-a)*Math.min(1,t)}};
  playerAim.call(g,1/60,{angleDiff:()=>0});
  updateCommand(g,owner,state,{droneLeash:650},1/60);
- assert.ok(Math.abs(owner.angle-state.angle)<1e-8,
-  'mouse pointer and live swarm command must share the same bearing');
- assert.ok(owner.angle<0&&state.active,'northward mouse should command north despite eastward WASD');
+ assert.ok(Math.abs(state.angle+Math.PI/2)<1e-8,
+  'live swarm uses raw northward mouse bearing');
+ assert.ok(Math.abs(owner.angle-(-Math.PI/2)*(13/60))<1e-8,
+  'cannon correctly smooths toward that same northward bearing');
+ assert.ok(state.active,'eastward WASD cannot recall or redirect the northward mouse command');
 });
