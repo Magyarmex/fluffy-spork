@@ -640,3 +640,89 @@ test('terrain occlusion outranks Guardian taunt ambiguity', () => {
   assert.equal(s.terrainOccludedBodyContacts, 1);
   assert.equal(s.defenseAmbiguousBodyContacts, 0);
 });
+
+
+/* Run 337: first physical body may be a neutral shape or drone, not a tank.
+ * These are opt-in diagnostic assertions against the materialized core and
+ * actual Sniper/Battlefield/Performance overlay composition. */
+function auditShape(id, x, y = 0, hp = 20) {
+  return { id, kind: 'shape', type: 'circle', x, y, r: 5, hp, maxHp: 20 };
+}
+function auditDrone(id, ownerId, x, y = 0, hp = 20) {
+  return { id, kind: 'drone', ownerId, x, y, r: 5, hp, maxHp: 20 };
+}
+for (const fps of [30, 60, 120]) {
+  test('shadow first-contact ordering includes neutral shapes at ' + fps + 'Hz', () => {
+    const { g } = boot(), tank = addScout(g, 40), shape = auditShape(51, 12);
+    g.shapes = [shape];
+    g.bullets = [ordinaryShot(9300 + fps)];
+    g.updateBullets(1 / fps);
+    const s = g.novaChronoShadowSnapshot();
+    assert.equal(s.predictedBodyContacts, 1);
+    assert.equal(s.unregisteredBodyContacts, 1);
+    assert.equal(s.events[0].targetId, shape.id);
+    assert.equal(s.events[0].targetKind, 'shape');
+    assert.ok(Math.abs(s.events[0].expectedX - 4) < 1e-8);
+    assert.equal(shape.hp, 20);
+    assert.equal(tank.hp, 100);
+  });
+}
+test('shadow resolves earliest drone before shape and tank without touching combat', () => {
+  const { g } = boot(), tank = addScout(g, 40);
+  const shape = auditShape(51, 12), drone = auditDrone(61, 9, 12);
+  g.shapes = [shape]; g.drones = [drone];
+  g.bullets = [ordinaryShot(9340)];
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.predictedBodyContacts, 1);
+  assert.equal(s.events[0].targetId, drone.id);
+  assert.equal(s.events[0].targetKind, 'drone');
+  assert.ok(Math.abs(s.events[0].expectedX - 3) < 1e-8);
+  assert.equal(drone.hp, 20);
+  assert.equal(shape.hp, 20);
+  assert.equal(tank.hp, 100);
+});
+test('friendly drone cannot shadow a valid neutral first contact', () => {
+  const { g } = boot(); addScout(g, 40);
+  g.shapes = [auditShape(51, 12)];
+  g.drones = [auditDrone(61, 1, 12)];
+  g.bullets = [ordinaryShot(9341)];
+  g.updateBullets(1 / 30);
+  const event = g.novaChronoShadowSnapshot().events[0];
+  assert.equal(event.targetId, 51);
+  assert.equal(event.targetKind, 'shape');
+});
+test('allied owner metadata excludes allied drones but not hostile drones', () => {
+  for (const allied of [true, false]) {
+    const { g } = boot(); addScout(g, 40);
+    const shooter = { id: 1, teamId: 'blue' }, other = { id: 9, teamId: allied ? 'blue' : 'red' };
+    g.getTank = id => id === 1 ? shooter : id === 9 ? other : null;
+    g.areAllies = (a, b) => a.teamId === b.teamId;
+    g.drones = [auditDrone(61, 9, 12)];
+    g.bullets = [ordinaryShot(9342)];
+    g.updateBullets(1 / 30);
+    const event = g.novaChronoShadowSnapshot().events[0];
+    assert.equal(event.targetKind, allied ? 'tank' : 'drone');
+    assert.equal(event.targetId, allied ? 2 : 61);
+  }
+});
+test('dead or unreachable shapes and drones do not hide a reachable tank', () => {
+  const { g } = boot(); addScout(g, 40);
+  g.shapes = [auditShape(51, 12, 0, 0), auditShape(52, 100)];
+  g.drones = [auditDrone(61, 9, 12, 0, 0), auditDrone(62, 9, 100)];
+  g.bullets = [ordinaryShot(9343)];
+  g.updateBullets(1 / 30);
+  const event = g.novaChronoShadowSnapshot().events[0];
+  assert.equal(event.targetId, 2);
+  assert.equal(event.targetKind, 'tank');
+});
+test('crowded entity arrays fail closed rather than misattribute an unscanned first contact', () => {
+  const { g } = boot(); addScout(g, 40);
+  g.shapes = Array.from({ length: 161 }, (_, i) => auditShape(1000 + i, i === 0 ? 12 : 500));
+  g.bullets = [ordinaryShot(9344)];
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.sampledShortShots, 1);
+  assert.equal(s.predictedBodyContacts, 0);
+  assert.equal(s.unregisteredBodyContacts, 0);
+});
