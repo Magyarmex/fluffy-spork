@@ -608,10 +608,28 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   var dx=b.vx*dt,dy=b.vy*dt,limit=b.ttl/dt;
   if(!Number.isFinite(dx)||!Number.isFinite(dy)||!(dx*dx+dy*dy>1e-12)||
      Math.abs(b.x)>=MAP_LIMIT-20||Math.abs(b.y)>=MAP_LIMIT-20)return false;
-  /* Moving drones have no trustworthy same-tick start snapshot in this
-   * composition. Defer their battles instead of inventing static contacts. */
-  if(g.drones&&g.drones.some(function(d){return d&&d.hp>0;}))return false;
-  var best=null,bestT=limit,tie=false,uncertain=false,ax=b.x,ay=b.y;
+  /* A live drone may intercept this projectile before the body. Only
+   * exclude a drone when its complete observed movement corridor is remote.
+   * Missing/newborn, nonfinite or discontinuous histories remain ambiguous. */
+  var ax=b.x,ay=b.y,ex=ax+dx*limit,ey=ay+dy*limit;
+  var drones=g.drones||[];
+  for(var di=0;di<drones.length;di++){
+   var dr=drones[di];if(!dr||!(dr.hp>0))continue;
+   if(!g.__novaShapeSweepActive||
+      dr.__novaChronoDroneEpoch!==g.__novaShapeSweepEpoch)return false;
+   var sx=dr.__novaChronoDronePrevX,sy=dr.__novaChronoDronePrevY;
+   if(!Number.isFinite(sx)||!Number.isFinite(sy)||
+      !Number.isFinite(dr.x)||!Number.isFinite(dr.y))return false;
+   var mx=dr.x-sx,my=dr.y-sy;
+   if(mx*mx+my*my>96*96)return false;
+   var pad=Math.max(0,b.r||2)+Math.max(0,dr.r||8)+1+
+     Math.max(30,dt*800);
+   if(Math.max(ax,ex)+pad>=Math.min(sx,dr.x)&&
+      Math.min(ax,ex)-pad<=Math.max(sx,dr.x)&&
+      Math.max(ay,ey)+pad>=Math.min(sy,dr.y)&&
+      Math.min(ay,ey)-pad<=Math.max(sy,dr.y))return false;
+  }
+  var best=null,bestT=limit,tie=false,uncertain=false;
   function consider(e,kind){
    if(!e)return;
    var rr=0,sx=e.x,sy=e.y,mx=0,my=0;
