@@ -816,7 +816,7 @@ test('remote moving drone does not erase a genuine first tank contact diagnostic
   g.updateBullets(1/30);
   const s=g.novaChronoShadowSnapshot();
   assert.equal(s.predictedBodyContacts,1,
-    'distant drone movement cannot globally suppress a real tank contact');
+    'distant drone movement cannot globally suppress a real tank contact; snapshot='+JSON.stringify(s)+' hp='+tank.hp);
   assert.equal(s.registeredBodyContacts,1);
   assert.equal(tank.hp,80);
 });
