@@ -1,6 +1,6 @@
 'use strict';
-// Chronological Cannon fuse-before-terrain regression for #147/#193. Actual shipping overlay order is\n// Battlefield -> Three Disciplines -> Performance (when present).\n// Do not merge until a chronological
-// resolver orders Cannon fuse and terrain BEFORE applying either side effect.
+// Bounded first-fuse-before-later-terrain acceptance tests for #147/#193.
+// Execute the materialized core in Battlefield -> Disciplines -> Performance order.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -60,17 +60,18 @@ function boot(performance) {
   return m.exports.Game;
 }
 
-function run(Game,hz,withWall=true,{startX=146,wallX=168,vx=380}={}){
+function run(Game,hz,withWall=true,{startX=146,wallX=168,vx=380,ttl=2,pen=1,cover=false,extras=null}={}){
   const g=new Game(),bursts=[];
   g.time=1;g.__novaBattlefield={coverBroken:0};
   g.__novaTerrain=withWall?[{id:-51,shape:'rect',x:wallX,y:0,w:20,h:80,
-    solid:true,destructible:false}]:[];
+    solid:true,destructible:cover,hp:cover?100:0}]:[];
   g.clusterBurst=b=>bursts.push({x:b.x,y:b.y});
   g.weakenBullet=()=>{};
   g.bullets=[{kind:'bullet',id:777,ownerId:1,x:startX,y:0,
-    vx,vy:0,r:8.5,dmg:26,ttl:2,shell:true,pen:1,hits:0,dead:false,
+    vx,vy:0,r:8.5,dmg:26,ttl,shell:true,pen,hits:0,dead:false,
     __v17Cannon:true,__v17FuseDist:150,__v17SpawnX:0,__v17SpawnY:0,
     __v17FuseArmed:false,splash:72,splashDmg:.4,color:'#ffb45e'}];
+  if(extras)extras(g);
   for(let frame=0;frame<10&&g.bullets.length;frame++){
     g.time+=1/hz;g.updateBullets(1/hz);
   }
@@ -121,4 +122,60 @@ for(const optimized of [false,true]){
         'wall pre-pass must not override earlier fuse; burst x='+bursts[0].x);
     });
   }
+}
+
+/* Negative controls: this correction must not steal authority from earlier
+ * terrain, nearby bodies, moving drones, competing projectiles or expiry. */
+for (const optimized of [false,true]) {
+  const Game=boot(optimized),prefix=optimized?'optimized':'baseline';
+  test(prefix+' earlier wall still wins before Cannon fuse',()=>{
+    const {bursts}=run(Game,30,true,{wallX:160});
+    assert.equal(bursts.length,1);
+    assert.ok(bursts[0].x<148);
+  });
+  test(prefix+' later destructible cover is not damaged by pre-fuse collision',()=>{
+    const {g,bursts}=run(Game,30,true,{cover:true});
+    assert.equal(bursts.length,1);
+    assert.ok(Math.abs(bursts[0].x-150)<1e-6);
+    assert.equal(g.__novaTerrain[0].hp,100);
+  });
+  test(prefix+' distant live opponent does not prevent valid fuse',()=>{
+    const {bursts}=run(Game,30,true,{extras:g=>{
+      g.tanks=[{id:2,kind:'tank',cls:'scout',x:1000,y:1000,alive:true}];
+    }});
+    assert.equal(bursts.length,1);
+    assert.ok(Math.abs(bursts[0].x-150)<1e-6);
+  });
+  test(prefix+' near hostile tank keeps chronology conservative',()=>{
+    const {bursts}=run(Game,30,true,{extras:g=>{
+      g.tanks=[{id:2,kind:'tank',cls:'scout',x:151,y:0,alive:true}];
+    }});
+    assert.equal(bursts.length,1);
+    assert.ok(bursts[0].x>150,'do not skip wall while a tank may be hit');
+  });
+  test(prefix+' live drone keeps chronology conservative',()=>{
+    const {bursts}=run(Game,30,true,{extras:g=>{
+      g.drones=[{id:4,kind:'drone',x:2000,y:2000,r:8,hp:50}];
+    }});
+    assert.equal(bursts.length,1);
+    assert.ok(bursts[0].x>150);
+  });
+  test(prefix+' potentially intercepting bullet keeps chronology conservative',()=>{
+    const {bursts}=run(Game,30,true,{extras:g=>{
+      g.bullets.push({kind:'bullet',id:778,ownerId:8,x:150,y:0,
+        vx:0,vy:0,r:3,dmg:5,ttl:2,pen:0,hits:0,dead:false});
+    }});
+    assert.equal(bursts.length,1);
+    assert.ok(bursts[0].x>150);
+  });
+  test(prefix+' short TTL does not trigger speculative fuse-first shortcut',()=>{
+    const {bursts}=run(Game,30,true,{ttl:.005});
+    assert.equal(bursts.length,1);
+    assert.ok(bursts[0].x>150);
+  });
+  test(prefix+' high penetration leaves original terrain authority intact',()=>{
+    const {bursts}=run(Game,30,true,{pen:2});
+    assert.equal(bursts.length,1);
+    assert.ok(bursts[0].x>150);
+  });
 }
