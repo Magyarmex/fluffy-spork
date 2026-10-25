@@ -110,9 +110,15 @@ function chooseTarget(g,classes,observer,a,now){
 }
 function replanDelay(t){return (t&&t.ai&&t.ai.isElite?ELITE_REPLAN:NORMAL_REPLAN)+(Math.abs(Number(t&&t.id)||0)%4)*.009;}
 function fairTarget(g,classes,t,now){
-  var a=t.ai||{},cur=a.__v1112TargetId>=0&&g.getTank?g.getTank(a.__v1112TargetId):null;
+  var a=t.ai||{},previousId=a.__v1112TargetId;
+  var cur=previousId>=0&&g.getTank?g.getTank(previousId):null;
   var valid=cur&&alive(cur)&&hostile(g,t,cur)&&canPerceive(g,classes,t,cur)&&!(cur.spawnShieldT>0);
-  if(!valid||now>=Number(a.__v1112NextThink||0)){
+  /* An empty target slot is not permission to rescan every tank every frame.
+   * When nobody is perceptible, keep the normal bounded reaction cadence.
+   * A formerly valid target that dies, hides or gains spawn protection must
+   * still be dropped and replaced immediately, even between think ticks. */
+  if(!valid){cur=null;a.__v1112TargetId=-1;}
+  if(now>=Number(a.__v1112NextThink||0)||(previousId>=0&&!valid)){
     cur=chooseTarget(g,classes,t,a,now);
     a.__v1112TargetId=cur?cur.id:-1;
     a.__v1112NextThink=now+replanDelay(t);
