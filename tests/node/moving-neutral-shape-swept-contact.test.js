@@ -239,3 +239,12 @@ for(const fps of [30,60,120,240]){
   assert.equal(g.hits.length,0);
  });
 }
+
+test('moving shape can cross a nearly stationary projectile in one frame',()=>{
+ const g=boot(),s={id:5,kind:'shape',type:'crasher',x:0,y:-25,
+  vx:0,vy:1500,r:15,hp:20,maxHp:20};
+ g.shapes=[s];g.bullets=[{...bullet(),vx:0}];
+ g.update(1/30);
+ assert.deepEqual(g.hits,[5]);
+ assert.equal(s.hp,10);
+});
