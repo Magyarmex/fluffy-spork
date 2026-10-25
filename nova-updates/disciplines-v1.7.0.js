@@ -122,7 +122,7 @@ wrap('game/classes',function(c){
     clusterking:'Programs entire sectors: precise fuse placement turns ten-child clusters into deliberate area traps.',
     siegebomber:'Slow siege shells reward patient fuse placement and brutal, intentional breaches through cover.',
     annihilator:'One enormous spatial commitment. Put the detonation exactly where the opponent has to be.',
-    quakecannon:'Shock artillery that rewards deliberate blast placement, lane denial and terrain destruction.',
+    quake:'Shock artillery that rewards deliberate blast placement, lane denial and terrain destruction.',
     guard:'Directional vanguard armor. Your aim direction is also your strongest facing.',
     fortress:'A walking bunker whose defense is strongest only where the player deliberately points it.',
     juggernaut:'Build Stampede momentum by holding a clean line; sharp turns sacrifice impact force.',
@@ -232,9 +232,9 @@ wrap('game/engine',function(engine,require){
 
   function inputDepth(g,t){return cannonInputDepth(g,t);}
   function cannonProfile(t){
-    var heavy=t.cls==='siegebomber'||t.cls==='annihilator'||t.cls==='quakecannon';
+    var heavy=t.cls==='siegebomber'||t.cls==='annihilator'||t.cls==='quake';
     var cluster=t.cls==='bomber'||t.cls==='clusterking'||t.cls==='siegebomber';
-    return{heavy:heavy,cluster:cluster,structure:t.cls==='annihilator'||t.cls==='quakecannon'?1.9:t.cls==='siegebomber'?1.75:t.cls==='demolisher'?1.55:1.35};
+    return{heavy:heavy,cluster:cluster,structure:t.cls==='annihilator'||t.cls==='quake'?1.9:t.cls==='siegebomber'?1.75:t.cls==='demolisher'?1.55:1.35};
   }
   function annotateCannon(g,t,before,force){
     var depth=inputDepth(g,t);
