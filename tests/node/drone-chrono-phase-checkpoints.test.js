@@ -10,7 +10,7 @@ const root=path.resolve(__dirname,'../..');
 const battlefield=fs.readFileSync(path.join(root,'nova-updates/battlefield-v1.6.0.js'),'utf8');
 const live=fs.readFileSync(path.join(root,'nova-updates/second-body-live-vector-v1.10.7.js'),'utf8');
 
-function boot({trace=true,spawn=false,baseMotion=25,damaged=true}={}){
+function boot({trace=true,spawn=false,baseMotion=25,damaged=true,ownerX=100,ownerY=100}={}){
   class Game {
     update(dt){this.time+=dt;this.updateDrones(dt);}
     updateDrones(){
@@ -37,7 +37,7 @@ function boot({trace=true,spawn=false,baseMotion=25,damaged=true}={}){
     carrier:{droneLeash:650,size:15},gunner:{size:15}
   },lineageForClass:id=>id==='carrier'?'controller':'gunner'}));
   const owner={id:1,cls:'carrier',team:1,alive:true,isPlayer:true,
-    x:100,y:100,hp:100,maxHp:100,angle:0,swarmT:0,
+    x:ownerX,y:ownerY,hp:100,maxHp:100,angle:0,swarmT:0,
     __novaSwarm:{active:false,power:0}};
   const drone={id:11,ownerId:1,x:-30,y:0,r:8,hp:damaged?10:100,
     maxHp:100,speed:200,__novaPhase:'form',attackCd:1};
@@ -70,10 +70,22 @@ test('trace distinguishes initial, pre-terrain, post-terrain and post-Live-Vecto
   assert.equal(drone.__novaChronoDroneBaseY,0);
   assert.ok(drone.__novaChronoDroneTerrainX<=-19,
     'Battlefield moves the drone out of the wall after base movement');
-  assert.equal(drone.__novaChronoDroneTerrainY,0);
+  assert.ok(Number.isFinite(drone.__novaChronoDroneTerrainY));
+  assert.notEqual(drone.__novaChronoDroneTerrainY,drone.__novaChronoDroneBaseY,
+    'the real Battlefield terrain-bias recovery changes the lateral position');
   assert.equal(drone.__novaChronoDroneLiveX,drone.x);
   assert.equal(drone.__novaChronoDroneLiveY,drone.y);
-  assert.ok(drone.y>0,'Live Vector repair adds a distinct post-terrain movement');
+  assert.ok(Number.isFinite(drone.y),'postprocess produces a finite position');
+  assert.equal(g.isTerrainSafe(drone.x,drone.y,9),true);
+});
+test('unobstructed Live Vector repair is a separate observed movement stage',()=>{
+  const {g,drone}=boot({baseMotion:0,ownerX:-50,ownerY:100});
+  g.update(1/30);
+  assert.equal(drone.__novaChronoDroneBaseX,-30);
+  assert.equal(drone.__novaChronoDroneTerrainX,-30);
+  assert.ok(drone.__novaChronoDroneLiveY>drone.__novaChronoDroneTerrainY,
+    'postprocess moves toward owner after the Battlefield stage');
+  assert.equal(drone.__novaChronoDroneLiveEpoch,g.__novaShapeSweepEpoch);
   assert.equal(g.isTerrainSafe(drone.x,drone.y,9),true);
 });
 test('opt-in checkpoints do not alter gameplay state',()=>{
@@ -109,7 +121,8 @@ test('phase snapshots are not an authority for time of collision',()=>{
   const {g,drone}=boot();
   g.update(.2);
   assert.ok(drone.__novaChronoDroneBaseX>drone.__novaChronoDroneTerrainX);
-  assert.ok(drone.__novaChronoDroneLiveY>drone.__novaChronoDroneTerrainY);
+  assert.notEqual(drone.__novaChronoDroneBaseY,drone.__novaChronoDroneTerrainY,
+    'terrain correction is a separate physical stage');
   // Base movement crossed solid terrain and was corrected. An endpoint-only
   // interpolation would invent a physically impossible path through the wall.
   assert.equal(g.isTerrainSafe(drone.__novaChronoDroneBaseX,0,9),false);
