@@ -838,3 +838,18 @@ test('newborn drone without frame-start evidence cannot generate a backdated dia
   g.updateBullets(1/30);
   assert.equal(g.novaChronoShadowSnapshot().predictedBodyContacts,0);
 });
+
+
+test('observed intermediate drone motion defeats misleading identical frame endpoints',()=>{
+  const {g}=boot(),drone=auditDrone(9005,9,12,0);
+  g.drones=[drone];g.tanks=[];g.bullets=[ordinaryShot(9605)];
+  g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=3;
+  drone.__novaChronoDroneEpoch=3;
+  drone.__novaChronoDronePrevX=12;drone.__novaChronoDronePrevY=0;
+  drone.__novaChronoDroneTraceEpoch=3;
+  drone.__novaChronoDroneBaseX=12;drone.__novaChronoDroneBaseY=80;
+  drone.__novaChronoDroneTerrainX=12;drone.__novaChronoDroneTerrainY=0;
+  g.updateBullets(1/30);
+  assert.equal(g.novaChronoShadowSnapshot().predictedBodyContacts,0,
+    'a return to the same endpoint does not prove a stationary trajectory');
+});
