@@ -80,7 +80,7 @@ function shell(id, x, vx, ttl) {
 }
 
 for (const fps of [30, 60, 120, 240]) {
-  test('shipping overlay stack: TTL overshoot is observed at ' + fps + 'Hz', () => {
+  test('shipping overlay stack: isolated shell expires at its physical position at ' + fps + 'Hz', () => {
     const { g, window } = boot();
     g.bullets = [shell(1, 0, 6000, 0.005)];
     const frames = Math.ceil(0.005 * fps);
@@ -88,11 +88,11 @@ for (const fps of [30, 60, 120, 240]) {
     const s = g.novaChronoShadowSnapshot();
     assert.equal(s.frames, frames);
     assert.equal(s.sampledShells, frames);
-    assert.equal(s.ttlOvershoots, 1);
+    assert.equal(s.ttlOvershoots, 0);
     assert.equal(s.arenaOvershoots, 0);
     assert.equal(window.__NOVA_CHRONO_SHADOW_LAST__, g.__novaChronoShadow);
     assert.equal(g.burstOrigins.length, 1);
-    assert.ok(Math.abs(g.burstOrigins[0].x - 6000 * frames / fps) < 1e-8);
+    assert.ok(Math.abs(g.burstOrigins[0].x - 30) < 1e-8);
   });
 }
 
@@ -109,7 +109,7 @@ test('shipping Battlefield: wall before expiry is not a false alarm', () => {
   assert.ok(g.burstOrigins[0].x <= 81);
 });
 
-test('shipping Battlefield: wall beyond TTL is correctly flagged', () => {
+test('shipping Battlefield: wall beyond TTL cannot steal an earlier shell expiry', () => {
   const { g } = boot();
   g.__novaTerrain = [{ id: -2, shape: 'rect', x: 100, y: 0,
     w: 40, h: 80, solid: true, destructible: false }];
@@ -117,8 +117,9 @@ test('shipping Battlefield: wall beyond TTL is correctly flagged', () => {
   g.updateBullets(1 / 30);
   const s = g.novaChronoShadowSnapshot();
   assert.equal(s.bursts, 1);
-  assert.equal(s.ttlOvershoots, 1);
-  assert.ok(s.events[0].expectedX < g.burstOrigins[0].x);
+  assert.equal(s.ttlOvershoots, 0);
+  assert.ok(Math.abs(g.burstOrigins[0].x - 30) < 1e-8);
+  assert.equal(g.__novaTerrain[0].solid, true);
 });
 
 test('shipping Sniper interception: early physical burst is not an overshoot', () => {
