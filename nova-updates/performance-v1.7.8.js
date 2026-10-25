@@ -126,13 +126,13 @@ wrap('game/input',function(input){
     if(canvas&&canvas.getBoundingClientRect&&!this.__novaRectOriginal){
       var self=this,original=canvas.getBoundingClientRect.bind(canvas);
       this.__novaRectOriginal=original;
-      function refresh(){try{self.__novaCachedRect=original();}catch(_){}}
+      function refresh(){try{var oldRect=self.__novaCachedRect,nextRect=original();if(oldRect){var shiftX=oldRect.left-nextRect.left,shiftY=oldRect.top-nextRect.top;if(Number.isFinite(shiftX)&&Number.isFinite(shiftY)&&(shiftX||shiftY)){/* Stick origins are canvas-relative. Preserve held-finger vectors when the viewport pans underneath them. */if(self.move&&self.move.active){self.move.ox+=shiftX;self.move.oy+=shiftY;}if(self.aim&&self.aim.active){self.aim.ox+=shiftX;self.aim.oy+=shiftY;}}}self.__novaCachedRect=nextRect;}catch(_){}}
       this.__novaRectRefresh=refresh;refresh();
       canvas.getBoundingClientRect=function(){return self.__novaCachedRect||original();};
       if(typeof window!=='undefined'){
         window.addEventListener('resize',refresh,{passive:true});
         window.addEventListener('scroll',refresh,{passive:true,capture:true});
-        if(window.visualViewport)window.visualViewport.addEventListener('resize',refresh,{passive:true});
+        if(window.visualViewport){window.visualViewport.addEventListener('resize',refresh,{passive:true});window.visualViewport.addEventListener('scroll',refresh,{passive:true});}
       }
       if(typeof ResizeObserver!=='undefined')try{this.__novaRectObserver=new ResizeObserver(refresh);this.__novaRectObserver.observe(canvas);}catch(_){}
     }
@@ -142,7 +142,7 @@ wrap('game/input',function(input){
     if(this.__novaStickPaintRaf&&typeof cancelAnimationFrame==='function'){cancelAnimationFrame(this.__novaStickPaintRaf);this.__novaStickPaintRaf=0;}
     var canvas=this.canvas,refresh=this.__novaRectRefresh;
     if(canvas&&this.__novaRectOriginal)canvas.getBoundingClientRect=this.__novaRectOriginal;
-    if(typeof window!=='undefined'&&refresh){window.removeEventListener('resize',refresh);window.removeEventListener('scroll',refresh,true);if(window.visualViewport)window.visualViewport.removeEventListener('resize',refresh);}
+    if(typeof window!=='undefined'&&refresh){window.removeEventListener('resize',refresh);window.removeEventListener('scroll',refresh,true);if(window.visualViewport){window.visualViewport.removeEventListener('resize',refresh);window.visualViewport.removeEventListener('scroll',refresh);}}
     if(this.__novaRectObserver){try{this.__novaRectObserver.disconnect();}catch(_){}this.__novaRectObserver=null;}
     this.__novaRectOriginal=null;this.__novaCachedRect=null;this.__novaRectRefresh=null;this.__novaStickDom=null;
     return oldDetach.call(this);
