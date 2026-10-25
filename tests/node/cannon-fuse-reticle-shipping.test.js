@@ -97,3 +97,38 @@ test('held stick depth changes preview before next shot',()=>{
  g.input.aim.dx=59;g.input.aim.dy=0;const p2=render();
  assert.ok(p2.x>p1.x+40);g.tryFire(t);
  const q=predicted(g.bullets[0]);near(p2.x,q.x,'x');near(p2.y,q.y,'y');});
+
+
+/* At full stick deflection the historic range formula could program a fuse
+ * beyond the projectile's remaining TTL. Cannon then vanished without an
+ * airburst; Bomber burst only at TTL expiry, not at the displayed reticle. */
+for(const cls of ['cannon','bomber'])for(const fps of [30,60,120,240]){
+ test(cls+' full stick '+fps+'Hz: programmed fuse must be reachable before TTL',()=>{
+ const {g,t,render,bursts}=boot(cls,'stick',.32);
+ g.input.aim.dx=65;g.input.aim.dy=0;
+ const preview=render();g.tryFire(t);
+ const b=g.bullets[0],maxTravel=Math.hypot(b.vx,b.vy)*Math.max(0,b.ttl-.033);
+ assert.ok(b.__v17FuseDist<=maxTravel+1e-6,
+   'programmed distance '+b.__v17FuseDist+' exceeds safe lifetime travel '+maxTravel);
+ for(let i=0;i<Math.ceil(1.2*fps)&&g.bullets.length;i++){
+   g.updateBullets(1/fps);g.time+=1/fps;
+ }
+ const hit=bursts.find(x=>x.kind===('bomber'===cls?'cluster':'splash'));
+ assert.ok(hit,'full stick must actually airburst rather than expire');
+ near(hit.x,preview.x,'full-depth x',2.01);near(hit.y,preview.y,'full-depth y',2.01);
+ });
+}
+test('moving hull reduces reachable fuse distance without changing mid-depth',()=>{
+ const {g,t,render}=boot('bomber','stick',0,-200,0);
+ g.input.aim.dx=65;g.input.aim.dy=0;const p=render();g.tryFire(t);
+ const b=g.bullets[0],travel=Math.hypot(b.vx,b.vy)*(b.ttl-.033);
+ assert.ok(b.__v17FuseDist<=travel+1e-6);
+ const q=predicted(b);near(p.x,q.x,'moving x');near(p.y,q.y,'moving y');
+});
+test('ordinary mid-depth fuse program retains its original range formula',()=>{
+ const {g,t}=boot('cannon','stick',0);
+ g.input.aim.dx=32.5;g.input.aim.dy=0;g.tryFire(t);
+ const depth=(32.5-5)/55,range=g.weaponRange(t);
+ const original=Math.max(150,Math.min(range*.965,range*(.20+.78*depth)));
+ near(g.bullets[0].__v17FuseDist,original,'unchanged mid-depth');
+});

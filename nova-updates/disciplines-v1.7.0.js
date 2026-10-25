@@ -67,9 +67,24 @@ function cannonInputDepth(g,t){
   }
   return null;
 }
-function cannonFuseDistance(g,t,depth){
+/* The shipping RAF clamps simulation steps to 0.033s. A fuse beyond the
+ * last surviving step can never fire: core TTL expiry removes the projectile
+ * before Three Disciplines can detonate it. Only cap otherwise unreachable
+ * programs; do not change mid-depth fuses or weapon speed/lifetime. */
+function cannonReachableFuse(raw,speed,ttl){
+  if(!Number.isFinite(speed)||speed<=0||!Number.isFinite(ttl))return raw;
+  return Math.min(raw,Math.max(0,speed*(ttl-.033)));
+}
+function cannonFuseDistance(g,t,depth,def){
   var range=g.weaponRange?g.weaponRange(t):650;
-  return clamp(range*(.20+.78*depth),150,range*.965);
+  var raw=clamp(range*(.20+.78*depth),150,range*.965);
+  if(!def||!def.bullet)return raw;
+  var speed=g.bulletSpeed?g.bulletSpeed(t):def.bullet.speed;
+  if(!Number.isFinite(speed))return raw;
+  var a=t.angle||0,vx=Math.cos(a)*speed+(t.vx||0)*.22;
+  var vy=Math.sin(a)*speed+(t.vy||0)*.22;
+  var ttl=def.bullet.ttl==null?1.05:def.bullet.ttl;
+  return cannonReachableFuse(raw,Math.hypot(vx,vy),ttl);
 }
 function ad(target,current){var d=(target-current+Math.PI)%TAU;if(d<0)d+=TAU;return d-Math.PI;}
 function moveAngle(current,target,max){return current+clamp(ad(target,current),-max,max);}
@@ -225,11 +240,12 @@ wrap('game/engine',function(engine,require){
     var depth=inputDepth(g,t);
     if(depth==null&&!force)return;
     if(depth==null)depth=.82;
-    var range=g.weaponRange?g.weaponRange(t):650,dist=cannonFuseDistance(g,t,depth),prof=cannonProfile(t);
+    var range=g.weaponRange?g.weaponRange(t):650,dist=cannonFuseDistance(g,t,depth,C[t.cls]),prof=cannonProfile(t);
     for(var i=before;i<g.bullets.length;i++){
       var b=g.bullets[i];if(!b||b.ownerId!==t.id)continue;
-      b.__v17Cannon=true;b.__v17FuseDist=dist;b.__v17SpawnX=b.x;b.__v17SpawnY=b.y;
-      b.__v17FuseArmed=dist>210;b.__novaStructureMult=prof.structure;
+      var shotDist=cannonReachableFuse(dist,Math.hypot(b.vx||0,b.vy||0),b.ttl);
+      b.__v17Cannon=true;b.__v17FuseDist=shotDist;b.__v17SpawnX=b.x;b.__v17SpawnY=b.y;
+      b.__v17FuseArmed=shotDist>210;b.__novaStructureMult=prof.structure;
       b.__v17FuseHeavy=prof.heavy;b.__v17FuseCluster=!!b.shell;
     }
     t.__v17FuseDepth=depth;t.__v17FuseDist=dist;t.__v17FuseRange=range;
@@ -452,7 +468,7 @@ wrap('game/render',function(renderMod,require){
   }
   function cannonDepth(g,t){
     var depth=cannonInputDepth(g,t);
-    return cannonFuseDistance(g,t,depth==null?.72:depth);
+    return cannonFuseDistance(g,t,depth==null?.72:depth,C[t.cls]);
   }
   function drawCannon(ctx,g,t){
     if(!t.isPlayer)return;
