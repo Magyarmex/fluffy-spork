@@ -725,7 +725,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   var wallT=((hit.x-ox)*dx+(hit.y-oy)*dy)/A;
   if(!(wallT>fuseT+1e-7&&wallT<=1+1e-7))return false;
   var px=ox+dx*fuseT,py=oy+dy*fuseT;
-  if(Math.abs(px)>=MAP_LIMIT-20||Math.abs(py)>=MAP_LIMIT-20)return false;
+  /* The core checks the full-frame endpoint for arena exit before the
+   * post-core fuse handler can fire. Do not skip a wall if that would
+   * turn its existing burst into a silent out-of-bounds deletion. */
+  if(Math.abs(px)>=MAP_LIMIT-20||Math.abs(py)>=MAP_LIMIT-20||
+     Math.abs(nx)>=MAP_LIMIT-20||Math.abs(ny)>=MAP_LIMIT-20)return false;
   /* Drones have no trustworthy frame-start position in this wrapper. */
   var drones=g.drones||[];
   for(var di=0;di<drones.length;di++)if(drones[di]&&drones[di].hp>0)return false;
