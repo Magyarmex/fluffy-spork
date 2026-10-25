@@ -107,7 +107,8 @@ for (const optimized of [false, true]) {
   });
   test(label + ': penetrating destructible cover retains shell until actual expiry', () => {
     const { bursts, b, g } = fire(boot(optimized), {
-      destructible: true, pen: 3, ttl: 0.005,
+      destructible: true, pen: 3, ttl: 0.005, vx: 12000,
+      // Padded wall contact occurs before expiry, not after it.
     });
     assert.equal(g.__novaTerrain[0].solid, false);
     assert.equal(b.__novaBreachAtTime, g.time, 'surviving cover breach must be stamped');
