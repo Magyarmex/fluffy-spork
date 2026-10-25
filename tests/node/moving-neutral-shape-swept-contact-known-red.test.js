@@ -97,3 +97,19 @@ test('static shape outside bullet trajectory remains untouched', () => {
 test('materialized production loads Battlefield collision overlay', () => {
   assert.ok(html.includes('nova-updates/battlefield-v1.6.0.js'));
 });
+
+test('moving Crasher cannot receive a phantom hit from its later endpoint', () => {
+  const g = boot(), dt = 1 / 30;
+  const s = { id: 5, kind: 'shape', type: 'crasher', x: 10,
+    y: 20.5, r: 15, hp: 20, maxHp: 20 };
+  g.shapes = [s];
+  g.bullets = [{ id: 3, kind: 'bullet', ownerId: 1,
+    x: 0, y: 0, vx: 1500, vy: 0, r: 3, dmg: 10,
+    pen: 0, ttl: 1, hits: 0, dead: false, shell: false, beam: false }];
+  // At the time the bullet passes x=10, the Crasher is still above
+  // the combined 18-unit radius. It moves into the corridor only later.
+  s.y -= 105 * dt;
+  g.updateBullets(dt);
+  assert.equal(g.hits.length, 0, 'endpoint-only sweep invented a past collision');
+  assert.equal(s.hp, 20);
+});
