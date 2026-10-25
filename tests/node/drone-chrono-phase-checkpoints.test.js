@@ -161,6 +161,21 @@ test('a new frame invalidates previous optional stage epochs',()=>{
   assert.notEqual(drone.__novaChronoDroneTraceEpoch,g.__novaShapeSweepEpoch);
   assert.notEqual(drone.__novaChronoDroneLiveEpoch,g.__novaShapeSweepEpoch);
 });
+test('missing Terrain Intelligence cannot leave a falsely current route checkpoint',()=>{
+  const {g,drone}=boot({withTerrainIntelligence:false,trace:true,
+    baseMotion:0,damaged:false});
+  // A previous life/redeploy may reuse a numeric epoch; frame entry must
+  // explicitly invalidate every optional phase, even if an overlay is absent.
+  drone.__novaChronoDroneRouteEpoch=1;
+  drone.__novaChronoDroneRouteX=12345;
+  drone.__novaChronoDroneRouteY=12345;
+  g.update(1/60);
+  assert.equal(g.__novaShapeSweepEpoch,1);
+  assert.equal(drone.__novaChronoDroneTraceEpoch,1);
+  assert.equal(drone.__novaChronoDroneLiveEpoch,1);
+  assert.equal(drone.__novaChronoDroneRouteEpoch,-1,
+    'stale route position must not masquerade as this frame');
+});
 test('phase snapshots are not an authority for time of collision',()=>{
   const {g,drone}=boot();
   g.update(.2);
