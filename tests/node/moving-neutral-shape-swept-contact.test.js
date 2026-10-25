@@ -248,3 +248,15 @@ test('moving shape can cross a nearly stationary projectile in one frame',()=>{
  assert.deepEqual(g.hits,[5]);
  assert.equal(s.hp,10);
 });
+
+test('swept-shape index releases active references when the battlefield goes quiet',()=>{
+ const g=boot(),s={id:5,kind:'shape',type:'crasher',x:10,y:17,
+  vx:0,vy:105,r:15,hp:20,maxHp:20};
+ g.shapes=[s];g.bullets=[bullet()];g.update(1/30);
+ const ix=g.__novaSweptShapeGrid;
+ assert.ok(ix&&ix.active.length>0&&ix.all.length===1);
+ g.bullets=[];g.update(1/30);
+ assert.equal(ix.active.length,0);
+ assert.equal(ix.all.length,0);
+ for(const bucket of ix.cells.values())assert.equal(bucket.length,0);
+});
