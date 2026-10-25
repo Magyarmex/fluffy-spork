@@ -120,3 +120,35 @@ test('recent damage still delays Controller repair after enemies leave', () => {
   assert.equal(s.drone.hp, 30);
   assert.ok(s.drone.__lvRepairWait > 2.5);
 });
+
+test('a hostile tank near the drone, but beyond the owner-centered radius, still interrupts service', () => {
+  const s = scenario({ hostileX: 235 });
+  s.tick();
+  assert.equal(s.drone.hp, 30);
+});
+
+test('shipping Game.updateDrones gates multiple damaged drones with one owner scan per frame', () => {
+  const s = scenario({ hostileX: 100 });
+  const second = { ...s.drone, id: 11, x: 40, __lvLastHp: 30 };
+  s.g.drones.push(second);
+  s.g.player = s.owner;
+  let relations = 0;
+  s.g.areHostile = (a, b) => { relations++; return a.team !== b.team; };
+  s.g.updateDrones(1 / 60);
+  assert.equal(s.drone.hp, 30);
+  assert.equal(second.hp, 30);
+  assert.equal(relations, 1, 'one owner candidate snapshot, not one full scan per drone');
+  s.other.x = 900;
+  s.g.updateDrones(1 / 60);
+  assert.ok(s.drone.hp > 30 && second.hp > 30,
+    'next simulation update must refresh cached candidate list');
+});
+
+test('owner candidate cache still evaluates proximity independently for each drone', () => {
+  const s = scenario({ hostileX: 240 });
+  const farther = { ...s.drone, id: 11, x: -40, __lvLastHp: 30 };
+  s.g.drones.push(farther);
+  s.g.updateDrones(1 / 60);
+  assert.equal(s.drone.hp, 30, 'near drone cannot heal');
+  assert.ok(farther.hp > 30, 'distant drone can heal without sharing another drone\'s threat result');
+});
