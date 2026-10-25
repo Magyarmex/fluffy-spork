@@ -964,7 +964,19 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
  var d=this.drones[j];
  var traced=traceOn&&d&&d.__novaChronoDroneEpoch===this.__novaShapeSweepEpoch;
  if(traced){d.__novaChronoDroneBaseX=d.x;d.__novaChronoDroneBaseY=d.y;}
- var hit=circleResolve(this,d,(d.r||8)+1);if(hit){if(d.__novaPhase==='dash'){d.__novaPhase='recover';d.__novaPhaseT=Math.max(.28,d.__novaPhaseT||0);d.__novaCommitted=false;d.__novaTarget=null;if(this.addParticles)this.addParticles(d.x,d.y,d.color,4,65,'spark');}var n=d.__novaTerrainBump,side=d.__novaTerrainBias||(((d.id||0)&1)?1:-1);d.__novaTerrainBias=side;if(n){d.x+=-n.y*side*28*dt;d.y+=n.x*side*28*dt;}circleResolve(this,d,(d.r||8)+1);}
+ var hit=circleResolve(this,d,(d.r||8)+1);if(hit){if(d.__novaPhase==='dash'){d.__novaPhase='recover';d.__novaPhaseT=Math.max(.28,d.__novaPhaseT||0);d.__novaCommitted=false;d.__novaTarget=null;if(this.addParticles)this.addParticles(d.x,d.y,d.color,4,65,'spark');}var n=d.__novaTerrainBump,side=d.__novaTerrainBias||(((d.id||0)&1)?1:-1);d.__novaTerrainBias=side;if(n){d.x+=-n.y*side*28*dt;d.y+=n.x*side*28*dt;}circleResolve(this,d,(d.r||8)+1);
+  /* Rectangle/circle contact is inclusive in isTerrainSafe. The legacy
+   * resolver lands exactly on the padded face, which the later Live Vector
+   * repair/peel sweep interprets as embedded and can freeze there. Release
+   * only a confirmed terrain-contact drone by a tiny outward clearance,
+   * and only when the candidate point is actually terrain-safe. */
+  var pad=(d.r||8)+1,normal=d.__novaTerrainBump;
+  if(!safePoint(this,d.x,d.y,pad)&&normal&&
+     Number.isFinite(normal.x)&&Number.isFinite(normal.y)){
+    var nx=d.x+normal.x*.001,ny=d.y+normal.y*.001;
+    if(safePoint(this,nx,ny,pad)){d.x=nx;d.y=ny;}
+  }
+ }
  if(traced){d.__novaChronoDroneTerrainX=d.x;d.__novaChronoDroneTerrainY=d.y;
   d.__novaChronoDroneTraceEpoch=this.__novaShapeSweepEpoch;}}
    var spotMap=this.__novaSpotterByOwner||(this.__novaSpotterByOwner=new Map());spotMap.clear();for(var di=0;di<this.drones.length;di++){var sd=this.drones[di];if(sd&&sd.__novaSpotter&&!spotMap.has(sd.ownerId))spotMap.set(sd.ownerId,sd);}
