@@ -549,14 +549,18 @@ for (const hz of [30,60,120,240]) {
   g.updateBullets(1/hz);
   assert.equal(g.hits,1,'later remote drone must not erase earlier physical contact');
  });
- test('TTL contact still defers witnessed hostile drone ahead of body at '+hz+'Hz',()=>{
+ test('TTL contact awards witnessed zero-time hostile drone before later tank at '+hz+'Hz',()=>{
   const g=isolatedWorld({x:28,vx:6000,ttl:.002,drones:[{
    kind:'drone',id:5,ownerId:3,x:8,y:0,r:8,hp:20,
    __novaChronoDroneEpoch:7,__novaChronoDronePrevX:8,__novaChronoDronePrevY:0
   }]});
   g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=7;
+  let tankHits=0,droneHits=0;
+  g.damageTank=()=>{tankHits++;g.hits++;};
+  g.damageDrone=()=>{droneHits++;g.hits++;};
   g.updateBullets(1/hz);
-  assert.equal(g.hits,0,'potential earlier drone contact must keep original authority');
+  assert.equal(tankHits,0,'later tank must not steal the first physical contact');
+  assert.equal(droneHits,1,'witnessed hostile drone is the actual first victim');
  });
 }
 test('moving hostile drone crossing the first-contact corridor remains ambiguous',()=>{
