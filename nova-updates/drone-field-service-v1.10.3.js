@@ -64,7 +64,9 @@ wrap('game/engine',function(engine){var Game=engine.Game;if(!Game||Game.prototyp
    * Match Battlefield's 96u frame-jump gate rather than projecting a
    * teleport into the next projectile danger horizon. */
   if(moveX*moveX+moveY*moveY<=96*96){s.motionDiscontinuous=false;s.motionVX=moveX/dt;s.motionVY=moveY/dt;}
-  else{s.motionDiscontinuous=true;s.motionVX=0;s.motionVY=0;}
+  else{s.motionDiscontinuous=true;s.motionVX=0;s.motionVY=0;
+   /* The cached threat result belongs to the previous position. */
+   s.nextThreatAt=0;s.nextProjectileAt=0;}
  }else{s.motionDiscontinuous=false;s.motionVX=0;s.motionVY=0;}if(canRepair(this,d,owner,s))heal(this,d,s,dt);}registerTips();return out;};});
 registerTips();
 window.__NOVA_FIELD_SERVICE__={version:VERSION,codename:CODENAME,repairDelay:REPAIR_DELAY,repairRate:REPAIR_RATE,controllerUsesCommandWeave:true,routingOwner:'Terrain Intelligence',projectileHorizon:PROJECTILE_HORIZON,projectileInterval:PROJECTILE_INTERVAL};
