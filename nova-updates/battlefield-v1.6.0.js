@@ -640,9 +640,6 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    var rr=0,sx=e.x,sy=e.y,mx=0,my=0;
    if(kind==='tank'){
     if(!e.alive||e.id===b.ownerId)return;
-    if(e.spawnShieldT>0||e.shieldT>0||e.bulwarkT>0||e.tauntT>0){uncertain=true;return;}
-    var owner=g.getTank&&g.getTank(b.ownerId);
-    if(typeof g.areAllies==='function'&&(!owner||g.areAllies(owner,e))){uncertain=true;return;}
     var def=CLASSES[e.cls];if(!def){uncertain=true;return;}
     rr=b.r+def.size+3;
     if(e.__novaSweepMoveTime===g.time){
@@ -668,6 +665,14 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       Math.min(ax,bx)>Math.max(sx,tx1)+rr||
       Math.max(ay,by)<Math.min(sy,ty1)-rr||
       Math.min(ay,by)>Math.max(sy,ty1)+rr)return;
+   /* Remote tanks cannot affect this shot's physical first contact, even
+    * when protected or allied. Check defenses only after excluding their
+    * complete observed movement corridor. Nearby cases still defer. */
+   if(kind==='tank'){
+    if(e.spawnShieldT>0||e.shieldT>0||e.bulwarkT>0||e.tauntT>0){uncertain=true;return;}
+    var owner=g.getTank&&g.getTank(b.ownerId);
+    if(typeof g.areAllies==='function'&&(!owner||g.areAllies(owner,e))){uncertain=true;return;}
+   }
    /* A child shape created by an earlier hit during this very frame has no
     * valid frame-start existence interval. Defer rather than backdate it. */
    if(kind==='shape'&&e.born===g.time){uncertain=true;return;}
