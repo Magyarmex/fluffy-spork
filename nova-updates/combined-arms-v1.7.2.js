@@ -293,6 +293,9 @@ wrap('game/render',function(renderMod,require){
   function patched(g,w,h){
     old(g,w,h);
     if(!g||!g.ctx||!g.player||!g.player.alive||lineage(classes,g.player)!=='cannon')return;
+    /* Match the FUSE reticle's input-visibility contract. Released touch
+     * sticks must not leave an orphaned IMPACT marker on the battlefield. */
+    if(!g.input||!((g.input.aim&&g.input.aim.active)||g.input.mouseActive))return;
     var p=g.player.__v172FusePreview;if(!p||(!p.blocked&&!p.mayBreach))return;
     var ctx=g.ctx,a=world(g,p.x,p.y,screen),solid=p.solid;
     ctx.save();ctx.setTransform(g.dpr||1,0,0,g.dpr||1,0,0);ctx.globalCompositeOperation='lighter';
