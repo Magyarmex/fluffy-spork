@@ -151,3 +151,21 @@ test('already-dead Guardians never inflict posthumous reflected damage', () => {
     assert.equal(guard.tauntT, 3);
   }
 });
+
+test('reflected damage does not inherit the original splash cover context', () => {
+  const g = boot(), guard = tank(1, 'fortress', 0, 0, { tauntT: 3 });
+  const attacker = tank(2, 'scout', 100, Math.PI);
+  g.tanks = [guard, attacker];
+  g.__v172BlastContext = { active: true };
+  const old = g.damageTank;
+  g.damageTank = function(t, dmg, source, ...rest) {
+    // Simulate Combined Arms rejecting a target outside the original blast.
+    if (t === attacker && this.__v172BlastContext.active) return;
+    return old.call(this, t, dmg, source, ...rest);
+  };
+  g.damageTank(guard, 20, attacker.id);
+  assert.ok(Math.abs(attacker.hp - 94) < 1e-9,
+    'a direct reflection must not be hidden by unrelated blast exposure');
+  assert.equal(g.__v172BlastContext.active, true,
+    'the original splash context must resume after reflection');
+});
