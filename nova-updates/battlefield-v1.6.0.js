@@ -601,7 +601,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   * motion, and no simultaneous bodies. All ambiguous cases remain owned by
   * the existing engine until the full chronological resolver is ready. */
  function isolatedTTLBodyContact(g,b,dt){
-  if(!b||b.dead||b.shell||b.beam||b.splash||!(b.ttl>0)||
+  if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||!(b.ttl>0)||
      !(b.ttl<=dt)||!(dt>0)||!(b.pen>=0)||(b.hits||0)>0||
      !Number.isFinite(b.x)||!Number.isFinite(b.y)||
      !Number.isFinite(b.vx)||!Number.isFinite(b.vy))return false;
@@ -619,8 +619,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
     if(!e.alive||e.id===b.ownerId)return;
     if(e.spawnShieldT>0||e.shieldT>0||e.bulwarkT>0||e.tauntT>0){uncertain=true;return;}
     var owner=g.getTank&&g.getTank(b.ownerId);
-    if(owner&&typeof g.areAllies==='function'&&g.areAllies(owner,e))return;
-    var def=CLASSES[e.cls];if(!def)return;
+    if(typeof g.areAllies==='function'&&(!owner||g.areAllies(owner,e))){uncertain=true;return;}
+    var def=CLASSES[e.cls];if(!def){uncertain=true;return;}
     rr=b.r+def.size+3;
     if(e.__novaSweepMoveTime===g.time){
      if(!Number.isFinite(e.__novaSweepPrevX)||!Number.isFinite(e.__novaSweepPrevY))return;
@@ -707,7 +707,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
  var expiring=0;
  if(dt>0)for(var countI=0;countI<this.bullets.length;countI++){
   var eb=this.bullets[countI];
-  if(eb&&!eb.dead&&!eb.shell&&!eb.beam&&!eb.splash&&eb.ttl>0&&eb.ttl<=dt)expiring++;
+  if(eb&&!eb.dead&&!eb.shell&&!eb.beam&&!eb.splash&&!eb.__v17Cannon&&eb.ttl>0&&eb.ttl<=dt)expiring++;
  }
  var projected=expiring*(this.bullets.length+(this.tanks||[]).length+
    (this.shapes||[]).length+(this.drones||[]).length);
