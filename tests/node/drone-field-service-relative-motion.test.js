@@ -28,12 +28,12 @@ function boot(){
   const m={exports:{}};mods['game/engine'](m,m.exports,()=>({}));
   return{Game:m.exports.Game,hooks:win.__NOVA_FIELD_SERVICE_TEST__};
 }
-function scenario({bulletX=200,bulletY=0,bulletVX=200,bulletVY=0,moveVX=0,moveVY=0,dt=.05,ttl,shell=false,teleportX}={}){
+function scenario({bulletX=200,bulletY=0,bulletVX=200,bulletVY=0,moveVX=0,moveVY=0,dt=.05,ttl,shell=false,teleportX,novaVX}={}){
   const {Game}=boot(),g=new Game();
   const owner={id:1,team:'blue',cls:'marksman',alive:true,x:0,y:0};
   const enemy={id:2,team:'red',cls:'marksman',alive:true,x:1000,y:0};
   const drone={id:7,kind:'drone',ownerId:1,x:80,y:0,hp:100,maxHp:100,r:8,
-    attackCd:0,moveVX,moveVY,teleportX}; // no __novaVX: core legacy movement
+    attackCd:0,moveVX,moveVY,teleportX,__novaVX:novaVX}; // no __novaVX: core legacy movement
   g.tanks=[owner,enemy];g.tankById.set(1,owner);g.tankById.set(2,enemy);
   g.drones=[drone];g.damageDrone(drone,20);
   g.bullets=[{ownerId:2,x:bulletX,y:bulletY,vx:bulletVX,vy:bulletVY,r:3,ttl,shell}];
@@ -199,5 +199,19 @@ for(const fps of [30,60,120,240]){
   test('discontinuous relocation does not suppress repair for a departing projectile at '+fps+'Hz',()=>{
     const {drone}=scenario({teleportX:-70,bulletX:-30,bulletVX:200,dt:1/fps});
     assert.ok(drone.hp>80,'departure is safe from the new position');
+  });
+}
+
+// A discontinuity does not invalidate a separately reported bounded velocity.
+// Test both stationary and explicitly reported motion instead of blindly
+// trusting the relocation delta or silently ignoring the motion signal.
+for(const fps of [30,60,120,240]){
+  test('relocated drone cannot heal while declared motion catches departing fire at '+fps+'Hz',()=>{
+    const {drone}=scenario({teleportX:-70,novaVX:600,bulletX:-30,bulletVX:200,dt:1/fps});
+    assert.equal(drone.hp,80,'declared chase velocity predicts an intercept');
+  });
+  test('relocated drone still repairs when both stationary and declared retreat are safe at '+fps+'Hz',()=>{
+    const {drone}=scenario({teleportX:-70,novaVX:-600,bulletX:-30,bulletVX:200,dt:1/fps});
+    assert.ok(drone.hp>80,'neither conservative motion hypothesis intersects');
   });
 }
