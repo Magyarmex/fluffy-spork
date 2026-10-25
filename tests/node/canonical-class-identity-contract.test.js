@@ -52,7 +52,7 @@ test('class-specific description keys in Three Disciplines and Apex exist',()=>{
  const classes=canonicalClasses(),ids=new Set(Object.keys(classes.CLASSES));
  for(const name of ['disciplines-v1.7.0.js','apex-disciplines-v1.7.1.js']){
   const source=fs.readFileSync(path.join(root,'nova-updates',name),'utf8');
-  const start=source.indexOf('var text={');
+  const start=source.indexOf('text={');
   assert.ok(start>=0,name+' description registry');
   const end=source.indexOf('\n  };',start);
   assert.ok(end>start,name+' description registry terminator');
