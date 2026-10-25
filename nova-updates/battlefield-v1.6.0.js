@@ -716,7 +716,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   if(!(A>1e-12))return false;
   var fx=ox-b.__v17SpawnX,fy=oy-b.__v17SpawnY,R=b.__v17FuseDist;
   var C=fx*fx+fy*fy-R*R,B=fx*dx+fy*dy;
-  if(!(C<0)||!Number.isFinite(C)||!Number.isFinite(B))return false;
+  if(!(C<0)||!Number.isFinite(C)||!Number.isFinite(B)||
+     Math.abs(C)<=1e-10*(fx*fx+fy*fy+R*R))return false;
   var D=B*B-A*C;
   if(!(D>0)||!Number.isFinite(D))return false;
   var root=Math.sqrt(D),fuseT=B>=0?-C/(B+root):(-B+root)/A;
@@ -747,6 +748,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   }
   for(var si=0;si<shapes.length;si++){
    var s=shapes[si];if(!s||!(s.hp>0))continue;
+   if(shapeWasTeleported(g,s))return false;
    var start=shapeSweepStart(g,s),r=(s.r||15)+(b.r||2);
    if(near(start?start.x:s.x,start?start.y:s.y,s.x,s.y,
            r+(start?0:Math.max(30,dt*800))))return false;
