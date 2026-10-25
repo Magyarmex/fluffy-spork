@@ -123,3 +123,31 @@ test('moving shape can be hit on the next frame after a teleport',()=>{
  g.update(1/30);
  assert.equal(g.hits.length,1);
 });
+
+test('seeded moving-shape contacts agree with independent relative-motion oracle',()=>{
+ let seed=338253;
+ const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ const g=boot();let checked=0,expectedHits=0;
+ for(const fps of [30,60,120,240]){
+  const dt=1/fps;
+  for(let k=0;k<250;k++){
+   const sx=2+rand()*44,sy=-26+rand()*52;
+   const vy=-105+rand()*210,vx=400+rand()*1100;
+   const fx=-sx,fy=-sy,dx=vx*dt,dy=-vy*dt;
+   const a=dx*dx+dy*dy;
+   const t=Math.max(0,Math.min(1,-(fx*dx+fy*dy)/a));
+   const sep=(fx+dx*t)**2+(fy+dy*t)**2;
+   if(Math.abs(sep-18*18)<1e-5)continue; // numerical tangency is a separate gate
+   const shouldHit=sep<18*18;
+   const s={id:k+1000,kind:'shape',type:'crasher',x:sx,y:sy,
+    vx:0,vy,r:15,hp:20,maxHp:20};
+   g.shapes=[s];g.bullets=[{...bullet(),vx}];g.hits.length=0;
+   g.update(dt);
+   assert.equal(g.hits.length,shouldHit?1:0,
+    'fps='+fps+' case='+k+' x='+sx+' y='+sy+' vy='+vy+' vx='+vx);
+   expectedHits+=Number(shouldHit);checked++;
+  }
+ }
+ assert.ok(checked>=995);
+ assert.ok(expectedHits>100,'oracle exercised actual contacts');
+});
