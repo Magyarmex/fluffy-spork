@@ -615,7 +615,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   var best=null,bestT=limit,tie=false,uncertain=false,blockedT=Infinity;
   function consider(e,kind){
    if(!e)return;
-   var rr=0,sx=e.x,sy=e.y,mx=0,my=0;
+   var rr=0,sx=e.x,sy=e.y,mx=0,my=0,discontinuousTankMove=false;
    if(kind==='tank'){
     if(!e.alive||e.id===b.ownerId)return;
     var def=CLASSES[e.cls];if(!def){uncertain=true;return;}
@@ -624,6 +624,9 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      if(!Number.isFinite(e.__novaSweepPrevX)||!Number.isFinite(e.__novaSweepPrevY)){uncertain=true;return;}
      sx=e.__novaSweepPrevX;sy=e.__novaSweepPrevY;
      mx=e.x-sx;my=e.y-sy;
+     /* A large finite jump is not proof of continuous travel through
+      * intervening targets. Match the shape sweep's 96u relocation gate. */
+     discontinuousTankMove=mx*mx+my*my>96*96;
     }
    }else{
     if(!(e.hp>0))return;
@@ -643,6 +646,9 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       Math.min(ax,bx)>Math.max(sx,tx1)+rr||
       Math.max(ay,by)<Math.min(sy,ty1)-rr||
       Math.min(ay,by)>Math.max(sy,ty1)+rr)return;
+   /* A discontinuous tank corridor could be a teleport. It may matter,
+    * but it cannot authorize a synthetic hit at any intermediate point. */
+   if(discontinuousTankMove){uncertain=true;return;}
    /* Remote tanks cannot affect this shot's physical first contact, even
     * when protected or allied. Check defenses only after excluding their
     * complete observed movement corridor. Nearby cases still defer. */
