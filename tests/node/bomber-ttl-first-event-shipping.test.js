@@ -154,3 +154,20 @@ for(const optimized of [false,true]){
   });
  }
 }
+
+for(const optimized of [false,true]){
+ test('[CONTROL] '+(optimized?'optimized':'baseline')+
+      ' hostile drone near Bomber expiry retains conservative authority',()=>{
+  const Game=boot(optimized),g=new Game(),bursts=[];
+  g.time=1;g.__novaBattlefield={coverBroken:0};g.__novaTerrain=[];
+  g.clusterBurst=b=>bursts.push({x:b.x,y:b.y});
+  g.weakenBullet=()=>{};
+  g.drones=[{kind:'drone',id:4,ownerId:2,x:30,y:0,r:8,hp:50}];
+  g.bullets=[{kind:'bullet',id:777,ownerId:1,x:0,y:0,
+   vx:6000,vy:0,r:3,dmg:26,ttl:.005,shell:true,pen:1,hits:0,dead:false,
+   splash:0,color:'#ffb45e'}];
+  g.updateBullets(1/30);
+  assert.equal(bursts.length,1);
+  assert.ok(bursts[0].x>30,'unwitnessed hostile drone still defers early expiry');
+ });
+}
