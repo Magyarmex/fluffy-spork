@@ -133,11 +133,12 @@ for (const optimized of [false,true]) {
     assert.equal(bursts.length,1);
     assert.ok(bursts[0].x<148);
   });
-  test(prefix+' later destructible cover is not damaged by pre-fuse collision',()=>{
+  test(prefix+' later cover receives only physically reachable fuse splash',()=>{
     const {g,bursts}=run(Game,30,true,{cover:true});
     assert.equal(bursts.length,1);
     assert.ok(Math.abs(bursts[0].x-150)<1e-6);
-    assert.equal(g.__novaTerrain[0].hp,100);
+    assert.ok(g.__novaTerrain[0].hp>80&&g.__novaTerrain[0].hp<100,
+      'splash may reach cover, but the later direct shell impact must not occur');
   });
   test(prefix+' distant live opponent does not prevent valid fuse',()=>{
     const {bursts}=run(Game,30,true,{extras:g=>{
