@@ -321,3 +321,41 @@ test('Battlefield Game.update captures live drone start before movement and bull
    'full shipping update must preserve distant-drone chronology');
  assert.equal(g.__novaShapeSweepActive,false);
 });
+
+/* Frame-phase parity and adversarial drone-motion gates. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'optimized':'baseline';
+ for(const {hz,startX,wallX,vx} of [
+  {hz:60,startX:147.9,wallX:168,vx:380},
+  {hz:120,startX:147.9,wallX:164.625,vx:380},
+  {hz:240,startX:147.9,wallX:164.625,vx:861.84}
+ ]){
+  test(label+' remote witnessed drone does not veto fuse at '+hz+'Hz',()=>{
+   const {bursts}=run(Game,hz,true,{startX,wallX,vx,extras:g=>{
+    g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=8;
+    g.drones=[{id:6,kind:'drone',x:2000,y:2000,r:8,hp:50,
+      __novaChronoDroneEpoch:8,__novaChronoDronePrevX:1998,__novaChronoDronePrevY:1999}];
+   }});
+   assert.equal(bursts.length,1);
+   assert.ok(Math.abs(bursts[0].x-150)<1e-6);
+  });
+ }
+ test(label+' drone moving across the shot corridor defers',()=>{
+  const {bursts}=run(Game,30,true,{extras:g=>{
+   g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=9;
+   g.drones=[{id:6,kind:'drone',x:170,y:-10,r:8,hp:50,
+     __novaChronoDroneEpoch:9,__novaChronoDronePrevX:120,__novaChronoDronePrevY:70}];
+  }});
+  assert.equal(bursts.length,1);
+  assert.ok(bursts[0].x>150);
+ });
+ test(label+' nonfinite drone history defers instead of granting fuse',()=>{
+  const {bursts}=run(Game,30,true,{extras:g=>{
+   g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=9;
+   g.drones=[{id:6,kind:'drone',x:2000,y:2000,r:8,hp:50,
+     __novaChronoDroneEpoch:9,__novaChronoDronePrevX:NaN,__novaChronoDronePrevY:2000}];
+  }});
+  assert.equal(bursts.length,1);
+  assert.ok(bursts[0].x>150);
+ });
+}
