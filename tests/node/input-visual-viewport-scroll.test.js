@@ -92,6 +92,28 @@ test('visualViewport pan preserves left/right twin-stick ownership', () => {
   assert.equal(h.input.aim.active, false, 'panning must not convert move into fire');
 });
 
+
+test('panning does not turn stationary held fingers into phantom movement or aim', () => {
+  const h = boot();
+  h.touch(1, 120, 110);
+  h.touch(2, 650, 110);
+  h.input.pm({ pointerType: 'touch', pointerId: 1, clientX: 145, clientY: 110 });
+  h.input.pm({ pointerType: 'touch', pointerId: 2, clientX: 675, clientY: 110 });
+  assert.equal(h.input.move.dx, 25);
+  assert.equal(h.input.aim.dx, 25);
+  h.setRect(40, 20);
+  h.fire('viewport', 'scroll');
+  // Fingers remain physically stationary while the viewport moves underneath.
+  h.input.pm({ pointerType: 'touch', pointerId: 1, clientX: 145, clientY: 110 });
+  h.input.pm({ pointerType: 'touch', pointerId: 2, clientX: 675, clientY: 110 });
+  assert.equal(h.input.move.dx, 25, 'viewport panning must not steer the tank');
+  assert.equal(h.input.move.dy, 0);
+  assert.equal(h.input.aim.dx, 25, 'viewport panning must not swing the turret');
+  assert.equal(h.input.aim.dy, 0);
+  assert.equal(h.input.move.ox, 80);
+  assert.equal(h.input.aim.ox, 610);
+});
+
 test('visualViewport scroll refresh is event-driven, not a layout read per pointer', () => {
   const h = boot();
   const before = h.rectReads();
