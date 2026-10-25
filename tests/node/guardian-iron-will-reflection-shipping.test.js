@@ -169,3 +169,13 @@ test('reflected damage does not inherit the original splash cover context', () =
   assert.equal(g.__v172BlastContext.active, true,
     'the original splash context must resume after reflection');
 });
+
+test('Bastion inherits the same frontal Iron Will reflection without losing armor', () => {
+  const g = boot(), guard = tank(1, 'bastion', 0, 0, { tauntT: 3 });
+  const attacker = tank(2, 'scout', 100, Math.PI);
+  g.tanks = [guard, attacker];
+  g.damageTank(guard, 20, attacker.id);
+  assert.ok(Math.abs(attacker.hp - 94) < 1e-9);
+  assert.ok(guard.hp > 96, 'Bastion active frontal armor remains effective');
+  assert.equal(guard.tauntT, 3);
+});
