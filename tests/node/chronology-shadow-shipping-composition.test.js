@@ -503,7 +503,7 @@ test('dense opt-in audit skips unbounded interception scans safely', () => {
   assert.equal(s.interceptionUnscannedBodyContacts, 1);
   assert.equal(s.predictedBodyContacts, 0);
   assert.equal(s.unregisteredBodyContacts, 0);
-  assert.equal(target.hp, 100, 'dense projectile frame stays on original chronological path');
+  assert.equal(target.hp, 80, 'one isolated expiring shot remains eligible in dense distant fire');
 });
 
 
