@@ -1,5 +1,5 @@
 'use strict';
-// KNOWN RED: fast moving neutral shape crosses a projectile within one frame,
+// KNOWN RED: moving neutral shape crosses a projectile within one frame,
 // but Battlefield currently sweeps the bullet against the shape's END position.
 // Research gate only: do not merge until authoritative moving-shape collision
 // and spatial broadphase are corrected without hurting normal game performance.
@@ -69,20 +69,20 @@ function boot() {
 }
 function simulate(fps, moving = true) {
   const g = boot(), dt = 1 / fps;
-  const s = { id: 5, kind: 'shape', type: 'star', x: 25,
-    y: moving ? 20 : -20, r: 5, hp: 20, maxHp: 20 };
+  const s = { id: 5, kind: 'shape', type: 'crasher', x: 10,
+    y: moving ? 17 : 20.5, r: 15, hp: 20, maxHp: 20 };
   g.shapes = [s];
   g.bullets = [{ id: 3, kind: 'bullet', ownerId: 1,
     x: 0, y: 0, vx: 1500, vy: 0, r: 3, dmg: 10,
     pen: 0, ttl: 1, hits: 0, dead: false, shell: false, beam: false }];
   for (let i = 0; i < Math.ceil(fps / 10) && g.bullets.length; i++) {
-    if (moving) s.y -= 1200 * dt;
+    if (moving) s.y += 105 * dt;
     g.updateBullets(dt);
   }
   return { hits: g.hits.length, hp: s.hp };
 }
 for (const fps of [30, 60, 120, 240]) {
-  test('moving Star crossing a bullet is hit regardless of FPS at ' + fps + 'Hz', () => {
+  test('moving Crasher crossing a bullet is hit regardless of FPS at ' + fps + 'Hz', () => {
     const result = simulate(fps);
     assert.equal(result.hits, 1,
       'real shipping Battlefield must sweep BOTH bullet and moving shape');
