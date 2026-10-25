@@ -190,3 +190,28 @@ test('inherited lateral hull motion reveals cover missed by the hull ray',()=>{
  near(p.x,actual.hit.x,'moving narrow-cover x');
  near(p.y,actual.hit.y,'moving narrow-cover y');
 });
+
+test('penetration upgrades switch cover cue from certain impact to possible breach',()=>{
+ const {g,t}=boot('cannon');
+ g.__novaTerrain=[wall(180,true,250)];
+ const base=g.novaFusePreview(t);
+ assert.equal(base.blocked,true);assert.equal(base.mayBreach,false);
+ t.stats.penetration=4; /* materialized core: floor(4 * 0.6) = 2 */
+ const upgraded=g.novaFusePreview(t);
+ assert.equal(upgraded.blocked,false);assert.equal(upgraded.mayBreach,true);
+ g.tryFire(t);assert.equal(g.bullets[0].pen,2);
+});
+test('upgraded projectile radius uses actual materialized collision padding',()=>{
+ const {g,t}=boot('cannon');
+ t.stats.damage=6;
+ g.bulletDamageFor=(tank,d)=>d*(1+.13*tank.stats.damage);
+ g.__novaTerrain=[{...wall(150),w:10,h:18,y:13}];
+ const p=g.novaFusePreview(t);g.tryFire(t);
+ const b=g.bullets[0],mag=Math.hypot(b.vx,b.vy);
+ const physical=g.firstTerrainHit(b.x,b.y,
+  b.x+b.vx/mag*b.__v17FuseDist,b.y+b.vy/mag*b.__v17FuseDist,b.r*.45);
+ assert.ok(physical);
+ assert.equal(p.blocked,true);
+ near(p.x,physical.hit.x,'upgraded contact x');
+ near(p.y,physical.hit.y,'upgraded contact y');
+});
