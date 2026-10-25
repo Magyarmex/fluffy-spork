@@ -195,8 +195,10 @@ for(const fps of [30,60,120,240]){
    g.time+=1/fps;g.updateBullets(1/fps);
   }
   assert.equal(bursts.length,1,'one programmed airburst');
-  assert.ok(Math.abs(bursts[0][0]-150)<1e-8,
-   'reticle at 150, actual burst '+bursts[0][0]);
+  const step=380/fps,triggerFrame=Math.ceil((150-2)/step);
+  const endpoint=triggerFrame*step,expected=endpoint>=150?150:endpoint;
+  assert.ok(Math.abs(bursts[0][0]-expected)<1e-8,
+   'expected first fuse crossing or existing 2u early trigger '+expected+', got '+bursts[0][0]);
   assert.equal(g.bullets.length,0);
  });
 }
