@@ -289,3 +289,43 @@ test('legacy shape impact uses the actual post-movement contact direction', () =
     'impact direction must reflect the real attacking position');
   assert.equal(impact.dy, s.target.y - s.d.y);
 });
+
+
+/* A hunter that reaches the 12-unit approach band must not step through its
+ * target/last-seen point. The same-frame melee check is intentionally retained. */
+for (const hz of [30, 60, 120, 240]) {
+  test('legacy hunter respects 12-unit arrival band at ' + hz + ' Hz while attacking', () => {
+    const s = harness('tank');
+    s.target.x = 13.5;
+    s.owner.swarmT = 1; // real swarm speed multiplier exposes the overshoot
+    s.d.speed = 300;
+    s.d.retargetT = 1;
+    s.d.attackCd = 0;
+    let hits = 0;
+    s.g.damageTank = () => { hits++; };
+    s.tick(1 / hz);
+    assert.ok(s.d.x <= s.target.x - 12 + 1e-8,
+      'arrival should stop at the near-side band, not jump through the target');
+    assert.equal(hits, 1, 'clamped arrival must retain valid close-range melee');
+    const stopped = s.d.x;
+    s.d.attackCd = 100;
+    for (let i = 0; i < 8; i++) s.tick(1 / hz);
+    assert.ok(Math.abs(s.d.x - stopped) < 1e-8,
+      'the hunter must hold the intended standoff rather than drift');
+  });
+  test('hidden drone pursuit cannot overshoot its last legitimately seen point at ' + hz + ' Hz', () => {
+    const s = harness('drone');
+    s.target.x = 300; // live location is not a valid navigation input
+    s.d.__novaLegacySeenTarget = s.target;
+    s.d.__novaLegacySeenX = 13.5;
+    s.d.__novaLegacySeenY = 0;
+    s.d.__novaLegacyVisionT = 1;
+    s.d.retargetT = 1;
+    s.owner.swarmT = 1;
+    s.d.speed = 300;
+    s.tick(1 / hz);
+    assert.ok(s.d.x <= 1.5 + 1e-8,
+      'last-seen approach cannot cross the 12-unit arrival band');
+    assert.equal(s.d.__novaLegacySeenX, 13.5);
+  });
+}
