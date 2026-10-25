@@ -193,3 +193,38 @@ test('Fair Engagement preserves a legitimate unshielded cached Controller target
   g.updateDrones(1/60);
   assert.equal(owner.__novaLiveVectorAI.targetId,current.id);
 });
+
+// Production authority: the outer Fair Engagement wrapper must replan the
+// actual Controller's target before Live Vector uses its virtual stick.
+test('shipping Fair Engagement retargets Controller AI after a bounded think tick',()=>{
+  const {load}=boot(),ai=load('game/ai'),Game=load('game/engine').Game;
+  const g=Object.assign(new Game(),game(800,600,1));
+  const owner=tank(1,0,0,{cls:'carrier',team:'blue',
+    ai:{state:'hunt',targetId:2,__v1112TargetId:2,__v1112NextThink:0}});
+  const old=tank(2,300,0,{team:'red'});
+  const nearer=tank(3,90,0,{team:'red'});
+  g.tanks=[owner,old,nearer];g.time=7;
+  ai.updateAI(owner,g,1/60);
+  assert.equal(owner.ai.__v1112TargetId,nearer.id,
+    'Fair Engagement must not keep a visible but inferior target forever');
+  g.updateDrones(1/60);
+  assert.equal(owner.__novaLiveVectorAI.targetId,nearer.id,
+    'Live Vector must consume the fair retarget rather than its private sensor');
+  assert.equal(owner.ai.targetId,nearer.id);
+  assert.equal(g.tanks.length,3,'legacy narrow target view must be restored');
+});
+
+test('Fair Engagement Controller replan respects an existing think interval',()=>{
+  const {load}=boot(),ai=load('game/ai'),Game=load('game/engine').Game;
+  const g=Object.assign(new Game(),game(800,600,1));
+  const owner=tank(1,0,0,{cls:'carrier',team:'blue',
+    ai:{state:'hunt',targetId:2,__v1112TargetId:2,__v1112NextThink:7.15}});
+  const old=tank(2,300,0,{team:'red'}),nearer=tank(3,90,0,{team:'red'});
+  g.tanks=[owner,old,nearer];g.time=7;
+  ai.updateAI(owner,g,1/60);g.updateDrones(1/60);
+  assert.equal(owner.__novaLiveVectorAI.targetId,old.id,
+    'bounded reaction cadence is a legitimate commitment, not omniscience');
+  g.time=7.2;ai.updateAI(owner,g,1/60);g.updateDrones(1/60);
+  assert.equal(owner.__novaLiveVectorAI.targetId,nearer.id,
+    'after the scheduled think, the fair target must update');
+});
