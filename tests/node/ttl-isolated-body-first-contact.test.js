@@ -25,7 +25,7 @@ function shippingCoreBullets() {
     { CLASSES: { scout: { size: 15 } } }, 2250);
 }
 
-function boot(updateImpl) {
+function boot(updateImpl, optimized = false) {
   class Game {
     constructor() {
       this.time = 1;
@@ -63,8 +63,10 @@ function boot(updateImpl) {
   const context = { window: { __novaModules: modules },
     console: { info() {}, warn() {}, error() {} },
     Math, Map, Set, Date, performance: { now: () => 0 } };
-  vm.runInNewContext(fs.readFileSync(path.join(root,
-    'nova-updates/battlefield-v1.6.0.js'), 'utf8'), context);
+  const layers = ['battlefield-v1.6.0.js'];
+  if (optimized) layers.push('performance-v1.7.5.js');
+  for (const file of layers) vm.runInNewContext(fs.readFileSync(path.join(root,
+    'nova-updates', file), 'utf8'), context, { filename: file });
   const module = { exports: {} };
   modules['game/engine'](module, module.exports, spec => spec === './classes'
     ? { CLASSES: { scout: { size: 15 } } }
@@ -420,4 +422,105 @@ test('nonfinite drone speed keeps TTL recovery conservative',()=>{
  g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=7;
  g.updateBullets(1/30);
  assert.equal(g.hits,0);
+});
+
+
+/* Run349: a remote tank's defensive state cannot cancel a physically valid
+ * contact with a different, unprotected tank. Broad-phase must precede
+ * defensive/alliance uncertainty, while near contenders remain conservative. */
+for (const hz of [30,60,120,240]) {
+ test('remote spawn-shielded tank does not suppress TTL hit at '+hz+'Hz',()=>{
+  const g=isolatedWorld({x:28,vx:6000,ttl:.002,extraTanks:[{
+   kind:'tank',id:3,x:1000,y:1000,cls:'scout',hp:100,alive:true,
+   spawnShieldT:1,shieldT:1,bulwarkT:1,tauntT:1
+  }]});
+  g.updateBullets(1/hz);
+  assert.equal(g.hits,1,'distant defensive tank must not erase the reachable hit');
+ });
+ test('remote allied tank does not suppress TTL hit at '+hz+'Hz',()=>{
+  const g=isolatedWorld({x:28,vx:6000,ttl:.002,extraTanks:[{
+   kind:'tank',id:3,x:1000,y:1000,cls:'scout',hp:100,alive:true,teamId:'red'
+  }]});
+  g.tanks[0].teamId='blue';
+  g.getTank=()=>({id:1,teamId:'red'});
+  g.areAllies=(a,b)=>a.teamId===b.teamId;
+  g.updateBullets(1/hz);
+  assert.equal(g.hits,1,'distant ally must not cancel an unrelated enemy contact');
+ });
+}
+test('near shielded contender still defers physical TTL contact',()=>{
+ const g=isolatedWorld({x:40,extraTanks:[{
+  kind:'tank',id:3,x:20,y:0,cls:'scout',hp:100,alive:true,spawnShieldT:1
+ }]});
+ g.updateBullets(1/30);
+ assert.equal(g.hits,0,'nearby defensive collision remains chronologically uncertain');
+});
+test('near allied contender still defers physical TTL contact',()=>{
+ const g=isolatedWorld({x:40,extraTanks:[{
+  kind:'tank',id:3,x:20,y:0,cls:'scout',hp:100,alive:true,teamId:'blue'
+ }]});
+ g.tanks[0].teamId='red';
+ g.getTank=()=>({id:1,teamId:'blue'});
+ g.areAllies=(a,b)=>a.teamId===b.teamId;
+ g.updateBullets(1/30);
+ assert.equal(g.hits,0,'nearby allied collision remains chronologically uncertain');
+});
+
+
+/* Verify the real Game.update wrapper captures the moving shielded tank
+ * before the projectile updater; also run the optimized production layer. */
+for (const optimized of [false, true]) {
+ for (const hz of [30, 60, 120, 240]) {
+  test('materialized update ignores remote moving shielded tank ('+
+       (optimized?'optimized':'baseline')+', '+hz+'Hz)',()=>{
+   const FullGame=boot(function(dt){
+    this.time+=dt;
+    const remote=this.tanks[1];
+    remote.__novaSweepPrevX=remote.x;remote.__novaSweepPrevY=remote.y;
+    remote.x+=2;remote.__novaSweepMoveTime=this.time;
+    this.updateBullets(dt);
+   },optimized);
+   const g=new FullGame();
+   g.tanks=[
+    {kind:'tank',id:2,x:28,y:0,cls:'scout',hp:100,alive:true},
+    {kind:'tank',id:3,x:1000,y:1000,cls:'scout',hp:100,alive:true,spawnShieldT:1}
+   ];
+   g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,vx:6000,vy:0,
+    r:3,dmg:20,ttl:.002,pen:0,hits:0,dead:false,shell:false,beam:false}];
+   g.update(1/hz);
+   assert.equal(g.hits,1,'remote moving spawn shield must not suppress hit');
+  });
+ }
+}
+
+
+test('remote shield with witnessed small movement still permits TTL hit',()=>{
+ const g=isolatedWorld({x:28,vx:6000,ttl:.002,extraTanks:[{
+  kind:'tank',id:3,x:1000,y:1000,cls:'scout',hp:100,alive:true,spawnShieldT:1,
+  __novaSweepPrevX:999,__novaSweepPrevY:1000
+ }]});
+ g.tanks[1].__novaSweepMoveTime=g.time;
+ g.updateBullets(1/30);
+ assert.equal(g.hits,1);
+});
+test('shielded tank crossing the shot corridor remains ambiguous',()=>{
+ const g=isolatedWorld({x:28,vx:6000,ttl:.002,extraTanks:[{
+  kind:'tank',id:3,x:1000,y:1000,cls:'scout',hp:100,alive:true,spawnShieldT:1,
+  __novaSweepPrevX:20,__novaSweepPrevY:0
+ }]});
+ g.tanks[1].__novaSweepMoveTime=g.time;
+ g.updateBullets(1/30);
+ assert.equal(g.hits,0,'observed moving protected tank could have intercepted');
+});
+test('nonfinite moving-tank history cannot authorize speculative TTL damage',()=>{
+ for (const position of ['target','remote']) {
+  const g=isolatedWorld({x:28,vx:6000,ttl:.002,extraTanks:[{
+   kind:'tank',id:3,x:1000,y:1000,cls:'scout',hp:100,alive:true,spawnShieldT:1
+  }]});
+  const tank=position==='target'?g.tanks[0]:g.tanks[1];
+  tank.__novaSweepMoveTime=g.time;
+  tank.__novaSweepPrevX=NaN;tank.__novaSweepPrevY=0;
+  g.updateBullets(1/30);
+  assert.equal(g.hits,0,'invalid '+position+' movement must defer');
+ }
 });
