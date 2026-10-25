@@ -93,7 +93,7 @@ function blastExposure(g,C,t,x,y){
 function cannonStructure(cls){
   if(cls==='siegebomber')return 2.35;
   if(cls==='annihilator')return 2.10;
-  if(cls==='quakecannon')return 2.00;
+  if(cls==='quake')return 2.00;
   if(cls==='demolisher')return 1.70;
   if(cls==='clusterking')return 1.55;
   if(cls==='bomber')return 1.42;
