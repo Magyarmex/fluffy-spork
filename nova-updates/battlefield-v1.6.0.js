@@ -601,10 +601,6 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   * motion, and no simultaneous bodies. All ambiguous cases remain owned by
   * the existing engine until the full chronological resolver is ready. */
  function isolatedTTLBodyContact(g,b,dt){
-  /* Avoid quadratic work in bullet-heavy scenes until the shared swept
-   * projectile index is integrated. Preserve the existing path above this
-   * bounded 32-projectile diagnostic-safe envelope. */
-  if(g.bullets&&g.bullets.length>32)return false;
   if(!b||b.dead||b.shell||b.beam||b.splash||!(b.ttl>0)||
      !(b.ttl<=dt)||!(dt>0)||!(b.pen>=0)||(b.hits||0)>0||
      !Number.isFinite(b.x)||!Number.isFinite(b.y)||
@@ -703,7 +699,21 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   b.hits++;b.pen--;b.dead=true;b.vx=0;b.vy=0;
   return true;
  }
- var oldUpdateBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var terrain=ensureTerrain(this);for(var pre=this.bullets.length-1;pre>=0;pre--)isolatedTTLBodyContact(this,this.bullets[pre],dt);for(var i=0;i<this.bullets.length;i++){var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,sweepDt=dt;/* Non-shell shots expire without spawning fragments: terrain after their remaining lifetime is unreachable. Shell expiry needs coupled chronological burst arbitration. */if(!b.shell&&Number.isFinite(b.ttl)){if(b.ttl<=0)continue;sweepDt=Math.min(dt,b.ttl);}var nx=ox+(b.vx||0)*sweepDt,ny=oy+(b.vy||0)*sweepDt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){b.__novaBreachAtTime=this.time;b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
+ var oldUpdateBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var terrain=ensureTerrain(this);
+ /* Bound pairwise geometry per frame, not total bullets: one expiring shot
+  * remains eligible in a crowded but spatially separated firefight. When
+  * projected work is too high, defer ALL shots to the existing path rather
+  * than introducing arbitrary array-order fairness. */
+ var expiring=0;
+ if(dt>0)for(var countI=0;countI<this.bullets.length;countI++){
+  var eb=this.bullets[countI];
+  if(eb&&!eb.dead&&!eb.shell&&!eb.beam&&!eb.splash&&eb.ttl>0&&eb.ttl<=dt)expiring++;
+ }
+ var projected=expiring*(this.bullets.length+(this.tanks||[]).length+
+   (this.shapes||[]).length+(this.drones||[]).length);
+ if(projected>0&&projected<=900)
+  for(var pre=this.bullets.length-1;pre>=0;pre--)
+   isolatedTTLBodyContact(this,this.bullets[pre],dt);for(var i=0;i<this.bullets.length;i++){var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,sweepDt=dt;/* Non-shell shots expire without spawning fragments: terrain after their remaining lifetime is unreachable. Shell expiry needs coupled chronological burst arbitration. */if(!b.shell&&Number.isFinite(b.ttl)){if(b.ttl<=0)continue;sweepDt=Math.min(dt,b.ttl);}var nx=ox+(b.vx||0)*sweepDt,ny=oy+(b.vy||0)*sweepDt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){b.__novaBreachAtTime=this.time;b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
    /* The core still advances a dead bullet before removing it; a shell may
      * expire or leave the arena in that pass. Consume its one-time burst now. */
     if(b.shell&&this.clusterBurst){var childStart=this.bullets.length;this.clusterBurst(b);clearTerrainBurstChildren(this,s,h,childStart);b.shell=false;}if(b.splash&&this.splashAt)this.splashAt(h.x,h.y,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.dead=true;if(this.addFlash)this.addFlash(h.x,h.y,s.destructible?'#8fd4ff':'#b9c7e7',Math.min(46,14+(b.dmg||0)*.24));if(this.cam&&b.dmg>42)this.cam.shake=Math.max(this.cam.shake,.08);/* The materialized core still advances dead bullets before removing them. Freeze a terrain-killed projectile at its impact so its final trail cannot leak through cover. Breaching live shots keep their velocity above. */b.vx=0;b.vy=0;
