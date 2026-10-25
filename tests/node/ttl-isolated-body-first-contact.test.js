@@ -638,16 +638,16 @@ for(const hz of [30,60,120,240]){
  * before or simultaneous with the hit remains authoritative/uncertain. */
 for (const hz of [30,60,120,240]) {
  test('later stationary spawn shield does not erase earlier TTL hit at '+hz+'Hz',()=>{
-  const g=isolatedWorld({x:28,vx:6000,ttl:.005,extraTanks:[{
-   kind:'tank',id:3,x:50,y:0,cls:'scout',hp:100,alive:true,spawnShieldT:1
+  const g=isolatedWorld({x:28,vx:12000,ttl:.004,extraTanks:[{
+   kind:'tank',id:3,x:60,y:0,cls:'scout',hp:100,alive:true,spawnShieldT:1
   }]});
   const victims=[];g.damageTank=e=>victims.push(e.id);
   g.updateBullets(1/hz);
   assert.deepEqual(victims,[2],'only the physically earlier unshielded tank is hit');
  });
  test('later stationary ally does not erase earlier TTL hit at '+hz+'Hz',()=>{
-  const g=isolatedWorld({x:28,vx:6000,ttl:.005,extraTanks:[{
-   kind:'tank',id:3,x:50,y:0,cls:'scout',hp:100,alive:true,teamId:'blue'
+  const g=isolatedWorld({x:28,vx:12000,ttl:.004,extraTanks:[{
+   kind:'tank',id:3,x:60,y:0,cls:'scout',hp:100,alive:true,teamId:'blue'
   }]});
   g.tanks[0].teamId='red';
   g.getTank=()=>({id:1,teamId:'blue'});
@@ -657,7 +657,7 @@ for (const hz of [30,60,120,240]) {
   assert.deepEqual(victims,[2],'later ally cannot veto earlier enemy hit');
  });
  test('earlier stationary shield still vetoes TTL shortcut at '+hz+'Hz',()=>{
-  const g=isolatedWorld({x:40,vx:6000,ttl:.005,extraTanks:[{
+  const g=isolatedWorld({x:60,vx:12000,ttl:.004,extraTanks:[{
    kind:'tank',id:3,x:20,y:0,cls:'scout',hp:100,alive:true,spawnShieldT:1
   }]});
   g.updateBullets(1/hz);
@@ -665,16 +665,16 @@ for (const hz of [30,60,120,240]) {
  });
 }
 test('moving protected tank beyond hit remains conservative',()=>{
- const g=isolatedWorld({x:28,vx:6000,ttl:.005,extraTanks:[{
-  kind:'tank',id:3,x:50,y:0,cls:'scout',hp:100,alive:true,spawnShieldT:1,
-  __novaSweepPrevX:48,__novaSweepPrevY:0
+ const g=isolatedWorld({x:28,vx:12000,ttl:.004,extraTanks:[{
+  kind:'tank',id:3,x:60,y:0,cls:'scout',hp:100,alive:true,spawnShieldT:1,
+  __novaSweepPrevX:58,__novaSweepPrevY:0
  }]});
  g.tanks[1].__novaSweepMoveTime=g.time;
  g.updateBullets(1/30);
  assert.equal(g.hits,0,'moving shield chronology is not certified');
 });
 test('same-location shield and unshielded contact remains conservative',()=>{
- const g=isolatedWorld({x:28,vx:6000,ttl:.005,extraTanks:[{
+ const g=isolatedWorld({x:28,vx:12000,ttl:.004,extraTanks:[{
   kind:'tank',id:3,x:28,y:0,cls:'scout',hp:100,alive:true,spawnShieldT:1
  }]});
  g.updateBullets(1/30);
