@@ -790,6 +790,12 @@ function zeroTimeDroneWorld(fps, drones, terrain = [], otherBullets = []) {
   g.drones = drones.map((d, i) => ({kind:'drone', id:10+i, ownerId:2,
     x:8, y:0, r:8, hp:20, ...d}));
   g.__novaTerrain = terrain;
+  g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=42;
+  for (const d of g.drones) {
+    d.__novaChronoDroneEpoch=42;
+    d.__novaChronoDronePrevX=d.x;
+    d.__novaChronoDronePrevY=d.y;
+  }
   g.bullets = [{kind:'bullet', id:1, ownerId:1, x:0, y:0,
     vx:500, vy:0, r:3, dmg:20, ttl:.004, pen:0,
     hits:0, dead:false, shell:false, beam:false}, ...otherBullets];
@@ -815,8 +821,27 @@ for (const fps of [30,60,120,240]) {
     assert.equal(zeroTimeDroneWorld(fps,[{}],terrain).hits,0);
   });
   test('TTL-first competing projectile at origin vetoes speculative drone damage at '+fps+'Hz', () => {
-    const other=[{kind:'bullet',id:99,ownerId:3,x:0,y:0,
+    const other=[{kind:'bullet',id:99,ownerId:3,x:-7,y:0,
       vx:0,vy:0,r:3,ttl:1,pen:0,hits:0,dead:false}];
     assert.equal(zeroTimeDroneWorld(fps,[{}],[],other).hits,0);
+  });
+}
+
+for (const fps of [30,60,120,240]) {
+  test('TTL-first uncertified drone history never authorizes an early hit at '+fps+'Hz',()=>{
+    const g=zeroTimeDroneWorld(fps,[{}]);
+    g.drones[0].__novaChronoDroneEpoch=-1;
+    g.hits=0;g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+      vx:500,vy:0,r:3,dmg:20,ttl:.004,pen:0,hits:0,dead:false}];
+    g.updateBullets(1/fps);
+    assert.equal(g.hits,0);
+  });
+  test('TTL-first drone entering origin after frame start cannot create a phantom hit at '+fps+'Hz',()=>{
+    const g=zeroTimeDroneWorld(fps,[{}]);
+    g.drones[0].__novaChronoDronePrevX=100;
+    g.hits=0;g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+      vx:500,vy:0,r:3,dmg:20,ttl:.004,pen:0,hits:0,dead:false}];
+    g.updateBullets(1/fps);
+    assert.equal(g.hits,0);
   });
 }
