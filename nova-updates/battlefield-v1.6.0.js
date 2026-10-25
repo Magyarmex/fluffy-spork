@@ -622,8 +622,13 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       !Number.isFinite(dr.x)||!Number.isFinite(dr.y))return false;
    var mx=dr.x-sx,my=dr.y-sy;
    if(mx*mx+my*my>96*96)return false;
+   /* Canonical committed dives can exceed base drone speed. Bound any
+    * unobserved curved motion by four times the recorded speed; malformed
+    * speeds cannot authorize a speculative contact. */
+   if(dr.speed!=null&&!Number.isFinite(dr.speed))return false;
+   var motionBound=Math.max(800,(dr.speed>0?dr.speed*4:800));
    var pad=Math.max(0,b.r||2)+Math.max(0,dr.r||8)+1+
-     Math.max(30,dt*800);
+     Math.max(30,dt*motionBound);
    if(Math.max(ax,ex)+pad>=Math.min(sx,dr.x)&&
       Math.min(ax,ex)-pad<=Math.max(sx,dr.x)&&
       Math.max(ay,ey)+pad>=Math.min(sy,dr.y)&&
@@ -773,8 +778,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       !Number.isFinite(dr.x)||!Number.isFinite(dr.y))return false;
    var ddx=dr.x-dsx,ddy=dr.y-dsy;
    if(ddx*ddx+ddy*ddy>96*96)return false;
+   if(dr.speed!=null&&!Number.isFinite(dr.speed))return false;
+   var motionBound=Math.max(800,(dr.speed>0?dr.speed*4:800));
    if(near(dsx,dsy,dr.x,dr.y,
-      Math.max(0,dr.r||8)+(b.r||2)+1+Math.max(30,dt*800)))return false;
+      Math.max(0,dr.r||8)+(b.r||2)+1+
+      Math.max(30,dt*motionBound)))return false;
   }
   for(var ti=0;ti<tanks.length;ti++){
    var t=tanks[ti];if(!t||!t.alive||t.id===b.ownerId)continue;
