@@ -530,15 +530,20 @@ test('nearer spawn-shielded body masks a vulnerable body behind it', () => {
   g.updateBullets(1 / 30);
   assert.equal(g.novaChronoShadowSnapshot().predictedBodyContacts, 0);
 });
-test('vulnerable first body remains a valid diagnostic before a shielded rear body', () => {
+test('vulnerable first body is registered before a shielded rear body', () => {
   const { g } = boot(), front = addScout(g, 35);
   front.spawnShieldT = 0;
   g.tanks.push({ id: 3, kind: 'tank', cls: 'scout', x: 55, y: 0,
     hp: 100, alive: true, spawnShieldT: 1 });
   g.bullets = [ordinaryShot(8303)];
   g.updateBullets(1 / 30);
-  assert.equal(g.novaChronoShadowSnapshot().predictedBodyContacts, 1);
-  assert.equal(g.novaChronoShadowSnapshot().unregisteredBodyContacts, 1);
+  const audit = g.novaChronoShadowSnapshot();
+  assert.equal(audit.predictedBodyContacts, 1);
+  /* Previously this was a real missed hit. With remote-defense filtering,
+   * the physical first contact now registers, so the diagnostic must agree. */
+  assert.equal(audit.registeredBodyContacts, 1);
+  assert.equal(audit.unregisteredBodyContacts, 0);
+  assert.ok(front.hp < 100, 'vulnerable front target receives actual damage');
 });
 test('allied different-owner projectile cannot conceal a true short-TTL miss', () => {
   const { g } = boot(), target = addScout(g);
