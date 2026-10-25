@@ -614,3 +614,20 @@ for(const hz of [30,60,120,240]){
   assert.equal(shape.hp,80);
  });
 }
+
+/* Canonical Minigun round reaches a Circle near its natural .8s lifetime.
+ * A same-owner Controller drone on that firing lane cannot suppress farming. */
+for(const hz of [30,60,120,240]){
+ test('full-lifetime Minigun farming ignores owned drone at '+hz+'Hz',()=>{
+  const g=new Game();
+  g.shapes=[{kind:'shape',id:2,x:396,y:0,r:12,hp:100,born:g.time-1}];
+  g.drones=[{kind:'drone',id:5,ownerId:1,x:380,y:0,r:8,hp:20}];
+  g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,vx:480,vy:0,
+   r:3.8*(1+7.084*.0085),dmg:7.084,ttl:.8,pen:1,
+   hits:0,dead:false,shell:false,beam:false}];
+  for(let frame=0;frame<300&&g.bullets.length;frame++){
+   g.updateBullets(1/hz);g.time+=1/hz;
+  }
+  assert.equal(g.hits,1,'owner drone is transparent to Minigun neutral contact');
+ });
+}
