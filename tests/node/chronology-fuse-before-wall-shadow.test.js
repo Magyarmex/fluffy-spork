@@ -188,3 +188,22 @@ for(const optimized of [false,true]){
     assert.equal(snap.ttlOvershoots,1,'independent TTL defect remains visible');
   });
 }
+
+test('later non-wall burst is not falsely attributed to the wall',()=>{
+  const Game=boot(false),g=new Game(),b={
+    id:900,kind:'bullet',ownerId:1,shell:true,dead:false,
+    x:151,y:0,vx:380,vy:0,r:8.5,dmg:26,ttl:2,pen:1,hits:0
+  };
+  g.bursts=[];g.__novaTerrain=[];
+  g.__novaChronoShadowFrame={dt:1/30,samples:new Map([[b,{
+    id:900,x:146,y:0,vx:380,vy:0,ttl:2,
+    fuseFirst:{time:2/380,x:148,y:0,wallTime:8.175/380,
+      wallX:154.175,wallY:0,wallId:-51}
+  }]])};
+  g.clusterBurst(b);
+  const snap=g.novaChronoShadowSnapshot();
+  assert.equal(snap.bursts,1);
+  assert.equal(snap.fuseBeforeWallLateBursts,0);
+  assert.equal(g.bursts.length,1);
+  assert.equal(g.bursts[0].x,151);
+});
