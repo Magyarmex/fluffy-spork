@@ -9,8 +9,9 @@ const vm=require('node:vm');
 const root=path.resolve(__dirname,'../..');
 const battlefield=fs.readFileSync(path.join(root,'nova-updates/battlefield-v1.6.0.js'),'utf8');
 const live=fs.readFileSync(path.join(root,'nova-updates/second-body-live-vector-v1.10.7.js'),'utf8');
+const terrainIntelligence=fs.readFileSync(path.join(root,'nova-updates/terrain-intelligence-v1.10.2.js'),'utf8');
 
-function boot({trace=true,spawn=false,baseMotion=25,damaged=true,ownerX=100,ownerY=100}={}){
+function boot({trace=true,spawn=false,baseMotion=25,damaged=true,ownerX=100,ownerY=100,withTerrainIntelligence=false}={}){
   class Game {
     update(dt){this.time+=dt;this.updateDrones(dt);}
     updateDrones(){
@@ -31,6 +32,7 @@ function boot({trace=true,spawn=false,baseMotion=25,damaged=true,ownerX=100,owne
     console:{info(){},warn(){},error(){}},performance:{now:()=>0},
     Math,Date,Map,Set,Number,Object,Array,WeakMap};
   vm.runInNewContext(battlefield,ctx,{filename:'battlefield-v1.6.0.js'});
+  if(withTerrainIntelligence)vm.runInNewContext(terrainIntelligence,ctx,{filename:'terrain-intelligence-v1.10.2.js'});
   vm.runInNewContext(live,ctx,{filename:'second-body-live-vector-v1.10.7.js'});
   const m={exports:{}};
   modules['game/engine'](m,m.exports,()=>({CLASSES:{
@@ -103,6 +105,32 @@ test('unobstructed Live Vector repair is a separate observed movement stage',()=
     'postprocess moves toward owner after the Battlefield stage');
   assert.equal(drone.__novaChronoDroneLiveEpoch,g.__novaShapeSweepEpoch);
   assert.equal(g.isTerrainSafe(drone.x,drone.y,9),true);
+});
+test('full Battlefield → Terrain Intelligence → Live Vector chain observes route stage',()=>{
+  const {g,drone}=boot({withTerrainIntelligence:true,baseMotion:0,
+    ownerX:-50,ownerY:100});
+  g.update(1/30);
+  const epoch=g.__novaShapeSweepEpoch;
+  assert.equal(drone.__novaChronoDroneTraceEpoch,epoch);
+  assert.equal(drone.__novaChronoDroneRouteEpoch,epoch);
+  assert.equal(drone.__novaChronoDroneLiveEpoch,epoch);
+  assert.ok(Number.isFinite(drone.__novaChronoDroneRouteX));
+  assert.ok(Number.isFinite(drone.__novaChronoDroneRouteY));
+  assert.equal(drone.__novaChronoDroneRouteX,drone.__novaChronoDroneTerrainX,
+    'no separate routing displacement in this unobstructed fixture');
+  assert.equal(drone.__novaChronoDroneRouteY,drone.__novaChronoDroneTerrainY);
+  assert.ok(drone.__novaChronoDroneLiveY>drone.__novaChronoDroneRouteY,
+    'postprocess movement remains a distinct later stage');
+});
+test('routing stage is inert when diagnostics are disabled',()=>{
+  const a=boot({withTerrainIntelligence:true,trace:true,baseMotion:0,
+    ownerX:-50,ownerY:100});
+  const b=boot({withTerrainIntelligence:true,trace:false,baseMotion:0,
+    ownerX:-50,ownerY:100});
+  a.g.update(1/60);b.g.update(1/60);
+  assert.equal(a.drone.x,b.drone.x);
+  assert.equal(a.drone.y,b.drone.y);
+  assert.equal(b.drone.__novaChronoDroneRouteEpoch,undefined);
 });
 test('opt-in checkpoints do not alter gameplay state',()=>{
   const a=boot({trace:true}),b=boot({trace:false});
