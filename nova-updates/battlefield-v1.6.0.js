@@ -601,6 +601,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   * motion, and no simultaneous bodies. All ambiguous cases remain owned by
   * the existing engine until the full chronological resolver is ready. */
  function isolatedTTLBodyContact(g,b,dt){
+  /* Avoid quadratic work in bullet-heavy scenes until the shared swept
+   * projectile index is integrated. Preserve the existing path above this
+   * bounded 32-projectile diagnostic-safe envelope. */
+  if(g.bullets&&g.bullets.length>32)return false;
   if(!b||b.dead||b.shell||b.beam||b.splash||!(b.ttl>0)||
      !(b.ttl<=dt)||!(dt>0)||!(b.pen>=0)||(b.hits||0)>0||
      !Number.isFinite(b.x)||!Number.isFinite(b.y)||
