@@ -222,3 +222,21 @@ test('Cannon fuse preserves existing two-unit early-trigger tolerance',()=>{
  g.updateBullets(1/30);
  assert.deepEqual(origins,[99]);
 });
+
+test('Cannon fuse never rewinds a shell that breached cover in the same frame',()=>{
+ const {Game}=loadDisciplines(),g=new Game(),origins=[];
+ g.clusterBurst=b=>origins.push(b.x);
+ g.bullets=[{x:120,y:0,px:80,py:0,dead:false,shell:true,pen:1,hits:0,
+  __novaBreachAtTime:g.time,__v17Cannon:true,__v17FuseDist:100,
+  __v17SpawnX:0,__v17SpawnY:0}];
+ g.updateBullets(1/30);
+ assert.deepEqual(origins,[120],'cover breach requires coupled chronology, not a post-core rewind');
+});
+test('Cannon fuse never rewinds a shell with an already registered victim',()=>{
+ const {Game}=loadDisciplines(),g=new Game(),origins=[];
+ g.clusterBurst=b=>origins.push(b.x);
+ g.bullets=[{x:120,y:0,px:80,py:0,dead:false,shell:true,pen:1,hits:1,
+  __v17Cannon:true,__v17FuseDist:100,__v17SpawnX:0,__v17SpawnY:0}];
+ g.updateBullets(1/30);
+ assert.deepEqual(origins,[120],'existing damage must not be silently reordered');
+});
