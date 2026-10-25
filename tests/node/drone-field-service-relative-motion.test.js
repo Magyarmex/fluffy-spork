@@ -243,3 +243,13 @@ test('discontinuous relocation immediately refreshes previously safe hostile-uni
   d.teleportX=-70;g.time=7.02;g.updateDrones(1/60);
   assert.equal(d.hp,healed,'nearby hostile at new location must interrupt repair');
 });
+
+test('materialized playable runtime wires Field Service before Live Vector postprocessing',()=>{
+  const html=fs.readFileSync(path.join(__dirname,'../../index.html'),'utf8');
+  const battlefield=html.indexOf('nova-updates/battlefield-v1.6.0.js');
+  const terrain=html.indexOf('nova-updates/terrain-intelligence-v1.10.2.js');
+  const field=html.indexOf('nova-updates/drone-field-service-v1.10.3.js');
+  const live=html.indexOf('nova-updates/second-body-live-vector-v1.10.7.js');
+  assert.ok(battlefield>=0&&terrain>battlefield&&field>terrain&&live>field,
+    'the tested Field Service wrapper must execute in the actual shipping chain');
+});
