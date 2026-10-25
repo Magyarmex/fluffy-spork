@@ -202,7 +202,7 @@ wrap('game/engine',function(engine,require){
     if(this.bullets&&this.firstTerrainHit){
       for(var i=0;i<this.bullets.length;i++){
         var b=this.bullets[i];if(!b||b.dead||!(b.__novaStructureMult>1))continue;
-        var nx=b.x+(b.vx||0)*dt,ny=b.y+(b.vy||0)*dt;
+        var reach=Number.isFinite(b.ttl)?Math.min(dt,b.ttl):dt;if(!(reach>0))continue;var nx=b.x+(b.vx||0)*reach,ny=b.y+(b.vy||0)*reach;
         var hit=this.firstTerrainHit(b.x,b.y,nx,ny,(b.r||2)*.45);
         if(!hit||!hit.solid||!hit.solid.destructible||hit.solid.hp<=1)continue;
         if(b.__v171PrimedCover===hit.solid.id)continue;
