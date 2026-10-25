@@ -730,9 +730,9 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    * turn its existing burst into a silent out-of-bounds deletion. */
   if(Math.abs(px)>=MAP_LIMIT-20||Math.abs(py)>=MAP_LIMIT-20||
      Math.abs(nx)>=MAP_LIMIT-20||Math.abs(ny)>=MAP_LIMIT-20)return false;
-  /* Drones have no trustworthy frame-start position in this wrapper. */
+  /* Battlefield captures live drone starts at Game.update entry. Unknown
+   * births or discontinuous movement still retain original collision authority. */
   var drones=g.drones||[];
-  for(var di=0;di<drones.length;di++)if(drones[di]&&drones[di].hp>0)return false;
   var tanks=g.tanks||[],shapes=g.shapes||[],bullets=g.bullets||[];
   if(tanks.length+shapes.length+bullets.length>500)return false;
   var minx=Math.min(ox,nx),maxx=Math.max(ox,nx),
@@ -742,6 +742,21 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       !Number.isFinite(x1)||!Number.isFinite(y1)||!Number.isFinite(pad))return true;
    return Math.max(x0,x1)+pad>=minx&&Math.min(x0,x1)-pad<=maxx&&
           Math.max(y0,y1)+pad>=miny&&Math.min(y0,y1)-pad<=maxy;
+  }
+  /* Only a witnessed, bounded drone corridor can be ruled out. A drone
+   * near either endpoint, or moving through the projectile AABB, must defer.
+   * The extra movement pad covers non-linear steering inside the frame. */
+  for(var di=0;di<drones.length;di++){
+   var dr=drones[di];if(!dr||!(dr.hp>0))continue;
+   if(!g.__novaShapeSweepActive||
+      dr.__novaChronoDroneEpoch!==g.__novaShapeSweepEpoch)return false;
+   var dsx=dr.__novaChronoDronePrevX,dsy=dr.__novaChronoDronePrevY;
+   if(!Number.isFinite(dsx)||!Number.isFinite(dsy)||
+      !Number.isFinite(dr.x)||!Number.isFinite(dr.y))return false;
+   var ddx=dr.x-dsx,ddy=dr.y-dsy;
+   if(ddx*ddx+ddy*ddy>96*96)return false;
+   if(near(dsx,dsy,dr.x,dr.y,
+      Math.max(0,dr.r||8)+(b.r||2)+1+Math.max(30,dt*800)))return false;
   }
   for(var ti=0;ti<tanks.length;ti++){
    var t=tanks[ti];if(!t||!t.alive||t.id===b.ownerId)continue;
@@ -793,7 +808,15 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    for(var ti=0;ti<this.tanks.length;ti++){var o=this.tanks[ti];if(!o||!o.alive||o.__novaSpotterContactId==null||o.__novaSpotterContactId<0)continue;var target=this.getTank(o.__novaSpotterContactId),spot=spotMap.get(o.id)||null;if(target&&spot&&!lineOfSight(this,spot.x,spot.y,target.x,target.y,2)){o.__novaSpotterContactId=-1;o.__novaSpotterContactUntil=0;o.__novaSpotterDroneId=-1;}}
  return out;};
 
- var oldUpdate=Game.prototype.update;Game.prototype.update=function(dt){ensureTerrain(this);var epoch=(this.__novaShapeSweepEpoch||0)+1;this.__novaShapeSweepEpoch=epoch;var shapes=this.shapes||[];for(var si=0;si<shapes.length;si++){var sh=shapes[si];if(!sh)continue;sh.__novaShapeSweepEpoch=epoch;sh.__novaShapeSweepPrevX=sh.x;sh.__novaShapeSweepPrevY=sh.y;}this.__novaShapeSweepActive=true;if(this.__novaBattlefield&&!this.__novaBattlefield.announced&&this.status==='playing'&&this.time>.1){this.__novaBattlefield.announced=true;if(this.toast)this.toast('¦ BATTLEFIELD · '+this.__novaBattlefield.name+'  COVER CHANGES THE FIGHT','info');}
+ var oldUpdate=Game.prototype.update;Game.prototype.update=function(dt){ensureTerrain(this);var epoch=(this.__novaShapeSweepEpoch||0)+1;this.__novaShapeSweepEpoch=epoch;
+ /* Capture drones before AI/drone movement; the later projectile pre-pass
+  * may only exclude drones whose complete observed corridor is remote. */
+ var chronoDrones=this.drones||[];for(var di=0;di<chronoDrones.length;di++){
+  var cd=chronoDrones[di];if(!cd||!(cd.hp>0))continue;
+  cd.__novaChronoDroneEpoch=epoch;
+  cd.__novaChronoDronePrevX=cd.x;cd.__novaChronoDronePrevY=cd.y;
+ }
+ var shapes=this.shapes||[];for(var si=0;si<shapes.length;si++){var sh=shapes[si];if(!sh)continue;sh.__novaShapeSweepEpoch=epoch;sh.__novaShapeSweepPrevX=sh.x;sh.__novaShapeSweepPrevY=sh.y;}this.__novaShapeSweepActive=true;if(this.__novaBattlefield&&!this.__novaBattlefield.announced&&this.status==='playing'&&this.time>.1){this.__novaBattlefield.announced=true;if(this.toast)this.toast('¦ BATTLEFIELD · '+this.__novaBattlefield.name+'  COVER CHANGES THE FIGHT','info');}
    var out;try{out=oldUpdate.call(this,dt);}finally{this.__novaShapeSweepActive=false;}for(var i=0;i<this.shapes.length;i++){var s=this.shapes[i];if(!s||s.hp<=0)continue;circleResolve(this,s,(s.r||10)*.86);}return out;};
 });
 
