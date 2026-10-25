@@ -163,3 +163,20 @@ for(const fps of [30,60,120,240]){
   assert.equal(world(fps,20.5,-105,true).hits,0);
  });
 }
+
+test('swept grid recovers moving shape absent from endpoint spatial hash',()=>{
+ const g=boot(),s={id:5,kind:'shape',type:'crasher',x:10,y:17,
+  vx:0,vy:105,r:15,hp:20,maxHp:20};
+ g.shapes=[s];g.bullets=[bullet()];
+ g.hash.query=(_x,_y,_r,out)=>{out.length=0;}; // endpoint hash misses motion
+ g.update(1/30);
+ assert.deepEqual(g.hits,[5]);
+});
+for(const y of [18,18.0001,18.1]){
+ test('parallel moving shape at separation '+y+' is not a phantom hit',()=>{
+  const g=boot(),s={id:5,kind:'shape',type:'crasher',x:10,y,
+   vx:105,vy:0,r:15,hp:20,maxHp:20};
+  g.shapes=[s];g.bullets=[bullet()];g.update(1/30);
+  assert.equal(g.hits.length,0);
+ });
+}
