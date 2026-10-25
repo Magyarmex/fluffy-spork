@@ -421,3 +421,45 @@ test('nonfinite drone speed keeps TTL recovery conservative',()=>{
  g.updateBullets(1/30);
  assert.equal(g.hits,0);
 });
+
+
+/* Run349: a remote tank's defensive state cannot cancel a physically valid
+ * contact with a different, unprotected tank. Broad-phase must precede
+ * defensive/alliance uncertainty, while near contenders remain conservative. */
+for (const hz of [30,60,120,240]) {
+ test('remote spawn-shielded tank does not suppress TTL hit at '+hz+'Hz',()=>{
+  const g=isolatedWorld({x:28,vx:6000,ttl:.002,extraTanks:[{
+   kind:'tank',id:3,x:1000,y:1000,cls:'scout',hp:100,alive:true,
+   spawnShieldT:1,shieldT:1,bulwarkT:1,tauntT:1
+  }]});
+  g.updateBullets(1/hz);
+  assert.equal(g.hits,1,'distant defensive tank must not erase the reachable hit');
+ });
+ test('remote allied tank does not suppress TTL hit at '+hz+'Hz',()=>{
+  const g=isolatedWorld({x:28,vx:6000,ttl:.002,extraTanks:[{
+   kind:'tank',id:3,x:1000,y:1000,cls:'scout',hp:100,alive:true,teamId:'blue'
+  }]});
+  g.tanks[0].teamId='red';
+  g.getTank=()=>({id:1,teamId:'red'});
+  g.areAllies=(a,b)=>a.teamId===b.teamId;
+  g.updateBullets(1/hz);
+  assert.equal(g.hits,1,'distant ally must not cancel an unrelated enemy contact');
+ });
+}
+test('near shielded contender still defers physical TTL contact',()=>{
+ const g=isolatedWorld({x:40,extraTanks:[{
+  kind:'tank',id:3,x:20,y:0,cls:'scout',hp:100,alive:true,spawnShieldT:1
+ }]});
+ g.updateBullets(1/30);
+ assert.equal(g.hits,0,'nearby defensive collision remains chronologically uncertain');
+});
+test('near allied contender still defers physical TTL contact',()=>{
+ const g=isolatedWorld({x:40,extraTanks:[{
+  kind:'tank',id:3,x:20,y:0,cls:'scout',hp:100,alive:true,teamId:'blue'
+ }]});
+ g.tanks[0].teamId='red';
+ g.getTank=()=>({id:1,teamId:'blue'});
+ g.areAllies=(a,b)=>a.teamId===b.teamId;
+ g.updateBullets(1/30);
+ assert.equal(g.hits,0,'nearby allied collision remains chronologically uncertain');
+});
