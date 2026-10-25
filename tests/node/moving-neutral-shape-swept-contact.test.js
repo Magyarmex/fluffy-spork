@@ -41,7 +41,8 @@ function boot(){
  Game.prototype.updateBullets=coreBullets();
  Game.prototype.update=function(dt){
   this.time+=dt;
-  for(const s of this.shapes){s.x+=(s.vx||0)*dt;s.y+=(s.vy||0)*dt;}
+  if(this.__testShapeMotion)this.__testShapeMotion(dt);
+  else for(const s of this.shapes){s.x+=(s.vx||0)*dt;s.y+=(s.vy||0)*dt;}
   this.updateBullets(dt);
  };
  Game.prototype.damageShape=function(s,dmg){s.hp-=dmg;this.hits.push(s.id);};
@@ -90,4 +91,35 @@ test('stationary neutral shape in projectile corridor still takes damage',()=>{
 });
 test('materialized production includes Battlefield overlay',()=>{
  assert.ok(html.includes('nova-updates/battlefield-v1.6.0.js'));
+});
+
+for(const reverse of [false,true]){
+ test('earliest moving Crasher beats a later static shape, reverse='+reverse,()=>{
+  const g=boot(),dt=1/30;
+  const cr={id:5,kind:'shape',type:'crasher',x:10,y:17,vx:0,vy:105,r:15,hp:20,maxHp:20};
+  const later={id:6,kind:'shape',type:'square',x:34,y:0,vx:0,vy:0,r:15,hp:20,maxHp:20};
+  g.shapes=reverse?[later,cr]:[cr,later];g.bullets=[bullet()];
+  g.update(dt);
+  assert.deepEqual(g.hits,[5],'first physical shape must win, regardless of insertion order');
+  assert.equal(cr.hp,10);assert.equal(later.hp,20);
+ });
+}
+test('teleported shape does not invent a hit along its relocation gap',()=>{
+ const g=boot(),s={id:5,kind:'shape',type:'star',x:10,y:150,
+  vx:0,vy:0,r:15,hp:20,maxHp:20};
+ g.shapes=[s];g.bullets=[bullet()];
+ g.__testShapeMotion=()=>{s.y=0;}; // instant relocation, not physical movement
+ g.update(1/30);
+ assert.equal(g.hits.length,0);
+ assert.equal(s.hp,20);
+});
+test('moving shape can be hit on the next frame after a teleport',()=>{
+ const g=boot(),s={id:5,kind:'shape',type:'star',x:10,y:150,
+  vx:0,vy:0,r:15,hp:20,maxHp:20};
+ g.shapes=[s];g.bullets=[bullet()];
+ g.__testShapeMotion=()=>{s.y=0;};
+ g.update(1/30);assert.equal(g.hits.length,0);
+ g.__testShapeMotion=null;g.bullets=[bullet()];
+ g.update(1/30);
+ assert.equal(g.hits.length,1);
 });
