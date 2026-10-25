@@ -213,3 +213,42 @@ for (const optimized of [false, true]) {
     }
   });
 }
+
+
+/* Physical-first expiry must compose with Apex's structural pre-pass and
+ * its five/ten-child sector shaping, not only the unmodified six-child core. */
+for (const optimized of [false, true]) {
+  for (const cluster of [6, 10]) {
+    test((optimized ? 'optimized' : 'base') +
+      ': Apex shell TTL precedes later structural cover, ' + cluster + ' children', () => {
+      const g = new (boot(optimized, true))();
+      g.time = 1; g.__novaBattlefield = { coverBroken: 0 };
+      g.__novaTerrain = [{ id: -101, shape: 'rect', x: 45, y: 0,
+        w: 4, h: 80, solid: true, destructible: true, hp: 100 }];
+      g.__testOwner = { id: 1, cls: 'clusterking', angle: 0,
+        __v17FuseDepth: .5, stats: { damage: 0 }, level: 1, alive: true };
+      g.bullets = [{ id: 777, x: 0, y: 0, vx: 6000, vy: 0,
+        r: 3, dmg: 26, ttl: .005, shell: true, ownerId: 1,
+        pen: 1, hits: 0, dead: false, color: '#aef',
+        clusterDmg: 8, cluster, __novaClusterClass: 'clusterking',
+        __novaClusterFuseDepth: .5, __novaStructureMult: 2.35,
+        __v17Cannon: true, __v17FuseDist: 150,
+        __v17SpawnX: 0, __v17SpawnY: 0 }];
+      g.updateBullets(1 / 30);
+      assert.equal(g.__novaTerrain[0].hp, 100,
+        'Apex may not prime a barricade physically beyond shell lifetime');
+      assert.equal(g.bullets.length, cluster,
+        'the shell must burst once, with Apex child count intact');
+      const remaining = 1 / 30 - .005;
+      for (const child of g.bullets) {
+        assert.equal(child.shell, false);
+        assert.ok(Math.hypot(child.x - 30, child.y) <= 330 * remaining + 1e-7,
+          'fragment may move only after birth at x=30');
+        assert.ok(Math.abs(child.ttl - (.7 - remaining)) < 1e-8,
+          'fragment lifetime must begin at physical birth');
+        assert.ok(Math.hypot(child.vx, child.vy) > 200,
+          'full fragment velocity must be restored after this frame');
+      }
+    });
+  }
+}
