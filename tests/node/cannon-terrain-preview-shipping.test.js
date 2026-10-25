@@ -163,3 +163,30 @@ test('released touch aim hides both fuse and impact markers',()=>{
  assert.ok(!labels.some(x=>x.startsWith('IMPACT ')||x.startsWith('FUSE ')),
    'no aiming input should leave no persistent impact/fuse marker: '+labels);
 });
+
+test('inherited lateral hull motion does not invent a hull-ray cover impact',()=>{
+ const {g,t}=boot('cannon',0,0,250);
+ g.__novaTerrain=[{...wall(150),w:10,h:12,y:0}];
+ const oldHullRay=g.firstTerrainHit(t.x,t.y,t.x+320,t.y,4);
+ assert.ok(oldHullRay,'historic hull-centered ray would report a false IMPACT');
+ const p=g.novaFusePreview(t);
+ g.tryFire(t);const b=g.bullets[0],mag=Math.hypot(b.vx,b.vy);
+ const actual=g.firstTerrainHit(b.x,b.y,
+  b.x+b.vx/mag*b.__v17FuseDist,b.y+b.vy/mag*b.__v17FuseDist,b.r*.45);
+ assert.equal(actual,null,'moving projectile must clear the narrow cover');
+ assert.equal(p.blocked,false,'preview must not invent the old hull-ray contact');
+});
+test('inherited lateral hull motion reveals cover missed by the hull ray',()=>{
+ const {g,t}=boot('cannon',0,0,250);
+ g.__novaTerrain=[{...wall(150),w:10,h:12,y:15}];
+ assert.equal(g.firstTerrainHit(t.x,t.y,t.x+320,t.y,4),null,
+  'historic hull-centered ray would miss the real blocker');
+ const p=g.novaFusePreview(t);
+ g.tryFire(t);const b=g.bullets[0],mag=Math.hypot(b.vx,b.vy);
+ const actual=g.firstTerrainHit(b.x,b.y,
+  b.x+b.vx/mag*b.__v17FuseDist,b.y+b.vy/mag*b.__v17FuseDist,b.r*.45);
+ assert.ok(actual,'actual projectile should reach narrow cover');
+ assert.equal(p.blocked,true);
+ near(p.x,actual.hit.x,'moving narrow-cover x');
+ near(p.y,actual.hit.y,'moving narrow-cover y');
+});
