@@ -868,3 +868,33 @@ for (const fps of [30,60,120,240]) {
     assert.equal(g.hits,0);
   });
 }
+
+/* Production composition: Battlefield must capture the drone's start
+ * position through Game.update; direct helper tests alone are insufficient. */
+for (const optimized of [false,true]) {
+  for (const fps of [30,60,120,240]) {
+    test('shipping Game.update awards witnessed point-blank hostile drone before TTL ('+
+      (optimized?'optimized':'baseline')+', '+fps+'Hz)',()=>{
+      const FullGame=boot(function(dt){this.time+=dt;this.updateBullets(dt);},optimized);
+      const g=new FullGame();
+      g.tanks=[];g.drones=[{kind:'drone',id:7,ownerId:2,x:8,y:0,r:8,hp:20}];
+      g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+        vx:500,vy:0,r:3,dmg:20,ttl:.004,pen:0,hits:0,dead:false}];
+      g.update(1/fps);
+      assert.equal(g.hits,1);
+      assert.equal(g.__novaShapeSweepActive,false);
+    });
+    test('shipping Game.update refuses an uncertified moved-in drone ('+
+      (optimized?'optimized':'baseline')+', '+fps+'Hz)',()=>{
+      const FullGame=boot(function(dt){
+        this.drones[0].x=8;this.time+=dt;this.updateBullets(dt);
+      },optimized);
+      const g=new FullGame();
+      g.tanks=[];g.drones=[{kind:'drone',id:7,ownerId:2,x:100,y:0,r:8,hp:20}];
+      g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+        vx:500,vy:0,r:3,dmg:20,ttl:.004,pen:0,hits:0,dead:false}];
+      g.update(1/fps);
+      assert.equal(g.hits,0);
+    });
+  }
+}
