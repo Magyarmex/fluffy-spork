@@ -76,6 +76,7 @@ function boot(withPerf=false,withCore=false){
   ?{CLASSES:{scout:{size:15}}}:{ARENA_HALF:2250});
  const g=new m.exports.Game();
  if(withCore){
+  g.__novaBattlefield={announced:true,name:'TEST'};
   g.status='playing';g.zoom=1;g.w=800;g.h=600;
   g.player={id:99,kind:'tank',cls:'scout',x:1000,y:1000,vx:0,vy:0,
    alive:true,isPlayer:true,angle:0,hp:100,maxHp:100,stats:{regen:0},
