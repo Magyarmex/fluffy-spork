@@ -731,3 +731,39 @@ test('moving allied tank in corridor still vetoes unproven contact order',()=>{
  g.updateBullets(1/30);
  assert.equal(g.hits,0);
 });
+
+
+/* Run351 follow-up: discontinuous tank relocations are NOT swept movement.
+ * A short-lived projectile must not damage a tank that teleported across
+ * its corridor without physically travelling through the intervening space.
+ * The existing shape sweep already rejects jumps over 96 units. */
+for(const hz of [30,60,120,240]){
+ test('TTL recovery does not backdate large tank teleport away at '+hz+'Hz',()=>{
+  const g=isolatedWorld({x:1000,vx:12000,ttl:.004});
+  const t=g.tanks[0];t.__novaSweepMoveTime=g.time;
+  t.__novaSweepPrevX=-30;t.__novaSweepPrevY=0;
+  g.updateBullets(1/hz);
+  assert.equal(g.hits,0,'teleport departure is not a swept body contact');
+ });
+ test('TTL recovery does not backdate large tank teleport across at '+hz+'Hz',()=>{
+  const g=isolatedWorld({x:-1000,vx:12000,ttl:.004});
+  const t=g.tanks[0];t.__novaSweepMoveTime=g.time;
+  t.__novaSweepPrevX=120;t.__novaSweepPrevY=0;
+  g.updateBullets(1/hz);
+  assert.equal(g.hits,0,'teleport arrival/departure cannot claim intervening hit');
+ });
+ test('ordinary witnessed tank movement still allows real TTL hit at '+hz+'Hz',()=>{
+  const g=isolatedWorld({x:40,vx:12000,ttl:.004});
+  const t=g.tanks[0];t.__novaSweepMoveTime=g.time;
+  t.__novaSweepPrevX=30;t.__novaSweepPrevY=0;
+  g.updateBullets(1/hz);
+  assert.equal(g.hits,1,'small observed motion retains swept contact');
+ });
+ test('large remote tank relocation cannot manufacture contact at '+hz+'Hz',()=>{
+  const g=isolatedWorld({x:1200,vx:12000,ttl:.004});
+  const t=g.tanks[0];t.__novaSweepMoveTime=g.time;
+  t.__novaSweepPrevX=1500;t.__novaSweepPrevY=1500;
+  g.updateBullets(1/hz);
+  assert.equal(g.hits,0);
+ });
+}
