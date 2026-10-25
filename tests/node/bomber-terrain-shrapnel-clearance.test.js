@@ -169,9 +169,10 @@ for (const optimized of [false, true]) {
     assert.equal(g.__novaTerrain[0].solid, false);
     assert.equal(g.bullets.length, 6);
   });
-  test(label + ': terrain impact plus same-tick TTL cannot create a second shrapnel burst', () => {
+  test(label + ': earlier TTL burst keeps six children before a later wall', () => {
     const g = fire(boot(optimized), 'rect', 60, { sameTick: true });
-    assert.equal(g.bullets.length, 3);
+    assert.equal(g.bullets.length, 6, 'expiry at x=-108 precedes wall face x=-80');
+    assert.ok(g.bullets.every(b => b.x < -100), 'children cannot be born at the later wall');
   });
   test(label + ': natural expiry near intact cover keeps original burst origin', () => {
     const g = fire(boot(optimized), 'rect', 60, { expireNear: true });
