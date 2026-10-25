@@ -336,7 +336,7 @@ wrap('game/engine',function(engine,require){
 
   var oldDamage=Game.prototype.damageTank;
   Game.prototype.damageTank=function(t,dmg,srcId,kx,ky){
-    if(!guardian(t))return oldDamage.call(this,t,dmg,srcId,kx,ky);
+    if(!guardian(t)||!t.alive||t.hp<=0)return oldDamage.call(this,t,dmg,srcId,kx,ky);
     /* Core shields already make the hit harmless. Do not spend Perfect Guard
      * or award a countercharge for damage that could never reach the hull. */
     if(t.spawnShieldT>0||t.shieldT>0)return oldDamage.call(this,t,dmg,srcId,kx,ky);
