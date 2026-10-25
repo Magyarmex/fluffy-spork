@@ -805,11 +805,117 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   }
   return true;
  }
+
+ /* Physical-first TTL slice for an isolated Bomber shell. This does not
+  * arbitrate contested contacts: it commits expiry only when every potentially
+  * earlier wall/body/drone/projectile and newborn-fragment corridor is excluded.
+  * The core otherwise retains authority until the full #147 solver lands. */
+ function isolatedShellExpiry(g,b,dt,terrain){
+  if(!b||b.dead||!b.shell||b.beam||b.__novaClusterBurstConsumed||
+     !(dt>0)||!(b.ttl>0&&b.ttl<dt-1e-9)||(b.hits||0)!==0||
+     !(b.pen>=0)||b.pen>=2||b.__novaBreachAtTime===g.time||
+     !Number.isFinite(b.x)||!Number.isFinite(b.y)||
+     !Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
+     !Number.isFinite(b.r)||!Number.isFinite(b.ttl))return null;
+  var x=b.x+b.vx*b.ttl,y=b.y+b.vy*b.ttl;
+  if(!Number.isFinite(x)||!Number.isFinite(y))return null;
+  var remain=dt-b.ttl,childReach=360*remain+2.5;
+  if(Math.abs(b.x)>=MAP_LIMIT-20||Math.abs(b.y)>=MAP_LIMIT-20||
+     Math.abs(x)+childReach>=MAP_LIMIT-20||
+     Math.abs(y)+childReach>=MAP_LIMIT-20)return null;
+  /* A programmed Cannon fuse may have already crossed before TTL. Keep
+   * Three Disciplines authoritative, including its historical 2u tolerance. */
+  if(b.__v17Cannon&&b.__v17FuseDist>0){
+   if(!Number.isFinite(b.__v17SpawnX)||!Number.isFinite(b.__v17SpawnY)||
+      Math.hypot(x-b.__v17SpawnX,y-b.__v17SpawnY)+2>=b.__v17FuseDist)return null;
+  }
+  if(firstSolidHit(g,b.x,b.y,x,y,(b.r||2)*.45))return null;
+  /* Children travel at <=330u/s in the canonical cluster builder; Apex
+   * rotates/clones those children without increasing speed. The 360u/s
+   * clearance also covers their collision padding and numerical margin. */
+  for(var ti=0;ti<terrain.length;ti++){
+   var wall=terrain[ti];if(!solidAlive(wall))continue;
+   var distance=wall.shape==='circle'
+     ?Math.max(0,Math.hypot(x-wall.x,y-wall.y)-(wall.r||0))
+     :Math.hypot(Math.max(0,Math.abs(x-wall.x)-(wall.w||0)*.5),
+                 Math.max(0,Math.abs(y-wall.y)-(wall.h||0)*.5));
+   if(!(distance>childReach))return null;
+  }
+  var sx=Math.min(b.x,x),ex=Math.max(b.x,x),
+      sy=Math.min(b.y,y),ey=Math.max(b.y,y);
+  function near(x0,y0,x1,y1,pad){
+   if(!Number.isFinite(x0)||!Number.isFinite(y0)||
+      !Number.isFinite(x1)||!Number.isFinite(y1)||
+      !Number.isFinite(pad))return true;
+   return Math.max(x0,x1)+pad>=sx&&Math.min(x0,x1)-pad<=ex&&
+          Math.max(y0,y1)+pad>=sy&&Math.min(y0,y1)-pad<=ey;
+  }
+  var tanks=g.tanks||[],shapes=g.shapes||[],drones=g.drones||[],
+      bullets=g.bullets||[];
+  if(tanks.length+shapes.length+drones.length+bullets.length>600)return null;
+  for(var i=0;i<tanks.length;i++){
+   var t=tanks[i];if(!t||!t.alive)continue;
+   var known=t.__novaSweepMoveTime===g.time;
+   var tx=known?t.__novaSweepPrevX:t.x,ty=known?t.__novaSweepPrevY:t.y;
+   if(near(tx,ty,t.x,t.y,childReach+85+(known?0:dt*2000)))return null;
+  }
+  for(var j=0;j<shapes.length;j++){
+   var shape=shapes[j];if(!shape||!(shape.hp>0))continue;
+   if(shapeWasTeleported(g,shape))return null;
+   var start=shapeSweepStart(g,shape);
+   if(near(start?start.x:shape.x,start?start.y:shape.y,shape.x,shape.y,
+      childReach+(shape.r||15)+35+(start?0:dt*2000)))return null;
+  }
+  for(var k=0;k<drones.length;k++){
+   var d=drones[k];if(!d||!(d.hp>0))continue;
+   if(!g.__novaShapeSweepActive||
+      d.__novaChronoDroneEpoch!==g.__novaShapeSweepEpoch)return null;
+   var dx=d.__novaChronoDronePrevX,dy=d.__novaChronoDronePrevY;
+   if(!Number.isFinite(dx)||!Number.isFinite(dy)||
+      !Number.isFinite(d.x)||!Number.isFinite(d.y)||
+      Math.hypot(d.x-dx,d.y-dy)>96)return null;
+   if(near(dx,dy,d.x,d.y,childReach+(d.r||8)+30+dt*1600))return null;
+  }
+  for(var q=0;q<bullets.length;q++){
+   var other=bullets[q];if(!other||other===b||other.dead)continue;
+   if(near(other.x,other.y,other.x+(other.vx||0)*dt,
+           other.y+(other.vy||0)*dt,childReach+(other.r||2)+16))return null;
+  }
+  return {x:x,y:y,ttl:b.ttl,remain:remain};
+ }
  var oldUpdateBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var terrain=ensureTerrain(this);
  /* Bound pairwise geometry per frame, not total bullets: one expiring shot
   * remains eligible in a crowded but spatially separated firefight. When
   * projected work is too high, defer ALL shots to the existing path rather
   * than introducing arbitrary array-order fairness. */
+
+ /* Commit only isolated first-event expirations. Scale newborn fragment
+  * motion for this one frame, then restore full velocity; their TTL receives
+  * the same birth-time adjustment. The core still owns ordinary collisions. */
+ var ttlChildren=[];
+ var shellWork=0;
+ if(dt>0&&this.bullets&&this.bullets.length){
+  for(var countS=0;countS<this.bullets.length;countS++){
+   var shellS=this.bullets[countS];
+   if(shellS&&shellS.shell&&shellS.ttl>0&&shellS.ttl<dt)shellWork++;
+  }
+  var work=shellWork*(this.bullets.length+(this.tanks||[]).length+
+      (this.shapes||[]).length+(this.drones||[]).length+(terrain||[]).length);
+  if(work>0&&work<=2500)for(var si=this.bullets.length-1;si>=0;si--){
+   var shell=this.bullets[si],expiry=isolatedShellExpiry(this,shell,dt,terrain);
+   if(!expiry)continue;
+   var childStart=this.bullets.length;
+   shell.x=expiry.x;shell.y=expiry.y;shell.px=expiry.x;shell.py=expiry.y;
+   this.clusterBurst(shell);
+   for(var ci=childStart;ci<this.bullets.length;ci++){
+    var child=this.bullets[ci];if(!child||child.dead)continue;
+    ttlChildren.push({child:child,vx:child.vx,vy:child.vy});
+    child.vx*=expiry.remain/dt;child.vy*=expiry.remain/dt;
+    if(Number.isFinite(child.ttl))child.ttl+=expiry.ttl;
+   }
+   shell.dead=true;shell.shell=false;shell.vx=0;shell.vy=0;
+  }
+ }
  var expiring=0;
  if(dt>0)for(var countI=0;countI<this.bullets.length;countI++){
   var eb=this.bullets[countI];
@@ -824,7 +930,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      * expire or leave the arena in that pass. Consume its one-time burst now. */
     if(b.shell&&this.clusterBurst){var childStart=this.bullets.length;this.clusterBurst(b);clearTerrainBurstChildren(this,s,h,childStart);b.shell=false;}if(b.splash&&this.splashAt)this.splashAt(h.x,h.y,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.dead=true;if(this.addFlash)this.addFlash(h.x,h.y,s.destructible?'#8fd4ff':'#b9c7e7',Math.min(46,14+(b.dmg||0)*.24));if(this.cam&&b.dmg>42)this.cam.shake=Math.max(this.cam.shake,.08);/* The materialized core still advances dead bullets before removing them. Freeze a terrain-killed projectile at its impact so its final trail cannot leak through cover. Breaching live shots keep their velocity above. */b.vx=0;b.vy=0;
  }
- var out=oldUpdateBullets.call(this,dt);for(var j=0;j<terrain.length;j++){var q=terrain[j];if(q.flash>0)q.flash=Math.max(0,q.flash-dt);}return out;};
+ var out;try{out=oldUpdateBullets.call(this,dt);}finally{for(var ci=0;ci<ttlChildren.length;ci++){var saved=ttlChildren[ci];saved.child.vx=saved.vx;saved.child.vy=saved.vy;}}for(var j=0;j<terrain.length;j++){var q=terrain[j];if(q.flash>0)q.flash=Math.max(0,q.flash-dt);}return out;};
 
  var splashBullet={shell:true,beam:false,vx:0,vy:0};
  var oldSplash=Game.prototype.splashAt;Game.prototype.splashAt=function(x,y,radius,frac,ownerId,knock,color,dmg){var out=oldSplash.apply(this,arguments),a=terrainCandidates(this,x,y,x,y,radius);for(var i=0;i<a.length;i++){var s=a[i];if(!s.destructible||s.hp<=0)continue;var dx=Math.max(Math.abs(x-s.x)-(s.shape==='rect'?s.w*.5:s.r),0),dy=Math.max(Math.abs(y-s.y)-(s.shape==='rect'?s.h*.5:s.r),0),dist=Math.hypot(dx,dy);if(dist>radius)continue;var fall=1-clamp(dist/Math.max(1,radius),0,1)*.55;damageCover(this,s,(dmg||0)*(frac||.4)*fall,ownerId,x,y,splashBullet);}return out;};
