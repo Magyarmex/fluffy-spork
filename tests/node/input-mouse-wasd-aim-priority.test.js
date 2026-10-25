@@ -86,7 +86,7 @@ test('shipping core explicitly prioritizes aimVec over the mouse fallback',()=>{
 });
 
 test('WASD plus mouse aligns the gun with the canonical Controller live command',()=>{
- const Input=boot(),input=new Input();
+ const Input=boot(),input=new Input();input.firing=true;
  const source=controller;
  const a=source.indexOf('    function updatePlayerCommand(');
  const b=source.indexOf('    function updateAICommand(',a);
