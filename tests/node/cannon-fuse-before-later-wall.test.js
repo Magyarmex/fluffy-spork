@@ -60,7 +60,7 @@ function boot(performance) {
   return m.exports.Game;
 }
 
-function run(Game,hz,withWall=true,{startX=146,wallX=168,vx=380,ttl=2,pen=1,cover=false,shell=true,extras=null}={}){
+function run(Game,hz,withWall=true,{startX=146,wallX=168,vx=380,ttl=2,pen=1,cover=false,shell=true,spawnX=0,fuseDist=150,extras=null}={}){
   const g=new Game(),bursts=[];
   g.time=1;g.__novaBattlefield={coverBroken:0};
   g.__novaTerrain=withWall?[{id:-51,shape:'rect',x:wallX,y:0,w:20,h:80,
@@ -70,7 +70,7 @@ function run(Game,hz,withWall=true,{startX=146,wallX=168,vx=380,ttl=2,pen=1,cove
   g.weakenBullet=()=>{};
   g.bullets=[{kind:'bullet',id:777,ownerId:1,x:startX,y:0,
     vx,vy:0,r:8.5,dmg:26,ttl,shell,pen,hits:0,dead:false,
-    __v17Cannon:true,__v17FuseDist:150,__v17SpawnX:0,__v17SpawnY:0,
+    __v17Cannon:true,__v17FuseDist:fuseDist,__v17SpawnX:spawnX,__v17SpawnY:0,
     __v17FuseArmed:false,splash:72,splashDmg:.4,color:'#ffb45e'}];
   if(extras)extras(g);
   for(let frame=0;frame<10&&g.bullets.length;frame++){
@@ -237,5 +237,18 @@ for(const optimized of [false,true]){
   }});
   assert.equal(bursts.length,1);
   assert.ok(Math.abs(bursts[0].x-150)<1e-6);
+ });
+}
+
+for(const optimized of [false,true]){
+ const Game=boot(optimized),prefix=optimized?'optimized':'baseline';
+ test(prefix+' arena exit later in frame prevents unsafe post-core fuse deferral',()=>{
+  // Fuse at x=2204, later wall at x=2210, but full-frame endpoint x=2270
+  // is outside the arena. Core would delete the shell before Disciplines.
+  const {bursts}=run(Game,30,true,{
+   startX:2200,wallX:2223.825,vx:2100,spawnX:2054,fuseDist:150
+  });
+  assert.equal(bursts.length,1,'must not silently delete a shell at arena exit');
+  assert.ok(bursts[0].x>2204,'unsafe case retains existing wall burst');
  });
 }
