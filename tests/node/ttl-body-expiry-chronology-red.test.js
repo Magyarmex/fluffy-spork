@@ -206,3 +206,39 @@ for (const kind of ['shape', 'drone']) {
     });
   }
 }
+
+
+/* Canonical Minigun projectile configuration from materialized CLASSES:
+ * speed=480, radius=3.8, pen=1, ttl=.8. A neutral shape at x=396, r=12
+ * is physically reached at x=380.2 (t=.792083s) before expiry at x=384.
+ * This is a full-lifetime class-configuration regression, not a fabricated
+ * initially short-TTL projectile. Existing 60Hz execution misses it. */
+for (const fps of [30, 60, 120, 240]) {
+  test('KNOWN RED #234: full-lifetime Minigun round reaches neutral shape at ' + fps + 'Hz', () => {
+    const g = new Game();
+    g.shapes = [{ kind: 'shape', id: 2, x: 396, y: 0, r: 12, hp: 100 }];
+    g.bullets = [{ kind: 'bullet', id: 1, ownerId: 1,
+      x: 0, y: 0, vx: 480, vy: 0, r: 3.8, dmg: 7,
+      ttl: .8, pen: 1, hits: 0, dead: false,
+      shell: false, beam: false }];
+    for (let frame = 0; frame < 300 && g.bullets.length; frame++) {
+      g.updateBullets(1 / fps);
+      g.time += 1 / fps;
+    }
+    assert.equal(g.hits, 1,
+      'physical first contact at .792083s must precede .8s expiry');
+  });
+  test('full-lifetime Minigun round cannot hit shape beyond TTL at ' + fps + 'Hz', () => {
+    const g = new Game();
+    g.shapes = [{ kind: 'shape', id: 2, x: 405, y: 0, r: 12, hp: 100 }];
+    g.bullets = [{ kind: 'bullet', id: 1, ownerId: 1,
+      x: 0, y: 0, vx: 480, vy: 0, r: 3.8, dmg: 7,
+      ttl: .8, pen: 1, hits: 0, dead: false,
+      shell: false, beam: false }];
+    for (let frame = 0; frame < 300 && g.bullets.length; frame++) {
+      g.updateBullets(1 / fps);
+      g.time += 1 / fps;
+    }
+    assert.equal(g.hits, 0);
+  });
+}
