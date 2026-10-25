@@ -37,7 +37,7 @@ function boot() {
       this.hits = 0;
       this.hash = { query: (_x, _y, _r, out) => {
         out.length = 0;
-        out.push(...this.tanks);
+        out.push(...this.tanks, ...this.shapes, ...this.drones);
       } };
     }
   }
@@ -50,6 +50,8 @@ function boot() {
   Game.prototype.getTank = () => null;
   Game.prototype.resolveBulletCollisions = function() {};
   Game.prototype.damageTank = function() { this.hits++; };
+  Game.prototype.damageShape = function() { this.hits++; };
+  Game.prototype.damageDrone = function() { this.hits++; };
   Game.prototype.updateBullets = shippingCoreBullets();
   class Sfx { resume() {} }
   const modules = {
@@ -151,4 +153,32 @@ for (const fps of [30, 60, 120, 240]) {
   test('KNOWN RED #234: exact-frame TTL penetrating round hits at ' + fps + 'Hz', () => {
     assert.equal(simulate(Game, fps, 23, 500, 1 / fps, 1), 1);
   });
+}
+
+
+/* Run 334: the same real materialized TTL-before-contact defect affects
+ * neutral farming and drone combat, not only tank hulls. Ordinary 500u/s
+ * projectiles expire at x=2.5; first physical contact is at x=1 (t=.002s).
+ * Keep these RED gates until all three body types resolve chronologically. */
+for (const kind of ['shape', 'drone']) {
+  for (const fps of [30, 60, 120, 240]) {
+    test('KNOWN RED #234: reachable ' + kind + ' is hit before TTL at ' + fps + 'Hz', () => {
+      const g = new Game();
+      const target = kind === 'shape'
+        ? { kind: 'shape', id: 2, x: 16, y: 0, r: 12, hp: 100 }
+        : { kind: 'drone', id: 2, ownerId: 2, x: 13, y: 0, r: 8, hp: 100 };
+      if (kind === 'shape') g.shapes = [target];
+      else g.drones = [target];
+      g.bullets = [{ kind: 'bullet', id: 1, ownerId: 1,
+        x: 0, y: 0, vx: 500, vy: 0, r: 3, dmg: 20,
+        ttl: .005, pen: 1, hits: 0, dead: false,
+        shell: false, beam: false }];
+      for (let frame = 0; frame < 20 && g.bullets.length; frame++) {
+        g.updateBullets(1 / fps);
+        g.time += 1 / fps;
+      }
+      assert.equal(g.hits, 1,
+        kind + ' first contact at x=1 must precede expiry at x=2.5');
+    });
+  }
 }
