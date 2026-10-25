@@ -1083,7 +1083,13 @@
         // Actual contact distance is separate from remembered pursuit position.
         // Otherwise a drone could damage an unseen enemy at a stale location.
         var sp = d.speed * (swarming ? 1.45 : 1);
-        if (dd > 12) { d.x += dx / dd * sp * dt; d.y += dy / dd * sp * dt; }
+        // Respect the existing 12-unit arrival band even when a fast/swarmed
+        // hunter would cross its target or a legitimately last-seen position
+        // in a single frame. Reach and impact still use the resulting position.
+        if (dd > 12) {
+          var travel = Math.min(dd - 12, Math.max(0, sp * dt));
+          d.x += dx / dd * travel; d.y += dy / dd * travel;
+        }
         // The attack and LOS checks run after movement. Use the same physical
         // position for reach and impact direction, including stale-sighting
         // pursuit of enemy drones between bounded visibility samples.
