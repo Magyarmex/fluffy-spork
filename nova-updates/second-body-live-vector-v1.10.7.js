@@ -392,7 +392,19 @@ wrap('game/engine',function(engine,require){
     planAIControllers(this);
     var restore=prepareAIVirtualThumbs(this),out;
     try{out=oldDrones.apply(this,arguments);}finally{restore();}
-    postProcessControllers(this,dt);updateTelemetry(this,dt);registerTips();
+    postProcessControllers(this,dt);
+    /* Optional post-Live-Vector checkpoint. This records a phase endpoint,
+     * not a continuous subframe trajectory or collision-time guarantee. */
+    if(this.__novaDroneChronoTraceEnabled===true&&this.__novaShapeSweepActive===true){
+      var epoch=this.__novaShapeSweepEpoch,ds=this.drones||[];
+      for(var i=0;i<ds.length;i++){
+        var d=ds[i];
+        if(!d||d.__novaChronoDroneTraceEpoch!==epoch)continue;
+        d.__novaChronoDroneLiveX=d.x;d.__novaChronoDroneLiveY=d.y;
+        d.__novaChronoDroneLiveEpoch=epoch;
+      }
+    }
+    updateTelemetry(this,dt);registerTips();
     return out;
   };
 
