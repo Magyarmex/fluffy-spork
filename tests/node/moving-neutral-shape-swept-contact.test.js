@@ -20,7 +20,20 @@ function coreBullets(){
    clamp:(x,lo,hi)=>Math.max(lo,Math.min(hi,x))},
   {CLASSES:{scout:{size:15}}},2250);
 }
-function boot(withPerf=false){
+function coreUpdate(){
+ const marker='    update(dt) {',at=html.indexOf(marker);
+ assert.ok(at>=0,'materialized core update missing');
+ let p=at+marker.length,depth=1;
+ while(depth&&p<html.length){if(html[p]==='{')depth++;else if(html[p]==='}')depth--;p++;}
+ assert.equal(depth,0);
+ return new Function('types_1','classes_1','ai_1','storage_1','M','SHAPE_TARGETS',
+  'return function(dt){'+html.slice(at+marker.length,p-1)+'}')(
+  {rnd:()=>1,TAU:Math.PI*2,clamp:(x,a,b)=>Math.max(a,Math.min(b,x)),
+   lerp:(a,b,t)=>a+(b-a)*t,dist2:(ax,ay,bx,by)=>(ax-bx)**2+(ay-by)**2},
+  {CLASSES:{scout:{size:15,hpMult:1},crasher:{size:15,hpMult:1}}},
+  {updateAI(){}},{lsSet(){}},2250,[]);
+}
+function boot(withPerf=false,withCore=false){
  class Game{
   constructor(){
    this.bullets=[];this.shapes=[];this.tanks=[];this.drones=[];
@@ -40,7 +53,7 @@ function boot(withPerf=false){
   Game.prototype[name]=function(){};
  }
  Game.prototype.updateBullets=coreBullets();
- Game.prototype.update=function(dt){
+ Game.prototype.update=withCore?coreUpdate():function(dt){
   this.time+=dt;
   if(this.__testShapeMotion)this.__testShapeMotion(dt);
   else for(const s of this.shapes){s.x+=(s.vx||0)*dt;s.y+=(s.vy||0)*dt;}
@@ -61,7 +74,23 @@ function boot(withPerf=false){
  const m={exports:{}};
  modules['game/engine'](m,m.exports,id=>id.includes('classes')
   ?{CLASSES:{scout:{size:15}}}:{ARENA_HALF:2250});
- return new m.exports.Game();
+ const g=new m.exports.Game();
+ if(withCore){
+  g.status='playing';g.zoom=1;g.w=800;g.h=600;
+  g.player={id:99,kind:'tank',cls:'scout',x:1000,y:1000,vx:0,vy:0,
+   alive:true,isPlayer:true,angle:0,hp:100,maxHp:100,stats:{regen:0},
+   level:1,abilityCd:0,fireCd:0,regenDelay:1,perk:null};
+  g.tanks=[g.player];g.input={moveVec:()=>({x:0,y:0}),aimVec:()=>null,
+   mouseActive:false,firing:false,autofire:false,abilityQueued:false};
+  g.parts=[];g.texts=[];g.shapeTimer=100;g.powerupTimer=100;
+  g.crasherTimer=100;g.eliteTimer=100;g.hudTimer=1;
+  g.powerups=[];g.shapeCounts=new Map();g.aiRespawns=[];
+  g.cb={event(){}};g.tankSpeed=()=>0;g.bodyCollisions=()=>{};
+  g.updateOrbs=()=>{};g.updatePowerups=()=>{};g.syncHud=()=>{};
+  g.updateMusicIntensity=()=>{};g.spawnAITank=()=>{};
+  g.cam={x:0,y:0,zoom:1,shake:0};
+ }
+ return g;
 }
 function bullet(){return{id:3,kind:'bullet',ownerId:1,
  x:0,y:0,vx:1500,vy:0,r:3,dmg:10,pen:0,ttl:1,
@@ -191,5 +220,22 @@ for(const [label,x,vx,expected] of [
    vx,vy:0,r:15,hp:20,maxHp:20};
   g.shapes=[s];g.bullets=[bullet()];g.update(1/30);
   assert.equal(g.hits.length,expected);
+ });
+}
+
+for(const fps of [30,60,120,240]){
+ test('actual materialized Game.update + Battlefield: Crasher hit at '+fps+' Hz',()=>{
+  const g=boot(false,true),s={id:5,kind:'shape',type:'crasher',x:10,y:17,
+   vx:0,vy:105,r:15,hp:20,maxHp:20,wanderT:999,spin:0,angle:0};
+  g.shapes=[s];g.bullets=[bullet()];
+  g.update(1/fps);
+  assert.equal(g.hits.length,1);
+ });
+ test('actual materialized Game.update + Battlefield: no phantom at '+fps+' Hz',()=>{
+  const g=boot(false,true),s={id:5,kind:'shape',type:'crasher',x:10,y:20.5,
+   vx:0,vy:-105,r:15,hp:20,maxHp:20,wanderT:999,spin:0,angle:0};
+  g.shapes=[s];g.bullets=[bullet()];
+  g.update(1/fps);
+  assert.equal(g.hits.length,0);
  });
 }
