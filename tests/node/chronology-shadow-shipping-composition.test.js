@@ -726,3 +726,27 @@ test('crowded entity arrays fail closed rather than misattribute an unscanned fi
   assert.equal(s.predictedBodyContacts, 0);
   assert.equal(s.unregisteredBodyContacts, 0);
 });
+
+test('shadow does not invent a shape contact a fraction after projectile expiry', () => {
+  const { g } = boot(); addScout(g, 100);
+  g.shapes = [auditShape(51, 38 + 6e-7)];
+  g.bullets = [ordinaryShot(9345)];
+  g.updateBullets(1 / 30);
+  assert.equal(g.novaChronoShadowSnapshot().predictedBodyContacts, 0);
+});
+test('shadow does not invent a tank contact a fraction after projectile expiry', () => {
+  const { g } = boot(); addScout(g, 51 + 6e-7);
+  g.bullets = [ordinaryShot(9346)];
+  g.updateBullets(1 / 30);
+  assert.equal(g.novaChronoShadowSnapshot().predictedBodyContacts, 0);
+});
+test('shadow abstains from mathematically tangent contacts but keeps clear grazing hits', () => {
+  for (const [y, expected] of [[8, 0], [7.99999, 1], [8.00001, 0]]) {
+    const { g } = boot(); addScout(g, 100);
+    g.shapes = [auditShape(51, 20, y)];
+    g.bullets = [ordinaryShot(9347)];
+    g.updateBullets(1 / 30);
+    assert.equal(g.novaChronoShadowSnapshot().predictedBodyContacts, expected,
+      'near-tangent neutral body y=' + y);
+  }
+});
