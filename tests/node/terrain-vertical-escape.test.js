@@ -79,3 +79,41 @@ test('ordinary player movement is not redirected by AI escape state',()=>{
 test('shipping composition loads Terrain Intelligence in playable runtime',()=>{
  assert.ok(shipping.includes('nova-updates/terrain-intelligence-v1.10.2.js'));
 });
+
+/* End-to-end watchdog activation: no manually injected escape vector.
+ * A wall prevents forward progress for two 0.31s samples, so the actual
+ * Terrain Intelligence watchdog must choose the wall's vertical tangent. */
+test('stalled AI tank generates and follows vertical wall tangent naturally',()=>{
+ const {Game}=boot(),g=new Game();
+ g.firstTerrainHit=()=>({hit:{nx:1,ny:0}});
+ const t={id:31,cls:'gunner',x:0,y:0,isPlayer:false,ai:{}};
+ for(const now of [0,.31,.62]){
+  g.time=now;g.moveTank(t,100,0,1/60);
+ }
+ assert.ok(t.ai.__v1102Nav.escapeUntil>.62,'watchdog generated active escape');
+ near(t.ai.__v1102Nav.escapeX,0,'vertical tangent X');
+ assert.ok(Math.abs(t.ai.__v1102Nav.escapeY)>.9,'vertical tangent Y');
+ assert.ok(Math.abs(g.lastMove.vy)>50,'actual tank movement follows tangent');
+ near(Math.hypot(g.lastMove.vx,g.lastMove.vy),100,'speed budget');
+});
+test('stalled Controller drone generates and follows vertical wall tangent naturally',()=>{
+ const {Game}=boot(),g=new Game(),owner={id:31,cls:'carrier',alive:true,__novaSwarm:{active:true}};
+ const d={id:32,ownerId:31,hp:100,r:8,x:0,y:0,
+  __novaPhase:'form',__novaVX:100,__novaVY:0};
+ g.drones=[d];g.getTank=id=>id===31?owner:null;
+ g.firstTerrainHit=()=>({hit:{nx:-1,ny:0}});
+ for(const now of [0,.31,.62]){g.time=now;g.updateDrones(1/60);}
+ assert.ok(d.__v1102Nav.escapeUntil>.62,'drone watchdog generated active escape');
+ near(d.__v1102Nav.escapeX,0,'drone vertical tangent X');
+ assert.ok(Math.abs(d.__novaVY)>50,'actual drone steering follows tangent');
+ near(Math.hypot(d.__novaVX,d.__novaVY),100,'drone speed budget');
+});
+test('committed drone dash cannot be diverted by anti-stuck watchdog',()=>{
+ const {Game}=boot(),g=new Game(),owner={id:31,cls:'carrier',alive:true,__novaSwarm:{active:true}};
+ const d={id:33,ownerId:31,hp:100,r:8,x:0,y:0,
+  __novaPhase:'dash',__novaVX:100,__novaVY:0,
+  __v1102Nav:{sampleAt:0,escapeUntil:2,escapeX:0,escapeY:1}};
+ g.drones=[d];g.getTank=id=>id===31?owner:null;g.time=1;
+ g.updateDrones(1/60);
+ assert.equal(d.__novaVX,100);assert.equal(d.__novaVY,0);
+});
