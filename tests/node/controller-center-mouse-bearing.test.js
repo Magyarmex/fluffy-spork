@@ -92,3 +92,28 @@ test('shipping Controller and Live Vector remain in correct composition order',(
  assert.ok(a>=0&&b>a);
  assert.match(shipping,/aimA = Math\.atan2\(wy - pl\.y, wx - pl\.x\)/);
 });
+
+test('deadzone edge preserves true close-range mouse aim outside two world units',()=>{
+ const Game=boot(),inside=new Game(),outside=new Game();
+ inside.input.mouseX=401.999;inside.update(1/60);
+ outside.input.mouseX=402.001;outside.update(1/60);
+ assert.equal(inside.player.angle,1.25);
+ assert.notEqual(outside.player.angle,1.25);
+});
+test('centered pointer is compared with the moved hull, not a stale frame start',()=>{
+ const Game=boot(),g=new Game();g.input.mouseX=401;
+ g.moveTank=pl=>{pl.x=1;};g.update(1/60);
+ assert.equal(g.player.angle,1.25);
+});
+test('optimized subclass inherits centered-pointer protection',()=>{
+ const Game=boot();class Optimized extends Game{}
+ const g=new Optimized();g.player.cls='cannon';g.update(1/60);
+ assert.equal(g.player.angle,1.25);
+});
+test('thrown player update cannot leave a stale aim interception for the next tick',()=>{
+ const Game=boot(),g=new Game();g.input.aimVec=()=>({x:1,y:0});
+ g.nearestTank=()=>{throw Error('injected aiming failure');};
+ assert.throws(()=>g.update(1/60),/injected aiming failure/);
+ assert.equal(g.__novaMouseCenterAimPending,false);
+ assert.equal(g.lerpAngle(1,2,.5),1.5);
+});
