@@ -336,3 +336,10 @@ test('older neutral shape remains a valid isolated TTL contact',()=>{
  g.updateBullets(1/30);
  assert.equal(shape.hp,0,'older neutral must still receive physical contact');
 });
+
+test('distant same-frame child does not suppress an unrelated tank hit',()=>{
+ const g=isolatedWorld();
+ g.shapes=[{id:9,kind:'shape',type:'circle',x:900,y:900,r:5,hp:20,born:g.time}];
+ g.updateBullets(1/30);
+ assert.equal(g.hits,1,'only newborn shapes in the swept corridor are ambiguous');
+});
