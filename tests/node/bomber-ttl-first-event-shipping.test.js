@@ -128,3 +128,29 @@ test('[TTL #193] expired Bomber children advance only the remaining subframe',()
   'child should be born at x=30 and advance 0.028333s to x='+expected+
   ', not start at the full-frame shell endpoint '+created[0].x);
 });
+
+
+/* Run350: owned Controller-gene drones cannot delay the physical expiry
+ * of their own Bomber shell. Core direct/splash/fragment drone damage all
+ * exclude the same ownerId; a hostile drone remains a real contender. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'optimized':'baseline';
+ for(const hz of [30,60,120,240]){
+  test('[TTL #193] '+label+' own drone does not delay Bomber expiry at '+hz+'Hz',()=>{
+   const g=new Game(),bursts=[];
+   g.time=1;g.__novaBattlefield={coverBroken:0};g.__novaTerrain=[];
+   g.clusterBurst=b=>bursts.push({x:b.x,y:b.y});
+   g.weakenBullet=()=>{};
+   g.drones=[{kind:'drone',id:4,ownerId:1,x:30,y:0,r:8,hp:50}];
+   g.bullets=[{kind:'bullet',id:777,ownerId:1,x:0,y:0,
+    vx:6000,vy:0,r:3,dmg:26,ttl:.005,shell:true,pen:1,hits:0,dead:false,
+    splash:0,color:'#ffb45e'}];
+   for(let frame=0;frame<6&&g.bullets.length;frame++){
+    g.time+=1/hz;g.updateBullets(1/hz);
+   }
+   assert.equal(bursts.length,1);
+   assert.ok(Math.abs(bursts[0].x-30)<1e-6,
+    'own drone cannot move a shell expiry beyond x=30: '+bursts[0].x);
+  });
+ }
+}
