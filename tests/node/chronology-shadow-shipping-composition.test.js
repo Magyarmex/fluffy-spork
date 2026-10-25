@@ -686,13 +686,18 @@ test('shadow resolves earliest drone before shape and tank without touching comb
 });
 test('friendly drone cannot shadow a valid neutral first contact', () => {
   const { g } = boot(); addScout(g, 40);
-  g.shapes = [auditShape(51, 12)];
+  const shape = auditShape(51, 12);
+  g.shapes = [shape];
   g.drones = [auditDrone(61, 1, 12)];
   g.bullets = [ordinaryShot(9341)];
   g.updateBullets(1 / 30);
-  const event = g.novaChronoShadowSnapshot().events[0];
-  assert.equal(event.targetId, 51);
-  assert.equal(event.targetKind, 'shape');
+  const snapshot = g.novaChronoShadowSnapshot();
+  assert.equal(shape.hp, 0, 'owned drone must not prevent real neutral damage');
+  assert.equal(snapshot.predictedBodyContacts, 1);
+  assert.equal(snapshot.registeredBodyContacts, 1,
+    'correctly recovered contact is no longer a missing-hit diagnostic event');
+  assert.equal(snapshot.unregisteredBodyContacts, 0);
+  assert.equal(snapshot.events.some(e => e.kind === 'unregistered-body-contact'), false);
 });
 test('allied owner metadata excludes allied drones but not hostile drones', () => {
   for (const allied of [true, false]) {
