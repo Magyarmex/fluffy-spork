@@ -75,8 +75,24 @@ test('trace distinguishes initial, pre-terrain, post-terrain and post-Live-Vecto
     'the real Battlefield terrain-bias recovery changes the lateral position');
   assert.equal(drone.__novaChronoDroneLiveX,drone.x);
   assert.equal(drone.__novaChronoDroneLiveY,drone.y);
-  assert.ok(Number.isFinite(drone.y),'postprocess produces a finite position');
+  assert.ok(drone.y>drone.__novaChronoDroneTerrainY,
+    'the tiny terrain clearance lets Live Vector resume tangential repair');
   assert.equal(g.isTerrainSafe(drone.x,drone.y,9),true);
+});
+test('wall-corrected drone resumes repair without diagnostic instrumentation',()=>{
+  const {g,drone}=boot({trace:false,baseMotion:25,damaged:true});
+  g.update(.2);
+  assert.equal(g.isTerrainSafe(drone.x,drone.y,9),true,
+    'Battlefield leaves the drone outside the inclusive padded wall');
+  assert.ok(drone.y>0,'Live Vector can slide along the wall toward its owner');
+  assert.equal(drone.__novaChronoDroneTraceEpoch,undefined,
+    'gameplay correction does not depend on diagnostic mode');
+});
+test('safe open-field movement receives no artificial wall clearance',()=>{
+  const {g,drone}=boot({trace:true,baseMotion:0,damaged:false});
+  g.update(1/60);
+  assert.equal(drone.__novaChronoDroneTerrainX,drone.__novaChronoDroneBaseX);
+  assert.equal(drone.__novaChronoDroneTerrainY,drone.__novaChronoDroneBaseY);
 });
 test('unobstructed Live Vector repair is a separate observed movement stage',()=>{
   const {g,drone}=boot({baseMotion:0,ownerX:-50,ownerY:100});
@@ -123,6 +139,8 @@ test('phase snapshots are not an authority for time of collision',()=>{
   assert.ok(drone.__novaChronoDroneBaseX>drone.__novaChronoDroneTerrainX);
   assert.notEqual(drone.__novaChronoDroneBaseY,drone.__novaChronoDroneTerrainY,
     'terrain correction is a separate physical stage');
+  assert.ok(drone.__novaChronoDroneLiveY>drone.__novaChronoDroneTerrainY,
+    'postprocess now escapes the inclusive contact boundary');
   // Base movement crossed solid terrain and was corrected. An endpoint-only
   // interpolation would invent a physically impossible path through the wall.
   assert.equal(g.isTerrainSafe(drone.__novaChronoDroneBaseX,0,9),false);
