@@ -95,5 +95,5 @@ test('static shape outside bullet trajectory remains untouched', () => {
   assert.equal(result.hp, 20);
 });
 test('materialized production loads Battlefield collision overlay', () => {
-  assert.match(html, /nova-updates\\/battlefield-v1\\.6\\.0\\.js/);
+  assert.ok(html.includes('nova-updates/battlefield-v1.6.0.js'));
 });
