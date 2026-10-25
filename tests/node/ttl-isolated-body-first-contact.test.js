@@ -243,3 +243,62 @@ for (const fps of [30, 60, 120, 240]) {
     assert.equal(g.hits, 0);
   });
 }
+
+/* Safety gates: the partial recovery must abstain rather than steal
+ * chronological authority from terrain, projectiles, defenses or drones. */
+function isolatedWorld({x=40,vx=6000,ttl=.005,pen=0,extraTanks=[],drones=[],otherBullets=[],terrain=[]}={}){
+  const g=new Game();
+  g.tanks=[{kind:'tank',id:2,x,y:0,cls:'scout',hp:100,alive:true},...extraTanks];
+  g.drones=drones;g.__novaTerrain=terrain;
+  g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,vx,vy:0,r:3,
+    dmg:20,ttl,pen,hits:0,dead:false,shell:false,beam:false},...otherBullets];
+  return g;
+}
+test('partial TTL recovery never crosses earlier permanent cover',()=>{
+ const g=isolatedWorld({terrain:[{id:-1,shape:'rect',x:10,y:0,w:4,h:80,solid:true,destructible:false}]});
+ g.updateBullets(1/30);
+ assert.equal(g.hits,0);
+});
+test('partial TTL recovery ignores spatially distant competing bullets',()=>{
+ const g=isolatedWorld({otherBullets:[{kind:'bullet',id:4,ownerId:3,x:200,y:200,vx:0,vy:0,r:3,ttl:1,pen:0,hits:0,dead:false}]});
+ g.updateBullets(1/30);
+ assert.equal(g.hits,1);
+});
+test('potential earlier projectile interception blocks shortcut',()=>{
+ const g=isolatedWorld({otherBullets:[{kind:'bullet',id:4,ownerId:3,x:10,y:0,vx:0,vy:0,r:3,ttl:1,pen:0,hits:0,dead:false}]});
+ g.updateBullets(1/30);
+ assert.equal(g.hits,0);
+});
+test('active drone movement uncertainty blocks shortcut',()=>{
+ const g=isolatedWorld({drones:[{kind:'drone',id:5,ownerId:3,x:200,y:200,r:8,hp:20}]});
+ g.updateBullets(1/30);
+ assert.equal(g.hits,0);
+});
+test('spawn-shielded target is not assigned synthetic damage',()=>{
+ const g=isolatedWorld();g.tanks[0].spawnShieldT=1;
+ g.updateBullets(1/30);
+ assert.equal(g.hits,0);
+});
+test('explicit allied tank is not damaged by partial TTL recovery',()=>{
+ const g=isolatedWorld();g.tanks[0].teamId='blue';
+ g.getTank=()=>({id:1,teamId:'blue'});
+ g.areAllies=(a,b)=>a.teamId===b.teamId;
+ g.updateBullets(1/30);
+ assert.equal(g.hits,0);
+});
+test('simultaneous body contacts defer to full chronological solver',()=>{
+ const g=isolatedWorld({extraTanks:[{kind:'tank',id:3,x:40,y:0,cls:'scout',hp:100,alive:true}]});
+ g.updateBullets(1/30);
+ assert.equal(g.hits,0);
+});
+test('physical arena exit precedes an outside-arena target',()=>{
+ const g=isolatedWorld({x:2300});
+ g.bullets[0].x=2200;
+ g.updateBullets(1/30);
+ assert.equal(g.hits,0);
+});
+test('splash projectiles retain original arbitration until unified solver',()=>{
+ const g=isolatedWorld();g.bullets[0].splash=40;
+ g.updateBullets(1/30);
+ assert.equal(g.hits,0);
+});
