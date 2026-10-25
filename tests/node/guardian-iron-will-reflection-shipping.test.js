@@ -139,3 +139,15 @@ test('reflection exceptions restore Iron Will duration and reentrancy guard', ()
   assert.equal(guard.bulwarkT, 0);
   assert.equal(g.__v17ReflectingIronWill, false);
 });
+
+test('already-dead Guardians never inflict posthumous reflected damage', () => {
+  for (const state of [{ alive: false, hp: 100 }, { alive: true, hp: 0 }]) {
+    const g = boot(), guard = tank(1, 'fortress', 0, 0,
+      { tauntT: 3, ...state });
+    const attacker = tank(2, 'scout', 100, Math.PI);
+    g.tanks = [guard, attacker];
+    g.damageTank(guard, 20, attacker.id);
+    assert.equal(attacker.hp, 100);
+    assert.equal(guard.tauntT, 3);
+  }
+});
