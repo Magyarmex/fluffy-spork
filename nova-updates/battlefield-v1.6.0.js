@@ -812,6 +812,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   * The core otherwise retains authority until the full #147 solver lands. */
  function isolatedShellExpiry(g,b,dt,terrain){
   if(!b||b.dead||!b.shell||b.beam||b.__novaClusterBurstConsumed||
+     typeof g.clusterBurst!=='function'||
      !(dt>0)||!(b.ttl>0&&b.ttl<dt-1e-9)||(b.hits||0)!==0||
      !(b.pen>=0)||b.pen>=2||b.__novaBreachAtTime===g.time||
      !Number.isFinite(b.x)||!Number.isFinite(b.y)||
