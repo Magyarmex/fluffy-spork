@@ -688,6 +688,7 @@ test('friendly drone cannot shadow a valid neutral first contact', () => {
   const { g } = boot(); addScout(g, 40);
   const shape = auditShape(51, 12);
   g.shapes = [shape];
+  g.damageShape = (victim, damage) => { victim.hp -= damage; };
   g.drones = [auditDrone(61, 1, 12)];
   g.bullets = [ordinaryShot(9341)];
   g.updateBullets(1 / 30);
