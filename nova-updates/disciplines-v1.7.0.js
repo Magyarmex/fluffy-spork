@@ -86,6 +86,24 @@ function cannonFuseDistance(g,t,depth,def){
   var ttl=def.bullet.ttl==null?1.05:def.bullet.ttl;
   return cannonReachableFuse(raw,Math.hypot(vx,vy),ttl);
 }
+/* Shared prediction for the live Cannon reticle and Combined Arms terrain
+ * marker. The canonical Game.tryFire shell/single path uses barrel zero,
+ * muzzle offset, 22% inherited hull velocity and the same fuse depth. */
+function cannonShotPreview(g,t,def){
+  var depth=cannonInputDepth(g,t);
+  var dist=cannonFuseDistance(g,t,depth==null?.72:depth,def);
+  var barrel=def&&def.barrels&&def.barrels[0];
+  var a=t.angle||0,cs=Math.cos(a),sn=Math.sin(a);
+  var len=(barrel?barrel.len:0)+8,side=barrel?(barrel.x||0):0;
+  var ox=t.x+cs*len-sn*side,oy=t.y+sn*len+cs*side;
+  var speed=g.bulletSpeed?g.bulletSpeed(t):((def&&def.bullet&&def.bullet.speed)||1);
+  var vx=cs*speed+(t.vx||0)*.22,vy=sn*speed+(t.vy||0)*.22;
+  var mag=Math.hypot(vx,vy)||1;
+  var bullet=def&&def.bullet||{},dmg=g.bulletDamageFor?g.bulletDamageFor(t,bullet.dmg||0):(bullet.dmg||0);
+  var r=(bullet.r||2)*(1+clamp(dmg*.0085,0,.45));
+  var pen=(bullet.pen||0)+Math.floor(((t.stats&&t.stats.penetration)||0)*.6)+(t.gene==='sniper'?1:0);
+  return {ox:ox,oy:oy,x:ox+vx/mag*dist,y:oy+vy/mag*dist,dist:dist,r:r,pen:pen};
+}
 function ad(target,current){var d=(target-current+Math.PI)%TAU;if(d<0)d+=TAU;return d-Math.PI;}
 function moveAngle(current,target,max){return current+clamp(ad(target,current),-max,max);}
 function d2(ax,ay,bx,by){var x=bx-ax,y=by-ay;return x*x+y*y;}
@@ -175,6 +193,7 @@ wrap('game/engine',function(engine,require){
   var Game=engine.Game;if(!Game||Game.prototype.__novaThreeDisciplines)return;
   Game.prototype.__novaThreeDisciplines=true;
   var classes=require('./classes'),C=classes.CLASSES;
+  Game.prototype.novaCannonShotPreview=function(t){return cannonShotPreview(this,t,C[t.cls]);};
 
   function gunner(t){return lineage(classes,t)==='gunner';}
   function cannon(t){return lineage(classes,t)==='cannon';}
@@ -474,22 +493,20 @@ wrap('game/render',function(renderMod,require){
     if(!t.isPlayer)return;
     var input=g.input&&g.input.aim;
     if(!(input&&input.active)&&!(g.input&&g.input.mouseActive))return;
-    var dist=cannonDepth(g,t),def=C[t.cls],barrel=def&&def.barrels&&def.barrels[0];
-    /* Game.tryFire's primary shell/single barrel uses tank angle, muzzle
-     * offset (barrel.len+8, barrel.x), and 22% inherited hull velocity.
-     * The fuse is distance travelled FROM THAT MUZZLE, not from the hull. */
-    var a=t.angle,cs=Math.cos(a),sn=Math.sin(a);
-    var len=(barrel?barrel.len:0)+8,side=barrel?(barrel.x||0):0;
-    var ox=t.x+cs*len-sn*side,oy=t.y+sn*len+cs*side;
-    var speed=g.bulletSpeed?g.bulletSpeed(t):((def&&def.bullet&&def.bullet.speed)||1);
-    var vx=cs*speed+(t.vx||0)*.22,vy=sn*speed+(t.vy||0)*.22;
-    var mag=Math.hypot(vx,vy)||1;
-    var x=ox+vx/mag*dist,y=oy+vy/mag*dist;
+    var def=C[t.cls],shot=cannonShotPreview(g,t,def);
+    var dist=shot.dist,ox=shot.ox,oy=shot.oy,x=shot.x,y=shot.y;
+    /* A guaranteed earlier terrain impact supersedes the programmed fuse.
+     * Combined Arms owns the IMPACT glyph; avoid a false FUSE glyph beyond
+     * the wall. Potential cover breaches remain explicitly uncertain. */
+    var terrain=g.novaFusePreview?g.novaFusePreview(t):null;
+    var blocked=!!(terrain&&terrain.blocked);
+    if(blocked){x=terrain.x;y=terrain.y;}
     var rad=(def&&def.bullet&&def.bullet.splash)||46;
     ctx.save();ctx.globalCompositeOperation='lighter';
     ctx.strokeStyle='rgba(255,190,112,.78)';ctx.fillStyle='rgba(255,190,112,.07)';
     ctx.lineWidth=1.3;ctx.setLineDash([5,7]);
     ctx.beginPath();ctx.moveTo(ox,oy);ctx.lineTo(x,y);ctx.stroke();ctx.setLineDash([]);
+    if(blocked){ctx.restore();return;}
     ctx.beginPath();ctx.arc(x,y,Math.max(15,rad*.32),0,TAU);ctx.fill();ctx.stroke();
     ctx.beginPath();ctx.moveTo(x-9,y);ctx.lineTo(x+9,y);ctx.moveTo(x,y-9);ctx.lineTo(x,y+9);ctx.stroke();
     ctx.font='800 8px Orbitron,system-ui';ctx.textAlign='center';
