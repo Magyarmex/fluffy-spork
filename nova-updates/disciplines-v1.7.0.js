@@ -361,8 +361,25 @@ wrap('game/engine',function(engine,require){
     else if(diff<prof.arc*.72)factor*=1-prof.passive*.32;
     if(active&&front)factor*=1-prof.active;
     else if(active&&diff<prof.arc*.72)factor*=.86;
-    var r=oldDamage.call(this,t,dmg*factor,srcId,kx,ky);
-    t.bulwarkT=oldB;t.tauntT=oldT;
+    var r;
+    try{
+      /* The directional guard disables legacy taunt before core damage,
+       * otherwise the old 360-degree mitigation leaks through. That also
+       * disabled Iron Will's advertised 30% reflection. Restore one bounded
+       * frontal reflection, never reflecting a reflected hit: two Fortresses
+       * facing each other must not recurse indefinitely. */
+      if(oldT>0&&front&&dmg>0&&!this.__v17ReflectingIronWill){
+        var src=srcId>=0&&this.getTank?this.getTank(srcId):null;
+        if(src&&src.alive&&src.id!==t.id){
+          this.__v17ReflectingIronWill=true;
+          try{this.damageTank(src,dmg*.30,t.id);}
+          finally{this.__v17ReflectingIronWill=false;}
+        }
+      }
+      r=oldDamage.call(this,t,dmg*factor,srcId,kx,ky);
+    }finally{
+      t.bulwarkT=oldB;t.tauntT=oldT;
+    }
     if(active&&front){
       t.__v17CounterCharge=clamp(Math.max(t.__v17CounterCharge||0,prof.counter*(1-factor)),0,1);
       t.__v17GuardPulseUntil=this.time+.18;
