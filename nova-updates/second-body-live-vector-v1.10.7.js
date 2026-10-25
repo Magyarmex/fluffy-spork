@@ -181,10 +181,12 @@ wrap('game/engine',function(engine,require){
       dist2(owner.x,owner.y,current.x,current.y)*.81:Infinity,ts=g.tanks||[];
     for(var i=0;i<ts.length;i++){
       var t=ts[i];if(!t||!t.alive||t.id===owner.id||t.spawnShieldT>0||
-        !hostileOwners(g,owner,t)||!sensorSees(g,owner,t))continue;
-      /* Human identity does not improve target score. */
+        !hostileOwners(g,owner,t))continue;
+      /* Distance prefilter precedes expensive sensor/terrain checks.
+       * Human identity does not improve target score. */
       var s=dist2(owner.x,owner.y,t.x,t.y);
-      if(s<score){score=s;best=t;}
+      if(!(s<score)||!sensorSees(g,owner,t))continue;
+      score=s;best=t;
     }
     return best;
   }
