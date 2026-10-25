@@ -389,8 +389,11 @@
           this.status === 'playing' && pl && pl.alive &&
           input && input.mouseActive &&
           !(input.aim && input.aim.active) &&
-          !(input.move && input.move.active) &&
-          !(key && (key.up || key.down || key.left || key.right)) &&
+          /* Zero Churn makes the mouse authoritative even while moving with
+           * WASD/left stick. Only the older core needs movement-aim fallback. */
+          (input.__novaZeroChurn ||
+           (!(input.move && input.move.active) &&
+            !(key && (key.up || key.down || key.left || key.right)))) &&
           Number.isFinite(input.mouseX) && Number.isFinite(input.mouseY));
         try { return baseUpdate.apply(this, arguments); }
         finally { this.__novaMouseCenterAimPending = false; }
