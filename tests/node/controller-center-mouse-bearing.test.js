@@ -59,10 +59,12 @@ test('deliberate cursor aim outside deadzone still turns cannon',()=>{
  const Game=boot(),g=new Game();g.input.mouseX=425;g.update(1/60);
  assert.notEqual(g.player.angle,1.25);
 });
-test('non-Controller classes retain native centered-mouse behavior',()=>{
- const Game=boot(),g=new Game();g.player.cls='scout';g.update(1/60);
- assert.notEqual(g.player.angle,1.25);
-});
+for(const cls of ['scout','sniper','gunner','cannon','guardian']){
+ test(cls+' also retains gun bearing when mouse crosses hull center',()=>{
+  const Game=boot(),g=new Game();g.player.cls=cls;g.update(1/60);
+  assert.equal(g.player.angle,1.25);
+ });
+}
 test('keyboard movement aim remains authoritative over mouse fallback',()=>{
  const Game=boot(),g=new Game();
  g.input.keyboard.right=true;g.input.aimVec=()=>({x:0,y:1});
