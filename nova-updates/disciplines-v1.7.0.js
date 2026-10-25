@@ -45,6 +45,32 @@ function wrap(id,after){
   mods[id]=function(module,exports,require){old(module,exports,require);after(module.exports,require);};
 }
 function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+
+/* One input contract for both the next projectile and its live aiming marker.
+ * In particular, mouse distance must not reuse the preceding shot's fuse. */
+function cannonInputDepth(g,t){
+  var range=g.weaponRange?g.weaponRange(t):650;
+  if(t.isPlayer){
+    var a=g.input&&g.input.aim;
+    if(a&&a.active)return clamp((Math.hypot(a.dx||0,a.dy||0)-5)/55,.08,1);
+    if(g.input&&g.input.mouseActive&&g.canvas){
+      var rect=g.canvas.getBoundingClientRect(),z=(g.cam&&g.cam.zoom)||1;
+      var wx=g.cam.x+(g.input.mouseX-rect.left-g.w*.5)/z;
+      var wy=g.cam.y+(g.input.mouseY-rect.top-g.h*.5)/z;
+      return clamp(Math.hypot(wx-t.x,wy-t.y)/Math.max(1,range),.08,1);
+    }
+    return .72;
+  }
+  if(t.ai&&t.ai.state==='hunt'&&t.ai.targetId>=0){
+    var q=g.getTank&&g.getTank(t.ai.targetId);
+    if(q&&q.alive)return clamp(Math.hypot(q.x-t.x,q.y-t.y)/Math.max(1,range),.12,.96);
+  }
+  return null;
+}
+function cannonFuseDistance(g,t,depth){
+  var range=g.weaponRange?g.weaponRange(t):650;
+  return clamp(range*(.20+.78*depth),150,range*.965);
+}
 function ad(target,current){var d=(target-current+Math.PI)%TAU;if(d<0)d+=TAU;return d-Math.PI;}
 function moveAngle(current,target,max){return current+clamp(ad(target,current),-max,max);}
 function d2(ax,ay,bx,by){var x=bx-ax,y=by-ay;return x*x+y*y;}
@@ -189,27 +215,7 @@ wrap('game/engine',function(engine,require){
     }
   }
 
-  function inputDepth(g,t){
-    var range=g.weaponRange?g.weaponRange(t):650;
-    if(t.isPlayer){
-      var a=g.input&&g.input.aim;
-      if(a&&a.active){
-        var mag=Math.hypot(a.dx||0,a.dy||0);
-        return clamp((mag-5)/55,.08,1);
-      }
-      if(g.input&&g.input.mouseActive&&g.canvas){
-        var rect=g.canvas.getBoundingClientRect(),z=(g.cam&&g.cam.zoom)||1;
-        var wx=g.cam.x+(g.input.mouseX-rect.left-g.w*.5)/z,wy=g.cam.y+(g.input.mouseY-rect.top-g.h*.5)/z;
-        return clamp(Math.hypot(wx-t.x,wy-t.y)/Math.max(1,range),.08,1);
-      }
-      return .72;
-    }
-    if(t.ai&&t.ai.state==='hunt'&&t.ai.targetId>=0){
-      var q=g.getTank&&g.getTank(t.ai.targetId);
-      if(q&&q.alive)return clamp(Math.hypot(q.x-t.x,q.y-t.y)/Math.max(1,range),.12,.96);
-    }
-    return null;
-  }
+  function inputDepth(g,t){return cannonInputDepth(g,t);}
   function cannonProfile(t){
     var heavy=t.cls==='siegebomber'||t.cls==='annihilator'||t.cls==='quakecannon';
     var cluster=t.cls==='bomber'||t.cls==='clusterking'||t.cls==='siegebomber';
@@ -219,7 +225,7 @@ wrap('game/engine',function(engine,require){
     var depth=inputDepth(g,t);
     if(depth==null&&!force)return;
     if(depth==null)depth=.82;
-    var range=g.weaponRange?g.weaponRange(t):650,dist=clamp(range*(.20+.78*depth),150,range*.965),prof=cannonProfile(t);
+    var range=g.weaponRange?g.weaponRange(t):650,dist=cannonFuseDistance(g,t,depth),prof=cannonProfile(t);
     for(var i=before;i<g.bullets.length;i++){
       var b=g.bullets[i];if(!b||b.ownerId!==t.id)continue;
       b.__v17Cannon=true;b.__v17FuseDist=dist;b.__v17SpawnX=b.x;b.__v17SpawnY=b.y;
@@ -445,20 +451,34 @@ wrap('game/render',function(renderMod,require){
     ctx.restore();
   }
   function cannonDepth(g,t){
-    var a=g.input&&g.input.aim,range=g.weaponRange?g.weaponRange(t):650;
-    if(t.isPlayer&&a&&a.active){var mag=Math.hypot(a.dx||0,a.dy||0),d=clamp((mag-5)/55,.08,1);return clamp(range*(.20+.78*d),150,range*.965);}
-    if(t.__v17FuseRange&&t.__v17FuseDist)return t.__v17FuseDist;
-    return range*.72;
+    var depth=cannonInputDepth(g,t);
+    return cannonFuseDistance(g,t,depth==null?.72:depth);
   }
   function drawCannon(ctx,g,t){
     if(!t.isPlayer)return;
-    var a=g.input&&g.input.aim;if(!(a&&a.active)&&!(g.input&&g.input.mouseActive))return;
-    var dist=cannonDepth(g,t),x=t.x+Math.cos(t.angle)*dist,y=t.y+Math.sin(t.angle)*dist,def=C[t.cls],rad=(def&&def.bullet&&def.bullet.splash)||46;
-    ctx.save();ctx.globalCompositeOperation='lighter';ctx.strokeStyle='rgba(255,190,112,.78)';ctx.fillStyle='rgba(255,190,112,.07)';ctx.lineWidth=1.3;ctx.setLineDash([5,7]);
-    ctx.beginPath();ctx.moveTo(t.x,t.y);ctx.lineTo(x,y);ctx.stroke();ctx.setLineDash([]);
+    var input=g.input&&g.input.aim;
+    if(!(input&&input.active)&&!(g.input&&g.input.mouseActive))return;
+    var dist=cannonDepth(g,t),def=C[t.cls],barrel=def&&def.barrels&&def.barrels[0];
+    /* Game.tryFire's primary shell/single barrel uses tank angle, muzzle
+     * offset (barrel.len+8, barrel.x), and 22% inherited hull velocity.
+     * The fuse is distance travelled FROM THAT MUZZLE, not from the hull. */
+    var a=t.angle,cs=Math.cos(a),sn=Math.sin(a);
+    var len=(barrel?barrel.len:0)+8,side=barrel?(barrel.x||0):0;
+    var ox=t.x+cs*len-sn*side,oy=t.y+sn*len+cs*side;
+    var speed=g.bulletSpeed?g.bulletSpeed(t):((def&&def.bullet&&def.bullet.speed)||1);
+    var vx=cs*speed+(t.vx||0)*.22,vy=sn*speed+(t.vy||0)*.22;
+    var mag=Math.hypot(vx,vy)||1;
+    var x=ox+vx/mag*dist,y=oy+vy/mag*dist;
+    var rad=(def&&def.bullet&&def.bullet.splash)||46;
+    ctx.save();ctx.globalCompositeOperation='lighter';
+    ctx.strokeStyle='rgba(255,190,112,.78)';ctx.fillStyle='rgba(255,190,112,.07)';
+    ctx.lineWidth=1.3;ctx.setLineDash([5,7]);
+    ctx.beginPath();ctx.moveTo(ox,oy);ctx.lineTo(x,y);ctx.stroke();ctx.setLineDash([]);
     ctx.beginPath();ctx.arc(x,y,Math.max(15,rad*.32),0,TAU);ctx.fill();ctx.stroke();
     ctx.beginPath();ctx.moveTo(x-9,y);ctx.lineTo(x+9,y);ctx.moveTo(x,y-9);ctx.lineTo(x,y+9);ctx.stroke();
-    ctx.font='800 8px Orbitron,system-ui';ctx.textAlign='center';ctx.fillStyle='rgba(255,224,187,.90)';ctx.fillText('FUSE '+Math.round(dist),x,y-18);
+    ctx.font='800 8px Orbitron,system-ui';ctx.textAlign='center';
+    ctx.fillStyle='rgba(255,224,187,.90)';
+    ctx.fillText('FUSE '+Math.round(dist),x,y-18);
     ctx.restore();
   }
   function guardProf(id){
