@@ -207,3 +207,13 @@ test('later non-wall burst is not falsely attributed to the wall',()=>{
   assert.equal(g.bursts.length,1);
   assert.equal(g.bursts[0].x,151);
 });
+
+test('simultaneous fuse threshold and wall are not called a definite misorder',()=>{
+  const Game=boot(false),{g,bursts}=run(Game,30,true,
+    {startX:146,wallX:148+10+8.5*.45,vx:380});
+  assert.equal(bursts.length,1);
+  assert.ok(Math.abs(bursts[0].x-148)<1e-6);
+  const snap=g.novaChronoShadowSnapshot();
+  assert.equal(snap.fuseBeforeWallCandidates,0);
+  assert.equal(snap.fuseBeforeWallLateBursts,0);
+});
