@@ -789,3 +789,52 @@ test('shipping short-TTL shadow refuses teleport-gap body prediction',()=>{
  g.updateBullets(1/30);
  assert.equal(g.novaChronoShadowSnapshot().predictedBodyContacts,0);
 });
+
+
+/* Run 353: opt-in shadow must not call a drone's frame-end location an
+ * authoritative earlier collision when the drone demonstrably moved. */
+test('chronology shadow abstains from phantom hit at moving drone final position',()=>{
+  const {g}=boot(),drone=auditDrone(9001,9,12,0);
+  g.drones=[drone];g.tanks=[];g.bullets=[ordinaryShot(9601)];
+  g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=3;
+  drone.__novaChronoDroneEpoch=3;
+  drone.__novaChronoDronePrevX=12;drone.__novaChronoDronePrevY=100;
+  g.updateBullets(1/30);
+  const s=g.novaChronoShadowSnapshot();
+  assert.equal(s.sampledShortShots,1);
+  assert.equal(s.predictedBodyContacts,0,
+    'final position is not proof that a moving drone occupied it at contact time');
+  assert.equal(s.unregisteredBodyContacts,0);
+});
+
+test('remote moving drone does not erase a genuine first tank contact diagnostic',()=>{
+  const {g}=boot(),tank=addScout(g,40),drone=auditDrone(9002,9,1000,0);
+  g.drones=[drone];g.bullets=[ordinaryShot(9602)];
+  g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=3;
+  drone.__novaChronoDroneEpoch=3;
+  drone.__novaChronoDronePrevX=1000;drone.__novaChronoDronePrevY=100;
+  g.updateBullets(1/30);
+  const s=g.novaChronoShadowSnapshot();
+  assert.equal(s.predictedBodyContacts,1,
+    'distant drone movement cannot globally suppress a real tank contact');
+  assert.equal(s.registeredBodyContacts,1);
+  assert.equal(tank.hp,80);
+});
+
+test('witnessed stationary drone remains eligible for shadow first contact',()=>{
+  const {g}=boot(),drone=auditDrone(9003,9,12,0);
+  g.drones=[drone];g.tanks=[];g.bullets=[ordinaryShot(9603)];
+  g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=3;
+  drone.__novaChronoDroneEpoch=3;
+  drone.__novaChronoDronePrevX=12;drone.__novaChronoDronePrevY=0;
+  g.updateBullets(1/30);
+  assert.equal(g.novaChronoShadowSnapshot().predictedBodyContacts,1);
+});
+
+test('newborn drone without frame-start evidence cannot generate a backdated diagnostic',()=>{
+  const {g}=boot(),drone=auditDrone(9004,9,12,0);
+  g.drones=[drone];g.tanks=[];g.bullets=[ordinaryShot(9604)];
+  g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=3;
+  g.updateBullets(1/30);
+  assert.equal(g.novaChronoShadowSnapshot().predictedBodyContacts,0);
+});
