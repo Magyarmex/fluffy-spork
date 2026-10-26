@@ -323,3 +323,54 @@ test('fair AI exception restores tank visibility and nearestTank ownership atomi
   assert.equal(g.player,originalPlayer,'human handle must restore after an exception');
   assert.equal(g.nearestTank,originalNearest,'nearestTank owner must restore after an exception');
 });
+
+
+test('late-bound ecology survives three real redeploys without multiplying neutrals',()=>{
+  const {Game,window}=bootModules();
+  const callbacks={hud:noop,event:noop,toast:noop,offer:noop,stick:noop,gameover:noop};
+  const g=new Game(canvas(),canvas(),callbacks,'low');
+  let lastState=null;
+  for(let life=0;life<3;life++){
+    for(let frame=0;frame<120;frame++)g.update(1/60);
+    assert.equal(g.status,'playing','life '+life+' remains playable');
+    assert.ok(g.__lfState&&g.__lfState.age>=1.9,'life '+life+' advances ecological time');
+    assert.notEqual(g.__lfState,lastState,'redeploy does not reuse previous life ecology');
+    assert.ok(g.shapes.length>=100&&g.shapes.length<220,
+      'life '+life+' keeps neutral population bounded');
+    const ids=new Set(g.shapes.filter(s=>s&&s.hp>0).map(s=>s.id));
+    assert.equal(ids.size,g.shapes.filter(s=>s&&s.hp>0).length,
+      'life '+life+' retains unique live neutral identities');
+    lastState=g.__lfState;
+    if(life<2){
+      g.redeploy();
+      assert.equal(g.time,0,'redeploy resets match time');
+      assert.ok(g.player&&g.player.alive&&g.status==='playing',
+        'redeploy creates a playable human tank');
+    }
+  }
+  assert.equal(window.NOVALivingFront.snapshot().active,true);
+});
+
+test('late-bound War Room retains real combat, not merely an animated empty arena',()=>{
+  const {Game,menu,errors,rafCallbacks}=bootModules(true);
+  assert.ok(menu.children.some(n=>n.className==='nv-lobby-battlefield'));
+  let launched=0,attempts=0;
+  const original=Game.prototype.tryFire;
+  Game.prototype.tryFire=function(t){
+    if(this.__novaDecorativeWorld)attempts++;
+    const before=this.bullets?this.bullets.length:0;
+    const out=original.apply(this,arguments);
+    if(this.__novaDecorativeWorld&&this.bullets&&this.bullets.length>before)launched++;
+    return out;
+  };
+  let ts=100;
+  for(let i=0;i<160;i++){
+    const cb=rafCallbacks.shift();
+    assert.equal(typeof cb,'function','War Room animation continues');
+    cb(ts);ts+=80;
+  }
+  assert.ok(attempts>0,'decorative AI must attempt combat after late binding');
+  assert.ok(launched>0,'decorative AI must actually launch live projectiles');
+  assert.deepEqual(errors.filter(e=>!e.includes('React hooks unavailable')),[],
+    'sustained decorative combat does not produce runtime errors');
+});
