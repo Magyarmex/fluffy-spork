@@ -469,8 +469,10 @@ wrap('game/render',function(renderMod,require){
     var ctx=g.ctx,now=Number(g.time)||0;drawShear(g,ctx);
     if(isController(g.player)&&(g.player.__novaLiveVectorTutorialUntil||0)>now){
       ctx.save();ctx.setTransform(g.dpr||1,0,0,g.dpr||1,0,0);ctx.textAlign='center';ctx.font='800 9px Orbitron,system-ui';ctx.fillStyle='rgba(207,255,224,.92)';ctx.shadowBlur=10;ctx.shadowColor='#75f0a3';
-      ctx.fillText('RIGHT STICK ANGLE = GUN + SWARM · DEPTH = SWARM RANGE · RELEASE = RECALL',g.w*.5,g.h*.72);
-      ctx.font='700 10px Rajdhani,system-ui';ctx.fillStyle='rgba(170,220,190,.82)';ctx.shadowBlur=0;ctx.fillText('Cannon hits DESIGNATE · deep pressure leaves fewer drones close enough to peel',g.w*.5,g.h*.72+15);ctx.restore();
+      var portrait=g.w<480;
+      ctx.fillText(portrait?'AIM = GUN + SWARM · DEPTH = RANGE':'RIGHT STICK ANGLE = GUN + SWARM · DEPTH = SWARM RANGE · RELEASE = RECALL',g.w*.5,g.h*.72,Math.max(120,g.w-24));
+      ctx.font='700 10px Rajdhani,system-ui';ctx.fillStyle='rgba(170,220,190,.82)';ctx.shadowBlur=0;
+      ctx.fillText(portrait?'RELEASE = RECALL · HITS DESIGNATE':'Cannon hits DESIGNATE · deep pressure leaves fewer drones close enough to peel',g.w*.5,g.h*.72+15,Math.max(120,g.w-24));ctx.restore();
     }
     var ts=g.tanks||[];
     for(var i=0;i<ts.length;i++){
