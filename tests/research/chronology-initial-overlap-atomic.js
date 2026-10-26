@@ -132,8 +132,19 @@ const cases=[];
  const w=base();w.bodies=[{id:'moving',x:55,v:-200,r:8},{id:'rear',x:95,v:0,r:8}];
  check(verify(w,'moving').events.length===2,'moving and rear contact');cases.push('moving-then-rear');
 }
+{
+ const w=base();w.pen=0;
+ const boundary=1/60;
+ // Near-simultaneous contacts straddling a frame boundary must remain
+ // one ambiguous first-contact group, never an arbitrary first-array hit.
+ w.bodies=[{id:'before',x:1000*(boundary-2e-10)+11,v:0,r:8},
+           {id:'after',x:1000*(boundary+2e-10)+11,v:0,r:8}];
+ check(verify(w,'frame-boundary-near-tie').stop==='ambiguous-body',
+   'near-tie across frame boundary must remain ambiguous');
+ cases.push('near-tie-crosses-frame-boundary');
+}
 function rng(seed){return()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);}
-const random=rng(20261026),stats={deterministic:cases,worlds:0,comparisons:0,ambiguous:0,disagreements:0};
+const random=rng(20261026),stats={deterministic:cases,worlds:0,comparisons:0,permutationComparisons:0,ambiguous:0,disagreements:0};
 for(let n=0;n<6000;n++){
  const w=base();w.v=350+random()*2500;w.ttl=.02+random()*.15;
  w.pen=Math.floor(random()*5);w.dmg=15+random()*50;
@@ -148,6 +159,14 @@ for(let n=0;n<6000;n++){
  if(random()<.35)w.hostiles.push({id:'hostile',x:random()<.3?0:random()*100,
    v:(random()-.5)*400,r:3});
  const ref=solve(w,0,true);stats.worlds++;
+ if(n<200){
+  const permuted={...w,bodies:w.bodies.slice().reverse()};
+  for(const sch of SCHEDULES){
+   stats.permutationComparisons++;
+   check(equal(ref,solve(permuted,sch)),
+     'entity-array permutation changed first contact: '+n);
+  }
+ }
  if(ref.stop&&ref.stop.startsWith('ambiguous'))stats.ambiguous++;
  for(const sch of SCHEDULES){stats.comparisons++;
   const actual=solve(w,sch);if(!equal(ref,actual)){
