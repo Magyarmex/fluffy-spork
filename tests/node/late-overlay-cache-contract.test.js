@@ -30,7 +30,7 @@ function canvas() {
   c.getContext = () => ctx;
   return c;
 }
-function bootModules(withMenu=false) {
+function bootModules(withMenu=false,forceEarlyCache=false) {
   const errors = [];
   const store = new Map(), listeners = {}, rafCallbacks=[];
   const menu = withMenu ? {
@@ -79,6 +79,11 @@ function bootModules(withMenu=false) {
   for (const script of overlays) {
     vm.runInContext(fs.readFileSync(path.join(root, script), 'utf8'), context,
       {filename: script, timeout: 5000});
+    if(forceEarlyCache && script==='nova-updates/lobby-battlefield-v1.10.10.js'){
+      const req=window.__novaMakeRequire('lobby-battlefield-v11010');
+      for(const spec of ['./game/engine','./game/classes','./game/ai','./game/render'])
+        req(spec);
+    }
   }
   const preRequireCache = {
     engine: !!window.__novaCache['game/engine'],
@@ -188,4 +193,33 @@ test('actual decorative War Room advances two seconds without hijacking playable
     'menu simulation must never impersonate the active playable match');
   assert.deepEqual(errors.filter(e=>!e.includes('React hooks unavailable')),[],
     'two seconds of real decorative combat must not produce engine errors');
+});
+
+test('differential audit: premature cache vs late binding in four seconds of real combat',()=>{
+  const baseline=bootModules(false,true), candidate=bootModules();
+  assert.equal(baseline.Game.prototype.__novaLivingFrontCore,undefined,
+    'emulated current production cache bypasses the Living Front owner');
+  assert.equal(baseline.Game.prototype.__novaFairEngagement,undefined,
+    'emulated current production cache bypasses the Fair Engagement owner');
+  assert.equal(candidate.Game.prototype.__novaLivingFrontCore,true);
+  assert.equal(candidate.Game.prototype.__novaFairEngagement,true);
+  function sample(boot){
+    const g=new boot.Game(canvas(),canvas(),{hud:noop,event:noop,toast:noop,offer:noop,stick:noop,gameover:noop},'low');
+    const durations=[];
+    for(let i=0;i<240;i++){
+      const t0=performance.now();g.update(1/60);
+      durations.push(performance.now()-t0);
+    }
+    durations.sort((a,b)=>a-b);
+    return {tanks:g.tanks.length,shapes:g.shapes.length,
+      ecology:!!g.__lfState,meanMs:+(durations.reduce((a,b)=>a+b,0)/durations.length).toFixed(3),
+      p95Ms:+durations[Math.floor(durations.length*.95)].toFixed(3),
+      peakMs:+durations[durations.length-1].toFixed(3)};
+  }
+  const old=sample(baseline), now=sample(candidate);
+  console.info('NOVA_LATE_BIND_DIFFERENTIAL '+JSON.stringify({baseline:old,candidate:now}));
+  assert.equal(old.ecology,false);
+  assert.equal(now.ecology,true);
+  assert.equal(now.tanks>0,true);
+  assert.ok(now.shapes>=100&&now.shapes<220);
 });
