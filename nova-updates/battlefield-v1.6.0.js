@@ -790,6 +790,9 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      if(best&&bestT<1e-8){tie=true;return;}
      best={e:e,kind:'drone'};bestT=0;tie=false;return;
     }
+    /* A penetrating round may still owe a later target another contact.
+     * A single guaranteed drone overlap cannot certify its entire budget. */
+    if(b.pen!==0)return;
     if(!witnessed||!Number.isFinite(e.speed)||!(e.speed>0)||
        !Number.isFinite(e.__novaChronoDronePrevSpeed)||
        !(e.__novaChronoDronePrevSpeed>0)||
