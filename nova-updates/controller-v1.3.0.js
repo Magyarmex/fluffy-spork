@@ -372,13 +372,21 @@
           var input = this.input, pl = this.player, cam = this.cam;
           if (pl && input && cam && this.canvas &&
               typeof this.canvas.getBoundingClientRect === 'function' &&
-              Number.isFinite(a) && Number.isFinite(this.zoom) && this.zoom > 0) {
-            var rect = this.canvas.getBoundingClientRect();
-            var wx = cam.x + (input.mouseX - rect.left - this.w * .5) / this.zoom;
-            var wy = cam.y + (input.mouseY - rect.top - this.h * .5) / this.zoom;
-            var dx = wx - pl.x, dy = wy - pl.y;
-            if (Number.isFinite(dx) && Number.isFinite(dy) &&
-                dx * dx + dy * dy <= 4) return a;
+              Number.isFinite(a)) {
+            /* The rendered camera eases toward the resize target zoom.
+             * Mouse bearing must follow the zoom the player actually sees. */
+            var z = Number(cam.zoom);
+            if (!(z > 0)) z = Number(this.zoom);
+            if (z > 0 && Number.isFinite(z)) {
+              var rect = this.canvas.getBoundingClientRect();
+              var wx = cam.x + (input.mouseX - rect.left - this.w * .5) / z;
+              var wy = cam.y + (input.mouseY - rect.top - this.h * .5) / z;
+              var dx = wx - pl.x, dy = wy - pl.y;
+              if (Number.isFinite(dx) && Number.isFinite(dy)) {
+                if (dx * dx + dy * dy <= 4) return a;
+                return baseLerpAngle.call(this, a, Math.atan2(dy, dx), t);
+              }
+            }
           }
         }
         return baseLerpAngle.call(this, a, b, t);
@@ -502,8 +510,10 @@
         }
       } else if (input && input.mouseActive && input.firing) {
         var rect = g.canvas.getBoundingClientRect();
-        var wx = g.cam.x + (input.mouseX - rect.left - g.w * 0.5) / (g.zoom || 1);
-        var wy = g.cam.y + (input.mouseY - rect.top - g.h * 0.5) / (g.zoom || 1);
+        var z = Number(g.cam && g.cam.zoom);
+        if (!(z > 0)) z = Number(g.zoom) || 1;
+        var wx = g.cam.x + (input.mouseX - rect.left - g.w * 0.5) / z;
+        var wy = g.cam.y + (input.mouseY - rect.top - g.h * 0.5) / z;
         var mdx = wx - owner.x, mdy = wy - owner.y, md = Math.hypot(mdx, mdy);
         if (md > 5) {
           active = true;
