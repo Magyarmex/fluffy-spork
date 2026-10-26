@@ -220,9 +220,9 @@ if(typeof document!=='undefined'&&document.head&&typeof document.createElement==
   if(!document.getElementById||!document.getElementById(hudStyleId)){
     var hudStyle=document.createElement('style');hudStyle.id=hudStyleId;
     hudStyle.textContent='@media(max-width:440px){'
-      +'[class~="right-[78px]"]>.panel{padding-left:4px;padding-right:4px}'
+      +'[class~="right-[78px]"]>.panel{padding-left:3px;padding-right:3px}'
       +'[class~="right-[78px]"]>.panel>div:first-child{gap:2px}'
-      +'[class~="right-[78px]"]>.panel>div:first-child>div:first-child{padding-left:3px;padding-right:3px;font-size:9px}'
+      +'[class~="right-[78px]"]>.panel>div:first-child>div:first-child{padding-left:2px;padding-right:2px;font-size:9px}'
       +'[class~="right-[78px]"]>.panel>div:first-child>div:nth-child(2){gap:2px;font-size:9px;min-width:0}'
       +'[class~="right-[78px]"]>.panel>div:first-child>div:nth-child(2)>span:first-child{font-size:12px;flex-shrink:0}'
       +'[class~="right-[78px]"]>.panel>div:first-child>div:nth-child(2)>span:last-child{letter-spacing:.015em;min-width:0}'
