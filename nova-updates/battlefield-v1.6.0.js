@@ -793,13 +793,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
     var maxTime=dt*limit;
     if(!witnessed||!Number.isFinite(e.speed)||!(e.speed>0)||
        e.__novaPhase==='dash'||e.__novaCommitted||e.__novaSpotter){
-     /* Only a potentially reachable drone may block unrelated hull hits. */
-     var checkX=witnessed?dsx:e.x,checkY=witnessed?dsy:e.y;
-     var reach=drR+Math.max(40,dt*2400);
-     if(Math.max(ax,ax+dx*limit)+reach>=checkX&&
-        Math.min(ax,ax+dx*limit)-reach<=checkX&&
-        Math.max(ay,ay+dy*limit)+reach>=checkY&&
-        Math.min(ay,ay+dy*limit)-reach<=checkY)uncertain=true;
+     /* No new authority without a speed witness. The existing later
+      * drone-corridor veto still protects an earlier tank/shape contact. */
      return;
     }
     var speedBound=Math.max(1200,e.speed*6,
@@ -817,15 +812,24 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       sample=t;break;
      }
     }
+    /* Only a drone that COULD arrive before the current first body can
+     * veto that body. A later drone elsewhere on the TTL corridor cannot
+     * erase an earlier, already-proven tank or neutral contact. */
+    var windowT=best?Math.min(bestT,limit):limit;
+    var reach=drR+speedBound*dt*windowT;
+    var potentiallyEarlier=
+       Math.max(ax,ax+dx*windowT)+reach>=Math.min(dsx,e.x)&&
+       Math.min(ax,ax+dx*windowT)-reach<=Math.max(dsx,e.x)&&
+       Math.max(ay,ay+dy*windowT)+reach>=Math.min(dsy,e.y)&&
+       Math.min(ay,ay+dy*windowT)-reach<=Math.max(dsy,e.y);
     if(sample===null){
-     var reach=drR+speedBound*maxTime;
-     if(Math.max(ax,ax+dx*limit)+reach>=Math.min(dsx,e.x)&&
-        Math.min(ax,ax+dx*limit)-reach<=Math.max(dsx,e.x)&&
-        Math.max(ay,ay+dy*limit)+reach>=Math.min(dsy,e.y)&&
-        Math.min(ay,ay+dy*limit)-reach<=Math.max(dsy,e.y))uncertain=true;
+     if(potentiallyEarlier)uncertain=true;
      return;
     }
-    if(best){uncertain=true;return;}
+    if(best){
+     if(potentiallyEarlier)uncertain=true;
+     return;
+    }
     best={e:e,kind:'drone',guaranteed:true};bestT=sample;tie=false;return;
    }
    var rr=0,sx=e.x,sy=e.y,mx=0,my=0,discontinuousTankMove=false;
