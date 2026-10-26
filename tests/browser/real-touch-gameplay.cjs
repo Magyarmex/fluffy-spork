@@ -118,6 +118,15 @@ async function run(browser,label,viewport){
   assert.equal(cancelled.firing,false,label+': cancel clears firing');
   // Warden command must be driven by the actual right touch, not merely a hull turn.
   await page.evaluate(()=>{
+   if(window.innerWidth>window.innerHeight&&window.innerHeight<500){
+    const proto=CanvasRenderingContext2D.prototype,old=proto.fillText;
+    window.__novaLandscapeHints=[];
+    proto.fillText=function(text,x,y){
+     if(typeof text==='string'&&text.startsWith('RIGHT STICK ANGLE = GUN + SWARM'))
+      window.__novaLandscapeHints.push({y,time:window.__novaTouchGame?.time});
+     return old.apply(this,arguments);
+    };
+   }
    const g=window.__novaTouchGame;
    g.setClass(g.player,'warden');
    g.player.spawnShieldT=20;
@@ -125,6 +134,10 @@ async function run(browser,label,viewport){
   await page.waitForTimeout(200);
   await both();
   await page.waitForTimeout(240);
+  if(label==='touch-landscape-844'){
+   const early=await page.evaluate(()=>window.__novaLandscapeHints.length);
+   assert.equal(early,0,label+': canvas tutorial must not duplicate the immediate React toast');
+  }
   const warden=await snapshot();
   assert.equal(warden.cls,'warden',label+': Warden transition occurred in actual game');
   assert.equal(warden.swarm?.active,true,label+': right touch activates Controller swarm command');
@@ -147,6 +160,20 @@ async function run(browser,label,viewport){
    label+': Controller analog depth must increase command power: '+JSON.stringify({shallow,deep}));
   await send('touchCancel',[]);
   await page.waitForTimeout(80);
+  if(label==='touch-landscape-844'){
+   await page.waitForFunction(()=>{
+    const g=window.__novaTouchGame,p=g?.player;
+    return g&&p&&g.time>=p.__novaLiveVectorTutorialStart+0.15;
+   },null,{timeout:12000});
+   await page.waitForTimeout(90);
+   const hint=await page.evaluate(()=>({
+    calls:window.__novaLandscapeHints.slice(-8),
+    expectedY:window.__novaTouchGame.h*.57
+   }));
+   assert.ok(hint.calls.length>0,label+': delayed canvas reminder appears later');
+   assert.ok(hint.calls.every(v=>Math.abs(v.y-hint.expectedY)<2),
+    label+': short landscape reminder stays above upgrade badge: '+JSON.stringify(hint));
+  }
   // Pausing during a live two-finger chord must release gameplay ownership.
   await both();
   await page.getByRole('button',{name:'Pause'}).click();
