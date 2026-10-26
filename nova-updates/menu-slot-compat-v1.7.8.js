@@ -291,7 +291,7 @@ mods['game/engine']=function(module,exports,require){
  original(module,exports,require);
  var Game=module.exports.Game;
  if(!Game||Game.prototype.__novaDeathInsightInstalled)return;
- var classes;try{classes=require('./game/classes');}catch(ignore){return;}
+ var classes;try{classes=require('./classes');}catch(ignore){return;}
  Game.prototype.__novaDeathInsightInstalled=true;
  var oldKill=Game.prototype.killTank,oldUpdate=Game.prototype.update,oldRedeploy=Game.prototype.redeploy;
  if(typeof oldKill==='function')Game.prototype.killTank=function(victim,killer){
