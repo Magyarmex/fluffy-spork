@@ -179,6 +179,7 @@ async function scenario(browser, label, options) {
       assert.ok(toastGeometry.height<110,
         'portrait tutorial toast must not obscure a large part of the arena: '+JSON.stringify(toastGeometry));
       console.log('NOVA_PORTRAIT_TOAST '+JSON.stringify(toastGeometry));
+      await page.screenshot({path:path.join(output,label+'-warden-toast.png')});
     }
     if(label.startsWith('mobile'))await assertPortraitHud(page,label+'-warden','WARDEN');
     if(label.startsWith('mobile')){
