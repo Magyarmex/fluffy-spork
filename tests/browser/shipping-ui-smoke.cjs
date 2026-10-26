@@ -77,8 +77,15 @@ async function scenario(browser, label, options) {
     // A 320x568 CSS-pixel handset must expose the complete primary lobby,
     // not merely a centered Deploy button with the archive/control row clipped.
     if(label==='mobile-320-short'){
-      for(const caption of ['DEPLOY','BLACKGLASS','CONTROLS','DEBUG','OPEN ARCHIVE']){
-        const box=await page.getByText(caption,{exact:true}).first().boundingBox();
+      const critical={
+        DEPLOY:page.getByRole('button',{name:/DEPLOY/i}).first(),
+        BLACKGLASS:page.locator('[data-nova-action="blackglass"]'),
+        CONTROLS:page.locator('[data-nova-action="controls"]'),
+        DEBUG:page.locator('[data-nova-action="debug"]'),
+        'OPEN ARCHIVE':page.locator('[data-nova-action="updates"]')
+      };
+      for(const [caption,element] of Object.entries(critical)){
+        const box=await element.first().boundingBox();
         assert.ok(box&&box.x>=-1&&box.y>=-1&&
           box.x+box.width<=320+1&&box.y+box.height<=568-1,
           label+': '+caption+' must fit inside the visible lobby: '+JSON.stringify(box));
