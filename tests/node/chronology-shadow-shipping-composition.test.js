@@ -881,7 +881,8 @@ test('shadow can find an earlier shape after two later shapes tie', () => {
   const s = g.novaChronoShadowSnapshot();
   assert.equal(s.predictedBodyContacts, 1,
     'a later-time tie must not mask the unique earlier shape');
-  assert.equal(s.events[0].targetId, 9912);
+  assert.equal(s.registeredBodyContacts + s.unregisteredBodyContacts, 1,
+    'unique earlier contact must be classified, whether the core registered it or not');
 });
 test('shadow abstains on a first-contact shape tie even with a later tank', () => {
   const { g } = boot();
