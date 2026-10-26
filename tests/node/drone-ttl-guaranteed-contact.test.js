@@ -99,7 +99,7 @@ function droneWorld(hz, optimized, options={}) {
   g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
     vx:options.vx===undefined?6000:options.vx,vy:0,
     r:3,dmg:20,ttl:options.ttl===undefined?.004:options.ttl,
-    pen:0,hits:0,dead:false,shell:false,beam:false}];
+    pen:options.pen||0,hits:0,dead:false,shell:false,beam:false}];
   if(options.otherBullets)g.bullets.push(...options.otherBullets);
   g.update(1/hz);
   return g;
@@ -147,6 +147,10 @@ for(const optimized of [false,true])for(const hz of [30,60,120,240]){
  test('terrain-corrected drone cannot claim an unobserved straight route '+label,()=>{
   const g=droneWorld(hz,optimized,{terrainBump:{x:1,y:0}});
   assert.equal(g.hits,0);
+ });
+ test('piercing budget remains with original resolver '+label,()=>{
+  const g=droneWorld(hz,optimized,{pen:1});
+  assert.equal(g.hits,0,'single guaranteed contact cannot consume unproven penetration');
  });
  test('committed dash cannot be inferred from endpoint envelope '+label,()=>{
   const g=droneWorld(hz,optimized,{phase:'dash'});
