@@ -1001,3 +1001,18 @@ for(const optimized of [false,true]){
    'the lane with uncertain prior victim damage must abstain');
  });
 }
+
+
+for(const optimized of [false,true]){
+ test((optimized?'optimized':'baseline')+
+  ' self-owned lateral bullet does not suppress legitimate piercing contacts',()=>{
+  const Game=boot(undefined,optimized),{g,a,b}=makeWorld(Game);
+  g.bullets.push({kind:'bullet',id:77002,ownerId:a.id,
+   x:40,y:19,vx:0,vy:0,r:3,dmg:30,ttl:1,pen:0,
+   hits:0,dead:false,shell:false,beam:false});
+  g.time+=.35/30;g.updateBullets(.35/30);
+  assert.equal(a.hitCount,1);
+  assert.equal(b.hitCount,1,
+   'a tank cannot be damaged by its own unrelated stationary bullet');
+ });
+}
