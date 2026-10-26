@@ -23,3 +23,13 @@ test('Controller tutorial keeps desktop copy and uses short portrait instruction
   assert.match(controller,/RIGHT STICK ANGLE = GUN \+ SWARM/);
   assert.match(controller,/Math\.max\(120,g\.w-24\)/);
 });
+
+test('portrait HUD preserves class identity and control affordances without changing desktop',()=>{
+  assert.match(visuals,/nova-portrait-hud-identity/);
+  assert.match(visuals,/@media\(max-width:440px\)/);
+  assert.match(visuals,/\[class~="right-\[78px\]"\]/);
+  assert.match(visuals,/button\[aria-label="Toggle autofire"\]/);
+  assert.match(visuals,/Hybrid gene:/);
+  assert.match(visuals,/@media\(max-width:360px\)/);
+  assert.doesNotMatch(visuals,/display:none[^']*button\[aria-label="Pause"\]/);
+});
