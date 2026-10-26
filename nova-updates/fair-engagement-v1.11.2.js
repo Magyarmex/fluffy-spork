@@ -213,15 +213,32 @@ wrap('game/ai',function(ai,require){
     a.__v1112InjectedId=id;
     if(changed)a.__v1105PlanT=0;
 
-    var all=g.tanks,player=g.player,narrow=[t];
+    var all=g.tanks,player=g.player,narrow=[t],nearest=g.nearestTank,
+        ownNearest=Object.prototype.hasOwnProperty.call(g,'nearestTank');
     if(target&&target.id!==t.id)narrow.push(target);
     g.tanks=narrow;
     /* Only the actual human remains the special g.player handle. AI-vs-AI
      * targets flow through nearest/target-id paths, avoiding accidental player
      * semantics in old code while still leaving only the chosen rival visible. */
     g.player=target&&target.isPlayer?target:null;
+    /* Legacy core flee movement uses nearestTank(own position,900,own id),
+     * then dereferences g.player.x if no threat exists. A fair no-target frame
+     * deliberately has g.player=null. Return an inert, local fallback ONLY for
+     * that exact flee query: never reveal a hidden human or create a real
+     * target. Preserve the original nearestTank owner after this AI call. */
+    if(typeof nearest==='function')g.nearestTank=function(x,y,max,exclude){
+      var found=nearest.apply(this,arguments);
+      if(found||a.state!=='flee'||max!==900||exclude!==t.id||x!==t.x||y!==t.y)return found;
+      var heading=Number(t.angle)||0;
+      return{id:-1,alive:false,x:t.x+Math.cos(heading)*96,y:t.y+Math.sin(heading)*96};
+    };
     var out;
-    try{out=old.apply(this,arguments);}finally{g.tanks=all;g.player=player;}
+    try{out=old.apply(this,arguments);}finally{
+      g.tanks=all;g.player=player;
+      if(typeof nearest==='function'){
+        if(ownNearest)g.nearestTank=nearest;else delete g.nearestTank;
+      }
+    }
 
     /* Older wrappers may rewrite compatibility target slots after execution.
      * Reassert only the information contract; flee state remains authoritative. */
