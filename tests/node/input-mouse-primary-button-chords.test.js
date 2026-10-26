@@ -59,10 +59,13 @@ test('native mousedown captures left press after right button already owns point
   fire('window','mouseup',mouse(0,2));
   assert.equal(input.firing,false);
 });
-test('mouse move recovers primary-button state after missed button event',()=>{
+test('mouse movement clears missed release but never arms an outside-canvas drag',()=>{
   const {input,pointer}=boot();
-  input.pm(pointer(0,1));assert.equal(input.firing,true);
-  input.pm(pointer(0,2));assert.equal(input.firing,false);
+  input.pm(pointer(0,1));
+  assert.equal(input.firing,false,'press began outside the gameplay canvas');
+  input.pd(pointer(0,1));assert.equal(input.firing,true);
+  input.pm(pointer(0,2));assert.equal(input.firing,false,'left button no longer held');
+  input.pm(pointer(0,1));assert.equal(input.firing,false,'no new canvas press');
   assert.equal(input.mouseActive,true);
 });
 test('mouse chord listeners do not change touch aim or persist after detach',()=>{
@@ -83,4 +86,19 @@ test('legacy pointer event without button metadata remains a primary click',()=>
   assert.equal(input.firing,true);
   input.pu({pointerType:'mouse'});
   assert.equal(input.firing,false);
+});
+
+test('twenty attach/detach cycles never leak native mouse chord listeners',()=>{
+  const {input,events,canvas}=boot();
+  for(let i=0;i<20;i++){
+    assert.equal(events.canvas.get('mousedown')?.size,1);
+    assert.equal(events.window.get('mouseup')?.size,1);
+    input.detach();
+    assert.equal(events.canvas.get('mousedown')?.size||0,0);
+    assert.equal(events.window.get('mouseup')?.size||0,0);
+    input.attach(canvas);
+  }
+  input.detach();
+  assert.equal(events.canvas.get('mousedown')?.size||0,0);
+  assert.equal(events.window.get('mouseup')?.size||0,0);
 });
