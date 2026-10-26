@@ -141,7 +141,8 @@
               if (primary && (event.buttons == null || !!(event.buttons & 1)))
                 input.__novaPrimaryPressCaptured = true;
             }
-            if (method === 'pu' && (event.button == null || event.button === 0))
+            if (method === 'pu' &&
+                (event.type === 'pointercancel' || event.button == null || event.button === 0))
               input.__novaPrimaryPressCaptured = false;
             if (method === 'pm' && typeof event.buttons === 'number' &&
                 !(event.buttons & 1))
