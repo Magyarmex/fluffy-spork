@@ -14,12 +14,22 @@ const start=html.indexOf('            const mv = this.input.moveVec();');
 const end=html.indexOf('            const firing = this.input.firing',start);
 assert.ok(start>=0&&end>start,'canonical embedded player aim path exists');
 const playerAim=new Function('sdt','types_1',html.slice(start,end));
+const camStart=html.indexOf('        // camera (smooth framerate-independent lag + look-ahead offset)');
+const camEnd=html.indexOf('        // hud sync',camStart);
+assert.ok(camStart>end&&camEnd>camStart,'real camera step follows aim');
+const cameraStep=new Function('dt','types_1',html.slice(camStart,camEnd));
+function renderedBearing(g){
+ const rect=g.canvas.getBoundingClientRect();
+ const wx=g.cam.x+(g.input.mouseX-rect.left-g.w*.5)/g.cam.zoom;
+ const wy=g.cam.y+(g.input.mouseY-rect.top-g.h*.5)/g.cam.zoom;
+ return Math.atan2(wy-g.player.y,wx-g.player.x);
+}
 function boot(){
   class Game{
     constructor(){
       this.status='playing';
       this.player={id:1,cls:'carrier',alive:true,x:0,y:0,vx:0,vy:0,angle:0};
-      this.w=800;this.h=600;this.zoom=.5;this.cam={x:70,y:0,zoom:1};
+      this.w=800;this.h=600;this.zoom=.5;this.cam={x:70,y:0,zoom:1,shake:0};
       this.canvas={getBoundingClientRect(){return{left:0,top:0}}};
       this.input={mouseActive:true,mouseX:400,mouseY:350,firing:true,
         aim:{active:false},move:{active:false},keyboard:{},
@@ -29,7 +39,10 @@ function boot(){
     moveTank(){}
     nearestTank(){return null}
     lerpAngle(a,b){return b}
-    update(dt){playerAim.call(this,dt,{angleDiff:(a,b)=>Math.abs(a-b)});}
+    update(dt){
+      playerAim.call(this,dt,{angleDiff:(a,b)=>Math.abs(a-b)});
+      cameraStep.call(this,dt,{lerp:(a,b,t)=>a+(b-a)*t});
+    }
   }
   const modules={'game/engine':m=>{m.exports.Game=Game}};
   const window={__novaModules:modules};
@@ -45,16 +58,16 @@ for(const hz of [30,60,120,240]){
   test('desktop mouse aim uses visible zoom during easing at '+hz+' FPS',()=>{
     const g=boot();
     g.update(1/hz);
-    const expected=Math.atan2(50,70); // visible cam.zoom=1
-    const targetZoomBearing=Math.atan2(100,70); // erroneous g.zoom=.5
-    assert.ok(Math.abs(expected-targetZoomBearing)>.2,'test setup exposes a material angle gap');
+    const expected=renderedBearing(g);
+    const targetZoomBearing=Math.atan2(100,70); // erroneous pre-easing target projection
+    assert.ok(Math.abs(expected-targetZoomBearing)>.1,'test setup exposes a material angle gap');
     assert.ok(Math.abs(g.player.angle-expected)<1e-8,
-      'mouse bearing should follow the rendered camera, not its future zoom target');
+      'mouse bearing should follow the camera actually rendered after the update');
   });
 }
 test('control: equal target/render zoom preserves correct mouse bearing',()=>{
   const g=boot();g.cam.zoom=g.zoom;g.update(1/60);
-  assert.ok(Math.abs(g.player.angle-Math.atan2(100,70))<1e-8);
+  assert.ok(Math.abs(g.player.angle-renderedBearing(g))<1e-8);
 });
 test('control: centered camera makes zoom error bearing-neutral',()=>{
   const g=boot();g.cam.x=0;g.update(1/60);
