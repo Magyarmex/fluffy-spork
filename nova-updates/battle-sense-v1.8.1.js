@@ -19,8 +19,24 @@ function lineage(classes,t){try{return t?classes.lineageForClass(t.cls):null;}ca
 function visible(g,a,b){return !!b&&b.alive!==false&&(!g.hasLineOfSight||g.hasLineOfSight(a.x,a.y,b.x,b.y,3));}
 function sameSide(a,b){var keys=['teamId','team','factionId','faction','side'];for(var i=0;i<keys.length;i++){var k=keys[i];if(a&&b&&a[k]!=null&&b[k]!=null)return a[k]===b[k];}return null;}
 function hostile(g,a,b){if(!a||!b||a.id===b.id||b.alive===false)return false;if(typeof g.areAllies==='function'&&g.areAllies(a,b))return false;if(typeof g.areHostile==='function')return !!g.areHostile(a,b);var side=sameSide(a,b);return side===null?true:!side;}
+/* Keep friendly ordinary fire out of tactical lane-risk decisions. Unknown
+ * owners remain dangerous, and shells retain conservative burst warnings. */
+function alliedOrdinaryShot(g,observerId,b){
+  if(observerId==null||!b||b.shell||b.ownerId==null)return false;
+  var map=g.tankById;
+  var observer=map&&typeof map.get==='function'?map.get(observerId):null;
+  var owner=map&&typeof map.get==='function'?map.get(b.ownerId):null;
+  if(typeof g.getTank==='function'){
+    if(!observer)observer=g.getTank(observerId);
+    if(!owner)owner=g.getTank(b.ownerId);
+  }
+  if(!observer||!owner)return false;
+  if(typeof g.areAllies==='function'&&g.areAllies(observer,owner))return true;
+  if(typeof g.areHostile==='function')return !g.areHostile(observer,owner);
+  return sameSide(observer,owner)===true;
+}
 function localCount(g,t,r){var n=0,rr=r*r,ts=g.tanks||[];for(var i=0;i<ts.length;i++){var q=ts[i];if(!q||q.id===t.id||q.alive===false||!hostile(g,t,q))continue;if(d2(t.x,t.y,q.x,q.y)<rr&&visible(g,t,q))n++;}return n;}
-function laneRisk(g,x,y,ignoreOwnerId){var s=0,bs=g.bullets||[],look=.34,r=150,immediate=42;for(var i=0;i<bs.length;i++){var b=bs[i];if(!b||b.dead||ignoreOwnerId!=null&&b.ownerId===ignoreOwnerId||(!b.shell&&Number.isFinite(b.ttl)&&b.ttl<=0))continue;var vx=b.vx||0,vy=b.vy||0,speed=Math.hypot(vx,vy),rx=x-b.x,ry=y-b.y,dist=Math.hypot(rx,ry),threat=0;if(dist<immediate)threat=(1-dist/immediate)*.9+.3;if(speed>1){var tt=(rx*vx+ry*vy)/(speed*speed);if(tt>0&&tt<=look){/* Only reachable pre-expiry positions threaten this lane. Shells retain burst danger. */if(!b.shell&&Number.isFinite(b.ttl))tt=Math.min(tt,b.ttl);var cx=b.x+vx*tt,cy=b.y+vy*tt,miss=Math.hypot(x-cx,y-cy);if(miss<r){var path=1-miss/r,urgency=.55+.45*(1-tt/look),speedW=clamp(speed/650,.75,1.35);threat=Math.max(threat,path*urgency*speedW);}}}if(threat>0&&g.hasLineOfSight&&!g.hasLineOfSight(x,y,b.x,b.y,2))threat=0;s+=threat;}return s;}
+function laneRisk(g,x,y,ignoreOwnerId){var s=0,bs=g.bullets||[],look=.34,r=150,immediate=42;for(var i=0;i<bs.length;i++){var b=bs[i];if(!b||b.dead||ignoreOwnerId!=null&&b.ownerId===ignoreOwnerId||(!b.shell&&Number.isFinite(b.ttl)&&b.ttl<=0)||alliedOrdinaryShot(g,ignoreOwnerId,b))continue;var vx=b.vx||0,vy=b.vy||0,speed=Math.hypot(vx,vy),rx=x-b.x,ry=y-b.y,dist=Math.hypot(rx,ry),threat=0;if(dist<immediate)threat=(1-dist/immediate)*.9+.3;if(speed>1){var tt=(rx*vx+ry*vy)/(speed*speed);if(tt>0&&tt<=look){/* Only reachable pre-expiry positions threaten this lane. Shells retain burst danger. */if(!b.shell&&Number.isFinite(b.ttl))tt=Math.min(tt,b.ttl);var cx=b.x+vx*tt,cy=b.y+vy*tt,miss=Math.hypot(x-cx,y-cy);if(miss<r){var path=1-miss/r,urgency=.55+.45*(1-tt/look),speedW=clamp(speed/650,.75,1.35);threat=Math.max(threat,path*urgency*speedW);}}}if(threat>0&&g.hasLineOfSight&&!g.hasLineOfSight(x,y,b.x,b.y,2))threat=0;s+=threat;}return s;}
 function resourceValue(t,pu,pressure){var hp=clamp(t.hp/Math.max(1,t.maxHp||t.hp||1),0,1),v=.1;if(pu.type==='heal')v=(1-hp)*2.5;else if(pu.type==='shield')v=.65+pressure*.38+(1-hp)*.45;else if(pu.type==='nuke')v=.45+pressure*.7;else if(pu.type==='triple')v=.62+(hp>.45?.25:0);else if(pu.type==='haste')v=.55+(hp>.4?.25:0);return v;}
 function routeDistance(g,t,p,direct){direct=direct==null?Math.hypot(p.x-t.x,p.y-t.y):direct;if(!g.hasLineOfSight||g.hasLineOfSight(t.x,t.y,p.x,p.y,8)||!g.novaBattlefieldWaypoint)return direct;var wp=g.novaBattlefieldWaypoint(t.x,t.y,p.x,p.y,18,t.id);if(!wp||!Number.isFinite(wp.x)||!Number.isFinite(wp.y))return direct;return Math.hypot(wp.x-t.x,wp.y-t.y)+Math.hypot(p.x-wp.x,p.y-wp.y);}
 function resourceContest(g,t,p,selfDist){var ts=g.tanks||[],bestLead=0,selfSpeed=g.tankSpeed?g.tankSpeed(t):0;for(var i=0;i<ts.length;i++){var q=ts[i];if(!q||q.id===t.id||q.alive===false||!hostile(g,t,q)||!visible(g,t,q))continue;var qd=Math.hypot(p.x-q.x,p.y-q.y);if(g.hasLineOfSight&&!g.hasLineOfSight(q.x,q.y,p.x,p.y,8))continue;var lead=selfDist-qd;if(selfSpeed>1&&g.tankSpeed){var qSpeed=g.tankSpeed(q);if(qSpeed>1)lead=(selfDist/selfSpeed-qd/qSpeed)*selfSpeed;}if(lead<=70)continue;if(lead>bestLead)bestLead=lead;}return clamp((bestLead-70)/300,0,.55);}
