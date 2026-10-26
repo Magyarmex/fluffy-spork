@@ -846,3 +846,37 @@ for(const optimized of [false,true]){
   assert.equal(g.__novaShapeSweepActive,false);
  });
 }
+
+
+/* Deterministic real-update stress: spatial separation, contact order and
+ * victim identity remain invariant under array permutation and frame split. */
+for(const optimized of [false,true]){
+ test((optimized?'optimized':'baseline')+
+  ' seeded multi-shot live epoch preserves all physical victim identities',()=>{
+  const Game=boot(function(dt){
+   this.time+=dt;
+   for(const t of this.tanks){
+    t.__novaSweepMoveTime=this.time;
+    t.__novaSweepPrevX=t.x;t.__novaSweepPrevY=t.y;
+   }
+   this.updateBullets(dt);
+  },optimized);
+  let seed=375026;
+  function rnd(){seed=(Math.imul(seed,1664525)+1013904223)>>>0;
+   return seed/4294967296;}
+  for(let w=0;w<160;w++){
+   const fps=w%2?60:30,{g,victims}=multiShotRemoteWorld(Game,5,50);
+   for(let i=0;i<5;i++){
+    victims[i*2].x=35+rnd()*12;
+    victims[i*2+1].x=64+rnd()*10;
+   }
+   if(w%3===0)g.bullets.reverse();
+   if(w%5===0)g.tanks.reverse();
+   const dt=.35/fps;
+   for(let frame=0;frame<3;frame++)g.update(dt);
+   assert.deepEqual(victims.map(v=>v.hitCount),Array(10).fill(1),
+    'all ten stationary hulls must be hit exactly once in world '+w);
+   assert.equal(g.__novaShapeSweepActive,false);
+  }
+ });
+}
