@@ -97,3 +97,28 @@ for(const hz of [30,60,120,240]){
   }
  });
 }
+
+test('seeded 4,000-world oracle preserves prepopulated output and grid order',()=>{
+ const LF=boot();let seed=20261026;
+ function rand(){return ((seed=Math.imul(seed,1664525)+1013904223>>>0)/4294967296);}
+ for(let worldId=0;worldId<4000;worldId++){
+  const bullets=[],n=1+Math.floor(rand()*80);
+  for(let i=0;i<n;i++){
+   const b=shot(i,(rand()-.5)*1200,(rand()-.5)*1200,rand()<.12);
+   bullets.push(b);if(rand()<.09)bullets.push(b);
+  }
+  const {g}=world(LF,bullets);
+  const x=(rand()-.5)*1200,y=(rand()-.5)*1200,r=5+rand()*320;
+  const initial=[];
+  for(let i=0;i<3;i++)if(rand()<.3)initial.push(bullets[Math.floor(rand()*bullets.length)]);
+  const expected=initial.slice(),ix=g.__lfBulletIndex,rr=r*r;
+  for(let cx=Math.floor((x-r)/ix.cell);cx<=Math.floor((x+r)/ix.cell);cx++)
+   for(let cy=Math.floor((y-r)/ix.cell);cy<=Math.floor((y+r)/ix.cell);cy++){
+    const bucket=ix.cells.get(cx*10000+cy)||[];
+    for(const b of bucket)if(!b.dead&&(b.x-x)**2+(b.y-y)**2<=rr&&!expected.includes(b))
+     expected.push(b);
+   }
+  const actual=Array.from(LF.queryBullets(g,x,y,r,initial.slice()));
+  assert.deepEqual(actual,expected,'world '+worldId);
+ }
+});
