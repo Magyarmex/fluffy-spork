@@ -246,6 +246,23 @@ test('defensive ability timing reacts to credible projectile pressure',()=>{
   assert.equal(g.abilities,1,'Bulwark should be intentionally committed under incoming fire');
 });
 
+test('actual Predator AI does not waste Bulwark on a projectile that expires before contact',()=>{
+ function play(ttl){
+  const {Game,ai}=loadPredator(),g=new Game();
+  const hunter=tank(1,'guard',{ai:brain({archetype:'guard',__v180PlanT:0}),abilityCd:0});
+  const player=tank(7,'twin',{isPlayer:true,x:260});
+  g.tanks=[hunter,player];g.player=player;
+  g.bullets=[{ownerId:7,x:160,y:5,vx:-500,vy:0,ttl,dead:false}];
+  ai.updateAI(hunter,g,.16); // real module-wrapped AI, not just the threat helper
+  return {abilities:g.abilities,risk:hunter.ai.__v180Threat.risk};
+ }
+ const spent=play(.02),live=play(.5);
+ assert.equal(spent.risk,0,'short-lived distant fire cannot create a threat');
+ assert.equal(spent.abilities,0,'do not spend a defensive cooldown on vanished fire');
+ assert.ok(live.risk>.34,'long-lived incoming fire remains a credible threat');
+ assert.equal(live.abilities,1,'credible pressure still triggers canonical Bulwark');
+});
+
 test('AI movement remains live while planning is reaction-limited',()=>{
   const {Game,ai}=loadPredator(),g=new Game();
   const hunter=tank(1,'twin',{ai:brain({__v180PlanT:0})}),player=tank(7,'guard',{isPlayer:true,x:420});
