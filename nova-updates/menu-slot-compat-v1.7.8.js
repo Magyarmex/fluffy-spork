@@ -226,7 +226,16 @@ function installDeathTitleFit(){
  var style=document.createElement('style');style.id='nova-death-title-fit';
  style.textContent='@media(max-width:360px){'+
   '.absolute.inset-0.z-50 > .panel.anim-pop > .font-display.text-red-400{'+
-  'font-size:24px;letter-spacing:.12em;line-height:1.25}}';
+  'font-size:24px;letter-spacing:.12em;line-height:1.25}}'+
+  /* A short landscape phone has only 320px of height. Keep the existing
+   * death card and its earned statistics, but make its full contents
+   * scrollable rather than clipping Redeploy or hiding the title offscreen.
+   * :has scopes this to the actual React-owned TERMINATED modal, not Pause
+   * or upgrade cards, and leaves taller phones/desktops unchanged. */
+  '@media(max-height:400px) and (orientation:landscape){'+
+  '.absolute.inset-0.z-50 > .panel.anim-pop:has(> .font-display.text-red-400){'+
+  'max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);'+
+  'overflow-y:auto;overscroll-behavior:contain;}}';
  document.head.appendChild(style);
 }
 installDeathTitleFit();

@@ -324,7 +324,7 @@ async function scenario(browser, label, options) {
     await page.screenshot({path:path.join(output,label+'-warden.png')});
     // Actual React-owned death panel: verify the Fieldcraft note is truthful,
     // readable at 320px, and discarded on redeploy. No synthetic DOM fixture.
-    if(label==='desktop'||label.startsWith('mobile')){
+    if(label==='desktop'||label.startsWith('mobile')||label==='landscape-568'){
       await page.evaluate(()=>{
         const g=window.__novaBrowserLiveGame;
         const enemy=g.tanks.find(t=>t&&!t.isPlayer&&t.alive);
@@ -417,5 +417,7 @@ async function scenario(browser, label, options) {
     await scenario(browser,'mobile-360',{viewport:{width:360,height:780},deviceScaleFactor:2,isMobile:true,hasTouch:true});
     await scenario(browser,'mobile',{viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
     await scenario(browser,'mobile-430',{viewport:{width:430,height:932},deviceScaleFactor:2,isMobile:true,hasTouch:true});
+    // The compact 568x320 landscape phone must keep its full death/redeploy panel on-screen.
+    await scenario(browser,'landscape-568',{viewport:{width:568,height:320},deviceScaleFactor:2,isMobile:true,hasTouch:true});
   } finally { await browser.close(); }
 })().catch(e=>{console.error(e);process.exitCode=1;});
