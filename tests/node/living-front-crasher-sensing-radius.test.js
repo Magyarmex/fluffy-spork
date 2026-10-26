@@ -66,7 +66,7 @@ test('terrain line-of-sight continues to veto in-radius acquisition',()=>{
  assert.equal(scenario({x:500,blocked:true}).cr.__lfTargetId,-1);
 });
 test('an out-of-radius weak target cannot displace a valid local target',()=>{
- const near={id:3,kind:'shape',type:'circle',x:690,y:0,hp:19,
+ const near={id:3,kind:'shape',type:'circle',x:690,y:0,hp:8,
   maxHp:20,r:12,vx:0,vy:0};
  const s=scenario({x:715,extra:[near]});
  assert.equal(s.cr.__lfTargetId,3);
