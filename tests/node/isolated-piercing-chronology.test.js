@@ -527,3 +527,22 @@ for(const optimized of [false,true]) {
   assert.deepEqual(order,[a.id,b.id]);
  });
 }
+
+/* Remaining-penetration accounting uses projectile simulation time, not the
+ * full-speed match clock, during the player's 35% death transition. */
+for(const optimized of [false,true])for(const fps of [30,60,120,240]){
+ test((optimized?'optimized':'baseline')+
+  ' pen=2 Marksman TTL survives 35% death-slow at '+fps+'Hz',()=>{
+  const Game=boot(undefined,optimized),{g,a,b}=makeWorld(Game,52);
+  a.x=25;
+  const shot=g.bullets[0];shot.vx=1050;shot.r=5.5;
+  shot.ttl=.03;shot.pen=2;shot.dmg=21;
+  const dt=.35/fps;
+  for(let frame=0;frame<120&&g.bullets.length;frame++){
+   g.time+=1/fps;g.updateBullets(dt);
+  }
+  assert.equal(a.hitCount,1);
+  assert.equal(b.hitCount,1);
+  assert.equal(g.hits,2);
+ });
+}
