@@ -3,6 +3,8 @@
 // never hand-dispatches fake PointerEvents and never replaces input methods.
 const assert=require('node:assert/strict');
 const {chromium}=require('playwright');
+const fs=require('node:fs');
+const path=require('node:path');
 
 async function run(browser,label,viewport){
  const context=await browser.newContext({viewport,deviceScaleFactor:2,isMobile:true,hasTouch:true});
@@ -83,6 +85,8 @@ async function run(browser,label,viewport){
    label+': actual player must move while two fingers are held: '+JSON.stringify({held,moving}));
   assert.ok(moving.shots>held.shots,
    label+': real player projectiles must launch under right-stick fire: '+JSON.stringify({held,moving}));
+  fs.mkdirSync(path.join('artifacts','browser'),{recursive:true});
+  await page.screenshot({path:path.join('artifacts','browser',label+'-dual-touch.png')});
   // Release right first. CDP touchEnd carries the contact being released.
   await send('touchEnd',[rightMoved]);
   await page.waitForTimeout(120);
@@ -126,6 +130,21 @@ async function run(browser,label,viewport){
   assert.equal(warden.swarm?.active,true,label+': right touch activates Controller swarm command');
   assert.ok(Math.hypot(warden.swarm.nodeX-warden.x,warden.swarm.nodeY-warden.y)>35,
    label+': Controller command node follows live touch direction/depth: '+JSON.stringify(warden));
+  const commandBearing=Math.atan2(warden.swarm.nodeY-warden.y,warden.swarm.nodeX-warden.x);
+  const stickBearing=Math.atan2(warden.aim.dy,warden.aim.dx);
+  const bearingError=Math.atan2(Math.sin(commandBearing-stickBearing),Math.cos(commandBearing-stickBearing));
+  assert.ok(Math.abs(bearingError)<0.12,
+   label+': Controller command bearing must match right-stick direction: '+JSON.stringify({commandBearing,stickBearing,bearingError,warden}));
+  await page.screenshot({path:path.join('artifacts','browser',label+'-warden-command.png')});
+  const rightShallow={...right,x:right.x+14,y:right.y-14};
+  await send('touchMove',[leftMoved,rightShallow]);
+  await page.waitForTimeout(190);
+  const shallow=await snapshot();
+  await send('touchMove',[leftMoved,rightMoved]);
+  await page.waitForTimeout(190);
+  const deep=await snapshot();
+  assert.ok(deep.swarm.power>shallow.swarm.power+0.15,
+   label+': Controller analog depth must increase command power: '+JSON.stringify({shallow,deep}));
   await send('touchCancel',[]);
   await page.waitForTimeout(80);
   // Pausing during a live two-finger chord must release gameplay ownership.
