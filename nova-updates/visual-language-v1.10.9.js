@@ -230,8 +230,6 @@ if(typeof document!=='undefined'&&document.head&&typeof document.createElement==
       +'[class~="right-[78px]"]>.panel>div:first-child>button{padding:2px 3px;min-width:24px;min-height:25px}'
       +'[class~="right-[78px]"]>.panel>div:first-child>button[aria-label="Toggle autofire"]{padding-left:2px;padding-right:2px;font-size:8px;letter-spacing:0}'
       +'[class~="right-[78px]"]>.panel>div:first-child>div[title^="Hybrid gene:"]{padding-left:2px;padding-right:2px;font-size:8px}'
-      +'}@media(max-width:360px){'
-      +'[class~="right-[78px]"]>.panel>div:first-child>div[class~="ml-auto"]>span:last-child{display:none}'
       +'}';
     document.head.appendChild(hudStyle);
   }
