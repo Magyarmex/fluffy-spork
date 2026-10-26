@@ -30,7 +30,7 @@ function canvas() {
   c.getContext = () => ctx;
   return c;
 }
-function runGame(hz, controller, klass) {
+function runGame(hz, controller, klass, mouseButton) {
   const errors = [];
   const store = new Map();
   const document = {hidden: false, visibilityState: 'visible',
@@ -77,6 +77,11 @@ function runGame(hz, controller, klass) {
     if (t === this.player && this.bullets.length > before) launched++;
     return result;
   };
+  if (mouseButton != null) {
+    game.input.autofire = false;
+    game.input.pd({pointerType:'mouse',pointerId:1,button:mouseButton,
+      buttons:mouseButton===0?1:2,clientX:700,clientY:300,target:game.canvas});
+  }
   if (controller) {
     game.setClass(game.player, 'warden');
     game.player.angle = Math.PI / 2;
@@ -105,6 +110,11 @@ function runGame(hz, controller, klass) {
     assert.ok(game.drones.some(d => d.ownerId === game.player.id),
       'real Warden command spawns player-owned drones');
   }
+  if (mouseButton != null) {
+    assert.equal(game.input.mouseActive, true, 'mouse still aims in the real game');
+    if (mouseButton === 0) assert.ok(launched > 0, 'primary click launches live shots');
+    else assert.equal(launched, 0, 'secondary click never launches a player shot');
+  }
   if (klass) {
     assert.equal(game.player.cls, klass, 'requested class is still active');
     assert.ok(launched > 0, 'the real weapon path launches at least one player projectile');
@@ -129,4 +139,12 @@ for (const [hz, controller] of [[30, false], [120, false], [60, true], [240, tru
 for (const klass of ['twin', 'cannon', 'marksman', 'carrier', 'guard']) {
   test('materialized '+klass+' lineage moves and fires for two seconds at 60 FPS',
     () => runGame(60, false, klass));
+}
+
+for (const hz of [30, 60, 120, 240]) {
+  for (const button of [0, 2]) {
+    test('materialized full game: '+(button===0?'primary':'secondary')+
+      ' mouse click '+hz+' FPS firing contract',
+      () => runGame(hz, false, null, button));
+  }
 }
