@@ -66,6 +66,17 @@ function hostile(g,a,b){
   var side=sameSide(a,b);if(side!==null)return !side;
   return true;
 }
+/* Ordinary allied rounds cannot hit this tank. Preserve unknown owners and
+ * Bomber shells conservatively: shell expiry may still create area hazards. */
+function alliedOrdinaryShot(g,t,b){
+  if(!b||b.shell||b.ownerId==null)return false;
+  var map=g.tankById,owner=map&&typeof map.get==='function'?map.get(b.ownerId):null;
+  if(!owner&&typeof g.getTank==='function')owner=g.getTank(b.ownerId);
+  if(!owner)return false;
+  if(typeof g.areAllies==='function'&&g.areAllies(t,owner))return true;
+  if(typeof g.areHostile==='function')return !g.areHostile(t,owner);
+  return sameSide(t,owner)===true;
+}
 function visible(g,a,b,pad){
   if(!alive(b))return false;
   return !g.hasLineOfSight||g.hasLineOfSight(a.x,a.y,b.x,b.y,pad==null?3:pad);
@@ -142,7 +153,7 @@ function solveIntercept(sx,sy,tx,ty,tvx,tvy,speed,maxT,out){
 function threatVector(g,C,t,out){
   out=out||{};var vx=0,vy=0,risk=0,soon=9,bs=g.bullets||[],safe=sizeOf(C,t)+20;
   for(var i=0;i<bs.length;i++){
-    var b=bs[i];if(!b||b.dead||b.ownerId===t.id)continue;
+    var b=bs[i];if(!b||b.dead||b.ownerId===t.id||alliedOrdinaryShot(g,t,b))continue;
     var rx=b.x-t.x,ry=b.y-t.y,v2=(b.vx||0)*(b.vx||0)+(b.vy||0)*(b.vy||0);if(v2<100)continue;
     var tc=-(rx*(b.vx||0)+ry*(b.vy||0))/v2;if(tc<0||tc>.82)continue;
     /* An ordinary round cannot threaten beyond its remaining physical life.
