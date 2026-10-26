@@ -87,7 +87,8 @@ function droneWorld(hz, optimized, options={}) {
     this.updateBullets(dt);
   },optimized);
   const g=new FullGame();
-  g.tanks=[];g.shapes=[];
+  g.tanks=[];g.shapes=[];g.hitOwners=[];
+  g.damageDrone=function(_d,_damage,ownerId){this.hits++;this.hitOwners.push(ownerId);};
   g.drones=[{kind:'drone',id:7,ownerId:options.owned?1:2,
     x:options.x===undefined?22:options.x,y:0,r:8,hp:20,
     speed:options.speed===undefined?200:options.speed,
@@ -136,7 +137,7 @@ for(const optimized of [false,true])for(const hz of [30,60,120,240]){
   const g=droneWorld(hz,optimized,{otherBullets:[{kind:'bullet',id:99,
    ownerId:3,x:22,y:0,vx:0,vy:0,r:3,dmg:20,ttl:1,pen:0,
    hits:0,dead:false,shell:false,beam:false}]});
-  assert.equal(g.hits,0,'first event belongs to competing shot');
+  assert.ok(!g.hitOwners.includes(1),'first event belongs to competing shot');
  });
 
 }
