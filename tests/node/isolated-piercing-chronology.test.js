@@ -421,3 +421,48 @@ for(const optimized of [false,true])for(const fps of [30,60,120,240]){
   assert.equal(g.hits,2);
  });
 }
+
+/* Run 372b: an expiring Marksman-family projectile can retain penetration
+ * after one hull. Its remaining physically reachable hulls must still be
+ * damaged before TTL even when the bullet expires mid-frame. Pen=2, speed
+ * 1050u/s, radius 5.5; no shell/splash/beam or shield involved. */
+for(const optimized of [false,true])for(const fps of [30,60,120,240]){
+ test((optimized?'optimized':'baseline')+
+  ' pen=2 Marksman TTL reaches two distinct hulls at '+fps+'Hz',()=>{
+  const Game=boot(undefined,optimized),{g,a,b}=makeWorld(Game,52);
+  a.x=25;
+  const shot=g.bullets[0];shot.vx=1050;shot.r=5.5;shot.ttl=.03;
+  shot.pen=2;shot.dmg=21;
+  for(let frame=0;frame<100&&g.bullets.length;frame++){
+   const dt=1/fps;g.time+=dt;g.updateBullets(dt);
+  }
+  assert.equal(a.hitCount,1);
+  assert.equal(b.hitCount,1,'second physical contact before expiry');
+  assert.equal(g.hits,2);
+ });
+ test((optimized?'optimized':'baseline')+
+  ' pen=2 Marksman TTL cannot damage unreachable hull at '+fps+'Hz',()=>{
+  const Game=boot(undefined,optimized),{g,b}=makeWorld(Game,120);
+  g.tanks[0].x=25;
+  const shot=g.bullets[0];shot.vx=1050;shot.r=5.5;shot.ttl=.03;
+  shot.pen=2;shot.dmg=21;
+  for(let frame=0;frame<100&&g.bullets.length;frame++){
+   const dt=1/fps;g.time+=dt;g.updateBullets(dt);
+  }
+  assert.equal(b.hitCount,0);
+ });
+}
+for(const optimized of [false,true]) {
+ test((optimized?'optimized':'baseline')+
+  ' pen=2 expiring high-speed shot resolves three chronological hulls',()=>{
+  const Game=boot(undefined,optimized),{g,a,b}=makeWorld(Game,52);
+  a.x=25;
+  const c={kind:'tank',id:4,x:78,y:0,cls:'scout',hp:100,alive:true,hitCount:0};
+  g.tanks.push(c);
+  const shot=g.bullets[0];shot.vx=2500;shot.r=5.5;shot.ttl=.03;
+  shot.pen=2;shot.dmg=21;
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.deepEqual([a.hitCount,b.hitCount,c.hitCount],[1,1,1]);
+  assert.equal(g.hits,3);
+ });
+}
