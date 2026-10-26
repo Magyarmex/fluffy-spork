@@ -29,6 +29,6 @@ test('portrait HUD preserves class identity and control affordances without chan
   assert.match(visuals,/@media\(max-width:440px\)/);
   assert.match(visuals,/\[class~="right-\[78px\]"\]/);
   assert.match(visuals,/button\[aria-label="Toggle autofire"\]/);
-  assert.match(visuals,/@media\(max-width:360px\)/);
+  assert.doesNotMatch(visuals,/span:last-child\{display:none\}/);
   assert.doesNotMatch(visuals,/display:none[^']*button\[aria-label="Pause"\]/);
 });
