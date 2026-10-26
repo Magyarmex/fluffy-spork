@@ -103,6 +103,35 @@ test('projectile risk produces a deterministic evasive vector',()=>{
   assert.ok(Math.abs(r.y)>.5,'head-on threat should choose a lateral dodge');
 });
 
+/* An AI rival should dodge a projectile only while it can still reach the
+ * threatened space. Otherwise a near-expired bullet at long range grants
+ * artificial evasive pressure despite physically vanishing first. */
+for(const hz of [30,60,120,240]){
+ test('Predator threat respects physical bullet TTL at '+hz+'Hz',()=>{
+  const {context,Game,CLASSES}=loadPredator(),g=new Game(),t=tank(1,'twin');
+  const threat=context.window.__NOVA_PREDATOR_TEST__.threatVector;
+  const shot={ownerId:9,x:160,y:5,vx:-500,vy:0,dead:false,ttl:0.05};
+  g.bullets=[shot];
+  const expired=threat(g,CLASSES,t,{});
+  assert.equal(expired.risk,0,
+    'projectile expires at x=135, far outside the tank safety corridor');
+  shot.ttl=0.5;
+  const live=threat(g,CLASSES,t,{});
+  assert.ok(live.risk>.1,
+    'the same shot with enough lifetime must still provoke an evasive plan');
+  shot.x=50;shot.ttl=0.05;
+  const near=threat(g,CLASSES,t,{});
+  assert.ok(near.risk>0,
+    'a shot entering the safety corridor before expiry must remain dangerous');
+  shot.ttl=0;
+  assert.equal(threat(g,CLASSES,t,{}).risk,0,
+    'already-expired but not yet reaped projectiles must not cause a dodge');
+  shot.ttl=undefined;shot.x=160;
+  assert.ok(threat(g,CLASSES,t,{}).risk>.1,
+    'legacy projectile fixtures without a TTL preserve historical behavior');
+ });
+}
+
 test('target saturation lowers dogpile priority',()=>{
   const {context,Game}=loadPredator(),g=new Game(),hunter=tank(1,'twin',{ai:brain()}),player=tank(7,'guard',{isPlayer:true,x:300});
   g.tanks=[hunter,player];
