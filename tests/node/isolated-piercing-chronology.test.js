@@ -768,3 +768,38 @@ for(const optimized of [false,true]){
   });
  }
 }
+
+
+/* Independent-shot recovery is deliberately NOT an event-order resolver.
+ * If two piercing shots can damage the same hull, do not let whichever
+ * projectile appears first claim the shared victim through this shortcut. */
+for(const optimized of [false,true]){
+ test((optimized?'optimized':'baseline')+
+  ' shared-hull collision attribution is independent of bullet array order',()=>{
+  const Game=boot(undefined,optimized);
+  function run(reverse){
+   const g=new Game(),a={kind:'tank',id:2,x:40,y:5,cls:'scout',
+    hp:100,alive:true,owners:[]},b={kind:'tank',id:3,x:65,y:5,
+    cls:'scout',hp:100,alive:true,owners:[]};
+   g.tanks=[a,b];
+   g.damageTank=function(t,dmg,owner){t.hp-=dmg;t.owners.push(owner);};
+   g.bullets=[
+    {kind:'bullet',id:11,ownerId:111,x:0,y:0,vx:6000,vy:0,
+     r:3,dmg:40,ttl:.01,pen:1,hits:0,dead:false,shell:false,beam:false},
+    {kind:'bullet',id:12,ownerId:222,x:0,y:10,vx:6000,vy:0,
+     r:3,dmg:40,ttl:.01,pen:1,hits:0,dead:false,shell:false,beam:false}
+   ];
+   for(let i=0;i<120;i++)g.shapes.push({kind:'shape',id:1000+i,
+    x:-900+(i%20)*4,y:-900+Math.floor(i/20)*4,r:12,hp:100});
+   for(let i=0;i<500;i++)g.bullets.push({kind:'bullet',id:2000+i,
+    ownerId:2000+i,x:900+(i%20)*4,y:900+Math.floor(i/20)*4,
+    vx:0,vy:0,r:2,dmg:1,ttl:2,pen:0,hits:0,dead:false,
+    shell:false,beam:false});
+   if(reverse)g.bullets.reverse();
+   g.time+=.35/30;g.updateBullets(.35/30);
+   return [a.owners,b.owners];
+  }
+  assert.deepEqual(run(false),run(true),
+   'ambiguous shared-hull attribution must not depend on array order');
+ });
+}
