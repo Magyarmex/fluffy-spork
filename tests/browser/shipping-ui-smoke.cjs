@@ -39,6 +39,8 @@ async function assertPortraitHud(page, label, expectedClass) {
     label+': hybrid gene badge does not cover class or kills: '+JSON.stringify(metrics));
   assert.ok(metrics.class.right+1<=metrics.kills.left,
     label+': class identity must not collide with kill indicator: '+JSON.stringify(metrics));
+  assert.ok(metrics.buttons.every(b=>b.box.bottom-b.box.top>=29.5),
+    label+': compact combat controls retain at least a 30px vertical tap target: '+JSON.stringify(metrics));
   assert.ok(metrics.buttons.every(b=>b.box.left>=metrics.panel.left&&b.box.right<=metrics.panel.right+1),
     label+': autofire, leaderboard and pause remain inside HUD: '+JSON.stringify(metrics));
   assert.ok(metrics.scrollWidth<=metrics.viewport+1,
