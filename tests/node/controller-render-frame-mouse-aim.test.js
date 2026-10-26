@@ -181,3 +181,35 @@ for(const hz of [30,60,120,240]){
   assert.ok(Math.abs(g.player.angle-expected)<1e-10);
  });
 }
+
+test('512 seeded moving-camera worlds agree with final visible cursor bearing',()=>{
+ const Game=boot();
+ let seed=0x3692026;
+ const random=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ let checked=0;
+ for(let i=0;i<512;i++){
+  const g=new Game(),dt=1/[30,60,120,240][i%4];
+  g.player.x=(random()-.5)*600;g.player.y=(random()-.5)*600;
+  g.player.vx=(random()-.5)*300;g.player.vy=(random()-.5)*300;
+  g.cam.x=(random()-.5)*500;g.cam.y=(random()-.5)*500;
+  g.cam.zoom=.2+random()*1.8;g.zoom=.2+random()*1.8;
+  g.input.mouseX=random()*800;g.input.mouseY=random()*600;
+  g.update(dt);
+  const wx=g.cam.x+(g.input.mouseX-400)/g.cam.zoom;
+  const wy=g.cam.y+(g.input.mouseY-300)/g.cam.zoom;
+  const dx=wx-g.player.x,dy=wy-g.player.y;
+  if(dx*dx+dy*dy<=4)continue; // intended centered-pointer deadzone
+  checked++;
+  const expected=Math.atan2(dy,dx)*Math.min(1,dt*13);
+  assert.ok(Math.abs(g.player.angle-expected)<1e-10,
+    'visible aim mismatch at seeded world '+i);
+ }
+ assert.ok(checked>500,'seeded worlds exercise noncentered mouse aim');
+});
+test('throwing core update clears projection frame state for subsequent input',()=>{
+ const Game=boot(),g=new Game();
+ g.afterAim=()=>{throw new Error('injected core failure')};
+ assert.throws(()=>g.update(1/30),/injected core failure/);
+ assert.equal(g.__novaMouseAimFrameDt,undefined);
+ assert.equal(g.__novaMouseCenterAimPending,false);
+});
