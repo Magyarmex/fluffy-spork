@@ -216,7 +216,7 @@ async function scenario(browser, label, options) {
     await page.screenshot({path:path.join(output,label+'-warden.png')});
     // Actual React-owned death panel: verify the Fieldcraft note is truthful,
     // readable at 320px, and discarded on redeploy. No synthetic DOM fixture.
-    if(label==='desktop'||label==='mobile-320'){
+    if(label==='desktop'||label.startsWith('mobile')){
       await page.evaluate(()=>{
         const g=window.__novaBrowserLiveGame;
         const enemy=g.tanks.find(t=>t&&!t.isPlayer&&t.alive);
@@ -259,6 +259,26 @@ async function scenario(browser, label, options) {
         label+': insight must fit the viewport: '+JSON.stringify(geometry));
       assert.ok(geometry.panelTop>=-1&&geometry.panelBottom<=geometry.viewportHeight+1,
         label+': complete TERMINATED panel must remain vertically visible: '+JSON.stringify(geometry));
+      // Measure the text glyphs, not only the block box: the 320px defect
+      // paints past the panel even though the block itself remains contained.
+      const deathTitle=await page.getByText('TERMINATED',{exact:true}).evaluate(el=>{
+        const panel=el.parentElement,pr=panel.getBoundingClientRect();
+        const range=document.createRange();range.selectNodeContents(el);
+        const glyph=range.getBoundingClientRect(),style=getComputedStyle(panel);
+        return {glyphLeft:glyph.left,glyphRight:glyph.right,
+          innerLeft:pr.left+parseFloat(style.paddingLeft),
+          innerRight:pr.right-parseFloat(style.paddingRight),
+          fontSize:getComputedStyle(el).fontSize,
+          letterSpacing:getComputedStyle(el).letterSpacing,
+          viewport:innerWidth};
+      });
+      assert.ok(deathTitle.glyphLeft>=deathTitle.innerLeft-1&&
+        deathTitle.glyphRight<=deathTitle.innerRight+1,
+        label+': TERMINATED glyphs must fit inside the panel content box: '+
+        JSON.stringify(deathTitle));
+      if(deathTitle.viewport>=390)assert.equal(deathTitle.fontSize,'30px',
+        label+': retain desktop/large-phone title scale');
+      console.log('NOVA_DEATH_TITLE '+JSON.stringify({label,deathTitle}));
       await page.screenshot({path:path.join(output,label+'-death-insight.png')});
       await page.getByRole('button',{name:/REDEPLOY/}).click();
       await page.waitForFunction(()=>window.__novaBrowserLiveGame?.status==='playing',
@@ -285,6 +305,7 @@ async function scenario(browser, label, options) {
   try {
     await scenario(browser,'desktop',{viewport:{width:1280,height:800},deviceScaleFactor:1});
     await scenario(browser,'mobile-320',{viewport:{width:320,height:700},deviceScaleFactor:2,isMobile:true,hasTouch:true});
+    await scenario(browser,'mobile-360',{viewport:{width:360,height:780},deviceScaleFactor:2,isMobile:true,hasTouch:true});
     await scenario(browser,'mobile',{viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
     await scenario(browser,'mobile-430',{viewport:{width:430,height:932},deviceScaleFactor:2,isMobile:true,hasTouch:true});
   } finally { await browser.close(); }
