@@ -609,6 +609,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   * chronological solver. Live-frame shortcuts exhaust penetration; TTL
   * shortcuts settle only proven pre-expiry contacts before the shot dies.
   * Never leave a partially backdated bullet live. */
+ /* A single eligible shot may prove a local corridor even when remote fire
+  * exceeds the global 900-comparison estimate. Its own full-entity scan
+  * remains capped; multiple eligible shots retain the global work gate. */
+ var ISOLATED_RECOVERY_SCAN_CAP=1200;
  function isolatedTTLStationaryPiercingChain(g,b,dt,nonExpiring){
   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
      b.__novaBreachAtTime===g.time||
@@ -643,7 +647,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    * live games do, so missing live witness conservatively abstains. */
   var tanks=g.tanks||[],shapes=g.shapes||[],drones=g.drones||[],
       others=g.bullets||[],contacts=[];
-  if(tanks.length+shapes.length+drones.length+others.length>360)return false;
+  if(tanks.length+shapes.length+drones.length+others.length>
+     ISOLATED_RECOVERY_SCAN_CAP)return false;
   for(var ti=0;ti<tanks.length;ti++){
    var t=tanks[ti];if(!t||!t.alive||t.id===b.ownerId)continue;
    var def=CLASSES[t.cls],rr=b.r+(def&&def.size||0)+3;
@@ -1104,7 +1109,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
  var bodyWork=this.bullets.length+(this.tanks||[]).length+
    (this.shapes||[]).length+(this.drones||[]).length;
  var projected=expiring*bodyWork;
- if(projected>0&&projected<=900)
+ if(projected>0&&(projected<=900||
+    (expiring===1&&bodyWork<=ISOLATED_RECOVERY_SCAN_CAP)))
   for(var pre=this.bullets.length-1;pre>=0;pre--){
    var expiringBullet=this.bullets[pre];
    if(!isolatedTTLStationaryPiercingChain(this,expiringBullet,dt))
@@ -1114,7 +1120,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   * Reuse the identical physical-first-contact proof, but only when the
   * entire penetration budget is consumed before the frame boundary.
   * A surviving or uncertain round stays with the original engine. */
- if(paired>0&&paired*bodyWork<=900)
+ if(paired>0&&(paired*bodyWork<=900||
+    (paired===1&&bodyWork<=ISOLATED_RECOVERY_SCAN_CAP)))
   for(var pair=this.bullets.length-1;pair>=0;pair--){
    var liveBullet=this.bullets[pair];
    if(liveBullet&&liveBullet.ttl>dt)

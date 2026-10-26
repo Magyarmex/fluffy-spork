@@ -568,3 +568,113 @@ for(const optimized of [false,true]) {
   assert.equal(g.__novaShapeSweepActive,false);
  });
 }
+
+/* Run 374: an isolated piercing shot must not lose physical contacts merely
+ * because hundreds of unrelated projectiles exist elsewhere in the arena.
+ * The background shots are remote, stationary, and harmless; the direct
+ * collision system still owns any genuinely competing projectile. */
+for(const optimized of [false,true]){
+ const Game=boot(undefined,optimized),label=optimized?'optimized':'baseline';
+ for(const fps of [30,60,120,240]){
+  test(label+' remote projectile density preserves expiring penetration at '+fps+'Hz',()=>{
+   const {g,a,b}=makeWorld(Game);
+   for(let i=0;i<960;i++)g.bullets.push({kind:'bullet',id:100+i,ownerId:10+i,
+    x:900+(i%24)*3,y:900+Math.floor(i/24)*3,vx:0,vy:0,
+    r:2,dmg:1,ttl:2,pen:0,hits:0,dead:false,shell:false,beam:false});
+   const dt=.35/fps;
+   for(let frame=0;frame<20;frame++){g.time+=dt;g.updateBullets(dt);}
+   assert.equal(a.hitCount,1,'first physically reached hull');
+   assert.equal(b.hitCount,1,'second physically reached hull despite remote fire');
+  });
+ }
+ test(label+' remote projectile density preserves non-expiring same-frame penetration',()=>{
+  const {g,a,b}=makeWorld(Game);
+  g.bullets[0].ttl=.1;
+  for(let i=0;i<960;i++)g.bullets.push({kind:'bullet',id:2000+i,ownerId:10+i,
+   x:900+(i%24)*3,y:900+Math.floor(i/24)*3,vx:0,vy:0,
+   r:2,dmg:1,ttl:2,pen:0,hits:0,dead:false,shell:false,beam:false});
+  g.time+=.02;g.updateBullets(.02);
+  assert.equal(a.hitCount,1);
+  assert.equal(b.hitCount,1);
+ });
+ test(label+' dense remote fire cannot bypass a genuinely nearby interceptor',()=>{
+  const {g,a,b}=makeWorld(Game);
+  g.bullets.push({kind:'bullet',id:5,ownerId:8,x:10,y:0,vx:0,vy:0,
+   r:3,dmg:5,ttl:2,pen:0,hits:0,dead:false,shell:false,beam:false});
+  for(let i=0;i<960;i++)g.bullets.push({kind:'bullet',id:3000+i,ownerId:10+i,
+   x:900+(i%24)*3,y:900+Math.floor(i/24)*3,vx:0,vy:0,
+   r:2,dmg:1,ttl:2,pen:0,hits:0,dead:false,shell:false,beam:false});
+  g.time+=.35/30;g.updateBullets(.35/30);
+  assert.equal(b.hitCount,0,'uncertain interception must remain conservative');
+ });
+}
+
+for(const optimized of [false,true]){
+ test((optimized?'optimized':'baseline')+
+  ' dense distant-fire result is independent of projectile array ordering',()=>{
+  const Game=boot(undefined,optimized),{g,a,b}=makeWorld(Game);
+  for(let i=0;i<960;i++)g.bullets.push({kind:'bullet',id:4000+i,ownerId:10+i,
+   x:900+(i%24)*3,y:900+Math.floor(i/24)*3,vx:0,vy:0,
+   r:2,dmg:1,ttl:2,pen:0,hits:0,dead:false,shell:false,beam:false});
+  g.bullets.reverse();
+  g.time+=.35/30;g.updateBullets(.35/30);
+  assert.equal(a.hitCount,1,'first physical contact despite reverse order');
+  assert.equal(b.hitCount,1,'second physical contact despite reverse order');
+ });
+}
+
+/* The dense-fire exception is not a license to cross earlier physical
+ * defenses: terrain and protected hulls retain their conservative veto. */
+for(const optimized of [false,true]){
+ const Game=boot(undefined,optimized),mode=optimized?'optimized':'baseline';
+ for(const defense of ['wall','shield']){
+  test(mode+' remote fire cannot bypass earlier '+defense,()=>{
+   const {g,a,b}=makeWorld(Game);
+   if(defense==='wall')g.__novaTerrain=[{id:-10,shape:'rect',
+    x:10,y:0,w:4,h:80,solid:true,destructible:false}];
+   else a.spawnShieldT=1;
+   for(let i=0;i<960;i++)g.bullets.push({kind:'bullet',id:6000+i,ownerId:10+i,
+    x:900+(i%24)*3,y:900+Math.floor(i/24)*3,vx:0,vy:0,
+    r:2,dmg:1,ttl:2,pen:0,hits:0,dead:false,shell:false,beam:false});
+   g.time+=.35/30;g.updateBullets(.35/30);
+   assert.equal(b.hitCount,0,'protected first event prevents speculative second hit');
+   if(defense==='wall')assert.equal(a.hitCount,0);
+  });
+ }
+}
+
+/* Distant neutral bodies must not defeat the same physical proof: the
+ * previous helper rejected >360 total entities before checking location. */
+for(const optimized of [false,true]){
+ test((optimized?'optimized':'baseline')+
+  ' remote shapes and bullets preserve the isolated two-hull contact',()=>{
+  const Game=boot(undefined,optimized),{g,a,b}=makeWorld(Game);
+  for(let i=0;i<400;i++){
+   g.shapes.push({kind:'shape',id:8000+i,x:-900+(i%20)*4,
+    y:-900+Math.floor(i/20)*4,r:12,hp:100});
+   g.bullets.push({kind:'bullet',id:9000+i,ownerId:10+i,
+    x:900+(i%20)*4,y:900+Math.floor(i/20)*4,vx:0,vy:0,
+    r:2,dmg:1,ttl:2,pen:0,hits:0,dead:false,shell:false,beam:false});
+  }
+  g.time+=.35/30;g.updateBullets(.35/30);
+  assert.equal(a.hitCount,1);
+  assert.equal(b.hitCount,1,'remote neutral ecology cannot suppress penetration');
+ });
+}
+
+/* Canonical ordinary-neutral population size plus crowded distant fire:
+ * the two eligible hulls are the only local physical contacts. */
+for(const optimized of [false,true]){
+ test((optimized?'optimized':'baseline')+
+  ' canonical neutral population does not suppress a lone piercing shot',()=>{
+  const Game=boot(undefined,optimized),{g,a,b}=makeWorld(Game);
+  for(let i=0;i<120;i++)g.shapes.push({kind:'shape',id:12000+i,
+   x:-900+(i%20)*4,y:-900+Math.floor(i/20)*4,r:12,hp:100});
+  for(let i=0;i<960;i++)g.bullets.push({kind:'bullet',id:13000+i,
+   ownerId:10+i,x:900+(i%24)*3,y:900+Math.floor(i/24)*3,
+   vx:0,vy:0,r:2,dmg:1,ttl:2,pen:0,hits:0,dead:false,shell:false,beam:false});
+  g.time+=.35/30;g.updateBullets(.35/30);
+  assert.equal(a.hitCount,1);
+  assert.equal(b.hitCount,1);
+ });
+}
