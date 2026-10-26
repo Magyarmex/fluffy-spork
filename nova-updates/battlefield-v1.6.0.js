@@ -711,8 +711,29 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   }
   for(var bi=0;bi<others.length;bi++){
    var o=others[bi];if(!o||o===b||o.dead)continue;
-   if(near(o.x,o.y,o.x+(o.vx||0)*dt,o.y+(o.vy||0)*dt,
-      (o.r||2)+b.r+2))return false;
+   if(!Number.isFinite(o.x)||!Number.isFinite(o.y)||
+      !Number.isFinite(o.vx)||!Number.isFinite(o.vy)||
+      !Number.isFinite(o.r)||!(o.r>0))return false;
+   if(near(o.x,o.y,o.x+o.vx*dt,o.y+o.vy*dt,
+      o.r+b.r+2))return false;
+   /* A competing projectile can already overlap a target hull without
+    * touching this shot's narrow corridor. Such a t=0 contact must not
+    * be reordered behind our speculative multi-hit proof. Consider the
+    * other bullet's conservative movement only UNTIL each body contact;
+    * this veto awards no damage and leaves ordinary collisions intact. */
+   for(var ct=0;ct<contacts.length;ct++){
+    var target=contacts[ct].e;
+    if(o.ownerId===target.id)continue;
+    var until=Math.min(dt,contacts[ct].t*travelT),
+        tx=o.x+o.vx*until,ty=o.y+o.vy*until,
+        radius=o.r+CLASSES[target.cls].size+3;
+    if(!Number.isFinite(tx)||!Number.isFinite(ty)||
+       !Number.isFinite(radius))return false;
+    if(Math.max(o.x,tx)+radius>=target.x&&
+       Math.min(o.x,tx)-radius<=target.x&&
+       Math.max(o.y,ty)+radius>=target.y&&
+       Math.min(o.y,ty)-radius<=target.y)return false;
+   }
   }
   if(firstSolidHit(g,ax,ay,ex,ey,b.r*.45))return false;
   /* Reuse the real damage owner, never fabricate HP or kill credit. */
