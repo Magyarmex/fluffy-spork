@@ -140,3 +140,12 @@ test('failed kill does not fabricate a death insight',()=>{
  g.killTank(v,killer());g.update();
  assert.equal(p.note,null);
 });
+
+test('decorative War Room cannot create a playable death insight',()=>{
+ const {Game,addPanel,observers}=boot(),g=new Game(),p=addPanel();
+ g.__novaDecorativeWorld=true;
+ g.killTank(victim(),killer());g.update();
+ assert.equal(p.note,null);
+ assert.equal(observers.length,0);
+ assert.equal(g.__novaDeathInsight,undefined);
+});
