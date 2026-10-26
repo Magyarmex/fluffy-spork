@@ -84,6 +84,7 @@ function droneWorld(hz, optimized, options={}) {
   const FullGame=boot(function(dt){
     this.time+=dt;
     if(options.move!==false) this.drones[0].y+=2;
+    if(options.endSpeed!==undefined)this.drones[0].speed=options.endSpeed;
     this.updateBullets(dt);
   },optimized);
   const g=new FullGame();
@@ -92,7 +93,8 @@ function droneWorld(hz, optimized, options={}) {
   g.drones=[{kind:'drone',id:7,ownerId:options.owned?1:2,
     x:options.x===undefined?22:options.x,y:0,r:8,hp:20,
     speed:options.speed===undefined?200:options.speed,
-    __novaPhase:options.phase||'form',__novaVX:options.residual||0}];
+    __novaPhase:options.phase||'form',__novaVX:options.residual||0,
+    __novaTerrainBump:options.terrainBump||null}];
   g.__novaTerrain=options.terrain||[];
   g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
     vx:options.vx===undefined?6000:options.vx,vy:0,
@@ -132,6 +134,14 @@ for(const optimized of [false,true])for(const hz of [30,60,120,240]){
  test('faster projectile retains the same first-contact guarantee '+label,()=>{
   const g=droneWorld(hz,optimized,{x:17,vx:3100,ttl:.004});
   assert.equal(g.hits,1,'3,100u/s shot has a guaranteed overlap before TTL');
+ });
+ test('speed drop during frame cannot erase faster start-of-frame bound '+label,()=>{
+  const g=droneWorld(hz,optimized,{speed:2000,endSpeed:200});
+  assert.equal(g.hits,0,'start-of-frame speed may invalidate the guarantee');
+ });
+ test('terrain-corrected drone cannot claim an unobserved straight route '+label,()=>{
+  const g=droneWorld(hz,optimized,{terrainBump:{x:1,y:0}});
+  assert.equal(g.hits,0);
  });
  test('committed dash cannot be inferred from endpoint envelope '+label,()=>{
   const g=droneWorld(hz,optimized,{phase:'dash'});
