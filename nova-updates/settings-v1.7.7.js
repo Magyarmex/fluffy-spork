@@ -229,18 +229,20 @@ function installUI(){
   document.addEventListener('fullscreenchange',updateFullscreenButton);
   document.addEventListener('webkitfullscreenchange',updateFullscreenButton);
   document.addEventListener('keydown',function(e){
+    if(!overlay||overlay.hidden||e.key!=='Escape')return;
+    e.preventDefault();e.stopImmediatePropagation();closeConsole(true);
+  },true);
+  /* Stop gameplay hotkeys AFTER the focused slider/button receives its
+   * keydown, but BEFORE the window-level game Input handler. A capture-phase
+   * stop here would prevent target keyboard handlers from running. The
+   * browser's default arrow/Space actions remain enabled. */
+  document.addEventListener('keydown',function(e){
     if(!overlay||overlay.hidden)return;
-    if(e.key==='Escape'){
-      e.preventDefault();e.stopImmediatePropagation();closeConsole(true);return;
-    }
-    /* The console is modal: sliders and buttons must receive native arrow
-     * and Space behavior, but the gameplay Input listener on window must
-     * never interpret those same keys as movement, ultimate or autofire. */
     var k=String(e.key||'').toLowerCase();
     if(k==='w'||k==='a'||k==='s'||k==='d'||k==='e'||k==='f'||
        k===' '||k==='arrowup'||k==='arrowdown'||k==='arrowleft'||k==='arrowright')
       e.stopPropagation();
-  },true);
+  });
   updateFullscreenButton();refreshUI();scheduleVisibilityRefresh();
 }
 
