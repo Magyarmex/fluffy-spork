@@ -729,3 +729,42 @@ for(const optimized of [false,true]){
   assert.deepEqual(victims.map(v=>v.hitCount),Array(10).fill(1));
  });
 }
+
+
+/* Run 375: a spatially local, batch-budgeted recovery must not acquire
+ * global density dependence or bypass an independent shot's real defenses.
+ * These execute the materialized core and the actual Battlefield overlay. */
+for(const optimized of [false,true]){
+ const Game=boot(undefined,optimized),mode=optimized?'optimized':'baseline';
+ for(const fps of [30,60]){
+  test(mode+' multi-shot piercing survives 960 remote bullets at '+fps+'Hz',()=>{
+   const {g,victims}=multiShotRemoteWorld(Game,5,960);
+   const dt=.35/fps;
+   for(let frame=0;frame<3;frame++){g.time+=dt;g.updateBullets(dt);}
+   assert.deepEqual(victims.map(v=>v.hitCount),Array(10).fill(1));
+  });
+ }
+ test(mode+' independent non-expiring shots resolve both hulls in one frame',()=>{
+  const {g,victims}=multiShotRemoteWorld(Game,5,50);
+  for(const b of g.bullets)if(b.ownerId===1)b.ttl=.1;
+  g.time+=.35/30;g.updateBullets(.35/30);
+  assert.deepEqual(victims.map(v=>v.hitCount),Array(10).fill(1));
+ });
+ for(const veto of ['interceptor','wall','shield']){
+  test(mode+' one '+veto+' veto cannot starve four independent piercing shots',()=>{
+   const {g,victims}=multiShotRemoteWorld(Game,5,50);
+   if(veto==='interceptor')g.bullets.push({kind:'bullet',id:90099,
+    ownerId:888,x:10,y:0,vx:0,vy:0,r:3,dmg:1,ttl:2,
+    pen:0,hits:0,dead:false,shell:false,beam:false});
+   else if(veto==='wall')g.__novaTerrain=[{id:-999,shape:'rect',
+    x:10,y:0,w:4,h:80,solid:true,destructible:false}];
+   else victims[0].spawnShieldT=1;
+   g.time+=.35/30;g.updateBullets(.35/30);
+   assert.deepEqual(victims.slice(2).map(v=>v.hitCount),Array(8).fill(1),
+    'unrelated shots remain independently correct');
+   assert.equal(victims[1].hitCount,0,
+    'the vetoed shot must not damage a target beyond its first obstacle');
+   if(veto==='wall')assert.equal(victims[0].hitCount,0);
+  });
+ }
+}
