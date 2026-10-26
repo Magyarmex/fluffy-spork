@@ -66,8 +66,13 @@ const dt=.35/30,ix=indexProjectiles(ps,dt);let found=0;
 let t0=performance.now();for(let i=0;i<10000;i++)for(const q of qps)found+=query(ix,q).length;
 let indexMs=performance.now()-t0;t0=performance.now();for(let i=0;i<10000;i++)for(const q of qps)found+=oracle(ps,q,dt).length;
 let bruteMs=performance.now()-t0;
+const frames=1000;let built=0;
+t0=performance.now();for(let f=0;f<frames;f++){const frameIndex=indexProjectiles(ps,dt);for(const q of qps)built+=query(frameIndex,q).length;}
+const buildAndQueryMs=performance.now()-t0;
+t0=performance.now();for(let f=0;f<frames;f++)for(const q of qps)built+=oracle(ps,q,dt).length;
+const frameBruteMs=performance.now()-t0;
 const result={kind:'research-only swept AABB broadphase',worlds,queries,metamorphic,
  false_negatives:misses,false_positives:extras,background_projectiles:n,independent_queries:qps.length,
  candidate_count:query(ix,qps[0]).length,benchmark:{index_ms:indexMs,brute_ms:bruteMs,
- speedup:bruteMs/indexMs},note:'Synthetic candidate discovery only. No gameplay chronology, side effects or phone FPS proven.'};
+ speedup:bruteMs/indexMs,frame_build_plus_five_queries_ms:buildAndQueryMs,frame_brute_five_queries_ms:frameBruteMs,frame_speedup:frameBruteMs/buildAndQueryMs},note:'Synthetic candidate discovery only. No gameplay chronology, side effects or phone FPS proven.'};
 console.log(JSON.stringify(result,null,2));
