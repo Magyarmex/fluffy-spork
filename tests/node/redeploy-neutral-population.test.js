@@ -110,3 +110,14 @@ test('redeploy does not delete preexisting extra neutral bodies to conceal overp
   assert.equal(counts(g).circle,63,'preexisting surplus must not multiply');
   for(const s of existing)assert.ok(g.shapes.includes(s),'surviving ecology is not wiped to satisfy count');
 });
+
+test('surviving neutral IDs remain resolvable after redeploy',()=>{
+  const g=bootGame();
+  const survivors=g.shapes.slice(0,12);
+  for(const s of survivors)assert.equal(g.getShape(s.id),s,'baseline lookup is indexed');
+  g.redeploy();
+  for(const s of survivors)assert.equal(g.getShape(s.id),s,
+    'redeploy must not orphan surviving neutral shapes in Zero Churn lookup');
+  const live=g.shapes.filter(s=>s&&s.hp>0);
+  assert.equal(g.shapeById.size,live.length,'index and physical population agree');
+});
