@@ -129,3 +129,20 @@ test('decorative War Room mounts after parser completion with late gameplay owne
   assert.deepEqual(errors.filter(e=>!e.includes('React hooks unavailable')),[],
     'menu initialization must not log unexpected engine errors');
 });
+
+for(const hz of [30,60,120,240]){
+  test('late-bound real Game runs Living Front + Fair Engagement for four seconds at '+hz+' FPS',()=>{
+    const {Game,window}=bootModules();
+    const g=new Game(canvas(),canvas(),{hud:noop,event:noop,toast:noop,offer:noop,stick:noop,gameover:noop},'low');
+    for(let i=0;i<hz*4;i++)g.update(1/hz);
+    assert.equal(g.status,'playing');
+    assert.ok(Math.abs(g.time-4)<1e-5);
+    assert.equal(g.__lfState?.sectors?.length,16,'ecology must actually tick in playable game');
+    assert.ok(g.__lfState.stats && Number.isFinite(g.__lfState.planMsEma));
+    assert.ok(g.shapes.length>=100 && g.shapes.length<220,
+      'neutral population stays bounded after ecological updates');
+    assert.equal(Game.prototype.__novaFairEngagement,true);
+    assert.equal(Game.prototype.__novaLivingFrontCore,true);
+    assert.equal(window.__novaMakeRequire('')('game/ai').updateAI.__novaFairEngagement,true);
+  });
+}
