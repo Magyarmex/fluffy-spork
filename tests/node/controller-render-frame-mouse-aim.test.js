@@ -18,7 +18,7 @@ assert.ok(aimStart>=0&&aimEnd>aimStart&&camStart>aimEnd&&camEnd>camStart,
   'real shipping player aim and camera update are present');
 const playerAim=new Function('sdt','types_1',html.slice(aimStart,aimEnd));
 const cameraStep=new Function('dt','types_1',html.slice(camStart,camEnd));
-function boot(){
+function boot(withTactical=false){
  class Game{
   constructor(){
    this.status='playing';
@@ -42,9 +42,13 @@ function boot(){
  }
  const modules={'game/engine':m=>{m.exports.Game=Game}};
  const window={__novaModules:modules};
- vm.runInNewContext(controller,{window,document:{addEventListener(){}},
+ const context={window,document:{addEventListener(){}},
    console:{info(){},warn(){},error(){}},Math,Number,Object,Array,Map,Set,WeakMap,Date,
-   performance:{now:()=>0},navigator:{}},{filename:'controller-v1.3.0.js'});
+   performance:{now:()=>0},navigator:{}};
+ vm.runInNewContext(controller,context,{filename:'controller-v1.3.0.js'});
+ if(withTactical)vm.runInNewContext(fs.readFileSync(path.join(root,
+   'nova-updates/tactical-framing-v1.8.2.js'),'utf8'),context,
+   {filename:'tactical-framing-v1.8.2.js'});
  const m={exports:{}};
  modules['game/engine'](m,m.exports,id=>id==='./classes'?
    {CLASSES:{scout:{size:15},carrier:{droneLeash:650}},ABILITIES:{}}:{});
@@ -162,3 +166,18 @@ test('unfired mouse does not create a Controller command',()=>{
  updateCommand(g,g.player,state,{droneLeash:1000},1/60);
  assert.equal(state.active,false);
 });
+
+/* Full module composition: Long Glass is the later wrapper that restores the
+ * tactical camera after the core updates it. Test the actual shipping module,
+ * not just a hand-set tactical-state flag. */
+for(const hz of [30,60,120,240]){
+ test('real Long Glass + Controller aim matches final tactical camera at '+hz+'Hz',()=>{
+  const Game=boot(true),g=new Game(),dt=1/hz;
+  g.player.cls='carrier';g.player.isPlayer=true;
+  g.player.__novaSwarm={active:true,nodeX:1200,nodeY:0};
+  g.update(dt);
+  assert.equal(g.__novaTacticalCamera.active,true);
+  const expected=expectedAngle(g)*Math.min(1,dt*13);
+  assert.ok(Math.abs(g.player.angle-expected)<1e-10);
+ });
+}
