@@ -74,6 +74,17 @@ async function scenario(browser, label, options) {
     assert.equal(menu.decorative,true,label+': War Room must be visible');
     assert.equal(menu.active,false,label+': War Room must not impersonate active game');
     await page.screenshot({path:path.join(output,label+'-menu.png')});
+    // A 320x568 CSS-pixel handset must expose the complete primary lobby,
+    // not merely a centered Deploy button with the archive/control row clipped.
+    if(label==='mobile-320-short'){
+      for(const caption of ['DEPLOY','BLACKGLASS','CONTROLS','DEBUG','OPEN ARCHIVE']){
+        const box=await page.getByText(caption,{exact:true}).first().boundingBox();
+        assert.ok(box&&box.x>=-1&&box.y>=-1&&
+          box.x+box.width<=320+1&&box.y+box.height<=568-1,
+          label+': '+caption+' must fit inside the visible lobby: '+JSON.stringify(box));
+      }
+    }
+
 
     // Observe the actual React-owned Game instance without replacing its update logic.
     await page.evaluate(()=>{
@@ -305,6 +316,7 @@ async function scenario(browser, label, options) {
   try {
     await scenario(browser,'desktop',{viewport:{width:1280,height:800},deviceScaleFactor:1});
     await scenario(browser,'mobile-320',{viewport:{width:320,height:700},deviceScaleFactor:2,isMobile:true,hasTouch:true});
+    await scenario(browser,'mobile-320-short',{viewport:{width:320,height:568},deviceScaleFactor:2,isMobile:true,hasTouch:true});
     await scenario(browser,'mobile-360',{viewport:{width:360,height:780},deviceScaleFactor:2,isMobile:true,hasTouch:true});
     await scenario(browser,'mobile',{viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
     await scenario(browser,'mobile-430',{viewport:{width:430,height:932},deviceScaleFactor:2,isMobile:true,hasTouch:true});
