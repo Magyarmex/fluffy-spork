@@ -1,6 +1,13 @@
 name: NOVA Browser Smoke
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'nova-updates/**'
+      - 'index.html'
+      - 'tests/browser/**'
+      - '.github/workflows/browser-smoke.yml'
   pull_request:
     paths:
       - 'nova-updates/**'
