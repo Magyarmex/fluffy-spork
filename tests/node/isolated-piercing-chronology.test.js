@@ -387,3 +387,20 @@ for(const optimized of [false,true]) {
   assert.deepEqual(order,[a.id,b.id],'physical first contact, not hash order');
  });
 }
+
+/* Non-expiring rounds must also preserve victim identities when the death
+ * transition slows the simulation to 35% while render FPS remains unchanged. */
+for(const optimized of [false,true])for(const fps of [30,60,120,240]){
+ test((optimized?'optimized':'baseline')+
+  ' non-expiring piercing survives death-slow at '+fps+'Hz',()=>{
+  const Game=boot(undefined,optimized),{g,a,b}=makeWorld(Game);
+  g.bullets[0].ttl=.2;
+  const dt=.35/fps;
+  for(let frame=0;frame<60&&g.bullets.length;frame++){
+   g.time+=dt;g.updateBullets(dt);
+  }
+  assert.equal(a.hitCount,1);
+  assert.equal(b.hitCount,1);
+  assert.equal(g.hits,2);
+ });
+}
