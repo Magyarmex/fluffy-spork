@@ -11,6 +11,7 @@ test('initial-overlap event groups remain invariant under six frame schedules', 
   assert.equal(result.worlds, 6000);
   assert.equal(result.comparisons, 36000);
   assert.equal(result.disagreements, 0);
-  assert.equal(result.deterministic.length, 6);
+  assert.equal(result.deterministic.length, 7);
+  assert.equal(result.permutationComparisons, 1200);
   assert.ok(result.ambiguous > 0, 'simultaneous unaffordable contacts must be observed');
 });
