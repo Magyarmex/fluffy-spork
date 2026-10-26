@@ -53,7 +53,10 @@ function boot(){
   clearTimeout(id){timeouts.delete(id);},
   console:{},Math,Number,String,Array,Object});
  const m={exports:{}};
- modules['game/engine'](m,m.exports,()=>classes);
+ modules['game/engine'](m,m.exports,spec=>{
+  assert.equal(spec,'./classes','require path must resolve from game/engine');
+  return classes;
+ });
  function addPanel(){
   const redeploy={textContent:'⚡ REDEPLOY'};
   const menu={textContent:'MAIN MENU'};
