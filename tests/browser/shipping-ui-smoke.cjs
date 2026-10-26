@@ -197,7 +197,19 @@ async function scenario(browser, label, options) {
       await assertPortraitHud(page,label+'-warden-restored','WARDEN');
     }
     if(label.startsWith('mobile')){
-      await page.waitForTimeout(2300);
+      // Tutorial timing uses simulated Game.time, not wall time. Under CI load
+      // a fixed sleep can elapse before the actual 2.8s game-time reveal.
+      await page.waitForFunction(()=>{
+        const g=window.__novaBrowserLiveGame,p=g?.player;
+        return p&&Number.isFinite(p.__novaLiveVectorTutorialStart)&&
+          g.time>=p.__novaLiveVectorTutorialStart+0.15;
+      },null,{timeout:12000});
+      await page.waitForTimeout(120);
+      const timing=await page.evaluate(()=>{
+        const g=window.__novaBrowserLiveGame,p=g.player;
+        return {time:g.time,start:p.__novaLiveVectorTutorialStart,until:p.__novaLiveVectorTutorialUntil};
+      });
+      assert.ok(timing.time<timing.until,label+': tutorial observation remains inside its intended window: '+JSON.stringify(timing));
       const later=await page.evaluate(()=>window.__novaPortraitCanvasTutorialLines);
       assert.ok(later>0,label+': canvas tutorial continues teaching after toast has cleared');
     }
