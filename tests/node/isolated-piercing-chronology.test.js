@@ -642,3 +642,22 @@ for(const optimized of [false,true]){
   });
  }
 }
+
+/* Distant neutral bodies must not defeat the same physical proof: the
+ * previous helper rejected >360 total entities before checking location. */
+for(const optimized of [false,true]){
+ test((optimized?'optimized':'baseline')+
+  ' remote shapes and bullets preserve the isolated two-hull contact',()=>{
+  const Game=boot(undefined,optimized),{g,a,b}=makeWorld(Game);
+  for(let i=0;i<400;i++){
+   g.shapes.push({kind:'shape',id:8000+i,x:-900+(i%20)*4,
+    y:-900+Math.floor(i/20)*4,r:12,hp:100});
+   g.bullets.push({kind:'bullet',id:9000+i,ownerId:10+i,
+    x:900+(i%20)*4,y:900+Math.floor(i/20)*4,vx:0,vy:0,
+    r:2,dmg:1,ttl:2,pen:0,hits:0,dead:false,shell:false,beam:false});
+  }
+  g.time+=.35/30;g.updateBullets(.35/30);
+  assert.equal(a.hitCount,1);
+  assert.equal(b.hitCount,1,'remote neutral ecology cannot suppress penetration');
+ });
+}
