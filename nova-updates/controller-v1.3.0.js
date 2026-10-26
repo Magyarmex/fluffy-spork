@@ -120,6 +120,7 @@
             if (method === 'pd' && input.mouseActive) {
               input.mouseActive = false;
               input.firing = false;
+              input.__novaPrimaryPressCaptured = false;
             }
           } else if (event && event.pointerType === 'mouse' && input.touchSeen &&
                      input.stickId.move === -1 && input.stickId.aim === -1 &&
@@ -127,7 +128,33 @@
                       inputClockMs() - input.__novaLastTouchMs >= 900)) {
             input.touchSeen = false;
           }
-          return original.call(input, event);
+          var wasFiring = input.firing;
+          var result = original.call(input, event);
+          if (event && event.pointerType === 'mouse' && !input.touchSeen) {
+            /* Pointer Events fire pointerdown only for the first held button
+             * and pointerup only after the last is released. The core's
+             * any-button toggle therefore fires on right-click and drops
+             * primary fire on unrelated releases. Track the left button,
+             * without letting a drag begun outside the canvas start firing. */
+            if (method === 'pd') {
+              var primary = event.button == null ? true : event.button === 0;
+              if (primary && (event.buttons == null || !!(event.buttons & 1)))
+                input.__novaPrimaryPressCaptured = true;
+            }
+            if (method === 'pu' && (event.button == null || event.button === 0))
+              input.__novaPrimaryPressCaptured = false;
+            if (method === 'pm' && typeof event.buttons === 'number' &&
+                !(event.buttons & 1))
+              input.__novaPrimaryPressCaptured = false;
+            if (method === 'pu' && typeof event.buttons === 'number' &&
+                !(event.buttons & 1))
+              input.__novaPrimaryPressCaptured = false;
+            if (method === 'pd' || method === 'pu' ||
+                (method === 'pm' && typeof event.buttons === 'number'))
+              input.firing = !!input.__novaPrimaryPressCaptured;
+            else if (method === 'pm') input.firing = wasFiring;
+          }
+          return result;
         };
       });
     }
@@ -161,6 +188,24 @@
       }
       this.__novaCoreBlurListeners = legacyBlur;
       var self = this;
+      this.__novaPrimaryPressCaptured = false;
+      /* Native mouse events report individual button transitions even when
+       * Pointer Events suppress additional pointerdown/up during a chord. */
+      this.__novaPrimaryMouseDown = function (event) {
+        if (!event || event.button !== 0 || self.touchSeen) return;
+        self.__novaPrimaryPressCaptured = true;
+        self.mouseActive = true;
+        if (Number.isFinite(event.clientX)) self.mouseX = event.clientX;
+        if (Number.isFinite(event.clientY)) self.mouseY = event.clientY;
+        self.firing = true;
+      };
+      this.__novaPrimaryMouseUp = function (event) {
+        if (!event || event.button !== 0) return;
+        self.__novaPrimaryPressCaptured = false;
+        if (!self.touchSeen) self.firing = false;
+      };
+      canvas.addEventListener('mousedown', this.__novaPrimaryMouseDown);
+      window.addEventListener('mouseup', this.__novaPrimaryMouseUp);
       function reset() {
         var held = self.move.active || self.aim.active ||
           self.stickId.move !== -1 || self.stickId.aim !== -1;
@@ -169,6 +214,7 @@
         self.move.dx = self.move.dy = self.aim.dx = self.aim.dy = 0;
         self.keyboard.up = self.keyboard.down = self.keyboard.left = self.keyboard.right = false;
         self.firing = false; self.mouseActive = false; self.abilityQueued = false;
+        self.__novaPrimaryPressCaptured = false;
         // The Performance/Zero Churn layer wraps emit and caches UI activity.
         if (held) { self.emit('move'); self.emit('aim'); }
       }
@@ -178,6 +224,12 @@
       document.addEventListener('visibilitychange', this.__novaVisibilityReset);
     };
     if (typeof oldDetach === 'function') Input.prototype.detach = function () {
+      if (this.__novaPrimaryMouseDown && this.canvas)
+        this.canvas.removeEventListener('mousedown', this.__novaPrimaryMouseDown);
+      if (this.__novaPrimaryMouseUp)
+        window.removeEventListener('mouseup', this.__novaPrimaryMouseUp);
+      this.__novaPrimaryMouseDown = this.__novaPrimaryMouseUp = null;
+      this.__novaPrimaryPressCaptured = false;
       if (this.__novaBlurReset) window.removeEventListener('blur', this.__novaBlurReset);
       if (this.__novaVisibilityReset) document.removeEventListener('visibilitychange', this.__novaVisibilityReset);
       this.__novaBlurReset = this.__novaVisibilityReset = null;
