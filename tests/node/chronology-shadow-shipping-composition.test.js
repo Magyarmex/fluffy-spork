@@ -894,3 +894,31 @@ test('shadow abstains on a first-contact shape tie even with a later tank', () =
   assert.equal(s.predictedBodyContacts, 0);
   assert.equal(s.unregisteredBodyContacts, 0);
 });
+
+test('shadow first-contact attribution is permutation-invariant in seeded shape worlds', () => {
+  let seed = 20261026;
+  const random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
+  for (let world = 0; world < 40; world++) {
+    const positions = Array.from({ length: 4 }, () => 10 + 3 * Math.floor(random() * 7));
+    const earliest = Math.min(...positions);
+    const expected = positions.filter(x => x === earliest).length === 1 ? 1 : 0;
+    for (const order of [positions, positions.slice().reverse()]) {
+      const { g } = boot();
+      g.shapes = order.map((x, i) => auditShape(9950 + i, x));
+      g.bullets = [ordinaryShot(9990 + world)];
+      g.updateBullets(1 / 30);
+      const s = g.novaChronoShadowSnapshot();
+      assert.equal(s.predictedBodyContacts, expected,
+        'seeded world ' + world + ' positions=' + JSON.stringify(order));
+    }
+  }
+});
+test('shadow can resolve an earlier drone after a simultaneous tank/shape contact', () => {
+  const { g } = boot();
+  addScout(g, 40); // tank first contact x=19
+  g.shapes = [auditShape(9961, 27)]; // shape first contact x=19
+  g.drones = [auditDrone(9962, 9, 25)]; // drone first contact x=16
+  g.bullets = [ordinaryShot(9963)];
+  g.updateBullets(1 / 30);
+  assert.equal(g.novaChronoShadowSnapshot().predictedBodyContacts, 1);
+});
