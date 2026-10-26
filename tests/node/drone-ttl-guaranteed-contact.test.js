@@ -91,12 +91,13 @@ function droneWorld(hz, optimized, options={}) {
   g.drones=[{kind:'drone',id:7,ownerId:options.owned?1:2,
     x:options.x===undefined?22:options.x,y:0,r:8,hp:20,
     speed:options.speed===undefined?200:options.speed,
-    __novaPhase:options.phase||'form'}];
+    __novaPhase:options.phase||'form',__novaVX:options.residual||0}];
   g.__novaTerrain=options.terrain||[];
   g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
     vx:options.vx===undefined?6000:options.vx,vy:0,
     r:3,dmg:20,ttl:options.ttl===undefined?.004:options.ttl,
     pen:0,hits:0,dead:false,shell:false,beam:false}];
+  if(options.otherBullets)g.bullets.push(...options.otherBullets);
   g.update(1/hz);
   return g;
 }
@@ -127,4 +128,15 @@ for(const optimized of [false,true])for(const hz of [30,60,120,240]){
   const g=droneWorld(hz,optimized,{phase:'dash'});
   assert.equal(g.hits,0);
  });
+ test('unbounded residual drone velocity cannot authorize backdated hit '+label,()=>{
+  const g=droneWorld(hz,optimized,{residual:20000});
+  assert.equal(g.hits,0);
+ });
+ test('earlier projectile contact on same drone blocks guessed kill credit '+label,()=>{
+  const g=droneWorld(hz,optimized,{otherBullets:[{kind:'bullet',id:99,
+   ownerId:3,x:22,y:0,vx:0,vy:0,r:3,dmg:20,ttl:1,pen:0,
+   hits:0,dead:false,shell:false,beam:false}]});
+  assert.equal(g.hits,0,'first event belongs to competing shot');
+ });
+
 }
