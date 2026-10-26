@@ -622,3 +622,23 @@ for(const optimized of [false,true]){
   assert.equal(b.hitCount,1,'second physical contact despite reverse order');
  });
 }
+
+/* The dense-fire exception is not a license to cross earlier physical
+ * defenses: terrain and protected hulls retain their conservative veto. */
+for(const optimized of [false,true]){
+ const Game=boot(undefined,optimized),mode=optimized?'optimized':'baseline';
+ for(const defense of ['wall','shield']){
+  test(mode+' remote fire cannot bypass earlier '+defense,()=>{
+   const {g,a,b}=makeWorld(Game);
+   if(defense==='wall')g.__novaTerrain=[{id:-10,shape:'rect',
+    x:10,y:0,w:4,h:80,solid:true,destructible:false}];
+   else a.spawnShieldT=1;
+   for(let i=0;i<960;i++)g.bullets.push({kind:'bullet',id:6000+i,ownerId:10+i,
+    x:900+(i%24)*3,y:900+Math.floor(i/24)*3,vx:0,vy:0,
+    r:2,dmg:1,ttl:2,pen:0,hits:0,dead:false,shell:false,beam:false});
+   g.time+=.35/30;g.updateBullets(.35/30);
+   assert.equal(b.hitCount,0,'protected first event prevents speculative second hit');
+   if(defense==='wall')assert.equal(a.hitCount,0);
+  });
+ }
+}
