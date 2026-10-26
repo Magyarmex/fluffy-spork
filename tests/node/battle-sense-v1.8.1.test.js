@@ -16,6 +16,26 @@ test('third-party geometry ignores nearby visible bystanders that are not fighti
 test('third-party geometry recognizes a duel when the target is engaging the nearby tank',()=>{const {c,Game}=load(),g=new Game(),self=T(1,'twin',-300,0),target=T(2,'guard',0,0),duelist=T(3,'cannon',200,0);target.ai.__v180TargetId=duelist.id;g.tanks=[self,target,duelist];const v=c.window.__NOVA_BATTLE_SENSE_TEST__.thirdPartyVector(g,self,target,{});assert.ok(v.x<-.9);assert.ok(v.weight>0);});
 test('third-party geometry rejects stale duel memory when the duelists are separated by cover',()=>{const {c,Game}=load(),g=new Game(),self=T(1,'twin',-300,0),target=T(2,'guard',0,0),duelist=T(3,'cannon',200,0);duelist.ai.__v180TargetId=target.id;g.tanks=[self,target,duelist];g.hasLineOfSight=(ax,ay,bx,by)=>!(ax===target.x&&ay===target.y&&bx===duelist.x&&by===duelist.y);const v=c.window.__NOVA_BATTLE_SENSE_TEST__.thirdPartyVector(g,self,target,{});assert.equal(v.weight,0);assert.equal(v.x,0);assert.equal(v.y,0);});
 test('AI can collect neutral powerups while player behavior remains delegated',()=>{const {Game}=load(),g=new Game(),bot=T(1,'guard',0,0);g.tanks=[bot];g.powerups=[{id:8,type:'shield',x:10,y:0}];g.updatePowerups(.1);assert.deepEqual(g.applied,[[1,'shield']]);assert.equal(g.powerups.length,0);});
+test('Battle Sense lane risk respects ordinary projectile expiry without losing shell danger',()=>{
+ const {c,Game}=load(),g=new Game(),h=c.window.__NOVA_BATTLE_SENSE_TEST__;
+ const shot={ownerId:9,x:-180,y:0,vx:900,vy:0,dead:false,ttl:.02};
+ g.bullets=[shot];
+ assert.equal(h.laneRisk(g,0,0),0,
+  'ordinary shot expires at x=-162 before reaching the 150-unit danger lane');
+ shot.ttl=.5;
+ assert.ok(h.laneRisk(g,0,0)>.3,'live incoming projectile still threatens the lane');
+ shot.ttl=.1;
+ assert.ok(h.laneRisk(g,0,0)>0,
+  'a shot reaching the lane envelope before expiry remains a tactical risk');
+ shot.ttl=0;
+ assert.equal(h.laneRisk(g,0,0),0,'already expired ordinary shot is inert');
+ shot.ttl=.02;shot.shell=true;
+ assert.ok(h.laneRisk(g,0,0)>.3,
+  'Bomber expiry can create splash/fragments and must retain conservative risk');
+ shot.shell=false;shot.ttl=undefined;
+ assert.ok(h.laneRisk(g,0,0)>.3,'legacy projectiles without TTL retain behavior');
+});
+
 test('lane risk recognizes projectile-dense ground',()=>{const {c,Game}=load(),g=new Game();g.bullets=[{x:0,y:0,vx:900,vy:0},{x:15,y:0,vx:800,vy:0}];const h=c.window.__NOVA_BATTLE_SENSE_TEST__;assert.ok(h.laneRisk(g,0,0)>h.laneRisk(g,400,400));});
 test('lane risk values incoming fire above the same projectile moving away',()=>{const {c,Game}=load(),g=new Game(),h=c.window.__NOVA_BATTLE_SENSE_TEST__;g.bullets=[{x:-120,y:0,vx:600,vy:0}];const incoming=h.laneRisk(g,0,0);g.bullets=[{x:120,y:0,vx:600,vy:0}];const departing=h.laneRisk(g,0,0);assert.ok(incoming>0.35,`expected incoming threat, got ${incoming}`);assert.ok(departing<0.05,`departing fire should not poison a lane, got ${departing}`);});
 test('lane risk detects a crossing trajectory before the projectile reaches the lane',()=>{const {c,Game}=load(),g=new Game(),h=c.window.__NOVA_BATTLE_SENSE_TEST__;g.bullets=[{x:55,y:-120,vx:0,vy:650}];const crossing=h.laneRisk(g,0,0);g.bullets=[{x:190,y:-120,vx:0,vy:650}];const miss=h.laneRisk(g,0,0);assert.ok(crossing>0.2,`expected projected crossing threat, got ${crossing}`);assert.ok(crossing>miss+0.15,`crossing fire should matter more than a wide miss: ${crossing} vs ${miss}`);});

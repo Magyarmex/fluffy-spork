@@ -103,6 +103,67 @@ test('projectile risk produces a deterministic evasive vector',()=>{
   assert.ok(Math.abs(r.y)>.5,'head-on threat should choose a lateral dodge');
 });
 
+/* An AI rival should dodge a projectile only while it can still reach the
+ * threatened space. Otherwise a near-expired bullet at long range grants
+ * artificial evasive pressure despite physically vanishing first. */
+for(const hz of [30,60,120,240]){
+ test('Predator threat respects physical bullet TTL at '+hz+'Hz',()=>{
+  const {context,Game,CLASSES}=loadPredator(),g=new Game(),t=tank(1,'twin');
+  const threat=context.window.__NOVA_PREDATOR_TEST__.threatVector;
+  const remaining=0.75/hz; // genuinely shorter than this simulation frame
+  const shot={ownerId:9,x:160,y:5,vx:-500,vy:0,dead:false,ttl:remaining};
+  g.bullets=[shot];
+  const expired=threat(g,CLASSES,t,{});
+  assert.equal(expired.risk,0,
+    'projectile expires before entering the tank safety corridor at '+hz+'Hz');
+  shot.ttl=0.5;
+  const live=threat(g,CLASSES,t,{});
+  assert.ok(live.risk>.1,
+    'the same shot with enough lifetime must still provoke an evasive plan');
+  shot.x=50;shot.ttl=remaining;
+  const near=threat(g,CLASSES,t,{});
+  assert.ok(near.risk>0,
+    'a shot entering the safety corridor before expiry must remain dangerous');
+  // Bomber shells can detonate into splash and fragments at expiry;
+  // their future threat is deliberately conservative until chronology is solved.
+  shot.x=160;shot.ttl=remaining;shot.shell=true;
+  assert.ok(threat(g,CLASSES,t,{}).risk>.1,
+    'expiring Bomber shells must retain existing burst-threat awareness');
+  shot.shell=false;shot.x=50;
+  shot.ttl=0;
+  assert.equal(threat(g,CLASSES,t,{}).risk,0,
+    'already-expired but not yet reaped projectiles must not cause a dodge');
+  shot.ttl=undefined;shot.x=160;
+  assert.ok(threat(g,CLASSES,t,{}).risk>.1,
+    'legacy projectile fixtures without a TTL preserve historical behavior');
+ });
+}
+
+test('seeded physical-TTL projectile-risk oracle preserves every reachable threat',()=>{
+ const {context,Game,CLASSES}=loadPredator(),g=new Game(),t=tank(1,'twin');
+ const risk=context.window.__NOVA_PREDATOR_TEST__.threatVector;
+ let seed=0x3802026,checked=0,excluded=0;
+ const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ for(let i=0;i<2400;i++){
+  const x=(rand()-.5)*600,y=(rand()-.5)*600,
+    speed=100+rand()*1700,angle=rand()*Math.PI*2,
+    vx=Math.cos(angle)*speed,vy=Math.sin(angle)*speed,
+    ttl=.005+rand()*.995;
+  const closest=-(x*vx+y*vy)/(vx*vx+vy*vy);
+  if(closest<0||closest>=.82)continue; // preserve the canonical prediction horizon
+  const reachableTime=Math.min(closest,ttl);
+  const separation=Math.hypot(x+vx*reachableTime,y+vy*reachableTime);
+  const expected=separation<(14+20)*1.75;
+  g.bullets=[{ownerId:9,x,y,vx,vy,ttl,dead:false,shell:false}];
+  const actual=risk(g,CLASSES,t,{}).risk>0;
+  assert.equal(actual,expected,
+    'reachable projectile corridor disagrees with independent geometric oracle at world '+i);
+  checked++;if(!expected)excluded++;
+ }
+ assert.ok(checked>500&&excluded>100,
+   'seeded worlds must exercise both reachable and expired-before-contact shots');
+});
+
 test('target saturation lowers dogpile priority',()=>{
   const {context,Game}=loadPredator(),g=new Game(),hunter=tank(1,'twin',{ai:brain()}),player=tank(7,'guard',{isPlayer:true,x:300});
   g.tanks=[hunter,player];
@@ -183,6 +244,23 @@ test('defensive ability timing reacts to credible projectile pressure',()=>{
   g.tanks=[hunter,player];g.player=player;g.bullets=[{ownerId:7,x:120,y:0,vx:-480,vy:0,dead:false}];
   ai.updateAI(hunter,g,.16);
   assert.equal(g.abilities,1,'Bulwark should be intentionally committed under incoming fire');
+});
+
+test('actual Predator AI does not waste Bulwark on a projectile that expires before contact',()=>{
+ function play(ttl){
+  const {Game,ai}=loadPredator(),g=new Game();
+  const hunter=tank(1,'guard',{ai:brain({archetype:'guard',__v180PlanT:0}),abilityCd:0});
+  const player=tank(7,'twin',{isPlayer:true,x:260});
+  g.tanks=[hunter,player];g.player=player;
+  g.bullets=[{ownerId:7,x:160,y:5,vx:-500,vy:0,ttl,dead:false}];
+  ai.updateAI(hunter,g,.16); // real module-wrapped AI, not just the threat helper
+  return {abilities:g.abilities,risk:hunter.ai.__v180Threat.risk};
+ }
+ const spent=play(.02),live=play(.5);
+ assert.equal(spent.risk,0,'short-lived distant fire cannot create a threat');
+ assert.equal(spent.abilities,0,'do not spend a defensive cooldown on vanished fire');
+ assert.ok(live.risk>.34,'long-lived incoming fire remains a credible threat');
+ assert.equal(live.abilities,1,'credible pressure still triggers canonical Bulwark');
 });
 
 test('AI movement remains live while planning is reaction-limited',()=>{
