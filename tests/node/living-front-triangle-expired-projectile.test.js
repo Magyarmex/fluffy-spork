@@ -8,7 +8,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const root = path.resolve(__dirname, '../..');
 
-function scenario(shots, visible = () => true) {
+function scenario(shots, visible = () => true, type = 'triangle') {
   const window = { __novaModules: {} };
   const ctx = { window, Math, Map, Set, WeakMap, Number, Object, Array, Date, JSON,
     performance: { now: () => 0 },
@@ -17,7 +17,7 @@ function scenario(shots, visible = () => true) {
     vm.runInNewContext(fs.readFileSync(path.join(root, 'nova-updates', file), 'utf8'),
       ctx, { filename: file });
   const LF = window.__NOVA_LIVING_FRONT_INTERNAL__;
-  const s = { id: 3, kind: 'shape', type: 'triangle', x: 0, y: 0,
+  const s = { id: 3, kind: 'shape', type, x: 0, y: 0,
     r: 16, hp: 30, vx: 0, vy: 0 };
   const rays = [];
   const g = { time: 10, shapes: [s], bullets: [], tanks: [],
@@ -25,7 +25,7 @@ function scenario(shots, visible = () => true) {
     // projectile until the next spatial rebuild.
     hash: { query(_x, _y, _r, out) { out.push(...shots); } },
     hasLineOfSight(_x, _y, x, y) { rays.push([x, y]); return visible(x, y); } };
-  const defs = { triangle: { speed: 90 } };
+  const defs = { triangle: { speed: 90 }, circle: { speed: 60 } };
   const st = LF.ensure(g, defs);
   LF.behaviorTick(g, st, defs, 1 / 60);
   return { s, rays, st };
@@ -77,6 +77,21 @@ test('dead projectile never suppresses a real incoming dodge', () => {
   assert.equal(mixed.st.stats.triangleEvasions, 1);
   assert.equal(mixed.s.__lfEvadeDirX, expected.s.__lfEvadeDirX);
   assert.equal(mixed.s.__lfEvadeDirY, expected.s.__lfEvadeDirY);
+});
+
+
+test('expired ordinary shot cannot herd a Circle or conceal live fire', () => {
+  const expired = shot(1, 10, { ttl: 0 });
+  const live = shot(2, 70);
+  const noFire = scenario([expired], () => true, 'circle');
+  assert.equal(noFire.rays.length, 0);
+  assert.equal(noFire.st.stats.nearFireHerds, 0);
+  assert.equal(noFire.s.__lfDisturbance, undefined);
+  const reference = scenario([live], () => true, 'circle');
+  const mixed = scenario([expired, live], () => true, 'circle');
+  assert.equal(mixed.st.stats.nearFireHerds, 1);
+  assert.ok(Math.abs(mixed.s.vx - reference.s.vx) < 1e-9);
+  assert.ok(Math.abs(mixed.s.vy - reference.s.vy) < 1e-9);
 });
 
 test('fix belongs to the materialized shipping Living Front overlay', () => {
