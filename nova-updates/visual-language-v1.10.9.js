@@ -227,7 +227,7 @@ if(typeof document!=='undefined'&&document.head&&typeof document.createElement==
       +'[class~="right-[78px]"]>.panel>div:first-child>div:nth-child(2)>span:first-child{font-size:12px;flex-shrink:0}'
       +'[class~="right-[78px]"]>.panel>div:first-child>div:nth-child(2)>span:last-child{letter-spacing:.015em;min-width:0}'
       +'[class~="right-[78px]"]>.panel>div:first-child>div[class~="ml-auto"]{margin-left:0;gap:2px;font-size:9px}'
-      +'[class~="right-[78px]"]>.panel>div:first-child>button{padding:2px 3px;min-width:24px;min-height:25px}'
+      +'[class~="right-[78px]"]>.panel>div:first-child>button{padding:2px 3px;min-width:24px;min-height:30px}'
       +'[class~="right-[78px]"]>.panel>div:first-child>button[aria-label="Toggle autofire"]{padding-left:2px;padding-right:2px;font-size:8px;letter-spacing:0}'
       +'[class~="right-[78px]"]>.panel>div:first-child>div[title^="Hybrid gene:"]{padding-left:1px;padding-right:1px;font-size:8px}'
       +'}@media(max-width:360px){'
