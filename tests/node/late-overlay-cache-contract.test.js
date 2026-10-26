@@ -270,9 +270,16 @@ test('fair no-target flee never dereferences a hidden player or leaks a temporar
   human.x=1900;human.y=1900;
   bot.x=-1900;bot.y=-1900;
   bot.ai.state='flee';bot.ai.thinkT=1;bot.ai.__v1112TargetId=-1;
+  let fleeQueries=0;
+  const originalNearest=g.nearestTank;
+  g.nearestTank=function(x,y,max,exclude){
+    if(max===900&&exclude===bot.id)fleeQueries++;
+    return originalNearest.apply(this,arguments);
+  };
   const nearest=g.nearestTank,player=g.player;
   assert.doesNotThrow(()=>ai.updateAI(bot,g,1/60),
     'a legitimate low-health flee with no perceived opponent must not crash');
+  assert.ok(fleeQueries>0,'the test must exercise the exact legacy flee query');
   assert.equal(g.nearestTank,nearest,'temporary flee fallback is fully restored');
   assert.equal(g.player,player,'actual human handle is fully restored');
   assert.equal(bot.ai.__v1112TargetId,-1,'no hidden player target is introduced');
