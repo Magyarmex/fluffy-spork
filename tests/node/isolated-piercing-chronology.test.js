@@ -220,3 +220,15 @@ for(const optimized of [false,true]) {
   assert.equal(b.hitCount,0);
  });
 }
+
+for(const optimized of [false,true]) {
+ test((optimized?'optimized':'baseline')+
+  ' same-tick cover breach cannot use stationary piercing shortcut',()=>{
+  const Game=boot(undefined,optimized),{g,b}=makeWorld(Game);
+  g.bullets[0].__novaBreachAtTime=g.time;
+  const dt=.35/30;g.time+=dt;
+  g.bullets[0].__novaBreachAtTime=g.time;
+  g.updateBullets(dt);
+  assert.equal(b.hitCount,0,'prior cover breach requires full chronological arbitration');
+ });
+}
