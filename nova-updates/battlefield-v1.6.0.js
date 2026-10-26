@@ -790,9 +790,6 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      if(best&&bestT<1e-8){tie=true;return;}
      best={e:e,kind:'drone'};bestT=0;tie=false;return;
     }
-    /* A penetrating round may still owe a later target another contact.
-     * A single guaranteed drone overlap cannot certify its entire budget. */
-    if(b.pen!==0)return;
     if(!witnessed||!Number.isFinite(e.speed)||!(e.speed>0)||
        !Number.isFinite(e.__novaChronoDronePrevSpeed)||
        !(e.__novaChronoDronePrevSpeed>0)||
@@ -921,26 +918,58 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    * first contact. Another nearby body might have hit first. Do not let
    * this conservative proof reorder tank/shape damage or kill credit. */
   if(best.guaranteed){
+   /* Piercing shots survive the drone hit until TTL. To commit their one
+    * guaranteed hit, prove the ENTIRE remaining TTL corridor free of other
+    * bodies, cover and competing shots; otherwise defer the whole event. */
+   var proofX=b.pen>0?ax+dx*limit:hx,
+       proofY=b.pen>0?ay+dy*limit:hy;
+   if(b.pen>0&&firstSolidHit(g,hx,hy,proofX,proofY,(b.r||2)*.45))
+    return false;
    for(var ti=0;ti<tanks.length;ti++){
     var t=tanks[ti];if(!t||!t.alive||t.id===b.ownerId)continue;
     var def=CLASSES[t.cls],pad=b.r+(def&&def.size||30)+3;
     var tx=t.x,ty=t.y,px=t.__novaSweepMoveTime===g.time?t.__novaSweepPrevX:tx,
         py=t.__novaSweepMoveTime===g.time?t.__novaSweepPrevY:ty;
     if(!Number.isFinite(px)||!Number.isFinite(py)||
-       Math.max(ax,hx)+pad>=Math.min(tx,px)&&
-       Math.min(ax,hx)-pad<=Math.max(tx,px)&&
-       Math.max(ay,hy)+pad>=Math.min(ty,py)&&
-       Math.min(ay,hy)-pad<=Math.max(ty,py))return false;
+       Math.max(ax,proofX)+pad>=Math.min(tx,px)&&
+       Math.min(ax,proofX)-pad<=Math.max(tx,px)&&
+       Math.max(ay,proofY)+pad>=Math.min(ty,py)&&
+       Math.min(ay,proofY)-pad<=Math.max(ty,py))return false;
    }
    for(var si=0;si<shapes.length;si++){
     var s=shapes[si];if(!s||!(s.hp>0))continue;
     var st=shapeSweepStart(g,s),sx=st?st.x:s.x,sy=st?st.y:s.y,
         pad=b.r+(s.r||15)+4;
     if(!Number.isFinite(sx)||!Number.isFinite(sy)||
-       Math.max(ax,hx)+pad>=Math.min(sx,s.x)&&
-       Math.min(ax,hx)-pad<=Math.max(sx,s.x)&&
-       Math.max(ay,hy)+pad>=Math.min(sy,s.y)&&
-       Math.min(ay,hy)-pad<=Math.max(sy,s.y))return false;
+       Math.max(ax,proofX)+pad>=Math.min(sx,s.x)&&
+       Math.min(ax,proofX)-pad<=Math.max(sx,s.x)&&
+       Math.max(ay,proofY)+pad>=Math.min(sy,s.y)&&
+       Math.min(ay,proofY)-pad<=Math.max(sy,s.y))return false;
+   }
+   if(b.pen>0){
+    for(var di=0;di<drones.length;di++){
+     var d=drones[di];if(!d||d===best.e||!(d.hp>0)||
+        d.ownerId===b.ownerId)continue;
+     var sx=d.__novaChronoDronePrevX,sy=d.__novaChronoDronePrevY,
+         pad=b.r+(d.r||8)+1+Math.max(30,dt*2400);
+     if(!Number.isFinite(sx)||!Number.isFinite(sy)||
+        Math.max(ax,proofX)+pad>=Math.min(sx,d.x)&&
+        Math.min(ax,proofX)-pad<=Math.max(sx,d.x)&&
+        Math.max(ay,proofY)+pad>=Math.min(sy,d.y)&&
+        Math.min(ay,proofY)-pad<=Math.max(sy,d.y))return false;
+    }
+    var shots=g.bullets||[];
+    for(var bi=0;bi<shots.length;bi++){
+     var o=shots[bi];if(!o||o===b||o.dead)continue;
+     var ox=o.x,oy=o.y,ex=ox+(o.vx||0)*dt,
+         ey=oy+(o.vy||0)*dt,pad=b.r+(o.r||2)+2;
+     if(!Number.isFinite(ox)||!Number.isFinite(oy)||
+        !Number.isFinite(ex)||!Number.isFinite(ey)||
+        Math.max(ax,proofX)+pad>=Math.min(ox,ex)&&
+        Math.min(ax,proofX)-pad<=Math.max(ox,ex)&&
+        Math.max(ay,proofY)+pad>=Math.min(oy,ey)&&
+        Math.min(ay,proofY)-pad<=Math.max(oy,ey))return false;
+    }
    }
   }
   if(Math.abs(hx)>=MAP_LIMIT-20||Math.abs(hy)>=MAP_LIMIT-20)return false;
@@ -1030,7 +1059,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      Math.sin(ang)*(b.knock||0)*.006);
   }else if(best.kind==='shape')g.damageShape(best.e,b.dmg,vx,vy);
   else g.damageDrone(best.e,b.dmg,b.ownerId);
+  var piercingDrone=best.guaranteed&&b.pen>0;
   b.hits++;b.pen--;b.dead=true;b.vx=0;b.vy=0;
+  if(piercingDrone){
+   b.x=ax+dx*limit;b.y=ay+dy*limit;b.px=b.x;b.py=b.y;
+  }
   return true;
  }
  /* Only skip a LATER terrain impact when a Cannon fuse is provably first.
