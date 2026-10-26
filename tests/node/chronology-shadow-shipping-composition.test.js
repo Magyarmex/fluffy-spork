@@ -853,3 +853,72 @@ test('observed intermediate drone motion defeats misleading identical frame endp
   assert.equal(g.novaChronoShadowSnapshot().predictedBodyContacts,0,
     'a return to the same endpoint does not prove a stationary trajectory');
 });
+
+/* Run 368: the optional first-contact comparator must not assign an arbitrary
+ * victim when multiple bodies share the earliest physical contact. A later
+ * tie must not hide a distinct, strictly earlier body encountered afterward. */
+for (const reversed of [false, true]) {
+  test('shadow abstains on simultaneous tank contacts regardless of array order (' +
+    (reversed ? 'reversed' : 'forward') + ')', () => {
+    const { g } = boot(), first = addScout(g, 40);
+    const second = { ...first, id: 3, hp: 100 };
+    g.tanks = reversed ? [second, first] : [first, second];
+    g.bullets = [ordinaryShot(9900 + Number(reversed))];
+    g.updateBullets(1 / 30);
+    const s = g.novaChronoShadowSnapshot();
+    assert.equal(s.sampledShortShots, 1);
+    assert.equal(s.predictedBodyContacts, 0,
+      'two simultaneous first victims have no uniquely attributable contact');
+    assert.equal(s.unregisteredBodyContacts, 0);
+  });
+}
+test('shadow can find an earlier shape after two later shapes tie', () => {
+  const { g } = boot();
+  g.tanks = [];
+  g.shapes = [auditShape(9910, 20), auditShape(9911, 20), auditShape(9912, 12)];
+  g.bullets = [ordinaryShot(9913)];
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.predictedBodyContacts, 1,
+    'a later-time tie must not mask the unique earlier shape');
+  assert.equal(s.registeredBodyContacts + s.unregisteredBodyContacts, 1,
+    'unique earlier contact must be classified, whether the core registered it or not');
+});
+test('shadow abstains on a first-contact shape tie even with a later tank', () => {
+  const { g } = boot();
+  addScout(g, 40);
+  g.shapes = [auditShape(9920, 12), auditShape(9921, 12)];
+  g.bullets = [ordinaryShot(9922)];
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.predictedBodyContacts, 0);
+  assert.equal(s.unregisteredBodyContacts, 0);
+});
+
+test('shadow first-contact attribution is permutation-invariant in seeded shape worlds', () => {
+  let seed = 20261026;
+  const random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
+  for (let world = 0; world < 40; world++) {
+    const positions = Array.from({ length: 4 }, () => 10 + 3 * Math.floor(random() * 7));
+    const earliest = Math.min(...positions);
+    const expected = positions.filter(x => x === earliest).length === 1 ? 1 : 0;
+    for (const order of [positions, positions.slice().reverse()]) {
+      const { g } = boot();
+      g.shapes = order.map((x, i) => auditShape(9950 + i, x));
+      g.bullets = [ordinaryShot(9990 + world)];
+      g.updateBullets(1 / 30);
+      const s = g.novaChronoShadowSnapshot();
+      assert.equal(s.predictedBodyContacts, expected,
+        'seeded world ' + world + ' positions=' + JSON.stringify(order));
+    }
+  }
+});
+test('shadow can resolve an earlier drone after a simultaneous tank/shape contact', () => {
+  const { g } = boot();
+  addScout(g, 40); // tank first contact x=19
+  g.shapes = [auditShape(9961, 27)]; // shape first contact x=19
+  g.drones = [auditDrone(9962, 9, 25)]; // drone first contact x=16
+  g.bullets = [ordinaryShot(9963)];
+  g.updateBullets(1 / 30);
+  assert.equal(g.novaChronoShadowSnapshot().predictedBodyContacts, 1);
+});

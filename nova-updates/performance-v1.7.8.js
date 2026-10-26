@@ -326,7 +326,7 @@ wrap('game/engine',function(engine,require){
        !Number.isFinite(b.x)||!Number.isFinite(b.y)||
        !Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
        Math.abs(b.x)>CHRONO_ARENA_EDGE||Math.abs(b.y)>CHRONO_ARENA_EDGE)return null;
-    var best=null,owner=typeof g.getTank==='function'?g.getTank(b.ownerId):null;
+    var best=null,tied=false,owner=typeof g.getTank==='function'?g.getTank(b.ownerId):null;
     for(var i=0;i<g.tanks.length;i++){
       var t=g.tanks[i];
       if(!t||!t.alive||t.id===b.ownerId||
@@ -362,9 +362,10 @@ wrap('game/engine',function(engine,require){
         hit=C/(-halfB+Math.sqrt(D));
       }
       if(!Number.isFinite(hit)||hit<0||hit>b.ttl)continue;
-      if(!best||hit<best.time)best={targetId:t.id,time:hit,
+      if(best&&Math.abs(hit-best.time)<=1e-9)tied=true;
+      else if(!best||hit<best.time-1e-9){tied=false;best={targetId:t.id,time:hit,
         immune:t.spawnShieldT>0||t.shieldT>0,guardAmbiguous:t.bulwarkT>0||t.tauntT>0,
-        x:b.x+(b.vx||0)*hit,y:b.y+(b.vy||0)*hit};
+        x:b.x+(b.vx||0)*hit,y:b.y+(b.vy||0)*hit};}
     }
     /* The first victim may be a neutral shape or a hostile drone. */
     var shapes=g.shapes||[];
@@ -374,9 +375,9 @@ wrap('game/engine',function(engine,require){
          !Number.isFinite(shape.x)||!Number.isFinite(shape.y))continue;
       var shapeTime=chronoShapeTime(g,b,shape,(b.r||2)+shape.r,dt);
       if(shapeTime===null||shapeTime>b.ttl)continue;
-      if(best&&Math.abs(shapeTime-best.time)<=1e-9)return null;
-      if(!best||shapeTime<best.time)best={targetId:shape.id,kind:'shape',time:shapeTime,
-        x:b.x+(b.vx||0)*shapeTime,y:b.y+(b.vy||0)*shapeTime};
+      if(best&&Math.abs(shapeTime-best.time)<=1e-9)tied=true;
+      else if(!best||shapeTime<best.time-1e-9){tied=false;best={targetId:shape.id,kind:'shape',time:shapeTime,
+        x:b.x+(b.vx||0)*shapeTime,y:b.y+(b.vy||0)*shapeTime};}
     }
     var drones=g.drones||[];
     for(var k=0;k<drones.length;k++){
@@ -432,11 +433,13 @@ wrap('game/engine',function(engine,require){
       }
       var droneTime=chronoStaticBodyTime(b,drone,droneRadius);
       if(droneTime===null||droneTime>b.ttl)continue;
-      if(best&&Math.abs(droneTime-best.time)<=1e-9)return null;
-      if(!best||droneTime<best.time)best={targetId:drone.id,kind:'drone',time:droneTime,
-        x:b.x+(b.vx||0)*droneTime,y:b.y+(b.vy||0)*droneTime};
+      if(best&&Math.abs(droneTime-best.time)<=1e-9)tied=true;
+      else if(!best||droneTime<best.time-1e-9){tied=false;best={targetId:drone.id,kind:'drone',time:droneTime,
+        x:b.x+(b.vx||0)*droneTime,y:b.y+(b.vy||0)*droneTime};}
     }
-    if(!best)return null;
+    /* Equal-time first contacts cannot be attributed to a unique victim.
+     * Continue scanning after a tie: a strictly earlier body may still appear. */
+    if(!best||tied)return null;
     /* Spawn and ordinary shields unconditionally block core damage. Guardian
      * bulwark is different: its v1.7 directional wrapper can allow damage. */
     if(best.immune)return null;
