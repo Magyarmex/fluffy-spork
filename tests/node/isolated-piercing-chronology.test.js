@@ -546,3 +546,25 @@ for(const optimized of [false,true])for(const fps of [30,60,120,240]){
   assert.equal(g.hits,2);
  });
 }
+
+for(const optimized of [false,true]) {
+ test((optimized?'optimized':'baseline')+
+  ' pen=2 TTL contact recovery works through real Game.update epoch',()=>{
+  const Game=boot(function(dt){
+   this.time+=dt;
+   for(const t of this.tanks){
+    t.__novaSweepMoveTime=this.time;
+    t.__novaSweepPrevX=t.x;t.__novaSweepPrevY=t.y;
+   }
+   this.updateBullets(dt);
+  },optimized);
+  const {g,a,b}=makeWorld(Game,52);a.x=25;
+  const shot=g.bullets[0];shot.vx=1050;shot.r=5.5;
+  shot.ttl=.03;shot.pen=2;shot.dmg=21;
+  g.update(1/30);
+  assert.equal(a.hitCount,1);
+  assert.equal(b.hitCount,1);
+  assert.equal(g.hits,2);
+  assert.equal(g.__novaShapeSweepActive,false);
+ });
+}
