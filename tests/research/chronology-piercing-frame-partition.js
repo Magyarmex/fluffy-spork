@@ -27,12 +27,15 @@ function frameEvents(world,start,dt,ledger){
 }
 function simulate(world,fps){
  const ledger=new Set(),events=[];
- for(let start=0;start<world.ttl-1e-12&&events.length<=world.pen;start+=1/fps){
-  for(const e of frameEvents(world,start,1/fps,ledger)){
+ let frameIndex=0;
+ for(let start=0;start<world.ttl-1e-12&&events.length<=world.pen;){
+  const dt=typeof fps==='number'?1/fps:fps(frameIndex++);
+  for(const e of frameEvents(world,start,dt,ledger)){
    if(events.length>world.pen)break;
    if(ledger.has(e.id))continue;
    ledger.add(e.id);events.push(e);
   }
+  start+=dt;
  }
  return events;
 }
@@ -74,7 +77,9 @@ for(let n=0;n<30000;n++){
   stats.ambiguous++;continue;
  }
  stats.worlds++;stats.contacts+=expected.length;
- for(const fps of fpsList){
+ for(const fps of [...fpsList,
+   i=>i%3===0?1/30:i%3===1?1/240:1/90,
+   i=>i%4===0?1/45:i%4===1?1/120:i%4===2?1/60:1/200]){
   const actual=simulate(world,fps);stats.comparisons++;
   if(actual.length!==expected.length||
      actual.some((e,i)=>e.id!==expected[i].id||Math.abs(e.time-expected[i].time)>2e-8)){
