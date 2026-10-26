@@ -237,8 +237,9 @@ async function scenario(browser, label, options) {
       ]){
         await page.evaluate(tier=>{
           const g=window.__novaBrowserLiveGame;
-          if(!g?.cb?.event)throw new Error('real Game event callback unavailable');
-          g.cb.event({type:'offer',tier});
+          if(!g?.openOffer)throw new Error('real Game offer lifecycle unavailable');
+          g.pendingOffer=tier;
+          g.openOffer();
         },tier);
         const heading=page.getByText(title,{exact:true});
         await heading.waitFor({state:'visible',timeout:8000});
@@ -271,6 +272,8 @@ async function scenario(browser, label, options) {
           label+': DECIDE LATER must be reachable after scrolling: '+JSON.stringify(laterBox));
         await later.click();
         await heading.waitFor({state:'detached',timeout:8000});
+        assert.equal(await page.evaluate(()=>window.__novaBrowserLiveGame?.paused),false,
+          label+': dismissing the choice must resume the real game');
       }
     }
 
