@@ -109,6 +109,20 @@ async function scenario(browser, label, options) {
     assert.ok(controller.drones>0,label+': Controller actually deploys allied drones');
     assert.equal(controller.ecology,true,label+': ecology remains active after class change');
     assert.equal(controller.playing,true,label+': Controller transition does not end the run');
+    if(label==='mobile'){
+      const toastGeometry=await page.evaluate(()=>{
+        const node=document.querySelector('[class~="top-[18%]"] > .panel.anim-pop');
+        const rect=node?.getBoundingClientRect();
+        return rect?{left:rect.left,right:rect.right,width:rect.width,height:rect.height,
+          viewport:window.innerWidth,font:getComputedStyle(node).fontSize}:null;
+      });
+      assert.ok(toastGeometry,'Controller tutorial toast remains present');
+      assert.ok(toastGeometry.left>=0&&toastGeometry.right<=toastGeometry.viewport,
+        'portrait toast stays entirely inside viewport: '+JSON.stringify(toastGeometry));
+      assert.ok(toastGeometry.height<110,
+        'portrait tutorial toast must not obscure a large part of the arena: '+JSON.stringify(toastGeometry));
+      console.log('NOVA_PORTRAIT_TOAST '+JSON.stringify(toastGeometry));
+    }
     await page.screenshot({path:path.join(output,label+'-warden.png')});
     assert.deepEqual(errors,[],label+': no uncaught browser exceptions');
     console.log('NOVA_BROWSER_SMOKE '+JSON.stringify({label,menu,liveAge:live.age,paused,resumed,errors}));

@@ -200,6 +200,18 @@ wrap('game/render',function(render,require){
   patched.__novaSignalDiscipline=true;render.render=patched;
 });
 
+/* A long combat announcement must not become a giant central blocker on a
+ * portrait touch viewport. Keep the original text and pointer transparency;
+ * only constrain the existing React Toast container and its typography. */
+if(typeof document!=='undefined'&&document.head&&typeof document.createElement==='function'){
+  var toastStyleId='nova-portrait-toast-constraint';
+  if(!document.getElementById||!document.getElementById(toastStyleId)){
+    var toastStyle=document.createElement('style');toastStyle.id=toastStyleId;
+    toastStyle.textContent='@media(max-width:480px){[class~="top-[18%]"][class~="pointer-events-none"]{width:min(94vw,360px);max-width:calc(100vw - 16px)}[class~="top-[18%]"][class~="pointer-events-none"]>.panel.anim-pop{box-sizing:border-box;width:100%;max-width:100%;padding:7px 10px;font-size:11px;line-height:1.35;letter-spacing:.035em;overflow-wrap:break-word}}';
+    document.head.appendChild(toastStyle);
+  }
+}
+
 window.__NOVA_VISUAL_LANGUAGE_TEST__={normalizeSpec:normalizeSpec,shouldSuppressLegacy:shouldSuppressLegacy,saveFeedback:saveFeedback,version:VERSION};
 console.info('[NOVA TANKS] v'+VERSION+' '+CODENAME+' visual language online');
 })();

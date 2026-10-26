@@ -1,0 +1,25 @@
+'use strict';
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const root=path.resolve(__dirname,'../..');
+const visuals=fs.readFileSync(path.join(root,'nova-updates/visual-language-v1.10.9.js'),'utf8');
+const controller=fs.readFileSync(path.join(root,'nova-updates/second-body-live-vector-v1.10.7.js'),'utf8');
+
+test('portrait combat toasts have a narrow viewport-only style owner',()=>{
+  assert.match(visuals,/nova-portrait-toast-constraint/);
+  assert.match(visuals,/@media\(max-width:480px\)/);
+  assert.match(visuals,/\[class~="top-\[18%\]"\]/);
+  assert.match(visuals,/pointer-events-none/);
+  assert.match(visuals,/width:min\(94vw,360px\)/);
+  assert.match(visuals,/letter-spacing:\.035em/);
+});
+
+test('Controller tutorial keeps desktop copy and uses short portrait instructions',()=>{
+  assert.match(controller,/var portrait=g\.w<480/);
+  assert.match(controller,/AIM = GUN \+ SWARM · DEPTH = RANGE/);
+  assert.match(controller,/RELEASE = RECALL · HITS DESIGNATE/);
+  assert.match(controller,/RIGHT STICK ANGLE = GUN \+ SWARM/);
+  assert.match(controller,/Math\.max\(120,g\.w-24\)/);
+});
