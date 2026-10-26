@@ -898,3 +898,87 @@ for (const optimized of [false,true]) {
     });
   }
 }
+
+
+/* Run 370: Game.update uses a 0.35 projectile simulation-speed multiplier
+ * during the player's death transition, while g.time still advances at full
+ * frame duration. The physical first-contact contract is in projectile
+ * simulation seconds, not the match clock. Preserve this red gate so a
+ * chronological event queue cannot accidentally use the wrong clock. */
+function simulateSlowProjectile(Game, fps, scale, targetX, ttl) {
+  const g = new Game();
+  g.tanks = [{ kind: 'tank', id: 2, x: targetX, y: 0,
+    cls: 'scout', hp: 100, alive: true }];
+  g.bullets = [{ kind: 'bullet', id: 1, ownerId: 1, x: 0, y: 0,
+    vx: 6000, vy: 0, r: 3, dmg: 20, ttl, pen: 0,
+    hits: 0, dead: false, shell: false, beam: false }];
+  for (let i = 0; i < 30 && g.bullets.length; i++) {
+    g.updateBullets(scale / fps);
+    g.time += 1 / fps; // match clock differs from projectile simulation time
+  }
+  return g.hits;
+}
+for (const fps of [30, 60, 120, 240]) {
+  test('death-slow 0.35x projectile clock: reachable hull before TTL at ' + fps + 'Hz', () => {
+    assert.equal(simulateSlowProjectile(Game, fps, .35, 40, .005), 1,
+      'physical contact at 0.00317 projectile-seconds precedes TTL 0.005');
+  });
+  test('death-slow 0.35x projectile clock: no phantom beyond TTL at ' + fps + 'Hz', () => {
+    assert.equal(simulateSlowProjectile(Game, fps, .35, 100, .005), 0);
+  });
+}
+
+
+/* Run 370 follow-up: an isolated first-contact rescue is not enough for a
+ * penetrating projectile that reaches TWO targets inside one simulation
+ * slice. Death slow-motion changes that slice from dt to 0.35*dt, so it
+ * must be part of the chronological multi-hit acceptance matrix. */
+function simulateSlowPiercing(Game, fps, scale, secondX) {
+  const g = new Game();
+  // A raw hit count is not proof of two victims: the legacy core can damage
+  // the SAME hull on consecutive frames while a penetrating round overlaps.
+  const victims = [], originalDamage = g.damageTank;
+  g.damageTank = function(target) { victims.push(target.id); return originalDamage.apply(this, arguments); };
+  g.tanks = [40, secondX].map((x, i) => ({
+    kind: 'tank', id: i + 2, x, y: 0, cls: 'scout', hp: 100, alive: true
+  }));
+  g.bullets = [{ kind: 'bullet', id: 1, ownerId: 1, x: 0, y: 0,
+    vx: 6000, vy: 0, r: 3, dmg: 20, ttl: .010, pen: 1,
+    hits: 0, dead: false, shell: false, beam: false }];
+  for (let i = 0; i < 30 && g.bullets.length; i++) {
+    g.updateBullets(scale / fps);
+    g.time += 1 / fps;
+  }
+  return victims;
+}
+for (const fps of [30, 60, 120, 240]) {
+  test('death-slow penetration: two pre-expiry hulls hit at ' + fps + 'Hz', () => {
+    // Contact 1: x=19 at .00317s; contact 2: x=44 at .00733s.
+    // Both precede TTL=.010s. No terrain, drones, or interception.
+    assert.deepEqual(simulateSlowPiercing(Game, fps, .35, 65), [2, 3],
+      'penetration must damage two distinct hulls in physical contact order');
+  });
+  test('death-slow penetration: second hull beyond TTL is not hit at ' + fps + 'Hz', () => {
+    assert.deepEqual(simulateSlowPiercing(Game, fps, .35, 200), [2],
+      'out-of-TTL second hull cannot be hit or substituted by a duplicate first hit');
+  });
+}
+
+/* Run 371 follow-up: ordinary non-expiring projectile with two reachable
+ * stationary hulls inside a single frame. The production #337 shortcut is
+ * intentionally limited to the TTL-expiration frame, so this separate
+ * physical ordering case remains a known-red full-chronology acceptance gate.
+ * First contacts at x=19 and x=44 (0.003167s and 0.007333s at 6000u/s). */
+for(const fps of [30,60,120,240]){
+ test('KNOWN RED: non-expiring piercing shot reaches both stationary hulls at '+fps+'Hz',()=>{
+  const g=new Game(),first={kind:'tank',id:2,x:40,y:0,cls:'scout',hp:100,alive:true,hitCount:0},
+   second={kind:'tank',id:3,x:65,y:0,cls:'scout',hp:100,alive:true,hitCount:0};
+  g.tanks=[first,second];
+  g.damageTank=function(t){t.hitCount++;this.hits++;};
+  g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,vx:6000,vy:0,
+   r:3,dmg:20,ttl:1,pen:1,hits:0,dead:false,shell:false,beam:false}];
+  for(let i=0;i<5&&g.bullets.length;i++){g.time+=1/fps;g.updateBullets(1/fps);}
+  assert.equal(first.hitCount,1,'first chronological hull');
+  assert.equal(second.hitCount,1,'second chronological hull within first frame at 30–120Hz');
+ });
+}
