@@ -104,3 +104,32 @@ test('Live War Room obeys Signal Discipline and loads after it', () => {
   assert.ok(deploy.indexOf(signals) < deploy.indexOf(live));
   assert.match(deploy, /! grep -q 'nova-updates\/lobby-battlefield-v1\.10\.1\.js' index\.html\.new/);
 });
+
+test('War Room trims stale Zero Churn shape IDs alongside decorative bodies', () => {
+  assert.match(source, /trimNeutralPopulation\(g,shapeBudget\)/,
+    'real menu preparation must call the tested index rebuild');
+  const trim = metadataBoot().__NOVA_LOBBY_BATTLEFIELD_TEST__.trimNeutralPopulation;
+  const shapes = [1, 2, 3, 4, 5].map(id => ({id, hp:100, type:'circle'}));
+  const g = {shapes, shapeById: new Map(shapes.map(s => [s.id,s]))};
+  const getShape = id => g.shapeById.get(id)||null;
+  assert.equal(getShape(5),shapes[4], 'precondition: a future trimmed shape is indexed');
+  trim(g,3);
+  assert.deepEqual(g.shapes.map(s=>s.id),[1,2,3]);
+  assert.deepEqual([...g.shapeById.keys()],[1,2,3],
+    'truncated menu bodies must not remain targetable by ID');
+  assert.equal(getShape(5),null);
+  assert.equal(getShape(3),shapes[2]);
+  trim(g,3);
+  assert.equal(g.shapeById.size,3,'remount/reconciliation remains idempotent');
+});
+
+test('War Room index recovery also removes preexisting dead or ghost entries', () => {
+  const trim = metadataBoot().__NOVA_LOBBY_BATTLEFIELD_TEST__.trimNeutralPopulation;
+  const alive = {id:1,hp:20},dead={id:2,hp:0};
+  const g={shapes:[alive,dead],shapeById:new Map([[1,alive],[2,dead],[99,{id:99,hp:30}]])};
+  trim(g,34);
+  assert.deepEqual([...g.shapeById.keys()],[1],
+    'the map must reflect only surviving physical neutral shapes');
+  assert.doesNotThrow(()=>trim({shapes:[alive]},1),
+    'legacy contexts without a Zero Churn index remain supported');
+});
