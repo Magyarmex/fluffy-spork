@@ -102,3 +102,21 @@ test('twenty attach/detach cycles never leak native mouse chord listeners',()=>{
   assert.equal(events.canvas.get('mousedown')?.size||0,0);
   assert.equal(events.window.get('mouseup')?.size||0,0);
 });
+
+test('pointercancel disarms captured primary fire even with stale buttons bit',()=>{
+  const {input,pointer}=boot();
+  input.pd(pointer(0,1));assert.equal(input.firing,true);
+  input.pu(pointer(-1,1,{type:'pointercancel'}));
+  assert.equal(input.firing,false,'cancelled pointer cannot keep firing');
+});
+test('touch takeover cancels the old primary capture and its late mouseup is harmless',()=>{
+  const {input,pointer,mouse,fire}=boot();
+  input.pd(pointer(0,1));assert.equal(input.firing,true);
+  input.pd({pointerType:'touch',pointerId:12,clientX:700,clientY:200,target:null});
+  assert.equal(input.aim.active,true);
+  assert.equal(input.firing,true);
+  fire('window','mouseup',mouse(0,0));
+  assert.equal(input.firing,true,'late mouseup must not cancel touch firing');
+  input.pu({pointerType:'touch',pointerId:12});
+  assert.equal(input.firing,false);
+});
