@@ -30,7 +30,7 @@ function canvas() {
   c.getContext = () => ctx;
   return c;
 }
-function runGame(hz, controller) {
+function runGame(hz, controller, klass) {
   const errors = [];
   const store = new Map();
   const document = {hidden: false, visibilityState: 'visible',
@@ -76,6 +76,13 @@ function runGame(hz, controller) {
     game.input.aim.active = true;
     game.input.aim.dx = 80;
     game.input.aim.dy = 0;
+  } else if (klass) {
+    game.setClass(game.player, klass);
+    game.input.aim.active = true;
+    game.input.aim.dx = 80;
+    game.input.aim.dy = 0;
+    game.input.firing = true;
+    game.input.keyboard.right = true;
   }
   for (let i = 0; i < 2 * hz; i++) game.update(1 / hz);
   requireGame('game/render').render(game, game.w, game.h);
@@ -90,6 +97,11 @@ function runGame(hz, controller) {
     assert.ok(game.drones.some(d => d.ownerId === game.player.id),
       'real Warden command spawns player-owned drones');
   }
+  if (klass) {
+    assert.equal(game.player.cls, klass, 'requested class is still active');
+    assert.ok(Number.isFinite(game.player.x) && Number.isFinite(game.player.y),
+      'movement and combat retain finite player coordinates');
+  }
   const unexpected = errors.filter(s => !s.includes('React hooks unavailable; interaction patch not installed'));
   assert.deepEqual(unexpected, [], 'no unexpected runtime console errors');
 }
@@ -102,4 +114,10 @@ test('shipping HTML contains the actual inline game and its overlay chain', () =
 for (const [hz, controller] of [[30, false], [120, false], [60, true], [240, true]]) {
   test('materialized game: ' + (controller ? 'Warden Controller' : 'baseline') +
     ' survives two seconds at ' + hz + ' FPS', () => runGame(hz, controller));
+}
+
+// Exercise the real combat/update/render composition across all five tier-1 lineages.
+for (const klass of ['twin', 'cannon', 'marksman', 'carrier', 'guard']) {
+  test('materialized '+klass+' lineage moves and fires for two seconds at 60 FPS',
+    () => runGame(60, false, klass));
 }
