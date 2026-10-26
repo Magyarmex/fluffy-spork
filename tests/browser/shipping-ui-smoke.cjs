@@ -27,7 +27,7 @@ async function assertPortraitHud(page, label, expectedClass) {
   });
   assert.ok(metrics.root&&metrics.class&&metrics.kills,label+': actual TopBar exists: '+JSON.stringify(metrics));
   assert.equal(metrics.classText,expectedClass,label+': canonical class label remains present');
-  assert.ok(metrics.requiredClassWidth<=metrics.visibleClassWidth+1,
+  assert.ok(metrics.requiredClassWidth<=metrics.visibleClassWidth,
     label+': full class name must remain readable at narrow widths: '+JSON.stringify(metrics));
   if(metrics.gene&&metrics.viewport<=360){
     assert.equal(metrics.clockDisplay,'none',label+': 320px hybrid badge takes clock space instead of clipping class');
@@ -178,6 +178,8 @@ async function scenario(browser, label, options) {
         const g=window.__novaBrowserLiveGame;
         g.player.gene=null;g.syncHud();
       });
+      await page.waitForTimeout(100);
+      await assertPortraitHud(page,label+'-warden-restored','WARDEN');
     }
     await page.screenshot({path:path.join(output,label+'-warden.png')});
     assert.deepEqual(errors,[],label+': no uncaught browser exceptions');
