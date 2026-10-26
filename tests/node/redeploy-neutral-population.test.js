@@ -80,6 +80,8 @@ function counts(g){
 }
 test('materialized initial neutral ecology begins at canonical 120-body contract',()=>{
   const g=bootGame();
+  assert.match(String(g.seedShapes),/counts=Object.create/,'shipping Living Front deficit-only seeding is installed');
+  assert.match(String(g.redeploy),/shapeById.clear/,'shipping redeploy rebuilds surviving shape lookup');
   assert.deepEqual(counts(g),TARGET);
 });
 test('two consecutive redeploys preserve existing neutral bodies without population doubling',()=>{
