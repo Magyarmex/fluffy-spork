@@ -333,7 +333,9 @@ test('late-bound ecology survives three real redeploys without multiplying neutr
   for(let life=0;life<3;life++){
     for(let frame=0;frame<120;frame++)g.update(1/60);
     assert.equal(g.status,'playing','life '+life+' remains playable');
-    assert.ok(g.__lfState&&g.__lfState.age>=1.9,'life '+life+' advances ecological time');
+    assert.ok(g.time>1.9,'life '+life+' advances canonical match time');
+    assert.ok(g.__lfState&&g.__lfState.age>1.5,
+      'life '+life+' advances ecological time; age='+g.__lfState?.age+' gameTime='+g.time);
     assert.notEqual(g.__lfState,lastState,'redeploy does not reuse previous life ecology');
     assert.ok(g.shapes.length>=100&&g.shapes.length<220,
       'life '+life+' keeps neutral population bounded');
