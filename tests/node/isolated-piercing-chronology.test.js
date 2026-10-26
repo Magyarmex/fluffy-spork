@@ -207,3 +207,16 @@ for(const optimized of [false,true]) {
   assert.equal(b.hitCount,0);
  });
 }
+
+for(const optimized of [false,true]) {
+ test((optimized?'optimized':'baseline')+
+  ' uncertain nearby neutral movement cannot be bypassed by piercing shortcut',()=>{
+  const Game=boot(undefined,optimized),{g,b}=makeWorld(Game);
+  /* At 38u lateral distance the shape is not currently overlapping the
+   * projectile, but a normal within-frame displacement can enter its path.
+   * The old unpadded endpoint-only exclusion would have backdated two hits. */
+  g.shapes=[{kind:'shape',id:8,x:38,y:38,r:12,hp:100}];
+  const dt=.35/30;g.time+=dt;g.updateBullets(dt);
+  assert.equal(b.hitCount,0);
+ });
+}
