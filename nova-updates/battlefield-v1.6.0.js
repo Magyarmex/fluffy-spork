@@ -766,26 +766,71 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   var best=null,bestT=limit,tie=false,uncertain=false,blockedT=Infinity;
   function consider(e,kind){
    if(!e)return;
-   /* A hostile drone already intersecting the bullet at the beginning of
-    * this projectile update has a physical zero-time contact. Do not infer
-    * a later crossing from endpoints: drone steering/dashes are multi-stage.
-    * Require a witnessed frame-start overlap as well as current overlap.
-    * Unknown/newborn movement retains the original collision authority. */
+   /* Never infer a drone's exact path from phase checkpoints. For a
+    * bounded-speed non-dashing drone, however, a projectile can sometimes
+    * prove contact without knowing that path: at time t the drone cannot
+    * be farther than speedBound*t from its witnessed frame-start position.
+    * A projectile STRICTLY inside that shrinking circle must have touched
+    * the drone by t. The sample time is an upper bound, not a fabricated
+    * first-contact timestamp. Competing bodies are vetoed below. */
    if(kind==='drone'){
     if(!(e.hp>0)||e.ownerId===b.ownerId)return;
     var drR=b.r+e.r+1;
     if(!(drR>0)||!Number.isFinite(drR)||
        !Number.isFinite(e.x)||!Number.isFinite(e.y)){uncertain=true;return;}
-    if(!(d2(ax,ay,e.x,e.y)<drR*drR))return;
-    if(!g.__novaShapeSweepActive||
-       e.__novaChronoDroneEpoch!==g.__novaShapeSweepEpoch||
-       !Number.isFinite(e.__novaChronoDronePrevX)||
-       !Number.isFinite(e.__novaChronoDronePrevY)||
-       !(d2(ax,ay,e.__novaChronoDronePrevX,e.__novaChronoDronePrevY)<drR*drR)){
+    var dsx=e.__novaChronoDronePrevX,dsy=e.__novaChronoDronePrevY;
+    var witnessed=g.__novaShapeSweepActive&&
+       e.__novaChronoDroneEpoch===g.__novaShapeSweepEpoch&&
+       Number.isFinite(dsx)&&Number.isFinite(dsy);
+    var overlapNow=d2(ax,ay,e.x,e.y)<drR*drR;
+    if(overlapNow){
+     if(!witnessed||!(d2(ax,ay,dsx,dsy)<drR*drR)){
       uncertain=true;return;
+     }
+     if(best&&bestT<1e-8){tie=true;return;}
+     best={e:e,kind:'drone'};bestT=0;tie=false;return;
     }
-    if(best&&bestT<1e-8){tie=true;return;}
-    best={e:e,kind:'drone'};bestT=0;tie=false;return;
+    if(!witnessed||!Number.isFinite(e.speed)||!(e.speed>0)||
+       !Number.isFinite(e.__novaChronoDronePrevSpeed)||
+       !(e.__novaChronoDronePrevSpeed>0)||
+       !Number.isFinite(e.__novaChronoDronePrevV)||
+       e.__novaPhase==='dash'||e.__novaChronoDronePrevPhase==='dash'||
+       e.__novaCommitted||e.__novaChronoDronePrevCommitted||
+       e.__novaSpotter||e.__novaTerrainBump){
+     /* No new authority without a speed witness. The existing later
+      * drone-corridor veto still protects an earlier tank/shape contact. */
+     return;
+    }
+    var speedBound=Math.max(1200,e.speed*6,
+      (e.__novaChronoDronePrevSpeed||0)*6,
+      (e.__novaChronoDronePrevV||0)*2,
+      Math.hypot(e.__novaVX||0,e.__novaVY||0)*2,
+      Math.hypot(e.__lvVX||0,e.__lvVY||0)*2,
+      Math.hypot(e.__novaIdleVX||0,e.__novaIdleVY||0)*2),
+      move=Math.hypot(e.x-dsx,e.y-dsy);
+    if(!Number.isFinite(speedBound)||speedBound>4000||
+       move>96||move>speedBound*dt+1e-6){uncertain=true;return;}
+    /* Cull remote drones before any quadratic/sampled proof. An earlier
+     * tank or neutral hit shortens the only time window in which this
+     * drone could affect the result. */
+    var windowT=best?Math.min(bestT,limit):limit;
+    var reach=drR+speedBound*dt*windowT;
+    var potentiallyEarlier=
+       Math.max(ax,ax+dx*windowT)+reach>=Math.min(dsx,e.x)&&
+       Math.min(ax,ax+dx*windowT)-reach<=Math.max(dsx,e.x)&&
+       Math.max(ay,ay+dy*windowT)+reach>=Math.min(dsy,e.y)&&
+       Math.min(ay,ay+dy*windowT)-reach<=Math.max(dsy,e.y);
+    if(!potentiallyEarlier)return;
+    var sample=null, fractions=[.25,.5,.75,.9];
+    for(var fi=0;fi<fractions.length;fi++){
+     var t=limit*fractions[fi],seconds=dt*t;
+     var px=ax+dx*t,py=ay+dy*t;
+     if(Math.hypot(px-dsx,py-dsy)+speedBound*seconds<drR-1e-5){
+      sample=t;break;
+     }
+    }
+    if(sample===null||best){uncertain=true;return;}
+    best={e:e,kind:'drone',guaranteed:true};bestT=sample;tie=false;return;
    }
    var rr=0,sx=e.x,sy=e.y,mx=0,my=0,discontinuousTankMove=false;
    if(kind==='tank'){
@@ -869,6 +914,64 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   for(var di=0;di<drones.length;di++)consider(drones[di],'drone');
   if(!best||tie||uncertain||blockedT<=bestT+1e-8)return false;
   var hx=ax+dx*bestT,hy=ay+dy*bestT;
+  /* A guaranteed-overlap time is an upper bound on the drone's actual
+   * first contact. Another nearby body might have hit first. Do not let
+   * this conservative proof reorder tank/shape damage or kill credit. */
+  if(best.guaranteed){
+   /* Piercing shots survive the drone hit until TTL. To commit their one
+    * guaranteed hit, prove the ENTIRE remaining TTL corridor free of other
+    * bodies, cover and competing shots; otherwise defer the whole event. */
+   var proofX=b.pen>0?ax+dx*limit:hx,
+       proofY=b.pen>0?ay+dy*limit:hy;
+   if(b.pen>0&&firstSolidHit(g,hx,hy,proofX,proofY,(b.r||2)*.45))
+    return false;
+   for(var ti=0;ti<tanks.length;ti++){
+    var t=tanks[ti];if(!t||!t.alive||t.id===b.ownerId)continue;
+    var def=CLASSES[t.cls],pad=b.r+(def&&def.size||30)+3;
+    var tx=t.x,ty=t.y,px=t.__novaSweepMoveTime===g.time?t.__novaSweepPrevX:tx,
+        py=t.__novaSweepMoveTime===g.time?t.__novaSweepPrevY:ty;
+    if(!Number.isFinite(px)||!Number.isFinite(py)||
+       Math.max(ax,proofX)+pad>=Math.min(tx,px)&&
+       Math.min(ax,proofX)-pad<=Math.max(tx,px)&&
+       Math.max(ay,proofY)+pad>=Math.min(ty,py)&&
+       Math.min(ay,proofY)-pad<=Math.max(ty,py))return false;
+   }
+   for(var si=0;si<shapes.length;si++){
+    var s=shapes[si];if(!s||!(s.hp>0))continue;
+    var st=shapeSweepStart(g,s),sx=st?st.x:s.x,sy=st?st.y:s.y,
+        pad=b.r+(s.r||15)+4;
+    if(!Number.isFinite(sx)||!Number.isFinite(sy)||
+       Math.max(ax,proofX)+pad>=Math.min(sx,s.x)&&
+       Math.min(ax,proofX)-pad<=Math.max(sx,s.x)&&
+       Math.max(ay,proofY)+pad>=Math.min(sy,s.y)&&
+       Math.min(ay,proofY)-pad<=Math.max(sy,s.y))return false;
+   }
+   if(b.pen>0){
+    for(var di=0;di<drones.length;di++){
+     var d=drones[di];if(!d||d===best.e||!(d.hp>0)||
+        d.ownerId===b.ownerId)continue;
+     var sx=d.__novaChronoDronePrevX,sy=d.__novaChronoDronePrevY,
+         pad=b.r+(d.r||8)+1+Math.max(30,dt*2400);
+     if(!Number.isFinite(sx)||!Number.isFinite(sy)||
+        Math.max(ax,proofX)+pad>=Math.min(sx,d.x)&&
+        Math.min(ax,proofX)-pad<=Math.max(sx,d.x)&&
+        Math.max(ay,proofY)+pad>=Math.min(sy,d.y)&&
+        Math.min(ay,proofY)-pad<=Math.max(sy,d.y))return false;
+    }
+    var shots=g.bullets||[];
+    for(var bi=0;bi<shots.length;bi++){
+     var o=shots[bi];if(!o||o===b||o.dead)continue;
+     var ox=o.x,oy=o.y,ex=ox+(o.vx||0)*dt,
+         ey=oy+(o.vy||0)*dt,pad=b.r+(o.r||2)+2;
+     if(!Number.isFinite(ox)||!Number.isFinite(oy)||
+        !Number.isFinite(ex)||!Number.isFinite(ey)||
+        Math.max(ax,proofX)+pad>=Math.min(ox,ex)&&
+        Math.min(ax,proofX)-pad<=Math.max(ox,ex)&&
+        Math.max(ay,proofY)+pad>=Math.min(oy,ey)&&
+        Math.min(ay,proofY)-pad<=Math.max(oy,ey))return false;
+    }
+   }
+  }
   if(Math.abs(hx)>=MAP_LIMIT-20||Math.abs(hy)>=MAP_LIMIT-20)return false;
   /* Owned drones are transparent to their own projectiles in the shipping
    * core. A hostile drone may still intercept earlier: only rule it out if
@@ -918,6 +1021,18 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    /* A projectile may hit the chosen body from the side without crossing
     * this bullet's path. It can change HP/kill credit BEFORE first contact.
     * The fallback first-hit recovery must obey the same veto as piercing. */
+   /* A competing projectile may reach the SAME drone from a different
+    * direction without crossing our bullet corridor. Our guaranteed
+    * overlap time is only an upper bound, so preserve earlier kill credit. */
+   if(best.guaranteed&&o.ownerId!==best.e.id){
+    var dr=best.e,dsx=dr.__novaChronoDronePrevX,
+        dsy=dr.__novaChronoDronePrevY,rr=(o.r||2)+(dr.r||8)+1;
+    if(!Number.isFinite(o.r)||!Number.isFinite(ex)||!Number.isFinite(ey)||
+       Math.max(o.x,ex)+rr>=Math.min(dsx,dr.x)&&
+       Math.min(o.x,ex)-rr<=Math.max(dsx,dr.x)&&
+       Math.max(o.y,ey)+rr>=Math.min(dsy,dr.y)&&
+       Math.min(o.y,ey)-rr<=Math.max(dsy,dr.y))return false;
+   }
    if(best.kind==='tank'&&o.ownerId!==best.e.id){
     var td=CLASSES[best.e.cls];
     if(!td||!Number.isFinite(td.size)||
@@ -944,7 +1059,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      Math.sin(ang)*(b.knock||0)*.006);
   }else if(best.kind==='shape')g.damageShape(best.e,b.dmg,vx,vy);
   else g.damageDrone(best.e,b.dmg,b.ownerId);
+  var piercingDrone=best.guaranteed&&b.pen>0;
   b.hits++;b.pen--;b.dead=true;b.vx=0;b.vy=0;
+  if(piercingDrone){
+   b.x=ax+dx*limit;b.y=ay+dy*limit;b.px=b.x;b.py=b.y;
+  }
   return true;
  }
  /* Only skip a LATER terrain impact when a Cannon fuse is provably first.
@@ -1360,6 +1479,16 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   var cd=chronoDrones[di];if(!cd||!(cd.hp>0))continue;
   cd.__novaChronoDroneEpoch=epoch;
   cd.__novaChronoDronePrevX=cd.x;cd.__novaChronoDronePrevY=cd.y;
+  /* Snapshot the actual motion envelope before the core/Controller stages
+   * can change speed or enter/leave a committed dash. No interpolation or
+   * stage checkpoint is treated as an authoritative contact timestamp. */
+  cd.__novaChronoDronePrevSpeed=cd.speed;
+  cd.__novaChronoDronePrevPhase=cd.__novaPhase;
+  cd.__novaChronoDronePrevCommitted=!!cd.__novaCommitted;
+  cd.__novaChronoDronePrevV=Math.max(
+   Math.hypot(cd.__novaVX||0,cd.__novaVY||0),
+   Math.hypot(cd.__lvVX||0,cd.__lvVY||0),
+   Math.hypot(cd.__novaIdleVX||0,cd.__novaIdleVY||0));
   /* Start is recorded even without diagnostics for the existing conservative
    * collision gate; optional stages are kept separate from this authority. */
   if(this.__novaDroneChronoTraceEnabled===true){
