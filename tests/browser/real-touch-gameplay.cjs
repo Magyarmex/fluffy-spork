@@ -48,7 +48,7 @@ async function run(browser,label,viewport){
   const rightMoved={...right,x:right.x+Math.min(38,rect.width*.10),y:right.y-35};
   const hit=await page.evaluate(({left,right})=>[left,right].map(p=>{
    const e=document.elementFromPoint(p.x,p.y);
-   return {tag:e?.tagName,ui:!!e?.closest?.('[data-ui]'),canvas:e?.matches?.('canvas.absolute.inset-0')};
+   return {tag:e?.tagName,cls:String(e?.className||'').slice(0,240),html:e?.outerHTML?.slice(0,350),pointerEvents:e?getComputedStyle(e).pointerEvents:null,ui:!!e?.closest?.('[data-ui]'),canvas:e?.matches?.('canvas.absolute.inset-0'),status:window.__novaTouchGame?.status};
   }),{left,right});
   assert.ok(hit.every(h=>h.canvas&&!h.ui),label+': both contacts must land on actual gameplay canvas: '+JSON.stringify(hit));
   const cdp=await context.newCDPSession(page);
