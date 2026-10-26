@@ -243,6 +243,9 @@ async function scenario(browser, label, options) {
         },tier);
         const heading=page.getByText(title,{exact:true});
         await heading.waitFor({state:'visible',timeout:8000});
+        // Wait for the real anim-pop entrance to settle before measuring glyphs
+        // and buttons; a scaled transition can briefly hide full-size overflow.
+        await page.waitForTimeout(500);
         const panel=heading.locator('xpath=..');
         const geometry=await panel.evaluate(el=>{
           const box=el.getBoundingClientRect();
@@ -265,6 +268,7 @@ async function scenario(browser, label, options) {
           ['auto','scroll'].includes(geometry.overflowY),
           label+': tall evolution options must scroll inside the modal: '+JSON.stringify(geometry));
         await panel.evaluate(el=>{el.scrollTop=el.scrollHeight;});
+        await page.waitForTimeout(100);
         const later=panel.getByRole('button',{name:/DECIDE LATER/i});
         const laterBox=await later.boundingBox();
         assert.ok(laterBox&&laterBox.y>=-1&&
