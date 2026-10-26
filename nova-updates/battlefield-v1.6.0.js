@@ -1085,7 +1085,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   }
   /* Limit worst-case scans even if all distant shots have empty corridors. */
   if(shots.length<2||shots.length*bullets.length>12000)return null;
-  var plan=new Map(),work=0;
+  var plan=new Map(),work=0,seenTargets=new Set();
   for(var si=0;si<shots.length;si++){
    var b=shots[si],travelT=nonExpiring?dt:b.ttl;
    if(!(travelT>0)||!Number.isFinite(travelT)||
@@ -1096,6 +1096,25 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    if(!Number.isFinite(ex)||!Number.isFinite(ey))return null;
    var minx=Math.min(b.x,ex),maxx=Math.max(b.x,ex),
        miny=Math.min(b.y,ey),maxy=Math.max(b.y,ey),local=[];
+   /* If two shots might contact the same hull, their damage and defense
+    * changes are not independent. Defer the whole batch rather than let
+    * projectile array order decide which shortcut runs first. */
+   var tanks=g.tanks||[];
+   for(var ti=0;ti<tanks.length;ti++){
+    var t=tanks[ti];if(!t||!t.alive||t.id===b.ownerId)continue;
+    var def=CLASSES[t.cls],size=def&&Number.isFinite(def.size)?
+       Math.max(0,def.size):120;
+    var pad=b.r+size+3,tx=t.x,ty=t.y,
+        px=t.__novaSweepMoveTime===g.time?t.__novaSweepPrevX:tx,
+        py=t.__novaSweepMoveTime===g.time?t.__novaSweepPrevY:ty;
+    if(!Number.isFinite(tx)||!Number.isFinite(ty)||
+       !Number.isFinite(px)||!Number.isFinite(py))return null;
+    if(Math.max(tx,px)+pad>=minx&&Math.min(tx,px)-pad<=maxx&&
+       Math.max(ty,py)+pad>=miny&&Math.min(ty,py)-pad<=maxy){
+     if(seenTargets.has(t))return null;
+     seenTargets.add(t);
+    }
+   }
    for(var bi=0;bi<bullets.length;bi++){
     var o=bullets[bi];if(!o||o===b||o.dead)continue;
     var ox=o.x,oy=o.y,tx=ox+(o.vx||0)*dt,
