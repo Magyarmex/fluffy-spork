@@ -466,3 +466,64 @@ for(const optimized of [false,true]) {
   assert.equal(g.hits,3);
  });
 }
+
+/* Marksman TTL adversarial gates: no partial penetration may be backdated
+ * through defense, unknown motion, cover or a competing projectile. */
+for(const optimized of [false,true]) {
+ const mode=optimized?'optimized':'baseline',Game=boot(undefined,optimized);
+ function world(){
+  const {g,a,b}=makeWorld(Game,52);a.x=25;
+  const shot=g.bullets[0];shot.vx=1050;shot.r=5.5;
+  shot.ttl=.03;shot.pen=2;shot.dmg=21;
+  return {g,a,b};
+ }
+ test(mode+' pen=2 TTL refuses shielded later hull',()=>{
+  const {g,b}=world();b.spawnShieldT=2;
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.equal(b.hitCount,0);
+ });
+ test(mode+' pen=2 TTL refuses unknown tank motion',()=>{
+  const {g,b}=world();g.__novaShapeSweepActive=true;
+  g.__novaShapeSweepEpoch=372;
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.equal(b.hitCount,0);
+ });
+ test(mode+' pen=2 TTL refuses moving tank witness',()=>{
+  const {g,b}=world();g.__novaShapeSweepActive=true;
+  g.__novaShapeSweepEpoch=372;
+  g.time+=1/30;
+  for(const t of g.tanks){
+   t.__novaSweepMoveTime=g.time;
+   t.__novaSweepPrevX=t.x;t.__novaSweepPrevY=t.y;
+  }
+  b.__novaSweepPrevY=18;
+  g.updateBullets(1/30);
+  assert.equal(b.hitCount,0);
+ });
+ test(mode+' pen=2 TTL refuses permanent wall between contacts',()=>{
+  const {g,b}=world();
+  g.__novaTerrain=[{id:-372,shape:'rect',x:20,y:0,w:3,h:90,
+   solid:true,destructible:false}];
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.equal(b.hitCount,0);
+ });
+ test(mode+' pen=2 TTL refuses competing hostile projectile',()=>{
+  const {g,b}=world();
+  g.bullets.push({kind:'bullet',id:372,ownerId:9,x:15,y:0,vx:0,vy:0,
+   r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,shell:false,beam:false});
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.equal(b.hitCount,0);
+ });
+ test(mode+' pen=2 TTL never reaches hull beyond expiry',()=>{
+  const {g,b}=world();b.x=70;
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.equal(b.hitCount,0);
+ });
+ test(mode+' pen=2 TTL preserves chronological order under reversed hash',()=>{
+  const {g,a,b}=world();g.tanks.reverse();
+  const order=[];
+  g.damageTank=function(t){order.push(t.id);t.hitCount++;this.hits++;};
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.deepEqual(order,[a.id,b.id]);
+ });
+}
