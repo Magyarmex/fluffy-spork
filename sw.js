@@ -222,7 +222,7 @@ async function stageLatest({ force = false } = {}) {
         const critical = discoverCriticalAssets(html, indexURL);
         const stored = await Promise.all(critical.map((url) =>
           cache.match(canonicalURL(url))));
-        if (stored.every(Boolean)) {
+        if (stored.every(isCacheable)) {
           await stageOptionalAssets(cache);
           return { changed: false, fingerprint: buildFingerprint };
         }
@@ -249,11 +249,21 @@ async function stageLatest({ force = false } = {}) {
         promotedAt: Date.now(),
       };
       await writeActiveState(nextState);
-      await purgeNonCanonicalNovaCaches(nextState);
+      // The active pointer is now committed. Failure to remove old caches or
+      // notify tabs must never roll back/delete the newly promoted game.
+      try {
+        await purgeNonCanonicalNovaCaches(nextState);
+      } catch (error) {
+        console.warn('[NOVA PWA] Old-cache cleanup deferred:', error);
+      }
 
-      const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-      for (const client of clients) {
-        client.postMessage({ type: 'NOVA_UPDATE_READY', fingerprint: buildFingerprint });
+      try {
+        const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+        for (const client of clients) {
+          client.postMessage({ type: 'NOVA_UPDATE_READY', fingerprint: buildFingerprint });
+        }
+      } catch (error) {
+        console.warn('[NOVA PWA] Update notification deferred:', error);
       }
 
       return { changed: true, fingerprint: buildFingerprint };
@@ -278,7 +288,14 @@ async function cachedRealShell() {
     (await cache.match(absoluteURL('./index.html')));
   if (!response) return null;
   try {
-    await validateShellResponse(response);
+    const html = await validateShellResponse(response);
+    // A valid shell without even one required script cannot boot. Cache
+    // eviction can happen after promotion, so verify the *active* build on
+    // every navigation, including offline and failed-online-recovery paths.
+    const critical = discoverCriticalAssets(html, absoluteURL('./'));
+    const stored = await Promise.all(critical.map((url) =>
+      cache.match(canonicalURL(url))));
+    if (!stored.every(isCacheable)) return null;
     return response;
   } catch (_) {
     return null;
@@ -306,16 +323,20 @@ async function navigationResponse() {
 }
 
 async function assetResponse(request) {
+  // Scripts in the active build have already been fetched and staged together.
+  // Serving fresh same-URL bytes independently can mix a validated HTML shell
+  // with a different game module (and makes offline boot needlessly slow).
+  // Only untracked assets fall back to the network.
+  const { cache } = await activeBuildCache();
+  if (cache) {
+    const cached = await cache.match(canonicalURL(request.url));
+    if (isCacheable(cached)) return cached;
+  }
+
   try {
     const response = await fetchFresh(request.url);
     if (isCacheable(response)) return response;
   } catch (_) {}
-
-  const { cache } = await activeBuildCache();
-  if (cache) {
-    const cached = await cache.match(canonicalURL(request.url));
-    if (cached) return cached;
-  }
   return Response.error();
 }
 

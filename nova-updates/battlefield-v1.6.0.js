@@ -366,9 +366,142 @@ wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.
 
  var oldTryFire=Game.prototype.tryFire;Game.prototype.tryFire=function(t){if(t&&!t.isPlayer&&t.ai&&t.ai.targetId>=0){var target=this.getTank(t.ai.targetId);if(target&&target.alive&&!lineOfSight(this,t.x,t.y,target.x,target.y,4)){t.__novaTerrainDeniedFire=true;t.__novaTerrainDeniedUntil=this.time+.15;return;}}return oldTryFire.apply(this,arguments);};
 
- /* The core bullet loop can retain killed shapes in its same-tick spatial hash.
-  * Filter dead shapes only while it queries; restore the original method even on failure. */
- var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){for(var m=0;m<this.bullets.length;m++){var mb=this.bullets[m];if(mb)mb.__novaSweepHitsBefore=mb.hits||0;}var hash=this.hash,query=hash&&hash.query,hadOwn=hash&&Object.prototype.hasOwnProperty.call(hash,'query'),out,self=this,cursor=-1,started=false,generation=(this.__novaDirectQueryGeneration||0)+1,pending=[],splashDepth=0;
+/* Shape motion is resolved before projectiles in the canonical core. Keep a
+ * frame-local start position so collisions use relative motion, not the
+ * shape's later endpoint. Large jumps are relocations, never swept attacks. */
+var SHAPE_SWEEP_CELL=128,SHAPE_SWEEP_TELEPORT=96;
+function shapeSweepStart(g,s){
+ if(!g.__novaShapeSweepActive||s.__novaShapeSweepEpoch!==g.__novaShapeSweepEpoch)return null;
+ var x=s.__novaShapeSweepPrevX,y=s.__novaShapeSweepPrevY;
+ if(!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(s.x)||!Number.isFinite(s.y))return null;
+ var dx=s.x-x,dy=s.y-y;
+ if(dx*dx+dy*dy>SHAPE_SWEEP_TELEPORT*SHAPE_SWEEP_TELEPORT)return null;
+ if(dx*dx+dy*dy<1e-16)return null;
+ return{x:x,y:y};
+}
+function shapeWasTeleported(g,s){
+ if(!g.__novaShapeSweepActive||s.__novaShapeSweepEpoch!==g.__novaShapeSweepEpoch)return false;
+ var x=s.__novaShapeSweepPrevX,y=s.__novaShapeSweepPrevY;
+ return Number.isFinite(x)&&Number.isFinite(y)&&
+  d2(x,y,s.x,s.y)>SHAPE_SWEEP_TELEPORT*SHAPE_SWEEP_TELEPORT;
+}
+/* First entry of a projectile against a shape moving during this same
+ * frame. Stable quadratic roots avoid cancellation on shallow crossings. */
+/* Exact binary64 geometry is used only when the fast swept-circle
+ * discriminant is too close to tangency to be trustworthy. No epsilon can
+ * turn a genuine miss into damage; exact equality is not an overlap.
+ * Ordinary collisions stay on the allocation-free fast path. */
+var shapeExactView=new DataView(new ArrayBuffer(8));
+function shapeDyadic(v){
+ if(!Number.isFinite(v))return null;
+ if(v===0)return [0n,0];
+ shapeExactView.setFloat64(0,v,false);
+ var hi=shapeExactView.getUint32(0,false),lo=shapeExactView.getUint32(4,false),exp=(hi>>>20)&2047;
+ var mant=(BigInt(hi&0xfffff)<<32n)|BigInt(lo);
+ return [(hi>>>31?-1n:1n)*(exp===0?mant:((1n<<52n)|mant)),exp===0?-1074:exp-1023-52];
+}
+function exactMovingShapeHitT(ax,ay,ex,ey,sx,sy,sxe,sye,rr){
+ var raw=[ax,ay,ex,ey,sx,sy,sxe,sye,rr],parts=[],minExp=0;
+ for(var i=0;i<raw.length;i++){var p=shapeDyadic(raw[i]);if(!p)return null;parts.push(p);if(p[1]<minExp)minExp=p[1];}
+ var v=[];for(i=0;i<parts.length;i++)v.push(parts[i][0]<<BigInt(parts[i][1]-minExp));
+ var fx=v[0]-v[4],fy=v[1]-v[5],dx=(v[2]-v[0])-(v[6]-v[4]),dy=(v[3]-v[1])-(v[7]-v[5]),r=v[8];
+ var A=dx*dx+dy*dy,H=fx*dx+fy*dy,C=fx*fx+fy*fy-r*r;
+ if(C<0n)return 0;
+ if(A===0n||H>=0n||H*H-A*C<=0n)return null;
+ var vertexBeforeEnd=-H<=A;
+ if(!vertexBeforeEnd){
+  var atEnd=A+2n*H+C;
+  if(atEnd>0n||(atEnd===0n&&A+H<=0n))return null;
+ }
+ /* Exact bisection of the entry root. The high bound is either the
+  * closest-approach time or the frame end, known to contain overlap. */
+ var boundN=vertexBeforeEnd?-H:1n,boundD=vertexBeforeEnd?A:1n;
+ var low=0n,high=1n,den=1n;
+ for(i=0;i<58;i++){
+  low*=2n;high*=2n;den*=2n;
+  var mid=(low+high)>>1n,n=boundN*mid,d=boundD*den;
+  var q=A*n*n+2n*H*n*d+C*d*d;
+  if(q<=0n)high=mid;else low=mid;
+ }
+ var t=Number(boundN)/Number(boundD)*(Number(high)/Number(den));
+ return Number.isFinite(t)?Math.min(t,1-Number.EPSILON/2):null;
+}
+function movingShapeHitT(g,s,ax,ay,ex,ey,rr){
+ var start=shapeSweepStart(g,s);if(!start)return null;
+ var dx=ex-ax-(s.x-start.x),dy=ey-ay-(s.y-start.y);
+ var fx=ax-start.x,fy=ay-start.y,A=dx*dx+dy*dy;
+ var B=2*(fx*dx+fy*dy),C=fx*fx+fy*fy-rr*rr;
+ if(!Number.isFinite(A)||!Number.isFinite(B)||!Number.isFinite(C))return null;
+ if(C< -1e-9)return 0;
+ var D=B*B-4*A*C,magnitude=B*B+4*A*(fx*fx+fy*fy+rr*rr);
+ if(Math.abs(C)<=1e-9||(A>0&&Number.isFinite(D)&&Math.abs(D)<=1e-12*magnitude))
+  return exactMovingShapeHitT(ax,ay,ex,ey,start.x,start.y,s.x,s.y,rr);
+ if(A<1e-12||!(D>0))return null;
+ var root=Math.sqrt(D),q=-.5*(B+(B<0?-root:root));
+ if(!q)return null;
+ var t0=q/A,t1=C/q,entry=Math.min(t0,t1),exit=Math.max(t0,t1);
+ if(exit<=0||entry>=1)return null;
+ return entry<=0?0:entry;
+}
+/* Only moving shapes require an additional swept broadphase: the canonical
+ * hash already contains stationary shapes, tanks and drones. Index the shape
+ * movement corridor once per frame, not once per projectile. */
+function sweptShapeGrid(g){
+ var ix=g.__novaSweptShapeGrid;
+ if(ix){for(var z=0;z<ix.active.length;z++)ix.active[z].length=0;ix.active.length=0;ix.all.length=0;}
+ if(!g.__novaShapeSweepActive||!g.bullets||!g.bullets.length)return null;
+ if(!ix)ix=g.__novaSweptShapeGrid={cells:new Map(),active:[],all:[],scratch:[],stamp:0};
+ var a=g.shapes||[];
+ for(var i=0;i<a.length;i++){
+  var s=a[i];if(!s||!(s.hp>0))continue;
+  var start=shapeSweepStart(g,s);if(!start)continue;
+  ix.all.push(s);
+  var r=Math.max(0,s.r||0),x0=Math.floor((Math.min(start.x,s.x)-r)/SHAPE_SWEEP_CELL),x1=Math.floor((Math.max(start.x,s.x)+r)/SHAPE_SWEEP_CELL),y0=Math.floor((Math.min(start.y,s.y)-r)/SHAPE_SWEEP_CELL),y1=Math.floor((Math.max(start.y,s.y)+r)/SHAPE_SWEEP_CELL);
+  for(var x=x0;x<=x1;x++)for(var y=y0;y<=y1;y++){
+   /* Arena cell coordinates are bounded to +/-19; numeric keys are unique. */
+   var k=x*10000+y,arr=ix.cells.get(k);
+   if(!arr){arr=[];ix.cells.set(k,arr);}
+   if(!arr.length)ix.active.push(arr);
+   arr.push(s);
+  }
+ }
+ return ix;
+}
+function appendSweptShapes(ix,b,ax,ay,ex,ey,out){
+ if(!ix||!ix.all.length)return;
+ var r=Math.max(0,b.r||0),x0=Math.floor((Math.min(ax,ex)-r)/SHAPE_SWEEP_CELL),x1=Math.floor((Math.max(ax,ex)+r)/SHAPE_SWEEP_CELL),y0=Math.floor((Math.min(ay,ey)-r)/SHAPE_SWEEP_CELL),y1=Math.floor((Math.max(ay,ey)+r)/SHAPE_SWEEP_CELL);
+ var stamp=++ix.stamp;if(stamp>1000000000){ix.stamp=stamp=1;for(var z=0;z<ix.all.length;z++)ix.all[z].__novaShapeQueryStamp=0;}
+ function add(s){if(s.__novaShapeQueryStamp===stamp)return;s.__novaShapeQueryStamp=stamp;if(out.indexOf(s)<0)out.push(s);}
+ if((x1-x0+1)*(y1-y0+1)>200){for(var z=0;z<ix.all.length;z++)add(ix.all[z]);return;}
+ for(var x=x0;x<=x1;x++)for(var y=y0;y<=y1;y++){
+  var a=ix.cells.get(x*10000+y);if(!a)continue;
+  for(var i=0;i<a.length;i++)add(a[i]);
+ }
+}
+/* Core endpoint contact cannot win over a moving shape that was crossed
+ * earlier in the frame. Defer the whole bullet's direct body query to the
+ * existing swept recovery, which chooses the first physical victim. */
+function needsMovingShapeRecovery(g,ix,b,candidates){
+ if(!ix||!ix.all.length||!candidates.length||b.px==null)return false;
+ /* Only defer when the core would otherwise apply an endpoint body hit.
+  * The normal swept recovery already handles bullets with no endpoint hit. */
+ var endpoint=false;
+ for(var j=0;j<candidates.length;j++){
+  var e=candidates[j],rr=0;
+  if(e.kind==='shape'&&e.hp>0)rr=b.r+e.r;
+  else if(e.kind==='tank'&&e.alive&&e.id!==b.ownerId)rr=b.r+CLASSES[e.cls].size+3;
+  else if(e.kind==='drone'&&e.hp>0&&e.ownerId!==b.ownerId)rr=b.r+e.r+1;
+  if(rr&&d2(b.x,b.y,e.x,e.y)<rr*rr){endpoint=true;break;}
+ }
+ if(!endpoint)return false;
+ var ax=b.px,ay=b.py,ex=b.x,ey=b.y,moving=ix.scratch;moving.length=0;
+ appendSweptShapes(ix,b,ax,ay,ex,ey,moving);
+ for(var i=0;i<moving.length;i++){
+  var s=moving[i];if(s.hp>0&&movingShapeHitT(g,s,ax,ay,ex,ey,b.r+s.r)!=null)return true;
+ }
+ return false;
+}
+var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var movingShapes=sweptShapeGrid(this);for(var m=0;m<this.bullets.length;m++){var mb=this.bullets[m];if(mb)mb.__novaSweepHitsBefore=mb.hits||0;}var hash=this.hash,query=hash&&hash.query,hadOwn=hash&&Object.prototype.hasOwnProperty.call(hash,'query'),out,self=this,cursor=-1,started=false,generation=(this.__novaDirectQueryGeneration||0)+1,pending=[],splashDepth=0;
  this.__novaDirectQueryGeneration=generation;
  var oldSplashForContacts=this.splashAt,hadOwnSplash=Object.prototype.hasOwnProperty.call(this,'splashAt');
  /* A penetrating shot must contact each physical victim only once, even
@@ -389,9 +522,11 @@ wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.
    var victims=b&&b.__novaDirectVictims,write=0;
    for(var scan=0;scan<candidates.length;scan++){
      var candidate=candidates[scan];
-     if(candidate&&(candidate.kind!=='shape'||candidate.hp>0)&&!(victims&&victims.has(candidate)))candidates[write++]=candidate;
+     if(!candidate||(candidate.kind==='shape'&&candidate.hp<=0)||(victims&&victims.has(candidate)))continue;
+     candidates[write++]=candidate;
    }
    candidates.length=write;
+   if(b&&needsMovingShapeRecovery(self,movingShapes,b,candidates)){candidates.length=0;return value;}
    /* The shipping core takes the first endpoint-overlapping body in hash
     * order. When several bodies overlap the same bullet endpoint, select the
     * surface crossed first. Splash queries must retain their original order.
@@ -414,6 +549,7 @@ wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.
          else if(ce.kind==='drone'&&ce.ownerId!==b.ownerId&&ce.hp>0)rr=b.r+ce.r+1;
          if(!rr||d2(b.x,b.y,ce.x,ce.y)>=rr*rr)continue;
          var rx=dx,ry=dy,tx=ce.x,ty=ce.y;
+         if(ce.kind==='shape'){var sp=shapeSweepStart(self,ce);if(sp){rx-=ce.x-sp.x;ry-=ce.y-sp.y;tx=sp.x;ty=sp.y;}}
          if(ce.kind==='tank'&&ce.__novaSweepMoveTime===self.time){
            rx-=ce.x-ce.__novaSweepPrevX;ry-=ce.y-ce.__novaSweepPrevY;
            tx=ce.__novaSweepPrevX;ty=ce.__novaSweepPrevY;
@@ -455,25 +591,444 @@ wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.
        (pb.__novaDirectVictims||(pb.__novaDirectVictims=new Set())).add(item[1]);
      }
    }
- }for(var i=this.bullets.length-1;i>=0;i--){var b=this.bullets[i];if(!b||b.dead||(b.hits||0)!==b.__novaSweepHitsBefore)continue;var ax=b.px==null?b.x:b.px,ay=b.py==null?b.y:b.py,ex=b.x,ey=b.y,travel=Math.hypot(ex-ax,ey-ay);if(travel<1e-6)continue;this.hash.query((ax+ex)*.5,(ay+ey)*.5,travel*.5+b.r+46,this.tmp);var first=null;for(var j=0;j<this.tmp.length;j++){var e=this.tmp[j],er=0;if(b.__novaDirectVictims&&b.__novaDirectVictims.has(e))continue;if(e.kind==='shape'&&e.hp>0)er=e.r;else if(e.kind==='tank'&&e.id!==b.ownerId&&e.alive)er=CLASSES[e.cls].size+3;else if(e.kind==='drone'&&e.ownerId!==b.ownerId&&e.hp>0)er=e.r+1;else continue;var rr=b.r+er,dx=ex-ax,dy=ey-ay,tx=e.x,ty=e.y;if(e.kind==='tank'&&e.__novaSweepMoveTime===this.time){dx-=e.x-e.__novaSweepPrevX;dy-=e.y-e.__novaSweepPrevY;tx=e.__novaSweepPrevX;ty=e.__novaSweepPrevY;}var fx=ax-tx,fy=ay-ty,A=dx*dx+dy*dy,B=2*(fx*dx+fy*dy),C=fx*fx+fy*fy-rr*rr,t=null;if(C<0)t=0;else{var D=B*B-4*A*C;if(D>0){var root=Math.sqrt(D),t0=(-B-root)/(2*A),t1=(-B+root)/(2*A);if(t0>=0&&t0<=1)t=t0;else if(t1>=0&&t1<=1)t=t1;}}if(t!=null&&(!first||t<first.t))first={e:e,t:t};}if(!first)continue;var e=first.e,hitT=first.t===0?0:Math.min(1,first.t+1e-9),hx=ax+(ex-ax)*hitT,hy=ay+(ey-ay)*hitT;b.x=hx;b.y=hy;if(e.kind==='shape'){if(b.shell)this.clusterBurst(b);this.damageShape(e,b.dmg,b.vx,b.vy);}else if(e.kind==='tank'){if(b.shell)this.clusterBurst(b);var ang=Math.atan2(b.vy,b.vx);this.damageTank(e,b.dmg,b.ownerId,Math.cos(ang)*(b.knock||0)*.006,Math.sin(ang)*(b.knock||0)*.006);}else this.damageDrone(e,b.dmg,b.ownerId);if(b.splash&&e.kind!=='drone')this.splashAt(hx,hy,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.hits++;b.pen--;if(b.pen<0)b.dead=true;else (b.__novaDirectVictims||(b.__novaDirectVictims=new Set())).add(e);if(!b.dead){b.x=ex;b.y=ey;}else this.bullets.splice(i,1);}return out;};
+ }for(var i=this.bullets.length-1;i>=0;i--){var b=this.bullets[i];if(!b||b.dead||(b.hits||0)!==b.__novaSweepHitsBefore)continue;var ax=b.px==null?b.x:b.px,ay=b.py==null?b.y:b.py,ex=b.x,ey=b.y,travel=Math.hypot(ex-ax,ey-ay);if(travel<1e-6&&!(movingShapes&&movingShapes.all.length))continue;this.hash.query((ax+ex)*.5,(ay+ey)*.5,travel*.5+b.r+46,this.tmp);appendSweptShapes(movingShapes,b,ax,ay,ex,ey,this.tmp);var first=null;for(var j=0;j<this.tmp.length;j++){var e=this.tmp[j],er=0;if(b.__novaDirectVictims&&b.__novaDirectVictims.has(e))continue;if(e.kind==='shape'&&e.hp>0&&!shapeWasTeleported(this,e))er=e.r;else if(e.kind==='tank'&&e.id!==b.ownerId&&e.alive)er=CLASSES[e.cls].size+3;else if(e.kind==='drone'&&e.ownerId!==b.ownerId&&e.hp>0)er=e.r+1;else continue;var rr=b.r+er,dx=ex-ax,dy=ey-ay,tx=e.x,ty=e.y;if(e.kind==='shape'){var start=shapeSweepStart(this,e);if(start){dx-=e.x-start.x;dy-=e.y-start.y;tx=start.x;ty=start.y;}}if(e.kind==='tank'&&e.__novaSweepMoveTime===this.time){dx-=e.x-e.__novaSweepPrevX;dy-=e.y-e.__novaSweepPrevY;tx=e.__novaSweepPrevX;ty=e.__novaSweepPrevY;}var fx=ax-tx,fy=ay-ty,A=dx*dx+dy*dy,B=2*(fx*dx+fy*dy),C=fx*fx+fy*fy-rr*rr,t=null;if(e.kind==='shape'&&shapeSweepStart(this,e))t=movingShapeHitT(this,e,ax,ay,ex,ey,rr);else if(C<0)t=0;else{var D=B*B-4*A*C;if(D>0){var root=Math.sqrt(D),t0=(-B-root)/(2*A),t1=(-B+root)/(2*A);if(t0>=0&&t0<=1)t=t0;else if(t1>=0&&t1<=1)t=t1;}}if(t!=null&&(!first||t<first.t))first={e:e,t:t};}if(!first)continue;var e=first.e,hitT=first.t===0?0:Math.min(1,first.t+1e-9),hx=ax+(ex-ax)*hitT,hy=ay+(ey-ay)*hitT;b.x=hx;b.y=hy;if(e.kind==='shape'){if(b.shell)this.clusterBurst(b);this.damageShape(e,b.dmg,b.vx,b.vy);}else if(e.kind==='tank'){if(b.shell)this.clusterBurst(b);var ang=Math.atan2(b.vy,b.vx);this.damageTank(e,b.dmg,b.ownerId,Math.cos(ang)*(b.knock||0)*.006,Math.sin(ang)*(b.knock||0)*.006);}else this.damageDrone(e,b.dmg,b.ownerId);if(b.splash&&e.kind!=='drone')this.splashAt(hx,hy,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.hits++;b.pen--;if(b.pen<0)b.dead=true;else (b.__novaDirectVictims||(b.__novaDirectVictims=new Set())).add(e);if(!b.dead){b.x=ex;b.y=ey;}else this.bullets.splice(i,1);}return out;};
 
- var oldUpdateBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var terrain=ensureTerrain(this);for(var i=0;i<this.bullets.length;i++){var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,sweepDt=dt;/* Non-shell shots expire without spawning fragments: terrain after their remaining lifetime is unreachable. Shell expiry needs coupled chronological burst arbitration. */if(!b.shell&&Number.isFinite(b.ttl)){if(b.ttl<=0)continue;sweepDt=Math.min(dt,b.ttl);}var nx=ox+(b.vx||0)*sweepDt,ny=oy+(b.vy||0)*sweepDt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
+
+ /* Conservative physical-first-contact recovery for an expiring ordinary
+  * projectile. The materialized core kills TTL<=0 shots BEFORE body queries.
+  * Only settle an unambiguous earlier body contact: no shell/splash, no
+  * competing projectile corridor, no earlier terrain, no uncertain drone
+  * motion, and no simultaneous bodies. All ambiguous cases remain owned by
+  * the existing engine until the full chronological resolver is ready. */
+ function isolatedTTLBodyContact(g,b,dt){
+  if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||!(b.ttl>0)||
+     !(b.ttl<=dt)||!(dt>0)||!(b.pen>=0)||(b.hits||0)>0||
+     !Number.isFinite(b.x)||!Number.isFinite(b.y)||
+     !Number.isFinite(b.vx)||!Number.isFinite(b.vy))return false;
+  var dx=b.vx*dt,dy=b.vy*dt,limit=b.ttl/dt;
+  if(!Number.isFinite(dx)||!Number.isFinite(dy)||!(dx*dx+dy*dy>1e-12)||
+     Math.abs(b.x)>=MAP_LIMIT-20||Math.abs(b.y)>=MAP_LIMIT-20)return false;
+  /* First resolve the earliest body candidate. A drone can only veto a
+   * contact if it might intercept BEFORE that candidate, not somewhere later
+   * on the projectile's remaining TTL path. */
+  var ax=b.x,ay=b.y;
+  var best=null,bestT=limit,tie=false,uncertain=false,blockedT=Infinity;
+  function consider(e,kind){
+   if(!e)return;
+   /* A hostile drone already intersecting the bullet at the beginning of
+    * this projectile update has a physical zero-time contact. Do not infer
+    * a later crossing from endpoints: drone steering/dashes are multi-stage.
+    * Require a witnessed frame-start overlap as well as current overlap.
+    * Unknown/newborn movement retains the original collision authority. */
+   if(kind==='drone'){
+    if(!(e.hp>0)||e.ownerId===b.ownerId)return;
+    var drR=b.r+e.r+1;
+    if(!(drR>0)||!Number.isFinite(drR)||
+       !Number.isFinite(e.x)||!Number.isFinite(e.y)){uncertain=true;return;}
+    if(!(d2(ax,ay,e.x,e.y)<drR*drR))return;
+    if(!g.__novaShapeSweepActive||
+       e.__novaChronoDroneEpoch!==g.__novaShapeSweepEpoch||
+       !Number.isFinite(e.__novaChronoDronePrevX)||
+       !Number.isFinite(e.__novaChronoDronePrevY)||
+       !(d2(ax,ay,e.__novaChronoDronePrevX,e.__novaChronoDronePrevY)<drR*drR)){
+      uncertain=true;return;
+    }
+    if(best&&bestT<1e-8){tie=true;return;}
+    best={e:e,kind:'drone'};bestT=0;tie=false;return;
+   }
+   var rr=0,sx=e.x,sy=e.y,mx=0,my=0,discontinuousTankMove=false;
+   if(kind==='tank'){
+    if(!e.alive||e.id===b.ownerId)return;
+    var def=CLASSES[e.cls];if(!def){uncertain=true;return;}
+    rr=b.r+def.size+3;
+    if(e.__novaSweepMoveTime===g.time){
+     if(!Number.isFinite(e.__novaSweepPrevX)||!Number.isFinite(e.__novaSweepPrevY)){uncertain=true;return;}
+     sx=e.__novaSweepPrevX;sy=e.__novaSweepPrevY;
+     mx=e.x-sx;my=e.y-sy;
+     /* A large finite jump is not proof of continuous travel through
+      * intervening targets. Match the shape sweep's 96u relocation gate. */
+     discontinuousTankMove=mx*mx+my*my>96*96;
+    }
+   }else{
+    if(!(e.hp>0))return;
+    rr=b.r+e.r;
+    if(shapeWasTeleported(g,e)){
+     /* Unknown jump: even an apparent crossing is not proof of contact. */
+     uncertain=true;return;
+    }
+    var start=shapeSweepStart(g,e);
+    if(start){sx=start.x;sy=start.y;mx=e.x-sx;my=e.y-sy;}
+   }
+   if(!(rr>0)||!Number.isFinite(sx)||!Number.isFinite(sy)||
+      !Number.isFinite(mx)||!Number.isFinite(my)){uncertain=true;return;}
+   /* Reject distant bodies before the more expensive swept-circle roots. */
+   var bx=ax+dx*limit,by=ay+dy*limit,tx1=sx+mx,ty1=sy+my;
+   if(Math.max(ax,bx)<Math.min(sx,tx1)-rr||
+      Math.min(ax,bx)>Math.max(sx,tx1)+rr||
+      Math.max(ay,by)<Math.min(sy,ty1)-rr||
+      Math.min(ay,by)>Math.max(sy,ty1)+rr)return;
+   /* A discontinuous tank corridor could be a teleport. It may matter,
+    * but it cannot authorize a synthetic hit at any intermediate point. */
+   if(discontinuousTankMove){uncertain=true;return;}
+   /* Remote tanks cannot affect this shot's physical first contact, even
+    * when protected or allied. Check defenses only after excluding their
+    * complete observed movement corridor. Nearby cases still defer. */
+   var protectedTank=false;
+   if(kind==='tank'){
+    var owner=g.getTank&&g.getTank(b.ownerId);
+    protectedTank=e.spawnShieldT>0||e.shieldT>0||
+      e.bulwarkT>0||e.tauntT>0||
+      (typeof g.areAllies==='function'&&(!owner||g.areAllies(owner,e)));
+    /* Moving protected bodies have no certified subframe trajectory. Keep
+     * the existing conservative veto even when their endpoints look late. */
+    if(protectedTank&&e.__novaSweepMoveTime===g.time){uncertain=true;return;}
+   }
+   /* A child shape created by an earlier hit during this very frame has no
+    * valid frame-start existence interval. Defer rather than backdate it. */
+   if(kind==='shape'&&e.born===g.time){uncertain=true;return;}
+   var fx=ax-sx,fy=ay-sy,rx=dx-mx,ry=dy-my;
+   var A=rx*rx+ry*ry,B=2*(fx*rx+fy*ry),C=fx*fx+fy*fy-rr*rr;
+   if(!Number.isFinite(A)||!Number.isFinite(B)||!Number.isFinite(C)){uncertain=true;return;}
+   var t=null;
+   if(C<0)t=0;
+   else if(A>1e-12){
+    var D=B*B-4*A*C;
+    /* Ambiguous near-tangencies belong to the exact chronological solver,
+     * not an optimistic early damage path. */
+    if(Math.abs(D)<1e-10*(B*B+4*A*(fx*fx+fy*fy+rr*rr))){uncertain=true;return;}
+    if(D>0){
+     var root=Math.sqrt(D),q=-.5*(B+(B<0?-root:root));
+     if(q){
+      var enter=Math.min(q/A,C/q),leave=Math.max(q/A,C/q);
+      if(leave>0&&enter<1)t=Math.max(0,enter);
+     }
+    }
+   }
+   if(t==null||!(t<limit-1e-10))return;
+   /* A stationary shield/ally can veto only a contact at or before the
+    * first valid hit, not a physically later one. Never damage it here. */
+   if(protectedTank){blockedT=Math.min(blockedT,t);return;}
+   if(best&&Math.abs(t-bestT)<1e-8){tie=true;return;}
+   if(t<bestT){best={e:e,kind:kind};bestT=t;tie=false;}
+  }
+  var tanks=g.tanks||[],shapes=g.shapes||[];
+  for(var ti=0;ti<tanks.length;ti++)consider(tanks[ti],'tank');
+  for(var si=0;si<shapes.length;si++)consider(shapes[si],'shape');
+  var drones=g.drones||[];
+  for(var di=0;di<drones.length;di++)consider(drones[di],'drone');
+  if(!best||tie||uncertain||blockedT<=bestT+1e-8)return false;
+  var hx=ax+dx*bestT,hy=ay+dy*bestT;
+  if(Math.abs(hx)>=MAP_LIMIT-20||Math.abs(hy)>=MAP_LIMIT-20)return false;
+  /* Owned drones are transparent to their own projectiles in the shipping
+   * core. A hostile drone may still intercept earlier: only rule it out if
+   * the witnessed start/end corridor plus a conservative curved-motion pad
+   * is remote from the segment ending at the chosen FIRST body contact. */
+  for(var di=0;di<drones.length;di++){
+   var dr=drones[di];if(!dr||!(dr.hp>0)||dr.ownerId===b.ownerId||
+      (best.kind==='drone'&&dr===best.e))continue;
+   if(!g.__novaShapeSweepActive||
+      dr.__novaChronoDroneEpoch!==g.__novaShapeSweepEpoch)return false;
+   var sx=dr.__novaChronoDronePrevX,sy=dr.__novaChronoDronePrevY;
+   if(!Number.isFinite(sx)||!Number.isFinite(sy)||
+      !Number.isFinite(dr.x)||!Number.isFinite(dr.y))return false;
+   var mx=dr.x-sx,my=dr.y-sy;
+   if(mx*mx+my*my>96*96)return false;
+   if(dr.speed!=null&&!Number.isFinite(dr.speed))return false;
+   var motionBound=Math.max(800,(dr.speed>0?dr.speed*4:800));
+   var pad=Math.max(0,b.r||2)+Math.max(0,dr.r||8)+1+
+     Math.max(30,dt*motionBound);
+   if(Math.max(ax,hx)+pad>=Math.min(sx,dr.x)&&
+      Math.min(ax,hx)-pad<=Math.max(sx,dr.x)&&
+      Math.max(ay,hy)+pad>=Math.min(sy,dr.y)&&
+      Math.min(ay,hy)-pad<=Math.max(sy,dr.y))return false;
+  }
+  /* A cover event at or before the body makes this lane ambiguous, including
+   * destructible-cover penetration and exact-time ties. */
+  if(bestT===0){
+   /* Zero-length circle sweeps have no quadratic root. Check containment
+    * explicitly so a drone cannot be hit from inside a pillar or cover. */
+   var originSolids=terrainCandidates(g,ax,ay,ax,ay,(b.r||2)*.45);
+   for(var solidI=0;solidI<originSolids.length;solidI++)
+    if(pointInsideSolid(originSolids[solidI],ax,ay,(b.r||2)*.45))return false;
+  }
+  if(firstSolidHit(g,ax,ay,hx,hy,(b.r||2)*.45))return false;
+  /* A projectile that could have intercepted before contact also excludes
+   * this bounded shortcut. AABB overlap is deliberately conservative. */
+  var others=g.bullets||[];
+  for(var bi=0;bi<others.length;bi++){
+   var o=others[bi];if(!o||o===b||o.dead)continue;
+   if(!Number.isFinite(o.x)||!Number.isFinite(o.y)||
+      !Number.isFinite(o.vx)||!Number.isFinite(o.vy))return false;
+   var ex=o.x+o.vx*dt*bestT,ey=o.y+o.vy*dt*bestT,pad=(b.r||0)+(o.r||0)+2;
+   if(Math.min(ax,hx)-pad<=Math.max(o.x,ex)&&
+      Math.max(ax,hx)+pad>=Math.min(o.x,ex)&&
+      Math.min(ay,hy)-pad<=Math.max(o.y,ey)&&
+      Math.max(ay,hy)+pad>=Math.min(o.y,ey))return false;
+  }
+  var vx=b.vx,vy=b.vy;
+  b.x=hx;b.y=hy;b.px=hx;b.py=hy;
+  if(best.kind==='tank'){
+   var ang=Math.atan2(vy,vx);
+   g.damageTank(best.e,b.dmg,b.ownerId,Math.cos(ang)*(b.knock||0)*.006,
+     Math.sin(ang)*(b.knock||0)*.006);
+  }else if(best.kind==='shape')g.damageShape(best.e,b.dmg,vx,vy);
+  else g.damageDrone(best.e,b.dmg,b.ownerId);
+  b.hits++;b.pen--;b.dead=true;b.vx=0;b.vy=0;
+  return true;
+ }
+ /* Only skip a LATER terrain impact when a Cannon fuse is provably first.
+  * Uncertain body, drone, projectile, expiry and breach chronology stays on
+  * the original path; this is not a general event resolver. */
+ function fuseDefinitelyBeforeTerrain(g,b,dt,ox,oy,nx,ny,hit){
+  if(!b||!b.__v17Cannon||!(b.__v17FuseDist>0)||!(b.ttl>dt)||
+     !(dt>0)||(b.hits||0)!==0||!(b.pen>=0)||b.pen>=2||
+     b.__novaBreachAtTime===g.time||
+     !Number.isFinite(b.__v17SpawnX)||!Number.isFinite(b.__v17SpawnY)||
+     !Number.isFinite(ox)||!Number.isFinite(oy)||
+     !Number.isFinite(nx)||!Number.isFinite(ny))return false;
+  var dx=nx-ox,dy=ny-oy,A=dx*dx+dy*dy;
+  if(!(A>1e-12))return false;
+  var fx=ox-b.__v17SpawnX,fy=oy-b.__v17SpawnY,R=b.__v17FuseDist;
+  var C=fx*fx+fy*fy-R*R,B=fx*dx+fy*dy;
+  if(!(C<0)||!Number.isFinite(C)||!Number.isFinite(B)||
+     Math.abs(C)<=1e-10*(fx*fx+fy*fy+R*R))return false;
+  var D=B*B-A*C;
+  if(!(D>0)||!Number.isFinite(D))return false;
+  var root=Math.sqrt(D),fuseT=B>=0?-C/(B+root):(-B+root)/A;
+  if(!(fuseT>=0&&fuseT<=1))return false;
+  var wallT=((hit.x-ox)*dx+(hit.y-oy)*dy)/A;
+  if(!(wallT>fuseT+1e-7&&wallT<=1+1e-7))return false;
+  var px=ox+dx*fuseT,py=oy+dy*fuseT;
+  /* The core checks the full-frame endpoint for arena exit before the
+   * post-core fuse handler can fire. Do not skip a wall if that would
+   * turn its existing burst into a silent out-of-bounds deletion. */
+  if(Math.abs(px)>=MAP_LIMIT-20||Math.abs(py)>=MAP_LIMIT-20||
+     Math.abs(nx)>=MAP_LIMIT-20||Math.abs(ny)>=MAP_LIMIT-20)return false;
+  /* Battlefield captures live drone starts at Game.update entry. Unknown
+   * births or discontinuous movement still retain original collision authority. */
+  var drones=g.drones||[];
+  var tanks=g.tanks||[],shapes=g.shapes||[],bullets=g.bullets||[];
+  if(tanks.length+shapes.length+bullets.length>500)return false;
+  var minx=Math.min(ox,nx),maxx=Math.max(ox,nx),
+      miny=Math.min(oy,ny),maxy=Math.max(oy,ny);
+  function near(x0,y0,x1,y1,pad){
+   if(!Number.isFinite(x0)||!Number.isFinite(y0)||
+      !Number.isFinite(x1)||!Number.isFinite(y1)||!Number.isFinite(pad))return true;
+   return Math.max(x0,x1)+pad>=minx&&Math.min(x0,x1)-pad<=maxx&&
+          Math.max(y0,y1)+pad>=miny&&Math.min(y0,y1)-pad<=maxy;
+  }
+  /* Only a witnessed, bounded drone corridor can be ruled out. A drone
+   * near either endpoint, or moving through the projectile AABB, must defer.
+   * The extra movement pad covers non-linear steering inside the frame. */
+  for(var di=0;di<drones.length;di++){
+   var dr=drones[di];if(!dr||!(dr.hp>0)||dr.ownerId===b.ownerId)continue;
+   if(!g.__novaShapeSweepActive||
+      dr.__novaChronoDroneEpoch!==g.__novaShapeSweepEpoch)return false;
+   var dsx=dr.__novaChronoDronePrevX,dsy=dr.__novaChronoDronePrevY;
+   if(!Number.isFinite(dsx)||!Number.isFinite(dsy)||
+      !Number.isFinite(dr.x)||!Number.isFinite(dr.y))return false;
+   var ddx=dr.x-dsx,ddy=dr.y-dsy;
+   if(ddx*ddx+ddy*ddy>96*96)return false;
+   if(dr.speed!=null&&!Number.isFinite(dr.speed))return false;
+   var motionBound=Math.max(800,(dr.speed>0?dr.speed*4:800));
+   if(near(dsx,dsy,dr.x,dr.y,
+      Math.max(0,dr.r||8)+(b.r||2)+1+
+      Math.max(30,dt*motionBound)))return false;
+  }
+  for(var ti=0;ti<tanks.length;ti++){
+   var t=tanks[ti];if(!t||!t.alive||t.id===b.ownerId)continue;
+   var def=CLASSES[t.cls],r=(def&&def.size||30)+(b.r||2)+3;
+   var known=t.__novaSweepMoveTime===g.time;
+   if(near(known?t.__novaSweepPrevX:t.x,known?t.__novaSweepPrevY:t.y,
+           t.x,t.y,r+(known?0:Math.max(30,dt*800))))return false;
+  }
+  for(var si=0;si<shapes.length;si++){
+   var s=shapes[si];if(!s||!(s.hp>0))continue;
+   if(shapeWasTeleported(g,s))return false;
+   var start=shapeSweepStart(g,s),r=(s.r||15)+(b.r||2);
+   if(near(start?start.x:s.x,start?start.y:s.y,s.x,s.y,
+           r+(start?0:Math.max(30,dt*800))))return false;
+  }
+  for(var bi=0;bi<bullets.length;bi++){
+   var o=bullets[bi];if(!o||o===b||o.dead)continue;
+   if(near(o.x,o.y,o.x+(o.vx||0)*dt,o.y+(o.vy||0)*dt,
+           (o.r||2)+(b.r||2)+2))return false;
+  }
+  return true;
+ }
+
+ /* Physical-first TTL slice for an isolated Bomber shell. This does not
+  * arbitrate contested contacts: it commits expiry only when every potentially
+  * earlier wall/body/drone/projectile and newborn-fragment corridor is excluded.
+  * The core otherwise retains authority until the full #147 solver lands. */
+ function isolatedShellExpiry(g,b,dt,terrain){
+  if(!b||b.dead||!b.shell||b.beam||b.__novaClusterBurstConsumed||
+     typeof g.clusterBurst!=='function'||
+     !(dt>0)||!(b.ttl>0&&b.ttl<dt-1e-9)||(b.hits||0)!==0||
+     !(b.pen>=0)||b.pen>=2||b.__novaBreachAtTime===g.time||
+     !Number.isFinite(b.x)||!Number.isFinite(b.y)||
+     !Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
+     !Number.isFinite(b.r)||!Number.isFinite(b.ttl))return null;
+  var x=b.x+b.vx*b.ttl,y=b.y+b.vy*b.ttl;
+  if(!Number.isFinite(x)||!Number.isFinite(y))return null;
+  var remain=dt-b.ttl,childReach=360*remain+2.5;
+  if(Math.abs(b.x)>=MAP_LIMIT-20||Math.abs(b.y)>=MAP_LIMIT-20||
+     Math.abs(x)+childReach>=MAP_LIMIT-20||
+     Math.abs(y)+childReach>=MAP_LIMIT-20)return null;
+  /* A programmed Cannon fuse may have already crossed before TTL. Keep
+   * Three Disciplines authoritative, including its historical 2u tolerance. */
+  if(b.__v17Cannon&&b.__v17FuseDist>0){
+   if(!Number.isFinite(b.__v17SpawnX)||!Number.isFinite(b.__v17SpawnY)||
+      Math.hypot(x-b.__v17SpawnX,y-b.__v17SpawnY)+2>=b.__v17FuseDist)return null;
+  }
+  if(firstSolidHit(g,b.x,b.y,x,y,(b.r||2)*.45))return null;
+  /* Children travel at <=330u/s in the canonical cluster builder; Apex
+   * rotates/clones those children without increasing speed. The 360u/s
+   * clearance also covers their collision padding and numerical margin. */
+  for(var ti=0;ti<terrain.length;ti++){
+   var wall=terrain[ti];if(!solidAlive(wall))continue;
+   var distance=wall.shape==='circle'
+     ?Math.max(0,Math.hypot(x-wall.x,y-wall.y)-(wall.r||0))
+     :Math.hypot(Math.max(0,Math.abs(x-wall.x)-(wall.w||0)*.5),
+                 Math.max(0,Math.abs(y-wall.y)-(wall.h||0)*.5));
+   if(!(distance>childReach))return null;
+  }
+  var sx=Math.min(b.x,x),ex=Math.max(b.x,x),
+      sy=Math.min(b.y,y),ey=Math.max(b.y,y);
+  function near(x0,y0,x1,y1,pad){
+   if(!Number.isFinite(x0)||!Number.isFinite(y0)||
+      !Number.isFinite(x1)||!Number.isFinite(y1)||
+      !Number.isFinite(pad))return true;
+   return Math.max(x0,x1)+pad>=sx&&Math.min(x0,x1)-pad<=ex&&
+          Math.max(y0,y1)+pad>=sy&&Math.min(y0,y1)-pad<=ey;
+  }
+  var tanks=g.tanks||[],shapes=g.shapes||[],drones=g.drones||[],
+      bullets=g.bullets||[];
+  if(tanks.length+shapes.length+drones.length+bullets.length>600)return null;
+  for(var i=0;i<tanks.length;i++){
+   var t=tanks[i];if(!t||!t.alive)continue;
+   var known=t.__novaSweepMoveTime===g.time;
+   var tx=known?t.__novaSweepPrevX:t.x,ty=known?t.__novaSweepPrevY:t.y;
+   if(near(tx,ty,t.x,t.y,childReach+85+(known?0:dt*2000)))return null;
+  }
+  for(var j=0;j<shapes.length;j++){
+   var shape=shapes[j];if(!shape||!(shape.hp>0))continue;
+   if(shapeWasTeleported(g,shape))return null;
+   var start=shapeSweepStart(g,shape);
+   if(near(start?start.x:shape.x,start?start.y:shape.y,shape.x,shape.y,
+      childReach+(shape.r||15)+35+(start?0:dt*2000)))return null;
+  }
+  for(var k=0;k<drones.length;k++){
+   var d=drones[k];if(!d||!(d.hp>0)||d.ownerId===b.ownerId)continue;
+   if(!g.__novaShapeSweepActive||
+      d.__novaChronoDroneEpoch!==g.__novaShapeSweepEpoch)return null;
+   var dx=d.__novaChronoDronePrevX,dy=d.__novaChronoDronePrevY;
+   if(!Number.isFinite(dx)||!Number.isFinite(dy)||
+      !Number.isFinite(d.x)||!Number.isFinite(d.y)||
+      Math.hypot(d.x-dx,d.y-dy)>96)return null;
+   if(near(dx,dy,d.x,d.y,childReach+(d.r||8)+30+dt*1600))return null;
+  }
+  for(var q=0;q<bullets.length;q++){
+   var other=bullets[q];if(!other||other===b||other.dead)continue;
+   if(near(other.x,other.y,other.x+(other.vx||0)*dt,
+           other.y+(other.vy||0)*dt,childReach+(other.r||2)+16))return null;
+  }
+  return {x:x,y:y,ttl:b.ttl,remain:remain};
+ }
+ var oldUpdateBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var terrain=ensureTerrain(this);
+ /* Bound pairwise geometry per frame, not total bullets: one expiring shot
+  * remains eligible in a crowded but spatially separated firefight. When
+  * projected work is too high, defer ALL shots to the existing path rather
+  * than introducing arbitrary array-order fairness. */
+
+ /* Commit only isolated first-event expirations. Scale newborn fragment
+  * motion for this one frame, then restore full velocity; their TTL receives
+  * the same birth-time adjustment. The core still owns ordinary collisions. */
+ var ttlChildren=[];
+ var shellWork=0;
+ if(dt>0&&this.bullets&&this.bullets.length){
+  for(var countS=0;countS<this.bullets.length;countS++){
+   var shellS=this.bullets[countS];
+   if(shellS&&shellS.shell&&shellS.ttl>0&&shellS.ttl<dt)shellWork++;
+  }
+  var work=shellWork*(this.bullets.length+(this.tanks||[]).length+
+      (this.shapes||[]).length+(this.drones||[]).length+(terrain||[]).length);
+  if(work>0&&work<=2500)for(var si=this.bullets.length-1;si>=0;si--){
+   var shell=this.bullets[si],expiry=isolatedShellExpiry(this,shell,dt,terrain);
+   if(!expiry)continue;
+   var childStart=this.bullets.length;
+   shell.x=expiry.x;shell.y=expiry.y;shell.px=expiry.x;shell.py=expiry.y;
+   this.clusterBurst(shell);
+   for(var ci=childStart;ci<this.bullets.length;ci++){
+    var child=this.bullets[ci];if(!child||child.dead)continue;
+    ttlChildren.push({child:child,vx:child.vx,vy:child.vy});
+    child.vx*=expiry.remain/dt;child.vy*=expiry.remain/dt;
+    if(Number.isFinite(child.ttl))child.ttl+=expiry.ttl;
+   }
+   shell.dead=true;shell.shell=false;shell.vx=0;shell.vy=0;
+  }
+ }
+ var expiring=0;
+ if(dt>0)for(var countI=0;countI<this.bullets.length;countI++){
+  var eb=this.bullets[countI];
+  if(eb&&!eb.dead&&!eb.shell&&!eb.beam&&!eb.splash&&!eb.__v17Cannon&&eb.ttl>0&&eb.ttl<=dt)expiring++;
+ }
+ var projected=expiring*(this.bullets.length+(this.tanks||[]).length+
+   (this.shapes||[]).length+(this.drones||[]).length);
+ if(projected>0&&projected<=900)
+  for(var pre=this.bullets.length-1;pre>=0;pre--)
+   isolatedTTLBodyContact(this,this.bullets[pre],dt);for(var i=0;i<this.bullets.length;i++){var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,sweepDt=dt;/* Terrain beyond physical projectile lifetime is unreachable, including shells. */if(Number.isFinite(b.ttl)){if(b.ttl<=0)continue;sweepDt=Math.min(dt,b.ttl);}var nx=ox+(b.vx||0)*sweepDt,ny=oy+(b.vy||0)*sweepDt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;if(fuseDefinitelyBeforeTerrain(this,b,dt,ox,oy,nx,ny,fh.hit))continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){b.__novaBreachAtTime=this.time;b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
    /* The core still advances a dead bullet before removing it; a shell may
      * expire or leave the arena in that pass. Consume its one-time burst now. */
     if(b.shell&&this.clusterBurst){var childStart=this.bullets.length;this.clusterBurst(b);clearTerrainBurstChildren(this,s,h,childStart);b.shell=false;}if(b.splash&&this.splashAt)this.splashAt(h.x,h.y,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.dead=true;if(this.addFlash)this.addFlash(h.x,h.y,s.destructible?'#8fd4ff':'#b9c7e7',Math.min(46,14+(b.dmg||0)*.24));if(this.cam&&b.dmg>42)this.cam.shake=Math.max(this.cam.shake,.08);/* The materialized core still advances dead bullets before removing them. Freeze a terrain-killed projectile at its impact so its final trail cannot leak through cover. Breaching live shots keep their velocity above. */b.vx=0;b.vy=0;
  }
- var out=oldUpdateBullets.call(this,dt);for(var j=0;j<terrain.length;j++){var q=terrain[j];if(q.flash>0)q.flash=Math.max(0,q.flash-dt);}return out;};
+ var out;try{out=oldUpdateBullets.call(this,dt);}finally{for(var ci=0;ci<ttlChildren.length;ci++){var saved=ttlChildren[ci];saved.child.vx=saved.vx;saved.child.vy=saved.vy;}}for(var j=0;j<terrain.length;j++){var q=terrain[j];if(q.flash>0)q.flash=Math.max(0,q.flash-dt);}return out;};
 
  var splashBullet={shell:true,beam:false,vx:0,vy:0};
  var oldSplash=Game.prototype.splashAt;Game.prototype.splashAt=function(x,y,radius,frac,ownerId,knock,color,dmg){var out=oldSplash.apply(this,arguments),a=terrainCandidates(this,x,y,x,y,radius);for(var i=0;i<a.length;i++){var s=a[i];if(!s.destructible||s.hp<=0)continue;var dx=Math.max(Math.abs(x-s.x)-(s.shape==='rect'?s.w*.5:s.r),0),dy=Math.max(Math.abs(y-s.y)-(s.shape==='rect'?s.h*.5:s.r),0),dist=Math.hypot(dx,dy);if(dist>radius)continue;var fall=1-clamp(dist/Math.max(1,radius),0,1)*.55;damageCover(this,s,(dmg||0)*(frac||.4)*fall,ownerId,x,y,splashBullet);}return out;};
 
- var oldUpdateDrones=Game.prototype.updateDrones;Game.prototype.updateDrones=function(dt){ensureTerrain(this);var out=oldUpdateDrones.call(this,dt);for(var j=0;j<this.drones.length;j++){var d=this.drones[j],hit=circleResolve(this,d,(d.r||8)+1);if(hit){if(d.__novaPhase==='dash'){d.__novaPhase='recover';d.__novaPhaseT=Math.max(.28,d.__novaPhaseT||0);d.__novaCommitted=false;d.__novaTarget=null;if(this.addParticles)this.addParticles(d.x,d.y,d.color,4,65,'spark');}var n=d.__novaTerrainBump,side=d.__novaTerrainBias||(((d.id||0)&1)?1:-1);d.__novaTerrainBias=side;if(n){d.x+=-n.y*side*28*dt;d.y+=n.x*side*28*dt;}circleResolve(this,d,(d.r||8)+1);}}
+ var oldUpdateDrones=Game.prototype.updateDrones;Game.prototype.updateDrones=function(dt){ensureTerrain(this);
+ /* Optional observation only: base drone motion and terrain correction are
+  * separate stages. These checkpoints are NOT time-stamped collision paths. */
+ var traceOn=this.__novaDroneChronoTraceEnabled===true&&this.__novaShapeSweepActive===true;
+ var out=oldUpdateDrones.call(this,dt);for(var j=0;j<this.drones.length;j++){
+ var d=this.drones[j];
+ var traced=traceOn&&d&&d.__novaChronoDroneEpoch===this.__novaShapeSweepEpoch;
+ if(traced){d.__novaChronoDroneBaseX=d.x;d.__novaChronoDroneBaseY=d.y;}
+ var hit=circleResolve(this,d,(d.r||8)+1);if(hit){if(d.__novaPhase==='dash'){d.__novaPhase='recover';d.__novaPhaseT=Math.max(.28,d.__novaPhaseT||0);d.__novaCommitted=false;d.__novaTarget=null;if(this.addParticles)this.addParticles(d.x,d.y,d.color,4,65,'spark');}var n=d.__novaTerrainBump,side=d.__novaTerrainBias||(((d.id||0)&1)?1:-1);d.__novaTerrainBias=side;if(n){d.x+=-n.y*side*28*dt;d.y+=n.x*side*28*dt;}circleResolve(this,d,(d.r||8)+1);
+  /* Rectangle/circle contact is inclusive in isTerrainSafe. The legacy
+   * resolver lands exactly on the padded face, which the later Live Vector
+   * repair/peel sweep interprets as embedded and can freeze there. Release
+   * only a confirmed terrain-contact drone by a tiny outward clearance,
+   * and only when the candidate point is actually terrain-safe. */
+  var pad=(d.r||8)+1,normal=d.__novaTerrainBump;
+  if(!safePoint(this,d.x,d.y,pad)&&normal&&
+     Number.isFinite(normal.x)&&Number.isFinite(normal.y)){
+    var nx=d.x+normal.x*.001,ny=d.y+normal.y*.001;
+    if(safePoint(this,nx,ny,pad)){d.x=nx;d.y=ny;}
+  }
+ }
+ if(traced){d.__novaChronoDroneTerrainX=d.x;d.__novaChronoDroneTerrainY=d.y;
+  d.__novaChronoDroneTraceEpoch=this.__novaShapeSweepEpoch;}}
    var spotMap=this.__novaSpotterByOwner||(this.__novaSpotterByOwner=new Map());spotMap.clear();for(var di=0;di<this.drones.length;di++){var sd=this.drones[di];if(sd&&sd.__novaSpotter&&!spotMap.has(sd.ownerId))spotMap.set(sd.ownerId,sd);}
    for(var ti=0;ti<this.tanks.length;ti++){var o=this.tanks[ti];if(!o||!o.alive||o.__novaSpotterContactId==null||o.__novaSpotterContactId<0)continue;var target=this.getTank(o.__novaSpotterContactId),spot=spotMap.get(o.id)||null;if(target&&spot&&!lineOfSight(this,spot.x,spot.y,target.x,target.y,2)){o.__novaSpotterContactId=-1;o.__novaSpotterContactUntil=0;o.__novaSpotterDroneId=-1;}}
  return out;};
 
- var oldUpdate=Game.prototype.update;Game.prototype.update=function(dt){ensureTerrain(this);if(this.__novaBattlefield&&!this.__novaBattlefield.announced&&this.status==='playing'&&this.time>.1){this.__novaBattlefield.announced=true;if(this.toast)this.toast('¦ BATTLEFIELD · '+this.__novaBattlefield.name+'  COVER CHANGES THE FIGHT','info');}
-   var out=oldUpdate.call(this,dt);for(var i=0;i<this.shapes.length;i++){var s=this.shapes[i];if(!s||s.hp<=0)continue;circleResolve(this,s,(s.r||10)*.86);}return out;};
+ var oldUpdate=Game.prototype.update;Game.prototype.update=function(dt){ensureTerrain(this);var epoch=(this.__novaShapeSweepEpoch||0)+1;this.__novaShapeSweepEpoch=epoch;
+ /* Capture drones before AI/drone movement; the later projectile pre-pass
+  * may only exclude drones whose complete observed corridor is remote. */
+ var chronoDrones=this.drones||[];for(var di=0;di<chronoDrones.length;di++){
+  var cd=chronoDrones[di];if(!cd||!(cd.hp>0))continue;
+  cd.__novaChronoDroneEpoch=epoch;
+  cd.__novaChronoDronePrevX=cd.x;cd.__novaChronoDronePrevY=cd.y;
+  /* Start is recorded even without diagnostics for the existing conservative
+   * collision gate; optional stages are kept separate from this authority. */
+  if(this.__novaDroneChronoTraceEnabled===true){
+   cd.__novaChronoDroneTraceEpoch=-1;cd.__novaChronoDroneRouteEpoch=-1;cd.__novaChronoDroneLiveEpoch=-1;
+  }
+ }
+ var shapes=this.shapes||[];for(var si=0;si<shapes.length;si++){var sh=shapes[si];if(!sh)continue;sh.__novaShapeSweepEpoch=epoch;sh.__novaShapeSweepPrevX=sh.x;sh.__novaShapeSweepPrevY=sh.y;}this.__novaShapeSweepActive=true;if(this.__novaBattlefield&&!this.__novaBattlefield.announced&&this.status==='playing'&&this.time>.1){this.__novaBattlefield.announced=true;if(this.toast)this.toast('¦ BATTLEFIELD · '+this.__novaBattlefield.name+'  COVER CHANGES THE FIGHT','info');}
+   var out;try{out=oldUpdate.call(this,dt);}finally{this.__novaShapeSweepActive=false;}for(var i=0;i<this.shapes.length;i++){var s=this.shapes[i];if(!s||s.hp<=0)continue;circleResolve(this,s,(s.r||10)*.86);}return out;};
 });
 
 wrap('game/ai',function(ai){var old=ai.updateAI;if(!old||old.__novaBattlefieldAI)return;function patched(t,g,dt){if(t&&t.ai&&t.ai.targetId>=0){var tar=g.getTank&&g.getTank(t.ai.targetId);if(tar&&tar.alive&&g.hasLineOfSight&&!g.hasLineOfSight(t.x,t.y,tar.x,tar.y,3)){t.ai.__novaOccluded=(t.ai.__novaOccluded||0)+dt;if(t.ai.__novaOccluded>.28){t.ai.targetId=-1;t.ai.state='wander';t.ai.thinkT=0;t.ai.fireHold=Math.max(t.ai.fireHold||0,.18);}}else t.ai.__novaOccluded=Math.max(0,(t.ai.__novaOccluded||0)-dt*2);}var out=old(t,g,dt);if(t&&t.__novaTerrainBumpT>0){t.__novaTerrainBumpT-=dt;if(t.ai&&t.__novaTerrainBumpT>0&&Math.random()<dt*4){t.ai.strafe=(t.ai.strafe||1)*-1;t.ai.thinkT=0;}}return out;}patched.__novaBattlefieldAI=true;ai.updateAI=patched;});

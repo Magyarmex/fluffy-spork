@@ -120,6 +120,7 @@
             if (method === 'pd' && input.mouseActive) {
               input.mouseActive = false;
               input.firing = false;
+              input.__novaPrimaryPressCaptured = false;
             }
           } else if (event && event.pointerType === 'mouse' && input.touchSeen &&
                      input.stickId.move === -1 && input.stickId.aim === -1 &&
@@ -127,7 +128,34 @@
                       inputClockMs() - input.__novaLastTouchMs >= 900)) {
             input.touchSeen = false;
           }
-          return original.call(input, event);
+          var wasFiring = input.firing;
+          var result = original.call(input, event);
+          if (event && event.pointerType === 'mouse' && !input.touchSeen) {
+            /* Pointer Events fire pointerdown only for the first held button
+             * and pointerup only after the last is released. The core's
+             * any-button toggle therefore fires on right-click and drops
+             * primary fire on unrelated releases. Track the left button,
+             * without letting a drag begun outside the canvas start firing. */
+            if (method === 'pd') {
+              var primary = event.button == null ? true : event.button === 0;
+              if (primary && (event.buttons == null || !!(event.buttons & 1)))
+                input.__novaPrimaryPressCaptured = true;
+            }
+            if (method === 'pu' &&
+                (event.type === 'pointercancel' || event.button == null || event.button === 0))
+              input.__novaPrimaryPressCaptured = false;
+            if (method === 'pm' && typeof event.buttons === 'number' &&
+                !(event.buttons & 1))
+              input.__novaPrimaryPressCaptured = false;
+            if (method === 'pu' && typeof event.buttons === 'number' &&
+                !(event.buttons & 1))
+              input.__novaPrimaryPressCaptured = false;
+            if (method === 'pd' || method === 'pu' ||
+                (method === 'pm' && typeof event.buttons === 'number'))
+              input.firing = !!input.__novaPrimaryPressCaptured;
+            else if (method === 'pm') input.firing = wasFiring;
+          }
+          return result;
         };
       });
     }
@@ -161,6 +189,24 @@
       }
       this.__novaCoreBlurListeners = legacyBlur;
       var self = this;
+      this.__novaPrimaryPressCaptured = false;
+      /* Native mouse events report individual button transitions even when
+       * Pointer Events suppress additional pointerdown/up during a chord. */
+      this.__novaPrimaryMouseDown = function (event) {
+        if (!event || event.button !== 0 || self.touchSeen) return;
+        self.__novaPrimaryPressCaptured = true;
+        self.mouseActive = true;
+        if (Number.isFinite(event.clientX)) self.mouseX = event.clientX;
+        if (Number.isFinite(event.clientY)) self.mouseY = event.clientY;
+        self.firing = true;
+      };
+      this.__novaPrimaryMouseUp = function (event) {
+        if (!event || event.button !== 0) return;
+        self.__novaPrimaryPressCaptured = false;
+        if (!self.touchSeen) self.firing = false;
+      };
+      canvas.addEventListener('mousedown', this.__novaPrimaryMouseDown);
+      window.addEventListener('mouseup', this.__novaPrimaryMouseUp);
       function reset() {
         var held = self.move.active || self.aim.active ||
           self.stickId.move !== -1 || self.stickId.aim !== -1;
@@ -169,6 +215,7 @@
         self.move.dx = self.move.dy = self.aim.dx = self.aim.dy = 0;
         self.keyboard.up = self.keyboard.down = self.keyboard.left = self.keyboard.right = false;
         self.firing = false; self.mouseActive = false; self.abilityQueued = false;
+        self.__novaPrimaryPressCaptured = false;
         // The Performance/Zero Churn layer wraps emit and caches UI activity.
         if (held) { self.emit('move'); self.emit('aim'); }
       }
@@ -178,6 +225,12 @@
       document.addEventListener('visibilitychange', this.__novaVisibilityReset);
     };
     if (typeof oldDetach === 'function') Input.prototype.detach = function () {
+      if (this.__novaPrimaryMouseDown && this.canvas)
+        this.canvas.removeEventListener('mousedown', this.__novaPrimaryMouseDown);
+      if (this.__novaPrimaryMouseUp)
+        window.removeEventListener('mouseup', this.__novaPrimaryMouseUp);
+      this.__novaPrimaryMouseDown = this.__novaPrimaryMouseUp = null;
+      this.__novaPrimaryPressCaptured = false;
       if (this.__novaBlurReset) window.removeEventListener('blur', this.__novaBlurReset);
       if (this.__novaVisibilityReset) document.removeEventListener('visibilitychange', this.__novaVisibilityReset);
       this.__novaBlurReset = this.__novaVisibilityReset = null;
@@ -356,6 +409,57 @@
     if (!Game || Game.prototype.__novaSecondBody) return;
     Game.prototype.__novaSecondBody = true;
     Game.prototype.__novaControllerHeldDeadzoneSafe = true;
+    /* The shared materialized mouse fallback uses atan2(cursor - hull).
+     * At exact hull center atan2(0,0) invents an eastward bearing for EVERY
+     * class. Live Vector also holds Controller command depth at center, so
+     * keeping the actual cannon bearing is important for command parity.
+     * Only intercept the first (player) aim interpolation
+     * of an actual mouse-fallback frame; AI and touch/keyboard aim stay native.
+     * No per-frame closures or changes to mouse ownership/fire state. */
+    if (typeof Game.prototype.update === 'function' &&
+        typeof Game.prototype.lerpAngle === 'function') {
+      var baseUpdate = Game.prototype.update, baseLerpAngle = Game.prototype.lerpAngle;
+      Game.prototype.lerpAngle = function (a, b, t) {
+        if (this.__novaMouseCenterAimPending) {
+          this.__novaMouseCenterAimPending = false;
+          var input = this.input, pl = this.player, cam = this.cam;
+          if (pl && input && cam && this.canvas &&
+              typeof this.canvas.getBoundingClientRect === 'function' &&
+              Number.isFinite(a)) {
+            /* The rendered camera eases toward the resize target zoom.
+             * Mouse bearing must follow the zoom the player actually sees. */
+            var z = Number(cam.zoom);
+            if (!(z > 0)) z = Number(this.zoom);
+            if (z > 0 && Number.isFinite(z)) {
+              var rect = this.canvas.getBoundingClientRect();
+              var wx = cam.x + (input.mouseX - rect.left - this.w * .5) / z;
+              var wy = cam.y + (input.mouseY - rect.top - this.h * .5) / z;
+              var dx = wx - pl.x, dy = wy - pl.y;
+              if (Number.isFinite(dx) && Number.isFinite(dy)) {
+                if (dx * dx + dy * dy <= 4) return a;
+                return baseLerpAngle.call(this, a, Math.atan2(dy, dx), t);
+              }
+            }
+          }
+        }
+        return baseLerpAngle.call(this, a, b, t);
+      };
+      Game.prototype.update = function (dt) {
+        var input = this.input, key = input && input.keyboard, pl = this.player;
+        this.__novaMouseCenterAimPending = !!(
+          this.status === 'playing' && pl && pl.alive &&
+          input && input.mouseActive &&
+          !(input.aim && input.aim.active) &&
+          /* Zero Churn makes the mouse authoritative even while moving with
+           * WASD/left stick. Only the older core needs movement-aim fallback. */
+          (input.__novaZeroChurn ||
+           (!(input.move && input.move.active) &&
+            !(key && (key.up || key.down || key.left || key.right)))) &&
+          Number.isFinite(input.mouseX) && Number.isFinite(input.mouseY));
+        try { return baseUpdate.apply(this, arguments); }
+        finally { this.__novaMouseCenterAimPending = false; }
+      };
+    }
 
     var classMod = require('./classes');
     var CLASSES = classMod.CLASSES;
@@ -459,8 +563,10 @@
         }
       } else if (input && input.mouseActive && input.firing) {
         var rect = g.canvas.getBoundingClientRect();
-        var wx = g.cam.x + (input.mouseX - rect.left - g.w * 0.5) / (g.zoom || 1);
-        var wy = g.cam.y + (input.mouseY - rect.top - g.h * 0.5) / (g.zoom || 1);
+        var z = Number(g.cam && g.cam.zoom);
+        if (!(z > 0)) z = Number(g.zoom) || 1;
+        var wx = g.cam.x + (input.mouseX - rect.left - g.w * 0.5) / z;
+        var wy = g.cam.y + (input.mouseY - rect.top - g.h * 0.5) / z;
         var mdx = wx - owner.x, mdy = wy - owner.y, md = Math.hypot(mdx, mdy);
         if (md > 5) {
           active = true;
@@ -624,7 +730,7 @@
 
     function formationPoint(g, owner, d, squad, target, state, profile) {
       var n = Math.max(1, squad.length), idx = Math.max(0, squad.indexOf(d));
-      var dir = state.angle || owner.angle || 0, ux = Math.cos(dir), uy = Math.sin(dir), px = -uy, py = ux;
+      var dir = Number.isFinite(state.angle) ? state.angle : (Number.isFinite(owner.angle) ? owner.angle : 0), ux = Math.cos(dir), uy = Math.sin(dir), px = -uy, py = ux;
       var cx = state.nodeX, cy = state.nodeY, mid = (n - 1) * 0.5;
       var slot = idx - mid;
       if (profile.formation === 'wall') {
@@ -1082,10 +1188,19 @@
         var dx = followX - d.x, dy = followY - d.y, dd = Math.hypot(dx, dy) || 1;
         // Actual contact distance is separate from remembered pursuit position.
         // Otherwise a drone could damage an unseen enemy at a stale location.
+        var sp = d.speed * (swarming ? 1.45 : 1);
+        // Respect the existing 12-unit arrival band even when a fast/swarmed
+        // hunter would cross its target or a legitimately last-seen position
+        // in a single frame. Reach and impact still use the resulting position.
+        if (dd > 12) {
+          var travel = Math.min(dd - 12, Math.max(0, sp * dt));
+          d.x += dx / dd * travel; d.y += dy / dd * travel;
+        }
+        // The attack and LOS checks run after movement. Use the same physical
+        // position for reach and impact direction, including stale-sighting
+        // pursuit of enemy drones between bounded visibility samples.
         var hitDx = target.x - d.x, hitDy = target.y - d.y;
         var hitDist = Math.hypot(hitDx, hitDy) || 1;
-        var sp = d.speed * (swarming ? 1.45 : 1);
-        if (dd > 12) { d.x += dx / dd * sp * dt; d.y += dy / dd * sp * dt; }
         if (d.attackCd <= 0 && target.hp > 0) {
           var tr = target.kind === 'shape' ? target.r : target.kind === 'drone' ? target.r + 2 : ((CLASSES[target.cls] && CLASSES[target.cls].size) || 15) + 4;
           if (hitDist < tr + d.r + 5 && contactClear(g, d, target)) {

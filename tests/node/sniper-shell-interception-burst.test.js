@@ -356,3 +356,37 @@ for (const full of [false, true]) {
     assert.deepEqual(g.bursts, []);
   });
 }
+
+
+/* A near-tangent physical interception can pass the shipping closest-approach
+ * collision predicate while the naive quadratic's discriminant rounds below
+ * zero. The shell must burst at the actual first contact, never at its frame
+ * endpoint. These are deterministic, real materialized-core/overlay fixtures. */
+for (const full of [false, true]) {
+  for (const fps of [30, 60, 120, 240]) {
+    for (const reverse of [false, true]) {
+      test((full ? 'full overlays' : 'Sniper/Battlefield') +
+        ': grazing shell first-contact origin at ' + fps + 'Hz, order ' +
+        (reverse ? 'reversed' : 'normal'), () => {
+        const g = boot(full);
+        const startX = -41.03035987611268;
+        const startY = -102.08760540501297;
+        const travelX = 35.76770663652846;
+        const travelY = 110.16572940105719;
+        const shell = bullet(71, 1, startX, travelX * fps, 1, true);
+        shell.y = startY; shell.vy = travelY * fps;
+        const blocker = bullet(72, 2, 0, 0, 3);
+        g.bullets = reverse ? [blocker, shell] : [shell, blocker];
+        g.updateBullets(1 / fps);
+        assert.deepEqual(g.bursts, [71],
+          'closest-approach predicate confirms this grazing interception');
+        assert.equal(g.burstOrigins.length, 1);
+        const origin = g.burstOrigins[0];
+        assert.ok(Math.abs(origin.x - (-7.133443380488899)) < .02,
+          'physical grazing origin X, not shell endpoint: ' + origin.x);
+        assert.ok(Math.abs(origin.y - 2.3160279655822222) < .02,
+          'physical grazing origin Y, not shell endpoint: ' + origin.y);
+      });
+    }
+  }
+}

@@ -58,7 +58,7 @@ function tempestBand(h){return clamp(1-Math.abs(h-.56)/.36,0,1);}
 function needleGate(h,s){return clamp(1-Math.abs(h-.56)/.105,0,1)*clamp((s-.70)/.25,0,1);}
 function flakDiscipline(h,s){return clamp(1-Math.abs(h-.43)/.34,0,1)*clamp((s-.58)/.34,0,1);}
 function clusterWidth(depth){return 1.92-clamp(depth||0,0,1)*.88;}
-function isApex(id){return id==='tempest'||id==='needlestorm'||id==='breachlord'||id==='flakmaster'||id==='clusterking'||id==='siegebomber'||id==='annihilator'||id==='quakecannon'||id==='bastion'||id==='aegis'||id==='meteor'||id==='ravager';}
+function isApex(id){return id==='tempest'||id==='needlestorm'||id==='breachlord'||id==='flakmaster'||id==='clusterking'||id==='siegebomber'||id==='annihilator'||id==='quake'||id==='bastion'||id==='aegis'||id==='meteor'||id==='ravager';}
 
 wrap('game/classes',function(c){
   var C=c.CLASSES||{},text={
@@ -69,7 +69,7 @@ wrap('game/classes',function(c){
     clusterking:'Sector programmer. Fuse depth controls both where the cluster opens and how wide its child-bomb fan spreads.',
     siegebomber:'True siege artillery. Deliberate shell placement applies exceptional structural pressure to Battlefield cover.',
     annihilator:'Maximum commitment cannon. Deep programmed shots gain blast authority at the cost of an even larger reload opening.',
-    quakecannon:'Displacement artillery. Deep fuse programs trade time and prediction for stronger lane-clearing shock.',
+    quake:'Displacement artillery. Deep fuse programs trade time and prediction for stronger lane-clearing shock.',
     bastion:'Anchor bunker. Nearly stop, face the lane and become brutally efficient from the front; movement and flanks break the posture.',
     aegis:'Mobile counter-guard. Perfect timing converts defense into a short repositioning window.',
     meteor:'Peak-commitment rammer. Straight lines build terrifying impact quickly; steering throws that force away.',
@@ -139,7 +139,7 @@ wrap('game/engine',function(engine,require){
         for(i=before;i<this.bullets.length;i++){b=this.bullets[i];if(!b||b.ownerId!==t.id)continue;b.dmg*=1+.10*commit;if(b.splash)b.splash*=1+.13*commit;if(b.knock)b.knock*=1+.12*commit;b.__v171Committed=commit;}
         t.fireCd*=1+.22*commit;t.__v171CommitUntil=this.time+.18+.18*commit;
       }
-    }else if(t.cls==='quakecannon'){
+    }else if(t.cls==='quake'){
       var qd=clamp(t.__v17FuseDepth||0,0,1);t.__v171ApexMeter=qd;
       for(i=before;i<this.bullets.length;i++){b=this.bullets[i];if(!b||b.ownerId!==t.id)continue;if(b.knock)b.knock*=1+.62*qd;if(b.splash)b.splash*=1+.10*qd;b.__v171QuakeDepth=qd;}
     }
@@ -202,9 +202,25 @@ wrap('game/engine',function(engine,require){
     if(this.bullets&&this.firstTerrainHit){
       for(var i=0;i<this.bullets.length;i++){
         var b=this.bullets[i];if(!b||b.dead||!(b.__novaStructureMult>1))continue;
-        var nx=b.x+(b.vx||0)*dt,ny=b.y+(b.vy||0)*dt;
+        var reach=Number.isFinite(b.ttl)?Math.min(dt,b.ttl):dt;if(!(reach>0))continue;var nx=b.x+(b.vx||0)*reach,ny=b.y+(b.vy||0)*reach;
         var hit=this.firstTerrainHit(b.x,b.y,nx,ny,(b.r||2)*.45);
         if(!hit||!hit.solid||!hit.solid.destructible||hit.solid.hp<=1)continue;
+        /* This is a DIRECT cover-hit bonus, not fuse splash. The Battlefield
+         * chronological guard can let a programmed Cannon fuse detonate before
+         * a later wall; never pre-damage that unreachable wall here. Restrict
+         * to the same bounded, unspent Cannon slice and leave uncertain
+         * near-threshold / penetrating histories on their existing path. */
+        if(b.__v17Cannon&&b.__v17FuseDist>0&&b.ttl>dt&&
+           (b.hits||0)===0&&b.pen>=0&&b.pen<2&&
+           b.__novaBreachAtTime!==this.time&&hit.hit&&
+           Number.isFinite(b.__v17SpawnX)&&Number.isFinite(b.__v17SpawnY)&&
+           Number.isFinite(b.x)&&Number.isFinite(b.y)&&
+           Number.isFinite(hit.hit.x)&&Number.isFinite(hit.hit.y)){
+          var fuse=b.__v17FuseDist,
+              from=Math.hypot(b.x-b.__v17SpawnX,b.y-b.__v17SpawnY),
+              contact=Math.hypot(hit.hit.x-b.__v17SpawnX,hit.hit.y-b.__v17SpawnY);
+          if(from+2<fuse&&contact>fuse+1e-7)continue;
+        }
         if(b.__v171PrimedCover===hit.solid.id)continue;
         b.__v171PrimedCover=hit.solid.id;
         var shellMult=b.shell?1.35:1;

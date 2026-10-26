@@ -289,7 +289,66 @@ wrap('game/engine',function(engine,require){
     d.x=nx;d.y=ny;d.__novaVX=d.__lvVX;d.__novaVY=d.__lvVY;
     if(Math.abs(d.__lvVX)+Math.abs(d.__lvVY)>3)d.angle=Math.atan2(d.__lvVY,d.__lvVX);
   }
-  function repairDrone(g,d,owner,state,dt){
+  /* Controller repair is faster than generic Field Service, not a combat heal.
+   * Only legitimately sensed hostile tanks close to the damaged drone interrupt
+   * service. Cache owner-visible candidates once per squad update; each drone
+   * still checks its own distance and unobstructed line of sight. */
+  function hostileTankNearRepair(g,owner,d,radius,cache){
+    var candidates=cache&&cache.candidates;
+    if(!candidates){
+      candidates=[];var ts=g.tanks||[],fair=window.__NOVA_FAIR_ENGAGEMENT__;
+      var ownerBound=(radius+145)*(radius+145);
+      for(var i=0;i<ts.length;i++){
+        var t=ts[i];
+        if(!t||t.id===owner.id||t.alive===false||(t.hp!=null&&t.hp<=0)||
+           t.spawnShieldT>0||!(dist2(owner.x,owner.y,t.x,t.y)<=ownerBound)||
+           !hostileOwners(g,owner,t))continue;
+        if(!owner.isPlayer&&owner.ai&&fair&&typeof fair.inGameplayViewport==='function'&&
+           !fair.inGameplayViewport(g,owner,t))continue;
+        candidates.push(t);
+      }
+      if(cache)cache.candidates=candidates;
+    }
+    var r2=radius*radius;
+    for(var j=0;j<candidates.length;j++){
+      var target=candidates[j];
+      if(dist2(d.x,d.y,target.x,target.y)<=r2&&
+         lineClear(g,d.x,d.y,target.x,target.y,2))return true;
+    }
+    return false;
+  }
+  /* Controller repair is a local physical activity. A hostile drone beside
+   * the healer can interrupt it even when the hostile is beyond the hull's
+   * peel-screen radius; a drone near the hull but far from the healer cannot.
+   * Only consider candidates within radius + the existing 145u repair leash,
+   * preserving AI viewport fairness and avoiding full per-drone scans. */
+  function hostileDroneNearRepair(g,owner,d,radius,cache){
+    var candidates=cache&&cache.droneCandidates;
+    if(!candidates){
+      candidates=[];var ds=g.drones||[],fair=window.__NOVA_FAIR_ENGAGEMENT__;
+      var ownerBound=(radius+145)*(radius+145);
+      for(var i=0;i<ds.length;i++){
+        var threat=ds[i];
+        if(!threat||!(threat.hp>0)||threat.ownerId===owner.id||
+           threat.__novaSpotter||
+           !(dist2(owner.x,owner.y,threat.x,threat.y)<=ownerBound))continue;
+        var other=ownerOf(g,threat);
+        if(!other||!hostileOwners(g,owner,other))continue;
+        if(!owner.isPlayer&&fair&&typeof fair.inGameplayViewport==='function'&&
+           !fair.inGameplayViewport(g,owner,threat))continue;
+        candidates.push(threat);
+      }
+      if(cache)cache.droneCandidates=candidates;
+    }
+    var r2=radius*radius;
+    for(var j=0;j<candidates.length;j++){
+      var t=candidates[j];
+      if(t.hp>0&&dist2(d.x,d.y,t.x,t.y)<=r2&&
+         lineClear(g,d.x,d.y,t.x,t.y,2))return true;
+    }
+    return false;
+  }
+  function repairDrone(g,d,owner,state,dt,threatCache){
     var max=Math.max(1,d.maxHp||d.hp||1),f=d.hp/max,active=!!(state&&state.active),threshold=active?(owner.cls==='broodmother'?.12:.18):.62;
     if(d.__lvLastHp==null)d.__lvLastHp=d.hp;
     if(d.hp<d.__lvLastHp-.01)d.__lvRepairWait=REPAIR_DELAY;else d.__lvRepairWait=Math.max(0,(d.__lvRepairWait||0)-dt);
@@ -300,8 +359,10 @@ wrap('game/engine',function(engine,require){
     if(!d.__lvRepairing)return false;
     if(d.__novaPhase==='windup'||d.__novaPhase!=='recover'){d.__novaPhase='recover';d.__novaPhaseT=Math.max(d.__novaPhaseT||0,.22);d.__novaTarget=null;d.targetRef=null;}
     steerToward(g,d,owner.x,owner.y,Math.max(150,(d.speed||180)*1.08),dt);
-    var near=dist2(d.x,d.y,owner.x,owner.y)<145*145,combat=!!hostileDroneNear(g,owner,225);
-    if(near&&!combat&&(d.__lvRepairWait||0)<=0){
+    var near=dist2(d.x,d.y,owner.x,owner.y)<145*145;
+    if(near&&(d.__lvRepairWait||0)<=0&&
+       !hostileDroneNearRepair(g,owner,d,225,threatCache)&&
+       !hostileTankNearRepair(g,owner,d,225,threatCache)){
       var before=d.hp;d.hp=Math.min(max,d.hp+max*REPAIR_RATE*Math.max(0,dt));
       if(d.hp>before&&Number(g.time||0)>=(d.__lvRepairFxAt||0)){d.__lvRepairFxAt=Number(g.time||0)+.34;if(g.addParticles)g.addParticles(d.x,d.y,'#8fffd0',2,22,'glow');if(g.addRing)g.addRing(d.x,d.y,'#8fffd0',8);}
     }
@@ -335,7 +396,8 @@ wrap('game/engine',function(engine,require){
       var owner=g.getTank?g.getTank(+key):null;if(!owner&&g.tankById&&g.tankById.get)owner=g.tankById.get(+key);if(!owner)return;
       var group=groups[key],state=owner.__novaSwarm||null;
       group.sort(function(a,b){return ((a.slot==null?a.__novaSlot:a.slot)||0)-((b.slot==null?b.__novaSlot:b.slot)||0);});
-      for(var j=0;j<group.length;j++)repairDrone(g,group[j],owner,state,dt);
+      var repairThreatCache={candidates:null};
+      for(var j=0;j<group.length;j++)repairDrone(g,group[j],owner,state,dt,repairThreatCache);
       var threat=hostileDroneNear(g,owner,owner.isPlayer?285:250);
       peelScreen(g,group,owner,state,threat,dt);
     });
@@ -361,7 +423,19 @@ wrap('game/engine',function(engine,require){
     planAIControllers(this);
     var restore=prepareAIVirtualThumbs(this),out;
     try{out=oldDrones.apply(this,arguments);}finally{restore();}
-    postProcessControllers(this,dt);updateTelemetry(this,dt);registerTips();
+    postProcessControllers(this,dt);
+    /* Optional post-Live-Vector checkpoint. This records a phase endpoint,
+     * not a continuous subframe trajectory or collision-time guarantee. */
+    if(this.__novaDroneChronoTraceEnabled===true&&this.__novaShapeSweepActive===true){
+      var epoch=this.__novaShapeSweepEpoch,ds=this.drones||[];
+      for(var i=0;i<ds.length;i++){
+        var d=ds[i];
+        if(!d||d.__novaChronoDroneTraceEpoch!==epoch)continue;
+        d.__novaChronoDroneLiveX=d.x;d.__novaChronoDroneLiveY=d.y;
+        d.__novaChronoDroneLiveEpoch=epoch;
+      }
+    }
+    updateTelemetry(this,dt);registerTips();
     return out;
   };
 
@@ -370,6 +444,7 @@ wrap('game/engine',function(engine,require){
     var was=isController(t),out=oldSetClass.apply(this,arguments),now=isController(t);
     if(t&&t.isPlayer&&now&&!was){
       if(t.__novaSwarm)t.__novaSwarm.tutorialUntil=0;
+      t.__novaLiveVectorTutorialStart=(this.time||0)+2.8;
       t.__novaLiveVectorTutorialUntil=(this.time||0)+10.5;
       if(this.toast)this.toast('❖ SECOND BODY — RIGHT STICK ANGLE: GUN + SWARM · DEPTH: RANGE · RELEASE: RECALL · HIT: DESIGNATE','info');
     }
@@ -393,10 +468,17 @@ wrap('game/render',function(renderMod,require){
   function patched(g,w,h){
     old(g,w,h);if(!g||!g.ctx||!g.player||!g.player.alive)return;
     var ctx=g.ctx,now=Number(g.time)||0;drawShear(g,ctx);
-    if(isController(g.player)&&(g.player.__novaLiveVectorTutorialUntil||0)>now){
+    /* Let the immediate React toast teach first on every viewport; the canvas
+     * reminder follows after 2.8s of simulation rather than duplicating it. */
+    if(isController(g.player)&&(g.player.__novaLiveVectorTutorialUntil||0)>now&&
+       now>=(g.player.__novaLiveVectorTutorialStart||0)){
       ctx.save();ctx.setTransform(g.dpr||1,0,0,g.dpr||1,0,0);ctx.textAlign='center';ctx.font='800 9px Orbitron,system-ui';ctx.fillStyle='rgba(207,255,224,.92)';ctx.shadowBlur=10;ctx.shadowColor='#75f0a3';
-      ctx.fillText('RIGHT STICK ANGLE = GUN + SWARM · DEPTH = SWARM RANGE · RELEASE = RECALL',g.w*.5,g.h*.72);
-      ctx.font='700 10px Rajdhani,system-ui';ctx.fillStyle='rgba(170,220,190,.82)';ctx.shadowBlur=0;ctx.fillText('Cannon hits DESIGNATE · deep pressure leaves fewer drones close enough to peel',g.w*.5,g.h*.72+15);ctx.restore();
+      var portrait=g.w<480;
+      /* Short landscape screens place the upgrade-ready badge near 72% height. */
+      var hintY=!portrait&&g.h<500?g.h*.57:g.h*.72;
+      ctx.fillText(portrait?'AIM = GUN + SWARM · DEPTH = RANGE':'RIGHT STICK ANGLE = GUN + SWARM · DEPTH = SWARM RANGE · RELEASE = RECALL',g.w*.5,hintY,Math.max(120,g.w-24));
+      ctx.font='700 10px Rajdhani,system-ui';ctx.fillStyle='rgba(170,220,190,.82)';ctx.shadowBlur=0;
+      ctx.fillText(portrait?'RELEASE = RECALL · HITS DESIGNATE':'Cannon hits DESIGNATE · deep pressure leaves fewer drones close enough to peel',g.w*.5,hintY+15,Math.max(120,g.w-24));ctx.restore();
     }
     var ts=g.tanks||[];
     for(var i=0;i<ts.length;i++){

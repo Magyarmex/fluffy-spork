@@ -1,0 +1,46 @@
+name: NOVA Browser Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'nova-updates/**'
+      - 'index.html'
+      - 'tests/browser/**'
+      - '.github/workflows/browser-smoke.yml'
+  pull_request:
+    paths:
+      - 'nova-updates/**'
+      - 'index.html'
+      - 'tests/browser/**'
+      - '.github/workflows/browser-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  chromium:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --no-audit --no-fund --no-package-lock
+      - run: npm install --no-save --no-audit --no-fund --no-package-lock playwright@1.56.1
+      - run: npx playwright install chromium
+      - name: Serve shipping runtime
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/nova-browser-http.log 2>&1 &
+          echo $! > /tmp/nova-browser-http.pid
+      - name: Run real React + Chromium smoke
+        run: |
+          node tests/browser/real-touch-gameplay.cjs
+          node tests/browser/shipping-ui-smoke.cjs
+      - name: Preserve browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-browser-smoke
+          path: artifacts/browser/
+          if-no-files-found: ignore
+          retention-days: 14

@@ -93,7 +93,7 @@ function blastExposure(g,C,t,x,y){
 function cannonStructure(cls){
   if(cls==='siegebomber')return 2.35;
   if(cls==='annihilator')return 2.10;
-  if(cls==='quakecannon')return 2.00;
+  if(cls==='quake')return 2.00;
   if(cls==='demolisher')return 1.70;
   if(cls==='clusterking')return 1.55;
   if(cls==='bomber')return 1.42;
@@ -161,9 +161,26 @@ wrap('game/engine',function(engine,require){
     return t.__v17FuseDist||range*.72;
   }
   function updateFusePreview(g,t){
-    var dist=liveFuseDist(g,t),ex=t.x+Math.cos(t.angle)*dist,ey=t.y+Math.sin(t.angle)*dist,hit=g.firstTerrainHit?g.firstTerrainHit(t.x,t.y,ex,ey,4):null,p=t.__v172FusePreview||(t.__v172FusePreview={});
-    if(hit&&hit.hit){p.blocked=true;p.x=hit.hit.x;p.y=hit.hit.y;p.programX=ex;p.programY=ey;p.programDist=dist;p.solid=hit.solid;p.actualDist=Math.hypot(hit.hit.x-t.x,hit.hit.y-t.y);}
-    else{p.blocked=false;p.x=ex;p.y=ey;p.programX=ex;p.programY=ey;p.programDist=dist;p.solid=null;p.actualDist=dist;}
+    /* The Three Disciplines predictor follows the actual muzzle, inherited
+     * velocity and current analog/mouse depth. The old hull-centered probe
+     * could display an IMPACT even when the fired shell would miss cover. */
+    var shot=g.novaCannonShotPreview&&g.novaCannonShotPreview(t);
+    var dist=shot?shot.dist:liveFuseDist(g,t);
+    var ox=shot?shot.ox:t.x,oy=shot?shot.oy:t.y;
+    var ex=shot?shot.x:t.x+Math.cos(t.angle)*dist;
+    var ey=shot?shot.y:t.y+Math.sin(t.angle)*dist;
+    var hit=g.firstTerrainHit?g.firstTerrainHit(ox,oy,ex,ey,shot?shot.r*.45:4):null;
+    var p=t.__v172FusePreview||(t.__v172FusePreview={});
+    p.programX=ex;p.programY=ey;p.programDist=dist;
+    p.originX=ox;p.originY=oy;
+    p.solid=hit&&hit.hit?hit.solid:null;
+    /* A shot with enough penetration may destroy cover and continue. Its
+     * exact survival depends on damage and integrity at impact; show a
+     * conditional cover cue rather than falsely promising an IMPACT. */
+    p.mayBreach=!!(p.solid&&p.solid.destructible&&shot&&shot.pen>=2);
+    p.blocked=!!(p.solid&&!p.mayBreach);
+    p.x=hit&&hit.hit?hit.hit.x:ex;p.y=hit&&hit.hit?hit.hit.y:ey;
+    p.actualDist=Math.hypot(p.x-ox,p.y-oy);
     return p;
   }
   Game.prototype.novaFusePreview=function(t){return updateFusePreview(this,t);};
@@ -276,13 +293,16 @@ wrap('game/render',function(renderMod,require){
   function patched(g,w,h){
     old(g,w,h);
     if(!g||!g.ctx||!g.player||!g.player.alive||lineage(classes,g.player)!=='cannon')return;
-    var p=g.player.__v172FusePreview;if(!p||!p.blocked)return;
+    /* Match the FUSE reticle's input-visibility contract. Released touch
+     * sticks must not leave an orphaned IMPACT marker on the battlefield. */
+    if(!g.input||!((g.input.aim&&g.input.aim.active)||g.input.mouseActive))return;
+    var p=g.player.__v172FusePreview;if(!p||(!p.blocked&&!p.mayBreach))return;
     var ctx=g.ctx,a=world(g,p.x,p.y,screen),solid=p.solid;
     ctx.save();ctx.setTransform(g.dpr||1,0,0,g.dpr||1,0,0);ctx.globalCompositeOperation='lighter';
     ctx.strokeStyle='rgba(255,238,204,.94)';ctx.fillStyle='rgba(255,167,94,.12)';ctx.lineWidth=1.4;
     var r=9+2*Math.sin((g.time||0)*8);ctx.beginPath();ctx.moveTo(a.x-r,a.y-r);ctx.lineTo(a.x+r,a.y+r);ctx.moveTo(a.x+r,a.y-r);ctx.lineTo(a.x-r,a.y+r);ctx.stroke();
     ctx.beginPath();ctx.arc(a.x,a.y,r+5,0,TAU);ctx.stroke();
-    ctx.font='800 8px Orbitron,system-ui';ctx.textAlign='center';ctx.fillStyle='#ffe5c4';var label='IMPACT '+Math.round(p.actualDist);
+    ctx.font='800 8px Orbitron,system-ui';ctx.textAlign='center';ctx.fillStyle='#ffe5c4';var label=(p.mayBreach?'BREACH? ':'IMPACT ')+Math.round(p.actualDist);
     if(solid&&solid.destructible&&solid.maxHp)label+=' · COVER '+Math.round(clamp(solid.hp/solid.maxHp,0,1)*100)+'%';
     ctx.fillText(label,a.x,a.y-17);
     ctx.restore();

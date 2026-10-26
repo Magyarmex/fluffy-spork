@@ -14,7 +14,9 @@ function boot(){
       this.tankById=new Map();this.particles=0;}
     damageDrone(d,damage){d.hp=Math.max(0,d.hp-damage);}
     updateDrones(dt){for(const d of this.drones){
-      d.x+=(d.moveVX||0)*dt;d.y+=(d.moveVY||0)*dt;
+      if(Number.isFinite(d.teleportX))d.x=d.teleportX;
+      else d.x+=(d.moveVX||0)*dt;
+      d.y+=(d.moveVY||0)*dt;
     }}
     hasLineOfSight(){return true;}
     addParticles(){this.particles++;}
@@ -26,12 +28,12 @@ function boot(){
   const m={exports:{}};mods['game/engine'](m,m.exports,()=>({}));
   return{Game:m.exports.Game,hooks:win.__NOVA_FIELD_SERVICE_TEST__};
 }
-function scenario({bulletX=200,bulletY=0,bulletVX=200,bulletVY=0,moveVX=0,moveVY=0,dt=.05,ttl,shell=false}={}){
+function scenario({bulletX=200,bulletY=0,bulletVX=200,bulletVY=0,moveVX=0,moveVY=0,dt=.05,ttl,shell=false,teleportX,novaVX}={}){
   const {Game}=boot(),g=new Game();
   const owner={id:1,team:'blue',cls:'marksman',alive:true,x:0,y:0};
   const enemy={id:2,team:'red',cls:'marksman',alive:true,x:1000,y:0};
   const drone={id:7,kind:'drone',ownerId:1,x:80,y:0,hp:100,maxHp:100,r:8,
-    attackCd:0,moveVX,moveVY}; // no __novaVX: core legacy movement
+    attackCd:0,moveVX,moveVY,teleportX,__novaVX:novaVX}; // no __novaVX: core legacy movement
   g.tanks=[owner,enemy];g.tankById.set(1,owner);g.tankById.set(2,enemy);
   g.drones=[drone];g.damageDrone(drone,20);
   g.bullets=[{ownerId:2,x:bulletX,y:bulletY,vx:bulletVX,vy:bulletVY,r:3,ttl,shell}];
@@ -185,4 +187,69 @@ test('ordinary short-lived shots remain safely excluded next to hazardous shells
   const shell=scenario({bulletX:125,bulletVX:-200,ttl:.04,shell:true});
   assert.ok(safe.drone.hp>80);
   assert.equal(shell.drone.hp,80);
+});
+
+// RED first: a discontinuous relocation is not a 3,000u/s sustained drone velocity.
+// The projectile's future approach must be tested from the actual new position.
+for(const fps of [30,60,120,240]){
+  test('discontinuous drone relocation cannot disguise approaching hostile fire at '+fps+'Hz',()=>{
+    const {drone}=scenario({teleportX:-70,bulletX:-30,bulletVX:-200,dt:1/fps});
+    assert.equal(drone.hp,80,'projectile is approaching the relocated drone within the danger horizon');
+  });
+  test('discontinuous relocation does not suppress repair for a departing projectile at '+fps+'Hz',()=>{
+    const {drone}=scenario({teleportX:-70,bulletX:-30,bulletVX:200,dt:1/fps});
+    assert.ok(drone.hp>80,'departure is safe from the new position');
+  });
+}
+
+// A discontinuity does not invalidate a separately reported bounded velocity.
+// Test both stationary and explicitly reported motion instead of blindly
+// trusting the relocation delta or silently ignoring the motion signal.
+for(const fps of [30,60,120,240]){
+  test('relocated drone cannot heal while declared motion catches departing fire at '+fps+'Hz',()=>{
+    const {drone}=scenario({teleportX:-70,novaVX:600,bulletX:-30,bulletVX:200,dt:1/fps});
+    assert.equal(drone.hp,80,'declared chase velocity predicts an intercept');
+  });
+  test('relocated drone still repairs when both stationary and declared retreat are safe at '+fps+'Hz',()=>{
+    const {drone}=scenario({teleportX:-70,novaVX:-600,bulletX:-30,bulletVX:200,dt:1/fps});
+    assert.ok(drone.hp>80,'neither conservative motion hypothesis intersects');
+  });
+}
+
+// A teleport also invalidates cached danger scans from the previous location.
+test('discontinuous relocation immediately refreshes previously safe projectile cache',()=>{
+  const {Game}=boot(),g=new Game();
+  const owner={id:1,team:'blue',cls:'marksman',alive:true,x:0,y:0};
+  const enemy={id:2,team:'red',cls:'marksman',alive:true,x:1000,y:0};
+  const d={id:7,kind:'drone',ownerId:1,x:80,y:0,hp:100,maxHp:100,r:8,attackCd:0};
+  g.tanks=[owner,enemy];g.tankById=new Map([[1,owner],[2,enemy]]);g.drones=[d];
+  g.damageDrone(d,20);g.time=7;g.updateDrones(.05);
+  const healed=d.hp;assert.ok(healed>80);
+  assert.ok(d.__novaFieldService.nextProjectileAt>7.02);
+  d.teleportX=-70;g.bullets=[{ownerId:2,x:-30,y:0,vx:-200,vy:0,r:3}];
+  g.time=7.02;g.updateDrones(1/60);
+  assert.equal(d.hp,healed,'new position must be rescanned before another repair tick');
+});
+
+test('discontinuous relocation immediately refreshes previously safe hostile-unit cache',()=>{
+  const {Game}=boot(),g=new Game();
+  const owner={id:1,team:'blue',cls:'marksman',alive:true,x:0,y:0};
+  const enemy={id:2,team:'red',cls:'marksman',alive:true,x:-60,y:0};
+  const d={id:7,kind:'drone',ownerId:1,x:500,y:0,hp:100,maxHp:100,r:8,attackCd:0};
+  g.tanks=[owner,enemy];g.tankById=new Map([[1,owner],[2,enemy]]);g.drones=[d];
+  g.damageDrone(d,20);g.time=7;g.updateDrones(.05);
+  const healed=d.hp;assert.ok(healed>80);
+  assert.ok(d.__novaFieldService.nextThreatAt>7.02);
+  d.teleportX=-70;g.time=7.02;g.updateDrones(1/60);
+  assert.equal(d.hp,healed,'nearby hostile at new location must interrupt repair');
+});
+
+test('materialized playable runtime wires Field Service before Live Vector postprocessing',()=>{
+  const html=fs.readFileSync(path.join(__dirname,'../../index.html'),'utf8');
+  const battlefield=html.indexOf('nova-updates/battlefield-v1.6.0.js');
+  const terrain=html.indexOf('nova-updates/terrain-intelligence-v1.10.2.js');
+  const field=html.indexOf('nova-updates/drone-field-service-v1.10.3.js');
+  const live=html.indexOf('nova-updates/second-body-live-vector-v1.10.7.js');
+  assert.ok(battlefield>=0&&terrain>battlefield&&field>terrain&&live>field,
+    'the tested Field Service wrapper must execute in the actual shipping chain');
 });

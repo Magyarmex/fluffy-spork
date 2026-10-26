@@ -177,7 +177,7 @@ function sampleStuck(g,obj,vx,vy,pad,seed,state){
   }
   return state;
 }
-function applyEscape(state,vx,vy){var sp=Math.hypot(vx||0,vy||0);if(!state||sp<1||!state.escapeX)return{x:vx,y:vy};var ux=vx/sp,uy=vy/sp,x=ux*.24+state.escapeX*.76,y=uy*.24+state.escapeY*.76,m=Math.hypot(x,y)||1;return{x:x/m*sp,y:y/m*sp};}
+function applyEscape(state,vx,vy){var sp=Math.hypot(vx||0,vy||0);if(!state||sp<1||!Number.isFinite(state.escapeX)||!Number.isFinite(state.escapeY)||!(state.escapeX*state.escapeX+state.escapeY*state.escapeY>1e-12))return{x:vx,y:vy};var ux=vx/sp,uy=vy/sp,x=ux*.24+state.escapeX*.76,y=uy*.24+state.escapeY*.76,m=Math.hypot(x,y)||1;return{x:x/m*sp,y:y/m*sp};}
 function droneIntent(d){
   var vx=d.__novaVX||0,vy=d.__novaVY||0;if(d.__novaSpotter&&Math.hypot(d.__novaScoutVX||0,d.__novaScoutVY||0)>24){vx=d.__novaScoutVX||0;vy=d.__novaScoutVY||0;}return{x:vx,y:vy};
 }
@@ -263,6 +263,18 @@ wrap('game/engine',function(engine,require){
       }
     }
     Object.keys(groups).forEach(function(k){separateSwarm(groups[k]);});
+    /* Optional checkpoint after routing/separation, between Battlefield's
+     * terrain stage and Live Vector's repair/peel stage. It is a position
+     * observation, NOT a time-stamped physical collision trajectory. */
+    if(this.__novaDroneChronoTraceEnabled===true&&this.__novaShapeSweepActive===true){
+      var epoch=this.__novaShapeSweepEpoch;
+      for(var ci=0;ci<ds.length;ci++){
+        var cd=ds[ci];
+        if(!cd||cd.__novaChronoDroneTraceEpoch!==epoch)continue;
+        cd.__novaChronoDroneRouteX=cd.x;cd.__novaChronoDroneRouteY=cd.y;
+        cd.__novaChronoDroneRouteEpoch=epoch;
+      }
+    }
     return out;
   };
 });

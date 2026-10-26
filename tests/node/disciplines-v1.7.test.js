@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 
-function loadDisciplines() {
+function loadDisciplines(coreUpdater) {
   const CLASSES = {
     twin:{id:'twin',fireMode:'single',bullet:{splash:0},size:14},
     cannon:{id:'cannon',fireMode:'single',bullet:{splash:70,splashDmg:.4},size:16},
@@ -35,7 +35,7 @@ function loadDisciplines() {
     if(ab==='stampede'){t.stampedeT=4;t.abilityCd=12;}
   };
   Game.prototype.bodyDamage=function(){return 100;};
-  Game.prototype.updateBullets=function(){};
+  Game.prototype.updateBullets=coreUpdater||function(){};
   Game.prototype.update=function(){};
   Game.prototype.tankSpeed=function(){return 100;};
   Game.prototype.weaponRange=function(){return 500;};
@@ -160,4 +160,83 @@ test('Gunner fire builds heat and marks projectiles',()=>{
   g.player=t;g.tanks=[t];g.tryFire(t);
   assert.ok(t.__v17Heat>0);
   assert.equal(g.bullets[0].__v17Gunner,true);
+});
+
+/* Run 339: the Cannon's visible fuse marker promises a spatial commitment.
+ * The shipping core can move the shell beyond the programmed distance in
+ * one frame. An unobstructed survivor must burst at its first fuse crossing. */
+function realShippingBulletUpdater(){
+ const html=fs.readFileSync(path.join(__dirname,'../../index.html'),'utf8');
+ const marker='    updateBullets(dt) {',start=html.indexOf(marker);
+ assert.ok(start>=0,'materialized core bullet updater absent');
+ let p=start+marker.length,depth=1;
+ while(depth&&p<html.length){if(html[p]==='{')depth++;else if(html[p]==='}')depth--;p++;}
+ assert.equal(depth,0);
+ return new Function('types_1','classes_1','M',
+  'return function(dt){'+html.slice(start+marker.length,p-1)+'}')(
+  {dist2:(ax,ay,bx,by)=>(ax-bx)**2+(ay-by)**2},
+  {CLASSES:{scout:{size:15}}},2250);
+}
+for(const fps of [30,60,120,240]){
+ test('materialized Cannon fuse crosses at exact distance at '+fps+' Hz',()=>{
+  const {Game}=loadDisciplines(realShippingBulletUpdater()),g=new Game();
+  g.hash={query(_x,_y,_r,out){out.length=0;}};g.tmp=[];
+  g.initBulletIntegrity=()=>{};g.resolveBulletCollisions=()=>{};g.addParticles=()=>{};
+  const origins=[];g.clusterBurst=b=>origins.push([b.x,b.y]);
+  g.splashAt=(x,y)=>{g.splashOrigin=[x,y];};
+  g.bullets=[{kind:'bullet',id:55,ownerId:1,x:80,y:0,vx:40*fps,vy:0,
+   px:80,py:0,ttl:2,r:3,dmg:12,pen:0,hits:0,shell:true,dead:false,
+   __v17Cannon:true,__v17FuseDist:100,__v17SpawnX:0,__v17SpawnY:0,
+   __v17FuseArmed:true,splash:60,splashDmg:.4,color:'#fff'}];
+  g.updateBullets(1/fps);
+  assert.equal(origins.length,1,'one fuse burst');
+  assert.ok(Math.abs(origins[0][0]-100)<1e-8,'burst should match reticle, got '+origins[0][0]);
+  assert.ok(Math.abs(g.splashOrigin[0]-100)<1e-8,'splash and fragments must share origin');
+  assert.equal(g.bullets.length,0);
+ });
+}
+test('Cannon fuse crossing preserves oblique aim geometry',()=>{
+ const {Game}=loadDisciplines(),g=new Game();
+ const origins=[];g.clusterBurst=b=>origins.push([b.x,b.y]);
+ g.bullets=[{x:72,y:96,px:48,py:64,dead:false,shell:true,
+  __v17Cannon:true,__v17FuseDist:100,__v17SpawnX:0,__v17SpawnY:0}];
+ g.updateBullets(1/30);
+ assert.equal(origins.length,1);
+ assert.ok(Math.abs(origins[0][0]-60)<1e-8);
+ assert.ok(Math.abs(origins[0][1]-80)<1e-8);
+});
+test('Cannon fuse does not move a projectile already killed by an earlier impact',()=>{
+ const earlier=function(){const b=this.bullets[0];b.x=90;b.y=0;b.dead=true;this.clusterBurst(b);};
+ const {Game}=loadDisciplines(earlier),g=new Game(),origins=[];
+ g.clusterBurst=b=>origins.push(b.x);
+ g.bullets=[{x:80,y:0,px:80,py:0,dead:false,shell:true,
+  __v17Cannon:true,__v17FuseDist:100,__v17SpawnX:0,__v17SpawnY:0}];
+ g.updateBullets(1/30);
+ assert.deepEqual(origins,[90]);
+});
+test('Cannon fuse preserves existing two-unit early-trigger tolerance',()=>{
+ const {Game}=loadDisciplines(),g=new Game(),origins=[];
+ g.clusterBurst=b=>origins.push(b.x);
+ g.bullets=[{x:99,y:0,px:90,py:0,dead:false,shell:true,
+  __v17Cannon:true,__v17FuseDist:100,__v17SpawnX:0,__v17SpawnY:0}];
+ g.updateBullets(1/30);
+ assert.deepEqual(origins,[99]);
+});
+
+test('Cannon fuse never rewinds a shell that breached cover in the same frame',()=>{
+ const {Game}=loadDisciplines(),g=new Game(),origins=[];
+ g.clusterBurst=b=>origins.push(b.x);
+ g.bullets=[{x:120,y:0,px:80,py:0,dead:false,shell:true,pen:1,hits:0,
+  __novaBreachAtTime:g.time,__v17Cannon:true,__v17FuseDist:100,
+  __v17SpawnX:0,__v17SpawnY:0}];
+ g.updateBullets(1/30);
+ assert.deepEqual(origins,[120],'cover breach requires coupled chronology, not a post-core rewind');
+});
+test('Cannon fuse never rewinds a shell with an already registered victim',()=>{
+ const {Game}=loadDisciplines(),g=new Game(),origins=[];
+ g.clusterBurst=b=>origins.push(b.x);
+ g.bullets=[{x:120,y:0,px:80,py:0,dead:false,shell:true,pen:1,hits:1,
+  __v17Cannon:true,__v17FuseDist:100,__v17SpawnX:0,__v17SpawnY:0}];
+ g.updateBullets(1/30);
+ assert.deepEqual(origins,[120],'existing damage must not be silently reordered');
 });

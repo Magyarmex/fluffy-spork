@@ -45,6 +45,65 @@ function wrap(id,after){
   mods[id]=function(module,exports,require){old(module,exports,require);after(module.exports,require);};
 }
 function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+
+/* One input contract for both the next projectile and its live aiming marker.
+ * In particular, mouse distance must not reuse the preceding shot's fuse. */
+function cannonInputDepth(g,t){
+  var range=g.weaponRange?g.weaponRange(t):650;
+  if(t.isPlayer){
+    var a=g.input&&g.input.aim;
+    if(a&&a.active)return clamp((Math.hypot(a.dx||0,a.dy||0)-5)/55,.08,1);
+    if(g.input&&g.input.mouseActive&&g.canvas){
+      var rect=g.canvas.getBoundingClientRect(),z=(g.cam&&g.cam.zoom)||1;
+      var wx=g.cam.x+(g.input.mouseX-rect.left-g.w*.5)/z;
+      var wy=g.cam.y+(g.input.mouseY-rect.top-g.h*.5)/z;
+      return clamp(Math.hypot(wx-t.x,wy-t.y)/Math.max(1,range),.08,1);
+    }
+    return .72;
+  }
+  if(t.ai&&t.ai.state==='hunt'&&t.ai.targetId>=0){
+    var q=g.getTank&&g.getTank(t.ai.targetId);
+    if(q&&q.alive)return clamp(Math.hypot(q.x-t.x,q.y-t.y)/Math.max(1,range),.12,.96);
+  }
+  return null;
+}
+/* The shipping RAF clamps simulation steps to 0.033s. A fuse beyond the
+ * last surviving step can never fire: core TTL expiry removes the projectile
+ * before Three Disciplines can detonate it. Only cap otherwise unreachable
+ * programs; do not change mid-depth fuses or weapon speed/lifetime. */
+function cannonReachableFuse(raw,speed,ttl){
+  if(!Number.isFinite(speed)||speed<=0||!Number.isFinite(ttl))return raw;
+  return Math.min(raw,Math.max(0,speed*(ttl-.033)));
+}
+function cannonFuseDistance(g,t,depth,def){
+  var range=g.weaponRange?g.weaponRange(t):650;
+  var raw=clamp(range*(.20+.78*depth),150,range*.965);
+  if(!def||!def.bullet)return raw;
+  var speed=g.bulletSpeed?g.bulletSpeed(t):def.bullet.speed;
+  if(!Number.isFinite(speed))return raw;
+  var a=t.angle||0,vx=Math.cos(a)*speed+(t.vx||0)*.22;
+  var vy=Math.sin(a)*speed+(t.vy||0)*.22;
+  var ttl=def.bullet.ttl==null?1.05:def.bullet.ttl;
+  return cannonReachableFuse(raw,Math.hypot(vx,vy),ttl);
+}
+/* Shared prediction for the live Cannon reticle and Combined Arms terrain
+ * marker. The canonical Game.tryFire shell/single path uses barrel zero,
+ * muzzle offset, 22% inherited hull velocity and the same fuse depth. */
+function cannonShotPreview(g,t,def){
+  var depth=cannonInputDepth(g,t);
+  var dist=cannonFuseDistance(g,t,depth==null?.72:depth,def);
+  var barrel=def&&def.barrels&&def.barrels[0];
+  var a=t.angle||0,cs=Math.cos(a),sn=Math.sin(a);
+  var len=(barrel?barrel.len:0)+8,side=barrel?(barrel.x||0):0;
+  var ox=t.x+cs*len-sn*side,oy=t.y+sn*len+cs*side;
+  var speed=g.bulletSpeed?g.bulletSpeed(t):((def&&def.bullet&&def.bullet.speed)||1);
+  var vx=cs*speed+(t.vx||0)*.22,vy=sn*speed+(t.vy||0)*.22;
+  var mag=Math.hypot(vx,vy)||1;
+  var bullet=def&&def.bullet||{},dmg=g.bulletDamageFor?g.bulletDamageFor(t,bullet.dmg||0):(bullet.dmg||0);
+  var r=(bullet.r||2)*(1+clamp(dmg*.0085,0,.45));
+  var pen=(bullet.pen||0)+Math.floor(((t.stats&&t.stats.penetration)||0)*.6)+(t.gene==='sniper'?1:0);
+  return {ox:ox,oy:oy,x:ox+vx/mag*dist,y:oy+vy/mag*dist,dist:dist,r:r,pen:pen};
+}
 function ad(target,current){var d=(target-current+Math.PI)%TAU;if(d<0)d+=TAU;return d-Math.PI;}
 function moveAngle(current,target,max){return current+clamp(ad(target,current),-max,max);}
 function d2(ax,ay,bx,by){var x=bx-ax,y=by-ay;return x*x+y*y;}
@@ -81,7 +140,7 @@ wrap('game/classes',function(c){
     clusterking:'Programs entire sectors: precise fuse placement turns ten-child clusters into deliberate area traps.',
     siegebomber:'Slow siege shells reward patient fuse placement and brutal, intentional breaches through cover.',
     annihilator:'One enormous spatial commitment. Put the detonation exactly where the opponent has to be.',
-    quakecannon:'Shock artillery that rewards deliberate blast placement, lane denial and terrain destruction.',
+    quake:'Shock artillery that rewards deliberate blast placement, lane denial and terrain destruction.',
     guard:'Directional vanguard armor. Your aim direction is also your strongest facing.',
     fortress:'A walking bunker whose defense is strongest only where the player deliberately points it.',
     juggernaut:'Build Stampede momentum by holding a clean line; sharp turns sacrifice impact force.',
@@ -134,6 +193,7 @@ wrap('game/engine',function(engine,require){
   var Game=engine.Game;if(!Game||Game.prototype.__novaThreeDisciplines)return;
   Game.prototype.__novaThreeDisciplines=true;
   var classes=require('./classes'),C=classes.CLASSES;
+  Game.prototype.novaCannonShotPreview=function(t){return cannonShotPreview(this,t,C[t.cls]);};
 
   function gunner(t){return lineage(classes,t)==='gunner';}
   function cannon(t){return lineage(classes,t)==='cannon';}
@@ -189,41 +249,22 @@ wrap('game/engine',function(engine,require){
     }
   }
 
-  function inputDepth(g,t){
-    var range=g.weaponRange?g.weaponRange(t):650;
-    if(t.isPlayer){
-      var a=g.input&&g.input.aim;
-      if(a&&a.active){
-        var mag=Math.hypot(a.dx||0,a.dy||0);
-        return clamp((mag-5)/55,.08,1);
-      }
-      if(g.input&&g.input.mouseActive&&g.canvas){
-        var rect=g.canvas.getBoundingClientRect(),z=(g.cam&&g.cam.zoom)||1;
-        var wx=g.cam.x+(g.input.mouseX-rect.left-g.w*.5)/z,wy=g.cam.y+(g.input.mouseY-rect.top-g.h*.5)/z;
-        return clamp(Math.hypot(wx-t.x,wy-t.y)/Math.max(1,range),.08,1);
-      }
-      return .72;
-    }
-    if(t.ai&&t.ai.state==='hunt'&&t.ai.targetId>=0){
-      var q=g.getTank&&g.getTank(t.ai.targetId);
-      if(q&&q.alive)return clamp(Math.hypot(q.x-t.x,q.y-t.y)/Math.max(1,range),.12,.96);
-    }
-    return null;
-  }
+  function inputDepth(g,t){return cannonInputDepth(g,t);}
   function cannonProfile(t){
-    var heavy=t.cls==='siegebomber'||t.cls==='annihilator'||t.cls==='quakecannon';
+    var heavy=t.cls==='siegebomber'||t.cls==='annihilator'||t.cls==='quake';
     var cluster=t.cls==='bomber'||t.cls==='clusterking'||t.cls==='siegebomber';
-    return{heavy:heavy,cluster:cluster,structure:t.cls==='annihilator'||t.cls==='quakecannon'?1.9:t.cls==='siegebomber'?1.75:t.cls==='demolisher'?1.55:1.35};
+    return{heavy:heavy,cluster:cluster,structure:t.cls==='annihilator'||t.cls==='quake'?1.9:t.cls==='siegebomber'?1.75:t.cls==='demolisher'?1.55:1.35};
   }
   function annotateCannon(g,t,before,force){
     var depth=inputDepth(g,t);
     if(depth==null&&!force)return;
     if(depth==null)depth=.82;
-    var range=g.weaponRange?g.weaponRange(t):650,dist=clamp(range*(.20+.78*depth),150,range*.965),prof=cannonProfile(t);
+    var range=g.weaponRange?g.weaponRange(t):650,dist=cannonFuseDistance(g,t,depth,C[t.cls]),prof=cannonProfile(t);
     for(var i=before;i<g.bullets.length;i++){
       var b=g.bullets[i];if(!b||b.ownerId!==t.id)continue;
-      b.__v17Cannon=true;b.__v17FuseDist=dist;b.__v17SpawnX=b.x;b.__v17SpawnY=b.y;
-      b.__v17FuseArmed=dist>210;b.__novaStructureMult=prof.structure;
+      var shotDist=cannonReachableFuse(dist,Math.hypot(b.vx||0,b.vy||0),b.ttl);
+      b.__v17Cannon=true;b.__v17FuseDist=shotDist;b.__v17SpawnX=b.x;b.__v17SpawnY=b.y;
+      b.__v17FuseArmed=shotDist>210;b.__novaStructureMult=prof.structure;
       b.__v17FuseHeavy=prof.heavy;b.__v17FuseCluster=!!b.shell;
     }
     t.__v17FuseDepth=depth;t.__v17FuseDist=dist;t.__v17FuseRange=range;
@@ -295,7 +336,7 @@ wrap('game/engine',function(engine,require){
 
   var oldDamage=Game.prototype.damageTank;
   Game.prototype.damageTank=function(t,dmg,srcId,kx,ky){
-    if(!guardian(t))return oldDamage.call(this,t,dmg,srcId,kx,ky);
+    if(!guardian(t)||!t.alive||t.hp<=0)return oldDamage.call(this,t,dmg,srcId,kx,ky);
     /* Core shields already make the hit harmless. Do not spend Perfect Guard
      * or award a countercharge for damage that could never reach the hull. */
     if(t.spawnShieldT>0||t.shieldT>0)return oldDamage.call(this,t,dmg,srcId,kx,ky);
@@ -320,8 +361,32 @@ wrap('game/engine',function(engine,require){
     else if(diff<prof.arc*.72)factor*=1-prof.passive*.32;
     if(active&&front)factor*=1-prof.active;
     else if(active&&diff<prof.arc*.72)factor*=.86;
-    var r=oldDamage.call(this,t,dmg*factor,srcId,kx,ky);
-    t.bulwarkT=oldB;t.tauntT=oldT;
+    var r;
+    try{
+      /* The directional guard disables legacy taunt before core damage,
+       * otherwise the old 360-degree mitigation leaks through. That also
+       * disabled Iron Will's advertised 30% reflection. Restore one bounded
+       * frontal reflection, never reflecting a reflected hit: two Fortresses
+       * facing each other must not recurse indefinitely. */
+      if(oldT>0&&front&&dmg>0&&!this.__v17ReflectingIronWill){
+        var src=srcId>=0&&this.getTank?this.getTank(srcId):null;
+        if(src&&src.alive&&src.id!==t.id){
+          /* Reflection is a new direct hit, not another target of the
+           * original Combined Arms splash exposure calculation. */
+          var blast=this.__v172BlastContext,wasBlast=!!(blast&&blast.active);
+          if(wasBlast)blast.active=false;
+          this.__v17ReflectingIronWill=true;
+          try{this.damageTank(src,dmg*.30,t.id);}
+          finally{
+            this.__v17ReflectingIronWill=false;
+            if(wasBlast)blast.active=true;
+          }
+        }
+      }
+      r=oldDamage.call(this,t,dmg*factor,srcId,kx,ky);
+    }finally{
+      t.bulwarkT=oldB;t.tauntT=oldT;
+    }
     if(active&&front){
       t.__v17CounterCharge=clamp(Math.max(t.__v17CounterCharge||0,prof.counter*(1-factor)),0,1);
       t.__v17GuardPulseUntil=this.time+.18;
@@ -347,6 +412,27 @@ wrap('game/engine',function(engine,require){
       var b=this.bullets[i];if(!b||b.dead||!b.__v17Cannon||!b.__v17FuseDist)continue;
       var tr=Math.hypot(b.x-b.__v17SpawnX,b.y-b.__v17SpawnY);
       if(tr+2<b.__v17FuseDist)continue;
+      /* The core already resolved this frame's direct hits and terrain.
+       * For a surviving, non-breaching shot with no direct victims, place the
+       * airburst at the FIRST crossing of the programmed fuse circle rather
+       * than at the FPS-dependent frame endpoint. Never rewind a registered
+       * hit or a high-penetration cover-breach path: those require the wider
+       * chronological resolver. The historical 2u early-trigger tolerance
+       * remains unchanged when the fuse circle was not actually crossed. */
+      if((b.hits||0)===0&&(b.pen||0)<2&&b.__novaBreachAtTime!==this.time&&tr>=b.__v17FuseDist&&
+         Number.isFinite(b.px)&&Number.isFinite(b.py)&&
+         Number.isFinite(b.__v17SpawnX)&&Number.isFinite(b.__v17SpawnY)){
+        var fx=b.px-b.__v17SpawnX,fy=b.py-b.__v17SpawnY;
+        var dx=b.x-b.px,dy=b.y-b.py,a=dx*dx+dy*dy;
+        var c=fx*fx+fy*fy-b.__v17FuseDist*b.__v17FuseDist;
+        if(a>1e-12&&c<0){
+          var h=fx*dx+fy*dy,disc=h*h-a*c;
+          if(disc>=0){
+            var root=Math.sqrt(disc),t=h>=0?-c/(h+root):(-h+root)/a;
+            if(t>=0&&t<=1){b.x=b.px+dx*t;b.y=b.py+dy*t;}
+          }
+        }
+      }
       var owner=this.getTank&&this.getTank(b.ownerId),frac=b.splashDmg||.36;
       if(!b.__v17FuseArmed)frac*=.72;
       if(b.shell&&this.clusterBurst)this.clusterBurst(b);
@@ -424,20 +510,32 @@ wrap('game/render',function(renderMod,require){
     ctx.restore();
   }
   function cannonDepth(g,t){
-    var a=g.input&&g.input.aim,range=g.weaponRange?g.weaponRange(t):650;
-    if(t.isPlayer&&a&&a.active){var mag=Math.hypot(a.dx||0,a.dy||0),d=clamp((mag-5)/55,.08,1);return clamp(range*(.20+.78*d),150,range*.965);}
-    if(t.__v17FuseRange&&t.__v17FuseDist)return t.__v17FuseDist;
-    return range*.72;
+    var depth=cannonInputDepth(g,t);
+    return cannonFuseDistance(g,t,depth==null?.72:depth,C[t.cls]);
   }
   function drawCannon(ctx,g,t){
     if(!t.isPlayer)return;
-    var a=g.input&&g.input.aim;if(!(a&&a.active)&&!(g.input&&g.input.mouseActive))return;
-    var dist=cannonDepth(g,t),x=t.x+Math.cos(t.angle)*dist,y=t.y+Math.sin(t.angle)*dist,def=C[t.cls],rad=(def&&def.bullet&&def.bullet.splash)||46;
-    ctx.save();ctx.globalCompositeOperation='lighter';ctx.strokeStyle='rgba(255,190,112,.78)';ctx.fillStyle='rgba(255,190,112,.07)';ctx.lineWidth=1.3;ctx.setLineDash([5,7]);
-    ctx.beginPath();ctx.moveTo(t.x,t.y);ctx.lineTo(x,y);ctx.stroke();ctx.setLineDash([]);
+    var input=g.input&&g.input.aim;
+    if(!(input&&input.active)&&!(g.input&&g.input.mouseActive))return;
+    var def=C[t.cls],shot=cannonShotPreview(g,t,def);
+    var dist=shot.dist,ox=shot.ox,oy=shot.oy,x=shot.x,y=shot.y;
+    /* A guaranteed earlier terrain impact supersedes the programmed fuse.
+     * Combined Arms owns the IMPACT glyph; avoid a false FUSE glyph beyond
+     * the wall. Potential cover breaches remain explicitly uncertain. */
+    var terrain=g.novaFusePreview?g.novaFusePreview(t):null;
+    var blocked=!!(terrain&&terrain.blocked);
+    if(blocked){x=terrain.x;y=terrain.y;}
+    var rad=(def&&def.bullet&&def.bullet.splash)||46;
+    ctx.save();ctx.globalCompositeOperation='lighter';
+    ctx.strokeStyle='rgba(255,190,112,.78)';ctx.fillStyle='rgba(255,190,112,.07)';
+    ctx.lineWidth=1.3;ctx.setLineDash([5,7]);
+    ctx.beginPath();ctx.moveTo(ox,oy);ctx.lineTo(x,y);ctx.stroke();ctx.setLineDash([]);
+    if(blocked){ctx.restore();return;}
     ctx.beginPath();ctx.arc(x,y,Math.max(15,rad*.32),0,TAU);ctx.fill();ctx.stroke();
     ctx.beginPath();ctx.moveTo(x-9,y);ctx.lineTo(x+9,y);ctx.moveTo(x,y-9);ctx.lineTo(x,y+9);ctx.stroke();
-    ctx.font='800 8px Orbitron,system-ui';ctx.textAlign='center';ctx.fillStyle='rgba(255,224,187,.90)';ctx.fillText('FUSE '+Math.round(dist),x,y-18);
+    ctx.font='800 8px Orbitron,system-ui';ctx.textAlign='center';
+    ctx.fillStyle='rgba(255,224,187,.90)';
+    ctx.fillText('FUSE '+Math.round(dist),x,y-18);
     ctx.restore();
   }
   function guardProf(id){

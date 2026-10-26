@@ -112,8 +112,12 @@
     return dx * dx + dy * dy <= rr * rr;
   }
 
-  /* Only needed for a lethal shell interception: compute the first time two
-   * moving projectile discs touch, rather than using their frame endpoints. */
+  /* A swept interception has already been established by the caller.
+   * Its burst must occur at the first physical contact, not at the endpoint.
+   * Near tangency, subtracting two large quadratic terms can round a real
+   * contact's discriminant below zero. Match the closest-approach predicate,
+   * use the cancellation-resistant entry root normally, and only bisect the
+   * rare numerical boundary case. Never run the slow path for ordinary hits. */
   function firstProjectileContactTime(a, b, rr) {
     var ax = a.px == null ? a.x : a.px, ay = a.py == null ? a.y : a.py;
     var bx = b.px == null ? b.x : b.px, by = b.py == null ? b.y : b.py;
@@ -123,10 +127,26 @@
     if (c <= 0) return 0;
     var aa = vx * vx + vy * vy;
     if (aa < 1e-9) return null;
-    var halfB = rx * vx + ry * vy, disc = halfB * halfB - aa * c;
-    if (disc < 0) return null;
-    var t = (-halfB - Math.sqrt(disc)) / aa;
-    return t >= 0 && t <= 1 ? t : null;
+    var halfB = rx * vx + ry * vy;
+    if (halfB >= 0) return null;
+    var closest = clamp(-halfB / aa, 0, 1);
+    var cx = rx + vx * closest, cy = ry + vy * closest;
+    if (cx * cx + cy * cy > rr * rr) return null;
+    var disc = halfB * halfB - aa * c;
+    if (disc >= 0) {
+      var denom = -halfB + Math.sqrt(disc);
+      var entry = denom > 0 ? c / denom : null;
+      if (entry != null && entry >= 0 && entry <= 1) return entry;
+    }
+    /* Only reached when the quadratic's discriminant or entry time is
+     * inconsistent with the confirmed swept hit. The first contact lies in [0, closest]. */
+    var lo = 0, hi = closest;
+    for (var i = 0; i < 44; i++) {
+      var mid = (lo + hi) * .5, mx = rx + vx * mid, my = ry + vy * mid;
+      if (mx * mx + my * my <= rr * rr) hi = mid;
+      else lo = mid;
+    }
+    return hi;
   }
 
   function burstShellAtContact(game, shell, time) {
@@ -403,7 +423,35 @@
     }
 
     Game.prototype.resolveBulletCollisions = function () {
-      for (var i = this.bullets.length - 1; i >= 0; i--) {
+      /* Preserve descending pair order and exact swept-disc narrow phase.
+       * At high projectile counts, reuse per-shot swept AABBs to reject
+       * geometrically impossible pairs before the costly closest-approach
+       * calculation. This is a necessary-only test: tangent/crossing paths
+       * and nonfinite coordinates always retain the original narrow phase.
+       * Tiny volleys skip the setup cost. */
+      var count = this.bullets.length, bounds = null;
+      if (count >= 32) {
+        bounds = this.__novaProjectileSweptBounds || (this.__novaProjectileSweptBounds = []);
+        bounds.length = count * 4;
+        for (var k = 0; k < count; k++) {
+          var shot = this.bullets[k], off = k * 4;
+          if (!shot) { bounds[off] = bounds[off+1] = bounds[off+2] = bounds[off+3] = NaN; continue; }
+          var px = shot.px == null ? shot.x : shot.px;
+          var py = shot.py == null ? shot.y : shot.py;
+          /* Malformed/nonfinite positions are never proof of separation.
+           * Defer those pairs to the original collision predicate. */
+          if (!Number.isFinite(px) || !Number.isFinite(py) ||
+              !Number.isFinite(shot.x) || !Number.isFinite(shot.y)) {
+            bounds[off] = bounds[off+1] = bounds[off+2] = bounds[off+3] = NaN;
+            continue;
+          }
+          bounds[off] = Math.min(px, shot.x);
+          bounds[off+1] = Math.max(px, shot.x);
+          bounds[off+2] = Math.min(py, shot.y);
+          bounds[off+3] = Math.max(py, shot.y);
+        }
+      }
+      for (var i = count - 1; i >= 0; i--) {
         var a = this.bullets[i];
         if (!a || a.dead) continue;
         this.initBulletIntegrity(a);
@@ -412,6 +460,13 @@
           if (!b || b.dead || b.ownerId === a.ownerId) continue;
           this.initBulletIntegrity(b);
           var rr = a.r + b.r + 1.5, dx = a.x - b.x, dy = a.y - b.y;
+          if (bounds && rr >= 0) {
+            var ia = i * 4, ib = j * 4;
+            if (bounds[ia] > bounds[ib+1] + rr ||
+                bounds[ib] > bounds[ia+1] + rr ||
+                bounds[ia+2] > bounds[ib+3] + rr ||
+                bounds[ib+2] > bounds[ia+3] + rr) continue;
+          }
           if (dx * dx + dy * dy > rr * rr && !sweptBulletHit(a, b, rr)) continue;
           if (alliedProjectileOwners(this, a, b)) continue;
           var ah = a.hp || 0, bh = b.hp || 0;

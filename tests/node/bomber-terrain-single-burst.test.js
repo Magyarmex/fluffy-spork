@@ -25,7 +25,7 @@ function realCoreUpdater() {
 }
 const coreUpdate = realCoreUpdater();
 
-function boot(performanceLayer) {
+function boot(performanceLayer, withDisciplines = false) {
   function Game() {
     this.hash = { query(_x, _y, _r, out) { out.length = 0; } };
     this.tmp = [];
@@ -48,14 +48,14 @@ function boot(performanceLayer) {
   };
   const ctx = { window: { __novaModules: modules }, console, Math, Map, Date,
     performance: { now: () => 0 } };
-  const files = ['battlefield-v1.6.0.js'];
+  const files = withDisciplines ? ['disciplines-v1.7.0.js', 'battlefield-v1.6.0.js'] : ['battlefield-v1.6.0.js'];
   if (performanceLayer) files.push('performance-v1.7.5.js');
   for (const file of files) vm.runInNewContext(
     fs.readFileSync(path.join(__dirname, '../../nova-updates', file), 'utf8'),
     ctx, { filename: file });
   const module = { exports: {} };
   modules['game/engine'](module, module.exports, spec => {
-    if (spec === './classes') return { CLASSES: { scout: { size: 14 } } };
+    if (spec === './classes') return { CLASSES: { scout: { size: 14 }, cannon: { size: 15 } }, lineageForClass: id => id === 'cannon' ? 'cannon' : 'scout' };
     if (spec === './types') return { ARENA_HALF: 2250 };
     throw new Error('Unexpected dependency: ' + spec);
   });
@@ -107,9 +107,11 @@ for (const optimized of [false, true]) {
   });
   test(label + ': penetrating destructible cover retains shell until actual expiry', () => {
     const { bursts, b, g } = fire(boot(optimized), {
-      destructible: true, pen: 3, ttl: 0.005,
+      destructible: true, pen: 3, ttl: 0.005, vx: 12000,
+      // Padded wall contact occurs before expiry, not after it.
     });
     assert.equal(g.__novaTerrain[0].solid, false);
+    assert.equal(b.__novaBreachAtTime, g.time, 'surviving cover breach must be stamped');
     assert.equal(bursts, 1, 'penetrating shell must still burst at TTL');
     assert.equal(b.dead, true);
   });
@@ -177,3 +179,45 @@ for(const optimized of [false,true]){
     assert.equal(hp,100);
   });
 }
+
+/* Real materialized core + Three Disciplines + Battlefield composition.
+ * Cannon's canonical 380u/s shell should burst at its reticle independent
+ * of the simulation frame that first crosses the programmed radius. */
+for(const fps of [30,60,120,240]){
+ test('shipping Cannon + Battlefield fuse at 380u/s, '+fps+'Hz',()=>{
+  const Game=boot(false,true),g=new Game(),bursts=[];
+  g.time=1;g.__novaBattlefield={coverBroken:0};g.__novaTerrain=[];
+  g.clusterBurst=b=>bursts.push([b.x,b.y]);g.weakenBullet=()=>{};
+  g.bullets=[{kind:'bullet',id:800+fps,ownerId:1,x:0,y:0,
+   vx:380,vy:0,r:8.5,dmg:26,ttl:2,shell:true,pen:1,hits:0,dead:false,
+   __v17Cannon:true,__v17FuseDist:150,__v17SpawnX:0,__v17SpawnY:0,
+   __v17FuseArmed:false,splash:72,splashDmg:.4,color:'#ffb45e'}];
+  for(let frame=0;frame<100&&g.bullets.length;frame++){
+   g.time+=1/fps;g.updateBullets(1/fps);
+  }
+  assert.equal(bursts.length,1,'one programmed airburst');
+  const step=380/fps,triggerFrame=Math.ceil((150-2)/step);
+  const endpoint=triggerFrame*step,expected=endpoint>=150?150:endpoint;
+  assert.ok(Math.abs(bursts[0][0]-expected)<1e-8,
+   'expected first fuse crossing or existing 2u early trigger '+expected+', got '+bursts[0][0]);
+  assert.equal(g.bullets.length,0);
+ });
+}
+
+test('shipping Cannon + Battlefield: earlier permanent wall wins over fuse',()=>{
+ const Game=boot(false,true),g=new Game(),origins=[];
+ g.time=1;g.__novaBattlefield={coverBroken:0};
+ g.__novaTerrain=[{id:-91,shape:'rect',x:80,y:0,w:20,h:80,
+  solid:true,destructible:false}];
+ g.clusterBurst=b=>origins.push(b.x);g.weakenBullet=()=>{};
+ g.bullets=[{kind:'bullet',id:991,ownerId:1,x:0,y:0,vx:380,vy:0,
+  r:8.5,dmg:26,ttl:2,shell:true,pen:1,hits:0,dead:false,
+  __v17Cannon:true,__v17FuseDist:150,__v17SpawnX:0,__v17SpawnY:0,
+  __v17FuseArmed:false,splash:72,splashDmg:.4,color:'#ffb45e'}];
+ for(let frame=0;frame<40&&g.bullets.length;frame++){
+  g.time+=1/30;g.updateBullets(1/30);
+ }
+ assert.equal(origins.length,1,'terrain impact must burst once');
+ assert.ok(origins[0]<80,'solid cover must win before the later fuse');
+ assert.equal(g.bullets.length,0);
+});

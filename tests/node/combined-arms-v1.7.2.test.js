@@ -6,11 +6,11 @@ const path = require('node:path');
 
 function loadCombinedArms() {
   const CLASSES = {
-    cannon:{id:'cannon',size:16}, siegebomber:{id:'siegebomber',size:17},
+    cannon:{id:'cannon',size:16}, siegebomber:{id:'siegebomber',size:17}, quake:{id:'quake',size:17},
     guard:{id:'guard',size:16}, twin:{id:'twin',size:14}, carrier:{id:'carrier',size:15}
   };
   function lineageForClass(id){
-    if(id==='cannon'||id==='siegebomber') return 'cannon';
+    if(id==='cannon'||id==='siegebomber'||id==='quake') return 'cannon';
     if(id==='guard') return 'guardian';
     if(id==='twin') return 'gunner';
     if(id==='carrier') return 'controller';
@@ -145,4 +145,16 @@ test('AI last-seen memory freezes hidden target coordinates',()=>{
   assert.equal(hunter.ai.__v172LastSeenX,120);
   assert.equal(hunter.ai.__v172LastSeenY,30);
   assert.equal(hunter.ai.__v172Investigating,true);
+});
+
+
+test('canonical Quake AI breach fire uses its intended structural impact multiplier',()=>{
+ const {Game}=loadCombinedArms(),g=new Game(),t=tank(2,'quake',{x:-200,ai:{targetId:7}});
+ g.tanks=[t];g.block={id:-2,shape:'rect',x:0,y:0,w:50,h:100,
+   destructible:true,hp:100,maxHp:200};
+ assert.equal(g.novaBreachCover(t,{solid:g.block,hit:{x:-25,y:0}}),true);
+ assert.equal(g.bullets[0].__v172BreachIntent,true);
+ assert.ok(g.bullets[0].__novaStructureMult>=2,
+   'Quake breach fire must receive the same canonical structural specialization as its design');
+ assert.equal(t.ai.targetId,7,'breaching must not expose hidden target coordinates');
 });

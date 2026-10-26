@@ -101,3 +101,13 @@ test('production materializer retires Command Weave and loads Live Vector last',
   assert.match(deploy, /grep -q 'nova-updates\/second-body-live-vector-v1\.10\.7\.js'/);
   assert.match(deploy, /! grep -q 'nova-updates\/controller-command-weave-v1\.10\.0\.js'/);
 });
+
+test('Controller canvas reminder is delayed on all viewports and avoids short-landscape upgrade badge', () => {
+  assert.match(source, /now>=\(g\.player\.__novaLiveVectorTutorialStart\|\|0\)/);
+  assert.doesNotMatch(source, /g\.w>=480\|\|now>=/);
+  assert.match(source, /hintY=!portrait&&g\.h<500\?g\.h\*\.57:g\.h\*\.72/);
+  // At 844x390 the hint lines sit at y=222.3/237.3, not y=280.8/295.8,
+  // where the collapsed upgrade badge occupies the center of the screen.
+  const h=390, y=h*.57;
+  assert.ok(y+15<h*.68);
+});
