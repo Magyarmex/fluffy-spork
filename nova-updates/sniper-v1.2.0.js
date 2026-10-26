@@ -423,7 +423,28 @@
     }
 
     Game.prototype.resolveBulletCollisions = function () {
-      for (var i = this.bullets.length - 1; i >= 0; i--) {
+      /* Preserve descending pair order and exact swept-disc narrow phase.
+       * At high projectile counts, reuse per-shot swept AABBs to reject
+       * geometrically impossible pairs before the costly closest-approach
+       * calculation. This is a necessary-only test: tangent/crossing paths
+       * and nonfinite coordinates always retain the original narrow phase.
+       * Tiny volleys skip the setup cost. */
+      var count = this.bullets.length, bounds = null;
+      if (count >= 32) {
+        bounds = this.__novaProjectileSweptBounds || (this.__novaProjectileSweptBounds = []);
+        bounds.length = count * 4;
+        for (var k = 0; k < count; k++) {
+          var shot = this.bullets[k], off = k * 4;
+          if (!shot) { bounds[off] = bounds[off+1] = bounds[off+2] = bounds[off+3] = NaN; continue; }
+          var px = shot.px == null ? shot.x : shot.px;
+          var py = shot.py == null ? shot.y : shot.py;
+          bounds[off] = Math.min(px, shot.x);
+          bounds[off+1] = Math.max(px, shot.x);
+          bounds[off+2] = Math.min(py, shot.y);
+          bounds[off+3] = Math.max(py, shot.y);
+        }
+      }
+      for (var i = count - 1; i >= 0; i--) {
         var a = this.bullets[i];
         if (!a || a.dead) continue;
         this.initBulletIntegrity(a);
@@ -432,6 +453,13 @@
           if (!b || b.dead || b.ownerId === a.ownerId) continue;
           this.initBulletIntegrity(b);
           var rr = a.r + b.r + 1.5, dx = a.x - b.x, dy = a.y - b.y;
+          if (bounds) {
+            var ia = i * 4, ib = j * 4;
+            if (bounds[ia] > bounds[ib+1] + rr ||
+                bounds[ib] > bounds[ia+1] + rr ||
+                bounds[ia+2] > bounds[ib+3] + rr ||
+                bounds[ib+2] > bounds[ia+3] + rr) continue;
+          }
           if (dx * dx + dy * dy > rr * rr && !sweptBulletHit(a, b, rr)) continue;
           if (alliedProjectileOwners(this, a, b)) continue;
           var ah = a.hp || 0, bh = b.hp || 0;
