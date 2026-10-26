@@ -438,6 +438,13 @@
           if (!shot) { bounds[off] = bounds[off+1] = bounds[off+2] = bounds[off+3] = NaN; continue; }
           var px = shot.px == null ? shot.x : shot.px;
           var py = shot.py == null ? shot.y : shot.py;
+          /* Malformed/nonfinite positions are never proof of separation.
+           * Defer those pairs to the original collision predicate. */
+          if (!Number.isFinite(px) || !Number.isFinite(py) ||
+              !Number.isFinite(shot.x) || !Number.isFinite(shot.y)) {
+            bounds[off] = bounds[off+1] = bounds[off+2] = bounds[off+3] = NaN;
+            continue;
+          }
           bounds[off] = Math.min(px, shot.x);
           bounds[off+1] = Math.max(px, shot.x);
           bounds[off+2] = Math.min(py, shot.y);
@@ -453,7 +460,7 @@
           if (!b || b.dead || b.ownerId === a.ownerId) continue;
           this.initBulletIntegrity(b);
           var rr = a.r + b.r + 1.5, dx = a.x - b.x, dy = a.y - b.y;
-          if (bounds) {
+          if (bounds && rr >= 0) {
             var ia = i * 4, ib = j * 4;
             if (bounds[ia] > bounds[ib+1] + rr ||
                 bounds[ib] > bounds[ia+1] + rr ||
