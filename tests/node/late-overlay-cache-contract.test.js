@@ -32,7 +32,7 @@ function canvas() {
 }
 function bootModules(withMenu=false) {
   const errors = [];
-  const store = new Map(), listeners = {};
+  const store = new Map(), listeners = {}, rafCallbacks=[];
   const menu = withMenu ? {
     children: [], isConnected: true, offsetParent: {},
     classList: {add: noop, remove: noop},
@@ -71,7 +71,7 @@ function bootModules(withMenu=false) {
     Uint8ClampedArray, ArrayBuffer, Promise, JSON, Symbol, Error, TypeError,
     RegExp, String, Boolean, Infinity, NaN, parseInt, parseFloat, isNaN,
     performance, setTimeout, clearTimeout, setInterval: () => 0,
-    clearInterval: noop, requestAnimationFrame: () => 0,
+    clearInterval: noop, requestAnimationFrame: fn => {rafCallbacks.push(fn);return rafCallbacks.length;},
     cancelAnimationFrame: noop, Image: class {}, Audio: class {},
     URL, Blob, TextEncoder, TextDecoder});
   vm.runInContext(inline, context, {filename: 'index.html#canonical-engine', timeout: 12000});
@@ -88,7 +88,7 @@ function bootModules(withMenu=false) {
   if(withMenu && listeners.DOMContentLoaded) listeners.DOMContentLoaded();
   const requireGame = window.__novaMakeRequire('');
   const Game = requireGame('game/engine').Game;
-  return {Game,window,requireGame,preRequireCache,menu,errors};
+  return {Game,window,requireGame,preRequireCache,menu,errors,rafCallbacks};
 }
 
 /* Research-only shipping-path acceptance. This verifies module ownership,
@@ -172,4 +172,19 @@ test('decorative War Room ecology cannot overwrite active playable-match diagnos
   for(let i=0;i<30;i++)decorative.update(1/60);
   assert.equal(window.NOVALivingFront.snapshot().age,active.age,
     'decorative updates cannot replace the active match snapshot');
+});
+
+test('actual decorative War Room advances two seconds without hijacking playable ecology',()=>{
+  const {menu,window,errors,rafCallbacks}=bootModules(true);
+  assert.equal(menu.children.filter(n=>n.className==='nv-lobby-battlefield').length,1);
+  let ts=100;
+  for(let i=0;i<28;i++){
+    const next=rafCallbacks.shift();
+    assert.equal(typeof next,'function','live War Room schedules its next frame');
+    next(ts);ts+=80;
+  }
+  assert.equal(window.NOVALivingFront.snapshot().active,false,
+    'menu simulation must never impersonate the active playable match');
+  assert.deepEqual(errors.filter(e=>!e.includes('React hooks unavailable')),[],
+    'two seconds of real decorative combat must not produce engine errors');
 });
