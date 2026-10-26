@@ -611,9 +611,9 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   * Never leave a partially backdated bullet live. */
  /* A single eligible shot may prove a local corridor even when remote fire
   * exceeds the global 900-comparison estimate. Its own full-entity scan
-  * remains capped; multiple eligible shots retain the global work gate. */
+  * remains capped; multi-shot local batches must pass a shared preflight. */
  var ISOLATED_RECOVERY_SCAN_CAP=1200;
- function isolatedTTLStationaryPiercingChain(g,b,dt,nonExpiring){
+ function isolatedTTLStationaryPiercingChain(g,b,dt,nonExpiring,localOthers){
   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
      b.__novaBreachAtTime===g.time||
      !(dt>0)||!(b.ttl>0)||
@@ -646,7 +646,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    * directly exercised test harness has no Game.update movement epoch;
    * live games do, so missing live witness conservatively abstains. */
   var tanks=g.tanks||[],shapes=g.shapes||[],drones=g.drones||[],
-      others=g.bullets||[],contacts=[];
+      others=localOthers||g.bullets||[],contacts=[];
   if(tanks.length+shapes.length+drones.length+others.length>
      ISOLATED_RECOVERY_SCAN_CAP)return false;
   for(var ti=0;ti<tanks.length;ti++){
@@ -1066,6 +1066,73 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   }
   return {x:x,y:y,ttl:b.ttl,remain:remain};
  }
+ /* A bounded, spatially local proof for several independent piercing shots.
+  * Do not spend the global budget on unrelated distant projectiles. Preflight
+  * every eligible shot before committing ANY extra damage: if the entire
+  * batch cannot be checked within the same conservative work ceiling, all
+  * shots retain the legacy engine's authority (no first-N array bias).
+  * This is a cheap O(shots * bullets) prefilter, NOT a general event solver. */
+ function localStationaryPiercingPlan(g,dt,nonExpiring){
+  var bullets=g.bullets||[],shots=[],bodyCost=(g.tanks||[]).length+
+      (g.shapes||[]).length+(g.drones||[]).length;
+  if(!(dt>0)||!Number.isFinite(dt))return null;
+  for(var i=0;i<bullets.length;i++){
+   var b=bullets[i];
+   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon)continue;
+   if(nonExpiring ? b.ttl>dt&&b.pen===1&&(b.hits||0)===0 :
+      b.ttl>0&&b.ttl<=dt&&
+       (b.pen>=1||(b.pen===0&&(b.hits||0)>0)))shots.push(b);
+  }
+  /* Limit worst-case scans even if all distant shots have empty corridors. */
+  if(shots.length<2||shots.length*bullets.length>12000)return null;
+  var plan=new Map(),work=0,seenTargets=new Set();
+  for(var si=0;si<shots.length;si++){
+   var b=shots[si],travelT=nonExpiring?dt:b.ttl;
+   if(!(travelT>0)||!Number.isFinite(travelT)||
+      !Number.isFinite(b.x)||!Number.isFinite(b.y)||
+      !Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
+      !Number.isFinite(b.r)||!(b.r>0))return null;
+   var ex=b.x+b.vx*travelT,ey=b.y+b.vy*travelT;
+   if(!Number.isFinite(ex)||!Number.isFinite(ey))return null;
+   var minx=Math.min(b.x,ex),maxx=Math.max(b.x,ex),
+       miny=Math.min(b.y,ey),maxy=Math.max(b.y,ey),local=[];
+   /* If two shots might contact the same hull, their damage and defense
+    * changes are not independent. Defer the whole batch rather than let
+    * projectile array order decide which shortcut runs first. */
+   var tanks=g.tanks||[];
+   for(var ti=0;ti<tanks.length;ti++){
+    var t=tanks[ti];if(!t||!t.alive||t.id===b.ownerId)continue;
+    var def=CLASSES[t.cls],size=def&&Number.isFinite(def.size)?
+       Math.max(0,def.size):120;
+    var pad=b.r+size+3,tx=t.x,ty=t.y,
+        px=t.__novaSweepMoveTime===g.time?t.__novaSweepPrevX:tx,
+        py=t.__novaSweepMoveTime===g.time?t.__novaSweepPrevY:ty;
+    if(!Number.isFinite(tx)||!Number.isFinite(ty)||
+       !Number.isFinite(px)||!Number.isFinite(py))return null;
+    if(Math.max(tx,px)+pad>=minx&&Math.min(tx,px)-pad<=maxx&&
+       Math.max(ty,py)+pad>=miny&&Math.min(ty,py)-pad<=maxy){
+     if(seenTargets.has(t))return null;
+     seenTargets.add(t);
+    }
+   }
+   for(var bi=0;bi<bullets.length;bi++){
+    var o=bullets[bi];if(!o||o===b||o.dead)continue;
+    var ox=o.x,oy=o.y,tx=ox+(o.vx||0)*dt,
+        ty=oy+(o.vy||0)*dt,pad=(o.r||2)+b.r+2;
+    /* Unknown motion must remain a veto candidate, never be discarded. */
+    if(!Number.isFinite(ox)||!Number.isFinite(oy)||
+       !Number.isFinite(tx)||!Number.isFinite(ty)||
+       !Number.isFinite(pad)||
+       (Math.max(ox,tx)+pad>=minx&&Math.min(ox,tx)-pad<=maxx&&
+        Math.max(oy,ty)+pad>=miny&&Math.min(oy,ty)-pad<=maxy))
+     local.push(o);
+   }
+   var cost=bodyCost+local.length+1;
+   if(cost>ISOLATED_RECOVERY_SCAN_CAP||(work+=cost)>900)return null;
+   plan.set(b,local);
+  }
+  return plan;
+ }
  var oldUpdateBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var terrain=ensureTerrain(this);
  /* Bound pairwise geometry per frame, not total bullets: one expiring shot
   * remains eligible in a crowded but spatially separated firefight. When
@@ -1109,23 +1176,38 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
  var bodyWork=this.bullets.length+(this.tanks||[]).length+
    (this.shapes||[]).length+(this.drones||[]).length;
  var projected=expiring*bodyWork;
- if(projected>0&&(projected<=900||
-    (expiring===1&&bodyWork<=ISOLATED_RECOVERY_SCAN_CAP)))
+ var legacyExpiring=projected>0&&(projected<=900||
+    (expiring===1&&bodyWork<=ISOLATED_RECOVERY_SCAN_CAP));
+ var localExpiring=!legacyExpiring&&expiring>1?
+    localStationaryPiercingPlan(this,dt,false):null;
+ if(legacyExpiring||localExpiring)
   for(var pre=this.bullets.length-1;pre>=0;pre--){
    var expiringBullet=this.bullets[pre];
-   if(!isolatedTTLStationaryPiercingChain(this,expiringBullet,dt))
+   if(localExpiring){
+    if(localExpiring.has(expiringBullet))
+     isolatedTTLStationaryPiercingChain(this,expiringBullet,dt,false,
+      localExpiring.get(expiringBullet));
+   }else if(!isolatedTTLStationaryPiercingChain(this,expiringBullet,dt))
     isolatedTTLBodyContact(this,expiringBullet,dt);
   }
  /* Non-expiring pen=1 shots may exhaust both contacts within this frame.
   * Reuse the identical physical-first-contact proof, but only when the
   * entire penetration budget is consumed before the frame boundary.
   * A surviving or uncertain round stays with the original engine. */
- if(paired>0&&(paired*bodyWork<=900||
-    (paired===1&&bodyWork<=ISOLATED_RECOVERY_SCAN_CAP)))
+ var legacyPaired=paired>0&&(paired*bodyWork<=900||
+    (paired===1&&bodyWork<=ISOLATED_RECOVERY_SCAN_CAP));
+ var localPaired=!legacyPaired&&paired>1?
+    localStationaryPiercingPlan(this,dt,true):null;
+ if(legacyPaired||localPaired)
   for(var pair=this.bullets.length-1;pair>=0;pair--){
    var liveBullet=this.bullets[pair];
-   if(liveBullet&&liveBullet.ttl>dt)
-    isolatedTTLStationaryPiercingChain(this,liveBullet,dt,true);
+   if(liveBullet&&liveBullet.ttl>dt){
+    if(localPaired){
+     if(localPaired.has(liveBullet))
+      isolatedTTLStationaryPiercingChain(this,liveBullet,dt,true,
+       localPaired.get(liveBullet));
+    }else isolatedTTLStationaryPiercingChain(this,liveBullet,dt,true);
+   }
   }
  for(var i=0;i<this.bullets.length;i++){var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,sweepDt=dt;/* Terrain beyond physical projectile lifetime is unreachable, including shells. */if(Number.isFinite(b.ttl)){if(b.ttl<=0)continue;sweepDt=Math.min(dt,b.ttl);}var nx=ox+(b.vx||0)*sweepDt,ny=oy+(b.vy||0)*sweepDt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;if(fuseDefinitelyBeforeTerrain(this,b,dt,ox,oy,nx,ny,fh.hit))continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){b.__novaBreachAtTime=this.time;b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
    /* The core still advances a dead bullet before removing it; a shell may
