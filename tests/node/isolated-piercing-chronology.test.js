@@ -939,3 +939,18 @@ for(const optimized of [false,true])for(const fps of [30,60]){
   assert.deepEqual(victims.map(v=>v.hitCount),Array(10).fill(1));
  });
 }
+
+
+for(const optimized of [false,true])for(const fps of [30,60]){
+ test((optimized?'optimized':'baseline')+
+  ' non-expiring five-shot chronology ignores 960 remote piercing rounds at '+fps+'Hz',()=>{
+  const Game=boot(undefined,optimized);
+  const {g,victims}=multiShotRemoteWorld(Game,5,960);
+  for(const b of g.bullets){
+   b.pen=1;b.ttl=.2;
+  }
+  const dt=.35/fps;
+  for(let frame=0;frame<3;frame++){g.time+=dt;g.updateBullets(dt);}
+  assert.deepEqual(victims.map(v=>v.hitCount),Array(10).fill(1));
+ });
+}
