@@ -8,9 +8,30 @@ function edge(s,k){var m=ARENA-120;k=k||1;if(s.x>m)s.vx-=((s.x-m)/120)*24*k;if(s
 function los(g,ax,ay,bx,by,pad){return !g.hasLineOfSight||g.hasLineOfSight(ax,ay,bx,by,pad||2);}
 var BULLET_CELL=180;
 function bulletKey(cx,cy){return cx*10000+cy;}
-function bulletIndex(g){var ix=g.__lfBulletIndex;if(ix)return ix;return g.__lfBulletIndex={cell:BULLET_CELL,cells:new Map(),active:[],creates:0};}
+function bulletIndex(g){var ix=g.__lfBulletIndex;if(ix)return ix;return g.__lfBulletIndex={cell:BULLET_CELL,cells:new Map(),active:[],creates:0,queryStamp:0,querySeen:new WeakMap()};}
 function buildBulletIndex(g,st){var ix=bulletIndex(g),active=ix.active;for(var i=0;i<active.length;i++)active[i].length=0;active.length=0;var seen=Object.create(null),bs=g.bullets||[],cell=ix.cell;for(i=0;i<bs.length;i++){var b=bs[i];if(!b||b.dead)continue;var cx=Math.floor(b.x/cell),cy=Math.floor(b.y/cell),key=bulletKey(cx,cy),bucket=ix.cells.get(key);if(!bucket){bucket=[];ix.cells.set(key,bucket);ix.creates++;}if(bucket.length===0)active.push(bucket);bucket.push(b);var si=sectorIndex(b.x,b.y);if(!seen[si]){seen[si]=1;LF.addPressure(g,b.x,b.y,.005);}}return ix;}
-function queryBullets(g,x,y,r,out){var ix=g.__lfBulletIndex;if(!ix)return out;var cell=ix.cell,cx0=Math.floor((x-r)/cell),cx1=Math.floor((x+r)/cell),cy0=Math.floor((y-r)/cell),cy1=Math.floor((y+r)/cell),rr=r*r;for(var cx=cx0;cx<=cx1;cx++)for(var cy=cy0;cy<=cy1;cy++){var a=ix.cells.get(bulletKey(cx,cy));if(!a)continue;for(var i=0;i<a.length;i++){var b=a[i];if(!b||b.dead||d2(x,y,b.x,b.y)>rr)continue;var exists=false;for(var j=0;j<out.length;j++)if(out[j]===b){exists=true;break;}if(!exists)out.push(b);}}return out;}
+/* One bullet occupies exactly one grid cell, but duplicate references and
+ * fallback hashes may still prepopulate the output. Reuse a per-world weak
+ * identity map instead of scanning an ever-growing output for every bullet:
+ * dense-fire queries are linear, and no projectile objects are mutated. */
+function queryBullets(g,x,y,r,out){
+ var ix=g.__lfBulletIndex;if(!ix)return out;
+ var cell=ix.cell,cx0=Math.floor((x-r)/cell),cx1=Math.floor((x+r)/cell),
+     cy0=Math.floor((y-r)/cell),cy1=Math.floor((y+r)/cell),rr=r*r;
+ var stamp=++ix.queryStamp;
+ if(stamp>1000000000){stamp=ix.queryStamp=1;ix.querySeen=new WeakMap();}
+ var seen=ix.querySeen;
+ for(var j=0;j<out.length;j++){var pre=out[j];if(pre&&pre.kind==='bullet')seen.set(pre,stamp);}
+ for(var cx=cx0;cx<=cx1;cx++)for(var cy=cy0;cy<=cy1;cy++){
+  var a=ix.cells.get(bulletKey(cx,cy));if(!a)continue;
+  for(var i=0;i<a.length;i++){
+   var b=a[i];
+   if(!b||b.dead||d2(x,y,b.x,b.y)>rr||seen.get(b)===stamp)continue;
+   seen.set(b,stamp);out.push(b);
+  }
+ }
+ return out;
+}
 function calmNeighbor(st,i){var ns=neighbors(i),cur=st.sectors[i],best=-1,delta=.12;for(var k=0;k<ns.length;k++){var q=st.sectors[ns[k]],d=(cur.pressure-q.pressure)*.90+(q.maturity-cur.maturity)*.18;if(d>delta){delta=d;best=ns[k];}}return best;}
 function migrate(st,s,defs){if(!({circle:1,triangle:1,square:1,pentagon:1})[s.type]){s.__lfMigrationIntent=-1;return;}var i=sectorIndex(s.x,s.y),to=calmNeighbor(st,i);if(to<0){s.__lfMigrationIntent=-1;return;}var c=sectorCenter(to),dx=c.x-s.x,dy=c.y-s.y,m=Math.hypot(dx,dy)||1,res=s.type==='pentagon'?.20:s.type==='square'?.34:s.type==='triangle'?.65:.54,sp=speed(defs,s.type);s.vx+=dx/m*sp*.24*res;s.vy+=dy/m*sp*.24*res;s.__lfMigrationIntent=to;cap(s,sp*(s.type==='triangle'?2:1.45));}
 function transition(st,s){var n=sectorIndex(s.x,s.y),o=s.__lfSector;if(o==null){s.__lfSector=n;return;}if(n===o)return;if(s.__lfMigrationIntent===n){var a=sectorCenter(o),b=sectorCenter(n),dx=b.x-a.x,dy=b.y-a.y,m=Math.hypot(dx,dy)||1;st.sectors[o].outbound++;st.sectors[n].inbound++;st.sectors[o].flowX+=dx/m;st.sectors[o].flowY+=dy/m;st.migrationHeat++;st.migrationX+=dx/m;st.migrationY+=dy/m;st.migrationTransitions++;}s.__lfSector=n;}
