@@ -71,8 +71,19 @@ t0=performance.now();for(let f=0;f<frames;f++){const frameIndex=indexProjectiles
 const buildAndQueryMs=performance.now()-t0;
 t0=performance.now();for(let f=0;f<frames;f++)for(const q of qps)built+=oracle(ps,q,dt).length;
 const frameBruteMs=performance.now()-t0;
+const sizeSweep=[];
+for(const count of [20,50,100,300,1000]){
+ const items=ps.slice(0,count),repeats=500;let sink=0;
+ let t=performance.now();for(let f=0;f<repeats;f++){
+  const frameIndex=indexProjectiles(items,dt);for(const q of qps)sink+=query(frameIndex,q).length;
+ }
+ const indexedMs=performance.now()-t;
+ t=performance.now();for(let f=0;f<repeats;f++)for(const q of qps)sink+=oracle(items,q,dt).length;
+ const bruteMs=performance.now()-t;
+ sizeSweep.push({projectiles:count,indexed_ms:indexedMs,brute_ms:bruteMs,speedup:bruteMs/indexedMs});
+}
 const result={kind:'research-only swept AABB broadphase',worlds,queries,metamorphic,
  false_negatives:misses,false_positives:extras,background_projectiles:n,independent_queries:qps.length,
- candidate_count:query(ix,qps[0]).length,benchmark:{index_ms:indexMs,brute_ms:bruteMs,
+ candidate_count:query(ix,qps[0]).length,size_sweep:sizeSweep,benchmark:{index_ms:indexMs,brute_ms:bruteMs,
  speedup:bruteMs/indexMs,frame_build_plus_five_queries_ms:buildAndQueryMs,frame_brute_five_queries_ms:frameBruteMs,frame_speedup:frameBruteMs/buildAndQueryMs},note:'Synthetic candidate discovery only. No gameplay chronology, side effects or phone FPS proven.'};
 console.log(JSON.stringify(result,null,2));
