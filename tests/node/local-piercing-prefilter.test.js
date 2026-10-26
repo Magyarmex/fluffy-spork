@@ -176,3 +176,17 @@ test('960 distant piercing rounds cannot exhaust the local preflight',()=>{
  assert.ok(p,'remote expiring piercing shots are not local proof work');
  assert.deepEqual(new Set(p.keys()),new Set(local));
 });
+
+
+test('candidate-target scan remains bounded when remote piercing density explodes',()=>{
+ const local=Array.from({length:5},(_,i)=>shot(i*160));
+ const remote=Array.from({length:1500},(_,i)=>({
+  ...shot(1100+Math.floor(i/20)*3),x:900+(i%20)*3,vx:0
+ }));
+ const g=world([...local,...remote],0,120);
+ for(let i=0;i<5;i++)g.tanks.push(
+  {id:2*i+2,x:40,y:i*160,cls:'scout',alive:true,hp:100},
+  {id:2*i+3,x:65,y:i*160,cls:'scout',alive:true,hp:100});
+ assert.equal(plan(g,.35/30,false),null,
+  'do not trade local fairness for an unbounded O(projectiles * hulls) scan');
+});
