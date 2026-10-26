@@ -94,3 +94,67 @@ test('centered mouse retains current gun bearing through camera easing',()=>{
  g.update(1/60);
  assert.equal(g.player.angle,1.25);
 });
+
+/* The Controller Command Node must follow the same post-update camera as the
+ * cannon. Exercise the actual command function from the shipping overlay. */
+const helperStart=controller.indexOf('    function renderedMouseCamera(');
+const commandStart=controller.indexOf('    function updatePlayerCommand(',helperStart);
+const commandEnd=controller.indexOf('    function updateAICommand(',commandStart);
+assert.ok(helperStart>=0&&commandStart>helperStart&&commandEnd>commandStart,
+  'shared projection and real Controller command are present');
+const updateCommand=new Function('clamp','maxCommandRange','clampNode',
+  controller.slice(helperStart,commandEnd)+'\nreturn updatePlayerCommand;')(
+  (v,a,b)=>Math.max(a,Math.min(b,v)),()=>1000,
+  (_owner,x,y)=>({x,y}));
+function commandState(){
+ return {angle:0,wasActive:false,lastCommandCue:-99,lastRecallCue:-99,
+   nodeX:0,nodeY:0,strikeAt:0};
+}
+for(const hz of [30,60,120,240]){
+ test('Controller mouse Command Node matches rendered camera at '+hz+'Hz',()=>{
+  const Game=boot(),g=new Game(),dt=1/hz;
+  g.player.cls='carrier';g.time=1;g.sfx={};g.__novaMouseAimFrameDt=dt;
+  const state=commandState();
+  updateCommand(g,g.player,state,{droneLeash:1000},dt);
+  cameraStep.call(g,dt,{lerp:(a,b,t)=>a+(b-a)*t});
+  const rect=g.canvas.getBoundingClientRect();
+  const wx=g.cam.x+(g.input.mouseX-rect.left-g.w*.5)/g.cam.zoom;
+  const wy=g.cam.y+(g.input.mouseY-rect.top-g.h*.5)/g.cam.zoom;
+  assert.equal(state.active,true);
+  assert.ok(Math.abs(state.nodeX-wx)<1e-10,'command X follows visible cursor');
+  assert.ok(Math.abs(state.nodeY-wy)<1e-10,'command Y follows visible cursor');
+  assert.ok(Math.abs(state.angle-Math.atan2(wy-g.player.y,wx-g.player.x))<1e-10);
+ });
+}
+test('Controller tactical command respects Long Glass restored projection',()=>{
+ const Game=boot(),g=new Game(),dt=1/30;
+ g.player.cls='carrier';g.time=1;g.sfx={};
+ g.__novaMouseAimFrameDt=dt;
+ g.__novaTacticalCamera={active:true,transition:true};
+ g.cam={x:50,y:30,zoom:.4,shake:0};g.zoom=.4;
+ const state=commandState(),stable={...g.cam};
+ updateCommand(g,g.player,state,{droneLeash:1000},dt);
+ cameraStep.call(g,dt,{lerp:(a,b,t)=>a+(b-a)*t});
+ Object.assign(g.cam,stable);
+ assert.ok(Math.abs(state.nodeX-(50+200/.4))<1e-10);
+ assert.ok(Math.abs(state.nodeY-(30+100/.4))<1e-10);
+});
+test('Controller touch command is independent of camera prediction',()=>{
+ const Game=boot(),g=new Game();
+ g.player.cls='carrier';g.time=1;g.sfx={};
+ g.__novaMouseAimFrameDt=1/30;
+ g.input.aim={active:true,dx:0,dy:-40};
+ const state=commandState();
+ updateCommand(g,g.player,state,{droneLeash:1000},1/30);
+ assert.equal(state.active,true);
+ assert.ok(Math.abs(state.nodeX-g.player.x)<1e-10);
+ assert.ok(state.nodeY<g.player.y);
+});
+test('unfired mouse does not create a Controller command',()=>{
+ const Game=boot(),g=new Game();
+ g.player.cls='carrier';g.time=1;g.sfx={};
+ g.__novaMouseAimFrameDt=1/60;g.input.firing=false;
+ const state=commandState();
+ updateCommand(g,g.player,state,{droneLeash:1000},1/60);
+ assert.equal(state.active,false);
+});
