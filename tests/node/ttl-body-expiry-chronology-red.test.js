@@ -244,3 +244,42 @@ for (const fps of [30, 60, 120, 240]) {
     assert.equal(g.hits, 0);
   });
 }
+
+/* Run 365: a TTL recovery that fixes only the FIRST body is not enough for
+ * piercing. Both hulls are physically reached before the projectile expires,
+ * and neither is shielded, allied, or behind cover. These are KNOWN-RED
+ * acceptance tests; do not merge the research branch to production. */
+for (const fps of [30, 60, 120, 240]) {
+  for (const weapon of ['minigun', 'marksman']) {
+    test('KNOWN RED #234: ordered piercing contacts for ' + weapon + ' at ' + fps + 'Hz', () => {
+      const g = new Game();
+      g.hitIds = [];
+      g.damageTank = function(t) { this.hits++; this.hitIds.push(t.id); };
+      const isMinigun = weapon === 'minigun';
+      const x1 = isMinigun ? 365 : 25;
+      const x2 = isMinigun ? 397 : 52;
+      g.tanks = [
+        { kind: 'tank', id: 2, x: x1, y: 0,
+          cls: 'scout', hp: 100, alive: true },
+        { kind: 'tank', id: 3, x: x2, y: 0,
+          cls: 'scout', hp: 100, alive: true }
+      ];
+      g.bullets = [{
+        kind: 'bullet', id: 1, ownerId: 1,
+        x: 0, y: 0, px: 0, py: 0,
+        vx: isMinigun ? 480 : 1050, vy: 0,
+        r: isMinigun ? 3.8 * (1 + 7 * .0085) : 5.5,
+        dmg: isMinigun ? 7 : 21,
+        ttl: isMinigun ? .795 : .03,
+        pen: isMinigun ? 1 : 2,
+        hits: 0, dead: false, shell: false, beam: false
+      }];
+      for (let frame = 0; frame < 300 && g.bullets.length; frame++) {
+        g.updateBullets(1 / fps);
+        g.time += 1 / fps;
+      }
+      assert.deepEqual(g.hitIds, [2, 3],
+        'both physically reachable hulls must be struck once before expiry');
+    });
+  }
+}
