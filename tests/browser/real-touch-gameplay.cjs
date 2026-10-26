@@ -64,7 +64,7 @@ async function run(browser,label,viewport){
     move:i&&{active:i.move.active,dx:i.move.dx,dy:i.move.dy,id:i.stickId.move},
     aim:i&&{active:i.aim.active,dx:i.aim.dx,dy:i.aim.dy,id:i.stickId.aim},
     firing:i?.firing,shots:window.__novaTouchShots,
-    swarm:p?.__novaSwarm&&{active:p.__novaSwarm.active,nodeX:p.__novaSwarm.nodeX,nodeY:p.__novaSwarm.nodeY,power:p.__novaSwarm.power}};
+    swarm:p?.__novaSwarm&&{active:p.__novaSwarm.active,angle:p.__novaSwarm.angle,nodeX:p.__novaSwarm.nodeX,nodeY:p.__novaSwarm.nodeY,power:p.__novaSwarm.power}};
   });
   async function both(){
    await send('touchStart',[left]);
@@ -143,7 +143,9 @@ async function run(browser,label,viewport){
   assert.equal(warden.swarm?.active,true,label+': right touch activates Controller swarm command');
   assert.ok(Math.hypot(warden.swarm.nodeX-warden.x,warden.swarm.nodeY-warden.y)>35,
    label+': Controller command node follows live touch direction/depth: '+JSON.stringify(warden));
-  const commandBearing=Math.atan2(warden.swarm.nodeY-warden.y,warden.swarm.nodeX-warden.x);
+  // The command node is clamped at arena edges; its final displacement can
+  // differ from the requested bearing. Compare the authoritative stick bearing.
+  const commandBearing=warden.swarm.angle;
   const stickBearing=Math.atan2(warden.aim.dy,warden.aim.dx);
   const bearingError=Math.atan2(Math.sin(commandBearing-stickBearing),Math.cos(commandBearing-stickBearing));
   assert.ok(Math.abs(bearingError)<0.12,
