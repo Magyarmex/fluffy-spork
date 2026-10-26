@@ -19,22 +19,23 @@ function boot(){
   fs.readFileSync(path.join(root,file),'utf8'),context,{filename:file});
  return window;
 }
-function scenario({x=715,indexed=true,blocked=false,existing=false,dt=.12,extra=[]}={}){
+function scenario({x=715,indexed=true,blocked=false,existing=false,dt=.12,extra=[],tank=false}={}){
  const window=boot(),LF=window.__NOVA_LIVING_FRONT_INTERNAL__;
  const cr={id:1,kind:'shape',type:'crasher',x:0,y:0,hp:100,maxHp:100,
   r:15,vx:0,vy:0,__lfPredatorState:'track',__lfPredatorT:.2,
   __lfTargetId:existing?2:-1,__lfTargetKind:existing?'shape':''};
- const target={id:2,kind:'shape',type:'circle',x,y:0,hp:1,maxHp:20,
+ const target={id:2,kind:tank?'tank':'shape',type:'circle',x,y:0,hp:1,maxHp:20,
   r:12,vx:0,vy:0};
- const shapes=[cr,target,...extra],rays=[];
- const g={time:10,shapes,bullets:[],tanks:[],
+ const shapes=[cr,...(tank?[]:[target]),...extra],rays=[],tanks=tank?[target]:[];
+ const g={time:10,shapes,bullets:[],tanks,
   getShape(id){return shapes.find(s=>s.id===id)||null;},
+  getTank(id){return tanks.find(t=>t.id===id)||null;},
   hasLineOfSight(ax,ay,bx,by){rays.push([ax,ay,bx,by]);return !blocked;}};
  if(indexed){
   g.hash=window.__NOVA_PERFORMANCE_2_TEST__.optimizeHash({
    cell:180,map:new Map()
   });
-  for(const s of shapes)g.hash.insert(s);
+  for(const s of [...shapes,...tanks])g.hash.insert(s);
  }
  const defs={circle:{speed:60,xp:10},crasher:{speed:105,xp:60}};
  const st=LF.ensure(g,defs);
@@ -81,4 +82,10 @@ test('fix is wired into the materialized Living Front runtime',()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
  assert.ok(html.includes('nova-updates/living-front-instincts-v1.12.0.js'));
  assert.ok(html.includes('nova-updates/performance-v1.7.8.js'));
+});
+
+test('low-health tank beyond sensing radius is not secretly acquired',()=>{
+ assert.equal(scenario({x:715,tank:true,indexed:true}).cr.__lfTargetId,-1);
+ assert.equal(scenario({x:715,tank:true,indexed:false}).cr.__lfTargetId,-1);
+ assert.equal(scenario({x:690,tank:true,indexed:true}).cr.__lfTargetId,2);
 });
