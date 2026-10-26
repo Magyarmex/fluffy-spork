@@ -285,3 +285,25 @@ test('fair no-target flee never dereferences a hidden player or leaks a temporar
   assert.equal(bot.ai.__v1112TargetId,-1,'no hidden player target is introduced');
   assert.ok(Number.isFinite(bot.x)&&Number.isFinite(bot.y));
 });
+
+test('fair flee keeps a genuinely visible human threat authoritative',()=>{
+  const {Game,requireGame}=bootModules();
+  const ai=requireGame('game/ai');
+  const g=new Game(canvas(),canvas(),{hud:noop,event:noop},'low');
+  const human=g.player,bot=g.tanks.find(t=>t&&!t.isPlayer);
+  assert.ok(bot);
+  g.tanks=[bot,human];g.time=10;g.cam.zoom=1;g.w=800;g.h=600;
+  bot.x=0;bot.y=0;human.x=90;human.y=0;human.spawnShieldT=0;
+  bot.ai.state='flee';bot.ai.thinkT=1;bot.ai.__v1112TargetId=human.id;
+  const originalNearest=g.nearestTank;
+  g.nearestTank=function(x,y,max,exclude){
+    if(max===900&&exclude===bot.id)return human;
+    return originalNearest.apply(this,arguments);
+  };
+  const nearest=g.nearestTank;
+  assert.doesNotThrow(()=>ai.updateAI(bot,g,1/60));
+  assert.equal(bot.ai.__v1112TargetId,human.id,
+    'a legitimately visible human remains the actual fair target');
+  assert.equal(g.nearestTank,nearest);
+  assert.equal(g.player,human);
+});
