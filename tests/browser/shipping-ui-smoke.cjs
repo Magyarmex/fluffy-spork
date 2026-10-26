@@ -74,6 +74,48 @@ async function scenario(browser, label, options) {
     assert.equal(menu.decorative,true,label+': War Room must be visible');
     assert.equal(menu.active,false,label+': War Room must not impersonate active game');
     await page.screenshot({path:path.join(output,label+'-menu.png')});
+    // Fieldcraft's rotating briefing must render every registered lesson in full.
+    // The previous fixed-height line silently cropped longer tactical advice on
+    // 320px handsets even though the primary lobby buttons remained visible.
+    if(label==='mobile-320-short'||label==='mobile-320'||label==='mobile-360'){
+      await page.locator('.nova-tip-line').waitFor({state:'visible',timeout:15000});
+      const tipFit=await page.evaluate(()=>{
+        const line=document.querySelector('.nova-tip-line');
+        const surface=line?.closest('[data-nova-slot="tips"]')||line?.parentElement;
+        const tips=window.NOVATips?.current?.()||[];
+        if(!line||!surface||!tips.length)return {error:'shipping Fieldcraft surface or registry unavailable'};
+        const original=line.textContent;
+        let worst={overflow:-1,height:0,id:null,text:null};
+        for(const tip of tips){
+          line.textContent=tip.text;
+          const range=document.createRange();range.selectNodeContents(line);
+          const glyph=range.getBoundingClientRect();
+          const panel=surface.getBoundingClientRect();
+          const overflow=Math.max(0,line.scrollHeight-line.clientHeight,
+            glyph.bottom-panel.bottom,glyph.bottom-innerHeight);
+          if(overflow>worst.overflow||
+             (overflow===worst.overflow&&glyph.height>worst.height))
+            worst={overflow,height:glyph.height,id:tip.id,text:tip.text};
+        }
+        line.textContent=worst.text;
+        return {count:tips.length,worst,viewport:innerWidth,height:innerHeight,
+          panel:surface.getBoundingClientRect().toJSON(),
+          line:line.getBoundingClientRect().toJSON(),
+          lineScrollHeight:line.scrollHeight,lineClientHeight:line.clientHeight,
+          overflowStyle:getComputedStyle(line).overflowY,
+          original};
+      });
+      assert.ok(!tipFit.error,label+': '+JSON.stringify(tipFit));
+      await page.screenshot({path:path.join(output,label+'-longest-fieldcraft-tip.png')});
+      await page.evaluate(original=>{
+        const line=document.querySelector('.nova-tip-line');
+        if(line)line.textContent=original;
+      },tipFit.original);
+      assert.ok(tipFit.worst.overflow<=1,
+        label+': every registered Fieldcraft tip must fit its actual lobby card and viewport: '+JSON.stringify(tipFit));
+      console.log('NOVA_FIELDCRAFT_TIP_FIT '+JSON.stringify({label,...tipFit,original:undefined}));
+    }
+
     // A 320x568 CSS-pixel handset must expose the complete primary lobby,
     // not merely a centered Deploy button with the archive/control row clipped.
     if(label==='mobile-320-short'){
