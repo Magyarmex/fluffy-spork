@@ -33,6 +33,16 @@ async function scenario(browser, label, options) {
     assert.equal(menu.active,false,label+': War Room must not impersonate active game');
     await page.screenshot({path:path.join(output,label+'-menu.png')});
 
+    // Observe the actual React-owned Game instance without replacing its update logic.
+    await page.evaluate(()=>{
+      const Game=window.__novaMakeRequire('')('game/engine').Game;
+      const original=Game.prototype.update;
+      Game.prototype.update=function(dt){
+        if(!this.__novaDecorativeWorld)window.__novaBrowserLiveGame=this;
+        return original.apply(this,arguments);
+      };
+    });
+
     await deploy.click();
     await page.locator('canvas.absolute.inset-0').waitFor({state:'visible',timeout:30000});
     await page.waitForTimeout(1300);
@@ -77,6 +87,29 @@ async function scenario(browser, label, options) {
     await page.waitForTimeout(600);
     const resumed=await page.evaluate(()=>window.NOVALivingFront.snapshot().age);
     assert.ok(resumed>paused,label+': resume must restart ecological simulation');
+
+    // Exercise Controller on the same live React/game path, not a synthetic VM.
+    await page.evaluate(()=>{
+      const g=window.__novaBrowserLiveGame;
+      if(!g||!g.player)throw new Error('React-owned playable Game missing');
+      g.setClass(g.player,'warden');
+      g.player.spawnShieldT=20;
+    });
+    await page.waitForTimeout(1000);
+    const controller=await page.evaluate(()=>{
+      const g=window.__novaBrowserLiveGame;
+      return {
+        cls:g.player.cls,
+        drones:g.drones.filter(d=>d.ownerId===g.player.id&&d.hp>0).length,
+        ecology:!!g.__lfState,
+        playing:g.status==='playing'
+      };
+    });
+    assert.equal(controller.cls,'warden',label+': live Controller class transition works');
+    assert.ok(controller.drones>0,label+': Controller actually deploys allied drones');
+    assert.equal(controller.ecology,true,label+': ecology remains active after class change');
+    assert.equal(controller.playing,true,label+': Controller transition does not end the run');
+    await page.screenshot({path:path.join(output,label+'-warden.png')});
     assert.deepEqual(errors,[],label+': no uncaught browser exceptions');
     console.log('NOVA_BROWSER_SMOKE '+JSON.stringify({label,menu,liveAge:live.age,paused,resumed,errors}));
   } finally {
