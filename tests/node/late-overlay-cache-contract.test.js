@@ -146,3 +146,21 @@ for(const hz of [30,60,120,240]){
     assert.equal(window.__novaMakeRequire('')('game/ai').updateAI.__novaFairEngagement,true);
   });
 }
+
+test('decorative War Room ecology cannot overwrite active playable-match diagnostics',()=>{
+  const {Game,window}=bootModules();
+  const callbacks={hud:noop,event:noop,toast:noop,offer:noop,stick:noop,gameover:noop};
+  const decorative=new Game(canvas(),canvas(),callbacks,'low');
+  decorative.__novaDecorativeWorld=true;
+  for(let i=0;i<30;i++)decorative.update(1/60);
+  assert.equal(window.NOVALivingFront.snapshot().active,false,
+    'background menu combat is not an active player match');
+  const playable=new Game(canvas(),canvas(),callbacks,'low');
+  for(let i=0;i<30;i++)playable.update(1/60);
+  const active=window.NOVALivingFront.snapshot();
+  assert.equal(active.active,true);
+  assert.equal(active.age,.5);
+  for(let i=0;i<30;i++)decorative.update(1/60);
+  assert.equal(window.NOVALivingFront.snapshot().age,active.age,
+    'decorative updates cannot replace the active match snapshot');
+});
