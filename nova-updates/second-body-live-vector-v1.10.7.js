@@ -444,6 +444,7 @@ wrap('game/engine',function(engine,require){
     var was=isController(t),out=oldSetClass.apply(this,arguments),now=isController(t);
     if(t&&t.isPlayer&&now&&!was){
       if(t.__novaSwarm)t.__novaSwarm.tutorialUntil=0;
+      t.__novaLiveVectorTutorialStart=(this.time||0)+2.8;
       t.__novaLiveVectorTutorialUntil=(this.time||0)+10.5;
       if(this.toast)this.toast('❖ SECOND BODY — RIGHT STICK ANGLE: GUN + SWARM · DEPTH: RANGE · RELEASE: RECALL · HIT: DESIGNATE','info');
     }
@@ -467,7 +468,10 @@ wrap('game/render',function(renderMod,require){
   function patched(g,w,h){
     old(g,w,h);if(!g||!g.ctx||!g.player||!g.player.alive)return;
     var ctx=g.ctx,now=Number(g.time)||0;drawShear(g,ctx);
-    if(isController(g.player)&&(g.player.__novaLiveVectorTutorialUntil||0)>now){
+    /* Portrait gets the immediate React toast first; defer the canvas reminder
+     * until that toast has cleared so two identical lessons never stack. */
+    if(isController(g.player)&&(g.player.__novaLiveVectorTutorialUntil||0)>now&&
+       (g.w>=480||now>=(g.player.__novaLiveVectorTutorialStart||0))){
       ctx.save();ctx.setTransform(g.dpr||1,0,0,g.dpr||1,0,0);ctx.textAlign='center';ctx.font='800 9px Orbitron,system-ui';ctx.fillStyle='rgba(207,255,224,.92)';ctx.shadowBlur=10;ctx.shadowColor='#75f0a3';
       var portrait=g.w<480;
       ctx.fillText(portrait?'AIM = GUN + SWARM · DEPTH = RANGE':'RIGHT STICK ANGLE = GUN + SWARM · DEPTH = SWARM RANGE · RELEASE = RECALL',g.w*.5,g.h*.72,Math.max(120,g.w-24));
