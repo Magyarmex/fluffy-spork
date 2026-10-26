@@ -803,3 +803,46 @@ for(const optimized of [false,true]){
    'ambiguous shared-hull attribution must not depend on array order');
  });
 }
+
+
+/* Run 375 follow-through: the multi-shot recovery must also work through
+ * the real Game.update epoch, where Battlefield requires witnessed motion.
+ * Direct updateBullets fixtures alone are not a shipping integration gate. */
+for(const optimized of [false,true]){
+ const mode=optimized?'optimized':'baseline';
+ for(const fps of [30,60]){
+  test(mode+' five piercing shots survive remote density through Game.update at '+fps+'Hz',()=>{
+   const Game=boot(function(dt){
+    this.time+=dt;
+    for(const t of this.tanks){
+     t.__novaSweepMoveTime=this.time;
+     t.__novaSweepPrevX=t.x;t.__novaSweepPrevY=t.y;
+    }
+    this.updateBullets(dt);
+   },optimized);
+   const {g,victims}=multiShotRemoteWorld(Game,5,960),dt=.35/fps;
+   for(let frame=0;frame<3;frame++)g.update(dt);
+   assert.deepEqual(victims.map(v=>v.hitCount),Array(10).fill(1));
+   assert.equal(g.__novaShapeSweepActive,false,
+    'live movement epoch must be closed after the update');
+  });
+ }
+ test(mode+' moving first hull vetoes only its own multi-shot recovery',()=>{
+  const Game=boot(function(dt){
+   this.time+=dt;
+   for(const t of this.tanks){
+    t.__novaSweepMoveTime=this.time;
+    t.__novaSweepPrevX=t.x;t.__novaSweepPrevY=t.y;
+   }
+   this.tanks[0].x+=5;
+   this.updateBullets(dt);
+  },optimized);
+  const {g,victims}=multiShotRemoteWorld(Game,5,50);
+  g.update(.35/30);
+  assert.equal(victims[1].hitCount,0,
+   'uncertain moving-hull chronology must not authorize the second contact');
+  assert.deepEqual(victims.slice(2).map(v=>v.hitCount),Array(8).fill(1),
+   'independent witnessed-stationary shots must still recover');
+  assert.equal(g.__novaShapeSweepActive,false);
+ });
+}
