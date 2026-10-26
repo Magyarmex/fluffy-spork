@@ -167,6 +167,8 @@ function LiveWorld(canvas,m){
   this.scale=this.low?LOW_SCALE:NORMAL_SCALE;this.last=0;this.acc=0;this.lastRender=0;this.raf=0;this.dead=false;this.elapsed=0;
   this.respawns=[];this.roster=Object.keys(CLASSES).sort(classOrder);this.mm=document.createElement('canvas');this.mm.width=this.mm.height=32;
   this.game=new Game(canvas,this.mm,callbacks(),'low');
+  /* Presentation-only world: do not publish its ecology as the active match. */
+  this.game.__novaDecorativeWorld=true;
   this.boundFrame=this.frame.bind(this);
   this.detachInteractiveRuntime();
   this.prepareCanonicalBattle();
