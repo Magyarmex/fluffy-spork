@@ -790,14 +790,20 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      if(best&&bestT<1e-8){tie=true;return;}
      best={e:e,kind:'drone'};bestT=0;tie=false;return;
     }
-    var maxTime=dt*limit;
     if(!witnessed||!Number.isFinite(e.speed)||!(e.speed>0)||
-       e.__novaPhase==='dash'||e.__novaCommitted||e.__novaSpotter){
+       !Number.isFinite(e.__novaChronoDronePrevSpeed)||
+       !(e.__novaChronoDronePrevSpeed>0)||
+       !Number.isFinite(e.__novaChronoDronePrevV)||
+       e.__novaPhase==='dash'||e.__novaChronoDronePrevPhase==='dash'||
+       e.__novaCommitted||e.__novaChronoDronePrevCommitted||
+       e.__novaSpotter||e.__novaTerrainBump){
      /* No new authority without a speed witness. The existing later
       * drone-corridor veto still protects an earlier tank/shape contact. */
      return;
     }
     var speedBound=Math.max(1200,e.speed*6,
+      (e.__novaChronoDronePrevSpeed||0)*6,
+      (e.__novaChronoDronePrevV||0)*2,
       Math.hypot(e.__novaVX||0,e.__novaVY||0)*2,
       Math.hypot(e.__lvVX||0,e.__lvVY||0)*2,
       Math.hypot(e.__novaIdleVX||0,e.__novaIdleVY||0)*2),
@@ -1443,6 +1449,16 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   var cd=chronoDrones[di];if(!cd||!(cd.hp>0))continue;
   cd.__novaChronoDroneEpoch=epoch;
   cd.__novaChronoDronePrevX=cd.x;cd.__novaChronoDronePrevY=cd.y;
+  /* Snapshot the actual motion envelope before the core/Controller stages
+   * can change speed or enter/leave a committed dash. No interpolation or
+   * stage checkpoint is treated as an authoritative contact timestamp. */
+  cd.__novaChronoDronePrevSpeed=cd.speed;
+  cd.__novaChronoDronePrevPhase=cd.__novaPhase;
+  cd.__novaChronoDronePrevCommitted=!!cd.__novaCommitted;
+  cd.__novaChronoDronePrevV=Math.max(
+   Math.hypot(cd.__novaVX||0,cd.__novaVY||0),
+   Math.hypot(cd.__lvVX||0,cd.__lvVY||0),
+   Math.hypot(cd.__novaIdleVX||0,cd.__novaIdleVY||0));
   /* Start is recorded even without diagnostics for the existing conservative
    * collision gate; optional stages are kept separate from this authority. */
   if(this.__novaDroneChronoTraceEnabled===true){
