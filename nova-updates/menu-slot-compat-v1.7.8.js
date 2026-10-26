@@ -213,6 +213,19 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 (function(){
 'use strict';
 var mods=window.__novaModules;if(!mods||!mods['game/engine'])return;
+// The React-owned death title is wider than its 320px panel content box.
+// Scope the correction to that exact modal; do not change other red labels,
+// large-phone/desktop typography, buttons, or the compressed game shell.
+function installDeathTitleFit(){
+ if(typeof document==='undefined'||!document.head||!document.createElement)return;
+ if(document.getElementById&&document.getElementById('nova-death-title-fit'))return;
+ var style=document.createElement('style');style.id='nova-death-title-fit';
+ style.textContent='@media(max-width:360px){'+
+  '.absolute.inset-0.z-50 > .panel.anim-pop > .font-display.text-red-400{'+
+  'font-size:24px;letter-spacing:.12em;line-height:1.25}}';
+ document.head.appendChild(style);
+}
+installDeathTitleFit();
 var lessons={
  gunner:'Break the firing lane with cover, then re-enter between bursts.',
  cannon:'Spread out from cover edges and read the fuse or impact cue.',
