@@ -229,8 +229,17 @@ function installUI(){
   document.addEventListener('fullscreenchange',updateFullscreenButton);
   document.addEventListener('webkitfullscreenchange',updateFullscreenButton);
   document.addEventListener('keydown',function(e){
-    if(!overlay||overlay.hidden||e.key!=='Escape')return;
-    e.preventDefault();e.stopImmediatePropagation();closeConsole(true);
+    if(!overlay||overlay.hidden)return;
+    if(e.key==='Escape'){
+      e.preventDefault();e.stopImmediatePropagation();closeConsole(true);return;
+    }
+    /* The console is modal: sliders and buttons must receive native arrow
+     * and Space behavior, but the gameplay Input listener on window must
+     * never interpret those same keys as movement, ultimate or autofire. */
+    var k=String(e.key||'').toLowerCase();
+    if(k==='w'||k==='a'||k==='s'||k==='d'||k==='e'||k==='f'||
+       k===' '||k==='arrowup'||k==='arrowdown'||k==='arrowleft'||k==='arrowright')
+      e.stopPropagation();
   },true);
   updateFullscreenButton();refreshUI();scheduleVisibilityRefresh();
 }
@@ -249,6 +258,11 @@ function openConsole(){
   if(!overlay||!activeGame||!gameVisible())return;
   resumeAfterClose=!activeGame.paused;
   if(resumeAfterClose&&activeGame.setPaused)activeGame.setPaused(true);
+  /* Release held controls and queued abilities before focus enters the
+   * settings dialog. Controller's existing reset also clears stale pointer
+   * ownership and notifies the stick UI; preserve autofire preference. */
+  if(activeGame.input&&typeof activeGame.input.__novaBlurReset==='function')
+    activeGame.input.__novaBlurReset();
   overlay.hidden=false;gearButton.hidden=true;refreshUI();updateFullscreenButton();
   var first=overlay.querySelector('input,button');if(first&&first.focus)first.focus({preventScroll:true});
 }
