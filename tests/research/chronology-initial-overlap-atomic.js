@@ -153,7 +153,7 @@ const cases=[];
  cases.push('simultaneous-cover-owners-abstain');
 }
 function rng(seed){return()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);}
-const random=rng(20261026),stats={deterministic:cases,worlds:0,comparisons:0,permutationComparisons:0,metamorphicComparisons:0,ambiguous:0,disagreements:0};
+const random=rng(20261026),stats={deterministic:cases,worlds:0,comparisons:0,permutationComparisons:0,metamorphicComparisons:0,timeScaleComparisons:0,ambiguous:0,disagreements:0};
 for(let n=0;n<6000;n++){
  const w=base();w.v=350+random()*2500;w.ttl=.02+random()*.15;
  w.pen=Math.floor(random()*5);w.dmg=15+random()*50;
@@ -196,6 +196,21 @@ for(let n=0;n<6000;n++){
    stats.metamorphicComparisons++;
    check(equal(ref,solve(transformed,sch)),
      'mirror/translation changed physical event order: '+n);
+  }
+ }
+ if(n<100){
+  const k=2;
+  const scaled={...w,v:w.v*k,ttl:w.ttl/k,
+    bodies:w.bodies.map(b=>({...b,v:b.v*k})),
+    hostiles:w.hostiles.map(q=>({...q,v:q.v*k}))};
+  for(const sch of SCHEDULES){
+   const actual=solve(scaled,sch);
+   stats.timeScaleComparisons++;
+   check(ref.stop===actual.stop&&ref.pen===actual.pen&&
+     ref.events.length===actual.events.length&&ref.events.every((e,i)=>
+      e.id===actual.events[i].id&&e.kind===actual.events[i].kind&&
+      Math.abs(e.time-k*actual.events[i].time)<1e-7),
+     'time scaling changed first contact: '+n);
   }
  }
  for(const sch of SCHEDULES){stats.comparisons++;
