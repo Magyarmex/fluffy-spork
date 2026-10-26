@@ -47,6 +47,7 @@ function trimNeutralPopulation(g,budget){
   }
 }
 
+
 window.__NOVA_VERSION=VERSION;
 window.__NOVA_LOBBY_BATTLEFIELD_RELEASE__={
   version:VERSION,codename:CODENAME,date:'2026-08-10',
@@ -89,18 +90,26 @@ if(typeof document==='undefined'||!document.createElement)return;
 if(window.__NOVA_LIVE_WAR_ROOM_RUNTIME__)return;
 window.__NOVA_LIVE_WAR_ROOM_RUNTIME__=true;
 
+/* The War Room is decorative. It must not instantiate/capture gameplay
+ * modules while later script overlays are still registering their factories.
+ * Resolve the same canonical modules only when a real menu needs a world. */
 var req=window.__novaMakeRequire;
 if(!req){console.error('[NOVA v1.10.10] module runtime unavailable');return;}
-var engine,classes,ai,render;
-try{
-  engine=req('lobby-battlefield-v11010')('./game/engine');
-  classes=req('lobby-battlefield-v11010')('./game/classes');
-  ai=req('lobby-battlefield-v11010')('./game/ai');
-  render=req('lobby-battlefield-v11010')('./game/render');
-}catch(e){console.error('[NOVA v1.10.10] canonical gameplay modules unavailable',e);return;}
-var Game=engine&&engine.Game,CLASSES=classes&&classes.CLASSES||{};
-if(!Game||!render||typeof render.render!=='function'||!Object.keys(CLASSES).length){
-  console.error('[NOVA v1.10.10] canonical engine/render/class registry incomplete');return;
+var engine,classes,ai,render,Game,CLASSES={};
+function resolveCanonicalModules(){
+  if(Game)return true;
+  try{
+    var requireGame=req('lobby-battlefield-v11010');
+    engine=requireGame('./game/engine');
+    classes=requireGame('./game/classes');
+    ai=requireGame('./game/ai');
+    render=requireGame('./game/render');
+  }catch(e){console.error('[NOVA v1.10.10] canonical gameplay modules unavailable',e);return false;}
+  Game=engine&&engine.Game;CLASSES=classes&&classes.CLASSES||{};
+  if(!Game||!render||typeof render.render!=='function'||!Object.keys(CLASSES).length){
+    Game=null;console.error('[NOVA v1.10.10] canonical engine/render/class registry incomplete');return false;
+  }
+  return true;
 }
 
 function installCss(){
@@ -173,6 +182,8 @@ function LiveWorld(canvas,m){
   this.scale=this.low?LOW_SCALE:NORMAL_SCALE;this.last=0;this.acc=0;this.lastRender=0;this.raf=0;this.dead=false;this.elapsed=0;
   this.respawns=[];this.roster=Object.keys(CLASSES).sort(classOrder);this.mm=document.createElement('canvas');this.mm.width=this.mm.height=32;
   this.game=new Game(canvas,this.mm,callbacks(),'low');
+  /* Presentation-only world: do not publish its ecology as the active match. */
+  this.game.__novaDecorativeWorld=true;
   this.boundFrame=this.frame.bind(this);
   this.detachInteractiveRuntime();
   this.prepareCanonicalBattle();
@@ -274,7 +285,7 @@ function removeStalePresentation(m){
   for(var i=0;i<stale.length;i++)if(stale[i]&&stale[i].parentElement)stale[i].parentElement.removeChild(stale[i]);
 }
 function mount(m){
-  if(!m)return;
+  if(!m||!resolveCanonicalModules())return;
   removeStalePresentation(m);
   installCss();m.classList.add('nv-war-room');
   var existing=Array.prototype.slice.call(m.children);for(var i=0;i<existing.length;i++)existing[i].classList.add('nv-lobby-foreground');
@@ -284,12 +295,16 @@ function mount(m){
   current=new LiveWorld(c,m);current.atmosphere=a;current.start();
 }
 function reconcile(){
+  /* Parser-blocking overlays register after this script. Even if a menu
+   * already exists, wait for DOMContentLoaded before requiring the engine. */
+  if(document.readyState==='loading')return;
   var m=menu();
   var detached=current&&(!current.canvas.isConnected||current.canvas.parentElement!==current.menu||!current.atmosphere||!current.atmosphere.isConnected||current.atmosphere.parentElement!==current.menu);
   if(current&&(!m||current.menu!==m||!m.isConnected||detached)){current.destroy();current=null;}
   if(m&&!current)mount(m);
 }
 var mo=new MutationObserver(reconcile);mo.observe(document.documentElement,{childList:true,subtree:true});
+document.addEventListener('DOMContentLoaded',reconcile);
 document.addEventListener('visibilitychange',function(){if(current)current.last=performance.now();});
 window.addEventListener('resize',function(){if(current)current.resize();},{passive:true});
 reconcile();
