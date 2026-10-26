@@ -220,5 +220,7 @@ async function run(browser,label,viewport){
  try{
   await run(browser,'touch-portrait-320',{width:320,height:700});
   await run(browser,'touch-landscape-844',{width:844,height:390});
+  // Compact landscape phones must retain two independently usable real-touch sticks.
+  await run(browser,'touch-landscape-568',{width:568,height:320});
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
