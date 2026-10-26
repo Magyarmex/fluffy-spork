@@ -875,7 +875,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   if(Math.abs(b.x)>=MAP_LIMIT-20||Math.abs(b.y)>=MAP_LIMIT-20||
      Math.abs(x)+childReach>=MAP_LIMIT-20||
      Math.abs(y)+childReach>=MAP_LIMIT-20)return null;
-  /* Penetration upgrades do not extend physical TTL. This shortcut still\n   * requires no earlier solid contact, breach, body, drone or projectile,\n   * and keeps newborn fragments clear of nearby cover. */\n  /* A programmed Cannon fuse may have already crossed before TTL. Keep
+  /* Penetration upgrades do not extend physical TTL. This shortcut still
+   * requires no earlier solid contact, breach, body, drone or projectile,
+   * and keeps newborn fragments clear of nearby cover. */
+  /* A programmed Cannon fuse may have already crossed before TTL. Keep
    * Three Disciplines authoritative, including its historical 2u tolerance. */
   if(b.__v17Cannon&&b.__v17FuseDist>0){
    if(!Number.isFinite(b.__v17SpawnX)||!Number.isFinite(b.__v17SpawnY)||
