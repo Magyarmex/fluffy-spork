@@ -81,8 +81,7 @@ async function scenario(browser, label, options) {
         DEPLOY:page.getByRole('button',{name:/DEPLOY/i}).first(),
         BLACKGLASS:page.locator('[data-nova-action="blackglass"]'),
         CONTROLS:page.locator('[data-nova-action="controls"]'),
-        DEBUG:page.locator('[data-nova-action="debug"]'),
-        'OPEN ARCHIVE':page.locator('[data-nova-action="updates"]')
+        DEBUG:page.locator('[data-nova-action="debug"]')
       };
       for(const [caption,element] of Object.entries(critical)){
         assert.ok(await element.count(),label+': missing lobby action '+caption);
@@ -91,6 +90,25 @@ async function scenario(browser, label, options) {
           box.x+box.width<=320+1&&box.y+box.height<=568-1,
           label+': '+caption+' must fit inside the visible lobby: '+JSON.stringify(box));
       }
+      // The release archive is a text-bearing feature rail, not the hidden
+      // legacy updates action. Measure its actually painted text node.
+      const archive=await page.evaluate(()=>{
+        const root=document.querySelector('#root');
+        if(!root)return null;
+        const walk=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+        let node;
+        while((node=walk.nextNode())){
+          if(!node.textContent.includes('OPEN ARCHIVE'))continue;
+          const range=document.createRange();range.selectNodeContents(node);
+          const b=range.getBoundingClientRect();
+          if(b.width>0&&b.height>0)return {x:b.x,y:b.y,width:b.width,height:b.height};
+        }
+        return null;
+      });
+      assert.ok(archive&&archive.x>=-1&&archive.y>=-1&&
+        archive.x+archive.width<=321&&archive.y+archive.height<=567,
+        label+': OPEN ARCHIVE text must fit inside the visible lobby: '+JSON.stringify(archive));
+
     }
 
 
