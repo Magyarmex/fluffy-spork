@@ -67,7 +67,7 @@ function boot(){
    removeChild(node){assert.equal(this.note,node);this.note=null;node.parentNode=null;}};
   panels.push(panel);return panel;
  }
- return {Game:m.exports.Game,api:window.__NOVA_DEATH_INSIGHT_TEST__,
+ return {Game:m.exports.Game,api:window.__NOVA_DEATH_INSIGHT_TEST__,document,
   addPanel,panels,observers,timeouts};
 }
 function victim(){return{id:1,alive:true,isPlayer:true,cls:'scout'};}
@@ -158,5 +158,22 @@ test('allied damage cannot be presented as an opponent matchup',()=>{
  g.areAllies=()=>true;
  g.killTank(victim(),killer('marksman'));g.update();
  assert.equal(p.note,null);
+ assert.equal(g.__novaDeathInsight,null);
+});
+
+test('optional alliance API failure cannot prevent an authoritative kill',()=>{
+ const {Game,addPanel}=boot(),g=new Game(),p=addPanel(),v=victim();
+ g.areAllies=()=>{throw new Error('transient alliance lookup');};
+ assert.doesNotThrow(()=>g.killTank(v,killer()));
+ assert.equal(v.alive,false);
+ assert.doesNotThrow(()=>g.update());
+ assert.equal(p.note,null,'uncertain allegiance must not produce a claim');
+});
+test('broken presentation DOM cannot interrupt the game update',()=>{
+ const {Game,document}=boot(),g=new Game();
+ document.querySelectorAll=()=>{throw new Error('DOM unavailable');};
+ g.killTank(victim(),killer());
+ assert.doesNotThrow(()=>g.update());
+ assert.equal(g.status,'dead');
  assert.equal(g.__novaDeathInsight,null);
 });
