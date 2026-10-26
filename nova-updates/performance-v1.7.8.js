@@ -640,8 +640,38 @@ wrap('game/engine',function(engine,require){
   };
   Base.prototype.getShape=function(id){return this.shapeById?this.shapeById.get(id)||null:null;};
 
+  /* Redeploy keeps physical neutral shapes but core seedShapes would append
+   * another complete 120-body farm each life. This owner executes before the
+   * War Room eagerly caches Game, unlike later Living Front wrappers. */
+  var seedTargets={circle:62,triangle:30,square:16,pentagon:8,hexagon:4};
+  var oldSeedShapes=Base.prototype.seedShapes;
+  if(oldSeedShapes)Base.prototype.seedShapes=function(){
+    var counts=Object.create(null),shapes=this.shapes||[];
+    for(var i=0;i<shapes.length;i++){
+      var s=shapes[i];
+      if(s&&s.hp>0&&Object.prototype.hasOwnProperty.call(seedTargets,s.type))
+        counts[s.type]=(counts[s.type]||0)+1;
+    }
+    for(var type in seedTargets){
+      if(!Object.prototype.hasOwnProperty.call(seedTargets,type))continue;
+      var missing=Math.max(0,seedTargets[type]-(counts[type]||0));
+      for(var j=0;j<missing;j++)this.spawnShape(type,true);
+    }
+  };
   var oldRedeploy=Base.prototype.redeploy;
-  if(oldRedeploy)Base.prototype.redeploy=function(){if(this.shapeById)this.shapeById.clear();return oldRedeploy.apply(this,arguments);};
+  if(oldRedeploy)Base.prototype.redeploy=function(){
+    var out=oldRedeploy.apply(this,arguments);
+    /* Preserve lookups for surviving bodies; the old clear orphaned every
+     * retained neutral until a future rebuild (which never happened). */
+    if(this.shapeById){
+      this.shapeById.clear();
+      var shapes=this.shapes||[];
+      for(var i=0;i<shapes.length;i++){
+        var s=shapes[i];if(s&&s.hp>0)this.shapeById.set(s.id,s);
+      }
+    }
+    return out;
+  };
 
   Base.prototype.nearestShape=function(x,y,max){
     var hash=this.hash,limit=max*max,best=null,bd=limit;
