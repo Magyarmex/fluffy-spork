@@ -409,6 +409,30 @@
     if (!Game || Game.prototype.__novaSecondBody) return;
     Game.prototype.__novaSecondBody = true;
     Game.prototype.__novaControllerHeldDeadzoneSafe = true;
+    /* The core aims before camera easing but renders after it. Project the
+     * pointer through the camera that this very update will display. Long
+     * Glass restores its own tactical camera after core update, so it must
+     * remain authoritative during a tactical transition. */
+    function renderedMouseCamera(g) {
+      var cam = g.cam || {}, x = Number(cam.x) || 0, y = Number(cam.y) || 0;
+      var z = Number(cam.zoom);
+      if (!(z > 0)) z = Number(g.zoom) || 1;
+      var dt = Number(g.__novaMouseAimFrameDt), pl = g.player;
+      var tactical = g.__novaTacticalCamera;
+      if (dt > 0 && Number.isFinite(dt) && pl &&
+          !(tactical && (tactical.active || tactical.transition))) {
+        var k = 1 - Math.exp(-7.2 * dt);
+        x += (pl.x + (Number(pl.vx) || 0) * .16 - x) * k;
+        y += (pl.y + (Number(pl.vy) || 0) * .16 - y) * k;
+        var targetZoom = Number(g.zoom);
+        if (targetZoom > 0 && Number.isFinite(targetZoom))
+          z += (targetZoom - z) * (1 - Math.exp(-4 * dt));
+      }
+      var out = g.__novaMouseAimCamera ||
+        (g.__novaMouseAimCamera = { x: 0, y: 0, zoom: 1 });
+      out.x = x; out.y = y; out.zoom = z;
+      return out;
+    }
     /* The shared materialized mouse fallback uses atan2(cursor - hull).
      * At exact hull center atan2(0,0) invents an eastward bearing for EVERY
      * class. Live Vector also holds Controller command depth at center, so
@@ -428,12 +452,11 @@
               Number.isFinite(a)) {
             /* The rendered camera eases toward the resize target zoom.
              * Mouse bearing must follow the zoom the player actually sees. */
-            var z = Number(cam.zoom);
-            if (!(z > 0)) z = Number(this.zoom);
-            if (z > 0 && Number.isFinite(z)) {
+            var projection = renderedMouseCamera(this);
+            if (projection.zoom > 0 && Number.isFinite(projection.zoom)) {
               var rect = this.canvas.getBoundingClientRect();
-              var wx = cam.x + (input.mouseX - rect.left - this.w * .5) / z;
-              var wy = cam.y + (input.mouseY - rect.top - this.h * .5) / z;
+              var wx = projection.x + (input.mouseX - rect.left - this.w * .5) / projection.zoom;
+              var wy = projection.y + (input.mouseY - rect.top - this.h * .5) / projection.zoom;
               var dx = wx - pl.x, dy = wy - pl.y;
               if (Number.isFinite(dx) && Number.isFinite(dy)) {
                 if (dx * dx + dy * dy <= 4) return a;
@@ -446,6 +469,7 @@
       };
       Game.prototype.update = function (dt) {
         var input = this.input, key = input && input.keyboard, pl = this.player;
+        this.__novaMouseAimFrameDt = dt > 0 && Number.isFinite(dt) ? dt : 0;
         this.__novaMouseCenterAimPending = !!(
           this.status === 'playing' && pl && pl.alive &&
           input && input.mouseActive &&
@@ -457,7 +481,10 @@
             !(key && (key.up || key.down || key.left || key.right)))) &&
           Number.isFinite(input.mouseX) && Number.isFinite(input.mouseY));
         try { return baseUpdate.apply(this, arguments); }
-        finally { this.__novaMouseCenterAimPending = false; }
+        finally {
+          this.__novaMouseCenterAimPending = false;
+          this.__novaMouseAimFrameDt = undefined;
+        }
       };
     }
 
@@ -563,10 +590,9 @@
         }
       } else if (input && input.mouseActive && input.firing) {
         var rect = g.canvas.getBoundingClientRect();
-        var z = Number(g.cam && g.cam.zoom);
-        if (!(z > 0)) z = Number(g.zoom) || 1;
-        var wx = g.cam.x + (input.mouseX - rect.left - g.w * 0.5) / z;
-        var wy = g.cam.y + (input.mouseY - rect.top - g.h * 0.5) / z;
+        var projection = renderedMouseCamera(g);
+        var wx = projection.x + (input.mouseX - rect.left - g.w * 0.5) / projection.zoom;
+        var wy = projection.y + (input.mouseY - rect.top - g.h * 0.5) / projection.zoom;
         var mdx = wx - owner.x, mdy = wy - owner.y, md = Math.hypot(mdx, mdy);
         if (md > 5) {
           active = true;
