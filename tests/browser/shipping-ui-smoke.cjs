@@ -214,6 +214,65 @@ async function scenario(browser, label, options) {
       assert.ok(later>0,label+': canvas tutorial continues teaching after toast has cleared');
     }
     await page.screenshot({path:path.join(output,label+'-warden.png')});
+    // Actual React-owned death panel: verify the Fieldcraft note is truthful,
+    // readable at 320px, and discarded on redeploy. No synthetic DOM fixture.
+    if(label==='desktop'||label==='mobile-320'){
+      await page.evaluate(()=>{
+        const g=window.__novaBrowserLiveGame;
+        const enemy=g.tanks.find(t=>t&&!t.isPlayer&&t.alive);
+        if(!enemy)throw new Error('real AI killer unavailable');
+        enemy.cls='marksman'; // known Sniper-lineage opponent
+        g.player.spawnShieldT=0;g.player.shieldT=0;
+        g.player.bulwarkT=0;g.player.tauntT=0;
+        g.damageTank(g.player,1e8,enemy.id);
+        if(g.status!=='dying')throw new Error('lethal damage did not enter dying state');
+      });
+      await page.getByText('TERMINATED',{exact:true}).waitFor({state:'visible',timeout:20000});
+      const deathDiagnostic=await page.evaluate(()=>{
+        const g=window.__novaBrowserLiveGame;
+        const Game=window.__novaMakeRequire('')('game/engine').Game;
+        return {installed:!!Game.prototype.__novaDeathInsightInstalled,
+          note:g?.__novaDeathInsight,attempted:g?.__novaDeathInsightAttempted,
+          observer:!!g?.__novaDeathInsightObserver,
+          status:g?.status,playerAlive:g?.player?.alive,
+          panels:[...document.querySelectorAll('.panel')].map(p=>p.textContent.slice(0,130)),
+          extension:!!window.__NOVA_DEATH_INSIGHT_TEST__};
+      });
+      console.log('NOVA_DEATH_DIAGNOSTIC '+JSON.stringify({label,deathDiagnostic}));
+      const note=page.locator('[data-nova-death-insight]');
+      await note.waitFor({state:'visible',timeout:12000});
+      const geometry=await note.evaluate(el=>{
+        const n=el.getBoundingClientRect(),p=el.parentElement.getBoundingClientRect();
+        return {text:el.textContent,top:n.top,bottom:n.bottom,left:n.left,right:n.right,
+          panelLeft:p.left,panelRight:p.right,panelTop:p.top,panelBottom:p.bottom,
+          viewport:innerWidth,viewportHeight:innerHeight,height:n.height,
+          buttons:el.querySelectorAll('button').length};
+      });
+      assert.match(geometry.text,/LAST OPPONENT: MARKSMAN/,
+        label+': death insight must name the actual killer class');
+      assert.match(geometry.text,/sightline/,
+        label+': lesson must be specific to the killer lineage');
+      assert.equal(geometry.buttons,0,label+': no extra combat controls');
+      assert.ok(geometry.left>=geometry.panelLeft-1&&geometry.right<=geometry.panelRight+1,
+        label+': insight stays within the existing panel: '+JSON.stringify(geometry));
+      assert.ok(geometry.left>=-1&&geometry.right<=geometry.viewport+1&&geometry.height<100,
+        label+': insight must fit the viewport: '+JSON.stringify(geometry));
+      assert.ok(geometry.panelTop>=-1&&geometry.panelBottom<=geometry.viewportHeight+1,
+        label+': complete TERMINATED panel must remain vertically visible: '+JSON.stringify(geometry));
+      await page.screenshot({path:path.join(output,label+'-death-insight.png')});
+      await page.getByRole('button',{name:/REDEPLOY/}).click();
+      await page.waitForFunction(()=>window.__novaBrowserLiveGame?.status==='playing',
+        null,{timeout:15000});
+      assert.equal(await note.count(),0,label+': previous-life insight must be removed');
+      if(label==='desktop'){
+        await page.evaluate(()=>{
+          const g=window.__novaBrowserLiveGame;
+          g.killTank(g.player,null); // unknown cause cannot inherit the old killer
+        });
+        await page.getByText('TERMINATED',{exact:true}).waitFor({state:'visible',timeout:20000});
+        assert.equal(await note.count(),0,'unknown second-life death must not fabricate a killer');
+      }
+    }
     assert.deepEqual(errors,[],label+': no uncaught browser exceptions');
     console.log('NOVA_BROWSER_SMOKE '+JSON.stringify({label,menu,liveAge:live.age,paused,resumed,errors}));
   } finally {

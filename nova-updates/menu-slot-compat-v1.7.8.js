@@ -204,3 +204,118 @@ function start(){
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
+
+/* NOVA FIELDCRAFT DEATH INSIGHT — authoritative killer class, no guessed cause.
+ * One optional matchup lesson on the existing TERMINATED panel; no new screen,
+ * controls, currency, bonuses, or change to the damage/kill-credit path.
+ * The canonical React GameOver is in the compressed shipping payload, so this
+ * presentation-only extension is mounted after React creates its modal. */
+(function(){
+'use strict';
+var mods=window.__novaModules;if(!mods||!mods['game/engine'])return;
+var lessons={
+ gunner:'Break the firing lane with cover, then re-enter between bursts.',
+ cannon:'Spread out from cover edges and read the fuse or impact cue.',
+ sniper:'Break the sightline, then rotate before exposing the same angle.',
+ controller:'Disrupt the drone approach; avoid chasing the swarm into crossfire.',
+ guardian:'Avoid a frontal trade; make the defender turn before committing.'
+};
+function choose(victim,killer,classes){
+ if(!victim||!victim.isPlayer||!killer||killer===victim||
+    killer.id==null||killer.id===victim.id||!killer.cls||
+    !classes||!classes.CLASSES)return null;
+ var def=classes.CLASSES[killer.cls];
+ var lineage=typeof classes.lineageForClass==='function'?
+   classes.lineageForClass(killer.cls):null;
+ if(!def||!lessons[lineage])return null;
+ return {name:String(def.name||killer.cls).slice(0,40),lesson:lessons[lineage]};
+}
+function findPanel(){
+ if(typeof document==='undefined'||!document.querySelectorAll)return null;
+ var panels=document.querySelectorAll('.panel');
+ for(var i=0;i<panels.length;i++){
+  var p=panels[i],buttons=p.querySelectorAll('button'),redeploy=null;
+  if(!p.textContent||p.textContent.indexOf('TERMINATED')<0)continue;
+  for(var j=0;j<buttons.length;j++)
+   if((buttons[j].textContent||'').indexOf('REDEPLOY')>=0){redeploy=buttons[j];break;}
+  if(redeploy)return {panel:p,before:redeploy};
+ }
+ return null;
+}
+function paint(info){
+ if(!info)return false;
+ var target=findPanel();if(!target)return false;
+ if(target.panel.querySelector('[data-nova-death-insight]'))return true;
+ var box=document.createElement('div');
+ box.setAttribute('data-nova-death-insight','');
+ box.setAttribute('role','note');
+ box.style.cssText='margin-top:10px;padding:8px 10px;border:1px solid rgba(125,243,255,.28);border-radius:8px;background:rgba(0,0,0,.42);text-align:left;overflow-wrap:anywhere;';
+ var heading=document.createElement('div');
+ heading.style.cssText='font-size:9px;line-height:1.4;font-weight:800;letter-spacing:.07em;color:#7df3ff;';
+ heading.textContent='FIELDCRAFT · LAST OPPONENT: '+info.name.toUpperCase();
+ var body=document.createElement('div');
+ body.style.cssText='margin-top:3px;font-size:11px;line-height:1.35;color:#e2e8f0;';
+ body.textContent=info.lesson;
+ box.appendChild(heading);box.appendChild(body);
+ target.panel.insertBefore(box,target.before);
+ return true;
+}
+function cleanup(g){
+ if(g.__novaDeathInsightObserver){g.__novaDeathInsightObserver.disconnect();g.__novaDeathInsightObserver=null;}
+ if(g.__novaDeathInsightTimeout!=null&&typeof clearTimeout==='function'){
+  clearTimeout(g.__novaDeathInsightTimeout);g.__novaDeathInsightTimeout=null;
+ }
+ if(typeof document!=='undefined'&&document.querySelector){
+  var node=document.querySelector('[data-nova-death-insight]');
+  if(node&&node.parentNode)node.parentNode.removeChild(node);
+ }
+ g.__novaDeathInsight=null;g.__novaDeathInsightAttempted=false;
+}
+function mount(g){
+ if(!g.__novaDeathInsight||g.__novaDeathInsightAttempted)return;
+ g.__novaDeathInsightAttempted=true;
+ if(paint(g.__novaDeathInsight))return;
+ if(typeof MutationObserver!=='function'||typeof document==='undefined')return;
+ var root=document.getElementById('root')||document.body;if(!root)return;
+ var observer=new MutationObserver(function(){
+  if(paint(g.__novaDeathInsight)){observer.disconnect();g.__novaDeathInsightObserver=null;}
+ });
+ g.__novaDeathInsightObserver=observer;
+ observer.observe(root,{childList:true,subtree:true});
+ if(typeof setTimeout==='function')g.__novaDeathInsightTimeout=setTimeout(function(){
+  if(g.__novaDeathInsightObserver===observer){observer.disconnect();g.__novaDeathInsightObserver=null;}
+ },4000);
+}
+var original=mods['game/engine'];
+mods['game/engine']=function(module,exports,require){
+ original(module,exports,require);
+ var Game=module.exports.Game;
+ if(!Game||Game.prototype.__novaDeathInsightInstalled)return;
+ var classes;try{classes=require('./classes');}catch(ignore){return;}
+ Game.prototype.__novaDeathInsightInstalled=true;
+ var oldKill=Game.prototype.killTank,oldUpdate=Game.prototype.update,oldRedeploy=Game.prototype.redeploy;
+ if(typeof oldKill==='function')Game.prototype.killTank=function(victim,killer){
+  var wasAlive=!!(!this.__novaDecorativeWorld&&victim&&victim.alive!==false&&victim.isPlayer);
+  var note=null;
+  if(wasAlive)try{
+   note=choose(victim,killer,classes);
+   if(note&&typeof this.areAllies==='function'&&this.areAllies(victim,killer))note=null;
+  }catch(ignore){note=null;} // Presentation must never interrupt a lethal hit.
+
+  var out=oldKill.apply(this,arguments);
+  if(wasAlive&&victim.alive===false){this.__novaDeathInsight=note;this.__novaDeathInsightAttempted=false;}
+  return out;
+ };
+ if(typeof oldUpdate==='function')Game.prototype.update=function(){
+  var out=oldUpdate.apply(this,arguments);
+  if(!this.__novaDecorativeWorld&&this.status==='dead'&&this.__novaDeathInsight)
+   try{mount(this);}catch(ignore){this.__novaDeathInsight=null;}
+  return out;
+ };
+ if(typeof oldRedeploy==='function')Game.prototype.redeploy=function(){
+  var out=oldRedeploy.apply(this,arguments);
+  try{cleanup(this);}catch(ignore){this.__novaDeathInsight=null;}return out;
+ };
+};
+window.__NOVA_DEATH_INSIGHT_TEST__={choose:choose,paint:paint,cleanup:cleanup};
+})();
