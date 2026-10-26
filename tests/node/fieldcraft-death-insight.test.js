@@ -72,7 +72,7 @@ function killer(cls='marksman'){return{id:2,alive:true,cls};}
 test('actual materialized shipping path loads the Fieldcraft owner before boot',()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
  assert.ok(html.includes('nova-updates/menu-slot-compat-v1.7.8.js'));
- const boot=html.search(/window\\.__bootModule\\((['"])main\\1\\)/);
+ const boot=html.search(/window\.__bootModule\((['"])main\1\)/);
  assert.ok(boot>=0,'materialized boot marker exists');
  assert.ok(html.indexOf('nova-updates/menu-slot-compat-v1.7.8.js')<boot,
   'Fieldcraft owner must load before the playable game boot');
