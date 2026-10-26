@@ -102,8 +102,12 @@ const commandStart=controller.indexOf('    function updatePlayerCommand(',helper
 const commandEnd=controller.indexOf('    function updateAICommand(',commandStart);
 assert.ok(helperStart>=0&&commandStart>helperStart&&commandEnd>commandStart,
   'shared projection and real Controller command are present');
+const helperEnd=controller.indexOf('    /* The shared materialized mouse fallback',helperStart);
+assert.ok(helperEnd>helperStart&&helperEnd<commandStart,
+  'projection helper ends before Game wrapper and command function');
 const updateCommand=new Function('clamp','maxCommandRange','clampNode',
-  controller.slice(helperStart,commandEnd)+'\nreturn updatePlayerCommand;')(
+  controller.slice(helperStart,helperEnd)+'\n'+
+  controller.slice(commandStart,commandEnd)+'\nreturn updatePlayerCommand;')(
   (v,a,b)=>Math.max(a,Math.min(b,v)),()=>1000,
   (_owner,x,y)=>({x,y}));
 function commandState(){
