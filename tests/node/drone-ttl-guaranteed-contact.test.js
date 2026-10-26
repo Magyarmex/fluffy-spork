@@ -112,7 +112,7 @@ for(const optimized of [false,true])for(const hz of [30,60,120,240]){
  });
  test('piercing shot cannot ignore a later wall before TTL '+label,()=>{
   const g=droneWorld(hz,optimized,{x:13,vx:1500,ttl:.004,pen:4,
-    terrain:[{id:-1,shape:'rect',x:5,y:0,w:1,h:70,
+    terrain:[{id:-1,shape:'rect',x:5.8,y:0,w:.2,h:70,
       solid:true,destructible:false}]});
   assert.equal(g.hits,0,'piercing TTL shortcut defers a later solid');
  });
