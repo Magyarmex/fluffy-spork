@@ -234,7 +234,8 @@ function installDeathTitleFit(){
    * or upgrade cards, and leaves taller phones/desktops unchanged. */
   '@media(max-height:400px) and (orientation:landscape){'+
   '.absolute.inset-0.z-50 > .panel.anim-pop:has(> .font-display.text-red-400){'+
-  'max-height:calc(100vh - 32px);overflow-y:auto;overscroll-behavior:contain;}}';
+  'max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);'+
+  'overflow-y:auto;overscroll-behavior:contain;}}';
  document.head.appendChild(style);
 }
 installDeathTitleFit();
