@@ -802,7 +802,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
         Math.min(ay,ay+dy*limit)-reach<=checkY)uncertain=true;
      return;
     }
-    var speedBound=Math.max(800,e.speed*4),move=Math.hypot(e.x-dsx,e.y-dsy);
+    var speedBound=Math.max(1200,e.speed*6,
+      Math.hypot(e.__novaVX||0,e.__novaVY||0)*2,
+      Math.hypot(e.__lvVX||0,e.__lvVY||0)*2,
+      Math.hypot(e.__novaIdleVX||0,e.__novaIdleVY||0)*2),
+      move=Math.hypot(e.x-dsx,e.y-dsy);
     if(!Number.isFinite(speedBound)||speedBound>4000||
        move>96||move>speedBound*dt+1e-6){uncertain=true;return;}
     var sample=null, fractions=[.25,.5,.75,.9];
@@ -923,7 +927,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    }
    for(var si=0;si<shapes.length;si++){
     var s=shapes[si];if(!s||!(s.hp>0))continue;
-    var st=shapeSweepStart(g,s),sx=st?st.x:s.x,sy=st?st.y,
+    var st=shapeSweepStart(g,s),sx=st?st.x:s.x,sy=st?st.y:s.y,
         pad=b.r+(s.r||15)+4;
     if(!Number.isFinite(sx)||!Number.isFinite(sy)||
        Math.max(ax,hx)+pad>=Math.min(sx,s.x)&&
@@ -981,6 +985,18 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    /* A projectile may hit the chosen body from the side without crossing
     * this bullet's path. It can change HP/kill credit BEFORE first contact.
     * The fallback first-hit recovery must obey the same veto as piercing. */
+   /* A competing projectile may reach the SAME drone from a different
+    * direction without crossing our bullet corridor. Our guaranteed
+    * overlap time is only an upper bound, so preserve earlier kill credit. */
+   if(best.guaranteed&&o.ownerId!==best.e.id){
+    var dr=best.e,dsx=dr.__novaChronoDronePrevX,
+        dsy=dr.__novaChronoDronePrevY,rr=(o.r||2)+(dr.r||8)+1;
+    if(!Number.isFinite(o.r)||!Number.isFinite(ex)||!Number.isFinite(ey)||
+       Math.max(o.x,ex)+rr>=Math.min(dsx,dr.x)&&
+       Math.min(o.x,ex)-rr<=Math.max(dsx,dr.x)&&
+       Math.max(o.y,ey)+rr>=Math.min(dsy,dr.y)&&
+       Math.min(o.y,ey)-rr<=Math.max(dsy,dr.y))return false;
+   }
    if(best.kind==='tank'&&o.ownerId!==best.e.id){
     var td=CLASSES[best.e.cls];
     if(!td||!Number.isFinite(td.size)||
