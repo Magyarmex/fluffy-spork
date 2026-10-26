@@ -1016,3 +1016,25 @@ for(const optimized of [false,true]){
    'a tank cannot be damaged by its own unrelated stationary bullet');
  });
 }
+
+
+for(const optimized of [false,true]){
+ test((optimized?'optimized':'baseline')+
+  ' a projectile arriving after both piercing contacts does not veto them',()=>{
+  const Game=boot(undefined,optimized),{g,a,b}=makeWorld(Game);
+  const owners=[];
+  g.damageTank=function(t,dmg,owner){
+   owners.push(owner);t.hitCount++;
+  };
+  /* At x=65 the competing projectile enters the second hull at t=.010s;
+   * the piercing shot reaches that hull at about t=.0073s. */
+  g.bullets.push({kind:'bullet',id:77003,ownerId:7,
+   x:65,y:25,vx:0,vy:-400,r:3,dmg:10,ttl:1,pen:0,
+   hits:0,dead:false,shell:false,beam:false});
+  g.time+=.35/30;g.updateBullets(.35/30);
+  assert.equal(a.hitCount,1);
+  assert.equal(b.hitCount,2);
+  assert.deepEqual(owners,[1,1,7],
+   'the shortcut must remain available when other damage is provably later');
+ });
+}
