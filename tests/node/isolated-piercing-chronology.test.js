@@ -954,3 +954,33 @@ for(const optimized of [false,true])for(const fps of [30,60]){
   assert.deepEqual(victims.map(v=>v.hitCount),Array(10).fill(1));
  });
 }
+
+
+/* Run 376 adversarial: a competing projectile can already be inside the
+ * FIRST victim's hull without touching the piercing shot's narrow corridor.
+ * The optional shortcut must not reorder that earlier damage and kill credit.
+ * Test the materialized core and both shipping Battlefield compositions. */
+for(const optimized of [false,true])for(const ttl of [.01,.2]){
+ test((optimized?'optimized':'baseline')+
+  ' earlier lateral projectile contact vetoes piercing shortcut TTL='+ttl,()=>{
+  const Game=boot(undefined,optimized),{g,a}=makeWorld(Game);
+  a.hp=45;
+  g.bullets[0].ttl=ttl;
+  const events=[];
+  g.damageTank=function(t,dmg,owner){
+   events.push({id:t.id,owner});
+   t.hitCount++;t.hp-=dmg;
+   if(t.hp<=0)t.alive=false;
+  };
+  /* At y=19 this bullet is inside the first hull's 21u hit radius at t=0,
+   * but it does not overlap the piercing shot's 8u projectile corridor. */
+  g.bullets.push({kind:'bullet',id:77000,ownerId:7,x:40,y:19,
+   vx:0,vy:0,r:3,dmg:30,ttl:1,pen:0,hits:0,dead:false,
+   shell:false,beam:false});
+  const dt=.35/30;
+  g.time+=dt;g.updateBullets(dt);
+  assert.ok(events.length>0,'earlier competitor must apply ordinary damage');
+  assert.equal(events[0].owner,7,
+   'a t=0 contact must precede the piercing shot at t>0');
+ });
+}
