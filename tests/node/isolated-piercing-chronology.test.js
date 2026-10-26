@@ -232,3 +232,21 @@ for(const optimized of [false,true]) {
   assert.equal(b.hitCount,0,'prior cover breach requires full chronological arbitration');
  });
 }
+
+/* Canonical Minigun: 480u/s, pen=1, TTL=.8, emitted damage=7.084,
+ * radius=3.8*(1+damage*.0085). Two stationary hulls near the lifetime
+ * boundary should both receive direct damage, not depend on FPS. */
+for(const optimized of [false,true])for(const fps of [30,60,120,240]){
+ test((optimized?'optimized':'baseline')+
+  ' full-lifetime Minigun penetrates two healthy hulls at '+fps+'Hz',()=>{
+  const Game=boot(undefined,optimized),{g,a,b}=makeWorld(Game,395);
+  a.x=370;
+  const shot=g.bullets[0];shot.vx=480;shot.ttl=.8;
+  shot.r=3.8*(1+7.084*.0085);shot.dmg=7.084;
+  for(let frame=0;frame<300&&g.bullets.length;frame++){
+   const dt=1/fps;g.time+=dt;g.updateBullets(dt);
+  }
+  assert.equal(a.hitCount,1);
+  assert.equal(b.hitCount,1,'second physical contact occurs before .8s expiry');
+ });
+}
