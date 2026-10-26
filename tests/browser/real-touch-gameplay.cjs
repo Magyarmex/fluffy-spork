@@ -64,7 +64,7 @@ async function run(browser,label,viewport){
     move:i&&{active:i.move.active,dx:i.move.dx,dy:i.move.dy,id:i.stickId.move},
     aim:i&&{active:i.aim.active,dx:i.aim.dx,dy:i.aim.dy,id:i.stickId.aim},
     firing:i?.firing,shots:window.__novaTouchShots,
-    swarm:p?.__novaSwarm&&{active:p.__novaSwarm.active,nodeX:p.__novaSwarm.nodeX,nodeY:p.__novaSwarm.nodeY,power:p.__novaSwarm.power}};
+    swarm:p?.__novaSwarm&&{active:p.__novaSwarm.active,angle:p.__novaSwarm.angle,nodeX:p.__novaSwarm.nodeX,nodeY:p.__novaSwarm.nodeY,power:p.__novaSwarm.power}};
   });
   async function both(){
    await send('touchStart',[left]);
@@ -118,6 +118,15 @@ async function run(browser,label,viewport){
   assert.equal(cancelled.firing,false,label+': cancel clears firing');
   // Warden command must be driven by the actual right touch, not merely a hull turn.
   await page.evaluate(()=>{
+   if(window.innerWidth>window.innerHeight&&window.innerHeight<500){
+    const proto=CanvasRenderingContext2D.prototype,old=proto.fillText;
+    window.__novaLandscapeHints=[];
+    proto.fillText=function(text,x,y){
+     if(typeof text==='string'&&text.startsWith('RIGHT STICK ANGLE = GUN + SWARM'))
+      window.__novaLandscapeHints.push({y,time:window.__novaTouchGame?.time});
+     return old.apply(this,arguments);
+    };
+   }
    const g=window.__novaTouchGame;
    g.setClass(g.player,'warden');
    g.player.spawnShieldT=20;
@@ -125,12 +134,18 @@ async function run(browser,label,viewport){
   await page.waitForTimeout(200);
   await both();
   await page.waitForTimeout(240);
+  if(label==='touch-landscape-844'){
+   const early=await page.evaluate(()=>window.__novaLandscapeHints.length);
+   assert.equal(early,0,label+': canvas tutorial must not duplicate the immediate React toast');
+  }
   const warden=await snapshot();
   assert.equal(warden.cls,'warden',label+': Warden transition occurred in actual game');
   assert.equal(warden.swarm?.active,true,label+': right touch activates Controller swarm command');
   assert.ok(Math.hypot(warden.swarm.nodeX-warden.x,warden.swarm.nodeY-warden.y)>35,
    label+': Controller command node follows live touch direction/depth: '+JSON.stringify(warden));
-  const commandBearing=Math.atan2(warden.swarm.nodeY-warden.y,warden.swarm.nodeX-warden.x);
+  // The command node is clamped at arena edges; its final displacement can
+  // differ from the requested bearing. Compare the authoritative stick bearing.
+  const commandBearing=warden.swarm.angle;
   const stickBearing=Math.atan2(warden.aim.dy,warden.aim.dx);
   const bearingError=Math.atan2(Math.sin(commandBearing-stickBearing),Math.cos(commandBearing-stickBearing));
   assert.ok(Math.abs(bearingError)<0.12,
@@ -147,6 +162,20 @@ async function run(browser,label,viewport){
    label+': Controller analog depth must increase command power: '+JSON.stringify({shallow,deep}));
   await send('touchCancel',[]);
   await page.waitForTimeout(80);
+  if(label==='touch-landscape-844'){
+   await page.waitForFunction(()=>{
+    const g=window.__novaTouchGame,p=g?.player;
+    return g&&p&&g.time>=p.__novaLiveVectorTutorialStart+0.15;
+   },null,{timeout:12000});
+   await page.waitForTimeout(90);
+   const hint=await page.evaluate(()=>({
+    calls:window.__novaLandscapeHints.slice(-8),
+    expectedY:window.__novaTouchGame.h*.57
+   }));
+   assert.ok(hint.calls.length>0,label+': delayed canvas reminder appears later');
+   assert.ok(hint.calls.every(v=>Math.abs(v.y-hint.expectedY)<2),
+    label+': short landscape reminder stays above upgrade badge: '+JSON.stringify(hint));
+  }
   // Pausing during a live two-finger chord must release gameplay ownership.
   await both();
   await page.getByRole('button',{name:'Pause'}).click();

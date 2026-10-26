@@ -34,8 +34,9 @@ test('portrait HUD preserves class identity and control affordances without chan
   assert.doesNotMatch(visuals,/display:none[^']*button\[aria-label="Pause"\]/);
 });
 
-test('portrait Controller tutorial defers canvas copy until the React toast clears',()=>{
+test('Controller tutorial defers canvas copy until the React toast clears on all viewports',()=>{
   assert.match(controller,/__novaLiveVectorTutorialStart=\(this\.time\|\|0\)\+2\.8/);
-  assert.match(controller,/g\.w>=480\|\|now>=\(g\.player\.__novaLiveVectorTutorialStart\|\|0\)/);
+  assert.match(controller,/now>=\(g\.player\.__novaLiveVectorTutorialStart\|\|0\)/);
+  assert.doesNotMatch(controller,/g\.w>=480\|\|now>=/);
   assert.match(controller,/__novaLiveVectorTutorialUntil=\(this\.time\|\|0\)\+10\.5/);
 });

@@ -468,15 +468,17 @@ wrap('game/render',function(renderMod,require){
   function patched(g,w,h){
     old(g,w,h);if(!g||!g.ctx||!g.player||!g.player.alive)return;
     var ctx=g.ctx,now=Number(g.time)||0;drawShear(g,ctx);
-    /* Portrait gets the immediate React toast first; defer the canvas reminder
-     * until that toast has cleared so two identical lessons never stack. */
+    /* Let the immediate React toast teach first on every viewport; the canvas
+     * reminder follows after 2.8s of simulation rather than duplicating it. */
     if(isController(g.player)&&(g.player.__novaLiveVectorTutorialUntil||0)>now&&
-       (g.w>=480||now>=(g.player.__novaLiveVectorTutorialStart||0))){
+       now>=(g.player.__novaLiveVectorTutorialStart||0)){
       ctx.save();ctx.setTransform(g.dpr||1,0,0,g.dpr||1,0,0);ctx.textAlign='center';ctx.font='800 9px Orbitron,system-ui';ctx.fillStyle='rgba(207,255,224,.92)';ctx.shadowBlur=10;ctx.shadowColor='#75f0a3';
       var portrait=g.w<480;
-      ctx.fillText(portrait?'AIM = GUN + SWARM · DEPTH = RANGE':'RIGHT STICK ANGLE = GUN + SWARM · DEPTH = SWARM RANGE · RELEASE = RECALL',g.w*.5,g.h*.72,Math.max(120,g.w-24));
+      /* Short landscape screens place the upgrade-ready badge near 72% height. */
+      var hintY=!portrait&&g.h<500?g.h*.57:g.h*.72;
+      ctx.fillText(portrait?'AIM = GUN + SWARM · DEPTH = RANGE':'RIGHT STICK ANGLE = GUN + SWARM · DEPTH = SWARM RANGE · RELEASE = RECALL',g.w*.5,hintY,Math.max(120,g.w-24));
       ctx.font='700 10px Rajdhani,system-ui';ctx.fillStyle='rgba(170,220,190,.82)';ctx.shadowBlur=0;
-      ctx.fillText(portrait?'RELEASE = RECALL · HITS DESIGNATE':'Cannon hits DESIGNATE · deep pressure leaves fewer drones close enough to peel',g.w*.5,g.h*.72+15,Math.max(120,g.w-24));ctx.restore();
+      ctx.fillText(portrait?'RELEASE = RECALL · HITS DESIGNATE':'Cannon hits DESIGNATE · deep pressure leaves fewer drones close enough to peel',g.w*.5,hintY+15,Math.max(120,g.w-24));ctx.restore();
     }
     var ts=g.tanks||[];
     for(var i=0;i<ts.length;i++){
