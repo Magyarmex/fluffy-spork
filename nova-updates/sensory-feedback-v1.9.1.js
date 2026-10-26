@@ -86,6 +86,13 @@ Sfx.prototype.novaFeedbackDrone=function(p,friendly){if(throttle(this,'__novaFbD
 wrap('game/engine',function(engine,require){
 var Game=engine.Game;if(!Game||Game.prototype.__novaImpactLanguage)return;
 Game.prototype.__novaImpactLanguage=true;
+/* Reusing Game after death must not replay the old life's hit, damage,
+ * reload, heartbeat or death cues against a clock reset to zero. */
+var oldRedeploy=Game.prototype.redeploy;
+if(typeof oldRedeploy==='function')Game.prototype.redeploy=function(){
+ this.__v191Feedback=null;
+ return oldRedeploy.apply(this,arguments);
+};
 var classes=require('./classes'),C=classes&&classes.CLASSES||{};
 function isBeam(t){var d=t&&C[t.cls];return !!(d&&d.fireMode==='beam');}
 function hasSniperReady(t){try{return classes.lineageForClass&&classes.lineageForClass(t.cls)==='sniper';}catch(_){return false;}}
