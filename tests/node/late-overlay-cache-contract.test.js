@@ -223,3 +223,13 @@ test('differential audit: premature cache vs late binding in four seconds of rea
   assert.equal(now.tanks>0,true);
   assert.ok(now.shapes>=100&&now.shapes<220);
 });
+
+test('late-bound materialized render/audio owners are actually installed',()=>{
+  const {requireGame,Game}=bootModules();
+  const render=requireGame('game/render'),audio=requireGame('game/audio');
+  assert.equal(render.render.__novaLivingFront,true,
+    'Crasher commitment and other ecology VFX must reach the real renderer');
+  assert.equal(audio.Sfx.prototype.__novaLivingFrontAudio,true,
+    'Crasher commitment sound hooks must reach the real audio class');
+  assert.equal(Game.prototype.__novaLivingFrontCore,true);
+});
