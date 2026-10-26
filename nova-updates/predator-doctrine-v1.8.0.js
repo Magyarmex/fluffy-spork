@@ -145,6 +145,15 @@ function threatVector(g,C,t,out){
     var b=bs[i];if(!b||b.dead||b.ownerId===t.id)continue;
     var rx=b.x-t.x,ry=b.y-t.y,v2=(b.vx||0)*(b.vx||0)+(b.vy||0)*(b.vy||0);if(v2<100)continue;
     var tc=-(rx*(b.vx||0)+ry*(b.vy||0))/v2;if(tc<0||tc>.82)continue;
+    /* An ordinary round cannot threaten beyond its remaining physical life.
+     * Check the closest reachable point, not just the theoretical future
+     * intercept: it can still enter the safety corridor before expiring.
+     * Bomber shells keep their existing warning because expiry bursts into
+     * splash/fragments, which this simple projectile vector cannot predict. */
+    if(!b.shell&&Number.isFinite(b.ttl)){
+      if(b.ttl<=0)continue;
+      tc=Math.min(tc,b.ttl);
+    }
     var cx=rx+(b.vx||0)*tc,cy=ry+(b.vy||0)*tc,cd=Math.hypot(cx,cy);if(cd>safe*1.75)continue;
     if(g.hasLineOfSight&&!g.hasLineOfSight(b.x,b.y,t.x,t.y,3))continue;
     var w=(1-clamp(cd/(safe*1.75),0,1))*(1-clamp(tc/.82,0,1));
