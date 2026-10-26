@@ -244,7 +244,8 @@ async function scenario(browser, label, options) {
       const geometry=await note.evaluate(el=>{
         const n=el.getBoundingClientRect(),p=el.parentElement.getBoundingClientRect();
         return {text:el.textContent,top:n.top,bottom:n.bottom,left:n.left,right:n.right,
-          panelLeft:p.left,panelRight:p.right,viewport:innerWidth,height:n.height,
+          panelLeft:p.left,panelRight:p.right,panelTop:p.top,panelBottom:p.bottom,
+          viewport:innerWidth,viewportHeight:innerHeight,height:n.height,
           buttons:el.querySelectorAll('button').length};
       });
       assert.match(geometry.text,/LAST OPPONENT: MARKSMAN/,
@@ -256,6 +257,8 @@ async function scenario(browser, label, options) {
         label+': insight stays within the existing panel: '+JSON.stringify(geometry));
       assert.ok(geometry.left>=-1&&geometry.right<=geometry.viewport+1&&geometry.height<100,
         label+': insight must fit the viewport: '+JSON.stringify(geometry));
+      assert.ok(geometry.panelTop>=-1&&geometry.panelBottom<=geometry.viewportHeight+1,
+        label+': complete TERMINATED panel must remain vertically visible: '+JSON.stringify(geometry));
       await page.screenshot({path:path.join(output,label+'-death-insight.png')});
       await page.getByRole('button',{name:/REDEPLOY/}).click();
       await page.waitForFunction(()=>window.__novaBrowserLiveGame?.status==='playing',
