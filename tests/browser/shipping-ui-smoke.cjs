@@ -228,6 +228,17 @@ async function scenario(browser, label, options) {
         if(g.status!=='dying')throw new Error('lethal damage did not enter dying state');
       });
       await page.getByText('TERMINATED',{exact:true}).waitFor({state:'visible',timeout:20000});
+      const deathDiagnostic=await page.evaluate(()=>{
+        const g=window.__novaBrowserLiveGame;
+        const Game=window.__novaMakeRequire('')('game/engine').Game;
+        return {installed:!!Game.prototype.__novaDeathInsightInstalled,
+          note:g?.__novaDeathInsight,attempted:g?.__novaDeathInsightAttempted,
+          observer:!!g?.__novaDeathInsightObserver,
+          status:g?.status,playerAlive:g?.player?.alive,
+          panels:[...document.querySelectorAll('.panel')].map(p=>p.textContent.slice(0,130)),
+          extension:!!window.__NOVA_DEATH_INSIGHT_TEST__};
+      });
+      console.log('NOVA_DEATH_DIAGNOSTIC '+JSON.stringify({label,deathDiagnostic}));
       const note=page.locator('[data-nova-death-insight]');
       await note.waitFor({state:'visible',timeout:12000});
       const geometry=await note.evaluate(el=>{
