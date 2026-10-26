@@ -200,3 +200,27 @@ for(const optimized of [false,true]){
   });
  }
 }
+
+/* Full canonical Bomber projectile lifetime and speed, rather than only an
+ * artificially short remaining TTL. Pen=2 is reachable with a single normal
+ * penetration upgrade; pen=3 is reachable with further build investment. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),mode=optimized?'optimized':'baseline';
+ for(const pen of [2,3])for(const hz of [30,60,120,240]){
+  test('[TTL #193] '+mode+' full-lifetime upgraded Bomber shell at '+hz+'Hz pen='+pen,()=>{
+   const g=new Game(),bursts=[];
+   g.time=1;g.__novaBattlefield={coverBroken:0};g.__novaTerrain=[];
+   g.weakenBullet=()=>{};
+   g.clusterBurst=b=>bursts.push({x:b.x,y:b.y});
+   g.bullets=[{kind:'bullet',id:777,ownerId:1,x:0,y:0,
+    vx:360,vy:0,r:8,dmg:20,ttl:1.1,shell:true,pen,
+    hits:0,dead:false,splash:45,splashDmg:.3,color:'#ffb45e'}];
+   for(let frame=0;frame<300&&g.bullets.length;frame++){
+    g.time+=1/hz;g.updateBullets(1/hz);
+   }
+   assert.equal(bursts.length,1);
+   assert.ok(Math.abs(bursts[0].x-396)<1e-6,
+    '360u/s * 1.1s = 396u physical range, got '+bursts[0].x);
+  });
+ }
+}
