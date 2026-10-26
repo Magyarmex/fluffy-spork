@@ -30,8 +30,8 @@ function boot(){
     documentElement:{style:{setProperty(){}},requestFullscreen:null},
     createElement:el,getElementById(id){return id==='root'?rootEl:findId(body,id)||findId(head,id);},
     querySelector(sel){return sel==='#root canvas.absolute.inset-0'?canvas:null;},
-    addEventListener(k,fn){on(documentListeners,k,fn);},
-    removeEventListener(k,fn){off(documentListeners,k,fn);}};
+    addEventListener(k,fn,capture){on(documentListeners,capture===true?k+'-capture':k,fn);},
+    removeEventListener(k,fn,capture){off(documentListeners,capture===true?k+'-capture':k,fn);}};
   const store=new Map(),localStorage={getItem(k){return store.get(k)||null;},
     setItem(k,v){store.set(k,String(v));}};
   const window={__novaModules:{},__defineModule(id,fn){this.__novaModules[id]=fn;},
@@ -70,7 +70,9 @@ function boot(){
       preventDefault(){this.defaultPrevented=true;},
       stopPropagation(){this.stopped=true;},
       stopImmediatePropagation(){this.stopped=true;}};
-    for(const fn of documentListeners.get('keydown')||[])fn(event);
+    for(const fn of documentListeners.get('keydown-capture')||[])fn(event);
+    if(!event.stopped)for(const fn of target.listeners?.get('keydown')||[])fn(event);
+    if(!event.stopped)for(const fn of documentListeners.get('keydown')||[])fn(event);
     if(!event.stopped)for(const fn of windowListeners.get('keydown')||[])fn(event);
     return event;
   }
@@ -79,11 +81,13 @@ function boot(){
 test('Pilot Console keyboard focus never activates combat keys while modal is visible',()=>{
   const {game,gear,overlay,click,key}=boot();
   click(gear);assert.equal(overlay.hidden,false);assert.equal(game.paused,true);
-  const slider=overlay.querySelector('input,button');
+  const slider=overlay.querySelector('input,button'),received=[];
+  slider.addEventListener('keydown',e=>received.push(e.key));
   for(const k of ['w','a','s','d','ArrowLeft','ArrowRight','e',' ','f']){
     const before=game.input.autofire;
     const e=key(k,slider);
     assert.equal(e.defaultPrevented,false,'native slider/button key handling must survive '+k);
+    assert.equal(received.at(-1),k,'focused control must receive its keydown before gameplay isolation');
     assert.equal(game.input.abilityQueued,false,'modal key must not queue an ultimate');
     assert.equal(game.input.autofire,before,'modal key must not toggle autofire');
     assert.deepEqual(Object.values(game.input.keyboard),[false,false,false,false],
