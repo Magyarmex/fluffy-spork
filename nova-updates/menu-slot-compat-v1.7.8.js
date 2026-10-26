@@ -146,7 +146,11 @@ window.__NOVA_TIPS_CONTRACT__={
 window.__NOVA_FIELDCRAFT_TIPS__={version:VERSION,codename:CODENAME,date:'2026-08-08',count:BASE_TIPS.length,displayMs:DISPLAY_MS,rotation:'shuffle-bag'};
 
 function installStyles(){if(document.getElementById('nova-fieldcraft-tip-style'))return;var s=document.createElement('style');s.id='nova-fieldcraft-tip-style';s.textContent=[
- '.nova-tip-line{height:clamp(28px,5.2vh,38px);overflow:hidden;margin-top:3px;font:700 clamp(9px,1.6vh,10.5px)/1.24 Rajdhani,system-ui;color:#d2deed;transition:opacity .18s ease,transform .18s ease}',
+ '.nova-tip-line{min-height:clamp(28px,5.2vh,38px);height:auto;overflow:visible;margin-top:3px;font:700 clamp(9px,1.6vh,10.5px)/1.24 Rajdhani,system-ui;color:#d2deed;transition:opacity .18s ease,transform .18s ease}',
+ /* Reserve enough lines on narrow handsets so the shuffle-bag rotation does
+  * not crop advice or move the controls every 10.4 seconds. The text may
+  * still grow if a future reviewed tip is unusually long. */
+ '@media(max-width:430px){.nova-tip-line{min-height:56px}}',
  '.nova-tip-line.swap,.nova-context-tip.swap .nova-context-tip-text{opacity:0;transform:translateY(3px)}',
  '.nova-context-tip{margin-top:10px;padding:8px 9px;border:1px solid rgba(125,243,255,.13);border-radius:9px;background:rgba(29,73,104,.08);min-width:0}',
  '.nova-context-tip-k{font:800 7px/1 Orbitron,system-ui;letter-spacing:.13em;color:#5d8da8;text-transform:uppercase}',
