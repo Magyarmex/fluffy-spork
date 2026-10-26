@@ -599,12 +599,26 @@ for(const optimized of [false,true]){
  });
  test(label+' dense remote fire cannot bypass a genuinely nearby interceptor',()=>{
   const {g,a,b}=makeWorld(Game);
-  g.bullets.push({kind:'bullet',id:5,ownerId:8,x:50,y:0,vx:0,vy:0,
+  g.bullets.push({kind:'bullet',id:5,ownerId:8,x:10,y:0,vx:0,vy:0,
    r:3,dmg:5,ttl:2,pen:0,hits:0,dead:false,shell:false,beam:false});
   for(let i=0;i<960;i++)g.bullets.push({kind:'bullet',id:3000+i,ownerId:10+i,
    x:900+(i%24)*3,y:900+Math.floor(i/24)*3,vx:0,vy:0,
    r:2,dmg:1,ttl:2,pen:0,hits:0,dead:false,shell:false,beam:false});
   g.time+=.35/30;g.updateBullets(.35/30);
   assert.equal(b.hitCount,0,'uncertain interception must remain conservative');
+ });
+}
+
+for(const optimized of [false,true]){
+ test((optimized?'optimized':'baseline')+
+  ' dense distant-fire result is independent of projectile array ordering',()=>{
+  const Game=boot(undefined,optimized),{g,a,b}=makeWorld(Game);
+  for(let i=0;i<960;i++)g.bullets.push({kind:'bullet',id:4000+i,ownerId:10+i,
+   x:900+(i%24)*3,y:900+Math.floor(i/24)*3,vx:0,vy:0,
+   r:2,dmg:1,ttl:2,pen:0,hits:0,dead:false,shell:false,beam:false});
+  g.bullets.reverse();
+  g.time+=.35/30;g.updateBullets(.35/30);
+  assert.equal(a.hitCount,1,'first physical contact despite reverse order');
+  assert.equal(b.hitCount,1,'second physical contact despite reverse order');
  });
 }
