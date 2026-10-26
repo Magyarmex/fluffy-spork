@@ -152,3 +152,11 @@ test('decorative War Room cannot create a playable death insight',()=>{
  assert.equal(observers.length,0);
  assert.equal(g.__novaDeathInsight,undefined);
 });
+
+test('allied damage cannot be presented as an opponent matchup',()=>{
+ const {Game,addPanel}=boot(),g=new Game(),p=addPanel();
+ g.areAllies=()=>true;
+ g.killTank(victim(),killer('marksman'));g.update();
+ assert.equal(p.note,null);
+ assert.equal(g.__novaDeathInsight,null);
+});
