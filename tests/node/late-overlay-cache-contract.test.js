@@ -307,3 +307,19 @@ test('fair flee keeps a genuinely visible human threat authoritative',()=>{
   assert.equal(g.nearestTank,nearest);
   assert.equal(g.player,human);
 });
+
+test('fair AI exception restores tank visibility and nearestTank ownership atomically',()=>{
+  const {Game,requireGame}=bootModules();
+  const ai=requireGame('game/ai');
+  const g=new Game(canvas(),canvas(),{hud:noop,event:noop},'low');
+  const bot=g.tanks.find(t=>t&&!t.isPlayer);
+  assert.ok(bot);
+  g.tanks=[bot];g.time=10;
+  bot.ai.state='flee';bot.ai.thinkT=1;bot.ai.__v1112TargetId=-1;
+  const originalTanks=g.tanks,originalPlayer=g.player,originalNearest=g.nearestTank;
+  g.moveTank=()=>{throw new Error('injected movement failure');};
+  assert.throws(()=>ai.updateAI(bot,g,1/60),/injected movement failure/);
+  assert.equal(g.tanks,originalTanks,'AI target list must restore after an exception');
+  assert.equal(g.player,originalPlayer,'human handle must restore after an exception');
+  assert.equal(g.nearestTank,originalNearest,'nearestTank owner must restore after an exception');
+});
