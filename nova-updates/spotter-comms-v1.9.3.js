@@ -53,6 +53,13 @@ wrap('game/engine',function(engine){
     if(!decision.allow)return;
     return oldAddText.call(this,x,y,decision.text,color,size);
   };
+  /* redeploy() reuses the same Game instance but resets its simulation clock.
+   * A warning emitted in the previous life must not silence the new life. */
+  var oldRedeploy=Game.prototype.redeploy;
+  if(typeof oldRedeploy==='function')Game.prototype.redeploy=function(){
+    this.__novaSpotterCommsState=null;
+    return oldRedeploy.apply(this,arguments);
+  };
 });
 
 window.__NOVA_VERSION=VERSION;
