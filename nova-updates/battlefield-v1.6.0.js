@@ -711,8 +711,31 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   }
   for(var bi=0;bi<others.length;bi++){
    var o=others[bi];if(!o||o===b||o.dead)continue;
-   if(near(o.x,o.y,o.x+(o.vx||0)*dt,o.y+(o.vy||0)*dt,
-      (o.r||2)+b.r+2))return false;
+   if(!Number.isFinite(o.x)||!Number.isFinite(o.y)||
+      !Number.isFinite(o.vx)||!Number.isFinite(o.vy)||
+      !Number.isFinite(o.r)||!(o.r>0))return false;
+   if(near(o.x,o.y,o.x+o.vx*dt,o.y+o.vy*dt,
+      o.r+b.r+2))return false;
+   /* A competing projectile can already overlap a target hull without
+    * touching this shot's narrow corridor. Such a t=0 contact must not
+    * be reordered behind our speculative multi-hit proof. Consider the
+    * other bullet's conservative movement only UNTIL each body contact;
+    * this veto awards no damage and leaves ordinary collisions intact. */
+   for(var ct=0;ct<contacts.length;ct++){
+    var target=contacts[ct].e;
+    if(o.ownerId===target.id)continue;
+    var targetDef=CLASSES[target.cls];
+    if(!targetDef||!Number.isFinite(targetDef.size))return false;
+    var until=Math.min(dt,contacts[ct].t*travelT),
+        tx=o.x+o.vx*until,ty=o.y+o.vy*until,
+        radius=o.r+Math.max(0,targetDef.size)+3;
+    if(!Number.isFinite(tx)||!Number.isFinite(ty)||
+       !Number.isFinite(radius))return false;
+    if(Math.max(o.x,tx)+radius>=target.x&&
+       Math.min(o.x,tx)-radius<=target.x&&
+       Math.max(o.y,ty)+radius>=target.y&&
+       Math.min(o.y,ty)-radius<=target.y)return false;
+   }
   }
   if(firstSolidHit(g,ax,ay,ex,ey,b.r*.45))return false;
   /* Reuse the real damage owner, never fabricate HP or kill credit. */
@@ -892,6 +915,26 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       Math.max(ax,hx)+pad>=Math.min(o.x,ex)&&
       Math.min(ay,hy)-pad<=Math.max(o.y,ey)&&
       Math.max(ay,hy)+pad>=Math.min(o.y,ey))return false;
+   /* A projectile may hit the chosen body from the side without crossing
+    * this bullet's path. It can change HP/kill credit BEFORE first contact.
+    * The fallback first-hit recovery must obey the same veto as piercing. */
+   if(best.kind==='tank'&&o.ownerId!==best.e.id){
+    var td=CLASSES[best.e.cls];
+    if(!td||!Number.isFinite(td.size)||
+       !Number.isFinite(o.r)||!(o.r>0))return false;
+    var rr=o.r+Math.max(0,td.size)+3,
+        bx=best.e.x,by=best.e.y,
+        sx=best.e.__novaSweepMoveTime===g.time?
+           best.e.__novaSweepPrevX:bx,
+        sy=best.e.__novaSweepMoveTime===g.time?
+           best.e.__novaSweepPrevY:by;
+    if(!Number.isFinite(sx)||!Number.isFinite(sy)||
+       !Number.isFinite(ex)||!Number.isFinite(ey))return false;
+    if(Math.max(o.x,ex)+rr>=Math.min(sx,bx)&&
+       Math.min(o.x,ex)-rr<=Math.max(sx,bx)&&
+       Math.max(o.y,ey)+rr>=Math.min(sy,by)&&
+       Math.min(o.y,ey)-rr<=Math.max(sy,by))return false;
+   }
   }
   var vx=b.vx,vy=b.vy;
   b.x=hx;b.y=hy;b.px=hx;b.py=hy;
@@ -1165,17 +1208,31 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      seenTargets.add(t);
     }
    }
+   var threatTargets=possible&&possible.get(b)||[];
    for(var bi=0;bi<bullets.length;bi++){
     var o=bullets[bi];if(!o||o===b||o.dead)continue;
     var ox=o.x,oy=o.y,tx=ox+(o.vx||0)*dt,
         ty=oy+(o.vy||0)*dt,pad=(o.r||2)+b.r+2;
-    /* Unknown motion must remain a veto candidate, never be discarded. */
-    if(!Number.isFinite(ox)||!Number.isFinite(oy)||
+    /* Unknown motion must remain a veto candidate, never be discarded.
+     * A bullet outside THIS projectile's narrow corridor may nevertheless
+     * already overlap one of its victim hulls. Keep it in the local proof
+     * set so damage order cannot be silently reversed. */
+    var compete=!Number.isFinite(ox)||!Number.isFinite(oy)||
        !Number.isFinite(tx)||!Number.isFinite(ty)||
        !Number.isFinite(pad)||
        (Math.max(ox,tx)+pad>=minx&&Math.min(ox,tx)-pad<=maxx&&
-        Math.max(oy,ty)+pad>=miny&&Math.min(oy,ty)-pad<=maxy))
-     local.push(o);
+        Math.max(oy,ty)+pad>=miny&&Math.min(oy,ty)-pad<=maxy);
+    if(!compete)for(var ht=0;ht<threatTargets.length;ht++){
+     var hull=threatTargets[ht];
+     if(o.ownerId===hull.id)continue;
+     var hd=CLASSES[hull.cls],hr=(o.r||2)+
+       (hd&&Number.isFinite(hd.size)?Math.max(0,hd.size):120)+3;
+     if(Math.max(ox,tx)+hr>=hull.x&&Math.min(ox,tx)-hr<=hull.x&&
+        Math.max(oy,ty)+hr>=hull.y&&Math.min(oy,ty)-hr<=hull.y){
+      compete=true;break;
+     }
+    }
+    if(compete)local.push(o);
    }
    var cost=bodyCost+local.length+1;
    if(cost>ISOLATED_RECOVERY_SCAN_CAP||(work+=cost)>900)return null;

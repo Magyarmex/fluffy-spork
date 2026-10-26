@@ -954,3 +954,87 @@ for(const optimized of [false,true])for(const fps of [30,60]){
   assert.deepEqual(victims.map(v=>v.hitCount),Array(10).fill(1));
  });
 }
+
+
+/* Run 376 adversarial: a competing projectile can already be inside the
+ * FIRST victim's hull without touching the piercing shot's narrow corridor.
+ * The optional shortcut must not reorder that earlier damage and kill credit.
+ * Test the materialized core and both shipping Battlefield compositions. */
+for(const optimized of [false,true])for(const ttl of [.01,.2]){
+ test((optimized?'optimized':'baseline')+
+  ' earlier lateral projectile contact vetoes piercing shortcut TTL='+ttl,()=>{
+  const Game=boot(undefined,optimized),{g,a}=makeWorld(Game);
+  a.hp=45;
+  g.bullets[0].ttl=ttl;
+  const events=[];
+  g.damageTank=function(t,dmg,owner){
+   events.push({id:t.id,owner});
+   t.hitCount++;t.hp-=dmg;
+   if(t.hp<=0)t.alive=false;
+  };
+  /* At y=19 this bullet is inside the first hull's 21u hit radius at t=0,
+   * but it does not overlap the piercing shot's 8u projectile corridor. */
+  g.bullets.push({kind:'bullet',id:77000,ownerId:7,x:40,y:19,
+   vx:0,vy:0,r:3,dmg:30,ttl:1,pen:0,hits:0,dead:false,
+   shell:false,beam:false});
+  const dt=.35/30;
+  g.time+=dt;g.updateBullets(dt);
+  assert.ok(events.length>0,'earlier competitor must apply ordinary damage');
+  assert.equal(events[0].owner,7,
+   'a t=0 contact must precede the piercing shot at t>0');
+ });
+}
+
+
+for(const optimized of [false,true]){
+ test((optimized?'optimized':'baseline')+
+  ' lateral hull competitor vetoes only its own piercing lane',()=>{
+  const Game=boot(undefined,optimized);
+  const {g,victims}=multiShotRemoteWorld(Game,5,50);
+  g.bullets.push({kind:'bullet',id:77001,ownerId:7,
+   x:40,y:19,vx:0,vy:0,r:3,dmg:20,ttl:1,pen:0,
+   hits:0,dead:false,shell:false,beam:false});
+  g.time+=.35/30;g.updateBullets(.35/30);
+  assert.deepEqual(victims.slice(2).map(v=>v.hitCount),Array(8).fill(1),
+   'four unrelated stationary two-hull shots must still recover');
+  assert.equal(victims[1].hitCount,0,
+   'the lane with uncertain prior victim damage must abstain');
+ });
+}
+
+
+for(const optimized of [false,true]){
+ test((optimized?'optimized':'baseline')+
+  ' self-owned lateral bullet does not suppress legitimate piercing contacts',()=>{
+  const Game=boot(undefined,optimized),{g,a,b}=makeWorld(Game);
+  g.bullets.push({kind:'bullet',id:77002,ownerId:a.id,
+   x:40,y:19,vx:0,vy:0,r:3,dmg:30,ttl:1,pen:0,
+   hits:0,dead:false,shell:false,beam:false});
+  g.time+=.35/30;g.updateBullets(.35/30);
+  assert.equal(a.hitCount,1);
+  assert.equal(b.hitCount,1,
+   'a tank cannot be damaged by its own unrelated stationary bullet');
+ });
+}
+
+
+for(const optimized of [false,true]){
+ test((optimized?'optimized':'baseline')+
+  ' a projectile arriving after both piercing contacts does not veto them',()=>{
+  const Game=boot(undefined,optimized),{g,a,b}=makeWorld(Game);
+  const owners=[];
+  g.damageTank=function(t,dmg,owner){
+   owners.push(owner);t.hitCount++;
+  };
+  /* At x=65 the competing projectile enters the second hull at t=.010s;
+   * the piercing shot reaches that hull at about t=.0073s. */
+  g.bullets.push({kind:'bullet',id:77003,ownerId:7,
+   x:65,y:25,vx:0,vy:-400,r:3,dmg:10,ttl:1,pen:0,
+   hits:0,dead:false,shell:false,beam:false});
+  g.time+=.35/30;g.updateBullets(.35/30);
+  assert.equal(a.hitCount,1);
+  assert.equal(b.hitCount,2);
+  assert.deepEqual(owners,[1,1,7],
+   'the shortcut must remain available when other damage is provably later');
+ });
+}
