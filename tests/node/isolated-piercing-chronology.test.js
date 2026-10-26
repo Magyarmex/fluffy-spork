@@ -679,9 +679,9 @@ for(const optimized of [false,true]){
  });
 }
 
-/* RESEARCH — KNOWN RED: a global projectile-count gate still suppresses
- * physically isolated penetrating shots when several expire in one frame.
- * This is not a production fix; preserve the failing acceptance tests. */
+/* Regression-first evidence from PR #344: independent piercing shots must
+ * not be starved by unrelated distant projectiles when several expire in
+ * one frame. These formerly red acceptance cases now guard production. */
 function multiShotRemoteWorld(Game,shotCount,remoteCount,reverse=false){
  const g=new Game(),victims=[];
  for(let i=0;i<shotCount;i++){
@@ -715,7 +715,7 @@ for(const optimized of [false,true]){
   });
  }
  for(const fps of [30,60]){
-  test(mode+' KNOWN RED: fifth isolated shot must not be starved at '+fps+'Hz',()=>{
+  test(mode+' fifth isolated shot must not be starved at '+fps+'Hz',()=>{
    const {g,victims}=multiShotRemoteWorld(Game,5,50);
    const dt=.35/fps;
    for(let frame=0;frame<3;frame++){g.time+=dt;g.updateBullets(dt);}
@@ -723,7 +723,7 @@ for(const optimized of [false,true]){
     Array(10).fill(1),'five independent pairs are physically reachable');
   });
  }
- test(mode+' KNOWN RED: dense multi-shot outcome independent of bullet order',()=>{
+ test(mode+' dense multi-shot outcome independent of bullet order',()=>{
   const {g,victims}=multiShotRemoteWorld(Game,5,50,true);
   g.time+=.35/30;g.updateBullets(.35/30);
   assert.deepEqual(victims.map(v=>v.hitCount),Array(10).fill(1));
@@ -801,5 +801,82 @@ for(const optimized of [false,true]){
   }
   assert.deepEqual(run(false),run(true),
    'ambiguous shared-hull attribution must not depend on array order');
+ });
+}
+
+
+/* Run 375 follow-through: the multi-shot recovery must also work through
+ * the real Game.update epoch, where Battlefield requires witnessed motion.
+ * Direct updateBullets fixtures alone are not a shipping integration gate. */
+for(const optimized of [false,true]){
+ const mode=optimized?'optimized':'baseline';
+ for(const fps of [30,60]){
+  test(mode+' five piercing shots survive remote density through Game.update at '+fps+'Hz',()=>{
+   const Game=boot(function(dt){
+    this.time+=dt;
+    for(const t of this.tanks){
+     t.__novaSweepMoveTime=this.time;
+     t.__novaSweepPrevX=t.x;t.__novaSweepPrevY=t.y;
+    }
+    this.updateBullets(dt);
+   },optimized);
+   const {g,victims}=multiShotRemoteWorld(Game,5,960),dt=.35/fps;
+   for(let frame=0;frame<3;frame++)g.update(dt);
+   assert.deepEqual(victims.map(v=>v.hitCount),Array(10).fill(1));
+   assert.equal(g.__novaShapeSweepActive,false,
+    'live movement epoch must be closed after the update');
+  });
+ }
+ test(mode+' moving first hull vetoes only its own multi-shot recovery',()=>{
+  const Game=boot(function(dt){
+   this.time+=dt;
+   for(const t of this.tanks){
+    t.__novaSweepMoveTime=this.time;
+    t.__novaSweepPrevX=t.x;t.__novaSweepPrevY=t.y;
+   }
+   this.tanks[0].x+=5;
+   this.updateBullets(dt);
+  },optimized);
+  const {g,victims}=multiShotRemoteWorld(Game,5,50);
+  g.update(.35/30);
+  assert.equal(victims[1].hitCount,0,
+   'uncertain moving-hull chronology must not authorize the second contact');
+  assert.deepEqual(victims.slice(2).map(v=>v.hitCount),Array(8).fill(1),
+   'independent witnessed-stationary shots must still recover');
+  assert.equal(g.__novaShapeSweepActive,false);
+ });
+}
+
+
+/* Deterministic real-update stress: spatial separation, contact order and
+ * victim identity remain invariant under array permutation and frame split. */
+for(const optimized of [false,true]){
+ test((optimized?'optimized':'baseline')+
+  ' seeded multi-shot live epoch preserves all physical victim identities',()=>{
+  const Game=boot(function(dt){
+   this.time+=dt;
+   for(const t of this.tanks){
+    t.__novaSweepMoveTime=this.time;
+    t.__novaSweepPrevX=t.x;t.__novaSweepPrevY=t.y;
+   }
+   this.updateBullets(dt);
+  },optimized);
+  let seed=375026;
+  function rnd(){seed=(Math.imul(seed,1664525)+1013904223)>>>0;
+   return seed/4294967296;}
+  for(let w=0;w<160;w++){
+   const fps=w%2?60:30,{g,victims}=multiShotRemoteWorld(Game,5,50);
+   for(let i=0;i<5;i++){
+    victims[i*2].x=35+rnd()*12;
+    victims[i*2+1].x=64+rnd()*10;
+   }
+   if(w%3===0)g.bullets.reverse();
+   if(w%5===0)g.tanks.reverse();
+   const dt=.35/fps;
+   for(let frame=0;frame<3;frame++)g.update(dt);
+   assert.deepEqual(victims.map(v=>v.hitCount),Array(10).fill(1),
+    'all ten stationary hulls must be hit exactly once in world '+w);
+   assert.equal(g.__novaShapeSweepActive,false);
+  }
  });
 }
