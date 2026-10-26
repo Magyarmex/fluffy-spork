@@ -86,7 +86,7 @@ test('Live War Room clears stale owned nodes even if React reparents them before
   assert.match(source, /querySelectorAll\('\.nv-lobby-battlefield,\.nv-lobby-atmosphere'\)/);
   assert.match(source, /if\(stale\[i\]&&stale\[i\]\.parentElement\)stale\[i\]\.parentElement\.removeChild\(stale\[i\]\)/);
   assert.doesNotMatch(source, /stale\[i\]\.parentElement===m/);
-  assert.match(source, /function mount\(m\)\{\s*if\(!m\)return;\s*removeStalePresentation\(m\);/);
+  assert.match(source, /function mount\(m\)\{\s*if\(!m\|\|!resolveCanonicalModules\(\)\)return;\s*removeStalePresentation\(m\);/);
   assert.doesNotMatch(source, /if\(!m\|\|m\.querySelector\('\.nv-lobby-battlefield'\)\)return/);
 });
 
@@ -103,4 +103,16 @@ test('Live War Room obeys Signal Discipline and loads after it', () => {
   assert.ok(deploy.indexOf(parity) < deploy.indexOf(signals));
   assert.ok(deploy.indexOf(signals) < deploy.indexOf(live));
   assert.match(deploy, /! grep -q 'nova-updates\/lobby-battlefield-v1\.10\.1\.js' index\.html\.new/);
+});
+
+
+test('decorative War Room does not pre-cache modules before late gameplay overlays', () => {
+  assert.match(source, /function resolveCanonicalModules\(\)/);
+  assert.match(source, /if\(document\.readyState==='loading'\)return;/);
+  assert.match(source, /document\.addEventListener\('DOMContentLoaded',reconcile\)/);
+  assert.match(source, /if\(!m\|\|!resolveCanonicalModules\(\)\)return;/);
+  const preMount = source.slice(source.indexOf('var req=window.__novaMakeRequire;'),
+    source.indexOf('function installCss()'));
+  assert.doesNotMatch(preMount, /\nengine=req\(/,
+    'War Room must not eagerly execute engine module factories');
 });
