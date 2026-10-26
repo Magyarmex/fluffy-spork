@@ -1188,17 +1188,31 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      seenTargets.add(t);
     }
    }
+   var threatTargets=possible&&possible.get(b)||[];
    for(var bi=0;bi<bullets.length;bi++){
     var o=bullets[bi];if(!o||o===b||o.dead)continue;
     var ox=o.x,oy=o.y,tx=ox+(o.vx||0)*dt,
         ty=oy+(o.vy||0)*dt,pad=(o.r||2)+b.r+2;
-    /* Unknown motion must remain a veto candidate, never be discarded. */
-    if(!Number.isFinite(ox)||!Number.isFinite(oy)||
+    /* Unknown motion must remain a veto candidate, never be discarded.
+     * A bullet outside THIS projectile's narrow corridor may nevertheless
+     * already overlap one of its victim hulls. Keep it in the local proof
+     * set so damage order cannot be silently reversed. */
+    var compete=!Number.isFinite(ox)||!Number.isFinite(oy)||
        !Number.isFinite(tx)||!Number.isFinite(ty)||
        !Number.isFinite(pad)||
        (Math.max(ox,tx)+pad>=minx&&Math.min(ox,tx)-pad<=maxx&&
-        Math.max(oy,ty)+pad>=miny&&Math.min(oy,ty)-pad<=maxy))
-     local.push(o);
+        Math.max(oy,ty)+pad>=miny&&Math.min(oy,ty)-pad<=maxy);
+    if(!compete)for(var ht=0;ht<threatTargets.length;ht++){
+     var hull=threatTargets[ht];
+     if(o.ownerId===hull.id)continue;
+     var hd=CLASSES[hull.cls],hr=(o.r||2)+
+       (hd&&Number.isFinite(hd.size)?Math.max(0,hd.size):120)+3;
+     if(Math.max(ox,tx)+hr>=hull.x&&Math.min(ox,tx)-hr<=hull.x&&
+        Math.max(oy,ty)+hr>=hull.y&&Math.min(oy,ty)-hr<=hull.y){
+      compete=true;break;
+     }
+    }
+    if(compete)local.push(o);
    }
    var cost=bodyCost+local.length+1;
    if(cost>ISOLATED_RECOVERY_SCAN_CAP||(work+=cost)>900)return null;
