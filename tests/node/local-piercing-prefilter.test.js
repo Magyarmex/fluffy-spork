@@ -149,3 +149,15 @@ test('non-targeted piercing shots remain possible local interceptors',()=>{
  assert.ok(p.get(local).includes(crossing),
   'a projectile without eligible hulls can still intercept another shot');
 });
+
+
+test('one-hull piercing shot still vetoes a shared two-hull shortcut',()=>{
+ const full=shot(0),partial={...shot(0),vx:3000};
+ const g=world([full,partial,...Array.from({length:5},(_,i)=>shot(1000+i*160))],50,120);
+ g.tanks=[{id:2,x:40,y:0,cls:'scout',alive:true,hp:100},
+          {id:3,x:65,y:0,cls:'scout',alive:true,hp:100}];
+ assert.equal(plan(g,.35/30,false),null,
+  'an ineligible one-hit shot can still kill or weaken the shared first hull');
+ g.bullets.reverse();
+ assert.equal(plan(g,.35/30,false),null,'array order cannot bypass shared attribution');
+});
