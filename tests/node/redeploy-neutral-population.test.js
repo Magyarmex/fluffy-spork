@@ -72,13 +72,13 @@ function bootGame() {
   return game;
 }
 
-const TARGET={circle:62,triangle:30,square:16,pentagon:8,hexagon:4};
+const TARGET={circle:62,triangle:30,square:16,pentagon:8,hexagon:4,star:1};
 function counts(g){
-  const out={circle:0,triangle:0,square:0,pentagon:0,hexagon:0};
+  const out={circle:0,triangle:0,square:0,pentagon:0,hexagon:0,star:0};
   for(const s of g.shapes)if(s&&s.hp>0&&Object.hasOwn(out,s.type))out[s.type]++;
   return out;
 }
-test('materialized initial neutral ecology begins at canonical 120-body contract',()=>{
+test('materialized initial neutral ecology begins at canonical 121-body contract',()=>{
   const g=bootGame();
   assert.deepEqual(counts(g),TARGET);
 });
@@ -120,4 +120,14 @@ test('surviving neutral IDs remain resolvable after redeploy',()=>{
     'redeploy must not orphan surviving neutral shapes in Zero Churn lookup');
   const live=g.shapes.filter(s=>s&&s.hp>0);
   assert.equal(g.shapeById.size,live.length,'index and physical population agree');
+});
+
+test('redeploy immediately replenishes the canonical one-star neutral deficit',()=>{
+  const g=bootGame();
+  const star=g.shapes.find(s=>s.type==='star');
+  assert.ok(star&&star.hp>0,'materialized initial arena has one star');
+  g.shapes.splice(g.shapes.indexOf(star),1);
+  assert.equal(counts(g).star,0);
+  g.redeploy();
+  assert.equal(counts(g).star,1,'the rare star is part of the core neutral baseline');
 });
