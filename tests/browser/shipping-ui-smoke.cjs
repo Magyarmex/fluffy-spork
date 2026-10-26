@@ -180,6 +180,45 @@ async function scenario(browser, label, options) {
         archive.x+archive.width<=321&&archive.y+archive.height<=567,
         label+': OPEN ARCHIVE text must fit inside the visible lobby: '+JSON.stringify(archive));
 
+      // Research-only: previous Chromium evidence showed a briefly absent
+      // hero in a screenshot after forcibly cycling every tip. Determine
+      // whether a *natural* 10.4s Fieldcraft rotation can actually blink the
+      // primary hero/Deploy, or whether that image was test-induced.
+      await page.waitForTimeout(900); // clear the initial 700ms entrance
+      const rotationWitness=await page.evaluate(async()=>{
+        const m=document.querySelector('#root .menu-grid-bg');
+        const hero=m?.querySelector('.nv-hero'),primary=m?.querySelector('.nv-primary');
+        const line=m?.querySelector('.nova-tip-line');
+        if(!m||!hero||!primary||!line)return {error:'canonical lobby elements missing'};
+        let minHero=1,minPrimary=1,samples=0,tipChanges=0,menuReplaced=false;
+        let previous=line.textContent;
+        const obs=new MutationObserver(()=>{
+          if(line.textContent!==previous){previous=line.textContent;tipChanges++;}
+        });
+        obs.observe(line,{subtree:true,childList:true,characterData:true});
+        const start=performance.now();
+        await new Promise(resolve=>{
+          function sample(){
+            const h=Number(getComputedStyle(hero).opacity),p=Number(getComputedStyle(primary).opacity);
+            minHero=Math.min(minHero,h);minPrimary=Math.min(minPrimary,p);
+            menuReplaced ||= document.querySelector('#root .menu-grid-bg')!==m;
+            samples++;
+            if(performance.now()-start>=11200)resolve();
+            else requestAnimationFrame(sample);
+          }
+          sample();
+        });
+        obs.disconnect();
+        return {minHero,minPrimary,samples,tipChanges,menuReplaced};
+      });
+      console.log('NOVA_LOBBY_NATURAL_TIP_ROTATION '+JSON.stringify(rotationWitness));
+      assert.ok(!rotationWitness.error&&rotationWitness.tipChanges>0,
+        'a real Fieldcraft rotation must be observed: '+JSON.stringify(rotationWitness));
+      assert.ok(rotationWitness.minHero>.90&&rotationWitness.minPrimary>.90&&
+        !rotationWitness.menuReplaced,
+        'natural Fieldcraft rotation must not hide the title or Deploy: '+JSON.stringify(rotationWitness));
+
+
     }
 
 
