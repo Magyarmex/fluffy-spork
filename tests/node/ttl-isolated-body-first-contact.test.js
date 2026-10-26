@@ -898,3 +898,32 @@ for (const optimized of [false,true]) {
     });
   }
 }
+
+
+/* Run 370: Game.update uses a 0.35 projectile simulation-speed multiplier
+ * during the player's death transition, while g.time still advances at full
+ * frame duration. The physical first-contact contract is in projectile
+ * simulation seconds, not the match clock. Preserve this red gate so a
+ * chronological event queue cannot accidentally use the wrong clock. */
+function simulateSlowProjectile(Game, fps, scale, targetX, ttl) {
+  const g = new Game();
+  g.tanks = [{ kind: 'tank', id: 2, x: targetX, y: 0,
+    cls: 'scout', hp: 100, alive: true }];
+  g.bullets = [{ kind: 'bullet', id: 1, ownerId: 1, x: 0, y: 0,
+    vx: 6000, vy: 0, r: 3, dmg: 20, ttl, pen: 0,
+    hits: 0, dead: false, shell: false, beam: false }];
+  for (let i = 0; i < 30 && g.bullets.length; i++) {
+    g.updateBullets(scale / fps);
+    g.time += 1 / fps; // match clock differs from projectile simulation time
+  }
+  return g.hits;
+}
+for (const fps of [30, 60, 120, 240]) {
+  test('death-slow 0.35x projectile clock: reachable hull before TTL at ' + fps + 'Hz', () => {
+    assert.equal(simulateSlowProjectile(Game, fps, .35, 40, .005), 1,
+      'physical contact at 0.00317 projectile-seconds precedes TTL 0.005');
+  });
+  test('death-slow 0.35x projectile clock: no phantom beyond TTL at ' + fps + 'Hz', () => {
+    assert.equal(simulateSlowProjectile(Game, fps, .35, 100, .005), 0);
+  });
+}
