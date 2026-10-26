@@ -224,3 +224,32 @@ for(const optimized of [false,true]){
   });
  }
 }
+
+/* Children must inherit the remaining portion of the frame even for an
+ * upgraded shell. They must not be born at the frame endpoint or inherit a
+ * shortened permanent velocity after this update. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),mode=optimized?'optimized':'baseline';
+ for(const hz of [30,120])for(const pen of [2,3]){
+  test('[TTL #193] '+mode+' pen='+pen+' fragments receive remaining subframe at '+hz+'Hz',()=>{
+   const g=new Game(),created=[];
+   g.time=1;g.__novaBattlefield={coverBroken:0};g.__novaTerrain=[];
+   g.weakenBullet=()=>{};
+   g.clusterBurst=function(shell){
+    const child={kind:'bullet',id:778,ownerId:1,x:shell.x,y:0,
+     vx:300,vy:0,r:3,dmg:2,ttl:1,pen:0,hits:0,dead:false,
+     shell:false,beam:false,splash:0};
+    created.push(child);this.bullets.push(child);
+   };
+   g.bullets=[{kind:'bullet',id:777,ownerId:1,x:0,y:0,
+    vx:6000,vy:0,r:3,dmg:26,ttl:.005,pen,hits:0,dead:false,
+    shell:true,beam:false,splash:0}];
+   g.updateBullets(1/hz);
+   assert.equal(created.length,1);
+   const expected=30+300*(1/hz-.005);
+   assert.ok(Math.abs(created[0].x-expected)<1e-6,
+    'fragment should travel only post-birth time: '+created[0].x+' vs '+expected);
+   assert.equal(created[0].vx,300,'permanent fragment speed unchanged');
+  });
+ }
+}
