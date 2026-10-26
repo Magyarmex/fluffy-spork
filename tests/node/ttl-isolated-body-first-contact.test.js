@@ -935,6 +935,10 @@ for (const fps of [30, 60, 120, 240]) {
  * must be part of the chronological multi-hit acceptance matrix. */
 function simulateSlowPiercing(Game, fps, scale, secondX) {
   const g = new Game();
+  // A raw hit count is not proof of two victims: the legacy core can damage
+  // the SAME hull on consecutive frames while a penetrating round overlaps.
+  const victims = [], originalDamage = g.damageTank;
+  g.damageTank = function(target) { victims.push(target.id); return originalDamage.apply(this, arguments); };
   g.tanks = [40, secondX].map((x, i) => ({
     kind: 'tank', id: i + 2, x, y: 0, cls: 'scout', hp: 100, alive: true
   }));
@@ -945,15 +949,17 @@ function simulateSlowPiercing(Game, fps, scale, secondX) {
     g.updateBullets(scale / fps);
     g.time += 1 / fps;
   }
-  return g.hits;
+  return victims;
 }
 for (const fps of [30, 60, 120, 240]) {
   test('death-slow penetration: two pre-expiry hulls hit at ' + fps + 'Hz', () => {
     // Contact 1: x=19 at .00317s; contact 2: x=44 at .00733s.
     // Both precede TTL=.010s. No terrain, drones, or interception.
-    assert.equal(simulateSlowPiercing(Game, fps, .35, 65), 2);
+    assert.deepEqual(simulateSlowPiercing(Game, fps, .35, 65), [2, 3],
+      'penetration must damage two distinct hulls in physical contact order');
   });
   test('death-slow penetration: second hull beyond TTL is not hit at ' + fps + 'Hz', () => {
-    assert.equal(simulateSlowPiercing(Game, fps, .35, 200), 1);
+    assert.deepEqual(simulateSlowPiercing(Game, fps, .35, 200), [2],
+      'out-of-TTL second hull cannot be hit or substituted by a duplicate first hit');
   });
 }
