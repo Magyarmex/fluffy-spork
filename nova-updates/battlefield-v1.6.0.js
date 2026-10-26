@@ -810,6 +810,17 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       move=Math.hypot(e.x-dsx,e.y-dsy);
     if(!Number.isFinite(speedBound)||speedBound>4000||
        move>96||move>speedBound*dt+1e-6){uncertain=true;return;}
+    /* Cull remote drones before any quadratic/sampled proof. An earlier
+     * tank or neutral hit shortens the only time window in which this
+     * drone could affect the result. */
+    var windowT=best?Math.min(bestT,limit):limit;
+    var reach=drR+speedBound*dt*windowT;
+    var potentiallyEarlier=
+       Math.max(ax,ax+dx*windowT)+reach>=Math.min(dsx,e.x)&&
+       Math.min(ax,ax+dx*windowT)-reach<=Math.max(dsx,e.x)&&
+       Math.max(ay,ay+dy*windowT)+reach>=Math.min(dsy,e.y)&&
+       Math.min(ay,ay+dy*windowT)-reach<=Math.max(dsy,e.y);
+    if(!potentiallyEarlier)return;
     var sample=null, fractions=[.25,.5,.75,.9];
     for(var fi=0;fi<fractions.length;fi++){
      var t=limit*fractions[fi],seconds=dt*t;
@@ -818,24 +829,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       sample=t;break;
      }
     }
-    /* Only a drone that COULD arrive before the current first body can
-     * veto that body. A later drone elsewhere on the TTL corridor cannot
-     * erase an earlier, already-proven tank or neutral contact. */
-    var windowT=best?Math.min(bestT,limit):limit;
-    var reach=drR+speedBound*dt*windowT;
-    var potentiallyEarlier=
-       Math.max(ax,ax+dx*windowT)+reach>=Math.min(dsx,e.x)&&
-       Math.min(ax,ax+dx*windowT)-reach<=Math.max(dsx,e.x)&&
-       Math.max(ay,ay+dy*windowT)+reach>=Math.min(dsy,e.y)&&
-       Math.min(ay,ay+dy*windowT)-reach<=Math.max(dsy,e.y);
-    if(sample===null){
-     if(potentiallyEarlier)uncertain=true;
-     return;
-    }
-    if(best){
-     if(potentiallyEarlier)uncertain=true;
-     return;
-    }
+    if(sample===null||best){uncertain=true;return;}
     best={e:e,kind:'drone',guaranteed:true};bestT=sample;tie=false;return;
    }
    var rr=0,sx=e.x,sy=e.y,mx=0,my=0,discontinuousTankMove=false;
