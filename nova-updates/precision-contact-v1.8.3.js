@@ -119,6 +119,13 @@ wrap('game/engine',function(engine){
  var Game=engine.Game;if(!Game||Game.prototype.__novaContactSpark)return;Game.prototype.__novaContactSpark=true;
  var oldFire=Game.prototype.tryFire;if(oldFire)Game.prototype.tryFire=function(t){var before=this.bullets?this.bullets.length:0,out=oldFire.apply(this,arguments);if(t&&!t.isPlayer&&this.player&&this.player.alive&&this.bullets&&this.bullets.length>before){var shot=[];for(var i=before;i<this.bullets.length;i++){var b=this.bullets[i];if(b&&b.ownerId===t.id&&b.__novaSniperLineage&&!b.__novaRail&&!b.beam)shot.push(b);}if(shot.length)markVolley(this,t,shot);}return out;};
  var oldBullets=Game.prototype.updateBullets;if(oldBullets)Game.prototype.updateBullets=function(dt){if(this.status==='playing'&&this.player&&this.player.alive)scanEntries(this,dt);return oldBullets.apply(this,arguments);};
+ /* A redeploy reuses Game but discards every bullet and resets simulation time.
+  * Retaining the previous volley/spark timestamps would invent incoming fire. */
+ var oldRedeploy=Game.prototype.redeploy;
+ if(typeof oldRedeploy==='function')Game.prototype.redeploy=function(){
+  this.__v183Contact=null;
+  return oldRedeploy.apply(this,arguments);
+ };
 });
 wrap('game/render',function(renderMod){
  var oldRender=renderMod.render;if(!oldRender||oldRender.__novaContactSpark)return;
