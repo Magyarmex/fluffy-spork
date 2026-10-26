@@ -122,6 +122,37 @@ wrap('game/input',function(input){
 
   var oldAttach=Input.prototype.attach,oldDetach=Input.prototype.detach;
   Input.prototype.attach=function(canvas){
+    /* One keyboard owner for normal play, pause/offer, and focused UI.
+     * Install before the core attach registers its window key handlers.
+     * Suppressed held keys stay suppressed until keyup, even across resume. */
+    if(!this.__novaPauseKeyGate){
+      var self=this,oldKd=this.kd,oldKu=this.ku;
+      this.__novaPauseSuppressedKeys=new Set();
+      this.kd=function(e){
+        var key=String(e&&e.key||'').toLowerCase();
+        var gameplayKey=key==='w'||key==='a'||key==='s'||key==='d'||
+          key==='arrowup'||key==='arrowdown'||key==='arrowleft'||key==='arrowright'||
+          key==='e'||key===' '||key==='f';
+        if(!gameplayKey)return oldKd.call(self,e);
+        var target=e&&e.target,tag=String(target&&target.tagName||'').toLowerCase();
+        var uiFocus=!!(target&&(
+          tag==='button'||tag==='input'||tag==='textarea'||tag==='select'||
+          target.isContentEditable||
+          (typeof target.closest==='function'&&
+           target.closest('[data-ui],[role="dialog"],[role="button"],[contenteditable="true"]'))));
+        if(self.__novaInputPaused||uiFocus||(e&&e.defaultPrevented)){
+          self.__novaPauseSuppressedKeys.add(key);
+          return; /* Keep native Space/arrow activation and scrolling intact. */
+        }
+        if(self.__novaPauseSuppressedKeys.has(key))return;
+        return oldKd.call(self,e);
+      };
+      this.ku=function(e){
+        self.__novaPauseSuppressedKeys.delete(String(e&&e.key||'').toLowerCase());
+        return oldKu.call(self,e); /* Keyup always releases stale movement. */
+      };
+      this.__novaPauseKeyGate=true;
+    }
     var out=oldAttach.call(this,canvas);
     if(canvas&&canvas.getBoundingClientRect&&!this.__novaRectOriginal){
       var self=this,originalMethod=canvas.getBoundingClientRect,original=originalMethod.bind(canvas);
@@ -140,6 +171,7 @@ wrap('game/input',function(input){
     return out;
   };
   Input.prototype.detach=function(){
+    if(this.__novaPauseSuppressedKeys)this.__novaPauseSuppressedKeys.clear();
     if(this.__novaStickPaintRaf&&typeof cancelAnimationFrame==='function'){cancelAnimationFrame(this.__novaStickPaintRaf);this.__novaStickPaintRaf=0;}
     var canvas=this.canvas,refresh=this.__novaRectRefresh;
     if(canvas&&this.__novaRectOriginal){if(this.__novaRectHadOwn)canvas.getBoundingClientRect=this.__novaRectOriginal;else delete canvas.getBoundingClientRect;}
@@ -154,6 +186,27 @@ wrap('game/input',function(input){
 wrap('game/engine',function(engine,require){
   var Base=engine.Game;if(!Base||Base.prototype.__novaZeroChurn)return;
   Base.prototype.__novaZeroChurn=true;
+
+  /* The engine owns pause state; the Input listener owns gameplay shortcuts.
+   * Synchronize them at the single shared pause API, not in each React modal.
+   * Entering pause drops held/queued combat state but preserves autofire choice. */
+  var oldSetPaused=Base.prototype.setPaused;
+  if(typeof oldSetPaused==='function')Base.prototype.setPaused=function(){
+    var wasPaused=!!this.paused,out=oldSetPaused.apply(this,arguments);
+    if(this.input){
+      this.input.__novaInputPaused=!!this.paused;
+      if(!wasPaused&&this.paused){
+        if(typeof this.input.__novaBlurReset==='function')this.input.__novaBlurReset();
+        else{
+          this.input.firing=false;this.input.abilityQueued=false;
+          if(this.input.keyboard)for(var key in this.input.keyboard)
+            if(Object.prototype.hasOwnProperty.call(this.input.keyboard,key))
+              this.input.keyboard[key]=false;
+        }
+      }
+    }
+    return out;
+  };
 
   /* Opt-in, read-only projectile chronology diagnostics. Disabled in normal play.
    * Sample at most 12 pre-existing shells per frame; never reorder or mutate them.
