@@ -679,9 +679,9 @@ for(const optimized of [false,true]){
  });
 }
 
-/* RESEARCH — KNOWN RED: a global projectile-count gate still suppresses
- * physically isolated penetrating shots when several expire in one frame.
- * This is not a production fix; preserve the failing acceptance tests. */
+/* Regression-first evidence from PR #344: independent piercing shots must
+ * not be starved by unrelated distant projectiles when several expire in
+ * one frame. These formerly red acceptance cases now guard production. */
 function multiShotRemoteWorld(Game,shotCount,remoteCount,reverse=false){
  const g=new Game(),victims=[];
  for(let i=0;i<shotCount;i++){
@@ -715,7 +715,7 @@ for(const optimized of [false,true]){
   });
  }
  for(const fps of [30,60]){
-  test(mode+' KNOWN RED: fifth isolated shot must not be starved at '+fps+'Hz',()=>{
+  test(mode+' fifth isolated shot must not be starved at '+fps+'Hz',()=>{
    const {g,victims}=multiShotRemoteWorld(Game,5,50);
    const dt=.35/fps;
    for(let frame=0;frame<3;frame++){g.time+=dt;g.updateBullets(dt);}
@@ -723,7 +723,7 @@ for(const optimized of [false,true]){
     Array(10).fill(1),'five independent pairs are physically reachable');
   });
  }
- test(mode+' KNOWN RED: dense multi-shot outcome independent of bullet order',()=>{
+ test(mode+' dense multi-shot outcome independent of bullet order',()=>{
   const {g,victims}=multiShotRemoteWorld(Game,5,50,true);
   g.time+=.35/30;g.updateBullets(.35/30);
   assert.deepEqual(victims.map(v=>v.hitCount),Array(10).fill(1));
