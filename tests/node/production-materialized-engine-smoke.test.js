@@ -69,6 +69,14 @@ function runGame(hz, controller, klass) {
   const requireGame = window.__novaMakeRequire('');
   const Game = requireGame('game/engine').Game;
   const game = new Game(canvas(), canvas(), {hud: noop, event: noop}, 'low');
+  let launched = 0;
+  const actualTryFire = game.tryFire;
+  game.tryFire = function(t) {
+    const before = this.bullets.length;
+    const result = actualTryFire.apply(this, arguments);
+    if (t === this.player && this.bullets.length > before) launched++;
+    return result;
+  };
   if (controller) {
     game.setClass(game.player, 'warden');
     game.player.angle = Math.PI / 2;
@@ -99,6 +107,7 @@ function runGame(hz, controller, klass) {
   }
   if (klass) {
     assert.equal(game.player.cls, klass, 'requested class is still active');
+    assert.ok(launched > 0, 'the real weapon path launches at least one player projectile');
     assert.ok(Number.isFinite(game.player.x) && Number.isFinite(game.player.y),
       'movement and combat retain finite player coordinates');
   }
