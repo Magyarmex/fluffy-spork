@@ -110,6 +110,12 @@ for(const optimized of [false,true])for(const hz of [30,60,120,240]){
   const g=droneWorld(hz,optimized);
   assert.equal(g.hits,1,'start-position speed envelope proves pre-expiry overlap');
  });
+ test('piercing shot cannot ignore a later wall before TTL '+label,()=>{
+  const g=droneWorld(hz,optimized,{x:13,vx:1500,ttl:.004,pen:4,
+    terrain:[{id:-1,shape:'rect',x:5,y:0,w:1,h:70,
+      solid:true,destructible:false}]});
+  assert.equal(g.hits,0,'piercing TTL shortcut defers a later solid');
+ });
  test('later wall cannot erase an earlier guaranteed drone hit '+label,()=>{
   const g=droneWorld(hz,optimized,{terrain:[{id:-1,shape:'rect',
     x:38,y:0,w:2,h:70,solid:true,destructible:false}]});
@@ -148,9 +154,9 @@ for(const optimized of [false,true])for(const hz of [30,60,120,240]){
   const g=droneWorld(hz,optimized,{terrainBump:{x:1,y:0}});
   assert.equal(g.hits,0);
  });
- test('piercing budget remains with original resolver '+label,()=>{
-  const g=droneWorld(hz,optimized,{pen:1});
-  assert.equal(g.hits,0,'single guaranteed contact cannot consume unproven penetration');
+ test('single provable contact preserves piercing weapon TTL '+label,()=>{
+  const g=droneWorld(hz,optimized,{x:13,vx:1500,ttl:.004,pen:4});
+  assert.equal(g.hits,1,'Assassin-speed piercing shot must hit before expiration');
  });
  test('committed dash cannot be inferred from endpoint envelope '+label,()=>{
   const g=droneWorld(hz,optimized,{phase:'dash'});
