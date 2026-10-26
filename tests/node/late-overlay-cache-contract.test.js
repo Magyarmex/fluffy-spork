@@ -30,13 +30,26 @@ function canvas() {
   c.getContext = () => ctx;
   return c;
 }
-function bootModules() {
+function bootModules(withMenu=false) {
   const errors = [];
-  const store = new Map();
-  const document = {hidden: false, visibilityState: 'visible',
-    addEventListener: noop, removeEventListener: noop,
+  const store = new Map(), listeners = {};
+  const menu = withMenu ? {
+    children: [], isConnected: true, offsetParent: {},
+    classList: {add: noop, remove: noop},
+    getBoundingClientRect: () => ({width: 800, height: 600}),
+    querySelectorAll: () => [],
+    insertBefore(node, before) {
+      const at = before ? this.children.indexOf(before) : -1;
+      if(at < 0) this.children.push(node);
+      else this.children.splice(at, 0, node);
+      node.parentElement=this;node.isConnected=true;
+      this.firstChild=this.children[0];
+    }
+  } : null;
+  const document = {hidden: false, visibilityState: 'visible', readyState:'loading',
+    addEventListener: (name,fn) => {listeners[name]=fn;}, removeEventListener: noop,
     createElement: () => canvas(), getElementById: () => null,
-    querySelector: () => null, querySelectorAll: () => [],
+    querySelector: () => menu, querySelectorAll: () => [],
     body: {appendChild: noop}, head: {appendChild: noop},
     documentElement: {style: {setProperty: noop, removeProperty: noop},
       classList: {toggle: noop, add: noop, remove: noop}}};
@@ -71,9 +84,11 @@ function bootModules() {
     ai: !!window.__novaCache['game/ai'],
     render: !!window.__novaCache['game/render']
   };
+  document.readyState='complete';
+  if(withMenu && listeners.DOMContentLoaded) listeners.DOMContentLoaded();
   const requireGame = window.__novaMakeRequire('');
   const Game = requireGame('game/engine').Game;
-  return {Game,window,requireGame,preRequireCache};
+  return {Game,window,requireGame,preRequireCache,menu,errors};
 }
 
 /* Research-only shipping-path acceptance. This verifies module ownership,
@@ -99,4 +114,18 @@ test('War Room never caches gameplay modules before late overlays register',()=>
   assert.equal(window.__NOVA_LOBBY_BATTLEFIELD_TEST__.canonicalRuntime,true);
   assert.deepEqual(preRequireCache,{engine:false,ai:false,render:false},
     'decorative menu must not instantiate canonical modules before the playable game');
+});
+
+test('decorative War Room mounts after parser completion with late gameplay owners',()=>{
+  const {Game,window,menu,errors,preRequireCache}=bootModules(true);
+  assert.deepEqual(preRequireCache,{engine:false,ai:false,render:false},
+    'the parser must finish installing all overlays before the menu requires modules');
+  assert.equal(Game.prototype.__novaFairEngagement,true);
+  assert.equal(Game.prototype.__novaLivingFrontCore,true);
+  assert.equal(menu.children.filter(n=>n.className==='nv-lobby-battlefield').length,1,
+    'War Room mounts exactly one canonical background canvas');
+  assert.equal(menu.children.filter(n=>n.className==='nv-lobby-atmosphere').length,1,
+    'War Room mounts exactly one atmosphere layer');
+  assert.deepEqual(errors.filter(e=>!e.includes('React hooks unavailable')),[],
+    'menu initialization must not log unexpected engine errors');
 });
