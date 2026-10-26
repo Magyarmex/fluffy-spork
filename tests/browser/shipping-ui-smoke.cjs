@@ -29,8 +29,12 @@ async function assertPortraitHud(page, label, expectedClass) {
   assert.equal(metrics.classText,expectedClass,label+': canonical class label remains present');
   assert.ok(metrics.requiredClassWidth<=metrics.visibleClassWidth+1,
     label+': full class name must remain readable at narrow widths: '+JSON.stringify(metrics));
-  assert.notEqual(metrics.clockDisplay,'none',label+': elapsed match time remains visible');
-  assert.ok(metrics.kills.right+1<=metrics.clock.left,label+': kills and clock do not collide: '+JSON.stringify(metrics));
+  if(metrics.gene&&metrics.viewport<=360){
+    assert.equal(metrics.clockDisplay,'none',label+': 320px hybrid badge takes clock space instead of clipping class');
+  }else{
+    assert.notEqual(metrics.clockDisplay,'none',label+': elapsed match time remains visible');
+    assert.ok(metrics.kills.right+1<=metrics.clock.left,label+': kills and clock do not collide: '+JSON.stringify(metrics));
+  }
   if(metrics.gene)assert.ok(metrics.class.right+1<=metrics.gene.left&&metrics.gene.right+1<=metrics.kills.left,
     label+': hybrid gene badge does not cover class or kills: '+JSON.stringify(metrics));
   assert.ok(metrics.class.right+1<=metrics.kills.left,
