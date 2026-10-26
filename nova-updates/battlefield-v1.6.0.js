@@ -677,7 +677,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    var s=shapes[si];if(!s||!(s.hp>0))continue;
    if(shapeWasTeleported(g,s))return false;
    var st=shapeSweepStart(g,s),sx=st?st.x:s.x,sy=st?st.y:s.y;
-   if(near(sx,sy,s.x,s.y,(s.r||15)+b.r+4))return false;
+   if(near(sx,sy,s.x,s.y,(s.r||15)+b.r+4+Math.max(30,dt*800)))return false;
   }
   for(var di=0;di<drones.length;di++){
    var d=drones[di];if(!d||!(d.hp>0)||d.ownerId===b.ownerId)continue;
