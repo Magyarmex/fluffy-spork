@@ -190,3 +190,17 @@ test('candidate-target scan remains bounded when remote piercing density explode
  assert.equal(plan(g,.35/30,false),null,
   'do not trade local fairness for an unbounded O(projectiles * hulls) scan');
 });
+
+
+test('lateral victim-hull threats remain in the multi-shot proof candidate set',()=>{
+ const local=shot(0),remote=shot(1000);
+ const g=world([local,remote],50,120);
+ g.tanks=[{id:2,x:40,y:0,cls:'scout',alive:true,hp:100},
+          {id:3,x:65,y:0,cls:'scout',alive:true,hp:100}];
+ const lateral={x:40,y:19,vx:0,vy:0,r:3,ttl:1,pen:0,ownerId:7};
+ g.bullets.push(lateral);
+ const p=plan(g,.35/30,false);
+ assert.ok(p,'one eligible shot should retain its bounded local proof');
+ assert.ok(p.get(local).includes(lateral),
+  'a t=0 hull hit must not disappear just because bullet paths do not cross');
+});
