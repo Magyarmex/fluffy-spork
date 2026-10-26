@@ -66,9 +66,14 @@ function bootModules() {
     vm.runInContext(fs.readFileSync(path.join(root, script), 'utf8'), context,
       {filename: script, timeout: 5000});
   }
+  const preRequireCache = {
+    engine: !!window.__novaCache['game/engine'],
+    ai: !!window.__novaCache['game/ai'],
+    render: !!window.__novaCache['game/render']
+  };
   const requireGame = window.__novaMakeRequire('');
   const Game = requireGame('game/engine').Game;
-  return {Game,window,requireGame};
+  return {Game,window,requireGame,preRequireCache};
 }
 
 /* Research-only shipping-path acceptance. This verifies module ownership,
@@ -90,8 +95,8 @@ test('authoritative AI update function receives Fair Engagement wrapper',()=>{
     'AI module must receive actual Fair Engagement scoring wrapper');
 });
 test('War Room never caches gameplay modules before late overlays register',()=>{
-  const {window}=bootModules();
+  const {window,preRequireCache}=bootModules();
   assert.equal(window.__NOVA_LOBBY_BATTLEFIELD_TEST__.canonicalRuntime,true);
-  assert.equal(window.__novaCache['game/engine'].__novaMissing,undefined);
-  assert.equal(window.__novaCache['game/ai'].__novaMissing,undefined);
+  assert.deepEqual(preRequireCache,{engine:false,ai:false,render:false},
+    'decorative menu must not instantiate canonical modules before the playable game');
 });
