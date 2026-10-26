@@ -250,3 +250,60 @@ for(const optimized of [false,true])for(const fps of [30,60,120,240]){
   assert.equal(b.hitCount,1,'second physical contact occurs before .8s expiry');
  });
 }
+
+/* Run 372: the previous TTL-only chain cannot fix a penetrating projectile
+ * that reaches two distinct hulls inside one frame while its TTL remains
+ * positive. Exercise the actual materialized core plus Battlefield wrappers.
+ * No extra projectile lifetime, damage, or penetration is authorized. */
+for(const optimized of [false,true]) {
+ const mode=optimized?'Battlefield + Performance':'Battlefield';
+ const Game=boot(undefined,optimized);
+ for(const fps of [30,60,120,240]) {
+  test(mode+' non-expiring piercing pair is FPS-invariant at '+fps+'Hz',()=>{
+   const {g,a,b}=makeWorld(Game);
+   g.bullets[0].ttl=.2;
+   for(let frame=0;frame<30&&g.bullets.length;frame++){
+    const dt=1/fps;g.time+=dt;g.updateBullets(dt);
+   }
+   assert.equal(a.hitCount,1,'first hull must be hit exactly once');
+   assert.equal(b.hitCount,1,'second physical contact must survive frame partition');
+   assert.equal(g.hits,2);
+  });
+ }
+ test(mode+' non-expiring piercing refuses missing movement witness',()=>{
+  const {g,b}=makeWorld(Game);
+  g.bullets[0].ttl=.2;
+  g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=372;
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.equal(b.hitCount,0,'cannot backdate without authoritative tank motion');
+ });
+ test(mode+' non-expiring piercing respects intervening permanent wall',()=>{
+  const {g,b}=makeWorld(Game);
+  g.bullets[0].ttl=.2;
+  g.__novaTerrain=[{id:-372,shape:'rect',x:48,y:0,w:3,h:90,
+   solid:true,destructible:false}];
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.equal(b.hitCount,0);
+ });
+ test(mode+' non-expiring piercing respects spawn shield on later hull',()=>{
+  const {g,b}=makeWorld(Game);
+  g.bullets[0].ttl=.2;b.spawnShieldT=2;
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.equal(b.hitCount,0);
+ });
+ test(mode+' non-expiring piercing refuses hostile projectile interception',()=>{
+  const {g,b}=makeWorld(Game);
+  g.bullets[0].ttl=.2;
+  g.bullets.push({kind:'bullet',id:372,ownerId:9,x:30,y:0,vx:0,vy:0,
+   r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,shell:false,beam:false});
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.equal(b.hitCount,0);
+ });
+ test(mode+' non-expiring piercing refuses uncertain neutral corridor',()=>{
+  const {g,b}=makeWorld(Game);
+  g.bullets[0].ttl=.2;
+  g.shapes=[{kind:'shape',id:372,x:38,y:38,r:12,hp:100}];
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.equal(b.hitCount,0);
+ });
+}
