@@ -106,6 +106,8 @@ test('Live War Room obeys Signal Discipline and loads after it', () => {
 });
 
 test('War Room trims stale Zero Churn shape IDs alongside decorative bodies', () => {
+  assert.match(source, /trimNeutralPopulation\(g,shapeBudget\)/,
+    'real menu preparation must call the tested index rebuild');
   const trim = metadataBoot().__NOVA_LOBBY_BATTLEFIELD_TEST__.trimNeutralPopulation;
   const shapes = [1, 2, 3, 4, 5].map(id => ({id, hp:100, type:'circle'}));
   const g = {shapes, shapeById: new Map(shapes.map(s => [s.id,s]))};
