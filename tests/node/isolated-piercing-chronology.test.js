@@ -880,3 +880,77 @@ for(const optimized of [false,true]){
   }
  });
 }
+
+
+/* Run 376: optional chronological proof must be local to physically
+ * eligible shots, even when OTHER penetrating shots expire this frame.
+ * These execute the materialized core + shipping Battlefield/Performance. */
+for(const optimized of [false,true]){
+ const mode=optimized?'optimized':'baseline';
+ for(const fps of [30,60]){
+  for(const reverse of [false,true]){
+   test(mode+' five valid piercing shots survive five remote piercing shots at '+
+    fps+'Hz, reversed='+reverse,()=>{
+    const Game=boot(undefined,optimized);
+    const {g,victims}=multiShotRemoteWorld(Game,5,50);
+    for(let i=0;i<5;i++)g.bullets.push({kind:'bullet',
+     id:70000+i,ownerId:5000+i,x:0,y:1100+i*160,
+     vx:6000,vy:0,r:3,dmg:20,ttl:.01,pen:1,hits:0,dead:false,
+     shell:false,beam:false});
+    if(reverse)g.bullets.reverse();
+    const dt=.35/fps;
+    for(let frame=0;frame<3;frame++){g.time+=dt;g.updateBullets(dt);}
+    assert.deepEqual(victims.map(v=>v.hitCount),Array(10).fill(1),
+     'remote piercing shots cannot consume a valid local proof budget');
+   });
+  }
+ }
+ test(mode+' single useful shot survives seven remote piercing shots through Game.update',()=>{
+  const Game=boot(function(dt){
+   this.time+=dt;
+   for(const t of this.tanks){
+    t.__novaSweepMoveTime=this.time;
+    t.__novaSweepPrevX=t.x;t.__novaSweepPrevY=t.y;
+   }
+   this.updateBullets(dt);
+  },optimized);
+  const {g,victims}=multiShotRemoteWorld(Game,1,50);
+  for(let i=0;i<7;i++)g.bullets.push({kind:'bullet',
+   id:71000+i,ownerId:5100+i,x:0,y:1100+i*140,
+   vx:6000,vy:0,r:3,dmg:20,ttl:.01,pen:1,hits:0,dead:false,
+   shell:false,beam:false});
+  for(let frame=0;frame<3;frame++)g.update(.35/30);
+  assert.deepEqual(victims.map(v=>v.hitCount),[1,1]);
+  assert.equal(g.__novaShapeSweepActive,false);
+ });
+}
+
+
+for(const optimized of [false,true])for(const fps of [30,60]){
+ test((optimized?'optimized':'baseline')+
+  ' five valid shots survive 960 remote expiring piercing bullets at '+fps+'Hz',()=>{
+  const Game=boot(undefined,optimized);
+  const {g,victims}=multiShotRemoteWorld(Game,5,960);
+  for(const b of g.bullets)if(b.ownerId!==1){
+   b.pen=1;b.ttl=.01;
+  }
+  const dt=.35/fps;
+  for(let frame=0;frame<3;frame++){g.time+=dt;g.updateBullets(dt);}
+  assert.deepEqual(victims.map(v=>v.hitCount),Array(10).fill(1));
+ });
+}
+
+
+for(const optimized of [false,true])for(const fps of [30,60]){
+ test((optimized?'optimized':'baseline')+
+  ' non-expiring five-shot chronology ignores 960 remote piercing rounds at '+fps+'Hz',()=>{
+  const Game=boot(undefined,optimized);
+  const {g,victims}=multiShotRemoteWorld(Game,5,960);
+  for(const b of g.bullets){
+   b.pen=1;b.ttl=.2;
+  }
+  const dt=.35/fps;
+  for(let frame=0;frame<3;frame++){g.time+=dt;g.updateBullets(dt);}
+  assert.deepEqual(victims.map(v=>v.hitCount),Array(10).fill(1));
+ });
+}

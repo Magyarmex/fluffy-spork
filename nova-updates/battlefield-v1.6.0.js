@@ -1083,8 +1083,58 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       b.ttl>0&&b.ttl<=dt&&
        (b.pen>=1||(b.pen===0&&(b.hits||0)>0)))shots.push(b);
   }
-  /* Limit worst-case scans even if all distant shots have empty corridors. */
-  if(shots.length<2||shots.length*bullets.length>12000)return null;
+  /* The optional multi-hit proof is useful only when a shot can reach
+   * enough distinct hulls. Remote piercing rounds still belong to the
+   * ordinary engine and MUST remain in every local interception query.
+   * Count conservative swept-AABB possibilities, not speculative hits.
+   * Track shared hulls across ALL shots (including discarded ones): a
+   * one-hull shot can still kill a victim before another shot arrives. */
+  if(shots.length<2)return null;
+  var tanks=g.tanks||[];
+  if(tanks.length){
+   if(shots.length*tanks.length>12000)return null;
+   var eligible=[],possible=new Map(),targetUsers=new Map();
+   for(var ps=0;ps<shots.length;ps++){
+    var pb=shots[ps],span=nonExpiring?dt:pb.ttl;
+    if(!(span>0)||!Number.isFinite(span)||
+       !Number.isFinite(pb.x)||!Number.isFinite(pb.y)||
+       !Number.isFinite(pb.vx)||!Number.isFinite(pb.vy)||
+       !Number.isFinite(pb.r)||!(pb.r>0))return null;
+    var bx=pb.x+pb.vx*span,by=pb.y+pb.vy*span;
+    if(!Number.isFinite(bx)||!Number.isFinite(by))return null;
+    var lx=Math.min(pb.x,bx),hx=Math.max(pb.x,bx),
+        ly=Math.min(pb.y,by),hy=Math.max(pb.y,by),targets=[];
+    for(var pt=0;pt<tanks.length;pt++){
+     var target=tanks[pt];
+     if(!target||!target.alive||target.id===pb.ownerId)continue;
+     var cls=CLASSES[target.cls],sz=cls&&Number.isFinite(cls.size)?
+        Math.max(0,cls.size):120;
+     var pad=pb.r+sz+3,tx=target.x,ty=target.y,
+         sx=target.__novaSweepMoveTime===g.time?target.__novaSweepPrevX:tx,
+         sy=target.__novaSweepMoveTime===g.time?target.__novaSweepPrevY:ty;
+     if(!Number.isFinite(tx)||!Number.isFinite(ty)||
+        !Number.isFinite(sx)||!Number.isFinite(sy))return null;
+     if(Math.max(tx,sx)+pad>=lx&&Math.min(tx,sx)-pad<=hx&&
+        Math.max(ty,sy)+pad>=ly&&Math.min(ty,sy)-pad<=hy){
+      targets.push(target);
+      targetUsers.set(target,(targetUsers.get(target)||0)+1);
+     }
+    }
+    possible.set(pb,targets);
+    if(targets.length>=(nonExpiring?2:((pb.hits||0)>0?1:2)))
+     eligible.push(pb);
+   }
+   /* A discarded one-hit projectile may still change another shot's
+    * victim. Preserve the original shared-target batch veto. */
+   for(var es=0;es<eligible.length;es++){
+    var touched=possible.get(eligible[es]);
+    for(var et=0;et<touched.length;et++)
+     if(targetUsers.get(touched[et])>1)return null;
+   }
+   shots=eligible;
+  }
+  /* Bound full projectile scans only for shots that can benefit from them. */
+  if(!shots.length||shots.length*bullets.length>12000)return null;
   var plan=new Map(),work=0,seenTargets=new Set();
   for(var si=0;si<shots.length;si++){
    var b=shots[si],travelT=nonExpiring?dt:b.ttl;
