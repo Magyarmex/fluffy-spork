@@ -10,9 +10,9 @@ const root = path.resolve(__dirname, '../..');
 const defs = {circle:{speed:60},triangle:{speed:90},square:{speed:40},
   pentagon:{speed:30},hexagon:{speed:20}};
 
-function boot() {
+function boot(math=Math) {
   const window = {__novaModules:{}};
-  const context = {window,Math,Map,Set,Number,Object,Array,Date,JSON,
+  const context = {window,Math:math,Map,Set,Number,Object,Array,Date,JSON,
     performance:{now:()=>0},console:{info(){},error(){},warn(){}}};
   for (const name of ['living-front-core-v1.12.0.js',
     'living-front-instincts-v1.12.0.js'])
@@ -44,6 +44,18 @@ test('100 shapes in an irrelevant spatial bucket cost zero terrain rays',()=>{
   assert.deepEqual(result.rays[0],[25,0]);
   assert.ok(result.shapes.at(-1).vx>0);
   assert.ok(result.shapes.slice(0,-1).every(s=>s.vx===0&&s.vy===0));
+});
+
+test('distant spatial-bucket candidates skip even the square-root calculation',()=>{
+  let hypotCalls=0;
+  const trackedMath=Object.create(Math);
+  trackedMath.hypot=(...values)=>{hypotCalls++;return Math.hypot(...values);};
+  const LF=boot(trackedMath);
+  const far=Array.from({length:100},(_,i)=>shape(i+1,'circle',200+i,0));
+  const result=run(LF,far,100,.6);
+  assert.equal(result.rays.length,0);
+  assert.equal(hypotCalls,0,'irrelevant distant candidates must not pay Math.hypot');
+  assert.ok(result.shapes.every(s=>s.vx===0&&s.vy===0));
 });
 
 test('weak edge-of-burst impulse never triggers a terrain ray',()=>{
