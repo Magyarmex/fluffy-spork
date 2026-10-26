@@ -95,6 +95,18 @@ test('expired ordinary shot cannot herd a Circle or conceal live fire', () => {
 });
 
 
+
+test('unconsumed expiring shell remains a visible threat, dead shell does not', () => {
+  for (const type of ['circle', 'triangle']) {
+    const live = scenario([shot(1, 30, { shell: true, ttl: 0 })], () => true, type);
+    const dead = scenario([shot(1, 30, { shell: true, ttl: 0, dead: true })],
+      () => true, type);
+    assert.equal(live.st.stats.nearFireHerds, 1, type + ' must respect live shell burst');
+    assert.equal(dead.st.stats.nearFireHerds, 0, type + ' must ignore dead shell');
+    assert.equal(dead.rays.length, 0);
+  }
+});
+
 test('seeded neutral perception matches a reference with stale rounds removed', () => {
   const window = { __novaModules: {} };
   const ctx = { window, Math, Map, Set, WeakMap, Number, Object, Array, Date, JSON,
