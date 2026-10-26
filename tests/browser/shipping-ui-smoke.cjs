@@ -132,6 +132,16 @@ async function scenario(browser, label, options) {
     assert.ok(resumed>paused,label+': resume must restart ecological simulation');
 
     // Exercise Controller on the same live React/game path, not a synthetic VM.
+    if(label.startsWith('mobile'))await page.evaluate(()=>{
+      const proto=CanvasRenderingContext2D.prototype;
+      const original=proto.fillText;
+      window.__novaPortraitCanvasTutorialLines=0;
+      proto.fillText=function(text){
+        if(typeof text==='string'&&text.includes('AIM = GUN + SWARM'))
+          window.__novaPortraitCanvasTutorialLines++;
+        return original.apply(this,arguments);
+      };
+    });
     await page.evaluate(()=>{
       const g=window.__novaBrowserLiveGame;
       if(!g||!g.player)throw new Error('React-owned playable Game missing');
@@ -139,6 +149,10 @@ async function scenario(browser, label, options) {
       g.player.spawnShieldT=20;
     });
     await page.waitForTimeout(1000);
+    if(label.startsWith('mobile')){
+      const early=await page.evaluate(()=>window.__novaPortraitCanvasTutorialLines);
+      assert.equal(early,0,label+': canvas tutorial must not duplicate the still-visible toast');
+    }
     const controller=await page.evaluate(()=>{
       const g=window.__novaBrowserLiveGame;
       return {
@@ -165,6 +179,7 @@ async function scenario(browser, label, options) {
       assert.ok(toastGeometry.height<110,
         'portrait tutorial toast must not obscure a large part of the arena: '+JSON.stringify(toastGeometry));
       console.log('NOVA_PORTRAIT_TOAST '+JSON.stringify(toastGeometry));
+      await page.screenshot({path:path.join(output,label+'-warden-toast.png')});
     }
     if(label.startsWith('mobile'))await assertPortraitHud(page,label+'-warden','WARDEN');
     if(label.startsWith('mobile')){
@@ -180,6 +195,11 @@ async function scenario(browser, label, options) {
       });
       await page.waitForTimeout(100);
       await assertPortraitHud(page,label+'-warden-restored','WARDEN');
+    }
+    if(label.startsWith('mobile')){
+      await page.waitForTimeout(2300);
+      const later=await page.evaluate(()=>window.__novaPortraitCanvasTutorialLines);
+      assert.ok(later>0,label+': canvas tutorial continues teaching after toast has cleared');
     }
     await page.screenshot({path:path.join(output,label+'-warden.png')});
     assert.deepEqual(errors,[],label+': no uncaught browser exceptions');
