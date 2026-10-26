@@ -134,7 +134,7 @@ let cases=0;
 {const w=base();w.v.y=200;w.covers=[{...cover('gap',60,70),h:10}];
  w.targets=[tank('reachable',95,19)];validate(w,['reachable']);cases++;}
 let seed=20261026;const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
-const stats={deterministic:cases,worlds:0,comparisons:0,events:0,excludedNearTies:0,disagreements:0};
+const stats={deterministic:cases,worlds:0,comparisons:0,events:0,excludedNearTies:0,disagreements:0,ties:{zeroZero:0,nonzero:0,bodyBody:0,coverCover:0,bodyCover:0}};
 for(let n=0;n<20000;n++){
  const ttl=.01+rand()*.22,speed=400+rand()*4500,pen=Math.floor(rand()*7);
  const w={p:{x:0,y:0},v:{x:speed,y:(rand()-.5)*350},r:2+rand()*4,
@@ -150,10 +150,19 @@ for(let n=0;n<20000;n++){
    h:12+rand()*70,destructible,hp:destructible?8+rand()*65:Infinity});
  }
  const times=[];
- for(const t of w.targets){const x=bodyOracle(w,t);if(x!==null)times.push(x);}
- for(const c of w.covers){const x=faceOracle(w,c);if(x!==null)times.push(x);}
- times.sort((a,b)=>a-b);
- if(times.some((t,i)=>i&&t-times[i-1]<1e-8)){stats.excludedNearTies++;continue;}
+ for(const t of w.targets){const x=bodyOracle(w,t);if(x!==null)times.push({at:x,kind:'body'});}
+ for(const c of w.covers){const x=faceOracle(w,c);if(x!==null)times.push({at:x,kind:'cover'});}
+ times.sort((a,b)=>a.at-b.at);
+ const tied=times.slice(1).map((e,i)=>[times[i],e]).filter(([a,b])=>b.at-a.at<1e-8);
+ if(tied.length){
+  stats.excludedNearTies++;
+  for(const [a,b] of tied){
+   if(a.at===0&&b.at===0)stats.ties.zeroZero++;else stats.ties.nonzero++;
+   if(a.kind===b.kind)stats.ties[a.kind==='body'?'bodyBody':'coverCover']++;
+   else stats.ties.bodyCover++;
+  }
+  continue;
+ }
  const expected=oracle(w);stats.worlds++;stats.events+=expected.length;
  for(const f of fps){stats.comparisons++;if(!same(expected,frames(w,f))){
   stats.disagreements++;if(stats.disagreements<=2)console.error('mismatch',JSON.stringify({w,expected}));
