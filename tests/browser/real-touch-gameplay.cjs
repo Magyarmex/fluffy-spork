@@ -38,7 +38,10 @@ async function run(browser,label,viewport){
   await page.getByRole('button',{name:/DEPLOY/i}).first().click();
   const canvas=page.locator('canvas.absolute.inset-0');
   await canvas.waitFor({state:'visible',timeout:30000});
-  await page.waitForFunction(()=>window.__novaTouchGame?.status==='playing',{timeout:20000});
+  await page.waitForFunction(()=>window.__novaTouchGame?.status==='playing',null,{timeout:20000});
+  // The React loading veil intentionally outlives Game.status='playing'.
+  // A real finger cannot reach the canvas until the veil finishes leaving.
+  await page.locator('.nv-loading').waitFor({state:'hidden',timeout:20000});
   await page.evaluate(()=>{const g=window.__novaTouchGame;g.input.autofire=false;g.player.spawnShieldT=20;});
   const rect=await canvas.boundingBox();
   assert.ok(rect&&rect.width>200&&rect.height>200,label+': game canvas has real dimensions');
