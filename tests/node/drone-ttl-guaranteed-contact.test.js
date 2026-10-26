@@ -125,6 +125,14 @@ for(const optimized of [false,true])for(const hz of [30,60,120,240]){
   const g=droneWorld(hz,optimized,{x:13,vx:500});
   assert.equal(g.hits,0);
  });
+ test('realistic fast Sniper-family projectile can hit witnessed drone '+label,()=>{
+  const g=droneWorld(hz,optimized,{x:16.5,vx:2500,ttl:.004});
+  assert.equal(g.hits,1,'2,500u/s shot has a guaranteed overlap before TTL');
+ });
+ test('faster projectile retains the same first-contact guarantee '+label,()=>{
+  const g=droneWorld(hz,optimized,{x:17,vx:3100,ttl:.004});
+  assert.equal(g.hits,1,'3,100u/s shot has a guaranteed overlap before TTL');
+ });
  test('committed dash cannot be inferred from endpoint envelope '+label,()=>{
   const g=droneWorld(hz,optimized,{phase:'dash'});
   assert.equal(g.hits,0);
