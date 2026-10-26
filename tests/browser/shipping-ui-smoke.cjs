@@ -109,7 +109,7 @@ async function scenario(browser, label, options) {
     assert.ok(controller.drones>0,label+': Controller actually deploys allied drones');
     assert.equal(controller.ecology,true,label+': ecology remains active after class change');
     assert.equal(controller.playing,true,label+': Controller transition does not end the run');
-    if(label==='mobile'){
+    if(label.startsWith('mobile')){
       const toastGeometry=await page.evaluate(()=>{
         const node=document.querySelector('[class~="top-[18%]"] > .panel.anim-pop');
         const rect=node?.getBoundingClientRect();
@@ -135,6 +135,8 @@ async function scenario(browser, label, options) {
   const browser=await chromium.launch({headless:true,args:['--disable-dev-shm-usage','--no-sandbox']});
   try {
     await scenario(browser,'desktop',{viewport:{width:1280,height:800},deviceScaleFactor:1});
+    await scenario(browser,'mobile-320',{viewport:{width:320,height:700},deviceScaleFactor:2,isMobile:true,hasTouch:true});
     await scenario(browser,'mobile',{viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
+    await scenario(browser,'mobile-430',{viewport:{width:430,height:932},deviceScaleFactor:2,isMobile:true,hasTouch:true});
   } finally { await browser.close(); }
 })().catch(e=>{console.error(e);process.exitCode=1;});
