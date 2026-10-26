@@ -359,3 +359,31 @@ for(const optimized of [false,true]) {
   assert.equal(b.hitCount,0,'moving hull must use full chronology');
  });
 }
+
+for(const optimized of [false,true]) {
+ const mode=optimized?'optimized':'baseline';
+ test(mode+' non-expiring pair works through real Game.update movement epoch',()=>{
+  const Game=boot(function(dt){
+   this.time+=dt;
+   for(const t of this.tanks){
+    t.__novaSweepMoveTime=this.time;
+    t.__novaSweepPrevX=t.x;t.__novaSweepPrevY=t.y;
+   }
+   this.updateBullets(dt);
+  },optimized);
+  const {g,a,b}=makeWorld(Game);
+  g.bullets[0].ttl=.2;
+  g.update(1/30);
+  assert.equal(a.hitCount,1);
+  assert.equal(b.hitCount,1);
+  assert.equal(g.__novaShapeSweepActive,false);
+ });
+ test(mode+' non-expiring pair resolves chronological damage despite reversed hash order',()=>{
+  const Game=boot(undefined,optimized),{g,a,b}=makeWorld(Game,65,true);
+  g.bullets[0].ttl=.2;
+  const order=[];
+  g.damageTank=function(t){order.push(t.id);t.hitCount++;this.hits++;};
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.deepEqual(order,[a.id,b.id],'physical first contact, not hash order');
+ });
+}
