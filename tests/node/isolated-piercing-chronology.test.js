@@ -924,3 +924,18 @@ for(const optimized of [false,true]){
   assert.equal(g.__novaShapeSweepActive,false);
  });
 }
+
+
+for(const optimized of [false,true])for(const fps of [30,60]){
+ test((optimized?'optimized':'baseline')+
+  ' five valid shots survive 960 remote expiring piercing bullets at '+fps+'Hz',()=>{
+  const Game=boot(undefined,optimized);
+  const {g,victims}=multiShotRemoteWorld(Game,5,960);
+  for(const b of g.bullets)if(b.ownerId!==1){
+   b.pen=1;b.ttl=.01;
+  }
+  const dt=.35/fps;
+  for(let frame=0;frame<3;frame++){g.time+=dt;g.updateBullets(dt);}
+  assert.deepEqual(victims.map(v=>v.hitCount),Array(10).fill(1));
+ });
+}
