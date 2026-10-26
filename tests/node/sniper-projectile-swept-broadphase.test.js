@@ -111,7 +111,9 @@ test('dense swept crossings and tangencies survive the prefilter', () => {
     shot(i + 1, i + 1, 1000 + i * 40, 1000, 1000 + i * 40, 1000));
   shots[0] = shot(1, 1, -30, 0, 30, 0, { hp: 1 });
   shots[1] = shot(2, 2, 30, 0, -30, 0, { hp: 3 });
-  shots[2] = shot(3, 3, -30, 7.5, 30, 7.5, { hp: 3 });
+  // A separate tangent pair must not steal the crossing pair's collision.
+  shots[2] = shot(3, 3, 400, 7.5, 460, 7.5, { hp: 3 });
+  shots[3] = shot(4, 4, 460, 0, 400, 0, { hp: 3 });
   const g = compare(shots);
   assert.equal(g.bullets[0].dead, true, 'crossing bullets must intercept');
   assert.ok(g.events.length >= 1, 'interception feedback must remain');
