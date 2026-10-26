@@ -212,6 +212,31 @@ if(typeof document!=='undefined'&&document.head&&typeof document.createElement==
   }
 }
 
+/* The canonical TopBar has a narrow fixed lane to the left of the minimap.
+ * Preserve full class identity, kills and all three buttons on small phones.
+ * Only compact existing controls; desktop and combat simulation stay untouched. */
+if(typeof document!=='undefined'&&document.head&&typeof document.createElement==='function'){
+  var hudStyleId='nova-portrait-hud-identity';
+  if(!document.getElementById||!document.getElementById(hudStyleId)){
+    var hudStyle=document.createElement('style');hudStyle.id=hudStyleId;
+    hudStyle.textContent='@media(max-width:440px){'
+      +'[class~="right-[78px]"]>.panel{padding-left:4px;padding-right:4px}'
+      +'[class~="right-[78px]"]>.panel>div:first-child{gap:2px}'
+      +'[class~="right-[78px]"]>.panel>div:first-child>div:first-child{padding-left:3px;padding-right:3px;font-size:9px}'
+      +'[class~="right-[78px]"]>.panel>div:first-child>div:nth-child(2){gap:2px;font-size:9px;min-width:0}'
+      +'[class~="right-[78px]"]>.panel>div:first-child>div:nth-child(2)>span:first-child{font-size:12px;flex-shrink:0}'
+      +'[class~="right-[78px]"]>.panel>div:first-child>div:nth-child(2)>span:last-child{letter-spacing:.015em;min-width:0}'
+      +'[class~="right-[78px]"]>.panel>div:first-child>div[class~="ml-auto"]{margin-left:0;gap:2px;font-size:9px}'
+      +'[class~="right-[78px]"]>.panel>div:first-child>button{padding:2px 3px;min-width:24px;min-height:25px}'
+      +'[class~="right-[78px]"]>.panel>div:first-child>button[aria-label="Toggle autofire"]{padding-left:2px;padding-right:2px;font-size:8px;letter-spacing:0}'
+      +'[class~="right-[78px]"]>.panel>div:first-child>div[title^="Hybrid gene:"]{padding-left:2px;padding-right:2px;font-size:8px}'
+      +'}@media(max-width:360px){'
+      +'[class~="right-[78px]"]>.panel>div:first-child>div[class~="ml-auto"]>span:last-child{display:none}'
+      +'}';
+    document.head.appendChild(hudStyle);
+  }
+}
+
 window.__NOVA_VISUAL_LANGUAGE_TEST__={normalizeSpec:normalizeSpec,shouldSuppressLegacy:shouldSuppressLegacy,saveFeedback:saveFeedback,version:VERSION};
 console.info('[NOVA TANKS] v'+VERSION+' '+CODENAME+' visual language online');
 })();
