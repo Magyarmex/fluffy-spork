@@ -143,6 +143,16 @@ test('friendly and hostile projectiles retain their existing relation rules', ()
   assert.equal(g.bullets[0].dead, true, 'hostile shots still intercept');
 });
 
+test('nonfinite positions and malformed radii defer to legacy narrow phase', () => {
+  const shots = Array.from({ length: 32 }, (_, i) =>
+    shot(i + 1, i + 1, i * 50, 1000, i * 50, 1000));
+  shots[0] = shot(1, 1, Infinity, 0, Infinity, 0);
+  shots[1] = shot(2, 2, 0, 0, 0, 0);
+  shots[2] = shot(3, 3, 10, NaN, 10, NaN);
+  shots[3] = shot(4, 4, 10, 0, 10, 0, { r: -10 });
+  compare(shots);
+});
+
 test('small volleys bypass setup; large volleys reuse scratch storage', () => {
   const g = boot(true);
   g.bullets = Array.from({ length: 31 }, (_, i) =>
