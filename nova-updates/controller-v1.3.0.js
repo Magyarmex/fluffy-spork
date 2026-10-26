@@ -590,7 +590,12 @@
         }
       } else if (input && input.mouseActive && input.firing) {
         var rect = g.canvas.getBoundingClientRect();
-        var projection = renderedMouseCamera(g);
+        /* Keep the independently extracted command function testable without
+         * its surrounding module closure. The shipping module always has the
+         * shared projection helper. */
+        var projection = typeof renderedMouseCamera === 'function'
+          ? renderedMouseCamera(g)
+          : { x: g.cam.x, y: g.cam.y, zoom: Number(g.cam.zoom) > 0 ? Number(g.cam.zoom) : Number(g.zoom) || 1 };
         var wx = projection.x + (input.mouseX - rect.left - g.w * 0.5) / projection.zoom;
         var wy = projection.y + (input.mouseY - rect.top - g.h * 0.5) / projection.zoom;
         var mdx = wx - owner.x, mdy = wy - owner.y, md = Math.hypot(mdx, mdy);
