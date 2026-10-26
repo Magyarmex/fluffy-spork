@@ -296,19 +296,25 @@ mods['game/engine']=function(module,exports,require){
  var oldKill=Game.prototype.killTank,oldUpdate=Game.prototype.update,oldRedeploy=Game.prototype.redeploy;
  if(typeof oldKill==='function')Game.prototype.killTank=function(victim,killer){
   var wasAlive=!!(!this.__novaDecorativeWorld&&victim&&victim.alive!==false&&victim.isPlayer);
-  var note=wasAlive?choose(victim,killer,classes):null;
-  if(note&&typeof this.areAllies==='function'&&this.areAllies(victim,killer))note=null;
+  var note=null;
+  if(wasAlive)try{
+   note=choose(victim,killer,classes);
+   if(note&&typeof this.areAllies==='function'&&this.areAllies(victim,killer))note=null;
+  }catch(ignore){note=null;} // Presentation must never interrupt a lethal hit.
+
   var out=oldKill.apply(this,arguments);
   if(wasAlive&&victim.alive===false){this.__novaDeathInsight=note;this.__novaDeathInsightAttempted=false;}
   return out;
  };
  if(typeof oldUpdate==='function')Game.prototype.update=function(){
   var out=oldUpdate.apply(this,arguments);
-  if(!this.__novaDecorativeWorld&&this.status==='dead'&&this.__novaDeathInsight)mount(this);
+  if(!this.__novaDecorativeWorld&&this.status==='dead'&&this.__novaDeathInsight)
+   try{mount(this);}catch(ignore){this.__novaDeathInsight=null;}
   return out;
  };
  if(typeof oldRedeploy==='function')Game.prototype.redeploy=function(){
-  var out=oldRedeploy.apply(this,arguments);cleanup(this);return out;
+  var out=oldRedeploy.apply(this,arguments);
+  try{cleanup(this);}catch(ignore){this.__novaDeathInsight=null;}return out;
  };
 };
 window.__NOVA_DEATH_INSIGHT_TEST__={choose:choose,paint:paint,cleanup:cleanup};
