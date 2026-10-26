@@ -123,6 +123,12 @@ for(const hz of [30,60,120,240]){
   const near=threat(g,CLASSES,t,{});
   assert.ok(near.risk>0,
     'a shot entering the safety corridor before expiry must remain dangerous');
+  // Bomber shells can detonate into splash and fragments at expiry;
+  // their future threat is deliberately conservative until chronology is solved.
+  shot.x=160;shot.ttl=0.05;shot.shell=true;
+  assert.ok(threat(g,CLASSES,t,{}).risk>.1,
+    'expiring Bomber shells must retain existing burst-threat awareness');
+  shot.shell=false;shot.x=50;
   shot.ttl=0;
   assert.equal(threat(g,CLASSES,t,{}).risk,0,
     'already-expired but not yet reaped projectiles must not cause a dodge');
