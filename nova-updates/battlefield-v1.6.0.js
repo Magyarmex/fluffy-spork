@@ -594,26 +594,28 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
  }for(var i=this.bullets.length-1;i>=0;i--){var b=this.bullets[i];if(!b||b.dead||(b.hits||0)!==b.__novaSweepHitsBefore)continue;var ax=b.px==null?b.x:b.px,ay=b.py==null?b.y:b.py,ex=b.x,ey=b.y,travel=Math.hypot(ex-ax,ey-ay);if(travel<1e-6&&!(movingShapes&&movingShapes.all.length))continue;this.hash.query((ax+ex)*.5,(ay+ey)*.5,travel*.5+b.r+46,this.tmp);appendSweptShapes(movingShapes,b,ax,ay,ex,ey,this.tmp);var first=null;for(var j=0;j<this.tmp.length;j++){var e=this.tmp[j],er=0;if(b.__novaDirectVictims&&b.__novaDirectVictims.has(e))continue;if(e.kind==='shape'&&e.hp>0&&!shapeWasTeleported(this,e))er=e.r;else if(e.kind==='tank'&&e.id!==b.ownerId&&e.alive)er=CLASSES[e.cls].size+3;else if(e.kind==='drone'&&e.ownerId!==b.ownerId&&e.hp>0)er=e.r+1;else continue;var rr=b.r+er,dx=ex-ax,dy=ey-ay,tx=e.x,ty=e.y;if(e.kind==='shape'){var start=shapeSweepStart(this,e);if(start){dx-=e.x-start.x;dy-=e.y-start.y;tx=start.x;ty=start.y;}}if(e.kind==='tank'&&e.__novaSweepMoveTime===this.time){dx-=e.x-e.__novaSweepPrevX;dy-=e.y-e.__novaSweepPrevY;tx=e.__novaSweepPrevX;ty=e.__novaSweepPrevY;}var fx=ax-tx,fy=ay-ty,A=dx*dx+dy*dy,B=2*(fx*dx+fy*dy),C=fx*fx+fy*fy-rr*rr,t=null;if(e.kind==='shape'&&shapeSweepStart(this,e))t=movingShapeHitT(this,e,ax,ay,ex,ey,rr);else if(C<0)t=0;else{var D=B*B-4*A*C;if(D>0){var root=Math.sqrt(D),t0=(-B-root)/(2*A),t1=(-B+root)/(2*A);if(t0>=0&&t0<=1)t=t0;else if(t1>=0&&t1<=1)t=t1;}}if(t!=null&&(!first||t<first.t))first={e:e,t:t};}if(!first)continue;var e=first.e,hitT=first.t===0?0:Math.min(1,first.t+1e-9),hx=ax+(ex-ax)*hitT,hy=ay+(ey-ay)*hitT;b.x=hx;b.y=hy;if(e.kind==='shape'){if(b.shell)this.clusterBurst(b);this.damageShape(e,b.dmg,b.vx,b.vy);}else if(e.kind==='tank'){if(b.shell)this.clusterBurst(b);var ang=Math.atan2(b.vy,b.vx);this.damageTank(e,b.dmg,b.ownerId,Math.cos(ang)*(b.knock||0)*.006,Math.sin(ang)*(b.knock||0)*.006);}else this.damageDrone(e,b.dmg,b.ownerId);if(b.splash&&e.kind!=='drone')this.splashAt(hx,hy,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.hits++;b.pen--;if(b.pen<0)b.dead=true;else (b.__novaDirectVictims||(b.__novaDirectVictims=new Set())).add(e);if(!b.dead){b.x=ex;b.y=ey;}else this.bullets.splice(i,1);}return out;};
 
 
- /* Conservative physical-first-contact recovery for an expiring ordinary
-  * projectile. The materialized core kills TTL<=0 shots BEFORE body queries.
+ /* Conservative physical-first-contact recovery for ordinary projectiles.
+  * The materialized core kills TTL<=0 shots BEFORE body queries and otherwise
+  * resolves only one endpoint body contact per projectile per frame.
   * Only settle an unambiguous earlier body contact: no shell/splash, no
   * competing projectile corridor, no earlier terrain, no uncertain drone
   * motion, and no simultaneous bodies. All ambiguous cases remain owned by
   * the existing engine until the full chronological resolver is ready. */
- /* Bounded first-event chain for an expiring, ordinary piercing round.
+ /* Bounded first-event chain for ordinary piercing rounds.
   * Only unambiguous, witnessed-stationary, healthy tank hulls qualify.
   * No cover, hostile drones, other projectiles, shapes, initial overlap,
   * simultaneous contacts, defenses or on-hit deaths may enter this shortcut.
   * Other combat remains owned by the existing engine and the future #147
-  * chronological solver. The whole remaining penetration budget must be
-  * consumed here: never leave a partially backdated bullet live. */
+  * chronological solver. Live-frame shortcuts exhaust penetration; TTL
+  * shortcuts settle only proven pre-expiry contacts before the shot dies.
+  * Never leave a partially backdated bullet live. */
  function isolatedTTLStationaryPiercingChain(g,b,dt,nonExpiring){
   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
      b.__novaBreachAtTime===g.time||
      !(dt>0)||!(b.ttl>0)||
      (nonExpiring ? !(b.ttl>dt&&b.pen===1&&b.hits===0) : !(b.ttl<=dt))||
-     !(b.pen===0||b.pen===1)||!(b.hits>=0)||
-     (b.hits===0&&b.pen!==1)||
+     !(b.pen===0||b.pen===1||(!nonExpiring&&b.pen===2))||
+     !(b.hits>=0)||(b.hits===0&&b.pen===0)||
      (b.hits>0&&!(b.__novaDirectVictims instanceof Set))||
      !Number.isFinite(b.x)||!Number.isFinite(b.y)||
      !Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
@@ -671,9 +673,16 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    if(!(enter>1e-9))return false;
    contacts.push({e:t,t:enter});
   }
-  if(contacts.length!==b.pen+1||contacts.length>2)return false;
+  /* A live non-expiring round must exhaust its full pen=1 budget here.
+   * A TTL-expiring round can settle a partial remaining budget safely:
+   * the projectile will die at expiry regardless of unused penetration.
+   * The original one-body TTL resolver retains first-hit ownership. */
+  if(nonExpiring ? contacts.length!==2 :
+     contacts.length<(b.hits>0?1:2)||contacts.length>b.pen+1||contacts.length>3)
+   return false;
   contacts.sort(function(a,c){return a.t-c.t;});
-  if(contacts.length===2&&contacts[1].t-contacts[0].t<1e-7)return false;
+  for(var oi=1;oi<contacts.length;oi++)
+   if(contacts[oi].t-contacts[oi-1].t<1e-7)return false;
   /* Non-tank bodies, including newborns and discontinuously moving drones,
    * may take physical priority. Only prove their corridors are remote. */
   for(var si=0;si<shapes.length;si++){

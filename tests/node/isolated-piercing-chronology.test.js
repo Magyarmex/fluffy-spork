@@ -421,3 +421,150 @@ for(const optimized of [false,true])for(const fps of [30,60,120,240]){
   assert.equal(g.hits,2);
  });
 }
+
+/* Run 372b: an expiring Marksman-family projectile can retain penetration
+ * after one hull. Its remaining physically reachable hulls must still be
+ * damaged before TTL even when the bullet expires mid-frame. Pen=2, speed
+ * 1050u/s, radius 5.5; no shell/splash/beam or shield involved. */
+for(const optimized of [false,true])for(const fps of [30,60,120,240]){
+ test((optimized?'optimized':'baseline')+
+  ' pen=2 Marksman TTL reaches two distinct hulls at '+fps+'Hz',()=>{
+  const Game=boot(undefined,optimized),{g,a,b}=makeWorld(Game,52);
+  a.x=25;
+  const shot=g.bullets[0];shot.vx=1050;shot.r=5.5;shot.ttl=.03;
+  shot.pen=2;shot.dmg=21;
+  for(let frame=0;frame<100&&g.bullets.length;frame++){
+   const dt=1/fps;g.time+=dt;g.updateBullets(dt);
+  }
+  assert.equal(a.hitCount,1);
+  assert.equal(b.hitCount,1,'second physical contact before expiry');
+  assert.equal(g.hits,2);
+ });
+ test((optimized?'optimized':'baseline')+
+  ' pen=2 Marksman TTL cannot damage unreachable hull at '+fps+'Hz',()=>{
+  const Game=boot(undefined,optimized),{g,b}=makeWorld(Game,120);
+  g.tanks[0].x=25;
+  const shot=g.bullets[0];shot.vx=1050;shot.r=5.5;shot.ttl=.03;
+  shot.pen=2;shot.dmg=21;
+  for(let frame=0;frame<100&&g.bullets.length;frame++){
+   const dt=1/fps;g.time+=dt;g.updateBullets(dt);
+  }
+  assert.equal(b.hitCount,0);
+ });
+}
+for(const optimized of [false,true]) {
+ test((optimized?'optimized':'baseline')+
+  ' pen=2 expiring high-speed shot resolves three chronological hulls',()=>{
+  const Game=boot(undefined,optimized),{g,a,b}=makeWorld(Game,52);
+  a.x=25;
+  const c={kind:'tank',id:4,x:78,y:0,cls:'scout',hp:100,alive:true,hitCount:0};
+  g.tanks.push(c);
+  const shot=g.bullets[0];shot.vx=2500;shot.r=5.5;shot.ttl=.03;
+  shot.pen=2;shot.dmg=21;
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.deepEqual([a.hitCount,b.hitCount,c.hitCount],[1,1,1]);
+  assert.equal(g.hits,3);
+ });
+}
+
+/* Marksman TTL adversarial gates: no partial penetration may be backdated
+ * through defense, unknown motion, cover or a competing projectile. */
+for(const optimized of [false,true]) {
+ const mode=optimized?'optimized':'baseline',Game=boot(undefined,optimized);
+ function world(){
+  const {g,a,b}=makeWorld(Game,52);a.x=25;
+  const shot=g.bullets[0];shot.vx=1050;shot.r=5.5;
+  shot.ttl=.03;shot.pen=2;shot.dmg=21;
+  return {g,a,b};
+ }
+ test(mode+' pen=2 TTL refuses shielded later hull',()=>{
+  const {g,b}=world();b.spawnShieldT=2;
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.equal(b.hitCount,0);
+ });
+ test(mode+' pen=2 TTL refuses unknown tank motion',()=>{
+  const {g,b}=world();g.__novaShapeSweepActive=true;
+  g.__novaShapeSweepEpoch=372;
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.equal(b.hitCount,0);
+ });
+ test(mode+' pen=2 TTL refuses moving tank witness',()=>{
+  const {g,b}=world();g.__novaShapeSweepActive=true;
+  g.__novaShapeSweepEpoch=372;
+  g.time+=1/30;
+  for(const t of g.tanks){
+   t.__novaSweepMoveTime=g.time;
+   t.__novaSweepPrevX=t.x;t.__novaSweepPrevY=t.y;
+  }
+  b.__novaSweepPrevY=18;
+  g.updateBullets(1/30);
+  assert.equal(b.hitCount,0);
+ });
+ test(mode+' pen=2 TTL refuses permanent wall between contacts',()=>{
+  const {g,b}=world();
+  g.__novaTerrain=[{id:-372,shape:'rect',x:20,y:0,w:3,h:90,
+   solid:true,destructible:false}];
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.equal(b.hitCount,0);
+ });
+ test(mode+' pen=2 TTL refuses competing hostile projectile',()=>{
+  const {g,b}=world();
+  g.bullets.push({kind:'bullet',id:372,ownerId:9,x:15,y:0,vx:0,vy:0,
+   r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,shell:false,beam:false});
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.equal(b.hitCount,0);
+ });
+ test(mode+' pen=2 TTL never reaches hull beyond expiry',()=>{
+  const {g,b}=world();b.x=70;
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.equal(b.hitCount,0);
+ });
+ test(mode+' pen=2 TTL preserves chronological order under reversed hash',()=>{
+  const {g,a,b}=world();g.tanks.reverse();
+  const order=[];
+  g.damageTank=function(t){order.push(t.id);t.hitCount++;this.hits++;};
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.deepEqual(order,[a.id,b.id]);
+ });
+}
+
+/* Remaining-penetration accounting uses projectile simulation time, not the
+ * full-speed match clock, during the player's 35% death transition. */
+for(const optimized of [false,true])for(const fps of [30,60,120,240]){
+ test((optimized?'optimized':'baseline')+
+  ' pen=2 Marksman TTL survives 35% death-slow at '+fps+'Hz',()=>{
+  const Game=boot(undefined,optimized),{g,a,b}=makeWorld(Game,52);
+  a.x=25;
+  const shot=g.bullets[0];shot.vx=1050;shot.r=5.5;
+  shot.ttl=.03;shot.pen=2;shot.dmg=21;
+  const dt=.35/fps;
+  for(let frame=0;frame<120&&g.bullets.length;frame++){
+   g.time+=1/fps;g.updateBullets(dt);
+  }
+  assert.equal(a.hitCount,1);
+  assert.equal(b.hitCount,1);
+  assert.equal(g.hits,2);
+ });
+}
+
+for(const optimized of [false,true]) {
+ test((optimized?'optimized':'baseline')+
+  ' pen=2 TTL contact recovery works through real Game.update epoch',()=>{
+  const Game=boot(function(dt){
+   this.time+=dt;
+   for(const t of this.tanks){
+    t.__novaSweepMoveTime=this.time;
+    t.__novaSweepPrevX=t.x;t.__novaSweepPrevY=t.y;
+   }
+   this.updateBullets(dt);
+  },optimized);
+  const {g,a,b}=makeWorld(Game,52);a.x=25;
+  const shot=g.bullets[0];shot.vx=1050;shot.r=5.5;
+  shot.ttl=.03;shot.pen=2;shot.dmg=21;
+  g.update(1/30);
+  assert.equal(a.hitCount,1);
+  assert.equal(b.hitCount,1);
+  assert.equal(g.hits,2);
+  assert.equal(g.__novaShapeSweepActive,false);
+ });
+}
