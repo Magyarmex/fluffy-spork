@@ -42,6 +42,30 @@ async function scenario(browser, label, options) {
     assert.equal(live.sectors?.length,16,label+': all ecological sectors present');
     await page.screenshot({path:path.join(output,label+'-playing.png')});
 
+    if(label==='desktop'){
+      await page.evaluate(()=>{
+        const Game=window.__novaMakeRequire('')('game/engine').Game;
+        const original=Game.prototype.tryFire;
+        window.__novaBrowserPlayerShots=0;
+        Game.prototype.tryFire=function(t){
+          const n=this.bullets.length;
+          const result=original.apply(this,arguments);
+          if(t&&t.isPlayer&&this.bullets.length>n)window.__novaBrowserPlayerShots++;
+          return result;
+        };
+      });
+      const box=await page.locator('canvas.absolute.inset-0').boundingBox();
+      assert.ok(box&&box.width>100&&box.height>100);
+      await page.mouse.move(box.x+box.width*.66,box.y+box.height*.5);
+      await page.keyboard.down('d');
+      await page.mouse.down();
+      await page.waitForTimeout(900);
+      await page.mouse.up();
+      await page.keyboard.up('d');
+      const shots=await page.evaluate(()=>window.__novaBrowserPlayerShots);
+      assert.ok(shots>0,'actual desktop mouse+WASD gameplay must launch projectiles');
+    }
+
     await page.getByRole('button',{name:'Pause'}).click();
     await page.getByText('PAUSED',{exact:true}).waitFor({state:'visible'});
     const paused=await page.evaluate(()=>window.NOVALivingFront.snapshot().age);
