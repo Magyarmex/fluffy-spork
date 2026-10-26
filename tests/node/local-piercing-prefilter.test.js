@@ -102,3 +102,50 @@ test('candidate identity is invariant under bullet-array permutation',()=>{
  assert.ok(b);
  shots.forEach((s,i)=>assert.deepEqual(new Set(b.get(s)),before[i]));
 });
+
+
+/* Run 376: remote piercing projectiles must not consume optional proof
+ * budget when they cannot possibly touch enough stationary hulls.
+ * They must STILL be considered as interception veto candidates. */
+test('remote penetrating shots do not starve five physically eligible corridors',()=>{
+ const local=Array.from({length:5},(_,i)=>shot(i*160));
+ const remote=Array.from({length:5},(_,i)=>shot(1150+i*160));
+ const g=world([...local,...remote],50,120);
+ for(let i=0;i<5;i++){
+  g.tanks.push({id:2*i+2,x:40,y:i*160,cls:'scout',alive:true,hp:100},
+               {id:2*i+3,x:65,y:i*160,cls:'scout',alive:true,hp:100});
+ }
+ const dt=.35/30;
+ const planA=plan(g,dt,false);
+ assert.ok(planA,'unrelated piercing shots must not reject the valid batch');
+ assert.equal(planA.size,5);
+ for(const b of local)assert.ok(planA.has(b));
+ for(const b of remote)assert.equal(planA.has(b),false);
+ g.bullets.reverse();
+ const planB=plan(g,dt,false);
+ assert.ok(planB,'reversing array order must not change batch eligibility');
+ assert.deepEqual(new Set(planB.keys()),new Set(local));
+});
+
+test('one valid corridor survives multiple irrelevant expiring piercing shots',()=>{
+ const local=shot(0);
+ const remote=Array.from({length:7},(_,i)=>shot(1000+i*120));
+ const g=world([local,...remote],50,120);
+ g.tanks=[{id:2,x:40,y:0,cls:'scout',alive:true,hp:100},
+          {id:3,x:65,y:0,cls:'scout',alive:true,hp:100}];
+ const p=plan(g,.35/30,false);
+ assert.ok(p,'single useful proof must survive unrelated expiring shots');
+ assert.deepEqual([...p.keys()],[local]);
+});
+
+test('non-targeted piercing shots remain possible local interceptors',()=>{
+ const local=shot(0);
+ const crossing={...shot(-100,.2),x:10,vx:0,vy:20000,pen:1};
+ const g=world([local,crossing,...Array.from({length:4},(_,i)=>shot(1000+i*160))],50,120);
+ g.tanks=[{id:2,x:40,y:0,cls:'scout',alive:true,hp:100},
+          {id:3,x:65,y:0,cls:'scout',alive:true,hp:100}];
+ const p=plan(g,.35/30,false);
+ assert.ok(p,'remote shots without eligible hulls must not starve the local proof');
+ assert.ok(p.get(local).includes(crossing),
+  'a projectile without eligible hulls can still intercept another shot');
+});
