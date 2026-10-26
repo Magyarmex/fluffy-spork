@@ -15,10 +15,12 @@ async function assertPortraitHud(page, label, expectedClass) {
     const className=identity?.querySelector('span:last-child');
     const score=row?.querySelector('[class~="ml-auto"]');
     const kills=score?.querySelector('span:first-child');
+    const clock=score?.querySelector('span:last-child');
+    const gene=row?.querySelector('[title^="Hybrid gene:"]');
     const buttons=[...(row?.querySelectorAll(':scope > button')||[])];
     const box=e=>{if(!e)return null;const r=e.getBoundingClientRect();return{left:r.left,right:r.right,width:r.width,top:r.top,bottom:r.bottom};};
     return {viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth,
-      root:box(root),panel:box(panel),identity:box(identity),class:box(className),kills:box(kills),
+      root:box(root),panel:box(panel),identity:box(identity),class:box(className),kills:box(kills),clock:box(clock),clockDisplay:clock&&getComputedStyle(clock).display,gene:box(gene),
       classText:className?.textContent,visibleClassWidth:className?.clientWidth,
       requiredClassWidth:className?.scrollWidth,
       buttons:buttons.map(b=>({name:b.getAttribute('aria-label'),box:box(b)}))};
@@ -27,6 +29,10 @@ async function assertPortraitHud(page, label, expectedClass) {
   assert.equal(metrics.classText,expectedClass,label+': canonical class label remains present');
   assert.ok(metrics.requiredClassWidth<=metrics.visibleClassWidth+1,
     label+': full class name must remain readable at narrow widths: '+JSON.stringify(metrics));
+  assert.notEqual(metrics.clockDisplay,'none',label+': elapsed match time remains visible');
+  assert.ok(metrics.kills.right+1<=metrics.clock.left,label+': kills and clock do not collide: '+JSON.stringify(metrics));
+  if(metrics.gene)assert.ok(metrics.class.right+1<=metrics.gene.left&&metrics.gene.right+1<=metrics.kills.left,
+    label+': hybrid gene badge does not cover class or kills: '+JSON.stringify(metrics));
   assert.ok(metrics.class.right+1<=metrics.kills.left,
     label+': class identity must not collide with kill indicator: '+JSON.stringify(metrics));
   assert.ok(metrics.buttons.every(b=>b.box.left>=metrics.panel.left&&b.box.right<=metrics.panel.right+1),
@@ -155,6 +161,18 @@ async function scenario(browser, label, options) {
       console.log('NOVA_PORTRAIT_TOAST '+JSON.stringify(toastGeometry));
     }
     if(label.startsWith('mobile'))await assertPortraitHud(page,label+'-warden','WARDEN');
+    if(label.startsWith('mobile')){
+      await page.evaluate(()=>{
+        const g=window.__novaBrowserLiveGame;
+        g.player.gene='gunner';g.syncHud();
+      });
+      await page.waitForTimeout(150);
+      await assertPortraitHud(page,label+'-hybrid-warden','WARDEN');
+      await page.evaluate(()=>{
+        const g=window.__novaBrowserLiveGame;
+        g.player.gene=null;g.syncHud();
+      });
+    }
     await page.screenshot({path:path.join(output,label+'-warden.png')});
     assert.deepEqual(errors,[],label+': no uncaught browser exceptions');
     console.log('NOVA_BROWSER_SMOKE '+JSON.stringify({label,menu,liveAge:live.age,paused,resumed,errors}));
