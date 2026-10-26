@@ -865,7 +865,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   if(!b||b.dead||!b.shell||b.beam||b.__novaClusterBurstConsumed||
      typeof g.clusterBurst!=='function'||
      !(dt>0)||!(b.ttl>0&&b.ttl<dt-1e-9)||(b.hits||0)!==0||
-     !(b.pen>=0)||b.pen>=2||b.__novaBreachAtTime===g.time||
+     !(b.pen>=0)||b.__novaBreachAtTime===g.time||
      !Number.isFinite(b.x)||!Number.isFinite(b.y)||
      !Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
      !Number.isFinite(b.r)||!Number.isFinite(b.ttl))return null;
@@ -875,6 +875,9 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   if(Math.abs(b.x)>=MAP_LIMIT-20||Math.abs(b.y)>=MAP_LIMIT-20||
      Math.abs(x)+childReach>=MAP_LIMIT-20||
      Math.abs(y)+childReach>=MAP_LIMIT-20)return null;
+  /* Penetration upgrades do not extend physical TTL. This shortcut still
+   * requires no earlier solid contact, breach, body, drone or projectile,
+   * and keeps newborn fragments clear of nearby cover. */
   /* A programmed Cannon fuse may have already crossed before TTL. Keep
    * Three Disciplines authoritative, including its historical 2u tolerance. */
   if(b.__v17Cannon&&b.__v17FuseDist>0){

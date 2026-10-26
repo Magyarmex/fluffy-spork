@@ -65,7 +65,7 @@ function boot(performance, updateImpl) {
 /* Physical-first isolated shell expiry is required to precede later terrain.
  * Earlier wall contact and fragment birth timing remain explicit gates.
  * Contested body/projectile/cover chains remain tracked under #147. */
-function runExpiry(Game,hz,{startX=0,vx=6000,ttl=.005,wallX=null}={}){
+function runExpiry(Game,hz,{startX=0,vx=6000,ttl=.005,wallX=null,pen=1}={}){
  const g=new Game(),bursts=[];
  g.time=1;g.__novaBattlefield={coverBroken:0};
  g.__novaTerrain=wallX===null?[]:[{id:-51,shape:'rect',x:wallX,y:0,w:4,h:80,
@@ -73,7 +73,7 @@ function runExpiry(Game,hz,{startX=0,vx=6000,ttl=.005,wallX=null}={}){
  g.clusterBurst=b=>bursts.push({x:b.x,y:b.y});
  g.weakenBullet=()=>{};
  g.bullets=[{kind:'bullet',id:777,ownerId:1,x:startX,y:0,
-   vx,vy:0,r:3,dmg:26,ttl,shell:true,pen:1,hits:0,dead:false,
+   vx,vy:0,r:3,dmg:26,ttl,shell:true,pen,hits:0,dead:false,
    splash:0,color:'#ffb45e'}];
  for(let frame=0;frame<6&&g.bullets.length;frame++){
   g.time+=1/hz;g.updateBullets(1/hz);
@@ -170,4 +170,86 @@ for(const optimized of [false,true]){
   assert.equal(bursts.length,1);
   assert.ok(bursts[0].x>30,'unwitnessed hostile drone still defers early expiry');
  });
+}
+
+/* #193: high-penetration Bomber shells are produced by normal penetration
+ * upgrades and Sniper gene. Penetration cannot defer expiry when no earlier
+ * terrain, body or projectile event exists. Exercise the shipping core and
+ * Battlefield/Disciplines/Performance composition at all supported rates. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),mode=optimized?'optimized':'baseline';
+ for(const pen of [2,3,5]){
+  for(const hz of [30,60,120,240]){
+   test('[TTL #193] '+mode+' upgraded pen='+pen+' shell expires at physical x=30, '+hz+'Hz',()=>{
+    const {bursts}=runExpiry(Game,hz,{pen});
+    assert.equal(bursts.length,1,'one upgraded shell, one burst');
+    assert.ok(Math.abs(bursts[0].x-30)<1e-6,
+     'upgraded shell must expire at x=30, got '+bursts[0].x);
+   });
+   test('[TTL #193] '+mode+' upgraded pen='+pen+' later wall cannot precede expiry, '+hz+'Hz',()=>{
+    const {bursts}=runExpiry(Game,hz,{pen,wallX:400});
+    assert.equal(bursts.length,1);
+    assert.ok(Math.abs(bursts[0].x-30)<1e-6,
+     'far wall cannot extend upgraded shell TTL: '+bursts[0].x);
+   });
+  }
+  test('[TTL #193] '+mode+' upgraded pen='+pen+' earlier permanent wall still wins',()=>{
+   const {bursts}=runExpiry(Game,30,{pen,wallX:18});
+   assert.equal(bursts.length,1);
+   assert.ok(bursts[0].x<30,'wall at x=18 must beat TTL x=30');
+  });
+ }
+}
+
+/* Full canonical Bomber projectile lifetime and speed, rather than only an
+ * artificially short remaining TTL. Pen=2 is reachable with a single normal
+ * penetration upgrade; pen=3 is reachable with further build investment. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),mode=optimized?'optimized':'baseline';
+ for(const pen of [2,3])for(const hz of [30,60,120,240]){
+  test('[TTL #193] '+mode+' full-lifetime upgraded Bomber shell at '+hz+'Hz pen='+pen,()=>{
+   const g=new Game(),bursts=[];
+   g.time=1;g.__novaBattlefield={coverBroken:0};g.__novaTerrain=[];
+   g.weakenBullet=()=>{};
+   g.clusterBurst=b=>bursts.push({x:b.x,y:b.y});
+   g.bullets=[{kind:'bullet',id:777,ownerId:1,x:0,y:0,
+    vx:360,vy:0,r:8,dmg:20,ttl:1.1,shell:true,pen,
+    hits:0,dead:false,splash:45,splashDmg:.3,color:'#ffb45e'}];
+   for(let frame=0;frame<300&&g.bullets.length;frame++){
+    g.time+=1/hz;g.updateBullets(1/hz);
+   }
+   assert.equal(bursts.length,1);
+   assert.ok(Math.abs(bursts[0].x-396)<1e-6,
+    '360u/s * 1.1s = 396u physical range, got '+bursts[0].x);
+  });
+ }
+}
+
+/* Children must inherit the remaining portion of the frame even for an
+ * upgraded shell. They must not be born at the frame endpoint or inherit a
+ * shortened permanent velocity after this update. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),mode=optimized?'optimized':'baseline';
+ for(const hz of [30,120])for(const pen of [2,3]){
+  test('[TTL #193] '+mode+' pen='+pen+' fragments receive remaining subframe at '+hz+'Hz',()=>{
+   const g=new Game(),created=[];
+   g.time=1;g.__novaBattlefield={coverBroken:0};g.__novaTerrain=[];
+   g.weakenBullet=()=>{};
+   g.clusterBurst=function(shell){
+    const child={kind:'bullet',id:778,ownerId:1,x:shell.x,y:0,
+     vx:300,vy:0,r:3,dmg:2,ttl:1,pen:0,hits:0,dead:false,
+     shell:false,beam:false,splash:0};
+    created.push(child);this.bullets.push(child);
+   };
+   g.bullets=[{kind:'bullet',id:777,ownerId:1,x:0,y:0,
+    vx:6000,vy:0,r:3,dmg:26,ttl:.005,pen,hits:0,dead:false,
+    shell:true,beam:false,splash:0}];
+   g.updateBullets(1/hz);
+   assert.equal(created.length,1);
+   const expected=30+300*(1/hz-.005);
+   assert.ok(Math.abs(created[0].x-expected)<1e-6,
+    'fragment should travel only post-birth time: '+created[0].x+' vs '+expected);
+   assert.equal(created[0].vx,300,'permanent fragment speed unchanged');
+  });
+ }
 }
