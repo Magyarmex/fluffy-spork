@@ -661,3 +661,20 @@ for(const optimized of [false,true]){
   assert.equal(b.hitCount,1,'remote neutral ecology cannot suppress penetration');
  });
 }
+
+/* Canonical ordinary-neutral population size plus crowded distant fire:
+ * the two eligible hulls are the only local physical contacts. */
+for(const optimized of [false,true]){
+ test((optimized?'optimized':'baseline')+
+  ' canonical neutral population does not suppress a lone piercing shot',()=>{
+  const Game=boot(undefined,optimized),{g,a,b}=makeWorld(Game);
+  for(let i=0;i<120;i++)g.shapes.push({kind:'shape',id:12000+i,
+   x:-900+(i%20)*4,y:-900+Math.floor(i/20)*4,r:12,hp:100});
+  for(let i=0;i<960;i++)g.bullets.push({kind:'bullet',id:13000+i,
+   ownerId:10+i,x:900+(i%24)*3,y:900+Math.floor(i/24)*3,
+   vx:0,vy:0,r:2,dmg:1,ttl:2,pen:0,hits:0,dead:false,shell:false,beam:false});
+  g.time+=.35/30;g.updateBullets(.35/30);
+  assert.equal(a.hitCount,1);
+  assert.equal(b.hitCount,1);
+ });
+}
