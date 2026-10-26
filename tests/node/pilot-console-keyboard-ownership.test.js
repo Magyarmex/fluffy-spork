@@ -113,3 +113,13 @@ test('Pilot Console does not unpause a run that was already paused',()=>{
   assert.equal(overlay.hidden,false);
   key('Escape');assert.equal(game.paused,true);
 });
+
+test('closing Pilot Console returns keyboard ownership without changing autofire preference',()=>{
+  const {game,gear,click,key}=boot();
+  game.input.autofire=false;
+  click(gear);
+  key('f');assert.equal(game.input.autofire,false);
+  key('Escape');
+  key('f');assert.equal(game.input.autofire,true);
+  key('w');assert.equal(game.input.keyboard.up,true);
+});
