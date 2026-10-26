@@ -110,22 +110,23 @@ for(const hz of [30,60,120,240]){
  test('Predator threat respects physical bullet TTL at '+hz+'Hz',()=>{
   const {context,Game,CLASSES}=loadPredator(),g=new Game(),t=tank(1,'twin');
   const threat=context.window.__NOVA_PREDATOR_TEST__.threatVector;
-  const shot={ownerId:9,x:160,y:5,vx:-500,vy:0,dead:false,ttl:0.05};
+  const remaining=0.75/hz; // genuinely shorter than this simulation frame
+  const shot={ownerId:9,x:160,y:5,vx:-500,vy:0,dead:false,ttl:remaining};
   g.bullets=[shot];
   const expired=threat(g,CLASSES,t,{});
   assert.equal(expired.risk,0,
-    'projectile expires at x=135, far outside the tank safety corridor');
+    'projectile expires before entering the tank safety corridor at '+hz+'Hz');
   shot.ttl=0.5;
   const live=threat(g,CLASSES,t,{});
   assert.ok(live.risk>.1,
     'the same shot with enough lifetime must still provoke an evasive plan');
-  shot.x=50;shot.ttl=0.05;
+  shot.x=50;shot.ttl=remaining;
   const near=threat(g,CLASSES,t,{});
   assert.ok(near.risk>0,
     'a shot entering the safety corridor before expiry must remain dangerous');
   // Bomber shells can detonate into splash and fragments at expiry;
   // their future threat is deliberately conservative until chronology is solved.
-  shot.x=160;shot.ttl=0.05;shot.shell=true;
+  shot.x=160;shot.ttl=remaining;shot.shell=true;
   assert.ok(threat(g,CLASSES,t,{}).risk>.1,
     'expiring Bomber shells must retain existing burst-threat awareness');
   shot.shell=false;shot.x=50;
