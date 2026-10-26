@@ -568,3 +568,43 @@ for(const optimized of [false,true]) {
   assert.equal(g.__novaShapeSweepActive,false);
  });
 }
+
+/* Run 374: an isolated piercing shot must not lose physical contacts merely
+ * because hundreds of unrelated projectiles exist elsewhere in the arena.
+ * The background shots are remote, stationary, and harmless; the direct
+ * collision system still owns any genuinely competing projectile. */
+for(const optimized of [false,true]){
+ const Game=boot(undefined,optimized),label=optimized?'optimized':'baseline';
+ for(const fps of [30,60,120,240]){
+  test(label+' remote projectile density preserves expiring penetration at '+fps+'Hz',()=>{
+   const {g,a,b}=makeWorld(Game);
+   for(let i=0;i<960;i++)g.bullets.push({kind:'bullet',id:100+i,ownerId:10+i,
+    x:900+(i%24)*3,y:900+Math.floor(i/24)*3,vx:0,vy:0,
+    r:2,dmg:1,ttl:2,pen:0,hits:0,dead:false,shell:false,beam:false});
+   const dt=.35/fps;
+   for(let frame=0;frame<20;frame++){g.time+=dt;g.updateBullets(dt);}
+   assert.equal(a.hitCount,1,'first physically reached hull');
+   assert.equal(b.hitCount,1,'second physically reached hull despite remote fire');
+  });
+ }
+ test(label+' remote projectile density preserves non-expiring same-frame penetration',()=>{
+  const {g,a,b}=makeWorld(Game);
+  g.bullets[0].ttl=.1;
+  for(let i=0;i<960;i++)g.bullets.push({kind:'bullet',id:2000+i,ownerId:10+i,
+   x:900+(i%24)*3,y:900+Math.floor(i/24)*3,vx:0,vy:0,
+   r:2,dmg:1,ttl:2,pen:0,hits:0,dead:false,shell:false,beam:false});
+  g.time+=.02;g.updateBullets(.02);
+  assert.equal(a.hitCount,1);
+  assert.equal(b.hitCount,1);
+ });
+ test(label+' dense remote fire cannot bypass a genuinely nearby interceptor',()=>{
+  const {g,a,b}=makeWorld(Game);
+  g.bullets.push({kind:'bullet',id:5,ownerId:8,x:50,y:0,vx:0,vy:0,
+   r:3,dmg:5,ttl:2,pen:0,hits:0,dead:false,shell:false,beam:false});
+  for(let i=0;i<960;i++)g.bullets.push({kind:'bullet',id:3000+i,ownerId:10+i,
+   x:900+(i%24)*3,y:900+Math.floor(i/24)*3,vx:0,vy:0,
+   r:2,dmg:1,ttl:2,pen:0,hits:0,dead:false,shell:false,beam:false});
+  g.time+=.35/30;g.updateBullets(.35/30);
+  assert.equal(b.hitCount,0,'uncertain interception must remain conservative');
+ });
+}
