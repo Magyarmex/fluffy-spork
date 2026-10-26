@@ -963,3 +963,22 @@ for (const fps of [30, 60, 120, 240]) {
       'out-of-TTL second hull cannot be hit or substituted by a duplicate first hit');
   });
 }
+
+/* Run 371 follow-up: ordinary non-expiring projectile with two reachable
+ * stationary hulls inside a single frame. The production #337 shortcut is
+ * intentionally limited to the TTL-expiration frame, so this separate
+ * physical ordering case remains a known-red full-chronology acceptance gate.
+ * First contacts at x=19 and x=44 (0.003167s and 0.007333s at 6000u/s). */
+for(const fps of [30,60,120,240]){
+ test('KNOWN RED: non-expiring piercing shot reaches both stationary hulls at '+fps+'Hz',()=>{
+  const g=new Game(),first={kind:'tank',id:2,x:40,y:0,cls:'scout',hp:100,alive:true,hitCount:0},
+   second={kind:'tank',id:3,x:65,y:0,cls:'scout',hp:100,alive:true,hitCount:0};
+  g.tanks=[first,second];
+  g.damageTank=function(t){t.hitCount++;this.hits++;};
+  g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,vx:6000,vy:0,
+   r:3,dmg:20,ttl:1,pen:1,hits:0,dead:false,shell:false,beam:false}];
+  for(let i=0;i<5&&g.bullets.length;i++){g.time+=1/fps;g.updateBullets(1/fps);}
+  assert.equal(first.hitCount,1,'first chronological hull');
+  assert.equal(second.hitCount,1,'second chronological hull within first frame at 30–120Hz');
+ });
+}
