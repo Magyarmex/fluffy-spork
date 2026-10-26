@@ -107,6 +107,35 @@ async function scenario(browser, label, options) {
       });
       assert.ok(!tipFit.error,label+': '+JSON.stringify(tipFit));
       await page.screenshot({path:path.join(output,label+'-longest-fieldcraft-tip.png')});
+      if(label==='mobile-320-short'){
+        // Keep the *longest* real tip mounted while checking action geometry.
+        // Fixing clipping by growing the card must not push Deploy, the
+        // utility row, or the Archive link off a short phone.
+        const longTipActions=await page.evaluate(()=>{
+          const root=document.querySelector('#root');
+          const buttons=[...root.querySelectorAll('button')];
+          const deploy=buttons.find(b=>/DEPLOY/i.test(b.textContent||''));
+          const targets=[deploy,
+            root.querySelector('[data-nova-action="blackglass"]'),
+            root.querySelector('[data-nova-action="controls"]'),
+            root.querySelector('[data-nova-action="debug"]')];
+          const rects=targets.map(e=>e?.getBoundingClientRect().toJSON()||null);
+          const walk=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+          let node,archive=null;
+          while((node=walk.nextNode())){
+            if(!node.textContent.includes('OPEN ARCHIVE'))continue;
+            const range=document.createRange();range.selectNodeContents(node);
+            const b=range.getBoundingClientRect();
+            if(b.width>0&&b.height>0){archive=b.toJSON();break;}
+          }
+          return {rects,archive,viewport:innerWidth,height:innerHeight};
+        });
+        assert.ok([...longTipActions.rects,longTipActions.archive].every(r=>
+          r&&r.left>=-1&&r.top>=-1&&r.right<=longTipActions.viewport+1&&
+          r.bottom<=longTipActions.height-1),
+          label+': longest Fieldcraft tip must not displace primary lobby actions: '+JSON.stringify(longTipActions));
+      }
+
       await page.evaluate(original=>{
         const line=document.querySelector('.nova-tip-line');
         if(line)line.textContent=original;
