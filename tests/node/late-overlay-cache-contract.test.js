@@ -49,7 +49,8 @@ function bootModules(withMenu=false) {
   const document = {hidden: false, visibilityState: 'visible', readyState:'loading',
     addEventListener: (name,fn) => {listeners[name]=fn;}, removeEventListener: noop,
     createElement: () => canvas(), getElementById: () => null,
-    querySelector: () => menu, querySelectorAll: () => [],
+    querySelector: selector => selector==='#root .menu-grid-bg'?menu:null,
+    querySelectorAll: () => [],
     body: {appendChild: noop}, head: {appendChild: noop},
     documentElement: {style: {setProperty: noop, removeProperty: noop},
       classList: {toggle: noop, add: noop, remove: noop}}};
