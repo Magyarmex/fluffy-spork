@@ -374,3 +374,32 @@ test('late-bound War Room retains real combat, not merely an animated empty aren
   assert.deepEqual(errors.filter(e=>!e.includes('React hooks unavailable')),[],
     'sustained decorative combat does not produce runtime errors');
 });
+
+
+test('fair AI cannot resolve a stale hidden tank through global getTank',()=>{
+  const {Game,requireGame}=bootModules();
+  const ai=requireGame('game/ai');
+  const g=new Game(canvas(),canvas(),{hud:noop,event:noop},'low');
+  const human=g.player,bot=g.tanks.find(t=>t&&!t.isPlayer);
+  assert.ok(human&&bot);
+  g.tanks=[bot,human];g.time=10;
+  human.x=1800;human.y=1800;human.spawnShieldT=0;
+  bot.x=-1800;bot.y=-1800;
+  bot.ai.state='hunt';bot.ai.thinkT=1;
+  bot.ai.targetId=human.id;
+  bot.ai.__v1112TargetId=-1;
+  bot.ai.__v1112NextThink=11;
+  let forbiddenLookups=0;
+  const base=g.getTank;
+  g.getTank=function(id){
+    if(id===human.id)forbiddenLookups++;
+    return base.apply(this,arguments);
+  };
+  const getTank=g.getTank;
+  assert.doesNotThrow(()=>ai.updateAI(bot,g,1/60));
+  assert.equal(forbiddenLookups,0,
+    'the legacy AI must not resolve offscreen targets via the unfiltered global tank map');
+  assert.equal(g.getTank,getTank,'temporary visibility guard restores the exact prior owner');
+  assert.equal(g.player,human,'real human handle restores after AI update');
+  assert.equal(bot.ai.__v1112TargetId,-1);
+});
