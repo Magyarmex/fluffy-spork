@@ -927,3 +927,33 @@ for (const fps of [30, 60, 120, 240]) {
     assert.equal(simulateSlowProjectile(Game, fps, .35, 100, .005), 0);
   });
 }
+
+
+/* Run 370 follow-up: an isolated first-contact rescue is not enough for a
+ * penetrating projectile that reaches TWO targets inside one simulation
+ * slice. Death slow-motion changes that slice from dt to 0.35*dt, so it
+ * must be part of the chronological multi-hit acceptance matrix. */
+function simulateSlowPiercing(Game, fps, scale, secondX) {
+  const g = new Game();
+  g.tanks = [40, secondX].map((x, i) => ({
+    kind: 'tank', id: i + 2, x, y: 0, cls: 'scout', hp: 100, alive: true
+  }));
+  g.bullets = [{ kind: 'bullet', id: 1, ownerId: 1, x: 0, y: 0,
+    vx: 6000, vy: 0, r: 3, dmg: 20, ttl: .010, pen: 1,
+    hits: 0, dead: false, shell: false, beam: false }];
+  for (let i = 0; i < 30 && g.bullets.length; i++) {
+    g.updateBullets(scale / fps);
+    g.time += 1 / fps;
+  }
+  return g.hits;
+}
+for (const fps of [30, 60, 120, 240]) {
+  test('death-slow penetration: two pre-expiry hulls hit at ' + fps + 'Hz', () => {
+    // Contact 1: x=19 at .00317s; contact 2: x=44 at .00733s.
+    // Both precede TTL=.010s. No terrain, drones, or interception.
+    assert.equal(simulateSlowPiercing(Game, fps, .35, 65), 2);
+  });
+  test('death-slow penetration: second hull beyond TTL is not hit at ' + fps + 'Hz', () => {
+    assert.equal(simulateSlowPiercing(Game, fps, .35, 200), 1);
+  });
+}
