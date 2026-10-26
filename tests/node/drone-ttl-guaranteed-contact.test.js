@@ -110,6 +110,11 @@ for(const optimized of [false,true])for(const hz of [30,60,120,240]){
   const g=droneWorld(hz,optimized);
   assert.equal(g.hits,1,'start-position speed envelope proves pre-expiry overlap');
  });
+ test('later wall cannot erase an earlier guaranteed drone hit '+label,()=>{
+  const g=droneWorld(hz,optimized,{terrain:[{id:-1,shape:'rect',
+    x:38,y:0,w:2,h:70,solid:true,destructible:false}]});
+  assert.equal(g.hits,1,'drone is reached before the wall');
+ });
  test('earlier permanent cover still vetoes drone TTL contact '+label,()=>{
   const g=droneWorld(hz,optimized,{terrain:[{id:-1,shape:'rect',
     x:6,y:0,w:2,h:70,solid:true,destructible:false}]});
@@ -153,7 +158,7 @@ for(const optimized of [false,true])for(const hz of [30,60,120,240]){
  });
  test('earlier projectile contact on same drone blocks guessed kill credit '+label,()=>{
   const g=droneWorld(hz,optimized,{otherBullets:[{kind:'bullet',id:99,
-   ownerId:3,x:22,y:0,vx:0,vy:0,r:3,dmg:20,ttl:1,pen:0,
+   ownerId:3,x:22,y:10,vx:0,vy:0,r:3,dmg:20,ttl:1,pen:0,
    hits:0,dead:false,shell:false,beam:false}]});
   assert.ok(!g.hitOwners.includes(1),'first event belongs to competing shot');
  });
