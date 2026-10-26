@@ -612,8 +612,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      b.__novaBreachAtTime===g.time||
      !(dt>0)||!(b.ttl>0)||
      (nonExpiring ? !(b.ttl>dt&&b.pen===1&&b.hits===0) : !(b.ttl<=dt))||
-     !(b.pen===0||b.pen===1)||!(b.hits>=0)||
-     (b.hits===0&&b.pen!==1)||
+     !(b.pen===0||b.pen===1||(!nonExpiring&&b.pen===2))||
+     !(b.hits>=0)||(b.hits===0&&b.pen===0)||
      (b.hits>0&&!(b.__novaDirectVictims instanceof Set))||
      !Number.isFinite(b.x)||!Number.isFinite(b.y)||
      !Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
@@ -671,9 +671,16 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    if(!(enter>1e-9))return false;
    contacts.push({e:t,t:enter});
   }
-  if(contacts.length!==b.pen+1||contacts.length>2)return false;
+  /* A live non-expiring round must exhaust its full pen=1 budget here.
+   * A TTL-expiring round can settle a partial remaining budget safely:
+   * the projectile will die at expiry regardless of unused penetration.
+   * The original one-body TTL resolver retains first-hit ownership. */
+  if(nonExpiring ? contacts.length!==2 :
+     contacts.length<(b.hits>0?1:2)||contacts.length>b.pen+1||contacts.length>3)
+   return false;
   contacts.sort(function(a,c){return a.t-c.t;});
-  if(contacts.length===2&&contacts[1].t-contacts[0].t<1e-7)return false;
+  for(var oi=1;oi<contacts.length;oi++)
+   if(contacts[oi].t-contacts[oi-1].t<1e-7)return false;
   /* Non-tank bodies, including newborns and discontinuously moving drones,
    * may take physical priority. Only prove their corridors are remote. */
   for(var si=0;si<shapes.length;si++){
