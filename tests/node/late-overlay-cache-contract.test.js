@@ -259,3 +259,22 @@ for(const hz of [30,120]){
     assert.ok(g.__lfState.age>=11,'ecology sector simulation actually advances');
   });
 }
+
+test('fair no-target flee never dereferences a hidden player or leaks a temporary nearest owner',()=>{
+  const {Game,requireGame}=bootModules();
+  const ai=requireGame('game/ai');
+  const g=new Game(canvas(),canvas(),{hud:noop,event:noop},'low');
+  const human=g.player,bot=g.tanks.find(t=>t&&!t.isPlayer);
+  assert.ok(bot);
+  g.tanks=[bot];g.time=10;
+  human.x=1900;human.y=1900;
+  bot.x=-1900;bot.y=-1900;
+  bot.ai.state='flee';bot.ai.thinkT=1;bot.ai.__v1112TargetId=-1;
+  const nearest=g.nearestTank,player=g.player;
+  assert.doesNotThrow(()=>ai.updateAI(bot,g,1/60),
+    'a legitimate low-health flee with no perceived opponent must not crash');
+  assert.equal(g.nearestTank,nearest,'temporary flee fallback is fully restored');
+  assert.equal(g.player,player,'actual human handle is fully restored');
+  assert.equal(bot.ai.__v1112TargetId,-1,'no hidden player target is introduced');
+  assert.ok(Number.isFinite(bot.x)&&Number.isFinite(bot.y));
+});
