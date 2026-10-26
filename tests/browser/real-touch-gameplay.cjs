@@ -211,6 +211,41 @@ async function run(browser,label,viewport){
   assert.ok(downs.length>=8&&ups.length>=4&&cancels.length>=4,
    label+': Chromium generated genuine two-contact releases and cancellations: '+JSON.stringify({downs:downs.length,ups:ups.length,cancels:cancels.length}));
   assert.ok(events.every(e=>e.trusted),label+': touch events must be browser-trusted');
+  // Compact landscape: the in-game Pilot Settings must remain operable at
+  // 320 CSS pixels of height without stealing or resurrecting stick ownership.
+  if(label==='touch-landscape-568'){
+   const gear=page.locator('#nova-pilot-gear');
+   await gear.waitFor({state:'visible',timeout:10000});
+   await gear.click();
+   const dialog=page.getByRole('dialog',{name:'Gameplay settings'});
+   await dialog.waitFor({state:'visible',timeout:10000});
+   const panel=await page.locator('#nova-pilot-panel').evaluate(el=>{
+    const r=el.getBoundingClientRect();
+    return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,
+      scrollHeight:el.scrollHeight,clientHeight:el.clientHeight,
+      viewportW:innerWidth,viewportH:innerHeight};
+   });
+   assert.ok(panel.left>=-1&&panel.right<=panel.viewportW+1&&
+     panel.top>=-1&&panel.bottom<=panel.viewportH+1,
+     label+': settings panel must stay within short landscape viewport: '+JSON.stringify(panel));
+   assert.equal(await page.evaluate(()=>window.__novaTouchGame.paused),true,
+     label+': opening Pilot Settings pauses real gameplay');
+   const opacity=page.getByRole('slider',{name:'Joystick opacity'});
+   await opacity.focus();
+   await page.keyboard.press('Home');
+   assert.equal(await opacity.inputValue(),'30',
+     label+': keyboard and accessibility slider input remains usable in short landscape');
+   await page.getByRole('button',{name:'RESET DEFAULTS'}).click();
+   await page.getByRole('button',{name:'DONE · RESUME'}).click();
+   await dialog.waitFor({state:'hidden',timeout:10000});
+   const after=await snapshot();
+   assert.equal(await page.evaluate(()=>window.__novaTouchGame.paused),false,
+     label+': Pilot Settings resumes gameplay');
+   assert.equal(after.move.active,false,label+': settings cannot resurrect movement');
+   assert.equal(after.aim.active,false,label+': settings cannot resurrect aim');
+   assert.equal(after.firing,false,label+': settings cannot resurrect firing');
+   console.log('NOVA_COMPACT_LANDSCAPE_SETTINGS '+JSON.stringify({panel,after}));
+  }
   assert.deepEqual(errors,[],label+': no uncaught JavaScript exceptions');
   console.log('NOVA_REAL_TOUCH '+JSON.stringify({label,viewport,held,moving,rightUp,leftUp,cancelled,warden,events:{downs:downs.length,ups:ups.length,cancels:cancels.length},errors}));
  }finally{await context.close();}
@@ -220,5 +255,7 @@ async function run(browser,label,viewport){
  try{
   await run(browser,'touch-portrait-320',{width:320,height:700});
   await run(browser,'touch-landscape-844',{width:844,height:390});
+  // Compact landscape phones must retain two independently usable real-touch sticks.
+  await run(browser,'touch-landscape-568',{width:568,height:320});
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
