@@ -39,6 +39,7 @@ async function run(browser,label,viewport){
   const canvas=page.locator('canvas.absolute.inset-0');
   await canvas.waitFor({state:'visible',timeout:30000});
   await page.waitForFunction(()=>window.__novaTouchGame?.status==='playing',{timeout:20000});
+  await page.evaluate(()=>{const g=window.__novaTouchGame;g.input.autofire=false;g.player.spawnShieldT=20;});
   const rect=await canvas.boundingBox();
   assert.ok(rect&&rect.width>200&&rect.height>200,label+': game canvas has real dimensions');
   const left={x:rect.x+rect.width*.20,y:rect.y+rect.height*.68,id:11,radiusX:1,radiusY:1,force:1};
@@ -124,6 +125,27 @@ async function run(browser,label,viewport){
    label+': Controller command node follows live touch direction/depth: '+JSON.stringify(warden));
   await send('touchCancel',[]);
   await page.waitForTimeout(80);
+  // Pausing during a live two-finger chord must release gameplay ownership.
+  await both();
+  await page.getByRole('button',{name:'Pause'}).click();
+  await page.getByText('PAUSED',{exact:true}).waitFor({state:'visible'});
+  const paused=await page.evaluate(()=>{
+   const g=window.__novaTouchGame;
+   return {paused:g.paused,move:g.input.move.active,aim:g.input.aim.active,
+    firing:g.input.firing,ability:g.input.abilityQueued};
+  });
+  assert.equal(paused.paused,true,label+': gameplay is paused');
+  assert.equal(paused.move,false,label+': pause releases movement touch');
+  assert.equal(paused.aim,false,label+': pause releases aim touch');
+  assert.equal(paused.firing,false,label+': pause stops firing');
+  assert.equal(paused.ability,false,label+': pause clears queued ability');
+  await send('touchCancel',[]);
+  await page.getByRole('button',{name:/RESUME/i}).click();
+  await page.waitForTimeout(120);
+  const resumed=await snapshot();
+  assert.equal(resumed.move.active,false,label+': resume does not resurrect movement');
+  assert.equal(resumed.aim.active,false,label+': resume does not resurrect aiming');
+  assert.equal(resumed.firing,false,label+': resume does not resurrect fire');
   const events=await page.evaluate(()=>window.__novaTouchEvents);
   const downs=events.filter(e=>e.type==='pointerdown'),ups=events.filter(e=>e.type==='pointerup'),cancels=events.filter(e=>e.type==='pointercancel');
   assert.ok(downs.length>=8&&ups.length>=4&&cancels.length>=4,
