@@ -74,6 +74,43 @@ async function scenario(browser, label, options) {
     assert.equal(menu.decorative,true,label+': War Room must be visible');
     assert.equal(menu.active,false,label+': War Room must not impersonate active game');
     await page.screenshot({path:path.join(output,label+'-menu.png')});
+    // A 320x568 CSS-pixel handset must expose the complete primary lobby,
+    // not merely a centered Deploy button with the archive/control row clipped.
+    if(label==='mobile-320-short'){
+      const critical={
+        DEPLOY:page.getByRole('button',{name:/DEPLOY/i}).first(),
+        BLACKGLASS:page.locator('[data-nova-action="blackglass"]'),
+        CONTROLS:page.locator('[data-nova-action="controls"]'),
+        DEBUG:page.locator('[data-nova-action="debug"]')
+      };
+      for(const [caption,element] of Object.entries(critical)){
+        assert.ok(await element.count(),label+': missing lobby action '+caption);
+        const box=await element.first().boundingBox();
+        assert.ok(box&&box.x>=-1&&box.y>=-1&&
+          box.x+box.width<=320+1&&box.y+box.height<=568-1,
+          label+': '+caption+' must fit inside the visible lobby: '+JSON.stringify(box));
+      }
+      // The release archive is a text-bearing feature rail, not the hidden
+      // legacy updates action. Measure its actually painted text node.
+      const archive=await page.evaluate(()=>{
+        const root=document.querySelector('#root');
+        if(!root)return null;
+        const walk=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+        let node;
+        while((node=walk.nextNode())){
+          if(!node.textContent.includes('OPEN ARCHIVE'))continue;
+          const range=document.createRange();range.selectNodeContents(node);
+          const b=range.getBoundingClientRect();
+          if(b.width>0&&b.height>0)return {x:b.x,y:b.y,width:b.width,height:b.height};
+        }
+        return null;
+      });
+      assert.ok(archive&&archive.x>=-1&&archive.y>=-1&&
+        archive.x+archive.width<=321&&archive.y+archive.height<=567,
+        label+': OPEN ARCHIVE text must fit inside the visible lobby: '+JSON.stringify(archive));
+
+    }
+
 
     // Observe the actual React-owned Game instance without replacing its update logic.
     await page.evaluate(()=>{
@@ -305,6 +342,7 @@ async function scenario(browser, label, options) {
   try {
     await scenario(browser,'desktop',{viewport:{width:1280,height:800},deviceScaleFactor:1});
     await scenario(browser,'mobile-320',{viewport:{width:320,height:700},deviceScaleFactor:2,isMobile:true,hasTouch:true});
+    await scenario(browser,'mobile-320-short',{viewport:{width:320,height:568},deviceScaleFactor:2,isMobile:true,hasTouch:true});
     await scenario(browser,'mobile-360',{viewport:{width:360,height:780},deviceScaleFactor:2,isMobile:true,hasTouch:true});
     await scenario(browser,'mobile',{viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true});
     await scenario(browser,'mobile-430',{viewport:{width:430,height:932},deviceScaleFactor:2,isMobile:true,hasTouch:true});
