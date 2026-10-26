@@ -233,3 +233,29 @@ test('late-bound materialized render/audio owners are actually installed',()=>{
     'Crasher commitment sound hooks must reach the real audio class');
   assert.equal(Game.prototype.__novaLivingFrontCore,true);
 });
+
+for(const hz of [30,120]){
+  test('late-bound Controller, ecology and Fair Engagement survive twelve-second combat at '+hz+' FPS',()=>{
+    const {Game}=bootModules();
+    const g=new Game(canvas(),canvas(),{hud:noop,event:noop,toast:noop,offer:noop,stick:noop,gameover:noop},'low');
+    g.setClass(g.player,'warden');
+    g.player.hp=1e6;g.player.maxHp=1e6;g.player.spawnShieldT=1e6;
+    g.input.aim.active=true;g.input.aim.dx=80;g.input.aim.dy=0;
+    g.input.keyboard.right=true;g.input.firing=true;
+    for(let i=0;i<12*hz;i++){
+      g.update(1/hz);
+      if(i%hz===0){
+        for(const e of [...g.tanks,...g.shapes,...g.drones]){
+          assert.ok(Number.isFinite(e.x)&&Number.isFinite(e.y),
+            'all physical entities retain finite world coordinates');
+        }
+        assert.ok(g.shapes.length<220,'ecology must not grow an unbounded neutral population');
+      }
+    }
+    assert.equal(g.status,'playing');
+    assert.equal(g.__lfState.sectors.length,16);
+    assert.ok(g.drones.some(d=>d.ownerId===g.player.id),
+      'the real Controller drone owner still spawns allied drones');
+    assert.ok(g.__lfState.age>=11,'ecology sector simulation actually advances');
+  });
+}
