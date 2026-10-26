@@ -37,7 +37,7 @@ function bootModules(withMenu=false) {
     children: [], isConnected: true, offsetParent: {},
     classList: {add: noop, remove: noop},
     getBoundingClientRect: () => ({width: 800, height: 600}),
-    querySelectorAll: () => [],
+    querySelectorAll: () => [], querySelector: () => null,
     insertBefore(node, before) {
       const at = before ? this.children.indexOf(before) : -1;
       if(at < 0) this.children.push(node);
@@ -103,11 +103,20 @@ test('playable Game prototype receives Living Front ecology',()=>{
   assert.equal(Game.prototype.__novaLivingFrontCore,true,
     'Living Front engine hook must be installed in the cached playable Game');
 });
-test('authoritative AI update function receives Fair Engagement wrapper',()=>{
-  const {requireGame}=bootModules();
+test('authoritative AI update composes Living Front outside the Fair Engagement gate',()=>{
+  const {Game,requireGame}=bootModules();
   const ai=requireGame('game/ai');
-  assert.equal(ai.updateAI.__novaFairEngagement,true,
-    'AI module must receive actual Fair Engagement scoring wrapper');
+  assert.equal(ai.updateAI.__novaLivingFront,true,
+    'Living Front must be the final AI wrapper around the earlier fair gate');
+  const g=new Game(canvas(),canvas(),{hud:noop,event:noop},'low');
+  const player=g.player, bot=g.tanks.find(t=>t&&!t.isPlayer);
+  assert.ok(player&&bot,'real match provides human and bot actors');
+  player.x=1600;player.y=1600;player.spawnShieldT=0;
+  bot.x=-1600;bot.y=-1600;bot.ai.__v1112TargetId=player.id;
+  g.tanks=[bot,player];g.time=10;
+  ai.updateAI(bot,g,1/60);
+  assert.equal(bot.ai.__v1112TargetId,-1,
+    'actual composed AI must reject a stale offscreen player target');
 });
 test('War Room never caches gameplay modules before late overlays register',()=>{
   const {window,preRequireCache}=bootModules();
@@ -143,7 +152,7 @@ for(const hz of [30,60,120,240]){
       'neutral population stays bounded after ecological updates');
     assert.equal(Game.prototype.__novaFairEngagement,true);
     assert.equal(Game.prototype.__novaLivingFrontCore,true);
-    assert.equal(window.__novaMakeRequire('')('game/ai').updateAI.__novaFairEngagement,true);
+    assert.equal(window.__novaMakeRequire('')('game/ai').updateAI.__novaLivingFront,true);
   });
 }
 
