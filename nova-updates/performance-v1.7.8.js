@@ -643,7 +643,7 @@ wrap('game/engine',function(engine,require){
   /* Redeploy keeps physical neutral shapes but core seedShapes would append
    * another complete 120-body farm each life. This owner executes before the
    * War Room eagerly caches Game, unlike later Living Front wrappers. */
-  var seedTargets={circle:62,triangle:30,square:16,pentagon:8,hexagon:4};
+  var seedTargets={circle:62,triangle:30,square:16,pentagon:8,hexagon:4,star:1};
   var oldSeedShapes=Base.prototype.seedShapes;
   if(oldSeedShapes)Base.prototype.seedShapes=function(){
     var counts=Object.create(null),shapes=this.shapes||[];
