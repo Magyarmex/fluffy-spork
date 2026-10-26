@@ -307,3 +307,55 @@ for(const optimized of [false,true]) {
   assert.equal(b.hitCount,0);
  });
 }
+
+/* Adversarial 372: high-speed two-body chronology must not depend on hash
+ * ordering or a lucky frame boundary. Exercise 480 deterministic layouts
+ * against both shipping module compositions. */
+for(const optimized of [false,true]) {
+ const Game=boot(undefined,optimized);
+ test((optimized?'optimized':'baseline')+
+  ' 240 randomized non-expiring pairs preserve both victims at 30Hz',()=>{
+  let seed=3722026;
+  const rnd=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+  for(let i=0;i<240;i++){
+   const firstX=28+rnd()*16,secondX=firstX+24+rnd()*11;
+   const {g,a,b}=makeWorld(Game,secondX,i%2===0);
+   a.x=firstX;g.bullets[0].ttl=.2;
+   g.time+=1/30;g.updateBullets(1/30);
+   assert.equal(a.hitCount,1,'first victim '+i);
+   assert.equal(b.hitCount,1,'second victim '+i);
+   assert.equal(g.hits,2,'no duplicate hits '+i);
+  }
+ });
+ test((optimized?'optimized':'baseline')+
+  ' non-expiring shortcut cannot reach a second hull beyond this frame',()=>{
+  const {g,a,b}=makeWorld(Game,300);
+  g.bullets[0].ttl=.2;
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.equal(a.hitCount,1);
+  assert.equal(b.hitCount,0,'later physical contact belongs to later frame');
+ });
+ test((optimized?'optimized':'baseline')+
+  ' same-tick cover breach vetoes non-expiring shortcut',()=>{
+  const {g,b}=makeWorld(Game);
+  g.bullets[0].ttl=.2;
+  const dt=1/30;g.time+=dt;
+  g.bullets[0].__novaBreachAtTime=g.time;
+  g.updateBullets(dt);
+  assert.equal(b.hitCount,0,'no speculative replay after cover breach');
+ });
+ test((optimized?'optimized':'baseline')+
+  ' moving tank witness vetoes non-expiring shortcut',()=>{
+  const {g,b}=makeWorld(Game);
+  g.bullets[0].ttl=.2;
+  g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=372;
+  g.time+=1/30;
+  for(const t of g.tanks){
+   t.__novaSweepMoveTime=g.time;
+   t.__novaSweepPrevX=t.x;t.__novaSweepPrevY=t.y;
+  }
+  b.__novaSweepPrevY=18;
+  g.updateBullets(1/30);
+  assert.equal(b.hitCount,0,'moving hull must use full chronology');
+ });
+}
