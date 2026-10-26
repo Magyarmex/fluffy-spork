@@ -853,3 +853,43 @@ test('observed intermediate drone motion defeats misleading identical frame endp
   assert.equal(g.novaChronoShadowSnapshot().predictedBodyContacts,0,
     'a return to the same endpoint does not prove a stationary trajectory');
 });
+
+/* Run 368: the optional first-contact comparator must not assign an arbitrary
+ * victim when multiple bodies share the earliest physical contact. A later
+ * tie must not hide a distinct, strictly earlier body encountered afterward. */
+for (const reversed of [false, true]) {
+  test('shadow abstains on simultaneous tank contacts regardless of array order (' +
+    (reversed ? 'reversed' : 'forward') + ')', () => {
+    const { g } = boot(), first = addScout(g, 40);
+    const second = { ...first, id: 3, hp: 100 };
+    g.tanks = reversed ? [second, first] : [first, second];
+    g.bullets = [ordinaryShot(9900 + Number(reversed))];
+    g.updateBullets(1 / 30);
+    const s = g.novaChronoShadowSnapshot();
+    assert.equal(s.sampledShortShots, 1);
+    assert.equal(s.predictedBodyContacts, 0,
+      'two simultaneous first victims have no uniquely attributable contact');
+    assert.equal(s.unregisteredBodyContacts, 0);
+  });
+}
+test('shadow can find an earlier shape after two later shapes tie', () => {
+  const { g } = boot();
+  g.tanks = [];
+  g.shapes = [auditShape(9910, 20), auditShape(9911, 20), auditShape(9912, 12)];
+  g.bullets = [ordinaryShot(9913)];
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.predictedBodyContacts, 1,
+    'a later-time tie must not mask the unique earlier shape');
+  assert.equal(s.events[0].targetId, 9912);
+});
+test('shadow abstains on a first-contact shape tie even with a later tank', () => {
+  const { g } = boot();
+  addScout(g, 40);
+  g.shapes = [auditShape(9920, 12), auditShape(9921, 12)];
+  g.bullets = [ordinaryShot(9922)];
+  g.updateBullets(1 / 30);
+  const s = g.novaChronoShadowSnapshot();
+  assert.equal(s.predictedBodyContacts, 0);
+  assert.equal(s.unregisteredBodyContacts, 0);
+});
