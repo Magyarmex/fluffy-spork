@@ -60,7 +60,7 @@ async function run(browser,label,viewport){
   const send=(type,touchPoints)=>cdp.send('Input.dispatchTouchEvent',{type,touchPoints});
   const snapshot=()=>page.evaluate(()=>{
    const g=window.__novaTouchGame, i=g?.input, p=g?.player;
-   return {status:g?.status,x:p?.x,y:p?.y,cls:p?.cls,
+   return {status:g?.status,time:g?.time,x:p?.x,y:p?.y,cls:p?.cls,
     move:i&&{active:i.move.active,dx:i.move.dx,dy:i.move.dy,id:i.stickId.move},
     aim:i&&{active:i.aim.active,dx:i.aim.dx,dy:i.aim.dy,id:i.stickId.aim},
     firing:i?.firing,shots:window.__novaTouchShots,
@@ -80,6 +80,15 @@ async function run(browser,label,viewport){
   }
   const held=await both();
   await page.waitForTimeout(650);
+  // Game.start caps each simulation step at 33 ms. Under a busy CI renderer,
+  // 650 ms of wall time can advance less than Scout's 0.5 s reload, making a
+  // correct held-fire input look broken. Preserve the same shot assertion but
+  // give the engine at least 0.65 s of authoritative simulation time.
+  assert.ok(Number.isFinite(held.time),label+': gameplay simulation clock is available');
+  await page.waitForFunction(start=>{
+   const g=window.__novaTouchGame;
+   return g&&g.status==='playing'&&g.time>=start+0.65;
+  },held.time,{timeout:15000});
   const moving=await snapshot();
   assert.ok(Math.hypot(moving.x-held.x,moving.y-held.y)>1,
    label+': actual player must move while two fingers are held: '+JSON.stringify({held,moving}));
