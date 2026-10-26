@@ -297,6 +297,7 @@ mods['game/engine']=function(module,exports,require){
  if(typeof oldKill==='function')Game.prototype.killTank=function(victim,killer){
   var wasAlive=!!(!this.__novaDecorativeWorld&&victim&&victim.alive!==false&&victim.isPlayer);
   var note=wasAlive?choose(victim,killer,classes):null;
+  if(note&&typeof this.areAllies==='function'&&this.areAllies(victim,killer))note=null;
   var out=oldKill.apply(this,arguments);
   if(wasAlive&&victim.alive===false){this.__novaDeathInsight=note;this.__novaDeathInsightAttempted=false;}
   return out;
