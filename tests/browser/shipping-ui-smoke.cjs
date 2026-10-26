@@ -85,6 +85,7 @@ async function scenario(browser, label, options) {
         'OPEN ARCHIVE':page.locator('[data-nova-action="updates"]')
       };
       for(const [caption,element] of Object.entries(critical)){
+        assert.ok(await element.count(),label+': missing lobby action '+caption);
         const box=await element.first().boundingBox();
         assert.ok(box&&box.x>=-1&&box.y>=-1&&
           box.x+box.width<=320+1&&box.y+box.height<=568-1,
