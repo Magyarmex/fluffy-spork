@@ -295,7 +295,7 @@ mods['game/engine']=function(module,exports,require){
  Game.prototype.__novaDeathInsightInstalled=true;
  var oldKill=Game.prototype.killTank,oldUpdate=Game.prototype.update,oldRedeploy=Game.prototype.redeploy;
  if(typeof oldKill==='function')Game.prototype.killTank=function(victim,killer){
-  var wasAlive=!!(victim&&victim.alive!==false&&victim.isPlayer);
+  var wasAlive=!!(!this.__novaDecorativeWorld&&victim&&victim.alive!==false&&victim.isPlayer);
   var note=wasAlive?choose(victim,killer,classes):null;
   var out=oldKill.apply(this,arguments);
   if(wasAlive&&victim.alive===false){this.__novaDeathInsight=note;this.__novaDeathInsightAttempted=false;}
@@ -303,7 +303,7 @@ mods['game/engine']=function(module,exports,require){
  };
  if(typeof oldUpdate==='function')Game.prototype.update=function(){
   var out=oldUpdate.apply(this,arguments);
-  if(this.status==='dead'&&this.__novaDeathInsight)mount(this);
+  if(!this.__novaDecorativeWorld&&this.status==='dead'&&this.__novaDeathInsight)mount(this);
   return out;
  };
  if(typeof oldRedeploy==='function')Game.prototype.redeploy=function(){
