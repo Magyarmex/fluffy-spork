@@ -724,9 +724,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    for(var ct=0;ct<contacts.length;ct++){
     var target=contacts[ct].e;
     if(o.ownerId===target.id)continue;
+    var targetDef=CLASSES[target.cls];
+    if(!targetDef||!Number.isFinite(targetDef.size))return false;
     var until=Math.min(dt,contacts[ct].t*travelT),
         tx=o.x+o.vx*until,ty=o.y+o.vy*until,
-        radius=o.r+CLASSES[target.cls].size+3;
+        radius=o.r+Math.max(0,targetDef.size)+3;
     if(!Number.isFinite(tx)||!Number.isFinite(ty)||
        !Number.isFinite(radius))return false;
     if(Math.max(o.x,tx)+radius>=target.x&&
