@@ -90,3 +90,72 @@ for(let n=0;n<30000;n++){
 }
 console.log(JSON.stringify(stats,null,2));
 assert.equal(stats.disagreements,0);
+
+// Stage 2: an infinite permanent vertical wall competes with body contacts.
+// This is geometry only. Cover breach, finite rectangles and XP remain out of scope.
+function wallTime(world){
+ if(!Number.isFinite(world.wallX)||!(world.v.x>0))return null;
+ return Math.max(0,(world.wallX-world.r-world.p.x)/world.v.x);
+}
+function wallReference(world){
+ const hits=[];
+ for(const t of world.targets){
+  const time=referenceTime(world.p,world.v,t.p,t.v,t.r+world.r,world.ttl);
+  if(time!==null)hits.push({id:t.id,time});
+ }
+ const wt=wallTime(world);
+ if(wt!==null&&wt<world.ttl)hits.push({id:'wall',time:wt});
+ hits.sort((a,b)=>a.time-b.time||String(a.id).localeCompare(String(b.id)));
+ const out=[];
+ for(const e of hits){
+  // A projectile exhausted by an earlier hit cannot later strike a wall.
+  if(out.length>world.pen)break;
+  if(e.id==='wall'){out.push(e);break;}
+  out.push(e);
+ }
+ return out;
+}
+function wallFrames(world,schedule){
+ const seen=new Set(),out=[];let frame=0,stop=false;
+ for(let start=0;start<world.ttl-1e-12&&!stop&&out.length<=world.pen;){
+  const dt=typeof schedule==='number'?1/schedule:schedule(frame++);
+  const horizon=Math.min(dt,world.ttl-start);
+  const events=frameEvents(world,start,dt,seen),wt=wallTime(world);
+  if(wt!==null&&wt>=start-1e-12&&wt<start+horizon)
+   events.push({id:'wall',time:wt});
+  events.sort((a,b)=>a.time-b.time||String(a.id).localeCompare(String(b.id)));
+  for(const e of events){
+   if(out.length>world.pen){stop=true;break;}
+   if(e.id==='wall'){out.push(e);stop=true;break;}
+   if(!seen.has(e.id)){seen.add(e.id);out.push(e);}
+  }
+  start+=dt;
+ }
+ return out;
+}
+const wallStats={worlds:0,comparisons:0,contacts:0,ambiguous:0,disagreements:0};
+for(let n=0;n<12000;n++){
+ const ttl=.006+rand()*.24,speed=300+rand()*4500,pen=Math.floor(rand()*4);
+ const world={p:{x:0,y:0},v:{x:speed,y:0},r:2+rand()*4,ttl,pen,
+  wallX:speed*ttl*rand()*1.3,targets:[]};
+ for(let i=0;i<5;i++){
+  const time=ttl*rand()*1.3;
+  world.targets.push({id:i+1,p:{x:speed*time+rand()*30-15,y:rand()*40-20},
+   v:{x:rand()*250-125,y:rand()*250-125},r:5+rand()*12});
+ }
+ const expected=wallReference(world);
+ if(expected.some((e,i)=>i>0&&Math.abs(e.time-expected[i-1].time)<1e-8)){
+  wallStats.ambiguous++;continue;
+ }
+ wallStats.worlds++;wallStats.contacts+=expected.length;
+ for(const schedule of [...fpsList,i=>i%2===0?1/30:1/240]){
+  const actual=wallFrames(world,schedule);wallStats.comparisons++;
+  if(actual.length!==expected.length||
+     actual.some((e,i)=>e.id!==expected[i].id||Math.abs(e.time-expected[i].time)>2e-8)){
+   wallStats.disagreements++;
+   if(wallStats.disagreements<=3)console.error('WALL MISMATCH',JSON.stringify({world,expected,actual}));
+  }
+ }
+}
+console.log('wall-first:',JSON.stringify(wallStats,null,2));
+assert.equal(wallStats.disagreements,0);
