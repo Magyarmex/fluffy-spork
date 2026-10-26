@@ -915,6 +915,26 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       Math.max(ax,hx)+pad>=Math.min(o.x,ex)&&
       Math.min(ay,hy)-pad<=Math.max(o.y,ey)&&
       Math.max(ay,hy)+pad>=Math.min(o.y,ey))return false;
+   /* A projectile may hit the chosen body from the side without crossing
+    * this bullet's path. It can change HP/kill credit BEFORE first contact.
+    * The fallback first-hit recovery must obey the same veto as piercing. */
+   if(best.kind==='tank'&&o.ownerId!==best.e.id){
+    var td=CLASSES[best.e.cls];
+    if(!td||!Number.isFinite(td.size)||
+       !Number.isFinite(o.r)||!(o.r>0))return false;
+    var rr=o.r+Math.max(0,td.size)+3,
+        bx=best.e.x,by=best.e.y,
+        sx=best.e.__novaSweepMoveTime===g.time?
+           best.e.__novaSweepPrevX:bx,
+        sy=best.e.__novaSweepMoveTime===g.time?
+           best.e.__novaSweepPrevY:by;
+    if(!Number.isFinite(sx)||!Number.isFinite(sy)||
+       !Number.isFinite(ex)||!Number.isFinite(ey))return false;
+    if(Math.max(o.x,ex)+rr>=Math.min(sx,bx)&&
+       Math.min(o.x,ex)-rr<=Math.max(sx,bx)&&
+       Math.max(o.y,ey)+rr>=Math.min(sy,by)&&
+       Math.min(o.y,ey)-rr<=Math.max(sy,by))return false;
+   }
   }
   var vx=b.vx,vy=b.vy;
   b.x=hx;b.y=hy;b.px=hx;b.py=hy;
