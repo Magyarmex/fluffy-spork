@@ -147,3 +147,42 @@ test('keyups during pause release latches; normal WASD and F return after resume
     dispatch('keydown','f');assert.equal(game.input.autofire,!before);
   }finally{dispose();}
 });
+
+for(const pointerType of ['touch','pen']){
+  test('pause releases active '+pointerType+' stick ownership without changing autofire',()=>{
+    const {game,dispose}=boot();
+    try{
+      const pref=game.input.autofire;
+      game.input.pd({pointerType,pointerId:23,clientX:720,clientY:260,target:game.canvas});
+      assert.equal(game.input.aim.active,true,'pointer acquires the aim stick');
+      assert.equal(game.input.firing,true);
+      game.setPaused(true);
+      assert.equal(game.input.aim.active,false,'pause releases the aim stick');
+      assert.equal(game.input.stickId.aim,-1);
+      assert.equal(game.input.firing,false);
+      assert.equal(game.input.autofire,pref);
+      game.setPaused(false);
+      game.input.pd({pointerType,pointerId:24,clientX:720,clientY:260,target:game.canvas});
+      assert.equal(game.input.aim.active,true,'fresh pointer can reacquire after resume');
+    }finally{dispose();}
+  });
+}
+test('pause keyboard gate survives detach/reattach without leaking window handlers',()=>{
+  const {game,dispatch,dispose,listeners}=boot();
+  try{
+    const input=game.input;
+    for(let i=0;i<12;i++){
+      assert.equal((listeners.window.get('keydown')||[]).length,1);
+      input.detach();
+      assert.equal((listeners.window.get('keydown')||[]).length,0);
+      input.attach(game.canvas);
+    }
+    game.setPaused(true);
+    dispatch('keydown','e');
+    assert.equal(input.abilityQueued,false);
+    dispatch('keyup','e');
+    game.setPaused(false);
+    dispatch('keydown','e');
+    assert.equal(input.abilityQueued,true);
+  }finally{dispose();}
+});
