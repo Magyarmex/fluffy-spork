@@ -145,3 +145,65 @@ for(const optimized of [false,true]) {
   assert.equal(b.hitCount,0,'interception must not be bypassed');
  });
 }
+
+/* Adversarial proof gates: geometry, witness ownership, and adjacent systems. */
+for(const optimized of [false,true]) {
+ const mode=optimized?'optimized':'baseline',Game=boot(undefined,optimized);
+ test(mode+' 240 seeded stationary pairs preserve victim identities at 30Hz',()=>{
+  let seed=3712026;
+  const rnd=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+  for(let i=0;i<240;i++){
+   const firstX=28+rnd()*16,secondX=firstX+24+rnd()*11;
+   const {g,a,b}=makeWorld(Game,secondX,i%2===0);
+   a.x=firstX;
+   const dt=.35/30;g.time+=dt;g.updateBullets(dt);
+   assert.equal(a.hitCount,1,'first victim '+i);
+   assert.equal(b.hitCount,1,'second victim '+i);
+  }
+ });
+ test(mode+' active movement epoch without tank witness cannot backdate penetration',()=>{
+  const {g,a,b}=makeWorld(Game);
+  g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=17;
+  g.time+=.35/30;g.updateBullets(.35/30);
+  assert.equal(b.hitCount,0);
+ });
+ test(mode+' observed moving target does not receive a speculative stationary hit',()=>{
+  const {g,a,b}=makeWorld(Game);
+  g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=17;
+  g.time+=.35/30;
+  for(const t of g.tanks){
+   t.__novaSweepMoveTime=g.time;
+   t.__novaSweepPrevX=t.x;t.__novaSweepPrevY=t.y;
+  }
+  b.__novaSweepPrevY=18;
+  g.updateBullets(.35/30);
+  assert.equal(b.hitCount,0);
+ });
+ test(mode+' real Game.update movement witness enables stationary piercing pair',()=>{
+  const FullGame=boot(function(dt){
+   this.time+=dt;
+   for(const t of this.tanks){
+    t.__novaSweepMoveTime=this.time;
+    t.__novaSweepPrevX=t.x;t.__novaSweepPrevY=t.y;
+   }
+   this.updateBullets(dt);
+  },optimized);
+  const {g,a,b}=makeWorld(FullGame);
+  g.update(.35/30);
+  assert.equal(a.hitCount,1);
+  assert.equal(b.hitCount,1);
+  assert.equal(g.__novaShapeSweepActive,false);
+ });
+ test(mode+' a wall between the victims never authorizes a second hit',()=>{
+  const {g,b}=makeWorld(Game);
+  g.__novaTerrain=[{id:-1,shape:'rect',x:40,y:0,w:3,h:90,
+   solid:true,destructible:false}];
+  g.time+=.35/30;g.updateBullets(.35/30);
+  assert.equal(b.hitCount,0);
+ });
+ test(mode+' spawn-shielded second tank cannot be damaged by shortcut',()=>{
+  const {g,b}=makeWorld(Game);b.spawnShieldT=2;
+  g.time+=.35/30;g.updateBullets(.35/30);
+  assert.equal(b.hitCount,0);
+ });
+}
