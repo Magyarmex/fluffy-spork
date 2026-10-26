@@ -128,7 +128,10 @@ test('focused gameplay UI keeps native Space/arrow behavior and never fires abil
     assert.equal(game.input.keyboard.left,false);
     assert.equal(game.input.autofire,true);
     dispatch('keydown','e');
-    assert.equal(game.input.abilityQueued,true,'canvas/game keyboard remains responsive');
+    assert.equal(game.input.abilityQueued,false,'held focused E stays suppressed after focus leaves');
+    dispatch('keyup','e');
+    dispatch('keydown','e');
+    assert.equal(game.input.abilityQueued,true,'new canvas/game press after keyup remains responsive');
   }finally{dispose();}
 });
 test('keyups during pause release latches; normal WASD and F return after resume',()=>{
