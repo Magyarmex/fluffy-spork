@@ -609,6 +609,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   * consumed here: never leave a partially backdated bullet live. */
  function isolatedTTLStationaryPiercingChain(g,b,dt){
   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
+     b.__novaBreachAtTime===g.time||
      !(dt>0)||!(b.ttl>0&&b.ttl<=dt)||
      !(b.pen===0||b.pen===1)||!(b.hits>=0)||
      (b.hits===0&&b.pen!==1)||
