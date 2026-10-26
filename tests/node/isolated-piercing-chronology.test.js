@@ -678,3 +678,54 @@ for(const optimized of [false,true]){
   assert.equal(b.hitCount,1);
  });
 }
+
+/* RESEARCH — KNOWN RED: a global projectile-count gate still suppresses
+ * physically isolated penetrating shots when several expire in one frame.
+ * This is not a production fix; preserve the failing acceptance tests. */
+function multiShotRemoteWorld(Game,shotCount,remoteCount,reverse=false){
+ const g=new Game(),victims=[];
+ for(let i=0;i<shotCount;i++){
+  const y=i*160,a={kind:'tank',id:200+i*2,x:40,y,cls:'scout',
+   hp:100,alive:true,hitCount:0},b={kind:'tank',id:201+i*2,
+   x:65,y,cls:'scout',hp:100,alive:true,hitCount:0};
+  g.tanks.push(a,b);victims.push(a,b);
+  g.bullets.push({kind:'bullet',id:100+i,ownerId:1,x:0,y,
+   vx:6000,vy:0,r:3,dmg:20,ttl:.01,pen:1,hits:0,dead:false,
+   shell:false,beam:false});
+ }
+ for(let i=0;i<120;i++)g.shapes.push({kind:'shape',id:10000+i,
+  x:-900+(i%20)*4,y:-900+Math.floor(i/20)*4,r:12,hp:100});
+ for(let i=0;i<remoteCount;i++)g.bullets.push({kind:'bullet',
+  id:20000+i,ownerId:1000+i,x:900+(i%10)*4,
+  y:900+Math.floor(i/10)*4,vx:0,vy:0,r:2,dmg:1,
+  ttl:2,pen:0,hits:0,dead:false,shell:false,beam:false});
+ if(reverse)g.bullets.reverse();
+ g.damageTank=function(t){t.hitCount++;};
+ return {g,victims};
+}
+for(const optimized of [false,true]){
+ const Game=boot(undefined,optimized),mode=optimized?'optimized':'baseline';
+ for(const control of [{shots:4,remote:50},{shots:5,remote:0}]){
+  test(mode+' local-chronology budget control '+control.shots+
+   ' shots, '+control.remote+' distant bullets',()=>{
+   const {g,victims}=multiShotRemoteWorld(Game,control.shots,control.remote);
+   g.time+=.35/30;g.updateBullets(.35/30);
+   assert.deepEqual(victims.map(v=>v.hitCount),
+    Array(victims.length).fill(1));
+  });
+ }
+ for(const fps of [30,60]){
+  test(mode+' KNOWN RED: fifth isolated shot must not be starved at '+fps+'Hz',()=>{
+   const {g,victims}=multiShotRemoteWorld(Game,5,50);
+   const dt=.35/fps;
+   for(let frame=0;frame<3;frame++){g.time+=dt;g.updateBullets(dt);}
+   assert.deepEqual(victims.map(v=>v.hitCount),
+    Array(10).fill(1),'five independent pairs are physically reachable');
+  });
+ }
+ test(mode+' KNOWN RED: dense multi-shot outcome independent of bullet order',()=>{
+  const {g,victims}=multiShotRemoteWorld(Game,5,50,true);
+  g.time+=.35/30;g.updateBullets(.35/30);
+  assert.deepEqual(victims.map(v=>v.hitCount),Array(10).fill(1));
+ });
+}
