@@ -138,6 +138,31 @@ for(const hz of [30,60,120,240]){
  });
 }
 
+test('seeded physical-TTL projectile-risk oracle preserves every reachable threat',()=>{
+ const {context,Game,CLASSES}=loadPredator(),g=new Game(),t=tank(1,'twin');
+ const risk=context.window.__NOVA_PREDATOR_TEST__.threatVector;
+ let seed=0x3802026,checked=0,excluded=0;
+ const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ for(let i=0;i<2400;i++){
+  const x=(rand()-.5)*600,y=(rand()-.5)*600,
+    speed=100+rand()*1700,angle=rand()*Math.PI*2,
+    vx=Math.cos(angle)*speed,vy=Math.sin(angle)*speed,
+    ttl=.005+rand()*.995;
+  const closest=-(x*vx+y*vy)/(vx*vx+vy*vy);
+  if(closest<0||closest>=.82)continue; // preserve the canonical prediction horizon
+  const reachableTime=Math.min(closest,ttl);
+  const separation=Math.hypot(x+vx*reachableTime,y+vy*reachableTime);
+  const expected=separation<(14+20)*1.75;
+  g.bullets=[{ownerId:9,x,y,vx,vy,ttl,dead:false,shell:false}];
+  const actual=risk(g,CLASSES,t,{}).risk>0;
+  assert.equal(actual,expected,
+    'reachable projectile corridor disagrees with independent geometric oracle at world '+i);
+  checked++;if(!expected)excluded++;
+ }
+ assert.ok(checked>500&&excluded>100,
+   'seeded worlds must exercise both reachable and expired-before-contact shots');
+});
+
 test('target saturation lowers dogpile priority',()=>{
   const {context,Game}=loadPredator(),g=new Game(),hunter=tank(1,'twin',{ai:brain()}),player=tank(7,'guard',{isPlayer:true,x:300});
   g.tanks=[hunter,player];
