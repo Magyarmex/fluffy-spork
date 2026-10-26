@@ -250,3 +250,174 @@ for(const optimized of [false,true])for(const fps of [30,60,120,240]){
   assert.equal(b.hitCount,1,'second physical contact occurs before .8s expiry');
  });
 }
+
+/* Run 372: the previous TTL-only chain cannot fix a penetrating projectile
+ * that reaches two distinct hulls inside one frame while its TTL remains
+ * positive. Exercise the actual materialized core plus Battlefield wrappers.
+ * No extra projectile lifetime, damage, or penetration is authorized. */
+for(const optimized of [false,true]) {
+ const mode=optimized?'Battlefield + Performance':'Battlefield';
+ const Game=boot(undefined,optimized);
+ for(const fps of [30,60,120,240]) {
+  test(mode+' non-expiring piercing pair is FPS-invariant at '+fps+'Hz',()=>{
+   const {g,a,b}=makeWorld(Game);
+   g.bullets[0].ttl=.2;
+   for(let frame=0;frame<30&&g.bullets.length;frame++){
+    const dt=1/fps;g.time+=dt;g.updateBullets(dt);
+   }
+   assert.equal(a.hitCount,1,'first hull must be hit exactly once');
+   assert.equal(b.hitCount,1,'second physical contact must survive frame partition');
+   assert.equal(g.hits,2);
+  });
+ }
+ test(mode+' non-expiring piercing refuses missing movement witness',()=>{
+  const {g,b}=makeWorld(Game);
+  g.bullets[0].ttl=.2;
+  g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=372;
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.equal(b.hitCount,0,'cannot backdate without authoritative tank motion');
+ });
+ test(mode+' non-expiring piercing respects intervening permanent wall',()=>{
+  const {g,b}=makeWorld(Game);
+  g.bullets[0].ttl=.2;
+  g.__novaTerrain=[{id:-372,shape:'rect',x:48,y:0,w:3,h:90,
+   solid:true,destructible:false}];
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.equal(b.hitCount,0);
+ });
+ test(mode+' non-expiring piercing respects spawn shield on later hull',()=>{
+  const {g,b}=makeWorld(Game);
+  g.bullets[0].ttl=.2;b.spawnShieldT=2;
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.equal(b.hitCount,0);
+ });
+ test(mode+' non-expiring piercing refuses hostile projectile interception',()=>{
+  const {g,b}=makeWorld(Game);
+  g.bullets[0].ttl=.2;
+  g.bullets.push({kind:'bullet',id:372,ownerId:9,x:30,y:0,vx:0,vy:0,
+   r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,shell:false,beam:false});
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.equal(b.hitCount,0);
+ });
+ test(mode+' non-expiring piercing refuses uncertain neutral corridor',()=>{
+  const {g,b}=makeWorld(Game);
+  g.bullets[0].ttl=.2;
+  g.shapes=[{kind:'shape',id:372,x:38,y:38,r:12,hp:100}];
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.equal(b.hitCount,0);
+ });
+}
+
+/* Adversarial 372: high-speed two-body chronology must not depend on hash
+ * ordering or a lucky frame boundary. Exercise 480 deterministic layouts
+ * against both shipping module compositions. */
+for(const optimized of [false,true]) {
+ const Game=boot(undefined,optimized);
+ test((optimized?'optimized':'baseline')+
+  ' 240 randomized non-expiring pairs preserve both victims at 30Hz',()=>{
+  let seed=3722026;
+  const rnd=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+  for(let i=0;i<240;i++){
+   const firstX=28+rnd()*16,secondX=firstX+24+rnd()*11;
+   const {g,a,b}=makeWorld(Game,secondX,i%2===0);
+   a.x=firstX;g.bullets[0].ttl=.2;
+   g.time+=1/30;g.updateBullets(1/30);
+   assert.equal(a.hitCount,1,'first victim '+i);
+   assert.equal(b.hitCount,1,'second victim '+i);
+   assert.equal(g.hits,2,'no duplicate hits '+i);
+  }
+ });
+ test((optimized?'optimized':'baseline')+
+  ' non-expiring shortcut cannot reach a second hull beyond this frame',()=>{
+  const {g,a,b}=makeWorld(Game,300);
+  g.bullets[0].ttl=.2;
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.equal(a.hitCount,1);
+  assert.equal(b.hitCount,0,'later physical contact belongs to later frame');
+ });
+ test((optimized?'optimized':'baseline')+
+  ' same-tick cover breach vetoes non-expiring shortcut',()=>{
+  const {g,b}=makeWorld(Game);
+  g.bullets[0].ttl=.2;
+  const dt=1/30;g.time+=dt;
+  g.bullets[0].__novaBreachAtTime=g.time;
+  g.updateBullets(dt);
+  assert.equal(b.hitCount,0,'no speculative replay after cover breach');
+ });
+ test((optimized?'optimized':'baseline')+
+  ' moving tank witness vetoes non-expiring shortcut',()=>{
+  const {g,b}=makeWorld(Game);
+  g.bullets[0].ttl=.2;
+  g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=372;
+  g.time+=1/30;
+  for(const t of g.tanks){
+   t.__novaSweepMoveTime=g.time;
+   t.__novaSweepPrevX=t.x;t.__novaSweepPrevY=t.y;
+  }
+  b.__novaSweepPrevY=18;
+  g.updateBullets(1/30);
+  assert.equal(b.hitCount,0,'moving hull must use full chronology');
+ });
+}
+
+for(const optimized of [false,true]) {
+ const mode=optimized?'optimized':'baseline';
+ test(mode+' non-expiring pair works through real Game.update movement epoch',()=>{
+  const Game=boot(function(dt){
+   this.time+=dt;
+   for(const t of this.tanks){
+    t.__novaSweepMoveTime=this.time;
+    t.__novaSweepPrevX=t.x;t.__novaSweepPrevY=t.y;
+   }
+   this.updateBullets(dt);
+  },optimized);
+  const {g,a,b}=makeWorld(Game);
+  g.bullets[0].ttl=.2;
+  g.update(1/30);
+  assert.equal(a.hitCount,1);
+  assert.equal(b.hitCount,1);
+  assert.equal(g.__novaShapeSweepActive,false);
+ });
+ test(mode+' non-expiring pair resolves chronological damage despite reversed hash order',()=>{
+  const Game=boot(undefined,optimized),{g,a,b}=makeWorld(Game,65,true);
+  g.bullets[0].ttl=.2;
+  const order=[];
+  g.damageTank=function(t){order.push(t.id);t.hitCount++;this.hits++;};
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.deepEqual(order,[a.id,b.id],'physical first contact, not hash order');
+ });
+}
+
+/* Non-expiring rounds must also preserve victim identities when the death
+ * transition slows the simulation to 35% while render FPS remains unchanged. */
+for(const optimized of [false,true])for(const fps of [30,60,120,240]){
+ test((optimized?'optimized':'baseline')+
+  ' non-expiring piercing survives death-slow at '+fps+'Hz',()=>{
+  const Game=boot(undefined,optimized),{g,a,b}=makeWorld(Game);
+  g.bullets[0].ttl=.2;
+  const dt=.35/fps;
+  for(let frame=0;frame<60&&g.bullets.length;frame++){
+   g.time+=dt;g.updateBullets(dt);
+  }
+  assert.equal(a.hitCount,1);
+  assert.equal(b.hitCount,1);
+  assert.equal(g.hits,2);
+ });
+}
+
+/* 1,100u/s is within reach of upgraded mid-speed weapon lineages; unlike
+ * the 6,000u/s stress case, this regression uses a modest 36.7u 30Hz step.
+ * Starting at x=15 places both 25u-separated hull contacts inside it. */
+for(const optimized of [false,true])for(const fps of [30,60,120,240]){
+ test((optimized?'optimized':'baseline')+
+  ' boosted mid-speed pen=1 shot reaches both hulls at '+fps+'Hz',()=>{
+  const Game=boot(undefined,optimized),{g,a,b}=makeWorld(Game);
+  const shot=g.bullets[0];shot.x=15;shot.vx=1100;shot.ttl=.4;
+  for(let frame=0;frame<60&&g.bullets.length;frame++){
+   const dt=1/fps;g.time+=dt;g.updateBullets(dt);
+  }
+  assert.equal(a.hitCount,1);
+  assert.equal(b.hitCount,1);
+  assert.equal(g.hits,2);
+ });
+}

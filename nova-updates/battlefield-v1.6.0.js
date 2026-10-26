@@ -607,10 +607,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   * Other combat remains owned by the existing engine and the future #147
   * chronological solver. The whole remaining penetration budget must be
   * consumed here: never leave a partially backdated bullet live. */
- function isolatedTTLStationaryPiercingChain(g,b,dt){
+ function isolatedTTLStationaryPiercingChain(g,b,dt,nonExpiring){
   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
      b.__novaBreachAtTime===g.time||
-     !(dt>0)||!(b.ttl>0&&b.ttl<=dt)||
+     !(dt>0)||!(b.ttl>0)||
+     (nonExpiring ? !(b.ttl>dt&&b.pen===1&&b.hits===0) : !(b.ttl<=dt))||
      !(b.pen===0||b.pen===1)||!(b.hits>=0)||
      (b.hits===0&&b.pen!==1)||
      (b.hits>0&&!(b.__novaDirectVictims instanceof Set))||
@@ -618,7 +619,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      !Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
      !Number.isFinite(b.r)||!Number.isFinite(b.dmg)||
      !(b.r>0)||!(b.dmg>0))return false;
-  var ax=b.x,ay=b.y,dx=b.vx*b.ttl,dy=b.vy*b.ttl,
+  var travelT=nonExpiring?dt:b.ttl,
+      ax=b.x,ay=b.y,dx=b.vx*travelT,dy=b.vy*travelT,
       ex=ax+dx,ey=ay+dy,limit=MAP_LIMIT-20;
   if(!(dx*dx+dy*dy>1e-12)||
      !Number.isFinite(ex)||!Number.isFinite(ey)||
@@ -1083,19 +1085,33 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    shell.dead=true;shell.shell=false;shell.vx=0;shell.vy=0;
   }
  }
- var expiring=0;
+ var expiring=0,paired=0;
  if(dt>0)for(var countI=0;countI<this.bullets.length;countI++){
   var eb=this.bullets[countI];
   if(eb&&!eb.dead&&!eb.shell&&!eb.beam&&!eb.splash&&!eb.__v17Cannon&&eb.ttl>0&&eb.ttl<=dt)expiring++;
+  if(eb&&!eb.dead&&!eb.shell&&!eb.beam&&!eb.splash&&!eb.__v17Cannon&&
+     eb.ttl>dt&&eb.pen===1&&(eb.hits||0)===0)paired++;
  }
- var projected=expiring*(this.bullets.length+(this.tanks||[]).length+
-   (this.shapes||[]).length+(this.drones||[]).length);
+ var bodyWork=this.bullets.length+(this.tanks||[]).length+
+   (this.shapes||[]).length+(this.drones||[]).length;
+ var projected=expiring*bodyWork;
  if(projected>0&&projected<=900)
   for(var pre=this.bullets.length-1;pre>=0;pre--){
    var expiringBullet=this.bullets[pre];
    if(!isolatedTTLStationaryPiercingChain(this,expiringBullet,dt))
     isolatedTTLBodyContact(this,expiringBullet,dt);
-  }for(var i=0;i<this.bullets.length;i++){var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,sweepDt=dt;/* Terrain beyond physical projectile lifetime is unreachable, including shells. */if(Number.isFinite(b.ttl)){if(b.ttl<=0)continue;sweepDt=Math.min(dt,b.ttl);}var nx=ox+(b.vx||0)*sweepDt,ny=oy+(b.vy||0)*sweepDt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;if(fuseDefinitelyBeforeTerrain(this,b,dt,ox,oy,nx,ny,fh.hit))continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){b.__novaBreachAtTime=this.time;b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
+  }
+ /* Non-expiring pen=1 shots may exhaust both contacts within this frame.
+  * Reuse the identical physical-first-contact proof, but only when the
+  * entire penetration budget is consumed before the frame boundary.
+  * A surviving or uncertain round stays with the original engine. */
+ if(paired>0&&paired*bodyWork<=900)
+  for(var pair=this.bullets.length-1;pair>=0;pair--){
+   var liveBullet=this.bullets[pair];
+   if(liveBullet&&liveBullet.ttl>dt)
+    isolatedTTLStationaryPiercingChain(this,liveBullet,dt,true);
+  }
+ for(var i=0;i<this.bullets.length;i++){var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,sweepDt=dt;/* Terrain beyond physical projectile lifetime is unreachable, including shells. */if(Number.isFinite(b.ttl)){if(b.ttl<=0)continue;sweepDt=Math.min(dt,b.ttl);}var nx=ox+(b.vx||0)*sweepDt,ny=oy+(b.vy||0)*sweepDt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;if(fuseDefinitelyBeforeTerrain(this,b,dt,ox,oy,nx,ny,fh.hit))continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){b.__novaBreachAtTime=this.time;b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
    /* The core still advances a dead bullet before removing it; a shell may
      * expire or leave the arena in that pass. Consume its one-time burst now. */
     if(b.shell&&this.clusterBurst){var childStart=this.bullets.length;this.clusterBurst(b);clearTerrainBurstChildren(this,s,h,childStart);b.shell=false;}if(b.splash&&this.splashAt)this.splashAt(h.x,h.y,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.dead=true;if(this.addFlash)this.addFlash(h.x,h.y,s.destructible?'#8fd4ff':'#b9c7e7',Math.min(46,14+(b.dmg||0)*.24));if(this.cam&&b.dmg>42)this.cam.shake=Math.max(this.cam.shake,.08);/* The materialized core still advances dead bullets before removing them. Freeze a terrain-killed projectile at its impact so its final trail cannot leak through cover. Breaching live shots keep their velocity above. */b.vx=0;b.vy=0;
