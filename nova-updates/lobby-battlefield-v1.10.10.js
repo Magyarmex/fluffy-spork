@@ -33,6 +33,20 @@ function callbacks(){
   var noop=function(){};
   return {hud:noop,event:noop,toast:noop,offer:noop,stick:noop,gameover:noop};
 }
+/* The Zero Churn getShape lookup is a separate map, not an array scan.
+ * Removing menu-only neutral bodies must remove their IDs as well; otherwise
+ * decorative AI can resolve invisible shapes that no longer exist in g.shapes. */
+function trimNeutralPopulation(g,budget){
+  if(!g||!Array.isArray(g.shapes))return;
+  if(g.shapes.length>budget)g.shapes.length=budget;
+  if(g.shapeById&&typeof g.shapeById.clear==='function'){
+    g.shapeById.clear();
+    for(var i=0;i<g.shapes.length;i++){
+      var s=g.shapes[i];if(s&&s.hp>0)g.shapeById.set(s.id,s);
+    }
+  }
+}
+
 
 window.__NOVA_VERSION=VERSION;
 window.__NOVA_LOBBY_BATTLEFIELD_RELEASE__={
@@ -59,7 +73,8 @@ window.__NOVA_LOBBY_BATTLEFIELD_TEST__={
   version:VERSION,codename:CODENAME,canonicalRuntime:true,legacyApproximation:false,
   legalLevelForTier:legalLevelForTier,normalSimHz:NORMAL_SIM_HZ,lowSimHz:LOW_SIM_HZ,
   normalRenderHz:NORMAL_RENDER_HZ,lowRenderHz:LOW_RENDER_HZ,
-  normalScale:NORMAL_SCALE,lowScale:LOW_SCALE,panSpeed:PAN_UNITS_PER_SEC
+  normalScale:NORMAL_SCALE,lowScale:LOW_SCALE,panSpeed:PAN_UNITS_PER_SEC,
+  trimNeutralPopulation:trimNeutralPopulation
 };
 
 if(window.NOVAVisuals&&typeof window.NOVAVisuals.register==='function'){
@@ -191,7 +206,7 @@ LiveWorld.prototype.prepareCanonicalBattle=function(){
   g.tanks.length=0;if(g.tankById&&g.tankById.clear)g.tankById.clear();
   g.bullets.length=0;g.drones.length=0;g.orbs.length=0;g.powerups.length=0;g.aiRespawns.length=0;
   var shapeBudget=this.low?SHAPE_BUDGET_LOW:SHAPE_BUDGET_NORMAL;
-  if(g.shapes.length>shapeBudget)g.shapes.length=shapeBudget;
+  trimNeutralPopulation(g,shapeBudget);
   g.shapeTimer=1e9;g.powerupTimer=1e9;g.eliteTimer=1e9;g.crasherTimer=1e9;
   g.status='playing';g.paused=false;g.player=spectator();
 
