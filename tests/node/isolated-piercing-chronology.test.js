@@ -404,3 +404,20 @@ for(const optimized of [false,true])for(const fps of [30,60,120,240]){
   assert.equal(g.hits,2);
  });
 }
+
+/* 1,100u/s is within reach of upgraded mid-speed weapon lineages; unlike
+ * the 6,000u/s stress case, this regression uses a modest 36.7u 30Hz step.
+ * Starting at x=15 places both 25u-separated hull contacts inside it. */
+for(const optimized of [false,true])for(const fps of [30,60,120,240]){
+ test((optimized?'optimized':'baseline')+
+  ' boosted mid-speed pen=1 shot reaches both hulls at '+fps+'Hz',()=>{
+  const Game=boot(undefined,optimized),{g,a,b}=makeWorld(Game);
+  const shot=g.bullets[0];shot.x=15;shot.vx=1100;shot.ttl=.4;
+  for(let frame=0;frame<60&&g.bullets.length;frame++){
+   const dt=1/fps;g.time+=dt;g.updateBullets(dt);
+  }
+  assert.equal(a.hitCount,1);
+  assert.equal(b.hitCount,1);
+  assert.equal(g.hits,2);
+ });
+}
