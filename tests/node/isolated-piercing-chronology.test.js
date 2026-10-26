@@ -984,3 +984,20 @@ for(const optimized of [false,true])for(const ttl of [.01,.2]){
    'a t=0 contact must precede the piercing shot at t>0');
  });
 }
+
+
+for(const optimized of [false,true]){
+ test((optimized?'optimized':'baseline')+
+  ' lateral hull competitor vetoes only its own piercing lane',()=>{
+  const Game=boot(undefined,optimized);
+  const {g,victims}=multiShotRemoteWorld(Game,5,50);
+  g.bullets.push({kind:'bullet',id:77001,ownerId:7,
+   x:40,y:19,vx:0,vy:0,r:3,dmg:20,ttl:1,pen:0,
+   hits:0,dead:false,shell:false,beam:false});
+  g.time+=.35/30;g.updateBullets(.35/30);
+  assert.deepEqual(victims.slice(2).map(v=>v.hitCount),Array(8).fill(1),
+   'four unrelated stationary two-hull shots must still recover');
+  assert.equal(victims[1].hitCount,0,
+   'the lane with uncertain prior victim damage must abstain');
+ });
+}
