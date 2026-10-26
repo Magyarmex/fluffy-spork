@@ -80,23 +80,6 @@ var LF=window.__NOVA_LIVING_FRONT_INTERNAL__={VERSION:VERSION,TAU:TAU,GRID:GRID,
 wrap('game/engine',function(engine,require){
   var Game=engine.Game;if(!Game||Game.prototype.__novaLivingFrontCore)return;Game.prototype.__novaLivingFrontCore=true;var defs=(require('./types')||{}).SHAPE_DEFS||{};LF.defs=defs;
   Game.prototype.pityStartLevel=function(){return 1;};
-  /* The physical ecology survives redeploy. Core seedShapes unconditionally
-   * adds a complete 120-shape population each time, doubling the live farm.
-   * Fill only deficits; never delete surviving/earned neutral geography. */
-  var oldSeed=Game.prototype.seedShapes;
-  if(oldSeed)Game.prototype.seedShapes=function(){
-    var counts=Object.create(null),shapes=this.shapes||[];
-    for(var i=0;i<shapes.length;i++){
-      var s=shapes[i];
-      if(s&&s.hp>0&&Object.prototype.hasOwnProperty.call(TARGETS,s.type))
-        counts[s.type]=(counts[s.type]||0)+1;
-    }
-    for(var type in TARGETS){
-      if(!Object.prototype.hasOwnProperty.call(TARGETS,type))continue;
-      var missing=Math.max(0,TARGETS[type]-(counts[type]||0));
-      for(var j=0;j<missing;j++)this.spawnShape(type,true);
-    }
-  };
   var oldSpawn=Game.prototype.spawnShape;if(oldSpawn)Game.prototype.spawnShape=function(type,anywhere){
     var st=ensure(this,defs),n=this.shapes?this.shapes.length:0,out=oldSpawn.apply(this,arguments);if(this.shapes&&this.shapes.length>n)for(var i=n;i<this.shapes.length;i++){var s=this.shapes[i];initShape(this,s);var high=!!HIGH[s.type],early=ageProgress(st)<.34;if((!anywhere||high&&early)&&s.type!=='star')relocate(this,s,chooseSpawnSector(st,s.type,s.id),s.type==='crasher'?290:230);}return out;
   };
@@ -117,20 +100,7 @@ wrap('game/engine',function(engine,require){
   var oldOrbs=Game.prototype.updateOrbs;if(oldOrbs)Game.prototype.updateOrbs=function(dt){var self=this,oldGain=this.gainXP,own=Object.prototype.hasOwnProperty.call(this,'gainXP'),arr=this.orbs,oldSplice=arr&&arr.splice,ownSplice=arr&&Object.prototype.hasOwnProperty.call(arr,'splice'),pending=0,pendingAmt=0;if(typeof oldGain!=='function'||!arr||typeof oldSplice!=='function')return oldOrbs.apply(this,arguments);this.gainXP=function(t,amt){var before=t&&Number(t.xp)||0,out=oldGain.apply(self,arguments);pending=t&&t.isPlayer?Math.max(0,(Number(t.xp)||0)-before):0;pendingAmt=Number(amt)||0;return out;};arr.splice=function(start,count){var idx=Number(start)||0;if(idx<0)idx=Math.max(0,arr.length+idx);var o=arr[idx];if(pending>0&&o&&o.__lfNeutral&&Math.abs((Number(o.xp)||0)-pendingAmt)<1e-6&&self.__lfState)self.__lfState.stats.playerNeutralXP+=pending;pending=0;pendingAmt=0;return oldSplice.apply(arr,arguments);};try{return oldOrbs.apply(this,arguments);}finally{if(own)this.gainXP=oldGain;else delete this.gainXP;if(ownSplice)arr.splice=oldSplice;else delete arr.splice;}};
   var oldUpdate=Game.prototype.update;if(oldUpdate)Game.prototype.update=function(dt){activeGame=this;var st=ensure(this,defs),out;this.__lfSuppressBaseCrasher=true;try{out=oldUpdate.call(this,dt);}finally{this.__lfSuppressBaseCrasher=false;}if(this.status==='playing'){st.sectorT-=dt;st.behaviorT-=dt;st.directorT-=dt;if(st.sectorT<=0){var sd=SECTOR_PERIOD-st.sectorT;st.sectorT=SECTOR_PERIOD;sectorTick(this,st,defs,clamp(sd,SECTOR_PERIOD,SECTOR_PERIOD*2));}if(st.behaviorT<=0){var bd=BEHAVIOR_PERIOD-st.behaviorT;st.behaviorT=BEHAVIOR_PERIOD;if(LF.behaviorTick)LF.behaviorTick(this,st,defs,clamp(bd,BEHAVIOR_PERIOD,BEHAVIOR_PERIOD*2));}if(st.directorT<=0){st.directorT=DIRECTOR_PERIOD;if(LF.directorTick)LF.directorTick(this,st);}}return out;};
   var oldMap=Game.prototype.drawMinimap;if(oldMap)Game.prototype.drawMinimap=function(){var out=oldMap.apply(this,arguments),st=this.__lfState,ctx=this.mmCtx;if(!st||!ctx||!st.signal)return out;var sig=st.signal,tm=this.time||0;if(tm>=sig.until)return out;var S=216,sc=S/(ARENA*2),px=function(x){return(x+ARENA)*sc;},py=function(y){return(y+ARENA)*sc;};ctx.save();ctx.globalAlpha=.68;ctx.lineWidth=1.5;if(sig.type==='BLOOM'){var c=sectorCenter(sig.sector);ctx.strokeStyle='#ffc94d';ctx.beginPath();ctx.arc(px(c.x),py(c.y),17+Math.sin(tm*5)*2,0,TAU);ctx.stroke();}else if(sig.type==='MIGRATION'){var a=sectorCenter(sig.from),b=sectorCenter(sig.to),ax=px(a.x),ay=py(a.y),bx=px(b.x),by=py(b.y),an=Math.atan2(by-ay,bx-ax);ctx.strokeStyle='#7df3ff';ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.lineTo(bx-Math.cos(an-.6)*7,by-Math.sin(an-.6)*7);ctx.moveTo(bx,by);ctx.lineTo(bx-Math.cos(an+.6)*7,by-Math.sin(an+.6)*7);ctx.stroke();}else if(sig.type==='ROGUE STAR'){var rs=this.getShape&&this.getShape(sig.starId),rx=rs?rs.x:sig.x,ry=rs?rs.y:sig.y;ctx.fillStyle='#ffe066';ctx.beginPath();ctx.arc(px(rx),py(ry),4,0,TAU);ctx.fill();}ctx.restore();return out;};
-  var oldRedeploy=Game.prototype.redeploy;if(oldRedeploy)Game.prototype.redeploy=function(){
-    this.__lfState=null;
-    var out=oldRedeploy.apply(this,arguments);
-    /* Zero Churn clears shapeById on redeploy. With surviving shapes retained,
-     * rebuild the lookup so ecology, AI and targeting can still resolve them. */
-    if(this.shapeById){
-      this.shapeById.clear();
-      var shapes=this.shapes||[];
-      for(var i=0;i<shapes.length;i++){
-        var s=shapes[i];if(s&&s.hp>0)this.shapeById.set(s.id,s);
-      }
-    }
-    return out;
-  };
+  var oldRedeploy=Game.prototype.redeploy;if(oldRedeploy)Game.prototype.redeploy=function(){this.__lfState=null;return oldRedeploy.apply(this,arguments);};
   var oldDestroy=Game.prototype.destroy;if(oldDestroy)Game.prototype.destroy=function(){if(this.__lfState){lastSnapshot=snapshot(this);window.__NOVA_LIVING_FRONT_LAST__=lastSnapshot;}if(activeGame===this)activeGame=null;return oldDestroy.apply(this,arguments);};
 });
 console.info('[NOVA TANKS] v'+VERSION+' Living Front ecology core online');
