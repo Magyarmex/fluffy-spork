@@ -143,6 +143,15 @@ const cases=[];
    'near-tie across frame boundary must remain ambiguous');
  cases.push('near-tie-crosses-frame-boundary');
 }
+{
+ const w=base();
+ w.covers=[{id:'wallA',lo:-5,hi:5,breakable:true,hp:10},
+           {id:'wallB',lo:-5,hi:5,breakable:true,hp:10}];
+ w.bodies=[{id:'inside',x:0,v:0,r:8}];
+ check(verify(w,'two-overlapping-cover-faces').stop==='ambiguous-cover',
+   'two simultaneous cover owners must not depend on array order');
+ cases.push('simultaneous-cover-owners-abstain');
+}
 function rng(seed){return()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);}
 const random=rng(20261026),stats={deterministic:cases,worlds:0,comparisons:0,permutationComparisons:0,ambiguous:0,disagreements:0};
 for(let n=0;n<6000;n++){
@@ -155,6 +164,11 @@ for(let n=0;n<6000;n++){
  if(random()<.55){
   const x=random()<.25?0:random()*100;
   w.covers.push({id:'wall',lo:x-5,hi:x+5,breakable:random()<.5,hp:10+random()*50});
+ }
+ if(random()<.25){
+  const x=random()<.2?0:random()*100;
+  w.covers.push({id:'wall2',lo:x-4,hi:x+4,
+    breakable:random()<.5,hp:10+random()*50});
  }
  if(random()<.35)w.hostiles.push({id:'hostile',x:random()<.3?0:random()*100,
    v:(random()-.5)*400,r:3});
