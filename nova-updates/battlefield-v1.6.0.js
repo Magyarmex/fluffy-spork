@@ -647,8 +647,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    * live games do, so missing live witness conservatively abstains. */
   var tanks=g.tanks||[],shapes=g.shapes||[],drones=g.drones||[],
       others=g.bullets||[],contacts=[];
-  if(tanks.length+shapes.length+drones.length>360||
-     others.length>ISOLATED_RECOVERY_SCAN_CAP)return false;
+  if(tanks.length+shapes.length+drones.length+others.length>
+     ISOLATED_RECOVERY_SCAN_CAP)return false;
   for(var ti=0;ti<tanks.length;ti++){
    var t=tanks[ti];if(!t||!t.alive||t.id===b.ownerId)continue;
    var def=CLASSES[t.cls],rr=b.r+(def&&def.size||0)+3;
