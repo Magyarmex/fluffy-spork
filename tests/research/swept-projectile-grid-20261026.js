@@ -71,6 +71,26 @@ t0=performance.now();for(let f=0;f<frames;f++){const frameIndex=indexProjectiles
 const buildAndQueryMs=performance.now()-t0;
 t0=performance.now();for(let f=0;f<frames;f++)for(const q of qps)built+=oracle(ps,q,dt).length;
 const frameBruteMs=performance.now()-t0;
+function trueMovingCircleContact(a,b,dt){
+ const end=Math.min(dt,a.ttl,b.ttl),sx=a.x-b.x,sy=a.y-b.y,
+  vx=a.vx-b.vx,vy=a.vy-b.vy,r=a.r+b.r;
+ const A=vx*vx+vy*vy,B=2*(sx*vx+sy*vy),C=sx*sx+sy*sy-r*r;
+ if(C<=0)return true;
+ if(A<=0)return false;
+ const D=B*B-4*A*C;if(D<0)return false;
+ const t=(-B-Math.sqrt(D))/(2*A);return t>=0&&t<=end;
+}
+let physicalContacts=0,physicalMisses=0;
+for(let k=0;k<20000;k++){
+ const a={x:0,y:0,vx:5000,vy:0,r:3,ttl:.01};
+ const b={x:5+rand()*60,y:(rand()-.5)*18,vx:(rand()-.5)*200,
+  vy:(rand()-.5)*200,r:3,ttl:.01};
+ if(trueMovingCircleContact(a,b,.02)){
+  physicalContacts++;
+  if(!query(indexProjectiles([b],.02),a).includes(0))physicalMisses++;
+ }
+}
+assert.equal(physicalMisses,0,'real moving-circle contacts must survive AABB candidate discovery');
 const sizeSweep=[];
 for(const count of [20,50,100,300,1000]){
  const items=ps.slice(0,count),repeats=500;let sink=0;
@@ -83,7 +103,7 @@ for(const count of [20,50,100,300,1000]){
  sizeSweep.push({projectiles:count,indexed_ms:indexedMs,brute_ms:bruteMs,speedup:bruteMs/indexedMs});
 }
 const result={kind:'research-only swept AABB broadphase',worlds,queries,metamorphic,
- false_negatives:misses,false_positives:extras,background_projectiles:n,independent_queries:qps.length,
+ false_negatives:misses,false_positives:extras,physical_contacts:physicalContacts,physical_false_negatives:physicalMisses,background_projectiles:n,independent_queries:qps.length,
  candidate_count:query(ix,qps[0]).length,size_sweep:sizeSweep,benchmark:{index_ms:indexMs,brute_ms:bruteMs,
  speedup:bruteMs/indexMs,frame_build_plus_five_queries_ms:buildAndQueryMs,frame_brute_five_queries_ms:frameBruteMs,frame_speedup:frameBruteMs/buildAndQueryMs},note:'Synthetic candidate discovery only. No gameplay chronology, side effects or phone FPS proven.'};
 console.log(JSON.stringify(result,null,2));
