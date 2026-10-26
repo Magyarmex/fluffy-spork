@@ -600,6 +600,118 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   * competing projectile corridor, no earlier terrain, no uncertain drone
   * motion, and no simultaneous bodies. All ambiguous cases remain owned by
   * the existing engine until the full chronological resolver is ready. */
+ /* Bounded first-event chain for an expiring, ordinary piercing round.
+  * Only unambiguous, witnessed-stationary, healthy tank hulls qualify.
+  * No cover, hostile drones, other projectiles, shapes, initial overlap,
+  * simultaneous contacts, defenses or on-hit deaths may enter this shortcut.
+  * Other combat remains owned by the existing engine and the future #147
+  * chronological solver. The whole remaining penetration budget must be
+  * consumed here: never leave a partially backdated bullet live. */
+ function isolatedTTLStationaryPiercingChain(g,b,dt){
+  if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
+     b.__novaBreachAtTime===g.time||
+     !(dt>0)||!(b.ttl>0&&b.ttl<=dt)||
+     !(b.pen===0||b.pen===1)||!(b.hits>=0)||
+     (b.hits===0&&b.pen!==1)||
+     (b.hits>0&&!(b.__novaDirectVictims instanceof Set))||
+     !Number.isFinite(b.x)||!Number.isFinite(b.y)||
+     !Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
+     !Number.isFinite(b.r)||!Number.isFinite(b.dmg)||
+     !(b.r>0)||!(b.dmg>0))return false;
+  var ax=b.x,ay=b.y,dx=b.vx*b.ttl,dy=b.vy*b.ttl,
+      ex=ax+dx,ey=ay+dy,limit=MAP_LIMIT-20;
+  if(!(dx*dx+dy*dy>1e-12)||
+     !Number.isFinite(ex)||!Number.isFinite(ey)||
+     Math.max(Math.abs(ax),Math.abs(ex),Math.abs(ay),Math.abs(ey))>=limit)return false;
+  var owner=g.getTank&&g.getTank(b.ownerId);
+  if(typeof g.areAllies==='function'&&!owner)return false;
+  var minx=Math.min(ax,ex),maxx=Math.max(ax,ex),
+      miny=Math.min(ay,ey),maxy=Math.max(ay,ey);
+  function near(x0,y0,x1,y1,pad){
+   if(!Number.isFinite(x0)||!Number.isFinite(y0)||
+      !Number.isFinite(x1)||!Number.isFinite(y1)||
+      !Number.isFinite(pad))return true;
+   return Math.max(x0,x1)+pad>=minx&&Math.min(x0,x1)-pad<=maxx&&
+          Math.max(y0,y1)+pad>=miny&&Math.min(y0,y1)-pad<=maxy;
+  }
+  /* A stationary-hull proof must cover the actual movement epoch. A
+   * directly exercised test harness has no Game.update movement epoch;
+   * live games do, so missing live witness conservatively abstains. */
+  var tanks=g.tanks||[],shapes=g.shapes||[],drones=g.drones||[],
+      others=g.bullets||[],contacts=[];
+  if(tanks.length+shapes.length+drones.length+others.length>360)return false;
+  for(var ti=0;ti<tanks.length;ti++){
+   var t=tanks[ti];if(!t||!t.alive||t.id===b.ownerId)continue;
+   var def=CLASSES[t.cls],rr=b.r+(def&&def.size||0)+3;
+   if(!(rr>0)||!Number.isFinite(rr)||!Number.isFinite(t.x)||
+      !Number.isFinite(t.y))return false;
+   var known=t.__novaSweepMoveTime===g.time,
+       sx=known?t.__novaSweepPrevX:t.x,
+       sy=known?t.__novaSweepPrevY:t.y;
+   if(!near(sx,sy,t.x,t.y,rr+2))continue;
+   if(g.__novaShapeSweepActive&&!known)return false;
+   if(!Number.isFinite(sx)||!Number.isFinite(sy)||
+      Math.hypot(t.x-sx,t.y-sy)>1e-8)return false;
+   if(t.spawnShieldT>0||t.shieldT>0||t.bulwarkT>0||
+      t.tauntT>0||!Number.isFinite(t.hp)||t.hp<=b.dmg*2||
+      (typeof g.areAllies==='function'&&g.areAllies(owner,t)))return false;
+   if(b.__novaDirectVictims&&b.__novaDirectVictims.has(t))continue;
+   var fx=ax-t.x,fy=ay-t.y,A=dx*dx+dy*dy,
+       B=2*(fx*dx+fy*dy),C=fx*fx+fy*fy-rr*rr;
+   if(!(C>1e-9))return false; /* initial overlap is ambiguous */
+   var D=B*B-4*A*C;
+   if(Math.abs(D)<=1e-10*(B*B+4*A*(fx*fx+fy*fy+rr*rr)))return false;
+   if(D<=0)continue;
+   var root=Math.sqrt(D),q=-.5*(B+(B<0?-root:root));
+   if(!q)return false;
+   var enter=Math.min(q/A,C/q),leave=Math.max(q/A,C/q);
+   if(leave<=0||enter>=1-1e-9)continue;
+   if(!(enter>1e-9))return false;
+   contacts.push({e:t,t:enter});
+  }
+  if(contacts.length!==b.pen+1||contacts.length>2)return false;
+  contacts.sort(function(a,c){return a.t-c.t;});
+  if(contacts.length===2&&contacts[1].t-contacts[0].t<1e-7)return false;
+  /* Non-tank bodies, including newborns and discontinuously moving drones,
+   * may take physical priority. Only prove their corridors are remote. */
+  for(var si=0;si<shapes.length;si++){
+   var s=shapes[si];if(!s||!(s.hp>0))continue;
+   if(shapeWasTeleported(g,s))return false;
+   var st=shapeSweepStart(g,s),sx=st?st.x:s.x,sy=st?st.y:s.y;
+   if(near(sx,sy,s.x,s.y,(s.r||15)+b.r+4+Math.max(30,dt*800)))return false;
+  }
+  for(var di=0;di<drones.length;di++){
+   var d=drones[di];if(!d||!(d.hp>0)||d.ownerId===b.ownerId)continue;
+   if(!g.__novaShapeSweepActive||
+      d.__novaChronoDroneEpoch!==g.__novaShapeSweepEpoch||
+      !Number.isFinite(d.__novaChronoDronePrevX)||
+      !Number.isFinite(d.__novaChronoDronePrevY)||
+      !Number.isFinite(d.x)||!Number.isFinite(d.y))return false;
+   var mx=d.x-d.__novaChronoDronePrevX,my=d.y-d.__novaChronoDronePrevY;
+   if(mx*mx+my*my>96*96||!Number.isFinite(d.speed==null?0:d.speed))return false;
+   var motionBound=Math.max(800,(d.speed>0?d.speed*4:800));
+   if(near(d.__novaChronoDronePrevX,d.__novaChronoDronePrevY,d.x,d.y,
+      (d.r||8)+b.r+1+Math.max(30,dt*motionBound)))return false;
+  }
+  for(var bi=0;bi<others.length;bi++){
+   var o=others[bi];if(!o||o===b||o.dead)continue;
+   if(near(o.x,o.y,o.x+(o.vx||0)*dt,o.y+(o.vy||0)*dt,
+      (o.r||2)+b.r+2))return false;
+  }
+  if(firstSolidHit(g,ax,ay,ex,ey,b.r*.45))return false;
+  /* Reuse the real damage owner, never fabricate HP or kill credit. */
+  var ang=Math.atan2(b.vy,b.vx),kx=Math.cos(ang)*(b.knock||0)*.006,
+      ky=Math.sin(ang)*(b.knock||0)*.006;
+  for(var ci=0;ci<contacts.length;ci++){
+   var hit=contacts[ci];
+   b.x=ax+dx*hit.t;b.y=ay+dy*hit.t;
+   g.damageTank(hit.e,b.dmg,b.ownerId,kx,ky);
+   b.hits++;b.pen--;
+   (b.__novaDirectVictims||(b.__novaDirectVictims=new Set())).add(hit.e);
+  }
+  b.dead=true;b.px=b.x;b.py=b.y;b.vx=0;b.vy=0;
+  return true;
+ }
  function isolatedTTLBodyContact(g,b,dt){
   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||!(b.ttl>0)||
      !(b.ttl<=dt)||!(dt>0)||!(b.pen>=0)||(b.hits||0)>0||
@@ -979,8 +1091,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
  var projected=expiring*(this.bullets.length+(this.tanks||[]).length+
    (this.shapes||[]).length+(this.drones||[]).length);
  if(projected>0&&projected<=900)
-  for(var pre=this.bullets.length-1;pre>=0;pre--)
-   isolatedTTLBodyContact(this,this.bullets[pre],dt);for(var i=0;i<this.bullets.length;i++){var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,sweepDt=dt;/* Terrain beyond physical projectile lifetime is unreachable, including shells. */if(Number.isFinite(b.ttl)){if(b.ttl<=0)continue;sweepDt=Math.min(dt,b.ttl);}var nx=ox+(b.vx||0)*sweepDt,ny=oy+(b.vy||0)*sweepDt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;if(fuseDefinitelyBeforeTerrain(this,b,dt,ox,oy,nx,ny,fh.hit))continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){b.__novaBreachAtTime=this.time;b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
+  for(var pre=this.bullets.length-1;pre>=0;pre--){
+   var expiringBullet=this.bullets[pre];
+   if(!isolatedTTLStationaryPiercingChain(this,expiringBullet,dt))
+    isolatedTTLBodyContact(this,expiringBullet,dt);
+  }for(var i=0;i<this.bullets.length;i++){var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,sweepDt=dt;/* Terrain beyond physical projectile lifetime is unreachable, including shells. */if(Number.isFinite(b.ttl)){if(b.ttl<=0)continue;sweepDt=Math.min(dt,b.ttl);}var nx=ox+(b.vx||0)*sweepDt,ny=oy+(b.vy||0)*sweepDt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;if(fuseDefinitelyBeforeTerrain(this,b,dt,ox,oy,nx,ny,fh.hit))continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){b.__novaBreachAtTime=this.time;b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
    /* The core still advances a dead bullet before removing it; a shell may
      * expire or leave the arena in that pass. Consume its one-time burst now. */
     if(b.shell&&this.clusterBurst){var childStart=this.bullets.length;this.clusterBurst(b);clearTerrainBurstChildren(this,s,h,childStart);b.shell=false;}if(b.splash&&this.splashAt)this.splashAt(h.x,h.y,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.dead=true;if(this.addFlash)this.addFlash(h.x,h.y,s.destructible?'#8fd4ff':'#b9c7e7',Math.min(46,14+(b.dmg||0)*.24));if(this.cam&&b.dmg>42)this.cam.shake=Math.max(this.cam.shake,.08);/* The materialized core still advances dead bullets before removing them. Freeze a terrain-killed projectile at its impact so its final trail cannot leak through cover. Breaching live shots keep their velocity above. */b.vx=0;b.vy=0;
