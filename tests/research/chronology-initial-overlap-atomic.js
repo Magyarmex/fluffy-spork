@@ -153,7 +153,7 @@ const cases=[];
  cases.push('simultaneous-cover-owners-abstain');
 }
 function rng(seed){return()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);}
-const random=rng(20261026),stats={deterministic:cases,worlds:0,comparisons:0,permutationComparisons:0,ambiguous:0,disagreements:0};
+const random=rng(20261026),stats={deterministic:cases,worlds:0,comparisons:0,permutationComparisons:0,metamorphicComparisons:0,ambiguous:0,disagreements:0};
 for(let n=0;n<6000;n++){
  const w=base();w.v=350+random()*2500;w.ttl=.02+random()*.15;
  w.pen=Math.floor(random()*5);w.dmg=15+random()*50;
@@ -182,6 +182,22 @@ for(let n=0;n<6000;n++){
   }
  }
  if(ref.stop&&ref.stop.startsWith('ambiguous'))stats.ambiguous++;
+ if(n<150){
+  const mirror={...w,p:-w.p,v:-w.v,
+    bodies:w.bodies.map(b=>({...b,x:-b.x,v:-b.v})),
+    covers:w.covers.map(c=>({...c,lo:-c.hi,hi:-c.lo})),
+    hostiles:w.hostiles.map(q=>({...q,x:-q.x,v:-q.v}))};
+  const shift=733;
+  const translated={...w,p:w.p+shift,
+    bodies:w.bodies.map(b=>({...b,x:b.x+shift})),
+    covers:w.covers.map(c=>({...c,lo:c.lo+shift,hi:c.hi+shift})),
+    hostiles:w.hostiles.map(q=>({...q,x:q.x+shift}))};
+  for(const transformed of [mirror,translated])for(const sch of SCHEDULES){
+   stats.metamorphicComparisons++;
+   check(equal(ref,solve(transformed,sch)),
+     'mirror/translation changed physical event order: '+n);
+  }
+ }
  for(const sch of SCHEDULES){stats.comparisons++;
   const actual=solve(w,sch);if(!equal(ref,actual)){
    stats.disagreements++;if(stats.disagreements<=2)throw Error('world '+n+' '+JSON.stringify({w,ref,actual}));
