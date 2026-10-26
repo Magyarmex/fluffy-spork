@@ -345,3 +345,21 @@ mods['game/engine']=function(module,exports,require){
 };
 window.__NOVA_DEATH_INSIGHT_TEST__={choose:choose,paint:paint,cleanup:cleanup};
 })();
+
+
+/* Short-screen evolution access — keep the canonical React class/mastery
+ * choices usable on compact phones without changing choices or combat.
+ * Gene Splice already has a scroll contract; target only the two modal
+ * families whose direct child is a vertical list of selectable cards. */
+(function(){
+ 'use strict';
+ if(typeof document==='undefined'||!document.head||!document.createElement)return;
+ if(document.getElementById('nova-short-evolution-fit'))return;
+ var style=document.createElement('style');
+ style.id='nova-short-evolution-fit';
+ style.textContent='@media(max-height:620px) and (max-width:700px){'+
+  '#root .absolute.inset-0.z-50 > .panel.anim-pop:has(> .mt-3.flex.flex-col.gap-2){'+
+  'min-height:0;max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);'+
+  'overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;}}';
+ document.head.appendChild(style);
+})();

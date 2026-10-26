@@ -227,6 +227,60 @@ async function scenario(browser, label, options) {
       assert.ok(shots>0,'actual desktop mouse+WASD gameplay must launch projectiles');
     }
 
+    // The real evolution and mastery dialogs must remain operable on short
+    // phones. Trigger the shipping Game -> React event callback, not a mock
+    // modal; all choices and DECIDE LATER must remain reachable.
+    if(label==='landscape-568'||label==='mobile-320-short'){
+      for(const [tier,title] of [
+        [1,'EVOLVE — CHOOSE YOUR PATH'],
+        [3,'★ MASTERY PERK ★']
+      ]){
+        await page.evaluate(tier=>{
+          const g=window.__novaBrowserLiveGame;
+          if(!g?.openOffer)throw new Error('real Game offer lifecycle unavailable');
+          g.pendingOffer=tier;
+          g.openOffer();
+        },tier);
+        const heading=page.getByText(title,{exact:true});
+        await heading.waitFor({state:'visible',timeout:8000});
+        // Wait for the real anim-pop entrance to settle before measuring glyphs
+        // and buttons; a scaled transition can briefly hide full-size overflow.
+        await page.waitForTimeout(500);
+        const panel=heading.locator('xpath=..');
+        const geometry=await panel.evaluate(el=>{
+          const box=el.getBoundingClientRect();
+          const later=[...el.querySelectorAll('button')].find(b=>
+            /DECIDE LATER/i.test(b.textContent||''));
+          const button=later?.getBoundingClientRect();
+          return {top:box.top,bottom:box.bottom,left:box.left,right:box.right,
+            viewportWidth:innerWidth,viewportHeight:innerHeight,
+            scrollHeight:el.scrollHeight,clientHeight:el.clientHeight,
+            overflowY:getComputedStyle(el).overflowY,
+            later:button?.toJSON()||null};
+        });
+        console.log('NOVA_EVOLUTION_MODAL '+JSON.stringify({label,tier,geometry}));
+        await page.screenshot({path:path.join(output,label+'-offer-'+tier+'.png')});
+        assert.ok(geometry.top>=-1&&geometry.bottom<=geometry.viewportHeight+1,
+          label+': '+title+' must fit the visible screen: '+JSON.stringify(geometry));
+        assert.ok(geometry.left>=-1&&geometry.right<=geometry.viewportWidth+1,
+          label+': '+title+' must fit the screen width: '+JSON.stringify(geometry));
+        assert.ok(geometry.scrollHeight<=geometry.clientHeight+1||
+          ['auto','scroll'].includes(geometry.overflowY),
+          label+': tall evolution options must scroll inside the modal: '+JSON.stringify(geometry));
+        await panel.evaluate(el=>{el.scrollTop=el.scrollHeight;});
+        await page.waitForTimeout(100);
+        const later=panel.getByRole('button',{name:/DECIDE LATER/i});
+        const laterBox=await later.boundingBox();
+        assert.ok(laterBox&&laterBox.y>=-1&&
+          laterBox.y+laterBox.height<=geometry.viewportHeight+1,
+          label+': DECIDE LATER must be reachable after scrolling: '+JSON.stringify(laterBox));
+        await later.click();
+        await heading.waitFor({state:'detached',timeout:8000});
+        assert.equal(await page.evaluate(()=>window.__novaBrowserLiveGame?.paused),false,
+          label+': dismissing the choice must resume the real game');
+      }
+    }
+
     await page.getByRole('button',{name:'Pause'}).click();
     await page.getByText('PAUSED',{exact:true}).waitFor({state:'visible'});
     const paused=await page.evaluate(()=>window.NOVALivingFront.snapshot().age);
