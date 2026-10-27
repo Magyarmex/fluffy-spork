@@ -71,7 +71,7 @@ function recordFrontlinePlayerDeath(g,st,t){
 }
 function frontlineTick(g,st,observedContest){
  var f=ensureFrontline(g,st);if(!f)return false;
- var p=g.player,inside=!!(p&&alive(p)&&p.spawnShieldT<=0&&sectorIndex(p.x,p.y)===f.sector);
+ var p=g.player,inside=!!(p&&alive(p)&&!(p.spawnShieldT>0)&&sectorIndex(p.x,p.y)===f.sector);
  if(p&&alive(p)){
   var c=sectorCenter(f.sector),dist=Math.hypot(p.x-c.x,p.y-c.y);
   if(f.playerStartDist==null&&!inside)f.playerStartDist=dist;
