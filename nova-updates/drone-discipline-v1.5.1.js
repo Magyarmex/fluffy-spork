@@ -55,6 +55,7 @@ function hitShape(g,owner,d,target){if(d.attackCd>0||!validShape(target))return;
 function controlIdle(g,owner,d,squad,claims,dt){var state=owner.__novaSwarm;if(!state||state.active)return false;if(d.__novaPhase==='dash')return false;
  var recall=state.recallUntil>g.time;if(d.__novaPhase==='windup'){d.__novaPhase='recover';d.__novaPhaseT=Math.max(.24,d.__novaPhaseT||.24);d.__novaCommitted=false;d.__novaTarget=null;}
  var threat=d.__novaDefenseTarget,dr=defenseRadius(d)*1.22;if(!enemyDrone(g,threat,owner)||spotter(threat)||d2(owner.x,owner.y,threat.x,threat.y)>dr*dr||!fairDroneInView(g,owner,threat)||!contactClear(g,d,threat))threat=null;if(!threat)threat=nearestDefense(g,owner,d);d.__novaDefenseTarget=threat||null;
+ if(d.__novaPhase==='recover'){d.__novaPhaseT=(d.__novaPhaseT||0)-dt;if(d.__novaPhaseT<=0)d.__novaPhase='form';}
  if(threat&&!recall){d.__novaIdleMode='defend';d.__novaIdleShape=null;steer(d,threat.x,threat.y,d.speed*1.30,dt);hitDrone(g,owner,d,threat);return true;}
  var od=Math.sqrt(d2(owner.x,owner.y,d.x,d.y));if(recall||d.__novaIdleMode==='return'||od>homeRadius(d)){d.__novaIdleMode='return';d.__novaIdleShape=null;var hp=homePoint(g,owner,d,squad);steer(d,hp.x,hp.y,d.speed*1.18,dt);if(!recall&&od<resumeRadius(d))d.__novaIdleMode='farm';return true;}
  var shape=chooseShape(g,owner,d,claims);d.__novaIdleShape=shape||null;if(shape){d.__novaIdleMode='farm';steer(d,shape.x,shape.y,d.speed*(owner.swarmT>0?1.34:1),dt);hitShape(g,owner,d,shape);if(shape.hp<=0)d.__novaIdleShape=null;return true;}
@@ -65,10 +66,15 @@ wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.
  var oldUpdate=Game.prototype.updateDrones;Game.prototype.updateDrones=function(dt){
    var gen=(this.__novaDroneSnapshotGen||0)+1;this.__novaDroneSnapshotGen=gen;
    var preState=buildSquads(this);
-   for(var bi=0;bi<preState.active.length;bi++){var preBucket=preState.active[bi],o=preBucket.owner;for(var pi=0;pi<preBucket.drones.length;pi++){var d=preBucket.drones[pi];d.__novaPreGen=gen;d.__novaPreX=d.x;d.__novaPreY=d.y;d.__novaPreAngle=d.angle;var st=o.__novaSwarm;if(st&&!st.active&&d.__novaPhase!=='dash'){d.__novaFarmTarget=null;d.retargetT=999;}}}
-   oldUpdate.call(this,dt);
+   for(var bi=0;bi<preState.active.length;bi++){var preBucket=preState.active[bi],o=preBucket.owner;for(var pi=0;pi<preBucket.drones.length;pi++){var d=preBucket.drones[pi];d.__novaPreGen=gen;d.__novaPreX=d.x;d.__novaPreY=d.y;d.__novaPreAngle=d.angle;d.__novaPreWasDash=d.__novaPhase==='dash';var st=o.__novaSwarm;if(st&&!st.active&&d.__novaPhase!=='dash'){d.__novaFarmTarget=null;d.retargetT=999;}}}
+   /* Controller's first idle pass is replaced by this overlay. Suppress
+    * its movement and contact side effects, not just its final coordinates.
+    * Keep active commands and committed dashes on the original path. */
+   var priorIdlePass=this.__novaSwarmIdlePass;
+   this.__novaSwarmIdlePass=true;
+   try{oldUpdate.call(this,dt);}finally{this.__novaSwarmIdlePass=priorIdlePass;}
    var postState=buildSquads(this);
-   for(var ai=0;ai<postState.active.length;ai++){var bucket=postState.active[ai],owner=bucket.owner;if(!owner||!owner.__novaSwarm||owner.__novaSwarm.active)continue;var sq=bucket.drones,claims=bucket.claims;claims.clear();for(var di=0;di<sq.length;di++){var drone=sq[di];if(drone.__novaPreGen!==gen||drone.__novaPhase==='dash')continue;drone.x=drone.__novaPreX;drone.y=drone.__novaPreY;drone.angle=drone.__novaPreAngle;controlIdle(this,owner,drone,sq,claims,dt);drone.x=clamp(drone.x,-MAP_LIMIT+24,MAP_LIMIT-24);drone.y=clamp(drone.y,-MAP_LIMIT+24,MAP_LIMIT-24);}}
+   for(var ai=0;ai<postState.active.length;ai++){var bucket=postState.active[ai],owner=bucket.owner;if(!owner||!owner.__novaSwarm||owner.__novaSwarm.active)continue;var sq=bucket.drones,claims=bucket.claims;claims.clear();for(var di=0;di<sq.length;di++){var drone=sq[di];if(drone.__novaPreGen!==gen||drone.__novaPreWasDash||drone.__novaPhase==='dash')continue;drone.x=drone.__novaPreX;drone.y=drone.__novaPreY;drone.angle=drone.__novaPreAngle;controlIdle(this,owner,drone,sq,claims,dt);drone.x=clamp(drone.x,-MAP_LIMIT+24,MAP_LIMIT-24);drone.y=clamp(drone.y,-MAP_LIMIT+24,MAP_LIMIT-24);}}
  };
 });
 window.__NOVA_DRONE_PERF_TEST__={buildSquads:buildSquads,homePoint:homePoint,enemyDrone:enemyDrone,nearestDefense:nearestDefense};
