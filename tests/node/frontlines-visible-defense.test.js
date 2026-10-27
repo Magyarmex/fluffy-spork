@@ -89,3 +89,13 @@ test('dense irrelevant volleys do not trigger a terrain scan per projectile',()=
  assert.deepEqual(dodgeVisibleProjectile(g,p,F,{x:0,y:1}),{x:0,y:1});
  assert.ok(calls<=3,'only plausible visible threat and dodge lane need terrain checks: '+calls);
 });
+
+test('equal-distance visible targets use stable IDs rather than tank array order',()=>{
+ const a={id:7,x:60,y:0,hp:100,alive:true},b={id:3,x:0,y:60,hp:100,alive:true};
+ const g=game([]);const F2={...F,inGameplayViewport:()=>true};
+ g.tanks=[p,a,b];
+ const first=aimAtVisibleHostile(g,p,F2);
+ g.tanks=[b,p,a];
+ assert.deepEqual(aimAtVisibleHostile(g,p,F2),first);
+ assert.deepEqual(first,{x:0,y:1});
+});
