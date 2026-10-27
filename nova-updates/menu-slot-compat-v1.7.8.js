@@ -235,7 +235,17 @@ function installDeathTitleFit(){
   '@media(max-height:400px) and (orientation:landscape){'+
   '.absolute.inset-0.z-50 > .panel.anim-pop:has(> .font-display.text-red-400){'+
   'max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);'+
-  'overflow-y:auto;overscroll-behavior:contain;}}';
+  'overflow-y:auto;overscroll-behavior:contain;padding:8px 12px;}'+
+  /* Preserve every earned stat and the opponent lesson, but reduce vertical
+   * chrome so Redeploy and Main Menu are visible without discovering scroll. */
+  '.absolute.inset-0.z-50 > .panel.anim-pop:has(> .font-display.text-red-400) > .font-display.text-red-400{font-size:20px;letter-spacing:.12em;line-height:1.1;}'+
+  '.absolute.inset-0.z-50 > .panel.anim-pop:has(> .font-display.text-red-400) > .mt-4.grid{margin-top:6px;gap:4px;}'+
+  '.absolute.inset-0.z-50 > .panel.anim-pop:has(> .font-display.text-red-400) > .mt-4.grid > div{padding:2px 6px;}'+
+  '.absolute.inset-0.z-50 > .panel.anim-pop:has(> .font-display.text-red-400) > .mt-4.grid > div > div:first-child{font-size:8px;line-height:1.15;}'+
+  '.absolute.inset-0.z-50 > .panel.anim-pop:has(> .font-display.text-red-400) > .mt-4.grid > div > div:last-child{font-size:11px;line-height:1.2;}'+
+  '.absolute.inset-0.z-50 > .panel.anim-pop:has(> .font-display.text-red-400) > [data-nova-death-insight]{margin-top:5px!important;padding:4px 6px!important;}'+
+  '.absolute.inset-0.z-50 > .panel.anim-pop:has(> .font-display.text-red-400) > button.btn-primary{margin-top:6px;padding-top:6px;padding-bottom:6px;font-size:11px;}'+
+  '.absolute.inset-0.z-50 > .panel.anim-pop:has(> .font-display.text-red-400) > button.btn-ghost{margin-top:4px;padding-top:4px;padding-bottom:4px;font-size:10px;}}';
  document.head.appendChild(style);
 }
 installDeathTitleFit();
