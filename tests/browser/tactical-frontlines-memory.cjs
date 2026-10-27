@@ -64,15 +64,15 @@ const {chromium}=require('playwright');
     throw Error('real shipping telemetry did not record witnessed contest');
    if(!window.NOVALivingFront.diagnostics().includes('observed-contest'))
     throw Error('COPY ECOLOGY omits chronological Frontlines trace');
-   // Physical arrivals are an A/B witness, not a memory-only AI counter.
-   // Exercise the real shipped engine state without changing combat authority.
+   // Physical arrivals must be certified by the real movement owner, not by
+   // sampled positions alone. Deliberately relocate an enemy without moveTank.
    const beforePhysical=snap.frontline.counts.aiPhysicalArrivals;
    if(typeof beforePhysical!=='number')throw Error('physical A/B arrival counter missing');
    const oldEnemyX=e.x,oldEnemyY=e.y;
    e.x=-1150;e.y=-550;g.time+=.22;LF.frontlineTick(g,st,false);
    e.x=-1110;e.y=-550;g.time+=.22;LF.frontlineTick(g,st,false);
-   if(st.frontlineTelemetry.counts.aiPhysicalArrivals!==beforePhysical+1)
-    throw Error('real runtime did not record a witnessed physical AI sector entry');
+   if(st.frontlineTelemetry.counts.aiPhysicalArrivals!==beforePhysical)
+    throw Error('real runtime accepted direct enemy relocation as a physical AI arrival');
    e.x=oldEnemyX;e.y=oldEnemyY;
    g.drawMinimap();
    const ctx=g.mmCtx,S=216;
@@ -88,7 +88,7 @@ const {chromium}=require('playwright');
    if(T.contestCandidate(g,st))throw Error('expired memory still creates live contact');
    return{changedChannels:changed,publicMemoryTTL:24,liveSignalExpired:true,
      realFairEngagement:!!window.__NOVA_FAIR_ENGAGEMENT_TEST__,
-     realBattlefieldLOS:typeof g.hasLineOfSight==='function'};
+     realBattlefieldLOS:typeof g.hasLineOfSight==='function',shortTeleportRejected:true};
   });
   assert.equal(errors.length,0,errors.join('\n'));
   const dir=path.join('artifacts','browser');fs.mkdirSync(dir,{recursive:true});
