@@ -25,7 +25,8 @@ const {chromium}=require('playwright');
    const ai=window.__novaMakeRequire('')('game/ai');
    if(!T||!ai||typeof ai.updateAI!=='function')throw Error('shipping AI / Frontlines owner missing');
    g.setPaused(true);
-   const e=g.tanks.find(t=>t&&t.ai&&t!==g.player&&Math.abs(Number(t.id)||0)%3===1&&Math.abs(Number(t.id)||0)%4!==0);
+   /* Test a genuinely NEW rotating cohort (phase 2), not the old fixed id%3===1 group. */
+   const e=g.tanks.find(t=>t&&t.ai&&t!==g.player&&Math.abs(Number(t.id)||0)%3===2&&Math.abs(Number(t.id)||0)%4!==0);
    if(!e)throw Error('no eligible actual rival in the canonical arena');
    /* Battlefield layouts and seeds differ between runs. Search the real
     * terrain for a legal public opportunity rather than assuming sector 5
@@ -54,9 +55,9 @@ const {chromium}=require('playwright');
     p.x=2000;p.y=2000;
     for(const o of other){o.t.alive=false;o.t.hp=0;}
     g.shapes=[];g.bullets=[];g.hash=null;
-    g.time=106;
+    g.time=146;
     const st=g.__lfState;st.directorEnabled=true;st.signal=null;
-    st.bloomMemory={sector:sector,announcedAt:100,until:124};
+    st.bloomMemory={sector:sector,announcedAt:140,until:164};
     const a=e.ai;a.__lfEcoT=0;a.__lfFrontTurn=null;a.__lfFrontTurnSpentKey=null;
     a.__v1112TargetId=-1;a.__v180HitAt=-99;a.__v180Threat={risk:0};a.__v180Posture='investigate';
     const before=st.stats.aiFrontlineCommitments||0,startX=e.x,startY=e.y;
@@ -73,8 +74,8 @@ const {chromium}=require('playwright');
      * during the live public five-second announcement. Reuse the verified
      * terrain-safe outside approach, not a synthetic movement substitute. */
     e.x=spot.x;e.y=spot.y;
-    st.signal={type:'BLOOM',sector:sector,x:c.x,y:c.y,started:105,until:110};
-    st.bloomMemory={sector:sector,announcedAt:105,until:129};
+    st.signal={type:'BLOOM',sector:sector,x:c.x,y:c.y,started:145,until:150};
+    st.bloomMemory={sector:sector,announcedAt:145,until:169};
     a.__lfEcoT=0;a.__lfFrontTurn=null;a.__lfFrontTurnSpentKey=null;
     a.__v1112TargetId=-1;a.__v180HitAt=-99;a.__v180Threat={risk:0};a.__v180Posture='investigate';
     const liveBefore=st.stats.aiFrontlineCommitments||0;
