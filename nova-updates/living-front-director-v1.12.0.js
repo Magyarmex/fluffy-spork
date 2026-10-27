@@ -48,10 +48,11 @@ function contestHostile(g,a,b){
 function contestCandidate(g,st){
  var now=g&&g.time||0,op=publicBloom(st,now),p=g&&g.player;
  if(!op||!p||!alive(p)||p.spawnShieldT>0||g.__novaDecorativeWorld||sectorIndex(p.x,p.y)!==op.sector)return false;
- /* A remembered announcement is not proof that valuable shapes remain. */
- if(!op.live){var sector=st.sectors&&st.sectors[op.sector],mem=st.bloomMemory;
-  if(!sector||sector.value<Math.max(155,(mem.initialValue||0)*.25))return false;
- }
+ /* A public announcement is not proof that valuable shapes still remain.
+  * Half the original BLOOM entry threshold prevents empty-sector false alarms.
+  * For stale memory also require a quarter of its originally observed value. */
+ var sector=st.sectors&&st.sectors[op.sector],mem=st.bloomMemory;
+ if(!sector||sector.value<Math.max(155,(!op.live&&mem?mem.initialValue||0:0)*.25))return false;
  var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
  if(!F||typeof F.inGameplayViewport!=='function'||typeof g.hasLineOfSight!=='function')return false;
  var ts=g.tanks||[];
