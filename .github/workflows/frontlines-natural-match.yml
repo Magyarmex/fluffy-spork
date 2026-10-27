@@ -8,6 +8,7 @@ on:
       - 'tests/browser/frontlines-visible-defense.js'
       - 'tests/browser/frontlines-commitment-audit.js'
       - 'scripts/frontlines-natural-matrix-report.cjs'
+      - 'scripts/frontlines-defense-matrix-report.cjs'
       - 'scripts/frontlines-ab-batch.cjs'
       - 'scripts/frontlines-ab-report.cjs'
       - '.github/workflows/frontlines-natural-match.yml'
@@ -59,10 +60,16 @@ jobs:
 
 
   defensive-pilot-probe:
-    # Independent one-seed falsifier. Do not contaminate the established
-    # 18-pair baseline or silently promote a scripted pilot to gameplay.
+    # Six predeclared layout/seed pairs, never merged into the historical
+    # 18-pair baseline. A single lucky surviving pilot proves little.
     runs-on: ubuntu-latest
     timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        layout: [0, 1, 2]
+        seed: [0, 1]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -74,18 +81,49 @@ jobs:
       - name: Serve the actual shipping game
         run: |
           python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/nova-defense-http.log 2>&1 &
-      - name: Run defensive visible-threat Scout pilot against natural BLOOM
+      - name: Run fair visible-threat pilot against natural BLOOM
         env:
-          NOVA_LAYOUT_INDEX: 0
-          NOVA_SEED_INDEX: 0
+          NOVA_LAYOUT_INDEX: ${{ matrix.layout }}
+          NOVA_SEED_INDEX: ${{ matrix.seed }}
           NOVA_PILOT_POLICY: public-bloom-harvest-defense
         run: node tests/browser/frontlines-natural-match-ab.cjs
-      - name: Preserve the defensive-policy falsifier separately from baseline
+      - name: Preserve defensive-policy evidence independently of baseline
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: nova-frontlines-visible-defense-probe-0-0
+          name: nova-frontlines-visible-defense-probe-${{ matrix.layout }}-${{ matrix.seed }}
           path: artifacts/browser/frontlines-natural-*
+          if-no-files-found: warn
+          retention-days: 14
+
+  collate-defensive-probe:
+    needs: [paired-natural-match, defensive-pilot-probe]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: nova-frontlines-visible-defense-probe-*
+          path: artifacts/defense
+          merge-multiple: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: nova-frontlines-natural-ab-*-public-bloom-harvest-*
+          path: artifacts/baseline
+          merge-multiple: false
+      - name: Compare all six predeclared seeds against matching historical harvest policy
+        run: node scripts/frontlines-defense-matrix-report.cjs artifacts/defense artifacts/baseline 6
+      - name: Preserve falsifiable six-seed result, including negative outcomes
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-frontlines-defense-matrix-summary
+          path: artifacts/defense/frontlines-defense-matrix-summary.json
           if-no-files-found: warn
           retention-days: 14
 
