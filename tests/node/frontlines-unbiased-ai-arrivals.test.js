@@ -183,3 +183,15 @@ test('a temporary shield does not turn the same bot re-entry into a new arrival'
  assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,1,
   'one living bot may only arrive once per public opportunity');
 });
+
+test('replacement while old bot is shielded still resets its previous arrival flag',()=>{
+ const s=scene();s.e.x=-1200;s.LF.frontlineTick(s.g,s.st,false);
+ sample(s,-1150,-550);sample(s,-1110,-550);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,1);
+ s.e.spawnShieldT=1;s.LF.frontlineTick(s.g,s.st,false); // sampled path baseline is dropped
+ s.e={id:2,x:-1200,y:-550,hp:100,alive:true,team:2,ai:{__lfEcoMode:'none'}};
+ s.g.tanks[1]=s.e;s.LF.frontlineTick(s.g,s.st,false);
+ sample(s,-1150,-550);sample(s,-1110,-550);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,2,
+  'a shielded old incarnation cannot conceal replacement of the tank object');
+});
