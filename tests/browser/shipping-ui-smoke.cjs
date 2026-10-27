@@ -379,7 +379,7 @@ async function scenario(browser, label, options) {
     // Actual React-owned death panel: verify the Fieldcraft note is truthful,
     // readable at 320px, and discarded on redeploy. No synthetic DOM fixture.
     if(label==='desktop'||label.startsWith('mobile')||label==='landscape-568'){
-      await page.evaluate(()=>{
+      await page.evaluate(label=>{
         const g=window.__novaBrowserLiveGame;
         const enemy=g.tanks.find(t=>t&&!t.isPlayer&&t.alive);
         if(!enemy)throw new Error('real AI killer unavailable');
@@ -391,7 +391,7 @@ async function scenario(browser, label, options) {
         g.player.bulwarkT=0;g.player.tauntT=0;
         g.damageTank(g.player,1e8,enemy.id);
         if(g.status!=='dying')throw new Error('lethal damage did not enter dying state');
-      });
+      },label);
       await page.getByText('TERMINATED',{exact:true}).waitFor({state:'visible',timeout:20000});
       const deathDiagnostic=await page.evaluate(()=>{
         const g=window.__novaBrowserLiveGame;
