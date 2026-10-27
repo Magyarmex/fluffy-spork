@@ -50,13 +50,19 @@ test('one public BLOOM, one observed contest, repeated ticks and re-entry are di
  assert.equal(f.counts.playerDeaths,1);
 });
 test('AI arrivals require an actual memory-approach state and are counted once per announcement',()=>{
- const {g,st,e,LF}=scene();LF.frontlineTick(g,st,false);
+ const {g,st,e,LF}=scene();
+ LF.frontlineTick(g,st,false);
+ assert.equal(st.frontlineTelemetry.counts.aiArrivals,0,'already present is not a measured arrival');
+ e.x=-900;e.y=-900;LF.frontlineTick(g,st,false);
+ e.x=-750;e.y=-750;LF.frontlineTick(g,st,false);
+ assert.equal(st.frontlineTelemetry.counts.aiApproaches,1);
+ e.x=-520;e.y=-540;LF.frontlineTick(g,st,false);
  assert.equal(st.frontlineTelemetry.counts.aiArrivals,1);
  LF.frontlineTick(g,st,false);assert.equal(st.frontlineTelemetry.counts.aiArrivals,1);
  e.id=3;e.ai.__lfEcoMode='local';LF.frontlineTick(g,st,false);
  assert.equal(st.frontlineTelemetry.counts.aiArrivals,1);
  e.ai.__lfEcoMode='memory';LF.frontlineTick(g,st,false);
- assert.equal(st.frontlineTelemetry.counts.aiArrivals,2);
+ assert.equal(st.frontlineTelemetry.counts.aiArrivals,1,'a new id spawned inside is not an arrival');
 });
 test('neutral XP is attributed only to the public pocket and actual pilot, never PvP or distant drops',()=>{
  const {g,st,p,LF}=scene();LF.frontlineTick(g,st,false);
@@ -113,4 +119,26 @@ test('actual damage authority records death even when the Director stops ticking
  assert.equal(st.frontlineTelemetry.events.filter(e=>e.kind==='player-death').length,1);
  LF.recordFrontlinePlayerDeath(g,st,p);
  assert.equal(st.frontlineTelemetry.counts.playerDeaths,1,'do not double count a fatal hit');
+});
+
+test('pilot approach requires measured progress toward a publicly announced sector',()=>{
+ const {g,st,p,LF}=scene();
+ p.x=-900;p.y=-900;LF.frontlineTick(g,st,false);
+ assert.equal(st.frontlineTelemetry.counts.playerApproaches,0);
+ p.x=-750;p.y=-750;LF.frontlineTick(g,st,false);
+ assert.equal(st.frontlineTelemetry.counts.playerApproaches,1);
+ p.x=-560;p.y=-560;LF.frontlineTick(g,st,false);
+ assert.equal(st.frontlineTelemetry.counts.playerApproaches,1);
+ assert.equal(st.frontlineTelemetry.counts.playerEntries,1);
+});
+test('death between Director ticks counts actual sector entry, never a stale expired memory',()=>{
+ const {g,st,p,LF}=scene();
+ p.x=-900;p.y=-900;LF.frontlineTick(g,st,false);
+ p.x=-560;p.y=-560;g.damageTank(p,200);
+ assert.equal(st.frontlineTelemetry.counts.playerDeaths,1);
+ assert.equal(st.frontlineTelemetry.counts.playerEntries,1);
+ const q=scene();q.LF.frontlineTick(q.g,q.st,false);
+ q.st.signal=null;q.st.bloomMemory.until=100;
+ q.g.damageTank(q.p,200);
+ assert.equal(q.st.frontlineTelemetry.counts.playerDeaths,0);
 });
