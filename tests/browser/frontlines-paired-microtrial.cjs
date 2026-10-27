@@ -49,9 +49,14 @@ const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
      let spot=null,center=null,sector=-1;
      for(let i=0;i<16&&!spot;i++){
       const c=T.sectorCenter(i);
-      for(let dx=-500;dx<=500&&!spot;dx+=100)for(let dy=-500;dy<=500&&!spot;dy+=100){
+      /* The sector half-width is 562.5u. The original 240–570u
+       * center-distance search accidentally started every rival INSIDE
+       * its BLOOM sector. Demand a true outside-to-inside rotation, not
+       * merely movement toward the center of an already occupied pocket. */
+      for(let dx=-650;dx<=650&&!spot;dx+=50)for(let dy=-650;dy<=650&&!spot;dy+=50){
        const x=c.x+dx,y=c.y+dy,d=Math.hypot(dx,dy);
-       if(d<240||d>570)continue;
+       if(d<575||d>650||Math.abs(x)>T.ARENA-40||Math.abs(y)>T.ARENA-40)continue;
+       if(T.sectorIndex(x,y)===i)continue;
        if(g.isTerrainSafe&&!g.isTerrainSafe(x,y,28))continue;
        if(g.hasLineOfSight&&!g.hasLineOfSight(x,y,c.x,c.y,8))continue;
        spot={x,y,d};center=c;sector=i;
@@ -65,7 +70,7 @@ const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
      const baseTank={...e},baseAI={...e.ai},st=g.__lfState,a=e.ai;
      const memo={sector,announcedAt:100,until:124,initialValue:500};
      const random=Math.random;
-     const run=(enabled)=>{
+     const run=(enabled,steps=1)=>{
       for(const k of Object.keys(e))if(!(k in baseTank))delete e[k];
       Object.assign(e,baseTank);e.ai=a;
       for(const k of Object.keys(a))if(!(k in baseAI))delete a[k];
@@ -77,9 +82,17 @@ const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
       g.time=106;
       let state=0x6d2b79f5;
       Math.random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return (state>>>0)/4294967296;};
-      try{ai.updateAI(e,g,.3);}finally{Math.random=random;}
+      let entered=false;
+      try{
+       for(let step=0;step<steps;step++){
+        g.time=106+step*.275;
+        ai.updateAI(e,g,.275);
+        if(T.sectorIndex(e.x,e.y)===sector)entered=true;
+       }
+      }finally{Math.random=random;}
       const dx=e.x-spot.x,dy=e.y-spot.y;
       return{mode:a.__lfEcoMode,committed:!!a.__lfFrontTurnSpentKey,
+       entered:entered,insideAtEnd:T.sectorIndex(e.x,e.y)===sector,
        distance:+Math.hypot(dx,dy).toFixed(3),
        progress:+(spot.d-Math.hypot(e.x-center.x,e.y-center.y)).toFixed(3),
        x:+dx.toFixed(3),y:+dy.toFixed(3)};
@@ -88,12 +101,26 @@ const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
       p.x=2000;p.y=2000;
       for(const o of other){o.t.alive=false;o.t.hp=0;}
       g.shapes=[];g.bullets=[];g.hash=null;
-      const off=run(false),on=run(true);
+      /* Counterbalance execution order. A one-step A/B is not controlled if
+       * the first arm changes hidden state consumed by the second arm. */
+      const off=run(false),on=run(true),onFirst=run(true),offSecond=run(false);
+      const equal=(a,b)=>a.mode===b.mode&&a.committed===b.committed&&
+       a.entered===b.entered&&a.insideAtEnd===b.insideAtEnd&&
+       Math.abs(a.progress-b.progress)<.001&&Math.abs(a.x-b.x)<.001&&Math.abs(a.y-b.y)<.001;
+      if(!equal(off,offSecond)||!equal(on,onFirst))
+       throw Error('paired microtrial has an execution-order confound: '+JSON.stringify({layout,off,on,onFirst,offSecond}));
       if(on.mode!=='memory'||!on.committed)throw Error('ON arm failed to reach actual tactical commitment: '+JSON.stringify({layout,spot,on}));
       if(off.mode==='memory'||off.committed)throw Error('OFF arm inherited a public-memory commitment');
       if(!(on.distance>0&&off.distance>0))throw Error('paired actual movement did not occur');
+      /* Longer fixed-input movement horizon, still not a live match: combat,
+       * harvesting and player controls are deliberately frozen. */
+      const offLong=run(false,8),onLong=run(true,8),onLongFirst=run(true,8),offLongSecond=run(false,8);
+      if(!equal(offLong,offLongSecond)||!equal(onLong,onLongFirst))
+       throw Error('eight-step A/B has an execution-order confound: '+JSON.stringify({layout,offLong,onLong,onLongFirst,offLongSecond}));
       return{layout,seed,sector,approachDistance:Math.round(spot.d),off,on,
-       deltaProgress:+(on.progress-off.progress).toFixed(3),method:'one AI decision, actual Game.moveTank, frozen rival/pilot/terrain'};
+       deltaProgress:+(on.progress-off.progress).toFixed(3),orderInvariant:true,
+       eightStep:{off:offLong,on:onLong,deltaProgress:+(onLong.progress-offLong.progress).toFixed(3),orderInvariant:true},
+       method:'one-step and eight-step frozen-input AI microtrials, actual Game.moveTank, counterbalanced order'};
      }finally{
       e.x=original.x;e.y=original.y;e.hp=original.hp;e.maxHp=original.maxHp;
       e.spawnShieldT=original.shield;p.x=original.playerX;p.y=original.playerY;
