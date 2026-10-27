@@ -5,6 +5,7 @@ on:
     paths:
       - 'tests/browser/frontlines-natural-match-ab.cjs'
       - 'tests/browser/frontlines-public-pilot.js'
+      - 'tests/browser/frontlines-commitment-audit.js'
       - 'scripts/frontlines-natural-matrix-report.cjs'
       - 'scripts/frontlines-ab-batch.cjs'
       - 'scripts/frontlines-ab-report.cjs'
