@@ -21,7 +21,7 @@ function boot(fair=true){
 function scene(fair=true){
  const {T,LF,Game}=boot(fair),g=new Game(),p={id:1,x:-560,y:-560,hp:100,alive:true},
   enemy={id:2,x:-520,y:-540,hp:100,alive:true};
- const calls=[],ctx={save(){},restore(){},beginPath(){},arc(x,y,r){calls.push({type:'arc',r});},stroke(){},fill(){},moveTo(){},lineTo(){},
+ const calls=[],ctx={save(){},restore(){},beginPath(){},arc(x,y,r){calls.push({type:'arc',x,y,r});},stroke(){},fill(){},moveTo(){},lineTo(){},
   fillText(s){calls.push(s);calls.push({type:'text',value:s,font:this.font});}};
  Object.assign(g,{time:100,player:p,tanks:[p,enemy],shapes:[],w:800,h:600,cam:{zoom:1},
   mmCtx:ctx,hasLineOfSight:()=>true,areHostile:(a,b)=>a.id!==b.id,areAllies:()=>false});
@@ -50,6 +50,19 @@ test('60px CSS minimap gets a readable contest badge rather than a 2.5px label',
  assert.ok(calls.some(v=>v&&v.type==='arc'&&v.r*2*60/216>=10),
   'badge must have a >=10 CSS px visual target');
  assert.ok(!calls.includes('CONTESTED'),'the old 2.5 CSS px text is not a usable signal');
+});
+test('contest badge preserves the actual sector center and stays on the map at every latitude',()=>{
+ const {g,st,calls}=scene();
+ for(const sector of [1,5,9,13]){
+  calls.length=0;
+  st.signal.sector=sector;st.contestSignal={sector,until:104};
+  g.drawMinimap();
+  const badge=calls.find(v=>v&&v.type==='arc'&&v.r===22);
+  assert.ok(badge,'visible contest draws a 12px CSS badge');
+  const centerY=(Math.floor(sector/4)+.5)*54;
+  assert.ok(Math.abs(badge.y-centerY)>=27,'badge must not cover the sector/player dot');
+  assert.ok(badge.y>=22&&badge.y<=194,'badge must stay inside minimap canvas');
+ }
 });
 test('terrain occlusion suppresses signal and clears stale contest',()=>{
  const {T,g,st,calls}=scene();T.updateContest(g,st);
