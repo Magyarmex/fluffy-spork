@@ -49,6 +49,38 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+
+  defensive-pilot-probe:
+    # Independent one-seed falsifier. Do not contaminate the established
+    # 18-pair baseline or silently promote a scripted pilot to gameplay.
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --no-audit --no-fund --no-package-lock
+      - run: npm install --no-save --no-audit --no-fund --no-package-lock playwright@1.56.1
+      - run: npx playwright install chromium
+      - name: Serve the actual shipping game
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/nova-defense-http.log 2>&1 &
+      - name: Run defensive visible-threat Scout pilot against natural BLOOM
+        env:
+          NOVA_LAYOUT_INDEX: 0
+          NOVA_SEED_INDEX: 0
+          NOVA_PILOT_POLICY: public-bloom-harvest-defense
+        run: node tests/browser/frontlines-natural-match-ab.cjs
+      - name: Preserve the defensive-policy falsifier separately from baseline
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-frontlines-visible-defense-probe-0-0
+          path: artifacts/browser/frontlines-natural-*
+          if-no-files-found: warn
+          retention-days: 14
+
   collate-natural-matrix:
     needs: paired-natural-match
     if: ${{ always() }}
