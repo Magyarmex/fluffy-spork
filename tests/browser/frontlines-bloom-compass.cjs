@@ -65,53 +65,7 @@ const {chromium}=require('playwright');
    if(c.type==='MIGRATION'){
     assert.equal(signal.from,5,'migration must retain witnessed origin');
     assert.equal(signal.to,6,'migration must retain the public destination');
-    assert.match(signal.emitted,new RegExp('MIGRATION · '+c.bearing+' · FLOW '+c.flow+'
-   await page.waitForFunction(message=>[...document.querySelectorAll('.panel.anim-pop')].
-    some(n=>n.textContent===message),signal.emitted,{timeout:10000});
-   // A paused-game overlay can fully occlude the toast while all geometry
-   // assertions still pass. Verify the real playing presentation instead.
-   assert.equal(await page.getByText('PAUSED',{exact:true}).count(),0,
-    'a pause modal must not conceal the compass under test');
-   // The pop-in animation scales the bounding box; inspect settled geometry.
-   await page.waitForTimeout(400);
-   const ui=await page.evaluate(message=>{
-    const n=[...document.querySelectorAll('.panel.anim-pop')].
-     find(n=>n.textContent===message);
-    if(!n)return null;
-    const r=n.getBoundingClientRect(),range=document.createRange();
-    const gear=document.getElementById('nova-pilot-gear');
-    const gr=gear&&!gear.hidden?gear.getBoundingClientRect():null;
-    range.selectNodeContents(n);
-    const glyph=range.getBoundingClientRect();
-    return {text:n.textContent,left:r.left,right:r.right,top:r.top,bottom:r.bottom,
-     height:r.height,scrollWidth:n.scrollWidth,clientWidth:n.clientWidth,
-     scrollHeight:n.scrollHeight,clientHeight:n.clientHeight,
-     glyphLeft:glyph.left,glyphRight:glyph.right,
-     gear:gr?{left:gr.left,right:gr.right,top:gr.top,bottom:gr.bottom}:null,
-     viewport:window.innerWidth,viewportHeight:window.innerHeight};
-   },signal.emitted);
-   assert.ok(ui,'public compass must reach the actual React toast');
-   assert.ok(ui.left>=-1&&ui.right<=ui.viewport+1,
-    'toast panel clips at '+c.width+'px: '+JSON.stringify(ui));
-   assert.ok(ui.glyphLeft>=-1&&ui.glyphRight<=ui.viewport+1,
-    'toast glyphs clip at '+c.width+'px: '+JSON.stringify(ui));
-   assert.ok(ui.scrollWidth<=ui.clientWidth+1&&ui.scrollHeight<=ui.clientHeight+1,
-    'toast text overflows its panel at '+c.width+'px: '+JSON.stringify(ui));
-   assert.ok(ui.gear,'real gameplay settings button must be present');
-   assert.ok(ui.bottom<=ui.gear.top||ui.top>=ui.gear.bottom||
-    ui.right<=ui.gear.left||ui.left>=ui.gear.right,
-    'public announcement must not sit underneath the settings button: '+JSON.stringify(ui));
-   assert.ok(ui.height<110,'toast obscures too much combat at '+c.width+'px: '+JSON.stringify(ui));
-   assert.ok(ui.top>=0&&ui.bottom<=ui.viewportHeight,'toast outside portrait viewport: '+JSON.stringify(ui));
-   await page.screenshot({path:path.join(output,
-    'frontlines-'+(c.type||'bloom').toLowerCase()+'-compass-'+c.bearing.replace(/ /g,'-').toLowerCase()+'-'+c.width+'.png')});
-   results.push({bearing:c.bearing,signal,ui});
-  }
-  assert.deepEqual(errors,[],'no runtime page errors');
-  console.log('NOVA_BLOOM_COMPASS '+JSON.stringify(results));
- }finally{await browser.close();}
-})().catch(e=>{console.error(e);process.exitCode=1;});
-));
+    assert.match(signal.emitted,new RegExp('MIGRATION · '+c.bearing+' · FLOW '+c.flow+'$'));
    }else{
     assert.equal(signal.sector,5,'BLOOM must not change public destination');
     assert.match(signal.emitted,new RegExp('SHAPE BLOOM · '+c.bearing+' · quiet ground is rich'));
@@ -151,11 +105,11 @@ const {chromium}=require('playwright');
    assert.ok(ui.gear,'real gameplay settings button must be present');
    assert.ok(ui.bottom<=ui.gear.top||ui.top>=ui.gear.bottom||
     ui.right<=ui.gear.left||ui.left>=ui.gear.right,
-    'BLOOM announcement must not sit underneath the settings button: '+JSON.stringify(ui));
+    'public announcement must not sit underneath the settings button: '+JSON.stringify(ui));
    assert.ok(ui.height<110,'toast obscures too much combat at '+c.width+'px: '+JSON.stringify(ui));
    assert.ok(ui.top>=0&&ui.bottom<=ui.viewportHeight,'toast outside portrait viewport: '+JSON.stringify(ui));
    await page.screenshot({path:path.join(output,
-    'frontlines-bloom-compass-'+c.bearing.replace(/ /g,'-').toLowerCase()+'-'+c.width+'.png')});
+    'frontlines-'+(c.type||'bloom').toLowerCase()+'-compass-'+c.bearing.replace(/ /g,'-').toLowerCase()+'-'+c.width+'.png')});
    results.push({bearing:c.bearing,signal,ui});
   }
   assert.deepEqual(errors,[],'no runtime page errors');
