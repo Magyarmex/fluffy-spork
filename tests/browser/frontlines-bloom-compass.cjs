@@ -49,7 +49,7 @@ const {chromium}=require('playwright');
     let emitted=null;
     const old=g.toast;
     g.toast=function(message){emitted=message;return old.apply(this,arguments);};
-    try{LF.directorTick(g,st);}finally{g.toast=old;}
+    try{LF.directorTick(g,st);}finally{g.toast=old;g.setPaused(false);}
     return {emitted,sector:st.signal&&st.signal.sector,type:st.signal&&st.signal.type,
      realGame:!!window.__novaMakeRequire,viewport:window.innerWidth};
    },{x:c.x,y:c.y});
@@ -59,6 +59,10 @@ const {chromium}=require('playwright');
    assert.match(signal.emitted,new RegExp('SHAPE BLOOM · '+c.bearing+' · quiet ground is rich'));
    await page.waitForFunction(message=>[...document.querySelectorAll('.panel.anim-pop')].
     some(n=>n.textContent===message),signal.emitted,{timeout:10000});
+   // A paused-game overlay can fully occlude the toast while all geometry
+   // assertions still pass. Verify the real playing presentation instead.
+   assert.equal(await page.getByText('PAUSED',{exact:true}).count(),0,
+    'a pause modal must not conceal the compass under test');
    // The pop-in animation scales the bounding box; inspect settled geometry.
    await page.waitForTimeout(400);
    const ui=await page.evaluate(message=>{
