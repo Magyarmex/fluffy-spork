@@ -71,6 +71,24 @@ const {chromium}=require('playwright');
   assert.equal(errors.length,0,errors.join('\n'));
   const dir=path.join('artifacts','browser');fs.mkdirSync(dir,{recursive:true});
   await page.screenshot({path:path.join(dir,'tactical-frontlines-memory.png')});
+  await page.setViewportSize({width:320,height:568});
+  const mobile=await page.evaluate(()=>{
+   const g=window.__novaFrontlineGame,T=window.__NOVA_LIVING_FRONT_TEST__;
+   const st=g.__lfState,now=g.time;
+   g.w=320;g.h=568;g.cam.x=g.player.x;g.cam.y=g.player.y;
+   st.signal=null;st.bloomMemory={sector:5,announcedAt:now-7,until:now+17,initialValue:500};
+   st.sectors[5].value=500;
+   if(!T.updateContest(g,st))throw Error('320px viewport lost a physically visible local contest');
+   g.drawMinimap();
+   const S=216,ctx=g.mmCtx,withSignal=new Uint8Array(ctx.getImageData(0,0,S,S).data);
+   st.contestSignal=null;g.drawMinimap();
+   const without=ctx.getImageData(0,0,S,S).data;
+   let changed=0;for(let i=0;i<withSignal.length;i++)if(withSignal[i]!==without[i])changed++;
+   if(changed<100)throw Error('320px portrait lost CONTESTED minimap signal: '+changed);
+   return{viewport:320,changedChannels:changed};
+  });
+  await page.screenshot({path:path.join(dir,'tactical-frontlines-mobile.png')});
   console.log('NOVA_FRONTLINES_REAL_BROWSER '+JSON.stringify(result));
+  console.log('NOVA_FRONTLINES_MOBILE_BROWSER '+JSON.stringify(mobile));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e.stack||e);process.exitCode=1;});
