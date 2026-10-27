@@ -1479,7 +1479,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
  var d=this.drones[j];
  var traced=traceOn&&d&&d.__novaChronoDroneEpoch===this.__novaShapeSweepEpoch;
  if(traced){d.__novaChronoDroneBaseX=d.x;d.__novaChronoDroneBaseY=d.y;}
- var hit=circleResolve(this,d,(d.r||8)+1);if(hit){if(d.__novaPhase==='dash'){d.__novaPhase='recover';d.__novaPhaseT=Math.max(.28,d.__novaPhaseT||0);d.__novaCommitted=false;d.__novaTarget=null;if(this.addParticles)this.addParticles(d.x,d.y,d.color,4,65,'spark');}var n=d.__novaTerrainBump,side=d.__novaTerrainBias||(((d.id||0)&1)?1:-1);d.__novaTerrainBias=side;if(n){d.x+=-n.y*side*28*dt;d.y+=n.x*side*28*dt;}circleResolve(this,d,(d.r||8)+1);
+ var hit=circleResolve(this,d,(d.r||8)+1);if(hit){
+  if(traced&&d.__novaChronoIdleRawEpoch===this.__novaShapeSweepEpoch)
+   d.__novaChronoIdleInvalidEpoch=this.__novaShapeSweepEpoch;
+  if(d.__novaPhase==='dash'){d.__novaPhase='recover';d.__novaPhaseT=Math.max(.28,d.__novaPhaseT||0);d.__novaCommitted=false;d.__novaTarget=null;if(this.addParticles)this.addParticles(d.x,d.y,d.color,4,65,'spark');}var n=d.__novaTerrainBump,side=d.__novaTerrainBias||(((d.id||0)&1)?1:-1);d.__novaTerrainBias=side;if(n){d.x+=-n.y*side*28*dt;d.y+=n.x*side*28*dt;}circleResolve(this,d,(d.r||8)+1);
   /* Rectangle/circle contact is inclusive in isTerrainSafe. The legacy
    * resolver lands exactly on the padded face, which the later Live Vector
    * repair/peel sweep interprets as embedded and can freeze there. Release
@@ -1522,6 +1525,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    /* Raw Swarm integration witnesses are per-epoch diagnostics, never
     * collision authority. Invalidate before any drone owner moves. */
    cd.__novaChronoIdleRawEpoch=-1;
+   cd.__novaChronoIdleInvalidEpoch=-1;
+   cd.__novaChronoIdleUnmodifiedEpoch=-1;
   }
  }
  var shapes=this.shapes||[];for(var si=0;si<shapes.length;si++){var sh=shapes[si];if(!sh)continue;sh.__novaShapeSweepEpoch=epoch;sh.__novaShapeSweepPrevX=sh.x;sh.__novaShapeSweepPrevY=sh.y;}this.__novaShapeSweepActive=true;if(this.__novaBattlefield&&!this.__novaBattlefield.announced&&this.status==='playing'&&this.time>.1){this.__novaBattlefield.announced=true;if(this.toast)this.toast('¦ BATTLEFIELD · '+this.__novaBattlefield.name+'  COVER CHANGES THE FIGHT','info');}
