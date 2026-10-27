@@ -7,8 +7,9 @@ function boot(initial=100,storageFails=false){
  const writes=[],timers=new Map(),listeners={},docListeners={};
  let nextTimer=1;
  class Game{
-  constructor(){this.best=initial;this.status='playing';this.player={id:1,isPlayer:true,score:initial,level:1};}
+  constructor(){this.best=initial;this.status='playing';this.player={id:1,isPlayer:true,score:initial,level:1};this.orbs=[];}
   gainXP(t,amt){t.score+=amt;}
+  updateOrbs(){this.gainXP(this.player,25);}
   pityStartLevel(){return 9;}
   redeploy(){return 'redeployed';}
   destroy(){return 'destroyed';}
@@ -84,4 +85,11 @@ test('production path still includes the Living Front progression owner before b
  assert.match(html,/nova-updates\/living-front-core-v1\.12\.0\.js/);
  assert.match(core,/Game\.prototype\.pityStartLevel=function\(\)\{return 1;\}/);
  assert.match(core,/novatanks_best/);
+});
+
+test('the Living Front neutral-orb gainXP wrapper also saves earned records',()=>{
+ const b=boot(),g=new b.Game();
+ g.updateOrbs(.1);
+ b.tick();
+ assert.equal(b.store.get('novatanks_best'),'125');
 });
