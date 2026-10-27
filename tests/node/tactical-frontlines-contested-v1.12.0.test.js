@@ -21,8 +21,8 @@ function boot(fair=true){
 function scene(fair=true){
  const {T,LF,Game}=boot(fair),g=new Game(),p={id:1,x:-560,y:-560,hp:100,alive:true},
   enemy={id:2,x:-520,y:-540,hp:100,alive:true};
- const calls=[],ctx={save(){},restore(){},beginPath(){},arc(){},stroke(){},fill(){},moveTo(){},lineTo(){},
-  fillText(s){calls.push(s);}};
+ const calls=[],ctx={save(){},restore(){},beginPath(){},arc(x,y,r){calls.push({type:'arc',r});},stroke(){},fill(){},moveTo(){},lineTo(){},
+  fillText(s){calls.push(s);calls.push({type:'text',value:s,font:this.font});}};
  Object.assign(g,{time:100,player:p,tanks:[p,enemy],shapes:[],w:800,h:600,cam:{zoom:1},
   mmCtx:ctx,hasLineOfSight:()=>true,areHostile:(a,b)=>a.id!==b.id,areAllies:()=>false});
  g.__lfState={signal:{type:'BLOOM',sector:5,started:98,until:104},stats:{},sectors:Array.from({length:16},(_,i)=>({value:i===5?500:0,maturity:0,pressure:0})),
@@ -36,14 +36,26 @@ test('visible hostile in the existing BLOOM sector yields a single readable cont
  assert.equal(st.stats.contests,1);
  assert.equal(st.contestSignal.sector,5);
  assert.equal(g.drawMinimap(),'base');
- assert.ok(calls.includes('CONTESTED'),'actual shipping minimap path must render the signal');
+ assert.ok(calls.includes('!'),'actual shipping minimap path must render the signal');
  T.updateContest(g,st);assert.equal(st.stats.contests,1,'do not count every Director tick');
+});
+test('60px CSS minimap gets a readable contest badge rather than a 2.5px label',()=>{
+ const {T,g,calls,st}=scene();
+ assert.equal(T.updateContest(g,st),true);
+ g.drawMinimap();
+ const badge=calls.find(v=>v&&v.type==='text'&&v.value==='!');
+ assert.ok(badge,'CONTESTED must use a large visible exclamation badge');
+ const fontPx=Number((badge.font||'').match(/(\\d+)px/)?.[1]||0);
+ assert.ok(fontPx*60/216>=8,'badge glyph must remain at least 8 CSS px on 60px minimap');
+ assert.ok(calls.some(v=>v&&v.type==='arc'&&v.r*2*60/216>=10),
+  'badge must have a >=10 CSS px visual target');
+ assert.ok(!calls.includes('CONTESTED'),'the old 2.5 CSS px text is not a usable signal');
 });
 test('terrain occlusion suppresses signal and clears stale contest',()=>{
  const {T,g,st,calls}=scene();T.updateContest(g,st);
  g.hasLineOfSight=()=>false;assert.equal(T.updateContest(g,st),false);
  assert.equal(st.contestSignal,null);g.drawMinimap();
- assert.equal(calls.includes('CONTESTED'),false);
+ assert.equal(calls.includes('!'),false);
 });
 test('outside the real Fair Engagement viewport is not radar',()=>{
  const {T,g,enemy,st}=scene();g.w=320;enemy.x=-320;
@@ -121,7 +133,7 @@ test('last-known BLOOM can be contested after the live five-second signal, but n
  assert.equal(T.contestCandidate(g,st),true);
  assert.equal(T.updateContest(g,st),true);
  assert.equal(g.drawMinimap(),'base');
- assert.ok(calls.includes('CONTESTED'),'render after the public live signal expires');
+ assert.ok(calls.includes('!'),'render after the public live signal expires');
  g.time=123;
  assert.equal(T.updateContest(g,st),false);
  assert.equal(st.contestSignal,null);
@@ -134,7 +146,7 @@ test('a depleted remembered BLOOM is historical information, not a false live co
  assert.equal(T.contestCandidate(g,st),false);
  assert.equal(T.updateContest(g,st),false);
  g.drawMinimap();
- assert.ok(!calls.includes('CONTESTED'));
+ assert.ok(!calls.includes('!'));
 });
 
 test('a remembered BLOOM never reveals an occluded, off-screen or allied opponent',()=>{
