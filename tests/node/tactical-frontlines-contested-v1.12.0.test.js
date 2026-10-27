@@ -109,9 +109,9 @@ test('a publicly announced BLOOM leaves bounded last-known map intelligence afte
  assert.equal(st.bloomMemory.announcedAt,100);
  assert.equal(st.bloomMemory.until,124);
  g.time=106;st.signal=null;
- assert.equal(windowDoesNotLeakEnemy(g,st),true,'visible opponent is required even with public memory');
+ g.tanks=[g.player];
+ assert.equal(boot().T.contestCandidate(g,st),false,'public memory alone is not evidence of an enemy');
 });
-function windowDoesNotLeakEnemy(g,st){return !!st.bloomMemory&&st.bloomMemory.sector===5;}
 
 test('last-known BLOOM can be contested after the live five-second signal, but not after memory expiry',()=>{
  const {T,g,st,calls}=scene();
