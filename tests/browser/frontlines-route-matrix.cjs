@@ -123,6 +123,12 @@ const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
       a.__v1102Nav=null;g.__v1102Routes=Object.create(null);g.__v1102RouteContext=null;
       e.x=spot.x;e.y=spot.y;e.hp=e.maxHp||100;e.alive=true;e.spawnShieldT=0;
       a.__lfEcoT=0;a.__lfEcoBias={};a.__lfFrontTurn=null;a.__lfFrontTurnSpentKey=null;
+      /* Live arena initialization consumes RNG after the layout seed. Freeze
+       * the actual rival's initial wander/think state so repeated CI runs
+       * reproduce the same approach, not merely ON/OFF order within one run. */
+      e.angle=0;e.vx=0;e.vy=0;
+      a.state='wander';a.thinkT=999;a.targetId=-1;a.wanderA=0;a.wanderT=999;
+      a.strafe=1;a.dodgeT=0;a.dodgeX=0;a.dodgeY=0;a.aggression=.6;
       a.__v1112TargetId=-1;a.__v180HitAt=-99;a.__v180Threat={risk:0};a.__v180Posture='investigate';
       st.directorEnabled=true;st.signal=null;st.bloomMemory=enabled?memo:null;
       g.time=106;
