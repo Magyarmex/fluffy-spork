@@ -26,7 +26,7 @@ test('live announcement, expired opportunity, disabled Director and arrived bot 
  g.time=106;t.x=-900;sample(a,g,t,true,sectorIndex);
  g.__lfState.directorEnabled=false;sample(a,g,t,true,sectorIndex);
  sample(a,g,t,false,sectorIndex);
- assert.equal(a.samples,4);assert.equal(a.publicMemory,3);
+ assert.equal(a.samples,5);assert.equal(a.enabledSamples,4);assert.equal(a.publicMemory,3);
  assert.equal(a.liveSignal,1);assert.equal(a.expiredWindow,1);
  assert.equal(a.alreadyInside,1);assert.equal(a.precombatIntersection,0);
 });
