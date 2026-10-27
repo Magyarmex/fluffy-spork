@@ -32,7 +32,7 @@ function scene(){
   lastSignalAt:100,lastMeaningfulAt:100,migrationHeat:0};
  Object.assign(g,{__lfState:st,status:'playing',time:101,player:p,tanks:[p,e],shapes:[],bullets:[],orbs:[],
   w:800,h:600,cam:{zoom:1},hasLineOfSight:()=>true,areHostile:(a,b)=>a.id!==b.id});
- return {g,st,p,e,LF,T:window.__NOVA_LIVING_FRONT_TEST__};
+ return {g,st,p,e,LF,T:window.__NOVA_LIVING_FRONT_TEST__,window};
 }
 test('one public BLOOM, one observed contest, repeated ticks and re-entry are distinguished',()=>{
  const {g,st,p,LF}=scene();
@@ -225,4 +225,13 @@ test('decorative War Room cannot produce pilot opportunity telemetry',()=>{
  const {g,st,LF}=scene();g.__novaDecorativeWorld=true;
  assert.equal(LF.frontlineTick(g,st,true),false);
  assert.equal(st.frontlineTelemetry,undefined);
+});
+
+test('canonical Fieldcraft explains dashed last-known BLOOM and visible-only CONTESTED',()=>{
+ const {window}=scene();
+ const tip=window.__NOVA_LIVING_FRONT_TIPS__.find(t=>t.id==='living-front-bloom-choice');
+ assert.ok(tip);
+ assert.match(tip.text,/dashed ring is last-known/);
+ assert.match(tip.text,/CONTESTED means a visible rival/);
+ assert.equal(window.__NOVA_LIVING_FRONT_TIPS__.length,7,'no extra tip slot or UI clutter');
 });
