@@ -81,3 +81,11 @@ test('unseen tank changes cannot alter a visible hostile aim',()=>{
  hidden.hp=10000;hidden.x=900;hidden.id=999;
  assert.deepEqual(aimAtVisibleHostile(g,p,F2),before);
 });
+
+test('dense irrelevant volleys do not trigger a terrain scan per projectile',()=>{
+ const misses=Array.from({length:500},(_,i)=>shot({id:100+i,y:80}));
+ const g=game([...misses,shot()]);let calls=0;
+ g.hasLineOfSight=()=>{calls++;return true;};
+ assert.deepEqual(dodgeVisibleProjectile(g,p,F,{x:0,y:1}),{x:0,y:1});
+ assert.ok(calls<=3,'only plausible visible threat and dodge lane need terrain checks: '+calls);
+});
