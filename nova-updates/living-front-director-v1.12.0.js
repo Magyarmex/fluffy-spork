@@ -89,7 +89,7 @@ function frontlineTick(g,st,observedContest){
  }
  var p=g.player,inside=!!(p&&alive(p)&&!(p.spawnShieldT>0)&&sectorIndex(p.x,p.y)===f.sector);
  var now=Number(g.time)||0,delta=clamp(now-(f.lastSampleTime==null?now:f.lastSampleTime),0,LF.SECTOR_PERIOD*2);
- f.counts.playerSeconds+=delta*(f.playerInside&&inside?1:(f.playerInside||inside?.5:0));
+ f.counts.playerSeconds+=delta*(f.playerInside&&inside?1:((f.playerInside||inside)?0.5:0));
  f.lastSampleTime=now;
  if(p&&alive(p)){
   var c=sectorCenter(f.sector),dist=Math.hypot(p.x-c.x,p.y-c.y);
