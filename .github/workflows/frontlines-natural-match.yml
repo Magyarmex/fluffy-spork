@@ -1,0 +1,35 @@
+name: NOVA Frontlines Natural Match Research
+
+on:
+  pull_request:
+    paths:
+      - 'tests/browser/frontlines-natural-match-ab.cjs'
+      - '.github/workflows/frontlines-natural-match.yml'
+  workflow_dispatch:
+
+jobs:
+  paired-natural-match:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --no-audit --no-fund --no-package-lock
+      - run: npm install --no-save --no-audit --no-fund --no-package-lock playwright@1.56.1
+      - run: npx playwright install chromium
+      - name: Serve actual shipping game
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/nova-natural-http.log 2>&1 &
+          echo $! > /tmp/nova-natural-http.pid
+      - name: Execute paired natural Director full-match research
+        run: node tests/browser/frontlines-natural-match-ab.cjs
+      - name: Preserve research evidence even when experiment falsifies assumptions
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-frontlines-natural-ab
+          path: artifacts/browser/frontlines-natural-match-ab.json
+          if-no-files-found: warn
+          retention-days: 14
