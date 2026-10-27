@@ -922,3 +922,24 @@ test('shadow can resolve an earlier drone after a simultaneous tank/shape contac
   g.updateBullets(1 / 30);
   assert.equal(g.novaChronoShadowSnapshot().predictedBodyContacts, 1);
 });
+
+
+/* Convex TTL drone proof must survive the actual Sniper -> Polish ->
+ * Battlefield -> Apex -> Performance -> Contact Spark combat composition,
+ * not only an isolated Battlefield wrapper. This fixture supplies the
+ * same authoritative frame-start witness normally set by Game.update. */
+for(const fps of [30,60,120,240]){
+ test('full shipping combat stack retains late TTL hostile-drone contact at '+fps+'Hz',()=>{
+  const {g}=boot();let hits=0;
+  g.damageDrone=(_d,_damage,_ownerId)=>{hits++;};
+  g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=1;
+  g.drones=[{kind:'drone',id:7,ownerId:2,x:16.8,y:2,r:8,hp:20,
+   speed:200,__novaPhase:'form',__novaChronoDroneEpoch:1,
+   __novaChronoDronePrevX:16.8,__novaChronoDronePrevY:0,
+   __novaChronoDronePrevSpeed:200,__novaChronoDronePrevV:0}];
+  g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,vx:2500,vy:0,
+   r:3,dmg:20,ttl:.004,pen:0,hits:0,dead:false,shell:false,beam:false}];
+  g.updateBullets(1/fps);
+  assert.equal(hits,1,'materialized full combat stack must preserve the proof');
+ });
+}
