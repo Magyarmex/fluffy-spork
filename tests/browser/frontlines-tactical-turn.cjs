@@ -27,15 +27,21 @@ const {chromium}=require('playwright');
    g.setPaused(true);
    const e=g.tanks.find(t=>t&&t.ai&&t!==g.player&&Math.abs(Number(t.id)||0)%3===1&&Math.abs(Number(t.id)||0)%4!==0);
    if(!e)throw Error('no eligible actual rival in the canonical arena');
-   const c=T.sectorCenter(5);let spot=null;
-   for(let dx=-500;dx<=500&&!spot;dx+=100)for(let dy=-500;dy<=500&&!spot;dy+=100){
-    const x=c.x+dx,y=c.y+dy,d=Math.hypot(dx,dy);
-    if(d<240||d>570)continue;
-    if(g.isTerrainSafe&&!g.isTerrainSafe(x,y,28))continue;
-    if(g.hasLineOfSight&&!g.hasLineOfSight(x,y,c.x,c.y,8))continue;
-    spot={x,y,d};
+   /* Battlefield layouts and seeds differ between runs. Search the real
+    * terrain for a legal public opportunity rather than assuming sector 5
+    * has an unobstructed approach in every random map. */
+   let c=null,spot=null,sector=-1;
+   for(let i=0;i<16&&!spot;i++){
+    const center=T.sectorCenter(i);
+    for(let dx=-500;dx<=500&&!spot;dx+=100)for(let dy=-500;dy<=500&&!spot;dy+=100){
+     const x=center.x+dx,y=center.y+dy,d=Math.hypot(dx,dy);
+     if(d<240||d>570)continue;
+     if(g.isTerrainSafe&&!g.isTerrainSafe(x,y,28))continue;
+     if(g.hasLineOfSight&&!g.hasLineOfSight(x,y,center.x,center.y,8))continue;
+     spot={x,y,d};c=center;sector=i;
+    }
    }
-   if(!spot)throw Error('no real terrain-safe approach to public sector 5');
+   if(!spot)throw Error('no real terrain-safe approach to any public sector');
    const original={x:e.x,y:e.y,hp:e.hp,maxHp:e.maxHp,spawnShieldT:e.spawnShieldT};
    const originalShapes=g.shapes,originalBullets=g.bullets,originalHash=g.hash;
    const p=g.player,oldPX=p.x,oldPY=p.y;
@@ -47,7 +53,7 @@ const {chromium}=require('playwright');
     g.shapes=[];g.bullets=[];g.hash=null;
     g.time=106;
     const st=g.__lfState;st.directorEnabled=true;st.signal=null;
-    st.bloomMemory={sector:5,announcedAt:100,until:124};
+    st.bloomMemory={sector:sector,announcedAt:100,until:124};
     const a=e.ai;a.__lfEcoT=0;a.__lfFrontTurn=null;a.__lfFrontTurnSpentKey=null;
     a.__v1112TargetId=-1;a.__v180HitAt=-99;a.__v180Threat={risk:0};a.__v180Posture='investigate';
     const before=st.stats.aiFrontlineCommitments||0,startX=e.x,startY=e.y;
@@ -61,7 +67,7 @@ const {chromium}=require('playwright');
      throw Error('real AI commitment did not use public memory');
     return{realComposedAI:true,commitmentsAdded:after-before,mode:a.__lfEcoMode,
      weight:+a.__lfEcoWeight.toFixed(3),approachDistance:Math.round(spot.d),
-     actualMovement:+moved.toFixed(3),towardPublicCenter:toward==null?null:+toward.toFixed(3)};
+     sector:sector,actualMovement:+moved.toFixed(3),towardPublicCenter:toward==null?null:+toward.toFixed(3)};
    }finally{
     e.x=original.x;e.y=original.y;e.hp=original.hp;e.maxHp=original.maxHp;e.spawnShieldT=original.spawnShieldT;
     p.x=oldPX;p.y=oldPY;g.shapes=originalShapes;g.bullets=originalBullets;g.hash=originalHash;
