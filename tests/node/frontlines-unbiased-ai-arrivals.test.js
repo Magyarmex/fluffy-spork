@@ -3,7 +3,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 function scene(mode='none'){
- class Game{drawMinimap(){return 'base';}}
+ class Game{drawMinimap(){return 'base';}moveTank(t,vx,vy,dt){t.x+=vx*dt;t.y+=vy*dt;}}
  const window={__novaModules:{'game/engine':function(m){m.exports={Game};}}};
  const ctx={window,console:{info(){},warn(){},error(){}},Math,Number,Object,Array,Date,JSON,Map,Set,
   performance:{now:()=>0},setTimeout(){},clearTimeout(){}};
@@ -22,7 +22,12 @@ function scene(mode='none'){
   tankSpeed:()=>350,areHostile:(a,b)=>a.team!==b.team,hasLineOfSight:()=>true});
  return {g,st,p,e,LF};
 }
-function sample(s,x,y,dt=.22){s.g.time+=dt;s.e.x=x;s.e.y=y;s.LF.frontlineTick(s.g,s.st,false);}
+function sample(s,x,y,dt=.22,throughMovement=true){
+ s.g.time+=dt;
+ if(throughMovement)s.g.moveTank(s.e,(x-s.e.x)/dt,(y-s.e.y)/dt,dt);
+ else{s.e.x=x;s.e.y=y;}
+ s.LF.frontlineTick(s.g,s.st,false);
+}
 test('identical physical arrivals count identically with memory ON, local or OFF',()=>{
  const totals=[];
  for(const mode of ['memory','local','none']){
@@ -80,4 +85,25 @@ test('a bot cannot inflate approach telemetry by resetting its sampled path',()=
  sample(s,-1930,-550);sample(s,-1850,-550);
  assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalApproaches,1,
   'same bot must not count another approach during one public BLOOM');
+});
+
+test('short unobserved teleport over sector edge never counts as physical arrival',()=>{
+ const s=scene();s.e.x=-1200;s.LF.frontlineTick(s.g,s.st,false);
+ sample(s,-1150,-550);sample(s,-1135,-550);
+ sample(s,-1110,-550,.22,false); // only 25 units: old speed heuristic accepts this jump
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,0);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalApproaches,0);
+});
+test('interleaved short relocation invalidates a partially witnessed path',()=>{
+ const s=scene();s.e.x=-1200;s.LF.frontlineTick(s.g,s.st,false);
+ s.g.time+=.22;s.g.moveTank(s.e,35/.22,0,.22);
+ s.e.x=-1118; // invisible relocation after a legitimate move
+ s.g.moveTank(s.e,10/.22,0,.22);
+ s.LF.frontlineTick(s.g,s.st,false);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,0);
+});
+test('legitimate engine movement still certifies one arrival',()=>{
+ const s=scene();s.e.x=-1200;s.LF.frontlineTick(s.g,s.st,false);
+ sample(s,-1160,-550);sample(s,-1130,-550);sample(s,-1110,-550);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,1);
 });
