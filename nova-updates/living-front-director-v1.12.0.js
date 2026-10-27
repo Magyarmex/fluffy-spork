@@ -106,11 +106,21 @@ function physicalAIArrivals(g,f,p,ts,now){
   var t=ts[i],id=t&&t.id!=null?String(t.id):null;
   if(!id)continue;
   if(!t.ai||t===p||!alive(t)||t.spawnShieldT>0||!contestHostile(g,p,t)){
+   /* Death ends one physical bot incarnation. Temporary shields do not. */
+   if(!alive(t)){
+    delete arrived[id];delete approached[id];
+    delete f.aiSeen[id];delete f.aiApproachSeen[id];delete f.aiStartDist[id];
+   }
    delete last[id];continue;
   }
   seen[id]=true;
   var inside=sectorIndex(t.x,t.y)===f.sector,dist=Math.hypot(t.x-c.x,t.y-c.y),prev=last[id];
   if(!prev||prev.ref!==t){
+   if(prev&&prev.ref!==t){
+    /* Same numeric id, new physical tank: never inherit the old arrival. */
+    delete arrived[id];delete approached[id];
+    delete f.aiSeen[id];delete f.aiApproachSeen[id];delete f.aiStartDist[id];
+   }
    last[id]={ref:t,x:t.x,y:t.y,t:now,inside:inside,startDist:inside?null:dist,approached:false};
    continue;
   }
@@ -143,7 +153,10 @@ function physicalAIArrivals(g,f,p,ts,now){
   }
   prev.x=t.x;prev.y=t.y;prev.t=now;prev.inside=inside;
  }
- for(var key in last)if(!seen[key])delete last[key];
+ for(var key in last)if(!seen[key]){
+  delete last[key];delete arrived[key];delete approached[key];
+  delete f.aiSeen[key];delete f.aiApproachSeen[key];delete f.aiStartDist[key];
+ }
  /* One witness is valid for one telemetry interval, never a later sample. */
  f.aiPhysicalMotion={};
 }
