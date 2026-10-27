@@ -30,7 +30,7 @@ class Game {
   this.__novaTerrain=[];this.quality='high';this.sfx={};
   this.cam={x:0,y:0,zoom:1,shake:0};this.w=800;this.h=600;
  }
- update(dt){this.time+=dt;this.updateDrones(dt);this.updateBullets(dt);}
+ update(dt){this.time+=dt;if(this.__novaTestSpawnBullet){this.bullets.push(this.__novaTestSpawnBullet);this.__novaTestSpawnBullet=null;}this.updateDrones(dt);this.updateBullets(dt);}
  updateDrones(){}
  updateBullets(){}
  initBulletIntegrity(){}
@@ -102,7 +102,7 @@ function world({trace=true,terrain=[],damaged=false,command=false}={}){
 }
 
 function shotWorld(hz,{terrain=[],command=false,trace=false,x=20,y=0,
-  vx=2500,ttl=.004,otherBullets=[],friendly=false,phase='form',idleVY=null}={}){
+  vx=2500,ttl=.004,otherBullets=[],friendly=false,phase='form',idleVY=null,bornThisFrame=false}={}){
  const {g,d,owner}=world({trace,terrain,command});
  owner.x=-200;owner.y=0;
  const shooter={id:2,cls:'basic',kind:'tank',alive:true,x:-1000,y:0,hp:100};
@@ -113,6 +113,7 @@ function shotWorld(hz,{terrain=[],command=false,trace=false,x=20,y=0,
  g.bullets=[{kind:'bullet',id:100,ownerId:friendly?1:2,x:0,y:0,
   vx,vy:0,r:3,dmg:20,ttl,pen:0,hits:0,dead:false,
   shell:false,beam:false},...otherBullets];
+ if(bornThisFrame)g.__novaTestSpawnBullet=g.bullets.shift();
  g.update(1/hz);
  return {g,d,owner};
 }
@@ -126,6 +127,12 @@ for(const hz of [30,60,120,240]){
   assert.equal(d.hp,10);
   assert.notEqual(g.__novaDroneChronoTraceEnabled,true,
    'temporary tracing must not remain globally enabled');
+ });
+ test('same-frame newly fired projectile receives certified contact at '+hz+'Hz',()=>{
+  const {g,d}=shotWorld(hz,{bornThisFrame:true});
+  assert.equal(d.__novaChronoIdleUnmodifiedEpoch,g.__novaShapeSweepEpoch,
+   'tracing must arm after the firing phase, before drone movement');
+  assert.deepEqual(g.hitOwners,[2]);
  });
  test('certified idle drone beyond TTL remains unharmed at '+hz+'Hz',()=>{
   const {g}=shotWorld(hz,{x:32});
