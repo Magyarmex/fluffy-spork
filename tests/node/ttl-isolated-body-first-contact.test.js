@@ -1045,3 +1045,28 @@ for(const optimized of [false,true])for(const fps of [30,60]){
   assert.equal(g.__novaShapeSweepActive,false);
  });
 }
+
+
+/* A zero-time hostile drone overlap is not permission to reorder a separate
+ * zero-time lateral projectile already touching that same drone. */
+for(const optimized of [false,true]){
+ test((optimized?'optimized':'baseline')+
+  ' 2000 remote bullets cannot backdate lateral drone hit at t=0',()=>{
+  const Game=boot(undefined,optimized),g=new Game(),events=[];
+  g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=42;
+  g.drones=[{kind:'drone',id:10,ownerId:2,x:8,y:0,r:8,hp:30,
+   __novaChronoDroneEpoch:42,__novaChronoDronePrevX:8,
+   __novaChronoDronePrevY:0}];
+  g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+   vx:500,vy:0,r:3,dmg:20,ttl:.004,pen:0,hits:0,
+   dead:false,shell:false,beam:false}];
+  addRemoteTTLFire(g);
+  g.bullets.push({kind:'bullet',id:99997,ownerId:7,x:8,y:10,
+   vx:0,vy:0,r:3,dmg:15,ttl:1,pen:0,hits:0,
+   dead:false,shell:false,beam:false});
+  g.damageDrone=(d,dmg,owner)=>{events.push(owner);d.hp-=dmg;};
+  g.updateBullets(1/30);
+  assert.deepEqual(events,[7],
+   'simultaneous lateral contact must defer speculative TTL damage');
+ });
+}
