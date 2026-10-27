@@ -99,7 +99,7 @@ test('the actual shipping HTML loads the patched Director after Fair Engagement 
 
 
 test('a publicly announced BLOOM leaves bounded last-known map intelligence after its short live signal',()=>{
- const {LF,g,st}=scene();
+ const {T,LF,g,st}=scene();
  st.signal=null;st.stats.blooms=0;st.lastSignalAt=-99;st.lastBloomSector=-1;
  st.ceiling=1;st.cooldowns.bloom=0;
  st.sectors[5].maturity=.9;st.sectors[5].value=900;
@@ -110,7 +110,7 @@ test('a publicly announced BLOOM leaves bounded last-known map intelligence afte
  assert.equal(st.bloomMemory.until,124);
  g.time=106;st.signal=null;
  g.tanks=[g.player];
- assert.equal(boot().T.contestCandidate(g,st),false,'public memory alone is not evidence of an enemy');
+ assert.equal(T.contestCandidate(g,st),false,'public memory alone is not evidence of an enemy');
 });
 
 test('last-known BLOOM can be contested after the live five-second signal, but not after memory expiry',()=>{
