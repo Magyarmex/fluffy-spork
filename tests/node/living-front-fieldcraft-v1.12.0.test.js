@@ -29,7 +29,7 @@ test('Living Front registers seven stable tactical tips through canonical NOVATi
     assert.match(tip.id, /^living-front-/);
     assert.ok(tip.text.length >= 70, tip.id);
     assert.ok(Array.isArray(tip.tags) && tip.tags.includes('living-front'), tip.id);
-    assert.equal(tip.reviewed, '2026-08-30');
+    assert.equal(tip.reviewed, tip.id === 'living-front-bloom-choice' ? '2026-10-27' : '2026-08-30');
     assert.equal(tip.source, 'living-front-v1.12.0');
   }
 });
