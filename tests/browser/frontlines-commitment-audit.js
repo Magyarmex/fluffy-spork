@@ -3,14 +3,14 @@
  * materialize during natural matches. No gameplay imports or player-facing UI.
  * Sample after the real composed AI update; do not call any AI authority. */
 (function(root){
- function create(){return{samples:0,publicMemory:0,liveSignal:0,expiredWindow:0,
+ function create(){return{samples:0,enabledSamples:0,publicMemory:0,liveSignal:0,expiredWindow:0,
   eligibleWindow:0,alreadyInside:0,subset:0,healthy:0,memoryMode:0,
   meaningfulWeight:0,precombatIntersection:0,activeTurn:0,started:0,
   _seen:new Set()};}
  function sample(audit,g,t,enabled,sectorIndex){
-  if(!audit||!g||!t||!t.ai||!enabled)return;
+  if(!audit||!g||!t||!t.ai)return;
   const a=t.ai,st=g.__lfState,now=Number(g.time)||0,m=st&&st.bloomMemory;
-  audit.samples++;
+  audit.samples++;if(enabled)audit.enabledSamples++;
   if(!st||st.directorEnabled===false||!m||!(now>=m.announcedAt&&now<m.until))return;
   audit.publicMemory++;
   if(st.signal&&st.signal.type==='BLOOM'&&now<st.signal.until){audit.liveSignal++;return;}
