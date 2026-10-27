@@ -11,6 +11,8 @@ const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
 const LAYOUT_INDEX=Number(process.env.NOVA_LAYOUT_INDEX??0);
 const SEED_INDEX=Number(process.env.NOVA_SEED_INDEX??0);
 const PILOT_POLICY=process.env.NOVA_PILOT_POLICY||'wander';
+const AB_MODE=process.env.NOVA_AB_MODE||'memory';
+if(!['memory','live-turn'].includes(AB_MODE))throw Error('NOVA_AB_MODE must be memory or live-turn');
 if(!Number.isInteger(LAYOUT_INDEX)||LAYOUT_INDEX<0||LAYOUT_INDEX>=LAYOUTS.length)
  throw Error('NOVA_LAYOUT_INDEX must be 0, 1, or 2');
 if(!Number.isInteger(SEED_INDEX)||SEED_INDEX<0||SEED_INDEX>1000)
@@ -31,6 +33,7 @@ async function arm(browser,enabled,label){
   await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({state:'visible',timeout:45000});
   await page.addScriptTag({url:'/tests/browser/frontlines-public-pilot.js'});
   await page.addScriptTag({url:'/tests/browser/frontlines-commitment-audit.js'});
+  await page.addScriptTag({url:'/tests/browser/frontlines-live-turn-intervention.js'});
   await page.evaluate(({terrainSeed,gameSeed})=>{
    let state=gameSeed>>>0;
    const seeded=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return (state>>>0)/4294967296;};
@@ -75,7 +78,7 @@ async function arm(browser,enabled,label){
   },{terrainSeed:TERRAIN_SEED,gameSeed:GAME_SEED});
   await page.getByRole('button',{name:/DEPLOY/i}).first().click();
   await page.waitForFunction(()=>window.__novaNaturalMatchGame?.status==='playing'&&!!window.__novaNaturalMatchGame.__lfState,{timeout:30000});
-  const initial=await page.evaluate(({enabled,pilotPolicy,trialRng,terrainIndex,seedIndex})=>{
+  const initial=await page.evaluate(({enabled,pilotPolicy,trialRng,terrainIndex,seedIndex,abMode})=>{
    const g=window.__novaNaturalMatchGame;
    g.setPaused(true); // Advance actual Game.update ourselves.
    /* Paused rendering still runs requestAnimationFrame and may mutate shared
@@ -89,16 +92,29 @@ async function arm(browser,enabled,label){
    g.__novaTrialRng=trialRng; // Simulation RNG isolated from asynchronous paused rendering.
    g.__novaExperimentSeed='natural-20261027-'+terrainIndex+'-'+seedIndex;
    g.__novaExperimentPolicy=pilotPolicy;
+   g.__novaExperimentABMode=abMode;
    if(g.__novaBattlefield?.name!==['CROSSFIRE','SPLIT HORIZON','FOUR GATES'][terrainIndex])throw Error('uncontrolled layout '+g.__novaBattlefield?.name);
    const ai=window.__novaMakeRequire('')('game/ai');
    if(!ai||typeof ai.updateAI!=='function')throw Error('missing composed AI');
    if(!enabled){
     const original=ai.updateAI;
-    ai.updateAI=function(t,world,dt){
-     const st=world.__lfState,memory=st&&st.bloomMemory;
-     if(st)st.bloomMemory=null;
-     try{return original(t,world,dt);}finally{if(st)st.bloomMemory=memory;}
-    };
+    if(abMode==='memory'){
+     // Historical experiment: suppress stale memory (live turns still ON).
+     ai.updateAI=function(t,world,dt){
+      const st=world.__lfState,memory=st&&st.bloomMemory;
+      if(st)st.bloomMemory=null;
+      try{return original(t,world,dt);}finally{if(st)st.bloomMemory=memory;}
+     };
+    }else{
+     // Causal intervention: retain public signals and stale memory;
+     // forbid only a fresh live commitment on the current announcement.
+     const intervention=window.__novaResearchLiveTurnIntervention;
+     if(!intervention||typeof intervention.suppressLiveStart!=='function')
+      throw Error('missing research-only live-turn intervention');
+     ai.updateAI=function(t,world,dt){
+      return intervention.suppressLiveStart(original,t,world,dt);
+     };
+    }
    }
    /* Observe the real composed AI without altering its decision authority. */
    const commitmentWitness=window.__novaResearchCommitmentAudit;
@@ -232,7 +248,7 @@ async function arm(browser,enabled,label){
     bots:g.tanks.filter(t=>t.ai).map(t=>[t.id,+t.x.toFixed(3),+t.y.toFixed(3),t.cls]),
     shapes:g.shapes.slice(0,32).map(s=>[s.id,s.type,+s.x.toFixed(3),+s.y.toFixed(3)])});
    return{fingerprint,initialBotCount:g.tanks.filter(t=>t.ai).length,initialShapes:g.shapes.length};
-  },{enabled,pilotPolicy:PILOT_POLICY,trialRng:TRIAL_RNG,terrainIndex:LAYOUT_INDEX,seedIndex:SEED_INDEX});
+  },{enabled,pilotPolicy:PILOT_POLICY,trialRng:TRIAL_RNG,terrainIndex:LAYOUT_INDEX,seedIndex:SEED_INDEX,abMode:AB_MODE});
   let last=null;
   for(let i=0;i<Math.ceil(SECONDS/DT/CHUNK);i++){
    last=await page.evaluate(({steps,dt})=>{
@@ -252,7 +268,7 @@ async function arm(browser,enabled,label){
   }
   const result=await page.evaluate(()=>{
    const g=window.__novaNaturalMatchGame,s=window.NOVALivingFront.snapshot(),p=g.player;
-   return{metadata:{layout:g.__novaBattlefield.name,seed:g.__novaExperimentSeed,pilotPolicy:g.__novaExperimentPolicy},
+   return{metadata:{layout:g.__novaBattlefield.name,seed:g.__novaExperimentSeed,pilotPolicy:g.__novaExperimentPolicy,abMode:g.__novaExperimentABMode},
     frontline:s.frontline,stats:s.stats,game:{time:+g.time.toFixed(3),status:g.status,
      pilotAlive:!!p.alive,score:p.score,kills:p.kills,level:p.level,
      botCount:g.tanks.filter(t=>t.ai&&t.alive).length},
@@ -287,26 +303,33 @@ async function arm(browser,enabled,label){
   assert.equal(off.initial.fingerprint,offReplay.initial.fingerprint,'same seed must reproduce initial world');
   const same=JSON.stringify(off.result)===JSON.stringify(offReplay.result);
   const naturalOpportunityObserved=[off,on].every(a=>a.result.naturalBlooms>0);
-  const report={method:'scripted full-match natural Director research; not human fun; public-bloom is closed-loop policy',
+  if(AB_MODE==='live-turn'){
+   assert.equal(off.result.commitmentAudit.startedLive,0,'OFF must suppress all live-turn starts');
+   assert.equal(offReplay.result.commitmentAudit.startedLive,0,'OFF replay must also suppress live starts');
+  }
+  const verifiedLiveStart=AB_MODE==='live-turn'&&on.result.commitmentAudit.startedLive>0;
+  const report={method:AB_MODE==='live-turn'?'paired natural full-match live-turn causal intervention (not human fun)':'scripted full-match natural Director research; not human fun; public-bloom is closed-loop policy',
+   abMode:AB_MODE,verifiedLiveStart,
    initialWorldIdentical:true,offReplayIdentical:same,
    naturalOpportunityObserved,
-   interpretation:naturalOpportunityObserved?'Descriptive only: natural BLOOM observed; inspect opportunity timing, deaths and public pilot commands before causal interpretation.':'INCONCLUSIVE: at least one arm had no natural BLOOM; retain this censored pair.',
+   interpretation:AB_MODE==='live-turn'?(verifiedLiveStart&&naturalOpportunityObserved?'Live-turn intervention activated; interpret matched-policy differences cautiously because later public signals can diverge endogenously.':'INCONCLUSIVE: no verified ON live start or natural BLOOM exposure in both arms; retain the pair.'):(naturalOpportunityObserved?'Descriptive only: natural BLOOM observed; inspect opportunity timing, deaths and public pilot commands before causal interpretation.':'INCONCLUSIVE: at least one arm had no natural BLOOM; retain this censored pair.'),
    off:off.result,on:on.result,offReplay:offReplay.result,
    limits:['No artificial BLOOM or forced survival','One layout/seed/pilot-policy per invocation; matrix must aggregate independently',
     'A deterministic Scout script is not a human player',
     'Public-bloom commands can differ after ON/OFF worlds diverge; this is matched policy, not fixed inputs',
     'Public-bloom command samples are input calls, not measured seconds or proof of physical progress',
-    'Seed replay is checked, not assumed']};
+    'Seed replay is checked, not assumed',
+    'In live-turn mode, only live-start authority is intervened on; later natural signals can differ as treatment outcomes']};
   const dir=path.join('artifacts','browser');fs.mkdirSync(dir,{recursive:true});
   fs.writeFileSync(path.join(dir,'frontlines-natural-match-ab.json'),JSON.stringify(report,null,2));
   fs.writeFileSync(path.join(dir,'frontlines-natural-on.json'),JSON.stringify(on.result,null,2));
   fs.writeFileSync(path.join(dir,'frontlines-natural-off.json'),JSON.stringify(off.result,null,2));
   fs.writeFileSync(path.join(dir,'frontlines-natural-manifest.json'),JSON.stringify({
-   pairs:[{layout:LAYOUT,seed:SEED_ID,pilotPolicy:PILOT_POLICY,
+   pairs:[{layout:LAYOUT,seed:SEED_ID,pilotPolicy:PILOT_POLICY,abMode:AB_MODE,
     on:'frontlines-natural-on.json',off:'frontlines-natural-off.json'}]
   },null,2));
   console.log('NOVA_FRONTLINES_NATURAL_MATCH_AB '+JSON.stringify({initialWorldIdentical:true,offReplayIdentical:same,
-   naturalOpportunityObserved,
+   naturalOpportunityObserved,abMode:AB_MODE,verifiedLiveStart,
    config:{layout:LAYOUT,seed:SEED_ID,pilotPolicy:PILOT_POLICY},
    off:{time:off.result.game.time,status:off.result.game.status,blooms:off.result.naturalBlooms,publicBloomCommands:off.result.publicBloomCommandSamples,frontline:off.result.frontline?.counts,contestGateAudit:Object.fromEntries(Object.entries(off.result.contestGateAudit).filter(([k])=>k!=='coLocationExamples'))},
    on:{time:on.result.game.time,status:on.result.game.status,blooms:on.result.naturalBlooms,publicBloomCommands:on.result.publicBloomCommandSamples,frontline:on.result.frontline?.counts,contestGateAudit:Object.fromEntries(Object.entries(on.result.contestGateAudit).filter(([k])=>k!=='coLocationExamples'))}}));

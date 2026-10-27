@@ -1,0 +1,75 @@
+name: NOVA Frontlines Live Turn Causal Research
+
+on:
+  pull_request:
+    paths:
+      - 'tests/browser/frontlines-natural-match-ab.cjs'
+      - 'tests/browser/frontlines-live-turn-intervention.js'
+      - 'tests/browser/frontlines-commitment-audit.js'
+      - 'scripts/frontlines-live-turn-matrix-report.cjs'
+      - '.github/workflows/frontlines-live-turn-causal.yml'
+  workflow_dispatch:
+
+jobs:
+  paired-live-turn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        layout: [0, 1, 2]
+        pilot: [wander, public-bloom, public-bloom-harvest]
+        seed: [0, 1]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --no-audit --no-fund --no-package-lock
+      - run: npm install --no-save --no-audit --no-fund --no-package-lock playwright@1.56.1
+      - run: npx playwright install chromium
+      - name: Serve real 48-overlay shipping game
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/nova-live-turn-http.log 2>&1 &
+          echo $! > /tmp/nova-live-turn-http.pid
+      - name: Isolate live public BLOOM commitment in paired natural matches
+        env:
+          NOVA_AB_MODE: live-turn
+          NOVA_LAYOUT_INDEX: ${{ matrix.layout }}
+          NOVA_PILOT_POLICY: ${{ matrix.pilot }}
+          NOVA_SEED_INDEX: ${{ matrix.seed }}
+        run: node tests/browser/frontlines-natural-match-ab.cjs
+      - name: Preserve falsifying evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-frontlines-natural-ab-live-turn-${{ matrix.layout }}-${{ matrix.pilot }}-${{ matrix.seed }}
+          path: artifacts/browser/frontlines-natural-*
+          if-no-files-found: warn
+          retention-days: 14
+
+  collate-live-turn:
+    needs: paired-live-turn
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: nova-frontlines-natural-ab-live-turn-*
+          path: artifacts/matrix
+          merge-multiple: false
+      - name: Verify all attempted pairs and the isolated intervention
+        run: node scripts/frontlines-live-turn-matrix-report.cjs artifacts/matrix 18
+      - name: Preserve complete matrix summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-frontlines-live-turn-matrix-summary
+          path: artifacts/matrix/frontlines-live-turn-matrix-summary.json
+          if-no-files-found: warn
+          retention-days: 14
