@@ -168,3 +168,23 @@ for(const fps of [30,60,120]){
   assert.equal(g.hits,0,'unknown drone contact requires a stronger time witness');
  });
 }
+
+test('seeded independent two-lane TTL contacts agree with analytic geometry',()=>{
+ let seed=20261027;
+ const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ let worlds=0,reachable=0;
+ for(const fps of [30,60,120])for(const reverse of [false,true])
+  for(let n=0;n<100;n++){
+   const xs=[25+rand()*65,25+rand()*65];
+   const g=batchWorld(fps,{reverse,mutate:g=>{
+    g.tanks[0].x=xs[0];g.tanks[1].x=xs[1];
+   }});
+   const expected=xs.filter(x=>x-21<=6000*.005).length;
+   reachable+=expected;worlds++;
+   assert.equal(g.hits,expected,
+    'nonlethal independent physical contacts must not depend on remote density, order or FPS: '+
+    JSON.stringify({fps,reverse,xs,expected,actual:g.hits}));
+  }
+ assert.equal(worlds,600);
+ assert.ok(reachable>100&&reachable<1000,'oracle must exercise hits and misses');
+});
