@@ -1,0 +1,80 @@
+'use strict';
+// Research gate: Fair Engagement's one-target legacy view currently masks
+// Battle Sense's third-party tactical geometry. Keep hidden information hidden.
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const vm=require('node:vm');
+const root=path.resolve(__dirname,'../..');
+const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const battle='nova-updates/battle-sense-v1.8.1.js';
+const fair='nova-updates/fair-engagement-v1.11.2.js';
+assert.ok(html.indexOf(battle)>=0&&html.indexOf(fair)>html.indexOf(battle),
+ 'real shipping order must load Battle Sense before Fair Engagement');
+function boot(){
+ class Game {
+  constructor(){this.time=10;this.w=1000;this.h=800;this.cam={zoom:1};
+   this.tanks=[];this.bullets=[];this.powerups=[];this.status='playing';}
+  getTank(id){return this.tanks.find(t=>t.id===id)||null;}
+  hasLineOfSight(){return true;}
+  moveTank(){}
+  tankSpeed(){return 200;}
+ }
+ const classes={CLASSES:{twin:{size:15},guard:{size:15},cannon:{size:15}},
+  lineageForClass:cls=>cls==='guard'?'guardian':cls==='cannon'?'cannon':'gunner'};
+ const mods={
+  'game/engine':m=>{m.exports.Game=Game;},
+  'game/ai':m=>{m.exports.updateAI=(t,g)=>{g.__legacyVisibleIds=g.tanks.map(q=>q.id);};},
+  'game/classes':m=>{m.exports=classes;}
+ };
+ const win={__novaModules:mods};
+ const ctx={window:win,console:{info(){},warn(){},error(){}},
+  Math,Number,Object,Map,Set,Date,Array};
+ for(const file of [battle,fair])vm.runInNewContext(
+  fs.readFileSync(path.join(root,file),'utf8'),ctx,{filename:file});
+ const cache={};
+ function requireModule(id){if(cache[id])return cache[id].exports;
+  const m={exports:{}};cache[id]=m;
+  mods[id](m,m.exports,ref=>ref==='./classes'?requireModule('game/classes'):null);
+  return m.exports;
+ }
+ return {Game:requireModule('game/engine').Game,
+  ai:requireModule('game/ai'),win};
+}
+function tank(id,cls,x,y){
+ return {id,cls,x,y,hp:100,maxHp:100,alive:true,isPlayer:false,
+  spawnShieldT:0,ai:{state:'wander',targetId:-1,__v180TargetId:-1}};
+}
+function scene({width=1000,cover=false}={}){
+ const {Game,ai}=boot(),g=new Game();g.w=width;
+ const self=tank(1,'twin',-300,0),target=tank(2,'guard',0,0),
+  duelist=tank(3,'cannon',200,0);
+ target.ai.__v180TargetId=duelist.id;
+ g.tanks=[self,target,duelist];
+ if(cover)g.hasLineOfSight=(ax,ay,bx,by)=>!(
+  ax===target.x&&ay===target.y&&bx===duelist.x&&by===duelist.y);
+ return {g,ai,self,target,duelist};
+}
+test('[RED] composed AI recognizes a legitimately perceived third-party duel',()=>{
+ const {g,ai,self}=scene();
+ ai.updateAI(self,g,1/30);
+ assert.equal(self.ai.__v1112TargetId,2,'fairly chosen primary target is unchanged');
+ assert.equal(self.ai.__v181Mode,'crossfire',
+  'Battle Sense should see other genuinely perceived duelists, not just the primary target');
+ assert.equal(g.tanks.length,3,'legacy AI narrowing must be restored after thinking');
+ assert.deepEqual(Array.from(g.__legacyVisibleIds),[1,2],
+  'legacy target gate must still see exactly one primary rival');
+});
+test('offscreen third party cannot influence the composed AI',()=>{
+ const {g,ai,self}=scene({width:600});
+ ai.updateAI(self,g,1/30);
+ assert.notEqual(self.ai.__v181Mode,'crossfire');
+ assert.equal(self.ai.__v1112TargetId,2);
+});
+test('occluded third party cannot influence crossfire',()=>{
+ const {g,ai,self}=scene({cover:true});
+ ai.updateAI(self,g,1/30);
+ assert.notEqual(self.ai.__v181Mode,'crossfire');
+ assert.equal(self.ai.__v1112TargetId,2);
+});
