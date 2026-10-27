@@ -283,6 +283,13 @@ async function arm(browser,enabled,label){
   assert.ok(result.commitmentAudit.samples>0,'real composed AI must be observed');
   assert.ok(result.commitmentAudit.eligibleWindow<=result.commitmentAudit.publicMemory);
   assert.ok(result.commitmentAudit.precombatIntersection<=result.commitmentAudit.eligibleWindow);
+  const liveGate=result.commitmentAudit.liveGate;
+  assert.ok(liveGate,'research live eligibility witness required');
+  assert.equal(liveGate.samples,result.commitmentAudit.liveSignal);
+  assert.equal(Object.values(liveGate.firstBlock).reduce((a,b)=>a+b,0),liveGate.samples);
+  assert.ok(liveGate.possibleFreshNoHeldTarget<=liveGate.possibleFreshStarts);
+  assert.ok(liveGate.possibleFreshStarts<=liveGate.precombatIntersection);
+  assert.ok(liveGate.precombatIntersection<=liveGate.samples);
   assert.equal(result.contestGateAudit.pilotInside,
    result.contestGateAudit.noHostile+result.contestGateAudit.hostileCoLocated);
   assert.equal(result.contestGateAudit.hostileCoLocated,
