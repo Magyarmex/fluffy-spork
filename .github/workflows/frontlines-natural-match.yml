@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - 'tests/browser/frontlines-natural-match-ab.cjs'
+      - 'scripts/frontlines-natural-matrix-report.cjs'
+      - 'scripts/frontlines-ab-batch.cjs'
+      - 'scripts/frontlines-ab-report.cjs'
       - '.github/workflows/frontlines-natural-match.yml'
   workflow_dispatch:
 
@@ -41,5 +44,31 @@ jobs:
         with:
           name: nova-frontlines-natural-ab-${{ matrix.layout }}-${{ matrix.pilot }}-${{ matrix.seed }}
           path: artifacts/browser/frontlines-natural-*
+          if-no-files-found: warn
+          retention-days: 14
+
+  collate-natural-matrix:
+    needs: paired-natural-match
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: nova-frontlines-natural-ab-*
+          path: artifacts/matrix
+          merge-multiple: false
+      - name: Validate all attempted pairs and preserve bloom-less censored trials
+        run: node scripts/frontlines-natural-matrix-report.cjs artifacts/matrix 12
+      - name: Preserve audited matrix summary
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-frontlines-natural-matrix-summary
+          path: artifacts/matrix/frontlines-natural-matrix-summary.json
           if-no-files-found: warn
           retention-days: 14
