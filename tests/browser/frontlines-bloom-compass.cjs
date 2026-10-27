@@ -52,6 +52,9 @@ const {chromium}=require('playwright');
     st.sectors.forEach(s=>{s.value=0;s.maturity=.1;s.pressure=0;s.outbound=0;});
     st.sectors[5].value=900;st.sectors[5].maturity=.95;
     st.sectors[5].outbound=12;
+    // The test jumps to match-time 100 within the first live second. Prevent
+    // a pending Battlefield startup toast from overwriting this test signal.
+    if(g.__novaBattlefield)g.__novaBattlefield.announced=true;
     let emitted=null;
     const old=g.toast;
     g.toast=function(message){emitted=message;return old.apply(this,arguments);};
@@ -95,7 +98,11 @@ const {chromium}=require('playwright');
      gear:gr?{left:gr.left,right:gr.right,top:gr.top,bottom:gr.bottom}:null,
      viewport:window.innerWidth,viewportHeight:window.innerHeight};
    },signal.emitted);
-   assert.ok(ui,'public compass must reach the actual React toast');
+   assert.ok(ui,'public compass must reach the actual React toast: '+
+    JSON.stringify({signal,visible:await page.evaluate(()=>
+     [...document.querySelectorAll('div')].map(e=>e.textContent||'')
+      .filter(t=>t.includes('BLOOM')||t.includes('MIGRATION'))
+      .slice(-5))}));
    assert.ok(ui.left>=-1&&ui.right<=ui.viewport+1,
     'toast panel clips at '+c.width+'px: '+JSON.stringify(ui));
    assert.ok(ui.glyphLeft>=-1&&ui.glyphRight<=ui.viewport+1,
