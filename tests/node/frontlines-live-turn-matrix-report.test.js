@@ -17,7 +17,7 @@ function snap(layout,seed,policy,startedLive,arrivals=1,blooms=2){
 function pair(root,layout,policy,seed,liveStarts=1,blooms=2){
  const name='nova-frontlines-natural-ab-live-turn-'+layout.replaceAll(' ','-')+'-'+policy+'-'+seed;
  const dir=path.join(root,name);fs.mkdirSync(dir);
- const on=snap(layout,seed,policy,liveStarts,2,blooms),off=snap(layout,seed,policy,0,1,blooms);
+ const on=snap(layout,seed,policy,liveStarts,liveStarts?2:1,blooms),off=snap(layout,seed,policy,0,1,blooms);
  const row={layout,seed,pilotPolicy:policy,abMode:'live-turn',on:'frontlines-natural-on.json',off:'frontlines-natural-off.json'};
  const report={abMode:'live-turn',verifiedLiveStart:liveStarts>0,
   naturalOpportunityObserved:blooms>0,initialWorldIdentical:true,offReplayIdentical:true,
@@ -83,4 +83,12 @@ test('collector rejects an incomplete or internally impossible live-gate witness
  fs.writeFileSync(path.join(p.dir,'frontlines-natural-on.json'),JSON.stringify(p.report.on));
  fs.writeFileSync(path.join(p.dir,'frontlines-natural-match-ab.json'),JSON.stringify(p.report));
  assert.throws(()=>collectLiveTurnMatrix(root,1),/impossible live gate intersection/);
+}));
+
+test('no live turn must imply identical physical game outcomes in both arms',()=>sandbox(root=>{
+ const p=pair(root,'CROSSFIRE','wander','s0',0);
+ p.report.on.frontline.counts.aiPhysicalArrivals=2;
+ fs.writeFileSync(path.join(p.dir,'frontlines-natural-on.json'),JSON.stringify(p.report.on));
+ fs.writeFileSync(path.join(p.dir,'frontlines-natural-match-ab.json'),JSON.stringify(p.report));
+ assert.throws(()=>collectLiveTurnMatrix(root,1),/no-treatment ON\/OFF gameplay diverged/);
 }));
