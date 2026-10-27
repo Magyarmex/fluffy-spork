@@ -25,7 +25,7 @@ function scene(fair=true){
   fillText(s){calls.push(s);}};
  Object.assign(g,{time:100,player:p,tanks:[p,enemy],shapes:[],w:800,h:600,cam:{zoom:1},
   mmCtx:ctx,hasLineOfSight:()=>true,areHostile:(a,b)=>a.id!==b.id,areAllies:()=>false});
- g.__lfState={signal:{type:'BLOOM',sector:5,started:98,until:104},stats:{},sectors:Array.from({length:16},()=>({value:0,maturity:0,pressure:0})),
+ g.__lfState={signal:{type:'BLOOM',sector:5,started:98,until:104},stats:{},sectors:Array.from({length:16},(_,i)=>({value:i===5?500:0,maturity:0,pressure:0})),
   lastSignalAt:99,cooldowns:{bloom:24,migration:20,star:58},migrationHeat:0,planMsEma:0,planMsPeak:0};
  return {T,LF,g,p,enemy,calls,st:g.__lfState};
 }
@@ -156,5 +156,10 @@ test('last-known BLOOM memory survives a different public Director signal withou
  st.signal={type:'MIGRATION',started:105,until:110,from:1,to:2};
  assert.equal(T.contestCandidate(g,st),true);
  g.tanks=[g.player];
+ assert.equal(T.contestCandidate(g,st),false);
+});
+
+test('even a live BLOOM cannot advertise an empty opportunity as contested',()=>{
+ const {T,g,st}=scene();st.sectors[5].value=0;
  assert.equal(T.contestCandidate(g,st),false);
 });
