@@ -29,7 +29,7 @@ function collectMatrix(root,expected=12){
    throw Error(dir+': initial-world equality or independent OFF replay failed');
   const row=manifest.pairs[0];
   if(!['CROSSFIRE','SPLIT HORIZON','FOUR GATES'].includes(row.layout)||
-     !['wander','public-bloom','public-bloom-harvest'].includes(row.pilotPolicy)||
+     !['wander','public-bloom','public-bloom-harvest','public-bloom-harvest-defense'].includes(row.pilotPolicy)||
      typeof row.seed!=='string'||!row.seed)
    throw Error(dir+': missing declared layout, seed or pilot policy');
   if(row.on!=='frontlines-natural-on.json'||row.off!=='frontlines-natural-off.json')
@@ -45,6 +45,7 @@ function collectMatrix(root,expected=12){
    nonnegative(s.naturalBlooms,arm+' natural BLOOM count');
    nonnegative(s.publicBloomCommandSamples,arm+' public pilot command samples');
    if(s.visibleNeutralAimSamples!=null)nonnegative(s.visibleNeutralAimSamples,arm+' visible-neutral aim samples');
+   if(s.visibleDodgeSamples!=null)nonnegative(s.visibleDodgeSamples,arm+' visible-threat dodge samples');
   }
   const onHas=!!on.frontline?.counts,offHas=!!off.frontline?.counts;
   if((on.naturalBlooms>0&&!onHas)||(off.naturalBlooms>0&&!offHas))
