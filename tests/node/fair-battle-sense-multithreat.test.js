@@ -163,3 +163,11 @@ test('witnessed fire aimed away from the duelist does not imply a duel',()=>{
  ai.updateAI(self,g,1/60);
  assert.notEqual(self.ai.__v181Mode,'crossfire');
 });
+
+test('visible allied duelists do not create imaginary hostile crossfire',()=>{
+ const {g,ai,self,target,duelist}=scene();
+ self.team='blue';target.team='red';duelist.team='red';
+ ai.updateAI(self,g,1/60);
+ assert.notEqual(self.ai.__v181Mode,'crossfire');
+ assert.equal(self.ai.__v1112TargetId,2);
+});
