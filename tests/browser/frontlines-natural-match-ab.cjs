@@ -15,8 +15,8 @@ if(!Number.isInteger(LAYOUT_INDEX)||LAYOUT_INDEX<0||LAYOUT_INDEX>=LAYOUTS.length
  throw Error('NOVA_LAYOUT_INDEX must be 0, 1, or 2');
 if(!Number.isInteger(SEED_INDEX)||SEED_INDEX<0||SEED_INDEX>1000)
  throw Error('NOVA_SEED_INDEX must be an integer from 0 to 1000');
-if(!['wander','public-bloom'].includes(PILOT_POLICY))
- throw Error('NOVA_PILOT_POLICY must be wander or public-bloom');
+if(!['wander','public-bloom','public-bloom-harvest'].includes(PILOT_POLICY))
+ throw Error('NOVA_PILOT_POLICY must be wander, public-bloom, or public-bloom-harvest');
 const LAYOUT=LAYOUTS[LAYOUT_INDEX],TERRAIN_SEED=LAYOUT_INDEX;
 const GAME_SEED=(0x1d4a3f21^Math.imul(SEED_INDEX,0x9e3779b9))>>>0;
 const TRIAL_RNG=(0x7d27e91b^Math.imul(SEED_INDEX,0x85ebca6b))>>>0;
@@ -29,6 +29,7 @@ async function arm(browser,enabled,label){
  try{
   await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded',timeout:45000});
   await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({state:'visible',timeout:45000});
+  await page.addScriptTag({url:'/tests/browser/frontlines-public-pilot.js'});
   await page.evaluate(({terrainSeed,gameSeed})=>{
    let state=gameSeed>>>0;
    const seeded=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return (state>>>0)/4294967296;};
@@ -162,7 +163,7 @@ async function arm(browser,enabled,label){
    if(g.tanks.filter(t=>t.ai).length<8)throw Error('expected eight ordinary rivals');
    g.input.mouseActive=false;g.input.autofire=true;g.input.firing=false;
    const wander=()=>({x:Math.cos(g.time*.29),y:Math.sin(g.time*.29)});
-   if(pilotPolicy==='public-bloom'){
+   if(pilotPolicy==='public-bloom'||pilotPolicy==='public-bloom-harvest'){
     const LF=window.__NOVA_LIVING_FRONT_INTERNAL__;
     if(!LF||typeof LF.sectorCenter!=='function'||typeof LF.sectorIndex!=='function')
      throw Error('missing canonical public sector geometry');
@@ -179,11 +180,29 @@ async function arm(browser,enabled,label){
      g.__novaPublicBloomCommands=(g.__novaPublicBloomCommands||0)+1;
      return{x:dx/d,y:dy/d};
     };
+    if(pilotPolicy==='public-bloom-harvest'){
+     const helper=window.__novaResearchPublicPilot;
+     if(!helper)throw Error('research-only public pilot helper missing');
+     g.input.moveVec=()=>{
+      const v=helper.moveTowardPublicBloom(g,p,LF);
+      if(v){g.__novaPublicBloomCommands=(g.__novaPublicBloomCommands||0)+1;return v;}
+      return wander();
+     };
+    }
    }else g.input.moveVec=wander;
    /* Wander movement and aim depend only on simulation time. The optional
     * public-signal movement policy is closed-loop: identical rules and initial
     * state, but not necessarily identical commands after ON/OFF diverge. */
    g.input.aimVec=()=>({x:Math.cos(g.time*.73),y:Math.sin(g.time*.73)});
+   if(pilotPolicy==='public-bloom-harvest'){
+    const helper=window.__novaResearchPublicPilot,LF=window.__NOVA_LIVING_FRONT_INTERNAL__,
+     F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
+    g.input.aimVec=()=>{
+     const v=helper.aimAtVisibleNeutral(g,p,LF,F);
+     if(v){g.__novaVisibleAimSamples=(g.__novaVisibleAimSamples||0)+1;return v;}
+     return{x:Math.cos(g.time*.73),y:Math.sin(g.time*.73)};
+    };
+   }
    const fingerprint=JSON.stringify({layout:g.__novaBattlefield.name,
     pilot:{x:+p.x.toFixed(3),y:+p.y.toFixed(3),cls:p.cls},
     bots:g.tanks.filter(t=>t.ai).map(t=>[t.id,+t.x.toFixed(3),+t.y.toFixed(3),t.cls]),
@@ -215,6 +234,7 @@ async function arm(browser,enabled,label){
      botCount:g.tanks.filter(t=>t.ai&&t.alive).length},
     contestGateAudit:g.__novaContestAudit,
     naturalBlooms:s.stats.blooms||0,publicBloomCommandSamples:g.__novaPublicBloomCommands||0,
+    visibleNeutralAimSamples:g.__novaVisibleAimSamples||0,
     events:s.frontline?.events||[]};
   });
   if(result.naturalBlooms>0)assert.ok(result.contestGateAudit.samples>0,'announced BLOOM must be audited');
