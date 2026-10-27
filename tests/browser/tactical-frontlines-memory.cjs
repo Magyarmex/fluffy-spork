@@ -73,6 +73,20 @@ const {chromium}=require('playwright');
    e.x=-1110;e.y=-550;g.time+=.22;LF.frontlineTick(g,st,false);
    if(st.frontlineTelemetry.counts.aiPhysicalArrivals!==beforePhysical)
     throw Error('real runtime accepted direct enemy relocation as a physical AI arrival');
+   // Positive proof on the real composed movement owner. Choose a genuinely
+   // traversable short corridor across sector 5's west edge; no mock physics.
+   let certifiedEntry=false,entryY=null;
+   for(let y=-1030;y<=-80&&!certifiedEntry;y+=95){
+    if(g.isTerrainSafe&&(!g.isTerrainSafe(-1160,y,25)||!g.isTerrainSafe(-1070,y,25)))continue;
+    if(!g.hasLineOfSight(-1160,y,-1070,y,20))continue;
+    e.x=-1160;e.y=y;e.vx=0;e.vy=0;
+    g.time+=.22;LF.frontlineTick(g,st,false); // unobserved reposition: reset baseline
+    g.time+=.22;g.moveTank(e,350,0,.22);LF.frontlineTick(g,st,false);
+    if(T.sectorIndex(e.x,e.y)===5&&st.frontlineTelemetry.counts.aiPhysicalArrivals===beforePhysical+1){
+     certifiedEntry=true;entryY=y;
+    }
+   }
+   if(!certifiedEntry)throw Error('real composed moveTank failed to certify any terrain-safe sector entry');
    e.x=oldEnemyX;e.y=oldEnemyY;
    g.drawMinimap();
    const ctx=g.mmCtx,S=216;
@@ -88,7 +102,7 @@ const {chromium}=require('playwright');
    if(T.contestCandidate(g,st))throw Error('expired memory still creates live contact');
    return{changedChannels:changed,publicMemoryTTL:24,liveSignalExpired:true,
      realFairEngagement:!!window.__NOVA_FAIR_ENGAGEMENT_TEST__,
-     realBattlefieldLOS:typeof g.hasLineOfSight==='function',shortTeleportRejected:true};
+     realBattlefieldLOS:typeof g.hasLineOfSight==='function',shortTeleportRejected:true,certifiedEntry,entryY};
   });
   assert.equal(errors.length,0,errors.join('\n'));
   const dir=path.join('artifacts','browser');fs.mkdirSync(dir,{recursive:true});
