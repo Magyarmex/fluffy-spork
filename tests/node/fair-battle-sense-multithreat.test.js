@@ -51,6 +51,10 @@ function scene({width=1000,cover=false}={}){
  const self=tank(1,'twin',-300,0),target=tank(2,'guard',0,0),
   duelist=tank(3,'cannon',200,0);
  target.ai.__v180TargetId=duelist.id;
+ // Observer witnessed the target fire east toward the other visible duelist.
+ self.ai.__v181ObservedShotId=target.id;
+ self.ai.__v181ObservedShotAt=9.9;
+ self.ai.__v181ObservedShotAngle=0;
  g.tanks=[self,target,duelist];
  if(cover)g.hasLineOfSight=(ax,ay,bx,by)=>!(
   ax===target.x&&ay===target.y&&bx===duelist.x&&by===duelist.y);
@@ -142,4 +146,20 @@ test('legacy AI exception restores both canonical tank list and tactical snapsho
  assert.throws(()=>ai.updateAI(self,g,1/60),/injected AI failure/);
  assert.equal(g.tanks.length,3);
  assert.equal(Object.prototype.hasOwnProperty.call(g,'__novaFairVisibleTanks'),false);
+});
+
+test('private rival target plans alone do not grant crossfire knowledge',()=>{
+ const {g,ai,self}=scene();
+ self.ai.__v181ObservedShotId=undefined;
+ self.ai.__v181ObservedShotAt=undefined;
+ self.ai.__v181ObservedShotAngle=undefined;
+ ai.updateAI(self,g,1/60);
+ assert.notEqual(self.ai.__v181Mode,'crossfire',
+  'visible tanks are not proof of a duel without witnessed firing');
+});
+test('witnessed fire aimed away from the duelist does not imply a duel',()=>{
+ const {g,ai,self}=scene();
+ self.ai.__v181ObservedShotAngle=Math.PI;
+ ai.updateAI(self,g,1/60);
+ assert.notEqual(self.ai.__v181Mode,'crossfire');
 });
