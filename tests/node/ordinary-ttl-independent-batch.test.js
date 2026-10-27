@@ -248,3 +248,27 @@ for(const fps of [30,60,120]){
   assert.equal(batchWorld(fps,{pen:1,mutate:g=>{g.bullets[1].y=0;}}).hits,0);
  });
 }
+
+for(const fps of [30,60,120]){
+ test('live movement epoch admits witnessed stationary pen=1 hulls at '+fps+'Hz',()=>{
+  const g=batchWorld(fps,{pen:1,mutate:g=>{
+   g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=17;
+   for(const t of g.tanks){
+    t.__novaSweepMoveTime=g.time;
+    t.__novaSweepPrevX=t.x;t.__novaSweepPrevY=t.y;
+   }
+  }});
+  assert.equal(g.hits,2,'stationary live movement witnesses must make the pen=1 lane reachable');
+ });
+ test('live moving hull cannot be backdated as stationary at '+fps+'Hz',()=>{
+  const g=batchWorld(fps,{pen:1,mutate:g=>{
+   g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=17;
+   for(const t of g.tanks){
+    t.__novaSweepMoveTime=g.time;
+    t.__novaSweepPrevX=t.x;t.__novaSweepPrevY=t.y;
+   }
+   g.tanks[0].__novaSweepPrevX=g.tanks[0].x-8;
+  }});
+  assert.equal(g.hits,1,'only independently witnessed stationary second hull may be recovered');
+ });
+}
