@@ -112,7 +112,7 @@ const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
      const baseTank={...e},baseAI={...e.ai},st=g.__lfState,a=e.ai;
      let memo={sector,announcedAt:100,until:124,initialValue:500};
      const random=Math.random;
-     const run=(enabled,steps=1)=>{
+     const run=(enabled,steps=1,capture=false)=>{
       for(const k of Object.keys(e))if(!(k in baseTank))delete e[k];
       Object.assign(e,baseTank);e.ai=a;
       for(const k of Object.keys(a))if(!(k in baseAI))delete a[k];
@@ -129,10 +129,24 @@ const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
       let state=0x6d2b79f5;
       Math.random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return (state>>>0)/4294967296;};
       let entered=false;
+      const trace=[];
       try{
        for(let step=0;step<steps;step++){
         g.time=106+step*.275;
         ai.updateAI(e,g,.275);
+        if(capture){
+         const nav=a.__v1102Nav||{},routes=g.__v1102Routes||{},
+          routeKey=Object.keys(routes).find(k=>k.startsWith(String(e.id)+':')),
+          route=routeKey&&routes[routeKey];
+         trace.push({step,x:+e.x.toFixed(2),y:+e.y.toFixed(2),
+          sector:T.sectorIndex(e.x,e.y),eco:a.__lfEcoMode,
+          committed:!!(a.__lfFrontTurn&&g.time<a.__lfFrontTurn.until),
+          bump:+(e.__novaTerrainBumpT||0).toFixed(3),
+          stuck:nav.stuck||0,escape:!!(nav.escapeUntil&&g.time<nav.escapeUntil),
+          routeKey:routeKey||null,routeIndex:route?route.index:null,
+          nextWaypoint:route&&route.points&&route.points[route.index]?
+           {x:+route.points[route.index].x.toFixed(1),y:+route.points[route.index].y.toFixed(1)}:null});
+        }
         if(T.sectorIndex(e.x,e.y)===sector)entered=true;
        }
       }finally{Math.random=random;}
@@ -141,7 +155,7 @@ const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
        entered:entered,insideAtEnd:T.sectorIndex(e.x,e.y)===sector,
        distance:+Math.hypot(dx,dy).toFixed(3),
        progress:+(spot.d-Math.hypot(e.x-center.x,e.y-center.y)).toFixed(3),
-       x:+dx.toFixed(3),y:+dy.toFixed(3)};
+       x:+dx.toFixed(3),y:+dy.toFixed(3),trace:capture?trace:undefined};
      };
      try{
       p.x=2000;p.y=2000;
@@ -164,7 +178,8 @@ const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
       if(approach.label==='baseline'&&!(on.distance>0&&off.distance>0))throw Error('paired actual movement did not occur');
       /* Longer fixed-input movement horizon, still not a live match: combat,
        * harvesting and player controls are deliberately frozen. */
-      const offLong=run(false,8),onLong=run(true,8),onLongFirst=run(true,8),offLongSecond=run(false,8);
+      const offLong=run(false,8,approach.blocked),onLong=run(true,8,approach.blocked),
+       onLongFirst=run(true,8,approach.blocked),offLongSecond=run(false,8,approach.blocked);
       if(!equal(offLong,offLongSecond)||!equal(onLong,onLongFirst))
        throw Error('eight-step A/B has an execution-order confound: '+JSON.stringify({layout,offLong,onLong,onLongFirst,offLongSecond}));
       trials.push({label:approach.label,blocked:approach.blocked,sector,
