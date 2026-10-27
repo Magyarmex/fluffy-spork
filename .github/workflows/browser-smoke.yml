@@ -44,6 +44,7 @@ jobs:
           node tests/browser/real-touch-gameplay.cjs
           node tests/browser/shipping-ui-smoke.cjs
           node tests/browser/tactical-frontlines-memory.cjs
+          node tests/browser/frontlines-bloom-compass.cjs
           node tests/browser/frontlines-tactical-turn.cjs
           node tests/browser/frontlines-paired-microtrial.cjs
           node tests/browser/frontlines-route-matrix.cjs
