@@ -21,7 +21,7 @@ test('natural-match audit is read-only and counts a valid precombat commitment w
 });
 test('live announcement, expired opportunity, disabled Director and arrived bot are separate gates',()=>{
  const {g,t}=scene(),a=create();
- g.__lfState.signal={type:'BLOOM',until:108};sample(a,g,t,true,sectorIndex);
+ g.__lfState.signal={type:'BLOOM',sector:5,started:100,until:108};sample(a,g,t,true,sectorIndex);
  g.__lfState.signal=null;g.time=114;sample(a,g,t,true,sectorIndex);
  g.time=106;t.x=-900;sample(a,g,t,true,sectorIndex);
  g.__lfState.directorEnabled=false;sample(a,g,t,true,sectorIndex);
