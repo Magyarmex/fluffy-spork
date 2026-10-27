@@ -57,11 +57,15 @@ async function arm(browser,enabled,label){
     return result;
    };
    Game.prototype.start=function(){
-    /* Freeze before the first RAF tick so initial fingerprints are not
-     * contaminated by scheduling differences between fresh Chromium pages. */
+    /* Seed all synchronous start work, including post-spawn AI ordering and
+     * hidden initial state; previously the eighth bot restored Math.random
+     * while start still had work to do. Freeze before the first RAF tick. */
     window.__novaNaturalMatchGame=this;
     this.paused=true;
-    return start.apply(this,arguments);
+    const randomBefore=Math.random,dateBefore=Date.now;
+    Math.random=seeded;Date.now=()=>0;
+    try{return start.apply(this,arguments);}
+    finally{Math.random=randomBefore;Date.now=dateBefore;}
    };
    Game.prototype.update=function(){
     if(!this.__novaDecorativeWorld)window.__novaNaturalMatchGame=this;
