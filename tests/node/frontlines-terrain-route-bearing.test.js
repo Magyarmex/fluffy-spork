@@ -62,3 +62,25 @@ test('blocked memory route cannot reveal hidden sector state or bypass low-healt
  assert.equal(b.weight,a.weight);assert.equal(b.x,a.x);assert.equal(b.y,a.y);
  t.hp=20;assert.equal(T.publicEcoBias(g,t,{},{}).weight,0);
 });
+
+test('shipping AI movement wrapper actually follows a routed public opportunity and restores movement',()=>{
+ const window={__novaModules:{
+  'game/engine':function(m){m.exports={Game:class{}};},
+  'game/ai':function(m){m.exports={updateAI:function(t,g,dt){g.moveTank(t,100,0,dt);}};}
+ }};
+ const ctx={window,console:{info(){},warn(){},error(){}},Math,Number,Object,Array,Date,JSON,Map,Set,
+  performance:{now:()=>0},setTimeout(){},clearTimeout(){}};
+ for(const name of ['living-front-core-v1.12.0.js','living-front-instincts-v1.12.0.js','living-front-director-v1.12.0.js'])
+  vm.runInNewContext(fs.readFileSync(path.join(root,'nova-updates',name),'utf8'),ctx,{filename:name});
+ const aiModule={exports:{}};window.__novaModules['game/ai'](aiModule,aiModule.exports,()=>({SHAPE_DEFS:{}}));
+ const t={id:3,x:-900,y:-900,hp:100,maxHp:100,alive:true,ai:{isElite:false,__v1112TargetId:-1}};
+ const st={signal:null,directorEnabled:true,bloomMemory:{sector:5,announcedAt:100,until:124},
+  queryScratch:[],queryScratch2:[],sectors:Array.from({length:16},()=>({value:0,maturity:0,pressure:0})),stats:{aiRotations:0}};
+ const recorded=[],originalMove=(_t,x,y)=>recorded.push({x,y});
+ const g={time:106,w:800,h:600,cam:{zoom:1},shapes:[],bullets:[],tanks:[t],__lfState:st,
+  hasLineOfSight:()=>false,novaBattlefieldWaypoint:()=>({x:t.x+60,y:t.y-120}),moveTank:originalMove};
+ aiModule.exports.updateAI(t,g,.3);
+ assert.equal(recorded.length,1);assert.ok(recorded[0].y<0,'actual engine movement must turn toward reachable waypoint');
+ assert.equal(g.moveTank,originalMove,'the temporary wrapper cannot hijack later movement');
+ assert.equal(t.ai.__lfEcoMode,'memory');
+});
