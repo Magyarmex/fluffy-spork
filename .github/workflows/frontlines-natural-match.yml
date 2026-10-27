@@ -16,6 +16,7 @@ jobs:
       matrix:
         layout: [0, 1, 2]
         pilot: [wander, public-bloom]
+        seed: [0, 1]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,13 +33,13 @@ jobs:
         env:
           NOVA_LAYOUT_INDEX: ${{ matrix.layout }}
           NOVA_PILOT_POLICY: ${{ matrix.pilot }}
-          NOVA_SEED_INDEX: 0
+          NOVA_SEED_INDEX: ${{ matrix.seed }}
         run: node tests/browser/frontlines-natural-match-ab.cjs
       - name: Preserve research evidence even when experiment falsifies assumptions
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: nova-frontlines-natural-ab-${{ matrix.layout }}-${{ matrix.pilot }}
+          name: nova-frontlines-natural-ab-${{ matrix.layout }}-${{ matrix.pilot }}-${{ matrix.seed }}
           path: artifacts/browser/frontlines-natural-*
           if-no-files-found: warn
           retention-days: 14
