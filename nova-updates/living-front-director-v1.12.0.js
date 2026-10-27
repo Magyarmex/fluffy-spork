@@ -20,7 +20,24 @@ function bloomCandidate(st){if(!bloomAgeEligible(st))return-1;var avg=mean(st),b
 function decision(st,ctx){if(ctx&&ctx.enabled===false)return null;var now=ctx&&ctx.now||0;if(st.signal&&now<st.signal.until)return null;if(now-st.lastSignalAt<8)return null;if(st.cooldowns.bloom<=0){var b=bloomCandidate(st);if(b>=0&&(b!==st.lastBloomSector||st.sectors[b].maturity>.78*st.ceiling))return{type:'BLOOM',sector:b};}if(st.cooldowns.migration<=0&&st.migrationHeat>=5){var from=ctx&&ctx.migrationFrom;if(from==null||from<0){var val=-1;for(var i=0;i<16;i++)if(st.sectors[i].outbound>val){val=st.sectors[i].outbound;from=i;}}if(from>=0){var m=Math.hypot(st.migrationX,st.migrationY)||1,c=sectorCenter(from),to=sectorIndex(c.x+st.migrationX/m*(LF.ARENA*2/LF.GRID)*.8,c.y+st.migrationY/m*(LF.ARENA*2/LF.GRID)*.8);if(to!==from)return{type:'MIGRATION',from:from,to:to};}}if(st.cooldowns.star<=0&&!(ctx&&ctx.hasStar)&&bloomCandidate(st)<0&&st.migrationHeat<3&&now>72&&now-st.lastMeaningfulAt>31)return{type:'ROGUE STAR'};return null;}
 function setSignal(g,st,d){var now=g.time||0,sig={type:d.type,started:now,until:now+(d.type==='BLOOM'?5:d.type==='MIGRATION'?4.4:7)};if(d.type==='BLOOM'){sig.sector=d.sector;var c=sectorCenter(d.sector);sig.x=c.x;sig.y=c.y;st.cooldowns.bloom=24;st.lastBloomSector=d.sector;st.bloomMemory={sector:d.sector,announcedAt:now,until:now+24,initialValue:st.sectors[d.sector]?st.sectors[d.sector].value:0};st.lastMeaningfulAt=now;st.stats.blooms++;}else if(d.type==='MIGRATION'){sig.from=d.from;sig.to=d.to;var a=sectorCenter(d.from),b=sectorCenter(d.to);sig.x=(a.x+b.x)/2;sig.y=(a.y+b.y)/2;st.cooldowns.migration=20;st.lastMeaningfulAt=now;st.stats.migrations++;st.migrationHeat*=.28;}else{st.cooldowns.star=58;var n=(g.shapes||[]).length;if(g.spawnShape)g.spawnShape('star',false);var s=(g.shapes||[])[(g.shapes||[]).length-1];if((g.shapes||[]).length<=n||!s||s.type!=='star')return;LF.initStar(g,st,s);sig.starId=s.id;sig.x=s.x;sig.y=s.y;st.lastMeaningfulAt=now;}st.signal=sig;st.lastSignal=d.type;st.lastSignalAt=now;if(d.type==='BLOOM')ensureFrontline(g,st);if(g.toast)g.toast(d.type==='BLOOM'?'✦ SHAPE BLOOM · value has accumulated in quiet ground':d.type==='MIGRATION'?'⇢ MIGRATION · neutral population is moving':'★ ROGUE STAR · intercept the roaming prize','info');if(g.sfx&&g.sfx.novaLivingSignal)g.sfx.novaLivingSignal(d.type,g.player?clamp((sig.x-g.player.x)/900,-1,1):0);}
 LF.directorTick=function(g,st){var t0=LF.ms(),hasStar=false,sh=g.shapes||[];for(var i=0;i<sh.length;i++)if(sh[i]&&sh[i].hp>0&&sh[i].type==='star'){hasStar=true;break;}if(st.signal&&st.signal.type==='ROGUE STAR'&&st.signal.starId&&g.getShape&&!g.getShape(st.signal.starId))st.signal=null;var d=decision(st,{enabled:st.directorEnabled,now:g.time||0,hasStar:hasStar});if(d)setSignal(g,st,d);if(st.signal&&(g.time||0)>=st.signal.until)st.signal=null;var observed=updateContest(g,st);frontlineTick(g,st,observed);LF.planSample(st,LF.ms()-t0);};
-function visible(g,t,s){var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;var inView=F&&F.inGameplayViewport?F.inGameplayViewport(g,t,s):(function(){var z=(g.cam&&g.cam.zoom)||1,hx=(g.w||800)/(2*z),hy=(g.h||600)/(2*z);return Math.abs(s.x-t.x)<=hx&&Math.abs(s.y-t.y)<=hy;})();return !!inView&&(!g.hasLineOfSight||g.hasLineOfSight(t.x,t.y,s.x,s.y,2));}
+/* A neutral shape can legitimately share its numeric ID with a tank.
+ * Fair Engagement's inGameplayViewport excludes same-ID *tanks* to prevent
+ * self-targeting; applying that predicate to shapes hides real visible farm
+ * and can break Rogue Star last-seen tracking. Keep identical viewport/LoS
+ * geometry while reserving tank identity filtering for tank targets. */
+function visible(g,t,s){
+ var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__,inView=false;
+ if(s&&s.kind==='shape'){
+  var e=F&&typeof F.viewportHalfExtents==='function'?F.viewportHalfExtents(g):null;
+  if(!e){var z=(g.cam&&g.cam.zoom)||1;e={x:(g.w||800)/(2*z),y:(g.h||600)/(2*z)};}
+  inView=!!t&&s.hp>0&&Math.abs(s.x-t.x)<=e.x&&Math.abs(s.y-t.y)<=e.y;
+ }else{
+  inView=F&&F.inGameplayViewport?F.inGameplayViewport(g,t,s):
+   (function(){var z=(g.cam&&g.cam.zoom)||1,hx=(g.w||800)/(2*z),hy=(g.h||600)/(2*z);
+    return !!t&&!!s&&Math.abs(s.x-t.x)<=hx&&Math.abs(s.y-t.y)<=hy;})();
+ }
+ return !!inView&&(!g.hasLineOfSight||g.hasLineOfSight(t.x,t.y,s.x,s.y,2));
+}
 
 /* Tactical Frontlines: a BLOOM is contested only when the human pilot and a
  * genuinely hostile, unshielded tank are in that sector and the opponent is
