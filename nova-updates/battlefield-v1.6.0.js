@@ -1097,7 +1097,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    /* A competing projectile may reach the SAME drone from another direction
     * without crossing our bullet corridor. This veto protects kill credit
     * for both exact certified contacts and bounded guaranteed overlaps. */
-   if((best.guaranteed||best.exact)&&o.ownerId!==best.e.id){
+   if(best.kind==='drone'&&o.ownerId!==best.e.id){
     var dr=best.e,dsx=dr.__novaChronoDronePrevX,
         dsy=dr.__novaChronoDronePrevY,rr=(o.r||2)+(dr.r||8)+1;
     if(!Number.isFinite(o.r)||!Number.isFinite(ex)||!Number.isFinite(ey)||
