@@ -16,7 +16,7 @@ function writePair(root,layout,policy,seed,arrivals=2){
  const dir=path.join(root,name);fs.mkdirSync(dir);
  const on=snapshot(layout,seed,policy,arrivals),off=snapshot(layout,seed,policy,1);
  const row={layout,seed,pilotPolicy:policy,on:'frontlines-natural-on.json',off:'frontlines-natural-off.json'};
- const report={initialWorldIdentical:true,offReplayIdentical:true,on,off,offReplay:off};
+ const report={initialWorldIdentical:true,offReplayIdentical:true,on,off,offReplay:structuredClone(off)};
  for(const [file,data] of [['frontlines-natural-on.json',on],['frontlines-natural-off.json',off],
   ['frontlines-natural-manifest.json',{pairs:[row]}],['frontlines-natural-match-ab.json',report]])
   fs.writeFileSync(path.join(dir,file),JSON.stringify(data));
