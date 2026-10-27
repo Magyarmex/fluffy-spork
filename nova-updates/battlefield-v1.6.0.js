@@ -1517,6 +1517,35 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
  var oldSplash=Game.prototype.splashAt;Game.prototype.splashAt=function(x,y,radius,frac,ownerId,knock,color,dmg){var out=oldSplash.apply(this,arguments),a=terrainCandidates(this,x,y,x,y,radius);for(var i=0;i<a.length;i++){var s=a[i];if(!s.destructible||s.hp<=0)continue;var dx=Math.max(Math.abs(x-s.x)-(s.shape==='rect'?s.w*.5:s.r),0),dy=Math.max(Math.abs(y-s.y)-(s.shape==='rect'?s.h*.5:s.r),0),dist=Math.hypot(dx,dy);if(dist>radius)continue;var fall=1-clamp(dist/Math.max(1,radius),0,1)*.55;damageCover(this,s,(dmg||0)*(frac||.4)*fall,ownerId,x,y,splashBullet);}return out;};
 
  var oldUpdateDrones=Game.prototype.updateDrones;Game.prototype.updateDrones=function(dt){ensureTerrain(this);
+ /* Enable the existing read-only motion witness only for a bounded,
+  * spatially relevant ordinary TTL shot. Keep the optional instrumentation
+  * off for the usual frames and for large crowded populations. */
+ var priorTrace=this.__novaDroneChronoTraceEnabled,autoTrace=false;
+ var bs=this.bullets||[],ds=this.drones||[];
+ if(this.__novaShapeSweepActive===true&&priorTrace!==true&&dt>0&&Number.isFinite(dt)&&
+    bs.length>0&&ds.length>0&&bs.length<=256&&ds.length<=64){
+  for(var bi=0;bi<bs.length&&!autoTrace;bi++){
+   var pb=bs[bi];
+   if(!pb||pb.dead||pb.shell||pb.beam||pb.splash||
+      pb.__v17Cannon||pb.pen!==0||(pb.hits||0)!==0||
+      !(pb.ttl>0&&pb.ttl<=dt)||
+      !Number.isFinite(pb.x)||!Number.isFinite(pb.y)||
+      !Number.isFinite(pb.vx)||!Number.isFinite(pb.vy))continue;
+   var px=pb.x+pb.vx*pb.ttl,py=pb.y+pb.vy*pb.ttl;
+   if(!Number.isFinite(px)||!Number.isFinite(py))continue;
+   for(var dj=0;dj<ds.length;dj++){
+    var dr=ds[dj];if(!dr||!(dr.hp>0)||
+       dr.ownerId===pb.ownerId||!Number.isFinite(dr.x)||
+       !Number.isFinite(dr.y))continue;
+    var pad=(pb.r||3)+(dr.r||8)+1+Math.max(30,dt*2400);
+    if(dr.x+pad>=Math.min(pb.x,px)&&dr.x-pad<=Math.max(pb.x,px)&&
+       dr.y+pad>=Math.min(pb.y,py)&&dr.y-pad<=Math.max(pb.y,py)){
+      this.__novaDroneChronoTraceEnabled=true;autoTrace=true;break;
+    }
+   }
+  }
+ }
+ if(autoTrace)this.__novaDroneChronoAutoTrace=true;
  /* Optional observation only: base drone motion and terrain correction are
   * separate stages. These checkpoints are NOT time-stamped collision paths. */
  var traceOn=this.__novaDroneChronoTraceEnabled===true&&this.__novaShapeSweepActive===true;
@@ -1547,34 +1576,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
  return out;};
 
  var oldUpdate=Game.prototype.update;Game.prototype.update=function(dt){ensureTerrain(this);
- /* Enable the existing read-only motion witness only for a bounded,
-  * spatially relevant ordinary TTL shot. Keep the optional instrumentation
-  * off for the usual frames and for large crowded populations. */
- var priorTrace=this.__novaDroneChronoTraceEnabled,autoTrace=false;
- var bs=this.bullets||[],ds=this.drones||[];
- if(priorTrace!==true&&dt>0&&Number.isFinite(dt)&&
-    bs.length>0&&ds.length>0&&bs.length<=256&&ds.length<=64){
-  for(var bi=0;bi<bs.length&&!autoTrace;bi++){
-   var pb=bs[bi];
-   if(!pb||pb.dead||pb.shell||pb.beam||pb.splash||
-      pb.__v17Cannon||pb.pen!==0||(pb.hits||0)!==0||
-      !(pb.ttl>0&&pb.ttl<=dt)||
-      !Number.isFinite(pb.x)||!Number.isFinite(pb.y)||
-      !Number.isFinite(pb.vx)||!Number.isFinite(pb.vy))continue;
-   var px=pb.x+pb.vx*pb.ttl,py=pb.y+pb.vy*pb.ttl;
-   if(!Number.isFinite(px)||!Number.isFinite(py))continue;
-   for(var dj=0;dj<ds.length;dj++){
-    var dr=ds[dj];if(!dr||!(dr.hp>0)||
-       dr.ownerId===pb.ownerId||!Number.isFinite(dr.x)||
-       !Number.isFinite(dr.y))continue;
-    var pad=(pb.r||3)+(dr.r||8)+1+Math.max(30,dt*2400);
-    if(dr.x+pad>=Math.min(pb.x,px)&&dr.x-pad<=Math.max(pb.x,px)&&
-       dr.y+pad>=Math.min(pb.y,py)&&dr.y-pad<=Math.max(pb.y,py)){
-      this.__novaDroneChronoTraceEnabled=true;autoTrace=true;break;
-    }
-   }
-  }
- }
+ var priorTrace=this.__novaDroneChronoTraceEnabled;
+ this.__novaDroneChronoAutoTrace=false;
  var epoch=(this.__novaShapeSweepEpoch||0)+1;this.__novaShapeSweepEpoch=epoch;
  /* Capture drones before AI/drone movement; the later projectile pre-pass
   * may only exclude drones whose complete observed corridor is remote. */
@@ -1604,7 +1607,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   }
  }
  var shapes=this.shapes||[];for(var si=0;si<shapes.length;si++){var sh=shapes[si];if(!sh)continue;sh.__novaShapeSweepEpoch=epoch;sh.__novaShapeSweepPrevX=sh.x;sh.__novaShapeSweepPrevY=sh.y;}this.__novaShapeSweepActive=true;if(this.__novaBattlefield&&!this.__novaBattlefield.announced&&this.status==='playing'&&this.time>.1){this.__novaBattlefield.announced=true;if(this.toast)this.toast('¦ BATTLEFIELD · '+this.__novaBattlefield.name+'  COVER CHANGES THE FIGHT','info');}
-   var out;try{out=oldUpdate.call(this,dt);}finally{this.__novaShapeSweepActive=false;if(autoTrace)this.__novaDroneChronoTraceEnabled=priorTrace;}for(var i=0;i<this.shapes.length;i++){var s=this.shapes[i];if(!s||s.hp<=0)continue;circleResolve(this,s,(s.r||10)*.86);}return out;};
+   var out;try{out=oldUpdate.call(this,dt);}finally{this.__novaShapeSweepActive=false;if(this.__novaDroneChronoAutoTrace){this.__novaDroneChronoTraceEnabled=priorTrace;this.__novaDroneChronoAutoTrace=false;}}for(var i=0;i<this.shapes.length;i++){var s=this.shapes[i];if(!s||s.hp<=0)continue;circleResolve(this,s,(s.r||10)*.86);}return out;};
 });
 
 wrap('game/ai',function(ai){var old=ai.updateAI;if(!old||old.__novaBattlefieldAI)return;function patched(t,g,dt){if(t&&t.ai&&t.ai.targetId>=0){var tar=g.getTank&&g.getTank(t.ai.targetId);if(tar&&tar.alive&&g.hasLineOfSight&&!g.hasLineOfSight(t.x,t.y,tar.x,tar.y,3)){t.ai.__novaOccluded=(t.ai.__novaOccluded||0)+dt;if(t.ai.__novaOccluded>.28){t.ai.targetId=-1;t.ai.state='wander';t.ai.thinkT=0;t.ai.fireHold=Math.max(t.ai.fireHold||0,.18);}}else t.ai.__novaOccluded=Math.max(0,(t.ai.__novaOccluded||0)-dt*2);}var out=old(t,g,dt);if(t&&t.__novaTerrainBumpT>0){t.__novaTerrainBumpT-=dt;if(t.ai&&t.__novaTerrainBumpT>0&&Math.random()<dt*4){t.ai.strafe=(t.ai.strafe||1)*-1;t.ai.thinkT=0;}}return out;}patched.__novaBattlefieldAI=true;ai.updateAI=patched;});
