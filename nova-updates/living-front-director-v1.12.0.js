@@ -149,6 +149,13 @@ function contestHostile(g,a,b){
  * shape. This runs only at the decimated Director cadence and stops as soon
  * as enough visible neutral value is proven (canonical neutral population is
  * bounded), rather than scanning hidden sector state or adding frame work. */
+/* Long Glass / tactical framing can move the actual rendered camera away from
+ * the player hull. A player-centered Fair Engagement check alone is not proof
+ * that an object is presently on screen. Fail closed for tactical UI intel. */
+function inRenderedCamera(g,p,s,e){
+ var cam=g.cam||{},cx=Number.isFinite(cam.x)?cam.x:p.x,cy=Number.isFinite(cam.y)?cam.y:p.y;
+ return Math.abs(s.x-cx)<=e.x&&Math.abs(s.y-cy)<=e.y;
+}
 function observedPocketValue(g,st,p,sector,required){
  var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__,defs=st&&st.defs||LF.defs;
  if(!F||typeof F.viewportHalfExtents!=='function'||!g||typeof g.hasLineOfSight!=='function'||!defs)return 0;
@@ -157,7 +164,7 @@ function observedPocketValue(g,st,p,sector,required){
  var sh=g.shapes||[],value=0;
  for(var i=0;i<sh.length;i++){
   var s=sh[i];if(!s||!(s.hp>0)||sectorIndex(s.x,s.y)!==sector)continue;
-  if(Math.abs(s.x-p.x)>e.x||Math.abs(s.y-p.y)>e.y)continue;
+  if(Math.abs(s.x-p.x)>e.x||Math.abs(s.y-p.y)>e.y||!inRenderedCamera(g,p,s,e))continue;
   var base=xp(defs,s.type);if(!(base>0))continue;
   if(!g.hasLineOfSight(p.x,p.y,s.x,s.y,2))continue;
   value+=base+(s.type==='crasher'?(Number(s.__lfBounty)||0):0)
@@ -173,13 +180,14 @@ function contestCandidate(g,st){
   * current value. Require enough genuinely visible neutral value. Private
   * sector totals and the initial BLOOM value must never control the badge. */
  var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
- if(!F||typeof F.inGameplayViewport!=='function'||typeof g.hasLineOfSight!=='function')return false;
+ if(!F||typeof F.inGameplayViewport!=='function'||typeof F.viewportHalfExtents!=='function'||typeof g.hasLineOfSight!=='function')return false;
+ var ext=F.viewportHalfExtents(g);if(!ext||!(ext.x>0)||!(ext.y>0))return false;
  var ts=g.tanks||[];
  for(var i=0;i<ts.length;i++){
   var t=ts[i];if(!t||t===p||t.id===p.id||!alive(t)||t.spawnShieldT>0||sectorIndex(t.x,t.y)!==op.sector)continue;
   if(!contestHostile(g,p,t))continue;
   /* Only scan the neutral pocket after a legitimate hostile is witnessed. */
-  if(visible(g,p,t)&&observedPocketValue(g,st,p,op.sector,155)>=155)return true;
+  if(visible(g,p,t)&&inRenderedCamera(g,p,t,ext)&&observedPocketValue(g,st,p,op.sector,155)>=155)return true;
  }
  return false;
 }
