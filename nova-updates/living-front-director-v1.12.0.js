@@ -60,13 +60,13 @@ function ensureFrontline(g,st){
  var op=publicBloom(st,g.time||0);if(!op)return null;
  var f=st.frontlineTelemetry;
  if(!f)f=st.frontlineTelemetry={currentKey:null,sector:-1,announcedAt:-1,playerInside:false,
-  seenContest:false,aiSeen:{},aiStartDist:{},aiApproachSeen:{},aiPhysicalLast:{},aiPhysicalArrived:{},events:[],counts:{announcements:0,resolved:0,contestSurvivals:0,playerSeconds:0,playerApproaches:0,aiApproaches:0,playerEntries:0,playerExits:0,
+  seenContest:false,aiSeen:{},aiStartDist:{},aiApproachSeen:{},aiPhysicalLast:{},aiPhysicalArrived:{},aiPhysicalApproachSeen:{},events:[],counts:{announcements:0,resolved:0,contestSurvivals:0,playerSeconds:0,playerApproaches:0,aiApproaches:0,playerEntries:0,playerExits:0,
   observedContests:0,playerDeaths:0,aiArrivals:0,aiPhysicalArrivals:0,aiPhysicalApproaches:0,neutralXP:0}};
  var key=op.sector+':'+op.announcedAt;
  if(f.currentKey!==key){
   closeFrontline(g,st,'replaced');
   f.currentKey=key;f.sector=op.sector;f.announcedAt=op.announcedAt;
-  f.playerInside=false;f.seenContest=false;f.deathRecorded=false;f.closed=false;f.lastSampleTime=Number(g.time)||0;f.playerStartDist=null;f.playerApproachSeen=false;f.aiSeen={};f.aiStartDist={};f.aiApproachSeen={};f.aiPhysicalLast={};f.aiPhysicalArrived={};
+  f.playerInside=false;f.seenContest=false;f.deathRecorded=false;f.closed=false;f.lastSampleTime=Number(g.time)||0;f.playerStartDist=null;f.playerApproachSeen=false;f.aiSeen={};f.aiStartDist={};f.aiApproachSeen={};f.aiPhysicalLast={};f.aiPhysicalArrived={};f.aiPhysicalApproachSeen={};
   f.counts.announcements++;frontlineTrace(f,g,'announced',op.live?'live':'memory');
  }
  return f;
@@ -88,7 +88,7 @@ function recordFrontlinePlayerDeath(g,st,t){
  * deliberately omitted by LF.snapshot and the Debug event ring. */
 function physicalAIArrivals(g,f,p,ts,now){
  if(!p||!alive(p))return;
- var c=sectorCenter(f.sector),last=f.aiPhysicalLast,arrived=f.aiPhysicalArrived,seen={};
+ var c=sectorCenter(f.sector),last=f.aiPhysicalLast,arrived=f.aiPhysicalArrived,approached=f.aiPhysicalApproachSeen,seen={};
  for(var i=0;i<ts.length;i++){
   var t=ts[i],id=t&&t.id!=null?String(t.id):null;
   if(!id)continue;
@@ -111,8 +111,8 @@ function physicalAIArrivals(g,f,p,ts,now){
    last[id]={ref:t,x:t.x,y:t.y,t:now,inside:inside,startDist:inside?null:dist,approached:false};
    continue;
   }
-  if(!prev.approached&&prev.startDist!=null&&prev.startDist-dist>=60){
-   prev.approached=true;f.counts.aiPhysicalApproaches++;
+  if(!approached[id]&&prev.startDist!=null&&prev.startDist-dist>=60){
+   approached[id]=true;f.counts.aiPhysicalApproaches++;
    frontlineTrace(f,g,'ai-physical-approach',t.ai.__lfEcoMode||'none');
   }
   if(!prev.inside&&inside&&!arrived[id]){
