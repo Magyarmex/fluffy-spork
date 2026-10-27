@@ -220,7 +220,7 @@ wrap('game/ai',function(ai,require){
     /* Battle Sense may reason about other actually perceived opponents without
      * exposing them to legacy target selection. Build this only on its bounded
      * tactical planning tick; the old AI still sees exactly [self, target]. */
-    if((Number(a.__v181Think)||0)<=dt){
+    if(window.__NOVA_BATTLE_SENSE__&&target&&(Number(a.__v181Think)||0)<=dt){
       var contacts=[t];
       for(var ci=0;ci<all.length;ci++){
         var cq=all[ci];
