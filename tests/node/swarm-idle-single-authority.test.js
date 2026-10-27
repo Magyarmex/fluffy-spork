@@ -119,3 +119,17 @@ for(const hz of [30,60,120,240]){
   assert.deepEqual(s.hits,[]);
  });
 }
+
+for(const hz of [30,60,120,240]){
+ test('committed dash interrupted by solid cover is not rewound at '+hz+'Hz',()=>{
+  const s=world({enemy:false,phase:'dash',phaseT:.5});
+  s.d.__novaVX=300;s.d.__novaVY=0;s.d.__novaHitRun=true;
+  s.g.firstTerrainHit=()=>({hit:{t:.5}});
+  s.g.updateDrones(1/hz);
+  assert.equal(s.d.__novaPhase,'recover','wall interrupts committed dash');
+  assert.ok(Math.abs(s.d.x-150/hz)<1e-6,
+   'wall-truncated dash position must survive idle post-processing');
+  assert.equal(s.shape.hp,100,'wall abort cannot harvest in the same frame');
+  assert.deepEqual(s.hits,[]);
+ });
+}
