@@ -199,3 +199,20 @@ test('occluded non-primary witnesses cannot observe AI-fired shots',()=>{
  assert.equal(other.ai.__v181ObservedShotId,undefined);
  assert.equal(Object.prototype.hasOwnProperty.call(g,'__novaFairShotWitnesses'),false);
 });
+
+test('real AI firing witness drives another observer crossfire without target-plan access',()=>{
+ const {g,ai,self,target,duelist}=scene();
+ delete self.ai.__v181ObservedShotId;
+ delete self.ai.__v181ObservedShotAt;
+ delete self.ai.__v181ObservedShotAngle;
+ target.angle=0;g.__fireDuringAI=true;
+ ai.updateAI(target,g,1/60);
+ assert.equal(self.ai.__v181ObservedShotId,target.id,
+  'observer must actually witness the AI-fired shot');
+ assert.equal(self.ai.__v181ObservedShotAngle,0);
+ g.__fireDuringAI=false;
+ ai.updateAI(self,g,1/60);
+ assert.equal(self.ai.__v1112TargetId,target.id);
+ assert.equal(self.ai.__v181Mode,'crossfire');
+ assert.equal(Object.prototype.hasOwnProperty.call(g,'__novaFairShotWitnesses'),false);
+});
