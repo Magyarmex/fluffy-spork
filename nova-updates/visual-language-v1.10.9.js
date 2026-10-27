@@ -211,7 +211,7 @@ if(typeof document!=='undefined'&&document.head&&typeof document.createElement==
       /* The portrait settings gear sits below the top bar and can physically
        * cover the first line of an otherwise in-bounds toast. Keep transient
        * announcements below that control, without moving desktop/landscape UI. */
-      '@media(max-width:480px) and (orientation:portrait){[class~="top-[18%]"][class~="pointer-events-none"]{top:clamp(128px,21vh,152px)}}';
+      '@media(max-width:480px) and (orientation:portrait){[class~="top-[18%]"][class~="pointer-events-none"]{top:calc(env(safe-area-inset-top,0px) + clamp(128px,21vh,152px))}}';
     document.head.appendChild(toastStyle);
   }
 }
