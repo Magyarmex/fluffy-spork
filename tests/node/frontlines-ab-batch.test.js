@@ -67,3 +67,36 @@ test('CLI reads relative COPY ECOLOGY snapshots with a human-readable header',()
   const r=readManifest(path.join(dir,'manifest.json'));assert.equal(r.pairCount,1);
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+
+test('batch preserves policy as a pairing dimension rather than mixing scripted pilots',()=>{
+ const {m,data,load}=make(1),base=m.pairs[0];
+ const bloom={...base,pilotPolicy:'public-bloom',on:'bloom-on',off:'bloom-off'};
+ const wander={...base,pilotPolicy:'wander'};
+ m.pairs=[bloom,wander];
+ data['bloom-on']=snap('CROSSFIRE','seed-0',{aiPhysicalArrivals:8});
+ data['bloom-off']=snap('CROSSFIRE','seed-0',{aiPhysicalArrivals:2});
+ data['bloom-on'].metadata.pilotPolicy='public-bloom';
+ data['bloom-off'].metadata.pilotPolicy='public-bloom';
+ data[base.on].metadata.pilotPolicy='wander';
+ data[base.off].metadata.pilotPolicy='wander';
+ const r=analyzeManifest(m,load);
+ assert.equal(r.pairCount,2);
+ assert.equal(r.policies['public-bloom'].metrics.arrivalsPer100OutsideBotSeconds.meanPairedDelta,3);
+ assert.equal(r.policies.wander.metrics.arrivalsPer100OutsideBotSeconds.meanPairedDelta,1);
+ assert.ok(r.warnings.some(w=>/Multiple pilot policies mixed/.test(w)));
+ assert.throws(()=>analyzeManifest({pairs:[{...bloom,pilotPolicy:'wander'}]},load),/snapshot pilot policy differs/);
+ assert.throws(()=>analyzeManifest({pairs:[{...bloom,pilotPolicy:null}]},load),/pilot policy missing from manifest/);
+});
+test('missing snapshot provenance and rejected movement witnesses cannot disappear silently',()=>{
+ const {m,data,load}=make(1);
+ delete data['on-0'].metadata.seed;
+ assert.throws(()=>analyzeManifest(m,load),/snapshot seed differs/);
+ data['on-0'].metadata.seed='seed-0';
+ data['on-0'].frontline.counts.aiPhysicalRejectedCrossings=2;
+ data['off-0'].frontline.counts.aiPhysicalRejectedCrossings=0;
+ const r=analyzeManifest(m,load);
+ assert.ok(r.warnings.some(w=>/uncertified crossing candidates present/.test(w)));
+ delete data['off-0'].frontline.counts.aiPhysicalRejectedCrossings;
+ assert.ok(analyzeManifest(m,load).warnings.some(w=>/rejection counters missing/.test(w)));
+});
