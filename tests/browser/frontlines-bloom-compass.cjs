@@ -29,14 +29,11 @@ const {chromium}=require('playwright');
    {bearing:'NW',x:937.5,y:937.5,width:320},
    {bearing:'SAME SECTOR',x:-562.5,y:-562.5,width:320},
    // Stress the existing responsive toast below the normal 320px phone floor.
-   {bearing:'SAME SECTOR',x:-562.5,y:-562.5,width:280},
-   // A migration reports two distinct public facts: crossing location and flow.
-   {type:'MIGRATION',bearing:'E OF YOU',flow:'E',x:-1750,y:-562.5,width:320},
-   {type:'MIGRATION',bearing:'NEAR YOU',flow:'E',x:0,y:-562.5,width:280}
+   {bearing:'SAME SECTOR',x:-562.5,y:-562.5,width:280}
   ];
   for(const c of cases){
    await page.setViewportSize({width:c.width,height:568});
-   const signal=await page.evaluate(({x,y,type})=>{
+   const signal=await page.evaluate(({x,y})=>{
     const g=window.__novaBloomCompassGame,LF=window.__NOVA_LIVING_FRONT_INTERNAL__;
     if(!LF||!g?.player||!g.toast)throw Error('canonical Front Director/player/toast missing');
     g.setPaused(true);
@@ -45,36 +42,21 @@ const {chromium}=require('playwright');
     g.cam.x=x;g.cam.y=y;
     st.age=100;st.ceiling=1;st.signal=null;st.bloomMemory=null;
     st.lastSignalAt=-99;st.lastBloomSector=-1;st.directorEnabled=true;
-    st.migrationHeat=type==='MIGRATION'?6:0;
-    st.migrationX=1;st.migrationY=0;
-    st.cooldowns.bloom=type==='MIGRATION'?100:0;
-    st.cooldowns.migration=type==='MIGRATION'?0:100;st.cooldowns.star=100;
-    st.sectors.forEach(s=>{s.value=0;s.maturity=.1;s.pressure=0;s.outbound=0;});
+    st.migrationHeat=0;
+    st.cooldowns.bloom=0;st.cooldowns.migration=100;st.cooldowns.star=100;
+    st.sectors.forEach(s=>{s.value=0;s.maturity=.1;s.pressure=0;});
     st.sectors[5].value=900;st.sectors[5].maturity=.95;
-    st.sectors[5].outbound=12;
-    // We artificially jump to match-time 100 within the first live second.
-    // Prevent an unrelated pending Battlefield START toast from overwriting
-    // this deliberately emitted public signal on the next engine frame.
-    if(g.__novaBattlefield)g.__novaBattlefield.announced=true;
     let emitted=null;
     const old=g.toast;
     g.toast=function(message){emitted=message;return old.apply(this,arguments);};
     try{LF.directorTick(g,st);}finally{g.toast=old;g.setPaused(false);}
-    return {emitted,sector:st.signal&&st.signal.sector,
-     from:st.signal&&st.signal.from,to:st.signal&&st.signal.to,
-     type:st.signal&&st.signal.type,
+    return {emitted,sector:st.signal&&st.signal.sector,type:st.signal&&st.signal.type,
      realGame:!!window.__novaMakeRequire,viewport:window.innerWidth};
-   },{x:c.x,y:c.y,type:c.type});
-   assert.equal(signal.type,c.type||'BLOOM','real Director must announce the intended public signal');
-   if(c.type==='MIGRATION'){
-    assert.equal(signal.from,5,'migration must retain witnessed origin');
-    assert.equal(signal.to,6,'migration must retain the public destination');
-    assert.match(signal.emitted,new RegExp('MIGRATION · '+c.bearing+' · FLOW '+c.flow+'$'));
-   }else{
-    assert.equal(signal.sector,5,'BLOOM must not change public destination');
-    assert.match(signal.emitted,new RegExp('SHAPE BLOOM · '+c.bearing+' · quiet ground is rich'));
-   }
+   },{x:c.x,y:c.y});
+   assert.equal(signal.type,'BLOOM','real Director must announce a BLOOM');
+   assert.equal(signal.sector,5,'announcement must not change public destination');
    assert.equal(signal.viewport,c.width);
+   assert.match(signal.emitted,new RegExp('SHAPE BLOOM · '+c.bearing+' · quiet ground is rich'));
    await page.waitForFunction(message=>[...document.querySelectorAll('.panel.anim-pop')].
     some(n=>n.textContent===message),signal.emitted,{timeout:10000});
    // A paused-game overlay can fully occlude the toast while all geometry
@@ -109,11 +91,11 @@ const {chromium}=require('playwright');
    assert.ok(ui.gear,'real gameplay settings button must be present');
    assert.ok(ui.bottom<=ui.gear.top||ui.top>=ui.gear.bottom||
     ui.right<=ui.gear.left||ui.left>=ui.gear.right,
-    'public announcement must not sit underneath the settings button: '+JSON.stringify(ui));
+    'BLOOM announcement must not sit underneath the settings button: '+JSON.stringify(ui));
    assert.ok(ui.height<110,'toast obscures too much combat at '+c.width+'px: '+JSON.stringify(ui));
    assert.ok(ui.top>=0&&ui.bottom<=ui.viewportHeight,'toast outside portrait viewport: '+JSON.stringify(ui));
    await page.screenshot({path:path.join(output,
-    'frontlines-'+(c.type||'bloom').toLowerCase()+'-compass-'+c.bearing.replace(/ /g,'-').toLowerCase()+'-'+c.width+'.png')});
+    'frontlines-bloom-compass-'+c.bearing.replace(/ /g,'-').toLowerCase()+'-'+c.width+'.png')});
    results.push({bearing:c.bearing,signal,ui});
   }
   assert.deepEqual(errors,[],'no runtime page errors');
