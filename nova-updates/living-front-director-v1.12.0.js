@@ -55,10 +55,17 @@ function ensureFrontline(g,st){
  var key=op.sector+':'+op.announcedAt;
  if(f.currentKey!==key){
   f.currentKey=key;f.sector=op.sector;f.announcedAt=op.announcedAt;
-  f.playerInside=false;f.seenContest=false;f.aiSeen={};
+  f.playerInside=false;f.seenContest=false;f.deathRecorded=false;f.aiSeen={};
   f.counts.announcements++;frontlineTrace(f,g,'announced',op.live?'live':'memory');
  }
  return f;
+}
+function recordFrontlinePlayerDeath(g,st,t){
+ var f=st&&st.frontlineTelemetry;
+ if(!f||!t||t!==g.player||!f.playerInside||f.deathRecorded||
+   sectorIndex(t.x,t.y)!==f.sector)return false;
+ f.deathRecorded=true;f.counts.playerDeaths++;frontlineTrace(f,g,'player-death');
+ return true;
 }
 function frontlineTick(g,st,observedContest){
  var f=ensureFrontline(g,st);if(!f)return false;
@@ -66,7 +73,7 @@ function frontlineTick(g,st,observedContest){
  if(inside&&!f.playerInside){f.counts.playerEntries++;frontlineTrace(f,g,'player-entry');}
  if(!inside&&f.playerInside){
   f.counts.playerExits++;frontlineTrace(f,g,'player-exit');
-  if(p&&!alive(p)&&sectorIndex(p.x,p.y)===f.sector){f.counts.playerDeaths++;frontlineTrace(f,g,'player-death');}
+  if(p&&!alive(p))recordFrontlinePlayerDeath(g,st,p);
  }
  f.playerInside=inside;
  if(inside&&observedContest&&!f.seenContest){
@@ -92,6 +99,7 @@ function recordFrontlineNeutralXP(g,st,t,amount,orb){
  return true;
 }
 LF.frontlineTick=frontlineTick;
+LF.recordFrontlinePlayerDeath=recordFrontlinePlayerDeath;
 LF.recordFrontlineNeutralXP=recordFrontlineNeutralXP;
 function contestHostile(g,a,b){
  if(g.areAllies&&g.areAllies(a,b))return false;
