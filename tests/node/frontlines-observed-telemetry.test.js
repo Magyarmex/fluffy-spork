@@ -282,3 +282,13 @@ test('unobserved long tab gaps cannot inflate Frontlines exposure denominators',
  assert.ok(c.sampledSeconds<=LF.SECTOR_PERIOD*2+1e-6);
  assert.ok(c.hostileBotSeconds<=LF.SECTOR_PERIOD*2+1e-6);
 });
+
+test('a pilot already dead before an opportunity starts is not a new death censor',()=>{
+ const {g,st,p,LF}=scene();
+ p.hp=0;p.alive=false; // e.g. a pending redeploy with playing status
+ LF.frontlineTick(g,st,false);
+ assert.equal(st.frontlineTelemetry.counts.pilotDeathCensors,0);
+ g.time=125;st.signal=null;LF.frontlineTick(g,st,false);
+ assert.equal(st.frontlineTelemetry.counts.pilotDeathCensors,0,
+  'the opportunity never observed an alive pilot and cannot claim that death');
+});
