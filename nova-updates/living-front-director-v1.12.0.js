@@ -48,8 +48,14 @@ function frontlineTrace(f,g,kind,mode,amount){
 function closeFrontline(g,st,reason){
  var f=st&&st.frontlineTelemetry;
  if(!f||f.closed||!f.currentKey)return false;
- /* A fatal run is censored even when the pilot died outside the BLOOM. */
- if(g&&g.player&&f.pilotWasAlive&&!alive(g.player)&&!f.pilotDeathCensored){
+ /* Closure is not a death witness. If sampling resumes after the public
+  * opportunity expired (or a new BLOOM replaced it), a dead pilot cannot
+  * retroactively censor the old opportunity. The authoritative damage hook
+  * records in-window deaths immediately; this fallback only covers a still-
+  * active, matching public opportunity when the damage hook was missed. */
+ var active=g&&publicBloom(st,Number(g.time)||0);
+ if(g&&g.player&&f.pilotWasAlive&&!alive(g.player)&&!f.pilotDeathCensored&&
+    active&&active.sector===f.sector&&active.announcedAt===f.announcedAt){
   f.pilotDeathCensored=true;f.counts.pilotDeathCensors=(f.counts.pilotDeathCensors||0)+1;
   frontlineTrace(f,g,'pilot-death-censor');
  }
