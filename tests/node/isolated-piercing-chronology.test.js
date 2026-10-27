@@ -1038,3 +1038,24 @@ for(const optimized of [false,true]){
    'the shortcut must remain available when other damage is provably later');
  });
 }
+
+
+/* Run 387: a SINGLE useful penetrating shot must not lose physical hits
+ * merely because >1200 unrelated bullets exist elsewhere. Exercise the
+ * materialized core and both shipping Battlefield compositions, including
+ * expiry, surviving two-hit penetration and reversed array order. */
+for (const optimized of [false,true]) for (const fps of [30,60]) {
+ for (const nonExpiring of [false,true]) for (const reverse of [false,true]) {
+  test((optimized?'optimized':'baseline')+
+   ' single piercing shot ignores 2000 remote bullets at '+fps+
+   'Hz, live='+nonExpiring+', reversed='+reverse,()=>{
+   const Game=boot(undefined,optimized);
+   const {g,victims}=multiShotRemoteWorld(Game,1,2000,reverse);
+   if(nonExpiring)g.bullets.find(b=>b.ownerId===1).ttl=.2;
+   const dt=.35/fps;
+   for(let frame=0;frame<3;frame++){g.time+=dt;g.updateBullets(dt);}
+   assert.deepEqual(victims.map(v=>v.hitCount),[1,1],
+    'a distant firefight cannot disable two chronological local contacts');
+  });
+ }
+}
