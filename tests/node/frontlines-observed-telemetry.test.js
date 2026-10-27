@@ -42,7 +42,7 @@ test('one public BLOOM, one observed contest, repeated ticks and re-entry are di
  assert.equal(f.counts.announcements,1);
  assert.equal(f.counts.playerEntries,1);
  assert.equal(f.counts.observedContests,1);
- p.x=-900;p.y=-900;LF.frontlineTick(g,st,false);
+ p.x=-1500;p.y=-1500;LF.frontlineTick(g,st,false);
  assert.equal(f.counts.playerExits,1);
  p.x=-560;p.y=-560;LF.frontlineTick(g,st,true);
  assert.equal(f.counts.playerEntries,2);
@@ -54,8 +54,8 @@ test('AI arrivals require an actual memory-approach state and are counted once p
  const {g,st,e,LF}=scene();
  LF.frontlineTick(g,st,false);
  assert.equal(st.frontlineTelemetry.counts.aiArrivals,0,'already present is not a measured arrival');
- e.x=-900;e.y=-900;LF.frontlineTick(g,st,false);
- e.x=-750;e.y=-750;LF.frontlineTick(g,st,false);
+ e.x=-1500;e.y=-1500;LF.frontlineTick(g,st,false);
+ e.x=-1250;e.y=-1250;LF.frontlineTick(g,st,false);
  assert.equal(st.frontlineTelemetry.counts.aiApproaches,1);
  e.x=-520;e.y=-540;LF.frontlineTick(g,st,false);
  assert.equal(st.frontlineTelemetry.counts.aiArrivals,1);
@@ -124,9 +124,9 @@ test('actual damage authority records death even when the Director stops ticking
 
 test('pilot approach requires measured progress toward a publicly announced sector',()=>{
  const {g,st,p,LF}=scene();
- p.x=-900;p.y=-900;LF.frontlineTick(g,st,false);
+ p.x=-1500;p.y=-1500;LF.frontlineTick(g,st,false);
  assert.equal(st.frontlineTelemetry.counts.playerApproaches,0);
- p.x=-750;p.y=-750;LF.frontlineTick(g,st,false);
+ p.x=-1250;p.y=-1250;LF.frontlineTick(g,st,false);
  assert.equal(st.frontlineTelemetry.counts.playerApproaches,1);
  p.x=-560;p.y=-560;LF.frontlineTick(g,st,false);
  assert.equal(st.frontlineTelemetry.counts.playerApproaches,1);
@@ -134,7 +134,7 @@ test('pilot approach requires measured progress toward a publicly announced sect
 });
 test('death between Director ticks counts actual sector entry, never a stale expired memory',()=>{
  const {g,st,p,LF}=scene();
- p.x=-900;p.y=-900;LF.frontlineTick(g,st,false);
+ p.x=-1500;p.y=-1500;LF.frontlineTick(g,st,false);
  p.x=-560;p.y=-560;g.damageTank(p,200);
  assert.equal(st.frontlineTelemetry.counts.playerDeaths,1);
  assert.equal(st.frontlineTelemetry.counts.playerEntries,1);
@@ -148,7 +148,7 @@ test('the canonical 4.5Hz sector owner samples entry even without a Director tic
  const {g,st,p}=scene();
  st.sectorT=0;st.behaviorT=10;st.directorT=10;st.tutorial={ecology:true};
  st.migrationHeat=0;st.migrationX=0;st.migrationY=0;
- p.x=-900;p.y=-900;
+ p.x=-1500;p.y=-1500;
  assert.equal(g.update(1/60),'base-update');
  assert.equal(st.frontlineTelemetry.counts.playerEntries,0);
  p.x=-560;p.y=-560;st.sectorT=0;
