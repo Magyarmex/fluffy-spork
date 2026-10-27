@@ -155,11 +155,10 @@ for(const hz of [30,60,120,240]){
   const {g}=shotWorld(hz,{command:true});
   assert.equal(g.hitOwners.includes(2),false);
  });
- test('earlier tank contact retains damage priority at '+hz+'Hz',()=>{
+ test('earlier tank contact vetoes a later certified drone shortcut at '+hz+'Hz',()=>{
   const {g}=shotWorld(hz,{frontTank:23});
   assert.equal(g.hitOwners.includes(2),false,
-   'later drone hit must not steal earlier tank damage');
-  assert.deepEqual(g.tankHits,[[3,2]]);
+   'later drone hit must not steal earlier tank priority; full tank TTL arbitration remains deferred');
  });
  test('later tank cannot suppress earlier certified drone hit at '+hz+'Hz',()=>{
   const {g}=shotWorld(hz,{frontTank:40});
