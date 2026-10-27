@@ -110,3 +110,31 @@ test('Debug labels commitment decisions as intent, not physical arrivals',()=>{
  assert.match(summary,/AI INTENT 1/);
  assert.ok(!summary.includes('AI TURN'),'intention is not proof of completed movement');
 });
+
+test('noncommitted ecology must never convert an explicit stationary hold into movement',()=>{
+ const s=scene(3); // id 3 is ineligible for a tactical turn but receives ordinary public ecology
+ s.g.__testMoveVelocity=0;
+ const move=s.tick();
+ assert.equal(s.t.ai.__lfEcoMode,'memory');
+ assert.ok(s.t.ai.__lfEcoWeight>.04,'test must exercise a real ecological suggestion');
+ assert.equal(move.x,0,'a stationary hold is not permission to move toward ecology');
+ assert.equal(move.y,0);
+ assert.equal(s.g.moveTank,s.originalMove,'temporary movement wrapper must restore authority');
+});
+test('ordinary ecological steering cannot bend a faster dash/boost command',()=>{
+ const s=scene(3);
+ s.g.__testMoveVelocity=-220;
+ const move=s.tick();
+ assert.equal(s.t.ai.__lfEcoMode,'memory');
+ assert.ok(s.t.ai.__lfEcoWeight>.04);
+ assert.equal(move.x,-220,'the original high-speed movement owner keeps direction and magnitude');
+ assert.equal(move.y,0);
+});
+test('expired tactical commitment preserves the same zero-input and boost guarantees',()=>{
+ const s=scene();s.tick();s.g.time=109;
+ s.g.__testMoveVelocity=0;
+ assert.equal(s.tick().x,0);
+ s.g.__testMoveVelocity=-220;
+ assert.equal(s.tick().x,-220);
+ assert.equal(s.st.stats.aiFrontlineCommitments,1);
+});
