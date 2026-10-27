@@ -88,12 +88,19 @@ const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
       p.x=2000;p.y=2000;
       for(const o of other){o.t.alive=false;o.t.hp=0;}
       g.shapes=[];g.bullets=[];g.hash=null;
-      const off=run(false),on=run(true);
+      /* Counterbalance execution order. A one-step A/B is not controlled if
+       * the first arm changes hidden state consumed by the second arm. */
+      const off=run(false),on=run(true),onFirst=run(true),offSecond=run(false);
+      const equal=(a,b)=>a.mode===b.mode&&a.committed===b.committed&&
+       Math.abs(a.progress-b.progress)<.001&&Math.abs(a.x-b.x)<.001&&Math.abs(a.y-b.y)<.001;
+      if(!equal(off,offSecond)||!equal(on,onFirst))
+       throw Error('paired microtrial has an execution-order confound: '+JSON.stringify({layout,off,on,onFirst,offSecond}));
       if(on.mode!=='memory'||!on.committed)throw Error('ON arm failed to reach actual tactical commitment: '+JSON.stringify({layout,spot,on}));
       if(off.mode==='memory'||off.committed)throw Error('OFF arm inherited a public-memory commitment');
       if(!(on.distance>0&&off.distance>0))throw Error('paired actual movement did not occur');
       return{layout,seed,sector,approachDistance:Math.round(spot.d),off,on,
-       deltaProgress:+(on.progress-off.progress).toFixed(3),method:'one AI decision, actual Game.moveTank, frozen rival/pilot/terrain'};
+       deltaProgress:+(on.progress-off.progress).toFixed(3),orderInvariant:true,
+       method:'one AI decision, actual Game.moveTank, frozen rival/pilot/terrain, counterbalanced order'};
      }finally{
       e.x=original.x;e.y=original.y;e.hp=original.hp;e.maxHp=original.maxHp;
       e.spawnShieldT=original.shield;p.x=original.playerX;p.y=original.playerY;
