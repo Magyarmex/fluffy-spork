@@ -13,7 +13,7 @@ assert.ok(html.indexOf('nova-updates/'+files[0])>=0&&
  html.indexOf('nova-updates/'+files[1])>html.indexOf('nova-updates/'+files[0]),
  'test uses the materialized production overlay order');
 
-function boot(withSwarm=true){
+function boot(withSwarm=true,withBattlefield=false){
  class Game {
   updateDrones(){}
   tryFire(){}
@@ -32,8 +32,8 @@ function boot(withSwarm=true){
  };
  const win={__novaModules:modules};
  const ctx={window:win,console:{info(){},warn(){},error(){}},
-  Math,Map,Set,Number,Object,Array,Date};
- for(const file of (withSwarm?files:files.slice(0,1)))
+  Math,Map,Set,Number,Object,Array,Date,performance:{now:()=>0}};
+ for(const file of [...(withSwarm?files:files.slice(0,1)),...(withBattlefield?['battlefield-v1.6.0.js']:[])])
   vm.runInNewContext(fs.readFileSync(path.join(root,'nova-updates',file),'utf8'),
    ctx,{filename:file});
  const mod={exports:{}};
@@ -47,8 +47,8 @@ function boot(withSwarm=true){
  });
  return mod.exports.Game;
 }
-function world({withSwarm=true,enemy=true,phase='form',phaseT=0,aim=false}={}){
- const Game=boot(withSwarm),g=new Game();
+function world({withSwarm=true,withBattlefield=false,enemy=true,phase='form',phaseT=0,aim=false}={}){
+ const Game=boot(withSwarm,withBattlefield),g=new Game();
  const owner={id:1,cls:'carrier',kind:'tank',alive:true,isPlayer:true,
   x:0,y:0,angle:0,hp:100,maxHp:100,swarmT:0,droneRespawnT:999};
  const enemyOwner={id:2,cls:'basic',kind:'tank',alive:true,isPlayer:false,
@@ -63,7 +63,7 @@ function world({withSwarm=true,enemy=true,phase='form',phaseT=0,aim=false}={}){
  const shape={id:20,kind:'shape',type:'circle',x:12,y:0,r:10,hp:100};
  Object.assign(g,{time:10,quality:'high',sfx:{},input:{aim:{active:aim,dx:50,dy:0}},
   tanks:[owner,enemyOwner],drones:enemy?[d,hostile]:[d],
-  shapes:[shape],droneCounts:new Map(),
+  shapes:[shape],__novaTerrain:[],droneCounts:new Map(),
   tankById:new Map([[1,owner],[2,enemyOwner]])});
  const hits=[];
  g.damageShape=(s,damage)=>{hits.push(['shape',s.id]);s.hp-=damage;};
@@ -131,5 +131,16 @@ for(const hz of [30,60,120,240]){
    'wall-truncated dash position must survive idle post-processing');
   assert.equal(s.shape.hp,100,'wall abort cannot harvest in the same frame');
   assert.deepEqual(s.hits,[]);
+ });
+}
+
+for(const hz of [30,60,120,240]){
+ test('shipping Controller → Swarm → Battlefield preserves one defensive contact at '+hz+'Hz',()=>{
+  const s=world({withBattlefield:true});
+  s.g.updateDrones(1/hz);
+  assert.equal(s.d.__novaIdleMode,'defend');
+  assert.equal(s.shape.hp,100,'discarded Controller farm contact must not leak through Battlefield');
+  assert.equal(s.hostile.hp,18,'real defensive contact must survive terrain wrapper');
+  assert.deepEqual(s.hits,[['drone',11]]);
  });
 }
