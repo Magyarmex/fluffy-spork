@@ -65,7 +65,7 @@ const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
      const baseTank={...e},baseAI={...e.ai},st=g.__lfState,a=e.ai;
      const memo={sector,announcedAt:100,until:124,initialValue:500};
      const random=Math.random;
-     const run=(enabled)=>{
+     const run=(enabled,steps=1)=>{
       for(const k of Object.keys(e))if(!(k in baseTank))delete e[k];
       Object.assign(e,baseTank);e.ai=a;
       for(const k of Object.keys(a))if(!(k in baseAI))delete a[k];
@@ -77,7 +77,12 @@ const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
       g.time=106;
       let state=0x6d2b79f5;
       Math.random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return (state>>>0)/4294967296;};
-      try{ai.updateAI(e,g,.3);}finally{Math.random=random;}
+      try{
+       for(let step=0;step<steps;step++){
+        g.time=106+step*.275;
+        ai.updateAI(e,g,.275);
+       }
+      }finally{Math.random=random;}
       const dx=e.x-spot.x,dy=e.y-spot.y;
       return{mode:a.__lfEcoMode,committed:!!a.__lfFrontTurnSpentKey,
        distance:+Math.hypot(dx,dy).toFixed(3),
@@ -98,9 +103,15 @@ const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
       if(on.mode!=='memory'||!on.committed)throw Error('ON arm failed to reach actual tactical commitment: '+JSON.stringify({layout,spot,on}));
       if(off.mode==='memory'||off.committed)throw Error('OFF arm inherited a public-memory commitment');
       if(!(on.distance>0&&off.distance>0))throw Error('paired actual movement did not occur');
+      /* Longer fixed-input movement horizon, still not a live match: combat,
+       * harvesting and player controls are deliberately frozen. */
+      const offLong=run(false,8),onLong=run(true,8),onLongFirst=run(true,8),offLongSecond=run(false,8);
+      if(!equal(offLong,offLongSecond)||!equal(onLong,onLongFirst))
+       throw Error('eight-step A/B has an execution-order confound: '+JSON.stringify({layout,offLong,onLong,onLongFirst,offLongSecond}));
       return{layout,seed,sector,approachDistance:Math.round(spot.d),off,on,
        deltaProgress:+(on.progress-off.progress).toFixed(3),orderInvariant:true,
-       method:'one AI decision, actual Game.moveTank, frozen rival/pilot/terrain, counterbalanced order'};
+       eightStep:{off:offLong,on:onLong,deltaProgress:+(onLong.progress-offLong.progress).toFixed(3),orderInvariant:true},
+       method:'one-step and eight-step frozen-input AI microtrials, actual Game.moveTank, counterbalanced order'};
      }finally{
       e.x=original.x;e.y=original.y;e.hp=original.hp;e.maxHp=original.maxHp;
       e.spawnShieldT=original.shield;p.x=original.playerX;p.y=original.playerY;
