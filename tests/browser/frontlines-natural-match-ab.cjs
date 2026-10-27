@@ -1,6 +1,6 @@
 'use strict';
 /* Research-only NATURAL full-match A/B on the real 48-overlay shipping game.
- * The pilot is a deterministic, sight-limited scripted Scout, not a human.
+ * The pilot is a deterministic, fixed-input scripted Scout, not a human.
  * No fake BLOOM, private sector values, teleport, invulnerability or AI buffs. */
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');
@@ -74,19 +74,9 @@ async function arm(browser,enabled,label){
    if(g.tanks.filter(t=>t.ai).length<8)throw Error('expected eight ordinary rivals');
    g.input.mouseActive=false;g.input.autofire=true;g.input.firing=false;
    g.input.moveVec=()=>({x:Math.cos(g.time*.29),y:Math.sin(g.time*.29)});
-   g.input.aimVec=()=>{
-    const p=g.player,z=g.zoom||1,hx=(g.w||900)/(2*z),hy=(g.h||700)/(2*z);
-    let best=null,dist=Infinity;
-    for(const s of g.shapes){
-     if(!s||s.hp<=0||s.type==='crasher'||Math.abs(s.x-p.x)>hx||Math.abs(s.y-p.y)>hy)continue;
-     const d=(s.x-p.x)**2+(s.y-p.y)**2;
-     if(d>=dist||g.hasLineOfSight&&!g.hasLineOfSight(p.x,p.y,s.x,s.y,2))continue;
-     best=s;dist=d;
-    }
-    if(!best)return{x:Math.cos(g.time*.37),y:Math.sin(g.time*.37)};
-    const dx=best.x-p.x,dy=best.y-p.y,m=Math.hypot(dx,dy)||1;
-    return{x:dx/m,y:dy/m};
-   };
+   /* The input commands depend only on simulation time: exactly the same
+    * stick bearings and firing cadence in both arms, even after divergence. */
+   g.input.aimVec=()=>({x:Math.cos(g.time*.73),y:Math.sin(g.time*.73)});
    const fingerprint=JSON.stringify({layout:g.__novaBattlefield.name,
     pilot:{x:+p.x.toFixed(3),y:+p.y.toFixed(3),cls:p.cls},
     bots:g.tanks.filter(t=>t.ai).map(t=>[t.id,+t.x.toFixed(3),+t.y.toFixed(3),t.cls]),
