@@ -6,6 +6,7 @@ const root=path.resolve(__dirname,'../..');
 function scene(){
  class Game{
   drawMinimap(){return 'base';}
+  update(dt){this.time+=dt;return 'base-update';}
   gainXP(t,amt){t.xp=(t.xp||0)+amt;}
   updateOrbs(){if(!this.orbs.length)return;const o=this.orbs[0];this.gainXP(this.player,o.xp);this.orbs.splice(0,1);}
   damageTank(t,amt){t.hp-=amt;if(t.hp<=0){t.alive=false;this.status='dead';}}
@@ -141,4 +142,16 @@ test('death between Director ticks counts actual sector entry, never a stale exp
  q.st.signal=null;q.st.bloomMemory.until=100;
  q.g.damageTank(q.p,200);
  assert.equal(q.st.frontlineTelemetry.counts.playerDeaths,0);
+});
+
+test('the canonical 4.5Hz sector owner samples entry even without a Director tick',()=>{
+ const {g,st,p}=scene();
+ st.sectorT=0;st.behaviorT=10;st.directorT=10;st.tutorial={ecology:true};
+ st.migrationHeat=0;st.migrationX=0;st.migrationY=0;
+ p.x=-900;p.y=-900;
+ assert.equal(g.update(1/60),'base-update');
+ assert.equal(st.frontlineTelemetry.counts.playerEntries,0);
+ p.x=-560;p.y=-560;st.sectorT=0;
+ g.update(1/60);
+ assert.equal(st.frontlineTelemetry.counts.playerEntries,1);
 });
