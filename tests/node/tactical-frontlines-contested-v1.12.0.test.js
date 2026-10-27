@@ -54,7 +54,13 @@ test('allies and nonhostile tanks cannot create a false contest',()=>{
  const {T,g,st}=scene();
  g.areAllies=()=>true;assert.equal(T.contestCandidate(g,st),false);
  g.areAllies=()=>false;g.areHostile=()=>false;assert.equal(T.contestCandidate(g,st),false);
- delete g.areHostile;assert.equal(T.contestCandidate(g,st),false,'unknown hostility fails closed');
+ delete g.areHostile;assert.equal(T.contestCandidate(g,st),true,'canonical FFA without team methods is hostile by default');
+ g.player.team=7;g.tanks[1].team=7;assert.equal(T.contestCandidate(g,st),false,'shared team tags are allied');
+ g.tanks[1].team=8;assert.equal(T.contestCandidate(g,st),true,'different teams are hostile');
+});
+test('canonical FFA without hostility helpers still exposes an observed enemy',()=>{
+ const {T,g,st}=scene();delete g.areHostile;delete g.areAllies;
+ assert.equal(T.contestCandidate(g,st),true);
 });
 test('spawn shields, dead targets and player death suppress the contest',()=>{
  const {T,g,p,enemy,st}=scene();
