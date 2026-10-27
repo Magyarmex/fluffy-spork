@@ -256,7 +256,22 @@ function updateContest(g,st){
  return true;
 }
 function saturation(g,key,id){var n=0,ts=g.tanks||[];for(var i=0;i<ts.length;i++){var q=ts[i];if(q&&q.id!==id&&q.ai&&alive(q)&&q.ai.__lfEcoKey===key&&q.ai.__lfEcoWeight>.05)n++;}return n;}
-function routeCost(g,t,x,y,direct){direct=direct==null?Math.hypot(x-t.x,y-t.y):direct;if(!g.hasLineOfSight||g.hasLineOfSight(t.x,t.y,x,y,8)||!g.novaBattlefieldWaypoint)return direct;var wp=g.novaBattlefieldWaypoint(t.x,t.y,x,y,18,t.id);if(!wp)return direct*1.22;return Math.hypot(wp.x-t.x,wp.y-t.y)+Math.hypot(x-wp.x,y-wp.y);}
+/* The strategic score and its movement bearing must use the SAME terrain
+ * route. Previously routeCost checked a waypoint but AI still steered along
+ * the blocked straight line, undoing Battlefield routing at the final move.
+ * A missing/invalid waypoint is not permission to walk through solid cover.
+ * Preserve direct steering when no Battlefield waypoint owner is installed. */
+function routeCost(g,t,x,y,direct,bearing){
+ direct=direct==null?Math.hypot(x-t.x,y-t.y):direct;
+ if(bearing){bearing.x=(x-t.x)/(direct||1);bearing.y=(y-t.y)/(direct||1);}
+ if(!g.hasLineOfSight||g.hasLineOfSight(t.x,t.y,x,y,8)||!g.novaBattlefieldWaypoint)return direct;
+ var wp=g.novaBattlefieldWaypoint(t.x,t.y,x,y,18,t.id);
+ if(!wp||!Number.isFinite(wp.x)||!Number.isFinite(wp.y))return Infinity;
+ var leg=Math.hypot(wp.x-t.x,wp.y-t.y);
+ if(!(leg>1))return Infinity;
+ if(bearing){bearing.x=(wp.x-t.x)/leg;bearing.y=(wp.y-t.y)/leg;}
+ return leg+Math.hypot(x-wp.x,y-wp.y);
+}
 /* Ecology AI may react to a held combat target only while that target is
  * actually within the same gameplay viewport as the player, or relayed by
  * a legitimate active Sniper Observer. A stale target id is not live radar. */
@@ -271,8 +286,8 @@ function fairEcoTarget(g,t,target){
  var relay=!!ECO_SNIPER_CLASSES[t.cls]&&t.__novaSpotterContactId===target.id&&Number(t.__novaSpotterContactUntil)>Number(g.time||0);
  return !!seen||relay;
 }
-function publicEcoBias(g,t,defs,out){out=out||{};out.x=0;out.y=0;out.weight=0;out.key='none';out.mode='none';if(!g||!t||!t.ai)return out;var hp=clamp(t.hp/Math.max(1,t.maxHp||t.hp||1),0,1),a=t.ai,target=a.__v1112TargetId>=0&&g.getTank?g.getTank(a.__v1112TargetId):null;if(!fairEcoTarget(g,t,target))target=null;if(hp<.30||target&&d2(t.x,t.y,target.x,target.y)<330*330)return out;var st=g.__lfState,sig=st&&st.signal,now=g.time||0,bx=0,by=0,bw=0,key='none',mode='none',judgment=a.isElite?1.08:.94;if(sig&&now<sig.until){var sx=sig.x,sy=sig.y;if(sig.type==='ROGUE STAR'&&sig.starId&&g.getShape){var star=g.getShape(sig.starId);if(star){/* Only a visible Star updates AI memory. When it escapes sight, pursue the last seen position rather than gaining remote tracking or forgetting the sighting. */if(visible(g,t,star)){sx=star.x;sy=star.y;a.__lfStarSeenId=sig.starId;a.__lfStarSeenX=sx;a.__lfStarSeenY=sy;}else if(a.__lfStarSeenId===sig.starId&&Number.isFinite(a.__lfStarSeenX)&&Number.isFinite(a.__lfStarSeenY)){sx=a.__lfStarSeenX;sy=a.__lfStarSeenY;}}else return out;}var direct=Math.hypot(sx-t.x,sy-t.y),dist=routeCost(g,t,sx,sy,direct),base=sig.type==='ROGUE STAR'?.87:sig.type==='BLOOM'?.68:.48,k=sig.type+':'+(sig.sector!=null?sig.sector:sig.to!=null?sig.to:sig.starId||0),score=base-dist/2300-saturation(g,k,t.id)*.13;if(score>.20){var dx=sx-t.x,dy=sy-t.y,m=Math.hypot(dx,dy)||1;bx=dx/m;by=dy/m;bw=clamp(score*(.72+.28*hp)*judgment,0,.48);key=k;mode='signal';}}
- if(bw<=.04){var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__,ext=F&&F.viewportHalfExtents?F.viewportHalfExtents(g):{x:Math.max(280,(g.w||800)/2),y:Math.max(220,(g.h||600)/2)},rad=Math.hypot(ext.x,ext.y),cand=st?LF.query(g,st,t.x,t.y,rad,0):(g.shapes||[]),vx=0,vy=0,value=0,count=0;for(var i=0;i<cand.length;i++){var s=cand[i];if(!s||s.kind!=='shape'||s.hp<=0||s.type==='crasher'||!visible(g,t,s))continue;var w=Math.max(5,xp(defs,s.type));vx+=s.x*w;vy+=s.y*w;value+=w;count++;}if(count>=4&&value>=170){vx/=value;vy/=value;var dx2=vx-t.x,dy2=vy-t.y,m2=Math.hypot(dx2,dy2)||1,k2='LOCAL:'+sectorIndex(vx,vy),travel=routeCost(g,t,vx,vy,m2),score2=clamp((value-160)/750,0,.36)-travel/3200-saturation(g,k2,t.id)*.10;if(score2>.08){bx=dx2/m2;by=dy2/m2;bw=clamp(score2*judgment,0,.32);key=k2;mode='local';}}}
+function publicEcoBias(g,t,defs,out){out=out||{};out.x=0;out.y=0;out.weight=0;out.key='none';out.mode='none';if(!g||!t||!t.ai)return out;var hp=clamp(t.hp/Math.max(1,t.maxHp||t.hp||1),0,1),a=t.ai,target=a.__v1112TargetId>=0&&g.getTank?g.getTank(a.__v1112TargetId):null;if(!fairEcoTarget(g,t,target))target=null;if(hp<.30||target&&d2(t.x,t.y,target.x,target.y)<330*330)return out;var st=g.__lfState,sig=st&&st.signal,now=g.time||0,bx=0,by=0,bw=0,key='none',mode='none',judgment=a.isElite?1.08:.94;if(sig&&now<sig.until){var sx=sig.x,sy=sig.y;if(sig.type==='ROGUE STAR'&&sig.starId&&g.getShape){var star=g.getShape(sig.starId);if(star){/* Only a visible Star updates AI memory. When it escapes sight, pursue the last seen position rather than gaining remote tracking or forgetting the sighting. */if(visible(g,t,star)){sx=star.x;sy=star.y;a.__lfStarSeenId=sig.starId;a.__lfStarSeenX=sx;a.__lfStarSeenY=sy;}else if(a.__lfStarSeenId===sig.starId&&Number.isFinite(a.__lfStarSeenX)&&Number.isFinite(a.__lfStarSeenY)){sx=a.__lfStarSeenX;sy=a.__lfStarSeenY;}}else return out;}var direct=Math.hypot(sx-t.x,sy-t.y),bearing={},dist=routeCost(g,t,sx,sy,direct,bearing),base=sig.type==='ROGUE STAR'?.87:sig.type==='BLOOM'?.68:.48,k=sig.type+':'+(sig.sector!=null?sig.sector:sig.to!=null?sig.to:sig.starId||0),score=base-dist/2300-saturation(g,k,t.id)*.13;if(score>.20){bx=bearing.x;by=bearing.y;bw=clamp(score*(.72+.28*hp)*judgment,0,.48);key=k;mode='signal';}}
+ if(bw<=.04){var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__,ext=F&&F.viewportHalfExtents?F.viewportHalfExtents(g):{x:Math.max(280,(g.w||800)/2),y:Math.max(220,(g.h||600)/2)},rad=Math.hypot(ext.x,ext.y),cand=st?LF.query(g,st,t.x,t.y,rad,0):(g.shapes||[]),vx=0,vy=0,value=0,count=0;for(var i=0;i<cand.length;i++){var s=cand[i];if(!s||s.kind!=='shape'||s.hp<=0||s.type==='crasher'||!visible(g,t,s))continue;var w=Math.max(5,xp(defs,s.type));vx+=s.x*w;vy+=s.y*w;value+=w;count++;}if(count>=4&&value>=170){vx/=value;vy/=value;var dx2=vx-t.x,dy2=vy-t.y,m2=Math.hypot(dx2,dy2)||1,k2='LOCAL:'+sectorIndex(vx,vy),bearing2={},travel=routeCost(g,t,vx,vy,m2,bearing2),score2=clamp((value-160)/750,0,.36)-travel/3200-saturation(g,k2,t.id)*.10;if(score2>.08){bx=bearing2.x;by=bearing2.y;bw=clamp(score2*judgment,0,.32);key=k2;mode='local';}}}
 /* AI may remember a *publicly announced* BLOOM, never hidden sector maturity.
  * The stale opportunity loses confidence with age and loses to a stronger
  * locally visible farm. Saturation reuses the live BLOOM key so bots do not
@@ -281,12 +296,12 @@ if((!sig||now>=sig.until)&&st){
  var remembered=publicBloom(st,now);
  if(remembered&&!remembered.live){
   var c=sectorCenter(remembered.sector),dx3=c.x-t.x,dy3=c.y-t.y,direct3=Math.hypot(dx3,dy3),
-   conf=clamp((remembered.until-now)/24,0,1),dist3=routeCost(g,t,c.x,c.y,direct3),
+   conf=clamp((remembered.until-now)/24,0,1),bearing3={},dist3=routeCost(g,t,c.x,c.y,direct3,bearing3),
    k3='BLOOM:'+remembered.sector,
    score3=.54*Math.sqrt(conf)-dist3/2600-saturation(g,k3,t.id)*.13,
    memoryWeight=clamp(score3*.5*judgment,0,.26);
   if(direct3>120&&score3>.20&&memoryWeight>bw+.03){
-   bx=dx3/direct3;by=dy3/direct3;bw=memoryWeight;key=k3;mode='memory';
+   bx=bearing3.x;by=bearing3.y;bw=memoryWeight;key=k3;mode='memory';
   }
  }
 }
