@@ -17,7 +17,7 @@ function scene(id=7){
  for(const name of ['living-front-core-v1.12.0.js','living-front-instincts-v1.12.0.js','living-front-director-v1.12.0.js'])
   vm.runInNewContext(fs.readFileSync(path.join(root,'nova-updates',name),'utf8'),ctx,{filename:name});
  const aiModule={exports:{}};window.__novaModules['game/ai'](aiModule,aiModule.exports,()=>({SHAPE_DEFS:{}}));
- const t={id,x:-900,y:-900,hp:100,maxHp:100,alive:true,ai:{isElite:false,__v1112TargetId:-1}};
+ const t={id,x:-1130,y:-600,hp:100,maxHp:100,alive:true,ai:{isElite:false,__v1112TargetId:-1}}; // truly outside sector 5
  const st={signal:null,directorEnabled:true,bloomMemory:{sector:5,announcedAt:100,until:124,initialValue:500},
   queryScratch:[],queryScratch2:[],sectors:Array.from({length:16},()=>({value:0,maturity:0,pressure:0})),stats:{aiRotations:0}};
  const moves=[],originalMove=(_t,x,y)=>moves.push({x,y});
@@ -137,4 +137,25 @@ test('expired tactical commitment preserves the same zero-input and boost guaran
  s.g.__testMoveVelocity=-220;
  assert.equal(s.tick().x,-220);
  assert.equal(s.st.stats.aiFrontlineCommitments,1);
+});
+
+test('a rival already inside a public BLOOM must not start a blind center-seeking commitment',()=>{
+ const s=scene();s.t.x=-900;s.t.y=-900;
+ assert.equal(s.T.sectorIndex(s.t.x,s.t.y),5,'fixture must be inside');
+ const move=s.tick();
+ assert.equal(s.st.stats.aiFrontlineCommitments||0,0);
+ assert.equal(s.t.ai.__lfFrontTurn,null);
+ assert.ok(move.x<0,'local movement owner remains authoritative once destination is reached');
+});
+test('entering the public sector cancels an active tactical turn immediately',()=>{
+ const s=scene();
+ assert.notEqual(s.T.sectorIndex(s.t.x,s.t.y),5,'initial route must start outside');
+ s.tick();assert.equal(s.st.stats.aiFrontlineCommitments,1);
+ s.t.x=-1100;s.t.y=-600; // physically entered; no secret sector-value lookup
+ assert.equal(s.T.sectorIndex(s.t.x,s.t.y),5);
+ s.g.time=106.3;
+ const move=s.tick();
+ assert.equal(s.t.ai.__lfFrontTurn,null,'do not keep blindly steering to the sector center');
+ assert.ok(move.x<0,'ordinary local movement regains priority');
+ assert.equal(s.st.stats.aiFrontlineCommitments,1,'arrival must not re-trigger a second commitment');
 });
