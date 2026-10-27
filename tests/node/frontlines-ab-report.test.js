@@ -41,3 +41,24 @@ test('unmatched seeds/layouts and missing or impossible exposure cannot be silen
  const bad=sample();delete bad.frontline.counts.hostileOutsideBotSeconds;
  assert.throws(()=>extract(bad),/missing Frontlines counter/);
 });
+
+
+test('paired pilot policies must match even when layout and seed match',()=>{
+ const on=sample({}, {pilotPolicy:'public-bloom'});
+ assert.throws(()=>analyzePair(on,sample({}, {pilotPolicy:'wander'})),/unmatched pilot policies/);
+ assert.throws(()=>analyzePair(on,sample()),/unmatched pilot policies/);
+ assert.equal(analyzePair(on,sample({}, {pilotPolicy:'public-bloom'})).on.pilotPolicy,'public-bloom');
+});
+test('uncertified crossing candidates are reported without inventing missed arrivals',()=>{
+ const on=sample({aiPhysicalArrivals:4,aiPhysicalRejectedCrossings:1}),
+  off=sample({aiPhysicalArrivals:1,aiPhysicalRejectedCrossings:3});
+ const r=analyzePair(on,off);
+ assert.equal(r.on.rates.rejectedCrossingShare,.2);
+ assert.equal(r.off.rates.rejectedCrossingShare,.75);
+ assert.equal(r.delta.rejectedCrossingShare,-.55);
+ assert.ok(r.warnings.some(w=>/Uncertified crossing/.test(w)));
+ const missing=analyzePair(sample(),sample());
+ assert.equal(missing.on.rates.rejectedCrossingShare,null);
+ assert.ok(missing.warnings.some(w=>/counter missing/.test(w)));
+ assert.throws(()=>extract(sample({aiPhysicalRejectedCrossings:-1})),/invalid\/missing Frontlines counter/);
+});
