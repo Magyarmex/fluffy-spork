@@ -15,6 +15,7 @@ assert.ok(html.indexOf('nova-updates/'+files[0])>=0&&
 
 function boot(withSwarm=true,withBattlefield=false){
  class Game {
+  update(dt){this.time+=dt;this.updateDrones(dt);}
   updateDrones(){}
   tryFire(){}
   damageTank(){}
@@ -225,4 +226,34 @@ test('terrain correction is visibly distinct from raw idle integration',()=>{
   'raw integration remains observable, never implicitly collision-certified');
  assert.notEqual(s.d.__novaChronoIdleRawEndX,s.d.__novaChronoDroneTerrainX);
  assert.equal(s.d.__novaChronoDroneTraceEpoch,37);
+});
+
+test('real Battlefield Game.update owns the raw integration epoch',()=>{
+ const s=world({enemy:false,withBattlefield:true});
+ s.d.speed=200;s.g.__novaDroneChronoTraceEnabled=true;
+ s.g.update(1/60);
+ const epoch=s.g.__novaShapeSweepEpoch;
+ assert.equal(epoch,1);
+ assert.equal(s.d.__novaChronoIdleRawEpoch,epoch);
+ assert.equal(s.d.__novaChronoDroneTraceEpoch,epoch);
+ assert.equal(s.g.__novaShapeSweepActive,false,
+  'movement epoch is closed after the real Game.update wrapper');
+ s.g.__novaDroneChronoTraceEnabled=false;
+ s.g.update(1/60);
+ assert.equal(s.g.__novaShapeSweepEpoch,epoch+1);
+ assert.notEqual(s.d.__novaChronoIdleRawEpoch,s.g.__novaShapeSweepEpoch,
+  'old diagnostic must not be reused as a new frame witness');
+});
+test('optional integration diagnostics do not change real drone motion or attacks',()=>{
+ const a=world({enemy:false,withBattlefield:true});
+ const b=world({enemy:false,withBattlefield:true});
+ a.d.speed=200;b.d.speed=200;
+ a.g.__novaDroneChronoTraceEnabled=true;
+ for(let i=0;i<5;i++){a.g.update(1/60);b.g.update(1/60);}
+ for(const key of ['x','y','hp','attackCd','__novaVX','__novaVY',
+   '__novaIdleVX','__novaIdleVY','__novaPhase']){
+  assert.equal(a.d[key],b.d[key],key+' must be independent of diagnostics');
+ }
+ assert.equal(a.shape.hp,b.shape.hp,'damage and farming must be unchanged');
+ assert.equal(b.d.__novaChronoIdleRawEpoch,undefined);
 });
