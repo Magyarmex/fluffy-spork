@@ -30,7 +30,7 @@ function visible(g,t,s){
  if(s&&s.kind==='shape'){
   var e=F&&typeof F.viewportHalfExtents==='function'?F.viewportHalfExtents(g):null;
   if(!e){var z=(g.cam&&g.cam.zoom)||1;e={x:(g.w||800)/(2*z),y:(g.h||600)/(2*z)};}
-  inView=!!t&&s.hp>0&&Math.abs(s.x-t.x)<=e.x&&Math.abs(s.y-t.y)<=e.y;
+  inView=!!t&&alive(s)&&s.hp>0&&Math.abs(s.x-t.x)<=e.x&&Math.abs(s.y-t.y)<=e.y;
  }else{
   inView=F&&F.inGameplayViewport?F.inGameplayViewport(g,t,s):
    (function(){var z=(g.cam&&g.cam.zoom)||1,hx=(g.w||800)/(2*z),hy=(g.h||600)/(2*z);
