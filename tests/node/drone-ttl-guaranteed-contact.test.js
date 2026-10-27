@@ -246,3 +246,27 @@ for(const optimized of [false,true])for(const hz of [30,60]){
   assert.equal(g.hits,1,'preserve a previously authorized positive-time witness');
  });
 }
+
+/* Metamorphic shipping-path check: the convex proof is independent of
+ * direction, viewport frame rate and unrelated remote projectile density.
+ * These are deterministic physical guarantees, not gameplay hit-rate data. */
+for(const optimized of [false,true])for(const hz of [30,60,120,240]){
+ test('seeded TTL-envelope contacts survive unrelated remote fire ('+
+  (optimized?'optimized':'baseline')+', '+hz+'Hz)',()=>{
+  let seed=0x3832026+hz+(optimized?4096:0);
+  const rnd=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+  for(let i=0;i<32;i++){
+   const direction=rnd()<.5?-1:1;
+   const speed=2500+rnd()*3500;
+   const end=speed*.004;
+   const offset=4.5+rnd()*1.5;
+   const y=(rnd()-.5)*2.4;
+   const g=droneWorld(hz,optimized,{x:direction*(end+offset),y,
+    vx:direction*speed,ttl:.004,moveY:2,
+    otherBullets:[{kind:'bullet',id:99,ownerId:3,
+      x:1000,y:1000,vx:0,vy:0,r:3,dmg:1,ttl:1,
+      pen:0,hits:0,dead:false,shell:false,beam:false}]});
+   assert.equal(g.hits,1,'seed '+i+' must retain its certified physical contact');
+  }
+ });
+}
