@@ -33,6 +33,30 @@ test('one healthy, unengaged AI can deliberately reverse toward a recent public 
  assert.equal(s.st.stats.aiFrontlineCommitments,1);
  assert.equal(s.g.moveTank,s.originalMove,'temporary movement authority must be restored');
 });
+test('live public BLOOM stops pulling a rival toward the center after physical sector entry',()=>{
+ const inside=scene();
+ inside.t.x=-900;inside.t.y=-600; // sector 5, not its arbitrary center
+ inside.st.signal={type:'BLOOM',sector:5,x:-562.5,y:-562.5,started:105,until:110};
+ inside.st.bloomMemory={sector:5,announcedAt:105,until:129};
+ const move=inside.tick();
+ assert.equal(inside.T.sectorIndex(inside.t.x,inside.t.y),5);
+ assert.equal(inside.t.ai.__lfEcoMode,'none','inside rival should return to local decisions');
+ assert.equal(move.x,-100,'ordinary combat/farm movement must not be pulled to center');
+ assert.equal(inside.st.stats.aiFrontlineCommitments||0,0);
+ const outside=scene();
+ outside.st.signal={...inside.st.signal};
+ const approach=outside.tick();
+ assert.equal(outside.T.sectorIndex(outside.t.x,outside.t.y)!==5,true);
+ assert.equal(outside.t.ai.__lfEcoMode,'signal','outside rival still follows public opportunity');
+ assert.ok(approach.x>-100,'outside rival retains the approach bearing');
+});
+test('live non-BLOOM signals still steer normally after the BLOOM arrival handoff',()=>{
+ const s=scene();s.t.x=-900;s.t.y=-600;
+ s.st.signal={type:'MIGRATION',to:5,x:-562.5,y:-562.5,started:105,until:110};
+ const move=s.tick();
+ assert.equal(s.t.ai.__lfEcoMode,'signal');
+ assert.ok(move.x>-100,'the arrival handoff is BLOOM-specific');
+});
 test('a tactical turn is bounded and cannot restart repeatedly on the same announcement',()=>{
  const s=scene();s.tick();s.g.time=109;s.tick();
  assert.ok(s.moves.at(-1).x<0,'after commitment expires the ordinary mild memory bias resumes');
