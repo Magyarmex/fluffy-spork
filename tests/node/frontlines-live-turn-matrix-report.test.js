@@ -4,7 +4,11 @@ const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const {collectLiveTurnMatrix}=require('../../scripts/frontlines-live-turn-matrix-report.cjs');
 function snap(layout,seed,policy,startedLive,arrivals=1,blooms=2){
  return{metadata:{layout,seed,pilotPolicy:policy,abMode:'live-turn'},
-  naturalBlooms:blooms,publicBloomCommandSamples:0,commitmentAudit:{startedLive,startedMemory:0},
+  naturalBlooms:blooms,publicBloomCommandSamples:0,commitmentAudit:{startedLive,startedMemory:0,
+   liveSignal:0,liveGate:{samples:0,signalIntent:0,strongWeight:0,outside:0,selected:0,
+    healthy:0,threatClear:0,noHeldTarget:0,unspent:0,precombatIntersection:0,
+    possibleFreshStarts:0,possibleFreshNoHeldTarget:0,
+    firstBlock:{intent:0,weight:0,arrived:0,subset:0,health:0,threat:0,heldTarget:0,spent:0,possible:0}}},
   game:{time:120,status:'dead'},frontline:blooms?{counts:{
    announcements:2,aiPhysicalArrivals:arrivals,aiPhysicalRejectedCrossings:0,
    hostileOutsideBotSeconds:200,hostileBotSeconds:250,pilotAliveSeconds:100,
@@ -64,4 +68,19 @@ test('forbidden OFF live start, incorrect mode and witness mismatch fail closed'
  p.report.abMode='live-turn';p.report.verifiedLiveStart=false;
  fs.writeFileSync(path.join(p.dir,'frontlines-natural-match-ab.json'),JSON.stringify(p.report));
  assert.throws(()=>collectLiveTurnMatrix(root,1),/witness disagrees/);
+}));
+
+test('collector rejects an incomplete or internally impossible live-gate witness',()=>sandbox(root=>{
+ const p=pair(root,'CROSSFIRE','wander','s0',1);
+ p.report.on.commitmentAudit.liveSignal=1;
+ fs.writeFileSync(path.join(p.dir,'frontlines-natural-on.json'),JSON.stringify(p.report.on));
+ fs.writeFileSync(path.join(p.dir,'frontlines-natural-match-ab.json'),JSON.stringify(p.report));
+ assert.throws(()=>collectLiveTurnMatrix(root,1),/sample totals disagree/);
+ p.report.on.commitmentAudit.liveGate.samples=1;
+ p.report.on.commitmentAudit.liveGate.firstBlock.possible=1;
+ p.report.on.commitmentAudit.liveGate.precombatIntersection=0;
+ p.report.on.commitmentAudit.liveGate.possibleFreshStarts=1;
+ fs.writeFileSync(path.join(p.dir,'frontlines-natural-on.json'),JSON.stringify(p.report.on));
+ fs.writeFileSync(path.join(p.dir,'frontlines-natural-match-ab.json'),JSON.stringify(p.report));
+ assert.throws(()=>collectLiveTurnMatrix(root,1),/impossible live gate intersection/);
 }));
