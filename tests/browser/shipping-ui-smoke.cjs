@@ -421,6 +421,26 @@ async function scenario(browser, label, options) {
         label+': insight must fit the viewport: '+JSON.stringify(geometry));
       assert.ok(geometry.panelTop>=-1&&geometry.panelBottom<=geometry.viewportHeight+1,
         label+': complete TERMINATED panel must remain vertically visible: '+JSON.stringify(geometry));
+      if(label==='landscape-568'){
+        // A scrollable death panel can fit its outer box while hiding both
+        // critical next-run actions below the fold. Require immediate access.
+        const actionFit=await page.evaluate(()=>{
+          const note=document.querySelector('[data-nova-death-insight]');
+          const panel=note?.parentElement;
+          const buttons=[...(panel?.querySelectorAll('button')||[])];
+          const rect=b=>{const r=b.getBoundingClientRect();return{
+            text:b.textContent,left:r.left,right:r.right,top:r.top,bottom:r.bottom};};
+          return {height:innerHeight,scrollTop:panel?.scrollTop||0,
+            actions:buttons.map(rect),panel:panel?.getBoundingClientRect().toJSON()};
+        });
+        assert.equal(actionFit.actions.length,2,
+          'landscape death screen retains Redeploy and Main Menu');
+        assert.ok(actionFit.actions.every(b=>b.top>=8&&b.bottom<=actionFit.height-8),
+          'both next-run actions must be visible WITHOUT scrolling at 568x320: '+
+          JSON.stringify(actionFit));
+        assert.equal(actionFit.scrollTop,0,'actions must fit at initial scroll position');
+        console.log('NOVA_LANDSCAPE_DEATH_ACTIONS '+JSON.stringify(actionFit));
+      }
       // Measure the text glyphs, not only the block box: the 320px defect
       // paints past the panel even though the block itself remains contained.
       const deathTitle=await page.getByText('TERMINATED',{exact:true}).evaluate(el=>{
