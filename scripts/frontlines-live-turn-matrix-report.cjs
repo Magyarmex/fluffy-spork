@@ -51,7 +51,7 @@ function collectLiveTurnMatrix(root,expected=18){
   if(r.verifiedLiveStart!==(on>0))throw Error(dir+': live-start witness disagrees with report');
   if(on===0){
    for(const key of ['frontline','stats','game','contestGateAudit','naturalBlooms',
-     'publicBloomCommandSamples','visibleNeutralAimSamples','visibleDodgeSamples','events'])
+     'publicBloomCommandSamples','visibleNeutralAimSamples','visibleDodgeSamples','visibleHostileAimSamples','events'])
     if(JSON.stringify(r.on[key])!==JSON.stringify(r.off[key]))
      throw Error(dir+': no-treatment ON/OFF gameplay diverged in '+key);
   }
