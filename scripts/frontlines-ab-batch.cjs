@@ -27,11 +27,14 @@ function bootstrap(values,repetitions=2000){
  samples.sort((a,b)=>a-b);
  return [rounded(percentile(samples,.025)),rounded(percentile(samples,.975))];
 }
-function metadata(s){return{layout:s.layout??s.metadata?.layout??null,seed:s.seed??s.metadata?.seed??null};}
-function checkSnapshot(s,layout,seed,arm){
+function metadata(s){return{layout:s.layout??s.metadata?.layout??null,seed:s.seed??s.metadata?.seed??null,
+ pilotPolicy:s.pilotPolicy??s.metadata?.pilotPolicy??null};}
+function checkSnapshot(s,layout,seed,policy,arm){
  const m=metadata(s);
- if(m.layout!=null&&String(m.layout)!==layout)throw Error(arm+' snapshot layout differs from manifest: '+m.layout+' vs '+layout);
- if(m.seed!=null&&String(m.seed)!==seed)throw Error(arm+' snapshot seed differs from manifest: '+m.seed+' vs '+seed);
+ if(m.layout==null||String(m.layout)!==layout)throw Error(arm+' snapshot layout differs from manifest: '+m.layout+' vs '+layout);
+ if(m.seed==null||String(m.seed)!==seed)throw Error(arm+' snapshot seed differs from manifest: '+m.seed+' vs '+seed);
+ if(policy!=null&&m.pilotPolicy!==policy)throw Error(arm+' snapshot pilot policy differs from manifest: '+m.pilotPolicy+' vs '+policy);
+ if(policy==null&&m.pilotPolicy!=null)throw Error(arm+' snapshot pilot policy missing from manifest: '+m.pilotPolicy);
  return extract(s);
 }
 function groupSummary(pairs){
@@ -60,30 +63,38 @@ function analyzeManifest(manifest,load){
  const seen=new Set(),pairs=[],warnings=[];
  for(let i=0;i<manifest.pairs.length;i++){
   const row=manifest.pairs[i],layout=validKey(row?.layout,'layout at pair '+i),seed=validKey(row?.seed,'seed at pair '+i);
-  const key=JSON.stringify([layout,seed]);if(seen.has(key))throw Error('duplicate layout/seed pair '+key);seen.add(key);
+  const policy=row.pilotPolicy==null?null:validKey(row.pilotPolicy,'pilot policy at pair '+i);
+  const key=JSON.stringify([layout,seed,policy]);if(seen.has(key))throw Error('duplicate layout/seed/pilot-policy pair '+key);seen.add(key);
   const onPath=validKey(row.on,'ON snapshot path at pair '+i),offPath=validKey(row.off,'OFF snapshot path at pair '+i);
   if(onPath===offPath)throw Error('ON/OFF cannot point to the same snapshot: '+key);
-  const on=checkSnapshot(load(onPath),layout,seed,'ON'),off=checkSnapshot(load(offPath),layout,seed,'OFF');
+  const on=checkSnapshot(load(onPath),layout,seed,policy,'ON'),off=checkSnapshot(load(offPath),layout,seed,policy,'OFF');
   for(const arm of [on,off])for(const [metric,[num,den]] of Object.entries(METRICS)){
    finiteNonnegative(arm.counts[num],metric+' numerator');finiteNonnegative(arm.counts[den],metric+' denominator');
   }
-  pairs.push({layout,seed,on,off});
+  pairs.push({layout,seed,pilotPolicy:policy,on,off});
+  if(on.counts.aiPhysicalRejectedCrossings==null||off.counts.aiPhysicalRejectedCrossings==null)
+   warnings.push(key+': movement-witness rejection counters missing');
+  else if(on.counts.aiPhysicalRejectedCrossings||off.counts.aiPhysicalRejectedCrossings)
+   warnings.push(key+': uncertified crossing candidates present (not confirmed missed arrivals)');
   if(on.counts.pilotDeathCensors||off.counts.pilotDeathCensors)warnings.push(key+': pilot death censored opportunity observation');
   if(on.counts.hostileOutsideBotSeconds<100||off.counts.hostileOutsideBotSeconds<100)warnings.push(key+': under 100 outside-sector hostile bot-seconds in at least one arm');
  }
  const layouts={};for(const layout of [...new Set(pairs.map(p=>p.layout))].sort())layouts[layout]=groupSummary(pairs.filter(p=>p.layout===layout));
  const overall=groupSummary(pairs);
+ const policies={};for(const policy of [...new Set(pairs.map(p=>p.pilotPolicy??'unspecified'))].sort())
+  policies[policy]=groupSummary(pairs.filter(p=>(p.pilotPolicy??'unspecified')===policy));
  const byLayout={};for(const metric of Object.keys(METRICS)){
   const vals=Object.values(layouts).map(x=>x.metrics[metric].meanPairedDelta).filter(v=>v!=null);
   byLayout[metric]=rounded(vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null);
  }
  if(pairs.length<8)warnings.push('Fewer than eight paired matches: descriptive evidence is weak.');
+ if(Object.keys(policies).length>1)warnings.push('Multiple pilot policies mixed: use per-policy paired results, not the pooled overall effect.');
  if(Object.keys(layouts).length<3)warnings.push('Not all three Battlefield layouts represented.');
  if(pairs.some(p=>p.on.counts.announcements===0||p.off.counts.announcements===0))warnings.push('At least one arm observed no public BLOOM announcements.');
  warnings.push('Matching seed labels do not prove identical initial state, scripted pilot inputs, or causal effects.');
  warnings.push('Pooled rates can be distorted by different exposure mixes; prioritize per-layout paired deltas.');
  return{method:'paired descriptive natural-match Frontlines analysis; provenance supplied by manifest, not independently verified',
-  pairCount:pairs.length,layoutCount:Object.keys(layouts).length,layouts,overall,
+  pairCount:pairs.length,layoutCount:Object.keys(layouts).length,layouts,policies,overall,
   equalLayoutMeanPairedDelta:byLayout,warnings};
 }
 function readManifest(file){
