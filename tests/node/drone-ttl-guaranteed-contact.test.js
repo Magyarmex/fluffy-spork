@@ -83,7 +83,10 @@ function boot(updateImpl, optimized = false) {
 function droneWorld(hz, optimized, options={}) {
   const FullGame=boot(function(dt){
     this.time+=dt;
-    if(options.move!==false) this.drones[0].y+=2;
+    if(options.move!==false){
+      this.drones[0].x+=options.moveX||0;
+      this.drones[0].y+=options.moveY===undefined?2:options.moveY;
+    }
     if(options.endSpeed!==undefined)this.drones[0].speed=options.endSpeed;
     this.updateBullets(dt);
   },optimized);
@@ -91,13 +94,14 @@ function droneWorld(hz, optimized, options={}) {
   g.tanks=[];g.shapes=[];g.hitOwners=[];
   g.damageDrone=function(_d,_damage,ownerId){this.hits++;this.hitOwners.push(ownerId);};
   g.drones=[{kind:'drone',id:7,ownerId:options.owned?1:2,
-    x:options.x===undefined?22:options.x,y:0,r:8,hp:20,
+    x:options.x===undefined?22:options.x,
+    y:options.y===undefined?0:options.y,r:8,hp:20,
     speed:options.speed===undefined?200:options.speed,
     __novaPhase:options.phase||'form',__novaVX:options.residual||0,
     __novaTerrainBump:options.terrainBump||null}];
   g.__novaTerrain=options.terrain||[];
   g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
-    vx:options.vx===undefined?6000:options.vx,vy:0,
+    vx:options.vx===undefined?6000:options.vx,vy:options.vy||0,
     r:3,dmg:20,ttl:options.ttl===undefined?.004:options.ttl,
     pen:options.pen||0,hits:0,dead:false,shell:false,beam:false}];
   if(options.otherBullets)g.bullets.push(...options.otherBullets);
@@ -173,4 +177,96 @@ for(const optimized of [false,true])for(const hz of [30,60,120,240]){
   assert.ok(!g.hitOwners.includes(1),'first event belongs to competing shot');
  });
 
+}
+
+
+/* Convex physical-contact proof: four fixed interior samples miss real
+ * pre-expiration contacts near the TTL boundary or when a drone ends
+ * over the bullet origin despite starting outside the contact radius. These
+ * tests exercise the materialized core and Battlefield/Performance wrappers. */
+for(const optimized of [false,true])for(const hz of [30,60,120,240]){
+ const label=(optimized?'optimized':'baseline')+' '+hz+'Hz';
+ test('late TTL drone contact is not lost between fixed samples '+label,()=>{
+  const g=droneWorld(hz,optimized,{x:16.8,vx:2500,ttl:.004,moveY:2});
+  assert.equal(g.hits,1,'physical guaranteed overlap exists at TTL, not at 90% TTL');
+ });
+ test('fast late-TTL contact retains the same geometric guarantee '+label,()=>{
+  const g=droneWorld(hz,optimized,{x:29.9,vx:6000,ttl:.004,moveY:2});
+  assert.equal(g.hits,1);
+ });
+ test('end overlap cannot suppress an earlier certified envelope contact '+label,()=>{
+  const g=droneWorld(hz,optimized,{x:13,vx:6000,ttl:.004,moveX:-3,moveY:0});
+  assert.equal(g.hits,1,'drone began outside but guaranteed contact before expiry');
+ });
+ test('late proof never passes through earlier permanent cover '+label,()=>{
+  const g=droneWorld(hz,optimized,{x:16.8,vx:2500,ttl:.004,
+   terrain:[{id:-1,shape:'rect',x:2,y:0,w:1,h:70,
+     solid:true,destructible:false}]});
+  assert.equal(g.hits,0);
+ });
+ test('late proof preserves competing projectile kill-credit veto '+label,()=>{
+  const g=droneWorld(hz,optimized,{x:16.8,vx:2500,ttl:.004,
+   otherBullets:[{kind:'bullet',id:99,ownerId:3,x:16.8,y:1,
+    vx:0,vy:0,r:3,dmg:20,ttl:1,pen:0,hits:0,dead:false,shell:false,beam:false}]});
+  assert.ok(!g.hitOwners.includes(1));
+ });
+}
+for(const optimized of [false,true])for(const hz of [30,60,120,240]){
+ test('start-only overlap without bullet birth witness stays conservative ('+
+  (optimized?'optimized':'baseline')+', '+hz+'Hz)',()=>{
+  const g=droneWorld(hz,optimized,{x:11.99,vx:500,ttl:.004,
+   moveX:0,moveY:20});
+  assert.equal(g.hits,0,'do not backdate an unknown-age projectile from a start-only overlap');
+ });
+}
+
+/* Independent coordinate rotations and bounded synthetic worlds check the
+ * exact convex minimum in the actual shipping Game.update path. */
+for(const optimized of [false,true])for(const hz of [30,60,120,240]){
+ const label=(optimized?'optimized':'baseline')+' '+hz+'Hz';
+ test('rotated late-TTL drone contact remains provable '+label,()=>{
+  const rt=Math.SQRT1_2;
+  const g=droneWorld(hz,optimized,{x:(16.8-1)*rt,y:(16.8+1)*rt,
+   vx:2500*rt,vy:2500*rt,ttl:.004});
+  assert.equal(g.hits,1,'the physical proof is rotation invariant');
+ });
+ test('late proof is symmetric for reversed projectile direction '+label,()=>{
+  const g=droneWorld(hz,optimized,{x:-16.8,y:1,vx:-2500,ttl:.004});
+  assert.equal(g.hits,1);
+ });
+ test('provably unreachable drone stays unharmed '+label,()=>{
+  const g=droneWorld(hz,optimized,{x:40,vx:2500,ttl:.004});
+  assert.equal(g.hits,0);
+ });
+}
+for(const optimized of [false,true])for(const hz of [30,60]){
+ test('existing positive-time sample survives a frame-start convex minimum ('+
+  (optimized?'optimized':'baseline')+', '+hz+'Hz)',()=>{
+  const g=droneWorld(hz,optimized,{x:10,vx:500,ttl:.004,moveY:20});
+  assert.equal(g.hits,1,'preserve a previously authorized positive-time witness');
+ });
+}
+
+/* Metamorphic shipping-path check: the convex proof is independent of
+ * direction, viewport frame rate and unrelated remote projectile density.
+ * These are deterministic physical guarantees, not gameplay hit-rate data. */
+for(const optimized of [false,true])for(const hz of [30,60,120,240]){
+ test('seeded TTL-envelope contacts survive unrelated remote fire ('+
+  (optimized?'optimized':'baseline')+', '+hz+'Hz)',()=>{
+  let seed=0x3832026+hz+(optimized?4096:0);
+  const rnd=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+  for(let i=0;i<32;i++){
+   const direction=rnd()<.5?-1:1;
+   const speed=2500+rnd()*3500;
+   const end=speed*.004;
+   const offset=4.5+rnd()*1.5;
+   const y=(rnd()-.5)*2.4;
+   const g=droneWorld(hz,optimized,{x:direction*(end+offset),y,
+    vx:direction*speed,ttl:.004,moveY:2,
+    otherBullets:[{kind:'bullet',id:99,ownerId:3,
+      x:1000,y:1000,vx:0,vy:0,r:3,dmg:1,ttl:1,
+      pen:0,hits:0,dead:false,shell:false,beam:false}]});
+   assert.equal(g.hits,1,'seed '+i+' must retain its certified physical contact');
+  }
+ });
 }
