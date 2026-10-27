@@ -236,3 +236,49 @@ test('canonical Fieldcraft explains dashed last-known BLOOM and visible-only CON
  assert.doesNotMatch(tip.text,/CONTESTED/,'Fieldcraft must describe the actual visible icon');
  assert.equal(window.__NOVA_LIVING_FRONT_TIPS__.length,7,'no extra tip slot or UI clutter');
 });
+
+test('paired Frontlines telemetry exposes sampled time and eligible hostile bot-seconds',()=>{
+ const {g,st,p,e,LF,T}=scene();
+ e.ai.__lfEcoMode='none'; // denominator must be independent of the A/B strategy
+ LF.frontlineTick(g,st,false);
+ g.time+=.22;LF.frontlineTick(g,st,false);
+ const c=st.frontlineTelemetry.counts;
+ assert.ok(Math.abs(c.sampledSeconds-.22)<1e-6);
+ assert.ok(Math.abs(c.pilotAliveSeconds-.22)<1e-6);
+ assert.ok(Math.abs(c.hostileBotSeconds-.22)<1e-6);
+ e.spawnShieldT=1;g.time+=.22;LF.frontlineTick(g,st,false);
+ assert.ok(Math.abs(c.hostileBotSeconds-.22)<1e-6,'shielded rival contributes no eligible bot exposure');
+ e.spawnShieldT=0;g.areHostile=()=>false;g.time+=.22;LF.frontlineTick(g,st,false);
+ assert.ok(Math.abs(c.hostileBotSeconds-.22)<1e-6,'ally contributes no hostile bot exposure');
+ assert.ok(Math.abs(c.sampledSeconds-.66)<1e-6);
+ assert.ok(Math.abs(c.pilotAliveSeconds-.66)<1e-6);
+ const summary=T.debugSummary(LF.snapshot(g));
+ assert.match(summary,/BOT-S 0\.2/);
+ assert.match(summary,/ALIVE-S 0\.7/);
+});
+test('death outside the announced pocket censors the opportunity without fabricating an in-zone death',()=>{
+ const {g,st,p,LF}=scene();LF.frontlineTick(g,st,false);
+ p.x=-1500;p.y=-1500;g.damageTank(p,200);
+ const c=st.frontlineTelemetry.counts;
+ assert.equal(c.pilotDeathCensors,1,'A/B must report early pilot death even outside the contested pocket');
+ assert.equal(c.playerDeaths,0,'in-zone deaths remain a separate metric');
+ assert.equal(st.frontlineTelemetry.events.filter(e=>e.kind==='pilot-death-censor').length,1);
+ LF.frontlineTick(g,st,false);LF.frontlineTick(g,st,false);
+ assert.equal(c.pilotDeathCensors,1,'death censor is counted once after closure');
+});
+test('fatal in-pocket combat records both an in-zone death and one A/B death censor',()=>{
+ const {g,st,p,LF}=scene();LF.frontlineTick(g,st,true);
+ g.damageTank(p,200);
+ const c=st.frontlineTelemetry.counts;
+ assert.equal(c.playerDeaths,1);
+ assert.equal(c.pilotDeathCensors,1);
+ LF.recordFrontlinePlayerDeath(g,st,p);
+ assert.equal(c.pilotDeathCensors,1);
+});
+test('unobserved long tab gaps cannot inflate Frontlines exposure denominators',()=>{
+ const {g,st,LF}=scene();LF.frontlineTick(g,st,false);
+ g.time+=12;st.signal=null;LF.frontlineTick(g,st,false);
+ const c=st.frontlineTelemetry.counts;
+ assert.ok(c.sampledSeconds<=LF.SECTOR_PERIOD*2+1e-6);
+ assert.ok(c.hostileBotSeconds<=LF.SECTOR_PERIOD*2+1e-6);
+});
