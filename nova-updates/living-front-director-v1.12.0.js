@@ -161,7 +161,11 @@ function physicalAIArrivals(g,f,p,ts,now){
    approached[id]=true;f.counts.aiPhysicalApproaches++;
    frontlineTrace(f,g,'ai-physical-approach',t.ai.__lfEcoMode||'none');
   }
-  if(!prev.inside&&inside&&!arrived[id]){
+  /* A bot may enter and leave between two decimated Director samples.
+   * An actual moveTank substep ending inside is a physical visit even when
+   * both sampling endpoints are outside. Never infer visits from straight-
+   * line interpolation or uncertified/discontinuous movement. */
+  if(!prev.inside&&(inside||w.entered)&&!arrived[id]){
    arrived[id]=true;f.counts.aiPhysicalArrivals++;
    frontlineTrace(f,g,'ai-physical-arrival',t.ai.__lfEcoMode||'none');
   }
@@ -424,11 +428,14 @@ LF.wrap('game/engine',function(engine){
    var ax=t.x,ay=t.y,id=String(t.id),m=f.aiPhysicalMotion||(f.aiPhysicalMotion={}),w=m[id];
    var valid=Number.isFinite(bx)&&Number.isFinite(by)&&Number.isFinite(ax)&&Number.isFinite(ay)&&
     Number.isFinite(dt)&&dt>0;
+   /* Preserve witnessed transient entries until the next Director sample.
+    * The boolean carries no positions into Debug or player-facing signals. */
+   var entered=sectorIndex(bx,by)!==f.sector&&sectorIndex(ax,ay)===f.sector;
    if(!w||w.ref!==t){
-    m[id]={ref:t,startX:bx,startY:by,endX:ax,endY:ay,segments:1,valid:valid};
+    m[id]={ref:t,startX:bx,startY:by,endX:ax,endY:ay,segments:1,valid:valid,entered:entered};
    }else{
     if(Math.hypot(w.endX-bx,w.endY-by)>.01)w.valid=false;
-    w.endX=ax;w.endY=ay;w.segments++;
+    w.endX=ax;w.endY=ay;w.segments++;w.entered=w.entered||entered;
     if(!valid)w.valid=false;
    }
    return result;
