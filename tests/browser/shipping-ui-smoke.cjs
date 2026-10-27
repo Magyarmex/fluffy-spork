@@ -384,6 +384,9 @@ async function scenario(browser, label, options) {
         const enemy=g.tanks.find(t=>t&&!t.isPlayer&&t.alive);
         if(!enemy)throw new Error('real AI killer unavailable');
         enemy.cls='marksman'; // known Sniper-lineage opponent
+        // The optional NEW HIGH SCORE line is the worst-case height; prove
+        // both actions remain visible even when the player earns a record.
+        if(label==='landscape-568')g.player.score=Math.max(200,(Number(g.best)||0)+200);
         g.player.spawnShieldT=0;g.player.shieldT=0;
         g.player.bulwarkT=0;g.player.tauntT=0;
         g.damageTank(g.player,1e8,enemy.id);
