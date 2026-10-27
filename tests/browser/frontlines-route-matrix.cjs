@@ -106,7 +106,8 @@ const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
 
      const original={x:e.x,y:e.y,hp:e.hp,maxHp:e.maxHp,shield:e.spawnShieldT,
       playerX:p.x,playerY:p.y,shapes:g.shapes,bullets:g.bullets,hash:g.hash,
-      tanks:g.tanks,time:g.time,signal:g.__lfState.signal,memory:g.__lfState.bloomMemory};
+      tanks:g.tanks,time:g.time,signal:g.__lfState.signal,memory:g.__lfState.bloomMemory,
+      routes:g.__v1102Routes,routeContext:g.__v1102RouteContext};
      const other=g.tanks.filter(t=>t!==e&&t!==p).map(t=>({t,hp:t.hp,alive:t.alive}));
      const baseTank={...e},baseAI={...e.ai},st=g.__lfState,a=e.ai;
      let memo={sector,announcedAt:100,until:124,initialValue:500};
@@ -116,6 +117,10 @@ const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
       Object.assign(e,baseTank);e.ai=a;
       for(const k of Object.keys(a))if(!(k in baseAI))delete a[k];
       Object.assign(a,baseAI);
+      /* Terrain Intelligence caches waypoint plans by tank id. Reusing a
+       * physical id across experimental arms without resetting this cache
+       * makes ON/OFF order change the route, even with identical RNG. */
+      a.__v1102Nav=null;g.__v1102Routes=Object.create(null);g.__v1102RouteContext=null;
       e.x=spot.x;e.y=spot.y;e.hp=e.maxHp||100;e.alive=true;e.spawnShieldT=0;
       a.__lfEcoT=0;a.__lfEcoBias={};a.__lfFrontTurn=null;a.__lfFrontTurnSpentKey=null;
       a.__v1112TargetId=-1;a.__v180HitAt=-99;a.__v180Threat={risk:0};a.__v180Posture='investigate';
@@ -175,6 +180,7 @@ const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
       e.spawnShieldT=original.shield;p.x=original.playerX;p.y=original.playerY;
       g.shapes=original.shapes;g.bullets=original.bullets;g.hash=original.hash;
       g.tanks=original.tanks;g.time=original.time;st.signal=original.signal;st.bloomMemory=original.memory;
+      g.__v1102Routes=original.routes;g.__v1102RouteContext=original.routeContext;
       for(const o of other){o.t.hp=o.hp;o.t.alive=o.alive;}
      }
     },raw);
