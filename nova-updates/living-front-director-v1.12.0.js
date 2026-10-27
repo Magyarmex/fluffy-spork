@@ -49,6 +49,8 @@ function closeFrontline(g,st,reason){
  var f=st&&st.frontlineTelemetry;
  if(!f||f.closed||!f.currentKey)return false;
  f.closed=true;f.counts.resolved++;
+ /* Do not retain tank references after the public opportunity closes. */
+ f.aiPhysicalMotion={};f.aiPhysicalLast={};
  if(f.seenContest&&!f.deathRecorded&&g.player&&alive(g.player)){
   f.counts.contestSurvivals++;frontlineTrace(f,g,'contest-survived');
  }
@@ -60,13 +62,13 @@ function ensureFrontline(g,st){
  var op=publicBloom(st,g.time||0);if(!op)return null;
  var f=st.frontlineTelemetry;
  if(!f)f=st.frontlineTelemetry={currentKey:null,sector:-1,announcedAt:-1,playerInside:false,
-  seenContest:false,aiSeen:{},aiStartDist:{},aiApproachSeen:{},aiPhysicalLast:{},aiPhysicalArrived:{},aiPhysicalApproachSeen:{},events:[],counts:{announcements:0,resolved:0,contestSurvivals:0,playerSeconds:0,playerApproaches:0,aiApproaches:0,playerEntries:0,playerExits:0,
-  observedContests:0,playerDeaths:0,aiArrivals:0,aiPhysicalArrivals:0,aiPhysicalApproaches:0,neutralXP:0}};
+  seenContest:false,aiSeen:{},aiStartDist:{},aiApproachSeen:{},aiPhysicalLast:{},aiPhysicalMotion:{},aiPhysicalArrived:{},aiPhysicalApproachSeen:{},events:[],counts:{announcements:0,resolved:0,contestSurvivals:0,playerSeconds:0,playerApproaches:0,aiApproaches:0,playerEntries:0,playerExits:0,
+  observedContests:0,playerDeaths:0,aiArrivals:0,aiPhysicalArrivals:0,aiPhysicalApproaches:0,aiPhysicalRejectedCrossings:0,neutralXP:0}};
  var key=op.sector+':'+op.announcedAt;
  if(f.currentKey!==key){
   closeFrontline(g,st,'replaced');
   f.currentKey=key;f.sector=op.sector;f.announcedAt=op.announcedAt;
-  f.playerInside=false;f.seenContest=false;f.deathRecorded=false;f.closed=false;f.lastSampleTime=Number(g.time)||0;f.playerStartDist=null;f.playerApproachSeen=false;f.aiSeen={};f.aiStartDist={};f.aiApproachSeen={};f.aiPhysicalLast={};f.aiPhysicalArrived={};f.aiPhysicalApproachSeen={};
+  f.playerInside=false;f.seenContest=false;f.deathRecorded=false;f.closed=false;f.lastSampleTime=Number(g.time)||0;f.playerStartDist=null;f.playerApproachSeen=false;f.aiSeen={};f.aiStartDist={};f.aiApproachSeen={};f.aiPhysicalLast={};f.aiPhysicalMotion={};f.aiPhysicalArrived={};f.aiPhysicalApproachSeen={};
   f.counts.announcements++;frontlineTrace(f,g,'announced',op.live?'live':'memory');
  }
  return f;
@@ -87,8 +89,8 @@ function recordFrontlinePlayerDeath(g,st,t){
  * AI movement, signals, combat or XP. Raw coordinates stay internal and are
  * deliberately omitted by LF.snapshot and the Debug event ring. */
 function physicalAIArrivals(g,f,p,ts,now){
- if(!p||!alive(p))return;
- var c=sectorCenter(f.sector),last=f.aiPhysicalLast,arrived=f.aiPhysicalArrived,approached=f.aiPhysicalApproachSeen,seen={};
+ if(!p||!alive(p)){f.aiPhysicalMotion={};return;}
+ var c=sectorCenter(f.sector),last=f.aiPhysicalLast,motion=f.aiPhysicalMotion||{},arrived=f.aiPhysicalArrived,approached=f.aiPhysicalApproachSeen,seen={};
  for(var i=0;i<ts.length;i++){
   var t=ts[i],id=t&&t.id!=null?String(t.id):null;
   if(!id)continue;
@@ -101,13 +103,22 @@ function physicalAIArrivals(g,f,p,ts,now){
    last[id]={ref:t,x:t.x,y:t.y,t:now,inside:inside,startDist:inside?null:dist,approached:false};
    continue;
   }
-  var dt=now-prev.t,travel=Math.hypot(t.x-prev.x,t.y-prev.y);
+  var dt=now-prev.t,travel=Math.hypot(t.x-prev.x,t.y-prev.y),w=motion[id];
+  /* Position samples alone cannot distinguish a 25-unit teleport from real
+   * travel. Require the actual moveTank owner to account for the complete
+   * interval, including every intermediate call and its final position. */
+  var certified=!!(w&&w.ref===t&&w.valid&&w.segments>0&&
+   Math.hypot(w.startX-prev.x,w.startY-prev.y)<=.01&&
+   Math.hypot(w.endX-t.x,w.endY-t.y)<=.01);
   if(dt<=0&&travel<=1e-6)continue;
   var speed=typeof g.tankSpeed==='function'?Number(g.tankSpeed(t)):900;
   if(!(speed>0)||!Number.isFinite(speed))speed=900;
   /* A jump, long background gap or recycled body is not a witnessed journey.
    * Prefer missing a dash arrival over fabricating a physical A/B advantage. */
-  if(!(dt>0&&dt<=2)||travel>Math.max(180,speed*dt*2.2+60)){
+  if(!certified||!(dt>0&&dt<=2)||travel>Math.max(180,speed*dt*2.2+60)){
+   /* Report coverage loss separately: a zero arrival count may otherwise
+    * mean either no tactical rotation or a movement we could not certify. */
+   if(!prev.inside&&inside)f.counts.aiPhysicalRejectedCrossings++;
    last[id]={ref:t,x:t.x,y:t.y,t:now,inside:inside,startDist:inside?null:dist,approached:false};
    continue;
   }
@@ -122,12 +133,14 @@ function physicalAIArrivals(g,f,p,ts,now){
   prev.x=t.x;prev.y=t.y;prev.t=now;prev.inside=inside;
  }
  for(var key in last)if(!seen[key])delete last[key];
+ /* One witness is valid for one telemetry interval, never a later sample. */
+ f.aiPhysicalMotion={};
 }
 function frontlineTick(g,st,observedContest){
  var f=ensureFrontline(g,st);
  if(!f){
-  if(g&&st&&g.status==='playing'&&st.directorEnabled!==false&&!g.__novaDecorativeWorld)
-   closeFrontline(g,st,'expired');
+  if(g&&st&&!g.__novaDecorativeWorld)
+   closeFrontline(g,st,st.directorEnabled===false?'disabled':g.status!=='playing'?'ended':'expired');
   return false;
  }
  var p=g.player,inside=!!(p&&alive(p)&&!(p.spawnShieldT>0)&&sectorIndex(p.x,p.y)===f.sector);
@@ -285,6 +298,33 @@ LF.wrap('game/ai',function(ai,require){var old=ai.updateAI;if(!old||old.__novaLi
 LF.wrap('game/engine',function(engine){
  var Game=engine.Game;if(!Game||Game.prototype.__novaFrontlineContest)return;
  Game.prototype.__novaFrontlineContest=true;
+ /* Physical Frontlines telemetry must observe the canonical movement owner.
+  * No movement/physics authority changes: this wrapper only records the
+  * before/after positions returned by the existing fully composed moveTank.
+  * Any unobserved relocation between calls invalidates the entire interval. */
+ var oldMove=Game.prototype.moveTank;
+ if(oldMove&&!oldMove.__novaFrontlineWitness){
+  function witnessedMove(t,vx,vy,dt){
+   var st=this.__lfState,f=st&&st.frontlineTelemetry;
+   var eligible=!!(f&&!f.closed&&f.currentKey&&st.directorEnabled!==false&&t&&t.ai&&t.id!=null&&alive(t));
+   var bx=eligible?t.x:0,by=eligible?t.y:0;
+   var result=oldMove.apply(this,arguments);
+   if(!eligible||!this.__lfState||this.__lfState.frontlineTelemetry!==f)return result;
+   var ax=t.x,ay=t.y,id=String(t.id),m=f.aiPhysicalMotion||(f.aiPhysicalMotion={}),w=m[id];
+   var valid=Number.isFinite(bx)&&Number.isFinite(by)&&Number.isFinite(ax)&&Number.isFinite(ay)&&
+    Number.isFinite(dt)&&dt>0;
+   if(!w||w.ref!==t){
+    m[id]={ref:t,startX:bx,startY:by,endX:ax,endY:ay,segments:1,valid:valid};
+   }else{
+    if(Math.hypot(w.endX-bx,w.endY-by)>.01)w.valid=false;
+    w.endX=ax;w.endY=ay;w.segments++;
+    if(!valid)w.valid=false;
+   }
+   return result;
+  }
+  witnessedMove.__novaFrontlineWitness=true;
+  Game.prototype.moveTank=witnessedMove;
+ }
  var oldMap=Game.prototype.drawMinimap;if(!oldMap)return;
  Game.prototype.drawMinimap=function(){
   var out=oldMap.apply(this,arguments),st=this.__lfState,c=st&&st.contestSignal,ctx=this.mmCtx,now=this.time||0,op=publicBloom(st,now);

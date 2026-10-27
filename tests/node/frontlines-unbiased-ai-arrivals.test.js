@@ -3,12 +3,17 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 function scene(mode='none'){
- class Game{drawMinimap(){return 'base';}}
+ class Game{drawMinimap(){return 'base';}moveTank(t,vx,vy,dt){t.x+=vx*dt;t.y+=vy*dt;}}
  const window={__novaModules:{'game/engine':function(m){m.exports={Game};}}};
  const ctx={window,console:{info(){},warn(){},error(){}},Math,Number,Object,Array,Date,JSON,Map,Set,
   performance:{now:()=>0},setTimeout(){},clearTimeout(){}};
  for(const name of ['living-front-core-v1.12.0.js','living-front-instincts-v1.12.0.js','living-front-director-v1.12.0.js'])
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../../nova-updates',name),'utf8'),ctx,{filename:name});
+ // Load the composed engine module: this installs the observational moveTank
+ // witness exactly as the production module registry does.
+ const engineModule={exports:{}};
+ window.__novaModules['game/engine'](engineModule,{},()=>({}));
+ assert.equal(engineModule.exports.Game,Game);
  const LF=window.__NOVA_LIVING_FRONT_INTERNAL__,g=new Game();
  const p={id:1,x:-560,y:-560,hp:100,team:1,alive:true};
  const e={id:2,x:-1150,y:-550,hp:100,team:2,alive:true,ai:{__lfEcoMode:mode,__lfEcoKey:'BLOOM:5',__lfEcoWeight:.2}};
@@ -22,7 +27,12 @@ function scene(mode='none'){
   tankSpeed:()=>350,areHostile:(a,b)=>a.team!==b.team,hasLineOfSight:()=>true});
  return {g,st,p,e,LF};
 }
-function sample(s,x,y,dt=.22){s.g.time+=dt;s.e.x=x;s.e.y=y;s.LF.frontlineTick(s.g,s.st,false);}
+function sample(s,x,y,dt=.22,throughMovement=true){
+ s.g.time+=dt;
+ if(throughMovement)s.g.moveTank(s.e,(x-s.e.x)/dt,(y-s.e.y)/dt,dt);
+ else{s.e.x=x;s.e.y=y;}
+ s.LF.frontlineTick(s.g,s.st,false);
+}
 test('identical physical arrivals count identically with memory ON, local or OFF',()=>{
  const totals=[];
  for(const mode of ['memory','local','none']){
@@ -80,4 +90,52 @@ test('a bot cannot inflate approach telemetry by resetting its sampled path',()=
  sample(s,-1930,-550);sample(s,-1850,-550);
  assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalApproaches,1,
   'same bot must not count another approach during one public BLOOM');
+});
+
+test('short unobserved teleport over sector edge never counts as physical arrival',()=>{
+ const s=scene();s.e.x=-1200;s.LF.frontlineTick(s.g,s.st,false);
+ sample(s,-1150,-550);sample(s,-1135,-550);
+ const beforeApproaches=s.st.frontlineTelemetry.counts.aiPhysicalApproaches;
+ sample(s,-1110,-550,.22,false); // only 25 units: old speed heuristic accepts this jump
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,0);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalRejectedCrossings,1);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalApproaches,beforeApproaches);
+});
+test('interleaved short relocation invalidates a partially witnessed path',()=>{
+ const s=scene();s.e.x=-1200;s.LF.frontlineTick(s.g,s.st,false);
+ s.g.time+=.22;s.g.moveTank(s.e,35/.22,0,.22);
+ s.e.x=-1118; // invisible relocation after a legitimate move
+ s.g.moveTank(s.e,10/.22,0,.22);
+ s.LF.frontlineTick(s.g,s.st,false);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,0);
+});
+test('legitimate engine movement still certifies one arrival',()=>{
+ const s=scene();s.e.x=-1200;s.LF.frontlineTick(s.g,s.st,false);
+ sample(s,-1160,-550);sample(s,-1130,-550);sample(s,-1110,-550);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,1);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalRejectedCrossings,0);
+});
+
+test('disabling Director closes the opportunity and drops retained movement references',()=>{
+ const s=scene();s.LF.frontlineTick(s.g,s.st,false);
+ sample(s,-1110,-550);
+ const f=s.st.frontlineTelemetry;
+ assert.ok(f.aiPhysicalLast['2']);
+ s.st.directorEnabled=false;
+ s.LF.frontlineTick(s.g,s.st,false);
+ assert.equal(f.closed,true);
+ assert.equal(f.counts.resolved,1);
+ assert.deepEqual(Object.keys(f.aiPhysicalLast),[]);
+ assert.deepEqual(Object.keys(f.aiPhysicalMotion),[]);
+ s.LF.frontlineTick(s.g,s.st,false);
+ assert.equal(f.counts.resolved,1,'closing a disabled opportunity is idempotent');
+});
+
+test('multiple real movement substeps compose into one certified Director sample',()=>{
+ const s=scene();s.e.x=-1190;s.LF.frontlineTick(s.g,s.st,false);
+ s.g.time+=.22;
+ for(let i=0;i<5;i++)s.g.moveTank(s.e,90/.22,0,.22/5);
+ s.LF.frontlineTick(s.g,s.st,false);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,1);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalRejectedCrossings,0);
 });

@@ -64,16 +64,37 @@ const {chromium}=require('playwright');
     throw Error('real shipping telemetry did not record witnessed contest');
    if(!window.NOVALivingFront.diagnostics().includes('observed-contest'))
     throw Error('COPY ECOLOGY omits chronological Frontlines trace');
-   // Physical arrivals are an A/B witness, not a memory-only AI counter.
-   // Exercise the real shipped engine state without changing combat authority.
+   // Physical arrivals must be certified by the real movement owner, not by
+   // sampled positions alone. Deliberately relocate an enemy without moveTank.
    const beforePhysical=snap.frontline.counts.aiPhysicalArrivals;
-   if(typeof beforePhysical!=='number')throw Error('physical A/B arrival counter missing');
+   const beforeRejected=snap.frontline.counts.aiPhysicalRejectedCrossings;
+   if(typeof beforePhysical!=='number'||typeof beforeRejected!=='number')
+    throw Error('physical A/B arrival and rejected-crossing counters missing');
    const oldEnemyX=e.x,oldEnemyY=e.y;
    e.x=-1150;e.y=-550;g.time+=.22;LF.frontlineTick(g,st,false);
    e.x=-1110;e.y=-550;g.time+=.22;LF.frontlineTick(g,st,false);
-   if(st.frontlineTelemetry.counts.aiPhysicalArrivals!==beforePhysical+1)
-    throw Error('real runtime did not record a witnessed physical AI sector entry');
+   if(st.frontlineTelemetry.counts.aiPhysicalArrivals!==beforePhysical)
+    throw Error('real runtime accepted direct enemy relocation as a physical AI arrival');
+   if(st.frontlineTelemetry.counts.aiPhysicalRejectedCrossings!==beforeRejected+1)
+    throw Error('real runtime failed to diagnose the rejected AI sector crossing');
+   // Positive proof on the real composed movement owner. Choose a genuinely
+   // traversable short corridor across sector 5's west edge; no mock physics.
+   let certifiedEntry=false,entryY=null;
+   for(let y=-1030;y<=-80&&!certifiedEntry;y+=95){
+    if(g.isTerrainSafe&&(!g.isTerrainSafe(-1160,y,25)||!g.isTerrainSafe(-1070,y,25)))continue;
+    if(!g.hasLineOfSight(-1160,y,-1070,y,20))continue;
+    e.x=-1160;e.y=y;e.vx=0;e.vy=0;
+    g.time+=.22;LF.frontlineTick(g,st,false); // unobserved reposition: reset baseline
+    g.time+=.22;g.moveTank(e,350,0,.22);LF.frontlineTick(g,st,false);
+    if(T.sectorIndex(e.x,e.y)===5&&st.frontlineTelemetry.counts.aiPhysicalArrivals===beforePhysical+1){
+     certifiedEntry=true;entryY=y;
+    }
+   }
+   if(!certifiedEntry)throw Error('real composed moveTank failed to certify any terrain-safe sector entry');
    e.x=oldEnemyX;e.y=oldEnemyY;
+   // The corridor probe advances the clock: refresh the genuine contest before
+   // comparing the short-lived badge, rather than relying on a stale 1.4s cue.
+   if(!T.updateContest(g,st))throw Error('real contest did not survive the movement probe');
    g.drawMinimap();
    const ctx=g.mmCtx,S=216;
    const withContest=new Uint8Array(ctx.getImageData(0,0,S,S).data);
@@ -88,7 +109,7 @@ const {chromium}=require('playwright');
    if(T.contestCandidate(g,st))throw Error('expired memory still creates live contact');
    return{changedChannels:changed,publicMemoryTTL:24,liveSignalExpired:true,
      realFairEngagement:!!window.__NOVA_FAIR_ENGAGEMENT_TEST__,
-     realBattlefieldLOS:typeof g.hasLineOfSight==='function'};
+     realBattlefieldLOS:typeof g.hasLineOfSight==='function',shortTeleportRejected:true,certifiedEntry,entryY};
   });
   assert.equal(errors.length,0,errors.join('\n'));
   const dir=path.join('artifacts','browser');fs.mkdirSync(dir,{recursive:true});
