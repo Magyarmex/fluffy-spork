@@ -144,3 +144,18 @@ for(const hz of [30,60,120,240]){
   assert.deepEqual(s.hits,[['drone',11]]);
  });
 }
+
+for(const hz of [30,60,120,240]){
+ test('two idle allied drones reserve separate shapes without phantom double hits at '+hz+'Hz',()=>{
+  const s=world({enemy:false});
+  const second={...s.d,id:12,slot:1,attackCd:0,__novaPhase:'form'};
+  const other={id:21,kind:'shape',type:'circle',x:0,y:12,r:10,hp:100};
+  s.g.drones=[second,s.d]; // reverse the physical array vs sorted squad slots
+  s.g.shapes=[other,s.shape]; // reverse shape enumeration too
+  s.g.updateDrones(1/hz);
+  assert.equal(s.shape.hp,88);
+  assert.equal(other.hp,88);
+  assert.equal(s.hits.length,2);
+  assert.deepEqual(new Set(s.hits.map(h=>h[1])),new Set([20,21]));
+ });
+}
