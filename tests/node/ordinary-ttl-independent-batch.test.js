@@ -93,7 +93,7 @@ function simulate(Game, fps, x, velocity, ttl, pen = 0) {
  * the bounded whole-batch recovery, at 30/60/120Hz in both array orders.
  * The nonlethal disjoint cases must now remain green. */
 const Game=boot(),OptimizedGame=boot(undefined,true);
-function batchWorld(fps,{reverse=false,far=false,wall=false,mutate=null,optimized=false}={}){
+function batchWorld(fps,{reverse=false,far=false,wall=false,mutate=null,optimized=false,pen=0}={}){
  const g=new (optimized?OptimizedGame:Game)();
  g.tanks=[{kind:'tank',id:2,x:far?100:40,y:0,cls:'scout',hp:100,alive:true},
           {kind:'tank',id:3,x:far?100:40,y:400,cls:'scout',hp:100,alive:true}];
@@ -107,7 +107,7 @@ function batchWorld(fps,{reverse=false,far=false,wall=false,mutate=null,optimize
   w:4,h:80,solid:true,destructible:false}];
  const local=[0,400].map((y,i)=>({
   kind:'bullet',id:1+i,ownerId:1,x:0,y,vx:6000,vy:0,
-  r:3,dmg:20,ttl:.005,pen:0,hits:0,dead:false,shell:false,beam:false
+  r:3,dmg:20,ttl:.005,pen,hits:0,dead:false,shell:false,beam:false
  }));
  const remote=Array.from({length:500},(_,i)=>({
   kind:'bullet',id:500+i,ownerId:9,x:1100+i*2,y:1100,
@@ -222,5 +222,29 @@ for(const fps of [30,60,120]){
    'only the independent second lane may claim a recovered contact');
   assert.ok(g.contacts.some(c=>c.owner===3&&c.target===2),
    'the real lateral bullet retains its own legitimate hit');
+ });
+}
+
+/* Every canonical class fires with initial penetration >=1. A pen=0-only
+ * synthetic fix would be dead code in real matches. Exercise pen=1 first-hit
+ * expiration in both Battlefield and Performance composition. */
+for(const fps of [30,60,120,240])for(const reverse of [false,true])
+ for(const optimized of [false,true]){
+ test('canonical pen=1 two independent TTL contacts at '+fps+'Hz reverse='+
+  reverse+' optimized='+optimized,()=>{
+  const g=batchWorld(fps,{reverse,optimized,pen:1});
+  assert.equal(g.hits,2,'real pen=1 rounds must not miss two independent first hits');
+ });
+ test('canonical pen=1 cannot invent contact beyond TTL at '+fps+'Hz reverse='+
+  reverse+' optimized='+optimized,()=>{
+  assert.equal(batchWorld(fps,{reverse,optimized,pen:1,far:true}).hits,0);
+ });
+}
+for(const fps of [30,60,120]){
+ test('pen=1 cannot consume a second body behind an earlier wall at '+fps+'Hz',()=>{
+  assert.equal(batchWorld(fps,{pen:1,wall:true}).hits,1);
+ });
+ test('pen=1 shared hull cannot be double-committed without chronology at '+fps+'Hz',()=>{
+  assert.equal(batchWorld(fps,{pen:1,mutate:g=>{g.bullets[1].y=0;}}).hits,0);
  });
 }
