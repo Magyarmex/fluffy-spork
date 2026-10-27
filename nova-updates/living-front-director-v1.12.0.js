@@ -55,7 +55,7 @@ function closeFrontline(g,st,reason){
  }
  f.closed=true;f.counts.resolved++;
  /* Do not retain tank references after the public opportunity closes. */
- f.aiPhysicalMotion={};f.aiPhysicalLast={};
+ f.aiPhysicalMotion={};f.aiPhysicalLast={};f.aiPhysicalIdentity={};
  if(f.seenContest&&!f.deathRecorded&&g.player&&alive(g.player)){
   f.counts.contestSurvivals++;frontlineTrace(f,g,'contest-survived');
  }
@@ -67,13 +67,13 @@ function ensureFrontline(g,st){
  var op=publicBloom(st,g.time||0);if(!op)return null;
  var f=st.frontlineTelemetry;
  if(!f)f=st.frontlineTelemetry={currentKey:null,sector:-1,announcedAt:-1,playerInside:false,
-  seenContest:false,aiSeen:{},aiStartDist:{},aiApproachSeen:{},aiPhysicalLast:{},aiPhysicalMotion:{},aiPhysicalArrived:{},aiPhysicalApproachSeen:{},events:[],counts:{announcements:0,resolved:0,contestSurvivals:0,playerSeconds:0,playerApproaches:0,aiApproaches:0,playerEntries:0,playerExits:0,
+  seenContest:false,aiSeen:{},aiStartDist:{},aiApproachSeen:{},aiPhysicalLast:{},aiPhysicalMotion:{},aiPhysicalIdentity:{},aiPhysicalArrived:{},aiPhysicalApproachSeen:{},events:[],counts:{announcements:0,resolved:0,contestSurvivals:0,playerSeconds:0,playerApproaches:0,aiApproaches:0,playerEntries:0,playerExits:0,
   observedContests:0,playerDeaths:0,pilotDeathCensors:0,sampledSeconds:0,pilotAliveSeconds:0,hostileBotSeconds:0,aiArrivals:0,aiPhysicalArrivals:0,aiPhysicalApproaches:0,aiPhysicalRejectedCrossings:0,neutralXP:0}};
  var key=op.sector+':'+op.announcedAt;
  if(f.currentKey!==key){
   closeFrontline(g,st,'replaced');
   f.currentKey=key;f.sector=op.sector;f.announcedAt=op.announcedAt;
-  f.playerInside=false;f.seenContest=false;f.deathRecorded=false;f.pilotDeathCensored=false;f.pilotWasAlive=!!(g.player&&alive(g.player));f.closed=false;f.lastSampleTime=Number(g.time)||0;f.playerStartDist=null;f.playerApproachSeen=false;f.aiSeen={};f.aiStartDist={};f.aiApproachSeen={};f.aiPhysicalLast={};f.aiPhysicalMotion={};f.aiPhysicalArrived={};f.aiPhysicalApproachSeen={};
+  f.playerInside=false;f.seenContest=false;f.deathRecorded=false;f.pilotDeathCensored=false;f.pilotWasAlive=!!(g.player&&alive(g.player));f.closed=false;f.lastSampleTime=Number(g.time)||0;f.playerStartDist=null;f.playerApproachSeen=false;f.aiSeen={};f.aiStartDist={};f.aiApproachSeen={};f.aiPhysicalLast={};f.aiPhysicalMotion={};f.aiPhysicalIdentity={};f.aiPhysicalArrived={};f.aiPhysicalApproachSeen={};
   f.counts.announcements++;frontlineTrace(f,g,'announced',op.live?'live':'memory');
  }
  return f;
@@ -101,14 +101,22 @@ function recordFrontlinePlayerDeath(g,st,t){
  * deliberately omitted by LF.snapshot and the Debug event ring. */
 function physicalAIArrivals(g,f,p,ts,now){
  if(!p||!alive(p)){f.aiPhysicalMotion={};return;}
- var c=sectorCenter(f.sector),last=f.aiPhysicalLast,motion=f.aiPhysicalMotion||{},arrived=f.aiPhysicalArrived,approached=f.aiPhysicalApproachSeen,seen={};
+ var c=sectorCenter(f.sector),last=f.aiPhysicalLast,motion=f.aiPhysicalMotion||{},arrived=f.aiPhysicalArrived,approached=f.aiPhysicalApproachSeen,identity=f.aiPhysicalIdentity||(f.aiPhysicalIdentity={}),seen={},present={};
  for(var i=0;i<ts.length;i++){
   var t=ts[i],id=t&&t.id!=null?String(t.id):null;
   if(!id)continue;
+  present[id]=true;
+  /* A temporary shield clears the movement baseline but not identity. A new
+   * tank with the same numeric id must still receive a fresh arrival budget. */
+  if(identity[id]&&identity[id]!==t){
+   delete arrived[id];delete approached[id];delete last[id];
+   delete f.aiSeen[id];delete f.aiApproachSeen[id];delete f.aiStartDist[id];
+  }
+  identity[id]=t;
   if(!t.ai||t===p||!alive(t)||t.spawnShieldT>0||!contestHostile(g,p,t)){
    /* Death ends one physical bot incarnation. Temporary shields do not. */
    if(!alive(t)){
-    delete arrived[id];delete approached[id];
+    delete identity[id];delete arrived[id];delete approached[id];
     delete f.aiSeen[id];delete f.aiApproachSeen[id];delete f.aiStartDist[id];
    }
    delete last[id];continue;
@@ -152,6 +160,10 @@ function physicalAIArrivals(g,f,p,ts,now){
    frontlineTrace(f,g,'ai-physical-arrival',t.ai.__lfEcoMode||'none');
   }
   prev.x=t.x;prev.y=t.y;prev.t=now;prev.inside=inside;
+ }
+ for(var oldId in identity)if(!present[oldId]){
+  delete identity[oldId];delete arrived[oldId];delete approached[oldId];
+  delete f.aiSeen[oldId];delete f.aiApproachSeen[oldId];delete f.aiStartDist[oldId];
  }
  for(var key in last)if(!seen[key]){
   delete last[key];delete arrived[key];delete approached[key];
