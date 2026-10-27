@@ -63,7 +63,7 @@ function ensureFrontline(g,st){
  var f=st.frontlineTelemetry;
  if(!f)f=st.frontlineTelemetry={currentKey:null,sector:-1,announcedAt:-1,playerInside:false,
   seenContest:false,aiSeen:{},aiStartDist:{},aiApproachSeen:{},aiPhysicalLast:{},aiPhysicalMotion:{},aiPhysicalArrived:{},aiPhysicalApproachSeen:{},events:[],counts:{announcements:0,resolved:0,contestSurvivals:0,playerSeconds:0,playerApproaches:0,aiApproaches:0,playerEntries:0,playerExits:0,
-  observedContests:0,playerDeaths:0,aiArrivals:0,aiPhysicalArrivals:0,aiPhysicalApproaches:0,neutralXP:0}};
+  observedContests:0,playerDeaths:0,aiArrivals:0,aiPhysicalArrivals:0,aiPhysicalApproaches:0,aiPhysicalRejectedCrossings:0,neutralXP:0}};
  var key=op.sector+':'+op.announcedAt;
  if(f.currentKey!==key){
   closeFrontline(g,st,'replaced');
@@ -116,6 +116,9 @@ function physicalAIArrivals(g,f,p,ts,now){
   /* A jump, long background gap or recycled body is not a witnessed journey.
    * Prefer missing a dash arrival over fabricating a physical A/B advantage. */
   if(!certified||!(dt>0&&dt<=2)||travel>Math.max(180,speed*dt*2.2+60)){
+   /* Report coverage loss separately: a zero arrival count may otherwise
+    * mean either no tactical rotation or a movement we could not certify. */
+   if(!prev.inside&&inside)f.counts.aiPhysicalRejectedCrossings++;
    last[id]={ref:t,x:t.x,y:t.y,t:now,inside:inside,startDist:inside?null:dist,approached:false};
    continue;
   }
