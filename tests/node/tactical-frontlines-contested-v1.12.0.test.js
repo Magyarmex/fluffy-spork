@@ -238,3 +238,11 @@ test('visible resource identity is independent of player tank id namespace',()=>
  g.shapes[0].id=g.player.id;
  assert.equal(T.contestCandidate(g,st),true,'shape and tank id namespaces may overlap');
 });
+
+test('uncontested sectors do not scan neutral line of sight',()=>{
+ const {T,g,st}=scene();
+ let calls=0;g.hasLineOfSight=()=>{calls++;return true;};
+ g.areHostile=()=>false;
+ assert.equal(T.contestCandidate(g,st),false);
+ assert.equal(calls,0,'without a visible hostile, no neutral-resource visibility work is needed');
+});
