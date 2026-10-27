@@ -81,11 +81,24 @@ const {chromium}=require('playwright');
    if(!T.updateContest(g,st))throw Error('320px viewport lost a physically visible local contest');
    g.drawMinimap();
    const S=216,ctx=g.mmCtx,withSignal=new Uint8Array(ctx.getImageData(0,0,S,S).data);
+   // Validate at the physical CSS scale, not only the 216px backing canvas.
+   const cssWidth=g.mm.getBoundingClientRect().width;
+   if(Math.abs(cssWidth-60)>2)throw Error('shipping minimap CSS scale changed: '+cssWidth);
+   const down=document.createElement('canvas');down.width=60;down.height=60;
+   const downCtx=down.getContext('2d');
+   const sample=()=>{downCtx.clearRect(0,0,60,60);downCtx.drawImage(g.mm,0,0,60,60);return new Uint8Array(downCtx.getImageData(0,0,60,60).data);};
+   const cssWith=sample();
    st.contestSignal=null;g.drawMinimap();
    const without=ctx.getImageData(0,0,S,S).data;
+   const cssWithout=sample();
+   let cssChanged=0;
+   for(let i=0;i<cssWith.length;i+=4){
+    if(Math.max(Math.abs(cssWith[i]-cssWithout[i]),Math.abs(cssWith[i+1]-cssWithout[i+1]),Math.abs(cssWith[i+2]-cssWithout[i+2]))>28)cssChanged++;
+   }
+   if(cssChanged<24)throw Error('CONTESTED badge disappears at real 60px CSS minimap scale: '+cssChanged);
    let changed=0;for(let i=0;i<withSignal.length;i++)if(withSignal[i]!==without[i])changed++;
    if(changed<100)throw Error('320px portrait lost CONTESTED minimap signal: '+changed);
-   return{viewport:320,changedChannels:changed};
+   return{viewport:320,changedChannels:changed,cssChangedPixels:cssChanged,minimapCssWidth:cssWidth};
   });
   await page.screenshot({path:path.join(dir,'tactical-frontlines-mobile.png')});
   await page.evaluate(()=>{
