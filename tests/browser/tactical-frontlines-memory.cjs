@@ -92,6 +92,9 @@ const {chromium}=require('playwright');
    }
    if(!certifiedEntry)throw Error('real composed moveTank failed to certify any terrain-safe sector entry');
    e.x=oldEnemyX;e.y=oldEnemyY;
+   // The corridor probe advances the clock: refresh the genuine contest before
+   // comparing the short-lived badge, rather than relying on a stale 1.4s cue.
+   if(!T.updateContest(g,st))throw Error('real contest did not survive the movement probe');
    g.drawMinimap();
    const ctx=g.mmCtx,S=216;
    const withContest=new Uint8Array(ctx.getImageData(0,0,S,S).data);
