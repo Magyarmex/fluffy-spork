@@ -216,3 +216,18 @@ test('real AI firing witness drives another observer crossfire without target-pl
  assert.equal(self.ai.__v181Mode,'crossfire');
  assert.equal(Object.prototype.hasOwnProperty.call(g,'__novaFairShotWitnesses'),false);
 });
+
+test('offscreen AI shot observers are rejected before terrain raycasts',()=>{
+ const {Game}=boot(),g=new Game();g.w=600;g.h=600;
+ const shooter=tank(1,'twin',0,0),local=tank(2,'guard',100,0);
+ shooter.angle=0;
+ const remote=Array.from({length:100},(_,i)=>tank(10+i,'twin',900+i*5,0));
+ g.tanks=[shooter,local];
+ g.__novaFairShotWitnesses=[shooter,local,...remote];
+ let rays=0;g.hasLineOfSight=()=>{rays++;return true;};
+ g.tryFire(shooter);
+ assert.equal(local.ai.__v181ObservedShotId,1);
+ assert.equal(rays,1,
+  'only the in-viewport witness should need an expensive terrain visibility ray');
+ assert.ok(remote.every(t=>t.ai.__v181ObservedShotId===undefined));
+});
