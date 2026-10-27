@@ -364,5 +364,5 @@ test('outside-sector bot exposure excludes occupants, shields and allies without
  g.time+=.22;LF.frontlineTick(g,st,false);
  assert.ok(Math.abs(c.hostileBotSeconds-.66)<1e-6);
  assert.ok(Math.abs(c.hostileOutsideBotSeconds-.22)<1e-6);
- assert.match(T.debugSummary(LF.snapshot(g)),/OUT-S 0\\.2/);
+ assert.match(T.debugSummary(LF.snapshot(g)),/OUT-S 0\.2/);
 });
