@@ -94,13 +94,14 @@ function droneWorld(hz, optimized, options={}) {
   g.tanks=[];g.shapes=[];g.hitOwners=[];
   g.damageDrone=function(_d,_damage,ownerId){this.hits++;this.hitOwners.push(ownerId);};
   g.drones=[{kind:'drone',id:7,ownerId:options.owned?1:2,
-    x:options.x===undefined?22:options.x,y:0,r:8,hp:20,
+    x:options.x===undefined?22:options.x,
+    y:options.y===undefined?0:options.y,r:8,hp:20,
     speed:options.speed===undefined?200:options.speed,
     __novaPhase:options.phase||'form',__novaVX:options.residual||0,
     __novaTerrainBump:options.terrainBump||null}];
   g.__novaTerrain=options.terrain||[];
   g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
-    vx:options.vx===undefined?6000:options.vx,vy:0,
+    vx:options.vx===undefined?6000:options.vx,vy:options.vy||0,
     r:3,dmg:20,ttl:options.ttl===undefined?.004:options.ttl,
     pen:options.pen||0,hits:0,dead:false,shell:false,beam:false}];
   if(options.otherBullets)g.bullets.push(...options.otherBullets);
@@ -216,5 +217,32 @@ for(const optimized of [false,true])for(const hz of [30,60,120,240]){
   const g=droneWorld(hz,optimized,{x:11.99,vx:500,ttl:.004,
    moveX:0,moveY:20});
   assert.equal(g.hits,0,'do not backdate an unknown-age projectile from a start-only overlap');
+ });
+}
+
+/* Independent coordinate rotations and bounded synthetic worlds check the
+ * exact convex minimum in the actual shipping Game.update path. */
+for(const optimized of [false,true])for(const hz of [30,60,120,240]){
+ const label=(optimized?'optimized':'baseline')+' '+hz+'Hz';
+ test('rotated late-TTL drone contact remains provable '+label,()=>{
+  const rt=Math.SQRT1_2;
+  const g=droneWorld(hz,optimized,{x:(16.8-1)*rt,y:(16.8+1)*rt,
+   vx:2500*rt,vy:2500*rt,ttl:.004});
+  assert.equal(g.hits,1,'the physical proof is rotation invariant');
+ });
+ test('late proof is symmetric for reversed projectile direction '+label,()=>{
+  const g=droneWorld(hz,optimized,{x:-16.8,y:1,vx:-2500,ttl:.004});
+  assert.equal(g.hits,1);
+ });
+ test('provably unreachable drone stays unharmed '+label,()=>{
+  const g=droneWorld(hz,optimized,{x:40,vx:2500,ttl:.004});
+  assert.equal(g.hits,0);
+ });
+}
+for(const optimized of [false,true])for(const hz of [30,60]){
+ test('existing positive-time sample survives a frame-start convex minimum ('+
+  (optimized?'optimized':'baseline')+', '+hz+'Hz)',()=>{
+  const g=droneWorld(hz,optimized,{x:10,vx:500,ttl:.004,moveY:20});
+  assert.equal(g.hits,1,'preserve a previously authorized positive-time witness');
  });
 }
