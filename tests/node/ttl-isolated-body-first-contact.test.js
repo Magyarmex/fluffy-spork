@@ -974,3 +974,24 @@ for(const optimized of [false,true]){
   assert.equal(g.hits,0,'permanent cover must retain physical priority');
  });
 }
+
+
+for(const optimized of [false,true]){
+ test((optimized?'optimized':'baseline')+
+  ' 2000 remote bullets preserve earlier lateral neutral-shape damage',()=>{
+  const Game=boot(undefined,optimized),g=new Game(),events=[];
+  g.tanks=[{kind:'tank',id:2,x:100,y:0,cls:'scout',hp:100,alive:true}];
+  g.shapes=[{kind:'shape',id:3,x:16,y:0,r:12,hp:100,born:g.time-1}];
+  g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+   vx:500,vy:0,r:3,dmg:20,ttl:.005,pen:0,hits:0,
+   dead:false,shell:false,beam:false}];
+  addRemoteTTLFire(g);
+  g.bullets.push({kind:'bullet',id:99998,ownerId:7,x:16,y:14,
+   vx:0,vy:0,r:3,dmg:30,ttl:1,pen:0,hits:0,
+   dead:false,shell:false,beam:false});
+  g.damageShape=(s,dmg)=>{events.push(dmg);s.hp-=dmg;};
+  g.updateBullets(1/30);
+  assert.deepEqual(events,[30],
+   'a lateral t=0 shape hit must precede the expiring local shot');
+ });
+}
