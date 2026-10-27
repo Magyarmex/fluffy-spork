@@ -751,7 +751,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   b.dead=true;b.px=b.x;b.py=b.y;b.vx=0;b.vy=0;
   return true;
  }
- function isolatedTTLBodyContact(g,b,dt){
+ function isolatedTTLBodyContact(g,b,dt,localOthers){
   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||!(b.ttl>0)||
      !(b.ttl<=dt)||!(dt>0)||!(b.pen>=0)||(b.hits||0)>0||
      !Number.isFinite(b.x)||!Number.isFinite(b.y)||
@@ -1081,7 +1081,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   if(firstSolidHit(g,ax,ay,hx,hy,(b.r||2)*.45))return false;
   /* A projectile that could have intercepted before contact also excludes
    * this bounded shortcut. AABB overlap is deliberately conservative. */
-  var others=g.bullets||[];
+  var others=localOthers||g.bullets||[];
   for(var bi=0;bi<others.length;bi++){
    var o=others[bi];if(!o||o===b||o.dead)continue;
    if(!Number.isFinite(o.x)||!Number.isFinite(o.y)||
@@ -1432,6 +1432,94 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   }
   return plan;
  }
+ /* One ordinary TTL first contact can be proven even when thousands of
+  * unrelated bullets exist elsewhere. This is only a conservative candidate
+  * preflight for the EXISTING first-event resolver, not a second damage owner.
+  * Include every shot that could intersect this projectile OR any potentially
+  * reached tank/shape/drone (including lateral earlier kill-credit threats).
+  * Unknown motion remains a veto; cap both comparisons and local proof size. */
+ function localSingleTTLBodyOthers(g,b,dt){
+  var bullets=g.bullets||[],tanks=g.tanks||[],
+      shapes=g.shapes||[],drones=g.drones||[],
+      bodyCost=tanks.length+shapes.length+drones.length;
+  if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
+     b.pen!==0||(b.hits||0)!==0||
+     !(dt>0)||!Number.isFinite(dt)||
+     !(b.ttl>0&&b.ttl<=dt)||
+     !Number.isFinite(b.x)||!Number.isFinite(b.y)||
+     !Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
+     !Number.isFinite(b.r)||!(b.r>0)||
+     bodyCost>=ISOLATED_RECOVERY_SCAN_CAP||
+     bullets.length>12000)return null;
+  var ex=b.x+b.vx*b.ttl,ey=b.y+b.vy*b.ttl;
+  if(!Number.isFinite(ex)||!Number.isFinite(ey))return null;
+  function overlaps(ax,ay,bx,by,cx,cy,dx,dy,pad){
+   return Math.max(ax,bx)+pad>=Math.min(cx,dx)&&
+          Math.min(ax,bx)-pad<=Math.max(cx,dx)&&
+          Math.max(ay,by)+pad>=Math.min(cy,dy)&&
+          Math.min(ay,by)-pad<=Math.max(cy,dy);
+  }
+  var targets=[],invalid=false;
+  function target(e,kind){
+   if(!e||kind==='tank'?!e.alive:
+      kind==='shape'?! (e.hp>0):!(e.hp>0))return;
+   if(kind==='tank'&&e.id===b.ownerId)return;
+   if(kind==='drone'&&e.ownerId===b.ownerId)return;
+   var radius=kind==='tank'?
+      ((CLASSES[e.cls]&&Number.isFinite(CLASSES[e.cls].size))?
+       Math.max(0,CLASSES[e.cls].size):120)+3:
+      kind==='shape'?(e.r||15):(e.r||8)+1;
+   var sx=e.x,sy=e.y;
+   if(kind==='tank'&&e.__novaSweepMoveTime===g.time){
+    sx=e.__novaSweepPrevX;sy=e.__novaSweepPrevY;
+   }else if(kind==='shape'){
+    var start=shapeSweepStart(g,e);
+    if(start){sx=start.x;sy=start.y;}
+   }else if(kind==='drone'&&g.__novaShapeSweepActive&&
+      e.__novaChronoDroneEpoch===g.__novaShapeSweepEpoch){
+    sx=e.__novaChronoDronePrevX;sy=e.__novaChronoDronePrevY;
+   }
+   if(!Number.isFinite(radius)||!(radius>0)||
+      !Number.isFinite(sx)||!Number.isFinite(sy)||
+      !Number.isFinite(e.x)||!Number.isFinite(e.y)){
+    invalid=true;return;
+   }
+   /* Only drone movement can be inferred from a bounded speed ball;
+    * tank and shape first-event checks use witnessed start/end corridors. */
+   var motionPad=kind==='drone'?Math.max(30,dt*4000):4;
+   if(overlaps(b.x,b.y,ex,ey,sx,sy,e.x,e.y,
+      radius+b.r+motionPad))
+    targets.push({sx:sx,sy:sy,ex:e.x,ey:e.y,r:radius+motionPad});
+  }
+  for(var ti=0;ti<tanks.length;ti++)target(tanks[ti],'tank');
+  for(var si=0;si<shapes.length;si++)target(shapes[si],'shape');
+  for(var di=0;di<drones.length;di++)target(drones[di],'drone');
+  if(invalid||targets.length*bullets.length>12000)return null;
+  var local=[];
+  for(var bi=0;bi<bullets.length;bi++){
+   var o=bullets[bi];if(!o||o===b||o.dead)continue;
+   if(!Number.isFinite(o.x)||!Number.isFinite(o.y)||
+      !Number.isFinite(o.vx)||!Number.isFinite(o.vy)||
+      !Number.isFinite(o.r)){
+    local.push(o);
+   }else{
+    var ox=o.x+o.vx*dt,oy=o.y+o.vy*dt,
+        pad=b.r+Math.max(0,o.r)+2,
+        possible=!Number.isFinite(ox)||!Number.isFinite(oy)||
+         overlaps(b.x,b.y,ex,ey,o.x,o.y,ox,oy,pad);
+    if(!possible)for(var j=0;j<targets.length;j++){
+     var t=targets[j],rr=t.r+Math.max(0,o.r);
+     if(overlaps(o.x,o.y,ox,oy,t.sx,t.sy,t.ex,t.ey,rr)){
+      possible=true;break;
+     }
+    }
+    if(possible)local.push(o);
+   }
+   if(local.length+bodyCost+1>ISOLATED_RECOVERY_SCAN_CAP)
+    return null;
+  }
+  return local;
+ }
  var oldUpdateBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var terrain=ensureTerrain(this);
  /* Bound pairwise geometry per frame, not total bullets: one expiring shot
   * remains eligible in a crowded but spatially separated firefight. When
@@ -1479,13 +1567,28 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
     (expiring===1&&bodyWork<=ISOLATED_RECOVERY_SCAN_CAP));
  var localExpiring=!legacyExpiring&&expiring>0?
     localStationaryPiercingPlan(this,dt,false):null;
- if(legacyExpiring||localExpiring)
+ var localSingleBody=null;
+ if(!legacyExpiring&&!localExpiring&&expiring===1)
+  for(var candidateI=0;candidateI<this.bullets.length;candidateI++){
+   var candidate=this.bullets[candidateI];
+   if(candidate&&!candidate.dead&&!candidate.shell&&!candidate.beam&&
+      !candidate.splash&&!candidate.__v17Cannon&&candidate.pen===0&&
+      (candidate.hits||0)===0&&candidate.ttl>0&&candidate.ttl<=dt){
+    var nearby=localSingleTTLBodyOthers(this,candidate,dt);
+    if(nearby)localSingleBody={bullet:candidate,others:nearby};
+    break;
+   }
+  }
+ if(legacyExpiring||localExpiring||localSingleBody)
   for(var pre=this.bullets.length-1;pre>=0;pre--){
    var expiringBullet=this.bullets[pre];
    if(localExpiring){
     if(localExpiring.has(expiringBullet))
      isolatedTTLStationaryPiercingChain(this,expiringBullet,dt,false,
       localExpiring.get(expiringBullet));
+   }else if(localSingleBody){
+    if(expiringBullet===localSingleBody.bullet)
+     isolatedTTLBodyContact(this,expiringBullet,dt,localSingleBody.others);
    }else if(!isolatedTTLStationaryPiercingChain(this,expiringBullet,dt))
     isolatedTTLBodyContact(this,expiringBullet,dt);
   }
