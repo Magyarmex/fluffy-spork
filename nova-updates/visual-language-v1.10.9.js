@@ -207,7 +207,11 @@ if(typeof document!=='undefined'&&document.head&&typeof document.createElement==
   var toastStyleId='nova-portrait-toast-constraint';
   if(!document.getElementById||!document.getElementById(toastStyleId)){
     var toastStyle=document.createElement('style');toastStyle.id=toastStyleId;
-    toastStyle.textContent='@media(max-width:480px){[class~="top-[18%]"][class~="pointer-events-none"]{width:min(94vw,360px);max-width:calc(100vw - 16px)}[class~="top-[18%]"][class~="pointer-events-none"]>.panel.anim-pop{box-sizing:border-box;width:100%;max-width:100%;padding:7px 10px;font-size:11px;line-height:1.35;letter-spacing:.035em;overflow-wrap:break-word}}';
+    toastStyle.textContent='@media(max-width:480px){[class~="top-[18%]"][class~="pointer-events-none"]{width:min(94vw,360px);max-width:calc(100vw - 16px)}[class~="top-[18%]"][class~="pointer-events-none"]>.panel.anim-pop{box-sizing:border-box;width:100%;max-width:100%;padding:7px 10px;font-size:11px;line-height:1.35;letter-spacing:.035em;overflow-wrap:break-word}}'+
+      /* The portrait settings gear sits below the top bar and can physically
+       * cover the first line of an otherwise in-bounds toast. Keep transient
+       * announcements below that control, without moving desktop/landscape UI. */
+      '@media(max-width:480px) and (orientation:portrait){[class~="top-[18%]"][class~="pointer-events-none"]{top:clamp(128px,21vh,152px)}}';
     document.head.appendChild(toastStyle);
   }
 }
