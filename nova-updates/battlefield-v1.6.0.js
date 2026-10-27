@@ -1534,6 +1534,84 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   }
   return local;
  }
+ /* Two or more ordinary rounds may expire in the same frame while distant
+  * fire makes the global projected-work estimate too expensive. Preflight
+  * the ENTIRE eligible batch, never the first N array entries. Each round
+  * retains the existing first-event resolver; this planner only proves
+  * that their possible body contacts cannot share a victim. */
+ function localOrdinaryTTLBatchPlan(g,dt){
+  var bullets=g.bullets||[],shots=[],tanks=g.tanks||[],
+      shapes=g.shapes||[],drones=g.drones||[],
+      bodyCount=tanks.length+shapes.length+drones.length;
+  if(!(dt>0)||!Number.isFinite(dt))return null;
+  for(var i=0;i<bullets.length;i++){
+   var b=bullets[i];
+   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
+      !(b.ttl>0&&b.ttl<=dt))continue;
+   /* A mixed penetration/ordinary batch has unresolved shared effects.
+    * Do not commit any shortcut from this lane in that situation. */
+   if(b.pen!==0||(b.hits||0)!==0)return null;
+   shots.push(b);
+  }
+  if(shots.length<2||shots.length>12||
+     shots.length*(bullets.length+bodyCount)>6000)return null;
+  var plan=new Map(),claimed=new Set();
+  for(var si=0;si<shots.length;si++){
+   var shot=shots[si];
+   if(!Number.isFinite(shot.x)||!Number.isFinite(shot.y)||
+      !Number.isFinite(shot.vx)||!Number.isFinite(shot.vy)||
+      !Number.isFinite(shot.r)||!(shot.r>0)||
+      !Number.isFinite(shot.dmg)||!(shot.dmg>0))return null;
+   var others=localSingleTTLBodyOthers(g,shot,dt);
+   if(!others)return null;
+   var x1=shot.x+shot.vx*shot.ttl,y1=shot.y+shot.vy*shot.ttl;
+   if(!Number.isFinite(x1)||!Number.isFinite(y1))return null;
+   function candidate(e,kind){
+    if(!e||(kind==='tank'?!e.alive:!(e.hp>0))||
+       (kind==='tank'&&e.id===shot.ownerId)||
+       (kind==='drone'&&e.ownerId===shot.ownerId))return true;
+    var radius=kind==='tank'?
+       (CLASSES[e.cls]&&Number.isFinite(CLASSES[e.cls].size)?
+        Math.max(0,CLASSES[e.cls].size)+3:120):
+       kind==='shape'?(e.r||15):(e.r||8)+1;
+    var sx=e.x,sy=e.y,pad=shot.r+radius+4;
+    if(kind==='tank'&&e.__novaSweepMoveTime===g.time){
+     sx=e.__novaSweepPrevX;sy=e.__novaSweepPrevY;
+    }else if(kind==='shape'){
+     var start=shapeSweepStart(g,e);
+     if(start){sx=start.x;sy=start.y;}
+    }else if(kind==='drone'){
+     if(g.__novaShapeSweepActive&&
+        e.__novaChronoDroneEpoch===g.__novaShapeSweepEpoch){
+      sx=e.__novaChronoDronePrevX;sy=e.__novaChronoDronePrevY;
+     }
+     pad+=Math.max(30,dt*4000);
+    }
+    if(!Number.isFinite(radius)||!(radius>0)||
+       !Number.isFinite(sx)||!Number.isFinite(sy)||
+       !Number.isFinite(e.x)||!Number.isFinite(e.y))return false;
+    if(Math.max(shot.x,x1)+pad<Math.min(sx,e.x)||
+       Math.min(shot.x,x1)-pad>Math.max(sx,e.x)||
+       Math.max(shot.y,y1)+pad<Math.min(sy,e.y)||
+       Math.min(shot.y,y1)-pad>Math.max(sy,e.y))return true;
+    /* Unknown discontinuity, death/fragment spawning or shared victim:
+     * defer the whole batch. This lane is intentionally nonlethal only. */
+    if(kind==='shape'&&shapeWasTeleported(g,e))return false;
+    if(!Number.isFinite(e.hp)||e.hp<=shot.dmg*2||
+       claimed.has(e))return false;
+    claimed.add(e);
+    return true;
+   }
+   for(var ti=0;ti<tanks.length;ti++)
+    if(!candidate(tanks[ti],'tank'))return null;
+   for(var qi=0;qi<shapes.length;qi++)
+    if(!candidate(shapes[qi],'shape'))return null;
+   for(var di=0;di<drones.length;di++)
+    if(!candidate(drones[di],'drone'))return null;
+   plan.set(shot,others);
+  }
+  return plan;
+ }
  var oldUpdateBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var terrain=ensureTerrain(this);
  /* Bound pairwise geometry per frame, not total bullets: one expiring shot
   * remains eligible in a crowded but spatially separated firefight. When
@@ -1581,8 +1659,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
     (expiring===1&&bodyWork<=ISOLATED_RECOVERY_SCAN_CAP));
  var localExpiring=!legacyExpiring&&expiring>0?
     localStationaryPiercingPlan(this,dt,false):null;
+ var localOrdinaryBatch=!legacyExpiring&&!localExpiring&&expiring>1?
+    localOrdinaryTTLBatchPlan(this,dt):null;
  var localSingleBody=null;
- if(!legacyExpiring&&!localExpiring&&expiring===1)
+ if(!legacyExpiring&&!localExpiring&&!localOrdinaryBatch&&expiring===1)
   for(var candidateI=0;candidateI<this.bullets.length;candidateI++){
    var candidate=this.bullets[candidateI];
    if(candidate&&!candidate.dead&&!candidate.shell&&!candidate.beam&&
@@ -1593,10 +1673,14 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
     break;
    }
   }
- if(legacyExpiring||localExpiring||localSingleBody)
+ if(legacyExpiring||localExpiring||localOrdinaryBatch||localSingleBody)
   for(var pre=this.bullets.length-1;pre>=0;pre--){
    var expiringBullet=this.bullets[pre];
-   if(localExpiring){
+   if(localOrdinaryBatch){
+    if(localOrdinaryBatch.has(expiringBullet))
+     isolatedTTLBodyContact(this,expiringBullet,dt,
+      localOrdinaryBatch.get(expiringBullet));
+   }else if(localExpiring){
     if(localExpiring.has(expiringBullet))
      isolatedTTLStationaryPiercingChain(this,expiringBullet,dt,false,
       localExpiring.get(expiringBullet));
