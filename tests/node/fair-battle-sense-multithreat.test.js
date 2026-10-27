@@ -135,3 +135,11 @@ test('perceived multi-threat snapshots obey the existing bounded tactical think 
  assert.equal(current,undefined,'original temporary value is restored');
  assert.equal(g.tanks.length,3);
 });
+
+test('legacy AI exception restores both canonical tank list and tactical snapshot',()=>{
+ const {g,ai,self}=scene();
+ Object.defineProperty(g,'__legacyVisibleIds',{set(){throw new Error('injected AI failure');}});
+ assert.throws(()=>ai.updateAI(self,g,1/60),/injected AI failure/);
+ assert.equal(g.tanks.length,3);
+ assert.equal(Object.prototype.hasOwnProperty.call(g,'__novaFairVisibleTanks'),false);
+});
