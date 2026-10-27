@@ -202,3 +202,14 @@ for(const fps of [30,60,120,240])for(const reverse of [false,true]){
   assert.equal(batchWorld(fps,{reverse,far:true,optimized:true}).hits,0);
  });
 }
+
+for(const fps of [30,60,120]){
+ test('lateral competing projectile cannot steal first-lane attribution at '+fps+'Hz',()=>{
+  const g=batchWorld(fps,{mutate:g=>g.bullets.push({
+   kind:'bullet',id:10001,ownerId:3,x:40,y:19,vx:0,vy:0,
+   r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false
+  })});
+  assert.equal(g.hits,1,
+   'a bullet already near the victim hull must veto the first lane even off its path');
+ });
+}
