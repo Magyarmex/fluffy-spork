@@ -98,6 +98,7 @@ test('short unobserved teleport over sector edge never counts as physical arriva
  const beforeApproaches=s.st.frontlineTelemetry.counts.aiPhysicalApproaches;
  sample(s,-1110,-550,.22,false); // only 25 units: old speed heuristic accepts this jump
  assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,0);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalRejectedCrossings,1);
  assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalApproaches,beforeApproaches);
 });
 test('interleaved short relocation invalidates a partially witnessed path',()=>{
@@ -112,6 +113,7 @@ test('legitimate engine movement still certifies one arrival',()=>{
  const s=scene();s.e.x=-1200;s.LF.frontlineTick(s.g,s.st,false);
  sample(s,-1160,-550);sample(s,-1130,-550);sample(s,-1110,-550);
  assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,1);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalRejectedCrossings,0);
 });
 
 test('disabling Director closes the opportunity and drops retained movement references',()=>{
