@@ -248,8 +248,11 @@ async function arm(browser,enabled,label){
    g.input.aimVec=()=>({x:Math.cos(g.time*.73),y:Math.sin(g.time*.73)});
    if(pilotPolicy==='public-bloom-harvest'||pilotPolicy==='public-bloom-harvest-defense'){
     const helper=window.__novaResearchPublicPilot,LF=window.__NOVA_LIVING_FRONT_INTERNAL__,
-     F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
+     F=window.__NOVA_FAIR_ENGAGEMENT_TEST__,
+     defense=pilotPolicy==='public-bloom-harvest-defense'?window.__novaResearchVisibleDefense:null;
     g.input.aimVec=()=>{
+     const hostile=defense&&defense.aimAtVisibleHostile(g,p,F);
+     if(hostile){g.__novaVisibleHostileAimSamples=(g.__novaVisibleHostileAimSamples||0)+1;return hostile;}
      const v=helper.aimAtVisibleNeutral(g,p,LF,F);
      if(v){g.__novaVisibleAimSamples=(g.__novaVisibleAimSamples||0)+1;return v;}
      return{x:Math.cos(g.time*.73),y:Math.sin(g.time*.73)};
@@ -289,6 +292,7 @@ async function arm(browser,enabled,label){
     naturalBlooms:s.stats.blooms||0,publicBloomCommandSamples:g.__novaPublicBloomCommands||0,
     visibleNeutralAimSamples:g.__novaVisibleAimSamples||0,
     visibleDodgeSamples:g.__novaVisibleDodgeSamples||0,
+    visibleHostileAimSamples:g.__novaVisibleHostileAimSamples||0,
     events:s.frontline?.events||[]};
   });
   if(result.naturalBlooms>0)assert.ok(result.contestGateAudit.samples>0,'announced BLOOM must be audited');
