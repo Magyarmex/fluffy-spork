@@ -175,3 +175,20 @@ test('diagnostics-disabled shipping chain creates no final motion witness',()=>{
  g.update(1/60);
  assert.equal(d.__novaChronoIdleUnmodifiedEpoch,undefined);
 });
+
+test('Terrain Intelligence reroute invalidates a raw corridor with safe endpoints',()=>{
+ const wall={id:-1,shape:'rect',x:27,y:0,w:4,h:70,
+  solid:true,destructible:false};
+ const {g,d}=world({terrain:[wall]});
+ d.x=0;d.y=0;d.__novaIdleVX=3000;d.__novaIdleVY=0;
+ g.update(1/30);
+ const epoch=g.__novaShapeSweepEpoch;
+ assert.equal(d.__novaChronoIdleRawEpoch,epoch);
+ assert.ok(d.__novaChronoIdleRawEndX>42,
+  'the raw integration crosses the wall and ends beyond its padded face');
+ assert.equal(d.__novaChronoDroneBaseX,d.__novaChronoDroneTerrainX,
+  'Battlefield endpoint resolution alone does not see this crossing');
+ assert.equal(d.__novaChronoIdleInvalidEpoch,epoch,
+  'Terrain Intelligence must veto a crossed corridor even if endpoints are clear');
+ assert.notEqual(d.__novaChronoIdleUnmodifiedEpoch,epoch);
+});
