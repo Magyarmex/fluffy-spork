@@ -64,3 +64,20 @@ test('one live turn cannot restart on its own remembered announcement',()=>{
  assert.equal(s.st.stats.aiFrontlineCommitments,1,'same public announcement has one turn budget');
  s.g.time=112;s.tick();assert.equal(s.st.stats.aiFrontlineCommitments,1);
 });
+test('live public commitment cannot depend on hidden ecological sector values',()=>{
+ const a=scene(),b=scene();
+ b.st.sectors[5].value=99999;b.st.sectors[5].maturity=1;
+ b.st.sectors[3].value=1;b.st.sectors[3].pressure=999;
+ const first=a.tick(),second=b.tick();
+ assert.deepEqual(second,first,'private maturity/value must not steer a public decision');
+ assert.equal(a.t.ai.__lfEcoWeight,b.t.ai.__lfEcoWeight);
+ assert.equal(a.st.stats.aiFrontlineCommitments,b.st.stats.aiFrontlineCommitments);
+});
+test('a genuinely visible nearby combat target vetoes the live public turn',()=>{
+ const s=scene(),enemy={id:99,x:-1100,y:-600,hp:100,maxHp:100,alive:true,spawnShieldT:0};
+ s.t.ai.__v1112TargetId=99;s.g.getTank=id=>id===99?enemy:null;
+ s.g.hasLineOfSight=()=>true;
+ const move=s.tick();
+ assert.equal(s.st.stats.aiFrontlineCommitments||0,0);
+ assert.ok(move.x<0,'live public farm cannot override immediate visible combat');
+});
