@@ -232,6 +232,7 @@ test('canonical Fieldcraft explains dashed last-known BLOOM and visible-only CON
  const tip=window.__NOVA_LIVING_FRONT_TIPS__.find(t=>t.id==='living-front-bloom-choice');
  assert.ok(tip);
  assert.match(tip.text,/dashed ring is last-known/);
- assert.match(tip.text,/CONTESTED means a visible rival/);
+ assert.match(tip.text,/red ! on a BLOOM means a visible rival/);
+ assert.doesNotMatch(tip.text,/CONTESTED/,'Fieldcraft must describe the actual visible icon');
  assert.equal(window.__NOVA_LIVING_FRONT_TIPS__.length,7,'no extra tip slot or UI clutter');
 });
