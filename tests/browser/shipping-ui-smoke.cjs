@@ -458,7 +458,9 @@ async function scenario(browser, label, options) {
         deathTitle.glyphRight<=deathTitle.innerRight+1,
         label+': TERMINATED glyphs must fit inside the panel content box: '+
         JSON.stringify(deathTitle));
-      if(deathTitle.viewport>=390)assert.equal(deathTitle.fontSize,'30px',
+      if(label==='landscape-568')assert.equal(deathTitle.fontSize,'20px',
+        label+': compact only the short-landscape death title');
+      else if(deathTitle.viewport>=390)assert.equal(deathTitle.fontSize,'30px',
         label+': retain desktop/large-phone title scale');
       console.log('NOVA_DEATH_TITLE '+JSON.stringify({label,deathTitle}));
       await page.screenshot({path:path.join(output,label+'-death-insight.png')});
