@@ -100,5 +100,5 @@ test('no-treatment live-turn pairs must also match visible-defense decisions',()
  for(const [name,data] of [['frontlines-natural-on.json',p.report.on],
   ['frontlines-natural-off.json',p.report.off],['frontlines-natural-match-ab.json',p.report]])
   fs.writeFileSync(path.join(p.dir,name),JSON.stringify(data));
- assert.throws(()=>collectLiveTurnMatrix(root,1),/no-treatment ON\\/OFF gameplay diverged in visibleDodgeSamples/);
+ assert.throws(()=>collectLiveTurnMatrix(root,1),/no-treatment ON\/OFF gameplay diverged in visibleDodgeSamples/);
 }));
