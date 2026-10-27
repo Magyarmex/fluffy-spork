@@ -7,7 +7,7 @@ const root=path.resolve(__dirname,'../..');
 function boot(fair=true){
  const Game=class{drawMinimap(){return 'base';}};
  const window={__novaModules:{'game/engine':function(m){m.exports={Game};}}};
- if(fair)window.__NOVA_FAIR_ENGAGEMENT_TEST__={inGameplayViewport(g,p,t){
+ if(fair)window.__NOVA_FAIR_ENGAGEMENT_TEST__={viewportHalfExtents(g){return{x:g.w/(2*g.cam.zoom),y:g.h/(2*g.cam.zoom)};},inGameplayViewport(g,p,t){
   return Math.abs(t.x-p.x)<=g.w/(2*g.cam.zoom)&&Math.abs(t.y-p.y)<=g.h/(2*g.cam.zoom);
  }};
  const ctx={window,console:{info(){},warn(){},error(){}},Math,Number,Object,Array,Date,JSON,Map,Set,
@@ -23,9 +23,9 @@ function scene(fair=true){
   enemy={id:2,x:-520,y:-540,hp:100,alive:true};
  const calls=[],ctx={save(){},restore(){},beginPath(){},arc(x,y,r){calls.push({type:'arc',x,y,r});},stroke(){},fill(){},moveTo(){},lineTo(){},
   fillText(s){calls.push(s);calls.push({type:'text',value:s,font:this.font});}};
- Object.assign(g,{time:100,player:p,tanks:[p,enemy],shapes:[],w:800,h:600,cam:{zoom:1},
+ Object.assign(g,{time:100,player:p,tanks:[p,enemy],shapes:[{id:44,type:'hexagon',x:-540,y:-550,hp:200}],w:800,h:600,cam:{zoom:1},
   mmCtx:ctx,hasLineOfSight:()=>true,areHostile:(a,b)=>a.id!==b.id,areAllies:()=>false});
- g.__lfState={signal:{type:'BLOOM',sector:5,started:98,until:104},stats:{},sectors:Array.from({length:16},(_,i)=>({value:i===5?500:0,maturity:0,pressure:0})),
+ g.__lfState={defs:{hexagon:{xp:200},square:{xp:50},pentagon:{xp:100},circle:{xp:5}},signal:{type:'BLOOM',sector:5,started:98,until:104},stats:{},sectors:Array.from({length:16},(_,i)=>({value:i===5?500:0,maturity:0,pressure:0})),
   lastSignalAt:99,cooldowns:{bloom:24,migration:20,star:58},migrationHeat:0,planMsEma:0,planMsPeak:0};
  return {T,LF,g,p,enemy,calls,st:g.__lfState};
 }
@@ -155,7 +155,7 @@ test('last-known BLOOM can be contested after the live five-second signal, but n
 test('a depleted remembered BLOOM is historical information, not a false live contest',()=>{
  const {T,g,st,calls}=scene();
  st.signal=null;st.bloomMemory={sector:5,announcedAt:98,until:122};
- st.sectors[5].value=0;g.time=106;
+ st.sectors[5].value=0;g.shapes=[];g.time=106;
  assert.equal(T.contestCandidate(g,st),false);
  assert.equal(T.updateContest(g,st),false);
  g.drawMinimap();
@@ -185,7 +185,7 @@ test('last-known BLOOM memory survives a different public Director signal withou
 });
 
 test('even a live BLOOM cannot advertise an empty opportunity as contested',()=>{
- const {T,g,st}=scene();st.sectors[5].value=0;
+ const {T,g,st}=scene();st.sectors[5].value=0;g.shapes=[];
  assert.equal(T.contestCandidate(g,st),false);
 });
 
@@ -201,4 +201,63 @@ test('disabling the Front Director also suppresses its remembered tactical signa
  st.bloomMemory={sector:5,announcedAt:98,until:122,initialValue:500};
  st.directorEnabled=false;
  assert.equal(T.contestCandidate(g,st),false);
+});
+
+test('a visible contest is invariant under hidden live sector totals',()=>{
+ const {T,g,st}=scene();
+ assert.equal(T.contestCandidate(g,st),true);
+ st.sectors[5].value=0;
+ assert.equal(T.contestCandidate(g,st),true,'a hidden sector total cannot suppress a visible real pocket');
+ st.sectors[5].value=100000;
+ assert.equal(T.contestCandidate(g,st),true);
+});
+test('hidden resources cannot produce a contest when no visible neutral shape remains',()=>{
+ const {T,g,st}=scene();
+ g.shapes=[];st.sectors[5].value=9000;
+ assert.equal(T.contestCandidate(g,st),false,'visible rival alone does not prove an active harvest');
+});
+test('occluded and off-screen resources do not reveal current hidden pocket value',()=>{
+ const {T,g,st}=scene();
+ st.sectors[5].value=9000;
+ g.hasLineOfSight=(x1,y1,x2,y2)=>x2!==-540;
+ assert.equal(T.contestCandidate(g,st),false,'terrain must hide the neutral resource even if rival is visible');
+ g.hasLineOfSight=()=>true;
+ g.shapes[0].x=-1000;g.shapes[0].y=-550;
+ assert.equal(T.contestCandidate(g,st),false,'offscreen neutral shape must not qualify');
+});
+test('visible small and dead neutral shapes cannot advertise a depleted BLOOM',()=>{
+ const {T,g,st}=scene();
+ st.sectors[5].value=10000;
+ g.shapes=[{id:80,type:'circle',x:-540,y:-550,hp:10},{id:81,type:'circle',x:-550,y:-550,hp:10}];
+ assert.equal(T.contestCandidate(g,st),false,'ten observed XP is not a meaningful pocket');
+ g.shapes=[{id:44,type:'hexagon',x:-540,y:-550,hp:0}];
+ assert.equal(T.contestCandidate(g,st),false,'dead shape cannot be harvested');
+});
+test('visible resource identity is independent of player tank id namespace',()=>{
+ const {T,g,st}=scene();
+ g.shapes[0].id=g.player.id;
+ assert.equal(T.contestCandidate(g,st),true,'shape and tank id namespaces may overlap');
+});
+
+test('uncontested sectors do not scan neutral line of sight',()=>{
+ const {T,g,st}=scene();
+ let calls=0;g.hasLineOfSight=()=>{calls++;return true;};
+ g.areHostile=()=>false;
+ assert.equal(T.contestCandidate(g,st),false);
+ assert.equal(calls,0,'without a visible hostile, no neutral-resource visibility work is needed');
+});
+
+test('tactical camera cannot reveal a shape that is near the hull but off the rendered screen',()=>{
+ const {T,g,st}=scene();
+ g.shapes[0].x=-900;g.cam.x=-240;g.cam.y=-560;
+ assert.equal(T.contestCandidate(g,st),false,'Long Glass must not turn hull-proximity into hidden harvest radar');
+ g.cam.x=-560;
+ assert.equal(T.contestCandidate(g,st),true,'restore visible pocket when the camera actually includes it');
+});
+test('tactical camera cannot reveal an enemy outside the rendered viewport',()=>{
+ const {T,g,st}=scene();
+ g.cam.x=-950;g.cam.y=-560;
+ assert.equal(T.contestCandidate(g,st),false,'enemy near hull but off-screen is not a witnessed contest');
+ g.cam.x=-560;
+ assert.equal(T.contestCandidate(g,st),true);
 });

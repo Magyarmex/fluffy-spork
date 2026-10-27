@@ -143,21 +143,51 @@ function contestHostile(g,a,b){
  for(var i=0;i<keys.length;i++){var k=keys[i];if(a[k]!=null&&b[k]!=null)return a[k]!==b[k];}
  return true;
 }
+/* CONTESTED is player-facing intelligence: use the same viewport geometry as
+ * Fair Engagement, but do not pass shapes through its tank-ID predicate.
+ * A shape and tank may share an ID. Terrain LoS is required for every counted
+ * shape. This runs only at the decimated Director cadence and stops as soon
+ * as enough visible neutral value is proven (canonical neutral population is
+ * bounded), rather than scanning hidden sector state or adding frame work. */
+/* Long Glass / tactical framing can move the actual rendered camera away from
+ * the player hull. A player-centered Fair Engagement check alone is not proof
+ * that an object is presently on screen. Fail closed for tactical UI intel. */
+function inRenderedCamera(g,p,s,e){
+ var cam=g.cam||{},cx=Number.isFinite(cam.x)?cam.x:p.x,cy=Number.isFinite(cam.y)?cam.y:p.y;
+ return Math.abs(s.x-cx)<=e.x&&Math.abs(s.y-cy)<=e.y;
+}
+function observedPocketValue(g,st,p,sector,required){
+ var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__,defs=st&&st.defs||LF.defs;
+ if(!F||typeof F.viewportHalfExtents!=='function'||!g||typeof g.hasLineOfSight!=='function'||!defs)return 0;
+ var e=F.viewportHalfExtents(g);
+ if(!e||!(e.x>0)||!(e.y>0))return 0;
+ var sh=g.shapes||[],value=0;
+ for(var i=0;i<sh.length;i++){
+  var s=sh[i];if(!s||!(s.hp>0)||sectorIndex(s.x,s.y)!==sector)continue;
+  if(Math.abs(s.x-p.x)>e.x||Math.abs(s.y-p.y)>e.y||!inRenderedCamera(g,p,s,e))continue;
+  var base=xp(defs,s.type);if(!(base>0))continue;
+  if(!g.hasLineOfSight(p.x,p.y,s.x,s.y,2))continue;
+  value+=base+(s.type==='crasher'?(Number(s.__lfBounty)||0):0)
+   +(s.type==='hexagon'?80:s.type==='star'?170:s.type==='pentagon'?22:0);
+  if(value>=required)return value;
+ }
+ return value;
+}
 function contestCandidate(g,st){
  var now=g&&g.time||0,op=publicBloom(st,now),p=g&&g.player;
  if(!op||!p||!alive(p)||p.spawnShieldT>0||g.__novaDecorativeWorld||sectorIndex(p.x,p.y)!==op.sector)return false;
- /* A public announcement is not proof that valuable shapes still remain.
-  * Half the original BLOOM entry threshold prevents empty-sector false alarms.
-  * For stale memory also require a bounded fraction of the announced value. */
- var sector=st.sectors&&st.sectors[op.sector],mem=st.bloomMemory;
- if(!sector||sector.value<Math.max(155,Math.min(310,(!op.live&&mem?mem.initialValue||0:0)*.25)))return false;
+ /* The BLOOM announcement is historical public intelligence, not proof of
+  * current value. Require enough genuinely visible neutral value. Private
+  * sector totals and the initial BLOOM value must never control the badge. */
  var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
- if(!F||typeof F.inGameplayViewport!=='function'||typeof g.hasLineOfSight!=='function')return false;
+ if(!F||typeof F.inGameplayViewport!=='function'||typeof F.viewportHalfExtents!=='function'||typeof g.hasLineOfSight!=='function')return false;
+ var ext=F.viewportHalfExtents(g);if(!ext||!(ext.x>0)||!(ext.y>0))return false;
  var ts=g.tanks||[];
  for(var i=0;i<ts.length;i++){
   var t=ts[i];if(!t||t===p||t.id===p.id||!alive(t)||t.spawnShieldT>0||sectorIndex(t.x,t.y)!==op.sector)continue;
   if(!contestHostile(g,p,t))continue;
-  if(visible(g,p,t))return true;
+  /* Only scan the neutral pocket after a legitimate hostile is witnessed. */
+  if(visible(g,p,t)&&inRenderedCamera(g,p,t,ext)&&observedPocketValue(g,st,p,op.sector,155)>=155)return true;
  }
  return false;
 }
