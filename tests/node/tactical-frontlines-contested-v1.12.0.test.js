@@ -16,10 +16,10 @@ function boot(fair=true){
   vm.runInNewContext(fs.readFileSync(path.join(root,'nova-updates',name),'utf8'),ctx,{filename:name});
  const module={exports:{}};
  window.__novaModules['game/engine'](module,module.exports,()=>({SHAPE_DEFS:{}}));
- return {T:window.__NOVA_LIVING_FRONT_TEST__,Game:module.exports.Game};
+ return {T:window.__NOVA_LIVING_FRONT_TEST__,LF:window.__NOVA_LIVING_FRONT_INTERNAL__,Game:module.exports.Game};
 }
 function scene(fair=true){
- const {T,Game}=boot(fair),g=new Game(),p={id:1,x:-560,y:-560,hp:100,alive:true},
+ const {T,LF,Game}=boot(fair),g=new Game(),p={id:1,x:-560,y:-560,hp:100,alive:true},
   enemy={id:2,x:-520,y:-540,hp:100,alive:true};
  const calls=[],ctx={save(){},restore(){},beginPath(){},arc(){},stroke(){},fill(){},moveTo(){},lineTo(){},
   fillText(s){calls.push(s);}};
@@ -27,7 +27,7 @@ function scene(fair=true){
   mmCtx:ctx,hasLineOfSight:()=>true,areHostile:(a,b)=>a.id!==b.id,areAllies:()=>false});
  g.__lfState={signal:{type:'BLOOM',sector:5,started:98,until:104},stats:{},sectors:Array.from({length:16},()=>({value:0,maturity:0,pressure:0})),
   lastSignalAt:99,cooldowns:{bloom:24,migration:20,star:58},migrationHeat:0,planMsEma:0,planMsPeak:0};
- return {T,g,p,enemy,calls,st:g.__lfState};
+ return {T,LF,g,p,enemy,calls,st:g.__lfState};
 }
 test('visible hostile in the existing BLOOM sector yields a single readable contest',()=>{
  const {T,g,calls,st}=scene();
@@ -77,12 +77,11 @@ test('decorative lobby simulation cannot generate player tactical signals',()=>{
  assert.equal(T.contestCandidate(g,st),false);
 });
 test('Director tick updates contest but never replaces the public BLOOM',()=>{
- const {T,g,st}=scene(),before=JSON.stringify(st.signal);
- const LF=g.__lfState; // same authoritative state used by the Director
- // directorTick is available through the internal API after boot in production;
- // this assertion also protects the public signal from being rewritten by the UI.
- assert.equal(T.updateContest(g,LF),true);
- assert.equal(JSON.stringify(st.signal),before);
+ const {LF,g,st}=scene(),before=JSON.stringify(st.signal);
+ LF.directorTick(g,st);
+ assert.equal(st.stats.contests,1,'the real Director tick must drive contest telemetry');
+ assert.ok(st.contestSignal,'the real Director tick must drive the minimap signal');
+ assert.equal(JSON.stringify(st.signal),before,'local contest cannot rewrite public BLOOM');
 });
 test('the actual shipping HTML loads the patched Director after Fair Engagement and Living Front core',()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
