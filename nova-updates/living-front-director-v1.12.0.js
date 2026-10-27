@@ -25,15 +25,24 @@ function visible(g,t,s){var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;var inView=F&
  * genuinely hostile, unshielded tank are in that sector and the opponent is
  * actually visible through the shipping Fair Engagement + terrain contracts.
  * This does not reveal unseen coordinates, modify AI utility, or spawn value. */
+function contestHostile(g,a,b){
+ if(g.areAllies&&g.areAllies(a,b))return false;
+ if(typeof g.areHostile==='function')return !!g.areHostile(a,b);
+ /* The canonical free-for-all Game has no areHostile method. Match Fair
+  * Engagement's existing team-tag fallback rather than disabling the feature. */
+ var keys=['teamId','team','factionId','faction','side'];
+ for(var i=0;i<keys.length;i++){var k=keys[i];if(a[k]!=null&&b[k]!=null)return a[k]!==b[k];}
+ return true;
+}
 function contestCandidate(g,st){
  var sig=st&&st.signal,p=g&&g.player,now=g&&g.time||0;
  if(!sig||sig.type!=='BLOOM'||now>=sig.until||!p||!alive(p)||p.spawnShieldT>0||g.__novaDecorativeWorld||sectorIndex(p.x,p.y)!==sig.sector)return false;
  var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
- if(!F||typeof F.inGameplayViewport!=='function'||typeof g.hasLineOfSight!=='function'||typeof g.areHostile!=='function')return false;
+ if(!F||typeof F.inGameplayViewport!=='function'||typeof g.hasLineOfSight!=='function')return false;
  var ts=g.tanks||[];
  for(var i=0;i<ts.length;i++){
   var t=ts[i];if(!t||t===p||t.id===p.id||!alive(t)||t.spawnShieldT>0||sectorIndex(t.x,t.y)!==sig.sector)continue;
-  if(!g.areHostile(p,t)||g.areAllies&&g.areAllies(p,t))continue;
+  if(!contestHostile(g,p,t))continue;
   if(visible(g,p,t))return true;
  }
  return false;
