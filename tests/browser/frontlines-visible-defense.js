@@ -41,7 +41,7 @@
     const bx=Number(desired?.x)||0,by=Number(desired?.y)||0;
     const prefer=bx*nx+by*ny>=0?1:-1;
     for(const sign of [prefer,-prefer]){
-      const x=nx*sign,y=ny*sign;
+      const x=nx*sign||0,y=ny*sign||0;
       if(g.hasLineOfSight(p.x,p.y,p.x+x*STEP,p.y+y*STEP,SCOUT_RADIUS))
         return{x,y};
     }
