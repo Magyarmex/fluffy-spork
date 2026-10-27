@@ -72,3 +72,13 @@ test('live starts and later remembered samples are deduplicated by public announ
  g.time=106;g.__lfState.signal=null;sample(a,g,t,true,sectorIndex);
  assert.equal(a.started,1);assert.equal(a.startedLive,1);assert.equal(a.startedMemory,0);
 });
+test('a different live announcement cannot relabel an older remembered commitment',()=>{
+ const {g,t}=scene(),a=create();
+ t.ai.__lfFrontTurnSpentKey='BLOOM:5:100';
+ g.__lfState.signal={type:'BLOOM',sector:7,started:103,until:108};
+ sample(a,g,t,true,sectorIndex);
+ assert.equal(a.started,1);
+ assert.equal(a.startedLive,0);
+ assert.equal(a.startedMemory,1);
+ assert.equal(a.liveSignal,0,'unrelated live announcement is not the remembered opportunity');
+});
