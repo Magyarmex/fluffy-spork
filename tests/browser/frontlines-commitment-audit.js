@@ -45,7 +45,8 @@
    const intent=a.__lfEcoMode==='signal'&&a.__lfEcoKey==='BLOOM:'+m.sector;
    const weight=Number(a.__lfEcoWeight)>.10;
    const outside=typeof sectorIndex==='function'&&sectorIndex(t.x,t.y)!==m.sector;
-   const selected=Math.abs(Number(t.id)||0)%3===1;
+   /* Mirror production's public-epoch cohort without reading hidden state. */
+   const selected=Math.abs(Number(t.id)||0)%3===Math.floor(m.announcedAt/24)%3;
    const healthy=t.alive!==false&&t.hp>0&&!(t.spawnShieldT>0)&&
     t.hp/Math.max(1,t.maxHp||t.hp||1)>=.65;
    const hitAt=Number(a.__v180HitAt);
@@ -77,7 +78,7 @@
   if(now-m.announcedAt>12){audit.expiredWindow++;return;}
   audit.eligibleWindow++;
   if(typeof sectorIndex==='function'&&sectorIndex(t.x,t.y)===m.sector){audit.alreadyInside++;return;}
-  const subset=Math.abs(Number(t.id)||0)%3===1;
+  const subset=Math.abs(Number(t.id)||0)%3===Math.floor(m.announcedAt/24)%3;
   const healthy=t.alive!==false&&t.hp>0&&!(t.spawnShieldT>0)&&
    t.hp/Math.max(1,t.maxHp||t.hp||1)>=.65;
   const mode=a.__lfEcoMode==='memory'&&a.__lfEcoKey==='BLOOM:'+m.sector;

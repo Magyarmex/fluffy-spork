@@ -381,7 +381,12 @@ function frontlineTurnEligible(g,t,a,now){
  /* The public destination has been reached. Hand control back to local
   * visible farming/combat instead of steering blindly toward its center. */
  if(sectorIndex(t.x,t.y)===op.sector)return false;
- if(Math.abs(Number(t.id)||0)%3!==1)return false;
+ /* Rotate the one-third responder cohort by the PUBLIC announcement epoch.
+  * A fixed id%3 cohort made the same rivals react for the entire session.
+  * The 24s bucket matches BLOOM's cooldown scale; the announced timestamp
+  * stays constant through live signal and stale memory. No private ecology,
+  * player identity or per-frame randomness influences this choice. */
+ if(Math.abs(Number(t.id)||0)%3!==Math.floor(op.announcedAt/24)%3)return false;
  if(t.hp/Math.max(1,t.maxHp||t.hp||1)<.65)return false;
  /* A visible incoming projectile or an active defensive combat posture wins
   * immediately, even if the old public opportunity still exists. */

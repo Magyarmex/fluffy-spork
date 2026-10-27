@@ -65,7 +65,7 @@ test('a tactical turn is bounded and cannot restart repeatedly on the same annou
 });
 test('a genuinely new public BLOOM can support a new tactical turn',()=>{
  const s=scene();s.tick();s.g.time=109;s.tick();
- s.st.bloomMemory={sector:5,announcedAt:140,until:164};s.g.time=146;s.tick();
+ s.st.bloomMemory={sector:5,announcedAt:180,until:204};s.g.time=186;s.tick();
  assert.ok(s.moves.at(-1).x>0);
  assert.equal(s.st.stats.aiFrontlineCommitments,2);
 });
@@ -182,4 +182,51 @@ test('entering the public sector cancels an active tactical turn immediately',()
  assert.equal(s.t.ai.__lfFrontTurn,null,'do not keep blindly steering to the sector center');
  assert.ok(move.x<0,'ordinary local movement regains priority');
  assert.equal(s.st.stats.aiFrontlineCommitments,1,'arrival must not re-trigger a second commitment');
+});
+
+test('public announcement epoch rotates the responder cohort without changing its one-third budget',()=>{
+ const cases=[
+  {announcedAt:72,now:78,eligible:9,excluded:7}, // 72/24 -> cohort 0
+  {announcedAt:100,now:106,eligible:7,excluded:11}, // 100/24 -> cohort 1
+  {announcedAt:140,now:146,eligible:11,excluded:7} // 140/24 -> cohort 2
+ ];
+ for(const c of cases){
+  for(const [id,expected] of [[c.eligible,1],[c.excluded,0]]){
+   const s=scene(id);
+   s.st.bloomMemory={sector:5,announcedAt:c.announcedAt,until:c.announcedAt+24,initialValue:500};
+   s.g.time=c.now;s.tick();
+   assert.equal(s.st.stats.aiFrontlineCommitments||0,expected,
+    'id '+id+' at public epoch '+c.announcedAt);
+  }
+ }
+});
+test('live announcement and its stale memory use one unchanged rotating cohort',()=>{
+ const s=scene(11);
+ s.st.bloomMemory={sector:5,announcedAt:140,until:164,initialValue:500};
+ s.st.signal={type:'BLOOM',sector:5,x:-562.5,y:-562.5,started:140,until:145};
+ s.g.time=142;s.tick();
+ assert.equal(s.st.stats.aiFrontlineCommitments,1);
+ assert.equal(s.t.ai.__lfFrontTurnSpentKey,'BLOOM:5:140');
+ s.st.signal=null;s.g.time=146;s.t.ai.__lfEcoT=0;s.tick();
+ assert.equal(s.st.stats.aiFrontlineCommitments,1,'stale memory cannot rearm same announcement');
+ const excluded=scene(7);
+ excluded.st.bloomMemory={sector:5,announcedAt:140,until:164,initialValue:500};
+ excluded.st.signal={type:'BLOOM',sector:5,x:-562.5,y:-562.5,started:140,until:145};
+ excluded.g.time=142;excluded.tick();
+ assert.equal(excluded.st.stats.aiFrontlineCommitments||0,0);
+ excluded.st.signal=null;excluded.g.time=146;excluded.t.ai.__lfEcoT=0;excluded.tick();
+ assert.equal(excluded.st.stats.aiFrontlineCommitments||0,0);
+});
+test('cohort remains bound to the announcement even when match time crosses a 24s boundary',()=>{
+ const started=119.6,until=started+24;
+ for(const [id,expected] of [[7,1],[11,0]]){
+  const s=scene(id);
+  s.st.bloomMemory={sector:5,announcedAt:started,until,initialValue:500};
+  s.st.signal={type:'BLOOM',sector:5,x:-562.5,y:-562.5,started,until:started+5};
+  s.g.time=123;s.tick();
+  assert.equal(s.st.stats.aiFrontlineCommitments||0,expected,'live phase id '+id);
+  s.st.signal=null;s.g.time=124.7;s.t.ai.__lfEcoT=0;s.tick();
+  assert.equal(s.st.stats.aiFrontlineCommitments||0,expected,
+   'later memory phase must not switch to the new match-clock bucket for id '+id);
+ }
 });
