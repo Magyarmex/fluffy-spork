@@ -18,12 +18,15 @@ async function run(){
    const Game=window.__novaMakeRequire('')('game/engine').Game;
    const old=Game.prototype.update;
    Game.prototype.update=function(dt){
-    if(!this.__novaDecorativeWorld)window.__novaScoreGame=this;
+    if(!this.__novaDecorativeWorld&&this.player&&this.status==='playing'){
+     window.__novaScoreGame=this;
+     if(!this.__novaBestSmokePaused){this.__novaBestSmokePaused=true;this.setPaused(true);}
+    }
     return old.apply(this,arguments);
    };
   });
   await page.getByRole('button',{name:/DEPLOY/i}).first().click();
-  await page.waitForFunction(()=>window.__novaScoreGame?.status==='playing',{timeout:30000});
+  await page.waitForFunction(()=>window.__novaScoreGame?.status==='playing',null,{timeout:30000});
   const earned=await page.evaluate(()=>{
    const g=window.__novaScoreGame;
    g.setPaused(true);
