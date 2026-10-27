@@ -50,26 +50,35 @@ function ensureFrontline(g,st){
  var op=publicBloom(st,g.time||0);if(!op)return null;
  var f=st.frontlineTelemetry;
  if(!f)f=st.frontlineTelemetry={currentKey:null,sector:-1,announcedAt:-1,playerInside:false,
-  seenContest:false,aiSeen:{},events:[],counts:{announcements:0,playerEntries:0,playerExits:0,
+  seenContest:false,aiSeen:{},aiStartDist:{},aiApproachSeen:{},events:[],counts:{announcements:0,playerApproaches:0,aiApproaches:0,playerEntries:0,playerExits:0,
   observedContests:0,playerDeaths:0,aiArrivals:0,neutralXP:0}};
  var key=op.sector+':'+op.announcedAt;
  if(f.currentKey!==key){
   f.currentKey=key;f.sector=op.sector;f.announcedAt=op.announcedAt;
-  f.playerInside=false;f.seenContest=false;f.deathRecorded=false;f.aiSeen={};
+  f.playerInside=false;f.seenContest=false;f.deathRecorded=false;f.playerStartDist=null;f.playerApproachSeen=false;f.aiSeen={};f.aiStartDist={};f.aiApproachSeen={};
   f.counts.announcements++;frontlineTrace(f,g,'announced',op.live?'live':'memory');
  }
  return f;
 }
 function recordFrontlinePlayerDeath(g,st,t){
  var f=st&&st.frontlineTelemetry;
- if(!f||!t||t!==g.player||!f.playerInside||f.deathRecorded||
-   sectorIndex(t.x,t.y)!==f.sector)return false;
+ if(!f||!t||t!==g.player||f.deathRecorded||sectorIndex(t.x,t.y)!==f.sector)return false;
+ var op=publicBloom(st,g.time||0);
+ if(!op||op.sector!==f.sector||op.announcedAt!==f.announcedAt)return false;
+ if(!f.playerInside){f.playerInside=true;f.counts.playerEntries++;frontlineTrace(f,g,'player-entry');}
  f.deathRecorded=true;f.counts.playerDeaths++;frontlineTrace(f,g,'player-death');
  return true;
 }
 function frontlineTick(g,st,observedContest){
  var f=ensureFrontline(g,st);if(!f)return false;
  var p=g.player,inside=!!(p&&alive(p)&&p.spawnShieldT<=0&&sectorIndex(p.x,p.y)===f.sector);
+ if(p&&alive(p)){
+  var c=sectorCenter(f.sector),dist=Math.hypot(p.x-c.x,p.y-c.y);
+  if(f.playerStartDist==null&&!inside)f.playerStartDist=dist;
+  if(!f.playerApproachSeen&&f.playerStartDist!=null&&f.playerStartDist-dist>=120){
+   f.playerApproachSeen=true;f.counts.playerApproaches++;frontlineTrace(f,g,'player-approach');
+  }
+ }
  if(inside&&!f.playerInside){f.counts.playerEntries++;frontlineTrace(f,g,'player-entry');}
  if(!inside&&f.playerInside){
   f.counts.playerExits++;frontlineTrace(f,g,'player-exit');
@@ -83,9 +92,14 @@ function frontlineTick(g,st,observedContest){
  for(var i=0;i<ts.length;i++){
   var t=ts[i],a=t&&t.ai;
   if(!t||t===p||!alive(t)||!a||a.__lfEcoMode!=='memory'||a.__lfEcoKey!=='BLOOM:'+f.sector||
-    !(a.__lfEcoWeight>.04)||sectorIndex(t.x,t.y)!==f.sector)continue;
-  var id=String(t.id);
-  if(f.aiSeen[id])continue;
+    !(a.__lfEcoWeight>.04))continue;
+  var id=String(t.id),c2=sectorCenter(f.sector),dist2=Math.hypot(t.x-c2.x,t.y-c2.y),
+   aiInside=sectorIndex(t.x,t.y)===f.sector;
+  if(!aiInside&&f.aiStartDist[id]==null)f.aiStartDist[id]=dist2;
+  if(!f.aiApproachSeen[id]&&f.aiStartDist[id]!=null&&f.aiStartDist[id]-dist2>=60){
+   f.aiApproachSeen[id]=true;f.counts.aiApproaches++;frontlineTrace(f,g,'ai-memory-approach');
+  }
+  if(!aiInside||!f.aiApproachSeen[id]||f.aiSeen[id])continue;
   f.aiSeen[id]=true;f.counts.aiArrivals++;frontlineTrace(f,g,'ai-memory-arrival');
  }
  return true;
