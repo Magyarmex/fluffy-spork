@@ -18,7 +18,7 @@ function mean(st){var n=0;for(var i=0;i<16;i++)n+=st.sectors[i].value;return n/1
 function bloomAgeEligible(st){return !!st&&LF.ageProgress(st)>=.15;}
 function bloomCandidate(st){if(!bloomAgeEligible(st))return-1;var avg=mean(st),best=-1,score=0;for(var i=0;i<16;i++){var s=st.sectors[i],m=s.maturity/Math.max(.1,st.ceiling),v=s.value/(avg+1);if(s.value<310||m<.62||v<1.34)continue;var q=v*.72+m*.55-clamp(s.pressure,0,1)*.42;if(q>score){score=q;best=i;}}return best;}
 function decision(st,ctx){if(ctx&&ctx.enabled===false)return null;var now=ctx&&ctx.now||0;if(st.signal&&now<st.signal.until)return null;if(now-st.lastSignalAt<8)return null;if(st.cooldowns.bloom<=0){var b=bloomCandidate(st);if(b>=0&&(b!==st.lastBloomSector||st.sectors[b].maturity>.78*st.ceiling))return{type:'BLOOM',sector:b};}if(st.cooldowns.migration<=0&&st.migrationHeat>=5){var from=ctx&&ctx.migrationFrom;if(from==null||from<0){var val=-1;for(var i=0;i<16;i++)if(st.sectors[i].outbound>val){val=st.sectors[i].outbound;from=i;}}if(from>=0){var m=Math.hypot(st.migrationX,st.migrationY)||1,c=sectorCenter(from),to=sectorIndex(c.x+st.migrationX/m*(LF.ARENA*2/LF.GRID)*.8,c.y+st.migrationY/m*(LF.ARENA*2/LF.GRID)*.8);if(to!==from)return{type:'MIGRATION',from:from,to:to};}}if(st.cooldowns.star<=0&&!(ctx&&ctx.hasStar)&&bloomCandidate(st)<0&&st.migrationHeat<3&&now>72&&now-st.lastMeaningfulAt>31)return{type:'ROGUE STAR'};return null;}
-function setSignal(g,st,d){var now=g.time||0,sig={type:d.type,started:now,until:now+(d.type==='BLOOM'?5:d.type==='MIGRATION'?4.4:7)};if(d.type==='BLOOM'){sig.sector=d.sector;var c=sectorCenter(d.sector);sig.x=c.x;sig.y=c.y;st.cooldowns.bloom=24;st.lastBloomSector=d.sector;st.lastMeaningfulAt=now;st.stats.blooms++;}else if(d.type==='MIGRATION'){sig.from=d.from;sig.to=d.to;var a=sectorCenter(d.from),b=sectorCenter(d.to);sig.x=(a.x+b.x)/2;sig.y=(a.y+b.y)/2;st.cooldowns.migration=20;st.lastMeaningfulAt=now;st.stats.migrations++;st.migrationHeat*=.28;}else{st.cooldowns.star=58;var n=(g.shapes||[]).length;if(g.spawnShape)g.spawnShape('star',false);var s=(g.shapes||[])[(g.shapes||[]).length-1];if((g.shapes||[]).length<=n||!s||s.type!=='star')return;LF.initStar(g,st,s);sig.starId=s.id;sig.x=s.x;sig.y=s.y;st.lastMeaningfulAt=now;}st.signal=sig;st.lastSignal=d.type;st.lastSignalAt=now;if(g.toast)g.toast(d.type==='BLOOM'?'✦ SHAPE BLOOM · value has accumulated in quiet ground':d.type==='MIGRATION'?'⇢ MIGRATION · neutral population is moving':'★ ROGUE STAR · intercept the roaming prize','info');if(g.sfx&&g.sfx.novaLivingSignal)g.sfx.novaLivingSignal(d.type,g.player?clamp((sig.x-g.player.x)/900,-1,1):0);}
+function setSignal(g,st,d){var now=g.time||0,sig={type:d.type,started:now,until:now+(d.type==='BLOOM'?5:d.type==='MIGRATION'?4.4:7)};if(d.type==='BLOOM'){sig.sector=d.sector;var c=sectorCenter(d.sector);sig.x=c.x;sig.y=c.y;st.cooldowns.bloom=24;st.lastBloomSector=d.sector;st.bloomMemory={sector:d.sector,announcedAt:now,until:now+24,initialValue:st.sectors[d.sector]?st.sectors[d.sector].value:0};st.lastMeaningfulAt=now;st.stats.blooms++;}else if(d.type==='MIGRATION'){sig.from=d.from;sig.to=d.to;var a=sectorCenter(d.from),b=sectorCenter(d.to);sig.x=(a.x+b.x)/2;sig.y=(a.y+b.y)/2;st.cooldowns.migration=20;st.lastMeaningfulAt=now;st.stats.migrations++;st.migrationHeat*=.28;}else{st.cooldowns.star=58;var n=(g.shapes||[]).length;if(g.spawnShape)g.spawnShape('star',false);var s=(g.shapes||[])[(g.shapes||[]).length-1];if((g.shapes||[]).length<=n||!s||s.type!=='star')return;LF.initStar(g,st,s);sig.starId=s.id;sig.x=s.x;sig.y=s.y;st.lastMeaningfulAt=now;}st.signal=sig;st.lastSignal=d.type;st.lastSignalAt=now;if(g.toast)g.toast(d.type==='BLOOM'?'✦ SHAPE BLOOM · value has accumulated in quiet ground':d.type==='MIGRATION'?'⇢ MIGRATION · neutral population is moving':'★ ROGUE STAR · intercept the roaming prize','info');if(g.sfx&&g.sfx.novaLivingSignal)g.sfx.novaLivingSignal(d.type,g.player?clamp((sig.x-g.player.x)/900,-1,1):0);}
 LF.directorTick=function(g,st){var t0=LF.ms(),hasStar=false,sh=g.shapes||[];for(var i=0;i<sh.length;i++)if(sh[i]&&sh[i].hp>0&&sh[i].type==='star'){hasStar=true;break;}if(st.signal&&st.signal.type==='ROGUE STAR'&&st.signal.starId&&g.getShape&&!g.getShape(st.signal.starId))st.signal=null;var d=decision(st,{enabled:st.directorEnabled,now:g.time||0,hasStar:hasStar});if(d)setSignal(g,st,d);if(st.signal&&(g.time||0)>=st.signal.until)st.signal=null;updateContest(g,st);LF.planSample(st,LF.ms()-t0);};
 function visible(g,t,s){var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;var inView=F&&F.inGameplayViewport?F.inGameplayViewport(g,t,s):(function(){var z=(g.cam&&g.cam.zoom)||1,hx=(g.w||800)/(2*z),hy=(g.h||600)/(2*z);return Math.abs(s.x-t.x)<=hx&&Math.abs(s.y-t.y)<=hy;})();return !!inView&&(!g.hasLineOfSight||g.hasLineOfSight(t.x,t.y,s.x,s.y,2));}
 
@@ -26,6 +26,17 @@ function visible(g,t,s){var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;var inView=F&
  * genuinely hostile, unshielded tank are in that sector and the opponent is
  * actually visible through the shipping Fair Engagement + terrain contracts.
  * This does not reveal unseen coordinates, modify AI utility, or spawn value. */
+/* A public BLOOM announcement remains actionable as last-known intelligence for
+ * one bounded rotation. After its live five-second signal, the memory ring is
+ * explicitly stale: it cannot reveal enemy positions or guarantee current XP. */
+function publicBloom(st,now){
+ if(!st||st.directorEnabled===false)return null;
+ var sig=st.signal;
+ if(sig&&sig.type==='BLOOM'&&now<sig.until)return{sector:sig.sector,announcedAt:sig.started,until:sig.until,live:true};
+ var mem=st&&st.bloomMemory;
+ if(mem&&now<mem.until)return{sector:mem.sector,announcedAt:mem.announcedAt,until:mem.until,live:false};
+ return null;
+}
 function contestHostile(g,a,b){
  if(g.areAllies&&g.areAllies(a,b))return false;
  if(typeof g.areHostile==='function')return !!g.areHostile(a,b);
@@ -36,13 +47,18 @@ function contestHostile(g,a,b){
  return true;
 }
 function contestCandidate(g,st){
- var sig=st&&st.signal,p=g&&g.player,now=g&&g.time||0;
- if(!sig||sig.type!=='BLOOM'||now>=sig.until||!p||!alive(p)||p.spawnShieldT>0||g.__novaDecorativeWorld||sectorIndex(p.x,p.y)!==sig.sector)return false;
+ var now=g&&g.time||0,op=publicBloom(st,now),p=g&&g.player;
+ if(!op||!p||!alive(p)||p.spawnShieldT>0||g.__novaDecorativeWorld||sectorIndex(p.x,p.y)!==op.sector)return false;
+ /* A public announcement is not proof that valuable shapes still remain.
+  * Half the original BLOOM entry threshold prevents empty-sector false alarms.
+  * For stale memory also require a bounded fraction of the announced value. */
+ var sector=st.sectors&&st.sectors[op.sector],mem=st.bloomMemory;
+ if(!sector||sector.value<Math.max(155,Math.min(310,(!op.live&&mem?mem.initialValue||0:0)*.25)))return false;
  var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
  if(!F||typeof F.inGameplayViewport!=='function'||typeof g.hasLineOfSight!=='function')return false;
  var ts=g.tanks||[];
  for(var i=0;i<ts.length;i++){
-  var t=ts[i];if(!t||t===p||t.id===p.id||!alive(t)||t.spawnShieldT>0||sectorIndex(t.x,t.y)!==sig.sector)continue;
+  var t=ts[i];if(!t||t===p||t.id===p.id||!alive(t)||t.spawnShieldT>0||sectorIndex(t.x,t.y)!==op.sector)continue;
   if(!contestHostile(g,p,t))continue;
   if(visible(g,p,t))return true;
  }
@@ -50,9 +66,9 @@ function contestCandidate(g,st){
 }
 function updateContest(g,st){
  if(!contestCandidate(g,st)){st.contestSignal=null;return false;}
- var sig=st.signal,now=g.time||0,key=sig.sector+':'+sig.started;
+ var now=g.time||0,op=publicBloom(st,now),key=op.sector+':'+op.announcedAt;
  if(st.__lfLastContestKey!==key){st.__lfLastContestKey=key;st.stats=st.stats||{};st.stats.contests=(st.stats.contests||0)+1;}
- st.contestSignal={sector:sig.sector,until:Math.min(sig.until,now+1.4)};
+ st.contestSignal={sector:op.sector,until:Math.min(op.until,now+1.4)};
  return true;
 }
 function saturation(g,key,id){var n=0,ts=g.tanks||[];for(var i=0;i<ts.length;i++){var q=ts[i];if(q&&q.id!==id&&q.ai&&alive(q)&&q.ai.__lfEcoKey===key&&q.ai.__lfEcoWeight>.05)n++;}return n;}
@@ -82,9 +98,16 @@ LF.wrap('game/engine',function(engine){
  Game.prototype.__novaFrontlineContest=true;
  var oldMap=Game.prototype.drawMinimap;if(!oldMap)return;
  Game.prototype.drawMinimap=function(){
-  var out=oldMap.apply(this,arguments),st=this.__lfState,c=st&&st.contestSignal,ctx=this.mmCtx,now=this.time||0;
-  if(!c||!ctx||now>=c.until||!st.signal||st.signal.type!=='BLOOM'||st.signal.sector!==c.sector)return out;
-  var center=sectorCenter(c.sector),scale=216/(LF.ARENA*2),x=(center.x+LF.ARENA)*scale,y=(center.y+LF.ARENA)*scale;
+  var out=oldMap.apply(this,arguments),st=this.__lfState,c=st&&st.contestSignal,ctx=this.mmCtx,now=this.time||0,op=publicBloom(st,now);
+  if(!ctx||!op)return out;
+  var center=sectorCenter(op.sector),scale=216/(LF.ARENA*2),x=(center.x+LF.ARENA)*scale,y=(center.y+LF.ARENA)*scale;
+  if(!op.live){
+   var fade=clamp((op.until-now)/24,0,1);
+   ctx.save();ctx.globalAlpha=.12+.20*fade;ctx.lineWidth=1.5;ctx.strokeStyle='#ffc94d';
+   if(ctx.setLineDash)ctx.setLineDash([3,4]);
+   ctx.beginPath();ctx.arc(x,y,17,0,Math.PI*2);ctx.stroke();ctx.restore();
+  }
+  if(!c||now>=c.until||c.sector!==op.sector)return out;
   ctx.save();ctx.globalAlpha=.9;ctx.lineWidth=2;ctx.strokeStyle='#ff7c8b';
   ctx.beginPath();ctx.arc(x,y,21,0,Math.PI*2);ctx.stroke();
   ctx.font='bold 9px Rajdhani,system-ui';ctx.textAlign='center';ctx.fillStyle='#ffb3bc';
