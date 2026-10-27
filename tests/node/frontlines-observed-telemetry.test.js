@@ -178,3 +178,27 @@ test('pilot shield suppresses contest entry but absent shield metadata means uns
  const q=scene();delete q.p.spawnShieldT;q.LF.frontlineTick(q.g,q.st,false);
  assert.equal(q.st.frontlineTelemetry.counts.playerEntries,1);
 });
+
+test('a witnessed contest resolves as survived only after the public opportunity ends',()=>{
+ const {g,st,LF}=scene();LF.frontlineTick(g,st,true);
+ assert.equal(st.frontlineTelemetry.counts.contestSurvivals,0);
+ g.time=125;st.signal=null;LF.frontlineTick(g,st,false);
+ assert.equal(st.frontlineTelemetry.counts.resolved,1);
+ assert.equal(st.frontlineTelemetry.counts.contestSurvivals,1);
+ LF.frontlineTick(g,st,false);
+ assert.equal(st.frontlineTelemetry.counts.contestSurvivals,1,'resolution must be idempotent');
+});
+test('fatal contest cannot be counted as a survival at memory expiry',()=>{
+ const {g,st,p,LF}=scene();LF.frontlineTick(g,st,true);
+ g.damageTank(p,200);
+ g.time=125;st.signal=null;g.status='playing';LF.frontlineTick(g,st,false);
+ assert.equal(st.frontlineTelemetry.counts.playerDeaths,1);
+ assert.equal(st.frontlineTelemetry.counts.contestSurvivals,0);
+});
+test('time in public opportunity is sampled from simulation time, capped across long gaps',()=>{
+ const {g,st,LF}=scene();LF.frontlineTick(g,st,false);
+ g.time+=.22;LF.frontlineTick(g,st,false);
+ assert.ok(st.frontlineTelemetry.counts.playerSeconds>=.21);
+ g.time+=15;st.signal=null;LF.frontlineTick(g,st,false);
+ assert.ok(st.frontlineTelemetry.counts.playerSeconds<.7,'tab suspension must not inflate presence');
+});
