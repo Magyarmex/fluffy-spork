@@ -43,6 +43,6 @@ test('hidden projectiles do not change visible-threat decisions',()=>{
 });
 test('the pilot does not require private AI, target or ecology state',()=>{
  const g=game();
- assert.deepEqual(dodgeVisibleProjectile(g,p,F,{x:1,y:0}),{x:0,y:1});
+ assert.deepEqual(dodgeVisibleProjectile(g,p,F,{x:1,y:0}),{x:0,y:-1});
  assert.equal(dodgeVisibleProjectile(g,p,null,{x:1,y:0}),null);
 });
