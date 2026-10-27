@@ -1,4 +1,4 @@
-/* NOVA TANKS v1.6.0  Battlefield
+/* NOVA TANKS v1.6.0 — Battlefield
  * Terrain, line-of-sight, destructible cover, tactical lanes, AI pathing,
  * spawn safety, drone/spotter terrain interaction, battlefield rendering and SFX.
  * Performance hardening: exact spatial broad-phase for every private terrain hot path.
@@ -1740,7 +1740,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    cd.__novaChronoIdleUnmodifiedEpoch=-1;
   }
  }
- var shapes=this.shapes||[];for(var si=0;si<shapes.length;si++){var sh=shapes[si];if(!sh)continue;sh.__novaShapeSweepEpoch=epoch;sh.__novaShapeSweepPrevX=sh.x;sh.__novaShapeSweepPrevY=sh.y;}this.__novaShapeSweepActive=true;if(this.__novaBattlefield&&!this.__novaBattlefield.announced&&this.status==='playing'&&this.time>.1){this.__novaBattlefield.announced=true;if(this.toast)this.toast('¦ BATTLEFIELD · '+this.__novaBattlefield.name+'  COVER CHANGES THE FIGHT','info');}
+ var shapes=this.shapes||[];for(var si=0;si<shapes.length;si++){var sh=shapes[si];if(!sh)continue;sh.__novaShapeSweepEpoch=epoch;sh.__novaShapeSweepPrevX=sh.x;sh.__novaShapeSweepPrevY=sh.y;}this.__novaShapeSweepActive=true;if(this.__novaBattlefield&&!this.__novaBattlefield.announced&&this.status==='playing'&&this.time>.1){this.__novaBattlefield.announced=true;if(this.toast)this.toast('¦ BATTLEFIELD · '+this.__novaBattlefield.name+' · COVER CHANGES THE FIGHT','info');}
    var out;try{out=oldUpdate.call(this,dt);}finally{this.__novaShapeSweepActive=false;if(this.__novaDroneChronoAutoTrace){this.__novaDroneChronoTraceEnabled=priorTrace;this.__novaDroneChronoAutoTrace=false;}}for(var i=0;i<this.shapes.length;i++){var s=this.shapes[i];if(!s||s.hp<=0)continue;circleResolve(this,s,(s.r||10)*.86);}return out;};
 });
 
