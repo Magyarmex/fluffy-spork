@@ -35,6 +35,11 @@ test('same-ID neutral still requires real terrain line of sight',()=>{
  assert.equal(T.publicEcoBias(g,t,{square:{xp:100}},{}).mode,'none',
   'an occluded fourth square cannot be counted as visible value');
 });
+test('a dead same-ID neutral cannot masquerade as visible local value',()=>{
+ const T=boot(),{t,g,shapes}=world();
+ shapes[0].alive=false;
+ assert.equal(T.publicEcoBias(g,t,{square:{xp:100}},{}).mode,'none');
+});
 test('same-ID Rogue Star updates last-seen position only while genuinely visible',()=>{
  const T=boot(),{t,g}=world();
  const star={id:3,kind:'shape',type:'star',x:120,y:20,hp:100};
