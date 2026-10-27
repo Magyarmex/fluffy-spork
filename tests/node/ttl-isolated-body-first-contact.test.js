@@ -1025,3 +1025,23 @@ for(const optimized of [false,true])for(const fps of [30,60]){
    'seeded worlds must exercise both physical classifications');
  });
 }
+
+
+/* The full Game.update epoch, not only a direct projectile helper, must
+ * preserve the same result under remote fire and both runtime overlays. */
+for(const optimized of [false,true])for(const fps of [30,60]){
+ test((optimized?'optimized':'baseline')+
+  ' Game.update retains single ordinary TTL contact amid 2000 remote bullets at '+
+  fps+'Hz',()=>{
+  const Game=boot(function(dt){this.time+=dt;this.updateBullets(dt);},optimized);
+  const g=new Game();
+  g.tanks=[{kind:'tank',id:2,x:40,y:0,cls:'scout',hp:100,alive:true}];
+  g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+   vx:6000,vy:0,r:3,dmg:20,ttl:.005,pen:0,hits:0,
+   dead:false,shell:false,beam:false}];
+  addRemoteTTLFire(g);
+  g.update(1/fps);
+  assert.equal(g.hits,1,'the shipping update epoch must not suppress local contact');
+  assert.equal(g.__novaShapeSweepActive,false);
+ });
+}
