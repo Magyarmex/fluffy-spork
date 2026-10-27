@@ -1,11 +1,26 @@
 'use strict';
 /* Research-only NATURAL full-match A/B on the real 48-overlay shipping game.
- * The pilot is a deterministic, fixed-input scripted Scout, not a human.
+ * The pilot is a deterministic scripted Scout, not a human. Wander inputs
+ * depend only on time; the public-bloom policy reacts to public events, so
+ * its ON/OFF inputs may diverge after the worlds diverge.
  * No fake BLOOM, private sector values, teleport, invulnerability or AI buffs. */
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');
 const {chromium}=require('playwright');
-const LAYOUT='CROSSFIRE',TERRAIN_SEED=0,GAME_SEED=0x1d4a3f21;
+const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
+const LAYOUT_INDEX=Number(process.env.NOVA_LAYOUT_INDEX??0);
+const SEED_INDEX=Number(process.env.NOVA_SEED_INDEX??0);
+const PILOT_POLICY=process.env.NOVA_PILOT_POLICY||'wander';
+if(!Number.isInteger(LAYOUT_INDEX)||LAYOUT_INDEX<0||LAYOUT_INDEX>=LAYOUTS.length)
+ throw Error('NOVA_LAYOUT_INDEX must be 0, 1, or 2');
+if(!Number.isInteger(SEED_INDEX)||SEED_INDEX<0||SEED_INDEX>1000)
+ throw Error('NOVA_SEED_INDEX must be an integer from 0 to 1000');
+if(!['wander','public-bloom'].includes(PILOT_POLICY))
+ throw Error('NOVA_PILOT_POLICY must be wander or public-bloom');
+const LAYOUT=LAYOUTS[LAYOUT_INDEX],TERRAIN_SEED=LAYOUT_INDEX;
+const GAME_SEED=(0x1d4a3f21^Math.imul(SEED_INDEX,0x9e3779b9))>>>0;
+const TRIAL_RNG=(0x7d27e91b^Math.imul(SEED_INDEX,0x85ebca6b))>>>0;
+const SEED_ID='natural-20261027-'+LAYOUT_INDEX+'-'+SEED_INDEX;
 const SECONDS=165,DT=1/30,CHUNK=450;
 async function arm(browser,enabled,label){
  const context=await browser.newContext({viewport:{width:900,height:700}});
@@ -54,11 +69,13 @@ async function arm(browser,enabled,label){
   },{terrainSeed:TERRAIN_SEED,gameSeed:GAME_SEED});
   await page.getByRole('button',{name:/DEPLOY/i}).first().click();
   await page.waitForFunction(()=>window.__novaNaturalMatchGame?.status==='playing'&&!!window.__novaNaturalMatchGame.__lfState,{timeout:30000});
-  const initial=await page.evaluate(enabled=>{
+  const initial=await page.evaluate(({enabled,pilotPolicy,trialRng,terrainIndex,seedIndex})=>{
    const g=window.__novaNaturalMatchGame;
    g.setPaused(true); // Disable RAF simulation; advance actual Game.update ourselves.
-   g.__novaTrialRng=0x7d27e91b; // Simulation RNG isolated from asynchronous paused rendering.
-   if(g.__novaBattlefield?.name!=='CROSSFIRE')throw Error('uncontrolled layout '+g.__novaBattlefield?.name);
+   g.__novaTrialRng=trialRng; // Simulation RNG isolated from asynchronous paused rendering.
+   g.__novaExperimentSeed='natural-20261027-'+terrainIndex+'-'+seedIndex;
+   g.__novaExperimentPolicy=pilotPolicy;
+   if(g.__novaBattlefield?.name!==['CROSSFIRE','SPLIT HORIZON','FOUR GATES'][terrainIndex])throw Error('uncontrolled layout '+g.__novaBattlefield?.name);
    const ai=window.__novaMakeRequire('')('game/ai');
    if(!ai||typeof ai.updateAI!=='function')throw Error('missing composed AI');
    if(!enabled){
@@ -73,16 +90,35 @@ async function arm(browser,enabled,label){
    if(!p||p.cls!=='scout')throw Error('expected unmodified Scout pilot');
    if(g.tanks.filter(t=>t.ai).length<8)throw Error('expected eight ordinary rivals');
    g.input.mouseActive=false;g.input.autofire=true;g.input.firing=false;
-   g.input.moveVec=()=>({x:Math.cos(g.time*.29),y:Math.sin(g.time*.29)});
-   /* The input commands depend only on simulation time: exactly the same
-    * stick bearings and firing cadence in both arms, even after divergence. */
+   const wander=()=>({x:Math.cos(g.time*.29),y:Math.sin(g.time*.29)});
+   if(pilotPolicy==='public-bloom'){
+    const LF=window.__NOVA_LIVING_FRONT_INTERNAL__;
+    if(!LF||typeof LF.sectorCenter!=='function'||typeof LF.sectorIndex!=='function')
+     throw Error('missing canonical public sector geometry');
+    g.input.moveVec=()=>{
+     const st=g.__lfState,now=g.time||0,sig=st&&st.signal,mem=st&&st.bloomMemory;
+     // Public Director announcement / last-known sector only. Never read
+     // hidden maturity, current neutral value, or enemy coordinates.
+     const sector=sig&&sig.type==='BLOOM'&&now<sig.until?sig.sector:
+      mem&&now<mem.until?mem.sector:null;
+     if(!Number.isInteger(sector)||sector<0||sector>=16)return wander();
+     if(LF.sectorIndex(p.x,p.y)===sector)return{x:0,y:0};
+     const c=LF.sectorCenter(sector),dx=c.x-p.x,dy=c.y-p.y,d=Math.hypot(dx,dy);
+     if(!(d>1))return{x:0,y:0};
+     g.__novaPublicBloomCommands=(g.__novaPublicBloomCommands||0)+1;
+     return{x:dx/d,y:dy/d};
+    };
+   }else g.input.moveVec=wander;
+   /* Wander movement and aim depend only on simulation time. The optional
+    * public-signal movement policy is closed-loop: identical rules and initial
+    * state, but not necessarily identical commands after ON/OFF diverge. */
    g.input.aimVec=()=>({x:Math.cos(g.time*.73),y:Math.sin(g.time*.73)});
    const fingerprint=JSON.stringify({layout:g.__novaBattlefield.name,
     pilot:{x:+p.x.toFixed(3),y:+p.y.toFixed(3),cls:p.cls},
     bots:g.tanks.filter(t=>t.ai).map(t=>[t.id,+t.x.toFixed(3),+t.y.toFixed(3),t.cls]),
     shapes:g.shapes.slice(0,32).map(s=>[s.id,s.type,+s.x.toFixed(3),+s.y.toFixed(3)])});
    return{fingerprint,initialBotCount:g.tanks.filter(t=>t.ai).length,initialShapes:g.shapes.length};
-  },enabled);
+  },{enabled,pilotPolicy:PILOT_POLICY,trialRng:TRIAL_RNG,terrainIndex:LAYOUT_INDEX,seedIndex:SEED_INDEX});
   let last=null;
   for(let i=0;i<Math.ceil(SECONDS/DT/CHUNK);i++){
    last=await page.evaluate(({steps,dt})=>{
@@ -102,11 +138,12 @@ async function arm(browser,enabled,label){
   }
   const result=await page.evaluate(()=>{
    const g=window.__novaNaturalMatchGame,s=window.NOVALivingFront.snapshot(),p=g.player;
-   return{metadata:{layout:g.__novaBattlefield.name,seed:'natural-20261027-0'},
+   return{metadata:{layout:g.__novaBattlefield.name,seed:g.__novaExperimentSeed,pilotPolicy:g.__novaExperimentPolicy},
     frontline:s.frontline,stats:s.stats,game:{time:+g.time.toFixed(3),status:g.status,
      pilotAlive:!!p.alive,score:p.score,kills:p.kills,level:p.level,
      botCount:g.tanks.filter(t=>t.ai&&t.alive).length},
-    naturalBlooms:s.stats.blooms||0,events:s.frontline?.events||[]};
+    naturalBlooms:s.stats.blooms||0,publicBloomCommandSamples:g.__novaPublicBloomCommands||0,
+    events:s.frontline?.events||[]};
   });
   assert.equal(errors.length,0,errors.join('\n'));
   return{label,enabled,initial,last,result};
@@ -119,31 +156,32 @@ async function arm(browser,enabled,label){
   assert.equal(off.initial.fingerprint,on.initial.fingerprint,'ON/OFF must begin from identical real world');
   assert.equal(off.initial.fingerprint,offReplay.initial.fingerprint,'same seed must reproduce initial world');
   const same=JSON.stringify(off.result)===JSON.stringify(offReplay.result);
-  const noStaleMemoryWindow=[off,on].every(arm=>{
-   const c=arm.result.frontline?.counts;
-   return c&&c.announcements===1&&c.pilotAliveSeconds<=5;
-  });
-  const report={method:'scripted full-match natural Director research; not human fun',
+  const naturalOpportunityObserved=[off,on].every(a=>a.result.naturalBlooms>0);
+  const report={method:'scripted full-match natural Director research; not human fun; public-bloom is closed-loop policy',
    initialWorldIdentical:true,offReplayIdentical:same,
-   staleMemoryWindowObserved:!noStaleMemoryWindow,
-   interpretation:noStaleMemoryWindow?'INCONCLUSIVE: pilot died before the five-second live BLOOM ended; ON/OFF stale-memory logic had no observation window':'Descriptive only; inspect per-event timeline before interpreting differences.',
+   naturalOpportunityObserved,
+   interpretation:naturalOpportunityObserved?'Descriptive only: natural BLOOM observed; inspect opportunity timing, deaths and public pilot commands before causal interpretation.':'INCONCLUSIVE: at least one arm had no natural BLOOM; retain this censored pair.',
    off:off.result,on:on.result,offReplay:offReplay.result,
-   limits:['No artificial BLOOM or forced survival','One layout and one seed only',
-    'A deterministic Scout script is not a human player','Seed replay is checked, not assumed']};
+   limits:['No artificial BLOOM or forced survival','One layout/seed/pilot-policy per invocation; matrix must aggregate independently',
+    'A deterministic Scout script is not a human player',
+    'Public-bloom commands can differ after ON/OFF worlds diverge; this is matched policy, not fixed inputs',
+    'Public-bloom command samples are input calls, not measured seconds or proof of physical progress',
+    'Seed replay is checked, not assumed']};
   const dir=path.join('artifacts','browser');fs.mkdirSync(dir,{recursive:true});
   fs.writeFileSync(path.join(dir,'frontlines-natural-match-ab.json'),JSON.stringify(report,null,2));
   fs.writeFileSync(path.join(dir,'frontlines-natural-on.json'),JSON.stringify(on.result,null,2));
   fs.writeFileSync(path.join(dir,'frontlines-natural-off.json'),JSON.stringify(off.result,null,2));
   fs.writeFileSync(path.join(dir,'frontlines-natural-manifest.json'),JSON.stringify({
-   pairs:[{layout:LAYOUT,seed:'natural-20261027-0',
+   pairs:[{layout:LAYOUT,seed:SEED_ID,pilotPolicy:PILOT_POLICY,
     on:'frontlines-natural-on.json',off:'frontlines-natural-off.json'}]
   },null,2));
   console.log('NOVA_FRONTLINES_NATURAL_MATCH_AB '+JSON.stringify({initialWorldIdentical:true,offReplayIdentical:same,
-   staleMemoryWindowObserved:!noStaleMemoryWindow,
-   off:{time:off.result.game.time,status:off.result.game.status,blooms:off.result.naturalBlooms,frontline:off.result.frontline?.counts},
-   on:{time:on.result.game.time,status:on.result.game.status,blooms:on.result.naturalBlooms,frontline:on.result.frontline?.counts}}));
+   naturalOpportunityObserved,
+   config:{layout:LAYOUT,seed:SEED_ID,pilotPolicy:PILOT_POLICY},
+   off:{time:off.result.game.time,status:off.result.game.status,blooms:off.result.naturalBlooms,publicBloomCommands:off.result.publicBloomCommandSamples,frontline:off.result.frontline?.counts},
+   on:{time:on.result.game.time,status:on.result.game.status,blooms:on.result.naturalBlooms,publicBloomCommands:on.result.publicBloomCommandSamples,frontline:on.result.frontline?.counts}}));
   if(!same)throw Error('same-arm full-match replay diverged; cannot claim controlled A/B');
-  if(!off.result.naturalBlooms||!on.result.naturalBlooms)
-   throw Error('no natural BLOOM in one or both arms; report is evidence of censoring, not Frontlines effect');
+  // No natural announcement is valid negative/censored research evidence,
+  // not a CI failure to hide by selecting a friendlier seed.
  }finally{await browser.close();}
 })().catch(e=>{console.error(e.stack||e);process.exitCode=1;});
