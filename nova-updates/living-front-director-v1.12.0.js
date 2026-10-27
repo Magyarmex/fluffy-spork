@@ -49,6 +49,8 @@ function closeFrontline(g,st,reason){
  var f=st&&st.frontlineTelemetry;
  if(!f||f.closed||!f.currentKey)return false;
  f.closed=true;f.counts.resolved++;
+ /* Do not retain tank references after the public opportunity closes. */
+ f.aiPhysicalMotion={};f.aiPhysicalLast={};
  if(f.seenContest&&!f.deathRecorded&&g.player&&alive(g.player)){
   f.counts.contestSurvivals++;frontlineTrace(f,g,'contest-survived');
  }
@@ -134,8 +136,8 @@ function physicalAIArrivals(g,f,p,ts,now){
 function frontlineTick(g,st,observedContest){
  var f=ensureFrontline(g,st);
  if(!f){
-  if(g&&st&&g.status==='playing'&&st.directorEnabled!==false&&!g.__novaDecorativeWorld)
-   closeFrontline(g,st,'expired');
+  if(g&&st&&!g.__novaDecorativeWorld)
+   closeFrontline(g,st,st.directorEnabled===false?'disabled':g.status!=='playing'?'ended':'expired');
   return false;
  }
  var p=g.player,inside=!!(p&&alive(p)&&!(p.spawnShieldT>0)&&sectorIndex(p.x,p.y)===f.sector);
@@ -301,7 +303,7 @@ LF.wrap('game/engine',function(engine){
  if(oldMove&&!oldMove.__novaFrontlineWitness){
   function witnessedMove(t,vx,vy,dt){
    var st=this.__lfState,f=st&&st.frontlineTelemetry;
-   var eligible=!!(f&&!f.closed&&f.currentKey&&t&&t.ai&&t.id!=null&&alive(t));
+   var eligible=!!(f&&!f.closed&&f.currentKey&&st.directorEnabled!==false&&t&&t.ai&&t.id!=null&&alive(t));
    var bx=eligible?t.x:0,by=eligible?t.y:0;
    var result=oldMove.apply(this,arguments);
    if(!eligible||!this.__lfState||this.__lfState.frontlineTelemetry!==f)return result;
