@@ -1,4 +1,5 @@
 /* NOVA TANKS v1.12.0 — Living Front / Stage III: Front Director + Strategic AI */
+/* NOVA_VISUAL_INTENT: CONTESTED marks a witnessed hostile contest of an existing public BLOOM on the minimap; it adds no enemy radar, persistent HUD or decorative effects. */
 (function(){'use strict';
 var LF=window.__NOVA_LIVING_FRONT_INTERNAL__,mods=window.__novaModules;if(!LF||!mods||!LF.instincts){console.error('[NOVA v1.12.0] Living Front stages missing');return;}if(window.__NOVA_LIVING_FRONT__)return;
 var V=LF.VERSION,clamp=LF.clamp,d2=LF.d2,alive=LF.alive,xp=LF.xp,sectorCenter=LF.sectorCenter,sectorIndex=LF.sectorIndex;
