@@ -181,8 +181,8 @@ for(const optimized of [false,true])for(const hz of [30,60,120,240]){
 
 
 /* Convex physical-contact proof: four fixed interior samples miss real
- * pre-expiration contacts near the TTL boundary or when a witnessed drone
- * begins in contact and moves away before projectile processing. These
+ * pre-expiration contacts near the TTL boundary or when a drone ends
+ * over the bullet origin despite starting outside the contact radius. These
  * tests exercise the materialized core and Battlefield/Performance wrappers. */
 for(const optimized of [false,true])for(const hz of [30,60,120,240]){
  const label=(optimized?'optimized':'baseline')+' '+hz+'Hz';
