@@ -795,6 +795,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      * owner must have accepted this exact segment in the current epoch.
      * No guessed dash, terrain correction, route or repair is admissible. */
     if(b.pen===0&&(b.hits||0)===0&&witnessed&&
+       Number.isFinite(b.dmg)&&b.dmg>0&&
+       Number.isFinite(b.r)&&b.r>0&&
        g.__novaDroneChronoTraceEnabled===true&&
        e.__novaChronoIdleUnmodifiedEpoch===g.__novaShapeSweepEpoch&&
        e.__novaChronoIdleRawDt===dt&&
@@ -1092,9 +1094,9 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    /* A projectile may hit the chosen body from the side without crossing
     * this bullet's path. It can change HP/kill credit BEFORE first contact.
     * The fallback first-hit recovery must obey the same veto as piercing. */
-   /* A competing projectile may reach the SAME drone from a different
-    * direction without crossing our bullet corridor. Our guaranteed
-    * overlap time is only an upper bound, so preserve earlier kill credit. */
+   /* A competing projectile may reach the SAME drone from another direction
+    * without crossing our bullet corridor. This veto protects kill credit
+    * for both exact certified contacts and bounded guaranteed overlaps. */
    if((best.guaranteed||best.exact)&&o.ownerId!==best.e.id){
     var dr=best.e,dsx=dr.__novaChronoDronePrevX,
         dsy=dr.__novaChronoDronePrevY,rr=(o.r||2)+(dr.r||8)+1;
