@@ -313,6 +313,16 @@ test('death before expiry still censors an active BLOOM when only closure sees i
  assert.equal(st.frontlineTelemetry.counts.pilotDeathCensors,1,
   'do not discard legitimate early deaths when the normal damage hook is unavailable');
 });
+test('death-censor fallback respects the exact 24-second expiry boundary',()=>{
+ for(const [at,expected] of [[123.999,1],[124,0],[124.001,0]]){
+  const {g,st,p,LF}=scene();LF.frontlineTick(g,st,false);
+  g.time=at;st.signal=null;
+  p.hp=0;p.alive=false;g.status='dead';
+  LF.frontlineTick(g,st,false);
+  assert.equal(st.frontlineTelemetry.counts.pilotDeathCensors,expected,
+   'at t='+at+' only a still-active public memory can certify the death');
+ }
+});
 test('a pilot already dead before an opportunity starts is not a new death censor',()=>{
  const {g,st,p,LF}=scene();
  p.hp=0;p.alive=false; // e.g. a pending redeploy with playing status
