@@ -172,14 +172,14 @@ function contestCandidate(g,st){
  /* The BLOOM announcement is historical public intelligence, not proof of
   * current value. Require enough genuinely visible neutral value. Private
   * sector totals and the initial BLOOM value must never control the badge. */
- if(observedPocketValue(g,st,p,op.sector,155)<155)return false;
  var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
  if(!F||typeof F.inGameplayViewport!=='function'||typeof g.hasLineOfSight!=='function')return false;
  var ts=g.tanks||[];
  for(var i=0;i<ts.length;i++){
   var t=ts[i];if(!t||t===p||t.id===p.id||!alive(t)||t.spawnShieldT>0||sectorIndex(t.x,t.y)!==op.sector)continue;
   if(!contestHostile(g,p,t))continue;
-  if(visible(g,p,t))return true;
+  /* Only scan the neutral pocket after a legitimate hostile is witnessed. */
+  if(visible(g,p,t)&&observedPocketValue(g,st,p,op.sector,155)>=155)return true;
  }
  return false;
 }
