@@ -53,6 +53,28 @@ test('hidden target current coordinates cannot change ecological decisions', () 
   assert.ok(Math.abs(one.x - two.x) < 1e-12);
 });
 
+test('terrain-occluded held target inside viewport cannot suppress public ecology', () => {
+  const T = boot(), w = world(20);
+  w.g.hasLineOfSight = () => false;
+  const occluded = bias(T, w);
+  w.owner.ai.__v1112TargetId = -1;
+  const noTarget = bias(T, w);
+  assert.equal(occluded.mode, 'signal');
+  assert.equal(occluded.weight, noTarget.weight,
+    'occluded live target position must not change the ecological priority');
+  assert.equal(occluded.x, noTarget.x);
+  assert.equal(occluded.y, noTarget.y);
+});
+test('active Sniper Observer relay may still prioritize a terrain-occluded contact', () => {
+  const T = boot(), w = world(20);
+  w.g.hasLineOfSight = () => false;
+  w.owner.cls = 'railgun';
+  w.owner.__novaSpotterContactId = 2;
+  w.owner.__novaSpotterContactUntil = 20;
+  assert.equal(bias(T, w).weight, 0, 'legitimate live Observer relay still authorizes combat priority');
+  w.owner.__novaSpotterContactUntil = 9;
+  assert.ok(bias(T, w).weight > .15, 'expired relay is not current sight');
+});
 test('visible nearby enemy remains a legitimate combat priority', () => {
   const T = boot(), w = world(20);
   assert.equal(bias(T, w).weight, 0);
