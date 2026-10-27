@@ -30,20 +30,28 @@ const {chromium}=require('playwright');
    if(!p||!e||!T)throw Error('canonical player/enemy/Frontlines API missing');
    p.hp=Math.max(100,p.hp);p.alive=true;p.spawnShieldT=0;
    e.hp=Math.max(100,e.hp);e.alive=true;e.spawnShieldT=0;
+   // A live contest requires an ACTUALLY VISIBLE, harvestable neutral pocket.
+   // Do not fake private sector.value: that was the exact information leak.
+   const shape=g.shapes.find(s=>s&&s.type==='hexagon'&&s.hp>0);
+   if(!shape)throw Error('canonical hexagon resource missing');
    let found=false;
    for(let iy=0;iy<6&&!found;iy++)for(let ix=0;ix<6&&!found;ix++){
-    const x=-1000+ix*180,y=-1000+iy*180,ex=x+40,ey=y+20;
-    if(g.isTerrainSafe&&(!g.isTerrainSafe(x,y,20)||!g.isTerrainSafe(ex,ey,20)))continue;
-    if(!g.hasLineOfSight(x,y,ex,ey,2))continue;
-    p.x=x;p.y=y;e.x=ex;e.y=ey;found=true;
+    const x=-1000+ix*180,y=-1000+iy*180,ex=x+40,ey=y+20,sx=x+75,sy=y+35;
+    if(g.isTerrainSafe&&(!g.isTerrainSafe(x,y,20)||!g.isTerrainSafe(ex,ey,20)||!g.isTerrainSafe(sx,sy,25)))continue;
+    if(!g.hasLineOfSight(x,y,ex,ey,2)||!g.hasLineOfSight(x,y,sx,sy,2))continue;
+    p.x=x;p.y=y;e.x=ex;e.y=ey;shape.x=sx;shape.y=sy;found=true;
    }
-   if(!found)throw Error('no real terrain-safe visible pair in BLOOM sector 5');
+   if(!found)throw Error('no real terrain-safe visible enemy and harvestable hexagon in BLOOM sector 5');
    g.cam.x=p.x;g.cam.y=p.y;
    const st=g.__lfState,now=g.time;
    st.signal=null;st.bloomMemory={sector:5,announcedAt:now-7,until:now+17,initialValue:500};
-   st.sectors[5].value=500;
+   st.sectors[5].value=0; // Deliberately false private value: must not control UI.
    const visible=T.contestCandidate(g,st);
-   if(!visible)throw Error('real Battlefield LOS/viewport does not certify chosen pair');
+   if(!visible)throw Error('real Battlefield LOS/viewport does not certify visible hostile and hexagon');
+   shape.hp=0;
+   if(T.contestCandidate(g,st))throw Error('dead visible resource still advertised as contested');
+   shape.hp=Math.max(1,shape.hp+200);
+   if(!T.contestCandidate(g,st))throw Error('restored visible resource did not restore contest');
    if(!T.updateContest(g,st))throw Error('certified contest was not emitted');
    const LF=window.__NOVA_LIVING_FRONT_INTERNAL__;
    if(!LF.frontlineTick(g,st,true))throw Error('real Frontlines telemetry did not activate');
@@ -52,6 +60,16 @@ const {chromium}=require('playwright');
     throw Error('real shipping telemetry did not record witnessed contest');
    if(!window.NOVALivingFront.diagnostics().includes('observed-contest'))
     throw Error('COPY ECOLOGY omits chronological Frontlines trace');
+   // Physical arrivals are an A/B witness, not a memory-only AI counter.
+   // Exercise the real shipped engine state without changing combat authority.
+   const beforePhysical=snap.frontline.counts.aiPhysicalArrivals;
+   if(typeof beforePhysical!=='number')throw Error('physical A/B arrival counter missing');
+   const oldEnemyX=e.x,oldEnemyY=e.y;
+   e.x=-1150;e.y=-550;g.time+=.22;LF.frontlineTick(g,st,false);
+   e.x=-1110;e.y=-550;g.time+=.22;LF.frontlineTick(g,st,false);
+   if(st.frontlineTelemetry.counts.aiPhysicalArrivals!==beforePhysical+1)
+    throw Error('real runtime did not record a witnessed physical AI sector entry');
+   e.x=oldEnemyX;e.y=oldEnemyY;
    g.drawMinimap();
    const ctx=g.mmCtx,S=216;
    const withContest=new Uint8Array(ctx.getImageData(0,0,S,S).data);
@@ -77,7 +95,7 @@ const {chromium}=require('playwright');
    const st=g.__lfState,now=g.time;
    g.w=320;g.h=568;g.cam.x=g.player.x;g.cam.y=g.player.y;
    st.signal=null;st.bloomMemory={sector:5,announcedAt:now-7,until:now+17,initialValue:500};
-   st.sectors[5].value=500;
+   st.sectors[5].value=0; // Still independent of hidden sector totals.
    if(!T.updateContest(g,st))throw Error('320px viewport lost a physically visible local contest');
    g.drawMinimap();
    const S=216,ctx=g.mmCtx,withSignal=new Uint8Array(ctx.getImageData(0,0,S,S).data);
