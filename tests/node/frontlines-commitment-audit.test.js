@@ -116,3 +116,19 @@ test('live held-target gate is a conservative bound, not a hidden visibility cla
  assert.equal(a.liveGate.firstBlock.heldTarget,1);
  assert.equal(a.liveGate.noHeldTarget,0);
 });
+
+test('read-only cohort audit rotates with public announcement time in both phases',()=>{
+ const {g,t}=scene(),audit=create();
+ g.__lfState.bloomMemory={sector:5,announcedAt:140,until:164};
+ g.time=146;sample(audit,g,t,true,sectorIndex);
+ assert.equal(audit.subset,0,'id 7 is not selected for the second public epoch');
+ t.id=11;sample(audit,g,t,true,sectorIndex);
+ assert.equal(audit.subset,1,'id 11 takes the second epoch cohort');
+ g.time=142;g.__lfState.signal={type:'BLOOM',sector:5,started:140,until:145};
+ t.ai.__lfEcoMode='signal';
+ sample(audit,g,t,true,sectorIndex);
+ assert.equal(audit.liveGate.selected,1,'live announcement matches its memory cohort');
+ t.id=7;sample(audit,g,t,true,sectorIndex);
+ assert.equal(audit.liveGate.selected,1,'old cohort does not remain selected');
+ assert.equal(audit.liveGate.samples,2);
+});
