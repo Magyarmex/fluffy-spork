@@ -127,6 +127,7 @@ test('disabling Director closes the opportunity and drops retained movement refe
  assert.equal(f.counts.resolved,1);
  assert.deepEqual(Object.keys(f.aiPhysicalLast),[]);
  assert.deepEqual(Object.keys(f.aiPhysicalMotion),[]);
+ assert.deepEqual(Object.keys(f.aiPhysicalIdentity),[],'closed opportunity must release tank references');
  s.LF.frontlineTick(s.g,s.st,false);
  assert.equal(f.counts.resolved,1,'closing a disabled opportunity is idempotent');
 });
@@ -149,4 +150,62 @@ test('Debug clearly distinguishes physical arrivals, rejected crossings and memo
  assert.match(summary,/REJECT 1/);
  assert.match(summary,/AI MEM 0/);
  assert.ok(!summary.includes('AI ARRIVE'),'ambiguous old label must not survive');
+});
+
+test('a new bot reusing an id after a witnessed death gets its own physical arrival',()=>{
+ const s=scene();s.e.x=-1200;s.LF.frontlineTick(s.g,s.st,false);
+ sample(s,-1150,-550);sample(s,-1110,-550);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,1);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalApproaches,1);
+ s.e.hp=0;s.e.alive=false;s.LF.frontlineTick(s.g,s.st,false);
+ s.e={id:2,x:-1200,y:-550,hp:100,alive:true,team:2,ai:{__lfEcoMode:'none'}};
+ s.g.tanks[1]=s.e;s.LF.frontlineTick(s.g,s.st,false);
+ sample(s,-1150,-550);sample(s,-1110,-550);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,2,
+  'a different bot incarnation must not inherit the previous arrival flag');
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalApproaches,2);
+});
+test('replacing a tank object with the same id resets physical arrival identity',()=>{
+ const s=scene();s.e.x=-1200;s.LF.frontlineTick(s.g,s.st,false);
+ sample(s,-1150,-550);sample(s,-1110,-550);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,1);
+ s.e={id:2,x:-1200,y:-550,hp:100,alive:true,team:2,ai:{__lfEcoMode:'none'}};
+ s.g.tanks[1]=s.e;s.LF.frontlineTick(s.g,s.st,false);
+ sample(s,-1150,-550);sample(s,-1110,-550);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,2);
+});
+test('a temporary shield does not turn the same bot re-entry into a new arrival',()=>{
+ const s=scene();s.e.x=-1200;s.LF.frontlineTick(s.g,s.st,false);
+ sample(s,-1150,-550);sample(s,-1110,-550);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,1);
+ s.e.spawnShieldT=1;s.LF.frontlineTick(s.g,s.st,false);
+ s.e.spawnShieldT=0;s.e.x=-1200;s.LF.frontlineTick(s.g,s.st,false);
+ sample(s,-1150,-550);sample(s,-1110,-550);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,1,
+  'one living bot may only arrive once per public opportunity');
+});
+
+test('replacement while old bot is shielded still resets its previous arrival flag',()=>{
+ const s=scene();s.e.x=-1200;s.LF.frontlineTick(s.g,s.st,false);
+ sample(s,-1150,-550);sample(s,-1110,-550);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,1);
+ s.e.spawnShieldT=1;s.LF.frontlineTick(s.g,s.st,false); // sampled path baseline is dropped
+ s.e={id:2,x:-1200,y:-550,hp:100,alive:true,team:2,ai:{__lfEcoMode:'none'}};
+ s.g.tanks[1]=s.e;s.LF.frontlineTick(s.g,s.st,false);
+ sample(s,-1150,-550);sample(s,-1110,-550);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,2,
+  'a shielded old incarnation cannot conceal replacement of the tank object');
+});
+
+test('removed bot identity is released without preserving a stale arrival flag',()=>{
+ const s=scene();s.e.x=-1200;s.LF.frontlineTick(s.g,s.st,false);
+ sample(s,-1150,-550);sample(s,-1110,-550);
+ const f=s.st.frontlineTelemetry;
+ assert.equal(f.counts.aiPhysicalArrivals,1);
+ s.g.tanks=[s.p];s.LF.frontlineTick(s.g,s.st,false);
+ assert.deepEqual(Object.keys(f.aiPhysicalIdentity).filter(id=>id==='2'),[]);
+ s.e={id:2,x:-1200,y:-550,hp:100,alive:true,team:2,ai:{__lfEcoMode:'none'}};
+ s.g.tanks.push(s.e);s.LF.frontlineTick(s.g,s.st,false);
+ sample(s,-1150,-550);sample(s,-1110,-550);
+ assert.equal(f.counts.aiPhysicalArrivals,2);
 });
