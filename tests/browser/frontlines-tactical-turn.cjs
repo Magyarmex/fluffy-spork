@@ -50,15 +50,18 @@ const {chromium}=require('playwright');
     st.bloomMemory={sector:5,announcedAt:100,until:124};
     const a=e.ai;a.__lfEcoT=0;a.__lfFrontTurn=null;a.__lfFrontTurnSpentKey=null;
     a.__v1112TargetId=-1;a.__v180HitAt=-99;a.__v180Threat={risk:0};a.__v180Posture='investigate';
-    const before=st.stats.aiFrontlineCommitments||0;
+    const before=st.stats.aiFrontlineCommitments||0,startX=e.x,startY=e.y;
     ai.updateAI(e,g,.3);
+    const dx=e.x-startX,dy=e.y-startY,moved=Math.hypot(dx,dy);
+    const toward=moved>0?(dx*(c.x-startX)+dy*(c.y-startY))/(moved*spot.d):null;
     const after=st.stats.aiFrontlineCommitments||0;
     if(after!==before+1)throw Error('real composed AI did not start public BLOOM commitment: '+JSON.stringify({
      mode:a.__lfEcoMode,weight:a.__lfEcoWeight,before,after,spot}));
     if(a.__lfEcoMode!=='memory'||!a.__lfFrontTurnSpentKey)
      throw Error('real AI commitment did not use public memory');
     return{realComposedAI:true,commitmentsAdded:after-before,mode:a.__lfEcoMode,
-     weight:+a.__lfEcoWeight.toFixed(3),approachDistance:Math.round(spot.d)};
+     weight:+a.__lfEcoWeight.toFixed(3),approachDistance:Math.round(spot.d),
+     actualMovement:+moved.toFixed(3),towardPublicCenter:toward==null?null:+toward.toFixed(3)};
    }finally{
     e.x=original.x;e.y=original.y;e.hp=original.hp;e.maxHp=original.maxHp;e.spawnShieldT=original.spawnShieldT;
     p.x=oldPX;p.y=oldPY;g.shapes=originalShapes;g.bullets=originalBullets;g.hash=originalHash;
