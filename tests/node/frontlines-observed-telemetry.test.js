@@ -202,3 +202,15 @@ test('time in public opportunity is sampled from simulation time, capped across 
  g.time+=15;st.signal=null;LF.frontlineTick(g,st,false);
  assert.ok(st.frontlineTelemetry.counts.playerSeconds<.7,'tab suspension must not inflate presence');
 });
+
+test('Director emission records the public BLOOM immediately, before another sector sample',()=>{
+ const {g,st,LF}=scene();
+ st.signal=null;st.bloomMemory=null;st.ceiling=1;st.age=120;
+ st.lastSignalAt=-99;st.lastBloomSector=-1;st.cooldowns.bloom=0;
+ st.sectors[5].maturity=.9;st.sectors[5].value=900;st.stats.blooms=0;
+ LF.directorTick(g,st);
+ assert.equal(st.signal.type,'BLOOM');
+ assert.equal(st.frontlineTelemetry.counts.announcements,1);
+ LF.frontlineTick(g,st,false);
+ assert.equal(st.frontlineTelemetry.counts.announcements,1);
+});
