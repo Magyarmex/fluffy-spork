@@ -246,3 +246,18 @@ test('uncontested sectors do not scan neutral line of sight',()=>{
  assert.equal(T.contestCandidate(g,st),false);
  assert.equal(calls,0,'without a visible hostile, no neutral-resource visibility work is needed');
 });
+
+test('tactical camera cannot reveal a shape that is near the hull but off the rendered screen',()=>{
+ const {T,g,st}=scene();
+ g.shapes[0].x=-900;g.cam.x=-240;g.cam.y=-560;
+ assert.equal(T.contestCandidate(g,st),false,'Long Glass must not turn hull-proximity into hidden harvest radar');
+ g.cam.x=-560;
+ assert.equal(T.contestCandidate(g,st),true,'restore visible pocket when the camera actually includes it');
+});
+test('tactical camera cannot reveal an enemy outside the rendered viewport',()=>{
+ const {T,g,st}=scene();
+ g.cam.x=-950;g.cam.y=-560;
+ assert.equal(T.contestCandidate(g,st),false,'enemy near hull but off-screen is not a witnessed contest');
+ g.cam.x=-560;
+ assert.equal(T.contestCandidate(g,st),true);
+});
