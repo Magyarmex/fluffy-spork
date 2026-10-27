@@ -93,7 +93,7 @@ test('hidden or shielded enemy cannot become an observed contest through diagnos
 });
 test('bounded chronological events and copied snapshot contain no private enemy coordinates',()=>{
  const {g,st,p,LF}=scene();
- for(let i=0;i<70;i++){p.x=i%2?-900:-560;p.y=p.x;g.time+=.01;LF.frontlineTick(g,st,false);}
+ for(let i=0;i<70;i++){p.x=i%2?-1500:-560;p.y=p.x;g.time+=.01;LF.frontlineTick(g,st,false);}
  const f=st.frontlineTelemetry;
  assert.ok(f.events.length<=48,'event ring is bounded');
  const snap=LF.snapshot(g);
