@@ -77,14 +77,17 @@ const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
       g.time=106;
       let state=0x6d2b79f5;
       Math.random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return (state>>>0)/4294967296;};
+      let entered=false;
       try{
        for(let step=0;step<steps;step++){
         g.time=106+step*.275;
         ai.updateAI(e,g,.275);
+        if(T.sectorIndex(e.x,e.y)===sector)entered=true;
        }
       }finally{Math.random=random;}
       const dx=e.x-spot.x,dy=e.y-spot.y;
       return{mode:a.__lfEcoMode,committed:!!a.__lfFrontTurnSpentKey,
+       entered:entered,insideAtEnd:T.sectorIndex(e.x,e.y)===sector,
        distance:+Math.hypot(dx,dy).toFixed(3),
        progress:+(spot.d-Math.hypot(e.x-center.x,e.y-center.y)).toFixed(3),
        x:+dx.toFixed(3),y:+dy.toFixed(3)};
@@ -97,6 +100,7 @@ const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
        * the first arm changes hidden state consumed by the second arm. */
       const off=run(false),on=run(true),onFirst=run(true),offSecond=run(false);
       const equal=(a,b)=>a.mode===b.mode&&a.committed===b.committed&&
+       a.entered===b.entered&&a.insideAtEnd===b.insideAtEnd&&
        Math.abs(a.progress-b.progress)<.001&&Math.abs(a.x-b.x)<.001&&Math.abs(a.y-b.y)<.001;
       if(!equal(off,offSecond)||!equal(on,onFirst))
        throw Error('paired microtrial has an execution-order confound: '+JSON.stringify({layout,off,on,onFirst,offSecond}));
