@@ -101,3 +101,12 @@ test('a match clock earlier than the public announcement cannot create a tactica
  const s=scene();s.g.time=90;
  assert.ok(s.tick().x<0);assert.equal(s.st.stats.aiFrontlineCommitments||0,0);
 });
+
+test('Debug labels commitment decisions as intent, not physical arrivals',()=>{
+ const s=scene();s.tick();
+ const summary=s.T.debugSummary({active:true,version:'1.12.0',age:106,ceiling:.3,director:'idle',
+  lastSignal:'BLOOM',totalXP:0,playerNeutralXPPerMin:0,planMsEma:0,planMsPeak:0,
+  counts:{},stats:s.st.stats,sectors:[],hexAvgNeighbors:0});
+ assert.match(summary,/AI INTENT 1/);
+ assert.ok(!summary.includes('AI TURN'),'intention is not proof of completed movement');
+});
