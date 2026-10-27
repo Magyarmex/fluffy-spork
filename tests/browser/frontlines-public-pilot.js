@@ -39,9 +39,9 @@
   const defs=g.__lfState&&g.__lfState.defs||LF.defs;
   let best=null,dist=Infinity;
   for(const s of g.shapes||[]){
-   if(!s||!(s.hp>0)||!(LF.xp(defs,s.type)>0)||
-      Math.abs(s.x-p.x)>ext.x||Math.abs(s.y-p.y)>ext.y||
-      Math.abs(s.x-cx)>ext.x||Math.abs(s.y-cy)>ext.y||
+   if(!s||Math.abs(s.x-p.x)>ext.x||Math.abs(s.y-p.y)>ext.y||
+      Math.abs(s.x-cx)>ext.x||Math.abs(s.y-cy)>ext.y)continue;
+   if(!(s.hp>0)||!(LF.xp(defs,s.type)>0)||
       !g.hasLineOfSight(p.x,p.y,s.x,s.y,2))continue;
    const d=Math.hypot(s.x-p.x,s.y-p.y);
    if(d>1&&d<dist){dist=d;best=s;}
