@@ -119,8 +119,14 @@ async function arm(browser,enabled,label){
   assert.equal(off.initial.fingerprint,on.initial.fingerprint,'ON/OFF must begin from identical real world');
   assert.equal(off.initial.fingerprint,offReplay.initial.fingerprint,'same seed must reproduce initial world');
   const same=JSON.stringify(off.result)===JSON.stringify(offReplay.result);
+  const noStaleMemoryWindow=[off,on].every(arm=>{
+   const c=arm.result.frontline?.counts;
+   return c&&c.announcements===1&&c.pilotAliveSeconds<=5;
+  });
   const report={method:'scripted full-match natural Director research; not human fun',
    initialWorldIdentical:true,offReplayIdentical:same,
+   staleMemoryWindowObserved:!noStaleMemoryWindow,
+   interpretation:noStaleMemoryWindow?'INCONCLUSIVE: pilot died before the five-second live BLOOM ended; ON/OFF stale-memory logic had no observation window':'Descriptive only; inspect per-event timeline before interpreting differences.',
    off:off.result,on:on.result,offReplay:offReplay.result,
    limits:['No artificial BLOOM or forced survival','One layout and one seed only',
     'A deterministic Scout script is not a human player','Seed replay is checked, not assumed']};
@@ -133,6 +139,7 @@ async function arm(browser,enabled,label){
     on:'frontlines-natural-on.json',off:'frontlines-natural-off.json'}]
   },null,2));
   console.log('NOVA_FRONTLINES_NATURAL_MATCH_AB '+JSON.stringify({initialWorldIdentical:true,offReplayIdentical:same,
+   staleMemoryWindowObserved:!noStaleMemoryWindow,
    off:{time:off.result.game.time,status:off.result.game.status,blooms:off.result.naturalBlooms,frontline:off.result.frontline?.counts},
    on:{time:on.result.game.time,status:on.result.game.status,blooms:on.result.naturalBlooms,frontline:on.result.frontline?.counts}}));
   if(!same)throw Error('same-arm full-match replay diverged; cannot claim controlled A/B');
