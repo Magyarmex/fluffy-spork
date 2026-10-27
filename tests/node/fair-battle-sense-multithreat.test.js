@@ -119,3 +119,19 @@ test('explicit fair no-target state cannot resurrect a hidden legacy target',()=
  assert.deepEqual(Array.from(g.__legacyVisibleIds),[1]);
  assert.equal(Object.prototype.hasOwnProperty.call(g,'__novaFairVisibleTanks'),false);
 });
+
+test('perceived multi-threat snapshots obey the existing bounded tactical think cadence',()=>{
+ const {g,ai,self}=scene();
+ let current,builds=0;
+ Object.defineProperty(g,'__novaFairVisibleTanks',{configurable:true,
+  get(){return current;},
+  set(v){if(Array.isArray(v))builds++;current=v;}});
+ for(let frame=0;frame<60;frame++){
+  g.time+=1/60;
+  ai.updateAI(self,g,1/60);
+ }
+ assert.ok(builds>=4&&builds<=10,
+  'one second should create about six tactical snapshots, not sixty: '+builds);
+ assert.equal(current,undefined,'original temporary value is restored');
+ assert.equal(g.tanks.length,3);
+});
