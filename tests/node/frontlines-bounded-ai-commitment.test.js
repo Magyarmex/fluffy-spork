@@ -77,3 +77,16 @@ test('hidden sector value never affects tactical turn eligibility or heading',()
  assert.equal(av.x,bv.x);assert.equal(av.y,bv.y);
  assert.equal(a.st.stats.aiFrontlineCommitments,b.st.stats.aiFrontlineCommitments);
 });
+
+test('tactical commitment uses the first reachable Battlefield waypoint, not a wall-facing vector',()=>{
+ const s=scene();s.g.hasLineOfSight=()=>false;
+ s.g.novaBattlefieldWaypoint=()=>({x:s.t.x+150,y:s.t.y-40});
+ const m=s.tick();
+ assert.ok(m.x>0&&m.y<0,'committed AI follows the reachable waypoint even when the public center lies northeast');
+ assert.equal(s.st.stats.aiFrontlineCommitments,1);
+});
+test('a blocked public opportunity without a valid route cannot start a tactical commitment',()=>{
+ const s=scene();s.g.hasLineOfSight=()=>false;s.g.novaBattlefieldWaypoint=()=>null;
+ assert.equal(s.tick().x,-100);
+ assert.equal(s.st.stats.aiFrontlineCommitments||0,0);
+});
