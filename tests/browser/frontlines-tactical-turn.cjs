@@ -74,8 +74,8 @@ const {chromium}=require('playwright');
      * during the live public five-second announcement. Reuse the verified
      * terrain-safe outside approach, not a synthetic movement substitute. */
     e.x=spot.x;e.y=spot.y;
-    st.signal={type:'BLOOM',sector:sector,x:c.x,y:c.y,started:145,until:150};
-    st.bloomMemory={sector:sector,announcedAt:145,until:169};
+    st.signal={type:'BLOOM',sector:sector,x:c.x,y:c.y,started:142,until:147};
+    st.bloomMemory={sector:sector,announcedAt:142,until:166};
     a.__lfEcoT=0;a.__lfFrontTurn=null;a.__lfFrontTurnSpentKey=null;
     a.__v1112TargetId=-1;a.__v180HitAt=-99;a.__v180Threat={risk:0};a.__v180Posture='investigate';
     const liveBefore=st.stats.aiFrontlineCommitments||0;
