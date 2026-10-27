@@ -102,13 +102,14 @@ function world({trace=true,terrain=[],damaged=false,command=false}={}){
 }
 
 function shotWorld(hz,{terrain=[],command=false,trace=false,x=20,y=0,
-  vx=2500,ttl=.004,otherBullets=[],friendly=false,phase='form'}={}){
+  vx=2500,ttl=.004,otherBullets=[],friendly=false,phase='form',idleVY=null}={}){
  const {g,d,owner}=world({trace,terrain,command});
  owner.x=-200;owner.y=0;
  const shooter={id:2,cls:'basic',kind:'tank',alive:true,x:-1000,y:0,hp:100};
  g.tanks.push(shooter);g.tankById.set(2,shooter);
  g.shapes[0].x=0;g.shapes[0].y=50;
  d.x=x;d.y=y;d.__novaPhase=phase;
+ if(idleVY!==null)d.__novaIdleVY=idleVY;
  g.bullets=[{kind:'bullet',id:100,ownerId:friendly?1:2,x:0,y:0,
   vx,vy:0,r:3,dmg:20,ttl,pen:0,hits:0,dead:false,
   shell:false,beam:false},...otherBullets];
@@ -127,7 +128,7 @@ for(const hz of [30,60,120,240]){
    'temporary tracing must not remain globally enabled');
  });
  test('certified idle drone beyond TTL remains unharmed at '+hz+'Hz',()=>{
-  const {g}=shotWorld(hz,{x:100});
+  const {g}=shotWorld(hz,{x:32});
   assert.equal(g.hitOwners.includes(2),false);
  });
  test('earlier permanent cover blocks certified drone hit at '+hz+'Hz',()=>{
@@ -148,6 +149,20 @@ for(const hz of [30,60,120,240]){
    x:20,y:10,vx:0,vy:0,r:3,dmg:2,ttl:1,pen:0,hits:0,
    dead:false,shell:false,beam:false}]});
   assert.equal(g.hitOwners.includes(2),false);
+ });
+}
+for(const hz of [30,60,120,240]){
+ test('certified lateral idle motion may contact before TTL at '+hz+'Hz',()=>{
+  const {g,d}=shotWorld(hz,{x:15,y:13,idleVY:-800});
+  assert.equal(d.__novaChronoIdleUnmodifiedEpoch,g.__novaShapeSweepEpoch);
+  const t=.004,dt=1/hz;
+  const x=d.__novaChronoIdleRawX+
+   (d.__novaChronoIdleRawEndX-d.__novaChronoIdleRawX)*t/dt;
+  const y=d.__novaChronoIdleRawY+
+   (d.__novaChronoIdleRawEndY-d.__novaChronoIdleRawY)*t/dt;
+  assert.ok(Math.hypot(x-2500*t,y)<12,
+   'independent relative-position oracle proves pre-expiry overlap');
+  assert.deepEqual(g.hitOwners,[2]);
  });
 }
 test('non-expiring shots do not activate the optional motion witness',()=>{
