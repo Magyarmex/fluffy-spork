@@ -125,3 +125,19 @@ test('full shipping chain does not certify actively commanded drones as idle',()
  g.update(1/60);
  assert.equal(d.__novaChronoIdleRawEpoch,-1);
 });
+
+test('full shipping path witnesses a physical contact before TTL that remains unawarded',()=>{
+ const {g,d}=world();
+ const dt=1/60,ttl=.004,projectileVX=2500,combinedRadius=12;
+ g.update(dt);
+ assert.equal(d.__novaChronoIdleRawEpoch,g.__novaShapeSweepEpoch);
+ const x0=d.__novaChronoIdleRawX,x1=d.__novaChronoIdleRawEndX;
+ const velocity=(x1-x0)/dt;
+ const first=(x0-combinedRadius)/(projectileVX-velocity);
+ assert.ok(first>0&&first<ttl,
+  'exact witnessed relative-motion contact precedes physical expiration');
+ assert.equal(x1,d.__novaChronoDroneLiveX,
+  'this fixture has no later displacement, unlike the terrain test');
+ // No additional projectile damage is authorized by the witness alone.
+ assert.equal(d.hp,30);
+});
