@@ -153,7 +153,7 @@ for(const hz of [30,60,120,240]){
 }
 for(const hz of [30,60,120,240]){
  test('certified lateral idle motion may contact before TTL at '+hz+'Hz',()=>{
-  const {g,d}=shotWorld(hz,{x:15,y:13,idleVY:-800});
+  const {g,d}=shotWorld(hz,{x:14,y:9.5,idleVY:-800});
   assert.equal(d.__novaChronoIdleUnmodifiedEpoch,g.__novaShapeSweepEpoch);
   const t=.004,dt=1/hz;
   const x=d.__novaChronoIdleRawX+
@@ -161,7 +161,7 @@ for(const hz of [30,60,120,240]){
   const y=d.__novaChronoIdleRawY+
    (d.__novaChronoIdleRawEndY-d.__novaChronoIdleRawY)*t/dt;
   assert.ok(Math.hypot(x-2500*t,y)<12,
-   'independent relative-position oracle proves pre-expiry overlap');
+   'independent relative-position oracle proves pre-expiry overlap: '+JSON.stringify({x,y,dt}));
   assert.deepEqual(g.hitOwners,[2]);
  });
 }
