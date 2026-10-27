@@ -898,3 +898,45 @@ for (const optimized of [false,true]) {
     });
   }
 }
+
+
+/* Run 387: one ordinary non-piercing TTL shot must not lose a real local
+ * first contact to 2,000 unrelated distant projectiles. This is the actual
+ * materialized core with shipping Battlefield and optimized composition. */
+function addRemoteTTLFire(g,count=2000,reverse=false){
+ for(let i=0;i<count;i++)g.bullets.push({kind:'bullet',
+  id:90000+i,ownerId:1000+i,x:900+(i%10)*4,
+  y:900+Math.floor(i/10)*4,vx:0,vy:0,r:2,dmg:1,
+  ttl:2,pen:0,hits:0,dead:false,shell:false,beam:false});
+ if(reverse)g.bullets.reverse();
+}
+for(const optimized of [false,true])for(const fps of [30,60]){
+ for(const reverse of [false,true]){
+  test((optimized?'optimized':'baseline')+
+   ' non-piercing first tank hit survives 2000 remote bullets at '+
+   fps+'Hz, reversed='+reverse,()=>{
+   const Game=boot(undefined,optimized);
+   const g=new Game();
+   g.tanks=[{kind:'tank',id:2,x:40,y:0,cls:'scout',hp:100,alive:true}];
+   g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+    vx:6000,vy:0,r:3,dmg:20,ttl:.005,pen:0,hits:0,
+    dead:false,shell:false,beam:false}];
+   addRemoteTTLFire(g,2000,reverse);
+   g.updateBullets(1/fps);
+   assert.equal(g.hits,1,'distant projectiles cannot erase first tank contact');
+  });
+  test((optimized?'optimized':'baseline')+
+   ' non-piercing first shape hit survives 2000 remote bullets at '+
+   fps+'Hz, reversed='+reverse,()=>{
+   const Game=boot(undefined,optimized),g=new Game();
+   g.tanks=[{kind:'tank',id:2,x:100,y:0,cls:'scout',hp:100,alive:true}];
+   g.shapes=[{kind:'shape',id:3,x:16,y:0,r:12,hp:100,born:g.time-1}];
+   g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+    vx:500,vy:0,r:3,dmg:20,ttl:.005,pen:0,hits:0,
+    dead:false,shell:false,beam:false}];
+   addRemoteTTLFire(g,2000,reverse);
+   g.updateBullets(1/fps);
+   assert.equal(g.hits,1,'distant projectiles cannot erase first neutral contact');
+  });
+ }
+}
