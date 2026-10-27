@@ -940,3 +940,37 @@ for(const optimized of [false,true])for(const fps of [30,60]){
   });
  }
 }
+
+
+/* Adversarial: locality is only a performance filter, never permission to
+ * skip an earlier lateral hit, projectile interception, or solid cover. */
+for(const optimized of [false,true]){
+ const LocalGame=boot(undefined,optimized),mode=optimized?'optimized':'baseline';
+ test(mode+' 2000 remote bullets preserve earlier lateral kill credit',()=>{
+  const g=new LocalGame(),events=[];
+  g.tanks=[{kind:'tank',id:2,x:40,y:0,cls:'scout',hp:45,alive:true}];
+  g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+   vx:6000,vy:0,r:3,dmg:20,ttl:.005,pen:0,hits:0,
+   dead:false,shell:false,beam:false}];
+  addRemoteTTLFire(g);
+  g.bullets.push({kind:'bullet',id:99999,ownerId:7,x:40,y:19,
+   vx:0,vy:0,r:3,dmg:30,ttl:1,pen:0,hits:0,
+   dead:false,shell:false,beam:false});
+  g.damageTank=(t,dmg,owner)=>{events.push(owner);t.hp-=dmg;};
+  g.updateBullets(1/30);
+  assert.deepEqual(events,[7],
+   'a t=0 lateral competitor must retain damage priority');
+ });
+ test(mode+' 2000 remote bullets do not permit first hit through cover',()=>{
+  const g=new LocalGame();
+  g.tanks=[{kind:'tank',id:2,x:40,y:0,cls:'scout',hp:100,alive:true}];
+  g.__novaTerrain=[{id:-1,shape:'rect',x:10,y:0,w:4,h:80,
+   solid:true,destructible:false}];
+  g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+   vx:6000,vy:0,r:3,dmg:20,ttl:.005,pen:0,hits:0,
+   dead:false,shell:false,beam:false}];
+  addRemoteTTLFire(g);
+  g.updateBullets(1/30);
+  assert.equal(g.hits,0,'permanent cover must retain physical priority');
+ });
+}
