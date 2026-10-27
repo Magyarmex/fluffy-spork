@@ -46,6 +46,7 @@ function collectMatrix(root,expected=12){
    nonnegative(s.publicBloomCommandSamples,arm+' public pilot command samples');
    if(s.visibleNeutralAimSamples!=null)nonnegative(s.visibleNeutralAimSamples,arm+' visible-neutral aim samples');
    if(s.visibleDodgeSamples!=null)nonnegative(s.visibleDodgeSamples,arm+' visible-threat dodge samples');
+   if(s.visibleHostileAimSamples!=null)nonnegative(s.visibleHostileAimSamples,arm+' visible-hostile aim samples');
   }
   const onHas=!!on.frontline?.counts,offHas=!!off.frontline?.counts;
   if((on.naturalBlooms>0&&!onHas)||(off.naturalBlooms>0&&!offHas))
