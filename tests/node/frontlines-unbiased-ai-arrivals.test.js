@@ -25,7 +25,7 @@ function scene(mode='none'){
   lastSignalAt:100,lastMeaningfulAt:100,migrationHeat:0};
  Object.assign(g,{__lfState:st,status:'playing',time:100,player:p,tanks:[p,e],shapes:[],w:800,h:600,cam:{zoom:1},
   tankSpeed:()=>350,areHostile:(a,b)=>a.team!==b.team,hasLineOfSight:()=>true});
- return {g,st,p,e,LF};
+ return {g,st,p,e,LF,T:window.__NOVA_LIVING_FRONT_TEST__};
 }
 function sample(s,x,y,dt=.22,throughMovement=true){
  s.g.time+=dt;
@@ -138,4 +138,15 @@ test('multiple real movement substeps compose into one certified Director sample
  s.LF.frontlineTick(s.g,s.st,false);
  assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,1);
  assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalRejectedCrossings,0);
+});
+
+test('Debug clearly distinguishes physical arrivals, rejected crossings and memory-only arrivals',()=>{
+ const s=scene('none');s.e.x=-1200;s.LF.frontlineTick(s.g,s.st,false);
+ sample(s,-1150,-550);sample(s,-1135,-550);sample(s,-1110,-550);
+ sample(s,-1150,-550,.22,false);sample(s,-1110,-550,.22,false);
+ const summary=s.T.debugSummary(s.LF.snapshot(s.g));
+ assert.match(summary,/AI PHYS 1/);
+ assert.match(summary,/REJECT 1/);
+ assert.match(summary,/AI MEM 0/);
+ assert.ok(!summary.includes('AI ARRIVE'),'ambiguous old label must not survive');
 });
