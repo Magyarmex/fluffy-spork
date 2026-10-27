@@ -82,3 +82,37 @@ test('a different live announcement cannot relabel an older remembered commitmen
  assert.equal(a.startedMemory,1);
  assert.equal(a.liveSignal,0,'unrelated live announcement is not the remembered opportunity');
 });
+
+test('live public BLOOM gate audit separates reachable candidates from combat and spent vetoes',()=>{
+ const {g,t}=scene(),a=create();
+ g.time=104;g.__lfState.signal={type:'BLOOM',sector:5,started:100,until:105};
+ t.ai.__lfEcoMode='signal';t.ai.__lfEcoKey='BLOOM:5';t.ai.__lfEcoWeight=.2;
+ const before=JSON.stringify({g,t});
+ sample(a,g,t,true,sectorIndex);
+ assert.equal(JSON.stringify({g,t}),before,'live gate observer must be read-only');
+ assert.equal(a.liveSignal,1);assert.equal(a.liveGate.samples,1);
+ assert.equal(a.liveGate.precombatIntersection,1);
+ assert.equal(a.liveGate.possibleFreshStarts,1);
+ assert.equal(a.liveGate.possibleFreshNoHeldTarget,1);
+ assert.equal(a.liveGate.firstBlock.possible,1);
+ t.ai.__v180Threat={risk:.5};sample(a,g,t,true,sectorIndex);
+ assert.equal(a.liveGate.firstBlock.threat,1);
+ t.ai.__v180Threat=null;t.ai.__lfFrontTurnSpentKey='BLOOM:5:100';
+ sample(a,g,t,true,sectorIndex);
+ assert.equal(a.liveGate.firstBlock.spent,1);
+ t.x=-900;sample(a,g,t,true,sectorIndex);
+ assert.equal(a.liveGate.firstBlock.arrived,1);
+ assert.equal(Object.values(a.liveGate.firstBlock).reduce((x,y)=>x+y,0),a.liveSignal);
+ assert.equal(summary(a).liveGate.samples,4);
+});
+test('live held-target gate is a conservative bound, not a hidden visibility claim',()=>{
+ const {g,t}=scene(),a=create();
+ g.time=104;g.__lfState.signal={type:'BLOOM',sector:5,started:100,until:105};
+ t.ai.__lfEcoMode='signal';t.ai.__lfEcoKey='BLOOM:5';t.ai.__lfEcoWeight=.2;
+ t.ai.__v1112TargetId=99;
+ sample(a,g,t,true,sectorIndex);
+ assert.equal(a.liveGate.possibleFreshStarts,1,'held target may be stale or occluded');
+ assert.equal(a.liveGate.possibleFreshNoHeldTarget,0);
+ assert.equal(a.liveGate.firstBlock.heldTarget,1);
+ assert.equal(a.liveGate.noHeldTarget,0);
+});

@@ -7,6 +7,10 @@
   eligibleWindow:0,alreadyInside:0,subset:0,healthy:0,memoryMode:0,
   meaningfulWeight:0,precombatIntersection:0,activeTurn:0,started:0,
   startedLive:0,startedMemory:0,activeTurnLive:0,activeTurnMemory:0,
+  liveGate:{samples:0,signalIntent:0,strongWeight:0,outside:0,selected:0,
+   healthy:0,threatClear:0,noHeldTarget:0,unspent:0,
+   precombatIntersection:0,possibleFreshStarts:0,possibleFreshNoHeldTarget:0,
+   firstBlock:{intent:0,weight:0,arrived:0,subset:0,health:0,threat:0,heldTarget:0,spent:0,possible:0}},
   _seen:new Set()};}
  function sample(audit,g,t,enabled,sectorIndex){
   if(!audit||!g||!t||!t.ai)return;
@@ -31,7 +35,45 @@
    audit.activeTurn++;
    if(live)audit.activeTurnLive++;else audit.activeTurnMemory++;
   }
-  if(live){audit.liveSignal++;return;}
+  if(live){
+   audit.liveSignal++;
+   /* Post-update, read-only eligibility witness. These counters are correlated
+    * AI samples, NOT independent decisions. The upper bound does not claim a
+    * held target is actually visible; the lower bound requires no held target.
+    * Do not read private target coordinates or leak gates to the live HUD. */
+   const gate=audit.liveGate;gate.samples++;
+   const intent=a.__lfEcoMode==='signal'&&a.__lfEcoKey==='BLOOM:'+m.sector;
+   const weight=Number(a.__lfEcoWeight)>.10;
+   const outside=typeof sectorIndex==='function'&&sectorIndex(t.x,t.y)!==m.sector;
+   const selected=Math.abs(Number(t.id)||0)%3===1;
+   const healthy=t.alive!==false&&t.hp>0&&!(t.spawnShieldT>0)&&
+    t.hp/Math.max(1,t.maxHp||t.hp||1)>=.65;
+   const hitAt=Number(a.__v180HitAt);
+   const recentHit=Number.isFinite(hitAt)&&now>=hitAt&&now-hitAt<2.5;
+   const threatClear=!(a.__v180Threat&&Number(a.__v180Threat.risk)>.12)&&
+    !['evade','break','cover'].includes(a.__v180Posture)&&!recentHit;
+   const noHeldTarget=!(a.__v1112TargetId!=null&&a.__v1112TargetId>=0);
+   const unspent=a.__lfFrontTurnSpentKey!==expected;
+   if(intent)gate.signalIntent++;
+   if(weight)gate.strongWeight++;
+   if(outside)gate.outside++;
+   if(selected)gate.selected++;
+   if(healthy)gate.healthy++;
+   if(threatClear)gate.threatClear++;
+   if(noHeldTarget)gate.noHeldTarget++;
+   if(unspent)gate.unspent++;
+   const precombat=intent&&weight&&outside&&selected&&healthy;
+   if(precombat)gate.precombatIntersection++;
+   if(precombat&&threatClear&&unspent){
+    gate.possibleFreshStarts++;
+    if(noHeldTarget)gate.possibleFreshNoHeldTarget++;
+   }
+   const block=!intent?'intent':!weight?'weight':!outside?'arrived':
+    !selected?'subset':!healthy?'health':!threatClear?'threat':
+    !noHeldTarget?'heldTarget':!unspent?'spent':'possible';
+   gate.firstBlock[block]++;
+   return;
+  }
   if(now-m.announcedAt>12){audit.expiredWindow++;return;}
   audit.eligibleWindow++;
   if(typeof sectorIndex==='function'&&sectorIndex(t.x,t.y)===m.sector){audit.alreadyInside++;return;}

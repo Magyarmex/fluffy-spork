@@ -8,12 +8,35 @@ function count(v,label){
  if(!Number.isInteger(v)||v<0)throw Error('invalid '+label);
  return v;
 }
+const GATE_FIELDS=['samples','signalIntent','strongWeight','outside','selected','healthy',
+ 'threatClear','noHeldTarget','unspent','precombatIntersection',
+ 'possibleFreshStarts','possibleFreshNoHeldTarget'];
+function addGate(total,audit,label){
+ const gate=audit?.liveGate;
+ if(!gate)throw Error(label+': missing live eligibility witness');
+ const samples=count(gate.samples,label+' live gate samples');
+ if(samples!==count(audit.liveSignal,label+' live signal samples'))
+  throw Error(label+': live signal and gate sample totals disagree');
+ let blocks=0;
+ for(const [key,value] of Object.entries(gate.firstBlock||{}))
+  blocks+=count(value,label+' first block '+key);
+ if(blocks!==samples)throw Error(label+': live first-block partition is incomplete');
+ for(const field of GATE_FIELDS)total[field]=(total[field]||0)+count(gate[field],label+' '+field);
+ const first=total.firstBlock||(total.firstBlock={});
+ for(const [key,value] of Object.entries(gate.firstBlock||{}))
+  first[key]=(first[key]||0)+value;
+ if(gate.possibleFreshNoHeldTarget>gate.possibleFreshStarts||
+    gate.possibleFreshStarts>gate.precombatIntersection||
+    gate.precombatIntersection>samples)
+  throw Error(label+': impossible live gate intersection');
+}
 function collectLiveTurnMatrix(root,expected=18){
  const base=collectMatrix(root,expected);
  const dirs=fs.readdirSync(root,{withFileTypes:true})
   .filter(d=>d.isDirectory()&&d.name.startsWith('nova-frontlines-natural-ab-'))
   .map(d=>d.name).sort();
  let startedOn=0,startedOff=0,activePairs=0,exposedActivePairs=0;
+ const liveGateTotals={on:{},off:{}};
  const groups={},trials=[];
  for(const dir of dirs){
   const r=JSON.parse(fs.readFileSync(path.join(root,dir,'frontlines-natural-match-ab.json'),'utf8'));
@@ -26,6 +49,14 @@ function collectLiveTurnMatrix(root,expected=18){
    replay=count(r.offReplay?.commitmentAudit?.startedLive,'OFF replay live starts');
   if(off!==0||replay!==0)throw Error(dir+': OFF arm initiated a forbidden live commitment');
   if(r.verifiedLiveStart!==(on>0))throw Error(dir+': live-start witness disagrees with report');
+  if(on===0){
+   for(const key of ['frontline','stats','game','contestGateAudit','naturalBlooms',
+     'publicBloomCommandSamples','visibleNeutralAimSamples','events'])
+    if(JSON.stringify(r.on[key])!==JSON.stringify(r.off[key]))
+     throw Error(dir+': no-treatment ON/OFF gameplay diverged in '+key);
+  }
+  addGate(liveGateTotals.on,r.on.commitmentAudit,dir+' ON');
+  addGate(liveGateTotals.off,r.off.commitmentAudit,dir+' OFF');
   const m=r.on.metadata,group=m.layout+' / '+m.pilotPolicy;
   const entry=groups[group]||(groups[group]={pairs:0,startedOn:0,startedOff:0,activePairs:0});
   entry.pairs++;entry.startedOn+=on;entry.startedOff+=off;
@@ -39,7 +70,7 @@ function collectLiveTurnMatrix(root,expected=18){
  const informative=startedOn>0&&exposedActivePairs>0;
  return{...base,method:'matched-initial-state natural-match live public BLOOM turn intervention',
   intervention:'OFF masks only matching live spent-key during each composed AI call; both arms retain public signals and stale memory',
-  liveTurn:{startedOn,startedOff,activePairs,exposedActivePairs,informative,groups,trials},
+  liveTurn:{startedOn,startedOff,activePairs,exposedActivePairs,informative,groups,trials,liveGateTotals},
   interpretation:informative?'Live intervention verified. Compare paired, exposure-normalized outcomes; later naturally generated public signals may diverge as treatment effects.':'INCONCLUSIVE: no verified ON live commitment in an exposed pair; do not interpret outcome deltas.',
   warnings:[...base.warnings,
    'Matching initial seeds do not guarantee identical later Director announcements after gameplay trajectories diverge.',
@@ -54,6 +85,7 @@ if(require.main===module){
    attempted:r.observedPairs,analyzable:r.analyzablePairs,censored:r.censored.length,
    liveStartsOn:r.liveTurn.startedOn,liveStartsOff:r.liveTurn.startedOff,
    activePairs:r.liveTurn.activePairs,informative:r.liveTurn.informative,
+   liveGateOn:r.liveTurn.liveGateTotals.on,liveGateOff:r.liveTurn.liveGateTotals.off,
    pairedArrivalRateDelta:r.batch?.overall?.metrics?.arrivalsPer100OutsideBotSeconds?.meanPairedDelta??null}));
  }catch(e){console.error(e.stack||e);process.exitCode=1;}
 }

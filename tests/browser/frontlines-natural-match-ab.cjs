@@ -283,6 +283,13 @@ async function arm(browser,enabled,label){
   assert.ok(result.commitmentAudit.samples>0,'real composed AI must be observed');
   assert.ok(result.commitmentAudit.eligibleWindow<=result.commitmentAudit.publicMemory);
   assert.ok(result.commitmentAudit.precombatIntersection<=result.commitmentAudit.eligibleWindow);
+  const liveGate=result.commitmentAudit.liveGate;
+  assert.ok(liveGate,'research live eligibility witness required');
+  assert.equal(liveGate.samples,result.commitmentAudit.liveSignal);
+  assert.equal(Object.values(liveGate.firstBlock).reduce((a,b)=>a+b,0),liveGate.samples);
+  assert.ok(liveGate.possibleFreshNoHeldTarget<=liveGate.possibleFreshStarts);
+  assert.ok(liveGate.possibleFreshStarts<=liveGate.precombatIntersection);
+  assert.ok(liveGate.precombatIntersection<=liveGate.samples);
   assert.equal(result.contestGateAudit.pilotInside,
    result.contestGateAudit.noHostile+result.contestGateAudit.hostileCoLocated);
   assert.equal(result.contestGateAudit.hostileCoLocated,
@@ -308,6 +315,14 @@ async function arm(browser,enabled,label){
    assert.equal(offReplay.result.commitmentAudit.startedLive,0,'OFF replay must also suppress live starts');
   }
   const verifiedLiveStart=AB_MODE==='live-turn'&&on.result.commitmentAudit.startedLive>0;
+  if(AB_MODE==='live-turn'&&!verifiedLiveStart){
+   /* If no live turn was initiated, masking its start must be a true
+    * no-op for the physical game. OFF replay alone cannot prove this. */
+   for(const key of ['frontline','stats','game','contestGateAudit','naturalBlooms',
+     'publicBloomCommandSamples','visibleNeutralAimSamples','events'])
+    assert.deepEqual(on.result[key],off.result[key],
+     'no-treatment live-turn arms must have identical '+key);
+  }
   const report={method:AB_MODE==='live-turn'?'paired natural full-match live-turn causal intervention (not human fun)':'scripted full-match natural Director research; not human fun; public-bloom is closed-loop policy',
    abMode:AB_MODE,verifiedLiveStart,
    initialWorldIdentical:true,offReplayIdentical:same,
