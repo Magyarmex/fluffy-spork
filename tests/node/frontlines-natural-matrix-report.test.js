@@ -60,3 +60,19 @@ test('duplicate layout/seed/policy combinations are rejected despite distinct ar
   fs.writeFileSync(path.join(b.dir,file),JSON.stringify(data));
  assert.throws(()=>collectMatrix(root,2),/duplicate layout\/seed\/pilot-policy/);
 }));
+
+test('naturally bloom-less paired trials remain in the denominator of attempted research',()=>sandbox(root=>{
+ writePair(root,'CROSSFIRE','wander','s0',2);
+ const b=writePair(root,'FOUR GATES','public-bloom','s1');
+ for(const arm of [b.on,b.off]){arm.naturalBlooms=0;delete arm.frontline;}
+ b.report.on=b.on;b.report.off=b.off;b.report.offReplay=structuredClone(b.off);
+ for(const [file,data] of [['frontlines-natural-on.json',b.on],['frontlines-natural-off.json',b.off],
+  ['frontlines-natural-match-ab.json',b.report]])
+  fs.writeFileSync(path.join(b.dir,file),JSON.stringify(data));
+ const r=collectMatrix(root,2);
+ assert.equal(r.observedPairs,2);
+ assert.equal(r.analyzablePairs,1);
+ assert.equal(r.censored.length,1);
+ assert.equal(r.batch.pairCount,1);
+ assert.ok(r.warnings.some(x=>/retained as censored evidence/.test(x)));
+}));
