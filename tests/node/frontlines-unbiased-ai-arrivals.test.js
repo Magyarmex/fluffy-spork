@@ -150,3 +150,36 @@ test('Debug clearly distinguishes physical arrivals, rejected crossings and memo
  assert.match(summary,/AI MEM 0/);
  assert.ok(!summary.includes('AI ARRIVE'),'ambiguous old label must not survive');
 });
+
+test('a new bot reusing an id after a witnessed death gets its own physical arrival',()=>{
+ const s=scene();s.e.x=-1200;s.LF.frontlineTick(s.g,s.st,false);
+ sample(s,-1150,-550);sample(s,-1110,-550);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,1);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalApproaches,1);
+ s.e.hp=0;s.e.alive=false;s.LF.frontlineTick(s.g,s.st,false);
+ s.e={id:2,x:-1200,y:-550,hp:100,alive:true,team:2,ai:{__lfEcoMode:'none'}};
+ s.g.tanks[1]=s.e;s.LF.frontlineTick(s.g,s.st,false);
+ sample(s,-1150,-550);sample(s,-1110,-550);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,2,
+  'a different bot incarnation must not inherit the previous arrival flag');
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalApproaches,2);
+});
+test('replacing a tank object with the same id resets physical arrival identity',()=>{
+ const s=scene();s.e.x=-1200;s.LF.frontlineTick(s.g,s.st,false);
+ sample(s,-1150,-550);sample(s,-1110,-550);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,1);
+ s.e={id:2,x:-1200,y:-550,hp:100,alive:true,team:2,ai:{__lfEcoMode:'none'}};
+ s.g.tanks[1]=s.e;s.LF.frontlineTick(s.g,s.st,false);
+ sample(s,-1150,-550);sample(s,-1110,-550);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,2);
+});
+test('a temporary shield does not turn the same bot re-entry into a new arrival',()=>{
+ const s=scene();s.e.x=-1200;s.LF.frontlineTick(s.g,s.st,false);
+ sample(s,-1150,-550);sample(s,-1110,-550);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,1);
+ s.e.spawnShieldT=1;s.LF.frontlineTick(s.g,s.st,false);
+ s.e.spawnShieldT=0;s.e.x=-1200;s.LF.frontlineTick(s.g,s.st,false);
+ sample(s,-1150,-550);sample(s,-1110,-550);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,1,
+  'one living bot may only arrive once per public opportunity');
+});
