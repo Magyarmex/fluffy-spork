@@ -1106,6 +1106,20 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
        Math.max(o.y,ey)+rr>=Math.min(dsy,dr.y)&&
        Math.min(o.y,ey)-rr<=Math.max(dsy,dr.y))return false;
    }
+   /* A lateral projectile may already overlap the chosen neutral shape
+    * without crossing our narrow projectile corridor. Shape damage/XP
+    * ordering must not be backdated ahead of that earlier contact. */
+   if(best.kind==='shape'){
+    var shape=best.e,start=shapeSweepStart(g,shape),
+        sx=start?start.x:shape.x,sy=start?start.y:shape.y,
+        rr=(o.r||2)+Math.max(0,shape.r||0);
+    if(!Number.isFinite(sx)||!Number.isFinite(sy)||
+       !Number.isFinite(rr)||!(rr>0)||
+       Math.max(o.x,ex)+rr>=Math.min(sx,shape.x)&&
+       Math.min(o.x,ex)-rr<=Math.max(sx,shape.x)&&
+       Math.max(o.y,ey)+rr>=Math.min(sy,shape.y)&&
+       Math.min(o.y,ey)-rr<=Math.max(sy,shape.y))return false;
+   }
    if(best.kind==='tank'&&o.ownerId!==best.e.id){
     var td=CLASSES[best.e.cls];
     if(!td||!Number.isFinite(td.size)||
