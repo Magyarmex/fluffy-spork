@@ -214,7 +214,21 @@ wrap('game/ai',function(ai,require){
     if(changed)a.__v1105PlanT=0;
 
     var all=g.tanks,player=g.player,narrow=[t],nearest=g.nearestTank,
-        ownNearest=Object.prototype.hasOwnProperty.call(g,'nearestTank');
+        ownNearest=Object.prototype.hasOwnProperty.call(g,'nearestTank'),
+        ownTactical=Object.prototype.hasOwnProperty.call(g,'__novaFairVisibleTanks'),
+        priorTactical=g.__novaFairVisibleTanks;
+    /* Battle Sense may reason about other actually perceived opponents without
+     * exposing them to legacy target selection. Build this only on its bounded
+     * tactical planning tick; the old AI still sees exactly [self, target]. */
+    if((Number(a.__v181Think)||0)<=dt){
+      var contacts=[t];
+      for(var ci=0;ci<all.length;ci++){
+        var cq=all[ci];
+        if(cq&&cq.id!==t.id&&alive(cq)&&canPerceive(g,classes,t,cq))
+          contacts.push(cq);
+      }
+      g.__novaFairVisibleTanks=contacts;
+    }else g.__novaFairVisibleTanks=null;
     if(target&&target.id!==t.id)narrow.push(target);
     g.tanks=narrow;
     /* Only the actual human remains the special g.player handle. AI-vs-AI
@@ -235,6 +249,8 @@ wrap('game/ai',function(ai,require){
     var out;
     try{out=old.apply(this,arguments);}finally{
       g.tanks=all;g.player=player;
+      if(ownTactical)g.__novaFairVisibleTanks=priorTactical;
+      else delete g.__novaFairVisibleTanks;
       if(typeof nearest==='function'){
         if(ownNearest)g.nearestTank=nearest;else delete g.nearestTank;
       }
