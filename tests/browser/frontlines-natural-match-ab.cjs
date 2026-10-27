@@ -1,6 +1,8 @@
 'use strict';
 /* Research-only NATURAL full-match A/B on the real 48-overlay shipping game.
- * The pilot is a deterministic, fixed-input scripted Scout, not a human.
+ * The pilot is a deterministic scripted Scout, not a human. Wander inputs
+ * depend only on time; the public-bloom policy reacts to public events, so
+ * its ON/OFF inputs may diverge after the worlds diverge.
  * No fake BLOOM, private sector values, teleport, invulnerability or AI buffs. */
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');
@@ -107,8 +109,9 @@ async function arm(browser,enabled,label){
      return{x:dx/d,y:dy/d};
     };
    }else g.input.moveVec=wander;
-   /* The input commands depend only on simulation time: exactly the same
-    * stick bearings and firing cadence in both arms, even after divergence. */
+   /* Wander movement and aim depend only on simulation time. The optional
+    * public-signal movement policy is closed-loop: identical rules and initial
+    * state, but not necessarily identical commands after ON/OFF diverge. */
    g.input.aimVec=()=>({x:Math.cos(g.time*.73),y:Math.sin(g.time*.73)});
    const fingerprint=JSON.stringify({layout:g.__novaBattlefield.name,
     pilot:{x:+p.x.toFixed(3),y:+p.y.toFixed(3),cls:p.cls},
@@ -154,13 +157,16 @@ async function arm(browser,enabled,label){
   assert.equal(off.initial.fingerprint,offReplay.initial.fingerprint,'same seed must reproduce initial world');
   const same=JSON.stringify(off.result)===JSON.stringify(offReplay.result);
   const naturalOpportunityObserved=[off,on].every(a=>a.result.naturalBlooms>0);
-  const report={method:'scripted full-match natural Director research; not human fun',
+  const report={method:'scripted full-match natural Director research; not human fun; public-bloom is closed-loop policy',
    initialWorldIdentical:true,offReplayIdentical:same,
    naturalOpportunityObserved,
    interpretation:naturalOpportunityObserved?'Descriptive only: natural BLOOM observed; inspect opportunity timing, deaths and public pilot commands before causal interpretation.':'INCONCLUSIVE: at least one arm had no natural BLOOM; retain this censored pair.',
    off:off.result,on:on.result,offReplay:offReplay.result,
    limits:['No artificial BLOOM or forced survival','One layout/seed/pilot-policy per invocation; matrix must aggregate independently',
-    'A deterministic Scout script is not a human player','Seed replay is checked, not assumed']};
+    'A deterministic Scout script is not a human player',
+    'Public-bloom commands can differ after ON/OFF worlds diverge; this is matched policy, not fixed inputs',
+    'Public-bloom command samples are input calls, not measured seconds or proof of physical progress',
+    'Seed replay is checked, not assumed']};
   const dir=path.join('artifacts','browser');fs.mkdirSync(dir,{recursive:true});
   fs.writeFileSync(path.join(dir,'frontlines-natural-match-ab.json'),JSON.stringify(report,null,2));
   fs.writeFileSync(path.join(dir,'frontlines-natural-on.json'),JSON.stringify(on.result,null,2));
