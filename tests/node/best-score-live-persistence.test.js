@@ -93,3 +93,14 @@ test('the Living Front neutral-orb gainXP wrapper also saves earned records',()=
  b.tick();
  assert.equal(b.store.get('novatanks_best'),'125');
 });
+
+test('redeployed player identity cannot be confused with a stale prior tank',()=>{
+ const b=boot(),g=new b.Game(),old=g.player;
+ g.gainXP(old,100);g.redeploy();
+ assert.equal(b.store.get('novatanks_best'),'200');
+ g.player={id:7,isPlayer:true,score:0,level:1};
+ g.gainXP(old,1000);b.tick();
+ assert.equal(b.store.get('novatanks_best'),'200','stale tank must never update new session record');
+ g.gainXP(g.player,250);b.tick();
+ assert.equal(b.store.get('novatanks_best'),'250');
+});
