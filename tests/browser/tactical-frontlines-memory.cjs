@@ -91,9 +91,15 @@ const {chromium}=require('playwright');
   await page.evaluate(()=>{
    const g=window.__novaFrontlineGame,T=window.__NOVA_LIVING_FRONT_TEST__;
    T.updateContest(g,g.__lfState);g.drawMinimap();
-   // Screenshot-only: uncover the paused game without changing simulation state.
-   for(const el of document.querySelectorAll('div.fixed.inset-0'))
-    if(/PAUSED|INITIALIZING CHASSIS/.test(el.textContent||''))el.style.display='none';
+   // Screenshot-only: uncover the actual PauseModal (absolute, not fixed).
+   const title=[...document.querySelectorAll('div')].find(el=>
+    el.children.length===0&&el.textContent?.trim()==='PAUSED');
+   const modal=title?.parentElement?.parentElement;
+   if(!modal||!modal.classList.contains('absolute')||!modal.classList.contains('inset-0'))
+    throw Error('real pause modal not found for unobscured gameplay visual QA');
+   modal.style.display='none';
+   const rect=g.mm.getBoundingClientRect();
+   if(rect.width<40||rect.height<40)throw Error('real minimap not visible in mobile viewport');
   });
   await page.screenshot({path:path.join(dir,'tactical-frontlines-mobile-visible.png')});
   console.log('NOVA_FRONTLINES_REAL_BROWSER '+JSON.stringify(result));
