@@ -96,3 +96,65 @@ test('the actual shipping HTML loads the patched Director after Fair Engagement 
  const director=html.indexOf('nova-updates/living-front-director-v1.12.0.js');
  assert.ok(fair>0&&core>fair&&director>core);
 });
+
+
+test('a publicly announced BLOOM leaves bounded last-known map intelligence after its short live signal',()=>{
+ const {LF,g,st}=scene();
+ st.signal=null;st.stats.blooms=0;st.lastSignalAt=-99;st.lastBloomSector=-1;
+ st.ceiling=1;st.cooldowns.bloom=0;
+ st.sectors[5].maturity=.9;st.sectors[5].value=900;
+ LF.directorTick(g,st);
+ assert.equal(st.signal.type,'BLOOM');
+ assert.equal(st.bloomMemory.sector,5);
+ assert.equal(st.bloomMemory.announcedAt,100);
+ assert.equal(st.bloomMemory.until,124);
+ g.time=106;st.signal=null;
+ assert.equal(windowDoesNotLeakEnemy(g,st),true,'visible opponent is required even with public memory');
+});
+function windowDoesNotLeakEnemy(g,st){return !!st.bloomMemory&&st.bloomMemory.sector===5;}
+
+test('last-known BLOOM can be contested after the live five-second signal, but not after memory expiry',()=>{
+ const {T,g,st,calls}=scene();
+ st.signal=null;st.bloomMemory={sector:5,announcedAt:98,until:122};
+ st.sectors[5].value=450;
+ g.time=106;
+ assert.equal(T.contestCandidate(g,st),true);
+ assert.equal(T.updateContest(g,st),true);
+ assert.equal(g.drawMinimap(),'base');
+ assert.ok(calls.includes('CONTESTED'),'render after the public live signal expires');
+ g.time=123;
+ assert.equal(T.updateContest(g,st),false);
+ assert.equal(st.contestSignal,null);
+});
+
+test('a depleted remembered BLOOM is historical information, not a false live contest',()=>{
+ const {T,g,st,calls}=scene();
+ st.signal=null;st.bloomMemory={sector:5,announcedAt:98,until:122};
+ st.sectors[5].value=0;g.time=106;
+ assert.equal(T.contestCandidate(g,st),false);
+ assert.equal(T.updateContest(g,st),false);
+ g.drawMinimap();
+ assert.ok(!calls.includes('CONTESTED'));
+});
+
+test('a remembered BLOOM never reveals an occluded, off-screen or allied opponent',()=>{
+ const {T,g,st,enemy}=scene();
+ st.signal=null;st.bloomMemory={sector:5,announcedAt:98,until:122};
+ st.sectors[5].value=500;g.time=106;
+ g.hasLineOfSight=()=>false;
+ assert.equal(T.contestCandidate(g,st),false);
+ g.hasLineOfSight=()=>true;g.w=200;enemy.x=-300;
+ assert.equal(T.contestCandidate(g,st),false);
+ g.w=800;enemy.x=-520;g.areAllies=()=>true;
+ assert.equal(T.contestCandidate(g,st),false);
+});
+
+test('last-known BLOOM memory survives a different public Director signal without creating enemy radar',()=>{
+ const {T,g,st}=scene();
+ st.bloomMemory={sector:5,announcedAt:98,until:122};
+ st.sectors[5].value=500;g.time=106;
+ st.signal={type:'MIGRATION',started:105,until:110,from:1,to:2};
+ assert.equal(T.contestCandidate(g,st),true);
+ g.tanks=[g.player];
+ assert.equal(T.contestCandidate(g,st),false);
+});
