@@ -92,3 +92,13 @@ test('no live turn must imply identical physical game outcomes in both arms',()=
  fs.writeFileSync(path.join(p.dir,'frontlines-natural-match-ab.json'),JSON.stringify(p.report));
  assert.throws(()=>collectLiveTurnMatrix(root,1),/no-treatment ON\/OFF gameplay diverged/);
 }));
+
+test('no-treatment live-turn pairs must also match visible-defense decisions',()=>sandbox(root=>{
+ const p=pair(root,'CROSSFIRE','public-bloom-harvest-defense','s0',0);
+ p.report.on.visibleDodgeSamples=1;p.report.off.visibleDodgeSamples=0;
+ p.report.offReplay=structuredClone(p.report.off);
+ for(const [name,data] of [['frontlines-natural-on.json',p.report.on],
+  ['frontlines-natural-off.json',p.report.off],['frontlines-natural-match-ab.json',p.report]])
+  fs.writeFileSync(path.join(p.dir,name),JSON.stringify(data));
+ assert.throws(()=>collectLiveTurnMatrix(root,1),/no-treatment ON\/OFF gameplay diverged in visibleDodgeSamples/);
+}));
