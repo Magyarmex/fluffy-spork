@@ -73,6 +73,10 @@ async function arm(browser,enabled,label){
   const initial=await page.evaluate(({enabled,pilotPolicy,trialRng,terrainIndex,seedIndex})=>{
    const g=window.__novaNaturalMatchGame;
    g.setPaused(true); // Disable RAF simulation; advance actual Game.update ourselves.
+   /* Async spawn completion may permute bot array order despite identical
+    * ids/positions. Canonicalize simulation iteration before the first step
+    * so OFF replay compares the same physical update order, not RAF timing. */
+   g.tanks.sort((a,b)=>Number(a.id)-Number(b.id));
    g.__novaTrialRng=trialRng; // Simulation RNG isolated from asynchronous paused rendering.
    g.__novaExperimentSeed='natural-20261027-'+terrainIndex+'-'+seedIndex;
    g.__novaExperimentPolicy=pilotPolicy;
