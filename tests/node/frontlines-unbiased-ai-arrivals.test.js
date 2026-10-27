@@ -90,9 +90,10 @@ test('a bot cannot inflate approach telemetry by resetting its sampled path',()=
 test('short unobserved teleport over sector edge never counts as physical arrival',()=>{
  const s=scene();s.e.x=-1200;s.LF.frontlineTick(s.g,s.st,false);
  sample(s,-1150,-550);sample(s,-1135,-550);
+ const beforeApproaches=s.st.frontlineTelemetry.counts.aiPhysicalApproaches;
  sample(s,-1110,-550,.22,false); // only 25 units: old speed heuristic accepts this jump
  assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,0);
- assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalApproaches,0);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalApproaches,beforeApproaches);
 });
 test('interleaved short relocation invalidates a partially witnessed path',()=>{
  const s=scene();s.e.x=-1200;s.LF.frontlineTick(s.g,s.st,false);
