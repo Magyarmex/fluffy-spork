@@ -92,9 +92,9 @@ function simulate(Game, fps, x, velocity, ttl, pen = 0) {
 /* Regression-first proof: this exact materialized-core fixture failed before
  * the bounded whole-batch recovery, at 30/60/120Hz in both array orders.
  * The nonlethal disjoint cases must now remain green. */
-const Game=boot();
-function batchWorld(fps,{reverse=false,far=false,wall=false,mutate=null}={}){
- const g=new Game();
+const Game=boot(),OptimizedGame=boot(undefined,true);
+function batchWorld(fps,{reverse=false,far=false,wall=false,mutate=null,optimized=false}={}){
+ const g=new (optimized?OptimizedGame:Game)();
  g.tanks=[{kind:'tank',id:2,x:far?100:40,y:0,cls:'scout',hp:100,alive:true},
           {kind:'tank',id:3,x:far?100:40,y:400,cls:'scout',hp:100,alive:true}];
  // Real neutral ecology is dense; distant shapes must not suppress
@@ -188,3 +188,17 @@ test('seeded independent two-lane TTL contacts agree with analytic geometry',()=
  assert.equal(worlds,600);
  assert.ok(reachable>100&&reachable<1000,'oracle must exercise hits and misses');
 });
+
+/* The optional performance overlay is loaded after Battlefield in shipping.
+ * It must not erase the new bounded recovery or change first-event parity. */
+for(const fps of [30,60,120,240])for(const reverse of [false,true]){
+ test('optimized shipping overlay retains two independent TTL contacts at '+
+  fps+'Hz reversed='+reverse,()=>{
+  const g=batchWorld(fps,{reverse,optimized:true});
+  assert.equal(g.hits,2);
+ });
+ test('optimized shipping overlay retains no-hit TTL bound at '+
+  fps+'Hz reversed='+reverse,()=>{
+  assert.equal(batchWorld(fps,{reverse,far:true,optimized:true}).hits,0);
+ });
+}
