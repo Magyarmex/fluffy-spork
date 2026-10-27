@@ -48,12 +48,13 @@ const {chromium}=require('playwright');
    g.drawMinimap();
    const ctx=g.mmCtx,S=216;
    const withContest=new Uint8Array(ctx.getImageData(0,0,S,S).data);
-   e.alive=false;
-   if(T.updateContest(g,st))throw Error('dead opponent still creates contest');
+   st.contestSignal=null;
    g.drawMinimap();
    const withoutContest=ctx.getImageData(0,0,S,S).data;
    let changed=0;for(let i=0;i<withContest.length;i++)if(withContest[i]!==withoutContest[i])changed++;
    if(changed<100)throw Error('real shipping minimap did not visibly render CONTESTED: '+changed);
+   e.alive=false;
+   if(T.updateContest(g,st))throw Error('dead opponent still creates contest');
    e.alive=true;st.bloomMemory.until=now-1;
    if(T.contestCandidate(g,st))throw Error('expired memory still creates live contact');
    return{changedChannels:changed,publicMemoryTTL:24,liveSignalExpired:true,
