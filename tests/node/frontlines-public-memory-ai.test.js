@@ -56,3 +56,28 @@ test('already committed rivals saturate remembered opportunity rather than dogpi
  const b=T.publicEcoBias(g,t,{},{});
  assert.equal(b.mode,'none');
 });
+
+test('the actual wrapped AI update steers toward public memory without permanently hijacking movement',()=>{
+ const window={__novaModules:{
+  'game/engine':function(m){m.exports={Game:class{}};},
+  'game/ai':function(m){m.exports={updateAI:function(t,g,dt){g.moveTank(t,100,0,dt);}};}
+ }};
+ const ctx={window,console:{info(){},warn(){},error(){}},Math,Number,Object,Array,Date,JSON,Map,Set,
+  performance:{now:()=>0},setTimeout(){},clearTimeout(){}};
+ for(const name of ['living-front-core-v1.12.0.js','living-front-instincts-v1.12.0.js','living-front-director-v1.12.0.js'])
+  vm.runInNewContext(fs.readFileSync(path.join(root,'nova-updates',name),'utf8'),ctx,{filename:name});
+ const aiModule={exports:{}};
+ window.__novaModules['game/ai'](aiModule,aiModule.exports,()=>({SHAPE_DEFS:{}}));
+ const t={id:3,x:-900,y:-900,hp:100,maxHp:100,alive:true,ai:{isElite:false,__v1112TargetId:-1}};
+ const st={signal:null,directorEnabled:true,bloomMemory:{sector:5,announcedAt:100,until:124,initialValue:500},
+  queryScratch:[],queryScratch2:[],sectors:Array.from({length:16},()=>({value:0,maturity:0,pressure:0})),stats:{aiRotations:0}};
+ const recorded=[];
+ const originalMove=function(_t,x,y){recorded.push({x,y});};
+ const g={time:106,w:800,h:600,cam:{zoom:1},shapes:[],bullets:[],tanks:[t],__lfState:st,moveTank:originalMove};
+ aiModule.exports.updateAI(t,g,.3);
+ assert.equal(g.moveTank,originalMove,'temporary movement wrapper must always restore authority');
+ assert.equal(recorded.length,1);
+ assert.ok(recorded[0].x<100&&recorded[0].y>0,'actual AI movement is pulled toward remembered public front');
+ assert.equal(t.ai.__lfEcoMode,'memory');
+ assert.equal(st.stats.aiRotations,1);
+});
