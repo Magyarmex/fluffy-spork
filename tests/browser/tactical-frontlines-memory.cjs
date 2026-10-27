@@ -1,0 +1,60 @@
+'use strict';
+// Real React/Chromium acceptance for Tactical Frontlines: no mock engine,
+// no fake visibility API and no detached overlay-only render.
+const assert=require('node:assert/strict');
+const fs=require('node:fs'),path=require('node:path');
+const {chromium}=require('playwright');
+
+(async()=>{
+ const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+ const page=await browser.newPage({viewport:{width:900,height:700}});
+ const errors=[];page.on('pageerror',e=>errors.push(String(e.stack||e)));
+ try{
+  await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded',timeout:45000});
+  await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({state:'visible',timeout:45000});
+  await page.evaluate(()=>{
+   const Game=window.__novaMakeRequire('')('game/engine').Game;
+   const old=Game.prototype.update;
+   Game.prototype.update=function(){
+    if(!this.__novaDecorativeWorld)window.__novaFrontlineGame=this;
+    return old.apply(this,arguments);
+   };
+  });
+  await page.getByRole('button',{name:/DEPLOY/i}).first().click();
+  await page.waitForFunction(()=>window.__novaFrontlineGame?.status==='playing'&&
+    !!window.__novaFrontlineGame.__lfState,{timeout:30000});
+  const result=await page.evaluate(()=>{
+   const g=window.__novaFrontlineGame,T=window.__NOVA_LIVING_FRONT_TEST__;
+   g.setPaused(true);
+   const p=g.player,e=g.tanks.find(t=>t!==p&&!t.isPlayer);
+   if(!p||!e||!T)throw Error('canonical player/enemy/Frontlines API missing');
+   p.x=-560;p.y=-560;p.hp=Math.max(100,p.hp);p.alive=true;p.spawnShieldT=0;
+   e.x=-520;e.y=-540;e.hp=Math.max(100,e.hp);e.alive=true;e.spawnShieldT=0;
+   g.cam.x=p.x;g.cam.y=p.y;
+   const st=g.__lfState,now=g.time;
+   st.signal=null;st.bloomMemory={sector:5,announcedAt:now-7,until:now+17,initialValue:500};
+   st.sectors[5].value=500;
+   const visible=T.contestCandidate(g,st);
+   if(!visible)throw Error('real Battlefield LOS/viewport does not certify chosen pair');
+   if(!T.updateContest(g,st))throw Error('certified contest was not emitted');
+   g.drawMinimap();
+   const ctx=g.mmCtx,S=216;
+   const withContest=new Uint8Array(ctx.getImageData(0,0,S,S).data);
+   e.alive=false;
+   if(T.updateContest(g,st))throw Error('dead opponent still creates contest');
+   g.drawMinimap();
+   const withoutContest=ctx.getImageData(0,0,S,S).data;
+   let changed=0;for(let i=0;i<withContest.length;i++)if(withContest[i]!==withoutContest[i])changed++;
+   if(changed<100)throw Error('real shipping minimap did not visibly render CONTESTED: '+changed);
+   e.alive=true;st.bloomMemory.until=now-1;
+   if(T.contestCandidate(g,st))throw Error('expired memory still creates live contact');
+   return{changedChannels:changed,publicMemoryTTL:24,liveSignalExpired:true,
+     realFairEngagement:!!window.__NOVA_FAIR_ENGAGEMENT_TEST__,
+     realBattlefieldLOS:typeof g.hasLineOfSight==='function'};
+  });
+  assert.equal(errors.length,0,errors.join('\n'));
+  const dir=path.join('artifacts','browser');fs.mkdirSync(dir,{recursive:true});
+  await page.screenshot({path:path.join(dir,'tactical-frontlines-memory.png')});
+  console.log('NOVA_FRONTLINES_REAL_BROWSER '+JSON.stringify(result));
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e.stack||e);process.exitCode=1;});
