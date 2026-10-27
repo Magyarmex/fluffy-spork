@@ -223,10 +223,17 @@ LF.wrap('game/engine',function(engine){
    ctx.beginPath();ctx.arc(x,y,17,0,Math.PI*2);ctx.stroke();ctx.restore();
   }
   if(!c||now>=c.until||c.sector!==op.sector)return out;
-  ctx.save();ctx.globalAlpha=.9;ctx.lineWidth=2;ctx.strokeStyle='#ff7c8b';
-  ctx.beginPath();ctx.arc(x,y,21,0,Math.PI*2);ctx.stroke();
-  ctx.font='bold 9px Rajdhani,system-ui';ctx.textAlign='center';ctx.fillStyle='#ffb3bc';
-  ctx.fillText('CONTESTED',clamp(x,47,169),clamp(y-24,12,204));
+  /* The shipping minimap is 216 canvas pixels but only 60 CSS pixels wide.
+   * A 9px canvas label was 2.5 CSS px: present in screenshots, unreadable in play.
+   * Keep one static, high-contrast 12px CSS badge instead of adding a HUD/toast. */
+  /* Offset the badge from the BLOOM center so the pilot/enemy dots and the
+   * actual resource location remain visible; flip below near the north edge. */
+  var badgeY=y<54?y+28:y-28;
+  ctx.save();ctx.globalAlpha=1;
+  ctx.fillStyle='rgba(48,10,25,.94)';ctx.strokeStyle='#ff788b';ctx.lineWidth=4;
+  ctx.beginPath();ctx.arc(x,badgeY,22,0,Math.PI*2);ctx.fill();ctx.stroke();
+  ctx.font='900 35px Rajdhani,system-ui';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillStyle='#fff7f8';ctx.fillText('!',x,badgeY+2);
   ctx.restore();return out;
  };
 });
