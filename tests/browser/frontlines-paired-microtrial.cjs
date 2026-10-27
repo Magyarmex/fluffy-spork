@@ -49,9 +49,14 @@ const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
      let spot=null,center=null,sector=-1;
      for(let i=0;i<16&&!spot;i++){
       const c=T.sectorCenter(i);
-      for(let dx=-500;dx<=500&&!spot;dx+=100)for(let dy=-500;dy<=500&&!spot;dy+=100){
+      /* The sector half-width is 562.5u. The original 240–570u
+       * center-distance search accidentally started every rival INSIDE
+       * its BLOOM sector. Demand a true outside-to-inside rotation, not
+       * merely movement toward the center of an already occupied pocket. */
+      for(let dx=-650;dx<=650&&!spot;dx+=50)for(let dy=-650;dy<=650&&!spot;dy+=50){
        const x=c.x+dx,y=c.y+dy,d=Math.hypot(dx,dy);
-       if(d<240||d>570)continue;
+       if(d<575||d>650||Math.abs(x)>T.ARENA-40||Math.abs(y)>T.ARENA-40)continue;
+       if(T.sectorIndex(x,y)===i)continue;
        if(g.isTerrainSafe&&!g.isTerrainSafe(x,y,28))continue;
        if(g.hasLineOfSight&&!g.hasLineOfSight(x,y,c.x,c.y,8))continue;
        spot={x,y,d};center=c;sector=i;
