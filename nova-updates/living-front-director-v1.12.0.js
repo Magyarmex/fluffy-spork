@@ -49,7 +49,7 @@ function closeFrontline(g,st,reason){
  var f=st&&st.frontlineTelemetry;
  if(!f||f.closed||!f.currentKey)return false;
  /* A fatal run is censored even when the pilot died outside the BLOOM. */
- if(g&&g.player&&!alive(g.player)&&!f.pilotDeathCensored){
+ if(g&&g.player&&f.pilotWasAlive&&!alive(g.player)&&!f.pilotDeathCensored){
   f.pilotDeathCensored=true;f.counts.pilotDeathCensors=(f.counts.pilotDeathCensors||0)+1;
   frontlineTrace(f,g,'pilot-death-censor');
  }
@@ -73,7 +73,7 @@ function ensureFrontline(g,st){
  if(f.currentKey!==key){
   closeFrontline(g,st,'replaced');
   f.currentKey=key;f.sector=op.sector;f.announcedAt=op.announcedAt;
-  f.playerInside=false;f.seenContest=false;f.deathRecorded=false;f.pilotDeathCensored=false;f.closed=false;f.lastSampleTime=Number(g.time)||0;f.playerStartDist=null;f.playerApproachSeen=false;f.aiSeen={};f.aiStartDist={};f.aiApproachSeen={};f.aiPhysicalLast={};f.aiPhysicalMotion={};f.aiPhysicalArrived={};f.aiPhysicalApproachSeen={};
+  f.playerInside=false;f.seenContest=false;f.deathRecorded=false;f.pilotDeathCensored=false;f.pilotWasAlive=!!(g.player&&alive(g.player));f.closed=false;f.lastSampleTime=Number(g.time)||0;f.playerStartDist=null;f.playerApproachSeen=false;f.aiSeen={};f.aiStartDist={};f.aiApproachSeen={};f.aiPhysicalLast={};f.aiPhysicalMotion={};f.aiPhysicalArrived={};f.aiPhysicalApproachSeen={};
   f.counts.announcements++;frontlineTrace(f,g,'announced',op.live?'live':'memory');
  }
  return f;
@@ -158,6 +158,7 @@ function frontlineTick(g,st,observedContest){
  var now=Number(g.time)||0,delta=clamp(now-(f.lastSampleTime==null?now:f.lastSampleTime),0,LF.SECTOR_PERIOD*2);
  f.counts.playerSeconds+=delta*(f.playerInside&&inside?1:((f.playerInside||inside)?0.5:0));
  f.lastSampleTime=now;
+ if(p&&alive(p))f.pilotWasAlive=true;
  /* Bounded exposure denominators: independent of AI ecology mode. */
  f.counts.sampledSeconds=(f.counts.sampledSeconds||0)+delta;
  if(p&&alive(p))f.counts.pilotAliveSeconds=(f.counts.pilotAliveSeconds||0)+delta;
