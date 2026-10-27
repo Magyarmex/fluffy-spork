@@ -155,3 +155,16 @@ test('the canonical 4.5Hz sector owner samples entry even without a Director tic
  g.update(1/60);
  assert.equal(st.frontlineTelemetry.counts.playerEntries,1);
 });
+
+test('allied and spawn-protected bots cannot inflate hostile arrival telemetry',()=>{
+ const {g,st,e,LF}=scene();
+ e.x=-1500;e.y=-1500;e.spawnShieldT=2;LF.frontlineTick(g,st,false);
+ e.x=-1250;e.y=-1250;LF.frontlineTick(g,st,false);
+ e.x=-520;e.y=-540;LF.frontlineTick(g,st,false);
+ assert.equal(st.frontlineTelemetry.counts.aiArrivals,0);
+ e.spawnShieldT=0;e.x=-1500;e.y=-1500;
+ g.areHostile=()=>false;LF.frontlineTick(g,st,false);
+ e.x=-1250;e.y=-1250;LF.frontlineTick(g,st,false);
+ e.x=-520;e.y=-540;LF.frontlineTick(g,st,false);
+ assert.equal(st.frontlineTelemetry.counts.aiArrivals,0);
+});
