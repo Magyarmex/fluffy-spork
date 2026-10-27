@@ -49,7 +49,7 @@ const {chromium}=require('playwright');
     let emitted=null;
     const old=g.toast;
     g.toast=function(message){emitted=message;return old.apply(this,arguments);};
-    try{LF.directorTick(g,st);}finally{g.toast=old;}
+    try{LF.directorTick(g,st);}finally{g.toast=old;g.setPaused(false);}
     return {emitted,sector:st.signal&&st.signal.sector,type:st.signal&&st.signal.type,
      realGame:!!window.__novaMakeRequire,viewport:window.innerWidth};
    },{x:c.x,y:c.y});
@@ -59,6 +59,10 @@ const {chromium}=require('playwright');
    assert.match(signal.emitted,new RegExp('SHAPE BLOOM · '+c.bearing+' · quiet ground is rich'));
    await page.waitForFunction(message=>[...document.querySelectorAll('.panel.anim-pop')].
     some(n=>n.textContent===message),signal.emitted,{timeout:10000});
+   // A paused-game overlay can fully occlude the toast while all geometry
+   // assertions still pass. Verify the real playing presentation instead.
+   assert.equal(await page.getByText('PAUSED',{exact:true}).count(),0,
+    'a pause modal must not conceal the compass under test');
    // The pop-in animation scales the bounding box; inspect settled geometry.
    await page.waitForTimeout(400);
    const ui=await page.evaluate(message=>{
@@ -66,12 +70,15 @@ const {chromium}=require('playwright');
      find(n=>n.textContent===message);
     if(!n)return null;
     const r=n.getBoundingClientRect(),range=document.createRange();
+    const gear=document.getElementById('nova-pilot-gear');
+    const gr=gear&&!gear.hidden?gear.getBoundingClientRect():null;
     range.selectNodeContents(n);
     const glyph=range.getBoundingClientRect();
     return {text:n.textContent,left:r.left,right:r.right,top:r.top,bottom:r.bottom,
      height:r.height,scrollWidth:n.scrollWidth,clientWidth:n.clientWidth,
      scrollHeight:n.scrollHeight,clientHeight:n.clientHeight,
      glyphLeft:glyph.left,glyphRight:glyph.right,
+     gear:gr?{left:gr.left,right:gr.right,top:gr.top,bottom:gr.bottom}:null,
      viewport:window.innerWidth,viewportHeight:window.innerHeight};
    },signal.emitted);
    assert.ok(ui,'public compass must reach the actual React toast');
@@ -81,6 +88,10 @@ const {chromium}=require('playwright');
     'toast glyphs clip at '+c.width+'px: '+JSON.stringify(ui));
    assert.ok(ui.scrollWidth<=ui.clientWidth+1&&ui.scrollHeight<=ui.clientHeight+1,
     'toast text overflows its panel at '+c.width+'px: '+JSON.stringify(ui));
+   assert.ok(ui.gear,'real gameplay settings button must be present');
+   assert.ok(ui.bottom<=ui.gear.top||ui.top>=ui.gear.bottom||
+    ui.right<=ui.gear.left||ui.left>=ui.gear.right,
+    'BLOOM announcement must not sit underneath the settings button: '+JSON.stringify(ui));
    assert.ok(ui.height<110,'toast obscures too much combat at '+c.width+'px: '+JSON.stringify(ui));
    assert.ok(ui.top>=0&&ui.bottom<=ui.viewportHeight,'toast outside portrait viewport: '+JSON.stringify(ui));
    await page.screenshot({path:path.join(output,
