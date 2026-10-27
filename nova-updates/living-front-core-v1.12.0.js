@@ -66,7 +66,7 @@ function sectorTick(g,st,defs,dt){
   var ts=g.tanks||[];for(i=0;i<ts.length;i++)if(alive(ts[i]))ss[sectorIndex(ts[i].x,ts[i].y)].tanks++;
   for(i=0;i<16;i++)advanceSector(ss[i],dt,st.ceiling);st.migrationHeat*=Math.exp(-dt*.42);st.migrationX*=Math.exp(-dt*.33);st.migrationY*=Math.exp(-dt*.33);for(var k in st.cooldowns)st.cooldowns[k]=Math.max(0,st.cooldowns[k]-dt);
   if(!st.tutorial.ecology&&st.age>14&&g.player&&g.toast){st.tutorial.ecology=true;g.toast('LIVING FRONT · quiet ground matures; fighting and harvesting move the farm','info');}
-  if(!g.__novaDecorativeWorld){lastSnapshot=snapshot(g);window.__NOVA_LIVING_FRONT_LAST__=lastSnapshot;}planSample(st,ms()-t0);
+  if(LF.frontlineTick)LF.frontlineTick(g,st,false);if(!g.__novaDecorativeWorld){lastSnapshot=snapshot(g);window.__NOVA_LIVING_FRONT_LAST__=lastSnapshot;}planSample(st,ms()-t0);
 }
 function snapshot(g){
   var st=g&&g.__lfState;if(!st)return{active:false,version:VERSION};var counts={circle:0,triangle:0,square:0,pentagon:0,hexagon:0,star:0,crasher:0},total=0,defs=st.defs||{},sh=g.shapes||[],i;
