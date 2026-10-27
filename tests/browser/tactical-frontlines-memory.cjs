@@ -48,10 +48,14 @@ const {chromium}=require('playwright');
    st.sectors[5].value=0; // Deliberately false private value: must not control UI.
    const visible=T.contestCandidate(g,st);
    if(!visible)throw Error('real Battlefield LOS/viewport does not certify visible hostile and hexagon');
-   shape.hp=0;
-   if(T.contestCandidate(g,st))throw Error('dead visible resource still advertised as contested');
-   shape.hp=Math.max(1,shape.hp+200);
-   if(!T.contestCandidate(g,st))throw Error('restored visible resource did not restore contest');
+   // Other naturally spawned resources may also be visible. To prove the
+   // depleted-pocket gate, temporarily suppress ALL harvestable shapes in the
+   // same sector, then restore their exact HP without running simulation.
+   const priorHp=g.shapes.map(s=>s&&s.hp);
+   for(const s of g.shapes)if(s&&T.sectorIndex(s.x,s.y)===5)s.hp=0;
+   if(T.contestCandidate(g,st))throw Error('fully depleted visible pocket still advertised as contested');
+   g.shapes.forEach((s,i)=>{if(s)s.hp=priorHp[i];});
+   if(!T.contestCandidate(g,st))throw Error('restored visible resources did not restore contest');
    if(!T.updateContest(g,st))throw Error('certified contest was not emitted');
    const LF=window.__NOVA_LIVING_FRONT_INTERNAL__;
    if(!LF.frontlineTick(g,st,true))throw Error('real Frontlines telemetry did not activate');
