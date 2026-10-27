@@ -56,13 +56,15 @@ function scene({width=1000,cover=false}={}){
   ax===target.x&&ay===target.y&&bx===duelist.x&&by===duelist.y);
  return {g,ai,self,target,duelist};
 }
-test('[RED] composed AI recognizes a legitimately perceived third-party duel',()=>{
+test('composed AI recognizes a legitimately perceived third-party duel',()=>{
  const {g,ai,self}=scene();
  ai.updateAI(self,g,1/30);
  assert.equal(self.ai.__v1112TargetId,2,'fairly chosen primary target is unchanged');
  assert.equal(self.ai.__v181Mode,'crossfire',
   'Battle Sense should see other genuinely perceived duelists, not just the primary target');
  assert.equal(g.tanks.length,3,'legacy AI narrowing must be restored after thinking');
+ assert.equal(Object.prototype.hasOwnProperty.call(g,'__novaFairVisibleTanks'),false,
+  'temporary perceived-tank snapshot must not leak beyond this AI call');
  assert.deepEqual(Array.from(g.__legacyVisibleIds),[1,2],
   'legacy target gate must still see exactly one primary rival');
 });
@@ -77,4 +79,33 @@ test('occluded third party cannot influence crossfire',()=>{
  ai.updateAI(self,g,1/30);
  assert.notEqual(self.ai.__v181Mode,'crossfire');
  assert.equal(self.ai.__v1112TargetId,2);
+});
+
+for(const hz of [30,60,120,240]){
+ test('composed AI decompresses under three actually visible local threats at '+hz+'Hz',()=>{
+  const {g,ai,self}=scene();
+  self.x=0;self.hp=45;g.w=1000;g.h=800;
+  const target=g.tanks[1],duelist=g.tanks[2];
+  target.x=110;target.y=0;target.ai.__v180TargetId=-1;
+  duelist.x=0;duelist.y=130;
+  const third=tank(4,'twin',-110,0);
+  g.tanks.push(third);
+  ai.updateAI(self,g,1/hz);
+  assert.equal(self.ai.__v181Mode,'decompress',
+   'local pressure must include other perceived opponents, not only primary target');
+  assert.equal(g.tanks.length,4);
+  assert.equal(Object.prototype.hasOwnProperty.call(g,'__novaFairVisibleTanks'),false);
+ });
+}
+test('covered opponents do not inflate tactical decompression pressure',()=>{
+ const {g,ai,self}=scene();
+ self.x=0;self.hp=45;
+ const target=g.tanks[1],duelist=g.tanks[2];
+ target.x=110;target.y=0;target.ai.__v180TargetId=-1;
+ duelist.x=0;duelist.y=130;
+ const third=tank(4,'twin',-110,0);g.tanks.push(third);
+ g.hasLineOfSight=(_ax,_ay,bx,by)=>bx===110&&by===0;
+ ai.updateAI(self,g,1/60);
+ assert.notEqual(self.ai.__v181Mode,'decompress',
+  'occluded opponents are not visible pressure');
 });
