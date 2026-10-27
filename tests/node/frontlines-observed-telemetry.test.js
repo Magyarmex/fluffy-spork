@@ -340,8 +340,29 @@ test('equal public opportunities produce equal exposure denominators in memory O
   LF.frontlineTick(g,st,false);
   for(let i=0;i<5;i++){g.time+=.22;LF.frontlineTick(g,st,false);}
   const c=st.frontlineTelemetry.counts;
-  totals.push([c.sampledSeconds,c.pilotAliveSeconds,c.hostileBotSeconds].map(v=>+v.toFixed(6)));
+  totals.push([c.sampledSeconds,c.pilotAliveSeconds,c.hostileBotSeconds,c.hostileOutsideBotSeconds].map(v=>+v.toFixed(6)));
  }
  assert.deepEqual(totals,[totals[0],totals[0],totals[0]],
   'the comparator must not include the ecological steering mode in its denominator');
+});
+
+test('outside-sector bot exposure excludes occupants, shields and allies without reading AI strategy',()=>{
+ const {g,st,e,LF,T}=scene();
+ e.ai.__lfEcoMode='none';
+ LF.frontlineTick(g,st,false);
+ g.time+=.22;LF.frontlineTick(g,st,false);
+ const c=st.frontlineTelemetry.counts;
+ assert.ok(Math.abs(c.hostileBotSeconds-.22)<1e-6);
+ assert.equal(c.hostileOutsideBotSeconds,0,'a bot already inside cannot newly arrive');
+ e.x=-1500;e.y=-1500;g.time+=.22;LF.frontlineTick(g,st,false);
+ assert.ok(Math.abs(c.hostileOutsideBotSeconds-.22)<1e-6);
+ e.spawnShieldT=1;g.time+=.22;LF.frontlineTick(g,st,false);
+ assert.ok(Math.abs(c.hostileOutsideBotSeconds-.22)<1e-6,'spawn protection excludes exposure');
+ e.spawnShieldT=0;g.areHostile=()=>false;g.time+=.22;LF.frontlineTick(g,st,false);
+ assert.ok(Math.abs(c.hostileOutsideBotSeconds-.22)<1e-6,'allied tank excludes exposure');
+ g.areHostile=(a,b)=>a.id!==b.id;e.x=-520;e.y=-540;
+ g.time+=.22;LF.frontlineTick(g,st,false);
+ assert.ok(Math.abs(c.hostileBotSeconds-.66)<1e-6);
+ assert.ok(Math.abs(c.hostileOutsideBotSeconds-.22)<1e-6);
+ assert.match(T.debugSummary(LF.snapshot(g)),/OUT-S 0\\.2/);
 });
