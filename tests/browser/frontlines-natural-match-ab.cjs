@@ -18,7 +18,7 @@ async function arm(browser,enabled,label){
    let state=gameSeed>>>0;
    const seeded=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return (state>>>0)/4294967296;};
    const Game=window.__novaMakeRequire('')('game/engine').Game;
-   const spawn=Game.prototype.spawnPlayer,spawnAI=Game.prototype.spawnAITank,update=Game.prototype.update;
+   const spawn=Game.prototype.spawnPlayer,spawnAI=Game.prototype.spawnAITank,update=Game.prototype.update,start=Game.prototype.start;
    /* Seed the entire synchronous real-game constructor (player, neutral
     * population, eight rivals), not the unrelated decorative/menu RAF. */
    Game.prototype.spawnPlayer=function(){
@@ -39,6 +39,13 @@ async function arm(browser,enabled,label){
      }
     }
     return result;
+   };
+   Game.prototype.start=function(){
+    /* Freeze before the first RAF tick so initial fingerprints are not
+     * contaminated by scheduling differences between fresh Chromium pages. */
+    window.__novaNaturalMatchGame=this;
+    this.paused=true;
+    return start.apply(this,arguments);
    };
    Game.prototype.update=function(){
     if(!this.__novaDecorativeWorld)window.__novaNaturalMatchGame=this;
