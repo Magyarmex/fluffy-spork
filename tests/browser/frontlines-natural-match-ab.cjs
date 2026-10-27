@@ -30,6 +30,7 @@ async function arm(browser,enabled,label){
   await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded',timeout:45000});
   await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({state:'visible',timeout:45000});
   await page.addScriptTag({url:'/tests/browser/frontlines-public-pilot.js'});
+  await page.addScriptTag({url:'/tests/browser/frontlines-commitment-audit.js'});
   await page.evaluate(({terrainSeed,gameSeed})=>{
    let state=gameSeed>>>0;
    const seeded=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return (state>>>0)/4294967296;};
@@ -99,6 +100,17 @@ async function arm(browser,enabled,label){
      try{return original(t,world,dt);}finally{if(st)st.bloomMemory=memory;}
     };
    }
+   /* Observe the real composed AI without altering its decision authority. */
+   const commitmentWitness=window.__novaResearchCommitmentAudit;
+   if(!commitmentWitness)throw Error('missing research commitment witness');
+   g.__novaCommitmentAudit=commitmentWitness.create();
+   const beforeAudit=ai.updateAI;
+   ai.updateAI=function(t,world,dt){
+    const result=beforeAudit(t,world,dt);
+    if(world===g)commitmentWitness.sample(g.__novaCommitmentAudit,world,t,enabled,
+     window.__NOVA_LIVING_FRONT_INTERNAL__.sectorIndex);
+    return result;
+   };
    /* Research-only: inspect the same visibility/value gates as CONTESTED at
     * Director cadence; results are post-match artifacts, never live HUD intel. */
    const LF=window.__NOVA_LIVING_FRONT_INTERNAL__,T=window.__NOVA_LIVING_FRONT_TEST__,
@@ -245,12 +257,16 @@ async function arm(browser,enabled,label){
      pilotAlive:!!p.alive,score:p.score,kills:p.kills,level:p.level,
      botCount:g.tanks.filter(t=>t.ai&&t.alive).length},
     contestGateAudit:g.__novaContestAudit,
+    commitmentAudit:window.__novaResearchCommitmentAudit.summary(g.__novaCommitmentAudit),
     naturalBlooms:s.stats.blooms||0,publicBloomCommandSamples:g.__novaPublicBloomCommands||0,
     visibleNeutralAimSamples:g.__novaVisibleAimSamples||0,
     events:s.frontline?.events||[]};
   });
   if(result.naturalBlooms>0)assert.ok(result.contestGateAudit.samples>0,'announced BLOOM must be audited');
   assert.equal(result.contestGateAudit.gateMismatches,0,'audit must agree with shipping CONTESTED');
+  assert.ok(result.commitmentAudit.samples>0,'real composed AI must be observed');
+  assert.ok(result.commitmentAudit.eligibleWindow<=result.commitmentAudit.publicMemory);
+  assert.ok(result.commitmentAudit.precombatIntersection<=result.commitmentAudit.eligibleWindow);
   assert.equal(result.contestGateAudit.pilotInside,
    result.contestGateAudit.noHostile+result.contestGateAudit.hostileCoLocated);
   assert.equal(result.contestGateAudit.hostileCoLocated,
