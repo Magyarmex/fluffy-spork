@@ -1553,7 +1553,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
  var priorTrace=this.__novaDroneChronoTraceEnabled,autoTrace=false;
  var bs=this.bullets||[],ds=this.drones||[];
  if(priorTrace!==true&&dt>0&&Number.isFinite(dt)&&
-    bs.length<=256&&ds.length<=64){
+    bs.length>0&&ds.length>0&&bs.length<=256&&ds.length<=64){
   for(var bi=0;bi<bs.length&&!autoTrace;bi++){
    var pb=bs[bi];
    if(!pb||pb.dead||pb.shell||pb.beam||pb.splash||
