@@ -109,3 +109,13 @@ test('covered opponents do not inflate tactical decompression pressure',()=>{
  assert.notEqual(self.ai.__v181Mode,'decompress',
   'occluded opponents are not visible pressure');
 });
+
+test('explicit fair no-target state cannot resurrect a hidden legacy target',()=>{
+ const {g,ai,self}=scene({width:180});
+ self.ai.__v180TargetId=2;self.ai.targetId=2;
+ ai.updateAI(self,g,1/60);
+ assert.equal(self.ai.__v1112TargetId,-1);
+ assert.equal(self.ai.__v181Mode,'none');
+ assert.deepEqual(Array.from(g.__legacyVisibleIds),[1]);
+ assert.equal(Object.prototype.hasOwnProperty.call(g,'__novaFairVisibleTanks'),false);
+});
