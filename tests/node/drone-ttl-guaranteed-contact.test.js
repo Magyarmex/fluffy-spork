@@ -83,7 +83,10 @@ function boot(updateImpl, optimized = false) {
 function droneWorld(hz, optimized, options={}) {
   const FullGame=boot(function(dt){
     this.time+=dt;
-    if(options.move!==false) this.drones[0].y+=2;
+    if(options.move!==false){
+      this.drones[0].x+=options.moveX||0;
+      this.drones[0].y+=options.moveY===undefined?2:options.moveY;
+    }
     if(options.endSpeed!==undefined)this.drones[0].speed=options.endSpeed;
     this.updateBullets(dt);
   },optimized);
@@ -173,4 +176,45 @@ for(const optimized of [false,true])for(const hz of [30,60,120,240]){
   assert.ok(!g.hitOwners.includes(1),'first event belongs to competing shot');
  });
 
+}
+
+
+/* Convex physical-contact proof: four fixed interior samples miss real
+ * pre-expiration contacts near the TTL boundary or when a witnessed drone
+ * begins in contact and moves away before projectile processing. These
+ * tests exercise the materialized core and Battlefield/Performance wrappers. */
+for(const optimized of [false,true])for(const hz of [30,60,120,240]){
+ const label=(optimized?'optimized':'baseline')+' '+hz+'Hz';
+ test('late TTL drone contact is not lost between fixed samples '+label,()=>{
+  const g=droneWorld(hz,optimized,{x:16.8,vx:2500,ttl:.004,moveY:2});
+  assert.equal(g.hits,1,'physical guaranteed overlap exists at TTL, not at 90% TTL');
+ });
+ test('fast late-TTL contact retains the same geometric guarantee '+label,()=>{
+  const g=droneWorld(hz,optimized,{x:29.9,vx:6000,ttl:.004,moveY:2});
+  assert.equal(g.hits,1);
+ });
+ test('end overlap cannot suppress an earlier certified envelope contact '+label,()=>{
+  const g=droneWorld(hz,optimized,{x:13,vx:6000,ttl:.004,moveX:-3,moveY:0});
+  assert.equal(g.hits,1,'drone began outside but guaranteed contact before expiry');
+ });
+ test('late proof never passes through earlier permanent cover '+label,()=>{
+  const g=droneWorld(hz,optimized,{x:16.8,vx:2500,ttl:.004,
+   terrain:[{id:-1,shape:'rect',x:2,y:0,w:1,h:70,
+     solid:true,destructible:false}]});
+  assert.equal(g.hits,0);
+ });
+ test('late proof preserves competing projectile kill-credit veto '+label,()=>{
+  const g=droneWorld(hz,optimized,{x:16.8,vx:2500,ttl:.004,
+   otherBullets:[{kind:'bullet',id:99,ownerId:3,x:16.8,y:1,
+    vx:0,vy:0,r:3,dmg:20,ttl:1,pen:0,hits:0,dead:false,shell:false,beam:false}]});
+  assert.ok(!g.hitOwners.includes(1));
+ });
+}
+for(const optimized of [false,true])for(const hz of [30,60,120,240]){
+ test('witnessed frame-start overlap survives drone moving away ('+
+  (optimized?'optimized':'baseline')+', '+hz+'Hz)',()=>{
+  const g=droneWorld(hz,optimized,{x:11.99,vx:500,ttl:.004,
+   moveX:0,moveY:20});
+  assert.equal(g.hits,1,'a t=0 contact is certain even if the drone leaves later');
+ });
 }
