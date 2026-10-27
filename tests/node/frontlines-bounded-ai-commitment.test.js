@@ -90,3 +90,14 @@ test('a blocked public opportunity without a valid route cannot start a tactical
  assert.equal(s.tick().x,-100);
  assert.equal(s.st.stats.aiFrontlineCommitments||0,0);
 });
+
+test('incoming projectile risk and defensive combat posture interrupt the turn immediately',()=>{
+ const s=scene();s.tick();s.t.ai.__v180Threat={risk:.5};s.g.time=106.3;
+ assert.ok(s.tick().x<0);assert.equal(s.t.ai.__lfFrontTurn,null);
+ const q=scene();q.t.ai.__v180Posture='evade';
+ assert.ok(q.tick().x<0);assert.equal(q.st.stats.aiFrontlineCommitments||0,0);
+});
+test('a match clock earlier than the public announcement cannot create a tactical turn',()=>{
+ const s=scene();s.g.time=90;
+ assert.ok(s.tick().x<0);assert.equal(s.st.stats.aiFrontlineCommitments||0,0);
+});
