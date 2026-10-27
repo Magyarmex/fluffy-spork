@@ -214,3 +214,15 @@ test('Director emission records the public BLOOM immediately, before another sec
  LF.frontlineTick(g,st,false);
  assert.equal(st.frontlineTelemetry.counts.announcements,1);
 });
+
+test('nonfatal damage never creates a Frontlines death',()=>{
+ const {g,st,p,LF}=scene();LF.frontlineTick(g,st,true);
+ g.damageTank(p,20);
+ assert.equal(st.frontlineTelemetry.counts.playerDeaths,0);
+ assert.equal(p.hp,80);
+});
+test('decorative War Room cannot produce pilot opportunity telemetry',()=>{
+ const {g,st,LF}=scene();g.__novaDecorativeWorld=true;
+ assert.equal(LF.frontlineTick(g,st,true),false);
+ assert.equal(st.frontlineTelemetry,undefined);
+});
