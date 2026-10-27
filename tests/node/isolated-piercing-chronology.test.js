@@ -1038,3 +1038,52 @@ for(const optimized of [false,true]){
    'the shortcut must remain available when other damage is provably later');
  });
 }
+
+
+/* Run 387: a SINGLE useful penetrating shot must not lose physical hits
+ * merely because >1200 unrelated bullets exist elsewhere. Exercise the
+ * materialized core and both shipping Battlefield compositions, including
+ * expiry, surviving two-hit penetration and reversed array order. */
+for (const optimized of [false,true]) for (const fps of [30,60]) {
+ for (const nonExpiring of [false,true]) for (const reverse of [false,true]) {
+  test((optimized?'optimized':'baseline')+
+   ' single piercing shot ignores 2000 remote bullets at '+fps+
+   'Hz, live='+nonExpiring+', reversed='+reverse,()=>{
+   const Game=boot(undefined,optimized);
+   const {g,victims}=multiShotRemoteWorld(Game,1,2000,reverse);
+   if(nonExpiring)g.bullets.find(b=>b.ownerId===1).ttl=.2;
+   const dt=.35/fps;
+   for(let frame=0;frame<3;frame++){g.time+=dt;g.updateBullets(dt);}
+   assert.deepEqual(victims.map(v=>v.hitCount),[1,1],
+    'a distant firefight cannot disable two chronological local contacts');
+  });
+ }
+}
+
+
+/* The 2,000-remote-bullet exception must not reorder an earlier local
+ * projectile or tunnel through permanent cover. Both outcomes remain
+ * independent of the remote bullet array order. */
+for(const optimized of [false,true])for(const reverse of [false,true]){
+ test((optimized?'optimized':'baseline')+
+  ' 2000 remote bullets cannot bypass earlier lateral projectile, reversed='+reverse,()=>{
+  const Game=boot(undefined,optimized),{g,a}=makeWorld(Game);
+  const events=[];
+  g.damageTank=function(t,dmg,owner){
+   events.push({id:t.id,owner});t.hitCount++;t.hp-=dmg;
+   if(t.hp<=0)t.alive=false;
+  };
+  for(let i=0;i<2000;i++)g.bullets.push({kind:'bullet',
+   id:80000+i,ownerId:1000+i,x:900+(i%10)*4,
+   y:900+Math.floor(i/10)*4,vx:0,vy:0,r:2,dmg:1,
+   ttl:2,pen:0,hits:0,dead:false,shell:false,beam:false});
+  g.bullets.push({kind:'bullet',id:90000,ownerId:7,x:40,y:19,
+   vx:0,vy:0,r:3,dmg:30,ttl:1,pen:0,hits:0,dead:false,
+   shell:false,beam:false});
+  if(reverse)g.bullets.reverse();
+  g.time+=.35/30;g.updateBullets(.35/30);
+  assert.ok(events.length>0,'earlier competing contact must still occur');
+  assert.equal(events[0].owner,7,
+   'local collision chronology cannot be overwritten by a remote-density shortcut');
+ });
+}

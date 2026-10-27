@@ -1301,7 +1301,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   }
   return {x:x,y:y,ttl:b.ttl,remain:remain};
  }
- /* A bounded, spatially local proof for several independent piercing shots.
+ /* A bounded, spatially local proof for independent piercing shots.
   * Do not spend the global budget on unrelated distant projectiles. Preflight
   * every eligible shot before committing ANY extra damage: if the entire
   * batch cannot be checked within the same conservative work ceiling, all
@@ -1324,7 +1324,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    * Count conservative swept-AABB possibilities, not speculative hits.
    * Track shared hulls across ALL shots (including discarded ones): a
    * one-hull shot can still kill a victim before another shot arrives. */
-  if(shots.length<2)return null;
+  if(!shots.length)return null;
   var tanks=g.tanks||[];
   if(tanks.length){
    if(shots.length*tanks.length>12000)return null;
@@ -1477,7 +1477,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
  var projected=expiring*bodyWork;
  var legacyExpiring=projected>0&&(projected<=900||
     (expiring===1&&bodyWork<=ISOLATED_RECOVERY_SCAN_CAP));
- var localExpiring=!legacyExpiring&&expiring>1?
+ var localExpiring=!legacyExpiring&&expiring>0?
     localStationaryPiercingPlan(this,dt,false):null;
  if(legacyExpiring||localExpiring)
   for(var pre=this.bullets.length-1;pre>=0;pre--){
@@ -1495,7 +1495,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   * A surviving or uncertain round stays with the original engine. */
  var legacyPaired=paired>0&&(paired*bodyWork<=900||
     (paired===1&&bodyWork<=ISOLATED_RECOVERY_SCAN_CAP));
- var localPaired=!legacyPaired&&paired>1?
+ var localPaired=!legacyPaired&&paired>0?
     localStationaryPiercingPlan(this,dt,true):null;
  if(legacyPaired||localPaired)
   for(var pair=this.bullets.length-1;pair>=0;pair--){
