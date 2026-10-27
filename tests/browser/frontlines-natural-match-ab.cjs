@@ -86,6 +86,77 @@ async function arm(browser,enabled,label){
      try{return original(t,world,dt);}finally{if(st)st.bloomMemory=memory;}
     };
    }
+   /* Research-only: inspect the same visibility/value gates as CONTESTED at
+    * Director cadence; results are post-match artifacts, never live HUD intel. */
+   const LF=window.__NOVA_LIVING_FRONT_INTERNAL__,T=window.__NOVA_LIVING_FRONT_TEST__,
+    F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
+   if(!LF||!T||!F||typeof LF.directorTick!=='function'||
+      typeof F.inGameplayViewport!=='function'||typeof F.viewportHalfExtents!=='function')
+    throw Error('shipping Director / Fair Engagement unavailable');
+   const audit={samples:0,pilotInside:0,noHostile:0,hostileCoLocated:0,
+    outsideGameplayViewport:0,outsideRenderedCamera:0,terrainOccluded:0,
+    hostileVisible:0,visibleNeutralBelow155:0,visibleNeutralAtLeast155:0,
+    candidateTrue:0,gateMismatches:0,coLocationExamples:[]};
+   const director=LF.directorTick;
+   LF.directorTick=function(world,st){
+    const out=director.apply(this,arguments);
+    if(world!==g||world.status!=='playing'||st.directorEnabled===false)return out;
+    const now=world.time||0,sig=st.signal,mem=st.bloomMemory;
+    const sector=sig&&sig.type==='BLOOM'&&now<sig.until?sig.sector:
+     mem&&now<mem.until?mem.sector:null;
+    if(!Number.isInteger(sector)||sector<0||sector>=16)return out;
+    audit.samples++;
+    const pilot=world.player;
+    if(!pilot||!(pilot.hp>0)||pilot.alive===false||pilot.spawnShieldT>0||
+       LF.sectorIndex(pilot.x,pilot.y)!==sector)return out;
+    audit.pilotInside++;
+    const eligible=(world.tanks||[]).filter(t=>{
+     if(!t||t===pilot||t.id===pilot.id||!(t.hp>0)||t.alive===false||
+        t.spawnShieldT>0||LF.sectorIndex(t.x,t.y)!==sector)return false;
+     if(world.areAllies&&world.areAllies(pilot,t))return false;
+     if(typeof world.areHostile==='function')return !!world.areHostile(pilot,t);
+     for(const key of ['teamId','team','factionId','faction','side'])
+      if(pilot[key]!=null&&t[key]!=null)return pilot[key]!==t[key];
+     return true;
+    });
+    if(!eligible.length){audit.noHostile++;return out;}
+    audit.hostileCoLocated++;
+    const ext=F.viewportHalfExtents(world);
+    if(!ext||!(ext.x>0)||!(ext.y>0))throw Error('invalid viewport');
+    const gameplay=eligible.filter(t=>F.inGameplayViewport(world,pilot,t));
+    if(!gameplay.length){audit.outsideGameplayViewport++;return out;}
+    const cam=world.cam||{},cx=Number.isFinite(cam.x)?cam.x:pilot.x,
+     cy=Number.isFinite(cam.y)?cam.y:pilot.y;
+    const rendered=gameplay.filter(t=>Math.abs(t.x-cx)<=ext.x&&Math.abs(t.y-cy)<=ext.y);
+    if(!rendered.length){audit.outsideRenderedCamera++;return out;}
+    const seen=rendered.filter(t=>world.hasLineOfSight(pilot.x,pilot.y,t.x,t.y,2));
+    if(!seen.length){audit.terrainOccluded++;return out;}
+    audit.hostileVisible++;
+    const defs=st.defs||LF.defs;
+    let value=0;
+    for(const shape of world.shapes||[]){
+     if(!shape||!(shape.hp>0)||LF.sectorIndex(shape.x,shape.y)!==sector||
+        Math.abs(shape.x-pilot.x)>ext.x||Math.abs(shape.y-pilot.y)>ext.y||
+        Math.abs(shape.x-cx)>ext.x||Math.abs(shape.y-cy)>ext.y||
+        !world.hasLineOfSight(pilot.x,pilot.y,shape.x,shape.y,2))continue;
+     const base=LF.xp(defs,shape.type);
+     if(!(base>0))continue;
+     value+=base+(shape.type==='crasher'?(Number(shape.__lfBounty)||0):0)+
+      (shape.type==='hexagon'?80:shape.type==='star'?170:shape.type==='pentagon'?22:0);
+     if(value>=155)break;
+    }
+    if(value>=155)audit.visibleNeutralAtLeast155++;
+    else audit.visibleNeutralBelow155++;
+    const candidate=!!T.contestCandidate(world,st);
+    if(candidate)audit.candidateTrue++;
+    if(candidate!==(value>=155))audit.gateMismatches++;
+    if(audit.coLocationExamples.length<24)
+     audit.coLocationExamples.push({time:+now.toFixed(2),sector,
+      visibleHostiles:seen.length,visibleNeutralValue:+value.toFixed(1),
+      eligible:value>=155});
+    return out;
+   };
+   g.__novaContestAudit=audit;
    const p=g.player;
    if(!p||p.cls!=='scout')throw Error('expected unmodified Scout pilot');
    if(g.tanks.filter(t=>t.ai).length<8)throw Error('expected eight ordinary rivals');
@@ -142,9 +213,20 @@ async function arm(browser,enabled,label){
     frontline:s.frontline,stats:s.stats,game:{time:+g.time.toFixed(3),status:g.status,
      pilotAlive:!!p.alive,score:p.score,kills:p.kills,level:p.level,
      botCount:g.tanks.filter(t=>t.ai&&t.alive).length},
+    contestGateAudit:g.__novaContestAudit,
     naturalBlooms:s.stats.blooms||0,publicBloomCommandSamples:g.__novaPublicBloomCommands||0,
     events:s.frontline?.events||[]};
   });
+  if(result.naturalBlooms>0)assert.ok(result.contestGateAudit.samples>0,'announced BLOOM must be audited');
+  assert.equal(result.contestGateAudit.gateMismatches,0,'audit must agree with shipping CONTESTED');
+  assert.equal(result.contestGateAudit.pilotInside,
+   result.contestGateAudit.noHostile+result.contestGateAudit.hostileCoLocated);
+  assert.equal(result.contestGateAudit.hostileCoLocated,
+   result.contestGateAudit.outsideGameplayViewport+
+   result.contestGateAudit.outsideRenderedCamera+
+   result.contestGateAudit.terrainOccluded+result.contestGateAudit.hostileVisible);
+  assert.equal(result.contestGateAudit.hostileVisible,
+   result.contestGateAudit.visibleNeutralBelow155+result.contestGateAudit.visibleNeutralAtLeast155);
   assert.equal(errors.length,0,errors.join('\n'));
   return{label,enabled,initial,last,result};
  }finally{await context.close();}
@@ -178,8 +260,8 @@ async function arm(browser,enabled,label){
   console.log('NOVA_FRONTLINES_NATURAL_MATCH_AB '+JSON.stringify({initialWorldIdentical:true,offReplayIdentical:same,
    naturalOpportunityObserved,
    config:{layout:LAYOUT,seed:SEED_ID,pilotPolicy:PILOT_POLICY},
-   off:{time:off.result.game.time,status:off.result.game.status,blooms:off.result.naturalBlooms,publicBloomCommands:off.result.publicBloomCommandSamples,frontline:off.result.frontline?.counts},
-   on:{time:on.result.game.time,status:on.result.game.status,blooms:on.result.naturalBlooms,publicBloomCommands:on.result.publicBloomCommandSamples,frontline:on.result.frontline?.counts}}));
+   off:{time:off.result.game.time,status:off.result.game.status,blooms:off.result.naturalBlooms,publicBloomCommands:off.result.publicBloomCommandSamples,frontline:off.result.frontline?.counts,contestGateAudit:Object.fromEntries(Object.entries(off.result.contestGateAudit).filter(([k])=>k!=='coLocationExamples'))},
+   on:{time:on.result.game.time,status:on.result.game.status,blooms:on.result.naturalBlooms,publicBloomCommands:on.result.publicBloomCommandSamples,frontline:on.result.frontline?.counts,contestGateAudit:Object.fromEntries(Object.entries(on.result.contestGateAudit).filter(([k])=>k!=='coLocationExamples'))}}));
   if(!same)throw Error('same-arm full-match replay diverged; cannot claim controlled A/B');
   // No natural announcement is valid negative/censored research evidence,
   // not a CI failure to hide by selecting a friendlier seed.
