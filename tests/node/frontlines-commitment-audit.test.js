@@ -44,3 +44,31 @@ test('spent-key starts are counted once without changing AI state',()=>{
  sample(a,g,t,true,sectorIndex);sample(a,g,t,true,sectorIndex);
  assert.equal(a.started,1);assert.equal(a.activeTurn,2);
 });
+test('a live public commitment is witnessed even if the rival arrives during the same AI update',()=>{
+ const {g,t}=scene(),a=create();
+ g.time=104;g.__lfState.signal={type:'BLOOM',sector:5,started:100,until:105};
+ t.x=-900;t.y=-600; // already inside when the post-update observer samples
+ t.ai.__lfFrontTurnSpentKey='BLOOM:5:100';
+ t.ai.__lfFrontTurn={key:'BLOOM:5:100',until:106};
+ sample(a,g,t,true,sectorIndex);sample(a,g,t,true,sectorIndex);
+ assert.equal(a.liveSignal,2);
+ assert.equal(a.started,1);assert.equal(a.startedLive,1);
+ assert.equal(a.activeTurn,2);assert.equal(a.activeTurnLive,2);
+ assert.equal(a.eligibleWindow,0,'live phase still bypasses stale-window eligibility');
+});
+test('a spent key from another announcement is not misattributed to the current BLOOM',()=>{
+ const {g,t}=scene(),a=create();
+ t.ai.__lfFrontTurnSpentKey='BLOOM:5:80';
+ t.ai.__lfFrontTurn={key:'BLOOM:5:80',until:108};
+ sample(a,g,t,false,sectorIndex);
+ assert.equal(a.started,0);assert.equal(a.activeTurn,0);
+ assert.equal(a.enabledSamples,0);
+});
+test('live starts and later remembered samples are deduplicated by public announcement',()=>{
+ const {g,t}=scene(),a=create();
+ t.ai.__lfFrontTurnSpentKey='BLOOM:5:100';
+ g.time=104;g.__lfState.signal={type:'BLOOM',sector:5,started:100,until:105};
+ sample(a,g,t,true,sectorIndex);
+ g.time=106;g.__lfState.signal=null;sample(a,g,t,true,sectorIndex);
+ assert.equal(a.started,1);assert.equal(a.startedLive,1);assert.equal(a.startedMemory,0);
+});
