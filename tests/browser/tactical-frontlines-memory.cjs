@@ -45,6 +45,13 @@ const {chromium}=require('playwright');
    const visible=T.contestCandidate(g,st);
    if(!visible)throw Error('real Battlefield LOS/viewport does not certify chosen pair');
    if(!T.updateContest(g,st))throw Error('certified contest was not emitted');
+   const LF=window.__NOVA_LIVING_FRONT_INTERNAL__;
+   if(!LF.frontlineTick(g,st,true))throw Error('real Frontlines telemetry did not activate');
+   const snap=window.NOVALivingFront.snapshot();
+   if(!snap.frontline||snap.frontline.counts.observedContests!==1||snap.frontline.counts.playerEntries!==1)
+    throw Error('real shipping telemetry did not record witnessed contest');
+   if(!window.NOVALivingFront.diagnostics().includes('observed-contest'))
+    throw Error('COPY ECOLOGY omits chronological Frontlines trace');
    g.drawMinimap();
    const ctx=g.mmCtx,S=216;
    const withContest=new Uint8Array(ctx.getImageData(0,0,S,S).data);
