@@ -45,7 +45,7 @@ test('60px CSS minimap gets a readable contest badge rather than a 2.5px label',
  g.drawMinimap();
  const badge=calls.find(v=>v&&v.type==='text'&&v.value==='!');
  assert.ok(badge,'CONTESTED must use a large visible exclamation badge');
- const fontPx=Number((badge.font||'').match(/(\\d+)px/)?.[1]||0);
+ const fontPx=Number((badge.font||'').match(/(\d+)px/)?.[1]||0);
  assert.ok(fontPx*60/216>=8,'badge glyph must remain at least 8 CSS px on 60px minimap');
  assert.ok(calls.some(v=>v&&v.type==='arc'&&v.r*2*60/216>=10),
   'badge must have a >=10 CSS px visual target');
