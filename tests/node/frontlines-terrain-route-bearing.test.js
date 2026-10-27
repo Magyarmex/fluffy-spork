@@ -28,7 +28,9 @@ test('remembered public BLOOM follows a terrain waypoint instead of steering thr
  assert.equal(calls[0].id,t.id);
 });
 test('live public BLOOM also respects the terrain waypoint',()=>{
- const {T,t,st,g}=scene();st.signal={type:'BLOOM',sector:5,x:-560,y:-560,started:105,until:110};
+ const {T,t,st,g}=scene();t.x=-1130; // genuinely outside sector 5; arrival handoff must not cancel approach
+ assert.notEqual(T.sectorIndex(t.x,t.y),5);
+ st.signal={type:'BLOOM',sector:5,x:-560,y:-560,started:105,until:110};
  g.hasLineOfSight=()=>false;
  g.novaBattlefieldWaypoint=()=>({x:t.x-80,y:t.y+50});
  const b=T.publicEcoBias(g,t,{},{});
