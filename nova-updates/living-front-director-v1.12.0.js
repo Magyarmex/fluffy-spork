@@ -350,7 +350,7 @@ LF.wrap('game/ai',function(ai,require){var old=ai.updateAI;if(!old||old.__novaLi
  var raw=Math.hypot(vx||0,vy||0),cap=g.tankSpeed&&Number(g.tankSpeed(tt));
  /* A committed dash, boosted move or deliberate stationary hold belongs to
   * its original combat owner; ecology cannot commandeer those commands. */
- if(committed&&(!(raw>1e-6)||(cap>0&&raw>cap*1.15)))return move.apply(g,arguments);
+ if(!(raw>1e-6)||(cap>0&&raw>cap*1.15))return move.apply(g,arguments);
  var sp=raw||(cap||1),w=committed?.66:clamp(a.__lfEcoWeight,0,.48),
   x=(vx||0)/sp*(1-w)+a.__lfEcoX*w,y=(vy||0)/sp*(1-w)+a.__lfEcoY*w,m=Math.hypot(x,y)||1;
  return move.call(g,tt,x/m*sp,y/m*sp,dd);
