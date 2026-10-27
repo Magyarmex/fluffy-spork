@@ -67,12 +67,16 @@ const {chromium}=require('playwright');
    // Physical arrivals must be certified by the real movement owner, not by
    // sampled positions alone. Deliberately relocate an enemy without moveTank.
    const beforePhysical=snap.frontline.counts.aiPhysicalArrivals;
-   if(typeof beforePhysical!=='number')throw Error('physical A/B arrival counter missing');
+   const beforeRejected=snap.frontline.counts.aiPhysicalRejectedCrossings;
+   if(typeof beforePhysical!=='number'||typeof beforeRejected!=='number')
+    throw Error('physical A/B arrival and rejected-crossing counters missing');
    const oldEnemyX=e.x,oldEnemyY=e.y;
    e.x=-1150;e.y=-550;g.time+=.22;LF.frontlineTick(g,st,false);
    e.x=-1110;e.y=-550;g.time+=.22;LF.frontlineTick(g,st,false);
    if(st.frontlineTelemetry.counts.aiPhysicalArrivals!==beforePhysical)
     throw Error('real runtime accepted direct enemy relocation as a physical AI arrival');
+   if(st.frontlineTelemetry.counts.aiPhysicalRejectedCrossings!==beforeRejected+1)
+    throw Error('real runtime failed to diagnose the rejected AI sector crossing');
    // Positive proof on the real composed movement owner. Choose a genuinely
    // traversable short corridor across sector 5's west edge; no mock physics.
    let certifiedEntry=false,entryY=null;
