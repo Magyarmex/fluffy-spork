@@ -84,3 +84,15 @@ test('shipping AI movement wrapper actually follows a routed public opportunity 
  assert.equal(g.moveTank,originalMove,'the temporary wrapper cannot hijack later movement');
  assert.equal(t.ai.__lfEcoMode,'memory');
 });
+
+test('locally visible neutral farm also follows a route to its aggregate center',()=>{
+ const {T,g,t,st}=scene();st.bloomMemory=null;g.w=1200;g.h=1200;
+ g.shapes=[[-560,-540],[-540,-560],[-580,-560],[-560,-580]].map(([x,y],id)=>({
+  id:id+10,x,y,kind:'shape',type:'pentagon',hp:100
+ }));
+ g.hasLineOfSight=(_ax,_ay,bx,by)=>!(bx===-560&&by===-560);
+ g.novaBattlefieldWaypoint=()=>({x:t.x-60,y:t.y+100});
+ const b=T.publicEcoBias(g,t,{pentagon:{xp:100}},{});
+ assert.equal(b.mode,'local');assert.ok(b.weight>.04);
+ assert.ok(b.x<0&&b.y>0,'local farm centroid must not undo Battlefield routing');
+});
