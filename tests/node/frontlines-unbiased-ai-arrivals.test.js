@@ -141,6 +141,32 @@ test('multiple real movement substeps compose into one certified Director sample
  assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalRejectedCrossings,0);
 });
 
+test('a real in-and-out visit between Director samples counts one physical arrival',()=>{
+ const s=scene();s.e.x=-1130;s.LF.frontlineTick(s.g,s.st,false);
+ s.g.time+=.22;
+ s.g.moveTank(s.e,20/.11,0,.11); // actual movement owner reaches sector 5
+ assert.equal(s.T.sectorIndex(s.e.x,s.e.y),5);
+ s.g.moveTank(s.e,-20/.11,0,.11); // leaves before the next Director tick
+ assert.notEqual(s.T.sectorIndex(s.e.x,s.e.y),5);
+ s.LF.frontlineTick(s.g,s.st,false);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,1,
+  'two witnessed substeps prove a visit even though both samples were outside');
+ s.g.time+=.22;s.LF.frontlineTick(s.g,s.st,false);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,1,'one incarnation, one arrival');
+});
+test('outside-only substeps and unwitnessed exits cannot fabricate transient arrivals',()=>{
+ const s=scene();s.e.x=-1130;s.LF.frontlineTick(s.g,s.st,false);
+ s.g.time+=.22;
+ s.g.moveTank(s.e,-10/.11,0,.11);s.g.moveTank(s.e,10/.11,0,.11);
+ s.LF.frontlineTick(s.g,s.st,false);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,0);
+ const q=scene();q.e.x=-1130;q.LF.frontlineTick(q.g,q.st,false);
+ q.g.time+=.22;q.g.moveTank(q.e,20/.11,0,.11);
+ q.e.x=-1130; // direct relocation is not a certified second movement
+ q.LF.frontlineTick(q.g,q.st,false);
+ assert.equal(q.st.frontlineTelemetry.counts.aiPhysicalArrivals,0,
+  'an unobserved exit invalidates the interval even after a witnessed entry');
+});
 test('Debug clearly distinguishes physical arrivals, rejected crossings and memory-only arrivals',()=>{
  const s=scene('none');s.e.x=-1200;s.LF.frontlineTick(s.g,s.st,false);
  sample(s,-1150,-550);sample(s,-1135,-550);sample(s,-1110,-550);
