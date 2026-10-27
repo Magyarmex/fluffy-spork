@@ -163,3 +163,17 @@ test('even a live BLOOM cannot advertise an empty opportunity as contested',()=>
  const {T,g,st}=scene();st.sectors[5].value=0;
  assert.equal(T.contestCandidate(g,st),false);
 });
+
+test('a formerly huge BLOOM remains contestable when a meaningful pocket survives',()=>{
+ const {T,g,st}=scene();g.time=106;st.signal=null;
+ st.bloomMemory={sector:5,announcedAt:98,until:122,initialValue:8000};
+ st.sectors[5].value=450;
+ assert.equal(T.contestCandidate(g,st),true,
+  'do not require 25% of a huge old pocket when 450 XP still physically remains');
+});
+test('disabling the Front Director also suppresses its remembered tactical signals',()=>{
+ const {T,g,st}=scene();g.time=106;st.signal=null;
+ st.bloomMemory={sector:5,announcedAt:98,until:122,initialValue:500};
+ st.directorEnabled=false;
+ assert.equal(T.contestCandidate(g,st),false);
+});
