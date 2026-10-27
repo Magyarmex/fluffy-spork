@@ -257,3 +257,32 @@ test('optional integration diagnostics do not change real drone motion or attack
  assert.equal(a.shape.hp,b.shape.hp,'damage and farming must be unchanged');
  assert.equal(b.d.__novaChronoIdleRawEpoch,undefined);
 });
+
+test('actual idle steering witnesses a physical pre-expiry contact the speed ball cannot prove',()=>{
+ const s=world({enemy:false,withBattlefield:true});
+ s.d.x=20;s.d.speed=200;s.d.attackCd=999;
+ s.shape.x=0;s.shape.y=0;
+ s.g.__novaDroneChronoTraceEnabled=true;
+ const dt=1/60,ttl=.004,bulletVX=2500,radius=12;
+ s.g.update(dt);
+ const epoch=s.g.__novaShapeSweepEpoch;
+ assert.equal(s.d.__novaChronoIdleRawEpoch,epoch);
+ const x0=s.d.__novaChronoIdleRawX,x1=s.d.__novaChronoIdleRawEndX;
+ assert.equal(x0,20);
+ assert.equal(x1,s.d.__novaChronoDroneTerrainX,
+  'the simple source fixture has no terrain displacement');
+ const droneVX=(x1-x0)/dt;
+ const firstContact=(x0-radius)/(bulletVX-droneVX);
+ assert.ok(firstContact>0&&firstContact<ttl,
+  'relative-motion first contact is physically before projectile expiry');
+ // A conservative 1200u/s unknown-motion envelope cannot prove this hit.
+ // This is a read-only falsifier, not permission to apply damage.
+ let best=Infinity;
+ for(let i=0;i<=1000;i++){
+  const t=ttl*i/1000;
+  best=Math.min(best,Math.abs(bulletVX*t-x0)+1200*t);
+ }
+ assert.ok(best>=radius,
+  'the current unknown-motion guarantee must remain conservative');
+ assert.equal(s.d.__novaChronoIdleRawDt,dt);
+});
