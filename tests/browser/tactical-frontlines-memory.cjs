@@ -28,8 +28,16 @@ const {chromium}=require('playwright');
    g.setPaused(true);
    const p=g.player,e=g.tanks.find(t=>t!==p&&!t.isPlayer);
    if(!p||!e||!T)throw Error('canonical player/enemy/Frontlines API missing');
-   p.x=-560;p.y=-560;p.hp=Math.max(100,p.hp);p.alive=true;p.spawnShieldT=0;
-   e.x=-520;e.y=-540;e.hp=Math.max(100,e.hp);e.alive=true;e.spawnShieldT=0;
+   p.hp=Math.max(100,p.hp);p.alive=true;p.spawnShieldT=0;
+   e.hp=Math.max(100,e.hp);e.alive=true;e.spawnShieldT=0;
+   let found=false;
+   for(let iy=0;iy<6&&!found;iy++)for(let ix=0;ix<6&&!found;ix++){
+    const x=-1000+ix*180,y=-1000+iy*180,ex=x+40,ey=y+20;
+    if(g.isTerrainSafe&&(!g.isTerrainSafe(x,y,20)||!g.isTerrainSafe(ex,ey,20)))continue;
+    if(!g.hasLineOfSight(x,y,ex,ey,2))continue;
+    p.x=x;p.y=y;e.x=ex;e.y=ey;found=true;
+   }
+   if(!found)throw Error('no real terrain-safe visible pair in BLOOM sector 5');
    g.cam.x=p.x;g.cam.y=p.y;
    const st=g.__lfState,now=g.time;
    st.signal=null;st.bloomMemory={sector:5,announcedAt:now-7,until:now+17,initialValue:500};
