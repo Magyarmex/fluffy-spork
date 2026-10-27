@@ -113,3 +113,18 @@ test('legitimate engine movement still certifies one arrival',()=>{
  sample(s,-1160,-550);sample(s,-1130,-550);sample(s,-1110,-550);
  assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,1);
 });
+
+test('disabling Director closes the opportunity and drops retained movement references',()=>{
+ const s=scene();s.LF.frontlineTick(s.g,s.st,false);
+ sample(s,-1110,-550);
+ const f=s.st.frontlineTelemetry;
+ assert.ok(f.aiPhysicalLast['2']);
+ s.st.directorEnabled=false;
+ s.LF.frontlineTick(s.g,s.st,false);
+ assert.equal(f.closed,true);
+ assert.equal(f.counts.resolved,1);
+ assert.deepEqual(Object.keys(f.aiPhysicalLast),[]);
+ assert.deepEqual(Object.keys(f.aiPhysicalMotion),[]);
+ s.LF.frontlineTick(s.g,s.st,false);
+ assert.equal(f.counts.resolved,1,'closing a disabled opportunity is idempotent');
+});
