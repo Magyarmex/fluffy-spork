@@ -102,7 +102,8 @@ function world({trace=true,terrain=[],damaged=false,command=false}={}){
 }
 
 function shotWorld(hz,{terrain=[],command=false,trace=false,x=20,y=0,
-  vx=2500,ttl=.004,otherBullets=[],friendly=false,phase='form',idleVY=null,bornThisFrame=false,frontTank=null,cachedSteering=false}={}){
+  vx=2500,ttl=.004,otherBullets=[],friendly=false,phase='form',idleVY=null,bornThisFrame=false,frontTank=null,cachedSteering=false,
+  remoteBullets=0,reverseBullets=false}={}){
  const {g,d,owner}=world({trace,terrain,command});
  owner.x=-200;owner.y=0;
  const shooter={id:2,cls:'basic',kind:'tank',alive:true,x:-1000,y:0,hp:100};
@@ -117,7 +118,12 @@ function shotWorld(hz,{terrain=[],command=false,trace=false,x=20,y=0,
  g.bullets=[{kind:'bullet',id:100,ownerId:friendly?1:2,x:0,y:0,
   vx,vy:0,r:3,dmg:20,ttl,pen:0,hits:0,dead:false,
   shell:false,beam:false},...otherBullets];
- if(bornThisFrame)g.__novaTestSpawnBullet=g.bullets.shift();
+ for(let i=0;i<remoteBullets;i++)g.bullets.push({kind:'bullet',
+  id:200+i,ownerId:3,x:1200+i*.1,y:1200,vx:10,vy:0,
+  r:3,dmg:2,ttl:1,pen:0,hits:0,dead:false,shell:false,beam:false});
+ if(reverseBullets)g.bullets.reverse();
+ if(bornThisFrame)g.__novaTestSpawnBullet=g.bullets.find(b=>b.id===100),
+  g.bullets=g.bullets.filter(b=>b.id!==100);
  g.update(1/hz);
  return {g,d,owner};
 }
@@ -201,3 +207,13 @@ test('non-expiring shots do not activate the optional motion witness',()=>{
  assert.equal(d.__novaChronoIdleRawEpoch,undefined);
  assert.notEqual(g.__novaDroneChronoTraceEnabled,true);
 });
+
+for(const hz of [30,60,120,240])for(const reverse of [false,true]){
+ test('remote projectile density cannot disable local certified TTL contact '+
+  hz+'Hz reverse='+reverse,()=>{
+  const {g,d}=shotWorld(hz,{remoteBullets:960,reverseBullets:reverse});
+  assert.equal(d.__novaChronoIdleUnmodifiedEpoch,g.__novaShapeSweepEpoch,
+   'unrelated remote bullets must not globally disable the local motion witness');
+  assert.deepEqual(g.hitOwners,[2]);
+ });
+}
