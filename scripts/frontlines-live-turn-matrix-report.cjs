@@ -49,6 +49,12 @@ function collectLiveTurnMatrix(root,expected=18){
    replay=count(r.offReplay?.commitmentAudit?.startedLive,'OFF replay live starts');
   if(off!==0||replay!==0)throw Error(dir+': OFF arm initiated a forbidden live commitment');
   if(r.verifiedLiveStart!==(on>0))throw Error(dir+': live-start witness disagrees with report');
+  if(on===0){
+   for(const key of ['frontline','stats','game','contestGateAudit','naturalBlooms',
+     'publicBloomCommandSamples','visibleNeutralAimSamples','events'])
+    if(JSON.stringify(r.on[key])!==JSON.stringify(r.off[key]))
+     throw Error(dir+': no-treatment ON/OFF gameplay diverged in '+key);
+  }
   addGate(liveGateTotals.on,r.on.commitmentAudit,dir+' ON');
   addGate(liveGateTotals.off,r.off.commitmentAudit,dir+' OFF');
   const m=r.on.metadata,group=m.layout+' / '+m.pilotPolicy;
