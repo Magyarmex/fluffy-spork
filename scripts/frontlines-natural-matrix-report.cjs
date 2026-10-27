@@ -18,7 +18,7 @@ function collectMatrix(root,expected=12){
   .filter(d=>d.isDirectory()&&d.name.startsWith('nova-frontlines-natural-ab-'))
   .map(d=>d.name).sort();
  if(dirs.length!==expected)throw Error('incomplete natural-match matrix: expected '+expected+' artifact folders, got '+dirs.length);
- const pairs=[],observations=[];
+ const pairs=[],observations=[],censored=[];
  for(const dir of dirs){
   const base=path.join(root,dir),report=readJson(path.join(base,'frontlines-natural-match-ab.json'));
   const manifest=readJson(path.join(base,'frontlines-natural-manifest.json'));
@@ -45,7 +45,11 @@ function collectMatrix(root,expected=12){
    nonnegative(s.naturalBlooms,arm+' natural BLOOM count');
    nonnegative(s.publicBloomCommandSamples,arm+' public pilot command samples');
   }
-  pairs.push({...key,on:path.join(dir,row.on),off:path.join(dir,row.off)});
+  const onHas=!!on.frontline?.counts,offHas=!!off.frontline?.counts;
+  if((on.naturalBlooms>0&&!onHas)||(off.naturalBlooms>0&&!offHas))
+   throw Error(dir+': natural BLOOM occurred but Frontlines counters are missing');
+  if(onHas&&offHas) pairs.push({...key,on:path.join(dir,row.on),off:path.join(dir,row.off)});
+  else censored.push({...key,reason:'No natural BLOOM in at least one arm; no physical-arrival exposure denominator'});
   observations.push({...key,off:{time:off.game?.time,status:off.game?.status,
     blooms:off.naturalBlooms,publicBloomCommandSamples:off.publicBloomCommandSamples,
     physicalArrivals:off.frontline?.counts?.aiPhysicalArrivals,
@@ -57,12 +61,13 @@ function collectMatrix(root,expected=12){
     observedContests:on.frontline?.counts?.observedContests,
     pilotDeathCensors:on.frontline?.counts?.pilotDeathCensors}});
  }
- const batch=analyzeManifest({pairs},p=>parseSnapshot(fs.readFileSync(path.join(root,p),'utf8')));
- const warnings=[...batch.warnings,
+ const batch=pairs.length?analyzeManifest({pairs},p=>parseSnapshot(fs.readFileSync(path.join(root,p),'utf8'))):null;
+ const warnings=[...(batch?.warnings||[]),
+  ...(censored.length?[censored.length+' predeclared paired trials had no analyzable natural-BLOOM exposure; retained as censored evidence.']:[]),
   'A public-bloom scripted pilot reacts to changing public announcements; ON/OFF commands may diverge after the worlds diverge.',
   'No policy here models a human player, real-device controls, strategic fun or statistically representative matchmaking.'];
  return{method:'reproducible natural full-match matrix, actual materialized NOVA TANKS',
-  expectedPairs:expected,observedPairs:pairs.length,observations,batch,warnings};
+  expectedPairs:expected,observedPairs:dirs.length,analyzablePairs:pairs.length,censored,observations,batch,warnings};
 }
 if(require.main===module){
  try{
@@ -71,9 +76,9 @@ if(require.main===module){
   const report=collectMatrix(root,expected);
   fs.writeFileSync(path.join(root,'frontlines-natural-matrix-summary.json'),JSON.stringify(report,null,2));
   console.log('NOVA_FRONTLINES_NATURAL_MATRIX '+JSON.stringify({
-   pairs:report.observedPairs,layouts:report.batch.layoutCount,
-   policies:Object.keys(report.batch.policies),
-   arrivalRateDelta:report.batch.overall.metrics.arrivalsPer100OutsideBotSeconds.meanPairedDelta,
+   pairs:report.observedPairs,analyzablePairs:report.analyzablePairs,censoredPairs:report.censored.length,
+   layouts:report.batch?.layoutCount||0,policies:Object.keys(report.batch?.policies||{}),
+   arrivalRateDelta:report.batch?.overall.metrics.arrivalsPer100OutsideBotSeconds.meanPairedDelta??null,
    warnings:report.warnings.length}));
  }catch(e){console.error(e.stack||e);process.exitCode=1;}
 }
