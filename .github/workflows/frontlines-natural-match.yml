@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'tests/browser/frontlines-natural-match-ab.cjs'
+      - 'tests/browser/frontlines-public-pilot.js'
       - 'scripts/frontlines-natural-matrix-report.cjs'
       - 'scripts/frontlines-ab-batch.cjs'
       - 'scripts/frontlines-ab-report.cjs'
@@ -18,7 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         layout: [0, 1, 2]
-        pilot: [wander, public-bloom]
+        pilot: [wander, public-bloom, public-bloom-harvest]
         seed: [0, 1]
     steps:
       - uses: actions/checkout@v4
@@ -63,7 +64,7 @@ jobs:
           path: artifacts/matrix
           merge-multiple: false
       - name: Validate all attempted pairs and preserve bloom-less censored trials
-        run: node scripts/frontlines-natural-matrix-report.cjs artifacts/matrix 12
+        run: node scripts/frontlines-natural-matrix-report.cjs artifacts/matrix 18
       - name: Preserve audited matrix summary
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
