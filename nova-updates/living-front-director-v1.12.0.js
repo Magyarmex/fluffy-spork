@@ -22,17 +22,35 @@ function decision(st,ctx){if(ctx&&ctx.enabled===false)return null;var now=ctx&&c
  * that public destination and the pilot's own hull to give an immediate
  * rotation bearing on tiny mobile maps. The direction is frozen at announcement,
  * not a live radar pointer or a new permanent HUD. */
+function compassBearing(dx,dy){
+ return ['E','SE','S','SW','W','NW','N','NE'][
+  (Math.round(Math.atan2(dy,dx)/(Math.PI/4))+8)%8];
+}
 function bloomToast(g,sector){
  var p=g&&g.player;
  if(!p||!alive(p)||!Number.isFinite(p.x)||!Number.isFinite(p.y))
   return '✦ SHAPE BLOOM · value has accumulated in quiet ground';
  var c=sectorCenter(sector);
  var bearing=sectorIndex(p.x,p.y)===sector?'SAME SECTOR':
-  ['E','SE','S','SW','W','NW','N','NE'][
-   (Math.round(Math.atan2(c.y-p.y,c.x-p.x)/(Math.PI/4))+8)%8];
+  compassBearing(c.x-p.x,c.y-p.y);
  return '✦ SHAPE BLOOM · '+bearing+' · quiet ground is rich';
 }
-function setSignal(g,st,d){var now=g.time||0,sig={type:d.type,started:now,until:now+(d.type==='BLOOM'?5:d.type==='MIGRATION'?4.4:7)};if(d.type==='BLOOM'){sig.sector=d.sector;var c=sectorCenter(d.sector);sig.x=c.x;sig.y=c.y;st.cooldowns.bloom=24;st.lastBloomSector=d.sector;st.bloomMemory={sector:d.sector,announcedAt:now,until:now+24,initialValue:st.sectors[d.sector]?st.sectors[d.sector].value:0};st.lastMeaningfulAt=now;st.stats.blooms++;}else if(d.type==='MIGRATION'){sig.from=d.from;sig.to=d.to;var a=sectorCenter(d.from),b=sectorCenter(d.to);sig.x=(a.x+b.x)/2;sig.y=(a.y+b.y)/2;st.cooldowns.migration=20;st.lastMeaningfulAt=now;st.stats.migrations++;st.migrationHeat*=.28;}else{st.cooldowns.star=58;var n=(g.shapes||[]).length;if(g.spawnShape)g.spawnShape('star',false);var s=(g.shapes||[])[(g.shapes||[]).length-1];if((g.shapes||[]).length<=n||!s||s.type!=='star')return;LF.initStar(g,st,s);sig.starId=s.id;sig.x=s.x;sig.y=s.y;st.lastMeaningfulAt=now;}st.signal=sig;st.lastSignal=d.type;st.lastSignalAt=now;if(d.type==='BLOOM')ensureFrontline(g,st);if(g.toast)g.toast(d.type==='BLOOM'?bloomToast(g,d.sector):d.type==='MIGRATION'?'⇢ MIGRATION · neutral population is moving':'★ ROGUE STAR · intercept the roaming prize','info');if(g.sfx&&g.sfx.novaLivingSignal)g.sfx.novaLivingSignal(d.type,g.player?clamp((sig.x-g.player.x)/900,-1,1):0);}
+/* A MIGRATION is an already-public report of actual neutral crossings.
+ * Tell the player where the reported crossing lies AND which way the
+ * population was moving. Both bearings are frozen at announcement; neither
+ * is a live shape tracker, a hidden-value scan or a permanent HUD. */
+function migrationToast(g,from,to){
+ var a=sectorCenter(from),b=sectorCenter(to);
+ var flow=compassBearing(b.x-a.x,b.y-a.y);
+ var p=g&&g.player;
+ if(!p||!alive(p)||!Number.isFinite(p.x)||!Number.isFinite(p.y))
+  return '⇢ MIGRATION · FLOW '+flow+' · neutral shapes moving';
+ var mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+ var dx=mx-p.x,dy=my-p.y;
+ var location=Math.hypot(dx,dy)<120?'NEAR YOU':compassBearing(dx,dy)+' OF YOU';
+ return '⇢ MIGRATION · '+location+' · FLOW '+flow;
+}
+function setSignal(g,st,d){var now=g.time||0,sig={type:d.type,started:now,until:now+(d.type==='BLOOM'?5:d.type==='MIGRATION'?4.4:7)};if(d.type==='BLOOM'){sig.sector=d.sector;var c=sectorCenter(d.sector);sig.x=c.x;sig.y=c.y;st.cooldowns.bloom=24;st.lastBloomSector=d.sector;st.bloomMemory={sector:d.sector,announcedAt:now,until:now+24,initialValue:st.sectors[d.sector]?st.sectors[d.sector].value:0};st.lastMeaningfulAt=now;st.stats.blooms++;}else if(d.type==='MIGRATION'){sig.from=d.from;sig.to=d.to;var a=sectorCenter(d.from),b=sectorCenter(d.to);sig.x=(a.x+b.x)/2;sig.y=(a.y+b.y)/2;st.cooldowns.migration=20;st.lastMeaningfulAt=now;st.stats.migrations++;st.migrationHeat*=.28;}else{st.cooldowns.star=58;var n=(g.shapes||[]).length;if(g.spawnShape)g.spawnShape('star',false);var s=(g.shapes||[])[(g.shapes||[]).length-1];if((g.shapes||[]).length<=n||!s||s.type!=='star')return;LF.initStar(g,st,s);sig.starId=s.id;sig.x=s.x;sig.y=s.y;st.lastMeaningfulAt=now;}st.signal=sig;st.lastSignal=d.type;st.lastSignalAt=now;if(d.type==='BLOOM')ensureFrontline(g,st);if(g.toast)g.toast(d.type==='BLOOM'?bloomToast(g,d.sector):d.type==='MIGRATION'?migrationToast(g,d.from,d.to):'★ ROGUE STAR · intercept the roaming prize','info');if(g.sfx&&g.sfx.novaLivingSignal)g.sfx.novaLivingSignal(d.type,g.player?clamp((sig.x-g.player.x)/900,-1,1):0);}
 LF.directorTick=function(g,st){var t0=LF.ms(),hasStar=false,sh=g.shapes||[];for(var i=0;i<sh.length;i++)if(sh[i]&&sh[i].hp>0&&sh[i].type==='star'){hasStar=true;break;}if(st.signal&&st.signal.type==='ROGUE STAR'&&st.signal.starId&&g.getShape&&!g.getShape(st.signal.starId))st.signal=null;var d=decision(st,{enabled:st.directorEnabled,now:g.time||0,hasStar:hasStar});if(d)setSignal(g,st,d);if(st.signal&&(g.time||0)>=st.signal.until)st.signal=null;var observed=updateContest(g,st);frontlineTick(g,st,observed);LF.planSample(st,LF.ms()-t0);};
 function visible(g,t,s){var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;var inView=F&&F.inGameplayViewport?F.inGameplayViewport(g,t,s):(function(){var z=(g.cam&&g.cam.zoom)||1,hx=(g.w||800)/(2*z),hy=(g.h||600)/(2*z);return Math.abs(s.x-t.x)<=hx&&Math.abs(s.y-t.y)<=hy;})();return !!inView&&(!g.hasLineOfSight||g.hasLineOfSight(t.x,t.y,s.x,s.y,2));}
 
