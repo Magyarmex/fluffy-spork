@@ -19,7 +19,7 @@ function bloomAgeEligible(st){return !!st&&LF.ageProgress(st)>=.15;}
 function bloomCandidate(st){if(!bloomAgeEligible(st))return-1;var avg=mean(st),best=-1,score=0;for(var i=0;i<16;i++){var s=st.sectors[i],m=s.maturity/Math.max(.1,st.ceiling),v=s.value/(avg+1);if(s.value<310||m<.62||v<1.34)continue;var q=v*.72+m*.55-clamp(s.pressure,0,1)*.42;if(q>score){score=q;best=i;}}return best;}
 function decision(st,ctx){if(ctx&&ctx.enabled===false)return null;var now=ctx&&ctx.now||0;if(st.signal&&now<st.signal.until)return null;if(now-st.lastSignalAt<8)return null;if(st.cooldowns.bloom<=0){var b=bloomCandidate(st);if(b>=0&&(b!==st.lastBloomSector||st.sectors[b].maturity>.78*st.ceiling))return{type:'BLOOM',sector:b};}if(st.cooldowns.migration<=0&&st.migrationHeat>=5){var from=ctx&&ctx.migrationFrom;if(from==null||from<0){var val=-1;for(var i=0;i<16;i++)if(st.sectors[i].outbound>val){val=st.sectors[i].outbound;from=i;}}if(from>=0){var m=Math.hypot(st.migrationX,st.migrationY)||1,c=sectorCenter(from),to=sectorIndex(c.x+st.migrationX/m*(LF.ARENA*2/LF.GRID)*.8,c.y+st.migrationY/m*(LF.ARENA*2/LF.GRID)*.8);if(to!==from)return{type:'MIGRATION',from:from,to:to};}}if(st.cooldowns.star<=0&&!(ctx&&ctx.hasStar)&&bloomCandidate(st)<0&&st.migrationHeat<3&&now>72&&now-st.lastMeaningfulAt>31)return{type:'ROGUE STAR'};return null;}
 function setSignal(g,st,d){var now=g.time||0,sig={type:d.type,started:now,until:now+(d.type==='BLOOM'?5:d.type==='MIGRATION'?4.4:7)};if(d.type==='BLOOM'){sig.sector=d.sector;var c=sectorCenter(d.sector);sig.x=c.x;sig.y=c.y;st.cooldowns.bloom=24;st.lastBloomSector=d.sector;st.bloomMemory={sector:d.sector,announcedAt:now,until:now+24,initialValue:st.sectors[d.sector]?st.sectors[d.sector].value:0};st.lastMeaningfulAt=now;st.stats.blooms++;}else if(d.type==='MIGRATION'){sig.from=d.from;sig.to=d.to;var a=sectorCenter(d.from),b=sectorCenter(d.to);sig.x=(a.x+b.x)/2;sig.y=(a.y+b.y)/2;st.cooldowns.migration=20;st.lastMeaningfulAt=now;st.stats.migrations++;st.migrationHeat*=.28;}else{st.cooldowns.star=58;var n=(g.shapes||[]).length;if(g.spawnShape)g.spawnShape('star',false);var s=(g.shapes||[])[(g.shapes||[]).length-1];if((g.shapes||[]).length<=n||!s||s.type!=='star')return;LF.initStar(g,st,s);sig.starId=s.id;sig.x=s.x;sig.y=s.y;st.lastMeaningfulAt=now;}st.signal=sig;st.lastSignal=d.type;st.lastSignalAt=now;if(g.toast)g.toast(d.type==='BLOOM'?'✦ SHAPE BLOOM · value has accumulated in quiet ground':d.type==='MIGRATION'?'⇢ MIGRATION · neutral population is moving':'★ ROGUE STAR · intercept the roaming prize','info');if(g.sfx&&g.sfx.novaLivingSignal)g.sfx.novaLivingSignal(d.type,g.player?clamp((sig.x-g.player.x)/900,-1,1):0);}
-LF.directorTick=function(g,st){var t0=LF.ms(),hasStar=false,sh=g.shapes||[];for(var i=0;i<sh.length;i++)if(sh[i]&&sh[i].hp>0&&sh[i].type==='star'){hasStar=true;break;}if(st.signal&&st.signal.type==='ROGUE STAR'&&st.signal.starId&&g.getShape&&!g.getShape(st.signal.starId))st.signal=null;var d=decision(st,{enabled:st.directorEnabled,now:g.time||0,hasStar:hasStar});if(d)setSignal(g,st,d);if(st.signal&&(g.time||0)>=st.signal.until)st.signal=null;updateContest(g,st);LF.planSample(st,LF.ms()-t0);};
+LF.directorTick=function(g,st){var t0=LF.ms(),hasStar=false,sh=g.shapes||[];for(var i=0;i<sh.length;i++)if(sh[i]&&sh[i].hp>0&&sh[i].type==='star'){hasStar=true;break;}if(st.signal&&st.signal.type==='ROGUE STAR'&&st.signal.starId&&g.getShape&&!g.getShape(st.signal.starId))st.signal=null;var d=decision(st,{enabled:st.directorEnabled,now:g.time||0,hasStar:hasStar});if(d)setSignal(g,st,d);if(st.signal&&(g.time||0)>=st.signal.until)st.signal=null;var observed=updateContest(g,st);frontlineTick(g,st,observed);LF.planSample(st,LF.ms()-t0);};
 function visible(g,t,s){var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;var inView=F&&F.inGameplayViewport?F.inGameplayViewport(g,t,s):(function(){var z=(g.cam&&g.cam.zoom)||1,hx=(g.w||800)/(2*z),hy=(g.h||600)/(2*z);return Math.abs(s.x-t.x)<=hx&&Math.abs(s.y-t.y)<=hy;})();return !!inView&&(!g.hasLineOfSight||g.hasLineOfSight(t.x,t.y,s.x,s.y,2));}
 
 /* Tactical Frontlines: a BLOOM is contested only when the human pilot and a
@@ -37,6 +37,62 @@ function publicBloom(st,now){
  if(mem&&now<mem.until)return{sector:mem.sector,announcedAt:mem.announcedAt,until:mem.until,live:false};
  return null;
 }
+
+/* Frontlines research telemetry: observation only. No authority over movement,
+ * damage, Director decisions, player HUD, or AI information. */
+function frontlineTrace(f,g,kind,mode,amount){
+ var e={t:+(Number(g.time)||0).toFixed(2),kind:kind,sector:f.sector,mode:mode||'memory'};
+ if(Number.isFinite(amount))e.xp=+amount.toFixed(2);
+ f.events.push(e);if(f.events.length>48)f.events.shift();
+}
+function ensureFrontline(g,st){
+ if(!g||!st||g.__novaDecorativeWorld||g.status!=='playing'||st.directorEnabled===false)return null;
+ var op=publicBloom(st,g.time||0);if(!op)return null;
+ var f=st.frontlineTelemetry;
+ if(!f)f=st.frontlineTelemetry={currentKey:null,sector:-1,announcedAt:-1,playerInside:false,
+  seenContest:false,aiSeen:{},events:[],counts:{announcements:0,playerEntries:0,playerExits:0,
+  observedContests:0,playerDeaths:0,aiArrivals:0,neutralXP:0}};
+ var key=op.sector+':'+op.announcedAt;
+ if(f.currentKey!==key){
+  f.currentKey=key;f.sector=op.sector;f.announcedAt=op.announcedAt;
+  f.playerInside=false;f.seenContest=false;f.aiSeen={};
+  f.counts.announcements++;frontlineTrace(f,g,'announced',op.live?'live':'memory');
+ }
+ return f;
+}
+function frontlineTick(g,st,observedContest){
+ var f=ensureFrontline(g,st);if(!f)return false;
+ var p=g.player,inside=!!(p&&alive(p)&&p.spawnShieldT<=0&&sectorIndex(p.x,p.y)===f.sector);
+ if(inside&&!f.playerInside){f.counts.playerEntries++;frontlineTrace(f,g,'player-entry');}
+ if(!inside&&f.playerInside){
+  f.counts.playerExits++;frontlineTrace(f,g,'player-exit');
+  if(p&&!alive(p)&&sectorIndex(p.x,p.y)===f.sector){f.counts.playerDeaths++;frontlineTrace(f,g,'player-death');}
+ }
+ f.playerInside=inside;
+ if(inside&&observedContest&&!f.seenContest){
+  f.seenContest=true;f.counts.observedContests++;frontlineTrace(f,g,'observed-contest');
+ }
+ var ts=g.tanks||[];
+ for(var i=0;i<ts.length;i++){
+  var t=ts[i],a=t&&t.ai;
+  if(!t||t===p||!alive(t)||!a||a.__lfEcoMode!=='memory'||a.__lfEcoKey!=='BLOOM:'+f.sector||
+    !(a.__lfEcoWeight>.04)||sectorIndex(t.x,t.y)!==f.sector)continue;
+  var id=String(t.id);
+  if(f.aiSeen[id])continue;
+  f.aiSeen[id]=true;f.counts.aiArrivals++;frontlineTrace(f,g,'ai-memory-arrival');
+ }
+ return true;
+}
+function recordFrontlineNeutralXP(g,st,t,amount,orb){
+ if(!g||!t||t!==g.player||!orb||!(amount>0))return false;
+ var f=ensureFrontline(g,st);
+ if(!f||!alive(t)||sectorIndex(t.x,t.y)!==f.sector||
+    sectorIndex(orb.x,orb.y)!==f.sector)return false;
+ f.counts.neutralXP+=amount;frontlineTrace(f,g,'neutral-harvest',null,amount);
+ return true;
+}
+LF.frontlineTick=frontlineTick;
+LF.recordFrontlineNeutralXP=recordFrontlineNeutralXP;
 function contestHostile(g,a,b){
  if(g.areAllies&&g.areAllies(a,b))return false;
  if(typeof g.areHostile==='function')return !!g.areHostile(a,b);
@@ -134,7 +190,7 @@ LF.wrap('game/engine',function(engine){
  };
 });
 function diag(){var g=LF.getActive(),s=g?LF.snapshot(g):LF.getLast()||{active:false,version:V};return'NOVA TANKS · LIVING FRONT '+V+'\n'+JSON.stringify(s,null,2);}
-function debugSummary(s){if(!s||!s.active)return'LIVING FRONT · no active/recorded match telemetry yet';var st=s.stats||{},counts=s.counts||{};return'LIVING FRONT v'+V+' · age '+s.age+'s · ceiling '+s.ceiling+' · '+s.director+' / last '+s.lastSignal+' · total XP '+s.totalXP+' · player neutral '+s.playerNeutralXPPerMin+' XP/min · plan '+s.planMsEma+'ms EMA / '+s.planMsPeak+'ms peak\nSHAPES C'+(counts.circle||0)+' T'+(counts.triangle||0)+' S'+(counts.square||0)+' P'+(counts.pentagon||0)+' H'+(counts.hexagon||0)+' ★'+(counts.star||0)+' CR'+(counts.crasher||0)+' · EVADE '+(st.triangleEvasions||0)+' · CRASH '+(st.crasherCharges||0)+'/'+(st.crasherHits||0)+'/'+(st.crasherMisses||0)+' · OVER '+(st.crasherOvershoots||0)+' · BOUNTY '+Math.round(st.bountyAbsorbed||0)+'/'+Math.round(st.bountyReleased||0)+' · STAR '+(st.starsIntercepted||0)+'/'+(st.starsSpawned||0)+' · BLOOM '+(st.blooms||0)+' · MIG '+(st.migrations||0)+' · AI ROT '+(st.aiRotations||0)+' · CONTEST '+(st.contests||0)+' · HEX AVG '+s.hexAvgNeighbors+'\n'+s.sectors.map(function(q){return q.i+':M'+q.m.toFixed(2)+' P'+q.p.toFixed(2)+' N'+q.n+' XP'+q.xp+' H'+q.harvest.toFixed(2)+' C'+q.combat.toFixed(2)+' '+q.in.toFixed(1)+'→/'+q.out.toFixed(1)+'←';}).join(' · ');}
+function debugSummary(s){if(!s||!s.active)return'LIVING FRONT · no active/recorded match telemetry yet';var st=s.stats||{},counts=s.counts||{};return'LIVING FRONT v'+V+' · age '+s.age+'s · ceiling '+s.ceiling+' · '+s.director+' / last '+s.lastSignal+' · total XP '+s.totalXP+' · player neutral '+s.playerNeutralXPPerMin+' XP/min · plan '+s.planMsEma+'ms EMA / '+s.planMsPeak+'ms peak\nSHAPES C'+(counts.circle||0)+' T'+(counts.triangle||0)+' S'+(counts.square||0)+' P'+(counts.pentagon||0)+' H'+(counts.hexagon||0)+' ★'+(counts.star||0)+' CR'+(counts.crasher||0)+' · EVADE '+(st.triangleEvasions||0)+' · CRASH '+(st.crasherCharges||0)+'/'+(st.crasherHits||0)+'/'+(st.crasherMisses||0)+' · OVER '+(st.crasherOvershoots||0)+' · BOUNTY '+Math.round(st.bountyAbsorbed||0)+'/'+Math.round(st.bountyReleased||0)+' · STAR '+(st.starsIntercepted||0)+'/'+(st.starsSpawned||0)+' · BLOOM '+(st.blooms||0)+' · MIG '+(st.migrations||0)+' · AI ROT '+(st.aiRotations||0)+' · CONTEST '+(st.contests||0)+' · HEX AVG '+s.hexAvgNeighbors+'\n'+s.sectors.map(function(q){return q.i+':M'+q.m.toFixed(2)+' P'+q.p.toFixed(2)+' N'+q.n+' XP'+q.xp+' H'+q.harvest.toFixed(2)+' C'+q.combat.toFixed(2)+' '+q.in.toFixed(1)+'→/'+q.out.toFixed(1)+'←';}).join(' · ')+(s.frontline?' | FRONTLINES · ANN '+s.frontline.counts.announcements+' · ENTRY '+s.frontline.counts.playerEntries+' · CONTEST '+s.frontline.counts.observedContests+' · AI ARRIVE '+s.frontline.counts.aiArrivals+' · NEUTRAL XP '+Math.round(s.frontline.counts.neutralXP):'');}
 function fill(root){if(!root)return;var h=root.querySelector('.nv-lf-debug');if(!h){h=document.createElement('div');h.className='nv-lf-debug';h.style.cssText='margin-top:8px;padding:8px;border:1px solid rgba(255,201,77,.18);border-radius:10px;background:rgba(12,16,26,.7);font:600 9px/1.25 Rajdhani,system-ui;color:#aebed0;white-space:pre-wrap;';var a=root.querySelector('.nv-debug-actions');a?root.insertBefore(h,a):root.appendChild(h);}var s=LF.getActive()?LF.snapshot(LF.getActive()):LF.getLast();h.textContent=debugSummary(s);var b=document.createElement('button');b.type='button';b.dataset.lfCopy='1';b.className='nv-debug-btn';b.textContent='COPY ECOLOGY';b.style.marginTop='7px';b.onclick=function(){if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(diag()).catch(function(){});};h.appendChild(document.createElement('br'));h.appendChild(b);}
 function registerTips(){var api=window.NOVATips;if(!api||typeof api.registerMany!=='function'||window.__NOVA_LIVING_FRONT_TIPS_REGISTERED__)return false;window.__NOVA_LIVING_FRONT_TIPS_REGISTERED__=true;api.registerMany(TIP_DEFS);return true;}
 function bindTipLine(){return registerTips();} // compatibility shim: canonical Fieldcraft owns rendering, cadence, and shuffle bags.
