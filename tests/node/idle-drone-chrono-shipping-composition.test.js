@@ -99,6 +99,8 @@ for(const hz of [30,60,120,240]){
   assert.equal(d.__novaChronoDroneTraceEpoch,epoch);
   assert.equal(d.__novaChronoDroneRouteEpoch,epoch);
   assert.equal(d.__novaChronoDroneLiveEpoch,epoch);
+  assert.equal(d.__novaChronoIdleUnmodifiedEpoch,epoch,
+   'unobstructed idle integration survives every shipping movement owner');
   assert.equal(d.__novaChronoIdleRawEndX,d.__novaChronoDroneBaseX);
   assert.equal(d.__novaChronoIdleRawEndX,d.__novaChronoDroneTerrainX);
   assert.equal(d.__novaChronoIdleRawEndX,d.__novaChronoDroneRouteX);
@@ -140,4 +142,36 @@ test('full shipping path witnesses a physical contact before TTL that remains un
   'this fixture has no later displacement, unlike the terrain test');
  // No additional projectile damage is authorized by the witness alone.
  assert.equal(d.hp,30);
+});
+
+test('wall correction invalidates the final idle motion witness',()=>{
+ const wall={id:-1,shape:'rect',x:20,y:0,w:16,h:60,
+  solid:true,destructible:false};
+ const {g,d}=world({terrain:[wall]});
+ g.update(1/30);
+ assert.equal(d.__novaChronoIdleRawEpoch,g.__novaShapeSweepEpoch);
+ assert.notEqual(d.__novaChronoIdleUnmodifiedEpoch,g.__novaShapeSweepEpoch);
+ assert.equal(d.__novaChronoIdleInvalidEpoch,g.__novaShapeSweepEpoch);
+});
+test('Live Vector repair invalidates the raw Swarm motion even with safe terrain',()=>{
+ const {g,d}=world({damaged:true});
+ g.update(1/60);
+ assert.equal(d.__novaChronoIdleRawEpoch,g.__novaShapeSweepEpoch);
+ assert.equal(d.__novaChronoIdleInvalidEpoch,g.__novaShapeSweepEpoch);
+ assert.notEqual(d.__novaChronoIdleUnmodifiedEpoch,g.__novaShapeSweepEpoch);
+});
+test('Performance cached steering invalidates a previous idle integration',()=>{
+ const {g,d}=world();
+ g.__novaPerfDronePlanAt=g.time+1;
+ d.__v172Waypoint={x:150,y:0};
+ d.__v172WaypointUntil=g.time+2;
+ g.update(1/60);
+ assert.equal(d.__novaChronoIdleRawEpoch,g.__novaShapeSweepEpoch);
+ assert.equal(d.__novaChronoIdleInvalidEpoch,g.__novaShapeSweepEpoch);
+ assert.notEqual(d.__novaChronoIdleUnmodifiedEpoch,g.__novaShapeSweepEpoch);
+});
+test('diagnostics-disabled shipping chain creates no final motion witness',()=>{
+ const {g,d}=world({trace:false});
+ g.update(1/60);
+ assert.equal(d.__novaChronoIdleUnmodifiedEpoch,undefined);
 });
