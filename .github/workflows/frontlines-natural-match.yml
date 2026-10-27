@@ -13,6 +13,13 @@ on:
       - '.github/workflows/frontlines-natural-match.yml'
   workflow_dispatch:
 
+# Supersede obsolete PR/feature-branch checks; never cancel a mainline
+# validation or an explicit manual run. Event-scoped groups avoid push/PR
+# collisions for the same head, and main uses its SHA rather than ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || (github.event_name == 'workflow_dispatch' && github.run_id) || (github.ref == 'refs/heads/main' && github.sha) || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/main') }}
+
 jobs:
   paired-natural-match:
     runs-on: ubuntu-latest
