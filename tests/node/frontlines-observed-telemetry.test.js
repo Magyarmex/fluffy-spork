@@ -292,3 +292,16 @@ test('a pilot already dead before an opportunity starts is not a new death censo
  assert.equal(st.frontlineTelemetry.counts.pilotDeathCensors,0,
   'the opportunity never observed an alive pilot and cannot claim that death');
 });
+
+test('equal public opportunities produce equal exposure denominators in memory ON/OFF/local modes',()=>{
+ const totals=[];
+ for(const mode of ['memory','none','local']){
+  const {g,st,e,LF}=scene();e.ai.__lfEcoMode=mode;
+  LF.frontlineTick(g,st,false);
+  for(let i=0;i<5;i++){g.time+=.22;LF.frontlineTick(g,st,false);}
+  const c=st.frontlineTelemetry.counts;
+  totals.push([c.sampledSeconds,c.pilotAliveSeconds,c.hostileBotSeconds].map(v=>+v.toFixed(6)));
+ }
+ assert.deepEqual(totals,[totals[0],totals[0],totals[0]],
+  'the comparator must not include the ecological steering mode in its denominator');
+});
