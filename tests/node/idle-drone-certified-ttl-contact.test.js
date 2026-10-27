@@ -25,7 +25,7 @@ for(let i=1;i<overlays.length;i++){
 class Game {
  constructor(){
   this.time=1;this.tanks=[];this.drones=[];this.shapes=[];this.bullets=[];
-  this.tmp=[];this.hitOwners=[];this.hash={query:(_x,_y,_r,out)=>{out.length=0;out.push(...this.tanks,...this.shapes,...this.drones);}};
+  this.tmp=[];this.hitOwners=[];this.tankHits=[];this.hash={query:(_x,_y,_r,out)=>{out.length=0;out.push(...this.tanks,...this.shapes,...this.drones);}};
   this.droneCounts=new Map();this.tankById=new Map();
   this.__novaTerrain=[];this.quality='high';this.sfx={};
   this.cam={x:0,y:0,zoom:1,shake:0};this.w=800;this.h=600;
@@ -42,7 +42,7 @@ class Game {
  removeDroneAt(i){this.drones.splice(i,1);}
  acquireDroneTarget(){return null;}
  getTank(id){return this.tankById.get(id)||null;}
- damageTank(){}
+ damageTank(t,amount,owner){this.tankHits.push([t.id,owner]);}
  damageDrone(d,amount,owner){this.hitOwners.push(owner);d.hp-=amount;}
  damageShape(){}
  addImpactDebris(){}
@@ -102,14 +102,18 @@ function world({trace=true,terrain=[],damaged=false,command=false}={}){
 }
 
 function shotWorld(hz,{terrain=[],command=false,trace=false,x=20,y=0,
-  vx=2500,ttl=.004,otherBullets=[],friendly=false,phase='form',idleVY=null,bornThisFrame=false}={}){
+  vx=2500,ttl=.004,otherBullets=[],friendly=false,phase='form',idleVY=null,bornThisFrame=false,frontTank=null,cachedSteering=false}={}){
  const {g,d,owner}=world({trace,terrain,command});
  owner.x=-200;owner.y=0;
  const shooter={id:2,cls:'basic',kind:'tank',alive:true,x:-1000,y:0,hp:100};
  g.tanks.push(shooter);g.tankById.set(2,shooter);
  g.shapes[0].x=0;g.shapes[0].y=50;
+ if(frontTank!==null){const t={id:3,cls:'basic',kind:'tank',alive:true,
+  x:frontTank,y:0,hp:100};g.tanks.push(t);g.tankById.set(3,t);}
  d.x=x;d.y=y;d.__novaPhase=phase;
  if(idleVY!==null)d.__novaIdleVY=idleVY;
+ if(cachedSteering){g.__novaPerfDronePlanAt=g.time+1;
+  d.__v172Waypoint={x:150,y:0};d.__v172WaypointUntil=g.time+2;}
  g.bullets=[{kind:'bullet',id:100,ownerId:friendly?1:2,x:0,y:0,
   vx,vy:0,r:3,dmg:20,ttl,pen:0,hits:0,dead:false,
   shell:false,beam:false},...otherBullets];
@@ -149,6 +153,27 @@ for(const hz of [30,60,120,240]){
  });
  test('uncertified commanded movement never invents contact at '+hz+'Hz',()=>{
   const {g}=shotWorld(hz,{command:true});
+  assert.equal(g.hitOwners.includes(2),false);
+ });
+ test('earlier tank contact retains damage priority at '+hz+'Hz',()=>{
+  const {g}=shotWorld(hz,{frontTank:23});
+  assert.equal(g.hitOwners.includes(2),false,
+   'later drone hit must not steal earlier tank damage');
+  assert.deepEqual(g.tankHits,[[3,2]]);
+ });
+ test('later tank cannot suppress earlier certified drone hit at '+hz+'Hz',()=>{
+  const {g}=shotWorld(hz,{frontTank:40});
+  assert.deepEqual(g.hitOwners,[2]);
+ });
+ test('terrain-corrected idle path is never certified for damage at '+hz+'Hz',()=>{
+  const {g,d}=shotWorld(hz,{terrain:[{id:-1,shape:'rect',
+   x:20,y:0,w:16,h:60,solid:true,destructible:false}]});
+  assert.notEqual(d.__novaChronoIdleUnmodifiedEpoch,g.__novaShapeSweepEpoch);
+  assert.equal(g.hitOwners.includes(2),false);
+ });
+ test('cached-steering displacement invalidates first-contact proof at '+hz+'Hz',()=>{
+  const {g,d}=shotWorld(hz,{cachedSteering:true});
+  assert.notEqual(d.__novaChronoIdleUnmodifiedEpoch,g.__novaShapeSweepEpoch);
   assert.equal(g.hitOwners.includes(2),false);
  });
  test('side projectile competing for the drone vetoes speculative credit at '+hz+'Hz',()=>{
