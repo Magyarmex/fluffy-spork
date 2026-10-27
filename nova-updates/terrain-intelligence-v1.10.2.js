@@ -252,7 +252,13 @@ wrap('game/engine',function(engine,require){
       if(isController(owner)) (groups[owner.id]||(groups[owner.id]=[])).push(d);
       if(d.__novaPhase==='dash'||d.__novaPhase==='windup')continue;
       var pad=(d.r||8)+5;
-      if(before[d.id]&&owner.__novaSwarm&&!owner.__novaSwarm.active)preserveIdleDroneTerrain(this,d,before[d.id],dt,pad);
+      if(before[d.id]&&owner.__novaSwarm&&!owner.__novaSwarm.active){
+        var rerouted=preserveIdleDroneTerrain(this,d,before[d.id],dt,pad);
+        if(rerouted&&this.__novaDroneChronoTraceEnabled===true&&
+           this.__novaShapeSweepActive===true&&
+           d.__novaChronoIdleRawEpoch===this.__novaShapeSweepEpoch)
+          d.__novaChronoIdleInvalidEpoch=this.__novaShapeSweepEpoch;
+      }
       var intent=droneIntent(d),sp=Math.hypot(intent.x,intent.y),st=sampleStuck(this,d,intent.x,intent.y,pad,d.id,d.__v1102Nav||(d.__v1102Nav={}));
       if(st.escapeUntil>now&&sp>1){var e=applyEscape(st,intent.x,intent.y);if(d.__novaSpotter){d.__novaScoutVX=e.x;d.__novaScoutVY=e.y;}else{d.__novaVX=e.x;d.__novaVY=e.y;}}
       if(d.__novaSpotter&&sp>28&&now>=(d.__v1102SpotterPlanAt||0)){
