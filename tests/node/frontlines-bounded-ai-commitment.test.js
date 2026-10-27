@@ -217,3 +217,16 @@ test('live announcement and its stale memory use one unchanged rotating cohort',
  excluded.st.signal=null;excluded.g.time=146;excluded.t.ai.__lfEcoT=0;excluded.tick();
  assert.equal(excluded.st.stats.aiFrontlineCommitments||0,0);
 });
+test('cohort remains bound to the announcement even when match time crosses a 24s boundary',()=>{
+ const started=119.6,until=started+24;
+ for(const [id,expected] of [[7,1],[11,0]]){
+  const s=scene(id);
+  s.st.bloomMemory={sector:5,announcedAt:started,until,initialValue:500};
+  s.st.signal={type:'BLOOM',sector:5,x:-562.5,y:-562.5,started,until:started+5};
+  s.g.time=123;s.tick();
+  assert.equal(s.st.stats.aiFrontlineCommitments||0,expected,'live phase id '+id);
+  s.st.signal=null;s.g.time=124.7;s.t.ai.__lfEcoT=0;s.tick();
+  assert.equal(s.st.stats.aiFrontlineCommitments||0,expected,
+   'later memory phase must not switch to the new match-clock bucket for id '+id);
+ }
+});
