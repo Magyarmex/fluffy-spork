@@ -369,9 +369,15 @@ if(target&&alive(target))bw*=.55;if((t.id||0)%4===0)bw*=.72;out.x=bx;out.y=by;ou
  * and immediately yields to a visible combat target or recent damage.
  * Each rival can commit only once to a particular public announcement. */
 function frontlineTurnEligible(g,t,a,now){
- if(!g||!t||!a||a.__lfEcoMode!=='memory'||!(a.__lfEcoWeight>.10)||!alive(t)||t.spawnShieldT>0)return false;
+ if(!g||!t||!a||!(a.__lfEcoWeight>.10)||!alive(t)||t.spawnShieldT>0)return false;
  var op=publicBloom(g.__lfState,now);
- if(!op||op.live||a.__lfEcoKey!=='BLOOM:'+op.sector||now<op.announcedAt||now-op.announcedAt>12)return false;
+ /* Fresh public BLOOM is the most actionable moment. One selected rival may
+  * commit during the live announcement as well as its remembered afterimage;
+  * both phases share the SAME once-per-announcement key and combat vetoes.
+  * Never promote another signal type or stale ecology to movement authority. */
+ if(!op||a.__lfEcoKey!=='BLOOM:'+op.sector||
+    a.__lfEcoMode!==(op.live?'signal':'memory')||
+    now<op.announcedAt||now-op.announcedAt>12)return false;
  /* The public destination has been reached. Hand control back to local
   * visible farming/combat instead of steering blindly toward its center. */
  if(sectorIndex(t.x,t.y)===op.sector)return false;
