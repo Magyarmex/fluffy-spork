@@ -841,6 +841,19 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      if(optimal>1e-9&&
         Math.hypot(wx+dx*optimal,wy+dy*optimal)+k*optimal<drR-1e-5)
       sample=optimal;
+     /* Preserve the already-shipped positive-time witnesses when the
+      * convex minimum is at frame start. A newly spawned projectile has
+      * no authoritative frame-start birth witness, so do not extend this
+      * path to a previously unproven t=0-only overlap. */
+     if(sample===null&&optimal<=1e-9){
+      var fractions=[.25,.5,.75,.9];
+      for(var fi=0;fi<fractions.length;fi++){
+       var t=limit*fractions[fi];
+       if(Math.hypot(wx+dx*t,wy+dy*t)+k*t<drR-1e-5){
+        sample=t;break;
+       }
+      }
+     }
     }
     if(sample===null||best){uncertain=true;return;}
     best={e:e,kind:'drone',guaranteed:true};bestT=sample;tie=false;return;
