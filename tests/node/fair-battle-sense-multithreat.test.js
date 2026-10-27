@@ -19,13 +19,14 @@ function boot(){
   getTank(id){return this.tanks.find(t=>t.id===id)||null;}
   hasLineOfSight(){return true;}
   moveTank(){}
+  tryFire(t){this.bullets.push({ownerId:t.id,x:t.x,y:t.y,vx:500,vy:0});}
   tankSpeed(){return 200;}
  }
  const classes={CLASSES:{twin:{size:15},guard:{size:15},cannon:{size:15}},
   lineageForClass:cls=>cls==='guard'?'guardian':cls==='cannon'?'cannon':'gunner'};
  const mods={
   'game/engine':m=>{m.exports.Game=Game;},
-  'game/ai':m=>{m.exports.updateAI=(t,g)=>{g.__legacyVisibleIds=g.tanks.map(q=>q.id);};},
+  'game/ai':m=>{m.exports.updateAI=(t,g)=>{g.__legacyVisibleIds=g.tanks.map(q=>q.id);if(g.__fireDuringAI)g.tryFire(t);};},
   'game/classes':m=>{m.exports=classes;}
  };
  const win={__novaModules:mods};
@@ -170,4 +171,31 @@ test('visible allied duelists do not create imaginary hostile crossfire',()=>{
  ai.updateAI(self,g,1/60);
  assert.notEqual(self.ai.__v181Mode,'crossfire');
  assert.equal(self.ai.__v1112TargetId,2);
+});
+
+test('AI-fired shots reach genuinely visible non-primary witnesses, never remote radar',()=>{
+ const {Game,ai}=boot(),g=new Game();g.w=600;
+ const shooter=tank(1,'twin',0,0),primary=tank(2,'guard',-100,0),
+  other=tank(3,'cannon',200,0),remote=tank(4,'twin',900,0);
+ shooter.angle=0;g.tanks=[shooter,primary,other,remote];g.__fireDuringAI=true;
+ ai.updateAI(shooter,g,1/60);
+ assert.equal(shooter.ai.__v1112TargetId,2);
+ assert.deepEqual(Array.from(g.__legacyVisibleIds),[1,2]);
+ assert.equal(other.ai.__v181ObservedShotId,1,
+  'non-primary local witness sees actual AI-fired projectile');
+ assert.equal(other.ai.__v181ObservedShotAngle,0);
+ assert.equal(remote.ai.__v181ObservedShotId,undefined,
+  'offscreen observer cannot receive hidden global firing information');
+ assert.equal(Object.prototype.hasOwnProperty.call(g,'__novaFairShotWitnesses'),false);
+ assert.equal(g.tanks.length,4);
+});
+test('occluded non-primary witnesses cannot observe AI-fired shots',()=>{
+ const {Game,ai}=boot(),g=new Game();g.w=600;
+ const shooter=tank(1,'twin',0,0),primary=tank(2,'guard',-100,0),
+  other=tank(3,'cannon',200,0);
+ shooter.angle=0;g.tanks=[shooter,primary,other];g.__fireDuringAI=true;
+ g.hasLineOfSight=(_ax,_ay,bx)=>bx!==0;
+ ai.updateAI(shooter,g,1/60);
+ assert.equal(other.ai.__v181ObservedShotId,undefined);
+ assert.equal(Object.prototype.hasOwnProperty.call(g,'__novaFairShotWitnesses'),false);
 });
