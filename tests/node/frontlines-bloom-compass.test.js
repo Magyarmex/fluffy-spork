@@ -41,13 +41,13 @@ test('public BLOOM announces eight hull-relative compass directions',()=>{
   assert.ok(message.length<=58,'compass guidance must not expand the existing mobile toast');
  }
 });
-test('player already in the public BLOOM sector gets HERE rather than a false travel direction',()=>{
- assert.match(announce(0,0),/SHAPE BLOOM · HERE ·/);
+test('player already in the public BLOOM sector gets SAME SECTOR rather than falsely implying the resource is at the hull',()=>{
+ assert.match(announce(0,0),/SHAPE BLOOM · SAME SECTOR ·/);
 });
 test('missing player position retains the original informational announcement',()=>{
  const message=announce(1500,0,false);
  assert.match(message,/SHAPE BLOOM/);
- assert.doesNotMatch(message,/SHAPE BLOOM · (?:E|SE|S|SW|W|NW|N|NE|HERE) ·/);
+ assert.doesNotMatch(message,/SHAPE BLOOM · (?:E|SE|S|SW|W|NW|N|NE|SAME SECTOR) ·/);
 });
 test('compass never changes the canonical public signal or reads hidden value for its bearing',()=>{
  const LF=boot(),c=LF.sectorCenter(5);
