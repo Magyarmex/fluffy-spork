@@ -60,13 +60,13 @@ function ensureFrontline(g,st){
  var op=publicBloom(st,g.time||0);if(!op)return null;
  var f=st.frontlineTelemetry;
  if(!f)f=st.frontlineTelemetry={currentKey:null,sector:-1,announcedAt:-1,playerInside:false,
-  seenContest:false,aiSeen:{},aiStartDist:{},aiApproachSeen:{},events:[],counts:{announcements:0,resolved:0,contestSurvivals:0,playerSeconds:0,playerApproaches:0,aiApproaches:0,playerEntries:0,playerExits:0,
-  observedContests:0,playerDeaths:0,aiArrivals:0,neutralXP:0}};
+  seenContest:false,aiSeen:{},aiStartDist:{},aiApproachSeen:{},aiPhysicalLast:{},aiPhysicalArrived:{},events:[],counts:{announcements:0,resolved:0,contestSurvivals:0,playerSeconds:0,playerApproaches:0,aiApproaches:0,playerEntries:0,playerExits:0,
+  observedContests:0,playerDeaths:0,aiArrivals:0,aiPhysicalArrivals:0,aiPhysicalApproaches:0,neutralXP:0}};
  var key=op.sector+':'+op.announcedAt;
  if(f.currentKey!==key){
   closeFrontline(g,st,'replaced');
   f.currentKey=key;f.sector=op.sector;f.announcedAt=op.announcedAt;
-  f.playerInside=false;f.seenContest=false;f.deathRecorded=false;f.closed=false;f.lastSampleTime=Number(g.time)||0;f.playerStartDist=null;f.playerApproachSeen=false;f.aiSeen={};f.aiStartDist={};f.aiApproachSeen={};
+  f.playerInside=false;f.seenContest=false;f.deathRecorded=false;f.closed=false;f.lastSampleTime=Number(g.time)||0;f.playerStartDist=null;f.playerApproachSeen=false;f.aiSeen={};f.aiStartDist={};f.aiApproachSeen={};f.aiPhysicalLast={};f.aiPhysicalArrived={};
   f.counts.announcements++;frontlineTrace(f,g,'announced',op.live?'live':'memory');
  }
  return f;
@@ -79,6 +79,49 @@ function recordFrontlinePlayerDeath(g,st,t){
  if(!f.playerInside){f.playerInside=true;f.counts.playerEntries++;frontlineTrace(f,g,'player-entry');}
  f.deathRecorded=true;f.counts.playerDeaths++;frontlineTrace(f,g,'player-death');
  return true;
+}
+/* Physical A/B witness: count every hostile AI that *actually moves* into
+ * the public opportunity, regardless of its current ecology steering mode.
+ * The older aiArrivals counter remains memory-only for diagnosis, but is not
+ * a valid ON/OFF comparator. This function is observational: never influences
+ * AI movement, signals, combat or XP. Raw coordinates stay internal and are
+ * deliberately omitted by LF.snapshot and the Debug event ring. */
+function physicalAIArrivals(g,f,p,ts,now){
+ if(!p||!alive(p))return;
+ var c=sectorCenter(f.sector),last=f.aiPhysicalLast,arrived=f.aiPhysicalArrived,seen={};
+ for(var i=0;i<ts.length;i++){
+  var t=ts[i],id=t&&t.id!=null?String(t.id):null;
+  if(!id)continue;
+  if(!t.ai||t===p||!alive(t)||t.spawnShieldT>0||!contestHostile(g,p,t)){
+   delete last[id];continue;
+  }
+  seen[id]=true;
+  var inside=sectorIndex(t.x,t.y)===f.sector,dist=Math.hypot(t.x-c.x,t.y-c.y),prev=last[id];
+  if(!prev||prev.ref!==t){
+   last[id]={ref:t,x:t.x,y:t.y,t:now,inside:inside,startDist:inside?null:dist,approached:false};
+   continue;
+  }
+  var dt=now-prev.t,travel=Math.hypot(t.x-prev.x,t.y-prev.y);
+  if(dt<=0&&travel<=1e-6)continue;
+  var speed=typeof g.tankSpeed==='function'?Number(g.tankSpeed(t)):900;
+  if(!(speed>0)||!Number.isFinite(speed))speed=900;
+  /* A jump, long background gap or recycled body is not a witnessed journey.
+   * Prefer missing a dash arrival over fabricating a physical A/B advantage. */
+  if(!(dt>0&&dt<=2)||travel>Math.max(180,speed*dt*2.2+60)){
+   last[id]={ref:t,x:t.x,y:t.y,t:now,inside:inside,startDist:inside?null:dist,approached:false};
+   continue;
+  }
+  if(!prev.approached&&prev.startDist!=null&&prev.startDist-dist>=60){
+   prev.approached=true;f.counts.aiPhysicalApproaches++;
+   frontlineTrace(f,g,'ai-physical-approach',t.ai.__lfEcoMode||'none');
+  }
+  if(!prev.inside&&inside&&!arrived[id]){
+   arrived[id]=true;f.counts.aiPhysicalArrivals++;
+   frontlineTrace(f,g,'ai-physical-arrival',t.ai.__lfEcoMode||'none');
+  }
+  prev.x=t.x;prev.y=t.y;prev.t=now;prev.inside=inside;
+ }
+ for(var key in last)if(!seen[key])delete last[key];
 }
 function frontlineTick(g,st,observedContest){
  var f=ensureFrontline(g,st);
@@ -121,6 +164,7 @@ function frontlineTick(g,st,observedContest){
   if(!aiInside||!f.aiApproachSeen[id]||f.aiSeen[id])continue;
   f.aiSeen[id]=true;f.counts.aiArrivals++;frontlineTrace(f,g,'ai-memory-arrival');
  }
+ physicalAIArrivals(g,f,p,ts,now);
  return true;
 }
 function recordFrontlineNeutralXP(g,st,t,amount,orb){
