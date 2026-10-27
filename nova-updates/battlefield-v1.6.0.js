@@ -788,6 +788,51 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      if(best&&bestT<1e-8){tie=true;return;}
      best={e:e,kind:'drone'};bestT=0;tie=false;return;
     }
+    /* A complete, certified single idle integration is stronger evidence
+     * than the speed-ball envelope: it gives a real straight movement segment
+     * with the same frame duration as the projectile. Only the ordinary
+     * one-hit, non-piercing TTL lane can consume it. Every later movement
+     * owner must have accepted this exact segment in the current epoch.
+     * No guessed dash, terrain correction, route or repair is admissible. */
+    if(b.pen===0&&(b.hits||0)===0&&witnessed&&
+       g.__novaDroneChronoTraceEnabled===true&&
+       e.__novaChronoIdleUnmodifiedEpoch===g.__novaShapeSweepEpoch&&
+       e.__novaChronoIdleRawDt===dt&&
+       e.__novaChronoIdleRawX===dsx&&
+       e.__novaChronoIdleRawY===dsy&&
+       e.__novaChronoIdleRawEndX===e.x&&
+       e.__novaChronoIdleRawEndY===e.y&&
+       !e.__novaCommitted&&e.__novaPhase!=='dash'){
+     var relx=dx-(e.x-dsx),rely=dy-(e.y-dsy),
+         fx=ax-dsx,fy=ay-dsy,
+         A=relx*relx+rely*rely,
+         B=2*(fx*relx+fy*rely),
+         C=fx*fx+fy*fy-drR*drR;
+     if(!(C>1e-9)||!Number.isFinite(A)||
+        !Number.isFinite(B)||!Number.isFinite(C)){
+       uncertain=true;return;
+     }
+     if(A>1e-12){
+       var D=B*B-4*A*C;
+       if(!Number.isFinite(D)||
+          Math.abs(D)<=1e-10*(B*B+4*A*(fx*fx+fy*fy+drR*drR))){
+         uncertain=true;return;
+       }
+       if(D>0){
+         var root=Math.sqrt(D),q=-.5*(B+(B<0?-root:root));
+         if(!q){uncertain=true;return;}
+         var enter=Math.min(q/A,C/q),leave=Math.max(q/A,C/q);
+         if(leave>0&&enter>=0&&enter<limit-1e-10){
+           if(best&&Math.abs(enter-bestT)<1e-8){tie=true;return;}
+           if(enter<bestT){
+             best={e:e,kind:'drone',exact:true};
+             bestT=enter;tie=false;
+           }
+         }
+       }
+     }
+     return; /* certified miss is not an unknown-motion veto */
+    }
     /* End-only overlap is not a zero-time contact. It can still have a
      * rigorous pre-expiry proof below, using the witnessed frame start. */
     if(!witnessed||!Number.isFinite(e.speed)||!(e.speed>0)||
@@ -1050,7 +1095,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    /* A competing projectile may reach the SAME drone from a different
     * direction without crossing our bullet corridor. Our guaranteed
     * overlap time is only an upper bound, so preserve earlier kill credit. */
-   if(best.guaranteed&&o.ownerId!==best.e.id){
+   if((best.guaranteed||best.exact)&&o.ownerId!==best.e.id){
     var dr=best.e,dsx=dr.__novaChronoDronePrevX,
         dsy=dr.__novaChronoDronePrevY,rr=(o.r||2)+(dr.r||8)+1;
     if(!Number.isFinite(o.r)||!Number.isFinite(ex)||!Number.isFinite(ey)||
@@ -1501,7 +1546,36 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    for(var ti=0;ti<this.tanks.length;ti++){var o=this.tanks[ti];if(!o||!o.alive||o.__novaSpotterContactId==null||o.__novaSpotterContactId<0)continue;var target=this.getTank(o.__novaSpotterContactId),spot=spotMap.get(o.id)||null;if(target&&spot&&!lineOfSight(this,spot.x,spot.y,target.x,target.y,2)){o.__novaSpotterContactId=-1;o.__novaSpotterContactUntil=0;o.__novaSpotterDroneId=-1;}}
  return out;};
 
- var oldUpdate=Game.prototype.update;Game.prototype.update=function(dt){ensureTerrain(this);var epoch=(this.__novaShapeSweepEpoch||0)+1;this.__novaShapeSweepEpoch=epoch;
+ var oldUpdate=Game.prototype.update;Game.prototype.update=function(dt){ensureTerrain(this);
+ /* Enable the existing read-only motion witness only for a bounded,
+  * spatially relevant ordinary TTL shot. Keep the optional instrumentation
+  * off for the usual frames and for large crowded populations. */
+ var priorTrace=this.__novaDroneChronoTraceEnabled,autoTrace=false;
+ var bs=this.bullets||[],ds=this.drones||[];
+ if(priorTrace!==true&&dt>0&&Number.isFinite(dt)&&
+    bs.length<=256&&ds.length<=64){
+  for(var bi=0;bi<bs.length&&!autoTrace;bi++){
+   var pb=bs[bi];
+   if(!pb||pb.dead||pb.shell||pb.beam||pb.splash||
+      pb.__v17Cannon||pb.pen!==0||(pb.hits||0)!==0||
+      !(pb.ttl>0&&pb.ttl<=dt)||
+      !Number.isFinite(pb.x)||!Number.isFinite(pb.y)||
+      !Number.isFinite(pb.vx)||!Number.isFinite(pb.vy))continue;
+   var px=pb.x+pb.vx*pb.ttl,py=pb.y+pb.vy*pb.ttl;
+   if(!Number.isFinite(px)||!Number.isFinite(py))continue;
+   for(var dj=0;dj<ds.length;dj++){
+    var dr=ds[dj];if(!dr||!(dr.hp>0)||
+       dr.ownerId===pb.ownerId||!Number.isFinite(dr.x)||
+       !Number.isFinite(dr.y))continue;
+    var pad=(pb.r||3)+(dr.r||8)+1+Math.max(30,dt*2400);
+    if(dr.x+pad>=Math.min(pb.x,px)&&dr.x-pad<=Math.max(pb.x,px)&&
+       dr.y+pad>=Math.min(pb.y,py)&&dr.y-pad<=Math.max(pb.y,py)){
+      this.__novaDroneChronoTraceEnabled=true;autoTrace=true;break;
+    }
+   }
+  }
+ }
+ var epoch=(this.__novaShapeSweepEpoch||0)+1;this.__novaShapeSweepEpoch=epoch;
  /* Capture drones before AI/drone movement; the later projectile pre-pass
   * may only exclude drones whose complete observed corridor is remote. */
  var chronoDrones=this.drones||[];for(var di=0;di<chronoDrones.length;di++){
@@ -1530,7 +1604,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   }
  }
  var shapes=this.shapes||[];for(var si=0;si<shapes.length;si++){var sh=shapes[si];if(!sh)continue;sh.__novaShapeSweepEpoch=epoch;sh.__novaShapeSweepPrevX=sh.x;sh.__novaShapeSweepPrevY=sh.y;}this.__novaShapeSweepActive=true;if(this.__novaBattlefield&&!this.__novaBattlefield.announced&&this.status==='playing'&&this.time>.1){this.__novaBattlefield.announced=true;if(this.toast)this.toast('¦ BATTLEFIELD · '+this.__novaBattlefield.name+'  COVER CHANGES THE FIGHT','info');}
-   var out;try{out=oldUpdate.call(this,dt);}finally{this.__novaShapeSweepActive=false;}for(var i=0;i<this.shapes.length;i++){var s=this.shapes[i];if(!s||s.hp<=0)continue;circleResolve(this,s,(s.r||10)*.86);}return out;};
+   var out;try{out=oldUpdate.call(this,dt);}finally{this.__novaShapeSweepActive=false;if(autoTrace)this.__novaDroneChronoTraceEnabled=priorTrace;}for(var i=0;i<this.shapes.length;i++){var s=this.shapes[i];if(!s||s.hp<=0)continue;circleResolve(this,s,(s.r||10)*.86);}return out;};
 });
 
 wrap('game/ai',function(ai){var old=ai.updateAI;if(!old||old.__novaBattlefieldAI)return;function patched(t,g,dt){if(t&&t.ai&&t.ai.targetId>=0){var tar=g.getTank&&g.getTank(t.ai.targetId);if(tar&&tar.alive&&g.hasLineOfSight&&!g.hasLineOfSight(t.x,t.y,tar.x,tar.y,3)){t.ai.__novaOccluded=(t.ai.__novaOccluded||0)+dt;if(t.ai.__novaOccluded>.28){t.ai.targetId=-1;t.ai.state='wander';t.ai.thinkT=0;t.ai.fireHold=Math.max(t.ai.fireHold||0,.18);}}else t.ai.__novaOccluded=Math.max(0,(t.ai.__novaOccluded||0)-dt*2);}var out=old(t,g,dt);if(t&&t.__novaTerrainBumpT>0){t.__novaTerrainBumpT-=dt;if(t.ai&&t.__novaTerrainBumpT>0&&Math.random()<dt*4){t.ai.strafe=(t.ai.strafe||1)*-1;t.ai.thinkT=0;}}return out;}patched.__novaBattlefieldAI=true;ai.updateAI=patched;});
