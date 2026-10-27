@@ -995,3 +995,33 @@ for(const optimized of [false,true]){
    'a lateral t=0 shape hit must precede the expiring local shot');
  });
 }
+
+
+/* Deterministic differential gate: remote density must not alter the
+ * analytic first-contact classification for ordinary one-hit tank rounds. */
+for(const optimized of [false,true])for(const fps of [30,60]){
+ test((optimized?'optimized':'baseline')+
+  ' seeded 2000-remote-bullet first-event parity at '+fps+'Hz',()=>{
+  const Game=boot(undefined,optimized);
+  let seed=0x2026387;
+  const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+  let reachable=0,unreachable=0;
+  for(let i=0;i<40;i++){
+   const x=30+rand()*95,vx=2500+rand()*5500,ttl=.003+rand()*.009;
+   const contact=(x-21)/vx,expected=contact<ttl-1e-7;
+   if(Math.abs(contact-ttl)<1e-7)continue;
+   const g=new Game();
+   g.tanks=[{kind:'tank',id:2,x,y:0,cls:'scout',hp:100,alive:true}];
+   g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+    vx,vy:0,r:3,dmg:20,ttl,pen:0,hits:0,
+    dead:false,shell:false,beam:false}];
+   addRemoteTTLFire(g);
+   g.updateBullets(1/fps);
+   assert.equal(g.hits,expected?1:0,
+    'world '+i+' x='+x+' speed='+vx+' ttl='+ttl);
+   if(expected)reachable++;else unreachable++;
+  }
+  assert.ok(reachable>5&&unreachable>5,
+   'seeded worlds must exercise both physical classifications');
+ });
+}
