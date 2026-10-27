@@ -47,7 +47,31 @@
     }
     return null;
   }
-  const api={dodgeVisibleProjectile};
+  /* Aim directly at a witnessed, reachable hostile before resuming neutral
+   * harvest. No global radar, hidden class information, predictive aimbot,
+   * remote targeting, or shooting through cover. */
+  function aimAtVisibleHostile(g,p,F){
+    if(!g||!p||!F||typeof F.viewportHalfExtents!=='function'||
+       typeof F.inGameplayViewport!=='function'||typeof g.hasLineOfSight!=='function')return null;
+    const ext=F.viewportHalfExtents(g);
+    if(!ext||!(ext.x>0)||!(ext.y>0))return null;
+    const cam=g.cam||{},cx=Number.isFinite(cam.x)?cam.x:p.x,
+      cy=Number.isFinite(cam.y)?cam.y:p.y;
+    let target=null,dist=Infinity;
+    for(const t of g.tanks||[]){
+      if(!t||t===p||t.id===p.id||t.alive===false||!(t.hp>0)||
+         t.spawnShieldT>0||!Number.isFinite(t.x)||!Number.isFinite(t.y)||
+         Math.abs(t.x-p.x)>ext.x||Math.abs(t.y-p.y)>ext.y||
+         Math.abs(t.x-cx)>ext.x||Math.abs(t.y-cy)>ext.y)continue;
+      if(!F.inGameplayViewport(g,p,t)||!g.hasLineOfSight(p.x,p.y,t.x,t.y,2))continue;
+      if(typeof g.areAllies==='function'&&g.areAllies(p,t))continue;
+      if(typeof g.areHostile==='function'&&!g.areHostile(p,t))continue;
+      const d=Math.hypot(t.x-p.x,t.y-p.y);
+      if(d>1&&d<=420&&d<dist){target=t;dist=d;}
+    }
+    return target?{x:(target.x-p.x)/dist,y:(target.y-p.y)/dist}:null;
+  }
+  const api={dodgeVisibleProjectile,aimAtVisibleHostile};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
   else root.__novaResearchVisibleDefense=api;
 })(typeof window!=='undefined'?window:globalThis);
