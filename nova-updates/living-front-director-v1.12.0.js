@@ -30,7 +30,8 @@ function visible(g,t,s){var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;var inView=F&
  * one bounded rotation. After its live five-second signal, the memory ring is
  * explicitly stale: it cannot reveal enemy positions or guarantee current XP. */
 function publicBloom(st,now){
- var sig=st&&st.signal;
+ if(!st||st.directorEnabled===false)return null;
+ var sig=st.signal;
  if(sig&&sig.type==='BLOOM'&&now<sig.until)return{sector:sig.sector,announcedAt:sig.started,until:sig.until,live:true};
  var mem=st&&st.bloomMemory;
  if(mem&&now<mem.until)return{sector:mem.sector,announcedAt:mem.announcedAt,until:mem.until,live:false};
@@ -50,9 +51,9 @@ function contestCandidate(g,st){
  if(!op||!p||!alive(p)||p.spawnShieldT>0||g.__novaDecorativeWorld||sectorIndex(p.x,p.y)!==op.sector)return false;
  /* A public announcement is not proof that valuable shapes still remain.
   * Half the original BLOOM entry threshold prevents empty-sector false alarms.
-  * For stale memory also require a quarter of its originally observed value. */
+  * For stale memory also require a bounded fraction of the announced value. */
  var sector=st.sectors&&st.sectors[op.sector],mem=st.bloomMemory;
- if(!sector||sector.value<Math.max(155,(!op.live&&mem?mem.initialValue||0:0)*.25))return false;
+ if(!sector||sector.value<Math.max(155,Math.min(310,(!op.live&&mem?mem.initialValue||0:0)*.25)))return false;
  var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
  if(!F||typeof F.inGameplayViewport!=='function'||typeof g.hasLineOfSight!=='function')return false;
  var ts=g.tanks||[];
