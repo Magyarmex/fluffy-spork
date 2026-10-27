@@ -143,14 +143,36 @@ function contestHostile(g,a,b){
  for(var i=0;i<keys.length;i++){var k=keys[i];if(a[k]!=null&&b[k]!=null)return a[k]!==b[k];}
  return true;
 }
+/* CONTESTED is player-facing intelligence: use the same viewport geometry as
+ * Fair Engagement, but do not pass shapes through its tank-ID predicate.
+ * A shape and tank may share an ID. Terrain LoS is required for every counted
+ * shape. This runs only at the decimated Director cadence and stops as soon
+ * as enough visible neutral value is proven (canonical neutral population is
+ * bounded), rather than scanning hidden sector state or adding frame work. */
+function observedPocketValue(g,st,p,sector,required){
+ var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__,defs=st&&st.defs||LF.defs;
+ if(!F||typeof F.viewportHalfExtents!=='function'||!g||typeof g.hasLineOfSight!=='function'||!defs)return 0;
+ var e=F.viewportHalfExtents(g);
+ if(!e||!(e.x>0)||!(e.y>0))return 0;
+ var sh=g.shapes||[],value=0;
+ for(var i=0;i<sh.length;i++){
+  var s=sh[i];if(!s||!(s.hp>0)||sectorIndex(s.x,s.y)!==sector)continue;
+  if(Math.abs(s.x-p.x)>e.x||Math.abs(s.y-p.y)>e.y)continue;
+  var base=xp(defs,s.type);if(!(base>0))continue;
+  if(!g.hasLineOfSight(p.x,p.y,s.x,s.y,2))continue;
+  value+=base+(s.type==='crasher'?(Number(s.__lfBounty)||0):0)
+   +(s.type==='hexagon'?80:s.type==='star'?170:s.type==='pentagon'?22:0);
+  if(value>=required)return value;
+ }
+ return value;
+}
 function contestCandidate(g,st){
  var now=g&&g.time||0,op=publicBloom(st,now),p=g&&g.player;
  if(!op||!p||!alive(p)||p.spawnShieldT>0||g.__novaDecorativeWorld||sectorIndex(p.x,p.y)!==op.sector)return false;
- /* A public announcement is not proof that valuable shapes still remain.
-  * Half the original BLOOM entry threshold prevents empty-sector false alarms.
-  * For stale memory also require a bounded fraction of the announced value. */
- var sector=st.sectors&&st.sectors[op.sector],mem=st.bloomMemory;
- if(!sector||sector.value<Math.max(155,Math.min(310,(!op.live&&mem?mem.initialValue||0:0)*.25)))return false;
+ /* The BLOOM announcement is historical public intelligence, not proof of
+  * current value. Require enough genuinely visible neutral value. Private
+  * sector totals and the initial BLOOM value must never control the badge. */
+ if(observedPocketValue(g,st,p,op.sector,155)<155)return false;
  var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
  if(!F||typeof F.inGameplayViewport!=='function'||typeof g.hasLineOfSight!=='function')return false;
  var ts=g.tanks||[];
