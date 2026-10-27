@@ -9,6 +9,11 @@ function scene(mode='none'){
   performance:{now:()=>0},setTimeout(){},clearTimeout(){}};
  for(const name of ['living-front-core-v1.12.0.js','living-front-instincts-v1.12.0.js','living-front-director-v1.12.0.js'])
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../../nova-updates',name),'utf8'),ctx,{filename:name});
+ // Load the composed engine module: this installs the observational moveTank
+ // witness exactly as the production module registry does.
+ const engineModule={exports:{}};
+ window.__novaModules['game/engine'](engineModule,{},()=>({}));
+ assert.equal(engineModule.exports.Game,Game);
  const LF=window.__NOVA_LIVING_FRONT_INTERNAL__,g=new Game();
  const p={id:1,x:-560,y:-560,hp:100,team:1,alive:true};
  const e={id:2,x:-1150,y:-550,hp:100,team:2,alive:true,ai:{__lfEcoMode:mode,__lfEcoKey:'BLOOM:5',__lfEcoWeight:.2}};
