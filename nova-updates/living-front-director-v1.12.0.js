@@ -306,7 +306,51 @@ if((!sig||now>=sig.until)&&st){
  }
 }
 if(target&&alive(target))bw*=.55;if((t.id||0)%4===0)bw*=.72;out.x=bx;out.y=by;out.weight=bw;out.key=key;out.mode=mode;return out;}
-LF.wrap('game/ai',function(ai,require){var old=ai.updateAI;if(!old||old.__novaLivingFront)return;var defs=(require('./types')||{}).SHAPE_DEFS||{};function patched(t,g,dt){if(!t||!t.ai||!g)return old(t,g,dt);var a=t.ai;a.__lfEcoT=(a.__lfEcoT||0)-dt;if(a.__lfEcoT<=0){a.__lfEcoT=(a.isElite?LF.AI_PERIOD*.82:LF.AI_PERIOD)+(Math.abs(t.id||0)%5)*.019;var prev=a.__lfEcoKey||'none',b=publicEcoBias(g,t,defs,a.__lfEcoBias||(a.__lfEcoBias={}));a.__lfEcoX=b.x;a.__lfEcoY=b.y;a.__lfEcoWeight=b.weight;a.__lfEcoKey=b.key;a.__lfEcoMode=b.mode;if(b.weight>.08&&prev!==b.key&&g.__lfState)g.__lfState.stats.aiRotations++;}var move=g.moveTank,own=Object.prototype.hasOwnProperty.call(g,'moveTank');if(move&&a.__lfEcoWeight>.04)g.moveTank=function(tt,vx,vy,dd){if(tt!==t)return move.apply(g,arguments);var sp=Math.hypot(vx||0,vy||0)||((g.tankSpeed&&g.tankSpeed(tt))||1),w=clamp(a.__lfEcoWeight,0,.48),x=(vx||0)/sp*(1-w)+a.__lfEcoX*w,y=(vy||0)/sp*(1-w)+a.__lfEcoY*w,m=Math.hypot(x,y)||1;return move.call(g,tt,x/m*sp,y/m*sp,dd);};try{return old(t,g,dt);}finally{if(move){if(own)g.moveTank=move;else delete g.moveTank;}}}patched.__novaLivingFront=true;ai.updateAI=patched;});
+/* Tactical Frontlines: a short route commitment lets a few healthy rivals
+ * make a meaningful public-opportunity turn instead of only drifting a few
+ * degrees. It never consults private ecology, never targets the human by id,
+ * and immediately yields to a visible combat target or recent damage.
+ * Each rival can commit only once to a particular public announcement. */
+function frontlineTurnEligible(g,t,a,now){
+ if(!g||!t||!a||a.__lfEcoMode!=='memory'||!(a.__lfEcoWeight>.10)||!alive(t)||t.spawnShieldT>0)return false;
+ var op=publicBloom(g.__lfState,now);
+ if(!op||op.live||a.__lfEcoKey!=='BLOOM:'+op.sector||now-op.announcedAt>12)return false;
+ if(Math.abs(Number(t.id)||0)%3!==1)return false;
+ if(t.hp/Math.max(1,t.maxHp||t.hp||1)<.65)return false;
+ var targetId=a.__v1112TargetId;
+ if(targetId!=null&&targetId>=0){
+  if(typeof g.getTank!=='function')return false;
+  if(fairEcoTarget(g,t,g.getTank(targetId)))return false;
+ }
+ var hitAt=Number(a.__v180HitAt);
+ if(Number.isFinite(hitAt)&&now>=hitAt&&now-hitAt<2.5)return false;
+ return true;
+}
+function refreshFrontlineTurn(g,t,a){
+ var now=Number(g.time)||0,op=publicBloom(g.__lfState,now);
+ if(!frontlineTurnEligible(g,t,a,now)){a.__lfFrontTurn=null;return;}
+ var key='BLOOM:'+op.sector+':'+op.announcedAt,active=a.__lfFrontTurn;
+ if(active&&(active.key!==key||now>=active.until))a.__lfFrontTurn=null;
+ if(!a.__lfFrontTurn&&a.__lfFrontTurnSpentKey!==key){
+  a.__lfFrontTurn={key:key,until:now+2.2};
+  a.__lfFrontTurnSpentKey=key;
+  var st=g.__lfState;st.stats=st.stats||{};
+  st.stats.aiFrontlineCommitments=(st.stats.aiFrontlineCommitments||0)+1;
+ }
+}
+LF.wrap('game/ai',function(ai,require){var old=ai.updateAI;if(!old||old.__novaLivingFront)return;var defs=(require('./types')||{}).SHAPE_DEFS||{};function patched(t,g,dt){if(!t||!t.ai||!g)return old(t,g,dt);var a=t.ai;a.__lfEcoT=(a.__lfEcoT||0)-dt;if(a.__lfEcoT<=0){a.__lfEcoT=(a.isElite?LF.AI_PERIOD*.82:LF.AI_PERIOD)+(Math.abs(t.id||0)%5)*.019;var prev=a.__lfEcoKey||'none',b=publicEcoBias(g,t,defs,a.__lfEcoBias||(a.__lfEcoBias={}));a.__lfEcoX=b.x;a.__lfEcoY=b.y;a.__lfEcoWeight=b.weight;a.__lfEcoKey=b.key;a.__lfEcoMode=b.mode;if(b.weight>.08&&prev!==b.key&&g.__lfState)g.__lfState.stats.aiRotations++;refreshFrontlineTurn(g,t,a);}var move=g.moveTank,own=Object.prototype.hasOwnProperty.call(g,'moveTank');if(move&&a.__lfEcoWeight>.04)g.moveTank=function(tt,vx,vy,dd){
+ if(tt!==t)return move.apply(g,arguments);
+ var now=Number(g.time)||0,turn=a.__lfFrontTurn,
+  committed=!!(turn&&now<turn.until&&frontlineTurnEligible(g,t,a,now));
+ if(turn&&!committed)a.__lfFrontTurn=null;
+ var raw=Math.hypot(vx||0,vy||0),cap=g.tankSpeed&&Number(g.tankSpeed(tt));
+ /* A committed dash, boosted move or deliberate stationary hold belongs to
+  * its original combat owner; ecology cannot commandeer those commands. */
+ if(committed&&(!(raw>1e-6)||(cap>0&&raw>cap*1.15)))return move.apply(g,arguments);
+ var sp=raw||(cap||1),w=committed?.66:clamp(a.__lfEcoWeight,0,.48),
+  x=(vx||0)/sp*(1-w)+a.__lfEcoX*w,y=(vy||0)/sp*(1-w)+a.__lfEcoY*w,m=Math.hypot(x,y)||1;
+ return move.call(g,tt,x/m*sp,y/m*sp,dd);
+};try{return old(t,g,dt);}finally{if(move){if(own)g.moveTank=move;else delete g.moveTank;}}}patched.__novaLivingFront=true;ai.updateAI=patched;});
 
 /* The core minimap already draws the public BLOOM. Add a short local contest
  * accent after it, without introducing a new HUD, minimap authority or input. */
