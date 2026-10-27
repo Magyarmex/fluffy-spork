@@ -379,16 +379,19 @@ async function scenario(browser, label, options) {
     // Actual React-owned death panel: verify the Fieldcraft note is truthful,
     // readable at 320px, and discarded on redeploy. No synthetic DOM fixture.
     if(label==='desktop'||label.startsWith('mobile')||label==='landscape-568'){
-      await page.evaluate(()=>{
+      await page.evaluate(label=>{
         const g=window.__novaBrowserLiveGame;
         const enemy=g.tanks.find(t=>t&&!t.isPlayer&&t.alive);
         if(!enemy)throw new Error('real AI killer unavailable');
         enemy.cls='marksman'; // known Sniper-lineage opponent
+        // The optional NEW HIGH SCORE line is the worst-case height; prove
+        // both actions remain visible even when the player earns a record.
+        if(label==='landscape-568')g.player.score=Math.max(200,(Number(g.best)||0)+200);
         g.player.spawnShieldT=0;g.player.shieldT=0;
         g.player.bulwarkT=0;g.player.tauntT=0;
         g.damageTank(g.player,1e8,enemy.id);
         if(g.status!=='dying')throw new Error('lethal damage did not enter dying state');
-      });
+      },label);
       await page.getByText('TERMINATED',{exact:true}).waitFor({state:'visible',timeout:20000});
       const deathDiagnostic=await page.evaluate(()=>{
         const g=window.__novaBrowserLiveGame;
@@ -421,6 +424,26 @@ async function scenario(browser, label, options) {
         label+': insight must fit the viewport: '+JSON.stringify(geometry));
       assert.ok(geometry.panelTop>=-1&&geometry.panelBottom<=geometry.viewportHeight+1,
         label+': complete TERMINATED panel must remain vertically visible: '+JSON.stringify(geometry));
+      if(label==='landscape-568'){
+        // A scrollable death panel can fit its outer box while hiding both
+        // critical next-run actions below the fold. Require immediate access.
+        const actionFit=await page.evaluate(()=>{
+          const note=document.querySelector('[data-nova-death-insight]');
+          const panel=note?.parentElement;
+          const buttons=[...(panel?.querySelectorAll('button')||[])];
+          const rect=b=>{const r=b.getBoundingClientRect();return{
+            text:b.textContent,left:r.left,right:r.right,top:r.top,bottom:r.bottom};};
+          return {height:innerHeight,scrollTop:panel?.scrollTop||0,
+            actions:buttons.map(rect),panel:panel?.getBoundingClientRect().toJSON()};
+        });
+        assert.equal(actionFit.actions.length,2,
+          'landscape death screen retains Redeploy and Main Menu');
+        assert.ok(actionFit.actions.every(b=>b.top>=8&&b.bottom<=actionFit.height-8),
+          'both next-run actions must be visible WITHOUT scrolling at 568x320: '+
+          JSON.stringify(actionFit));
+        assert.equal(actionFit.scrollTop,0,'actions must fit at initial scroll position');
+        console.log('NOVA_LANDSCAPE_DEATH_ACTIONS '+JSON.stringify(actionFit));
+      }
       // Measure the text glyphs, not only the block box: the 320px defect
       // paints past the panel even though the block itself remains contained.
       const deathTitle=await page.getByText('TERMINATED',{exact:true}).evaluate(el=>{
@@ -438,7 +461,9 @@ async function scenario(browser, label, options) {
         deathTitle.glyphRight<=deathTitle.innerRight+1,
         label+': TERMINATED glyphs must fit inside the panel content box: '+
         JSON.stringify(deathTitle));
-      if(deathTitle.viewport>=390)assert.equal(deathTitle.fontSize,'30px',
+      if(label==='landscape-568')assert.equal(deathTitle.fontSize,'20px',
+        label+': compact only the short-landscape death title');
+      else if(deathTitle.viewport>=390)assert.equal(deathTitle.fontSize,'30px',
         label+': retain desktop/large-phone title scale');
       console.log('NOVA_DEATH_TITLE '+JSON.stringify({label,deathTitle}));
       await page.screenshot({path:path.join(output,label+'-death-insight.png')});
