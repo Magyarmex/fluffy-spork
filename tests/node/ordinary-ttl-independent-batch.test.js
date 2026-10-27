@@ -205,11 +205,22 @@ for(const fps of [30,60,120,240])for(const reverse of [false,true]){
 
 for(const fps of [30,60,120]){
  test('lateral competing projectile cannot steal first-lane attribution at '+fps+'Hz',()=>{
-  const g=batchWorld(fps,{mutate:g=>g.bullets.push({
-   kind:'bullet',id:10001,ownerId:3,x:40,y:19,vx:0,vy:0,
-   r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false
-  })});
-  assert.equal(g.hits,1,
-   'a bullet already near the victim hull must veto the first lane even off its path');
+  const g=batchWorld(fps,{mutate:g=>{
+   g.contacts=[];
+   g.damageTank=function(t,dmg,ownerId){
+    this.hits++;this.contacts.push({target:t.id,owner:ownerId});
+   };
+   g.bullets.push({
+    kind:'bullet',id:10001,ownerId:3,x:40,y:19,vx:0,vy:0,
+    r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false
+   });
+  }});
+  /* The lateral bullet itself legitimately starts INSIDE tank 2 and can
+   * damage it through the core. Count attribution, not total damage events:
+   * our expiring first-lane shot must abstain while lane 2 still hits. */
+  assert.deepEqual(g.contacts.filter(c=>c.owner===1).map(c=>c.target),[3],
+   'only the independent second lane may claim a recovered contact');
+  assert.ok(g.contacts.some(c=>c.owner===3&&c.target===2),
+   'the real lateral bullet retains its own legitimate hit');
  });
 }
