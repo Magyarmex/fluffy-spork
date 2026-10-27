@@ -1461,8 +1461,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   }
   var targets=[],invalid=false;
   function target(e,kind){
-   if(!e||kind==='tank'?!e.alive:
-      kind==='shape'?! (e.hp>0):!(e.hp>0))return;
+   if(!e)return;
+   if(kind==='tank'?!e.alive:!(e.hp>0))return;
    if(kind==='tank'&&e.id===b.ownerId)return;
    if(kind==='drone'&&e.ownerId===b.ownerId)return;
    var radius=kind==='tank'?
