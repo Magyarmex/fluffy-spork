@@ -25,14 +25,19 @@ function extract(s){
  const fields=['announcements','aiPhysicalArrivals','hostileOutsideBotSeconds',
   'hostileBotSeconds','pilotAliveSeconds','pilotDeathCensors','observedContests','neutralXP'];
  const counts={};for(const k of fields)counts[k]=count(c,k);
+ // This is a rejected candidate crossing, not proof of an unobserved arrival.
+ if(c.aiPhysicalRejectedCrossings!=null)counts.aiPhysicalRejectedCrossings=count(c,'aiPhysicalRejectedCrossings');
  if(counts.hostileOutsideBotSeconds>counts.hostileBotSeconds+1e-6)
   throw Error('outside exposure exceeds total hostile bot exposure');
  return{layout:s.layout||s.metadata?.layout||null,seed:s.seed??s.metadata?.seed??null,
+  pilotPolicy:s.pilotPolicy??s.metadata?.pilotPolicy??null,
   counts,rates:{
    arrivalsPer100OutsideBotSeconds:divide(counts.aiPhysicalArrivals,counts.hostileOutsideBotSeconds,100),
    contestsPerPilotMinute:divide(counts.observedContests,counts.pilotAliveSeconds,60),
    neutralXpPerPilotMinute:divide(counts.neutralXP,counts.pilotAliveSeconds,60),
-   deathCensorsPerAnnouncement:divide(counts.pilotDeathCensors,counts.announcements,1)
+   deathCensorsPerAnnouncement:divide(counts.pilotDeathCensors,counts.announcements,1),
+   rejectedCrossingShare:counts.aiPhysicalRejectedCrossings==null?null:
+    divide(counts.aiPhysicalRejectedCrossings,counts.aiPhysicalRejectedCrossings+counts.aiPhysicalArrivals,1)
   }};
 }
 function analyzePair(onSnapshot,offSnapshot){
@@ -41,6 +46,10 @@ function analyzePair(onSnapshot,offSnapshot){
   throw Error('unmatched Battlefield layouts: '+on.layout+' vs '+off.layout);
  if(on.seed!=null&&off.seed!=null&&on.seed!==off.seed)
   throw Error('unmatched experiment seeds: '+on.seed+' vs '+off.seed);
+ if(on.pilotPolicy!=null||off.pilotPolicy!=null){
+  if(!on.pilotPolicy||on.pilotPolicy!==off.pilotPolicy)
+   throw Error('unmatched pilot policies: '+on.pilotPolicy+' vs '+off.pilotPolicy);
+ }
  const delta={};
  for(const k of Object.keys(on.rates))
   delta[k]=on.rates[k]==null||off.rates[k]==null?null:+(on.rates[k]-off.rates[k]).toFixed(5);
@@ -51,6 +60,10 @@ function analyzePair(onSnapshot,offSnapshot){
   warnings.push('Pilot death censored opportunity observation; do not compare raw totals.');
  if(on.counts.hostileOutsideBotSeconds<100||off.counts.hostileOutsideBotSeconds<100)
   warnings.push('Less than 100 outside-sector bot-seconds per arm; arrival-rate estimates are fragile.');
+ if(on.counts.aiPhysicalRejectedCrossings==null||off.counts.aiPhysicalRejectedCrossings==null)
+  warnings.push('Movement-witness rejection counter missing in at least one arm; physical-arrival quality cannot be audited.');
+ else if(on.counts.aiPhysicalRejectedCrossings||off.counts.aiPhysicalRejectedCrossings)
+  warnings.push('Uncertified crossing candidates exist; rejected crossings are not confirmed missed arrivals. Inspect witness traces before interpreting low arrival rates.');
  return{method:'paired Frontlines descriptive rates; physical arrivals / outside-sector hostile bot-seconds',
   on,off,delta,warnings};
 }
