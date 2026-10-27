@@ -33,9 +33,12 @@ const {chromium}=require('playwright');
    let c=null,spot=null,sector=-1;
    for(let i=0;i<16&&!spot;i++){
     const center=T.sectorCenter(i);
-    for(let dx=-500;dx<=500&&!spot;dx+=100)for(let dy=-500;dy<=500&&!spot;dy+=100){
+    for(let dx=-650;dx<=650&&!spot;dx+=50)for(let dy=-650;dy<=650&&!spot;dy+=50){
      const x=center.x+dx,y=center.y+dy,d=Math.hypot(dx,dy);
-     if(d<240||d>570)continue;
+     /* An earlier fixture began INSIDE the announced sector. Require a
+      * genuine outside-to-inside rotation, not center-seeking after arrival. */
+     if(d<575||d>625||T.sectorIndex(x,y)===i||
+        Math.abs(x)>T.ARENA-40||Math.abs(y)>T.ARENA-40)continue;
      if(g.isTerrainSafe&&!g.isTerrainSafe(x,y,28))continue;
      if(g.hasLineOfSight&&!g.hasLineOfSight(x,y,center.x,center.y,8))continue;
      spot={x,y,d};c=center;sector=i;
