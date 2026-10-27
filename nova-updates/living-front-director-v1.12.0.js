@@ -317,6 +317,10 @@ function frontlineTurnEligible(g,t,a,now){
  if(!op||op.live||a.__lfEcoKey!=='BLOOM:'+op.sector||now-op.announcedAt>12)return false;
  if(Math.abs(Number(t.id)||0)%3!==1)return false;
  if(t.hp/Math.max(1,t.maxHp||t.hp||1)<.65)return false;
+ /* A visible incoming projectile or an active defensive combat posture wins
+  * immediately, even if the old public opportunity still exists. */
+ if(a.__v180Threat&&Number(a.__v180Threat.risk)>.12)return false;
+ if(a.__v180Posture==='evade'||a.__v180Posture==='break'||a.__v180Posture==='cover')return false;
  var targetId=a.__v1112TargetId;
  if(targetId!=null&&targetId>=0){
   if(typeof g.getTank!=='function')return false;
