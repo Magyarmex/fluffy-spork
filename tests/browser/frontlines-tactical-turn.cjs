@@ -68,6 +68,7 @@ const {chromium}=require('playwright');
      mode:a.__lfEcoMode,weight:a.__lfEcoWeight,before,after,spot}));
     if(a.__lfEcoMode!=='memory'||!a.__lfFrontTurnSpentKey)
      throw Error('real AI commitment did not use public memory');
+    const rememberedWeight=+a.__lfEcoWeight.toFixed(3);
     /* The same real Battlefield/AI/movement composition must also respond
      * during the live public five-second announcement. Reuse the verified
      * terrain-safe outside approach, not a synthetic movement substitute. */
@@ -85,7 +86,7 @@ const {chromium}=require('playwright');
      throw Error('live public BLOOM failed real composed tactical turn: '+JSON.stringify({
       mode:a.__lfEcoMode,weight:a.__lfEcoWeight,before:liveBefore,after:liveAfter,liveToward,spot}));
     return{realComposedAI:true,commitmentsAdded:after-before,mode:'memory',
-     weight:+a.__lfEcoWeight.toFixed(3),approachDistance:Math.round(spot.d),
+     weight:rememberedWeight,approachDistance:Math.round(spot.d),
      sector:sector,actualMovement:+moved.toFixed(3),towardPublicCenter:toward==null?null:+toward.toFixed(3),
      livePublic:{commitmentsAdded:liveAfter-liveBefore,actualMovement:+liveMoved.toFixed(3),
       towardPublicCenter:+liveToward.toFixed(3),mode:a.__lfEcoMode}};
