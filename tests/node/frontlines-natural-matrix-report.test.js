@@ -85,7 +85,7 @@ test('opt-in visible-defense policy is separately identifiable and validates dod
   ['frontlines-natural-off.json',p.off],['frontlines-natural-match-ab.json',p.report]])
   fs.writeFileSync(path.join(p.dir,name),JSON.stringify(data));
  const r=collectMatrix(root,1);
- assert.equal(r.batch.policies['public-bloom-harvest-defense'].pairCount,1);
+ assert.equal(r.batch.policies['public-bloom-harvest-defense'].pairs,1);
  p.on.visibleDodgeSamples=-1;
  p.report.on=p.on;
  fs.writeFileSync(path.join(p.dir,'frontlines-natural-on.json'),JSON.stringify(p.on));
