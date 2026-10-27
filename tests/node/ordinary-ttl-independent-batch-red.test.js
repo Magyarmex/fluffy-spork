@@ -93,7 +93,7 @@ function simulate(Game, fps, x, velocity, ttl, pen = 0) {
  * first-contact gap. Do not merge until the complete independent-batch
  * safety preflight is implemented and these assertions turn green. */
 const Game=boot();
-function batchWorld(fps,{reverse=false,far=false,wall=false}={}){
+function batchWorld(fps,{reverse=false,far=false,wall=false,mutate=null}={}){
  const g=new Game();
  g.tanks=[{kind:'tank',id:2,x:far?100:40,y:0,cls:'scout',hp:100,alive:true},
           {kind:'tank',id:3,x:far?100:40,y:400,cls:'scout',hp:100,alive:true}];
@@ -114,6 +114,7 @@ function batchWorld(fps,{reverse=false,far=false,wall=false}={}){
   vx:0,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false
  }));
  g.bullets=[...local,...remote];
+ if(mutate)mutate(g);
  if(reverse)g.bullets.reverse();
  g.updateBullets(1/fps);
  return g;
@@ -131,5 +132,39 @@ for(const fps of [30,60,120,240]){
  test('RED: earlier cover vetoes only its own lane at '+fps+'Hz',()=>{
   const g=batchWorld(fps,{wall:true});
   assert.equal(g.hits,1,'cover must stop first lane without suppressing disjoint valid second lane');
+ });
+}
+
+/* The preflight is deliberately all-or-nothing when target attribution
+ * could depend on bullet order, a lethal callback, or unknown movement.
+ * These controls must stay conservative until a full chronological solver. */
+for(const fps of [30,60,120]){
+ test('shared target never receives speculative batch damage at '+fps+'Hz',()=>{
+  const g=batchWorld(fps,{mutate:g=>{g.bullets[1].y=0;}});
+  assert.equal(g.hits,0,'two shots sharing a hull require chronological arbitration');
+ });
+ test('potentially lethal shared-frame batch defers at '+fps+'Hz',()=>{
+  const g=batchWorld(fps,{mutate:g=>{g.tanks[0].hp=30;}});
+  assert.equal(g.hits,0,'nonlethal proof must not pre-commit kill/reward side effects');
+ });
+ test('moving hull crossing both lanes vetoes batch at '+fps+'Hz',()=>{
+  const g=batchWorld(fps,{mutate:g=>{
+   g.tanks[0].__novaSweepMoveTime=g.time;
+   g.tanks[0].__novaSweepPrevX=40;g.tanks[0].__novaSweepPrevY=400;
+  }});
+  assert.equal(g.hits,0,'shared swept hull cannot be assigned to both bullets');
+ });
+ test('earlier competing projectile vetoes only its own lane at '+fps+'Hz',()=>{
+  const g=batchWorld(fps,{mutate:g=>g.bullets.push({
+   kind:'bullet',id:9999,ownerId:3,x:10,y:0,vx:0,vy:0,
+   r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false
+  })});
+  assert.equal(g.hits,1,'a credible interceptor must not erase independent second contact');
+ });
+ test('uncertified nearby drone prevents speculative batch contact at '+fps+'Hz',()=>{
+  const g=batchWorld(fps,{mutate:g=>g.drones.push({
+   kind:'drone',id:800,ownerId:4,x:12,y:0,r:8,hp:20
+  })});
+  assert.equal(g.hits,0,'unknown drone contact requires a stronger time witness');
  });
 }
