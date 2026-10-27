@@ -216,7 +216,12 @@ wrap('game/ai',function(ai,require){
     var all=g.tanks,player=g.player,narrow=[t],nearest=g.nearestTank,
         ownNearest=Object.prototype.hasOwnProperty.call(g,'nearestTank'),
         ownTactical=Object.prototype.hasOwnProperty.call(g,'__novaFairVisibleTanks'),
-        priorTactical=g.__novaFairVisibleTanks;
+        priorTactical=g.__novaFairVisibleTanks,
+        ownWitnesses=Object.prototype.hasOwnProperty.call(g,'__novaFairShotWitnesses'),
+        priorWitnesses=g.__novaFairShotWitnesses;
+    /* Shot observers must be evaluated from the real world list, even while
+     * the shooter AI sees only its one fair primary target. */
+    g.__novaFairShotWitnesses=all;
     /* Battle Sense may reason about other actually perceived opponents without
      * exposing them to legacy target selection. Build this only on its bounded
      * tactical planning tick; the old AI still sees exactly [self, target]. */
@@ -251,6 +256,8 @@ wrap('game/ai',function(ai,require){
       g.tanks=all;g.player=player;
       if(ownTactical)g.__novaFairVisibleTanks=priorTactical;
       else delete g.__novaFairVisibleTanks;
+      if(ownWitnesses)g.__novaFairShotWitnesses=priorWitnesses;
+      else delete g.__novaFairShotWitnesses;
       if(typeof nearest==='function'){
         if(ownNearest)g.nearestTank=nearest;else delete g.nearestTank;
       }
