@@ -80,6 +80,63 @@ var LF=window.__NOVA_LIVING_FRONT_INTERNAL__={VERSION:VERSION,TAU:TAU,GRID:GRID,
 wrap('game/engine',function(engine,require){
   var Game=engine.Game;if(!Game||Game.prototype.__novaLivingFrontCore)return;Game.prototype.__novaLivingFrontCore=true;var defs=(require('./types')||{}).SHAPE_DEFS||{};LF.defs=defs;
   Game.prototype.pityStartLevel=function(){return 1;};
+  /* A personal-best SCORE is a displayed record, not a power boost.
+   * The legacy core only saves it on game-over. Closing a successful live
+   * run used to discard that record. Coalesce writes during XP bursts and
+   * flush on page hide, redeploy or teardown. Keep this.best untouched until
+   * game-over so its existing isBest/record announcement stays correct.
+   * The no-pity redeploy rule above is intentionally unchanged. */
+  var bestPendingGames=new Set();
+  function flushBestScore(g){
+    if(!g)return;
+    if(g.__lfBestSaveTimer!=null&&typeof clearTimeout==='function')
+      clearTimeout(g.__lfBestSaveTimer);
+    g.__lfBestSaveTimer=null;
+    bestPendingGames.delete(g);
+    var candidate=Number(g.__lfBestPendingScore);
+    g.__lfBestPendingScore=0;
+    if(!Number.isFinite(candidate)||candidate<=0)return;
+    try{
+      var storage=window.localStorage;
+      if(!storage||typeof storage.getItem!=='function'||typeof storage.setItem!=='function')return;
+      var previous=Number(storage.getItem('novatanks_best'))||0;
+      if(candidate>previous)storage.setItem('novatanks_best',String(candidate));
+      g.__lfBestPersistedScore=Math.max(Number(g.__lfBestPersistedScore)||0,candidate,previous);
+    }catch(ignore){/* localStorage can be unavailable in private mode */ }
+  }
+  var oldBestGainXP=Game.prototype.gainXP;
+  if(typeof oldBestGainXP==='function')Game.prototype.gainXP=function(t,amt){
+    var out=oldBestGainXP.apply(this,arguments);
+    if(t!==this.player||!t||!t.isPlayer||this.__novaDecorativeWorld||
+       this.status!=='playing')return out;
+    var candidate=Math.round(Number(t.score));
+    if(!Number.isFinite(candidate)||candidate<=Math.max(Number(this.best)||0,
+       Number(this.__lfBestPersistedScore)||0,Number(this.__lfBestPendingScore)||0))return out;
+    this.__lfBestPendingScore=candidate;
+    bestPendingGames.add(this);
+    if(this.__lfBestSaveTimer==null){
+      if(typeof setTimeout==='function'){
+        var self=this;
+        this.__lfBestSaveTimer=setTimeout(function(){flushBestScore(self);},1200);
+      }else flushBestScore(this);
+    }
+    return out;
+  };
+  var oldBestRedeploy=Game.prototype.redeploy;
+  if(typeof oldBestRedeploy==='function')Game.prototype.redeploy=function(){
+    flushBestScore(this);return oldBestRedeploy.apply(this,arguments);
+  };
+  var oldBestDestroy=Game.prototype.destroy;
+  if(typeof oldBestDestroy==='function')Game.prototype.destroy=function(){
+    flushBestScore(this);return oldBestDestroy.apply(this,arguments);
+  };
+  if(typeof window.addEventListener==='function')
+    window.addEventListener('pagehide',function(){bestPendingGames.forEach(flushBestScore);});
+  if(typeof document!=='undefined'&&document&&typeof document.addEventListener==='function')
+    document.addEventListener('visibilitychange',function(){
+      if(document.hidden)bestPendingGames.forEach(flushBestScore);
+    });
+
   var oldSpawn=Game.prototype.spawnShape;if(oldSpawn)Game.prototype.spawnShape=function(type,anywhere){
     var st=ensure(this,defs),n=this.shapes?this.shapes.length:0,out=oldSpawn.apply(this,arguments);if(this.shapes&&this.shapes.length>n)for(var i=n;i<this.shapes.length;i++){var s=this.shapes[i];initShape(this,s);var high=!!HIGH[s.type],early=ageProgress(st)<.34;if((!anywhere||high&&early)&&s.type!=='star')relocate(this,s,chooseSpawnSector(st,s.type,s.id),s.type==='crasher'?290:230);}return out;
   };
