@@ -106,3 +106,16 @@ test('active Controller command retains the original movement/attack owner',()=>
  assert.equal(s.owner.__novaSwarm.active,true);
  assert.equal(s.g.__novaSwarmIdlePass,undefined);
 });
+
+for(const hz of [30,60,120,240]){
+ test('committed dash ending this frame is not rewound into an idle farm hit at '+hz+'Hz',()=>{
+  const s=world({enemy:false,phase:'dash',phaseT:.001});
+  s.d.__novaVX=300;s.d.__novaVY=0;s.d.__novaHitRun=true;
+  s.g.updateDrones(1/hz);
+  assert.equal(s.d.__novaPhase,'recover','dash enters recovery after physical movement');
+  assert.ok(Math.abs(s.d.x-300/hz)<1e-6,
+   'dash physical displacement must survive Swarm Discipline post-processing');
+  assert.equal(s.shape.hp,100,'dash recovery cannot also harvest in the same frame');
+  assert.deepEqual(s.hits,[]);
+ });
+}
