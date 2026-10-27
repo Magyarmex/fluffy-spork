@@ -783,13 +783,13 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
        e.__novaChronoDroneEpoch===g.__novaShapeSweepEpoch&&
        Number.isFinite(dsx)&&Number.isFinite(dsy);
     var overlapNow=d2(ax,ay,e.x,e.y)<drR*drR;
-    if(overlapNow){
-     if(!witnessed||!(d2(ax,ay,dsx,dsy)<drR*drR)){
-      uncertain=true;return;
-     }
+    if(overlapNow&&!witnessed){uncertain=true;return;}
+    if(overlapNow&&d2(ax,ay,dsx,dsy)<drR*drR){
      if(best&&bestT<1e-8){tie=true;return;}
      best={e:e,kind:'drone'};bestT=0;tie=false;return;
     }
+    /* End-only overlap is not a zero-time contact. It can still have a
+     * rigorous pre-expiry proof below, using the witnessed frame start. */
     if(!witnessed||!Number.isFinite(e.speed)||!(e.speed>0)||
        !Number.isFinite(e.__novaChronoDronePrevSpeed)||
        !(e.__novaChronoDronePrevSpeed>0)||
@@ -821,13 +821,26 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
        Math.max(ay,ay+dy*windowT)+reach>=Math.min(dsy,e.y)&&
        Math.min(ay,ay+dy*windowT)-reach<=Math.max(dsy,e.y);
     if(!potentiallyEarlier)return;
-    var sample=null, fractions=[.25,.5,.75,.9];
-    for(var fi=0;fi<fractions.length;fi++){
-     var t=limit*fractions[fi],seconds=dt*t;
-     var px=ax+dx*t,py=ay+dy*t;
-     if(Math.hypot(px-dsx,py-dsy)+speedBound*seconds<drR-1e-5){
-      sample=t;break;
+    /* Minimize distance(projectile(t), droneStart) + speedBound*t
+     * over the physical TTL interval. This function is convex. Four
+     * fixed samples can miss a guaranteed contact near expiry or between
+     * samples, even for ordinary Sniper-family projectile speeds.
+     * The minimum is exact for the straight projectile and the enclosing
+     * drone speed ball; it does NOT infer a drone trajectory. */
+    var sample=null,k=speedBound*dt,v2=dx*dx+dy*dy;
+    if(Number.isFinite(v2)&&v2>1e-12){
+     var wx=ax-dsx,wy=ay-dsy,dot=wx*dx+wy*dy,optimal=0;
+     if(v2>k*k){
+      var perp2=Math.max(0,wx*wx+wy*wy-dot*dot/v2);
+      optimal=-dot/v2-k*Math.sqrt(perp2)/
+       (Math.sqrt(v2)*Math.sqrt(v2-k*k));
+      optimal=Math.max(0,Math.min(windowT,optimal));
      }
+     /* Without a bullet-birth witness, a start-only overlap followed by
+      * drone departure is not enough to backdate a newly spawned shot. */
+     if(optimal>1e-9&&
+        Math.hypot(wx+dx*optimal,wy+dy*optimal)+k*optimal<drR-1e-5)
+      sample=optimal;
     }
     if(sample===null||best){uncertain=true;return;}
     best={e:e,kind:'drone',guaranteed:true};bestT=sample;tie=false;return;
