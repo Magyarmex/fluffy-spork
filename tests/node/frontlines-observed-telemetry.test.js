@@ -168,3 +168,13 @@ test('allied and spawn-protected bots cannot inflate hostile arrival telemetry',
  e.x=-520;e.y=-540;LF.frontlineTick(g,st,false);
  assert.equal(st.frontlineTelemetry.counts.aiArrivals,0);
 });
+
+test('pilot shield suppresses contest entry but absent shield metadata means unshielded',()=>{
+ const {g,st,p,LF}=scene();
+ p.spawnShieldT=1;LF.frontlineTick(g,st,false);
+ assert.equal(st.frontlineTelemetry.counts.playerEntries,0);
+ p.spawnShieldT=0;LF.frontlineTick(g,st,false);
+ assert.equal(st.frontlineTelemetry.counts.playerEntries,1);
+ const q=scene();delete q.p.spawnShieldT;q.LF.frontlineTick(q.g,q.st,false);
+ assert.equal(q.st.frontlineTelemetry.counts.playerEntries,1);
+});
