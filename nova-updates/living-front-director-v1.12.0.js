@@ -48,6 +48,11 @@ function frontlineTrace(f,g,kind,mode,amount){
 function closeFrontline(g,st,reason){
  var f=st&&st.frontlineTelemetry;
  if(!f||f.closed||!f.currentKey)return false;
+ /* A fatal run is censored even when the pilot died outside the BLOOM. */
+ if(g&&g.player&&f.pilotWasAlive&&!alive(g.player)&&!f.pilotDeathCensored){
+  f.pilotDeathCensored=true;f.counts.pilotDeathCensors=(f.counts.pilotDeathCensors||0)+1;
+  frontlineTrace(f,g,'pilot-death-censor');
+ }
  f.closed=true;f.counts.resolved++;
  /* Do not retain tank references after the public opportunity closes. */
  f.aiPhysicalMotion={};f.aiPhysicalLast={};
@@ -63,21 +68,27 @@ function ensureFrontline(g,st){
  var f=st.frontlineTelemetry;
  if(!f)f=st.frontlineTelemetry={currentKey:null,sector:-1,announcedAt:-1,playerInside:false,
   seenContest:false,aiSeen:{},aiStartDist:{},aiApproachSeen:{},aiPhysicalLast:{},aiPhysicalMotion:{},aiPhysicalArrived:{},aiPhysicalApproachSeen:{},events:[],counts:{announcements:0,resolved:0,contestSurvivals:0,playerSeconds:0,playerApproaches:0,aiApproaches:0,playerEntries:0,playerExits:0,
-  observedContests:0,playerDeaths:0,aiArrivals:0,aiPhysicalArrivals:0,aiPhysicalApproaches:0,aiPhysicalRejectedCrossings:0,neutralXP:0}};
+  observedContests:0,playerDeaths:0,pilotDeathCensors:0,sampledSeconds:0,pilotAliveSeconds:0,hostileBotSeconds:0,aiArrivals:0,aiPhysicalArrivals:0,aiPhysicalApproaches:0,aiPhysicalRejectedCrossings:0,neutralXP:0}};
  var key=op.sector+':'+op.announcedAt;
  if(f.currentKey!==key){
   closeFrontline(g,st,'replaced');
   f.currentKey=key;f.sector=op.sector;f.announcedAt=op.announcedAt;
-  f.playerInside=false;f.seenContest=false;f.deathRecorded=false;f.closed=false;f.lastSampleTime=Number(g.time)||0;f.playerStartDist=null;f.playerApproachSeen=false;f.aiSeen={};f.aiStartDist={};f.aiApproachSeen={};f.aiPhysicalLast={};f.aiPhysicalMotion={};f.aiPhysicalArrived={};f.aiPhysicalApproachSeen={};
+  f.playerInside=false;f.seenContest=false;f.deathRecorded=false;f.pilotDeathCensored=false;f.pilotWasAlive=!!(g.player&&alive(g.player));f.closed=false;f.lastSampleTime=Number(g.time)||0;f.playerStartDist=null;f.playerApproachSeen=false;f.aiSeen={};f.aiStartDist={};f.aiApproachSeen={};f.aiPhysicalLast={};f.aiPhysicalMotion={};f.aiPhysicalArrived={};f.aiPhysicalApproachSeen={};
   f.counts.announcements++;frontlineTrace(f,g,'announced',op.live?'live':'memory');
  }
  return f;
 }
 function recordFrontlinePlayerDeath(g,st,t){
  var f=st&&st.frontlineTelemetry;
- if(!f||!t||t!==g.player||f.deathRecorded||sectorIndex(t.x,t.y)!==f.sector)return false;
+ if(!f||f.closed||!t||t!==g.player||alive(t))return false;
  var op=publicBloom(st,g.time||0);
  if(!op||op.sector!==f.sector||op.announcedAt!==f.announcedAt)return false;
+ /* A/B death censor is independent of where the fatal hit happened. */
+ if(!f.pilotDeathCensored){
+  f.pilotDeathCensored=true;f.counts.pilotDeathCensors=(f.counts.pilotDeathCensors||0)+1;
+  frontlineTrace(f,g,'pilot-death-censor');
+ }
+ if(f.deathRecorded||sectorIndex(t.x,t.y)!==f.sector)return false;
  if(!f.playerInside){f.playerInside=true;f.counts.playerEntries++;frontlineTrace(f,g,'player-entry');}
  f.deathRecorded=true;f.counts.playerDeaths++;frontlineTrace(f,g,'player-death');
  return true;
@@ -147,6 +158,10 @@ function frontlineTick(g,st,observedContest){
  var now=Number(g.time)||0,delta=clamp(now-(f.lastSampleTime==null?now:f.lastSampleTime),0,LF.SECTOR_PERIOD*2);
  f.counts.playerSeconds+=delta*(f.playerInside&&inside?1:((f.playerInside||inside)?0.5:0));
  f.lastSampleTime=now;
+ if(p&&alive(p))f.pilotWasAlive=true;
+ /* Bounded exposure denominators: independent of AI ecology mode. */
+ f.counts.sampledSeconds=(f.counts.sampledSeconds||0)+delta;
+ if(p&&alive(p))f.counts.pilotAliveSeconds=(f.counts.pilotAliveSeconds||0)+delta;
  if(p&&alive(p)){
   var c=sectorCenter(f.sector),dist=Math.hypot(p.x-c.x,p.y-c.y);
   if(f.playerStartDist==null&&!inside)f.playerStartDist=dist;
@@ -166,6 +181,8 @@ function frontlineTick(g,st,observedContest){
  var ts=g.tanks||[];
  for(var i=0;i<ts.length;i++){
   var t=ts[i],a=t&&t.ai;
+  if(delta>0&&p&&alive(p)&&t&&t!==p&&a&&alive(t)&&!(t.spawnShieldT>0)&&contestHostile(g,p,t))
+   f.counts.hostileBotSeconds=(f.counts.hostileBotSeconds||0)+delta;
   if(!t||t===p||!p||!alive(t)||t.spawnShieldT>0||!contestHostile(g,p,t)||!a||a.__lfEcoMode!=='memory'||a.__lfEcoKey!=='BLOOM:'+f.sector||
     !(a.__lfEcoWeight>.04))continue;
   var id=String(t.id),c2=sectorCenter(f.sector),dist2=Math.hypot(t.x-c2.x,t.y-c2.y),
@@ -415,7 +432,7 @@ LF.wrap('game/engine',function(engine){
  };
 });
 function diag(){var g=LF.getActive(),s=g?LF.snapshot(g):LF.getLast()||{active:false,version:V};return'NOVA TANKS · LIVING FRONT '+V+'\n'+JSON.stringify(s,null,2);}
-function debugSummary(s){if(!s||!s.active)return'LIVING FRONT · no active/recorded match telemetry yet';var st=s.stats||{},counts=s.counts||{};return'LIVING FRONT v'+V+' · age '+s.age+'s · ceiling '+s.ceiling+' · '+s.director+' / last '+s.lastSignal+' · total XP '+s.totalXP+' · player neutral '+s.playerNeutralXPPerMin+' XP/min · plan '+s.planMsEma+'ms EMA / '+s.planMsPeak+'ms peak\nSHAPES C'+(counts.circle||0)+' T'+(counts.triangle||0)+' S'+(counts.square||0)+' P'+(counts.pentagon||0)+' H'+(counts.hexagon||0)+' ★'+(counts.star||0)+' CR'+(counts.crasher||0)+' · EVADE '+(st.triangleEvasions||0)+' · CRASH '+(st.crasherCharges||0)+'/'+(st.crasherHits||0)+'/'+(st.crasherMisses||0)+' · OVER '+(st.crasherOvershoots||0)+' · BOUNTY '+Math.round(st.bountyAbsorbed||0)+'/'+Math.round(st.bountyReleased||0)+' · STAR '+(st.starsIntercepted||0)+'/'+(st.starsSpawned||0)+' · BLOOM '+(st.blooms||0)+' · MIG '+(st.migrations||0)+' · AI ROT '+(st.aiRotations||0)+' · AI INTENT '+(st.aiFrontlineCommitments||0)+' · CONTEST '+(st.contests||0)+' · HEX AVG '+s.hexAvgNeighbors+'\n'+s.sectors.map(function(q){return q.i+':M'+q.m.toFixed(2)+' P'+q.p.toFixed(2)+' N'+q.n+' XP'+q.xp+' H'+q.harvest.toFixed(2)+' C'+q.combat.toFixed(2)+' '+q.in.toFixed(1)+'→/'+q.out.toFixed(1)+'←';}).join(' · ')+(s.frontline?' | FRONTLINES · ANN '+s.frontline.counts.announcements+' · ENTRY '+s.frontline.counts.playerEntries+' · CONTEST '+s.frontline.counts.observedContests+' · AI PHYS '+(s.frontline.counts.aiPhysicalArrivals||0)+' · REJECT '+(s.frontline.counts.aiPhysicalRejectedCrossings||0)+' · AI MEM '+(s.frontline.counts.aiArrivals||0)+' · NEUTRAL XP '+Math.round(s.frontline.counts.neutralXP)+' · SURVIVED '+s.frontline.counts.contestSurvivals+' · IN ZONE '+s.frontline.counts.playerSeconds.toFixed(1)+'s':'');}
+function debugSummary(s){if(!s||!s.active)return'LIVING FRONT · no active/recorded match telemetry yet';var st=s.stats||{},counts=s.counts||{};return'LIVING FRONT v'+V+' · age '+s.age+'s · ceiling '+s.ceiling+' · '+s.director+' / last '+s.lastSignal+' · total XP '+s.totalXP+' · player neutral '+s.playerNeutralXPPerMin+' XP/min · plan '+s.planMsEma+'ms EMA / '+s.planMsPeak+'ms peak\nSHAPES C'+(counts.circle||0)+' T'+(counts.triangle||0)+' S'+(counts.square||0)+' P'+(counts.pentagon||0)+' H'+(counts.hexagon||0)+' ★'+(counts.star||0)+' CR'+(counts.crasher||0)+' · EVADE '+(st.triangleEvasions||0)+' · CRASH '+(st.crasherCharges||0)+'/'+(st.crasherHits||0)+'/'+(st.crasherMisses||0)+' · OVER '+(st.crasherOvershoots||0)+' · BOUNTY '+Math.round(st.bountyAbsorbed||0)+'/'+Math.round(st.bountyReleased||0)+' · STAR '+(st.starsIntercepted||0)+'/'+(st.starsSpawned||0)+' · BLOOM '+(st.blooms||0)+' · MIG '+(st.migrations||0)+' · AI ROT '+(st.aiRotations||0)+' · AI INTENT '+(st.aiFrontlineCommitments||0)+' · CONTEST '+(st.contests||0)+' · HEX AVG '+s.hexAvgNeighbors+'\n'+s.sectors.map(function(q){return q.i+':M'+q.m.toFixed(2)+' P'+q.p.toFixed(2)+' N'+q.n+' XP'+q.xp+' H'+q.harvest.toFixed(2)+' C'+q.combat.toFixed(2)+' '+q.in.toFixed(1)+'→/'+q.out.toFixed(1)+'←';}).join(' · ')+(s.frontline?' | FRONTLINES · ANN '+s.frontline.counts.announcements+' · ENTRY '+s.frontline.counts.playerEntries+' · CONTEST '+s.frontline.counts.observedContests+' · AI PHYS '+(s.frontline.counts.aiPhysicalArrivals||0)+' · BOT-S '+(s.frontline.counts.hostileBotSeconds||0).toFixed(1)+' · ALIVE-S '+(s.frontline.counts.pilotAliveSeconds||0).toFixed(1)+' · CENSORED '+(s.frontline.counts.pilotDeathCensors||0)+' · REJECT '+(s.frontline.counts.aiPhysicalRejectedCrossings||0)+' · AI MEM '+(s.frontline.counts.aiArrivals||0)+' · NEUTRAL XP '+Math.round(s.frontline.counts.neutralXP)+' · SURVIVED '+s.frontline.counts.contestSurvivals+' · IN ZONE '+s.frontline.counts.playerSeconds.toFixed(1)+'s':'');}
 function fill(root){if(!root)return;var h=root.querySelector('.nv-lf-debug');if(!h){h=document.createElement('div');h.className='nv-lf-debug';h.style.cssText='margin-top:8px;padding:8px;border:1px solid rgba(255,201,77,.18);border-radius:10px;background:rgba(12,16,26,.7);font:600 9px/1.25 Rajdhani,system-ui;color:#aebed0;white-space:pre-wrap;';var a=root.querySelector('.nv-debug-actions');a?root.insertBefore(h,a):root.appendChild(h);}var s=LF.getActive()?LF.snapshot(LF.getActive()):LF.getLast();h.textContent=debugSummary(s);var b=document.createElement('button');b.type='button';b.dataset.lfCopy='1';b.className='nv-debug-btn';b.textContent='COPY ECOLOGY';b.style.marginTop='7px';b.onclick=function(){if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(diag()).catch(function(){});};h.appendChild(document.createElement('br'));h.appendChild(b);}
 function registerTips(){var api=window.NOVATips;if(!api||typeof api.registerMany!=='function'||window.__NOVA_LIVING_FRONT_TIPS_REGISTERED__)return false;window.__NOVA_LIVING_FRONT_TIPS_REGISTERED__=true;api.registerMany(TIP_DEFS);return true;}
 function bindTipLine(){return registerTips();} // compatibility shim: canonical Fieldcraft owns rendering, cadence, and shuffle bags.
