@@ -91,7 +91,7 @@ function frontlineTick(g,st,observedContest){
  var ts=g.tanks||[];
  for(var i=0;i<ts.length;i++){
   var t=ts[i],a=t&&t.ai;
-  if(!t||t===p||!alive(t)||!a||a.__lfEcoMode!=='memory'||a.__lfEcoKey!=='BLOOM:'+f.sector||
+  if(!t||t===p||!p||!alive(t)||t.spawnShieldT>0||!contestHostile(g,p,t)||!a||a.__lfEcoMode!=='memory'||a.__lfEcoKey!=='BLOOM:'+f.sector||
     !(a.__lfEcoWeight>.04))continue;
   var id=String(t.id),c2=sectorCenter(f.sector),dist2=Math.hypot(t.x-c2.x,t.y-c2.y),
    aiInside=sectorIndex(t.x,t.y)===f.sector;
