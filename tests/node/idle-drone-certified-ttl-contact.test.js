@@ -217,3 +217,20 @@ for(const hz of [30,60,120,240])for(const reverse of [false,true]){
   assert.deepEqual(g.hitOwners,[2]);
  });
 }
+
+
+/* Run 387: verify the actual eight-overlay Controller movement and
+ * certified first-contact chain above the former 1,200-body global cap. */
+for(const hz of [30,60])for(const reverse of [false,true]){
+ test('certified idle drone survives 2000 unrelated projectiles at '+
+  hz+'Hz, reversed='+reverse,()=>{
+  const {g,d}=shotWorld(hz,{remoteBullets:2000,reverseBullets:reverse});
+  assert.equal(d.__novaChronoIdleUnmodifiedEpoch,g.__novaShapeSweepEpoch,
+   'real movement epoch must remain certified under remote fire');
+  assert.deepEqual(g.hitOwners,[2],
+   'one physical pre-expiry drone hit must retain ordinary damage attribution');
+  assert.equal(d.hp,10);
+  assert.notEqual(g.__novaDroneChronoTraceEnabled,true,
+   'optional tracing must be reset after the real update');
+ });
+}

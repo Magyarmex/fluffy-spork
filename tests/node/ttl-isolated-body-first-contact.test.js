@@ -898,3 +898,175 @@ for (const optimized of [false,true]) {
     });
   }
 }
+
+
+/* Run 387: one ordinary non-piercing TTL shot must not lose a real local
+ * first contact to 2,000 unrelated distant projectiles. This is the actual
+ * materialized core with shipping Battlefield and optimized composition. */
+function addRemoteTTLFire(g,count=2000,reverse=false){
+ for(let i=0;i<count;i++)g.bullets.push({kind:'bullet',
+  id:90000+i,ownerId:1000+i,x:900+(i%10)*4,
+  y:900+Math.floor(i/10)*4,vx:0,vy:0,r:2,dmg:1,
+  ttl:2,pen:0,hits:0,dead:false,shell:false,beam:false});
+ if(reverse)g.bullets.reverse();
+}
+for(const optimized of [false,true])for(const fps of [30,60]){
+ for(const reverse of [false,true]){
+  test((optimized?'optimized':'baseline')+
+   ' non-piercing first tank hit survives 2000 remote bullets at '+
+   fps+'Hz, reversed='+reverse,()=>{
+   const Game=boot(undefined,optimized);
+   const g=new Game();
+   g.tanks=[{kind:'tank',id:2,x:40,y:0,cls:'scout',hp:100,alive:true}];
+   g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+    vx:6000,vy:0,r:3,dmg:20,ttl:.005,pen:0,hits:0,
+    dead:false,shell:false,beam:false}];
+   addRemoteTTLFire(g,2000,reverse);
+   g.updateBullets(1/fps);
+   assert.equal(g.hits,1,'distant projectiles cannot erase first tank contact');
+  });
+  test((optimized?'optimized':'baseline')+
+   ' non-piercing first shape hit survives 2000 remote bullets at '+
+   fps+'Hz, reversed='+reverse,()=>{
+   const Game=boot(undefined,optimized),g=new Game();
+   g.tanks=[{kind:'tank',id:2,x:100,y:0,cls:'scout',hp:100,alive:true}];
+   g.shapes=[{kind:'shape',id:3,x:16,y:0,r:12,hp:100,born:g.time-1}];
+   g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+    vx:500,vy:0,r:3,dmg:20,ttl:.005,pen:0,hits:0,
+    dead:false,shell:false,beam:false}];
+   addRemoteTTLFire(g,2000,reverse);
+   g.updateBullets(1/fps);
+   assert.equal(g.hits,1,'distant projectiles cannot erase first neutral contact');
+  });
+ }
+}
+
+
+/* Adversarial: locality is only a performance filter, never permission to
+ * skip an earlier lateral hit, projectile interception, or solid cover. */
+for(const optimized of [false,true]){
+ const LocalGame=boot(undefined,optimized),mode=optimized?'optimized':'baseline';
+ test(mode+' 2000 remote bullets preserve earlier lateral kill credit',()=>{
+  const g=new LocalGame(),events=[];
+  g.tanks=[{kind:'tank',id:2,x:40,y:0,cls:'scout',hp:45,alive:true}];
+  g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+   vx:6000,vy:0,r:3,dmg:20,ttl:.005,pen:0,hits:0,
+   dead:false,shell:false,beam:false}];
+  addRemoteTTLFire(g);
+  g.bullets.push({kind:'bullet',id:99999,ownerId:7,x:40,y:19,
+   vx:0,vy:0,r:3,dmg:30,ttl:1,pen:0,hits:0,
+   dead:false,shell:false,beam:false});
+  g.damageTank=(t,dmg,owner)=>{events.push(owner);t.hp-=dmg;};
+  g.updateBullets(1/30);
+  assert.deepEqual(events,[7],
+   'a t=0 lateral competitor must retain damage priority');
+ });
+ test(mode+' 2000 remote bullets do not permit first hit through cover',()=>{
+  const g=new LocalGame();
+  g.tanks=[{kind:'tank',id:2,x:40,y:0,cls:'scout',hp:100,alive:true}];
+  g.__novaTerrain=[{id:-1,shape:'rect',x:10,y:0,w:4,h:80,
+   solid:true,destructible:false}];
+  g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+   vx:6000,vy:0,r:3,dmg:20,ttl:.005,pen:0,hits:0,
+   dead:false,shell:false,beam:false}];
+  addRemoteTTLFire(g);
+  g.updateBullets(1/30);
+  assert.equal(g.hits,0,'permanent cover must retain physical priority');
+ });
+}
+
+
+for(const optimized of [false,true]){
+ test((optimized?'optimized':'baseline')+
+  ' 2000 remote bullets preserve earlier lateral neutral-shape damage',()=>{
+  const Game=boot(undefined,optimized),g=new Game(),events=[];
+  g.tanks=[{kind:'tank',id:2,x:100,y:0,cls:'scout',hp:100,alive:true}];
+  g.shapes=[{kind:'shape',id:3,x:16,y:0,r:12,hp:100,born:g.time-1}];
+  g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+   vx:500,vy:0,r:3,dmg:20,ttl:.005,pen:0,hits:0,
+   dead:false,shell:false,beam:false}];
+  addRemoteTTLFire(g);
+  g.bullets.push({kind:'bullet',id:99998,ownerId:7,x:16,y:14,
+   vx:0,vy:0,r:3,dmg:30,ttl:1,pen:0,hits:0,
+   dead:false,shell:false,beam:false});
+  g.damageShape=(s,dmg)=>{events.push(dmg);s.hp-=dmg;};
+  g.updateBullets(1/30);
+  assert.deepEqual(events,[30],
+   'a lateral t=0 shape hit must precede the expiring local shot');
+ });
+}
+
+
+/* Deterministic differential gate: remote density must not alter the
+ * analytic first-contact classification for ordinary one-hit tank rounds. */
+for(const optimized of [false,true])for(const fps of [30,60]){
+ test((optimized?'optimized':'baseline')+
+  ' seeded 2000-remote-bullet first-event parity at '+fps+'Hz',()=>{
+  const Game=boot(undefined,optimized);
+  let seed=0x2026387;
+  const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+  let reachable=0,unreachable=0;
+  for(let i=0;i<40;i++){
+   const x=30+rand()*95,vx=2500+rand()*5500,ttl=.003+rand()*.009;
+   const contact=(x-21)/vx,expected=contact<ttl-1e-7;
+   if(Math.abs(contact-ttl)<1e-7)continue;
+   const g=new Game();
+   g.tanks=[{kind:'tank',id:2,x,y:0,cls:'scout',hp:100,alive:true}];
+   g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+    vx,vy:0,r:3,dmg:20,ttl,pen:0,hits:0,
+    dead:false,shell:false,beam:false}];
+   addRemoteTTLFire(g);
+   g.updateBullets(1/fps);
+   assert.equal(g.hits,expected?1:0,
+    'world '+i+' x='+x+' speed='+vx+' ttl='+ttl);
+   if(expected)reachable++;else unreachable++;
+  }
+  assert.ok(reachable>5&&unreachable>5,
+   'seeded worlds must exercise both physical classifications');
+ });
+}
+
+
+/* The full Game.update epoch, not only a direct projectile helper, must
+ * preserve the same result under remote fire and both runtime overlays. */
+for(const optimized of [false,true])for(const fps of [30,60]){
+ test((optimized?'optimized':'baseline')+
+  ' Game.update retains single ordinary TTL contact amid 2000 remote bullets at '+
+  fps+'Hz',()=>{
+  const Game=boot(function(dt){this.time+=dt;this.updateBullets(dt);},optimized);
+  const g=new Game();
+  g.tanks=[{kind:'tank',id:2,x:40,y:0,cls:'scout',hp:100,alive:true}];
+  g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+   vx:6000,vy:0,r:3,dmg:20,ttl:.005,pen:0,hits:0,
+   dead:false,shell:false,beam:false}];
+  addRemoteTTLFire(g);
+  g.update(1/fps);
+  assert.equal(g.hits,1,'the shipping update epoch must not suppress local contact');
+  assert.equal(g.__novaShapeSweepActive,false);
+ });
+}
+
+
+/* A zero-time hostile drone overlap is not permission to reorder a separate
+ * zero-time lateral projectile already touching that same drone. */
+for(const optimized of [false,true]){
+ test((optimized?'optimized':'baseline')+
+  ' 2000 remote bullets cannot backdate lateral drone hit at t=0',()=>{
+  const Game=boot(undefined,optimized),g=new Game(),events=[];
+  g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=42;
+  g.drones=[{kind:'drone',id:10,ownerId:2,x:8,y:0,r:8,hp:30,
+   __novaChronoDroneEpoch:42,__novaChronoDronePrevX:8,
+   __novaChronoDronePrevY:0}];
+  g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+   vx:500,vy:0,r:3,dmg:20,ttl:.004,pen:0,hits:0,
+   dead:false,shell:false,beam:false}];
+  addRemoteTTLFire(g);
+  g.bullets.push({kind:'bullet',id:99997,ownerId:7,x:8,y:10,
+   vx:0,vy:0,r:3,dmg:15,ttl:1,pen:0,hits:0,
+   dead:false,shell:false,beam:false});
+  g.damageDrone=(d,dmg,owner)=>{events.push(owner);d.hp-=dmg;};
+  g.updateBullets(1/30);
+  assert.deepEqual(events,[7],
+   'simultaneous lateral contact must defer speculative TTL damage');
+ });
+}
