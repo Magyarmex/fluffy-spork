@@ -40,6 +40,7 @@ jobs:
           node tests/browser/frontlines-tactical-turn.cjs
           node tests/browser/frontlines-paired-microtrial.cjs
           node tests/browser/frontlines-route-matrix.cjs
+          node tests/browser/best-score-live-reload.cjs
       - name: Preserve browser screenshots
         if: always()
         uses: actions/upload-artifact@v4
