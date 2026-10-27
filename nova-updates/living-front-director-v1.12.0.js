@@ -27,7 +27,7 @@ function bloomToast(g,sector){
  if(!p||!alive(p)||!Number.isFinite(p.x)||!Number.isFinite(p.y))
   return '✦ SHAPE BLOOM · value has accumulated in quiet ground';
  var c=sectorCenter(sector);
- var bearing=sectorIndex(p.x,p.y)===sector?'HERE':
+ var bearing=sectorIndex(p.x,p.y)===sector?'SAME SECTOR':
   ['E','SE','S','SW','W','NW','N','NE'][
    (Math.round(Math.atan2(c.y-p.y,c.x-p.x)/(Math.PI/4))+8)%8];
  return '✦ SHAPE BLOOM · '+bearing+' · quiet ground is rich';
