@@ -15,6 +15,7 @@ assert.ok(html.indexOf('nova-updates/'+files[0])>=0&&
 
 function boot(withSwarm=true,withBattlefield=false){
  class Game {
+  update(dt){this.time+=dt;this.updateDrones(dt);}
   updateDrones(){}
   tryFire(){}
   damageTank(){}
@@ -159,3 +160,129 @@ for(const hz of [30,60,120,240]){
   assert.deepEqual(new Set(s.hits.map(h=>h[1])),new Set([20,21]));
  });
 }
+
+
+/* A chronological drone resolver needs motion from the actual integration
+ * owner, not an invented straight line between Battlefield/Live Vector stage
+ * checkpoints. This diagnostic is deliberately non-authoritative until all
+ * later movement owners have been reconciled. */
+function tracedIdleWorld(options={}){
+ const s=world({enemy:false,withBattlefield:!!options.battlefield,
+  aim:!!options.aim,phase:options.phase||'form'});
+ s.g.__novaDroneChronoTraceEnabled=options.trace!==false;
+ s.g.__novaShapeSweepActive=true;
+ s.g.__novaShapeSweepEpoch=37;
+ s.d.__novaChronoDroneEpoch=37;
+ s.d.__novaChronoDronePrevX=s.d.x;
+ s.d.__novaChronoDronePrevY=s.d.y;
+ s.d.speed=options.speed===undefined?200:options.speed;
+ return s;
+}
+for(const hz of [30,60,120,240]){
+ test('idle Swarm records its real integration, not a phase interpolation at '+hz+'Hz',()=>{
+  const s=tracedIdleWorld({battlefield:true});
+  const beforeX=s.d.x,beforeY=s.d.y,dt=1/hz;
+  s.g.updateDrones(dt);
+  assert.equal(s.d.__novaChronoIdleRawEpoch,37);
+  assert.equal(s.d.__novaChronoIdleRawX,beforeX);
+  assert.equal(s.d.__novaChronoIdleRawY,beforeY);
+  assert.equal(s.d.__novaChronoIdleRawEndX,s.d.__novaChronoDroneBaseX);
+  assert.equal(s.d.__novaChronoIdleRawEndY,s.d.__novaChronoDroneBaseY);
+  assert.equal(s.d.__novaChronoIdleRawDt,dt);
+  assert.equal(s.d.__novaChronoIdleRawEndX,s.d.x);
+  assert.ok(s.d.__novaChronoIdleRawEndX>beforeX);
+ });
+}
+test('raw integration witness is absent when diagnostics are disabled',()=>{
+ const s=tracedIdleWorld({trace:false});
+ s.g.updateDrones(1/60);
+ assert.equal(s.d.__novaChronoIdleRawEpoch,undefined);
+});
+test('committed dash never masquerades as idle Swarm integration',()=>{
+ const s=tracedIdleWorld({phase:'dash'});
+ s.d.__novaVX=300;s.d.__novaVY=0;s.d.__novaHitRun=true;
+ s.g.updateDrones(1/60);
+ assert.equal(s.d.__novaChronoIdleRawEpoch,undefined);
+});
+test('active command movement never masquerades as idle Swarm integration',()=>{
+ const s=tracedIdleWorld({aim:true});
+ s.g.updateDrones(1/60);
+ assert.equal(s.owner.__novaSwarm.active,true);
+ assert.equal(s.d.__novaChronoIdleRawEpoch,undefined);
+});
+test('arena clamping cannot produce a false raw straight segment',()=>{
+ const s=tracedIdleWorld({speed:1000});
+ s.d.x=2225.9;s.owner.x=2500;
+ s.g.updateDrones(1/30);
+ assert.equal(s.d.x,2226);
+ assert.equal(s.d.__novaChronoIdleRawEpoch,-1);
+});
+test('terrain correction is visibly distinct from raw idle integration',()=>{
+ const s=tracedIdleWorld({battlefield:true});
+ s.g.__novaTerrain=[{id:-1,shape:'rect',x:0,y:0,w:30,h:30,
+  solid:true,destructible:false}];
+ s.g.updateDrones(1/30);
+ assert.equal(s.d.__novaChronoIdleRawEpoch,37,
+  'raw integration remains observable, never implicitly collision-certified');
+ assert.notEqual(s.d.__novaChronoIdleRawEndX,s.d.__novaChronoDroneTerrainX);
+ assert.equal(s.d.__novaChronoDroneTraceEpoch,37);
+});
+
+test('real Battlefield Game.update owns the raw integration epoch',()=>{
+ const s=world({enemy:false,withBattlefield:true});
+ s.d.speed=200;s.g.__novaDroneChronoTraceEnabled=true;
+ s.g.update(1/60);
+ const epoch=s.g.__novaShapeSweepEpoch;
+ assert.equal(epoch,1);
+ assert.equal(s.d.__novaChronoIdleRawEpoch,epoch);
+ assert.equal(s.d.__novaChronoDroneTraceEpoch,epoch);
+ assert.equal(s.g.__novaShapeSweepActive,false,
+  'movement epoch is closed after the real Game.update wrapper');
+ s.g.__novaDroneChronoTraceEnabled=false;
+ s.g.update(1/60);
+ assert.equal(s.g.__novaShapeSweepEpoch,epoch+1);
+ assert.notEqual(s.d.__novaChronoIdleRawEpoch,s.g.__novaShapeSweepEpoch,
+  'old diagnostic must not be reused as a new frame witness');
+});
+test('optional integration diagnostics do not change real drone motion or attacks',()=>{
+ const a=world({enemy:false,withBattlefield:true});
+ const b=world({enemy:false,withBattlefield:true});
+ a.d.speed=200;b.d.speed=200;
+ a.g.__novaDroneChronoTraceEnabled=true;
+ for(let i=0;i<5;i++){a.g.update(1/60);b.g.update(1/60);}
+ for(const key of ['x','y','hp','attackCd','__novaVX','__novaVY',
+   '__novaIdleVX','__novaIdleVY','__novaPhase']){
+  assert.equal(a.d[key],b.d[key],key+' must be independent of diagnostics');
+ }
+ assert.equal(a.shape.hp,b.shape.hp,'damage and farming must be unchanged');
+ assert.equal(b.d.__novaChronoIdleRawEpoch,undefined);
+});
+
+test('actual idle steering witnesses a physical pre-expiry contact the speed ball cannot prove',()=>{
+ const s=world({enemy:false,withBattlefield:true});
+ s.d.x=20;s.d.speed=200;s.d.attackCd=999;
+ s.shape.x=0;s.shape.y=0;
+ s.g.__novaDroneChronoTraceEnabled=true;
+ const dt=1/60,ttl=.004,bulletVX=2500,radius=12;
+ s.g.update(dt);
+ const epoch=s.g.__novaShapeSweepEpoch;
+ assert.equal(s.d.__novaChronoIdleRawEpoch,epoch);
+ const x0=s.d.__novaChronoIdleRawX,x1=s.d.__novaChronoIdleRawEndX;
+ assert.equal(x0,20);
+ assert.equal(x1,s.d.__novaChronoDroneTerrainX,
+  'the simple source fixture has no terrain displacement');
+ const droneVX=(x1-x0)/dt;
+ const firstContact=(x0-radius)/(bulletVX-droneVX);
+ assert.ok(firstContact>0&&firstContact<ttl,
+  'relative-motion first contact is physically before projectile expiry');
+ // A conservative 1200u/s unknown-motion envelope cannot prove this hit.
+ // This is a read-only falsifier, not permission to apply damage.
+ let best=Infinity;
+ for(let i=0;i<=1000;i++){
+  const t=ttl*i/1000;
+  best=Math.min(best,Math.abs(bulletVX*t-x0)+1200*t);
+ }
+ assert.ok(best>=radius,
+  'the current unknown-motion guarantee must remain conservative');
+ assert.equal(s.d.__novaChronoIdleRawDt,dt);
+});

@@ -74,7 +74,30 @@ wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.
    this.__novaSwarmIdlePass=true;
    try{oldUpdate.call(this,dt);}finally{this.__novaSwarmIdlePass=priorIdlePass;}
    var postState=buildSquads(this);
-   for(var ai=0;ai<postState.active.length;ai++){var bucket=postState.active[ai],owner=bucket.owner;if(!owner||!owner.__novaSwarm||owner.__novaSwarm.active)continue;var sq=bucket.drones,claims=bucket.claims;claims.clear();for(var di=0;di<sq.length;di++){var drone=sq[di];if(drone.__novaPreGen!==gen||drone.__novaPreWasDash||drone.__novaPhase==='dash')continue;drone.x=drone.__novaPreX;drone.y=drone.__novaPreY;drone.angle=drone.__novaPreAngle;controlIdle(this,owner,drone,sq,claims,dt);drone.x=clamp(drone.x,-MAP_LIMIT+24,MAP_LIMIT-24);drone.y=clamp(drone.y,-MAP_LIMIT+24,MAP_LIMIT-24);}}
+   for(var ai=0;ai<postState.active.length;ai++){var bucket=postState.active[ai],owner=bucket.owner;if(!owner||!owner.__novaSwarm||owner.__novaSwarm.active)continue;var sq=bucket.drones,claims=bucket.claims;claims.clear();for(var di=0;di<sq.length;di++){var drone=sq[di];if(drone.__novaPreGen!==gen||drone.__novaPreWasDash||drone.__novaPhase==='dash')continue;drone.x=drone.__novaPreX;drone.y=drone.__novaPreY;drone.angle=drone.__novaPreAngle;
+    var rawX=drone.x,rawY=drone.y;
+    var didSteer=controlIdle(this,owner,drone,sq,claims,dt);
+    var integratedX=drone.x,integratedY=drone.y;
+    drone.x=clamp(drone.x,-MAP_LIMIT+24,MAP_LIMIT-24);drone.y=clamp(drone.y,-MAP_LIMIT+24,MAP_LIMIT-24);
+    /* Optional first-party movement witness. This records the ACTUAL idle
+     * steer integration, not an interpolation between later wrapper stages.
+     * Battlefield terrain, cached routing and Live Vector may still change
+     * the path. This raw witness MUST NOT authorize collision damage. */
+    if(this.__novaDroneChronoTraceEnabled===true&&this.__novaShapeSweepActive===true&&
+       drone.__novaChronoDroneEpoch===this.__novaShapeSweepEpoch){
+      drone.__novaChronoIdleRawEpoch=-1;
+      if(didSteer&&dt>0&&Number.isFinite(dt)&&
+         Number.isFinite(rawX)&&Number.isFinite(rawY)&&
+         Number.isFinite(integratedX)&&Number.isFinite(integratedY)&&
+         drone.__novaPrevX===rawX&&drone.__novaPrevY===rawY&&
+         drone.x===integratedX&&drone.y===integratedY){
+        drone.__novaChronoIdleRawEpoch=this.__novaShapeSweepEpoch;
+        drone.__novaChronoIdleRawX=rawX;drone.__novaChronoIdleRawY=rawY;
+        drone.__novaChronoIdleRawEndX=integratedX;
+        drone.__novaChronoIdleRawEndY=integratedY;
+        drone.__novaChronoIdleRawDt=dt;
+      }
+    }}}
  };
 });
 window.__NOVA_DRONE_PERF_TEST__={buildSquads:buildSquads,homePoint:homePoint,enemyDrone:enemyDrone,nearestDefense:nearestDefense};
