@@ -1036,6 +1036,11 @@
       var swarming = owner.swarmT > 0;
       var baseSpeed = d.speed * (swarming ? 1.34 : 1);
       if (!state.active && d.__novaPhase !== 'dash') {
+        // Swarm Discipline owns the entire idle movement/contact decision.
+        // Its older Controller pass is discarded and rewound; allowing the
+        // legacy farm attack here could damage a shape from a path the drone
+        // never ultimately takes (and consume the real defense cooldown).
+        if (g.__novaSwarmIdlePass === true && owner.__novaSwarm) return true;
         var recalling = state.recallUntil > g.time;
         return simulateFarm(g, owner, d, squad, profile, dt, recalling);
       }
