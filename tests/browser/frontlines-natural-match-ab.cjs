@@ -16,14 +16,29 @@ async function arm(browser,enabled,label){
   await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({state:'visible',timeout:45000});
   await page.evaluate(({terrainSeed,gameSeed})=>{
    let state=gameSeed>>>0;
-   Math.random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return (state>>>0)/4294967296;};
+   const seeded=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return (state>>>0)/4294967296;};
    const Game=window.__novaMakeRequire('')('game/engine').Game;
-   const spawn=Game.prototype.spawnPlayer,update=Game.prototype.update;
+   const spawn=Game.prototype.spawnPlayer,spawnAI=Game.prototype.spawnAITank,update=Game.prototype.update;
+   /* Seed the entire synchronous real-game constructor (player, neutral
+    * population, eight rivals), not the unrelated decorative/menu RAF. */
    Game.prototype.spawnPlayer=function(){
     if(this.__novaTerrain)return spawn.apply(this,arguments);
     const now=Date.now,rand=Math.random;let first=true;
-    Date.now=()=>0;Math.random=()=>first?(first=false,terrainSeed/0x7fffffff):rand();
-    try{return spawn.apply(this,arguments);}finally{Date.now=now;Math.random=rand;}
+    this.__novaInitRandomRestore=rand;this.__novaInitSpawnCount=0;
+    Date.now=()=>0;Math.random=()=>first?(first=false,terrainSeed/0x7fffffff):seeded();
+    try{return spawn.apply(this,arguments);}
+    finally{Date.now=now;Math.random=seeded;}
+   };
+   Game.prototype.spawnAITank=function(){
+    const result=spawnAI.apply(this,arguments);
+    if(this.__novaInitRandomRestore){
+     this.__novaInitSpawnCount++;
+     if(this.__novaInitSpawnCount>=8){
+      Math.random=this.__novaInitRandomRestore;
+      delete this.__novaInitRandomRestore;delete this.__novaInitSpawnCount;
+     }
+    }
+    return result;
    };
    Game.prototype.update=function(){
     if(!this.__novaDecorativeWorld)window.__novaNaturalMatchGame=this;
