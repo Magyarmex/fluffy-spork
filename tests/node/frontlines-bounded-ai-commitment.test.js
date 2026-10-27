@@ -65,7 +65,7 @@ test('a tactical turn is bounded and cannot restart repeatedly on the same annou
 });
 test('a genuinely new public BLOOM can support a new tactical turn',()=>{
  const s=scene();s.tick();s.g.time=109;s.tick();
- s.st.bloomMemory={sector:5,announcedAt:140,until:164};s.g.time=146;s.tick();
+ s.st.bloomMemory={sector:5,announcedAt:180,until:204};s.g.time=186;s.tick();
  assert.ok(s.moves.at(-1).x>0);
  assert.equal(s.st.stats.aiFrontlineCommitments,2);
 });
