@@ -314,7 +314,7 @@ if(target&&alive(target))bw*=.55;if((t.id||0)%4===0)bw*=.72;out.x=bx;out.y=by;ou
 function frontlineTurnEligible(g,t,a,now){
  if(!g||!t||!a||a.__lfEcoMode!=='memory'||!(a.__lfEcoWeight>.10)||!alive(t)||t.spawnShieldT>0)return false;
  var op=publicBloom(g.__lfState,now);
- if(!op||op.live||a.__lfEcoKey!=='BLOOM:'+op.sector||now-op.announcedAt>12)return false;
+ if(!op||op.live||a.__lfEcoKey!=='BLOOM:'+op.sector||now<op.announcedAt||now-op.announcedAt>12)return false;
  if(Math.abs(Number(t.id)||0)%3!==1)return false;
  if(t.hp/Math.max(1,t.maxHp||t.hp||1)<.65)return false;
  /* A visible incoming projectile or an active defensive combat posture wins
