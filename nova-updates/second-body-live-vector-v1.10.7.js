@@ -258,6 +258,11 @@ wrap('game/engine',function(engine,require){
     };
   }
   function steerToward(g,d,x,y,speed,dt){
+    /* Repair/peel is a SECOND physical integration. Even if the final
+     * endpoint coincides, a raw idle Swarm segment is no longer complete. */
+    if(g.__novaDroneChronoTraceEnabled===true&&g.__novaShapeSweepActive===true&&
+       d.__novaChronoIdleRawEpoch===g.__novaShapeSweepEpoch)
+      d.__novaChronoIdleInvalidEpoch=g.__novaShapeSweepEpoch;
     if(g.hasLineOfSight&&!g.hasLineOfSight(d.x,d.y,x,y,Math.max(2,(d.r||8)*.45))&&g.novaBattlefieldWaypoint){
       var wp=g.novaBattlefieldWaypoint(d.x,d.y,x,y,(d.r||8)+5,d.id);if(wp){x=wp.x;y=wp.y;}
     }
@@ -433,6 +438,40 @@ wrap('game/engine',function(engine,require){
         if(!d||d.__novaChronoDroneTraceEpoch!==epoch)continue;
         d.__novaChronoDroneLiveX=d.x;d.__novaChronoDroneLiveY=d.y;
         d.__novaChronoDroneLiveEpoch=epoch;
+        /* Optional end-of-chain unmodified-motion witness. This proves
+         * only that the single idle integrator's linear segment survived
+         * every known shipping movement owner and clear terrain. It does
+         * NOT resolve earlier projectiles, other bodies, shields or TTL,
+         * and must never award damage on its own. */
+        d.__novaChronoIdleUnmodifiedEpoch=-1;
+        if(d.hp>0&&d.__novaChronoIdleRawEpoch===epoch&&
+           d.__novaChronoIdleInvalidEpoch!==epoch&&
+           d.__novaChronoDroneRouteEpoch===epoch&&
+           d.__novaChronoIdleRawDt===dt&&!d.__novaCommitted&&
+           d.__novaPhase!=='dash'&&
+           Number.isFinite(d.__novaChronoIdleRawX)&&
+           Number.isFinite(d.__novaChronoIdleRawY)&&
+           Number.isFinite(d.__novaChronoIdleRawEndX)&&
+           Number.isFinite(d.__novaChronoIdleRawEndY)&&
+           d.__novaChronoDronePrevX===d.__novaChronoIdleRawX&&
+           d.__novaChronoDronePrevY===d.__novaChronoIdleRawY&&
+           d.__novaChronoDroneBaseX===d.__novaChronoIdleRawEndX&&
+           d.__novaChronoDroneBaseY===d.__novaChronoIdleRawEndY&&
+           d.__novaChronoDroneTerrainX===d.__novaChronoIdleRawEndX&&
+           d.__novaChronoDroneTerrainY===d.__novaChronoIdleRawEndY&&
+           d.__novaChronoDroneRouteX===d.__novaChronoIdleRawEndX&&
+           d.__novaChronoDroneRouteY===d.__novaChronoIdleRawEndY&&
+           d.x===d.__novaChronoIdleRawEndX&&
+           d.y===d.__novaChronoIdleRawEndY&&
+           typeof this.firstTerrainHit==='function'){
+          try{
+            var block=this.firstTerrainHit(
+              d.__novaChronoIdleRawX,d.__novaChronoIdleRawY,
+              d.__novaChronoIdleRawEndX,d.__novaChronoIdleRawEndY,
+              (d.r||8)+5);
+            if(!block)d.__novaChronoIdleUnmodifiedEpoch=epoch;
+          }catch(ignored){/* diagnostics fail closed; combat stays intact */}
+        }
       }
     }
     updateTelemetry(this,dt);registerTips();
