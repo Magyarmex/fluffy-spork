@@ -126,6 +126,12 @@ async function arm(browser,enabled,label){
     'A deterministic Scout script is not a human player','Seed replay is checked, not assumed']};
   const dir=path.join('artifacts','browser');fs.mkdirSync(dir,{recursive:true});
   fs.writeFileSync(path.join(dir,'frontlines-natural-match-ab.json'),JSON.stringify(report,null,2));
+  fs.writeFileSync(path.join(dir,'frontlines-natural-on.json'),JSON.stringify(on.result,null,2));
+  fs.writeFileSync(path.join(dir,'frontlines-natural-off.json'),JSON.stringify(off.result,null,2));
+  fs.writeFileSync(path.join(dir,'frontlines-natural-manifest.json'),JSON.stringify({
+   pairs:[{layout:LAYOUT,seed:'natural-20261027-0',
+    on:'frontlines-natural-on.json',off:'frontlines-natural-off.json'}]
+  },null,2));
   console.log('NOVA_FRONTLINES_NATURAL_MATCH_AB '+JSON.stringify({initialWorldIdentical:true,offReplayIdentical:same,
    off:{time:off.result.game.time,status:off.result.game.status,blooms:off.result.naturalBlooms,frontline:off.result.frontline?.counts},
    on:{time:on.result.game.time,status:on.result.game.status,blooms:on.result.naturalBlooms,frontline:on.result.frontline?.counts}}));
