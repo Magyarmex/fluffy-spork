@@ -306,7 +306,55 @@ if((!sig||now>=sig.until)&&st){
  }
 }
 if(target&&alive(target))bw*=.55;if((t.id||0)%4===0)bw*=.72;out.x=bx;out.y=by;out.weight=bw;out.key=key;out.mode=mode;return out;}
-LF.wrap('game/ai',function(ai,require){var old=ai.updateAI;if(!old||old.__novaLivingFront)return;var defs=(require('./types')||{}).SHAPE_DEFS||{};function patched(t,g,dt){if(!t||!t.ai||!g)return old(t,g,dt);var a=t.ai;a.__lfEcoT=(a.__lfEcoT||0)-dt;if(a.__lfEcoT<=0){a.__lfEcoT=(a.isElite?LF.AI_PERIOD*.82:LF.AI_PERIOD)+(Math.abs(t.id||0)%5)*.019;var prev=a.__lfEcoKey||'none',b=publicEcoBias(g,t,defs,a.__lfEcoBias||(a.__lfEcoBias={}));a.__lfEcoX=b.x;a.__lfEcoY=b.y;a.__lfEcoWeight=b.weight;a.__lfEcoKey=b.key;a.__lfEcoMode=b.mode;if(b.weight>.08&&prev!==b.key&&g.__lfState)g.__lfState.stats.aiRotations++;}var move=g.moveTank,own=Object.prototype.hasOwnProperty.call(g,'moveTank');if(move&&a.__lfEcoWeight>.04)g.moveTank=function(tt,vx,vy,dd){if(tt!==t)return move.apply(g,arguments);var sp=Math.hypot(vx||0,vy||0)||((g.tankSpeed&&g.tankSpeed(tt))||1),w=clamp(a.__lfEcoWeight,0,.48),x=(vx||0)/sp*(1-w)+a.__lfEcoX*w,y=(vy||0)/sp*(1-w)+a.__lfEcoY*w,m=Math.hypot(x,y)||1;return move.call(g,tt,x/m*sp,y/m*sp,dd);};try{return old(t,g,dt);}finally{if(move){if(own)g.moveTank=move;else delete g.moveTank;}}}patched.__novaLivingFront=true;ai.updateAI=patched;});
+/* Tactical Frontlines: a short route commitment lets a few healthy rivals
+ * make a meaningful public-opportunity turn instead of only drifting a few
+ * degrees. It never consults private ecology, never targets the human by id,
+ * and immediately yields to a visible combat target or recent damage.
+ * Each rival can commit only once to a particular public announcement. */
+function frontlineTurnEligible(g,t,a,now){
+ if(!g||!t||!a||a.__lfEcoMode!=='memory'||!(a.__lfEcoWeight>.10)||!alive(t)||t.spawnShieldT>0)return false;
+ var op=publicBloom(g.__lfState,now);
+ if(!op||op.live||a.__lfEcoKey!=='BLOOM:'+op.sector||now<op.announcedAt||now-op.announcedAt>12)return false;
+ if(Math.abs(Number(t.id)||0)%3!==1)return false;
+ if(t.hp/Math.max(1,t.maxHp||t.hp||1)<.65)return false;
+ /* A visible incoming projectile or an active defensive combat posture wins
+  * immediately, even if the old public opportunity still exists. */
+ if(a.__v180Threat&&Number(a.__v180Threat.risk)>.12)return false;
+ if(a.__v180Posture==='evade'||a.__v180Posture==='break'||a.__v180Posture==='cover')return false;
+ var targetId=a.__v1112TargetId;
+ if(targetId!=null&&targetId>=0){
+  if(typeof g.getTank!=='function')return false;
+  if(fairEcoTarget(g,t,g.getTank(targetId)))return false;
+ }
+ var hitAt=Number(a.__v180HitAt);
+ if(Number.isFinite(hitAt)&&now>=hitAt&&now-hitAt<2.5)return false;
+ return true;
+}
+function refreshFrontlineTurn(g,t,a){
+ var now=Number(g.time)||0,op=publicBloom(g.__lfState,now);
+ if(!frontlineTurnEligible(g,t,a,now)){a.__lfFrontTurn=null;return;}
+ var key='BLOOM:'+op.sector+':'+op.announcedAt,active=a.__lfFrontTurn;
+ if(active&&(active.key!==key||now>=active.until))a.__lfFrontTurn=null;
+ if(!a.__lfFrontTurn&&a.__lfFrontTurnSpentKey!==key){
+  a.__lfFrontTurn={key:key,until:now+2.2};
+  a.__lfFrontTurnSpentKey=key;
+  var st=g.__lfState;st.stats=st.stats||{};
+  st.stats.aiFrontlineCommitments=(st.stats.aiFrontlineCommitments||0)+1;
+ }
+}
+LF.wrap('game/ai',function(ai,require){var old=ai.updateAI;if(!old||old.__novaLivingFront)return;var defs=(require('./types')||{}).SHAPE_DEFS||{};function patched(t,g,dt){if(!t||!t.ai||!g)return old(t,g,dt);var a=t.ai;a.__lfEcoT=(a.__lfEcoT||0)-dt;if(a.__lfEcoT<=0){a.__lfEcoT=(a.isElite?LF.AI_PERIOD*.82:LF.AI_PERIOD)+(Math.abs(t.id||0)%5)*.019;var prev=a.__lfEcoKey||'none',b=publicEcoBias(g,t,defs,a.__lfEcoBias||(a.__lfEcoBias={}));a.__lfEcoX=b.x;a.__lfEcoY=b.y;a.__lfEcoWeight=b.weight;a.__lfEcoKey=b.key;a.__lfEcoMode=b.mode;if(b.weight>.08&&prev!==b.key&&g.__lfState)g.__lfState.stats.aiRotations++;refreshFrontlineTurn(g,t,a);}var move=g.moveTank,own=Object.prototype.hasOwnProperty.call(g,'moveTank');if(move&&a.__lfEcoWeight>.04)g.moveTank=function(tt,vx,vy,dd){
+ if(tt!==t)return move.apply(g,arguments);
+ var now=Number(g.time)||0,turn=a.__lfFrontTurn,
+  committed=!!(turn&&now<turn.until&&frontlineTurnEligible(g,t,a,now));
+ if(turn&&!committed)a.__lfFrontTurn=null;
+ var raw=Math.hypot(vx||0,vy||0),cap=g.tankSpeed&&Number(g.tankSpeed(tt));
+ /* A committed dash, boosted move or deliberate stationary hold belongs to
+  * its original combat owner; ecology cannot commandeer those commands. */
+ if(committed&&(!(raw>1e-6)||(cap>0&&raw>cap*1.15)))return move.apply(g,arguments);
+ var sp=raw||(cap||1),w=committed?.66:clamp(a.__lfEcoWeight,0,.48),
+  x=(vx||0)/sp*(1-w)+a.__lfEcoX*w,y=(vy||0)/sp*(1-w)+a.__lfEcoY*w,m=Math.hypot(x,y)||1;
+ return move.call(g,tt,x/m*sp,y/m*sp,dd);
+};try{return old(t,g,dt);}finally{if(move){if(own)g.moveTank=move;else delete g.moveTank;}}}patched.__novaLivingFront=true;ai.updateAI=patched;});
 
 /* The core minimap already draws the public BLOOM. Add a short local contest
  * accent after it, without introducing a new HUD, minimap authority or input. */
@@ -367,7 +415,7 @@ LF.wrap('game/engine',function(engine){
  };
 });
 function diag(){var g=LF.getActive(),s=g?LF.snapshot(g):LF.getLast()||{active:false,version:V};return'NOVA TANKS · LIVING FRONT '+V+'\n'+JSON.stringify(s,null,2);}
-function debugSummary(s){if(!s||!s.active)return'LIVING FRONT · no active/recorded match telemetry yet';var st=s.stats||{},counts=s.counts||{};return'LIVING FRONT v'+V+' · age '+s.age+'s · ceiling '+s.ceiling+' · '+s.director+' / last '+s.lastSignal+' · total XP '+s.totalXP+' · player neutral '+s.playerNeutralXPPerMin+' XP/min · plan '+s.planMsEma+'ms EMA / '+s.planMsPeak+'ms peak\nSHAPES C'+(counts.circle||0)+' T'+(counts.triangle||0)+' S'+(counts.square||0)+' P'+(counts.pentagon||0)+' H'+(counts.hexagon||0)+' ★'+(counts.star||0)+' CR'+(counts.crasher||0)+' · EVADE '+(st.triangleEvasions||0)+' · CRASH '+(st.crasherCharges||0)+'/'+(st.crasherHits||0)+'/'+(st.crasherMisses||0)+' · OVER '+(st.crasherOvershoots||0)+' · BOUNTY '+Math.round(st.bountyAbsorbed||0)+'/'+Math.round(st.bountyReleased||0)+' · STAR '+(st.starsIntercepted||0)+'/'+(st.starsSpawned||0)+' · BLOOM '+(st.blooms||0)+' · MIG '+(st.migrations||0)+' · AI ROT '+(st.aiRotations||0)+' · CONTEST '+(st.contests||0)+' · HEX AVG '+s.hexAvgNeighbors+'\n'+s.sectors.map(function(q){return q.i+':M'+q.m.toFixed(2)+' P'+q.p.toFixed(2)+' N'+q.n+' XP'+q.xp+' H'+q.harvest.toFixed(2)+' C'+q.combat.toFixed(2)+' '+q.in.toFixed(1)+'→/'+q.out.toFixed(1)+'←';}).join(' · ')+(s.frontline?' | FRONTLINES · ANN '+s.frontline.counts.announcements+' · ENTRY '+s.frontline.counts.playerEntries+' · CONTEST '+s.frontline.counts.observedContests+' · AI PHYS '+(s.frontline.counts.aiPhysicalArrivals||0)+' · REJECT '+(s.frontline.counts.aiPhysicalRejectedCrossings||0)+' · AI MEM '+(s.frontline.counts.aiArrivals||0)+' · NEUTRAL XP '+Math.round(s.frontline.counts.neutralXP)+' · SURVIVED '+s.frontline.counts.contestSurvivals+' · IN ZONE '+s.frontline.counts.playerSeconds.toFixed(1)+'s':'');}
+function debugSummary(s){if(!s||!s.active)return'LIVING FRONT · no active/recorded match telemetry yet';var st=s.stats||{},counts=s.counts||{};return'LIVING FRONT v'+V+' · age '+s.age+'s · ceiling '+s.ceiling+' · '+s.director+' / last '+s.lastSignal+' · total XP '+s.totalXP+' · player neutral '+s.playerNeutralXPPerMin+' XP/min · plan '+s.planMsEma+'ms EMA / '+s.planMsPeak+'ms peak\nSHAPES C'+(counts.circle||0)+' T'+(counts.triangle||0)+' S'+(counts.square||0)+' P'+(counts.pentagon||0)+' H'+(counts.hexagon||0)+' ★'+(counts.star||0)+' CR'+(counts.crasher||0)+' · EVADE '+(st.triangleEvasions||0)+' · CRASH '+(st.crasherCharges||0)+'/'+(st.crasherHits||0)+'/'+(st.crasherMisses||0)+' · OVER '+(st.crasherOvershoots||0)+' · BOUNTY '+Math.round(st.bountyAbsorbed||0)+'/'+Math.round(st.bountyReleased||0)+' · STAR '+(st.starsIntercepted||0)+'/'+(st.starsSpawned||0)+' · BLOOM '+(st.blooms||0)+' · MIG '+(st.migrations||0)+' · AI ROT '+(st.aiRotations||0)+' · AI INTENT '+(st.aiFrontlineCommitments||0)+' · CONTEST '+(st.contests||0)+' · HEX AVG '+s.hexAvgNeighbors+'\n'+s.sectors.map(function(q){return q.i+':M'+q.m.toFixed(2)+' P'+q.p.toFixed(2)+' N'+q.n+' XP'+q.xp+' H'+q.harvest.toFixed(2)+' C'+q.combat.toFixed(2)+' '+q.in.toFixed(1)+'→/'+q.out.toFixed(1)+'←';}).join(' · ')+(s.frontline?' | FRONTLINES · ANN '+s.frontline.counts.announcements+' · ENTRY '+s.frontline.counts.playerEntries+' · CONTEST '+s.frontline.counts.observedContests+' · AI PHYS '+(s.frontline.counts.aiPhysicalArrivals||0)+' · REJECT '+(s.frontline.counts.aiPhysicalRejectedCrossings||0)+' · AI MEM '+(s.frontline.counts.aiArrivals||0)+' · NEUTRAL XP '+Math.round(s.frontline.counts.neutralXP)+' · SURVIVED '+s.frontline.counts.contestSurvivals+' · IN ZONE '+s.frontline.counts.playerSeconds.toFixed(1)+'s':'');}
 function fill(root){if(!root)return;var h=root.querySelector('.nv-lf-debug');if(!h){h=document.createElement('div');h.className='nv-lf-debug';h.style.cssText='margin-top:8px;padding:8px;border:1px solid rgba(255,201,77,.18);border-radius:10px;background:rgba(12,16,26,.7);font:600 9px/1.25 Rajdhani,system-ui;color:#aebed0;white-space:pre-wrap;';var a=root.querySelector('.nv-debug-actions');a?root.insertBefore(h,a):root.appendChild(h);}var s=LF.getActive()?LF.snapshot(LF.getActive()):LF.getLast();h.textContent=debugSummary(s);var b=document.createElement('button');b.type='button';b.dataset.lfCopy='1';b.className='nv-debug-btn';b.textContent='COPY ECOLOGY';b.style.marginTop='7px';b.onclick=function(){if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(diag()).catch(function(){});};h.appendChild(document.createElement('br'));h.appendChild(b);}
 function registerTips(){var api=window.NOVATips;if(!api||typeof api.registerMany!=='function'||window.__NOVA_LIVING_FRONT_TIPS_REGISTERED__)return false;window.__NOVA_LIVING_FRONT_TIPS_REGISTERED__=true;api.registerMany(TIP_DEFS);return true;}
 function bindTipLine(){return registerTips();} // compatibility shim: canonical Fieldcraft owns rendering, cadence, and shuffle bags.
