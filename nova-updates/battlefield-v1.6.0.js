@@ -613,7 +613,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   * exceeds the global 900-comparison estimate. Its own full-entity scan
   * remains capped; multi-shot local batches must pass a shared preflight. */
  var ISOLATED_RECOVERY_SCAN_CAP=1200;
- function isolatedTTLStationaryPiercingChain(g,b,dt,nonExpiring,localOthers){
+ function isolatedTTLStationaryPiercingChain(g,b,dt,nonExpiring,localOthers,allowSingle){
   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
      b.__novaBreachAtTime===g.time||
      !(dt>0)||!(b.ttl>0)||
@@ -683,7 +683,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    * the projectile will die at expiry regardless of unused penetration.
    * The original one-body TTL resolver retains first-hit ownership. */
   if(nonExpiring ? contacts.length!==2 :
-     contacts.length<(b.hits>0?1:2)||contacts.length>b.pen+1||contacts.length>3)
+     contacts.length<(allowSingle?1:(b.hits>0?1:2))||contacts.length>b.pen+1||contacts.length>3)
    return false;
   contacts.sort(function(a,c){return a.t-c.t;});
   for(var oi=1;oi<contacts.length;oi++)
@@ -1452,12 +1452,12 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   * Include every shot that could intersect this projectile OR any potentially
   * reached tank/shape/drone (including lateral earlier kill-credit threats).
   * Unknown motion remains a veto; cap both comparisons and local proof size. */
- function localSingleTTLBodyOthers(g,b,dt){
+ function localSingleTTLBodyOthers(g,b,dt,allowPiercing){
   var bullets=g.bullets||[],tanks=g.tanks||[],
       shapes=g.shapes||[],drones=g.drones||[],
       bodyCost=tanks.length+shapes.length+drones.length;
   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
-     b.pen!==0||(b.hits||0)!==0||
+     (b.pen!==0&&!(allowPiercing&&b.pen===1))||(b.hits||0)!==0||
      !(dt>0)||!Number.isFinite(dt)||
      !(b.ttl>0&&b.ttl<=dt)||
      !Number.isFinite(b.x)||!Number.isFinite(b.y)||
@@ -1540,7 +1540,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   * retains the existing first-event resolver; this planner only proves
   * that their possible body contacts cannot share a victim. */
  function localOrdinaryTTLBatchPlan(g,dt){
-  var bullets=g.bullets||[],shots=[],tanks=g.tanks||[],
+  var bullets=g.bullets||[],shots=[],penMode=null,tanks=g.tanks||[],
       shapes=g.shapes||[],drones=g.drones||[],
       bodyCount=tanks.length+shapes.length+drones.length;
   if(!(dt>0)||!Number.isFinite(dt))return null;
@@ -1550,7 +1550,9 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       !(b.ttl>0&&b.ttl<=dt))continue;
    /* A mixed penetration/ordinary batch has unresolved shared effects.
     * Do not commit any shortcut from this lane in that situation. */
-   if(b.pen!==0||(b.hits||0)!==0)return null;
+   if((b.pen!==0&&b.pen!==1)||(b.hits||0)!==0)return null;
+   if(penMode===null)penMode=b.pen;
+   else if(penMode!==b.pen)return null;
    shots.push(b);
   }
   if(shots.length<2||shots.length>12||
@@ -1562,7 +1564,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       !Number.isFinite(shot.vx)||!Number.isFinite(shot.vy)||
       !Number.isFinite(shot.r)||!(shot.r>0)||
       !Number.isFinite(shot.dmg)||!(shot.dmg>0))return null;
-   var others=localSingleTTLBodyOthers(g,shot,dt);
+   var others=localSingleTTLBodyOthers(g,shot,dt,shot.pen===1);
    if(!others)return null;
    var x1=shot.x+shot.vx*shot.ttl,y1=shot.y+shot.vy*shot.ttl;
    if(!Number.isFinite(x1)||!Number.isFinite(y1))return null;
@@ -1677,9 +1679,14 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   for(var pre=this.bullets.length-1;pre>=0;pre--){
    var expiringBullet=this.bullets[pre];
    if(localOrdinaryBatch){
-    if(localOrdinaryBatch.has(expiringBullet))
-     isolatedTTLBodyContact(this,expiringBullet,dt,
-      localOrdinaryBatch.get(expiringBullet));
+    if(localOrdinaryBatch.has(expiringBullet)){
+     if(expiringBullet.pen===1)
+      isolatedTTLStationaryPiercingChain(this,expiringBullet,dt,false,
+       localOrdinaryBatch.get(expiringBullet),true);
+     else
+      isolatedTTLBodyContact(this,expiringBullet,dt,
+       localOrdinaryBatch.get(expiringBullet));
+    }
    }else if(localExpiring){
     if(localExpiring.has(expiringBullet))
      isolatedTTLStationaryPiercingChain(this,expiringBullet,dt,false,
