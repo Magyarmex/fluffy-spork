@@ -76,3 +76,19 @@ test('naturally bloom-less paired trials remain in the denominator of attempted 
  assert.equal(r.batch.pairCount,1);
  assert.ok(r.warnings.some(x=>/retained as censored evidence/.test(x)));
 }));
+
+test('opt-in visible-defense policy is separately identifiable and validates dodge samples',()=>sandbox(root=>{
+ const p=writePair(root,'CROSSFIRE','public-bloom-harvest-defense','s0');
+ p.on.visibleDodgeSamples=12;p.off.visibleDodgeSamples=9;
+ p.report.on=p.on;p.report.off=p.off;p.report.offReplay=structuredClone(p.off);
+ for(const [name,data] of [['frontlines-natural-on.json',p.on],
+  ['frontlines-natural-off.json',p.off],['frontlines-natural-match-ab.json',p.report]])
+  fs.writeFileSync(path.join(p.dir,name),JSON.stringify(data));
+ const r=collectMatrix(root,1);
+ assert.equal(r.batch.policies['public-bloom-harvest-defense'].pairCount,1);
+ p.on.visibleDodgeSamples=-1;
+ p.report.on=p.on;
+ fs.writeFileSync(path.join(p.dir,'frontlines-natural-on.json'),JSON.stringify(p.on));
+ fs.writeFileSync(path.join(p.dir,'frontlines-natural-match-ab.json'),JSON.stringify(p.report));
+ assert.throws(()=>collectMatrix(root,1),/invalid ON visible-threat dodge samples/);
+}));
