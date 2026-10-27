@@ -130,3 +130,12 @@ test('disabling Director closes the opportunity and drops retained movement refe
  s.LF.frontlineTick(s.g,s.st,false);
  assert.equal(f.counts.resolved,1,'closing a disabled opportunity is idempotent');
 });
+
+test('multiple real movement substeps compose into one certified Director sample',()=>{
+ const s=scene();s.e.x=-1190;s.LF.frontlineTick(s.g,s.st,false);
+ s.g.time+=.22;
+ for(let i=0;i<5;i++)s.g.moveTank(s.e,90/.22,0,.22/5);
+ s.LF.frontlineTick(s.g,s.st,false);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalArrivals,1);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalRejectedCrossings,0);
+});
