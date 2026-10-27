@@ -88,6 +88,14 @@ const {chromium}=require('playwright');
    return{viewport:320,changedChannels:changed};
   });
   await page.screenshot({path:path.join(dir,'tactical-frontlines-mobile.png')});
+  await page.evaluate(()=>{
+   const g=window.__novaFrontlineGame,T=window.__NOVA_LIVING_FRONT_TEST__;
+   T.updateContest(g,g.__lfState);g.drawMinimap();
+   // Screenshot-only: uncover the paused game without changing simulation state.
+   for(const el of document.querySelectorAll('div.fixed.inset-0'))
+    if(/PAUSED|INITIALIZING CHASSIS/.test(el.textContent||''))el.style.display='none';
+  });
+  await page.screenshot({path:path.join(dir,'tactical-frontlines-mobile-visible.png')});
   console.log('NOVA_FRONTLINES_REAL_BROWSER '+JSON.stringify(result));
   console.log('NOVA_FRONTLINES_MOBILE_BROWSER '+JSON.stringify(mobile));
  }finally{await browser.close();}
