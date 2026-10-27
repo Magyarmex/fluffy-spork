@@ -1519,14 +1519,26 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
  var oldSplash=Game.prototype.splashAt;Game.prototype.splashAt=function(x,y,radius,frac,ownerId,knock,color,dmg){var out=oldSplash.apply(this,arguments),a=terrainCandidates(this,x,y,x,y,radius);for(var i=0;i<a.length;i++){var s=a[i];if(!s.destructible||s.hp<=0)continue;var dx=Math.max(Math.abs(x-s.x)-(s.shape==='rect'?s.w*.5:s.r),0),dy=Math.max(Math.abs(y-s.y)-(s.shape==='rect'?s.h*.5:s.r),0),dist=Math.hypot(dx,dy);if(dist>radius)continue;var fall=1-clamp(dist/Math.max(1,radius),0,1)*.55;damageCover(this,s,(dmg||0)*(frac||.4)*fall,ownerId,x,y,splashBullet);}return out;};
 
  var oldUpdateDrones=Game.prototype.updateDrones;Game.prototype.updateDrones=function(dt){ensureTerrain(this);
- /* Enable the existing read-only motion witness only for a bounded,
-  * spatially relevant ordinary TTL shot. Keep the optional instrumentation
-  * off for the usual frames and for large crowded populations. */
+ /* Enable the existing read-only motion witness only for a spatially
+  * relevant ordinary TTL shot. Remote density never disables local proof;
+  * a union broad phase rejects unrelated bullets before drone comparisons. */
  var priorTrace=this.__novaDroneChronoTraceEnabled,autoTrace=false;
  var bs=this.bullets||[],ds=this.drones||[];
  if(this.__novaShapeSweepActive===true&&priorTrace!==true&&dt>0&&Number.isFinite(dt)&&
-    bs.length>0&&ds.length>0&&bs.length<=256&&ds.length<=64){
-  for(var bi=0;bi<bs.length&&!autoTrace;bi++){
+    bs.length>0&&ds.length>0){
+  /* One union AABB rejects remote fire in O(1) per bullet before any
+   * bullet×drone work. Never use a global projectile-count cutoff:
+   * unrelated distant gunfire cannot disable a local certified contact. */
+  var minDX=Infinity,maxDX=-Infinity,minDY=Infinity,maxDY=-Infinity;
+  var motionPad=Math.max(30,dt*2400);
+  for(var ci=0;ci<ds.length;ci++){
+   var cd=ds[ci];if(!cd||!(cd.hp>0)||
+      !Number.isFinite(cd.x)||!Number.isFinite(cd.y))continue;
+   var cr=(cd.r||8)+1+motionPad;
+   minDX=Math.min(minDX,cd.x-cr);maxDX=Math.max(maxDX,cd.x+cr);
+   minDY=Math.min(minDY,cd.y-cr);maxDY=Math.max(maxDY,cd.y+cr);
+  }
+  for(var bi=0;bi<bs.length&&!autoTrace&&minDX!==Infinity;bi++){
    var pb=bs[bi];
    if(!pb||pb.dead||pb.shell||pb.beam||pb.splash||
       pb.__v17Cannon||pb.pen!==0||(pb.hits||0)!==0||
@@ -1535,6 +1547,9 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       !Number.isFinite(pb.vx)||!Number.isFinite(pb.vy))continue;
    var px=pb.x+pb.vx*pb.ttl,py=pb.y+pb.vy*pb.ttl;
    if(!Number.isFinite(px)||!Number.isFinite(py))continue;
+   var br=pb.r||3;
+   if(Math.max(pb.x,px)+br<minDX||Math.min(pb.x,px)-br>maxDX||
+      Math.max(pb.y,py)+br<minDY||Math.min(pb.y,py)-br>maxDY)continue;
    for(var dj=0;dj<ds.length;dj++){
     var dr=ds[dj];if(!dr||!(dr.hp>0)||
        dr.ownerId===pb.ownerId||!Number.isFinite(dr.x)||
