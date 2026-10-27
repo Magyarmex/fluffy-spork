@@ -35,6 +35,7 @@ async function arm(browser,enabled,label){
   const initial=await page.evaluate(enabled=>{
    const g=window.__novaNaturalMatchGame;
    g.setPaused(true); // Disable RAF simulation; advance actual Game.update ourselves.
+   g.__novaTrialRng=0x7d27e91b; // Simulation RNG isolated from asynchronous paused rendering.
    if(g.__novaBattlefield?.name!=='CROSSFIRE')throw Error('uncontrolled layout '+g.__novaBattlefield?.name);
    const ai=window.__novaMakeRequire('')('game/ai');
    if(!ai||typeof ai.updateAI!=='function')throw Error('missing composed AI');
@@ -74,7 +75,15 @@ async function arm(browser,enabled,label){
   for(let i=0;i<Math.ceil(SECONDS/DT/CHUNK);i++){
    last=await page.evaluate(({steps,dt})=>{
     const g=window.__novaNaturalMatchGame;
-    for(let j=0;j<steps&&g.status!=='dead';j++)g.update(dt);
+    const previousRandom=Math.random;
+    Math.random=()=>{
+     let state=g.__novaTrialRng>>>0;
+     state^=state<<13;state^=state>>>17;state^=state<<5;
+     g.__novaTrialRng=state>>>0;
+     return g.__novaTrialRng/4294967296;
+    };
+    try{for(let j=0;j<steps&&g.status!=='dead';j++)g.update(dt);}
+    finally{Math.random=previousRandom;}
     return{time:g.time,status:g.status,blooms:g.__lfState?.stats?.blooms||0};
    },{steps:Math.min(CHUNK,Math.ceil(SECONDS/DT)-i*CHUNK),dt:DT});
    if(last.status==='dead')break;
