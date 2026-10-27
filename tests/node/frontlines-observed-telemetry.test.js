@@ -283,6 +283,46 @@ test('unobserved long tab gaps cannot inflate Frontlines exposure denominators',
  assert.ok(c.hostileBotSeconds<=LF.SECTOR_PERIOD*2+1e-6);
 });
 
+test('death after public BLOOM expiry cannot censor a completed opportunity',()=>{
+ const {g,st,p,LF}=scene();LF.frontlineTick(g,st,false);
+ g.time=125;st.signal=null; // memory expired at 124
+ p.hp=0;p.alive=false;g.status='dead'; // no damage callback to supply an earlier fatal timestamp
+ LF.frontlineTick(g,st,false);
+ const f=st.frontlineTelemetry;
+ assert.equal(f.counts.resolved,1,'the opportunity still resolves');
+ assert.equal(f.counts.pilotDeathCensors,0,'post-expiry death is not an observed death during BLOOM');
+ assert.equal(f.events.filter(e=>e.kind==='pilot-death-censor').length,0);
+ LF.frontlineTick(g,st,false);
+ assert.equal(f.counts.resolved,1,'closure remains idempotent');
+});
+test('a replacement BLOOM cannot inherit a death censor from the previous pocket',()=>{
+ const {g,st,p,LF}=scene();LF.frontlineTick(g,st,false);
+ g.time=123;
+ st.signal={type:'BLOOM',sector:6,started:122,until:127};
+ st.bloomMemory={sector:6,announcedAt:122,until:146,initialValue:500};
+ p.hp=0;p.alive=false;g.status='dead';
+ LF.frontlineTick(g,st,false);
+ assert.equal(st.frontlineTelemetry.counts.pilotDeathCensors,0,
+  'an unrelated later public signal cannot certify death during the previous signal');
+});
+test('death before expiry still censors an active BLOOM when only closure sees it',()=>{
+ const {g,st,p,LF}=scene();LF.frontlineTick(g,st,false);
+ g.time=123;st.signal=null; // 24-second public memory remains valid
+ p.hp=0;p.alive=false;g.status='dead';
+ LF.frontlineTick(g,st,false);
+ assert.equal(st.frontlineTelemetry.counts.pilotDeathCensors,1,
+  'do not discard legitimate early deaths when the normal damage hook is unavailable');
+});
+test('death-censor fallback respects the exact 24-second expiry boundary',()=>{
+ for(const [at,expected] of [[123.999,1],[124,0],[124.001,0]]){
+  const {g,st,p,LF}=scene();LF.frontlineTick(g,st,false);
+  g.time=at;st.signal=null;
+  p.hp=0;p.alive=false;g.status='dead';
+  LF.frontlineTick(g,st,false);
+  assert.equal(st.frontlineTelemetry.counts.pilotDeathCensors,expected,
+   'at t='+at+' only a still-active public memory can certify the death');
+ }
+});
 test('a pilot already dead before an opportunity starts is not a new death censor',()=>{
  const {g,st,p,LF}=scene();
  p.hp=0;p.alive=false; // e.g. a pending redeploy with playing status
