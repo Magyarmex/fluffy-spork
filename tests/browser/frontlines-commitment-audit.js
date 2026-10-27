@@ -6,6 +6,7 @@
  function create(){return{samples:0,enabledSamples:0,publicMemory:0,liveSignal:0,expiredWindow:0,
   eligibleWindow:0,alreadyInside:0,subset:0,healthy:0,memoryMode:0,
   meaningfulWeight:0,precombatIntersection:0,activeTurn:0,started:0,
+  startedLive:0,startedMemory:0,activeTurnLive:0,activeTurnMemory:0,
   _seen:new Set()};}
  function sample(audit,g,t,enabled,sectorIndex){
   if(!audit||!g||!t||!t.ai)return;
@@ -13,7 +14,23 @@
   audit.samples++;if(enabled)audit.enabledSamples++;
   if(!st||st.directorEnabled===false||!m||!(now>=m.announcedAt&&now<m.until))return;
   audit.publicMemory++;
-  if(st.signal&&st.signal.type==='BLOOM'&&now<st.signal.until){audit.liveSignal++;return;}
+  /* A turn may start AND physically arrive during the same composed AI
+   * update. Count the actual spent key before any live/arrival/window return,
+   * not only among rivals still outside when the observer samples them. */
+  const live=!!(st.signal&&st.signal.type==='BLOOM'&&now<st.signal.until);
+  const expected='BLOOM:'+m.sector+':'+m.announcedAt;
+  if(a.__lfFrontTurnSpentKey===expected){
+   const unique=String(t.id)+':'+expected;
+   if(!audit._seen.has(unique)){
+    audit._seen.add(unique);audit.started++;
+    if(live)audit.startedLive++;else audit.startedMemory++;
+   }
+  }
+  if(a.__lfFrontTurn&&a.__lfFrontTurn.key===expected&&now<a.__lfFrontTurn.until){
+   audit.activeTurn++;
+   if(live)audit.activeTurnLive++;else audit.activeTurnMemory++;
+  }
+  if(live){audit.liveSignal++;return;}
   if(now-m.announcedAt>12){audit.expiredWindow++;return;}
   audit.eligibleWindow++;
   if(typeof sectorIndex==='function'&&sectorIndex(t.x,t.y)===m.sector){audit.alreadyInside++;return;}
@@ -27,11 +44,7 @@
   if(mode)audit.memoryMode++;
   if(weight)audit.meaningfulWeight++;
   if(subset&&healthy&&mode&&weight)audit.precombatIntersection++;
-  if(a.__lfFrontTurn&&now<a.__lfFrontTurn.until)audit.activeTurn++;
-  const key=a.__lfFrontTurnSpentKey;
-  if(key){const unique=String(t.id)+':'+key;
-   if(!audit._seen.has(unique)){audit._seen.add(unique);audit.started++;}
-  }
+
  }
  function summary(audit){
   const out={};
