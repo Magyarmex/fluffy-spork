@@ -16,6 +16,8 @@ test('public pilot never treats an expired or non-BLOOM signal as a destination'
  g.__lfState.bloomMemory={sector:5,until:20};
  assert.equal(publicSector(g),5);
  g.__lfState.bloomMemory.until=9;assert.equal(publicSector(g),null);
+ g.__lfState.signal.until=15;g.__lfState.directorEnabled=false;
+ assert.equal(publicSector(g),null,'disabled Director cannot supply a pilot destination');
 });
 test('pilot continues toward the public center instead of stopping at sector entry',()=>{
  const g=game();const v=moveTowardPublicBloom(g,{...p,x:180},LF);
