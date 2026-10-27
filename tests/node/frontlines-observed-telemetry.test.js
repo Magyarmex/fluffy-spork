@@ -8,6 +8,7 @@ function scene(){
   drawMinimap(){return 'base';}
   gainXP(t,amt){t.xp=(t.xp||0)+amt;}
   updateOrbs(){if(!this.orbs.length)return;const o=this.orbs[0];this.gainXP(this.player,o.xp);this.orbs.splice(0,1);}
+  damageTank(t,amt){t.hp-=amt;if(t.hp<=0){t.alive=false;this.status='dead';}}
   redeploy(){return 'redeployed';}
  }
  const window={__novaModules:{'game/engine':function(m){m.exports={Game};}},
@@ -102,4 +103,14 @@ test('disabled Director and redeploy cannot leak an old opportunity into a new l
  assert.equal(st.frontlineTelemetry.counts.announcements,1);
  assert.equal(g.redeploy(),'redeployed');
  assert.equal(g.__lfState,null);
+});
+
+test('actual damage authority records death even when the Director stops ticking after game over',()=>{
+ const {g,st,p,LF}=scene();LF.frontlineTick(g,st,true);
+ g.damageTank(p,200);
+ assert.equal(g.status,'dead');
+ assert.equal(st.frontlineTelemetry.counts.playerDeaths,1);
+ assert.equal(st.frontlineTelemetry.events.filter(e=>e.kind==='player-death').length,1);
+ LF.recordFrontlinePlayerDeath(g,st,p);
+ assert.equal(st.frontlineTelemetry.counts.playerDeaths,1,'do not double count a fatal hit');
 });
