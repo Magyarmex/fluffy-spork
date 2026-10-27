@@ -68,7 +68,8 @@
       if(typeof g.areAllies==='function'&&g.areAllies(p,t))continue;
       if(typeof g.areHostile==='function'&&!g.areHostile(p,t))continue;
       const d=Math.hypot(t.x-p.x,t.y-p.y);
-      if(d>1&&d<=420&&d<dist){target=t;dist=d;}
+      if(d>1&&d<=420&&(d<dist-1e-9||
+         Math.abs(d-dist)<=1e-9&&Number(t.id)<Number(target?.id??Infinity))){target=t;dist=d;}
     }
     return target?{x:(target.x-p.x)/dist,y:(target.y-p.y)/dist}:null;
   }
