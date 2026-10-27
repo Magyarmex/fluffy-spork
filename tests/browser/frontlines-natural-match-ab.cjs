@@ -76,7 +76,11 @@ async function arm(browser,enabled,label){
   await page.waitForFunction(()=>window.__novaNaturalMatchGame?.status==='playing'&&!!window.__novaNaturalMatchGame.__lfState,{timeout:30000});
   const initial=await page.evaluate(({enabled,pilotPolicy,trialRng,terrainIndex,seedIndex})=>{
    const g=window.__novaNaturalMatchGame;
-   g.setPaused(true); // Disable RAF simulation; advance actual Game.update ourselves.
+   g.setPaused(true); // Advance actual Game.update ourselves.
+   /* Paused rendering still runs requestAnimationFrame and may mutate shared
+    * visual/game caches between independent OFF replays. Cancel the loop:
+    * this is a deterministic headless simulation, not a screenshot test. */
+   if(g.raf){cancelAnimationFrame(g.raf);g.raf=0;}
    /* Async spawn completion may permute bot array order despite identical
     * ids/positions. Canonicalize simulation iteration before the first step
     * so OFF replay compares the same physical update order, not RAF timing. */
