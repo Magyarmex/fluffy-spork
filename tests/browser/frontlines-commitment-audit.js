@@ -17,7 +17,8 @@
   /* A turn may start AND physically arrive during the same composed AI
    * update. Count the actual spent key before any live/arrival/window return,
    * not only among rivals still outside when the observer samples them. */
-  const live=!!(st.signal&&st.signal.type==='BLOOM'&&now<st.signal.until);
+  const live=!!(st.signal&&st.signal.type==='BLOOM'&&now<st.signal.until&&
+   st.signal.sector===m.sector&&st.signal.started===m.announcedAt);
   const expected='BLOOM:'+m.sector+':'+m.announcedAt;
   if(a.__lfFrontTurnSpentKey===expected){
    const unique=String(t.id)+':'+expected;
