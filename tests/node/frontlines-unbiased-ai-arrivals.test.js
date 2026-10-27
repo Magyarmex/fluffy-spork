@@ -71,3 +71,13 @@ test('physical arrival diagnostics reveal no hidden enemy coordinates',()=>{
  assert.equal(snap.frontline.counts.aiPhysicalArrivals,1);
  assert.ok(!JSON.stringify(snap.frontline).includes('"x"'));
 });
+
+test('a bot cannot inflate approach telemetry by resetting its sampled path',()=>{
+ const s=scene('none');s.e.x=-1500;s.LF.frontlineTick(s.g,s.st,false);
+ sample(s,-1450,-550);sample(s,-1380,-550);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalApproaches,1);
+ sample(s,-2000,-550); // implausible discontinuity: new baseline, not a new bot
+ sample(s,-1930,-550);sample(s,-1850,-550);
+ assert.equal(s.st.frontlineTelemetry.counts.aiPhysicalApproaches,1,
+  'same bot must not count another approach during one public BLOOM');
+});
