@@ -211,10 +211,10 @@ for(const optimized of [false,true])for(const hz of [30,60,120,240]){
  });
 }
 for(const optimized of [false,true])for(const hz of [30,60,120,240]){
- test('witnessed frame-start overlap survives drone moving away ('+
+ test('start-only overlap without bullet birth witness stays conservative ('+
   (optimized?'optimized':'baseline')+', '+hz+'Hz)',()=>{
   const g=droneWorld(hz,optimized,{x:11.99,vx:500,ttl:.004,
    moveX:0,moveY:20});
-  assert.equal(g.hits,1,'a t=0 contact is certain even if the drone leaves later');
+  assert.equal(g.hits,0,'do not backdate an unknown-age projectile from a start-only overlap');
  });
 }
