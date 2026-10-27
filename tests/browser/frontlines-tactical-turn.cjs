@@ -68,9 +68,28 @@ const {chromium}=require('playwright');
      mode:a.__lfEcoMode,weight:a.__lfEcoWeight,before,after,spot}));
     if(a.__lfEcoMode!=='memory'||!a.__lfFrontTurnSpentKey)
      throw Error('real AI commitment did not use public memory');
-    return{realComposedAI:true,commitmentsAdded:after-before,mode:a.__lfEcoMode,
-     weight:+a.__lfEcoWeight.toFixed(3),approachDistance:Math.round(spot.d),
-     sector:sector,actualMovement:+moved.toFixed(3),towardPublicCenter:toward==null?null:+toward.toFixed(3)};
+    const rememberedWeight=+a.__lfEcoWeight.toFixed(3);
+    /* The same real Battlefield/AI/movement composition must also respond
+     * during the live public five-second announcement. Reuse the verified
+     * terrain-safe outside approach, not a synthetic movement substitute. */
+    e.x=spot.x;e.y=spot.y;
+    st.signal={type:'BLOOM',sector:sector,x:c.x,y:c.y,started:105,until:110};
+    st.bloomMemory={sector:sector,announcedAt:105,until:129};
+    a.__lfEcoT=0;a.__lfFrontTurn=null;a.__lfFrontTurnSpentKey=null;
+    a.__v1112TargetId=-1;a.__v180HitAt=-99;a.__v180Threat={risk:0};a.__v180Posture='investigate';
+    const liveBefore=st.stats.aiFrontlineCommitments||0;
+    ai.updateAI(e,g,.3);
+    const liveDX=e.x-spot.x,liveDY=e.y-spot.y,liveMoved=Math.hypot(liveDX,liveDY);
+    const liveToward=liveMoved>0?(liveDX*(c.x-spot.x)+liveDY*(c.y-spot.y))/(liveMoved*spot.d):null;
+    const liveAfter=st.stats.aiFrontlineCommitments||0;
+    if(liveAfter!==liveBefore+1||a.__lfEcoMode!=='signal'||!(liveToward>.7))
+     throw Error('live public BLOOM failed real composed tactical turn: '+JSON.stringify({
+      mode:a.__lfEcoMode,weight:a.__lfEcoWeight,before:liveBefore,after:liveAfter,liveToward,spot}));
+    return{realComposedAI:true,commitmentsAdded:after-before,mode:'memory',
+     weight:rememberedWeight,approachDistance:Math.round(spot.d),
+     sector:sector,actualMovement:+moved.toFixed(3),towardPublicCenter:toward==null?null:+toward.toFixed(3),
+     livePublic:{commitmentsAdded:liveAfter-liveBefore,actualMovement:+liveMoved.toFixed(3),
+      towardPublicCenter:+liveToward.toFixed(3),mode:a.__lfEcoMode}};
    }finally{
     e.x=original.x;e.y=original.y;e.hp=original.hp;e.maxHp=original.maxHp;e.spawnShieldT=original.spawnShieldT;
     p.x=oldPX;p.y=oldPY;g.shapes=originalShapes;g.bullets=originalBullets;g.hash=originalHash;
