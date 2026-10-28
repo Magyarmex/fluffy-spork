@@ -1,0 +1,78 @@
+name: NOVA Migration Interception A/B Research
+
+on:
+  pull_request:
+    paths:
+      - 'nova-updates/living-front-director-v1.12.0.js'
+      - 'tests/node/frontlines-migration-intercept-probe.test.js'
+      - 'tests/browser/frontlines-natural-match-ab.cjs'
+      - 'scripts/frontlines-migration-intercept-report.cjs'
+      - '.github/workflows/frontlines-migration-intercept.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  paired-migration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        layout: [0, 1, 2]
+        seed: [0, 1]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --no-audit --no-fund --no-package-lock
+      - run: npm install --no-save --no-audit --no-fund --no-package-lock playwright@1.56.1
+      - run: npx playwright install chromium
+      - name: Serve the real shipping game
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/nova-migration-http.log 2>&1 &
+      - name: Compare public midpoint against downstream crossing waypoint
+        env:
+          NOVA_LAYOUT_INDEX: ${{ matrix.layout }}
+          NOVA_SEED_INDEX: ${{ matrix.seed }}
+          NOVA_PILOT_POLICY: public-bloom-harvest-defense
+          NOVA_AB_MODE: migration-intercept
+        run: node tests/browser/frontlines-natural-match-ab.cjs
+      - name: Preserve negative, censored and positive trials
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-frontlines-migration-intercept-${{ matrix.layout }}-${{ matrix.seed }}
+          path: artifacts/browser/frontlines-natural-*
+          if-no-files-found: warn
+          retention-days: 14
+
+  collate-migration:
+    needs: paired-migration
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: nova-frontlines-migration-intercept-*
+          path: artifacts/migration
+          merge-multiple: false
+      - name: Validate complete six-pair evidence and preserve censored trials
+        run: node scripts/frontlines-migration-intercept-report.cjs artifacts/migration 6
+      - name: Preserve matrix summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-frontlines-migration-intercept-summary
+          path: artifacts/migration/migration-intercept-summary.json
+          if-no-files-found: warn
+          retention-days: 14
