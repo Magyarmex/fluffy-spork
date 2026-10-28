@@ -79,7 +79,7 @@ function scenario(Game,{fps=30,positions=[40,70,100],pen=2,
  if(shape)g.shapes=[{kind:'shape',id:90,x:55,y:0,r:8,hp:100}];
  if(moving){
   for(const t of g.tanks){
-   t.__novaSweepMoveTime=g.time;
+   t.__novaSweepMoveTime=g.time+1/fps;
    t.__novaSweepPrevX=t.x-1;
    t.__novaSweepPrevY=t.y;
   }
