@@ -159,7 +159,7 @@ wrap('game/engine',function(engine,require){
   var oldUpdate=Game.prototype.update;if(oldUpdate)Game.prototype.update=function(dt){if(!this.__novaDecorativeWorld)activeGame=this;var st=ensure(this,defs),out;this.__lfSuppressBaseCrasher=true;try{out=oldUpdate.call(this,dt);}finally{this.__lfSuppressBaseCrasher=false;}if(this.status==='playing'){st.sectorT-=dt;st.behaviorT-=dt;st.directorT-=dt;if(st.sectorT<=0){var sd=SECTOR_PERIOD-st.sectorT;st.sectorT=SECTOR_PERIOD;sectorTick(this,st,defs,clamp(sd,SECTOR_PERIOD,SECTOR_PERIOD*2));}if(st.behaviorT<=0){var bd=BEHAVIOR_PERIOD-st.behaviorT;st.behaviorT=BEHAVIOR_PERIOD;if(LF.behaviorTick)LF.behaviorTick(this,st,defs,clamp(bd,BEHAVIOR_PERIOD,BEHAVIOR_PERIOD*2));}if(st.directorT<=0){st.directorT=DIRECTOR_PERIOD;if(LF.directorTick)LF.directorTick(this,st);}}return out;};
   var oldMap=Game.prototype.drawMinimap;if(oldMap)Game.prototype.drawMinimap=function(){var out=oldMap.apply(this,arguments),st=this.__lfState,ctx=this.mmCtx;if(!st||!ctx||!st.signal||st.directorEnabled===false)return out;var sig=st.signal,tm=this.time||0;if(!Number.isFinite(sig.started)||tm<sig.started||tm>=sig.until)return out;var S=216,sc=S/(ARENA*2),px=function(x){return(x+ARENA)*sc;},py=function(y){return(y+ARENA)*sc;};ctx.save();ctx.globalAlpha=.68;ctx.lineWidth=1.5;if(sig.type==='BLOOM'){var c=sectorCenter(sig.sector);ctx.strokeStyle='#ffc94d';ctx.beginPath();ctx.arc(px(c.x),py(c.y),17+Math.sin(tm*5)*2,0,TAU);ctx.stroke();}else if(sig.type==='MIGRATION'){var a=sectorCenter(sig.from),b=sectorCenter(sig.to),ax=px(a.x),ay=py(a.y),bx=px(b.x),by=py(b.y),an=Math.atan2(by-ay,bx-ax);ctx.strokeStyle='#7df3ff';ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.lineTo(bx-Math.cos(an-.6)*7,by-Math.sin(an-.6)*7);ctx.moveTo(bx,by);ctx.lineTo(bx-Math.cos(an+.6)*7,by-Math.sin(an+.6)*7);ctx.stroke();}else if(sig.type==='ROGUE STAR'&&Number.isFinite(sig.x)&&Number.isFinite(sig.y)){/* Public report is frozen: never turn the minimap into a live, through-cover Star tracker. */var rx=sig.x,ry=sig.y;ctx.fillStyle='#ffe066';ctx.beginPath();ctx.arc(px(rx),py(ry),4,0,TAU);ctx.fill();}ctx.restore();return out;};
   /* Redeploy resets Game.time but deliberately preserves neutral bodies.
-   * Their absolute simulation-clock timestamps must follow that reset:
+   * Their absolute simulation-clock timestamps (including core shape.born) must follow that reset:
    * otherwise a surviving Star gains an entire extra life's worth of time,
    * while a Triangle's committed dodge/cooldown can be silently cancelled.
    * Snapshot identity before seedShapes() refills deficits, then adjust only
@@ -175,6 +175,8 @@ wrap('game/engine',function(engine,require){
       for(var i=0;i<survivors.length;i++){
         var s=survivors[i];
         if(!s||!stillHere.has(s)||!(s.hp>0))continue;
+        /* Battlefield uses born===g.time to veto same-frame shape contacts. */
+        if(Number.isFinite(s.born))s.born+=shift;
         if(Number.isFinite(s.__lfSpawnAt))s.__lfSpawnAt+=shift;
         if(s.type==='star'&&Number.isFinite(s.__lfStarBorn))s.__lfStarBorn+=shift;
         if(s.type==='triangle'){
