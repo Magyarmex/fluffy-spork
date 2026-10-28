@@ -286,3 +286,17 @@ test('Fieldcraft death lesson recovers when React replaces the whole modal',()=>
  g.redeploy();
  assert.equal(replacement.note,null);
 });
+
+test('Fieldcraft remount ignores nested front-choice buttons and keeps React insertion owner',()=>{
+ const {Game,addPanel}=boot(),g=new Game(),p=addPanel();
+ g.killTank(victim(),killer('marksman'));g.update();
+ assert.ok(p.note);
+ p.removeChild(p.note);
+ const nativeButtons=p.querySelectorAll.bind(p);
+ const nested={textContent:'⚡ REDEPLOY FRESH',
+  getAttribute(name){return name==='data-nova-insertion'?'fresh':null;}};
+ p.querySelectorAll=sel=>sel==='button'?[nested,...nativeButtons(sel)]:nativeButtons(sel);
+ g.update();
+ assert.ok(p.note,'the note remounts before the original React callback');
+ assert.match(p.note.children[0].textContent,/MARKSMAN/);
+});
