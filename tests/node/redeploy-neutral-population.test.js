@@ -195,3 +195,20 @@ test('replenished neutral bodies use the new clock, not the previous life offset
   assert.equal(replacement.__lfStarBorn,0,'new Star starts at age zero');
   assert.equal(replacement.__lfSpawnAt,0,'new neutral body is not shifted as a survivor');
 });
+
+test('Rogue Star exit-phase threshold survives redeploy without an early retreat',()=>{
+  const g=bootGame(),star=g.shapes.find(s=>s.type==='star'),LF=g.__testLivingFront;
+  assert.ok(star&&LF);
+  g.time=100;
+  star.__lfStarBorn=80;star.__lfExit=false;
+  g.redeploy();
+  assert.equal(g.time-star.__lfStarBorn,20);
+  const st=LF.ensure(g,LF.defs);
+  g.time=2.9;
+  LF.behaviorTick(g,st,LF.defs,.12);
+  assert.equal(star.__lfExit,false,'age 22.9 cannot trigger the age >23 exit');
+  g.time=3.1;
+  LF.behaviorTick(g,st,LF.defs,.12);
+  assert.equal(star.__lfExit,true,'age 23.1 must start the exit phase');
+  assert.ok(g.shapes.includes(star),'exit phase does not despawn the Star prematurely');
+});
