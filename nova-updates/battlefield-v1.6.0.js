@@ -683,7 +683,16 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    * A TTL-expiring round can settle a partial remaining budget safely:
    * the projectile will die at expiry regardless of unused penetration.
    * The original one-body TTL resolver retains first-hit ownership. */
-  if(nonExpiring ? contacts.length!==b.pen+1 :
+  /* A pen=2 shot may certify exactly two nonlethal hull contacts now and
+   * retain its last penetration for a later frame. The core's query wrapper
+   * excludes certified victims; the shot MUST be restored to its pre-frame
+   * position so core advances it exactly once. Do not speculate through
+   * knockback, lethal damage or an already-mutated victim ledger. */
+  var partialNonExpiring=nonExpiring&&b.pen===2&&b.hits===0&&
+      contacts.length===2&&(!b.__novaDirectVictims||b.__novaDirectVictims.size===0);
+  if(partialNonExpiring&&((b.knock||0)!==0||
+     contacts.some(function(c){return c.e.hp<=b.dmg*4;})))return false;
+  if(nonExpiring ? (!partialNonExpiring&&contacts.length!==b.pen+1) :
      contacts.length<(allowSingle?1:(b.hits>0?1:2))||contacts.length>b.pen+1||contacts.length>3)
    return false;
   contacts.sort(function(a,c){return a.t-c.t;});
@@ -749,6 +758,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    b.hits++;b.pen--;
    (b.__novaDirectVictims||(b.__novaDirectVictims=new Set())).add(hit.e);
   }
+  if(partialNonExpiring){b.x=ax;b.y=ay;return true;}
   b.dead=true;b.px=b.x;b.py=b.y;b.vx=0;b.vy=0;
   return true;
  }
