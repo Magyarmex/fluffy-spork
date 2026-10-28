@@ -234,3 +234,35 @@ test('invalid clock and offscreen marker cannot disrupt the original minimap',()
  assert.equal(g.__novaLastFrontMarker,null,'invalid game clock clears waypoint');
  assert.equal(g.mapDraws,3);
 });
+
+
+test('RETURN refuses a physically occupied hostile tank insertion and samples another bearing',()=>{
+ let seq=[0,0,.25,0],i=0;
+ const {Game}=boot({random:()=>seq[i++]??.25}),g=new Game();
+ g.tanks=[{id:91,alive:true,x:420,y:0,cls:'guard'}];
+ g.killTank(victim());g.update();g.__novaRedeployChoice='return';g.redeploy();
+ assert.ok(Math.hypot(g.player.x-420,g.player.y)>72,'no tank-hull overlap on insertion');
+ assert.ok(g.player.y>400,'a second safe RETURN bearing is accepted');
+ assert.deepEqual(g.randCalls,[400],'RETURN stays a genuine return, not a fresh fallback');
+});
+test('RETURN refuses an occupied live drone insertion without rejecting a dead drone',()=>{
+ let seq=[0,0,.25,0],i=0;
+ const {Game}=boot({random:()=>seq[i++]??.25}),g=new Game();
+ g.drones=[{id:41,hp:20,x:420,y:0,r:9}];
+ g.killTank(victim());g.update();g.__novaRedeployChoice='return';g.redeploy();
+ assert.ok(Math.hypot(g.player.x-420,g.player.y)>44,'no active-drone overlap');
+ assert.ok(g.player.y>400);
+ const {Game:Other}=boot({random:()=>0}),h=new Other();
+ h.drones=[{id:41,hp:0,x:420,y:0,r:9}];
+ h.killTank(victim());h.update();h.__novaRedeployChoice='return';h.redeploy();
+ assert.equal(h.player.x,420,'destroyed drones do not deny a valid insertion');
+});
+test('RETURN falls back safely when every sampled insertion is body-occupied',()=>{
+ const {Game}=boot({random:()=>0}),g=new Game();
+ g.tanks=[{id:19,alive:true,x:420,y:0,cls:'scout'}];
+ g.killTank(victim());g.update();g.__novaRedeployChoice='return';g.redeploy();
+ assert.equal(g.player.x,1900,'do not spawn inside the living tank');
+ assert.deepEqual(g.randCalls,[900,400],'legacy FRESH path owns the fallback');
+ assert.deepEqual(g.toasts,[{message:'↩ RETURN UNAVAILABLE · FRESH FRONT',kind:'info'}]);
+ assert.equal(g.__novaLastFrontMarker,null,'fallback cannot claim a RETURN waypoint');
+});
