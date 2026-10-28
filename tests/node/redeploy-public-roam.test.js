@@ -81,6 +81,9 @@ test('real patrol stalls still advance after a neutral chase ends', () => {
   assert.equal(policy.stats().waypointFailures, 0, 'the chase cannot age the patrol');
   game.time = 8.5;
   policy.move();
+  assert.equal(policy.stats().waypointFailures, 0, 'timeout is strict: exactly 3.5 seconds is not failure');
+  game.time = 8.7;
+  policy.move();
   assert.equal(policy.stats().waypointFailures, 1, 'genuine no-progress patrol times out');
   assert.equal(policy.stats().patrolIndex, 1);
 });
