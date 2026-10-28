@@ -17,10 +17,34 @@ var TIPS=TIP_DEFS.map(function(t){return t.text;});
 function mean(st){var n=0;for(var i=0;i<16;i++)n+=st.sectors[i].value;return n/16;}
 function bloomAgeEligible(st){return !!st&&LF.ageProgress(st)>=.15;}
 function bloomCandidate(st){if(!bloomAgeEligible(st))return-1;var avg=mean(st),best=-1,score=0;for(var i=0;i<16;i++){var s=st.sectors[i],m=s.maturity/Math.max(.1,st.ceiling),v=s.value/(avg+1);if(s.value<310||m<.62||v<1.34)continue;var q=v*.72+m*.55-clamp(s.pressure,0,1)*.42;if(q>score){score=q;best=i;}}return best;}
-function decision(st,ctx){var adopting=!!(ctx&&ctx.adoptStarId>0);if(ctx&&ctx.enabled===false)return null;var now=ctx&&ctx.now||0;if(st.signal&&now<st.signal.until)return null;if(now-st.lastSignalAt<8)return null;if(st.cooldowns.bloom<=0){var b=bloomCandidate(st);if(b>=0&&(b!==st.lastBloomSector||st.sectors[b].maturity>.78*st.ceiling))return{type:'BLOOM',sector:b};}if(st.cooldowns.migration<=0&&st.migrationHeat>=5){var from=ctx&&ctx.migrationFrom;if(from==null||from<0){var val=-1;for(var i=0;i<16;i++)if(st.sectors[i].outbound>val){val=st.sectors[i].outbound;from=i;}}if(from>=0){/* The reported origin must use its own witnessed crossing direction.
- * Global migrationX/Y mixes unrelated sectors and can announce a flow that
- * never crossed this origin. A cancelled local flow is not a direction. */
-var local=st.sectors[from],fx=Number(local&&local.flowX)||0,fy=Number(local&&local.flowY)||0,m=Math.hypot(fx,fy);if(m>1e-6){var c=sectorCenter(from),to=sectorIndex(c.x+fx/m*(LF.ARENA*2/LF.GRID)*.8,c.y+fy/m*(LF.ARENA*2/LF.GRID)*.8);if(to!==from)return{type:'MIGRATION',from:from,to:to};}}}/* Publicizing a real fresh Star has a shorter quiet gate than creating one.
+/* Only physical source-local crossing flow can authorize a public direction.
+ * A cancelled or boundary-clamped busiest source must not mask a different
+ * sector's coherent witnessed migration. Explicit research source overrides
+ * remain fail-closed and never silently substitute another origin. */
+function migrationAt(st,from){
+ var local=st.sectors[from],fx=Number(local&&local.flowX)||0,
+     fy=Number(local&&local.flowY)||0,m=Math.hypot(fx,fy);
+ if(!(m>1e-6))return null;
+ var c=sectorCenter(from),to=sectorIndex(c.x+fx/m*(LF.ARENA*2/LF.GRID)*.8,
+                                     c.y+fy/m*(LF.ARENA*2/LF.GRID)*.8);
+ return to===from?null:{type:'MIGRATION',from:from,to:to};
+}
+function decision(st,ctx){var adopting=!!(ctx&&ctx.adoptStarId>0);if(ctx&&ctx.enabled===false)return null;var now=ctx&&ctx.now||0;if(st.signal&&now<st.signal.until)return null;if(now-st.lastSignalAt<8)return null;if(st.cooldowns.bloom<=0){var b=bloomCandidate(st);if(b>=0&&(b!==st.lastBloomSector||st.sectors[b].maturity>.78*st.ceiling))return{type:'BLOOM',sector:b};}
+if(st.cooldowns.migration<=0&&st.migrationHeat>=5){
+ var forced=ctx&&ctx.migrationFrom;
+ if(forced!=null&&forced>=0){var selected=migrationAt(st,forced);if(selected)return selected;}
+ else{
+  var best=null,bestOutbound=0;
+  for(var i=0;i<16;i++){
+   var outbound=Number(st.sectors[i]&&st.sectors[i].outbound)||0;
+   if(!(outbound>bestOutbound))continue;
+   var candidate=migrationAt(st,i);
+   if(candidate){best=candidate;bestOutbound=outbound;}
+  }
+  if(best)return best;
+ }
+}
+/* Publicizing a real fresh Star has a shorter quiet gate than creating one.
  * BLOOM still wins first when actually eligible; a rich sector on BLOOM
  * cooldown must not permanently veto an unrelated time-limited Star. */
 if(st.cooldowns.star<=0&&(!(ctx&&ctx.hasStar)||adopting)&&
