@@ -13,6 +13,7 @@ on:
       - 'package.json'
       - '.github/nova-tailwind.css'
       - '.github/workflows/deploy.yml'
+      - 'scripts/patch-star-minimap.cjs'
   workflow_dispatch:
 
 permissions:
@@ -64,6 +65,7 @@ jobs:
           cat nova-gz/*.b64 | tr -d '\r\n\t ' | base64 --decode | gzip --decompress > index.html.new
           test -s index.html.new
           grep -q 'NOVA TANKS' index.html.new
+          node scripts/patch-star-minimap.cjs index.html.new
 
           python3 - <<'PY'
           from pathlib import Path
@@ -163,6 +165,7 @@ jobs:
               # Dynamically loaded Owner HUD is optional for offline staging,
               # but changes to it must still invalidate the validated shell.
               'nova-updates/owner-operations-v1.11.1.js',
+              'scripts/patch-star-minimap.cjs',
               'pwa-register.js',
               'sw.js',
               'manifest.webmanifest',
