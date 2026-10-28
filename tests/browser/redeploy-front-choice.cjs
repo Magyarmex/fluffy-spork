@@ -53,6 +53,8 @@ async function run(browser,width,height){
   assert.ok(after.notices.some(n=>n.message==='↩ RETURN · LAST FRONT '+bearing),
    'real React redeploy must tell the player the direction of their witnessed last front: '+
    JSON.stringify(after.notices));
+  await page.getByText('↩ RETURN · LAST FRONT '+bearing,{exact:true})
+   .waitFor({state:'visible',timeout:2000});
   await page.locator('[data-nova-front-choice]').waitFor({state:'hidden',timeout:5000});
   assert.deepEqual(errors,[],'no page errors');
   console.log('NOVA_REDEPLOY_FRONT_SMOKE '+JSON.stringify({width,height,dist,terrain:after.terrain,reset:after.choice}));
