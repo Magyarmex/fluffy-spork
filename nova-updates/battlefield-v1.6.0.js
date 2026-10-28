@@ -1357,10 +1357,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
          hy0=ht.__novaSweepMoveTime===g.time?ht.__novaSweepPrevY:ht.y;
      if(!Number.isFinite(ht.x)||!Number.isFinite(ht.y)||
         !Number.isFinite(hx0)||!Number.isFinite(hy0))return null;
-     minHullX=Math.min(minHullX,ht.x,hx0)-hs-3;
-     minHullY=Math.min(minHullY,ht.y,hy0)-hs-3;
-     maxHullX=Math.max(maxHullX,ht.x,hx0)+hs+3;
-     maxHullY=Math.max(maxHullY,ht.y,hy0)+hs+3;
+     minHullX=Math.min(minHullX,Math.min(ht.x,hx0)-hs-3);
+     minHullY=Math.min(minHullY,Math.min(ht.y,hy0)-hs-3);
+     maxHullX=Math.max(maxHullX,Math.max(ht.x,hx0)+hs+3);
+     maxHullY=Math.max(maxHullY,Math.max(ht.y,hy0)+hs+3);
     }
     if(minHullX!==Infinity)hullBounds={minX:minHullX,minY:minHullY,
        maxX:maxHullX,maxY:maxHullY};
