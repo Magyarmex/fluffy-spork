@@ -34,3 +34,33 @@ test('shape markers are outlines only and preserve native drone body visibility'
 test('same-team drones are friendly and different-team drones are hostile',()=>{const h=loadLayer(),player={id:1,alive:true,teamId:'A'},owners=[player,{id:2,alive:true,teamId:'A'},{id:3,alive:true,teamId:'B'}],drones=[{ownerId:2,x:-15,y:0,hp:10,role:'escort'},{ownerId:3,x:15,y:0,hp:10,role:'escort'}];h.render.render(game(h.ctx,owners,drones,player),200,120);assert.deepEqual(h.draws.map(d=>d.color),['#4da8ff','#4da8ff','#ff4d62','#ff4d62']);assert.equal(h.strokes[0].path.some(p=>p.op==='arc'),true);assert.equal(h.strokes[1].path.some(p=>p.op==='lineTo'),true);});
 test('non-hostile relation hooks stay neutral instead of being painted or marked hostile',()=>{const h=loadLayer(),player={id:1,alive:true},owners=[player,{id:2,alive:true}],g=game(h.ctx,owners,[{ownerId:2,x:0,y:0,hp:10,role:'escort'}],player);g.areHostile=()=>false;h.render.render(g,200,120);assert.equal(h.draws.length,0);assert.equal(h.strokes.length,0);});
 test('off-screen drones are culled before glow and shape IFF passes',()=>{const h=loadLayer(),owners=[{id:1,alive:true},{id:2,alive:true}],drones=[{ownerId:1,x:0,y:0,hp:10,role:'escort'},{ownerId:2,x:5000,y:5000,hp:10,role:'hunter'}];h.render.render(game(h.ctx,owners,drones),200,120);assert.equal(h.draws.length,2);assert.equal(h.strokes.length,1);assert.ok(h.draws.every(d=>d.color==='#4da8ff'));});
+
+
+test('IFF marker CSS-pixel stroke stays readable at zoomed-out mobile camera scales',()=>{
+  for(const zoom of [0.5,0.66,0.78,1,1.5,2]){
+    const h=loadLayer();
+    const owners=[{id:1,alive:true},{id:2,alive:true}];
+    const drones=[
+      {ownerId:1,x:-25,y:0,hp:10,role:'escort'},
+      {ownerId:2,x:25,y:0,hp:10,role:'hunter'}
+    ];
+    const g=game(h.ctx,owners,drones);
+    g.cam.zoom=zoom;
+    g.dpr=2;
+    h.render.render(g,320,480);
+    assert.equal(h.getBaseRenders(),1,'native render remains authoritative at zoom '+zoom);
+    assert.equal(h.draws.length,4,'two cached glow passes per visible drone at zoom '+zoom);
+    assert.equal(h.strokes.length,2,'both shape-coded allegiance markers survive zoom '+zoom);
+    const expected=Math.min(1.8,Math.max(1.35,1.35*zoom));
+    for(const marker of h.strokes){
+      assert.ok(Math.abs(marker.lineWidth*zoom-expected)<1e-9,
+        'marker CSS width must be '+expected+'px at zoom '+zoom);
+      assert.ok(marker.lineWidth*zoom>=1.35&&marker.lineWidth*zoom<=1.8,
+        'marker must not become subpixel or dominate the native drone');
+    }
+    assert.equal(h.strokes[0].path.some(p=>p.op==='arc'),true,
+      'friendly allegiance still uses a ring');
+    assert.equal(h.strokes[1].path.some(p=>p.op==='lineTo'),true,
+      'hostile allegiance still uses a diamond');
+  }
+});
