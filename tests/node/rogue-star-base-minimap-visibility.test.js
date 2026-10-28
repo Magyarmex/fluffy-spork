@@ -45,7 +45,7 @@ function scene(){
   const star={id:77,type:'star',x:600,y:0,hp:100};
   const circle={id:78,type:'circle',x:1400,y:0,hp:100};
   Object.assign(g,{mmCtx:ctx,player,tanks:[player],shapes:[star,circle],
-    powerups:[],w:800,h:600,cam:{zoom:1},hasLineOfSight:()=>true});
+    powerups:[],w:800,h:600,cam:{zoom:1,x:0,y:0},hasLineOfSight:()=>true});
   const draw=()=>{draws.length=0;g.drawMinimap();return draws.filter(d=>d.w===2&&d.h===2);};
   return{env,g,player,star,circle,draw};
 }
@@ -82,6 +82,21 @@ test('viewport zoom and portrait-width changes follow the player sight contract'
   assert.equal(s.draw().some(d=>d.color==='#ffe066'),false);
   s.g.w=1600;
   assert.equal(s.draw().some(d=>d.color==='#ffe066'),true);
+});
+test('camera offset cannot leak a Star outside the actually rendered screen',()=>{
+  const s=scene();s.star.x=100;s.star.y=0;
+  assert.equal(s.draw().some(d=>d.color==='#ffe066'),true);
+  s.g.cam.x=2000;
+  assert.equal(s.draw().some(d=>d.color==='#ffe066'),false,
+    'Long Glass camera shift must not reveal off-screen live Star coordinates');
+  s.g.cam.x=0;
+  assert.equal(s.draw().some(d=>d.color==='#ffe066'),true);
+});
+test('missing camera geometry fails closed rather than guessing player visibility',()=>{
+  const s=scene();s.star.x=100;
+  delete s.g.cam.x;
+  assert.equal(s.draw().some(d=>d.color==='#ffe066'),false);
+  assert.equal(s.draw().some(d=>d.color==='#55ddff'),true);
 });
 test('missing Fair Engagement fails closed for Star only; dead pilot cannot radar',()=>{
   const s=scene();s.star.x=100;
