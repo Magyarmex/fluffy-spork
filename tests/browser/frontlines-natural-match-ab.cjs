@@ -128,7 +128,8 @@ async function arm(browser,enabled,label){
    ai.updateAI=function(t,world,dt){
     const result=beforeAudit(t,world,dt);
     if(world===g){
-     commitmentWitness.sample(g.__novaCommitmentAudit,world,t,enabled,
+     commitmentWitness.sample(g.__novaCommitmentAudit,world,t,
+      abMode==='migration-intercept'?true:enabled,
       window.__NOVA_LIVING_FRONT_INTERNAL__.sectorIndex);
      if(world.__lfState?.signal?.type==='MIGRATION'&&
         t?.ai?.__lfEcoKey?.startsWith('MIGRATION:')&&t.ai.__lfEcoWeight>.04)
