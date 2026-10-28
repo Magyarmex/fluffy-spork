@@ -12,7 +12,8 @@ function boot(){
  for(const name of ['living-front-core-v1.12.0.js','living-front-instincts-v1.12.0.js',
   'living-front-director-v1.12.0.js'])
   vm.runInNewContext(fs.readFileSync(path.join(root,'nova-updates',name),'utf8'),ctx,{filename:name});
- return window.__NOVA_LIVING_FRONT_TEST__;
+ const T=window.__NOVA_LIVING_FRONT_TEST__;T.internal=window.__NOVA_LIVING_FRONT_INTERNAL__;
+ return T;
 }
 function state(T){
  const sectors=Array.from({length:16},(_,i)=>({...T.makeSector(i),value:80,maturity:.1,
@@ -96,6 +97,38 @@ test('public destination must be a witnessed origin-to-destination crossing, not
  assert.equal(d.from,5);
  assert.equal(d.to,1,'choose the most witnessed physical route 5->1');
  assert.notEqual(d.to,2,'never report unwitnessed diagonal 5->2');
+});
+test('opposite witnessed routes do not invent a dominant public destination',()=>{
+ const T=boot(),st=state(T);
+ st.sectors[5].outbound=6;st.sectors[5].flowTo[1]=3;st.sectors[5].flowTo[9]=3;
+ assert.equal(T.directorDecision(st,{enabled:true,now:100,hasStar:true}),null);
+});
+test('a genuinely diagonal witnessed crossing may still be reported diagonally',()=>{
+ const T=boot(),st=state(T);
+ st.sectors[5].outbound=5;st.sectors[5].flowTo[2]=5;
+ const d=T.directorDecision(st,{enabled:true,now:100,hasStar:true});
+ assert.equal(d?.from,5);assert.equal(d?.to,2);
+});
+test('actual Wild Instincts transition records and decays only physical intended routes',()=>{
+ const T=boot(),LF=T.internal,defs={square:{speed:0}},c=T.sectorCenter(1);
+ const s={id:7,type:'square',kind:'shape',hp:100,r:15,x:c.x,y:c.y,vx:0,vy:0,
+  __lfSector:5,__lfMigrationIntent:6};
+ const g={time:100,shapes:[s],bullets:[],tanks:[],hasLineOfSight:()=>true};
+ const st=LF.ensure(g,defs);
+ LF.behaviorTick(g,st,defs,.12);
+ assert.equal(st.sectors[5].outbound,0,'unintended movement cannot forge a route');
+ assert.equal(st.sectors[5].flowTo[1],0);
+ s.__lfSector=5;s.__lfMigrationIntent=1;
+ LF.behaviorTick(g,st,defs,.12);
+ assert.equal(st.sectors[5].outbound,1);
+ assert.equal(st.sectors[5].flowTo[1],1,'actual intended 5→1 transition must be recorded');
+ assert.equal(st.sectors[5].flowTo[2],0,'diagonal destination was never visited');
+ const before=st.sectors[5].outbound;
+ T.advanceSector(st.sectors[5],.5,1);
+ const expected=Math.exp(-.48*.5);
+ assert.ok(Math.abs(st.sectors[5].outbound-before*expected)<1e-10);
+ assert.ok(Math.abs(st.sectors[5].flowTo[1]-expected)<1e-10,
+  'route witness must decay at the same rate as source outbound count');
 });
 test('source-local direction is independent of hidden maturity/value and unrelated flows',()=>{
  const T=boot(),st=state(T);
