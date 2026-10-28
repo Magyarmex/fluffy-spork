@@ -1175,3 +1175,53 @@ for(const optimized of [false,true]){
     assert.equal(b.hitCount,0);
   });
 }
+
+
+/* Independent seeded geometry: different speeds, separations, FPS and hash
+ * order must preserve the same two physical victim identities. These are
+ * controlled nonlethal worlds, not an estimate of natural match frequency. */
+for(const optimized of [false,true]){
+  const mode=optimized?'optimized':'baseline';
+  const Game=boot(function(dt){this.time+=dt;this.updateBullets(dt);},optimized);
+  test(mode+' 400 seeded neutral-pair frame partitions preserve two victims',()=>{
+    let seed=4192026;
+    const rnd=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+    const worlds=Array.from({length:100},(_,i)=>{
+      const x1=30+rnd()*50,vx=3000+rnd()*6000;
+      return {x1,x2:x1+25+rnd()*45,vx,reverse:i%2===0};
+    });
+    for(const fps of [30,60,120,240])for(const w of worlds){
+      const {g,a,b}=neutralPair(Game,w.x2,w.reverse);
+      a.x=w.x1;g.bullets[0].vx=w.vx;
+      for(let frame=0;frame<100&&g.bullets.length;frame++)g.update(1/fps);
+      assert.equal(a.hitCount,1,'first victim at '+fps+'Hz');
+      assert.equal(b.hitCount,1,'second victim at '+fps+'Hz');
+      assert.equal(g.hits,2,'no duplicate/phantom contact at '+fps+'Hz');
+    }
+  });
+  test(mode+' remote independent fire does not suppress local shape-pair proof',()=>{
+    const {g,a,b}=neutralPair(Game);
+    g.bullets.push({kind:'bullet',id:500,ownerId:9,x:2000,y:2000,
+      vx:0,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,
+      dead:false,shell:false,beam:false,splash:0});
+    g.update(1/30);
+    assert.equal(a.hitCount,1);assert.equal(b.hitCount,1);
+  });
+  test(mode+' tangent neutral contact is never upgraded to an invented hit',()=>{
+    const {g,b}=neutralPair(Game);
+    b.y=15; // exactly bullet.r + shape.r: tangent, not overlap
+    g.update(1/30);
+    assert.equal(b.hitCount,0);
+  });
+  test(mode+' unknown newborn remote neutral defers the entire shortcut',()=>{
+    const Newborn=boot(function(dt){
+      this.time+=dt;
+      this.shapes.push({kind:'shape',id:999,type:'circle',
+        x:1500,y:1500,r:12,hp:100,born:this.time});
+      this.updateBullets(dt);
+    },optimized);
+    const {g,b}=neutralPair(Newborn);
+    g.update(1/30);
+    assert.equal(b.hitCount,0);
+  });
+}
