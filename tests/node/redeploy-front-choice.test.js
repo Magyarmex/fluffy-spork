@@ -63,7 +63,7 @@ function boot(options={}){
    removeChild(node){assert.equal(node,this.choice);this.choice=null;node.parentNode=null;}};
   panel.redeploy=redeploy;panels.push(panel);return panel;
  }
- return {Game:m.exports.Game,api:window.__NOVA_FRONT_CHOICE_TEST__,addPanel,observers,timers,mapMarks};
+ return {Game:m.exports.Game,api:window.__NOVA_FRONT_CHOICE_TEST__,addPanel,panels,observers,timers,mapMarks};
 }
 function victim(x=0,y=0){return {id:1,isPlayer:true,alive:true,x,y};}
 test('materialized production chain loads front choice before game boot',()=>{
@@ -256,4 +256,22 @@ test('death modal recovers if React removes its injected action row',()=>{
  assert.equal(panel.redeploy.clicked,1,'React callback remains authoritative after remount');
  g.redeploy();
  assert.equal(panel.redeploy.style.display,'','original action is restored on exit');
+});
+
+test('React replacing the whole dead panel also restores a live callback',()=>{
+ const {Game,addPanel,panels}=boot(),g=new Game(),firstPanel=addPanel();
+ g.killTank(victim(100,200));g.update();
+ assert.ok(firstPanel.choice);
+ firstPanel.choice.isConnected=false;
+ firstPanel.redeploy.isConnected=false;
+ panels.shift(); // React discarded its previous panel, but the Game stays dead.
+ const replacement=addPanel();
+ g.update();
+ assert.ok(replacement.choice,'the newly mounted React modal gets both choices');
+ assert.equal(replacement.redeploy.style.display,'none');
+ replacement.choice.children[0].onclick();
+ assert.equal(replacement.redeploy.clicked,1,'the NEW React callback is used');
+ assert.equal(firstPanel.redeploy.clicked,0,'no stale callback from the discarded panel');
+ g.redeploy();
+ assert.equal(replacement.redeploy.style.display,'','the live callback is restored');
 });
