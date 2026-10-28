@@ -73,7 +73,7 @@ test('production materializer applies both base patches before composing the she
 test('the exact decoded nova-gz production payload accepts both surgical patches', () => {
   const gzDir = path.join(__dirname, '../../nova-gz');
   const b64 = fs.readdirSync(gzDir).filter(f => f.endsWith('.b64')).sort()
-    .map(f => fs.readFileSync(path.join(gzDir, f), 'utf8')).join('').replace(/\\s+/g, '');
+    .map(f => fs.readFileSync(path.join(gzDir, f), 'utf8')).join('').replace(/\s+/g, '');
   const decoded = zlib.gunzipSync(Buffer.from(b64, 'base64')).toString('utf8');
   const starPatched = patchStarMinimap(decoded);
   const patched = patchSavedRecords(starPatched);
