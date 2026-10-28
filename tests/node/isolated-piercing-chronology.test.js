@@ -1311,18 +1311,22 @@ for(const optimized of [false,true]){
 
 
 /* Run 423: TTL-expiring high-penetration shots have the same certified
- * three-body chronology as pen=2. This is NOT permission to backdate live
- * pen>=3 shots, four-body chains, cover breaches or uncertain motion. */
+ * three-body chronology as pen=2. The 15,000u/s stress geometry deliberately
+ * keeps the first target outside the initial 240Hz core endpoint (62.5u),
+ * so every FPS tests the SAME fully certified expiry corridor rather than
+ * the separate unresolved cross-frame victim-identity problem.
+ * This is NOT permission to backdate live pen>=3 shots, four-body chains,
+ * cover breaches or uncertain motion. */
 function highPenTTLWorld(Game, pen=3, reverse=false) {
-  const {g,a,b}=makeWorld(Game,52,reverse);
-  a.x=25;
-  const c={kind:'tank',id:4,x:78,y:0,cls:'scout',
+  const {g,a,b}=makeWorld(Game,103,reverse);
+  a.x=88;
+  const c={kind:'tank',id:4,x:120,y:0,cls:'scout',
     hp:100,alive:true,hitCount:0};
-  const d={kind:'tank',id:5,x:120,y:0,cls:'scout',
+  const d={kind:'tank',id:5,x:160,y:0,cls:'scout',
     hp:100,alive:true,hitCount:0};
   g.tanks.push(c,d);
   const shot=g.bullets[0];
-  shot.vx=2500;shot.r=5.5;shot.ttl=.03;shot.pen=pen;shot.dmg=21;
+  shot.vx=15000;shot.r=5.5;shot.ttl=.007;shot.pen=pen;shot.dmg=21;
   return {g,a,b,c,d,shot};
 }
 for(const optimized of [false,true]){
@@ -1377,7 +1381,7 @@ for(const optimized of [false,true]){
   });
   test(mode+' pen='+pen+' refuses an unproven four-body chain',()=>{
    const {g,d}=highPenTTLWorld(Game,pen);
-   d.x=93; // fourth body is physically reachable, but >3 is unproven
+   d.x=126; // fourth body is physically reachable, but >3 is unproven
    g.time+=1/30;g.updateBullets(1/30);
    assert.equal(d.hitCount,0);
   });
