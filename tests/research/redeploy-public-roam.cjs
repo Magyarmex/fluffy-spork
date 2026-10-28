@@ -34,12 +34,14 @@ function createPublicRoam(game, player, origin, fair) {
   if (!finitePoint(origin)) throw Error('A witnessed finite death position is required');
   let patrolIndex = 0, waypointFailures = 0, routeRequests = 0, routeWaypoints = 0;
   let lastDistance = Infinity, lastProgressTime = Number.isFinite(game.time) ? game.time : 0;
+  let activated = false;
   const clamp = v => Math.max(-1900, Math.min(1900, v));
   const patrolPoint = () => ({
     x: clamp(origin.x + PATROL[patrolIndex][0]),
     y: clamp(origin.y + PATROL[patrolIndex][1])
   });
   function move() {
+    if (!activated) { lastProgressTime = game.time; activated = true; }
     const neutral = visibleNeutral(game, player, fair);
     // Approach a currently visible neutral, but do not chase its hidden last
     // location or stop indefinitely inside its collision radius.
