@@ -115,7 +115,7 @@ Automated PR review found a cross-owner lifecycle mismatch that the prior Living
 | Bounded herding | Local proximity/fire/blast response + resistance + diminishing returns |
 | Bloom truthfulness | Reports existing value only; Bloom branch never spawns value |
 | Migration truthfulness | Requires accumulated real crossings |
-| Rogue Star uniqueness | Sole Director-created opportunity; max one live Star gate |
+| Rogue Star uniqueness | Publicly adopts at most one fresh existing Star without duplication or teleport; original no-Star creation fallback remains; bounded 58s public cooldown |
 | AI fairness | Public signals + Fair Engagement viewport + terrain LOS; no hidden maturity read |
 | AI anti-dogpile | Opportunity saturation penalty + deterministic damping + fight/health gates |
 | AI difficulty by judgment | Elite cadence/judgment differs without extra information or stats |
