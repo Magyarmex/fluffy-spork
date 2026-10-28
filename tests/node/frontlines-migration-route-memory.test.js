@@ -60,17 +60,14 @@ test('the shipping minimap shows a dashed, fading last-known route after the liv
 test('memory expires and cannot compete with live announcements or disabled Director',()=>{
  const {g,calls}=scene();
  for(const [time,signal,enabled,expected] of [
-  [100,null,true,false], // the live signal normally occupies this period
-  [115.99,null,true,true],[116,null,true,false],[120,null,true,false],
+  [100,{type:'MIGRATION',from:5,to:6,started:100,until:104.4},true,false],
+  [105,null,true,true],[115.99,null,true,true],[116,null,true,false],[120,null,true,false],
   [110,{type:'BLOOM',sector:2,started:108,until:113},true,false],
   [110,{type:'MIGRATION',from:5,to:6,started:108,until:113},true,false],
   [110,null,false,false],[110,null,true,true]
  ]){
   calls.length=0;g.time=time;g.__lfState.signal=signal;g.__lfState.directorEnabled=enabled;
-  // No synthetic live signal at t=100: the stale-memory guard is time-based,
-  // so only the actually expired/live-suppression cases constrain rendering.
   g.drawMinimap();
-  if(time===100&&!signal)continue;
   assert.equal(dashed(calls),expected,JSON.stringify({time,signal,enabled}));
  }
 });
@@ -89,4 +86,18 @@ test('stale route is independent of hidden shapes and grants no AI movement auth
  assert.equal(T.publicEcoBias(g,t,{},{}).mode,'none','AI cannot read UI-only migration memory');
  assert.ok(fs.readFileSync(path.join(root,'index.html'),'utf8')
   .includes('nova-updates/living-front-director-v1.12.0.js'));
+});
+
+test('a newer public opportunity retires the older migration afterimage',()=>{
+ const {LF,g}=scene(),st=g.__lfState;
+ g.time=109;g.toast=function(){};
+ st.lastSignalAt=100;st.lastBloomSector=-1;st.lastMeaningfulAt=100;
+ st.ceiling=1;st.migrationHeat=0;
+ st.cooldowns={bloom:0,migration:100,star:100};
+ st.sectors=Array.from({length:16},(_,i)=>({value:i===9?900:10,
+  maturity:i===9?.95:.1,pressure:0,outbound:0}));
+ st.stats={blooms:0,migrations:0};
+ LF.directorTick(g,st);
+ assert.equal(st.signal?.type,'BLOOM');
+ assert.equal(st.migrationMemory,null,'do not resurrect an obsolete route after BLOOM');
 });
