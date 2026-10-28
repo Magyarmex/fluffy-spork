@@ -9,6 +9,7 @@ on:
       - 'tests/browser/**'
       - '.github/workflows/browser-smoke.yml'
       - 'scripts/patch-star-minimap.cjs'
+      - 'scripts/patch-saved-records.cjs'
   pull_request:
     paths:
       - 'nova-updates/**'
@@ -16,6 +17,7 @@ on:
       - 'tests/browser/**'
       - '.github/workflows/browser-smoke.yml'
       - 'scripts/patch-star-minimap.cjs'
+      - 'scripts/patch-saved-records.cjs'
   workflow_dispatch:
 
 # Supersede obsolete PR/feature-branch checks; never cancel a mainline
@@ -39,6 +41,8 @@ jobs:
       - run: npx playwright install chromium
       - name: Apply the exact production base-minimap patch to the PR shipping shell
         run: node scripts/patch-star-minimap.cjs index.html
+      - name: Apply canonical saved-record protection before browser tests
+        run: node scripts/patch-saved-records.cjs index.html
       - name: Serve shipping runtime
         run: |
           python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/nova-browser-http.log 2>&1 &
@@ -56,6 +60,7 @@ jobs:
           node tests/browser/frontlines-paired-microtrial.cjs
           node tests/browser/frontlines-route-matrix.cjs
           node tests/browser/best-score-live-reload.cjs
+          node tests/browser/corrupt-saved-records.cjs
       - name: Preserve browser screenshots
         if: always()
         uses: actions/upload-artifact@v4
