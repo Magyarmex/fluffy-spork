@@ -21,7 +21,7 @@ async function main() {
     await page.reload({waitUntil:'domcontentloaded',timeout:45000});
     await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({state:'visible',timeout:45000});
     const menu = await page.evaluate(()=>document.body.innerText);
-    assert.ok(menu.includes('BEST SCORE'), 'record remains visible in React menu');
+    assert.ok(!menu.includes('BEST SCORE'), 'invalid zero-equivalent record is not displayed in React menu');
     assert.ok(!menu.includes('Infinity') && !menu.includes('NaN'), 'menu cannot display corrupt record');
 
     await page.evaluate(()=>{
