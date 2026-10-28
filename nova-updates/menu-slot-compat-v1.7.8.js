@@ -426,7 +426,7 @@ function paint(g){
   var b=document.createElement('button');b.type='button';
   b.setAttribute('data-ui','true');
   b.setAttribute('data-nova-insertion',choice);
-  b.style.cssText='min-width:0;border:1px solid rgba(125,243,255,.4);border-radius:7px;background:rgba(31,104,136,.24);padding:'+(window.innerHeight<=400?'5':'9')+'px 3px;font:700 10px/1.2 Rajdhani,system-ui;color:#d2deed;touch-action:manipulation;';
+  b.style.cssText='min-width:0;border:1px solid rgba(125,243,255,.4);border-radius:7px;background:rgba(31,104,136,.24);padding:'+(window.innerHeight<=400?'8':'10')+'px 3px;font:700 12px/1.2 Rajdhani,system-ui;color:#d2deed;touch-action:manipulation;';
   b.textContent=caption;b.title=detail;
   b.addEventListener('click',function(){
    g.__novaRedeployChoice=choice;
