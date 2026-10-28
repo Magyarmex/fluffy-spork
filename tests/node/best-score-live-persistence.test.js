@@ -104,3 +104,14 @@ test('redeployed player identity cannot be confused with a stale prior tank',()=
  g.gainXP(g.player,250);b.tick();
  assert.equal(b.store.get('novatanks_best'),'250');
 });
+
+test('nonfinite persisted score cannot block a newly earned personal best',()=>{
+ for(const corrupted of ['Infinity','-Infinity','NaN','oops']){
+  const b=boot(100),g=new b.Game();
+  b.store.set('novatanks_best',corrupted);
+  g.gainXP(g.player,30);
+  b.tick();
+  assert.equal(b.store.get('novatanks_best'),'130',corrupted);
+  assert.deepEqual(b.writes,[['novatanks_best','130']],corrupted);
+ }
+});
