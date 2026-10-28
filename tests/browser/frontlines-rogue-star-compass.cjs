@@ -78,19 +78,44 @@ const {chromium}=require('playwright');
     const marker=await page.evaluate(()=>{
      const g=window.__novaStarCompassGame,st=g.__lfState,sig=st.signal;
      if(sig?.type!=='ROGUE STAR'||!g.mmCtx)throw Error('live Star minimap owner missing');
-     const star=g.getShape(sig.starId),originalArc=g.mmCtx.arc;
+     const star=g.getShape(sig.starId),originalArc=g.mmCtx.arc,
+      originalFill=g.mmCtx.fillRect,originalSight=g.hasLineOfSight;
      if(!star)throw Error('announced Star missing before marker verification');
-     const original={x:star.x,y:star.y},points=[];
+     const original={x:star.x,y:star.y,camX:g.cam.x,camY:g.cam.y},points=[],dots=[];
      g.setPaused(true);
      try{
-      star.x=sig.x>0?sig.x-900:sig.x+900;
-      star.y=sig.y>0?sig.y-900:sig.y+900;
-      g.mmCtx.arc=function(x,y,r){if(Math.abs(r-4)<1e-6)points.push([x,y]);return originalArc.apply(this,arguments);};
-      g.drawMinimap();
-      return{points,expected:[(sig.x+2250)*216/4500,(sig.y+2250)*216/4500],
-       live:[(star.x+2250)*216/4500,(star.y+2250)*216/4500]};
+      g.mmCtx.arc=function(x,y,r){
+       if(Math.abs(r-4)<1e-6)points.push([x,y]);
+       return originalArc.apply(this,arguments);
+      };
+      g.mmCtx.fillRect=function(x,y,w,h){
+       if(w===2&&h===2&&this.fillStyle==='#ffe066')dots.push([x,y]);
+       return originalFill.apply(this,arguments);
+      };
+      const sample=()=>{
+       points.length=0;dots.length=0;g.drawMinimap();
+       return{points:points.slice(),dots:dots.slice()};
+      };
+      // Force the physical Star far outside the pilot's actual viewport,
+      // without changing its frozen public report or hiding ordinary shapes.
+      star.x=g.player.x>0?-2100:2100;
+      star.y=g.player.y>0?-2100:2100;
+      const hiddenPosition={x:star.x,y:star.y},hidden=sample();
+      star.x=g.player.x;star.y=g.player.y+50;
+      g.hasLineOfSight=()=>true;
+      const visible=sample();
+      g.cam.x=g.player.x>0?g.player.x-1700:g.player.x+1700;
+      g.cam.y=g.player.y>0?g.player.y-1700:g.player.y+1700;
+      const cameraShifted=sample();
+      return{points:hidden.points,hiddenDots:hidden.dots,visibleDots:visible.dots,
+       cameraShiftedDots:cameraShifted.dots,
+       expected:[(sig.x+2250)*216/4500,(sig.y+2250)*216/4500],
+       live:[(hiddenPosition.x+2250)*216/4500,(hiddenPosition.y+2250)*216/4500]};
      }finally{
-      g.mmCtx.arc=originalArc;star.x=original.x;star.y=original.y;g.setPaused(false);
+      g.mmCtx.arc=originalArc;g.mmCtx.fillRect=originalFill;
+      g.hasLineOfSight=originalSight;
+      star.x=original.x;star.y=original.y;
+      g.cam.x=original.camX;g.cam.y=original.camY;g.setPaused(false);
      }
     });
     const near=(p,q)=>Math.hypot(p[0]-q[0],p[1]-q[1])<.02;
@@ -98,6 +123,12 @@ const {chromium}=require('playwright');
      'minimap must mark the frozen public report: '+JSON.stringify(marker));
     assert.ok(!marker.points.some(p=>near(p,marker.live)),
      'hidden live Star must not become a minimap tracking beacon: '+JSON.stringify(marker));
+    assert.equal(marker.hiddenDots.length,0,
+     'generic 2px Star dot must not reveal an off-screen live position: '+JSON.stringify(marker));
+    assert.equal(marker.visibleDots.length,1,
+     'Star dot should remain available when physically visible: '+JSON.stringify(marker));
+    assert.equal(marker.cameraShiftedDots.length,0,
+     'Long Glass camera offset must not reveal an off-screen Star: '+JSON.stringify(marker));
     assert.match(signal.emitted,/^★ ROGUE STAR · REPORTED (?:E|SE|S|SW|W|NW|N|NE|NEAR YOU) · cut its route$/);
     assert.equal(signal.viewport,width);
     await page.waitForFunction(message=>[...document.querySelectorAll('.panel.anim-pop')].

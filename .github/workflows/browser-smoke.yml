@@ -8,12 +8,14 @@ on:
       - 'index.html'
       - 'tests/browser/**'
       - '.github/workflows/browser-smoke.yml'
+      - 'scripts/patch-star-minimap.cjs'
   pull_request:
     paths:
       - 'nova-updates/**'
       - 'index.html'
       - 'tests/browser/**'
       - '.github/workflows/browser-smoke.yml'
+      - 'scripts/patch-star-minimap.cjs'
   workflow_dispatch:
 
 # Supersede obsolete PR/feature-branch checks; never cancel a mainline
@@ -35,6 +37,8 @@ jobs:
       - run: npm install --no-audit --no-fund --no-package-lock
       - run: npm install --no-save --no-audit --no-fund --no-package-lock playwright@1.56.1
       - run: npx playwright install chromium
+      - name: Apply the exact production base-minimap patch to the PR shipping shell
+        run: node scripts/patch-star-minimap.cjs index.html
       - name: Serve shipping runtime
         run: |
           python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/nova-browser-http.log 2>&1 &
