@@ -158,3 +158,38 @@ for(const optimized of [false,true]){
   }
  });
 }
+
+/* Independent analytic first-contact oracle. This checks the ACTUAL
+ * production wrappers, not a copy of their quadratic solver. Every
+ * certified three-contact world must receive all three hits; worlds whose
+ * third hull lies beyond the frame must never receive that third hit.
+ * A split-frame 120Hz miss remains a separate known-red chronology issue.
+ */
+test('seeded 4,000-world FPS differential never fabricates a pen-2 contact',()=>{
+ let seed=3191707;
+ const rand=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+ const variants=[boot(false),boot(true)];
+ let certified=0,proved=0;
+ for(const fps of [30,60,120,240])for(let i=0;i<1000;i++){
+  const dt=1/fps,velocity=600+rand()*10000;
+  const spacing=27+rand()*65,x1=24+rand()*90;
+  const positions=[x1,x1+spacing,x1+2*spacing];
+  const first=(positions[0]-21)/velocity;
+  const third=(positions[2]-21)/velocity;
+  const full=first>0&&third<dt;
+  const results=variants.map(Game=>scenario(Game,{fps,positions,velocity}));
+  assert.deepEqual(results[0].byId,results[1].byId,
+   'Performance must not change body results at '+fps+'Hz');
+  for(const result of results){
+   assert.ok(Object.values(result.byId).every(h=>h<=1),
+    'no duplicate victim hits at '+fps+'Hz');
+   if(full)assert.deepEqual(result.byId,{2:1,3:1,4:1},
+    'all certified contacts must resolve at '+fps+'Hz');
+   if(third>dt)assert.equal(result.byId[4],0,
+    'cannot hit third hull beyond frame at '+fps+'Hz');
+  }
+  if(full){certified++;proved++;}
+ }
+ assert.ok(certified>100,'oracle must exercise many genuine full chains');
+ assert.equal(proved,certified);
+});
