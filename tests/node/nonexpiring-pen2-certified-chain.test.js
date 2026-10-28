@@ -68,7 +68,7 @@ function boot(optimized){
 
 function scenario(Game,{fps=30,positions=[40,70,100],pen=2,
  wall=null,shield=false,shape=false,moving=false,competitor=false,
- reverse=false,ttl=.2,velocity=6000,frames=1}={}){
+ reverse=false,ttl=.2,velocity=6000,frames=1,remoteBullets=0}={}){
  const g=new Game();
  g.tanks=positions.map((x,i)=>({kind:'tank',id:i+2,x,y:0,
   cls:'scout',hp:100,alive:true,hitCount:0}));
@@ -86,6 +86,9 @@ function scenario(Game,{fps=30,positions=[40,70,100],pen=2,
  }
  g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,vx:velocity,vy:0,
   r:3,dmg:20,ttl,pen,hits:0,dead:false,shell:false,beam:false}];
+ for(let i=0;i<remoteBullets;i++)g.bullets.push({kind:'bullet',
+  id:100+i,ownerId:1000+i,x:0,y:1000+i*2,vx:6000,vy:0,
+  r:3,dmg:20,ttl:.2,pen:2,hits:0,dead:false,shell:false,beam:false});
  if(competitor)g.bullets.push({kind:'bullet',id:7,ownerId:77,
   x:0,y:0,vx:velocity,vy:0,r:3,dmg:20,ttl,pen:0,hits:0,dead:false,
   shell:false,beam:false});
@@ -104,6 +107,10 @@ for(const optimized of [false,true]){
   const out=scenario(Game);
   assert.deepEqual(out.byId,{2:1,3:1,4:1});
   assert.ok(out.bullets.every(b=>b.dead),'complete budget consumes projectile');
+ });
+ test(label+': 200 remote live pen-2 rounds do not hide the local certified chain',()=>{
+  const out=scenario(boot(optimized),{remoteBullets:200});
+  assert.deepEqual(out.byId,{2:1,3:1,4:1});
  });
  test(label+': reverse enumeration does not change chronological victims',()=>{
   assert.deepEqual(scenario(boot(optimized),{reverse:true}).byId,
