@@ -55,14 +55,11 @@ function collect(root,expected=6){
   if(on.naturalMigrations===0){
    censored.push({layout:meta.layout,seed:meta.seed,
     reason:on.migrationGateAudit.unblocked['5']===0?
-     'No eligible public migration at canonical gate 5 during actual Director ticks':
+     'No public migration eligible at gate 5; Star gate may still be affected':
      'Director eligibility sampled but no announcement'});
-   if(off.naturalMigrations===0)
-    for(const key of ['game','stats','frontline','events','contestGateAudit',
-     'naturalBlooms','naturalMigrations','migrationAIBiasSamples',
-     'visibleNeutralAimSamples','visibleDodgeSamples','visibleHostileAimSamples'])
-     assert.deepEqual(on[key],off[key],
-      'no announcement in either arm must preserve physical outcomes: '+key);
+   /* A no-migration arm is not an unexposed arm for the heat-memory
+    * intervention: the same heat also gates future ROGUE STAR adoption.
+    * Preserve all physical differences and count displaced Star signals. */
   }
   function row(arm){
    return{migrations:arm.naturalMigrations,blooms:arm.naturalBlooms,
@@ -96,7 +93,7 @@ function collect(root,expected=6){
    'AI bias samples are not physical interceptions, visible fights or fun',
    'Migration crossing counts are physical; decayed heat and gate samples are temporally correlated',
    'ON/OFF pilot policies can diverge after public announcements',
-   'Censored pairs remain in denominator; do not select successful seeds',
+   'Zero-migration pairs remain in denominator and may still have changed Star timing; do not claim no treatment',
    'No other AI, projectile, economy, ecology or spawn parameter is intervened on']};
 }
 if(require.main===module){
