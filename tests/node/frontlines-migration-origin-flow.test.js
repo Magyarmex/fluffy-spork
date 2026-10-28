@@ -79,6 +79,18 @@ test('global crossing heat cannot manufacture a source with zero outbound witnes
  st.sectors[5].flowX=3;st.sectors[5].outbound=0;
  assert.equal(T.directorDecision(st,{enabled:true,now:100,hasStar:true}),null);
 });
+test('public destination must be a witnessed origin-to-destination crossing, not a diagonal vector average',()=>{
+ const T=boot(),st=state(T);
+ // Four real 5->1 north crossings plus three real 5->6 east crossings.
+ // Their aggregate vector points NE to sector 2, which no shape entered.
+ st.sectors[5].outbound=7;st.sectors[5].flowX=3;st.sectors[5].flowY=-4;
+ st.sectors[5].flowTo={1:4,6:3};
+ const d=T.directorDecision(st,{enabled:true,now:100,hasStar:true});
+ assert.equal(d?.type,'MIGRATION');
+ assert.equal(d.from,5);
+ assert.equal(d.to,1,'choose the most witnessed physical route 5->1');
+ assert.notEqual(d.to,2,'never report unwitnessed diagonal 5->2');
+});
 test('source-local direction is independent of hidden maturity/value and unrelated flows',()=>{
  const T=boot(),st=state(T);
  st.sectors[5].outbound=6;st.sectors[5].flowX=1;st.sectors[5].flowY=0;
