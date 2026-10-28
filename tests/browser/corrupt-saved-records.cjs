@@ -48,10 +48,13 @@ async function main() {
     await page.waitForFunction(()=>Number(localStorage.getItem('novatanks_best'))>=40,null,{timeout:7000});
     const savedLevel=await page.evaluate(()=>{
       const g=window.__novaCorruptRecordGame;
+      const before={alive:g.player.alive,level:g.player.level,bestRunLevel:g.bestRunLevel};
       g.killTank(g.player,null);
-      return localStorage.getItem('novatanks_bestlevel');
+      return {stored:localStorage.getItem('novatanks_bestlevel'),before,
+        after:{alive:g.player.alive,level:g.player.level,bestRunLevel:g.bestRunLevel,status:g.status}};
     });
-    assert.equal(savedLevel,'1','a legitimate death replaces poisoned best-level storage');
+    console.log('NOVA_BESTLEVEL_DIAGNOSTIC '+JSON.stringify(savedLevel));
+    assert.equal(savedLevel.stored,'1','a legitimate death replaces poisoned best-level storage');
     await page.reload({waitUntil:'domcontentloaded',timeout:45000});
     await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({state:'visible',timeout:45000});
     const recovered=await page.evaluate(()=>({
