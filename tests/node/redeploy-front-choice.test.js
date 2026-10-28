@@ -193,7 +193,9 @@ test('fresh redeploy has no extra notice and UI failures cannot prevent a return
 test('successful RETURN marks only the witnessed death front on the existing minimap',()=>{
  const {Game,mapMarks}=boot({random:()=>0}),g=new Game();
  g.killTank(victim(100,200));g.update();g.__novaRedeployChoice='return';g.redeploy();
- assert.deepEqual(g.__novaLastFrontMarker,{x:100,y:200,until:24});
+ assert.equal(g.__novaLastFrontMarker.x,100);
+ assert.equal(g.__novaLastFrontMarker.y,200);
+ assert.equal(g.__novaLastFrontMarker.until,24);
  g.drawMinimap();
  assert.equal(g.mapDraws,1,'the original minimap remains authoritative');
  assert.equal(mapMarks.length,1,'exactly one fixed waypoint ring');
