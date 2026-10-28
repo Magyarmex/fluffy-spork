@@ -17,7 +17,11 @@ var TIPS=TIP_DEFS.map(function(t){return t.text;});
 function mean(st){var n=0;for(var i=0;i<16;i++)n+=st.sectors[i].value;return n/16;}
 function bloomAgeEligible(st){return !!st&&LF.ageProgress(st)>=.15;}
 function bloomCandidate(st){if(!bloomAgeEligible(st))return-1;var avg=mean(st),best=-1,score=0;for(var i=0;i<16;i++){var s=st.sectors[i],m=s.maturity/Math.max(.1,st.ceiling),v=s.value/(avg+1);if(s.value<310||m<.62||v<1.34)continue;var q=v*.72+m*.55-clamp(s.pressure,0,1)*.42;if(q>score){score=q;best=i;}}return best;}
-function decision(st,ctx){var adopting=!!(ctx&&ctx.adoptStarId>0);if(ctx&&ctx.enabled===false)return null;var now=ctx&&ctx.now||0;if(st.signal&&now<st.signal.until)return null;if(now-st.lastSignalAt<8)return null;if(st.cooldowns.bloom<=0){var b=bloomCandidate(st);if(b>=0&&(b!==st.lastBloomSector||st.sectors[b].maturity>.78*st.ceiling))return{type:'BLOOM',sector:b};}if(st.cooldowns.migration<=0&&st.migrationHeat>=5){var from=ctx&&ctx.migrationFrom;if(from==null||from<0){var val=-1;for(var i=0;i<16;i++)if(st.sectors[i].outbound>val){val=st.sectors[i].outbound;from=i;}}if(from>=0){var m=Math.hypot(st.migrationX,st.migrationY)||1,c=sectorCenter(from),to=sectorIndex(c.x+st.migrationX/m*(LF.ARENA*2/LF.GRID)*.8,c.y+st.migrationY/m*(LF.ARENA*2/LF.GRID)*.8);if(to!==from)return{type:'MIGRATION',from:from,to:to};}}/* Publicizing a real fresh Star has a shorter quiet gate than creating one.
+function decision(st,ctx){var adopting=!!(ctx&&ctx.adoptStarId>0);if(ctx&&ctx.enabled===false)return null;var now=ctx&&ctx.now||0;if(st.signal&&now<st.signal.until)return null;if(now-st.lastSignalAt<8)return null;if(st.cooldowns.bloom<=0){var b=bloomCandidate(st);if(b>=0&&(b!==st.lastBloomSector||st.sectors[b].maturity>.78*st.ceiling))return{type:'BLOOM',sector:b};}/* Research-only paired threshold: shipping remains 5. A scripted match may
+ * explicitly select 3 to test whether real crossings produce useful public
+ * opportunities. Never read hidden ecology from a player or AI context. */
+var migrationGate=ctx&&ctx.migrationGateResearch===3?3:5;
+if(st.cooldowns.migration<=0&&st.migrationHeat>=migrationGate){var from=ctx&&ctx.migrationFrom;if(from==null||from<0){var val=-1;for(var i=0;i<16;i++)if(st.sectors[i].outbound>val){val=st.sectors[i].outbound;from=i;}}if(from>=0){var m=Math.hypot(st.migrationX,st.migrationY)||1,c=sectorCenter(from),to=sectorIndex(c.x+st.migrationX/m*(LF.ARENA*2/LF.GRID)*.8,c.y+st.migrationY/m*(LF.ARENA*2/LF.GRID)*.8);if(to!==from)return{type:'MIGRATION',from:from,to:to};}}/* Publicizing a real fresh Star has a shorter quiet gate than creating one.
  * BLOOM still wins first when actually eligible; a rich sector on BLOOM
  * cooldown must not permanently veto an unrelated time-limited Star. */
 if(st.cooldowns.star<=0&&(!(ctx&&ctx.hasStar)||adopting)&&
@@ -98,7 +102,7 @@ LF.directorTick=function(g,st){var t0=LF.ms(),hasStar=false,adoptStarId=null,sh=
   if(!s.__lfPublicAnnounced&&Number.isFinite(s.__lfStarBorn)&&age>=0&&age<=8)
    adoptStarId=s.id;
  }
- if(st.signal&&st.signal.type==='ROGUE STAR'&&st.signal.starId&&g.getShape&&!g.getShape(st.signal.starId))st.signal=null;var d=decision(st,{enabled:st.directorEnabled,now:g.time||0,hasStar:hasStar,adoptStarId:adoptStarId});if(d)setSignal(g,st,d);if(st.signal&&(g.time||0)>=st.signal.until)st.signal=null;var observed=updateContest(g,st);frontlineTick(g,st,observed);LF.planSample(st,LF.ms()-t0);};
+ if(st.signal&&st.signal.type==='ROGUE STAR'&&st.signal.starId&&g.getShape&&!g.getShape(st.signal.starId))st.signal=null;var d=decision(st,{enabled:st.directorEnabled,now:g.time||0,hasStar:hasStar,adoptStarId:adoptStarId,migrationGateResearch:g.__novaResearchMigrationGate});if(d)setSignal(g,st,d);if(st.signal&&(g.time||0)>=st.signal.until)st.signal=null;var observed=updateContest(g,st);frontlineTick(g,st,observed);LF.planSample(st,LF.ms()-t0);};
 function visible(g,t,s){var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;var inView=F&&F.inGameplayViewport?F.inGameplayViewport(g,t,s):(function(){var z=(g.cam&&g.cam.zoom)||1,hx=(g.w||800)/(2*z),hy=(g.h||600)/(2*z);return Math.abs(s.x-t.x)<=hx&&Math.abs(s.y-t.y)<=hy;})();return !!inView&&(!g.hasLineOfSight||g.hasLineOfSight(t.x,t.y,s.x,s.y,2));}
 
 /* Tactical Frontlines: a BLOOM is contested only when the human pilot and a
