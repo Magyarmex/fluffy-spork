@@ -3,8 +3,8 @@
  * player choice, not a unit-only helper. No hidden world manipulation. */
 const assert=require('node:assert/strict');
 const {chromium}=require('playwright');
-async function run(browser,width){
- const context=await browser.newContext({viewport:{width,height:700}});
+async function run(browser,width,height){
+ const context=await browser.newContext({viewport:{width,height}});
  const page=await context.newPage(),errors=[];
  page.on('pageerror',e=>errors.push(String(e.stack||e)));
  try{
@@ -42,12 +42,12 @@ async function run(browser,width){
   assert.ok(dist>=420-1e-6&&dist<=850+1e-6,'return inserts near the witnessed front');
   assert.equal(after.terrain,true,'return position is terrain safe');
   assert.equal(after.choice,'fresh','choice resets after redeploy');
-  assert.equal(await page.locator('[data-nova-front-choice]').count(),0);
+  await page.locator('[data-nova-front-choice]').waitFor({state:'hidden',timeout:5000});
   assert.deepEqual(errors,[],'no page errors');
-  console.log('NOVA_REDEPLOY_FRONT_SMOKE '+JSON.stringify({width,dist,terrain:after.terrain,reset:after.choice}));
+  console.log('NOVA_REDEPLOY_FRONT_SMOKE '+JSON.stringify({width,height,dist,terrain:after.terrain,reset:after.choice}));
  }finally{await context.close();}
 }
 async function main(){const browser=await chromium.launch({headless:true,args:['--no-sandbox']});try{
- for(const width of [320,900])await run(browser,width);
+ for(const [width,height] of [[320,568],[640,320],[900,700]])await run(browser,width,height);
 }finally{await browser.close();}}
 main().catch(e=>{console.error(e.stack||e);process.exitCode=1;});
