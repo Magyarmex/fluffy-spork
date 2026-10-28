@@ -1308,3 +1308,78 @@ for(const optimized of [false,true]){
   assert.equal(a.hitCount,1);assert.equal(b.hitCount,1);
  });
 }
+
+
+/* Run 423: TTL-expiring high-penetration shots have the same certified
+ * three-body chronology as pen=2. This is NOT permission to backdate live
+ * pen>=3 shots, four-body chains, cover breaches or uncertain motion. */
+function highPenTTLWorld(Game, pen=3, reverse=false) {
+  const {g,a,b}=makeWorld(Game,52,reverse);
+  a.x=25;
+  const c={kind:'tank',id:4,x:78,y:0,cls:'scout',
+    hp:100,alive:true,hitCount:0};
+  const d={kind:'tank',id:5,x:120,y:0,cls:'scout',
+    hp:100,alive:true,hitCount:0};
+  g.tanks.push(c,d);
+  const shot=g.bullets[0];
+  shot.vx=2500;shot.r=5.5;shot.ttl=.03;shot.pen=pen;shot.dmg=21;
+  return {g,a,b,c,d,shot};
+}
+for(const optimized of [false,true]){
+ const mode=optimized?'optimized':'baseline',Game=boot(undefined,optimized);
+ for(const pen of [3,4]){
+  for(const fps of [30,60,120,240]){
+   test(mode+' pen='+pen+' TTL three certified hulls at '+fps+'Hz',()=>{
+    const {g,a,b,c,d}=highPenTTLWorld(Game,pen);
+    for(let i=0;i<40&&g.bullets.length;i++){
+     g.time+=1/fps;g.updateBullets(1/fps);
+    }
+    assert.deepEqual([a.hitCount,b.hitCount,c.hitCount,d.hitCount],
+      [1,1,1,0],'no missing or post-expiry hull hits');
+    assert.equal(g.hits,3);
+   });
+  }
+  test(mode+' pen='+pen+' preserves first-contact order, not hash order',()=>{
+   const {g,a,b,c,d}=highPenTTLWorld(Game,pen,true);
+   g.tanks.reverse();
+   const order=[];
+   g.damageTank=t=>{order.push(t.id);t.hitCount++;g.hits++;};
+   g.time+=1/30;g.updateBullets(1/30);
+   assert.deepEqual(order,[a.id,b.id,c.id]);
+   assert.equal(d.hitCount,0);
+  });
+  test(mode+' pen='+pen+' refuses an earlier permanent wall',()=>{
+   const {g,c}=highPenTTLWorld(Game,pen);
+   g.__novaTerrain=[{id:-423,shape:'rect',x:44,y:0,w:3,h:90,
+     solid:true,destructible:false}];
+   g.time+=1/30;g.updateBullets(1/30);
+   assert.equal(c.hitCount,0);
+  });
+  test(mode+' pen='+pen+' refuses shielded later hull',()=>{
+   const {g,c}=highPenTTLWorld(Game,pen);
+   c.spawnShieldT=2;
+   g.time+=1/30;g.updateBullets(1/30);
+   assert.equal(c.hitCount,0);
+  });
+  test(mode+' pen='+pen+' refuses competing projectile interception',()=>{
+   const {g,c}=highPenTTLWorld(Game,pen);
+   g.bullets.push({kind:'bullet',id:423,ownerId:9,x:15,y:0,
+     vx:0,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,
+     dead:false,shell:false,beam:false});
+   g.time+=1/30;g.updateBullets(1/30);
+   assert.equal(c.hitCount,0);
+  });
+  test(mode+' pen='+pen+' refuses unknown movement epoch',()=>{
+   const {g,c}=highPenTTLWorld(Game,pen);
+   g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=423;
+   g.time+=1/30;g.updateBullets(1/30);
+   assert.equal(c.hitCount,0);
+  });
+  test(mode+' pen='+pen+' refuses an unproven four-body chain',()=>{
+   const {g,d}=highPenTTLWorld(Game,pen);
+   d.x=93; // fourth body is physically reachable, but >3 is unproven
+   g.time+=1/30;g.updateBullets(1/30);
+   assert.equal(d.hitCount,0);
+  });
+ }
+}
