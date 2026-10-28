@@ -69,6 +69,8 @@ test('disabled Director remains closed regardless of timestamp',()=>{
  s.st.bloomMemory={sector:5,announcedAt:90,until:114};
  assert.equal(s.T.contestCandidate(s.g,s.st),false);
  assert.equal(s.T.publicEcoBias(s.g,s.bot,{},{}).mode,'none');
+ s.g.drawMinimap();assert.equal(s.arcs.length,0,
+  'disabling the Director must also silence the older core minimap owner');
 });
 
 test('Rogue Star minimap reports only its frozen public location, never hidden live coordinates',()=>{
