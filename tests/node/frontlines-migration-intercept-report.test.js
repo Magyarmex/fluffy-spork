@@ -9,6 +9,7 @@ function fixture(){
  const meta={layout:'CROSSFIRE',seed:'natural-20261027-0-0',
   pilotPolicy:'public-bloom-harvest-defense',abMode:'migration-intercept'};
  const arm=()=>({metadata:meta,naturalMigrations:0,migrationAIBiasSamples:0,
+  migrationDiagnostics:{transitions:0,peakHeat:0,peak15s:0,signals:0,horizonSeconds:300},
   naturalBlooms:0,game:{score:10,pilotAlive:true,time:100},
   stats:{aiRotations:2},frontline:{counts:{}},events:[],
   contestGateAudit:{},visibleNeutralAimSamples:0,
@@ -30,12 +31,16 @@ test('migration matrix retains natural no-exposure trials as censored',()=>{
   const result=collect(f.root,1);
   assert.equal(result.observedPairs,1);assert.equal(result.exposedPairs,0);
   assert.equal(result.censored.length,1);
+  assert.match(result.censored[0].reason,/No physical migration crossings/);
+  assert.deepEqual(result.physicalCrossings,{off:0,on:0});
   assert.throws(()=>collect(f.root,2),/predeclared/);
  }finally{f.cleanup();}
 });
 test('migration matrix accepts genuinely exposed paired trial without claiming fun',()=>{
  const f=fixture();try{
   f.on.naturalMigrations=f.off.naturalMigrations=1;
+  f.on.migrationDiagnostics={transitions:6,peakHeat:5.4,peak15s:6,signals:1,horizonSeconds:300};
+  f.off.migrationDiagnostics={...f.on.migrationDiagnostics};
   f.on.migrationAIBiasSamples=2;f.off.migrationAIBiasSamples=3;
   f.write();const result=collect(f.root,1);
   assert.equal(result.exposedPairs,1);assert.equal(result.censored.length,0);
@@ -48,5 +53,26 @@ test('migration matrix rejects corrupted OFF replay',()=>{
   const data=JSON.parse(fs.readFileSync(p,'utf8'));
   data.offReplay.game.score=11;fs.writeFileSync(p,JSON.stringify(data));
   assert.throws(()=>collect(f.root,1),/OFF replay must be identical/);
+ }finally{f.cleanup();}
+});
+
+test('migration matrix explains physical crossings below the decayed heat gate',()=>{
+ const f=fixture();try{
+  for(const a of [f.on,f.off])a.migrationDiagnostics={
+   transitions:3,peakHeat:1.75,peak15s:2,signals:0,horizonSeconds:300};
+  f.write();const result=collect(f.root,1);
+  assert.equal(result.exposedPairs,0);
+  assert.match(result.censored[0].reason,/decayed heat never reached/);
+  assert.deepEqual(result.physicalCrossings,{off:3,on:3});
+  assert.deepEqual(result.peakHeat,{off:1.75,on:1.75});
+ }finally{f.cleanup();}
+});
+test('migration matrix rejects invented heat and unobserved Director announcements',()=>{
+ const f=fixture();try{
+  f.on.migrationDiagnostics.peakHeat=2;
+  f.write();assert.throws(()=>collect(f.root,1),/heat must come from witnessed/);
+  f.on.migrationDiagnostics.peakHeat=0;
+  f.on.migrationDiagnostics.signals=1;
+  f.write();assert.throws(()=>collect(f.root,1),/signal counts must agree/);
  }finally{f.cleanup();}
 });
