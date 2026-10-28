@@ -22,7 +22,7 @@ function collate(dir){
       x.initial?.initialStars!==1||x.initial?.initialBots<8||
       !finite(x.result?.time)||!finite(x.result?.playerScore)||
       !finite(x.result?.audit?.announcements)||
-      x.result.audit.announcements!==x.result.stats?.starAnnouncements||
+      x.result.audit.announcements!==(x.result.stats?.starAnnouncements||0)||
       x.censored!==(x.result.time<x.horizon)||
       x.horizon!==300)throw Error('invalid natural-match evidence: '+name);
    const p=x.result.audit.pilot;
