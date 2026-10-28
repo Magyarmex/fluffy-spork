@@ -161,7 +161,7 @@ wrap('game/engine',function(engine,require){
   /* Redeploy resets Game.time but deliberately preserves neutral bodies.
    * Their absolute simulation-clock timestamps (including core shape.born) must follow that reset:
    * otherwise a surviving Star gains an entire extra life's worth of time,
-   * while a Triangle's committed dodge/cooldown can be silently cancelled.
+   * while a Triangle's dodge/cooldown can remain stuck for an extra life.
    * Snapshot identity before seedShapes() refills deficits, then adjust only
    * survivors after the original reset. New bodies already use the new clock.
    * The Director/sector session state intentionally starts fresh. */
