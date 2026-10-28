@@ -47,13 +47,15 @@ function boot(options={}){
  vm.runInNewContext(patch,context);
  const m={exports:{}};window.__novaModules['game/engine'](m,m.exports,()=>{throw Error('no extra imports');});
  function addPanel(){
-  const redeploy={textContent:'⚡ REDEPLOY'};
+  const redeploy={textContent:'⚡ REDEPLOY',style:{},attributes:{},tabIndex:0,clicked:0,
+   setAttribute(k,v){this.attributes[k]=v;},removeAttribute(k){delete this.attributes[k];},
+   click(){this.clicked++;}};
   const panel={textContent:'TERMINATED SCORE REDEPLOY',choice:null,
    querySelectorAll(sel){return sel==='button'?[redeploy]:[];},
    querySelector(sel){return sel==='[data-nova-front-choice]'?this.choice:null;},
    insertBefore(node,before){assert.equal(before,redeploy);this.choice=node;node.parentNode=this;},
    removeChild(node){assert.equal(node,this.choice);this.choice=null;node.parentNode=null;}};
-  panels.push(panel);return panel;
+  panel.redeploy=redeploy;panels.push(panel);return panel;
  }
  return {Game:m.exports.Game,api:window.__NOVA_FRONT_CHOICE_TEST__,addPanel,observers,timers};
 }
@@ -120,21 +122,22 @@ test('non-player deaths and decorative worlds cannot expose a choice',()=>{
  const h=new Game();h.__novaDecorativeWorld=true;h.killTank(victim());h.update();
  assert.equal(h.__novaRedeployOrigin,undefined);
 });
-test('death modal presents accessible mutually exclusive plans without duplicate rows',()=>{
+test('death modal presents accessible one-click plans and restores original callback',()=>{
  const {Game,addPanel}=boot(),g=new Game(),panel=addPanel();
  g.killTank(victim());g.update();
  assert.ok(panel.choice);
- const row=panel.choice,buttons=row.children[1].children;
+ const row=panel.choice,buttons=row.children;
  assert.equal(row.attributes.role,'group');
  assert.equal(buttons.length,2);
- assert.equal(buttons[0].attributes['aria-pressed'],'true');
- assert.equal(buttons[1].attributes['aria-pressed'],'false');
+ assert.equal(panel.redeploy.style.display,'none');
+ assert.equal(panel.redeploy.attributes['aria-hidden'],'true');
  buttons[1].onclick();
  assert.equal(g.__novaRedeployChoice,'return');
- assert.equal(buttons[0].attributes['aria-pressed'],'false');
- assert.equal(buttons[1].attributes['aria-pressed'],'true');
+ assert.equal(panel.redeploy.clicked,1,'original React callback remains authoritative');
  g.update();assert.equal(panel.choice,row);
  g.redeploy();assert.equal(panel.choice,null);
+ assert.equal(panel.redeploy.style.display,'');
+ assert.equal(panel.redeploy.attributes['aria-hidden'],undefined);
 });
 test('React panel may mount after death; observer disconnects on success',()=>{
  const {Game,addPanel,observers}=boot(),g=new Game();
