@@ -72,11 +72,30 @@ async function run(browser,width,height){
    'React RETURN must preserve Star age across the clock reset: '+JSON.stringify(survivingStar));
   assert.equal(survivingStar.announced,true,'a public Star must not become announceable twice');
   const waypoint=await page.evaluate(()=>{
-   const g=window.__novaFrontSmokeGame;
-   g.drawMinimap(); // Full materialized engine + HTML-ordered minimap overlays.
-   return {marker:g.__novaLastFrontMarker,time:g.time};
+   const g=window.__novaFrontSmokeGame,ctx=g.mmCtx,m=g.__novaLastFrontMarker;
+   if(!m)throw Error('RETURN waypoint was not armed');
+   const x=(m.x+2250)*216/4500,y=(m.y+2250)*216/4500;
+   const left=Math.max(0,Math.min(199,Math.floor(x)-8));
+   const top=Math.max(0,Math.min(199,Math.floor(y)-8));
+   g.__novaLastFrontMarker=null;
+   g.drawMinimap(); // Baseline full materialized minimap without the waypoint.
+   const base=ctx.getImageData(left,top,17,17).data;
+   g.__novaLastFrontMarker=m;
+   g.drawMinimap(); // Exact same world, only the fixed waypoint changes.
+   const withMarker=ctx.getImageData(left,top,17,17).data;
+   let changed=0,gold=0;
+   for(let i=0;i<base.length;i+=4){
+    if(Math.abs(base[i]-withMarker[i])+
+       Math.abs(base[i+1]-withMarker[i+1])+
+       Math.abs(base[i+2]-withMarker[i+2])>40)changed++;
+    if(withMarker[i]>190&&withMarker[i+1]>120&&withMarker[i+1]<240&&
+       withMarker[i+2]<170)gold++;
+   }
+   return {marker:g.__novaLastFrontMarker,time:g.time,changed,gold};
   });
   assert.ok(waypoint.marker,'RETURN must expose its fixed last-front waypoint');
+  assert.ok(waypoint.changed>=10&&waypoint.gold>=5,
+   'the actual minimap must visibly paint a gold last-front crosshair: '+JSON.stringify(waypoint));
   assert.equal(waypoint.marker.x,death.x);
   assert.equal(waypoint.marker.y,death.y);
   assert.ok(waypoint.marker.until-waypoint.time>20,
