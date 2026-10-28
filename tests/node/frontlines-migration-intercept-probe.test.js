@@ -20,7 +20,8 @@ function scene(){
   ai:{isElite:false,__v1112TargetId:-1}};
  const st={signal:{type:'MIGRATION',from:0,to:1,x:(from.x+to.x)/2,
   y:(from.y+to.y)/2,started:100,until:105},
-  directorEnabled:true,sectors:Array.from({length:16},()=>({value:0,maturity:0,pressure:0}))};
+  directorEnabled:true,queryScratch:[],queryScratch2:[],
+  sectors:Array.from({length:16},()=>({value:0,maturity:0,pressure:0}))};
  const g={time:101,w:800,h:600,cam:{zoom:1},shapes:[],bullets:[],tanks:[t],__lfState:st};
  return{T,t,st,g};
 }
