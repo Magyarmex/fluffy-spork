@@ -40,6 +40,19 @@ function collect(root,expected=6){
     '15s burst must be backed by witnessed crossings');
    assert.equal(m.signals,arm.naturalMigrations,'Director and observer signal counts must agree');
    assert.equal(m.horizonSeconds,300,'all six predeclared trials use same maximum horizon');
+   const gate=arm.migrationGateAudit;
+   assert.ok(gate&&Number.isInteger(gate.samples)&&gate.samples>0,
+    'real Director decision cadence must be observed');
+   assert.ok(gate.peakHeat>=0&&gate.peakHeat<=m.transitions+1e-7,
+    'Director heat must be backed by physical crossings');
+   for(const threshold of ['3','3.5','4','5']){
+    assert.ok(Number.isInteger(gate.at[threshold])&&gate.at[threshold]>=0);
+    assert.ok(Number.isInteger(gate.unblocked[threshold])&&
+     gate.unblocked[threshold]>=0&&gate.unblocked[threshold]<=gate.at[threshold],
+     'Director gate eligibility cannot exceed heat-eligible samples');
+   }
+   assert.ok(gate.unblocked['5']>=arm.naturalMigrations,
+    'every canonical migration signal must be eligible at the 5 gate');
   }
   const exposed=on.naturalMigrations>0&&off.naturalMigrations>0&&
    on.migrationAIBiasSamples>0&&off.migrationAIBiasSamples>0;
@@ -58,10 +71,10 @@ function collect(root,expected=6){
     assert.deepEqual(on[key],off[key],
      'without migration, physical outcome must not depend on waypoint probe: '+key);
   rows.push({layout:meta.layout,seed:meta.seed,exposed,
-   off:{diagnostics:off.migrationDiagnostics,migrations:off.naturalMigrations,aiBiasSamples:off.migrationAIBiasSamples,
+   off:{diagnostics:off.migrationDiagnostics,gate:off.migrationGateAudit,migrations:off.naturalMigrations,aiBiasSamples:off.migrationAIBiasSamples,
     score:off.game.score,pilotAlive:off.game.pilotAlive,seconds:off.game.time,
     aiRotations:off.stats.aiRotations||0,contests:off.frontline?.counts?.observedContests||0},
-   on:{diagnostics:on.migrationDiagnostics,migrations:on.naturalMigrations,aiBiasSamples:on.migrationAIBiasSamples,
+   on:{diagnostics:on.migrationDiagnostics,gate:on.migrationGateAudit,migrations:on.naturalMigrations,aiBiasSamples:on.migrationAIBiasSamples,
     score:on.game.score,pilotAlive:on.game.pilotAlive,seconds:on.game.time,
     aiRotations:on.stats.aiRotations||0,contests:on.frontline?.counts?.observedContests||0}});
  }
@@ -72,12 +85,16 @@ function collect(root,expected=6){
    on:rows.reduce((a,r)=>a+r.on.diagnostics.transitions,0)},
   peakHeat:{off:Math.max(...rows.map(r=>r.off.diagnostics.peakHeat)),
    on:Math.max(...rows.map(r=>r.on.diagnostics.peakHeat))},
+  directorEligibleAtThreshold:Object.fromEntries(['3','3.5','4','5'].map(k=>[k,{
+   off:rows.reduce((a,r)=>a+r.off.gate.unblocked[k],0),
+   on:rows.reduce((a,r)=>a+r.on.gate.unblocked[k],0)}])),
   limits:['Not a human fun score','AI bias samples are not physical interceptions or visible fights',
    'BLOOM contest telemetry is not a migration-specific contact counter',
    'No-migration trials remain censored, never selected away',
    'Later public signals and pilot inputs may diverge after treatment',
    'Heat peaks are correlated time-series observations, not independent migration events',
-   '300 seconds is a ceiling; the scripted pilot may die earlier']};
+   '300 seconds is a ceiling; the scripted pilot may die earlier',
+   'Director gate counts are correlated cadence samples, not independent migration events']};
 }
 if(require.main===module){
  try{const root=process.argv[2]||'artifacts/migration',
@@ -85,7 +102,8 @@ if(require.main===module){
   fs.writeFileSync(path.join(root,'migration-intercept-summary.json'),JSON.stringify(result,null,2));
   console.log('NOVA_MIGRATION_INTERCEPT_MATRIX '+JSON.stringify({
    pairs:result.observedPairs,exposed:result.exposedPairs,censored:result.censored.length,
-   physicalCrossings:result.physicalCrossings,peakHeat:result.peakHeat}));
+   physicalCrossings:result.physicalCrossings,peakHeat:result.peakHeat,
+   directorEligibleAtThreshold:result.directorEligibleAtThreshold}));
  }catch(e){console.error(e.stack||e);process.exitCode=1;}
 }
 module.exports={collect};
