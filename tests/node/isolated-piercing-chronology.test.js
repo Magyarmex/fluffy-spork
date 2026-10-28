@@ -1087,3 +1087,91 @@ for(const optimized of [false,true])for(const reverse of [false,true]){
    'local collision chronology cannot be overwritten by a remote-density shortcut');
  });
 }
+
+
+/* Run 419 — neutral-shape piercing chronology.
+ * A fast pen=1 round can cross two ordinary stationary neutral hulls
+ * within one frame while TTL stays positive. The materialized core
+ * and the single-hit swept fallback lose the second contact at 30/60Hz.
+ * Use the real Game.update epoch, Battlefield and Performance layers;
+ * refuse any unproven movement, kill/fragment, cover or competing fire. */
+function neutralPair(Game, secondX=70, reverse=false, firstHp=100) {
+  const g=new Game();
+  const a={kind:'shape',id:401,type:'square',x:40,y:0,r:12,
+    hp:firstHp,maxHp:firstHp,hitCount:0};
+  const b={kind:'shape',id:402,type:'square',x:secondX,y:0,r:12,
+    hp:100,maxHp:100,hitCount:0};
+  g.shapes=reverse?[b,a]:[a,b];
+  g.damageShape=function(s,dmg){
+    s.hp-=dmg;s.hitCount++;this.hits++;
+  };
+  g.bullets=[{kind:'bullet',id:400,ownerId:1,x:0,y:0,
+    vx:6000,vy:0,r:3,dmg:20,ttl:.5,pen:1,hits:0,
+    dead:false,shell:false,beam:false,splash:0}];
+  return {g,a,b};
+}
+for(const optimized of [false,true]){
+  const mode=optimized?'Battlefield + Performance':'Battlefield';
+  const Game=boot(function(dt){this.time+=dt;this.updateBullets(dt);},optimized);
+  for(const fps of [30,60,120,240]){
+    test(mode+' neutral pen=1 physically reaches two stationary shapes at '+fps+'Hz',()=>{
+      const {g,a,b}=neutralPair(Game);
+      for(let frame=0;frame<30&&g.bullets.length;frame++)g.update(1/fps);
+      assert.equal(a.hitCount,1,'first neutral receives exactly one hit');
+      assert.equal(b.hitCount,1,'second neutral reached before frame/TTL boundary');
+      assert.equal(a.hp,80);assert.equal(b.hp,80);
+    });
+  }
+  test(mode+' neutral pair is independent of hash iteration order',()=>{
+    const {g,a,b}=neutralPair(Game,70,true);
+    g.update(1/30);
+    assert.equal(a.hitCount,1);assert.equal(b.hitCount,1);
+  });
+  test(mode+' neutral pair does not invent a hit beyond this frame',()=>{
+    const {g,b}=neutralPair(Game,240);
+    g.update(1/30);
+    assert.equal(b.hitCount,0);
+  });
+  test(mode+' neutral pair defers intervening permanent cover',()=>{
+    const {g,b}=neutralPair(Game);
+    g.__novaTerrain=[{id:-419,shape:'rect',x:55,y:0,w:4,h:80,
+      solid:true,destructible:false,hp:0}];
+    g.update(1/30);
+    assert.equal(b.hitCount,0);
+  });
+  test(mode+' neutral pair defers nearby competing projectile',()=>{
+    const {g,b}=neutralPair(Game);
+    g.bullets.push({kind:'bullet',id:499,ownerId:9,x:50,y:0,
+      vx:0,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,
+      dead:false,shell:false,beam:false,splash:0});
+    g.update(1/30);
+    assert.equal(b.hitCount,0);
+  });
+  test(mode+' neutral pair refuses a lethal first shape and fragment ambiguity',()=>{
+    const {g,b}=neutralPair(Game,70,false,15);
+    g.update(1/30);
+    assert.equal(b.hitCount,0);
+  });
+  test(mode+' neutral pair refuses a moving shape in its corridor',()=>{
+    const MovingGame=boot(function(dt){
+      this.time+=dt;this.shapes[1].x+=5;this.updateBullets(dt);
+    },optimized);
+    const {g,b}=neutralPair(MovingGame);
+    g.update(1/30);
+    assert.equal(b.hitCount,0);
+  });
+  test(mode+' neutral pair refuses a shape born during this frame',()=>{
+    const BornGame=boot(function(dt){
+      this.time+=dt;this.shapes[1].born=this.time;this.updateBullets(dt);
+    },optimized);
+    const {g,b}=neutralPair(BornGame);
+    g.update(1/30);
+    assert.equal(b.hitCount,0);
+  });
+  test(mode+' neutral pair refuses missing Game.update movement epoch',()=>{
+    const Isolated=boot(undefined,optimized);
+    const {g,b}=neutralPair(Isolated);
+    g.updateBullets(1/30);
+    assert.equal(b.hitCount,0);
+  });
+}
