@@ -8,6 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const crypto = require('node:crypto');
+const {createPublicRoam} = require('../research/redeploy-public-roam.cjs');
 const root = path.resolve(__dirname, '../..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)]
@@ -119,9 +120,14 @@ function run(seed,choice,hz,seconds,policy='navigate'){
    'RETURN must actually use the intended geographic sampler');
   let routeRequests=0,routeWaypoints=0,frontReached=null,firstVisibleEnemy=null,
    firstVisibleNeutral=null;
-  let distanceTravelled=0,last={x:p.x,y:p.y};
-  g.input.mouseActive=false;g.input.autofire=policy==='harvest';g.input.firing=false;
+  let distanceTravelled=0,postFrontTravelled=0,last={x:p.x,y:p.y};
+  let neutralXPAtFront=null,firstNeutralXP=null;
+  const fair=g.__testFair;
+  if(policy!=='navigate')assert.ok(fair&&fair.viewportHalfExtents,'Fair Engagement must be present');
+  const roaming=policy==='harvest_roam'?createPublicRoam(g,p,origin,fair):null;
+  g.input.mouseActive=false;g.input.autofire=policy!=='navigate';g.input.firing=false;
   g.input.moveVec=()=>{
+   if(roaming&&frontReached!==null)return roaming.move();
    const dx=origin.x-p.x,dy=origin.y-p.y,d=Math.hypot(dx,dy);
    if(d<=130)return{x:0,y:0};
    let target=origin;
@@ -140,9 +146,8 @@ function run(seed,choice,hz,seconds,policy='navigate'){
    * both the player's Fair Engagement viewport and the rendered camera,
    * with physical terrain line-of-sight. No sector maturity, off-screen
    * shapes, bot positions or hidden rewards steer the firing decision. */
-  const fair=g.__testFair;
-  if(policy==='harvest')assert.ok(fair&&fair.viewportHalfExtents,'Fair Engagement must be present');
   g.input.aimVec=()=>{
+   if(roaming)return roaming.aim();
    if(policy!=='harvest')return{x:1,y:0};
    const ext=fair.viewportHalfExtents(g),cam=g.cam||{},cx=Number.isFinite(cam.x)?cam.x:p.x,
     cy=Number.isFinite(cam.y)?cam.y:p.y;
@@ -163,9 +168,16 @@ function run(seed,choice,hz,seconds,policy='navigate'){
    g.update(dt);
    if(!p.alive)break;
    const dist=Math.hypot(p.x-origin.x,p.y-origin.y);
-   distanceTravelled+=Math.hypot(p.x-last.x,p.y-last.y);
+   const stepTravel=Math.hypot(p.x-last.x,p.y-last.y);
+   distanceTravelled+=stepTravel;
+   if(frontReached!==null)postFrontTravelled+=stepTravel;
    last={x:p.x,y:p.y};
-   if(frontReached===null&&dist<=130)frontReached=g.time;
+   if(frontReached===null&&dist<=130){
+    frontReached=g.time;
+    neutralXPAtFront=Number(g.__lfState?.stats?.playerNeutralXP)||0;
+   }
+   if(firstNeutralXP===null&&(Number(g.__lfState?.stats?.playerNeutralXP)||0)>0)
+    firstNeutralXP=g.time;
    if(firstVisibleNeutral===null){
     const seen=g.shapes.some(t=>t&&t.hp>0&&
      Math.hypot(t.x-p.x,t.y-p.y)<250&&
@@ -185,6 +197,10 @@ function run(seed,choice,hz,seconds,policy='navigate'){
    startDistance:+startDistance.toFixed(2),
    endDistance:+Math.hypot(p.x-origin.x,p.y-origin.y).toFixed(2),
    travelled:+distanceTravelled.toFixed(2),
+   postFrontTravelled:+postFrontTravelled.toFixed(2),
+   postFrontSeconds:frontReached===null?null:+Math.max(0,g.time-frontReached).toFixed(3),
+   postFrontNeutralXP:frontReached===null?null:+Math.max(0,(Number(g.__lfState?.stats?.playerNeutralXP)||0)-neutralXPAtFront).toFixed(2),
+   firstNeutralXP:firstNeutralXP===null?null:+firstNeutralXP.toFixed(3),
    frontReached:frontReached===null?null:+frontReached.toFixed(3),
    firstVisibleEnemy:firstVisibleEnemy===null?null:+firstVisibleEnemy.toFixed(3),
    firstVisibleNeutral:firstVisibleNeutral===null?null:+firstVisibleNeutral.toFixed(3),
@@ -192,7 +208,9 @@ function run(seed,choice,hz,seconds,policy='navigate'){
    score:+(Number(p.score)||0).toFixed(2),xp:+(Number(p.xp)||0).toFixed(2),
    kills:p.kills,level:p.level,
    neutralXP:+(Number(g.__lfState?.stats?.playerNeutralXP)||0).toFixed(2),
-   routeRequests,routeWaypoints,time:+g.time.toFixed(3)};
+   routeRequests:routeRequests+(roaming?roaming.stats().routeRequests:0),
+   routeWaypoints:routeWaypoints+(roaming?roaming.stats().routeWaypoints:0),
+   roaming:roaming?roaming.stats():null,time:+g.time.toFixed(3)};
  });
 }
 function comparable(a,b){
@@ -207,10 +225,18 @@ const FULL_SEEDS=[
  1517835,1517842,1517846,1517848,1517852,1517873,
  1517839,1517866,1517870,1517880,1517891,1517893
 ];
+test('real composed RETURN pilot keeps moving after reaching the remembered front',()=>{
+ const r=run(1517825,'return',30,8,'harvest_roam');
+ assert.ok(r.frontReached!==null&&r.frontReached<6,'seed must reach front while alive');
+ assert.ok(r.postFrontTravelled>20,'roaming policy must move in the real Game.update path');
+ assert.ok(r.roaming&&r.roaming.patrolIndex>=0,'roaming policy must be exercised');
+ assert.ok(r.postFrontSeconds>0,'post-front exposure must be recorded');
+});
+
 test('FRESH/RETURN real-engine matched pilot is deterministic under counterbalanced arm order',()=>{
  const full=process.env.NOVA_REDEPLOY_FULL_PILOT==='1';
  const policy=process.env.NOVA_REDEPLOY_POLICY||'navigate';
- assert.ok(['navigate','harvest'].includes(policy),'explicitly supported public policy');
+ assert.ok(['navigate','harvest','harvest_roam'].includes(policy),'explicitly supported public policy');
  const report=[],seeds=full?FULL_SEEDS:[0x172901,0x172902,0x172903];
  const seconds=full?20:2,seen=new Set();
  for(const hz of [30,60]){
@@ -247,6 +273,7 @@ test('FRESH/RETURN real-engine matched pilot is deterministic under counterbalan
   fs.mkdirSync(dir,{recursive:true});
   fs.writeFileSync(path.join(dir,'results-'+policy+'.json'),JSON.stringify({
    contract:'total-policy effect, not isolated geography or human skill',
+   policyNote:policy==='harvest_roam'?'public-only neutral approach and terrain-aware patrol AFTER reaching remembered front':'original baseline; harvest stops moving at remembered front',
    policy,seconds,worlds:36,frameRates:[30,60],counterbalancedPerHz:6,
    layouts:[...seen].sort(),results:report
   },null,2));
