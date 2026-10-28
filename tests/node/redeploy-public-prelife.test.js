@@ -53,6 +53,26 @@ test('natural first-life death is retained rather than overwritten by a scripted
   assert.equal(result.elapsed,0.2);
   assert.equal(game.input.autofire,false);
 });
+test('first life can react only to a visible hostile and an approaching visible projectile',()=>{
+  const {game,fair}=setup();
+  game.tanks[1].x=0;game.tanks[1].y=100;
+  game.bullets=[{id:9,x:80,y:0,vx:-400,vy:0,ttl:1,r:3,ownerId:999}];
+  fair.inGameplayViewport=()=>true;
+  const aims=[],moves=[],original=game.update;
+  game.update=function(dt){
+    aims.push(this.input.aimVec());
+    moves.push(this.input.moveVec());
+    original.call(this,dt);
+  };
+  playPublicPrelude(game,10,0.1,fair);
+  assert.ok(aims[0].y>0.9,'hostile target must be physically visible and in the viewport');
+  assert.ok(moves[0].y<0,'visible incoming projectile causes a lateral dodge');
+  game.tanks[1].spawnShieldT=1;
+  game.bullets=[];
+  aims.length=0;
+  playPublicPrelude(game,10,0.1,fair);
+  assert.ok(aims[0].x>0.9,'spawn-shielded hostile cannot steal neutral aim');
+});
 test('invalid or unobservable prelude cannot silently use private state',()=>{
   const {game,fair}=setup();
   assert.throws(()=>playPublicPrelude(game,0,2,fair),/finite/);
