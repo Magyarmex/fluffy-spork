@@ -247,7 +247,7 @@ canvas {
     <link rel="icon" href="./nova-icon.svg" type="image/svg+xml" />
     <meta name="application-name" content="NOVA TANKS" />
     <script defer src="./pwa-register.js"></script>
-      <meta name="nova-runtime-build" content="3902ec769169712d85f3b3ff" />
+      <meta name="nova-runtime-build" content="28fc717d07b90fd295715808" />
   </head>
   <body>
     <div id="root"></div>
@@ -4238,6 +4238,22 @@ class Game {
         const px = (x) => (x + M) * scale;
         const py = (y) => (y + M) * scale;
         for (const s of this.shapes) {
+            // Rogue Stars are interception prey, not global live radar.
+            // Ordinary resource dots retain the established farming map.
+            if (s.type === 'star') {
+                const p = this.player;
+                const fair = window.__NOVA_FAIR_ENGAGEMENT__;
+                const cam = this.cam;
+                if (!p || !p.alive || !cam || !(cam.zoom > 0) ||
+                    !Number.isFinite(cam.x) || !Number.isFinite(cam.y) ||
+                    !fair || typeof fair.inGameplayViewport !== 'function' ||
+                    !fair.inGameplayViewport(this, p, s) ||
+                    Math.abs(s.x - cam.x) > this.w / (2 * cam.zoom) ||
+                    Math.abs(s.y - cam.y) > this.h / (2 * cam.zoom) ||
+                    (typeof this.hasLineOfSight === 'function' &&
+                     !this.hasLineOfSight(p.x, p.y, s.x, s.y, 3)))
+                    continue;
+            }
             ctx.fillStyle = types_1.SHAPE_DEFS[s.type].color;
             ctx.globalAlpha = s.type === 'circle' ? 0.5 : 0.75;
             ctx.fillRect(px(s.x) - 1, py(s.y) - 1, 2, 2);
