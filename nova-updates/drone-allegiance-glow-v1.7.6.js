@@ -16,12 +16,17 @@ function ownerOf(g,d){return g&&g.tankById&&g.tankById.get?g.tankById.get(d.owne
 function sameSide(a,b){var keys=['teamId','team','factionId','faction','side'];for(var i=0;i<keys.length;i++){var k=keys[i];if(a&&b&&a[k]!=null&&b[k]!=null)return a[k]===b[k];}return null;}
 function relation(g,d){var p=g&&g.player;if(!p||!d)return 0;if(d.ownerId===p.id)return 1;var o=ownerOf(g,d);if(!o||o.alive===false)return 0;if(typeof g.areAllies==='function'&&g.areAllies(p,o))return 1;if(typeof g.areHostile==='function')return g.areHostile(p,o)?-1:0;var side=sameSide(p,o);if(side!==null)return side?1:-1;return -1;}
 function markerKind(rel){return rel>0?'friendly-ring':rel<0?'hostile-diamond':'none';}
-function drawMarker(ctx,d,rel,col,outer){
- if(!ctx||!rel)return;var r=outer+4;ctx.globalAlpha=MARKER_ALPHA;ctx.strokeStyle=col;ctx.lineWidth=1.35;ctx.beginPath();
+function drawMarker(ctx,d,rel,col,outer,strokeWidth){
+ if(!ctx||!rel)return;var r=outer+4;ctx.globalAlpha=MARKER_ALPHA;ctx.strokeStyle=col;ctx.lineWidth=strokeWidth;ctx.beginPath();
  if(rel>0){ctx.arc(d.x,d.y,r,0,Math.PI*2);}else{ctx.moveTo(d.x,d.y-r);ctx.lineTo(d.x+r,d.y);ctx.lineTo(d.x,d.y+r);ctx.lineTo(d.x-r,d.y);ctx.closePath();}
  ctx.stroke();
 }
-function drawIFF(g,w,h,glowSprite){if(!g||!g.ctx||!g.player||!g.cam||!g.drones||!g.drones.length)return;var ctx=g.ctx,cam=g.cam,zoom=cam.zoom||1,dpr=g.dpr||1;var halfW=w/(2*zoom),halfH=h/(2*zoom),pad=78;var x0=cam.x-halfW-pad,x1=cam.x+halfW+pad,y0=cam.y-halfH-pad,y1=cam.y+halfH+pad;ctx.save();ctx.setTransform(dpr,0,0,dpr,0,0);ctx.translate(w/2,h/2);ctx.scale(zoom,zoom);ctx.translate(-cam.x,-cam.y);ctx.globalCompositeOperation='lighter';for(var i=0;i<g.drones.length;i++){var d=g.drones[i];if(!d||d.hp<=0||d.x<x0||d.x>x1||d.y<y0||d.y>y1)continue;var rel=relation(g,d);if(!rel)continue;var col=rel>0?FRIENDLY:HOSTILE;var outer=d.role==='hunter'?31:24,inner=d.role==='hunter'?18:14,sprite=glowSprite(col);ctx.globalAlpha=HALO_ALPHA;ctx.drawImage(sprite,d.x-outer,d.y-outer,outer*2,outer*2);ctx.globalAlpha=CORE_ALPHA;ctx.drawImage(sprite,d.x-inner,d.y-inner,inner*2,inner*2);drawMarker(ctx,d,rel,col,outer);}ctx.restore();}
+function drawIFF(g,w,h,glowSprite){if(!g||!g.ctx||!g.player||!g.cam||!g.drones||!g.drones.length)return;var ctx=g.ctx,cam=g.cam,zoom=cam.zoom||1,dpr=g.dpr||1;var halfW=w/(2*zoom),halfH=h/(2*zoom),pad=78;/* The IFF shape is a non-color ownership cue. Its original 1.35-world-unit
+ * stroke became subpixel at the .5-.78 mobile/War Room camera zoom.
+ * Keep its CSS-pixel width between 1.35 and 1.8, without changing the
+ * drone's world-space radius, native color, culling, or combat authority. */
+ var markerWidth=Math.min(1.8,Math.max(1.35,1.35*zoom))/zoom;
+ var x0=cam.x-halfW-pad,x1=cam.x+halfW+pad,y0=cam.y-halfH-pad,y1=cam.y+halfH+pad;ctx.save();ctx.setTransform(dpr,0,0,dpr,0,0);ctx.translate(w/2,h/2);ctx.scale(zoom,zoom);ctx.translate(-cam.x,-cam.y);ctx.globalCompositeOperation='lighter';for(var i=0;i<g.drones.length;i++){var d=g.drones[i];if(!d||d.hp<=0||d.x<x0||d.x>x1||d.y<y0||d.y>y1)continue;var rel=relation(g,d);if(!rel)continue;var col=rel>0?FRIENDLY:HOSTILE;var outer=d.role==='hunter'?31:24,inner=d.role==='hunter'?18:14,sprite=glowSprite(col);ctx.globalAlpha=HALO_ALPHA;ctx.drawImage(sprite,d.x-outer,d.y-outer,outer*2,outer*2);ctx.globalAlpha=CORE_ALPHA;ctx.drawImage(sprite,d.x-inner,d.y-inner,inner*2,inner*2);drawMarker(ctx,d,rel,col,outer,markerWidth);}ctx.restore();}
 wrap('game/render',function(render){if(!render||typeof render.render!=='function'||typeof render.glowSprite!=='function'||render.__novaDroneIFF)return;render.__novaDroneIFF=true;var oldRender=render.render,glowSprite=render.glowSprite;render.render=function(g,w,h){oldRender(g,w,h);drawIFF(g,w,h,glowSprite);};});
 window.__NOVA_DRONE_IFF_TEST__={relation:relation,sameSide:sameSide,markerKind:markerKind,friendlyColor:FRIENDLY,hostileColor:HOSTILE,alpha:HALO_ALPHA,coreAlpha:CORE_ALPHA,markerAlpha:MARKER_ALPHA};
 console.info('[NOVA TANKS] v'+VERSION+' '+CODENAME+' drone allegiance linked');
