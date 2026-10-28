@@ -69,6 +69,7 @@ function bootGame() {
   const requireGame = window.__novaMakeRequire('');
   const Game = requireGame('game/engine').Game;
   const game = new Game(canvas(), canvas(), {hud: noop, event: noop}, 'low');
+  Object.defineProperty(game, '__testLivingFront', {value: window.__NOVA_LIVING_FRONT_INTERNAL__});
   return game;
 }
 
@@ -130,4 +131,67 @@ test('redeploy immediately replenishes the canonical one-star neutral deficit',(
   assert.equal(counts(g).star,0);
   g.redeploy();
   assert.equal(counts(g).star,1,'the rare star is part of the core neutral baseline');
+});
+
+test('surviving Rogue Star keeps its physical age and expires at the same deadline at 30–240 Hz',()=>{
+  for(const hz of [30,60,120,240]){
+    const g=bootGame(),star=g.shapes.find(s=>s.type==='star'),LF=g.__testLivingFront;
+    assert.ok(star&&LF&&LF.behaviorTick,'the shipping Star and instinct owner must be installed');
+    const initial={x:star.x,y:star.y,hp:star.hp};
+    g.time=100;
+    star.__lfStarBorn=90;star.__lfSpawnAt=90;
+    star.__lfPublicAnnounced=true;star.__lfExit=true;
+    g.redeploy();
+    assert.equal(g.time,0,'the original game resets its clock on redeploy');
+    assert.strictEqual(g.getShape(star.id),star,'the same physical Star survives');
+    assert.deepEqual({x:star.x,y:star.y,hp:star.hp},initial,'redeploy does not alter its body');
+    assert.equal(star.__lfStarBorn,-10,'Star birth is rebased, not restarted');
+    assert.equal(star.__lfSpawnAt,-10,'general neutral birth age is preserved');
+    assert.equal(star.__lfPublicAnnounced,true,'an announced Star cannot be announced twice');
+    assert.equal(star.__lfExit,true,'the Star keeps its exit phase');
+    const st=LF.ensure(g,LF.defs);
+    g.time=22-1/hz;
+    LF.behaviorTick(g,st,LF.defs,.12);
+    assert.ok(g.shapes.includes(star),hz+' Hz: still alive before age 32');
+    g.time=22+1/hz;
+    LF.behaviorTick(g,st,LF.defs,.12);
+    assert.ok(!g.shapes.includes(star),hz+' Hz: expires at age >32');
+    assert.equal(g.getShape(star.id),null,hz+' Hz: spatial ID lookup is cleared');
+    assert.equal(st.stats.starsExpired,1,hz+' Hz: expiry is counted exactly once');
+  }
+});
+
+test('two redeploys preserve fresh Star adoption age and Triangle dodge/cooldown timing',()=>{
+  const g=bootGame(),star=g.shapes.find(s=>s.type==='star'),
+    tri=g.shapes.find(s=>s.type==='triangle');
+  assert.ok(star&&tri);
+  g.time=100;
+  star.__lfStarBorn=96;star.__lfPublicAnnounced=false;
+  tri.__lfSpawnAt=95;
+  tri.__lfEvadeUntil=100.2;tri.__lfEvadeReady=100.9;
+  g.redeploy();
+  assert.equal(star.__lfStarBorn,-4);
+  assert.equal(g.time-star.__lfStarBorn,4,'unannounced Star remains in its 0–8s adoption window');
+  assert.equal(tri.__lfSpawnAt,-5);
+  assert.ok(Math.abs(tri.__lfEvadeUntil-.2)<1e-9);
+  assert.ok(Math.abs(tri.__lfEvadeReady-.9)<1e-9);
+  g.time=.1;
+  g.redeploy();
+  assert.strictEqual(g.getShape(star.id),star);
+  assert.equal(g.time-star.__lfStarBorn,4.1,'a second redeploy does not rejuvenate the Star');
+  assert.ok(Math.abs(tri.__lfEvadeUntil-.1)<1e-9,'active dodge retains its remaining duration');
+  assert.ok(Math.abs(tri.__lfEvadeReady-.8)<1e-9,'cooldown retains its remaining duration');
+  assert.equal(star.__lfPublicAnnounced,false,'the Star is not marked announced by redeploy');
+});
+
+test('replenished neutral bodies use the new clock, not the previous life offset',()=>{
+  const g=bootGame(),old=g.shapes.find(s=>s.type==='star');
+  assert.ok(old);
+  g.time=100;
+  g.shapes.splice(g.shapes.indexOf(old),1);
+  g.redeploy();
+  const replacement=g.shapes.find(s=>s.type==='star');
+  assert.ok(replacement&&replacement!==old);
+  assert.equal(replacement.__lfStarBorn,0,'new Star starts at age zero');
+  assert.equal(replacement.__lfSpawnAt,0,'new neutral body is not shifted as a survivor');
 });
