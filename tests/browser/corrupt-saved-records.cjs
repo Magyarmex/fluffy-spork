@@ -54,7 +54,9 @@ async function main() {
         after:{alive:g.player.alive,level:g.player.level,bestRunLevel:g.bestRunLevel,status:g.status}};
     });
     console.log('NOVA_BESTLEVEL_DIAGNOSTIC '+JSON.stringify(savedLevel));
-    assert.equal(savedLevel.stored,'1','a legitimate death replaces poisoned best-level storage');
+    assert.ok(savedLevel.before.level>=1 && savedLevel.before.bestRunLevel===0);
+    assert.equal(savedLevel.stored,String(savedLevel.before.level),
+      'a legitimate death replaces poisoned best-level storage with the actual earned level');
     await page.reload({waitUntil:'domcontentloaded',timeout:45000});
     await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({state:'visible',timeout:45000});
     const recovered=await page.evaluate(()=>({
