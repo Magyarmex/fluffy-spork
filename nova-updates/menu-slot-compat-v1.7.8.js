@@ -390,12 +390,14 @@ function validOrigin(p){
   Math.abs(p.x)<=2250&&Math.abs(p.y)<=2250);
 }
 function sampleReturn(g,p){
- if(!validOrigin(p))return null;
+ if(!validOrigin(p)||!g||typeof g.isTerrainSafe!=='function')return null;
  for(var i=0;i<64;i++){
   var a=Math.random()*PI2,r=420+Math.random()*430;
   var x=p.x+Math.cos(a)*r,y=p.y+Math.sin(a)*r;
   if(Math.abs(x)>2050||Math.abs(y)>2050)continue;
-  if(typeof g.isTerrainSafe==='function'&&!g.isTerrainSafe(x,y,75))continue;
+  var safe=false;
+  try{safe=!!g.isTerrainSafe(x,y,75);}catch(ignore){return null;}
+  if(!safe)continue;
   return{x:x,y:y};
  }
  return null;
