@@ -3,8 +3,8 @@ name: NOVA Public Migration Heat Memory A/B Research
 on:
   pull_request:
     paths:
-      - 'nova-updates/living-front-director-v1.12.0.js'
-      - 'tests/node/frontlines-migration-memory-intervention.test.js'
+      - 'nova-updates/living-front-core-v1.12.0.js'
+      - 'tests/node/frontlines-migration-heat-memory.test.js'
       - 'tests/browser/frontlines-migration-memory-ab.cjs'
       - 'scripts/frontlines-migration-memory-report.cjs'
       - '.github/workflows/frontlines-migration-memory.yml'
@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  paired-natural-threshold:
+  paired-natural-memory:
     runs-on: ubuntu-latest
     timeout-minutes: 18
     strategy:
@@ -33,10 +33,10 @@ jobs:
       - run: npm install --no-save --no-audit --no-fund --no-package-lock playwright@1.56.1
       - run: npx playwright install chromium
       - name: Run exact shipping core heat memory unit tests
-        run: node --test tests/node/frontlines-migration-memory-intervention.test.js
+        run: node --test tests/node/frontlines-migration-heat-memory.test.js
       - name: Serve real 48-overlay shipping game
         run: |
-          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/nova-threshold-http.log 2>&1 &
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/nova-memory-http.log 2>&1 &
       - name: Compare public migration decay 0.42 OFF vs 0.28 ON (gate 5), with OFF replay
         env:
           NOVA_LAYOUT_INDEX: ${{ matrix.layout }}
@@ -53,8 +53,8 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-  collate-threshold:
-    needs: paired-natural-threshold
+  collate-memory:
+    needs: paired-natural-memory
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
