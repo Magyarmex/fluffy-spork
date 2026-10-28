@@ -72,3 +72,15 @@ test('obsolete v1.7.4 auto-update badge is not shipped', () => {
   assert.doesNotMatch(scriptList, /auto-update-test-v1\.7\.4/);
   assert.match(scriptList, /menu-debug-motion-v1\.7\.8/);
 });
+
+
+test('legacy Signal Flow refresh is idempotent under subtree MutationObserver', () => {
+  const {src}=loadLayer();
+  assert.match(src,/if\(k&&k\.textContent!=='TIPS'\)k\.textContent='TIPS'/);
+  assert.match(src,/if\(line\.textContent!==tipText\)line\.textContent=tipText/);
+  assert.match(src,/if\(v&&v\.textContent!==countText\)v\.textContent=countText/);
+  assert.match(src,/paint\(\);if\(tipTimer\)return;tipTimer=setInterval/);
+  assert.match(src,/if\(foot&&foot\.textContent!==footerText\)foot\.textContent=footerText/);
+  assert.doesNotMatch(src,/if\(k\)k\.textContent='TIPS'/);
+  assert.doesNotMatch(src,/line\.textContent=TIPS\[i\]/);
+});

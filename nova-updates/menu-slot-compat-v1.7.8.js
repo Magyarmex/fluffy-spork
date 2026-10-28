@@ -172,7 +172,7 @@ function mountMain(){
  var old=surface.querySelector('.nv-tip-line'),line=surface.querySelector('.nova-tip-line');
  if(old){old.classList.remove('nv-tip-line');old.classList.add('nova-tip-line');line=old;}
  if(!line){line=document.createElement('div');line.className='nova-tip-line';surface.appendChild(line);}
- var k=surface.querySelector('.nv-brief-k'),label=surface.querySelector('.nv-brief-v');if(k)k.textContent='TIPS';
+ var k=surface.querySelector('.nv-brief-k'),label=surface.querySelector('.nv-brief-v');if(k&&k.textContent!=='TIPS')k.textContent='TIPS';
  if(mainMenu!==m){if(mainTimer)clearInterval(mainTimer);mainTimer=0;mainMenu=m;paintMain(line,label);}
  if(mainTimer)return;
  mainTimer=setInterval(function(){
