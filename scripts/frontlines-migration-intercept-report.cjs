@@ -37,7 +37,11 @@ function collect(root,expected=6){
   if(!exposed)censored.push({layout:meta.layout,seed:meta.seed,
    reason:'No public migration plus AI migration bias in both arms'});
   if(!on.naturalMigrations&&!off.naturalMigrations)
-   assert.deepEqual(on,off,'without any migration, waypoint intervention must be a no-op');
+   for(const key of ['game','stats','frontline','events','contestGateAudit',
+     'naturalBlooms','visibleNeutralAimSamples','visibleDodgeSamples',
+     'visibleHostileAimSamples'])
+    assert.deepEqual(on[key],off[key],
+     'without migration, physical outcome must not depend on waypoint probe: '+key);
   rows.push({layout:meta.layout,seed:meta.seed,exposed,
    off:{migrations:off.naturalMigrations,aiBiasSamples:off.migrationAIBiasSamples,
     score:off.game.score,pilotAlive:off.game.pilotAlive,seconds:off.game.time,
