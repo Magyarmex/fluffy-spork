@@ -247,7 +247,7 @@ canvas {
     <link rel="icon" href="./nova-icon.svg" type="image/svg+xml" />
     <meta name="application-name" content="NOVA TANKS" />
     <script defer src="./pwa-register.js"></script>
-      <meta name="nova-runtime-build" content="28fc717d07b90fd295715808" />
+      <meta name="nova-runtime-build" content="d0049a978aa8cf8e19b8cca8" />
   </head>
   <body>
     <div id="root"></div>
@@ -816,7 +816,7 @@ function App() {
         });
     };
     return (React.createElement("div", { className: "relative h-full w-full overflow-hidden bg-[#04060d]" },
-        screen === 'menu' && (React.createElement(MenuScreen, { best: Number((0, storage_1.lsGet)('novatanks_best') || 0), muted: muted, musicOff: musicOff, quality: quality, onPlay: startGame, onToggleMute: toggleMute, onToggleMusic: toggleMusic, onToggleQuality: toggleQuality, isTouch: isTouch })),
+        screen === 'menu' && (React.createElement(MenuScreen, { best: (() => { const score = Number((0, storage_1.lsGet)('novatanks_best') || 0); return Number.isFinite(score) && score >= 0 ? score : 0; })(), muted: muted, musicOff: musicOff, quality: quality, onPlay: startGame, onToggleMute: toggleMute, onToggleMusic: toggleMusic, onToggleQuality: toggleQuality, isTouch: isTouch })),
         screen === 'game' && (React.createElement("div", { className: "relative h-full w-full" },
             React.createElement("canvas", { ref: canvasRef, className: "absolute inset-0 h-full w-full" }),
             React.createElement("div", { className: "panel absolute right-2 top-2 z-20 rounded-xl p-0.5" },
@@ -2345,8 +2345,10 @@ class Game {
         this.mmCtx = mm.getContext('2d');
         this.cb = cb;
         this.quality = quality;
-        this.best = Number((0, storage_1.lsGet)('novatanks_best') || 0);
-        this.bestRunLevel = Number((0, storage_1.lsGet)('novatanks_bestlevel') || 0);
+        const savedBestScore = Number((0, storage_1.lsGet)('novatanks_best') || 0);
+        this.best = Number.isFinite(savedBestScore) && savedBestScore >= 0 ? savedBestScore : 0;
+        const savedBestLevel = Number((0, storage_1.lsGet)('novatanks_bestlevel') || 0);
+        this.bestRunLevel = Number.isInteger(savedBestLevel) && savedBestLevel >= 0 && savedBestLevel <= types_1.MAX_LEVEL ? savedBestLevel : 0;
         this.muted = (0, storage_1.lsGet)('novatanks_muted') === '1';
         this.sfx.setMuted(this.muted);
         // Pre-allocate pools to prevent GC stutter
