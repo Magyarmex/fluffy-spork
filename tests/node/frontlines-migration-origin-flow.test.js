@@ -27,6 +27,7 @@ test('dominant source northward flow cannot be misreported as global eastward fl
  // Four other crossings at sector 10: all east. Global vector points east.
  st.sectors[5].outbound=5;st.sectors[5].flowY=-3;
  st.sectors[10].outbound=4;st.sectors[10].flowX=4;
+ st.sectors[5].flowTo[1]=4;st.sectors[5].flowTo[9]=1;st.sectors[10].flowTo[11]=4;
  const d=T.directorDecision(st,{enabled:true,now:100,hasStar:true});
  assert.equal(d?.type,'MIGRATION');
  assert.equal(d.from,5);
@@ -36,6 +37,7 @@ test('explicitly selected second source uses its own eastward flow',()=>{
  const T=boot(),st=state(T);
  st.sectors[5].outbound=5;st.sectors[5].flowY=-3;
  st.sectors[10].outbound=4;st.sectors[10].flowX=4;
+ st.sectors[5].flowTo[1]=4;st.sectors[5].flowTo[9]=1;st.sectors[10].flowTo[11]=4;
  const d=T.directorDecision(st,{enabled:true,now:100,hasStar:true,migrationFrom:10});
  assert.equal(d?.type,'MIGRATION');
  assert.equal(d.from,10);
@@ -47,6 +49,7 @@ test('cancelling source flows do not invent a public migration direction',()=>{
  // still has a global direction. This source has no coherent public flow.
  st.sectors[5].outbound=6;st.sectors[5].flowX=0;st.sectors[5].flowY=0;
  st.sectors[10].outbound=4;st.sectors[10].flowX=0;
+ st.sectors[5].flowTo[1]=3;st.sectors[5].flowTo[9]=3;
  assert.equal(T.directorDecision(st,{enabled:true,now:100,hasStar:true}),null);
 });
 test('cancelled busiest origin cannot mask a second witnessed coherent migration',()=>{
@@ -55,6 +58,7 @@ test('cancelled busiest origin cannot mask a second witnessed coherent migration
  // crossings from sector 10 remain a valid public opportunity.
  st.sectors[5].outbound=6;st.sectors[5].flowX=0;st.sectors[5].flowY=0;
  st.sectors[10].outbound=4;st.sectors[10].flowX=4;
+ st.sectors[5].flowTo[1]=3;st.sectors[5].flowTo[9]=3;st.sectors[10].flowTo[11]=4;
  const d=T.directorDecision(st,{enabled:true,now:100,hasStar:true});
  assert.equal(d?.type,'MIGRATION');
  assert.equal(d.from,10,'the announced origin must have coherent witnessed flow');
@@ -70,6 +74,8 @@ test('equally busy origins select the first coherent real source deterministical
  st.sectors[5].outbound=4;st.sectors[5].flowX=0;st.sectors[5].flowY=0;
  st.sectors[6].outbound=4;st.sectors[6].flowX=-3;
  st.sectors[10].outbound=4;st.sectors[10].flowX=3;
+ st.sectors[5].flowTo[1]=2;st.sectors[5].flowTo[9]=2;
+ st.sectors[6].flowTo[5]=4;st.sectors[10].flowTo[11]=4;
  const d=T.directorDecision(st,{enabled:true,now:100,hasStar:true});
  assert.equal(d?.from,6,'skip cancelled tie, preserve stable sector order');
  assert.equal(d?.to,5);
@@ -95,6 +101,7 @@ test('source-local direction is independent of hidden maturity/value and unrelat
  const T=boot(),st=state(T);
  st.sectors[5].outbound=6;st.sectors[5].flowX=1;st.sectors[5].flowY=0;
  st.sectors[10].outbound=4;st.sectors[10].flowY=-4;
+ st.sectors[5].flowTo[6]=6;st.sectors[10].flowTo[6]=4;
  const ctx={enabled:true,now:100,hasStar:true};
  const d=T.directorDecision(st,ctx);
  assert.equal(d?.to,6);
@@ -106,7 +113,7 @@ test('source-local direction is independent of hidden maturity/value and unrelat
 });
 test('source flow preserves canonical migration gate, cooldown and shipping overlay',()=>{
  const T=boot(),st=state(T);
- st.sectors[5].outbound=6;st.sectors[5].flowX=1;
+ st.sectors[5].outbound=6;st.sectors[5].flowX=1;st.sectors[5].flowTo[6]=6;
  st.migrationHeat=4.99;
  assert.equal(T.directorDecision(st,{enabled:true,now:100,hasStar:true}),null);
  st.migrationHeat=6;st.cooldowns.migration=3;
