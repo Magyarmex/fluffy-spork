@@ -434,6 +434,26 @@ function validOrigin(p){
  return !!(p&&Number.isFinite(p.x)&&Number.isFinite(p.y)&&
   Math.abs(p.x)<=2250&&Math.abs(p.y)<=2250);
 }
+/* RETURN may revisit a dangerous fight, but it must not materialize inside
+ * an existing hull. Only reject immediate physical overlaps; do not read
+ * hidden threats to pick a strategically favorable lane or evade combat. */
+function returnBodyClear(g,x,y){
+ var tanks=g.tanks||[],drones=g.drones||[];
+ for(var i=0;i<tanks.length;i++){
+  var t=tanks[i];
+  if(!t||t.alive===false||(t.hp!=null&&!(t.hp>0))||
+     !Number.isFinite(t.x)||!Number.isFinite(t.y))continue;
+  var dx=x-t.x,dy=y-t.y;
+  if(Math.abs(dx)<64&&Math.abs(dy)<64&&dx*dx+dy*dy<64*64)return false;
+ }
+ for(var j=0;j<drones.length;j++){
+  var d=drones[j];
+  if(!d||!(d.hp>0)||!Number.isFinite(d.x)||!Number.isFinite(d.y))continue;
+  var ux=x-d.x,uy=y-d.y;
+  if(Math.abs(ux)<40&&Math.abs(uy)<40&&ux*ux+uy*uy<40*40)return false;
+ }
+ return true;
+}
 function sampleReturn(g,p){
  if(!validOrigin(p)||!g||typeof g.isTerrainSafe!=='function')return null;
  for(var i=0;i<64;i++){
@@ -442,7 +462,7 @@ function sampleReturn(g,p){
   if(Math.abs(x)>2050||Math.abs(y)>2050)continue;
   var safe=false;
   try{safe=!!g.isTerrainSafe(x,y,75);}catch(ignore){return null;}
-  if(!safe)continue;
+  if(!safe||!returnBodyClear(g,x,y))continue;
   return{x:x,y:y};
  }
  return null;
