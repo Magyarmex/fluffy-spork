@@ -108,7 +108,7 @@ function rogueStarToast(g,sig){
  var bearing=Math.hypot(dx,dy)<120?'NEAR YOU':compassBearing(dx,dy);
  return '★ ROGUE STAR · REPORTED '+bearing+' · cut its route';
 }
-function setSignal(g,st,d){var now=g.time||0,sig={type:d.type,started:now,until:now+(d.type==='BLOOM'?5:d.type==='MIGRATION'?4.4:7)};if(d.type==='BLOOM'){sig.sector=d.sector;var c=sectorCenter(d.sector);sig.x=c.x;sig.y=c.y;st.cooldowns.bloom=24;st.lastBloomSector=d.sector;st.bloomMemory={sector:d.sector,announcedAt:now,until:now+24,initialValue:st.sectors[d.sector]?st.sectors[d.sector].value:0};st.lastMeaningfulAt=now;st.stats.blooms++;}else if(d.type==='MIGRATION'){sig.from=d.from;sig.to=d.to;var a=sectorCenter(d.from),b=sectorCenter(d.to);sig.x=(a.x+b.x)/2;sig.y=(a.y+b.y)/2;st.cooldowns.migration=20;st.lastMeaningfulAt=now;st.stats.migrations++;st.migrationHeat*=.28;}else{
+function setSignal(g,st,d){var now=g.time||0,sig={type:d.type,started:now,until:now+(d.type==='BLOOM'?5:d.type==='MIGRATION'?4.4:7)};if(d.type==='BLOOM'){sig.sector=d.sector;var c=sectorCenter(d.sector);sig.x=c.x;sig.y=c.y;st.cooldowns.bloom=24;st.lastBloomSector=d.sector;st.bloomMemory={sector:d.sector,announcedAt:now,until:now+24,initialValue:st.sectors[d.sector]?st.sectors[d.sector].value:0};st.lastMeaningfulAt=now;st.stats.blooms++;}else if(d.type==='MIGRATION'){sig.from=d.from;sig.to=d.to;var a=sectorCenter(d.from),b=sectorCenter(d.to);sig.x=(a.x+b.x)/2;sig.y=(a.y+b.y)/2;st.cooldowns.migration=20;st.migrationMemory={from:d.from,to:d.to,announcedAt:now,until:now+16};st.lastMeaningfulAt=now;st.stats.migrations++;st.migrationHeat*=.28;}else{
   /* The canonical game already maintains one ordinary Star. A freshly
    * spawned, real Star can become the rare public opportunity without
    * duplicating or teleporting it. Preserve the old created-Star fallback
@@ -129,7 +129,7 @@ function setSignal(g,st,d){var now=g.time||0,sig={type:d.type,started:now,until:
   sig.starId=s.id;sig.x=s.x;sig.y=s.y;
   st.lastMeaningfulAt=now;
   st.stats.starAnnouncements=(st.stats.starAnnouncements||0)+1;
- }st.signal=sig;st.lastSignal=d.type;st.lastSignalAt=now;if(d.type==='BLOOM')ensureFrontline(g,st);if(g.toast)g.toast(d.type==='BLOOM'?bloomToast(g,d.sector):d.type==='MIGRATION'?migrationToast(g,d.from,d.to):rogueStarToast(g,sig),'info');if(g.sfx&&g.sfx.novaLivingSignal)g.sfx.novaLivingSignal(d.type,g.player?clamp((sig.x-g.player.x)/900,-1,1):0);}
+ }if(d.type!=='MIGRATION')st.migrationMemory=null;st.signal=sig;st.lastSignal=d.type;st.lastSignalAt=now;if(d.type==='BLOOM')ensureFrontline(g,st);if(g.toast)g.toast(d.type==='BLOOM'?bloomToast(g,d.sector):d.type==='MIGRATION'?migrationToast(g,d.from,d.to):rogueStarToast(g,sig),'info');if(g.sfx&&g.sfx.novaLivingSignal)g.sfx.novaLivingSignal(d.type,g.player?clamp((sig.x-g.player.x)/900,-1,1):0);}
 LF.directorTick=function(g,st){var t0=LF.ms(),hasStar=false,adoptStarId=null,sh=g.shapes||[],now=g.time||0;
  for(var i=0;i<sh.length;i++){
   var s=sh[i];if(!s||!(s.hp>0)||s.type!=='star')continue;
@@ -584,6 +584,31 @@ LF.wrap('game/engine',function(engine){
  var oldMap=Game.prototype.drawMinimap;if(!oldMap)return;
  Game.prototype.drawMinimap=function(){
   var out=oldMap.apply(this,arguments),st=this.__lfState,c=st&&st.contestSignal,ctx=this.mmCtx,now=this.time||0,op=publicBloom(st,now);
+  /* A live MIGRATION lasts 4.4s, too briefly for a distant pilot to
+   * plan an intercept. Keep its PUBLIC, frozen sector-to-sector route as
+   * a fading dashed minimap afterimage for 16s from announcement. The
+   * afterimage is explicitly stale: no live shape tracking, no hidden
+   * sector sampling, no AI movement authority and no new HUD control.
+   * A new live signal always takes visual priority. */
+  var mem=st&&st.migrationMemory,live=st&&st.signal&&now<st.signal.until;
+  if(ctx&&mem&&st.directorEnabled!==false&&this.status==='playing'&&!live&&
+     now>=mem.announcedAt&&now<mem.until&&
+     Number.isInteger(mem.from)&&Number.isInteger(mem.to)&&
+     mem.from>=0&&mem.from<16&&mem.to>=0&&mem.to<16&&mem.from!==mem.to){
+   var ma=sectorCenter(mem.from),mb=sectorCenter(mem.to),ms=216/(LF.ARENA*2),
+     ax=(ma.x+LF.ARENA)*ms,ay=(ma.y+LF.ARENA)*ms,
+     bx=(mb.x+LF.ARENA)*ms,by=(mb.y+LF.ARENA)*ms,
+     angle=Math.atan2(by-ay,bx-ax),fade=clamp((mem.until-now)/16,0,1);
+   ctx.save();ctx.globalAlpha=.16+.35*fade;ctx.strokeStyle='#7df3ff';
+   ctx.lineWidth=3.5;if(ctx.setLineDash)ctx.setLineDash([7,5]);
+   ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.stroke();
+   if(ctx.setLineDash)ctx.setLineDash([]);
+   ctx.beginPath();
+   ctx.moveTo(bx-Math.cos(angle-.6)*8,by-Math.sin(angle-.6)*8);
+   ctx.lineTo(bx,by);
+   ctx.lineTo(bx-Math.cos(angle+.6)*8,by-Math.sin(angle+.6)*8);
+   ctx.stroke();ctx.restore();
+  }
   if(!ctx||!op)return out;
   var center=sectorCenter(op.sector),scale=216/(LF.ARENA*2),x=(center.x+LF.ARENA)*scale,y=(center.y+LF.ARENA)*scale;
   if(!op.live){
