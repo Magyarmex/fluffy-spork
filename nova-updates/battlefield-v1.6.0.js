@@ -1668,9 +1668,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   for(var candidateI=0;candidateI<this.bullets.length;candidateI++){
    var candidate=this.bullets[candidateI];
    if(candidate&&!candidate.dead&&!candidate.shell&&!candidate.beam&&
-      !candidate.splash&&!candidate.__v17Cannon&&candidate.pen===0&&
+      !candidate.splash&&!candidate.__v17Cannon&&
+      (candidate.pen===0||candidate.pen===1)&&
       (candidate.hits||0)===0&&candidate.ttl>0&&candidate.ttl<=dt){
-    var nearby=localSingleTTLBodyOthers(this,candidate,dt);
+    var nearby=localSingleTTLBodyOthers(this,candidate,dt,candidate.pen===1);
     if(nearby)localSingleBody={bullet:candidate,others:nearby};
     break;
    }
@@ -1692,8 +1693,13 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      isolatedTTLStationaryPiercingChain(this,expiringBullet,dt,false,
       localExpiring.get(expiringBullet));
    }else if(localSingleBody){
-    if(expiringBullet===localSingleBody.bullet)
-     isolatedTTLBodyContact(this,expiringBullet,dt,localSingleBody.others);
+    if(expiringBullet===localSingleBody.bullet){
+     if(expiringBullet.pen===1)
+      isolatedTTLStationaryPiercingChain(this,expiringBullet,dt,false,
+       localSingleBody.others,true);
+     else
+      isolatedTTLBodyContact(this,expiringBullet,dt,localSingleBody.others);
+    }
    }else if(!isolatedTTLStationaryPiercingChain(this,expiringBullet,dt))
     isolatedTTLBodyContact(this,expiringBullet,dt);
   }
