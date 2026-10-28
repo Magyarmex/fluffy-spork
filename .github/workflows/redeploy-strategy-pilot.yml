@@ -8,6 +8,10 @@ on:
       - 'tests/node/redeploy-paired-real-pilot.test.js'
       - 'tests/node/redeploy-public-roam.test.js'
       - 'tests/research/redeploy-public-roam.cjs'
+      - 'tests/research/redeploy-public-prelife.cjs'
+      - 'tests/node/redeploy-public-prelife.test.js'
+      - 'tests/node/redeploy-played-prelife-report.test.js'
+      - 'scripts/redeploy-played-prelife-report.cjs'
       - '.github/workflows/redeploy-strategy-pilot.yml'
   workflow_dispatch:
 
@@ -43,4 +47,73 @@ jobs:
           name: nova-redeploy-paired-${{ matrix.policy }}
           path: artifacts/redeploy-pilot/
           if-no-files-found: error
+          retention-days: 30
+
+  played-first-life:
+    # Separate cohort: never pool with the instant-death baseline. This
+    # exercises actual 8s first-life combat/ecology before either redeploy arm.
+    strategy:
+      fail-fast: false
+      matrix:
+        policy: [navigate, harvest_roam]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Run 36 matched post-combat worlds at 30/60 Hz (${{ matrix.policy }})
+        env:
+          NOVA_REDEPLOY_FULL_PILOT: '1'
+          NOVA_REDEPLOY_POLICY: ${{ matrix.policy }}
+          NOVA_REDEPLOY_PRELIFE_SECONDS: '8'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/redeploy-pilot
+          node --test tests/node/redeploy-paired-real-pilot.test.js 2>&1 | tee artifacts/redeploy-pilot/run.log
+      - name: Analyze played-first-life cohort with seed-clustered uncertainty
+        env:
+          NOVA_REDEPLOY_POLICY: ${{ matrix.policy }}
+        run: node scripts/redeploy-played-prelife-report.cjs "artifacts/redeploy-pilot/results-${NOVA_REDEPLOY_POLICY}.json"
+      - name: Preserve post-combat paired evidence, including falsifications
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-redeploy-played-prelife-${{ matrix.policy }}
+          path: artifacts/redeploy-pilot/
+          if-no-files-found: error
+          retention-days: 30
+
+  compare-played-policies:
+    needs: played-first-life
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: nova-redeploy-played-prelife-*
+          path: artifacts/played
+          merge-multiple: false
+      - name: Compare post-front roaming against navigation after identical first lives
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/redeploy-pilot-analysis.cjs \
+            artifacts/played/nova-redeploy-played-prelife-navigate/results-navigate.json \
+            artifacts/played/nova-redeploy-played-prelife-harvest_roam/results-harvest_roam.json \
+            | tee artifacts/played/played-policy-contrast.json
+      - name: Preserve seed-clustered difference-in-differences, including negative results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-redeploy-played-prelife-contrast
+          path: artifacts/played/played-policy-contrast.json
+          if-no-files-found: warn
           retention-days: 30

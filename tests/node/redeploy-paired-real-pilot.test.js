@@ -9,6 +9,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const crypto = require('node:crypto');
 const {createPublicRoam} = require('../research/redeploy-public-roam.cjs');
+const {playPublicPrelude} = require('../research/redeploy-public-prelife.cjs');
 const root = path.resolve(__dirname, '../..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)]
@@ -89,13 +90,15 @@ function withSeed(seed,fn){
  try{return fn();}finally{Math.random=priorRandom;Date.now=priorDate;}
 }
 function finitePosition(p){return p&&Number.isFinite(p.x)&&Number.isFinite(p.y);}
-function run(seed,choice,hz,seconds,policy='navigate'){
+function run(seed,choice,hz,seconds,policy='navigate',preludeSeconds=0){
  return withSeed(seed,()=>{
   const g=bootGame();
   if(!g.player)g.redeploy();
   assert.ok(g.player&&g.player.alive,'real materialized Game has a live Scout');
+  const prelude=preludeSeconds>0?playPublicPrelude(g,hz,preludeSeconds,g.__testFair):null;
   const origin={x:g.player.x,y:g.player.y};
   assert.ok(finitePosition(origin),'death origin is finite');
+  if(prelude)assert.deepEqual(prelude.origin,origin,'death location is witnessed after actual play');
   const layout=g.__novaBattlefield.name,initialShapes=g.shapes.length;
   const terrainSeed=g.__novaBattlefield.seed>>>0,rotation=(terrainSeed>>>3)%4,
    mirrored=!!((terrainSeed>>>5)&1);
@@ -107,13 +110,27 @@ function run(seed,choice,hz,seconds,policy='navigate'){
    rivals:(g.tanks||[]).filter(t=>t.ai).map(t=>[t.id,t.cls,t.x,t.y,t.hp]),
    origin
   });
-  g.killTank(g.player,null);
+  if(g.player.alive)g.killTank(g.player,null);
   assert.equal(g.__novaRedeployChoice,'fresh','each death defaults to FRESH');
   g.__novaRedeployChoice=choice;
   g.redeploy();
   assert.equal(g.status,'playing');
   assert.equal(g.__novaRedeployChoice,'fresh','choice cannot leak across lives');
   assert.ok(g.isTerrainSafe(g.player.x,g.player.y,75),'real spawn must be terrain safe');
+  // Observation only: never feed post-insertion enemy/neutral state into
+  // movement or aiming. Quantify the RNG/spawn confound explicitly.
+  const digest = value => crypto.createHash('sha256')
+    .update(JSON.stringify(value)).digest('hex');
+  const aiAtInsertion=(g.tanks||[]).filter(t=>t&&t.ai)
+    .map(t=>[t.id,t.cls,t.x,t.y,t.hp]);
+  const neutralsAtInsertion=(g.shapes||[]).filter(t=>t)
+    .map(t=>[t.id,t.type,t.x,t.y,t.hp]);
+  const postInsertion={
+    aiCount:aiAtInsertion.length,neutralCount:neutralsAtInsertion.length,
+    enemyClassesHash:digest(aiAtInsertion.map(t=>t[1])),
+    enemyBodiesHash:digest(aiAtInsertion),
+    neutralBodiesHash:digest(neutralsAtInsertion)
+  };
   const p=g.player,spawn={x:p.x,y:p.y};
   const startDistance=Math.hypot(p.x-origin.x,p.y-origin.y);
   if(choice==='return')assert.ok(startDistance>=420-1e-6&&startDistance<=850+1e-6,
@@ -192,7 +209,7 @@ function run(seed,choice,hz,seconds,policy='navigate'){
     if(visible)firstVisibleEnemy=g.time;
    }
   }
-  return{seed,choice,hz,policy,layout,rotation,mirrored,initialShapes,
+  return{seed,choice,hz,policy,prelude,postInsertion,layout,rotation,mirrored,initialShapes,
    fingerprint,fingerprintHash:crypto.createHash('sha256').update(fingerprint).digest('hex'),origin,spawn,
    startDistance:+startDistance.toFixed(2),
    endDistance:+Math.hypot(p.x-origin.x,p.y-origin.y).toFixed(2),
@@ -233,21 +250,33 @@ test('real composed RETURN pilot keeps moving after reaching the remembered fron
  assert.ok(r.postFrontSeconds>0,'post-front exposure must be recorded');
 });
 
+test('pre-death public combat changes the witnessed world without introducing arm-order bias',()=>{
+ const a=run(1517825,'fresh',30,2,'harvest_roam',3);
+ const b=run(1517825,'return',30,2,'harvest_roam',3);
+ assert.ok(a.prelude&&a.prelude.ticks>0&&a.prelude.elapsed>0);
+ assert.deepEqual(a.prelude,b.prelude,'both choices inherit exactly the same played first life');
+ assert.equal(a.fingerprintHash,b.fingerprintHash,'the actual post-play world is matched');
+ assert.deepEqual(a.origin,a.prelude.origin);
+ assert.ok(Number.isFinite(a.prelude.travelled));
+});
+
 test('FRESH/RETURN real-engine matched pilot is deterministic under counterbalanced arm order',()=>{
  const full=process.env.NOVA_REDEPLOY_FULL_PILOT==='1';
  const policy=process.env.NOVA_REDEPLOY_POLICY||'navigate';
  assert.ok(['navigate','harvest','harvest_roam'].includes(policy),'explicitly supported public policy');
  const report=[],seeds=full?FULL_SEEDS:[0x172901,0x172902,0x172903];
- const seconds=full?20:2,seen=new Set();
+ const seconds=full?20:2,preludeSeconds=Number(process.env.NOVA_REDEPLOY_PRELIFE_SECONDS||0),seen=new Set();
+ assert.ok(Number.isFinite(preludeSeconds)&&preludeSeconds>=0&&preludeSeconds<=30,
+  'pre-death simulation must be explicitly bounded');
  for(const hz of [30,60]){
   for(let i=0;i<seeds.length;i++){
-   const seed=seeds[i],fresh=run(seed,'fresh',hz,seconds,policy);
-   const returning=run(seed,'return',hz,seconds,policy);
+   const seed=seeds[i],fresh=run(seed,'fresh',hz,seconds,policy,preludeSeconds);
+   const returning=run(seed,'return',hz,seconds,policy,preludeSeconds);
    /* Full experiment counterbalances a representative of each map/rotation
     * cell. The ordinary CI smoke counterbalances every case. */
    if(!full||i%6===0){
-    const returningFirst=run(seed,'return',hz,seconds,policy);
-    const freshSecond=run(seed,'fresh',hz,seconds,policy);
+    const returningFirst=run(seed,'return',hz,seconds,policy,preludeSeconds);
+    const freshSecond=run(seed,'fresh',hz,seconds,policy,preludeSeconds);
     assert.ok(comparable(fresh,freshSecond),
      'FRESH must be order-independent: '+JSON.stringify({fresh,freshSecond}));
     assert.ok(comparable(returning,returningFirst),
@@ -259,6 +288,10 @@ test('FRESH/RETURN real-engine matched pilot is deterministic under counterbalan
    assert.equal(fresh.initialShapes,returning.initialShapes,'same pre-death ecology count');
    assert.equal(fresh.fingerprint,returning.fingerprint,
     'same pre-death physical terrain, neutral and AI world');
+   if(preludeSeconds>0){
+    assert.ok(fresh.prelude&&fresh.prelude.ticks>0,'actual pre-death Game.update must run');
+    assert.deepEqual(fresh.prelude,returning.prelude,'matched first-life play before either choice');
+   }
    assert.ok(fresh.time>0&&returning.time>0,'both arms run real composed Game.update');
    seen.add(fresh.layout+'/'+fresh.rotation);
    const compact=x=>{const {fingerprint,...rest}=x;return rest;};
@@ -274,13 +307,13 @@ test('FRESH/RETURN real-engine matched pilot is deterministic under counterbalan
   fs.writeFileSync(path.join(dir,'results-'+policy+'.json'),JSON.stringify({
    contract:'total-policy effect, not isolated geography or human skill',
    policyNote:policy==='harvest_roam'?'public-only neutral approach and terrain-aware patrol AFTER reaching remembered front':'original baseline; harvest stops moving at remembered front',
-   policy,seconds,worlds:36,frameRates:[30,60],counterbalancedPerHz:6,
+   policy,seconds,preludeSeconds,worlds:36,frameRates:[30,60],counterbalancedPerHz:6,
    layouts:[...seen].sort(),results:report
   },null,2));
  }
  const avg=(key,mode)=>report.reduce((sum,r)=>sum+r[mode][key],0)/report.length;
  console.log('NOVA_REDEPLOY_REAL_PAIRED_PILOT '+JSON.stringify({
-  full,policy,worlds:seeds.length,seconds,scenarios:report.length,
+  full,policy,preludeSeconds,worlds:seeds.length,seconds,scenarios:report.length,
   layouts:[...seen].sort(),
   meanStartDistance:{fresh:+avg('startDistance','fresh').toFixed(2),
    return:+avg('startDistance','returning').toFixed(2)},
