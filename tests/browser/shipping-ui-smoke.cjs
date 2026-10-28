@@ -488,7 +488,7 @@ async function scenario(browser, label, options) {
         const actionFit=await page.evaluate(()=>{
           const note=document.querySelector('[data-nova-death-insight]');
           const panel=note?.parentElement;
-          const buttons=[...(panel?.querySelectorAll('button')||[])];
+          const buttons=[...(panel?.querySelectorAll('button')||[])].filter(b=>getComputedStyle(b).display!=='none');
           const rect=b=>{const r=b.getBoundingClientRect();return{
             text:b.textContent,left:r.left,right:r.right,top:r.top,bottom:r.bottom};};
           return {height:innerHeight,scrollTop:panel?.scrollTop||0,
