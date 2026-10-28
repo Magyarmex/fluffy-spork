@@ -518,6 +518,7 @@ function paint(g){
  }
  make('fresh','⚡ REDEPLOY FRESH','Original random insertion, normally away from the last position.');
  make('return','↩ REDEPLOY RETURN','Re-enter 420–850 world units from the last death, where terrain allows.');
+ g.__novaFrontRow=row;
  g.__novaFrontOriginalButton=target.before;
  g.__novaFrontOriginalDisplay=target.before.style?target.before.style.display:'';
  g.__novaFrontOriginalTabIndex=target.before.tabIndex;
@@ -539,6 +540,7 @@ function cleanup(g){
   if(g.__novaFrontOriginalTabIndex!=null)original.tabIndex=g.__novaFrontOriginalTabIndex;
  }
  g.__novaFrontOriginalButton=null;
+ g.__novaFrontRow=null;
  if(typeof document!=='undefined'&&document.querySelector){
   var node=document.querySelector('[data-nova-front-choice]');
   if(node&&node.parentNode)node.parentNode.removeChild(node);
@@ -546,7 +548,19 @@ function cleanup(g){
  g.__novaFrontMounted=false;
 }
 function mount(g){
- if(g.__novaFrontMounted)return;
+ if(g.__novaFrontMounted){
+  /* React owns the death modal. A reconciliation, viewport/layout remount,
+   * or replacement of its original button can detach our foreign action row
+   * while Game.status stays dead. Never leave the original action hidden with
+   * no working replacement. Check retained nodes in O(1), not a 60Hz DOM
+   * query; a detached row or callback button requires a clean remount. */
+  var row=g.__novaFrontRow,original=g.__novaFrontOriginalButton;
+  var rowLive=!!(row&&(typeof row.isConnected==='boolean'?
+    row.isConnected:!!row.parentNode));
+  var callbackLive=!!(original&&original.isConnected!==false);
+  if(rowLive&&callbackLive)return;
+  cleanup(g);
+ }
  if(paint(g)){g.__novaFrontMounted=true;return;}
  if(g.__novaFrontObserver||typeof MutationObserver!=='function')return;
  var root=document.getElementById('root')||document.body;if(!root)return;
