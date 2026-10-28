@@ -420,39 +420,29 @@ function paint(g){
  var row=document.createElement('div');
  row.setAttribute('data-nova-front-choice','');
  row.setAttribute('role','group');
- row.setAttribute('aria-label','Next-life battlefield insertion');
- row.style.cssText='margin-top:8px;display:flex;flex-direction:column;gap:4px;min-width:0;';
- var label=document.createElement('div');
- label.style.cssText='font:700 9px/1.2 Rajdhani,system-ui;letter-spacing:.07em;color:#9fb9ce;';
- label.textContent='NEXT INSERTION · NO STAT BONUS';
- var buttons=document.createElement('div');
- buttons.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:6px;';
+ row.setAttribute('aria-label','Redeploy: fresh front or return near the last position; no stat bonus');
+ row.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;min-width:0;';
  function make(choice,caption,detail){
   var b=document.createElement('button');b.type='button';
   b.setAttribute('data-ui','true');
   b.setAttribute('data-nova-insertion',choice);
-  b.style.cssText='min-width:0;border:1px solid rgba(125,243,255,.25);border-radius:7px;background:rgba(0,0,0,.42);padding:5px 3px;font:700 10px/1.2 Rajdhani,system-ui;color:#d2deed;touch-action:manipulation;';
-  b.textContent=caption;
-  b.title=detail;
+  b.style.cssText='min-width:0;border:1px solid rgba(125,243,255,.4);border-radius:7px;background:rgba(31,104,136,.24);padding:9px 3px;font:700 10px/1.2 Rajdhani,system-ui;color:#d2deed;touch-action:manipulation;';
+  b.textContent=caption;b.title=detail;
   b.addEventListener('click',function(){
    g.__novaRedeployChoice=choice;
-   var all=buttons.querySelectorAll('button');
-   for(var i=0;i<all.length;i++){
-    var selected=all[i]===b;
-    all[i].setAttribute('aria-pressed',selected?'true':'false');
-    all[i].style.borderColor=selected?'#7df3ff':'rgba(125,243,255,.25)';
-    all[i].style.background=selected?'rgba(31,104,136,.36)':'rgba(0,0,0,.42)';
-   }
+   /* Keep React's original redeploy callback authoritative. */
+   target.before.click();
   });
-  b.setAttribute('aria-pressed',g.__novaRedeployChoice===choice?'true':'false');
-  if(g.__novaRedeployChoice===choice){
-   b.style.borderColor='#7df3ff';b.style.background='rgba(31,104,136,.36)';
-  }
-  buttons.appendChild(b);
+  row.appendChild(b);
  }
- make('fresh','FRESH FRONT','Keep the existing random redeploy, normally away from the last position.');
- make('return','RETURN TO FRONT','Re-enter 420–850 world units from the last death, where terrain allows.');
- row.appendChild(label);row.appendChild(buttons);
+ make('fresh','⚡ REDEPLOY FRESH','Original random insertion, normally away from the last position.');
+ make('return','↩ REDEPLOY RETURN','Re-enter 420–850 world units from the last death, where terrain allows.');
+ g.__novaFrontOriginalButton=target.before;
+ g.__novaFrontOriginalDisplay=target.before.style?target.before.style.display:'';
+ g.__novaFrontOriginalTabIndex=target.before.tabIndex;
+ if(target.before.style)target.before.style.display='none';
+ target.before.setAttribute('aria-hidden','true');
+ target.before.tabIndex=-1;
  target.panel.insertBefore(row,target.before);
  return true;
 }
@@ -461,6 +451,13 @@ function cleanup(g){
  if(g.__novaFrontTimer!=null&&typeof clearTimeout==='function'){
   clearTimeout(g.__novaFrontTimer);g.__novaFrontTimer=null;
  }
+ var original=g.__novaFrontOriginalButton;
+ if(original){
+  if(original.style)original.style.display=g.__novaFrontOriginalDisplay||'';
+  if(typeof original.removeAttribute==='function')original.removeAttribute('aria-hidden');
+  if(g.__novaFrontOriginalTabIndex!=null)original.tabIndex=g.__novaFrontOriginalTabIndex;
+ }
+ g.__novaFrontOriginalButton=null;
  if(typeof document!=='undefined'&&document.querySelector){
   var node=document.querySelector('[data-nova-front-choice]');
   if(node&&node.parentNode)node.parentNode.removeChild(node);
