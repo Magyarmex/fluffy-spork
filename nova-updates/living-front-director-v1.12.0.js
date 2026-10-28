@@ -150,10 +150,17 @@ function visible(g,t,s){var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;var inView=F&
  * explicitly stale: it cannot reveal enemy positions or guarantee current XP. */
 function publicBloom(st,now){
  if(!st||st.directorEnabled===false)return null;
+ /* Public intelligence cannot precede its announcement. A clock reset,
+  * replay discontinuity or malformed future record must not manufacture a
+  * CONTESTED badge, Frontlines telemetry window or AI memory commitment. */
  var sig=st.signal;
- if(sig&&sig.type==='BLOOM'&&now<sig.until)return{sector:sig.sector,announcedAt:sig.started,until:sig.until,live:true};
- var mem=st&&st.bloomMemory;
- if(mem&&now<mem.until)return{sector:mem.sector,announcedAt:mem.announcedAt,until:mem.until,live:false};
+ if(sig&&sig.type==='BLOOM'&&Number.isFinite(sig.started)&&
+    now>=sig.started&&now<sig.until)
+  return{sector:sig.sector,announcedAt:sig.started,until:sig.until,live:true};
+ var mem=st.bloomMemory;
+ if(mem&&Number.isFinite(mem.announcedAt)&&
+    now>=mem.announcedAt&&now<mem.until)
+  return{sector:mem.sector,announcedAt:mem.announcedAt,until:mem.until,live:false};
  return null;
 }
 
