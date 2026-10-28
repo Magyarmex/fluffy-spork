@@ -57,9 +57,9 @@ function boot(options={}){
    setAttribute(k,v){this.attributes[k]=v;},removeAttribute(k){delete this.attributes[k];},
    click(){this.clicked++;}};
   const panel={textContent:'TERMINATED SCORE REDEPLOY',choice:null,
-   querySelectorAll(sel){return sel==='button'?[redeploy]:[];},
+   querySelectorAll(sel){return sel==='button'?[this.redeploy]:[];},
    querySelector(sel){return sel==='[data-nova-front-choice]'?this.choice:null;},
-   insertBefore(node,before){assert.equal(before,redeploy);this.choice=node;node.parentNode=this;},
+   insertBefore(node,before){assert.equal(before,this.redeploy);this.choice=node;node.parentNode=this;},
    removeChild(node){assert.equal(node,this.choice);this.choice=null;node.parentNode=null;}};
   panel.redeploy=redeploy;panels.push(panel);return panel;
  }
@@ -274,4 +274,21 @@ test('React replacing the whole dead panel also restores a live callback',()=>{
  assert.equal(firstPanel.redeploy.clicked,0,'no stale callback from the discarded panel');
  g.redeploy();
  assert.equal(replacement.redeploy.style.display,'','the live callback is restored');
+});
+
+test('death modal repairs a replaced React callback even when the row survives',()=>{
+ const {Game,addPanel}=boot(),g=new Game(),panel=addPanel();
+ g.killTank(victim(100,200));g.update();
+ const stale=panel.redeploy,first=panel.choice;
+ first.isConnected=true;stale.isConnected=false;
+ panel.redeploy={...stale,style:{},attributes:{},clicked:0,
+  click(){this.clicked++;}};
+ panel.redeploy.isConnected=true;
+ g.update();
+ assert.ok(panel.choice&&panel.choice!==first,'row is rebound to the new React callback');
+ panel.choice.children[1].onclick();
+ assert.equal(panel.redeploy.clicked,1);
+ assert.equal(stale.clicked,0,'the detached React callback cannot be invoked');
+ g.redeploy();
+ assert.equal(panel.redeploy.style.display,'');
 });
