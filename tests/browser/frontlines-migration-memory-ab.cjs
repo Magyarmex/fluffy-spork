@@ -451,11 +451,9 @@ async function arm(browser,enabled,label){
    assert.equal(offReplay.result.commitmentAudit.startedLive,0,'OFF replay must also suppress live starts');
   }
   const verifiedLiveStart=AB_MODE==='live-turn'&&on.result.commitmentAudit.startedLive>0;
-  if(AB_MODE==='migration-memory'&&!naturalOpportunityObserved){
-   for(const key of ['game','stats','frontline','events','contestGateAudit','naturalBlooms','naturalMigrations','migrationAIBiasSamples','visibleNeutralAimSamples','visibleDodgeSamples','visibleHostileAimSamples'])
-    assert.deepEqual(on.result[key],off.result[key],
-     'no public migration means threshold intervention cannot change '+key);
-  }
+  /* Longer heat memory can delay ROGUE STAR via the existing <3 quiet gate
+   * even without a MIGRATION announcement. Such side effects are treatment,
+   * not a reason to assert ON/OFF physical identity or discard the pair. */
   if(AB_MODE==='live-turn'&&!verifiedLiveStart){
    /* If no live turn was initiated, masking its start must be a true
     * no-op for the physical game. OFF replay alone cannot prove this. */
@@ -472,7 +470,7 @@ async function arm(browser,enabled,label){
    initialWorldIdentical:true,initialFingerprint:off.initial.fingerprint,offReplayIdentical:same,
    naturalOpportunityObserved,
    interpretation:AB_MODE==='migration-memory'?
-    (naturalOpportunityObserved?'ON produced natural migration announcements; compare physical player/AI behavior, not raw rotations.':'INCONCLUSIVE: ON had no natural migration announcement; retain censored pair.'):
+    (naturalOpportunityObserved?'ON produced natural migration announcements; compare physical player/AI behavior, not raw rotations.':'INCONCLUSIVE: ON had no natural migration announcement; retain the pair and inspect possible Star-gate displacement.'):
     AB_MODE==='live-turn'?(verifiedLiveStart&&naturalOpportunityObserved?'Live-turn intervention activated; interpret matched-policy differences cautiously because later public signals can diverge endogenously.':'INCONCLUSIVE: no verified ON live start or natural BLOOM exposure in both arms; retain the pair.'):(naturalOpportunityObserved?'Descriptive only: natural BLOOM observed; inspect opportunity timing, deaths and public pilot commands before causal interpretation.':'INCONCLUSIVE: at least one arm had no natural BLOOM; retain this censored pair.'),
    off:off.result,on:on.result,offReplay:offReplay.result,
    limits:['No artificial BLOOM or forced survival','One layout/seed/pilot-policy per invocation; matrix must aggregate independently',
@@ -481,7 +479,7 @@ async function arm(browser,enabled,label){
     'Public-bloom command samples are input calls, not measured seconds or proof of physical progress',
     'Seed replay is checked, not assumed',
     'In live-turn mode, only live-start authority is intervened on; later natural signals can differ as treatment outcomes',
-    'In migration-memory mode, only the decayed physical crossing memory (0.42 OFF, 0.28 ON) changes; gate 5, AI, physics and public waypoint remain canonical',
+    'In migration-memory mode, only the crossing-memory decay coefficient changes; this may also delay ROGUE STAR through the existing heat<3 quiet gate even without a MIGRATION signal',
      'Migration diagnostics read real post-update crossing counters, 15s burst density and decayed heat; 300s is the predeclared horizon, not forced survival',
      'Director gate audit samples the real decision cadence and separately records active-signal, cooldown, BLOOM and directional blockers without changing the decision']};
   const dir=path.join('artifacts','browser');fs.mkdirSync(dir,{recursive:true});
