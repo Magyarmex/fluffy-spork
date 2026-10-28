@@ -3,18 +3,21 @@ name: NOVA Redeploy Strategy Pilot
 on:
   push:
     branches:
-      - 'nova/redeploy-real-sim-pilot-*'
+      - 'nova/redeploy-*-pilot-*'
     paths:
       - 'tests/node/redeploy-paired-real-pilot.test.js'
       - '.github/workflows/redeploy-strategy-pilot.yml'
   workflow_dispatch:
 
 concurrency:
-  group: redeploy-pilot-${{ github.ref }}
+  group: redeploy-pilot-${{ github.ref }}-${{ github.workflow }}
   cancel-in-progress: true
 
 jobs:
   paired-real-engine:
+    strategy:
+      matrix:
+        policy: [navigate, harvest]
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -22,9 +25,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Run 36 matched worlds at 30/60 Hz for 20 simulated seconds
+      - name: Run 36 matched worlds at 30/60 Hz for 20 simulated seconds (${{ matrix.policy }})
         env:
           NOVA_REDEPLOY_FULL_PILOT: '1'
+          NOVA_REDEPLOY_POLICY: ${{ matrix.policy }}
         shell: bash
         run: |
           set -euo pipefail
@@ -34,7 +38,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: nova-redeploy-paired-real-engine
+          name: nova-redeploy-paired-${{ matrix.policy }}
           path: artifacts/redeploy-pilot/
           if-no-files-found: error
           retention-days: 30
