@@ -129,7 +129,7 @@ function setSignal(g,st,d){var now=g.time||0,sig={type:d.type,started:now,until:
   sig.starId=s.id;sig.x=s.x;sig.y=s.y;
   st.lastMeaningfulAt=now;
   st.stats.starAnnouncements=(st.stats.starAnnouncements||0)+1;
- }st.signal=sig;st.lastSignal=d.type;st.lastSignalAt=now;if(d.type==='BLOOM')ensureFrontline(g,st);if(g.toast)g.toast(d.type==='BLOOM'?bloomToast(g,d.sector):d.type==='MIGRATION'?migrationToast(g,d.from,d.to):rogueStarToast(g,sig),'info');if(g.sfx&&g.sfx.novaLivingSignal)g.sfx.novaLivingSignal(d.type,g.player?clamp((sig.x-g.player.x)/900,-1,1):0);}
+ }if(d.type!=='MIGRATION')st.migrationMemory=null;st.signal=sig;st.lastSignal=d.type;st.lastSignalAt=now;if(d.type==='BLOOM')ensureFrontline(g,st);if(g.toast)g.toast(d.type==='BLOOM'?bloomToast(g,d.sector):d.type==='MIGRATION'?migrationToast(g,d.from,d.to):rogueStarToast(g,sig),'info');if(g.sfx&&g.sfx.novaLivingSignal)g.sfx.novaLivingSignal(d.type,g.player?clamp((sig.x-g.player.x)/900,-1,1):0);}
 LF.directorTick=function(g,st){var t0=LF.ms(),hasStar=false,adoptStarId=null,sh=g.shapes||[],now=g.time||0;
  for(var i=0;i<sh.length;i++){
   var s=sh[i];if(!s||!(s.hp>0)||s.type!=='star')continue;
