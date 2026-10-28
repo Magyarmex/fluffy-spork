@@ -49,6 +49,8 @@ const {chromium}=require('playwright');
     st.migrationMemory=null;const baseline=sample();
     st.migrationMemory={from:5,to:6,announcedAt:100,until:116};
     const afterimage=sample();
+    // Save exact rendered minimap, including its real 60px CSS downsample.
+    const rawPng=g.mm.toDataURL('image/png'),cssPng=down.toDataURL('image/png');
     const rawChanged=count(baseline.raw,afterimage.raw,4,18);
     const cssChanged=count(baseline.css,afterimage.css,4,18);
     if(rawChanged<35||cssChanged<7)
@@ -66,7 +68,7 @@ const {chromium}=require('playwright');
     const disabled=sample();
     if(count(baseline.raw,disabled.raw,4,2)!==0)
      throw Error('disabled Director still renders migration history');
-    return{realShippingGame:true,cssWidth,rawChanged,cssChanged,
+    return{realShippingGame:true,cssWidth,rawChanged,cssChanged,rawPng,cssPng,
      expiredClean:true,liveSignalPriority:true,disabledClean:true};
    }finally{
     g.time=original.time;st.signal=original.signal;
@@ -77,7 +79,28 @@ const {chromium}=require('playwright');
   });
   assert.deepEqual(errors,[],'no browser runtime errors');
   const dir=path.join('artifacts','browser');fs.mkdirSync(dir,{recursive:true});
+  const {rawPng,cssPng,...summary}=result;
+  fs.writeFileSync(path.join(dir,'migration-route-memory-minimap-216.png'),
+   Buffer.from(rawPng.split(',')[1],'base64'));
+  fs.writeFileSync(path.join(dir,'migration-route-memory-minimap-60.png'),
+   Buffer.from(cssPng.split(',')[1],'base64'));
+  // Uncover the actual gameplay viewport for a human visual inspection.
+  // This is screenshot-only; the browser is discarded after this test.
+  await page.evaluate(()=>{
+   const g=window.__novaMigrationMemoryGame,st=g.__lfState;
+   g.time=105;st.signal=null;st.bloomMemory=null;st.directorEnabled=true;
+   st.migrationMemory={from:5,to:6,announcedAt:100,until:116};
+   g.drawMinimap();
+   const title=[...document.querySelectorAll('div')].find(el=>
+    el.children.length===0&&el.textContent?.trim()==='PAUSED');
+   const modal=title?.parentElement?.parentElement;
+   if(!modal||!modal.classList.contains('absolute')||!modal.classList.contains('inset-0'))
+    throw Error('real pause modal not found for visible migration QA');
+   modal.style.display='none';
+   const rect=g.mm.getBoundingClientRect();
+   if(rect.width<40||rect.height<40)throw Error('minimap hidden in portrait viewport');
+  });
   await page.screenshot({path:path.join(dir,'migration-route-memory-mobile.png')});
-  console.log('NOVA_MIGRATION_ROUTE_MEMORY '+JSON.stringify(result));
+  console.log('NOVA_MIGRATION_ROUTE_MEMORY '+JSON.stringify(summary));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e.stack||e);process.exitCode=1;});
