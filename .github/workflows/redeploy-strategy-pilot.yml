@@ -8,6 +8,8 @@ on:
       - 'tests/node/redeploy-paired-real-pilot.test.js'
       - 'tests/node/redeploy-public-roam.test.js'
       - 'tests/research/redeploy-public-roam.cjs'
+      - 'tests/research/redeploy-public-prelife.cjs'
+      - 'tests/node/redeploy-public-prelife.test.js'
       - '.github/workflows/redeploy-strategy-pilot.yml'
   workflow_dispatch:
 
@@ -41,6 +43,39 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: nova-redeploy-paired-${{ matrix.policy }}
+          path: artifacts/redeploy-pilot/
+          if-no-files-found: error
+          retention-days: 30
+
+  played-first-life:
+    # Separate cohort: never pool with the instant-death baseline. This
+    # exercises actual 8s first-life combat/ecology before either redeploy arm.
+    strategy:
+      fail-fast: false
+      matrix:
+        policy: [navigate, harvest_roam]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Run 36 matched post-combat worlds at 30/60 Hz (${{ matrix.policy }})
+        env:
+          NOVA_REDEPLOY_FULL_PILOT: '1'
+          NOVA_REDEPLOY_POLICY: ${{ matrix.policy }}
+          NOVA_REDEPLOY_PRELIFE_SECONDS: '8'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/redeploy-pilot
+          node --test tests/node/redeploy-paired-real-pilot.test.js 2>&1 | tee artifacts/redeploy-pilot/run.log
+      - name: Preserve post-combat paired evidence, including falsifications
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-redeploy-played-prelife-${{ matrix.policy }}
           path: artifacts/redeploy-pilot/
           if-no-files-found: error
           retention-days: 30
