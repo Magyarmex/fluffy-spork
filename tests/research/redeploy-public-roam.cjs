@@ -49,6 +49,10 @@ function createPublicRoam(game, player, origin, fair) {
     let target;
     if (chase) {
       target = neutral;
+      // A visible-neutral chase is not a patrol attempt. Suspend the patrol
+      // stall clock and discard its old distance before resuming the route.
+      lastProgressTime = game.time;
+      lastDistance = Infinity;
     } else {
       target = patrolPoint();
       let d = Math.hypot(target.x - player.x, target.y - player.y);
