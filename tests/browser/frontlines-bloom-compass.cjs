@@ -51,7 +51,7 @@ const {chromium}=require('playwright');
     st.cooldowns.migration=type==='MIGRATION'?0:100;st.cooldowns.star=100;
     st.sectors.forEach(s=>{s.value=0;s.maturity=.1;s.pressure=0;s.outbound=0;});
     st.sectors[5].value=900;st.sectors[5].maturity=.95;
-    st.sectors[5].outbound=12;
+    st.sectors[5].outbound=12;st.sectors[5].flowX=1;st.sectors[5].flowY=0;
     // The test jumps to match-time 100 within the first live second. Prevent
     // a pending Battlefield startup toast from overwriting this test signal.
     if(g.__novaBattlefield)g.__novaBattlefield.announced=true;

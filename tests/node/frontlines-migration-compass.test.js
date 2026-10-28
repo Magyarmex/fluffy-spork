@@ -19,7 +19,8 @@ function announce(mx,my,player={x:-1750,y:-562.5,hp:100,alive:true},sectorValue=
   migrationHeat:6,migrationX:mx,migrationY:my,
   cooldowns:{bloom:100,migration:0,star:100},
   sectors:Array.from({length:16},(_,i)=>({
-   value:sectorValue,maturity:.1,pressure:0,harvest:0,combat:0,outbound:i===5?12:0
+   value:sectorValue,maturity:.1,pressure:0,harvest:0,combat:0,outbound:i===5?12:0,
+    flowX:i===5?mx:0,flowY:i===5?my:0
   })),
   stats:{blooms:0,migrations:0,starsSpawned:0,aiRotations:0}
  };
