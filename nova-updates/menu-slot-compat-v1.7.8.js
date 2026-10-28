@@ -426,7 +426,7 @@ function paint(g){
   var b=document.createElement('button');b.type='button';
   b.setAttribute('data-ui','true');
   b.setAttribute('data-nova-insertion',choice);
-  b.style.cssText='min-width:0;border:1px solid rgba(125,243,255,.4);border-radius:7px;background:rgba(31,104,136,.24);padding:'+(window.innerHeight<=400?'5':'9')+'px 3px;font:700 10px/1.2 Rajdhani,system-ui;color:#d2deed;touch-action:manipulation;';
+  b.style.cssText='min-width:0;border:1px solid rgba(125,243,255,.4);border-radius:7px;background:rgba(31,104,136,.24);padding:'+(window.innerHeight<=400?'8':'10')+'px 3px;font:700 12px/1.2 Rajdhani,system-ui;color:#d2deed;touch-action:manipulation;';
   b.textContent=caption;b.title=detail;
   b.addEventListener('click',function(){
    g.__novaRedeployChoice=choice;
@@ -506,15 +506,34 @@ mods['game/engine']=function(module,exports,require){
   if(this.__novaFrontSpawnArmed&&minDist===900){
    this.__novaFrontSpawnArmed=false;
    var near=sampleReturn(this,this.__novaRedeployOrigin);
-   if(near)return near;
+   if(near){this.__novaFrontReturnAccepted=true;return near;}
   }
   return oldRand.apply(this,arguments);
  };
  if(typeof oldRedeploy==='function')Game.prototype.redeploy=function(){
-  this.__novaFrontSpawnArmed=this.__novaRedeployChoice==='return'&&validOrigin(this.__novaRedeployOrigin);
-  try{return oldRedeploy.apply(this,arguments);}
-  finally{
+  var returning=this.__novaRedeployChoice==='return'&&validOrigin(this.__novaRedeployOrigin);
+  var origin=returning?{x:this.__novaRedeployOrigin.x,y:this.__novaRedeployOrigin.y}:null;
+  this.__novaFrontSpawnArmed=returning;
+  this.__novaFrontReturnAccepted=false;
+  try{
+   var out=oldRedeploy.apply(this,arguments);
+   /* A return can fall back to the legacy random spawn. Never silently
+    * misrepresent it as a successful return; on success orient the player
+    * using only the death location they already witnessed. */
+   if(returning&&this.status==='playing'&&this.player&&typeof this.toast==='function'){
+    try{
+     if(this.__novaFrontReturnAccepted){
+      var a=Math.atan2(origin.y-this.player.y,origin.x-this.player.x);
+      var directions=['E','SE','S','SW','W','NW','N','NE'];
+      var bearing=directions[(Math.round(a/(Math.PI/4))+8)%8];
+      this.toast('↩ RETURN · LAST FRONT '+bearing,'info');
+     }else this.toast('↩ RETURN UNAVAILABLE · FRESH FRONT','info');
+    }catch(ignore){} // Presentation cannot block a successful redeploy.
+   }
+   return out;
+  }finally{
    this.__novaFrontSpawnArmed=false;
+   this.__novaFrontReturnAccepted=false;
    cleanup(this);
    this.__novaRedeployOrigin=null;
    this.__novaRedeployChoice='fresh';

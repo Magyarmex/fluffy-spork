@@ -13,6 +13,8 @@ const patch=source.slice(start);
 function boot(options={}){
  const observers=[],panels=[],timers=new Map();
  let nextTimer=1;
+ const randomMath=Object.create(Math);
+ randomMath.random=options.random||Math.random;
  function element(tag){
   return {tag,style:{},attributes:{},children:[],textContent:'',title:'',
    setAttribute(k,v){this.attributes[k]=v;},
@@ -33,7 +35,8 @@ function boot(options={}){
   notify(){if(!this.disconnected)this.fn();}
  }
  class Game{
-  constructor(){this.status='playing';this.player=null;this.randCalls=[];this.__novaTerrain=[{id:1}];}
+  constructor(){this.status='playing';this.player=null;this.randCalls=[];this.toasts=[];this.__novaTerrain=[{id:1}];}
+  toast(message,kind){this.toasts.push({message,kind});}
   isTerrainSafe(x,y,pad){return options.safe?options.safe(x,y,pad):true;}
   randSpawnPos(dist){this.randCalls.push(dist);return {x:1900,y:1900};}
   killTank(victim){if(!victim.alive)return;victim.alive=false;this.status='dying';}
@@ -41,7 +44,7 @@ function boot(options={}){
   redeploy(){this.status='playing';this.player={...this.randSpawnPos(900),isPlayer:true};this.randSpawnPos(400);return 'redeployed';}
  }
  const window={__novaModules:{'game/engine':m=>{m.exports.Game=Game;}}};
- const context={window,document,MutationObserver,Math,Number,
+ const context={window,document,MutationObserver,Math:randomMath,Number,
   setTimeout(fn){const id=nextTimer++;timers.set(id,fn);return id;},
   clearTimeout(id){timers.delete(id);}};
  vm.runInNewContext(patch,context);
@@ -152,4 +155,34 @@ test('new death does not inherit the previous plan',()=>{
  g.killTank(victim());g.update();g.__novaRedeployChoice='return';g.redeploy();
  g.killTank(victim(500,500));g.update();
  assert.equal(g.__novaRedeployChoice,'fresh');
+});
+
+test('successful return tells player which way the last front lies',()=>{
+ const {Game}=boot({random:()=>0}),g=new Game();
+ g.killTank(victim(100,200));g.update();g.__novaRedeployChoice='return';
+ g.redeploy();
+ assert.deepEqual(g.toasts,[{message:'↩ RETURN · LAST FRONT W',kind:'info'}]);
+ assert.equal(g.__novaFrontReturnAccepted,false,'success flag cannot leak to next life');
+});
+test('return direction reflects actual spawn quadrant rather than a guessed map sector',()=>{
+ const {Game}=boot({random:()=>.25}),g=new Game();
+ g.killTank(victim(100,200));g.update();g.__novaRedeployChoice='return';
+ g.redeploy();
+ assert.deepEqual(g.toasts,[{message:'↩ RETURN · LAST FRONT N',kind:'info'}]);
+});
+test('terrain-blocked return explicitly announces legacy fresh fallback',()=>{
+ const {Game}=boot({safe:()=>false,random:()=>0}),g=new Game();
+ g.killTank(victim(100,200));g.update();g.__novaRedeployChoice='return';
+ g.redeploy();
+ assert.deepEqual(g.toasts,[{message:'↩ RETURN UNAVAILABLE · FRESH FRONT',kind:'info'}]);
+ assert.deepEqual(g.randCalls,[900,400]);
+});
+test('fresh redeploy has no extra notice and UI failures cannot prevent a return',()=>{
+ const {Game}=boot({random:()=>0}),g=new Game();
+ g.killTank(victim());g.update();g.redeploy();
+ assert.deepEqual(g.toasts,[],'fresh behavior remains unchanged');
+ g.killTank(victim());g.update();g.__novaRedeployChoice='return';
+ g.toast=()=>{throw Error('toast bridge unavailable');};
+ assert.doesNotThrow(()=>g.redeploy(),'presentation failure must never block play');
+ assert.equal(g.status,'playing');
 });
