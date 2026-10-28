@@ -83,8 +83,8 @@ const {chromium}=require('playwright');
      const original={x:star.x,y:star.y},points=[];
      g.setPaused(true);
      try{
-      star.x=Math.max(-2000,Math.min(2000,sig.x+900));
-      star.y=Math.max(-2000,Math.min(2000,sig.y+900));
+      star.x=sig.x>0?sig.x-900:sig.x+900;
+      star.y=sig.y>0?sig.y-900:sig.y+900;
       g.mmCtx.arc=function(x,y,r){if(Math.abs(r-4)<1e-6)points.push([x,y]);return originalArc.apply(this,arguments);};
       g.drawMinimap();
       return{points,expected:[(sig.x+2250)*216/4500,(sig.y+2250)*216/4500],
