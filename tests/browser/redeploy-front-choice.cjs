@@ -71,6 +71,16 @@ async function run(browser,width,height){
   assert.ok(Math.abs(survivingStar.age-starClock.age)<.35,
    'React RETURN must preserve Star age across the clock reset: '+JSON.stringify(survivingStar));
   assert.equal(survivingStar.announced,true,'a public Star must not become announceable twice');
+  const waypoint=await page.evaluate(()=>{
+   const g=window.__novaFrontSmokeGame;
+   g.drawMinimap(); // Full materialized engine + HTML-ordered minimap overlays.
+   return {marker:g.__novaLastFrontMarker,time:g.time};
+  });
+  assert.ok(waypoint.marker,'RETURN must expose its fixed last-front waypoint');
+  assert.equal(waypoint.marker.x,death.x);
+  assert.equal(waypoint.marker.y,death.y);
+  assert.ok(waypoint.marker.until-waypoint.time>20,
+   'the player gets enough time to orient after redeploy');
   const dist=Math.hypot(after.x-death.x,after.y-death.y);
   assert.ok(dist>=420-1e-6&&dist<=850+1e-6,'return inserts near the witnessed front');
   assert.equal(after.terrain,true,'return position is terrain safe');
