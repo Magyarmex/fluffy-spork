@@ -106,6 +106,7 @@ test('opposite witnessed routes do not invent a dominant public destination',()=
 test('a genuinely diagonal witnessed crossing may still be reported diagonally',()=>{
  const T=boot(),st=state(T);
  st.sectors[5].outbound=5;st.sectors[5].flowTo[2]=5;
+ st.sectors[5].flowX=3.5355339;st.sectors[5].flowY=-3.5355339;
  const d=T.directorDecision(st,{enabled:true,now:100,hasStar:true});
  assert.equal(d?.from,5);assert.equal(d?.to,2);
 });
