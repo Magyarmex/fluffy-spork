@@ -88,6 +88,9 @@ const seconds=300,dt=1/30,chunk=450;
    const audit={ticks:0,after72:0,fresh:0,freshAfter72:0,
     quietFreshAfter72:0,candidates:0,announcements:0,
     firstCandidate:null,firstAnnouncement:null,events:[],
+    /* Counterfactual is read-only: a candidate at an actual Director tick,
+     * not an independent event or a simulated gameplay intervention. */
+    counterfactual:{},maxQuietWithFreshAfter72:0,
     starGenerations:[],seenStarIds:[],blocked:{
      noStar:0,staleStar:0,early:0,activeSignal:0,signalCooldown:0,
      starCooldown:0,notQuiet:0,bloom:0,migrationHeat:0,other:0}};
@@ -103,8 +106,25 @@ const seconds=300,dt=1/30,chunk=450;
     audit.ticks++;if(now>72)audit.after72++;
     if(fresh.length){audit.fresh++;if(now>72){
      audit.freshAfter72++;
+     audit.maxQuietWithFreshAfter72=Math.max(audit.maxQuietWithFreshAfter72,
+      now-st.lastMeaningfulAt);
      if(now-st.lastMeaningfulAt>31)audit.quietFreshAfter72++;
     }}
+    const baseReady=now>72&&(!st.signal||now>=st.signal.until)&&
+     now-st.lastSignalAt>=8&&st.cooldowns.star<=0&&
+     T.bloomCandidate(st)<0&&st.migrationHeat<3;
+    if(baseReady)for(const maxAge of [8,12,16]){
+     const adoptable=stars.some(s=>!s.__lfPublicAnnounced&&
+      Number.isFinite(s.__lfStarBorn)&&now-s.__lfStarBorn>=0&&
+      now-s.__lfStarBorn<=maxAge);
+     if(!adoptable)continue;
+     for(const quiet of [12,16,20,24,28,31]){
+      if(now-st.lastMeaningfulAt<=quiet)continue;
+      const key='quiet'+quiet+'-age'+maxAge;
+      const times=audit.counterfactual[key]||(audit.counterfactual[key]=[]);
+      if(times.length<128)times.push(+now.toFixed(2));
+     }
+    }
     for(const s of stars)if(!audit.seenStarIds.includes(s.id)){
      audit.seenStarIds.push(s.id);
      audit.starGenerations.push({id:s.id,born:+(s.__lfStarBorn||0).toFixed(2)});
