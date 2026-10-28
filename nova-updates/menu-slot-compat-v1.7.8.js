@@ -492,6 +492,7 @@ mods['game/engine']=function(module,exports,require){
  if(typeof oldMap==='function')Game.prototype.drawMinimap=function(){
   var out=oldMap.apply(this,arguments),m=this.__novaLastFrontMarker;
   if(!m||this.status!=='playing'||!this.player||!this.player.alive)return out;
+  if(!validOrigin(m)){this.__novaLastFrontMarker=null;return out;}
   if(!Number.isFinite(this.time)||this.time>=m.until||
      Math.hypot(this.player.x-m.x,this.player.y-m.y)<130){
    this.__novaLastFrontMarker=null;return out;
@@ -500,7 +501,8 @@ mods['game/engine']=function(module,exports,require){
   if(!ctx||typeof ctx.save!=='function')return out;
   /* Same 216px / +/-2250 projection as the canonical minimap. */
   var x=(m.x+2250)*216/4500,y=(m.y+2250)*216/4500;
-  if(!Number.isFinite(x)||!Number.isFinite(y)||x<1||x>215||y<1||y>215)return out;
+  if(!Number.isFinite(x)||!Number.isFinite(y))return out;
+  /* Edge deaths still get a partially clipped, honest-position marker. */
   ctx.save();
   try{
    ctx.strokeStyle='#ffd166';ctx.lineWidth=2;
