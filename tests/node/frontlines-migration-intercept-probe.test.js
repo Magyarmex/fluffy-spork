@@ -73,3 +73,22 @@ test('no public signal or low health prevents experimental migration steering',(
  st.signal=live;st.directorEnabled=true;t.hp=20;
  assert.equal(T.publicEcoBias(g,t,{},{}).weight,0);
 });
+
+test('experimental migration waypoint still follows the actual terrain route',()=>{
+ const {T,t,g}=scene();g.__novaMigrationInterceptProbe=true;
+ g.hasLineOfSight=()=>false;
+ g.novaBattlefieldWaypoint=()=>({x:t.x-40,y:t.y-40});
+ const routed=T.publicEcoBias(g,t,{},{});
+ assert.equal(routed.mode,'signal');
+ assert.ok(routed.x<0&&routed.y<0,'terrain waypoint, not direct target, owns steering');
+ g.novaBattlefieldWaypoint=()=>null;
+ assert.equal(T.publicEcoBias(g,t,{},{}).weight,0,
+  'missing safe terrain route must not authorize a through-cover turn');
+});
+test('visible close combat target retains priority over public migration probe',()=>{
+ const {T,t,g}=scene();g.__novaMigrationInterceptProbe=true;
+ const target={id:7,x:t.x+40,y:t.y+40,hp:100,alive:true,spawnShieldT:0};
+ g.tanks.push(target);g.getTank=id=>id===7?target:null;
+ t.ai.__v1112TargetId=7;
+ assert.equal(T.publicEcoBias(g,t,{},{}).weight,0);
+});
