@@ -1614,6 +1614,120 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   }
   return plan;
  }
+
+ /* Witnessed nonlethal neutral piercing pair. The core and swept fallback
+  * can lose the second Circle/Square contact at low FPS. Resolve only
+  * two proven stationary contacts; leave every contested event to the
+  * existing engine rather than inventing a general chronology. */
+ function isolatedStationaryShapePair(g,b,dt){
+  if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
+     b.__novaBreachAtTime===g.time||b.pen!==1||(b.hits||0)!==0||
+     (b.__novaDirectVictims&&b.__novaDirectVictims.size)||
+     !(dt>0)||!Number.isFinite(dt)||!Number.isFinite(b.ttl)||
+     !(b.ttl>dt)||g.__novaShapeSweepActive!==true||
+     !Number.isFinite(g.__novaShapeSweepEpoch)||
+     !Number.isFinite(b.x)||!Number.isFinite(b.y)||
+     !Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
+     !Number.isFinite(b.r)||!(b.r>0)||
+     !Number.isFinite(b.dmg)||!(b.dmg>0))return false;
+  var shapes=g.shapes||[],tanks=g.tanks||[],drones=g.drones||[],
+      bullets=g.bullets||[];
+  if(shapes.length>180||tanks.length>30||drones.length>80||
+     bullets.length>300)return false;
+  var ax=b.x,ay=b.y,dx=b.vx*dt,dy=b.vy*dt,
+      ex=ax+dx,ey=ay+dy,limit=MAP_LIMIT-20;
+  if(!(dx*dx+dy*dy>1e-12)||!Number.isFinite(ex)||
+     !Number.isFinite(ey)||
+     Math.max(Math.abs(ax),Math.abs(ay),Math.abs(ex),Math.abs(ey))>=limit)
+    return false;
+  function near(x,y,tx,ty,pad){
+   if(!Number.isFinite(x)||!Number.isFinite(y)||
+      !Number.isFinite(tx)||!Number.isFinite(ty)||
+      !Number.isFinite(pad)||!(pad>=0))return true;
+   return Math.max(ax,ex)+pad>=Math.min(x,tx)&&
+          Math.min(ax,ex)-pad<=Math.max(x,tx)&&
+          Math.max(ay,ey)+pad>=Math.min(y,ty)&&
+          Math.min(ay,ey)-pad<=Math.max(y,ty);
+  }
+  var contacts=[],A=dx*dx+dy*dy;
+  for(var si=0;si<shapes.length;si++){
+   var s=shapes[si];if(!s||!(s.hp>0))continue;
+   var rr=b.r+s.r,
+       sx=s.__novaShapeSweepPrevX,sy=s.__novaShapeSweepPrevY;
+   /* Require frame-start evidence even for remote shapes: a newborn or
+    * shape that moved away could otherwise conceal an earlier contact. */
+   if(!(rr>0)||!Number.isFinite(rr)||
+      s.__novaShapeSweepEpoch!==g.__novaShapeSweepEpoch||
+      !Number.isFinite(sx)||!Number.isFinite(sy)||
+      !Number.isFinite(s.x)||!Number.isFinite(s.y))return false;
+   if(!near(sx,sy,s.x,s.y,rr+4))continue;
+   if(s.born===g.time||sx!==s.x||sy!==s.y||
+      shapeWasTeleported(g,s)||
+      (s.type!=='circle'&&s.type!=='square'))return false;
+   var fx=ax-s.x,fy=ay-s.y,C=fx*fx+fy*fy-rr*rr,
+       B=2*(fx*dx+fy*dy);
+   if(!(C>1e-9))return false;
+   var D=B*B-4*A*C;
+   if(!Number.isFinite(D)||
+      Math.abs(D)<=1e-10*(B*B+4*A*(fx*fx+fy*fy+rr*rr)))return false;
+   if(D<=0)continue;
+   var root=Math.sqrt(D),q=-.5*(B+(B<0?-root:root));
+   if(!q)return false;
+   var enter=Math.min(q/A,C/q),leave=Math.max(q/A,C/q);
+   if(leave<=0||enter>=1-1e-9)continue;
+   if(!(enter>1e-9))return false;
+   if(!Number.isFinite(s.hp)||s.hp<=b.dmg*2)return false;
+   contacts.push({e:s,t:enter});
+   if(contacts.length>2)return false;
+  }
+  if(contacts.length!==2)return false;
+  contacts.sort(function(a,c){return a.t-c.t;});
+  if(contacts[1].t-contacts[0].t<1e-7)return false;
+  for(var ti=0;ti<tanks.length;ti++){
+   var t=tanks[ti];if(!t||!t.alive||t.id===b.ownerId)continue;
+   var def=CLASSES[t.cls];
+   if(!def||!Number.isFinite(def.size))return false;
+   var sx=t.__novaSweepMoveTime===g.time?t.__novaSweepPrevX:t.x,
+       sy=t.__novaSweepMoveTime===g.time?t.__novaSweepPrevY:t.y;
+   if(near(sx,sy,t.x,t.y,b.r+def.size+7))return false;
+  }
+  for(var di=0;di<drones.length;di++){
+   var d=drones[di];if(!d||!(d.hp>0)||d.ownerId===b.ownerId)continue;
+   if(d.__novaChronoDroneEpoch!==g.__novaShapeSweepEpoch||
+      !Number.isFinite(d.__novaChronoDronePrevX)||
+      !Number.isFinite(d.__novaChronoDronePrevY))return false;
+   if(near(d.__novaChronoDronePrevX,d.__novaChronoDronePrevY,
+      d.x,d.y,b.r+(d.r||8)+1+Math.max(30,dt*4000)))return false;
+  }
+  /* Nearby ordinary shots, any shell/blast, or unknown motion can alter
+   * first contact, bullet interception, or neutral damage/kill credit. */
+  for(var bi=0;bi<bullets.length;bi++){
+   var o=bullets[bi];if(!o||o===b||o.dead)continue;
+   if(o.shell||o.splash||o.beam||o.__v17Cannon||
+      !Number.isFinite(o.x)||!Number.isFinite(o.y)||
+      !Number.isFinite(o.vx)||!Number.isFinite(o.vy)||
+      !Number.isFinite(o.r)||!(o.r>0))return false;
+   var ox=o.x+o.vx*dt,oy=o.y+o.vy*dt;
+   if(near(o.x,o.y,ox,oy,b.r+o.r+2))return false;
+   for(var ci=0;ci<contacts.length;ci++){
+    var target=contacts[ci].e,pad=o.r+target.r+2;
+    if(Math.max(o.x,ox)+pad>=target.x&&
+       Math.min(o.x,ox)-pad<=target.x&&
+       Math.max(o.y,oy)+pad>=target.y&&
+       Math.min(o.y,oy)-pad<=target.y)return false;
+   }
+  }
+  if(firstSolidHit(g,ax,ay,ex,ey,b.r*.45))return false;
+  for(var ci=0;ci<contacts.length;ci++){
+   var hit=contacts[ci];
+   b.x=ax+dx*hit.t;b.y=ay+dy*hit.t;
+   g.damageShape(hit.e,b.dmg,b.vx,b.vy);
+   b.hits++;b.pen--;
+   (b.__novaDirectVictims||(b.__novaDirectVictims=new Set())).add(hit.e);
+  }
+  b.dead=true;b.px=b.x;b.py=b.y;b.vx=0;b.vy=0;
+  return true;
+ }
  var oldUpdateBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var terrain=ensureTerrain(this);
  /* Bound pairwise geometry per frame, not total bullets: one expiring shot
   * remains eligible in a crowded but spatially separated firefight. When
@@ -1714,7 +1828,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
  if(legacyPaired||localPaired)
   for(var pair=this.bullets.length-1;pair>=0;pair--){
    var liveBullet=this.bullets[pair];
-   if(liveBullet&&liveBullet.ttl>dt){
+   if(liveBullet&&!liveBullet.dead&&liveBullet.ttl>dt){
+    if(paired===1&&isolatedStationaryShapePair(this,liveBullet,dt))continue;
     if(localPaired){
      if(localPaired.has(liveBullet))
       isolatedTTLStationaryPiercingChain(this,liveBullet,dt,true,
