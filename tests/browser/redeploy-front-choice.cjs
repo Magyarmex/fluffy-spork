@@ -46,6 +46,16 @@ async function run(browser,width,height){
   assert.ok(fit.left>=0&&fit.right<=fit.width&&fit.top>=0&&fit.bottom<=fit.viewportHeight,
    'return action must remain on screen: '+JSON.stringify(fit));
   assert.ok(fit.scrollWidth<=fit.width,'return choice must not create horizontal overflow');
+  // Witness a surviving physical Star through the actual React RETURN click.
+  // Fix its age to ten seconds immediately before redeploy, so UI latency
+  // cannot turn this into a test of a random natural Star's birth time.
+  const starClock=await page.evaluate(()=>{
+   const g=window.__novaFrontSmokeGame,star=g.shapes.find(s=>s.type==='star'&&s.hp>0);
+   if(!star)throw Error('expected the baseline physical Rogue Star');
+   star.__lfStarBorn=g.time-10;
+   star.__lfPublicAnnounced=true;
+   return {id:star.id,age:g.time-star.__lfStarBorn};
+  });
   await returnButton.click();
   await page.waitForFunction(()=>window.__novaFrontSmokeGame?.status==='playing',null,{timeout:15000});
   const after=await page.evaluate(()=>{
@@ -53,6 +63,14 @@ async function run(browser,width,height){
    return {x:g.player.x,y:g.player.y,choice:g.__novaRedeployChoice,
     terrain:g.isTerrainSafe(g.player.x,g.player.y,75),notices:window.__novaFrontNotices};
   });
+  const survivingStar=await page.evaluate(id=>{
+   const g=window.__novaFrontSmokeGame,star=g.getShape(id);
+   return star?{age:g.time-star.__lfStarBorn,announced:star.__lfPublicAnnounced}:null;
+  },starClock.id);
+  assert.ok(survivingStar,'React RETURN must retain the physical Star body');
+  assert.ok(Math.abs(survivingStar.age-starClock.age)<.35,
+   'React RETURN must preserve Star age across the clock reset: '+JSON.stringify(survivingStar));
+  assert.equal(survivingStar.announced,true,'a public Star must not become announceable twice');
   const dist=Math.hypot(after.x-death.x,after.y-death.y);
   assert.ok(dist>=420-1e-6&&dist<=850+1e-6,'return inserts near the witnessed front');
   assert.equal(after.terrain,true,'return position is terrain safe');
