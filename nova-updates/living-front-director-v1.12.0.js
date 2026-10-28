@@ -599,8 +599,8 @@ LF.wrap('game/engine',function(engine){
      ax=(ma.x+LF.ARENA)*ms,ay=(ma.y+LF.ARENA)*ms,
      bx=(mb.x+LF.ARENA)*ms,by=(mb.y+LF.ARENA)*ms,
      angle=Math.atan2(by-ay,bx-ax),fade=clamp((mem.until-now)/16,0,1);
-   ctx.save();ctx.globalAlpha=.16+.35*fade;ctx.strokeStyle='#7df3ff';
-   ctx.lineWidth=3.5;if(ctx.setLineDash)ctx.setLineDash([7,5]);
+   ctx.save();ctx.globalAlpha=.23+.43*fade;ctx.strokeStyle='#7df3ff';
+   ctx.lineWidth=4.5;if(ctx.setLineDash)ctx.setLineDash([7,5]);
    ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.stroke();
    if(ctx.setLineDash)ctx.setLineDash([]);
    ctx.beginPath();
