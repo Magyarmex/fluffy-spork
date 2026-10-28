@@ -1,6 +1,6 @@
 'use strict';
 // A Rogue Star is publicly announced and already drawn on the minimap.
-// Its one-shot spawn bearing helps mobile interception without live radar.
+// Its one-shot reported bearing helps mobile interception without live radar.
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const root=path.resolve(__dirname,'../..');
@@ -12,21 +12,21 @@ function boot(){
   vm.runInNewContext(fs.readFileSync(path.join(root,'nova-updates',name),'utf8'),ctx,{filename:name});
  return{LF:window.__NOVA_LIVING_FRONT_INTERNAL__,T:window.__NOVA_LIVING_FRONT_TEST__};
 }
-test('Rogue Star initial public bearing covers eight hull-relative directions',()=>{
+test('Rogue Star reported public bearing covers eight hull-relative directions',()=>{
  const {T}=boot(),p={x:0,y:0,hp:100,alive:true};
  const directions=[['E',1000,0],['SE',1000,1000],['S',0,1000],
   ['SW',-1000,1000],['W',-1000,0],['NW',-1000,-1000],
   ['N',0,-1000],['NE',1000,-1000]];
  for(const [name,x,y] of directions){
   const message=T.rogueStarToast({player:p},{x,y});
-  assert.match(message,new RegExp('ROGUE STAR · SPAWN '+name+' · cut its route$'));
+  assert.match(message,new RegExp('ROGUE STAR · REPORTED '+name+' · cut its route$'));
   assert.ok(message.length<=58,'portrait announcement must remain compact: '+message);
  }
 });
 test('nearby Star and missing/invalid player remain truthful',()=>{
  const {T}=boot();
  const player={x:100,y:100,hp:100,alive:true};
- assert.match(T.rogueStarToast({player},{x:110,y:115}),/SPAWN NEAR YOU/);
+ assert.match(T.rogueStarToast({player},{x:110,y:115}),/REPORTED NEAR YOU/);
  for(const g of [{player:null},{player:{...player,x:NaN}},{player:{...player,hp:0}}]){
   const msg=T.rogueStarToast(g,{x:1000,y:0});
   assert.equal(msg,'★ ROGUE STAR · intercept the roaming prize');
@@ -34,7 +34,7 @@ test('nearby Star and missing/invalid player remain truthful',()=>{
  assert.equal(T.rogueStarToast({player},{x:NaN,y:100}),
   '★ ROGUE STAR · intercept the roaming prize');
 });
-test('real Front Director announces the initial spawn only, not a live Star tracker',()=>{
+test('real Front Director announces the public report only, not a live Star tracker',()=>{
  const {LF}=boot(),toasts=[];
  const st={age:100,ceiling:1,signal:null,bloomMemory:null,directorEnabled:true,
   lastSignalAt:-99,lastMeaningfulAt:0,lastBloomSector:-1,
@@ -72,7 +72,7 @@ test('public Star bearing is independent of hidden ecology and unrelated shapes'
  const rich={player,shapes:[{x:10,y:20}],__lfState:{sectors:[{value:9999,maturity:1}]}};
  const poor={player,shapes:[{x:-2000,y:-2000}],__lfState:{sectors:[{value:0,maturity:0}]}};
  assert.equal(T.rogueStarToast(rich,sig),T.rogueStarToast(poor,sig));
- assert.match(T.rogueStarToast(rich,sig),/SPAWN E/);
+ assert.match(T.rogueStarToast(rich,sig),/REPORTED E/);
 });
 
 test('fresh canonical baseline Star becomes public without duplicate spawn or teleport',()=>{
@@ -96,7 +96,7 @@ test('fresh canonical baseline Star becomes public without duplicate spawn or te
  assert.equal(st.stats.starsSpawned,0,'adoption must not masquerade as new spawn');
  assert.equal(st.stats.starAnnouncements,1);
  assert.equal(star.__lfPublicAnnounced,true);
- assert.match(messages[0],/SPAWN NE/);
+ assert.match(messages[0],/REPORTED NE/);
  // Force a second quiet public opportunity; the same Star is not eligible.
  st.signal=null;st.lastSignalAt=-99;st.lastMeaningfulAt=0;
  st.cooldowns.star=0;
