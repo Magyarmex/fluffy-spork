@@ -31,6 +31,7 @@ test('rejects unmatched first lives, repeated FPS observations and missing seeds
   s.results[0].returning.prelude=s.results[0].fresh.prelude;
   s.results[1].hz=30;
   assert.throws(()=>reportPlayedFirstLife(s,2),/Duplicate played-first-life/);
+  s.results[1].hz=60;
   s.results.pop();
   assert.throws(()=>reportPlayedFirstLife(s,2),/Missing independent seeds/);
 });
