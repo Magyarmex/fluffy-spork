@@ -33,6 +33,7 @@ test('reachable public migration yields an audited steering sample and route bin
  assert.equal(b.mode,'signal');assert.equal(b.key,'MIGRATION:6');assert.ok(b.weight>.04);
  assert.equal(st.stats.migrationAiSamples,1);assert.equal(st.stats.migrationAiSteered,1);
  assert.equal(st.stats.migrationAiRouteLt300,1);
+ assert.equal(t.ai.__lfMigrationSignalStarted,100,'the accepted bias witnesses this announcement epoch');
  assert.equal(st.stats.migrationAiPhysicalArrivals||0,0,'an intention is not an arrival');
 });
 test('health and legitimate visible combat vetoes are distinct from route failures',()=>{
@@ -86,7 +87,7 @@ test('changing hidden maturity and value cannot change migration decision or rou
 });
 test('only a witnessed, plausible sector entry counts as physical arrival, once',()=>{
  const {T,g,t,st}=scene(-20);
- t.ai.__lfEcoKey='MIGRATION:6';t.ai.__lfEcoMode='signal';
+ t.ai.__lfEcoKey='MIGRATION:6';t.ai.__lfEcoMode='signal';t.ai.__lfMigrationSignalStarted=100;
  assert.equal(T.sectorIndex(t.x,t.y),5);
  g.moveTank(t,124,0,.3);
  assert.equal(T.sectorIndex(t.x,t.y),6);
@@ -97,11 +98,18 @@ test('only a witnessed, plausible sector entry counts as physical arrival, once'
 test('teleport-scale motion, absent speed, non-AI and expired signals fail closed',()=>{
  for(const invalid of ['teleport','speed','no-ai','expired']){
   const {g,t,st}=scene(-20);
-  t.ai.__lfEcoKey='MIGRATION:6';t.ai.__lfEcoMode='signal';
+  t.ai.__lfEcoKey='MIGRATION:6';t.ai.__lfEcoMode='signal';t.ai.__lfMigrationSignalStarted=100;
   if(invalid==='teleport')g.moveTank(t,2000,0,.3);
   if(invalid==='speed'){delete g.tankSpeed;g.moveTank(t,124,0,.3);}
   if(invalid==='no-ai'){t.ai=null;g.moveTank(t,124,0,.3);}
   if(invalid==='expired'){g.time=105;g.moveTank(t,124,0,.3);}
   assert.equal(st.stats.migrationAiPhysicalArrivals||0,0,invalid);
  }
+});
+test('stale AI steering from a previous public migration cannot count a new arrival',()=>{
+ const {g,t,st}=scene(-20);
+ t.ai.__lfEcoKey='MIGRATION:6';t.ai.__lfEcoMode='signal';
+ t.ai.__lfMigrationSignalStarted=99;
+ g.moveTank(t,124,0,.3);
+ assert.equal(st.stats.migrationAiPhysicalArrivals||0,0);
 });
