@@ -24,7 +24,8 @@ const LAYOUT=LAYOUTS[LAYOUT_INDEX],TERRAIN_SEED=LAYOUT_INDEX;
 const GAME_SEED=(0x1d4a3f21^Math.imul(SEED_INDEX,0x9e3779b9))>>>0;
 const TRIAL_RNG=(0x7d27e91b^Math.imul(SEED_INDEX,0x85ebca6b))>>>0;
 const SEED_ID='natural-20261027-'+LAYOUT_INDEX+'-'+SEED_INDEX;
-const SECONDS=165,DT=1/30,CHUNK=450;
+/* Predeclared longer natural-exposure horizon for the migration-only experiment. */
+const SECONDS=AB_MODE==='migration-intercept'?300:165,DT=1/30,CHUNK=450;
 async function arm(browser,enabled,label){
  const context=await browser.newContext({viewport:{width:900,height:700}});
  const page=await context.newPage(),errors=[];
@@ -285,7 +286,31 @@ async function arm(browser,enabled,label){
      g.__novaTrialRng=state>>>0;
      return g.__novaTrialRng/4294967296;
     };
-    try{for(let j=0;j<steps&&g.status!=='dead';j++)g.update(dt);}
+    try{for(let j=0;j<steps&&g.status!=='dead';j++){
+      g.update(dt);
+      if(g.__novaExperimentABMode==='migration-intercept'){
+       /* Observation ONLY: read actual post-update crossing counters and
+        * exponentially decayed migration heat; never alter ecology or AI.
+        * Retain a bounded 15-second crossing window to explain censoring. */
+       const st=g.__lfState;
+       if(st){
+        const m=g.__novaMigrationDiagnostics||(g.__novaMigrationDiagnostics={
+         transitions:0,peakHeat:0,peak15s:0,firstTransitionAt:null,
+         firstSignalAt:null,signals:0,lastCount:0,lastSignals:0,window:[]});
+        const count=Math.max(0,Number(st.migrationTransitions)||0);
+        const delta=Math.max(0,count-m.lastCount);
+        if(delta&&m.firstTransitionAt===null)m.firstTransitionAt=+g.time.toFixed(3);
+        for(let k=0;k<Math.min(delta,64);k++)m.window.push(g.time);
+        while(m.window.length&&m.window[0]<g.time-15)m.window.shift();
+        m.peak15s=Math.max(m.peak15s,m.window.length);
+        m.peakHeat=Math.max(m.peakHeat,Number(st.migrationHeat)||0);
+        m.lastCount=count;m.transitions=count;
+        const signals=Number(st.stats?.migrations)||0;
+        if(signals>m.lastSignals&&m.firstSignalAt===null)m.firstSignalAt=+g.time.toFixed(3);
+        m.lastSignals=signals;m.signals=signals;
+       }
+      }
+     }}
     finally{Math.random=previousRandom;}
     return{time:g.time,status:g.status,blooms:g.__lfState?.stats?.blooms||0};
    },{steps:Math.min(CHUNK,Math.ceil(SECONDS/DT)-i*CHUNK),dt:DT});
@@ -301,12 +326,27 @@ async function arm(browser,enabled,label){
     commitmentAudit:window.__novaResearchCommitmentAudit.summary(g.__novaCommitmentAudit),
     naturalBlooms:s.stats.blooms||0,naturalMigrations:s.stats.migrations||0,
     migrationAIBiasSamples:g.__novaMigrationAIBiasSamples||0,publicBloomCommandSamples:g.__novaPublicBloomCommands||0,
+     migrationDiagnostics:g.__novaMigrationDiagnostics?{
+      transitions:g.__novaMigrationDiagnostics.transitions,
+      peakHeat:+g.__novaMigrationDiagnostics.peakHeat.toFixed(4),
+      peak15s:g.__novaMigrationDiagnostics.peak15s,
+      firstTransitionAt:g.__novaMigrationDiagnostics.firstTransitionAt,
+      firstSignalAt:g.__novaMigrationDiagnostics.firstSignalAt,
+      signals:g.__novaMigrationDiagnostics.signals,
+      threshold:5,horizonSeconds:300}:null,
     visibleNeutralAimSamples:g.__novaVisibleAimSamples||0,
     visibleDodgeSamples:g.__novaVisibleDodgeSamples||0,
     visibleHostileAimSamples:g.__novaVisibleHostileAimSamples||0,
     events:s.frontline?.events||[]};
   });
-  if(result.naturalBlooms>0)assert.ok(result.contestGateAudit.samples>0,'announced BLOOM must be audited');
+  if(AB_MODE==='migration-intercept'){
+    const m=result.migrationDiagnostics;
+    assert.ok(m&&Number.isInteger(m.transitions)&&m.transitions>=0,'actual crossings must be observed');
+    assert.ok(m.peakHeat>=0&&m.peakHeat<=m.transitions+1e-7,'heat must be bounded by real crossings');
+    assert.equal(m.signals,result.naturalMigrations,'diagnostic signals must equal Director signals');
+    assert.equal(m.horizonSeconds,SECONDS,'predeclared migration horizon must be preserved');
+   }
+   if(result.naturalBlooms>0)assert.ok(result.contestGateAudit.samples>0,'announced BLOOM must be audited');
   assert.equal(result.contestGateAudit.gateMismatches,0,'audit must agree with shipping CONTESTED');
   assert.ok(result.commitmentAudit.samples>0,'real composed AI must be observed');
   assert.ok(result.commitmentAudit.eligibleWindow<=result.commitmentAudit.publicMemory);
@@ -369,7 +409,8 @@ async function arm(browser,enabled,label){
     'Public-bloom command samples are input calls, not measured seconds or proof of physical progress',
     'Seed replay is checked, not assumed',
     'In live-turn mode, only live-start authority is intervened on; later natural signals can differ as treatment outcomes',
-    'In migration-intercept mode, only the frozen public crossing waypoint changes; later signals may diverge endogenously']};
+    'In migration-intercept mode, only the frozen public crossing waypoint changes; later signals may diverge endogenously',
+     'Migration diagnostics read real post-update crossing counters, 15s burst density and decayed heat; 300s is the predeclared horizon, not forced survival']};
   const dir=path.join('artifacts','browser');fs.mkdirSync(dir,{recursive:true});
   fs.writeFileSync(path.join(dir,'frontlines-natural-match-ab.json'),JSON.stringify(report,null,2));
   fs.writeFileSync(path.join(dir,'frontlines-natural-on.json'),JSON.stringify(on.result,null,2));
