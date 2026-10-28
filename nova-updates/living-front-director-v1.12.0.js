@@ -51,9 +51,9 @@ function migrationToast(g,from,to){
  return '⇢ MIGRATION · '+location+' · FLOW '+flow;
 }
 /* Rogue Star is already a PUBLIC created opportunity, with its position on
- * the existing minimap. Give small-screen players the initial spawn bearing
+ * the existing minimap. Give small-screen players the initial reported bearing
  * without tracking its future route or revealing another hidden entity.
- * SPAWN is deliberately explicit: this one-shot bearing becomes stale. */
+ * REPORTED is deliberately explicit: this one-shot bearing becomes stale. */
 function rogueStarToast(g,sig){
  var base='★ ROGUE STAR · intercept the roaming prize';
  var p=g&&g.player;
@@ -61,7 +61,7 @@ function rogueStarToast(g,sig){
     !Number.isFinite(sig.x)||!Number.isFinite(sig.y))return base;
  var dx=sig.x-p.x,dy=sig.y-p.y;
  var bearing=Math.hypot(dx,dy)<120?'NEAR YOU':compassBearing(dx,dy);
- return '★ ROGUE STAR · SPAWN '+bearing+' · cut its route';
+ return '★ ROGUE STAR · REPORTED '+bearing+' · cut its route';
 }
 function setSignal(g,st,d){var now=g.time||0,sig={type:d.type,started:now,until:now+(d.type==='BLOOM'?5:d.type==='MIGRATION'?4.4:7)};if(d.type==='BLOOM'){sig.sector=d.sector;var c=sectorCenter(d.sector);sig.x=c.x;sig.y=c.y;st.cooldowns.bloom=24;st.lastBloomSector=d.sector;st.bloomMemory={sector:d.sector,announcedAt:now,until:now+24,initialValue:st.sectors[d.sector]?st.sectors[d.sector].value:0};st.lastMeaningfulAt=now;st.stats.blooms++;}else if(d.type==='MIGRATION'){sig.from=d.from;sig.to=d.to;var a=sectorCenter(d.from),b=sectorCenter(d.to);sig.x=(a.x+b.x)/2;sig.y=(a.y+b.y)/2;st.cooldowns.migration=20;st.lastMeaningfulAt=now;st.stats.migrations++;st.migrationHeat*=.28;}else{
   /* The canonical game already maintains one ordinary Star. A freshly
