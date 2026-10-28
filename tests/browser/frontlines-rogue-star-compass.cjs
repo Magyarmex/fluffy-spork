@@ -28,6 +28,12 @@ const {chromium}=require('playwright');
      if(!LF||!g?.player||!g.toast)throw Error('real Director or pilot missing');
      g.setPaused(true);
      const st=g.__lfState;
+     /* Jumping to age 100 must also advance the one-time age-14 ecology
+      * tutorial. Otherwise its delayed startup toast overwrites the Star
+      * announcement on the next real update, a fixture-only time paradox. */
+     if(!st.tutorial||typeof st.tutorial.ecology!=='boolean')
+      throw Error('canonical ecology tutorial state missing');
+     st.tutorial.ecology=true;
      st.age=100;st.ceiling=1;st.signal=null;st.directorEnabled=true;
      st.lastSignalAt=-99;st.lastMeaningfulAt=0;
      st.migrationHeat=0;st.cooldowns.bloom=100;
