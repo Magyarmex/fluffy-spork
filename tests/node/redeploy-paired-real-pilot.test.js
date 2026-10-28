@@ -214,7 +214,7 @@ test('FRESH/RETURN real-engine matched pilot is deterministic under counterbalan
   }
  }
  if(full){
-  assert.equal(report.length,144,'36 matched worlds at two frame rates and two policies');
+  assert.equal(report.length,72,'36 matched worlds at two frame rates; each contains two policies');
   assert.equal(seen.size,6,'all three maps and two rotations must be exercised');
   const dir=path.join(root,'artifacts','redeploy-pilot');
   fs.mkdirSync(dir,{recursive:true});
