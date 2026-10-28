@@ -1,0 +1,504 @@
+'use strict';
+/* Research-only NATURAL full-match A/B on the real 48-overlay shipping game.
+ * The pilot is a deterministic scripted Scout, not a human. Wander inputs
+ * depend only on time; the public-bloom policy reacts to public events, so
+ * its ON/OFF inputs may diverge after the worlds diverge.
+ * No fake BLOOM, private sector values, teleport, invulnerability or AI buffs. */
+const assert=require('node:assert/strict');
+const fs=require('node:fs'),path=require('node:path');
+const {chromium}=require('playwright');
+const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
+const LAYOUT_INDEX=Number(process.env.NOVA_LAYOUT_INDEX??0);
+const SEED_INDEX=Number(process.env.NOVA_SEED_INDEX??0);
+const PILOT_POLICY=process.env.NOVA_PILOT_POLICY||'wander';
+const AB_MODE=process.env.NOVA_AB_MODE||'migration-threshold';
+if(!['memory','live-turn','migration-threshold'].includes(AB_MODE))
+ throw Error('NOVA_AB_MODE must be memory, live-turn or migration-threshold');
+if(!Number.isInteger(LAYOUT_INDEX)||LAYOUT_INDEX<0||LAYOUT_INDEX>=LAYOUTS.length)
+ throw Error('NOVA_LAYOUT_INDEX must be 0, 1, or 2');
+if(!Number.isInteger(SEED_INDEX)||SEED_INDEX<0||SEED_INDEX>1000)
+ throw Error('NOVA_SEED_INDEX must be an integer from 0 to 1000');
+if(!['wander','public-bloom','public-bloom-harvest','public-bloom-harvest-defense'].includes(PILOT_POLICY))
+ throw Error('NOVA_PILOT_POLICY must be wander, public-bloom, public-bloom-harvest, or public-bloom-harvest-defense');
+const LAYOUT=LAYOUTS[LAYOUT_INDEX],TERRAIN_SEED=LAYOUT_INDEX;
+const GAME_SEED=(0x1d4a3f21^Math.imul(SEED_INDEX,0x9e3779b9))>>>0;
+const TRIAL_RNG=(0x7d27e91b^Math.imul(SEED_INDEX,0x85ebca6b))>>>0;
+const SEED_ID='natural-20261027-'+LAYOUT_INDEX+'-'+SEED_INDEX;
+/* Predeclared 300s natural-exposure horizon for the migration gate experiment. */
+const SECONDS=AB_MODE==='migration-threshold'?300:165,DT=1/30,CHUNK=450;
+async function arm(browser,enabled,label){
+ const context=await browser.newContext({viewport:{width:900,height:700}});
+ const page=await context.newPage(),errors=[];
+ page.on('pageerror',e=>errors.push(String(e.stack||e)));
+ try{
+  await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded',timeout:45000});
+  await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({state:'visible',timeout:45000});
+  await page.addScriptTag({url:'/tests/browser/frontlines-public-pilot.js'});
+  await page.addScriptTag({url:'/tests/browser/frontlines-visible-defense.js'});
+  await page.addScriptTag({url:'/tests/browser/frontlines-commitment-audit.js'});
+  await page.addScriptTag({url:'/tests/browser/frontlines-live-turn-intervention.js'});
+  await page.evaluate(({terrainSeed,gameSeed})=>{
+   let state=gameSeed>>>0;
+   const seeded=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return (state>>>0)/4294967296;};
+   const Game=window.__novaMakeRequire('')('game/engine').Game;
+   const spawn=Game.prototype.spawnPlayer,spawnAI=Game.prototype.spawnAITank,update=Game.prototype.update,start=Game.prototype.start;
+   /* Seed the entire synchronous real-game constructor (player, neutral
+    * population, eight rivals), not the unrelated decorative/menu RAF. */
+   Game.prototype.spawnPlayer=function(){
+    if(this.__novaTerrain)return spawn.apply(this,arguments);
+    const now=Date.now,rand=Math.random;let first=true;
+    this.__novaInitRandomRestore=rand;this.__novaInitSpawnCount=0;
+    Date.now=()=>0;Math.random=()=>first?(first=false,terrainSeed/0x7fffffff):seeded();
+    try{return spawn.apply(this,arguments);}
+    finally{Date.now=now;Math.random=seeded;}
+   };
+   Game.prototype.spawnAITank=function(){
+    const result=spawnAI.apply(this,arguments);
+    if(this.__novaInitRandomRestore){
+     this.__novaInitSpawnCount++;
+     if(this.__novaInitSpawnCount>=8){
+      Math.random=this.__novaInitRandomRestore;
+      delete this.__novaInitRandomRestore;delete this.__novaInitSpawnCount;
+     }
+    }
+    return result;
+   };
+   Game.prototype.start=function(){
+    /* Seed all synchronous start work, including post-spawn AI ordering and
+     * hidden initial state; previously the eighth bot restored Math.random
+     * while start still had work to do. Freeze before the first RAF tick. */
+    window.__novaNaturalMatchGame=this;
+    this.paused=true;
+    const randomBefore=Math.random,dateBefore=Date.now;
+    Math.random=seeded;Date.now=()=>0;
+    try{return start.apply(this,arguments);}
+    finally{Math.random=randomBefore;Date.now=dateBefore;}
+   };
+   Game.prototype.update=function(){
+    if(!this.__novaDecorativeWorld)window.__novaNaturalMatchGame=this;
+    return update.apply(this,arguments);
+   };
+  },{terrainSeed:TERRAIN_SEED,gameSeed:GAME_SEED});
+  await page.getByRole('button',{name:/DEPLOY/i}).first().click();
+  await page.waitForFunction(()=>window.__novaNaturalMatchGame?.status==='playing'&&!!window.__novaNaturalMatchGame.__lfState,{timeout:30000});
+  const initial=await page.evaluate(({enabled,pilotPolicy,trialRng,terrainIndex,seedIndex,abMode})=>{
+   const g=window.__novaNaturalMatchGame;
+   g.setPaused(true); // Advance actual Game.update ourselves.
+   /* Paused rendering still runs requestAnimationFrame and may mutate shared
+    * visual/game caches between independent OFF replays. Cancel the loop:
+    * this is a deterministic headless simulation, not a screenshot test. */
+   if(g.raf){cancelAnimationFrame(g.raf);g.raf=0;}
+   /* Async spawn completion may permute bot array order despite identical
+    * ids/positions. Canonicalize simulation iteration before the first step
+    * so OFF replay compares the same physical update order, not RAF timing. */
+   g.tanks.sort((a,b)=>Number(a.id)-Number(b.id));
+   g.__novaTrialRng=trialRng; // Simulation RNG isolated from asynchronous paused rendering.
+   g.__novaExperimentSeed='natural-20261027-'+terrainIndex+'-'+seedIndex;
+   g.__novaExperimentPolicy=pilotPolicy;
+   g.__novaExperimentABMode=abMode;
+   /* Research intervention: ON lowers only the public migration gate to 3;
+    * OFF retains canonical 5, with AI, physics and waypoints unchanged. */
+   if(abMode==='migration-threshold'){
+     g.__novaResearchMigrationGate=enabled?3:5;
+     /* Read-only audit at the ACTUAL Director decision cadence. A high
+      * per-frame heat peak is not sufficient if BLOOM, cooldown, direction
+      * or another public signal blocks an announcement. */
+     const LF=window.__NOVA_LIVING_FRONT_INTERNAL__,
+      T=window.__NOVA_LIVING_FRONT_TEST__,oldDirector=LF.directorTick;
+     LF.directorTick=function(world,st){
+      if(world===g){
+       const audit=g.__novaMigrationDirectorGate||(g.__novaMigrationDirectorGate={
+        samples:0,peakHeat:0,at:{'3':0,'3.5':0,'4':0,'5':0},
+        unblocked:{'3':0,'3.5':0,'4':0,'5':0},
+        blocked:{signal:0,cooldown:0,bloom:0,direction:0}});
+       audit.samples++;
+       const now=world.time||0,heat=Number(st.migrationHeat)||0;
+       audit.peakHeat=Math.max(audit.peakHeat,heat);
+       const active=!!(st.signal&&now<st.signal.until),
+        cooldown=now-st.lastSignalAt<8||st.cooldowns.migration>0;
+       let bloom=false;
+       if(st.cooldowns.bloom<=0){
+        const sector=T.bloomCandidate(st);
+        bloom=sector>=0&&(sector!==st.lastBloomSector||
+         st.sectors[sector].maturity>.78*st.ceiling);
+       }
+       let from=-1,max=-1;
+       for(let i=0;i<16;i++)if(st.sectors[i].outbound>max){
+        max=st.sectors[i].outbound;from=i;
+       }
+       let direction=false;
+       if(from>=0){
+        const m=Math.hypot(st.migrationX,st.migrationY);
+        if(m>0){
+         const center=LF.sectorCenter(from),step=LF.ARENA*2/LF.GRID*.8;
+         direction=LF.sectorIndex(center.x+st.migrationX/m*step,
+          center.y+st.migrationY/m*step)!==from;
+        }
+       }
+       if(active)audit.blocked.signal++;
+       else if(cooldown)audit.blocked.cooldown++;
+       else if(bloom)audit.blocked.bloom++;
+       else if(!direction)audit.blocked.direction++;
+       for(const threshold of [3,3.5,4,5]){
+        const key=String(threshold);
+        if(heat>=threshold){
+         audit.at[key]++;
+         if(!active&&!cooldown&&!bloom&&direction)audit.unblocked[key]++;
+        }
+       }
+      }
+      return oldDirector.apply(this,arguments);
+     };
+    }
+   if(g.__novaBattlefield?.name!==['CROSSFIRE','SPLIT HORIZON','FOUR GATES'][terrainIndex])throw Error('uncontrolled layout '+g.__novaBattlefield?.name);
+   const ai=window.__novaMakeRequire('')('game/ai');
+   if(!ai||typeof ai.updateAI!=='function')throw Error('missing composed AI');
+   if(!enabled&&abMode!=='migration-intercept'){
+    const original=ai.updateAI;
+    if(abMode==='memory'){
+     // Historical experiment: suppress stale memory (live turns still ON).
+     ai.updateAI=function(t,world,dt){
+      const st=world.__lfState,memory=st&&st.bloomMemory;
+      if(st)st.bloomMemory=null;
+      try{return original(t,world,dt);}finally{if(st)st.bloomMemory=memory;}
+     };
+    }else{
+     // Causal intervention: retain public signals and stale memory;
+     // forbid only a fresh live commitment on the current announcement.
+     const intervention=window.__novaResearchLiveTurnIntervention;
+     if(!intervention||typeof intervention.suppressLiveStart!=='function')
+      throw Error('missing research-only live-turn intervention');
+     ai.updateAI=function(t,world,dt){
+      return intervention.suppressLiveStart(original,t,world,dt);
+     };
+    }
+   }
+   /* Observe the real composed AI without altering its decision authority. */
+   const commitmentWitness=window.__novaResearchCommitmentAudit;
+   if(!commitmentWitness)throw Error('missing research commitment witness');
+   g.__novaCommitmentAudit=commitmentWitness.create();
+   const beforeAudit=ai.updateAI;
+   ai.updateAI=function(t,world,dt){
+    const result=beforeAudit(t,world,dt);
+    if(world===g){
+     commitmentWitness.sample(g.__novaCommitmentAudit,world,t,
+      abMode==='migration-threshold'?true:enabled,
+      window.__NOVA_LIVING_FRONT_INTERNAL__.sectorIndex);
+     if(world.__lfState?.signal?.type==='MIGRATION'&&
+        t?.ai?.__lfEcoKey?.startsWith('MIGRATION:')&&t.ai.__lfEcoWeight>.04)
+      g.__novaMigrationAIBiasSamples=(g.__novaMigrationAIBiasSamples||0)+1;
+    }
+    return result;
+   };
+   /* Research-only: inspect the same visibility/value gates as CONTESTED at
+    * Director cadence; results are post-match artifacts, never live HUD intel. */
+   const LF=window.__NOVA_LIVING_FRONT_INTERNAL__,T=window.__NOVA_LIVING_FRONT_TEST__,
+    F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
+   if(!LF||!T||!F||typeof LF.directorTick!=='function'||
+      typeof F.inGameplayViewport!=='function'||typeof F.viewportHalfExtents!=='function')
+    throw Error('shipping Director / Fair Engagement unavailable');
+   const audit={samples:0,pilotInside:0,noHostile:0,hostileCoLocated:0,
+    outsideGameplayViewport:0,outsideRenderedCamera:0,terrainOccluded:0,
+    hostileVisible:0,visibleNeutralBelow155:0,visibleNeutralAtLeast155:0,
+    candidateTrue:0,gateMismatches:0,coLocationExamples:[]};
+   const director=LF.directorTick;
+   LF.directorTick=function(world,st){
+    const out=director.apply(this,arguments);
+    if(world!==g||world.status!=='playing'||st.directorEnabled===false)return out;
+    const now=world.time||0,sig=st.signal,mem=st.bloomMemory;
+    const sector=sig&&sig.type==='BLOOM'&&now<sig.until?sig.sector:
+     mem&&now<mem.until?mem.sector:null;
+    if(!Number.isInteger(sector)||sector<0||sector>=16)return out;
+    audit.samples++;
+    const pilot=world.player;
+    if(!pilot||!(pilot.hp>0)||pilot.alive===false||pilot.spawnShieldT>0||
+       LF.sectorIndex(pilot.x,pilot.y)!==sector)return out;
+    audit.pilotInside++;
+    const eligible=(world.tanks||[]).filter(t=>{
+     if(!t||t===pilot||t.id===pilot.id||!(t.hp>0)||t.alive===false||
+        t.spawnShieldT>0||LF.sectorIndex(t.x,t.y)!==sector)return false;
+     if(world.areAllies&&world.areAllies(pilot,t))return false;
+     if(typeof world.areHostile==='function')return !!world.areHostile(pilot,t);
+     for(const key of ['teamId','team','factionId','faction','side'])
+      if(pilot[key]!=null&&t[key]!=null)return pilot[key]!==t[key];
+     return true;
+    });
+    if(!eligible.length){audit.noHostile++;return out;}
+    audit.hostileCoLocated++;
+    const ext=F.viewportHalfExtents(world);
+    if(!ext||!(ext.x>0)||!(ext.y>0))throw Error('invalid viewport');
+    const gameplay=eligible.filter(t=>F.inGameplayViewport(world,pilot,t));
+    if(!gameplay.length){audit.outsideGameplayViewport++;return out;}
+    const cam=world.cam||{},cx=Number.isFinite(cam.x)?cam.x:pilot.x,
+     cy=Number.isFinite(cam.y)?cam.y:pilot.y;
+    const rendered=gameplay.filter(t=>Math.abs(t.x-cx)<=ext.x&&Math.abs(t.y-cy)<=ext.y);
+    if(!rendered.length){audit.outsideRenderedCamera++;return out;}
+    const seen=rendered.filter(t=>world.hasLineOfSight(pilot.x,pilot.y,t.x,t.y,2));
+    if(!seen.length){audit.terrainOccluded++;return out;}
+    audit.hostileVisible++;
+    const defs=st.defs||LF.defs;
+    let value=0;
+    for(const shape of world.shapes||[]){
+     if(!shape||!(shape.hp>0)||LF.sectorIndex(shape.x,shape.y)!==sector||
+        Math.abs(shape.x-pilot.x)>ext.x||Math.abs(shape.y-pilot.y)>ext.y||
+        Math.abs(shape.x-cx)>ext.x||Math.abs(shape.y-cy)>ext.y||
+        !world.hasLineOfSight(pilot.x,pilot.y,shape.x,shape.y,2))continue;
+     const base=LF.xp(defs,shape.type);
+     if(!(base>0))continue;
+     value+=base+(shape.type==='crasher'?(Number(shape.__lfBounty)||0):0)+
+      (shape.type==='hexagon'?80:shape.type==='star'?170:shape.type==='pentagon'?22:0);
+     if(value>=155)break;
+    }
+    if(value>=155)audit.visibleNeutralAtLeast155++;
+    else audit.visibleNeutralBelow155++;
+    const candidate=!!T.contestCandidate(world,st);
+    if(candidate)audit.candidateTrue++;
+    if(candidate!==(value>=155))audit.gateMismatches++;
+    if(audit.coLocationExamples.length<24)
+     audit.coLocationExamples.push({time:+now.toFixed(2),sector,
+      visibleHostiles:seen.length,visibleNeutralValue:+value.toFixed(1),
+      eligible:value>=155});
+    return out;
+   };
+   g.__novaContestAudit=audit;
+   const p=g.player;
+   if(!p||p.cls!=='scout')throw Error('expected unmodified Scout pilot');
+   if(g.tanks.filter(t=>t.ai).length<8)throw Error('expected eight ordinary rivals');
+   g.input.mouseActive=false;g.input.autofire=true;g.input.firing=false;
+   const wander=()=>({x:Math.cos(g.time*.29),y:Math.sin(g.time*.29)});
+   if(['public-bloom','public-bloom-harvest','public-bloom-harvest-defense'].includes(pilotPolicy)){
+    const LF=window.__NOVA_LIVING_FRONT_INTERNAL__;
+    if(!LF||typeof LF.sectorCenter!=='function'||typeof LF.sectorIndex!=='function')
+     throw Error('missing canonical public sector geometry');
+    g.input.moveVec=()=>{
+     const st=g.__lfState,now=g.time||0,sig=st&&st.signal,mem=st&&st.bloomMemory;
+     // Public Director announcement / last-known sector only. Never read
+     // hidden maturity, current neutral value, or enemy coordinates.
+     const sector=sig&&sig.type==='BLOOM'&&now<sig.until?sig.sector:
+      mem&&now<mem.until?mem.sector:null;
+     if(!Number.isInteger(sector)||sector<0||sector>=16)return wander();
+     if(LF.sectorIndex(p.x,p.y)===sector)return{x:0,y:0};
+     const c=LF.sectorCenter(sector),dx=c.x-p.x,dy=c.y-p.y,d=Math.hypot(dx,dy);
+     if(!(d>1))return{x:0,y:0};
+     g.__novaPublicBloomCommands=(g.__novaPublicBloomCommands||0)+1;
+     return{x:dx/d,y:dy/d};
+    };
+    if(pilotPolicy==='public-bloom-harvest'||pilotPolicy==='public-bloom-harvest-defense'){
+     const helper=window.__novaResearchPublicPilot;
+     if(!helper)throw Error('research-only public pilot helper missing');
+     g.input.moveVec=()=>{
+      const v=helper.moveTowardPublicBloom(g,p,LF);
+      if(v){g.__novaPublicBloomCommands=(g.__novaPublicBloomCommands||0)+1;return v;}
+      return wander();
+     };
+    }
+   }else g.input.moveVec=wander;
+   if(pilotPolicy==='public-bloom-harvest-defense'){
+    const defense=window.__novaResearchVisibleDefense,F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
+    if(!defense||typeof defense.dodgeVisibleProjectile!=='function'||!F)
+     throw Error('research-only visible defense helper missing');
+    const baseMove=g.input.moveVec;
+    g.input.moveVec=()=>{
+     const base=baseMove(),dodge=defense.dodgeVisibleProjectile(g,p,F,base);
+     if(dodge){g.__novaVisibleDodgeSamples=(g.__novaVisibleDodgeSamples||0)+1;return dodge;}
+     return base;
+    };
+   }
+   /* Wander movement and aim depend only on simulation time. The optional
+    * public-signal movement policy is closed-loop: identical rules and initial
+    * state, but not necessarily identical commands after ON/OFF diverge. */
+   g.input.aimVec=()=>({x:Math.cos(g.time*.73),y:Math.sin(g.time*.73)});
+   if(pilotPolicy==='public-bloom-harvest'||pilotPolicy==='public-bloom-harvest-defense'){
+    const helper=window.__novaResearchPublicPilot,LF=window.__NOVA_LIVING_FRONT_INTERNAL__,
+     F=window.__NOVA_FAIR_ENGAGEMENT_TEST__,
+     defense=pilotPolicy==='public-bloom-harvest-defense'?window.__novaResearchVisibleDefense:null;
+    g.input.aimVec=()=>{
+     const hostile=defense&&defense.aimAtVisibleHostile(g,p,F);
+     if(hostile){g.__novaVisibleHostileAimSamples=(g.__novaVisibleHostileAimSamples||0)+1;return hostile;}
+     const v=helper.aimAtVisibleNeutral(g,p,LF,F);
+     if(v){g.__novaVisibleAimSamples=(g.__novaVisibleAimSamples||0)+1;return v;}
+     return{x:Math.cos(g.time*.73),y:Math.sin(g.time*.73)};
+    };
+   }
+   const fingerprint=JSON.stringify({layout:g.__novaBattlefield.name,
+    pilot:{x:+p.x.toFixed(3),y:+p.y.toFixed(3),cls:p.cls},
+    bots:g.tanks.filter(t=>t.ai).map(t=>[t.id,+t.x.toFixed(3),+t.y.toFixed(3),t.cls]),
+    shapes:g.shapes.slice(0,32).map(s=>[s.id,s.type,+s.x.toFixed(3),+s.y.toFixed(3)])});
+   return{fingerprint,initialBotCount:g.tanks.filter(t=>t.ai).length,initialShapes:g.shapes.length};
+  },{enabled,pilotPolicy:PILOT_POLICY,trialRng:TRIAL_RNG,terrainIndex:LAYOUT_INDEX,seedIndex:SEED_INDEX,abMode:AB_MODE});
+  let last=null;
+  for(let i=0;i<Math.ceil(SECONDS/DT/CHUNK);i++){
+   last=await page.evaluate(({steps,dt})=>{
+    const g=window.__novaNaturalMatchGame;
+    const previousRandom=Math.random;
+    Math.random=()=>{
+     let state=g.__novaTrialRng>>>0;
+     state^=state<<13;state^=state>>>17;state^=state<<5;
+     g.__novaTrialRng=state>>>0;
+     return g.__novaTrialRng/4294967296;
+    };
+    try{for(let j=0;j<steps&&g.status!=='dead';j++){
+      g.update(dt);
+      if(g.__novaExperimentABMode==='migration-intercept'){
+       /* Observation ONLY: read actual post-update crossing counters and
+        * exponentially decayed migration heat; never alter ecology or AI.
+        * Retain a bounded 15-second crossing window to explain censoring. */
+       const st=g.__lfState;
+       if(st){
+        const m=g.__novaMigrationDiagnostics||(g.__novaMigrationDiagnostics={
+         transitions:0,peakHeat:0,peak15s:0,firstTransitionAt:null,
+         firstSignalAt:null,signals:0,lastCount:0,lastSignals:0,window:[]});
+        const count=Math.max(0,Number(st.migrationTransitions)||0);
+        const delta=Math.max(0,count-m.lastCount);
+        if(delta&&m.firstTransitionAt===null)m.firstTransitionAt=+g.time.toFixed(3);
+        for(let k=0;k<Math.min(delta,64);k++)m.window.push(g.time);
+        while(m.window.length&&m.window[0]<g.time-15)m.window.shift();
+        m.peak15s=Math.max(m.peak15s,m.window.length);
+        m.peakHeat=Math.max(m.peakHeat,Number(st.migrationHeat)||0);
+        m.lastCount=count;m.transitions=count;
+        const signals=Number(st.stats?.migrations)||0;
+        if(signals>m.lastSignals&&m.firstSignalAt===null)m.firstSignalAt=+g.time.toFixed(3);
+        m.lastSignals=signals;m.signals=signals;
+       }
+      }
+     }}
+    finally{Math.random=previousRandom;}
+    return{time:g.time,status:g.status,blooms:g.__lfState?.stats?.blooms||0};
+   },{steps:Math.min(CHUNK,Math.ceil(SECONDS/DT)-i*CHUNK),dt:DT});
+   if(last.status==='dead')break;
+  }
+  const result=await page.evaluate(()=>{
+   const g=window.__novaNaturalMatchGame,s=window.NOVALivingFront.snapshot(),p=g.player;
+   return{metadata:{layout:g.__novaBattlefield.name,seed:g.__novaExperimentSeed,pilotPolicy:g.__novaExperimentPolicy,abMode:g.__novaExperimentABMode},
+    frontline:s.frontline,stats:s.stats,game:{time:+g.time.toFixed(3),status:g.status,
+     pilotAlive:!!p.alive,score:p.score,kills:p.kills,level:p.level,
+     botCount:g.tanks.filter(t=>t.ai&&t.alive).length},
+    contestGateAudit:g.__novaContestAudit,
+    commitmentAudit:window.__novaResearchCommitmentAudit.summary(g.__novaCommitmentAudit),
+    naturalBlooms:s.stats.blooms||0,naturalMigrations:s.stats.migrations||0,
+    migrationAIBiasSamples:g.__novaMigrationAIBiasSamples||0,publicBloomCommandSamples:g.__novaPublicBloomCommands||0,
+     migrationGateAudit:g.__novaMigrationDirectorGate?{
+      samples:g.__novaMigrationDirectorGate.samples,
+      peakHeat:+g.__novaMigrationDirectorGate.peakHeat.toFixed(4),
+      at:{...g.__novaMigrationDirectorGate.at},
+      unblocked:{...g.__novaMigrationDirectorGate.unblocked},
+      blocked:{...g.__novaMigrationDirectorGate.blocked}}:null,
+     migrationDiagnostics:g.__novaMigrationDiagnostics?{
+      transitions:g.__novaMigrationDiagnostics.transitions,
+      peakHeat:+g.__novaMigrationDiagnostics.peakHeat.toFixed(4),
+      peak15s:g.__novaMigrationDiagnostics.peak15s,
+      firstTransitionAt:g.__novaMigrationDiagnostics.firstTransitionAt,
+      firstSignalAt:g.__novaMigrationDiagnostics.firstSignalAt,
+      signals:g.__novaMigrationDiagnostics.signals,
+      threshold:g.__novaResearchMigrationGate===3?3:5,horizonSeconds:300}:null,
+    visibleNeutralAimSamples:g.__novaVisibleAimSamples||0,
+    visibleDodgeSamples:g.__novaVisibleDodgeSamples||0,
+    visibleHostileAimSamples:g.__novaVisibleHostileAimSamples||0,
+    events:s.frontline?.events||[]};
+  });
+  if(AB_MODE==='migration-threshold'){
+    const m=result.migrationDiagnostics;
+    assert.ok(m&&Number.isInteger(m.transitions)&&m.transitions>=0,'actual crossings must be observed');
+    assert.ok(m.peakHeat>=0&&m.peakHeat<=m.transitions+1e-7,'heat must be bounded by real crossings');
+    assert.equal(m.signals,result.naturalMigrations,'diagnostic signals must equal Director signals');
+    assert.equal(m.horizonSeconds,SECONDS,'predeclared migration horizon must be preserved');
+    const gate=result.migrationGateAudit;
+    assert.ok(gate&&gate.samples>0,'real Director cadence must be audited');
+    assert.ok(gate.peakHeat>=0&&gate.peakHeat<=m.transitions+1e-7,
+     'Director heat must be backed by physical crossings');
+    for(const threshold of ['3','3.5','4','5']){
+     assert.ok(gate.at[threshold]>=gate.unblocked[threshold]&&gate.unblocked[threshold]>=0,
+      'unblocked gate cannot exceed actual heat-eligible Director samples');
+    }
+    assert.ok(gate.unblocked[String(m.threshold)]>=result.naturalMigrations,
+     'every real MIGRATION must have been eligible at its selected 3/5 gate');
+   }
+   if(result.naturalBlooms>0)assert.ok(result.contestGateAudit.samples>0,'announced BLOOM must be audited');
+  assert.equal(result.contestGateAudit.gateMismatches,0,'audit must agree with shipping CONTESTED');
+  assert.ok(result.commitmentAudit.samples>0,'real composed AI must be observed');
+  assert.ok(result.commitmentAudit.eligibleWindow<=result.commitmentAudit.publicMemory);
+  assert.ok(result.commitmentAudit.precombatIntersection<=result.commitmentAudit.eligibleWindow);
+  const liveGate=result.commitmentAudit.liveGate;
+  assert.ok(liveGate,'research live eligibility witness required');
+  assert.equal(liveGate.samples,result.commitmentAudit.liveSignal);
+  assert.equal(Object.values(liveGate.firstBlock).reduce((a,b)=>a+b,0),liveGate.samples);
+  assert.ok(liveGate.possibleFreshNoHeldTarget<=liveGate.possibleFreshStarts);
+  assert.ok(liveGate.possibleFreshStarts<=liveGate.precombatIntersection);
+  assert.ok(liveGate.precombatIntersection<=liveGate.samples);
+  assert.equal(result.contestGateAudit.pilotInside,
+   result.contestGateAudit.noHostile+result.contestGateAudit.hostileCoLocated);
+  assert.equal(result.contestGateAudit.hostileCoLocated,
+   result.contestGateAudit.outsideGameplayViewport+
+   result.contestGateAudit.outsideRenderedCamera+
+   result.contestGateAudit.terrainOccluded+result.contestGateAudit.hostileVisible);
+  assert.equal(result.contestGateAudit.hostileVisible,
+   result.contestGateAudit.visibleNeutralBelow155+result.contestGateAudit.visibleNeutralAtLeast155);
+  assert.equal(errors.length,0,errors.join('\n'));
+  return{label,enabled,initial,last,result};
+ }finally{await context.close();}
+}
+(async()=>{
+ const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+ try{
+  const off=await arm(browser,false,'OFF'),on=await arm(browser,true,'ON'),offReplay=await arm(browser,false,'OFF-REPLAY');
+  assert.equal(off.initial.fingerprint,on.initial.fingerprint,'ON/OFF must begin from identical real world');
+  assert.equal(off.initial.fingerprint,offReplay.initial.fingerprint,'same seed must reproduce initial world');
+  const same=JSON.stringify(off.result)===JSON.stringify(offReplay.result);
+  const naturalOpportunityObserved=AB_MODE==='migration-threshold'?
+   on.result.naturalMigrations>0:[off,on].every(a=>a.result.naturalBlooms>0);
+  if(AB_MODE==='live-turn'){
+   assert.equal(off.result.commitmentAudit.startedLive,0,'OFF must suppress all live-turn starts');
+   assert.equal(offReplay.result.commitmentAudit.startedLive,0,'OFF replay must also suppress live starts');
+  }
+  const verifiedLiveStart=AB_MODE==='live-turn'&&on.result.commitmentAudit.startedLive>0;
+  if(AB_MODE==='migration-threshold'&&!naturalOpportunityObserved){
+   for(const key of ['game','stats','frontline','events','contestGateAudit','naturalBlooms','naturalMigrations','migrationAIBiasSamples','visibleNeutralAimSamples','visibleDodgeSamples','visibleHostileAimSamples'])
+    assert.deepEqual(on.result[key],off.result[key],
+     'no public migration means threshold intervention cannot change '+key);
+  }
+  if(AB_MODE==='live-turn'&&!verifiedLiveStart){
+   /* If no live turn was initiated, masking its start must be a true
+    * no-op for the physical game. OFF replay alone cannot prove this. */
+   for(const key of ['frontline','stats','game','contestGateAudit','naturalBlooms',
+     'publicBloomCommandSamples','visibleNeutralAimSamples','events'])
+    assert.deepEqual(on.result[key],off.result[key],
+     'no-treatment live-turn arms must have identical '+key);
+  }
+  const report={method:AB_MODE==='migration-threshold'?
+   'paired natural full-match 3-vs-5 migration announcement gate (not human fun)':
+   AB_MODE==='live-turn'?'paired natural full-match live-turn causal intervention (not human fun)':
+   'scripted full-match natural Director research; not human fun; public-bloom is closed-loop policy',
+   abMode:AB_MODE,verifiedLiveStart,
+   initialWorldIdentical:true,initialFingerprint:off.initial.fingerprint,offReplayIdentical:same,
+   naturalOpportunityObserved,
+   interpretation:AB_MODE==='migration-threshold'?
+    (naturalOpportunityObserved?'ON produced natural migration announcements; compare physical player/AI behavior, not raw rotations.':'INCONCLUSIVE: ON had no natural migration announcement; retain censored pair.'):
+    AB_MODE==='live-turn'?(verifiedLiveStart&&naturalOpportunityObserved?'Live-turn intervention activated; interpret matched-policy differences cautiously because later public signals can diverge endogenously.':'INCONCLUSIVE: no verified ON live start or natural BLOOM exposure in both arms; retain the pair.'):(naturalOpportunityObserved?'Descriptive only: natural BLOOM observed; inspect opportunity timing, deaths and public pilot commands before causal interpretation.':'INCONCLUSIVE: at least one arm had no natural BLOOM; retain this censored pair.'),
+   off:off.result,on:on.result,offReplay:offReplay.result,
+   limits:['No artificial BLOOM or forced survival','One layout/seed/pilot-policy per invocation; matrix must aggregate independently',
+    'A deterministic Scout script is not a human player',
+    'Public-bloom commands can differ after ON/OFF worlds diverge; this is matched policy, not fixed inputs',
+    'Public-bloom command samples are input calls, not measured seconds or proof of physical progress',
+    'Seed replay is checked, not assumed',
+    'In live-turn mode, only live-start authority is intervened on; later natural signals can differ as treatment outcomes',
+    'In migration-threshold mode, only the Director heat threshold (5 OFF, 3 ON) changes; AI, physics, and public waypoint remain canonical',
+     'Migration diagnostics read real post-update crossing counters, 15s burst density and decayed heat; 300s is the predeclared horizon, not forced survival',
+     'Director gate audit samples the real decision cadence and separately records active-signal, cooldown, BLOOM and directional blockers without changing the decision']};
+  const dir=path.join('artifacts','browser');fs.mkdirSync(dir,{recursive:true});
+  fs.writeFileSync(path.join(dir,'frontlines-natural-match-ab.json'),JSON.stringify(report,null,2));
+  fs.writeFileSync(path.join(dir,'frontlines-natural-on.json'),JSON.stringify(on.result,null,2));
+  fs.writeFileSync(path.join(dir,'frontlines-natural-off.json'),JSON.stringify(off.result,null,2));
+  fs.writeFileSync(path.join(dir,'frontlines-natural-manifest.json'),JSON.stringify({
+   pairs:[{layout:LAYOUT,seed:SEED_ID,pilotPolicy:PILOT_POLICY,abMode:AB_MODE,
+    on:'frontlines-natural-on.json',off:'frontlines-natural-off.json'}]
+  },null,2));
+  console.log('NOVA_FRONTLINES_NATURAL_MATCH_AB '+JSON.stringify({initialWorldIdentical:true,offReplayIdentical:same,
+   naturalOpportunityObserved,abMode:AB_MODE,verifiedLiveStart,
+   config:{layout:LAYOUT,seed:SEED_ID,pilotPolicy:PILOT_POLICY},
+   off:{time:off.result.game.time,status:off.result.game.status,blooms:off.result.naturalBlooms,publicBloomCommands:off.result.publicBloomCommandSamples,frontline:off.result.frontline?.counts,contestGateAudit:Object.fromEntries(Object.entries(off.result.contestGateAudit).filter(([k])=>k!=='coLocationExamples'))},
+   on:{time:on.result.game.time,status:on.result.game.status,blooms:on.result.naturalBlooms,publicBloomCommands:on.result.publicBloomCommandSamples,frontline:on.result.frontline?.counts,contestGateAudit:Object.fromEntries(Object.entries(on.result.contestGateAudit).filter(([k])=>k!=='coLocationExamples'))}}));
+  if(!same)throw Error('same-arm full-match replay diverged; cannot claim controlled A/B');
+  // No natural announcement is valid negative/censored research evidence,
+  // not a CI failure to hide by selecting a friendlier seed.
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e.stack||e);process.exitCode=1;});
