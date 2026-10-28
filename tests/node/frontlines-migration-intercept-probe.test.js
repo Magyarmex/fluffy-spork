@@ -65,9 +65,10 @@ test('BLOOM and ROGUE STAR are unaffected by the migration-only probe',()=>{
   g.__novaMigrationInterceptProbe=false;
  }
 });
-test('disabled Director and low health still veto experimental migration',()=>{
+test('no public signal or low health prevents experimental migration steering',()=>{
  const {T,t,g,st}=scene();g.__novaMigrationInterceptProbe=true;
- st.directorEnabled=false;assert.equal(T.publicEcoBias(g,t,{},{}).weight,0);
- st.directorEnabled=true;t.hp=20;
+ const live=st.signal;st.signal=null;st.directorEnabled=false;
+ assert.equal(T.publicEcoBias(g,t,{},{}).weight,0);
+ st.signal=live;st.directorEnabled=true;t.hp=20;
  assert.equal(T.publicEcoBias(g,t,{},{}).weight,0);
 });
