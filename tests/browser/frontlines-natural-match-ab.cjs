@@ -127,8 +127,13 @@ async function arm(browser,enabled,label){
    const beforeAudit=ai.updateAI;
    ai.updateAI=function(t,world,dt){
     const result=beforeAudit(t,world,dt);
-    if(world===g)commitmentWitness.sample(g.__novaCommitmentAudit,world,t,enabled,
-     window.__NOVA_LIVING_FRONT_INTERNAL__.sectorIndex);
+    if(world===g){
+     commitmentWitness.sample(g.__novaCommitmentAudit,world,t,enabled,
+      window.__NOVA_LIVING_FRONT_INTERNAL__.sectorIndex);
+     if(world.__lfState?.signal?.type==='MIGRATION'&&
+        t?.ai?.__lfEcoKey?.startsWith('MIGRATION:')&&t.ai.__lfEcoWeight>.04)
+      g.__novaMigrationAIBiasSamples=(g.__novaMigrationAIBiasSamples||0)+1;
+    }
     return result;
    };
    /* Research-only: inspect the same visibility/value gates as CONTESTED at
@@ -292,7 +297,8 @@ async function arm(browser,enabled,label){
      botCount:g.tanks.filter(t=>t.ai&&t.alive).length},
     contestGateAudit:g.__novaContestAudit,
     commitmentAudit:window.__novaResearchCommitmentAudit.summary(g.__novaCommitmentAudit),
-    naturalBlooms:s.stats.blooms||0,naturalMigrations:s.stats.migrations||0,publicBloomCommandSamples:g.__novaPublicBloomCommands||0,
+    naturalBlooms:s.stats.blooms||0,naturalMigrations:s.stats.migrations||0,
+    migrationAIBiasSamples:g.__novaMigrationAIBiasSamples||0,publicBloomCommandSamples:g.__novaPublicBloomCommands||0,
     visibleNeutralAimSamples:g.__novaVisibleAimSamples||0,
     visibleDodgeSamples:g.__novaVisibleDodgeSamples||0,
     visibleHostileAimSamples:g.__novaVisibleHostileAimSamples||0,
