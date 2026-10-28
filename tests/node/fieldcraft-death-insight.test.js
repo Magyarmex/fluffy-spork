@@ -198,7 +198,7 @@ test('every real playable class teaches unique, actionable opponent counterplay'
   assert.equal(info.name,def.name);
   assert.ok(info.lesson.length>=48&&info.lesson.length<=145,
    'death modal tip must stay legible on compact phones: '+id+' '+info.lesson.length);
-  assert.match(info.lesson,/\b(bait|break|avoid|use|watch|read|stay|escape|cross|change|shift|sidestep|expect|flank|disrupt|do not|never|hunters|force)\b/i,
+  assert.match(info.lesson,/\b(bait|break|avoid|use|watch|read|stay|escape|cross|change|shift|sidestep|strafe|split|dodge|expect|flank|disrupt|do not|never|hunters|force)\b/i,
    'tip needs a concrete decision: '+id);
   assert.ok(!seen.has(info.lesson),'generic duplicated lesson for '+id);
   seen.add(info.lesson);
