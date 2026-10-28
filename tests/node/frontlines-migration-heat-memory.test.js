@@ -63,6 +63,25 @@ test('the public Director still requires heat >=5 and coherent flow',()=>{
  st.migrationX=0;st.migrationY=0;
  assert.notEqual(T.directorDecision(st,ctx)?.type,'MIGRATION');
 });
+test('longer heat memory can delay a Star even without reaching migration gate 5',()=>{
+ const files=['living-front-core-v1.12.0.js','living-front-instincts-v1.12.0.js',
+  'living-front-director-v1.12.0.js'];
+ const window={__novaModules:{'game/engine':function(m){m.exports={Game:class{}};}}};
+ const context={window,console:{info(){},warn(){},error(){}},Math,Number,Object,Array,Date,JSON,Map,Set,
+  performance:{now:()=>0},setTimeout(){},clearTimeout(){}};
+ for(const f of files)vm.runInNewContext(fs.readFileSync(path.join(root,'nova-updates',f),'utf8'),context,{filename:f});
+ const T=window.__NOVA_LIVING_FRONT_TEST__;
+ const st={sectors:Array.from({length:16},(_,i)=>({...T.makeSector(i),value:80,maturity:.1,outbound:0})),
+  ceiling:1,signal:null,lastSignalAt:-99,lastMeaningfulAt:0,lastBloomSector:-1,
+  migrationHeat:2.99,migrationX:0,migrationY:0,
+  cooldowns:{bloom:100,migration:100,star:0}};
+ const ctx={enabled:true,now:100,hasStar:false};
+ assert.equal(T.directorDecision(st,ctx)?.type,'ROGUE STAR');
+ st.migrationHeat=3.01;
+ assert.equal(T.directorDecision(st,ctx),null,
+  'a higher decayed crossing memory can defer a Star without any migration announcement');
+});
+
 test('shipping core is still in the real 48-overlay materialized game',()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
  assert.ok(html.includes('nova-updates/living-front-core-v1.12.0.js'));
