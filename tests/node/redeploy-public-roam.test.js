@@ -94,7 +94,7 @@ test('a chase after prior patrol progress does not inherit a stale distance', ()
   player.x = 200;
   game.time = 1;
   policy.move(); // Record patrol progress toward x=420.
-  game.shapes = [{id: 11, x: 200, y: 250, hp: 10}];
+  game.shapes = [{id: 11, x: 200, y: 180, hp: 10}];
   game.time = 2;
   policy.move();
   game.shapes = [];
