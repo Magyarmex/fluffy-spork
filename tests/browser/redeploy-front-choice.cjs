@@ -56,6 +56,24 @@ async function run(browser,width,height){
    star.__lfPublicAnnounced=true;
    return {id:star.id,age:g.time-star.__lfStarBorn};
   });
+  // Witness Star age on both sides of the *actual* redeploy call. A fixed
+  // wall-clock tolerance is invalid here: CI may advance 0.4+ seconds of
+  // legitimate simulation between Playwright evaluations. This invariant
+  // tests the clock rebase itself, not test-runner scheduling latency.
+  await page.evaluate(id=>{
+   const Game=window.__novaMakeRequire('')('game/engine').Game;
+   const original=Game.prototype.redeploy;
+   Game.prototype.redeploy=function(){
+    const before=this.shapes.find(s=>s.id===id);
+    const ageBefore=before?this.time-before.__lfStarBorn:null;
+    const out=original.apply(this,arguments);
+    const after=this.shapes.find(s=>s.id===id);
+    window.__novaStarAgeRebaseWitness={ageBefore,
+     ageAfter:after?this.time-after.__lfStarBorn:null,
+     timeAfter:this.time,stillHere:!!after};
+    return out;
+   };
+  },starClock.id);
   await returnButton.click();
   await page.waitForFunction(()=>window.__novaFrontSmokeGame?.status==='playing',null,{timeout:15000});
   const after=await page.evaluate(()=>{
@@ -75,11 +93,20 @@ async function run(browser,width,height){
    .waitFor({state:'visible',timeout:2000});
   const survivingStar=await page.evaluate(id=>{
    const g=window.__novaFrontSmokeGame,star=g.getShape(id);
-   return star?{age:g.time-star.__lfStarBorn,announced:star.__lfPublicAnnounced}:null;
+   return star?{age:g.time-star.__lfStarBorn,announced:star.__lfPublicAnnounced,
+    now:g.time,witness:window.__novaStarAgeRebaseWitness}:null;
   },starClock.id);
   assert.ok(survivingStar,'React RETURN must retain the physical Star body');
-  assert.ok(Math.abs(survivingStar.age-starClock.age)<.35,
-   'React RETURN must preserve Star age across the clock reset: '+JSON.stringify(survivingStar));
+  const ageWitness=survivingStar.witness;
+  assert.ok(ageWitness&&ageWitness.stillHere,
+   'the production redeploy must retain the same witnessed Star');
+  assert.ok(Math.abs(ageWitness.ageBefore-ageWitness.ageAfter)<1e-6,
+   'the actual redeploy call must preserve Star age exactly across its clock reset: '+
+   JSON.stringify(ageWitness));
+  assert.ok(Math.abs(survivingStar.age-
+   (ageWitness.ageAfter+survivingStar.now-ageWitness.timeAfter))<1e-6,
+   'subsequent simulation time must advance the Star age without a jump: '+
+   JSON.stringify(survivingStar));
   assert.equal(survivingStar.announced,true,'a public Star must not become announceable twice');
   const waypoint=await page.evaluate(()=>{
    const g=window.__novaFrontSmokeGame,ctx=g.mmCtx,m=g.__novaLastFrontMarker;
