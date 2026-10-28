@@ -351,15 +351,32 @@ function cleanup(g){
   if(node&&node.parentNode)node.parentNode.removeChild(node);
  }
  g.__novaDeathInsight=null;g.__novaDeathInsightAttempted=false;
+ g.__novaDeathInsightNode=null;
 }
 function mount(g){
- if(!g.__novaDeathInsight||g.__novaDeathInsightAttempted)return;
+ if(!g.__novaDeathInsight)return;
+ if(g.__novaDeathInsightAttempted){
+  /* The initial observer has a bounded wait. Only a previously mounted
+   * note may be retried after React detaches its foreign DOM node. */
+  var oldNode=g.__novaDeathInsightNode;
+  if(!oldNode)return;
+  if(typeof oldNode.isConnected==='boolean'?
+     oldNode.isConnected:!!oldNode.parentNode)return;
+  g.__novaDeathInsightAttempted=false;
+  g.__novaDeathInsightNode=null;
+ }
  g.__novaDeathInsightAttempted=true;
- if(paint(g.__novaDeathInsight))return;
+ if(paint(g.__novaDeathInsight)){
+  g.__novaDeathInsightNode=document.querySelector('[data-nova-death-insight]');
+  return;
+ }
  if(typeof MutationObserver!=='function'||typeof document==='undefined')return;
  var root=document.getElementById('root')||document.body;if(!root)return;
  var observer=new MutationObserver(function(){
-  if(paint(g.__novaDeathInsight)){observer.disconnect();g.__novaDeathInsightObserver=null;}
+  if(paint(g.__novaDeathInsight)){
+   g.__novaDeathInsightNode=document.querySelector('[data-nova-death-insight]');
+   observer.disconnect();g.__novaDeathInsightObserver=null;
+  }
  });
  g.__novaDeathInsightObserver=observer;
  observer.observe(root,{childList:true,subtree:true});
