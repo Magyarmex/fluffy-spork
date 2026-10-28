@@ -12,7 +12,13 @@ async function run(browser,width,height){
   await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({state:'visible',timeout:45000});
   await page.evaluate(()=>{
    const Game=window.__novaMakeRequire('')('game/engine').Game;
-   const old=Game.prototype.update;
+   const old=Game.prototype.update,oldToast=Game.prototype.toast;
+   window.__novaFrontNotices=[];
+   Game.prototype.toast=function(message,kind){
+    if(!this.__novaDecorativeWorld&&String(message).includes('RETURN'))
+     window.__novaFrontNotices.push({message,kind});
+    return oldToast.apply(this,arguments);
+   };
    Game.prototype.update=function(){
     if(!this.__novaDecorativeWorld&&this.player&&this.status==='playing')window.__novaFrontSmokeGame=this;
     return old.apply(this,arguments);
@@ -34,12 +40,19 @@ async function run(browser,width,height){
   await page.waitForFunction(()=>window.__novaFrontSmokeGame?.status==='playing',null,{timeout:15000});
   const after=await page.evaluate(()=>{
    const g=window.__novaFrontSmokeGame;
-   return {x:g.player.x,y:g.player.y,choice:g.__novaRedeployChoice,terrain:g.isTerrainSafe(g.player.x,g.player.y,75)};
+   return {x:g.player.x,y:g.player.y,choice:g.__novaRedeployChoice,
+    terrain:g.isTerrainSafe(g.player.x,g.player.y,75),notices:window.__novaFrontNotices};
   });
   const dist=Math.hypot(after.x-death.x,after.y-death.y);
   assert.ok(dist>=420-1e-6&&dist<=850+1e-6,'return inserts near the witnessed front');
   assert.equal(after.terrain,true,'return position is terrain safe');
   assert.equal(after.choice,'fresh','choice resets after redeploy');
+  const directions=['E','SE','S','SW','W','NW','N','NE'];
+  const angle=Math.atan2(death.y-after.y,death.x-after.x);
+  const bearing=directions[(Math.round(angle/(Math.PI/4))+8)%8];
+  assert.ok(after.notices.some(n=>n.message==='↩ RETURN · LAST FRONT '+bearing),
+   'real React redeploy must tell the player the direction of their witnessed last front: '+
+   JSON.stringify(after.notices));
   await page.locator('[data-nova-front-choice]').waitFor({state:'hidden',timeout:5000});
   assert.deepEqual(errors,[],'no page errors');
   console.log('NOVA_REDEPLOY_FRONT_SMOKE '+JSON.stringify({width,height,dist,terrain:after.terrain,reset:after.choice}));
