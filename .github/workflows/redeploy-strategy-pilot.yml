@@ -1,0 +1,40 @@
+name: NOVA Redeploy Strategy Pilot
+
+on:
+  push:
+    branches:
+      - 'nova/redeploy-real-sim-pilot-*'
+    paths:
+      - 'tests/node/redeploy-paired-real-pilot.test.js'
+      - '.github/workflows/redeploy-strategy-pilot.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: redeploy-pilot-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  paired-real-engine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Run 36 matched worlds at 30/60 Hz for 20 simulated seconds
+        env:
+          NOVA_REDEPLOY_FULL_PILOT: '1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/redeploy-pilot
+          node --test tests/node/redeploy-paired-real-pilot.test.js 2>&1 | tee artifacts/redeploy-pilot/run.log
+      - name: Preserve paired simulation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-redeploy-paired-real-engine
+          path: artifacts/redeploy-pilot/
+          if-no-files-found: error
+          retention-days: 30
