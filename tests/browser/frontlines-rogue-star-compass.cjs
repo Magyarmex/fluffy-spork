@@ -72,6 +72,32 @@ const {chromium}=require('playwright');
     assert.deepEqual(signal.adoptedPosition,signal.priorPosition,'adoption must not teleport the Star');
     assert.equal(signal.initialX,signal.starX,'public bearing must use public report');
     assert.equal(signal.initialY,signal.starY);
+    // The actual composed minimap must retain the public announcement
+    // position even if the living Star has moved out of sight. The AI already
+    // uses last-visible memory; the minimap must not be a stronger radar.
+    const marker=await page.evaluate(()=>{
+     const g=window.__novaStarCompassGame,st=g.__lfState,sig=st.signal;
+     if(sig?.type!=='ROGUE STAR'||!g.mmCtx)throw Error('live Star minimap owner missing');
+     const star=g.getShape(sig.starId),originalArc=g.mmCtx.arc;
+     if(!star)throw Error('announced Star missing before marker verification');
+     const original={x:star.x,y:star.y},points=[];
+     g.setPaused(true);
+     try{
+      star.x=Math.max(-2000,Math.min(2000,sig.x+900));
+      star.y=Math.max(-2000,Math.min(2000,sig.y+900));
+      g.mmCtx.arc=function(x,y,r){if(Math.abs(r-4)<1e-6)points.push([x,y]);return originalArc.apply(this,arguments);};
+      g.drawMinimap();
+      return{points,expected:[(sig.x+2250)*216/4500,(sig.y+2250)*216/4500],
+       live:[(star.x+2250)*216/4500,(star.y+2250)*216/4500]};
+     }finally{
+      g.mmCtx.arc=originalArc;star.x=original.x;star.y=original.y;g.setPaused(false);
+     }
+    });
+    const near=(p,q)=>Math.hypot(p[0]-q[0],p[1]-q[1])<.02;
+    assert.ok(marker.points.some(p=>near(p,marker.expected)),
+     'minimap must mark the frozen public report: '+JSON.stringify(marker));
+    assert.ok(!marker.points.some(p=>near(p,marker.live)),
+     'hidden live Star must not become a minimap tracking beacon: '+JSON.stringify(marker));
     assert.match(signal.emitted,/^★ ROGUE STAR · REPORTED (?:E|SE|S|SW|W|NW|N|NE|NEAR YOU) · cut its route$/);
     assert.equal(signal.viewport,width);
     await page.waitForFunction(message=>[...document.querySelectorAll('.panel.anim-pop')].
