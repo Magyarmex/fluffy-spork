@@ -46,6 +46,12 @@ async function main() {
     assert.deepEqual(result.before,{best:0,level:0,pity:1,score:0});
     assert.ok(result.after>=40 && result.alive, 'XP still awards normally');
     await page.waitForFunction(()=>Number(localStorage.getItem('novatanks_best'))>=40,null,{timeout:7000});
+    const savedLevel=await page.evaluate(()=>{
+      const g=window.__novaCorruptRecordGame;
+      g.killTank(g.player,null);
+      return localStorage.getItem('novatanks_bestlevel');
+    });
+    assert.equal(savedLevel,'1','a legitimate death replaces poisoned best-level storage');
     await page.reload({waitUntil:'domcontentloaded',timeout:45000});
     await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({state:'visible',timeout:45000});
     const recovered=await page.evaluate(()=>({
