@@ -74,3 +74,48 @@ test('public Star bearing is independent of hidden ecology and unrelated shapes'
  assert.equal(T.rogueStarToast(rich,sig),T.rogueStarToast(poor,sig));
  assert.match(T.rogueStarToast(rich,sig),/SPAWN E/);
 });
+
+test('fresh canonical baseline Star becomes public without duplicate spawn or teleport',()=>{
+ const {LF}=boot(),messages=[],star={id:42,kind:'shape',type:'star',
+  x:1200,y:-900,hp:100,__lfStarBorn:98},p={id:1,x:0,y:0,hp:100,alive:true};
+ const st={age:100,ceiling:1,signal:null,bloomMemory:null,directorEnabled:true,
+  lastSignalAt:-99,lastMeaningfulAt:0,lastBloomSector:-1,
+  migrationHeat:0,migrationX:0,migrationY:0,
+  cooldowns:{bloom:100,migration:100,star:0},
+  sectors:Array.from({length:16},()=>({value:0,maturity:.1,pressure:0,outbound:0})),
+  stats:{blooms:0,migrations:0,starsSpawned:0,aiRotations:0}};
+ const g={time:100,status:'playing',player:p,tanks:[p],shapes:[star],__lfState:st,
+  spawnShape(){throw Error('baseline adoption must never duplicate a Star');},
+  getShape(id){return id===star.id?star:null;},
+  toast(msg){messages.push(msg);}};
+ LF.directorTick(g,st);
+ assert.equal(st.signal?.type,'ROGUE STAR');
+ assert.equal(st.signal.starId,42);
+ assert.deepEqual([star.x,star.y],[1200,-900],'adoption cannot teleport');
+ assert.equal(g.shapes.length,1);
+ assert.equal(st.stats.starsSpawned,0,'adoption must not masquerade as new spawn');
+ assert.equal(st.stats.starAnnouncements,1);
+ assert.equal(star.__lfPublicAnnounced,true);
+ assert.match(messages[0],/SPAWN NE/);
+ // Force a second quiet public opportunity; the same Star is not eligible.
+ st.signal=null;st.lastSignalAt=-99;st.lastMeaningfulAt=0;
+ st.cooldowns.star=0;
+ LF.directorTick(g,st);
+ assert.equal(st.signal,null,'already-announced Star cannot be re-announced');
+ assert.equal(messages.length,1);
+});
+test('stale canonical Star does not get a misleading near-expiry announcement',()=>{
+ const {LF}=boot(),star={id:7,type:'star',kind:'shape',x:200,y:100,
+  hp:100,__lfStarBorn:40};
+ const st={age:100,ceiling:1,signal:null,directorEnabled:true,
+  lastSignalAt:-99,lastMeaningfulAt:0,lastBloomSector:-1,
+  migrationHeat:0,migrationX:0,migrationY:0,
+  cooldowns:{bloom:100,migration:100,star:0},
+  sectors:Array.from({length:16},()=>({value:0,maturity:.1,pressure:0,outbound:0})),
+  stats:{blooms:0,migrations:0,starsSpawned:0}};
+ const g={time:100,status:'playing',player:{x:0,y:0,hp:100,alive:true},
+  tanks:[],shapes:[star],__lfState:st,toast(){throw Error('no public signal expected');}};
+ LF.directorTick(g,st);
+ assert.equal(st.signal,null);
+ assert.equal(st.stats.starAnnouncements,undefined);
+});
