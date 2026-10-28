@@ -32,17 +32,23 @@ const {chromium}=require('playwright');
      st.lastSignalAt=-99;st.lastMeaningfulAt=0;
      st.migrationHeat=0;st.cooldowns.bloom=100;
      st.cooldowns.migration=100;st.cooldowns.star=0;
+     /* The rare Star is allowed only when no genuine BLOOM exists.
+      * Isolate that Director precondition without faking the Star itself. */
+     st.sectors.forEach(s=>{s.value=0;s.maturity=.1;s.pressure=0;s.outbound=0;});
      if(g.__novaBattlefield)g.__novaBattlefield.announced=true;
      g.time=100; // Research-only natural-age gate; no forced survival in production.
+     const T=window.__NOVA_LIVING_FRONT_TEST__;
+     const priorStars=g.shapes.filter(s=>s&&s.type==='star'&&s.hp>0).length;
+     const candidate=T.directorDecision(st,{enabled:true,now:g.time,hasStar:priorStars>0});
      let emitted=null;const old=g.toast;
      g.toast=function(message){emitted=message;return old.apply(this,arguments);};
      try{LF.directorTick(g,st);}finally{g.toast=old;g.setPaused(false);}
      const sig=st.signal,s=sig&&g.getShape&&g.getShape(sig.starId);
-     return{emitted,type:sig?.type,starId:sig?.starId,
+     return{emitted,priorStars,candidate,bloomCandidate:T.bloomCandidate(st),type:sig?.type,starId:sig?.starId,
       initialX:sig?.x,initialY:sig?.y,
       starX:s?.x,starY:s?.y,viewport:window.innerWidth};
     });
-    assert.equal(signal.type,'ROGUE STAR','real Director must announce a public Star');
+    assert.equal(signal.type,'ROGUE STAR','real Director must announce a public Star: '+JSON.stringify(signal));
     assert.ok(signal.starId>0,'real Star entity must be created');
     assert.equal(signal.initialX,signal.starX,'public bearing must use initial spawn');
     assert.equal(signal.initialY,signal.starY);
