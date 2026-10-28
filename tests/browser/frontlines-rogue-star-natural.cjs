@@ -91,6 +91,10 @@ const seconds=300,dt=1/30,chunk=450;
     /* Counterfactual is read-only: a candidate at an actual Director tick,
      * not an independent event or a simulated gameplay intervention. */
     counterfactual:{},maxQuietWithFreshAfter72:0,
+    gateCross:{freshWithBloomCandidate:0,freshBloomOnCooldown:0,
+     freshSignalActive:0,freshSignalCooldown:0,freshMigrationHot:0,
+     freshBelowQuiet16:0},variants:{baseline:[],quiet16Only:[],
+     removeBloomVetoOnly:[],combined16:[],combined12:[]},
     starGenerations:[],seenStarIds:[],blocked:{
      noStar:0,staleStar:0,early:0,activeSignal:0,signalCooldown:0,
      starCooldown:0,notQuiet:0,bloom:0,migrationHeat:0,other:0}};
@@ -113,6 +117,29 @@ const seconds=300,dt=1/30,chunk=450;
     const baseReady=now>72&&(!st.signal||now>=st.signal.until)&&
      now-st.lastSignalAt>=8&&st.cooldowns.star<=0&&
      T.bloomCandidate(st)<0&&st.migrationHeat<3;
+    if(now>72&&fresh.length){
+     const bloom=T.bloomCandidate(st),quiet=now-st.lastMeaningfulAt,
+      active=!!(st.signal&&now<st.signal.until),
+      signalCooldown=now-st.lastSignalAt<8,
+      bloomWins=st.cooldowns.bloom<=0&&bloom>=0&&
+       (bloom!==st.lastBloomSector||st.sectors[bloom].maturity>.78*st.ceiling),
+      common=!active&&!signalCooldown&&st.cooldowns.star<=0&&
+       st.migrationHeat<3&&!bloomWins;
+     if(bloom>=0)audit.gateCross.freshWithBloomCandidate++;
+     if(bloom>=0&&st.cooldowns.bloom>0)audit.gateCross.freshBloomOnCooldown++;
+     if(active)audit.gateCross.freshSignalActive++;
+     if(signalCooldown)audit.gateCross.freshSignalCooldown++;
+     if(st.migrationHeat>=3)audit.gateCross.freshMigrationHot++;
+     if(quiet<=16)audit.gateCross.freshBelowQuiet16++;
+     if(common){
+      const tests={baseline:quiet>31&&bloom<0,
+       quiet16Only:quiet>16&&bloom<0,
+       removeBloomVetoOnly:quiet>31,
+       combined16:quiet>16,combined12:quiet>12};
+      for(const key of Object.keys(tests))if(tests[key]&&audit.variants[key].length<128)
+       audit.variants[key].push(+now.toFixed(2));
+     }
+    }
     if(baseReady)for(const maxAge of [8,12,16]){
      const adoptable=stars.some(s=>!s.__lfPublicAnnounced&&
       Number.isFinite(s.__lfStarBorn)&&now-s.__lfStarBorn>=0&&
