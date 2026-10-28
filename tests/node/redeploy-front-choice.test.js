@@ -234,3 +234,26 @@ test('invalid clock and offscreen marker cannot disrupt the original minimap',()
  assert.equal(g.__novaLastFrontMarker,null,'invalid game clock clears waypoint');
  assert.equal(g.mapDraws,3);
 });
+
+
+test('death modal recovers if React removes its injected action row',()=>{
+ const {Game,addPanel}=boot(),g=new Game(),panel=addPanel();
+ g.killTank(victim(100,200));g.update();
+ const first=panel.choice;
+ assert.ok(first,'the initial two-choice action row exists');
+ assert.equal(panel.redeploy.style.display,'none','original React action is intentionally hidden');
+ // React can replace/reconcile the death modal while Game.status remains dead.
+ // Losing the foreign DOM row must not strand the player with no visible action.
+ panel.removeChild(first);
+ assert.equal(panel.choice,null);
+ g.update();
+ assert.ok(panel.choice,'a later dead-state tick must restore usable redeploy actions');
+ assert.notEqual(panel.choice,first,'the detached row is not reused');
+ assert.equal(panel.choice.children.length,2);
+ assert.equal(panel.redeploy.style.display,'none');
+ panel.choice.children[1].onclick();
+ assert.equal(g.__novaRedeployChoice,'return');
+ assert.equal(panel.redeploy.clicked,1,'React callback remains authoritative after remount');
+ g.redeploy();
+ assert.equal(panel.redeploy.style.display,'','original action is restored on exit');
+});
