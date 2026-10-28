@@ -88,6 +88,17 @@ test('return respects terrain rejection and falls back to original safe algorith
  assert.equal(g.player.x,1900);
  assert.deepEqual(g.randCalls,[900,400]);
 });
+test('missing or throwing terrain owner falls back without blocking redeploy',()=>{
+ const {Game}=boot(),g=new Game();
+ g.isTerrainSafe=undefined;
+ g.killTank(victim());g.update();g.__novaRedeployChoice='return';
+ assert.doesNotThrow(()=>g.redeploy());
+ assert.equal(g.player.x,1900);
+ const h=new Game();h.isTerrainSafe=()=>{throw Error('terrain temporarily unavailable');};
+ h.killTank(victim());h.update();h.__novaRedeployChoice='return';
+ assert.doesNotThrow(()=>h.redeploy());
+ assert.equal(h.player.x,1900);
+});
 test('return never chooses out-of-bounds near edge',()=>{
  const {Game}=boot(),g=new Game();
  g.killTank(victim(2240,2240));g.update();g.__novaRedeployChoice='return';
