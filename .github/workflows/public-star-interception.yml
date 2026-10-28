@@ -1,0 +1,52 @@
+name: Public Rogue Star Interception (research)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/browser/frontlines-public-star-*.js'
+      - 'tests/browser/frontlines-public-star-*.cjs'
+      - 'tests/node/frontlines-public-star-pilot.test.js'
+      - '.github/workflows/public-star-interception.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  natural-paired:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        layout: [0, 1, 2]
+        seed: [0, 1]
+        mode: [control, intercept]
+    env:
+      NOVA_LAYOUT_INDEX: ${{ matrix.layout }}
+      NOVA_SEED_INDEX: ${{ matrix.seed }}
+      NOVA_STAR_PILOT_MODE: ${{ matrix.mode }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --no-audit --no-fund --no-package-lock
+      - run: npm install --no-save --no-audit --no-fund --no-package-lock playwright@1.56.1
+      - run: npx playwright install chromium
+      - name: Verify public-only pilot invariants
+        run: node --test tests/node/frontlines-public-star-pilot.test.js
+      - name: Serve canonical materialized game
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/nova-star-public-http.log 2>&1 &
+      - name: Natural-match public Star interception audit
+        run: node tests/browser/frontlines-public-star-interception.cjs
+      - name: Preserve all trials including censored and zero-exposure cases
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: star-public-${{ matrix.layout }}-${{ matrix.seed }}-${{ matrix.mode }}
+          path: artifacts/star-public-intercept/
+          if-no-files-found: ignore
+          retention-days: 14
