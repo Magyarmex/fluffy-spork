@@ -1308,3 +1308,148 @@ for(const optimized of [false,true]){
   assert.equal(a.hitCount,1);assert.equal(b.hitCount,1);
  });
 }
+
+
+/* Run 423: TTL-expiring high-penetration shots have the same certified
+ * three-body chronology as pen=2. The 15,000u/s stress geometry deliberately
+ * keeps the first target outside the initial 240Hz core endpoint (62.5u),
+ * so every FPS tests the SAME fully certified expiry corridor rather than
+ * the separate unresolved cross-frame victim-identity problem.
+ * This is NOT permission to backdate live pen>=3 shots, four-body chains,
+ * cover breaches or uncertain motion. */
+function highPenTTLWorld(Game, pen=3, reverse=false) {
+  const {g,a,b}=makeWorld(Game,103,reverse);
+  a.x=88;
+  const c={kind:'tank',id:4,x:120,y:0,cls:'scout',
+    hp:100,alive:true,hitCount:0};
+  const d={kind:'tank',id:5,x:160,y:0,cls:'scout',
+    hp:100,alive:true,hitCount:0};
+  g.tanks.push(c,d);
+  const shot=g.bullets[0];
+  shot.vx=15000;shot.r=5.5;shot.ttl=.007;shot.pen=pen;shot.dmg=21;
+  return {g,a,b,c,d,shot};
+}
+for(const optimized of [false,true]){
+ const mode=optimized?'optimized':'baseline',Game=boot(undefined,optimized);
+ for(const pen of [3,4]){
+  for(const fps of [30,60,120,240]){
+   test(mode+' pen='+pen+' TTL three certified hulls at '+fps+'Hz',()=>{
+    const {g,a,b,c,d}=highPenTTLWorld(Game,pen);
+    for(let i=0;i<40&&g.bullets.length;i++){
+     g.time+=1/fps;g.updateBullets(1/fps);
+    }
+    assert.deepEqual([a.hitCount,b.hitCount,c.hitCount,d.hitCount],
+      [1,1,1,0],'no missing or post-expiry hull hits');
+    assert.equal(g.hits,3);
+   });
+  }
+  test(mode+' pen='+pen+' preserves first-contact order, not hash order',()=>{
+   const {g,a,b,c,d}=highPenTTLWorld(Game,pen,true);
+   g.tanks.reverse();
+   const order=[];
+   g.damageTank=t=>{order.push(t.id);t.hitCount++;g.hits++;};
+   g.time+=1/30;g.updateBullets(1/30);
+   assert.deepEqual(order,[a.id,b.id,c.id]);
+   assert.equal(d.hitCount,0);
+  });
+  test(mode+' pen='+pen+' refuses an earlier permanent wall',()=>{
+   const {g,c}=highPenTTLWorld(Game,pen);
+   g.__novaTerrain=[{id:-423,shape:'rect',x:44,y:0,w:3,h:90,
+     solid:true,destructible:false}];
+   g.time+=1/30;g.updateBullets(1/30);
+   assert.equal(c.hitCount,0);
+  });
+  test(mode+' pen='+pen+' refuses shielded later hull',()=>{
+   const {g,c}=highPenTTLWorld(Game,pen);
+   c.spawnShieldT=2;
+   g.time+=1/30;g.updateBullets(1/30);
+   assert.equal(c.hitCount,0);
+  });
+  test(mode+' pen='+pen+' refuses competing projectile interception',()=>{
+   const {g,c}=highPenTTLWorld(Game,pen);
+   g.bullets.push({kind:'bullet',id:423,ownerId:9,x:15,y:0,
+     vx:0,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,
+     dead:false,shell:false,beam:false});
+   g.time+=1/30;g.updateBullets(1/30);
+   assert.equal(c.hitCount,0);
+  });
+  test(mode+' pen='+pen+' refuses unknown movement epoch',()=>{
+   const {g,c}=highPenTTLWorld(Game,pen);
+   g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=423;
+   g.time+=1/30;g.updateBullets(1/30);
+   assert.equal(c.hitCount,0);
+  });
+  test(mode+' pen='+pen+' refuses an unproven four-body chain',()=>{
+   const {g,d}=highPenTTLWorld(Game,pen);
+   d.x=126; // fourth body is physically reachable, but >3 is unproven
+   g.time+=1/30;g.updateBullets(1/30);
+   assert.equal(d.hitCount,0);
+  });
+ }
+}
+
+
+/* The exact Apex class envelopes are playable, not invented projectile
+ * budgets. Model the final 33ms of their normal TTL at 30Hz; this is a
+ * collision-order stress case, not a measured natural encounter rate. */
+for(const optimized of [false,true]){
+ const Game=boot(undefined,optimized);
+ for(const variant of [
+   {name:'specter',pen:3,speed:1220,r:5.2,dmg:31,lastX:62},
+   {name:'assassin',pen:4,speed:1500,r:5.8,dmg:47,lastX:65}
+ ]){
+  test((optimized?'optimized':'baseline')+' canonical '+variant.name+
+    ' TTL tail preserves three direct victims at 30Hz',()=>{
+   assert.match(html,new RegExp(variant.name+':[\\s\\S]{0,500}bullet: \\{ dmg: '+
+     variant.dmg+', speed: '+variant.speed+', r: '+variant.r+
+     ', pen: '+variant.pen));
+   const {g,a,b,c}=highPenTTLWorld(Game,variant.pen);
+   a.x=25;b.x=45;c.x=variant.lastX;
+   const shot=g.bullets[0];
+   shot.vx=variant.speed;shot.r=variant.r;shot.dmg=variant.dmg;
+   shot.ttl=.033;
+   g.time+=1/30;g.updateBullets(1/30);
+   assert.deepEqual([a.hitCount,b.hitCount,c.hitCount],[1,1,1]);
+  });
+ }
+ for(const pen of [3,4]){
+  test((optimized?'optimized':'baseline')+' pen='+pen+
+    ' live frame cannot use TTL-only three-hull shortcut',()=>{
+   const {g,c}=highPenTTLWorld(Game,pen);
+   g.bullets[0].ttl=1;
+   g.time+=1/30;g.updateBullets(1/30);
+   assert.equal(c.hitCount,0,'live pen>=3 needs a separate full chronology proof');
+  });
+  test((optimized?'optimized':'baseline')+' pen='+pen+
+    ' nearby neutral movement blocks TTL shortcut',()=>{
+   const {g,c}=highPenTTLWorld(Game,pen);
+   g.shapes=[{kind:'shape',id:423,x:92,y:32,r:12,hp:100}];
+   g.time+=1/30;g.updateBullets(1/30);
+   assert.equal(c.hitCount,0);
+  });
+ }
+}
+
+
+/* Deterministic property sweep: all three certified contacts occur strictly
+ * before a 2ms TTL. This avoids conflating the TTL fix with unproven
+ * cross-frame hit-identity chronology; the fourth hull remains unreachable. */
+for(const optimized of [false,true]){
+ const Game=boot(undefined,optimized);
+ test((optimized?'optimized':'baseline')+
+   ' 800 seeded high-penetration expiry corridors preserve exact victims',()=>{
+  let seed=4232026;
+  const rnd=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+  for(const pen of [3,4])for(const fps of [30,60,120,240])
+   for(let i=0;i<100;i++){
+    const {g,a,b,c,d}=highPenTTLWorld(Game,pen,i%2===0);
+    a.x=25+rnd()*5;b.x=37+rnd()*5;c.x=50+rnd()*10;
+    d.x=100;
+    const shot=g.bullets[0];shot.vx=20000;shot.ttl=.002;
+    g.time+=1/fps;g.updateBullets(1/fps);
+    assert.deepEqual([a.hitCount,b.hitCount,c.hitCount,d.hitCount],
+      [1,1,1,0],'world '+i+' pen='+pen+' fps='+fps);
+    assert.equal(g.hits,3);
+   }
+ });
+}

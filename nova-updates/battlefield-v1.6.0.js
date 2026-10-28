@@ -618,7 +618,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      b.__novaBreachAtTime===g.time||
      !(dt>0)||!(b.ttl>0)||
      (nonExpiring ? !(b.ttl>dt&&b.pen===1&&b.hits===0) : !(b.ttl<=dt))||
-     !(b.pen===0||b.pen===1||(!nonExpiring&&b.pen===2))||
+     !(Number.isSafeInteger(b.pen)&&b.pen>=0)||
      !(b.hits>=0)||(b.hits===0&&b.pen===0)||
      (b.hits>0&&!(b.__novaDirectVictims instanceof Set))||
      !Number.isFinite(b.x)||!Number.isFinite(b.y)||
