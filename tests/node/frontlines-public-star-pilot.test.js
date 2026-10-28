@@ -64,3 +64,11 @@ test('visible Star remains legitimate even with Director disabled',()=>{
  const g=world([star(200,0)],report(0,250));g.__lfState.directorEnabled=false;
  assert.deepEqual(pilot.cue(g,player,F),{x:200,y:0,source:'visible'});
 });
+
+test('dead pilots never receive steering authority from a public report',()=>{
+ const dead={...player,alive:false};
+ const g=world([star(200,0)],report(0,250));
+ assert.equal(pilot.cue(g,dead,F),null);
+ assert.equal(pilot.moveTowardPublicStar(g,dead,F),null);
+ assert.equal(pilot.aimAtVisibleStar(g,dead,F),null);
+});
