@@ -52,3 +52,54 @@ test('no hidden neutral coordinate, invalid origin, or viewport omission can dir
   assert.deepEqual(policy.move(), {x: 1, y: 0});
   assert.equal(policy.aim(), null);
 });
+
+test('a long visible-neutral chase does not count as a stalled unattempted patrol', () => {
+  const {game, player, fair} = setup();
+  game.shapes = [{id: 11, x: 200, y: 0, hp: 10}];
+  const policy = createPublicRoam(game, player, {x: 0, y: 0}, fair);
+  for (const time of [0, 1, 2, 3, 4, 5, 6]) {
+    game.time = time;
+    assert.ok(policy.move().x > 0, 'the neutral is still a public target');
+  }
+  game.shapes = [];
+  game.time = 6.1;
+  assert.deepEqual(policy.move(), {x: 1, y: 0});
+  assert.equal(policy.stats().patrolIndex, 0);
+  assert.equal(policy.stats().waypointFailures, 0);
+});
+test('real patrol stalls still advance after a neutral chase ends', () => {
+  const {game, player, fair} = setup();
+  game.shapes = [{id: 11, x: 200, y: 0, hp: 10}];
+  const policy = createPublicRoam(game, player, {x: 0, y: 0}, fair);
+  game.time = 0;
+  policy.move();
+  game.time = 5;
+  policy.move();
+  game.shapes = [];
+  game.time = 5.1;
+  policy.move();
+  assert.equal(policy.stats().waypointFailures, 0, 'the chase cannot age the patrol');
+  game.time = 8.5;
+  policy.move();
+  assert.equal(policy.stats().waypointFailures, 1, 'genuine no-progress patrol times out');
+  assert.equal(policy.stats().patrolIndex, 1);
+});
+test('a chase after prior patrol progress does not inherit a stale distance', () => {
+  const {game, player, fair} = setup();
+  const policy = createPublicRoam(game, player, {x: 0, y: 0}, fair);
+  policy.move();
+  player.x = 200;
+  game.time = 1;
+  policy.move(); // Record patrol progress toward x=420.
+  game.shapes = [{id: 11, x: 200, y: 250, hp: 10}];
+  game.time = 2;
+  policy.move();
+  game.shapes = [];
+  game.time = 2.1;
+  policy.move();
+  assert.equal(policy.stats().waypointFailures, 0);
+  game.time = 5.7;
+  policy.move();
+  assert.equal(policy.stats().waypointFailures, 1,
+    'patrol timeout remains active after the chase, without stale progress');
+});
