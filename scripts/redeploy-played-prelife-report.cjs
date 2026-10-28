@@ -22,6 +22,11 @@ function reportPlayedFirstLife(report, expectedSeeds = 36) {
         JSON.stringify(a.origin) !== JSON.stringify(a.prelude.origin) ||
         JSON.stringify(b.origin) !== JSON.stringify(a.prelude.origin))
       throw Error('Unmatched played first life: ' + key);
+    if (!a.postInsertion || !b.postInsertion ||
+        !a.postInsertion.enemyClassesHash || !b.postInsertion.enemyClassesHash ||
+        !a.postInsertion.enemyBodiesHash || !b.postInsertion.enemyBodiesHash ||
+        !a.postInsertion.neutralBodiesHash || !b.postInsertion.neutralBodiesHash)
+      throw Error('Missing read-only post-insertion fingerprints: ' + key);
     if (a.prelude.elapsed <= 0 || a.prelude.ticks <= 0)
       throw Error('Missing real first-life ticks: ' + key);
     if (!Number.isFinite(a.neutralXP) || !Number.isFinite(b.neutralXP) ||
@@ -34,6 +39,9 @@ function reportPlayedFirstLife(report, expectedSeeds = 36) {
       preludeElapsed:p.elapsed, preludeTravel:p.travelled,
       preludeNeutralXP:p.neutralXPEarned, preludeChangedShapes:p.changedShapes,
       preludeChangedEnemies:p.changedEnemies, preludeChangedTerrain:p.changedTerrain,
+      sameEnemyClasses:a.postInsertion.enemyClassesHash===b.postInsertion.enemyClassesHash,
+      sameEnemyBodies:a.postInsertion.enemyBodiesHash===b.postInsertion.enemyBodiesHash,
+      sameNeutralBodies:a.postInsertion.neutralBodiesHash===b.postInsertion.neutralBodiesHash,
       neutralGap:b.neutralXP-a.neutralXP, scoreGap:b.score-a.score,
       hpGap:b.hp-a.hp, survivalGap:Number(b.alive)-Number(a.alive),
       freshReached:a.frontReached!==null, returnReached:b.frontReached!==null};
@@ -63,6 +71,11 @@ function reportPlayedFirstLife(report, expectedSeeds = 36) {
       meanChangedShapes:mean(rows.map(x => x.preludeChangedShapes)),
       meanChangedEnemies:mean(rows.map(x => x.preludeChangedEnemies)),
       meanChangedTerrain:mean(rows.map(x => x.preludeChangedTerrain))},
+    postInsertionParity:{sameEnemyClassSequence:rows.filter(x => x.sameEnemyClasses).length,
+      sameEnemyBodies:rows.filter(x => x.sameEnemyBodies).length,
+      sameNeutralBodies:rows.filter(x => x.sameNeutralBodies).length,
+      denominator:rows.length,
+      warning:'These are observed consequences of different insertion paths, not a claim of unfair spawning.'},
     returnMinusFresh:{neutralXP:metric('neutralGap'),score:metric('scoreGap'),
       hp:metric('hpGap'),survival:metric('survivalGap')},
     frontArrivals:{fresh:rows.filter(x => x.freshReached).length,
