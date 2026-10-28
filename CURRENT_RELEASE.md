@@ -63,7 +63,7 @@ The old Arena Director concept was narrowed into a restrained **Front Director**
 
 - **BLOOM** announces a naturally matured high-value pocket that already exists. The signal does not spawn value or activate an XP multiplier.
 - **MIGRATION** is announced only after enough real neutral entities have physically crossed sector boundaries in a coherent direction.
-- **ROGUE STAR** is the one deliberately created Director opportunity. After a sufficiently quiet stretch, one fast Star may enter as a globally readable interception prize.
+- **ROGUE STAR** can publicly adopt a fresh existing Star after 16 seconds without a Director opportunity, without creating or teleporting another Star. BLOOM still wins when eligible; a BLOOM on cooldown does not suppress this distinct opportunity. If no Star exists, the original created-Star fallback retains its stricter 31-second quiet requirement.
 - Director opportunities use cooldowns and state gates to prevent event spam and duplicate Stars.
 - Communication is intentionally restrained: short world/minimap/audio signals, not capture bars, permanent ecology HUDs, quest trackers, or extra buttons.
 - Living Front remains interesting with the Director disabled. The ecology, shape instincts, value geography, and physical migration continue to run without scripted events.

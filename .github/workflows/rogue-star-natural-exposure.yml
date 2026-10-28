@@ -1,0 +1,46 @@
+name: Rogue Star Natural Exposure (research)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/browser/frontlines-rogue-star-natural.cjs'
+      - '.github/workflows/rogue-star-natural-exposure.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  natural-match:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        layout: [0, 1, 2]
+        seed: [0, 1]
+    env:
+      NOVA_LAYOUT_INDEX: ${{ matrix.layout }}
+      NOVA_SEED_INDEX: ${{ matrix.seed }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --no-audit --no-fund --no-package-lock
+      - run: npm install --no-save --no-audit --no-fund --no-package-lock playwright@1.56.1
+      - run: npx playwright install chromium
+      - name: Serve actual shipping runtime
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/nova-star-http.log 2>&1 &
+      - name: Observe real unmodified Director and Star life cycle
+        run: node tests/browser/frontlines-rogue-star-natural.cjs
+      - name: Preserve complete natural-match evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rogue-star-natural-${{ matrix.layout }}-${{ matrix.seed }}
+          path: artifacts/star-natural/
+          if-no-files-found: ignore
+          retention-days: 14

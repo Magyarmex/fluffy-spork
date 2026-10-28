@@ -21,7 +21,7 @@ Living Front turns neutral shape farming into a dynamic battlefield ecology with
 - Quiet ground can mature into richer farming territory later in a match; fighting and harvesting disturb that geography.
 - Circles school gently, Triangles make readable committed evasions, Squares remain deliberately simple, Pentagons/Hexagons create directional cascades, Hexagons act as bounded keystones, and Rogue Stars become interception prey.
 - Crashers now use **Track → Telegraph → Charge → Overshoot → Recover**, obey terrain, and prey on vulnerable targets without gaining hidden combat stats.
-- The Front Director mostly reports real state through **BLOOM** and **MIGRATION**. **ROGUE STAR** is the one rare event allowed to create a new opportunity deliberately.
+- The Front Director mostly reports real state through **BLOOM** and **MIGRATION**. **ROGUE STAR** can announce a fresh existing Star after strategic quiet without duplicating it; the rarer created-Star fallback remains for a world with no Star.
 - AI may reason about ecology only through public Director signals and Fair Engagement-legal information; it receives no hidden maturity map or privileged live target coordinates.
 - Controller autonomy remains local: drones may handle nearby farming chores, but distant ecological decisions remain the player's.
 
