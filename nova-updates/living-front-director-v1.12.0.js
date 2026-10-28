@@ -24,17 +24,19 @@ function bloomCandidate(st){if(!bloomAgeEligible(st))return-1;var avg=mean(st),b
 function migrationAt(st,from){
  var local=st.sectors[from],routes=local&&local.flowTo;
  if(!routes)return null;
- var bestTo=-1,bestWeight=1e-6,total=0;
+ var bestTo=-1,bestWeight=1e-6,runnerUp=0;
  for(var to=0;to<16;to++){
   if(to===from)continue;
   var weight=Number(routes[to])||0;
   if(!(weight>0))continue;
-  total+=weight;
-  if(weight>bestWeight){bestWeight=weight;bestTo=to;}
+  if(weight>bestWeight){runnerUp=bestWeight;bestWeight=weight;bestTo=to;}
+  else if(weight>runnerUp)runnerUp=weight;
  }
- /* A tie between opposite routes is movement, but not one coherent public
-  * direction. Announce only a physically witnessed majority destination. */
- return bestTo>=0&&bestWeight>total*.5?
+ /* Report the strongest witnessed physical route. Exact ties and cancelled
+  * aggregate flow remain ambiguous; do not fabricate a dominant direction.
+  * Do not require a majority: that would erase legitimate split migrations. */
+ var net=Math.hypot(Number(local.flowX)||0,Number(local.flowY)||0);
+ return bestTo>=0&&bestWeight>runnerUp+1e-6&&net>1e-6?
   {type:'MIGRATION',from:from,to:bestTo}:null;
 }
 function decision(st,ctx){var adopting=!!(ctx&&ctx.adoptStarId>0);if(ctx&&ctx.enabled===false)return null;var now=ctx&&ctx.now||0;if(st.signal&&now<st.signal.until)return null;if(now-st.lastSignalAt<8)return null;if(st.cooldowns.bloom<=0){var b=bloomCandidate(st);if(b>=0&&(b!==st.lastBloomSector||st.sectors[b].maturity>.78*st.ceiling))return{type:'BLOOM',sector:b};}
