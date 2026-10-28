@@ -139,7 +139,7 @@ test('surviving Rogue Star keeps its physical age and expires at the same deadli
     assert.ok(star&&LF&&LF.behaviorTick,'the shipping Star and instinct owner must be installed');
     const initial={x:star.x,y:star.y,hp:star.hp};
     g.time=100;
-    star.__lfStarBorn=90;star.__lfSpawnAt=90;
+    star.__lfStarBorn=90;star.__lfSpawnAt=90;star.born=90;
     star.__lfPublicAnnounced=true;star.__lfExit=true;
     g.redeploy();
     assert.equal(g.time,0,'the original game resets its clock on redeploy');
@@ -147,6 +147,7 @@ test('surviving Rogue Star keeps its physical age and expires at the same deadli
     assert.deepEqual({x:star.x,y:star.y,hp:star.hp},initial,'redeploy does not alter its body');
     assert.equal(star.__lfStarBorn,-10,'Star birth is rebased, not restarted');
     assert.equal(star.__lfSpawnAt,-10,'general neutral birth age is preserved');
+    assert.equal(star.born,-10,'core shape birth clock must not impersonate a newborn in Battlefield');
     assert.equal(star.__lfPublicAnnounced,true,'an announced Star cannot be announced twice');
     assert.equal(star.__lfExit,true,'the Star keeps its exit phase');
     const st=LF.ensure(g,LF.defs);
@@ -167,12 +168,13 @@ test('two redeploys preserve fresh Star adoption age and Triangle dodge/cooldown
   assert.ok(star&&tri);
   g.time=100;
   star.__lfStarBorn=96;star.__lfPublicAnnounced=false;
-  tri.__lfSpawnAt=95;
+  tri.__lfSpawnAt=95;tri.born=95;
   tri.__lfEvadeUntil=100.2;tri.__lfEvadeReady=100.9;
   g.redeploy();
   assert.equal(star.__lfStarBorn,-4);
   assert.equal(g.time-star.__lfStarBorn,4,'unannounced Star remains in its 0–8s adoption window');
   assert.equal(tri.__lfSpawnAt,-5);
+  assert.equal(tri.born,-5,'the core shape birth clock follows the same rebase');
   assert.ok(Math.abs(tri.__lfEvadeUntil-.2)<1e-9);
   assert.ok(Math.abs(tri.__lfEvadeReady-.9)<1e-9);
   g.time=.1;
@@ -194,6 +196,7 @@ test('replenished neutral bodies use the new clock, not the previous life offset
   assert.ok(replacement&&replacement!==old);
   assert.equal(replacement.__lfStarBorn,0,'new Star starts at age zero');
   assert.equal(replacement.__lfSpawnAt,0,'new neutral body is not shifted as a survivor');
+  assert.equal(replacement.born,0,'Battlefield still recognizes a genuinely newborn shape');
 });
 
 test('Rogue Star exit-phase threshold survives redeploy without an early retreat',()=>{
@@ -211,4 +214,16 @@ test('Rogue Star exit-phase threshold survives redeploy without an early retreat
   LF.behaviorTick(g,st,LF.defs,.12);
   assert.equal(star.__lfExit,true,'age 23.1 must start the exit phase');
   assert.ok(g.shapes.includes(star),'exit phase does not despawn the Star prematurely');
+});
+
+test('old neutral birth timestamps cannot masquerade as current-frame births after redeploy',()=>{
+  const g=bootGame(),s=g.shapes.find(s=>s.type==='circle');
+  assert.ok(s);
+  g.time=100;s.born=12.5;
+  g.redeploy();
+  assert.strictEqual(g.getShape(s.id),s);
+  assert.equal(s.born,-87.5,'old birth must be rebased into the new clock domain');
+  g.time=12.5;
+  assert.notEqual(s.born,g.time,
+    'Battlefield born===g.time guard must not veto an old surviving body');
 });
