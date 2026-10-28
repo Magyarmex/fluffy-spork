@@ -99,7 +99,8 @@ wrap('game/engine',function(engine,require){
     try{
       var storage=window.localStorage;
       if(!storage||typeof storage.getItem!=='function'||typeof storage.setItem!=='function')return;
-      var previous=Number(storage.getItem('novatanks_best'))||0;
+      var storedBest=Number(storage.getItem('novatanks_best'));
+    var previous=Number.isFinite(storedBest)&&storedBest>=0?storedBest:0;
       if(candidate>previous)storage.setItem('novatanks_best',String(candidate));
       g.__lfBestPersistedScore=Math.max(Number(g.__lfBestPersistedScore)||0,candidate,previous);
     }catch(ignore){/* localStorage can be unavailable in private mode */ }
