@@ -260,3 +260,43 @@ test('team-mode uncertainty abstains from posthumous attribution',()=>{
  v.hp=5;g.damageTank(v,10,shooter.id);g.update();
  assert.equal(panel.note,null,'cannot reconstruct departed alliances');
 });
+
+test('Fieldcraft death lesson recovers after React removes its foreign DOM note',()=>{
+ const {Game,addPanel}=boot(),g=new Game(),p=addPanel();
+ g.killTank(victim(),killer('marksman'));g.update();
+ const first=p.note;
+ assert.ok(first);
+ p.removeChild(first);
+ g.update();
+ assert.ok(p.note&&p.note!==first,'dead-state tick remounts the missing lesson');
+ assert.match(p.note.children[0].textContent,/MARKSMAN/);
+ g.redeploy();
+ assert.equal(p.note,null,'cleanup still removes the remounted note');
+});
+test('Fieldcraft death lesson recovers when React replaces the whole modal',()=>{
+ const {Game,addPanel,panels}=boot(),g=new Game(),p=addPanel();
+ g.killTank(victim(),killer('carrier'));g.update();
+ assert.ok(p.note);
+ p.note.isConnected=false;
+ panels.shift();
+ const replacement=addPanel();
+ g.update();
+ assert.ok(replacement.note,'the new React modal gets the existing killer lesson');
+ assert.match(replacement.note.children[0].textContent,/CARRIER/);
+ g.redeploy();
+ assert.equal(replacement.note,null);
+});
+
+test('Fieldcraft remount ignores nested front-choice buttons and keeps React insertion owner',()=>{
+ const {Game,addPanel}=boot(),g=new Game(),p=addPanel();
+ g.killTank(victim(),killer('marksman'));g.update();
+ assert.ok(p.note);
+ p.removeChild(p.note);
+ const nativeButtons=p.querySelectorAll.bind(p);
+ const nested={textContent:'⚡ REDEPLOY FRESH',
+  getAttribute(name){return name==='data-nova-insertion'?'fresh':null;}};
+ p.querySelectorAll=sel=>sel==='button'?[nested,...nativeButtons(sel)]:nativeButtons(sel);
+ g.update();
+ assert.ok(p.note,'the note remounts before the original React callback');
+ assert.match(p.note.children[0].textContent,/MARKSMAN/);
+});

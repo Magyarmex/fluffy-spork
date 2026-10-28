@@ -57,13 +57,13 @@ function boot(options={}){
    setAttribute(k,v){this.attributes[k]=v;},removeAttribute(k){delete this.attributes[k];},
    click(){this.clicked++;}};
   const panel={textContent:'TERMINATED SCORE REDEPLOY',choice:null,
-   querySelectorAll(sel){return sel==='button'?[redeploy]:[];},
+   querySelectorAll(sel){return sel==='button'?[this.redeploy]:[];},
    querySelector(sel){return sel==='[data-nova-front-choice]'?this.choice:null;},
-   insertBefore(node,before){assert.equal(before,redeploy);this.choice=node;node.parentNode=this;},
+   insertBefore(node,before){assert.equal(before,this.redeploy);this.choice=node;node.parentNode=this;},
    removeChild(node){assert.equal(node,this.choice);this.choice=null;node.parentNode=null;}};
   panel.redeploy=redeploy;panels.push(panel);return panel;
  }
- return {Game:m.exports.Game,api:window.__NOVA_FRONT_CHOICE_TEST__,addPanel,observers,timers,mapMarks};
+ return {Game:m.exports.Game,api:window.__NOVA_FRONT_CHOICE_TEST__,addPanel,panels,observers,timers,mapMarks};
 }
 function victim(x=0,y=0){return {id:1,isPlayer:true,alive:true,x,y};}
 test('materialized production chain loads front choice before game boot',()=>{
@@ -233,4 +233,62 @@ test('invalid clock and offscreen marker cannot disrupt the original minimap',()
  assert.doesNotThrow(()=>g.drawMinimap());
  assert.equal(g.__novaLastFrontMarker,null,'invalid game clock clears waypoint');
  assert.equal(g.mapDraws,3);
+});
+
+
+test('death modal recovers if React removes its injected action row',()=>{
+ const {Game,addPanel}=boot(),g=new Game(),panel=addPanel();
+ g.killTank(victim(100,200));g.update();
+ const first=panel.choice;
+ assert.ok(first,'the initial two-choice action row exists');
+ assert.equal(panel.redeploy.style.display,'none','original React action is intentionally hidden');
+ // React can replace/reconcile the death modal while Game.status remains dead.
+ // Losing the foreign DOM row must not strand the player with no visible action.
+ panel.removeChild(first);
+ assert.equal(panel.choice,null);
+ g.update();
+ assert.ok(panel.choice,'a later dead-state tick must restore usable redeploy actions');
+ assert.notEqual(panel.choice,first,'the detached row is not reused');
+ assert.equal(panel.choice.children.length,2);
+ assert.equal(panel.redeploy.style.display,'none');
+ panel.choice.children[1].onclick();
+ assert.equal(g.__novaRedeployChoice,'return');
+ assert.equal(panel.redeploy.clicked,1,'React callback remains authoritative after remount');
+ g.redeploy();
+ assert.equal(panel.redeploy.style.display,'','original action is restored on exit');
+});
+
+test('React replacing the whole dead panel also restores a live callback',()=>{
+ const {Game,addPanel,panels}=boot(),g=new Game(),firstPanel=addPanel();
+ g.killTank(victim(100,200));g.update();
+ assert.ok(firstPanel.choice);
+ firstPanel.choice.isConnected=false;
+ firstPanel.redeploy.isConnected=false;
+ panels.shift(); // React discarded its previous panel, but the Game stays dead.
+ const replacement=addPanel();
+ g.update();
+ assert.ok(replacement.choice,'the newly mounted React modal gets both choices');
+ assert.equal(replacement.redeploy.style.display,'none');
+ replacement.choice.children[0].onclick();
+ assert.equal(replacement.redeploy.clicked,1,'the NEW React callback is used');
+ assert.equal(firstPanel.redeploy.clicked,0,'no stale callback from the discarded panel');
+ g.redeploy();
+ assert.equal(replacement.redeploy.style.display,'','the live callback is restored');
+});
+
+test('death modal repairs a replaced React callback even when the row survives',()=>{
+ const {Game,addPanel}=boot(),g=new Game(),panel=addPanel();
+ g.killTank(victim(100,200));g.update();
+ const stale=panel.redeploy,first=panel.choice;
+ first.isConnected=true;stale.isConnected=false;
+ panel.redeploy={...stale,style:{},attributes:{},clicked:0,
+  click(){this.clicked++;}};
+ panel.redeploy.isConnected=true;
+ g.update();
+ assert.ok(panel.choice&&panel.choice!==first,'row is rebound to the new React callback');
+ panel.choice.children[1].onclick();
+ assert.equal(panel.redeploy.clicked,1);
+ assert.equal(stale.clicked,0,'the detached React callback cannot be invoked');
+ g.redeploy();
+ assert.equal(panel.redeploy.style.display,'');
 });

@@ -317,8 +317,15 @@ function findPanel(){
  for(var i=0;i<panels.length;i++){
   var p=panels[i],buttons=p.querySelectorAll('button'),redeploy=null;
   if(!p.textContent||p.textContent.indexOf('TERMINATED')<0)continue;
-  for(var j=0;j<buttons.length;j++)
-   if((buttons[j].textContent||'').indexOf('REDEPLOY')>=0){redeploy=buttons[j];break;}
+  for(var j=0;j<buttons.length;j++){
+   var button=buttons[j];
+   /* Front Choice injects nested FRESH/RETURN buttons ahead of React's
+    * original callback. Only that React-owned button is a valid insertion
+    * sibling; inserting a note before a nested button throws NotFoundError. */
+   if(button&&typeof button.getAttribute==='function'&&
+      button.getAttribute('data-nova-insertion')!==null)continue;
+   if((button.textContent||'').indexOf('REDEPLOY')>=0){redeploy=button;break;}
+  }
   if(redeploy)return {panel:p,before:redeploy};
  }
  return null;
@@ -351,15 +358,32 @@ function cleanup(g){
   if(node&&node.parentNode)node.parentNode.removeChild(node);
  }
  g.__novaDeathInsight=null;g.__novaDeathInsightAttempted=false;
+ g.__novaDeathInsightNode=null;
 }
 function mount(g){
- if(!g.__novaDeathInsight||g.__novaDeathInsightAttempted)return;
+ if(!g.__novaDeathInsight)return;
+ if(g.__novaDeathInsightAttempted){
+  /* The initial observer has a bounded wait. Only a previously mounted
+   * note may be retried after React detaches its foreign DOM node. */
+  var oldNode=g.__novaDeathInsightNode;
+  if(!oldNode)return;
+  if(typeof oldNode.isConnected==='boolean'?
+     oldNode.isConnected:!!oldNode.parentNode)return;
+  g.__novaDeathInsightAttempted=false;
+  g.__novaDeathInsightNode=null;
+ }
  g.__novaDeathInsightAttempted=true;
- if(paint(g.__novaDeathInsight))return;
+ if(paint(g.__novaDeathInsight)){
+  g.__novaDeathInsightNode=document.querySelector('[data-nova-death-insight]');
+  return;
+ }
  if(typeof MutationObserver!=='function'||typeof document==='undefined')return;
  var root=document.getElementById('root')||document.body;if(!root)return;
  var observer=new MutationObserver(function(){
-  if(paint(g.__novaDeathInsight)){observer.disconnect();g.__novaDeathInsightObserver=null;}
+  if(paint(g.__novaDeathInsight)){
+   g.__novaDeathInsightNode=document.querySelector('[data-nova-death-insight]');
+   observer.disconnect();g.__novaDeathInsightObserver=null;
+  }
  });
  g.__novaDeathInsightObserver=observer;
  observer.observe(root,{childList:true,subtree:true});
@@ -518,6 +542,7 @@ function paint(g){
  }
  make('fresh','⚡ REDEPLOY FRESH','Original random insertion, normally away from the last position.');
  make('return','↩ REDEPLOY RETURN','Re-enter 420–850 world units from the last death, where terrain allows.');
+ g.__novaFrontRow=row;
  g.__novaFrontOriginalButton=target.before;
  g.__novaFrontOriginalDisplay=target.before.style?target.before.style.display:'';
  g.__novaFrontOriginalTabIndex=target.before.tabIndex;
@@ -539,6 +564,7 @@ function cleanup(g){
   if(g.__novaFrontOriginalTabIndex!=null)original.tabIndex=g.__novaFrontOriginalTabIndex;
  }
  g.__novaFrontOriginalButton=null;
+ g.__novaFrontRow=null;
  if(typeof document!=='undefined'&&document.querySelector){
   var node=document.querySelector('[data-nova-front-choice]');
   if(node&&node.parentNode)node.parentNode.removeChild(node);
@@ -546,7 +572,19 @@ function cleanup(g){
  g.__novaFrontMounted=false;
 }
 function mount(g){
- if(g.__novaFrontMounted)return;
+ if(g.__novaFrontMounted){
+  /* React owns the death modal. A reconciliation, viewport/layout remount,
+   * or replacement of its original button can detach our foreign action row
+   * while Game.status stays dead. Never leave the original action hidden with
+   * no working replacement. Check retained nodes in O(1), not a 60Hz DOM
+   * query; a detached row or callback button requires a clean remount. */
+  var row=g.__novaFrontRow,original=g.__novaFrontOriginalButton;
+  var rowLive=!!(row&&(typeof row.isConnected==='boolean'?
+    row.isConnected:!!row.parentNode));
+  var callbackLive=!!(original&&original.isConnected!==false);
+  if(rowLive&&callbackLive)return;
+  cleanup(g);
+ }
  if(paint(g)){g.__novaFrontMounted=true;return;}
  if(g.__novaFrontObserver||typeof MutationObserver!=='function')return;
  var root=document.getElementById('root')||document.body;if(!root)return;
