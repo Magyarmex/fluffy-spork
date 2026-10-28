@@ -20,7 +20,7 @@ async function run(browser,width,height){
   });
   await page.getByRole('button',{name:/DEPLOY/i}).first().click();
   await page.waitForFunction(()=>window.__novaFieldcraftGame?.status==='playing',null,{timeout:30000});
-  for(const cls of ['hivemind','bastion']){
+  for(const cls of ['hivemind','bastion','marksman']){
    const expected=await page.evaluate(id=>{
     const g=window.__novaFieldcraftGame,p=g.player;
     const killer=g.tanks.find(t=>t.alive&&!t.isPlayer&&t.id!==p.id);
@@ -29,7 +29,15 @@ async function run(browser,width,height){
     const classes=window.__novaMakeRequire('')('game/classes');
     const note=window.__NOVA_DEATH_INSIGHT_TEST__.choose(p,killer,classes);
     if(!note)throw Error('missing canonical matchup '+id);
-    g.killTank(p,killer);
+    if(id==='marksman'){
+     /* Real canonical unregister + lethal damage path of a projectile whose
+      * owner died while the projectile was still in flight. No XP is
+      * fabricated for a dead shooter. */
+     killer.alive=false;g.unregisterTank(killer);
+     if(g.getTank(killer.id))throw Error('dead rival still registered');
+     p.spawnShieldT=0;p.shieldT=0;p.bulwarkT=0;p.tauntT=0;
+     g.damageTank(p,p.hp+100,killer.id);
+    }else g.killTank(p,killer);
     return note;
    },cls);
    const note=page.locator('[data-nova-death-insight]');
@@ -62,7 +70,7 @@ async function run(browser,width,height){
    await note.waitFor({state:'hidden',timeout:5000});
   }
   assert.deepEqual(errors,[],'no real-browser page errors');
-  console.log('NOVA_FIELDCRAFT_CLASS_SMOKE '+JSON.stringify({width,height,classes:['hivemind','bastion']}));
+  console.log('NOVA_FIELDCRAFT_CLASS_SMOKE '+JSON.stringify({width,height,classes:['hivemind','bastion','marksman-posthumous']}));
  }finally{await context.close();}
 }
 async function main(){

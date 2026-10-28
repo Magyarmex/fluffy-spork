@@ -35,7 +35,14 @@ function boot(){
   notify(){if(!this.disconnected)this.callback();}
  }
  class Game{
-  constructor(){this.status='playing';}
+  constructor(){this.status='playing';this.tankById=new Map();}
+  getTank(id){return this.tankById.get(id)||null;}
+  unregisterTank(t){this.tankById.delete(t.id);}
+  damageTank(victim,dmg,sourceId){
+   if(!victim.alive)return;
+   victim.hp=(victim.hp??100)-dmg;
+   if(victim.hp<=0)this.killTank(victim,this.getTank(sourceId));
+  }
   killTank(victim){if(victim.alive===false)return;victim.alive=false;this.status='dying';}
   update(){if(this.status==='dying')this.status='dead';}
   redeploy(){this.status='playing';this.redeploys=(this.redeploys||0)+1;}
@@ -219,4 +226,37 @@ test('Apex lessons teach different counters inside each shared lineage',()=>{
   const b=api.choose(victim(),{id:2,cls:pair[1]},classes);
   assert.notEqual(a.lesson,b.lesson,'Apex pair must have distinct tactical advice');
  }
+});
+
+test('posthumous enemy projectile still teaches the actual class matchup',()=>{
+ const {Game,addPanel}=boot(),g=new Game(),panel=addPanel(),v=victim();
+ const shooter=killer('marksman');shooter.alive=false;
+ g.tankById.set(shooter.id,shooter);
+ g.unregisterTank(shooter);
+ assert.equal(g.getTank(shooter.id),null,'canonical dead owner is no longer a tank');
+ v.hp=6;g.damageTank(v,12,shooter.id);g.update();
+ assert.equal(v.alive,false);
+ assert.ok(panel.note,'death panel identifies a departed projectile owner');
+ assert.match(panel.note.children[0].textContent,/LAST OPPONENT: MARKSMAN/);
+ assert.match(panel.note.children[1].textContent,/sightline/);
+ assert.equal(g.__novaFieldcraftActiveSource,undefined,'damage context does not leak');
+ g.redeploy();
+ assert.equal(g.__novaFieldcraftDeadOwners,null,'redeploy forgets previous-life identities');
+});
+test('unknown owner and environmental damage never invent a Fieldcraft killer',()=>{
+ const a=boot(),g=new a.Game(),panel=a.addPanel(),v=victim();
+ v.hp=5;g.damageTank(v,20,99999);g.update();
+ assert.equal(panel.note,null);
+ assert.equal(g.__novaDeathInsight,null);
+ const b=boot(),h=new b.Game(),p=b.addPanel(),w=victim();
+ w.hp=5;h.damageTank(w,20,-1);h.update();
+ assert.equal(p.note,null);
+});
+test('team-mode uncertainty abstains from posthumous attribution',()=>{
+ const {Game,addPanel}=boot(),g=new Game(),panel=addPanel(),v=victim();
+ const shooter=killer('guard');shooter.alive=false;
+ g.unregisterTank(shooter);
+ g.areAllies=()=>false;
+ v.hp=5;g.damageTank(v,10,shooter.id);g.update();
+ assert.equal(panel.note,null,'cannot reconstruct departed alliances');
 });
