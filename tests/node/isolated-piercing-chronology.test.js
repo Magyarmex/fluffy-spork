@@ -1252,3 +1252,38 @@ for(const optimized of [false,true]){
     }
   });
 }
+
+
+/* Dense-fire proof: other pen=1 rounds can be numerous but physically
+ * remote. A global single-projectile gate would make the fix unreachable
+ * for real high-rate Tempest play; one local proof may still be unique. */
+for(const optimized of [false,true]){
+ const mode=optimized?'optimized':'baseline';
+ const Game=boot(function(dt){this.time+=dt;this.updateBullets(dt);},optimized);
+ test(mode+' 30 remote pen=1 rounds do not suppress a unique local pair',()=>{
+  const {g,a,b}=neutralPair(Game,65);
+  a.x=40;a.r=20;b.r=20;
+  g.bullets[0].x=16;g.bullets[0].vx=500*(1+.085*44);
+  g.bullets[0].r=3.7;g.bullets[0].dmg=8;g.bullets[0].ttl=.82;
+  for(let i=0;i<30;i++)g.bullets.push({
+   kind:'bullet',id:1000+i,ownerId:7,x:1400+i*8,y:1500,
+   vx:0,vy:0,r:3,dmg:7,ttl:1,pen:1,hits:0,
+   dead:false,shell:false,beam:false,splash:0
+  });
+  g.update(.033);
+  assert.equal(a.hitCount,1);assert.equal(b.hitCount,1);
+ });
+ test(mode+' two independent shape-pair proofs abstain as a batch',()=>{
+  const {g,b}=neutralPair(Game,65);
+  g.shapes[0].r=20;b.r=20;
+  g.bullets[0].x=16;g.bullets[0].vx=500*(1+.085*44);
+  g.bullets[0].r=3.7;g.bullets[0].dmg=8;g.bullets[0].ttl=.82;
+  const c={kind:'shape',id:801,type:'square',x:40,y:200,r:20,hp:55};
+  const d={kind:'shape',id:802,type:'square',x:65,y:200,r:20,hp:55};
+  g.shapes.push(c,d);
+  g.bullets.push({...g.bullets[0],id:803,y:200});
+  g.update(.033);
+  assert.equal(b.hitCount,0,'second victim cannot be picked by bullet-array order');
+  assert.equal(d.hp,55,'independent second lane must also abstain');
+ });
+}
