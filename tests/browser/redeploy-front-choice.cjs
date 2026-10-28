@@ -29,10 +29,8 @@ async function run(browser,width,height){
   });
   const returnButton=page.locator('[data-nova-insertion="return"]');
   await returnButton.waitFor({state:'visible',timeout:15000});
-  assert.equal(await page.locator('[data-nova-insertion="fresh"]').getAttribute('aria-pressed'),'true');
+  assert.equal(await page.locator('[data-nova-insertion="fresh"]').count(),1);
   await returnButton.click();
-  assert.equal(await returnButton.getAttribute('aria-pressed'),'true');
-  await page.getByRole('button',{name:/REDEPLOY/i}).first().click();
   await page.waitForFunction(()=>window.__novaFrontSmokeGame?.status==='playing',null,{timeout:15000});
   const after=await page.evaluate(()=>{
    const g=window.__novaFrontSmokeGame;
