@@ -1638,8 +1638,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       ex=ax+dx,ey=ay+dy,limit=MAP_LIMIT-20;
   if(!(dx*dx+dy*dy>1e-12)||!Number.isFinite(ex)||
      !Number.isFinite(ey)||
-     Math.max(Math.abs(ax),Math.abs(ay),Math.abs(ex),Math.abs(ey))>=limit)
-    return false;
+     Math.max(Math.abs(ax),Math.abs(ay),Math.abs(ex),Math.abs(ey))>=limit||
+     Math.hypot(dx,dy)<2*(12+b.r))return false;
   function near(x,y,tx,ty,pad){
    if(!Number.isFinite(x)||!Number.isFinite(y)||
       !Number.isFinite(tx)||!Number.isFinite(ty)||
@@ -1837,6 +1837,22 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    var candidate=this.bullets[sp];
    if(!candidate||candidate.dead||candidate.ttl<=dt||
       candidate.pen!==1||(candidate.hits||0)!==0)continue;
+   var reach=Math.hypot(candidate.vx*dt,candidate.vy*dt);
+   if(!Number.isFinite(reach)||reach<2*(12+candidate.r))continue;
+   /* A read-only spatial prefilter avoids scanning all 120 neutrals for
+    * every distant rapid-fire round. A missed candidate only falls back
+    * to the existing engine; it never authorizes speculative damage. */
+   if(this.hash&&typeof this.hash.query==='function'){
+    var nearShapes=[],mx=candidate.x+candidate.vx*dt*.5,
+        my=candidate.y+candidate.vy*dt*.5,eligible=0;
+    this.hash.query(mx,my,reach*.5+candidate.r+45,nearShapes);
+    for(var qi=0;qi<nearShapes.length;qi++){
+     var e=nearShapes[qi];
+     if(e&&e.kind==='shape'&&e.hp>candidate.dmg*2&&
+        (e.type==='circle'||e.type==='square')&&++eligible>=2)break;
+    }
+    if(eligible<2)continue;
+   }
    if(isolatedStationaryShapePair(this,candidate,dt,true)){
     if(shapePairCandidate){shapePairAmbiguous=true;break;}
     shapePairCandidate=candidate;
