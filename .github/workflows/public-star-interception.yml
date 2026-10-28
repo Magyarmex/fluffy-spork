@@ -6,6 +6,8 @@ on:
       - 'tests/browser/frontlines-public-star-*.js'
       - 'tests/browser/frontlines-public-star-*.cjs'
       - 'tests/node/frontlines-public-star-pilot.test.js'
+      - 'tests/node/public-star-interception-report.test.js'
+      - 'scripts/public-star-interception-report.cjs'
       - '.github/workflows/public-star-interception.yml'
   workflow_dispatch:
 
