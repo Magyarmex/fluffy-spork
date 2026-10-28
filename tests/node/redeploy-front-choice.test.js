@@ -222,10 +222,13 @@ test('RETURN waypoint clears on arrival, next death, fresh redeploy and fallback
 });
 test('invalid clock and offscreen marker cannot disrupt the original minimap',()=>{
  const {Game,mapMarks}=boot(),g=new Game();
- g.player={x:0,y:0,alive:true};g.__novaLastFrontMarker={x:2250,y:2250,until:50};
- g.drawMinimap();assert.equal(mapMarks.length,0,'out-of-bounds marker is not painted');
+ g.player={x:0,y:0,alive:true};g.__novaLastFrontMarker={x:3000,y:3000,until:50};
+ g.drawMinimap();assert.equal(mapMarks.length,0,'invalid out-of-world marker is not painted');
+ g.__novaLastFrontMarker={x:2240,y:2240,until:50};
+ g.drawMinimap();assert.equal(mapMarks.length,1,'edge deaths retain a clipped but honest marker');
+ assert.ok(mapMarks[0].x>215&&mapMarks[0].x<216);
  g.__novaLastFrontMarker={x:100,y:200,until:50};g.time=NaN;
  assert.doesNotThrow(()=>g.drawMinimap());
  assert.equal(g.__novaLastFrontMarker,null,'invalid game clock clears waypoint');
- assert.equal(g.mapDraws,2);
+ assert.equal(g.mapDraws,3);
 });
