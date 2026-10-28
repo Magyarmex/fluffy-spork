@@ -50,3 +50,30 @@ jobs:
           path: artifacts/star-public-intercept/
           if-no-files-found: ignore
           retention-days: 14
+
+  collate:
+    needs: natural-paired
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: star-public-*
+          path: artifacts/star-public-intercept
+          merge-multiple: true
+      - name: Validate all predeclared arms and report natural exposure
+        run: |
+          node --test tests/node/public-star-interception-report.test.js
+          node scripts/public-star-interception-report.cjs artifacts/star-public-intercept
+      - name: Preserve aggregate even if an arm is censored
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: star-public-report
+          path: artifacts/star-public-report/
+          if-no-files-found: ignore
+          retention-days: 14
