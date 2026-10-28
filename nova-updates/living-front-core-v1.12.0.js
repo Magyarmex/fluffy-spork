@@ -24,9 +24,9 @@ function sectorBounds(i,p){var c=coords(i),s=sectorSize();p=p||0;return{x0:-AREN
 function neighbors(i){var c=coords(i),a=[];if(c.x>0)a.push(i-1);if(c.x<GRID-1)a.push(i+1);if(c.y>0)a.push(i-GRID);if(c.y<GRID-1)a.push(i+GRID);return a;}
 function maturityCeiling(t){return clamp(.30+.70*smooth(((Number(t)||0)-18)/215),.30,1);}
 function ageProgress(st){return clamp(((st&&st.ceiling)||.30)-.30,0,.70)/.70;}
-function makeSector(i){return{index:i,maturity:.10+hash01(i,17)*.12,pressure:0,count:0,xp:0,value:0,tanks:0,recentHarvest:0,recentCombat:0,inbound:0,outbound:0,flowX:0,flowY:0};}
+function makeSector(i){return{index:i,maturity:.10+hash01(i,17)*.12,pressure:0,count:0,xp:0,value:0,tanks:0,recentHarvest:0,recentCombat:0,inbound:0,outbound:0,flowX:0,flowY:0,flowTo:new Float64Array(16)};}
 function advanceSector(s,dt,ceiling){
-  s.pressure*=Math.exp(-dt*.34);s.recentHarvest*=Math.exp(-dt*.22);s.recentCombat*=Math.exp(-dt*.25);s.inbound*=Math.exp(-dt*.48);s.outbound*=Math.exp(-dt*.48);s.flowX*=Math.exp(-dt*.42);s.flowY*=Math.exp(-dt*.42);
+  s.pressure*=Math.exp(-dt*.34);s.recentHarvest*=Math.exp(-dt*.22);s.recentCombat*=Math.exp(-dt*.25);var crossingDecay=Math.exp(-dt*.48);s.inbound*=crossingDecay;s.outbound*=crossingDecay;s.flowX*=Math.exp(-dt*.42);s.flowY*=Math.exp(-dt*.42);if(s.flowTo)for(var route=0;route<16;route++)s.flowTo[route]*=crossingDecay;
   var dis=clamp(s.pressure*.72+s.recentHarvest*.34+s.recentCombat*.28+Math.max(0,s.tanks-1)*.045,0,1.3),grow=.0058+.0078*(1-clamp(dis,0,1)),loss=.014*s.pressure+.009*s.recentHarvest+.006*s.recentCombat+.0012*Math.max(0,s.tanks-1);
   s.maturity=clamp(s.maturity+dt*(grow-loss),0,ceiling);return s;
 }
