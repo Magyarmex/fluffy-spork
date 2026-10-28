@@ -36,6 +36,16 @@ async function run(browser,width,height){
   const returnButton=page.locator('[data-nova-insertion="return"]');
   await returnButton.waitFor({state:'visible',timeout:15000});
   assert.equal(await page.locator('[data-nova-insertion="fresh"]').count(),1);
+  const fit=await returnButton.evaluate(b=>{
+   const rect=b.getBoundingClientRect(),font=getComputedStyle(b).fontSize;
+   return {font:parseFloat(font),height:rect.height,left:rect.left,right:rect.right,
+    top:rect.top,bottom:rect.bottom,width:innerWidth,viewportHeight:innerHeight,
+    scrollWidth:document.documentElement.scrollWidth};
+  });
+  assert.ok(fit.font>=12&&fit.height>=30,'return choice must be readable and touchable: '+JSON.stringify(fit));
+  assert.ok(fit.left>=0&&fit.right<=fit.width&&fit.top>=0&&fit.bottom<=fit.viewportHeight,
+   'return action must remain on screen: '+JSON.stringify(fit));
+  assert.ok(fit.scrollWidth<=fit.width,'return choice must not create horizontal overflow');
   await returnButton.click();
   await page.waitForFunction(()=>window.__novaFrontSmokeGame?.status==='playing',null,{timeout:15000});
   const after=await page.evaluate(()=>{
@@ -61,6 +71,6 @@ async function run(browser,width,height){
  }finally{await context.close();}
 }
 async function main(){const browser=await chromium.launch({headless:true,args:['--no-sandbox']});try{
- for(const [width,height] of [[320,568],[640,320],[900,700]])await run(browser,width,height);
+ for(const [width,height] of [[280,568],[320,568],[640,320],[900,700]])await run(browser,width,height);
 }finally{await browser.close();}}
 main().catch(e=>{console.error(e.stack||e);process.exitCode=1;});
