@@ -56,7 +56,7 @@ test('corrupt, negative, nonfinite and out-of-range records cannot poison a run'
 
 test('source drift fails closed instead of silently dropping protection', () => {
   const original = changes[0].before;
-  assert.throws(() => patchSavedRecords(html.replace(original, original + ' // drift')), /changed unexpectedly/);
+  assert.throws(() => patchSavedRecords(html.replace(original, original.replace('Number(', 'parseFloat('))), /changed unexpectedly/);
   assert.throws(() => patchSavedRecords('not a game'), /owners missing/);
   assert.throws(() => patchSavedRecords(null), /UTF-8/);
 });
