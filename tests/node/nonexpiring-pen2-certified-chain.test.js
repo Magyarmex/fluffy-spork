@@ -24,7 +24,7 @@ assert.equal(depth,0,'materialized core method is balanced');
 const core=new Function('types_1','classes_1','M',
  'return function(dt){'+html.slice(start+marker.length,end-1)+'}')(
  {dist2:(ax,ay,bx,by)=>(ax-bx)**2+(ay-by)**2},
- {CLASSES:{scout:{size:15}}},2250);
+ {CLASSES:{scout:{size:15},marksman:{size:14}}},2250);
 
 function boot(optimized){
  class Game{
@@ -62,16 +62,17 @@ function boot(optimized){
   {filename:'performance-v1.7.5.js'});
  const m={exports:{}};
  modules['game/engine'](m,m.exports,spec=>spec==='./classes'
-  ?{CLASSES:{scout:{size:15}}}:{ARENA_HALF:2250});
+  ?{CLASSES:{scout:{size:15},marksman:{size:14}}}:{ARENA_HALF:2250});
  return m.exports.Game;
 }
 
 function scenario(Game,{fps=30,positions=[40,70,100],pen=2,
  wall=null,shield=false,shape=false,moving=false,competitor=false,
- reverse=false,ttl=.2,velocity=6000,frames=1,remoteBullets=0,witnessed=false}={}){
+ reverse=false,ttl=.2,velocity=6000,frames=1,remoteBullets=0,witnessed=false,
+ targetClass='scout',radius=3}={}){
  const g=new Game();
  g.tanks=positions.map((x,i)=>({kind:'tank',id:i+2,x,y:0,
-  cls:'scout',hp:100,alive:true,hitCount:0}));
+  cls:targetClass,hp:100,alive:true,hitCount:0}));
  if(reverse)g.tanks.reverse();
  if(witnessed){
   g.__novaShapeSweepActive=true;
@@ -93,7 +94,7 @@ function scenario(Game,{fps=30,positions=[40,70,100],pen=2,
   }
  }
  g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,vx:velocity,vy:0,
-  r:3,dmg:20,ttl,pen,hits:0,dead:false,shell:false,beam:false}];
+  r:radius,dmg:20,ttl,pen,hits:0,dead:false,shell:false,beam:false}];
  for(let i=0;i<remoteBullets;i++)g.bullets.push({kind:'bullet',
   id:100+i,ownerId:1000+i,x:0,y:1000+i*2,vx:6000,vy:0,
   r:3,dmg:20,ttl:.2,pen:2,hits:0,dead:false,shell:false,beam:false});
@@ -127,6 +128,12 @@ for(const optimized of [false,true]){
  test(label+': reverse enumeration does not change chronological victims',()=>{
   assert.deepEqual(scenario(boot(optimized),{reverse:true}).byId,
    {2:1,3:1,4:1});
+ });
+ test(label+': upgraded Marksman at legitimate speed hits three non-overlapping hulls at 30Hz',()=>{
+  const speed=1050*(1+0.085*8); // canonical marksman + eight bullet-speed points
+  const out=scenario(boot(optimized),{fps:30,positions:[25,52,79],
+   velocity:speed,ttl:1.6,pen:2,targetClass:'marksman',radius:5,witnessed:true});
+  assert.deepEqual(out.byId,{2:1,3:1,4:1});
  });
  test(label+': 60Hz full-chain opportunity also resolves all three',()=>{
   assert.deepEqual(scenario(boot(optimized),{fps:60}).byId,
