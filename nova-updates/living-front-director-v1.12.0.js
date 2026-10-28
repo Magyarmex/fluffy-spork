@@ -491,7 +491,7 @@ if(hp<.30){migrationAudit(g,'health');return out;}
 if(target&&d2(t.x,t.y,target.x,target.y)<330*330){migrationAudit(g,'combat');return out;}
 var bx=0,by=0,bw=0,key='none',mode='none',judgment=a.isElite?1.08:.94;/* Once a rival physically reaches a live public BLOOM sector, stop pulling it toward the arbitrary sector center. Its ordinary visible farming/combat choices regain priority; this mirrors the stale-memory arrival handoff. */if(sig&&now<sig.until&&!(sig.type==='BLOOM'&&sectorIndex(t.x,t.y)===sig.sector)){var sx=sig.x,sy=sig.y;if(sig.type==='ROGUE STAR'&&sig.starId&&g.getShape){var star=g.getShape(sig.starId);if(star){/* Only a visible Star updates AI memory. When it escapes sight, pursue the last seen position rather than gaining remote tracking or forgetting the sighting. */if(visible(g,t,star)){sx=star.x;sy=star.y;a.__lfStarSeenId=sig.starId;a.__lfStarSeenX=sx;a.__lfStarSeenY=sy;}else if(a.__lfStarSeenId===sig.starId&&Number.isFinite(a.__lfStarSeenX)&&Number.isFinite(a.__lfStarSeenY)){sx=a.__lfStarSeenX;sy=a.__lfStarSeenY;}}else return out;}var direct=Math.hypot(sx-t.x,sy-t.y),bearing={},dist=routeCost(g,t,sx,sy,direct,bearing),base=sig.type==='ROGUE STAR'?.87:sig.type==='BLOOM'?.68:.48,k=sig.type+':'+(sig.sector!=null?sig.sector:sig.to!=null?sig.to:sig.starId||0),crowd=saturation(g,k,t.id),score=base-dist/2300-crowd*.13;
 if(sig.type==='MIGRATION')migrationAudit(g,!Number.isFinite(dist)?'blocked':score>.20?'steer':'score',dist,crowd);
-if(score>.20){bx=bearing.x;by=bearing.y;bw=clamp(score*(.72+.28*hp)*judgment,0,.48);key=k;mode='signal';}}
+if(score>.20){bx=bearing.x;by=bearing.y;bw=clamp(score*(.72+.28*hp)*judgment,0,.48);key=k;mode='signal';if(sig.type==='MIGRATION')a.__lfMigrationSignalStarted=sig.started;}}
  if(bw<=.04){var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__,ext=F&&F.viewportHalfExtents?F.viewportHalfExtents(g):{x:Math.max(280,(g.w||800)/2),y:Math.max(220,(g.h||600)/2)},rad=Math.hypot(ext.x,ext.y),cand=st?LF.query(g,st,t.x,t.y,rad,0):(g.shapes||[]),vx=0,vy=0,value=0,count=0;for(var i=0;i<cand.length;i++){var s=cand[i];if(!s||s.kind!=='shape'||s.hp<=0||s.type==='crasher'||!visible(g,t,s))continue;var w=Math.max(5,xp(defs,s.type));vx+=s.x*w;vy+=s.y*w;value+=w;count++;}if(count>=4&&value>=170){vx/=value;vy/=value;var dx2=vx-t.x,dy2=vy-t.y,m2=Math.hypot(dx2,dy2)||1,k2='LOCAL:'+sectorIndex(vx,vy),bearing2={},travel=routeCost(g,t,vx,vy,m2,bearing2),score2=clamp((value-160)/750,0,.36)-travel/3200-saturation(g,k2,t.id)*.10;if(score2>.08){bx=bearing2.x;by=bearing2.y;bw=clamp(score2*judgment,0,.32);key=k2;mode='local';}}}
 /* AI may remember a *publicly announced* BLOOM, never hidden sector maturity.
  * The stale opportunity loses confidence with age and loses to a stronger
@@ -593,6 +593,7 @@ function migrationPhysicalArrival(g,t,bx,by,ax,ay,dt){
     st.directorEnabled===false||!sig||sig.type!=='MIGRATION'||
     now<sig.started||now>=sig.until||!t||!t.ai||!alive(t)||
     t.ai.__lfEcoKey!=='MIGRATION:'+sig.to||t.ai.__lfEcoMode!=='signal'||
+    t.ai.__lfMigrationSignalStarted!==sig.started||
     !Number.isFinite(bx)||!Number.isFinite(by)||
     !Number.isFinite(ax)||!Number.isFinite(ay)||!(dt>0)||
     sectorIndex(bx,by)===sig.to||sectorIndex(ax,ay)!==sig.to)return;
