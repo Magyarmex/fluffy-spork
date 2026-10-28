@@ -1,0 +1,80 @@
+name: NOVA Public Migration Threshold A/B Research
+
+on:
+  pull_request:
+    paths:
+      - 'nova-updates/living-front-director-v1.12.0.js'
+      - 'tests/node/frontlines-migration-threshold-intervention.test.js'
+      - 'tests/browser/frontlines-migration-threshold-ab.cjs'
+      - 'scripts/frontlines-migration-threshold-report.cjs'
+      - '.github/workflows/frontlines-migration-threshold.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  paired-natural-threshold:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        layout: [0, 1, 2]
+        seed: [0, 1]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --no-audit --no-fund --no-package-lock
+      - run: npm install --no-save --no-audit --no-fund --no-package-lock playwright@1.56.1
+      - run: npx playwright install chromium
+      - name: Run exact shipping Director gate unit tests
+        run: node --test tests/node/frontlines-migration-threshold-intervention.test.js
+      - name: Serve real 48-overlay shipping game
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/nova-threshold-http.log 2>&1 &
+      - name: Compare public migration heat 5 OFF vs 3 ON, with OFF replay
+        env:
+          NOVA_LAYOUT_INDEX: ${{ matrix.layout }}
+          NOVA_SEED_INDEX: ${{ matrix.seed }}
+          NOVA_PILOT_POLICY: public-bloom-harvest-defense
+          NOVA_AB_MODE: migration-threshold
+        run: node tests/browser/frontlines-migration-threshold-ab.cjs
+      - name: Preserve all results including zero-exposure pairs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-frontlines-migration-threshold-${{ matrix.layout }}-${{ matrix.seed }}
+          path: artifacts/browser/frontlines-natural-*
+          if-no-files-found: warn
+          retention-days: 14
+
+  collate-threshold:
+    needs: paired-natural-threshold
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: nova-frontlines-migration-threshold-*
+          path: artifacts/migration-threshold
+          merge-multiple: false
+      - name: Validate all six predeclared pairs, physical crossing evidence and censorship
+        run: node scripts/frontlines-migration-threshold-report.cjs artifacts/migration-threshold 6
+      - name: Preserve reproducible complete matrix summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-frontlines-migration-threshold-summary
+          path: artifacts/migration-threshold/migration-threshold-summary.json
+          if-no-files-found: warn
+          retention-days: 14
