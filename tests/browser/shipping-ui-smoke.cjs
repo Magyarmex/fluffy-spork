@@ -328,6 +328,37 @@ async function scenario(browser, label, options) {
     assert.ok(controller.drones>0,label+': Controller actually deploys allied drones');
     assert.equal(controller.ecology,true,label+': ecology remains active after class change');
     assert.equal(controller.playing,true,label+': Controller transition does not end the run');
+
+    // Capture actual Canvas2D IFF strokes in the React-owned playable game,
+    // not only in a mocked renderer. Mobile zoom previously shrank the
+    // non-color ownership outline below one CSS pixel.
+    if(label==='mobile-320'){
+      const iff=await page.evaluate(async()=>{
+        const g=window.__novaBrowserLiveGame,ctx=g&&g.ctx;
+        if(!ctx)return {error:'live Canvas2D owner missing'};
+        const original=ctx.stroke,samples=[];
+        ctx.stroke=function(){
+          const color=String(this.strokeStyle).toLowerCase();
+          if(this.globalCompositeOperation==='lighter'&&
+             Math.abs(this.globalAlpha-.58)<.0001&&
+             (color==='#4da8ff'||color==='rgb(77, 168, 255)')){
+            const z=g.cam.zoom||1;
+            samples.push({zoom:z,width:this.lineWidth,
+              expected:Math.min(1.8,Math.max(1.35,1.35*z))});
+          }
+          return original.apply(this,arguments);
+        };
+        try{await new Promise(resolve=>setTimeout(resolve,700));}
+        finally{ctx.stroke=original;}
+        return {samples:samples.slice(0,30),count:samples.length};
+      });
+      assert.ok(!iff.error&&iff.count>0,
+        label+': actual Controller drones must paint shape-coded friendly IFF: '+JSON.stringify(iff));
+      assert.ok(iff.samples.every(s=>Math.abs(s.width*s.zoom-s.expected)<.025),
+        label+': actual IFF stroke must remain screen-pixel legible: '+JSON.stringify(iff));
+      console.log('NOVA_IFF_REAL_CANVAS '+JSON.stringify({label,...iff}));
+    }
+
     if(label.startsWith('mobile')){
       const toastGeometry=await page.evaluate(()=>{
         const node=document.querySelector('[class~="top-[18%]"] > .panel.anim-pop');

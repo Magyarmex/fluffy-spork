@@ -84,7 +84,7 @@ var BASE_TIPS=[
  tip('controller-shape-reservations',"Friendly Controller drones reserve different harvest shapes when alternatives exist. Spreading the swarm over nearby resources reduces redundant travel.",['controller','drones','economy']),
  tip('controller-auto-defense',"Automatic Controller defense intercepts nearby hostile combat drones but deliberately ignores Forward Observer spotters.",['controller','drones','observer']),
  tip('controller-manual-spotter',"Manual swarm commands can target hostile Forward Observers even though automatic drone defense ignores them. Spotter removal is a deliberate command decision.",['controller','drones','observer','combat']),
- tip('drone-iff',"Drone IFF halos encode allegiance without replacing lineage color: faint blue is friendly or allied; faint red is hostile.",['controller','drones','ui']),
+ tip('drone-iff',"Drone IFF: blue ring = friendly/allied; red diamond = hostile. The colored drone body still identifies its class.",['controller','drones','ui']),
  tip('graft-preview',"Blackglass graft previews show exact base-before-to-after stat changes. Judge the actual weapon, hull, mobility, splash, drone, or reduction delta instead of the gene name.",['blackglass','graft','lineage']),
  tip('apex-sidegrade',"Apex forms are mastery sidegrades, not automatic upgrades: Tempest, Cluster King, Bastion, and their peers ask you to exploit a specific discipline to earn the ceiling.",['blackglass','apex','lineage']),
  tip('aim-sensitivity-clamp',"Aim sensitivity changes how much thumb travel crosses the stick response, but the game still uses its existing clamp. Raising it does not grant extra aim range or combat stats.",['settings','controls']),
