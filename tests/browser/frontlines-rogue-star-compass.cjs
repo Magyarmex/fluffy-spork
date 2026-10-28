@@ -64,9 +64,9 @@ const {chromium}=require('playwright');
     assert.equal(signal.priorStars,1,'canonical one-Star population must be preserved');
     assert.equal(signal.currentShapeCount,signal.priorShapeCount,'adoption must not duplicate a Star');
     assert.deepEqual(signal.adoptedPosition,signal.priorPosition,'adoption must not teleport the Star');
-    assert.equal(signal.initialX,signal.starX,'public bearing must use initial spawn');
+    assert.equal(signal.initialX,signal.starX,'public bearing must use public report');
     assert.equal(signal.initialY,signal.starY);
-    assert.match(signal.emitted,/^★ ROGUE STAR · SPAWN (?:E|SE|S|SW|W|NW|N|NE|NEAR YOU) · cut its route$/);
+    assert.match(signal.emitted,/^★ ROGUE STAR · REPORTED (?:E|SE|S|SW|W|NW|N|NE|NEAR YOU) · cut its route$/);
     assert.equal(signal.viewport,width);
     await page.waitForFunction(message=>[...document.querySelectorAll('.panel.anim-pop')].
      some(n=>n.textContent===message),signal.emitted,{timeout:10000});
