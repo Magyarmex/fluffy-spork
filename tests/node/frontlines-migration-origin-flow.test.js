@@ -131,6 +131,27 @@ test('actual Wild Instincts transition records and decays only physical intended
  assert.ok(Math.abs(st.sectors[5].flowTo[1]-expected)<1e-10,
   'route witness must decay at the same rate as source outbound count');
 });
+test('seven real shape transitions cannot announce an unwitnessed diagonal route',()=>{
+ const T=boot(),LF=T.internal,defs={square:{speed:0}},shapes=[];
+ for(let i=0;i<7;i++){
+  const to=i<4?1:6,c=T.sectorCenter(to);
+  shapes.push({id:i+1,type:'square',kind:'shape',hp:100,r:15,x:c.x,y:c.y,
+   vx:0,vy:0,__lfSector:5,__lfMigrationIntent:to});
+ }
+ const g={time:100,shapes,bullets:[],tanks:[],hasLineOfSight:()=>true};
+ const st=LF.ensure(g,defs);
+ LF.behaviorTick(g,st,defs,.12);
+ assert.equal(st.migrationTransitions,7);
+ assert.equal(st.sectors[5].outbound,7);
+ assert.equal(st.sectors[5].flowTo[1],4);
+ assert.equal(st.sectors[5].flowTo[6],3);
+ assert.equal(st.sectors[5].flowTo[2],0);
+ const d=T.directorDecision(st,{enabled:true,now:100,hasStar:true});
+ assert.equal(d?.from,5);assert.equal(d?.to,1);
+ assert.notEqual(d.to,2,'a vector average is not a witnessed physical route');
+ const publicSnapshot=JSON.stringify(LF.snapshot(g));
+ assert.doesNotMatch(publicSnapshot,/flowTo/, 'private route witnesses must not leak into Debug snapshot');
+});
 test('source-local direction is independent of hidden maturity/value and unrelated flows',()=>{
  const T=boot(),st=state(T);
  st.sectors[5].outbound=6;st.sectors[5].flowX=1;st.sectors[5].flowY=0;
