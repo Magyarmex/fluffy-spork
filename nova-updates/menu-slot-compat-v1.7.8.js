@@ -382,7 +382,8 @@ mods['game/engine']=function(module,exports,require){
   * never posthumous XP, kill credit, AI targeting or tank resurrection. */
  if(typeof oldUnregister==='function')Game.prototype.unregisterTank=function(t){
   if(!this.__novaDecorativeWorld&&t&&t.alive===false&&!t.isPlayer&&
-     Number.isSafeInteger(t.id)&&typeof t.cls==='string'){
+     Number.isSafeInteger(t.id)&&classes&&classes.CLASSES&&
+     Object.prototype.hasOwnProperty.call(classes.CLASSES,t.cls)){
    var departed=this.__novaFieldcraftDeadOwners;
    if(!departed)departed=this.__novaFieldcraftDeadOwners=new Map();
    departed.set(t.id,{id:t.id,cls:t.cls});
