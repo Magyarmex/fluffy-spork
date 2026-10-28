@@ -1343,6 +1343,28 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   var tanks=g.tanks||[];
   if(tanks.length){
    if(shots.length*tanks.length>12000)return null;
+   /* Conservative all-hull envelope: pen-2 shots are common, but a shot
+    * nowhere near ANY live hull must not trigger per-shot hull scans.
+    * Include witnessed movement and hull radii; unknown geometry abstains. */
+   var hullBounds=null;
+   if(nonExpiring){
+    var minHullX=Infinity,minHullY=Infinity,maxHullX=-Infinity,maxHullY=-Infinity;
+    for(var hb=0;hb<tanks.length;hb++){
+     var ht=tanks[hb];if(!ht||!ht.alive)continue;
+     var hc=CLASSES[ht.cls],hs=hc&&Number.isFinite(hc.size)?
+        Math.max(0,hc.size):120;
+     var hx0=ht.__novaSweepMoveTime===g.time?ht.__novaSweepPrevX:ht.x,
+         hy0=ht.__novaSweepMoveTime===g.time?ht.__novaSweepPrevY:ht.y;
+     if(!Number.isFinite(ht.x)||!Number.isFinite(ht.y)||
+        !Number.isFinite(hx0)||!Number.isFinite(hy0))return null;
+     minHullX=Math.min(minHullX,ht.x,hx0)-hs-3;
+     minHullY=Math.min(minHullY,ht.y,hy0)-hs-3;
+     maxHullX=Math.max(maxHullX,ht.x,hx0)+hs+3;
+     maxHullY=Math.max(maxHullY,ht.y,hy0)+hs+3;
+    }
+    if(minHullX!==Infinity)hullBounds={minX:minHullX,minY:minHullY,
+       maxX:maxHullX,maxY:maxHullY};
+   }
    var eligible=[],possible=new Map(),targetUsers=new Map();
    for(var ps=0;ps<shots.length;ps++){
     var pb=shots[ps],span=nonExpiring?dt:pb.ttl;
@@ -1354,6 +1376,12 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
     if(!Number.isFinite(bx)||!Number.isFinite(by))return null;
     var lx=Math.min(pb.x,bx),hx=Math.max(pb.x,bx),
         ly=Math.min(pb.y,by),hy=Math.max(pb.y,by),targets=[];
+    if(nonExpiring&&hullBounds&&
+       (hx+pb.r<hullBounds.minX||lx-pb.r>hullBounds.maxX||
+        hy+pb.r<hullBounds.minY||ly-pb.r>hullBounds.maxY)){
+     possible.set(pb,targets);
+     continue; /* Cannot reach a hull even with the widest legal radius. */
+    }
     for(var pt=0;pt<tanks.length;pt++){
      var target=tanks[pt];
      if(!target||!target.alive||target.id===pb.ownerId)continue;
