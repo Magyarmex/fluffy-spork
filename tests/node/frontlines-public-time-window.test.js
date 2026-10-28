@@ -70,3 +70,21 @@ test('disabled Director remains closed regardless of timestamp',()=>{
  assert.equal(s.T.contestCandidate(s.g,s.st),false);
  assert.equal(s.T.publicEcoBias(s.g,s.bot,{},{}).mode,'none');
 });
+
+test('Rogue Star minimap reports only its frozen public location, never hidden live coordinates',()=>{
+ const s=scene();
+ const star={id:77,type:'star',x:1500,y:-900,hp:100};
+ let hiddenReads=0;
+ s.g.getShape=id=>{hiddenReads++;return id===77?star:null;};
+ s.st.signal={type:'ROGUE STAR',starId:77,x:300,y:0,started:98,until:110};
+ s.g.drawMinimap();
+ assert.equal(s.arcs.length,1,'public Star announcement should retain one minimap marker');
+ const first=s.arcs[0];
+ const scale=216/4500;
+ assert.ok(Math.abs(first[0]-(300+2250)*scale)<1e-8);
+ assert.ok(Math.abs(first[1]-108)<1e-8);
+ star.x=-1500;star.y=1200;
+ s.arcs.length=0;s.g.drawMinimap();
+ assert.deepEqual(s.arcs[0],first,'unseen Star movement cannot update public marker');
+ assert.equal(hiddenReads,0,'public minimap must not query private live Star coordinates');
+});
