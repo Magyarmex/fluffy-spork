@@ -65,7 +65,7 @@ const seconds=300,dt=1/30,chunk=450;
   await page.getByRole('button',{name:/DEPLOY/i}).first().click();
   await page.waitForFunction(()=>window.__novaStarNaturalGame?.status==='playing'&&
    !!window.__novaStarNaturalGame.__lfState,{timeout:30000});
-  const initial=await page.evaluate(({layout,seed})=>{
+  const initial=await page.evaluate(({layout,seed,mode})=>{
    const g=window.__novaStarNaturalGame;
    g.setPaused(true);
    if(g.raf){cancelAnimationFrame(g.raf);g.raf=0;}
