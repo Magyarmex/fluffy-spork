@@ -61,3 +61,9 @@ test('tip copy is mechanic-aware rather than generic filler', () => {
   }
   assert.doesNotMatch(fieldcraft, /Keep moving\.|Use cover\.|Watch your surroundings\.|Stay alert\./i);
 });
+
+
+test('drone allegiance tip teaches both shape and color rather than color alone', () => {
+  assert.match(fieldcraft, /Drone IFF: blue ring = friendly\/allied; red diamond = hostile/);
+  assert.match(fieldcraft, /colored drone body still identifies its class/);
+});
