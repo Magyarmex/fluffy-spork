@@ -155,7 +155,55 @@ async function run(browser,width,height){
   console.log('NOVA_REDEPLOY_FRONT_SMOKE '+JSON.stringify({width,height,dist,terrain:after.terrain,reset:after.choice}));
  }finally{await context.close();}
 }
+
+/* The original FRESH action must remain a real, independent React path.
+ * RETURN's minimap marker and death position must not leak into FRESH. */
+async function runFresh(browser){
+ const context=await browser.newContext({viewport:{width:320,height:568}});
+ const page=await context.newPage(),errors=[];
+ page.on('pageerror',e=>errors.push(String(e.stack||e)));
+ try{
+  await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded',timeout:45000});
+  await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({state:'visible',timeout:45000});
+  await page.evaluate(()=>{
+   const Game=window.__novaMakeRequire('')('game/engine').Game;
+   const oldUpdate=Game.prototype.update;
+   Game.prototype.update=function(){
+    if(!this.__novaDecorativeWorld&&this.player&&this.status==='playing')
+     window.__novaFreshSmokeGame=this;
+    return oldUpdate.apply(this,arguments);
+   };
+  });
+  await page.getByRole('button',{name:/DEPLOY/i}).first().click();
+  await page.waitForFunction(()=>window.__novaFreshSmokeGame?.status==='playing',null,{timeout:30000});
+  await page.evaluate(()=>{
+   const g=window.__novaFreshSmokeGame;
+   g.killTank(g.player,null);
+  });
+  const fresh=page.locator('[data-nova-insertion="fresh"]');
+  await fresh.waitFor({state:'visible',timeout:15000});
+  await fresh.click();
+  await page.waitForFunction(()=>window.__novaFreshSmokeGame?.status==='playing',null,{timeout:15000});
+  const result=await page.evaluate(()=>{
+   const g=window.__novaFreshSmokeGame;
+   return{choice:g.__novaRedeployChoice,origin:g.__novaRedeployOrigin,
+    marker:g.__novaLastFrontMarker,alive:g.player?.alive,
+    safe:g.isTerrainSafe(g.player.x,g.player.y,75),
+    actionCount:document.querySelectorAll('[data-nova-front-choice]').length};
+  });
+  assert.equal(result.choice,'fresh','FRESH must reset the next-life choice');
+  assert.equal(result.origin,null,'FRESH cannot retain a stale death position');
+  assert.equal(result.marker,null,'FRESH cannot display a RETURN waypoint');
+  assert.equal(result.alive,true,'FRESH must return to actual combat');
+  assert.equal(result.safe,true,'FRESH must preserve terrain-safe spawn');
+  assert.equal(result.actionCount,0,'the death action row must be removed');
+  assert.deepEqual(errors,[],'FRESH must not throw browser errors');
+  console.log('NOVA_REDEPLOY_FRESH_SMOKE '+JSON.stringify(result));
+ }finally{await context.close();}
+}
+
 async function main(){const browser=await chromium.launch({headless:true,args:['--no-sandbox']});try{
  for(const [width,height] of [[280,568],[320,568],[640,320],[900,700]])await run(browser,width,height);
+ await runFresh(browser);
 }finally{await browser.close();}}
 main().catch(e=>{console.error(e.stack||e);process.exitCode=1;});
