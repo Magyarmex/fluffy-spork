@@ -86,7 +86,14 @@ const {chromium}=require('playwright');
       gear:gr?{left:gr.left,right:gr.right,top:gr.top,bottom:gr.bottom}:null,
       viewport:window.innerWidth,viewportHeight:window.innerHeight};
     },signal.emitted);
-    assert.ok(ui,'Star announcement must reach React toast');
+    assert.ok(ui,'Star announcement must remain visible after settling: '+
+     JSON.stringify({signal,visible:await page.evaluate(()=>
+      [...document.querySelectorAll('.panel.anim-pop')].map(n=>n.textContent)),
+      state:await page.evaluate(()=>{
+       const g=window.__novaStarCompassGame;
+       return{time:g?.time,status:g?.status,signal:g?.__lfState?.signal,
+        starCount:g?.shapes?.filter(s=>s?.type==='star'&&s.hp>0).length};
+      })}));
     assert.ok(ui.left>=-1&&ui.right<=ui.viewport+1,'panel clips: '+JSON.stringify(ui));
     assert.ok(ui.glyphLeft>=-1&&ui.glyphRight<=ui.viewport+1,'text clips: '+JSON.stringify(ui));
     assert.ok(ui.scrollWidth<=ui.clientWidth+1&&ui.scrollHeight<=ui.clientHeight+1,
