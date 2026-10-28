@@ -58,3 +58,37 @@ jobs:
           path: artifacts/browser/
           if-no-files-found: ignore
           retention-days: 14
+
+  rogue-star-natural:
+    if: github.event_name == 'pull_request' && github.head_ref == 'feature/rogue-star-spawn-compass-run410'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        layout: [0, 1, 2]
+        seed: [0, 1]
+    env:
+      NOVA_LAYOUT_INDEX: ${{ matrix.layout }}
+      NOVA_SEED_INDEX: ${{ matrix.seed }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --no-audit --no-fund --no-package-lock
+      - run: npm install --no-save --no-audit --no-fund --no-package-lock playwright@1.56.1
+      - run: npx playwright install chromium
+      - name: Serve materialized runtime
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/nova-star-http.log 2>&1 &
+      - name: Observe natural Star opportunity (no forced state)
+        run: node tests/browser/frontlines-rogue-star-natural.cjs
+      - name: Preserve natural exposure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rogue-star-natural-${{ matrix.layout }}-${{ matrix.seed }}
+          path: artifacts/star-natural/
+          if-no-files-found: ignore
+          retention-days: 14
