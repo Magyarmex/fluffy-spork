@@ -1619,7 +1619,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   * can lose the second Circle/Square contact at low FPS. Resolve only
   * two proven stationary contacts; leave every contested event to the
   * existing engine rather than inventing a general chronology. */
- function isolatedStationaryShapePair(g,b,dt){
+ function isolatedStationaryShapePair(g,b,dt,dryRun){
   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
      b.__novaBreachAtTime===g.time||b.pen!==1||(b.hits||0)!==0||
      (b.__novaDirectVictims&&b.__novaDirectVictims.size)||
@@ -1718,6 +1718,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    }
   }
   if(firstSolidHit(g,ax,ay,ex,ey,b.r*.45))return false;
+  if(dryRun)return contacts; /* preflight without changing any combat state */
   for(var ci=0;ci<contacts.length;ci++){
    var hit=contacts[ci];
    b.x=ax+dx*hit.t;b.y=ay+dy*hit.t;
@@ -1825,11 +1826,29 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
     (paired===1&&bodyWork<=ISOLATED_RECOVERY_SCAN_CAP));
  var localPaired=!legacyPaired&&paired>0?
     localStationaryPiercingPlan(this,dt,true):null;
+
+ /* Preflight every eligible non-expiring pen=1 round, including dense
+  * remote fire. Commit ONLY if exactly one shot has a complete two-shape
+  * proof. This avoids first-N array bias and any shared-victim ordering
+  * between multiple simultaneous speculative shortcuts. */
+ var shapePairCandidate=null,shapePairAmbiguous=false;
+ if(paired>0&&paired<=96&&paired*bodyWork<=24000){
+  for(var sp=0;sp<this.bullets.length;sp++){
+   var candidate=this.bullets[sp];
+   if(!candidate||candidate.dead||candidate.ttl<=dt||
+      candidate.pen!==1||(candidate.hits||0)!==0)continue;
+   if(isolatedStationaryShapePair(this,candidate,dt,true)){
+    if(shapePairCandidate){shapePairAmbiguous=true;break;}
+    shapePairCandidate=candidate;
+   }
+  }
+  if(shapePairCandidate&&!shapePairAmbiguous)
+   isolatedStationaryShapePair(this,shapePairCandidate,dt,false);
+ }
  if(legacyPaired||localPaired)
   for(var pair=this.bullets.length-1;pair>=0;pair--){
    var liveBullet=this.bullets[pair];
    if(liveBullet&&!liveBullet.dead&&liveBullet.ttl>dt){
-    if(paired===1&&isolatedStationaryShapePair(this,liveBullet,dt))continue;
     if(localPaired){
      if(localPaired.has(liveBullet))
       isolatedTTLStationaryPiercingChain(this,liveBullet,dt,true,
