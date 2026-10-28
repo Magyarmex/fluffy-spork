@@ -1387,3 +1387,45 @@ for(const optimized of [false,true]){
   });
  }
 }
+
+
+/* The exact Apex class envelopes are playable, not invented projectile
+ * budgets. Model the final 33ms of their normal TTL at 30Hz; this is a
+ * collision-order stress case, not a measured natural encounter rate. */
+for(const optimized of [false,true]){
+ const Game=boot(undefined,optimized);
+ for(const variant of [
+   {name:'specter',pen:3,speed:1220,r:5.2,dmg:31,lastX:62},
+   {name:'assassin',pen:4,speed:1500,r:5.8,dmg:47,lastX:65}
+ ]){
+  test((optimized?'optimized':'baseline')+' canonical '+variant.name+
+    ' TTL tail preserves three direct victims at 30Hz',()=>{
+   assert.match(html,new RegExp(variant.name+':[\\s\\S]{0,500}bullet: \\{ dmg: '+
+     variant.dmg+', speed: '+variant.speed+', r: '+variant.r+
+     ', pen: '+variant.pen));
+   const {g,a,b,c}=highPenTTLWorld(Game,variant.pen);
+   a.x=25;b.x=45;c.x=variant.lastX;
+   const shot=g.bullets[0];
+   shot.vx=variant.speed;shot.r=variant.r;shot.dmg=variant.dmg;
+   shot.ttl=.033;
+   g.time+=1/30;g.updateBullets(1/30);
+   assert.deepEqual([a.hitCount,b.hitCount,c.hitCount],[1,1,1]);
+  });
+ }
+ for(const pen of [3,4]){
+  test((optimized?'optimized':'baseline')+' pen='+pen+
+    ' live frame cannot use TTL-only three-hull shortcut',()=>{
+   const {g,c}=highPenTTLWorld(Game,pen);
+   g.bullets[0].ttl=1;
+   g.time+=1/30;g.updateBullets(1/30);
+   assert.equal(c.hitCount,0,'live pen>=3 needs a separate full chronology proof');
+  });
+  test((optimized?'optimized':'baseline')+' pen='+pen+
+    ' nearby neutral movement blocks TTL shortcut',()=>{
+   const {g,c}=highPenTTLWorld(Game,pen);
+   g.shapes=[{kind:'shape',id:423,x:92,y:32,r:12,hp:100}];
+   g.time+=1/30;g.updateBullets(1/30);
+   assert.equal(c.hitCount,0);
+  });
+ }
+}
