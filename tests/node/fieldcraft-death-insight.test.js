@@ -177,3 +177,46 @@ test('broken presentation DOM cannot interrupt the game update',()=>{
  assert.equal(g.status,'dead');
  assert.equal(g.__novaDeathInsight,null);
 });
+
+function shippingClassRegistry(){
+ const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+ const marker='window.__defineModule("game/classes", function (module, exports, require) {';
+ const at=html.indexOf(marker),end=html.indexOf('\n});',at);
+ assert.ok(at>=0&&end>at,'materialized canonical class module exists');
+ const mod={exports:{}};
+ new Function('module','exports','require',html.slice(at+marker.length,end))(
+  mod,mod.exports,()=>{throw Error('unexpected class dependency');});
+ return mod.exports;
+}
+test('every real playable class teaches unique, actionable opponent counterplay',()=>{
+ const {api}=boot(),classes=shippingClassRegistry(),seen=new Set();
+ const entries=Object.entries(classes.CLASSES);
+ assert.equal(entries.length,36,'canonical class registry expanded: update the matchup audit');
+ for(const [id,def] of entries){
+  const info=api.choose(victim(),{id:2,cls:id},classes);
+  assert.ok(info,'missing matchup for '+id);
+  assert.equal(info.name,def.name);
+  assert.ok(info.lesson.length>=48&&info.lesson.length<=145,
+   'death modal tip must stay legible on compact phones: '+id+' '+info.lesson.length);
+  assert.match(info.lesson,/\b(bait|break|avoid|use|watch|read|stay|escape|cross|change|shift|sidestep|strafe|split|dodge|expect|flank|disrupt|do not|never|hunters|force|keep|punish)\b/i,
+   'tip needs a concrete decision: '+id);
+  assert.ok(!seen.has(info.lesson),'generic duplicated lesson for '+id);
+  seen.add(info.lesson);
+ }
+ assert.equal(seen.size,36);
+});
+test('a missing or prototype-inherited class never invents an opponent lesson',()=>{
+ const {api}=boot(),classes=shippingClassRegistry();
+ assert.equal(api.choose(victim(),{id:2,cls:'unknown'},classes),null);
+ assert.equal(api.choose(victim(),{id:2,cls:'toString'},classes),null);
+ assert.equal(api.choose(victim(),{id:2,cls:'__proto__'},classes),null);
+});
+test('Apex lessons teach different counters inside each shared lineage',()=>{
+ const {api}=boot(),classes=shippingClassRegistry();
+ for(const pair of [['tempest','needlestorm'],['clusterking','siegebomber'],
+  ['singularity','prism'],['hivemind','broodmother'],['bastion','aegis']]){
+  const a=api.choose(victim(),{id:2,cls:pair[0]},classes);
+  const b=api.choose(victim(),{id:2,cls:pair[1]},classes);
+  assert.notEqual(a.lesson,b.lesson,'Apex pair must have distinct tactical advice');
+ }
+});
