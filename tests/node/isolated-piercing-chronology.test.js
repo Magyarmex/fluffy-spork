@@ -1087,3 +1087,224 @@ for(const optimized of [false,true])for(const reverse of [false,true]){
    'local collision chronology cannot be overwritten by a remote-density shortcut');
  });
 }
+
+
+/* Run 419 — neutral-shape piercing chronology.
+ * A fast pen=1 round can cross two ordinary stationary neutral hulls
+ * within one frame while TTL stays positive. The materialized core
+ * and the single-hit swept fallback lose the second contact at 30/60Hz.
+ * Use the real Game.update epoch, Battlefield and Performance layers;
+ * refuse any unproven movement, kill/fragment, cover or competing fire. */
+function neutralPair(Game, secondX=70, reverse=false, firstHp=100) {
+  const g=new Game();
+  const a={kind:'shape',id:401,type:'square',x:40,y:0,r:12,
+    hp:firstHp,maxHp:firstHp,hitCount:0};
+  const b={kind:'shape',id:402,type:'square',x:secondX,y:0,r:12,
+    hp:100,maxHp:100,hitCount:0};
+  g.shapes=reverse?[b,a]:[a,b];
+  g.damageShape=function(s,dmg){
+    s.hp-=dmg;s.hitCount++;this.hits++;
+  };
+  g.bullets=[{kind:'bullet',id:400,ownerId:1,x:0,y:0,
+    vx:6000,vy:0,r:3,dmg:20,ttl:.5,pen:1,hits:0,
+    dead:false,shell:false,beam:false,splash:0}];
+  return {g,a,b};
+}
+for(const optimized of [false,true]){
+  const mode=optimized?'Battlefield + Performance':'Battlefield';
+  const Game=boot(function(dt){this.time+=dt;this.updateBullets(dt);},optimized);
+  for(const fps of [30,60,120,240]){
+    test(mode+' neutral pen=1 physically reaches two stationary shapes at '+fps+'Hz',()=>{
+      const {g,a,b}=neutralPair(Game);
+      for(let frame=0;frame<30&&g.bullets.length;frame++)g.update(1/fps);
+      assert.equal(a.hitCount,1,'first neutral receives exactly one hit');
+      assert.equal(b.hitCount,1,'second neutral reached before frame/TTL boundary');
+      assert.equal(a.hp,80);assert.equal(b.hp,80);
+    });
+  }
+  test(mode+' neutral pair is independent of hash iteration order',()=>{
+    const {g,a,b}=neutralPair(Game,70,true);
+    g.update(1/30);
+    assert.equal(a.hitCount,1);assert.equal(b.hitCount,1);
+  });
+  test(mode+' neutral pair does not invent a hit beyond this frame',()=>{
+    const {g,b}=neutralPair(Game,240);
+    g.update(1/30);
+    assert.equal(b.hitCount,0);
+  });
+  test(mode+' neutral pair defers intervening permanent cover',()=>{
+    const {g,b}=neutralPair(Game);
+    g.__novaTerrain=[{id:-419,shape:'rect',x:55,y:0,w:4,h:80,
+      solid:true,destructible:false,hp:0}];
+    g.update(1/30);
+    assert.equal(b.hitCount,0);
+  });
+  test(mode+' neutral pair defers nearby competing projectile',()=>{
+    const {g,b}=neutralPair(Game);
+    g.bullets.push({kind:'bullet',id:499,ownerId:9,x:50,y:0,
+      vx:0,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,
+      dead:false,shell:false,beam:false,splash:0});
+    g.update(1/30);
+    assert.equal(b.hitCount,0);
+  });
+  test(mode+' neutral pair refuses a lethal first shape and fragment ambiguity',()=>{
+    const {g,b}=neutralPair(Game,70,false,15);
+    g.update(1/30);
+    assert.equal(b.hitCount,0);
+  });
+  test(mode+' neutral pair refuses a moving shape in its corridor',()=>{
+    const MovingGame=boot(function(dt){
+      this.time+=dt;this.shapes[1].x+=5;this.updateBullets(dt);
+    },optimized);
+    const {g,b}=neutralPair(MovingGame);
+    g.update(1/30);
+    assert.equal(b.hitCount,0);
+  });
+  test(mode+' neutral pair refuses a shape born during this frame',()=>{
+    const BornGame=boot(function(dt){
+      this.time+=dt;this.shapes[1].born=this.time;this.updateBullets(dt);
+    },optimized);
+    const {g,b}=neutralPair(BornGame);
+    g.update(1/30);
+    assert.equal(b.hitCount,0);
+  });
+  test(mode+' neutral pair refuses missing Game.update movement epoch',()=>{
+    const Isolated=boot(undefined,optimized);
+    const {g,b}=neutralPair(Isolated);
+    g.updateBullets(1/30);
+    assert.equal(b.hitCount,0);
+  });
+}
+
+
+/* Independent seeded geometry: different speeds, separations, FPS and hash
+ * order must preserve the same two physical victim identities. These are
+ * controlled nonlethal worlds, not an estimate of natural match frequency. */
+for(const optimized of [false,true]){
+  const mode=optimized?'optimized':'baseline';
+  const Game=boot(function(dt){this.time+=dt;this.updateBullets(dt);},optimized);
+  test(mode+' 400 seeded neutral-pair frame partitions preserve two victims',()=>{
+    let seed=4192026;
+    const rnd=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+    const worlds=Array.from({length:100},(_,i)=>{
+      const x1=30+rnd()*50,vx=3000+rnd()*6000;
+      return {x1,x2:x1+25+rnd()*45,vx,reverse:i%2===0};
+    });
+    for(const fps of [30,60,120,240])for(const w of worlds){
+      const {g,a,b}=neutralPair(Game,w.x2,w.reverse);
+      a.x=w.x1;g.bullets[0].vx=w.vx;
+      for(let frame=0;frame<100&&g.bullets.length;frame++)g.update(1/fps);
+      assert.equal(a.hitCount,1,'first victim at '+fps+'Hz');
+      assert.equal(b.hitCount,1,'second victim at '+fps+'Hz');
+      assert.equal(g.hits,2,'no duplicate/phantom contact at '+fps+'Hz');
+    }
+  });
+  test(mode+' remote independent fire does not suppress local shape-pair proof',()=>{
+    const {g,a,b}=neutralPair(Game);
+    g.bullets.push({kind:'bullet',id:500,ownerId:9,x:2000,y:2000,
+      vx:0,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,
+      dead:false,shell:false,beam:false,splash:0});
+    g.update(1/30);
+    assert.equal(a.hitCount,1);assert.equal(b.hitCount,1);
+  });
+  test(mode+' tangent neutral contact is never upgraded to an invented hit',()=>{
+    const {g,b}=neutralPair(Game);
+    b.y=15; // exactly bullet.r + shape.r: tangent, not overlap
+    g.update(1/30);
+    assert.equal(b.hitCount,0);
+  });
+  test(mode+' unknown newborn remote neutral defers the entire shortcut',()=>{
+    const Newborn=boot(function(dt){
+      this.time+=dt;
+      this.shapes.push({kind:'shape',id:999,type:'circle',
+        x:1500,y:1500,r:12,hp:100,born:this.time});
+      this.updateBullets(dt);
+    },optimized);
+    const {g,b}=neutralPair(Newborn);
+    g.update(1/30);
+    assert.equal(b.hitCount,0);
+  });
+}
+
+
+/* Real class envelope, not a 6,000u/s synthetic weapon: Tempest's
+ * canonical 500u/s pen=1 shell at 44 earned bullet-speed upgrades reaches
+ * 2,370u/s under Game.bulletSpeed. At the actual 0.033s frame cap, two
+ * nonlethal Squares are physically crossed in one frame. The old shipping
+ * composition misses the second at 30Hz but hits it at 60/120Hz. */
+for(const optimized of [false,true]){
+  const mode=optimized?'optimized':'baseline';
+  const Game=boot(function(dt){this.time+=dt;this.updateBullets(dt);},optimized);
+  test(mode+' high-upgrade Tempest neutral penetration is FPS-invariant',()=>{
+    assert.match(html,/tempest:[\s\S]{0,1000}bullet:\s*\{ dmg: 6\.2, speed: 500, r: 3\.7, pen: 1/);
+    assert.match(html,/bulletSpeed\(t\) \{\s*let s = classes_1\.CLASSES\[t\.cls\]\.bullet\.speed \* \(1 \+ 0\.085 \* t\.stats\.bulletspeed\)/);
+    const speed=500*(1+.085*44);
+    for(const fps of [30,60,120]){
+      const {g,a,b}=neutralPair(Game,65);
+      a.x=40;a.r=20;b.r=20;
+      g.bullets[0].x=16;g.bullets[0].vx=speed;
+      g.bullets[0].r=3.7;g.bullets[0].dmg=8;g.bullets[0].ttl=.82;
+      for(let frame=0;frame<30&&g.bullets.length;frame++)
+        g.update(Math.min(.033,1/fps));
+      assert.equal(a.hitCount,1,'first Square at '+fps+'Hz');
+      assert.equal(b.hitCount,1,'second Square at '+fps+'Hz');
+      assert.equal(g.hits,2,'no extra hits at '+fps+'Hz');
+    }
+  });
+}
+
+
+/* Dense-fire proof: other pen=1 rounds can be numerous but physically
+ * remote. A global single-projectile gate would make the fix unreachable
+ * for real high-rate Tempest play; one local proof may still be unique. */
+for(const optimized of [false,true]){
+ const mode=optimized?'optimized':'baseline';
+ const Game=boot(function(dt){this.time+=dt;this.updateBullets(dt);},optimized);
+ test(mode+' 30 remote pen=1 rounds do not suppress a unique local pair',()=>{
+  const {g,a,b}=neutralPair(Game,65);
+  a.x=40;a.r=20;b.r=20;
+  g.bullets[0].x=16;g.bullets[0].vx=500*(1+.085*44);
+  g.bullets[0].r=3.7;g.bullets[0].dmg=8;g.bullets[0].ttl=.82;
+  for(let i=0;i<30;i++)g.bullets.push({
+   kind:'bullet',id:1000+i,ownerId:7,x:1400+i*8,y:1500,
+   vx:0,vy:0,r:3,dmg:7,ttl:1,pen:1,hits:0,
+   dead:false,shell:false,beam:false,splash:0
+  });
+  g.update(.033);
+  assert.equal(a.hitCount,1);assert.equal(b.hitCount,1);
+ });
+ test(mode+' two independent shape-pair proofs abstain as a batch',()=>{
+  const {g,b}=neutralPair(Game,65);
+  g.shapes[0].r=20;b.r=20;
+  g.bullets[0].x=16;g.bullets[0].vx=500*(1+.085*44);
+  g.bullets[0].r=3.7;g.bullets[0].dmg=8;g.bullets[0].ttl=.82;
+  const c={kind:'shape',id:801,type:'square',x:40,y:200,r:20,hp:55};
+  const d={kind:'shape',id:802,type:'square',x:65,y:200,r:20,hp:55};
+  g.shapes.push(c,d);
+  g.bullets.push({...g.bullets[0],id:803,y:200});
+  g.update(.033);
+  assert.equal(b.hitCount,0,'second victim cannot be picked by bullet-array order');
+  assert.equal(d.hp,55,'independent second lane must also abstain');
+ });
+}
+
+
+/* Real neutral ecology drifts each frame. A 0.3u observed movement
+ * envelope must not turn a physically guaranteed two-Square contact into
+ * a 30Hz miss; a larger 5u relocation remains a conservative veto. */
+for(const optimized of [false,true]){
+ const Game=boot(function(dt){
+  this.time+=dt;
+  for(const s of this.shapes)s.x+=.3;
+  this.updateBullets(dt);
+ },optimized);
+ test((optimized?'optimized':'baseline')+
+  ' slow moving Squares preserve guaranteed Tempest contacts at 30Hz',()=>{
+  const {g,a,b}=neutralPair(Game,65);
+  a.r=20;b.r=20;
+  g.bullets[0].x=15.5;g.bullets[0].vx=500*(1+.085*44);
+  g.bullets[0].r=3.7;g.bullets[0].dmg=8;g.bullets[0].ttl=.82;
+  g.update(.033);
+  assert.equal(a.hitCount,1);assert.equal(b.hitCount,1);
+ });
+}

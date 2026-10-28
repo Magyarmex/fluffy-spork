@@ -943,3 +943,29 @@ for(const fps of [30,60,120,240]){
   assert.equal(hits,1,'materialized full combat stack must preserve the proof');
  });
 }
+
+
+/* Run 419 full shipping combat composition: Sniper → Polish → Battlefield
+ * → Apex → Performance → Contact Spark. This exercises the real materialized
+ * core and the actual overlay order, not only Battlefield in isolation. */
+test('full shipping combat stack preserves two high-upgrade Tempest Square contacts at 30Hz',()=>{
+  const {g}=boot();
+  g.time=419;
+  g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=419;
+  const a={kind:'shape',id:4191,type:'square',x:40,y:0,r:20,
+    hp:55,maxHp:55,__novaShapeSweepEpoch:419,
+    __novaShapeSweepPrevX:40,__novaShapeSweepPrevY:0};
+  const b={kind:'shape',id:4192,type:'square',x:65,y:0,r:20,
+    hp:55,maxHp:55,__novaShapeSweepEpoch:419,
+    __novaShapeSweepPrevX:65,__novaShapeSweepPrevY:0};
+  g.shapes=[a,b];
+  g.hash.query=(_x,_y,_r,out)=>{out.length=0;out.push(...g.shapes);};
+  g.damageShape=(s,dmg)=>{s.hp-=dmg;};
+  g.bullets=[{kind:'bullet',id:4193,ownerId:1,x:16,y:0,
+    vx:500*(1+.085*44),vy:0,r:3.7,dmg:8,ttl:.82,
+    pen:1,hits:0,dead:false,shell:false,beam:false,splash:0}];
+  g.updateBullets(.033);
+  assert.equal(a.hp,47,'first physically reached Square');
+  assert.equal(b.hp,47,'second physically reached Square');
+  assert.equal(g.bullets.length,0,'penetration exhausted exactly once');
+});

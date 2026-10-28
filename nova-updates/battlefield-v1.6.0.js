@@ -1614,6 +1614,135 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   }
   return plan;
  }
+
+ /* Witnessed nonlethal neutral piercing pair. The core and swept fallback
+  * can lose the second Circle/Square contact at low FPS. Resolve only
+  * two proven stationary contacts; leave every contested event to the
+  * existing engine rather than inventing a general chronology. */
+ function isolatedStationaryShapePair(g,b,dt,dryRun){
+  if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
+     b.__novaBreachAtTime===g.time||b.pen!==1||(b.hits||0)!==0||
+     (b.__novaDirectVictims&&b.__novaDirectVictims.size)||
+     !(dt>0)||!Number.isFinite(dt)||!Number.isFinite(b.ttl)||
+     !(b.ttl>dt)||g.__novaShapeSweepActive!==true||
+     !Number.isFinite(g.__novaShapeSweepEpoch)||
+     !Number.isFinite(b.x)||!Number.isFinite(b.y)||
+     !Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
+     !Number.isFinite(b.r)||!(b.r>0)||
+     !Number.isFinite(b.dmg)||!(b.dmg>0))return false;
+  var shapes=g.shapes||[],tanks=g.tanks||[],drones=g.drones||[],
+      bullets=g.bullets||[];
+  if(shapes.length>180||tanks.length>30||drones.length>80||
+     bullets.length>300)return false;
+  var ax=b.x,ay=b.y,dx=b.vx*dt,dy=b.vy*dt,
+      ex=ax+dx,ey=ay+dy,limit=MAP_LIMIT-20;
+  if(!(dx*dx+dy*dy>1e-12)||!Number.isFinite(ex)||
+     !Number.isFinite(ey)||
+     Math.max(Math.abs(ax),Math.abs(ay),Math.abs(ex),Math.abs(ey))>=limit||
+     Math.hypot(dx,dy)<2*(12+b.r))return false;
+  function near(x,y,tx,ty,pad){
+   if(!Number.isFinite(x)||!Number.isFinite(y)||
+      !Number.isFinite(tx)||!Number.isFinite(ty)||
+      !Number.isFinite(pad)||!(pad>=0))return true;
+   return Math.max(ax,ex)+pad>=Math.min(x,tx)&&
+          Math.min(ax,ex)-pad<=Math.max(x,tx)&&
+          Math.max(ay,ey)+pad>=Math.min(y,ty)&&
+          Math.min(ay,ey)-pad<=Math.max(y,ty);
+  }
+  var contacts=[],A=dx*dx+dy*dy;
+  for(var si=0;si<shapes.length;si++){
+   var s=shapes[si];if(!s||!(s.hp>0))continue;
+   var rr=b.r+s.r,
+       sx=s.__novaShapeSweepPrevX,sy=s.__novaShapeSweepPrevY;
+   /* Require frame-start evidence even for remote shapes: a newborn or
+    * shape that moved away could otherwise conceal an earlier contact. */
+   if(!(rr>0)||!Number.isFinite(rr)||
+      s.__novaShapeSweepEpoch!==g.__novaShapeSweepEpoch||
+      !Number.isFinite(sx)||!Number.isFinite(sy)||
+      !Number.isFinite(s.x)||!Number.isFinite(s.y))return false;
+   if(!near(sx,sy,s.x,s.y,rr+4))continue;
+   /* Ordinary Circles/Squares drift at <=10u/s. The observed frame
+    * displacement bounds their entire straight core integration; use a
+    * larger outer radius for earliest POSSIBLE contact and a smaller
+    * inner radius for a GUARANTEED contact, independent of subframe
+    * interpolation. Any uncertain overlap or relocation is a veto. */
+   var motion=Math.hypot(s.x-sx,s.y-sy);
+   if(s.born===g.time||!Number.isFinite(motion)||motion>.5||
+      shapeWasTeleported(g,s)||
+      (s.type!=='circle'&&s.type!=='square'))return false;
+   var fx=ax-sx,fy=ay-sy,B=2*(fx*dx+fy*dy);
+   function entry(radius){
+    var C=fx*fx+fy*fy-radius*radius;
+    if(!(C>1e-9))return -1; /* ambiguous frame-start overlap */
+    var D=B*B-4*A*C;
+    if(!Number.isFinite(D)||
+       Math.abs(D)<=1e-10*(B*B+4*A*(fx*fx+fy*fy+radius*radius)))
+      return -1;
+    if(D<=0)return null;
+    var root=Math.sqrt(D),q=-.5*(B+(B<0?-root:root));
+    if(!q)return -1;
+    var enter=Math.min(q/A,C/q),leave=Math.max(q/A,C/q);
+    return leave<=0||enter>=1-1e-9?null:enter;
+   }
+   var possible=entry(rr+motion);
+   if(possible===-1)return false;
+   if(possible===null)continue;
+   var guaranteed=entry(rr-motion);
+   if(guaranteed===-1||guaranteed===null||
+      !(guaranteed>1e-9)||!(guaranteed<1-1e-9))return false;
+   if(!Number.isFinite(s.hp)||s.hp<=b.dmg*2)return false;
+   contacts.push({e:s,t:guaranteed,earliest:possible});
+   if(contacts.length>2)return false;
+  }
+  if(contacts.length!==2)return false;
+  contacts.sort(function(a,c){return a.t-c.t;});
+  if(contacts[1].earliest<=contacts[0].t+1e-7)return false;
+  for(var ti=0;ti<tanks.length;ti++){
+   var t=tanks[ti];if(!t||!t.alive||t.id===b.ownerId)continue;
+   var def=CLASSES[t.cls];
+   if(!def||!Number.isFinite(def.size))return false;
+   var sx=t.__novaSweepMoveTime===g.time?t.__novaSweepPrevX:t.x,
+       sy=t.__novaSweepMoveTime===g.time?t.__novaSweepPrevY:t.y;
+   if(near(sx,sy,t.x,t.y,b.r+def.size+7))return false;
+  }
+  for(var di=0;di<drones.length;di++){
+   var d=drones[di];if(!d||!(d.hp>0)||d.ownerId===b.ownerId)continue;
+   if(d.__novaChronoDroneEpoch!==g.__novaShapeSweepEpoch||
+      !Number.isFinite(d.__novaChronoDronePrevX)||
+      !Number.isFinite(d.__novaChronoDronePrevY))return false;
+   if(near(d.__novaChronoDronePrevX,d.__novaChronoDronePrevY,
+      d.x,d.y,b.r+(d.r||8)+1+Math.max(30,dt*4000)))return false;
+  }
+  /* Nearby ordinary shots, any shell/blast, or unknown motion can alter
+   * first contact, bullet interception, or neutral damage/kill credit. */
+  for(var bi=0;bi<bullets.length;bi++){
+   var o=bullets[bi];if(!o||o===b||o.dead)continue;
+   if(o.shell||o.splash||o.beam||o.__v17Cannon||
+      !Number.isFinite(o.x)||!Number.isFinite(o.y)||
+      !Number.isFinite(o.vx)||!Number.isFinite(o.vy)||
+      !Number.isFinite(o.r)||!(o.r>0))return false;
+   var ox=o.x+o.vx*dt,oy=o.y+o.vy*dt;
+   if(near(o.x,o.y,ox,oy,b.r+o.r+2))return false;
+   for(var ci=0;ci<contacts.length;ci++){
+    var target=contacts[ci].e,pad=o.r+target.r+2;
+    if(Math.max(o.x,ox)+pad>=target.x&&
+       Math.min(o.x,ox)-pad<=target.x&&
+       Math.max(o.y,oy)+pad>=target.y&&
+       Math.min(o.y,oy)-pad<=target.y)return false;
+   }
+  }
+  if(firstSolidHit(g,ax,ay,ex,ey,b.r*.45))return false;
+  if(dryRun)return contacts; /* preflight without changing any combat state */
+  for(var ci=0;ci<contacts.length;ci++){
+   var hit=contacts[ci];
+   b.x=ax+dx*hit.t;b.y=ay+dy*hit.t;
+   g.damageShape(hit.e,b.dmg,b.vx,b.vy);
+   b.hits++;b.pen--;
+   (b.__novaDirectVictims||(b.__novaDirectVictims=new Set())).add(hit.e);
+  }
+  b.dead=true;b.px=b.x;b.py=b.y;b.vx=0;b.vy=0;
+  return true;
+ }
  var oldUpdateBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var terrain=ensureTerrain(this);
  /* Bound pairwise geometry per frame, not total bullets: one expiring shot
   * remains eligible in a crowded but spatially separated firefight. When
@@ -1711,10 +1840,50 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
     (paired===1&&bodyWork<=ISOLATED_RECOVERY_SCAN_CAP));
  var localPaired=!legacyPaired&&paired>0?
     localStationaryPiercingPlan(this,dt,true):null;
+
+ /* Preflight every eligible non-expiring pen=1 round, including dense
+  * remote fire. Commit ONLY if exactly one shot has a complete two-shape
+  * proof. This avoids first-N array bias and any shared-victim ordering
+  * between multiple simultaneous speculative shortcuts. */
+ var shapePairCandidate=null,shapePairAmbiguous=false;
+ if(paired>0&&paired<=96&&paired*bodyWork<=24000){
+  for(var sp=0;sp<this.bullets.length;sp++){
+   var candidate=this.bullets[sp];
+   if(!candidate||candidate.dead||candidate.ttl<=dt||
+      candidate.pen!==1||(candidate.hits||0)!==0||
+      !Number.isFinite(candidate.r)||!(candidate.r>0)||
+      !Number.isFinite(candidate.dmg)||!(candidate.dmg>0)||
+      !Number.isFinite(candidate.ttl)||
+      !Number.isFinite(candidate.x)||!Number.isFinite(candidate.y)||
+      !Number.isFinite(candidate.vx)||!Number.isFinite(candidate.vy))continue;
+   var reach=Math.hypot(candidate.vx*dt,candidate.vy*dt);
+   if(!Number.isFinite(reach)||reach<2*(12+candidate.r))continue;
+   /* A read-only spatial prefilter avoids scanning all 120 neutrals for
+    * every distant rapid-fire round. A missed candidate only falls back
+    * to the existing engine; it never authorizes speculative damage. */
+   if(this.hash&&typeof this.hash.query==='function'){
+    var nearShapes=[],mx=candidate.x+candidate.vx*dt*.5,
+        my=candidate.y+candidate.vy*dt*.5,eligible=0;
+    this.hash.query(mx,my,reach*.5+candidate.r+45,nearShapes);
+    for(var qi=0;qi<nearShapes.length;qi++){
+     var e=nearShapes[qi];
+     if(e&&e.kind==='shape'&&e.hp>candidate.dmg*2&&
+        (e.type==='circle'||e.type==='square')&&++eligible>=2)break;
+    }
+    if(eligible<2)continue;
+   }
+   if(isolatedStationaryShapePair(this,candidate,dt,true)){
+    if(shapePairCandidate){shapePairAmbiguous=true;break;}
+    shapePairCandidate=candidate;
+   }
+  }
+  if(shapePairCandidate&&!shapePairAmbiguous)
+   isolatedStationaryShapePair(this,shapePairCandidate,dt,false);
+ }
  if(legacyPaired||localPaired)
   for(var pair=this.bullets.length-1;pair>=0;pair--){
    var liveBullet=this.bullets[pair];
-   if(liveBullet&&liveBullet.ttl>dt){
+   if(liveBullet&&!liveBullet.dead&&liveBullet.ttl>dt){
     if(localPaired){
      if(localPaired.has(liveBullet))
       isolatedTTLStationaryPiercingChain(this,liveBullet,dt,true,
