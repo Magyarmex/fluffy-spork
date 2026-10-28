@@ -74,6 +74,33 @@ async function scenario(browser, label, options) {
     assert.equal(menu.decorative,true,label+': War Room must be visible');
     assert.equal(menu.active,false,label+': War Room must not impersonate active game');
     await page.screenshot({path:path.join(output,label+'-menu.png')});
+
+    if(label==='mobile-320'){
+      // Real React/War Room DOM: one unrelated child-list mutation must not
+      // cause Fieldcraft to rewrite the already-correct TIPS heading every RAF.
+      const feedback=await page.evaluate(async()=>{
+        const menu=document.querySelector('#root .menu-grid-bg');
+        const heading=menu?.querySelector('.nv-brief-k');
+        if(!menu||!heading)return {error:'canonical Fieldcraft heading missing'};
+        let writes=0;
+        const observer=new MutationObserver(records=>{
+          writes+=records.filter(r=>r.type==='childList').length;
+        });
+        observer.observe(heading,{childList:true});
+        const marker=document.createComment('fieldcraft-observer-probe');
+        menu.appendChild(marker);
+        try{await new Promise(resolve=>setTimeout(resolve,450));}
+        finally{observer.disconnect();marker.remove();}
+        return {writes,heading:heading.textContent,stillConnected:heading.isConnected};
+      });
+      assert.ok(!feedback.error&&feedback.stillConnected,
+        label+': real Fieldcraft menu must be present: '+JSON.stringify(feedback));
+      assert.equal(feedback.heading,'TIPS');
+      assert.equal(feedback.writes,0,
+        label+': unrelated DOM mutation must not perpetually rewrite TIPS: '+JSON.stringify(feedback));
+      console.log('NOVA_FIELDCRAFT_OBSERVER_IDLE '+JSON.stringify(feedback));
+    }
+
     // Fieldcraft's rotating briefing must render every registered lesson in full.
     // The previous fixed-height line silently cropped longer tactical advice on
     // 320px handsets even though the primary lobby buttons remained visible.
