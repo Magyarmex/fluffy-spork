@@ -117,6 +117,20 @@ function run(seed,choice,hz,seconds,policy='navigate',preludeSeconds=0){
   assert.equal(g.status,'playing');
   assert.equal(g.__novaRedeployChoice,'fresh','choice cannot leak across lives');
   assert.ok(g.isTerrainSafe(g.player.x,g.player.y,75),'real spawn must be terrain safe');
+  // Observation only: never feed post-insertion enemy/neutral state into
+  // movement or aiming. Quantify the RNG/spawn confound explicitly.
+  const digest = value => crypto.createHash('sha256')
+    .update(JSON.stringify(value)).digest('hex');
+  const aiAtInsertion=(g.tanks||[]).filter(t=>t&&t.ai)
+    .map(t=>[t.id,t.cls,t.x,t.y,t.hp]);
+  const neutralsAtInsertion=(g.shapes||[]).filter(t=>t)
+    .map(t=>[t.id,t.type,t.x,t.y,t.hp]);
+  const postInsertion={
+    aiCount:aiAtInsertion.length,neutralCount:neutralsAtInsertion.length,
+    enemyClassesHash:digest(aiAtInsertion.map(t=>t[1])),
+    enemyBodiesHash:digest(aiAtInsertion),
+    neutralBodiesHash:digest(neutralsAtInsertion)
+  };
   const p=g.player,spawn={x:p.x,y:p.y};
   const startDistance=Math.hypot(p.x-origin.x,p.y-origin.y);
   if(choice==='return')assert.ok(startDistance>=420-1e-6&&startDistance<=850+1e-6,
@@ -195,7 +209,7 @@ function run(seed,choice,hz,seconds,policy='navigate',preludeSeconds=0){
     if(visible)firstVisibleEnemy=g.time;
    }
   }
-  return{seed,choice,hz,policy,prelude,layout,rotation,mirrored,initialShapes,
+  return{seed,choice,hz,policy,prelude,postInsertion,layout,rotation,mirrored,initialShapes,
    fingerprint,fingerprintHash:crypto.createHash('sha256').update(fingerprint).digest('hex'),origin,spawn,
    startDistance:+startDistance.toFixed(2),
    endDistance:+Math.hypot(p.x-origin.x,p.y-origin.y).toFixed(2),
