@@ -272,3 +272,42 @@ for(const fps of [30,60,120]){
   assert.equal(g.hits,1,'only independently witnessed stationary second hull may be recovered');
  });
 }
+
+
+/* Regression-first: one *canonical* pen=1 round must not lose a physically
+ * reachable first contact merely because distant, unrelated fire exceeds
+ * the global projectile-work cap. A second expiring round is NOT required.
+ * The same bounded local proof must preserve cover and interception vetoes. */
+function denseSinglePen1World(fps,{far=false,wall=false,optimized=false,interceptor=false}={}){
+ return batchWorld(fps,{pen:1,far,wall,optimized,mutate:g=>{
+  // Remove the second local expiring round; keep 1,600 remote rounds.
+  g.bullets.splice(1,1);
+  for(let i=0;i<1100;i++)g.bullets.push({
+   kind:'bullet',id:5000+i,ownerId:9,x:1800+i*2,y:1800,
+   vx:0,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false
+  });
+  if(interceptor)g.bullets.push({
+   kind:'bullet',id:99999,ownerId:3,x:10,y:0,
+   vx:0,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false
+  });
+ }});
+}
+for(const fps of [30,60,120])for(const optimized of [false,true]){
+ test('one canonical pen=1 TTL first hit survives distant fire at '+
+  fps+'Hz optimized='+optimized,()=>{
+  const g=denseSinglePen1World(fps,{optimized});
+  assert.equal(g.hits,1,'first contact at x=19 precedes TTL expiry at x=30');
+ });
+ test('one canonical pen=1 TTL shot cannot hit beyond expiry at '+
+  fps+'Hz optimized='+optimized,()=>{
+  assert.equal(denseSinglePen1World(fps,{optimized,far:true}).hits,0);
+ });
+}
+for(const fps of [30,60,120]){
+ test('single canonical pen=1 TTL contact respects earlier cover at '+fps+'Hz',()=>{
+  assert.equal(denseSinglePen1World(fps,{wall:true}).hits,0);
+ });
+ test('single canonical pen=1 TTL contact respects nearby competing shot at '+fps+'Hz',()=>{
+  assert.equal(denseSinglePen1World(fps,{interceptor:true}).hits,0);
+ });
+}
