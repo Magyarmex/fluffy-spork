@@ -374,12 +374,44 @@ mods['game/engine']=function(module,exports,require){
  if(!Game||Game.prototype.__novaDeathInsightInstalled)return;
  var classes;try{classes=require('./classes');}catch(ignore){return;}
  Game.prototype.__novaDeathInsightInstalled=true;
- var oldKill=Game.prototype.killTank,oldUpdate=Game.prototype.update,oldRedeploy=Game.prototype.redeploy;
+ var oldKill=Game.prototype.killTank,oldUpdate=Game.prototype.update,
+  oldRedeploy=Game.prototype.redeploy,oldUnregister=Game.prototype.unregisterTank,
+  oldDamage=Game.prototype.damageTank;
+ /* A rival's live bullet can kill the player after that rival has been
+  * unregistered. Preserve only a bounded class snapshot for Fieldcraft,
+  * never posthumous XP, kill credit, AI targeting or tank resurrection. */
+ if(typeof oldUnregister==='function')Game.prototype.unregisterTank=function(t){
+  if(!this.__novaDecorativeWorld&&t&&t.alive===false&&!t.isPlayer&&
+     Number.isSafeInteger(t.id)&&typeof t.cls==='string'){
+   var departed=this.__novaFieldcraftDeadOwners;
+   if(!departed)departed=this.__novaFieldcraftDeadOwners=new Map();
+   departed.set(t.id,{id:t.id,cls:t.cls});
+   if(departed.size>24)departed.delete(departed.keys().next().value);
+  }
+  return oldUnregister.apply(this,arguments);
+ };
+ if(typeof oldDamage==='function')Game.prototype.damageTank=function(victim,dmg,sourceId){
+  if(!victim||!victim.isPlayer||!Number.isSafeInteger(sourceId)||sourceId<0)
+   return oldDamage.apply(this,arguments);
+  var prior=this.__novaFieldcraftActiveSource;
+  this.__novaFieldcraftActiveSource=sourceId;
+  try{return oldDamage.apply(this,arguments);}
+  finally{this.__novaFieldcraftActiveSource=prior;}
+ };
  if(typeof oldKill==='function')Game.prototype.killTank=function(victim,killer){
   var wasAlive=!!(!this.__novaDecorativeWorld&&victim&&victim.alive!==false&&victim.isPlayer);
   var note=null;
   if(wasAlive)try{
    note=choose(victim,killer,classes);
+   /* The core passes null when a dead shooter's bullet lands. Use only
+    * this synchronous damage call's source ID and a witnessed dead-owner
+    * snapshot. In team modes abstain rather than guess an old alliance. */
+   if(!note&&!killer&&typeof this.areAllies!=='function'&&
+      Number.isSafeInteger(this.__novaFieldcraftActiveSource)){
+    var departed=this.__novaFieldcraftDeadOwners;
+    var owner=departed&&departed.get(this.__novaFieldcraftActiveSource);
+    if(owner)note=choose(victim,owner,classes);
+   }
    if(note&&typeof this.areAllies==='function'&&this.areAllies(victim,killer))note=null;
   }catch(ignore){note=null;} // Presentation must never interrupt a lethal hit.
 
@@ -395,7 +427,10 @@ mods['game/engine']=function(module,exports,require){
  };
  if(typeof oldRedeploy==='function')Game.prototype.redeploy=function(){
   var out=oldRedeploy.apply(this,arguments);
-  try{cleanup(this);}catch(ignore){this.__novaDeathInsight=null;}return out;
+  try{cleanup(this);}catch(ignore){this.__novaDeathInsight=null;}
+  this.__novaFieldcraftDeadOwners=null;
+  this.__novaFieldcraftActiveSource=undefined;
+  return out;
  };
 };
 window.__NOVA_DEATH_INSIGHT_TEST__={choose:choose,paint:paint,cleanup:cleanup};
