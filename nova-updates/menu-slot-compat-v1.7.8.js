@@ -256,6 +256,48 @@ var lessons={
  controller:'Disrupt the drone approach; avoid chasing the swarm into crossfire.',
  guardian:'Avoid a frontal trade; make the defender turn before committing.'
 };
+/* Class-specific COUNTERPLAY, not a claim about the fatal hit. The killer's
+ * canonical class is known; the actual damage source may be a drone, a
+ * reflected shot or another actor. Keep each lesson actionable, concise,
+ * and independent of private combat information or unobserved abilities. */
+var matchupLessons={
+ scout: "Use hard cover to break its single-shot lane; separate the hull from its escort before trading.",
+ twin: "Bait the twin firing lane behind cover, then cross at an angle while its barrels reset.",
+ minigun: "Break the rotary firing lane and force a turn; attack after heat and recoil spoil its tracking.",
+ shotgun: "Stay outside the pellet cone; bait the close blast, then punish the long reload.",
+ tempest: "Do not stand in its five-barrel lane; break sight, change angle, and punish overheated tracking.",
+ needlestorm: "Its needles reach farther than a Minigun; change angle sharply and attack between bursts.",
+ breachlord: "Avoid a point-blank trade: sidestep its wide nine-pellet burst, then punish the reload.",
+ flakmaster: "Its tight pellet cone reaches surprisingly far; strafe across the line, not straight backward.",
+ cannon: "Watch the fuse point, leave the predicted blast area, then push during the heavy reload.",
+ bomber: "Read the shell burst point and cross the cluster lane before its child bombs spread.",
+ demolisher: "Do not shelter at a blast edge; its huge splash reaches around gaps. Punish the slow reload.",
+ clusterking: "Escape the whole predicted cluster sector, not just the main shell; re-enter after fragments.",
+ siegebomber: "Change speed before its heavy cluster lands; use hard cover, then punish the long reload.",
+ annihilator: "Bait its enormous single shot into solid cover; push from a new angle during its long reload.",
+ quake: "Do not count on a slow heavy reload; use solid cover and shift lanes after each faster shell.",
+ marksman: "Break the sightline, then rotate before exposing the same angle.",
+ railgun: "Avoid lining up in a straight lane; bait its piercing rail shot, then cross during recovery.",
+ ghost: "Watch quiet lanes for stationary cloak; force movement, then punish its blink landing.",
+ singularity: "Never approach down one open lane; bait the extreme rail shot and cross during its long reload.",
+ prism: "Avoid its paired parallel beam lanes; shift sideways after a shot and close during recovery.",
+ specter: "Expect frequent blinks; cover likely exits and punish its new position, not the old one.",
+ assassin: "Bait its slow, high-damage opening shot; close during reload but keep room for its blink.",
+ carrier: "Disrupt the drone approach; avoid chasing the swarm into crossfire.",
+ overlord: "Do not fight six hunters in the open; split the swarm with cover and pressure the hull.",
+ warden: "Its armored hunters protect a damage-soaking hull; peel the drones before committing to the core.",
+ hivemind: "Nine hunters dominate open lanes; use a choke to separate the swarm from its hull.",
+ broodmother: "Hunters return quickly; exploit their travel time to pressure the hull instead of farming drones.",
+ citadel: "Its armored command core rewards flanks; avoid a prolonged head-on fight with six hunters.",
+ valkyrie: "Fast hunters can outflank you; change lanes and force them around solid cover.",
+ guard: "Avoid a frontal trade; make the defender turn before committing.",
+ fortress: "Its bunker is slow; flank outside the defended front arc instead of trading into armor.",
+ juggernaut: "Sidestep its committed Stampede; terrain contact drains momentum, then punish the recovery.",
+ bastion: "Its strongest guard is narrow and frontal; split angles rather than fighting inside its choke.",
+ aegis: "Bait its wide Perfect Guard before firing; change angle while the defense recovers.",
+ meteor: "Do not race a straight Stampede; sidestep near cover and punish a wall collision.",
+ ravager: "Its twin guns still pressure after a ram feint; dodge sideways and counter from cover."
+};
 function choose(victim,killer,classes){
  if(!victim||!victim.isPlayer||!killer||killer===victim||
     killer.id==null||killer.id===victim.id||!killer.cls||
@@ -263,8 +305,11 @@ function choose(victim,killer,classes){
  var def=classes.CLASSES[killer.cls];
  var lineage=typeof classes.lineageForClass==='function'?
    classes.lineageForClass(killer.cls):null;
- if(!def||!lessons[lineage])return null;
- return {name:String(def.name||killer.cls).slice(0,40),lesson:lessons[lineage]};
+ if(!Object.prototype.hasOwnProperty.call(classes.CLASSES,killer.cls))return null;
+ var lesson=Object.prototype.hasOwnProperty.call(matchupLessons,killer.cls)?
+   matchupLessons[killer.cls]:lessons[lineage];
+ if(!lesson)return null;
+ return {name:String(def.name||killer.cls).slice(0,40),lesson:lesson};
 }
 function findPanel(){
  if(typeof document==='undefined'||!document.querySelectorAll)return null;
