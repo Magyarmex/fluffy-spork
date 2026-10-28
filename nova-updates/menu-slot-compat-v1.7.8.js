@@ -421,12 +421,12 @@ function paint(g){
  row.setAttribute('data-nova-front-choice','');
  row.setAttribute('role','group');
  row.setAttribute('aria-label','Redeploy: fresh front or return near the last position; no stat bonus');
- row.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;min-width:0;';
+ row.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:'+(window.innerHeight<=400?'4':'10')+'px;min-width:0;';
  function make(choice,caption,detail){
   var b=document.createElement('button');b.type='button';
   b.setAttribute('data-ui','true');
   b.setAttribute('data-nova-insertion',choice);
-  b.style.cssText='min-width:0;border:1px solid rgba(125,243,255,.4);border-radius:7px;background:rgba(31,104,136,.24);padding:9px 3px;font:700 10px/1.2 Rajdhani,system-ui;color:#d2deed;touch-action:manipulation;';
+  b.style.cssText='min-width:0;border:1px solid rgba(125,243,255,.4);border-radius:7px;background:rgba(31,104,136,.24);padding:'+(window.innerHeight<=400?'5':'9')+'px 3px;font:700 10px/1.2 Rajdhani,system-ui;color:#d2deed;touch-action:manipulation;';
   b.textContent=caption;b.title=detail;
   b.addEventListener('click',function(){
    g.__novaRedeployChoice=choice;
