@@ -1225,3 +1225,30 @@ for(const optimized of [false,true]){
     assert.equal(b.hitCount,0);
   });
 }
+
+
+/* Real class envelope, not a 6,000u/s synthetic weapon: Tempest's
+ * canonical 500u/s pen=1 shell at 44 earned bullet-speed upgrades reaches
+ * 2,370u/s under Game.bulletSpeed. At the actual 0.033s frame cap, two
+ * nonlethal Squares are physically crossed in one frame. The old shipping
+ * composition misses the second at 30Hz but hits it at 60/120Hz. */
+for(const optimized of [false,true]){
+  const mode=optimized?'optimized':'baseline';
+  const Game=boot(function(dt){this.time+=dt;this.updateBullets(dt);},optimized);
+  test(mode+' high-upgrade Tempest neutral penetration is FPS-invariant',()=>{
+    assert.match(html,/tempest:[\s\S]{0,1000}bullet:\s*\{ dmg: 6\.2, speed: 500, r: 3\.7, pen: 1/);
+    assert.match(html,/bulletSpeed\(t\) \{\s*let s = classes_1\.CLASSES\[t\.cls\]\.bullet\.speed \* \(1 \+ 0\.085 \* t\.stats\.bulletspeed\)/);
+    const speed=500*(1+.085*44);
+    for(const fps of [30,60,120]){
+      const {g,a,b}=neutralPair(Game,65);
+      a.x=40;a.r=20;b.r=20;
+      g.bullets[0].x=16;g.bullets[0].vx=speed;
+      g.bullets[0].r=3.7;g.bullets[0].dmg=8;g.bullets[0].ttl=.82;
+      for(let frame=0;frame<30&&g.bullets.length;frame++)
+        g.update(Math.min(.033,1/fps));
+      assert.equal(a.hitCount,1,'first Square at '+fps+'Hz');
+      assert.equal(b.hitCount,1,'second Square at '+fps+'Hz');
+      assert.equal(g.hits,2,'no extra hits at '+fps+'Hz');
+    }
+  });
+}
