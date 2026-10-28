@@ -30,7 +30,9 @@ function indexReport(report) {
   for (const row of report.results) {
     const key = row.seed + '/' + row.hz;
     if (map.has(key)) throw Error('Duplicate pilot world: ' + key);
-    if (row.fresh?.fingerprintHash !== row.returning?.fingerprintHash) throw Error('Unmatched pre-death world: ' + key);
+    if (typeof row.fresh?.fingerprintHash !== 'string' || !row.fresh.fingerprintHash ||
+        row.fresh.fingerprintHash !== row.returning?.fingerprintHash)
+      throw Error('Unmatched pre-death world: ' + key);
     map.set(key, row);
   }
   return map;
@@ -54,6 +56,9 @@ function compareReports(baseline, treatment) {
       (old.returning[metric] - old.fresh[metric]);
     const row = {key, seed: old.seed, hz: old.hz,
       deltaNeutralXP: delta('neutralXP'), deltaScore: delta('score'),
+      deltaHP: delta('hp'),
+      deltaSurvival: (Number(now.returning.alive) - Number(now.fresh.alive)) -
+        (Number(old.returning.alive) - Number(old.fresh.alive)),
       baselineNeutralGap: old.returning.neutralXP - old.fresh.neutralXP,
       roamingNeutralGap: now.returning.neutralXP - now.fresh.neutralXP,
       freshPostFrontTravel: now.fresh.postFrontTravelled,
@@ -62,7 +67,7 @@ function compareReports(baseline, treatment) {
       returnPostFrontXP: now.returning.postFrontNeutralXP,
       freshReached: now.fresh.frontReached !== null,
       returnReached: now.returning.frontReached !== null};
-    if (!Number.isFinite(row.deltaNeutralXP) || !Number.isFinite(row.deltaScore))
+    if (![row.deltaNeutralXP, row.deltaScore, row.deltaHP, row.deltaSurvival].every(Number.isFinite))
       throw Error('Nonfinite outcome: ' + key);
     rows.push(row);
     if (!bySeed.has(old.seed)) bySeed.set(old.seed, []);
@@ -75,7 +80,8 @@ function compareReports(baseline, treatment) {
   return {contract:'scripted total-policy effect; 30/60Hz paired within seed; not isolated geography or human skill',
     baselinePolicy: baseline.policy, treatmentPolicy: treatment.policy,
     scenarios: rows.length, independentSeeds: bySeed.size,
-    differenceInDifferences: {neutralXP: describe('deltaNeutralXP'), score: describe('deltaScore')},
+    differenceInDifferences: {neutralXP: describe('deltaNeutralXP'), score: describe('deltaScore'),
+      hp: describe('deltaHP'), survival: describe('deltaSurvival')},
     neutralGap: {baseline: mean(rows.map(r => r.baselineNeutralGap)),
       roaming: mean(rows.map(r => r.roamingNeutralGap))},
     frontExposure: {freshReached: rows.filter(r => r.freshReached).length,
