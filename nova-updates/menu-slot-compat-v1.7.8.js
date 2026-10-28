@@ -271,7 +271,7 @@ var matchupLessons={
  flakmaster: "Its tight pellet cone reaches surprisingly far; strafe across the line, not straight backward.",
  cannon: "Watch the fuse point, leave the predicted blast area, then push during the heavy reload.",
  bomber: "Read the shell burst point and cross the cluster lane before its child bombs spread.",
- demolisher: "Do not shelter at a blast edge; its huge splash reaches around gaps. Punish the slow reload.",
+ demolisher: "Keep solid cover between you and the blast; exposed edges are unsafe. Punish its slow reload.",
  clusterking: "Escape the whole predicted cluster sector, not just the main shell; re-enter after fragments.",
  siegebomber: "Change speed before its heavy cluster lands; use hard cover, then punish the long reload.",
  annihilator: "Bait its enormous single shot into solid cover; push from a new angle during its long reload.",
