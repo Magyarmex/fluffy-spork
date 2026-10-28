@@ -1287,3 +1287,24 @@ for(const optimized of [false,true]){
   assert.equal(d.hp,55,'independent second lane must also abstain');
  });
 }
+
+
+/* Real neutral ecology drifts each frame. A 0.3u observed movement
+ * envelope must not turn a physically guaranteed two-Square contact into
+ * a 30Hz miss; a larger 5u relocation remains a conservative veto. */
+for(const optimized of [false,true]){
+ const Game=boot(function(dt){
+  this.time+=dt;
+  for(const s of this.shapes)s.x+=.3;
+  this.updateBullets(dt);
+ },optimized);
+ test((optimized?'optimized':'baseline')+
+  ' slow moving Squares preserve guaranteed Tempest contacts at 30Hz',()=>{
+  const {g,a,b}=neutralPair(Game,65);
+  a.r=20;b.r=20;
+  g.bullets[0].x=15.5;g.bullets[0].vx=500*(1+.085*44);
+  g.bullets[0].r=3.7;g.bullets[0].dmg=8;g.bullets[0].ttl=.82;
+  g.update(.033);
+  assert.equal(a.hitCount,1);assert.equal(b.hitCount,1);
+ });
+}
