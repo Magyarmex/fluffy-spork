@@ -1838,7 +1838,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    if(!candidate||candidate.dead||candidate.ttl<=dt||
       candidate.pen!==1||(candidate.hits||0)!==0||
       !Number.isFinite(candidate.r)||!(candidate.r>0)||
-      !Number.isFinite(candidate.dmg)||!(candidate.dmg>0))continue;
+      !Number.isFinite(candidate.dmg)||!(candidate.dmg>0)||
+      !Number.isFinite(candidate.ttl)||
+      !Number.isFinite(candidate.x)||!Number.isFinite(candidate.y)||
+      !Number.isFinite(candidate.vx)||!Number.isFinite(candidate.vy))continue;
    var reach=Math.hypot(candidate.vx*dt,candidate.vy*dt);
    if(!Number.isFinite(reach)||reach<2*(12+candidate.r))continue;
    /* A read-only spatial prefilter avoids scanning all 120 neutrals for
