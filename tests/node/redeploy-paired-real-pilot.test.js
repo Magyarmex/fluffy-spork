@@ -94,6 +94,14 @@ function run(seed,choice,hz,seconds){
   const origin={x:g.player.x,y:g.player.y};
   assert.ok(finitePosition(origin),'death origin is finite');
   const layout=g.__novaBattlefield.name,initialShapes=g.shapes.length;
+  /* Verify matched *physical worlds*, not just the same map label. */
+  const fingerprint=JSON.stringify({
+   layout,
+   terrain:(g.__novaTerrain||[]).map(t=>[t.id,t.type,t.x,t.y,t.w,t.h,t.r,t.hp]),
+   shapes:g.shapes.map(t=>[t.id,t.type,t.x,t.y,t.hp]),
+   rivals:(g.tanks||[]).filter(t=>t.ai).map(t=>[t.id,t.cls,t.x,t.y,t.hp]),
+   origin
+  });
   g.killTank(g.player,null);
   assert.equal(g.__novaRedeployChoice,'fresh','each death defaults to FRESH');
   g.__novaRedeployChoice=choice;
@@ -140,7 +148,7 @@ function run(seed,choice,hz,seconds){
     if(visible)firstVisibleEnemy=g.time;
    }
   }
-  return{seed,choice,hz,layout,initialShapes,origin,spawn,
+  return{seed,choice,hz,layout,initialShapes,fingerprint,origin,spawn,
    startDistance:+startDistance.toFixed(2),
    endDistance:+Math.hypot(p.x-origin.x,p.y-origin.y).toFixed(2),
    travelled:+distanceTravelled.toFixed(2),
@@ -168,6 +176,7 @@ test('FRESH/RETURN real-engine matched pilot is deterministic under counterbalan
    assert.equal(fresh.layout,returning.layout,'both arms must share the physical map');
    assert.deepEqual(fresh.origin,returning.origin,'both arms share a witnessed death position');
    assert.equal(fresh.initialShapes,returning.initialShapes,'same pre-death ecology count');
+   assert.equal(fresh.fingerprint,returning.fingerprint,'same pre-death physical terrain, neutral and AI world');
    assert.ok(fresh.time>0&&returning.time>0,'both arms run real composed Game.update');
    report.push({seed,hz,layout:fresh.layout,fresh,returning});
   }
