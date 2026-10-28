@@ -617,7 +617,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
      b.__novaBreachAtTime===g.time||
      !(dt>0)||!(b.ttl>0)||
-     (nonExpiring ? !(b.ttl>dt&&b.pen===1&&b.hits===0) : !(b.ttl<=dt))||
+     (nonExpiring ? !(b.ttl>dt&&(b.pen===1||b.pen===2)&&b.hits===0) : !(b.ttl<=dt))||
      !(Number.isSafeInteger(b.pen)&&b.pen>=0)||
      !(b.hits>=0)||(b.hits===0&&b.pen===0)||
      (b.hits>0&&!(b.__novaDirectVictims instanceof Set))||
@@ -678,11 +678,12 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    if(!(enter>1e-9))return false;
    contacts.push({e:t,t:enter});
   }
-  /* A live non-expiring round must exhaust its full pen=1 budget here.
+  /* A live non-expiring round must exhaust its entire pen=1/2 budget
+   * within this single frame. A split-frame partial chain is NOT certified.
    * A TTL-expiring round can settle a partial remaining budget safely:
    * the projectile will die at expiry regardless of unused penetration.
    * The original one-body TTL resolver retains first-hit ownership. */
-  if(nonExpiring ? contacts.length!==2 :
+  if(nonExpiring ? contacts.length!==b.pen+1 :
      contacts.length<(allowSingle?1:(b.hits>0?1:2))||contacts.length>b.pen+1||contacts.length>3)
    return false;
   contacts.sort(function(a,c){return a.t-c.t;});
@@ -1328,7 +1329,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   for(var i=0;i<bullets.length;i++){
    var b=bullets[i];
    if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon)continue;
-   if(nonExpiring ? b.ttl>dt&&b.pen===1&&(b.hits||0)===0 :
+   if(nonExpiring ? b.ttl>dt&&(b.pen===1||b.pen===2)&&(b.hits||0)===0 :
       b.ttl>0&&b.ttl<=dt&&
        (b.pen>=1||(b.pen===0&&(b.hits||0)>0)))shots.push(b);
   }
@@ -1342,6 +1343,28 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   var tanks=g.tanks||[];
   if(tanks.length){
    if(shots.length*tanks.length>12000)return null;
+   /* Conservative all-hull envelope: pen-2 shots are common, but a shot
+    * nowhere near ANY live hull must not trigger per-shot hull scans.
+    * Include witnessed movement and hull radii; unknown geometry abstains. */
+   var hullBounds=null;
+   if(nonExpiring){
+    var minHullX=Infinity,minHullY=Infinity,maxHullX=-Infinity,maxHullY=-Infinity;
+    for(var hb=0;hb<tanks.length;hb++){
+     var ht=tanks[hb];if(!ht||!ht.alive)continue;
+     var hc=CLASSES[ht.cls],hs=hc&&Number.isFinite(hc.size)?
+        Math.max(0,hc.size):120;
+     var hx0=ht.__novaSweepMoveTime===g.time?ht.__novaSweepPrevX:ht.x,
+         hy0=ht.__novaSweepMoveTime===g.time?ht.__novaSweepPrevY:ht.y;
+     if(!Number.isFinite(ht.x)||!Number.isFinite(ht.y)||
+        !Number.isFinite(hx0)||!Number.isFinite(hy0))return null;
+     minHullX=Math.min(minHullX,Math.min(ht.x,hx0)-hs-3);
+     minHullY=Math.min(minHullY,Math.min(ht.y,hy0)-hs-3);
+     maxHullX=Math.max(maxHullX,Math.max(ht.x,hx0)+hs+3);
+     maxHullY=Math.max(maxHullY,Math.max(ht.y,hy0)+hs+3);
+    }
+    if(minHullX!==Infinity)hullBounds={minX:minHullX,minY:minHullY,
+       maxX:maxHullX,maxY:maxHullY};
+   }
    var eligible=[],possible=new Map(),targetUsers=new Map();
    for(var ps=0;ps<shots.length;ps++){
     var pb=shots[ps],span=nonExpiring?dt:pb.ttl;
@@ -1353,6 +1376,12 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
     if(!Number.isFinite(bx)||!Number.isFinite(by))return null;
     var lx=Math.min(pb.x,bx),hx=Math.max(pb.x,bx),
         ly=Math.min(pb.y,by),hy=Math.max(pb.y,by),targets=[];
+    if(nonExpiring&&hullBounds&&
+       (hx+pb.r<hullBounds.minX||lx-pb.r>hullBounds.maxX||
+        hy+pb.r<hullBounds.minY||ly-pb.r>hullBounds.maxY)){
+     possible.set(pb,targets);
+     continue; /* Cannot reach a hull even with the widest legal radius. */
+    }
     for(var pt=0;pt<tanks.length;pt++){
      var target=tanks[pt];
      if(!target||!target.alive||target.id===pb.ownerId)continue;
@@ -1370,7 +1399,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      }
     }
     possible.set(pb,targets);
-    if(targets.length>=(nonExpiring?2:((pb.hits||0)>0?1:2)))
+    if(targets.length>=(nonExpiring?pb.pen+1:((pb.hits||0)>0?1:2)))
      eligible.push(pb);
    }
    /* A discarded one-hit projectile may still change another shot's
@@ -1781,7 +1810,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   var eb=this.bullets[countI];
   if(eb&&!eb.dead&&!eb.shell&&!eb.beam&&!eb.splash&&!eb.__v17Cannon&&eb.ttl>0&&eb.ttl<=dt)expiring++;
   if(eb&&!eb.dead&&!eb.shell&&!eb.beam&&!eb.splash&&!eb.__v17Cannon&&
-     eb.ttl>dt&&eb.pen===1&&(eb.hits||0)===0)paired++;
+     eb.ttl>dt&&(eb.pen===1||eb.pen===2)&&(eb.hits||0)===0)paired++;
  }
  var bodyWork=this.bullets.length+(this.tanks||[]).length+
    (this.shapes||[]).length+(this.drones||[]).length;
