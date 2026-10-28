@@ -10,6 +10,8 @@ on:
       - 'tests/research/redeploy-public-roam.cjs'
       - 'tests/research/redeploy-public-prelife.cjs'
       - 'tests/node/redeploy-public-prelife.test.js'
+      - 'tests/node/redeploy-played-prelife-report.test.js'
+      - 'scripts/redeploy-played-prelife-report.cjs'
       - '.github/workflows/redeploy-strategy-pilot.yml'
   workflow_dispatch:
 
@@ -71,6 +73,10 @@ jobs:
           set -euo pipefail
           mkdir -p artifacts/redeploy-pilot
           node --test tests/node/redeploy-paired-real-pilot.test.js 2>&1 | tee artifacts/redeploy-pilot/run.log
+      - name: Analyze played-first-life cohort with seed-clustered uncertainty
+        env:
+          NOVA_REDEPLOY_POLICY: ${{ matrix.policy }}
+        run: node scripts/redeploy-played-prelife-report.cjs "artifacts/redeploy-pilot/results-${NOVA_REDEPLOY_POLICY}.json"
       - name: Preserve post-combat paired evidence, including falsifications
         if: always()
         uses: actions/upload-artifact@v4
