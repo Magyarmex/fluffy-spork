@@ -42,6 +42,12 @@ async function run(browser,width,height){
    },cls);
    const note=page.locator('[data-nova-death-insight]');
    await note.waitFor({state:'visible',timeout:15000});
+   if(cls==='hivemind'){
+    // Simulate React reconciling away the foreign DOM node while Game is dead.
+    // The live shipping wrapper must restore the same authoritative lesson.
+    await note.evaluate(e=>e.remove());
+    await note.waitFor({state:'visible',timeout:7000});
+   }
    const heading=await note.locator('div').first().textContent();
    const body=await note.locator('div').nth(1).textContent();
    assert.equal(body,expected.lesson,'real React card must use canonical '+cls+' advice');
