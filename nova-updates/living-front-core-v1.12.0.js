@@ -64,7 +64,12 @@ function sectorTick(g,st,defs,dt){
   var t0=ms(),i,s,ss=st.sectors;st.age=Number(g.time)||st.age+dt;st.ceiling=maturityCeiling(st.age);for(i=0;i<16;i++){ss[i].count=0;ss[i].xp=0;ss[i].value=0;ss[i].tanks=0;}
   var sh=g.shapes||[];for(i=0;i<sh.length;i++){s=sh[i];if(!s||s.hp<=0)continue;var q=ss[sectorIndex(s.x,s.y)],v=xp(defs,s.type)+(s.type==='crasher'?(Number(s.__lfBounty)||0):0);q.count++;q.xp+=v;q.value+=v+(s.type==='hexagon'?80:s.type==='star'?170:s.type==='pentagon'?22:0);}
   var ts=g.tanks||[];for(i=0;i<ts.length;i++)if(alive(ts[i]))ss[sectorIndex(ts[i].x,ts[i].y)].tanks++;
-  for(i=0;i<16;i++)advanceSector(ss[i],dt,st.ceiling);st.migrationHeat*=Math.exp(-dt*.42);st.migrationX*=Math.exp(-dt*.33);st.migrationY*=Math.exp(-dt*.33);for(var k in st.cooldowns)st.cooldowns[k]=Math.max(0,st.cooldowns[k]-dt);
+  for(i=0;i<16;i++)advanceSector(ss[i],dt,st.ceiling);/* Research-only 2.48s versus canonical 1.65s heat half-life. Shipping
+   * remains 0.42 unless a per-game scripted experiment opts into 0.28.
+   * Only the public crossing-memory accumulator changes; physical shapes,
+   * sector pressure, movement and AI information remain canonical. */
+  var migrationDecay=g.__novaResearchMigrationHeatDecay===.28?.28:.42;
+  st.migrationHeat*=Math.exp(-dt*migrationDecay);st.migrationX*=Math.exp(-dt*.33);st.migrationY*=Math.exp(-dt*.33);for(var k in st.cooldowns)st.cooldowns[k]=Math.max(0,st.cooldowns[k]-dt);
   if(!st.tutorial.ecology&&st.age>14&&g.player&&g.toast){st.tutorial.ecology=true;g.toast('LIVING FRONT · quiet ground matures; fighting and harvesting move the farm','info');}
   if(LF.frontlineTick)LF.frontlineTick(g,st,false);if(!g.__novaDecorativeWorld){lastSnapshot=snapshot(g);window.__NOVA_LIVING_FRONT_LAST__=lastSnapshot;}planSample(st,ms()-t0);
 }
