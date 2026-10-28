@@ -31,7 +31,7 @@
        !Number.isFinite(sig.x)||!Number.isFinite(sig.y))return null;
     return{x:sig.x,y:sig.y,source:'report'};
   }
-  function cue(g,p,F){return visibleStar(g,p,F)||publicReport(g);}
+  function cue(g,p,F){return p&&p.alive?(visibleStar(g,p,F)||publicReport(g)):null;}
   function moveTowardPublicStar(g,p,F){
     const target=cue(g,p,F);if(!target)return null;
     const dx=target.x-p.x,dy=target.y-p.y,d=Math.hypot(dx,dy);
