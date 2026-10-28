@@ -4,6 +4,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const {patchSavedRecords, changes} = require('../../scripts/patch-saved-records.cjs');
+const zlib = require('node:zlib');
+const {patchStarMinimap} = require('../../scripts/patch-star-minimap.cjs');
 
 const html = fs.readFileSync(path.join(__dirname, '../../index.html'), 'utf8');
 
@@ -66,4 +68,17 @@ test('production materializer applies both base patches before composing the she
   const compose = deploy.indexOf("from pathlib import Path", saves);
   assert.ok(star >= 0 && saves > star && compose > saves, 'saved-record patch must run before composition');
   assert.match(deploy, /'scripts\/patch-saved-records.cjs',/);
+});
+
+test('the exact decoded nova-gz production payload accepts both surgical patches', () => {
+  const gzDir = path.join(__dirname, '../../nova-gz');
+  const b64 = fs.readdirSync(gzDir).filter(f => f.endsWith('.b64')).sort()
+    .map(f => fs.readFileSync(path.join(gzDir, f), 'utf8')).join('').replace(/\\s+/g, '');
+  const decoded = zlib.gunzipSync(Buffer.from(b64, 'base64')).toString('utf8');
+  const starPatched = patchStarMinimap(decoded);
+  const patched = patchSavedRecords(starPatched);
+  assert.ok(patched.length > decoded.length);
+  assert.equal(patchSavedRecords(patched), patched);
+  assert.match(patched, /const savedBestScore = Number/);
+  assert.match(patched, /const savedBestLevel = Number/);
 });
