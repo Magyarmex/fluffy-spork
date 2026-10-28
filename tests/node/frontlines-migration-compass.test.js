@@ -24,6 +24,10 @@ function announce(mx,my,player={x:-1750,y:-562.5,hp:100,alive:true},sectorValue=
   })),
   stats:{blooms:0,migrations:0,starsSpawned:0,aiRotations:0}
  };
+ const origin=LF.sectorCenter(5),m=Math.hypot(mx,my)||1;
+ const to=LF.sectorIndex(origin.x+mx/m*900,origin.y+my/m*900);
+ st.sectors[5].flowTo=Array(16).fill(0);
+ st.sectors[5].flowTo[to]=12; // A real origin-to-destination crossing, not just a vector.
  const g={time:100,status:'playing',w:800,h:600,cam:{zoom:1},
   player:player?{id:1,...player}:null,tanks:player?[{id:1,...player}]:[],
   shapes:[],__lfState:st,toast(s){toasts.push(s);}};
