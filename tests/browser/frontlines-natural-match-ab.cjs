@@ -94,10 +94,13 @@ async function arm(browser,enabled,label){
    g.__novaExperimentSeed='natural-20261027-'+terrainIndex+'-'+seedIndex;
    g.__novaExperimentPolicy=pilotPolicy;
    g.__novaExperimentABMode=abMode;
+   /* Research intervention: ON uses only frozen public migration from/to.
+    * OFF preserves the canonical midpoint, with all other AI unchanged. */
+   if(abMode==='migration-intercept')g.__novaMigrationInterceptProbe=!!enabled;
    if(g.__novaBattlefield?.name!==['CROSSFIRE','SPLIT HORIZON','FOUR GATES'][terrainIndex])throw Error('uncontrolled layout '+g.__novaBattlefield?.name);
    const ai=window.__novaMakeRequire('')('game/ai');
    if(!ai||typeof ai.updateAI!=='function')throw Error('missing composed AI');
-   if(!enabled){
+   if(!enabled&&abMode!=='migration-intercept'){
     const original=ai.updateAI;
     if(abMode==='memory'){
      // Historical experiment: suppress stale memory (live turns still ON).
@@ -289,7 +292,7 @@ async function arm(browser,enabled,label){
      botCount:g.tanks.filter(t=>t.ai&&t.alive).length},
     contestGateAudit:g.__novaContestAudit,
     commitmentAudit:window.__novaResearchCommitmentAudit.summary(g.__novaCommitmentAudit),
-    naturalBlooms:s.stats.blooms||0,publicBloomCommandSamples:g.__novaPublicBloomCommands||0,
+    naturalBlooms:s.stats.blooms||0,naturalMigrations:s.stats.migrations||0,publicBloomCommandSamples:g.__novaPublicBloomCommands||0,
     visibleNeutralAimSamples:g.__novaVisibleAimSamples||0,
     visibleDodgeSamples:g.__novaVisibleDodgeSamples||0,
     visibleHostileAimSamples:g.__novaVisibleHostileAimSamples||0,
@@ -326,7 +329,8 @@ async function arm(browser,enabled,label){
   assert.equal(off.initial.fingerprint,on.initial.fingerprint,'ON/OFF must begin from identical real world');
   assert.equal(off.initial.fingerprint,offReplay.initial.fingerprint,'same seed must reproduce initial world');
   const same=JSON.stringify(off.result)===JSON.stringify(offReplay.result);
-  const naturalOpportunityObserved=[off,on].every(a=>a.result.naturalBlooms>0);
+  const naturalOpportunityObserved=[off,on].every(a=>AB_MODE==='migration-intercept'?
+   a.result.naturalMigrations>0:a.result.naturalBlooms>0);
   if(AB_MODE==='live-turn'){
    assert.equal(off.result.commitmentAudit.startedLive,0,'OFF must suppress all live-turn starts');
    assert.equal(offReplay.result.commitmentAudit.startedLive,0,'OFF replay must also suppress live starts');
@@ -340,18 +344,24 @@ async function arm(browser,enabled,label){
     assert.deepEqual(on.result[key],off.result[key],
      'no-treatment live-turn arms must have identical '+key);
   }
-  const report={method:AB_MODE==='live-turn'?'paired natural full-match live-turn causal intervention (not human fun)':'scripted full-match natural Director research; not human fun; public-bloom is closed-loop policy',
+  const report={method:AB_MODE==='migration-intercept'?
+   'paired natural full-match public migration waypoint intervention (not human fun)':
+   AB_MODE==='live-turn'?'paired natural full-match live-turn causal intervention (not human fun)':
+   'scripted full-match natural Director research; not human fun; public-bloom is closed-loop policy',
    abMode:AB_MODE,verifiedLiveStart,
    initialWorldIdentical:true,initialFingerprint:off.initial.fingerprint,offReplayIdentical:same,
    naturalOpportunityObserved,
-   interpretation:AB_MODE==='live-turn'?(verifiedLiveStart&&naturalOpportunityObserved?'Live-turn intervention activated; interpret matched-policy differences cautiously because later public signals can diverge endogenously.':'INCONCLUSIVE: no verified ON live start or natural BLOOM exposure in both arms; retain the pair.'):(naturalOpportunityObserved?'Descriptive only: natural BLOOM observed; inspect opportunity timing, deaths and public pilot commands before causal interpretation.':'INCONCLUSIVE: at least one arm had no natural BLOOM; retain this censored pair.'),
+   interpretation:AB_MODE==='migration-intercept'?
+    (naturalOpportunityObserved?'Both arms observed natural migration; compare physical player/AI behavior, not raw rotations.':'INCONCLUSIVE: one or both arms had no natural migration; retain censored pair.'):
+    AB_MODE==='live-turn'?(verifiedLiveStart&&naturalOpportunityObserved?'Live-turn intervention activated; interpret matched-policy differences cautiously because later public signals can diverge endogenously.':'INCONCLUSIVE: no verified ON live start or natural BLOOM exposure in both arms; retain the pair.'):(naturalOpportunityObserved?'Descriptive only: natural BLOOM observed; inspect opportunity timing, deaths and public pilot commands before causal interpretation.':'INCONCLUSIVE: at least one arm had no natural BLOOM; retain this censored pair.'),
    off:off.result,on:on.result,offReplay:offReplay.result,
    limits:['No artificial BLOOM or forced survival','One layout/seed/pilot-policy per invocation; matrix must aggregate independently',
     'A deterministic Scout script is not a human player',
     'Public-bloom commands can differ after ON/OFF worlds diverge; this is matched policy, not fixed inputs',
     'Public-bloom command samples are input calls, not measured seconds or proof of physical progress',
     'Seed replay is checked, not assumed',
-    'In live-turn mode, only live-start authority is intervened on; later natural signals can differ as treatment outcomes']};
+    'In live-turn mode, only live-start authority is intervened on; later natural signals can differ as treatment outcomes',
+    'In migration-intercept mode, only the frozen public crossing waypoint changes; later signals may diverge endogenously']};
   const dir=path.join('artifacts','browser');fs.mkdirSync(dir,{recursive:true});
   fs.writeFileSync(path.join(dir,'frontlines-natural-match-ab.json'),JSON.stringify(report,null,2));
   fs.writeFileSync(path.join(dir,'frontlines-natural-on.json'),JSON.stringify(on.result,null,2));
