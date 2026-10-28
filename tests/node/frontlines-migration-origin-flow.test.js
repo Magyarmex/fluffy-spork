@@ -62,6 +62,22 @@ test('cancelled busiest origin cannot mask a second witnessed coherent migration
  // An explicit source override is a hard source choice, not permission to
  // silently substitute another source or fabricate its cancelled direction.
  assert.equal(T.directorDecision(st,{enabled:true,now:100,hasStar:true,migrationFrom:5}),null);
+ assert.equal(T.directorDecision(st,{enabled:true,now:100,hasStar:true,migrationFrom:NaN}),null);
+ assert.equal(T.directorDecision(st,{enabled:true,now:100,hasStar:true,migrationFrom:16}),null);
+});
+test('equally busy origins select the first coherent real source deterministically',()=>{
+ const T=boot(),st=state(T);
+ st.sectors[5].outbound=4;st.sectors[5].flowX=0;st.sectors[5].flowY=0;
+ st.sectors[6].outbound=4;st.sectors[6].flowX=-3;
+ st.sectors[10].outbound=4;st.sectors[10].flowX=3;
+ const d=T.directorDecision(st,{enabled:true,now:100,hasStar:true});
+ assert.equal(d?.from,6,'skip cancelled tie, preserve stable sector order');
+ assert.equal(d?.to,5);
+});
+test('global crossing heat cannot manufacture a source with zero outbound witnesses',()=>{
+ const T=boot(),st=state(T);
+ st.sectors[5].flowX=3;st.sectors[5].outbound=0;
+ assert.equal(T.directorDecision(st,{enabled:true,now:100,hasStar:true}),null);
 });
 test('source-local direction is independent of hidden maturity/value and unrelated flows',()=>{
  const T=boot(),st=state(T);
