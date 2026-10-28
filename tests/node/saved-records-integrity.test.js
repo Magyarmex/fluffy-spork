@@ -54,9 +54,21 @@ test('corrupt, negative, nonfinite and out-of-range records cannot poison a run'
   assert.deepEqual(evaluatePatchedRecords(null, null), {best:0, level:0, menu:0});
 });
 
-test('source drift fails closed instead of silently dropping protection', () => {
-  const original = changes[0].before;
-  assert.throws(() => patchSavedRecords(html.replace(original, original.replace('Number(', 'parseFloat('))), /changed unexpectedly/);
+test('source drift fails closed for both raw and materialized saved-record owners', () => {
+  /* index.html is materialized after deployment and may already contain
+   * the sanitized owner. Mutating the absent legacy read was a no-op and
+   * made this gate falsely red on the real shipping mainline. */
+  const patched = patchSavedRecords(html);
+  const {before, after} = changes[0];
+  assert.ok(patched.includes(after), 'sanitized owner must exist before drift injection');
+  const changedPatched = patched.replace(after, after.replace('Number(', 'parseFloat('));
+  assert.notEqual(changedPatched, patched, 'drift injection must modify real code');
+  assert.throws(() => patchSavedRecords(changedPatched), /changed unexpectedly/);
+  const raw = patched.replace(after, before);
+  assert.notEqual(raw, patched, 'legacy fixture must be reconstructed');
+  const changedRaw = raw.replace(before, before.replace('Number(', 'parseFloat('));
+  assert.notEqual(changedRaw, raw, 'legacy drift injection must modify real code');
+  assert.throws(() => patchSavedRecords(changedRaw), /changed unexpectedly/);
   assert.throws(() => patchSavedRecords('not a game'), /owners missing/);
   assert.throws(() => patchSavedRecords(null), /UTF-8/);
 });
