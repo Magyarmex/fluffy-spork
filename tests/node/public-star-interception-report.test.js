@@ -65,3 +65,13 @@ test('missing, mismatched, forged or unexpected arms fail closed',()=>{
   assert.throws(()=>collate(dir3),/unexpected or duplicate/);
  }finally{fs.rmSync(dir3,{recursive:true,force:true});}
 });
+
+test('naturally absent zero-announcement counters are treated as zero, not lost exposure',()=>{
+ const dir=fixture();
+ try{
+  mutate(dir,0,0,'control',x=>{x.result.stats={};});
+  const report=collate(dir);
+  assert.equal(report.pairs,6);
+  assert.equal(report.controlAnnouncements,0);
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
