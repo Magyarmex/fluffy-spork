@@ -71,6 +71,7 @@ function bootGame() {
   const Game = requireGame('game/engine').Game;
   const game = new Game(canvas(), canvas(), {hud: noop, event: noop}, 'low');
   Object.defineProperty(game, '__testLivingFront', {value: window.__NOVA_LIVING_FRONT_INTERNAL__});
+  Object.defineProperty(game, '__testFair', {value: window.__NOVA_FAIR_ENGAGEMENT_TEST__});
   return game;
 }
 
@@ -87,7 +88,7 @@ function withSeed(seed,fn){
  try{return fn();}finally{Math.random=priorRandom;Date.now=priorDate;}
 }
 function finitePosition(p){return p&&Number.isFinite(p.x)&&Number.isFinite(p.y);}
-function run(seed,choice,hz,seconds){
+function run(seed,choice,hz,seconds,policy='navigate'){
  return withSeed(seed,()=>{
   const g=bootGame();
   if(!g.player)g.redeploy();
@@ -119,7 +120,7 @@ function run(seed,choice,hz,seconds){
   let routeRequests=0,routeWaypoints=0,frontReached=null,firstVisibleEnemy=null,
    firstVisibleNeutral=null;
   let distanceTravelled=0,last={x:p.x,y:p.y};
-  g.input.mouseActive=false;g.input.autofire=false;g.input.firing=false;
+  g.input.mouseActive=false;g.input.autofire=policy==='harvest';g.input.firing=false;
   g.input.moveVec=()=>{
    const dx=origin.x-p.x,dy=origin.y-p.y,d=Math.hypot(dx,dy);
    if(d<=130)return{x:0,y:0};
@@ -135,7 +136,28 @@ function run(seed,choice,hz,seconds){
    const tx=target.x-p.x,ty=target.y-p.y,len=Math.hypot(tx,ty);
    return len>1?{x:tx/len,y:ty/len}:{x:0,y:0};
   };
-  g.input.aimVec=()=>({x:1,y:0});
+  /* A public-information harvesting policy may aim only at neutrals inside
+   * both the player's Fair Engagement viewport and the rendered camera,
+   * with physical terrain line-of-sight. No sector maturity, off-screen
+   * shapes, bot positions or hidden rewards steer the firing decision. */
+  const fair=g.__testFair;
+  if(policy==='harvest')assert.ok(fair&&fair.viewportHalfExtents,'Fair Engagement must be present');
+  g.input.aimVec=()=>{
+   if(policy!=='harvest')return{x:1,y:0};
+   const ext=fair.viewportHalfExtents(g),cam=g.cam||{},cx=Number.isFinite(cam.x)?cam.x:p.x,
+    cy=Number.isFinite(cam.y)?cam.y:p.y;
+   if(!ext||!(ext.x>0)||!(ext.y>0))return null;
+   let best=null,bd=Infinity;
+   for(const shape of g.shapes){
+    if(!shape||!(shape.hp>0)||Math.abs(shape.x-p.x)>ext.x||
+       Math.abs(shape.y-p.y)>ext.y||Math.abs(shape.x-cx)>ext.x||
+       Math.abs(shape.y-cy)>ext.y)continue;
+    const d=Math.hypot(shape.x-p.x,shape.y-p.y);
+    if(!(d>1)||d>=bd||!g.hasLineOfSight(p.x,p.y,shape.x,shape.y,2))continue;
+    best=shape;bd=d;
+   }
+   return best?{x:(best.x-p.x)/bd,y:(best.y-p.y)/bd}:null;
+  };
   const steps=Math.ceil(seconds*hz),dt=1/hz;
   for(let i=0;i<steps&&g.status==='playing';i++){
    g.update(dt);
@@ -158,7 +180,7 @@ function run(seed,choice,hz,seconds){
     if(visible)firstVisibleEnemy=g.time;
    }
   }
-  return{seed,choice,hz,layout,rotation,mirrored,initialShapes,
+  return{seed,choice,hz,policy,layout,rotation,mirrored,initialShapes,
    fingerprint,fingerprintHash:crypto.createHash('sha256').update(fingerprint).digest('hex'),origin,spawn,
    startDistance:+startDistance.toFixed(2),
    endDistance:+Math.hypot(p.x-origin.x,p.y-origin.y).toFixed(2),
@@ -167,6 +189,9 @@ function run(seed,choice,hz,seconds){
    firstVisibleEnemy:firstVisibleEnemy===null?null:+firstVisibleEnemy.toFixed(3),
    firstVisibleNeutral:firstVisibleNeutral===null?null:+firstVisibleNeutral.toFixed(3),
    hp:+p.hp.toFixed(2),alive:!!p.alive,status:g.status,
+   score:+(Number(p.score)||0).toFixed(2),xp:+(Number(p.xp)||0).toFixed(2),
+   kills:p.kills,level:p.level,
+   neutralXP:+(Number(g.__lfState?.stats?.playerNeutralXP)||0).toFixed(2),
    routeRequests,routeWaypoints,time:+g.time.toFixed(3)};
  });
 }
@@ -184,17 +209,19 @@ const FULL_SEEDS=[
 ];
 test('FRESH/RETURN real-engine matched pilot is deterministic under counterbalanced arm order',()=>{
  const full=process.env.NOVA_REDEPLOY_FULL_PILOT==='1';
+ const policy=process.env.NOVA_REDEPLOY_POLICY||'navigate';
+ assert.ok(['navigate','harvest'].includes(policy),'explicitly supported public policy');
  const report=[],seeds=full?FULL_SEEDS:[0x172901,0x172902,0x172903];
  const seconds=full?20:2,seen=new Set();
  for(const hz of [30,60]){
   for(let i=0;i<seeds.length;i++){
-   const seed=seeds[i],fresh=run(seed,'fresh',hz,seconds);
-   const returning=run(seed,'return',hz,seconds);
+   const seed=seeds[i],fresh=run(seed,'fresh',hz,seconds,policy);
+   const returning=run(seed,'return',hz,seconds,policy);
    /* Full experiment counterbalances a representative of each map/rotation
     * cell. The ordinary CI smoke counterbalances every case. */
    if(!full||i%6===0){
-    const returningFirst=run(seed,'return',hz,seconds);
-    const freshSecond=run(seed,'fresh',hz,seconds);
+    const returningFirst=run(seed,'return',hz,seconds,policy);
+    const freshSecond=run(seed,'fresh',hz,seconds,policy);
     assert.ok(comparable(fresh,freshSecond),
      'FRESH must be order-independent: '+JSON.stringify({fresh,freshSecond}));
     assert.ok(comparable(returning,returningFirst),
@@ -218,15 +245,15 @@ test('FRESH/RETURN real-engine matched pilot is deterministic under counterbalan
   assert.equal(seen.size,6,'all three maps and two rotations must be exercised');
   const dir=path.join(root,'artifacts','redeploy-pilot');
   fs.mkdirSync(dir,{recursive:true});
-  fs.writeFileSync(path.join(dir,'results.json'),JSON.stringify({
+  fs.writeFileSync(path.join(dir,'results-'+policy+'.json'),JSON.stringify({
    contract:'total-policy effect, not isolated geography or human skill',
-   seconds,worlds:36,frameRates:[30,60],counterbalancedPerHz:6,
+   policy,seconds,worlds:36,frameRates:[30,60],counterbalancedPerHz:6,
    layouts:[...seen].sort(),results:report
   },null,2));
  }
  const avg=(key,mode)=>report.reduce((sum,r)=>sum+r[mode][key],0)/report.length;
  console.log('NOVA_REDEPLOY_REAL_PAIRED_PILOT '+JSON.stringify({
-  full,worlds:seeds.length,seconds,scenarios:report.length,
+  full,policy,worlds:seeds.length,seconds,scenarios:report.length,
   layouts:[...seen].sort(),
   meanStartDistance:{fresh:+avg('startDistance','fresh').toFixed(2),
    return:+avg('startDistance','returning').toFixed(2)},
@@ -235,6 +262,10 @@ test('FRESH/RETURN real-engine matched pilot is deterministic under counterbalan
   visibleEnemy:{fresh:report.filter(r=>r.fresh.firstVisibleEnemy!==null).length,
    return:report.filter(r=>r.returning.firstVisibleEnemy!==null).length},
   alive:{fresh:report.filter(r=>r.fresh.alive).length,
-   return:report.filter(r=>r.returning.alive).length}
+   return:report.filter(r=>r.returning.alive).length},
+  meanNeutralXP:{fresh:+avg('neutralXP','fresh').toFixed(2),
+   return:+avg('neutralXP','returning').toFixed(2)},
+  meanScore:{fresh:+avg('score','fresh').toFixed(2),
+   return:+avg('score','returning').toFixed(2)}
  }));
 });
