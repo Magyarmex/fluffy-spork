@@ -1453,3 +1453,104 @@ for(const optimized of [false,true]){
    }
  });
 }
+
+/* Run 433: non-expiring pen=2 partial chronology across frame boundaries.
+ * A 120Hz first frame crosses the first TWO hulls, but not the third;
+ * the core used to credit only hull 1 then jump to hull 3 next frame.
+ * Prove exact victim identities and leave one legitimate later-frame hit. */
+function threeHullPen2(Game) {
+  const g = new Game();
+  g.tanks = [40, 70, 100].map((x, i) => ({
+    kind: 'tank', id: i + 2, x, y: 0, cls: 'scout',
+    hp: 100, alive: true, hitCount: 0
+  }));
+  g.damageTank = function(t) { t.hitCount++; this.hits++; };
+  g.bullets = [{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+    vx:6000,vy:0,r:3,dmg:20,ttl:.2,pen:2,hits:0,
+    dead:false,shell:false,beam:false}];
+  return g;
+}
+for (const optimized of [false, true]) {
+  const mode = optimized ? 'Battlefield+Performance' : 'Battlefield';
+  const Game = boot(undefined, optimized);
+  for (const fps of [30, 60, 120, 240]) {
+    test(mode+' pen-2 three-hull identity parity across '+fps+'Hz', () => {
+      const g = threeHullPen2(Game);
+      for (let frame=0;frame<15&&g.bullets.length;frame++) {
+        g.time += 1/fps;
+        g.updateBullets(1/fps);
+      }
+      assert.deepEqual(g.tanks.map(t=>t.hitCount), [1,1,1],
+        'all three real contacts must occur exactly once');
+      assert.equal(g.hits, 3);
+      assert.equal(g.bullets.length, 0);
+    });
+  }
+  test(mode+' 120Hz partial proof leaves one later-frame penetration', () => {
+    const g = threeHullPen2(Game);
+    g.time += 1/120;
+    g.updateBullets(1/120);
+    assert.deepEqual(g.tanks.map(t=>t.hitCount), [1,1,0]);
+    assert.equal(g.bullets.length, 1);
+    assert.equal(g.bullets[0].hits, 2);
+    assert.equal(g.bullets[0].pen, 0);
+    assert.equal(g.bullets[0].x, 50, 'core must advance exactly once');
+    assert.equal(g.bullets[0].__novaDirectVictims.size, 2);
+    g.time += 1/120;
+    g.updateBullets(1/120);
+    assert.deepEqual(g.tanks.map(t=>t.hitCount), [1,1,1]);
+    assert.equal(g.bullets.length, 0);
+  });
+  test(mode+' partial proof abstains on knockback', () => {
+    const g = threeHullPen2(Game);
+    g.bullets[0].knock = 1;
+    g.time += 1/120; g.updateBullets(1/120);
+    assert.equal(g.tanks[1].hitCount, 0,
+      'knockback could move an earlier hull; do not backdate two hits');
+  });
+  test(mode+' partial proof abstains on uncertain lethal damage', () => {
+    const g = threeHullPen2(Game);
+    g.tanks[1].hp = 70;
+    g.time += 1/120; g.updateBullets(1/120);
+    assert.equal(g.tanks[1].hitCount, 0);
+  });
+  test(mode+' partial proof abstains on intervening permanent cover', () => {
+    const g = threeHullPen2(Game);
+    g.__novaTerrain = [{id:-433,shape:'rect',x:48,y:0,
+      w:3,h:90,solid:true,destructible:false}];
+    g.time += 1/120; g.updateBullets(1/120);
+    assert.equal(g.tanks[1].hitCount, 0);
+  });
+  test(mode+' partial proof abstains on uncertain moving hull', () => {
+    const g = threeHullPen2(Game);
+    g.__novaShapeSweepActive = true;
+    g.__novaShapeSweepEpoch = 433;
+    g.time += 1/120;
+    for(const t of g.tanks) {
+      t.__novaSweepMoveTime = g.time;
+      t.__novaSweepPrevX = t.x;
+      t.__novaSweepPrevY = t.y;
+    }
+    g.tanks[1].__novaSweepPrevY = 12;
+    g.updateBullets(1/120);
+    assert.equal(g.tanks[1].hitCount, 0);
+  });
+  test(mode+' partial proof abstains on nearby neutral corridor', () => {
+    const g = threeHullPen2(Game);
+    g.shapes = [{kind:'shape',id:433,x:38,y:32,r:12,hp:100}];
+    g.time += 1/120; g.updateBullets(1/120);
+    assert.equal(g.tanks[1].hitCount, 0);
+  });
+  test(mode+' partial proof abstains on competing projectile corridor', () => {
+    const g = threeHullPen2(Game);
+    g.bullets.push({kind:'bullet',id:433,ownerId:9,x:60,y:0,
+      vx:0,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false});
+    g.damageTank = function(t,dmg,ownerId) {
+      t.hitCount++; this.hits++;
+      (this.attribution||(this.attribution=[])).push([t.id,ownerId]);
+    };
+    g.time += 1/120; g.updateBullets(1/120);
+    assert.equal((g.attribution||[]).filter(x=>x[0]===3&&x[1]===1).length, 0,
+      'the original projectile must not speculate across competing fire');
+  });
+}
