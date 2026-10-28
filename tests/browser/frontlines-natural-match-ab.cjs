@@ -12,7 +12,8 @@ const LAYOUT_INDEX=Number(process.env.NOVA_LAYOUT_INDEX??0);
 const SEED_INDEX=Number(process.env.NOVA_SEED_INDEX??0);
 const PILOT_POLICY=process.env.NOVA_PILOT_POLICY||'wander';
 const AB_MODE=process.env.NOVA_AB_MODE||'memory';
-if(!['memory','live-turn'].includes(AB_MODE))throw Error('NOVA_AB_MODE must be memory or live-turn');
+if(!['memory','live-turn','migration-intercept'].includes(AB_MODE))
+ throw Error('NOVA_AB_MODE must be memory, live-turn or migration-intercept');
 if(!Number.isInteger(LAYOUT_INDEX)||LAYOUT_INDEX<0||LAYOUT_INDEX>=LAYOUTS.length)
  throw Error('NOVA_LAYOUT_INDEX must be 0, 1, or 2');
 if(!Number.isInteger(SEED_INDEX)||SEED_INDEX<0||SEED_INDEX>1000)
