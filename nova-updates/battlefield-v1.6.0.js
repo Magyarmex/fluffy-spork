@@ -1661,28 +1661,42 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       !Number.isFinite(sx)||!Number.isFinite(sy)||
       !Number.isFinite(s.x)||!Number.isFinite(s.y))return false;
    if(!near(sx,sy,s.x,s.y,rr+4))continue;
-   if(s.born===g.time||sx!==s.x||sy!==s.y||
+   /* Ordinary Circles/Squares drift at <=10u/s. The observed frame
+    * displacement bounds their entire straight core integration; use a
+    * larger outer radius for earliest POSSIBLE contact and a smaller
+    * inner radius for a GUARANTEED contact, independent of subframe
+    * interpolation. Any uncertain overlap or relocation is a veto. */
+   var motion=Math.hypot(s.x-sx,s.y-sy);
+   if(s.born===g.time||!Number.isFinite(motion)||motion>.5||
       shapeWasTeleported(g,s)||
       (s.type!=='circle'&&s.type!=='square'))return false;
-   var fx=ax-s.x,fy=ay-s.y,C=fx*fx+fy*fy-rr*rr,
-       B=2*(fx*dx+fy*dy);
-   if(!(C>1e-9))return false;
-   var D=B*B-4*A*C;
-   if(!Number.isFinite(D)||
-      Math.abs(D)<=1e-10*(B*B+4*A*(fx*fx+fy*fy+rr*rr)))return false;
-   if(D<=0)continue;
-   var root=Math.sqrt(D),q=-.5*(B+(B<0?-root:root));
-   if(!q)return false;
-   var enter=Math.min(q/A,C/q),leave=Math.max(q/A,C/q);
-   if(leave<=0||enter>=1-1e-9)continue;
-   if(!(enter>1e-9))return false;
+   var fx=ax-sx,fy=ay-sy,B=2*(fx*dx+fy*dy);
+   function entry(radius){
+    var C=fx*fx+fy*fy-radius*radius;
+    if(!(C>1e-9))return -1; /* ambiguous frame-start overlap */
+    var D=B*B-4*A*C;
+    if(!Number.isFinite(D)||
+       Math.abs(D)<=1e-10*(B*B+4*A*(fx*fx+fy*fy+radius*radius)))
+      return -1;
+    if(D<=0)return null;
+    var root=Math.sqrt(D),q=-.5*(B+(B<0?-root:root));
+    if(!q)return -1;
+    var enter=Math.min(q/A,C/q),leave=Math.max(q/A,C/q);
+    return leave<=0||enter>=1-1e-9?null:enter;
+   }
+   var possible=entry(rr+motion);
+   if(possible===-1)return false;
+   if(possible===null)continue;
+   var guaranteed=entry(rr-motion);
+   if(guaranteed===-1||guaranteed===null||
+      !(guaranteed>1e-9)||!(guaranteed<1-1e-9))return false;
    if(!Number.isFinite(s.hp)||s.hp<=b.dmg*2)return false;
-   contacts.push({e:s,t:enter});
+   contacts.push({e:s,t:guaranteed,earliest:possible});
    if(contacts.length>2)return false;
   }
   if(contacts.length!==2)return false;
   contacts.sort(function(a,c){return a.t-c.t;});
-  if(contacts[1].t-contacts[0].t<1e-7)return false;
+  if(contacts[1].earliest<=contacts[0].t+1e-7)return false;
   for(var ti=0;ti<tanks.length;ti++){
    var t=tanks[ti];if(!t||!t.alive||t.id===b.ownerId)continue;
    var def=CLASSES[t.cls];
