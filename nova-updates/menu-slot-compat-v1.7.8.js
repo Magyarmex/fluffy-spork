@@ -317,8 +317,15 @@ function findPanel(){
  for(var i=0;i<panels.length;i++){
   var p=panels[i],buttons=p.querySelectorAll('button'),redeploy=null;
   if(!p.textContent||p.textContent.indexOf('TERMINATED')<0)continue;
-  for(var j=0;j<buttons.length;j++)
-   if((buttons[j].textContent||'').indexOf('REDEPLOY')>=0){redeploy=buttons[j];break;}
+  for(var j=0;j<buttons.length;j++){
+   var button=buttons[j];
+   /* Front Choice injects nested FRESH/RETURN buttons ahead of React's
+    * original callback. Only that React-owned button is a valid insertion
+    * sibling; inserting a note before a nested button throws NotFoundError. */
+   if(button&&typeof button.getAttribute==='function'&&
+      button.getAttribute('data-nova-insertion')!==null)continue;
+   if((button.textContent||'').indexOf('REDEPLOY')>=0){redeploy=button;break;}
+  }
   if(redeploy)return {panel:p,before:redeploy};
  }
  return null;
