@@ -1429,3 +1429,27 @@ for(const optimized of [false,true]){
   });
  }
 }
+
+
+/* Deterministic property sweep: all three certified contacts occur strictly
+ * before a 2ms TTL. This avoids conflating the TTL fix with unproven
+ * cross-frame hit-identity chronology; the fourth hull remains unreachable. */
+for(const optimized of [false,true]){
+ const Game=boot(undefined,optimized);
+ test((optimized?'optimized':'baseline')+
+   ' 800 seeded high-penetration expiry corridors preserve exact victims',()=>{
+  let seed=4232026;
+  const rnd=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+  for(const pen of [3,4])for(const fps of [30,60,120,240])
+   for(let i=0;i<100;i++){
+    const {g,a,b,c,d}=highPenTTLWorld(Game,pen,i%2===0);
+    a.x=25+rnd()*5;b.x=37+rnd()*5;c.x=50+rnd()*10;
+    d.x=100;
+    const shot=g.bullets[0];shot.vx=20000;shot.ttl=.002;
+    g.time+=1/fps;g.updateBullets(1/fps);
+    assert.deepEqual([a.hitCount,b.hitCount,c.hitCount,d.hitCount],
+      [1,1,1,0],'world '+i+' pen='+pen+' fps='+fps);
+    assert.equal(g.hits,3);
+   }
+ });
+}
