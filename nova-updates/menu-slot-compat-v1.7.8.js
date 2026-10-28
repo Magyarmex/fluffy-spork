@@ -373,3 +373,153 @@ window.__NOVA_DEATH_INSIGHT_TEST__={choose:choose,paint:paint,cleanup:cleanup};
   'overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;}}';
  document.head.appendChild(style);
 })();
+
+
+/* NOVA TANKS — Between-life front choice.
+ * The battlefield persists across redeploy, including breached cover. A
+ * player may return to the previous front or use the existing random
+ * reposition. Neither option grants stats, information, or invulnerability.
+ * The default remains exactly the legacy spawn algorithm. */
+(function(){
+'use strict';
+var mods=window.__novaModules;
+if(!mods||!mods['game/engine'])return;
+var PI2=Math.PI*2;
+function validOrigin(p){
+ return !!(p&&Number.isFinite(p.x)&&Number.isFinite(p.y)&&
+  Math.abs(p.x)<=2250&&Math.abs(p.y)<=2250);
+}
+function sampleReturn(g,p){
+ if(!validOrigin(p)||!g||typeof g.isTerrainSafe!=='function')return null;
+ for(var i=0;i<64;i++){
+  var a=Math.random()*PI2,r=420+Math.random()*430;
+  var x=p.x+Math.cos(a)*r,y=p.y+Math.sin(a)*r;
+  if(Math.abs(x)>2050||Math.abs(y)>2050)continue;
+  var safe=false;
+  try{safe=!!g.isTerrainSafe(x,y,75);}catch(ignore){return null;}
+  if(!safe)continue;
+  return{x:x,y:y};
+ }
+ return null;
+}
+function findPanel(){
+ if(typeof document==='undefined'||!document.querySelectorAll)return null;
+ var panels=document.querySelectorAll('.panel');
+ for(var i=0;i<panels.length;i++){
+  var p=panels[i],buttons=p.querySelectorAll('button'),redeploy=null;
+  if(!p.textContent||p.textContent.indexOf('TERMINATED')<0)continue;
+  for(var j=0;j<buttons.length;j++)
+   if((buttons[j].textContent||'').indexOf('REDEPLOY')>=0){redeploy=buttons[j];break;}
+  if(redeploy)return{panel:p,before:redeploy};
+ }
+ return null;
+}
+function paint(g){
+ var target=findPanel();if(!target)return false;
+ if(target.panel.querySelector('[data-nova-front-choice]'))return true;
+ var row=document.createElement('div');
+ row.setAttribute('data-nova-front-choice','');
+ row.setAttribute('role','group');
+ row.setAttribute('aria-label','Redeploy: fresh front or return near the last position; no stat bonus');
+ row.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:'+(window.innerHeight<=400?'4':'10')+'px;min-width:0;';
+ function make(choice,caption,detail){
+  var b=document.createElement('button');b.type='button';
+  b.setAttribute('data-ui','true');
+  b.setAttribute('data-nova-insertion',choice);
+  b.style.cssText='min-width:0;border:1px solid rgba(125,243,255,.4);border-radius:7px;background:rgba(31,104,136,.24);padding:'+(window.innerHeight<=400?'5':'9')+'px 3px;font:700 10px/1.2 Rajdhani,system-ui;color:#d2deed;touch-action:manipulation;';
+  b.textContent=caption;b.title=detail;
+  b.addEventListener('click',function(){
+   g.__novaRedeployChoice=choice;
+   /* Keep React's original redeploy callback authoritative. */
+   target.before.click();
+  });
+  row.appendChild(b);
+ }
+ make('fresh','⚡ REDEPLOY FRESH','Original random insertion, normally away from the last position.');
+ make('return','↩ REDEPLOY RETURN','Re-enter 420–850 world units from the last death, where terrain allows.');
+ g.__novaFrontOriginalButton=target.before;
+ g.__novaFrontOriginalDisplay=target.before.style?target.before.style.display:'';
+ g.__novaFrontOriginalTabIndex=target.before.tabIndex;
+ if(target.before.style)target.before.style.display='none';
+ target.before.setAttribute('aria-hidden','true');
+ target.before.tabIndex=-1;
+ target.panel.insertBefore(row,target.before);
+ return true;
+}
+function cleanup(g){
+ if(g.__novaFrontObserver){g.__novaFrontObserver.disconnect();g.__novaFrontObserver=null;}
+ if(g.__novaFrontTimer!=null&&typeof clearTimeout==='function'){
+  clearTimeout(g.__novaFrontTimer);g.__novaFrontTimer=null;
+ }
+ var original=g.__novaFrontOriginalButton;
+ if(original){
+  if(original.style)original.style.display=g.__novaFrontOriginalDisplay||'';
+  if(typeof original.removeAttribute==='function')original.removeAttribute('aria-hidden');
+  if(g.__novaFrontOriginalTabIndex!=null)original.tabIndex=g.__novaFrontOriginalTabIndex;
+ }
+ g.__novaFrontOriginalButton=null;
+ if(typeof document!=='undefined'&&document.querySelector){
+  var node=document.querySelector('[data-nova-front-choice]');
+  if(node&&node.parentNode)node.parentNode.removeChild(node);
+ }
+ g.__novaFrontMounted=false;
+}
+function mount(g){
+ if(g.__novaFrontMounted)return;
+ if(paint(g)){g.__novaFrontMounted=true;return;}
+ if(g.__novaFrontObserver||typeof MutationObserver!=='function')return;
+ var root=document.getElementById('root')||document.body;if(!root)return;
+ var observer=new MutationObserver(function(){
+  if(paint(g)){observer.disconnect();g.__novaFrontObserver=null;g.__novaFrontMounted=true;}
+ });
+ g.__novaFrontObserver=observer;observer.observe(root,{childList:true,subtree:true});
+ if(typeof setTimeout==='function')g.__novaFrontTimer=setTimeout(function(){
+  if(g.__novaFrontObserver===observer){observer.disconnect();g.__novaFrontObserver=null;}
+ },4000);
+}
+var original=mods['game/engine'];
+mods['game/engine']=function(module,exports,require){
+ original(module,exports,require);
+ var Game=module.exports.Game;
+ if(!Game||Game.prototype.__novaFrontChoiceInstalled)return;
+ Game.prototype.__novaFrontChoiceInstalled=true;
+ var oldKill=Game.prototype.killTank,oldUpdate=Game.prototype.update,
+  oldRedeploy=Game.prototype.redeploy,oldRand=Game.prototype.randSpawnPos;
+ if(typeof oldKill==='function')Game.prototype.killTank=function(victim,killer){
+  var player=!!(!this.__novaDecorativeWorld&&victim&&victim.isPlayer&&victim.alive!==false);
+  var pos=player?{x:victim.x,y:victim.y}:null;
+  var out=oldKill.apply(this,arguments);
+  if(player&&victim.alive===false&&validOrigin(pos)){
+   this.__novaRedeployOrigin=pos;
+   this.__novaRedeployChoice='fresh';
+   this.__novaFrontMounted=false;
+  }
+  return out;
+ };
+ if(typeof oldUpdate==='function')Game.prototype.update=function(){
+  var out=oldUpdate.apply(this,arguments);
+  if(!this.__novaDecorativeWorld&&this.status==='dead'&&validOrigin(this.__novaRedeployOrigin))
+   try{mount(this);}catch(ignore){cleanup(this);}
+  return out;
+ };
+ if(typeof oldRand==='function')Game.prototype.randSpawnPos=function(minDist){
+  if(this.__novaFrontSpawnArmed&&minDist===900){
+   this.__novaFrontSpawnArmed=false;
+   var near=sampleReturn(this,this.__novaRedeployOrigin);
+   if(near)return near;
+  }
+  return oldRand.apply(this,arguments);
+ };
+ if(typeof oldRedeploy==='function')Game.prototype.redeploy=function(){
+  this.__novaFrontSpawnArmed=this.__novaRedeployChoice==='return'&&validOrigin(this.__novaRedeployOrigin);
+  try{return oldRedeploy.apply(this,arguments);}
+  finally{
+   this.__novaFrontSpawnArmed=false;
+   cleanup(this);
+   this.__novaRedeployOrigin=null;
+   this.__novaRedeployChoice='fresh';
+  }
+ };
+};
+window.__NOVA_FRONT_CHOICE_TEST__={sampleReturn:sampleReturn,validOrigin:validOrigin,paint:paint,cleanup:cleanup};
+})();

@@ -488,14 +488,18 @@ async function scenario(browser, label, options) {
         const actionFit=await page.evaluate(()=>{
           const note=document.querySelector('[data-nova-death-insight]');
           const panel=note?.parentElement;
-          const buttons=[...(panel?.querySelectorAll('button')||[])];
+          const buttons=[...(panel?.querySelectorAll('button')||[])].filter(b=>getComputedStyle(b).display!=='none');
           const rect=b=>{const r=b.getBoundingClientRect();return{
             text:b.textContent,left:r.left,right:r.right,top:r.top,bottom:r.bottom};};
           return {height:innerHeight,scrollTop:panel?.scrollTop||0,
             actions:buttons.map(rect),panel:panel?.getBoundingClientRect().toJSON()};
         });
-        assert.equal(actionFit.actions.length,2,
-          'landscape death screen retains Redeploy and Main Menu');
+        assert.equal(actionFit.actions.length,3,
+          'landscape death screen retains both redeploy choices and Main Menu');
+        assert.ok(actionFit.actions.some(b=>/REDEPLOY FRESH/.test(b.text))&&
+          actionFit.actions.some(b=>/REDEPLOY RETURN/.test(b.text))&&
+          actionFit.actions.some(b=>/MAIN MENU/.test(b.text)),
+          'all three next-run actions must be present');
         assert.ok(actionFit.actions.every(b=>b.top>=8&&b.bottom<=actionFit.height-8),
           'both next-run actions must be visible WITHOUT scrolling at 568x320: '+
           JSON.stringify(actionFit));
@@ -525,7 +529,7 @@ async function scenario(browser, label, options) {
         label+': retain desktop/large-phone title scale');
       console.log('NOVA_DEATH_TITLE '+JSON.stringify({label,deathTitle}));
       await page.screenshot({path:path.join(output,label+'-death-insight.png')});
-      await page.getByRole('button',{name:/REDEPLOY/}).click();
+      await page.locator('[data-nova-insertion="fresh"]').click();
       await page.waitForFunction(()=>window.__novaBrowserLiveGame?.status==='playing',
         null,{timeout:15000});
       assert.equal(await note.count(),0,label+': previous-life insight must be removed');

@@ -61,6 +61,7 @@ jobs:
           node tests/browser/frontlines-route-matrix.cjs
           node tests/browser/best-score-live-reload.cjs
           node tests/browser/corrupt-saved-records.cjs
+          node tests/browser/redeploy-front-choice.cjs
       - name: Preserve browser screenshots
         if: always()
         uses: actions/upload-artifact@v4
