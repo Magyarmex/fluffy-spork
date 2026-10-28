@@ -494,8 +494,12 @@ async function scenario(browser, label, options) {
           return {height:innerHeight,scrollTop:panel?.scrollTop||0,
             actions:buttons.map(rect),panel:panel?.getBoundingClientRect().toJSON()};
         });
-        assert.equal(actionFit.actions.length,2,
-          'landscape death screen retains Redeploy and Main Menu');
+        assert.equal(actionFit.actions.length,3,
+          'landscape death screen retains both redeploy choices and Main Menu');
+        assert.ok(actionFit.actions.some(b=>/REDEPLOY FRESH/.test(b.text))&&
+          actionFit.actions.some(b=>/REDEPLOY RETURN/.test(b.text))&&
+          actionFit.actions.some(b=>/MAIN MENU/.test(b.text)),
+          'all three next-run actions must be present');
         assert.ok(actionFit.actions.every(b=>b.top>=8&&b.bottom<=actionFit.height-8),
           'both next-run actions must be visible WITHOUT scrolling at 568x320: '+
           JSON.stringify(actionFit));
