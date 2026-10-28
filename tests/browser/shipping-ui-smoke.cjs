@@ -529,7 +529,7 @@ async function scenario(browser, label, options) {
         label+': retain desktop/large-phone title scale');
       console.log('NOVA_DEATH_TITLE '+JSON.stringify({label,deathTitle}));
       await page.screenshot({path:path.join(output,label+'-death-insight.png')});
-      await page.getByRole('button',{name:/REDEPLOY/}).click();
+      await page.locator('[data-nova-insertion="fresh"]').click();
       await page.waitForFunction(()=>window.__novaBrowserLiveGame?.status==='playing',
         null,{timeout:15000});
       assert.equal(await note.count(),0,label+': previous-life insight must be removed');
