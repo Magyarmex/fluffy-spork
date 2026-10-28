@@ -225,6 +225,14 @@ const FULL_SEEDS=[
  1517835,1517842,1517846,1517848,1517852,1517873,
  1517839,1517866,1517870,1517880,1517891,1517893
 ];
+test('real composed RETURN pilot keeps moving after reaching the remembered front',()=>{
+ const r=run(1517825,'return',30,8,'harvest_roam');
+ assert.ok(r.frontReached!==null&&r.frontReached<6,'seed must reach front while alive');
+ assert.ok(r.postFrontTravelled>20,'roaming policy must move in the real Game.update path');
+ assert.ok(r.roaming&&r.roaming.patrolIndex>=0,'roaming policy must be exercised');
+ assert.ok(r.postFrontSeconds>0,'post-front exposure must be recorded');
+});
+
 test('FRESH/RETURN real-engine matched pilot is deterministic under counterbalanced arm order',()=>{
  const full=process.env.NOVA_REDEPLOY_FULL_PILOT==='1';
  const policy=process.env.NOVA_REDEPLOY_POLICY||'navigate';
