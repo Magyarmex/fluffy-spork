@@ -177,7 +177,7 @@ A Migration signal requires accumulated evidence of actual physical sector cross
 
 ### ROGUE STAR
 
-Rogue Star is the sole deliberately created opportunity in v1.12.0. It is eligible only after strategic quiet, when no meaningful Bloom or migration already provides movement pressure and no Star is active.
+The original v1.12.0 Rogue Star design was the sole Director-created opportunity, gated on strategic quiet and no living Star. The current refinement first announces an already living, at-most-eight-second-old Star after 16 seconds of quiet, with its real reported position frozen at announcement. It never duplicates, teleports, ages, or repositions that Star. BLOOM retains first priority when ready, but a BLOOM candidate on cooldown cannot veto the unrelated public Star report. The older no-Star creation fallback retains its stricter 31-second quiet gate and no-BLOOM requirement. A 58-second Star cooldown and existing public-signal spacing still apply.
 
 Director signals are brief minimap/world information. There are no capture bars, objective meters, permanent ecology panels, or mandatory contests.
 
