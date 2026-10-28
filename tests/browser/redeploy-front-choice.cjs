@@ -63,6 +63,16 @@ async function run(browser,width,height){
    return {x:g.player.x,y:g.player.y,choice:g.__novaRedeployChoice,
     terrain:g.isTerrainSafe(g.player.x,g.player.y,75),notices:window.__novaFrontNotices};
   });
+  // The original notice is transient: verify it while visible, before
+  // running extra full-canvas pixel comparisons and unrelated star checks.
+  const directions=['E','SE','S','SW','W','NW','N','NE'];
+  const angle=Math.atan2(death.y-after.y,death.x-after.x);
+  const bearing=directions[(Math.round(angle/(Math.PI/4))+8)%8];
+  assert.ok(after.notices.some(n=>n.message==='↩ RETURN · LAST FRONT '+bearing),
+   'real React redeploy must tell the player the direction of their witnessed last front: '+
+   JSON.stringify(after.notices));
+  await page.getByText('↩ RETURN · LAST FRONT '+bearing,{exact:true})
+   .waitFor({state:'visible',timeout:2000});
   const survivingStar=await page.evaluate(id=>{
    const g=window.__novaFrontSmokeGame,star=g.getShape(id);
    return star?{age:g.time-star.__lfStarBorn,announced:star.__lfPublicAnnounced}:null;
@@ -104,14 +114,6 @@ async function run(browser,width,height){
   assert.ok(dist>=420-1e-6&&dist<=850+1e-6,'return inserts near the witnessed front');
   assert.equal(after.terrain,true,'return position is terrain safe');
   assert.equal(after.choice,'fresh','choice resets after redeploy');
-  const directions=['E','SE','S','SW','W','NW','N','NE'];
-  const angle=Math.atan2(death.y-after.y,death.x-after.x);
-  const bearing=directions[(Math.round(angle/(Math.PI/4))+8)%8];
-  assert.ok(after.notices.some(n=>n.message==='↩ RETURN · LAST FRONT '+bearing),
-   'real React redeploy must tell the player the direction of their witnessed last front: '+
-   JSON.stringify(after.notices));
-  await page.getByText('↩ RETURN · LAST FRONT '+bearing,{exact:true})
-   .waitFor({state:'visible',timeout:2000});
   await page.locator('[data-nova-front-choice]').waitFor({state:'hidden',timeout:5000});
   assert.deepEqual(errors,[],'no page errors');
   console.log('NOVA_REDEPLOY_FRONT_SMOKE '+JSON.stringify({width,height,dist,terrain:after.terrain,reset:after.choice}));
