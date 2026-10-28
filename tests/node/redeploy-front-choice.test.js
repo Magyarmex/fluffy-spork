@@ -11,7 +11,7 @@ const start=source.indexOf(marker);
 assert.ok(start>=0,'shipping Fieldcraft file contains front choice');
 const patch=source.slice(start);
 function boot(options={}){
- const observers=[],panels=[],timers=new Map();
+ const observers=[],panels=[],timers=new Map(),mapMarks=[];
  let nextTimer=1;
  const randomMath=Object.create(Math);
  randomMath.random=options.random||Math.random;
@@ -35,13 +35,16 @@ function boot(options={}){
   notify(){if(!this.disconnected)this.fn();}
  }
  class Game{
-  constructor(){this.status='playing';this.player=null;this.randCalls=[];this.toasts=[];this.__novaTerrain=[{id:1}];}
+  constructor(){this.status='playing';this.player=null;this.randCalls=[];this.toasts=[];this.__novaTerrain=[{id:1}];this.time=0;
+   this.mmCtx={save(){},restore(){},beginPath(){},stroke(){},moveTo(){},lineTo(){},
+    arc(x,y,r){mapMarks.push({x,y,r});}};}
   toast(message,kind){this.toasts.push({message,kind});}
   isTerrainSafe(x,y,pad){return options.safe?options.safe(x,y,pad):true;}
   randSpawnPos(dist){this.randCalls.push(dist);return {x:1900,y:1900};}
   killTank(victim){if(!victim.alive)return;victim.alive=false;this.status='dying';}
   update(){if(this.status==='dying')this.status='dead';}
-  redeploy(){this.status='playing';this.player={...this.randSpawnPos(900),isPlayer:true};this.randSpawnPos(400);return 'redeployed';}
+  drawMinimap(){this.mapDraws=(this.mapDraws||0)+1;}
+  redeploy(){this.status='playing';this.time=0;this.player={...this.randSpawnPos(900),isPlayer:true,alive:true};this.randSpawnPos(400);return 'redeployed';}
  }
  const window={__novaModules:{'game/engine':m=>{m.exports.Game=Game;}}};
  const context={window,document,MutationObserver,Math:randomMath,Number,
@@ -60,7 +63,7 @@ function boot(options={}){
    removeChild(node){assert.equal(node,this.choice);this.choice=null;node.parentNode=null;}};
   panel.redeploy=redeploy;panels.push(panel);return panel;
  }
- return {Game:m.exports.Game,api:window.__NOVA_FRONT_CHOICE_TEST__,addPanel,observers,timers};
+ return {Game:m.exports.Game,api:window.__NOVA_FRONT_CHOICE_TEST__,addPanel,observers,timers,mapMarks};
 }
 function victim(x=0,y=0){return {id:1,isPlayer:true,alive:true,x,y};}
 test('materialized production chain loads front choice before game boot',()=>{
@@ -185,4 +188,44 @@ test('fresh redeploy has no extra notice and UI failures cannot prevent a return
  g.toast=()=>{throw Error('toast bridge unavailable');};
  assert.doesNotThrow(()=>g.redeploy(),'presentation failure must never block play');
  assert.equal(g.status,'playing');
+});
+
+test('successful RETURN marks only the witnessed death front on the existing minimap',()=>{
+ const {Game,mapMarks}=boot({random:()=>0}),g=new Game();
+ g.killTank(victim(100,200));g.update();g.__novaRedeployChoice='return';g.redeploy();
+ assert.deepEqual(g.__novaLastFrontMarker,{x:100,y:200,until:24});
+ g.drawMinimap();
+ assert.equal(g.mapDraws,1,'the original minimap remains authoritative');
+ assert.equal(mapMarks.length,1,'exactly one fixed waypoint ring');
+ assert.ok(Math.abs(mapMarks[0].x-(2350*216/4500))<1e-9);
+ assert.ok(Math.abs(mapMarks[0].y-(2450*216/4500))<1e-9);
+ assert.equal(mapMarks[0].r,6);
+ g.time=23.9;g.drawMinimap();assert.equal(mapMarks.length,2);
+ g.time=24;g.drawMinimap();
+ assert.equal(mapMarks.length,2,'the marker expires rather than tracking forever');
+ assert.equal(g.__novaLastFrontMarker,null);
+});
+test('RETURN waypoint clears on arrival, next death, fresh redeploy and fallback',()=>{
+ const {Game,mapMarks}=boot({random:()=>0}),g=new Game();
+ g.killTank(victim(100,200));g.update();g.__novaRedeployChoice='return';g.redeploy();
+ g.player.x=220;g.player.y=200;g.drawMinimap();
+ assert.equal(mapMarks.length,0,'arrival removes the waypoint before drawing');
+ assert.equal(g.__novaLastFrontMarker,null);
+ g.killTank(victim(300,400));g.update();g.__novaRedeployChoice='return';g.redeploy();
+ assert.ok(g.__novaLastFrontMarker);
+ g.killTank(g.player);g.update();
+ assert.equal(g.__novaLastFrontMarker,null,'death clears stale previous-life navigation');
+ g.redeploy();assert.equal(g.__novaLastFrontMarker,null,'fresh has no waypoint');
+ const h=new Game();h.isTerrainSafe=()=>false;
+ h.killTank(victim(100,200));h.update();h.__novaRedeployChoice='return';h.redeploy();
+ assert.equal(h.__novaLastFrontMarker,null,'failed RETURN cannot claim a return waypoint');
+});
+test('invalid clock and offscreen marker cannot disrupt the original minimap',()=>{
+ const {Game,mapMarks}=boot(),g=new Game();
+ g.player={x:0,y:0,alive:true};g.__novaLastFrontMarker={x:2250,y:2250,until:50};
+ g.drawMinimap();assert.equal(mapMarks.length,0,'out-of-bounds marker is not painted');
+ g.__novaLastFrontMarker={x:100,y:200,until:50};g.time=NaN;
+ assert.doesNotThrow(()=>g.drawMinimap());
+ assert.equal(g.__novaLastFrontMarker,null,'invalid game clock clears waypoint');
+ assert.equal(g.mapDraws,2);
 });
