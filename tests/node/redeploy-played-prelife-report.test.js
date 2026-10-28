@@ -7,9 +7,12 @@ function sample() {
   for (const seed of [1,2]) for (const hz of [30,60]) {
     const prelude={origin:{x:seed,y:hz},elapsed:8,ticks:hz*8,naturalDeath:false,
       travelled:100,neutralXPEarned:5,changedShapes:3,changedEnemies:2,changedTerrain:0};
-    const fresh={fingerprintHash:'played-'+seed+'-'+hz,origin:prelude.origin,prelude,
+    const postInsertion={enemyClassesHash:'classes',enemyBodiesHash:'enemy-fresh',
+      neutralBodiesHash:'neutral-fresh'};
+    const fresh={fingerprintHash:'played-'+seed+'-'+hz,origin:prelude.origin,prelude,postInsertion,
       neutralXP:10,score:20,hp:80,alive:true,frontReached:null};
-    const returning={...fresh,neutralXP:16,score:25,hp:90,frontReached:4};
+    const returning={...fresh,postInsertion:{...postInsertion,enemyBodiesHash:'enemy-return'},
+      neutralXP:16,score:25,hp:90,frontReached:4};
     results.push({seed,hz,layout:'Crossfire',rotation:0,fresh,returning});
   }
   return {policy:'harvest_roam',preludeSeconds:8,results};
@@ -21,6 +24,8 @@ test('post-combat report clusters FPS repeats and reports measured world changes
   assert.equal(summary.firstLife.worldsWithPhysicalChange,4);
   assert.equal(summary.returnMinusFresh.neutralXP.mean,6);
   assert.deepEqual(summary.returnMinusFresh.neutralXP.seedClusterBootstrap95,[6,6]);
+  assert.equal(summary.postInsertionParity.sameEnemyClassSequence,4);
+  assert.equal(summary.postInsertionParity.sameEnemyBodies,0);
   assert.equal(summary.frontArrivals.return,4);
   assert.equal(summary.frontArrivals.fresh,0);
 });
