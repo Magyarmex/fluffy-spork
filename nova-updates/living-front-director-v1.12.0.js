@@ -32,7 +32,10 @@ function migrationAt(st,from){
 function decision(st,ctx){var adopting=!!(ctx&&ctx.adoptStarId>0);if(ctx&&ctx.enabled===false)return null;var now=ctx&&ctx.now||0;if(st.signal&&now<st.signal.until)return null;if(now-st.lastSignalAt<8)return null;if(st.cooldowns.bloom<=0){var b=bloomCandidate(st);if(b>=0&&(b!==st.lastBloomSector||st.sectors[b].maturity>.78*st.ceiling))return{type:'BLOOM',sector:b};}
 if(st.cooldowns.migration<=0&&st.migrationHeat>=5){
  var forced=ctx&&ctx.migrationFrom;
- if(forced!=null&&forced>=0){var selected=migrationAt(st,forced);if(selected)return selected;}
+ if(forced!=null&&!(forced<0)){
+  if(!Number.isInteger(forced)||forced>=16)return null;
+  var selected=migrationAt(st,forced);if(selected)return selected;
+ }
  else{
   var best=null,bestOutbound=0;
   for(var i=0;i<16;i++){
