@@ -76,3 +76,19 @@ test('migration matrix rejects invented heat and unobserved Director announcemen
   f.write();assert.throws(()=>collect(f.root,1),/signal counts must agree/);
  }finally{f.cleanup();}
 });
+
+test('migration matrix separates a reached heat gate from a public signal',()=>{
+ const f=fixture();try{
+  for(const a of [f.on,f.off])a.migrationDiagnostics={
+   transitions:7,peakHeat:5.2,peak15s:7,signals:0,horizonSeconds:300};
+  f.write();const result=collect(f.root,1);
+  assert.equal(result.exposedPairs,0);
+  assert.match(result.censored[0].reason,/Heat reached gate but Director never announced/);
+ }finally{f.cleanup();}
+});
+test('migration matrix rejects impossible burst counts',()=>{
+ const f=fixture();try{
+  f.off.migrationDiagnostics.peak15s=1;
+  f.write();assert.throws(()=>collect(f.root,1),/15s burst must be backed/);
+ }finally{f.cleanup();}
+});
