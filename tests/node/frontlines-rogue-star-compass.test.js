@@ -66,3 +66,11 @@ test('shipping composition includes the real Director overlay',()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
  assert.ok(html.includes('nova-updates/living-front-director-v1.12.0.js'));
 });
+
+test('public Star bearing is independent of hidden ecology and unrelated shapes',()=>{
+ const {T}=boot(),player={x:0,y:0,hp:100,alive:true},sig={x:1200,y:0};
+ const rich={player,shapes:[{x:10,y:20}],__lfState:{sectors:[{value:9999,maturity:1}]}};
+ const poor={player,shapes:[{x:-2000,y:-2000}],__lfState:{sectors:[{value:0,maturity:0}]}};
+ assert.equal(T.rogueStarToast(rich,sig),T.rogueStarToast(poor,sig));
+ assert.match(T.rogueStarToast(rich,sig),/SPAWN E/);
+});
