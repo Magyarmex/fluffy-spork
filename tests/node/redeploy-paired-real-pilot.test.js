@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const crypto = require('node:crypto');
 const root = path.resolve(__dirname, '../..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)]
@@ -94,6 +95,8 @@ function run(seed,choice,hz,seconds){
   const origin={x:g.player.x,y:g.player.y};
   assert.ok(finitePosition(origin),'death origin is finite');
   const layout=g.__novaBattlefield.name,initialShapes=g.shapes.length;
+  const terrainSeed=g.__novaBattlefield.seed>>>0,rotation=(terrainSeed>>>3)%4,
+   mirrored=!!((terrainSeed>>>5)&1);
   /* Verify matched *physical worlds*, not just the same map label. */
   const fingerprint=JSON.stringify({
    layout,
@@ -113,7 +116,8 @@ function run(seed,choice,hz,seconds){
   const startDistance=Math.hypot(p.x-origin.x,p.y-origin.y);
   if(choice==='return')assert.ok(startDistance>=420-1e-6&&startDistance<=850+1e-6,
    'RETURN must actually use the intended geographic sampler');
-  let routeRequests=0,routeWaypoints=0,frontReached=null,firstVisibleEnemy=null;
+  let routeRequests=0,routeWaypoints=0,frontReached=null,firstVisibleEnemy=null,
+   firstVisibleNeutral=null;
   let distanceTravelled=0,last={x:p.x,y:p.y};
   g.input.mouseActive=false;g.input.autofire=false;g.input.firing=false;
   g.input.moveVec=()=>{
@@ -140,6 +144,12 @@ function run(seed,choice,hz,seconds){
    distanceTravelled+=Math.hypot(p.x-last.x,p.y-last.y);
    last={x:p.x,y:p.y};
    if(frontReached===null&&dist<=130)frontReached=g.time;
+   if(firstVisibleNeutral===null){
+    const seen=g.shapes.some(t=>t&&t.hp>0&&
+     Math.hypot(t.x-p.x,t.y-p.y)<250&&
+     (!g.hasLineOfSight||g.hasLineOfSight(p.x,p.y,t.x,t.y,2)));
+    if(seen)firstVisibleNeutral=g.time;
+   }
    if(firstVisibleEnemy===null){
     // Observation only, not an input to the scripted player's movement.
     const visible=g.tanks.some(t=>t&&t!==p&&t.alive&&t.ai&&
@@ -148,12 +158,14 @@ function run(seed,choice,hz,seconds){
     if(visible)firstVisibleEnemy=g.time;
    }
   }
-  return{seed,choice,hz,layout,initialShapes,fingerprint,origin,spawn,
+  return{seed,choice,hz,layout,rotation,mirrored,initialShapes,
+   fingerprint,fingerprintHash:crypto.createHash('sha256').update(fingerprint).digest('hex'),origin,spawn,
    startDistance:+startDistance.toFixed(2),
    endDistance:+Math.hypot(p.x-origin.x,p.y-origin.y).toFixed(2),
    travelled:+distanceTravelled.toFixed(2),
    frontReached:frontReached===null?null:+frontReached.toFixed(3),
    firstVisibleEnemy:firstVisibleEnemy===null?null:+firstVisibleEnemy.toFixed(3),
+   firstVisibleNeutral:firstVisibleNeutral===null?null:+firstVisibleNeutral.toFixed(3),
    hp:+p.hp.toFixed(2),alive:!!p.alive,status:g.status,
    routeRequests,routeWaypoints,time:+g.time.toFixed(3)};
  });
@@ -161,25 +173,68 @@ function run(seed,choice,hz,seconds){
 function comparable(a,b){
  return JSON.stringify(a)===JSON.stringify(b);
 }
+
+const FULL_SEEDS=[
+ 1517854,1517875,1517879,1517881,1517885,1517906,
+ 1517825,1517829,1517856,1517860,1517895,1517899,
+ 1517840,1517844,1517883,1517887,1517903,1517910,
+ 1517827,1517831,1517833,1517837,1517858,1517862,
+ 1517835,1517842,1517846,1517848,1517852,1517873,
+ 1517839,1517866,1517870,1517880,1517891,1517893
+];
 test('FRESH/RETURN real-engine matched pilot is deterministic under counterbalanced arm order',()=>{
- const report=[];
+ const full=process.env.NOVA_REDEPLOY_FULL_PILOT==='1';
+ const report=[],seeds=full?FULL_SEEDS:[0x172901,0x172902,0x172903];
+ const seconds=full?20:2,seen=new Set();
  for(const hz of [30,60]){
-  for(const seed of [0x172901,0x172902,0x172903]){
-   const fresh=run(seed,'fresh',hz,2);
-   const returning=run(seed,'return',hz,2);
-   const returningFirst=run(seed,'return',hz,2);
-   const freshSecond=run(seed,'fresh',hz,2);
-   assert.ok(comparable(fresh,freshSecond),
-    'FRESH must be order-independent: '+JSON.stringify({fresh,freshSecond}));
-   assert.ok(comparable(returning,returningFirst),
-    'RETURN must be order-independent: '+JSON.stringify({returning,returningFirst}));
+  for(let i=0;i<seeds.length;i++){
+   const seed=seeds[i],fresh=run(seed,'fresh',hz,seconds);
+   const returning=run(seed,'return',hz,seconds);
+   /* Full experiment counterbalances a representative of each map/rotation
+    * cell. The ordinary CI smoke counterbalances every case. */
+   if(!full||i%6===0){
+    const returningFirst=run(seed,'return',hz,seconds);
+    const freshSecond=run(seed,'fresh',hz,seconds);
+    assert.ok(comparable(fresh,freshSecond),
+     'FRESH must be order-independent: '+JSON.stringify({fresh,freshSecond}));
+    assert.ok(comparable(returning,returningFirst),
+     'RETURN must be order-independent: '+JSON.stringify({returning,returningFirst}));
+   }
    assert.equal(fresh.layout,returning.layout,'both arms must share the physical map');
+   assert.equal(fresh.rotation,returning.rotation,'both arms must share map rotation');
    assert.deepEqual(fresh.origin,returning.origin,'both arms share a witnessed death position');
    assert.equal(fresh.initialShapes,returning.initialShapes,'same pre-death ecology count');
-   assert.equal(fresh.fingerprint,returning.fingerprint,'same pre-death physical terrain, neutral and AI world');
+   assert.equal(fresh.fingerprint,returning.fingerprint,
+    'same pre-death physical terrain, neutral and AI world');
    assert.ok(fresh.time>0&&returning.time>0,'both arms run real composed Game.update');
-   report.push({seed,hz,layout:fresh.layout,fresh,returning});
+   seen.add(fresh.layout+'/'+fresh.rotation);
+   const compact=x=>{const {fingerprint,...rest}=x;return rest;};
+   report.push({seed,hz,layout:fresh.layout,rotation:fresh.rotation,
+    mirrored:fresh.mirrored,fresh:compact(fresh),returning:compact(returning)});
   }
  }
- console.log('NOVA_REDEPLOY_REAL_PAIRED_PILOT '+JSON.stringify(report));
+ if(full){
+  assert.equal(report.length,144,'36 matched worlds at two frame rates and two policies');
+  assert.equal(seen.size,6,'all three maps and two rotations must be exercised');
+  const dir=path.join(root,'artifacts','redeploy-pilot');
+  fs.mkdirSync(dir,{recursive:true});
+  fs.writeFileSync(path.join(dir,'results.json'),JSON.stringify({
+   contract:'total-policy effect, not isolated geography or human skill',
+   seconds,worlds:36,frameRates:[30,60],counterbalancedPerHz:6,
+   layouts:[...seen].sort(),results:report
+  },null,2));
+ }
+ const avg=(key,mode)=>report.reduce((sum,r)=>sum+r[mode][key],0)/report.length;
+ console.log('NOVA_REDEPLOY_REAL_PAIRED_PILOT '+JSON.stringify({
+  full,worlds:seeds.length,seconds,scenarios:report.length,
+  layouts:[...seen].sort(),
+  meanStartDistance:{fresh:+avg('startDistance','fresh').toFixed(2),
+   return:+avg('startDistance','returning').toFixed(2)},
+  reachedFront:{fresh:report.filter(r=>r.fresh.frontReached!==null).length,
+   return:report.filter(r=>r.returning.frontReached!==null).length},
+  visibleEnemy:{fresh:report.filter(r=>r.fresh.firstVisibleEnemy!==null).length,
+   return:report.filter(r=>r.returning.firstVisibleEnemy!==null).length},
+  alive:{fresh:report.filter(r=>r.fresh.alive).length,
+   return:report.filter(r=>r.returning.alive).length}
+ }));
 });
