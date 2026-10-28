@@ -61,7 +61,7 @@ function victim(x=0,y=0){return {id:1,isPlayer:true,alive:true,x,y};}
 test('materialized production chain loads front choice before game boot',()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
  assert.ok(html.includes('nova-updates/menu-slot-compat-v1.7.8.js'));
- assert.ok(html.indexOf('nova-updates/menu-slot-compat-v1.7.8.js')<html.search(/window\\.__bootModule\\((['\"])main\\1\\)/));
+ assert.ok(html.indexOf('nova-updates/menu-slot-compat-v1.7.8.js')<html.search(/window\.__bootModule\((['"])main\1\)/));
 });
 test('default fresh front preserves exact original spawn behavior',()=>{
  const {Game}=boot(),g=new Game();
