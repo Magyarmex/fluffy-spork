@@ -207,18 +207,22 @@ const seconds=300,dt=1/30,chunk=450;
      state^=state<<13;state^=state>>>17;state^=state<<5;
      g.__novaTrialRng=state>>>0;return g.__novaTrialRng/4294967296;
     };
-    try{for(let j=0;j<steps&&g.status!=='dead';j++)g.update(dt);}
-    finally{Math.random=oldRandom;}
-    const audit=g.__novaStarAudit;
-    if(audit?.announcements>0&&g.player?.alive){
-     const stars=(g.shapes||[]).filter(s=>s?.type==='star'&&s.hp>0);
-     for(const star of stars){const d=Math.hypot(star.x-g.player.x,star.y-g.player.y);
-      if(audit.pilot.minStarDistanceAfterReport===null||d<audit.pilot.minStarDistanceAfterReport)
-       audit.pilot.minStarDistanceAfterReport=+d.toFixed(2);
-      if(d<=100)audit.pilot.near100Frames++;
-      if(d<=250)audit.pilot.near250Frames++;
+    try{for(let j=0;j<steps&&g.status!=='dead';j++){
+     g.update(dt);
+     const audit=g.__novaStarAudit;
+     if(audit?.announcements>0&&g.player?.alive){
+      const last=audit.events[audit.events.length-1];
+      const star=(g.shapes||[]).find(s=>s?.id===last?.id&&s.type==='star'&&s.hp>0);
+      if(star){
+       const d=Math.hypot(star.x-g.player.x,star.y-g.player.y);
+       if(audit.pilot.minStarDistanceAfterReport===null||d<audit.pilot.minStarDistanceAfterReport)
+        audit.pilot.minStarDistanceAfterReport=+d.toFixed(2);
+       if(d<=100)audit.pilot.near100Frames++;
+       if(d<=250)audit.pilot.near250Frames++;
+      }
      }
-    }
+    }}
+    finally{Math.random=oldRandom;}
     return{time:g.time,status:g.status};
    },{steps:Math.min(chunk,Math.ceil(seconds/dt)-i*chunk),dt});
    if(progress.status==='dead')break;
