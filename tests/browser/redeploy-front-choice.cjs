@@ -35,6 +35,15 @@ async function run(browser,width,height){
   });
   const returnButton=page.locator('[data-nova-insertion="return"]');
   await returnButton.waitFor({state:'visible',timeout:15000});
+  // React owns the modal, not this injected action row. Exercise a real DOM
+  // reconciliation loss while the game remains dead: no hidden-button softlock.
+  await page.evaluate(()=>{
+   const row=document.querySelector('[data-nova-front-choice]');
+   if(!row)throw Error('missing first death action row');
+   row.remove();
+  });
+  await page.waitForFunction(()=>!!document.querySelector('[data-nova-insertion="return"]'),
+   null,{timeout:7000});
   assert.equal(await page.locator('[data-nova-insertion="fresh"]').count(),1);
   const fit=await returnButton.evaluate(b=>{
    const rect=b.getBoundingClientRect(),font=getComputedStyle(b).fontSize;
