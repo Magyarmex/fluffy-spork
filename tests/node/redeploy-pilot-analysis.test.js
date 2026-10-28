@@ -6,7 +6,7 @@ function report(policy, gap = 0) {
   const rows = [];
   for (const seed of [1, 2]) for (const hz of [30, 60]) {
     const base = {fingerprintHash: 'world' + seed, spawn: {x: seed, y: hz},
-      neutralXP: 10, score: 20, postFrontTravelled: 100, postFrontNeutralXP: 4,
+      neutralXP: 10, score: 20, hp: 100, alive: true, postFrontTravelled: 100, postFrontNeutralXP: 4,
       frontReached: 4};
     rows.push({seed, hz, layout: 'A', rotation: 0, mirrored: false,
       fresh: {...base}, returning: {...base, neutralXP: 10 + gap, score: 20 + gap}});
@@ -17,6 +17,7 @@ test('difference-in-differences is paired by world and clustered by seed', () =>
   const result = compareReports(report('harvest', -5), report('harvest_roam', 3));
   assert.equal(result.scenarios, 4);
   assert.equal(result.independentSeeds, 2);
+  assert.equal(result.differenceInDifferences.survival.mean, 0);
   assert.equal(result.differenceInDifferences.neutralXP.mean, 8);
   assert.deepEqual(result.differenceInDifferences.neutralXP.seedClusterBootstrap95, [8, 8]);
 });
