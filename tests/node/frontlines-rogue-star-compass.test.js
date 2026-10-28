@@ -119,3 +119,50 @@ test('stale canonical Star does not get a misleading near-expiry announcement',(
  assert.equal(st.signal,null);
  assert.equal(st.stats.starAnnouncements,undefined);
 });
+
+test('fresh-Star announcement survives Bloom cooldown without weakening created-Star rules',()=>{
+ const {LF,T}=boot();
+ const st={age:100,ceiling:1,signal:null,directorEnabled:true,
+  lastSignalAt:80,lastMeaningfulAt:82,lastBloomSector:-1,
+  migrationHeat:0,migrationX:0,migrationY:0,
+  cooldowns:{bloom:100,migration:100,star:0},
+  sectors:Array.from({length:16},()=>({value:0,maturity:.1,pressure:0,outbound:0})),
+  stats:{blooms:0,migrations:0,starsSpawned:0}};
+ st.sectors[5].value=900;st.sectors[5].maturity=.95;
+ const ctx={enabled:true,now:100,hasStar:true,adoptStarId:42};
+ assert.equal(T.bloomCandidate(st),5,'rich BLOOM remains physically real');
+ assert.equal(T.directorDecision(st,ctx)?.type,'ROGUE STAR',
+  'a BLOOM on cooldown cannot starve a fresh Star report');
+ assert.equal(T.directorDecision(st,{...ctx,adoptStarId:null}),null,
+  'existing Star without a fresh public candidate is never duplicated');
+ st.cooldowns.bloom=0;
+ assert.equal(T.directorDecision(st,ctx)?.type,'BLOOM',
+  'eligible BLOOM still has priority over Star adoption');
+ st.cooldowns.bloom=100;st.lastMeaningfulAt=85;
+ assert.equal(T.directorDecision(st,ctx),null,'Star still needs 16s of quiet');
+ st.lastMeaningfulAt=82;st.migrationHeat=3.1;
+ assert.equal(T.directorDecision(st,ctx),null,'active migration pressure blocks Star');
+ st.migrationHeat=0;
+ assert.equal(T.directorDecision(st,{...ctx,hasStar:false,adoptStarId:null}),null,
+  'created-Star fallback retains the old 31s and no-Bloom conditions');
+ st.sectors[5].value=0;st.lastMeaningfulAt=0;
+ assert.equal(T.directorDecision(st,{...ctx,hasStar:false,adoptStarId:null})?.type,
+  'ROGUE STAR','old created-Star fallback is preserved');
+ st.lastSignalAt=95;
+ assert.equal(T.directorDecision(st,ctx),null,'8s public signal spacing still applies');
+ st.lastSignalAt=80;st.cooldowns.star=20;
+ assert.equal(T.directorDecision(st,ctx),null,'58s Star cooldown remains authoritative');
+ // The real composed Director must adopt the same physical entity.
+ st.cooldowns.star=0;st.lastMeaningfulAt=82;st.sectors[5].value=900;
+ const star={id:42,type:'star',kind:'shape',hp:100,x:1200,y:0,__lfStarBorn:96};
+ const messages=[],g={time:100,status:'playing',player:{x:0,y:0,hp:100,alive:true},
+  tanks:[],shapes:[star],__lfState:st,getShape(id){return id===42?star:null;},
+  spawnShape(){throw Error('no duplicate Star');},toast(m){messages.push(m);}};
+ LF.directorTick(g,st);
+ assert.equal(st.signal?.type,'ROGUE STAR');
+ assert.equal(st.signal.starId,42);
+ assert.equal(st.stats.starsSpawned,0);
+ assert.equal(st.stats.starAnnouncements,1);
+ assert.equal(g.shapes.length,1);
+ assert.match(messages[0],/REPORTED E/);
+});
