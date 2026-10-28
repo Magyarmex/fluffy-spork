@@ -153,7 +153,7 @@ async function arm(browser,enabled,label){
    if(g.__novaBattlefield?.name!==['CROSSFIRE','SPLIT HORIZON','FOUR GATES'][terrainIndex])throw Error('uncontrolled layout '+g.__novaBattlefield?.name);
    const ai=window.__novaMakeRequire('')('game/ai');
    if(!ai||typeof ai.updateAI!=='function')throw Error('missing composed AI');
-   if(!enabled&&abMode!=='migration-intercept'){
+   if(!enabled&&abMode!=='migration-threshold'){
     const original=ai.updateAI;
     if(abMode==='memory'){
      // Historical experiment: suppress stale memory (live turns still ON).
@@ -339,7 +339,7 @@ async function arm(browser,enabled,label){
     };
     try{for(let j=0;j<steps&&g.status!=='dead';j++){
       g.update(dt);
-      if(g.__novaExperimentABMode==='migration-intercept'){
+      if(g.__novaExperimentABMode==='migration-threshold'){
        /* Observation ONLY: read actual post-update crossing counters and
         * exponentially decayed migration heat; never alter ecology or AI.
         * Retain a bounded 15-second crossing window to explain censoring. */
