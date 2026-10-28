@@ -98,7 +98,58 @@ async function arm(browser,enabled,label){
    g.__novaExperimentABMode=abMode;
    /* Research intervention: ON uses only frozen public migration from/to.
     * OFF preserves the canonical midpoint, with all other AI unchanged. */
-   if(abMode==='migration-intercept')g.__novaMigrationInterceptProbe=!!enabled;
+   if(abMode==='migration-intercept'){
+     g.__novaMigrationInterceptProbe=!!enabled;
+     /* Read-only audit at the ACTUAL Director decision cadence. A high
+      * per-frame heat peak is not sufficient if BLOOM, cooldown, direction
+      * or another public signal blocks an announcement. */
+     const LF=window.__NOVA_LIVING_FRONT_INTERNAL__,
+      T=window.__NOVA_LIVING_FRONT_TEST__,oldDirector=LF.directorTick;
+     LF.directorTick=function(world,st){
+      if(world===g){
+       const audit=g.__novaMigrationDirectorGate||(g.__novaMigrationDirectorGate={
+        samples:0,peakHeat:0,at:{'3':0,'3.5':0,'4':0,'5':0},
+        unblocked:{'3':0,'3.5':0,'4':0,'5':0},
+        blocked:{signal:0,cooldown:0,bloom:0,direction:0}});
+       audit.samples++;
+       const now=world.time||0,heat=Number(st.migrationHeat)||0;
+       audit.peakHeat=Math.max(audit.peakHeat,heat);
+       const active=!!(st.signal&&now<st.signal.until),
+        cooldown=now-st.lastSignalAt<8||st.cooldowns.migration>0;
+       let bloom=false;
+       if(st.cooldowns.bloom<=0){
+        const sector=T.bloomCandidate(st);
+        bloom=sector>=0&&(sector!==st.lastBloomSector||
+         st.sectors[sector].maturity>.78*st.ceiling);
+       }
+       let from=-1,max=-1;
+       for(let i=0;i<16;i++)if(st.sectors[i].outbound>max){
+        max=st.sectors[i].outbound;from=i;
+       }
+       let direction=false;
+       if(from>=0){
+        const m=Math.hypot(st.migrationX,st.migrationY);
+        if(m>0){
+         const center=LF.sectorCenter(from),step=LF.ARENA*2/LF.GRID*.8;
+         direction=LF.sectorIndex(center.x+st.migrationX/m*step,
+          center.y+st.migrationY/m*step)!==from;
+        }
+       }
+       if(active)audit.blocked.signal++;
+       else if(cooldown)audit.blocked.cooldown++;
+       else if(bloom)audit.blocked.bloom++;
+       else if(!direction)audit.blocked.direction++;
+       for(const threshold of [3,3.5,4,5]){
+        const key=String(threshold);
+        if(heat>=threshold){
+         audit.at[key]++;
+         if(!active&&!cooldown&&!bloom&&direction)audit.unblocked[key]++;
+        }
+       }
+      }
+      return oldDirector.apply(this,arguments);
+     };
+    }
    if(g.__novaBattlefield?.name!==['CROSSFIRE','SPLIT HORIZON','FOUR GATES'][terrainIndex])throw Error('uncontrolled layout '+g.__novaBattlefield?.name);
    const ai=window.__novaMakeRequire('')('game/ai');
    if(!ai||typeof ai.updateAI!=='function')throw Error('missing composed AI');
@@ -326,6 +377,12 @@ async function arm(browser,enabled,label){
     commitmentAudit:window.__novaResearchCommitmentAudit.summary(g.__novaCommitmentAudit),
     naturalBlooms:s.stats.blooms||0,naturalMigrations:s.stats.migrations||0,
     migrationAIBiasSamples:g.__novaMigrationAIBiasSamples||0,publicBloomCommandSamples:g.__novaPublicBloomCommands||0,
+     migrationGateAudit:g.__novaMigrationDirectorGate?{
+      samples:g.__novaMigrationDirectorGate.samples,
+      peakHeat:+g.__novaMigrationDirectorGate.peakHeat.toFixed(4),
+      at:{...g.__novaMigrationDirectorGate.at},
+      unblocked:{...g.__novaMigrationDirectorGate.unblocked},
+      blocked:{...g.__novaMigrationDirectorGate.blocked}}:null,
      migrationDiagnostics:g.__novaMigrationDiagnostics?{
       transitions:g.__novaMigrationDiagnostics.transitions,
       peakHeat:+g.__novaMigrationDiagnostics.peakHeat.toFixed(4),
@@ -345,6 +402,16 @@ async function arm(browser,enabled,label){
     assert.ok(m.peakHeat>=0&&m.peakHeat<=m.transitions+1e-7,'heat must be bounded by real crossings');
     assert.equal(m.signals,result.naturalMigrations,'diagnostic signals must equal Director signals');
     assert.equal(m.horizonSeconds,SECONDS,'predeclared migration horizon must be preserved');
+    const gate=result.migrationGateAudit;
+    assert.ok(gate&&gate.samples>0,'real Director cadence must be audited');
+    assert.ok(gate.peakHeat>=0&&gate.peakHeat<=m.peakHeat+1e-4,
+     'Director heat cannot exceed the full-frame observed maximum');
+    for(const threshold of ['3','3.5','4','5']){
+     assert.ok(gate.at[threshold]>=gate.unblocked[threshold]&&gate.unblocked[threshold]>=0,
+      'unblocked gate cannot exceed actual heat-eligible Director samples');
+    }
+    assert.ok(gate.unblocked['5']>=result.naturalMigrations,
+     'every real MIGRATION must have been eligible at the canonical 5 gate');
    }
    if(result.naturalBlooms>0)assert.ok(result.contestGateAudit.samples>0,'announced BLOOM must be audited');
   assert.equal(result.contestGateAudit.gateMismatches,0,'audit must agree with shipping CONTESTED');
@@ -410,7 +477,8 @@ async function arm(browser,enabled,label){
     'Seed replay is checked, not assumed',
     'In live-turn mode, only live-start authority is intervened on; later natural signals can differ as treatment outcomes',
     'In migration-intercept mode, only the frozen public crossing waypoint changes; later signals may diverge endogenously',
-     'Migration diagnostics read real post-update crossing counters, 15s burst density and decayed heat; 300s is the predeclared horizon, not forced survival']};
+     'Migration diagnostics read real post-update crossing counters, 15s burst density and decayed heat; 300s is the predeclared horizon, not forced survival',
+     'Director gate audit samples the real decision cadence and separately records active-signal, cooldown, BLOOM and directional blockers without changing the decision']};
   const dir=path.join('artifacts','browser');fs.mkdirSync(dir,{recursive:true});
   fs.writeFileSync(path.join(dir,'frontlines-natural-match-ab.json'),JSON.stringify(report,null,2));
   fs.writeFileSync(path.join(dir,'frontlines-natural-on.json'),JSON.stringify(on.result,null,2));
