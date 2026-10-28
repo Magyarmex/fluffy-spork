@@ -38,18 +38,32 @@ const {chromium}=require('playwright');
      if(g.__novaBattlefield)g.__novaBattlefield.announced=true;
      g.time=100; // Research-only natural-age gate; no forced survival in production.
      const T=window.__NOVA_LIVING_FRONT_TEST__;
+     const baseline=g.shapes.find(s=>s&&s.type==='star'&&s.hp>0);
+     if(!baseline)throw Error('canonical one-Star population missing');
      const priorStars=g.shapes.filter(s=>s&&s.type==='star'&&s.hp>0).length;
-     const candidate=T.directorDecision(st,{enabled:true,now:g.time,hasStar:priorStars>0});
+     const priorPosition={x:baseline.x,y:baseline.y},priorShapeCount=g.shapes.length;
+     /* The browser fixture advances the AGE of an existing physical Star,
+      * never removes it, creates another one, or teleports it. This isolates
+      * the natural fresh-Star adoption path at a valid public decision age. */
+     baseline.__lfStarBorn=g.time-2;
+     baseline.__lfPublicAnnounced=false;
+     const candidate=T.directorDecision(st,{enabled:true,now:g.time,
+      hasStar:true,adoptStarId:baseline.id});
      let emitted=null;const old=g.toast;
      g.toast=function(message){emitted=message;return old.apply(this,arguments);};
      try{LF.directorTick(g,st);}finally{g.toast=old;g.setPaused(false);}
      const sig=st.signal,s=sig&&g.getShape&&g.getShape(sig.starId);
-     return{emitted,priorStars,candidate,bloomCandidate:T.bloomCandidate(st),type:sig?.type,starId:sig?.starId,
+     return{emitted,priorStars,priorPosition,priorShapeCount,
+      currentShapeCount:g.shapes.length,adoptedPosition:{x:s?.x,y:s?.y},
+      candidate,bloomCandidate:T.bloomCandidate(st),type:sig?.type,starId:sig?.starId,
       initialX:sig?.x,initialY:sig?.y,
       starX:s?.x,starY:s?.y,viewport:window.innerWidth};
     });
     assert.equal(signal.type,'ROGUE STAR','real Director must announce a public Star: '+JSON.stringify(signal));
-    assert.ok(signal.starId>0,'real Star entity must be created');
+    assert.ok(signal.starId>0,'real Star entity must be present');
+    assert.equal(signal.priorStars,1,'canonical one-Star population must be preserved');
+    assert.equal(signal.currentShapeCount,signal.priorShapeCount,'adoption must not duplicate a Star');
+    assert.deepEqual(signal.adoptedPosition,signal.priorPosition,'adoption must not teleport the Star');
     assert.equal(signal.initialX,signal.starX,'public bearing must use initial spawn');
     assert.equal(signal.initialY,signal.starY);
     assert.match(signal.emitted,/^★ ROGUE STAR · SPAWN (?:E|SE|S|SW|W|NW|N|NE|NEAR YOU) · cut its route$/);
