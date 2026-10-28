@@ -404,8 +404,8 @@ async function arm(browser,enabled,label){
     assert.equal(m.horizonSeconds,SECONDS,'predeclared migration horizon must be preserved');
     const gate=result.migrationGateAudit;
     assert.ok(gate&&gate.samples>0,'real Director cadence must be audited');
-    assert.ok(gate.peakHeat>=0&&gate.peakHeat<=m.peakHeat+1e-4,
-     'Director heat cannot exceed the full-frame observed maximum');
+    assert.ok(gate.peakHeat>=0&&gate.peakHeat<=m.transitions+1e-7,
+     'Director heat must be backed by physical crossings');
     for(const threshold of ['3','3.5','4','5']){
      assert.ok(gate.at[threshold]>=gate.unblocked[threshold]&&gate.unblocked[threshold]>=0,
       'unblocked gate cannot exceed actual heat-eligible Director samples');
