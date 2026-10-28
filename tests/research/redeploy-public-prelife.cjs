@@ -3,6 +3,8 @@
 // camera, visible-neutral LOS and terrain-waypoint policy as the redeploy pilot.
 // No hidden enemy/shape positions, sector values or future spawns drive input.
 const {createPublicRoam} = require('./redeploy-public-roam.cjs');
+const {aimAtVisibleHostile, dodgeVisibleProjectile} =
+  require('../browser/frontlines-visible-defense.js');
 function finite(p) {return !!p && Number.isFinite(p.x) && Number.isFinite(p.y);}
 function snapshot(bodies) {
   return new Map((bodies || []).filter(x => x && x.id != null)
@@ -39,8 +41,11 @@ function playPublicPrelude(game, hz, seconds, fair) {
     game.input.mouseActive = false;
     game.input.autofire = true;
     game.input.firing = false;
-    game.input.moveVec = () => roam.move();
-    game.input.aimVec = () => roam.aim();
+    game.input.moveVec = () => {
+      const desired = roam.move();
+      return dodgeVisibleProjectile(game, player, fair, desired) || desired;
+    };
+    game.input.aimVec = () => aimAtVisibleHostile(game, player, fair) || roam.aim();
     for (let i = 0, count = Math.ceil(seconds * hz); i < count; i++) {
       if (game.status !== 'playing' || !player.alive) break;
       game.update(1 / hz);
