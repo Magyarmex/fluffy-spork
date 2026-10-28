@@ -12,7 +12,8 @@ function boot(){
  for(const name of ['living-front-core-v1.12.0.js','living-front-instincts-v1.12.0.js',
   'living-front-director-v1.12.0.js'])
   vm.runInNewContext(fs.readFileSync(path.join(root,'nova-updates',name),'utf8'),ctx,{filename:name});
- return window.__NOVA_LIVING_FRONT_TEST__;
+ const T=window.__NOVA_LIVING_FRONT_TEST__;T.internal=window.__NOVA_LIVING_FRONT_INTERNAL__;
+ return T;
 }
 function state(T){
  const sectors=Array.from({length:16},(_,i)=>({...T.makeSector(i),value:80,maturity:.1,
@@ -27,6 +28,7 @@ test('dominant source northward flow cannot be misreported as global eastward fl
  // Four other crossings at sector 10: all east. Global vector points east.
  st.sectors[5].outbound=5;st.sectors[5].flowY=-3;
  st.sectors[10].outbound=4;st.sectors[10].flowX=4;
+ st.sectors[5].flowTo[1]=4;st.sectors[5].flowTo[9]=1;st.sectors[10].flowTo[11]=4;
  const d=T.directorDecision(st,{enabled:true,now:100,hasStar:true});
  assert.equal(d?.type,'MIGRATION');
  assert.equal(d.from,5);
@@ -36,6 +38,7 @@ test('explicitly selected second source uses its own eastward flow',()=>{
  const T=boot(),st=state(T);
  st.sectors[5].outbound=5;st.sectors[5].flowY=-3;
  st.sectors[10].outbound=4;st.sectors[10].flowX=4;
+ st.sectors[5].flowTo[1]=4;st.sectors[5].flowTo[9]=1;st.sectors[10].flowTo[11]=4;
  const d=T.directorDecision(st,{enabled:true,now:100,hasStar:true,migrationFrom:10});
  assert.equal(d?.type,'MIGRATION');
  assert.equal(d.from,10);
@@ -47,6 +50,7 @@ test('cancelling source flows do not invent a public migration direction',()=>{
  // still has a global direction. This source has no coherent public flow.
  st.sectors[5].outbound=6;st.sectors[5].flowX=0;st.sectors[5].flowY=0;
  st.sectors[10].outbound=4;st.sectors[10].flowX=0;
+ st.sectors[5].flowTo[1]=3;st.sectors[5].flowTo[9]=3;
  assert.equal(T.directorDecision(st,{enabled:true,now:100,hasStar:true}),null);
 });
 test('cancelled busiest origin cannot mask a second witnessed coherent migration',()=>{
@@ -55,6 +59,7 @@ test('cancelled busiest origin cannot mask a second witnessed coherent migration
  // crossings from sector 10 remain a valid public opportunity.
  st.sectors[5].outbound=6;st.sectors[5].flowX=0;st.sectors[5].flowY=0;
  st.sectors[10].outbound=4;st.sectors[10].flowX=4;
+ st.sectors[5].flowTo[1]=3;st.sectors[5].flowTo[9]=3;st.sectors[10].flowTo[11]=4;
  const d=T.directorDecision(st,{enabled:true,now:100,hasStar:true});
  assert.equal(d?.type,'MIGRATION');
  assert.equal(d.from,10,'the announced origin must have coherent witnessed flow');
@@ -70,6 +75,8 @@ test('equally busy origins select the first coherent real source deterministical
  st.sectors[5].outbound=4;st.sectors[5].flowX=0;st.sectors[5].flowY=0;
  st.sectors[6].outbound=4;st.sectors[6].flowX=-3;
  st.sectors[10].outbound=4;st.sectors[10].flowX=3;
+ st.sectors[5].flowTo[1]=2;st.sectors[5].flowTo[9]=2;
+ st.sectors[6].flowTo[5]=4;st.sectors[10].flowTo[11]=4;
  const d=T.directorDecision(st,{enabled:true,now:100,hasStar:true});
  assert.equal(d?.from,6,'skip cancelled tie, preserve stable sector order');
  assert.equal(d?.to,5);
@@ -79,10 +86,77 @@ test('global crossing heat cannot manufacture a source with zero outbound witnes
  st.sectors[5].flowX=3;st.sectors[5].outbound=0;
  assert.equal(T.directorDecision(st,{enabled:true,now:100,hasStar:true}),null);
 });
+test('public destination must be a witnessed origin-to-destination crossing, not a diagonal vector average',()=>{
+ const T=boot(),st=state(T);
+ // Four real 5->1 north crossings plus three real 5->6 east crossings.
+ // Their aggregate vector points NE to sector 2, which no shape entered.
+ st.sectors[5].outbound=7;st.sectors[5].flowX=3;st.sectors[5].flowY=-4;
+ st.sectors[5].flowTo={1:4,6:3};
+ const d=T.directorDecision(st,{enabled:true,now:100,hasStar:true});
+ assert.equal(d?.type,'MIGRATION');
+ assert.equal(d.from,5);
+ assert.equal(d.to,1,'choose the most witnessed physical route 5->1');
+ assert.notEqual(d.to,2,'never report unwitnessed diagonal 5->2');
+});
+test('opposite witnessed routes do not invent a dominant public destination',()=>{
+ const T=boot(),st=state(T);
+ st.sectors[5].outbound=6;st.sectors[5].flowTo[1]=3;st.sectors[5].flowTo[9]=3;
+ assert.equal(T.directorDecision(st,{enabled:true,now:100,hasStar:true}),null);
+});
+test('a genuinely diagonal witnessed crossing may still be reported diagonally',()=>{
+ const T=boot(),st=state(T);
+ st.sectors[5].outbound=5;st.sectors[5].flowTo[2]=5;
+ st.sectors[5].flowX=3.5355339;st.sectors[5].flowY=-3.5355339;
+ const d=T.directorDecision(st,{enabled:true,now:100,hasStar:true});
+ assert.equal(d?.from,5);assert.equal(d?.to,2);
+});
+test('actual Wild Instincts transition records and decays only physical intended routes',()=>{
+ const T=boot(),LF=T.internal,defs={square:{speed:0}},c=T.sectorCenter(1);
+ const s={id:7,type:'square',kind:'shape',hp:100,r:15,x:c.x,y:c.y,vx:0,vy:0,
+  __lfSector:5,__lfMigrationIntent:6};
+ const g={time:100,shapes:[s],bullets:[],tanks:[],hasLineOfSight:()=>true};
+ const st=LF.ensure(g,defs);
+ LF.behaviorTick(g,st,defs,.12);
+ assert.equal(st.sectors[5].outbound,0,'unintended movement cannot forge a route');
+ assert.equal(st.sectors[5].flowTo[1],0);
+ s.__lfSector=5;s.__lfMigrationIntent=1;
+ LF.behaviorTick(g,st,defs,.12);
+ assert.equal(st.sectors[5].outbound,1);
+ assert.equal(st.sectors[5].flowTo[1],1,'actual intended 5→1 transition must be recorded');
+ assert.equal(st.sectors[5].flowTo[2],0,'diagonal destination was never visited');
+ const before=st.sectors[5].outbound;
+ T.advanceSector(st.sectors[5],.5,1);
+ const expected=Math.exp(-.48*.5);
+ assert.ok(Math.abs(st.sectors[5].outbound-before*expected)<1e-10);
+ assert.ok(Math.abs(st.sectors[5].flowTo[1]-expected)<1e-10,
+  'route witness must decay at the same rate as source outbound count');
+});
+test('seven real shape transitions cannot announce an unwitnessed diagonal route',()=>{
+ const T=boot(),LF=T.internal,defs={square:{speed:0}},shapes=[];
+ for(let i=0;i<7;i++){
+  const to=i<4?1:6,c=T.sectorCenter(to);
+  shapes.push({id:i+1,type:'square',kind:'shape',hp:100,r:15,x:c.x,y:c.y,
+   vx:0,vy:0,__lfSector:5,__lfMigrationIntent:to});
+ }
+ const g={time:100,shapes,bullets:[],tanks:[],hasLineOfSight:()=>true};
+ const st=LF.ensure(g,defs);
+ LF.behaviorTick(g,st,defs,.12);
+ assert.equal(st.migrationTransitions,7);
+ assert.equal(st.sectors[5].outbound,7);
+ assert.equal(st.sectors[5].flowTo[1],4);
+ assert.equal(st.sectors[5].flowTo[6],3);
+ assert.equal(st.sectors[5].flowTo[2],0);
+ const d=T.directorDecision(st,{enabled:true,now:100,hasStar:true});
+ assert.equal(d?.from,5);assert.equal(d?.to,1);
+ assert.notEqual(d.to,2,'a vector average is not a witnessed physical route');
+ const publicSnapshot=JSON.stringify(LF.snapshot(g));
+ assert.doesNotMatch(publicSnapshot,/flowTo/, 'private route witnesses must not leak into Debug snapshot');
+});
 test('source-local direction is independent of hidden maturity/value and unrelated flows',()=>{
  const T=boot(),st=state(T);
  st.sectors[5].outbound=6;st.sectors[5].flowX=1;st.sectors[5].flowY=0;
  st.sectors[10].outbound=4;st.sectors[10].flowY=-4;
+ st.sectors[5].flowTo[6]=6;st.sectors[10].flowTo[6]=4;
  const ctx={enabled:true,now:100,hasStar:true};
  const d=T.directorDecision(st,ctx);
  assert.equal(d?.to,6);
@@ -94,7 +168,7 @@ test('source-local direction is independent of hidden maturity/value and unrelat
 });
 test('source flow preserves canonical migration gate, cooldown and shipping overlay',()=>{
  const T=boot(),st=state(T);
- st.sectors[5].outbound=6;st.sectors[5].flowX=1;
+ st.sectors[5].outbound=6;st.sectors[5].flowX=1;st.sectors[5].flowTo[6]=6;
  st.migrationHeat=4.99;
  assert.equal(T.directorDecision(st,{enabled:true,now:100,hasStar:true}),null);
  st.migrationHeat=6;st.cooldowns.migration=3;

@@ -22,12 +22,22 @@ function bloomCandidate(st){if(!bloomAgeEligible(st))return-1;var avg=mean(st),b
  * sector's coherent witnessed migration. Explicit research source overrides
  * remain fail-closed and never silently substitute another origin. */
 function migrationAt(st,from){
- var local=st.sectors[from],fx=Number(local&&local.flowX)||0,
-     fy=Number(local&&local.flowY)||0,m=Math.hypot(fx,fy);
- if(!(m>1e-6))return null;
- var c=sectorCenter(from),to=sectorIndex(c.x+fx/m*(LF.ARENA*2/LF.GRID)*.8,
-                                     c.y+fy/m*(LF.ARENA*2/LF.GRID)*.8);
- return to===from?null:{type:'MIGRATION',from:from,to:to};
+ var local=st.sectors[from],routes=local&&local.flowTo;
+ if(!routes)return null;
+ var bestTo=-1,bestWeight=1e-6,runnerUp=0;
+ for(var to=0;to<16;to++){
+  if(to===from)continue;
+  var weight=Number(routes[to])||0;
+  if(!(weight>0))continue;
+  if(weight>bestWeight){runnerUp=bestWeight;bestWeight=weight;bestTo=to;}
+  else if(weight>runnerUp)runnerUp=weight;
+ }
+ /* Report the strongest witnessed physical route. Exact ties and cancelled
+  * aggregate flow remain ambiguous; do not fabricate a dominant direction.
+  * Do not require a majority: that would erase legitimate split migrations. */
+ var net=Math.hypot(Number(local.flowX)||0,Number(local.flowY)||0);
+ return bestTo>=0&&bestWeight>runnerUp+1e-6&&net>1e-6?
+  {type:'MIGRATION',from:from,to:bestTo}:null;
 }
 function decision(st,ctx){var adopting=!!(ctx&&ctx.adoptStarId>0);if(ctx&&ctx.enabled===false)return null;var now=ctx&&ctx.now||0;if(st.signal&&now<st.signal.until)return null;if(now-st.lastSignalAt<8)return null;if(st.cooldowns.bloom<=0){var b=bloomCandidate(st);if(b>=0&&(b!==st.lastBloomSector||st.sectors[b].maturity>.78*st.ceiling))return{type:'BLOOM',sector:b};}
 if(st.cooldowns.migration<=0&&st.migrationHeat>=5){
