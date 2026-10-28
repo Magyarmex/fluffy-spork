@@ -46,8 +46,22 @@ test('cancelling source flows do not invent a public migration direction',()=>{
  // Equal north/south crossings at the chosen source; unrelated sector
  // still has a global direction. This source has no coherent public flow.
  st.sectors[5].outbound=6;st.sectors[5].flowX=0;st.sectors[5].flowY=0;
- st.sectors[10].outbound=4;st.sectors[10].flowX=4;
+ st.sectors[10].outbound=4;st.sectors[10].flowX=0;
  assert.equal(T.directorDecision(st,{enabled:true,now:100,hasStar:true}),null);
+});
+test('cancelled busiest origin cannot mask a second witnessed coherent migration',()=>{
+ const T=boot(),st=state(T);
+ // Six opposite crossings from sector 5 cancel. Four genuine eastward
+ // crossings from sector 10 remain a valid public opportunity.
+ st.sectors[5].outbound=6;st.sectors[5].flowX=0;st.sectors[5].flowY=0;
+ st.sectors[10].outbound=4;st.sectors[10].flowX=4;
+ const d=T.directorDecision(st,{enabled:true,now:100,hasStar:true});
+ assert.equal(d?.type,'MIGRATION');
+ assert.equal(d.from,10,'the announced origin must have coherent witnessed flow');
+ assert.equal(d.to,11,'the direction must come from that origin, not global heat');
+ // An explicit source override is a hard source choice, not permission to
+ // silently substitute another source or fabricate its cancelled direction.
+ assert.equal(T.directorDecision(st,{enabled:true,now:100,hasStar:true,migrationFrom:5}),null);
 });
 test('source-local direction is independent of hidden maturity/value and unrelated flows',()=>{
  const T=boot(),st=state(T);
