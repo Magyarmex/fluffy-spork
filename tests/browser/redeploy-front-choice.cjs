@@ -63,18 +63,8 @@ async function run(browser,width,height){
    return {x:g.player.x,y:g.player.y,choice:g.__novaRedeployChoice,
     terrain:g.isTerrainSafe(g.player.x,g.player.y,75),notices:window.__novaFrontNotices};
   });
-  const survivingStar=await page.evaluate(id=>{
-   const g=window.__novaFrontSmokeGame,star=g.getShape(id);
-   return star?{age:g.time-star.__lfStarBorn,announced:star.__lfPublicAnnounced}:null;
-  },starClock.id);
-  assert.ok(survivingStar,'React RETURN must retain the physical Star body');
-  assert.ok(Math.abs(survivingStar.age-starClock.age)<.35,
-   'React RETURN must preserve Star age across the clock reset: '+JSON.stringify(survivingStar));
-  assert.equal(survivingStar.announced,true,'a public Star must not become announceable twice');
-  const dist=Math.hypot(after.x-death.x,after.y-death.y);
-  assert.ok(dist>=420-1e-6&&dist<=850+1e-6,'return inserts near the witnessed front');
-  assert.equal(after.terrain,true,'return position is terrain safe');
-  assert.equal(after.choice,'fresh','choice resets after redeploy');
+  // The original notice is transient: verify it while visible, before
+  // running extra full-canvas pixel comparisons and unrelated star checks.
   const directions=['E','SE','S','SW','W','NW','N','NE'];
   const angle=Math.atan2(death.y-after.y,death.x-after.x);
   const bearing=directions[(Math.round(angle/(Math.PI/4))+8)%8];
@@ -83,6 +73,47 @@ async function run(browser,width,height){
    JSON.stringify(after.notices));
   await page.getByText('↩ RETURN · LAST FRONT '+bearing,{exact:true})
    .waitFor({state:'visible',timeout:2000});
+  const survivingStar=await page.evaluate(id=>{
+   const g=window.__novaFrontSmokeGame,star=g.getShape(id);
+   return star?{age:g.time-star.__lfStarBorn,announced:star.__lfPublicAnnounced}:null;
+  },starClock.id);
+  assert.ok(survivingStar,'React RETURN must retain the physical Star body');
+  assert.ok(Math.abs(survivingStar.age-starClock.age)<.35,
+   'React RETURN must preserve Star age across the clock reset: '+JSON.stringify(survivingStar));
+  assert.equal(survivingStar.announced,true,'a public Star must not become announceable twice');
+  const waypoint=await page.evaluate(()=>{
+   const g=window.__novaFrontSmokeGame,ctx=g.mmCtx,m=g.__novaLastFrontMarker;
+   if(!m)throw Error('RETURN waypoint was not armed');
+   const x=(m.x+2250)*216/4500,y=(m.y+2250)*216/4500;
+   const left=Math.max(0,Math.min(199,Math.floor(x)-8));
+   const top=Math.max(0,Math.min(199,Math.floor(y)-8));
+   g.__novaLastFrontMarker=null;
+   g.drawMinimap(); // Baseline full materialized minimap without the waypoint.
+   const base=ctx.getImageData(left,top,17,17).data;
+   g.__novaLastFrontMarker=m;
+   g.drawMinimap(); // Exact same world, only the fixed waypoint changes.
+   const withMarker=ctx.getImageData(left,top,17,17).data;
+   let changed=0,gold=0;
+   for(let i=0;i<base.length;i+=4){
+    if(Math.abs(base[i]-withMarker[i])+
+       Math.abs(base[i+1]-withMarker[i+1])+
+       Math.abs(base[i+2]-withMarker[i+2])>40)changed++;
+    if(withMarker[i]>190&&withMarker[i+1]>120&&withMarker[i+1]<240&&
+       withMarker[i+2]<170)gold++;
+   }
+   return {marker:g.__novaLastFrontMarker,time:g.time,changed,gold};
+  });
+  assert.ok(waypoint.marker,'RETURN must expose its fixed last-front waypoint');
+  assert.ok(waypoint.changed>=10&&waypoint.gold>=5,
+   'the actual minimap must visibly paint a gold last-front crosshair: '+JSON.stringify(waypoint));
+  assert.equal(waypoint.marker.x,death.x);
+  assert.equal(waypoint.marker.y,death.y);
+  assert.ok(waypoint.marker.until-waypoint.time>20,
+   'the player gets enough time to orient after redeploy');
+  const dist=Math.hypot(after.x-death.x,after.y-death.y);
+  assert.ok(dist>=420-1e-6&&dist<=850+1e-6,'return inserts near the witnessed front');
+  assert.equal(after.terrain,true,'return position is terrain safe');
+  assert.equal(after.choice,'fresh','choice resets after redeploy');
   await page.locator('[data-nova-front-choice]').waitFor({state:'hidden',timeout:5000});
   assert.deepEqual(errors,[],'no page errors');
   console.log('NOVA_REDEPLOY_FRONT_SMOKE '+JSON.stringify({width,height,dist,terrain:after.terrain,reset:after.choice}));

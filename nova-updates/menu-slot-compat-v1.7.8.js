@@ -485,10 +485,40 @@ mods['game/engine']=function(module,exports,require){
  Game.prototype.__novaFrontChoiceInstalled=true;
  var oldKill=Game.prototype.killTank,oldUpdate=Game.prototype.update,
   oldRedeploy=Game.prototype.redeploy,oldRand=Game.prototype.randSpawnPos;
+ /* A RETURN player already witnessed this location. A short-lived, fixed
+  * minimap waypoint makes the geographic choice usable after the compass
+  * toast disappears. It never tracks enemies, neutrals, or a live target. */
+ var oldMap=Game.prototype.drawMinimap;
+ if(typeof oldMap==='function')Game.prototype.drawMinimap=function(){
+  var out=oldMap.apply(this,arguments),m=this.__novaLastFrontMarker;
+  if(!m||this.status!=='playing'||!this.player||!this.player.alive)return out;
+  if(!validOrigin(m)){this.__novaLastFrontMarker=null;return out;}
+  if(!Number.isFinite(this.time)||this.time>=m.until||
+     Math.hypot(this.player.x-m.x,this.player.y-m.y)<130){
+   this.__novaLastFrontMarker=null;return out;
+  }
+  var ctx=this.mmCtx;
+  if(!ctx||typeof ctx.save!=='function')return out;
+  /* Same 216px / +/-2250 projection as the canonical minimap. */
+  var x=(m.x+2250)*216/4500,y=(m.y+2250)*216/4500;
+  if(!Number.isFinite(x)||!Number.isFinite(y))return out;
+  /* Edge deaths still get a partially clipped, honest-position marker. */
+  ctx.save();
+  try{
+   ctx.strokeStyle='#ffd166';ctx.lineWidth=2;
+   ctx.beginPath();ctx.arc(x,y,6,0,PI2);ctx.stroke();
+   ctx.beginPath();ctx.moveTo(x-9,y);ctx.lineTo(x-4,y);
+   ctx.moveTo(x+4,y);ctx.lineTo(x+9,y);
+   ctx.moveTo(x,y-9);ctx.lineTo(x,y-4);
+   ctx.moveTo(x,y+4);ctx.lineTo(x,y+9);ctx.stroke();
+  }finally{ctx.restore();}
+  return out;
+ };
  if(typeof oldKill==='function')Game.prototype.killTank=function(victim,killer){
   var player=!!(!this.__novaDecorativeWorld&&victim&&victim.isPlayer&&victim.alive!==false);
   var pos=player?{x:victim.x,y:victim.y}:null;
   var out=oldKill.apply(this,arguments);
+  if(player&&victim.alive===false)this.__novaLastFrontMarker=null;
   if(player&&victim.alive===false&&validOrigin(pos)){
    this.__novaRedeployOrigin=pos;
    this.__novaRedeployChoice='fresh';
@@ -517,6 +547,9 @@ mods['game/engine']=function(module,exports,require){
   this.__novaFrontReturnAccepted=false;
   try{
    var out=oldRedeploy.apply(this,arguments);
+   this.__novaLastFrontMarker=returning&&this.__novaFrontReturnAccepted&&
+    this.status==='playing'&&origin?
+    {x:origin.x,y:origin.y,until:this.time+24}:null;
    /* A return can fall back to the legacy random spawn. Never silently
     * misrepresent it as a successful return; on success orient the player
     * using only the death location they already witnessed. */
