@@ -290,6 +290,26 @@ test('research arrival requires hull-clear terrain, not only 130u proximity',()=
  p.x=120;delete g.hasLineOfSight;
  assert.equal(terrainClearFrontArrival(g,p,origin),false,'missing terrain cannot certify arrival');
 });
+test('materialized Battlefield rejects near-front arrival across real intact cover',()=>{
+ const g=withSeed(1517825,()=>bootGame());
+ let witness=null;
+ for(const wall of g.__novaTerrain||[]){
+  if(!wall||wall.shape!=='rect'||!wall.destructible||!(wall.hp>0)||
+     Math.min(wall.w,wall.h)>70)continue;
+  const margin=28,alongY=wall.h<=wall.w;
+  const a=alongY?{x:wall.x,y:wall.y-wall.h/2-margin}:
+   {x:wall.x-wall.w/2-margin,y:wall.y};
+  const b=alongY?{x:wall.x,y:wall.y+wall.h/2+margin}:
+   {x:wall.x+wall.w/2+margin,y:wall.y};
+  if(Math.hypot(a.x-b.x,a.y-b.y)>=130)continue;
+  if(!g.isTerrainSafe(a.x,a.y,24)||!g.isTerrainSafe(b.x,b.y,24))continue;
+  if(g.hasLineOfSight(a.x,a.y,b.x,b.y,24))continue;
+  witness={a,b};break;
+ }
+ assert.ok(witness,'every canonical map has a valid blocked near-front cover pair');
+ assert.equal(terrainClearFrontArrival(g,witness.a,witness.b),false);
+ assert.equal(terrainClearFrontArrival(g,witness.b,witness.b),true);
+});
 test('real composed RETURN pilot keeps moving after reaching the remembered front',()=>{
  const r=run(1517825,'return',30,8,'harvest_roam');
  assert.ok(r.frontReached!==null&&r.frontReached<6,'seed must reach front while alive');
