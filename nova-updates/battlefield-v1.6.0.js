@@ -678,12 +678,24 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    if(!(enter>1e-9))return false;
    contacts.push({e:t,t:enter});
   }
-  /* A live non-expiring round must exhaust its entire pen=1/2 budget
-   * within this single frame. A split-frame partial chain is NOT certified.
-   * A TTL-expiring round can settle a partial remaining budget safely:
-   * the projectile will die at expiry regardless of unused penetration.
-   * The original one-body TTL resolver retains first-hit ownership. */
-  if(nonExpiring ? contacts.length!==b.pen+1 :
+  /* Ordinarily a non-expiring round must exhaust its pen=1/2 budget
+   * inside this frame. The narrowly certified pen=2 two-hull prefix below
+   * is the sole exception; it leaves the final penetration to the core.
+   * A TTL-expiring round may settle a partial remaining budget because it
+   * dies at expiry. The one-body TTL resolver retains first-hit ownership. */
+  /* A pen=2 shot may certify exactly two nonlethal hull contacts now and
+   * retain its last penetration for a later frame. The core's query wrapper
+   * excludes certified victims; the shot MUST be restored to its pre-frame
+   * position so core advances it exactly once. Do not speculate through
+   * knockback, lethal damage or an already-mutated victim ledger. */
+  var partialNonExpiring=nonExpiring&&b.pen===2&&b.hits===0&&
+      contacts.length===2&&(!b.__novaDirectVictims||b.__novaDirectVictims.size===0);
+  if(partialNonExpiring&&((b.knock||0)!==0||
+     contacts.some(function(c){return c.e.hp<=b.dmg*4;})||
+     (g.bullets||[]).some(function(o){
+      return o&&o!==b&&!o.dead&&(o.splash||o.shell);
+     })))return false;
+  if(nonExpiring ? (!partialNonExpiring&&contacts.length!==b.pen+1) :
      contacts.length<(allowSingle?1:(b.hits>0?1:2))||contacts.length>b.pen+1||contacts.length>3)
    return false;
   contacts.sort(function(a,c){return a.t-c.t;});
@@ -739,6 +751,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    }
   }
   if(firstSolidHit(g,ax,ay,ex,ey,b.r*.45))return false;
+  /* The core normally initializes projectile integrity before any hits.
+   * A surviving partial prefix must preserve the ORIGINAL pen=2 integrity
+   * rather than let core first initialize after we consume penetration. */
+  if(partialNonExpiring&&typeof g.initBulletIntegrity==='function')
+   g.initBulletIntegrity(b);
   /* Reuse the real damage owner, never fabricate HP or kill credit. */
   var ang=Math.atan2(b.vy,b.vx),kx=Math.cos(ang)*(b.knock||0)*.006,
       ky=Math.sin(ang)*(b.knock||0)*.006;
@@ -749,6 +766,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    b.hits++;b.pen--;
    (b.__novaDirectVictims||(b.__novaDirectVictims=new Set())).add(hit.e);
   }
+  if(partialNonExpiring){b.x=ax;b.y=ay;return true;}
   b.dead=true;b.px=b.x;b.py=b.y;b.vx=0;b.vy=0;
   return true;
  }
@@ -1399,7 +1417,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      }
     }
     possible.set(pb,targets);
-    if(targets.length>=(nonExpiring?pb.pen+1:((pb.hits||0)>0?1:2)))
+    /* A pen-2 shot with two plausible hulls may certify a partial
+     * first-frame prefix; the exact solver still requires two real roots
+     * and its normal conservative cover/defense/competition vetoes. */
+    if(targets.length>=(nonExpiring?(pb.pen===2?2:pb.pen+1):
+       ((pb.hits||0)>0?1:2)))
      eligible.push(pb);
    }
    /* A discarded one-hit projectile may still change another shot's

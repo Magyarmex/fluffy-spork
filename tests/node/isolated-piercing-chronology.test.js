@@ -1453,3 +1453,223 @@ for(const optimized of [false,true]){
    }
  });
 }
+
+/* Run 433: non-expiring pen=2 partial chronology across frame boundaries.
+ * A 120Hz first frame crosses the first TWO hulls, but not the third;
+ * the core used to credit only hull 1 then jump to hull 3 next frame.
+ * Prove exact victim identities and leave one legitimate later-frame hit. */
+function threeHullPen2(Game) {
+  const g = new Game();
+  g.tanks = [40, 70, 100].map((x, i) => ({
+    kind: 'tank', id: i + 2, x, y: 0, cls: 'scout',
+    hp: 100, alive: true, hitCount: 0
+  }));
+  g.damageTank = function(t) { t.hitCount++; this.hits++; };
+  g.bullets = [{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+    vx:6000,vy:0,r:3,dmg:20,ttl:.2,pen:2,hits:0,
+    dead:false,shell:false,beam:false}];
+  return g;
+}
+for (const optimized of [false, true]) {
+  const mode = optimized ? 'Battlefield+Performance' : 'Battlefield';
+  const Game = boot(undefined, optimized);
+  for (const fps of [30, 60, 120, 240]) {
+    test(mode+' pen-2 three-hull identity parity across '+fps+'Hz', () => {
+      const g = threeHullPen2(Game);
+      for (let frame=0;frame<15&&g.bullets.length;frame++) {
+        g.time += 1/fps;
+        g.updateBullets(1/fps);
+      }
+      assert.deepEqual(g.tanks.map(t=>t.hitCount), [1,1,1],
+        'all three real contacts must occur exactly once');
+      assert.equal(g.hits, 3);
+      assert.equal(g.bullets.length, 0);
+    });
+  }
+  test(mode+' 120Hz partial proof leaves one later-frame penetration', () => {
+    const g = threeHullPen2(Game);
+    g.time += 1/120;
+    g.updateBullets(1/120);
+    assert.deepEqual(g.tanks.map(t=>t.hitCount), [1,1,0]);
+    assert.equal(g.bullets.length, 1);
+    assert.equal(g.bullets[0].hits, 2);
+    assert.equal(g.bullets[0].pen, 0);
+    assert.equal(g.bullets[0].x, 50, 'core must advance exactly once');
+    assert.equal(g.bullets[0].__novaDirectVictims.size, 2);
+    g.time += 1/120;
+    g.updateBullets(1/120);
+    assert.deepEqual(g.tanks.map(t=>t.hitCount), [1,1,1]);
+    assert.equal(g.bullets.length, 0);
+  });
+  test(mode+' partial proof abstains on knockback', () => {
+    const g = threeHullPen2(Game);
+    g.bullets[0].knock = 1;
+    g.time += 1/120; g.updateBullets(1/120);
+    assert.equal(g.tanks[1].hitCount, 0,
+      'knockback could move an earlier hull; do not backdate two hits');
+  });
+  test(mode+' partial proof abstains on uncertain lethal damage', () => {
+    const g = threeHullPen2(Game);
+    g.tanks[1].hp = 70;
+    g.time += 1/120; g.updateBullets(1/120);
+    assert.equal(g.tanks[1].hitCount, 0);
+  });
+  test(mode+' partial proof abstains on intervening permanent cover', () => {
+    const g = threeHullPen2(Game);
+    g.__novaTerrain = [{id:-433,shape:'rect',x:48,y:0,
+      w:3,h:90,solid:true,destructible:false}];
+    g.time += 1/120; g.updateBullets(1/120);
+    assert.equal(g.tanks[1].hitCount, 0);
+  });
+  test(mode+' partial proof abstains on uncertain moving hull', () => {
+    const g = threeHullPen2(Game);
+    g.__novaShapeSweepActive = true;
+    g.__novaShapeSweepEpoch = 433;
+    g.time += 1/120;
+    for(const t of g.tanks) {
+      t.__novaSweepMoveTime = g.time;
+      t.__novaSweepPrevX = t.x;
+      t.__novaSweepPrevY = t.y;
+    }
+    g.tanks[1].__novaSweepPrevY = 12;
+    g.updateBullets(1/120);
+    assert.equal(g.tanks[1].hitCount, 0);
+  });
+  test(mode+' partial proof abstains on nearby neutral corridor', () => {
+    const g = threeHullPen2(Game);
+    g.shapes = [{kind:'shape',id:433,x:38,y:32,r:12,hp:100}];
+    g.time += 1/120; g.updateBullets(1/120);
+    assert.equal(g.tanks[1].hitCount, 0);
+  });
+  test(mode+' partial proof abstains on competing projectile corridor', () => {
+    const g = threeHullPen2(Game);
+    g.bullets.push({kind:'bullet',id:433,ownerId:9,x:60,y:0,
+      vx:0,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false});
+    g.damageTank = function(t,dmg,ownerId) {
+      t.hitCount++; this.hits++;
+      (this.attribution||(this.attribution=[])).push([t.id,ownerId]);
+    };
+    g.time += 1/120; g.updateBullets(1/120);
+    assert.equal((g.attribution||[]).filter(x=>x[0]===3&&x[1]===1).length, 0,
+      'the original projectile must not speculate across competing fire');
+  });
+}
+
+/* Differentially falsifiable seeded cohort: two distinct first-frame swept
+ * entries, a third entry only in the following frame, and no other entities.
+ * Reverse tank iteration to ensure contact identity is geometric, not array
+ * order. This cohort is NOT a natural gameplay hit-frequency estimate. */
+for(const optimized of [false,true]) {
+  test((optimized?'optimized':'baseline')+
+    ' 180 seeded pen-2 partial prefixes preserve all three identities at 120Hz',()=>{
+    const Game=boot(undefined,optimized);
+    let seed=4331028;
+    const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+    for(let n=0;n<180;n++){
+      const x1=28+rand()*10,x2=x1+24+rand()*6,x3=x2+26+rand()*8;
+      const g=threeHullPen2(Game);
+      g.tanks[0].x=x1;g.tanks[1].x=x2;g.tanks[2].x=x3;
+      if(n%2)g.tanks.reverse();
+      for(let frame=0;frame<5&&g.bullets.length;frame++){
+        g.time+=1/120;g.updateBullets(1/120);
+      }
+      assert.equal(g.hits,3,'exact three contacts '+n);
+      assert.deepEqual(g.tanks.map(t=>t.hitCount).sort(),[1,1,1],
+        'no duplicate or skipped victim '+n);
+    }
+  });
+}
+
+/* Shipping-scale ecology plus distant fire must use the local preflight.
+ * Otherwise the new two-hull prefix exists only in sparse test arenas. */
+for(const optimized of [false,true]) {
+  test((optimized?'optimized':'baseline')+
+    ' dense neutral ecology and 1300 remote shots retain pen-2 prefix at 120Hz',()=>{
+    const Game=boot(undefined,optimized),g=threeHullPen2(Game);
+    g.shapes=Array.from({length:120},(_,i)=>({
+      kind:'shape',id:500+i,x:1200+i*2,y:1200,
+      r:12,hp:100,type:'circle',born:0
+    }));
+    for(let i=0;i<1300;i++)g.bullets.push({
+      kind:'bullet',id:1000+i,ownerId:9,
+      x:1000+i*.4,y:1200,vx:0,vy:0,r:3,dmg:5,
+      ttl:1,pen:0,hits:0,dead:false
+    });
+    g.time+=1/120;g.updateBullets(1/120);
+    assert.deepEqual(g.tanks.map(t=>t.hitCount),[1,1,0],
+      'bounded local preflight must admit the two real first-frame hits');
+    g.time+=1/120;g.updateBullets(1/120);
+    assert.deepEqual(g.tanks.map(t=>t.hitCount),[1,1,1],
+      'third contact remains owned by the next frame');
+  });
+}
+
+/* Reachable Marksman build: base 1050u/s, eight bullet-speed upgrades
+ * (1050*(1+0.085*8)=1764u/s), base pen=2, 21 damage, no gene.
+ * At 30Hz the first two hulls are physically contacted before x=58.8;
+ * the third first-contact occurs later. */
+for(const optimized of [false,true]) {
+  test((optimized?'optimized':'baseline')+
+    ' upgraded canonical Marksman pen-2 preserves a split-frame third hit',()=>{
+    const Game=boot(undefined,optimized),g=threeHullPen2(Game);
+    g.tanks[0].x=26;g.tanks[1].x=56;g.tanks[2].x=86;
+    const b=g.bullets[0];
+    b.vx=1050*(1+.085*8);
+    b.dmg=21;
+    b.r=5.5*(1+21*.0085);
+    b.ttl=1.6;
+    g.time+=1/30;g.updateBullets(1/30);
+    assert.deepEqual(g.tanks.map(t=>t.hitCount),[1,1,0],
+      'two first-frame physical contacts must be credited');
+    for(let i=0;i<5&&g.bullets.length;i++){
+      g.time+=1/30;g.updateBullets(1/30);
+    }
+    assert.deepEqual(g.tanks.map(t=>t.hitCount),[1,1,1],
+      'the remaining penetration reaches the third hull in a later frame');
+  });
+}
+
+/* Integrity is calculated from the penetration at launch. A partial prefix
+ * must not initialize the surviving bullet AFTER consuming its first two
+ * contacts, which would silently weaken projectile-interception HP. */
+for(const optimized of [false,true]) {
+  test((optimized?'optimized':'baseline')+
+    ' partial pen-2 prefix retains original projectile integrity',()=>{
+    const Game=boot(undefined,optimized),g=threeHullPen2(Game);
+    const bullet=g.bullets[0];
+    const marker='    initBulletIntegrity(b) {';
+    const start=html.indexOf(marker);
+    assert.ok(start>=0,'materialized core integrity owner missing');
+    let end=start+marker.length,depth=1;
+    while(depth&&end<html.length){
+      if(html[end]==='{')depth++;
+      else if(html[end]==='}')depth--;
+      end++;
+    }
+    assert.equal(depth,0);
+    g.initBulletIntegrity=new Function('return function(b){'+
+      html.slice(start+marker.length,end-1)+'}')();
+    g.time+=1/120;g.updateBullets(1/120);
+    assert.equal(bullet.pen,0,'two certified contacts consumed');
+    const expected=Math.max(1,20*(.72+3*.08)*(1+2*.055));
+    assert.equal(bullet.maxHp,expected,
+      'real core must initialize interception HP with original pen=2');
+    assert.equal(bullet.hp,bullet.maxHp);
+  });
+}
+
+/* A remote shell/splash may affect hulls through a wide blast even when the
+ * shell itself is not in the local narrow projectile corridor. Never
+ * pre-commit partial chronology ahead of that unresolved event. */
+for(const optimized of [false,true]) {
+  test((optimized?'optimized':'baseline')+
+    ' remote splash vetoes speculative pen-2 prefix',()=>{
+    const Game=boot(undefined,optimized),g=threeHullPen2(Game);
+    g.bullets.push({kind:'bullet',id:999,ownerId:9,
+      x:1100,y:1100,vx:0,vy:0,r:3,dmg:5,splash:100,
+      ttl:1,pen:0,hits:0,dead:false});
+    g.time+=1/120;g.updateBullets(1/120);
+    assert.equal(g.tanks[1].hitCount,0,
+      'a remote unresolved splash must defer partial backdating');
+  });
+}
