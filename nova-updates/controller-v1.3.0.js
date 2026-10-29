@@ -1297,11 +1297,20 @@
         st.targetId = st.target ? st.target.id : -1;
         if (st.active && st.target) chooseStrike(this, owner0, squads[owner0.id] || [], st.target, st, pr);
       }
-      for (var di = this.drones.length - 1; di >= 0; di--) {
-        var d = this.drones[di], owner = this.tankById.get(d.ownerId);
+      /* A committed drone attack can kill a tank, whose death immediately
+       * removes several owned drones. Iterating live indices would then
+       * revisit shifted drones or read past the shortened array. Snapshot
+       * identities once; pay for indexOf only when compaction moved a drone. */
+      var frameDrones = this.drones.slice();
+      for (var di = frameDrones.length - 1; di >= 0; di--) {
+        var d = frameDrones[di];
+        if (!d) continue;
+        var liveIndex = this.drones[di] === d ? di : this.drones.indexOf(d);
+        if (liveIndex < 0) continue;
+        var owner = this.tankById.get(d.ownerId);
         if (d.hp <= 0 || !owner || !owner.alive || (d.temp && owner.swarmT <= 0)) {
           if (owner && d.hp > 0 && d.temp && this.addParticles) this.addParticles(d.x, d.y, d.color, 4, 100, 'spark');
-          this.removeDroneAt(di); continue;
+          this.removeDroneAt(liveIndex); continue;
         }
         var wasHit = d.hitFlash > 0.08;
         if (d.hitFlash > 0) d.hitFlash = Math.max(0, d.hitFlash - dt);
