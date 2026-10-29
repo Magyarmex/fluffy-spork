@@ -77,6 +77,7 @@ jobs:
           node tests/browser/corrupt-saved-records.cjs
           node tests/browser/redeploy-front-choice.cjs
           node tests/browser/fieldcraft-class-counterplay.cjs
+          node tests/browser/fieldcraft-rng-browser.cjs
       - name: Preserve browser screenshots
         if: always()
         uses: actions/upload-artifact@v4
