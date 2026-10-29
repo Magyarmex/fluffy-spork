@@ -284,8 +284,82 @@ async function runFresh(browser){
  }finally{await context.close();}
 }
 
+/* Exercise the *blocked* branch against real intact Battlefield geometry.
+ * The ordinary randomized RETURN smoke may land on a clear route in every
+ * viewport, so its green result alone cannot certify the new COVER cue. */
+async function runCoverCue(browser){
+ const context=await browser.newContext({viewport:{width:320,height:568}});
+ const page=await context.newPage(),errors=[];
+ page.on('pageerror',e=>errors.push(String(e.stack||e)));
+ try{
+  await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded',timeout:45000});
+  await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({state:'visible',timeout:45000});
+  await page.evaluate(()=>{
+   const Game=window.__novaMakeRequire('')('game/engine').Game;
+   const update=Game.prototype.update;
+   Game.prototype.update=function(){
+    if(!this.__novaDecorativeWorld&&this.player&&this.status==='playing')
+     window.__novaCoverSmokeGame=this;
+    return update.apply(this,arguments);
+   };
+   const randSpawn=Game.prototype.randSpawnPos;
+   Game.prototype.randSpawnPos=function(minDist){
+    if(this.__novaFrontSpawnArmed&&minDist===900){
+     const previous=Math.random;let draws=0;
+     Math.random=()=>draws++<2?0:previous(); // Only RETURN angle/radius.
+     try{return randSpawn.apply(this,arguments);}finally{Math.random=previous;}
+    }
+    return randSpawn.apply(this,arguments);
+   };
+  });
+  await page.getByRole('button',{name:/DEPLOY/i}).first().click();
+  await page.waitForFunction(()=>window.__novaCoverSmokeGame?.status==='playing',null,{timeout:30000});
+  const setup=await page.evaluate(()=>{
+   const g=window.__novaCoverSmokeGame;
+   let chosen=null;
+   for(const wall of g.__novaTerrain||[]){
+    if(!wall||wall.shape!=='rect'||!wall.destructible||!(wall.hp>0))continue;
+    const origin={x:wall.x-210,y:wall.y},spawn={x:wall.x+210,y:wall.y};
+    if(Math.abs(origin.x)>2050||Math.abs(spawn.x)>2050)continue;
+    if(!g.isTerrainSafe(origin.x,origin.y,75)||!g.isTerrainSafe(spawn.x,spawn.y,75))continue;
+    if(g.hasLineOfSight(origin.x,origin.y,spawn.x,spawn.y,24))continue;
+    chosen={origin,spawn,wallId:wall.id};break;
+   }
+   if(!chosen)throw Error('no intact real-cover eastward RETURN scenario');
+   g.player.x=chosen.origin.x;g.player.y=chosen.origin.y;
+   g.killTank(g.player,null);
+   return chosen;
+  });
+  const button=page.locator('[data-nova-insertion="return"]');
+  await button.waitFor({state:'visible',timeout:15000});
+  await button.click();
+  await page.waitForFunction(()=>window.__novaCoverSmokeGame?.status==='playing',null,{timeout:15000});
+  const result=await page.evaluate(origin=>{
+   const g=window.__novaCoverSmokeGame;
+   return {x:g.player.x,y:g.player.y,
+    directBlocked:!g.hasLineOfSight(g.player.x,g.player.y,origin.x,origin.y,24),
+    marker:!!g.__novaLastFrontMarker};
+  },setup.origin);
+  assert.ok(Math.abs(result.x-setup.spawn.x)<1e-6&&Math.abs(result.y-setup.spawn.y)<1e-6,
+   'test must force the intended 420u physical RETURN position: '+JSON.stringify({setup,result}));
+  assert.equal(result.directBlocked,true,'real intact cover must obstruct direct return');
+  assert.equal(result.marker,true,'blocked direct line must retain the front waypoint');
+  const cue='↩ RETURN · FRONT W · ~420u · COVER';
+  const el=page.getByText(cue,{exact:true});
+  await el.waitFor({state:'visible',timeout:2500});
+  const fit=await el.evaluate(node=>{const r=node.getBoundingClientRect();
+   return {left:r.left,right:r.right,viewport:innerWidth,
+    scrollWidth:document.documentElement.scrollWidth};});
+  assert.ok(fit.left>=-1&&fit.right<=fit.viewport+1&&fit.scrollWidth<=fit.viewport+1,
+   'actual blocked-route cue must fit a 320px viewport: '+JSON.stringify(fit));
+  assert.deepEqual(errors,[]);
+  console.log('NOVA_REDEPLOY_COVER_CUE_SMOKE '+JSON.stringify({setup,result,fit}));
+ }finally{await context.close();}
+}
+
 async function main(){const browser=await chromium.launch({headless:true,args:['--no-sandbox']});try{
  for(const [width,height] of [[280,568],[320,568],[568,320],[640,320],[900,700]])await run(browser,width,height);
  await runFresh(browser);
+ await runCoverCue(browser);
 }finally{await browser.close();}}
 main().catch(e=>{console.error(e.stack||e);process.exitCode=1;});
