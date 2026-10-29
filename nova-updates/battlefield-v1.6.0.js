@@ -1290,9 +1290,9 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    var u=Math.max(0,Math.min(1,
       ((o.x-ax)*sx+(o.y-ay)*sy)/seg2));
    var nx=ax+sx*u,ny=ay+sy*u;
-   if(Math.hypot(o.x-nx,o.y-ny)<=reach+o.r+b.r+2||
+   if(Math.hypot(o.x-nx,o.y-ny)<=reach+o.r+b.r+2+1e-6||
       Math.hypot(o.x-candidate.x,o.y-candidate.y)<=
-        reach+o.r+victimR+2)return false;
+        reach+o.r+victimR+2+1e-6)return false;
   }
   return true;
  }
