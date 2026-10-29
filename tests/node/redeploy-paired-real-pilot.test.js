@@ -574,13 +574,16 @@ test('common-safe real-engine insertion preserves native enemy clearance in both
   assert.equal(nativeFresh.fingerprintHash,nativeReturn.fingerprintHash);
   assert.deepEqual(nativeFresh.origin,nativeReturn.origin);
   const spawns={fresh:nativeFresh.spawn,return:nativeReturn.spawn};
+  /* Balance the common-world native base across independent seeds, not FPS.
+   * Both insertion arms still share one exactly identical generated world. */
+  const commonBaseChoice=i%2===0?'fresh':'return';
   const order=i%2?['return','fresh']:['fresh','return'],arms={};
   for(const choice of order){
    arms[choice]=run(seed,choice,hz,seconds,'harvest_roam',preludeSeconds,{
-    baseChoice:'fresh',spawnOverride:spawns[choice],commonSafeSpawns:spawns
+    baseChoice:commonBaseChoice,spawnOverride:spawns[choice],commonSafeSpawns:spawns
    });
    assert.deepEqual(arms[choice].spawn,spawns[choice]);
-   assert.deepEqual(arms[choice].generatedSpawn,spawns.fresh);
+   assert.deepEqual(arms[choice].generatedSpawn,spawns[commonBaseChoice]);
    assert.equal(arms[choice].fingerprintHash,nativeFresh.fingerprintHash);
    assert.ok(arms[choice].nearestEnemyDistance>=1000,
     'common world must preserve native AI exclusion for '+choice);
@@ -593,22 +596,23 @@ test('common-safe real-engine insertion preserves native enemy clearance in both
    'RNG replay must be identical before first simulated step');
   assert.deepEqual(arms.fresh.commonSafeSpawnStats,arms.return.commonSafeSpawnStats,
    'rejection sampling must be order-independent');
-  if(i===0){
-   const replay=run(seed,'fresh',hz,seconds,'harvest_roam',preludeSeconds,{
-    baseChoice:'fresh',spawnOverride:spawns.fresh,commonSafeSpawns:spawns
+  if(i<2){
+   const replay=run(seed,commonBaseChoice,hz,seconds,'harvest_roam',preludeSeconds,{
+    baseChoice:commonBaseChoice,spawnOverride:spawns[commonBaseChoice],
+    commonSafeSpawns:spawns
    });
-   assert.ok(comparable(replay,arms.fresh),'exact replay must reproduce the supported arm');
-   const sham=run(seed,'fresh',hz,seconds,'harvest_roam',preludeSeconds,{
-    baseChoice:'fresh',commonSafeSpawns:spawns
+   assert.ok(comparable(replay,arms[commonBaseChoice]),
+    'exact replay must reproduce the supported arm');
+   const sham=run(seed,commonBaseChoice,hz,seconds,'harvest_roam',preludeSeconds,{
+    baseChoice:commonBaseChoice,commonSafeSpawns:spawns
    });
-   assert.ok(comparable(sham,arms.fresh),
+   assert.ok(comparable(sham,arms[commonBaseChoice]),
     'same native location with/without transplant must have identical physical outcomes');
-
   }
   seen.add(nativeFresh.layout+'/'+nativeFresh.rotation);
   const compact=x=>{const {fingerprint,...rest}=x;return rest;};
   report.push({seed,hz,layout:nativeFresh.layout,rotation:nativeFresh.rotation,
-   spawns,origin:nativeFresh.origin,
+   commonBaseChoice,spawns,origin:nativeFresh.origin,
    native:{fresh:compact(nativeFresh),return:compact(nativeReturn)},
    common:{fresh:compact(arms.fresh),return:compact(arms.return)}});
  }
