@@ -64,7 +64,7 @@ function setPrior(g,mode='point'){
 function snap(c){return JSON.parse(JSON.stringify(c));}
 
 test('shipping composition includes the live Command Pad overlay',()=>{
-  assert.match(shipping,/nova-updates\\/controller-command-weave-v1\\.10\\.0\\.js/);
+  assert.ok(shipping.includes('nova-updates/controller-command-weave-v1.10.0.js'));
 });
 
 for(const type of ['touch','pen']){
