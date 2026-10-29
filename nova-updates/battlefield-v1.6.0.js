@@ -315,7 +315,33 @@ wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.
  var oldSpawnShape=Game.prototype.spawnShape;Game.prototype.spawnShape=function(type,anywhere){ensureTerrain(this);var before=this.shapes.length,out=oldSpawnShape.apply(this,arguments),s=this.shapes[this.shapes.length-1];if(this.shapes.length>before&&s&&!safePoint(this,s.x,s.y,(s.r||12)+12)){for(var i=0;i<24;i++){var p=this.randSpawnPos(260);if(safePoint(this,p.x,p.y,(s.r||12)+12)){s.x=p.x;s.y=p.y;break;}}}return out;};
  var oldSpawnPower=Game.prototype.spawnPowerup;Game.prototype.spawnPowerup=function(){ensureTerrain(this);var before=this.powerups.length,out=oldSpawnPower.apply(this,arguments),p=this.powerups[this.powerups.length-1];if(this.powerups.length>before&&p&&!safePoint(this,p.x,p.y,36)){for(var i=0;i<20;i++){var q=this.randSpawnPos(500);if(safePoint(this,q.x,q.y,36)){p.x=q.x;p.y=q.y;break;}}}return out;};
 
- var oldMove=Game.prototype.moveTank;Game.prototype.moveTank=function(t,vx,vy,dt){ensureTerrain(this);var ox=t.x,oy=t.y;if(t.__novaSweepMoveTime!==this.time){t.__novaSweepMoveTime=this.time;t.__novaSweepPrevX=ox;t.__novaSweepPrevY=oy;}var out=oldMove.call(this,t,vx,vy,dt),r=terrainRadiusForTank(t,CLASSES),hit=circleResolve(this,t,r);if(hit){var moved=Math.hypot(t.x-ox,t.y-oy);if(!t.isPlayer&&t.ai){t.ai.__novaTerrainStuck=(t.ai.__novaTerrainStuck||0)+(moved<Math.hypot(vx,vy)*dt*.18?dt:0);if(t.ai.__novaTerrainStuck>.28){t.ai.strafe=(t.ai.strafe||1)*-1;t.ai.wanderA=(t.angle||0)+(t.ai.strafe||1)*(1.0+Math.random()*.65);t.ai.wanderT=.55+Math.random()*.7;t.ai.thinkT=0;t.ai.__novaTerrainStuck=0;}}else if(t.isPlayer&&this.sfx&&this.sfx.novaTerrainScrape&&Math.hypot(vx,vy)>45)this.sfx.novaTerrainScrape((t.x-(this.player?this.player.x:t.x))/600);}else if(t.ai)t.ai.__novaTerrainStuck=Math.max(0,(t.ai.__novaTerrainStuck||0)-dt*2);return out;};
+ var oldMove=Game.prototype.moveTank;Game.prototype.moveTank=function(t,vx,vy,dt){ensureTerrain(this);var ox=t.x,oy=t.y;
+ /* Only one unobstructed, frame-exact Scout movement can certify a linear
+  * body trajectory for the narrowly bounded body-before-wall resolver.
+  * Subsequent movement, collision, phase relocation or endpoint mutation
+  * invalidates the witness. No interpolated AI/dash motion is inferred. */
+ if(t.cls==='scout'){
+  if(t.__novaLinearMoveEpoch!==this.time){
+   t.__novaLinearMoveEpoch=this.time;t.__novaLinearMoveCalls=0;
+  }
+  t.__novaLinearMoveCalls++;
+  t.__novaLinearMoveValid=false;
+ }
+ if(t.__novaSweepMoveTime!==this.time){t.__novaSweepMoveTime=this.time;t.__novaSweepPrevX=ox;t.__novaSweepPrevY=oy;}var out=oldMove.call(this,t,vx,vy,dt),r=terrainRadiusForTank(t,CLASSES),hit=circleResolve(this,t,r);if(hit){var moved=Math.hypot(t.x-ox,t.y-oy);if(!t.isPlayer&&t.ai){t.ai.__novaTerrainStuck=(t.ai.__novaTerrainStuck||0)+(moved<Math.hypot(vx,vy)*dt*.18?dt:0);if(t.ai.__novaTerrainStuck>.28){t.ai.strafe=(t.ai.strafe||1)*-1;t.ai.wanderA=(t.angle||0)+(t.ai.strafe||1)*(1.0+Math.random()*.65);t.ai.wanderT=.55+Math.random()*.7;t.ai.thinkT=0;t.ai.__novaTerrainStuck=0;}}else if(t.isPlayer&&this.sfx&&this.sfx.novaTerrainScrape&&Math.hypot(vx,vy)>45)this.sfx.novaTerrainScrape((t.x-(this.player?this.player.x:t.x))/600);}else if(t.ai)t.ai.__novaTerrainStuck=Math.max(0,(t.ai.__novaTerrainStuck||0)-dt*2);
+ if(t.cls==='scout'&&t.alive&&t.__novaLinearMoveCalls===1&&
+    !hit&&Number.isFinite(dt)&&dt>0&&
+    Number.isFinite(ox)&&Number.isFinite(oy)&&
+    Number.isFinite(t.x)&&Number.isFinite(t.y)&&
+    Number.isFinite(t.vx)&&Number.isFinite(t.vy)&&
+    Math.hypot(t.x-ox,t.y-oy)>1e-8&&
+    Math.hypot(t.x-ox-t.vx*dt,t.y-oy-t.vy*dt)<1e-6&&
+    Math.hypot(t.x-ox,t.y-oy)<96){
+  t.__novaLinearMoveValid=true;
+  t.__novaLinearMoveDt=dt;
+  t.__novaLinearMoveStartX=ox;t.__novaLinearMoveStartY=oy;
+  t.__novaLinearMoveEndX=t.x;t.__novaLinearMoveEndY=t.y;
+ }
+ return out;};
 
 
  /* Phase Shift relocates instantly after normal movement but before bullets
@@ -1855,32 +1881,58 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    if(!near(t.__novaSweepMoveTime===g.time?t.__novaSweepPrevX:t.x,
             t.__novaSweepMoveTime===g.time?t.__novaSweepPrevY:t.y,
             t.x,t.y,rr+Math.max(4,dt*800)))continue;
-   /* No target-specific movement interpolation or guessed spawn history. */
+   /* A Scout moved by exactly one unobstructed core integration has a
+    * witnessed straight segment. Other classes, terrain-corrected motion,
+    * dashes, stale epochs and externally mutated endpoints still abstain. */
+   var sx=t.__novaSweepPrevX,sy=t.__novaSweepPrevY;
+   var moved=Number.isFinite(sx)&&Number.isFinite(sy)&&
+       Math.hypot(t.x-sx,t.y-sy)>1e-8;
+   /* Newly spawned bullets did not exist while the tank moved earlier in
+    * this tick. Never backdate their contacts through that movement. */
+   if(moved&&(!Number.isSafeInteger(b.id)||
+      g.__novaFrameStartBulletEpoch!==g.__novaShapeSweepEpoch||
+      !(b.id<g.__novaFrameStartBulletIdCeiling)))return false;
+   var linear=moved&&t.cls==='scout'&&
+       t.__novaLinearMoveEpoch===g.time&&
+       t.__novaLinearMoveValid===true&&
+       t.__novaLinearMoveCalls===1&&
+       t.__novaLinearMoveDt===dt&&
+       t.__novaLinearMoveStartX===sx&&
+       t.__novaLinearMoveStartY===sy&&
+       t.__novaLinearMoveEndX===t.x&&
+       t.__novaLinearMoveEndY===t.y;
+   /* Do the terrain sweep only for a potentially qualifying pre-cover
+    * shot, not once per Scout on every simulation frame. */
+   if(linear&&firstSolidHit(g,sx,sy,t.x,t.y,def.size+3.5))
+    return false;
    if(t.__novaSweepMoveTime!==g.time||
-      !Number.isFinite(t.__novaSweepPrevX)||
-      !Number.isFinite(t.__novaSweepPrevY)||
+      !Number.isFinite(sx)||!Number.isFinite(sy)||
       !Number.isFinite(t.x)||!Number.isFinite(t.y)||
-      Math.hypot(t.x-t.__novaSweepPrevX,t.y-t.__novaSweepPrevY)>1e-8||
+      (moved&&!linear)||
       t.spawnShieldT>0||t.shieldT>0||t.bulwarkT>0||
       t.tauntT>0||t.invulnT>0||
       !Number.isFinite(t.hp)||t.hp<=b.dmg*2||
       (typeof g.areAllies==='function'&&g.areAllies(owner,t)))
     return false;
-   var fx=ax-t.x,fy=ay-t.y,
-       B=2*(fx*dx+fy*dy),C=fx*fx+fy*fy-rr*rr;
+   var fx=ax-sx,fy=ay-sy,
+       rx=dx-(moved?t.x-sx:0),ry=dy-(moved?t.y-sy:0),
+       RA=rx*rx+ry*ry;
+   if(!(RA>1e-12)||!Number.isFinite(RA))return false;
+   var B=2*(fx*rx+fy*ry),C=fx*fx+fy*fy-rr*rr;
    if(!(C>1e-8))return false;
-   var D=B*B-4*A*C;
+   var D=B*B-4*RA*C;
    if(!Number.isFinite(D)||
-      Math.abs(D)<=1e-10*(B*B+4*A*(fx*fx+fy*fy+rr*rr)))return false;
+      Math.abs(D)<=1e-10*(B*B+4*RA*(fx*fx+fy*fy+rr*rr)))return false;
    if(D<=0)continue;
    var root=Math.sqrt(D),q=-.5*(B+(B<0?-root:root));
    if(!q)return false;
-   var enter=Math.min(q/A,C/q),leave=Math.max(q/A,C/q);
+   var enter=Math.min(q/RA,C/q),leave=Math.max(q/RA,C/q);
    if(leave<=0||enter>=wallT-1e-6)continue;
    if(!(enter>1e-9))return false;
    if(victim)return false; /* no shared-victim or simultaneous arbitration */
    /* A hull overlapping cover is not a certified open-field contact. */
-   if(pointInsideSolid(wall.solid,t.x,t.y,def.size+3))return false;
+   var contactX=sx+(t.x-sx)*enter,contactY=sy+(t.y-sy)*enter;
+   if(pointInsideSolid(wall.solid,contactX,contactY,def.size+3))return false;
    victim=t;hitT=enter;
   }
   if(!victim)return false;
@@ -1915,11 +1967,19 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    var ox=o.x,oy=o.y,ot=Math.min(dt,Math.max(0,o.ttl||0)),
        nx=ox+o.vx*ot,ny=oy+o.vy*ot,pad=o.r+b.r+2;
    if(near(ox,oy,nx,ny,pad))return false;
-   var rr=o.r+CLASSES[victim.cls].size+3;
-   if(Math.max(ox,nx)+rr>=victim.x&&
-      Math.min(ox,nx)-rr<=victim.x&&
-      Math.max(oy,ny)+rr>=victim.y&&
-      Math.min(oy,ny)-rr<=victim.y)return false;
+   var rr=o.r+CLASSES[victim.cls].size+3,
+       vsx=victim.__novaLinearMoveValid===true&&
+         victim.__novaLinearMoveEpoch===g.time?
+         victim.__novaLinearMoveStartX:victim.x,
+       vsy=victim.__novaLinearMoveValid===true&&
+         victim.__novaLinearMoveEpoch===g.time?
+         victim.__novaLinearMoveStartY:victim.y;
+   /* A competing shot near the target's start can already have struck it,
+    * even when it is remote from the target's end-of-frame position. */
+   if(Math.max(ox,nx)+rr>=Math.min(vsx,victim.x)&&
+      Math.min(ox,nx)-rr<=Math.max(vsx,victim.x)&&
+      Math.max(oy,ny)+rr>=Math.min(vsy,victim.y)&&
+      Math.min(oy,ny)-rr<=Math.max(vsy,victim.y))return false;
   }
   /* Commit exactly one canonical hull hit, then let the existing wall owner
    * stop surviving piercing shots at the later physical wall. A pen=0 shot
@@ -2184,6 +2244,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
  var priorTrace=this.__novaDroneChronoTraceEnabled;
  this.__novaDroneChronoAutoTrace=false;
  var epoch=(this.__novaShapeSweepEpoch||0)+1;this.__novaShapeSweepEpoch=epoch;
+ /* A monotonic ID ceiling is an O(1) birth-time witness: bullets created
+  * later in this tick must not be treated as if they existed before movement. */
+ this.__novaFrameStartBulletEpoch=epoch;
+ this.__novaFrameStartBulletIdCeiling=Number.isSafeInteger(this.nextId)?this.nextId:0;
  /* Capture drones before AI/drone movement; the later projectile pre-pass
   * may only exclude drones whose complete observed corridor is remote. */
  var chronoDrones=this.drones||[];for(var di=0;di<chronoDrones.length;di++){

@@ -16,6 +16,14 @@ assert.ok(start>=0,'shipping core method');
 let end=start+marker.length,depth=1;
 while(depth&&end<html.length){if(html[end]==='{')depth++;else if(html[end]==='}')depth--;end++;}
 assert.equal(depth,0);
+const moveMarker='    moveTank(t, vx, vy, dt) {',moveStart=html.indexOf(moveMarker);
+assert.ok(moveStart>=0,'shipping core movement method');
+let moveEnd=moveStart+moveMarker.length,moveDepth=1;
+while(moveDepth&&moveEnd<html.length){if(html[moveEnd]==='{')moveDepth++;else if(html[moveEnd]==='}')moveDepth--;moveEnd++;}
+assert.equal(moveDepth,0);
+const coreMove=new Function('types_1','M',
+ 'return function(t,vx,vy,dt){'+html.slice(moveStart+moveMarker.length,moveEnd-1)+'}')(
+ {clamp:(v,min,max)=>Math.max(min,Math.min(max,v))},2250);
 const CLASSES={scout:{size:14},marksman:{size:14}};
 const core=new Function('types_1','classes_1','M',
  'return function(dt){'+html.slice(start+marker.length,end-1)+'}')(
@@ -37,6 +45,7 @@ function boot(optimized){
   'initBulletIntegrity','addRing','addFlash','addImpactDebris',
   'damageShape','damageDrone','weakenBullet','clusterBurst'])
   Game.prototype[name]=function(){};
+ Game.prototype.moveTank=coreMove;
  Game.prototype.randSpawnPos=()=>({x:1500,y:1500});
  Game.prototype.getTank=id=>id===1?{id:1,cls:'scout',alive:true}:null;
  Game.prototype.resolveBulletCollisions=function(){};
@@ -63,7 +72,9 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,
  wallShape='rect',otherShape=false,otherBullet=false,otherShell=false,moving=false,
  remoteBullets=0,
  shield=false,otherTank=false,ttl=1,pen=1,radius=3,
- active=true,knock=0,allied=false,destructible=false,damage=10}={}){
+ active=true,knock=0,allied=false,destructible=false,damage=10,
+ linearMove=null,tamperMove=false,doubleMove=false,
+ otherNearMovingStart=false,bornThisFrame=false}={}){
  const g=new Game(),dt=1/fps;
  g.__novaShapeSweepActive=active;
  g.areAllies=()=>allied;
@@ -87,6 +98,19 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,
  for(let i=0;i<remoteBullets;i++)g.bullets.push({kind:'bullet',id:100+i,
   ownerId:100+i,x:0,y:1000+i*3,vx:speed,vy:0,r:3,dmg:10,
   ttl:1,pen:1,hits:0,dead:false});
+ /* Simulate the shipping update wrapper's pre-movement nextId snapshot.
+  * A newly fired bullet cannot retroactively collide during that motion. */
+ g.__novaFrameStartBulletEpoch=g.__novaShapeSweepEpoch;
+ g.__novaFrameStartBulletIdCeiling=bornThisFrame?10:11;
+ if(otherNearMovingStart)g.bullets.push({kind:'bullet',id:1001,
+  ownerId:4,x:target+5,y:16,vx:0,vy:0,r:3,dmg:10,ttl:1,
+  pen:0,hits:0,dead:false,shell:false,beam:false});
+ if(linearMove){
+  t.vx=linearMove.vx;t.vy=linearMove.vy;
+  g.moveTank(t,linearMove.vx,linearMove.vy,dt);
+  if(doubleMove)g.moveTank(t,linearMove.vx,linearMove.vy,dt);
+  if(tamperMove)t.x+=4;
+ }
  g.updateBullets(dt);
  return {hits:g.hits,hp:t.hp,bullet:g.bullets[0],g};
 }
@@ -232,4 +256,92 @@ test('1,000 oblique 2D worlds preserve body-before-wall ordering',()=>{
   if(expected)hits++;else misses++;
  }
  assert.ok(hits>400&&misses>100,'oracle must exercise hits and misses');
+});
+
+/* Regression-first: real core moveTank and shipping Battlefield must agree
+ * on a single unobstructed Scout motion before the permanent wall. A bare
+ * start/end position is not proof of continuous motion. */
+for(const optimized of [false,true]){
+ const label=optimized?'Battlefield + Performance':'Battlefield';
+ test(label+': moving Scout crosses the bullet before a later wall at 30–240 Hz',()=>{
+  const Game=boot(optimized);
+  for(const fps of [30,60,120,240]){
+   const r=run(Game,{fps,speed:200*fps,linearMove:{vx:-600,vy:0}});
+   assert.deepEqual(r.hits,[2],'moving pre-cover body at '+fps+' Hz');
+   assert.equal(r.hp,90);
+   assert.equal(r.g.bullets.length,0,'later wall still stops shot');
+  }
+ });
+ test(label+': realistic 30Hz upgraded Marksman round hits moving Scout before wall',()=>{
+  const speed=1050*(1+.085*8),radius=5.5*(1+21*.0085);
+  const r=run(boot(optimized),{fps:30,speed,wall:60,target:32,
+   radius,damage:21,pen:2,linearMove:{vx:-200,vy:0}});
+  assert.deepEqual(r.hits,[2]);assert.equal(r.hp,79);
+ });
+ test(label+': Scout tunneling through a wall is not a certified linear hit',()=>{
+  const r=run(boot(optimized),{wall:60,target:85,
+   linearMove:{vx:-1800,vy:0}});
+  assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
+ });
+ test(label+': certified moving Scout behind cover remains protected',()=>{
+  const r=run(boot(optimized),{wall:50,target:150,
+   linearMove:{vx:-600,vy:0}});
+  assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
+ });
+ test(label+': moving Scout outside bullet lane cannot receive phantom hit',()=>{
+  const r=run(boot(optimized),{targetY:65,
+   linearMove:{vx:-600,vy:0}});
+  assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
+ });
+ test(label+': a competing shot near the moving hull start vetoes backdated damage',()=>{
+  const r=run(boot(optimized),{linearMove:{vx:-600,vy:0},
+   otherNearMovingStart:true});
+  assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
+ });
+ test(label+': a newly fired shot cannot backdate through earlier Scout motion',()=>{
+  const r=run(boot(optimized),{linearMove:{vx:-600,vy:0},
+   bornThisFrame:true});
+  assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
+ });
+ test(label+': second movement in the same tick invalidates linear witness',()=>{
+  const r=run(boot(optimized),{linearMove:{vx:-600,vy:0},doubleMove:true});
+  assert.deepEqual(r.hits,[]);
+ });
+ test(label+': post-move position mutation invalidates linear witness',()=>{
+  const r=run(boot(optimized),{linearMove:{vx:-600,vy:0},tamperMove:true});
+  assert.deepEqual(r.hits,[]);
+ });
+}
+
+/* 1,000 independent 2D moving-hull worlds, each with actual core moveTank,
+ * materialized Battlefield and optional Performance. The oracle uses
+ * perpendicular closest approach, not the shipping stable quadratic roots.
+ * The 200-unit frame travel is synthetic stress, not a player hit-rate sample.
+ */
+test('1,000 seeded moving Scout worlds match independent first-contact geometry',()=>{
+ let seed=0x438147;
+ const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ const games=[boot(false),boot(true)];
+ let hits=0,misses=0;
+ for(let i=0;i<1000;i++){
+  const fps=[30,60,120,240][i%4],target=45+rand()*30,
+   targetY=(rand()-.5)*70,vx=(rand()-.5)*1000,vy=(rand()-.5)*400,
+   mx=vx/fps,my=vy/fps,rx=200-mx,ry=-my,
+   A=rx*rx+ry*ry,u=(target*rx+targetY*ry)/A,
+   perpX=target-u*rx,perpY=targetY-u*ry,
+   perp2=perpX*perpX+perpY*perpY,rr=20,
+   entry=perp2<rr*rr
+    ?u-Math.sqrt((rr*rr-perp2)/A):Infinity,
+   wallT=(120-5-3*.45)/200,
+   expected=entry>1e-9&&entry<wallT-1e-6;
+  for(const Game of games){
+   const r=run(Game,{fps,speed:200*fps,target,targetY,
+    linearMove:{vx,vy}});
+   assert.deepEqual(r.hits,expected?[2]:[],
+    'moving-hull contact mismatch at '+fps+'Hz world '+i);
+   assert.equal(r.hp,expected?90:100);
+  }
+  if(expected)hits++;else misses++;
+ }
+ assert.ok(hits>100&&misses>100,'oracle exercises hits and misses');
 });
