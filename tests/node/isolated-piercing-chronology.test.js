@@ -1554,3 +1554,28 @@ for (const optimized of [false, true]) {
       'the original projectile must not speculate across competing fire');
   });
 }
+
+/* Differentially falsifiable seeded cohort: two distinct first-frame swept
+ * entries, a third entry only in the following frame, and no other entities.
+ * Reverse tank iteration to ensure contact identity is geometric, not array
+ * order. This cohort is NOT a natural gameplay hit-frequency estimate. */
+for(const optimized of [false,true]) {
+  test((optimized?'optimized':'baseline')+
+    ' 180 seeded pen-2 partial prefixes preserve all three identities at 120Hz',()=>{
+    const Game=boot(undefined,optimized);
+    let seed=4331028;
+    const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+    for(let n=0;n<180;n++){
+      const x1=28+rand()*10,x2=x1+24+rand()*6,x3=x2+26+rand()*8;
+      const g=threeHullPen2(Game);
+      g.tanks[0].x=x1;g.tanks[1].x=x2;g.tanks[2].x=x3;
+      if(n%2)g.tanks.reverse();
+      for(let frame=0;frame<5&&g.bullets.length;frame++){
+        g.time+=1/120;g.updateBullets(1/120);
+      }
+      assert.equal(g.hits,3,'exact three contacts '+n);
+      assert.deepEqual(g.tanks.map(t=>t.hitCount).sort(),[1,1,1],
+        'no duplicate or skipped victim '+n);
+    }
+  });
+}
