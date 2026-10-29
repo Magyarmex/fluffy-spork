@@ -16,6 +16,14 @@ assert.ok(start>=0,'shipping core method');
 let end=start+marker.length,depth=1;
 while(depth&&end<html.length){if(html[end]==='{')depth++;else if(html[end]==='}')depth--;end++;}
 assert.equal(depth,0);
+const moveMarker='    moveTank(t, vx, vy, dt) {',moveStart=html.indexOf(moveMarker);
+assert.ok(moveStart>=0,'shipping core movement method');
+let moveEnd=moveStart+moveMarker.length,moveDepth=1;
+while(moveDepth&&moveEnd<html.length){if(html[moveEnd]==='{')moveDepth++;else if(html[moveEnd]==='}')moveDepth--;moveEnd++;}
+assert.equal(moveDepth,0);
+const coreMove=new Function('types_1','M',
+ 'return function(t,vx,vy,dt){'+html.slice(moveStart+moveMarker.length,moveEnd-1)+'}')(
+ {clamp:(v,min,max)=>Math.max(min,Math.min(max,v))},2250);
 const CLASSES={scout:{size:14},marksman:{size:14}};
 const core=new Function('types_1','classes_1','M',
  'return function(dt){'+html.slice(start+marker.length,end-1)+'}')(
@@ -37,6 +45,7 @@ function boot(optimized){
   'initBulletIntegrity','addRing','addFlash','addImpactDebris',
   'damageShape','damageDrone','weakenBullet','clusterBurst'])
   Game.prototype[name]=function(){};
+ Game.prototype.moveTank=coreMove;
  Game.prototype.randSpawnPos=()=>({x:1500,y:1500});
  Game.prototype.getTank=id=>id===1?{id:1,cls:'scout',alive:true}:null;
  Game.prototype.resolveBulletCollisions=function(){};
@@ -63,7 +72,8 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,
  wallShape='rect',otherShape=false,otherBullet=false,otherShell=false,moving=false,
  remoteBullets=0,
  shield=false,otherTank=false,ttl=1,pen=1,radius=3,
- active=true,knock=0,allied=false,destructible=false,damage=10}={}){
+ active=true,knock=0,allied=false,destructible=false,damage=10,
+ linearMove=null,tamperMove=false,doubleMove=false}={}){
  const g=new Game(),dt=1/fps;
  g.__novaShapeSweepActive=active;
  g.areAllies=()=>allied;
@@ -87,6 +97,12 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,
  for(let i=0;i<remoteBullets;i++)g.bullets.push({kind:'bullet',id:100+i,
   ownerId:100+i,x:0,y:1000+i*3,vx:speed,vy:0,r:3,dmg:10,
   ttl:1,pen:1,hits:0,dead:false});
+ if(linearMove){
+  t.vx=linearMove.vx;t.vy=linearMove.vy;
+  g.moveTank(t,linearMove.vx,linearMove.vy,dt);
+  if(doubleMove)g.moveTank(t,linearMove.vx,linearMove.vy,dt);
+  if(tamperMove)t.x+=4;
+ }
  g.updateBullets(dt);
  return {hits:g.hits,hp:t.hp,bullet:g.bullets[0],g};
 }
@@ -233,3 +249,37 @@ test('1,000 oblique 2D worlds preserve body-before-wall ordering',()=>{
  }
  assert.ok(hits>400&&misses>100,'oracle must exercise hits and misses');
 });
+
+/* Regression-first: real core moveTank and shipping Battlefield must agree
+ * on a single unobstructed Scout motion before the permanent wall. A bare
+ * start/end position is not proof of continuous motion. */
+for(const optimized of [false,true]){
+ const label=optimized?'Battlefield + Performance':'Battlefield';
+ test(label+': moving Scout crosses the bullet before a later wall at 30–240 Hz',()=>{
+  const Game=boot(optimized);
+  for(const fps of [30,60,120,240]){
+   const r=run(Game,{fps,speed:200*fps,linearMove:{vx:-600,vy:0}});
+   assert.deepEqual(r.hits,[2],'moving pre-cover body at '+fps+' Hz');
+   assert.equal(r.hp,90);
+   assert.equal(r.g.bullets.length,0,'later wall still stops shot');
+  }
+ });
+ test(label+': certified moving Scout behind cover remains protected',()=>{
+  const r=run(boot(optimized),{wall:50,target:150,
+   linearMove:{vx:-600,vy:0}});
+  assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
+ });
+ test(label+': moving Scout outside bullet lane cannot receive phantom hit',()=>{
+  const r=run(boot(optimized),{targetY:65,
+   linearMove:{vx:-600,vy:0}});
+  assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
+ });
+ test(label+': second movement in the same tick invalidates linear witness',()=>{
+  const r=run(boot(optimized),{linearMove:{vx:-600,vy:0},doubleMove:true});
+  assert.deepEqual(r.hits,[]);
+ });
+ test(label+': post-move position mutation invalidates linear witness',()=>{
+  const r=run(boot(optimized),{linearMove:{vx:-600,vy:0},tamperMove:true});
+  assert.deepEqual(r.hits,[]);
+ });
+}
