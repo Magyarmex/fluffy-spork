@@ -1799,7 +1799,151 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   b.dead=true;b.px=b.x;b.py=b.y;b.vx=0;b.vy=0;
   return true;
  }
+
+ /* Issue #147: one provable tank-before-permanent-wall first contact.
+  * Battlefield's terrain pre-pass otherwise destroys the shot before the
+  * shipping core can resolve an earlier hull. This is NOT a general
+  * chronological solver: only a single ordinary non-shell, nonlethal,
+  * witnessed-stationary hostile hull with no nearby competing events may
+  * be settled here. Everything uncertain remains on the old path. */
+ function certifiedTankBeforePermanentWall(g,b,dt,ax,ay,ex,ey,wall){
+  if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
+     !(Number.isSafeInteger(b.pen)&&b.pen>=0&&b.pen<=4)||
+     (b.hits||0)!==0||
+     b.__novaBreachAtTime===g.time||
+     g.__novaShapeSweepActive!==true||
+     g.__novaWallProofHadShell===true||
+     (b.__novaDirectVictims&&b.__novaDirectVictims.size>0)||
+     !(dt>0)||!(b.ttl>dt)||!Number.isFinite(b.ttl)||
+     !Number.isFinite(b.dmg)||!(b.dmg>0)||
+     !Number.isFinite(b.r)||!(b.r>0)||
+     !Number.isFinite(ax)||!Number.isFinite(ay)||
+     !Number.isFinite(ex)||!Number.isFinite(ey)||
+     !Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
+     (b.knock||0)!==0||
+     !wall||!wall.solid||wall.solid.destructible||
+     !wall.hit||!(wall.hit.t>1e-6&&wall.hit.t<=1))return false;
+  var tanks=g.tanks||[],shapes=g.shapes||[],drones=g.drones||[],
+      shots=g.bullets||[];
+  /* Worst-case bound; most shots return after the tank scan. */
+  if(tanks.length+shapes.length+drones.length+shots.length>260||
+     shots.length>12)return false;
+  var dx=ex-ax,dy=ey-ay,A=dx*dx+dy*dy;
+  if(!(A>1e-12)||!Number.isFinite(A)||
+     Math.max(Math.abs(ax),Math.abs(ay),Math.abs(ex),Math.abs(ey))>=MAP_LIMIT-20)
+   return false;
+  var wallT=wall.hit.t;
+  var stopX=ax+dx*wallT,stopY=ay+dy*wallT,
+      minx=Math.min(ax,stopX),maxx=Math.max(ax,stopX),
+      miny=Math.min(ay,stopY),maxy=Math.max(ay,stopY);
+  function near(x0,y0,x1,y1,pad){
+   if(!Number.isFinite(x0)||!Number.isFinite(y0)||
+      !Number.isFinite(x1)||!Number.isFinite(y1)||
+      !Number.isFinite(pad))return true;
+   return Math.max(x0,x1)+pad>=minx&&
+          Math.min(x0,x1)-pad<=maxx&&
+          Math.max(y0,y1)+pad>=miny&&
+          Math.min(y0,y1)-pad<=maxy;
+  }
+  var owner=g.getTank&&g.getTank(b.ownerId),victim=null,hitT=0;
+  if(typeof g.areAllies==='function'&&!owner)return false;
+  for(var ti=0;ti<tanks.length;ti++){
+   var t=tanks[ti];if(!t||!t.alive||t.id===b.ownerId)continue;
+   var def=CLASSES[t.cls];
+   if(!def||!Number.isFinite(def.size)||!(def.size>0))return false;
+   var rr=b.r+def.size+3;
+   if(!near(t.__novaSweepMoveTime===g.time?t.__novaSweepPrevX:t.x,
+            t.__novaSweepMoveTime===g.time?t.__novaSweepPrevY:t.y,
+            t.x,t.y,rr+Math.max(4,dt*800)))continue;
+   /* No target-specific movement interpolation or guessed spawn history. */
+   if(t.__novaSweepMoveTime!==g.time||
+      !Number.isFinite(t.__novaSweepPrevX)||
+      !Number.isFinite(t.__novaSweepPrevY)||
+      !Number.isFinite(t.x)||!Number.isFinite(t.y)||
+      Math.hypot(t.x-t.__novaSweepPrevX,t.y-t.__novaSweepPrevY)>1e-8||
+      t.spawnShieldT>0||t.shieldT>0||t.bulwarkT>0||
+      t.tauntT>0||t.invulnT>0||
+      !Number.isFinite(t.hp)||t.hp<=b.dmg*2||
+      (typeof g.areAllies==='function'&&g.areAllies(owner,t)))
+    return false;
+   var fx=ax-t.x,fy=ay-t.y,
+       B=2*(fx*dx+fy*dy),C=fx*fx+fy*fy-rr*rr;
+   if(!(C>1e-8))return false;
+   var D=B*B-4*A*C;
+   if(!Number.isFinite(D)||
+      Math.abs(D)<=1e-10*(B*B+4*A*(fx*fx+fy*fy+rr*rr)))return false;
+   if(D<=0)continue;
+   var root=Math.sqrt(D),q=-.5*(B+(B<0?-root:root));
+   if(!q)return false;
+   var enter=Math.min(q/A,C/q),leave=Math.max(q/A,C/q);
+   if(leave<=0||enter>=wallT-1e-6)continue;
+   if(!(enter>1e-9))return false;
+   if(victim)return false; /* no shared-victim or simultaneous arbitration */
+   /* A hull overlapping cover is not a certified open-field contact. */
+   if(pointInsideSolid(wall.solid,t.x,t.y,def.size+3))return false;
+   victim=t;hitT=enter;
+  }
+  if(!victim)return false;
+  /* The first body may be geometrically clear while another moving body,
+   * neutral, drone, or projectile could change first contact or kill credit.
+   * Broad AABB vetoes are intentionally conservative and allocation-free. */
+  for(var si=0;si<shapes.length;si++){
+   var s=shapes[si];if(!s||!(s.hp>0))continue;
+   if(shapeWasTeleported(g,s))return false;
+   var st=shapeSweepStart(g,s),sx=st?st.x:s.x,sy=st?st.y:s.y;
+   if(near(sx,sy,s.x,s.y,(s.r||15)+b.r+Math.max(30,dt*800)))return false;
+  }
+  for(var di=0;di<drones.length;di++){
+   var d=drones[di];if(!d||!(d.hp>0)||d.ownerId===b.ownerId)continue;
+   var sx=d.__novaChronoDronePrevX,sy=d.__novaChronoDronePrevY;
+   if(!g.__novaShapeSweepActive||
+      d.__novaChronoDroneEpoch!==g.__novaShapeSweepEpoch||
+      !Number.isFinite(sx)||!Number.isFinite(sy)||
+      !Number.isFinite(d.x)||!Number.isFinite(d.y))return false;
+   if(near(sx,sy,d.x,d.y,(d.r||8)+b.r+1+Math.max(30,dt*2400)))return false;
+  }
+  for(var bi=0;bi<shots.length;bi++){
+   var o=shots[bi];if(!o||o===b||
+      o.__novaWallProofEpoch!==g.__novaWallProofEpoch)continue;
+   /* A previous terrain/shell event may already have moved or killed this
+    * shot; never reconstruct its pre-frame path from a frozen endpoint.
+    * Shell/blast side effects also have a larger competition radius. */
+   if(o.dead||o.shell||o.splash||o.__v17Cannon)return false;
+   if(!Number.isFinite(o.x)||!Number.isFinite(o.y)||
+      !Number.isFinite(o.vx)||!Number.isFinite(o.vy)||
+      !Number.isFinite(o.r)||!(o.r>0))return false;
+   var ox=o.x,oy=o.y,ot=Math.min(dt,Math.max(0,o.ttl||0)),
+       nx=ox+o.vx*ot,ny=oy+o.vy*ot,pad=o.r+b.r+2;
+   if(near(ox,oy,nx,ny,pad))return false;
+   var rr=o.r+CLASSES[victim.cls].size+3;
+   if(Math.max(ox,nx)+rr>=victim.x&&
+      Math.min(ox,nx)-rr<=victim.x&&
+      Math.max(oy,ny)+rr>=victim.y&&
+      Math.min(oy,ny)-rr<=victim.y)return false;
+  }
+  /* Commit exactly one canonical hull hit, then let the existing wall owner
+   * stop surviving piercing shots at the later physical wall. A pen=0 shot
+   * instead dies on the earlier hull, before it can touch that wall. */
+  var hx=ax+dx*hitT,hy=ay+dy*hitT;
+  if(typeof g.initBulletIntegrity==='function')g.initBulletIntegrity(b);
+  b.x=hx;b.y=hy;b.px=hx;b.py=hy;
+  g.damageTank(victim,b.dmg,b.ownerId,0,0);
+  b.hits++;b.pen--;
+  if(b.pen<0){
+   b.dead=true;b.vx=0;b.vy=0;
+   return 1; /* body consumed the shot; do not touch later cover */
+  }
+  (b.__novaDirectVictims||(b.__novaDirectVictims=new Set())).add(victim);
+  return 2; /* body hit committed; continue canonical wall response */
+ }
+
  var oldUpdateBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var terrain=ensureTerrain(this);
+ /* Snapshot all live competing shots BEFORE any shell/TTL/terrain pre-pass.
+  * A later shot cannot gain speculative priority because an earlier shot
+  * has already been killed, moved or spent by another pre-pass. */
+ var wallProofEpoch=(this.__novaWallProofEpoch||0)+1;
+ this.__novaWallProofEpoch=wallProofEpoch;
+ this.__novaWallProofHadShell=false;
  /* Bound pairwise geometry per frame, not total bullets: one expiring shot
   * remains eligible in a crowded but spatially separated firefight. When
   * projected work is too high, defer ALL shots to the existing path rather
@@ -1813,6 +1957,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
  if(dt>0&&this.bullets&&this.bullets.length){
   for(var countS=0;countS<this.bullets.length;countS++){
    var shellS=this.bullets[countS];
+   if(shellS&&!shellS.dead){
+    shellS.__novaWallProofEpoch=wallProofEpoch;
+    if(shellS.shell||shellS.splash||shellS.__v17Cannon)
+     this.__novaWallProofHadShell=true;
+   }
    if(shellS&&shellS.shell&&shellS.ttl>0&&shellS.ttl<dt)shellWork++;
   }
   var work=shellWork*(this.bullets.length+(this.tanks||[]).length+
@@ -1947,7 +2096,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
     }else isolatedTTLStationaryPiercingChain(this,liveBullet,dt,true);
    }
   }
- for(var i=0;i<this.bullets.length;i++){var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,sweepDt=dt;/* Terrain beyond physical projectile lifetime is unreachable, including shells. */if(Number.isFinite(b.ttl)){if(b.ttl<=0)continue;sweepDt=Math.min(dt,b.ttl);}var nx=ox+(b.vx||0)*sweepDt,ny=oy+(b.vy||0)*sweepDt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;if(fuseDefinitelyBeforeTerrain(this,b,dt,ox,oy,nx,ny,fh.hit))continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){b.__novaBreachAtTime=this.time;b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
+ for(var i=0;i<this.bullets.length;i++){var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,sweepDt=dt;/* Terrain beyond physical projectile lifetime is unreachable, including shells. */if(Number.isFinite(b.ttl)){if(b.ttl<=0)continue;sweepDt=Math.min(dt,b.ttl);}var nx=ox+(b.vx||0)*sweepDt,ny=oy+(b.vy||0)*sweepDt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;if(fuseDefinitelyBeforeTerrain(this,b,dt,ox,oy,nx,ny,fh.hit))continue;if(certifiedTankBeforePermanentWall(this,b,dt,ox,oy,nx,ny,fh)===1)continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){b.__novaBreachAtTime=this.time;b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
    /* The core still advances a dead bullet before removing it; a shell may
      * expire or leave the arena in that pass. Consume its one-time burst now. */
     if(b.shell&&this.clusterBurst){var childStart=this.bullets.length;this.clusterBurst(b);clearTerrainBurstChildren(this,s,h,childStart);b.shell=false;}if(b.splash&&this.splashAt)this.splashAt(h.x,h.y,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.dead=true;if(this.addFlash)this.addFlash(h.x,h.y,s.destructible?'#8fd4ff':'#b9c7e7',Math.min(46,14+(b.dmg||0)*.24));if(this.cam&&b.dmg>42)this.cam.shake=Math.max(this.cam.shake,.08);/* The materialized core still advances dead bullets before removing them. Freeze a terrain-killed projectile at its impact so its final trail cannot leak through cover. Breaching live shots keep their velocity above. */b.vx=0;b.vy=0;
