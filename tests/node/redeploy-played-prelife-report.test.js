@@ -102,7 +102,8 @@ test('60s natural cohort refuses to treat an unplayed death transition as real r
       fingerprintHash:fresh.fingerprintHash,deathTransitionTicks:fresh.deathTransitionTicks};
     results.push({seed,hz,layout:'Crossfire',rotation:0,fresh,returning});
   }
-  const s={policy:'harvest_roam',naturalExposurePilot:true,preludeSeconds:60,results};
+  const s={policy:'harvest_roam',naturalExposurePilot:true,preludeSeconds:60,
+    seconds:12,protocolVersion:'terrain-clear-front-arrival-v2',results};
   const summary=reportPlayedFirstLife(s,12);
   assert.equal(summary.independentSeeds,12);
   assert.equal(summary.firstLife.independentNaturalDeathSeeds,4);
@@ -142,7 +143,8 @@ test('natural cohort refuses missing death flags and impossible elapsed times',(
       fingerprintHash:fresh.fingerprintHash,deathTransitionTicks:42};
     results.push({seed,hz,layout:'Crossfire',rotation:0,fresh,returning});
   }
-  const s={policy:'harvest_roam',naturalExposurePilot:true,preludeSeconds:60,results};
+  const s={policy:'harvest_roam',naturalExposurePilot:true,preludeSeconds:60,
+    seconds:12,protocolVersion:'terrain-clear-front-arrival-v2',results};
   assert.equal(reportPlayedFirstLife(s,12).firstLife.independentForcedDeathSeeds,12);
   s.results[0].fresh.prelude.naturalDeath=undefined;
   assert.throws(()=>reportPlayedFirstLife(s,12),/Invalid natural-death exposure/);
