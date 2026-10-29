@@ -45,12 +45,8 @@ test('materialized Controller target preference and commitment are measured, not
  const results=[];
  for(const hz of [30,60,120])for(const seed of [1517840,1517854,1517875]){
   const player=arm(seed,hz,true),neutral=arm(seed,hz,false);
-  assert.equal(player.initial.targetId,player.initial.playerId,
-   'source-level human preference did not survive shipping composition');
-  assert.equal(neutral.initial.targetId,neutral.initial.npcId,
-   'identity-only control did not select the closer rival');
-  assert.ok(player.later.every(t=>t.targetId===player.initial.playerId),
-   'cached-target stickiness was not reproduced');
+  // This is a falsification pilot: do not require the hypothesized bias.
+  // The full overlay chain may override the local Live Vector plan.
   results.push({seed,hz,player,neutral});
  }
  const dir=path.join(root,'artifacts','controller-target-fairness');
@@ -59,5 +55,6 @@ test('materialized Controller target preference and commitment are measured, not
  console.log('NOVA_CONTROLLER_TARGET_BIAS '+JSON.stringify({scenarios:results.length,
   biasedSelections:results.filter(r=>r.player.initial.targetId===r.player.initial.playerId).length,
   identityControls:results.filter(r=>r.neutral.initial.targetId===r.neutral.initial.npcId).length,
-  stickyThroughSixSeconds:results.filter(r=>r.player.later.every(t=>t.targetId===r.player.initial.playerId)).length}));
+  stickyThroughSixSeconds:results.filter(r=>r.player.later.every(t=>t.targetId===r.player.initial.playerId)).length,
+  firstExamples:results.slice(0,3).map(r=>({hz:r.hz,seed:r.seed,player:r.player.initial,neutral:r.neutral.initial,later:r.player.later}))}));
 });
