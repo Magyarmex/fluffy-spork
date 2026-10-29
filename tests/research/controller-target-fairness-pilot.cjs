@@ -45,8 +45,13 @@ test('materialized Controller target preference and commitment are measured, not
  const results=[];
  for(const hz of [30,60,120])for(const seed of [1517840,1517854,1517875]){
   const player=arm(seed,hz,true),neutral=arm(seed,hz,false);
-  // This is a falsification pilot: do not require the hypothesized bias.
-  // The full overlay chain may override the local Live Vector plan.
+  // Fair Engagement must suppress Live Vector's legacy player preference.
+  assert.equal(player.initial.targetId,player.initial.npcId,
+   'human identity overrode a closer equally visible rival');
+  assert.equal(neutral.initial.targetId,neutral.initial.npcId,
+   'identity-only control did not select the closer rival');
+  assert.ok(player.later.every(t=>t.targetId===player.initial.npcId),
+   'Controller abandoned the closer rival for a farther human');
   results.push({seed,hz,player,neutral});
  }
  const dir=path.join(root,'artifacts','controller-target-fairness');
