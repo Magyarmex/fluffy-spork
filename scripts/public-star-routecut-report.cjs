@@ -30,6 +30,9 @@ function collate(dir){
       !finite(p.reportCues)||p.cues!==p.visibleCues+p.reportCues||
       !finite(p.near100Frames)||!finite(p.near250Frames)||
       !finite(p.routeActions)||p.routeActions<0||p.routeActions>p.cues||
+      !finite(p.routeVisibleActions)||!finite(p.routeReportActions)||
+      p.routeVisibleActions<0||p.routeReportActions<0||
+      p.routeVisibleActions+p.routeReportActions!==p.routeActions||
       (p.minStarDistanceAfterReport!==null&&
        (!finite(p.minStarDistanceAfterReport)||p.minStarDistanceAfterReport<0)))
      throw Error('invalid public pilot audit: '+name);
@@ -38,6 +41,7 @@ function collate(dir){
     announcements:x.result.audit.announcements,
     cues:p.cues,visibleCues:p.visibleCues,reportCues:p.reportCues,
     routeActions:p.routeActions,
+    routeVisibleActions:p.routeVisibleActions,routeReportActions:p.routeReportActions,
     near100Frames:p.near100Frames,near250Frames:p.near250Frames,
     minDistance:p.minStarDistanceAfterReport,censored:x.censored
    };
@@ -58,6 +62,8 @@ function collate(dir){
   controlAnnouncements:pairs.reduce((s,p)=>s+p.arms.control.announcements,0),
   routecutAnnouncements:pairs.reduce((s,p)=>s+p.arms.routecut.announcements,0),
   routecutActions:pairs.reduce((s,p)=>s+p.arms.routecut.routeActions,0),
+  routecutReportActions:pairs.reduce((s,p)=>s+p.arms.routecut.routeReportActions,0),
+  routecutVisibleActions:pairs.reduce((s,p)=>s+p.arms.routecut.routeVisibleActions,0),
   routecutPublicCues:pairs.reduce((s,p)=>s+p.arms.routecut.reportCues,0),
   routecutVisibleCues:pairs.reduce((s,p)=>s+p.arms.routecut.visibleCues,0),
   routecutNear100Frames:pairs.reduce((s,p)=>s+p.arms.routecut.near100Frames,0),
