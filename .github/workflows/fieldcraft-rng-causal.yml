@@ -1,0 +1,40 @@
+name: NOVA Fieldcraft RNG Causal A/B
+
+on:
+  push:
+    branches:
+      - 'nova/fieldcraft-rng-*'
+    paths:
+      - 'tests/research/fieldcraft-rng-causal-pilot.cjs'
+      - 'nova-updates/menu-slot-compat-v1.7.8.js'
+      - '.github/workflows/fieldcraft-rng-causal.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: nova-fieldcraft-rng-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  causal-ab:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Real Fieldcraft rotation versus matched gameplay
+        env:
+          NOVA_OVERLAY_AUDIO_RNG_CAUSAL: '1'
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/fieldcraft-rng-causality
+          node --test tests/research/fieldcraft-rng-causal-pilot.cjs 2>&1 | tee artifacts/fieldcraft-rng-causality/run.log
+      - name: Preserve causal A/B results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-fieldcraft-rng-causal
+          path: artifacts/fieldcraft-rng-causality/
+          if-no-files-found: warn
+          retention-days: 30
