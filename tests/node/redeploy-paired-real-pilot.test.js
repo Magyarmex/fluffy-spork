@@ -179,7 +179,7 @@ function run(seed,choice,hz,seconds,policy='navigate',preludeSeconds=0,experimen
   if(choice==='return')assert.ok(startDistance>=420-1e-6&&startDistance<=850+1e-6,
    'RETURN must actually use the intended geographic sampler');
   let routeRequests=0,routeWaypoints=0,frontReached=null,blockedNearFrontSeconds=0,firstVisibleEnemy=null,
-   firstVisibleNeutral=null;
+   firstFairVisibleEnemy=null,firstVisibleNeutral=null;
   let distanceTravelled=0,postFrontTravelled=0,last={x:p.x,y:p.y};
   let neutralXPAtFront=null,firstNeutralXP=null;
   const fair=g.__testFair;
@@ -246,8 +246,21 @@ function run(seed,choice,hz,seconds,policy='navigate',preludeSeconds=0,experimen
      (!g.hasLineOfSight||g.hasLineOfSight(p.x,p.y,t.x,t.y,2)));
     if(seen)firstVisibleNeutral=g.time;
    }
+   if(firstFairVisibleEnemy===null){
+    // Stronger viewport-and-camera visibility observation, never pilot steering.
+    const ext=fair?.viewportHalfExtents?.(g),cam=g.cam||{};
+    if(ext&&ext.x>0&&ext.y>0){
+     const cx=Number.isFinite(cam.x)?cam.x:p.x,
+      cy=Number.isFinite(cam.y)?cam.y:p.y;
+     const seen=g.tanks.some(t=>t&&t!==p&&t.alive&&t.ai&&
+      Math.abs(t.x-p.x)<=ext.x&&Math.abs(t.y-p.y)<=ext.y&&
+      Math.abs(t.x-cx)<=ext.x&&Math.abs(t.y-cy)<=ext.y&&
+      (!g.hasLineOfSight||g.hasLineOfSight(p.x,p.y,t.x,t.y,2)));
+     if(seen)firstFairVisibleEnemy=g.time;
+    }
+   }
    if(firstVisibleEnemy===null){
-    // Observation only, not an input to the scripted player's movement.
+    // Legacy 600u/LoS proxy, retained for old report compatibility.
     const visible=g.tanks.some(t=>t&&t!==p&&t.alive&&t.ai&&
      Math.hypot(t.x-p.x,t.y-p.y)<600&&
      (!g.hasLineOfSight||g.hasLineOfSight(p.x,p.y,t.x,t.y,2)));
@@ -267,6 +280,7 @@ function run(seed,choice,hz,seconds,policy='navigate',preludeSeconds=0,experimen
    frontReached:frontReached===null?null:+frontReached.toFixed(3),
    blockedNearFrontSeconds:+blockedNearFrontSeconds.toFixed(3),
    firstVisibleEnemy:firstVisibleEnemy===null?null:+firstVisibleEnemy.toFixed(3),
+   firstFairVisibleEnemy:firstFairVisibleEnemy===null?null:+firstFairVisibleEnemy.toFixed(3),
    firstVisibleNeutral:firstVisibleNeutral===null?null:+firstVisibleNeutral.toFixed(3),
    hp:+p.hp.toFixed(2),alive:!!p.alive,status:g.status,
    score:+(Number(p.score)||0).toFixed(2),xp:+(Number(p.xp)||0).toFixed(2),
