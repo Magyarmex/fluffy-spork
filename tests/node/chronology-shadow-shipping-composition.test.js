@@ -973,7 +973,7 @@ test('full shipping combat stack preserves two high-upgrade Tempest Square conta
 /* Cross-layer acceptance: the full materialized Sniper → Polish → Battlefield
  * → Apex → Performance → Precision stack must preserve the first physical
  * hull contact before a later destructible barricade. */
-test('full shipping overlay stack: nonpiercing hull before destructible cover',()=>{
+test('full shipping overlay stack: pen2 hull before destructible cover',()=>{
  const {g}=boot();
  g.time=1;g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=1;
  g.tanks=[{kind:'tank',id:2,cls:'scout',x:60,y:0,hp:100,alive:true,
