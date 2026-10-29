@@ -1,0 +1,47 @@
+name: NOVA Overlay Audio RNG Causal A/B
+
+on:
+  push:
+    branches:
+      - 'nova/overlay-audio-rng-isolation-*'
+    paths:
+      - 'tests/research/overlay-audio-rng-causal-pilot.cjs'
+      - 'tests/research/audio-rng-causal-pilot.cjs'
+      - 'nova-updates/polish-v1.3.1.js'
+      - 'nova-updates/sniper-v1.2.0.js'
+      - 'nova-updates/sniper-lineage-v1.4.1.js'
+      - 'nova-updates/controller-v1.3.0.js'
+      - 'nova-updates/stability-v1.4.0.js'
+      - 'nova-updates/precision-contact-v1.8.3.js'
+      - 'nova-updates/sensory-feedback-v1.9.1.js'
+      - '.github/workflows/overlay-audio-rng-causal.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: nova-overlay-audio-rng-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  causal-ab:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Real-game seven-owner audio RNG causal A/B
+        env:
+          NOVA_OVERLAY_AUDIO_RNG_CAUSAL: '1'
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/overlay-audio-rng-causality
+          node --test tests/research/overlay-audio-rng-causal-pilot.cjs 2>&1 | tee artifacts/overlay-audio-rng-causality/run.log
+      - name: Preserve all causal results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-overlay-audio-rng-causal
+          path: artifacts/overlay-audio-rng-causality/
+          if-no-files-found: warn
+          retention-days: 30
