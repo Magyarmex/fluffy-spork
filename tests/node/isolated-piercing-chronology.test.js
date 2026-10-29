@@ -1637,17 +1637,23 @@ for(const optimized of [false,true]) {
     ' partial pen-2 prefix retains original projectile integrity',()=>{
     const Game=boot(undefined,optimized),g=threeHullPen2(Game);
     const bullet=g.bullets[0];
-    g.initBulletIntegrity=function(b){
-      if(b.maxHp!==undefined)return;
-      b.integrityPenAtInit=b.pen;
-      b.maxHp=b.dmg*(1+Math.min(8,Math.max(0,b.pen))*.055);
-      b.hp=b.maxHp;
-    };
+    const marker='    initBulletIntegrity(b) {';
+    const start=html.indexOf(marker);
+    assert.ok(start>=0,'materialized core integrity owner missing');
+    let end=start+marker.length,depth=1;
+    while(depth&&end<html.length){
+      if(html[end]==='{')depth++;
+      else if(html[end]==='}')depth--;
+      end++;
+    }
+    assert.equal(depth,0);
+    g.initBulletIntegrity=new Function('return function(b){'+
+      html.slice(start+marker.length,end-1)+'}')();
     g.time+=1/120;g.updateBullets(1/120);
     assert.equal(bullet.pen,0,'two certified contacts consumed');
-    assert.equal(bullet.integrityPenAtInit,2,
-      'interception integrity must be calculated before consuming pen');
-    assert.equal(bullet.maxHp,20*1.11);
+    const expected=Math.max(1,20*(.72+3*.08)*(1+2*.055));
+    assert.equal(bullet.maxHp,expected,
+      'real core must initialize interception HP with original pen=2');
     assert.equal(bullet.hp,bullet.maxHp);
   });
 }
