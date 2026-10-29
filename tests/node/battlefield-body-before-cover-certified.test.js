@@ -556,3 +556,18 @@ for(const optimized of [false,true]){
   });
  }
 }
+
+/* Reachable upgraded Marksman geometry: base speed 1050, eight bullet-speed
+ * upgrades, base damage 21 and canonical size scaling. Pen3/4 can be reached
+ * via penetration upgrades; the shot still reaches this hull before cover. */
+for(const optimized of [false,true])for(const pen of [3,4]){
+ test((optimized?'Battlefield + Performance':'Battlefield')+
+  ': upgraded Marksman pen'+pen+' hull precedes intact barricade at 30Hz',()=>{
+  const speed=1050*(1+.085*8),radius=5.5*(1+21*.0085);
+  const r=run(boot(optimized),{fps:30,speed,wall:55,target:29,
+   pen,radius,damage:21,destructible:true,coverHp:1000});
+  assert.deepEqual(r.hits,[2]);assert.equal(r.hp,79);
+  assert.equal(r.g.__novaTerrain[0].hp,979);
+  assert.equal(r.g.bullets.length,0);
+ });
+}
