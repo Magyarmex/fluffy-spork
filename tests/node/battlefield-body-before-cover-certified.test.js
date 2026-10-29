@@ -74,7 +74,7 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,
  shield=false,otherTank=false,ttl=1,pen=1,radius=3,
  active=true,knock=0,allied=false,destructible=false,damage=10,
  linearMove=null,tamperMove=false,doubleMove=false,
- otherNearMovingStart=false,bornThisFrame=false}={}){
+ otherNearMovingStart=false,bornThisFrame=false,coverHp=1000}={}){
  const g=new Game(),dt=1/fps;
  g.__novaShapeSweepActive=active;
  g.areAllies=()=>allied;
@@ -86,8 +86,8 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,
   hp:100,alive:true,__novaSweepMoveTime:1,__novaSweepPrevX:30,__novaSweepPrevY:0});
  if(otherShape)g.shapes.push({kind:'shape',id:4,x:30,y:0,r:8,hp:100});
  g.__novaTerrain=[wallShape==='rect'
-  ?{id:-1,shape:'rect',x:wall,y:wallY,w:10,h:80,solid:true,destructible,hp:destructible?1000:0,maxHp:destructible?1000:0}
-   :{id:-1,shape:'circle',x:wall,y:wallY,r:5,solid:true,destructible,hp:destructible?1000:0,maxHp:destructible?1000:0}];
+  ?{id:-1,shape:'rect',x:wall,y:wallY,w:10,h:80,solid:true,destructible,hp:destructible?coverHp:0,maxHp:destructible?coverHp:0}
+   :{id:-1,shape:'circle',x:wall,y:wallY,r:5,solid:true,destructible,hp:destructible?coverHp:0,maxHp:destructible?coverHp:0}];
  g.bullets=[{kind:'bullet',id:10,ownerId:1,x:0,y:0,
   vx:speed,vy,r:radius,dmg:damage,knock,ttl,pen,hits:0,dead:false,shell:false,beam:false}];
  if(otherBullet)g.bullets.push({kind:'bullet',id:11,ownerId:4,
@@ -184,8 +184,10 @@ for(const optimized of [false,true]){
  test(label+': allied tank cannot be damaged by the shortcut',()=>{
   assert.deepEqual(run(boot(optimized),{allied:true}).hits,[]);
  });
- test(label+': destructible cover remains with existing breach authority',()=>{
-  assert.deepEqual(run(boot(optimized),{destructible:true}).hits,[]);
+ test(label+': pen1 hull contact precedes damage to later destructible cover',()=>{
+  const r=run(boot(optimized),{destructible:true});
+  assert.deepEqual(r.hits,[2]);assert.equal(r.hp,90);
+  assert.equal(r.g.__novaTerrain[0].hp,990);
  });
  test(label+': pen=5 remains outside this bounded proof',()=>{
   const r=run(boot(optimized),{pen:5});
@@ -404,8 +406,8 @@ for(const optimized of [false,true]){
     linearMove:{vx:-600,vy:0},tamperMove:true});
    assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
   });
-  test(label+': piercing rounds retain existing cover authority at '+fps+'Hz',()=>{
-   const r=run(Game,{fps,speed:200*fps,pen:1,destructible:true});
+  test(label+': pen3 breach chain still abstains at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:200*fps,pen:3,destructible:true});
    assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
    assert.equal(r.g.__novaTerrain[0].hp,990);
   });
@@ -439,18 +441,18 @@ test('1,000 seeded nonpiercing hull/destructible-cover orders at 30–240 Hz',()
  assert.ok(frontCount>400&&behindCount>300,'both orders exercised');
 });
 
-/* Reachable build, not just synthetic hypervelocity: the existing Marksman
- * eight-speed-upgrade 30Hz corridor from the permanent-wall regression also
- * exists with a destructible barricade behind the Scout. */
+/* Reachable build, not just synthetic hypervelocity: canonical Marksman
+ * begins with pen=2, base speed 1050 and damage 21. Its eight-speed-upgrade
+ * 30Hz corridor can hit a Scout before a destructible barricade. */
 for(const optimized of [false,true]){
  test((optimized?'Battlefield + Performance':'Battlefield')+
-  ': upgraded Marksman nonpiercing hit beats later destructible cover at 30Hz',()=>{
+  ': upgraded Marksman pen2 hit precedes later destructible cover at 30Hz',()=>{
   const speed=1050*(1+.085*8);
   const radius=5.5*(1+21*.0085);
   const r=run(boot(optimized),{fps:30,speed,wall:55,target:29,
-   pen:0,radius,damage:21,destructible:true});
+   pen:2,radius,damage:21,destructible:true});
   assert.deepEqual(r.hits,[2]);assert.equal(r.hp,79);
-  assert.equal(r.g.__novaTerrain[0].hp,1000);
+  assert.equal(r.g.__novaTerrain[0].hp,979);
  });
 }
 
@@ -484,3 +486,23 @@ test('1,000 oblique 2D nonpiercing shots respect destructible first surface',()=
  }
  assert.ok(hits>400&&misses>100,'oracle must exercise both outcomes');
 });
+
+/* Penetration 1/2 may resolve a hull and later cover, but cannot continue
+ * beyond that cover in the same frame, even if the barricade is destroyed. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'Battlefield + Performance':'Battlefield';
+ for(const fps of [30,60,120,240])for(const pen of [1,2]){
+  test(label+': pen'+pen+' hull then destructible cover at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:200*fps,pen,destructible:true});
+   assert.deepEqual(r.hits,[2]);assert.equal(r.hp,90);
+   assert.equal(r.g.__novaTerrain[0].hp,990);
+   assert.equal(r.g.bullets.length,0);
+  });
+  test(label+': pen'+pen+' hull then breached cover cannot continue at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:200*fps,pen,destructible:true,coverHp:5});
+   assert.deepEqual(r.hits,[2]);assert.equal(r.hp,90);
+   assert.equal(r.g.__novaTerrain[0].hp,0);
+   assert.equal(r.g.bullets.length,0);
+  });
+ }
+}
