@@ -56,11 +56,9 @@ function reportPlayedFirstLife(report, expectedSeeds = 36) {
   const clustered = field => [...bySeed.values()].map(group => mean(group.map(x => x[field])));
   const metric = field => ({mean:mean(rows.map(x => x[field])),
     seedClusterBootstrap95:clusteredBootstrap(clustered(field))});
-  const naturalSeeds = [...bySeed.values()].filter(group => {
-    if(group[0].naturalDeath !== group[1].naturalDeath)
-      throw Error('Frame-rate disagreement about natural death: '+group[0].seed);
-    return group[0].naturalDeath;
-  }).length;
+  const naturalSeeds = [...bySeed.values()].filter(group => group.every(x => x.naturalDeath)).length;
+  const discordantSeeds = [...bySeed.values()].filter(group =>
+    group[0].naturalDeath !== group[1].naturalDeath).length;
   const changed = rows.filter(x => x.preludeChangedShapes > 0 ||
     x.preludeChangedEnemies > 0 || x.preludeChangedTerrain > 0).length;
   return {
@@ -70,7 +68,8 @@ function reportPlayedFirstLife(report, expectedSeeds = 36) {
     layouts:[...layouts].sort(),
     firstLife:{naturalDeaths:rows.filter(x => x.naturalDeath).length,
       independentNaturalDeathSeeds:naturalSeeds,
-      independentForcedDeathSeeds:bySeed.size-naturalSeeds,
+      independentForcedDeathSeeds:bySeed.size-naturalSeeds-discordantSeeds,
+      fpsDiscordantDeathSeeds:discordantSeeds,
       naturalDeathExposureRate:naturalSeeds/bySeed.size,
       censoringNote:'Forced-death seeds are retained, not reclassified as naturally dead; do not estimate natural-death strategy effects from them.',
       worldsWithPhysicalChange:changed,
