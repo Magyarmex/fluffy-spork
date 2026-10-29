@@ -10,10 +10,11 @@ function fixture(){
    enemyBodiesHash:'body-'+seed,neutralBodiesHash:'neutral-'+seed,
    enemyFullStateHash:'full-ai-'+seed,neutralFullStateHash:'full-neutral-'+seed};
   const commonSafeSpawnStats={calls:8,attempts:12,maxAttempts:3};
+  const commonBaseChoice=seed===101?'fresh':'return';
   const arm=choice=>({
-   choice,baseChoice:'fresh',origin:{x:0,y:0},
+   choice,baseChoice:commonBaseChoice,origin:{x:0,y:0},
    prelude:{ticks:240,elapsed:8},spawn:spawns[choice],
-   generatedSpawn:spawns.fresh,postInsertion,
+   generatedSpawn:spawns[commonBaseChoice],postInsertion,
    rngDrawsAtInsertion:1900,commonSafeSpawnStats,
    nearestEnemyDistance:choice==='fresh'?1100:1300,
    neutralXP:choice==='fresh'?10:16,
@@ -24,6 +25,7 @@ function fixture(){
    travelled:choice==='fresh'?200:130,routeRequests:choice==='fresh'?3:1
   });
   results.push({seed,hz,layout:'Crossfire',rotation:0,origin:{x:0,y:0},
+   commonBaseChoice,
    spawns,common:{fresh:arm('fresh'),return:arm('return')},
    native:{fresh:{nearestEnemyDistance:1200},return:{nearestEnemyDistance:1250}}});
  }
@@ -35,6 +37,7 @@ test('common-safe report preserves one independent seed per FPS pair',()=>{
  assert.equal(out.independentSeeds,2);
  assert.equal(out.fpsRepeatedObservations,4);
  assert.equal(out.spawnSafety.safeArms,8);
+ assert.deepEqual(out.balancedNativeBasesBySeed,{fresh:1,return:1});
  assert.equal(out.spawnSafety.matchedEnemyNeutralWorldPairs,4);
  assert.equal(out.spawnSafety.generatedEnemies,32);
  assert.equal(out.spawnSafety.totalCandidateAttempts,48);
