@@ -622,3 +622,21 @@ for(const optimized of [false,true]){
   });
  }
 }
+
+/* Reachable 30Hz Marksman geometry, not a 6,000u/s synthetic bullet.
+ * Base 1050 speed × eight 8.5% speed upgrades travels 58.8u/frame.
+ * Cover face ~9, wall face ~27, rear Scout hull entry ~36.5.
+ * The rear hull is near the wall, so a padded-AABB-only veto would
+ * incorrectly abandon this real-build corridor. */
+for(const optimized of [false,true])for(const pen of [3,4]){
+ test((optimized?'Battlefield + Performance':'Battlefield')+
+  ': upgraded Marksman pen'+pen+' breaches then stops at nearby wall at 30Hz',()=>{
+  const speed=1050*(1+.085*8),radius=5.5*(1+21*.0085);
+  const r=run(boot(optimized),{fps:30,speed,pen,radius,damage:21,
+   destructible:true,wall:17,laterWall:35,target:60,coverHp:5});
+  assert.deepEqual(r.hits,[],'rear Scout cannot be hit through permanent cover');
+  assert.equal(r.hp,100);
+  assert.equal(r.g.__novaTerrain[0].hp,0);
+  assert.equal(r.g.__novaTerrain[1].solid,true);
+ });
+}
