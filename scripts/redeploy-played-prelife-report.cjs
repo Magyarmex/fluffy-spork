@@ -56,6 +56,11 @@ function reportPlayedFirstLife(report, expectedSeeds = 36) {
   const clustered = field => [...bySeed.values()].map(group => mean(group.map(x => x[field])));
   const metric = field => ({mean:mean(rows.map(x => x[field])),
     seedClusterBootstrap95:clusteredBootstrap(clustered(field))});
+  const naturalSeeds = [...bySeed.values()].filter(group => {
+    if(group[0].naturalDeath !== group[1].naturalDeath)
+      throw Error('Frame-rate disagreement about natural death: '+group[0].seed);
+    return group[0].naturalDeath;
+  }).length;
   const changed = rows.filter(x => x.preludeChangedShapes > 0 ||
     x.preludeChangedEnemies > 0 || x.preludeChangedTerrain > 0).length;
   return {
@@ -64,6 +69,10 @@ function reportPlayedFirstLife(report, expectedSeeds = 36) {
     independentSeeds:bySeed.size, fpsPairedObservations:rows.length,
     layouts:[...layouts].sort(),
     firstLife:{naturalDeaths:rows.filter(x => x.naturalDeath).length,
+      independentNaturalDeathSeeds:naturalSeeds,
+      independentForcedDeathSeeds:bySeed.size-naturalSeeds,
+      naturalDeathExposureRate:naturalSeeds/bySeed.size,
+      censoringNote:'Forced-death seeds are retained, not reclassified as naturally dead; do not estimate natural-death strategy effects from them.',
       worldsWithPhysicalChange:changed,
       meanElapsed:mean(rows.map(x => x.preludeElapsed)),
       meanTravel:mean(rows.map(x => x.preludeTravel)),
@@ -83,12 +92,16 @@ function reportPlayedFirstLife(report, expectedSeeds = 36) {
     limitations:['Enemy/neutral RNG and spawn placement remain coupled to redeploy choice.',
       'The first-life policy is automated and capped at a scripted window.',
       'A repeated FPS result does not double the independent sample size.',
-      'The experiment cannot establish human fun, skill or device performance.']
+      'The experiment cannot establish human fun, skill or device performance.',
+      'Natural-death exposure is a descriptive count, not a causal estimate; non-death seeds were forced to redeploy.']
   };
 }
 if (require.main === module) {
   if (process.argv.length !== 3) throw Error('Usage: node scripts/redeploy-played-prelife-report.cjs results-harvest_roam.json');
-  const summary = reportPlayedFirstLife(JSON.parse(fs.readFileSync(process.argv[2], 'utf8')));
+  const expectedSeeds = Number(process.env.NOVA_REDEPLOY_EXPECTED_SEEDS || 36);
+  if(!Number.isInteger(expectedSeeds)||expectedSeeds<1||expectedSeeds>36)
+    throw Error('Expected seeds must be an integer between 1 and 36');
+  const summary = reportPlayedFirstLife(JSON.parse(fs.readFileSync(process.argv[2], 'utf8')),expectedSeeds);
   const output = process.argv[2].replace(/\.json$/, '-summary.json');
   fs.writeFileSync(output, JSON.stringify(summary, null, 2));
   console.log(JSON.stringify(summary, null, 2));
