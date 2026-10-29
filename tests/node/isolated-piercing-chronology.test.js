@@ -1628,3 +1628,26 @@ for(const optimized of [false,true]) {
       'the remaining penetration reaches the third hull in a later frame');
   });
 }
+
+/* Integrity is calculated from the penetration at launch. A partial prefix
+ * must not initialize the surviving bullet AFTER consuming its first two
+ * contacts, which would silently weaken projectile-interception HP. */
+for(const optimized of [false,true]) {
+  test((optimized?'optimized':'baseline')+
+    ' partial pen-2 prefix retains original projectile integrity',()=>{
+    const Game=boot(undefined,optimized),g=threeHullPen2(Game);
+    const bullet=g.bullets[0];
+    g.initBulletIntegrity=function(b){
+      if(b.maxHp!==undefined)return;
+      b.integrityPenAtInit=b.pen;
+      b.maxHp=b.dmg*(1+Math.min(8,Math.max(0,b.pen))*.055);
+      b.hp=b.maxHp;
+    };
+    g.time+=1/120;g.updateBullets(1/120);
+    assert.equal(bullet.pen,0,'two certified contacts consumed');
+    assert.equal(bullet.integrityPenAtInit,2,
+      'interception integrity must be calculated before consuming pen');
+    assert.equal(bullet.maxHp,20*1.11);
+    assert.equal(bullet.hp,bullet.maxHp);
+  });
+}
