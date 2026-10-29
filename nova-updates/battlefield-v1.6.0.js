@@ -2019,11 +2019,31 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      shots.length>12)return false;
   /* A second barricade is eligible ONLY if it provably survives this
    * weakened round. A second breach still needs full event arbitration. */
-  var later=firstSolidHit(g,ax,ay,ex,ey,b.r*.45);
+  var later=firstSolidHit(g,ax,ay,ex,ey,b.r*.45),secondBreach=null;
+  /* Two weak barricades can be destroyed in one frame. The existing
+   * first-solid query sees only the second barricade, so a permanent
+   * pillar behind it used to become transparent. Certify the exact next
+   * permanent surface without changing terrain during the read-only proof.
+   * Other cover chains and uncertain event order still abstain. */
+  if(later&&later.solid&&later.solid.destructible&&
+     Number.isFinite(later.solid.hp)&&later.solid.hp>0&&
+     later.solid.hp<=b.dmg*(b.beam?.92:1)&&b.pen>=2){
+   var second=later,candidates=terrainCandidates(g,ax,ay,ex,ey,b.r*.45),
+       next=null;
+   for(var sc=0;sc<candidates.length;sc++){
+    var solid=candidates[sc];
+    if(solid===second.solid)continue;
+    var hit=solidHit(solid,ax,ay,ex,ey,b.r*.45);
+    if(!hit||hit.t<=second.hit.t+1e-6)continue;
+    if(!next||hit.t<next.hit.t)next={solid:solid,hit:hit};
+   }
+   if(!next||next.solid.destructible)return false;
+   secondBreach=second;later=next;
+  }
   if(!later||!later.solid||
      (later.solid.destructible&&
       !(Number.isFinite(later.solid.hp)&&
-        later.solid.hp>b.dmg*1.000001))||
+        later.solid.hp>b.dmg*(b.beam?.92:1)*1.000001))||
      !(later.hit&&later.hit.t>first.hit.t+1e-6&&
        later.hit.t<=1))return false;
   var stopX=ax+(ex-ax)*later.hit.t,stopY=ay+(ey-ay)*later.hit.t,
@@ -2107,6 +2127,17 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   /* The FIRST cover breach already happened exactly once. A certified
    * surviving second cover receives its own canonical structural damage,
    * impact sound and debris before this round stops. */
+  if(secondBreach){
+   /* Commit the certified second breach exactly once, in physical order.
+    * The first cover already consumed its penetration and integrity; the
+    * second must do so too before the later permanent wall stops the shot. */
+   b.x=secondBreach.hit.x;b.y=secondBreach.hit.y;b.px=b.x;b.py=b.y;
+   var breached=damageCover(g,secondBreach.solid,b.dmg,b.ownerId,b.x,b.y,b);
+   if(!breached){b.dead=true;b.vx=0;b.vy=0;return true;}
+   b.pen-=2;
+   if(g.weakenBullet)g.weakenBullet(b,(b.maxHp||b.dmg)*.38);
+   if(b.dead){b.vx=0;b.vy=0;return true;}
+  }
   b.x=later.hit.x;b.y=later.hit.y;b.px=b.x;b.py=b.y;
   if(later.solid.destructible)
    damageCover(g,later.solid,b.dmg,b.ownerId,b.x,b.y,b);
