@@ -1311,13 +1311,13 @@ for(const optimized of [false,true]){
 }
 
 
-/* Run 423: TTL-expiring high-penetration shots have the same certified
- * three-body chronology as pen=2. The 15,000u/s stress geometry deliberately
- * keeps the first target outside the initial 240Hz core endpoint (62.5u),
- * so every FPS tests the SAME fully certified expiry corridor rather than
- * the separate unresolved cross-frame victim-identity problem.
- * This is NOT permission to backdate live pen>=3 shots, four-body chains,
- * cover breaches or uncertain motion. */
+/* Run 423 established three-body TTL-expiry chronology for pen=3/4.
+ * Run 436 extends that same conservative proof to four/five stationary
+ * nonlethal hulls. The 15,000u/s stress geometry keeps the first target
+ * outside the initial 240Hz core endpoint (62.5u), testing the same expiry
+ * corridor rather than unresolved cross-frame victim-identity chronology.
+ * This is NOT permission to backdate live pen>=3 shots, cover breaches,
+ * contested contacts or uncertain motion. */
 function highPenTTLWorld(Game, pen=3, reverse=false) {
   const {g,a,b}=makeWorld(Game,103,reverse);
   a.x=88;
