@@ -153,3 +153,33 @@ test('cancellation restores preview even when Controller dies during drag',()=>{
   assert.deepEqual(snap(state(g)),prior);
   assert.equal(g.sfx.orders,0);
 });
+
+test('capture loss aborts preview without inventing a release',()=>{
+  const {g,emit}=boot(),prior=setPrior(g,'target');
+  emit('pointerdown',21,100,100);
+  emit('pointermove',21,600,350);
+  emit('lostpointercapture',21,600,350);
+  assert.deepEqual(snap(state(g)),prior);
+  assert.equal(g.sfx.orders,0);
+  emit('pointerup',21,600,350);
+  assert.deepEqual(snap(state(g)),prior);
+});
+test('synchronous capture-loss callback during ordinary release cannot cancel a valid command',()=>{
+  const {g,emit,pad}=boot();setPrior(g);
+  pad.releasePointerCapture=id=>emit('lostpointercapture',id);
+  emit('pointerdown',21,100,100);
+  emit('pointermove',21,600,350);
+  emit('pointerup',21,600,350);
+  assert.equal(g.sfx.orders,1);
+  assert.equal(state(g).preview,false);
+  assert.equal(state(g).mode,'point');
+});
+test('cancel is safe if releasing capture synchronously reports capture loss',()=>{
+  const {g,emit,pad}=boot(),prior=setPrior(g,'target');
+  pad.releasePointerCapture=id=>emit('lostpointercapture',id);
+  emit('pointerdown',21,100,100);
+  emit('pointermove',21,600,350);
+  emit('pointercancel',21,600,350);
+  assert.deepEqual(snap(state(g)),prior);
+  assert.equal(g.sfx.orders,0);
+});
