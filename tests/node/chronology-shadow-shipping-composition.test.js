@@ -969,3 +969,24 @@ test('full shipping combat stack preserves two high-upgrade Tempest Square conta
   assert.equal(b.hp,47,'second physically reached Square');
   assert.equal(g.bullets.length,0,'penetration exhausted exactly once');
 });
+
+/* Cross-layer acceptance: the full materialized Sniper → Polish → Battlefield
+ * → Apex → Performance → Precision stack must preserve the first physical
+ * hull contact before a later destructible barricade. */
+test('full shipping overlay stack: pen2 hull before destructible cover',()=>{
+ const {g}=boot();
+ g.time=1;g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=1;
+ g.tanks=[{kind:'tank',id:2,cls:'scout',x:60,y:0,hp:100,alive:true,
+  __novaSweepMoveTime:1,__novaSweepPrevX:60,__novaSweepPrevY:0}];
+ g.__novaTerrain=[{id:-1,shape:'rect',x:120,y:0,w:10,h:80,
+  solid:true,destructible:true,hp:1000,maxHp:1000}];
+ let hits=0;
+ g.damageTank=function(t,dmg){hits++;t.hp-=dmg;};
+ g.bullets=[ordinaryShot(10,0,6000,1)];
+ g.bullets[0].pen=2; /* canonical Marksman penetration budget */
+ g.updateBullets(1/30);
+ assert.equal(hits,1,'earlier physical hull must receive canonical damage');
+ assert.equal(g.tanks[0].hp,80);
+ assert.equal(g.__novaTerrain[0].hp,980,'later cover takes the surviving hit');
+ assert.equal(g.bullets.length,0,'pen2 shot stops after hull and cover');
+});
