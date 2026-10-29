@@ -983,9 +983,10 @@ test('full shipping overlay stack: nonpiercing hull before destructible cover',(
  let hits=0;
  g.damageTank=function(t,dmg){hits++;t.hp-=dmg;};
  g.bullets=[ordinaryShot(10,0,6000,1)];
+ g.bullets[0].pen=2; /* canonical Marksman penetration budget */
  g.updateBullets(1/30);
  assert.equal(hits,1,'earlier physical hull must receive canonical damage');
  assert.equal(g.tanks[0].hp,80);
- assert.equal(g.__novaTerrain[0].hp,1000,'later cover must remain intact');
- assert.equal(g.bullets.length,0,'nonpiercing shot is consumed at the hull');
+ assert.equal(g.__novaTerrain[0].hp,980,'later cover takes the surviving hit');
+ assert.equal(g.bullets.length,0,'pen2 shot stops after hull and cover');
 });
