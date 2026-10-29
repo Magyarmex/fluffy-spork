@@ -146,7 +146,7 @@ function firstDifference(a,b){
   if(JSON.stringify(a.trace[i])!==JSON.stringify(b.trace[i]))return a.trace[i].elapsed;
  return a.finalHash===b.finalHash?null:'final-only';
 }
-test('canonical audio noise-buffer RNG causal A/B in 12 seeds at 30/60Hz',()=>{
+if (!process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL) test('canonical audio noise-buffer RNG causal A/B in 12 seeds at 30/60Hz',()=>{
  const seeds=[1517854,1517875,1517825,1517829,1517840,1517844,
   1517827,1517831,1517835,1517842,1517839,1517866];
  const results=[];
