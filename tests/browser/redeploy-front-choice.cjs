@@ -131,7 +131,7 @@ async function run(browser,width,height){
   const bearing=directions[(Math.round(angle/(Math.PI/4))+8)%8];
   const direct=Math.round(Math.hypot(death.x-after.x,death.y-after.y)/10)*10;
   const cue='↩ RETURN · FRONT '+bearing+' · ~'+direct+'u'+
-   (after.directBlocked?' · DETOUR':'');
+   (after.directBlocked?' · COVER':'');
   assert.ok(after.notices.some(n=>n.message===cue),
    'real React redeploy must tell the player the direction of their witnessed last front: '+
    JSON.stringify(after.notices));
