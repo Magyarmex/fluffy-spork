@@ -159,3 +159,16 @@ test('real shipping shell loads Live Vector, not retired Command Weave', () => {
   assert.match(html, /src="\.\/nova-updates\/second-body-live-vector-v1\.10\.7\.js"/);
   assert.doesNotMatch(html, /src="\.\/nova-updates\/controller-command-weave-v1\.10\.0\.js"/);
 });
+
+test('shipping Live Vector stylus activation cannot double-fire from a pen compatibility click', () => {
+  const { window } = boot();
+  const bridge = window.__NOVA_LIVE_VECTOR_BUTTON_TEST__;
+  const { target } = hybridButton();
+  let swallowed = 0;
+  bridge.pointerDown({ pointerType: 'pen', target, cancelable: true,
+    preventDefault() {}, stopImmediatePropagation() {} });
+  bridge.clickCapture({ pointerType: 'pen', detail: 1,
+    sourceCapabilities: { firesTouchEvents: false }, target, cancelable: true,
+    preventDefault() { swallowed++; }, stopImmediatePropagation() { swallowed++; } });
+  assert.equal(swallowed, 2, 'pen follow-up click is not an independent mouse click');
+});
