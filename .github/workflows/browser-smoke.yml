@@ -29,7 +29,8 @@ concurrency:
 
 jobs:
   chromium:
-    runs-on: ubuntu-latest
+    # Playwright 1.56.1 Chromium is unsupported on ubuntu26.04 (ubuntu-latest).
+    runs-on: ubuntu-24.04
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4

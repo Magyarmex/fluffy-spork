@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   paired-natural-match:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 18
     strategy:
       fail-fast: false
@@ -62,7 +62,7 @@ jobs:
   defensive-pilot-probe:
     # Six predeclared layout/seed pairs, never merged into the historical
     # 18-pair baseline. A single lucky surviving pilot proves little.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 12
     strategy:
       fail-fast: false
@@ -99,7 +99,7 @@ jobs:
   collate-defensive-probe:
     needs: [paired-natural-match, defensive-pilot-probe]
     if: ${{ always() }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -130,7 +130,7 @@ jobs:
   collate-natural-matrix:
     needs: paired-natural-match
     if: ${{ always() }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
