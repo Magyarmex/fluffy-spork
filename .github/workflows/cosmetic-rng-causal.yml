@@ -4,8 +4,10 @@ on:
   push:
     branches:
       - 'nova/cosmetic-rng-causal-*'
+      - 'nova/isolate-cosmetic-rng-*'
     paths:
       - 'tests/research/cosmetic-rng-causal-pilot.cjs'
+      - 'scripts/patch-cosmetic-rng.cjs'
       - '.github/workflows/cosmetic-rng-causal.yml'
   workflow_dispatch:
 
@@ -28,7 +30,9 @@ jobs:
           set -euo pipefail
           mkdir -p artifacts/cosmetic-rng-causality
           node --test tests/research/cosmetic-rng-causal-pilot.cjs 2>&1 |
-            tee artifacts/cosmetic-rng-causality/run.log
+            tee artifacts/cosmetic-rng-causality/baseline.log
+          NOVA_COSMETIC_RNG_PATCHED=1 node --test tests/research/cosmetic-rng-causal-pilot.cjs 2>&1 |
+            tee artifacts/cosmetic-rng-causality/patched.log
       - name: Preserve positive and negative causal results
         if: always()
         uses: actions/upload-artifact@v4
