@@ -319,8 +319,8 @@
         var pref=clamp(reach*0.62,430,820);
         var radial=d>pref*1.12?1:d<pref*0.72?-1:0;
         ai.strafe=ai.strafe||(((t.id&1)?1:-1));
-        /* Preserve the historical 60 Hz chance per second, not per frame.
-         * Otherwise high-refresh clients make enemy snipers zigzag faster. */
+        /* When the legacy Sniper movement fallback actually owns the turn,
+         * preserve its 60 Hz reversal rate per simulated second. */
         /* Predator Doctrine owns movement whenever its plan is active.
          * Do not spend a shared gameplay RNG draw on an ignored legacy
          * strafe decision. Keep the time-based fallback if it is not. */
