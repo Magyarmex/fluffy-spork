@@ -522,12 +522,13 @@ async function scenario(browser, label, options) {
           const rect=b=>{const r=b.getBoundingClientRect();return{
             text:b.textContent,left:r.left,right:r.right,top:r.top,bottom:r.bottom};};
           return {height:innerHeight,scrollTop:panel?.scrollTop||0,
-            actions:buttons.map(rect),panel:panel?.getBoundingClientRect().toJSON()};
+            actions:buttons.map(b=>({...rect(b),insertion:b.getAttribute('data-nova-insertion')})),
+            panel:panel?.getBoundingClientRect().toJSON()};
         });
         assert.equal(actionFit.actions.length,3,
           'landscape death screen retains both redeploy choices and Main Menu');
-        assert.ok(actionFit.actions.some(b=>/REDEPLOY FRESH/.test(b.text))&&
-          actionFit.actions.some(b=>/REDEPLOY RETURN/.test(b.text))&&
+        assert.ok(actionFit.actions.some(b=>b.insertion==='fresh'&&/FRESH · RANDOM/.test(b.text))&&
+          actionFit.actions.some(b=>b.insertion==='return'&&/RETURN · NEAR FRONT/.test(b.text))&&
           actionFit.actions.some(b=>/MAIN MENU/.test(b.text)),
           'all three next-run actions must be present');
         assert.ok(actionFit.actions.every(b=>b.top>=8&&b.bottom<=actionFit.height-8),
