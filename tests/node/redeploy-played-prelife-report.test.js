@@ -76,3 +76,24 @@ test('zero natural deaths is reported as zero rather than disguised as natural p
   assert.equal(summary.firstLife.primary30Hz.meanNaturalDeathTime,null);
   assert.equal(summary.firstLife.technical60Hz.naturalDeaths,0);
 });
+
+test('60s natural cohort refuses to treat an unplayed death transition as real redeploy',()=>{
+  const original=sample(),results=[];
+  for(let seed=1;seed<=12;seed++)for(const hz of [30,60]){
+    const base=original.results.find(r=>r.hz===hz);
+    const prelude={...base.fresh.prelude,origin:{x:seed,y:hz},elapsed:60,
+      ticks:60*hz,naturalDeath:seed%3===0};
+    const fresh={...base.fresh,prelude,origin:prelude.origin,
+      fingerprintHash:'world-'+seed+'-'+hz,deathTransitionTicks:Math.ceil(1.4*hz)};
+    const returning={...base.returning,prelude,origin:prelude.origin,
+      fingerprintHash:fresh.fingerprintHash,deathTransitionTicks:fresh.deathTransitionTicks};
+    results.push({seed,hz,layout:'Crossfire',rotation:0,fresh,returning});
+  }
+  const s={policy:'harvest_roam',naturalExposurePilot:true,preludeSeconds:60,results};
+  assert.equal(reportPlayedFirstLife(s,12).independentSeeds,12);
+  s.results[0].returning.deathTransitionTicks=0;
+  assert.throws(()=>reportPlayedFirstLife(s,12),/Unmatched or skipped real death transition/);
+  s.results[0].returning.deathTransitionTicks=s.results[0].fresh.deathTransitionTicks;
+  s.preludeSeconds=8;
+  assert.throws(()=>reportPlayedFirstLife(s,12),/predeclare 60s/);
+});
