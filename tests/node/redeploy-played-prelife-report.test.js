@@ -60,6 +60,10 @@ test('natural-death exposure counts independent seeds and retains FPS disagreeme
   assert.equal(summary.firstLife.fpsDiscordantDeathSeeds,1,
     'a frame-rate-dependent natural death is evidence, not a fatal analysis error');
   assert.equal(summary.firstLife.naturalDeathExposureRate,.5);
+  assert.equal(summary.firstLife.primary30Hz.naturalDeaths,2);
+  assert.equal(summary.firstLife.technical60Hz.naturalDeaths,1);
+  assert.equal(summary.firstLife.primary30Hz.meanNaturalDeathTime,8);
+  assert.equal(summary.firstLife.technical60Hz.forcedDeaths,1);
   assert.match(summary.firstLife.censoringNote,/Forced-death/);
 });
 test('zero natural deaths is reported as zero rather than disguised as natural play',()=>{
@@ -69,4 +73,6 @@ test('zero natural deaths is reported as zero rather than disguised as natural p
   assert.equal(summary.firstLife.independentForcedDeathSeeds,2);
   assert.equal(summary.firstLife.fpsDiscordantDeathSeeds,0);
   assert.equal(summary.firstLife.naturalDeathExposureRate,0);
+  assert.equal(summary.firstLife.primary30Hz.meanNaturalDeathTime,null);
+  assert.equal(summary.firstLife.technical60Hz.naturalDeaths,0);
 });
