@@ -11,7 +11,9 @@ const crypto = require('node:crypto');
 const {createPublicRoam} = require('../research/redeploy-public-roam.cjs');
 const {playPublicPrelude} = require('../research/redeploy-public-prelife.cjs');
 const root = path.resolve(__dirname, '../..');
-const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const sourceHtml = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const html = process.env.NOVA_COSMETIC_RNG_PATCHED==='1' ?
+  require('../../scripts/patch-cosmetic-rng.cjs').patchCosmeticRng(sourceHtml) : sourceHtml;
 const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)]
   .map(m => m[1]).find(s => s.includes('window.__defineModule("game/engine"'));
 const overlays = [...html.matchAll(/<script[^>]+src=["']\.\/(nova-updates\/[^"']+)["']/g)]
@@ -194,7 +196,8 @@ test('cosmetic particle RNG causal A/B in shipping engine, 12 seeds x 30/60Hz',(
   erasedGameplayDivergences:results.filter(r=>r.erasedFirstGameplayDifference!==null).length,
   mutedRngDrawDifferences:results.filter(r=>r.normal.draws!==r.muted.draws).length,
   results:compact};
- fs.writeFileSync(path.join(dir,'results.json'),JSON.stringify(summary,null,2));
+ fs.writeFileSync(path.join(dir,process.env.NOVA_COSMETIC_RNG_PATCHED==='1' ?
+  'patched-results.json' : 'baseline-results.json'),JSON.stringify(summary,null,2));
  console.log('NOVA_COSMETIC_RNG_CAUSAL '+JSON.stringify({
   scenarios:summary.scenarios,
   mutedGameplayDivergences:summary.mutedGameplayDivergences,
@@ -208,4 +211,9 @@ test('cosmetic particle RNG causal A/B in shipping engine, 12 seeds x 30/60Hz',(
  // while preserving RNG consumption must not alter the physical game.
  assert.equal(summary.erasedGameplayDivergences,0,
   'VFX state itself affects gameplay: investigate before changing RNG ownership');
+ if(process.env.NOVA_COSMETIC_RNG_PATCHED==='1')
+  assert.equal(summary.mutedGameplayDivergences,0,
+   'cosmetic RNG still leaks into physical state after isolation');
+ else assert.ok(summary.mutedGameplayDivergences>0,
+   'baseline causal leak unexpectedly absent: review experiment validity');
 });
