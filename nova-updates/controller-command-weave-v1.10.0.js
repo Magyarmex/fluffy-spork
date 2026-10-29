@@ -232,11 +232,12 @@ wrap('game/engine',function(engine,require){
     pad.style.cssText='position:fixed;right:92px;bottom:max(22px,env(safe-area-inset-bottom));width:62px;height:62px;border-radius:22px 10px 22px 10px;border:1px solid rgba(110,224,255,.62);background:radial-gradient(circle at 38% 32%,rgba(132,242,255,.19),rgba(8,22,42,.82) 58%,rgba(4,10,22,.92));display:none;align-items:center;justify-content:center;z-index:31;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;backdrop-filter:blur(5px);font-family:Orbitron,system-ui;color:#c9f7ff;letter-spacing:.08em;font-weight:900;font-size:10px;box-shadow:0 0 20px rgba(70,210,255,.20),inset 0 0 12px rgba(70,210,255,.08);';
     pad.innerHTML='<div style="position:absolute;inset:9px;border:1px solid rgba(145,240,255,.22);border-radius:16px 7px 16px 7px;pointer-events:none"></div><span data-cw-label style="pointer-events:none;text-shadow:0 0 8px rgba(120,235,255,.7)">CMD</span>';
     document.body.appendChild(pad);
-    var pointer=-1,downX=0,downY=0,lastX=0,lastY=0,moved=false;
+    var pointer=-1,downX=0,downY=0,lastX=0,lastY=0,moved=false,gestureState=null,gesturePrior=null;
     function activeOwner(){return visibleControllerPlayer(g)?g.player:null;}
     function pd(e){
       var owner=activeOwner();if(!owner||pointer!==-1||e.button>0)return;
       pointer=e.pointerId;downX=lastX=e.clientX;downY=lastY=e.clientY;moved=false;
+      gestureState=commandState(owner);gesturePrior=Object.assign({},gestureState);
       if(e.cancelable)e.preventDefault();if(e.stopImmediatePropagation)e.stopImmediatePropagation();else e.stopPropagation();
       try{pad.setPointerCapture(pointer);}catch(_){}
       setPadStatus(g,'SET',true);
@@ -247,19 +248,34 @@ wrap('game/engine',function(engine,require){
       if(moved){var owner=activeOwner();if(owner){var p=screenToWorld(g,lastX,lastY);placeCommand(g,owner,p.x,p.y,true);}}
       if(e.cancelable)e.preventDefault();
     }
+    /* A canceled touch is not a command release. Drag preview updates the
+     * live swarm state, so restore only the preview still owned by this
+     * gesture. An independent command issued meanwhile must win. */
+    function abortGesture(){
+      if(moved&&gestureState&&gestureState.preview&&gesturePrior)
+        Object.assign(gestureState,gesturePrior);
+      gestureState=null;gesturePrior=null;moved=false;
+      setPadStatus(g,'CMD',false);
+    }
     function pu(e){
       if(e.pointerId!==pointer)return;var owner=activeOwner(),now=Date.now();
       try{if(pad.hasPointerCapture&&pad.hasPointerCapture(pointer))pad.releasePointerCapture(pointer);}catch(_){}
-      pointer=-1;if(!owner){setPadStatus(g,'CMD',false);return;}
+      pointer=-1;if(!owner){abortGesture();return;}
       var c=commandState(owner);
       if(moved){var p=screenToWorld(g,lastX,lastY);finishPlacedCommand(g,owner,p.x,p.y);}
       else if(now-c.lastTapAt<=DOUBLE_TAP_MS){c.lastTapAt=-99;setRecall(g,owner);}
       else{c.lastTapAt=now;stampAim(g,owner);}
-      c.preview=false;
+      c.preview=false;gestureState=null;gesturePrior=null;moved=false;
       if(e.cancelable)e.preventDefault();if(e.stopImmediatePropagation)e.stopImmediatePropagation();else if(e.stopPropagation)e.stopPropagation();
     }
-    pad.addEventListener('pointerdown',pd,{passive:false});pad.addEventListener('pointermove',pm,{passive:false});pad.addEventListener('pointerup',pu,{passive:false});pad.addEventListener('pointercancel',pu,{passive:false});
-    pad.__novaCleanup=function(){pad.removeEventListener('pointerdown',pd);pad.removeEventListener('pointermove',pm);pad.removeEventListener('pointerup',pu);pad.removeEventListener('pointercancel',pu);};
+    function pc(e){
+      if(e.pointerId!==pointer)return;
+      try{if(pad.hasPointerCapture&&pad.hasPointerCapture(pointer))pad.releasePointerCapture(pointer);}catch(_){}
+      pointer=-1;abortGesture();
+      if(e.cancelable)e.preventDefault();if(e.stopImmediatePropagation)e.stopImmediatePropagation();else if(e.stopPropagation)e.stopPropagation();
+    }
+    pad.addEventListener('pointerdown',pd,{passive:false});pad.addEventListener('pointermove',pm,{passive:false});pad.addEventListener('pointerup',pu,{passive:false});pad.addEventListener('pointercancel',pc,{passive:false});pad.addEventListener('lostpointercapture',pc);
+    pad.__novaCleanup=function(){pad.removeEventListener('pointerdown',pd);pad.removeEventListener('pointermove',pm);pad.removeEventListener('pointerup',pu);pad.removeEventListener('pointercancel',pc);pad.removeEventListener('lostpointercapture',pc);};
     pad.style.display=visibleControllerPlayer(g)?'flex':'none';return pad;
   }
 
