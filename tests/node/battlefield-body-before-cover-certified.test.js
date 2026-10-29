@@ -59,25 +59,25 @@ function boot(optimized){
   ?{CLASSES}:{ARENA_HALF:2250});
  return m.exports.Game;
 }
-function run(Game,{fps=30,speed=6000,wall=120,target=60,
+function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,
  wallShape='rect',otherShape=false,otherBullet=false,otherShell=false,moving=false,
  shield=false,otherTank=false,ttl=1,pen=1,radius=3,
  active=true,knock=0,allied=false,destructible=false,damage=10}={}){
  const g=new Game(),dt=1/fps;
  g.__novaShapeSweepActive=active;
  g.areAllies=()=>allied;
- const t={kind:'tank',id:2,cls:'scout',x:target,y:0,hp:100,
+ const t={kind:'tank',id:2,cls:'scout',x:target,y:targetY,hp:100,
   alive:true,__novaSweepMoveTime:1,__novaSweepPrevX:moving?target-4:target,
-  __novaSweepPrevY:0,spawnShieldT:shield?2:0};
+  __novaSweepPrevY:targetY,spawnShieldT:shield?2:0};
  g.tanks=[t];
  if(otherTank)g.tanks.push({kind:'tank',id:3,cls:'scout',x:30,y:0,
   hp:100,alive:true,__novaSweepMoveTime:1,__novaSweepPrevX:30,__novaSweepPrevY:0});
  if(otherShape)g.shapes.push({kind:'shape',id:4,x:30,y:0,r:8,hp:100});
  g.__novaTerrain=[wallShape==='rect'
-  ?{id:-1,shape:'rect',x:wall,y:0,w:10,h:80,solid:true,destructible,hp:destructible?1000:0,maxHp:destructible?1000:0}
-  :{id:-1,shape:'circle',x:wall,y:0,r:5,solid:true,destructible,hp:destructible?1000:0,maxHp:destructible?1000:0}];
+  ?{id:-1,shape:'rect',x:wall,y:wallY,w:10,h:80,solid:true,destructible,hp:destructible?1000:0,maxHp:destructible?1000:0}
+   :{id:-1,shape:'circle',x:wall,y:wallY,r:5,solid:true,destructible,hp:destructible?1000:0,maxHp:destructible?1000:0}];
  g.bullets=[{kind:'bullet',id:10,ownerId:1,x:0,y:0,
-  vx:speed,vy:0,r:radius,dmg:damage,knock,ttl,pen,hits:0,dead:false,shell:false,beam:false}];
+  vx:speed,vy,r:radius,dmg:damage,knock,ttl,pen,hits:0,dead:false,shell:false,beam:false}];
  if(otherBullet)g.bullets.push({kind:'bullet',id:11,ownerId:4,
   x:0,y:1,vx:speed,vy:0,r:3,dmg:10,ttl:1,pen:0,hits:0,dead:false});
  if(otherShell)g.bullets.push({kind:'bullet',id:12,ownerId:4,
@@ -193,4 +193,35 @@ test('2,000 seeded wall-crossing worlds obey first physical hull/cover order',()
   if(front)before++;else behind++;
  }
  assert.ok(before>1000&&behind>300,'both chronological orders exercised');
+});
+
+
+/* Independent 2D segment/circle projection oracle: unlike the shipping
+ * quadratic, this computes closest approach and entry by perpendicular
+ * distance. The rectangular wall's first x-slab is known analytically.
+ * This stresses oblique shots and near-grazes at four frame rates. */
+test('1,000 oblique 2D worlds preserve body-before-wall ordering',()=>{
+ let seed=0x2d147437;
+ const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ const variants=[boot(false),boot(true)];
+ let hits=0,misses=0;
+ for(const fps of [30,60,120,240])for(let i=0;i<250;i++){
+  const dx=180+rand()*40,dy=(rand()-.5)*55,
+   target=30+rand()*60,targetY=dy*target/dx+(rand()-.5)*65,
+   A=dx*dx+dy*dy,projection=(target*dx+targetY*dy)/A,
+   perpX=target-projection*dx,perpY=targetY-projection*dy,
+   perp2=perpX*perpX+perpY*perpY,rr=20,
+   entry=perp2<rr*rr
+    ?projection-Math.sqrt(rr*rr-perp2)/Math.sqrt(A):Infinity,
+   wallEntry=(120-5-3*.45)/dx,
+   expected=entry>1e-9&&entry<wallEntry-1e-6;
+  for(const Game of variants){
+   const r=run(Game,{fps,speed:dx*fps,vy:dy*fps,target,targetY,pen:2});
+   assert.deepEqual(r.hits,expected?[2]:[],
+    '2D first-surface mismatch at '+fps+'Hz case '+i);
+   assert.equal(r.hp,expected?90:100);
+  }
+  if(expected)hits++;else misses++;
+ }
+ assert.ok(hits>400&&misses>100,'oracle must exercise hits and misses');
 });
