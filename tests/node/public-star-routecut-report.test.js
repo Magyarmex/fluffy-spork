@@ -12,7 +12,7 @@ function fixture(){
    result:{time:100,playerScore:10,status:'dead',
     stats:{starAnnouncements:0},
     audit:{announcements:0,pilot:{mode,cues:0,visibleCues:0,reportCues:0,
-     near100Frames:0,near250Frames:0,routeActions:0,minStarDistanceAfterReport:null}}},
+     near100Frames:0,near250Frames:0,routeActions:0,routeVisibleActions:0,routeReportActions:0,minStarDistanceAfterReport:null}}},
    censored:true};
   fs.writeFileSync(path.join(dir,`layout-${layout}-seed-${seed}-${mode}.json`),
    JSON.stringify(x));
@@ -41,11 +41,14 @@ test('one exposed arm stays in paired denominator and retains measured physical 
    x.result.audit.pilot.visibleCues=2;
    x.result.audit.pilot.near100Frames=4;
    x.result.audit.pilot.routeActions=8;
+   x.result.audit.pilot.routeVisibleActions=2;
+   x.result.audit.pilot.routeReportActions=6;
    x.result.audit.pilot.minStarDistanceAfterReport=81.5;
   });
   const x=collate(dir);
   assert.equal(x.exposedPairs,1);assert.equal(x.noExposurePairs,5);
-  assert.equal(x.routecutPublicCues,10);assert.equal(x.routecutActions,8);assert.equal(x.routecutNear100Frames,4);
+  assert.equal(x.routecutPublicCues,10);assert.equal(x.routecutActions,8);
+  assert.equal(x.routecutReportActions,6);assert.equal(x.routecutVisibleActions,2);assert.equal(x.routecutNear100Frames,4);
   assert.equal(x.trials[2].arms.routecut.minDistance,81.5);
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
