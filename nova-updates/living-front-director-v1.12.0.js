@@ -144,7 +144,7 @@ LF.directorTick=function(g,st){var t0=LF.ms(),hasStar=false,adoptStarId=null,sh=
   if(!s.__lfPublicAnnounced&&Number.isFinite(s.__lfStarBorn)&&age>=0&&age<=8)
    adoptStarId=s.id;
  }
- if(st.signal&&st.signal.type==='ROGUE STAR'&&st.signal.starId&&g.getShape&&!g.getShape(st.signal.starId))st.signal=null;var d=decision(st,{enabled:st.directorEnabled,now:g.time||0,hasStar:hasStar,adoptStarId:adoptStarId});if(d)setSignal(g,st,d);if(st.signal&&(g.time||0)>=st.signal.until)st.signal=null;var observed=updateContest(g,st);frontlineTick(g,st,observed);LF.planSample(st,LF.ms()-t0);};
+ if(st.signal&&st.signal.type==='ROGUE STAR'&&st.signal.starId&&g.getShape&&!g.getShape(st.signal.starId)){st.signal=null;st.starMemory=null;}var d=decision(st,{enabled:st.directorEnabled,now:g.time||0,hasStar:hasStar,adoptStarId:adoptStarId});if(d)setSignal(g,st,d);if(st.signal&&(g.time||0)>=st.signal.until)st.signal=null;var observed=updateContest(g,st);frontlineTick(g,st,observed);LF.planSample(st,LF.ms()-t0);};
 function visible(g,t,s){var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;var inView=F&&F.inGameplayViewport?F.inGameplayViewport(g,t,s):(function(){var z=(g.cam&&g.cam.zoom)||1,hx=(g.w||800)/(2*z),hy=(g.h||600)/(2*z);return Math.abs(s.x-t.x)<=hx&&Math.abs(s.y-t.y)<=hy;})();return !!inView&&(!g.hasLineOfSight||g.hasLineOfSight(t.x,t.y,s.x,s.y,2));}
 
 /* Tactical Frontlines: a BLOOM is contested only when the human pilot and a
