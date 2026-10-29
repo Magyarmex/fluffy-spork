@@ -1811,6 +1811,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      !(Number.isSafeInteger(b.pen)&&b.pen>=0&&b.pen<=4)||
      (b.hits||0)!==0||
      b.__novaBreachAtTime===g.time||
+     g.__novaShapeSweepActive!==true||
      (b.__novaDirectVictims&&b.__novaDirectVictims.size>0)||
      !(dt>0)||!(b.ttl>dt)||!Number.isFinite(b.ttl)||
      !Number.isFinite(b.dmg)||!(b.dmg>0)||
