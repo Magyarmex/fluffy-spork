@@ -1024,6 +1024,7 @@ for(const pen of [3,4])for(const front of [false,true]){
   (front?'front hull retained':'rear hull blocked'),()=>{
   const {g}=boot();
   g.time=1;g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=1;
+  g.__novaBattlefield={coverBroken:0}; /* override prototype's release marker */
   const target={kind:'tank',id:2,cls:'scout',
    x:front?30:165,y:0,hp:100,alive:true,
    __novaSweepMoveTime:1,__novaSweepPrevX:front?30:165,
