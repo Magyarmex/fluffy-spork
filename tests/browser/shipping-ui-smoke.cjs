@@ -310,6 +310,36 @@ async function scenario(browser, label, options) {
 
     await page.getByRole('button',{name:'Pause'}).click();
     await page.getByText('PAUSED',{exact:true}).waitFor({state:'visible'});
+    { // Every real Pause viewport must preserve frame-zero touch targets.
+      const pauseEntry=await page.evaluate(()=>{
+        const panel=[...document.querySelectorAll('.panel.anim-pop')].find(node=>
+          [...node.children].some(child=>child.textContent==='PAUSED'));
+        if(!panel)throw Error('real React pause panel not found');
+        const animation=panel.getAnimations().find(a=>a.animationName);
+        if(!animation)throw Error('pause entrance animation not found');
+        animation.pause();animation.currentTime=0;
+        const buttons=[...panel.querySelectorAll('button')].map(b=>{
+          const r=b.getBoundingClientRect();
+          return{text:b.textContent,height:r.height,top:r.top,bottom:r.bottom};
+        });
+        const transform=getComputedStyle(panel).transform;
+        const animationName=getComputedStyle(panel).animationName;
+        animation.finish();
+        return{buttons,transform,animationName};
+      });
+      assert.equal(pauseEntry.buttons.length,5,
+        'real pause panel must expose all five actions: '+JSON.stringify(pauseEntry));
+      assert.ok(pauseEntry.buttons.every(b=>b.height>=30),
+        'every Pause action must remain >=30px at entrance frame zero: '+
+        JSON.stringify(pauseEntry));
+      if(label==='landscape-568')assert.ok(
+        pauseEntry.buttons.every(b=>b.top>=8&&b.bottom<=312),
+        'all five pause actions must remain inside the 320px viewport: '+
+        JSON.stringify(pauseEntry));
+      assert.equal(pauseEntry.animationName,'popIn',
+        'the existing Pause entrance animation must remain intact');
+      console.log('NOVA_LANDSCAPE_PAUSE_ACTIONS '+JSON.stringify(pauseEntry));
+    }
     const paused=await page.evaluate(()=>window.NOVALivingFront.snapshot().age);
     await page.waitForTimeout(550);
     const still=await page.evaluate(()=>window.NOVALivingFront.snapshot().age);

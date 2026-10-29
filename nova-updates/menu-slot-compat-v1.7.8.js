@@ -255,6 +255,19 @@ function installDeathTitleFit(){
  document.head.appendChild(style);
 }
 installDeathTitleFit();
+/* The real React Pause card animates from scale(.85). Its secondary
+ * buttons measure 34.5px at rest but only 29.325px at frame zero. A
+ * 36px unscaled minimum yields 30.6px even at the smallest scale, without
+ * replacing the established animation, adding controls or changing other
+ * modals. All five Pause actions remain within compact landscape bounds. */
+function installPauseTouchTargets(){
+ if(typeof document==='undefined'||!document.head||!document.createElement)return;
+ if(document.getElementById&&document.getElementById('nova-pause-touch-targets'))return;
+ var style=document.createElement('style');style.id='nova-pause-touch-targets';
+ style.textContent='.absolute.inset-0.z-50 > .panel.anim-pop:has(> .font-display.text-xl.text-cyan-200) button.btn-ghost{min-height:36px;}';
+ document.head.appendChild(style);
+}
+installPauseTouchTargets();
 var lessons={
  gunner:'Break the firing lane with cover, then re-enter between bursts.',
  cannon:'Spread out from cover edges and read the fuse or impact cue.',
