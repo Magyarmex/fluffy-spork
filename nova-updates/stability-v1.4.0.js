@@ -321,7 +321,11 @@
         ai.strafe=ai.strafe||(((t.id&1)?1:-1));
         /* Preserve the historical 60 Hz chance per second, not per frame.
          * Otherwise high-refresh clients make enemy snipers zigzag faster. */
-        if(Math.random()<1-Math.pow(1-0.0025,Math.max(0,dt)*60))ai.strafe*=-1;
+        /* Predator Doctrine owns movement whenever its plan is active.
+         * Do not spend a shared gameplay RNG draw on an ignored legacy
+         * strafe decision. Keep the time-based fallback if it is not. */
+        if(!ai.__v180OwnMove&&
+           Math.random()<1-Math.pow(1-0.0025,Math.max(0,dt)*60))ai.strafe*=-1;
         mx=ux*radial+(-uy)*ai.strafe*0.74;
         my=uy*radial+(ux)*ai.strafe*0.74;
         var dod=dodgeOverlay(t,g);mx+=dod.x*1.1;my+=dod.y*1.1;
@@ -366,7 +370,12 @@
       if(t.y<-MAP_LIMIT+140)t.y=-MAP_LIMIT+140;
       /* The same frame-rate independence applies to opportunistic abilities:
        * 0.006 was the original per-update chance at 60 Hz. */
-      if(t.abilityCd<=0&&(ai.state==='hunt'||ai.state==='flee')&&
+      /* Predator Doctrine owns tactical ability authorization and invokes
+       * permitted abilities itself after this legacy AI returns. Its
+       * interception rejects this random fallback, so do not consume a
+       * shared gameplay RNG draw for a decision that cannot take effect. */
+      if(!window.__NOVA_AI_DIRECTOR__&&t.abilityCd<=0&&
+         (ai.state==='hunt'||ai.state==='flee')&&
          Math.random()<1-Math.pow(1-0.006,Math.max(0,dt)*60))g.useAbility(t);
     }
 
