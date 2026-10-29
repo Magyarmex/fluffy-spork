@@ -106,3 +106,25 @@ test('a chase after prior patrol progress does not inherit a stale distance', ()
   assert.equal(policy.stats().waypointFailures, 1,
     'patrol timeout remains active after the chase, without stale progress');
 });
+
+test('seeded neutral-chase durations never masquerade as patrol failures',()=>{
+  let seed=20261029;
+  const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+  for(let n=0;n<240;n++){
+    const {game,player,fair}=setup();
+    game.shapes=[{id:100+n,x:200,y:0,hp:10}];
+    const policy=createPublicRoam(game,player,{x:0,y:0},fair);
+    const duration=4+Math.floor(rand()*20)*.5;
+    for(let t=0;t<=duration;t+=.5){game.time=t;policy.move();}
+    game.shapes=[];
+    game.time=duration+.01;
+    policy.move();
+    assert.equal(policy.stats().waypointFailures,0,
+      'neutral chase is not patrol failure: trial '+n);
+    assert.equal(policy.stats().patrolIndex,0);
+    game.time=duration+3.61;
+    policy.move();
+    assert.equal(policy.stats().waypointFailures,1,
+      'genuine stationary patrol must still time out: trial '+n);
+  }
+});
