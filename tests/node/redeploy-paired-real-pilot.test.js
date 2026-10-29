@@ -454,7 +454,7 @@ test('crossed real-world insertion isolates player geography from post-spawn AI/
     assert.deepEqual(arms[choice].spawn,spawns[choice]);
     assert.deepEqual(arms[choice].generatedSpawn,spawns[baseChoice]);
     assert.equal(arms[choice].fingerprintHash,nativeFresh.fingerprintHash);
-    assert.deepEqual(arms[choice].postInsertion,nativeFresh.postInsertion &&
+    assert.deepEqual(arms[choice].postInsertion,
      baseChoice==='fresh'?nativeFresh.postInsertion:nativeReturn.postInsertion);
    }
    assert.deepEqual(arms.fresh.postInsertion,arms.return.postInsertion,
