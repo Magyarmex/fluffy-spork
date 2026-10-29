@@ -59,6 +59,9 @@ function reportPlayedFirstLife(report, expectedSeeds = 36) {
   const naturalSeeds = [...bySeed.values()].filter(group => group.every(x => x.naturalDeath)).length;
   const discordantSeeds = [...bySeed.values()].filter(group =>
     group[0].naturalDeath !== group[1].naturalDeath).length;
+  const primary30 = rows.filter(x => x.hz===30);
+  const technical60 = rows.filter(x => x.hz===60);
+  const deathTimes = group => group.filter(x => x.naturalDeath).map(x => x.preludeElapsed);
   const changed = rows.filter(x => x.preludeChangedShapes > 0 ||
     x.preludeChangedEnemies > 0 || x.preludeChangedTerrain > 0).length;
   return {
@@ -71,6 +74,14 @@ function reportPlayedFirstLife(report, expectedSeeds = 36) {
       independentForcedDeathSeeds:bySeed.size-naturalSeeds-discordantSeeds,
       fpsDiscordantDeathSeeds:discordantSeeds,
       naturalDeathExposureRate:naturalSeeds/bySeed.size,
+      primary30Hz:{naturalDeaths:deathTimes(primary30).length,
+        forcedDeaths:primary30.length-deathTimes(primary30).length,
+        meanNaturalDeathTime:mean(deathTimes(primary30)),
+        meanObservedTime:mean(primary30.map(x=>x.preludeElapsed))},
+      technical60Hz:{naturalDeaths:deathTimes(technical60).length,
+        forcedDeaths:technical60.length-deathTimes(technical60).length,
+        meanNaturalDeathTime:mean(deathTimes(technical60)),
+        meanObservedTime:mean(technical60.map(x=>x.preludeElapsed))},
       censoringNote:'Forced-death seeds are retained, not reclassified as naturally dead; do not estimate natural-death strategy effects from them.',
       worldsWithPhysicalChange:changed,
       meanElapsed:mean(rows.map(x => x.preludeElapsed)),
