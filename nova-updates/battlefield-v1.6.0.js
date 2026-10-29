@@ -1900,7 +1900,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    if(near(sx,sy,d.x,d.y,(d.r||8)+b.r+1+Math.max(30,dt*2400)))return false;
   }
   for(var bi=0;bi<shots.length;bi++){
-   var o=shots[bi];if(!o||o===b||o.dead)continue;
+   var o=shots[bi];if(!o||o===b||
+      o.__novaWallProofEpoch!==g.__novaWallProofEpoch)continue;
    if(!Number.isFinite(o.x)||!Number.isFinite(o.y)||
       !Number.isFinite(o.vx)||!Number.isFinite(o.vy)||
       !Number.isFinite(o.r)||!(o.r>0))return false;
@@ -1956,8 +1957,13 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   }
  }
  var expiring=0,paired=0;
+ /* Preserve frame-start competitors even after an earlier wall kills them:
+  * no array-order advantage for a later speculative hull contact. */
+ var wallProofEpoch=(this.__novaWallProofEpoch||0)+1;
+ this.__novaWallProofEpoch=wallProofEpoch;
  if(dt>0)for(var countI=0;countI<this.bullets.length;countI++){
   var eb=this.bullets[countI];
+  if(eb&&!eb.dead)eb.__novaWallProofEpoch=wallProofEpoch;
   if(eb&&!eb.dead&&!eb.shell&&!eb.beam&&!eb.splash&&!eb.__v17Cannon&&eb.ttl>0&&eb.ttl<=dt)expiring++;
   if(eb&&!eb.dead&&!eb.shell&&!eb.beam&&!eb.splash&&!eb.__v17Cannon&&
      eb.ttl>dt&&(eb.pen===1||eb.pen===2)&&(eb.hits||0)===0)paired++;
