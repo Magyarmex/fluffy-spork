@@ -438,3 +438,18 @@ test('1,000 seeded nonpiercing hull/destructible-cover orders at 30–240 Hz',()
  }
  assert.ok(frontCount>400&&behindCount>300,'both orders exercised');
 });
+
+/* Reachable build, not just synthetic hypervelocity: the existing Marksman
+ * eight-speed-upgrade 30Hz corridor from the permanent-wall regression also
+ * exists with a destructible barricade behind the Scout. */
+for(const optimized of [false,true]){
+ test((optimized?'Battlefield + Performance':'Battlefield')+
+  ': upgraded Marksman nonpiercing hit beats later destructible cover at 30Hz',()=>{
+  const speed=1050*(1+.085*8);
+  const radius=5.5*(1+21*.0085);
+  const r=run(boot(optimized),{fps:30,speed,wall:55,target:29,
+   pen:0,radius,damage:21,destructible:true});
+  assert.deepEqual(r.hits,[2]);assert.equal(r.hp,79);
+  assert.equal(r.g.__novaTerrain[0].hp,1000);
+ });
+}
