@@ -345,3 +345,39 @@ test('1,000 seeded moving Scout worlds match independent first-contact geometry'
  }
  assert.ok(hits>100&&misses>100,'oracle exercises hits and misses');
 });
+
+/* A tank physically before destructible cover must receive a nonpiercing
+ * shot before that cover. This is the same first-contact contract already
+ * shipped for permanent walls, not permission to pierce intact cover.
+ * Test the materialized core with both shipping overlay compositions. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'Battlefield + Performance':'Battlefield';
+ for(const fps of [30,60,120,240]){
+  test(label+': nonpiercing shot hits certified hull BEFORE destructible cover at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:200*fps,pen:0,destructible:true});
+   assert.deepEqual(r.hits,[2]);
+   assert.equal(r.hp,90);
+   assert.equal(r.g.__novaTerrain[0].hp,1000,
+    'later cover must not be damaged by an already consumed shot');
+   assert.equal(r.g.bullets.length,0);
+  });
+  test(label+': destructible cover BEFORE hull retains interception at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:200*fps,pen:0,destructible:true,
+    wall:40,target:140});
+   assert.deepEqual(r.hits,[]);
+   assert.equal(r.hp,100);
+   assert.equal(r.g.__novaTerrain[0].hp,990);
+  });
+  test(label+': shielded hull does not bypass later destructible cover at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:200*fps,pen:0,destructible:true,shield:true});
+   assert.deepEqual(r.hits,[]);
+   assert.equal(r.hp,100);
+   assert.equal(r.g.__novaTerrain[0].hp,990);
+  });
+  test(label+': earlier neutral body vetoes speculative cover-front hit at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:200*fps,pen:0,destructible:true,otherShape:true});
+   assert.deepEqual(r.hits,[]);
+   assert.equal(r.hp,100);
+  });
+ }
+}
