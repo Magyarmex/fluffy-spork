@@ -259,8 +259,8 @@ wrap('game/engine',function(engine,require){
     }
     function pu(e){
       if(e.pointerId!==pointer)return;var owner=activeOwner(),now=Date.now();
-      try{if(pad.hasPointerCapture&&pad.hasPointerCapture(pointer))pad.releasePointerCapture(pointer);}catch(_){}
-      pointer=-1;if(!owner){abortGesture();return;}
+      var released=pointer;pointer=-1;
+      try{if(pad.hasPointerCapture&&pad.hasPointerCapture(released))pad.releasePointerCapture(released);}catch(_){}if(!owner){abortGesture();return;}
       var c=commandState(owner);
       if(moved){var p=screenToWorld(g,lastX,lastY);finishPlacedCommand(g,owner,p.x,p.y);}
       else if(now-c.lastTapAt<=DOUBLE_TAP_MS){c.lastTapAt=-99;setRecall(g,owner);}
@@ -270,8 +270,8 @@ wrap('game/engine',function(engine,require){
     }
     function pc(e){
       if(e.pointerId!==pointer)return;
-      try{if(pad.hasPointerCapture&&pad.hasPointerCapture(pointer))pad.releasePointerCapture(pointer);}catch(_){}
-      pointer=-1;abortGesture();
+      var released=pointer;pointer=-1;
+      try{if(pad.hasPointerCapture&&pad.hasPointerCapture(released))pad.releasePointerCapture(released);}catch(_){}abortGesture();
       if(e.cancelable)e.preventDefault();if(e.stopImmediatePropagation)e.stopImmediatePropagation();else if(e.stopPropagation)e.stopPropagation();
     }
     pad.addEventListener('pointerdown',pd,{passive:false});pad.addEventListener('pointermove',pm,{passive:false});pad.addEventListener('pointerup',pu,{passive:false});pad.addEventListener('pointercancel',pc,{passive:false});pad.addEventListener('lostpointercapture',pc);
