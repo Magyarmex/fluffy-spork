@@ -62,7 +62,7 @@ function boot(optimized){
 function run(Game,{fps=30,speed=6000,wall=120,target=60,
  wallShape='rect',otherShape=false,otherBullet=false,otherShell=false,moving=false,
  shield=false,otherTank=false,ttl=1,pen=1,radius=3,
- active=true,knock=0,allied=false,destructible=false}={}){
+ active=true,knock=0,allied=false,destructible=false,damage=10}={}){
  const g=new Game(),dt=1/fps;
  g.__novaShapeSweepActive=active;
  g.areAllies=()=>allied;
@@ -77,7 +77,7 @@ function run(Game,{fps=30,speed=6000,wall=120,target=60,
   ?{id:-1,shape:'rect',x:wall,y:0,w:10,h:80,solid:true,destructible,hp:destructible?1000:0,maxHp:destructible?1000:0}
   :{id:-1,shape:'circle',x:wall,y:0,r:5,solid:true,destructible,hp:destructible?1000:0,maxHp:destructible?1000:0}];
  g.bullets=[{kind:'bullet',id:10,ownerId:1,x:0,y:0,
-  vx:speed,vy:0,r:radius,dmg:10,knock,ttl,pen,hits:0,dead:false,shell:false,beam:false}];
+  vx:speed,vy:0,r:radius,dmg:damage,knock,ttl,pen,hits:0,dead:false,shell:false,beam:false}];
  if(otherBullet)g.bullets.push({kind:'bullet',id:11,ownerId:4,
   x:0,y:1,vx:speed,vy:0,r:3,dmg:10,ttl:1,pen:0,hits:0,dead:false});
  if(otherShell)g.bullets.push({kind:'bullet',id:12,ownerId:4,
@@ -161,8 +161,10 @@ for(const optimized of [false,true]){
  });
  test(label+': realistic 30Hz Marksman speed can reach a hull before cover',()=>{
   const speed=1050*(1+.085*8);
-  const r=run(boot(optimized),{speed,wall:55,target:29,pen:2,radius:5});
-  assert.deepEqual(r.hits,[2]);
+  const radius=5.5*(1+21*.0085); // canonical Marksman base + damage-size scaling
+  const r=run(boot(optimized),{speed,wall:55,target:29,
+   pen:2,radius,damage:21});
+  assert.deepEqual(r.hits,[2]);assert.equal(r.hp,79);
  });
 }
 
