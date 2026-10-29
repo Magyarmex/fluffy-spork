@@ -599,3 +599,26 @@ for(const optimized of [false,true]){
   });
  }
 }
+
+/* Adversarial neighbors: a body between the breached cover and the
+ * permanent wall must remain hittable; distant bullets must not defeat
+ * the isolated local wall proof merely by increasing global shot count. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'Battlefield + Performance':'Battlefield';
+ for(const fps of [30,60,120,240])for(const pen of [3,4]){
+  test(label+': pen'+pen+' middle hull after breach remains hittable at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:200*fps,pen,destructible:true,
+    wall:55,laterWall:145,target:95,coverHp:5});
+   assert.deepEqual(r.hits,[2]);
+   assert.equal(r.hp,90);
+   assert.equal(r.g.__novaTerrain[0].hp,0);
+  });
+  test(label+': pen'+pen+' remote fire does not expose rear hull at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:200*fps,pen,destructible:true,
+    wall:55,laterWall:110,target:165,coverHp:5,remoteBullets:4});
+   assert.deepEqual(r.hits,[]);
+   assert.equal(r.hp,100);
+   assert.equal(r.g.__novaTerrain[0].hp,0);
+  });
+ }
+}
