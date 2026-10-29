@@ -291,7 +291,7 @@ test('research arrival requires hull-clear terrain, not only 130u proximity',()=
  assert.equal(terrainClearFrontArrival(g,p,origin),false,'missing terrain cannot certify arrival');
 });
 test('materialized Battlefield rejects near-front arrival across real intact cover',()=>{
- const g=withSeed(1517825,()=>bootGame());
+ const g=withSeed(1517825,()=>{const game=bootGame();if(!game.player)game.redeploy();return game;});
  let witness=null;
  for(const wall of g.__novaTerrain||[]){
   if(!wall||wall.shape!=='rect'||!wall.destructible||!(wall.hp>0)||
