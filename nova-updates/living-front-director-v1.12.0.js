@@ -202,6 +202,11 @@ function ensureFrontline(g,st){
   seenContest:false,aiSeen:{},aiStartDist:{},aiApproachSeen:{},aiPhysicalLast:{},aiPhysicalMotion:{},aiPhysicalIdentity:{},aiPhysicalArrived:{},aiPhysicalApproachSeen:{},events:[],counts:{announcements:0,resolved:0,contestSurvivals:0,playerSeconds:0,playerApproaches:0,aiApproaches:0,playerEntries:0,playerExits:0,
   observedContests:0,playerDeaths:0,pilotDeathCensors:0,sampledSeconds:0,pilotAliveSeconds:0,hostileBotSeconds:0,hostileOutsideBotSeconds:0,aiArrivals:0,aiPhysicalArrivals:0,aiPhysicalApproaches:0,aiPhysicalRejectedCrossings:0,neutralXP:0}};
  var key=op.sector+':'+op.announcedAt;
+ /* A disabled Director resolves this public observation. Re-enabling it
+  * during the same announcement must not resurrect closed telemetry: that
+  * would count post-closure XP/exposure while the death hook still refuses
+  * attribution. Wait for a genuinely new public opportunity instead. */
+ if(f.closed&&f.currentKey===key)return null;
  if(f.currentKey!==key){
   closeFrontline(g,st,'replaced');
   f.currentKey=key;f.sector=op.sector;f.announcedAt=op.announcedAt;
