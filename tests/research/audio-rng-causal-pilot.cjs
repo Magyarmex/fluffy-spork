@@ -189,3 +189,6 @@ test('canonical audio noise-buffer RNG causal A/B in 12 seeds at 30/60Hz',()=>{
  else assert.ok(summary.audioGameplayDivergences>0,
    'baseline audio RNG leak unexpectedly absent');
 });
+
+// Shared real-game fixture for the independent overlay-audio causal pilot.
+module.exports={bootGame,FakeAudioContext,withSeed,digest,physical,firstDifference,playPublicPrelude};
