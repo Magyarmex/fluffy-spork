@@ -183,7 +183,7 @@ for(const optimized of [false,true]){
  * nearby stationary Scout before expiry even in a 30Hz frame. The current
  * non-shell physical TTL recovery excludes beams, causing FPS-dependent
  * phantom misses. The full frame may be longer than the projectile's life. */
-function runRailTTL(Game,{fps=30,beam=true,targetX=30,wall=false}={}){
+function runRailTTL(Game,{fps=30,beam=true,targetX=30,wall=false,otherBullets=[],reverse=false}={}){
  const g=new Game();
  const t={kind:'tank',id:2,cls:'scout',x:targetX,y:-520,
   hp:100,alive:true,__novaSweepMoveTime:1,
@@ -196,7 +196,8 @@ function runRailTTL(Game,{fps=30,beam=true,targetX=30,wall=false}={}){
   vx:3100,vy:0,r:8.84,dmg:95.2,baseDmg:95.2,
   maxHp:20,hp:20,pen:18,ttl:.005,hits:0,dead:false,shell:false,
   beam,__novaRail:beam,__novaFullRail:beam};
- g.bullets=[b];g.updateBullets(1/fps);
+ g.bullets=[b,...otherBullets];if(reverse)g.bullets.reverse();
+ g.updateBullets(1/fps);
  return {hp:t.hp,hits:g.hits,bullet:b};
 }
 for(const optimized of [false,true]){
@@ -222,4 +223,110 @@ for(const optimized of [false,true]){
    assert.ok(Math.abs(r.hp-4.8)<1e-8);
   });
  }
+}
+
+/* Run444: a remote projectile cannot erase a provable legal Singularity
+ * first contact. The beam TTL shortcut must still defer to projectiles
+ * that could intercept the rail OR change its intended victim's HP. */
+function remoteRailShot(i){return {kind:'bullet',id:100+i,ownerId:3,
+ x:1100+i*7,y:1000+i*3,vx:-70,vy:25,r:3,dmg:4,
+ pen:0,ttl:1,hits:0,dead:false,shell:false,beam:false};}
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'optimized':'baseline';
+ for(const fps of [30,60,120,240])for(const reverse of [false,true]){
+  test(label+': legal rail TTL hit survives distant independent fire at '+fps+
+   'Hz reversed='+reverse,()=>{
+   const r=runRailTTL(Game,{fps,reverse,
+    otherBullets:Array.from({length:12},(_,i)=>remoteRailShot(i))});
+   assert.ok(Math.abs(r.hp-4.8)<1e-8,
+    'remote fire cannot suppress a physical first contact before expiry');
+   assert.deepEqual(r.hits.map(h=>h.id),[2]);
+  });
+  test(label+': remote fire never invents a post-TTL rail hit at '+fps+
+   'Hz reversed='+reverse,()=>{
+   const r=runRailTTL(Game,{fps,reverse,targetX:60,
+    otherBullets:Array.from({length:12},(_,i)=>remoteRailShot(i))});
+   assert.equal(r.hp,100);
+   assert.deepEqual(r.hits,[]);
+  });
+ }
+ for(const fps of [30,60,120]){
+  test(label+': nearby interceptor keeps rail TTL shortcut conservative at '+fps+'Hz',()=>{
+   const r=runRailTTL(Game,{fps,otherBullets:[{kind:'bullet',id:70,
+    ownerId:3,x:5,y:-520,vx:0,vy:0,r:3,dmg:4,pen:0,ttl:1,
+    hits:0,dead:false,shell:false,beam:false}]});
+   assert.equal(r.hp,100,'nearby hostile projectile may intercept before the hull');
+  });
+  test(label+': lateral victim-hull threat blocks rail TTL backdating at '+fps+'Hz',()=>{
+   const r=runRailTTL(Game,{fps,otherBullets:[{kind:'bullet',id:71,
+    ownerId:3,x:30,y:-499,vx:0,vy:0,r:3,dmg:4,pen:0,ttl:1,
+    hits:0,dead:false,shell:false,beam:false}]});
+   assert.equal(r.hp,100,'nearby shot may change the intended victim first');
+  });
+ }
+}
+
+/* Adversarial controls: a remote shot with sufficient travel budget is NOT
+ * remote; neither are malformed trajectories or a second expiring rail.
+ * These scenarios must remain deferred rather than inventing hit order. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'optimized':'baseline';
+ for(const fps of [30,60,120]){
+  test(label+': legal-speed nearby competitor vetoes rail TTL at '+fps+'Hz',()=>{
+   const r=runRailTTL(Game,{fps,otherBullets:[{kind:'bullet',id:72,
+    ownerId:3,x:52,y:-520,vx:-3100,vy:0,r:3,dmg:4,
+    pen:0,ttl:.004,hits:0,dead:false,shell:false,beam:false}]});
+   assert.equal(r.hp,100,'speed-bound can reach the victim before the rail');
+  });
+  test(label+': invalid projectile motion cannot authorize rail TTL at '+fps+'Hz',()=>{
+   const r=runRailTTL(Game,{fps,otherBullets:[{kind:'bullet',id:73,
+    ownerId:3,x:1100,y:1000,vx:NaN,vy:0,r:3,dmg:4,
+    pen:0,ttl:.001,hits:0,dead:false,shell:false,beam:false}]});
+   assert.equal(r.hp,100,'unknown competing motion is a veto');
+  });
+  test(label+': two expiring rails cannot claim speculative array-order priority at '+fps+'Hz',()=>{
+   const r=runRailTTL(Game,{fps,otherBullets:[{kind:'bullet',id:74,
+    ownerId:3,x:1100,y:1000,vx:3100,vy:0,r:8.84,dmg:95.2,
+    baseDmg:95.2,maxHp:20,hp:20,pen:18,ttl:.005,hits:0,
+    dead:false,shell:false,beam:true,__novaRail:true,__novaFullRail:true}]});
+   assert.equal(r.hp,100,'two rails require a shared chronological arbiter');
+  });
+  test(label+': remote fire does not defeat earlier permanent cover at '+fps+'Hz',()=>{
+   const r=runRailTTL(Game,{fps,wall:true,
+    otherBullets:Array.from({length:12},(_,i)=>remoteRailShot(i))});
+   assert.equal(r.hp,100,'wall remains authoritative');
+  });
+ }
+}
+
+/* Near-tangent projectile uncertainty is not a proof of separation: a
+ * floating-point rounding difference must not authorize backdated damage. */
+for(const optimized of [false,true])for(const fps of [30,60,120]){
+ test((optimized?'optimized':'baseline')+
+  ': near-tangent projectile remains a conservative rail veto at '+fps+'Hz',()=>{
+  const r=runRailTTL(boot(optimized),{fps,otherBullets:[{kind:'bullet',
+   id:75,ownerId:3,x:0,y:-520+8.84+3+2,vx:0,vy:0,r:3,
+   dmg:4,pen:0,ttl:1,hits:0,dead:false,shell:false,beam:false}]});
+  assert.equal(r.hp,100,'a tangent is not certified remote');
+ });
+}
+
+/* Keep the optional rail proof cheap in dense fights: 256 total projectiles
+ * is an all-or-nothing cap, never a first-N selection by array order. */
+function denseRemoteRailShot(i){return {kind:'bullet',id:1000+i,ownerId:3,
+ x:1000+(i%30)*15,y:1000+Math.floor(i/30)*10,
+ vx:0,vy:0,r:3,dmg:4,pen:0,ttl:1,hits:0,dead:false,
+ shell:false,beam:false};}
+for(const optimized of [false,true])for(const reverse of [false,true]){
+ const Game=boot(optimized),label=optimized?'optimized':'baseline';
+ test(label+': 200 remote projectiles remain eligible for bounded rail proof reversed='+reverse,()=>{
+  const r=runRailTTL(Game,{fps:30,reverse,
+   otherBullets:Array.from({length:200},(_,i)=>denseRemoteRailShot(i))});
+  assert.ok(Math.abs(r.hp-4.8)<1e-8);
+ });
+ test(label+': above 256 projectiles rail proof defers whole frame reversed='+reverse,()=>{
+  const r=runRailTTL(Game,{fps:30,reverse,
+   otherBullets:Array.from({length:256},(_,i)=>denseRemoteRailShot(i))});
+  assert.equal(r.hp,100,'do not scan unbounded traffic or prefer early array entries');
+ });
 }
