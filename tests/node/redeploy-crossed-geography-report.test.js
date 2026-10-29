@@ -20,6 +20,7 @@ function fixture(){
    score:20+(position==='return'?4:0),
    alive:true,frontReached:position==='return'?3:null,
    firstVisibleEnemy:position==='return'?2:null,
+   firstFairVisibleEnemy:position==='return'?2:null,
    firstVisibleNeutral:1,blockedNearFrontSeconds:0,
    routeRequests:position==='return'?3:2,travelled:position==='return'?100:200
   });
@@ -44,6 +45,7 @@ test('crossed report identifies geography separately from generated enemy world'
  assert.deepEqual(out.metrics.hp.conditionalGeographyReturnMinusFresh.seedBootstrap95,[-10,-10]);
  assert.equal(out.metrics.neutralXP.conditionalGeographyReturnMinusFresh.mean,4);
  assert.equal(out.metrics.frontArrival.conditionalGeographyReturnMinusFresh.mean,1);
+ assert.equal(out.metrics.fairEnemySeen.conditionalGeographyReturnMinusFresh.mean,1);
 });
 test('crossed report rejects base-world mismatches rather than calling them causal',()=>{
  const data=fixture();
