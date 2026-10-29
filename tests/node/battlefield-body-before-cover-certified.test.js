@@ -61,6 +61,7 @@ function boot(optimized){
 }
 function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,
  wallShape='rect',otherShape=false,otherBullet=false,otherShell=false,moving=false,
+ remoteBullets=0,
  shield=false,otherTank=false,ttl=1,pen=1,radius=3,
  active=true,knock=0,allied=false,destructible=false,damage=10}={}){
  const g=new Game(),dt=1/fps;
@@ -83,6 +84,9 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,
  if(otherShell)g.bullets.push({kind:'bullet',id:12,ownerId:4,
   x:0,y:1000,vx:0,vy:0,r:9,dmg:10,ttl:1,pen:1,hits:0,dead:false,
   shell:true,splash:100});
+ for(let i=0;i<remoteBullets;i++)g.bullets.push({kind:'bullet',id:100+i,
+  ownerId:100+i,x:0,y:1000+i*3,vx:speed,vy:0,r:3,dmg:10,
+  ttl:1,pen:1,hits:0,dead:false});
  g.updateBullets(dt);
  return {hits:g.hits,hp:t.hp,bullet:g.bullets[0],g};
 }
@@ -142,6 +146,10 @@ for(const optimized of [false,true]){
    const r=run(boot(optimized),{pen});
    assert.deepEqual(r.hits,[2]);assert.equal(r.hp,90);
   }
+ });
+ test(label+': dense remote fire stays on canonical collision path',()=>{
+  const r=run(boot(optimized),{remoteBullets:12});
+  assert.deepEqual(r.hits,[],'13-shot frame must not speculate');
  });
  test(label+': no live movement epoch never authorizes early damage',()=>{
   assert.deepEqual(run(boot(optimized),{active:false}).hits,[]);
