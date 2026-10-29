@@ -1409,7 +1409,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      }
     }
     possible.set(pb,targets);
-    if(targets.length>=(nonExpiring?pb.pen+1:((pb.hits||0)>0?1:2)))
+    /* A pen-2 shot with two plausible hulls may certify a partial
+     * first-frame prefix; the exact solver still requires two real roots
+     * and its normal conservative cover/defense/competition vetoes. */
+    if(targets.length>=(nonExpiring?(pb.pen===2?2:pb.pen+1):
+       ((pb.hits||0)>0?1:2)))
      eligible.push(pb);
    }
    /* A discarded one-hit projectile may still change another shot's
