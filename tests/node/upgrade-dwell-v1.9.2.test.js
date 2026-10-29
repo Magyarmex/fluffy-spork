@@ -160,3 +160,35 @@ test('mouse pointer-down is left alone so normal desktop click behavior is uncha
   });
   assert.equal(fx.clicks(), 0);
 });
+
+test('ultimate touch bridge does not swallow a subsequent physical mouse click', () => {
+  const { window } = boot();
+  const fx = ultimateFixture();
+  const bridge = window.__NOVA_MULTITOUCH_ULTIMATE_TEST__;
+  bridge.onPointerDown({ pointerType: 'touch', target: fx.target, cancelable: true,
+    preventDefault() {}, stopPropagation() {} });
+  assert.equal(fx.clicks(), 1);
+  let swallowed = 0;
+  bridge.onClickCapture({ pointerType: 'mouse', detail: 1,
+    sourceCapabilities: { firesTouchEvents: false }, target: fx.target, cancelable: true,
+    preventDefault() { swallowed++; }, stopImmediatePropagation() { swallowed++; } });
+  assert.equal(swallowed, 0, 'physical mouse click must reach React');
+});
+
+test('ultimate keyboard click survives pending touch guard, but compatibility touch click is still suppressed', () => {
+  const { window } = boot();
+  const fx = ultimateFixture();
+  const bridge = window.__NOVA_MULTITOUCH_ULTIMATE_TEST__;
+  function touch() { bridge.onPointerDown({ pointerType: 'touch', target: fx.target, cancelable: true,
+    preventDefault() {}, stopPropagation() {} }); }
+  let swallowed = 0;
+  touch();
+  bridge.onClickCapture({ detail: 0, target: fx.target, cancelable: true,
+    preventDefault() { swallowed++; }, stopImmediatePropagation() { swallowed++; } });
+  assert.equal(swallowed, 0, 'keyboard click must reach React');
+  touch();
+  bridge.onClickCapture({ pointerType: 'touch', detail: 1,
+    sourceCapabilities: { firesTouchEvents: true }, target: fx.target, cancelable: true,
+    preventDefault() { swallowed++; }, stopImmediatePropagation() { swallowed++; } });
+  assert.equal(swallowed, 2, 'delayed touch click must not fire twice');
+});
