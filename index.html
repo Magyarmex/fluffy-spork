@@ -247,7 +247,7 @@ canvas {
     <link rel="icon" href="./nova-icon.svg" type="image/svg+xml" />
     <meta name="application-name" content="NOVA TANKS" />
     <script defer src="./pwa-register.js"></script>
-      <meta name="nova-runtime-build" content="eb2d040c7e83c96488f833ec" />
+      <meta name="nova-runtime-build" content="1266fc96b4833d7b81787e40" />
   </head>
   <body>
     <div id="root"></div>
@@ -2833,12 +2833,30 @@ class Game {
         const types = ['heal', 'shield', 'triple', 'haste', 'nuke'];
         this.powerups.push({ id: this.nextId++, kind: 'powerup', type: (0, types_1.pick)(types), x: p.x, y: p.y, ttl: 20, born: this.time });
     }
+    cosmeticRandom() {
+        let s = this.__novaCosmeticRngState;
+        if (!s) {
+            const id = (this.nextId || 1) >>> 0;
+            const tick = Number.isFinite(this.time) ? Math.floor(this.time * 1000) : 0;
+            s = (Math.imul(id, 0x9e3779b1) ^ tick ^ 0x85ebca6b) >>> 0;
+            if (!s) s = 0x6d2b79f5;
+        }
+        s ^= s << 13;
+        s ^= s >>> 17;
+        s ^= s << 5;
+        this.__novaCosmeticRngState = s >>> 0;
+        return this.__novaCosmeticRngState / 4294967296;
+    }
+    cosmeticRnd(a = 1, b) {
+        const r = this.cosmeticRandom();
+        return b === undefined ? r * a : a + r * (b - a);
+    }
     addParticles(x, y, color, n, speed, kind = 'spark') {
         const maxLife = 0.6;
         const finalN = this.quality === 'low' ? Math.max(1, Math.round(n * 0.5)) : n;
         for (let i = 0; i < finalN; i++) {
-            const a = (0, types_1.rnd)(types_1.TAU);
-            const sp = (0, types_1.rnd)(speed * 0.3, speed);
+            const a = this.cosmeticRnd(types_1.TAU);
+            const sp = this.cosmeticRnd(speed * 0.3, speed);
             const p = this.parts[this.partIdx];
             p.active = true;
             p.kind = kind;
@@ -2846,9 +2864,9 @@ class Game {
             p.y = y;
             p.vx = Math.cos(a) * sp;
             p.vy = Math.sin(a) * sp;
-            p.life = kind === 'ring' ? 0.45 : (0, types_1.rnd)(0.25, 0.6);
+            p.life = kind === 'ring' ? 0.45 : this.cosmeticRnd(0.25, 0.6);
             p.maxLife = maxLife;
-            p.size = kind === 'ring' ? (0, types_1.rnd)(20, 50) : (0, types_1.rnd)(2, 4.5);
+            p.size = kind === 'ring' ? this.cosmeticRnd(20, 50) : this.cosmeticRnd(2, 4.5);
             p.color = color;
             this.partIdx = (this.partIdx + 1) % this.parts.length;
         }
@@ -2898,8 +2916,8 @@ class Game {
         const finalCount = this.quality === 'low' ? Math.max(1, Math.round(count * 0.5)) : count;
         for (let i = 0; i < finalCount; i++) {
             // Spray outwards/backwards away from impact direction with slight spread
-            const a = baseAngle + (0, types_1.rnd)(-0.6, 0.6);
-            const sp = (0, types_1.rnd)(70, 180);
+            const a = baseAngle + this.cosmeticRnd(-0.6, 0.6);
+            const sp = this.cosmeticRnd(70, 180);
             const p = this.parts[this.partIdx];
             p.active = true;
             p.kind = 'spark';
@@ -2907,9 +2925,9 @@ class Game {
             p.y = y;
             p.vx = Math.cos(a) * sp;
             p.vy = Math.sin(a) * sp;
-            p.life = (0, types_1.rnd)(0.18, 0.42);
+            p.life = this.cosmeticRnd(0.18, 0.42);
             p.maxLife = 0.6;
-            p.size = (0, types_1.rnd)(1.8, 3.8);
+            p.size = this.cosmeticRnd(1.8, 3.8);
             p.color = color;
             this.partIdx = (this.partIdx + 1) % this.parts.length;
         }
@@ -3228,11 +3246,11 @@ class Game {
             }
             this.cam.shake = Math.max(this.cam.shake, Math.min(0.5, d / 60));
         }
-        else if (Math.random() < 0.5) {
+        else if (this.cosmeticRandom() < 0.5) {
             this.sfx.hit();
         }
-        if (Math.random() < 0.5)
-            this.addText(t.x + (0, types_1.rnd)(-10, 10), t.y - 18, String(Math.round(d)), '#ff8a8a', 11);
+        if (this.cosmeticRandom() < 0.5)
+            this.addText(t.x + this.cosmeticRnd(-10, 10), t.y - 18, String(Math.round(d)), '#ff8a8a', 11);
         if (t.hp <= 0)
             this.killTank(t, src);
     }
@@ -3685,7 +3703,7 @@ class Game {
                 const mx = (a.x + b.x) * 0.5;
                 const my = (a.y + b.y) * 0.5;
                 this.addImpactDebris(mx, my, a.vx - b.vx, a.vy - b.vy, ah >= bh ? a.color : b.color, 3);
-                if (ah + bh > 40 || Math.random() < 0.18)
+                if (ah + bh > 40 || this.cosmeticRandom() < 0.18)
                     this.addRing(mx, my, ah >= bh ? a.color : b.color, Math.min(48, 14 + (ah + bh) * 0.22));
                 if (a.dead && a.shell)
                     this.clusterBurst(a);
@@ -3705,10 +3723,10 @@ class Game {
             b.x += b.vx * dt;
             b.y += b.vy * dt;
             b.ttl -= dt;
-            if (b.beam && Math.random() < 0.85) {
+            if (b.beam && this.cosmeticRandom() < 0.85) {
                 this.addParticles(b.x, b.y, b.color, 1, 30, 'glow');
             }
-            else if (Math.random() < 0.22) {
+            else if (this.cosmeticRandom() < 0.22) {
                 this.addParticles(b.x, b.y, b.color, 1, 20, 'glow');
             }
             if (b.ttl <= 0 || b.x < -M + 20 || b.x > M - 20 || b.y < -M + 20 || b.y > M - 20) {
@@ -4649,8 +4667,8 @@ function render(g, w, h) {
     const cam = g.cam;
     const time = g.time;
     const zoom = cam.zoom;
-    const shakeX = cam.shake > 0 ? (Math.random() - 0.5) * cam.shake * 14 : 0;
-    const shakeY = cam.shake > 0 ? (Math.random() - 0.5) * cam.shake * 14 : 0;
+    const shakeX = cam.shake > 0 ? (g.cosmeticRandom() - 0.5) * cam.shake * 14 : 0;
+    const shakeY = cam.shake > 0 ? (g.cosmeticRandom() - 0.5) * cam.shake * 14 : 0;
     ctx.setTransform(g.dpr, 0, 0, g.dpr, 0, 0);
     ctx.fillStyle = '#04060d';
     ctx.fillRect(0, 0, w, h);
