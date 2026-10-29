@@ -1709,3 +1709,36 @@ for(const optimized of [false,true]){
   assert.equal(c.hitCount,0,'shielded fifth hull vetoes the entire proof');
  });
 }
+
+/* Seeded shipping-stack adversary: prove four/five distinct pre-expiry
+ * hulls across randomized spacings, order and frame rates, without
+ * awarding a sixth hull whose first contact is beyond physical TTL. */
+for(const optimized of [false,true]){
+ test((optimized?'optimized':'baseline')+
+  ' 800 seeded pen=3/4 four/five-hull TTL corridors preserve exact victims',()=>{
+  const Game=boot(undefined,optimized);
+  let seed=4362026;
+  const rnd=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+  for(const pen of [3,4])for(const fps of [30,60,120,240])
+   for(let trial=0;trial<100;trial++){
+    const g=new Game(),count=pen+1,positions=[27+rnd()*3];
+    for(let k=1;k<count;k++)positions.push(positions[k-1]+12+rnd()*4);
+    g.tanks=positions.map((x,i)=>({kind:'tank',id:i+2,x,y:0,
+     cls:'scout',hp:100,alive:true,hitCount:0}));
+    const remote={kind:'tank',id:99,x:130,y:0,cls:'scout',
+     hp:100,alive:true,hitCount:0};
+    g.tanks.push(remote);
+    const order=[];
+    g.damageTank=function(t){t.hitCount++;this.hits++;order.push(t.id);};
+    g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,vx:25000,vy:0,
+     r:5.5,dmg:20,ttl:.0035,pen,hits:0,dead:false,shell:false,
+     beam:false,splash:false}];
+    if(trial%2===0)g.tanks.reverse();
+    g.time+=1/fps;g.updateBullets(1/fps);
+    assert.deepEqual(order,Array.from({length:count},(_,i)=>i+2),
+     'chronological victims pen='+pen+' fps='+fps+' trial='+trial);
+    assert.equal(remote.hitCount,0,'no phantom sixth hull');
+    assert.equal(g.hits,count,'exactly one hit per certified hull');
+   }
+ });
+}
