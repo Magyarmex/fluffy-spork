@@ -82,12 +82,22 @@ function bootGame() {
  * only the remembered death position and physical route waypoints; neither
  * enemy coordinates nor private ecological state steer the pilot. The
  * analysis may inspect those values only after each simulated step. */
-function withSeed(seed,fn){
+function withSeed(seed,fn,traceCallsites=false){
  let state=seed>>>0||1,draws=0;
+ const callsites=Object.create(null);
  const priorRandom=Math.random,priorDate=Date.now;
- Math.random=()=>{draws++;state^=state<<13;state^=state>>>17;state^=state<<5;return(state>>>0)/4294967296;};
+ Math.random=()=>{
+  draws++;
+  if(traceCallsites){
+   const caller=(new Error().stack||'').split(String.fromCharCode(10))[2]||'<unknown>';
+   callsites[caller]=(callsites[caller]||0)+1;
+  }
+  state^=state<<13;state^=state>>>17;state^=state<<5;
+  return(state>>>0)/4294967296;
+ };
  Date.now=()=>0;
- try{return fn(()=>draws);}finally{Math.random=priorRandom;Date.now=priorDate;}
+ try{return fn(()=>draws,()=>({...callsites}));}
+ finally{Math.random=priorRandom;Date.now=priorDate;}
 }
 function finitePosition(p){return p&&Number.isFinite(p.x)&&Number.isFinite(p.y);}
 function run(seed,choice,hz,seconds,policy='navigate',preludeSeconds=0){
@@ -389,5 +399,48 @@ if(process.env.NOVA_REDEPLOY_TRACE_PILOT==='1') {
    naturalDeaths:report.filter(r=>r.prelude.naturalDeath).length,
    checkpoints:report.reduce((n,r)=>n+r.prelude.trace.length,0)
   }));
+ });
+}
+
+/* Opt-in source attribution: compare *where* seeded RNG draws occur, not just
+ * their count. The observer never influences Game input or random values. */
+if(process.env.NOVA_REDEPLOY_RNG_CALLSITE_PILOT==='1') {
+ test('attribute five-second 30/60Hz random draws to real shipping callsites',()=>{
+  const seed=1517840,results=[];
+  for(const hz of [30,60]){
+   const row=withSeed(seed,(readDraws,readCallsites)=>{
+    const g=bootGame();
+    if(!g.player)g.redeploy();
+    const initialDraws=readDraws(),before=readCallsites();
+    const initial={x:g.player.x,y:g.player.y,layout:g.__novaBattlefield.name};
+    const prelude=playPublicPrelude(g,hz,5,g.__testFair);
+    const after=readCallsites(),counts={};
+    for(const [site,count] of Object.entries(after)){
+     const delta=count-(before[site]||0);
+     if(delta>0)counts[site]=delta;
+    }
+    const total=readDraws()-initialDraws;
+    assert.equal(Object.values(counts).reduce((a,b)=>a+b,0),total,
+      'every RNG draw during played first life must have a source');
+    return {seed,hz,initial,drawsDuringPrelude:total,
+      prelude:{elapsed:prelude.elapsed,naturalDeath:prelude.naturalDeath,
+       origin:prelude.origin,hpAfter:prelude.hpAfter,neutralXPEarned:prelude.neutralXPEarned},
+      callsites:Object.entries(counts).sort((a,b)=>b[1]-a[1])};
+   },true);
+   results.push(row);
+  }
+  assert.deepEqual(results[0].initial,results[1].initial,
+    'FPS callsite attribution must share exact initial world');
+  assert.ok(results.every(r=>r.drawsDuringPrelude>0));
+  const dir=path.join(root,'artifacts','redeploy-rng-callsites');
+  fs.mkdirSync(dir,{recursive:true});
+  fs.writeFileSync(path.join(dir,'rng-callsites.json'),JSON.stringify({
+   contract:'read-only source attribution, NOT proof of FPS unfairness',
+   seed,seconds:5,frameRates:[30,60],results
+  },null,2));
+  console.log('NOVA_REDEPLOY_RNG_CALLSITES '+JSON.stringify(results.map(r=>({
+   hz:r.hz,draws:r.drawsDuringPrelude,distinctCallsites:r.callsites.length,
+   top:r.callsites.slice(0,5)
+  }))));
  });
 }
