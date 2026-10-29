@@ -118,3 +118,78 @@ test('non-sniper AI still delegates to the original owner', () => {
   frame(1 / 60, .5, .5, 'scout');
   assert.equal(getBaseCalls(), 1);
 });
+
+test('production Predator composition suppresses unused Sniper random rolls without losing movement', () => {
+  const predator = fs.readFileSync(path.join(root,
+    'nova-updates/predator-doctrine-v1.8.0.js'), 'utf8');
+  const refs = ['nova-updates/stability-v1.4.0.js',
+    'nova-updates/predator-doctrine-v1.8.0.js'];
+  const offsets = refs.map(ref => html.indexOf(ref));
+  assert.ok(offsets.every(n => n > 0) && offsets[0] < offsets[1],
+    'production must install Forward Observer before Predator Doctrine');
+
+  for (const fps of [30, 60, 120, 240]) {
+    let draws = 0, movement = null, abilities = 0;
+    const randomMath = Object.create(Math);
+    randomMath.random = () => { draws++; return .5; };
+    const classes = {
+      CLASSES: {
+        marksman: { fireMode: 'bullet', size: 15, ability: 'none' },
+        singularity: { fireMode: 'beam', size: 15, ability: 'phase' },
+        scout: { size: 15 }
+      },
+      lineageForClass(cls) {
+        return cls === 'marksman' || cls === 'singularity' ? 'sniper' : null;
+      }
+    };
+    const mods = {
+      'game/ai'(m) { m.exports.updateAI = () => {}; },
+      'game/classes'(m) { m.exports = classes; }
+    };
+    const window = { __novaModules: mods };
+    const ctx = { window, Math: randomMath, Number, Object, Array,
+      performance: { now: () => 1000 },
+      console: { info() {}, warn() {}, error() {} } };
+    vm.runInNewContext(source, ctx, { filename: 'stability-v1.4.0.js' });
+    vm.runInNewContext(predator, ctx, { filename: 'predator-doctrine-v1.8.0.js' });
+    const mod = { exports: {} };
+    mods['game/ai'](mod, mod.exports, () => classes);
+    function scenario(cls, hp) {
+      const t = { id: 1, cls, x: 0, y: 0, angle: 0, fireCd: 1,
+        abilityCd: 0, alive: true, hp, maxHp: 100,
+        ai: { thinkT: 10, state: 'hunt', targetId: 2, strafe: 1,
+          isElite: false, __novaAimSampleT: 10, __novaAimX: 400,
+          __novaAimY: 0 } };
+      const enemy = { id: 2, cls: 'scout', x: 400, y: 0,
+        alive: true, hp: 100, maxHp: 100, spawnShieldT: 0 };
+      const g = { time: 10, tanks: [t, enemy], player: enemy,
+        bullets: [], shapes: [], drones: [],
+        getTank(id) { return id === 2 ? enemy : null; },
+        tankSpeed() { return 200; }, weaponRange() { return 700; },
+        bulletSpeed() { return 800; }, nearestShape() { return null; },
+        hasLineOfSight() { return true; },
+        moveTank(_t, x, y) { movement = [x, y]; },
+        tryFire() {}, useAbility() { abilities++; } };
+      mod.exports.updateAI(t, g, 1 / fps);
+      return t;
+    }
+    const ordinary = scenario('marksman', 100);
+    assert.equal(ordinary.ai.__v180OwnMove, true, fps + 'Hz: Predator owns combat movement');
+    assert.ok(movement && Math.hypot(...movement) > 0, 'tactical movement still executes');
+    assert.equal(ordinary.ai.strafe, 1, 'ignored legacy strafe does not change');
+    assert.equal(draws, 0, fps + 'Hz: no unused legacy strafe/ability RNG draws');
+    const tactical = scenario('singularity', 20);
+    assert.equal(tactical.ai.__v180OwnMove, true);
+    assert.equal(abilities, 1, fps + 'Hz: low-HP phase ability still fires by tactical intent');
+    assert.equal(draws, 0, 'tactical ability needs no legacy random roll');
+  }
+});
+
+test('if Predator does not own movement, the Sniper strafe fallback remains time-based', () => {
+  // A temporary missing tactical movement plan must not freeze the legacy
+  // strafe grammar, even when the Predator module is registered.
+  const { frame } = boot();
+  const dt = 1 / 30, threshold = 1 - Math.pow(1 - .0025, dt * 60);
+  assert.equal(frame(dt, threshold - 1e-8, 1).strafe, -1);
+  assert.equal(frame(dt, threshold + 1e-8, 1).strafe, 1);
+});
