@@ -58,3 +58,14 @@ test('materializer patches before composition and includes script in fingerprint
  assert.match(deploy,/'scripts\/patch-ai-strafe-timebase.cjs',/);
  assert.match(deploy,/- 'scripts\/patch-ai-strafe-timebase.cjs'/);
 });
+
+test('real Chromium smoke patches the exact AI owner before serving the game',()=>{
+ const workflow=fs.readFileSync(path.join(root,'.github/workflows/browser-smoke.yml'),'utf8');
+ const saved=workflow.indexOf('node scripts/patch-saved-records.cjs index.html');
+ const ai=workflow.indexOf('node scripts/patch-ai-strafe-timebase.cjs index.html');
+ const serve=workflow.indexOf('python3 -m http.server',ai);
+ assert.ok(saved>=0&&ai>saved&&serve>ai,
+  'Chromium must exercise the same patched canonical AI base as Pages');
+ assert.equal(workflow.split("- 'scripts/patch-ai-strafe-timebase.cjs'").length-1,2,
+  'both push and PR browser gates must trigger on the patch owner');
+});
