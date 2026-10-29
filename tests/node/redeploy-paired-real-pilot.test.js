@@ -111,6 +111,18 @@ function run(seed,choice,hz,seconds,policy='navigate',preludeSeconds=0){
    origin
   });
   if(g.player.alive)g.killTank(g.player,null);
+  /* The 60s natural-death cohort must pass through the actual 1.3s
+   * dying -> dead transition before the player can choose redeploy.
+   * This is done BEFORE either arm chooses FRESH/RETURN, so both inherit
+   * the same deterministic death-transition world evolution. */
+  let deathTransitionTicks=0;
+  if(process.env.NOVA_REDEPLOY_NATURAL_PILOT==='1'&&preludeSeconds>0){
+   for(let i=0;i<Math.ceil(2*hz)&&g.status!=='dead';i++){
+    g.update(1/hz);deathTransitionTicks++;
+   }
+   assert.equal(g.status,'dead','natural-death cohort must reach the real game-over state');
+   assert.ok(deathTransitionTicks>0,'the death transition cannot be skipped');
+  }
   assert.equal(g.__novaRedeployChoice,'fresh','each death defaults to FRESH');
   g.__novaRedeployChoice=choice;
   g.redeploy();
@@ -209,7 +221,7 @@ function run(seed,choice,hz,seconds,policy='navigate',preludeSeconds=0){
     if(visible)firstVisibleEnemy=g.time;
    }
   }
-  return{seed,choice,hz,policy,prelude,postInsertion,layout,rotation,mirrored,initialShapes,
+  return{seed,choice,hz,policy,prelude,deathTransitionTicks,postInsertion,layout,rotation,mirrored,initialShapes,
    fingerprint,fingerprintHash:crypto.createHash('sha256').update(fingerprint).digest('hex'),origin,spawn,
    startDistance:+startDistance.toFixed(2),
    endDistance:+Math.hypot(p.x-origin.x,p.y-origin.y).toFixed(2),
@@ -262,11 +274,15 @@ test('pre-death public combat changes the witnessed world without introducing ar
 
 test('FRESH/RETURN real-engine matched pilot is deterministic under counterbalanced arm order',()=>{
  const full=process.env.NOVA_REDEPLOY_FULL_PILOT==='1';
+ const natural=full&&process.env.NOVA_REDEPLOY_NATURAL_PILOT==='1';
  const policy=process.env.NOVA_REDEPLOY_POLICY||'navigate';
  assert.ok(['navigate','harvest','harvest_roam'].includes(policy),'explicitly supported public policy');
- const report=[],seeds=full?FULL_SEEDS:[0x172901,0x172902,0x172903];
- const seconds=full?20:2,preludeSeconds=Number(process.env.NOVA_REDEPLOY_PRELIFE_SECONDS||0),seen=new Set();
- assert.ok(Number.isFinite(preludeSeconds)&&preludeSeconds>=0&&preludeSeconds<=30,
+ const report=[],seeds=natural?FULL_SEEDS.filter((_,i)=>i%6<2):
+  full?FULL_SEEDS:[0x172901,0x172902,0x172903];
+ const seconds=natural?12:full?20:2,
+  preludeSeconds=Number(process.env.NOVA_REDEPLOY_PRELIFE_SECONDS||0),seen=new Set();
+ if(natural)assert.equal(preludeSeconds,60,'natural-death exposure pilot must predeclare 60s');
+ assert.ok(Number.isFinite(preludeSeconds)&&preludeSeconds>=0&&preludeSeconds<=60,
   'pre-death simulation must be explicitly bounded');
  for(const hz of [30,60]){
   for(let i=0;i<seeds.length;i++){
@@ -274,7 +290,7 @@ test('FRESH/RETURN real-engine matched pilot is deterministic under counterbalan
    const returning=run(seed,'return',hz,seconds,policy,preludeSeconds);
    /* Full experiment counterbalances a representative of each map/rotation
     * cell. The ordinary CI smoke counterbalances every case. */
-   if(!full||i%6===0){
+   if(!full||(natural?i%2===0:i%6===0)){
     const returningFirst=run(seed,'return',hz,seconds,policy,preludeSeconds);
     const freshSecond=run(seed,'fresh',hz,seconds,policy,preludeSeconds);
     assert.ok(comparable(fresh,freshSecond),
@@ -300,20 +316,25 @@ test('FRESH/RETURN real-engine matched pilot is deterministic under counterbalan
   }
  }
  if(full){
-  assert.equal(report.length,72,'36 matched worlds at two frame rates; each contains two policies');
+  assert.equal(report.length,natural?24:72,
+   'each predeclared world has two technical frame-rate observations');
   assert.equal(seen.size,6,'all three maps and two rotations must be exercised');
   const dir=path.join(root,'artifacts','redeploy-pilot');
   fs.mkdirSync(dir,{recursive:true});
   fs.writeFileSync(path.join(dir,'results-'+policy+'.json'),JSON.stringify({
-   contract:'total-policy effect, not isolated geography or human skill',
+   contract:natural?'natural-death exposure / forced-death-censored total-policy pilot; NOT isolated geography or human skill':
+    'total-policy effect, not isolated geography or human skill',
    policyNote:policy==='harvest_roam'?'public-only neutral approach and terrain-aware patrol AFTER reaching remembered front':'original baseline; harvest stops moving at remembered front',
-   policy,seconds,preludeSeconds,worlds:36,frameRates:[30,60],counterbalancedPerHz:6,
+   policy,seconds,preludeSeconds,worlds:seeds.length,frameRates:[30,60],counterbalancedPerHz:6,
+   naturalExposurePilot:natural,
+   naturalDeathFpsObservations:report.filter(r=>r.fresh.prelude?.naturalDeath).length,
    layouts:[...seen].sort(),results:report
   },null,2));
  }
  const avg=(key,mode)=>report.reduce((sum,r)=>sum+r[mode][key],0)/report.length;
  console.log('NOVA_REDEPLOY_REAL_PAIRED_PILOT '+JSON.stringify({
-  full,policy,preludeSeconds,worlds:seeds.length,seconds,scenarios:report.length,
+  full,natural,policy,preludeSeconds,worlds:seeds.length,seconds,scenarios:report.length,
+  naturalDeathFpsObservations:report.filter(r=>r.fresh.prelude?.naturalDeath).length,
   layouts:[...seen].sort(),
   meanStartDistance:{fresh:+avg('startDistance','fresh').toFixed(2),
    return:+avg('startDistance','returning').toFixed(2)},

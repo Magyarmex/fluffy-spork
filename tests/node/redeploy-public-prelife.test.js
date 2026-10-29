@@ -76,7 +76,7 @@ test('first life can react only to a visible hostile and an approaching visible 
 test('invalid or unobservable prelude cannot silently use private state',()=>{
   const {game,fair}=setup();
   assert.throws(()=>playPublicPrelude(game,0,2,fair),/finite/);
-  assert.throws(()=>playPublicPrelude(game,30,31,fair),/finite/);
+  assert.throws(()=>playPublicPrelude(game,30,61,fair),/finite/);
   assert.throws(()=>playPublicPrelude(game,30,2,null),/public viewport/);
   game.player.x=Infinity;
   assert.throws(()=>playPublicPrelude(game,30,2,fair),/public viewport/);

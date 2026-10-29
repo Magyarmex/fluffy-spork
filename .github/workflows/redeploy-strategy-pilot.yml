@@ -86,6 +86,41 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  natural-death-exposure:
+    # Research only: longer actual first-life play, with forced deaths
+    # explicitly censored. Two independent seeds per layout/rotation cell.
+    # Do not pool these results with the 8s played-first-life cohort.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Run 12 predeclared worlds at 30/60 Hz with 60s public first-life play
+        env:
+          NOVA_REDEPLOY_FULL_PILOT: '1'
+          NOVA_REDEPLOY_NATURAL_PILOT: '1'
+          NOVA_REDEPLOY_POLICY: harvest_roam
+          NOVA_REDEPLOY_PRELIFE_SECONDS: '60'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/redeploy-pilot
+          node --test tests/node/redeploy-paired-real-pilot.test.js 2>&1 | tee artifacts/redeploy-pilot/run.log
+      - name: Count natural deaths, forced redeploys and FPS discordance
+        env:
+          NOVA_REDEPLOY_EXPECTED_SEEDS: '12'
+        run: node scripts/redeploy-played-prelife-report.cjs artifacts/redeploy-pilot/results-harvest_roam.json
+      - name: Preserve natural-death exposure and all censored trials
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-redeploy-natural-death-exposure
+          path: artifacts/redeploy-pilot/
+          if-no-files-found: warn
+          retention-days: 30
+
   compare-played-policies:
     needs: played-first-life
     if: ${{ always() }}

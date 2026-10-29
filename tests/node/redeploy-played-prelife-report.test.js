@@ -46,3 +46,98 @@ test('rejects instant-death and nonfinite outcomes',()=>{
   s.preludeSeconds=8;s.results[0].returning.hp=NaN;
   assert.throws(()=>reportPlayedFirstLife(s,2),/Nonfinite outcome/);
 });
+
+test('natural-death exposure counts independent seeds and retains FPS disagreement',()=>{
+  const s=sample();
+  for(const row of s.results){
+    if(row.seed===1 || (row.seed===2&&row.hz===30))
+      row.fresh.prelude.naturalDeath=true;
+  }
+  const summary=reportPlayedFirstLife(s,2);
+  assert.equal(summary.firstLife.naturalDeaths,3,'raw FPS observations are reported');
+  assert.equal(summary.firstLife.independentNaturalDeathSeeds,2,
+    'a death at either FPS is an exposed independent seed');
+  assert.equal(summary.firstLife.independentNaturalDeathSeedsAtBothHz,1);
+  assert.equal(summary.firstLife.independentForcedDeathSeeds,0);
+  assert.equal(summary.firstLife.fpsDiscordantDeathSeeds,1,
+    'a frame-rate-dependent natural death is evidence, not a fatal analysis error');
+  assert.equal(summary.firstLife.naturalDeathExposureRate,1);
+  assert.equal(summary.firstLife.bothHzNaturalDeathRate,.5);
+  assert.equal(summary.firstLife.primary30Hz.naturalDeaths,2);
+  assert.equal(summary.firstLife.technical60Hz.naturalDeaths,1);
+  assert.equal(summary.firstLife.primary30Hz.meanNaturalDeathTime,8);
+  assert.equal(summary.firstLife.technical60Hz.forcedDeaths,1);
+  assert.match(summary.firstLife.censoringNote,/Forced-death/);
+});
+test('zero natural deaths is reported as zero rather than disguised as natural play',()=>{
+  const summary=reportPlayedFirstLife(sample(),2);
+  assert.equal(summary.firstLife.naturalDeaths,0);
+  assert.equal(summary.firstLife.independentNaturalDeathSeeds,0);
+  assert.equal(summary.firstLife.independentNaturalDeathSeedsAtBothHz,0);
+  assert.equal(summary.firstLife.independentForcedDeathSeeds,2);
+  assert.equal(summary.firstLife.fpsDiscordantDeathSeeds,0);
+  assert.equal(summary.firstLife.naturalDeathExposureRate,0);
+  assert.equal(summary.firstLife.primary30Hz.meanNaturalDeathTime,null);
+  assert.equal(summary.firstLife.technical60Hz.naturalDeaths,0);
+});
+
+test('60s natural cohort refuses to treat an unplayed death transition as real redeploy',()=>{
+  const original=sample(),results=[];
+  for(let seed=1;seed<=12;seed++)for(const hz of [30,60]){
+    const base=original.results.find(r=>r.hz===hz);
+    const prelude={...base.fresh.prelude,origin:{x:seed,y:hz},elapsed:60,
+      ticks:60*hz,naturalDeath:seed%3===0};
+    const fresh={...base.fresh,prelude,origin:prelude.origin,
+      fingerprintHash:'world-'+seed+'-'+hz,deathTransitionTicks:Math.ceil(1.4*hz)};
+    const returning={...base.returning,prelude,origin:prelude.origin,
+      fingerprintHash:fresh.fingerprintHash,deathTransitionTicks:fresh.deathTransitionTicks};
+    results.push({seed,hz,layout:'Crossfire',rotation:0,fresh,returning});
+  }
+  const s={policy:'harvest_roam',naturalExposurePilot:true,preludeSeconds:60,results};
+  const summary=reportPlayedFirstLife(s,12);
+  assert.equal(summary.independentSeeds,12);
+  assert.equal(summary.firstLife.independentNaturalDeathSeeds,4);
+  assert.equal(summary.firstLife.independentNaturalDeathSeedsAtBothHz,4);
+  assert.equal(summary.firstLife.naturalDeathExposureRate,4/12);
+  s.results[0].returning.deathTransitionTicks=0;
+  assert.throws(()=>reportPlayedFirstLife(s,12),/Unmatched or skipped real death transition/);
+  s.results[0].returning.deathTransitionTicks=s.results[0].fresh.deathTransitionTicks;
+  s.preludeSeconds=8;
+  assert.throws(()=>reportPlayedFirstLife(s,12),/predeclare 60s/);
+});
+
+test('FPS-discordant deaths are exposure, not zero-exposure censoring',()=>{
+  const s=sample();
+  for(const row of s.results) {
+    row.fresh.prelude.naturalDeath =
+      (row.seed===1&&row.hz===30)||(row.seed===2&&row.hz===60);
+  }
+  const summary=reportPlayedFirstLife(s,2);
+  assert.equal(summary.firstLife.naturalDeaths,2);
+  assert.equal(summary.firstLife.independentNaturalDeathSeeds,2);
+  assert.equal(summary.firstLife.independentNaturalDeathSeedsAtBothHz,0);
+  assert.equal(summary.firstLife.independentForcedDeathSeeds,0);
+  assert.equal(summary.firstLife.fpsDiscordantDeathSeeds,2);
+  assert.equal(summary.firstLife.naturalDeathExposureRate,1);
+  assert.equal(summary.firstLife.bothHzNaturalDeathRate,0);
+});
+test('natural cohort refuses missing death flags and impossible elapsed times',()=>{
+  const base=sample(),results=[];
+  for(let seed=1;seed<=12;seed++)for(const hz of [30,60]){
+    const row=base.results.find(r=>r.hz===hz);
+    const prelude={...row.fresh.prelude,origin:{x:seed,y:hz},elapsed:60,
+      ticks:60*hz,naturalDeath:false};
+    const fresh={...row.fresh,prelude,origin:prelude.origin,
+      fingerprintHash:'world-'+seed+'-'+hz,deathTransitionTicks:42};
+    const returning={...row.returning,prelude,origin:prelude.origin,
+      fingerprintHash:fresh.fingerprintHash,deathTransitionTicks:42};
+    results.push({seed,hz,layout:'Crossfire',rotation:0,fresh,returning});
+  }
+  const s={policy:'harvest_roam',naturalExposurePilot:true,preludeSeconds:60,results};
+  assert.equal(reportPlayedFirstLife(s,12).firstLife.independentForcedDeathSeeds,12);
+  s.results[0].fresh.prelude.naturalDeath=undefined;
+  assert.throws(()=>reportPlayedFirstLife(s,12),/Invalid natural-death exposure/);
+  s.results[0].fresh.prelude.naturalDeath=false;
+  s.results[0].fresh.prelude.elapsed=61;
+  assert.throws(()=>reportPlayedFirstLife(s,12),/Invalid natural-death exposure/);
+});
