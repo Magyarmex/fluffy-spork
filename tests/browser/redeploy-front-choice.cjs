@@ -35,6 +35,9 @@ async function run(browser,width,height){
   });
   const returnButton=page.locator('[data-nova-insertion="return"]');
   await returnButton.waitFor({state:'visible',timeout:15000});
+  assert.equal(await returnButton.textContent(),'↩ RETURN · NEAR FRONT');
+  assert.match(await returnButton.getAttribute('aria-label'),/^↩ RETURN · NEAR FRONT.*420–850 world units.*No stat bonus/);
+  assert.equal(await page.locator('[data-nova-insertion="fresh"]').textContent(),'⚡ FRESH · RANDOM');
   // Freeze the *real* CSS entrance at its first frame. The former popIn
   // scale(.85) shrank a 32.4px control to 27.5px, even though the same
   // button passed after the 280ms animation finished. A settled-only
@@ -124,10 +127,12 @@ async function run(browser,width,height){
   const directions=['E','SE','S','SW','W','NW','N','NE'];
   const angle=Math.atan2(death.y-after.y,death.x-after.x);
   const bearing=directions[(Math.round(angle/(Math.PI/4))+8)%8];
-  assert.ok(after.notices.some(n=>n.message==='↩ RETURN · LAST FRONT '+bearing),
+  const direct=Math.round(Math.hypot(death.x-after.x,death.y-after.y)/10)*10;
+  const cue='↩ RETURN · FRONT '+bearing+' · ~'+direct+'u';
+  assert.ok(after.notices.some(n=>n.message===cue),
    'real React redeploy must tell the player the direction of their witnessed last front: '+
    JSON.stringify(after.notices));
-  await page.getByText('↩ RETURN · LAST FRONT '+bearing,{exact:true})
+  await page.getByText(cue,{exact:true})
    .waitFor({state:'visible',timeout:2000});
   const survivingStar=await page.evaluate(id=>{
    const g=window.__novaFrontSmokeGame,star=g.getShape(id);

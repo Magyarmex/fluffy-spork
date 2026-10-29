@@ -135,6 +135,12 @@ test('death modal presents accessible one-click plans and restores original call
  const row=panel.choice,buttons=row.children;
  assert.equal(row.attributes.role,'group');
  assert.equal(buttons.length,2);
+ assert.equal(buttons[0].textContent,'⚡ FRESH · RANDOM');
+ assert.equal(buttons[1].textContent,'↩ RETURN · NEAR FRONT');
+ assert.ok(buttons[0].attributes['aria-label'].startsWith(buttons[0].textContent));
+ assert.ok(buttons[1].attributes['aria-label'].startsWith(buttons[1].textContent));
+ assert.match(buttons[0].attributes['aria-label'],/random insertion.*No stat bonus/);
+ assert.match(buttons[1].attributes['aria-label'],/420–850 world units.*No stat bonus/);
  assert.equal(panel.redeploy.style.display,'none');
  assert.equal(panel.redeploy.attributes['aria-hidden'],'true');
  buttons[1].onclick();
@@ -164,14 +170,14 @@ test('successful return tells player which way the last front lies',()=>{
  const {Game}=boot({random:()=>0}),g=new Game();
  g.killTank(victim(100,200));g.update();g.__novaRedeployChoice='return';
  g.redeploy();
- assert.deepEqual(g.toasts,[{message:'↩ RETURN · LAST FRONT W',kind:'info'}]);
+ assert.deepEqual(g.toasts,[{message:'↩ RETURN · FRONT W · ~420u',kind:'info'}]);
  assert.equal(g.__novaFrontReturnAccepted,false,'success flag cannot leak to next life');
 });
 test('return direction reflects actual spawn quadrant rather than a guessed map sector',()=>{
  const {Game}=boot({random:()=>.25}),g=new Game();
  g.killTank(victim(100,200));g.update();g.__novaRedeployChoice='return';
  g.redeploy();
- assert.deepEqual(g.toasts,[{message:'↩ RETURN · LAST FRONT N',kind:'info'}]);
+ assert.deepEqual(g.toasts,[{message:'↩ RETURN · FRONT N · ~530u',kind:'info'}]);
 });
 test('terrain-blocked return explicitly announces legacy fresh fallback',()=>{
  const {Game}=boot({safe:()=>false,random:()=>0}),g=new Game();
@@ -291,4 +297,21 @@ test('death modal repairs a replaced React callback even when the row survives',
  assert.equal(stale.clicked,0,'the detached React callback cannot be invoked');
  g.redeploy();
  assert.equal(panel.redeploy.style.display,'');
+});
+
+/* The navigation cue reports an honest straight-line distance, not a route
+ * length or a promise that terrain between spawn and death is clear. */
+test('return distance cue is bounded and rounded without leaking hidden world state',()=>{
+ for(const sample of [0,.1,.3,.5,.75,.99]){
+  const {Game}=boot({random:()=>sample}),g=new Game();
+  g.killTank(victim(100,200));g.update();g.__novaRedeployChoice='return';
+  g.redeploy();
+  const distance=Math.hypot(g.player.x-100,g.player.y-200);
+  const expected=Math.round(distance/10)*10;
+  assert.ok(distance>=420-1e-8&&distance<=850+1e-8);
+  assert.equal(g.toasts.length,1);
+  assert.match(g.toasts[0].message,/^↩ RETURN · FRONT (E|SE|S|SW|W|NW|N|NE) · ~\d+u$/);
+  assert.ok(g.toasts[0].message.endsWith('~'+expected+'u'));
+  assert.equal(g.__novaRedeployOrigin,null);
+ }
 });
