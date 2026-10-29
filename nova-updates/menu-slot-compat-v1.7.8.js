@@ -648,10 +648,18 @@ mods['game/engine']=function(module,exports,require){
   var out=oldMap.apply(this,arguments),m=this.__novaLastFrontMarker;
   if(!m||this.status!=='playing'||!this.player||!this.player.alive)return out;
   if(!validOrigin(m)){this.__novaLastFrontMarker=null;return out;}
-  if(!Number.isFinite(this.time)||this.time>=m.until||
-     Math.hypot(this.player.x-m.x,this.player.y-m.y)<130){
+  if(!Number.isFinite(this.time)||this.time>=m.until){
    this.__novaLastFrontMarker=null;return out;
   }
+  /* A wall can separate the player from a nearby remembered front. A short
+   * straight-line distance alone is not arrival; retain the waypoint until
+   * the existing terrain owner certifies a hull-clear approach. */
+  var arrived=Math.hypot(this.player.x-m.x,this.player.y-m.y)<130;
+  if(arrived&&typeof this.hasLineOfSight==='function'){
+   try{arrived=!!this.hasLineOfSight(this.player.x,this.player.y,m.x,m.y,24);}
+   catch(ignore){arrived=false;} // Unavailable terrain cannot prove arrival.
+  }
+  if(arrived){this.__novaLastFrontMarker=null;return out;}
   var ctx=this.mmCtx;
   if(!ctx||typeof ctx.save!=='function')return out;
   /* Same 216px / +/-2250 projection as the canonical minimap. */

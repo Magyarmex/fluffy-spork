@@ -315,3 +315,35 @@ test('return distance cue is bounded and rounded without leaking hidden world st
   assert.equal(g.__novaRedeployOrigin,null);
  }
 });
+
+/* The front is a remembered physical location, not a Euclidean arrival
+ * trigger: a nearby wall can still separate the player from the old lane. */
+test('RETURN waypoint survives close range when solid terrain blocks the approach',()=>{
+ const {Game,mapMarks}=boot({random:()=>0}),g=new Game();
+ g.killTank(victim(100,200));g.update();g.__novaRedeployChoice='return';g.redeploy();
+ g.player.x=220;g.player.y=200; // 120u away, on the other side of cover.
+ const calls=[];
+ g.hasLineOfSight=(ax,ay,bx,by,pad)=>{
+  calls.push({ax,ay,bx,by,pad});return false;
+ };
+ g.drawMinimap();
+ assert.equal(mapMarks.length,1,'blocked near-front approach must retain the marker');
+ assert.ok(g.__novaLastFrontMarker,'straight-line proximity is not arrival');
+ assert.deepEqual(calls,[{ax:220,ay:200,bx:100,by:200,pad:24}],
+  'arrival check uses the existing terrain visibility owner with hull clearance');
+ g.hasLineOfSight=()=>true;
+ g.drawMinimap();
+ assert.equal(g.__novaLastFrontMarker,null,'clear nearby approach completes return');
+ assert.equal(mapMarks.length,1,'arrival removes the marker before the next draw');
+});
+test('RETURN waypoint keeps its timer when terrain visibility is temporarily unavailable',()=>{
+ const {Game,mapMarks}=boot({random:()=>0}),g=new Game();
+ g.killTank(victim(100,200));g.update();g.__novaRedeployChoice='return';g.redeploy();
+ g.player.x=220;g.player.y=200;
+ g.hasLineOfSight=()=>{throw Error('terrain cache not ready');};
+ assert.doesNotThrow(()=>g.drawMinimap());
+ assert.equal(mapMarks.length,1);
+ assert.ok(g.__novaLastFrontMarker);
+ g.time=24;g.drawMinimap();
+ assert.equal(g.__novaLastFrontMarker,null,'expiry is authoritative even without terrain visibility');
+});
