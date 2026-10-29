@@ -598,6 +598,12 @@ test('common-safe real-engine insertion preserves native enemy clearance in both
     baseChoice:'fresh',spawnOverride:spawns.fresh,commonSafeSpawns:spawns
    });
    assert.ok(comparable(replay,arms.fresh),'exact replay must reproduce the supported arm');
+   const sham=run(seed,'fresh',hz,seconds,'harvest_roam',preludeSeconds,{
+    baseChoice:'fresh',commonSafeSpawns:spawns
+   });
+   assert.ok(comparable(sham,arms.fresh),
+    'same native location with/without transplant must have identical physical outcomes');
+
   }
   seen.add(nativeFresh.layout+'/'+nativeFresh.rotation);
   const compact=x=>{const {fingerprint,...rest}=x;return rest;};
