@@ -68,8 +68,10 @@ function onUltimateClickCapture(event){
   if(!button||button!==touchGuardButton||Date.now()>touchGuardUntil)return;
   /* Do not eat a real mouse/keyboard activation that follows a touch on a
    * hybrid device. The original touch's compatibility click remains guarded. */
-  if(event.detail===0||event.pointerType==='mouse'||
-     (event.sourceCapabilities&&event.sourceCapabilities.firesTouchEvents===false))return;
+  var touchClick=event.pointerType==='touch'||
+     (event.sourceCapabilities&&event.sourceCapabilities.firesTouchEvents===true);
+  if(!touchClick&&(event.detail===0||event.pointerType==='mouse'||
+     (event.sourceCapabilities&&event.sourceCapabilities.firesTouchEvents===false)))return;
 
   if(event.cancelable&&typeof event.preventDefault==='function')event.preventDefault();
   if(typeof event.stopImmediatePropagation==='function')event.stopImmediatePropagation();
