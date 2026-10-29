@@ -315,14 +315,14 @@ test('FRESH/RETURN real-engine matched pilot is deterministic under counterbalan
    policyNote:policy==='harvest_roam'?'public-only neutral approach and terrain-aware patrol AFTER reaching remembered front':'original baseline; harvest stops moving at remembered front',
    policy,seconds,preludeSeconds,worlds:seeds.length,frameRates:[30,60],counterbalancedPerHz:6,
    naturalExposurePilot:natural,
-   naturallyDeadWorlds:report.filter(r=>r.fresh.prelude?.naturalDeath).length,
+   naturalDeathFpsObservations:report.filter(r=>r.fresh.prelude?.naturalDeath).length,
    layouts:[...seen].sort(),results:report
   },null,2));
  }
  const avg=(key,mode)=>report.reduce((sum,r)=>sum+r[mode][key],0)/report.length;
  console.log('NOVA_REDEPLOY_REAL_PAIRED_PILOT '+JSON.stringify({
   full,natural,policy,preludeSeconds,worlds:seeds.length,seconds,scenarios:report.length,
-  naturallyDeadWorlds:report.filter(r=>r.fresh.prelude?.naturalDeath).length,
+  naturalDeathFpsObservations:report.filter(r=>r.fresh.prelude?.naturalDeath).length,
   layouts:[...seen].sort(),
   meanStartDistance:{fresh:+avg('startDistance','fresh').toFixed(2),
    return:+avg('startDistance','returning').toFixed(2)},
