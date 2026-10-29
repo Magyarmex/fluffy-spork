@@ -111,6 +111,18 @@ function run(seed,choice,hz,seconds,policy='navigate',preludeSeconds=0){
    origin
   });
   if(g.player.alive)g.killTank(g.player,null);
+  /* The 60s natural-death cohort must pass through the actual 1.3s
+   * dying -> dead transition before the player can choose redeploy.
+   * This is done BEFORE either arm chooses FRESH/RETURN, so both inherit
+   * the same deterministic death-transition world evolution. */
+  let deathTransitionTicks=0;
+  if(process.env.NOVA_REDEPLOY_NATURAL_PILOT==='1'){
+   for(let i=0;i<Math.ceil(2*hz)&&g.status!=='dead';i++){
+    g.update(1/hz);deathTransitionTicks++;
+   }
+   assert.equal(g.status,'dead','natural-death cohort must reach the real game-over state');
+   assert.ok(deathTransitionTicks>0,'the death transition cannot be skipped');
+  }
   assert.equal(g.__novaRedeployChoice,'fresh','each death defaults to FRESH');
   g.__novaRedeployChoice=choice;
   g.redeploy();
@@ -209,7 +221,7 @@ function run(seed,choice,hz,seconds,policy='navigate',preludeSeconds=0){
     if(visible)firstVisibleEnemy=g.time;
    }
   }
-  return{seed,choice,hz,policy,prelude,postInsertion,layout,rotation,mirrored,initialShapes,
+  return{seed,choice,hz,policy,prelude,deathTransitionTicks,postInsertion,layout,rotation,mirrored,initialShapes,
    fingerprint,fingerprintHash:crypto.createHash('sha256').update(fingerprint).digest('hex'),origin,spawn,
    startDistance:+startDistance.toFixed(2),
    endDistance:+Math.hypot(p.x-origin.x,p.y-origin.y).toFixed(2),
