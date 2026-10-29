@@ -53,6 +53,9 @@ function boot(){
   return {g,emit,pad,labels};
 }
 function state(g){
+  if(!g.player.__novaCommandWeave)g.player.__novaCommandWeave={
+    active:false,mode:'recall',x:g.player.x,y:g.player.y,targetId:-1,
+    preview:false,changedAt:0,lastTapAt:-99,tutorialUntil:0};
   return g.player.__novaCommandWeave;
 }
 function setPrior(g,mode='point'){
