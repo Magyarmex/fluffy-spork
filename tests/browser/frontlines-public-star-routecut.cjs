@@ -89,7 +89,11 @@ const seconds=300,dt=1/30,chunk=450;
      if(cue.source==='visible')a.visibleCues++;else a.reportCues++;
     }
     const route=mode==='routecut'?starPilot.moveToPublicRouteCut(g,p,F,defense):null;
-    if(route&&g.__novaStarAudit?.pilot)g.__novaStarAudit.pilot.routeActions++;
+    if(route&&g.__novaStarAudit?.pilot){
+      const a=g.__novaStarAudit.pilot;a.routeActions++;
+      if(cue?.source==='visible')a.routeVisibleActions++;
+      else if(cue?.source==='report')a.routeReportActions++;
+    }
     const v=route||helper.moveTowardPublicBloom(g,p,LF)||wander();
     return defense.dodgeVisibleProjectile(g,p,F,v)||v;
    };
@@ -98,7 +102,7 @@ const seconds=300,dt=1/30,chunk=450;
     helper.aimAtVisibleNeutral(g,p,LF,F)||
     {x:Math.cos(g.time*.73),y:Math.sin(g.time*.73)};
    const audit={pilot:{mode,cues:0,visibleCues:0,reportCues:0,
-     near100Frames:0,near250Frames:0,routeActions:0,minStarDistanceAfterReport:null},
+     near100Frames:0,near250Frames:0,routeActions:0,routeVisibleActions:0,routeReportActions:0,minStarDistanceAfterReport:null},
     ticks:0,after72:0,fresh:0,freshAfter72:0,
     quietFreshAfter72:0,candidates:0,announcements:0,
     firstCandidate:null,firstAnnouncement:null,events:[],
