@@ -10,12 +10,15 @@ function sample() {
     const postInsertion={enemyClassesHash:'classes',enemyBodiesHash:'enemy-fresh',
       neutralBodiesHash:'neutral-fresh'};
     const fresh={fingerprintHash:'played-'+seed+'-'+hz,origin:prelude.origin,prelude,postInsertion,
-      neutralXP:10,score:20,hp:80,alive:true,frontReached:null};
+      neutralXP:10,score:20,hp:80,alive:true,frontReached:null,
+      blockedNearFrontSeconds:seed===1&&hz===30?.5:0};
     const returning={...fresh,postInsertion:{...postInsertion,enemyBodiesHash:'enemy-return'},
-      neutralXP:16,score:25,hp:90,frontReached:4};
+      neutralXP:16,score:25,hp:90,frontReached:4,
+      blockedNearFrontSeconds:seed===1&&hz===30?1.5:.25};
     results.push({seed,hz,layout:'Crossfire',rotation:0,fresh,returning});
   }
-  return {policy:'harvest_roam',preludeSeconds:8,results};
+  return {policy:'harvest_roam',preludeSeconds:8,seconds:12,
+    protocolVersion:'terrain-clear-front-arrival-v2',results};
 }
 test('post-combat report clusters FPS repeats and reports measured world changes',()=>{
   const summary=reportPlayedFirstLife(sample(),2);
@@ -28,6 +31,12 @@ test('post-combat report clusters FPS repeats and reports measured world changes
   assert.equal(summary.postInsertionParity.sameEnemyBodies,0);
   assert.equal(summary.frontArrivals.return,4);
   assert.equal(summary.frontArrivals.fresh,0);
+  assert.equal(summary.protocolVersion,'terrain-clear-front-arrival-v2');
+  assert.equal(summary.frontArrivals.blockedNearFront.freshObservations,1);
+  assert.equal(summary.frontArrivals.blockedNearFront.returnObservations,4);
+  assert.equal(summary.frontArrivals.blockedNearFront.freshSeconds.mean,.125);
+  assert.equal(summary.frontArrivals.blockedNearFront.returnSeconds.mean,.5625);
+  assert.equal(summary.frontArrivals.blockedNearFront.returnMinusFreshSeconds.mean,.4375);
 });
 test('rejects unmatched first lives, repeated FPS observations and missing seeds',()=>{
   const s=sample();
@@ -140,4 +149,27 @@ test('natural cohort refuses missing death flags and impossible elapsed times',(
   s.results[0].fresh.prelude.naturalDeath=false;
   s.results[0].fresh.prelude.elapsed=61;
   assert.throws(()=>reportPlayedFirstLife(s,12),/Invalid natural-death exposure/);
+});
+
+test('v2 rejects invalid blocked near-front exposure rather than inventing navigation evidence',()=>{
+  const s=sample(),row=s.results[0];
+  row.returning.blockedNearFrontSeconds=undefined;
+  assert.throws(()=>reportPlayedFirstLife(s,2),/Invalid terrain-blocked/);
+  row.returning.blockedNearFrontSeconds=-.1;
+  assert.throws(()=>reportPlayedFirstLife(s,2),/Invalid terrain-blocked/);
+  row.returning.blockedNearFrontSeconds=13;
+  assert.throws(()=>reportPlayedFirstLife(s,2),/Invalid terrain-blocked/);
+  row.returning.blockedNearFrontSeconds=1.5;
+  row.returning.frontReached=NaN;
+  assert.throws(()=>reportPlayedFirstLife(s,2),/Invalid terrain-clear arrival/);
+  row.returning.frontReached=4;
+  s.seconds=undefined;
+  assert.throws(()=>reportPlayedFirstLife(s,2),/finite post-redeploy/);
+});
+
+test('natural-death v2 analysis refuses a legacy distance-only report',()=>{
+  const s=sample();s.naturalExposurePilot=true;s.preludeSeconds=60;
+  assert.throws(()=>reportPlayedFirstLife(s,12),/Missing independent seeds/);
+  s.protocolVersion='legacy-distance-only';
+  assert.throws(()=>reportPlayedFirstLife(s,12),/terrain-clear-front-arrival-v2/);
 });
