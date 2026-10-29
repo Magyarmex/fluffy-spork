@@ -10,6 +10,7 @@ on:
       - '.github/workflows/browser-smoke.yml'
       - 'scripts/patch-star-minimap.cjs'
       - 'scripts/patch-saved-records.cjs'
+      - 'scripts/patch-ai-strafe-timebase.cjs'
   pull_request:
     paths:
       - 'nova-updates/**'
@@ -18,6 +19,7 @@ on:
       - '.github/workflows/browser-smoke.yml'
       - 'scripts/patch-star-minimap.cjs'
       - 'scripts/patch-saved-records.cjs'
+      - 'scripts/patch-ai-strafe-timebase.cjs'
   workflow_dispatch:
 
 # Supersede obsolete PR/feature-branch checks; never cancel a mainline
@@ -44,6 +46,8 @@ jobs:
         run: node scripts/patch-star-minimap.cjs index.html
       - name: Apply canonical saved-record protection before browser tests
         run: node scripts/patch-saved-records.cjs index.html
+      - name: Apply canonical AI strafe timebase before browser tests
+        run: node scripts/patch-ai-strafe-timebase.cjs index.html
       - name: Serve shipping runtime
         run: |
           python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/nova-browser-http.log 2>&1 &
