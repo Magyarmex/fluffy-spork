@@ -60,7 +60,7 @@ function boot(optimized){
  return m.exports.Game;
 }
 function run(Game,{fps=30,speed=6000,wall=120,target=60,
- wallShape='rect',otherShape=false,otherBullet=false,moving=false,
+ wallShape='rect',otherShape=false,otherBullet=false,otherShell=false,moving=false,
  shield=false,otherTank=false,ttl=1,pen=1,radius=3,
  active=true,knock=0,allied=false,destructible=false}={}){
  const g=new Game(),dt=1/fps;
@@ -80,6 +80,9 @@ function run(Game,{fps=30,speed=6000,wall=120,target=60,
   vx:speed,vy:0,r:radius,dmg:10,knock,ttl,pen,hits:0,dead:false,shell:false,beam:false}];
  if(otherBullet)g.bullets.push({kind:'bullet',id:11,ownerId:4,
   x:0,y:1,vx:speed,vy:0,r:3,dmg:10,ttl:1,pen:0,hits:0,dead:false});
+ if(otherShell)g.bullets.push({kind:'bullet',id:12,ownerId:4,
+  x:0,y:1000,vx:0,vy:0,r:9,dmg:10,ttl:1,pen:1,hits:0,dead:false,
+  shell:true,splash:100});
  g.updateBullets(dt);
  return {hits:g.hits,hp:t.hp,bullet:g.bullets[0],g};
 }
@@ -120,6 +123,10 @@ for(const optimized of [false,true]){
  });
  test(label+': competing projectile vetoes speculative hit',()=>{
   const r=run(boot(optimized),{otherBullet:true});
+  assert.deepEqual(r.hits,[]);
+ });
+ test(label+': unrelated live shell still vetoes speculative kill-credit ordering',()=>{
+  const r=run(boot(optimized),{otherShell:true});
   assert.deepEqual(r.hits,[]);
  });
  test(label+': TTL expiry before target is not bypassed',()=>{
