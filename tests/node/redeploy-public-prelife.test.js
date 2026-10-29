@@ -81,3 +81,30 @@ test('invalid or unobservable prelude cannot silently use private state',()=>{
   game.player.x=Infinity;
   assert.throws(()=>playPublicPrelude(game,30,2,fair),/public viewport/);
 });
+
+test('read-only 5s-style checkpoints observe RNG and world without changing pilot input',()=>{
+  const a=setup(),b=setup();
+  const baseline=playPublicPrelude(a.game,10,0.3,a.fair);
+  let draws=0;
+  const traced=playPublicPrelude(b.game,10,0.3,b.fair,1,()=>++draws);
+  assert.deepEqual(traced.origin,baseline.origin);
+  assert.equal(traced.neutralXPEarned,baseline.neutralXPEarned);
+  assert.equal(traced.trace.length,4,'initial plus one checkpoint per tick');
+  assert.deepEqual(traced.trace.map(x=>x.rngDraws),[1,2,3,4]);
+  assert.ok(traced.trace.every(x=>typeof x.enemyStateHash==='string'&&
+    typeof x.neutralStateHash==='string'&&typeof x.projectileStateHash==='string'));
+  assert.equal(b.game.input.moveVec,b.oldMove);
+  assert.equal(b.game.input.aimVec,b.oldAim);
+  assert.equal(baseline.trace,null,'ordinary prelude remains free of trace overhead');
+  assert.throws(()=>playPublicPrelude(b.game,10,0.3,b.fair,4),/trace cadence/);
+  assert.throws(()=>playPublicPrelude(b.game,10,0.3,b.fair,1,7),/RNG draw observer/);
+});
+test('early natural death records an immediate final checkpoint',()=>{
+  const {game,fair}=setup(),original=game.update;
+  game.update=function(dt){original.call(this,dt);if(this.time>=0.2)this.player.alive=false;};
+  const result=playPublicPrelude(game,10,1,fair,5,()=>0);
+  assert.equal(result.naturalDeath,true);
+  assert.equal(result.trace.length,2);
+  assert.equal(result.trace[1].elapsed,0.2);
+  assert.equal(result.trace[1].alive,false);
+});
