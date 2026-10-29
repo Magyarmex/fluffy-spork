@@ -89,3 +89,36 @@ test('combat pass includes screens, repair, disruption, sensed AI, real reserves
   assert.match(source, /SWARM FORMING/);
   assert.match(source, /commitUntil/);
 });
+
+test('a physical mouse click immediately after a touch button activation is not consumed by the touch guard', () => {
+  const { window } = boot();
+  const bridge = window.__NOVA_COMMAND_WEAVE_BUTTON_TEST__;
+  const button = { disabled: false, click() {}, classList: { contains() { return false; } } };
+  const target = { closest(selector) { return selector === 'button' ? button : null; } };
+  bridge.pointerDown({ pointerType: 'touch', target, cancelable: true,
+    preventDefault() {}, stopImmediatePropagation() {} });
+  let swallowed = 0;
+  bridge.clickCapture({ pointerType: 'mouse', detail: 1,
+    sourceCapabilities: { firesTouchEvents: false }, target, cancelable: true,
+    preventDefault() { swallowed++; }, stopImmediatePropagation() { swallowed++; } });
+  assert.equal(swallowed, 0, 'a real mouse click must not be treated as a delayed touch click');
+});
+
+test('keyboard activation survives a pending touch guard while delayed touch clicks remain suppressed', () => {
+  const { window } = boot();
+  const bridge = window.__NOVA_COMMAND_WEAVE_BUTTON_TEST__;
+  const button = { disabled: false, click() {}, classList: { contains() { return false; } } };
+  const target = { closest(selector) { return selector === 'button' ? button : null; } };
+  function touch() { bridge.pointerDown({ pointerType: 'touch', target, cancelable: true,
+    preventDefault() {}, stopImmediatePropagation() {} }); }
+  let swallowed = 0;
+  touch();
+  bridge.clickCapture({ detail: 0, target, cancelable: true,
+    preventDefault() { swallowed++; }, stopImmediatePropagation() { swallowed++; } });
+  assert.equal(swallowed, 0, 'keyboard click must remain operable');
+  touch();
+  bridge.clickCapture({ pointerType: 'touch', detail: 1,
+    sourceCapabilities: { firesTouchEvents: true }, target, cancelable: true,
+    preventDefault() { swallowed++; }, stopImmediatePropagation() { swallowed++; } });
+  assert.equal(swallowed, 2, 'a genuine delayed touch click must still be consumed');
+});
