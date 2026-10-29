@@ -35,8 +35,8 @@ async function run(browser,width,height){
   });
   const returnButton=page.locator('[data-nova-insertion="return"]');
   await returnButton.waitFor({state:'visible',timeout:15000});
-  assert.equal(await returnButton.textContent(),'↩ RETURN · NEAR DEATH');
-  assert.match(await returnButton.getAttribute('aria-label'),/^↩ RETURN · NEAR DEATH.*420–850 world units.*No stat bonus/);
+  assert.equal(await returnButton.textContent(),'↩ RETURN · NEAR FRONT');
+  assert.match(await returnButton.getAttribute('aria-label'),/^↩ RETURN · NEAR FRONT.*420–850 world units.*No stat bonus/);
   assert.equal(await page.locator('[data-nova-insertion="fresh"]').textContent(),'⚡ FRESH · RANDOM');
   // Freeze the *real* CSS entrance at its first frame. The former popIn
   // scale(.85) shrank a 32.4px control to 27.5px, even though the same
