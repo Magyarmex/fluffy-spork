@@ -74,7 +74,7 @@ function run(Game,{fps=30,speed=6000,wall=120,target=60,
   hp:100,alive:true,__novaSweepMoveTime:1,__novaSweepPrevX:30,__novaSweepPrevY:0});
  if(otherShape)g.shapes.push({kind:'shape',id:4,x:30,y:0,r:8,hp:100});
  g.__novaTerrain=[wallShape==='rect'
-  ?{id:-1,shape:'rect',x:wall,y:0,w:10,h:80,solid:true,destructible:false}
+  ?{id:-1,shape:'rect',x:wall,y:0,w:10,h:80,solid:true,destructible,hp:destructible?1000:0,maxHp:destructible?1000:0}
   :{id:-1,shape:'circle',x:wall,y:0,r:5,solid:true,destructible,hp:destructible?1000:0,maxHp:destructible?1000:0}];
  g.bullets=[{kind:'bullet',id:10,ownerId:1,x:0,y:0,
   vx:speed,vy:0,r:radius,dmg:10,knock,ttl,pen,hits:0,dead:false,shell:false,beam:false}];
