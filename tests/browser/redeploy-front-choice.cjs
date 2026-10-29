@@ -180,6 +180,43 @@ async function run(browser,width,height){
   assert.equal(waypoint.marker.y,death.y);
   assert.ok(waypoint.marker.until-waypoint.time>20,
    'the player gets enough time to orient after redeploy');
+  // Real Battlefield geometry, not a mocked visibility response: a nearby
+  // intact barricade must not make the remembered-front marker disappear.
+  const blockedApproach=await page.evaluate(()=>{
+   const g=window.__novaFrontSmokeGame,oldPlayer={x:g.player.x,y:g.player.y};
+   const oldMarker=g.__novaLastFrontMarker;
+   let candidate=null;
+   for(const wall of g.__novaTerrain||[]){
+    if(!wall||wall.shape!=='rect'||!wall.destructible||!(wall.hp>0))continue;
+    if(Math.min(wall.w,wall.h)>70)continue;
+    const pad=28,alongY=wall.h<=wall.w;
+    const a=alongY?{x:wall.x,y:wall.y-wall.h/2-pad}:
+     {x:wall.x-wall.w/2-pad,y:wall.y};
+    const b=alongY?{x:wall.x,y:wall.y+wall.h/2+pad}:
+     {x:wall.x+wall.w/2+pad,y:wall.y};
+    if(Math.hypot(a.x-b.x,a.y-b.y)>=130)continue;
+    if(!g.isTerrainSafe(a.x,a.y,24)||!g.isTerrainSafe(b.x,b.y,24))continue;
+    if(g.hasLineOfSight(a.x,a.y,b.x,b.y,24))continue;
+    candidate={wallId:wall.id,a,b};break;
+   }
+   if(!candidate)throw Error('no real intact short barricade for blocked approach');
+   try{
+    g.player.x=candidate.a.x;g.player.y=candidate.a.y;
+    g.__novaLastFrontMarker={x:candidate.b.x,y:candidate.b.y,until:g.time+24};
+    g.drawMinimap();
+    const retained=!!g.__novaLastFrontMarker;
+    g.player.x=candidate.b.x;g.player.y=candidate.b.y;
+    g.drawMinimap();
+    return {...candidate,retained,cleared:g.__novaLastFrontMarker===null};
+   }finally{
+    g.player.x=oldPlayer.x;g.player.y=oldPlayer.y;
+    g.__novaLastFrontMarker=oldMarker;
+   }
+  });
+  assert.equal(blockedApproach.retained,true,
+   'RETURN marker must remain across real intact cover: '+JSON.stringify(blockedApproach));
+  assert.equal(blockedApproach.cleared,true,
+   'arrival on the same side must remove the marker: '+JSON.stringify(blockedApproach));
   const dist=Math.hypot(after.x-death.x,after.y-death.y);
   assert.ok(dist>=420-1e-6&&dist<=850+1e-6,'return inserts near the witnessed front');
   assert.equal(after.terrain,true,'return position is terrain safe');
