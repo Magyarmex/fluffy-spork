@@ -3246,11 +3246,11 @@ class Game {
             }
             this.cam.shake = Math.max(this.cam.shake, Math.min(0.5, d / 60));
         }
-        else if (this.cosmeticRandom() < 0.5) {
+        else if ((typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) < 0.5) {
             this.sfx.hit();
         }
-        if (this.cosmeticRandom() < 0.5)
-            this.addText(t.x + this.cosmeticRnd(-10, 10), t.y - 18, String(Math.round(d)), '#ff8a8a', 11);
+        if ((typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) < 0.5)
+            this.addText(t.x + (typeof this.cosmeticRnd === "function" ? this.cosmeticRnd(-10, 10) : (0, types_1.rnd)(-10, 10)), t.y - 18, String(Math.round(d)), '#ff8a8a', 11);
         if (t.hp <= 0)
             this.killTank(t, src);
     }
@@ -3723,10 +3723,10 @@ class Game {
             b.x += b.vx * dt;
             b.y += b.vy * dt;
             b.ttl -= dt;
-            if (b.beam && this.cosmeticRandom() < 0.85) {
+            if (b.beam && (typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) < 0.85) {
                 this.addParticles(b.x, b.y, b.color, 1, 30, 'glow');
             }
-            else if (this.cosmeticRandom() < 0.22) {
+            else if ((typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) < 0.22) {
                 this.addParticles(b.x, b.y, b.color, 1, 20, 'glow');
             }
             if (b.ttl <= 0 || b.x < -M + 20 || b.x > M - 20 || b.y < -M + 20 || b.y > M - 20) {
