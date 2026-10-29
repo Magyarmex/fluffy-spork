@@ -310,7 +310,7 @@ async function scenario(browser, label, options) {
 
     await page.getByRole('button',{name:'Pause'}).click();
     await page.getByText('PAUSED',{exact:true}).waitFor({state:'visible'});
-    if(label==='landscape-568'){
+    { // Every real Pause viewport must preserve frame-zero touch targets.
       const pauseEntry=await page.evaluate(()=>{
         const panel=[...document.querySelectorAll('.panel.anim-pop')].find(node=>
           [...node.children].some(child=>child.textContent==='PAUSED'));
@@ -330,15 +330,14 @@ async function scenario(browser, label, options) {
       assert.equal(pauseEntry.buttons.length,5,
         'real pause panel must expose all five actions: '+JSON.stringify(pauseEntry));
       assert.ok(pauseEntry.buttons.every(b=>b.height>=30),
-        'every compact pause action must remain >=30px at entrance frame zero: '+
+        'every Pause action must remain >=30px at entrance frame zero: '+
         JSON.stringify(pauseEntry));
-      assert.ok(pauseEntry.buttons.every(b=>b.top>=8&&b.bottom<=312),
+      if(label==='landscape-568')assert.ok(
+        pauseEntry.buttons.every(b=>b.top>=8&&b.bottom<=312),
         'all five pause actions must remain inside the 320px viewport: '+
         JSON.stringify(pauseEntry));
-      assert.equal(pauseEntry.transform,'none',
-        'compact pause entrance must not shrink physical touch targets');
-      assert.equal(pauseEntry.animationName,'nova-pause-compact-fade',
-        'only compact Pause receives the non-scaling entrance');
+      assert.equal(pauseEntry.animationName,'popIn',
+        'the existing Pause entrance animation must remain intact');
       console.log('NOVA_LANDSCAPE_PAUSE_ACTIONS '+JSON.stringify(pauseEntry));
     }
     const paused=await page.evaluate(()=>window.NOVALivingFront.snapshot().age);
