@@ -2000,10 +2000,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
  }
 
  /* #147: after a barricade breach, honor the next certified solid surface:
-  * a permanent wall or an intact second barricade. Only stop an isolated
-  * ordinary shot when no earlier body/interception could be affected. */
+  * a permanent wall or an intact second barricade. This also applies to
+  * Sniper-annotated rails: a fast beam can cross both solids in one frame.
+  * Stop only when earlier body/interception contacts are ruled out. */
  function certifiedBreachLaterSolid(g,b,dt,ax,ay,ex,ey,first){
-  if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
+  if(!b||b.dead||b.shell||(b.beam&&b.__novaRail!==true)||b.splash||b.__v17Cannon||
      g.__novaShapeSweepActive!==true||g.__novaWallProofHadShell===true||
      !(dt>0&&Number.isFinite(dt))||
      !(Number.isFinite(b.ttl)&&b.ttl>dt)||
