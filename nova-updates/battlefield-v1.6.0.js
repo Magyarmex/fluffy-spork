@@ -2034,13 +2034,45 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   }
   /* Deliberately broad conservative vetoes. A moving/unknown earlier
    * contact must keep the existing owner rather than lose legitimate hits. */
+  /* Tank hulls get an exact first-contact proof rather than a padded
+   * AABB: a hull just BEHIND a wall must not disable the wall itself.
+   * Only stationary bodies or a witnessed single linear Scout move qualify.
+   * Unknown/multi-step motion abstains instead of inventing a trajectory. */
+  var dx=ex-ax,dy=ey-ay,A=dx*dx+dy*dy,wallT=later.hit.t;
+  if(!(A>1e-12)||!Number.isFinite(A))return false;
   for(var ti=0;ti<tanks.length;ti++){
    var t=tanks[ti];if(!t||!t.alive||t.id===b.ownerId)continue;
-   var def=CLASSES[t.cls];if(!def||!(def.size>0))return false;
-   var sx=t.__novaSweepMoveTime===g.time?t.__novaSweepPrevX:t.x,
-       sy=t.__novaSweepMoveTime===g.time?t.__novaSweepPrevY:t.y;
-   if(near(sx,sy,t.x,t.y,b.r+def.size+3+Math.max(30,dt*800)))
+   var def=CLASSES[t.cls];if(!def||!(def.size>0)||
+      t.__novaSweepMoveTime!==g.time)return false;
+   var sx=t.__novaSweepPrevX,sy=t.__novaSweepPrevY;
+   if(!Number.isFinite(sx)||!Number.isFinite(sy)||
+      !Number.isFinite(t.x)||!Number.isFinite(t.y))return false;
+   var moved=Math.hypot(t.x-sx,t.y-sy)>1e-8;
+   if(moved&&!(t.cls==='scout'&&
+      t.__novaLinearMoveEpoch===g.time&&
+      t.__novaLinearMoveValid===true&&
+      t.__novaLinearMoveCalls===1&&
+      t.__novaLinearMoveDt===dt&&
+      t.__novaLinearMoveStartX===sx&&
+      t.__novaLinearMoveStartY===sy&&
+      t.__novaLinearMoveEndX===t.x&&
+      t.__novaLinearMoveEndY===t.y))return false;
+   if(moved&&firstSolidHit(g,sx,sy,t.x,t.y,def.size+3.5))
     return false;
+   var rx=dx-(moved?t.x-sx:0),ry=dy-(moved?t.y-sy:0),
+       fx=ax-sx,fy=ay-sy,RA=rx*rx+ry*ry,rr=b.r+def.size+3;
+   if(!(RA>1e-12)||!Number.isFinite(RA))return false;
+   var B=2*(fx*rx+fy*ry),C=fx*fx+fy*fy-rr*rr;
+   if(!(C>1e-8))return false;
+   var D=B*B-4*RA*C;
+   if(!Number.isFinite(D)||
+      Math.abs(D)<=1e-10*(B*B+4*RA*(fx*fx+fy*fy+rr*rr)))
+    return false;
+   if(D<=0)continue;
+   var root=Math.sqrt(D),q=-.5*(B+(B<0?-root:root));
+   if(!q)return false;
+   var enter=Math.min(q/RA,C/q),leave=Math.max(q/RA,C/q);
+   if(leave>0&&enter<wallT+1e-6)return false;
   }
   for(var si=0;si<shapes.length;si++){
    var shape=shapes[si];if(!shape||!(shape.hp>0))continue;
