@@ -332,8 +332,13 @@ async function scenario(browser, label, options) {
       assert.ok(pauseEntry.buttons.every(b=>b.height>=30),
         'every compact pause action must remain >=30px at entrance frame zero: '+
         JSON.stringify(pauseEntry));
+      assert.ok(pauseEntry.buttons.every(b=>b.top>=8&&b.bottom<=312),
+        'all five pause actions must remain inside the 320px viewport: '+
+        JSON.stringify(pauseEntry));
       assert.equal(pauseEntry.transform,'none',
         'compact pause entrance must not shrink physical touch targets');
+      assert.equal(pauseEntry.animationName,'nova-pause-compact-fade',
+        'only compact Pause receives the non-scaling entrance');
       console.log('NOVA_LANDSCAPE_PAUSE_ACTIONS '+JSON.stringify(pauseEntry));
     }
     const paused=await page.evaluate(()=>window.NOVALivingFront.snapshot().age);
