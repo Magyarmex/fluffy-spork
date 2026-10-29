@@ -45,8 +45,8 @@ const patches=[
   ['(0, types_1.rnd)(1.8, 3.8)','this.cosmeticRnd(1.8, 3.8)',1]
  ]],
  ['    damageTank(', '    killTank(', [
-  ['else if (Math.random() < 0.5)', 'else if (this.cosmeticRandom() < 0.5)',1],
-  ['        if (Math.random() < 0.5)\n            this.addText', '        if (this.cosmeticRandom() < 0.5)\n            this.addText',1],
+  ['else if (Math.random() < 0.5)', 'else if ((typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) < 0.5)',1],
+  ['        if (Math.random() < 0.5)\n            this.addText', '        if ((typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) < 0.5)\n            this.addText',1],
   ['(0, types_1.rnd)(-10, 10)', 'this.cosmeticRnd(-10, 10)',1]
  ]],
  ['    updateBullets(', '    splashAt(', [
