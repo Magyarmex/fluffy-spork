@@ -25,7 +25,7 @@ function shippingCoreBullets() {
     { CLASSES: { scout: { size: 15 } } }, 2250);
 }
 
-function boot(updateImpl, optimized = false) {
+function boot(updateImpl, optimized = false, fullPerformance = false) {
   class Game {
     constructor() {
       this.time = 1;
@@ -65,6 +65,7 @@ function boot(updateImpl, optimized = false) {
     Math, Map, Set, Date, performance: { now: () => 0 } };
   const layers = ['battlefield-v1.6.0.js'];
   if (optimized) layers.push('performance-v1.7.5.js');
+  if (fullPerformance) layers.push('performance-v1.7.8.js');
   for (const file of layers) vm.runInNewContext(fs.readFileSync(path.join(root,
     'nova-updates', file), 'utf8'), context, { filename: file });
   const module = { exports: {} };
@@ -1774,3 +1775,19 @@ for(const optimized of [false,true]){
   });
  }
 }
+
+/* Production also loads Zero Churn after Performance. Exercise the complete
+ * current performance wrapper chain on the materialized core, rather than
+ * assuming the earlier 1.7.5-only harness is the final gameplay owner. */
+test('shipping Battlefield + Performance 1.7.5 + Zero Churn 1.7.8 credits five pre-expiry hulls',()=>{
+ const Game=boot(undefined,true,true),g=new Game(),order=[];
+ g.tanks=[25,36,47,58,69].map((x,i)=>({kind:'tank',id:i+2,x,y:0,
+  cls:'scout',hp:150,alive:true,hitCount:0}));
+ g.damageTank=function(t){t.hitCount++;this.hits++;order.push(t.id);};
+ g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,vx:1500,vy:0,
+  r:5.8,dmg:47,ttl:.033,pen:4,hits:0,dead:false,
+  shell:false,beam:false,splash:false}];
+ g.time+=1/30;g.updateBullets(1/30);
+ assert.deepEqual(order,[2,3,4,5,6]);
+ assert.equal(g.hits,5);
+});
