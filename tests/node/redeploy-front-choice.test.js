@@ -136,7 +136,7 @@ test('death modal presents accessible one-click plans and restores original call
  assert.equal(row.attributes.role,'group');
  assert.equal(buttons.length,2);
  assert.equal(buttons[0].textContent,'⚡ FRESH · RANDOM');
- assert.equal(buttons[1].textContent,'↩ RETURN · NEAR DEATH');
+ assert.equal(buttons[1].textContent,'↩ RETURN · NEAR FRONT');
  assert.ok(buttons[0].attributes['aria-label'].startsWith(buttons[0].textContent));
  assert.ok(buttons[1].attributes['aria-label'].startsWith(buttons[1].textContent));
  assert.match(buttons[0].attributes['aria-label'],/random insertion.*No stat bonus/);
