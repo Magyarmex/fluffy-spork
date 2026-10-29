@@ -25,6 +25,21 @@ const coreMove=new Function('types_1','M',
  'return function(t,vx,vy,dt){'+html.slice(moveStart+moveMarker.length,moveEnd-1)+'}')(
  {clamp:(v,min,max)=>Math.max(min,Math.min(max,v))},2250);
 const CLASSES={scout:{size:14},marksman:{size:14}};
+/* Extract projectile integrity directly from the shipping core. Test stubs
+ * elsewhere intentionally bypass interception HP, but a breach must not
+ * initialize integrity using penetration AFTER that breach. */
+function coreIntegrityMethod(name,args){
+ const marker='    '+name+'('+args+') {',start=html.indexOf(marker);
+ assert.ok(start>=0,'shipping core '+name);
+ let end=start+marker.length,depth=1;
+ while(depth&&end<html.length){if(html[end]==='{')depth++;else if(html[end]==='}')depth--;end++;}
+ assert.equal(depth,0);
+ return new Function('types_1','return function('+args+'){'+
+  html.slice(start+marker.length,end-1)+'}')(
+  {clamp:(v,min,max)=>Math.max(min,Math.min(max,v))});
+}
+const realInitIntegrity=coreIntegrityMethod('initBulletIntegrity','b');
+const realWeakenBullet=coreIntegrityMethod('weakenBullet','b, absorbed');
 const core=new Function('types_1','classes_1','M',
  'return function(dt){'+html.slice(start+marker.length,end-1)+'}')(
  {dist2:(ax,ay,bx,by)=>(ax-bx)**2+(ay-by)**2},
@@ -68,9 +83,9 @@ function boot(optimized){
   ?{CLASSES}:{ARENA_HALF:2250});
  return m.exports.Game;
 }
-function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,
+function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,laterWallY=0,
  wallShape='rect',otherShape=false,otherBullet=false,otherShell=false,moving=false,
- remoteBullets=0,
+ remoteBullets=0,laterCoverHp=null,realIntegrity=false,preinitialized=false,
  shield=false,otherTank=false,ttl=1,pen=1,radius=3,laterWall=null,
  active=true,knock=0,allied=false,destructible=false,damage=10,
  linearMove=null,tamperMove=false,doubleMove=false,
@@ -89,9 +104,11 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,
  g.__novaTerrain=[wallShape==='rect'
   ?{id:-1,shape:'rect',x:wall,y:wallY,w:10,h:80,solid:true,destructible,hp:destructible?coverHp:0,maxHp:destructible?coverHp:0}
    :{id:-1,shape:'circle',x:wall,y:wallY,r:5,solid:true,destructible,hp:destructible?coverHp:0,maxHp:destructible?coverHp:0}];
- if(laterWall!=null)g.__novaTerrain.push({id:-2,shape:'rect',x:laterWall,y:0,w:10,h:80,solid:true,destructible:false,hp:0,maxHp:0});
+ if(laterWall!=null)g.__novaTerrain.push({id:-2,shape:'rect',x:laterWall,y:laterWallY,w:10,h:80,solid:true,destructible:laterCoverHp!=null,hp:laterCoverHp||0,maxHp:laterCoverHp||0});
  g.bullets=[{kind:'bullet',id:10,ownerId:1,x:0,y:0,
   vx:speed,vy,r:radius,dmg:damage,knock,ttl,pen,hits:0,dead:false,shell:false,beam:false}];
+ if(realIntegrity){g.initBulletIntegrity=realInitIntegrity;g.weakenBullet=realWeakenBullet;}
+ if(preinitialized)g.initBulletIntegrity(g.bullets[0]);
  if(otherBullet)g.bullets.push({kind:'bullet',id:11,ownerId:4,
   x:0,y:1,vx:speed,vy:0,r:3,dmg:10,ttl:1,pen:0,hits:0,dead:false});
  if(otherShell)g.bullets.push({kind:'bullet',id:12,ownerId:4,
@@ -113,8 +130,9 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,
   if(doubleMove)g.moveTank(t,linearMove.vx,linearMove.vy,dt);
   if(tamperMove)t.x+=4;
  }
+ const shot=g.bullets[0];
  g.updateBullets(dt);
- return {hits:g.hits,hp:t.hp,bullet:g.bullets[0],g};
+ return {hits:g.hits,hp:t.hp,bullet:g.bullets[0],shot,g};
 }
 for(const optimized of [false,true]){
  const label=optimized?'Battlefield + Performance':'Battlefield';
@@ -640,3 +658,127 @@ for(const optimized of [false,true])for(const pen of [3,4]){
   assert.equal(r.g.__novaTerrain[1].solid,true);
  });
 }
+
+/* Run 442 regression-first: a second, intact barricade is still physical
+ * cover after a high-penetration shot breaches the first barricade. The
+ * original core would otherwise advance directly to the rear hull. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'Battlefield + Performance':'Battlefield';
+ for(const fps of [30,60,120,240])for(const pen of [3,4]){
+  test(label+': pen'+pen+' breach then intact second cover absorbs at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:200*fps,pen,destructible:true,
+    wall:55,laterWall:110,laterCoverHp:1000,target:165,coverHp:5});
+   assert.deepEqual(r.hits,[],'intact second barricade protects rear Scout');
+   assert.equal(r.hp,100);
+   assert.equal(r.g.__novaTerrain[0].hp,0,'first barricade breaks once');
+   assert.equal(r.g.__novaTerrain[1].hp,990,'second barricade takes one hit');
+   assert.equal(r.g.__novaTerrain[1].solid,true);
+   assert.equal(r.g.bullets.length,0,'second barricade consumes shot');
+  });
+  test(label+': pen'+pen+' earlier middle hull is not erased by second cover at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:200*fps,pen,destructible:true,
+    wall:55,laterWall:145,laterCoverHp:1000,target:95,coverHp:5});
+   assert.deepEqual(r.hits,[2]);
+   assert.equal(r.hp,90);
+   assert.equal(r.g.__novaTerrain[0].hp,0);
+  });
+ }
+}
+for(const optimized of [false,true])for(const pen of [3,4]){
+ test((optimized?'Battlefield + Performance':'Battlefield')+
+  ': reachable Marksman pen'+pen+' damages second intact barricade, not rear hull',()=>{
+  const speed=1050*(1+.085*8),radius=5.5*(1+21*.0085);
+  const r=run(boot(optimized),{fps:30,speed,pen,radius,damage:21,
+   destructible:true,wall:17,laterWall:35,laterCoverHp:1000,
+   target:60,coverHp:5});
+  assert.deepEqual(r.hits,[]);
+  assert.equal(r.hp,100);
+  assert.equal(r.g.__novaTerrain[0].hp,0);
+  assert.equal(r.g.__novaTerrain[1].hp,979);
+ });
+}
+
+/* The real materialized core defines bullet integrity at original penetration.
+ * A first-frame breach must not silently lower interception HP by calling
+ * initBulletIntegrity after consuming two penetration points. */
+for(const optimized of [false,true])for(const fps of [30,60,120,240])
+ for(const pen of [3,4]){
+ test((optimized?'Battlefield + Performance':'Battlefield')+
+  ': first breach preserves launch integrity pen'+pen+' at '+fps+'Hz',()=>{
+  const r=run(boot(optimized),{fps,speed:200*fps,pen,destructible:true,
+   wall:55,laterWall:110,laterCoverHp:1000,target:165,coverHp:5,
+   realIntegrity:true});
+  const expectedMax=10*(.72+3*.08)*(1+pen*.055);
+  assert.ok(Math.abs(r.shot.maxHp-expectedMax)<1e-9,
+   'first-frame breach must initialize integrity at original penetration');
+  assert.equal(r.shot.baseDmg,10);
+  assert.ok(r.shot.dmg>0&&r.shot.dmg<10,'breach weakens damage');
+  assert.ok(Math.abs(r.g.__novaTerrain[1].hp-(1000-r.shot.dmg))<1e-9,
+   'second barricade receives exactly the weakened damage');
+  assert.deepEqual(r.hits,[]);
+  assert.equal(r.g.__novaTerrain[0].hp,0);
+  assert.equal(r.g.__novaTerrain[1].solid,true);
+ });
+}
+
+/* Reachable first-frame gameplay: the bullet was spawned without integrity
+ * fields by the real tryFire core. A wounded barricade breaks, and a rear
+ * exposed tank is hit with exactly 62% of the launch damage. Pre-initializing
+ * the same projectile must produce the same result. */
+for(const optimized of [false,true])for(const pen of [3,4]){
+ const Game=boot(optimized),label=optimized?'Battlefield + Performance':'Battlefield';
+ test(label+': first-frame breach has same damage as preinitialized pen'+pen,()=>{
+  const options={fps:30,speed:6000,pen,destructible:true,
+   wall:55,target:165,coverHp:5,realIntegrity:true};
+  const fresh=run(Game,options),initialized=run(Game,{...options,preinitialized:true});
+  for(const r of [fresh,initialized]){
+   assert.deepEqual(r.hits,[2]);
+   assert.ok(Math.abs(r.hp-(100-6.2))<1e-9,
+    'breach weakens the 10-damage projectile to 62%');
+   assert.ok(Math.abs(r.shot.dmg-6.2)<1e-9);
+   assert.ok(Math.abs(r.shot.hp-r.shot.maxHp*.62)<1e-9);
+   assert.equal(r.g.__novaTerrain[0].hp,0);
+  }
+  assert.equal(fresh.shot.maxHp,initialized.shot.maxHp);
+  assert.equal(fresh.shot.dmg,initialized.shot.dmg);
+ });
+ test(label+': reachable upgraded Marksman pen'+pen+' first-frame breach damage',()=>{
+  const speed=1050*(1+.085*8),radius=5.5*(1+21*.0085);
+  const r=run(Game,{fps:30,speed,pen,radius,damage:21,
+   destructible:true,wall:17,target:50,coverHp:5,realIntegrity:true});
+  assert.deepEqual(r.hits,[2]);
+  assert.ok(Math.abs(r.hp-(100-21*.62))<1e-9);
+  assert.ok(Math.abs(r.shot.dmg-21*.62)<1e-9);
+  assert.ok(Math.abs(r.shot.maxHp-
+   (21*(.72+radius*.08)*(1+pen*.055)))<1e-9);
+ });
+}
+
+/* Seeded diagonal two-cover contacts exercise the real shipping collision
+ * geometry, not a bespoke segment-rectangle implementation. A damaged first
+ * barricade breaks; a healthy second barricade must take exactly one weakened
+ * hit and protect a rear hull, independent of Battlefield/Performance order. */
+test('600 seeded diagonal two-cover contacts preserve structural order',()=>{
+ let seed=0x442147;
+ const rnd=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ for(const optimized of [false,true]){
+  const Game=boot(optimized);
+  for(let i=0;i<300;i++){
+   const slope=(rnd()-.5)*1.2;
+   const wall=30+rnd()*20,laterWall=wall+30+rnd()*35;
+   const target=laterWall+45+rnd()*15;
+   const pen=i%2?3:4;
+   const r=run(Game,{fps:30,speed:6000,vy:6000*slope,
+    pen,destructible:true,wall,wallY:wall*slope,
+    laterWall,laterWallY:laterWall*slope,laterCoverHp:1000,
+    target,targetY:target*slope,coverHp:5,realIntegrity:true});
+   assert.deepEqual(r.hits,[],
+    'rear hull must be protected: optimized='+optimized+' seed='+i);
+   assert.equal(r.g.__novaTerrain[0].hp,0);
+   assert.ok(Math.abs(r.g.__novaTerrain[1].hp-993.8)<1e-8,
+    'second cover takes 62% damage once: seed='+i);
+   assert.equal(r.g.__novaTerrain[1].solid,true);
+   assert.equal(r.g.__novaBattlefield.coverBroken,1);
+  }
+ }
+});
