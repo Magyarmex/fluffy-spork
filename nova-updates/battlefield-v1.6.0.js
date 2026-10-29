@@ -1220,7 +1220,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      !Number.isFinite(b.r)||!(b.r>0)||
      !Number.isFinite(b.dmg)||!(b.dmg>0))return false;
   var bullets=g.bullets||[];
-  if(bullets.length!==1||bullets[0]!==b)return false;
+  if(bullets.length>1200||bullets.indexOf(b)<0||
+     g.__novaWallProofHadShell===true)return false;
   var ax=b.x,ay=b.y,ex=ax+b.vx*b.ttl,ey=ay+b.vy*b.ttl;
   if(!Number.isFinite(ex)||!Number.isFinite(ey)||
      Math.max(Math.abs(ax),Math.abs(ay),Math.abs(ex),Math.abs(ey))>=MAP_LIMIT-20||
@@ -1266,6 +1267,32 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    if(near(dr.__novaChronoDronePrevX,dr.__novaChronoDronePrevY,
       dr.x,dr.y,b.r+(dr.r||8)+1+Math.max(30,dt*2400)))
     return false;
+  }
+  /* Other live projectiles can be safely ignored ONLY when their entire
+   * possible travel during this frame cannot touch either the rail's TTL
+   * corridor or its chosen hull. A speed-ball is conservative even if a
+   * shot changes direction at terrain; lateral hull hits matter because
+   * they could change kill/XP attribution before the rail's first hit.
+   * One expiring rail is selected for the whole frame, never first-N. */
+  var sx=ex-ax,sy=ey-ay,seg2=sx*sx+sy*sy;
+  if(!(seg2>1e-12)||!Number.isFinite(seg2))return false;
+  var victimR=CLASSES[candidate.cls].size+3;
+  for(var bi=0;bi<bullets.length;bi++){
+   var o=bullets[bi];if(o===b)continue;
+   if(!o||o.dead||o.shell||o.splash||o.beam||
+      o.__v17Cannon||o.__novaRail||!(o.ttl>0)||
+      !Number.isFinite(o.ttl)||!Number.isFinite(o.x)||
+      !Number.isFinite(o.y)||!Number.isFinite(o.vx)||
+      !Number.isFinite(o.vy)||!Number.isFinite(o.r)||
+      !(o.r>0))return false;
+   var reach=Math.hypot(o.vx,o.vy)*dt;
+   if(!Number.isFinite(reach))return false;
+   var u=Math.max(0,Math.min(1,
+      ((o.x-ax)*sx+(o.y-ay)*sy)/seg2));
+   var nx=ax+sx*u,ny=ay+sy*u;
+   if(Math.hypot(o.x-nx,o.y-ny)<=reach+o.r+b.r+2||
+      Math.hypot(o.x-candidate.x,o.y-candidate.y)<=
+        reach+o.r+victimR+2)return false;
   }
   return true;
  }
@@ -2230,11 +2257,15 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
  }
  /* An isolated rail's physically earlier hull contact precedes TTL.
   * Do not infer any second rail victim, terrain or projectile interaction. */
- if(dt>0&&this.bullets&&this.bullets.length===1){
-  var railTTL=this.bullets[0];
-  if(certifiedSingleRailTTL(this,railTTL,dt))
-   isolatedTTLBodyContact(this,railTTL,dt,null,true);
+ var railTTL=null,railTTLCount=0;
+ if(dt>0&&this.bullets)for(var railI=0;railI<this.bullets.length;railI++){
+  var railCandidate=this.bullets[railI];
+  if(railCandidate&&!railCandidate.dead&&railCandidate.beam&&
+     railCandidate.__novaRail===true&&railCandidate.ttl>0&&
+     railCandidate.ttl<=dt){railTTL=railCandidate;railTTLCount++;}
  }
+ if(railTTLCount===1&&certifiedSingleRailTTL(this,railTTL,dt))
+  isolatedTTLBodyContact(this,railTTL,dt,null,true);
  var expiring=0,paired=0;
  if(dt>0)for(var countI=0;countI<this.bullets.length;countI++){
   var eb=this.bullets[countI];
