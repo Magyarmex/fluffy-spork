@@ -382,6 +382,7 @@ test('disabled Director cannot revive an already-resolved public BLOOM on re-ena
  assert.equal(LF.frontlineTick(g,st,false),false,
   'a resolved public window cannot resume sampling without a new announcement');
  assert.deepEqual(f.counts,before,'no post-closure exposure, entries or exits');
+ p.x=-560;p.y=-560; // In-pocket collection would be eligible except the window is closed.
  assert.equal(LF.recordFrontlineNeutralXP(g,st,p,25,{x:p.x,y:p.y}),false,
   'closed public windows must not resume harvesting attribution');
  p.hp=0;p.alive=false;
