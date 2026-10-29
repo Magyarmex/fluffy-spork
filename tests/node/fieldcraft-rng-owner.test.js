@@ -15,7 +15,8 @@ function load(){
  const math=Object.create(Math);
  math.random=()=>{sharedDraws++;return .5;};
  const window={};
- const document={readyState:'loading',addEventListener(){}};
+ const document={readyState:'loading',addEventListener(){},
+  querySelector(){return null;},querySelectorAll(){return [];}};
  vm.runInNewContext(fieldcraft,{window,document,Math:math,Date:{now:()=>123456789}},
   {filename:'shipping-fieldcraft',timeout:5000});
  assert.ok(window.NOVATips,'actual shipping tip API did not initialize');
