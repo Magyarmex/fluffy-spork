@@ -166,7 +166,7 @@ function run(seed,choice,hz,seconds,policy='navigate',preludeSeconds=0){
   const startDistance=Math.hypot(p.x-origin.x,p.y-origin.y);
   if(choice==='return')assert.ok(startDistance>=420-1e-6&&startDistance<=850+1e-6,
    'RETURN must actually use the intended geographic sampler');
-  let routeRequests=0,routeWaypoints=0,frontReached=null,blockedNearFrontTicks=0,firstVisibleEnemy=null,
+  let routeRequests=0,routeWaypoints=0,frontReached=null,blockedNearFrontSeconds=0,firstVisibleEnemy=null,
    firstVisibleNeutral=null;
   let distanceTravelled=0,postFrontTravelled=0,last={x:p.x,y:p.y};
   let neutralXPAtFront=null,firstNeutralXP=null;
@@ -224,7 +224,7 @@ function run(seed,choice,hz,seconds,policy='navigate',preludeSeconds=0){
     if(terrainClearFrontArrival(g,p,origin)){
      frontReached=g.time;
      neutralXPAtFront=Number(g.__lfState?.stats?.playerNeutralXP)||0;
-    }else blockedNearFrontTicks++;
+    }else blockedNearFrontSeconds+=dt;
    }
    if(firstNeutralXP===null&&(Number(g.__lfState?.stats?.playerNeutralXP)||0)>0)
     firstNeutralXP=g.time;
@@ -252,7 +252,7 @@ function run(seed,choice,hz,seconds,policy='navigate',preludeSeconds=0){
    postFrontNeutralXP:frontReached===null?null:+Math.max(0,(Number(g.__lfState?.stats?.playerNeutralXP)||0)-neutralXPAtFront).toFixed(2),
    firstNeutralXP:firstNeutralXP===null?null:+firstNeutralXP.toFixed(3),
    frontReached:frontReached===null?null:+frontReached.toFixed(3),
-   blockedNearFrontTicks,
+   blockedNearFrontSeconds:+blockedNearFrontSeconds.toFixed(3),
    firstVisibleEnemy:firstVisibleEnemy===null?null:+firstVisibleEnemy.toFixed(3),
    firstVisibleNeutral:firstVisibleNeutral===null?null:+firstVisibleNeutral.toFixed(3),
    hp:+p.hp.toFixed(2),alive:!!p.alive,status:g.status,
