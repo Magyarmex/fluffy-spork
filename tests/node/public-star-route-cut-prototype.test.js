@@ -18,9 +18,9 @@ function approx(a,b){assert.ok(Math.abs(a-b)<1e-8,'expected '+b+' got '+a);}
 test('prototype speed envelope is bounded by actual shipping Star speed caps',()=>{
  const core=fs.readFileSync(path.join(__dirname,'../../index.html'),'utf8');
  const instincts=fs.readFileSync(path.join(__dirname,'../../nova-updates/living-front-instincts-v1.12.0.js'),'utf8');
- assert.match(core,/star: \\{ hp: 340, xp: 500, r: 24, speed: 78/);
- assert.match(instincts,/STAR_SPEED_MULT=1\\.95/);
- assert.match(instincts,/cap\\(s,sp\\*1\\.12\\)/);
+ assert.ok(core.includes('star: { hp: 340, xp: 500, r: 24, speed: 78'));
+ assert.ok(instincts.includes('STAR_SPEED_MULT=1.95'));
+ assert.ok(instincts.includes('cap(s,sp*1.12)'));
  const t=pilot.publicRouteCutTarget(world(),p);
  approx(t.radius,78*1.95*1.12);
 });
