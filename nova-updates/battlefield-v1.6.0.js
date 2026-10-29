@@ -1829,9 +1829,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
  /* Issue #147: one provable tank-before-first-solid first contact.
   * Battlefield's terrain pre-pass otherwise destroys the shot before the
   * shipping core can resolve an earlier hull. Destructible cover is eligible only
-  * with pen<=2: the certified earlier hull consumes one penetration, then
-  * the existing cover response stops the shot without a further breach.
-  * Higher-penetration breach chains and contested events still abstain. */
+  * with pen<=2, or with pen3/4 when the cover is provably too healthy to
+  * breach from this non-shell, non-beam shot. The certified earlier hull
+  * consumes one penetration, then the existing cover response stops the
+  * shot. Potential breach chains and contested events still abstain. */
  function certifiedTankBeforeFirstSolid(g,b,dt,ax,ay,ex,ey,wall){
   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
      !(Number.isSafeInteger(b.pen)&&b.pen>=0&&b.pen<=4)||
@@ -1847,7 +1848,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      !Number.isFinite(ex)||!Number.isFinite(ey)||
      !Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
      (b.knock||0)!==0||
-     !wall||!wall.solid||(wall.solid.destructible&&b.pen>2)||
+     !wall||!wall.solid||(wall.solid.destructible&&b.pen>2&&
+       !(Number.isFinite(wall.solid.hp)&&wall.solid.hp>b.dmg*1.000001))||
      !wall.hit||!(wall.hit.t>1e-6&&wall.hit.t<=1))return false;
   var tanks=g.tanks||[],shapes=g.shapes||[],drones=g.drones||[],
       shots=g.bullets||[];
