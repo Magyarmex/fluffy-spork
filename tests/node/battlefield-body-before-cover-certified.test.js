@@ -71,7 +71,7 @@ function boot(optimized){
 function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,
  wallShape='rect',otherShape=false,otherBullet=false,otherShell=false,moving=false,
  remoteBullets=0,
- shield=false,otherTank=false,ttl=1,pen=1,radius=3,
+ shield=false,otherTank=false,ttl=1,pen=1,radius=3,laterWall=null,
  active=true,knock=0,allied=false,destructible=false,damage=10,
  linearMove=null,tamperMove=false,doubleMove=false,
  otherNearMovingStart=false,bornThisFrame=false,coverHp=1000}={}){
@@ -89,6 +89,7 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,
  g.__novaTerrain=[wallShape==='rect'
   ?{id:-1,shape:'rect',x:wall,y:wallY,w:10,h:80,solid:true,destructible,hp:destructible?coverHp:0,maxHp:destructible?coverHp:0}
    :{id:-1,shape:'circle',x:wall,y:wallY,r:5,solid:true,destructible,hp:destructible?coverHp:0,maxHp:destructible?coverHp:0}];
+ if(laterWall!=null)g.__novaTerrain.push({id:-2,shape:'rect',x:laterWall,y:0,w:10,h:80,solid:true,destructible:false,hp:0,maxHp:0});
  g.bullets=[{kind:'bullet',id:10,ownerId:1,x:0,y:0,
   vx:speed,vy,r:radius,dmg:damage,knock,ttl,pen,hits:0,dead:false,shell:false,beam:false}];
  if(otherBullet)g.bullets.push({kind:'bullet',id:11,ownerId:4,
@@ -573,4 +574,28 @@ for(const optimized of [false,true])for(const pen of [3,4]){
   assert.equal(r.g.__novaTerrain[0].hp,979);
   assert.equal(r.g.bullets.length,0);
  });
+}
+
+/* Regression-first: a breached barricade must not let a high-penetration
+ * round hit a tank behind a SECOND, permanent wall in the same frame.
+ * These are real shipping core + Battlefield/Performance compositions. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'Battlefield + Performance':'Battlefield';
+ for(const fps of [30,60,120,240])for(const pen of [3,4]){
+  test(label+': pen'+pen+' breached cover then permanent wall protects rear hull at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:200*fps,pen,destructible:true,
+    wall:55,laterWall:110,target:165,coverHp:5});
+   assert.deepEqual(r.hits,[],'a permanent wall must protect the rear hull');
+   assert.equal(r.hp,100);
+   assert.equal(r.g.__novaTerrain[0].hp,0,'earlier barricade must still breach');
+   assert.equal(r.g.__novaTerrain[1].solid,true);
+  });
+  test(label+': pen'+pen+' pre-breach front hull is not erased at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:200*fps,pen,destructible:true,
+    wall:75,laterWall:140,target:30,coverHp:5});
+   assert.deepEqual(r.hits,[2],'legitimate front hull must not be erased');
+   assert.equal(r.hp,90);
+   assert.equal(r.g.__novaTerrain[0].hp,0);
+  });
+ }
 }
