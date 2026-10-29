@@ -100,6 +100,15 @@ function withSeed(seed,fn,traceCallsites=false){
  finally{Math.random=priorRandom;Date.now=priorDate;}
 }
 function finitePosition(p){return p&&Number.isFinite(p.x)&&Number.isFinite(p.y);}
+/* A distance-only arrival can be on the wrong side of intact cover.
+ * Use the same public Battlefield terrain owner and hull clearance as
+ * RETURN's live waypoint; missing terrain authority is not proof of arrival. */
+function terrainClearFrontArrival(g,p,origin){
+ return !!(g&&p&&finitePosition(origin)&&
+  Math.hypot(p.x-origin.x,p.y-origin.y)<=130&&
+  typeof g.hasLineOfSight==='function'&&
+  g.hasLineOfSight(p.x,p.y,origin.x,origin.y,24));
+}
 function run(seed,choice,hz,seconds,policy='navigate',preludeSeconds=0){
  return withSeed(seed,()=>{
   const g=bootGame();
@@ -157,7 +166,7 @@ function run(seed,choice,hz,seconds,policy='navigate',preludeSeconds=0){
   const startDistance=Math.hypot(p.x-origin.x,p.y-origin.y);
   if(choice==='return')assert.ok(startDistance>=420-1e-6&&startDistance<=850+1e-6,
    'RETURN must actually use the intended geographic sampler');
-  let routeRequests=0,routeWaypoints=0,frontReached=null,firstVisibleEnemy=null,
+  let routeRequests=0,routeWaypoints=0,frontReached=null,blockedNearFrontSeconds=0,firstVisibleEnemy=null,
    firstVisibleNeutral=null;
   let distanceTravelled=0,postFrontTravelled=0,last={x:p.x,y:p.y};
   let neutralXPAtFront=null,firstNeutralXP=null;
@@ -168,7 +177,7 @@ function run(seed,choice,hz,seconds,policy='navigate',preludeSeconds=0){
   g.input.moveVec=()=>{
    if(roaming&&frontReached!==null)return roaming.move();
    const dx=origin.x-p.x,dy=origin.y-p.y,d=Math.hypot(dx,dy);
-   if(d<=130)return{x:0,y:0};
+   if(terrainClearFrontArrival(g,p,origin))return{x:0,y:0};
    let target=origin;
    if(typeof g.hasLineOfSight==='function'&&!g.hasLineOfSight(p.x,p.y,origin.x,origin.y,24)&&
       typeof g.novaBattlefieldWaypoint==='function'){
@@ -212,8 +221,10 @@ function run(seed,choice,hz,seconds,policy='navigate',preludeSeconds=0){
    if(frontReached!==null)postFrontTravelled+=stepTravel;
    last={x:p.x,y:p.y};
    if(frontReached===null&&dist<=130){
-    frontReached=g.time;
-    neutralXPAtFront=Number(g.__lfState?.stats?.playerNeutralXP)||0;
+    if(terrainClearFrontArrival(g,p,origin)){
+     frontReached=g.time;
+     neutralXPAtFront=Number(g.__lfState?.stats?.playerNeutralXP)||0;
+    }else blockedNearFrontSeconds+=dt;
    }
    if(firstNeutralXP===null&&(Number(g.__lfState?.stats?.playerNeutralXP)||0)>0)
     firstNeutralXP=g.time;
@@ -241,6 +252,7 @@ function run(seed,choice,hz,seconds,policy='navigate',preludeSeconds=0){
    postFrontNeutralXP:frontReached===null?null:+Math.max(0,(Number(g.__lfState?.stats?.playerNeutralXP)||0)-neutralXPAtFront).toFixed(2),
    firstNeutralXP:firstNeutralXP===null?null:+firstNeutralXP.toFixed(3),
    frontReached:frontReached===null?null:+frontReached.toFixed(3),
+   blockedNearFrontSeconds:+blockedNearFrontSeconds.toFixed(3),
    firstVisibleEnemy:firstVisibleEnemy===null?null:+firstVisibleEnemy.toFixed(3),
    firstVisibleNeutral:firstVisibleNeutral===null?null:+firstVisibleNeutral.toFixed(3),
    hp:+p.hp.toFixed(2),alive:!!p.alive,status:g.status,
@@ -264,6 +276,40 @@ const FULL_SEEDS=[
  1517835,1517842,1517846,1517848,1517852,1517873,
  1517839,1517866,1517870,1517880,1517891,1517893
 ];
+test('research arrival requires hull-clear terrain, not only 130u proximity',()=>{
+ const p={x:120,y:0},origin={x:0,y:0},calls=[];
+ const g={hasLineOfSight:(ax,ay,bx,by,pad)=>{
+  calls.push([ax,ay,bx,by,pad]);return false;
+ }};
+ assert.equal(terrainClearFrontArrival(g,p,origin),false,'wall blocks arrival');
+ assert.deepEqual(calls,[[120,0,0,0,24]]);
+ g.hasLineOfSight=()=>true;
+ assert.equal(terrainClearFrontArrival(g,p,origin),true,'clear approach arrives');
+ p.x=131;
+ assert.equal(terrainClearFrontArrival(g,p,origin),false,'distance remains bounded');
+ p.x=120;delete g.hasLineOfSight;
+ assert.equal(terrainClearFrontArrival(g,p,origin),false,'missing terrain cannot certify arrival');
+});
+test('materialized Battlefield rejects near-front arrival across real intact cover',()=>{
+ const g=withSeed(1517825,()=>{const game=bootGame();if(!game.player)game.redeploy();return game;});
+ let witness=null;
+ for(const wall of g.__novaTerrain||[]){
+  if(!wall||wall.shape!=='rect'||!wall.destructible||!(wall.hp>0)||
+     Math.min(wall.w,wall.h)>70)continue;
+  const margin=28,alongY=wall.h<=wall.w;
+  const a=alongY?{x:wall.x,y:wall.y-wall.h/2-margin}:
+   {x:wall.x-wall.w/2-margin,y:wall.y};
+  const b=alongY?{x:wall.x,y:wall.y+wall.h/2+margin}:
+   {x:wall.x+wall.w/2+margin,y:wall.y};
+  if(Math.hypot(a.x-b.x,a.y-b.y)>=130)continue;
+  if(!g.isTerrainSafe(a.x,a.y,24)||!g.isTerrainSafe(b.x,b.y,24))continue;
+  if(g.hasLineOfSight(a.x,a.y,b.x,b.y,24))continue;
+  witness={a,b};break;
+ }
+ assert.ok(witness,'every canonical map has a valid blocked near-front cover pair');
+ assert.equal(terrainClearFrontArrival(g,witness.a,witness.b),false);
+ assert.equal(terrainClearFrontArrival(g,witness.b,witness.b),true);
+});
 test('real composed RETURN pilot keeps moving after reaching the remembered front',()=>{
  const r=run(1517825,'return',30,8,'harvest_roam');
  assert.ok(r.frontReached!==null&&r.frontReached<6,'seed must reach front while alive');
@@ -334,6 +380,9 @@ test('FRESH/RETURN real-engine matched pilot is deterministic under counterbalan
   fs.writeFileSync(path.join(dir,'results-'+policy+'.json'),JSON.stringify({
    contract:natural?'natural-death exposure / forced-death-censored total-policy pilot; NOT isolated geography or human skill':
     'total-policy effect, not isolated geography or human skill',
+   protocolVersion:'terrain-clear-front-arrival-v2',
+   frontArrivalCriterion:'distance <= 130u AND Battlefield hasLineOfSight(...,24)',
+   blockedNearFrontUnit:'simulation seconds',
    policyNote:policy==='harvest_roam'?'public-only neutral approach and terrain-aware patrol AFTER reaching remembered front':'original baseline; harvest stops moving at remembered front',
    policy,seconds,preludeSeconds,worlds:seeds.length,frameRates:[30,60],counterbalancedPerHz:6,
    naturalExposurePilot:natural,
