@@ -89,7 +89,7 @@ function withSeed(seed,fn,traceCallsites=false){
  Math.random=()=>{
   draws++;
   if(traceCallsites){
-   const caller=(new Error().stack||'').split('\\n')[2]||'<unknown>';
+   const caller=(new Error().stack||'').split(String.fromCharCode(10))[2]||'<unknown>';
    callsites[caller]=(callsites[caller]||0)+1;
   }
   state^=state<<13;state^=state>>>17;state^=state<<5;
