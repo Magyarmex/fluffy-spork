@@ -12,6 +12,8 @@ on:
       - 'tests/node/redeploy-public-prelife.test.js'
       - 'tests/node/redeploy-played-prelife-report.test.js'
       - 'scripts/redeploy-played-prelife-report.cjs'
+      - 'scripts/redeploy-crossed-geography-report.cjs'
+      - 'tests/node/redeploy-crossed-geography-report.test.js'
       - '.github/workflows/redeploy-strategy-pilot.yml'
   workflow_dispatch:
 
@@ -150,5 +152,36 @@ jobs:
         with:
           name: nova-redeploy-played-prelife-contrast
           path: artifacts/played/played-policy-contrast.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  crossed-geography:
+    # Research-only 2x2: both actual player positions crossed with both
+    # native post-redeploy AI/neutral worlds. Do not interpret as human fun.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Run 12 predeclared worlds at 30/60 Hz with 8s witnessed first lives
+        env:
+          NOVA_REDEPLOY_CROSSED_PILOT: '1'
+          NOVA_REDEPLOY_PRELIFE_SECONDS: '8'
+          NOVA_REDEPLOY_POLICY: harvest_roam
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/redeploy-pilot
+          node --test tests/node/redeploy-paired-real-pilot.test.js 2>&1 | tee artifacts/redeploy-pilot/crossed-run.log
+      - name: Analyze within-base geography and between-base RNG effects
+        run: node scripts/redeploy-crossed-geography-report.cjs artifacts/redeploy-pilot/crossed-geography.json
+      - name: Preserve crossed evidence and falsifications
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-redeploy-crossed-geography
+          path: artifacts/redeploy-pilot/crossed-*
           if-no-files-found: warn
           retention-days: 30
