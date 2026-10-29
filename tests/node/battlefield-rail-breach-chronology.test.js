@@ -178,3 +178,48 @@ for(const optimized of [false,true]){
   assert.equal(r.cover.hp,0);
  });
 }
+
+/* #234: a legal 3,100u/s Singularity rail with 5ms remaining can hit a
+ * nearby stationary Scout before expiry even in a 30Hz frame. The current
+ * non-shell physical TTL recovery excludes beams, causing FPS-dependent
+ * phantom misses. The full frame may be longer than the projectile's life. */
+function runRailTTL(Game,{fps=30,beam=true,targetX=30,wall=false}={}){
+ const g=new Game();
+ const t={kind:'tank',id:2,cls:'scout',x:targetX,y:-520,
+  hp:100,alive:true,__novaSweepMoveTime:1,
+  __novaSweepPrevX:targetX,__novaSweepPrevY:-520};
+ g.tanks=[t];
+ if(typeof g.hash.insert==='function')g.hash.insert(t);
+ if(wall)g.__novaTerrain.push({id:-20,shape:'rect',x:8,y:-520,
+  w:4,h:80,solid:true,destructible:false,hp:0});
+ const b={kind:'bullet',id:1,ownerId:1,x:0,y:-520,
+  vx:3100,vy:0,r:8.84,dmg:95.2,baseDmg:95.2,
+  maxHp:20,hp:20,pen:18,ttl:.005,hits:0,dead:false,shell:false,
+  beam,__novaRail:beam,__novaFullRail:beam};
+ g.bullets=[b];g.updateBullets(1/fps);
+ return {hp:t.hp,hits:g.hits,bullet:b};
+}
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'optimized':'baseline';
+ for(const fps of [30,60,120,240]){
+  test(label+': legal Singularity rail hits before physical TTL at '+fps+'Hz',()=>{
+   const r=runRailTTL(Game,{fps});
+   assert.ok(Math.abs(r.hp-4.8)<1e-8,'first hull contact at 1.34ms precedes 5ms TTL');
+   assert.deepEqual(r.hits.map(h=>h.id),[2]);
+  });
+  test(label+': target beyond physical rail TTL is not hit at '+fps+'Hz',()=>{
+   const r=runRailTTL(Game,{fps,targetX:60});
+   assert.equal(r.hp,100);
+   assert.deepEqual(r.hits,[]);
+  });
+  test(label+': permanent wall before rail TTL contact blocks Scout at '+fps+'Hz',()=>{
+   const r=runRailTTL(Game,{fps,wall:true});
+   assert.equal(r.hp,100);
+   assert.deepEqual(r.hits,[]);
+  });
+  test(label+': ordinary projectile retains physical TTL contact at '+fps+'Hz',()=>{
+   const r=runRailTTL(Game,{fps,beam:false});
+   assert.ok(Math.abs(r.hp-4.8)<1e-8);
+  });
+ }
+}
