@@ -18,7 +18,7 @@ function arm(seed,hz,mode){return withSeed(seed,draws=>{
  const initial=digest(physical(g)),before=draws();
  let picked=null;
  if(mode!=='off'){
-  picked=g.__testWindow.NOVATips.next('main');
+  picked=g.__testWindow.NOVATips.next('fieldcraft-causal-main');
   assert.ok(picked&&picked.id,'actual tip shuffle failed');
   if(mode==='erased')picked=null; // Same selection/RNG, no displayed content.
  }
@@ -51,6 +51,7 @@ test('actual Fieldcraft shuffle must not influence matched physical combat',()=>
  fs.mkdirSync(dir,{recursive:true});
  fs.writeFileSync(path.join(dir,patched?'patched.json':'baseline.json'),
   JSON.stringify({patched,scenarios:results.length,physicalDivergences,results},null,2));
+ console.log('NOVA_FIELDCRAFT_PREASSERT '+JSON.stringify({patched,results}));
  if(patched){
   assert.ok(results.every(r=>r.sharedDraws===0),'Fieldcraft consumed gameplay RNG');
   assert.equal(physicalDivergences,0,'tip shuffle still influences physical combat');
