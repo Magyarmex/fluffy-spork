@@ -18,6 +18,7 @@ function arm(seed,hz,playerFlag){
   owner.cls='carrier';owner.x=0;owner.y=0;owner.angle=0;
   owner.hp=100;owner.maxHp=100;owner.ai.targetId=-1;
   owner.ai.state='wander';owner.ai.isElite=false;
+  delete owner.__novaLiveVectorAI;
   npc.x=100;npc.y=0;npc.alive=true;npc.spawnShieldT=0;npc.isPlayer=false;
   player.x=105;player.y=0;player.alive=true;player.spawnShieldT=0;
   player.isPlayer=playerFlag;
@@ -26,6 +27,7 @@ function arm(seed,hz,playerFlag){
   // This is a perception-controlled unit of the full shipping update chain,
   // not a claim about naturally occurring map positions.
   g.hasLineOfSight=()=>true;
+  g.areHostile=()=>true;g.areAllies=()=>false;
   g.updateDrones(1/hz);
   const initial={targetId:owner.ai.targetId,planId:owner.__novaLiveVectorAI?.targetId,
    ownerId:owner.id,npcId:npc.id,playerId:player.id};
