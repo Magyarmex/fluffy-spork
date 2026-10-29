@@ -801,8 +801,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   b.dead=true;b.px=b.x;b.py=b.y;b.vx=0;b.vy=0;
   return true;
  }
- function isolatedTTLBodyContact(g,b,dt,localOthers){
-  if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||!(b.ttl>0)||
+ function isolatedTTLBodyContact(g,b,dt,localOthers,allowRail){
+  if(!b||b.dead||b.shell||(b.beam&&!allowRail)||b.splash||b.__v17Cannon||!(b.ttl>0)||
      !(b.ttl<=dt)||!(dt>0)||!(b.pen>=0)||(b.hits||0)>0||
      !Number.isFinite(b.x)||!Number.isFinite(b.y)||
      !Number.isFinite(b.vx)||!Number.isFinite(b.vy))return false;
@@ -1200,6 +1200,72 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   b.hits++;b.pen--;b.dead=true;b.vx=0;b.vy=0;
   if(piercingDrone){
    b.x=ax+dx*limit;b.y=ay+dy*limit;b.px=b.x;b.py=b.y;
+  }
+  return true;
+ }
+ /* #234: a legal rail can reach one open-field hull before its final
+  * 5ms expires, while the endpoint-first core drops every beam at 30-120Hz.
+  * This intentionally narrow proof allows ONE nonlethal stationary hull and
+  * ONE live projectile, no cover or nearby neutral/drone/other hull. Do not
+  * apply the ordinary TTL shortcut to multi-target piercing rail chains. */
+ function certifiedSingleRailTTL(g,b,dt){
+  if(!b||b.dead||!b.beam||b.__novaRail!==true||b.shell||b.splash||
+     b.__v17Cannon||(b.knock||0)!==0||
+     !(dt>0&&Number.isFinite(dt))||
+     !(b.ttl>0&&b.ttl<=dt)||
+     !(Number.isSafeInteger(b.pen)&&b.pen>=0)||
+     (b.hits||0)!==0||g.__novaShapeSweepActive!==true||
+     !Number.isFinite(b.x)||!Number.isFinite(b.y)||
+     !Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
+     !Number.isFinite(b.r)||!(b.r>0)||
+     !Number.isFinite(b.dmg)||!(b.dmg>0))return false;
+  var bullets=g.bullets||[];
+  if(bullets.length!==1||bullets[0]!==b)return false;
+  var ax=b.x,ay=b.y,ex=ax+b.vx*b.ttl,ey=ay+b.vy*b.ttl;
+  if(!Number.isFinite(ex)||!Number.isFinite(ey)||
+     Math.max(Math.abs(ax),Math.abs(ay),Math.abs(ex),Math.abs(ey))>=MAP_LIMIT-20||
+     firstSolidHit(g,ax,ay,ex,ey,b.r*.45))return false;
+  function near(x0,y0,x1,y1,pad){
+   if(!Number.isFinite(x0)||!Number.isFinite(y0)||
+      !Number.isFinite(x1)||!Number.isFinite(y1)||
+      !Number.isFinite(pad))return true;
+   return Math.max(ax,ex)+pad>=Math.min(x0,x1)&&
+          Math.min(ax,ex)-pad<=Math.max(x0,x1)&&
+          Math.max(ay,ey)+pad>=Math.min(y0,y1)&&
+          Math.min(ay,ey)-pad<=Math.max(y0,y1);
+  }
+  var tanks=g.tanks||[],shapes=g.shapes||[],drones=g.drones||[],
+      owner=g.getTank&&g.getTank(b.ownerId),candidate=null;
+  if(typeof g.areAllies==='function'&&!owner)return false;
+  for(var ti=0;ti<tanks.length;ti++){
+   var t=tanks[ti];if(!t||!t.alive||t.id===b.ownerId)continue;
+   var def=CLASSES[t.cls];
+   if(!def||!Number.isFinite(def.size))return false;
+   var sx=t.__novaSweepMoveTime===g.time?t.__novaSweepPrevX:t.x,
+       sy=t.__novaSweepMoveTime===g.time?t.__novaSweepPrevY:t.y,
+       pad=b.r+def.size+3+2;
+   if(!near(sx,sy,t.x,t.y,pad))continue;
+   if(candidate||t.__novaSweepMoveTime!==g.time||
+      !Number.isFinite(sx)||!Number.isFinite(sy)||
+      Math.hypot(t.x-sx,t.y-sy)>1e-8||
+      t.spawnShieldT>0||t.shieldT>0||t.bulwarkT>0||
+      t.tauntT>0||t.invulnT>0||
+      !Number.isFinite(t.hp)||t.hp<=b.dmg*1.001||
+      (typeof g.areAllies==='function'&&g.areAllies(owner,t)))return false;
+   candidate=t;
+  }
+  if(!candidate)return false;
+  for(var si=0;si<shapes.length;si++){
+   var sh=shapes[si];if(!sh||!(sh.hp>0))continue;
+   var st=shapeSweepStart(g,sh),sx=st?st.x:sh.x,sy=st?st.y:sh.y;
+   if(near(sx,sy,sh.x,sh.y,b.r+(sh.r||15)+4+Math.max(30,dt*800)))
+    return false;
+  }
+  for(var di=0;di<drones.length;di++){
+   var dr=drones[di];if(!dr||!(dr.hp>0)||dr.ownerId===b.ownerId)continue;
+   if(near(dr.__novaChronoDronePrevX,dr.__novaChronoDronePrevY,
+      dr.x,dr.y,b.r+(dr.r||8)+1+Math.max(30,dt*2400)))
+    return false;
   }
   return true;
  }
@@ -2161,6 +2227,13 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    }
    shell.dead=true;shell.shell=false;shell.vx=0;shell.vy=0;
   }
+ }
+ /* An isolated rail's physically earlier hull contact precedes TTL.
+  * Do not infer any second rail victim, terrain or projectile interaction. */
+ if(dt>0&&this.bullets&&this.bullets.length===1){
+  var railTTL=this.bullets[0];
+  if(certifiedSingleRailTTL(this,railTTL,dt))
+   isolatedTTLBodyContact(this,railTTL,dt,null,true);
  }
  var expiring=0,paired=0;
  if(dt>0)for(var countI=0;countI<this.bullets.length;countI++){
