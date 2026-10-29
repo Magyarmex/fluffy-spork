@@ -1808,7 +1808,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   * be settled here. Everything uncertain remains on the old path. */
  function certifiedTankBeforePermanentWall(g,b,dt,ax,ay,ex,ey,wall){
   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
-     b.pen!==0||(b.hits||0)!==0||
+     !(Number.isSafeInteger(b.pen)&&b.pen>=0&&b.pen<=4)||
+     (b.hits||0)!==0||
      b.__novaBreachAtTime===g.time||
      (b.__novaDirectVictims&&b.__novaDirectVictims.size>0)||
      !(dt>0)||!(b.ttl>dt)||!Number.isFinite(b.ttl)||
@@ -1914,13 +1915,20 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       Math.max(oy,ny)+rr>=victim.y&&
       Math.min(oy,ny)-rr<=victim.y)return false;
   }
-  /* Commit exactly the canonical damage owner once; the later wall never
-   * receives damage. The core already understands dead, frozen projectiles. */
+  /* Commit exactly one canonical hull hit, then let the existing wall owner
+   * stop surviving piercing shots at the later physical wall. A pen=0 shot
+   * instead dies on the earlier hull, before it can touch that wall. */
   var hx=ax+dx*hitT,hy=ay+dy*hitT;
+  if(typeof g.initBulletIntegrity==='function')g.initBulletIntegrity(b);
   b.x=hx;b.y=hy;b.px=hx;b.py=hy;
   g.damageTank(victim,b.dmg,b.ownerId,0,0);
-  b.hits++;b.pen--;b.dead=true;b.vx=0;b.vy=0;
-  return true;
+  b.hits++;b.pen--;
+  if(b.pen<0){
+   b.dead=true;b.vx=0;b.vy=0;
+   return 1; /* body consumed the shot; do not touch later cover */
+  }
+  (b.__novaDirectVictims||(b.__novaDirectVictims=new Set())).add(victim);
+  return 2; /* body hit committed; continue canonical wall response */
  }
 
  var oldUpdateBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var terrain=ensureTerrain(this);
@@ -2076,7 +2084,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
     }else isolatedTTLStationaryPiercingChain(this,liveBullet,dt,true);
    }
   }
- for(var i=0;i<this.bullets.length;i++){var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,sweepDt=dt;/* Terrain beyond physical projectile lifetime is unreachable, including shells. */if(Number.isFinite(b.ttl)){if(b.ttl<=0)continue;sweepDt=Math.min(dt,b.ttl);}var nx=ox+(b.vx||0)*sweepDt,ny=oy+(b.vy||0)*sweepDt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;if(fuseDefinitelyBeforeTerrain(this,b,dt,ox,oy,nx,ny,fh.hit))continue;if(certifiedTankBeforePermanentWall(this,b,dt,ox,oy,nx,ny,fh))continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){b.__novaBreachAtTime=this.time;b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
+ for(var i=0;i<this.bullets.length;i++){var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,sweepDt=dt;/* Terrain beyond physical projectile lifetime is unreachable, including shells. */if(Number.isFinite(b.ttl)){if(b.ttl<=0)continue;sweepDt=Math.min(dt,b.ttl);}var nx=ox+(b.vx||0)*sweepDt,ny=oy+(b.vy||0)*sweepDt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;if(fuseDefinitelyBeforeTerrain(this,b,dt,ox,oy,nx,ny,fh.hit))continue;if(certifiedTankBeforePermanentWall(this,b,dt,ox,oy,nx,ny,fh)===1)continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){b.__novaBreachAtTime=this.time;b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
    /* The core still advances a dead bullet before removing it; a shell may
      * expire or leave the arena in that pass. Consume its one-time burst now. */
     if(b.shell&&this.clusterBurst){var childStart=this.bullets.length;this.clusterBurst(b);clearTerrainBurstChildren(this,s,h,childStart);b.shell=false;}if(b.splash&&this.splashAt)this.splashAt(h.x,h.y,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.dead=true;if(this.addFlash)this.addFlash(h.x,h.y,s.destructible?'#8fd4ff':'#b9c7e7',Math.min(46,14+(b.dmg||0)*.24));if(this.cam&&b.dmg>42)this.cam.shake=Math.max(this.cam.shake,.08);/* The materialized core still advances dead bullets before removing them. Freeze a terrain-killed projectile at its impact so its final trail cannot leak through cover. Breaching live shots keep their velocity above. */b.vx=0;b.vy=0;
