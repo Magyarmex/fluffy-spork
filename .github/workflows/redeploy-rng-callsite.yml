@@ -1,0 +1,41 @@
+name: NOVA RNG Callsite Attribution
+
+on:
+  push:
+    branches:
+      - 'nova/redeploy-rng-callsite-*'
+    paths:
+      - 'tests/node/redeploy-paired-real-pilot.test.js'
+      - '.github/workflows/redeploy-rng-callsite.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: nova-rng-callsite-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  callsite:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Attribute seeded RNG draws at 30/60Hz in real materialized Game
+        env:
+          NOVA_REDEPLOY_RNG_CALLSITE_PILOT: '1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/redeploy-rng-callsites
+          node --test tests/node/redeploy-paired-real-pilot.test.js 2>&1 |
+            tee artifacts/redeploy-rng-callsites/run.log
+      - name: Preserve callsite counts, including negative findings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-redeploy-rng-callsite-audit
+          path: artifacts/redeploy-rng-callsites/
+          if-no-files-found: warn
+          retention-days: 30
