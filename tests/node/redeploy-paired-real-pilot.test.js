@@ -110,7 +110,7 @@ function terrainClearFrontArrival(g,p,origin){
   g.hasLineOfSight(p.x,p.y,origin.x,origin.y,24));
 }
 function run(seed,choice,hz,seconds,policy='navigate',preludeSeconds=0,experiment=null){
- return withSeed(seed,()=>{
+ return withSeed(seed,readDraws=>{
   const g=bootGame();
   if(!g.player)g.redeploy();
   assert.ok(g.player&&g.player.alive,'real materialized Game has a live Scout');
@@ -146,7 +146,35 @@ function run(seed,choice,hz,seconds,policy='navigate',preludeSeconds=0,experimen
   const baseChoice=experiment?.baseChoice||choice;
   assert.ok(baseChoice==='fresh'||baseChoice==='return','valid native base-world policy');
   g.__novaRedeployChoice=baseChoice;
-  g.redeploy();
+  /* Research-only, predeclared common-safe intervention. Retain native
+   * player/neutral spawning and all eight actual spawnAITank calls, but
+   * reject AI positions that violate either genuine insertion's 1000u
+   * exclusion or the live Battlefield hull-clear terrain constraint.
+   * This override is removed before the first simulation tick. */
+  const nativeRandSpawnPos=g.randSpawnPos;
+  const commonSafeSpawnStats={calls:0,attempts:0,maxAttempts:0};
+  if(experiment?.commonSafeSpawns){
+   const positions=Object.values(experiment.commonSafeSpawns);
+   assert.equal(positions.length,2,'two predeclared genuine insertions required');
+   assert.ok(positions.every(finitePosition),'common-safe positions must be finite');
+   g.randSpawnPos=function(minDist){
+    if(minDist!==1000)return nativeRandSpawnPos.call(this,minDist);
+    commonSafeSpawnStats.calls++;
+    for(let attempt=1;attempt<=64;attempt++){
+     const candidate=nativeRandSpawnPos.call(this,minDist);
+     commonSafeSpawnStats.attempts++;
+     if(!finitePosition(candidate)||
+        !this.isTerrainSafe(candidate.x,candidate.y,75)||
+        !positions.every(p=>Math.hypot(candidate.x-p.x,candidate.y-p.y)>=1000))
+      continue;
+     commonSafeSpawnStats.maxAttempts=Math.max(commonSafeSpawnStats.maxAttempts,attempt);
+     return candidate;
+    }
+    throw Error('common-safe AI spawn support exhausted after 64 native candidates');
+   };
+  }
+  try{g.redeploy();}
+  finally{g.randSpawnPos=nativeRandSpawnPos;}
   assert.equal(g.status,'playing');
   assert.equal(g.__novaRedeployChoice,'fresh','choice cannot leak across lives');
   assert.ok(g.isTerrainSafe(g.player.x,g.player.y,75),'real spawn must be terrain safe');
@@ -168,6 +196,8 @@ function run(seed,choice,hz,seconds,policy='navigate',preludeSeconds=0,experimen
     .map(t=>[t.id,t.type,t.x,t.y,t.hp]);
   const postInsertion={
     aiCount:aiAtInsertion.length,neutralCount:neutralsAtInsertion.length,
+    enemyFullStateHash:digest((g.tanks||[]).filter(t=>t&&t.ai).map(t=>[t.id,t.cls,t.x,t.y,t.hp,t.vx,t.vy,t.ai,t.stats,t.fireCd,t.abilityCd,t.spawnShieldT])),
+    neutralFullStateHash:digest((g.shapes||[]).filter(Boolean).map(t=>[t.id,t.type,t.x,t.y,t.hp,t.vx,t.vy,t.state,t.behavior])),
     enemyClassesHash:digest(aiAtInsertion.map(t=>t[1])),
     enemyBodiesHash:digest(aiAtInsertion),
     neutralBodiesHash:digest(neutralsAtInsertion)
@@ -267,7 +297,8 @@ function run(seed,choice,hz,seconds,policy='navigate',preludeSeconds=0,experimen
     if(visible)firstVisibleEnemy=g.time;
    }
   }
-  return{seed,choice,baseChoice,generatedSpawn,hz,policy,prelude,deathTransitionTicks,postInsertion,layout,rotation,mirrored,initialShapes,
+  return{seed,choice,baseChoice,generatedSpawn,hz,policy,prelude,deathTransitionTicks,postInsertion,
+   commonSafeSpawnStats,rngDrawsAtInsertion:readDraws(),layout,rotation,mirrored,initialShapes,
    fingerprint,fingerprintHash:crypto.createHash('sha256').update(fingerprint).digest('hex'),origin,spawn,
    nearestEnemyDistance:Number.isFinite(nearestEnemyDistance)?+nearestEnemyDistance.toFixed(3):null,
    startDistance:+startDistance.toFixed(2),
@@ -521,6 +552,76 @@ test('crossed real-world insertion isolates player geography from post-spawn AI/
    nearestEnemyClearance:mean('clearanceGap'),hp:mean('hpGap'),
    neutralXP:mean('xpGap'),frontArrivalRate:mean('frontGap')},
   note:'Repeated FPS and two base worlds are not independent seeds; report is not a causal fun claim.'
+ }));
+});
+
+
+/* Supported counterfactual: one real Game-generated enemy/neutral world is
+ * conditioned to respect BOTH genuine player insertions. The two arms use
+ * the same base choice and RNG replay, differing only in the player's
+ * physical location. This is a conditional policy experiment, not a claim
+ * about natural-death frequency or human comprehension. */
+test('common-safe real-engine insertion preserves native enemy clearance in both arms',()=>{
+ const full=process.env.NOVA_REDEPLOY_COMMON_SAFE_PILOT==='1';
+ const seeds=full?FULL_SEEDS.filter((_,i)=>i%6<2):[1517825];
+ const rates=full?[30,60]:[30],seconds=full?12:1,preludeSeconds=full?8:0;
+ const report=[],seen=new Set();
+ for(const hz of rates)for(let i=0;i<seeds.length;i++){
+  const seed=seeds[i];
+  const nativeFresh=run(seed,'fresh',hz,0,'harvest_roam',preludeSeconds);
+  const nativeReturn=run(seed,'return',hz,0,'harvest_roam',preludeSeconds);
+  assert.equal(nativeFresh.fingerprintHash,nativeReturn.fingerprintHash);
+  assert.deepEqual(nativeFresh.origin,nativeReturn.origin);
+  const spawns={fresh:nativeFresh.spawn,return:nativeReturn.spawn};
+  const order=i%2?['return','fresh']:['fresh','return'],arms={};
+  for(const choice of order){
+   arms[choice]=run(seed,choice,hz,seconds,'harvest_roam',preludeSeconds,{
+    baseChoice:'fresh',spawnOverride:spawns[choice],commonSafeSpawns:spawns
+   });
+   assert.deepEqual(arms[choice].spawn,spawns[choice]);
+   assert.deepEqual(arms[choice].generatedSpawn,spawns.fresh);
+   assert.equal(arms[choice].fingerprintHash,nativeFresh.fingerprintHash);
+   assert.ok(arms[choice].nearestEnemyDistance>=1000,
+    'common world must preserve native AI exclusion for '+choice);
+   assert.equal(arms[choice].commonSafeSpawnStats.calls,8,
+    'all eight actual Game.spawnAITank calls must be constrained');
+  }
+  assert.deepEqual(arms.fresh.postInsertion,arms.return.postInsertion,
+   'AI/neutral full initial states must match across player positions');
+  assert.equal(arms.fresh.rngDrawsAtInsertion,arms.return.rngDrawsAtInsertion,
+   'RNG replay must be identical before first simulated step');
+  assert.deepEqual(arms.fresh.commonSafeSpawnStats,arms.return.commonSafeSpawnStats,
+   'rejection sampling must be order-independent');
+  if(i===0){
+   const replay=run(seed,'fresh',hz,seconds,'harvest_roam',preludeSeconds,{
+    baseChoice:'fresh',spawnOverride:spawns.fresh,commonSafeSpawns:spawns
+   });
+   assert.ok(comparable(replay,arms.fresh),'exact replay must reproduce the supported arm');
+  }
+  seen.add(nativeFresh.layout+'/'+nativeFresh.rotation);
+  const compact=x=>{const {fingerprint,...rest}=x;return rest;};
+  report.push({seed,hz,layout:nativeFresh.layout,rotation:nativeFresh.rotation,
+   spawns,origin:nativeFresh.origin,
+   native:{fresh:compact(nativeFresh),return:compact(nativeReturn)},
+   common:{fresh:compact(arms.fresh),return:compact(arms.return)}});
+ }
+ if(full){
+  assert.equal(report.length,24);
+  assert.equal(seen.size,6);
+  const dir=path.join(root,'artifacts','redeploy-pilot');
+  fs.mkdirSync(dir,{recursive:true});
+  fs.writeFileSync(path.join(dir,'common-safe-geography.json'),JSON.stringify({
+   contract:'shared real-engine enemy/neutral world with >=1000u AI clearance from both genuine insertion positions; conditional geography only',
+   protocolVersion:'common-safe-geography-v1',independentSeeds:12,
+   frameRates:rates,preludeSeconds,seconds,layouts:[...seen].sort(),results:report
+  },null,2));
+ }
+ console.log('NOVA_REDEPLOY_COMMON_SAFE '+JSON.stringify({
+  full,seeds:seeds.length,observations:report.length,
+  bothArmsSafe:report.every(r=>r.common.fresh.nearestEnemyDistance>=1000&&
+   r.common.return.nearestEnemyDistance>=1000),
+  identicalWorlds:report.every(r=>comparable(r.common.fresh.postInsertion,r.common.return.postInsertion)),
+  maxAttempts:Math.max(...report.map(r=>r.common.fresh.commonSafeSpawnStats.maxAttempts))
  }));
 });
 
