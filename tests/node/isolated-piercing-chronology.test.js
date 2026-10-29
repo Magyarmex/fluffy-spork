@@ -1579,3 +1579,27 @@ for(const optimized of [false,true]) {
     }
   });
 }
+
+/* Shipping-scale ecology plus distant fire must use the local preflight.
+ * Otherwise the new two-hull prefix exists only in sparse test arenas. */
+for(const optimized of [false,true]) {
+  test((optimized?'optimized':'baseline')+
+    ' dense neutral ecology and 1300 remote shots retain pen-2 prefix at 120Hz',()=>{
+    const Game=boot(undefined,optimized),g=threeHullPen2(Game);
+    g.shapes=Array.from({length:120},(_,i)=>({
+      kind:'shape',id:500+i,x:1200+i*2,y:1200,
+      r:12,hp:100,type:'circle',born:0
+    }));
+    for(let i=0;i<1300;i++)g.bullets.push({
+      kind:'bullet',id:1000+i,ownerId:9,
+      x:1000+i*.4,y:1200,vx:0,vy:0,r:3,dmg:5,
+      ttl:1,pen:0,hits:0,dead:false
+    });
+    g.time+=1/120;g.updateBullets(1/120);
+    assert.deepEqual(g.tanks.map(t=>t.hitCount),[1,1,0],
+      'bounded local preflight must admit the two real first-frame hits');
+    g.time+=1/120;g.updateBullets(1/120);
+    assert.deepEqual(g.tanks.map(t=>t.hitCount),[1,1,1],
+      'third contact remains owned by the next frame');
+  });
+}
