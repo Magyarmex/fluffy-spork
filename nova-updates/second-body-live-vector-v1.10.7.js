@@ -116,6 +116,13 @@ function isLegacyUltimate(button){
   function clickCapture(e){
     if(dispatchDepth||!e||!guarded)return;
     var b=buttonFrom(e.target),until=b&&guarded.get(b);if(!until||Date.now()>until)return;
+    /* A pending touch compatibility click must not consume a new physical
+     * mouse or keyboard activation. Explicit touch provenance wins over
+     * ambiguous click detail; keep the guard for the original touch. */
+    var touchClick=e.pointerType==='touch'||e.pointerType==='pen'||
+       (e.sourceCapabilities&&e.sourceCapabilities.firesTouchEvents===true);
+    if(!touchClick&&(e.detail===0||e.pointerType==='mouse'||
+       (e.sourceCapabilities&&e.sourceCapabilities.firesTouchEvents===false)))return;
     guarded.delete(b);
     if(e.cancelable&&e.preventDefault)e.preventDefault();
     if(e.stopImmediatePropagation)e.stopImmediatePropagation();else if(e.stopPropagation)e.stopPropagation();

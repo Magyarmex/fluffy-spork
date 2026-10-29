@@ -50,6 +50,7 @@ jobs:
       - name: Run real React + Chromium smoke
         run: |
           node tests/browser/real-touch-gameplay.cjs
+          node tests/browser/hybrid-button-handoff.cjs
           node tests/browser/shipping-ui-smoke.cjs
           node tests/browser/tactical-frontlines-memory.cjs
           node tests/browser/frontlines-bloom-compass.cjs

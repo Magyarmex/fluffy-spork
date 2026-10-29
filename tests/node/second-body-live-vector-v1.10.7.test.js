@@ -111,3 +111,64 @@ test('Controller canvas reminder is delayed on all viewports and avoids short-la
   const h=390, y=h*.57;
   assert.ok(y+15<h*.68);
 });
+
+function hybridButton() {
+  const button = { disabled: false, click() {}, classList: { contains() { return false; } } };
+  return { button, target: { closest(selector) { return selector === 'button' ? button : null; } } };
+}
+
+test('shipping Live Vector bridge preserves real mouse and keyboard clicks after a touch', () => {
+  const { window } = boot();
+  const bridge = window.__NOVA_LIVE_VECTOR_BUTTON_TEST__;
+  const { target } = hybridButton();
+  function touch() { bridge.pointerDown({ pointerType: 'touch', target, cancelable: true,
+    preventDefault() {}, stopImmediatePropagation() {} }); }
+  let swallowed = 0;
+  function click(extra) { bridge.clickCapture({ ...extra, target, cancelable: true,
+    preventDefault() { swallowed++; }, stopImmediatePropagation() { swallowed++; } }); }
+  touch();
+  click({ pointerType: 'mouse', detail: 1, sourceCapabilities: { firesTouchEvents: false } });
+  assert.equal(swallowed, 0, 'physical mouse click must not be swallowed');
+  touch();
+  click({ detail: 0 });
+  assert.equal(swallowed, 0, 'keyboard click must not be swallowed');
+  touch();
+  click({ pointerType: 'touch', detail: 1, sourceCapabilities: { firesTouchEvents: true } });
+  assert.equal(swallowed, 2, 'delayed touch compatibility click must still be consumed');
+});
+
+test('shipping Live Vector prioritizes touch provenance over misleading click metadata', () => {
+  const { window } = boot();
+  const bridge = window.__NOVA_LIVE_VECTOR_BUTTON_TEST__;
+  const { target } = hybridButton();
+  let swallowed = 0;
+  for (const click of [
+    { pointerType: 'touch', detail: 0 },
+    { pointerType: 'mouse', detail: 1, sourceCapabilities: { firesTouchEvents: true } }
+  ]) {
+    bridge.pointerDown({ pointerType: 'touch', target, cancelable: true,
+      preventDefault() {}, stopImmediatePropagation() {} });
+    bridge.clickCapture({ ...click, target, cancelable: true,
+      preventDefault() { swallowed++; }, stopImmediatePropagation() { swallowed++; } });
+  }
+  assert.equal(swallowed, 4, 'no second activation for a touch-origin click');
+});
+
+test('real shipping shell loads Live Vector, not retired Command Weave', () => {
+  const html = fs.readFileSync(path.join(__dirname, '../../index.html'), 'utf8');
+  assert.match(html, /src="\.\/nova-updates\/second-body-live-vector-v1\.10\.7\.js"/);
+  assert.doesNotMatch(html, /src="\.\/nova-updates\/controller-command-weave-v1\.10\.0\.js"/);
+});
+
+test('shipping Live Vector stylus activation cannot double-fire from a pen compatibility click', () => {
+  const { window } = boot();
+  const bridge = window.__NOVA_LIVE_VECTOR_BUTTON_TEST__;
+  const { target } = hybridButton();
+  let swallowed = 0;
+  bridge.pointerDown({ pointerType: 'pen', target, cancelable: true,
+    preventDefault() {}, stopImmediatePropagation() {} });
+  bridge.clickCapture({ pointerType: 'pen', detail: 1,
+    sourceCapabilities: { firesTouchEvents: false }, target, cancelable: true,
+    preventDefault() { swallowed++; }, stopImmediatePropagation() { swallowed++; } });
+  assert.equal(swallowed, 2, 'pen follow-up click is not an independent mouse click');
+});
