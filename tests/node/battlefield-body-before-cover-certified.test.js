@@ -1,0 +1,133 @@
+'use strict';
+/* A physical body before permanent cover must be hit before the later wall.
+ * This executes the materialized shipping core and real Battlefield wrapper,
+ * optionally with the Performance overlay, not a replacement physics model.
+ */
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const vm=require('node:vm');
+const root=path.resolve(__dirname,'../..');
+const read=p=>fs.readFileSync(path.join(root,p),'utf8');
+const html=read('index.html');
+const marker='    updateBullets(dt) {',start=html.indexOf(marker);
+assert.ok(start>=0,'shipping core method');
+let end=start+marker.length,depth=1;
+while(depth&&end<html.length){if(html[end]==='{')depth++;else if(html[end]==='}')depth--;end++;}
+assert.equal(depth,0);
+const CLASSES={scout:{size:14},marksman:{size:14}};
+const core=new Function('types_1','classes_1','M',
+ 'return function(dt){'+html.slice(start+marker.length,end-1)+'}')(
+ {dist2:(ax,ay,bx,by)=>(ax-bx)**2+(ay-by)**2},
+ {CLASSES},2250);
+function boot(optimized){
+ class Game{
+  constructor(){
+   this.time=1;this.bullets=[];this.tanks=[];this.shapes=[];this.drones=[];
+   this.__novaTerrain=[];this.tmp=[];this.cam={shake:0};this.sfx={};
+   this.player={id:999,x:1000,y:1000,alive:true};
+   this.hash={query:(_x,_y,_r,out)=>{out.length=0;out.push(...this.tanks,...this.shapes,...this.drones);}};
+   this.hits=[];this.coverHits=0;
+  }
+ }
+ for(const name of ['spawnPlayer','spawnShape','spawnPowerup','tryFire',
+  'updateDrones','update','moveTank','addParticles','splashAt',
+  'initBulletIntegrity','addRing','addFlash','addImpactDebris',
+  'damageShape','damageDrone','weakenBullet','clusterBurst'])
+  Game.prototype[name]=function(){};
+ Game.prototype.randSpawnPos=()=>({x:1500,y:1500});
+ Game.prototype.getTank=id=>id===1?{id:1,cls:'scout',alive:true}:null;
+ Game.prototype.resolveBulletCollisions=function(){};
+ Game.prototype.damageTank=function(t,dmg){this.hits.push(t.id);t.hp-=dmg;};
+ Game.prototype.updateBullets=core;
+ class Sfx{resume(){}}
+ const modules={
+  'game/engine':m=>{m.exports={Game}},
+  'game/audio':m=>{m.exports={Sfx}},
+  'game/ai':m=>{m.exports={updateAI(){}}},
+  'game/render':m=>{m.exports={render(){}}}
+ };
+ const ctx={window:{__novaModules:modules},
+  console:{info(){},warn(){},error(){}},Math,Map,Set,Date,
+  performance:{now:()=>0}};
+ vm.runInNewContext(read('nova-updates/battlefield-v1.6.0.js'),ctx);
+ if(optimized)vm.runInNewContext(read('nova-updates/performance-v1.7.5.js'),ctx);
+ const m={exports:{}};
+ modules['game/engine'](m,m.exports,spec=>spec==='./classes'
+  ?{CLASSES}:{ARENA_HALF:2250});
+ return m.exports.Game;
+}
+function run(Game,{fps=30,speed=6000,wall=120,target=60,
+ wallShape='rect',otherShape=false,otherBullet=false,moving=false,
+ shield=false,otherTank=false,ttl=1,pen=0}={}){
+ const g=new Game(),dt=1/fps;
+ const t={kind:'tank',id:2,cls:'scout',x:target,y:0,hp:100,
+  alive:true,__novaSweepMoveTime:1,__novaSweepPrevX:moving?target-4:target,
+  __novaSweepPrevY:0,spawnShieldT:shield?2:0};
+ g.tanks=[t];
+ if(otherTank)g.tanks.push({kind:'tank',id:3,cls:'scout',x:30,y:0,
+  hp:100,alive:true,__novaSweepMoveTime:1,__novaSweepPrevX:30,__novaSweepPrevY:0});
+ if(otherShape)g.shapes.push({kind:'shape',id:4,x:30,y:0,r:8,hp:100});
+ g.__novaTerrain=[wallShape==='rect'
+  ?{id:-1,shape:'rect',x:wall,y:0,w:10,h:80,solid:true,destructible:false}
+  :{id:-1,shape:'circle',x:wall,y:0,r:5,solid:true,destructible:false}];
+ g.bullets=[{kind:'bullet',id:10,ownerId:1,x:0,y:0,
+  vx:speed,vy:0,r:3,dmg:10,ttl,pen,hits:0,dead:false,shell:false,beam:false}];
+ if(otherBullet)g.bullets.push({kind:'bullet',id:11,ownerId:4,
+  x:0,y:1,vx:speed,vy:0,r:3,dmg:10,ttl:1,pen:0,hits:0,dead:false});
+ g.updateBullets(dt);
+ return {hits:g.hits,hp:t.hp,bullet:g.bullets[0],g};
+}
+for(const optimized of [false,true]){
+ const label=optimized?'Battlefield + Performance':'Battlefield';
+ test(label+': stationary scout BEFORE a later permanent wall is hit',()=>{
+  const r=run(boot(optimized));
+  assert.deepEqual(r.hits,[2]);assert.equal(r.hp,90);
+ });
+ test(label+': circular pillar behind a body cannot veto earlier contact',()=>{
+  const r=run(boot(optimized),{wallShape:'circle'});
+  assert.deepEqual(r.hits,[2]);
+ });
+ test(label+': wall BEFORE target still blocks the bullet',()=>{
+  const r=run(boot(optimized),{wall:25,target:90});
+  assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
+ });
+ test(label+': body BEHIND wall remains protected',()=>{
+  const r=run(boot(optimized),{wall:50,target:120});
+  assert.deepEqual(r.hits,[]);
+ });
+ test(label+': no early speculative hit with moving target',()=>{
+  const r=run(boot(optimized),{moving:true});
+  assert.deepEqual(r.hits,[]);
+ });
+ test(label+': shielded tank retains ordinary cover protection',()=>{
+  const r=run(boot(optimized),{shield:true});
+  assert.deepEqual(r.hits,[]);
+ });
+ test(label+': earlier neutral body vetoes speculative tank contact',()=>{
+  const r=run(boot(optimized),{otherShape:true});
+  assert.deepEqual(r.hits,[]);
+ });
+ test(label+': earlier tank vetoes later target shortcut',()=>{
+  const r=run(boot(optimized),{otherTank:true});
+  assert.deepEqual(r.hits,[]);
+ });
+ test(label+': competing projectile vetoes speculative hit',()=>{
+  const r=run(boot(optimized),{otherBullet:true});
+  assert.deepEqual(r.hits,[]);
+ });
+ test(label+': TTL expiry before target is not bypassed',()=>{
+  const r=run(boot(optimized),{ttl:.002});
+  assert.deepEqual(r.hits,[]);
+ });
+ test(label+': piercing rounds remain with existing collision owner',()=>{
+  const r=run(boot(optimized),{pen:2});
+  assert.deepEqual(r.hits,[]);
+ });
+ test(label+': realistic 30Hz Marksman speed can reach a hull before cover',()=>{
+  const speed=1050*(1+.085*8);
+  const r=run(boot(optimized),{speed,wall:55,target:29});
+  assert.deepEqual(r.hits,[2]);
+ });
+}
