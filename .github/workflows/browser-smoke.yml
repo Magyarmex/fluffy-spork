@@ -19,6 +19,8 @@ on:
       - 'index.html'
       - 'tests/browser/**'
       - 'tests/node/redeploy-paired-real-pilot.test.js'
+      - 'scripts/redeploy-common-safe-report.cjs'
+      - 'tests/node/redeploy-common-safe-report.test.js'
       - '.github/workflows/browser-smoke.yml'
       - 'scripts/patch-star-minimap.cjs'
       - 'scripts/patch-saved-records.cjs'
