@@ -1,0 +1,81 @@
+name: Public Rogue Star Route Cut (research)
+
+on:
+  pull_request:
+    paths:
+      - 'tests/browser/frontlines-public-star-*.js'
+      - 'tests/browser/frontlines-public-star-*.cjs'
+      - 'tests/node/public-star-route-cut-prototype.test.js'
+      - 'tests/node/public-star-routecut-report.test.js'
+      - 'scripts/public-star-routecut-report.cjs'
+      - '.github/workflows/public-star-routecut.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  natural-paired:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        layout: [0, 1, 2]
+        seed: [0, 1]
+        mode: [control, routecut]
+    env:
+      NOVA_LAYOUT_INDEX: ${{ matrix.layout }}
+      NOVA_SEED_INDEX: ${{ matrix.seed }}
+      NOVA_STAR_ROUTE_MODE: ${{ matrix.mode }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --no-audit --no-fund --no-package-lock
+      - run: npm install --no-save --no-audit --no-fund --no-package-lock playwright@1.56.1
+      - run: npx playwright install chromium
+      - name: Verify public-only pilot invariants
+        run: node --test tests/node/public-star-route-cut-prototype.test.js tests/node/frontlines-public-star-pilot.test.js
+      - name: Serve canonical materialized game
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/nova-star-public-http.log 2>&1 &
+      - name: Natural-match public Star interception audit
+        run: node tests/browser/frontlines-public-star-routecut.cjs
+      - name: Preserve all trials including censored and zero-exposure cases
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: star-routecut-${{ matrix.layout }}-${{ matrix.seed }}-${{ matrix.mode }}
+          path: artifacts/star-public-routecut/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  collate:
+    needs: natural-paired
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: star-routecut-*
+          path: artifacts/star-public-routecut
+          merge-multiple: true
+      - name: Validate all predeclared arms and report natural exposure
+        run: |
+          node --test tests/node/public-star-routecut-report.test.js
+          node scripts/public-star-routecut-report.cjs artifacts/star-public-routecut
+      - name: Preserve aggregate even if an arm is censored
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: star-routecut-report
+          path: artifacts/star-routecut-report/
+          if-no-files-found: ignore
+          retention-days: 14
