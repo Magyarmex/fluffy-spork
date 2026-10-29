@@ -302,11 +302,14 @@ async function runCoverCue(browser){
      window.__novaCoverSmokeGame=this;
     return update.apply(this,arguments);
    };
-   const redeploy=Game.prototype.redeploy;
-   Game.prototype.redeploy=function(){
-    const previous=Math.random;
-    Math.random=()=>0; // RETURN samples angle 0, radius 420; test-only.
-    try{return redeploy.apply(this,arguments);}finally{Math.random=previous;}
+   const randSpawn=Game.prototype.randSpawnPos;
+   Game.prototype.randSpawnPos=function(minDist){
+    if(this.__novaFrontSpawnArmed&&minDist===900){
+     const previous=Math.random;let draws=0;
+     Math.random=()=>draws++<2?0:previous(); // Only RETURN angle/radius.
+     try{return randSpawn.apply(this,arguments);}finally{Math.random=previous;}
+    }
+    return randSpawn.apply(this,arguments);
    };
   });
   await page.getByRole('button',{name:/DEPLOY/i}).first().click();
