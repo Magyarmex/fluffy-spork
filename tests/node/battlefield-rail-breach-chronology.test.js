@@ -83,7 +83,8 @@ function boot(optimized=true){
 }
 function run(Game,{beam=true,rail=true,cover=true,pillar=true,
  targetX=235,dt=.033,speed=18414,coverHp=5,extraShot=false,
- secondCoverHp=null,railHp=20,railMaxHp=20,railPen=19}={}){
+ secondCoverHp=null,secondCoverX=-125,secondCoverW=10,
+ railHp=20,railMaxHp=20,railPen=19}={}){
  const g=new Game();
  const t={kind:'tank',id:2,cls:'scout',x:targetX,y:-520,
   hp:100,alive:true,__novaSweepMoveTime:1,
@@ -95,7 +96,7 @@ function run(Game,{beam=true,rail=true,cover=true,pillar=true,
  if(cover)g.__novaTerrain.push({id:-1,shape:'rect',x:-260,y:-500,
   w:190,h:65,solid:true,destructible:true,hp:coverHp,maxHp:300});
  if(secondCoverHp!==null)g.__novaTerrain.push({id:-3,shape:'rect',
-  x:-125,y:-520,w:10,h:50,solid:true,destructible:true,
+  x:secondCoverX,y:-520,w:secondCoverW,h:50,solid:true,destructible:true,
   hp:secondCoverHp,maxHp:secondCoverHp});
  if(pillar)g.__novaTerrain.push({id:-2,shape:'circle',x:0,y:-520,
   r:105,solid:true,destructible:false,hp:0,maxHp:0});
@@ -221,5 +222,26 @@ for(const optimized of [false,true]){
   assert.equal(r.bullet.dead,true);
   assert.equal(r.coverBroken,2);
   assert.equal(r.secondCover.hp,0);
+ });
+}
+
+/* Equal-time first/second cover faces have no certified order. Do not
+ * invent a second structural break from a tie, even if a wall lies behind. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized);
+ test((optimized?'optimized':'baseline')+
+  ': simultaneous first and second cover face abstains from extra break',()=>{
+  const r=run(Game,{beam:false,rail:false,secondCoverHp:5,
+   secondCoverX:-260,secondCoverW:190});
+  assert.equal(r.cover.hp,0);
+  assert.equal(r.secondCover.hp,5,
+   'second cover may not be speculatively credited at equal contact time');
+  assert.equal(r.coverBroken,1);
+ });
+ test((optimized?'optimized':'baseline')+
+  ': an earlier Scout contact is not erased by later double-cover proof',()=>{
+  const r=run(Game,{beam:false,rail:false,secondCoverHp:5,targetX:-145});
+  assert.ok(r.hp<100,'physically earlier hull remains hittable');
+  assert.deepEqual(r.hits.map(h=>h.id),[2]);
  });
 }
