@@ -251,7 +251,7 @@ function installDeathTitleFit(){
   '.absolute.inset-0.z-50 > .panel.anim-pop:has(> .font-display.text-red-400) > .mt-4.grid > div > div:last-child{font-size:11px;line-height:1.2;}'+
   '.absolute.inset-0.z-50 > .panel.anim-pop:has(> .font-display.text-red-400) > [data-nova-death-insight]{margin-top:5px!important;padding:4px 6px!important;}'+
   '.absolute.inset-0.z-50 > .panel.anim-pop:has(> .font-display.text-red-400) > button.btn-primary{margin-top:6px;padding-top:6px;padding-bottom:6px;font-size:11px;}'+
-  '.absolute.inset-0.z-50 > .panel.anim-pop:has(> .font-display.text-red-400) > button.btn-ghost{margin-top:4px;padding-top:4px;padding-bottom:4px;font-size:10px;}}';
+  '.absolute.inset-0.z-50 > .panel.anim-pop:has(> .font-display.text-red-400) > button.btn-ghost{margin-top:4px;padding-top:4px;padding-bottom:4px;font-size:10px;min-height:30px;}}';
  document.head.appendChild(style);
 }
 installDeathTitleFit();
