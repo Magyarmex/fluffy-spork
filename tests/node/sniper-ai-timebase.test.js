@@ -122,11 +122,17 @@ test('non-sniper AI still delegates to the original owner', () => {
 test('production Predator composition suppresses unused Sniper random rolls without losing movement', () => {
   const predator = fs.readFileSync(path.join(root,
     'nova-updates/predator-doctrine-v1.8.0.js'), 'utf8');
+  const battleSense = fs.readFileSync(path.join(root,
+    'nova-updates/battle-sense-v1.8.1.js'), 'utf8');
+  const fairEngagement = fs.readFileSync(path.join(root,
+    'nova-updates/fair-engagement-v1.11.2.js'), 'utf8');
   const refs = ['nova-updates/stability-v1.4.0.js',
-    'nova-updates/predator-doctrine-v1.8.0.js'];
+    'nova-updates/predator-doctrine-v1.8.0.js',
+    'nova-updates/battle-sense-v1.8.1.js',
+    'nova-updates/fair-engagement-v1.11.2.js'];
   const offsets = refs.map(ref => html.indexOf(ref));
-  assert.ok(offsets.every(n => n > 0) && offsets[0] < offsets[1],
-    'production must install Forward Observer before Predator Doctrine');
+  assert.ok(offsets.every(n => n > 0) && offsets.every((n, i) => !i || offsets[i-1] < n),
+    'production must install Forward Observer, Predator, Battle Sense and Fair Engagement in order');
 
   for (const fps of [30, 60, 120, 240]) {
     let draws = 0, movement = null, abilities = 0;
@@ -152,6 +158,8 @@ test('production Predator composition suppresses unused Sniper random rolls with
       console: { info() {}, warn() {}, error() {} } };
     vm.runInNewContext(source, ctx, { filename: 'stability-v1.4.0.js' });
     vm.runInNewContext(predator, ctx, { filename: 'predator-doctrine-v1.8.0.js' });
+    vm.runInNewContext(battleSense, ctx, { filename: 'battle-sense-v1.8.1.js' });
+    vm.runInNewContext(fairEngagement, ctx, { filename: 'fair-engagement-v1.11.2.js' });
     const mod = { exports: {} };
     mods['game/ai'](mod, mod.exports, () => classes);
     function scenario(cls, hp) {
@@ -162,11 +170,13 @@ test('production Predator composition suppresses unused Sniper random rolls with
           __novaAimY: 0 } };
       const enemy = { id: 2, cls: 'scout', x: 400, y: 0,
         alive: true, hp: 100, maxHp: 100, spawnShieldT: 0 };
-      const g = { time: 10, tanks: [t, enemy], player: enemy,
+      const g = { time: 10, w: 900, h: 700, cam: { x: 0, y: 0, zoom: 1 },
+        tanks: [t, enemy], player: enemy,
         bullets: [], shapes: [], drones: [],
         getTank(id) { return id === 2 ? enemy : null; },
         tankSpeed() { return 200; }, weaponRange() { return 700; },
         bulletSpeed() { return 800; }, nearestShape() { return null; },
+        nearestTank() { return enemy; },
         hasLineOfSight() { return true; },
         moveTank(_t, x, y) { movement = [x, y]; },
         tryFire() {}, useAbility() { abilities++; } };
