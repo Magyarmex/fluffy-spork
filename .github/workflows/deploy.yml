@@ -15,6 +15,7 @@ on:
       - '.github/workflows/deploy.yml'
       - 'scripts/patch-star-minimap.cjs'
       - 'scripts/patch-saved-records.cjs'
+      - 'scripts/patch-ai-strafe-timebase.cjs'
   workflow_dispatch:
 
 permissions:
@@ -68,6 +69,7 @@ jobs:
           grep -q 'NOVA TANKS' index.html.new
           node scripts/patch-star-minimap.cjs index.html.new
           node scripts/patch-saved-records.cjs index.html.new
+          node scripts/patch-ai-strafe-timebase.cjs index.html.new
 
           python3 - <<'PY'
           from pathlib import Path
@@ -169,6 +171,7 @@ jobs:
               'nova-updates/owner-operations-v1.11.1.js',
               'scripts/patch-star-minimap.cjs',
               'scripts/patch-saved-records.cjs',
+              'scripts/patch-ai-strafe-timebase.cjs',
               'pwa-register.js',
               'sw.js',
               'manifest.webmanifest',
