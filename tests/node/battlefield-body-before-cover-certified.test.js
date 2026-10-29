@@ -83,7 +83,7 @@ function boot(optimized){
   ?{CLASSES}:{ARENA_HALF:2250});
  return m.exports.Game;
 }
-function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,
+function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,laterWallY=0,
  wallShape='rect',otherShape=false,otherBullet=false,otherShell=false,moving=false,
  remoteBullets=0,laterCoverHp=null,realIntegrity=false,preinitialized=false,
  shield=false,otherTank=false,ttl=1,pen=1,radius=3,laterWall=null,
@@ -104,7 +104,7 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,
  g.__novaTerrain=[wallShape==='rect'
   ?{id:-1,shape:'rect',x:wall,y:wallY,w:10,h:80,solid:true,destructible,hp:destructible?coverHp:0,maxHp:destructible?coverHp:0}
    :{id:-1,shape:'circle',x:wall,y:wallY,r:5,solid:true,destructible,hp:destructible?coverHp:0,maxHp:destructible?coverHp:0}];
- if(laterWall!=null)g.__novaTerrain.push({id:-2,shape:'rect',x:laterWall,y:0,w:10,h:80,solid:true,destructible:laterCoverHp!=null,hp:laterCoverHp||0,maxHp:laterCoverHp||0});
+ if(laterWall!=null)g.__novaTerrain.push({id:-2,shape:'rect',x:laterWall,y:laterWallY,w:10,h:80,solid:true,destructible:laterCoverHp!=null,hp:laterCoverHp||0,maxHp:laterCoverHp||0});
  g.bullets=[{kind:'bullet',id:10,ownerId:1,x:0,y:0,
   vx:speed,vy,r:radius,dmg:damage,knock,ttl,pen,hits:0,dead:false,shell:false,beam:false}];
  if(realIntegrity){g.initBulletIntegrity=realInitIntegrity;g.weakenBullet=realWeakenBullet;}
@@ -753,3 +753,32 @@ for(const optimized of [false,true])for(const pen of [3,4]){
    (21*(.72+radius*.08)*(1+pen*.055)))<1e-9);
  });
 }
+
+/* Seeded diagonal two-cover contacts exercise the real shipping collision
+ * geometry, not a bespoke segment-rectangle implementation. A damaged first
+ * barricade breaks; a healthy second barricade must take exactly one weakened
+ * hit and protect a rear hull, independent of Battlefield/Performance order. */
+test('600 seeded diagonal two-cover contacts preserve structural order',()=>{
+ let seed=0x442147;
+ const rnd=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ for(const optimized of [false,true]){
+  const Game=boot(optimized);
+  for(let i=0;i<300;i++){
+   const slope=(rnd()-.5)*1.2;
+   const wall=30+rnd()*20,laterWall=wall+30+rnd()*35;
+   const target=laterWall+45+rnd()*15;
+   const pen=i%2?3:4;
+   const r=run(Game,{fps:30,speed:6000,vy:6000*slope,
+    pen,destructible:true,wall,wallY:wall*slope,
+    laterWall,laterWallY:laterWall*slope,laterCoverHp:1000,
+    target,targetY:target*slope,coverHp:5,realIntegrity:true});
+   assert.deepEqual(r.hits,[],
+    'rear hull must be protected: optimized='+optimized+' seed='+i);
+   assert.equal(r.g.__novaTerrain[0].hp,0);
+   assert.ok(Math.abs(r.g.__novaTerrain[1].hp-993.8)<1e-8,
+    'second cover takes 62% damage once: seed='+i);
+   assert.equal(r.g.__novaTerrain[1].solid,true);
+   assert.equal(r.g.__novaBattlefield.coverBroken,1);
+  }
+ }
+});
