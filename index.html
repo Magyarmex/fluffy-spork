@@ -3246,10 +3246,10 @@ class Game {
             }
             this.cam.shake = Math.max(this.cam.shake, Math.min(0.5, d / 60));
         }
-        else if (this.cosmeticRandom() < 0.5) {
+        else if ((typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) < 0.5) {
             this.sfx.hit();
         }
-        if (this.cosmeticRandom() < 0.5)
+        if ((typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) < 0.5)
             this.addText(t.x + this.cosmeticRnd(-10, 10), t.y - 18, String(Math.round(d)), '#ff8a8a', 11);
         if (t.hp <= 0)
             this.killTank(t, src);
