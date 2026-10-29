@@ -1827,7 +1827,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       shots=g.bullets||[];
   /* Worst-case bound; most shots return after the tank scan. */
   if(tanks.length+shapes.length+drones.length+shots.length>260||
-     shots.length>24)return false;
+     shots.length>12)return false;
   var dx=ex-ax,dy=ey-ay,A=dx*dx+dy*dy;
   if(!(A>1e-12)||!Number.isFinite(A)||
      Math.max(Math.abs(ax),Math.abs(ay),Math.abs(ex),Math.abs(ey))>=MAP_LIMIT-20)
