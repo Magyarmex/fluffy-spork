@@ -97,7 +97,7 @@ function reportCrossed(data,expectedSeeds=12){
   }
   if(allSafe)fullySupportedSeeds++;
  }
- const causalIdentification=counts.nativeBelow===0&&counts.offDiagonalBelow===0;
+ const nativeSpawnSupportSatisfied=counts.nativeBelow===0&&counts.offDiagonalBelow===0;
  const out={contract:'crossed insertion falsification: exploratory outcomes, NOT identified native-play geography effects',
   independentSeeds:groups.size,fpsRepeatedObservations:data.results.length,
   crossedWorldPairs:data.results.length*2,layouts:[...layouts].sort(),
@@ -105,9 +105,9 @@ function reportCrossed(data,expectedSeeds=12){
   spawnSafety:{
    canonicalAIMinDistanceRequested:exclusion,
    ...counts,independentSeedsWithAllFourCellsSafeAtBothHz:fullySupportedSeeds,
-   causalGeographyIdentified:causalIdentification,
-   verdict:causalIdentification?
-    'All observed cells preserve native enemy clearance; other confounds and human value remain untested.':
+   nativeSpawnSupportSatisfied,causalGeographyIdentified:false,
+   verdict:nativeSpawnSupportSatisfied?
+    'Native enemy clearance is preserved, but full causal identification still requires independent world-state and replay controls.':
     'FALSIFIED: crossed positions violate the native 1000u AI spawn-exclusion policy. Exploratory effect estimates cannot be interpreted as native-play causal geography.'
   },
   postInsertionParity:{withinBaseWorldPairs:data.results.length*2,
