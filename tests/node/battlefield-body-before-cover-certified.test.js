@@ -25,6 +25,7 @@ function boot(optimized){
  class Game{
   constructor(){
    this.time=1;this.bullets=[];this.tanks=[];this.shapes=[];this.drones=[];
+   this.__novaShapeSweepActive=true;this.__novaShapeSweepEpoch=1;
    this.__novaTerrain=[];this.tmp=[];this.cam={shake:0};this.sfx={};
    this.player={id:999,x:1000,y:1000,alive:true};
    this.hash={query:(_x,_y,_r,out)=>{out.length=0;out.push(...this.tanks,...this.shapes,...this.drones);}};
@@ -60,7 +61,7 @@ function boot(optimized){
 }
 function run(Game,{fps=30,speed=6000,wall=120,target=60,
  wallShape='rect',otherShape=false,otherBullet=false,moving=false,
- shield=false,otherTank=false,ttl=1,pen=0}={}){
+ shield=false,otherTank=false,ttl=1,pen=1,radius=3}={}){
  const g=new Game(),dt=1/fps;
  const t={kind:'tank',id:2,cls:'scout',x:target,y:0,hp:100,
   alive:true,__novaSweepMoveTime:1,__novaSweepPrevX:moving?target-4:target,
@@ -73,7 +74,7 @@ function run(Game,{fps=30,speed=6000,wall=120,target=60,
   ?{id:-1,shape:'rect',x:wall,y:0,w:10,h:80,solid:true,destructible:false}
   :{id:-1,shape:'circle',x:wall,y:0,r:5,solid:true,destructible:false}];
  g.bullets=[{kind:'bullet',id:10,ownerId:1,x:0,y:0,
-  vx:speed,vy:0,r:3,dmg:10,ttl,pen,hits:0,dead:false,shell:false,beam:false}];
+  vx:speed,vy:0,r:radius,dmg:10,ttl,pen,hits:0,dead:false,shell:false,beam:false}];
  if(otherBullet)g.bullets.push({kind:'bullet',id:11,ownerId:4,
   x:0,y:1,vx:speed,vy:0,r:3,dmg:10,ttl:1,pen:0,hits:0,dead:false});
  g.updateBullets(dt);
@@ -121,13 +122,23 @@ for(const optimized of [false,true]){
   const r=run(boot(optimized),{ttl:.002});
   assert.deepEqual(r.hits,[]);
  });
- test(label+': piercing rounds remain with existing collision owner',()=>{
+ test(label+': pen=2 shot hits one hull then stops at the later permanent wall',()=>{
   const r=run(boot(optimized),{pen:2});
+  assert.deepEqual(r.hits,[2]);assert.equal(r.hp,90);
+ });
+ test(label+': pen=3 and pen=4 retain the same first-contact order',()=>{
+  for(const pen of [3,4]){
+   const r=run(boot(optimized),{pen});
+   assert.deepEqual(r.hits,[2]);assert.equal(r.hp,90);
+  }
+ });
+ test(label+': pen=5 remains outside this bounded proof',()=>{
+  const r=run(boot(optimized),{pen:5});
   assert.deepEqual(r.hits,[]);
  });
  test(label+': realistic 30Hz Marksman speed can reach a hull before cover',()=>{
   const speed=1050*(1+.085*8);
-  const r=run(boot(optimized),{speed,wall:55,target:29});
+  const r=run(boot(optimized),{speed,wall:55,target:29,pen:2,radius:5});
   assert.deepEqual(r.hits,[2]);
  });
 }
