@@ -1379,11 +1379,12 @@ for(const optimized of [false,true]){
    g.time+=1/30;g.updateBullets(1/30);
    assert.equal(c.hitCount,0);
   });
-  test(mode+' pen='+pen+' refuses an unproven four-body chain',()=>{
-   const {g,d}=highPenTTLWorld(Game,pen);
-   d.x=126; // fourth body is physically reachable, but >3 is unproven
+  test(mode+' pen='+pen+' recovers a fourth certified hull before expiry',()=>{
+   const {g,a,b,c,d}=highPenTTLWorld(Game,pen);
+   d.x=126; // contact x=102.5, before physical expiry at x=105
    g.time+=1/30;g.updateBullets(1/30);
-   assert.equal(d.hitCount,0);
+   assert.deepEqual([a.hitCount,b.hitCount,c.hitCount,d.hitCount],[1,1,1,1]);
+   assert.equal(g.hits,4);
   });
  }
 }
@@ -1672,4 +1673,39 @@ for(const optimized of [false,true]) {
     assert.equal(g.tanks[1].hitCount,0,
       'a remote unresolved splash must defer partial backdating');
   });
+}
+
+/* Run 436: a pen=4 shot can cross five separate healthy stationary hulls
+ * within its actual TTL. Verify all rates, both materialized wrapper stacks,
+ * exact physical order, and the unreachable sixth hull. */
+for(const optimized of [false,true]){
+ const mode=optimized?'optimized':'baseline',Game=boot(undefined,optimized);
+ for(const fps of [30,60,120,240]){
+  test(mode+' pen=4 credits five pre-expiry hulls at '+fps+'Hz',()=>{
+   const {g,a,b,c,d,shot}=highPenTTLWorld(Game,4,true);
+   d.x=126;
+   const fifth={kind:'tank',id:6,x:128,y:0,cls:'scout',hp:100,alive:true,hitCount:0};
+   const sixth={kind:'tank',id:7,x:155,y:0,cls:'scout',hp:100,alive:true,hitCount:0};
+   g.tanks.unshift(sixth,fifth);
+   const order=[];
+   g.damageTank=function(t){order.push(t.id);t.hitCount++;this.hits++;};
+   for(let frame=0;frame<30&&g.bullets.length;frame++){
+    g.time+=1/fps;g.updateBullets(1/fps);
+   }
+   assert.deepEqual([a.hitCount,b.hitCount,c.hitCount,d.hitCount,fifth.hitCount,sixth.hitCount],
+    [1,1,1,1,1,0],'only five reachable hulls');
+   assert.deepEqual(order,[a.id,b.id,c.id,d.id,fifth.id],
+    'damage must follow physical first-contact order');
+   assert.equal(g.hits,5);
+   assert.equal(shot.pen,-1);
+  });
+ }
+ test(mode+' pen=4 fifth-hull shield vetoes speculative chain',()=>{
+  const {g,c,d}=highPenTTLWorld(Game,4);
+  d.x=126;
+  g.tanks.push({kind:'tank',id:6,x:128,y:0,cls:'scout',
+   hp:100,alive:true,hitCount:0,spawnShieldT:2});
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.equal(c.hitCount,0,'shielded fifth hull vetoes the entire proof');
+ });
 }
