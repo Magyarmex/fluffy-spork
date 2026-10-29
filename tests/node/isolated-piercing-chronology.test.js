@@ -8,7 +8,7 @@ const vm = require('node:vm');
 const root = path.resolve(__dirname, '../..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 
-function shippingCoreBullets() {
+function shippingCoreBullets(scoutSize = 15) {
   const marker = '    updateBullets(dt) {';
   const start = html.indexOf(marker);
   assert.ok(start >= 0, 'materialized core bullet updater missing');
@@ -22,10 +22,10 @@ function shippingCoreBullets() {
   return new Function('types_1', 'classes_1', 'M',
     'return function(dt){' + html.slice(start + marker.length, end - 1) + '}')(
     { dist2: (ax, ay, bx, by) => (ax - bx) ** 2 + (ay - by) ** 2 },
-    { CLASSES: { scout: { size: 15 } } }, 2250);
+    { CLASSES: { scout: { size: scoutSize } } }, 2250);
 }
 
-function boot(updateImpl, optimized = false, fullPerformance = false) {
+function boot(updateImpl, optimized = false, fullPerformance = false, canonicalScout = false) {
   class Game {
     constructor() {
       this.time = 1;
@@ -52,7 +52,7 @@ function boot(updateImpl, optimized = false, fullPerformance = false) {
   Game.prototype.damageTank = function() { this.hits++; };
   Game.prototype.damageShape = function() { this.hits++; };
   Game.prototype.damageDrone = function() { this.hits++; };
-  Game.prototype.updateBullets = shippingCoreBullets();
+  Game.prototype.updateBullets = shippingCoreBullets(canonicalScout ? 14 : 15);
   class Sfx { resume() {} }
   const modules = {
     'game/engine': m => { m.exports = { Game }; },
@@ -70,7 +70,7 @@ function boot(updateImpl, optimized = false, fullPerformance = false) {
     'nova-updates', file), 'utf8'), context, { filename: file });
   const module = { exports: {} };
   modules['game/engine'](module, module.exports, spec => spec === './classes'
-    ? { CLASSES: { scout: { size: 15 } } }
+    ? { CLASSES: { scout: { size: canonicalScout ? 14 : 15 } } }
     : { ARENA_HALF: 2250 });
   return module.exports.Game;
 }
@@ -1791,3 +1791,37 @@ test('shipping Battlefield + Performance 1.7.5 + Zero Churn 1.7.8 credits five p
  assert.deepEqual(order,[2,3,4,5,6]);
  assert.equal(g.hits,5);
 });
+
+/* Canonical Scout size is 14, not the older synthetic 15u harness radius.
+ * The new 4/5-hull TTL proof must work with the exact production size.
+ * In particular x=128 is AFTER the 105u expiry endpoint for a 15,000u/s
+ * shot with 7ms TTL; x=127 is the last provably reachable fifth center. */
+for(const optimized of [false,true]){
+ const Game=boot(undefined,optimized,optimized,true);
+ for(const pen of [3,4])for(const fps of [30,60,120,240]){
+  test((optimized?'full-performance':'battlefield')+
+   ' canonical size=14 pen='+pen+' credits exact TTL hulls at '+fps+'Hz',()=>{
+   const scoutStart=html.indexOf('scout: {');
+   assert.ok(scoutStart>=0,'canonical Scout definition missing');
+   assert.ok(html.slice(scoutStart,scoutStart+650).includes('size: 14'),
+    'canonical Scout collision radius must be 14');
+   const g=new Game(),positions=pen===3?[88,103,120,126]:[88,103,120,126,127];
+   g.tanks=positions.map((x,i)=>({kind:'tank',id:i+2,x,y:0,
+    cls:'scout',hp:150,alive:true,hitCount:0}));
+   const beyond={kind:'tank',id:99,x:155,y:0,cls:'scout',
+    hp:150,alive:true,hitCount:0};
+   g.tanks.unshift(beyond);
+   const order=[];
+   g.damageTank=function(t){t.hitCount++;this.hits++;order.push(t.id);};
+   g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+    vx:15000,vy:0,r:5.5,dmg:21,ttl:.007,pen,hits:0,
+    dead:false,shell:false,beam:false,splash:false}];
+   for(let frame=0;frame<30&&g.bullets.length;frame++){
+    g.time+=1/fps;g.updateBullets(1/fps);
+   }
+   assert.deepEqual(order,positions.map((_,i)=>i+2));
+   assert.equal(beyond.hitCount,0);
+   assert.equal(g.hits,pen+1);
+  });
+ }
+}
