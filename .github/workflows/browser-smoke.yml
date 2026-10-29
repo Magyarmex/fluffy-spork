@@ -18,6 +18,7 @@ on:
       - 'nova-updates/**'
       - 'index.html'
       - 'tests/browser/**'
+      - 'tests/node/redeploy-paired-real-pilot.test.js'
       - '.github/workflows/browser-smoke.yml'
       - 'scripts/patch-star-minimap.cjs'
       - 'scripts/patch-saved-records.cjs'
