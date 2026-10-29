@@ -12,15 +12,17 @@ function arm(seed,hz,playerFlag){
   const g=bootGame();if(!g.player)g.redeploy();
   const owner=g.tanks.find(t=>t&&!t.isPlayer&&t.alive&&t.ai);
   const npc=g.tanks.find(t=>t&&!t.isPlayer&&t.id!==owner.id&&t.alive);
-  const player=g.player;
+  const player=g.tanks.find(t=>t&&!t.isPlayer&&t.id!==owner.id&&t.id!==npc.id&&t.alive);
+  const actualPlayer=g.player;
   assert.ok(owner&&npc&&player,'real engine actors unavailable');
   for(const t of g.tanks)if(t!==owner&&t!==npc&&t!==player)t.alive=false;
+  actualPlayer.alive=false;
   owner.cls='carrier';owner.x=0;owner.y=0;owner.angle=0;
   owner.hp=100;owner.maxHp=100;owner.ai.targetId=-1;
   owner.ai.state='wander';owner.ai.isElite=false;
   delete owner.__novaLiveVectorAI;
-  npc.x=100;npc.y=0;npc.alive=true;npc.spawnShieldT=0;npc.isPlayer=false;
-  player.x=105;player.y=0;player.alive=true;player.spawnShieldT=0;
+  npc.cls='scout';npc.x=100;npc.y=0;npc.alive=true;npc.spawnShieldT=0;npc.isPlayer=false;
+  player.cls='scout';player.x=105;player.y=0;player.alive=true;player.spawnShieldT=0;
   player.isPlayer=playerFlag;
   g.drones=[];g.time=1;
   // Both targets are deliberately visible in an otherwise empty open lane.
