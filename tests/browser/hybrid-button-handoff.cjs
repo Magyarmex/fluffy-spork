@@ -21,7 +21,7 @@ const { chromium } = require('playwright');
     await page.getByRole('button', { name: /DEPLOY/i }).first()
       .waitFor({ state: 'visible', timeout: 45000 });
     await page.waitForFunction(() =>
-      window.__NOVA_COMMAND_WEAVE_BUTTON_TEST__ &&
+      window.__NOVA_LIVE_VECTOR_BUTTON_TEST__ &&
       window.__NOVA_MULTITOUCH_ULTIMATE_TEST__, null, { timeout: 15000 });
     await page.evaluate(() => {
       window.__novaHybridClickLog = { ordinary: [], ultimate: [] };
