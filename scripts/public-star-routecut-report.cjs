@@ -70,8 +70,8 @@ module.exports={collate};
 if(require.main===module){
  const dir=process.argv[2]||'artifacts/star-public-routecut';
  const report=collate(dir);
- fs.mkdirSync('artifacts/star-public-report',{recursive:true});
- fs.writeFileSync('artifacts/star-public-report/summary.json',
+ fs.mkdirSync('artifacts/star-routecut-report',{recursive:true});
+ fs.writeFileSync('artifacts/star-routecut-report/summary.json',
   JSON.stringify(report,null,2)+'\n');
- console.log('NOVA_PUBLIC_STAR_REPORT '+JSON.stringify(report));
+ console.log('NOVA_PUBLIC_STAR_ROUTECUT_REPORT '+JSON.stringify(report));
 }
