@@ -111,9 +111,24 @@ function current(tags){
  if(!tags||!tags.length)return all;
  return all.filter(function(t){for(var i=0;i<tags.length;i++)if(t.tags.indexOf(tags[i])>=0)return true;return false;});
 }
-function shuffled(pool,lastId){
- var a=pool.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),x=a[i];a[i]=a[j];a[j]=x;}
- if(a.length>1&&a[0].id===lastId){var swap=1+Math.floor(Math.random()*(a.length-1)),y=a[0];a[0]=a[swap];a[swap]=y;}
+/* Presentation-only, per-bag shuffle stream. Never advance combat Math.random.
+ * Keep bag streams independent so context-card rotation cannot reshuffle main. */
+var fieldcraftStates=Object.create(null),fieldcraftEntropy=(Date.now()>>>0)^0x9e3779b9;
+function fieldcraftRandom(key){
+ key=String(key);
+ var state=fieldcraftStates[key];
+ if(state===undefined){
+  state=fieldcraftEntropy;
+  for(var c=0;c<key.length;c++)state=Math.imul(state^key.charCodeAt(c),16777619)>>>0;
+  if(!state)state=0x6d2b79f5;
+ }
+ state^=state<<13;state^=state>>>17;state^=state<<5;
+ fieldcraftStates[key]=state>>>0;
+ return (state>>>0)/4294967296;
+}
+function shuffled(pool,lastId,key){
+ var a=pool.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(fieldcraftRandom(key)*(i+1)),x=a[i];a[i]=a[j];a[j]=x;}
+ if(a.length>1&&a[0].id===lastId){var swap=1+Math.floor(fieldcraftRandom(key)*(a.length-1)),y=a[0];a[0]=a[swap];a[swap]=y;}
  return a.map(function(t){return t.id;});
 }
 function byId(id){for(var i=0;i<tips.length;i++)if(tips[i].id===id&&tips[i].active!==false)return tips[i];return null;}
@@ -121,7 +136,7 @@ function next(key,tags){
  var pool=current(tags);if(!pool.length)pool=current();if(!pool.length)return null;
  var allowed={};for(var i=0;i<pool.length;i++)allowed[pool[i].id]=true;
  var bag=bags[key]||[];bag=bag.filter(function(id){return !!allowed[id]&&!!byId(id);});
- if(!bag.length)bag=shuffled(pool,lastByBag[key]);
+ if(!bag.length)bag=shuffled(pool,lastByBag[key],key);
  var id=bag.shift(),picked=byId(id);bags[key]=bag;if(picked)lastByBag[key]=picked.id;return picked;
 }
 function audit(){
