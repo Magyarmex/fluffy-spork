@@ -298,3 +298,15 @@ for(const optimized of [false,true]){
   });
  }
 }
+
+/* Near-tangent projectile uncertainty is not a proof of separation: a
+ * floating-point rounding difference must not authorize backdated damage. */
+for(const optimized of [false,true])for(const fps of [30,60,120]){
+ test((optimized?'optimized':'baseline')+
+  ': near-tangent projectile remains a conservative rail veto at '+fps+'Hz',()=>{
+  const r=runRailTTL(boot(optimized),{fps,otherBullets:[{kind:'bullet',
+   id:75,ownerId:3,x:0,y:-520+8.84+3+2,vx:0,vy:0,r:3,
+   dmg:4,pen:0,ttl:1,hits:0,dead:false,shell:false,beam:false}]});
+  assert.equal(r.hp,100,'a tangent is not certified remote');
+ });
+}
