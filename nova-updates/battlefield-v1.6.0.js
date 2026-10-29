@@ -683,6 +683,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    * is the sole exception; it leaves the final penetration to the core.
    * A TTL-expiring round may settle a partial remaining budget because it
    * dies at expiry. The one-body TTL resolver retains first-hit ownership. */
+  /* TTL-expiring pen=3/4 shots may now certify up to five separate
+   * nonlethal stationary hulls, but ONLY with the existing complete
+   * corridor/competition/cover/defense proof. Do not extend the live-frame
+   * shortcut or infer moving targets. All contacts precede physical TTL. */
   /* A pen=2 shot may certify exactly two nonlethal hull contacts now and
    * retain its last penetration for a later frame. The core's query wrapper
    * excludes certified victims; the shot MUST be restored to its pre-frame
@@ -696,7 +700,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       return o&&o!==b&&!o.dead&&(o.splash||o.shell);
      })))return false;
   if(nonExpiring ? (!partialNonExpiring&&contacts.length!==b.pen+1) :
-     contacts.length<(allowSingle?1:(b.hits>0?1:2))||contacts.length>b.pen+1||contacts.length>3)
+     contacts.length<(allowSingle?1:(b.hits>0?1:2))||contacts.length>b.pen+1||
+     contacts.length>5||(contacts.length>3&&(b.pen<3||b.pen>4)))
    return false;
   contacts.sort(function(a,c){return a.t-c.t;});
   for(var oi=1;oi<contacts.length;oi++)
