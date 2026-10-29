@@ -158,3 +158,30 @@ for(const optimized of [false,true]){
   assert.deepEqual(r.hits,[2]);
  });
 }
+
+
+/* Independent first-surface geometry oracle. This intentionally includes
+ * very high speeds at 120/240Hz to stress ordering, not to estimate normal
+ * player encounter frequency. The actual materialized core and both shipping
+ * overlay compositions execute for every seeded world. */
+test('2,000 seeded wall-crossing worlds obey first physical hull/cover order',()=>{
+ let seed=0x147437;
+ const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ const variants=[boot(false),boot(true)];
+ let before=0,behind=0;
+ for(const fps of [30,60,120,240])for(let i=0;i<500;i++){
+  const wall=65+rand()*150,front=rand()<.75,
+   target=front?25+rand()*(wall-55):wall+35+rand()*60,
+   speed=(wall+10+rand()*80)*fps,pen=1+Math.floor(rand()*4);
+  for(const Game of variants){
+   const r=run(Game,{fps,wall,target,speed,pen});
+   assert.deepEqual(r.hits,front?[2]:[],
+    'wrong first-contact result at '+fps+'Hz world '+i);
+   assert.equal(r.hp,front?90:100);
+   assert.equal(r.g.bullets.length,0,
+    'wall must consume shot at '+fps+'Hz world '+i);
+  }
+  if(front)before++;else behind++;
+ }
+ assert.ok(before>1000&&behind>300,'both chronological orders exercised');
+});
