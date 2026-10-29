@@ -2026,6 +2026,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    * permanent surface without changing terrain during the read-only proof.
    * Other cover chains and uncertain event order still abstain. */
   if(later&&later.solid&&later.solid.destructible&&
+     later.hit&&Number.isFinite(later.hit.t)&&
+     later.hit.t>first.hit.t+1e-6&&later.hit.t<=1&&
      Number.isFinite(later.solid.hp)&&later.solid.hp>0&&
      later.solid.hp<=b.dmg*(b.beam?.92:1)&&b.pen>=2){
    var second=later,candidates=terrainCandidates(g,ax,ay,ex,ey,b.r*.45),
