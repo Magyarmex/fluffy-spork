@@ -50,7 +50,11 @@ function reportPlayedFirstLife(report, expectedSeeds = 36) {
       if (!Number.isFinite(blocked) || blocked < 0 ||
           blocked > report.seconds + 1e-6)
         throw Error('Invalid terrain-blocked near-front exposure: ' + key + '/' + name);
-      if (arm.frontReached !== null && !Number.isFinite(arm.frontReached))
+      // A reported arrival cannot predate redeploy or occur beyond the
+      // measured window (allow one final integration tick and rounding).
+      if (arm.frontReached !== null &&
+          (!Number.isFinite(arm.frontReached) || arm.frontReached < 0 ||
+           arm.frontReached > report.seconds + 1 / row.hz + 0.001))
         throw Error('Invalid terrain-clear arrival time: ' + key + '/' + name);
     }
     layouts.add(row.layout + '/' + row.rotation);

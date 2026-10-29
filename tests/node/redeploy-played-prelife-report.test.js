@@ -164,6 +164,10 @@ test('v2 rejects invalid blocked near-front exposure rather than inventing navig
   row.returning.blockedNearFrontSeconds=1.5;
   row.returning.frontReached=NaN;
   assert.throws(()=>reportPlayedFirstLife(s,2),/Invalid terrain-clear arrival/);
+  row.returning.frontReached=-0.01;
+  assert.throws(()=>reportPlayedFirstLife(s,2),/Invalid terrain-clear arrival/);
+  row.returning.frontReached=13;
+  assert.throws(()=>reportPlayedFirstLife(s,2),/Invalid terrain-clear arrival/);
   row.returning.frontReached=4;
   s.seconds=undefined;
   assert.throws(()=>reportPlayedFirstLife(s,2),/finite post-redeploy/);
