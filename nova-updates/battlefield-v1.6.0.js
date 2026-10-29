@@ -1886,6 +1886,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    var sx=t.__novaSweepPrevX,sy=t.__novaSweepPrevY;
    var moved=Number.isFinite(sx)&&Number.isFinite(sy)&&
        Math.hypot(t.x-sx,t.y-sy)>1e-8;
+   /* Newly spawned bullets did not exist while the tank moved earlier in
+    * this tick. Never backdate their contacts through that movement. */
+   if(moved&&(!Number.isSafeInteger(b.id)||
+      g.__novaFrameStartBulletEpoch!==g.__novaShapeSweepEpoch||
+      !(b.id<g.__novaFrameStartBulletIdCeiling)))return false;
    var linear=moved&&t.cls==='scout'&&
        t.__novaLinearMoveEpoch===g.time&&
        t.__novaLinearMoveValid===true&&
@@ -2234,6 +2239,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
  var priorTrace=this.__novaDroneChronoTraceEnabled;
  this.__novaDroneChronoAutoTrace=false;
  var epoch=(this.__novaShapeSweepEpoch||0)+1;this.__novaShapeSweepEpoch=epoch;
+ /* A monotonic ID ceiling is an O(1) birth-time witness: bullets created
+  * later in this tick must not be treated as if they existed before movement. */
+ this.__novaFrameStartBulletEpoch=epoch;
+ this.__novaFrameStartBulletIdCeiling=Number.isSafeInteger(this.nextId)?this.nextId:0;
  /* Capture drones before AI/drone movement; the later projectile pre-pass
   * may only exclude drones whose complete observed corridor is remote. */
  var chronoDrones=this.drones||[];for(var di=0;di<chronoDrones.length;di++){
