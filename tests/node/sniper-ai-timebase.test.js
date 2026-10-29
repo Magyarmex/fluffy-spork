@@ -195,9 +195,9 @@ test('production Predator composition suppresses unused Sniper random rolls with
   }
 });
 
-test('if Predator does not own movement, the Sniper strafe fallback remains time-based', () => {
-  // A temporary missing tactical movement plan must not freeze the legacy
-  // strafe grammar, even when the Predator module is registered.
+test('standalone Forward Observer fallback remains time-based without Predator', () => {
+  // The isolated legacy owner still gets its original combat grammar, with
+  // time-based hazards rather than the original per-render-frame rolls.
   const { frame } = boot();
   const dt = 1 / 30, threshold = 1 - Math.pow(1 - .0025, dt * 60);
   assert.equal(frame(dt, threshold - 1e-8, 1).strafe, -1);
