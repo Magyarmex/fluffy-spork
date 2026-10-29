@@ -25,7 +25,7 @@ function shippingCoreBullets() {
     { CLASSES: { scout: { size: 15 } } }, 2250);
 }
 
-function boot(updateImpl, optimized = false) {
+function boot(updateImpl, optimized = false, fullPerformance = false) {
   class Game {
     constructor() {
       this.time = 1;
@@ -65,6 +65,7 @@ function boot(updateImpl, optimized = false) {
     Math, Map, Set, Date, performance: { now: () => 0 } };
   const layers = ['battlefield-v1.6.0.js'];
   if (optimized) layers.push('performance-v1.7.5.js');
+  if (fullPerformance) layers.push('performance-v1.7.8.js');
   for (const file of layers) vm.runInNewContext(fs.readFileSync(path.join(root,
     'nova-updates', file), 'utf8'), context, { filename: file });
   const module = { exports: {} };
@@ -1310,13 +1311,13 @@ for(const optimized of [false,true]){
 }
 
 
-/* Run 423: TTL-expiring high-penetration shots have the same certified
- * three-body chronology as pen=2. The 15,000u/s stress geometry deliberately
- * keeps the first target outside the initial 240Hz core endpoint (62.5u),
- * so every FPS tests the SAME fully certified expiry corridor rather than
- * the separate unresolved cross-frame victim-identity problem.
- * This is NOT permission to backdate live pen>=3 shots, four-body chains,
- * cover breaches or uncertain motion. */
+/* Run 423 established three-body TTL-expiry chronology for pen=3/4.
+ * Run 436 extends that same conservative proof to four/five stationary
+ * nonlethal hulls. The 15,000u/s stress geometry keeps the first target
+ * outside the initial 240Hz core endpoint (62.5u), testing the same expiry
+ * corridor rather than unresolved cross-frame victim-identity chronology.
+ * This is NOT permission to backdate live pen>=3 shots, cover breaches,
+ * contested contacts or uncertain motion. */
 function highPenTTLWorld(Game, pen=3, reverse=false) {
   const {g,a,b}=makeWorld(Game,103,reverse);
   a.x=88;
@@ -1379,11 +1380,12 @@ for(const optimized of [false,true]){
    g.time+=1/30;g.updateBullets(1/30);
    assert.equal(c.hitCount,0);
   });
-  test(mode+' pen='+pen+' refuses an unproven four-body chain',()=>{
-   const {g,d}=highPenTTLWorld(Game,pen);
-   d.x=126; // fourth body is physically reachable, but >3 is unproven
+  test(mode+' pen='+pen+' recovers a fourth certified hull before expiry',()=>{
+   const {g,a,b,c,d}=highPenTTLWorld(Game,pen);
+   d.x=126; // contact x=102.5, before physical expiry at x=105
    g.time+=1/30;g.updateBullets(1/30);
-   assert.equal(d.hitCount,0);
+   assert.deepEqual([a.hitCount,b.hitCount,c.hitCount,d.hitCount],[1,1,1,1]);
+   assert.equal(g.hits,4);
   });
  }
 }
@@ -1673,3 +1675,119 @@ for(const optimized of [false,true]) {
       'a remote unresolved splash must defer partial backdating');
   });
 }
+
+/* Run 436: a pen=4 shot can cross five separate healthy stationary hulls
+ * within its actual TTL. Verify all rates, both materialized wrapper stacks,
+ * exact physical order, and the unreachable sixth hull. */
+for(const optimized of [false,true]){
+ const mode=optimized?'optimized':'baseline',Game=boot(undefined,optimized);
+ for(const fps of [30,60,120,240]){
+  test(mode+' pen=4 credits five pre-expiry hulls at '+fps+'Hz',()=>{
+   const {g,a,b,c,d,shot}=highPenTTLWorld(Game,4,true);
+   d.x=126;
+   const fifth={kind:'tank',id:6,x:128,y:0,cls:'scout',hp:100,alive:true,hitCount:0};
+   const sixth={kind:'tank',id:7,x:155,y:0,cls:'scout',hp:100,alive:true,hitCount:0};
+   g.tanks.unshift(sixth,fifth);
+   const order=[];
+   g.damageTank=function(t){order.push(t.id);t.hitCount++;this.hits++;};
+   for(let frame=0;frame<30&&g.bullets.length;frame++){
+    g.time+=1/fps;g.updateBullets(1/fps);
+   }
+   assert.deepEqual([a.hitCount,b.hitCount,c.hitCount,d.hitCount,fifth.hitCount,sixth.hitCount],
+    [1,1,1,1,1,0],'only five reachable hulls');
+   assert.deepEqual(order,[a.id,b.id,c.id,d.id,fifth.id],
+    'damage must follow physical first-contact order');
+   assert.equal(g.hits,5);
+   assert.equal(shot.pen,-1);
+  });
+ }
+ test(mode+' pen=4 fifth-hull shield vetoes speculative chain',()=>{
+  const {g,c,d}=highPenTTLWorld(Game,4);
+  d.x=126;
+  g.tanks.push({kind:'tank',id:6,x:128,y:0,cls:'scout',
+   hp:100,alive:true,hitCount:0,spawnShieldT:2});
+  g.time+=1/30;g.updateBullets(1/30);
+  assert.equal(c.hitCount,0,'shielded fifth hull vetoes the entire proof');
+ });
+}
+
+/* Seeded shipping-stack adversary: prove four/five distinct pre-expiry
+ * hulls across randomized spacings, order and frame rates, without
+ * awarding a sixth hull whose first contact is beyond physical TTL. */
+for(const optimized of [false,true]){
+ test((optimized?'optimized':'baseline')+
+  ' 800 seeded pen=3/4 four/five-hull TTL corridors preserve exact victims',()=>{
+  const Game=boot(undefined,optimized);
+  let seed=4362026;
+  const rnd=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+  for(const pen of [3,4])for(const fps of [30,60,120,240])
+   for(let trial=0;trial<100;trial++){
+    const g=new Game(),count=pen+1,positions=[27+rnd()*3];
+    for(let k=1;k<count;k++)positions.push(positions[k-1]+12+rnd()*4);
+    g.tanks=positions.map((x,i)=>({kind:'tank',id:i+2,x,y:0,
+     cls:'scout',hp:100,alive:true,hitCount:0}));
+    const remote={kind:'tank',id:99,x:130,y:0,cls:'scout',
+     hp:100,alive:true,hitCount:0};
+    g.tanks.push(remote);
+    const order=[];
+    g.damageTank=function(t){t.hitCount++;this.hits++;order.push(t.id);};
+    g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,vx:25000,vy:0,
+     r:5.5,dmg:20,ttl:.0035,pen,hits:0,dead:false,shell:false,
+     beam:false,splash:false}];
+    if(trial%2===0)g.tanks.reverse();
+    g.time+=1/fps;g.updateBullets(1/fps);
+    assert.deepEqual(order,Array.from({length:count},(_,i)=>i+2),
+     'chronological victims pen='+pen+' fps='+fps+' trial='+trial);
+    assert.equal(remote.hitCount,0,'no phantom sixth hull');
+    assert.equal(g.hits,count,'exactly one hit per certified hull');
+   }
+ });
+}
+
+/* Canonical Apex projectile envelopes, not 15,000u/s synthetic stress:
+ * at 30Hz a 33ms TTL tail can reach tightly grouped distinct hulls.
+ * This certifies the new fourth/fifth contact at real Specter/Assassin
+ * speed, radius, damage and penetration without changing those values. */
+for(const optimized of [false,true]){
+ const Game=boot(undefined,optimized);
+ for(const variant of [
+  {name:'specter',pen:3,speed:1220,r:5.2,dmg:31},
+  {name:'assassin',pen:4,speed:1500,r:5.8,dmg:47}
+ ]){
+  test((optimized?'optimized':'baseline')+' '+variant.name+
+   ' real-speed 30Hz TTL tail credits all certified hulls',()=>{
+   assert.match(html,new RegExp(variant.name+':[\\s\\S]{0,500}bullet: \\{ dmg: '+
+    variant.dmg+', speed: '+variant.speed+', r: '+variant.r+
+    ', pen: '+variant.pen));
+   const g=new Game(),count=variant.pen+1;
+   g.tanks=Array.from({length:count},(_,i)=>({kind:'tank',
+    id:i+2,x:25+i*11,y:0,cls:'scout',hp:150,alive:true,hitCount:0}));
+   g.tanks.reverse();
+   const order=[];
+   g.damageTank=function(t){t.hitCount++;this.hits++;order.push(t.id);};
+   g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+    vx:variant.speed,vy:0,r:variant.r,dmg:variant.dmg,
+    ttl:.033,pen:variant.pen,hits:0,dead:false,
+    shell:false,beam:false,splash:false}];
+   g.time+=1/30;g.updateBullets(1/30);
+   assert.deepEqual(order,Array.from({length:count},(_,i)=>i+2));
+   assert.equal(g.hits,count);
+  });
+ }
+}
+
+/* Production also loads Zero Churn after Performance. Exercise the complete
+ * current performance wrapper chain on the materialized core, rather than
+ * assuming the earlier 1.7.5-only harness is the final gameplay owner. */
+test('shipping Battlefield + Performance 1.7.5 + Zero Churn 1.7.8 credits five pre-expiry hulls',()=>{
+ const Game=boot(undefined,true,true),g=new Game(),order=[];
+ g.tanks=[25,36,47,58,69].map((x,i)=>({kind:'tank',id:i+2,x,y:0,
+  cls:'scout',hp:150,alive:true,hitCount:0}));
+ g.damageTank=function(t){t.hitCount++;this.hits++;order.push(t.id);};
+ g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,vx:1500,vy:0,
+  r:5.8,dmg:47,ttl:.033,pen:4,hits:0,dead:false,
+  shell:false,beam:false,splash:false}];
+ g.time+=1/30;g.updateBullets(1/30);
+ assert.deepEqual(order,[2,3,4,5,6]);
+ assert.equal(g.hits,5);
+});
