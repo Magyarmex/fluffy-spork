@@ -1220,7 +1220,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      !Number.isFinite(b.r)||!(b.r>0)||
      !Number.isFinite(b.dmg)||!(b.dmg>0))return false;
   var bullets=g.bullets||[];
-  if(bullets.length>1200||bullets.indexOf(b)<0||
+  if(bullets.length>256||bullets.indexOf(b)<0||
      g.__novaWallProofHadShell===true)return false;
   var ax=b.x,ay=b.y,ex=ax+b.vx*b.ttl,ey=ay+b.vy*b.ttl;
   if(!Number.isFinite(ex)||!Number.isFinite(ey)||
