@@ -22,8 +22,8 @@ function changed(before, after) {
 }
 function playPublicPrelude(game, hz, seconds, fair) {
   if (!Number.isFinite(hz) || hz < 1 || hz > 240 ||
-      !Number.isFinite(seconds) || seconds <= 0 || seconds > 30)
-    throw Error('Prelude requires a finite 1..240 Hz and 0..30s');
+      !Number.isFinite(seconds) || seconds <= 0 || seconds > 60)
+    throw Error('Prelude requires a finite 1..240 Hz and 0..60s');
   const player = game.player;
   if (!player || !player.alive || !finite(player) || game.status !== 'playing' ||
       !game.input || !fair || typeof fair.viewportHalfExtents !== 'function')
