@@ -35,6 +35,30 @@ async function run(browser,width,height){
   });
   const returnButton=page.locator('[data-nova-insertion="return"]');
   await returnButton.waitFor({state:'visible',timeout:15000});
+  // Freeze the *real* CSS entrance at its first frame. The former popIn
+  // scale(.85) shrank a 32.4px control to 27.5px, even though the same
+  // button passed after the 280ms animation finished. A settled-only
+  // screenshot cannot catch this touch-target regression.
+  const entry=await returnButton.evaluate(b=>{
+   if(!(innerHeight<=400&&innerWidth>innerHeight))return null;
+   const panel=b.closest('.panel.anim-pop');
+   if(!panel)throw Error('missing React-owned death modal');
+   const animation=panel.getAnimations().find(a=>a.animationName);
+   if(!animation)throw Error('death modal entrance animation unavailable');
+   animation.pause();
+   animation.currentTime=0;
+   const result={height:b.getBoundingClientRect().height,
+    transform:getComputedStyle(panel).transform,
+    animationName:getComputedStyle(panel).animationName};
+   animation.finish();
+   return result;
+  });
+  if(entry){
+   assert.ok(entry.height>=30,'RETURN must remain >=30px at entrance frame zero: '+JSON.stringify(entry));
+   assert.equal(entry.transform,'none','compact death entrance must not shrink physical touch targets');
+   assert.equal(entry.animationName,'nova-death-compact-fade',
+    'only the compact death card uses the non-scaling entrance');
+  }
   // React owns the modal, not this injected action row. Exercise a real DOM
   // reconciliation loss while the game remains dead: no hidden-button softlock.
   await page.evaluate(()=>{
@@ -203,7 +227,7 @@ async function runFresh(browser){
 }
 
 async function main(){const browser=await chromium.launch({headless:true,args:['--no-sandbox']});try{
- for(const [width,height] of [[280,568],[320,568],[640,320],[900,700]])await run(browser,width,height);
+ for(const [width,height] of [[280,568],[320,568],[568,320],[640,320],[900,700]])await run(browser,width,height);
  await runFresh(browser);
 }finally{await browser.close();}}
 main().catch(e=>{console.error(e.stack||e);process.exitCode=1;});
