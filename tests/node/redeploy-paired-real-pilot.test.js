@@ -83,11 +83,11 @@ function bootGame() {
  * enemy coordinates nor private ecological state steer the pilot. The
  * analysis may inspect those values only after each simulated step. */
 function withSeed(seed,fn){
- let state=seed>>>0||1;
+ let state=seed>>>0||1,draws=0;
  const priorRandom=Math.random,priorDate=Date.now;
- Math.random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return(state>>>0)/4294967296;};
+ Math.random=()=>{draws++;state^=state<<13;state^=state>>>17;state^=state<<5;return(state>>>0)/4294967296;};
  Date.now=()=>0;
- try{return fn();}finally{Math.random=priorRandom;Date.now=priorDate;}
+ try{return fn(()=>draws);}finally{Math.random=priorRandom;Date.now=priorDate;}
 }
 function finitePosition(p){return p&&Number.isFinite(p.x)&&Number.isFinite(p.y);}
 function run(seed,choice,hz,seconds,policy='navigate',preludeSeconds=0){
@@ -350,3 +350,44 @@ test('FRESH/RETURN real-engine matched pilot is deterministic under counterbalan
    return:+avg('score','returning').toFixed(2)}
  }));
 });
+
+/* Opt-in research job only: no extra production behavior, no extra ordinary
+ * CI test, and no hidden state used to control the simulated player. */
+if(process.env.NOVA_REDEPLOY_TRACE_PILOT==='1') {
+ test('locate earliest 30/60Hz first-life divergence in five predeclared worlds',()=>{
+  const seeds=[1517840,1517831,1517839,1517844,1517827];
+  const report=[];
+  for(const seed of seeds)for(const hz of [30,60]){
+   const row=withSeed(seed,readRngDraws=>{
+    const g=bootGame();
+    if(!g.player)g.redeploy();
+    assert.ok(g.player&&g.player.alive,'materialized game must start with live player');
+    const initial={x:g.player.x,y:g.player.y,layout:g.__novaBattlefield.name};
+    const prelude=playPublicPrelude(g,hz,60,g.__testFair,5*hz,readRngDraws);
+    assert.ok(prelude.trace&&prelude.trace.length>=2,'observational checkpoints exist');
+    assert.equal(prelude.trace[0].elapsed,0);
+    assert.ok(prelude.trace.every((v,i)=>i===0||
+      (v.elapsed>prelude.trace[i-1].elapsed &&
+       v.rngDraws>=prelude.trace[i-1].rngDraws)));
+    return {seed,hz,initial,prelude};
+   });
+   report.push(row);
+  }
+  for(const seed of seeds){
+   const a=report.find(r=>r.seed===seed&&r.hz===30);
+   const b=report.find(r=>r.seed===seed&&r.hz===60);
+   assert.deepEqual(a.initial,b.initial,'FPS comparison must share exact initial world');
+  }
+  const dir=path.join(root,'artifacts','redeploy-fps-trace');
+  fs.mkdirSync(dir,{recursive:true});
+  fs.writeFileSync(path.join(dir,'fps-trace.json'),JSON.stringify({
+   contract:'read-only observed 5s checkpoints; no causal physics claim',
+   seeds,frameRates:[30,60],seconds:60,report
+  },null,2));
+  console.log('NOVA_REDEPLOY_FPS_TRACE '+JSON.stringify({
+   seeds:seeds.length,observations:report.length,
+   naturalDeaths:report.filter(r=>r.prelude.naturalDeath).length,
+   checkpoints:report.reduce((n,r)=>n+r.prelude.trace.length,0)
+  }));
+ });
+}
