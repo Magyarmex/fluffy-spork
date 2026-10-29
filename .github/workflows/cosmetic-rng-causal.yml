@@ -1,0 +1,39 @@
+name: NOVA Cosmetic RNG Causal A/B
+
+on:
+  push:
+    branches:
+      - 'nova/cosmetic-rng-causal-*'
+    paths:
+      - 'tests/research/cosmetic-rng-causal-pilot.cjs'
+      - '.github/workflows/cosmetic-rng-causal.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: nova-cosmetic-rng-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  causal-ab:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Run paired visual RNG interventions in materialized engine
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/cosmetic-rng-causality
+          node --test tests/research/cosmetic-rng-causal-pilot.cjs 2>&1 |
+            tee artifacts/cosmetic-rng-causality/run.log
+      - name: Preserve positive and negative causal results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-cosmetic-rng-causal-ab
+          path: artifacts/cosmetic-rng-causality/
+          if-no-files-found: warn
+          retention-days: 30
