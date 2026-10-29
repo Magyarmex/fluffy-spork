@@ -748,6 +748,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    }
   }
   if(firstSolidHit(g,ax,ay,ex,ey,b.r*.45))return false;
+  /* The core normally initializes projectile integrity before any hits.
+   * A surviving partial prefix must preserve the ORIGINAL pen=2 integrity
+   * rather than let core first initialize after we consume penetration. */
+  if(partialNonExpiring&&typeof g.initBulletIntegrity==='function')
+   g.initBulletIntegrity(b);
   /* Reuse the real damage owner, never fabricate HP or kill credit. */
   var ang=Math.atan2(b.vy,b.vx),kx=Math.cos(ang)*(b.knock||0)*.006,
       ky=Math.sin(ang)*(b.knock||0)*.006;
