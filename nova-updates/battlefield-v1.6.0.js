@@ -721,6 +721,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   }
   for(var bi=0;bi<others.length;bi++){
    var o=others[bi];if(!o||o===b||o.dead)continue;
+   /* An unrelated blast can change a hull before this partial prefix
+    * completes even when its projectile misses the narrow bullet corridor.
+    * Defer partial chains whenever another live splash/shell exists. */
+   if(partialNonExpiring&&(o.splash||o.shell))return false;
    if(!Number.isFinite(o.x)||!Number.isFinite(o.y)||
       !Number.isFinite(o.vx)||!Number.isFinite(o.vy)||
       !Number.isFinite(o.r)||!(o.r>0))return false;
