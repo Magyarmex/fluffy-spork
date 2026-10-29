@@ -101,13 +101,6 @@ function isLegacyUltimate(button){
   function clickCapture(e){
     if(dispatchDepth||!e||!guarded)return;
     var b=buttonFrom(e.target),until=b&&guarded.get(b);if(!until||Date.now()>until)return;
-    /* The guard belongs to a delayed touch compatibility click, not a new
-     * physical mouse or keyboard activation on a hybrid device. Keep the
-     * pending guard so the original touch click is still consumed if it arrives. */
-    var touchClick=e.pointerType==='touch'||
-       (e.sourceCapabilities&&e.sourceCapabilities.firesTouchEvents===true);
-    if(!touchClick&&(e.detail===0||e.pointerType==='mouse'||
-       (e.sourceCapabilities&&e.sourceCapabilities.firesTouchEvents===false)))return;
     guarded.delete(b);
     if(e.cancelable&&e.preventDefault)e.preventDefault();
     if(e.stopImmediatePropagation)e.stopImmediatePropagation();else if(e.stopPropagation)e.stopPropagation();
