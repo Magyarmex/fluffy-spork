@@ -4,8 +4,10 @@ on:
   push:
     branches:
       - 'nova/audio-rng-causal-*'
+      - 'nova/isolate-core-audio-rng-*'
     paths:
       - 'tests/research/audio-rng-causal-pilot.cjs'
+      - 'scripts/patch-audio-rng.cjs'
       - '.github/workflows/audio-rng-causal.yml'
   workflow_dispatch:
 
@@ -28,7 +30,9 @@ jobs:
           set -euo pipefail
           mkdir -p artifacts/audio-rng-causality
           node --test tests/research/audio-rng-causal-pilot.cjs 2>&1 |
-            tee artifacts/audio-rng-causality/run.log
+            tee artifacts/audio-rng-causality/baseline.log
+          NOVA_AUDIO_RNG_PATCHED=1 node --test tests/research/audio-rng-causal-pilot.cjs 2>&1 |
+            tee artifacts/audio-rng-causality/patched.log
       - name: Preserve causal results including negative findings
         if: always()
         uses: actions/upload-artifact@v4

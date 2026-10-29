@@ -11,7 +11,9 @@ const crypto = require('node:crypto');
 const {createPublicRoam} = require('../research/redeploy-public-roam.cjs');
 const {playPublicPrelude} = require('../research/redeploy-public-prelife.cjs');
 const root = path.resolve(__dirname, '../..');
-const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const sourceHtml = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const html = process.env.NOVA_AUDIO_RNG_PATCHED==='1' ?
+ require('../../scripts/patch-audio-rng.cjs').patchAudioRng(sourceHtml) : sourceHtml;
 const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)]
   .map(m => m[1]).find(s => s.includes('window.__defineModule("game/engine"'));
 const overlays = [...html.matchAll(/<script[^>]+src=["']\.\/(nova-updates\/[^"']+)["']/g)]
@@ -153,8 +155,9 @@ test('canonical audio noise-buffer RNG causal A/B in 12 seeds at 30/60Hz',()=>{
    erased=arm(seed,hz,'erased');
   assert.equal(off.initial,enabled.initial);
   assert.equal(off.initial,erased.initial);
-  assert.equal(enabled.interventionDraws,22050);
-  assert.equal(erased.interventionDraws,22050);
+  const expectedSharedDraws=process.env.NOVA_AUDIO_RNG_PATCHED==='1'?0:22050;
+  assert.equal(enabled.interventionDraws,expectedSharedDraws);
+  assert.equal(erased.interventionDraws,expectedSharedDraws);
   assert.equal(off.interventionDraws,0);
   const audioFirst=firstDifference(off,enabled);
   const erasedFirst=firstDifference(enabled,erased);
@@ -168,7 +171,8 @@ test('canonical audio noise-buffer RNG causal A/B in 12 seeds at 30/60Hz',()=>{
   results};
  const dir=path.join(root,'artifacts','audio-rng-causality');
  fs.mkdirSync(dir,{recursive:true});
- fs.writeFileSync(path.join(dir,'results.json'),JSON.stringify(summary,null,2));
+ fs.writeFileSync(path.join(dir,process.env.NOVA_AUDIO_RNG_PATCHED==='1' ?
+ 'patched-results.json' : 'baseline-results.json'),JSON.stringify(summary,null,2));
  console.log('NOVA_AUDIO_RNG_CAUSAL '+JSON.stringify({
   scenarios:summary.scenarios,
   audioGameplayDivergences:summary.audioGameplayDivergences,
@@ -179,4 +183,9 @@ test('canonical audio noise-buffer RNG causal A/B in 12 seeds at 30/60Hz',()=>{
  }));
  assert.equal(summary.erasedGameplayDivergences,0,
   'audio waveform contents unexpectedly influence physical state');
+ if(process.env.NOVA_AUDIO_RNG_PATCHED==='1')
+  assert.equal(summary.audioGameplayDivergences,0,
+   'audio noise RNG still perturbs gameplay after isolation');
+ else assert.ok(summary.audioGameplayDivergences>0,
+   'baseline audio RNG leak unexpectedly absent');
 });
