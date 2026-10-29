@@ -265,3 +265,36 @@ for(const optimized of [false,true]){
   });
  }
 }
+
+/* Adversarial controls: a remote shot with sufficient travel budget is NOT
+ * remote; neither are malformed trajectories or a second expiring rail.
+ * These scenarios must remain deferred rather than inventing hit order. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'optimized':'baseline';
+ for(const fps of [30,60,120]){
+  test(label+': distant-origin high-speed competitor vetoes rail TTL at '+fps+'Hz',()=>{
+   const r=runRailTTL(Game,{fps,otherBullets:[{kind:'bullet',id:72,
+    ownerId:2,x:1000,y:-520,vx:-50000,vy:0,r:3,dmg:4,
+    pen:0,ttl:.001,hits:0,dead:false,shell:false,beam:false}]});
+   assert.equal(r.hp,100,'speed-bound can reach the hull before the rail');
+  });
+  test(label+': invalid projectile motion cannot authorize rail TTL at '+fps+'Hz',()=>{
+   const r=runRailTTL(Game,{fps,otherBullets:[{kind:'bullet',id:73,
+    ownerId:3,x:1100,y:1000,vx:NaN,vy:0,r:3,dmg:4,
+    pen:0,ttl:.001,hits:0,dead:false,shell:false,beam:false}]});
+   assert.equal(r.hp,100,'unknown competing motion is a veto');
+  });
+  test(label+': two expiring rails cannot claim speculative array-order priority at '+fps+'Hz',()=>{
+   const r=runRailTTL(Game,{fps,otherBullets:[{kind:'bullet',id:74,
+    ownerId:3,x:1100,y:1000,vx:3100,vy:0,r:8.84,dmg:95.2,
+    baseDmg:95.2,maxHp:20,hp:20,pen:18,ttl:.005,hits:0,
+    dead:false,shell:false,beam:true,__novaRail:true,__novaFullRail:true}]});
+   assert.equal(r.hp,100,'two rails require a shared chronological arbiter');
+  });
+  test(label+': remote fire does not defeat earlier permanent cover at '+fps+'Hz',()=>{
+   const r=runRailTTL(Game,{fps,wall:true,
+    otherBullets:Array.from({length:12},(_,i)=>remoteRailShot(i))});
+   assert.equal(r.hp,100,'wall remains authoritative');
+  });
+ }
+}
