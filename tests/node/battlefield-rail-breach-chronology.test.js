@@ -310,3 +310,23 @@ for(const optimized of [false,true])for(const fps of [30,60,120]){
   assert.equal(r.hp,100,'a tangent is not certified remote');
  });
 }
+
+/* Keep the optional rail proof cheap in dense fights: 256 total projectiles
+ * is an all-or-nothing cap, never a first-N selection by array order. */
+function denseRemoteRailShot(i){return {kind:'bullet',id:1000+i,ownerId:3,
+ x:1000+(i%30)*15,y:1000+Math.floor(i/30)*10,
+ vx:0,vy:0,r:3,dmg:4,pen:0,ttl:1,hits:0,dead:false,
+ shell:false,beam:false};}
+for(const optimized of [false,true])for(const reverse of [false,true]){
+ const Game=boot(optimized),label=optimized?'optimized':'baseline';
+ test(label+': 200 remote projectiles remain eligible for bounded rail proof reversed='+reverse,()=>{
+  const r=runRailTTL(Game,{fps:30,reverse,
+   otherBullets:Array.from({length:200},(_,i)=>denseRemoteRailShot(i))});
+  assert.ok(Math.abs(r.hp-4.8)<1e-8);
+ });
+ test(label+': above 256 projectiles rail proof defers whole frame reversed='+reverse,()=>{
+  const r=runRailTTL(Game,{fps:30,reverse,
+   otherBullets:Array.from({length:256},(_,i)=>denseRemoteRailShot(i))});
+  assert.equal(r.hp,100,'do not scan unbounded traffic or prefer early array entries');
+ });
+}
