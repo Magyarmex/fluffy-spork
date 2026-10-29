@@ -154,7 +154,13 @@
       if (!self.__novaObserverNoise) {
         var n=Math.max(1,Math.floor(c.sampleRate*0.3));
         var buf=c.createBuffer(1,n,c.sampleRate), data=buf.getChannelData(0);
-        for(var i=0;i<n;i++) data[i]=Math.random()*2-1;
+        var __novaAudioNoiseSeed = ((c.sampleRate >>> 0) ^ 0xe2740c93) >>> 0 || 1;
+        for (var i = 0; i < n; i++) {
+          __novaAudioNoiseSeed ^= __novaAudioNoiseSeed << 13;
+          __novaAudioNoiseSeed ^= __novaAudioNoiseSeed >>> 17;
+          __novaAudioNoiseSeed ^= __novaAudioNoiseSeed << 5;
+          data[i] = (__novaAudioNoiseSeed >>> 0) / 2147483648 - 1;
+        }
         self.__novaObserverNoise=buf;
       }
       var t0=c.currentTime+(delay||0), src=c.createBufferSource(), hi=c.createBiquadFilter(), lo=c.createBiquadFilter(), g=c.createGain();

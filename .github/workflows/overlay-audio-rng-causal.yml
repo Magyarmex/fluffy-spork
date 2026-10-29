@@ -33,6 +33,7 @@ jobs:
       - name: Real-game seven-owner audio RNG causal A/B
         env:
           NOVA_OVERLAY_AUDIO_RNG_CAUSAL: '1'
+          NOVA_OVERLAY_AUDIO_RNG_PATCHED: '1'
         run: |
           set -euo pipefail
           mkdir -p artifacts/overlay-audio-rng-causality
