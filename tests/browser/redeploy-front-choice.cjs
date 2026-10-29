@@ -47,7 +47,11 @@ async function run(browser,width,height){
    if(!animation)throw Error('death modal entrance animation unavailable');
    animation.pause();
    animation.currentTime=0;
+   const menu=[...panel.querySelectorAll('button')].find(node=>
+    (node.textContent||'').includes('MAIN MENU'));
+   if(!menu)throw Error('missing compact death Main Menu action');
    const result={height:b.getBoundingClientRect().height,
+    menuHeight:menu.getBoundingClientRect().height,
     transform:getComputedStyle(panel).transform,
     animationName:getComputedStyle(panel).animationName};
    animation.finish();
@@ -55,6 +59,7 @@ async function run(browser,width,height){
   });
   if(entry){
    assert.ok(entry.height>=30,'RETURN must remain >=30px at entrance frame zero: '+JSON.stringify(entry));
+   assert.ok(entry.menuHeight>=30,'Main Menu must remain >=30px at entrance frame zero: '+JSON.stringify(entry));
    assert.equal(entry.transform,'none','compact death entrance must not shrink physical touch targets');
    assert.equal(entry.animationName,'nova-death-compact-fade',
     'only the compact death card uses the non-scaling entrance');
