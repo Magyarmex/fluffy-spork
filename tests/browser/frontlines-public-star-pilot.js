@@ -54,10 +54,10 @@
   }
   /* Research-only alternative to naive pursuit. A public report gives one
    * old coordinate, NOT the Star's direction. Its current location is only
-   * bounded by a growing uncertainty disk (speed cap from canonical
+   * approximated by a growing uncertainty disk (nominal speed from canonical
    * 78u/s Star * 1.95 Living Front multiplier * 1.12 cap).
    * The nearest possible boundary point is a route-cut candidate, not
-   * a predicted Star position. Abstain when the disk already contains the
+   * a predicted Star position or a guaranteed reachability bound (impulses may differ). Abstain when the disk already contains the
    * pilot or when the remaining public window cannot cover the approach. */
   const STAR_SPEED_CAP=78*1.95*1.12,SCOUT_SPEED=124,ARRIVAL_MARGIN=85;
   function publicRouteCutTarget(g,p){
