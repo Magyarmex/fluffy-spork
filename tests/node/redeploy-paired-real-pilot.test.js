@@ -380,6 +380,9 @@ test('FRESH/RETURN real-engine matched pilot is deterministic under counterbalan
   fs.writeFileSync(path.join(dir,'results-'+policy+'.json'),JSON.stringify({
    contract:natural?'natural-death exposure / forced-death-censored total-policy pilot; NOT isolated geography or human skill':
     'total-policy effect, not isolated geography or human skill',
+   protocolVersion:'terrain-clear-front-arrival-v2',
+   frontArrivalCriterion:'distance <= 130u AND Battlefield hasLineOfSight(...,24)',
+   blockedNearFrontUnit:'simulation seconds',
    policyNote:policy==='harvest_roam'?'public-only neutral approach and terrain-aware patrol AFTER reaching remembered front':'original baseline; harvest stops moving at remembered front',
    policy,seconds,preludeSeconds,worlds:seeds.length,frameRates:[30,60],counterbalancedPerHz:6,
    naturalExposurePilot:natural,
