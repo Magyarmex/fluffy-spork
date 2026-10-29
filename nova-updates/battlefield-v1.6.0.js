@@ -1812,6 +1812,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      (b.hits||0)!==0||
      b.__novaBreachAtTime===g.time||
      g.__novaShapeSweepActive!==true||
+     g.__novaWallProofHadShell===true||
      (b.__novaDirectVictims&&b.__novaDirectVictims.size>0)||
      !(dt>0)||!(b.ttl>dt)||!Number.isFinite(b.ttl)||
      !Number.isFinite(b.dmg)||!(b.dmg>0)||
@@ -1937,6 +1938,12 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
  }
 
  var oldUpdateBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var terrain=ensureTerrain(this);
+ /* Snapshot all live competing shots BEFORE any shell/TTL/terrain pre-pass.
+  * A later shot cannot gain speculative priority because an earlier shot
+  * has already been killed, moved or spent by another pre-pass. */
+ var wallProofEpoch=(this.__novaWallProofEpoch||0)+1;
+ this.__novaWallProofEpoch=wallProofEpoch;
+ this.__novaWallProofHadShell=false;
  /* Bound pairwise geometry per frame, not total bullets: one expiring shot
   * remains eligible in a crowded but spatially separated firefight. When
   * projected work is too high, defer ALL shots to the existing path rather
@@ -1950,6 +1957,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
  if(dt>0&&this.bullets&&this.bullets.length){
   for(var countS=0;countS<this.bullets.length;countS++){
    var shellS=this.bullets[countS];
+   if(shellS&&!shellS.dead){
+    shellS.__novaWallProofEpoch=wallProofEpoch;
+    if(shellS.shell||shellS.splash||shellS.__v17Cannon)
+     this.__novaWallProofHadShell=true;
+   }
    if(shellS&&shellS.shell&&shellS.ttl>0&&shellS.ttl<dt)shellWork++;
   }
   var work=shellWork*(this.bullets.length+(this.tanks||[]).length+
@@ -1970,13 +1982,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   }
  }
  var expiring=0,paired=0;
- /* Preserve frame-start competitors even after an earlier wall kills them:
-  * no array-order advantage for a later speculative hull contact. */
- var wallProofEpoch=(this.__novaWallProofEpoch||0)+1;
- this.__novaWallProofEpoch=wallProofEpoch;
  if(dt>0)for(var countI=0;countI<this.bullets.length;countI++){
   var eb=this.bullets[countI];
-  if(eb&&!eb.dead)eb.__novaWallProofEpoch=wallProofEpoch;
   if(eb&&!eb.dead&&!eb.shell&&!eb.beam&&!eb.splash&&!eb.__v17Cannon&&eb.ttl>0&&eb.ttl<=dt)expiring++;
   if(eb&&!eb.dead&&!eb.shell&&!eb.beam&&!eb.splash&&!eb.__v17Cannon&&
      eb.ttl>dt&&(eb.pen===1||eb.pen===2)&&(eb.hits||0)===0)paired++;
