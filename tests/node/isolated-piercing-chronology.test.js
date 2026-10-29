@@ -1657,3 +1657,19 @@ for(const optimized of [false,true]) {
     assert.equal(bullet.hp,bullet.maxHp);
   });
 }
+
+/* A remote shell/splash may affect hulls through a wide blast even when the
+ * shell itself is not in the local narrow projectile corridor. Never
+ * pre-commit partial chronology ahead of that unresolved event. */
+for(const optimized of [false,true]) {
+  test((optimized?'optimized':'baseline')+
+    ' remote splash vetoes speculative pen-2 prefix',()=>{
+    const Game=boot(undefined,optimized),g=threeHullPen2(Game);
+    g.bullets.push({kind:'bullet',id:999,ownerId:9,
+      x:1100,y:1100,vx:0,vy:0,r:3,dmg:5,splash:100,
+      ttl:1,pen:0,hits:0,dead:false});
+    g.time+=1/120;g.updateBullets(1/120);
+    assert.equal(g.tanks[1].hitCount,0,
+      'a remote unresolved splash must defer partial backdating');
+  });
+}
