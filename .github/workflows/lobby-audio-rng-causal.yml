@@ -26,6 +26,7 @@ jobs:
       - name: Matched real lobby music to next-match RNG A/B
         env:
           NOVA_OVERLAY_AUDIO_RNG_CAUSAL: '1'
+          NOVA_LOBBY_AUDIO_RNG_PATCHED: '1'
         run: |
           set -euo pipefail
           mkdir -p artifacts/lobby-audio-rng-causality

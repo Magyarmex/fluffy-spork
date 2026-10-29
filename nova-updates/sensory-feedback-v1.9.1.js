@@ -57,7 +57,13 @@ o.connect(v);route(self,v,p);o.start(t);o.stop(t+dur+.025);
 }
 function noise(self,dur,gain,p,hp,lp,delay){
 self.resume();if(!self.ctx||!self.master||self.muted)return;
-var c=self.ctx;if(!self.__novaImpactNoise){var n=Math.max(1,Math.floor(c.sampleRate*.24)),b=c.createBuffer(1,n,c.sampleRate),d=b.getChannelData(0);for(var i=0;i<n;i++)d[i]=Math.random()*2-1;self.__novaImpactNoise=b;}
+var c=self.ctx;if(!self.__novaImpactNoise){var n=Math.max(1,Math.floor(c.sampleRate*.24)),b=c.createBuffer(1,n,c.sampleRate),d=b.getChannelData(0);var __novaAudioNoiseSeed = ((c.sampleRate >>> 0) ^ 0x17a9dc43) >>> 0 || 1;
+        for (var i = 0; i < n; i++) {
+          __novaAudioNoiseSeed ^= __novaAudioNoiseSeed << 13;
+          __novaAudioNoiseSeed ^= __novaAudioNoiseSeed >>> 17;
+          __novaAudioNoiseSeed ^= __novaAudioNoiseSeed << 5;
+          d[i] = (__novaAudioNoiseSeed >>> 0) / 2147483648 - 1;
+        }self.__novaImpactNoise=b;}
 var t=c.currentTime+(delay||0),src=c.createBufferSource(),hi=c.createBiquadFilter(),lo=c.createBiquadFilter(),v=c.createGain();src.buffer=self.__novaImpactNoise;hi.type='highpass';hi.frequency.value=hp||900;lo.type='lowpass';lo.frequency.value=lp||9000;
 v.gain.setValueAtTime(Math.max(.0002,gain),t);v.gain.exponentialRampToValueAtTime(.0001,t+dur);src.connect(hi);hi.connect(lo);lo.connect(v);route(self,v,p);src.start(t);src.stop(t+dur+.025);
 }
