@@ -52,7 +52,52 @@
     const dx=target.x-p.x,dy=target.y-p.y,d=Math.hypot(dx,dy);
     return d>1?{x:dx/d,y:dy/d}:null;
   }
-  const api={visibleStar,publicReport,cue,moveTowardPublicStar,aimAtVisibleStar};
+  /* Research-only alternative to naive pursuit. A public report gives one
+   * old coordinate, NOT the Star's direction. Its current location is only
+   * bounded by a growing uncertainty disk (speed cap from canonical
+   * 78u/s Star * 1.95 Living Front multiplier * 1.12 cap).
+   * The nearest possible boundary point is a route-cut candidate, not
+   * a predicted Star position. Abstain when the disk already contains the
+   * pilot or when the remaining public window cannot cover the approach. */
+  const STAR_SPEED_CAP=78*1.95*1.12,SCOUT_SPEED=124,ARRIVAL_MARGIN=85;
+  function publicRouteCutTarget(g,p){
+    const report=publicReport(g);
+    if(!report||!p||!p.alive||!Number.isFinite(p.x)||!Number.isFinite(p.y))return null;
+    const signal=g.__lfState.signal,age=g.time-signal.started,
+      remaining=signal.until-g.time;
+    if(!(age>=0&&remaining>0))return null;
+    const dx=report.x-p.x,dy=report.y-p.y,d=Math.hypot(dx,dy);
+    if(!(d>0&&Number.isFinite(d)))return null;
+    const radius=STAR_SPEED_CAP*age;
+    if(d<=radius+ARRIVAL_MARGIN)return null;
+    const distance=d-radius;
+    if(distance>SCOUT_SPEED*remaining+ARRIVAL_MARGIN)return null;
+    return{x:report.x-dx/d*radius,y:report.y-dy/d*radius,
+      radius,age,remaining,source:'public-route-cut'};
+  }
+  function moveToPublicRouteCut(g,p,F,defense){
+    if(!g||!p||!p.alive||typeof g.hasLineOfSight!=='function')return null;
+    /* A witnessed hostile in weapon range takes priority over an uncertain
+     * historical prize. The defensive helper itself uses only visible,
+     * unshielded, hostile units and actual terrain LoS. */
+    if(defense&&typeof defense.aimAtVisibleHostile==='function'&&
+       defense.aimAtVisibleHostile(g,p,F))return null;
+    const live=visibleStar(g,p,F);
+    if(live)return moveTowardPublicStar(g,p,F);
+    const target=publicRouteCutTarget(g,p);
+    if(!target)return null;
+    let point=target;
+    if(!g.hasLineOfSight(p.x,p.y,target.x,target.y,18)){
+      if(typeof g.novaBattlefieldWaypoint!=='function')return null;
+      const wp=g.novaBattlefieldWaypoint(p.x,p.y,target.x,target.y,18,p.id);
+      if(!wp||!Number.isFinite(wp.x)||!Number.isFinite(wp.y))return null;
+      point=wp;
+    }
+    const dx=point.x-p.x,dy=point.y-p.y,d=Math.hypot(dx,dy);
+    return d>1?{x:dx/d,y:dy/d}:null;
+  }
+  const api={visibleStar,publicReport,cue,moveTowardPublicStar,aimAtVisibleStar,
+    publicRouteCutTarget,moveToPublicRouteCut};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
   else root.__novaResearchPublicStarPilot=api;
 })(typeof window!=='undefined'?window:globalThis);
