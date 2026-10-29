@@ -503,6 +503,9 @@ async function scenario(browser, label, options) {
         assert.ok(actionFit.actions.every(b=>b.top>=8&&b.bottom<=actionFit.height-8),
           'both next-run actions must be visible WITHOUT scrolling at 568x320: '+
           JSON.stringify(actionFit));
+        assert.ok(actionFit.actions.every(b=>b.bottom-b.top>=30),
+          'FRESH, RETURN and Main Menu must all provide >=30px physical touch targets: '+
+          JSON.stringify(actionFit));
         assert.equal(actionFit.scrollTop,0,'actions must fit at initial scroll position');
         console.log('NOVA_LANDSCAPE_DEATH_ACTIONS '+JSON.stringify(actionFit));
       }
