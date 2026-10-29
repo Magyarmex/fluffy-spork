@@ -1014,3 +1014,37 @@ for(const pen of [3,4]){
   assert.equal(g.bullets.length,0,'projectile cannot continue through intact cover');
  });
 }
+
+/* #493: real materialized Sniper/Polish/Battlefield/Apex/Performance/
+ * Precision stack must not hit a rear hull after a thin barricade breach
+ * when a permanent wall physically intervenes. A front-hull control guards
+ * against the old experimental fix that erased legitimate earlier hits. */
+for(const pen of [3,4])for(const front of [false,true]){
+ test('full shipping stack: pen'+pen+' breached cover, '+
+  (front?'front hull retained':'rear hull blocked'),()=>{
+  const {g}=boot();
+  g.time=1;g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=1;
+  g.__novaBattlefield={coverBroken:0}; /* override prototype's release marker */
+  const target={kind:'tank',id:2,cls:'scout',
+   x:front?30:165,y:0,hp:100,alive:true,
+   __novaSweepMoveTime:1,__novaSweepPrevX:front?30:165,
+   __novaSweepPrevY:0};
+  g.tanks=[target];
+  g.hash.query=(_x,_y,_r,out)=>{out.length=0;out.push(target);};
+  g.__novaTerrain=[
+   {id:-1,shape:'rect',x:front?75:55,y:0,w:10,h:80,
+    solid:true,destructible:true,hp:5,maxHp:5},
+   {id:-2,shape:'rect',x:front?140:110,y:0,w:10,h:80,
+    solid:true,destructible:false,hp:0,maxHp:0}
+  ];
+  let hits=0;
+  g.damageTank=function(t,dmg){hits++;t.hp-=dmg;};
+  g.bullets=[ordinaryShot(4930+pen,0,6000,1)];
+  Object.assign(g.bullets[0],{pen,dmg:20,hp:100,maxHp:100});
+  g.updateBullets(1/30);
+  assert.equal(hits,front?1:0);
+  assert.equal(target.hp,front?80:100);
+  assert.equal(g.__novaTerrain[0].hp,0,'cover must break once');
+  assert.equal(g.__novaTerrain[1].solid,true,'later wall remains');
+ });
+}
