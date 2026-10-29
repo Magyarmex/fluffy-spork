@@ -272,6 +272,17 @@ for(const optimized of [false,true]){
    assert.equal(r.g.bullets.length,0,'later wall still stops shot');
   }
  });
+ test(label+': realistic 30Hz upgraded Marksman round hits moving Scout before wall',()=>{
+  const speed=1050*(1+.085*8),radius=5.5*(1+21*.0085);
+  const r=run(boot(optimized),{fps:30,speed,wall:60,target:32,
+   radius,damage:21,pen:2,linearMove:{vx:-200,vy:0}});
+  assert.deepEqual(r.hits,[2]);assert.equal(r.hp,79);
+ });
+ test(label+': Scout tunneling through a wall is not a certified linear hit',()=>{
+  const r=run(boot(optimized),{wall:60,target:85,
+   linearMove:{vx:-1800,vy:0}});
+  assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
+ });
  test(label+': certified moving Scout behind cover remains protected',()=>{
   const r=run(boot(optimized),{wall:50,target:150,
    linearMove:{vx:-600,vy:0}});
@@ -301,3 +312,36 @@ for(const optimized of [false,true]){
   assert.deepEqual(r.hits,[]);
  });
 }
+
+/* 1,000 independent 2D moving-hull worlds, each with actual core moveTank,
+ * materialized Battlefield and optional Performance. The oracle uses
+ * perpendicular closest approach, not the shipping stable quadratic roots.
+ * The 200-unit frame travel is synthetic stress, not a player hit-rate sample.
+ */
+test('1,000 seeded moving Scout worlds match independent first-contact geometry',()=>{
+ let seed=0x438147;
+ const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ const games=[boot(false),boot(true)];
+ let hits=0,misses=0;
+ for(let i=0;i<1000;i++){
+  const fps=[30,60,120,240][i%4],target=45+rand()*30,
+   targetY=(rand()-.5)*70,vx=(rand()-.5)*1000,vy=(rand()-.5)*400,
+   mx=vx/fps,my=vy/fps,rx=200-mx,ry=-my,
+   A=rx*rx+ry*ry,u=(target*rx+targetY*ry)/A,
+   perpX=target-u*rx,perpY=targetY-u*ry,
+   perp2=perpX*perpX+perpY*perpY,rr=20,
+   entry=perp2<rr*rr
+    ?u-Math.sqrt((rr*rr-perp2)/A):Infinity,
+   wallT=(120-5-3*.45)/200,
+   expected=entry>1e-9&&entry<wallT-1e-6;
+  for(const Game of games){
+   const r=run(Game,{fps,speed:200*fps,target,targetY,
+    linearMove:{vx,vy}});
+   assert.deepEqual(r.hits,expected?[2]:[],
+    'moving-hull contact mismatch at '+fps+'Hz world '+i);
+   assert.equal(r.hp,expected?90:100);
+  }
+  if(expected)hits++;else misses++;
+ }
+ assert.ok(hits>100&&misses>100,'oracle exercises hits and misses');
+});
