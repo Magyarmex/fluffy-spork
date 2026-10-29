@@ -233,7 +233,13 @@ function installDeathTitleFit(){
    * :has scopes this to the actual React-owned TERMINATED modal, not Pause
    * or upgrade cards, and leaves taller phones/desktops unchanged. */
   '@media(max-height:400px) and (orientation:landscape){'+
+  /* The React modal animates from scale(.85). Its otherwise 32.4px-tall
+   * FRESH/RETURN buttons briefly shrink to 27.5px on compact landscape.
+   * Keep the 280ms entrance but fade without scaling this specific card:
+   * no temporary undersized targets, no extra panel height or scrolling. */
+  '@keyframes nova-death-compact-fade{from{opacity:0;transform:none}to{opacity:1;transform:none}}'+
   '.absolute.inset-0.z-50 > .panel.anim-pop:has(> .font-display.text-red-400){'+
+  'animation-name:nova-death-compact-fade;'+
   'max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);'+
   'overflow-y:auto;overscroll-behavior:contain;padding:8px 12px;}'+
   /* Preserve every earned stat and the opponent lesson, but reduce vertical
