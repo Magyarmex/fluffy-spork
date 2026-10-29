@@ -1,0 +1,41 @@
+name: NOVA Lobby Audio RNG Causal A/B
+
+on:
+  push:
+    branches:
+      - 'nova/lobby-audio-rng-*'
+    paths:
+      - 'tests/research/lobby-audio-rng-causal-pilot.cjs'
+      - 'nova-updates/lobby-music-v1.5.1.js'
+      - '.github/workflows/lobby-audio-rng-causal.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: nova-lobby-audio-rng-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  causal-ab:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Matched real lobby music to next-match RNG A/B
+        env:
+          NOVA_OVERLAY_AUDIO_RNG_CAUSAL: '1'
+          NOVA_LOBBY_AUDIO_RNG_PATCHED: '1'
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/lobby-audio-rng-causality
+          node --test tests/research/lobby-audio-rng-causal-pilot.cjs 2>&1 | tee artifacts/lobby-audio-rng-causality/run.log
+      - name: Preserve causal results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-lobby-audio-rng-causal
+          path: artifacts/lobby-audio-rng-causality/
+          if-no-files-found: warn
+          retention-days: 30
