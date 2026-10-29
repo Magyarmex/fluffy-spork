@@ -262,10 +262,14 @@ test('pre-death public combat changes the witnessed world without introducing ar
 
 test('FRESH/RETURN real-engine matched pilot is deterministic under counterbalanced arm order',()=>{
  const full=process.env.NOVA_REDEPLOY_FULL_PILOT==='1';
+ const natural=full&&process.env.NOVA_REDEPLOY_NATURAL_PILOT==='1';
  const policy=process.env.NOVA_REDEPLOY_POLICY||'navigate';
  assert.ok(['navigate','harvest','harvest_roam'].includes(policy),'explicitly supported public policy');
- const report=[],seeds=full?FULL_SEEDS:[0x172901,0x172902,0x172903];
- const seconds=full?20:2,preludeSeconds=Number(process.env.NOVA_REDEPLOY_PRELIFE_SECONDS||0),seen=new Set();
+ const report=[],seeds=natural?FULL_SEEDS.filter((_,i)=>i%6<2):
+  full?FULL_SEEDS:[0x172901,0x172902,0x172903];
+ const seconds=natural?12:full?20:2,
+  preludeSeconds=Number(process.env.NOVA_REDEPLOY_PRELIFE_SECONDS||0),seen=new Set();
+ if(natural)assert.equal(preludeSeconds,60,'natural-death exposure pilot must predeclare 60s');
  assert.ok(Number.isFinite(preludeSeconds)&&preludeSeconds>=0&&preludeSeconds<=30,
   'pre-death simulation must be explicitly bounded');
  for(const hz of [30,60]){
@@ -274,7 +278,7 @@ test('FRESH/RETURN real-engine matched pilot is deterministic under counterbalan
    const returning=run(seed,'return',hz,seconds,policy,preludeSeconds);
    /* Full experiment counterbalances a representative of each map/rotation
     * cell. The ordinary CI smoke counterbalances every case. */
-   if(!full||i%6===0){
+   if(!full||(natural?i%2===0:i%6===0)){
     const returningFirst=run(seed,'return',hz,seconds,policy,preludeSeconds);
     const freshSecond=run(seed,'fresh',hz,seconds,policy,preludeSeconds);
     assert.ok(comparable(fresh,freshSecond),
@@ -300,20 +304,25 @@ test('FRESH/RETURN real-engine matched pilot is deterministic under counterbalan
   }
  }
  if(full){
-  assert.equal(report.length,72,'36 matched worlds at two frame rates; each contains two policies');
+  assert.equal(report.length,natural?24:72,
+   'each predeclared world has two technical frame-rate observations');
   assert.equal(seen.size,6,'all three maps and two rotations must be exercised');
   const dir=path.join(root,'artifacts','redeploy-pilot');
   fs.mkdirSync(dir,{recursive:true});
   fs.writeFileSync(path.join(dir,'results-'+policy+'.json'),JSON.stringify({
-   contract:'total-policy effect, not isolated geography or human skill',
+   contract:natural?'natural-death exposure / forced-death-censored total-policy pilot; NOT isolated geography or human skill':
+    'total-policy effect, not isolated geography or human skill',
    policyNote:policy==='harvest_roam'?'public-only neutral approach and terrain-aware patrol AFTER reaching remembered front':'original baseline; harvest stops moving at remembered front',
-   policy,seconds,preludeSeconds,worlds:36,frameRates:[30,60],counterbalancedPerHz:6,
+   policy,seconds,preludeSeconds,worlds:seeds.length,frameRates:[30,60],counterbalancedPerHz:6,
+   naturalExposurePilot:natural,
+   naturallyDeadWorlds:report.filter(r=>r.fresh.prelude?.naturalDeath).length,
    layouts:[...seen].sort(),results:report
   },null,2));
  }
  const avg=(key,mode)=>report.reduce((sum,r)=>sum+r[mode][key],0)/report.length;
  console.log('NOVA_REDEPLOY_REAL_PAIRED_PILOT '+JSON.stringify({
-  full,policy,preludeSeconds,worlds:seeds.length,seconds,scenarios:report.length,
+  full,natural,policy,preludeSeconds,worlds:seeds.length,seconds,scenarios:report.length,
+  naturallyDeadWorlds:report.filter(r=>r.fresh.prelude?.naturalDeath).length,
   layouts:[...seen].sort(),
   meanStartDistance:{fresh:+avg('startDistance','fresh').toFixed(2),
    return:+avg('startDistance','returning').toFixed(2)},
