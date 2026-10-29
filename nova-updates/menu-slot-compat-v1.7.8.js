@@ -730,7 +730,7 @@ mods['game/engine']=function(module,exports,require){
       var detour='';
       if(typeof this.hasLineOfSight==='function'){
        try{if(!this.hasLineOfSight(this.player.x,this.player.y,origin.x,origin.y,24))
-        detour=' · DETOUR';}catch(ignore){} // No unverified terrain claim.
+        detour=' · COVER';}catch(ignore){} // No unverified terrain claim.
       }
       this.toast('↩ RETURN · FRONT '+bearing+' · ~'+direct+'u'+detour,'info');
      }else this.toast('↩ RETURN UNAVAILABLE · FRESH FRONT','info');
