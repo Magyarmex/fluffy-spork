@@ -386,6 +386,48 @@ async function scenario(browser, label, options) {
     assert.equal(controller.ecology,true,label+': ecology remains active after class change');
     assert.equal(controller.playing,true,label+': Controller transition does not end the run');
 
+    // Real composed Controller Command Pad: a browser interruption must not
+    // commit a tap or leave a dragged swarm preview as a combat order.
+    if(label==='mobile-320'){
+      const interrupted=await page.evaluate(()=>{
+        const g=window.__novaBrowserLiveGame,pad=document.getElementById('nova-command-pad');
+        if(!g||!pad||!g.player||g.player.cls!=='warden')
+          return {error:'live Controller Command Pad missing'};
+        const c=g.player.__novaCommandWeave;
+        if(!c)return {error:'Controller command state missing'};
+        const saved={...c},rect=pad.getBoundingClientRect();
+        const px=rect.left+rect.width*.5,py=rect.top+rect.height*.5;
+        const event=(type,id,x,y)=>pad.dispatchEvent(new PointerEvent(type,{
+          bubbles:true,cancelable:true,pointerType:'touch',pointerId:id,
+          isPrimary:true,button:0,clientX:x,clientY:y}));
+        const baseline={active:true,mode:'target',targetId:77,x:120,y:80,
+          preview:false,changedAt:2,lastTapAt:-99};
+        Object.assign(c,baseline);
+        const prior={...c};
+        event('pointerdown',201,px,py);
+        event('pointercancel',201,px,py);
+        const canceledTap=JSON.stringify(c)===JSON.stringify(prior);
+        event('pointerdown',202,px,py);
+        event('pointermove',202,px-200,py-90);
+        const sawPreview=c.preview===true&&c.mode==='point';
+        event('pointercancel',202,px-200,py-90);
+        const canceledDrag=JSON.stringify(c)===JSON.stringify(prior);
+        event('pointerup',202,px-200,py-90);
+        const lateUpIgnored=JSON.stringify(c)===JSON.stringify(prior);
+        event('pointerdown',203,px,py);
+        event('pointermove',203,px-200,py-90);
+        event('pointerup',203,px-200,py-90);
+        const validRelease=c.mode==='point'&&c.preview===false&&
+          (c.x!==prior.x||c.y!==prior.y);
+        Object.assign(c,saved);
+        return {canceledTap,sawPreview,canceledDrag,lateUpIgnored,validRelease};
+      });
+      assert.deepEqual(interrupted,{
+        canceledTap:true,sawPreview:true,canceledDrag:true,
+        lateUpIgnored:true,validRelease:true
+      },label+': real Command Pad cancellation and release: '+JSON.stringify(interrupted));
+    }
+
     // Capture actual Canvas2D IFF strokes in the React-owned playable game,
     // not only in a mocked renderer. Mobile zoom previously shrank the
     // non-color ownership outline below one CSS pixel.
