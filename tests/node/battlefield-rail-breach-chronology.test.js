@@ -82,7 +82,8 @@ function boot(optimized=true){
  return m.exports.Game;
 }
 function run(Game,{beam=true,rail=true,cover=true,pillar=true,
- targetX=235,dt=.033,speed=18414,coverHp=5,extraShot=false}={}){
+ targetX=235,dt=.033,speed=18414,coverHp=5,extraShot=false,
+ secondCoverHp=null,railHp=20,railMaxHp=20,railPen=19}={}){
  const g=new Game();
  const t={kind:'tank',id:2,cls:'scout',x:targetX,y:-520,
   hp:100,alive:true,__novaSweepMoveTime:1,
@@ -93,11 +94,14 @@ function run(Game,{beam=true,rail=true,cover=true,pillar=true,
  if(typeof g.hash.insert==='function')g.hash.insert(t);
  if(cover)g.__novaTerrain.push({id:-1,shape:'rect',x:-260,y:-500,
   w:190,h:65,solid:true,destructible:true,hp:coverHp,maxHp:300});
+ if(secondCoverHp!==null)g.__novaTerrain.push({id:-3,shape:'rect',
+  x:-125,y:-520,w:10,h:50,solid:true,destructible:true,
+  hp:secondCoverHp,maxHp:secondCoverHp});
  if(pillar)g.__novaTerrain.push({id:-2,shape:'circle',x:0,y:-520,
   r:105,solid:true,destructible:false,hp:0,maxHp:0});
  const b={kind:'bullet',id:1,ownerId:1,x:-370,y:-520,
-  vx:speed,vy:0,r:8.84,dmg:95.2,baseDmg:95.2,maxHp:20,hp:20,
-  pen:19,ttl:.68,hits:0,dead:false,shell:false,beam,
+  vx:speed,vy:0,r:8.84,dmg:95.2,baseDmg:95.2,
+  maxHp:railMaxHp,hp:railHp,pen:railPen,ttl:.68,hits:0,dead:false,shell:false,beam,
   __novaRail:rail,__novaFullRail:rail};
  g.bullets=[b];
  if(extraShot)g.bullets.push({kind:'bullet',id:2,ownerId:3,
@@ -106,7 +110,7 @@ function run(Game,{beam=true,rail=true,cover=true,pillar=true,
  g.updateBullets(dt);
  return {hits:g.hits,hp:t.hp,cover:g.__novaTerrain.find(x=>x.id===-1),
   pillar:g.__novaTerrain.find(x=>x.id===-2),
-  bullet:b,remaining:g.bullets.map(x=>x.id)};
+  secondCover:g.__novaTerrain.find(x=>x.id===-3),bullet:b,remaining:g.bullets.map(x=>x.id)};
 }
 for(const optimized of [false,true]){
  const Game=boot(optimized);
@@ -145,13 +149,29 @@ for(const optimized of [false,true]){
   assert.equal(r.hp,100);
   assert.equal(r.cover.hp,0);
  });
- test(mode+': no rail marker does not gain new beam proof',()=>{
-  const r=run(Game,{rail:false});
+ test(mode+': a second intact barricade takes one rail hit and protects rear hull',()=>{
+  const r=run(Game,{pillar:false,secondCoverHp:1000});
   assert.equal(r.cover.hp,0);
-  /* Deliberate negative scope: a non-rail beam is not covered by this
-   * narrowly certified fix, even though broader chronology remains open. */
-  assert.ok(Math.abs(r.hp-40.976)<1e-8);
+  assert.equal(r.hp,100);
+  assert.equal(r.bullet.dead,true);
+  assert.ok(Math.abs(r.secondCover.hp-(1000-59.024*.92))<1e-8,
+   'beam cover multiplier applies exactly once to second barricade');
  });
+ test(mode+': a weakened rail that expires on first cover never reaches rear hull',()=>{
+  const r=run(Game,{railHp:1});
+  assert.equal(r.cover.hp,0);
+  assert.equal(r.hp,100);
+  assert.equal(r.bullet.dead,true);
+ });
+ for(const fps of [30,60,120,240]){
+  test(mode+': synthetic equal-chord rail wall proof at '+fps+'Hz',()=>{
+   const dt=1/fps,speed=607.662*fps;
+   const r=run(Game,{dt,speed});
+   assert.equal(r.cover.hp,0);
+   assert.equal(r.hp,100);
+   assert.equal(r.bullet.dead,true);
+  });
+ }
  test(mode+': remote competing projectile does not hide pillar',()=>{
   const r=run(Game,{extraShot:true});
   assert.equal(r.hp,100);
