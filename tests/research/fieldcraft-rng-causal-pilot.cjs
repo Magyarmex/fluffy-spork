@@ -15,7 +15,7 @@ function arm(seed,hz,mode){return withSeed(seed,draws=>{
  const g=bootGame();if(!g.player)g.redeploy();
  assert.ok(g.player&&g.player.alive);
  assert.ok(g.__testWindow.NOVATips,'shipping Fieldcraft overlay not loaded');
- const initial=digest(physical(g)),before=draws();
+ const initial=digest(physical(g)),tipCount=g.__testWindow.NOVATips.audit().current,before=draws();
  let picked=null;
  if(mode!=='off'){
   picked=g.__testWindow.NOVATips.next('fieldcraft-causal-main');
@@ -28,7 +28,7 @@ function arm(seed,hz,mode){return withSeed(seed,draws=>{
  const trace=prelude.trace.map(({elapsed,x,y,hp,alive,score,
   enemyStateHash,neutralStateHash,projectileStateHash})=>
   ({elapsed,x,y,hp,alive,score,enemyStateHash,neutralStateHash,projectileStateHash}));
- return {initial,interventionDraws,trace,finalHash:digest(physical(g)),
+ return {initial,tipCount,interventionDraws,trace,finalHash:digest(physical(g)),
   selectedTip:mode==='enabled'?picked.id:null};
 });}
 test('actual Fieldcraft shuffle must not influence matched physical combat',()=>{
@@ -43,7 +43,7 @@ test('actual Fieldcraft shuffle must not influence matched physical combat',()=>
   const firstPhysicalDifference=firstDifference(off,enabled);
   const erasedDifference=firstDifference(enabled,erased);
   assert.equal(erasedDifference,null,'discarding tip display changed physics');
-  results.push({seed,hz,sharedDraws:enabled.interventionDraws,
+  results.push({seed,hz,tipCount:enabled.tipCount,sharedDraws:enabled.interventionDraws,
    firstPhysicalDifference,erasedDifference,selectedTip:enabled.selectedTip});
  }
  const physicalDivergences=results.filter(r=>r.firstPhysicalDifference!==null).length;
@@ -51,12 +51,11 @@ test('actual Fieldcraft shuffle must not influence matched physical combat',()=>
  fs.mkdirSync(dir,{recursive:true});
  fs.writeFileSync(path.join(dir,patched?'patched.json':'baseline.json'),
   JSON.stringify({patched,scenarios:results.length,physicalDivergences,results},null,2));
- console.log('NOVA_FIELDCRAFT_PREASSERT '+JSON.stringify({patched,results}));
  if(patched){
   assert.ok(results.every(r=>r.sharedDraws===0),'Fieldcraft consumed gameplay RNG');
   assert.equal(physicalDivergences,0,'tip shuffle still influences physical combat');
  }else{
-  assert.ok(results.every(r=>r.sharedDraws===49),'baseline did not consume 49 shared draws');
+  assert.ok(results.every(r=>r.sharedDraws===r.tipCount-1),'baseline did not consume one draw per shuffle swap');
   assert.ok(physicalDivergences>0,'baseline causal leak was not reproduced');
  }
  console.log('NOVA_FIELDCRAFT_RNG '+JSON.stringify({patched,scenarios:results.length,
