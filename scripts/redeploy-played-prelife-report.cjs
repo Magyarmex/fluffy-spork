@@ -9,6 +9,8 @@ function reportPlayedFirstLife(report, expectedSeeds = 36) {
   if (!report || !(report.preludeSeconds > 0) ||
       !Array.isArray(report.results) || !report.results.length)
     throw Error('Expected nonempty played-first-life pilot');
+  if(report.naturalExposurePilot && (report.preludeSeconds!==60 || expectedSeeds!==12))
+    throw Error('Natural-death cohort must predeclare 60s and 12 independent seeds');
   const seen = new Set(), bySeed = new Map(), layouts = new Set(), rows = [];
   for (const row of report.results) {
     const key = row.seed + '/' + row.hz;
@@ -27,6 +29,9 @@ function reportPlayedFirstLife(report, expectedSeeds = 36) {
         !a.postInsertion.enemyBodiesHash || !b.postInsertion.enemyBodiesHash ||
         !a.postInsertion.neutralBodiesHash || !b.postInsertion.neutralBodiesHash)
       throw Error('Missing read-only post-insertion fingerprints: ' + key);
+    if(report.naturalExposurePilot && (!Number.isInteger(a.deathTransitionTicks) ||
+        a.deathTransitionTicks<=0 || a.deathTransitionTicks!==b.deathTransitionTicks))
+      throw Error('Unmatched or skipped real death transition: '+key);
     if (a.prelude.elapsed <= 0 || a.prelude.ticks <= 0)
       throw Error('Missing real first-life ticks: ' + key);
     if (!Number.isFinite(a.neutralXP) || !Number.isFinite(b.neutralXP) ||
