@@ -247,7 +247,7 @@ canvas {
     <link rel="icon" href="./nova-icon.svg" type="image/svg+xml" />
     <meta name="application-name" content="NOVA TANKS" />
     <script defer src="./pwa-register.js"></script>
-      <meta name="nova-runtime-build" content="b271d30b36e4856ae7c20295" />
+      <meta name="nova-runtime-build" content="f3ebc9ef3a33c11e9eb24390" />
   </head>
   <body>
     <div id="root"></div>
@@ -1311,8 +1311,14 @@ class Sfx {
             const len = this.ctx.sampleRate * 0.5;
             this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
             const d = this.noiseBuf.getChannelData(0);
-            for (let i = 0; i < len; i++)
-                d[i] = Math.random() * 2 - 1;
+            // Stable local noise stream; never perturb gameplay decisions.
+            let noiseSeed = ((this.ctx.sampleRate >>> 0) ^ 0x6d2b79f5) >>> 0 || 1;
+            for (let i = 0; i < len; i++) {
+                noiseSeed ^= noiseSeed << 13;
+                noiseSeed ^= noiseSeed >>> 17;
+                noiseSeed ^= noiseSeed << 5;
+                d[i] = (noiseSeed >>> 0) / 2147483648 - 1;
+            }
         }
         catch {
             this.ctx = null;
