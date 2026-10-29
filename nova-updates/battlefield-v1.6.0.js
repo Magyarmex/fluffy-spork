@@ -1957,11 +1957,19 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    var ox=o.x,oy=o.y,ot=Math.min(dt,Math.max(0,o.ttl||0)),
        nx=ox+o.vx*ot,ny=oy+o.vy*ot,pad=o.r+b.r+2;
    if(near(ox,oy,nx,ny,pad))return false;
-   var rr=o.r+CLASSES[victim.cls].size+3;
-   if(Math.max(ox,nx)+rr>=victim.x&&
-      Math.min(ox,nx)-rr<=victim.x&&
-      Math.max(oy,ny)+rr>=victim.y&&
-      Math.min(oy,ny)-rr<=victim.y)return false;
+   var rr=o.r+CLASSES[victim.cls].size+3,
+       vsx=victim.__novaLinearMoveValid===true&&
+         victim.__novaLinearMoveEpoch===g.time?
+         victim.__novaLinearMoveStartX:victim.x,
+       vsy=victim.__novaLinearMoveValid===true&&
+         victim.__novaLinearMoveEpoch===g.time?
+         victim.__novaLinearMoveStartY:victim.y;
+   /* A competing shot near the target's start can already have struck it,
+    * even when it is remote from the target's end-of-frame position. */
+   if(Math.max(ox,nx)+rr>=Math.min(vsx,victim.x)&&
+      Math.min(ox,nx)-rr<=Math.max(vsx,victim.x)&&
+      Math.max(oy,ny)+rr>=Math.min(vsy,victim.y)&&
+      Math.min(oy,ny)-rr<=Math.max(vsy,victim.y))return false;
   }
   /* Commit exactly one canonical hull hit, then let the existing wall owner
    * stop surviving piercing shots at the later physical wall. A pen=0 shot
