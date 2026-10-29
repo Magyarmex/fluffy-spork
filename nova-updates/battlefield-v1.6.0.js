@@ -1999,8 +1999,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   return 2; /* body hit committed; continue canonical wall response */
  }
 
- /* #147: after a barricade breach, prevent the materialized core from
-  * reaching a tank behind a later permanent wall. Only stop an isolated
+ /* #147: after a barricade breach, honor the next certified solid surface:
+  * a permanent wall or an intact second barricade. Only stop an isolated
   * ordinary shot when no earlier body/interception could be affected. */
  function certifiedBreachLaterPermanentWall(g,b,dt,ax,ay,ex,ey,first){
   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
@@ -2016,10 +2016,13 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       shots=g.bullets||[];
   if(tanks.length+shapes.length+drones.length+shots.length>260||
      shots.length>12)return false;
-  /* The first cover has already broken. The next obstacle must be a
-   * permanent wall; another breakable cover requires a full event solver. */
+  /* A second barricade is eligible ONLY if it provably survives this
+   * weakened round. A second breach still needs full event arbitration. */
   var later=firstSolidHit(g,ax,ay,ex,ey,b.r*.45);
-  if(!later||!later.solid||later.solid.destructible||
+  if(!later||!later.solid||
+     (later.solid.destructible&&
+      !(Number.isFinite(later.solid.hp)&&
+        later.solid.hp>b.dmg*1.000001))||
      !(later.hit&&later.hit.t>first.hit.t+1e-6&&
        later.hit.t<=1))return false;
   var stopX=ax+(ex-ax)*later.hit.t,stopY=ay+(ey-ay)*later.hit.t,
@@ -2100,10 +2103,15 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    if(near(other.x,other.y,other.x+other.vx*span,
       other.y+other.vy*span,b.r+(other.r||3)+2))return false;
   }
-  /* The normal cover damage/breach has already happened exactly once. */
+  /* The FIRST cover breach already happened exactly once. A certified
+   * surviving second cover receives its own canonical structural damage,
+   * impact sound and debris before this round stops. */
   b.x=later.hit.x;b.y=later.hit.y;b.px=b.x;b.py=b.y;
+  if(later.solid.destructible)
+   damageCover(g,later.solid,b.dmg,b.ownerId,b.x,b.y,b);
   b.dead=true;b.vx=0;b.vy=0;
-  if(g.addFlash)g.addFlash(b.x,b.y,'#b9c7e7',
+  if(g.addFlash)g.addFlash(b.x,b.y,
+   later.solid.destructible?'#8fd4ff':'#b9c7e7',
    Math.min(46,14+(b.dmg||0)*.24));
   if(g.cam&&b.dmg>42)g.cam.shake=Math.max(g.cam.shake,.08);
   return true;
