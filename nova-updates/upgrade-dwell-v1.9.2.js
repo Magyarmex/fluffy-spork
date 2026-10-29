@@ -68,7 +68,7 @@ function onUltimateClickCapture(event){
   if(!button||button!==touchGuardButton||Date.now()>touchGuardUntil)return;
   /* Do not eat a real mouse/keyboard activation that follows a touch on a
    * hybrid device. The original touch's compatibility click remains guarded. */
-  var touchClick=event.pointerType==='touch'||
+  var touchClick=event.pointerType==='touch'||event.pointerType==='pen'||
      (event.sourceCapabilities&&event.sourceCapabilities.firesTouchEvents===true);
   if(!touchClick&&(event.detail===0||event.pointerType==='mouse'||
      (event.sourceCapabilities&&event.sourceCapabilities.firesTouchEvents===false)))return;
