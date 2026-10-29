@@ -110,7 +110,7 @@ function run(Game,{beam=true,rail=true,cover=true,pillar=true,
  g.updateBullets(dt);
  return {hits:g.hits,hp:t.hp,cover:g.__novaTerrain.find(x=>x.id===-1),
   pillar:g.__novaTerrain.find(x=>x.id===-2),
-  secondCover:g.__novaTerrain.find(x=>x.id===-3),bullet:b,remaining:g.bullets.map(x=>x.id)};
+  secondCover:g.__novaTerrain.find(x=>x.id===-3),bullet:b,remaining:g.bullets.map(x=>x.id),coverBroken:g.__novaBattlefield.coverBroken};
 }
 for(const optimized of [false,true]){
  const Game=boot(optimized);
@@ -193,9 +193,33 @@ for(const optimized of [false,true]){
    const r=run(Game,{beam,rail:beam,secondCoverHp:5,dt,speed:607.662*fps});
    assert.equal(r.cover.hp,0,'first cover breached');
    assert.equal(r.secondCover.hp,0,'second cover must also breach');
+   assert.equal(r.coverBroken,2,'each cover break is credited exactly once');
    assert.equal(r.hp,100,'permanent pillar must protect rear Scout');
    assert.deepEqual(r.hits,[]);
    assert.equal(r.bullet.dead,true,'pillar must consume the shot');
   });
  }
+}
+
+/* Rail cover damage is 0.92x, not the ordinary 1.0x. A second barricade
+ * whose HP lies between these two thresholds must survive a beam hit and
+ * still stop the shot; ordinary rounds should breach it and reach the wall. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized);
+ test((optimized?'optimized':'baseline')+
+  ': rail second cover at HP55 survives exact beam damage',()=>{
+  const r=run(Game,{beam:true,rail:true,secondCoverHp:55});
+  assert.equal(r.hp,100);
+  assert.equal(r.bullet.dead,true);
+  assert.equal(r.coverBroken,1,'second cover is damaged, not breached');
+  assert.ok(Math.abs(r.secondCover.hp-(55-59.024*.92))<1e-8);
+ });
+ test((optimized?'optimized':'baseline')+
+  ': ordinary second cover at HP55 breaches before permanent wall',()=>{
+  const r=run(Game,{beam:false,rail:false,secondCoverHp:55});
+  assert.equal(r.hp,100);
+  assert.equal(r.bullet.dead,true);
+  assert.equal(r.coverBroken,2);
+  assert.equal(r.secondCover.hp,0);
+ });
 }
