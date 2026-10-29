@@ -76,6 +76,7 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,
  linearMove=null,tamperMove=false,doubleMove=false,
  otherNearMovingStart=false,bornThisFrame=false,coverHp=1000}={}){
  const g=new Game(),dt=1/fps;
+ g.__novaBattlefield={coverBroken:0};
  g.__novaShapeSweepActive=active;
  g.areAllies=()=>allied;
  const t={kind:'tank',id:2,cls:'scout',x:target,y:targetY,hp:100,
