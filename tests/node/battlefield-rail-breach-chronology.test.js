@@ -272,11 +272,11 @@ for(const optimized of [false,true]){
 for(const optimized of [false,true]){
  const Game=boot(optimized),label=optimized?'optimized':'baseline';
  for(const fps of [30,60,120]){
-  test(label+': distant-origin high-speed competitor vetoes rail TTL at '+fps+'Hz',()=>{
+  test(label+': legal-speed nearby competitor vetoes rail TTL at '+fps+'Hz',()=>{
    const r=runRailTTL(Game,{fps,otherBullets:[{kind:'bullet',id:72,
-    ownerId:2,x:1000,y:-520,vx:-50000,vy:0,r:3,dmg:4,
-    pen:0,ttl:.001,hits:0,dead:false,shell:false,beam:false}]});
-   assert.equal(r.hp,100,'speed-bound can reach the hull before the rail');
+    ownerId:3,x:52,y:-520,vx:-3100,vy:0,r:3,dmg:4,
+    pen:0,ttl:.004,hits:0,dead:false,shell:false,beam:false}]});
+   assert.equal(r.hp,100,'speed-bound can reach the victim before the rail');
   });
   test(label+': invalid projectile motion cannot authorize rail TTL at '+fps+'Hz',()=>{
    const r=runRailTTL(Game,{fps,otherBullets:[{kind:'bullet',id:73,
