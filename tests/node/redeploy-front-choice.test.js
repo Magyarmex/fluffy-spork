@@ -185,7 +185,7 @@ test('RETURN marks a cover-blocked direct approach as a detour without claiming 
  g.killTank(victim(100,200));g.update();g.__novaRedeployChoice='return';
  g.redeploy();
  assert.deepEqual(calls,[{ax:520,ay:200,bx:100,by:200,pad:24}]);
- assert.deepEqual(g.toasts,[{message:'↩ RETURN · FRONT W · ~420u · DETOUR',kind:'info'}]);
+ assert.deepEqual(g.toasts,[{message:'↩ RETURN · FRONT W · ~420u · COVER',kind:'info'}]);
  assert.ok(g.__novaLastFrontMarker,'a detour never suppresses the remembered-front waypoint');
 });
 test('RETURN does not invent a detour when terrain is clear or its query fails',()=>{
