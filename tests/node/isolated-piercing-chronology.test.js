@@ -1742,3 +1742,35 @@ for(const optimized of [false,true]){
    }
  });
 }
+
+/* Canonical Apex projectile envelopes, not 15,000u/s synthetic stress:
+ * at 30Hz a 33ms TTL tail can reach tightly grouped distinct hulls.
+ * This certifies the new fourth/fifth contact at real Specter/Assassin
+ * speed, radius, damage and penetration without changing those values. */
+for(const optimized of [false,true]){
+ const Game=boot(undefined,optimized);
+ for(const variant of [
+  {name:'specter',pen:3,speed:1220,r:5.2,dmg:31},
+  {name:'assassin',pen:4,speed:1500,r:5.8,dmg:47}
+ ]){
+  test((optimized?'optimized':'baseline')+' '+variant.name+
+   ' real-speed 30Hz TTL tail credits all certified hulls',()=>{
+   assert.match(html,new RegExp(variant.name+':[\\s\\S]{0,500}bullet: \\{ dmg: '+
+    variant.dmg+', speed: '+variant.speed+', r: '+variant.r+
+    ', pen: '+variant.pen));
+   const g=new Game(),count=variant.pen+1;
+   g.tanks=Array.from({length:count},(_,i)=>({kind:'tank',
+    id:i+2,x:25+i*11,y:0,cls:'scout',hp:150,alive:true,hitCount:0}));
+   g.tanks.reverse();
+   const order=[];
+   g.damageTank=function(t){t.hitCount++;this.hits++;order.push(t.id);};
+   g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+    vx:variant.speed,vy:0,r:variant.r,dmg:variant.dmg,
+    ttl:.033,pen:variant.pen,hits:0,dead:false,
+    shell:false,beam:false,splash:false}];
+   g.time+=1/30;g.updateBullets(1/30);
+   assert.deepEqual(order,Array.from({length:count},(_,i)=>i+2));
+   assert.equal(g.hits,count);
+  });
+ }
+}
