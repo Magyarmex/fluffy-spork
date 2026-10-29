@@ -453,3 +453,34 @@ for(const optimized of [false,true]){
   assert.equal(r.g.__novaTerrain[0].hp,1000);
  });
 }
+
+/* Oblique first-contact oracle uses independent projection/perpendicular
+ * distance rather than Battlefield's quadratic roots. The 80u-tall
+ * barricade is always intersected by these shallow projectile angles. */
+test('1,000 oblique 2D nonpiercing shots respect destructible first surface',()=>{
+ let seed=0x2d490147;
+ const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ const games=[boot(false),boot(true)];
+ let hits=0,misses=0;
+ for(const fps of [30,60,120,240])for(let i=0;i<250;i++){
+  const dx=180+rand()*40,dy=(rand()-.5)*55,
+   target=30+rand()*60,targetY=dy*target/dx+(rand()-.5)*65,
+   A=dx*dx+dy*dy,projection=(target*dx+targetY*dy)/A,
+   perpX=target-projection*dx,perpY=targetY-projection*dy,
+   perp2=perpX*perpX+perpY*perpY,rr=20,
+   entry=perp2<rr*rr
+    ?projection-Math.sqrt(rr*rr-perp2)/Math.sqrt(A):Infinity,
+   wallEntry=(120-5-3*.45)/dx,
+   expected=entry>1e-9&&entry<wallEntry-1e-6;
+  for(const Game of games){
+   const r=run(Game,{fps,speed:dx*fps,vy:dy*fps,target,targetY,
+    pen:0,destructible:true});
+   assert.deepEqual(r.hits,expected?[2]:[],
+    'oblique first-surface mismatch at '+fps+'Hz world '+i);
+   assert.equal(r.hp,expected?90:100);
+   assert.equal(r.g.__novaTerrain[0].hp,expected?1000:990);
+  }
+  if(expected)hits++;else misses++;
+ }
+ assert.ok(hits>400&&misses>100,'oracle must exercise both outcomes');
+});
