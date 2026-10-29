@@ -45,13 +45,13 @@ const patches=[
   ['(0, types_1.rnd)(1.8, 3.8)','this.cosmeticRnd(1.8, 3.8)',1]
  ]],
  ['    damageTank(', '    killTank(', [
-  ['else if (Math.random() < 0.5)', 'else if (this.cosmeticRandom() < 0.5)',1],
-  ['        if (Math.random() < 0.5)\n            this.addText', '        if (this.cosmeticRandom() < 0.5)\n            this.addText',1],
-  ['(0, types_1.rnd)(-10, 10)', 'this.cosmeticRnd(-10, 10)',1]
+  ['else if (Math.random() < 0.5)', 'else if ((typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) < 0.5)',1],
+  ['        if (Math.random() < 0.5)\n            this.addText', '        if ((typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) < 0.5)\n            this.addText',1],
+  ['(0, types_1.rnd)(-10, 10)', '(typeof this.cosmeticRnd === "function" ? this.cosmeticRnd(-10, 10) : (0, types_1.rnd)(-10, 10))',1]
  ]],
  ['    updateBullets(', '    splashAt(', [
-  ['if (b.beam && Math.random() < 0.85)', 'if (b.beam && this.cosmeticRandom() < 0.85)',1],
-  ['else if (Math.random() < 0.22)', 'else if (this.cosmeticRandom() < 0.22)',1]
+  ['if (b.beam && Math.random() < 0.85)', 'if (b.beam && (typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) < 0.85)',1],
+  ['else if (Math.random() < 0.22)', 'else if ((typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) < 0.22)',1]
  ]],
  ['function render(g, w, h) {', '    ctx.setTransform(', [
   ['(Math.random() - 0.5) * cam.shake * 14', '(g.cosmeticRandom() - 0.5) * cam.shake * 14',2]
@@ -76,7 +76,17 @@ function patchCosmeticRng(html){
    const old=count(part,before),newCount=count(part,after);
    if(old===expected&&newCount===0)part=part.split(before).join(after);
    else if(old===0&&newCount===expected){} // idempotent
-   else throw Error('canonical cosmetic source drift: '+start+' '+before);
+   else if(old===expected&&newCount===expected&&after.includes(before)){} // guarded fallback contains original expression
+   else {
+    // Older materialized shells already contain the direct cosmetic call.
+    // Upgrade them without weakening the canonical Game path; isolated
+    // regression harnesses may lack the cosmetic method entirely.
+    const legacy=after.replace('(typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random())','this.cosmeticRandom()')
+      .replace('(typeof this.cosmeticRnd === "function" ? this.cosmeticRnd(-10, 10) : (0, types_1.rnd)(-10, 10))','this.cosmeticRnd(-10, 10)');
+    if(old===0&&legacy!==after&&count(part,legacy)===expected)
+     part=part.split(legacy).join(after);
+    else throw Error('canonical cosmetic source drift: '+start+' '+before);
+   }
   }
   out=out.slice(0,a)+part+out.slice(b);
  }
