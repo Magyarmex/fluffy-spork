@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   paired-live-turn:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 18
     strategy:
       fail-fast: false
@@ -58,7 +58,7 @@ jobs:
   collate-live-turn:
     needs: paired-live-turn
     if: ${{ always() }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
