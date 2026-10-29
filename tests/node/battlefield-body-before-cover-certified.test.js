@@ -407,8 +407,8 @@ for(const optimized of [false,true]){
     linearMove:{vx:-600,vy:0},tamperMove:true});
    assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
   });
-  test(label+': pen3 breach chain still abstains at '+fps+'Hz',()=>{
-   const r=run(Game,{fps,speed:200*fps,pen:3,destructible:true});
+  test(label+': pen3 with competing shell still abstains at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:200*fps,pen:3,destructible:true,otherShell:true});
    assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
    assert.equal(r.g.__novaTerrain[0].hp,990);
   });
@@ -506,4 +506,71 @@ for(const optimized of [false,true]){
    assert.equal(r.g.bullets.length,0);
   });
  }
+}
+
+/* A penetrating round can legitimately strike a hull before a later intact
+ * barricade even when pen=3/4. Only the non-breaching case is certified:
+ * if the later cover could break, leave that event chain to the original
+ * owner until a full chronological breach solver exists. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'Battlefield + Performance':'Battlefield';
+ for(const fps of [30,60,120,240])for(const pen of [3,4]){
+  test(label+': pen'+pen+' first hull then intact cover at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:200*fps,pen,destructible:true,coverHp:1000});
+   assert.deepEqual(r.hits,[2]);assert.equal(r.hp,90);
+   assert.equal(r.g.__novaTerrain[0].hp,990);
+   assert.equal(r.g.bullets.length,0);
+  });
+  test(label+': pen'+pen+' cover first still protects hull at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:200*fps,pen,destructible:true,
+    wall:40,target:140,coverHp:1000});
+   assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
+   assert.equal(r.g.__novaTerrain[0].hp,990);
+  });
+  test(label+': pen'+pen+' shielded hull cannot claim first hit at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:200*fps,pen,destructible:true,
+    shield:true,coverHp:1000});
+   assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
+   assert.equal(r.g.__novaTerrain[0].hp,990);
+  });
+ }
+}
+
+/* A barely surviving barricade is still non-breaching; a barricade that
+ * would break must remain on the old path. A competing shell makes the
+ * latter abstention observable without relying on speculative breach order. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'Battlefield + Performance':'Battlefield';
+ for(const pen of [3,4]){
+  test(label+': pen'+pen+' near-threshold intact cover still follows hull at 30Hz',()=>{
+   const r=run(Game,{fps:30,speed:6000,pen,destructible:true,coverHp:10.1});
+   assert.deepEqual(r.hits,[2]);assert.equal(r.hp,90);
+   assert.ok(Math.abs(r.g.__novaTerrain[0].hp-.1)<1e-8);
+   assert.equal(r.g.__novaTerrain[0].solid,true);
+  });
+  test(label+': pen'+pen+' breakable cover keeps canonical breach path with competing shell',()=>{
+   const r=run(Game,{fps:30,speed:6000,pen,destructible:true,
+    coverHp:5,otherShell:true});
+   /* Canonical pre-pass breaches first, then the core resolves the hull.
+    * This is NOT a certified hull-before-cover event. Preserve the existing
+    * one-hit behavior while the full breach chronology remains unresolved. */
+   assert.deepEqual(r.hits,[2]);assert.equal(r.hp,90);
+   assert.equal(r.g.__novaTerrain[0].hp,0);
+  });
+ }
+}
+
+/* Reachable upgraded Marksman geometry: base speed 1050, eight bullet-speed
+ * upgrades, base damage 21 and canonical size scaling. Pen3/4 can be reached
+ * via penetration upgrades; the shot still reaches this hull before cover. */
+for(const optimized of [false,true])for(const pen of [3,4]){
+ test((optimized?'Battlefield + Performance':'Battlefield')+
+  ': upgraded Marksman pen'+pen+' hull precedes intact barricade at 30Hz',()=>{
+  const speed=1050*(1+.085*8),radius=5.5*(1+21*.0085);
+  const r=run(boot(optimized),{fps:30,speed,wall:55,target:29,
+   pen,radius,damage:21,destructible:true,coverHp:1000});
+  assert.deepEqual(r.hits,[2]);assert.equal(r.hp,79);
+  assert.equal(r.g.__novaTerrain[0].hp,979);
+  assert.equal(r.g.bullets.length,0);
+ });
 }
