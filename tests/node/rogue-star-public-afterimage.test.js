@@ -34,7 +34,7 @@ function scene(){
  assert.equal(st.signal?.type,'ROGUE STAR','canonical Director must announce existing Star');
  const original={x:st.signal.x,y:st.signal.y};
  const draw=()=>{draws.length=0;assert.equal(g.drawMinimap(),'base');return draws.slice();};
- return{g,st,star,draw,original};
+ return{g,st,star,draw,original,LF};
 }
 function marker(draws){return draws.find(d=>d.kind==='arc'&&Math.abs(d.r-14)<1e-6);}
 test('public Star report creates a bounded frozen memory without moving the Star',()=>{
@@ -76,6 +76,23 @@ test('new live signal takes priority and disabled Director suppresses memory',()
  assert.equal(marker(draw()),undefined);
  st.signal=null;st.directorEnabled=false;assert.equal(marker(draw()),undefined);
  st.directorEnabled=true;g.status='dead';assert.equal(marker(draw()),undefined);
+});
+test('a report cancelled during its live window cannot resurrect as a ghost',()=>{
+ const {g,st,draw,LF}=scene();
+ g.time=101;g.getShape=()=>null;
+ LF.directorTick(g,st);
+ assert.equal(st.signal,null,'canonical Director cancels a departed Star report');
+ assert.equal(st.starMemory,null,'cancelled report must not return as a ghost');
+ g.time=109;assert.equal(marker(draw()),undefined);
+});
+test('a newer public announcement permanently supersedes the old Star memory',()=>{
+ const {g,st,LF,draw}=scene();
+ g.time=110;st.cooldowns.bloom=0;
+ st.sectors[5].value=900;st.sectors[5].maturity=.95;
+ LF.directorTick(g,st);
+ assert.equal(st.signal?.type,'BLOOM');
+ assert.equal(st.starMemory,null,'new public opportunity retires stale Star clue');
+ st.signal=null;g.time=111;assert.equal(marker(draw()),undefined);
 });
 test('malformed or out-of-arena public memory cannot paint a phantom marker',()=>{
  const {g,st,draw}=scene();
