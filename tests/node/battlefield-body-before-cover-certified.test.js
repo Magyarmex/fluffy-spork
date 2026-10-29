@@ -535,3 +535,24 @@ for(const optimized of [false,true]){
   });
  }
 }
+
+/* A barely surviving barricade is still non-breaching; a barricade that
+ * would break must remain on the old path. A competing shell makes the
+ * latter abstention observable without relying on speculative breach order. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'Battlefield + Performance':'Battlefield';
+ for(const pen of [3,4]){
+  test(label+': pen'+pen+' near-threshold intact cover still follows hull at 30Hz',()=>{
+   const r=run(Game,{fps:30,speed:6000,pen,destructible:true,coverHp:10.1});
+   assert.deepEqual(r.hits,[2]);assert.equal(r.hp,90);
+   assert.ok(Math.abs(r.g.__novaTerrain[0].hp-.1)<1e-8);
+   assert.equal(r.g.__novaTerrain[0].solid,true);
+  });
+  test(label+': pen'+pen+' breakable cover and competing shell retain old arbitration',()=>{
+   const r=run(Game,{fps:30,speed:6000,pen,destructible:true,
+    coverHp:5,otherShell:true});
+   assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
+   assert.equal(r.g.__novaTerrain[0].hp,0);
+  });
+ }
+}
