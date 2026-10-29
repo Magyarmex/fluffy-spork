@@ -1,0 +1,45 @@
+name: NOVA First-Life FPS Divergence Trace
+
+on:
+  push:
+    branches:
+      - 'nova/redeploy-fps-trace-*'
+    paths:
+      - 'tests/research/redeploy-public-prelife.cjs'
+      - 'tests/node/redeploy-paired-real-pilot.test.js'
+      - 'tests/node/redeploy-public-prelife.test.js'
+      - '.github/workflows/redeploy-fps-trace.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: nova-fps-trace-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  trace:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify inert observational checkpoints
+        run: node --test tests/node/redeploy-public-prelife.test.js
+      - name: Trace five predeclared FPS-discordant worlds at 30 and 60 Hz
+        env:
+          NOVA_REDEPLOY_TRACE_PILOT: '1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/redeploy-fps-trace
+          node --test tests/node/redeploy-paired-real-pilot.test.js 2>&1 |
+            tee artifacts/redeploy-fps-trace/run.log
+      - name: Preserve read-only traces including negative results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-redeploy-fps-divergence-trace
+          path: artifacts/redeploy-fps-trace/
+          if-no-files-found: warn
+          retention-days: 30
