@@ -236,7 +236,7 @@ function installDeathTitleFit(){
   /* The React modal animates from scale(.85). Its otherwise 32.4px-tall
    * FRESH/RETURN buttons briefly shrink to 27.5px on compact landscape.
    * Keep the 280ms entrance but fade without scaling this specific card:
-   * no temporary undersized targets, no extra panel height or scrolling. */
+   * no temporary undersized targets or scale-induced clipping. */
   '@keyframes nova-death-compact-fade{from{opacity:0;transform:none}to{opacity:1;transform:none}}'+
   '.absolute.inset-0.z-50 > .panel.anim-pop:has(> .font-display.text-red-400){'+
   'animation-name:nova-death-compact-fade;'+
