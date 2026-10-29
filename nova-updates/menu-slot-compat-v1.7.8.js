@@ -567,7 +567,8 @@ function paint(g){
   b.setAttribute('data-nova-insertion',choice);
   b.style.cssText='min-width:0;border:1px solid rgba(125,243,255,.4);border-radius:7px;background:rgba(31,104,136,.24);padding:'+(window.innerHeight<=400?'8':'10')+'px 3px;font:700 12px/1.2 Rajdhani,system-ui;color:#d2deed;touch-action:manipulation;';
   b.textContent=caption;b.title=detail;
-  b.setAttribute('aria-label',detail+' No stat bonus.');
+  /* Accessible name must retain the visible label (label-in-name). */
+  b.setAttribute('aria-label',caption+' — '+detail+' No stat bonus.');
   b.addEventListener('click',function(){
    g.__novaRedeployChoice=choice;
    /* Keep React's original redeploy callback authoritative. */
