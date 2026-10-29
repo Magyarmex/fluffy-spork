@@ -11,6 +11,13 @@ function reportPlayedFirstLife(report, expectedSeeds = 36) {
     throw Error('Expected nonempty played-first-life pilot');
   if(report.naturalExposurePilot && (report.preludeSeconds!==60 || expectedSeeds!==12))
     throw Error('Natural-death cohort must predeclare 60s and 12 independent seeds');
+  // The v2 terrain-clear protocol must not silently mix with historical
+  // distance-only arrival measurements. Preserve older reports separately.
+  const terrainProtocol = report.protocolVersion === 'terrain-clear-front-arrival-v2';
+  if (report.naturalExposurePilot && !terrainProtocol)
+    throw Error('Natural-death terrain analysis requires terrain-clear-front-arrival-v2');
+  if (terrainProtocol && !(Number.isFinite(report.seconds) && report.seconds > 0))
+    throw Error('Terrain-clear protocol requires a finite post-redeploy observation window');
   const seen = new Set(), bySeed = new Map(), layouts = new Set(), rows = [];
   for (const row of report.results) {
     const key = row.seed + '/' + row.hz;
@@ -38,6 +45,14 @@ function reportPlayedFirstLife(report, expectedSeeds = 36) {
         !Number.isFinite(a.hp) || !Number.isFinite(b.hp) ||
         !Number.isFinite(a.score) || !Number.isFinite(b.score))
       throw Error('Nonfinite outcome: ' + key);
+    if (terrainProtocol) for (const [name, arm] of [['fresh', a], ['return', b]]) {
+      const blocked = arm.blockedNearFrontSeconds;
+      if (!Number.isFinite(blocked) || blocked < 0 ||
+          blocked > report.seconds + 1e-6)
+        throw Error('Invalid terrain-blocked near-front exposure: ' + key + '/' + name);
+      if (arm.frontReached !== null && !Number.isFinite(arm.frontReached))
+        throw Error('Invalid terrain-clear arrival time: ' + key + '/' + name);
+    }
     layouts.add(row.layout + '/' + row.rotation);
     const p = a.prelude;
     if(report.naturalExposurePilot &&
@@ -53,7 +68,10 @@ function reportPlayedFirstLife(report, expectedSeeds = 36) {
       sameNeutralBodies:a.postInsertion.neutralBodiesHash===b.postInsertion.neutralBodiesHash,
       neutralGap:b.neutralXP-a.neutralXP, scoreGap:b.score-a.score,
       hpGap:b.hp-a.hp, survivalGap:Number(b.alive)-Number(a.alive),
-      freshReached:a.frontReached!==null, returnReached:b.frontReached!==null};
+      freshReached:a.frontReached!==null, returnReached:b.frontReached!==null,
+      blockedFreshSeconds:terrainProtocol?a.blockedNearFrontSeconds:null,
+      blockedReturnSeconds:terrainProtocol?b.blockedNearFrontSeconds:null,
+      blockedGap:terrainProtocol?b.blockedNearFrontSeconds-a.blockedNearFrontSeconds:null};
     rows.push(entry);
     if (!bySeed.has(row.seed)) bySeed.set(row.seed, []);
     bySeed.get(row.seed).push(entry);
@@ -82,6 +100,7 @@ function reportPlayedFirstLife(report, expectedSeeds = 36) {
   return {
     contract:'played-first-life total-policy effect, NOT isolated geography, natural human play or fun',
     policy:report.policy, preludeSeconds:report.preludeSeconds,
+    protocolVersion:report.protocolVersion||'legacy-distance-only-or-unspecified',
     independentSeeds:bySeed.size, fpsPairedObservations:rows.length,
     layouts:[...layouts].sort(),
     firstLife:{naturalDeaths:rows.filter(x => x.naturalDeath).length,
@@ -115,7 +134,15 @@ function reportPlayedFirstLife(report, expectedSeeds = 36) {
     returnMinusFresh:{neutralXP:metric('neutralGap'),score:metric('scoreGap'),
       hp:metric('hpGap'),survival:metric('survivalGap')},
     frontArrivals:{fresh:rows.filter(x => x.freshReached).length,
-      return:rows.filter(x => x.returnReached).length},
+      return:rows.filter(x => x.returnReached).length,
+      ...(terrainProtocol?{blockedNearFront:{
+        freshObservations:rows.filter(x => x.blockedFreshSeconds>0).length,
+        returnObservations:rows.filter(x => x.blockedReturnSeconds>0).length,
+        freshSeconds:metric('blockedFreshSeconds'),
+        returnSeconds:metric('blockedReturnSeconds'),
+        returnMinusFreshSeconds:metric('blockedGap'),
+        interpretation:'Measured only while within 130u of the remembered front but hull-clear line of sight is blocked. Total redeploy-policy effect; not isolated geography or human navigation skill.'
+      }}:{})},
     limitations:['Enemy/neutral RNG and spawn placement remain coupled to redeploy choice.',
       'The first-life policy is automated and capped at a scripted window.',
       'A repeated FPS result does not double the independent sample size.',
