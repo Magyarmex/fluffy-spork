@@ -381,3 +381,33 @@ for(const optimized of [false,true]){
   });
  }
 }
+
+/* Adversarial neighbors: first-surface certification must not depend on
+ * rectangular geometry, falsely infer teleport motion, or grant a shot
+ * permission to cross cover when it still has piercing capacity. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'Battlefield + Performance':'Battlefield';
+ for(const fps of [30,60,120,240]){
+  test(label+': nonpiercing hull before circular destructible cover at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:200*fps,pen:0,destructible:true,wallShape:'circle'});
+   assert.deepEqual(r.hits,[2]);assert.equal(r.hp,90);
+   assert.equal(r.g.__novaTerrain[0].hp,1000);
+  });
+  test(label+': certified moving Scout before destructible cover at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:200*fps,pen:0,destructible:true,
+    linearMove:{vx:-600,vy:0}});
+   assert.deepEqual(r.hits,[2]);assert.equal(r.hp,90);
+   assert.equal(r.g.__novaTerrain[0].hp,1000);
+  });
+  test(label+': teleport-like movement remains unproven before cover at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:200*fps,pen:0,destructible:true,
+    linearMove:{vx:-600,vy:0},tamperMove:true});
+   assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
+  });
+  test(label+': piercing rounds retain existing cover authority at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:200*fps,pen:1,destructible:true});
+   assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
+   assert.equal(r.g.__novaTerrain[0].hp,990);
+  });
+ }
+}
