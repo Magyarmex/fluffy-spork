@@ -122,3 +122,21 @@ test('keyboard activation survives a pending touch guard while delayed touch cli
     preventDefault() { swallowed++; }, stopImmediatePropagation() { swallowed++; } });
   assert.equal(swallowed, 2, 'a genuine delayed touch click must still be consumed');
 });
+
+test('explicit touch provenance wins over ambiguous zero detail or mouse-compatible click type', () => {
+  const { window } = boot();
+  const bridge = window.__NOVA_COMMAND_WEAVE_BUTTON_TEST__;
+  const button = { disabled: false, click() {}, classList: { contains() { return false; } } };
+  const target = { closest(selector) { return selector === 'button' ? button : null; } };
+  let swallowed = 0;
+  for (const click of [
+    { pointerType: 'touch', detail: 0 },
+    { pointerType: 'mouse', detail: 1, sourceCapabilities: { firesTouchEvents: true } }
+  ]) {
+    bridge.pointerDown({ pointerType: 'touch', target, cancelable: true,
+      preventDefault() {}, stopImmediatePropagation() {} });
+    bridge.clickCapture({ ...click, target, cancelable: true,
+      preventDefault() { swallowed++; }, stopImmediatePropagation() { swallowed++; } });
+  }
+  assert.equal(swallowed, 4, 'touch-origin click must never execute twice');
+});
