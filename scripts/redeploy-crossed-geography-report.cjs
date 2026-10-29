@@ -78,10 +78,38 @@ function reportCrossed(data,expectedSeeds=12){
  assert.equal(groups.size,expectedSeeds,'independent seed count');
  assert.ok([...groups.values()].every(rows=>rows.length===2&&
   new Set(rows.map(r=>r.hz)).size===2),'each seed must have both frame rates');
- const out={contract:'conditional insertion geography within each native post-spawn world; NOT human fun, cue efficacy or total-policy causal identification',
+ /* The real spawnAITank uses randSpawnPos(1000) relative to the native
+  * player. Crossing an enemy world with the other player position can break
+  * this structural safety invariant. Such off-diagonal cells are not valid
+  * native-play counterfactuals; never promote their outcome gaps as causal. */
+ const exclusion=1000,counts={native:0,offDiagonal:0,nativeBelow:0,offDiagonalBelow:0};
+ let fullySupportedSeeds=0;
+ for(const rows of groups.values()){
+  let allSafe=true;
+  for(const row of rows)for(const base of choices)for(const pos of choices){
+   const dist=row.worlds[base][pos].nearestEnemyDistance;
+   const native=base===pos;
+   counts[native?'native':'offDiagonal']++;
+   if(dist<exclusion){
+    counts[native?'nativeBelow':'offDiagonalBelow']++;
+    if(!native)allSafe=false;
+   }
+  }
+  if(allSafe)fullySupportedSeeds++;
+ }
+ const causalIdentification=counts.nativeBelow===0&&counts.offDiagonalBelow===0;
+ const out={contract:'crossed insertion falsification: exploratory outcomes, NOT identified native-play geography effects',
   independentSeeds:groups.size,fpsRepeatedObservations:data.results.length,
   crossedWorldPairs:data.results.length*2,layouts:[...layouts].sort(),
   preludeSeconds:data.preludeSeconds,postSeconds:data.seconds,
+  spawnSafety:{
+   canonicalAIMinDistanceRequested:exclusion,
+   ...counts,independentSeedsWithAllFourCellsSafeAtBothHz:fullySupportedSeeds,
+   causalGeographyIdentified:causalIdentification,
+   verdict:causalIdentification?
+    'All observed cells preserve native enemy clearance; other confounds and human value remain untested.':
+    'FALSIFIED: crossed positions violate the native 1000u AI spawn-exclusion policy. Exploratory effect estimates cannot be interpreted as native-play causal geography.'
+  },
   postInsertionParity:{withinBaseWorldPairs:data.results.length*2,
    nativeFreshVsReturnEnemyBodiesSame:data.results.filter(r=>
     r.nativePostInsertion.fresh.enemyBodiesHash===r.nativePostInsertion.return.enemyBodiesHash).length,
@@ -89,9 +117,9 @@ function reportCrossed(data,expectedSeeds=12){
     r.nativePostInsertion.fresh.neutralBodiesHash===r.nativePostInsertion.return.neutralBodiesHash).length},
   metrics:{},limitations:[
    'One scripted public-information pilot, not a randomized human study.',
-   'The native FRESH and RETURN enemy/neutral worlds are separately generated; crossing removes their within-base confound but does not recreate all possible spawn-time side effects.',
+   'The native FRESH and RETURN enemy/neutral worlds are separately generated; crossing creates off-policy enemy proximity in many cells and does not preserve the 1000u AI spawn-exclusion policy.',
    'FPS and base worlds are repeated observations of each independent seed, not additional independent samples.',
-   'The native diagonal is a total-policy contrast; do not label it isolated geography.',
+   'The native diagonal is a total-policy contrast; off-diagonal differences are exploratory outside native spawn support, NOT isolated gameplay geography.',
    'Legacy 600u/LoS enemy-seen is not a camera/viewport observation; fairEnemySeen separately requires both player and camera bounds plus terrain line-of-sight.'
   ]};
  for(const [name,fn]of Object.entries(metrics)){
