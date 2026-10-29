@@ -8,7 +8,9 @@ const metrics={
  nearestEnemyDistance:x=>x.nearestEnemyDistance,
  hp:x=>x.hp,neutralXP:x=>x.neutralXP,score:x=>x.score,
  survival:x=>Number(x.alive),frontArrival:x=>Number(x.frontReached!==null),
- enemySeen:x=>Number(x.firstVisibleEnemy!==null),
+ enemySeenLegacyRangeProxy:x=>Number(x.firstVisibleEnemy!==null),
+ fairEnemySeen:x=>Number(x.firstFairVisibleEnemy!==null),
+ initialEnemyWithin60:x=>Number(x.nearestEnemyDistance<60),
  neutralSeen:x=>Number(x.firstVisibleNeutral!==null),
  blockedNearFrontSeconds:x=>x.blockedNearFrontSeconds,
  routeRequests:x=>x.routeRequests,travelled:x=>x.travelled
@@ -90,7 +92,7 @@ function reportCrossed(data,expectedSeeds=12){
    'The native FRESH and RETURN enemy/neutral worlds are separately generated; crossing removes their within-base confound but does not recreate all possible spawn-time side effects.',
    'FPS and base worlds are repeated observations of each independent seed, not additional independent samples.',
    'The native diagonal is a total-policy contrast; do not label it isolated geography.',
-   'First visible enemy is an observed LoS/range proxy, not guaranteed to be a player-noticed engagement.'
+   'Legacy 600u/LoS enemy-seen is not a camera/viewport observation; fairEnemySeen separately requires both player and camera bounds plus terrain line-of-sight.'
   ]};
  for(const [name,fn]of Object.entries(metrics)){
   const cluster=[];
