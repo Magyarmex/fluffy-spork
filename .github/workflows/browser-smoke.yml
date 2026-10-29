@@ -12,6 +12,7 @@ on:
       - 'scripts/patch-saved-records.cjs'
       - 'scripts/patch-ai-strafe-timebase.cjs'
       - 'scripts/patch-cosmetic-rng.cjs'
+      - 'scripts/patch-audio-rng.cjs'
   pull_request:
     paths:
       - 'nova-updates/**'
@@ -22,6 +23,7 @@ on:
       - 'scripts/patch-saved-records.cjs'
       - 'scripts/patch-ai-strafe-timebase.cjs'
       - 'scripts/patch-cosmetic-rng.cjs'
+      - 'scripts/patch-audio-rng.cjs'
   workflow_dispatch:
 
 # Supersede obsolete PR/feature-branch checks; never cancel a mainline
@@ -52,6 +54,8 @@ jobs:
         run: node scripts/patch-ai-strafe-timebase.cjs index.html
       - name: Isolate cosmetic RNG before browser tests
         run: node scripts/patch-cosmetic-rng.cjs index.html
+      - name: Isolate core audio RNG before browser tests
+        run: node scripts/patch-audio-rng.cjs index.html
       - name: Serve shipping runtime
         run: |
           python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/nova-browser-http.log 2>&1 &
