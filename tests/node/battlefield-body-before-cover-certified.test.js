@@ -85,7 +85,7 @@ function boot(optimized){
 }
 function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,
  wallShape='rect',otherShape=false,otherBullet=false,otherShell=false,moving=false,
- remoteBullets=0,laterCoverHp=null,realIntegrity=false,
+ remoteBullets=0,laterCoverHp=null,realIntegrity=false,preinitialized=false,
  shield=false,otherTank=false,ttl=1,pen=1,radius=3,laterWall=null,
  active=true,knock=0,allied=false,destructible=false,damage=10,
  linearMove=null,tamperMove=false,doubleMove=false,
@@ -108,6 +108,7 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,
  g.bullets=[{kind:'bullet',id:10,ownerId:1,x:0,y:0,
   vx:speed,vy,r:radius,dmg:damage,knock,ttl,pen,hits:0,dead:false,shell:false,beam:false}];
  if(realIntegrity){g.initBulletIntegrity=realInitIntegrity;g.weakenBullet=realWeakenBullet;}
+ if(preinitialized)g.initBulletIntegrity(g.bullets[0]);
  if(otherBullet)g.bullets.push({kind:'bullet',id:11,ownerId:4,
   x:0,y:1,vx:speed,vy:0,r:3,dmg:10,ttl:1,pen:0,hits:0,dead:false});
  if(otherShell)g.bullets.push({kind:'bullet',id:12,ownerId:4,
@@ -717,5 +718,38 @@ for(const optimized of [false,true])for(const fps of [30,60,120,240])
   assert.deepEqual(r.hits,[]);
   assert.equal(r.g.__novaTerrain[0].hp,0);
   assert.equal(r.g.__novaTerrain[1].solid,true);
+ });
+}
+
+/* Reachable first-frame gameplay: the bullet was spawned without integrity
+ * fields by the real tryFire core. A wounded barricade breaks, and a rear
+ * exposed tank is hit with exactly 62% of the launch damage. Pre-initializing
+ * the same projectile must produce the same result. */
+for(const optimized of [false,true])for(const pen of [3,4]){
+ const Game=boot(optimized),label=optimized?'Battlefield + Performance':'Battlefield';
+ test(label+': first-frame breach has same damage as preinitialized pen'+pen,()=>{
+  const options={fps:30,speed:6000,pen,destructible:true,
+   wall:55,target:165,coverHp:5,realIntegrity:true};
+  const fresh=run(Game,options),initialized=run(Game,{...options,preinitialized:true});
+  for(const r of [fresh,initialized]){
+   assert.deepEqual(r.hits,[2]);
+   assert.ok(Math.abs(r.hp-(100-6.2))<1e-9,
+    'breach weakens the 10-damage projectile to 62%');
+   assert.ok(Math.abs(r.shot.dmg-6.2)<1e-9);
+   assert.ok(Math.abs(r.shot.hp-r.shot.maxHp*.62)<1e-9);
+   assert.equal(r.g.__novaTerrain[0].hp,0);
+  }
+  assert.equal(fresh.shot.maxHp,initialized.shot.maxHp);
+  assert.equal(fresh.shot.dmg,initialized.shot.dmg);
+ });
+ test(label+': reachable upgraded Marksman pen'+pen+' first-frame breach damage',()=>{
+  const speed=1050*(1+.085*8),radius=5.5*(1+21*.0085);
+  const r=run(Game,{fps:30,speed,pen,radius,damage:21,
+   destructible:true,wall:17,target:50,coverHp:5,realIntegrity:true});
+  assert.deepEqual(r.hits,[2]);
+  assert.ok(Math.abs(r.hp-(100-21*.62))<1e-9);
+  assert.ok(Math.abs(r.shot.dmg-21*.62)<1e-9);
+  assert.ok(Math.abs(r.shot.maxHp-
+   (21*(.72+radius*.08)*(1+pen*.055)))<1e-9);
  });
 }
