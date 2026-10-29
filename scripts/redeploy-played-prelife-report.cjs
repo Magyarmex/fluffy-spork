@@ -40,6 +40,10 @@ function reportPlayedFirstLife(report, expectedSeeds = 36) {
       throw Error('Nonfinite outcome: ' + key);
     layouts.add(row.layout + '/' + row.rotation);
     const p = a.prelude;
+    if(report.naturalExposurePilot &&
+       (typeof p.naturalDeath !== 'boolean' ||
+        !(p.elapsed <= report.preludeSeconds + 1 / row.hz + 1e-6)))
+      throw Error('Invalid natural-death exposure/censoring record: ' + key);
     const entry = {seed:row.seed, hz:row.hz, naturalDeath:p.naturalDeath,
       preludeElapsed:p.elapsed, preludeTravel:p.travelled,
       preludeNeutralXP:p.neutralXPEarned, preludeChangedShapes:p.changedShapes,
@@ -61,9 +65,14 @@ function reportPlayedFirstLife(report, expectedSeeds = 36) {
   const clustered = field => [...bySeed.values()].map(group => mean(group.map(x => x[field])));
   const metric = field => ({mean:mean(rows.map(x => x[field])),
     seedClusterBootstrap95:clusteredBootstrap(clustered(field))});
-  const naturalSeeds = [...bySeed.values()].filter(group => group.every(x => x.naturalDeath)).length;
-  const discordantSeeds = [...bySeed.values()].filter(group =>
-    group[0].naturalDeath !== group[1].naturalDeath).length;
+  // The two frame rates are repeated observations of the SAME seed, not
+  // independent trials. A seed dying at either rate is exposed; dying at
+  // both rates is a stricter reproducibility measure, not the exposure rate.
+  const anyNaturalSeeds = [...bySeed.values()].filter(group =>
+    group.some(x => x.naturalDeath)).length;
+  const bothNaturalSeeds = [...bySeed.values()].filter(group =>
+    group.every(x => x.naturalDeath)).length;
+  const discordantSeeds = anyNaturalSeeds - bothNaturalSeeds;
   const primary30 = rows.filter(x => x.hz===30);
   const technical60 = rows.filter(x => x.hz===60);
   const deathTimes = group => group.filter(x => x.naturalDeath).map(x => x.preludeElapsed);
@@ -76,10 +85,12 @@ function reportPlayedFirstLife(report, expectedSeeds = 36) {
     independentSeeds:bySeed.size, fpsPairedObservations:rows.length,
     layouts:[...layouts].sort(),
     firstLife:{naturalDeaths:rows.filter(x => x.naturalDeath).length,
-      independentNaturalDeathSeeds:naturalSeeds,
-      independentForcedDeathSeeds:bySeed.size-naturalSeeds-discordantSeeds,
+      independentNaturalDeathSeeds:anyNaturalSeeds,
+      independentNaturalDeathSeedsAtBothHz:bothNaturalSeeds,
+      independentForcedDeathSeeds:bySeed.size-anyNaturalSeeds,
       fpsDiscordantDeathSeeds:discordantSeeds,
-      naturalDeathExposureRate:naturalSeeds/bySeed.size,
+      naturalDeathExposureRate:anyNaturalSeeds/bySeed.size,
+      bothHzNaturalDeathRate:bothNaturalSeeds/bySeed.size,
       primary30Hz:{naturalDeaths:deathTimes(primary30).length,
         forcedDeaths:primary30.length-deathTimes(primary30).length,
         meanNaturalDeathTime:meanOrNull(deathTimes(primary30)),
@@ -88,7 +99,7 @@ function reportPlayedFirstLife(report, expectedSeeds = 36) {
         forcedDeaths:technical60.length-deathTimes(technical60).length,
         meanNaturalDeathTime:meanOrNull(deathTimes(technical60)),
         meanObservedTime:mean(technical60.map(x=>x.preludeElapsed))},
-      censoringNote:'Forced-death seeds are retained, not reclassified as naturally dead; do not estimate natural-death strategy effects from them.',
+      censoringNote:'Natural-death exposure counts independent seeds dying at EITHER frame rate; both-Hz deaths measure reproducibility. Forced-death seeds are retained, not reclassified as naturally dead; do not estimate causal strategy effects from them.',
       worldsWithPhysicalChange:changed,
       meanElapsed:mean(rows.map(x => x.preludeElapsed)),
       meanTravel:mean(rows.map(x => x.preludeTravel)),
