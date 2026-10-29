@@ -76,6 +76,7 @@ function patchCosmeticRng(html){
    const old=count(part,before),newCount=count(part,after);
    if(old===expected&&newCount===0)part=part.split(before).join(after);
    else if(old===0&&newCount===expected){} // idempotent
+   else if(old===expected&&newCount===expected&&after.includes(before)){} // guarded fallback contains original expression
    else {
     // Older materialized shells already contain the direct cosmetic call.
     // Upgrade them without weakening the canonical Game path; isolated
