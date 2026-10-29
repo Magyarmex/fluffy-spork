@@ -202,6 +202,7 @@ function run(seed,choice,hz,seconds,policy='navigate',preludeSeconds=0,experimen
     enemyBodiesHash:digest(aiAtInsertion),
     neutralBodiesHash:digest(neutralsAtInsertion)
   };
+  const rngDrawsAtInsertion=readDraws();
   const p=g.player,spawn={x:p.x,y:p.y};
   const nearestEnemyDistance=Math.min(Infinity,...(g.tanks||[])
    .filter(t=>t&&t.ai&&t.alive).map(t=>Math.hypot(t.x-p.x,t.y-p.y)));
@@ -298,7 +299,7 @@ function run(seed,choice,hz,seconds,policy='navigate',preludeSeconds=0,experimen
    }
   }
   return{seed,choice,baseChoice,generatedSpawn,hz,policy,prelude,deathTransitionTicks,postInsertion,
-   commonSafeSpawnStats,rngDrawsAtInsertion:readDraws(),layout,rotation,mirrored,initialShapes,
+   commonSafeSpawnStats,rngDrawsAtInsertion,layout,rotation,mirrored,initialShapes,
    fingerprint,fingerprintHash:crypto.createHash('sha256').update(fingerprint).digest('hex'),origin,spawn,
    nearestEnemyDistance:Number.isFinite(nearestEnemyDistance)?+nearestEnemyDistance.toFixed(3):null,
    startDistance:+startDistance.toFixed(2),
