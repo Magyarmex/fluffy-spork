@@ -2076,7 +2076,9 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   }
   for(var si=0;si<shapes.length;si++){
    var shape=shapes[si];if(!shape||!(shape.hp>0))continue;
-   if(shapeWasTeleported(g,shape))return false;
+   /* An unobserved/newly spawned shape has no trustworthy start position. */
+   if(shape.__novaShapeSweepEpoch!==g.__novaShapeSweepEpoch||
+      shapeWasTeleported(g,shape))return false;
    var ss=shapeSweepStart(g,shape);
    if(near(ss?ss.x:shape.x,ss?ss.y:shape.y,shape.x,shape.y,
       b.r+(shape.r||15)+Math.max(30,dt*800)))return false;
