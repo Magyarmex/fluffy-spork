@@ -270,7 +270,7 @@ test('FRESH/RETURN real-engine matched pilot is deterministic under counterbalan
  const seconds=natural?12:full?20:2,
   preludeSeconds=Number(process.env.NOVA_REDEPLOY_PRELIFE_SECONDS||0),seen=new Set();
  if(natural)assert.equal(preludeSeconds,60,'natural-death exposure pilot must predeclare 60s');
- assert.ok(Number.isFinite(preludeSeconds)&&preludeSeconds>=0&&preludeSeconds<=30,
+ assert.ok(Number.isFinite(preludeSeconds)&&preludeSeconds>=0&&preludeSeconds<=60,
   'pre-death simulation must be explicitly bounded');
  for(const hz of [30,60]){
   for(let i=0;i<seeds.length;i++){
