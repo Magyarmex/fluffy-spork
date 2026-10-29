@@ -724,7 +724,15 @@ mods['game/engine']=function(module,exports,require){
       var bearing=directions[(Math.round(a/(Math.PI/4))+8)%8];
       /* Straight-line distance is not a terrain-route promise. */
       var direct=Math.round(Math.hypot(origin.x-this.player.x,origin.y-this.player.y)/10)*10;
-      this.toast('↩ RETURN · FRONT '+bearing+' · ~'+direct+'u','info');
+      /* The number is a straight-line distance, not a promised route.
+       * A hull-clear direct path blocked by existing cover is useful
+       * information at redeploy; never infer enemy locations or path length. */
+      var detour='';
+      if(typeof this.hasLineOfSight==='function'){
+       try{if(!this.hasLineOfSight(this.player.x,this.player.y,origin.x,origin.y,24))
+        detour=' · DETOUR';}catch(ignore){} // No unverified terrain claim.
+      }
+      this.toast('↩ RETURN · FRONT '+bearing+' · ~'+direct+'u'+detour,'info');
      }else this.toast('↩ RETURN UNAVAILABLE · FRESH FRONT','info');
     }catch(ignore){} // Presentation cannot block a successful redeploy.
    }
