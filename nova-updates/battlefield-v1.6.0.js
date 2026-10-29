@@ -691,7 +691,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   var partialNonExpiring=nonExpiring&&b.pen===2&&b.hits===0&&
       contacts.length===2&&(!b.__novaDirectVictims||b.__novaDirectVictims.size===0);
   if(partialNonExpiring&&((b.knock||0)!==0||
-     contacts.some(function(c){return c.e.hp<=b.dmg*4;})))return false;
+     contacts.some(function(c){return c.e.hp<=b.dmg*4;})||
+     (g.bullets||[]).some(function(o){
+      return o&&o!==b&&!o.dead&&(o.splash||o.shell);
+     })))return false;
   if(nonExpiring ? (!partialNonExpiring&&contacts.length!==b.pen+1) :
      contacts.length<(allowSingle?1:(b.hits>0?1:2))||contacts.length>b.pen+1||contacts.length>3)
    return false;
@@ -721,10 +724,6 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   }
   for(var bi=0;bi<others.length;bi++){
    var o=others[bi];if(!o||o===b||o.dead)continue;
-   /* An unrelated blast can change a hull before this partial prefix
-    * completes even when its projectile misses the narrow bullet corridor.
-    * Defer partial chains whenever another live splash/shell exists. */
-   if(partialNonExpiring&&(o.splash||o.shell))return false;
    if(!Number.isFinite(o.x)||!Number.isFinite(o.y)||
       !Number.isFinite(o.vx)||!Number.isFinite(o.vy)||
       !Number.isFinite(o.r)||!(o.r>0))return false;
