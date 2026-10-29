@@ -24,7 +24,7 @@ function scene(){
   cooldowns:{bloom:100,migration:100,star:0},
   sectors:Array.from({length:16},()=>({value:0,maturity:.1,pressure:0,outbound:0})),
   stats:{blooms:0,migrations:0,starsSpawned:0,aiRotations:0}};
- const ctx={save(){},restore(){},beginPath(){},stroke(){},setLineDash(){},
+ const ctx={save(){},restore(){},beginPath(){},stroke(){},fill(){},setLineDash(){},
   arc(x,y,r){draws.push({kind:'arc',x,y,r});},
   fillText(text,x,y){draws.push({kind:'text',text,x,y});}};
  Object.assign(g,{time:100,status:'playing',player:{id:1,x:0,y:0,hp:100,alive:true},
