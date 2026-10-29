@@ -1801,7 +1801,10 @@ for(const optimized of [false,true]){
  for(const pen of [3,4])for(const fps of [30,60,120,240]){
   test((optimized?'full-performance':'battlefield')+
    ' canonical size=14 pen='+pen+' credits exact TTL hulls at '+fps+'Hz',()=>{
-   assert.match(html,/scout: \\{[\\s\\S]{0,650}size: 14/);
+   const scoutStart=html.indexOf('scout: {');
+   assert.ok(scoutStart>=0,'canonical Scout definition missing');
+   assert.ok(html.slice(scoutStart,scoutStart+650).includes('size: 14'),
+    'canonical Scout collision radius must be 14');
    const g=new Game(),positions=pen===3?[88,103,120,126]:[88,103,120,126,127];
    g.tanks=positions.map((x,i)=>({kind:'tank',id:i+2,x,y:0,
     cls:'scout',hp:150,alive:true,hitCount:0}));
