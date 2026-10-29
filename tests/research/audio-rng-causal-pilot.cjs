@@ -155,8 +155,9 @@ test('canonical audio noise-buffer RNG causal A/B in 12 seeds at 30/60Hz',()=>{
    erased=arm(seed,hz,'erased');
   assert.equal(off.initial,enabled.initial);
   assert.equal(off.initial,erased.initial);
-  assert.equal(enabled.interventionDraws,22050);
-  assert.equal(erased.interventionDraws,22050);
+  const expectedSharedDraws=process.env.NOVA_AUDIO_RNG_PATCHED==='1'?0:22050;
+  assert.equal(enabled.interventionDraws,expectedSharedDraws);
+  assert.equal(erased.interventionDraws,expectedSharedDraws);
   assert.equal(off.interventionDraws,0);
   const audioFirst=firstDifference(off,enabled);
   const erasedFirst=firstDifference(enabled,erased);
