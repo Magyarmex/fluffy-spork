@@ -14,7 +14,7 @@ function fixture(){
    generatedSpawn:spawns[base],postInsertion:nativePostInsertion[base],
    fingerprintHash:'matched-world-'+seed+'-'+hz,
    origin:{x:0,y:0},prelude:{ticks:240,elapsed:8},
-   nearestEnemyDistance:(base==='fresh'?300:350)+(position==='return'?-80:0),
+   nearestEnemyDistance:base===position?1200:300,
    hp:(base==='fresh'?100:97)+(position==='return'?-10:0),
    neutralXP:(base==='fresh'?8:10)+(position==='return'?4:0),
    score:20+(position==='return'?4:0),
@@ -38,6 +38,11 @@ test('crossed report identifies geography separately from generated enemy world'
  assert.equal(out.fpsRepeatedObservations,4);
  assert.equal(out.crossedWorldPairs,8);
  assert.equal(out.postInsertionParity.nativeFreshVsReturnEnemyBodiesSame,0);
+ assert.equal(out.spawnSafety.nativeBelow,0);
+ assert.equal(out.spawnSafety.offDiagonalBelow,8);
+ assert.equal(out.spawnSafety.independentSeedsWithAllFourCellsSafeAtBothHz,0);
+ assert.equal(out.spawnSafety.causalGeographyIdentified,false);
+ assert.match(out.spawnSafety.verdict,/FALSIFIED/);
  assert.equal(out.metrics.hp.conditionalGeographyReturnMinusFresh.mean,-10);
  assert.equal(out.metrics.hp.baseWorldReturnMinusFresh.mean,-3);
  assert.equal(out.metrics.hp.geographyByBaseInteraction.mean,0);
@@ -46,6 +51,17 @@ test('crossed report identifies geography separately from generated enemy world'
  assert.equal(out.metrics.neutralXP.conditionalGeographyReturnMinusFresh.mean,4);
  assert.equal(out.metrics.frontArrival.conditionalGeographyReturnMinusFresh.mean,1);
  assert.equal(out.metrics.fairEnemySeen.conditionalGeographyReturnMinusFresh.mean,1);
+});
+test('crossed report accepts only fully spawn-safe counterfactual support',()=>{
+ const data=fixture();
+ for(const row of data.results)
+  for(const base of ['fresh','return'])
+   for(const pos of ['fresh','return'])
+    row.worlds[base][pos].nearestEnemyDistance=1200;
+ const out=reportCrossed(data,2);
+ assert.equal(out.spawnSafety.offDiagonalBelow,0);
+ assert.equal(out.spawnSafety.independentSeedsWithAllFourCellsSafeAtBothHz,2);
+ assert.equal(out.spawnSafety.causalGeographyIdentified,true);
 });
 test('crossed report rejects base-world mismatches rather than calling them causal',()=>{
  const data=fixture();
