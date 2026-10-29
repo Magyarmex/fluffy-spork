@@ -411,3 +411,30 @@ for(const optimized of [false,true]){
   });
  }
 }
+
+/* Independent 1D first-surface oracle: a nonpiercing shot cannot damage
+ * later cover if the healthy hull was first, nor hit a hull behind cover.
+ * Distances keep both orders well away from tangencies and wall overlap.
+ * Synthetic fast rounds test correctness, not ordinary player hit rates. */
+test('1,000 seeded nonpiercing hull/destructible-cover orders at 30–240 Hz',()=>{
+ let seed=0x490147;
+ const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ const games=[boot(false),boot(true)];
+ let frontCount=0,behindCount=0;
+ for(const fps of [30,60,120,240])for(let i=0;i<250;i++){
+  const wall=80+rand()*140,front=rand()<.55,
+   target=front?25+rand()*(wall-65):wall+45+rand()*60,
+   wallShape=rand()<.5?'rect':'circle',speed=(wall+170)*fps;
+  for(const Game of games){
+   const r=run(Game,{fps,wall,target,speed,wallShape,pen:0,destructible:true});
+   assert.deepEqual(r.hits,front?[2]:[],
+    'wrong first surface at '+fps+'Hz world '+i);
+   assert.equal(r.hp,front?90:100);
+   assert.equal(r.g.__novaTerrain[0].hp,front?1000:990,
+    'wrong cover damage at '+fps+'Hz world '+i);
+   assert.equal(r.g.bullets.length,0);
+  }
+  if(front)frontCount++;else behindCount++;
+ }
+ assert.ok(frontCount>400&&behindCount>300,'both orders exercised');
+});
