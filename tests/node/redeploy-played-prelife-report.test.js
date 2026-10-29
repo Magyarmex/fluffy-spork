@@ -46,3 +46,27 @@ test('rejects instant-death and nonfinite outcomes',()=>{
   s.preludeSeconds=8;s.results[0].returning.hp=NaN;
   assert.throws(()=>reportPlayedFirstLife(s,2),/Nonfinite outcome/);
 });
+
+test('natural-death exposure counts independent seeds and retains FPS disagreement',()=>{
+  const s=sample();
+  for(const row of s.results){
+    if(row.seed===1 || (row.seed===2&&row.hz===30))
+      row.fresh.prelude.naturalDeath=true;
+  }
+  const summary=reportPlayedFirstLife(s,2);
+  assert.equal(summary.firstLife.naturalDeaths,3,'raw FPS observations are reported');
+  assert.equal(summary.firstLife.independentNaturalDeathSeeds,1);
+  assert.equal(summary.firstLife.independentForcedDeathSeeds,0);
+  assert.equal(summary.firstLife.fpsDiscordantDeathSeeds,1,
+    'a frame-rate-dependent natural death is evidence, not a fatal analysis error');
+  assert.equal(summary.firstLife.naturalDeathExposureRate,.5);
+  assert.match(summary.firstLife.censoringNote,/Forced-death/);
+});
+test('zero natural deaths is reported as zero rather than disguised as natural play',()=>{
+  const summary=reportPlayedFirstLife(sample(),2);
+  assert.equal(summary.firstLife.naturalDeaths,0);
+  assert.equal(summary.firstLife.independentNaturalDeathSeeds,0);
+  assert.equal(summary.firstLife.independentForcedDeathSeeds,2);
+  assert.equal(summary.firstLife.fpsDiscordantDeathSeeds,0);
+  assert.equal(summary.firstLife.naturalDeathExposureRate,0);
+});
