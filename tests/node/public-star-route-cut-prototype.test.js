@@ -15,10 +15,11 @@ function world(signal=sig(),shapes=[]){
   novaBattlefieldWaypoint:()=>({x:0,y:100})};
 }
 function approx(a,b){assert.ok(Math.abs(a-b)<1e-8,'expected '+b+' got '+a);}
-test('prototype speed envelope is bounded by actual shipping Star speed caps',()=>{
+test('prototype nominal speed envelope follows current shipping Star constants',()=>{
  const core=fs.readFileSync(path.join(__dirname,'../../index.html'),'utf8');
  const instincts=fs.readFileSync(path.join(__dirname,'../../nova-updates/living-front-instincts-v1.12.0.js'),'utf8');
  assert.ok(core.includes('star: { hp: 340, xp: 500, r: 24, speed: 78'));
+ assert.ok(core.includes('let s = 124 * def.moveMult'));
  assert.ok(instincts.includes('STAR_SPEED_MULT=1.95'));
  assert.ok(instincts.includes('cap(s,sp*1.12)'));
  const t=pilot.publicRouteCutTarget(world(),p);
