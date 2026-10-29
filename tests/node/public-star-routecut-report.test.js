@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
-const {collate}=require('../../scripts/public-star-routecution-report.cjs');
+const {collate}=require('../../scripts/public-star-routecut-report.cjs');
 const layouts=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
 function fixture(){
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'nova-star-pairs-'));
