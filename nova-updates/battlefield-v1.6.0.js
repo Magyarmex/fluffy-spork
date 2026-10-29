@@ -1904,6 +1904,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   for(var bi=0;bi<shots.length;bi++){
    var o=shots[bi];if(!o||o===b||
       o.__novaWallProofEpoch!==g.__novaWallProofEpoch)continue;
+   /* A previous terrain/shell event may already have moved or killed this
+    * shot; never reconstruct its pre-frame path from a frozen endpoint.
+    * Shell/blast side effects also have a larger competition radius. */
+   if(o.dead||o.shell||o.splash||o.__v17Cannon)return false;
    if(!Number.isFinite(o.x)||!Number.isFinite(o.y)||
       !Number.isFinite(o.vx)||!Number.isFinite(o.vy)||
       !Number.isFinite(o.r)||!(o.r>0))return false;
