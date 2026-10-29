@@ -178,3 +178,24 @@ for(const optimized of [false,true]){
   assert.equal(r.cover.hp,0);
  });
 }
+
+/* #147: two genuinely breached covers in the same physical frame must not
+ * make the permanent pillar behind them transparent. This is a separate
+ * chronology gate from the already-shipped first-breach/second-solid case.
+ * The second cover must take its own structural damage, not merely block
+ * the hull by deleting the shot before its physical impact. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized);
+ for(const beam of [false,true])for(const fps of [30,60,120,240]){
+  test((optimized?'optimized':'baseline')+' '+(beam?'rail':'ordinary')+
+   ': two breached covers then pillar at '+fps+'Hz',()=>{
+   const dt=1/fps;
+   const r=run(Game,{beam,rail:beam,secondCoverHp:5,dt,speed:607.662*fps});
+   assert.equal(r.cover.hp,0,'first cover breached');
+   assert.equal(r.secondCover.hp,0,'second cover must also breach');
+   assert.equal(r.hp,100,'permanent pillar must protect rear Scout');
+   assert.deepEqual(r.hits,[]);
+   assert.equal(r.bullet.dead,true,'pillar must consume the shot');
+  });
+ }
+}
