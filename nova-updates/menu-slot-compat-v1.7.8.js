@@ -577,7 +577,7 @@ function paint(g){
   row.appendChild(b);
  }
  make('fresh','⚡ FRESH · RANDOM','Original random insertion, normally away from the last position.');
- make('return','↩ RETURN · NEAR DEATH','Re-enter 420–850 world units from the last death, where terrain allows.');
+ make('return','↩ RETURN · NEAR FRONT','Re-enter 420–850 world units from the last death, where terrain allows.');
  g.__novaFrontRow=row;
  g.__novaFrontOriginalButton=target.before;
  g.__novaFrontOriginalDisplay=target.before.style?target.before.style.display:'';
