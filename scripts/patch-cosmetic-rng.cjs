@@ -49,7 +49,7 @@ const patches=[
   ['        if (Math.random() < 0.5)\n            this.addText', '        if (this.cosmeticRandom() < 0.5)\n            this.addText',1],
   ['(0, types_1.rnd)(-10, 10)', 'this.cosmeticRnd(-10, 10)',1]
  ]],
- ['    updateBullets(', '    resolveBulletCollisions(', [
+ ['    updateBullets(', '    splashAt(', [
   ['if (b.beam && Math.random() < 0.85)', 'if (b.beam && this.cosmeticRandom() < 0.85)',1],
   ['else if (Math.random() < 0.22)', 'else if (this.cosmeticRandom() < 0.22)',1]
  ]],
