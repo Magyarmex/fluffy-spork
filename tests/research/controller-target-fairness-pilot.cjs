@@ -5,7 +5,13 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
+// The shared fixture also registers an unrelated audio baseline test unless
+// explicitly imported in fixture-only mode. Do not weaken either test.
+const previousAudioMode=process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL;
+process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
 const {bootGame,withSeed}=require('./audio-rng-causal-pilot.cjs');
+if(previousAudioMode===undefined)delete process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL;
+else process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL=previousAudioMode;
 const root=path.resolve(__dirname,'../..');
 function arm(seed,hz,playerFlag){
  return withSeed(seed,()=>{
