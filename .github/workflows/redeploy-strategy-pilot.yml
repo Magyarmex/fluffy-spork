@@ -13,6 +13,8 @@ on:
       - 'tests/node/redeploy-played-prelife-report.test.js'
       - 'scripts/redeploy-played-prelife-report.cjs'
       - 'scripts/redeploy-crossed-geography-report.cjs'
+      - 'scripts/redeploy-common-safe-report.cjs'
+      - 'tests/node/redeploy-common-safe-report.test.js'
       - 'tests/node/redeploy-crossed-geography-report.test.js'
       - '.github/workflows/redeploy-strategy-pilot.yml'
   workflow_dispatch:
@@ -184,4 +186,36 @@ jobs:
           name: nova-redeploy-crossed-geography
           path: artifacts/redeploy-pilot/crossed-*
           if-no-files-found: warn
+          retention-days: 30
+
+  common-safe-geography:
+    # Research-only controlled comparison. Both actual FRESH and RETURN
+    # insertion positions receive the SAME enemy/neutral world, generated
+    # through real Game.spawnAITank with >=1000u clearance from both.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Run supported common-safe worlds at 30/60 Hz
+        env:
+          NOVA_REDEPLOY_COMMON_SAFE_PILOT: '1'
+          NOVA_REDEPLOY_PRELIFE_SECONDS: '8'
+          NOVA_REDEPLOY_POLICY: harvest_roam
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/redeploy-pilot
+          node --test tests/node/redeploy-paired-real-pilot.test.js 2>&1 | tee artifacts/redeploy-pilot/common-safe-run.log
+      - name: Fail closed on initial spawn, RNG or world mismatch
+        run: node scripts/redeploy-common-safe-report.cjs artifacts/redeploy-pilot/common-safe-geography.json
+      - name: Preserve supported counterfactual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-redeploy-common-safe-geography
+          path: artifacts/redeploy-pilot/common-safe-*
+          if-no-files-found: error
           retention-days: 30
