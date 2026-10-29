@@ -70,7 +70,7 @@ function boot(optimized){
 }
 function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,
  wallShape='rect',otherShape=false,otherBullet=false,otherShell=false,moving=false,
- remoteBullets=0,
+ remoteBullets=0,laterCoverHp=null,
  shield=false,otherTank=false,ttl=1,pen=1,radius=3,laterWall=null,
  active=true,knock=0,allied=false,destructible=false,damage=10,
  linearMove=null,tamperMove=false,doubleMove=false,
@@ -89,7 +89,7 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,
  g.__novaTerrain=[wallShape==='rect'
   ?{id:-1,shape:'rect',x:wall,y:wallY,w:10,h:80,solid:true,destructible,hp:destructible?coverHp:0,maxHp:destructible?coverHp:0}
    :{id:-1,shape:'circle',x:wall,y:wallY,r:5,solid:true,destructible,hp:destructible?coverHp:0,maxHp:destructible?coverHp:0}];
- if(laterWall!=null)g.__novaTerrain.push({id:-2,shape:'rect',x:laterWall,y:0,w:10,h:80,solid:true,destructible:false,hp:0,maxHp:0});
+ if(laterWall!=null)g.__novaTerrain.push({id:-2,shape:'rect',x:laterWall,y:0,w:10,h:80,solid:true,destructible:laterCoverHp!=null,hp:laterCoverHp||0,maxHp:laterCoverHp||0});
  g.bullets=[{kind:'bullet',id:10,ownerId:1,x:0,y:0,
   vx:speed,vy,r:radius,dmg:damage,knock,ttl,pen,hits:0,dead:false,shell:false,beam:false}];
  if(otherBullet)g.bullets.push({kind:'bullet',id:11,ownerId:4,
@@ -638,5 +638,44 @@ for(const optimized of [false,true])for(const pen of [3,4]){
   assert.equal(r.hp,100);
   assert.equal(r.g.__novaTerrain[0].hp,0);
   assert.equal(r.g.__novaTerrain[1].solid,true);
+ });
+}
+
+/* Run 442 regression-first: a second, intact barricade is still physical
+ * cover after a high-penetration shot breaches the first barricade. The
+ * original core would otherwise advance directly to the rear hull. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'Battlefield + Performance':'Battlefield';
+ for(const fps of [30,60,120,240])for(const pen of [3,4]){
+  test(label+': pen'+pen+' breach then intact second cover absorbs at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:200*fps,pen,destructible:true,
+    wall:55,laterWall:110,laterCoverHp:1000,target:165,coverHp:5});
+   assert.deepEqual(r.hits,[],'intact second barricade protects rear Scout');
+   assert.equal(r.hp,100);
+   assert.equal(r.g.__novaTerrain[0].hp,0,'first barricade breaks once');
+   assert.equal(r.g.__novaTerrain[1].hp,990,'second barricade takes one hit');
+   assert.equal(r.g.__novaTerrain[1].solid,true);
+   assert.equal(r.g.bullets.length,0,'second barricade consumes shot');
+  });
+  test(label+': pen'+pen+' earlier middle hull is not erased by second cover at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:200*fps,pen,destructible:true,
+    wall:55,laterWall:145,laterCoverHp:1000,target:95,coverHp:5});
+   assert.deepEqual(r.hits,[2]);
+   assert.equal(r.hp,90);
+   assert.equal(r.g.__novaTerrain[0].hp,0);
+  });
+ }
+}
+for(const optimized of [false,true])for(const pen of [3,4]){
+ test((optimized?'Battlefield + Performance':'Battlefield')+
+  ': reachable Marksman pen'+pen+' damages second intact barricade, not rear hull',()=>{
+  const speed=1050*(1+.085*8),radius=5.5*(1+21*.0085);
+  const r=run(boot(optimized),{fps:30,speed,pen,radius,damage:21,
+   destructible:true,wall:17,laterWall:35,laterCoverHp:1000,
+   target:60,coverHp:5});
+  assert.deepEqual(r.hits,[]);
+  assert.equal(r.hp,100);
+  assert.equal(r.g.__novaTerrain[0].hp,0);
+  assert.equal(r.g.__novaTerrain[1].hp,979);
  });
 }
