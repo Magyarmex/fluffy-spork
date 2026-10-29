@@ -308,7 +308,7 @@ test('return distance cue is bounded and rounded without leaking hidden world st
   const expected=Math.round(distance/10)*10;
   assert.ok(distance>=420-1e-8&&distance<=850+1e-8);
   assert.equal(g.toasts.length,1);
-  assert.match(g.toasts[0].message,/^↩ RETURN · FRONT (E|SE|S|SW|W|NW|N|NE) · ~\\d+u$/);
+  assert.match(g.toasts[0].message,/^↩ RETURN · FRONT (E|SE|S|SW|W|NW|N|NE) · ~\d+u$/);
   assert.ok(g.toasts[0].message.endsWith('~'+expected+'u'));
   assert.equal(g.__novaRedeployOrigin,null);
  }
