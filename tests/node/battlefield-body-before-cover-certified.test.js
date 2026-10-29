@@ -407,8 +407,8 @@ for(const optimized of [false,true]){
     linearMove:{vx:-600,vy:0},tamperMove:true});
    assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
   });
-  test(label+': pen3 breach chain still abstains at '+fps+'Hz',()=>{
-   const r=run(Game,{fps,speed:200*fps,pen:3,destructible:true});
+  test(label+': pen3 with competing shell still abstains at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:200*fps,pen:3,destructible:true,otherShell:true});
    assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
    assert.equal(r.g.__novaTerrain[0].hp,990);
   });
@@ -504,6 +504,34 @@ for(const optimized of [false,true]){
    assert.deepEqual(r.hits,[2]);assert.equal(r.hp,90);
    assert.equal(r.g.__novaTerrain[0].hp,0);
    assert.equal(r.g.bullets.length,0);
+  });
+ }
+}
+
+/* A penetrating round can legitimately strike a hull before a later intact
+ * barricade even when pen=3/4. Only the non-breaching case is certified:
+ * if the later cover could break, leave that event chain to the original
+ * owner until a full chronological breach solver exists. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'Battlefield + Performance':'Battlefield';
+ for(const fps of [30,60,120,240])for(const pen of [3,4]){
+  test(label+': pen'+pen+' first hull then intact cover at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:200*fps,pen,destructible:true,coverHp:1000});
+   assert.deepEqual(r.hits,[2]);assert.equal(r.hp,90);
+   assert.equal(r.g.__novaTerrain[0].hp,990);
+   assert.equal(r.g.bullets.length,0);
+  });
+  test(label+': pen'+pen+' cover first still protects hull at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:200*fps,pen,destructible:true,
+    wall:40,target:140,coverHp:1000});
+   assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
+   assert.equal(r.g.__novaTerrain[0].hp,990);
+  });
+  test(label+': pen'+pen+' shielded hull cannot claim first hit at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:200*fps,pen,destructible:true,
+    shield:true,coverHp:1000});
+   assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
+   assert.equal(r.g.__novaTerrain[0].hp,990);
   });
  }
 }
