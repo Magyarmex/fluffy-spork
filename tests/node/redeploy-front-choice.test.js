@@ -179,6 +179,23 @@ test('return direction reflects actual spawn quadrant rather than a guessed map 
  g.redeploy();
  assert.deepEqual(g.toasts,[{message:'↩ RETURN · FRONT N · ~530u',kind:'info'}]);
 });
+test('RETURN marks a cover-blocked direct approach as a detour without claiming a route length',()=>{
+ const {Game}=boot({random:()=>0}),g=new Game(),calls=[];
+ g.hasLineOfSight=(ax,ay,bx,by,pad)=>{calls.push({ax,ay,bx,by,pad});return false;};
+ g.killTank(victim(100,200));g.update();g.__novaRedeployChoice='return';
+ g.redeploy();
+ assert.deepEqual(calls,[{ax:520,ay:200,bx:100,by:200,pad:24}]);
+ assert.deepEqual(g.toasts,[{message:'↩ RETURN · FRONT W · ~420u · COVER',kind:'info'}]);
+ assert.ok(g.__novaLastFrontMarker,'a detour never suppresses the remembered-front waypoint');
+});
+test('RETURN does not invent a detour when terrain is clear or its query fails',()=>{
+ for(const los of [()=>true,()=>{throw Error('terrain owner unavailable');}]){
+  const {Game}=boot({random:()=>0}),g=new Game();g.hasLineOfSight=los;
+  g.killTank(victim(100,200));g.update();g.__novaRedeployChoice='return';
+  assert.doesNotThrow(()=>g.redeploy());
+  assert.deepEqual(g.toasts,[{message:'↩ RETURN · FRONT W · ~420u',kind:'info'}]);
+ }
+});
 test('terrain-blocked return explicitly announces legacy fresh fallback',()=>{
  const {Game}=boot({safe:()=>false,random:()=>0}),g=new Game();
  g.killTank(victim(100,200));g.update();g.__novaRedeployChoice='return';

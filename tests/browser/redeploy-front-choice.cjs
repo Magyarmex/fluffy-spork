@@ -117,23 +117,34 @@ async function run(browser,width,height){
   },starClock.id);
   await returnButton.click();
   await page.waitForFunction(()=>window.__novaFrontSmokeGame?.status==='playing',null,{timeout:15000});
-  const after=await page.evaluate(()=>{
+  const after=await page.evaluate(origin=>{
    const g=window.__novaFrontSmokeGame;
+   const directBlocked=!g.hasLineOfSight(g.player.x,g.player.y,origin.x,origin.y,24);
    return {x:g.player.x,y:g.player.y,choice:g.__novaRedeployChoice,
-    terrain:g.isTerrainSafe(g.player.x,g.player.y,75),notices:window.__novaFrontNotices};
-  });
+    directBlocked,terrain:g.isTerrainSafe(g.player.x,g.player.y,75),
+    notices:window.__novaFrontNotices};
+  },death);
   // The original notice is transient: verify it while visible, before
   // running extra full-canvas pixel comparisons and unrelated star checks.
   const directions=['E','SE','S','SW','W','NW','N','NE'];
   const angle=Math.atan2(death.y-after.y,death.x-after.x);
   const bearing=directions[(Math.round(angle/(Math.PI/4))+8)%8];
   const direct=Math.round(Math.hypot(death.x-after.x,death.y-after.y)/10)*10;
-  const cue='↩ RETURN · FRONT '+bearing+' · ~'+direct+'u';
+  const cue='↩ RETURN · FRONT '+bearing+' · ~'+direct+'u'+
+   (after.directBlocked?' · COVER':'');
   assert.ok(after.notices.some(n=>n.message===cue),
    'real React redeploy must tell the player the direction of their witnessed last front: '+
    JSON.stringify(after.notices));
   await page.getByText(cue,{exact:true})
    .waitFor({state:'visible',timeout:2000});
+  const cueFit=await page.getByText(cue,{exact:true}).evaluate(el=>{
+   const rect=el.getBoundingClientRect();
+   return {left:rect.left,right:rect.right,viewport:innerWidth,
+    scrollWidth:document.documentElement.scrollWidth};
+  });
+  assert.ok(cueFit.left>=-1&&cueFit.right<=cueFit.viewport+1&&
+   cueFit.scrollWidth<=cueFit.viewport+1,
+   'RETURN orientation notice must fit the actual mobile viewport: '+JSON.stringify(cueFit));
   const survivingStar=await page.evaluate(id=>{
    const g=window.__novaFrontSmokeGame,star=g.getShape(id);
    return star?{age:g.time-star.__lfStarBorn,announced:star.__lfPublicAnnounced,
