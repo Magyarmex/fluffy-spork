@@ -320,11 +320,13 @@ wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.
   * body trajectory for the narrowly bounded body-before-wall resolver.
   * Subsequent movement, collision, phase relocation or endpoint mutation
   * invalidates the witness. No interpolated AI/dash motion is inferred. */
- if(t.__novaLinearMoveEpoch!==this.time){
-  t.__novaLinearMoveEpoch=this.time;t.__novaLinearMoveCalls=0;
+ if(t.cls==='scout'){
+  if(t.__novaLinearMoveEpoch!==this.time){
+   t.__novaLinearMoveEpoch=this.time;t.__novaLinearMoveCalls=0;
+  }
+  t.__novaLinearMoveCalls++;
+  t.__novaLinearMoveValid=false;
  }
- t.__novaLinearMoveCalls++;
- t.__novaLinearMoveValid=false;
  if(t.__novaSweepMoveTime!==this.time){t.__novaSweepMoveTime=this.time;t.__novaSweepPrevX=ox;t.__novaSweepPrevY=oy;}var out=oldMove.call(this,t,vx,vy,dt),r=terrainRadiusForTank(t,CLASSES),hit=circleResolve(this,t,r);if(hit){var moved=Math.hypot(t.x-ox,t.y-oy);if(!t.isPlayer&&t.ai){t.ai.__novaTerrainStuck=(t.ai.__novaTerrainStuck||0)+(moved<Math.hypot(vx,vy)*dt*.18?dt:0);if(t.ai.__novaTerrainStuck>.28){t.ai.strafe=(t.ai.strafe||1)*-1;t.ai.wanderA=(t.angle||0)+(t.ai.strafe||1)*(1.0+Math.random()*.65);t.ai.wanderT=.55+Math.random()*.7;t.ai.thinkT=0;t.ai.__novaTerrainStuck=0;}}else if(t.isPlayer&&this.sfx&&this.sfx.novaTerrainScrape&&Math.hypot(vx,vy)>45)this.sfx.novaTerrainScrape((t.x-(this.player?this.player.x:t.x))/600);}else if(t.ai)t.ai.__novaTerrainStuck=Math.max(0,(t.ai.__novaTerrainStuck||0)-dt*2);
  if(t.cls==='scout'&&t.alive&&t.__novaLinearMoveCalls===1&&
     !hit&&Number.isFinite(dt)&&dt>0&&
@@ -333,8 +335,7 @@ wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.
     Number.isFinite(t.vx)&&Number.isFinite(t.vy)&&
     Math.hypot(t.x-ox,t.y-oy)>1e-8&&
     Math.hypot(t.x-ox-t.vx*dt,t.y-oy-t.vy*dt)<1e-6&&
-    Math.hypot(t.x-ox,t.y-oy)<96&&
-    !firstSolidHit(this,ox,oy,t.x,t.y,r+.5)){
+    Math.hypot(t.x-ox,t.y-oy)<96){
   t.__novaLinearMoveValid=true;
   t.__novaLinearMoveDt=dt;
   t.__novaLinearMoveStartX=ox;t.__novaLinearMoveStartY=oy;
@@ -1900,6 +1901,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
        t.__novaLinearMoveStartY===sy&&
        t.__novaLinearMoveEndX===t.x&&
        t.__novaLinearMoveEndY===t.y;
+   /* Do the terrain sweep only for a potentially qualifying pre-cover
+    * shot, not once per Scout on every simulation frame. */
+   if(linear&&firstSolidHit(g,sx,sy,t.x,t.y,def.size+3.5))
+    return false;
    if(t.__novaSweepMoveTime!==g.time||
       !Number.isFinite(sx)||!Number.isFinite(sy)||
       !Number.isFinite(t.x)||!Number.isFinite(t.y)||
