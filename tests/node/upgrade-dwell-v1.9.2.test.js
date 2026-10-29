@@ -209,3 +209,17 @@ test('ultimate delayed touch click is suppressed even with zero detail or mouse-
   }
   assert.equal(swallowed, 4, 'touch-origin ultimate click must never execute twice');
 });
+
+test('ultimate stylus activation cannot double-fire from a pen compatibility click', () => {
+  const { window } = boot();
+  const fx = ultimateFixture();
+  const bridge = window.__NOVA_MULTITOUCH_ULTIMATE_TEST__;
+  let swallowed = 0;
+  bridge.onPointerDown({ pointerType: 'pen', target: fx.target, cancelable: true,
+    preventDefault() {}, stopPropagation() {} });
+  assert.equal(fx.clicks(), 1);
+  bridge.onClickCapture({ pointerType: 'pen', detail: 1,
+    sourceCapabilities: { firesTouchEvents: false }, target: fx.target, cancelable: true,
+    preventDefault() { swallowed++; }, stopImmediatePropagation() { swallowed++; } });
+  assert.equal(swallowed, 2, 'pen follow-up click is not an independent mouse click');
+});
