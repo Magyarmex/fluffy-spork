@@ -1603,3 +1603,28 @@ for(const optimized of [false,true]) {
       'third contact remains owned by the next frame');
   });
 }
+
+/* Reachable Marksman build: base 1050u/s, eight bullet-speed upgrades
+ * (1050*(1+0.085*8)=1764u/s), base pen=2, 21 damage, no gene.
+ * At 30Hz the first two hulls are physically contacted before x=58.8;
+ * the third first-contact occurs later. */
+for(const optimized of [false,true]) {
+  test((optimized?'optimized':'baseline')+
+    ' upgraded canonical Marksman pen-2 preserves a split-frame third hit',()=>{
+    const Game=boot(undefined,optimized),g=threeHullPen2(Game);
+    g.tanks[0].x=26;g.tanks[1].x=56;g.tanks[2].x=86;
+    const b=g.bullets[0];
+    b.vx=1050*(1+.085*8);
+    b.dmg=21;
+    b.r=5.5*(1+21*.0085);
+    b.ttl=1.6;
+    g.time+=1/30;g.updateBullets(1/30);
+    assert.deepEqual(g.tanks.map(t=>t.hitCount),[1,1,0],
+      'two first-frame physical contacts must be credited');
+    for(let i=0;i<5&&g.bullets.length;i++){
+      g.time+=1/30;g.updateBullets(1/30);
+    }
+    assert.deepEqual(g.tanks.map(t=>t.hitCount),[1,1,1],
+      'the remaining penetration reaches the third hull in a later frame');
+  });
+}
