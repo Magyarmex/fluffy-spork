@@ -61,8 +61,11 @@ function boot(optimized){
 }
 function run(Game,{fps=30,speed=6000,wall=120,target=60,
  wallShape='rect',otherShape=false,otherBullet=false,moving=false,
- shield=false,otherTank=false,ttl=1,pen=1,radius=3}={}){
+ shield=false,otherTank=false,ttl=1,pen=1,radius=3,
+ active=true,knock=0,allied=false,destructible=false}={}){
  const g=new Game(),dt=1/fps;
+ g.__novaShapeSweepActive=active;
+ g.areAllies=()=>allied;
  const t={kind:'tank',id:2,cls:'scout',x:target,y:0,hp:100,
   alive:true,__novaSweepMoveTime:1,__novaSweepPrevX:moving?target-4:target,
   __novaSweepPrevY:0,spawnShieldT:shield?2:0};
@@ -72,9 +75,9 @@ function run(Game,{fps=30,speed=6000,wall=120,target=60,
  if(otherShape)g.shapes.push({kind:'shape',id:4,x:30,y:0,r:8,hp:100});
  g.__novaTerrain=[wallShape==='rect'
   ?{id:-1,shape:'rect',x:wall,y:0,w:10,h:80,solid:true,destructible:false}
-  :{id:-1,shape:'circle',x:wall,y:0,r:5,solid:true,destructible:false}];
+  :{id:-1,shape:'circle',x:wall,y:0,r:5,solid:true,destructible,hp:destructible?1000:0,maxHp:destructible?1000:0}];
  g.bullets=[{kind:'bullet',id:10,ownerId:1,x:0,y:0,
-  vx:speed,vy:0,r:radius,dmg:10,ttl,pen,hits:0,dead:false,shell:false,beam:false}];
+  vx:speed,vy:0,r:radius,dmg:10,knock,ttl,pen,hits:0,dead:false,shell:false,beam:false}];
  if(otherBullet)g.bullets.push({kind:'bullet',id:11,ownerId:4,
   x:0,y:1,vx:speed,vy:0,r:3,dmg:10,ttl:1,pen:0,hits:0,dead:false});
  g.updateBullets(dt);
@@ -85,6 +88,7 @@ for(const optimized of [false,true]){
  test(label+': stationary scout BEFORE a later permanent wall is hit',()=>{
   const r=run(boot(optimized));
   assert.deepEqual(r.hits,[2]);assert.equal(r.hp,90);
+  assert.equal(r.g.bullets.length,0,'later wall must still stop the round');
  });
  test(label+': circular pillar behind a body cannot veto earlier contact',()=>{
   const r=run(boot(optimized),{wallShape:'circle'});
@@ -131,6 +135,18 @@ for(const optimized of [false,true]){
    const r=run(boot(optimized),{pen});
    assert.deepEqual(r.hits,[2]);assert.equal(r.hp,90);
   }
+ });
+ test(label+': no live movement epoch never authorizes early damage',()=>{
+  assert.deepEqual(run(boot(optimized),{active:false}).hits,[]);
+ });
+ test(label+': knockback effects remain on canonical path',()=>{
+  assert.deepEqual(run(boot(optimized),{knock:30}).hits,[]);
+ });
+ test(label+': allied tank cannot be damaged by the shortcut',()=>{
+  assert.deepEqual(run(boot(optimized),{allied:true}).hits,[]);
+ });
+ test(label+': destructible cover remains with existing breach authority',()=>{
+  assert.deepEqual(run(boot(optimized),{destructible:true}).hits,[]);
  });
  test(label+': pen=5 remains outside this bounded proof',()=>{
   const r=run(boot(optimized),{pen:5});
