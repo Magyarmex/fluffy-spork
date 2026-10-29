@@ -41,6 +41,7 @@ test('crossed report identifies geography separately from generated enemy world'
  assert.equal(out.spawnSafety.nativeBelow,0);
  assert.equal(out.spawnSafety.offDiagonalBelow,8);
  assert.equal(out.spawnSafety.independentSeedsWithAllFourCellsSafeAtBothHz,0);
+ assert.equal(out.spawnSafety.nativeSpawnSupportSatisfied,false);
  assert.equal(out.spawnSafety.causalGeographyIdentified,false);
  assert.match(out.spawnSafety.verdict,/FALSIFIED/);
  assert.equal(out.metrics.hp.conditionalGeographyReturnMinusFresh.mean,-10);
@@ -61,7 +62,8 @@ test('crossed report accepts only fully spawn-safe counterfactual support',()=>{
  const out=reportCrossed(data,2);
  assert.equal(out.spawnSafety.offDiagonalBelow,0);
  assert.equal(out.spawnSafety.independentSeedsWithAllFourCellsSafeAtBothHz,2);
- assert.equal(out.spawnSafety.causalGeographyIdentified,true);
+ assert.equal(out.spawnSafety.nativeSpawnSupportSatisfied,true);
+ assert.equal(out.spawnSafety.causalGeographyIdentified,false,'spawn support alone cannot establish causality');
 });
 test('crossed report rejects base-world mismatches rather than calling them causal',()=>{
  const data=fixture();
