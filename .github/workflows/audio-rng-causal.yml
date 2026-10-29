@@ -1,0 +1,39 @@
+name: NOVA Audio RNG Causal A/B
+
+on:
+  push:
+    branches:
+      - 'nova/audio-rng-causal-*'
+    paths:
+      - 'tests/research/audio-rng-causal-pilot.cjs'
+      - '.github/workflows/audio-rng-causal.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: nova-audio-rng-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  causal-ab:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Test audio noise buffer's shared RNG effect in materialized game
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/audio-rng-causality
+          node --test tests/research/audio-rng-causal-pilot.cjs 2>&1 |
+            tee artifacts/audio-rng-causality/run.log
+      - name: Preserve causal results including negative findings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-audio-rng-causal-ab
+          path: artifacts/audio-rng-causality/
+          if-no-files-found: warn
+          retention-days: 30
