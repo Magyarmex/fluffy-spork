@@ -1803,7 +1803,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
  /* Issue #147: one provable tank-before-permanent-wall first contact.
   * Battlefield's terrain pre-pass otherwise destroys the shot before the
   * shipping core can resolve an earlier hull. This is NOT a general
-  * chronological solver: only a single ordinary non-piercing, nonlethal,
+  * chronological solver: only a single ordinary non-shell, nonlethal,
   * witnessed-stationary hostile hull with no nearby competing events may
   * be settled here. Everything uncertain remains on the old path. */
  function certifiedTankBeforePermanentWall(g,b,dt,ax,ay,ex,ey,wall){
