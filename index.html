@@ -247,7 +247,7 @@ canvas {
     <link rel="icon" href="./nova-icon.svg" type="image/svg+xml" />
     <meta name="application-name" content="NOVA TANKS" />
     <script defer src="./pwa-register.js"></script>
-      <meta name="nova-runtime-build" content="e45a26a749789b9aa7eaa54d" />
+      <meta name="nova-runtime-build" content="eb2d040c7e83c96488f833ec" />
   </head>
   <body>
     <div id="root"></div>
@@ -998,8 +998,8 @@ function updateAI(t, g, dt) {
         else if (d < ai.preferredRange * 0.62)
             radial = -1;
         ai.strafe = ai.strafe || (Math.random() < 0.5 ? -1 : 1);
-        // strafe direction flips occasionally
-        if (Math.random() < 0.004)
+        // Strafe reversal probability is time-based (60 Hz reference).
+        if (Math.random() < 1 - Math.pow(0.996, Math.max(0, dt) * 60))
             ai.strafe *= -1;
         const px = -dy;
         const py = dx;
