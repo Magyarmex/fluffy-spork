@@ -192,3 +192,20 @@ test('ultimate keyboard click survives pending touch guard, but compatibility to
     preventDefault() { swallowed++; }, stopImmediatePropagation() { swallowed++; } });
   assert.equal(swallowed, 2, 'delayed touch click must not fire twice');
 });
+
+test('ultimate delayed touch click is suppressed even with zero detail or mouse-compatible pointerType', () => {
+  const { window } = boot();
+  const fx = ultimateFixture();
+  const bridge = window.__NOVA_MULTITOUCH_ULTIMATE_TEST__;
+  let swallowed = 0;
+  for (const click of [
+    { pointerType: 'touch', detail: 0 },
+    { pointerType: 'mouse', detail: 1, sourceCapabilities: { firesTouchEvents: true } }
+  ]) {
+    bridge.onPointerDown({ pointerType: 'touch', target: fx.target, cancelable: true,
+      preventDefault() {}, stopPropagation() {} });
+    bridge.onClickCapture({ ...click, target: fx.target, cancelable: true,
+      preventDefault() { swallowed++; }, stopImmediatePropagation() { swallowed++; } });
+  }
+  assert.equal(swallowed, 4, 'touch-origin ultimate click must never execute twice');
+});
