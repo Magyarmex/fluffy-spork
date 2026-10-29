@@ -49,7 +49,7 @@ test('source drift fails closed rather than silently losing cosmetic isolation',
  assert.throws(()=>patchCosmeticRng(null),/UTF-8/);
  assert.throws(()=>patchCosmeticRng(raw.replace(
   'if (b.beam && Math.random() < 0.85)',
-  'if (b.beam && Math.random() < 0.86)'),/drift/);
+  'if (b.beam && Math.random() < 0.86')),/drift/);
 });
 test('production and Chromium both apply patch before composing/serving game',()=>{
  const deploy=fs.readFileSync(path.join(root,'.github/workflows/deploy.yml'),'utf8');
