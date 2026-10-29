@@ -73,7 +73,8 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,
  remoteBullets=0,
  shield=false,otherTank=false,ttl=1,pen=1,radius=3,
  active=true,knock=0,allied=false,destructible=false,damage=10,
- linearMove=null,tamperMove=false,doubleMove=false}={}){
+ linearMove=null,tamperMove=false,doubleMove=false,
+ otherNearMovingStart=false}={}){
  const g=new Game(),dt=1/fps;
  g.__novaShapeSweepActive=active;
  g.areAllies=()=>allied;
@@ -97,6 +98,9 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,
  for(let i=0;i<remoteBullets;i++)g.bullets.push({kind:'bullet',id:100+i,
   ownerId:100+i,x:0,y:1000+i*3,vx:speed,vy:0,r:3,dmg:10,
   ttl:1,pen:1,hits:0,dead:false});
+ if(otherNearMovingStart)g.bullets.push({kind:'bullet',id:1001,
+  ownerId:4,x:target+5,y:16,vx:0,vy:0,r:3,dmg:10,ttl:1,
+  pen:0,hits:0,dead:false,shell:false,beam:false});
  if(linearMove){
   t.vx=linearMove.vx;t.vy=linearMove.vy;
   g.moveTank(t,linearMove.vx,linearMove.vy,dt);
@@ -272,6 +276,11 @@ for(const optimized of [false,true]){
  test(label+': moving Scout outside bullet lane cannot receive phantom hit',()=>{
   const r=run(boot(optimized),{targetY:65,
    linearMove:{vx:-600,vy:0}});
+  assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
+ });
+ test(label+': a competing shot near the moving hull start vetoes backdated damage',()=>{
+  const r=run(boot(optimized),{linearMove:{vx:-600,vy:0},
+   otherNearMovingStart:true});
   assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
  });
  test(label+': second movement in the same tick invalidates linear witness',()=>{
