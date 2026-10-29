@@ -1,0 +1,39 @@
+name: NOVA Controller Target Fairness Pilot
+
+on:
+  push:
+    branches:
+      - 'nova/controller-fair-target-audit-*'
+    paths:
+      - 'tests/research/controller-target-fairness-pilot.cjs'
+      - '.github/workflows/controller-target-fairness.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: nova-controller-target-fairness-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  real-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Measure actual 48-overlay Controller target selection
+        env:
+          NOVA_OVERLAY_AUDIO_RNG_CAUSAL: '1'
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/controller-target-fairness
+          node --test tests/research/controller-target-fairness-pilot.cjs 2>&1 | tee artifacts/controller-target-fairness/run.log
+      - name: Preserve controlled target-selection evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-controller-target-fairness
+          path: artifacts/controller-target-fairness/
+          if-no-files-found: warn
+          retention-days: 30
