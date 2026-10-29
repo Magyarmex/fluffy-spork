@@ -41,13 +41,15 @@ function analyzeCommonSafe(data,expectedSeeds=12){
   assert.ok(row.layout&&Number.isInteger(row.rotation));
   layoutCells.add(row.layout+'/'+row.rotation);
   assert.ok(row.spawns&&row.origin&&row.native&&row.common);
+  assert.ok(choices.includes(row.commonBaseChoice),'invalid common base choice');
   const a=row.common.fresh,c=row.common.return;
   assert.ok(same(a.origin,c.origin)&&same(a.origin,row.origin),'first-life origin mismatch');
   assert.ok(same(a.prelude,c.prelude),'witnessed first-life mismatch');
   assert.ok(same(a.spawn,row.spawns.fresh)&&same(c.spawn,row.spawns.return),
    'player insertion is not a genuine native location');
-  assert.ok(same(a.generatedSpawn,row.spawns.fresh)&&same(c.generatedSpawn,row.spawns.fresh),
-   'common world must share one native FRESH base');
+  assert.ok(same(a.generatedSpawn,row.spawns[row.commonBaseChoice])&&
+   same(c.generatedSpawn,row.spawns[row.commonBaseChoice]),
+   'common world must share one native base');
   assert.ok(same(a.postInsertion,c.postInsertion),'common enemy/neutral world mismatch');
   assert.ok(a.postInsertion.enemyFullStateHash&&a.postInsertion.neutralFullStateHash,
    'full enemy/neutral state fingerprints required');
@@ -59,7 +61,7 @@ function analyzeCommonSafe(data,expectedSeeds=12){
   for(const choice of choices){
    const x=row.common[choice],native=row.native[choice];
    assert.equal(x.choice,choice);
-   assert.equal(x.baseChoice,'fresh');
+   assert.equal(x.baseChoice,row.commonBaseChoice);
    assert.ok(Number.isFinite(x.nearestEnemyDistance)&&x.nearestEnemyDistance>=1000,
     'COMMON-SAFE SPAWN INVARIANT FAILED '+key+'/'+choice);
    assert.ok(native&&Number.isFinite(native.nearestEnemyDistance));
@@ -77,7 +79,13 @@ function analyzeCommonSafe(data,expectedSeeds=12){
  }
  assert.equal(grouped.size,expectedSeeds,'independent seed count mismatch');
  assert.ok([...grouped.values()].every(rows=>rows.length===2&&
-  new Set(rows.map(r=>r.hz)).size===2),'each seed requires both FPS repeats');
+  new Set(rows.map(r=>r.hz)).size===2&&
+  new Set(rows.map(r=>r.commonBaseChoice)).size===1),
+  'each seed requires both FPS repeats and one consistent base');
+ const baseSeedCounts={fresh:0,return:0};
+ for(const rows of grouped.values())baseSeedCounts[rows[0].commonBaseChoice]++;
+ assert.ok(Math.abs(baseSeedCounts.fresh-baseSeedCounts.return)<=1,
+  'common-world native base must be balanced across independent seeds');
  const metrics={};
  for(const [name,fn]of Object.entries(measures)){
   const clustered=[];
@@ -90,7 +98,8 @@ function analyzeCommonSafe(data,expectedSeeds=12){
  return {
   contract:'SUPPORTED common-safe initial world, CONDITIONAL scripted geography only; not native total-policy or human benefit',
   independentSeeds:grouped.size,fpsRepeatedObservations:data.results.length,
-  layouts:[...layoutCells].sort(),preludeSeconds:data.preludeSeconds,
+  layouts:[...layoutCells].sort(),balancedNativeBasesBySeed:baseSeedCounts,
+  preludeSeconds:data.preludeSeconds,
   postSeconds:data.seconds,
   spawnSafety:{minimumAISeparation:1000,safeArms,nativeSafeArms,
    matchedEnemyNeutralWorldPairs:worldParity,generatedEnemies:enemyCount,
@@ -98,7 +107,7 @@ function analyzeCommonSafe(data,expectedSeeds=12){
    initialSupportVerified:true},
   metrics,
   limitations:[
-   'Shared initial enemy worlds are conditioned on BOTH genuine insertion locations, rather than drawn from either native policy alone.',
+   'Shared initial enemy worlds are conditioned on BOTH genuine insertion locations, with native base choice counterbalanced across independent seeds.',
    'The 8s first life is played, but death is forced if the pilot survives; these are not natural-death exposures.',
    'Only the initial post-redeploy world is controlled; subsequent AI/ecology evolution is allowed to respond to the player.',
    'FPS repeats are technical repeated measures. Confidence intervals resample independent seeds only.',
