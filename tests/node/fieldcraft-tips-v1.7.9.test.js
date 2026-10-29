@@ -21,7 +21,9 @@ test('tip dwell time is exactly double the legacy rotation', () => {
 });
 
 test('rotation uses a shuffle bag rather than sequential indexes', () => {
-  assert.match(fieldcraft, /Math\.floor\(Math\.random\(\)\*\(i\+1\)\)/);
+  assert.match(fieldcraft, /Math\.floor\(fieldcraftRandom\(key\)\*\(i\+1\)\)/);
+  assert.match(fieldcraft, /function fieldcraftRandom\(key\)/);
+  assert.match(fieldcraft, /shuffled\(pool,lastByBag\[key\],key\)/);
   assert.match(fieldcraft, /if\(a\.length>1&&a\[0\]\.id===lastId\)/);
   assert.match(fieldcraft, /var bag=bags\[key\]\|\|\[\]/);
   assert.doesNotMatch(fieldcraft, /tipIndex/);
