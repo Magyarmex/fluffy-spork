@@ -25,6 +25,21 @@ const coreMove=new Function('types_1','M',
  'return function(t,vx,vy,dt){'+html.slice(moveStart+moveMarker.length,moveEnd-1)+'}')(
  {clamp:(v,min,max)=>Math.max(min,Math.min(max,v))},2250);
 const CLASSES={scout:{size:14},marksman:{size:14}};
+/* Extract projectile integrity directly from the shipping core. Test stubs
+ * elsewhere intentionally bypass interception HP, but a breach must not
+ * initialize integrity using penetration AFTER that breach. */
+function coreIntegrityMethod(name,args){
+ const marker='    '+name+'('+args+') {',start=html.indexOf(marker);
+ assert.ok(start>=0,'shipping core '+name);
+ let end=start+marker.length,depth=1;
+ while(depth&&end<html.length){if(html[end]==='{')depth++;else if(html[end]==='}')depth--;end++;}
+ assert.equal(depth,0);
+ return new Function('types_1','return function('+args+'){'+
+  html.slice(start+marker.length,end-1)+'}')(
+  {clamp:(v,min,max)=>Math.max(min,Math.min(max,v))});
+}
+const realInitIntegrity=coreIntegrityMethod('initBulletIntegrity','b');
+const realWeakenBullet=coreIntegrityMethod('weakenBullet','b, absorbed');
 const core=new Function('types_1','classes_1','M',
  'return function(dt){'+html.slice(start+marker.length,end-1)+'}')(
  {dist2:(ax,ay,bx,by)=>(ax-bx)**2+(ay-by)**2},
@@ -70,7 +85,7 @@ function boot(optimized){
 }
 function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,
  wallShape='rect',otherShape=false,otherBullet=false,otherShell=false,moving=false,
- remoteBullets=0,laterCoverHp=null,
+ remoteBullets=0,laterCoverHp=null,realIntegrity=false,
  shield=false,otherTank=false,ttl=1,pen=1,radius=3,laterWall=null,
  active=true,knock=0,allied=false,destructible=false,damage=10,
  linearMove=null,tamperMove=false,doubleMove=false,
@@ -92,6 +107,7 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,
  if(laterWall!=null)g.__novaTerrain.push({id:-2,shape:'rect',x:laterWall,y:0,w:10,h:80,solid:true,destructible:laterCoverHp!=null,hp:laterCoverHp||0,maxHp:laterCoverHp||0});
  g.bullets=[{kind:'bullet',id:10,ownerId:1,x:0,y:0,
   vx:speed,vy,r:radius,dmg:damage,knock,ttl,pen,hits:0,dead:false,shell:false,beam:false}];
+ if(realIntegrity){g.initBulletIntegrity=realInitIntegrity;g.weakenBullet=realWeakenBullet;}
  if(otherBullet)g.bullets.push({kind:'bullet',id:11,ownerId:4,
   x:0,y:1,vx:speed,vy:0,r:3,dmg:10,ttl:1,pen:0,hits:0,dead:false});
  if(otherShell)g.bullets.push({kind:'bullet',id:12,ownerId:4,
@@ -113,8 +129,9 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,
   if(doubleMove)g.moveTank(t,linearMove.vx,linearMove.vy,dt);
   if(tamperMove)t.x+=4;
  }
+ const shot=g.bullets[0];
  g.updateBullets(dt);
- return {hits:g.hits,hp:t.hp,bullet:g.bullets[0],g};
+ return {hits:g.hits,hp:t.hp,bullet:g.bullets[0],shot,g};
 }
 for(const optimized of [false,true]){
  const label=optimized?'Battlefield + Performance':'Battlefield';
@@ -677,5 +694,28 @@ for(const optimized of [false,true])for(const pen of [3,4]){
   assert.equal(r.hp,100);
   assert.equal(r.g.__novaTerrain[0].hp,0);
   assert.equal(r.g.__novaTerrain[1].hp,979);
+ });
+}
+
+/* The real materialized core defines bullet integrity at original penetration.
+ * A first-frame breach must not silently lower interception HP by calling
+ * initBulletIntegrity after consuming two penetration points. */
+for(const optimized of [false,true])for(const fps of [30,60,120,240])
+ for(const pen of [3,4]){
+ test((optimized?'Battlefield + Performance':'Battlefield')+
+  ': first breach preserves launch integrity pen'+pen+' at '+fps+'Hz',()=>{
+  const r=run(boot(optimized),{fps,speed:200*fps,pen,destructible:true,
+   wall:55,laterWall:110,laterCoverHp:1000,target:165,coverHp:5,
+   realIntegrity:true});
+  const expectedMax=10*(.72+3*.08)*(1+pen*.055);
+  assert.ok(Math.abs(r.shot.maxHp-expectedMax)<1e-9,
+   'first-frame breach must initialize integrity at original penetration');
+  assert.equal(r.shot.baseDmg,10);
+  assert.ok(r.shot.dmg>0&&r.shot.dmg<10,'breach weakens damage');
+  assert.ok(Math.abs(r.g.__novaTerrain[1].hp-(1000-r.shot.dmg))<1e-9,
+   'second barricade receives exactly the weakened damage');
+  assert.deepEqual(r.hits,[]);
+  assert.equal(r.g.__novaTerrain[0].hp,0);
+  assert.equal(r.g.__novaTerrain[1].solid,true);
  });
 }
