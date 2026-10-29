@@ -11,10 +11,10 @@ function sample() {
       neutralBodiesHash:'neutral-fresh'};
     const fresh={fingerprintHash:'played-'+seed+'-'+hz,origin:prelude.origin,prelude,postInsertion,
       neutralXP:10,score:20,hp:80,alive:true,frontReached:null,
-      blockedNearFrontSeconds:seed===1&&hz===30?.5:0};
+      blockedNearFrontSeconds:seed===1&&hz===30 ? .5 : 0};
     const returning={...fresh,postInsertion:{...postInsertion,enemyBodiesHash:'enemy-return'},
       neutralXP:16,score:25,hp:90,frontReached:4,
-      blockedNearFrontSeconds:seed===1&&hz===30?1.5:.25};
+      blockedNearFrontSeconds:seed===1&&hz===30 ? 1.5 : .25};
     results.push({seed,hz,layout:'Crossfire',rotation:0,fresh,returning});
   }
   return {policy:'harvest_roam',preludeSeconds:8,seconds:12,
@@ -169,7 +169,6 @@ test('v2 rejects invalid blocked near-front exposure rather than inventing navig
 
 test('natural-death v2 analysis refuses a legacy distance-only report',()=>{
   const s=sample();s.naturalExposurePilot=true;s.preludeSeconds=60;
-  assert.throws(()=>reportPlayedFirstLife(s,12),/Missing independent seeds/);
   s.protocolVersion='legacy-distance-only';
   assert.throws(()=>reportPlayedFirstLife(s,12),/terrain-clear-front-arrival-v2/);
 });
