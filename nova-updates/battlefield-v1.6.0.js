@@ -678,11 +678,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    if(!(enter>1e-9))return false;
    contacts.push({e:t,t:enter});
   }
-  /* A live non-expiring round must exhaust its entire pen=1/2 budget
-   * within this single frame. A split-frame partial chain is NOT certified.
-   * A TTL-expiring round can settle a partial remaining budget safely:
-   * the projectile will die at expiry regardless of unused penetration.
-   * The original one-body TTL resolver retains first-hit ownership. */
+  /* Ordinarily a non-expiring round must exhaust its pen=1/2 budget
+   * inside this frame. The narrowly certified pen=2 two-hull prefix below
+   * is the sole exception; it leaves the final penetration to the core.
+   * A TTL-expiring round may settle a partial remaining budget because it
+   * dies at expiry. The one-body TTL resolver retains first-hit ownership. */
   /* A pen=2 shot may certify exactly two nonlethal hull contacts now and
    * retain its last penetration for a later frame. The core's query wrapper
    * excludes certified victims; the shot MUST be restored to its pre-frame
