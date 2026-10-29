@@ -137,6 +137,14 @@ async function run(browser,width,height){
    JSON.stringify(after.notices));
   await page.getByText(cue,{exact:true})
    .waitFor({state:'visible',timeout:2000});
+  const cueFit=await page.getByText(cue,{exact:true}).evaluate(el=>{
+   const rect=el.getBoundingClientRect();
+   return {left:rect.left,right:rect.right,viewport:innerWidth,
+    scrollWidth:document.documentElement.scrollWidth};
+  });
+  assert.ok(cueFit.left>=-1&&cueFit.right<=cueFit.viewport+1&&
+   cueFit.scrollWidth<=cueFit.viewport+1,
+   'RETURN orientation notice must fit the actual mobile viewport: '+JSON.stringify(cueFit));
   const survivingStar=await page.evaluate(id=>{
    const g=window.__novaFrontSmokeGame,star=g.getShape(id);
    return star?{age:g.time-star.__lfStarBorn,announced:star.__lfPublicAnnounced,
