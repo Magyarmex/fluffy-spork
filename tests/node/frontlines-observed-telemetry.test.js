@@ -366,3 +366,30 @@ test('outside-sector bot exposure excludes occupants, shields and allies without
  assert.ok(Math.abs(c.hostileOutsideBotSeconds-.22)<1e-6);
  assert.match(T.debugSummary(LF.snapshot(g)),/OUT-S 0\.2/);
 });
+
+
+test('disabled Director cannot revive an already-resolved public BLOOM on re-enable',()=>{
+ const {g,st,p,LF}=scene();
+ LF.frontlineTick(g,st,true);
+ const f=st.frontlineTelemetry;
+ assert.equal(f.counts.announcements,1);
+ st.directorEnabled=false;
+ assert.equal(LF.frontlineTick(g,st,false),false);
+ assert.equal(f.closed,true,'disabling the Director resolves the public window');
+ const before={...f.counts};
+ st.directorEnabled=true;
+ p.x=-1500;p.y=-1500;g.time+=.1;
+ assert.equal(LF.frontlineTick(g,st,false),false,
+  'a resolved public window cannot resume sampling without a new announcement');
+ assert.deepEqual(f.counts,before,'no post-closure exposure, entries or exits');
+ p.hp=0;p.alive=false;
+ assert.equal(LF.recordFrontlinePlayerDeath(g,st,p),false,
+  'a closed window cannot attribute a later death');
+ g.time=110;p.hp=100;p.alive=true;
+ st.signal={type:'BLOOM',sector:6,started:110,until:115};
+ st.bloomMemory={sector:6,announcedAt:110,until:134,initialValue:500};
+ assert.equal(LF.frontlineTick(g,st,false),true,
+  'a genuinely new public BLOOM starts a new observation window');
+ assert.equal(f.counts.announcements,2);
+ assert.equal(f.closed,false);
+});
