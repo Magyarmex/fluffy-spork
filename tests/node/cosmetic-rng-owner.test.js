@@ -21,8 +21,8 @@ test('cosmetic RNG patch is unique, idempotent and applies to canonical source a
  assert.equal(patchCosmeticRng(html),patchCosmeticRng(patchCosmeticRng(html)));
  assert.equal(patched.split('    cosmeticRandom() {').length-1,1);
  assert.equal(patched.split('    cosmeticRnd(a = 1, b) {').length-1,1);
- assert.match(patched,/if \(b\.beam && this\.cosmeticRandom\(\) < 0\.85\)/);
- assert.match(patched,/else if \(this\.cosmeticRandom\(\) < 0\.22\)/);
+  assert.ok(patched.includes('if (b.beam && (typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) < 0.85)'));
+  assert.ok(patched.includes('else if ((typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) < 0.22)'));
  assert.match(patched,/g\.cosmeticRandom\(\) - 0\.5/);
  assert.match(patched,/Math\.random\(\) < 0\.004/,'gameplay AI strafe RNG must remain intact');
  assert.match(patched,/const spread = .*types_1\.rnd/,'weapon spread remains gameplay RNG');
