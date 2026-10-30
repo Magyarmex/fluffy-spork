@@ -55,6 +55,21 @@ test('real Wild Instincts keeps the recovery vulnerability before a new telegrap
  assert.equal(s.cr.__lfPredatorState,'charge');
  assert.equal(s.st.stats.crasherCharges,1);
 });
+test('actual recover-to-track transition cannot chain straight into another charge',()=>{
+ const s=scenario();
+ s.cr.__lfPredatorState='recover';
+ s.cr.__lfPredatorT=.01;
+ s.tick(.02);
+ assert.equal(s.cr.__lfPredatorState,'track');
+ assert.ok(Math.abs(s.cr.__lfPredatorT-.28)<1e-12);
+ s.tick(.1);
+ assert.equal(s.cr.__lfPredatorState,'track');
+ s.tick(.1);
+ assert.equal(s.cr.__lfPredatorState,'track');
+ s.tick(.1);
+ assert.equal(s.cr.__lfPredatorState,'telegraph');
+ assert.equal(s.st.stats.crasherCharges,0);
+});
 for(const hz of [30,60,120,240]){
  test('Crasher track delay survives '+hz+'Hz cadence',()=>{
   const s=scenario(),dt=1/hz;
