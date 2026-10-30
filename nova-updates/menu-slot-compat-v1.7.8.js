@@ -524,6 +524,23 @@ window.__NOVA_DEATH_INSIGHT_TEST__={choose:choose,paint:paint,cleanup:cleanup};
 var mods=window.__novaModules;
 if(!mods||!mods['game/engine'])return;
 var PI2=Math.PI*2;
+/* Between-life learning uses only already-earned public BLOOM telemetry.
+ * The data is a snapshot, never a live minimap or hidden ecology query.
+ * A missing, malformed or unvisited opportunity produces no recap. */
+function readFrontlineRecap(g){
+ var st=g&&g.__lfState,f=st&&st.frontlineTelemetry,c=f&&f.counts;
+ if(!c)return null;
+ var fields=['announcements','playerApproaches','playerEntries','observedContests','neutralXP'];
+ for(var i=0;i<fields.length;i++){
+  var n=c[fields[i]];
+  if(!Number.isFinite(n)||n<0||n>1000000)return null;
+ }
+ if(c.announcements<1||(c.playerApproaches<1&&c.playerEntries<1))return null;
+ return 'LAST LIFE · BLOOM APPROACH '+Math.floor(c.playerApproaches)+
+  ' · ENTRY '+Math.floor(c.playerEntries)+
+  ' · CONTEST '+Math.floor(c.observedContests)+
+  ' · +'+Math.round(c.neutralXP)+' NEUTRAL XP';
+}
 function validOrigin(p){
  return !!(p&&Number.isFinite(p.x)&&Number.isFinite(p.y)&&
   Math.abs(p.x)<=2250&&Math.abs(p.y)<=2250);
@@ -561,6 +578,18 @@ function paint(g){
  row.setAttribute('role','group');
  row.setAttribute('aria-label','Redeploy: fresh front or return near the last position; no stat bonus');
  row.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:'+(window.innerHeight<=400?'4':'10')+'px;min-width:0;';
+ /* No additional action: one compact line above the same two choices.
+  * Small landscape death cards already have a bounded scrolling contract. */
+ if(g.__novaFrontlineRecap){
+  var recap=document.createElement('div');
+  recap.setAttribute('data-nova-front-recap','');
+  recap.setAttribute('role','note');
+  recap.style.cssText='grid-column:1/-1;min-width:0;font:700 '+
+   (window.innerHeight<=400?'8':'9')+
+   'px/1.3 Rajdhani,system-ui;color:#a8c5d8;text-align:center;overflow-wrap:anywhere;';
+  recap.textContent=g.__novaFrontlineRecap;
+  row.appendChild(recap);
+ }
  function make(choice,caption,detail){
   var b=document.createElement('button');b.type='button';
   b.setAttribute('data-ui','true');
@@ -680,8 +709,13 @@ mods['game/engine']=function(module,exports,require){
  if(typeof oldKill==='function')Game.prototype.killTank=function(victim,killer){
   var player=!!(!this.__novaDecorativeWorld&&victim&&victim.isPlayer&&victim.alive!==false);
   var pos=player?{x:victim.x,y:victim.y}:null;
+  /* Snapshot BEFORE death/redeploy hooks can reset the ecology owner. */
+  var recap=player?readFrontlineRecap(this):null;
   var out=oldKill.apply(this,arguments);
-  if(player&&victim.alive===false)this.__novaLastFrontMarker=null;
+  if(player&&victim.alive===false){
+   this.__novaLastFrontMarker=null;
+   this.__novaFrontlineRecap=recap;
+  }
   if(player&&victim.alive===false&&validOrigin(pos)){
    this.__novaRedeployOrigin=pos;
    this.__novaRedeployChoice='fresh';
@@ -741,10 +775,11 @@ mods['game/engine']=function(module,exports,require){
    this.__novaFrontSpawnArmed=false;
    this.__novaFrontReturnAccepted=false;
    cleanup(this);
+   this.__novaFrontlineRecap=null;
    this.__novaRedeployOrigin=null;
    this.__novaRedeployChoice='fresh';
   }
  };
 };
-window.__NOVA_FRONT_CHOICE_TEST__={sampleReturn:sampleReturn,validOrigin:validOrigin,paint:paint,cleanup:cleanup};
+window.__NOVA_FRONT_CHOICE_TEST__={sampleReturn:sampleReturn,validOrigin:validOrigin,readFrontlineRecap:readFrontlineRecap,paint:paint,cleanup:cleanup};
 })();
