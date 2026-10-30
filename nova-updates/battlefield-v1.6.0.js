@@ -2672,8 +2672,14 @@ function certifiedTwoShotCoverPriority(g,dt){
   for(var i=0;i<arr.length;i++){
    var e=arr[i];if(!e||(group===0?!e.alive:!(e.hp>0)))continue;
    if(!Number.isFinite(e.x)||!Number.isFinite(e.y))return null;
-   var radius=group===0?(CLASSES[e.cls]&&CLASSES[e.cls].size||20)+3:
-              group===1?(e.r||20):(e.r||10)+1;
+   if(group===0&&(!CLASSES[e.cls]||
+      !Number.isFinite(CLASSES[e.cls].size)||
+      !(CLASSES[e.cls].size>0)))return null;
+   if(group!==0&&(!Number.isFinite(e.r)||!(e.r>0)))return null;
+   if((e.vx!=null&&!Number.isFinite(e.vx))||
+      (e.vy!=null&&!Number.isFinite(e.vy)))return null;
+   var radius=group===0?CLASSES[e.cls].size+3:
+              group===1?e.r:e.r+1;
    /* Require the actual same-frame movement witness for every neutral
     * shape and drone; unknown trajectories cannot certify a cover race. */
    if(group===1&&g.__novaShapeSweepActive&&
