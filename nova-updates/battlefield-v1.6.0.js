@@ -2665,6 +2665,11 @@ function certifiedTwoShotCoverPriority(g,dt){
   return null;
  var tanks=g.tanks||[],shapes=g.shapes||[],drones=g.drones||[];
  if(tanks.length+shapes.length+drones.length>260)return null;
+ /* Drone path checkpoints cannot certify every committed dash segment.
+  * A live drone anywhere makes this shortcut abstain; normal collisions
+  * retain their original owner until full drone chronology is available. */
+ for(var di=0;di<drones.length;di++)
+  if(drones[di]&&drones[di].hp>0)return null;
  var dx=ex-ax,dy=ey-ay,len=dx*dx+dy*dy;
  if(!(len>1e-9))return null;
  for(var group=0;group<3;group++){
