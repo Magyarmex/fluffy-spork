@@ -31,6 +31,7 @@ async function arm(browser,enabled,label){
  try{
   await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded',timeout:45000});
   await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({state:'visible',timeout:45000});
+  await page.addScriptTag({url:'/tests/browser/projectile-density-audit.js'});
   await page.addScriptTag({url:'/tests/browser/frontlines-public-pilot.js'});
   await page.addScriptTag({url:'/tests/browser/frontlines-visible-defense.js'});
   await page.addScriptTag({url:'/tests/browser/frontlines-commitment-audit.js'});
@@ -82,6 +83,10 @@ async function arm(browser,enabled,label){
   const initial=await page.evaluate(({enabled,pilotPolicy,trialRng,terrainIndex,seedIndex,abMode})=>{
    const g=window.__novaNaturalMatchGame;
    g.setPaused(true); // Advance actual Game.update ourselves.
+    /* Sample the real composed bullet owner; do not touch game decisions. */
+    const density=window.__novaProjectileDensityAudit;
+    if(!density)throw Error('projectile density research helper missing');
+    g.__novaProjectileDensityAudit=density.install(g,density.create());
    /* Paused rendering still runs requestAnimationFrame and may mutate shared
     * visual/game caches between independent OFF replays. Cancel the loop:
     * this is a deterministic headless simulation, not a screenshot test. */
@@ -288,7 +293,8 @@ async function arm(browser,enabled,label){
     frontline:s.frontline,stats:s.stats,game:{time:+g.time.toFixed(3),status:g.status,
      pilotAlive:!!p.alive,score:p.score,kills:p.kills,level:p.level,
      botCount:g.tanks.filter(t=>t.ai&&t.alive).length},
-    contestGateAudit:g.__novaContestAudit,
+    projectileDensityAudit:g.__novaProjectileDensityAudit,
+     contestGateAudit:g.__novaContestAudit,
     commitmentAudit:window.__novaResearchCommitmentAudit.summary(g.__novaCommitmentAudit),
     naturalBlooms:s.stats.blooms||0,publicBloomCommandSamples:g.__novaPublicBloomCommands||0,
     visibleNeutralAimSamples:g.__novaVisibleAimSamples||0,
@@ -299,6 +305,12 @@ async function arm(browser,enabled,label){
   if(result.naturalBlooms>0)assert.ok(result.contestGateAudit.samples>0,'announced BLOOM must be audited');
   assert.equal(result.contestGateAudit.gateMismatches,0,'audit must agree with shipping CONTESTED');
   assert.ok(result.commitmentAudit.samples>0,'real composed AI must be observed');
+   const density=result.projectileDensityAudit;
+   assert.ok(density.bulletUpdateCalls>0,'real composed projectile owner must be sampled');
+   assert.equal(Object.values(density.projectileCountBuckets).reduce((a,b)=>a+b,0),density.bulletUpdateCalls);
+   assert.ok(density.basicEligibleFrames<=density.projectileCountBuckets.threeToEight);
+   assert.ok(density.coverBreaksBasicEligible<=density.coverBreaksAtThreeToEight);
+   assert.ok(density.coverBreaksAtThreeToEight+density.coverBreaksAboveEight<=density.coverBreaks);
   assert.ok(result.commitmentAudit.eligibleWindow<=result.commitmentAudit.publicMemory);
   assert.ok(result.commitmentAudit.precombatIntersection<=result.commitmentAudit.eligibleWindow);
   const liveGate=result.commitmentAudit.liveGate;
@@ -352,6 +364,8 @@ async function arm(browser,enabled,label){
     'Public-bloom commands can differ after ON/OFF worlds diverge; this is matched policy, not fixed inputs',
     'Public-bloom command samples are input calls, not measured seconds or proof of physical progress',
     'Seed replay is checked, not assumed',
+     'Projectile density is read-only and counts necessary eligibility gates, not actual certificate activations or player benefit',
+     'Only cover breaks inside the bullet owner are counted; scripted Scout trials are not human-match frequencies',
     'In live-turn mode, only live-start authority is intervened on; later natural signals can differ as treatment outcomes']};
   const dir=path.join('artifacts','browser');fs.mkdirSync(dir,{recursive:true});
   fs.writeFileSync(path.join(dir,'frontlines-natural-match-ab.json'),JSON.stringify(report,null,2));
