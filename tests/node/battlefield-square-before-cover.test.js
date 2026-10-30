@@ -67,18 +67,18 @@ function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
   squareY=0,wallY=0,born=false,moved=false,extraBullet=false,
   extraTank=false,fragile=false,pen=0,extraSquare=false}={}){
  const g=new Game();
- const square={kind:'shape',id:50,type:'square',x:squareX,y:squareY,r:12,hp:fragile?10:100};
+ const square={kind:'shape',id:50,type:'square',x:squareX,y:squareY,r:20,hp:fragile?10:55};
  if(born)square.born=g.time;
  if(moved){square.__novaTestMove=true;}
  g.shapes=[square];
  if(extraSquare)g.shapes.push({kind:'shape',id:51,type:'square',
-  x:squareX+9,y:squareY,r:12,hp:100});
+  x:squareX+9,y:squareY,r:20,hp:55});
  g.__novaTerrain=[{id:-51,shape:'rect',x:wallX,y:wallY,w:8,h:80,
   solid:true,destructible:false,hp:0}];
  g.bullets=[{kind:'bullet',id:10,ownerId:1,x:0,y:0,vx,vy:0,
-  r:3,dmg:20,ttl:1,pen,hits:0,dead:false,shell:false,beam:false,splash:0}];
+  r:3,dmg:12,ttl:1,pen,hits:0,dead:false,shell:false,beam:false,splash:0}];
  if(extraBullet)g.bullets.push({kind:'bullet',id:11,ownerId:3,
-  x:extraBullet==='remote'?1000:20,y:extraBullet==='remote'?1000:0,vx:0,vy:0,r:3,dmg:20,ttl:1,pen:0,hits:0,dead:false});
+  x:extraBullet==='remote'?1000:0,y:extraBullet==='remote'?1000:0,vx:0,vy:0,r:3,dmg:20,ttl:1,pen:0,hits:0,dead:false});
  if(extraTank)g.tanks.push({kind:'tank',id:2,cls:'scout',alive:true,hp:100,x:30,y:0});
  if(moved){
   const oldUpdate=g.update.bind(g);
@@ -97,37 +97,37 @@ for(const optimized of [false,true]){
   test(mode+' square physically before cover is hit at '+hz+'Hz',()=>{
    const {g,square}=trial(Game,{hz});
    assert.deepEqual(g.hits,[50],'square must win the physical first contact');
-   assert.equal(square.hp,80);
+   assert.equal(square.hp,43);
    assert.equal(g.__novaTerrain[0].solid,true);
   });
   test(mode+' square behind cover is never hit at '+hz+'Hz',()=>{
    const {g,square}=trial(Game,{hz,squareX:120});
-   assert.equal(square.hp,100);
+   assert.equal(square.hp,55);
    assert.deepEqual(g.hits,[]);
   });
  }
  test(mode+' actual-speed nonlethal square hit precedes later cover',()=>{
-  const {g,square}=trial(Game,{hz:30,vx:1600,squareX:20,wallX:40});
-  assert.equal(square.hp,80);
+  const {g,square}=trial(Game,{hz:30,vx:2000,squareX:32,wallX:65});
+  assert.equal(square.hp,43);
   assert.deepEqual(g.hits,[50]);
  });
  test(mode+' newborn square cannot receive backdated contact',()=>{
   const {g,square}=trial(Game,{born:true});
-  assert.equal(square.hp,100);
+  assert.equal(square.hp,55);
   assert.deepEqual(g.hits,[]);
  });
  test(mode+' competing shot near square preserves original arbitration',()=>{
   const {g,square}=trial(Game,{extraBullet:true});
-  assert.equal(square.hp,100);
+  assert.equal(square.hp,55);
   assert.deepEqual(g.hits,[]);
  });
  test(mode+' remote projectile does not suppress independent square hit',()=>{
   const {g,square}=trial(Game,{extraBullet:'remote'});
-  assert.equal(square.hp,80);assert.deepEqual(g.hits,[50]);
+  assert.equal(square.hp,43);assert.deepEqual(g.hits,[50]);
  });
  test(mode+' witnessed moving square defers ambiguous first-contact proof',()=>{
   const {g,square}=trial(Game,{moved:true});
-  assert.equal(square.hp,100);assert.deepEqual(g.hits,[]);
+  assert.equal(square.hp,55);assert.deepEqual(g.hits,[]);
  });
  test(mode+' two potential square victims defer instead of choosing array order',()=>{
   const {g}=trial(Game,{extraSquare:true});
@@ -139,11 +139,11 @@ for(const optimized of [false,true]){
  });
  test(mode+' piercing rounds keep existing wall arbitration',()=>{
   const {g,square}=trial(Game,{pen:1});
-  assert.equal(square.hp,100);assert.deepEqual(g.hits,[]);
+  assert.equal(square.hp,55);assert.deepEqual(g.hits,[]);
  });
  test(mode+' competing tank before square preserves original arbitration',()=>{
   const {g,square}=trial(Game,{extraTank:true});
-  assert.equal(square.hp,100);
+  assert.equal(square.hp,55);
   assert.ok(g.hits.every(id=>id!==50));
  });
 }
@@ -159,10 +159,10 @@ const FullGame=boot(true,true);
 for(const hz of [30,60,120,240]){
  test('full shipping collision stack honors square before wall at '+hz+'Hz',()=>{
   const {g,square}=trial(FullGame,{hz});
-  assert.deepEqual(g.hits,[50]);assert.equal(square.hp,80);
+  assert.deepEqual(g.hits,[50]);assert.equal(square.hp,43);
  });
  test('full shipping collision stack keeps wall before square at '+hz+'Hz',()=>{
   const {g,square}=trial(FullGame,{hz,squareX:120});
-  assert.deepEqual(g.hits,[]);assert.equal(square.hp,100);
+  assert.deepEqual(g.hits,[]);assert.equal(square.hp,55);
  });
 }
