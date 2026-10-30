@@ -873,13 +873,15 @@ for(const optimized of [false,true]){
 /* Regression: canonical 120 neutral shapes plus 220 remote projectiles
  * exceeds the former 260-global-entity cap, but the actual proof has only
  * 342 scans. No distant shot may erase the earlier hull contact or let a
- * penetrating Marksman tunnel through a second permanent wall. The local
- * competitor and over-budget cases still fail closed. */
+ * penetrating Marksman tunnel through a second permanent wall. The 30Hz
+ * case uses real upgraded Marksman velocity; 60–240Hz cases scale velocity
+ * to retain two contacts within one frame as geometric stress fixtures.
+ * The local competitor and over-budget cases still fail closed. */
 for(const optimized of [false,true]){
  const Game=boot(optimized),label=optimized?'Battlefield + Performance':'Battlefield';
  const speed=1050*(1+.085*8),radius=5.5*(1+21*.0085);
  for(const fps of [30,60,120,240]){
-  test(label+': real Marksman hull-before-cover with 120 shapes and 220 remote shots at '+fps+'Hz',()=>{
+  test(label+': dense hull-before-cover (real Marksman at 30Hz) with 120 shapes and 220 remote shots at '+fps+'Hz',()=>{
    const r=run(Game,{fps,speed:fps===30?speed:60*fps,
     wall:55,target:29,pen:2,radius,damage:21,destructible:true,
     remoteShapes:120,remoteBullets:220});
@@ -887,7 +889,7 @@ for(const optimized of [false,true]){
    assert.equal(r.hp,79);
    assert.equal(r.g.__novaTerrain[0].hp,979);
   });
-  test(label+': real Marksman breach then permanent wall with 120 shapes and 220 remote shots at '+fps+'Hz',()=>{
+  test(label+': dense breach then permanent wall (real Marksman at 30Hz) with 120 shapes and 220 remote shots at '+fps+'Hz',()=>{
    const r=run(Game,{fps,speed:fps===30?speed:60*fps,
     wall:17,laterWall:35,target:60,pen:3,radius,damage:21,
     destructible:true,coverHp:5,remoteShapes:120,remoteBullets:220});
