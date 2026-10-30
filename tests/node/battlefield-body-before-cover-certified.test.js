@@ -101,11 +101,16 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,l
  if(otherTank)g.tanks.push({kind:'tank',id:3,cls:'scout',x:30,y:0,
   hp:100,alive:true,__novaSweepMoveTime:1,__novaSweepPrevX:30,__novaSweepPrevY:0});
  if(otherShape)g.shapes.push({kind:'shape',id:4,x:30,y:0,r:8,hp:100});
- for(let i=0;i<remoteShapes;i++)g.shapes.push({kind:'shape',id:2000+i,
-  x:-900+(i%20)*4,y:-900+Math.floor(i/20)*4,r:12,hp:100,
-  type:'square',__novaShapeSweepEpoch:g.__novaShapeSweepEpoch,
-  __novaShapeSweepPrevX:-900+(i%20)*4,
-  __novaShapeSweepPrevY:-900+Math.floor(i/20)*4});
+ const remoteDefs={circle:{r:12,hp:14},triangle:{r:16,hp:30},
+  square:{r:20,hp:55},pentagon:{r:26,hp:100},hexagon:{r:33,hp:190}};
+ for(let i=0;i<remoteShapes;i++){
+  const type=i<62?'circle':i<92?'triangle':i<108?'square':
+   i<116?'pentagon':'hexagon',def=remoteDefs[type];
+  const x=-900+(i%20)*4,y=-900+Math.floor(i/20)*4;
+  g.shapes.push({kind:'shape',id:2000+i,type,x,y,r:def.r,hp:def.hp,
+   __novaShapeSweepEpoch:g.__novaShapeSweepEpoch,
+   __novaShapeSweepPrevX:x,__novaShapeSweepPrevY:y});
+ }
  g.__novaTerrain=[wallShape==='rect'
   ?{id:-1,shape:'rect',x:wall,y:wallY,w:10,h:80,solid:true,destructible,hp:destructible?coverHp:0,maxHp:destructible?coverHp:0}
    :{id:-1,shape:'circle',x:wall,y:wallY,r:5,solid:true,destructible,hp:destructible?coverHp:0,maxHp:destructible?coverHp:0}];
