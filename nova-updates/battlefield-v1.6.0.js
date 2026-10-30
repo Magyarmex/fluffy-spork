@@ -2735,6 +2735,93 @@ function certifiedTwoShotCoverPriority(g,dt){
  }
  return [1,0];
 }
+
+/* A strictly bounded three-shot cover race: two ordinary pen<=1 shots
+ * damage and then destroy one cover BEFORE a third shot arrives. Only
+ * reorder the terrain pre-pass after proving all three first contacts,
+ * disjoint projectile corridors and absence of earlier body contacts.
+ * General multi-shot/shell/drone chronology remains #147. */
+function certifiedThreeShotCoverPriority(g,dt){
+ var bs=g.bullets;
+ if(!bs||bs.length!==3||!(dt>0&&dt<=.05)||
+    g.__novaShapeSweepActive!==true||
+    g.__novaFrameStartBulletEpoch!==g.__novaShapeSweepEpoch)return null;
+ var contacts=[],cover=null;
+ for(var i=0;i<3;i++){
+  var b=bs[i];
+  if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
+     (b.hits||0)!==0||(b.knock||0)!==0||
+     !Number.isSafeInteger(b.pen)||b.pen<0||b.pen>4||
+     !Number.isSafeInteger(b.id)||
+     !(b.id<g.__novaFrameStartBulletIdCeiling)||
+     !Number.isFinite(b.x)||!Number.isFinite(b.y)||
+     !Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
+     !Number.isFinite(b.r)||!(b.r>0)||
+     !Number.isFinite(b.dmg)||!(b.dmg>0)||
+     !Number.isFinite(b.ttl)||b.ttl<=dt)return null;
+  var ex=b.x+b.vx*dt,ey=b.y+b.vy*dt;
+  if(!Number.isFinite(ex)||!Number.isFinite(ey)||
+     Math.max(Math.abs(b.x),Math.abs(b.y),Math.abs(ex),Math.abs(ey))>=MAP_LIMIT-20)
+   return null;
+  var hit=firstSolidHit(g,b.x,b.y,ex,ey,b.r*.45);
+  if(!hit||!hit.solid.destructible||!(hit.solid.hp>0)||
+     !(hit.hit.t>1e-7))return null;
+  if(cover&&hit.solid!==cover)return null;
+  cover=hit.solid;
+  contacts.push({i:i,b:b,ax:b.x,ay:b.y,ex:ex,ey:ey,t:hit.hit.t});
+ }
+ contacts.sort(function(a,b){return a.t-b.t;});
+ var a=contacts[0],b=contacts[1],f=contacts[2];
+ if(!(a.t+1e-6<b.t&&b.t+1e-6<f.t)||
+    a.b.pen>1||b.b.pen>1||f.b.pen<1||
+    !(cover.hp>a.b.dmg&&cover.hp<=a.b.dmg+b.b.dmg))return null;
+ /* Disjoint swept AABBs rule out all projectile interceptions, even
+  * between two bullets moving in opposite directions. */
+ for(var j=0;j<3;j++)for(var k=j+1;k<3;k++){
+  var p=contacts[j],q=contacts[k],pad=p.b.r+q.b.r+2;
+  if(!(Math.max(p.ax,p.ex)+pad<Math.min(q.ax,q.ex)||
+       Math.max(q.ax,q.ex)+pad<Math.min(p.ax,p.ex)||
+       Math.max(p.ay,p.ey)+pad<Math.min(q.ay,q.ey)||
+       Math.max(q.ay,q.ey)+pad<Math.min(p.ay,p.ey)))return null;
+ }
+ var tanks=g.tanks||[],shapes=g.shapes||[],drones=g.drones||[];
+ if(tanks.length+shapes.length+drones.length>260)return null;
+ for(var di=0;di<drones.length;di++)
+  if(drones[di]&&drones[di].hp>0)return null;
+ for(var group=0;group<2;group++){
+  var arr=group===0?tanks:shapes;
+  for(var n=0;n<arr.length;n++){
+   var e=arr[n];if(!e||(group===0?!e.alive:!(e.hp>0)))continue;
+   if(!Number.isFinite(e.x)||!Number.isFinite(e.y)||
+      (e.vx!=null&&!Number.isFinite(e.vx))||
+      (e.vy!=null&&!Number.isFinite(e.vy)))return null;
+   if(group===0&&(!CLASSES[e.cls]||
+      !Number.isFinite(CLASSES[e.cls].size)||
+      !(CLASSES[e.cls].size>0)||
+      e.__novaSweepMoveTime!==g.time))return null;
+   if(group===1&&(!Number.isFinite(e.r)||!(e.r>0)||
+      e.__novaShapeSweepEpoch!==g.__novaShapeSweepEpoch||
+      shapeWasTeleported(g,e)))return null;
+   var prevX=group===0?e.__novaSweepPrevX:e.__novaShapeSweepPrevX,
+       prevY=group===0?e.__novaSweepPrevY:e.__novaShapeSweepPrevY;
+   if(!Number.isFinite(prevX)||!Number.isFinite(prevY))return null;
+   var motion=Math.hypot(e.x-prevX,e.y-prevY),
+       radius=group===0?CLASSES[e.cls].size+3:e.r,
+       speed=Math.hypot(e.vx||0,e.vy||0);
+   if(!Number.isFinite(motion)||!Number.isFinite(speed))return null;
+   for(var c=0;c<3;c++){
+    var shot=contacts[c],dx=(shot.ex-shot.ax)*shot.t,
+        dy=(shot.ey-shot.ay)*shot.t,len=dx*dx+dy*dy,
+        bound=radius+shot.b.r+8+motion+speed*dt*2;
+    if(!(len>1e-9)||!Number.isFinite(bound))return null;
+    var t=clamp(((e.x-shot.ax)*dx+(e.y-shot.ay)*dy)/len,0,1);
+    if(d2(shot.ax+t*dx,shot.ay+t*dy,e.x,e.y)<=bound*bound)
+     return null;
+   }
+  }
+ }
+ return contacts.map(function(x){return x.i;});
+}
  var oldUpdateBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var terrain=ensureTerrain(this);
  /* Snapshot all live competing shots BEFORE any shell/TTL/terrain pre-pass.
   * A later shot cannot gain speculative priority because an earlier shot
@@ -2955,7 +3042,7 @@ function certifiedTwoShotCoverPriority(g,dt){
     }else isolatedTTLStationaryPiercingChain(this,liveBullet,dt,true);
    }
   }
- var terrainOrder=certifiedTwoShotCoverPriority(this,dt);for(var terrainStep=0;terrainStep<this.bullets.length;terrainStep++){var i=terrainOrder?terrainOrder[terrainStep]:terrainStep;var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,sweepDt=dt;/* Terrain beyond physical projectile lifetime is unreachable, including shells. */if(Number.isFinite(b.ttl)){if(b.ttl<=0)continue;sweepDt=Math.min(dt,b.ttl);}var nx=ox+(b.vx||0)*sweepDt,ny=oy+(b.vy||0)*sweepDt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;if(fuseDefinitelyBeforeTerrain(this,b,dt,ox,oy,nx,ny,fh.hit))continue;if(certifiedTankBeforeFirstSolid(this,b,dt,ox,oy,nx,ny,fh)===1)continue;if(certifiedSquareBeforeFirstSolid(this,b,dt,ox,oy,nx,ny,fh)===1)continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){/* Integrity belongs to the launch build, not the post-breach pen. */if(this.initBulletIntegrity)this.initBulletIntegrity(b);b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){if(certifiedBreachLaterSolid(this,b,dt,ox,oy,nx,ny,fh))continue;b.__novaBreachAtTime=this.time;b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
+ var terrainOrder=certifiedTwoShotCoverPriority(this,dt)||certifiedThreeShotCoverPriority(this,dt);for(var terrainStep=0;terrainStep<this.bullets.length;terrainStep++){var i=terrainOrder?terrainOrder[terrainStep]:terrainStep;var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,sweepDt=dt;/* Terrain beyond physical projectile lifetime is unreachable, including shells. */if(Number.isFinite(b.ttl)){if(b.ttl<=0)continue;sweepDt=Math.min(dt,b.ttl);}var nx=ox+(b.vx||0)*sweepDt,ny=oy+(b.vy||0)*sweepDt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;if(fuseDefinitelyBeforeTerrain(this,b,dt,ox,oy,nx,ny,fh.hit))continue;if(certifiedTankBeforeFirstSolid(this,b,dt,ox,oy,nx,ny,fh)===1)continue;if(certifiedSquareBeforeFirstSolid(this,b,dt,ox,oy,nx,ny,fh)===1)continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){/* Integrity belongs to the launch build, not the post-breach pen. */if(this.initBulletIntegrity)this.initBulletIntegrity(b);b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){if(certifiedBreachLaterSolid(this,b,dt,ox,oy,nx,ny,fh))continue;b.__novaBreachAtTime=this.time;b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
    /* The core still advances a dead bullet before removing it; a shell may
      * expire or leave the arena in that pass. Consume its one-time burst now. */
     if(b.shell&&this.clusterBurst){var childStart=this.bullets.length;this.clusterBurst(b);clearTerrainBurstChildren(this,s,h,childStart);b.shell=false;}if(b.splash&&this.splashAt)this.splashAt(h.x,h.y,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.dead=true;if(this.addFlash)this.addFlash(h.x,h.y,s.destructible?'#8fd4ff':'#b9c7e7',Math.min(46,14+(b.dmg||0)*.24));if(this.cam&&b.dmg>42)this.cam.shake=Math.max(this.cam.shake,.08);/* The materialized core still advances dead bullets before removing them. Freeze a terrain-killed projectile at its impact so its final trail cannot leak through cover. Breaching live shots keep their velocity above. */b.vx=0;b.vy=0;
