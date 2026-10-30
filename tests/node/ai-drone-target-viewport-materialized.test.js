@@ -12,9 +12,23 @@ const inline=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)]
   .map(m=>m[1]).find(s=>s.includes('window.__defineModule("game/engine"'));
 const overlays=[...html.matchAll(/<script[^>]+src=["']\.\/(nova-updates\/[^"']+)["']/g)].map(m=>m[1]);
 const noop=()=>{};
+function canvas(){
+  const gradient={addColorStop:noop};
+  const c={clientWidth:320,clientHeight:240,width:320,height:240,
+    style:{setProperty:noop},classList:{add:noop,remove:noop,toggle:noop},
+    setAttribute:noop,appendChild:noop,remove:noop,querySelector:()=>null,
+    addEventListener:noop,removeEventListener:noop,
+    getBoundingClientRect:()=>({left:0,top:0,width:320,height:240})};
+  const ctx=new Proxy({canvas:c,createLinearGradient:()=>gradient,
+    createRadialGradient:()=>gradient,measureText:t=>({width:String(t).length*8}),
+    getImageData:()=>({data:new Uint8ClampedArray(4)})},
+    {get:(obj,key)=>key in obj?obj[key]:noop,
+      set:(obj,key,value)=>{obj[key]=value;return true;}});
+  c.getContext=()=>ctx;return c;
+}
 function boot(){
-  const document={hidden:false,addEventListener:noop,removeEventListener:noop,
-    createElement:()=>({getContext:()=>({}),style:{},addEventListener:noop}),
+  const document={hidden:false,visibilityState:'visible',addEventListener:noop,removeEventListener:noop,
+    createElement:()=>canvas(),
     getElementById:()=>null,querySelector:()=>null,querySelectorAll:()=>[],
     body:{appendChild:noop},head:{appendChild:noop},
     documentElement:{style:{setProperty:noop},classList:{toggle:noop,add:noop,remove:noop}}};
