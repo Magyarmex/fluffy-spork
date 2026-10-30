@@ -98,7 +98,9 @@ function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
   g.bullets.push({kind:'bullet',id:901,ownerId:901,
    x:cfg.x??1800,y:cfg.y??-1800,vx:cfg.vx??0,vy:cfg.vy??0,
    r:9,dmg:10,ttl:cfg.ttl??1,pen:1,hits:0,dead:false,
-   shell:true,splash:100});
+   shell:true,splash:100,__v17Cannon:!!cfg.cannon,
+   __v17FuseDist:cfg.fuse??0,__v17SpawnX:cfg.spawnX,
+   __v17SpawnY:cfg.spawnY});
  }
  if(reverseBullets)g.bullets.reverse();
  if(moved||teleport){
@@ -483,6 +485,39 @@ for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['f
    assert.equal(square.hp,43);
    assert.equal(g.__novaTerrain[0].hp,288);
    assert.deepEqual(g.hits,[50]);
+  });
+ }
+}
+
+/* Dense remote gunfire and programmed Cannon fuses are separate hazards.
+ * Preserve first-contact order only if the existing shell certificate
+ * proves that the fuse cannot fire during this frame. */
+for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['full shipping',FullGame]]){
+ for(const hz of [30,60,120,240]){
+  test(label+' remote shell and 180 independent rounds preserve Scout square/cover at '+hz+'Hz',()=>{
+   const {g,square}=trial(Game,{hz,vx:440,squareX:16.5,squareY:52,
+    wallX:94,wallWidth:180,wallHeight:60,bulletY:32,
+    pen:1,dmg:12,radius:5*(1+12*.0085),ttl:.004,
+    cover:true,remoteBullets:180,remoteShell:true});
+   assert.equal(square.hp,43);
+   assert.equal(g.__novaTerrain[0].hp,288);
+   assert.deepEqual(g.hits,[50]);
+  });
+ }
+ test(label+' remote Cannon shell with future programmed fuse preserves square contact',()=>{
+  const {g,square}=trial(Game,{hz:30,vx:1500,squareX:30,wallX:57,
+   pen:4,dmg:47,radius:5.8*(1+47*.0085),
+   remoteShell:{x:1800,y:-1800,vx:420,cannon:true,fuse:350,
+    spawnX:1800,spawnY:-1800}});
+  assert.equal(square.hp,8);assert.deepEqual(g.hits,[50]);
+ });
+ for(const cfg of [
+  {x:1800,y:-1800,vx:420,cannon:true,fuse:1,spawnX:1800,spawnY:-1800},
+  {x:1800,y:-1800,vx:420,cannon:true,fuse:350}]){
+  test(label+' uncertified Cannon fuse keeps conservative square path '+JSON.stringify(cfg),()=>{
+   const {g,square}=trial(Game,{hz:30,vx:1500,squareX:30,wallX:57,
+    pen:4,dmg:47,radius:5.8*(1+47*.0085),remoteShell:cfg});
+   assert.equal(square.hp,55);assert.deepEqual(g.hits,[]);
   });
  }
 }
