@@ -1,9 +1,9 @@
 'use strict';
-/* #147 regression-first bounded three-shot proof: three ordinary bullets hitting destructible cover in one
- * 30Hz frame must resolve by physical contact time, not bullet array order.
- * This is a real-speed 2500u/s case with disjoint projectile lanes, a
- * nonlethal Square first, and a downstream tank reached in the next frame.
- * Exercise the materialized Game.updateBullets and actual shipping overlays.
+/* #147: three ordinary shots share one destructible cover in a 30Hz frame.
+ * A nonlethal cover impact, then a lethal one, must precede a penetrating
+ * shot arriving at the former cover and reaching a downstream tank.
+ * The 2500u/s speed is a controlled stress fixture, NOT a named class loadout.
+ * Exercise materialized Game.updateBullets and actual shipping overlays.
  */
 const test=require('node:test');
 const assert=require('node:assert/strict');
