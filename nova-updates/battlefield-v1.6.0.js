@@ -2099,7 +2099,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
 
  /* #147: a nonlethal square physically BEFORE a wall must not disappear
   * merely because the core checks the full-frame endpoint after terrain.
-  * One witnessed stationary square, one nonpiercing shot, no competing
+  * One witnessed bounded-motion square, one nonpiercing shot, no competing
   * contact and no ambiguous chronology: otherwise defer to legacy combat. */
  function certifiedSquareBeforeFirstSolid(g,b,dt,ax,ay,ex,ey,wall){
   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
@@ -2140,27 +2140,41 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    var s=shapes[si];if(!s||!(s.hp>0))continue;
    if(!Number.isFinite(s.x)||!Number.isFinite(s.y)||
       !Number.isFinite(s.r)||!(s.r>0))return false;
-   var rr=b.r+s.r;
-   if(!near(s.x,s.y,s.x,s.y,rr+4+Math.max(0,dt*800)))continue;
+   var rr=b.r+s.r,
+       sx=Number.isFinite(s.__novaShapeSweepPrevX)?s.__novaShapeSweepPrevX:s.x,
+       sy=Number.isFinite(s.__novaShapeSweepPrevY)?s.__novaShapeSweepPrevY:s.y;
+   if(!near(sx,sy,s.x,s.y,rr+4+Math.max(0,dt*800)))continue;
    if(s.type!=='square'||s.born===g.time||
       s.__novaShapeSweepEpoch!==g.__novaShapeSweepEpoch||
       !Number.isFinite(s.__novaShapeSweepPrevX)||
       !Number.isFinite(s.__novaShapeSweepPrevY)||
-      Math.hypot(s.x-s.__novaShapeSweepPrevX,
-                 s.y-s.__novaShapeSweepPrevY)>1e-8||
-      !(s.hp>b.dmg*2)||
-      pointInsideSolid(wall.solid,s.x,s.y,s.r+1))return false;
-   var fx=ax-s.x,fy=ay-s.y,B=2*(fx*dx+fy*dy),
-       C=fx*fx+fy*fy-rr*rr;
-   if(!(C>1e-8))return false;
-   var D=B*B-4*A*C;
-   if(!Number.isFinite(D)||
-      Math.abs(D)<=1e-10*(B*B+4*A*(fx*fx+fy*fy+rr*rr)))return false;
-   if(D<=0)continue;
-   var root=Math.sqrt(D),q=-.5*(B+(B<0?-root:root));
-   if(!q)return false;
-   var enter=Math.min(q/A,C/q),leave=Math.max(q/A,C/q);
-   if(leave<=0||enter>=wallT-1e-6)continue;
+      !(s.hp>b.dmg*2))return false;
+   var move=Math.hypot(s.x-sx,s.y-sy);
+   if(!Number.isFinite(move)||move>96||
+      pointInsideSolid(wall.solid,sx,sy,s.r+1)||
+      pointInsideSolid(wall.solid,s.x,s.y,s.r+1)||
+      (move>1e-8&&firstSolidHit(g,sx,sy,s.x,s.y,s.r+1)))
+    return false;
+   var enter=null;
+   if(move>1e-8){
+    /* Reuse the exact moving-shape contact owner already used by
+     * Battlefield's shipping swept recovery, never an endpoint guess. */
+    enter=movingShapeHitT(g,s,ax,ay,ex,ey,rr);
+   }else{
+    var fx=ax-s.x,fy=ay-s.y,B=2*(fx*dx+fy*dy),
+        C=fx*fx+fy*fy-rr*rr;
+    if(!(C>1e-8))return false;
+    var D=B*B-4*A*C;
+    if(!Number.isFinite(D)||
+       Math.abs(D)<=1e-10*(B*B+4*A*(fx*fx+fy*fy+rr*rr)))return false;
+    if(D>0){
+     var root=Math.sqrt(D),q=-.5*(B+(B<0?-root:root));
+     if(!q)return false;
+     var leave=Math.max(q/A,C/q);
+     if(leave>0)enter=Math.min(q/A,C/q);
+    }
+   }
+   if(enter==null||enter>=wallT-1e-6)continue;
    if(!(enter>1e-9)||victim)return false;
    victim=s;hitT=enter;
   }
@@ -2190,10 +2204,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    if(near(o.x,o.y,ox,oy,b.r+o.r+2))return false;
    var toHit=Math.min(span,hitT*dt),
        hx=o.x+o.vx*toHit,hy=o.y+o.vy*toHit,rr=o.r+victim.r;
-   if(Math.max(o.x,hx)+rr>=victim.x&&
-      Math.min(o.x,hx)-rr<=victim.x&&
-      Math.max(o.y,hy)+rr>=victim.y&&
-      Math.min(o.y,hy)-rr<=victim.y)return false;
+   var vsx=victim.__novaShapeSweepPrevX,vsy=victim.__novaShapeSweepPrevY;
+   if(Math.max(o.x,hx)+rr>=Math.min(vsx,victim.x)&&
+      Math.min(o.x,hx)-rr<=Math.max(vsx,victim.x)&&
+      Math.max(o.y,hy)+rr>=Math.min(vsy,victim.y)&&
+      Math.min(o.y,hy)-rr<=Math.max(vsy,victim.y))return false;
   }
   var hx=ax+dx*hitT,hy=ay+dy*hitT;
   b.x=hx;b.y=hy;b.px=hx;b.py=hy;
