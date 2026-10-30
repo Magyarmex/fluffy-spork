@@ -152,5 +152,5 @@ for(const optimized of [false,true]){
 
 }
 test('actual materialized game includes the corrected Battlefield owner',()=>{
- assert.match(html,/nova-updates\\/battlefield-v1\\.6\\.0\\.js/);
+ assert.ok(html.includes('nova-updates/battlefield-v1.6.0.js'));
 });
