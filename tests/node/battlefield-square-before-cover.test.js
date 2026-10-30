@@ -66,7 +66,8 @@ function boot(optimized,full=false){
 function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
   squareY=0,wallY=0,born=false,moved=false,teleport=false,extraBullet=false,
   extraTank=false,fragile=false,pen=1,extraSquare=false,cover=false,
-  dmg=12,radius=3,ttl=1,wallHeight=80,wallWidth=8,bulletY=0,linearVy=0}={}){
+  dmg=12,radius=3,ttl=1,wallHeight=80,wallWidth=8,bulletY=0,linearVy=0,
+  remoteBullets=0,reverseBullets=false}={}){
  const g=new Game();
  const square={kind:'shape',id:50,type:'square',x:squareX,y:squareY,r:20,hp:fragile?10:55};
  if(born)square.born=g.time;
@@ -80,6 +81,13 @@ function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
  if(extraBullet)g.bullets.push({kind:'bullet',id:11,ownerId:3,
   x:extraBullet==='remote'?1000:0,y:extraBullet==='remote'?1000:0,vx:0,vy:0,r:3,dmg:20,ttl:1,pen:0,hits:0,dead:extraBullet==='dead'});
  if(extraTank)g.tanks.push({kind:'tank',id:2,cls:'scout',alive:true,hp:100,x:30,y:0});
+ /* Unrelated physical shots, spread over the actual 4,500-unit arena.
+  * Their independent paths cannot reach the square, wall or each other. */
+ for(let i=0;i<remoteBullets;i++)g.bullets.push({kind:'bullet',
+  id:1000+i,ownerId:1000+i,x:-1900+(i%40)*95,
+  y:850+Math.floor(i/40)*70,vx:0,vy:0,r:3,dmg:5,
+  ttl:1,pen:0,hits:0,dead:false,shell:false,beam:false,splash:0});
+ if(reverseBullets)g.bullets.reverse();
  if(moved||teleport){
   const oldUpdate=g.update.bind(g);
   g.update=function(dt){square.x=squareX;square.y=teleport?120:squareY;oldUpdate(dt);};
@@ -349,5 +357,40 @@ for(const hz of [30,60,120,240]){
  test('full shipping collision stack keeps wall before square at '+hz+'Hz',()=>{
   const {g,square}=trial(FullGame,{hz,squareX:120});
   assert.deepEqual(g.hits,[]);assert.equal(square.hp,55);
+ });
+}
+
+/* Regression-first: the legacy >128-shot and >300-combined global veto
+ * suppresses a proven earlier square contact even though every extra
+ * projectile is distant and independently inspected for competition.
+ * Keep the 260-body/600-total ceiling and all local-interception vetoes. */
+for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['full shipping',FullGame]]){
+ for(const hz of [30,60,120,240])for(const reverseBullets of [false,true]){
+  test(label+' dense remote fire preserves Scout square->cover at '+hz+'Hz reverse='+reverseBullets,()=>{
+   const {g,square}=trial(Game,{hz,vx:440,squareX:16.5,squareY:52,
+    wallX:94,wallWidth:180,wallHeight:60,bulletY:32,
+    pen:1,dmg:12,radius:5*(1+12*.0085),ttl:.004,
+    cover:true,remoteBullets:180,reverseBullets});
+   assert.equal(square.hp,43,'distant gunfire cannot erase earlier square hit');
+   assert.equal(g.__novaTerrain[0].hp,288,'remaining penetration must hit cover');
+   assert.deepEqual(g.hits,[50]);
+  });
+ }
+ test(label+' 350 remote shots preserve Assassin square before permanent wall',()=>{
+  const {g,square}=trial(Game,{hz:30,vx:1500,squareX:30,wallX:57,
+   pen:4,dmg:47,radius:5.8*(1+47*.0085),remoteBullets:350});
+  assert.equal(square.hp,8);assert.deepEqual(g.hits,[50]);
+ });
+ test(label+' nearby competitor still vetoes dense speculative square hit',()=>{
+  const {g,square}=trial(Game,{hz:30,remoteBullets:180,extraBullet:true});
+  assert.equal(square.hp,55);assert.deepEqual(g.hits,[]);
+ });
+ test(label+' beyond 600 combined checks remains conservatively unmodified',()=>{
+  const {g,square}=trial(Game,{hz:30,remoteBullets:610});
+  assert.equal(square.hp,55);assert.deepEqual(g.hits,[]);
+ });
+ test(label+' wall before square stays protective amid remote gunfire',()=>{
+  const {g,square}=trial(Game,{hz:30,squareX:120,remoteBullets:180});
+  assert.equal(square.hp,55);assert.deepEqual(g.hits,[]);
  });
 }
