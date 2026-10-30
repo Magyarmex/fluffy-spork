@@ -78,7 +78,7 @@ function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
  g.bullets=[{kind:'bullet',id:10,ownerId:1,x:0,y:0,vx,vy:0,
   r:radius,dmg,ttl:1,pen,hits:0,dead:false,shell:false,beam:false,splash:0}];
  if(extraBullet)g.bullets.push({kind:'bullet',id:11,ownerId:3,
-  x:extraBullet==='remote'?1000:0,y:extraBullet==='remote'?1000:0,vx:0,vy:0,r:3,dmg:20,ttl:1,pen:0,hits:0,dead:false});
+  x:extraBullet==='remote'?1000:0,y:extraBullet==='remote'?1000:0,vx:0,vy:0,r:3,dmg:20,ttl:1,pen:0,hits:0,dead:extraBullet==='dead'});
  if(extraTank)g.tanks.push({kind:'tank',id:2,cls:'scout',alive:true,hp:100,x:30,y:0});
  if(moved||teleport){
   const oldUpdate=g.update.bind(g);
@@ -123,6 +123,10 @@ for(const optimized of [false,true]){
  test(mode+' remote projectile does not suppress independent square hit',()=>{
   const {g,square}=trial(Game,{extraBullet:'remote'});
   assert.equal(square.hp,43);assert.deepEqual(g.hits,[50]);
+ });
+ test(mode+' previously dead competing bullet cannot certify its old corridor',()=>{
+  const {g,square}=trial(Game,{extraBullet:'dead'});
+  assert.equal(square.hp,55);assert.deepEqual(g.hits,[]);
  });
  test(mode+' witnessed bounded square motion receives real first contact',()=>{
   const {g,square}=trial(Game,{moved:true});
