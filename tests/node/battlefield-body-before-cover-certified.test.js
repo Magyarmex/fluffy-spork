@@ -51,7 +51,9 @@ function boot(optimized){
    this.__novaShapeSweepActive=true;this.__novaShapeSweepEpoch=1;
    this.__novaTerrain=[];this.tmp=[];this.cam={shake:0};this.sfx={};
    this.player={id:999,x:1000,y:1000,alive:true};
-   this.hash={query:(_x,_y,_r,out)=>{out.length=0;out.push(...this.tanks,...this.shapes,...this.drones);}};
+   this.hash={query:(_x,_y,_r,out)=>{out.length=0;
+    out.push(...this.tanks,...this.shapes,...this.drones);
+    if(this.__novaStaleHashShape)out.push(this.__novaStaleHashShape);}};
    this.hits=[];this.coverHits=0;
   }
  }
@@ -90,9 +92,12 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,l
  active=true,knock=0,allied=false,destructible=false,damage=10,
  linearMove=null,tamperMove=false,doubleMove=false,
  otherNearMovingStart=false,bornThisFrame=false,coverHp=1000,
- shellInterception=false,secondShell=false,shellShape=null}={}){
+ shellInterception=false,secondShell=false,shellShape=null,
+ shellStaleHashShape=false}={}){
  const g=new Game(),dt=1/fps;
  g.__novaBattlefield={coverBroken:0};
+ if(shellStaleHashShape)g.__novaStaleHashShape={
+  kind:'shape',id:888,type:'square',x:0,y:990,r:20,hp:0};
  g.__novaShapeSweepActive=active;
  g.areAllies=()=>allied;
  const t={kind:'tank',id:2,cls:'scout',x:target,y:targetY,hp:100,
@@ -251,6 +256,10 @@ for(const optimized of [false,true]){
  });
  test(label+': neutral near shell retains explosion veto',()=>{
   const r=run(boot(optimized),{otherShell:true,shellShape:'near'});
+  assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
+ });
+ test(label+': stale hash-only shape still vetoes possible shell burst',()=>{
+  const r=run(boot(optimized),{otherShell:true,shellStaleHashShape:true});
   assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
  });
  test(label+': pending-dead neutral cannot be ignored by shell proof',()=>{
