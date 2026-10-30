@@ -365,6 +365,45 @@ for(const optimized of [false,true]){
   assert.equal(r.hp,100,'second wall must remain protective');
   assert.equal(r.g.__novaTerrain[0].hp,0,'first cover still breaks');
  });
+ /* Cross-frame-rate and enumeration-order stress: the 30Hz fixture
+  * above is the real Marksman. Higher-Hz cases scale projectile speed to
+  * keep both physical contacts inside one frame without changing geometry. */
+ for(const fps of [30,60,120,240])for(const reverseBullets of [false,true]){
+  test(label+': dense remote shell first hull at '+fps+'Hz reversed='+reverseBullets,()=>{
+   const speed=fps===30?1050*(1+.085*8):60*fps,
+         radius=5.5*(1+21*.0085);
+   const r=run(boot(optimized),{fps,speed,wall:55,target:29,
+    pen:2,radius,damage:21,destructible:true,remoteShapes:120,
+    remoteBullets:220,otherShell:{x:1800,y:-1800},reverseBullets});
+   assert.deepEqual(r.hits,[2]);
+   assert.equal(r.hp,79);
+   assert.equal(r.g.__novaTerrain[0].hp,979);
+  });
+  test(label+': dense remote shell second wall at '+fps+'Hz reversed='+reverseBullets,()=>{
+   const speed=fps===30?1050*(1+.085*8):60*fps,
+         radius=5.5*(1+21*.0085);
+   const r=run(boot(optimized),{fps,speed,wall:17,laterWall:35,
+    target:50,pen:3,radius,damage:21,destructible:true,coverHp:5,
+    remoteShapes:120,remoteBullets:220,
+    otherShell:{x:1800,y:-1800},reverseBullets});
+   assert.deepEqual(r.hits,[]);
+   assert.equal(r.hp,100);
+   assert.equal(r.g.__novaTerrain[0].hp,0);
+  });
+ }
+ test(label+': dense remote shell with imminent expiry still vetoes',()=>{
+  const r=run(boot(optimized),{remoteShapes:120,remoteBullets:220,
+   otherShell:{x:1800,y:-1800,ttl:.001}});
+  assert.deepEqual(r.hits,[]);
+  assert.equal(r.hp,100);
+ });
+ test(label+': dense remote Cannon fuse still vetoes',()=>{
+  const r=run(boot(optimized),{remoteShapes:120,remoteBullets:220,
+   otherShell:{x:1800,y:-1800,cannon:true,fuse:1,
+    spawnX:1800,spawnY:-1800}});
+  assert.deepEqual(r.hits,[]);
+  assert.equal(r.hp,100);
+ });
  test(label+': dense local shell retains conservative contact veto',()=>{
   const r=run(boot(optimized),{remoteShapes:120,remoteBullets:220,
    otherShell:{x:0,y:30}});
