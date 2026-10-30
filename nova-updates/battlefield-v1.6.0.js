@@ -1942,6 +1942,146 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   return true;
  }
 
+ /* A shell in a different fight cannot reorder this shot if it cannot
+  * burst during this frame. No guessed fragment radius: certify an unspent,
+  * unchanged shell with no possible terrain, body or projectile contact.
+  * Any fuse, expiry, uncertain motion or local competition fails closed. */
+ function certifiedRemoteUnspentShells(g,b,dt,ax,ay,ex,ey){
+  /* No allocation on the overwhelmingly common shell-free wall path. */
+  if(g.__novaWallProofHadShell!==true)return true;
+  var safe=new Set();
+  if(!(Number.isFinite(dt)&&dt>0&&dt<=.05))return null;
+  var shots=g.bullets||[],tanks=g.tanks||[],shapes=g.shapes||[],
+      drones=g.drones||[],count=0;
+  if(shots.length+tanks.length+shapes.length+drones.length>260)return null;
+  function near(x0,y0,x1,y1,u0,v0,u1,v1,pad){
+   if(!Number.isFinite(x0)||!Number.isFinite(y0)||
+      !Number.isFinite(x1)||!Number.isFinite(y1)||
+      !Number.isFinite(u0)||!Number.isFinite(v0)||
+      !Number.isFinite(u1)||!Number.isFinite(v1)||
+      !Number.isFinite(pad))return true;
+   return Math.max(x0,x1)+pad>=Math.min(u0,u1)&&
+          Math.min(x0,x1)-pad<=Math.max(u0,u1)&&
+          Math.max(y0,y1)+pad>=Math.min(v0,v1)&&
+          Math.min(y0,y1)-pad<=Math.max(v0,v1);
+  }
+  for(var si=0;si<shots.length;si++){
+   var o=shots[si];
+   if(!o||o===b||
+      o.__novaWallProofSpecialEpoch!==g.__novaWallProofEpoch)continue;
+   if(++count>2||o.dead||!o.shell||
+      o.__novaClusterBurstConsumed||
+      o.__novaBreachAtTime===g.time||
+      !(Number.isFinite(o.ttl)&&o.ttl>dt)||
+      !(Number.isFinite(o.r)&&o.r>0)||
+      (o.splash!=null&&(!Number.isFinite(o.splash)||o.splash<0))||
+      !Number.isFinite(o.x)||!Number.isFinite(o.y)||
+      !Number.isFinite(o.vx)||!Number.isFinite(o.vy)||
+      o.__novaWallProofStartX!==o.x||
+      o.__novaWallProofStartY!==o.y||
+      o.__novaWallProofStartVx!==o.vx||
+      o.__novaWallProofStartVy!==o.vy||
+      o.__novaWallProofStartTtl!==o.ttl)return null;
+   var x0=o.x,y0=o.y,x1=x0+o.vx*dt,y1=y0+o.vy*dt;
+   if(!Number.isFinite(x1)||!Number.isFinite(y1)||
+      Math.max(Math.abs(x0),Math.abs(y0),
+       Math.abs(x1),Math.abs(y1))>=MAP_LIMIT-o.r-4||
+      firstSolidHit(g,x0,y0,x1,y1,o.r*.45))return null;
+   /* Cannon's programmed radial fuse can detonate without contact.
+    * Its distance from the launch point is convex along a straight
+    * unimpeded segment, so BOTH endpoints below the threshold certify
+    * that this frame cannot cross it. Missing/armed/near fuses abstain. */
+   if(o.__v17Cannon){
+    if(!(Number.isFinite(o.__v17FuseDist)&&o.__v17FuseDist>0)||
+       !Number.isFinite(o.__v17SpawnX)||
+       !Number.isFinite(o.__v17SpawnY)||
+       Math.max(Math.hypot(x0-o.__v17SpawnX,y0-o.__v17SpawnY),
+        Math.hypot(x1-o.__v17SpawnX,y1-o.__v17SpawnY))+2.000001>=
+        o.__v17FuseDist)return null;
+   }else if(o.__v17FuseDist)return null;
+   /* Even an unexpected burst cannot be local to this proof corridor. */
+   if(near(x0,y0,x1,y1,ax,ay,ex,ey,
+      o.r+(b.r||3)+Math.max(400,(o.splash||0)+150)))return null;
+   /* All body checks use witnessed start/end envelopes. Tanks retain a
+    * generous 320u unknown-motion margin; shapes use their existing 96u
+    * teleport guard plus 120u padding, drones a 160u motion margin. */
+   for(var ti=0;ti<tanks.length;ti++){
+    var t=tanks[ti];if(!t||!t.alive)continue;
+    var def=CLASSES[t.cls];
+    if(!def||!(Number.isFinite(def.size)&&def.size>0))return null;
+    var tx=t.__novaSweepMoveTime===g.time?t.__novaSweepPrevX:t.x,
+        ty=t.__novaSweepMoveTime===g.time?t.__novaSweepPrevY:t.y;
+    if(!Number.isFinite(tx)||!Number.isFinite(ty)||
+       !Number.isFinite(t.x)||!Number.isFinite(t.y)||
+       Math.hypot(t.x-tx,t.y-ty)>320||
+       near(x0,y0,x1,y1,tx,ty,t.x,t.y,o.r+def.size+320))return null;
+   }
+   /* The player may be separately referenced by an older core owner. */
+   var player=g.player;
+   if(player&&player.alive&&near(x0,y0,x1,y1,
+      player.x,player.y,player.x,player.y,o.r+400))return null;
+   for(var qi=0;qi<shapes.length;qi++){
+    /* Core shell-body queries can still see a shape awaiting removal;
+     * never infer that hp<=0 alone makes its collision harmless. */
+    var sh=shapes[qi];if(!sh)continue;
+    var st=shapeSweepStart(g,sh);
+    var sx=st?st.x:sh.x,sy=st?st.y:sh.y;
+    if(!Number.isFinite(sx)||!Number.isFinite(sy)||
+       !Number.isFinite(sh.x)||!Number.isFinite(sh.y)||
+       shapeWasTeleported(g,sh)||
+       Math.hypot(sh.x-sx,sh.y-sy)>SHAPE_SWEEP_TELEPORT||
+       near(x0,y0,x1,y1,sx,sy,sh.x,sh.y,
+        o.r+(sh.r||15)+120))return null;
+   }
+   for(var di=0;di<drones.length;di++){
+    var d=drones[di];if(!d||!(d.hp>0))continue;
+    var px=d.__novaChronoDroneEpoch===g.__novaShapeSweepEpoch?
+       d.__novaChronoDronePrevX:d.x,
+        py=d.__novaChronoDroneEpoch===g.__novaShapeSweepEpoch?
+       d.__novaChronoDronePrevY:d.y;
+    if(!Number.isFinite(px)||!Number.isFinite(py)||
+       !Number.isFinite(d.x)||!Number.isFinite(d.y)||
+       Math.hypot(d.x-px,d.y-py)>160||
+       near(x0,y0,x1,y1,px,py,d.x,d.y,
+        o.r+(d.r||8)+160))return null;
+   }
+   /* Core collisions query the spatial hash, which can still contain
+    * an entity removed from the live arrays earlier this frame. Check the
+    * actual core query owner as well: a stale shape can still burst a shell
+    * even when it is absent from g.shapes or has hp<=0. */
+   if(!g.hash||typeof g.hash.query!=='function')return null;
+   var nearby=[],mx=(x0+x1)*.5,my=(y0+y1)*.5,
+       radius=Math.hypot(x1-x0,y1-y0)*.5+o.r+400;
+   try{g.hash.query(mx,my,radius,nearby);}
+   catch(_e){return null;}
+   if(nearby.length>260)return null;
+   for(var hi=0;hi<nearby.length;hi++){
+    var e=nearby[hi];if(!e)continue;
+    var rad=0;
+    if(e.kind==='shape')rad=e.r||15;
+    else if(e.kind==='tank'&&e.alive){
+     var edef=CLASSES[e.cls];if(!edef)return null;
+     rad=edef.size+3;
+    }else if(e.kind==='drone'&&e.hp>0)rad=e.r||8;
+    else continue;
+    if(!Number.isFinite(rad)||rad<=0||
+       near(x0,y0,x1,y1,e.x,e.y,e.x,e.y,o.r+rad+160))
+     return null;
+   }
+   /* A crossing projectile could detonate the shell. Use its full sweep,
+    * not the endpoint or an unordered global shot count. */
+   for(var bi=0;bi<shots.length;bi++){
+    var other=shots[bi];if(!other||other===o||other===b)continue;
+    if(other.dead)return null;
+    var span=Math.min(dt,Math.max(0,other.ttl||0));
+    if(near(x0,y0,x1,y1,other.x,other.y,
+       other.x+other.vx*span,other.y+other.vy*span,
+       o.r+(other.r||3)+8))return null;
+   }
+   safe.add(o);
+  }
+  return count>0?safe:null;
+ }
  /* Issue #147: one provable tank-before-first-solid first contact.
   * Battlefield's terrain pre-pass otherwise destroys the shot before the
   * shipping core can resolve an earlier hull. Destructible cover is eligible only
@@ -1955,7 +2095,6 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      (b.hits||0)!==0||
      b.__novaBreachAtTime===g.time||
      g.__novaShapeSweepActive!==true||
-     g.__novaWallProofHadShell===true||
      (b.__novaDirectVictims&&b.__novaDirectVictims.size>0)||
      !(dt>0)||!(b.ttl>dt)||!Number.isFinite(b.ttl)||
      !Number.isFinite(b.dmg)||!(b.dmg>0)||
@@ -1975,6 +2114,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    * distant fire must not erase a certified body-before-cover hit. The
    * combined entity cap keeps the worst-case proof cost finite. */
   if(tanks.length+shapes.length+drones.length+shots.length>260)return false;
+  var safeShells=certifiedRemoteUnspentShells(g,b,dt,ax,ay,ex,ey);
+  if(!safeShells)return false;
   var dx=ex-ax,dy=ey-ay,A=dx*dx+dy*dy;
   if(!(A>1e-12)||!Number.isFinite(A)||
      Math.max(Math.abs(ax),Math.abs(ay),Math.abs(ex),Math.abs(ey))>=MAP_LIMIT-20)
@@ -2081,6 +2222,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    /* A previous terrain/shell event may already have moved or killed this
     * shot; never reconstruct its pre-frame path from a frozen endpoint.
     * Shell/blast side effects also have a larger competition radius. */
+   if(safeShells!==true&&safeShells.has(o))continue;
    if(o.dead||o.shell||o.splash||o.__v17Cannon)return false;
    if(!Number.isFinite(o.x)||!Number.isFinite(o.y)||
       !Number.isFinite(o.vx)||!Number.isFinite(o.vy)||
@@ -2271,7 +2413,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
  }
  function certifiedBreachLaterSolid(g,b,dt,ax,ay,ex,ey,first){
   if(!b||b.dead||b.shell||(b.beam&&b.__novaRail!==true)||b.splash||b.__v17Cannon||
-     g.__novaShapeSweepActive!==true||g.__novaWallProofHadShell===true||
+     g.__novaShapeSweepActive!==true||
      !(dt>0&&Number.isFinite(dt))||
      !(Number.isFinite(b.ttl)&&b.ttl>dt)||
      !(Number.isFinite(b.r)&&b.r>0)||
@@ -2285,6 +2427,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    * below already reject uncertain local competition. Distant fire must
    * not disable the second-wall proof after a legitimate first breach. */
   if(tanks.length+shapes.length+drones.length+shots.length>260)return false;
+  var safeShells=certifiedRemoteUnspentShells(g,b,dt,ax,ay,ex,ey);
+  if(!safeShells)return false;
   /* A second barricade is eligible ONLY if it provably survives this
    * weakened round. A second breach still needs full event arbitration. */
   var later=firstSolidHit(g,ax,ay,ex,ey,b.r*.45);
@@ -2366,6 +2510,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   for(var bi=0;bi<shots.length;bi++){
    var other=shots[bi];if(!other||other===b||
       other.__novaWallProofEpoch!==g.__novaWallProofEpoch)continue;
+   if(safeShells!==true&&safeShells.has(other))continue;
    if(other.dead||other.shell||other.splash||other.beam||
       other.__v17Cannon)return false;
    var span=Math.min(dt,Math.max(0,other.ttl||0));
@@ -2408,8 +2553,15 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    var shellS=this.bullets[countS];
    if(shellS&&!shellS.dead){
     shellS.__novaWallProofEpoch=wallProofEpoch;
-    if(shellS.shell||shellS.splash||shellS.__v17Cannon)
+    if(shellS.shell||shellS.splash||shellS.__v17Cannon){
      this.__novaWallProofHadShell=true;
+     shellS.__novaWallProofSpecialEpoch=wallProofEpoch;
+     shellS.__novaWallProofStartX=shellS.x;
+     shellS.__novaWallProofStartY=shellS.y;
+     shellS.__novaWallProofStartVx=shellS.vx;
+     shellS.__novaWallProofStartVy=shellS.vy;
+     shellS.__novaWallProofStartTtl=shellS.ttl;
+    }
    }
    if(shellS&&shellS.shell&&shellS.ttl>0&&shellS.ttl<dt)shellWork++;
   }
