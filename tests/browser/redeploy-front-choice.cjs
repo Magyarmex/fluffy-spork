@@ -26,6 +26,11 @@ async function run(browser,width,height){
   });
   await page.getByRole('button',{name:/DEPLOY/i}).first().click();
   await page.waitForFunction(()=>window.__novaFrontSmokeGame?.status==='playing',null,{timeout:30000});
+  // This is a between-life test, not an impossible sub-100ms spawn death.
+  // Let Battlefield deliver its one-time map introduction first; otherwise
+  // that unrelated first-spawn toast can replace RETURN during popIn.
+  await page.waitForFunction(()=>window.__novaFrontSmokeGame?.__novaBattlefield?.announced===true,
+   null,{timeout:10000});
   const death=await page.evaluate(()=>{
    const g=window.__novaFrontSmokeGame;
    const p=g.player;
