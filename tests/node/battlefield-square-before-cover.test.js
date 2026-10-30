@@ -123,7 +123,7 @@ for(const optimized of [false,true]){
   * contacts the square at x1.24 and the wall at x5.35, both within
   * its final 4ms (6u travel), even at 240Hz. */
  for(const hz of [30,60,120,240]){
-  test(mode+' expiring Assassin grazes square before thin wall at '+hz+'Hz',()=>{
+  test(mode+' expiring Assassin grazes square before Crossfire wall at '+hz+'Hz',()=>{
    const {g,square}=trial(Game,{hz,vx:1500,squareX:21,squareY:282,
     wallX:55,wallWidth:92,wallHeight:520,bulletY:262,
     pen:4,dmg:47,radius:5.8*(1+47*.0085),ttl:.004});
@@ -132,14 +132,14 @@ for(const optimized of [false,true]){
   });
  }
  /* Canonical Scout (440u/s, pen=1, dmg12, launch radius 5 scaled
-  * by damage) reaches a grazing square at x0.665 and real Crossfire-size
+  * by damage) reaches a grazing square at x0.665 and actual Crossfire 180x60
   * destructible cover at x1.520 before its last 4ms expire (x1.76).
-  * Square bottom y262 is 2u above the wall top y260. This is a legal
+  * Square bottom y32 is 2u above Crossfire cover top y30. This is a legal
   * real-weapon, real-cover-shape case, not a 30,000u/s stress fixture. */
  for(const hz of [30,60,120,240]){
   test(mode+' expiring Scout hits square AND real-size cover at '+hz+'Hz',()=>{
-   const {g,square}=trial(Game,{hz,vx:440,squareX:16.5,squareY:282,
-    wallX:50,wallWidth:92,wallHeight:520,bulletY:262,
+   const {g,square}=trial(Game,{hz,vx:440,squareX:16.5,squareY:52,
+    wallX:94,wallWidth:180,wallHeight:60,bulletY:32,
     pen:1,dmg:12,radius:5*(1+12*.0085),ttl:.004,cover:true});
    assert.equal(square.hp,43);
    assert.equal(g.__novaTerrain[0].hp,288,'piercing shot still reaches cover before TTL');
@@ -282,8 +282,8 @@ for(const hz of [30,60,120,240]){
   assert.equal(square.hp,8);assert.deepEqual(g.hits,[50]);
  });
  test('full shipping stack expiring Scout hits square and cover at '+hz+'Hz',()=>{
-  const {g,square}=trial(FullGame,{hz,vx:440,squareX:16.5,squareY:282,
-   wallX:50,wallWidth:92,wallHeight:520,bulletY:262,
+  const {g,square}=trial(FullGame,{hz,vx:440,squareX:16.5,squareY:52,
+   wallX:94,wallWidth:180,wallHeight:60,bulletY:32,
    pen:1,dmg:12,radius:5*(1+12*.0085),ttl:.004,cover:true});
   assert.equal(square.hp,43);
   assert.equal(g.__novaTerrain[0].hp,288);
