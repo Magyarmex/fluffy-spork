@@ -103,6 +103,29 @@ async function scenario(browser, label, options) {
       assert.equal(footerAudit.writes,0,
         label+': unrelated menu mutation must not rewrite the stable footer: '+JSON.stringify(footerAudit));
       console.log('NOVA_CURRENT_RELEASE_FOOTER '+JSON.stringify(footerAudit));
+      // The History root observer must not cause a self-sustaining RAF loop
+      // by assigning identical textContent to the hero and release badge.
+      const briefingIdle=await page.evaluate(async()=>{
+        const menu=document.querySelector('#root .menu-grid-bg');
+        const hero=menu?.querySelector('h1')?.parentElement?.querySelector('p');
+        const badge=menu?.querySelector('.nv-brief-v');
+        if(!menu||!hero||!badge)return {error:'shipping hero or release badge missing'};
+        let writes=0;
+        const observer=new MutationObserver(records=>{writes+=records.length;});
+        observer.observe(hero,{childList:true,characterData:true,subtree:true});
+        observer.observe(badge,{childList:true,characterData:true,subtree:true});
+        const marker=document.createComment('briefing-observer-idle-probe');
+        menu.appendChild(marker);
+        try{await new Promise(resolve=>setTimeout(resolve,450));}
+        finally{observer.disconnect();marker.remove();}
+        return {writes,hero:hero.textContent,badge:badge.textContent,
+          connected:hero.isConnected&&badge.isConnected};
+      });
+      assert.ok(!briefingIdle.error&&briefingIdle.connected,
+        label+': canonical hero and release badge must remain mounted: '+JSON.stringify(briefingIdle));
+      assert.equal(briefingIdle.writes,0,
+        label+': unrelated root mutation must not rewrite hero or release badge: '+JSON.stringify(briefingIdle));
+      console.log('NOVA_BRIEFING_OBSERVER_IDLE '+JSON.stringify(briefingIdle));
     }
     await page.screenshot({path:path.join(output,label+'-menu.png')});
 
