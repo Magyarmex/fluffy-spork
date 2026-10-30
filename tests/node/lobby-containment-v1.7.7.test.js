@@ -37,7 +37,9 @@ test('lobby current release follows the latest loaded runtime release', () => {
   assert.match(src, /function refreshData\(\)\{data=merge\(data\|\|\{releases:\[\]\}\);if\(window\.NOVALobby\)window\.NOVALobby\.version=data\.currentVersion;return data\}/);
   assert.match(src, /function current\(\)\{var d=refreshData\(\);return d\.releases&&d\.releases\[0\]\|\|window\.__NOVA_LOBBY_RELEASE__\}/);
   assert.match(src, /function makeHistoryPages\(\)\{refreshData\(\);historyPages=\[\]/);
-  assert.match(src, /ft\.textContent='NOVA TANKS v'\+latest\.version/);
+  assert.match(src, /var footerText='NOVA TANKS v'\+latest\.version/);
+  assert.match(src, /window\.NOVAMenuExperience\?'SIGNAL FLOW':'ONE SCREEN'/);
+  assert.match(src, /if\(ft\.textContent!==footerText\)ft\.textContent=footerText/);
   assert.match(src, /window\.NOVALobby\.version=data\.currentVersion/);
   assert.doesNotMatch(src, /return\{currentVersion:VERSION,releases:rs\}/);
 });
