@@ -2758,7 +2758,7 @@ function certifiedThreeShotCoverPriority(g,dt){
      !Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
      !Number.isFinite(b.r)||!(b.r>0)||
      !Number.isFinite(b.dmg)||!(b.dmg>0)||
-     !Number.isFinite(b.ttl)||b.ttl<dt)return null;
+     !Number.isFinite(b.ttl)||b.ttl<=dt)return null;
   var ex=b.x+b.vx*dt,ey=b.y+b.vy*dt;
   if(!Number.isFinite(ex)||!Number.isFinite(ey)||
      Math.max(Math.abs(b.x),Math.abs(b.y),Math.abs(ex),Math.abs(ey))>=MAP_LIMIT-20)
