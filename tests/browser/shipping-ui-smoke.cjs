@@ -324,9 +324,13 @@ async function scenario(browser, label, options) {
       const prior=await page.evaluate(()=>{
         const g=window.__novaBrowserLiveGame;
         if(!g?.player||!g.openOffer)throw Error('real capped Game missing');
-        const saved={level:g.player.level,pendingOffer:g.pendingOffer,
+        const saved={level:g.player.level,tier:g.player.tier,gene:g.player.gene,
+          perk:g.player.perk,pendingOffer:g.pendingOffer,
           masteryOfferChoices:g.masteryOfferChoices};
         g.player.level=45;
+        g.player.tier=3;
+        g.player.gene='guardian';
+        g.player.perk=null;
         g.pendingOffer=3;
         g.masteryOfferChoices=null;
         g.openOffer();
@@ -351,13 +355,28 @@ async function scenario(browser, label, options) {
         const reopened=(await heading.locator('xpath=..').locator('button').allTextContents()).slice(0,3);
         assert.deepEqual(reopened,initial,label+': reopening must not reroll the same milestone');
       }
-      await heading.locator('xpath=..').getByRole('button',{name:/DECIDE LATER/i}).click();
+      await heading.locator('xpath=..').locator('button').first().click();
       await heading.waitFor({state:'detached',timeout:8000});
+      const chosen=await page.evaluate(()=>{
+        const g=window.__novaBrowserLiveGame;
+        return {perk:g.player.perk,pending:g.pendingOffer,
+          saved:g.masteryOfferChoices,paused:g.paused};
+      });
+      assert.ok(chosen.perk,label+': capped mastery choice must apply');
+      assert.equal(chosen.pending,null,label+': consumed mastery must clear pending offer');
+      assert.equal(chosen.saved,null,label+': consumed mastery must clear cached triple');
+      assert.equal(chosen.paused,false,label+': mastery choice resumes combat');
+      assert.equal(await page.getByRole('button',{name:/EVOLVE READY/i}).count(),0,
+        label+': consumed mastery must not reopen');
       await page.evaluate(saved=>{
         const g=window.__novaBrowserLiveGame;
         g.player.level=saved.level;
+        g.player.tier=saved.tier;
+        g.player.gene=saved.gene;
+        g.player.perk=saved.perk;
         g.pendingOffer=saved.pendingOffer;
         g.masteryOfferChoices=saved.masteryOfferChoices;
+        g.recalcMaxHp(g.player);
         g.syncHud();
       },prior);
     }
