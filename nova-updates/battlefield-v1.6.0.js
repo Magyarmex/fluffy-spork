@@ -2284,6 +2284,48 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   * merely because the core checks the full-frame endpoint after terrain.
   * One witnessed bounded-motion square, bounded pen<=4 shot, no competing
   * contact and no ambiguous chronology: otherwise defer to legacy combat. */
+ /* #147: permit a FIRST nonlethal square hit even when another ordinary
+  * shot can strike the SAME cover later in this frame. This is safe only
+  * when the barricade is guaranteed to remain solid after the maximum
+  * possible structural damage from every shot whose sweep approaches it.
+  * Never infer shell/fuse/beam/structural multiplier effects. The normal
+  * collision owner still applies each cover hit exactly once. */
+ function certifiedNonlethalSharedCover(g,b,dt,wall){
+  if(!wall||!wall.solid||!wall.solid.destructible||
+     b.pen!==1||b.hits||b.__novaStructureMult>1||
+     !Number.isFinite(b.dmg)||!(b.dmg>0)||
+     !Number.isFinite(wall.solid.hp)||wall.solid.hp<=b.dmg*1.000001||
+     !Number.isFinite(dt)||!(dt>0&&dt<=.05))return false;
+  var w=wall.solid,
+      hx=w.shape==='rect'?w.w*.5:w.shape==='circle'?w.r:NaN,
+      hy=w.shape==='rect'?w.h*.5:w.shape==='circle'?w.r:NaN,
+      shots=g.bullets||[],total=b.dmg,contested=false;
+  if(!Number.isFinite(w.x)||!Number.isFinite(w.y)||
+     !Number.isFinite(hx)||!Number.isFinite(hy)||
+     !(hx>0&&hy>0)||shots.length>600)return false;
+  for(var i=0;i<shots.length;i++){
+   var o=shots[i];if(!o||o===b)continue;
+   if(o.dead||o.__novaWallProofEpoch!==g.__novaWallProofEpoch||
+      !Number.isFinite(o.x)||!Number.isFinite(o.y)||
+      !Number.isFinite(o.vx)||!Number.isFinite(o.vy)||
+      !Number.isFinite(o.r)||!(o.r>0)||
+      !Number.isFinite(o.ttl)||!(o.ttl>0))return false;
+   var span=Math.min(dt,o.ttl),ex=o.x+o.vx*span,ey=o.y+o.vy*span,
+       pad=o.r+2;
+   if(!Number.isFinite(ex)||!Number.isFinite(ey))return false;
+   if(Math.max(o.x,ex)+pad<w.x-hx||
+      Math.min(o.x,ex)-pad>w.x+hx||
+      Math.max(o.y,ey)+pad<w.y-hy||
+      Math.min(o.y,ey)-pad>w.y+hy)continue;
+   contested=true;
+   if(o.shell||o.beam||o.splash||o.__v17Cannon||
+      o.__novaStructureMult>1||o.pen!==0||
+      !Number.isFinite(o.dmg)||!(o.dmg>0))return false;
+   total+=o.dmg;
+   if(!Number.isFinite(total)||total*1.000001>=w.hp)return false;
+  }
+  return contested; /* no extra pre-pass for already-correct isolated fire */
+ }
  function certifiedSquareBeforeFirstSolid(g,b,dt,ax,ay,ex,ey,wall,dryRun){
   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
      !(Number.isSafeInteger(b.pen)&&b.pen>=0&&b.pen<=4)||(b.hits||0)!==0||(b.knock||0)!==0||
@@ -2417,7 +2459,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
     * Such a hit could change cover HP/solid state before the later event;
     * abstain on its full-frame swept AABB instead of assuming isolation.
     * Permanent cover cannot be destroyed by that unrelated round. */
-   if(wall.solid.destructible){
+   if(wall.solid.destructible&&
+      b.__novaNonlethalSharedCoverEpoch!==g.__novaWallProofEpoch){
     var ws=wall.solid,
         whx=ws.shape==='rect'?ws.w*.5:ws.shape==='circle'?ws.r:NaN,
         why=ws.shape==='rect'?ws.h*.5:ws.shape==='circle'?ws.r:NaN,
@@ -2608,6 +2651,49 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
     }
    }
    if(shellS&&shellS.shell&&shellS.ttl>0&&shellS.ttl<dt)shellWork++;
+  }
+  /* Certified first-event handoff before any shell/TTL/terrain
+   * side effects. Only ONE expiring pen=1 round may be certified; multiple
+   * candidates retain legacy ordering. The square is damaged first, but
+   * restore the shot's original start position so the existing terrain
+   * owner resolves the later cover contact over its ORIGINAL TTL segment.
+   * The nonlethal cover budget guarantees that wall stays solid. */
+  var sharedCandidate=null,sharedCount=0;
+  if(dt<=.05&&this.shapes&&this.shapes.length&&
+     this.bullets.length<=600&&
+     (this.tanks||[]).length+this.shapes.length+(this.drones||[]).length<=260){
+   for(var spi=0;spi<this.bullets.length;spi++){
+    var sb=this.bullets[spi];
+    if(sb&&!sb.dead&&sb.pen===1&&sb.ttl>0&&sb.ttl<=dt&&
+       !sb.shell&&!sb.beam&&!sb.splash&&!sb.__v17Cannon&&
+       (sb.hits||0)===0){
+     sharedCandidate=sb;
+     if(++sharedCount>1)break;
+    }
+   }
+   if(sharedCount===1&&Number.isFinite(sharedCandidate.x)&&
+      Number.isFinite(sharedCandidate.y)&&
+      Number.isFinite(sharedCandidate.vx)&&
+      Number.isFinite(sharedCandidate.vy)&&
+      Number.isFinite(sharedCandidate.r)&&sharedCandidate.r>0){
+    var sx0=sharedCandidate.x,sy0=sharedCandidate.y,
+        sex=sx0+sharedCandidate.vx*sharedCandidate.ttl,
+        sey=sy0+sharedCandidate.vy*sharedCandidate.ttl;
+    if(Number.isFinite(sex)&&Number.isFinite(sey)){
+     var swall=firstSolidHit(this,sx0,sy0,sex,sey,sharedCandidate.r*.45);
+     if(swall&&certifiedNonlethalSharedCover(this,sharedCandidate,dt,swall)){
+      sharedCandidate.__novaNonlethalSharedCoverEpoch=wallProofEpoch;
+      var sqFirst;
+      try{sqFirst=certifiedSquareBeforeFirstSolid(this,sharedCandidate,dt,
+       sx0,sy0,sex,sey,swall);}
+      finally{delete sharedCandidate.__novaNonlethalSharedCoverEpoch;}
+      if(sqFirst===2){
+       sharedCandidate.x=sx0;sharedCandidate.y=sy0;
+       sharedCandidate.px=sx0;sharedCandidate.py=sy0;
+      }
+     }
+    }
+   }
   }
   var work=shellWork*(this.bullets.length+(this.tanks||[]).length+
       (this.shapes||[]).length+(this.drones||[]).length+(terrain||[]).length);
