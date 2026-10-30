@@ -116,6 +116,17 @@ async function run(browser,width,height){
    };
   },starClock.id);
   await returnButton.click();
+  // The React toast lasts only 2.6s. Capture its actual DOM box immediately
+  // after the real click, before unrelated game-state/geometry evaluations
+  // can outlive it on a slow CI runner. This is not a Game.toast-only witness.
+  const cueDom=await page.getByText(/^↩ RETURN · FRONT /).evaluate(el=>{
+   const rect=el.getBoundingClientRect(),style=getComputedStyle(el);
+   return {message:(el.textContent||'').trim(),
+    left:rect.left,right:rect.right,width:rect.width,height:rect.height,
+    viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth,
+    visible:rect.width>0&&rect.height>0&&style.display!=='none'&&
+     style.visibility==='visible'&&Number(style.opacity)>0};
+  });
   await page.waitForFunction(()=>window.__novaFrontSmokeGame?.status==='playing',null,{timeout:15000});
   const after=await page.evaluate(origin=>{
    const g=window.__novaFrontSmokeGame;
@@ -135,16 +146,13 @@ async function run(browser,width,height){
   assert.ok(after.notices.some(n=>n.message===cue),
    'real React redeploy must tell the player the direction of their witnessed last front: '+
    JSON.stringify(after.notices));
-  await page.getByText(cue,{exact:true})
-   .waitFor({state:'visible',timeout:2000});
-  const cueFit=await page.getByText(cue,{exact:true}).evaluate(el=>{
-   const rect=el.getBoundingClientRect();
-   return {left:rect.left,right:rect.right,viewport:innerWidth,
-    scrollWidth:document.documentElement.scrollWidth};
-  });
-  assert.ok(cueFit.left>=-1&&cueFit.right<=cueFit.viewport+1&&
-   cueFit.scrollWidth<=cueFit.viewport+1,
-   'RETURN orientation notice must fit the actual mobile viewport: '+JSON.stringify(cueFit));
+  assert.equal(cueDom.message,cue,
+   'the real React DOM must render the exact witnessed RETURN cue');
+  assert.ok(cueDom.visible,
+   'RETURN notice must actually be visible after the React click: '+JSON.stringify(cueDom));
+  assert.ok(cueDom.left>=-1&&cueDom.right<=cueDom.viewport+1&&
+   cueDom.scrollWidth<=cueDom.viewport+1,
+   'RETURN orientation notice must fit the actual mobile viewport: '+JSON.stringify(cueDom));
   const survivingStar=await page.evaluate(id=>{
    const g=window.__novaFrontSmokeGame,star=g.getShape(id);
    return star?{age:g.time-star.__lfStarBorn,announced:star.__lfPublicAnnounced,
