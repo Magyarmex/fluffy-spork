@@ -76,7 +76,7 @@ function boot(optimized){
  return m.exports.Game;
 }
 
-function trial5(Game,order,hz=30,{extraBullet=false,liveDrone=false,newborn=false,credit=false}={}){
+function trial5(Game,order,hz=30,{extraBullet=false,liveDrone=false,newborn=false,credit=false,coverHP=35,breakerPen=1}={}){
  const g=new Game(),dt=1/hz;
  if(credit){g.coverXP=[];g.getTank=id=>({id,alive:true,isPlayer:false});
   g.gainXP=(owner,amount)=>g.coverXP.push([owner.id,amount]);}
@@ -86,14 +86,14 @@ function trial5(Game,order,hz=30,{extraBullet=false,liveDrone=false,newborn=fals
  if(liveDrone)g.drones.push({kind:'drone',id:88,ownerId:88,x:1700,y:1700,r:8,hp:20});
  if(typeof g.hash.insert==='function')g.hash.insert(tank);
  g.__novaTerrain=[{id:-1,shape:'rect',x:80,y:0,w:10,h:160,
-  solid:true,destructible:true,hp:35,maxHp:300}];
+  solid:true,destructible:true,hp:coverHP,maxHp:300}];
  const shots={
   F:{kind:'bullet',id:10,ownerId:1,x:0,y:0,vx:2500,vy:0,r:3,
    dmg:12,pen:2,ttl:.15,hits:0,dead:false,shell:false,beam:false,splash:0},
   A:{kind:'bullet',id:11,ownerId:3,x:120,y:50,vx:-2500,vy:0,r:3,
    dmg:10,pen:1,ttl:.15,hits:0,dead:false,shell:false,beam:false,splash:0},
   B:{kind:'bullet',id:newborn?101:12,ownerId:4,x:130,y:-50,vx:-2500,vy:0,r:3,
-   dmg:10,pen:1,ttl:.15,hits:0,dead:false,shell:false,beam:false,splash:0},
+   dmg:10,pen:breakerPen,ttl:.15,hits:0,dead:false,shell:false,beam:false,splash:0},
   C:{kind:'bullet',id:13,ownerId:5,x:140,y:75,vx:-2500,vy:0,r:3,
    dmg:10,pen:1,ttl:.15,hits:0,dead:false,shell:false,beam:false,splash:0},
   D:{kind:'bullet',id:14,ownerId:6,x:150,y:-75,vx:-2500,vy:0,r:3,
@@ -137,5 +137,17 @@ for(const optimized of [false,true]){
    const r=trial5(Game,order,30,{credit:true});
    assert.deepEqual(r.coverXP,[[6,18]],'cover break belongs to D in '+order);
   }
+ });
+}
+
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'full shipping overlays':'Battlefield';
+ for(const [name,opts] of [
+  ['insufficient cumulative damage',{coverHP:45}],
+  ['early destruction',{coverHP:15}],
+  ['penetrating breaker',{breakerPen:2}]
+ ])test(label+': five-shot certificate abstains on '+name,()=>{
+  const r=trial5(Game,'FABCD',30,opts);
+  assert.equal(r.tankHp,100,'uncertain ordering must retain conservative fallback');
  });
 }
