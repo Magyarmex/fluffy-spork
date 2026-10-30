@@ -76,7 +76,7 @@ function boot(optimized){
  return m.exports.Game;
 }
 
-function trial4(Game,order,hz=30,{extraBullet=false,liveDrone=false,remoteWitnessedDrone=false,nearWitnessedDrone=false,remoteDroneSpeed=320,remoteDroneEpoch=1,remoteDronePrevX=null,remoteDronePhase='orbit',newborn=false,credit=false}={}){
+function trial4(Game,order,hz=30,{extraBullet=false,liveDrone=false,remoteWitnessedDrone=false,nearWitnessedDrone=false,remoteDroneSpeed=320,remoteDroneEpoch=1,remoteDronePrevX=null,remoteDronePhase='orbit',remoteDroneVX=0,newborn=false,credit=false}={}){
  const g=new Game(),dt=1/hz;
  if(credit){g.coverXP=[];g.getTank=id=>({id,alive:true,isPlayer:false});
   g.gainXP=(owner,amount)=>g.coverXP.push([owner.id,amount]);}
@@ -88,6 +88,7 @@ function trial4(Game,order,hz=30,{extraBullet=false,liveDrone=false,remoteWitnes
   const x=nearWitnessedDrone?80:1700,y=nearWitnessedDrone?0:1700;
   g.drones.push({kind:'drone',id:89,ownerId:89,x,y,r:8,hp:20,
    speed:remoteDroneSpeed,__novaPhase:remoteDronePhase,__novaCommitted:false,
+   __novaVX:remoteDroneVX,__novaVY:0,
    __novaChronoDroneEpoch:remoteDroneEpoch,__novaChronoDronePrevX:remoteDronePrevX??x,
    __novaChronoDronePrevY:y});
  }
@@ -175,6 +176,7 @@ for(const optimized of [false,true]){
  for(const [name,opts] of [
   ['unwitnessed drone',{remoteWitnessedDrone:true,remoteDroneEpoch:0}],
   ['extreme-speed drone',{remoteWitnessedDrone:true,remoteDroneSpeed:100000}],
+  ['extreme residual steering velocity',{remoteWitnessedDrone:true,remoteDroneVX:50000}],
   ['discontinuous drone',{remoteWitnessedDrone:true,remoteDronePrevX:0}],
   ['committed dash',{remoteWitnessedDrone:true,remoteDronePhase:'dash'}]
  ])test(label+': '+name+' cannot certify cover priority',()=>{
