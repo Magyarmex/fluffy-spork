@@ -116,7 +116,7 @@ test('native offscreen hostile cannot suppress neutral farming', () => {
   assert.equal(s.g.acquireDroneTarget(s.d, s.owner, 650), shape);
 });
 
-test('native visible drone, human drone, and public hostile tank remain valid', () => {
+test('native visible drone and in-frame tank remain valid, but offscreen AI tank is rejected', () => {
   const s = scenario({ discipline: false });
   s.g.nativeTarget = s.visible;
   assert.equal(s.g.acquireDroneTarget(s.d, s.owner, 650), s.visible);
@@ -124,7 +124,11 @@ test('native visible drone, human drone, and public hostile tank remain valid', 
   const tank = { id: 3, kind: 'tank', alive: true, team: 'red',
     x: 600, y: 0, hp: 100 };
   s.g.nativeTarget = tank;
-  assert.equal(s.g.acquireDroneTarget(s.d, s.owner, 650), tank);
+  assert.equal(s.g.acquireDroneTarget(s.d, s.owner, 650), s.visible,
+    'offscreen public tank coordinates cannot override the Fair Engagement viewport');
+  tank.x = 90;
+  assert.equal(s.g.acquireDroneTarget(s.d, s.owner, 650), tank,
+    'in-frame tank remains a legitimate native pursuit target');
   const human = scenario({ discipline: false, player: true });
   human.g.nativeTarget = human.hidden;
   assert.equal(human.g.acquireDroneTarget(human.d, human.owner, 650), human.hidden);
