@@ -85,7 +85,7 @@ function boot(optimized){
 }
 function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,laterWallY=0,
  wallShape='rect',otherShape=false,otherBullet=false,otherShell=false,moving=false,
- remoteBullets=0,laterCoverHp=null,realIntegrity=false,preinitialized=false,
+ remoteBullets=0,remoteShapes=0,laterCoverHp=null,realIntegrity=false,preinitialized=false,
  shield=false,otherTank=false,ttl=1,pen=1,radius=3,laterWall=null,
  active=true,knock=0,allied=false,destructible=false,damage=10,
  linearMove=null,tamperMove=false,doubleMove=false,
@@ -101,6 +101,16 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,l
  if(otherTank)g.tanks.push({kind:'tank',id:3,cls:'scout',x:30,y:0,
   hp:100,alive:true,__novaSweepMoveTime:1,__novaSweepPrevX:30,__novaSweepPrevY:0});
  if(otherShape)g.shapes.push({kind:'shape',id:4,x:30,y:0,r:8,hp:100});
+ const remoteDefs={circle:{r:12,hp:14},triangle:{r:16,hp:30},
+  square:{r:20,hp:55},pentagon:{r:26,hp:100},hexagon:{r:33,hp:190}};
+ for(let i=0;i<remoteShapes;i++){
+  const type=i<62?'circle':i<92?'triangle':i<108?'square':
+   i<116?'pentagon':'hexagon',def=remoteDefs[type];
+  const x=-900+(i%20)*4,y=-900+Math.floor(i/20)*4;
+  g.shapes.push({kind:'shape',id:2000+i,type,x,y,r:def.r,hp:def.hp,
+   __novaShapeSweepEpoch:g.__novaShapeSweepEpoch,
+   __novaShapeSweepPrevX:x,__novaShapeSweepPrevY:y});
+ }
  g.__novaTerrain=[wallShape==='rect'
   ?{id:-1,shape:'rect',x:wall,y:wallY,w:10,h:80,solid:true,destructible,hp:destructible?coverHp:0,maxHp:destructible?coverHp:0}
    :{id:-1,shape:'circle',x:wall,y:wallY,r:5,solid:true,destructible,hp:destructible?coverHp:0,maxHp:destructible?coverHp:0}];
@@ -114,8 +124,11 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,l
  if(otherShell)g.bullets.push({kind:'bullet',id:12,ownerId:4,
   x:0,y:1000,vx:0,vy:0,r:9,dmg:10,ttl:1,pen:1,hits:0,dead:false,
   shell:true,splash:100});
+ /* Separate remote lanes by more than the native projectile-pair radius.
+  * They are independent fire, not an artificial pile of overlapping shots. */
  for(let i=0;i<remoteBullets;i++)g.bullets.push({kind:'bullet',id:100+i,
-  ownerId:100+i,x:0,y:1000+i*3,vx:speed,vy:0,r:3,dmg:10,
+  ownerId:100+i,x:-1900+(i%20)*190,y:900+Math.floor(i/20)*100,
+  vx:speed,vy:0,r:3,dmg:10,
   ttl:1,pen:1,hits:0,dead:false});
  /* Simulate the shipping update wrapper's pre-movement nextId snapshot.
   * A newly fired bullet cannot retroactively collide during that motion. */
@@ -191,9 +204,49 @@ for(const optimized of [false,true]){
    assert.deepEqual(r.hits,[2]);assert.equal(r.hp,90);
   }
  });
- test(label+': dense remote fire stays on canonical collision path',()=>{
+ test(label+': 13-shot remote fire preserves certified hull-before-cover chronology',()=>{
   const r=run(boot(optimized),{remoteBullets:12});
-  assert.deepEqual(r.hits,[],'13-shot frame must not speculate');
+  assert.deepEqual(r.hits,[2],'remote bullets must not erase earlier hull contact');
+  assert.equal(r.hp,90);
+ });
+ for(const fps of [30,60,120,240])for(const remoteBullets of [12,60,120,220]){
+  test(label+': '+remoteBullets+' remote rounds preserve first hull at '+fps+'Hz',()=>{
+   const r=run(boot(optimized),{fps,speed:200*fps,remoteBullets});
+   assert.deepEqual(r.hits,[2],'unrelated projectiles cannot change contact order');
+   assert.equal(r.hp,90);
+   assert.equal(r.g.__novaTerrain[0].solid,true,
+    'later permanent wall still stops the shot');
+  });
+ }
+ test(label+': canonical upgraded Marksman hits before cover with 120 remote shots',()=>{
+  const speed=1050*(1+.085*8),radius=5.5*(1+21*.0085);
+  const r=run(boot(optimized),{fps:30,speed,wall:55,target:29,
+   pen:2,radius,damage:21,remoteBullets:120,destructible:true});
+  assert.deepEqual(r.hits,[2]);
+  assert.equal(r.hp,79);
+  assert.equal(r.g.__novaTerrain[0].hp,979,
+   'cover still receives its later canonical structural damage');
+ });
+ test(label+': nearby competing projectile still vetoes proof amid remote fire',()=>{
+  const r=run(boot(optimized),{remoteBullets:24,otherBullet:true});
+  assert.deepEqual(r.hits,[],'local projectile interception remains ambiguous');
+ });
+ test(label+': remote shell still vetoes first-contact proof',()=>{
+  const r=run(boot(optimized),{remoteBullets:24,otherShell:true});
+  assert.deepEqual(r.hits,[],'shell side effects require separate arbitration');
+ });
+ test(label+': earlier neutral still vetoes proof amid remote fire',()=>{
+  const r=run(boot(optimized),{remoteBullets:24,otherShape:true});
+  assert.deepEqual(r.hits,[]);
+ });
+ test(label+': wall before hull remains protective amid remote fire',()=>{
+  const r=run(boot(optimized),{remoteBullets:24,wall:25,target:90});
+  assert.deepEqual(r.hits,[]);
+  assert.equal(r.hp,100);
+ });
+ test(label+': combined 260-entity budget still fails closed',()=>{
+  const r=run(boot(optimized),{remoteBullets:260});
+  assert.deepEqual(r.hits,[],'over-budget proof must use legacy path');
  });
  test(label+': no live movement epoch never authorizes early damage',()=>{
   assert.deepEqual(run(boot(optimized),{active:false}).hits,[]);
@@ -637,6 +690,79 @@ for(const optimized of [false,true]){
    assert.deepEqual(r.hits,[]);
    assert.equal(r.hp,100);
    assert.equal(r.g.__novaTerrain[0].hp,0);
+  });
+ }
+}
+
+/* A breached barricade must not turn an unrelated crowded firefight
+ * into permission to shoot through a later permanent wall or an intact
+ * second barricade. This executes the materialized core and Battlefield's
+ * actual structural-damage/penetration owners at four frame rates. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'Battlefield + Performance':'Battlefield';
+ for(const fps of [30,60,120,240])for(const pen of [3,4]){
+  for(const remoteBullets of [12,60,120,220])for(const laterCoverHp of [null,1000]){
+   test(label+': pen'+pen+' breach respects second '+(laterCoverHp?'cover':'wall')+
+    ' with '+remoteBullets+' remote shots at '+fps+'Hz',()=>{
+    const r=run(Game,{fps,speed:200*fps,pen,destructible:true,
+     wall:55,laterWall:110,laterCoverHp,target:165,coverHp:5,remoteBullets});
+    assert.deepEqual(r.hits,[],'later solid must protect rear hull');
+    assert.equal(r.hp,100);
+    assert.equal(r.g.__novaTerrain[0].hp,0,'first cover still breaches');
+    assert.equal(r.g.__novaTerrain[1].hp,laterCoverHp?990:0,
+     'second solid must receive its canonical response');
+    assert.equal(r.g.bullets.some(b=>b.id===10),false,
+     'the piercing projectile must stop at the second solid');
+   });
+  }
+ }
+ for(const pen of [3,4]){
+  test(label+': real upgraded Marksman pen'+pen+
+   ' cannot tunnel through second wall amid 120 remote shots at 30Hz',()=>{
+   const speed=1050*(1+.085*8),radius=5.5*(1+21*.0085);
+   const r=run(Game,{fps:30,speed,pen,radius,damage:21,
+    destructible:true,wall:17,laterWall:35,target:60,coverHp:5,
+    remoteBullets:120});
+   assert.deepEqual(r.hits,[]);
+   assert.equal(r.hp,100);
+   assert.equal(r.g.__novaTerrain[0].hp,0);
+   assert.equal(r.g.bullets.some(b=>b.id===10),false);
+  });
+  test(label+': real upgraded Marksman pen'+pen+
+   ' damages second intact cover amid 120 remote shots at 30Hz',()=>{
+   const speed=1050*(1+.085*8),radius=5.5*(1+21*.0085);
+   const r=run(Game,{fps:30,speed,pen,radius,damage:21,
+    destructible:true,wall:17,laterWall:35,laterCoverHp:1000,
+    target:60,coverHp:5,remoteBullets:120});
+   assert.deepEqual(r.hits,[]);
+   assert.equal(r.hp,100);
+   assert.equal(r.g.__novaTerrain[0].hp,0);
+   assert.equal(r.g.__novaTerrain[1].hp,979);
+  });
+ }
+}
+
+/* The real neutral population contains 120 shapes. A crowded-fire
+ * improvement must remain reachable with that population present, not
+ * only in an empty synthetic arena. 120 shapes + one Scout + 121 shots
+ * stays within the existing 260-entity safety budget. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'Battlefield + Performance':'Battlefield';
+ test(label+': canonical 120-shape ecology preserves hull-before-cover with 120 remote shots',()=>{
+  const r=run(Game,{fps:30,speed:6000,remoteShapes:120,remoteBullets:120});
+  assert.deepEqual(r.hits,[2]);
+  assert.equal(r.hp,90);
+ });
+ for(const laterCoverHp of [null,1000]){
+  test(label+': canonical 120-shape ecology preserves second '+
+   (laterCoverHp?'barricade':'wall')+' amid 120 remote shots',()=>{
+   const r=run(Game,{fps:30,speed:6000,pen:3,destructible:true,
+    wall:55,laterWall:110,target:165,coverHp:5,laterCoverHp,
+    remoteShapes:120,remoteBullets:120});
+   assert.deepEqual(r.hits,[]);
+   assert.equal(r.hp,100);
+   assert.equal(r.g.__novaTerrain[0].hp,0);
+   assert.equal(r.g.__novaTerrain[1].hp,laterCoverHp?990:0);
   });
  }
 }

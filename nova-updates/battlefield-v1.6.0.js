@@ -1969,9 +1969,12 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      !wall.hit||!(wall.hit.t>1e-6&&wall.hit.t<=1))return false;
   var tanks=g.tanks||[],shapes=g.shapes||[],drones=g.drones||[],
       shots=g.bullets||[];
-  /* Worst-case bound; most shots return after the tank scan. */
-  if(tanks.length+shapes.length+drones.length+shots.length>260||
-     shots.length>12)return false;
+  /* Bound the complete first-contact scan, not the global shot count.
+   * Every live frame-start projectile is checked below against both the
+   * candidate corridor and the victim's witnessed movement. Unrelated
+   * distant fire must not erase a certified body-before-cover hit. The
+   * combined entity cap keeps the worst-case proof cost finite. */
+  if(tanks.length+shapes.length+drones.length+shots.length>260)return false;
   var dx=ex-ax,dy=ey-ay,A=dx*dx+dy*dy;
   if(!(A>1e-12)||!Number.isFinite(A)||
      Math.max(Math.abs(ax),Math.abs(ay),Math.abs(ex),Math.abs(ey))>=MAP_LIMIT-20)
@@ -2278,8 +2281,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      !first||!first.hit||!Number.isFinite(first.hit.t))return false;
   var tanks=g.tanks||[],shapes=g.shapes||[],drones=g.drones||[],
       shots=g.bullets||[];
-  if(tanks.length+shapes.length+drones.length+shots.length>260||
-     shots.length>12)return false;
+  /* The complete 260-entity work bound and per-shot swept-corridor veto
+   * below already reject uncertain local competition. Distant fire must
+   * not disable the second-wall proof after a legitimate first breach. */
+  if(tanks.length+shapes.length+drones.length+shots.length>260)return false;
   /* A second barricade is eligible ONLY if it provably survives this
    * weakened round. A second breach still needs full event arbitration. */
   var later=firstSolidHit(g,ax,ay,ex,ey,b.r*.45);
