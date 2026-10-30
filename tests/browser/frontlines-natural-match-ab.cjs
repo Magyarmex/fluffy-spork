@@ -208,12 +208,13 @@ async function arm(browser,enabled,label){
     const LF=window.__NOVA_LIVING_FRONT_INTERNAL__;
     if(!LF||typeof LF.sectorCenter!=='function'||typeof LF.sectorIndex!=='function')
      throw Error('missing canonical public sector geometry');
+    // Reuse the tested public epoch predicate. A clock reset must never
+    // let the natural-match A/B pilot move on future-only information.
+    const helper=window.__novaResearchPublicPilot;
+    if(!helper||typeof helper.publicSector!=='function')
+     throw Error('research public BLOOM epoch selector missing');
     g.input.moveVec=()=>{
-     const st=g.__lfState,now=g.time||0,sig=st&&st.signal,mem=st&&st.bloomMemory;
-     // Public Director announcement / last-known sector only. Never read
-     // hidden maturity, current neutral value, or enemy coordinates.
-     const sector=sig&&sig.type==='BLOOM'&&now<sig.until?sig.sector:
-      mem&&now<mem.until?mem.sector:null;
+     const sector=helper.publicSector(g);
      if(!Number.isInteger(sector)||sector<0||sector>=16)return wander();
      if(LF.sectorIndex(p.x,p.y)===sector)return{x:0,y:0};
      const c=LF.sectorCenter(sector),dx=c.x-p.x,dy=c.y-p.y,d=Math.hypot(dx,dy);
