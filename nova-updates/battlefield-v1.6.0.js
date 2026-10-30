@@ -1947,8 +1947,9 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   * unchanged shell with no possible terrain, body or projectile contact.
   * Any fuse, expiry, uncertain motion or local competition fails closed. */
  function certifiedRemoteUnspentShells(g,b,dt,ax,ay,ex,ey){
+  /* No allocation on the overwhelmingly common shell-free wall path. */
+  if(g.__novaWallProofHadShell!==true)return true;
   var safe=new Set();
-  if(g.__novaWallProofHadShell!==true)return safe;
   if(!(Number.isFinite(dt)&&dt>0&&dt<=.05))return null;
   var shots=g.bullets||[],tanks=g.tanks||[],shapes=g.shapes||[],
       drones=g.drones||[],count=0;
@@ -2177,7 +2178,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    /* A previous terrain/shell event may already have moved or killed this
     * shot; never reconstruct its pre-frame path from a frozen endpoint.
     * Shell/blast side effects also have a larger competition radius. */
-   if(safeShells.has(o))continue;
+   if(safeShells!==true&&safeShells.has(o))continue;
    if(o.dead||o.shell||o.splash||o.__v17Cannon)return false;
    if(!Number.isFinite(o.x)||!Number.isFinite(o.y)||
       !Number.isFinite(o.vx)||!Number.isFinite(o.vy)||
@@ -2465,7 +2466,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   for(var bi=0;bi<shots.length;bi++){
    var other=shots[bi];if(!other||other===b||
       other.__novaWallProofEpoch!==g.__novaWallProofEpoch)continue;
-   if(safeShells.has(other))continue;
+   if(safeShells!==true&&safeShells.has(other))continue;
    if(other.dead||other.shell||other.splash||other.beam||
       other.__v17Cannon)return false;
    var span=Math.min(dt,Math.max(0,other.ttl||0));
