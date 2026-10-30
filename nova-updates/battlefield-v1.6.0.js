@@ -2637,7 +2637,12 @@ function certifiedTwoShotCoverPriority(g,dt){
    Number.isFinite(b.ttl)&&b.ttl>=dt;
  }
  if(!ordinary(late)||!ordinary(early)||late.pen<1||late.pen>4||
-    early.pen!==0)return null;
+    early.pen!==0||
+    g.__novaShapeSweepActive!==true||
+    g.__novaFrameStartBulletEpoch!==g.__novaShapeSweepEpoch||
+    !Number.isSafeInteger(early.id)||!Number.isSafeInteger(late.id)||
+    !(early.id<g.__novaFrameStartBulletIdCeiling)||
+    !(late.id<g.__novaFrameStartBulletIdCeiling))return null;
  var ax=early.x,ay=early.y,ex=ax+early.vx*dt,ey=ay+early.vy*dt,
      bx=late.x,by=late.y,fx=bx+late.vx*dt,fy=by+late.vy*dt;
  if(!Number.isFinite(ex)||!Number.isFinite(ey)||
