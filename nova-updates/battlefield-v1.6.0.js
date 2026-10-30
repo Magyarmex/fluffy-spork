@@ -1196,14 +1196,16 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    }
   }
   /* A TTL-expiring piercing shot can hit a square and then cover before
-   * expiry. This one-hit fallback otherwise kills it after the square,
-   * losing the legitimate later cover event. Hand off ONLY when the later
-   * terrain pre-pass can independently certify the full square->wall
-   * chronology. Single-shot proof prevents intervening array-order changes.
-   * If the dry run abstains, preserve this original first-hit recovery. */
+   * expiry. The one-hit fallback otherwise kills it after the square,
+   * losing the legitimate later cover event. The later terrain pre-pass
+   * must independently certify the full square->wall chronology.
+   * Do not require global single-shot isolation: the dry-run proof scans
+   * ALL competing shots and vetoes local contact, victim/cover threats,
+   * dead/relocated shots and uncertain ordering. The terrain owner repeats
+   * that proof after any earlier pre-pass side effects. If either proof
+   * abstains, preserve the original conservative first-hit recovery. */
   if(best.kind==='shape'&&best.e.type==='square'&&
-     b.pen>=1&&(b.hits||0)===0&&
-     (g.bullets||[]).length===1){
+     b.pen>=1&&(b.hits||0)===0){
    var expiryX=ax+dx*limit,expiryY=ay+dy*limit,
        laterWall=firstSolidHit(g,ax,ay,expiryX,expiryY,(b.r||2)*.45);
    if(laterWall&&laterWall.hit&&
@@ -2300,8 +2302,12 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      !(wall.hit.t>1e-6&&wall.hit.t<=1))return false;
   var tanks=g.tanks||[],shapes=g.shapes||[],drones=g.drones||[],
       shots=g.bullets||[];
-  if(tanks.length+shapes.length+drones.length+shots.length>300||
-     shots.length>128)return false;
+  /* Preserve the independent 260-body safety limit, but never let
+   * geographically unrelated shots erase an earlier square contact.
+   * Every shot still receives the full swept-corridor/victim veto below;
+   * cap total scan work at 600 rather than selecting the first N shots. */
+  var bodyCount=tanks.length+shapes.length+drones.length;
+  if(bodyCount>260||bodyCount+shots.length>600)return false;
   var dx=ex-ax,dy=ey-ay,A=dx*dx+dy*dy,wallT=wall.hit.t;
   if(!(A>1e-12)||!Number.isFinite(A)||
      Math.max(Math.abs(ax),Math.abs(ay),Math.abs(ex),Math.abs(ey))>=MAP_LIMIT-20)
@@ -2400,6 +2406,24 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       !Number.isFinite(o.r)||!(o.r>0))return false;
    var span=Math.min(dt,Math.max(0,o.ttl||0)),
        ox=o.x+o.vx*span,oy=o.y+o.vy*span;
+   /* Another round can strike the SAME destructible barricade from its
+    * opposite face without ever entering this shot's narrow corridor.
+    * Such a hit could change cover HP/solid state before the later event;
+    * abstain on its full-frame swept AABB instead of assuming isolation.
+    * Permanent cover cannot be destroyed by that unrelated round. */
+   if(wall.solid.destructible){
+    var ws=wall.solid,
+        whx=ws.shape==='rect'?ws.w*.5:ws.shape==='circle'?ws.r:NaN,
+        why=ws.shape==='rect'?ws.h*.5:ws.shape==='circle'?ws.r:NaN,
+        wp=o.r+2;
+    if(!Number.isFinite(ws.x)||!Number.isFinite(ws.y)||
+       !Number.isFinite(whx)||!Number.isFinite(why)||
+       !(whx>0&&why>0))return false;
+    if(Math.max(o.x,ox)+wp>=ws.x-whx&&
+       Math.min(o.x,ox)-wp<=ws.x+whx&&
+       Math.max(o.y,oy)+wp>=ws.y-why&&
+       Math.min(o.y,oy)-wp<=ws.y+why)return false;
+   }
    if(near(o.x,o.y,ox,oy,b.r+o.r+2))return false;
    var toHit=Math.min(span,hitT*Math.min(dt,b.ttl)),
        hx=o.x+o.vx*toHit,hy=o.y+o.vy*toHit,rr=o.r+victim.r;
