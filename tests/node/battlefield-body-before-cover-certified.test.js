@@ -124,8 +124,11 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,l
  if(otherShell)g.bullets.push({kind:'bullet',id:12,ownerId:4,
   x:0,y:1000,vx:0,vy:0,r:9,dmg:10,ttl:1,pen:1,hits:0,dead:false,
   shell:true,splash:100});
+ /* Separate remote lanes by more than the native projectile-pair radius.
+  * They are independent fire, not an artificial pile of overlapping shots. */
  for(let i=0;i<remoteBullets;i++)g.bullets.push({kind:'bullet',id:100+i,
-  ownerId:100+i,x:0,y:1000+i*3,vx:speed,vy:0,r:3,dmg:10,
+  ownerId:100+i,x:-1900+(i%20)*190,y:900+Math.floor(i/20)*100,
+  vx:speed,vy:0,r:3,dmg:10,
   ttl:1,pen:1,hits:0,dead:false});
  /* Simulate the shipping update wrapper's pre-movement nextId snapshot.
   * A newly fired bullet cannot retroactively collide during that motion. */
