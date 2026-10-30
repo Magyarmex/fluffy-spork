@@ -65,7 +65,7 @@ function boot(optimized,full=false){
 }
 function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
   squareY=0,wallY=0,born=false,moved=false,teleport=false,extraBullet=false,
-  extraTank=false,fragile=false,pen=1,extraSquare=false}={}){
+  extraTank=false,fragile=false,pen=1,extraSquare=false,cover=false}={}){
  const g=new Game();
  const square={kind:'shape',id:50,type:'square',x:squareX,y:squareY,r:20,hp:fragile?10:55};
  if(born)square.born=g.time;
@@ -73,7 +73,7 @@ function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
  if(extraSquare)g.shapes.push({kind:'shape',id:51,type:'square',
   x:squareX+9,y:squareY,r:20,hp:55});
  g.__novaTerrain=[{id:-51,shape:'rect',x:wallX,y:wallY,w:8,h:80,
-  solid:true,destructible:false,hp:0}];
+  solid:true,destructible:cover,hp:cover?300:0}];
  g.bullets=[{kind:'bullet',id:10,ownerId:1,x:0,y:0,vx,vy:0,
   r:3,dmg:12,ttl:1,pen,hits:0,dead:false,shell:false,beam:false,splash:0}];
  if(extraBullet)g.bullets.push({kind:'bullet',id:11,ownerId:3,
@@ -138,6 +138,18 @@ for(const optimized of [false,true]){
  test(mode+' lethal square damage defers to full chronology',()=>{
   const {g,square}=trial(Game,{fragile:true});
   assert.equal(square.hp,10);assert.deepEqual(g.hits,[]);
+ });
+ test(mode+' pen=1 square first then damages later destructible cover',()=>{
+  const {g,square}=trial(Game,{cover:true});
+  assert.equal(square.hp,43);
+  assert.deepEqual(g.hits,[50]);
+  assert.equal(g.__novaTerrain[0].hp,288,'surviving pen=1 bullet must still strike cover');
+  assert.equal(g.__novaTerrain[0].solid,true);
+ });
+ test(mode+' pen=0 square first does not damage later destructible cover',()=>{
+  const {g,square}=trial(Game,{pen:0,cover:true});
+  assert.equal(square.hp,43);
+  assert.equal(g.__novaTerrain[0].hp,300,'consumed pen=0 shot never reaches cover');
  });
  test(mode+' pen=0 square hit consumes bullet before later wall',()=>{
   const {g,square}=trial(Game,{pen:0});
