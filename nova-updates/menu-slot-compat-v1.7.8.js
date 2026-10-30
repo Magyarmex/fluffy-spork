@@ -710,7 +710,8 @@ mods['game/engine']=function(module,exports,require){
   var player=!!(!this.__novaDecorativeWorld&&victim&&victim.isPlayer&&victim.alive!==false);
   var pos=player?{x:victim.x,y:victim.y}:null;
   /* Snapshot BEFORE death/redeploy hooks can reset the ecology owner. */
-  var recap=player?readFrontlineRecap(this):null;
+  var recap=null;
+  if(player)try{recap=readFrontlineRecap(this);}catch(ignore){} // UI must not veto death.
   var out=oldKill.apply(this,arguments);
   if(player&&victim.alive===false){
    this.__novaLastFrontMarker=null;
