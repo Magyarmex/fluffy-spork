@@ -84,3 +84,15 @@ test('AI viewport changes with zoom and orientation, not a fixed distance thresh
   h.g.cam.zoom=1;h.g.w=480;
   assert.equal(h.acquire(),target,'landscape viewport contains the same tank');
 });
+
+test('dense AI fallback avoids viewport work for out-of-leash tanks',()=>{
+  const spotter={kind:'drone',id:9,ownerId:4,x:10,y:0,hp:10,__novaSpotter:true};
+  const h=boot(spotter),visible=enemy(2,100);
+  h.g.tanks.push(visible);
+  for(let i=0;i<100;i++)h.g.tanks.push(enemy(100+i,900+i*5));
+  const original=h.window.__NOVA_FAIR_ENGAGEMENT__.inGameplayViewport;
+  let calls=0;
+  h.window.__NOVA_FAIR_ENGAGEMENT__.inGameplayViewport=(...args)=>{calls++;return original(...args);};
+  assert.equal(h.acquire(),visible);
+  assert.equal(calls,1,'100 out-of-leash rivals must not trigger viewport checks');
+});
