@@ -2109,7 +2109,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      !Number.isSafeInteger(b.id)||
      g.__novaFrameStartBulletEpoch!==g.__novaShapeSweepEpoch||
      !(b.id<g.__novaFrameStartBulletIdCeiling)||
-     !(Number.isFinite(dt)&&dt>0&&Number.isFinite(b.ttl)&&b.ttl>dt)||
+     !(Number.isFinite(dt)&&dt>0&&Number.isFinite(b.ttl)&&b.ttl>0)||
      !(Number.isFinite(b.dmg)&&b.dmg>0)||
      !(Number.isFinite(b.r)&&b.r>0)||
      !Number.isFinite(ax)||!Number.isFinite(ay)||
@@ -2150,6 +2150,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       !Number.isFinite(s.__novaShapeSweepPrevY)||
       !(s.hp>b.dmg*1.000001))return false;
    var move=Math.hypot(s.x-sx,s.y-sy);
+   /* An expiring projectile travels only ttl, while a moving shape's
+    * witnessed endpoint covers the entire dt. Their normalized times do
+    * not align. Certify this new TTL slice only for stationary squares. */
+   if(b.ttl<=dt&&move>1e-8)return false;
    if(!Number.isFinite(move)||move>96||
       pointInsideSolid(wall.solid,sx,sy,s.r+1)||
       pointInsideSolid(wall.solid,s.x,s.y,s.r+1)||
@@ -2206,7 +2210,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    var span=Math.min(dt,Math.max(0,o.ttl||0)),
        ox=o.x+o.vx*span,oy=o.y+o.vy*span;
    if(near(o.x,o.y,ox,oy,b.r+o.r+2))return false;
-   var toHit=Math.min(span,hitT*dt),
+   var toHit=Math.min(span,hitT*Math.min(dt,b.ttl)),
        hx=o.x+o.vx*toHit,hy=o.y+o.vy*toHit,rr=o.r+victim.r;
    var vsx=victim.__novaShapeSweepPrevX,vsy=victim.__novaShapeSweepPrevY;
    if(Math.max(o.x,hx)+rr>=Math.min(vsx,victim.x)&&
