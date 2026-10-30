@@ -317,6 +317,51 @@ async function scenario(browser, label, options) {
       }
     }
 
+
+    // Real Game -> React -> EVOLVE READY loop at maximum level. A postponed
+    // mastery choice must remain accessible without offering free rerolls.
+    if(label==='landscape-568'||label==='mobile-320-short'){
+      const prior=await page.evaluate(()=>{
+        const g=window.__novaBrowserLiveGame;
+        if(!g?.player||!g.openOffer)throw Error('real capped Game missing');
+        const saved={level:g.player.level,pendingOffer:g.pendingOffer,
+          masteryOfferChoices:g.masteryOfferChoices};
+        g.player.level=45;
+        g.pendingOffer=3;
+        g.masteryOfferChoices=null;
+        g.openOffer();
+        return saved;
+      });
+      const heading=page.getByText('★ MASTERY PERK ★',{exact:true});
+      await heading.waitFor({state:'visible',timeout:8000});
+      const initial=(await heading.locator('xpath=..').locator('button').allTextContents()).slice(0,3);
+      assert.equal(new Set(initial).size,3,label+': capped mastery offers three distinct perks');
+      for(let repeat=0;repeat<3;repeat++){
+        await heading.locator('xpath=..').getByRole('button',{name:/DECIDE LATER/i}).click();
+        await heading.waitFor({state:'detached',timeout:8000});
+        const state=await page.evaluate(()=>{
+          const g=window.__novaBrowserLiveGame;
+          return {pending:g.pendingOffer,paused:g.paused,saved:g.masteryOfferChoices};
+        });
+        assert.equal(state.pending,3,label+': capped mastery remains pending');
+        assert.equal(state.paused,false,label+': DECIDE LATER resumes combat');
+        assert.equal(state.saved.length,3,label+': mastery triple is stored');
+        await page.getByRole('button',{name:/EVOLVE READY/i}).click();
+        await heading.waitFor({state:'visible',timeout:8000});
+        const reopened=(await heading.locator('xpath=..').locator('button').allTextContents()).slice(0,3);
+        assert.deepEqual(reopened,initial,label+': reopening must not reroll the same milestone');
+      }
+      await heading.locator('xpath=..').getByRole('button',{name:/DECIDE LATER/i}).click();
+      await heading.waitFor({state:'detached',timeout:8000});
+      await page.evaluate(saved=>{
+        const g=window.__novaBrowserLiveGame;
+        g.player.level=saved.level;
+        g.pendingOffer=saved.pendingOffer;
+        g.masteryOfferChoices=saved.masteryOfferChoices;
+        g.syncHud();
+      },prior);
+    }
+
     await page.getByRole('button',{name:'Pause'}).click();
     await page.getByText('PAUSED',{exact:true}).waitFor({state:'visible'});
     { // Every real Pause viewport must preserve frame-zero touch targets.
