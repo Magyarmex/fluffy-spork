@@ -95,7 +95,7 @@ function patchLevelCapOffer(html){
 const count=(s,x)=>s.split(x).length-1;
 function patchPerkOffer(html){
  if(typeof html!=='string')throw new TypeError('expected UTF-8 HTML');
- if(!html.includes('function PerkOffer({ onPick, onLater }) {')||
+ if(!(html.includes('function PerkOffer({ onPick, onLater }) {') || html.includes('function PerkOffer({ onPick, onLater, savedChoices }) {'))||
     !html.includes("const pool = ['dmg', 'speed', 'vitality', 'alacrity', 'thorns', 'wealth'];"))
    throw Error('canonical PerkOffer owner missing');
  const old=count(html,before),fixed=count(html,after);
