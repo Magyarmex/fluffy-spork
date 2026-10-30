@@ -1,7 +1,7 @@
 'use strict';
 /* #147: eight disjoint ordinary shots share one destructible cover in a 30Hz frame.
- * A, B, C damage cover, D destroys it, and later F passes
- * through the former cover and hits a downstream tank. The 2500u/s speed
+ * Seven disjoint pen-1 breakers damage cover in physical order; H
+ * destroys it, then later F passes the former cover and hits a tank. The 2500u/s speed
  * is a controlled stress fixture, not a class loadout. */
 const test=require('node:test');
 const assert=require('node:assert/strict');
