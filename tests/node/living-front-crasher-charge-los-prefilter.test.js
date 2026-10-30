@@ -89,3 +89,37 @@ test('the audited Instincts module is wired once into the real materialized game
  assert.ok(html.indexOf('living-front-core-v1.12.0.js')<
   html.indexOf('living-front-instincts-v1.12.0.js'));
 });
+
+test('real Living Front core + Instincts + hash and bullet-index composition avoids unrelated Crasher rays',()=>{
+ const core=fs.readFileSync(path.join(root,'nova-updates/living-front-core-v1.12.0.js'),'utf8');
+ for(const blocked of [false,true]){
+  const window={__novaModules:{}};
+  const context={window,Math,Map,Set,WeakMap,Number,Object,Array,Date,JSON,
+   performance:{now:()=>0},console:{info(){},warn(){},error(){}}};
+  vm.runInNewContext(core,context,{filename:'living-front-core-v1.12.0.js'});
+  vm.runInNewContext(source,context,{filename:'living-front-instincts-v1.12.0.js'});
+  const LF=window.__NOVA_LIVING_FRONT_INTERNAL__;
+  const cr={kind:'shape',type:'crasher',id:1,x:0,y:0,r:15,hp:100,maxHp:100,
+   vx:0,vy:0,__lfPredatorState:'charge',__lfPredatorT:.3,
+   __lfTargetId:-1,__lfCommitAngle:0};
+  const square={kind:'shape',type:'square',id:2,x:12,y:0,r:12,
+   hp:80,maxHp:80,vx:0,vy:0};
+  const far={kind:'shape',type:'circle',id:3,x:160,y:95,r:12,
+   hp:80,maxHp:80,vx:0,vy:0};
+  const tank={kind:'tank',id:4,x:165,y:95,r:18,hp:100,maxHp:100,alive:true};
+  const shot={kind:'bullet',id:5,x:30,y:0,r:3,dead:false,vx:100,vy:0,ttl:1};
+  const calls=[];
+  const g={time:10,shapes:[cr,square,far],tanks:[tank],bullets:[shot],
+   hash:{query(_x,_y,_r,out){out.push(cr,square,far,tank);}},
+   hasLineOfSight(ax,ay,bx,by){calls.push([ax,ay,bx,by]);return !(blocked&&ax===0&&ay===0);},
+   damageShape(e,n){e.hp-=n;}};
+  const defs={crasher:{speed:105},square:{speed:0},circle:{speed:60}};
+  const st=LF.ensure(g,defs);
+  LF.behaviorTick(g,st,defs,1/60);
+  assert.ok(g.__lfBulletIndex&&g.__lfBulletIndex.querySeen instanceof WeakMap);
+  assert.equal(calls.filter(c=>c[0]===0&&c[1]===0).length,1,
+   'only the physically touched square should trigger a Crasher-origin LOS ray');
+  assert.equal(square.hp,blocked?80:58);
+  assert.equal(!!cr.__lfChargeHit,!blocked);
+ }
+});
