@@ -52,6 +52,8 @@ test('real stability evolution wrapper grants cap grace once, not on each EVOLVE
     assert.equal(focusClears(),1,'repeat deferral cannot erase AI focus');
     assert.equal(g.pendingOffer,3);
     assert.equal(g.paused,false);
+    assert.equal(g.input.firing,false,'repeat deferral releases held fire');
+    assert.equal(g.input.abilityQueued,false,'repeat deferral releases queued ability');
   }
   g.pendingOffer=4;
   g.dismissOffer();
