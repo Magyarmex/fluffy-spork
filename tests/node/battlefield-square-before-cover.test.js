@@ -66,14 +66,14 @@ function boot(optimized,full=false){
 function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
   squareY=0,wallY=0,born=false,moved=false,teleport=false,extraBullet=false,
   extraTank=false,fragile=false,pen=1,extraSquare=false,cover=false,
-  dmg=12,radius=3,ttl=1}={}){
+  dmg=12,radius=3,ttl=1,wallHeight=80}={}){
  const g=new Game();
  const square={kind:'shape',id:50,type:'square',x:squareX,y:squareY,r:20,hp:fragile?10:55};
  if(born)square.born=g.time;
  g.shapes=[square];
  if(extraSquare)g.shapes.push({kind:'shape',id:51,type:'square',
   x:squareX+9,y:squareY,r:20,hp:55});
- g.__novaTerrain=[{id:-51,shape:'rect',x:wallX,y:wallY,w:8,h:80,
+ g.__novaTerrain=[{id:-51,shape:'rect',x:wallX,y:wallY,w:8,h:wallHeight,
   solid:true,destructible:cover,hp:cover?300:0}];
  g.bullets=[{kind:'bullet',id:10,ownerId:1,x:0,y:0,vx,vy:0,
   r:radius,dmg,ttl,pen,hits:0,dead:false,shell:false,beam:false,splash:0}];
@@ -116,6 +116,43 @@ for(const optimized of [false,true]){
    assert.deepEqual(g.hits,[50]);
   });
  }
+ /* Real canonical Assassin profile (1500u/s, pen=4, 47 damage,
+  * radius 5.8*(1+47*.0085)): a grazing square and a thin separated
+  * permanent wall both lie within the final 3ms of flight. The square
+  * circle bottom is y=6, while the wall top is y=4: no overlap. */
+ for(const hz of [30,60,120,240]){
+  test(mode+' expiring Assassin grazes square before thin wall at '+hz+'Hz',()=>{
+   const {g,square}=trial(Game,{hz,vx:1500,squareX:11,squareY:26,
+    wallX:10,wallHeight:8,pen:4,dmg:47,
+    radius:5.8*(1+47*.0085),ttl:.003});
+   assert.equal(square.hp,8,'actual class weapon must not lose first contact');
+   assert.deepEqual(g.hits,[50]);
+  });
+ }
+ test(mode+' expiring pen=0 shot consumes itself before cover',()=>{
+  const {g,square}=trial(Game,{hz:30,ttl:.0035,pen:0,cover:true});
+  assert.equal(square.hp,43);
+  assert.equal(g.__novaTerrain[0].hp,300);
+ });
+ test(mode+' expiring pen=1 shot damages square then destructible cover',()=>{
+  const {g,square}=trial(Game,{hz:30,ttl:.0035,pen:1,cover:true});
+  assert.equal(square.hp,43);
+  assert.equal(g.__novaTerrain[0].hp,288);
+ });
+ test(mode+' expiring square after wall is never backdated',()=>{
+  const {g,square}=trial(Game,{hz:240,vx:1500,squareX:25,squareY:26,
+   wallX:10,wallHeight:8,pen:4,dmg:47,
+   radius:5.8*(1+47*.0085),ttl:.003});
+  assert.equal(square.hp,55);
+  assert.deepEqual(g.hits,[]);
+ });
+ test(mode+' moving square with partial lifetime conservatively defers',()=>{
+  const {g,square}=trial(Game,{hz:240,vx:1500,squareX:11,squareY:26,
+   wallX:10,wallHeight:8,pen:4,dmg:47,
+   radius:5.8*(1+47*.0085),ttl:.003,moved:true});
+  assert.equal(square.hp,55);
+  assert.deepEqual(g.hits,[]);
+ });
  test(mode+' actual-speed nonlethal square hit precedes later cover',()=>{
   const {g,square}=trial(Game,{hz:30,vx:2000,squareX:32,wallX:65});
   assert.equal(square.hp,43);
@@ -205,6 +242,12 @@ for(const hz of [30,60,120,240]){
  test('full shipping stack honors expiring square before wall at '+hz+'Hz',()=>{
   const {g,square}=trial(FullGame,{hz,ttl:.0035});
   assert.equal(square.hp,43);assert.deepEqual(g.hits,[50]);
+ });
+ test('full shipping stack expiring Assassin square-before-wall at '+hz+'Hz',()=>{
+  const {g,square}=trial(FullGame,{hz,vx:1500,squareX:11,squareY:26,
+   wallX:10,wallHeight:8,pen:4,dmg:47,
+   radius:5.8*(1+47*.0085),ttl:.003});
+  assert.equal(square.hp,8);assert.deepEqual(g.hits,[50]);
  });
  test('full shipping collision stack honors square before wall at '+hz+'Hz',()=>{
   const {g,square}=trial(FullGame,{hz});
