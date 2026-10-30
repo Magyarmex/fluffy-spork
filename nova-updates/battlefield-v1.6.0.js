@@ -2658,7 +2658,9 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    * owner resolves the later cover contact over its ORIGINAL TTL segment.
    * The nonlethal cover budget guarantees that wall stays solid. */
   var sharedCandidate=null,sharedCount=0;
-  if(dt<=.05&&this.shapes&&this.shapes.length){
+  if(dt<=.05&&this.shapes&&this.shapes.length&&
+     this.bullets.length<=600&&
+     (this.tanks||[]).length+this.shapes.length+(this.drones||[]).length<=260){
    for(var spi=0;spi<this.bullets.length;spi++){
     var sb=this.bullets[spi];
     if(sb&&!sb.dead&&sb.pen===1&&sb.ttl>0&&sb.ttl<=dt&&
@@ -2680,9 +2682,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      var swall=firstSolidHit(this,sx0,sy0,sex,sey,sharedCandidate.r*.45);
      if(swall&&certifiedNonlethalSharedCover(this,sharedCandidate,dt,swall)){
       sharedCandidate.__novaNonlethalSharedCoverEpoch=wallProofEpoch;
-      var sqFirst=certifiedSquareBeforeFirstSolid(this,sharedCandidate,dt,
-       sx0,sy0,sex,sey,swall);
-      delete sharedCandidate.__novaNonlethalSharedCoverEpoch;
+      var sqFirst;
+      try{sqFirst=certifiedSquareBeforeFirstSolid(this,sharedCandidate,dt,
+       sx0,sy0,sex,sey,swall);}
+      finally{delete sharedCandidate.__novaNonlethalSharedCoverEpoch;}
       if(sqFirst===2){
        sharedCandidate.x=sx0;sharedCandidate.y=sy0;
        sharedCandidate.px=sx0;sharedCandidate.py=sy0;
