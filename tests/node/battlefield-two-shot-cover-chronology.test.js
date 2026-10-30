@@ -79,13 +79,15 @@ function boot(optimized){
 }
 function trial(Game,{hz=30,reverse=false,competitor=true,cover=true,
  competitorY=70,competitorX=120,coverHp=1,pen=2,
- shell=false,remoteBullet=false,newborn=false,remoteShapes=0,liveDrone=false,competitorPen=1}={}){
+ shell=false,remoteBullet=false,newborn=false,remoteShapes=0,liveDrone=false,competitorPen=1,postCoverSquare=false,postCoverSquareX=45,postCoverSquarePrevX=postCoverSquareX}={}){
  const g=new Game(),dt=1/hz;
  const tank={kind:'tank',id:2,cls:'scout',x:110,y:0,hp:100,alive:true,
   __novaSweepMoveTime:1,__novaSweepPrevX:110,__novaSweepPrevY:0};
  const square={kind:'shape',id:50,type:'square',x:40,y:0,r:20,hp:55,
   __novaShapeSweepEpoch:1,__novaShapeSweepPrevX:40,__novaShapeSweepPrevY:0};
- g.tanks=[tank];g.shapes=[square];
+ const behind=postCoverSquare?{kind:'shape',id:51,type:'square',x:postCoverSquareX,y:70,r:12,hp:55,
+  __novaShapeSweepEpoch:1,__novaShapeSweepPrevX:postCoverSquarePrevX,__novaShapeSweepPrevY:70}:null;
+ g.tanks=[tank];g.shapes=behind?[square,behind]:[square];
  if(liveDrone)g.drones.push({kind:'drone',id:80,ownerId:7,x:1700,y:1700,
   r:8,hp:20,__novaChronoDroneEpoch:1,
   __novaChronoDronePrevX:1700,__novaChronoDronePrevY:1700});
@@ -114,7 +116,8 @@ function trial(Game,{hz=30,reverse=false,competitor=true,cover=true,
   g.updateBullets(dt);g.time+=dt;
  }
  return {tankHp:tank.hp,squareHp:square.hp,coverHp:g.__novaTerrain[0]?.hp,
-  hits:g.hits,pen:focal.pen,coverBroken:g.__novaBattlefield.coverBroken};
+  hits:g.hits,pen:focal.pen,coverBroken:g.__novaBattlefield.coverBroken,
+  postCoverSquareHp:behind?.hp};
 }
 for(const optimized of [false,true]){
  const Game=boot(optimized),label=optimized?'full shipping overlay stack':'Battlefield';
@@ -129,6 +132,33 @@ for(const optimized of [false,true]){
    }
   });
  }
+ for(const hz of [30,60,120,240]){
+  test(label+': pen=1 breaker stops before a witnessed Square behind cover at '+hz+'Hz',()=>{
+   for(const reverse of [false,true]){
+    const r=trial(Game,{hz,reverse,postCoverSquare:true});
+    assert.equal(r.squareHp,43);
+    assert.equal(r.coverHp,0);
+    assert.equal(r.tankHp,88,'the later shot reaches its legitimate target');
+    assert.equal(r.postCoverSquareHp,55,'the spent breaker cannot damage a Square behind cover');
+    assert.deepEqual(r.hits.map(h=>h[0]),['shape','tank']);
+   }
+  });
+ }
+ test(label+': a spent pen=0 breaker also stops before a behind-cover Square',()=>{
+  for(const reverse of [false,true]){
+   const r=trial(Game,{postCoverSquare:true,competitorPen:0,reverse});
+   assert.equal(r.tankHp,88);
+   assert.equal(r.postCoverSquareHp,55);
+  }
+ });
+ test(label+': a Square physically before cover vetoes speculative breaker priority',()=>{
+  const r=trial(Game,{postCoverSquare:true,postCoverSquareX:100});
+  assert.equal(r.tankHp,100,'no false downstream promotion when the Square could be first');
+ });
+ test(label+': a moving Square cannot be certified as behind cover',()=>{
+  const r=trial(Game,{postCoverSquare:true,postCoverSquarePrevX:100});
+  assert.equal(r.tankHp,100,'the movement witness must veto the shortcut');
+ });
  test(label+': an already exhausted pen=0 breaker remains valid',()=>{
   const r=trial(Game,{competitorPen:0});
   assert.equal(r.squareHp,43);
