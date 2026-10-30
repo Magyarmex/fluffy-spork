@@ -72,3 +72,36 @@ test('real materialized runtime includes exactly one Wild Instincts overlay',()=
  assert.ok(html.indexOf('living-front-core-v1.12.0.js')<
   html.indexOf('living-front-instincts-v1.12.0.js'));
 });
+
+test('real Living Front Director creates a public Star at a distributed edge waypoint',()=>{
+ const window={__novaModules:{}};
+ const context={window,Math,Number,Object,Array,Date,JSON,Map,Set,WeakMap,
+  performance:{now:()=>0},setTimeout(){},clearTimeout(){},
+  console:{info(){},warn(){},error(){}}};
+ for(const name of ['living-front-core-v1.12.0.js',
+   'living-front-instincts-v1.12.0.js','living-front-director-v1.12.0.js'])
+  vm.runInNewContext(fs.readFileSync(path.join(root,'nova-updates',name),'utf8'),
+   context,{filename:name});
+ const LF=window.__NOVA_LIVING_FRONT_INTERNAL__;
+ const g={time:100,shapes:[],tanks:[],bullets:[],player:null,
+  spawnShape(type){this.shapes.push({id:33,type,kind:'shape',hp:100,r:24,x:0,y:0});},
+  getShape(id){return this.shapes.find(s=>s.id===id)||null;},
+  isTerrainSafe(){return true;},toast(){}};
+ const st=LF.ensure(g,{star:{xp:100}});
+ st.directorEnabled=true;st.age=100;st.ceiling=1;st.lastMeaningfulAt=0;
+ st.cooldowns.bloom=100;st.cooldowns.migration=100;st.cooldowns.star=0;
+ st.migrationHeat=0;
+ st.sectors.forEach(s=>{s.value=0;s.maturity=.1;s.pressure=0;s.outbound=0;});
+ LF.directorTick(g,st);
+ assert.equal(g.shapes.length,1,'the rare fallback creates only one real Star');
+ const s=g.shapes[0];
+ assert.equal(st.signal.type,'ROGUE STAR');
+ assert.equal(st.signal.starId,s.id);
+ assert.equal(st.signal.x,s.x);
+ assert.equal(st.signal.y,s.y);
+ assert.equal(s.y,-EDGE);
+ assert.ok(s.x>1000&&s.x<SPAN,
+  'real Director fallback should not be pinned to the old lower-left corner');
+ assert.equal(s.__lfGoalY,EDGE);
+ assert.equal(st.stats.starAnnouncements,1);
+});
