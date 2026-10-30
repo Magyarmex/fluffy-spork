@@ -22,11 +22,18 @@ function GameMethods(src){
     method(src,'gainXP','offerNextMilestone'),
     method(src,'offerNextMilestone','tryOffer'),
     method(src,'tryOffer','setClass'),
+    method(src,'applyClass','applyPerk'),
+    method(src,'applyPerk','applyGene'),
+    method(src,'applyGene','openOffer'),
     method(src,'openOffer','dismissOffer'),
     method(src,'dismissOffer','usePlayerAbility')
   ].join('\n');
-  return new Function('types_1','return class GameHarness {\n'+methods+'\n}')({
+  return new Function('types_1','classes_1','return class GameHarness {\n'+methods+'\n}')({
     MAX_LEVEL:45,xpForLevel:()=>1000
+  },{
+    CLASSES:{scout:{tier:0},tier1:{tier:1},tier2:{tier:2},apex:{tier:3,parent:'tier2'}},
+    PERKS:{speed:{name:'Speed'}},GENES:{guardian:{name:'Guardian',color:'#fff'}},
+    lineageForClass:()=> 'sniper'
   });
 }
 function boot(Owner,level,tier=3){
@@ -35,7 +42,10 @@ function boot(Owner,level,tier=3){
   g.status='playing';g.pendingOffer=tier;g.paused=true;g.masteryOfferChoices=null;
   g.setPaused=value=>{g.paused=value;};g.syncHud=()=>{};
   g.cb={event:e=>events.push(e)};g.sfx={levelup:()=>{}};
-  g.recalcMaxHp=()=>{};g.addText=()=>{};g.addRing=()=>{};g.syncAILevels=()=>{};
+  g.recalcMaxHp=()=>{};g.addText=()=>{};g.addRing=()=>{};g.addParticles=()=>{};
+  g.syncAILevels=()=>{};g.refitDrones=()=>{};
+  g.setClass=(t,id)=>{t.cls=id;t.tier={tier1:1,tier2:2,apex:3}[id];};
+  g.sfx.evolve=()=>{};
   return {g,events};
 }
 const Original=GameMethods(original),Fixed=GameMethods(fixed);
@@ -73,6 +83,32 @@ test('below-cap dismissal still waits for a real level-up; all capped evolution 
     assert.equal(g.paused,true);
     assert.deepEqual(events,[{type:'offer',tier}]);
   }
+});
+test('capped earned choices can be consumed and advance milestones exactly once',()=>{
+  const mastery=boot(Fixed,45);mastery.g.player.gene='guardian';
+  mastery.g.dismissOffer(triple);
+  mastery.g.openOffer();
+  mastery.g.applyPerk('speed');
+  assert.equal(mastery.g.player.perk,'speed');
+  assert.equal(mastery.g.pendingOffer,null,'mastery consumed exactly once');
+  assert.equal(mastery.g.masteryOfferChoices,null,'cached offer cleared on consumption');
+  assert.equal(mastery.g.paused,false);
+  const first=boot(Fixed,45,1);
+  first.g.player.tier=0;
+  first.g.dismissOffer();first.g.openOffer();first.g.applyClass('tier1');
+  assert.equal(first.g.player.tier,1);
+  assert.equal(first.g.pendingOffer,2,'next earned evolution follows the first at cap');
+  const gene=boot(Fixed,45,4);
+  gene.g.player.perk='speed';
+  gene.g.dismissOffer();gene.g.openOffer();gene.g.applyGene('guardian');
+  assert.equal(gene.g.player.gene,'guardian');
+  assert.equal(gene.g.pendingOffer,null);
+  const apex=boot(Fixed,45,5);
+  apex.g.player.cls='tier2';apex.g.player.tier=2;
+  apex.g.player.perk='speed';apex.g.player.gene='guardian';
+  apex.g.dismissOffer();apex.g.openOffer();apex.g.applyClass('apex');
+  assert.equal(apex.g.player.tier,3);
+  assert.equal(apex.g.pendingOffer,null);
 });
 test('invalid mastery choices fail closed and cannot contaminate the saved triple',()=>{
   for(const bad of [null,undefined,[],['dmg','dmg','speed'],['dmg','speed','forged'],['dmg','speed']]){
