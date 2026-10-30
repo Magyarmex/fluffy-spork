@@ -24,6 +24,7 @@ function boot(){
   const classes={CLASSES:{
     twin:{size:15,droneCount:0,droneRole:'hunter',droneLeash:500},
     carrier:{size:15,droneCount:4,droneRole:'hunter',droneLeash:500},
+    marksman:{size:15,droneCount:0,droneRole:'hunter',droneLeash:500},
     basic:{size:15,droneCount:0,droneRole:'hunter',droneLeash:500}
   },ABILITIES:{},lineageForClass:id=>id==='carrier'?'controller':'gunner'};
   const window={__novaModules:modules};
