@@ -341,12 +341,21 @@ async function scenario(browser, label, options) {
       const initial=(await heading.locator('xpath=..').locator('button').allTextContents()).slice(0,3);
       assert.equal(new Set(initial).size,3,label+': capped mastery offers three distinct perks');
       for(let repeat=0;repeat<3;repeat++){
+        if(repeat>0)await page.evaluate(()=>{
+          // Freeze a known no-shield baseline while the real modal is paused.
+          window.__novaBrowserLiveGame.player.spawnShieldT=0;
+        });
         await heading.locator('xpath=..').getByRole('button',{name:/DECIDE LATER/i}).click();
         await heading.waitFor({state:'detached',timeout:8000});
         const state=await page.evaluate(()=>{
           const g=window.__novaBrowserLiveGame;
-          return {pending:g.pendingOffer,paused:g.paused,saved:g.masteryOfferChoices};
+          return {pending:g.pendingOffer,paused:g.paused,saved:g.masteryOfferChoices,
+            shield:g.player.spawnShieldT};
         });
+        if(repeat===0)assert.ok(state.shield>1.5,
+          label+': first legitimate deferral retains existing evolution grace');
+        else assert.equal(state.shield,0,
+          label+': repeat deferral must not mint another invulnerability shield');
         assert.equal(state.pending,3,label+': capped mastery remains pending');
         assert.equal(state.paused,false,label+': DECIDE LATER resumes combat');
         assert.equal(state.saved.length,3,label+': mastery triple is stored');
