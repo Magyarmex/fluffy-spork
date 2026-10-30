@@ -37,6 +37,8 @@ function boot(optimized){
    this.cam={shake:0};this.sfx={};this.hits=[];
    this.player={id:999,x:1000,y:1000,alive:true};
    this.__novaShapeSweepActive=true;this.__novaShapeSweepEpoch=1;
+   this.__novaFrameStartBulletEpoch=1;
+   this.__novaFrameStartBulletIdCeiling=100;
    this.hash={query:(_x,_y,_r,out)=>{
     out.length=0;out.push(...this.tanks,...this.shapes,...this.drones);
    }};
