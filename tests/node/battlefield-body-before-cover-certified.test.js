@@ -90,7 +90,7 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,l
  active=true,knock=0,allied=false,destructible=false,damage=10,
  linearMove=null,tamperMove=false,doubleMove=false,
  otherNearMovingStart=false,bornThisFrame=false,coverHp=1000,
- shellInterception=false,secondShell=false}={}){
+ shellInterception=false,secondShell=false,shellShape=null}={}){
  const g=new Game(),dt=1/fps;
  g.__novaBattlefield={coverBroken:0};
  g.__novaShapeSweepActive=active;
@@ -111,6 +111,13 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,l
   g.shapes.push({kind:'shape',id:2000+i,type,x,y,r:def.r,hp:def.hp,
    __novaShapeSweepEpoch:g.__novaShapeSweepEpoch,
    __novaShapeSweepPrevX:x,__novaShapeSweepPrevY:y});
+ }
+ if(shellShape){
+  const y=shellShape==='near'?950:750;
+  g.shapes.push({kind:'shape',id:99,type:'square',x:0,y,r:20,hp:55,
+   __novaShapeSweepEpoch:g.__novaShapeSweepEpoch,
+   __novaShapeSweepPrevX:0,
+   __novaShapeSweepPrevY:shellShape==='teleport'?0:y});
  }
  g.__novaTerrain=[wallShape==='rect'
   ?{id:-1,shape:'rect',x:wall,y:wallY,w:10,h:80,solid:true,destructible,hp:destructible?coverHp:0,maxHp:destructible?coverHp:0}
@@ -236,6 +243,18 @@ for(const optimized of [false,true]){
  test(label+': two separated unspent shells remain independent',()=>{
   const r=run(boot(optimized),{otherShell:true,secondShell:true});
   assert.deepEqual(r.hits,[2]);assert.equal(r.hp,90);
+ });
+ test(label+': distant witnessed neutral does not disable remote-shell proof',()=>{
+  const r=run(boot(optimized),{otherShell:true,shellShape:'far'});
+  assert.deepEqual(r.hits,[2]);assert.equal(r.hp,90);
+ });
+ test(label+': neutral near shell retains explosion veto',()=>{
+  const r=run(boot(optimized),{otherShell:true,shellShape:'near'});
+  assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
+ });
+ test(label+': teleported neutral cannot certify a shell-free frame',()=>{
+  const r=run(boot(optimized),{otherShell:true,shellShape:'teleport'});
+  assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
  });
  test(label+': shell threatened by another projectile fails closed',()=>{
   const r=run(boot(optimized),{otherShell:true,shellInterception:true});
