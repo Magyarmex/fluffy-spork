@@ -343,8 +343,16 @@ wrap('game/ai',function(ai,require){
       if(window.__NOVA_AI_DIRECTOR__)window.__NOVA_AI_DIRECTOR__.abilities++;
       return use.apply(g,arguments);
     };
+    /* Scoped ownership prevents the canonical AI's dormant 2% lottery
+     * from consuming gameplay RNG while Predator decides abilities.
+     * Restore even if a nested legacy owner throws. */
+    var hadAbilityOwner=Object.prototype.hasOwnProperty.call(a,'__novaPredatorAbilityOwned'),
+        previousAbilityOwner=a.__novaPredatorAbilityOwned;
+    a.__novaPredatorAbilityOwned=true;
     var out;
     try{out=old(t,g,dt);}finally{
+      if(hadAbilityOwner)a.__novaPredatorAbilityOwned=previousAbilityOwner;
+      else delete a.__novaPredatorAbilityOwned;
       if(move){if(ownMove)g.moveTank=move;else delete g.moveTank;}
       if(fire){if(ownFire)g.tryFire=fire;else delete g.tryFire;}
       if(use){if(ownAbility)g.useAbility=use;else delete g.useAbility;}
