@@ -317,6 +317,82 @@ async function scenario(browser, label, options) {
       }
     }
 
+
+    // Real Game -> React -> EVOLVE READY loop at maximum level. A postponed
+    // mastery choice must remain accessible without offering free rerolls.
+    if(label==='landscape-568'||label==='mobile-320-short'){
+      const prior=await page.evaluate(()=>{
+        const g=window.__novaBrowserLiveGame;
+        if(!g?.player||!g.openOffer)throw Error('real capped Game missing');
+        const saved={level:g.player.level,tier:g.player.tier,gene:g.player.gene,
+          perk:g.player.perk,spawnShieldT:g.player.spawnShieldT,
+          hitFlash:g.player.hitFlash,pendingOffer:g.pendingOffer,
+          masteryOfferChoices:g.masteryOfferChoices};
+        g.player.level=45;
+        g.player.tier=3;
+        g.player.gene='guardian';
+        g.player.perk=null;
+        g.pendingOffer=3;
+        g.masteryOfferChoices=null;
+        g.openOffer();
+        return saved;
+      });
+      const heading=page.getByText('★ MASTERY PERK ★',{exact:true});
+      await heading.waitFor({state:'visible',timeout:8000});
+      const initial=(await heading.locator('xpath=..').locator('button').allTextContents()).slice(0,3);
+      assert.equal(new Set(initial).size,3,label+': capped mastery offers three distinct perks');
+      for(let repeat=0;repeat<3;repeat++){
+        if(repeat>0)await page.evaluate(()=>{
+          // Freeze a known no-shield baseline while the real modal is paused.
+          window.__novaBrowserLiveGame.player.spawnShieldT=0;
+        });
+        await heading.locator('xpath=..').getByRole('button',{name:/DECIDE LATER/i}).click();
+        await heading.waitFor({state:'detached',timeout:8000});
+        const state=await page.evaluate(()=>{
+          const g=window.__novaBrowserLiveGame;
+          return {pending:g.pendingOffer,paused:g.paused,saved:g.masteryOfferChoices,
+            shield:g.player.spawnShieldT};
+        });
+        if(repeat===0)assert.ok(state.shield>0.05,
+          label+': first legitimate deferral retains existing evolution grace');
+        else assert.equal(state.shield,0,
+          label+': repeat deferral must not mint another invulnerability shield');
+        assert.equal(state.pending,3,label+': capped mastery remains pending');
+        assert.equal(state.paused,false,label+': DECIDE LATER resumes combat');
+        assert.equal(state.saved.length,3,label+': mastery triple is stored');
+        await page.getByRole('button',{name:/EVOLVE READY/i}).click();
+        await heading.waitFor({state:'visible',timeout:8000});
+        const reopened=(await heading.locator('xpath=..').locator('button').allTextContents()).slice(0,3);
+        assert.deepEqual(reopened,initial,label+': reopening must not reroll the same milestone');
+      }
+      await heading.locator('xpath=..').locator('button').first().click();
+      await heading.waitFor({state:'detached',timeout:8000});
+      const chosen=await page.evaluate(()=>{
+        const g=window.__novaBrowserLiveGame;
+        return {perk:g.player.perk,pending:g.pendingOffer,
+          saved:g.masteryOfferChoices,paused:g.paused};
+      });
+      assert.ok(chosen.perk,label+': capped mastery choice must apply');
+      assert.equal(chosen.pending,null,label+': consumed mastery must clear pending offer');
+      assert.equal(chosen.saved,null,label+': consumed mastery must clear cached triple');
+      assert.equal(chosen.paused,false,label+': mastery choice resumes combat');
+      assert.equal(await page.getByRole('button',{name:/EVOLVE READY/i}).count(),0,
+        label+': consumed mastery must not reopen');
+      await page.evaluate(saved=>{
+        const g=window.__novaBrowserLiveGame;
+        g.player.level=saved.level;
+        g.player.tier=saved.tier;
+        g.player.gene=saved.gene;
+        g.player.perk=saved.perk;
+        g.player.spawnShieldT=saved.spawnShieldT;
+        g.player.hitFlash=saved.hitFlash;
+        g.pendingOffer=saved.pendingOffer;
+        g.masteryOfferChoices=saved.masteryOfferChoices;
+        g.recalcMaxHp(g.player);
+        g.syncHud();
+      },prior);
+    }
+
     await page.getByRole('button',{name:'Pause'}).click();
     await page.getByText('PAUSED',{exact:true}).waitFor({state:'visible'});
     { // Every real Pause viewport must preserve frame-zero touch targets.
