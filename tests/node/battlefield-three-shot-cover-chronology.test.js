@@ -78,11 +78,12 @@ function boot(optimized){
  return m.exports.Game;
 }
 
-function trial3(Game,order,hz=30){
+function trial3(Game,order,hz=30,{extraBullet=false,liveDrone=false,newborn=false}={}){
  const g=new Game(),dt=1/hz;
  const tank={kind:'tank',id:2,cls:'scout',x:110,y:0,hp:100,alive:true,
   __novaSweepMoveTime:1,__novaSweepPrevX:110,__novaSweepPrevY:0};
  g.tanks=[tank];g.shapes=[];g.drones=[];
+ if(liveDrone)g.drones.push({kind:'drone',id:88,ownerId:88,x:1700,y:1700,r:8,hp:20});
  if(typeof g.hash.insert==='function')g.hash.insert(tank);
  g.__novaTerrain=[{id:-1,shape:'rect',x:80,y:0,w:10,h:160,
   solid:true,destructible:true,hp:15,maxHp:300}];
@@ -91,10 +92,12 @@ function trial3(Game,order,hz=30){
    dmg:12,pen:2,ttl:.15,hits:0,dead:false,shell:false,beam:false,splash:0},
   A:{kind:'bullet',id:11,ownerId:3,x:120,y:50,vx:-2500,vy:0,r:3,
    dmg:10,pen:1,ttl:.15,hits:0,dead:false,shell:false,beam:false,splash:0},
-  B:{kind:'bullet',id:12,ownerId:4,x:130,y:-50,vx:-2500,vy:0,r:3,
+  B:{kind:'bullet',id:newborn?101:12,ownerId:4,x:130,y:-50,vx:-2500,vy:0,r:3,
    dmg:10,pen:1,ttl:.15,hits:0,dead:false,shell:false,beam:false,splash:0}
  };
  g.bullets=order.split('').map(k=>shots[k]);
+ if(extraBullet)g.bullets.push({kind:'bullet',id:13,ownerId:5,x:1700,y:1700,vx:0,vy:0,r:3,
+  dmg:5,pen:1,ttl:.15,hits:0,dead:false,shell:false,beam:false,splash:0});
  for(let i=0;i<Math.ceil(hz*.15);i++){g.updateBullets(dt);g.time+=dt;}
  return {tankHp:tank.hp,coverHp:g.__novaTerrain[0]?.hp,hits:g.hits};
 }
@@ -102,13 +105,21 @@ for(const optimized of [false,true]){
  const Game=boot(optimized),label=optimized?'full shipping overlays':'Battlefield';
  for(const hz of [30,60,120,240]){
   test(label+': three-shot chronological cover breach at '+hz+'Hz',()=>{
-   const favorable=trial3(Game,'ABF',hz);
-   const unfavorable=trial3(Game,'FAB',hz);
-   assert.equal(favorable.coverHp,0);
-   assert.equal(unfavorable.coverHp,0);
-   assert.equal(favorable.tankHp,88,'physical chronology should hit downstream tank');
-   assert.equal(unfavorable.tankHp,88,
-    'physical chronology cannot depend on projectile array order');
+   for(const order of ['ABF','FAB','AFB','BFA','BAF','FBA']){
+    const r=trial3(Game,order,hz);
+    assert.equal(r.coverHp,0,'both breakers must destroy cover');
+    assert.equal(r.tankHp,88,'physical chronology cannot depend on order '+order);
+   }
+  });
+ }
+}
+
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'full shipping overlays':'Battlefield';
+ for(const veto of ['extraBullet','liveDrone','newborn']){
+  test(label+': '+veto+' preserves conservative three-shot arbitration',()=>{
+   const r=trial3(Game,'FAB',30,{[veto]:true});
+   assert.equal(r.tankHp,100,'uncertain multi-shot ordering must abstain');
   });
  }
 }
