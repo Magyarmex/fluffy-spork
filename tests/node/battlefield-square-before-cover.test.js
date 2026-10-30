@@ -60,18 +60,20 @@ function boot(optimized){
 }
 function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
   squareY=0,wallY=0,born=false,moved=false,extraBullet=false,
-  extraTank=false}={}){
+  extraTank=false,fragile=false,pen=0,extraSquare=false}={}){
  const g=new Game();
- const square={kind:'shape',id:50,type:'square',x:squareX,y:squareY,r:12,hp:100};
+ const square={kind:'shape',id:50,type:'square',x:squareX,y:squareY,r:12,hp:fragile?10:100};
  if(born)square.born=g.time;
  if(moved){square.__novaTestMove=true;}
  g.shapes=[square];
+ if(extraSquare)g.shapes.push({kind:'shape',id:51,type:'square',
+  x:squareX+9,y:squareY,r:12,hp:100});
  g.__novaTerrain=[{id:-51,shape:'rect',x:wallX,y:wallY,w:8,h:80,
   solid:true,destructible:false,hp:0}];
  g.bullets=[{kind:'bullet',id:10,ownerId:1,x:0,y:0,vx,vy:0,
-  r:3,dmg:20,ttl:1,pen:0,hits:0,dead:false,shell:false,beam:false,splash:0}];
+  r:3,dmg:20,ttl:1,pen,hits:0,dead:false,shell:false,beam:false,splash:0}];
  if(extraBullet)g.bullets.push({kind:'bullet',id:11,ownerId:3,
-  x:20,y:0,vx:0,vy:0,r:3,dmg:20,ttl:1,pen:0,hits:0,dead:false});
+  x:extraBullet==='remote'?1000:20,y:extraBullet==='remote'?1000:0,vx:0,vy:0,r:3,dmg:20,ttl:1,pen:0,hits:0,dead:false});
  if(extraTank)g.tanks.push({kind:'tank',id:2,cls:'scout',alive:true,hp:100,x:30,y:0});
  if(moved){
   const oldUpdate=g.update.bind(g);
@@ -113,6 +115,26 @@ for(const optimized of [false,true]){
   const {g,square}=trial(Game,{extraBullet:true});
   assert.equal(square.hp,100);
   assert.deepEqual(g.hits,[]);
+ });
+ test(mode+' remote projectile does not suppress independent square hit',()=>{
+  const {g,square}=trial(Game,{extraBullet:'remote'});
+  assert.equal(square.hp,80);assert.deepEqual(g.hits,[50]);
+ });
+ test(mode+' witnessed moving square defers ambiguous first-contact proof',()=>{
+  const {g,square}=trial(Game,{moved:true});
+  assert.equal(square.hp,100);assert.deepEqual(g.hits,[]);
+ });
+ test(mode+' two potential square victims defer instead of choosing array order',()=>{
+  const {g}=trial(Game,{extraSquare:true});
+  assert.deepEqual(g.hits,[]);
+ });
+ test(mode+' lethal square damage defers to full chronology',()=>{
+  const {g,square}=trial(Game,{fragile:true});
+  assert.equal(square.hp,10);assert.deepEqual(g.hits,[]);
+ });
+ test(mode+' piercing rounds keep existing wall arbitration',()=>{
+  const {g,square}=trial(Game,{pen:1});
+  assert.equal(square.hp,100);assert.deepEqual(g.hits,[]);
  });
  test(mode+' competing tank before square preserves original arbitration',()=>{
   const {g,square}=trial(Game,{extraTank:true});
