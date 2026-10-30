@@ -681,6 +681,54 @@ for(const optimized of [false,true]){
  }
 }
 
+/* A breached barricade must not turn an unrelated crowded firefight
+ * into permission to shoot through a later permanent wall or an intact
+ * second barricade. This executes the materialized core and Battlefield's
+ * actual structural-damage/penetration owners at four frame rates. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'Battlefield + Performance':'Battlefield';
+ for(const fps of [30,60,120,240])for(const pen of [3,4]){
+  for(const remoteBullets of [12,60,120,220])for(const laterCoverHp of [null,1000]){
+   test(label+': pen'+pen+' breach respects second '+(laterCoverHp?'cover':'wall')+
+    ' with '+remoteBullets+' remote shots at '+fps+'Hz',()=>{
+    const r=run(Game,{fps,speed:200*fps,pen,destructible:true,
+     wall:55,laterWall:110,laterCoverHp,target:165,coverHp:5,remoteBullets});
+    assert.deepEqual(r.hits,[],'later solid must protect rear hull');
+    assert.equal(r.hp,100);
+    assert.equal(r.g.__novaTerrain[0].hp,0,'first cover still breaches');
+    assert.equal(r.g.__novaTerrain[1].hp,laterCoverHp?990:0,
+     'second solid must receive its canonical response');
+    assert.equal(r.g.bullets.some(b=>b.id===10),false,
+     'the piercing projectile must stop at the second solid');
+   });
+  }
+ }
+ for(const pen of [3,4]){
+  test(label+': real upgraded Marksman pen'+pen+
+   ' cannot tunnel through second wall amid 120 remote shots at 30Hz',()=>{
+   const speed=1050*(1+.085*8),radius=5.5*(1+21*.0085);
+   const r=run(Game,{fps:30,speed,pen,radius,damage:21,
+    destructible:true,wall:17,laterWall:35,target:60,coverHp:5,
+    remoteBullets:120});
+   assert.deepEqual(r.hits,[]);
+   assert.equal(r.hp,100);
+   assert.equal(r.g.__novaTerrain[0].hp,0);
+   assert.equal(r.g.bullets.some(b=>b.id===10),false);
+  });
+  test(label+': real upgraded Marksman pen'+pen+
+   ' damages second intact cover amid 120 remote shots at 30Hz',()=>{
+   const speed=1050*(1+.085*8),radius=5.5*(1+21*.0085);
+   const r=run(Game,{fps:30,speed,pen,radius,damage:21,
+    destructible:true,wall:17,laterWall:35,laterCoverHp:1000,
+    target:60,coverHp:5,remoteBullets:120});
+   assert.deepEqual(r.hits,[]);
+   assert.equal(r.hp,100);
+   assert.equal(r.g.__novaTerrain[0].hp,0);
+   assert.equal(r.g.__novaTerrain[1].hp,979);
+  });
+ }
+}
+
 /* Reachable 30Hz Marksman geometry, not a 6,000u/s synthetic bullet.
  * Base 1050 speed × eight 8.5% speed upgrades travels 58.8u/frame.
  * Cover face ~9, wall face ~27, rear Scout hull entry ~36.5.
