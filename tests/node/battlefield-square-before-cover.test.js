@@ -410,11 +410,9 @@ for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['f
  });
 }
 
-/* Adversarial counterexample to simply deleting the global singleton veto:
- * a different projectile can hit the SAME wall from the opposite face,
- * even when it never approaches the first square. The focal Scout's
- * speculative later-cover hit must abstain, leaving only the competitor's
- * one point of structural damage. */
+/* Issue #147: a nonlethal shared-cover contest must preserve the physical
+ * square-first event and both later cover hits regardless of bullet order.
+ * This is deliberately narrower than lethal-cover or interception ordering. */
 for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['full shipping',FullGame]]){
  for(const hz of [30,240])for(const reverseBullets of [false,true]){
   test(label+' same-cover competing shot vetoes speculative TTL chain at '+hz+'Hz reverse='+reverseBullets,()=>{
@@ -422,14 +420,13 @@ for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['f
     wallX:94,wallWidth:180,wallHeight:60,bulletY:32,
     pen:1,dmg:12,radius:5*(1+12*.0085),ttl:.004,
     cover:true,remoteBullets:180,coverCompetitor:true,reverseBullets});
-   /* Same-cover competition is not yet a complete chronological resolver.
-    * Preserve the conservative old path: the first square may be hit once
-    * or missed, but must never receive a duplicate speculative hit. */
-   assert.ok(square.hp===43||square.hp===55,
-    'contested square may have zero or one ordinary hit, never phantom damage');
-   assert.ok(g.hits.filter(id=>id===50).length<=1);
-   assert.equal(g.__novaTerrain[0].hp,299,
-    'only opposite-face competitor may damage this wall; focal chain must abstain');
+   /* The square is contacted before either projectile reaches cover.
+    * Both structural hits are nonlethal (300 HP > 12+1), so the cover
+    * remains solid regardless of which shot's array entry comes first. */
+   assert.equal(square.hp,43,'earlier square contact must not be erased');
+   assert.deepEqual(g.hits,[50],'exactly one physical neutral contact');
+   assert.equal(g.__novaTerrain[0].hp,287,
+    'both later cover hits apply exactly once despite reversed bullet order');
   });
  }
 }
