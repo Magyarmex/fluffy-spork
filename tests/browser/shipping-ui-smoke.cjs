@@ -274,6 +274,15 @@ async function scenario(browser, label, options) {
         // and buttons; a scaled transition can briefly hide full-size overflow.
         await page.waitForTimeout(500);
         const panel=heading.locator('xpath=..');
+        if(tier===3){
+          // The real compiled React PerkOffer must expose three distinct
+          // selectable mastery perks plus the unchanged postpone action.
+          const buttons=await panel.locator('button').allTextContents();
+          assert.equal(buttons.length,4,label+': exactly three mastery perks and DECIDE LATER');
+          assert.match(buttons[3],/DECIDE LATER/);
+          assert.equal(new Set(buttons.slice(0,3).map(s=>s.trim())).size,3,
+            label+': no duplicate mastery offers in the actual modal');
+        }
         const geometry=await panel.evaluate(el=>{
           const box=el.getBoundingClientRect();
           const later=[...el.querySelectorAll('button')].find(b=>
