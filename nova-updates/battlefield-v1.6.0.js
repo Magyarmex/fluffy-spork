@@ -452,16 +452,23 @@ function exactMovingShapeHitT(ax,ay,ex,ey,sx,sy,sxe,sye,rr){
  var t=Number(boundN)/Number(boundD)*(Number(high)/Number(den));
  return Number.isFinite(t)?Math.min(t,1-Number.EPSILON/2):null;
 }
-function movingShapeHitT(g,s,ax,ay,ex,ey,rr){
+function movingShapeHitT(g,s,ax,ay,ex,ey,rr,timeFraction){
  var start=shapeSweepStart(g,s);if(!start)return null;
- var dx=ex-ax-(s.x-start.x),dy=ey-ay-(s.y-start.y);
+ /* Ordinary full-frame sweeps use the witnessed endpoint unchanged.
+  * A certified short-TTL shot needs the square position at its actual
+  * expiry time, not the end of the longer simulation frame. */
+ var fraction=timeFraction==null?1:timeFraction;
+ if(!(fraction>0&&fraction<=1))return null;
+ var shapeEx=start.x+(s.x-start.x)*fraction,
+     shapeEy=start.y+(s.y-start.y)*fraction;
+ var dx=ex-ax-(shapeEx-start.x),dy=ey-ay-(shapeEy-start.y);
  var fx=ax-start.x,fy=ay-start.y,A=dx*dx+dy*dy;
  var B=2*(fx*dx+fy*dy),C=fx*fx+fy*fy-rr*rr;
  if(!Number.isFinite(A)||!Number.isFinite(B)||!Number.isFinite(C))return null;
  if(C< -1e-9)return 0;
  var D=B*B-4*A*C,magnitude=B*B+4*A*(fx*fx+fy*fy+rr*rr);
  if(Math.abs(C)<=1e-9||(A>0&&Number.isFinite(D)&&Math.abs(D)<=1e-12*magnitude))
-  return exactMovingShapeHitT(ax,ay,ex,ey,start.x,start.y,s.x,s.y,rr);
+  return exactMovingShapeHitT(ax,ay,ex,ey,start.x,start.y,shapeEx,shapeEy,rr);
  if(A<1e-12||!(D>0))return null;
  var root=Math.sqrt(D),q=-.5*(B+(B<0?-root:root));
  if(!q)return null;
@@ -2166,10 +2173,20 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       !Number.isFinite(s.__novaShapeSweepPrevY)||
       !(s.hp>b.dmg*1.000001))return false;
    var move=Math.hypot(s.x-sx,s.y-sy);
-   /* An expiring projectile travels only ttl, while a moving shape's
-    * witnessed endpoint covers the entire dt. Their normalized times do
-    * not align. Certify this new TTL slice only for stationary squares. */
-   if(b.ttl<=dt&&move>1e-8)return false;
+   /* Short-TTL motion must be time-aligned. The shipping square moves
+    * linearly at its current velocity during core integration, unless
+    * terrain/arena correction or another stage changes the path. Require
+    * the observed displacement to match velocity*dt and stay well inside
+    * arena bounds before interpolating the square to the shot's TTL. */
+   var ttlFraction=Math.min(1,b.ttl/dt);
+   if(ttlFraction<1&&move>1e-8){
+    if(dt>.05||!Number.isFinite(s.vx)||!Number.isFinite(s.vy)||
+       Math.hypot(s.vx,s.vy)>40||
+       Math.abs(s.x-sx-s.vx*dt)>1e-5||
+       Math.abs(s.y-sy-s.vy*dt)>1e-5||
+       Math.max(Math.abs(sx),Math.abs(sy),
+        Math.abs(s.x),Math.abs(s.y))>=MAP_LIMIT-40)return false;
+   }
    if(!Number.isFinite(move)||move>96||
       pointInsideSolid(wall.solid,sx,sy,s.r+1)||
       pointInsideSolid(wall.solid,s.x,s.y,s.r+1)||
@@ -2179,7 +2196,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    if(move>1e-8){
     /* Reuse the exact moving-shape contact owner already used by
      * Battlefield's shipping swept recovery, never an endpoint guess. */
-    enter=movingShapeHitT(g,s,ax,ay,ex,ey,rr);
+    enter=movingShapeHitT(g,s,ax,ay,ex,ey,rr,ttlFraction);
    }else{
     var fx=ax-s.x,fy=ay-s.y,B=2*(fx*dx+fy*dy),
         C=fx*fx+fy*fy-rr*rr;

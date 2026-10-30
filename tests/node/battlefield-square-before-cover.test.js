@@ -66,7 +66,7 @@ function boot(optimized,full=false){
 function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
   squareY=0,wallY=0,born=false,moved=false,teleport=false,extraBullet=false,
   extraTank=false,fragile=false,pen=1,extraSquare=false,cover=false,
-  dmg=12,radius=3,ttl=1,wallHeight=80,wallWidth=8,bulletY=0}={}){
+  dmg=12,radius=3,ttl=1,wallHeight=80,wallWidth=8,bulletY=0,linearVy=0}={}){
  const g=new Game();
  const square={kind:'shape',id:50,type:'square',x:squareX,y:squareY,r:20,hp:fragile?10:55};
  if(born)square.born=g.time;
@@ -86,6 +86,15 @@ function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
   // Capture the actual frame-start shape, then move inside core update.
   const original=g.updateBullets.bind(g);
   g.updateBullets=function(dt){square.x=squareX;square.y=teleport?squareY:squareY+10;return original(dt);};
+ }
+ if(linearVy){
+  /* Witnessed ordinary square integration inside the real update call,
+   * not a synthetic post-frame teleport or a guessed endpoint. */
+  const original=g.updateBullets.bind(g);
+  g.updateBullets=function(dt){
+   square.vx=0;square.vy=linearVy;square.y+=linearVy*dt;
+   return original(dt);
+  };
  }
  g.update(1/hz);
  return {g,square};
@@ -144,6 +153,31 @@ for(const optimized of [false,true]){
    assert.equal(square.hp,43);
    assert.equal(g.__novaTerrain[0].hp,288,'piercing shot still reaches cover before TTL');
    assert.deepEqual(g.hits,[50]);
+  });
+ }
+ for(const hz of [30,60,120,240]){
+  test(mode+' expiring Scout hits moving square then cover at '+hz+'Hz',()=>{
+   const {g,square}=trial(Game,{hz,vx:440,squareX:16.5,squareY:52,
+    wallX:94,wallWidth:180,wallHeight:60,bulletY:32,
+    pen:1,dmg:12,radius:5*(1+12*.0085),ttl:.004,
+    cover:true,linearVy:9});
+   assert.equal(square.hp,43,'witnessed square first contact');
+   assert.equal(g.__novaTerrain[0].hp,288,'later cover hit before TTL');
+   assert.deepEqual(g.hits,[50]);
+  });
+ }
+ /* Tight subframe ordering: correct 9u/s square contact at ~1.551ms,
+  * cover at ~1.638ms. Incorrectly treating the square's full-frame
+  * displacement as occurring within 4ms moves its predicted contact
+  * behind cover at 30/60Hz. */
+ for(const hz of [30,60]){
+  test(mode+' moving square partial-TTL chronology beats near cover at '+hz+'Hz',()=>{
+   const {g,square}=trial(Game,{hz,vx:440,squareX:16.5,squareY:52,
+    wallX:93.2,wallWidth:180,wallHeight:60,bulletY:32,
+    pen:1,dmg:12,radius:5*(1+12*.0085),ttl:.004,
+    cover:true,linearVy:9});
+   assert.equal(square.hp,43);
+   assert.equal(g.__novaTerrain[0].hp,288);
   });
  }
  test(mode+' expiring pen=0 shot consumes itself before cover',()=>{
@@ -289,6 +323,25 @@ for(const hz of [30,60,120,240]){
   assert.equal(g.__novaTerrain[0].hp,288);
   assert.deepEqual(g.hits,[50]);
  });
+ test('full shipping stack expiring Scout hits moving square and cover at '+hz+'Hz',()=>{
+  const {g,square}=trial(FullGame,{hz,vx:440,squareX:16.5,squareY:52,
+   wallX:94,wallWidth:180,wallHeight:60,bulletY:32,
+   pen:1,dmg:12,radius:5*(1+12*.0085),ttl:.004,
+   cover:true,linearVy:9});
+  assert.equal(square.hp,43);
+  assert.equal(g.__novaTerrain[0].hp,288);
+  assert.deepEqual(g.hits,[50]);
+ });
+ if(hz===30||hz===60){
+  test('full shipping stack orders moving square ahead of near cover at '+hz+'Hz',()=>{
+   const {g,square}=trial(FullGame,{hz,vx:440,squareX:16.5,squareY:52,
+    wallX:93.2,wallWidth:180,wallHeight:60,bulletY:32,
+    pen:1,dmg:12,radius:5*(1+12*.0085),ttl:.004,
+    cover:true,linearVy:9});
+   assert.equal(square.hp,43);
+   assert.equal(g.__novaTerrain[0].hp,288);
+  });
+ }
  test('full shipping collision stack honors square before wall at '+hz+'Hz',()=>{
   const {g,square}=trial(FullGame,{hz});
   assert.deepEqual(g.hits,[50]);assert.equal(square.hp,43);
