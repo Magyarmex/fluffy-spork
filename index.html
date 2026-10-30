@@ -247,7 +247,7 @@ canvas {
     <link rel="icon" href="./nova-icon.svg" type="image/svg+xml" />
     <meta name="application-name" content="NOVA TANKS" />
     <script defer src="./pwa-register.js"></script>
-      <meta name="nova-runtime-build" content="8e067ce2cde9ca544e0f5af9" />
+      <meta name="nova-runtime-build" content="8594c8db635069de8138f05d" />
   </head>
   <body>
     <div id="root"></div>
@@ -540,16 +540,17 @@ function GeneOffer({ current, onPick, onLater }) {
             React.createElement("div", { className: "mt-3 rounded-lg border border-fuchsia-300/20 bg-fuchsia-400/5 px-3 py-2 text-center text-[10px] font-semibold text-fuchsia-100/80" }, "Your original lineage stays intact \u2014 the splice adds a second combat identity instead of replacing it."),
             React.createElement("button", { "data-ui": true, onClick: onLater, className: "btn-ghost mt-3 w-full py-2 text-[10px]" }, "DECIDE LATER"))));
 }
-function PerkOffer({ onPick, onLater }) {
+function PerkOffer({ onPick, onLater, savedChoices }) {
     const pool = ['dmg', 'speed', 'vitality', 'alacrity', 'thorns', 'wealth'];
     const shuffled = (0, react_1.useMemo)(() => {
+        if (Array.isArray(savedChoices) && savedChoices.length === 3 && new Set(savedChoices).size === 3 && savedChoices.every(id => pool.includes(id))) return savedChoices;
         const picks = [...pool];
         for (let i = 0; i < 3; i++) {
             const j = i + Math.floor(Math.random() * (picks.length - i));
             [picks[i], picks[j]] = [picks[j], picks[i]];
         }
         return picks.slice(0, 3);
-    }, []);
+    }, [savedChoices]);
     return (React.createElement("div", { className: "absolute inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" },
         React.createElement("div", { className: "panel anim-pop w-full max-w-[430px] p-4" },
             React.createElement("div", { className: "text-center font-display text-sm font-black tracking-[0.25em] text-amber-300" }, "\u2605 MASTERY PERK \u2605"),
@@ -562,7 +563,7 @@ function PerkOffer({ onPick, onLater }) {
                         React.createElement("span", { className: "font-display text-sm font-bold tracking-wider text-amber-200" }, p.name),
                         React.createElement("span", { className: "block text-[11px] font-medium text-slate-300" }, p.desc))));
             })),
-            React.createElement("button", { "data-ui": true, onClick: onLater, className: "btn-ghost mt-3 w-full py-2 text-[10px]" }, "DECIDE LATER"))));
+            React.createElement("button", { "data-ui": true, onClick: () => onLater(shuffled), className: "btn-ghost mt-3 w-full py-2 text-[10px]" }, "DECIDE LATER"))));
 }
 function GameOver({ stats, onRedeploy, onMenu }) {
     const rows = [
@@ -851,7 +852,7 @@ function App() {
                 hud.pendingOffer && !offer && (React.createElement("button", { "data-ui": true, onClick: () => gameRef.current?.openOffer(), className: "anim-blink absolute left-1/2 top-[24%] z-40 -translate-x-1/2 rounded-full border border-purple-300/60 bg-purple-900/70 px-4 py-1.5 font-display text-[11px] font-bold tracking-[0.2em] text-purple-100 backdrop-blur-sm" }, "\uD83E\uDDEC EVOLVE READY")))),
             offer === 1 && React.createElement(ClassOffer, { tier: 1, base: tier1, onPick: (c) => { setTier1(c); tier1Ref.current = c; setOffer(null); gameRef.current?.applyClass(c); }, onLater: () => { setOffer(null); gameRef.current?.dismissOffer(); } }),
             offer === 2 && React.createElement(ClassOffer, { tier: 2, base: tier1Ref.current, onPick: (c) => { setOffer(null); gameRef.current?.applyClass(c); }, onLater: () => { setOffer(null); gameRef.current?.dismissOffer(); } }),
-            offer === 3 && React.createElement(PerkOffer, { onPick: (p) => { setOffer(null); gameRef.current?.applyPerk(p); }, onLater: () => { setOffer(null); gameRef.current?.dismissOffer(); } }),
+            offer === 3 && React.createElement(PerkOffer, { savedChoices: gameRef.current?.masteryOfferChoices, onPick: (p) => { setOffer(null); gameRef.current?.applyPerk(p); }, onLater: (choices) => { setOffer(null); gameRef.current?.dismissOffer(choices); } }),
             offer === 4 && hud && React.createElement(GeneOffer, { current: hud.classId, onPick: (g) => { setOffer(null); gameRef.current?.applyGene(g); }, onLater: () => { setOffer(null); gameRef.current?.dismissOffer(); } }),
             offer === 5 && hud && React.createElement(ClassOffer, { tier: 5, base: hud.classId, onPick: (c) => { setOffer(null); gameRef.current?.applyClass(c); }, onLater: () => { setOffer(null); gameRef.current?.dismissOffer(); } }),
             dead && deadRef.current && (React.createElement(GameOver, { stats: deadRef.current, onRedeploy: () => {
@@ -2472,6 +2473,7 @@ class Game {
     applyPerk(p) {
         const t = this.player;
         t.perk = p;
+        this.masteryOfferChoices = null;
         this.pendingOffer = null;
         this.setPaused(false);
         this.recalcMaxHp(t);
@@ -2501,8 +2503,18 @@ class Game {
         this.setPaused(true);
         this.cb.event({ type: 'offer', tier: this.pendingOffer });
     }
-    dismissOffer() {
-        this.pendingOffer = null;
+    dismissOffer(masterChoices) {
+        const capped = this.player && this.player.level >= types_1.MAX_LEVEL;
+        if (capped && this.pendingOffer === 3 && !this.masteryOfferChoices) {
+            const pool = ['dmg', 'speed', 'vitality', 'alacrity', 'thorns', 'wealth'];
+            if (Array.isArray(masterChoices) && masterChoices.length === 3 &&
+                new Set(masterChoices).size === 3 && masterChoices.every(id => pool.includes(id)))
+                this.masteryOfferChoices = masterChoices.slice();
+        }
+        if (!capped) {
+            this.pendingOffer = null;
+            this.masteryOfferChoices = null;
+        }
         this.setPaused(false);
         this.syncHud();
     }
@@ -2528,6 +2540,7 @@ class Game {
         this.textIdx = 0;
         this.aiRespawns = [];
         this.pendingOffer = null;
+        this.masteryOfferChoices = null;
         this.statPoints = 0;
         this.input.abilityQueued = false;
         this.input.firing = false;
