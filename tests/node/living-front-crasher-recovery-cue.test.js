@@ -11,12 +11,12 @@ const file = 'living-front-instincts-v1.12.0.js';
 const source = fs.readFileSync(path.join(root, 'nova-updates', file), 'utf8');
 
 function renderPhase(phase, opts = {}) {
-  const arcs = [], strokes = [], intents = [], saves = [];
+  const arcs = [], strokes = [], intents = [], saves = [], moves = [];
   const ctx = {
     globalAlpha: 1, lineWidth: 1,
     save() { saves.push('save'); },
     restore() { saves.push('restore'); },
-    setTransform() {}, beginPath() {}, moveTo() {}, lineTo() {},
+    setTransform() {}, beginPath() {}, moveTo(...args) { moves.push(args); }, lineTo() {},
     setLineDash() {}, fill() {},
     arc(...args) { arcs.push(args); },
     stroke() { strokes.push({ alpha: this.globalAlpha, width: this.lineWidth }); }
@@ -46,12 +46,14 @@ function renderPhase(phase, opts = {}) {
     cam: { x: 0, y: 0, zoom: 1 }, time: 10,
     __lfState: {}, shapes: [shape] };
   render.render(g, 800, 600);
-  return { arcs, strokes, intents, saves };
+  return { arcs, strokes, intents, saves, moves };
 }
 
 test('recovery has a small, world-space punish cue, absent in other phases', () => {
   const recovering = renderPhase('recover');
   assert.equal(recovering.arcs.length, 2, 'two small hull brackets, not a full-screen ring');
+  assert.equal(recovering.moves.length, 1,
+    'second bracket must begin a new subpath, never draw a connector through the hull');
   assert.equal(recovering.strokes.length, 1);
   assert.ok(recovering.strokes[0].alpha > .10 &&
     recovering.strokes[0].alpha < .40);
