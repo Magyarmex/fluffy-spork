@@ -123,3 +123,18 @@ test('created Star searches bounded terrain-clear opposite-edge routes',()=>{
  assert.equal(rays,101,'no route must exhaust only the bounded search');
  assert.ok(Number.isFinite(blocked.x)&&Number.isFinite(blocked.__lfGoalX));
 });
+
+test('age-23 Star exit uses a terrain-clear point on the same nearest edge',()=>{
+ const LF=boot(),s={id:33,type:'star',kind:'shape',x:1800,y:0,r:24,hp:100,
+  vx:0,vy:0,__lfStarBorn:0,__lfGoalX:-EDGE,__lfGoalY:0};
+ let rays=0;
+ const g={time:24,shapes:[s],tanks:[],bullets:[],
+  isTerrainSafe(){return true;},
+  hasLineOfSight(ax,ay,bx,by){rays++;return by>500;}};
+ LF.behaviorTick(g,{stats:{starsExpired:0,starLifetimeTotal:0},
+  sectors:[{}]}, {},.12);
+ assert.equal(s.__lfExit,true);
+ assert.equal(s.__lfGoalX,EDGE,'nearest right edge remains the exit');
+ assert.ok(s.__lfGoalY>500,'late exit must avoid the blocked transverse point');
+ assert.ok(rays>=2&&rays<=22,'exit search must be bounded');
+});
