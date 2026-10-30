@@ -2620,7 +2620,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
 
 
 /* A bounded cover race is resolvable without global bullet reordering only
- * when an independent non-piercing shot physically breaks the same cover
+ * when an independent low-penetration shot physically breaks the same cover
  * BEFORE a later penetrating shot arrives. Preserve core bullet order and
  * abstain on bodies, shells, interception, uncertain motion and large batches.
  * #147 retains the full multi-projectile chronological contract. */
@@ -2637,7 +2637,7 @@ function certifiedTwoShotCoverPriority(g,dt){
    Number.isFinite(b.ttl)&&b.ttl>=dt;
  }
  if(!ordinary(late)||!ordinary(early)||late.pen<1||late.pen>4||
-    early.pen!==0||
+    (early.pen<0||early.pen>1)||
     g.__novaShapeSweepActive!==true||
     g.__novaFrameStartBulletEpoch!==g.__novaShapeSweepEpoch||
     !Number.isSafeInteger(early.id)||!Number.isSafeInteger(late.id)||
