@@ -18,6 +18,7 @@ on:
       - 'scripts/patch-ai-strafe-timebase.cjs'
       - 'scripts/patch-cosmetic-rng.cjs'
       - 'scripts/patch-audio-rng.cjs'
+      - 'scripts/patch-perk-offer.cjs'
   workflow_dispatch:
 
 permissions:
@@ -74,6 +75,7 @@ jobs:
           node scripts/patch-ai-strafe-timebase.cjs index.html.new
           node scripts/patch-cosmetic-rng.cjs index.html.new
           node scripts/patch-audio-rng.cjs index.html.new
+          node scripts/patch-perk-offer.cjs index.html.new
 
           python3 - <<'PY'
           from pathlib import Path
@@ -178,6 +180,7 @@ jobs:
               'scripts/patch-ai-strafe-timebase.cjs',
               'scripts/patch-cosmetic-rng.cjs',
               'scripts/patch-audio-rng.cjs',
+              'scripts/patch-perk-offer.cjs',
               'pwa-register.js',
               'sw.js',
               'manifest.webmanifest',
