@@ -190,9 +190,11 @@ function frontlineTrace(f,g,kind,mode,amount){
      last.mode===phase&&Number.isFinite(f.harvestStartedAt)&&
      now>=f.harvestStartedAt&&now-f.harvestStartedAt<=.5){
    f.harvestRawXP+=amount;
-   last.xp=+f.harvestRawXP.toFixed(2);
-   last.count=(last.count||1)+1;
-   last.end=+now.toFixed(2);
+   /* Core snapshots shallow-copy the event ring. Replace the event instead
+    * of mutating an object already published to Debug/replay observers. */
+   f.events[f.events.length-1]=Object.assign({},last,{
+    xp:+f.harvestRawXP.toFixed(2),count:(last.count||1)+1,end:+now.toFixed(2)
+   });
    return;
   }
   f.harvestStartedAt=now;f.harvestRawXP=amount;e.count=1;
