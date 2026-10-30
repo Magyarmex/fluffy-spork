@@ -453,3 +453,36 @@ for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['f
   });
  }
 }
+
+/* The safe remote-shell exception must be a true noninterference property,
+ * not just one hand-picked square. Compare identical worlds with and without
+ * a shell that is unable to burst or contact the focal combat corridor. */
+for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['full shipping',FullGame]]){
+ test(label+' 160 seeded independent-shell worlds preserve square and cover outcomes',()=>{
+  let seed=0x6e0a2026;
+  const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+  for(let i=0;i<160;i++){
+   const cfg={hz:[30,60,120,240][i%4],vx:440+Math.floor(rand()*1900),
+    squareX:20+rand()*17,wallX:72+rand()*18,
+    dmg:8+Math.floor(rand()*24),radius:3+rand()*3,
+    pen:i%5,ttl:i%3===0?.004:1,cover:i%4===0,
+    reverseBullets:i%2===0};
+   const a=trial(Game,cfg),b=trial(Game,{...cfg,remoteShell:{
+    x:1800,y:-1800,vx:400,vy:0,ttl:1}});
+   assert.deepEqual([b.square.hp,b.g.__novaTerrain[0].hp,b.g.hits],
+    [a.square.hp,a.g.__novaTerrain[0].hp,a.g.hits],
+    'distant unspent shell must not alter square/cover outcome at seed '+i);
+  }
+ });
+ for(const hz of [30,60,120,240]){
+  test(label+' remote shell preserves physical Scout square then destructible cover at '+hz+'Hz',()=>{
+   const {g,square}=trial(Game,{hz,vx:440,squareX:16.5,squareY:52,
+    wallX:94,wallWidth:180,wallHeight:60,bulletY:32,
+    pen:1,dmg:12,radius:5*(1+12*.0085),ttl:.004,
+    cover:true,remoteShell:true});
+   assert.equal(square.hp,43);
+   assert.equal(g.__novaTerrain[0].hp,288);
+   assert.deepEqual(g.hits,[50]);
+  });
+ }
+}
