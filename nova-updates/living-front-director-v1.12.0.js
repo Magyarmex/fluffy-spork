@@ -178,6 +178,25 @@ function frontlineTrace(f,g,kind,mode,amount){
  }
  var e={t:+now.toFixed(2),kind:kind,sector:f.sector,mode:phase};
  if(Number.isFinite(amount))e.xp=+amount.toFixed(2);
+ /* A dense neutral-orb pickup burst must not evict the announcement, entry
+  * and visible contest that explain it. Coalesce only consecutive harvests
+  * in the SAME public sector/phase within 0.5s of the FIRST pickup. A
+  * strategic event, new opportunity, clock reset or phase transition breaks
+  * the group. Raw XP stays in private telemetry until rounded for Debug;
+  * counts.neutralXP and the original gainXP hook remain authoritative. */
+ if(kind==='neutral-harvest'&&Number.isFinite(amount)){
+  var last=f.events[f.events.length-1];
+  if(last&&last.kind==='neutral-harvest'&&last.sector===f.sector&&
+     last.mode===phase&&Number.isFinite(f.harvestStartedAt)&&
+     now>=f.harvestStartedAt&&now-f.harvestStartedAt<=.5){
+   f.harvestRawXP+=amount;
+   last.xp=+f.harvestRawXP.toFixed(2);
+   last.count=(last.count||1)+1;
+   last.end=+now.toFixed(2);
+   return;
+  }
+  f.harvestStartedAt=now;f.harvestRawXP=amount;e.count=1;
+ }else{f.harvestStartedAt=null;f.harvestRawXP=0;}
  f.events.push(e);if(f.events.length>48)f.events.shift();
 }
 function closeFrontline(g,st,reason){
