@@ -166,6 +166,20 @@ for(const optimized of [false,true]){
    assert.deepEqual(g.hits,[50]);
   });
  }
+ /* Tight subframe ordering: correct 9u/s square contact at ~1.551ms,
+  * cover at ~1.638ms. Incorrectly treating the square's full-frame
+  * displacement as occurring within 4ms moves its predicted contact
+  * behind cover at 30/60Hz. */
+ for(const hz of [30,60]){
+  test(mode+' moving square partial-TTL chronology beats near cover at '+hz+'Hz',()=>{
+   const {g,square}=trial(Game,{hz,vx:440,squareX:16.5,squareY:52,
+    wallX:93.2,wallWidth:180,wallHeight:60,bulletY:32,
+    pen:1,dmg:12,radius:5*(1+12*.0085),ttl:.004,
+    cover:true,linearVy:9});
+   assert.equal(square.hp,43);
+   assert.equal(g.__novaTerrain[0].hp,288);
+  });
+ }
  test(mode+' expiring pen=0 shot consumes itself before cover',()=>{
   const {g,square}=trial(Game,{hz:30,ttl:.0035,pen:0,cover:true});
   assert.equal(square.hp,43);
@@ -318,6 +332,16 @@ for(const hz of [30,60,120,240]){
   assert.equal(g.__novaTerrain[0].hp,288);
   assert.deepEqual(g.hits,[50]);
  });
+ if(hz===30||hz===60){
+  test('full shipping stack orders moving square ahead of near cover at '+hz+'Hz',()=>{
+   const {g,square}=trial(FullGame,{hz,vx:440,squareX:16.5,squareY:52,
+    wallX:93.2,wallWidth:180,wallHeight:60,bulletY:32,
+    pen:1,dmg:12,radius:5*(1+12*.0085),ttl:.004,
+    cover:true,linearVy:9});
+   assert.equal(square.hp,43);
+   assert.equal(g.__novaTerrain[0].hp,288);
+  });
+ }
  test('full shipping collision stack honors square before wall at '+hz+'Hz',()=>{
   const {g,square}=trial(FullGame,{hz});
   assert.deepEqual(g.hits,[50]);assert.equal(square.hp,43);
