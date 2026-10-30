@@ -585,7 +585,7 @@ function paint(g){
   recap.setAttribute('data-nova-front-recap','');
   recap.setAttribute('role','note');
   recap.style.cssText='grid-column:1/-1;min-width:0;font:700 '+
-   (window.innerHeight<=400?'8':'9')+
+   (window.innerHeight<=400?'9':'10')+
    'px/1.3 Rajdhani,system-ui;color:#a8c5d8;text-align:center;overflow-wrap:anywhere;';
   recap.textContent=g.__novaFrontlineRecap;
   row.appendChild(recap);
