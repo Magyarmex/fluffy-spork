@@ -89,6 +89,14 @@ const { chromium } = require('playwright');
           JSON.stringify(sample));
         const dir = path.join('artifacts', 'browser');
         fs.mkdirSync(dir, { recursive: true });
+        // Capture the real gameplay canvas separately: the pause modal
+        // intentionally obscures a normal full-page screenshot.
+        const dataUrl = await page.evaluate(() =>
+          window.__novaRecoveryGame.ctx.canvas.toDataURL('image/png'));
+        assert.match(dataUrl, /^data:image\/png;base64,/);
+        fs.writeFileSync(path.join(dir,
+          'crasher-recovery-canvas-' + viewport.width + 'x' + viewport.height + '.png'),
+          Buffer.from(dataUrl.split(',')[1], 'base64'));
         await page.screenshot({ path: path.join(dir,
           'crasher-recovery-' + viewport.width + 'x' + viewport.height + '.png') });
         assert.deepEqual(errors, [], 'no Chromium runtime errors');
