@@ -65,7 +65,8 @@ function boot(optimized,full=false){
 }
 function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
   squareY=0,wallY=0,born=false,moved=false,teleport=false,extraBullet=false,
-  extraTank=false,fragile=false,pen=1,extraSquare=false,cover=false}={}){
+  extraTank=false,fragile=false,pen=1,extraSquare=false,cover=false,
+  dmg=12,radius=3}={}){
  const g=new Game();
  const square={kind:'shape',id:50,type:'square',x:squareX,y:squareY,r:20,hp:fragile?10:55};
  if(born)square.born=g.time;
@@ -75,7 +76,7 @@ function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
  g.__novaTerrain=[{id:-51,shape:'rect',x:wallX,y:wallY,w:8,h:80,
   solid:true,destructible:cover,hp:cover?300:0}];
  g.bullets=[{kind:'bullet',id:10,ownerId:1,x:0,y:0,vx,vy:0,
-  r:3,dmg:12,ttl:1,pen,hits:0,dead:false,shell:false,beam:false,splash:0}];
+  r:radius,dmg,ttl:1,pen,hits:0,dead:false,shell:false,beam:false,splash:0}];
  if(extraBullet)g.bullets.push({kind:'bullet',id:11,ownerId:3,
   x:extraBullet==='remote'?1000:0,y:extraBullet==='remote'?1000:0,vx:0,vy:0,r:3,dmg:20,ttl:1,pen:0,hits:0,dead:false});
  if(extraTank)g.tanks.push({kind:'tank',id:2,cls:'scout',alive:true,hp:100,x:30,y:0});
@@ -156,8 +157,18 @@ for(const optimized of [false,true]){
   assert.equal(square.hp,43);assert.deepEqual(g.hits,[50]);
   assert.equal(g.__novaTerrain[0].solid,true);
  });
- test(mode+' pen=2 rounds defer to full chronology',()=>{
+ test(mode+' pen=2 round hits square then permanent wall',()=>{
   const {g,square}=trial(Game,{pen:2});
+  assert.equal(square.hp,43);assert.deepEqual(g.hits,[50]);
+ });
+ test(mode+' canonical 1500u/s pen=4 sniper hits square before permanent wall',()=>{
+  const {g,square}=trial(Game,{hz:30,vx:1500,squareX:28,wallX:55,
+    pen:4,dmg:47,radius:5.8});
+  assert.equal(square.hp,8);assert.deepEqual(g.hits,[50]);
+ });
+ test(mode+' pen=4 destructible wall retains legacy arbitration',()=>{
+  const {g,square}=trial(Game,{hz:30,vx:1500,squareX:28,wallX:55,
+    pen:4,dmg:47,radius:5.8,cover:true});
   assert.equal(square.hp,55);assert.deepEqual(g.hits,[]);
  });
  test(mode+' competing tank before square preserves original arbitration',()=>{
