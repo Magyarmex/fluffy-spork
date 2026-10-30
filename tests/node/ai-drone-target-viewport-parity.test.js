@@ -96,3 +96,15 @@ test('dense AI fallback avoids viewport work for out-of-leash tanks',()=>{
   assert.equal(h.acquire(),visible);
   assert.equal(calls,1,'100 out-of-leash rivals must not trigger viewport checks');
 });
+
+test('fresh Sniper Forward Observer relay remains a legitimate off-viewport exception',()=>{
+  const off=enemy(2,200),shape={kind:'shape',id:3,x:70,y:0,hp:20};
+  const h=boot(off);h.g.time=5;h.g.tanks.push(off);h.g.shapes.push(shape);
+  h.owner.cls='marksman';h.owner.__novaSpotterContactId=off.id;
+  h.owner.__novaSpotterContactUntil=6;
+  assert.equal(h.acquire(),off,'fresh public relay can guide a Sniper-gene drone');
+  h.owner.__novaSpotterContactUntil=4;
+  assert.equal(h.acquire(),shape,'expired relay is not live global radar');
+  h.owner.__novaSpotterContactUntil=6;h.owner.cls='twin';
+  assert.equal(h.acquire(),shape,'non-Sniper cannot inherit a spoofed relay');
+});
