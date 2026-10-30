@@ -167,7 +167,16 @@ function publicBloom(st,now){
 /* Frontlines research telemetry: observation only. No authority over movement,
  * damage, Director decisions, player HUD, or AI information. */
 function frontlineTrace(f,g,kind,mode,amount){
- var e={t:+(Number(g.time)||0).toFixed(2),kind:kind,sector:f.sector,mode:mode||'memory'};
+ var now=Number(g&&g.time)||0,phase=mode;
+ /* A missing explicit AI mode is not necessarily stale memory. Classify
+  * player entry, observed contest and actual neutral XP by the SAME public
+  * BLOOM window that authorized them; never label a live event as memory. */
+ if(!phase){
+  var op=publicBloom(g&&g.__lfState,now);
+  phase=op&&op.sector===f.sector&&op.announcedAt===f.announcedAt?
+   (op.live?'live':'memory'):'ended';
+ }
+ var e={t:+now.toFixed(2),kind:kind,sector:f.sector,mode:phase};
  if(Number.isFinite(amount))e.xp=+amount.toFixed(2);
  f.events.push(e);if(f.events.length>48)f.events.shift();
 }
