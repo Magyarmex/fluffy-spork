@@ -65,7 +65,7 @@ function boot(optimized,full=false){
 }
 function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
   squareY=0,wallY=0,born=false,moved=false,teleport=false,extraBullet=false,
-  extraTank=false,fragile=false,pen=0,extraSquare=false}={}){
+  extraTank=false,fragile=false,pen=1,extraSquare=false}={}){
  const g=new Game();
  const square={kind:'shape',id:50,type:'square',x:squareX,y:squareY,r:20,hp:fragile?10:55};
  if(born)square.born=g.time;
@@ -139,8 +139,13 @@ for(const optimized of [false,true]){
   const {g,square}=trial(Game,{fragile:true});
   assert.equal(square.hp,10);assert.deepEqual(g.hits,[]);
  });
- test(mode+' piercing rounds keep existing wall arbitration',()=>{
-  const {g,square}=trial(Game,{pen:1});
+ test(mode+' pen=0 square hit consumes bullet before later wall',()=>{
+  const {g,square}=trial(Game,{pen:0});
+  assert.equal(square.hp,43);assert.deepEqual(g.hits,[50]);
+  assert.equal(g.__novaTerrain[0].solid,true);
+ });
+ test(mode+' pen=2 rounds defer to full chronology',()=>{
+  const {g,square}=trial(Game,{pen:2});
   assert.equal(square.hp,55);assert.deepEqual(g.hits,[]);
  });
  test(mode+' competing tank before square preserves original arbitration',()=>{
