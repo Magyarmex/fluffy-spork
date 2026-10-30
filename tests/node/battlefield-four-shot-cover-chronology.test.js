@@ -130,10 +130,10 @@ for(const optimized of [false,true]){
 
 for(const optimized of [false,true]){
  const Game=boot(optimized),label=optimized?'full shipping overlays':'Battlefield';
- test(label+': second physical cover breaker receives the single structural reward',()=>{
+ test(label+': third physical cover breaker receives the single structural reward',()=>{
   for(const order of ['ABCF','FABC','FCBA']){
    const r=trial4(Game,order,30,{credit:true});
-   assert.deepEqual(r.coverXP,[[5,18]],'cover break belongs to B in '+order);
+   assert.deepEqual(r.coverXP,[[5,18]],'cover break belongs to C in '+order);
   }
  });
 }
