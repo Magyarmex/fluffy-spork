@@ -22,7 +22,7 @@ function boot(){
     addEventListener:noop,removeEventListener:noop,
     localStorage:{getItem:()=>null,setItem:noop},setTimeout,clearTimeout,performance};
   window.window=window;
-  const ctx=vm.createContext({window,document,Math,Number,Object,Array,Date,Map,Set,
+  const ctx=vm.createContext({window,document,innerWidth:320,innerHeight:240,Math,Number,Object,Array,Date,Map,Set,
     WeakMap,Uint8Array,Uint8ClampedArray,ArrayBuffer,Promise,JSON,Symbol,Error,
     TypeError,RegExp,String,Boolean,Infinity,NaN,parseInt,parseFloat,isNaN,
     performance,setTimeout,clearTimeout,setInterval:()=>0,clearInterval:noop,
