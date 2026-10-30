@@ -73,6 +73,37 @@ async function scenario(browser, label, options) {
     assert.equal(menu.ecology,true,label+': browser must load Living Front owner');
     assert.equal(menu.decorative,true,label+': War Room must be visible');
     assert.equal(menu.active,false,label+': War Room must not impersonate active game');
+    if(label==='mobile-320'){
+      // Assert the actual shipping React lobby, not just the isolated menu
+      // module: the historical Signal Flow overlay must not relabel the
+      // current Living Front release or churn the footer on unrelated updates.
+      await page.waitForFunction(() => window.NOVALobby?.version === '1.12.0' &&
+        document.querySelector('[data-nova-slot="footer"]')?.textContent.includes('v1.12.0'),
+        {timeout:15000});
+      const footerAudit=await page.evaluate(async()=>{
+        const menu=document.querySelector('#root .menu-grid-bg');
+        const footer=menu?.querySelector('[data-nova-slot="footer"]');
+        if(!menu||!footer)return {error:'shipping lobby footer missing'};
+        let writes=0;
+        const observer=new MutationObserver(records=>{writes+=records.length;});
+        observer.observe(footer,{childList:true,characterData:true,subtree:true});
+        const marker=document.createComment('release-footer-observer-probe');
+        menu.appendChild(marker);
+        try{await new Promise(resolve=>setTimeout(resolve,450));}
+        finally{observer.disconnect();marker.remove();}
+        return {text:footer.textContent,writes,connected:footer.isConnected,
+          lobbyVersion:window.NOVALobby?.version,menuModule:window.NOVAMenuExperience?.version};
+      });
+      assert.ok(!footerAudit.error&&footerAudit.connected,
+        label+': canonical release footer must remain mounted: '+JSON.stringify(footerAudit));
+      assert.equal(footerAudit.text,'NOVA TANKS v1.12.0 · SIGNAL FLOW · EVOLVE · ADAPT · ASCEND',
+        label+': current release and historical styling must coexist');
+      assert.equal(footerAudit.menuModule,'1.7.8',
+        label+': historical menu module version remains independent');
+      assert.equal(footerAudit.writes,0,
+        label+': unrelated menu mutation must not rewrite the stable footer: '+JSON.stringify(footerAudit));
+      console.log('NOVA_CURRENT_RELEASE_FOOTER '+JSON.stringify(footerAudit));
+    }
     await page.screenshot({path:path.join(output,label+'-menu.png')});
 
     if(label==='mobile-320'){
