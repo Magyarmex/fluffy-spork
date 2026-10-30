@@ -79,14 +79,21 @@ function boot(optimized){
 }
 function trial(Game,{hz=30,reverse=false,competitor=true,cover=true,
  competitorY=70,competitorX=120,coverHp=1,pen=2,
- shell=false,remoteBullet=false,newborn=false}={}){
+ shell=false,remoteBullet=false,newborn=false,remoteShapes=0}={}){
  const g=new Game(),dt=1/hz;
  const tank={kind:'tank',id:2,cls:'scout',x:110,y:0,hp:100,alive:true,
   __novaSweepMoveTime:1,__novaSweepPrevX:110,__novaSweepPrevY:0};
  const square={kind:'shape',id:50,type:'square',x:40,y:0,r:20,hp:55,
   __novaShapeSweepEpoch:1,__novaShapeSweepPrevX:40,__novaShapeSweepPrevY:0};
  g.tanks=[tank];g.shapes=[square];
- if(typeof g.hash.insert==='function'){g.hash.insert(tank);g.hash.insert(square);}
+ for(let i=0;i<remoteShapes;i++){
+  const x=-1700+(i%20)*35,y=1300+Math.floor(i/20)*35;
+  g.shapes.push({kind:'shape',id:200+i,type:'circle',x,y,r:12,hp:14,
+   __novaShapeSweepEpoch:1,__novaShapeSweepPrevX:x,__novaShapeSweepPrevY:y});
+ }
+ if(typeof g.hash.insert==='function'){
+  g.hash.insert(tank);for(const shape of g.shapes)g.hash.insert(shape);
+ }
  if(cover)g.__novaTerrain=[{id:-1,shape:'rect',x:80,y:0,
   w:10,h:160,solid:true,destructible:true,hp:coverHp,maxHp:300}];
  const focal={kind:'bullet',id:10,ownerId:1,x:0,y:0,vx:2500,vy:0,
@@ -118,6 +125,12 @@ for(const optimized of [false,true]){
    }
   });
  }
+ test(label+': 120 unrelated neutral shapes do not erase a certified local breach',()=>{
+  const r=trial(Game,{remoteShapes:120});
+  assert.equal(r.squareHp,43);
+  assert.equal(r.tankHp,88);
+  assert.equal(r.coverHp,0);
+ });
  test(label+': no competing breaker retains cover protection',()=>{
   const r=trial(Game,{competitor:false});
   assert.equal(r.tankHp,100);
