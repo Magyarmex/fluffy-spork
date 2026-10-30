@@ -125,8 +125,10 @@ test('compiled React PerkOffer reuses the same three choices across modal remoun
   const tree=(type,props,...children)=>({type,props:props||{},children});
   const pool=['dmg','speed','vitality','alacrity','thorns','wealth'];
   const perks=Object.fromEntries(pool.map(id=>[id,{name:id,icon:'+',desc:id}]));
-  const Component=new Function('React','react_1','classes_1',
-    fixed.slice(start,end)+'\nreturn PerkOffer;')({createElement:tree},{useMemo:fn=>fn()},{PERKS:perks});
+  let randomDraws=0;
+  const fakeMath={floor:Math.floor,random:()=>{randomDraws++;return .41;}};
+  const Component=new Function('React','react_1','classes_1','Math',
+    fixed.slice(start,end)+'\nreturn PerkOffer;')({createElement:tree},{useMemo:fn=>fn()},{PERKS:perks},fakeMath);
   const buttons=root=>{
     const found=[];const visit=x=>{
       if(!x||typeof x!=='object')return;
@@ -137,12 +139,14 @@ test('compiled React PerkOffer reuses the same three choices across modal remoun
   let saved;
   const first=buttons(Component({onPick:()=>{},onLater:choices=>{saved=choices;}}));
   assert.equal(first.length,4);
+  assert.equal(randomDraws,3,'new mastery offer consumes exactly three uniform draws');
   assert.equal(new Set(first.slice(0,3).map(b=>b.props.key)).size,3);
   first[3].props.onClick();
   assert.equal(saved.length,3);
   const {g}=boot(Fixed,45);g.dismissOffer(saved);
   const reopened=buttons(Component({savedChoices:g.masteryOfferChoices,onPick:()=>{},onLater:()=>{}}));
   assert.deepEqual(reopened.slice(0,3).map(b=>b.props.key),first.slice(0,3).map(b=>b.props.key));
+  assert.equal(randomDraws,3,'same capped offer must not consume any reroll RNG');
   assert.equal(reopened.length,4);
 });
 test('materializer patch is fail-closed, idempotent, and does not alter unrelated shell',()=>{
