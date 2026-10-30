@@ -2300,8 +2300,12 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      !(wall.hit.t>1e-6&&wall.hit.t<=1))return false;
   var tanks=g.tanks||[],shapes=g.shapes||[],drones=g.drones||[],
       shots=g.bullets||[];
-  if(tanks.length+shapes.length+drones.length+shots.length>300||
-     shots.length>128)return false;
+  /* Preserve the independent 260-body safety limit, but never let
+   * geographically unrelated shots erase an earlier square contact.
+   * Every shot still receives the full swept-corridor/victim veto below;
+   * cap total scan work at 600 rather than selecting the first N shots. */
+  var bodyCount=tanks.length+shapes.length+drones.length;
+  if(bodyCount>260||bodyCount+shots.length>600)return false;
   var dx=ex-ax,dy=ey-ay,A=dx*dx+dy*dy,wallT=wall.hit.t;
   if(!(A>1e-12)||!Number.isFinite(A)||
      Math.max(Math.abs(ax),Math.abs(ay),Math.abs(ex),Math.abs(ey))>=MAP_LIMIT-20)
