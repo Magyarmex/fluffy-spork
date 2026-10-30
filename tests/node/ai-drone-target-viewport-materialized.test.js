@@ -78,7 +78,7 @@ for(const hz of [30,60,120,240]){
     assert.equal(window.__NOVA_FAIR_ENGAGEMENT__.inGameplayViewport(g,owner,hidden),false);
     assert.equal(g.acquireDroneTarget(drone,owner,500),visible,
       'offscreen native tank must not win against a legitimate visible opponent');
-    g.testCandidates=[hidden];
+    g.testCandidates=[hidden];g.tanks=[owner,hidden];g.tankById.delete(visible.id);
     assert.equal(g.acquireDroneTarget(drone,owner,500),null,
       'offscreen-only tank may not become AI drone target');
     g.cam.zoom=.75;
