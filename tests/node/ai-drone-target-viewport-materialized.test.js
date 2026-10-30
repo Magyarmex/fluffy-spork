@@ -39,7 +39,7 @@ function boot(){
     fs.readFileSync(path.join(root,file),'utf8'),ctx,{filename:file,timeout:5000});
   const Game=window.__novaMakeRequire('')('game/engine').Game;
   const g=Object.create(Game.prototype);
-  const owner={id:1,kind:'tank',cls:'carrier',team:'blue',alive:true,
+  const owner={id:1,kind:'tank',cls:'twin',gene:'controller',team:'blue',alive:true,
     hp:100,maxHp:100,x:0,y:0,ai:{state:'farm'},isPlayer:false};
   const drone={id:10,kind:'drone',ownerId:1,x:180,y:0,hp:20,r:8,role:'hunter',leash:500};
   g.w=320;g.h=240;g.cam={zoom:1};g.time=5;g.tanks=[owner];g.drones=[drone];
@@ -56,7 +56,7 @@ function tank(id,x,isPlayer=false){
     maxHp:100,spawnShieldT:0,x,y:0,isPlayer};
 }
 for(const hz of [30,60,120,240]){
-  test('materialized AI drone fair viewport '+hz+'Hz',()=>{
+  test('materialized AI gene-drone fair viewport '+hz+'Hz',()=>{
     const {g,owner,drone,window}=boot();
     const hidden=tank(2,200),visible=tank(3,100);
     g.tanks.push(hidden,visible);g.tankById.set(2,hidden);g.tankById.set(3,visible);
@@ -72,7 +72,7 @@ for(const hz of [30,60,120,240]){
       'zooming out reveals the same tank without changing its identity');
     g.cam.zoom=1;g.w=320;owner.isPlayer=true;owner.ai=null;
     assert.equal(g.acquireDroneTarget(drone,owner,500),hidden,
-      'human Controller autonomous target behavior stays unchanged');
+      'human gene-grafted autonomous target behavior stays unchanged');
     void hz;
   });
 }
