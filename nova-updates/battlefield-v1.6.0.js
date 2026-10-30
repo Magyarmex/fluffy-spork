@@ -1196,14 +1196,16 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    }
   }
   /* A TTL-expiring piercing shot can hit a square and then cover before
-   * expiry. This one-hit fallback otherwise kills it after the square,
-   * losing the legitimate later cover event. Hand off ONLY when the later
-   * terrain pre-pass can independently certify the full square->wall
-   * chronology. Single-shot proof prevents intervening array-order changes.
-   * If the dry run abstains, preserve this original first-hit recovery. */
+   * expiry. The one-hit fallback otherwise kills it after the square,
+   * losing the legitimate later cover event. The later terrain pre-pass
+   * must independently certify the full square->wall chronology.
+   * Do not require global single-shot isolation: the dry-run proof scans
+   * ALL competing shots and vetoes local contact, victim/cover threats,
+   * dead/relocated shots and uncertain ordering. The terrain owner repeats
+   * that proof after any earlier pre-pass side effects. If either proof
+   * abstains, preserve the original conservative first-hit recovery. */
   if(best.kind==='shape'&&best.e.type==='square'&&
-     b.pen>=1&&(b.hits||0)===0&&
-     (g.bullets||[]).length===1){
+     b.pen>=1&&(b.hits||0)===0){
    var expiryX=ax+dx*limit,expiryY=ay+dy*limit,
        laterWall=firstSolidHit(g,ax,ay,expiryX,expiryY,(b.r||2)*.45);
    if(laterWall&&laterWall.hit&&
