@@ -44,7 +44,11 @@ const { chromium } = require('playwright');
           const cr = g.shapes.find(s => s?.type === 'crasher' &&
             !oldIds.has(s.id));
           if (!cr) throw Error('canonical Crasher spawn unavailable');
-          cr.x = g.cam.x; cr.y = g.cam.y;
+          // Keep the recovery cue separate from the player's own hull so
+          // the raw-canvas screenshot can actually be judged visually.
+          const zoom = g.cam.zoom || 1;
+          cr.x = g.cam.x + 80 / zoom;
+          cr.y = g.cam.y - 35 / zoom;
           cr.hp = Math.max(cr.hp, 95); cr.__lfBounty = 0;
           const original = CanvasRenderingContext2D.prototype.arc;
           const captures = [];
