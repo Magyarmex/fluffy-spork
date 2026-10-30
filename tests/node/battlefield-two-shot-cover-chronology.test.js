@@ -79,15 +79,15 @@ function boot(optimized){
 }
 function trial(Game,{hz=30,reverse=false,competitor=true,cover=true,
  competitorY=70,competitorX=120,coverHp=1,pen=2,
- shell=false,remoteBullet=false,newborn=false,remoteShapes=0,liveDrone=false,competitorPen=1,postCoverTank=false}={}){
+ shell=false,remoteBullet=false,newborn=false,remoteShapes=0,liveDrone=false,competitorPen=1,postCoverSquare=false}={}){
  const g=new Game(),dt=1/hz;
  const tank={kind:'tank',id:2,cls:'scout',x:110,y:0,hp:100,alive:true,
   __novaSweepMoveTime:1,__novaSweepPrevX:110,__novaSweepPrevY:0};
  const square={kind:'shape',id:50,type:'square',x:40,y:0,r:20,hp:55,
   __novaShapeSweepEpoch:1,__novaShapeSweepPrevX:40,__novaShapeSweepPrevY:0};
- const behind=postCoverTank?{kind:'tank',id:4,cls:'scout',x:45,y:70,hp:100,alive:true,
-  __novaSweepMoveTime:1,__novaSweepPrevX:45,__novaSweepPrevY:70}:null;
- g.tanks=behind?[tank,behind]:[tank];g.shapes=[square];
+ const behind=postCoverSquare?{kind:'shape',id:51,type:'square',x:45,y:70,r:12,hp:55,
+  __novaShapeSweepEpoch:1,__novaShapeSweepPrevX:45,__novaShapeSweepPrevY:70}:null;
+ g.tanks=[tank];g.shapes=behind?[square,behind]:[square];
  if(liveDrone)g.drones.push({kind:'drone',id:80,ownerId:7,x:1700,y:1700,
   r:8,hp:20,__novaChronoDroneEpoch:1,
   __novaChronoDronePrevX:1700,__novaChronoDronePrevY:1700});
@@ -117,7 +117,7 @@ function trial(Game,{hz=30,reverse=false,competitor=true,cover=true,
  }
  return {tankHp:tank.hp,squareHp:square.hp,coverHp:g.__novaTerrain[0]?.hp,
   hits:g.hits,pen:focal.pen,coverBroken:g.__novaBattlefield.coverBroken,
-  postCoverTankHp:behind?.hp};
+  postCoverSquareHp:behind?.hp};
 }
 for(const optimized of [false,true]){
  const Game=boot(optimized),label=optimized?'full shipping overlay stack':'Battlefield';
@@ -133,13 +133,13 @@ for(const optimized of [false,true]){
   });
  }
  for(const hz of [30,60,120,240]){
-  test(label+': pen=1 breaker dies at cover and cannot hit a tank behind it at '+hz+'Hz',()=>{
+  test(label+': pen=1 breaker stops before a witnessed Square behind cover at '+hz+'Hz',()=>{
    for(const reverse of [false,true]){
-    const r=trial(Game,{hz,reverse,postCoverTank:true});
+    const r=trial(Game,{hz,reverse,postCoverSquare:true});
     assert.equal(r.squareHp,43);
     assert.equal(r.coverHp,0);
     assert.equal(r.tankHp,88,'the later shot reaches its legitimate target');
-    assert.equal(r.postCoverTankHp,100,'the spent breaker cannot pass through cover');
+    assert.equal(r.postCoverSquareHp,55,'the spent breaker cannot damage a Square behind cover');
     assert.deepEqual(r.hits.map(h=>h[0]),['shape','tank']);
    }
   });
