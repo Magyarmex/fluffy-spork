@@ -2736,18 +2736,18 @@ function certifiedTwoShotCoverPriority(g,dt){
  return [1,0];
 }
 
-/* A strictly bounded three-shot cover race: two ordinary pen<=1 shots
- * damage and then destroy one cover BEFORE a third shot arrives. Only
- * reorder the terrain pre-pass after proving all three first contacts,
- * disjoint projectile corridors and absence of earlier body contacts.
- * General multi-shot/shell/drone chronology remains #147. */
-function certifiedThreeShotCoverPriority(g,dt){
+/* A bounded 3..8-shot cover race: N-1 ordinary pen<=1 shots
+ * progressively damage and then destroy one cover BEFORE the final
+ * penetrating shot arrives. Only reorder the terrain pre-pass after
+ * proving all first contacts, disjoint swept corridors, and no earlier
+ * body contact. This is NOT a general projectile event queue (#147). */
+function certifiedMultiShotCoverPriority(g,dt){
  var bs=g.bullets;
- if(!bs||bs.length!==3||!(dt>0&&dt<=.05)||
+ if(!bs||bs.length<3||bs.length>8||!(dt>0&&dt<=.05)||
     g.__novaShapeSweepActive!==true||
     g.__novaFrameStartBulletEpoch!==g.__novaShapeSweepEpoch)return null;
  var contacts=[],cover=null;
- for(var i=0;i<3;i++){
+ for(var i=0;i<bs.length;i++){
   var b=bs[i];
   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
      (b.hits||0)!==0||(b.knock||0)!==0||
@@ -2771,13 +2771,22 @@ function certifiedThreeShotCoverPriority(g,dt){
   contacts.push({i:i,b:b,ax:b.x,ay:b.y,ex:ex,ey:ey,t:hit.hit.t});
  }
  contacts.sort(function(a,b){return a.t-b.t;});
- var a=contacts[0],b=contacts[1],f=contacts[2];
- if(!(a.t+1e-6<b.t&&b.t+1e-6<f.t)||
-    a.b.pen>1||b.b.pen>1||f.b.pen<1||
-    !(cover.hp>a.b.dmg&&cover.hp<=a.b.dmg+b.b.dmg))return null;
+ var damage=0,priorDamage=0;
+ if(contacts[contacts.length-1].b.pen<1)return null;
+ for(var ci=0;ci<contacts.length;ci++){
+  var shot=contacts[ci];
+  if(ci>0&&!(contacts[ci-1].t+1e-6<shot.t))return null;
+  if(ci===contacts.length-1)break;
+  if(shot.b.pen>1)return null;
+  if(ci===contacts.length-2)priorDamage=damage;
+  damage+=shot.b.dmg;
+ }
+ /* Only the last breaker may destroy the cover. Every earlier breaker
+  * must strike intact cover and stop; the follower arrives afterward. */
+ if(!(cover.hp>priorDamage&&cover.hp<=damage))return null;
  /* Disjoint swept AABBs rule out all projectile interceptions, even
   * between two bullets moving in opposite directions. */
- for(var j=0;j<3;j++)for(var k=j+1;k<3;k++){
+ for(var j=0;j<contacts.length;j++)for(var k=j+1;k<contacts.length;k++){
   var p=contacts[j],q=contacts[k],pad=p.b.r+q.b.r+2;
   if(!(Math.max(p.ax,p.ex)+pad<Math.min(q.ax,q.ex)||
        Math.max(q.ax,q.ex)+pad<Math.min(p.ax,p.ex)||
@@ -2809,7 +2818,7 @@ function certifiedThreeShotCoverPriority(g,dt){
        radius=group===0?CLASSES[e.cls].size+3:e.r,
        speed=Math.hypot(e.vx||0,e.vy||0);
    if(!Number.isFinite(motion)||!Number.isFinite(speed))return null;
-   for(var c=0;c<3;c++){
+   for(var c=0;c<contacts.length;c++){
     var shot=contacts[c],dx=(shot.ex-shot.ax)*shot.t,
         dy=(shot.ey-shot.ay)*shot.t,len=dx*dx+dy*dy,
         bound=radius+shot.b.r+8+motion+speed*dt*2;
@@ -3042,7 +3051,7 @@ function certifiedThreeShotCoverPriority(g,dt){
     }else isolatedTTLStationaryPiercingChain(this,liveBullet,dt,true);
    }
   }
- var terrainOrder=certifiedTwoShotCoverPriority(this,dt)||certifiedThreeShotCoverPriority(this,dt);for(var terrainStep=0;terrainStep<this.bullets.length;terrainStep++){var i=terrainOrder?terrainOrder[terrainStep]:terrainStep;var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,sweepDt=dt;/* Terrain beyond physical projectile lifetime is unreachable, including shells. */if(Number.isFinite(b.ttl)){if(b.ttl<=0)continue;sweepDt=Math.min(dt,b.ttl);}var nx=ox+(b.vx||0)*sweepDt,ny=oy+(b.vy||0)*sweepDt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;if(fuseDefinitelyBeforeTerrain(this,b,dt,ox,oy,nx,ny,fh.hit))continue;if(certifiedTankBeforeFirstSolid(this,b,dt,ox,oy,nx,ny,fh)===1)continue;if(certifiedSquareBeforeFirstSolid(this,b,dt,ox,oy,nx,ny,fh)===1)continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){/* Integrity belongs to the launch build, not the post-breach pen. */if(this.initBulletIntegrity)this.initBulletIntegrity(b);b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){if(certifiedBreachLaterSolid(this,b,dt,ox,oy,nx,ny,fh))continue;b.__novaBreachAtTime=this.time;b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
+ var terrainOrder=certifiedTwoShotCoverPriority(this,dt)||certifiedMultiShotCoverPriority(this,dt);for(var terrainStep=0;terrainStep<this.bullets.length;terrainStep++){var i=terrainOrder?terrainOrder[terrainStep]:terrainStep;var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,sweepDt=dt;/* Terrain beyond physical projectile lifetime is unreachable, including shells. */if(Number.isFinite(b.ttl)){if(b.ttl<=0)continue;sweepDt=Math.min(dt,b.ttl);}var nx=ox+(b.vx||0)*sweepDt,ny=oy+(b.vy||0)*sweepDt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;if(fuseDefinitelyBeforeTerrain(this,b,dt,ox,oy,nx,ny,fh.hit))continue;if(certifiedTankBeforeFirstSolid(this,b,dt,ox,oy,nx,ny,fh)===1)continue;if(certifiedSquareBeforeFirstSolid(this,b,dt,ox,oy,nx,ny,fh)===1)continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){/* Integrity belongs to the launch build, not the post-breach pen. */if(this.initBulletIntegrity)this.initBulletIntegrity(b);b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){if(certifiedBreachLaterSolid(this,b,dt,ox,oy,nx,ny,fh))continue;b.__novaBreachAtTime=this.time;b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
    /* The core still advances a dead bullet before removing it; a shell may
      * expire or leave the arena in that pass. Consume its one-time burst now. */
     if(b.shell&&this.clusterBurst){var childStart=this.bullets.length;this.clusterBurst(b);clearTerrainBurstChildren(this,s,h,childStart);b.shell=false;}if(b.splash&&this.splashAt)this.splashAt(h.x,h.y,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.dead=true;if(this.addFlash)this.addFlash(h.x,h.y,s.destructible?'#8fd4ff':'#b9c7e7',Math.min(46,14+(b.dmg||0)*.24));if(this.cam&&b.dmg>42)this.cam.shake=Math.max(this.cam.shake,.08);/* The materialized core still advances dead bullets before removing them. Freeze a terrain-killed projectile at its impact so its final trail cannot leak through cover. Breaching live shots keep their velocity above. */b.vx=0;b.vy=0;
