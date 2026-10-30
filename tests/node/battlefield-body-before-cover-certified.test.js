@@ -89,7 +89,8 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,l
  shield=false,otherTank=false,ttl=1,pen=1,radius=3,laterWall=null,
  active=true,knock=0,allied=false,destructible=false,damage=10,
  linearMove=null,tamperMove=false,doubleMove=false,
- otherNearMovingStart=false,bornThisFrame=false,coverHp=1000}={}){
+ otherNearMovingStart=false,bornThisFrame=false,coverHp=1000,
+ shellInterception=false,secondShell=false}={}){
  const g=new Game(),dt=1/fps;
  g.__novaBattlefield={coverBroken:0};
  g.__novaShapeSweepActive=active;
@@ -129,6 +130,11 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,l
    shell:true,splash:cfg.splash??100,
    __v17Cannon:cfg.cannon||false,__v17FuseDist:cfg.fuse||0});
  }
+ if(shellInterception)g.bullets.push({kind:'bullet',id:13,ownerId:8,
+  x:0,y:1000,vx:0,vy:0,r:3,dmg:10,ttl:1,pen:0,hits:0,dead:false});
+ if(secondShell)g.bullets.push({kind:'bullet',id:14,ownerId:9,
+  x:-1400,y:-1400,vx:400,vy:0,r:9,dmg:10,ttl:1,pen:1,
+  hits:0,dead:false,shell:true,splash:100});
  /* Separate remote lanes by more than the native projectile-pair radius.
   * They are independent fire, not an artificial pile of overlapping shots. */
  for(let i=0;i<remoteBullets;i++)g.bullets.push({kind:'bullet',id:100+i,
@@ -208,6 +214,18 @@ for(const optimized of [false,true]){
    assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
   });
  }
+ test(label+': ordinary moving remote shell remains independent',()=>{
+  const r=run(boot(optimized),{otherShell:{vx:420,vy:0}});
+  assert.deepEqual(r.hits,[2]);assert.equal(r.hp,90);
+ });
+ test(label+': two separated unspent shells remain independent',()=>{
+  const r=run(boot(optimized),{otherShell:true,secondShell:true});
+  assert.deepEqual(r.hits,[2]);assert.equal(r.hp,90);
+ });
+ test(label+': shell threatened by another projectile fails closed',()=>{
+  const r=run(boot(optimized),{otherShell:true,shellInterception:true});
+  assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
+ });
  for(const cfg of [{ttl:.001},{vy:-30000},{cannon:true},{fuse:20},
   {y:350},{x:0,y:0}]){
   test(label+': shell hazard fails closed '+JSON.stringify(cfg),()=>{
