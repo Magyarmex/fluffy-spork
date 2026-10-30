@@ -191,9 +191,49 @@ for(const optimized of [false,true]){
    assert.deepEqual(r.hits,[2]);assert.equal(r.hp,90);
   }
  });
- test(label+': dense remote fire stays on canonical collision path',()=>{
+ test(label+': 13-shot remote fire preserves certified hull-before-cover chronology',()=>{
   const r=run(boot(optimized),{remoteBullets:12});
-  assert.deepEqual(r.hits,[],'13-shot frame must not speculate');
+  assert.deepEqual(r.hits,[2],'remote bullets must not erase earlier hull contact');
+  assert.equal(r.hp,90);
+ });
+ for(const fps of [30,60,120,240])for(const remoteBullets of [12,60,120,220]){
+  test(label+': '+remoteBullets+' remote rounds preserve first hull at '+fps+'Hz',()=>{
+   const r=run(boot(optimized),{fps,speed:200*fps,remoteBullets});
+   assert.deepEqual(r.hits,[2],'unrelated projectiles cannot change contact order');
+   assert.equal(r.hp,90);
+   assert.equal(r.g.__novaTerrain[0].solid,true,
+    'later permanent wall still stops the shot');
+  });
+ }
+ test(label+': canonical upgraded Marksman hits before cover with 120 remote shots',()=>{
+  const speed=1050*(1+.085*8),radius=5.5*(1+21*.0085);
+  const r=run(boot(optimized),{fps:30,speed,wall:55,target:29,
+   pen:2,radius,damage:21,remoteBullets:120,destructible:true});
+  assert.deepEqual(r.hits,[2]);
+  assert.equal(r.hp,79);
+  assert.equal(r.g.__novaTerrain[0].hp,979,
+   'cover still receives its later canonical structural damage');
+ });
+ test(label+': nearby competing projectile still vetoes proof amid remote fire',()=>{
+  const r=run(boot(optimized),{remoteBullets:24,otherBullet:true});
+  assert.deepEqual(r.hits,[],'local projectile interception remains ambiguous');
+ });
+ test(label+': remote shell still vetoes first-contact proof',()=>{
+  const r=run(boot(optimized),{remoteBullets:24,otherShell:true});
+  assert.deepEqual(r.hits,[],'shell side effects require separate arbitration');
+ });
+ test(label+': earlier neutral still vetoes proof amid remote fire',()=>{
+  const r=run(boot(optimized),{remoteBullets:24,otherShape:true});
+  assert.deepEqual(r.hits,[]);
+ });
+ test(label+': wall before hull remains protective amid remote fire',()=>{
+  const r=run(boot(optimized),{remoteBullets:24,wall:25,target:90});
+  assert.deepEqual(r.hits,[]);
+  assert.equal(r.hp,100);
+ });
+ test(label+': combined 260-entity budget still fails closed',()=>{
+  const r=run(boot(optimized),{remoteBullets:260});
+  assert.deepEqual(r.hits,[],'over-budget proof must use legacy path');
  });
  test(label+': no live movement epoch never authorizes early damage',()=>{
   assert.deepEqual(run(boot(optimized),{active:false}).hits,[]);
