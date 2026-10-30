@@ -2817,7 +2817,7 @@ function certifiedMultiShotCoverPriority(g,dt){
   var move=Math.hypot(dr.x-dr.__novaChronoDronePrevX,
                       dr.y-dr.__novaChronoDronePrevY);
   if(!Number.isFinite(move)||move>96)return null;
-  var travel=move+Math.max(2400,dr.speed*4)*dt*2;
+  var travel=move+Math.max(4800,dr.speed*8)*dt*2;
   for(var dc=0;dc<contacts.length;dc++){
    var shot=contacts[dc],dx=shot.ex-shot.ax,dy=shot.ey-shot.ay,
        len=dx*dx+dy*dy,rad=dr.r+shot.b.r+8+travel;
