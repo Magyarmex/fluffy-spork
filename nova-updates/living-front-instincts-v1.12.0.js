@@ -107,7 +107,7 @@ function initStar(g,st,s){var e=Math.floor((((Math.sin(s.id*17.3)*999)%1+1)%1)*4
    if(g.hasLineOfSight(pp.x,pp.y,qq.x,qq.y,(s.r||24)+5)){p=pp;q=qq;found=true;break;}
   }
  }
- s.x=p.x;s.y=p.y;s.__lfSector=sectorIndex(s.x,s.y);s.__lfRogue=true;s.__lfStarBorn=g.time||0;s.__lfGoalX=q.x;s.__lfGoalY=q.y;s.__lfGoalEdge=opp;s.wanderT=999;st.stats.starsSpawned++;}
+ s.x=p.x;s.y=p.y;s.__lfSector=sectorIndex(s.x,s.y);s.__lfRogue=true;s.__lfStarBorn=g.time||0;s.__lfGoalX=q.x;s.__lfGoalY=q.y;s.__lfGoalEdge=opp;s.wanderT=999;if(LF.recordStarSpawn)LF.recordStarSpawn(st,s);else st.stats.starsSpawned++;}
 function remove(g,s){var i=g.shapes.indexOf(s),last=g.shapes.length-1;if(i<0)return false;if(i!==last)g.shapes[i]=g.shapes[last];g.shapes.pop();if(g.shapeById)g.shapeById.delete(s.id);return true;}
 function star(g,st,s,defs,now){s.wanderT=999;var age=now-(s.__lfStarBorn==null?now:s.__lfStarBorn);if(age>32){st.stats.starsExpired++;st.stats.starLifetimeTotal+=age;remove(g,s);return false;}if(age>23&&!s.__lfExit){s.__lfExit=true;var e=Math.abs(s.x)>Math.abs(s.y)?(s.x>0?1:0):(s.y>0?3:2),p=starPoint(g,s,e,s.id+211);
  if(g.hasLineOfSight&&!g.hasLineOfSight(s.x,s.y,p.x,p.y,(s.r||24)+5)){
