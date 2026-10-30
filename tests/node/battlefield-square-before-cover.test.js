@@ -66,16 +66,16 @@ function boot(optimized,full=false){
 function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
   squareY=0,wallY=0,born=false,moved=false,teleport=false,extraBullet=false,
   extraTank=false,fragile=false,pen=1,extraSquare=false,cover=false,
-  dmg=12,radius=3,ttl=1,wallHeight=80}={}){
+  dmg=12,radius=3,ttl=1,wallHeight=80,wallWidth=8,bulletY=0}={}){
  const g=new Game();
  const square={kind:'shape',id:50,type:'square',x:squareX,y:squareY,r:20,hp:fragile?10:55};
  if(born)square.born=g.time;
  g.shapes=[square];
  if(extraSquare)g.shapes.push({kind:'shape',id:51,type:'square',
   x:squareX+9,y:squareY,r:20,hp:55});
- g.__novaTerrain=[{id:-51,shape:'rect',x:wallX,y:wallY,w:8,h:wallHeight,
+ g.__novaTerrain=[{id:-51,shape:'rect',x:wallX,y:wallY,w:wallWidth,h:wallHeight,
   solid:true,destructible:cover,hp:cover?300:0}];
- g.bullets=[{kind:'bullet',id:10,ownerId:1,x:0,y:0,vx,vy:0,
+ g.bullets=[{kind:'bullet',id:10,ownerId:1,x:0,y:bulletY,vx,vy:0,
   r:radius,dmg,ttl,pen,hits:0,dead:false,shell:false,beam:false,splash:0}];
  if(extraBullet)g.bullets.push({kind:'bullet',id:11,ownerId:3,
   x:extraBullet==='remote'?1000:0,y:extraBullet==='remote'?1000:0,vx:0,vy:0,r:3,dmg:20,ttl:1,pen:0,hits:0,dead:extraBullet==='dead'});
@@ -116,15 +116,17 @@ for(const optimized of [false,true]){
    assert.deepEqual(g.hits,[50]);
   });
  }
- /* Real canonical Assassin profile (1500u/s, pen=4, 47 damage,
-  * radius 5.8*(1+47*.0085)): a grazing square and a thin separated
-  * permanent wall both lie within the final 3ms of flight. The square
-  * circle bottom is y=6, while the wall top is y=4: no overlap. */
+ /* Real Assassin profile (1500u/s, pen=4, 47 damage,
+  * radius 5.8*(1+47*.0085)) against an ACTUAL Crossfire wall size:
+  * 92x520. A grazing square (center y282, radius20) is physically
+  * separated from the wall (top y260) by 2u. The shot at y262
+  * contacts the square at x1.24 and the wall at x5.35, both within
+  * its final 4ms (6u travel), even at 240Hz. */
  for(const hz of [30,60,120,240]){
   test(mode+' expiring Assassin grazes square before thin wall at '+hz+'Hz',()=>{
-   const {g,square}=trial(Game,{hz,vx:1500,squareX:11,squareY:26,
-    wallX:10,wallHeight:8,pen:4,dmg:47,
-    radius:5.8*(1+47*.0085),ttl:.003});
+   const {g,square}=trial(Game,{hz,vx:1500,squareX:21,squareY:282,
+    wallX:55,wallWidth:92,wallHeight:520,bulletY:262,
+    pen:4,dmg:47,radius:5.8*(1+47*.0085),ttl:.004});
    assert.equal(square.hp,8,'actual class weapon must not lose first contact');
    assert.deepEqual(g.hits,[50]);
   });
@@ -155,16 +157,16 @@ for(const optimized of [false,true]){
   assert.deepEqual(g.hits,[]);
  });
  test(mode+' expiring square after wall is never backdated',()=>{
-  const {g,square}=trial(Game,{hz:240,vx:1500,squareX:25,squareY:26,
-   wallX:10,wallHeight:8,pen:4,dmg:47,
-   radius:5.8*(1+47*.0085),ttl:.003});
+  const {g,square}=trial(Game,{hz:240,vx:1500,squareX:50,squareY:282,
+   wallX:55,wallWidth:92,wallHeight:520,bulletY:262,
+   pen:4,dmg:47,radius:5.8*(1+47*.0085),ttl:.004});
   assert.equal(square.hp,55);
   assert.deepEqual(g.hits,[]);
  });
  test(mode+' moving square with partial lifetime conservatively defers',()=>{
-  const {g,square}=trial(Game,{hz:240,vx:1500,squareX:11,squareY:26,
-   wallX:10,wallHeight:8,pen:4,dmg:47,
-   radius:5.8*(1+47*.0085),ttl:.003,moved:true});
+  const {g,square}=trial(Game,{hz:240,vx:1500,squareX:21,squareY:282,
+   wallX:55,wallWidth:92,wallHeight:520,bulletY:262,
+   pen:4,dmg:47,radius:5.8*(1+47*.0085),ttl:.004,moved:true});
   assert.equal(square.hp,55);
   assert.deepEqual(g.hits,[]);
  });
@@ -259,9 +261,9 @@ for(const hz of [30,60,120,240]){
   assert.equal(square.hp,43);assert.deepEqual(g.hits,[50]);
  });
  test('full shipping stack expiring Assassin square-before-wall at '+hz+'Hz',()=>{
-  const {g,square}=trial(FullGame,{hz,vx:1500,squareX:11,squareY:26,
-   wallX:10,wallHeight:8,pen:4,dmg:47,
-   radius:5.8*(1+47*.0085),ttl:.003});
+  const {g,square}=trial(FullGame,{hz,vx:1500,squareX:21,squareY:282,
+   wallX:55,wallWidth:92,wallHeight:520,bulletY:262,
+   pen:4,dmg:47,radius:5.8*(1+47*.0085),ttl:.004});
   assert.equal(square.hp,8);assert.deepEqual(g.hits,[50]);
  });
  test('full shipping collision stack honors square before wall at '+hz+'Hz',()=>{
