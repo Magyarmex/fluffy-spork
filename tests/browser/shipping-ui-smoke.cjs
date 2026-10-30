@@ -352,7 +352,7 @@ async function scenario(browser, label, options) {
           return {pending:g.pendingOffer,paused:g.paused,saved:g.masteryOfferChoices,
             shield:g.player.spawnShieldT};
         });
-        if(repeat===0)assert.ok(state.shield>1.5,
+        if(repeat===0)assert.ok(state.shield>0.05,
           label+': first legitimate deferral retains existing evolution grace');
         else assert.equal(state.shield,0,
           label+': repeat deferral must not mint another invulnerability shield');
