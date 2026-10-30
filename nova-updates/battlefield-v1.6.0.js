@@ -2690,13 +2690,15 @@ function certifiedTwoShotCoverPriority(g,dt){
    var t=clamp(((e.x-ax)*dx+(e.y-ay)*dy)/len,0,1),
        xx=ax+t*dx,yy=ay+t*dy;
    if(d2(xx,yy,e.x,e.y)<=bound*bound)return null;
-   /* A lethal first-body contact on the later corridor can create new
-    * projectiles or alter cover; never reorder its effects speculatively. */
+   /* Only a witnessed stationary, nonlethal Square may precede the
+    * later cover contact. Tanks, drones and other shape interactions may
+    * trigger stateful effects and retain legacy arbitration. */
    var latePad=radius+late.r+4,ldx=fx-bx,ldy=fy-by,
        llen=ldx*ldx+ldy*ldy,lt=llen>1e-9?
         clamp(((e.x-bx)*ldx+(e.y-by)*ldy)/llen,0,1):0;
-   if(e.hp>0&&e.hp<=late.dmg*2&&
-      d2(bx+lt*ldx,by+lt*ldy,e.x,e.y)<=latePad*latePad)return null;
+   if(d2(bx+lt*ldx,by+lt*ldy,e.x,e.y)<=latePad*latePad&&
+      !(group===1&&e.type==='square'&&e.hp>late.dmg*2&&
+        motion<1e-8))return null;
   }
  }
  return [1,0];
