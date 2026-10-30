@@ -64,6 +64,26 @@ const {chromium}=require('playwright');
     throw Error('real shipping telemetry did not record witnessed contest');
    if(!window.NOVALivingFront.diagnostics().includes('observed-contest'))
     throw Error('COPY ECOLOGY omits chronological Frontlines trace');
+   // Real shipping-chain regression: a dense legitimate public-pocket harvest
+   // must not evict the announcement/entry/contest from COPY ECOLOGY.
+   // The actual neutral-orb gainXP/splice authority is tested separately in
+   // the three-overlay Node regression; this probes the browser/Debug owner.
+   for(let i=0;i<70;i++){
+    if(!LF.recordFrontlineNeutralXP(g,st,p,1,{x:p.x,y:p.y}))
+     throw Error('real Frontlines rejected a valid public-sector neutral pickup');
+   }
+   const burst=LF.snapshot(g).frontline;
+   const kinds=burst.events.map(event=>event.kind);
+   if(!['announced','player-entry','observed-contest'].every(kind=>kinds.includes(kind)))
+    throw Error('dense harvest erased public tactical milestones: '+JSON.stringify(kinds));
+   const harvests=burst.events.filter(event=>event.kind==='neutral-harvest');
+   if(harvests.length!==1||harvests[0].count!==70||harvests[0].xp!==70||
+      burst.counts.neutralXP!==70)
+    throw Error('real browser did not coalesce 70 pickups: '+JSON.stringify(harvests));
+   if(!window.NOVALivingFront.diagnostics().includes('"count": 70'))
+    throw Error('COPY ECOLOGY does not expose bounded pickup count');
+   if(JSON.stringify(burst).includes('"x"'))
+    throw Error('COPY ECOLOGY exposed private coordinates');
    // Physical arrivals must be certified by the real movement owner, not by
    // sampled positions alone. Deliberately relocate an enemy without moveTank.
    const beforePhysical=snap.frontline.counts.aiPhysicalArrivals;
