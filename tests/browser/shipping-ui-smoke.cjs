@@ -325,7 +325,8 @@ async function scenario(browser, label, options) {
         const g=window.__novaBrowserLiveGame;
         if(!g?.player||!g.openOffer)throw Error('real capped Game missing');
         const saved={level:g.player.level,tier:g.player.tier,gene:g.player.gene,
-          perk:g.player.perk,pendingOffer:g.pendingOffer,
+          perk:g.player.perk,spawnShieldT:g.player.spawnShieldT,
+          hitFlash:g.player.hitFlash,pendingOffer:g.pendingOffer,
           masteryOfferChoices:g.masteryOfferChoices};
         g.player.level=45;
         g.player.tier=3;
@@ -383,6 +384,8 @@ async function scenario(browser, label, options) {
         g.player.tier=saved.tier;
         g.player.gene=saved.gene;
         g.player.perk=saved.perk;
+        g.player.spawnShieldT=saved.spawnShieldT;
+        g.player.hitFlash=saved.hitFlash;
         g.pendingOffer=saved.pendingOffer;
         g.masteryOfferChoices=saved.masteryOfferChoices;
         g.recalcMaxHp(g.player);
