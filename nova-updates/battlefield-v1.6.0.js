@@ -2669,9 +2669,19 @@ function certifiedTwoShotCoverPriority(g,dt){
    if(!Number.isFinite(e.x)||!Number.isFinite(e.y))return null;
    var radius=group===0?(CLASSES[e.cls]&&CLASSES[e.cls].size||20)+3:
               group===1?(e.r||20):(e.r||10)+1;
-   var prevX=Number.isFinite(e.__novaSweepPrevX)?e.__novaSweepPrevX:e.x,
-       prevY=Number.isFinite(e.__novaSweepPrevY)?e.__novaSweepPrevY:e.y,
-       motion=Math.hypot(e.x-prevX,e.y-prevY);
+   /* Require the actual same-frame movement witness for every neutral
+    * shape and drone; unknown trajectories cannot certify a cover race. */
+   if(group===1&&g.__novaShapeSweepActive&&
+      (e.__novaShapeSweepEpoch!==g.__novaShapeSweepEpoch||
+       shapeWasTeleported(g,e)))return null;
+   if(group===2&&g.__novaShapeSweepActive&&
+      e.__novaChronoDroneEpoch!==g.__novaShapeSweepEpoch)return null;
+   var prevX=group===1?e.__novaShapeSweepPrevX:
+             group===2?e.__novaChronoDronePrevX:e.__novaSweepPrevX,
+       prevY=group===1?e.__novaShapeSweepPrevY:
+             group===2?e.__novaChronoDronePrevY:e.__novaSweepPrevY;
+   if(!Number.isFinite(prevX)||!Number.isFinite(prevY))return null;
+   var motion=Math.hypot(e.x-prevX,e.y-prevY);
    if(!Number.isFinite(motion))return null;
    /* A conservative motion envelope includes observed displacement and
     * two velocity budgets. Unknown or nearby bodies veto this shortcut. */
