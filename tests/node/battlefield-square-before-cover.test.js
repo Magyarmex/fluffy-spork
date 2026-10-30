@@ -440,7 +440,10 @@ for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['f
 for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['full shipping',FullGame]]){
  for(const hz of [30,60,120,240])for(const reverseBullets of [false,true]){
   test(label+' remote unspent shell preserves square before permanent cover at '+hz+'Hz reverse='+reverseBullets,()=>{
-   const cfg={hz,vx:1500,squareX:30,wallX:57,
+   /* The one-frame wall proof is relevant only when the projectile actually
+    * reaches the wall this frame. The real 1500u/s Assassin does at 30Hz;
+    * higher rates use a fast synthetic stress shot to cross both contacts. */
+   const cfg={hz,vx:hz===30?1500:30000,squareX:30,wallX:57,
     pen:4,dmg:47,radius:5.8*(1+47*.0085),reverseBullets};
    const control=trial(Game,cfg);
    const {g,square}=trial(Game,{...cfg,remoteShell:true});
