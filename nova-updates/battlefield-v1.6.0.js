@@ -2651,7 +2651,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    }
    if(shellS&&shellS.shell&&shellS.ttl>0&&shellS.ttl<dt)shellWork++;
   }
-  /* Read-only global first-event preflight before any shell/TTL/terrain
+  /* Certified first-event handoff before any shell/TTL/terrain
    * side effects. Only ONE expiring pen=1 round may be certified; multiple
    * candidates retain legacy ordering. The square is damaged first, but
    * restore the shot's original start position so the existing terrain
