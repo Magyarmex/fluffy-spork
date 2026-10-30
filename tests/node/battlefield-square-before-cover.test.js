@@ -527,3 +527,40 @@ for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['f
   });
  }
 }
+
+
+/* Run 471 / issue #147: an ordinary expiring non-piercing Scout stops
+ * at its nonlethal square contact. A different shot's later collision with
+ * the same cover cannot retroactively erase that earlier, independent hit.
+ * Unlike pen=1, the focal pen=0 shot never reaches the contested cover.
+ * The read-only proof must run before either bullet's terrain side effects,
+ * so reversing the bullet array cannot change the result. */
+for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['full shipping',FullGame]]){
+ for(const hz of [30,60,120,240])for(const reverseBullets of [false,true]){
+  test(label+' expiring pen=0 Scout wins square before contested cover at '+hz+'Hz reverse='+reverseBullets,()=>{
+   const {g,square}=trial(Game,{hz,vx:440,squareX:16.5,squareY:52,
+    wallX:94,wallWidth:180,wallHeight:60,bulletY:32,
+    pen:0,dmg:12,radius:5*(1+12*.0085),ttl:.004,
+    cover:true,remoteBullets:180,coverCompetitor:true,reverseBullets});
+   assert.equal(square.hp,43,'first square hit cannot be erased by later cover competition');
+   assert.deepEqual(g.hits,[50],'the neutral receives exactly one physical hit');
+   assert.equal(g.__novaTerrain[0].hp,299,'only opposite-face competitor damages cover');
+  });
+ }
+ test(label+' pen=0 near-square competitor still vetoes speculative contact',()=>{
+  const {g,square}=trial(Game,{hz:30,vx:440,squareX:16.5,squareY:52,
+   wallX:94,wallWidth:180,wallHeight:60,bulletY:32,
+   pen:0,dmg:12,radius:5*(1+12*.0085),ttl:.004,
+   cover:true,extraBullet:true});
+  assert.equal(square.hp,55);
+  assert.deepEqual(g.hits,[]);
+ });
+ test(label+' pen=0 uncertain shell still vetoes speculative contact',()=>{
+  const {g,square}=trial(Game,{hz:30,vx:440,squareX:16.5,squareY:52,
+   wallX:94,wallWidth:180,wallHeight:60,bulletY:32,
+   pen:0,dmg:12,radius:5*(1+12*.0085),ttl:.004,
+   cover:true,remoteShell:{x:0,y:30}});
+  assert.equal(square.hp,55);
+  assert.deepEqual(g.hits,[]);
+ });
+}
