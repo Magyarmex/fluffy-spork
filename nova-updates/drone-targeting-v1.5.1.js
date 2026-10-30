@@ -15,10 +15,10 @@ function fairDroneInView(g,owner,target){var fair=window.__NOVA_FAIR_ENGAGEMENT_
 /* Forward Observer's fresh public relay is the one deliberate off-viewport
  * tank exception in Fair Engagement. Preserve it for Sniper-gene drones;
  * an arbitrary target ID or an expired relay must not become global radar. */
+var SNIPER_IDS={marksman:1,railgun:1,ghost:1,singularity:1,prism:1,specter:1,assassin:1};
 function fairTankPerceived(g,owner,t){
  if(fairDroneInView(g,owner,t))return true;
- var sniper={marksman:1,railgun:1,ghost:1,singularity:1,prism:1,specter:1,assassin:1};
- return !!(owner&&owner.ai&&!owner.isPlayer&&t&&sniper[owner.cls]&&
+ return !!(owner&&owner.ai&&!owner.isPlayer&&t&&SNIPER_IDS[owner.cls]&&
    owner.__novaSpotterContactId===t.id&&
    Number(owner.__novaSpotterContactUntil)>Number(g&&g.time||0));
 }
