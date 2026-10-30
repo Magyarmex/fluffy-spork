@@ -76,7 +76,7 @@ function boot(optimized){
  return m.exports.Game;
 }
 
-function trial4(Game,order,hz=30,{extraBullet=false,liveDrone=false,remoteWitnessedDrone=false,nearWitnessedDrone=false,newborn=false,credit=false}={}){
+function trial4(Game,order,hz=30,{extraBullet=false,liveDrone=false,remoteWitnessedDrone=false,nearWitnessedDrone=false,remoteDroneSpeed=320,remoteDroneEpoch=1,remoteDronePrevX=null,remoteDronePhase='orbit',newborn=false,credit=false}={}){
  const g=new Game(),dt=1/hz;
  if(credit){g.coverXP=[];g.getTank=id=>({id,alive:true,isPlayer:false});
   g.gainXP=(owner,amount)=>g.coverXP.push([owner.id,amount]);}
@@ -87,8 +87,8 @@ function trial4(Game,order,hz=30,{extraBullet=false,liveDrone=false,remoteWitnes
  if(remoteWitnessedDrone||nearWitnessedDrone){
   const x=nearWitnessedDrone?80:1700,y=nearWitnessedDrone?0:1700;
   g.drones.push({kind:'drone',id:89,ownerId:89,x,y,r:8,hp:20,
-   speed:320,__novaPhase:'orbit',__novaCommitted:false,
-   __novaChronoDroneEpoch:1,__novaChronoDronePrevX:x,
+   speed:remoteDroneSpeed,__novaPhase:remoteDronePhase,__novaCommitted:false,
+   __novaChronoDroneEpoch:remoteDroneEpoch,__novaChronoDronePrevX:remoteDronePrevX??x,
    __novaChronoDronePrevY:y});
  }
  if(typeof g.hash.insert==='function')g.hash.insert(tank);
@@ -115,6 +115,11 @@ function trial4(Game,order,hz=30,{extraBullet=false,liveDrone=false,remoteWitnes
   tank.__novaSweepMoveTime=g.time;
   tank.__novaSweepPrevX=tank.x;
   tank.__novaSweepPrevY=tank.y;
+  if(remoteWitnessedDrone||nearWitnessedDrone)for(const d of g.drones){
+   if(remoteDroneEpoch===1)d.__novaChronoDroneEpoch=i+1;
+   if(remoteDronePrevX===null)d.__novaChronoDronePrevX=d.x;
+   d.__novaChronoDronePrevY=d.y;
+  }
   g.updateBullets(dt);g.time+=dt;
  }
  return {tankHp:tank.hp,coverHp:g.__novaTerrain[0]?.hp,hits:g.hits,
@@ -156,9 +161,9 @@ for(const optimized of [false,true]){
 
 for(const optimized of [false,true]){
  const Game=boot(optimized),label=optimized?'full shipping overlays':'Battlefield';
- test(label+': distant witnessed idle drone does not suppress a proven cover breach',()=>{
+ for(const hz of [30,60,120,240])test(label+': distant witnessed idle drone preserves cover breach at '+hz+'Hz',()=>{
   for(const order of ['FABC','ABCF','FCBA']){
-   const r=trial4(Game,order,30,{remoteWitnessedDrone:true});
+   const r=trial4(Game,order,hz,{remoteWitnessedDrone:true});
    assert.equal(r.coverHp,0);
    assert.equal(r.tankHp,88,'remote witnessed drone cannot veto unrelated cover chronology '+order);
   }
@@ -166,5 +171,14 @@ for(const optimized of [false,true]){
  test(label+': nearby witnessed drone still vetoes speculative cover ordering',()=>{
   const r=trial4(Game,'FABC',30,{nearWitnessedDrone:true});
   assert.equal(r.tankHp,100,'a local drone could intercept or change first contact');
+ });
+ for(const [name,opts] of [
+  ['unwitnessed drone',{remoteWitnessedDrone:true,remoteDroneEpoch:0}],
+  ['extreme-speed drone',{remoteWitnessedDrone:true,remoteDroneSpeed:100000}],
+  ['discontinuous drone',{remoteWitnessedDrone:true,remoteDronePrevX:0}],
+  ['committed dash',{remoteWitnessedDrone:true,remoteDronePhase:'dash'}]
+ ])test(label+': '+name+' cannot certify cover priority',()=>{
+  const r=trial4(Game,'FABC',30,opts);
+  assert.equal(r.tankHp,100,'untrusted drone motion must preserve legacy collision ordering');
  });
 }
