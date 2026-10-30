@@ -2045,6 +2045,29 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
        near(x0,y0,x1,y1,px,py,d.x,d.y,
         o.r+(d.r||8)+160))return null;
    }
+   /* Core collisions query the spatial hash, which can still contain
+    * an entity removed from the live arrays earlier this frame. Check the
+    * actual core query owner as well: a stale shape can still burst a shell
+    * even when it is absent from g.shapes or has hp<=0. */
+   if(!g.hash||typeof g.hash.query!=='function')return null;
+   var nearby=[],mx=(x0+x1)*.5,my=(y0+y1)*.5,
+       radius=Math.hypot(x1-x0,y1-y0)*.5+o.r+400;
+   try{g.hash.query(mx,my,radius,nearby);}
+   catch(_e){return null;}
+   if(nearby.length>260)return null;
+   for(var hi=0;hi<nearby.length;hi++){
+    var e=nearby[hi];if(!e)continue;
+    var rad=0;
+    if(e.kind==='shape')rad=e.r||15;
+    else if(e.kind==='tank'&&e.alive){
+     var edef=CLASSES[e.cls];if(!edef)return null;
+     rad=edef.size+3;
+    }else if(e.kind==='drone'&&e.hp>0)rad=e.r||8;
+    else continue;
+    if(!Number.isFinite(rad)||rad<=0||
+       near(x0,y0,x1,y1,e.x,e.y,e.x,e.y,o.r+rad+160))
+     return null;
+   }
    /* A crossing projectile could detonate the shell. Use its full sweep,
     * not the endpoint or an unordered global shot count. */
    for(var bi=0;bi<shots.length;bi++){
