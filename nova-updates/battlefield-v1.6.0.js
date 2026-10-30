@@ -1955,7 +1955,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       drones=g.drones||[],count=0;
   if(shots.length+tanks.length+shapes.length+drones.length>260)return null;
   function near(x0,y0,x1,y1,u0,v0,u1,v1,pad){
-   if(![x0,y0,x1,y1,u0,v0,u1,v1,pad].every(Number.isFinite))return true;
+   if(!Number.isFinite(x0)||!Number.isFinite(y0)||
+      !Number.isFinite(x1)||!Number.isFinite(y1)||
+      !Number.isFinite(u0)||!Number.isFinite(v0)||
+      !Number.isFinite(u1)||!Number.isFinite(v1)||
+      !Number.isFinite(pad))return true;
    return Math.max(x0,x1)+pad>=Math.min(u0,u1)&&
           Math.min(x0,x1)-pad<=Math.max(u0,u1)&&
           Math.max(y0,y1)+pad>=Math.min(v0,v1)&&
@@ -1971,7 +1975,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       !(Number.isFinite(o.ttl)&&o.ttl>dt)||
       !(Number.isFinite(o.r)&&o.r>0)||
       (o.splash!=null&&(!Number.isFinite(o.splash)||o.splash<0))||
-      ![o.x,o.y,o.vx,o.vy].every(Number.isFinite)||
+      !Number.isFinite(o.x)||!Number.isFinite(o.y)||
+      !Number.isFinite(o.vx)||!Number.isFinite(o.vy)||
       o.__novaWallProofStartX!==o.x||
       o.__novaWallProofStartY!==o.y||
       o.__novaWallProofStartVx!==o.vx||
