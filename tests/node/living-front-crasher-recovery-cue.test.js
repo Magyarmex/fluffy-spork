@@ -83,3 +83,19 @@ test('recovery cue declares a specific player decision and keeps materialized ow
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   assert.equal(html.split('src="./nova-updates/' + file + '"').length - 1, 1);
 });
+
+test('existing Crasher Fieldcraft tip explains terrain bait and the punish cue', () => {
+  const director = fs.readFileSync(path.join(root, 'nova-updates',
+    'living-front-director-v1.12.0.js'), 'utf8');
+  const start = director.indexOf('var TIP_DEFS=[');
+  const end = director.indexOf('var TIPS=', start);
+  assert.ok(start >= 0 && end > start);
+  const tips = director.slice(start, end);
+  const crasher = tips.match(/\{id:'living-front-crasher-bounty',text:'([^']+)'/);
+  assert.ok(crasher, 'reuse the existing Crasher tip, not another tip slot');
+  assert.match(crasher[1],/bonus XP/);
+  assert.match(crasher[1],/Bait its charge into cover/);
+  assert.match(crasher[1],/recovery brackets fade/);
+  assert.equal((tips.match(/\{id:'living-front-/g) || []).length, 7,
+    'retain the seven-tip Fieldcraft shuffle bag');
+});
