@@ -36,7 +36,7 @@ test('track window is a real cooldown, not an unused timer',()=>{
  assert.equal(stillTracking.state,'track',
   'aligned target must not bypass the post-recovery tracking interval');
  assert.ok(Math.abs(stillTracking.t-.18)<1e-12);
- const ready=LF.crasherState('track',stillTracking.t,.181,true,true);
+ const ready=LF.crasherState('track',stillTracking.t,.18,true,true);
  assert.equal(ready.state,'telegraph');
  assert.equal(ready.t,.40);
 });
