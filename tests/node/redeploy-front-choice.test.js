@@ -411,3 +411,31 @@ test('Frontlines death recap is an immutable last-life snapshot, not a live trac
  assert.match(panel.choice.children[0].textContent,/CONTEST 0 · \+20 NEUTRAL XP/);
  assert.doesNotMatch(panel.choice.children[0].textContent,/9999|CONTEST 5/);
 });
+
+
+test('malformed Frontlines getter cannot prevent a real player death or redeploy',()=>{
+ const {Game,addPanel}=boot(),g=new Game(),panel=addPanel();
+ Object.defineProperty(g,'__lfState',{configurable:true,get(){throw Error('telemetry unavailable');}});
+ const p=victim(100,200);
+ assert.doesNotThrow(()=>g.killTank(p));
+ assert.equal(p.alive,false,'the authoritative kill must complete');
+ g.update();
+ assert.equal(panel.choice.children.length,2,'uncertain observation must fail closed');
+ assert.doesNotThrow(()=>g.redeploy());
+});
+test('React remount retains the last-life recap without duplicating buttons',()=>{
+ const {Game,addPanel}=boot(),g=new Game(),panel=addPanel();
+ g.__lfState={frontlineTelemetry:{counts:{announcements:1,playerApproaches:1,
+  playerEntries:1,observedContests:1,neutralXP:42}}};
+ g.killTank(victim(100,200));g.update();
+ const old=panel.choice;
+ assert.equal(old.children.length,3);
+ panel.removeChild(old);
+ g.update();
+ assert.ok(panel.choice&&panel.choice!==old);
+ assert.equal(panel.choice.children.length,3);
+ assert.match(panel.choice.children[0].textContent,/\+42 NEUTRAL XP/);
+ assert.equal(panel.choice.children.filter(c=>c.tag==='button').length,2);
+ g.redeploy();
+ assert.equal(g.__novaFrontlineRecap,null);
+});
