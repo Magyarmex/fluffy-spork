@@ -93,7 +93,7 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,l
  linearMove=null,tamperMove=false,doubleMove=false,
  otherNearMovingStart=false,bornThisFrame=false,coverHp=1000,
  shellInterception=false,secondShell=false,shellShape=null,
- shellStaleHashShape=false}={}){
+ shellStaleHashShape=false,reverseBullets=false}={}){
  const g=new Game(),dt=1/fps;
  g.__novaBattlefield={coverBroken:0};
  if(shellStaleHashShape)g.__novaStaleHashShape={
@@ -168,7 +168,10 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,l
   if(doubleMove)g.moveTank(t,linearMove.vx,linearMove.vy,dt);
   if(tamperMove)t.x+=4;
  }
- const shot=g.bullets[0];
+ /* Focal projectile may be first or last: wall chronology must not
+  * depend on the unrelated distant shots' array positions. */
+ if(reverseBullets)g.bullets.reverse();
+ const shot=g.bullets.find(b=>b.id===10);
  g.updateBullets(dt);
  return {hits:g.hits,hp:t.hp,bullet:g.bullets[0],shot,g};
 }
@@ -896,6 +899,23 @@ for(const optimized of [false,true]){
    assert.deepEqual(r.hits,[]);
    assert.equal(r.hp,100,'second wall must protect the rear hull');
    assert.equal(r.g.__novaTerrain[0].hp,0);
+   assert.equal(r.g.bullets.some(b=>b.id===10),false);
+  });
+ }
+ for(const reverseBullets of [false,true]){
+  test(label+': dense Marksman first-hull proof is remote-shot order invariant, reversed='+reverseBullets,()=>{
+   const r=run(Game,{fps:30,speed,radius,pen:2,damage:21,
+    wall:55,target:29,destructible:true,
+    remoteShapes:120,remoteBullets:220,reverseBullets});
+   assert.deepEqual(r.hits,[2]);
+   assert.equal(r.hp,79);
+  });
+  test(label+': dense second permanent wall remains protective, reversed='+reverseBullets,()=>{
+   const r=run(Game,{fps:30,speed,radius,pen:3,damage:21,
+    wall:17,laterWall:35,target:60,destructible:true,coverHp:5,
+    remoteShapes:120,remoteBullets:220,reverseBullets});
+   assert.deepEqual(r.hits,[]);
+   assert.equal(r.hp,100);
    assert.equal(r.g.bullets.some(b=>b.id===10),false);
   });
  }
