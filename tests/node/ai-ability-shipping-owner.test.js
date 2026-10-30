@@ -11,7 +11,7 @@ const {patchAIStrafeTimebase}=require('../../scripts/patch-ai-strafe-timebase.cj
 const root=path.resolve(__dirname,'../..');
 const b64=fs.readdirSync(path.join(root,'nova-gz')).filter(f=>f.endsWith('.b64'))
  .sort().map(f=>fs.readFileSync(path.join(root,'nova-gz',f),'utf8'))
- .join('').replace(/\\s+/g,'');
+ .join('').replace(/\s+/g,'');
 const raw=zlib.gunzipSync(Buffer.from(b64,'base64')).toString('utf8');
 const patched=patchAIStrafeTimebase(raw);
 function extractAI(html){
