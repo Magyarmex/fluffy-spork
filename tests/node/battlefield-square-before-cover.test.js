@@ -440,9 +440,12 @@ for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['f
 for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['full shipping',FullGame]]){
  for(const hz of [30,60,120,240])for(const reverseBullets of [false,true]){
   test(label+' remote unspent shell preserves square before permanent cover at '+hz+'Hz reverse='+reverseBullets,()=>{
-   const {g,square}=trial(Game,{hz,vx:1500,squareX:30,wallX:57,
-    pen:4,dmg:47,radius:5.8*(1+47*.0085),remoteShell:true,reverseBullets});
-   assert.equal(square.hp,8,'remote shell cannot suppress the physical square contact');
+   const cfg={hz,vx:1500,squareX:30,wallX:57,
+    pen:4,dmg:47,radius:5.8*(1+47*.0085),reverseBullets};
+   const control=trial(Game,cfg);
+   const {g,square}=trial(Game,{...cfg,remoteShell:true});
+   assert.equal(control.square.hp,8,'without shell this same physical contact must exist');
+   assert.equal(square.hp,control.square.hp,'remote shell cannot suppress the physical square contact');
    assert.deepEqual(g.hits,[50],'the neutral square receives exactly one hit');
   });
  }
