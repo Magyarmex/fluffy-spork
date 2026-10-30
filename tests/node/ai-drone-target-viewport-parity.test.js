@@ -2,7 +2,7 @@
 /* Real production overlay composition: the drone filter must not give AI
  * Controllers an extra off-screen tank sensor when their native selector
  * returns a tank or when a rejected spotter triggers combat fallback.
- * Human Controller autonomy and ordinary public in-frame tank pursuit stay. */
+ * Human gene-grafted autonomy and ordinary public in-frame tank pursuit stay. */
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
@@ -31,7 +31,7 @@ function boot(native){
   modules['game/engine'](m,m.exports,id=>id==='./classes'?
     {CLASSES:{carrier:{size:15}},lineageForClass(){return null;}}:{});
   const g=new m.exports.Game();
-  const owner={kind:'tank',id:1,cls:'carrier',x:0,y:0,hp:100,alive:true,
+  const owner={kind:'tank',id:1,cls:'twin',gene:'controller',x:0,y:0,hp:100,alive:true,
     ai:{state:'farm'},isPlayer:false,team:'blue'};
   const drone={kind:'drone',id:11,ownerId:1,x:180,y:0,hp:20,leash:500};
   g.w=320;g.h=240;g.cam={zoom:1};
@@ -71,7 +71,7 @@ test('off-screen human and NPC are treated identically by AI drone perception',(
     assert.equal(h.acquire(),shape);
   }
 });
-test('human Controller retains existing autonomous target behavior outside AI viewport',()=>{
+test('human gene-grafted retains existing autonomous target behavior outside AI viewport',()=>{
   const off=enemy(2,200),h=boot(off);h.owner.ai=null;h.owner.isPlayer=true;
   h.g.tanks.push(off);
   assert.equal(h.acquire(),off);
