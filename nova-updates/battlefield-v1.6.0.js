@@ -2281,8 +2281,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      !first||!first.hit||!Number.isFinite(first.hit.t))return false;
   var tanks=g.tanks||[],shapes=g.shapes||[],drones=g.drones||[],
       shots=g.bullets||[];
-  if(tanks.length+shapes.length+drones.length+shots.length>260||
-     shots.length>12)return false;
+  /* The complete 260-entity work bound and per-shot swept-corridor veto
+   * below already reject uncertain local competition. Distant fire must
+   * not disable the second-wall proof after a legitimate first breach. */
+  if(tanks.length+shapes.length+drones.length+shots.length>260)return false;
   /* A second barricade is eligible ONLY if it provably survives this
    * weakened round. A second breach still needs full event arbitration. */
   var later=firstSolidHit(g,ax,ay,ex,ey,b.r*.45);
