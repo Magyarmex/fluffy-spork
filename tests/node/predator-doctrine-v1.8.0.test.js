@@ -41,7 +41,7 @@ function loadPredator(){
   };
   Game.prototype.isTerrainSafe=function(){return true;};
   Game.prototype.firstTerrainHit=function(){return null;};
-  Game.prototype.moveTank=function(t,vx,vy,dt){this.moves.push([vx,vy]);t.x+=vx*dt;t.y+=vy*dt;t.vx=vx;t.vy=vy;};
+  Game.prototype.moveTank=function(t,vx,vy,dt){if(this.failMove)throw Error('intentional movement failure');this.moves.push([vx,vy]);t.x+=vx*dt;t.y+=vy*dt;t.vx=vx;t.vy=vy;};
   Game.prototype.tryFire=function(){this.fires++;};
   Game.prototype.useAbility=function(t){this.abilities++;t.abilityCd=5;};
   Game.prototype.damageTank=function(t,dmg){t.hp-=dmg;return dmg;};
@@ -104,6 +104,19 @@ test('Predator scopes legacy ability ownership without leaking across AI updates
  assert.equal(legacyOwnership.at(-1),true);
  assert.equal(hunter.ai.__novaPredatorAbilityOwned,false,
   'preexisting flag must be restored exactly');
+});
+
+test('Predator restores temporary ownership even when legacy movement throws',()=>{
+ const {Game,ai,legacyOwnership}=loadPredator(),g=new Game();
+ const hunter=tank(1,'guard',{ai:brain({state:'hunt',__v180PlanT:0}),abilityCd:0});
+ const enemy=tank(7,'twin',{isPlayer:true,x:260});
+ g.tanks=[hunter,enemy];g.player=enemy;g.failMove=true;
+ const move=g.moveTank,ability=g.useAbility;
+ assert.throws(()=>ai.updateAI(hunter,g,1/60),/intentional movement failure/);
+ assert.equal(legacyOwnership.at(-1),true);
+ assert.equal(Object.hasOwn(hunter.ai,'__novaPredatorAbilityOwned'),false);
+ assert.equal(g.moveTank,move,'movement wrapper must be removed on exception');
+ assert.equal(g.useAbility,ability,'ability wrapper must be removed on exception');
 });
 
 test('analytical interception leads a crossing target',()=>{
