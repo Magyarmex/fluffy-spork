@@ -67,7 +67,7 @@ function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
   squareY=0,wallY=0,born=false,moved=false,teleport=false,extraBullet=false,
   extraTank=false,fragile=false,pen=1,extraSquare=false,cover=false,
   dmg=12,radius=3,ttl=1,wallHeight=80,wallWidth=8,bulletY=0,linearVy=0,
-  remoteBullets=0,reverseBullets=false}={}){
+  remoteBullets=0,reverseBullets=false,coverCompetitor=false}={}){
  const g=new Game();
  const square={kind:'shape',id:50,type:'square',x:squareX,y:squareY,r:20,hp:fragile?10:55};
  if(born)square.born=g.time;
@@ -87,6 +87,12 @@ function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
   id:1000+i,ownerId:1000+i,x:-1900+(i%40)*95,
   y:850+Math.floor(i/40)*70,vx:0,vy:0,r:3,dmg:5,
   ttl:1,pen:0,hits:0,dead:false,shell:false,beam:false,splash:0});
+ /* An unrelated round can hit a DIFFERENT face of the SAME destructible
+  * barricade without approaching the focal square's narrow corridor.
+  * The chronological handoff must not pre-commit the later cover hit. */
+ if(coverCompetitor)g.bullets.push({kind:'bullet',id:900,ownerId:900,
+  x:200,y:0,vx:-5000,vy:0,r:3,dmg:1,ttl:1,
+  pen:0,hits:0,dead:false,shell:false,beam:false,splash:0});
  if(reverseBullets)g.bullets.reverse();
  if(moved||teleport){
   const oldUpdate=g.update.bind(g);
@@ -393,4 +399,23 @@ for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['f
   const {g,square}=trial(Game,{hz:30,squareX:120,remoteBullets:180});
   assert.equal(square.hp,55);assert.deepEqual(g.hits,[]);
  });
+}
+
+/* Adversarial counterexample to simply deleting the global singleton veto:
+ * a different projectile can hit the SAME wall from the opposite face,
+ * even when it never approaches the first square. The focal Scout's
+ * speculative later-cover hit must abstain, leaving only the competitor's
+ * one point of structural damage. */
+for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['full shipping',FullGame]]){
+ for(const hz of [30,240])for(const reverseBullets of [false,true]){
+  test(label+' same-cover competing shot vetoes speculative TTL chain at '+hz+'Hz reverse='+reverseBullets,()=>{
+   const {g,square}=trial(Game,{hz,vx:440,squareX:16.5,squareY:52,
+    wallX:94,wallWidth:180,wallHeight:60,bulletY:32,
+    pen:1,dmg:12,radius:5*(1+12*.0085),ttl:.004,
+    cover:true,remoteBullets:180,coverCompetitor:true,reverseBullets});
+   assert.equal(square.hp,43,'square still receives its earlier legitimate hit');
+   assert.equal(g.__novaTerrain[0].hp,299,
+    'only opposite-face competitor may damage this wall; focal chain must abstain');
+  });
+ }
 }
