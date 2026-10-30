@@ -324,10 +324,19 @@ for(const optimized of [false,true])for(const reverse of [false,true]){
    otherBullets:Array.from({length:200},(_,i)=>denseRemoteRailShot(i))});
   assert.ok(Math.abs(r.hp-4.8)<1e-8);
  });
- test(label+': above 256 projectiles rail proof defers whole frame reversed='+reverse,()=>{
+ test(label+': 257 independent projectiles retain certified rail hit reversed='+reverse,()=>{
   const r=runRailTTL(Game,{fps:30,reverse,
    otherBullets:Array.from({length:256},(_,i)=>denseRemoteRailShot(i))});
-  assert.equal(r.hp,100,'do not scan unbounded traffic or prefer early array entries');
+  assert.ok(Math.abs(r.hp-4.8)<1e-8,
+   'bounded remote fire cannot erase the earlier physical rail contact');
+ });
+ test(label+': above 600 combined scans still defers entire rail proof reversed='+reverse,()=>{
+  const r=runRailTTL(Game,{fps:30,reverse,
+   otherBullets:Array.from({length:600},(_,i)=>({
+    ...denseRemoteRailShot(i),x:1000+20*(i%40),
+    y:1000+25*Math.floor(i/40)}))});
+  assert.equal(r.hp,100,
+   'over-budget rail proof must fail closed without first-N selection');
  });
 }
 
