@@ -108,7 +108,16 @@ function trial8(Game,order,hz=30,{extraBullet=false,liveDrone=false,newborn=fals
  g.bullets=order.split('').map(k=>shots[k]);
  if(extraBullet)g.bullets.push({kind:'bullet',id:20,ownerId:20,x:1700,y:1700,vx:0,vy:0,r:3,
   dmg:5,pen:1,ttl:.15,hits:0,dead:false,shell:false,beam:false,splash:0});
- for(let i=0;i<Math.ceil(hz*.15);i++){g.updateBullets(dt);g.time+=dt;}
+ for(let i=0;i<Math.ceil(hz*.15);i++){
+  /* Witness a stationary tank at the actual current frame timestamp.
+   * The production movement owner refreshes this history each tick. */
+  g.__novaShapeSweepEpoch=i+1;
+  g.__novaFrameStartBulletEpoch=i+1;
+  tank.__novaSweepMoveTime=g.time;
+  tank.__novaSweepPrevX=tank.x;
+  tank.__novaSweepPrevY=tank.y;
+  g.updateBullets(dt);g.time+=dt;
+ }
  return {tankHp:tank.hp,coverHp:g.__novaTerrain[0]?.hp,hits:g.hits,
   coverXP:g.coverXP||[]};
 }
