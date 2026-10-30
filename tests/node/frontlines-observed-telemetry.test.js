@@ -396,3 +396,26 @@ test('disabled Director cannot revive an already-resolved public BLOOM on re-ena
  assert.equal(f.counts.announcements,2);
  assert.equal(f.closed,false);
 });
+
+
+test('Frontlines trace identifies LIVE public entries and stale MEMORY entries correctly',()=>{
+ const {g,st,p,LF}=scene();
+ LF.frontlineTick(g,st,true);
+ const f=st.frontlineTelemetry;
+ assert.equal(f.events.find(e=>e.kind==='announced').mode,'live');
+ assert.equal(f.events.find(e=>e.kind==='player-entry').mode,'live',
+  'a witnessed live BLOOM entry must not be mislabeled as stale memory');
+ assert.equal(f.events.find(e=>e.kind==='observed-contest').mode,'live');
+ assert.equal(LF.recordFrontlineNeutralXP(g,st,p,12,{x:p.x,y:p.y}),true);
+ assert.equal(f.events.find(e=>e.kind==='neutral-harvest').mode,'live');
+ p.x=-1500;p.y=-1500;g.time=106;st.signal=null;
+ LF.frontlineTick(g,st,false);
+ p.x=-560;p.y=-560;
+ LF.frontlineTick(g,st,false);
+ assert.equal(f.events.filter(e=>e.kind==='player-entry').at(-1).mode,'memory');
+ assert.equal(LF.recordFrontlineNeutralXP(g,st,p,15,{x:p.x,y:p.y}),true);
+ assert.equal(f.events.filter(e=>e.kind==='neutral-harvest').at(-1).mode,'memory');
+ g.time=125;LF.frontlineTick(g,st,false);
+ assert.equal(f.events.filter(e=>e.kind==='resolved').at(-1).mode,'expired',
+  'the trace must distinguish expired opportunity closure from a live or stale visit');
+});
