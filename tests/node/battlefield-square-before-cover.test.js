@@ -67,7 +67,7 @@ function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
   squareY=0,wallY=0,born=false,moved=false,teleport=false,extraBullet=false,
   extraTank=false,fragile=false,pen=1,extraSquare=false,cover=false,
   dmg=12,radius=3,ttl=1,wallHeight=80,wallWidth=8,bulletY=0,linearVy=0,
-  remoteBullets=0,reverseBullets=false,coverCompetitor=false}={}){
+  remoteBullets=0,reverseBullets=false,coverCompetitor=false,remoteShell=null}={}){
  const g=new Game();
  const square={kind:'shape',id:50,type:'square',x:squareX,y:squareY,r:20,hp:fragile?10:55};
  if(born)square.born=g.time;
@@ -93,6 +93,15 @@ function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
  if(coverCompetitor)g.bullets.push({kind:'bullet',id:900,ownerId:900,
   x:200,y:0,vx:-5000,vy:0,r:3,dmg:1,ttl:1,
   pen:0,hits:0,dead:false,shell:false,beam:false,splash:0});
+ if(remoteShell){
+  const cfg=remoteShell===true?{}:remoteShell;
+  g.bullets.push({kind:'bullet',id:901,ownerId:901,
+   x:cfg.x??1800,y:cfg.y??-1800,vx:cfg.vx??0,vy:cfg.vy??0,
+   r:9,dmg:10,ttl:cfg.ttl??1,pen:1,hits:0,dead:false,
+   shell:true,splash:100,__v17Cannon:!!cfg.cannon,
+   __v17FuseDist:cfg.fuse??0,__v17SpawnX:cfg.spawnX,
+   __v17SpawnY:cfg.spawnY});
+ }
  if(reverseBullets)g.bullets.reverse();
  if(moved||teleport){
   const oldUpdate=g.update.bind(g);
@@ -421,6 +430,100 @@ for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['f
    assert.ok(g.hits.filter(id=>id===50).length<=1);
    assert.equal(g.__novaTerrain[0].hp,299,
     'only opposite-face competitor may damage this wall; focal chain must abstain');
+  });
+ }
+}
+
+/* Issue #147: a distant, provably unspent shell must not erase an earlier
+ * square contact merely by existing. Use the same certified remote-shell
+ * exclusion already protecting earlier tank contacts. */
+for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['full shipping',FullGame]]){
+ for(const hz of [30,60,120,240])for(const reverseBullets of [false,true]){
+  test(label+' remote unspent shell preserves square before permanent cover at '+hz+'Hz reverse='+reverseBullets,()=>{
+   /* The one-frame wall proof is relevant only when the projectile actually
+    * reaches the wall this frame. The real 1500u/s Assassin does at 30Hz;
+    * higher rates use a fast synthetic stress shot to cross both contacts. */
+   const cfg={hz,vx:hz===30?1500:30000,squareX:30,wallX:57,
+    pen:4,dmg:47,radius:5.8*(1+47*.0085),reverseBullets};
+   const control=trial(Game,cfg);
+   const {g,square}=trial(Game,{...cfg,remoteShell:true});
+   assert.equal(control.square.hp,8,'without shell this same physical contact must exist');
+   assert.equal(square.hp,control.square.hp,'remote shell cannot suppress the physical square contact');
+   assert.deepEqual(g.hits,[50],'the neutral square receives exactly one hit');
+  });
+ }
+ for(const cfg of [{x:0,y:30},{ttl:.001}]){
+  test(label+' shell hazard still vetoes speculative square chronology '+JSON.stringify(cfg),()=>{
+   const {g,square}=trial(Game,{hz:30,vx:1500,squareX:30,wallX:57,
+    pen:4,dmg:47,radius:5.8*(1+47*.0085),remoteShell:cfg});
+   assert.equal(square.hp,55,'nearby or expiring shell is not certified harmless');
+   assert.deepEqual(g.hits,[]);
+  });
+ }
+}
+
+/* The safe remote-shell exception must be a true noninterference property,
+ * not just one hand-picked square. Compare identical worlds with and without
+ * a shell that is unable to burst or contact the focal combat corridor. */
+for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['full shipping',FullGame]]){
+ test(label+' 160 seeded independent-shell worlds preserve square and cover outcomes',()=>{
+  let seed=0x6e0a2026;
+  const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+  for(let i=0;i<160;i++){
+   const cfg={hz:[30,60,120,240][i%4],vx:440+Math.floor(rand()*1900),
+    squareX:20+rand()*17,wallX:72+rand()*18,
+    dmg:8+Math.floor(rand()*24),radius:3+rand()*3,
+    pen:i%5,ttl:i%3===0?.004:1,cover:i%4===0,
+    reverseBullets:i%2===0};
+   const a=trial(Game,cfg),b=trial(Game,{...cfg,remoteShell:{
+    x:1800,y:-1800,vx:400,vy:0,ttl:1}});
+   assert.deepEqual([b.square.hp,b.g.__novaTerrain[0].hp,b.g.hits],
+    [a.square.hp,a.g.__novaTerrain[0].hp,a.g.hits],
+    'distant unspent shell must not alter square/cover outcome at seed '+i);
+  }
+ });
+ for(const hz of [30,60,120,240]){
+  test(label+' remote shell preserves physical Scout square then destructible cover at '+hz+'Hz',()=>{
+   const {g,square}=trial(Game,{hz,vx:440,squareX:16.5,squareY:52,
+    wallX:94,wallWidth:180,wallHeight:60,bulletY:32,
+    pen:1,dmg:12,radius:5*(1+12*.0085),ttl:.004,
+    cover:true,remoteShell:true});
+   assert.equal(square.hp,43);
+   assert.equal(g.__novaTerrain[0].hp,288);
+   assert.deepEqual(g.hits,[50]);
+  });
+ }
+}
+
+/* Dense remote gunfire and programmed Cannon fuses are separate hazards.
+ * Preserve first-contact order only if the existing shell certificate
+ * proves that the fuse cannot fire during this frame. */
+for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['full shipping',FullGame]]){
+ for(const hz of [30,60,120,240]){
+  test(label+' remote shell and 180 independent rounds preserve Scout square/cover at '+hz+'Hz',()=>{
+   const {g,square}=trial(Game,{hz,vx:440,squareX:16.5,squareY:52,
+    wallX:94,wallWidth:180,wallHeight:60,bulletY:32,
+    pen:1,dmg:12,radius:5*(1+12*.0085),ttl:.004,
+    cover:true,remoteBullets:180,remoteShell:true});
+   assert.equal(square.hp,43);
+   assert.equal(g.__novaTerrain[0].hp,288);
+   assert.deepEqual(g.hits,[50]);
+  });
+ }
+ test(label+' remote Cannon shell with future programmed fuse preserves square contact',()=>{
+  const {g,square}=trial(Game,{hz:30,vx:1500,squareX:30,wallX:57,
+   pen:4,dmg:47,radius:5.8*(1+47*.0085),
+   remoteShell:{x:1800,y:-1800,vx:420,cannon:true,fuse:350,
+    spawnX:1800,spawnY:-1800}});
+  assert.equal(square.hp,8);assert.deepEqual(g.hits,[50]);
+ });
+ for(const cfg of [
+  {x:1800,y:-1800,vx:420,cannon:true,fuse:1,spawnX:1800,spawnY:-1800},
+  {x:1800,y:-1800,vx:420,cannon:true,fuse:350}]){
+  test(label+' uncertified Cannon fuse keeps conservative square path '+JSON.stringify(cfg),()=>{
+   const {g,square}=trial(Game,{hz:30,vx:1500,squareX:30,wallX:57,
+    pen:4,dmg:47,radius:5.8*(1+47*.0085),remoteShell:cfg});
+   assert.equal(square.hp,55);assert.deepEqual(g.hits,[]);
   });
  }
 }
