@@ -64,12 +64,11 @@ function boot(optimized,full=false){
  return m.exports.Game;
 }
 function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
-  squareY=0,wallY=0,born=false,moved=false,extraBullet=false,
+  squareY=0,wallY=0,born=false,moved=false,teleport=false,extraBullet=false,
   extraTank=false,fragile=false,pen=0,extraSquare=false}={}){
  const g=new Game();
  const square={kind:'shape',id:50,type:'square',x:squareX,y:squareY,r:20,hp:fragile?10:55};
  if(born)square.born=g.time;
- if(moved){square.__novaTestMove=true;}
  g.shapes=[square];
  if(extraSquare)g.shapes.push({kind:'shape',id:51,type:'square',
   x:squareX+9,y:squareY,r:20,hp:55});
@@ -80,13 +79,12 @@ function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
  if(extraBullet)g.bullets.push({kind:'bullet',id:11,ownerId:3,
   x:extraBullet==='remote'?1000:0,y:extraBullet==='remote'?1000:0,vx:0,vy:0,r:3,dmg:20,ttl:1,pen:0,hits:0,dead:false});
  if(extraTank)g.tanks.push({kind:'tank',id:2,cls:'scout',alive:true,hp:100,x:30,y:0});
- if(moved){
+ if(moved||teleport){
   const oldUpdate=g.update.bind(g);
-  g.update=function(dt){square.x=squareX;square.y=squareY;oldUpdate(dt);};
-  // The actual owner would move after the Battlefield snapshot. We inject
-  // a witnessed movement inside the core update, not an invented history.
+  g.update=function(dt){square.x=squareX;square.y=teleport?120:squareY;oldUpdate(dt);};
+  // Capture the actual frame-start shape, then move inside core update.
   const original=g.updateBullets.bind(g);
-  g.updateBullets=function(dt){square.x=squareX;square.y=squareY+10;return original(dt);};
+  g.updateBullets=function(dt){square.x=squareX;square.y=teleport?squareY:squareY+10;return original(dt);};
  }
  g.update(1/hz);
  return {g,square};
@@ -125,8 +123,12 @@ for(const optimized of [false,true]){
   const {g,square}=trial(Game,{extraBullet:'remote'});
   assert.equal(square.hp,43);assert.deepEqual(g.hits,[50]);
  });
- test(mode+' witnessed moving square defers ambiguous first-contact proof',()=>{
+ test(mode+' witnessed bounded square motion receives real first contact',()=>{
   const {g,square}=trial(Game,{moved:true});
+  assert.equal(square.hp,43);assert.deepEqual(g.hits,[50]);
+ });
+ test(mode+' discontinuous square teleport cannot create backdated contact',()=>{
+  const {g,square}=trial(Game,{teleport:true});
   assert.equal(square.hp,55);assert.deepEqual(g.hits,[]);
  });
  test(mode+' two potential square victims defer instead of choosing array order',()=>{
