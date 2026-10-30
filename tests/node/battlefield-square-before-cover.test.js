@@ -139,6 +139,21 @@ for(const optimized of [false,true]){
   assert.equal(square.hp,43);
   assert.equal(g.__novaTerrain[0].hp,288);
  });
+ test(mode+' expiry before wall never damages unreachable cover',()=>{
+  const {g}=trial(Game,{hz:30,ttl:.0035,wallX:200,cover:true});
+  assert.equal(g.__novaTerrain[0].hp,300);
+ });
+ test(mode+' square beyond physical TTL remains untouched',()=>{
+  const {g,square}=trial(Game,{hz:30,ttl:.0035,
+   squareX:150,wallX:200,cover:true});
+  assert.equal(square.hp,55);
+  assert.equal(g.__novaTerrain[0].hp,300);
+ });
+ test(mode+' competing projectile vetoes expiring square speculation',()=>{
+  const {g,square}=trial(Game,{hz:30,ttl:.0035,extraBullet:true});
+  assert.equal(square.hp,55);
+  assert.deepEqual(g.hits,[]);
+ });
  test(mode+' expiring square after wall is never backdated',()=>{
   const {g,square}=trial(Game,{hz:240,vx:1500,squareX:25,squareY:26,
    wallX:10,wallHeight:8,pen:4,dmg:47,
