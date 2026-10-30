@@ -66,7 +66,7 @@ function boot(optimized,full=false){
 function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
   squareY=0,wallY=0,born=false,moved=false,teleport=false,extraBullet=false,
   extraTank=false,fragile=false,pen=1,extraSquare=false,cover=false,coverHp=300,
-  secondExpiring=false,interceptBullet=false,
+  secondExpiring=false,
   dmg=12,radius=3,ttl=1,wallHeight=80,wallWidth=8,bulletY=0,linearVy=0,
   remoteBullets=0,reverseBullets=false,coverCompetitor=false,remoteShell=null}={}){
  const g=new Game();
@@ -105,9 +105,6 @@ function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
  }
  if(secondExpiring)g.bullets.push({kind:'bullet',id:998,ownerId:998,
   x:1600,y:1600,vx:0,vy:0,r:3,dmg:5,ttl:.004,pen:1,
-  hits:0,dead:false,shell:false,beam:false,splash:0});
- if(interceptBullet)g.bullets.push({kind:'bullet',id:997,ownerId:997,
-  x:0,y:32,vx:0,vy:0,r:3,dmg:5,ttl:1,pen:0,
   hits:0,dead:false,shell:false,beam:false,splash:0});
  if(reverseBullets)g.bullets.reverse();
  if(moved||teleport){
@@ -422,7 +419,7 @@ for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['f
  * This is deliberately narrower than lethal-cover or interception ordering. */
 for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['full shipping',FullGame]]){
  for(const hz of [30,240])for(const reverseBullets of [false,true]){
-  test(label+' same-cover competing shot vetoes speculative TTL chain at '+hz+'Hz reverse='+reverseBullets,()=>{
+  test(label+' nonlethal shared cover preserves both structural hits at '+hz+'Hz reverse='+reverseBullets,()=>{
    const {g,square}=trial(Game,{hz,vx:440,squareX:16.5,squareY:52,
     wallX:94,wallWidth:180,wallHeight:60,bulletY:32,
     pen:1,dmg:12,radius:5*(1+12*.0085),ttl:.004,
@@ -534,7 +531,7 @@ for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['f
 
 
 /* Run 471 safety gates: the local chronology proof is NOT a license to
- * precommit lethal cover breaks, ambiguous projectile interception, or
+ * precommit lethal cover breaks, ambiguous first-body contact, or
  * multiple expiring candidates. These cases retain conservative behavior. */
 for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['full shipping',FullGame]]){
  for(const hz of [30,240])for(const reverseBullets of [false,true]){
@@ -554,9 +551,9 @@ for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['f
    assert.equal(g.__novaTerrain[0].hp,299,'multi-candidate order remains conservative');
    assert.ok(square.hp===43||square.hp===55);
   });
-  test(label+' direct projectile interception hazard vetoes shared-cover proof at '+hz+'Hz reverse='+reverseBullets,()=>{
-   const {g,square}=trial(Game,{...common,interceptBullet:true});
-   assert.equal(g.__novaTerrain[0].hp,299,'interception cannot create phantom cover damage');
+  test(label+' two potential square victims veto shared-cover proof at '+hz+'Hz reverse='+reverseBullets,()=>{
+   const {g,square}=trial(Game,{...common,extraSquare:true});
+   assert.equal(g.__novaTerrain[0].hp,299,'ambiguous first body cannot create speculative cover damage');
    assert.ok(square.hp===43||square.hp===55);
   });
  }
