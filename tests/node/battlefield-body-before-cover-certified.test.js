@@ -267,9 +267,10 @@ for(const optimized of [false,true]){
   const r=run(boot(optimized),{remoteBullets:24,otherBullet:true});
   assert.deepEqual(r.hits,[],'local projectile interception remains ambiguous');
  });
- test(label+': remote shell still vetoes first-contact proof',()=>{
+ test(label+': remote unspent shell cannot suppress proof amid distant fire',()=>{
   const r=run(boot(optimized),{remoteBullets:24,otherShell:true});
-  assert.deepEqual(r.hits,[],'shell side effects require separate arbitration');
+  assert.deepEqual(r.hits,[2],'independent shell and shots cannot change first contact');
+  assert.equal(r.hp,90);
  });
  test(label+': earlier neutral still vetoes proof amid remote fire',()=>{
   const r=run(boot(optimized),{remoteBullets:24,otherShape:true});
