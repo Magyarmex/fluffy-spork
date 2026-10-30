@@ -324,9 +324,48 @@ for(const optimized of [false,true])for(const reverse of [false,true]){
    otherBullets:Array.from({length:200},(_,i)=>denseRemoteRailShot(i))});
   assert.ok(Math.abs(r.hp-4.8)<1e-8);
  });
- test(label+': above 256 projectiles rail proof defers whole frame reversed='+reverse,()=>{
+ test(label+': 257 independent projectiles retain certified rail hit reversed='+reverse,()=>{
   const r=runRailTTL(Game,{fps:30,reverse,
    otherBullets:Array.from({length:256},(_,i)=>denseRemoteRailShot(i))});
-  assert.equal(r.hp,100,'do not scan unbounded traffic or prefer early array entries');
+  assert.ok(Math.abs(r.hp-4.8)<1e-8,
+   'bounded remote fire cannot erase the earlier physical rail contact');
+ });
+ test(label+': above 600 combined scans still defers entire rail proof reversed='+reverse,()=>{
+  const r=runRailTTL(Game,{fps:30,reverse,
+   otherBullets:Array.from({length:600},(_,i)=>({
+    ...denseRemoteRailShot(i),x:1000+20*(i%40),
+    y:1000+25*Math.floor(i/40)}))});
+  assert.equal(r.hp,100,
+   'over-budget rail proof must fail closed without first-N selection');
+ });
+}
+
+/* Run 462 rail TTL density falsifier — RESEARCH ONLY, known-red before a
+ * safe redesign of the explicit 256-shot contract above. All 260 ordinary
+ * competitors are physically remote from the 5ms rail and its victim.
+ * At 240Hz the core may resolve the contact before TTL, independently of
+ * this fallback; 30–120Hz must exercise the actual TTL proof. */
+function separatedRailShot(i){return {kind:'bullet',id:2000+i,ownerId:3,
+ x:1100+40*(i%20),y:1000+45*Math.floor(i/20),
+ vx:-70,vy:25,r:3,dmg:4,pen:0,ttl:1,hits:0,dead:false,
+ shell:false,beam:false};}
+for(const optimized of [false,true])for(const reverse of [false,true]){
+ const Game=boot(optimized),label=optimized?'optimized':'baseline';
+ for(const fps of [30,60,120,240]){
+  test(label+': 260 genuinely remote rounds cannot erase legal rail TTL contact at '+
+   fps+'Hz reversed='+reverse,()=>{
+   const r=runRailTTL(Game,{fps,reverse,
+    otherBullets:Array.from({length:260},(_,i)=>separatedRailShot(i))});
+   assert.ok(Math.abs(r.hp-4.8)<1e-8,
+    'remote bullet density alone must not cancel physically reachable rail hit');
+   assert.deepEqual(r.hits.map(h=>h.id),[2]);
+  });
+ }
+ test(label+': local interceptor still vetoes dense rail TTL proof reversed='+reverse,()=>{
+  const r=runRailTTL(Game,{fps:30,reverse,
+   otherBullets:[...Array.from({length:260},(_,i)=>separatedRailShot(i)),
+    {kind:'bullet',id:2999,ownerId:3,x:5,y:-520,vx:0,vy:0,
+     r:3,dmg:4,pen:0,ttl:1,hits:0,dead:false,shell:false,beam:false}]});
+  assert.equal(r.hp,100);
  });
 }

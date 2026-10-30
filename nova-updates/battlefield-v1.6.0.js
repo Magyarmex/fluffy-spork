@@ -1243,8 +1243,14 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      !Number.isFinite(b.r)||!(b.r>0)||
      !Number.isFinite(b.dmg)||!(b.dmg>0))return false;
   var bullets=g.bullets||[];
-  if(bullets.length>256||bullets.indexOf(b)<0||
-     g.__novaWallProofHadShell===true)return false;
+  /* Rail TTL recovery already scans every competing shot for corridor and
+   * victim threats. Bound that actual work separately from living bodies;
+   * unrelated remote gunfire must not erase a certified physical contact.
+   * Keep an all-or-nothing 600-item limit, never a first-N selection. */
+  var bodyCount=(g.tanks||[]).length+(g.shapes||[]).length+
+      (g.drones||[]).length;
+  if(bodyCount>260||bodyCount+bullets.length>600||
+     bullets.indexOf(b)<0||g.__novaWallProofHadShell===true)return false;
   var ax=b.x,ay=b.y,ex=ax+b.vx*b.ttl,ey=ay+b.vy*b.ttl;
   if(!Number.isFinite(ex)||!Number.isFinite(ey)||
      Math.max(Math.abs(ax),Math.abs(ay),Math.abs(ex),Math.abs(ey))>=MAP_LIMIT-20||
