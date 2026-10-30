@@ -2099,11 +2099,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
 
  /* #147: a nonlethal square physically BEFORE a wall must not disappear
   * merely because the core checks the full-frame endpoint after terrain.
-  * One witnessed bounded-motion square, pen<=1 shot, no competing
+  * One witnessed bounded-motion square, bounded pen<=4 shot, no competing
   * contact and no ambiguous chronology: otherwise defer to legacy combat. */
  function certifiedSquareBeforeFirstSolid(g,b,dt,ax,ay,ex,ey,wall){
   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
-     (b.pen!==0&&b.pen!==1)||(b.hits||0)!==0||(b.knock||0)!==0||
+     !(Number.isSafeInteger(b.pen)&&b.pen>=0&&b.pen<=4)||(b.hits||0)!==0||(b.knock||0)!==0||
      b.__novaBreachAtTime===g.time||
      g.__novaShapeSweepActive!==true||g.__novaWallProofHadShell===true||
      !Number.isSafeInteger(b.id)||
@@ -2115,7 +2115,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      !Number.isFinite(ax)||!Number.isFinite(ay)||
      !Number.isFinite(ex)||!Number.isFinite(ey)||
      (b.__novaDirectVictims&&b.__novaDirectVictims.size>0)||
-     !wall||!wall.solid||!wall.hit||
+     !wall||!wall.solid||(b.pen>1&&wall.solid.destructible)||!wall.hit||
      !(wall.hit.t>1e-6&&wall.hit.t<=1))return false;
   var tanks=g.tanks||[],shapes=g.shapes||[],drones=g.drones||[],
       shots=g.bullets||[];
@@ -2148,7 +2148,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       s.__novaShapeSweepEpoch!==g.__novaShapeSweepEpoch||
       !Number.isFinite(s.__novaShapeSweepPrevX)||
       !Number.isFinite(s.__novaShapeSweepPrevY)||
-      !(s.hp>b.dmg*2))return false;
+      !(s.hp>b.dmg*1.000001))return false;
    var move=Math.hypot(s.x-sx,s.y-sy);
    if(!Number.isFinite(move)||move>96||
       pointInsideSolid(wall.solid,sx,sy,s.r+1)||
@@ -2216,7 +2216,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   g.damageShape(victim,b.dmg,b.vx,b.vy);
   b.hits++;b.pen--;
   if(b.pen<0){b.dead=true;b.vx=0;b.vy=0;return 1;}
-  /* The one remaining penetration belongs to the later wall, not a
+  /* Remaining penetration belongs to the later permanent wall, not a
    * second body. Preserve victim identity and canonical cover damage. */
   (b.__novaDirectVictims||(b.__novaDirectVictims=new Set())).add(victim);
   return 2;
