@@ -66,7 +66,7 @@ function boot(optimized,full=false){
 function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
   squareY=0,wallY=0,born=false,moved=false,teleport=false,extraBullet=false,
   extraTank=false,fragile=false,pen=1,extraSquare=false,cover=false,coverHp=300,
-  secondExpiring=false,
+  secondExpiring=false,extraSquareOffset=9,
   dmg=12,radius=3,ttl=1,wallHeight=80,wallWidth=8,bulletY=0,linearVy=0,
   remoteBullets=0,reverseBullets=false,coverCompetitor=false,remoteShell=null}={}){
  const g=new Game();
@@ -74,7 +74,7 @@ function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
  if(born)square.born=g.time;
  g.shapes=[square];
  if(extraSquare)g.shapes.push({kind:'shape',id:51,type:'square',
-  x:squareX+9,y:squareY,r:20,hp:55});
+  x:squareX+extraSquareOffset,y:squareY,r:20,hp:55});
  g.__novaTerrain=[{id:-51,shape:'rect',x:wallX,y:wallY,w:wallWidth,h:wallHeight,
   solid:true,destructible:cover,hp:cover?coverHp:0}];
  g.bullets=[{kind:'bullet',id:10,ownerId:1,x:0,y:bulletY,vx,vy:0,
@@ -552,7 +552,7 @@ for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['f
    assert.ok(square.hp===43||square.hp===55);
   });
   test(label+' two potential square victims veto shared-cover proof at '+hz+'Hz reverse='+reverseBullets,()=>{
-   const {g,square}=trial(Game,{...common,extraSquare:true});
+   const {g,square}=trial(Game,{...common,extraSquare:true,extraSquareOffset:-.3});
    assert.equal(g.__novaTerrain[0].hp,299,'ambiguous first body cannot create speculative cover damage');
    assert.ok(square.hp===43||square.hp===55);
   });
