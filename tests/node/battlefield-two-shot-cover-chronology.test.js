@@ -144,6 +144,13 @@ for(const optimized of [false,true]){
    }
   });
  }
+ test(label+': a spent pen=0 breaker also stops before a behind-cover Square',()=>{
+  for(const reverse of [false,true]){
+   const r=trial(Game,{postCoverSquare:true,competitorPen:0,reverse});
+   assert.equal(r.tankHp,88);
+   assert.equal(r.postCoverSquareHp,55);
+  }
+ });
  test(label+': a Square physically before cover vetoes speculative breaker priority',()=>{
   const r=trial(Game,{postCoverSquare:true,postCoverSquareX:100});
   assert.equal(r.tankHp,100,'no false downstream promotion when the Square could be first');
