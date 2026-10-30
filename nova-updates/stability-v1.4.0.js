@@ -414,7 +414,21 @@
     ['applyClass','applyPerk','applyGene','dismissOffer'].forEach(function(name){
       var old=Game.prototype[name];if(!old)return;
       Game.prototype[name]=function(){
+        var deferred=name==='dismissOffer'?this.pendingOffer:null;
         var out=old.apply(this,arguments);
+        // At level cap the earned offer stays pending after DECIDE LATER.
+        // Reopening and deferring the same choice must not repeatedly grant
+        // the 1.8s evolution shield or erase enemy focus. Grant grace once per
+        // player identity and earned tier; a new life or tier earns fresh grace.
+        if(name==='dismissOffer'){
+          if(!deferred)return out;
+          if(this.pendingOffer===deferred){
+            if(this.__novaCapGraceOwner===this.player&&this.__novaCapGraceTier===deferred)
+              return out;
+            this.__novaCapGraceOwner=this.player;
+            this.__novaCapGraceTier=deferred;
+          }
+        }
         evolutionGrace(this);
         return out;
       };
