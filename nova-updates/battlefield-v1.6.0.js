@@ -2096,6 +2096,135 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   * a permanent wall or an intact second barricade. This also applies to
   * Sniper-annotated rails: a fast beam can cross both solids in one frame.
   * Stop only when earlier body/interception contacts are ruled out. */
+
+ /* #147: a nonlethal square physically BEFORE a wall must not disappear
+  * merely because the core checks the full-frame endpoint after terrain.
+  * One witnessed bounded-motion square, bounded pen<=4 shot, no competing
+  * contact and no ambiguous chronology: otherwise defer to legacy combat. */
+ function certifiedSquareBeforeFirstSolid(g,b,dt,ax,ay,ex,ey,wall){
+  if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
+     !(Number.isSafeInteger(b.pen)&&b.pen>=0&&b.pen<=4)||(b.hits||0)!==0||(b.knock||0)!==0||
+     b.__novaBreachAtTime===g.time||
+     g.__novaShapeSweepActive!==true||g.__novaWallProofHadShell===true||
+     !Number.isSafeInteger(b.id)||
+     g.__novaFrameStartBulletEpoch!==g.__novaShapeSweepEpoch||
+     !(b.id<g.__novaFrameStartBulletIdCeiling)||
+     !(Number.isFinite(dt)&&dt>0&&Number.isFinite(b.ttl)&&b.ttl>dt)||
+     !(Number.isFinite(b.dmg)&&b.dmg>0)||
+     !(Number.isFinite(b.r)&&b.r>0)||
+     !Number.isFinite(ax)||!Number.isFinite(ay)||
+     !Number.isFinite(ex)||!Number.isFinite(ey)||
+     (b.__novaDirectVictims&&b.__novaDirectVictims.size>0)||
+     !wall||!wall.solid||(b.pen>1&&wall.solid.destructible)||!wall.hit||
+     !(wall.hit.t>1e-6&&wall.hit.t<=1))return false;
+  var tanks=g.tanks||[],shapes=g.shapes||[],drones=g.drones||[],
+      shots=g.bullets||[];
+  if(tanks.length+shapes.length+drones.length+shots.length>300||
+     shots.length>128)return false;
+  var dx=ex-ax,dy=ey-ay,A=dx*dx+dy*dy,wallT=wall.hit.t;
+  if(!(A>1e-12)||!Number.isFinite(A)||
+     Math.max(Math.abs(ax),Math.abs(ay),Math.abs(ex),Math.abs(ey))>=MAP_LIMIT-20)
+   return false;
+  var stopX=ax+dx*wallT,stopY=ay+dy*wallT,
+      minX=Math.min(ax,stopX),maxX=Math.max(ax,stopX),
+      minY=Math.min(ay,stopY),maxY=Math.max(ay,stopY);
+  function near(x0,y0,x1,y1,pad){
+   if(!Number.isFinite(x0)||!Number.isFinite(y0)||
+      !Number.isFinite(x1)||!Number.isFinite(y1)||
+      !Number.isFinite(pad))return true;
+   return Math.max(x0,x1)+pad>=minX&&Math.min(x0,x1)-pad<=maxX&&
+          Math.max(y0,y1)+pad>=minY&&Math.min(y0,y1)-pad<=maxY;
+  }
+  var victim=null,hitT=0;
+  for(var si=0;si<shapes.length;si++){
+   var s=shapes[si];if(!s||!(s.hp>0))continue;
+   if(!Number.isFinite(s.x)||!Number.isFinite(s.y)||
+      !Number.isFinite(s.r)||!(s.r>0))return false;
+   var rr=b.r+s.r,
+       sx=Number.isFinite(s.__novaShapeSweepPrevX)?s.__novaShapeSweepPrevX:s.x,
+       sy=Number.isFinite(s.__novaShapeSweepPrevY)?s.__novaShapeSweepPrevY:s.y;
+   if(!near(sx,sy,s.x,s.y,rr+4+Math.max(0,dt*800)))continue;
+   if(s.type!=='square'||s.born===g.time||
+      s.__novaShapeSweepEpoch!==g.__novaShapeSweepEpoch||
+      !Number.isFinite(s.__novaShapeSweepPrevX)||
+      !Number.isFinite(s.__novaShapeSweepPrevY)||
+      !(s.hp>b.dmg*1.000001))return false;
+   var move=Math.hypot(s.x-sx,s.y-sy);
+   if(!Number.isFinite(move)||move>96||
+      pointInsideSolid(wall.solid,sx,sy,s.r+1)||
+      pointInsideSolid(wall.solid,s.x,s.y,s.r+1)||
+      (move>1e-8&&firstSolidHit(g,sx,sy,s.x,s.y,s.r+1)))
+    return false;
+   var enter=null;
+   if(move>1e-8){
+    /* Reuse the exact moving-shape contact owner already used by
+     * Battlefield's shipping swept recovery, never an endpoint guess. */
+    enter=movingShapeHitT(g,s,ax,ay,ex,ey,rr);
+   }else{
+    var fx=ax-s.x,fy=ay-s.y,B=2*(fx*dx+fy*dy),
+        C=fx*fx+fy*fy-rr*rr;
+    if(!(C>1e-8))return false;
+    var D=B*B-4*A*C;
+    if(!Number.isFinite(D)||
+       Math.abs(D)<=1e-10*(B*B+4*A*(fx*fx+fy*fy+rr*rr)))return false;
+    if(D>0){
+     var root=Math.sqrt(D),q=-.5*(B+(B<0?-root:root));
+     if(!q)return false;
+     var leave=Math.max(q/A,C/q);
+     if(leave>0)enter=Math.min(q/A,C/q);
+    }
+   }
+   if(enter==null||enter>=wallT-1e-6)continue;
+   if(!(enter>1e-9)||victim)return false;
+   victim=s;hitT=enter;
+  }
+  if(!victim)return false;
+  /* A nearby tank, drone or lateral projectile can change first-contact
+   * order or damage credit. Never infer its trajectory. */
+  for(var ti=0;ti<tanks.length;ti++){
+   var t=tanks[ti];if(!t||!t.alive||t.id===b.ownerId)continue;
+   var def=CLASSES[t.cls];if(!def||!(def.size>0))return false;
+   var sx=t.__novaSweepMoveTime===g.time?t.__novaSweepPrevX:t.x,
+       sy=t.__novaSweepMoveTime===g.time?t.__novaSweepPrevY:t.y;
+   if(near(sx,sy,t.x,t.y,b.r+def.size+3+Math.max(30,dt*800)))
+    return false;
+  }
+  for(var di=0;di<drones.length;di++){
+   var d=drones[di];if(!d||!(d.hp>0)||d.ownerId===b.ownerId)continue;
+   if(near(d.__novaChronoDronePrevX,d.__novaChronoDronePrevY,d.x,d.y,
+      b.r+(d.r||8)+1+Math.max(30,dt*2400)))return false;
+  }
+  for(var bi=0;bi<shots.length;bi++){
+   var o=shots[bi];if(!o||o===b)continue;
+   /* A previous terrain pre-pass may already have killed or relocated this
+    * competitor. Its current endpoint cannot certify its earlier corridor. */
+   if(o.__novaWallProofEpoch!==g.__novaWallProofEpoch||
+      o.dead||o.__novaBreachAtTime===g.time)return false;
+   if(!Number.isFinite(o.x)||!Number.isFinite(o.y)||
+      !Number.isFinite(o.vx)||!Number.isFinite(o.vy)||
+      !Number.isFinite(o.r)||!(o.r>0))return false;
+   var span=Math.min(dt,Math.max(0,o.ttl||0)),
+       ox=o.x+o.vx*span,oy=o.y+o.vy*span;
+   if(near(o.x,o.y,ox,oy,b.r+o.r+2))return false;
+   var toHit=Math.min(span,hitT*dt),
+       hx=o.x+o.vx*toHit,hy=o.y+o.vy*toHit,rr=o.r+victim.r;
+   var vsx=victim.__novaShapeSweepPrevX,vsy=victim.__novaShapeSweepPrevY;
+   if(Math.max(o.x,hx)+rr>=Math.min(vsx,victim.x)&&
+      Math.min(o.x,hx)-rr<=Math.max(vsx,victim.x)&&
+      Math.max(o.y,hy)+rr>=Math.min(vsy,victim.y)&&
+      Math.min(o.y,hy)-rr<=Math.max(vsy,victim.y))return false;
+  }
+  var hx=ax+dx*hitT,hy=ay+dy*hitT;
+  if(typeof g.initBulletIntegrity==='function')g.initBulletIntegrity(b);
+  b.x=hx;b.y=hy;b.px=hx;b.py=hy;
+  g.damageShape(victim,b.dmg,b.vx,b.vy);
+  b.hits++;b.pen--;
+  if(b.pen<0){b.dead=true;b.vx=0;b.vy=0;return 1;}
+  /* Remaining penetration belongs to the later permanent wall, not a
+   * second body. Preserve victim identity and canonical cover damage. */
+  (b.__novaDirectVictims||(b.__novaDirectVictims=new Set())).add(victim);
+  return 2;
+ }
  function certifiedBreachLaterSolid(g,b,dt,ax,ay,ex,ey,first){
   if(!b||b.dead||b.shell||(b.beam&&b.__novaRail!==true)||b.splash||b.__v17Cannon||
      g.__novaShapeSweepActive!==true||g.__novaWallProofHadShell===true||
@@ -2381,7 +2510,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
     }else isolatedTTLStationaryPiercingChain(this,liveBullet,dt,true);
    }
   }
- for(var i=0;i<this.bullets.length;i++){var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,sweepDt=dt;/* Terrain beyond physical projectile lifetime is unreachable, including shells. */if(Number.isFinite(b.ttl)){if(b.ttl<=0)continue;sweepDt=Math.min(dt,b.ttl);}var nx=ox+(b.vx||0)*sweepDt,ny=oy+(b.vy||0)*sweepDt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;if(fuseDefinitelyBeforeTerrain(this,b,dt,ox,oy,nx,ny,fh.hit))continue;if(certifiedTankBeforeFirstSolid(this,b,dt,ox,oy,nx,ny,fh)===1)continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){/* Integrity belongs to the launch build, not the post-breach pen. */if(this.initBulletIntegrity)this.initBulletIntegrity(b);b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){if(certifiedBreachLaterSolid(this,b,dt,ox,oy,nx,ny,fh))continue;b.__novaBreachAtTime=this.time;b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
+ for(var i=0;i<this.bullets.length;i++){var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,sweepDt=dt;/* Terrain beyond physical projectile lifetime is unreachable, including shells. */if(Number.isFinite(b.ttl)){if(b.ttl<=0)continue;sweepDt=Math.min(dt,b.ttl);}var nx=ox+(b.vx||0)*sweepDt,ny=oy+(b.vy||0)*sweepDt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;if(fuseDefinitelyBeforeTerrain(this,b,dt,ox,oy,nx,ny,fh.hit))continue;if(certifiedTankBeforeFirstSolid(this,b,dt,ox,oy,nx,ny,fh)===1)continue;if(certifiedSquareBeforeFirstSolid(this,b,dt,ox,oy,nx,ny,fh)===1)continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){/* Integrity belongs to the launch build, not the post-breach pen. */if(this.initBulletIntegrity)this.initBulletIntegrity(b);b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){if(certifiedBreachLaterSolid(this,b,dt,ox,oy,nx,ny,fh))continue;b.__novaBreachAtTime=this.time;b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
    /* The core still advances a dead bullet before removing it; a shell may
      * expire or leave the arena in that pass. Consume its one-time burst now. */
     if(b.shell&&this.clusterBurst){var childStart=this.bullets.length;this.clusterBurst(b);clearTerrainBurstChildren(this,s,h,childStart);b.shell=false;}if(b.splash&&this.splashAt)this.splashAt(h.x,h.y,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.dead=true;if(this.addFlash)this.addFlash(h.x,h.y,s.destructible?'#8fd4ff':'#b9c7e7',Math.min(46,14+(b.dmg||0)*.24));if(this.cam&&b.dmg>42)this.cam.shake=Math.max(this.cam.shake,.08);/* The materialized core still advances dead bullets before removing them. Freeze a terrain-killed projectile at its impact so its final trail cannot leak through cover. Breaching live shots keep their velocity above. */b.vx=0;b.vy=0;
