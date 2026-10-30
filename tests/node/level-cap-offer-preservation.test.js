@@ -31,7 +31,7 @@ function GameMethods(src){
   return new Function('types_1','classes_1','return class GameHarness {\n'+methods+'\n}')({
     MAX_LEVEL:45,xpForLevel:()=>1000
   },{
-    CLASSES:{scout:{tier:0},tier1:{tier:1},tier2:{tier:2},apex:{tier:3,parent:'tier2'}},
+    CLASSES:{scout:{tier:0,name:'Scout',color:'#fff'},tier1:{tier:1,name:'Tier One',color:'#fff'},tier2:{tier:2,name:'Tier Two',color:'#fff'},apex:{tier:3,parent:'tier2',name:'Apex',color:'#fff'}},
     PERKS:{speed:{name:'Speed'}},GENES:{guardian:{name:'Guardian',color:'#fff'}},
     lineageForClass:()=> 'sniper'
   });
