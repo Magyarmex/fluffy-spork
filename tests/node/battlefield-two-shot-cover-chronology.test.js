@@ -79,7 +79,7 @@ function boot(optimized){
 }
 function trial(Game,{hz=30,reverse=false,competitor=true,cover=true,
  competitorY=70,competitorX=120,coverHp=1,pen=2,
- shell=false,remoteBullet=false}={}){
+ shell=false,remoteBullet=false,newborn=false}={}){
  const g=new Game(),dt=1/hz;
  const tank={kind:'tank',id:2,cls:'scout',x:110,y:0,hp:100,alive:true,
   __novaSweepMoveTime:1,__novaSweepPrevX:110,__novaSweepPrevY:0};
@@ -90,7 +90,7 @@ function trial(Game,{hz=30,reverse=false,competitor=true,cover=true,
   w:10,h:160,solid:true,destructible:true,hp:coverHp,maxHp:300}];
  const focal={kind:'bullet',id:10,ownerId:1,x:0,y:0,vx:2500,vy:0,
   r:3,dmg:12,pen,ttl:.15,hits:0,dead:false,shell:false,beam:false,splash:0};
- const other={kind:'bullet',id:11,ownerId:3,x:competitorX,y:competitorY,
+ const other={kind:'bullet',id:newborn?101:11,ownerId:3,x:competitorX,y:competitorY,
   vx:-2500,vy:0,r:3,dmg:10,pen:0,ttl:.15,hits:0,dead:false,
   shell,beam:false,splash:0};
  g.bullets=competitor?[focal,other]:[focal];
@@ -141,6 +141,15 @@ for(const optimized of [false,true]){
   const r=trial(Game,{remoteBullet:true});
   assert.equal(r.tankHp,100);
  });
+ test(label+': a newborn competitor cannot be backdated into this frame',()=>{
+  const r=trial(Game,{newborn:true});
+  assert.equal(r.tankHp,100);
+ });
+ test(label+': intersecting projectile corridors do not gain speculative priority',()=>{
+  const r=trial(Game,{competitorY:0});
+  assert.equal(r.tankHp,100);
+ });
+
 }
 test('actual materialized game includes the corrected Battlefield owner',()=>{
  assert.match(html,/nova-updates\\/battlefield-v1\\.6\\.0\\.js/);
