@@ -80,7 +80,7 @@ test('entry, exit, contest and death interrupt aggregation rather than disappear
  s.g.damageTank(s.p,200);
  const kinds=Array.from(s.st.frontlineTelemetry.events,e=>e.kind);
  assert.deepEqual(kinds,['announced','player-entry','neutral-harvest','player-exit',
-  'player-entry','observed-contest','neutral-harvest','pilot-death-censor','player-death']);
+  'player-approach','player-entry','observed-contest','neutral-harvest','pilot-death-censor','player-death']);
  assert.deepEqual(Array.from(harvestEvents(s),e=>e.xp),[1,2]);
 });
 test('separate public opportunities and unrelated sectors cannot share a harvest group',()=>{
