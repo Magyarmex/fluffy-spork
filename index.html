@@ -247,7 +247,7 @@ canvas {
     <link rel="icon" href="./nova-icon.svg" type="image/svg+xml" />
     <meta name="application-name" content="NOVA TANKS" />
     <script defer src="./pwa-register.js"></script>
-      <meta name="nova-runtime-build" content="b0e9147b541a65f04e845f60" />
+      <meta name="nova-runtime-build" content="8e067ce2cde9ca544e0f5af9" />
   </head>
   <body>
     <div id="root"></div>
@@ -542,7 +542,14 @@ function GeneOffer({ current, onPick, onLater }) {
 }
 function PerkOffer({ onPick, onLater }) {
     const pool = ['dmg', 'speed', 'vitality', 'alacrity', 'thorns', 'wealth'];
-    const shuffled = (0, react_1.useMemo)(() => [...pool].sort(() => Math.random() - 0.5).slice(0, 3), []);
+    const shuffled = (0, react_1.useMemo)(() => {
+        const picks = [...pool];
+        for (let i = 0; i < 3; i++) {
+            const j = i + Math.floor(Math.random() * (picks.length - i));
+            [picks[i], picks[j]] = [picks[j], picks[i]];
+        }
+        return picks.slice(0, 3);
+    }, []);
     return (React.createElement("div", { className: "absolute inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" },
         React.createElement("div", { className: "panel anim-pop w-full max-w-[430px] p-4" },
             React.createElement("div", { className: "text-center font-display text-sm font-black tracking-[0.25em] text-amber-300" }, "\u2605 MASTERY PERK \u2605"),
