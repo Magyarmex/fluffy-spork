@@ -119,7 +119,11 @@ async function run(browser,width,height){
   // The React toast lasts only 2.6s. Capture its actual DOM box immediately
   // after the real click, before unrelated game-state/geometry evaluations
   // can outlive it on a slow CI runner. This is not a Game.toast-only witness.
-  const cueDom=await page.getByText(/^↩ RETURN · FRONT /).evaluate(el=>{
+  const cueDom=await page.getByText(/^↩ RETURN · FRONT /).evaluate(async el=>{
+   // The toast's own 280ms popIn starts at opacity 0. Capture after that
+   // actual entrance, not at an invisible first animation frame.
+   const entrance=el.getAnimations().find(a=>a.animationName==='popIn');
+   if(entrance)await entrance.finished;
    const rect=el.getBoundingClientRect(),style=getComputedStyle(el);
    return {message:(el.textContent||'').trim(),
     left:rect.left,right:rect.right,width:rect.width,height:rect.height,
