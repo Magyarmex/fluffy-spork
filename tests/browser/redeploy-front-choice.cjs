@@ -60,7 +60,7 @@ async function run(browser,width,height){
   assert.ok(recapFit.left>=-1&&recapFit.right<=recapFit.width+1&&
    recapFit.scrollWidth<=recapFit.width+1,
    'last-life recap must fit the real viewport: '+JSON.stringify(recapFit));
-  assert.ok(recapFit.font>=8,'recap must remain legible on compact landscape');
+  assert.ok(recapFit.font>=9,'recap must remain legible on compact landscape');
   assert.equal(await returnButton.textContent(),'↩ RETURN · NEAR FRONT');
   assert.match(await returnButton.getAttribute('aria-label'),/^↩ RETURN · NEAR FRONT.*420–850 world units.*No stat bonus/);
   assert.equal(await page.locator('[data-nova-insertion="fresh"]').textContent(),'⚡ FRESH · RANDOM');
