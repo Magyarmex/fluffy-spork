@@ -1188,6 +1188,22 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
        Math.min(o.y,ey)-rr<=Math.max(sy,by))return false;
    }
   }
+  /* A TTL-expiring piercing shot can hit a square and then cover before
+   * expiry. This one-hit fallback otherwise kills it after the square,
+   * losing the legitimate later cover event. Hand off ONLY when the later
+   * terrain pre-pass can independently certify the full square->wall
+   * chronology. Single-shot proof prevents intervening array-order changes.
+   * If the dry run abstains, preserve this original first-hit recovery. */
+  if(best.kind==='shape'&&best.e.type==='square'&&
+     b.pen>=1&&(b.hits||0)===0&&
+     (g.bullets||[]).length===1){
+   var expiryX=ax+dx*limit,expiryY=ay+dy*limit,
+       laterWall=firstSolidHit(g,ax,ay,expiryX,expiryY,(b.r||2)*.45);
+   if(laterWall&&laterWall.hit&&
+      laterWall.hit.t>bestT/limit+1e-6&&
+      certifiedSquareBeforeFirstSolid(g,b,dt,ax,ay,
+       expiryX,expiryY,laterWall,true)===2)return false;
+  }
   var vx=b.vx,vy=b.vy;
   b.x=hx;b.y=hy;b.px=hx;b.py=hy;
   if(best.kind==='tank'){
@@ -2101,7 +2117,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   * merely because the core checks the full-frame endpoint after terrain.
   * One witnessed bounded-motion square, bounded pen<=4 shot, no competing
   * contact and no ambiguous chronology: otherwise defer to legacy combat. */
- function certifiedSquareBeforeFirstSolid(g,b,dt,ax,ay,ex,ey,wall){
+ function certifiedSquareBeforeFirstSolid(g,b,dt,ax,ay,ex,ey,wall,dryRun){
   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
      !(Number.isSafeInteger(b.pen)&&b.pen>=0&&b.pen<=4)||(b.hits||0)!==0||(b.knock||0)!==0||
      b.__novaBreachAtTime===g.time||
@@ -2218,6 +2234,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       Math.max(o.y,hy)+rr>=Math.min(vsy,victim.y)&&
       Math.min(o.y,hy)-rr<=Math.max(vsy,victim.y))return false;
   }
+  /* Read-only preflight lets the existing TTL body owner hand off a
+   * certified piercing square->wall chain without losing its first hit.
+   * Only the later terrain owner may commit damage or penetration. */
+  if(dryRun)return 2;
   var hx=ax+dx*hitT,hy=ay+dy*hitT;
   if(typeof g.initBulletIntegrity==='function')g.initBulletIntegrity(b);
   b.x=hx;b.y=hy;b.px=hx;b.py=hy;
