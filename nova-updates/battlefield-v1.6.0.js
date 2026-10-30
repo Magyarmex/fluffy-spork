@@ -2021,7 +2021,9 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    if(player&&player.alive&&near(x0,y0,x1,y1,
       player.x,player.y,player.x,player.y,o.r+400))return null;
    for(var qi=0;qi<shapes.length;qi++){
-    var sh=shapes[qi];if(!sh||!(sh.hp>0))continue;
+    /* Core shell-body queries can still see a shape awaiting removal;
+     * never infer that hp<=0 alone makes its collision harmless. */
+    var sh=shapes[qi];if(!sh)continue;
     var st=shapeSweepStart(g,sh);
     var sx=st?st.x:sh.x,sy=st?st.y:sh.y;
     if(!Number.isFinite(sx)||!Number.isFinite(sy)||
