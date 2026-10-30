@@ -65,7 +65,8 @@ function boot(optimized,full=false){
 }
 function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
   squareY=0,wallY=0,born=false,moved=false,teleport=false,extraBullet=false,
-  extraTank=false,fragile=false,pen=1,extraSquare=false,cover=false,
+  extraTank=false,fragile=false,pen=1,extraSquare=false,cover=false,coverHp=300,
+  secondExpiring=false,interceptBullet=false,
   dmg=12,radius=3,ttl=1,wallHeight=80,wallWidth=8,bulletY=0,linearVy=0,
   remoteBullets=0,reverseBullets=false,coverCompetitor=false,remoteShell=null}={}){
  const g=new Game();
@@ -75,7 +76,7 @@ function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
  if(extraSquare)g.shapes.push({kind:'shape',id:51,type:'square',
   x:squareX+9,y:squareY,r:20,hp:55});
  g.__novaTerrain=[{id:-51,shape:'rect',x:wallX,y:wallY,w:wallWidth,h:wallHeight,
-  solid:true,destructible:cover,hp:cover?300:0}];
+  solid:true,destructible:cover,hp:cover?coverHp:0}];
  g.bullets=[{kind:'bullet',id:10,ownerId:1,x:0,y:bulletY,vx,vy:0,
   r:radius,dmg,ttl,pen,hits:0,dead:false,shell:false,beam:false,splash:0}];
  if(extraBullet)g.bullets.push({kind:'bullet',id:11,ownerId:3,
@@ -102,6 +103,12 @@ function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
    __v17FuseDist:cfg.fuse??0,__v17SpawnX:cfg.spawnX,
    __v17SpawnY:cfg.spawnY});
  }
+ if(secondExpiring)g.bullets.push({kind:'bullet',id:998,ownerId:998,
+  x:1600,y:1600,vx:0,vy:0,r:3,dmg:5,ttl:.004,pen:1,
+  hits:0,dead:false,shell:false,beam:false,splash:0});
+ if(interceptBullet)g.bullets.push({kind:'bullet',id:997,ownerId:997,
+  x:0,y:32,vx:0,vy:0,r:3,dmg:5,ttl:1,pen:0,
+  hits:0,dead:false,shell:false,beam:false,splash:0});
  if(reverseBullets)g.bullets.reverse();
  if(moved||teleport){
   const oldUpdate=g.update.bind(g);
@@ -521,6 +528,36 @@ for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['f
    const {g,square}=trial(Game,{hz:30,vx:1500,squareX:30,wallX:57,
     pen:4,dmg:47,radius:5.8*(1+47*.0085),remoteShell:cfg});
    assert.equal(square.hp,55);assert.deepEqual(g.hits,[]);
+  });
+ }
+}
+
+
+/* Run 471 safety gates: the local chronology proof is NOT a license to
+ * precommit lethal cover breaks, ambiguous projectile interception, or
+ * multiple expiring candidates. These cases retain conservative behavior. */
+for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['full shipping',FullGame]]){
+ for(const hz of [30,240])for(const reverseBullets of [false,true]){
+  const common={hz,vx:440,squareX:16.5,squareY:52,
+   wallX:94,wallWidth:180,wallHeight:60,bulletY:32,
+   pen:1,dmg:12,radius:5*(1+12*.0085),ttl:.004,
+   cover:true,remoteBullets:180,coverCompetitor:true,reverseBullets};
+  test(label+' lethal shared-cover budget abstains at '+hz+'Hz reverse='+reverseBullets,()=>{
+   const {g,square}=trial(Game,{...common,coverHp:13});
+   assert.equal(g.__novaTerrain[0].hp,12,'no speculative structural damage');
+   assert.equal(g.__novaTerrain[0].solid,true);
+   assert.ok(square.hp===43||square.hp===55,'no duplicate or phantom square hit');
+   assert.ok(g.hits.filter(id=>id===50).length<=1);
+  });
+  test(label+' second expiring piercing round disables singleton proof at '+hz+'Hz reverse='+reverseBullets,()=>{
+   const {g,square}=trial(Game,{...common,secondExpiring:true});
+   assert.equal(g.__novaTerrain[0].hp,299,'multi-candidate order remains conservative');
+   assert.ok(square.hp===43||square.hp===55);
+  });
+  test(label+' direct projectile interception hazard vetoes shared-cover proof at '+hz+'Hz reverse='+reverseBullets,()=>{
+   const {g,square}=trial(Game,{...common,interceptBullet:true});
+   assert.equal(g.__novaTerrain[0].hp,299,'interception cannot create phantom cover damage');
+   assert.ok(square.hp===43||square.hp===55);
   });
  }
 }
