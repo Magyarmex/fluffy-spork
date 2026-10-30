@@ -83,7 +83,8 @@ function trial(Game,{hz=30,reverse=false,competitor=true,cover=true,
  const g=new Game(),dt=1/hz;
  const tank={kind:'tank',id:2,cls:'scout',x:110,y:0,hp:100,alive:true,
   __novaSweepMoveTime:1,__novaSweepPrevX:110,__novaSweepPrevY:0};
- const square={kind:'shape',id:50,type:'square',x:40,y:0,r:20,hp:55,\n  __novaShapeSweepEpoch:1,__novaShapeSweepPrevX:40,__novaShapeSweepPrevY:0};
+ const square={kind:'shape',id:50,type:'square',x:40,y:0,r:20,hp:55,
+  __novaShapeSweepEpoch:1,__novaShapeSweepPrevX:40,__novaShapeSweepPrevY:0};
  g.tanks=[tank];g.shapes=[square];
  if(typeof g.hash.insert==='function'){g.hash.insert(tank);g.hash.insert(square);}
  if(cover)g.__novaTerrain=[{id:-1,shape:'rect',x:80,y:0,
