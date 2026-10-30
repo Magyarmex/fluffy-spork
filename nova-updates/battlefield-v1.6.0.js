@@ -2002,8 +2002,9 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    /* Even an unexpected burst cannot be local to this proof corridor. */
    if(near(x0,y0,x1,y1,ax,ay,ex,ey,
       o.r+(b.r||3)+Math.max(400,(o.splash||0)+150)))return null;
-   /* No physical shell collision is possible with any current body.
-    * The 320u margin covers uncertain movement within a <=50ms frame. */
+   /* All body checks use witnessed start/end envelopes. Tanks retain a
+    * generous 320u unknown-motion margin; shapes use their existing 96u
+    * teleport guard plus 120u padding, drones a 160u motion margin. */
    for(var ti=0;ti<tanks.length;ti++){
     var t=tanks[ti];if(!t||!t.alive)continue;
     var def=CLASSES[t.cls];
@@ -2025,9 +2026,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
     var sx=st?st.x:sh.x,sy=st?st.y:sh.y;
     if(!Number.isFinite(sx)||!Number.isFinite(sy)||
        !Number.isFinite(sh.x)||!Number.isFinite(sh.y)||
-       Math.hypot(sh.x-sx,sh.y-sy)>320||
+       shapeWasTeleported(g,sh)||
+       Math.hypot(sh.x-sx,sh.y-sy)>SHAPE_SWEEP_TELEPORT||
        near(x0,y0,x1,y1,sx,sy,sh.x,sh.y,
-        o.r+(sh.r||15)+320))return null;
+        o.r+(sh.r||15)+120))return null;
    }
    for(var di=0;di<drones.length;di++){
     var d=drones[di];if(!d||!(d.hp>0))continue;
@@ -2037,9 +2039,9 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
        d.__novaChronoDronePrevY:d.y;
     if(!Number.isFinite(px)||!Number.isFinite(py)||
        !Number.isFinite(d.x)||!Number.isFinite(d.y)||
-       Math.hypot(d.x-px,d.y-py)>320||
+       Math.hypot(d.x-px,d.y-py)>160||
        near(x0,y0,x1,y1,px,py,d.x,d.y,
-        o.r+(d.r||8)+320))return null;
+        o.r+(d.r||8)+160))return null;
    }
    /* A crossing projectile could detonate the shell. Use its full sweep,
     * not the endpoint or an unordered global shot count. */
