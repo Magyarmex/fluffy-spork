@@ -79,7 +79,7 @@ function boot(optimized){
 }
 function trial(Game,{hz=30,reverse=false,competitor=true,cover=true,
  competitorY=70,competitorX=120,coverHp=1,pen=2,
- shell=false,remoteBullet=false,newborn=false,remoteShapes=0,liveDrone=false}={}){
+ shell=false,remoteBullet=false,newborn=false,remoteShapes=0,liveDrone=false,competitorPen=1}={}){
  const g=new Game(),dt=1/hz;
  const tank={kind:'tank',id:2,cls:'scout',x:110,y:0,hp:100,alive:true,
   __novaSweepMoveTime:1,__novaSweepPrevX:110,__novaSweepPrevY:0};
@@ -103,7 +103,7 @@ function trial(Game,{hz=30,reverse=false,competitor=true,cover=true,
  const focal={kind:'bullet',id:10,ownerId:1,x:0,y:0,vx:2500,vy:0,
   r:3,dmg:12,pen,ttl:.15,hits:0,dead:false,shell:false,beam:false,splash:0};
  const other={kind:'bullet',id:newborn?101:11,ownerId:3,x:competitorX,y:competitorY,
-  vx:-2500,vy:0,r:3,dmg:10,pen:0,ttl:.15,hits:0,dead:false,
+  vx:-2500,vy:0,r:3,dmg:10,pen:competitorPen,ttl:.15,hits:0,dead:false,
   shell,beam:false,splash:0};
  g.bullets=competitor?[focal,other]:[focal];
  if(remoteBullet)g.bullets.push({kind:'bullet',id:12,ownerId:12,
@@ -129,6 +129,12 @@ for(const optimized of [false,true]){
    }
   });
  }
+ test(label+': an already exhausted pen=0 breaker remains valid',()=>{
+  const r=trial(Game,{competitorPen:0});
+  assert.equal(r.squareHp,43);
+  assert.equal(r.tankHp,88);
+  assert.equal(r.coverHp,0);
+ });
  test(label+': 120 unrelated neutral shapes do not erase a certified local breach',()=>{
   const r=trial(Game,{remoteShapes:120});
   assert.equal(r.squareHp,43);
