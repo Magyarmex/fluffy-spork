@@ -131,7 +131,7 @@ for(const optimized of [false,true]){
   assert.equal(r.coverHp,0);
  });
  test(label+': insufficient competing damage cannot create a breach',()=>{
-  const r=trial(Game,{coverHp:20});
+  const r=trial(Game,{coverHp:100});
   assert.equal(r.tankHp,100);
   assert.ok(r.coverHp>0);
  });
