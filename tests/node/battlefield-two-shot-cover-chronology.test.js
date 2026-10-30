@@ -79,13 +79,16 @@ function boot(optimized){
 }
 function trial(Game,{hz=30,reverse=false,competitor=true,cover=true,
  competitorY=70,competitorX=120,coverHp=1,pen=2,
- shell=false,remoteBullet=false,newborn=false,remoteShapes=0}={}){
+ shell=false,remoteBullet=false,newborn=false,remoteShapes=0,liveDrone=false}={}){
  const g=new Game(),dt=1/hz;
  const tank={kind:'tank',id:2,cls:'scout',x:110,y:0,hp:100,alive:true,
   __novaSweepMoveTime:1,__novaSweepPrevX:110,__novaSweepPrevY:0};
  const square={kind:'shape',id:50,type:'square',x:40,y:0,r:20,hp:55,
   __novaShapeSweepEpoch:1,__novaShapeSweepPrevX:40,__novaShapeSweepPrevY:0};
  g.tanks=[tank];g.shapes=[square];
+ if(liveDrone)g.drones.push({kind:'drone',id:80,ownerId:7,x:1700,y:1700,
+  r:8,hp:20,__novaChronoDroneEpoch:1,
+  __novaChronoDronePrevX:1700,__novaChronoDronePrevY:1700});
  for(let i=0;i<remoteShapes;i++){
   const x=-1700+(i%20)*35,y=1300+Math.floor(i/20)*35;
   g.shapes.push({kind:'shape',id:200+i,type:'circle',x,y,r:12,hp:14,
@@ -93,6 +96,7 @@ function trial(Game,{hz=30,reverse=false,competitor=true,cover=true,
  }
  if(typeof g.hash.insert==='function'){
   g.hash.insert(tank);for(const shape of g.shapes)g.hash.insert(shape);
+  for(const drone of g.drones)g.hash.insert(drone);
  }
  if(cover)g.__novaTerrain=[{id:-1,shape:'rect',x:80,y:0,
   w:10,h:160,solid:true,destructible:true,hp:coverHp,maxHp:300}];
@@ -153,6 +157,10 @@ for(const optimized of [false,true]){
  });
  test(label+': a third shot preserves conservative existing arbitration',()=>{
   const r=trial(Game,{remoteBullet:true});
+  assert.equal(r.tankHp,100);
+ });
+ test(label+': any live drone preserves conservative interception ordering',()=>{
+  const r=trial(Game,{liveDrone:true});
   assert.equal(r.tankHp,100);
  });
  test(label+': a newborn competitor cannot be backdated into this frame',()=>{
