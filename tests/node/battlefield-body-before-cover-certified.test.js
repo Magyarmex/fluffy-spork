@@ -113,8 +113,9 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,l
    __novaShapeSweepPrevX:x,__novaShapeSweepPrevY:y});
  }
  if(shellShape){
-  const y=shellShape==='near'?950:750;
-  g.shapes.push({kind:'shape',id:99,type:'square',x:0,y,r:20,hp:55,
+  const y=shellShape==='near'||shellShape==='dead-near'?950:750;
+  g.shapes.push({kind:'shape',id:99,type:'square',x:0,y,r:20,
+   hp:shellShape==='dead-near'?0:55,
    __novaShapeSweepEpoch:g.__novaShapeSweepEpoch,
    __novaShapeSweepPrevX:0,
    __novaShapeSweepPrevY:shellShape==='teleport'?0:y});
@@ -250,6 +251,10 @@ for(const optimized of [false,true]){
  });
  test(label+': neutral near shell retains explosion veto',()=>{
   const r=run(boot(optimized),{otherShell:true,shellShape:'near'});
+  assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
+ });
+ test(label+': pending-dead neutral cannot be ignored by shell proof',()=>{
+  const r=run(boot(optimized),{otherShell:true,shellShape:'dead-near'});
   assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
  });
  test(label+': teleported neutral cannot certify a shell-free frame',()=>{
