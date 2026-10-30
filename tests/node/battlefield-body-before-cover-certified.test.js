@@ -128,7 +128,8 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,l
    x:cfg.x??0,y:cfg.y??1000,vx:cfg.vx??0,vy:cfg.vy??0,
    r:9,dmg:10,ttl:cfg.ttl??1,pen:1,hits:0,dead:false,
    shell:true,splash:cfg.splash??100,
-   __v17Cannon:cfg.cannon||false,__v17FuseDist:cfg.fuse||0});
+   __v17Cannon:cfg.cannon||false,__v17FuseDist:cfg.fuse||0,
+   __v17SpawnX:cfg.spawnX,__v17SpawnY:cfg.spawnY});
  }
  if(shellInterception)g.bullets.push({kind:'bullet',id:13,ownerId:8,
   x:0,y:1000,vx:0,vy:0,r:3,dmg:10,ttl:1,pen:0,hits:0,dead:false});
@@ -214,6 +215,20 @@ for(const optimized of [false,true]){
    assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
   });
  }
+ test(label+': real Cannon fuse far ahead remains independent',()=>{
+  const r=run(boot(optimized),{otherShell:{cannon:true,fuse:350,
+   spawnX:0,spawnY:1000,vx:420}});
+  assert.deepEqual(r.hits,[2]);assert.equal(r.hp,90);
+ });
+ test(label+': Cannon fuse reached this frame still vetoes',()=>{
+  const r=run(boot(optimized),{otherShell:{cannon:true,fuse:10,
+   spawnX:0,spawnY:1000,vx:420}});
+  assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
+ });
+ test(label+': Cannon missing launch witness fails closed',()=>{
+  const r=run(boot(optimized),{otherShell:{cannon:true,fuse:350,vx:420}});
+  assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
+ });
  test(label+': ordinary moving remote shell remains independent',()=>{
   const r=run(boot(optimized),{otherShell:{vx:420,vy:0}});
   assert.deepEqual(r.hits,[2]);assert.equal(r.hp,90);
