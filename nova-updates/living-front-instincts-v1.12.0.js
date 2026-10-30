@@ -69,7 +69,7 @@ function chooseCrasher(g,st,cr,defs){
  }
  return score>-.35?best:null;
 }
-function crasherState(state,t,dt,aligned,inRange){t-=dt;if(state==='track'&&t<=0&&aligned&&inRange)return{state:'telegraph',t:.40};if(state==='telegraph'&&t<=0)return{state:'charge',t:.56};if(state==='charge'&&t<=0)return{state:'overshoot',t:.18};if(state==='overshoot'&&t<=0)return{state:'recover',t:.54};if(state==='recover'&&t<=0)return{state:'track',t:.28};return{state:state,t:t};}
+function crasherState(state,t,dt,aligned,inRange){t-=dt;if(state==='track'&&t<=1e-9&&aligned&&inRange)return{state:'telegraph',t:.40};if(state==='telegraph'&&t<=0)return{state:'charge',t:.56};if(state==='charge'&&t<=0)return{state:'overshoot',t:.18};if(state==='overshoot'&&t<=0)return{state:'recover',t:.54};if(state==='recover'&&t<=0)return{state:'track',t:.28};return{state:state,t:t};}
 function decayTerrainBump(s,dt){if(!s||s.type!=='crasher')return 0;var t=Math.max(0,Number(s.__novaTerrainBumpT)||0);if(t<=0){s.__novaTerrainBumpT=0;return 0;}s.__novaTerrainBumpT=Math.max(0,t-Math.max(0,Number(dt)||0));return s.__novaTerrainBumpT;}
 function crasher(g,st,cr,defs,dt){
   cr.wanderT=999;var state=cr.__lfPredatorState||'track',target=null;if(cr.__lfTargetId>=0){target=cr.__lfTargetKind==='tank'?(g.getTank&&g.getTank(cr.__lfTargetId)):(g.getShape&&g.getShape(cr.__lfTargetId));if(!alive(target))target=null;}
