@@ -423,8 +423,12 @@
         if(name==='dismissOffer'){
           if(!deferred)return out;
           if(this.pendingOffer===deferred){
-            if(this.__novaCapGraceOwner===this.player&&this.__novaCapGraceTier===deferred)
+            if(this.__novaCapGraceOwner===this.player&&this.__novaCapGraceTier===deferred){
+              // Resume safely without minting another shield or erasing focus.
+              if(this.input){this.input.firing=false;this.input.abilityQueued=false;}
+              collapseUpgradeTraySoon();
               return out;
+            }
             this.__novaCapGraceOwner=this.player;
             this.__novaCapGraceTier=deferred;
           }
