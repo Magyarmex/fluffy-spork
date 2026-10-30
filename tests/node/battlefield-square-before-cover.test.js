@@ -20,19 +20,20 @@ function coreBullets(){
   {dist2:(ax,ay,bx,by)=>(ax-bx)**2+(ay-by)**2},
   {CLASSES:{scout:{size:15}}},2250);
 }
-function boot(optimized){
+function boot(optimized,full=false){
  class Game{
   constructor(){
    this.time=1;this.nextId=100;this.status='playing';
    this.bullets=[];this.tanks=[];this.shapes=[];this.drones=[];this.tmp=[];
    this.__novaTerrain=[];this.__novaBattlefield={name:'TEST',announced:true,coverBroken:0};
-   this.cam={shake:0};this.sfx={};this.hits=[];
+   this.cam={shake:0};this.sfx={};this.hits=[];this.tankById=new Map();
    this.hash={query:(_x,_y,_r,out)=>{out.length=0;out.push(...this.tanks,...this.shapes,...this.drones);}};
   }
  }
  for(const name of ['spawnPlayer','spawnShape','spawnPowerup','tryFire','updateDrones',
    'moveTank','addParticles','addRing','addFlash','addImpactDebris','splashAt',
-   'initBulletIntegrity','resolveBulletCollisions','clusterBurst','weakenBullet'])
+   'initBulletIntegrity','resolveBulletCollisions','clusterBurst','weakenBullet',
+   'setClass','useAbility','addText','nearestTank'])
   Game.prototype[name]=function(){};
  Game.prototype.randSpawnPos=()=>({x:1500,y:1500});
  Game.prototype.getTank=()=>null;
@@ -47,9 +48,13 @@ function boot(optimized){
   'game/ai':m=>{m.exports={updateAI(){}};},
   'game/render':m=>{m.exports={render(){}};}};
  const context={window:{__novaModules:modules},console:{info(){},warn(){},error(){}},
-  Math,Map,Set,Date,Number,Object,performance:{now:()=>0}};
- const overlays=['battlefield-v1.6.0.js'];
- if(optimized)overlays.push('performance-v1.7.5.js');
+  Math,Map,Set,Date,Number,Object,performance:{now:()=>0},
+  document:{addEventListener(){}},navigator:{}};
+ const overlays=full?['sniper-v1.2.0.js','polish-v1.3.1.js',
+  'battlefield-v1.6.0.js','apex-disciplines-v1.7.1.js',
+  'performance-v1.7.5.js','performance-v1.7.8.js',
+  'precision-contact-v1.8.3.js']:['battlefield-v1.6.0.js'];
+ if(optimized&&!full)overlays.push('performance-v1.7.5.js');
  for(const file of overlays)vm.runInNewContext(
   fs.readFileSync(path.join(root,'nova-updates',file),'utf8'),context,{filename:file});
  const m={exports:{}};
@@ -147,3 +152,17 @@ test('actual production loads Battlefield before Performance',()=>{
  const p=html.indexOf('nova-updates/performance-v1.7.5.js');
  assert.ok(b>=0&&p>b);
 });
+
+/* Integration owner: the full shipping collision/presentation overlay stack
+ * must not resurrect the wall hit or award a phantom contact behind cover. */
+const FullGame=boot(true,true);
+for(const hz of [30,60,120,240]){
+ test('full shipping collision stack honors square before wall at '+hz+'Hz',()=>{
+  const {g,square}=trial(FullGame,{hz});
+  assert.deepEqual(g.hits,[50]);assert.equal(square.hp,80);
+ });
+ test('full shipping collision stack keeps wall before square at '+hz+'Hz',()=>{
+  const {g,square}=trial(FullGame,{hz,squareX:120});
+  assert.deepEqual(g.hits,[]);assert.equal(square.hp,100);
+ });
+}
