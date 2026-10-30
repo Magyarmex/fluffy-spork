@@ -31,7 +31,24 @@ wrap('game/engine',function(engine){var Game=engine.Game;if(!Game||Game.prototyp
     If the native selector returns one, preserve combat awareness by trying the nearest
     visible hostile combatant inside the same bounded leash before the historical
     neutral-shape fallback. Manual Controller designation remains outside this path. */
- var combat=combatFallback(this,d,owner,leash);if(combat)return combat;return neutralFallback(this,d,owner,leash);};});
+ var combat=combatFallback(this,d,owner,leash);if(combat)return combat;return neutralFallback(this,d,owner,leash);};
+ /* A previously visible tank can cross the viewport boundary between the
+  * staggered 0.22-0.31s legacy retarget ticks. Drop only AI-owned cached
+  * tank pursuits that no longer have legal perception; leave player drones,
+  * neutral farming, hostile-drone last-seen logic and fresh Sniper relays. */
+ var oldUpdate=Game.prototype.updateDrones;
+ if(typeof oldUpdate==='function')Game.prototype.updateDrones=function(dt){
+  var ds=this.drones||[];
+  for(var i=0;i<ds.length;i++){
+   var drone=ds[i],owner=ownerOf(this,drone),target=drone&&drone.targetRef;
+   if(owner&&owner.ai&&!owner.isPlayer&&target&&target.kind==='tank'&&
+      !fairTankPerceived(this,owner,target)){
+    drone.targetRef=null;drone.targetId=-1;
+   }
+  }
+  return oldUpdate.apply(this,arguments);
+ };
+});
 window.__NOVA_DRONE_TARGET_FILTER_TEST__={combatFallback:combatFallback,hostile:hostile,sameSide:sameSide,nativeTargetAllowed:nativeTargetAllowed,neutralFallback:neutralFallback};
 console.info('[NOVA TANKS] v1.5.1 spotters and allies exempt from autonomous drone aggro');
 })();
