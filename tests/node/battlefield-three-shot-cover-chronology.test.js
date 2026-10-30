@@ -78,8 +78,10 @@ function boot(optimized){
  return m.exports.Game;
 }
 
-function trial3(Game,order,hz=30,{extraBullet=false,liveDrone=false,newborn=false}={}){
+function trial3(Game,order,hz=30,{extraBullet=false,liveDrone=false,newborn=false,credit=false}={}){
  const g=new Game(),dt=1/hz;
+ if(credit){g.coverXP=[];g.getTank=id=>({id,alive:true,isPlayer:false});
+  g.gainXP=(owner,amount)=>g.coverXP.push([owner.id,amount]);}
  const tank={kind:'tank',id:2,cls:'scout',x:110,y:0,hp:100,alive:true,
   __novaSweepMoveTime:1,__novaSweepPrevX:110,__novaSweepPrevY:0};
  g.tanks=[tank];g.shapes=[];g.drones=[];
@@ -99,7 +101,8 @@ function trial3(Game,order,hz=30,{extraBullet=false,liveDrone=false,newborn=fals
  if(extraBullet)g.bullets.push({kind:'bullet',id:13,ownerId:5,x:1700,y:1700,vx:0,vy:0,r:3,
   dmg:5,pen:1,ttl:.15,hits:0,dead:false,shell:false,beam:false,splash:0});
  for(let i=0;i<Math.ceil(hz*.15);i++){g.updateBullets(dt);g.time+=dt;}
- return {tankHp:tank.hp,coverHp:g.__novaTerrain[0]?.hp,hits:g.hits};
+ return {tankHp:tank.hp,coverHp:g.__novaTerrain[0]?.hp,hits:g.hits,
+  coverXP:g.coverXP||[]};
 }
 for(const optimized of [false,true]){
  const Game=boot(optimized),label=optimized?'full shipping overlays':'Battlefield';
@@ -122,4 +125,14 @@ for(const optimized of [false,true]){
    assert.equal(r.tankHp,100,'uncertain multi-shot ordering must abstain');
   });
  }
+}
+
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'full shipping overlays':'Battlefield';
+ test(label+': second physical cover breaker receives the single structural reward',()=>{
+  for(const order of ['ABF','FAB','FBA']){
+   const r=trial3(Game,order,30,{credit:true});
+   assert.deepEqual(r.coverXP,[[4,18]],'cover break belongs to B in '+order);
+  }
+ });
 }
