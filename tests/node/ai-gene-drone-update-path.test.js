@@ -66,3 +66,26 @@ for(const hz of [30,60,120,240]){
     assert.equal(hidden.hp,100,'offscreen target must not take incidental damage');
   });
 }
+
+test('legacy gene drone drops cached tank when it leaves the legal AI viewport',()=>{
+  const {g,visible,drone}=boot();
+  g.updateDrones(1/60);
+  assert.equal(drone.targetRef,visible);
+  visible.x=240;drone.retargetT=.20;
+  g.updateDrones(1/60);
+  assert.equal(drone.targetRef,null,'staggered retarget memory must not track live offscreen tank coordinates');
+  assert.equal(drone.targetId,-1);
+});
+test('cached Sniper public relay and human drone autonomy remain intact',()=>{
+  for(const mode of ['sniper','human']){
+    const {g,owner,visible,drone}=boot();
+    g.updateDrones(1/60);
+    visible.x=240;drone.retargetT=.20;
+    if(mode==='sniper'){
+      owner.cls='marksman';owner.__novaSpotterContactId=visible.id;
+      owner.__novaSpotterContactUntil=6;
+    }else{owner.isPlayer=true;owner.ai=null;}
+    g.updateDrones(1/60);
+    assert.equal(drone.targetRef,visible,mode+' must retain a legal cached pursuit');
+  }
+});
