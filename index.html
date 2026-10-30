@@ -247,7 +247,7 @@ canvas {
     <link rel="icon" href="./nova-icon.svg" type="image/svg+xml" />
     <meta name="application-name" content="NOVA TANKS" />
     <script defer src="./pwa-register.js"></script>
-      <meta name="nova-runtime-build" content="61caff25d38fe220f9132db8" />
+      <meta name="nova-runtime-build" content="804718150327cea0b7c7cdc5" />
   </head>
   <body>
     <div id="root"></div>
@@ -1103,7 +1103,8 @@ function updateAI(t, g, dt) {
     }
     // ----- ability -----
     if (t.abilityCd <= 0 && t.cls !== 'scout' && (ai.state === 'hunt' || ai.state === 'flee')) {
-        if (Math.random() < 0.02)
+        // Predator owns ability intent: no unused gameplay RNG draw.
+        if (!ai.__novaPredatorAbilityOwned && dt > 0 && Math.random() < 1 - Math.pow(0.98, Math.max(0, dt) * 60))
             g.useAbility(t);
     }
 }
