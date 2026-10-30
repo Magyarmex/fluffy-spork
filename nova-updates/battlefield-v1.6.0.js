@@ -2795,8 +2795,38 @@ function certifiedMultiShotCoverPriority(g,dt){
  }
  var tanks=g.tanks||[],shapes=g.shapes||[],drones=g.drones||[];
  if(tanks.length+shapes.length+drones.length>260)return null;
- for(var di=0;di<drones.length;di++)
-  if(drones[di]&&drones[di].hp>0)return null;
+ /* A remote, frame-witnessed ordinary drone cannot intercept any of the
+  * candidate shots. Unlike the old global any-drone veto, this permits
+  * physically independent Controller swarms elsewhere on the battlefield.
+  * We do NOT interpolate a drone path: the inflated motion envelope covers
+  * its observed displacement plus several ordinary steering passes. Any
+  * dash, unknown history, extreme speed or nearby corridor abstains. */
+ for(var di=0;di<drones.length;di++){
+  var dr=drones[di];if(!dr||!(dr.hp>0))continue;
+  if(dr.__novaChronoDroneEpoch!==g.__novaShapeSweepEpoch||
+     dr.__novaPhase==='dash'||dr.__novaPhase==='windup'||
+     dr.__novaCommitted===true||
+     !Number.isFinite(dr.x)||!Number.isFinite(dr.y)||
+     !Number.isFinite(dr.__novaChronoDronePrevX)||
+     !Number.isFinite(dr.__novaChronoDronePrevY)||
+     !Number.isFinite(dr.speed)||dr.speed<0||dr.speed>600||
+     !Number.isFinite(dr.r)||!(dr.r>0)||
+     !Number.isFinite(dr.__novaVX==null?0:dr.__novaVX)||
+     !Number.isFinite(dr.__novaVY==null?0:dr.__novaVY)||
+     Math.hypot(dr.__novaVX||0,dr.__novaVY||0)>2400)return null;
+  var move=Math.hypot(dr.x-dr.__novaChronoDronePrevX,
+                      dr.y-dr.__novaChronoDronePrevY);
+  if(!Number.isFinite(move)||move>96)return null;
+  var travel=move+Math.max(4800,dr.speed*8)*dt*2;
+  for(var dc=0;dc<contacts.length;dc++){
+   var shot=contacts[dc],dx=shot.ex-shot.ax,dy=shot.ey-shot.ay,
+       len=dx*dx+dy*dy,rad=dr.r+shot.b.r+8+travel;
+   if(!(len>1e-9)||!Number.isFinite(rad))return null;
+   var u=clamp(((dr.x-shot.ax)*dx+(dr.y-shot.ay)*dy)/len,0,1);
+   if(d2(shot.ax+u*dx,shot.ay+u*dy,dr.x,dr.y)<=rad*rad)
+    return null;
+  }
+ }
  for(var group=0;group<2;group++){
   var arr=group===0?tanks:shapes;
   for(var n=0;n<arr.length;n++){
