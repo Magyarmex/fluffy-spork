@@ -1969,7 +1969,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       o.__novaBreachAtTime===g.time||
       !(Number.isFinite(o.ttl)&&o.ttl>dt)||
       !(Number.isFinite(o.r)&&o.r>0)||
-      !Number.isFinite(o.splash||0)||
+      (o.splash!=null&&(!Number.isFinite(o.splash)||o.splash<0))||
       ![o.x,o.y,o.vx,o.vy].every(Number.isFinite)||
       o.__novaWallProofStartX!==o.x||
       o.__novaWallProofStartY!==o.y||
@@ -1992,13 +1992,24 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
     if(!def||!(Number.isFinite(def.size)&&def.size>0))return null;
     var tx=t.__novaSweepMoveTime===g.time?t.__novaSweepPrevX:t.x,
         ty=t.__novaSweepMoveTime===g.time?t.__novaSweepPrevY:t.y;
-    if(near(x0,y0,x1,y1,tx,ty,t.x,t.y,o.r+def.size+320))return null;
+    if(!Number.isFinite(tx)||!Number.isFinite(ty)||
+       !Number.isFinite(t.x)||!Number.isFinite(t.y)||
+       Math.hypot(t.x-tx,t.y-ty)>320||
+       near(x0,y0,x1,y1,tx,ty,t.x,t.y,o.r+def.size+320))return null;
    }
+   /* The player may be separately referenced by an older core owner. */
+   var player=g.player;
+   if(player&&player.alive&&near(x0,y0,x1,y1,
+      player.x,player.y,player.x,player.y,o.r+400))return null;
    for(var qi=0;qi<shapes.length;qi++){
     var sh=shapes[qi];if(!sh||!(sh.hp>0))continue;
     var st=shapeSweepStart(g,sh);
-    if(near(x0,y0,x1,y1,st?st.x:sh.x,st?st.y:sh.y,
-       sh.x,sh.y,o.r+(sh.r||15)+320))return null;
+    var sx=st?st.x:sh.x,sy=st?st.y:sh.y;
+    if(!Number.isFinite(sx)||!Number.isFinite(sy)||
+       !Number.isFinite(sh.x)||!Number.isFinite(sh.y)||
+       Math.hypot(sh.x-sx,sh.y-sy)>320||
+       near(x0,y0,x1,y1,sx,sy,sh.x,sh.y,
+        o.r+(sh.r||15)+320))return null;
    }
    for(var di=0;di<drones.length;di++){
     var d=drones[di];if(!d||!(d.hp>0))continue;
@@ -2006,7 +2017,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
        d.__novaChronoDronePrevX:d.x,
         py=d.__novaChronoDroneEpoch===g.__novaShapeSweepEpoch?
        d.__novaChronoDronePrevY:d.y;
-    if(near(x0,y0,x1,y1,px,py,d.x,d.y,o.r+(d.r||8)+320))return null;
+    if(!Number.isFinite(px)||!Number.isFinite(py)||
+       !Number.isFinite(d.x)||!Number.isFinite(d.y)||
+       Math.hypot(d.x-px,d.y-py)>320||
+       near(x0,y0,x1,y1,px,py,d.x,d.y,
+        o.r+(d.r||8)+320))return null;
    }
    /* A crossing projectile could detonate the shell. Use its full sweep,
     * not the endpoint or an unordered global shot count. */
