@@ -439,3 +439,54 @@ test('React remount retains the last-life recap without duplicating buttons',()=
  g.redeploy();
  assert.equal(g.__novaFrontlineRecap,null);
 });
+
+/* LAST LIFE is a per-redeploy observation, not the cumulative research tally.
+ * Keep the Director's aggregate counters intact for COPY ECOLOGY. */
+test('Frontlines recap reports only the second life despite cumulative Director counts',()=>{
+ const {Game,addPanel}=boot(),g=new Game(),panel=addPanel();
+ const counts={announcements:1,playerApproaches:1,playerEntries:1,observedContests:1,neutralXP:40};
+ g.__lfState={frontlineTelemetry:{counts}};
+ g.killTank(victim(100,200));g.update();
+ assert.match(panel.choice.children[0].textContent,/APPROACH 1 · ENTRY 1 · CONTEST 1 · \+40 NEUTRAL XP/);
+ g.redeploy();
+ counts.announcements+=1;counts.playerApproaches+=2;counts.playerEntries+=1;
+ counts.observedContests+=1;counts.neutralXP+=12;
+ g.killTank(g.player);g.update();
+ assert.equal(panel.choice.children[0].textContent,
+  'LAST LIFE · BLOOM APPROACH 2 · ENTRY 1 · CONTEST 1 · +12 NEUTRAL XP');
+ assert.deepEqual(counts,{announcements:2,playerApproaches:3,playerEntries:2,observedContests:2,neutralXP:52},
+  'the research aggregate must never be reset to make the UI truthful');
+});
+
+test('second life without BLOOM participation has no inherited LAST LIFE recap',()=>{
+ const {Game,addPanel}=boot(),g=new Game(),panel=addPanel();
+ const counts={announcements:1,playerApproaches:1,playerEntries:1,observedContests:1,neutralXP:40};
+ g.__lfState={frontlineTelemetry:{counts}};
+ g.killTank(victim());g.update();g.redeploy();
+ g.killTank(g.player);g.update();
+ assert.equal(panel.choice.children.length,2,
+  'an earlier life cannot manufacture tactical participation in this life');
+});
+
+test('returning into the SAME public BLOOM still counts this life without a new announcement',()=>{
+ const {Game,addPanel}=boot(),g=new Game(),panel=addPanel();
+ const counts={announcements:1,playerApproaches:1,playerEntries:1,observedContests:0,neutralXP:10};
+ g.__lfState={frontlineTelemetry:{counts}};
+ g.killTank(victim());g.update();g.redeploy();
+ counts.playerEntries++;counts.neutralXP+=7;
+ g.killTank(g.player);g.update();
+ assert.equal(panel.choice.children[0].textContent,
+  'LAST LIFE · BLOOM APPROACH 0 · ENTRY 1 · CONTEST 0 · +7 NEUTRAL XP');
+});
+
+test('new ecology telemetry after redeploy starts a fresh observation baseline',()=>{
+ const {Game,addPanel}=boot(),g=new Game(),panel=addPanel();
+ g.__lfState={frontlineTelemetry:{counts:{
+  announcements:3,playerApproaches:2,playerEntries:2,observedContests:1,neutralXP:80}}};
+ g.killTank(victim());g.update();g.redeploy();
+ g.__lfState={frontlineTelemetry:{counts:{
+  announcements:1,playerApproaches:1,playerEntries:1,observedContests:0,neutralXP:5}}};
+ g.killTank(g.player);g.update();
+ assert.equal(panel.choice.children[0].textContent,
+  'LAST LIFE · BLOOM APPROACH 1 · ENTRY 1 · CONTEST 0 · +5 NEUTRAL XP');
+});
