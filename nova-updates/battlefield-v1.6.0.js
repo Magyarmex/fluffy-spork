@@ -2417,7 +2417,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
     * Such a hit could change cover HP/solid state before the later event;
     * abstain on its full-frame swept AABB instead of assuming isolation.
     * Permanent cover cannot be destroyed by that unrelated round. */
-   if(wall.solid.destructible){
+   if(wall.solid.destructible&&b.pen>0){
     var ws=wall.solid,
         whx=ws.shape==='rect'?ws.w*.5:ws.shape==='circle'?ws.r:NaN,
         why=ws.shape==='rect'?ws.h*.5:ws.shape==='circle'?ws.r:NaN,
@@ -2608,6 +2608,41 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
     }
    }
    if(shellS&&shellS.shell&&shellS.ttl>0&&shellS.ttl<dt)shellWork++;
+  }
+  /* A non-piercing expiring round physically stops at its first nonlethal
+   * square. A competing shot's later impact on the SAME barricade cannot
+   * change that earlier square contact. Prove it before any projectile's
+   * terrain pre-pass can kill/move a competitor and erase its start path.
+   * Only one such candidate per frame: multiple expiring rounds retain
+   * legacy ordering. The existing proof still vetoes competing paths near
+   * the square, interception, uncertain shells, and any moving-body hazard.
+   * Penetrating rounds retain the full same-cover competition veto. */
+  var zeroCandidate=null,zeroCount=0;
+  if(this.shapes&&this.shapes.length){
+   for(var zi=0;zi<this.bullets.length;zi++){
+    var zb=this.bullets[zi];
+    if(zb&&!zb.dead&&zb.pen===0&&zb.ttl>0&&zb.ttl<=dt&&
+       !zb.shell&&!zb.beam&&!zb.splash&&!zb.__v17Cannon&&
+       (zb.hits||0)===0){
+     zeroCandidate=zb;
+     if(++zeroCount>1)break;
+    }
+   }
+   if(zeroCount===1&&Number.isFinite(zeroCandidate.x)&&
+      Number.isFinite(zeroCandidate.y)&&
+      Number.isFinite(zeroCandidate.vx)&&
+      Number.isFinite(zeroCandidate.vy)&&
+      Number.isFinite(zeroCandidate.r)&&zeroCandidate.r>0){
+    var zx=zeroCandidate.x,zy=zeroCandidate.y,
+        zeX=zx+zeroCandidate.vx*zeroCandidate.ttl,
+        zeY=zy+zeroCandidate.vy*zeroCandidate.ttl;
+    if(Number.isFinite(zeX)&&Number.isFinite(zeY)){
+     var zeroWall=firstSolidHit(this,zx,zy,zeX,zeY,zeroCandidate.r*.45);
+     if(zeroWall&&zeroWall.solid&&zeroWall.solid.destructible)
+      certifiedSquareBeforeFirstSolid(this,zeroCandidate,dt,
+       zx,zy,zeX,zeY,zeroWall);
+    }
+   }
   }
   var work=shellWork*(this.bullets.length+(this.tanks||[]).length+
       (this.shapes||[]).length+(this.drones||[]).length+(terrain||[]).length);
