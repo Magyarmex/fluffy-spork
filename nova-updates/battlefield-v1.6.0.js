@@ -2705,7 +2705,23 @@ function certifiedTwoShotCoverPriority(g,dt){
    if(!Number.isFinite(bound))return null;
    var t=clamp(((e.x-ax)*dx+(e.y-ay)*dy)/len,0,1),
        xx=ax+t*dx,yy=ay+t*dy;
-   if(d2(xx,yy,e.x,e.y)<=bound*bound)return null;
+   if(d2(xx,yy,e.x,e.y)<=bound*bound){
+    /* A witnessed stationary Square strictly BEHIND the first cover face
+     * cannot be touched by a pen<=1 breaker: that shot dies at the cover.
+     * Use an inflated earliest-contact bound, not just the Square center,
+     * and retain the veto for tanks, moving shapes and all drones. */
+    var squareAfterCover=false;
+    if(group===1&&e.type==='square'&&motion<1e-8&&
+       Math.abs(e.vx||0)<1e-8&&Math.abs(e.vy||0)<1e-8){
+     var along=((e.x-ax)*dx+(e.y-ay)*dy)/len,
+         perpX=ax+along*dx,perpY=ay+along*dy,
+         possibleFirst=along-Math.sqrt(Math.max(0,
+          bound*bound-d2(perpX,perpY,e.x,e.y))/len);
+     squareAfterCover=Number.isFinite(possibleFirst)&&
+       possibleFirst>eh.hit.t+1e-5;
+    }
+    if(!squareAfterCover)return null;
+   }
    /* Only a witnessed stationary, nonlethal Square may precede the
     * later cover contact. Tanks, drones and other shape interactions may
     * trigger stateful effects and retain legacy arbitration. */
