@@ -7,7 +7,9 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '../../nova-updates/living-front-instincts-v1.12.0.js'), 'utf8');
 const removeText = source.match(/^function remove\(g,s\)\{[^\n]+/m)?.[0];
-const starText = source.match(/^function star\(g,st,s,defs,now\)\{[^\n]+/m)?.[0];
+const starStart = source.indexOf('function star(g,st,s,defs,now){');
+const starEnd = source.indexOf('\nLF.disturbBurst=', starStart);
+const starText = starStart >= 0 && starEnd > starStart ? source.slice(starStart, starEnd) : null;
 assert.ok(removeText, 'Living Front removal function must exist');
 assert.ok(starText, 'Living Front Star behavior must exist');
 const { remove, star } = vm.runInNewContext(
