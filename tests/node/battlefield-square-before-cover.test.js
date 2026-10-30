@@ -67,7 +67,7 @@ function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
   squareY=0,wallY=0,born=false,moved=false,teleport=false,extraBullet=false,
   extraTank=false,fragile=false,pen=1,extraSquare=false,cover=false,
   dmg=12,radius=3,ttl=1,wallHeight=80,wallWidth=8,bulletY=0,linearVy=0,
-  remoteBullets=0,reverseBullets=false,coverCompetitor=false}={}){
+  remoteBullets=0,reverseBullets=false,coverCompetitor=false,remoteShell=null}={}){
  const g=new Game();
  const square={kind:'shape',id:50,type:'square',x:squareX,y:squareY,r:20,hp:fragile?10:55};
  if(born)square.born=g.time;
@@ -93,6 +93,13 @@ function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
  if(coverCompetitor)g.bullets.push({kind:'bullet',id:900,ownerId:900,
   x:200,y:0,vx:-5000,vy:0,r:3,dmg:1,ttl:1,
   pen:0,hits:0,dead:false,shell:false,beam:false,splash:0});
+ if(remoteShell){
+  const cfg=remoteShell===true?{}:remoteShell;
+  g.bullets.push({kind:'bullet',id:901,ownerId:901,
+   x:cfg.x??1800,y:cfg.y??-1800,vx:cfg.vx??0,vy:cfg.vy??0,
+   r:9,dmg:10,ttl:cfg.ttl??1,pen:1,hits:0,dead:false,
+   shell:true,splash:100});
+ }
  if(reverseBullets)g.bullets.reverse();
  if(moved||teleport){
   const oldUpdate=g.update.bind(g);
@@ -421,6 +428,28 @@ for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['f
    assert.ok(g.hits.filter(id=>id===50).length<=1);
    assert.equal(g.__novaTerrain[0].hp,299,
     'only opposite-face competitor may damage this wall; focal chain must abstain');
+  });
+ }
+}
+
+/* Issue #147: a distant, provably unspent shell must not erase an earlier
+ * square contact merely by existing. Use the same certified remote-shell
+ * exclusion already protecting earlier tank contacts. */
+for(const [label,Game] of [['baseline',boot(false)],['optimized',boot(true)],['full shipping',FullGame]]){
+ for(const hz of [30,60,120,240])for(const reverseBullets of [false,true]){
+  test(label+' remote unspent shell preserves square before permanent cover at '+hz+'Hz reverse='+reverseBullets,()=>{
+   const {g,square}=trial(Game,{hz,vx:1500,squareX:30,wallX:57,
+    pen:4,dmg:47,radius:5.8*(1+47*.0085),remoteShell:true,reverseBullets});
+   assert.equal(square.hp,8,'remote shell cannot suppress the physical square contact');
+   assert.deepEqual(g.hits,[50],'the neutral square receives exactly one hit');
+  });
+ }
+ for(const cfg of [{x:0,y:30},{ttl:.001}]){
+  test(label+' shell hazard still vetoes speculative square chronology '+JSON.stringify(cfg),()=>{
+   const {g,square}=trial(Game,{hz:30,vx:1500,squareX:30,wallX:57,
+    pen:4,dmg:47,radius:5.8*(1+47*.0085),remoteShell:cfg});
+   assert.equal(square.hp,55,'nearby or expiring shell is not certified harmless');
+   assert.deepEqual(g.hits,[]);
   });
  }
 }
