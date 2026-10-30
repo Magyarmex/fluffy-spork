@@ -9,7 +9,7 @@ const path=require('node:path');
 const vm=require('node:vm');
 const source=fs.readFileSync(path.join(__dirname,'../../nova-updates/lobby-history.js'),'utf8');
 
-function boot(){
+function boot({tipified=false}={}){
   const cls=()=>({add(){},remove(){},toggle(){},contains(){return false;}});
   const writes={tag:0,badge:0,line:0,footer:0};
   function textNode(key,initial=''){
@@ -23,7 +23,7 @@ function boot(){
   }
   const tag=textNode('tag'),badge=textNode('badge'),line=textNode('line');
   const footer=textNode('footer','NOVA TANKS v1.7.7 · OLD');
-  const briefing={dataset:{},querySelector(s){return s==='.nv-brief-v'?badge:null;}};
+  const briefing={dataset:tipified?{novaSlot:'tips'}:{},querySelector(s){return s==='.nv-brief-v'?badge:null;}};
   const shell={classList:cls(),querySelectorAll(){return [];}};
   const hero={classList:cls(),dataset:{},parentElement:shell,
     querySelector(s){return s==='p'?tag:null;}};
@@ -33,7 +33,8 @@ function boot(){
     classList:cls(),dataset:{},isConnected:true,scrollTop:0,
     querySelector(s){
       if(s==='h1')return title;
-      if(s==='[data-nova-slot="briefing"]')return briefing;
+      if(s==='[data-nova-slot="briefing"]')return tipified?null:briefing;
+      if(s==='[data-nova-slot="tips"]')return tipified?briefing:null;
       if(s==='[data-nova-slot="actions"]')return actions;
       if(s==='[data-nova-slot="feature-rail"]')return rail;
       if(s==='.nv-brief-line')return line;
@@ -105,4 +106,17 @@ test('new release resets briefing once, starts new timer and updates badge',()=>
   assert.deepEqual(app.writes,stable);
   app.rotate();
   assert.equal(app.line.textContent,'A new tactical lesson');
+});
+
+
+test('History does not overwrite Signal Flow-owned TIP count or revive a retired briefing timer',()=>{
+  const app=boot({tipified:true});
+  app.badge.textContent='TIP 2 / 8';
+  const before={...app.writes};
+  for(let i=0;i<100;i++)app.refresh();
+  assert.equal(app.badge.textContent,'TIP 2 / 8');
+  assert.equal(app.writes.badge,before.badge);
+  assert.equal(app.intervals.size,0,'History timer must remain retired under the tips owner');
+  assert.match(source,/var br=slot\('briefing'\)\|\|slot\('tips'\)/,
+    'History must reuse the existing tips slot instead of creating duplicate briefings');
 });
