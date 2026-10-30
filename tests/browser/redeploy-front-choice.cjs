@@ -115,21 +115,46 @@ async function run(browser,width,height){
     return out;
    };
   },starClock.id);
+  // Start a real painted-frame witness BEFORE the click. React's 280ms
+  // entrance begins at opacity 0 and can be cancelled by another toast;
+  // awaiting Animation.finished on a removed node produces AbortError.
+  // The first frame with >=50% opacity is an actual visible DOM notice.
+  await page.evaluate(()=>{
+   window.__novaReturnDomFrames=[];
+   window.__novaReturnDomStop=false;
+   const started=performance.now();
+   function sample(){
+    if(window.__novaReturnDomStop||performance.now()-started>4000)return;
+    const el=[...document.querySelectorAll('.anim-pop.panel')].find(node=>
+     /^↩ RETURN · FRONT /.test((node.textContent||'').trim()));
+    if(el&&window.__novaReturnDomFrames.length<200){
+     const rect=el.getBoundingClientRect(),style=getComputedStyle(el);
+     window.__novaReturnDomFrames.push({
+      message:(el.textContent||'').trim(),left:rect.left,right:rect.right,
+      width:rect.width,height:rect.height,viewport:innerWidth,
+      scrollWidth:document.documentElement.scrollWidth,
+      opacity:Number(style.opacity),display:style.display,
+      visibility:style.visibility,at:performance.now()-started});
+    }
+    requestAnimationFrame(sample);
+   }
+   requestAnimationFrame(sample);
+  });
   await returnButton.click();
-  // The React toast lasts only 2.6s. Capture its actual DOM box immediately
-  // after the real click, before unrelated game-state/geometry evaluations
-  // can outlive it on a slow CI runner. This is not a Game.toast-only witness.
-  const cueDom=await page.getByText(/^↩ RETURN · FRONT /).evaluate(async el=>{
-   // The toast's own 280ms popIn starts at opacity 0. Capture after that
-   // actual entrance, not at an invisible first animation frame.
-   const entrance=el.getAnimations().find(a=>a.animationName==='popIn');
-   if(entrance)await entrance.finished;
-   const rect=el.getBoundingClientRect(),style=getComputedStyle(el);
-   return {message:(el.textContent||'').trim(),
-    left:rect.left,right:rect.right,width:rect.width,height:rect.height,
-    viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth,
-    visible:rect.width>0&&rect.height>0&&style.display!=='none'&&
-     style.visibility==='visible'&&Number(style.opacity)>0};
+  await page.waitForFunction(()=>window.__novaReturnDomFrames?.some(f=>
+   f.opacity>=.5&&f.width>0&&f.height>0&&
+   f.display!=='none'&&f.visibility==='visible'),null,{timeout:1500})
+   .catch(async error=>{
+    const frames=await page.evaluate(()=>window.__novaReturnDomFrames||[]);
+    throw Error('RETURN notice never reached a visibly painted frame: '+
+     JSON.stringify(frames.slice(0,15))+'; '+String(error));
+   });
+  const cueDom=await page.evaluate(()=>{
+   const frames=window.__novaReturnDomFrames;
+   window.__novaReturnDomStop=true;
+   const frame=frames.find(f=>f.opacity>=.5&&f.width>0&&f.height>0&&
+    f.display!=='none'&&f.visibility==='visible');
+   return {...frame,visible:true};
   });
   await page.waitForFunction(()=>window.__novaFrontSmokeGame?.status==='playing',null,{timeout:15000});
   const after=await page.evaluate(origin=>{
