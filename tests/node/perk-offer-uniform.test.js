@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const zlib = require('node:zlib');
-const {patchPerkOffer, before, after} = require('../../scripts/patch-perk-offer.cjs');
+const {patchPerkOffer, before, after, capPerkSelectionAfter} = require('../../scripts/patch-perk-offer.cjs');
 const root = path.resolve(__dirname, '../..');
 const read = name => fs.readFileSync(path.join(root,name),'utf8');
 function originalShell() {
@@ -20,7 +20,9 @@ test('PerkOffer patch is exact, fail-closed, idempotent and applies to both shel
   assert.equal(occurrences(fixed,before),0);
   assert.equal(occurrences(fixed,after),1);
   assert.equal(patchPerkOffer(fixed),fixed);
-  assert.equal(occurrences(patchPerkOffer(shipping),after),1);
+  const live=patchPerkOffer(shipping);
+  assert.equal(occurrences(live,after)+occurrences(live,capPerkSelectionAfter),1,
+    'shipping may contain the cap-preserved memo after materialization');
   assert.throws(()=>patchPerkOffer(null),/UTF-8/);
   assert.throws(()=>patchPerkOffer('unrelated'),/PerkOffer owner/);
   assert.throws(()=>patchPerkOffer(original.replace(before,before.replace('Math.random() - 0.5','Math.random() - 0.4'))),/drift/);
