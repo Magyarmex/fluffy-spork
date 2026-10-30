@@ -93,7 +93,7 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,l
  linearMove=null,tamperMove=false,doubleMove=false,
  otherNearMovingStart=false,bornThisFrame=false,coverHp=1000,
  shellInterception=false,secondShell=false,shellShape=null,
- shellStaleHashShape=false}={}){
+ shellStaleHashShape=false,reverseBullets=false}={}){
  const g=new Game(),dt=1/fps;
  g.__novaBattlefield={coverBroken:0};
  if(shellStaleHashShape)g.__novaStaleHashShape={
@@ -168,7 +168,10 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,l
   if(doubleMove)g.moveTank(t,linearMove.vx,linearMove.vy,dt);
   if(tamperMove)t.x+=4;
  }
- const shot=g.bullets[0];
+ /* Focal projectile may be first or last: wall chronology must not
+  * depend on the unrelated distant shots' array positions. */
+ if(reverseBullets)g.bullets.reverse();
+ const shot=g.bullets.find(b=>b.id===10);
  g.updateBullets(dt);
  return {hits:g.hits,hp:t.hp,bullet:g.bullets[0],shot,g};
 }
@@ -347,8 +350,8 @@ for(const optimized of [false,true]){
   assert.deepEqual(r.hits,[]);
   assert.equal(r.hp,100);
  });
- test(label+': combined 260-entity budget still fails closed',()=>{
-  const r=run(boot(optimized),{remoteBullets:260});
+ test(label+': 600-check proof budget still fails closed',()=>{
+  const r=run(boot(optimized),{remoteBullets:600});
   assert.deepEqual(r.hits,[],'over-budget proof must use legacy path');
  });
  test(label+': no live movement epoch never authorizes early damage',()=>{
@@ -868,6 +871,64 @@ for(const optimized of [false,true]){
    assert.equal(r.g.__novaTerrain[1].hp,laterCoverHp?990:0);
   });
  }
+}
+
+/* Regression: canonical 120 neutral shapes plus 220 remote projectiles
+ * exceeds the former 260-global-entity cap, but the actual proof has only
+ * 342 scans. No distant shot may erase the earlier hull contact or let a
+ * penetrating Marksman tunnel through a second permanent wall. The 30Hz
+ * case uses real upgraded Marksman velocity; 60–240Hz cases scale velocity
+ * to retain two contacts within one frame as geometric stress fixtures.
+ * The local competitor and over-budget cases still fail closed. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'Battlefield + Performance':'Battlefield';
+ const speed=1050*(1+.085*8),radius=5.5*(1+21*.0085);
+ for(const fps of [30,60,120,240]){
+  test(label+': dense hull-before-cover (real Marksman at 30Hz) with 120 shapes and 220 remote shots at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:fps===30?speed:60*fps,
+    wall:55,target:29,pen:2,radius,damage:21,destructible:true,
+    remoteShapes:120,remoteBullets:220});
+   assert.deepEqual(r.hits,[2]);
+   assert.equal(r.hp,79);
+   assert.equal(r.g.__novaTerrain[0].hp,979);
+  });
+  test(label+': dense breach then permanent wall (real Marksman at 30Hz) with 120 shapes and 220 remote shots at '+fps+'Hz',()=>{
+   const r=run(Game,{fps,speed:fps===30?speed:60*fps,
+    wall:17,laterWall:35,target:60,pen:3,radius,damage:21,
+    destructible:true,coverHp:5,remoteShapes:120,remoteBullets:220});
+   assert.deepEqual(r.hits,[]);
+   assert.equal(r.hp,100,'second wall must protect the rear hull');
+   assert.equal(r.g.__novaTerrain[0].hp,0);
+   assert.equal(r.g.bullets.some(b=>b.id===10),false);
+  });
+ }
+ for(const reverseBullets of [false,true]){
+  test(label+': dense Marksman first-hull proof is remote-shot order invariant, reversed='+reverseBullets,()=>{
+   const r=run(Game,{fps:30,speed,radius,pen:2,damage:21,
+    wall:55,target:29,destructible:true,
+    remoteShapes:120,remoteBullets:220,reverseBullets});
+   assert.deepEqual(r.hits,[2]);
+   assert.equal(r.hp,79);
+  });
+  test(label+': dense second permanent wall remains protective, reversed='+reverseBullets,()=>{
+   const r=run(Game,{fps:30,speed,radius,pen:3,damage:21,
+    wall:17,laterWall:35,target:60,destructible:true,coverHp:5,
+    remoteShapes:120,remoteBullets:220,reverseBullets});
+   assert.deepEqual(r.hits,[]);
+   assert.equal(r.hp,100);
+   assert.equal(r.g.bullets.some(b=>b.id===10),false);
+  });
+ }
+ test(label+': nearby projectile still vetoes dense earlier-hull proof',()=>{
+  const r=run(Game,{remoteShapes:120,remoteBullets:220,otherBullet:true});
+  assert.deepEqual(r.hits,[]);
+  assert.equal(r.hp,100);
+ });
+ test(label+': over-600 work with real ecology still fails closed',()=>{
+  const r=run(Game,{remoteShapes:120,remoteBullets:480});
+  assert.deepEqual(r.hits,[]);
+  assert.equal(r.hp,100);
+ });
 }
 
 /* Reachable 30Hz Marksman geometry, not a 6,000u/s synthetic bullet.

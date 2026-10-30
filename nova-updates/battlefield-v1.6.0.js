@@ -2108,12 +2108,14 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      !wall.hit||!(wall.hit.t>1e-6&&wall.hit.t<=1))return false;
   var tanks=g.tanks||[],shapes=g.shapes||[],drones=g.drones||[],
       shots=g.bullets||[];
-  /* Bound the complete first-contact scan, not the global shot count.
-   * Every live frame-start projectile is checked below against both the
-   * candidate corridor and the victim's witnessed movement. Unrelated
-   * distant fire must not erase a certified body-before-cover hit. The
-   * combined entity cap keeps the worst-case proof cost finite. */
-  if(tanks.length+shapes.length+drones.length+shots.length>260)return false;
+  /* Limit actual scan work, while keeping the independent body and shot
+   * budgets separate. A normal 120-shape ecology plus distant gunfire must
+   * not disable a certified earlier hull contact merely by increasing the
+   * global projectile count. Every projectile is STILL inspected below for
+   * a possible corridor/interception or victim hit. Cap the total at 600
+   * checks so pathological projectile storms retain the legacy path. */
+  var bodyCount=tanks.length+shapes.length+drones.length;
+  if(bodyCount>260||bodyCount+shots.length>600)return false;
   var safeShells=certifiedRemoteUnspentShells(g,b,dt,ax,ay,ex,ey);
   if(!safeShells)return false;
   var dx=ex-ax,dy=ey-ay,A=dx*dx+dy*dy;
@@ -2423,10 +2425,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      !first||!first.hit||!Number.isFinite(first.hit.t))return false;
   var tanks=g.tanks||[],shapes=g.shapes||[],drones=g.drones||[],
       shots=g.bullets||[];
-  /* The complete 260-entity work bound and per-shot swept-corridor veto
-   * below already reject uncertain local competition. Distant fire must
-   * not disable the second-wall proof after a legitimate first breach. */
-  if(tanks.length+shapes.length+drones.length+shots.length>260)return false;
+  /* Preserve the same bounded scan contract as first-hull chronology.
+   * All remote projectiles remain in the per-shot swept-corridor veto; only
+   * the independent body count and actual combined scan work are bounded. */
+  var bodyCount=tanks.length+shapes.length+drones.length;
+  if(bodyCount>260||bodyCount+shots.length>600)return false;
   var safeShells=certifiedRemoteUnspentShells(g,b,dt,ax,ay,ex,ey);
   if(!safeShells)return false;
   /* A second barricade is eligible ONLY if it provably survives this
