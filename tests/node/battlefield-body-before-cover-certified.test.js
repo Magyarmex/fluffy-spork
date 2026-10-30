@@ -85,7 +85,7 @@ function boot(optimized){
 }
 function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,laterWallY=0,
  wallShape='rect',otherShape=false,otherBullet=false,otherShell=false,moving=false,
- remoteBullets=0,laterCoverHp=null,realIntegrity=false,preinitialized=false,
+ remoteBullets=0,remoteShapes=0,laterCoverHp=null,realIntegrity=false,preinitialized=false,
  shield=false,otherTank=false,ttl=1,pen=1,radius=3,laterWall=null,
  active=true,knock=0,allied=false,destructible=false,damage=10,
  linearMove=null,tamperMove=false,doubleMove=false,
@@ -101,6 +101,11 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,l
  if(otherTank)g.tanks.push({kind:'tank',id:3,cls:'scout',x:30,y:0,
   hp:100,alive:true,__novaSweepMoveTime:1,__novaSweepPrevX:30,__novaSweepPrevY:0});
  if(otherShape)g.shapes.push({kind:'shape',id:4,x:30,y:0,r:8,hp:100});
+ for(let i=0;i<remoteShapes;i++)g.shapes.push({kind:'shape',id:2000+i,
+  x:-900+(i%20)*4,y:-900+Math.floor(i/20)*4,r:12,hp:100,
+  type:'square',__novaShapeSweepEpoch:g.__novaShapeSweepEpoch,
+  __novaShapeSweepPrevX:-900+(i%20)*4,
+  __novaShapeSweepPrevY:-900+Math.floor(i/20)*4});
  g.__novaTerrain=[wallShape==='rect'
   ?{id:-1,shape:'rect',x:wall,y:wallY,w:10,h:80,solid:true,destructible,hp:destructible?coverHp:0,maxHp:destructible?coverHp:0}
    :{id:-1,shape:'circle',x:wall,y:wallY,r:5,solid:true,destructible,hp:destructible?coverHp:0,maxHp:destructible?coverHp:0}];
@@ -725,6 +730,31 @@ for(const optimized of [false,true]){
    assert.equal(r.hp,100);
    assert.equal(r.g.__novaTerrain[0].hp,0);
    assert.equal(r.g.__novaTerrain[1].hp,979);
+  });
+ }
+}
+
+/* The real neutral population contains 120 shapes. A crowded-fire
+ * improvement must remain reachable with that population present, not
+ * only in an empty synthetic arena. 120 shapes + one Scout + 121 shots
+ * stays within the existing 260-entity safety budget. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'Battlefield + Performance':'Battlefield';
+ test(label+': canonical 120-shape ecology preserves hull-before-cover with 120 remote shots',()=>{
+  const r=run(Game,{fps:30,speed:6000,remoteShapes:120,remoteBullets:120});
+  assert.deepEqual(r.hits,[2]);
+  assert.equal(r.hp,90);
+ });
+ for(const laterCoverHp of [null,1000]){
+  test(label+': canonical 120-shape ecology preserves second '+
+   (laterCoverHp?'barricade':'wall')+' amid 120 remote shots',()=>{
+   const r=run(Game,{fps:30,speed:6000,pen:3,destructible:true,
+    wall:55,laterWall:110,target:165,coverHp:5,laterCoverHp,
+    remoteShapes:120,remoteBullets:120});
+   assert.deepEqual(r.hits,[]);
+   assert.equal(r.hp,100);
+   assert.equal(r.g.__novaTerrain[0].hp,0);
+   assert.equal(r.g.__novaTerrain[1].hp,laterCoverHp?990:0);
   });
  }
 }
