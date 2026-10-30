@@ -131,6 +131,21 @@ for(const optimized of [false,true]){
    assert.deepEqual(g.hits,[50]);
   });
  }
+ /* Canonical Scout (440u/s, pen=1, dmg12, launch radius 5 scaled
+  * by damage) reaches a grazing square at x0.665 and real Crossfire-size
+  * destructible cover at x1.520 before its last 4ms expire (x1.76).
+  * Square bottom y262 is 2u above the wall top y260. This is a legal
+  * real-weapon, real-cover-shape case, not a 30,000u/s stress fixture. */
+ for(const hz of [30,60,120,240]){
+  test(mode+' expiring Scout hits square AND real-size cover at '+hz+'Hz',()=>{
+   const {g,square}=trial(Game,{hz,vx:440,squareX:16.5,squareY:282,
+    wallX:50,wallWidth:92,wallHeight:520,bulletY:262,
+    pen:1,dmg:12,radius:5*(1+12*.0085),ttl:.004,cover:true});
+   assert.equal(square.hp,43);
+   assert.equal(g.__novaTerrain[0].hp,288,'piercing shot still reaches cover before TTL');
+   assert.deepEqual(g.hits,[50]);
+  });
+ }
  test(mode+' expiring pen=0 shot consumes itself before cover',()=>{
   const {g,square}=trial(Game,{hz:30,ttl:.0035,pen:0,cover:true});
   assert.equal(square.hp,43);
@@ -265,6 +280,14 @@ for(const hz of [30,60,120,240]){
    wallX:55,wallWidth:92,wallHeight:520,bulletY:262,
    pen:4,dmg:47,radius:5.8*(1+47*.0085),ttl:.004});
   assert.equal(square.hp,8);assert.deepEqual(g.hits,[50]);
+ });
+ test('full shipping stack expiring Scout hits square and cover at '+hz+'Hz',()=>{
+  const {g,square}=trial(FullGame,{hz,vx:440,squareX:16.5,squareY:282,
+   wallX:50,wallWidth:92,wallHeight:520,bulletY:262,
+   pen:1,dmg:12,radius:5*(1+12*.0085),ttl:.004,cover:true});
+  assert.equal(square.hp,43);
+  assert.equal(g.__novaTerrain[0].hp,288);
+  assert.deepEqual(g.hits,[50]);
  });
  test('full shipping collision stack honors square before wall at '+hz+'Hz',()=>{
   const {g,square}=trial(FullGame,{hz});
