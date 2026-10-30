@@ -2288,7 +2288,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
      !(Number.isSafeInteger(b.pen)&&b.pen>=0&&b.pen<=4)||(b.hits||0)!==0||(b.knock||0)!==0||
      b.__novaBreachAtTime===g.time||
-     g.__novaShapeSweepActive!==true||g.__novaWallProofHadShell===true||
+     g.__novaShapeSweepActive!==true||
      !Number.isSafeInteger(b.id)||
      g.__novaFrameStartBulletEpoch!==g.__novaShapeSweepEpoch||
      !(b.id<g.__novaFrameStartBulletIdCeiling)||
@@ -2380,6 +2380,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    victim=s;hitT=enter;
   }
   if(!victim)return false;
+  /* Reuse the shell-free-frame certificate already protecting hull-first
+   * chronology. A genuinely distant unspent shell cannot affect this
+   * square or wall, but an uncertain burst still vetoes the shortcut. */
+  var safeShells=certifiedRemoteUnspentShells(g,b,dt,ax,ay,ex,ey);
+  if(!safeShells)return false;
   /* A nearby tank, drone or lateral projectile can change first-contact
    * order or damage credit. Never infer its trajectory. */
   for(var ti=0;ti<tanks.length;ti++){
@@ -2397,6 +2402,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   }
   for(var bi=0;bi<shots.length;bi++){
    var o=shots[bi];if(!o||o===b)continue;
+   if(safeShells!==true&&safeShells.has(o))continue;
    /* A previous terrain pre-pass may already have killed or relocated this
     * competitor. Its current endpoint cannot certify its earlier corridor. */
    if(o.__novaWallProofEpoch!==g.__novaWallProofEpoch||
