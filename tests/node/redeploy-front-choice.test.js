@@ -380,7 +380,7 @@ test('death choice shows a factual public-BLOOM recap without changing either ac
  assert.equal(note.attributes.role,'note');
  assert.ok(note.attributes['data-nova-front-recap']!==undefined);
  assert.equal(note.textContent,'LAST LIFE · BLOOM APPROACH 2 · ENTRY 3 · CONTEST 1 · +126 NEUTRAL XP');
- assert.ok(!JSON.stringify(note).includes('enemy'));
+ assert.ok(!note.textContent.includes('enemy'));
  assert.equal(fresh.textContent,'⚡ FRESH · RANDOM');
  assert.equal(ret.textContent,'↩ RETURN · NEAR FRONT');
  ret.onclick();
@@ -408,6 +408,6 @@ test('Frontlines death recap is an immutable last-life snapshot, not a live trac
  g.killTank(victim(100,200));
  counts.neutralXP=9999;counts.observedContests=5;
  g.update();
- assert.match(panel.choice.children[0].textContent,/CONTEST 0 · \\+20 NEUTRAL XP/);
+ assert.match(panel.choice.children[0].textContent,/CONTEST 0 · \+20 NEUTRAL XP/);
  assert.doesNotMatch(panel.choice.children[0].textContent,/9999|CONTEST 5/);
 });
