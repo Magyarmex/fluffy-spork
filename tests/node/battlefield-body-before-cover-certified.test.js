@@ -383,7 +383,7 @@ for(const optimized of [false,true]){
    const speed=fps===30?1050*(1+.085*8):60*fps,
          radius=5.5*(1+21*.0085);
    const r=run(boot(optimized),{fps,speed,wall:17,laterWall:35,
-    target:50,pen:3,radius,damage:21,destructible:true,coverHp:5,
+    target:60,pen:3,radius,damage:21,destructible:true,coverHp:5,
     remoteShapes:120,remoteBullets:220,
     otherShell:{x:1800,y:-1800},reverseBullets});
    assert.deepEqual(r.hits,[]);
