@@ -79,14 +79,14 @@ function boot(optimized){
 }
 function trial(Game,{hz=30,reverse=false,competitor=true,cover=true,
  competitorY=70,competitorX=120,coverHp=1,pen=2,
- shell=false,remoteBullet=false,newborn=false,remoteShapes=0,liveDrone=false,competitorPen=1,postCoverSquare=false}={}){
+ shell=false,remoteBullet=false,newborn=false,remoteShapes=0,liveDrone=false,competitorPen=1,postCoverSquare=false,postCoverSquareX=45,postCoverSquarePrevX=postCoverSquareX}={}){
  const g=new Game(),dt=1/hz;
  const tank={kind:'tank',id:2,cls:'scout',x:110,y:0,hp:100,alive:true,
   __novaSweepMoveTime:1,__novaSweepPrevX:110,__novaSweepPrevY:0};
  const square={kind:'shape',id:50,type:'square',x:40,y:0,r:20,hp:55,
   __novaShapeSweepEpoch:1,__novaShapeSweepPrevX:40,__novaShapeSweepPrevY:0};
- const behind=postCoverSquare?{kind:'shape',id:51,type:'square',x:45,y:70,r:12,hp:55,
-  __novaShapeSweepEpoch:1,__novaShapeSweepPrevX:45,__novaShapeSweepPrevY:70}:null;
+ const behind=postCoverSquare?{kind:'shape',id:51,type:'square',x:postCoverSquareX,y:70,r:12,hp:55,
+  __novaShapeSweepEpoch:1,__novaShapeSweepPrevX:postCoverSquarePrevX,__novaShapeSweepPrevY:70}:null;
  g.tanks=[tank];g.shapes=behind?[square,behind]:[square];
  if(liveDrone)g.drones.push({kind:'drone',id:80,ownerId:7,x:1700,y:1700,
   r:8,hp:20,__novaChronoDroneEpoch:1,
@@ -144,6 +144,14 @@ for(const optimized of [false,true]){
    }
   });
  }
+ test(label+': a Square physically before cover vetoes speculative breaker priority',()=>{
+  const r=trial(Game,{postCoverSquare:true,postCoverSquareX:100});
+  assert.equal(r.tankHp,100,'no false downstream promotion when the Square could be first');
+ });
+ test(label+': a moving Square cannot be certified as behind cover',()=>{
+  const r=trial(Game,{postCoverSquare:true,postCoverSquarePrevX:100});
+  assert.equal(r.tankHp,100,'the movement witness must veto the shortcut');
+ });
  test(label+': an already exhausted pen=0 breaker remains valid',()=>{
   const r=trial(Game,{competitorPen:0});
   assert.equal(r.squareHp,43);
