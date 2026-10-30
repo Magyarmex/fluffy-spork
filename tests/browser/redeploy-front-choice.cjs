@@ -35,11 +35,32 @@ async function run(browser,width,height){
    const g=window.__novaFrontSmokeGame;
    const p=g.player;
    const pos={x:p.x,y:p.y};
+   /* Exercise the real death-panel composition with already-observed public
+    * BLOOM counters. No hidden enemy positions, no extra combat authority. */
+   const st=g.__lfState||(g.__lfState={});
+   const ft=st.frontlineTelemetry||(st.frontlineTelemetry={counts:{}});
+   ft.counts=Object.assign(ft.counts||{},{
+    announcements:2,playerApproaches:2,playerEntries:3,
+    observedContests:1,neutralXP:125.8});
    g.killTank(p,null);
    return pos;
   });
   const returnButton=page.locator('[data-nova-insertion="return"]');
   await returnButton.waitFor({state:'visible',timeout:15000});
+  const recap=page.locator('[data-nova-front-recap]');
+  await recap.waitFor({state:'visible',timeout:15000});
+  assert.equal(await recap.textContent(),
+   'LAST LIFE · BLOOM APPROACH 2 · ENTRY 3 · CONTEST 1 · +126 NEUTRAL XP');
+  const recapFit=await recap.evaluate(node=>{
+   const r=node.getBoundingClientRect();
+   return {left:r.left,right:r.right,width:innerWidth,
+    font:parseFloat(getComputedStyle(node).fontSize),
+    scrollWidth:document.documentElement.scrollWidth};
+  });
+  assert.ok(recapFit.left>=-1&&recapFit.right<=recapFit.width+1&&
+   recapFit.scrollWidth<=recapFit.width+1,
+   'last-life recap must fit the real viewport: '+JSON.stringify(recapFit));
+  assert.ok(recapFit.font>=8,'recap must remain legible on compact landscape');
   assert.equal(await returnButton.textContent(),'↩ RETURN · NEAR FRONT');
   assert.match(await returnButton.getAttribute('aria-label'),/^↩ RETURN · NEAR FRONT.*420–850 world units.*No stat bonus/);
   assert.equal(await page.locator('[data-nova-insertion="fresh"]').textContent(),'⚡ FRESH · RANDOM');
