@@ -1969,8 +1969,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    var o=shots[si];
    if(!o||o===b||
       o.__novaWallProofSpecialEpoch!==g.__novaWallProofEpoch)continue;
-   if(++count>2||o.dead||!o.shell||o.__v17Cannon||
-      o.__v17FuseDist||o.__novaClusterBurstConsumed||
+   if(++count>2||o.dead||!o.shell||
+      o.__novaClusterBurstConsumed||
       o.__novaBreachAtTime===g.time||
       !(Number.isFinite(o.ttl)&&o.ttl>dt)||
       !(Number.isFinite(o.r)&&o.r>0)||
@@ -1987,6 +1987,18 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       Math.max(Math.abs(x0),Math.abs(y0),
        Math.abs(x1),Math.abs(y1))>=MAP_LIMIT-o.r-4||
       firstSolidHit(g,x0,y0,x1,y1,o.r*.45))return null;
+   /* Cannon's programmed radial fuse can detonate without contact.
+    * Its distance from the launch point is convex along a straight
+    * unimpeded segment, so BOTH endpoints below the threshold certify
+    * that this frame cannot cross it. Missing/armed/near fuses abstain. */
+   if(o.__v17Cannon){
+    if(!(Number.isFinite(o.__v17FuseDist)&&o.__v17FuseDist>0)||
+       !Number.isFinite(o.__v17SpawnX)||
+       !Number.isFinite(o.__v17SpawnY)||
+       Math.max(Math.hypot(x0-o.__v17SpawnX,y0-o.__v17SpawnY),
+        Math.hypot(x1-o.__v17SpawnX,y1-o.__v17SpawnY))+2.000001>=
+        o.__v17FuseDist)return null;
+   }else if(o.__v17FuseDist)return null;
    /* Even an unexpected burst cannot be local to this proof corridor. */
    if(near(x0,y0,x1,y1,ax,ay,ex,ey,
       o.r+(b.r||3)+Math.max(400,(o.splash||0)+150)))return null;
