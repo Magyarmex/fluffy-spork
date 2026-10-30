@@ -9,7 +9,7 @@ function scene(){
   drawMinimap(){return 'base';}
   update(dt){this.time+=dt;return 'base-update';}
   gainXP(t,amount){t.xp=(t.xp||0)+amount;}
-  updateOrbs(){if(!this.orbs.length)return;const o=this.orbs.shift();this.gainXP(this.player,o.xp);}
+  updateOrbs(){if(!this.orbs.length)return;const o=this.orbs[0];this.gainXP(this.player,o.xp);this.orbs.splice(0,1);}
   damageTank(t,amount){t.hp-=amount;if(t.hp<=0){t.alive=false;this.status='dead';}}
   redeploy(){return 'redeployed';}
  }
