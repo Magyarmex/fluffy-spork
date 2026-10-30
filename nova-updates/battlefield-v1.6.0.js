@@ -2810,7 +2810,10 @@ function certifiedMultiShotCoverPriority(g,dt){
      !Number.isFinite(dr.__novaChronoDronePrevX)||
      !Number.isFinite(dr.__novaChronoDronePrevY)||
      !Number.isFinite(dr.speed)||dr.speed<0||dr.speed>600||
-     !Number.isFinite(dr.r)||!(dr.r>0))return null;
+     !Number.isFinite(dr.r)||!(dr.r>0)||
+     !Number.isFinite(dr.__novaVX==null?0:dr.__novaVX)||
+     !Number.isFinite(dr.__novaVY==null?0:dr.__novaVY)||
+     Math.hypot(dr.__novaVX||0,dr.__novaVY||0)>2400)return null;
   var move=Math.hypot(dr.x-dr.__novaChronoDronePrevX,
                       dr.y-dr.__novaChronoDronePrevY);
   if(!Number.isFinite(move)||move>96)return null;
