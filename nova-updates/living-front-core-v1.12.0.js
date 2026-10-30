@@ -30,9 +30,21 @@ function advanceSector(s,dt,ceiling){
   var dis=clamp(s.pressure*.72+s.recentHarvest*.34+s.recentCombat*.28+Math.max(0,s.tanks-1)*.045,0,1.3),grow=.0058+.0078*(1-clamp(dis,0,1)),loss=.014*s.pressure+.009*s.recentHarvest+.006*s.recentCombat+.0012*Math.max(0,s.tanks-1);
   s.maturity=clamp(s.maturity+dt*(grow-loss),0,ceiling);return s;
 }
+/* Count physical Star births once per session, including ordinary Stars later
+ * adopted by the Director. A new life gets a new cohort even when a Star
+ * survives redeploy; identity is local to the session, not a global ID. */
+function recordStarSpawn(st,s){
+  if(!st||!st.stats||!s||s.type!=='star')return false;
+  var seen=st.__lfStarBirths||(st.__lfStarBirths=new WeakSet());
+  if(seen.has(s))return false;
+  seen.add(s);st.stats.starsSpawned++;return true;
+}
 function ensure(g,defs){
   if(g.__lfState)return g.__lfState;var a=[];for(var i=0;i<16;i++)a.push(makeSector(i));
-  return g.__lfState={version:VERSION,defs:defs,sectors:a,sectorT:0,behaviorT:0,directorT:0,age:0,ceiling:maturityCeiling(0),signal:null,lastSignal:'none',lastSignalAt:-99,lastMeaningfulAt:0,cooldowns:{bloom:0,migration:0,star:0},lastBloomSector:-1,migrationHeat:0,migrationX:0,migrationY:0,migrationTransitions:0,directorEnabled:true,stats:{triangleEvasions:0,crasherCharges:0,crasherHits:0,crasherMisses:0,crasherOvershoots:0,bountyAbsorbed:0,bountyReleased:0,starsSpawned:0,starsIntercepted:0,starsExpired:0,starLifetimeTotal:0,blooms:0,migrations:0,aiRotations:0,hexSamples:0,hexNeighbors:0,nearFireHerds:0,burstHerds:0,playerNeutralXP:0},planMsEma:0,planMsPeak:0,queryScratch:[],queryScratch2:[],tutorial:{ecology:false}};
+  var st=g.__lfState={version:VERSION,defs:defs,sectors:a,sectorT:0,behaviorT:0,directorT:0,age:0,ceiling:maturityCeiling(0),signal:null,lastSignal:'none',lastSignalAt:-99,lastMeaningfulAt:0,cooldowns:{bloom:0,migration:0,star:0},lastBloomSector:-1,migrationHeat:0,migrationX:0,migrationY:0,migrationTransitions:0,directorEnabled:true,stats:{triangleEvasions:0,crasherCharges:0,crasherHits:0,crasherMisses:0,crasherOvershoots:0,bountyAbsorbed:0,bountyReleased:0,starsSpawned:0,starsIntercepted:0,starsExpired:0,starLifetimeTotal:0,blooms:0,migrations:0,aiRotations:0,hexSamples:0,hexNeighbors:0,nearFireHerds:0,burstHerds:0,playerNeutralXP:0},planMsEma:0,planMsPeak:0,queryScratch:[],queryScratch2:[],tutorial:{ecology:false}};
+  var existing=g.shapes||[];
+  for(var j=0;j<existing.length;j++)if(existing[j]&&existing[j].type==='star'&&existing[j].hp>0)recordStarSpawn(st,existing[j]);
+  return st;
 }
 function planSample(st,n){st.planMsEma=st.planMsEma?lerp(st.planMsEma,n,.16):n;st.planMsPeak=Math.max(n,st.planMsPeak*.992);}
 function addPressure(g,x,y,n){var st=ensure(g,LF.defs||{}),s=st.sectors[sectorIndex(x,y)];s.pressure=clamp(s.pressure+(n||0),0,1.5);s.recentCombat=clamp(s.recentCombat+(n||0)*1.7,0,2);}
@@ -54,7 +66,7 @@ function safe(g,x,y,p){return!g.isTerrainSafe||g.isTerrainSafe(x,y,p||28);}
 function tankSafe(g,x,y,m){var ts=g.tanks||[],rr=(m||220)*(m||220);for(var i=0;i<ts.length;i++)if(alive(ts[i])&&d2(x,y,ts[i].x,ts[i].y)<rr)return false;return true;}
 function point(i,seed,k){var b=sectorBounds(i,90);return{x:lerp(b.x0,b.x1,hash01(seed+k*13,i+7)),y:lerp(b.y0,b.y1,hash01(seed+k*29,i+41))};}
 function relocate(g,s,i,min){for(var k=0;k<18;k++){var p=point(i,s.id||1,k);if(safe(g,p.x,p.y,(s.r||12)+15)&&tankSafe(g,p.x,p.y,min||220)){s.x=p.x;s.y=p.y;s.__lfSector=sectorIndex(p.x,p.y);return true;}}return false;}
-function initShape(g,s){if(!s)return;s.__lfSector=sectorIndex(s.x,s.y);s.__lfSpawnAt=g.time||0;if(s.type==='crasher'){s.__lfPredatorState='track';s.__lfPredatorT=.35+hash01(s.id,3)*.35;s.__lfTargetId=-1;s.__lfTargetKind='';s.__lfBounty=s.__lfBounty||0;s.wanderT=999;}if(s.type==='star'){s.__lfStarBorn=g.time||0;s.wanderT=999;}}
+function initShape(g,s){if(!s)return;s.__lfSector=sectorIndex(s.x,s.y);s.__lfSpawnAt=g.time||0;if(s.type==='crasher'){s.__lfPredatorState='track';s.__lfPredatorT=.35+hash01(s.id,3)*.35;s.__lfTargetId=-1;s.__lfTargetKind='';s.__lfBounty=s.__lfBounty||0;s.wanderT=999;}if(s.type==='star'){s.__lfStarBorn=g.time||0;s.wanderT=999;recordStarSpawn(ensure(g,LF.defs||{}),s);}}
 function awardBounty(cr,v){var b=Number(cr&&cr.__lfBounty)||0,a=clamp(b+Math.max(0,Number(v)||0)*.65,0,BOUNTY_CAP);if(cr)cr.__lfBounty=a;return a-b;}
 function query(g,st,x,y,r,alt){
   var out=alt?st.queryScratch2:st.queryScratch;out.length=0;if(g.hash&&g.hash.query){g.hash.query(x,y,r,out);if(LF&&LF.queryBullets)LF.queryBullets(g,x,y,r,out);return out;}
@@ -75,7 +87,7 @@ function snapshot(g){
   var stats=Object.assign({},st.stats),age=Math.max(0.001,st.age),hexAvg=stats.hexSamples?stats.hexNeighbors/stats.hexSamples:0,starEnded=stats.starsIntercepted+stats.starsExpired,starAvg=starEnded?stats.starLifetimeTotal/starEnded:0;
   return{active:true,version:VERSION,age:+st.age.toFixed(1),ceiling:+st.ceiling.toFixed(3),counts:counts,totalXP:Math.round(total),director:st.signal?st.signal.type:'idle',lastSignal:st.lastSignal,planMsEma:+st.planMsEma.toFixed(3),planMsPeak:+st.planMsPeak.toFixed(3),playerNeutralXP:+stats.playerNeutralXP.toFixed(1),playerNeutralXPPerMin:+(stats.playerNeutralXP/(age/60)).toFixed(1),hexAvgNeighbors:+hexAvg.toFixed(2),starAvgLifetime:+starAvg.toFixed(2),starInterceptionRate:stats.starsSpawned?+(stats.starsIntercepted/stats.starsSpawned).toFixed(3):0,stats:stats,sectors:sectors,frontline:st.frontlineTelemetry?{counts:Object.assign({},st.frontlineTelemetry.counts),current:{sector:st.frontlineTelemetry.sector,announcedAt:st.frontlineTelemetry.announcedAt},events:st.frontlineTelemetry.events.slice(-48)}:null};
 }
-var LF=window.__NOVA_LIVING_FRONT_INTERNAL__={VERSION:VERSION,TAU:TAU,GRID:GRID,ARENA:ARENA,SECTOR_PERIOD:SECTOR_PERIOD,BEHAVIOR_PERIOD:BEHAVIOR_PERIOD,DIRECTOR_PERIOD:DIRECTOR_PERIOD,AI_PERIOD:AI_PERIOD,BOUNTY_CAP:BOUNTY_CAP,TARGETS:TARGETS,defs:null,clamp:clamp,lerp:lerp,d2:d2,alive:alive,ms:ms,wrap:wrap,xp:xp,speed:speed,sectorIndex:sectorIndex,sectorCenter:sectorCenter,sectorBounds:sectorBounds,neighbors:neighbors,maturityCeiling:maturityCeiling,ageProgress:ageProgress,makeSector:makeSector,advanceSector:advanceSector,ensure:ensure,planSample:planSample,addPressure:addPressure,chooseSpawnSector:chooseSpawnSector,relocate:relocate,initShape:initShape,awardBounty:awardBounty,query:query,snapshot:snapshot,getActive:function(){return activeGame;},getLast:function(){return lastSnapshot;},setLast:function(v){lastSnapshot=v;}};
+var LF=window.__NOVA_LIVING_FRONT_INTERNAL__={VERSION:VERSION,TAU:TAU,GRID:GRID,ARENA:ARENA,SECTOR_PERIOD:SECTOR_PERIOD,BEHAVIOR_PERIOD:BEHAVIOR_PERIOD,DIRECTOR_PERIOD:DIRECTOR_PERIOD,AI_PERIOD:AI_PERIOD,BOUNTY_CAP:BOUNTY_CAP,TARGETS:TARGETS,defs:null,clamp:clamp,lerp:lerp,d2:d2,alive:alive,ms:ms,wrap:wrap,xp:xp,speed:speed,sectorIndex:sectorIndex,sectorCenter:sectorCenter,sectorBounds:sectorBounds,neighbors:neighbors,maturityCeiling:maturityCeiling,ageProgress:ageProgress,makeSector:makeSector,advanceSector:advanceSector,ensure:ensure,planSample:planSample,addPressure:addPressure,chooseSpawnSector:chooseSpawnSector,relocate:relocate,initShape:initShape,recordStarSpawn:recordStarSpawn,awardBounty:awardBounty,query:query,snapshot:snapshot,getActive:function(){return activeGame;},getLast:function(){return lastSnapshot;},setLast:function(v){lastSnapshot=v;}};
 
 wrap('game/engine',function(engine,require){
   var Game=engine.Game;if(!Game||Game.prototype.__novaLivingFrontCore)return;Game.prototype.__novaLivingFrontCore=true;var defs=(require('./types')||{}).SHAPE_DEFS||{};LF.defs=defs;
