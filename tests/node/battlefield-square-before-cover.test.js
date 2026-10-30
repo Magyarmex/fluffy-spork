@@ -66,7 +66,7 @@ function boot(optimized,full=false){
 function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
   squareY=0,wallY=0,born=false,moved=false,teleport=false,extraBullet=false,
   extraTank=false,fragile=false,pen=1,extraSquare=false,cover=false,
-  dmg=12,radius=3}={}){
+  dmg=12,radius=3,ttl=1}={}){
  const g=new Game();
  const square={kind:'shape',id:50,type:'square',x:squareX,y:squareY,r:20,hp:fragile?10:55};
  if(born)square.born=g.time;
@@ -76,7 +76,7 @@ function trial(Game,{hz=30,vx=30000,squareX=40,wallX=80,
  g.__novaTerrain=[{id:-51,shape:'rect',x:wallX,y:wallY,w:8,h:80,
   solid:true,destructible:cover,hp:cover?300:0}];
  g.bullets=[{kind:'bullet',id:10,ownerId:1,x:0,y:0,vx,vy:0,
-  r:radius,dmg,ttl:1,pen,hits:0,dead:false,shell:false,beam:false,splash:0}];
+  r:radius,dmg,ttl,pen,hits:0,dead:false,shell:false,beam:false,splash:0}];
  if(extraBullet)g.bullets.push({kind:'bullet',id:11,ownerId:3,
   x:extraBullet==='remote'?1000:0,y:extraBullet==='remote'?1000:0,vx:0,vy:0,r:3,dmg:20,ttl:1,pen:0,hits:0,dead:extraBullet==='dead'});
  if(extraTank)g.tanks.push({kind:'tank',id:2,cls:'scout',alive:true,hp:100,x:30,y:0});
@@ -103,6 +103,17 @@ for(const optimized of [false,true]){
    const {g,square}=trial(Game,{hz,squareX:120});
    assert.equal(square.hp,55);
    assert.deepEqual(g.hits,[]);
+  });
+ }
+ /* Regression-first: a shot that reaches both contacts before its lifetime
+  * ends must not be discarded merely because TTL < simulation dt.
+  * At 30..240 Hz, 30,000u/s x 0.0035s = 105u, past the square
+  * (first contact ~17u) and wall (~75u). Both occur before expiry. */
+ for(const hz of [30,60,120,240]){
+  test(mode+' expiring projectile still hits square before wall at '+hz+'Hz',()=>{
+   const {g,square}=trial(Game,{hz,ttl:.0035});
+   assert.equal(square.hp,43,'first square contact precedes TTL and wall');
+   assert.deepEqual(g.hits,[50]);
   });
  }
  test(mode+' actual-speed nonlethal square hit precedes later cover',()=>{
@@ -191,6 +202,10 @@ test('actual production loads Battlefield before Performance',()=>{
  * must not resurrect the wall hit or award a phantom contact behind cover. */
 const FullGame=boot(true,true);
 for(const hz of [30,60,120,240]){
+ test('full shipping stack honors expiring square before wall at '+hz+'Hz',()=>{
+  const {g,square}=trial(FullGame,{hz,ttl:.0035});
+  assert.equal(square.hp,43);assert.deepEqual(g.hits,[50]);
+ });
  test('full shipping collision stack honors square before wall at '+hz+'Hz',()=>{
   const {g,square}=trial(FullGame,{hz});
   assert.deepEqual(g.hits,[50]);assert.equal(square.hp,43);
