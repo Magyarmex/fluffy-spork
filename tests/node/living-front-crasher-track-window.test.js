@@ -70,7 +70,7 @@ test('actual recover-to-track transition cannot chain straight into another char
  assert.equal(s.cr.__lfPredatorState,'telegraph');
  assert.equal(s.st.stats.crasherCharges,0);
 });
-for(const hz of [30,60,120,240]){
+for(const hz of [8,10,30,60,120,240]){
  test('Crasher track delay survives '+hz+'Hz cadence',()=>{
   const s=scenario(),dt=1/hz;
   for(let elapsed=0;elapsed+dt<.28-1e-9;elapsed+=dt){
