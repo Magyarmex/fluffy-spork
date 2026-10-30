@@ -364,3 +364,50 @@ test('RETURN waypoint keeps its timer when terrain visibility is temporarily una
  g.time=24;g.drawMinimap();
  assert.equal(g.__novaLastFrontMarker,null,'expiry is authoritative even without terrain visibility');
 });
+
+
+/* Frontlines after-action learning: only public-opportunity telemetry that the
+ * pilot actually earned, never enemy coordinates or private sector maturity. */
+test('death choice shows a factual public-BLOOM recap without changing either action',()=>{
+ const {Game,addPanel}=boot(),g=new Game(),panel=addPanel();
+ g.__lfState={frontlineTelemetry:{counts:{announcements:2,playerApproaches:2,
+  playerEntries:3,observedContests:1,neutralXP:125.8}}};
+ g.killTank(victim(100,200));g.update();
+ const row=panel.choice;
+ assert.ok(row,'canonical React death panel receives the choice row');
+ assert.equal(row.children.length,3,'one compact observation plus the two existing actions');
+ const [note,fresh,ret]=row.children;
+ assert.equal(note.attributes.role,'note');
+ assert.ok(note.attributes['data-nova-front-recap']!==undefined);
+ assert.equal(note.textContent,'LAST LIFE · BLOOM APPROACH 2 · ENTRY 3 · CONTEST 1 · +126 NEUTRAL XP');
+ assert.ok(!JSON.stringify(note).includes('enemy'));
+ assert.equal(fresh.textContent,'⚡ FRESH · RANDOM');
+ assert.equal(ret.textContent,'↩ RETURN · NEAR FRONT');
+ ret.onclick();
+ assert.equal(g.__novaRedeployChoice,'return');
+ assert.equal(panel.redeploy.clicked,1,'the original React callback remains authoritative');
+ g.redeploy();
+ assert.equal(panel.choice,null,'recap is cleared on redeploy');
+ assert.equal(g.__novaFrontlineRecap,null,'old life cannot leak into the next life');
+});
+test('unobserved, malformed or empty Frontlines telemetry never creates a fake recap',()=>{
+ for(const counts of [null,{announcements:0,playerApproaches:1,playerEntries:1},
+  {announcements:1,playerApproaches:0,playerEntries:0,observedContests:1,neutralXP:500},
+  {announcements:1,playerApproaches:1,playerEntries:0,observedContests:0,neutralXP:Infinity},
+  {announcements:1,playerApproaches:1,playerEntries:0,observedContests:-1,neutralXP:0}]){
+  const {Game,addPanel}=boot(),g=new Game(),panel=addPanel();
+  if(counts)g.__lfState={frontlineTelemetry:{counts}};
+  g.killTank(victim(100,200));g.update();
+  assert.equal(panel.choice.children.length,2,'no invented tactical learning from invalid evidence');
+ }
+});
+test('Frontlines death recap is an immutable last-life snapshot, not a live tracker',()=>{
+ const {Game,addPanel}=boot(),g=new Game(),panel=addPanel();
+ const counts={announcements:1,playerApproaches:1,playerEntries:1,observedContests:0,neutralXP:20};
+ g.__lfState={frontlineTelemetry:{counts}};
+ g.killTank(victim(100,200));
+ counts.neutralXP=9999;counts.observedContests=5;
+ g.update();
+ assert.match(panel.choice.children[0].textContent,/CONTEST 0 · \\+20 NEUTRAL XP/);
+ assert.doesNotMatch(panel.choice.children[0].textContent,/9999|CONTEST 5/);
+});
