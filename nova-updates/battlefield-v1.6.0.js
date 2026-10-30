@@ -2299,7 +2299,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   var w=wall.solid,
       hx=w.shape==='rect'?w.w*.5:w.shape==='circle'?w.r:NaN,
       hy=w.shape==='rect'?w.h*.5:w.shape==='circle'?w.r:NaN,
-      shots=g.bullets||[],total=b.dmg;
+      shots=g.bullets||[],total=b.dmg,contested=false;
   if(!Number.isFinite(w.x)||!Number.isFinite(w.y)||
      !Number.isFinite(hx)||!Number.isFinite(hy)||
      !(hx>0&&hy>0)||shots.length>600)return false;
@@ -2317,13 +2317,14 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       Math.min(o.x,ex)-pad>w.x+hx||
       Math.max(o.y,ey)+pad<w.y-hy||
       Math.min(o.y,ey)-pad>w.y+hy)continue;
+   contested=true;
    if(o.shell||o.beam||o.splash||o.__v17Cannon||
       o.__novaStructureMult>1||o.pen!==0||
       !Number.isFinite(o.dmg)||!(o.dmg>0))return false;
    total+=o.dmg;
    if(!Number.isFinite(total)||total*1.000001>=w.hp)return false;
   }
-  return true;
+  return contested; /* no extra pre-pass for already-correct isolated fire */
  }
  function certifiedSquareBeforeFirstSolid(g,b,dt,ax,ay,ex,ey,wall,dryRun){
   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
