@@ -88,7 +88,7 @@ function crasher(g,st,cr,defs,dt){
   else if(state==='telegraph'){if(target)cr.__lfCommitAngle=Math.atan2(target.y-cr.y,target.x-cr.x);cr.vx*=.72;cr.vy*=.72;}
   else if(state==='charge'||state==='overshoot'){
     var ca=cr.__lfCommitAngle||0;cr.vx=Math.cos(ca)*sp*(state==='charge'?1.42:1.20);cr.vy=Math.sin(ca)*sp*(state==='charge'?1.42:1.20);
-    if(cr.__novaTerrainBumpT>0){cr.__lfPredatorState='recover';cr.__lfPredatorT=.70;cr.vx*=.28;cr.vy*=.28;if(state==='charge'&&!cr.__lfChargeHit)st.stats.crasherMisses++;cr.__lfTargetId=-1;state='recover';}
+    if(cr.__novaTerrainBumpT>0){cr.__lfPredatorState='recover';cr.__lfPredatorT=.70;cr.vx*=.28;cr.vy*=.28;if(cr.__lfChargeHit)st.stats.crasherHits++;else st.stats.crasherMisses++;cr.__lfTargetId=-1;state='recover';}
     if(state==='charge'||state==='overshoot'){var a2=query(g,st,cr.x,cr.y,48,1);for(var k=0;k<a2.length;k++){var e=a2[k];if(!e||e===cr)continue;/* Hash buckets include irrelevant bullets and out-of-contact bodies. Terrain rays are only needed for a physical charge candidate. */var tank=e.kind==='tank'&&alive(e),prey=e.kind==='shape'&&e.type!=='crasher'&&e.type!=='star'&&e.type!=='hexagon'&&e.hp>0;if(!tank&&!prey)continue;var reach=(cr.r||15)+(e.r||(tank?18:12))+(tank?4:3);if(!(d2(cr.x,cr.y,e.x,e.y)<Math.pow(reach,2))||!los(g,cr.x,cr.y,e.x,e.y,2))continue;if(tank){cr.__lfChargeHit=true;break;}var dmg=22;if(e.hp<=dmg)e.__lfPredatorKiller=cr.id;if(g.damageShape)g.damageShape(e,dmg,cr.vx*.55,cr.vy*.55);cr.__lfChargeHit=true;break;}}
   }else if(state==='recover'){cr.vx*=.88;cr.vy*=.88;}
   edge(cr,1.25);cap(cr,sp*1.45);
