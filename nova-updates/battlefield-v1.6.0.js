@@ -1953,7 +1953,12 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   if(!(Number.isFinite(dt)&&dt>0&&dt<=.05))return null;
   var shots=g.bullets||[],tanks=g.tanks||[],shapes=g.shapes||[],
       drones=g.drones||[],count=0;
-  if(shots.length+tanks.length+shapes.length+drones.length>260)return null;
+  /* Bound actual shell certification work, not unrelated distant fire.
+   * Keep the 260-body safety ceiling and the separate 260-candidate hash
+   * ceiling below; every shot is still inspected for interception. At most
+   * two witnessed shells may require these bounded 600-item scans. */
+  var bodyCount=tanks.length+shapes.length+drones.length;
+  if(bodyCount>260||bodyCount+shots.length>600)return null;
   function near(x0,y0,x1,y1,u0,v0,u1,v1,pad){
    if(!Number.isFinite(x0)||!Number.isFinite(y0)||
       !Number.isFinite(x1)||!Number.isFinite(y1)||
