@@ -2196,6 +2196,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   }
   for(var bi=0;bi<shots.length;bi++){
    var o=shots[bi];if(!o||o===b)continue;
+   /* A previous terrain pre-pass may already have killed or relocated this
+    * competitor. Its current endpoint cannot certify its earlier corridor. */
+   if(o.__novaWallProofEpoch!==g.__novaWallProofEpoch||
+      o.dead||o.__novaBreachAtTime===g.time)return false;
    if(!Number.isFinite(o.x)||!Number.isFinite(o.y)||
       !Number.isFinite(o.vx)||!Number.isFinite(o.vy)||
       !Number.isFinite(o.r)||!(o.r>0))return false;
