@@ -2618,6 +2618,79 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   return true;
  }
 
+
+/* A bounded cover race is resolvable without global bullet reordering only
+ * when an independent non-piercing shot physically breaks the same cover
+ * BEFORE a later penetrating shot arrives. Preserve core bullet order and
+ * abstain on bodies, shells, interception, uncertain motion and large batches.
+ * #147 retains the full multi-projectile chronological contract. */
+function certifiedTwoShotCoverPriority(g,dt){
+ var bs=g.bullets;
+ if(!bs||bs.length!==2||!(dt>0&&dt<=.05))return null;
+ var late=bs[0],early=bs[1];
+ function ordinary(b){
+  return b&&!b.dead&&!b.shell&&!b.beam&&!b.splash&&!b.__v17Cannon&&
+   (b.hits||0)===0&&(b.knock||0)===0&&Number.isSafeInteger(b.pen)&&
+   Number.isFinite(b.x)&&Number.isFinite(b.y)&&
+   Number.isFinite(b.vx)&&Number.isFinite(b.vy)&&
+   Number.isFinite(b.r)&&b.r>0&&Number.isFinite(b.dmg)&&b.dmg>0&&
+   Number.isFinite(b.ttl)&&b.ttl>=dt;
+ }
+ if(!ordinary(late)||!ordinary(early)||late.pen<1||late.pen>4||
+    early.pen!==0)return null;
+ var ax=early.x,ay=early.y,ex=ax+early.vx*dt,ey=ay+early.vy*dt,
+     bx=late.x,by=late.y,fx=bx+late.vx*dt,fy=by+late.vy*dt;
+ if(!Number.isFinite(ex)||!Number.isFinite(ey)||
+    !Number.isFinite(fx)||!Number.isFinite(fy)||
+    Math.max(Math.abs(ax),Math.abs(ay),Math.abs(ex),Math.abs(ey),
+             Math.abs(bx),Math.abs(by),Math.abs(fx),Math.abs(fy))>=MAP_LIMIT-20)
+  return null;
+ /* Spatially disjoint swept corridors rule out bullet interception even if
+  * the two shots move in opposite directions at different velocities. */
+ var pad=early.r+late.r+2;
+ if(!(Math.max(ax,ex)+pad<Math.min(bx,fx)||
+      Math.max(bx,fx)+pad<Math.min(ax,ex)||
+      Math.max(ay,ey)+pad<Math.min(by,fy)||
+      Math.max(by,fy)+pad<Math.min(ay,ey)))return null;
+ var eh=firstSolidHit(g,ax,ay,ex,ey,early.r*.45),
+     lh=firstSolidHit(g,bx,by,fx,fy,late.r*.45);
+ if(!eh||!lh||eh.solid!==lh.solid||!eh.solid.destructible||
+    !(eh.solid.hp>0&&eh.solid.hp<=early.dmg)||
+    !(eh.hit.t>1e-7&&lh.hit.t>1e-7&&eh.hit.t+1e-6<lh.hit.t))
+  return null;
+ var tanks=g.tanks||[],shapes=g.shapes||[],drones=g.drones||[];
+ if(tanks.length+shapes.length+drones.length>260)return null;
+ var dx=ex-ax,dy=ey-ay,len=dx*dx+dy*dy;
+ if(!(len>1e-9))return null;
+ for(var group=0;group<3;group++){
+  var arr=group===0?tanks:group===1?shapes:drones;
+  for(var i=0;i<arr.length;i++){
+   var e=arr[i];if(!e||(group===0?!e.alive:!(e.hp>0)))continue;
+   if(!Number.isFinite(e.x)||!Number.isFinite(e.y))return null;
+   var radius=group===0?(CLASSES[e.cls]&&CLASSES[e.cls].size||20)+3:
+              group===1?(e.r||20):(e.r||10)+1;
+   var prevX=Number.isFinite(e.__novaSweepPrevX)?e.__novaSweepPrevX:e.x,
+       prevY=Number.isFinite(e.__novaSweepPrevY)?e.__novaSweepPrevY:e.y,
+       motion=Math.hypot(e.x-prevX,e.y-prevY);
+   if(!Number.isFinite(motion))return null;
+   /* A conservative motion envelope includes observed displacement and
+    * two velocity budgets. Unknown or nearby bodies veto this shortcut. */
+   var bound=radius+early.r+8+motion+Math.hypot(e.vx||0,e.vy||0)*dt*2;
+   if(!Number.isFinite(bound))return null;
+   var t=clamp(((e.x-ax)*dx+(e.y-ay)*dy)/len,0,1),
+       xx=ax+t*dx,yy=ay+t*dy;
+   if(d2(xx,yy,e.x,e.y)<=bound*bound)return null;
+   /* A lethal first-body contact on the later corridor can create new
+    * projectiles or alter cover; never reorder its effects speculatively. */
+   var latePad=radius+late.r+4,ldx=fx-bx,ldy=fy-by,
+       llen=ldx*ldx+ldy*ldy,lt=llen>1e-9?
+        clamp(((e.x-bx)*ldx+(e.y-by)*ldy)/llen,0,1):0;
+   if(e.hp>0&&e.hp<=late.dmg*2&&
+      d2(bx+lt*ldx,by+lt*ldy,e.x,e.y)<=latePad*latePad)return null;
+  }
+ }
+ return [1,0];
+}
  var oldUpdateBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var terrain=ensureTerrain(this);
  /* Snapshot all live competing shots BEFORE any shell/TTL/terrain pre-pass.
   * A later shot cannot gain speculative priority because an earlier shot
@@ -2838,7 +2911,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
     }else isolatedTTLStationaryPiercingChain(this,liveBullet,dt,true);
    }
   }
- for(var i=0;i<this.bullets.length;i++){var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,sweepDt=dt;/* Terrain beyond physical projectile lifetime is unreachable, including shells. */if(Number.isFinite(b.ttl)){if(b.ttl<=0)continue;sweepDt=Math.min(dt,b.ttl);}var nx=ox+(b.vx||0)*sweepDt,ny=oy+(b.vy||0)*sweepDt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;if(fuseDefinitelyBeforeTerrain(this,b,dt,ox,oy,nx,ny,fh.hit))continue;if(certifiedTankBeforeFirstSolid(this,b,dt,ox,oy,nx,ny,fh)===1)continue;if(certifiedSquareBeforeFirstSolid(this,b,dt,ox,oy,nx,ny,fh)===1)continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){/* Integrity belongs to the launch build, not the post-breach pen. */if(this.initBulletIntegrity)this.initBulletIntegrity(b);b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){if(certifiedBreachLaterSolid(this,b,dt,ox,oy,nx,ny,fh))continue;b.__novaBreachAtTime=this.time;b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
+ var terrainOrder=certifiedTwoShotCoverPriority(this,dt);for(var terrainStep=0;terrainStep<this.bullets.length;terrainStep++){var i=terrainOrder?terrainOrder[terrainStep]:terrainStep;var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,sweepDt=dt;/* Terrain beyond physical projectile lifetime is unreachable, including shells. */if(Number.isFinite(b.ttl)){if(b.ttl<=0)continue;sweepDt=Math.min(dt,b.ttl);}var nx=ox+(b.vx||0)*sweepDt,ny=oy+(b.vy||0)*sweepDt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;if(fuseDefinitelyBeforeTerrain(this,b,dt,ox,oy,nx,ny,fh.hit))continue;if(certifiedTankBeforeFirstSolid(this,b,dt,ox,oy,nx,ny,fh)===1)continue;if(certifiedSquareBeforeFirstSolid(this,b,dt,ox,oy,nx,ny,fh)===1)continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){/* Integrity belongs to the launch build, not the post-breach pen. */if(this.initBulletIntegrity)this.initBulletIntegrity(b);b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){if(certifiedBreachLaterSolid(this,b,dt,ox,oy,nx,ny,fh))continue;b.__novaBreachAtTime=this.time;b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
    /* The core still advances a dead bullet before removing it; a shell may
      * expire or leave the arena in that pass. Consume its one-time burst now. */
     if(b.shell&&this.clusterBurst){var childStart=this.bullets.length;this.clusterBurst(b);clearTerrainBurstChildren(this,s,h,childStart);b.shell=false;}if(b.splash&&this.splashAt)this.splashAt(h.x,h.y,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.dead=true;if(this.addFlash)this.addFlash(h.x,h.y,s.destructible?'#8fd4ff':'#b9c7e7',Math.min(46,14+(b.dmg||0)*.24));if(this.cam&&b.dmg>42)this.cam.shake=Math.max(this.cam.shake,.08);/* The materialized core still advances dead bullets before removing them. Freeze a terrain-killed projectile at its impact so its final trail cannot leak through cover. Breaching live shots keep their velocity above. */b.vx=0;b.vy=0;
