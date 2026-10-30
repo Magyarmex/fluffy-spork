@@ -121,9 +121,14 @@ function run(Game,{fps=30,speed=6000,vy=0,wall=120,wallY=0,target=60,targetY=0,l
  if(preinitialized)g.initBulletIntegrity(g.bullets[0]);
  if(otherBullet)g.bullets.push({kind:'bullet',id:11,ownerId:4,
   x:0,y:1,vx:speed,vy:0,r:3,dmg:10,ttl:1,pen:0,hits:0,dead:false});
- if(otherShell)g.bullets.push({kind:'bullet',id:12,ownerId:4,
-  x:0,y:1000,vx:0,vy:0,r:9,dmg:10,ttl:1,pen:1,hits:0,dead:false,
-  shell:true,splash:100});
+ if(otherShell){
+  const cfg=otherShell===true?{}:otherShell;
+  g.bullets.push({kind:'bullet',id:12,ownerId:4,
+   x:cfg.x??0,y:cfg.y??1000,vx:cfg.vx??0,vy:cfg.vy??0,
+   r:9,dmg:10,ttl:cfg.ttl??1,pen:1,hits:0,dead:false,
+   shell:true,splash:cfg.splash??100,
+   __v17Cannon:cfg.cannon||false,__v17FuseDist:cfg.fuse||0});
+ }
  /* Separate remote lanes by more than the native projectile-pair radius.
   * They are independent fire, not an artificial pile of overlapping shots. */
  for(let i=0;i<remoteBullets;i++)g.bullets.push({kind:'bullet',id:100+i,
@@ -186,10 +191,41 @@ for(const optimized of [false,true]){
   const r=run(boot(optimized),{otherBullet:true});
   assert.deepEqual(r.hits,[]);
  });
- test(label+': unrelated live shell still vetoes speculative kill-credit ordering',()=>{
+ test(label+': remote unspent shell cannot suppress earlier hull contact',()=>{
   const r=run(boot(optimized),{otherShell:true});
-  assert.deepEqual(r.hits,[]);
+  assert.deepEqual(r.hits,[2]);assert.equal(r.hp,90);
  });
+ for(const fps of [30,60,120,240]){
+  test(label+': remote shell preserves real Marksman front hit at '+fps+'Hz',()=>{
+   const speed=1050*(1+.085*8),radius=5.5*(1+21*.0085);
+   const r=run(boot(optimized),{fps,speed,wall:55,target:29,
+    pen:2,radius,damage:21,otherShell:true});
+   assert.deepEqual(r.hits,[2]);assert.equal(r.hp,79);
+  });
+  test(label+': nearby shell still vetoes unproven ordering at '+fps+'Hz',()=>{
+   const r=run(boot(optimized),{fps,speed:200*fps,
+    otherShell:{y:30}});
+   assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
+  });
+ }
+ for(const cfg of [{ttl:.001},{vy:-30000},{cannon:true},{fuse:20},
+  {y:350},{x:0,y:0}]){
+  test(label+': shell hazard fails closed '+JSON.stringify(cfg),()=>{
+   const r=run(boot(optimized),{otherShell:cfg});
+   assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
+  });
+ }
+ for(const pen of [3,4])for(const fps of [30,60,120,240]){
+  test(label+': remote shell cannot expose rear hull after breach pen'+pen+
+   ' at '+fps+'Hz',()=>{
+   const r=run(boot(optimized),{fps,speed:200*fps,pen,
+    destructible:true,wall:55,laterWall:110,target:165,coverHp:5,
+    otherShell:true});
+   assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
+   assert.equal(r.g.__novaTerrain[0].hp,0);
+   assert.equal(r.g.bullets.some(b=>b.id===10),false);
+  });
+ }
  test(label+': TTL expiry before target is not bypassed',()=>{
   const r=run(boot(optimized),{ttl:.002});
   assert.deepEqual(r.hits,[]);
@@ -480,7 +516,7 @@ for(const optimized of [false,true]){
    assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
   });
   test(label+': pen3 with competing shell still abstains at '+fps+'Hz',()=>{
-   const r=run(Game,{fps,speed:200*fps,pen:3,destructible:true,otherShell:true});
+   const r=run(Game,{fps,speed:200*fps,pen:3,destructible:true,otherShell:{y:30}});
    assert.deepEqual(r.hits,[]);assert.equal(r.hp,100);
    assert.equal(r.g.__novaTerrain[0].hp,990);
   });
