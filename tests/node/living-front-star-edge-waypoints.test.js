@@ -105,3 +105,21 @@ test('real Living Front Director creates a public Star at a distributed edge way
  assert.equal(s.__lfGoalY,EDGE);
  assert.equal(st.stats.starAnnouncements,1);
 });
+
+test('created Star searches bounded terrain-clear opposite-edge routes',()=>{
+ const LF=boot(),s={id:33,type:'star',kind:'shape',r:24,x:0,y:0,hp:100};
+ let rays=0;
+ const g={time:60,isTerrainSafe(){return true;},
+  hasLineOfSight(ax,ay,bx,by){rays++;return ax>500&&bx>500;}};
+ LF.initStar(g,{stats:{starsSpawned:0}},s);
+ assert.equal(s.y,-EDGE);assert.equal(s.__lfGoalY,EDGE);
+ assert.ok(s.x>500&&s.__lfGoalX>500,
+  'the created Star must choose a visible edge-to-edge route instead of a blocked chord');
+ assert.ok(rays>1&&rays<=101,'route search must be bounded');
+ const blocked={id:33,type:'star',r:24,x:0,y:0};
+ rays=0;
+ LF.initStar({time:60,isTerrainSafe(){return true;},
+  hasLineOfSight(){rays++;return false;}},{stats:{starsSpawned:0}},blocked);
+ assert.equal(rays,101,'no route must exhaust only the bounded search');
+ assert.ok(Number.isFinite(blocked.x)&&Number.isFinite(blocked.__lfGoalX));
+});
