@@ -105,3 +105,18 @@ test('48-event cap survives interleaved events and malformed/foreign pickups are
  assert.equal(s.LF.recordFrontlineNeutralXP(s.g,s.st,s.g.tanks[1],10,{x:s.p.x,y:s.p.y}),false);
  assert.equal(s.st.frontlineTelemetry.counts.neutralXP,0);
 });
+
+test('a previously captured COPY ECOLOGY snapshot is immutable across later coalesced pickups',()=>{
+ const s=scene();s.LF.frontlineTick(s.g,s.st,false);
+ pickup(s,1);
+ const snapshot=s.LF.snapshot(s.g),before=JSON.stringify(snapshot.frontline.events);
+ pickup(s,2,.1);
+ assert.equal(JSON.stringify(snapshot.frontline.events),before,
+  'a published snapshot must not retroactively acquire later pickups');
+ const current=s.LF.snapshot(s.g).frontline.events.filter(e=>e.kind==='neutral-harvest');
+ assert.equal(current.length,1);
+ assert.equal(current[0].xp,3);
+ assert.equal(current[0].count,2);
+ assert.equal(s.st.frontlineTelemetry.counts.neutralXP,3);
+ assert.equal(s.p.xp,3);
+});
