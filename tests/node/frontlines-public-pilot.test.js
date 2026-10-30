@@ -6,14 +6,14 @@ const LF={defs:{circle:{xp:10},square:{xp:100}},xp:(defs,t)=>defs[t]?.xp||0,
  sectorCenter:s=>({x:s*100,y:0})};
 const F={viewportHalfExtents:()=>({x:100,y:100})};
 function game(shapes=[]){
- return{time:10,cam:{x:0,y:0},__lfState:{signal:{type:'BLOOM',sector:3,until:15},defs:LF.defs},
+ return{time:10,cam:{x:0,y:0},__lfState:{signal:{type:'BLOOM',sector:3,started:5,until:15},defs:LF.defs},
   shapes,hasLineOfSight:()=>true};
 }
 const p={id:1,x:0,y:0};
 test('public pilot never treats an expired or non-BLOOM signal as a destination',()=>{
  const g=game();assert.equal(publicSector(g),3);
  g.__lfState.signal.until=9;assert.equal(publicSector(g),null);
- g.__lfState.bloomMemory={sector:5,until:20};
+ g.__lfState.bloomMemory={sector:5,announcedAt:5,until:20};
  assert.equal(publicSector(g),5);
  g.__lfState.bloomMemory.until=9;assert.equal(publicSector(g),null);
  g.__lfState.signal.until=15;g.__lfState.directorEnabled=false;
@@ -56,4 +56,28 @@ test('visible neutral acquisition is deterministic under hidden-shape changes',(
  const before=aimAtVisibleNeutral(g,p,LF,F);
  g.shapes[1].hp=9999;g.shapes[1].type='circle';
  assert.deepEqual(aimAtVisibleNeutral(g,p,LF,F),before);
+});
+
+test('public pilot rejects future or malformed BLOOM signals and memories after clock reset',()=>{
+ const g=game();
+ g.__lfState.signal.started=20;g.__lfState.signal.until=25;
+ assert.equal(publicSector(g),null,'future live signal cannot be observed');
+ assert.equal(moveTowardPublicBloom(g,p,LF),null,'future public event cannot steer');
+ g.time=20;assert.equal(publicSector(g),3,'exact announcement time is public');
+ g.time=25;assert.equal(publicSector(g),null,'exact expiry is closed');
+ g.__lfState.signal=null;g.time=10;
+ g.__lfState.bloomMemory={sector:7,announcedAt:20,until:44};
+ assert.equal(publicSector(g),null,'future last-known memory is not public');
+ g.time=20;assert.equal(publicSector(g),7);
+ g.time=44;assert.equal(publicSector(g),null);
+ g.__lfState.bloomMemory={sector:7,until:99};
+ assert.equal(publicSector(g),null,'missing epoch cannot grant future intelligence');
+ g.__lfState.signal={type:'BLOOM',sector:3,until:99};
+ assert.equal(publicSector(g),null,'missing live start cannot grant future intelligence');
+});
+test('natural full-match research uses the same public epoch selector as the tested pilot',()=>{
+ const fs=require('node:fs'),path=require('node:path');
+ const source=fs.readFileSync(path.join(__dirname,'../browser/frontlines-natural-match-ab.cjs'),'utf8');
+ assert.match(source,/helper\.publicSector\(g\)/,
+  'research A/B movement must not duplicate a weaker future-signal predicate');
 });

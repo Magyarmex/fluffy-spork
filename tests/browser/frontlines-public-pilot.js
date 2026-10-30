@@ -8,8 +8,12 @@
  function publicSector(g){
   const st=g&&g.__lfState,now=g&&g.time||0,sig=st&&st.signal,mem=st&&st.bloomMemory;
   if(!st||st.directorEnabled===false)return null;
-  const s=sig&&sig.type==='BLOOM'&&now<sig.until?sig.sector:
-   mem&&now<mem.until?mem.sector:null;
+  // Mirror production publicBloom: a signal is public only after its
+  // announcement. Replay clock resets must never grant future information.
+  const s=sig&&sig.type==='BLOOM'&&Number.isFinite(sig.started)&&
+   now>=sig.started&&now<sig.until?sig.sector:
+   mem&&Number.isFinite(mem.announcedAt)&&
+   now>=mem.announcedAt&&now<mem.until?mem.sector:null;
   return Number.isInteger(s)&&s>=0&&s<16?s:null;
  }
  function moveTowardPublicBloom(g,p,LF){
