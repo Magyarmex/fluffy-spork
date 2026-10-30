@@ -117,7 +117,7 @@ test('materializer patch is fail-closed, idempotent, and does not alter unrelate
   assert.equal(patchLevelCapOffer(patchPerkOffer(shipping)).includes('dismissOffer(masterChoices)'),true);
   assert.throws(()=>patchLevelCapOffer('unrelated'),/owners missing/);
   assert.throws(()=>patchLevelCapOffer(fixed.replace('this.masteryOfferChoices = null;\n        this.statPoints = 0;',
-    'this.statPoints = 0;')),/redeploy reset drift/);
+    'this.masteryOfferChoices = 17;\n        this.statPoints = 0;')),/redeploy reset drift/);
   const src=read('scripts/patch-perk-offer.cjs');
   assert.match(src,/patchLevelCapOffer\(patchPerkOffer\(raw\)\)/);
   for(const file of ['.github/workflows/deploy.yml','.github/workflows/browser-smoke.yml']){
