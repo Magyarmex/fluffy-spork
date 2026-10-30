@@ -161,14 +161,14 @@ for(const optimized of [false,true]){
   const {g,square}=trial(Game,{pen:2});
   assert.equal(square.hp,43);assert.deepEqual(g.hits,[50]);
  });
- test(mode+' canonical 1500u/s pen=4 sniper hits square before permanent wall',()=>{
-  const {g,square}=trial(Game,{hz:30,vx:1500,squareX:28,wallX:55,
-    pen:4,dmg:47,radius:5.8});
+ test(mode+' canonical Assassin 1500u/s pen=4 hits square before permanent wall',()=>{
+  const {g,square}=trial(Game,{hz:30,vx:1500,squareX:30,wallX:57,
+    pen:4,dmg:47,radius:5.8*(1+47*.0085)});
   assert.equal(square.hp,8);assert.deepEqual(g.hits,[50]);
  });
  test(mode+' pen=4 destructible wall retains legacy arbitration',()=>{
-  const {g,square}=trial(Game,{hz:30,vx:1500,squareX:28,wallX:55,
-    pen:4,dmg:47,radius:5.8,cover:true});
+  const {g,square}=trial(Game,{hz:30,vx:1500,squareX:30,wallX:57,
+    pen:4,dmg:47,radius:5.8*(1+47*.0085),cover:true});
   assert.equal(square.hp,55);assert.deepEqual(g.hits,[]);
  });
  test(mode+' competing tank before square preserves original arbitration',()=>{
