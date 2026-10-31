@@ -406,3 +406,14 @@ test('zoomed tactical camera invalidates a badge when a short pan hides the last
  assert.ok(!s.draws.some(d=>d.type==='text'&&d.value==='!'),
   'a small pan can exceed a zoomed viewport even when under 40 world units');
 });
+
+test('dense 30-hostile visual denial remains bounded at 240 Hz with no false contest',()=>{
+ const s=scene();s.p.x=-1110;s.g.cam.x=s.p.x;
+ assert.equal(s.T.updateContest(s.g,s.st),true);
+ s.g.tanks=[s.p,...Array.from({length:30},(_,i)=>({id:i+100,x:-1050+(i%5)*10,y:-540+(i%6)*5,hp:100,alive:true}))];
+ let rays=0;s.g.hasLineOfSight=()=>{rays++;return false;};
+ for(let i=0;i<240;i++){s.g.time=100+i/240;s.g.drawMinimap();}
+ assert.ok(rays>100&&rays<260,'30 rivals must be scanned only at 160ms cadence, rays='+rays);
+ assert.ok(!s.draws.some(d=>d.type==='text'&&d.value==='!'));
+ assert.equal(s.st.stats.contests,1,'visual denial never changes Director scoring');
+});
