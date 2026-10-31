@@ -70,7 +70,7 @@ test('AI cannot pursue a remote enemy that left the cone before the next drone t
  assert.equal(w.owner.__novaSpotterContactId,-1,'scanner eventually retires contact');
 });
 test('AI relay rejects disabled, dead, missing, mismatched or occluded Observer before scan',()=>{
- for(const fault of ['disabled','dead','missing','wrong-owner','wrong-id','occluded']){
+ for(const fault of ['disabled','dead','missing','wrong-owner','wrong-id','occluded','zero-hp-target']){
   const w=boot();w.g.updateDrones(0);
   if(fault==='disabled')w.owner.__novaSpotterDownUntil=w.g.time+1;
   if(fault==='dead')w.drone.hp=0;
@@ -78,6 +78,7 @@ test('AI relay rejects disabled, dead, missing, mismatched or occluded Observer 
   if(fault==='wrong-owner')w.drone.ownerId=999;
   if(fault==='wrong-id')w.owner.__novaSpotterDroneId=999;
   if(fault==='occluded')w.g.blocked=true;
+  if(fault==='zero-hp-target')w.target.hp=0;
   assert.equal(w.perceive(),false,fault);
  }
 });
