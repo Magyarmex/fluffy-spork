@@ -252,6 +252,11 @@ test('opt-in cover research attributes effective damage and breaches without alt
   assert.ok(Number.isNaN(ignored.witness.allEffectiveDamage));
   assert.equal(ignored.witness.playerEffectiveDamage, 0);
   assert.equal(ignored.witness.allBreaks, 0);
+  const missingPilot = { schema: 1, allEffectiveDamage: 0,
+    playerEffectiveDamage: 0, allBreaks: 0, playerBreaks: 0 };
+  world(1, 400, 25, missingPilot);
+  assert.equal(missingPilot.allEffectiveDamage, 0, 'unknown pilot identity must fail closed');
+  assert.equal(missingPilot.allBreaks, 0);
 });
 
 
