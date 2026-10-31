@@ -53,6 +53,7 @@ async function arm(browser,enabled,label){
    'Causal OFF must patch exactly one shipping Disciplines script');
   await page.addScriptTag({url:'/tests/browser/projectile-density-audit.js'});
   if(BOMBER_RESEARCH)await page.addScriptTag({url:'/tests/browser/bomber-burst-audit.js'});
+  if(AB_MODE==='bomber-physics')await page.addScriptTag({url:'/tests/browser/bomber-combat-fingerprint.js'});
   await page.addScriptTag({url:'/tests/browser/frontlines-public-pilot.js'});
   await page.addScriptTag({url:'/tests/browser/cover-pressure-pilot.js'});
   await page.addScriptTag({url:'/tests/browser/frontlines-visible-defense.js'});
@@ -366,40 +367,11 @@ async function arm(browser,enabled,label){
           g.__novaBomberBurstAudit?.airburst?.advanced>0)
         g.__novaCausalFirstAdvanceTime=g.time;
        if(n%6===0){
-        /* Five-Hz read-only causality trace. Projectile coordinates and RNG
-         * are excluded: a moved fragment alone must not masquerade as
-         * damage, entity movement, or player progression. Health includes
-         * membership to witness deaths/spawns; it is not a hit attribution. */
-        const tanks=g.tanks.map(t=>[t.id,t.hp,t.alive,t.score,t.kills]),
-         shapes=g.shapes.map(t=>[t.id,t.hp,t.type]),
-         drones=g.drones.map(t=>[t.id,t.hp,t.ownerId]),
-         cover=(g.__novaTerrain||[]).map(t=>[t.id,t.hp,t.solid,t.destructible]),
-         pilot=[g.player?.id,g.player?.hp,g.player?.score,
-          g.player?.kills,g.player?.level,g.player?.xp,g.player?.alive];
-        const digest=value=>{
-         const str=JSON.stringify(value);
-         let h1=2166136261,h2=0x9e3779b9;
-         for(let k=0;k<str.length;k++){
-          const c=str.charCodeAt(k);
-          h1=Math.imul(h1^c,16777619);
-          h2=Math.imul(h2^c,2246822519);
-         }
-         return (h1>>>0).toString(16)+':'+(h2>>>0).toString(16);
-        };
-        const health=[pilot,tanks,shapes,drones,cover];
-        const bodies=[
-         g.tanks.map(t=>[t.id,t.x,t.y,t.hp,t.alive,t.cls,t.score,t.kills]),
-         g.shapes.map(t=>[t.id,t.x,t.y,t.hp,t.type]),
-         g.drones.map(t=>[t.id,t.x,t.y,t.hp,t.ownerId]),
-         cover,(g.powerups||[]).map(t=>[t.id,t.x,t.y,t.type]),
-         (g.orbs||[]).map(t=>[t.id,t.x,t.y,t.value]),pilot
-        ];
-        (g.__novaCausalCombatTrace||(g.__novaCausalCombatTrace=[])).push({
-         time:+g.time.toFixed(3),
-         bodyHash:digest(bodies),healthHash:digest(health),
-         categories:{pilot:digest(pilot),tanks:digest(tanks),
-          shapes:digest(shapes),drones:digest(drones),cover:digest(cover)}
-        });
+        const witness=window.__novaResearchBomberCombatFingerprint;
+        if(!witness||typeof witness.sample!=='function')
+         throw Error('projectile-free combat witness missing');
+        (g.__novaCausalCombatTrace||(g.__novaCausalCombatTrace=[]))
+         .push(witness.sample(g));
        }
        if(n%30===0){
         /* Read-only 1-second physical-state fingerprints, including RNG.
