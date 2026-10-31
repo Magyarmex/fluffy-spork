@@ -8,6 +8,9 @@ test('Bomber burst witness identifies actual callsites without inventing physica
  assert.equal(audit.siteFromStack('Error\n at unrelated.js:1:2'),'unknown');
  assert.equal(audit.source('battlefield-v1.6.0.js:928'),'battlefield');
  assert.equal(audit.source('index.html:3500'),'core');
+ assert.equal(audit.siteFromStack('Error\n at Object.clusterBurst (https://host/tests/browser/bomber-burst-audit.js:28:4)\n at Game.updateBullets (https://host/nova-updates/disciplines-v1.7.0.js:438:9)'),'disciplines-v1.7.0.js:438');
+ assert.equal(audit.source('disciplines-v1.7.0.js:438'),'disciplines');
+ assert.equal(audit.source('sniper-v1.2.0.js:12'),'other');
 });
 test('Bomber witness is read-only, preserves return value, child identity and consumed calls',()=>{
  const parent={ownerId:7,ttl:.1,x:10,y:20,shell:true};
@@ -26,7 +29,7 @@ test('Bomber witness is read-only, preserves return value, child identity and co
  assert.equal(a.calls,2);assert.equal(a.firstBursts,1);assert.equal(a.suppressedCalls,1);
  assert.equal(a.childrenCreated,1);
  assert.deepEqual(a.byOwner,{pilot:1,other:0,unknown:0});
- assert.deepEqual(a.bySource,{battlefield:1,core:0,unknown:0});
+ assert.deepEqual(a.bySource,{battlefield:1,core:0,disciplines:0,other:0,unknown:0});
  assert.deepEqual(a.byTTL,{positive:1,expired:0,unknown:0});
  assert.equal(a.examples.length,1);
  assert.equal(g.clusterBurst({ownerId:8,ttl:-.01,x:0,y:0,shell:true}), 'burst');
