@@ -285,3 +285,15 @@ test('continued two-hit shortcut requires a single live prior tank victim',()=>{
    'shape-only history cannot authorize a two-tank continuation');
  }
 });
+
+test('200 unrelated remote shots cannot suppress a local continuing pen=2 chain',()=>{
+ for(const optimized of [false,true])for(const fps of [30,60,120,240]){
+  const ttl=.2043253394891508;
+  const result=scenario(boot(optimized),{
+   fps,positions:[93.7598181758076,139.03676807903686,184.3137179822661],
+   velocity:3363.217242434621,ttl,frames:Math.ceil(ttl*fps)+2,
+   remoteBullets:200});
+  assert.deepEqual(result.byId,{2:1,3:1,4:1},
+   'unrelated remote fire cannot disable local physical contact at '+fps+'Hz');
+ }
+});
