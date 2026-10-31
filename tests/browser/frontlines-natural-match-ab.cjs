@@ -12,6 +12,9 @@ const LAYOUT_INDEX=Number(process.env.NOVA_LAYOUT_INDEX??0);
 const SEED_INDEX=Number(process.env.NOVA_SEED_INDEX??0);
 const PILOT_POLICY=process.env.NOVA_PILOT_POLICY||'wander';
 const AB_MODE=process.env.NOVA_AB_MODE||'memory';
+const BOMBER_RESEARCH=process.env.NOVA_BOMBER_RESEARCH==='1';
+if(BOMBER_RESEARCH&&(AB_MODE!=='cover-pressure'||PILOT_POLICY!=='cover-pressure'))
+ throw Error('Bomber research requires paired cover-pressure policy');
 if(!['memory','live-turn','cover-pressure'].includes(AB_MODE))throw Error('NOVA_AB_MODE must be memory, live-turn, or cover-pressure');
 if(!Number.isInteger(LAYOUT_INDEX)||LAYOUT_INDEX<0||LAYOUT_INDEX>=LAYOUTS.length)
  throw Error('NOVA_LAYOUT_INDEX must be 0, 1, or 2');
@@ -32,6 +35,7 @@ async function arm(browser,enabled,label){
   await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded',timeout:45000});
   await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({state:'visible',timeout:45000});
   await page.addScriptTag({url:'/tests/browser/projectile-density-audit.js'});
+  if(BOMBER_RESEARCH)await page.addScriptTag({url:'/tests/browser/bomber-burst-audit.js'});
   await page.addScriptTag({url:'/tests/browser/frontlines-public-pilot.js'});
   await page.addScriptTag({url:'/tests/browser/cover-pressure-pilot.js'});
   await page.addScriptTag({url:'/tests/browser/frontlines-visible-defense.js'});
@@ -81,7 +85,7 @@ async function arm(browser,enabled,label){
   },{terrainSeed:TERRAIN_SEED,gameSeed:GAME_SEED});
   await page.getByRole('button',{name:/DEPLOY/i}).first().click();
   await page.waitForFunction(()=>window.__novaNaturalMatchGame?.status==='playing'&&!!window.__novaNaturalMatchGame.__lfState,{timeout:30000});
-  const initial=await page.evaluate(({enabled,pilotPolicy,trialRng,terrainIndex,seedIndex,abMode})=>{
+  const initial=await page.evaluate(({enabled,pilotPolicy,trialRng,terrainIndex,seedIndex,abMode,bomberResearch})=>{
    const g=window.__novaNaturalMatchGame;
    g.setPaused(true); // Advance actual Game.update ourselves.
     /* Sample the real composed bullet owner; do not touch game decisions. */
@@ -221,7 +225,19 @@ async function arm(browser,enabled,label){
    };
    g.__novaContestAudit=audit;
    const p=g.player;
-   if(!p||p.cls!=='scout')throw Error('expected unmodified Scout pilot');
+   if(!p||p.cls!=='scout')throw Error('expected unmodified Scout initial pilot');
+   if(bomberResearch){
+    /* A standard Bomber weapon on the same initial physical world, with
+     * no invulnerability, added damage, fake targets or changed AI. This
+     * is a scripted class exposure experiment, not a human match. */
+    const classes=window.__novaMakeRequire('')('game/classes').CLASSES;
+    if(!classes?.bomber?.bullet?.cluster)throw Error('canonical Bomber unavailable');
+    p.cls='bomber';p.tier=1;p.color=classes.bomber.color;
+    p.fireCd=0;p.barrelIdx=0;
+    const witness=window.__novaBomberBurstAudit;
+    if(!witness)throw Error('research-only burst witness missing');
+    g.__novaBomberBurstAudit=witness.install(g,witness.create(p.id));
+   }
    if(g.tanks.filter(t=>t.ai).length<8)throw Error('expected eight ordinary rivals');
    g.input.mouseActive=false;g.input.autofire=true;g.input.firing=false;
    const wander=()=>({x:Math.cos(g.time*.29),y:Math.sin(g.time*.29)});
@@ -305,7 +321,7 @@ async function arm(browser,enabled,label){
     bots:g.tanks.filter(t=>t.ai).map(t=>[t.id,+t.x.toFixed(3),+t.y.toFixed(3),t.cls]),
     shapes:g.shapes.slice(0,32).map(s=>[s.id,s.type,+s.x.toFixed(3),+s.y.toFixed(3)])});
    return{fingerprint,initialBotCount:g.tanks.filter(t=>t.ai).length,initialShapes:g.shapes.length};
-  },{enabled,pilotPolicy:PILOT_POLICY,trialRng:TRIAL_RNG,terrainIndex:LAYOUT_INDEX,seedIndex:SEED_INDEX,abMode:AB_MODE});
+  },{enabled,pilotPolicy:PILOT_POLICY,trialRng:TRIAL_RNG,terrainIndex:LAYOUT_INDEX,seedIndex:SEED_INDEX,abMode:AB_MODE,bomberResearch:BOMBER_RESEARCH});
   let last=null;
   for(let i=0;i<Math.ceil(SECONDS/DT/CHUNK);i++){
    last=await page.evaluate(({steps,dt})=>{
@@ -330,6 +346,7 @@ async function arm(browser,enabled,label){
      pilotAlive:!!p.alive,score:p.score,kills:p.kills,level:p.level,
      botCount:g.tanks.filter(t=>t.ai&&t.alive).length},
     projectileDensityAudit:g.__novaProjectileDensityAudit,
+    ...(g.__novaBomberBurstAudit?{bomberBurstAudit:g.__novaBomberBurstAudit}:{}),
     coverPressure:{coverBroken:g.__novaBattlefield?.coverBroken||0,
      allEffectiveDamage:g.__novaCoverDamageResearch?.allEffectiveDamage||0,
      playerEffectiveDamage:g.__novaCoverDamageResearch?.playerEffectiveDamage||0,
@@ -359,6 +376,15 @@ async function arm(browser,enabled,label){
    assert.ok(density.basicEligibleFrames<=density.projectileCountBuckets.threeToEight);
    assert.ok(density.coverBreaksBasicEligible<=density.coverBreaksAtThreeToEight);
    assert.ok(density.coverBreaksAtThreeToEight+density.coverBreaksAboveEight<=density.coverBreaks);
+  if(BOMBER_RESEARCH){
+   const a=result.bomberBurstAudit;
+   assert.equal(a?.schema,1,'composed Bomber observer required');
+   assert.equal(a.firstBursts+a.suppressedCalls,a.calls);
+   assert.equal(Object.values(a.byOwner).reduce((x,y)=>x+y,0),a.firstBursts);
+   assert.equal(Object.values(a.bySource).reduce((x,y)=>x+y,0),a.firstBursts);
+   assert.equal(Object.values(a.byTTL).reduce((x,y)=>x+y,0),a.firstBursts);
+   assert.equal(Object.values(a.bySite).reduce((x,y)=>x+y,0),a.firstBursts);
+  }
   assert.ok(result.commitmentAudit.eligibleWindow<=result.commitmentAudit.publicMemory);
   assert.ok(result.commitmentAudit.precombatIntersection<=result.commitmentAudit.eligibleWindow);
   const liveGate=result.commitmentAudit.liveGate;
@@ -401,19 +427,21 @@ async function arm(browser,enabled,label){
     assert.deepEqual(on.result[key],off.result[key],
      'no-treatment live-turn arms must have identical '+key);
   }
-  const report={method:AB_MODE==='cover-pressure'?'paired ordinary Scout cover-seeking versus wander in the full shipping game; not human play':AB_MODE==='live-turn'?'paired natural full-match live-turn causal intervention (not human fun)':'scripted full-match natural Director research; not human fun; public-bloom is closed-loop policy',
-   abMode:AB_MODE,verifiedLiveStart,
+  const report={method:BOMBER_RESEARCH?'paired standard Bomber cover-seeking versus wander in the full shipping game; not human play':AB_MODE==='cover-pressure'?'paired ordinary Scout cover-seeking versus wander in the full shipping game; not human play':AB_MODE==='live-turn'?'paired natural full-match live-turn causal intervention (not human fun)':'scripted full-match natural Director research; not human fun; public-bloom is closed-loop policy',
+   abMode:AB_MODE,bomberResearch:BOMBER_RESEARCH,verifiedLiveStart,
    initialWorldIdentical:true,initialFingerprint:off.initial.fingerprint,offReplayIdentical:same,
    naturalOpportunityObserved,
    interpretation:AB_MODE==='cover-pressure'?'Descriptive matched initial worlds; ordinary cover-seeking input may change survival and subsequent AI/world states. Report early deaths and all no-target periods.':AB_MODE==='live-turn'?(verifiedLiveStart&&naturalOpportunityObserved?'Live-turn intervention activated; interpret matched-policy differences cautiously because later public signals can diverge endogenously.':'INCONCLUSIVE: no verified ON live start or natural BLOOM exposure in both arms; retain the pair.'):(naturalOpportunityObserved?'Descriptive only: natural BLOOM observed; inspect opportunity timing, deaths and public pilot commands before causal interpretation.':'INCONCLUSIVE: at least one arm had no natural BLOOM; retain this censored pair.'),
    off:off.result,on:on.result,offReplay:offReplay.result,
    limits:['No artificial BLOOM or forced survival','One layout/seed/pilot-policy per invocation; matrix must aggregate independently',
-    'A deterministic Scout script is not a human player',
+    BOMBER_RESEARCH?'A standard Bomber class is piloted by deterministic scripted inputs; no human gameplay inference':'A deterministic Scout script is not a human player',
     'Public-bloom commands can differ after ON/OFF worlds diverge; this is matched policy, not fixed inputs',
     'Public-bloom command samples are input calls, not measured seconds or proof of physical progress',
     'Seed replay is checked, not assumed',
     'Cover-pressure mode changes only pilot inputs; coverDamage includes AI damage and cannot be attributed solely to Scout',
     'Cover-pressure aim/move counts are input calls, not seconds fired or verified hits',
+    ...(BOMBER_RESEARCH?['Burst callsites are provenance, not a chronological first-contact oracle',
+      'Synthetic scripted Bomber exposure does not estimate ordinary human class usage']:[]),
      'Projectile density is read-only and counts necessary eligibility gates, not actual certificate activations or player benefit',
      'Only cover breaks inside the bullet owner are counted; scripted Scout trials are not human-match frequencies',
     'In live-turn mode, only live-start authority is intervened on; later natural signals can differ as treatment outcomes']};
@@ -422,7 +450,7 @@ async function arm(browser,enabled,label){
   fs.writeFileSync(path.join(dir,'frontlines-natural-on.json'),JSON.stringify(on.result,null,2));
   fs.writeFileSync(path.join(dir,'frontlines-natural-off.json'),JSON.stringify(off.result,null,2));
   fs.writeFileSync(path.join(dir,'frontlines-natural-manifest.json'),JSON.stringify({
-   pairs:[{layout:LAYOUT,seed:SEED_ID,pilotPolicy:PILOT_POLICY,abMode:AB_MODE,
+   pairs:[{layout:LAYOUT,seed:SEED_ID,pilotPolicy:PILOT_POLICY,abMode:AB_MODE,bomberResearch:BOMBER_RESEARCH,
     on:'frontlines-natural-on.json',off:'frontlines-natural-off.json'}]
   },null,2));
   console.log('NOVA_FRONTLINES_NATURAL_MATCH_AB '+JSON.stringify({initialWorldIdentical:true,offReplayIdentical:same,
