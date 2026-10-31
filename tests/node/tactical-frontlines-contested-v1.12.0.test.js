@@ -57,6 +57,8 @@ test('contest badge preserves the actual sector center and stays on the map at e
   calls.length=0;
   const center=LF.sectorCenter(sector);
   g.player.x=center.x;g.player.y=center.y;
+  g.tanks[1].x=center.x+40;g.tanks[1].y=center.y+20;
+  g.shapes[0].x=center.x+75;g.shapes[0].y=center.y+35;
   st.signal.sector=sector;
   st.contestSignal={sector,until:104,announcedAt:st.signal.started,pilotRef:g.player};
   g.drawMinimap();
