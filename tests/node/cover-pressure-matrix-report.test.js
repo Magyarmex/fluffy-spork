@@ -7,6 +7,8 @@ function sample(mode,seed){
    pilotPolicy:'cover-pressure',abMode:'cover-pressure'},
   game:{status:'dead',time:12},
   coverPressure:{coverBroken:mode==='ON'?1:0,coverDamage:mode==='ON'?290:0,
+   allEffectiveDamage:mode==='ON'?290:0,playerEffectiveDamage:mode==='ON'?250:0,
+   allBreaks:mode==='ON'?1:0,playerBreaks:mode==='ON'?1:0,
    certifiedActivations:mode==='ON'?1:0,playerShotsFired:mode==='ON'?9:3,
    aimSamples:mode==='ON'?12:0,moveSamples:mode==='ON'?6:0,noTargetSamples:2},
   projectileDensityAudit:{bulletUpdateCalls:360,coverBreaks:mode==='ON'?1:0,
@@ -25,6 +27,10 @@ test('collator retains early deaths and separate cover pressure arms',()=>{
  const f=fixture();try{
   const r=collect(f.root,1);
   assert.equal(r.totals.ON.coverDamage,290);
+  assert.equal(r.totals.ON.allEffectiveDamage,290);
+  assert.equal(r.totals.ON.playerEffectiveDamage,250);
+  assert.equal(r.totals.ON.allBreaks,1);
+  assert.equal(r.totals.ON.playerBreaks,1);
   assert.equal(r.totals.OFF.coverDamage,0);
   assert.equal(r.totals.ON.earlyDeaths,1);
   assert.equal(r.totals.OFF.earlyDeaths,1);
@@ -48,5 +54,19 @@ test('collator rejects fabricated negative counts and invalid arm identity',()=>
   f.report.on.metadata.pilotPolicy='wander';
   fs.writeFileSync(path.join(f.dir,'frontlines-natural-match-ab.json'),JSON.stringify(f.report));
   assert.throws(()=>collect(f.root,1),/mismatched research arms/);
+ }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+});
+
+test('collator rejects attribution exceeding authoritative cover totals',()=>{
+ const f=fixture();try{
+  const on=sample('ON',0);
+  on.coverPressure.playerEffectiveDamage=291;
+  assert.throws(()=>arm(on,'ON'),/inconsistent owner attribution/);
+  on.coverPressure.playerEffectiveDamage=250;
+  on.coverPressure.playerBreaks=2;
+  assert.throws(()=>arm(on,'ON'),/inconsistent owner attribution/);
+  on.coverPressure.playerBreaks=1;
+  on.coverPressure.allBreaks=2;
+  assert.throws(()=>arm(on,'ON'),/inconsistent owner attribution/);
  }finally{fs.rmSync(f.root,{recursive:true,force:true});}
 });
