@@ -95,18 +95,18 @@
         Math.hypot(e.__novaIdleVX||0,e.__novaIdleVY||0)*2);
        const traveled=Math.hypot(e.x-e.__novaChronoDronePrevX,
         e.y-e.__novaChronoDronePrevY);
-       const envelope=radius(e)+Math.max(p.r,...children.map(c=>c.r||0))+
-        Math.max(120,30+dt*(bound+1600));
+       const padding=Math.max(120,30+dt*(bound+1600));
        if(Number.isFinite(bound)&&bound<=4000&&traveled<=96&&
           traveled<=bound*dt+1e-6&&
           !near(p.px,p.py,p.x,p.y,e.__novaChronoDronePrevX,
-           e.__novaChronoDronePrevY,envelope)&&
-          !near(p.px,p.py,p.x,p.y,e.x,e.y,envelope)&&
+           e.__novaChronoDronePrevY,radius(e)+p.r+padding)&&
+          !near(p.px,p.py,p.x,p.y,e.x,e.y,radius(e)+p.r+padding)&&
           children.every(c=>c&&Number.isFinite(c.vx)&&Number.isFinite(c.vy)&&
            !near(c.x,c.y,c.x+c.vx*remaining,c.y+c.vy*remaining,
-            e.__novaChronoDronePrevX,e.__novaChronoDronePrevY,envelope)&&
+            e.__novaChronoDronePrevX,e.__novaChronoDronePrevY,
+            radius(e)+c.r+padding)&&
            !near(c.x,c.y,c.x+c.vx*remaining,c.y+c.vy*remaining,
-            e.x,e.y,envelope)))continue;
+            e.x,e.y,radius(e)+c.r+padding)))continue;
      }
      flags['missing'+kind+'Velocity']=true;continue;
     }
