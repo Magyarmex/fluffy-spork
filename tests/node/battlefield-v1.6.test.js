@@ -295,6 +295,7 @@ test('cover research includes splash damage with the same owner and overkill rul
     solid: true, destructible: true, hp: 100, maxHp: 100 }];
   g.__novaCoverDamageResearch = { schema: 1, pilotId: 1, allEffectiveDamage: 0,
     playerEffectiveDamage: 0, allBreaks: 0, playerBreaks: 0 };
+  g.player = { id: 99, alive: true }; // Redeployed pointer must not erase old shot ownership.
   g.splashAt(0, 0, 100, 1, 1, 0, '#fff', 40);
   assert.ok(Math.abs(g.__novaTerrain[0].hp - 46) < 1e-9);
   assert.ok(Math.abs(g.__novaCoverDamageResearch.playerEffectiveDamage - 54) < 1e-9);
