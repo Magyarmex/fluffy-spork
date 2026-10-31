@@ -65,7 +65,7 @@
   const groups=[
    ['Shape',g.shapes||[],e=>e&&e.hp>0,e=>e.r],
    ['Tank',g.tanks||[],e=>e&&e.alive&&e.id!==p.ownerId,
-    e=>(g.__novaAuditClasses&&g.__novaAuditClasses[e.cls]?.size)||21],
+    e=>1 /* strict lower bound on every canonical tank collision radius */],
    ['Drone',g.drones||[],e=>e&&e.hp>0&&e.ownerId!==p.ownerId,
     e=>(e.r||0)+1]
   ];
