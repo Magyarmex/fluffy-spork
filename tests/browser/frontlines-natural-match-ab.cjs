@@ -402,7 +402,8 @@ async function arm(browser,enabled,label){
    const b=a.airburst;
    assert.ok(b&&b.observerErrors===0,'airburst observer must remain safe');
    assert.equal(b.advanced+b.stationary+b.mixed+b.noChildren,b.calls);
-   assert.ok(b.calls<=a.bySource.disciplines);
+   assert.equal(b.calls,a.bySource.disciplines,
+    'every actual Disciplines airburst must be witnessed inside the frame');
    assert.ok(b.advancedChildren<=b.children);
    assert.equal(Object.values(b.byOwner).reduce((x,y)=>x+y,0),b.calls);
   }
