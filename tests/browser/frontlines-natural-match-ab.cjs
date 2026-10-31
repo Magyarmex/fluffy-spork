@@ -453,12 +453,12 @@ async function arm(browser,enabled,label){
     'Public-bloom commands can differ after ON/OFF worlds diverge; this is matched policy, not fixed inputs',
     'Public-bloom command samples are input calls, not measured seconds or proof of physical progress',
     'Seed replay is checked, not assumed',
-    'Cover-pressure mode changes only pilot inputs; coverDamage includes AI damage and cannot be attributed solely to Scout',
+    'Cover-pressure mode changes only pilot inputs; coverDamage includes AI damage and cannot be attributed solely to the player pilot',
     'Cover-pressure aim/move counts are input calls, not seconds fired or verified hits',
     ...(BOMBER_RESEARCH?['Burst callsites are provenance, not a chronological first-contact oracle',
       'Synthetic scripted Bomber exposure does not estimate ordinary human class usage']:[]),
      'Projectile density is read-only and counts necessary eligibility gates, not actual certificate activations or player benefit',
-     'Only cover breaks inside the bullet owner are counted; scripted Scout trials are not human-match frequencies',
+     'Only cover breaks inside the bullet owner are counted; scripted pilot trials are not human-match frequencies',
     'In live-turn mode, only live-start authority is intervened on; later natural signals can differ as treatment outcomes']};
   const dir=path.join('artifacts','browser');fs.mkdirSync(dir,{recursive:true});
   fs.writeFileSync(path.join(dir,'frontlines-natural-match-ab.json'),JSON.stringify(report,null,2));
