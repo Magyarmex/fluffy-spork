@@ -49,3 +49,37 @@ test('Bomber witness does not sample RNG or change gameplay if source is unknown
   assert.equal(a.byTTL.expired,1);assert.equal(a.childrenCreated,0);
  }finally{Math.random=saved;}
 });
+
+test('5,000 seeded burst sequences preserve projectile state and random-stream consumption',()=>{
+ function world(){
+  let seed=0x9e3779b9,draws=0;
+  const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;draws++;return seed/4294967296;};
+  const g={time:12,bullets:[],clusterBurst(b){
+   if(b.__novaClusterBurstConsumed)return 'repeat';
+   b.__novaClusterBurstConsumed=true;
+   const child={id:this.bullets.length+1,ownerId:b.ownerId,
+    vx:Math.floor(random()*1000),vy:Math.floor(random()*1000)};
+   this.bullets.push(child);return 'created';
+  }};
+  return {g,draws:()=>draws,seed:()=>seed};
+ }
+ const base=world(),instrumented=world();
+ const report=audit.install(instrumented.g,audit.create(1),
+  ()=> 'Error\n at Game.updateBullets (https://host/index.html:3761:8)');
+ for(let i=0;i<5000;i++){
+  const parent={id:i,ownerId:i%3===0?1:2,ttl:i%2?.1:-.1,x:i,y:0};
+  const copy={...parent};
+  base.g.bullets.push(parent);instrumented.g.bullets.push(copy);
+  assert.equal(instrumented.g.clusterBurst(copy),base.g.clusterBurst(parent));
+  if(i%7===0)
+   assert.equal(instrumented.g.clusterBurst(copy),base.g.clusterBurst(parent));
+ }
+ assert.equal(JSON.stringify(instrumented.g.bullets),JSON.stringify(base.g.bullets),
+  'research witness must not change projectile state or ordering');
+ assert.equal(instrumented.draws(),base.draws(),'no extra gameplay RNG calls');
+ assert.equal(instrumented.seed(),base.seed(),'identical final gameplay RNG state');
+ assert.equal(report.firstBursts,5000);
+ assert.equal(report.suppressedCalls,Math.ceil(5000/7));
+ assert.equal(report.bySource.core,5000);
+ assert.ok(report.examples.length<=20,'bounded artifact examples');
+});
