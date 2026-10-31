@@ -47,3 +47,17 @@ test('paired Bomber matrix preserves zero exposure and censored deaths',()=>{
   assert.equal(report.totals.ON.simulatedSeconds,70);
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
+
+test('matrix validates genuine witnessed airburst movement and rejects inconsistent fragments',()=>{
+ const a=audit(3);
+ a.bySource.battlefield=2;a.bySource.disciplines=1;
+ a.bySite={'battlefield-v1.6.0.js:999':2,'disciplines-v1.7.0.js:500':1};
+ Object.assign(a.airburst,{calls:1,sole:1,advanced:1,children:6,
+  advancedChildren:6,advancedDistance:16.5});
+ a.airburst.byOwner.pilot=1;
+ check(a,'valid movement');
+ a.airburst.advancedChildren=7;
+ assert.throws(()=>check(a,'bad movement'),/invalid airburst/);
+ a.airburst.advancedChildren=6;a.airburst.observerErrors=1;
+ assert.throws(()=>check(a,'observer failed'),/invalid airburst/);
+});
