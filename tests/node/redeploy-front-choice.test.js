@@ -506,3 +506,18 @@ test('RETURN fails closed if the stored death seed is corrupted',()=>{
  assert.equal(g.__novaLastFrontMarker,null);
  assert.equal(draws,0,'invalid seed cannot fall back to global combat RNG');
 });
+
+test('invalid death clock or identity cannot authorize a deterministic RETURN',()=>{
+ let draws=0;
+ const {Game,api}=boot({random:()=>{draws++;return .5;}});
+ assert.equal(api.returnSeed({x:0,y:0},NaN,1,3),0);
+ assert.equal(api.returnSeed({x:0,y:0},Infinity,1,3),0);
+ assert.equal(api.returnSeed({x:0,y:0},0,NaN,3),0);
+ assert.equal(api.returnSeed({x:Infinity,y:0},0,1,3),0);
+ const g=new Game();g.time=NaN;
+ g.killTank(victim(100,200));g.update();
+ g.__novaRedeployChoice='return';g.redeploy();
+ assert.equal(g.player.x,1900,'uncertain death clock falls back to legacy safe insertion');
+ assert.equal(g.__novaLastFrontMarker,null);
+ assert.equal(draws,0,'no accidental shared random draws on invalid input');
+});
