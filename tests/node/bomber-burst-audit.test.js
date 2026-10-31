@@ -155,6 +155,12 @@ test('Actual Three Disciplines module produces witnessed clear-corridor advances
   const g=new Patched(),dt=1/hz,speed=2000;
   g.tanks=[{id:1,cls:'bomber',alive:true,x:-500,y:-500}];
   if(mode==='near')g.shapes=[{id:50,hp:100,r:10,x:150,y:0,vx:0,vy:0}];
+  if(mode==='remoteDrone')g.drones=[{id:51,ownerId:9,hp:100,
+   x:900,y:900,r:6}];
+  if(mode==='remoteShapeNoVelocity')g.shapes=[{id:52,hp:100,
+   x:900,y:900,r:6}];
+  if(mode==='fragmentTerrain')g.__novaTerrain=[{id:53,shape:'rect',
+   x:152,y:0,w:1,h:2,solid:true,destructible:false}];
   g.bullets=[{id:70,ownerId:1,x:150-speed*dt*.35,y:0,vx:speed,vy:0,
    r:3,ttl:1,pen:0,hits:0,shell:true,dead:false,
    __v17Cannon:true,__v17FuseDist:150,__v17SpawnX:0,__v17SpawnY:0,
@@ -178,6 +184,21 @@ test('Actual Three Disciplines module produces witnessed clear-corridor advances
   assert.equal(a.airburst.gates.soleCleanNoNearby,mode==='clear'?1:0);
   assert.equal(a.airburst.gates.soleCleanNearShape,mode==='near'?1:0);
   assert.equal(a.airburst.gates.soleCleanNearAny,mode==='near'?1:0);
+  assert.equal(a.airburst.observerErrors,0);
+ }
+ for(const [mode,key] of [
+  ['remoteDrone','missingDroneVelocity'],
+  ['remoteShapeNoVelocity','missingShapeVelocity'],
+  ['fragmentTerrain','fragmentTerrainProximity']]){
+  const baseline=make(mode,60),g=make(mode,60),a=audit.create(1);
+  audit.install(g,a,()=> 'Error\\n at Game.updateBullets (https://host/nova-updates/disciplines-v1.7.0.js:500:12)');
+  baseline.updateBullets(1/60);g.updateBullets(1/60);
+  assert.deepEqual(g.bullets,baseline.bullets,
+   'diagnostic must not change '+mode+' physical gameplay');
+  assert.equal(a.airburst.veto.eligible,1,mode+' belongs to eligible cohort');
+  assert.equal(a.airburst.veto.counts[key],1,mode+' must witness sufficient veto');
+  assert.equal(a.airburst.veto.counts.noWitnessedSufficientVeto,0);
+  assert.equal(a.airburst.stationary,1);
   assert.equal(a.airburst.observerErrors,0);
  }
 });
