@@ -1,0 +1,37 @@
+name: NOVA Controller Command TTL Natural Census
+
+on:
+  pull_request:
+    paths:
+      - 'tests/research/controller-command-natural-census.cjs'
+      - 'tests/node/controller-command-natural-census.test.js'
+      - '.github/workflows/controller-command-natural-census.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  materialized-census:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify pure read-only census gates
+        run: node --test tests/node/controller-command-natural-census.test.js
+      - name: Run 3-seed 30/60Hz full-game Controller exposure census
+        run: |
+          mkdir -p artifacts/controller-command-natural
+          node tests/research/controller-command-natural-census.cjs 2>&1 | tee artifacts/controller-command-natural/run.log
+      - name: Preserve censored and zero-exposure trials
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-controller-command-natural-census
+          path: artifacts/controller-command-natural/
+          if-no-files-found: warn
+          retention-days: 30
