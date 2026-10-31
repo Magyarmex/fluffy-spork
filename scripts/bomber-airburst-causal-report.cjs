@@ -15,6 +15,20 @@ function validTrace(trace,label){
    label+': invalid physical sample');
   previous=s.time;
  }
+ const categories=['pilot','tanks','shapes','drones','cover'];
+ assert(Array.isArray(trace.combatSamples)&&trace.combatSamples.length<=825,
+  label+': invalid bounded non-projectile trace');
+ previous=-Infinity;
+ for(const s of trace.combatSamples){
+  assert(Number.isFinite(s.time)&&s.time>previous&&
+   typeof s.bodyHash==='string'&&/^[0-9a-f]+:[0-9a-f]+$/.test(s.bodyHash)&&
+   typeof s.healthHash==='string'&&/^[0-9a-f]+:[0-9a-f]+$/.test(s.healthHash)&&
+   s.categories&&Object.keys(s.categories).length===categories.length&&
+   categories.every(k=>typeof s.categories[k]==='string'&&
+    /^[0-9a-f]+:[0-9a-f]+$/.test(s.categories[k])),
+   label+': invalid non-projectile sample');
+  previous=s.time;
+ }
  assert(trace.firstAdvanceTime===null||
   Number.isFinite(trace.firstAdvanceTime)&&trace.firstAdvanceTime>=0,
   label+': invalid first-advance time');
@@ -28,7 +42,8 @@ function check(report,label){
  const c=report.bomberPhysicsCausal;
  assert(c&&c.sourcePatchVerified===true&&c.offAdvanced===0&&
   Number.isSafeInteger(c.onAdvanced)&&c.onAdvanced>=0&&
-  Number.isSafeInteger(c.sharedPhysicalSamples)&&c.sharedPhysicalSamples>=0,
+  Number.isSafeInteger(c.sharedPhysicalSamples)&&c.sharedPhysicalSamples>=0&&
+  Number.isSafeInteger(c.sharedCombatSamples)&&c.sharedCombatSamples>=0,
   label+': missing verified single-call intervention');
  for(const [name,arm] of [['OFF',report.off],['ON',report.on]]){
   assert(arm?.metadata?.abMode==='bomber-physics'&&
@@ -58,19 +73,54 @@ function check(report,label){
  assert(first===c.firstPhysicalDifferenceTime&&
   (first!==null)===c.physicalDifferenceObserved,
   label+': physical divergence claim is not supported by samples');
+ const combatA=report.off.bomberPhysicsTrace.combatSamples,
+  combatB=report.on.bomberPhysicsTrace.combatSamples;
+ const combatShared=Math.min(combatA.length,combatB.length);
+ assert(combatShared===c.sharedCombatSamples,
+  label+': shared non-projectile sample mismatch');
+ let firstBody=null,firstHealth=null,firstHealthCategories=null;
+ for(let i=0;i<combatShared;i++){
+  assert(combatA[i].time===combatB[i].time,
+   label+': unmatched non-projectile sample time');
+  if(firstBody===null&&combatA[i].bodyHash!==combatB[i].bodyHash)
+   firstBody=combatB[i].time;
+  if(firstHealth===null&&combatA[i].healthHash!==combatB[i].healthHash){
+   firstHealth=combatB[i].time;
+   firstHealthCategories=Object.keys(combatB[i].categories).filter(k=>
+    combatA[i].categories[k]!==combatB[i].categories[k]);
+   assert(firstHealthCategories.length>0,
+    label+': health divergence lacks category witness');
+  }
+ }
+ assert(firstBody===c.firstNonProjectileDifferenceTime&&
+  firstHealth===c.firstHealthDifferenceTime&&
+  JSON.stringify(firstHealthCategories)===
+   JSON.stringify(c.firstHealthDifferenceCategories),
+  label+': non-projectile divergence claim is unsupported');
+ assert(firstHealth===null||firstBody!==null&&firstBody<=firstHealth,
+  label+': health change cannot precede all non-projectile change');
  const t=report.on.bomberPhysicsTrace.firstAdvanceTime;
  assert(t===c.firstAdvanceTime,label+': inconsistent first advance');
  assert((c.onAdvanced>0)===(t!==null),
   label+': exposure count and first advance disagree');
  assert(first===null||first+1e-6>=t,
   label+': physical state changed before treatment');
+ assert(firstBody===null||t!==null&&firstBody+1e-6>=t,
+  label+': non-projectile state changed before treatment');
+ assert(firstHealth===null||t!==null&&firstHealth+1e-6>=t,
+  label+': health state changed before treatment');
  if(c.onAdvanced===0){
-  assert(JSON.stringify(a)===JSON.stringify(b)&&c.noAdvanceNoDifference===true,
+  assert(JSON.stringify(a)===JSON.stringify(b)&&
+   JSON.stringify(combatA)===JSON.stringify(combatB)&&
+   c.noAdvanceNoDifference===true,
    label+': unexposed worlds cannot diverge');
  }
  return {layout:report.off.metadata.layout,seed:report.off.metadata.seed,
   onAdvanced:c.onAdvanced,firstAdvanceTime:t,firstPhysicalDifferenceTime:first,
   physicalDifferenceObserved:first!==null,sharedSamples:shared,
+  sharedCombatSamples:combatShared,firstNonProjectileDifferenceTime:firstBody,
+  firstHealthDifferenceTime:firstHealth,
+  firstHealthDifferenceCategories:firstHealthCategories,
   off:{status:report.off.game.status,time:report.off.game.time,
    score:report.off.game.score,kills:report.off.game.kills,
    level:report.off.game.level,airbursts:report.off.bomberBurstAudit.airburst.calls},
@@ -98,9 +148,14 @@ function collect(root,expected=6){
   totals:{onAdvanced:rows.reduce((n,x)=>n+x.onAdvanced,0),
    exposedPairs:exposure.length,unexposedPairs:rows.length-exposure.length,
    physicallyDivergedPairs:divergence.length,
-   exposedWithoutSampledDivergence:exposure.length-divergence.length},
+   exposedWithoutSampledDivergence:exposure.length-divergence.length,
+   nonProjectileDivergedPairs:rows.filter(x=>
+    x.firstNonProjectileDifferenceTime!==null).length,
+   healthDivergedPairs:rows.filter(x=>
+    x.firstHealthDifferenceTime!==null).length},
   limits:['Scripted Bomber pilot; not human-play frequency, fun or balance',
-   'Physical state sampled every simulated second; first divergence is interval-censored',
+   'Projectile-inclusive physical state sampled at 1Hz; first divergence is interval-censored',
+   'Non-projectile body and health/progression sampled at 5Hz; hash differences are not hit attribution',
    'After first treatment, later AI/world/RNG differences are downstream and cannot be treated as independent events',
    'Deaths censor exposure; compare actual simulated seconds rather than equal sample counts',
    'No physical-device FPS or battery measurement',
