@@ -46,6 +46,42 @@ const {chromium}=require('playwright');
    const st=g.__lfState,now=g.time;
    st.signal=null;st.bloomMemory={sector:5,announcedAt:now-7,until:now+17,initialValue:500};
    st.sectors[5].value=0; // Deliberately false private value: must not control UI.
+   // Pre-entry threat must be witnessed in the REAL Battlefield, not inferred
+   // from hidden sector totals. Search a terrain-clear approach on any edge.
+   const saved=[p.x,p.y,e.x,e.y,shape.x,shape.y,g.cam.x,g.cam.y];
+   let earlyWarning=false;
+   for(const v of [-1010,-850,-690,-530,-370,-210,-90]){
+    if(earlyWarning)break;
+    const probes=[
+     [-1155,v,-1075,v+12,-1035,v+22],
+     [35,v,-45,v+12,-85,v+22],
+     [v,-1155,v+12,-1075,v+22,-1035],
+     [v,35,v+12,-45,v+22,-85]
+    ];
+    for(const [px,py,ex,ey,sx,sy] of probes){
+     if(g.isTerrainSafe&&(!g.isTerrainSafe(px,py,20)||
+        !g.isTerrainSafe(ex,ey,20)||!g.isTerrainSafe(sx,sy,25)))continue;
+     if(!g.hasLineOfSight(px,py,ex,ey,2)||!g.hasLineOfSight(px,py,sx,sy,2))continue;
+     p.x=px;p.y=py;e.x=ex;e.y=ey;shape.x=sx;shape.y=sy;
+     g.cam.x=px;g.cam.y=py;
+     if(!T.preEntryCandidate(g,st))continue;
+     if(T.contestCandidate(g,st)||T.updateContest(g,st)||
+        st.stats.contests||!st.approachSignal)
+      throw Error('real pre-entry visual witness incorrectly counted as inside contest');
+     const mm=g.mmCtx;if(!mm)throw Error('canonical minimap canvas unavailable');
+     const originalText=mm.fillText,originalDash=mm.setLineDash;
+     let badge=false,dash=false;
+     mm.fillText=function(text){if(text==='!')badge=true;return originalText.apply(this,arguments);};
+     mm.setLineDash=function(arr){if(arr&&arr[0]===7&&arr[1]===5)dash=true;
+      return originalDash.apply(this,arguments);};
+     try{g.drawMinimap();}finally{mm.fillText=originalText;mm.setLineDash=originalDash;}
+     if(!badge||!dash)throw Error('real minimap did not draw dashed pre-entry threat badge');
+     earlyWarning=true;break;
+    }
+   }
+   [p.x,p.y,e.x,e.y,shape.x,shape.y,g.cam.x,g.cam.y]=saved;
+   st.approachSignal=null;
+   if(!earlyWarning)throw Error('no physically visible, terrain-clear BLOOM pre-entry cue found');
    const visible=T.contestCandidate(g,st);
    if(!visible)throw Error('real Battlefield LOS/viewport does not certify visible hostile and hexagon');
    // Other naturally spawned resources may also be visible. To prove the
