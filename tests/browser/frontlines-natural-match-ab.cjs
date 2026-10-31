@@ -13,9 +13,9 @@ const SEED_INDEX=Number(process.env.NOVA_SEED_INDEX??0);
 const PILOT_POLICY=process.env.NOVA_PILOT_POLICY||'wander';
 const AB_MODE=process.env.NOVA_AB_MODE||'memory';
 const BOMBER_RESEARCH=process.env.NOVA_BOMBER_RESEARCH==='1';
-if(BOMBER_RESEARCH&&(AB_MODE!=='cover-pressure'||PILOT_POLICY!=='cover-pressure'))
+if(BOMBER_RESEARCH&&(!['cover-pressure','bomber-physics'].includes(AB_MODE)||PILOT_POLICY!=='cover-pressure'))
  throw Error('Bomber research requires paired cover-pressure policy');
-if(!['memory','live-turn','cover-pressure'].includes(AB_MODE))throw Error('NOVA_AB_MODE must be memory, live-turn, or cover-pressure');
+if(!['memory','live-turn','cover-pressure','bomber-physics'].includes(AB_MODE))throw Error('NOVA_AB_MODE must be memory, live-turn, cover-pressure, or bomber-physics');
 if(!Number.isInteger(LAYOUT_INDEX)||LAYOUT_INDEX<0||LAYOUT_INDEX>=LAYOUTS.length)
  throw Error('NOVA_LAYOUT_INDEX must be 0, 1, or 2');
 if(!Number.isInteger(SEED_INDEX)||SEED_INDEX<0||SEED_INDEX>1000)
@@ -28,12 +28,28 @@ const TRIAL_RNG=(0x7d27e91b^Math.imul(SEED_INDEX,0x85ebca6b))>>>0;
 const SEED_ID='natural-20261027-'+LAYOUT_INDEX+'-'+SEED_INDEX;
 const SECONDS=165,DT=1/30,CHUNK=450;
 async function arm(browser,enabled,label){
- const context=await browser.newContext({viewport:{width:900,height:700}});
+ const context=await browser.newContext({viewport:{width:900,height:700},serviceWorkers:'block'});
  const page=await context.newPage(),errors=[];
+ let patchedCount=0;
  page.on('pageerror',e=>errors.push(String(e.stack||e)));
  try{
+  /* Research-only OFF: intercept precisely one shipped script response and
+   * suppress only the newborn fragment movement. No gameplay source changes. */
+  if(AB_MODE==='bomber-physics'&&!enabled){
+   await page.route('**/nova-updates/disciplines-v1.7.0.js',async route=>{
+    const response=await route.fetch(),source=await response.text();
+    const needle='advanceClearFuseChildren(this,b,childStart,dt,physicalCross,sole);';
+    if(response.status()!==200||source.split(needle).length!==2)
+     throw Error('Causal OFF could not identify exact shipping fragment call');
+    patchedCount++;
+    await route.fulfill({response,body:source.replace(needle,
+     '/* research-only causal OFF: leave newborn fragments at birth */')});
+   });
+  }
   await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded',timeout:45000});
   await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({state:'visible',timeout:45000});
+  if(AB_MODE==='bomber-physics')assert.equal(patchedCount,enabled?0:1,
+   'Causal OFF must patch exactly one shipping Disciplines script');
   await page.addScriptTag({url:'/tests/browser/projectile-density-audit.js'});
   if(BOMBER_RESEARCH)await page.addScriptTag({url:'/tests/browser/bomber-burst-audit.js'});
   await page.addScriptTag({url:'/tests/browser/frontlines-public-pilot.js'});
@@ -104,7 +120,7 @@ async function arm(browser,enabled,label){
    g.__novaExperimentSeed='natural-20261027-'+terrainIndex+'-'+seedIndex;
    g.__novaExperimentPolicy=pilotPolicy;
    g.__novaExperimentABMode=abMode;
-   if(abMode==='cover-pressure'){
+   if(abMode==='cover-pressure'||abMode==='bomber-physics'){
     g.__novaCoverPriorityResearch={schema:1,activations:0};
     g.__novaCoverDamageResearch={schema:1,pilotId:g.player.id,allEffectiveDamage:0,
      playerEffectiveDamage:0,allBreaks:0,playerBreaks:0};
@@ -125,7 +141,7 @@ async function arm(browser,enabled,label){
    if(g.__novaBattlefield?.name!==['CROSSFIRE','SPLIT HORIZON','FOUR GATES'][terrainIndex])throw Error('uncontrolled layout '+g.__novaBattlefield?.name);
    const ai=window.__novaMakeRequire('')('game/ai');
    if(!ai||typeof ai.updateAI!=='function')throw Error('missing composed AI');
-   if(!enabled&&abMode!=='cover-pressure'){
+   if(!enabled&&abMode!=='cover-pressure'&&abMode!=='bomber-physics'){
     const original=ai.updateAI;
     if(abMode==='memory'){
      // Historical experiment: suppress stale memory (live turns still ON).
@@ -303,13 +319,13 @@ async function arm(browser,enabled,label){
      return{x:Math.cos(g.time*.73),y:Math.sin(g.time*.73)};
     };
    }
-   if(abMode==='cover-pressure'){
+   if(abMode==='cover-pressure'||abMode==='bomber-physics'){
     if(pilotPolicy!=='cover-pressure')throw Error('cover-pressure experiment requires its named policy');
     const helper=window.__novaResearchCoverPressurePilot,
      F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
     if(!helper||typeof helper.select!=='function'||!F)
      throw Error('missing public cover-pressure pilot or viewport contract');
-    if(enabled){
+    if(enabled||abMode==='bomber-physics'){
      g.input.moveVec=()=>{
       const v=helper.move(g,p,F);
       if(v){g.__novaCoverPressureMoveSamples=(g.__novaCoverPressureMoveSamples||0)+1;return v;}
@@ -340,7 +356,40 @@ async function arm(browser,enabled,label){
      g.__novaTrialRng=state>>>0;
      return g.__novaTrialRng/4294967296;
     };
-    try{for(let j=0;j<steps&&g.status!=='dead';j++)g.update(dt);}
+    try{
+     for(let j=0;j<steps&&g.status!=='dead';j++){
+      g.update(dt);
+      if(g.__novaExperimentABMode==='bomber-physics'){
+       const n=(g.__novaCausalFrames=(g.__novaCausalFrames||0)+1);
+       if(g.__novaCausalFirstAdvanceTime==null&&
+          g.__novaBomberBurstAudit?.airburst?.advanced>0)
+        g.__novaCausalFirstAdvanceTime=g.time;
+       if(n%30===0){
+        /* Read-only 1-second physical-state fingerprints, including RNG.
+         * This is a divergence witness, not a claim of improved player fun. */
+        const state=JSON.stringify({
+         rng:g.__novaTrialRng,
+         player:[g.player?.id,g.player?.x,g.player?.y,g.player?.hp,
+          g.player?.score,g.player?.kills,g.player?.level,g.player?.alive],
+         tanks:g.tanks.map(t=>[t.id,t.x,t.y,t.hp,t.alive,t.cls]),
+         shapes:g.shapes.map(t=>[t.id,t.x,t.y,t.hp,t.type]),
+         drones:g.drones.map(t=>[t.id,t.x,t.y,t.hp,t.ownerId]),
+         bullets:g.bullets.map(t=>[t.id,t.x,t.y,t.ttl,t.dead,t.ownerId])
+        });
+        let h1=2166136261,h2=0x9e3779b9;
+        for(let k=0;k<state.length;k++){
+         const c=state.charCodeAt(k);
+         h1=Math.imul(h1^c,16777619);
+         h2=Math.imul(h2^c,2246822519);
+        }
+        (g.__novaCausalTrace||(g.__novaCausalTrace=[])).push({
+         time:+g.time.toFixed(3),hash:(h1>>>0).toString(16)+':'+(h2>>>0).toString(16),
+         hp:g.player?.hp,score:g.player?.score,kills:g.player?.kills,
+         projectiles:g.bullets.length,alive:g.player?.alive});
+       }
+      }
+     }
+    }
     finally{Math.random=previousRandom;}
     return{time:g.time,status:g.status,blooms:g.__lfState?.stats?.blooms||0};
    },{steps:Math.min(CHUNK,Math.ceil(SECONDS/DT)-i*CHUNK),dt:DT});
@@ -355,6 +404,9 @@ async function arm(browser,enabled,label){
      pilotAlive:!!p.alive,score:p.score,kills:p.kills,level:p.level,
      botCount:g.tanks.filter(t=>t.ai&&t.alive).length},
     projectileDensityAudit:g.__novaProjectileDensityAudit,
+    ...(g.__novaExperimentABMode==='bomber-physics'?{bomberPhysicsTrace:{
+     firstAdvanceTime:g.__novaCausalFirstAdvanceTime??null,
+     samples:g.__novaCausalTrace||[]}}:{}),
     ...(g.__novaBomberBurstAudit?{bomberBurstAudit:g.__novaBomberBurstAudit}:{}),
     coverPressure:{coverBroken:g.__novaBattlefield?.coverBroken||0,
      allEffectiveDamage:g.__novaCoverDamageResearch?.allEffectiveDamage||0,
@@ -431,7 +483,7 @@ async function arm(browser,enabled,label){
   assert.equal(result.contestGateAudit.hostileVisible,
    result.contestGateAudit.visibleNeutralBelow155+result.contestGateAudit.visibleNeutralAtLeast155);
   assert.equal(errors.length,0,errors.join('\n'));
-  return{label,enabled,initial,last,result};
+  return{label,enabled,initial,last,result,patchedCount};
  }finally{await context.close();}
 }
 (async()=>{
@@ -442,6 +494,40 @@ async function arm(browser,enabled,label){
   assert.equal(off.initial.fingerprint,offReplay.initial.fingerprint,'same seed must reproduce initial world');
   const same=JSON.stringify(off.result)===JSON.stringify(offReplay.result);
   const naturalOpportunityObserved=[off,on].every(a=>a.result.naturalBlooms>0);
+  let bomberPhysicsCausal=null;
+  if(AB_MODE==='bomber-physics'){
+   assert.equal(off.patchedCount,1);
+   assert.equal(on.patchedCount,0);
+   assert.equal(offReplay.patchedCount,1);
+   assert.equal(off.result.bomberBurstAudit.airburst.advanced,0,
+    'OFF script must not advance newborn fragments');
+   const before=off.result.bomberPhysicsTrace.samples,
+    after=on.result.bomberPhysicsTrace.samples;
+   const shared=Math.min(before.length,after.length);
+   let firstDifferent=null;
+   for(let i=0;i<shared;i++){
+    assert.equal(before[i].time,after[i].time,
+     'matched physical samples must have identical simulated timestamps');
+    if(before[i].hash!==after[i].hash){
+     firstDifferent=after[i].time;break;
+    }
+   }
+   const firstAdvance=on.result.bomberPhysicsTrace.firstAdvanceTime;
+   if(firstDifferent!==null){
+    assert.ok(firstAdvance!==null&&firstDifferent+1e-6>=firstAdvance,
+     'physical divergence preceded the first corrected airburst');
+   }
+   if(on.result.bomberBurstAudit.airburst.advanced===0)
+    assert.deepEqual(after,before,
+     'no treatment exposure must leave all physical samples identical');
+   bomberPhysicsCausal={sourcePatchVerified:true,
+    offAdvanced:0,onAdvanced:on.result.bomberBurstAudit.airburst.advanced,
+    firstAdvanceTime:firstAdvance,firstPhysicalDifferenceTime:firstDifferent,
+    sharedPhysicalSamples:shared,
+    physicalDifferenceObserved:firstDifferent!==null,
+    noAdvanceNoDifference:on.result.bomberBurstAudit.airburst.advanced>0?null:
+     JSON.stringify(after)===JSON.stringify(before)};
+  }
   if(AB_MODE==='live-turn'){
    assert.equal(off.result.commitmentAudit.startedLive,0,'OFF must suppress all live-turn starts');
    assert.equal(offReplay.result.commitmentAudit.startedLive,0,'OFF replay must also suppress live starts');
@@ -455,11 +541,11 @@ async function arm(browser,enabled,label){
     assert.deepEqual(on.result[key],off.result[key],
      'no-treatment live-turn arms must have identical '+key);
   }
-  const report={method:BOMBER_RESEARCH?'paired standard Bomber cover-seeking versus wander in the full shipping game; not human play':AB_MODE==='cover-pressure'?'paired ordinary Scout cover-seeking versus wander in the full shipping game; not human play':AB_MODE==='live-turn'?'paired natural full-match live-turn causal intervention (not human fun)':'scripted full-match natural Director research; not human fun; public-bloom is closed-loop policy',
+  const report={bomberPhysicsCausal,method:AB_MODE==='bomber-physics'?'matched standard Bomber, identical scripted cover-seeking pilot; research-only single-call fragment-advance intervention':BOMBER_RESEARCH?'paired standard Bomber cover-seeking versus wander in the full shipping game; not human play':AB_MODE==='cover-pressure'?'paired ordinary Scout cover-seeking versus wander in the full shipping game; not human play':AB_MODE==='live-turn'?'paired natural full-match live-turn causal intervention (not human fun)':'scripted full-match natural Director research; not human fun; public-bloom is closed-loop policy',
    abMode:AB_MODE,bomberResearch:BOMBER_RESEARCH,verifiedLiveStart,
    initialWorldIdentical:true,initialFingerprint:off.initial.fingerprint,offReplayIdentical:same,
    naturalOpportunityObserved,
-   interpretation:AB_MODE==='cover-pressure'?'Descriptive matched initial worlds; ordinary cover-seeking input may change survival and subsequent AI/world states. Report early deaths and all no-target periods.':AB_MODE==='live-turn'?(verifiedLiveStart&&naturalOpportunityObserved?'Live-turn intervention activated; interpret matched-policy differences cautiously because later public signals can diverge endogenously.':'INCONCLUSIVE: no verified ON live start or natural BLOOM exposure in both arms; retain the pair.'):(naturalOpportunityObserved?'Descriptive only: natural BLOOM observed; inspect opportunity timing, deaths and public pilot commands before causal interpretation.':'INCONCLUSIVE: at least one arm had no natural BLOOM; retain this censored pair.'),
+   interpretation:AB_MODE==='bomber-physics'?'Causal ON/OFF difference is only the certified newborn-fragment movement; later combat, AI and RNG may diverge as downstream effects. Human fun and physical-device performance are unmeasured.':AB_MODE==='cover-pressure'?'Descriptive matched initial worlds; ordinary cover-seeking input may change survival and subsequent AI/world states. Report early deaths and all no-target periods.':AB_MODE==='live-turn'?(verifiedLiveStart&&naturalOpportunityObserved?'Live-turn intervention activated; interpret matched-policy differences cautiously because later public signals can diverge endogenously.':'INCONCLUSIVE: no verified ON live start or natural BLOOM exposure in both arms; retain the pair.'):(naturalOpportunityObserved?'Descriptive only: natural BLOOM observed; inspect opportunity timing, deaths and public pilot commands before causal interpretation.':'INCONCLUSIVE: at least one arm had no natural BLOOM; retain this censored pair.'),
    off:off.result,on:on.result,offReplay:offReplay.result,
    limits:['No artificial BLOOM or forced survival','One layout/seed/pilot-policy per invocation; matrix must aggregate independently',
     BOMBER_RESEARCH?'A standard Bomber class is piloted by deterministic scripted inputs; no human gameplay inference':'A deterministic Scout script is not a human player',
@@ -468,6 +554,9 @@ async function arm(browser,enabled,label){
     'Seed replay is checked, not assumed',
     'Cover-pressure mode changes only pilot inputs; coverDamage includes AI damage and cannot be attributed solely to the player pilot',
     'Cover-pressure aim/move counts are input calls, not seconds fired or verified hits',
+    ...(AB_MODE==='bomber-physics'?['OFF intercepts exactly one delivered Disciplines call, not repository source; production remains unchanged',
+      'Physical hashes sample once per simulated second; first divergence is interval-censored',
+      'Treatment effect is not a player-value or survival estimate; death-censored trials remain visible']:[]),
     ...(BOMBER_RESEARCH?['Burst callsites are provenance, not a chronological first-contact oracle',
       'Synthetic scripted Bomber exposure does not estimate ordinary human class usage']:[]),
      'Projectile density is read-only and counts necessary eligibility gates, not actual certificate activations or player benefit',
