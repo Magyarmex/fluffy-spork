@@ -191,7 +191,7 @@ test('Actual Three Disciplines module produces witnessed clear-corridor advances
   ['remoteShapeNoVelocity','missingShapeVelocity'],
   ['fragmentTerrain','fragmentTerrainProximity']]){
   const baseline=make(mode,60),g=make(mode,60),a=audit.create(1);
-  audit.install(g,a,()=> 'Error\\n at Game.updateBullets (https://host/nova-updates/disciplines-v1.7.0.js:500:12)');
+  audit.install(g,a,()=> 'Error\n at Game.updateBullets (https://host/nova-updates/disciplines-v1.7.0.js:500:12)');
   baseline.updateBullets(1/60);g.updateBullets(1/60);
   assert.deepEqual(g.bullets,baseline.bullets,
    'diagnostic must not change '+mode+' physical gameplay');
@@ -207,7 +207,7 @@ test('10,000 randomized sufficient-veto witnesses never contradict the actual sh
  const fs=require('node:fs'),path=require('node:path');
  const source=fs.readFileSync(path.join(__dirname,'../../nova-updates/disciplines-v1.7.0.js'),'utf8');
  const start=source.indexOf('  function advanceClearFuseChildren(');
- const end=source.indexOf('\\n  var oldBullets=Game.prototype.updateBullets;',start);
+ const end=source.indexOf('\n  var oldBullets=Game.prototype.updateBullets;',start);
  assert.ok(start>=0&&end>start,'shipping clearance owner must be present');
  const helper=new Function('C','clamp',source.slice(start,end)+
   ';return advanceClearFuseChildren;')(
