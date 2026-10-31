@@ -93,3 +93,10 @@ test('Debug snapshot exposes aggregate timing only, not hidden hostile positions
  assert.equal(snap.frontline.counts.cueUnder200Ms,1);
  assert.ok(!JSON.stringify(snap.frontline).includes('enemyX'));
 });
+
+test('BLOOM Fieldcraft teaches cautious narrow-screen approach without implying hidden enemy radar',()=>{
+ const source=fs.readFileSync(path.join(root,'nova-updates','living-front-director-v1.12.0.js'),'utf8');
+ assert.match(source,/On narrow screens, slow before crossing/);
+ assert.match(source,/dashed ring is last-known intel/);
+ assert.match(source,/dashed red ! at a BLOOM warns of a visible rival ahead/);
+});
