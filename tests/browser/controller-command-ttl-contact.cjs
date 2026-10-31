@@ -1,6 +1,6 @@
 'use strict';
 // Actual 48-overlay Chromium game: commanded Controller drone contact must
-// resolve before a projectile's physical TTL, without bypassing cover or
+// resolve before a projectile's physical TTL for pen=0 and pen=1, without bypassing cover or
 // inventing a hit beyond expiry. No mocked Game/physics implementations.
 const assert=require('node:assert/strict');
 const {chromium}=require('playwright');
@@ -33,7 +33,7 @@ const {chromium}=require('playwright');
      const owner=g.player;
      const cases=[];
      for(const hz of [30,60,120,240]){
-      for(const targetX of [20,24]){
+      for(const pen of [0,1])for(const targetX of [20,24]){
        g.setClass(owner,'carrier');
        owner.x=-200;owner.y=0;owner.vx=0;owner.vy=0;
        owner.alive=true;owner.droneRespawnT=999;
@@ -48,7 +48,7 @@ const {chromium}=require('playwright');
        g.shapes=[];g.orbs=[];g.powerups=[];g.aiRespawns=[];
        g.bullets=[{id:g.nextId++,kind:'bullet',ownerId:999999,
         x:0,y:0,vx:2500,vy:0,r:3,dmg:20,ttl:.004,
-        pen:0,hits:0,dead:false,shell:false,beam:false,
+        pen,hits:0,dead:false,shell:false,beam:false,
         splash:0,color:'#fff'}];
        g.__novaTerrain=[];delete g.__novaBattlefieldIndex;
        g.shapeTimer=999;g.powerupTimer=999;g.eliteTimer=999;
@@ -57,7 +57,7 @@ const {chromium}=require('playwright');
        g.input.move.active=false;g.input.firing=false;
        g.input.autofire=false;g.input.mouseActive=false;
        g.update(1/hz);
-       cases.push({hz,targetX,hp:d.hp,certified:
+       cases.push({hz,pen,targetX,hp:d.hp,certified:
         d.__novaChronoCommandBoundedEpoch===g.__novaShapeSweepEpoch,
         overlays:document.querySelectorAll('script[src*="nova-updates/"]').length});
       }
