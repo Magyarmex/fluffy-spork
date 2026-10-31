@@ -53,6 +53,7 @@ async function arm(browser,enabled,label){
    'Causal OFF must patch exactly one shipping Disciplines script');
   await page.addScriptTag({url:'/tests/browser/projectile-density-audit.js'});
   if(BOMBER_RESEARCH)await page.addScriptTag({url:'/tests/browser/bomber-burst-audit.js'});
+  if(AB_MODE==='bomber-physics')await page.addScriptTag({url:'/tests/browser/bomber-combat-fingerprint.js'});
   await page.addScriptTag({url:'/tests/browser/frontlines-public-pilot.js'});
   await page.addScriptTag({url:'/tests/browser/cover-pressure-pilot.js'});
   await page.addScriptTag({url:'/tests/browser/frontlines-visible-defense.js'});
@@ -365,6 +366,13 @@ async function arm(browser,enabled,label){
        if(g.__novaCausalFirstAdvanceTime==null&&
           g.__novaBomberBurstAudit?.airburst?.advanced>0)
         g.__novaCausalFirstAdvanceTime=g.time;
+       if(n%6===0){
+        const witness=window.__novaResearchBomberCombatFingerprint;
+        if(!witness||typeof witness.sample!=='function')
+         throw Error('projectile-free combat witness missing');
+        (g.__novaCausalCombatTrace||(g.__novaCausalCombatTrace=[]))
+         .push(witness.sample(g));
+       }
        if(n%30===0){
         /* Read-only 1-second physical-state fingerprints, including RNG.
          * This is a divergence witness, not a claim of improved player fun. */
@@ -410,7 +418,8 @@ async function arm(browser,enabled,label){
     projectileDensityAudit:g.__novaProjectileDensityAudit,
     ...(g.__novaExperimentABMode==='bomber-physics'?{bomberPhysicsTrace:{
      firstAdvanceTime:g.__novaCausalFirstAdvanceTime??null,
-     samples:g.__novaCausalTrace||[]}}:{}),
+     samples:g.__novaCausalTrace||[],
+     combatSamples:g.__novaCausalCombatTrace||[]}}:{}),
     ...(g.__novaBomberBurstAudit?{bomberBurstAudit:g.__novaBomberBurstAudit}:{}),
     coverPressure:{coverBroken:g.__novaBattlefield?.coverBroken||0,
      allEffectiveDamage:g.__novaCoverDamageResearch?.allEffectiveDamage||0,
@@ -516,7 +525,31 @@ async function arm(browser,enabled,label){
      firstDifferent=after[i].time;break;
     }
    }
+   const combatBefore=off.result.bomberPhysicsTrace.combatSamples,
+    combatAfter=on.result.bomberPhysicsTrace.combatSamples;
+   const combatShared=Math.min(combatBefore.length,combatAfter.length);
+   let firstBody=null,firstHealth=null,firstHealthCategory=null;
+   for(let i=0;i<combatShared;i++){
+    assert.equal(combatBefore[i].time,combatAfter[i].time,
+     'matched non-projectile samples must share timestamps');
+    if(firstBody===null&&combatBefore[i].bodyHash!==combatAfter[i].bodyHash)
+     firstBody=combatAfter[i].time;
+    if(firstHealth===null&&combatBefore[i].healthHash!==combatAfter[i].healthHash){
+     firstHealth=combatAfter[i].time;
+     firstHealthCategory=Object.keys(combatAfter[i].categories).filter(k=>
+      combatBefore[i].categories[k]!==combatAfter[i].categories[k]);
+     assert.ok(firstHealthCategory.length,
+      'health divergence must identify at least one category');
+    }
+   }
    const firstAdvance=on.result.bomberPhysicsTrace.firstAdvanceTime;
+   for(const [name,time] of [['body',firstBody],['health',firstHealth]]){
+    if(time!==null)assert.ok(firstAdvance!==null&&time+1e-6>=firstAdvance,
+     name+' divergence preceded the first corrected airburst');
+   }
+   if(on.result.bomberBurstAudit.airburst.advanced===0)
+    assert.deepEqual(combatAfter,combatBefore,
+     'unexposed worlds must retain non-projectile parity');
    if(firstDifferent!==null){
     assert.ok(firstAdvance!==null&&firstDifferent+1e-6>=firstAdvance,
      'physical divergence preceded the first corrected airburst');
@@ -527,7 +560,10 @@ async function arm(browser,enabled,label){
    bomberPhysicsCausal={sourcePatchVerified:true,
     offAdvanced:0,onAdvanced:on.result.bomberBurstAudit.airburst.advanced,
     firstAdvanceTime:firstAdvance,firstPhysicalDifferenceTime:firstDifferent,
-    sharedPhysicalSamples:shared,
+    sharedPhysicalSamples:shared,sharedCombatSamples:combatShared,
+    firstNonProjectileDifferenceTime:firstBody,
+    firstHealthDifferenceTime:firstHealth,
+    firstHealthDifferenceCategories:firstHealthCategory,
     physicalDifferenceObserved:firstDifferent!==null,
     noAdvanceNoDifference:on.result.bomberBurstAudit.airburst.advanced>0?null:
      JSON.stringify(after)===JSON.stringify(before)};
