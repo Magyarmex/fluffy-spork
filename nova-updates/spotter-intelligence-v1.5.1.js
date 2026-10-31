@@ -48,6 +48,27 @@ function knownContact(g,owner,d){
  }
  return null;
 }
+/* AI advances before the drone scan in the shipping Game.update order.
+ * The remembered contact ID/TTL is only a scan record, not proof that the
+ * Observer still sees the target at the current AI step. Reuse the same
+ * authoritative cone/LoS test without changing or clearing scan state.
+ * This is a pure query: the later drone scan owns memory retirement. */
+function liveRelay(g,owner,target){
+ if(!g||!owner||!target||!sniper(owner)||owner.alive===false||
+    (owner.hp!=null&&!(owner.hp>0))||!Array.isArray(g.drones)||
+    owner.__novaSpotterContactId!==target.id||
+    !(Number(owner.__novaSpotterContactUntil)>Number(g.time||0))||
+    Number(owner.__novaSpotterDownUntil)>Number(g.time||0))return false;
+ var id=owner.__novaSpotterDroneId;
+ if(id==null||id<0)return false;
+ for(var i=0;i<g.drones.length;i++){
+  var d=g.drones[i];
+  if(d&&d.id===id&&d.ownerId===owner.id&&d.__novaSpotter&&d.hp>0)
+   return knownContact(g,owner,d)===target;
+ }
+ return false;
+}
+window.__NOVA_SPOTTER_LIVE_RELAY__=liveRelay;
 function updateSuspicion(g,owner,d,dt){var known=knownContact(g,owner,d);if(known){d.__novaSuspectAngle=Math.atan2(known.y-d.y,known.x-d.x);d.__novaSuspectStrength=1;d.__novaLastKnownX=known.x;d.__novaLastKnownY=known.y;d.__novaSearchHold=.65;return}
  var activity=hostileBulletActivity(g,owner,d);if(activity){var cur=d.__novaSuspectAngle==null?activity.angle:d.__novaSuspectAngle;d.__novaSuspectAngle=moveAngle(cur,activity.angle,2.8*dt);d.__novaSuspectStrength=Math.max(d.__novaSuspectStrength||0,activity.strength);d.__novaSearchHold=.9;}
  else{d.__novaSearchHold=Math.max(0,(d.__novaSearchHold||0)-dt);d.__novaSuspectStrength=Math.max(0,(d.__novaSuspectStrength||0)-dt*(d.__novaSearchHold>0?.16:.34));}
