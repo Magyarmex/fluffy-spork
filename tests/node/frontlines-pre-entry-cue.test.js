@@ -302,3 +302,92 @@ test('cached contest never creates hidden outside radar or suppresses a new visi
  }
  assert.ok(visible>0&&hidden>0,'both visible and hidden worlds exercised');
 });
+
+test('solid contest requires fresh local visual witness at bounded cadence',()=>{
+ const s=scene();s.p.x=-1110;s.g.cam.x=s.p.x;
+ assert.equal(s.T.updateContest(s.g,s.st),true);
+ s.g.drawMinimap();assert.ok(s.draws.some(d=>d.type==='text'&&d.value==='!'));
+ s.enemy.x=1800;s.enemy.y=1800;s.g.time+=.17;s.draws.length=0;
+ s.g.drawMinimap();assert.ok(!s.draws.some(d=>d.type==='text'&&d.value==='!'));
+ s.enemy.x=-1050;s.enemy.y=-540;s.g.time+=.17;s.draws.length=0;
+ s.g.drawMinimap();assert.ok(s.draws.some(d=>d.type==='text'&&d.value==='!'));
+ assert.equal(s.st.stats.contests,1);
+});
+
+test('256 inside-contest visual states never assert a hidden rival',()=>{
+ let state=0x601b10c0;
+ const rand=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return(state>>>0)/4294967296;};
+ let yes=0,no=0;
+ for(let i=0;i<256;i++){
+  const s=scene();s.p.x=-1110;s.g.cam.x=s.p.x;
+  assert.equal(s.T.updateContest(s.g,s.st),true);
+  s.g.drawMinimap();s.draws.length=0;
+  if(rand()<.3)s.enemy.hp=0;
+  if(rand()<.3)s.enemy.spawnShieldT=1;
+  if(rand()<.3)s.enemy.x=1800;
+  if(rand()<.3)s.shape.hp=0;
+  if(rand()<.3)s.g.hasLineOfSight=()=>false;
+  if(rand()<.3)s.g.w=160;
+  if(rand()<.2)s.st.directorEnabled=false;
+  s.g.time+=.17;
+  const expected=s.T.contestCandidate(s.g,s.st);
+  s.g.drawMinimap();
+  const actual=s.draws.some(d=>d.type==='text'&&d.value==='!');
+  assert.equal(actual,expected,'cached inside badge must require fresh direct witness in world '+i);
+  if(expected)yes++;else no++;
+  assert.equal(s.st.stats.contests,1,'minimap must never mutate contest credit');
+ }
+ assert.ok(yes>0&&no>0);
+});
+
+test('solid contest invalidates immediately on viewport resize and zoom changes',()=>{
+ for(const change of [
+  s=>{s.g.w=90;},
+  s=>{s.g.cam.zoom=10;}
+ ]){
+  const s=scene();s.p.x=-1110;s.g.cam.x=s.p.x;
+  assert.equal(s.T.updateContest(s.g,s.st),true);
+  s.g.drawMinimap();assert.ok(s.draws.some(d=>d.type==='text'&&d.value==='!'));
+  change(s);s.draws.length=0;s.g.drawMinimap();
+  assert.equal(s.T.contestCandidate(s.g,s.st),false);
+  assert.ok(!s.draws.some(d=>d.type==='text'&&d.value==='!'),
+   'changed visible screen cannot retain old solid contest until cache expires');
+ }
+});
+
+test('solid contest invalidates on a large tactical camera jump before the cadence deadline',()=>{
+ const s=scene();s.p.x=-1110;s.g.cam.x=s.p.x;
+ assert.equal(s.T.updateContest(s.g,s.st),true);
+ s.g.drawMinimap();assert.ok(s.draws.some(d=>d.type==='text'&&d.value==='!'));
+ s.g.cam.x=-1700;s.draws.length=0;s.g.drawMinimap();
+ assert.equal(s.T.contestCandidate(s.g,s.st),false);
+ assert.ok(!s.draws.some(d=>d.type==='text'&&d.value==='!'),
+  'long-glass camera change must not advertise a rival outside the rendered view');
+});
+
+test('solid contest cache cannot outlive a clock rewind or an expired Director certificate',()=>{
+ const s=scene();s.p.x=-1110;s.g.cam.x=s.p.x;
+ assert.equal(s.T.updateContest(s.g,s.st),true);
+ s.g.drawMinimap();assert.ok(s.draws.some(d=>d.type==='text'&&d.value==='!'));
+ s.g.time=99;s.enemy.x=1800;s.draws.length=0;s.g.drawMinimap();
+ assert.ok(!s.draws.some(d=>d.type==='text'&&d.value==='!'),
+  'clock rewinds must re-evaluate current visibility');
+ s.g.time=104;s.enemy.x=-1050;s.draws.length=0;s.g.drawMinimap();
+ assert.ok(!s.draws.some(d=>d.type==='text'&&d.value==='!'),
+  'expired public BLOOM cannot show a solid contest');
+});
+
+test('solid contest rechecks visual freshness at 30, 60, 120 and 240 Hz without per-frame scans',()=>{
+ for(const fps of [30,60,120,240]){
+  const s=scene();s.p.x=-1110;s.g.cam.x=s.p.x;
+  assert.equal(s.T.updateContest(s.g,s.st),true);
+  let rays=0;const los=s.g.hasLineOfSight;
+  s.g.hasLineOfSight=(...args)=>{rays++;return los(...args);};
+  const start=s.g.time;
+  for(let i=0;i<fps;i++){s.g.time=start+i/fps;s.g.drawMinimap();}
+  assert.ok(rays>=8&&rays<=18,`${fps} Hz sampled ${rays} LOS rays, expected bounded 160ms cadence`);
+  s.enemy.hp=0;s.g.time=start+1.17;s.draws.length=0;s.g.drawMinimap();
+  assert.ok(!s.draws.some(d=>d.type==='text'&&d.value==='!'),`${fps} Hz stale solid badge`);
+  assert.equal(s.st.stats.contests,1,'minimap cannot award contest credit');
+ }
+});
