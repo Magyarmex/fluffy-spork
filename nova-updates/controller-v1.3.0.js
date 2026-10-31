@@ -1169,7 +1169,35 @@
       }
       var fp = formationPoint(g, owner, d, squad, target, state, profile);
       var response = profile.response * (owner.bulwarkT > 0 && profile.formation === 'wall' ? 1.20 : 1);
+      var commandStartX=d.x,commandStartY=d.y;
       steerDrone(d, fp.x, fp.y, baseSpeed * (owner.cls === 'valkyrie' ? 1.12 : 1), response, dt);
+      /* A commanded FORM step has exactly one constant-velocity physical
+       * integration. Record its actual bound, not an inferred route between
+       * later wrapper endpoints. Every later movement owner must accept it. */
+      if(g.__novaDroneChronoTraceEnabled===true&&g.__novaShapeSweepActive===true&&
+         d.__novaChronoDroneEpoch===g.__novaShapeSweepEpoch&&
+         d.__novaChronoDronePrevPhase==='form'&&state.active&&
+         !d.__novaCommitted&&d.__novaPhase==='form'&&
+         dt>0&&Number.isFinite(dt)&&Number.isFinite(commandStartX)&&
+         Number.isFinite(commandStartY)&&
+         d.__novaChronoDronePrevX===commandStartX&&
+         d.__novaChronoDronePrevY===commandStartY&&
+         d.__novaPrevX===commandStartX&&d.__novaPrevY===commandStartY&&
+         Number.isFinite(d.x)&&Number.isFinite(d.y)&&
+         Number.isFinite(d.__novaVX)&&Number.isFinite(d.__novaVY)&&
+         Number.isFinite(d.speed)&&d.speed>0){
+        var commandBound=Math.max(d.speed,Math.hypot(d.__novaVX,d.__novaVY));
+        if(commandBound>0&&commandBound<=4000&&
+           Math.hypot(d.x-commandStartX,d.y-commandStartY)<=commandBound*dt+1e-6){
+          d.__novaChronoCommandRawEpoch=g.__novaShapeSweepEpoch;
+          d.__novaChronoCommandRawDt=dt;
+          d.__novaChronoCommandRawX=commandStartX;
+          d.__novaChronoCommandRawY=commandStartY;
+          d.__novaChronoCommandRawEndX=d.x;
+          d.__novaChronoCommandRawEndY=d.y;
+          d.__novaChronoCommandSpeedBound=commandBound;
+        }
+      }
       return true;
     }
 

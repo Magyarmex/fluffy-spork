@@ -260,7 +260,11 @@ wrap('game/engine',function(engine,require){
           d.__novaChronoIdleInvalidEpoch=this.__novaShapeSweepEpoch;
       }
       var intent=droneIntent(d),sp=Math.hypot(intent.x,intent.y),st=sampleStuck(this,d,intent.x,intent.y,pad,d.id,d.__v1102Nav||(d.__v1102Nav={}));
-      if(st.escapeUntil>now&&sp>1){var e=applyEscape(st,intent.x,intent.y);if(d.__novaSpotter){d.__novaScoutVX=e.x;d.__novaScoutVY=e.y;}else{d.__novaVX=e.x;d.__novaVY=e.y;}}
+      if(st.escapeUntil>now&&sp>1){
+        if(this.__novaDroneChronoTraceEnabled===true&&
+           d.__novaChronoCommandRawEpoch===this.__novaShapeSweepEpoch)
+          d.__novaChronoCommandInvalidEpoch=this.__novaShapeSweepEpoch;
+        var e=applyEscape(st,intent.x,intent.y);if(d.__novaSpotter){d.__novaScoutVX=e.x;d.__novaScoutVY=e.y;}else{d.__novaVX=e.x;d.__novaVY=e.y;}}
       if(d.__novaSpotter&&sp>28&&now>=(d.__v1102SpotterPlanAt||0)){
         d.__v1102SpotterPlanAt=now+.125+((Math.abs(d.id||0)%3)*.014);var ux=intent.x/sp,uy=intent.y/sp,gx=d.x+ux*360,gy=d.y+uy*360;
         if(this.hasLineOfSight&&!this.hasLineOfSight(d.x,d.y,gx,gy,Math.max(2,pad*.35))){
@@ -269,6 +273,18 @@ wrap('game/engine',function(engine,require){
       }
     }
     Object.keys(groups).forEach(function(k){separateSwarm(groups[k]);});
+    /* Separation or rerouting after the Controller integrator invalidates
+     * its single-step witness even if a later wrapper restores the endpoint. */
+    if(this.__novaDroneChronoTraceEnabled===true&&this.__novaShapeSweepActive===true){
+      var commandEpoch=this.__novaShapeSweepEpoch;
+      for(var si=0;si<ds.length;si++){
+        var moved=ds[si];
+        if(moved&&moved.__novaChronoCommandRawEpoch===commandEpoch&&
+           (moved.x!==moved.__novaChronoCommandRawEndX||
+            moved.y!==moved.__novaChronoCommandRawEndY))
+          moved.__novaChronoCommandInvalidEpoch=commandEpoch;
+      }
+    }
     /* Optional checkpoint after routing/separation, between Battlefield's
      * terrain stage and Live Vector's repair/peel stage. It is a position
      * observation, NOT a time-stamped physical collision trajectory. */
