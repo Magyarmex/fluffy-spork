@@ -25,6 +25,8 @@ test('read-only witness identifies certified positive-time overlap without award
  assert.equal(a.expiringShots,1);assert.equal(a.witnessedExpiringShots,1);
  assert.equal(a.rawPenZeroHitsZero,1);assert.equal(a.possiblePairs,1);
  assert.equal(a.geometricGuarantees,1);
+ assert.equal(a.eligiblePenZero,1);assert.equal(a.eligiblePenOne,0);
+ assert.equal(a.possiblePenZero,1);assert.equal(a.guaranteedPenZero,1);
  assert.equal(a.certifiedDroneHpLossEvents,0);
  assert.equal(a.observerErrors,0);
 });
@@ -60,4 +62,22 @@ test('geometry is finite and conservative outside reachable corridor',()=>{
  b.x=0;b.id=10;
  assert.equal(census.before(g,.016).witnessed,0,
   'newborn projectile is not falsely counted as pre-frame, but may still be a valid geometric candidate');
+});
+
+test('one-penetration TTL shots enter the actual eligibility census, higher penetration stays excluded',()=>{
+ const d=drone(),b=bullet();b.pen=1;
+ const g={__novaShapeSweepEpoch:7,__novaShapeSweepActive:true,
+  __novaFrameStartBulletEpoch:7,__novaFrameStartBulletIdCeiling:10,
+  drones:[d],bullets:[b],updateBullets(){}};
+ const a=census.install(g,census.create());
+ g.updateBullets(.016);
+ assert.equal(a.eligiblePenOne,1);assert.equal(a.eligiblePenZero,0);
+ assert.equal(a.expiringShots,1);assert.equal(a.possiblePenOne,1);
+ assert.equal(a.guaranteedPenOne,1);
+ assert.equal(a.possiblePairs,a.possiblePenZero+a.possiblePenOne);
+ assert.equal(a.geometricGuarantees,a.guaranteedPenZero+a.guaranteedPenOne);
+ b.pen=2;g.updateBullets(.016);
+ assert.equal(a.expiringShots,1,'higher penetration must not inherit pen=1 certificate');
+ assert.equal(a.rawPenPositiveHitsZero,2,'raw observer retains excluded shots');
+ assert.equal(a.observerErrors,0);
 });

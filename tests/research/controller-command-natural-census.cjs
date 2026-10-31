@@ -26,6 +26,8 @@ function create(){
   expiringShots:0,witnessedExpiringShots:0,commandRawDrones:0,commandCertifiedDrones:0,
   framesWithCommandCertificate:0,certifiedWithExpiringShot:0,
   possiblePairs:0,geometricGuarantees:0,
+  eligiblePenZero:0,eligiblePenOne:0,possiblePenZero:0,possiblePenOne:0,
+  guaranteedPenZero:0,guaranteedPenOne:0,
   certifiedDroneHpLossEvents:0,certifiedDroneHpLost:0,
   observedCertifiedDroneDeaths:0,observerErrors:0,rawExpiringShots:0,rawExpiringNonShell:0,rawExpiringPenZero:0,rawExpiringHitsZero:0,rawPenZeroHitsZero:0,rawPenZeroHitsPositive:0,rawPenPositiveHitsZero:0,rawPenPositiveHitsPositive:0,rawDead:0,rawCannon:0,playerCommandInputFrames:0,playerDroneFrames:0,playerFormDroneFrames:0,examples:[],bulletSamples:[]};
 }
@@ -45,12 +47,13 @@ function before(g,dt){
  const rawExpiring=bs.filter(b=>b&&finite(b.ttl)&&b.ttl>0&&b.ttl<=dt);
  const playerDrones=ds.filter(d=>d&&d.hp>0&&d.ownerId===g.player?.id);
  const expiring=bs.filter(b=>b&&!b.dead&&!b.shell&&!b.beam&&!b.splash&&
-  !b.__v17Cannon&&b.pen===0&&(b.hits||0)===0&&
+  !b.__v17Cannon&&(b.pen===0||b.pen===1)&&(b.hits||0)===0&&
   finite(b.ttl)&&b.ttl>0&&b.ttl<=dt&&
   [b.x,b.y,b.vx,b.vy,b.r].every(finite)&&b.r>0);
  const witnessed=expiring.filter(b=>g.__novaFrameStartBulletEpoch===epoch&&
   Number.isSafeInteger(b.id)&&b.id<g.__novaFrameStartBulletIdCeiling);
- let possible=0,guaranteed=0;
+ let possible=0,guaranteed=0,possibleZero=0,possibleOne=0,
+  guaranteedZero=0,guaranteedOne=0;
  /* A projectile fired before drone movement can be valid even when its
   * id exceeds the pre-frame ceiling (see same-frame birth shipping test).
   * Count geometric candidates separately from chronological authority. */
@@ -62,18 +65,24 @@ function before(g,dt){
    radius=b.r+d.r+1,bound=d.__novaChronoCommandSpeedBound;
   if(distanceSegment(sx,sy,b.x,b.y,endX,endY)>radius+bound*b.ttl)continue;
   possible++;
+  if(b.pen===0)possibleZero++;else possibleOne++;
   /* Sufficient geometric proof only, NOT collision authority. Earlier
    * cover, shields, other projectiles and body priority may veto a hit. */
   for(let k=1;k<=20;k++){
    const t=b.ttl*k/20;
    if(Math.hypot(b.x+b.vx*t-sx,b.y+b.vy*t-sy)+bound*t<radius-1e-5){
-    guaranteed++;break;
+    guaranteed++;
+    if(b.pen===0)guaranteedZero++;else guaranteedOne++;
+    break;
    }
   }
  }
  return {raw:raw.length,certified,expiring:expiring.length,
   witnessed: witnessed.length,
   bullets:bs.length,possible,guaranteed,time:g.time,
+  eligiblePenZero:expiring.filter(b=>b.pen===0).length,
+  eligiblePenOne:expiring.filter(b=>b.pen===1).length,
+  possibleZero,possibleOne,guaranteedZero,guaranteedOne,
   rawExpiring:rawExpiring.length,
   rawNonShell:rawExpiring.filter(b=>!b.shell&&!b.beam&&!b.splash).length,
   rawPenZero:rawExpiring.filter(b=>b.pen===0).length,
@@ -115,6 +124,12 @@ function after(a,s){
  if(s.certified.length&&s.expiring)a.certifiedWithExpiringShot++;
  a.possiblePairs+=s.possible;
  a.geometricGuarantees+=s.guaranteed;
+ a.eligiblePenZero+=s.eligiblePenZero;
+ a.eligiblePenOne+=s.eligiblePenOne;
+ a.possiblePenZero+=s.possibleZero;
+ a.possiblePenOne+=s.possibleOne;
+ a.guaranteedPenZero+=s.guaranteedZero;
+ a.guaranteedPenOne+=s.guaranteedOne;
  for(const [d,hp] of s.health){
   if(d.hp<hp){
    a.certifiedDroneHpLossEvents++;
@@ -197,6 +212,12 @@ function main(){
   assert.equal(observed.observer.observerErrors,0,'observer failed');
   assert.ok(observed.ticks>0&&observed.observer.frames>0);
   assert.ok(observed.observer.geometricGuarantees<=observed.observer.possiblePairs);
+  assert.equal(observed.observer.eligiblePenZero+observed.observer.eligiblePenOne,
+   observed.observer.expiringShots,'penetration cohort coverage');
+  assert.equal(observed.observer.possiblePenZero+observed.observer.possiblePenOne,
+   observed.observer.possiblePairs,'geometric candidate cohort coverage');
+  assert.equal(observed.observer.guaranteedPenZero+observed.observer.guaranteedPenOne,
+   observed.observer.geometricGuarantees,'guaranteed contact cohort coverage');
   assert.ok(observed.observer.possiblePairs<=
    observed.observer.expiringShots*Math.max(1,observed.observer.commandCertifiedDrones));
   results.push({seed,hz,ticks:observed.ticks,status:observed.status,
