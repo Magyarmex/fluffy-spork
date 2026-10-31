@@ -3,6 +3,8 @@ name: NOVA Cover Pressure Natural Match Research
 on:
   pull_request:
     paths:
+      - 'nova-updates/battlefield-v1.6.0.js'
+      - 'tests/node/battlefield-eight-shot-cover-chronology.test.js'
       - 'tests/browser/cover-pressure-pilot.js'
       - 'tests/browser/frontlines-natural-match-ab.cjs'
       - 'tests/node/cover-pressure-pilot.test.js'
