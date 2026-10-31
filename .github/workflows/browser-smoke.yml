@@ -19,6 +19,7 @@ on:
       - 'nova-updates/**'
       - 'index.html'
       - 'tests/browser/**'
+      - 'tests/research/controller-command-natural-census.cjs'
       - 'tests/node/redeploy-paired-real-pilot.test.js'
       - 'scripts/redeploy-common-safe-report.cjs'
       - 'tests/node/redeploy-common-safe-report.test.js'
