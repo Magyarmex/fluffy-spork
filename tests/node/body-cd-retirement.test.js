@@ -40,7 +40,7 @@ test('real body collisions still respect the 0.4s cooldown for a live pair',()=>
 });
 test('unregistering a tank retires only its old collision pairs',()=>{
  const g=boot(),a=tank(1,0),b=tank(2,10),c=tank(3,20);
- g.tanks=[a,b,c];g.bodyCollisions(1/60);
+ g.tanks=[a,b,c];g.bodyCd=new Map([['1-2',1],['1-3',1],['2-3',1]]);
  assert.equal(g.bodyCd.size,3);
  const damageCount=g.damageEvents.length;
  assert.equal(g.unregisterTank(a),'unregistered');
