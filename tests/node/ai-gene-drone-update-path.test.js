@@ -27,7 +27,12 @@ function boot(){
     marksman:{size:15,droneCount:0,droneRole:'hunter',droneLeash:500},
     basic:{size:15,droneCount:0,droneRole:'hunter',droneLeash:500}
   },ABILITIES:{},lineageForClass:id=>id==='carrier'?'controller':'gunner'};
-  const window={__novaModules:modules};
+  /* Isolated viewport test double: the real Spotter+drone integration is
+   * exercised in spotter-drone-pre-scan-sight.test.js. */
+  const window={__novaModules:modules,
+    __NOVA_SPOTTER_LIVE_RELAY__:(g,owner,target)=>
+      owner.__novaSpotterContactId===target.id&&
+      owner.__novaSpotterContactUntil>g.time};
   const ctx={window,console:{info(){},warn(){},error(){}},
     Math,Number,Object,Array,Map,Set,Date,performance:{now:()=>0}};
   for(const file of ['controller-v1.3.0.js','drone-targeting-v1.5.1.js',
