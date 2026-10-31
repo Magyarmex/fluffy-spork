@@ -59,5 +59,5 @@ test('geometry is finite and conservative outside reachable corridor',()=>{
  assert.equal(census.before(g,.016).possible,0);
  b.x=0;b.id=10;
  assert.equal(census.before(g,.016).witnessed,0,
-  'newborn projectile cannot inherit a frame-start physical trajectory');
+  'newborn projectile is not falsely counted as pre-frame, but may still be a valid geometric candidate');
 });
