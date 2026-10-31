@@ -154,6 +154,25 @@ const {chromium}=require('playwright');
    g.drawMinimap();
    const ctx=g.mmCtx,S=216;
    const withContest=new Uint8Array(ctx.getImageData(0,0,S,S).data);
+   // Actual 48-overlay browser path: a solid contest is tied to the pilot
+   // and public BLOOM that witnessed it. Director cadence must not leave
+   // a stale ! after an immediate exit or same-sector announcement change.
+   const originalFill=ctx.fillText;
+   function solidBadgeCount(){
+    let badges=0;
+    ctx.fillText=function(value){if(value==='!')badges++;return originalFill.apply(this,arguments);};
+    try{g.drawMinimap();}finally{ctx.fillText=originalFill;}
+    return badges;
+   }
+   if(solidBadgeCount()!==1)throw Error('fresh real-game contest must show one solid badge');
+   const oldX=p.x;p.x=-1150;
+   if(solidBadgeCount()!==0)throw Error('stale CONTESTED survived pilot sector exit before Director tick');
+   p.x=oldX;
+   const oldBloom=st.bloomMemory;
+   st.bloomMemory={...oldBloom,announcedAt:oldBloom.announcedAt+.5};
+   if(solidBadgeCount()!==0)throw Error('old CONTESTED leaked into replacement same-sector BLOOM');
+   st.bloomMemory=oldBloom;
+   if(solidBadgeCount()!==1)throw Error('restored public opportunity lost valid contest');
    st.contestSignal=null;
    g.drawMinimap();
    const withoutContest=ctx.getImageData(0,0,S,S).data;
