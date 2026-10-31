@@ -450,6 +450,32 @@ wrap('game/engine',function(engine,require){
       }
       return true;
     }
+    /* A surviving shell is not proof that every earlier body contact was
+     * physically impossible. Reject the correction if its pre-fuse corridor
+     * contains a possible first contact, even when all children are clear. */
+    if(!Number.isFinite(parent.px)||!Number.isFinite(parent.py)||
+       !Number.isFinite(parent.x)||!Number.isFinite(parent.y)||
+       !(parent.r>0)||typeof g.firstTerrainHit!=='function'||
+       g.firstTerrainHit(parent.px,parent.py,parent.x,parent.y,parent.r*.45))return;
+    var parentTanks=g.tanks||[],parentShapes=g.shapes||[],parentDrones=g.drones||[];
+    for(var pt=0;pt<parentTanks.length;pt++){
+      var tank=parentTanks[pt];
+      if(!tank||!tank.alive||tank.id===parent.ownerId)continue;
+      var td=C[tank.cls];
+      if(!td||!entityClear(tank,(td.size||0)+3,
+         parent.px,parent.py,parent.x,parent.y,parent.r))return;
+    }
+    for(var ps=0;ps<parentShapes.length;ps++){
+      var shape0=parentShapes[ps];
+      if(shape0&&shape0.hp>0&&!entityClear(shape0,shape0.r,
+         parent.px,parent.py,parent.x,parent.y,parent.r))return;
+    }
+    for(var pd=0;pd<parentDrones.length;pd++){
+      var drone0=parentDrones[pd];
+      if(drone0&&drone0.hp>0&&drone0.ownerId!==parent.ownerId&&
+         !entityClear(drone0,(drone0.r||0)+1,
+          parent.px,parent.py,parent.x,parent.y,parent.r))return;
+    }
     for(var i=first;i<g.bullets.length;i++){
       var c=g.bullets[i];
       if(!c||c.dead||c.shell||c.beam||c.ownerId!==parent.ownerId||
