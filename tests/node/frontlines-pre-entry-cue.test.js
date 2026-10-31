@@ -151,9 +151,12 @@ test('solid contest marker never outlives the witnessed pilot, sector, or public
  const s=scene();s.p.x=-1110;s.g.cam.x=s.p.x;
  s.T.updateContest(s.g,s.st);s.p.x=-1170;s.g.cam.x=s.p.x;
  s.T.updateContest(s.g,s.st);
+ assert.equal(s.st.contestSignal,null,'leaving clears the solid contest witness');
  s.draws.length=0;s.g.drawMinimap();
- assert.ok(!s.draws.some(d=>d.type==='text'&&d.value==='!'),
-  'normal Director invalidation still clears the marker');
+ assert.ok(s.draws.some(d=>d.type==='text'&&d.value==='!'),
+  'a fresh visible rival can legitimately create an outside warning');
+ assert.ok(s.draws.some(d=>d.type==='dash'&&d.v.length>0),
+  'after leaving, a new warning must be dashed rather than solid');
 });
 
 
