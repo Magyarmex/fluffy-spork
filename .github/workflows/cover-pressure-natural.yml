@@ -1,0 +1,79 @@
+name: NOVA Cover Pressure Natural Match Research
+
+on:
+  pull_request:
+    paths:
+      - 'tests/browser/cover-pressure-pilot.js'
+      - 'tests/browser/frontlines-natural-match-ab.cjs'
+      - 'tests/node/cover-pressure-pilot.test.js'
+      - 'tests/node/cover-pressure-matrix-report.test.js'
+      - 'scripts/cover-pressure-matrix-report.cjs'
+      - '.github/workflows/cover-pressure-natural.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || (github.event_name == 'workflow_dispatch' && github.run_id) || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  cover-pressure-pairs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        layout: [0, 1, 2]
+        seed: [0, 1]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --no-audit --no-fund --no-package-lock
+      - run: npm install --no-save --no-audit --no-fund --no-package-lock playwright@1.56.1
+      - run: npx playwright install chromium
+      - name: Serve exact shipping composition
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/nova-cover-pressure-http.log 2>&1 &
+      - name: Run deterministic Scout wander versus visible-cover policy with OFF replay
+        env:
+          NOVA_LAYOUT_INDEX: ${{ matrix.layout }}
+          NOVA_SEED_INDEX: ${{ matrix.seed }}
+          NOVA_PILOT_POLICY: cover-pressure
+          NOVA_AB_MODE: cover-pressure
+        run: node tests/browser/frontlines-natural-match-ab.cjs
+      - name: Preserve negative and censored trials
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-cover-pressure-${{ matrix.layout }}-${{ matrix.seed }}
+          path: artifacts/browser/frontlines-natural-*
+          if-no-files-found: warn
+          retention-days: 14
+
+  collate:
+    needs: cover-pressure-pairs
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: nova-cover-pressure-*
+          path: artifacts/cover-pressure
+          merge-multiple: false
+      - name: Require all six pairs and independently verified replay
+        run: node scripts/cover-pressure-matrix-report.cjs artifacts/cover-pressure 6
+      - name: Preserve complete report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-cover-pressure-summary
+          path: artifacts/cover-pressure/cover-pressure-summary.json
+          if-no-files-found: warn
+          retention-days: 14
