@@ -90,7 +90,7 @@ function world({trace=true,terrain=[],damaged=false,command=false}={}){
   x:0,y:0,angle:0,hp:100,maxHp:100,swarmT:0,droneRespawnT:999,
   __novaSwarm:{active:false,power:0}};
  const d={id:10,kind:'drone',ownerId:1,x:20,y:0,r:8,
-  hp:damaged?8:30,maxHp:30,speed:200,dmg:12,attackCd:999,
+  hp:damaged?3:30,maxHp:30,speed:200,dmg:12,attackCd:999,
   retargetT:999,leash:650,role:'hunter',slot:0,orbitA:0,orbitR:55,
   __novaPhase:'form',__novaPhaseT:0};
  const shape={id:20,kind:'shape',type:'circle',x:0,y:0,r:10,hp:100};
@@ -103,8 +103,8 @@ function world({trace=true,terrain=[],damaged=false,command=false}={}){
 
 function shotWorld(hz,{terrain=[],command=false,trace=false,x=20,y=0,
   vx=2500,ttl=.004,otherBullets=[],friendly=false,phase='form',idleVY=null,bornThisFrame=false,frontTank=null,cachedSteering=false,
-  remoteBullets=0,reverseBullets=false,extraDrone=false}={}){
- const {g,d,owner}=world({trace,terrain,command});
+  remoteBullets=0,reverseBullets=false,extraDrone=false,damaged=false}={}){
+ const {g,d,owner}=world({trace,terrain,command,damaged});
  owner.x=-200;owner.y=0;
  const shooter={id:2,cls:'basic',kind:'tank',alive:true,x:-1000,y:0,hp:100};
  g.tanks.push(shooter);g.tankById.set(2,shooter);
@@ -213,6 +213,13 @@ for(const hz of [30,60,120,240]){
   assert.notEqual(d.__novaChronoCommandBoundedEpoch,g.__novaShapeSweepEpoch);
   assert.equal(g.hitOwners.includes(2),false);
  });
+ test('commanded repair movement invalidates single-step certificate at '+hz+'Hz',()=>{
+  const {g,d}=shotWorld(hz,{command:true,damaged:true,trace:true});
+  assert.equal(d.__novaChronoCommandInvalidEpoch,g.__novaShapeSweepEpoch,
+   'real Live Vector repair performs a second integration');
+  assert.notEqual(d.__novaChronoCommandBoundedEpoch,g.__novaShapeSweepEpoch);
+  assert.equal(g.hitOwners.includes(2),false);
+ });
  test('earlier tank contact vetoes a later certified drone shortcut at '+hz+'Hz',()=>{
   const {g}=shotWorld(hz,{frontTank:23});
   assert.equal(g.hitOwners.includes(2),false,
@@ -284,6 +291,29 @@ for(const hz of [30,60,120,240]){
   assert.ok(certified>=12,'seed must exercise multiple guaranteed command contacts: '+certified);
  });
 }
+
+/* Exact Run 494 pre-fix paired distribution: the old generic speed ball
+ * missed 416 of these 605 mathematically guaranteed commanded contacts.
+ * This regression uses the same seed and physical source composition. */
+test('Run 494 commanded 605-contact replay no longer misses physical TTL hits',()=>{
+ let seed=4942026,guaranteed=0;
+ const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ for(const hz of [30,60,120,240]){
+  let atFps=0;
+  for(let i=0;i<200;i++){
+   const x=15+rand()*8,y=-4+rand()*8;
+   if(!(Math.hypot(x,y)>12&&Math.hypot(x-10,y)+.8<12))continue;
+   const {g,d}=shotWorld(hz,{command:true,x,y});
+   assert.equal(d.__novaChronoCommandBoundedEpoch,g.__novaShapeSweepEpoch);
+   assert.deepEqual(g.hitOwners,[2],
+    'previously missed guaranteed contact '+JSON.stringify({hz,i,x,y}));
+   atFps++;guaranteed++;
+  }
+  assert.equal(atFps,({30:148,60:151,120:163,240:143})[hz],
+   'same predeclared geometric exposure as the baseline');
+ }
+ assert.equal(guaranteed,605);
+});
 
 test('non-expiring shots do not activate the optional motion witness',()=>{
  const {g,d}=shotWorld(60,{ttl:1,x:100});
