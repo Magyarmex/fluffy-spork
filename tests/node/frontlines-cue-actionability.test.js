@@ -72,6 +72,7 @@ test('uncertified teleport, disabled Director and shielded player cannot fabrica
   if(variant==='teleport')s.g.moveTank(s.p,5000,0,.1);
   else{if(variant==='disabled')s.st.directorEnabled=false;else s.p.spawnShieldT=1;cross(s,.1,200);}
   assert.equal(s.f.counts.cuedPhysicalEntries+s.f.counts.uncuedPhysicalEntries,0,variant);
+  assert.equal(s.f.counts.pilotPhysicalRejectedCrossings,variant==='teleport'?1:0,variant);
  }
 });
 test('cue from an earlier pilot cannot be transferred to a new player identity',()=>{
