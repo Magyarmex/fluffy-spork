@@ -452,6 +452,7 @@ wrap('game/engine',function(engine,require){
        * bounded-motion ball; unknown, new, committed or discontinuous motion
        * still abstains. The same ball protects parent and EVERY fragment. */
       if(e.kind==='drone'&&(!Number.isFinite(e.vx)||!Number.isFinite(e.vy))){
+        if(remoteDrones.has(e))return true;
         if(!g.__novaShapeSweepActive||
            e.__novaChronoDroneEpoch!==g.__novaShapeSweepEpoch||
            !Number.isFinite(e.__novaChronoDronePrevX)||
@@ -473,7 +474,6 @@ wrap('game/engine',function(engine,require){
         if(!Number.isFinite(bound)||bound>4000||traveled>96||
            traveled>bound*dt+1e-6)return false;
         var pad=Math.max(120,30+dt*(bound+1600));
-        if(remoteDrones.has(e))return true;
         if(bounds&&Number.isFinite(bounds.minX)&&Number.isFinite(bounds.maxX)&&
            Number.isFinite(bounds.minY)&&Number.isFinite(bounds.maxY)){
           var wide=r+bounds.maxR+pad,px=e.__novaChronoDronePrevX,
