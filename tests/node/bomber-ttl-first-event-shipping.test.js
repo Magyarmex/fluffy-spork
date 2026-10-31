@@ -261,12 +261,20 @@ for(const optimized of [false,true]){
  * every bullet. The original implementation advances them a whole dt,
  * overstating reach and draining their lifetime too early. This regression
  * uses the actual materialized core and shipping Battlefield wrapper. */
-function runTerrainChildBirth(Game,hz,ttl=2,wallX=20){
+function runTerrainChildBirth(Game,hz,ttl=2,wallX=20,shapeX=null){
  const g=new Game(),dt=1/hz,created=[];
  g.time=1;g.__novaBattlefield={coverBroken:0};
  g.__novaTerrain=[{id:-81,shape:'rect',x:wallX,y:0,w:4,h:80,
    solid:true,destructible:false,hp:0}];
  g.weakenBullet=()=>{};
+ const shapeHits=[];
+ if(Number.isFinite(shapeX)){
+  const shape={id:42,kind:'shape',type:'circle',x:shapeX,y:0,
+   r:.3,hp:100,flash:0};
+  g.shapes=[shape];
+  g.hash={query(_x,_y,_r,out){out.length=0;out.push(shape);}};
+  g.damageShape=(e,dmg)=>{shapeHits.push({id:e.id,dmg});e.hp-=dmg;};
+ }
  g.clusterBurst=function(parent){
   const child={kind:'bullet',id:778,ownerId:1,x:parent.x-10,y:0,
    vx:-300,vy:0,r:3,dmg:2,ttl:1,pen:0,hits:0,dead:false,
@@ -279,7 +287,7 @@ function runTerrainChildBirth(Game,hz,ttl=2,wallX=20){
    shell:true,beam:false,splash:0};
  g.bullets=[shell];
  g.updateBullets(dt);
- return {g,dt,shell,created};
+ return {g,dt,shell,created,shapeHits};
 }
 for(const optimized of [false,true]){
  const Game=boot(optimized),label=optimized?'optimized':'baseline';
@@ -312,4 +320,29 @@ for(const optimized of [false,true]){
     'newborn fragment must not travel before frame-end impact');
   assert.ok(Math.abs(created[0].child.ttl-created[0].startTTL)<1e-8);
  });
+}
+
+
+/* Player-facing consequence: a newly born fragment must not damage a neutral
+ * shape beyond its true post-impact travel, but a shape inside the physically
+ * reachable corridor must still be damaged. This uses the actual core's body
+ * collision plus Battlefield's swept fallback, not just a position assertion. */
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'optimized':'baseline';
+ for(const hz of [30,60,120,240]){
+  test('[terrain child contact] '+label+' '+hz+
+   'Hz rejects pre-birth shape damage while preserving reachable damage',()=>{
+   const dt=1/hz,impactX=20-2-3*.45,impactT=impactX/6000;
+   const initialX=impactX-10,finalX=initialX-300*(dt-impactT);
+   const unreachable=runTerrainChildBirth(Game,hz,2,20,finalX-3.6);
+   assert.equal(unreachable.created.length,1);
+   assert.equal(unreachable.shapeHits.length,0,
+    'fragment must not hit a neutral beyond its physical birth-time reach');
+   const reachable=runTerrainChildBirth(Game,hz,2,20,finalX-3.0);
+   assert.equal(reachable.created.length,1);
+   assert.equal(reachable.shapeHits.length,1,
+    'physically reachable neutral must still take canonical damage');
+   assert.equal(reachable.shapeHits[0].dmg,2);
+  });
+ }
 }
