@@ -100,7 +100,19 @@ async function arm(browser,enabled,label){
    g.__novaExperimentSeed='natural-20261027-'+terrainIndex+'-'+seedIndex;
    g.__novaExperimentPolicy=pilotPolicy;
    g.__novaExperimentABMode=abMode;
-   if(abMode==='cover-pressure')g.__novaCoverPriorityResearch={schema:1,activations:0};
+   if(abMode==='cover-pressure'){
+    g.__novaCoverPriorityResearch={schema:1,activations:0};
+    /* Observe actual player projectiles created by the composed weapon
+     * owner. An aim-input sample is not proof that a shot was fired. */
+    const fire=g.tryFire;
+    g.tryFire=function(t){
+     const before=this.bullets.length,out=fire.apply(this,arguments);
+     if(t===this.player&&this.bullets.length>before)
+      this.__novaResearchPlayerShots=(this.__novaResearchPlayerShots||0)+
+       this.bullets.length-before;
+     return out;
+    };
+   }
    if(g.__novaBattlefield?.name!==['CROSSFIRE','SPLIT HORIZON','FOUR GATES'][terrainIndex])throw Error('uncontrolled layout '+g.__novaBattlefield?.name);
    const ai=window.__novaMakeRequire('')('game/ai');
    if(!ai||typeof ai.updateAI!=='function')throw Error('missing composed AI');
@@ -317,6 +329,7 @@ async function arm(browser,enabled,label){
      botCount:g.tanks.filter(t=>t.ai&&t.alive).length},
     projectileDensityAudit:g.__novaProjectileDensityAudit,
     coverPressure:{coverBroken:g.__novaBattlefield?.coverBroken||0,
+     playerShotsFired:g.__novaResearchPlayerShots||0,
      certifiedActivations:g.__novaCoverPriorityResearch?.activations||0,
      coverDamage:(g.__novaTerrain||[]).filter(t=>t.destructible).reduce((sum,t)=>
       sum+Math.max(0,(t.maxHp||0)-Math.max(0,t.hp||0)),0),
