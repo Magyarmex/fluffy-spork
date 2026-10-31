@@ -102,7 +102,7 @@ function world({trace=true,terrain=[],damaged=false,command=false}={}){
 }
 
 function shotWorld(hz,{terrain=[],command=false,trace=false,x=20,y=0,
-  vx=2500,ttl=.004,otherBullets=[],friendly=false,phase='form',idleVY=null,bornThisFrame=false,frontTank=null,cachedSteering=false,
+  vx=2500,ttl=.004,pen=0,otherBullets=[],friendly=false,phase='form',idleVY=null,bornThisFrame=false,frontTank=null,cachedSteering=false,
   remoteBullets=0,reverseBullets=false,extraDrone=false,damaged=false}={}){
  const {g,d,owner}=world({trace,terrain,command,damaged});
  owner.x=-200;owner.y=0;
@@ -118,7 +118,7 @@ function shotWorld(hz,{terrain=[],command=false,trace=false,x=20,y=0,
  if(cachedSteering){g.__novaPerfDronePlanAt=g.time+1;
   d.__v172Waypoint={x:150,y:0};d.__v172WaypointUntil=g.time+2;}
  g.bullets=[{kind:'bullet',id:100,ownerId:friendly?1:2,x:0,y:0,
-  vx,vy:0,r:3,dmg:20,ttl,pen:0,hits:0,dead:false,
+  vx,vy:0,r:3,dmg:20,ttl,pen,hits:0,dead:false,
   shell:false,beam:false},...otherBullets];
  for(let i=0;i<remoteBullets;i++)g.bullets.push({kind:'bullet',
   id:200+i,ownerId:3,x:1200+i*.1,y:1200,vx:10,vy:0,
@@ -165,6 +165,47 @@ for(const hz of [30,60,120,240]){
    'all shipping movement owners must certify one commanded form integration');
   assert.deepEqual(g.hitOwners,[2]);
   assert.equal(d.hp,10);
+ });
+ test('commanded pen=1 shot recovers certified pre-TTL contact at '+hz+'Hz',()=>{
+  const {g,d}=shotWorld(hz,{command:true,pen:1});
+  assert.equal(d.__novaChronoCommandBoundedEpoch,g.__novaShapeSweepEpoch,
+   'ordinary piercing shot must arm the existing safe command witness');
+  assert.deepEqual(g.hitOwners,[2],
+   'single guaranteed contact before expiry retains real damage owner');
+  assert.equal(d.hp,10);
+ });
+ test('commanded pen=1 shot beyond physical TTL remains harmless at '+hz+'Hz',()=>{
+  const {g,d}=shotWorld(hz,{command:true,pen:1,x:24});
+  assert.equal(d.hp,30);assert.equal(g.hitOwners.includes(2),false);
+ });
+ test('commanded pen=1 shot cannot bypass earlier solid cover at '+hz+'Hz',()=>{
+  const {g,d}=shotWorld(hz,{command:true,pen:1,
+   terrain:[{id:-1,shape:'rect',x:6,y:0,w:2,h:70,
+    solid:true,destructible:false}]});
+  assert.equal(d.hp,30);assert.equal(g.hitOwners.includes(2),false);
+ });
+ test('remote projectile density cannot suppress local pen=1 contact at '+hz+'Hz',()=>{
+  const {g,d}=shotWorld(hz,{command:true,pen:1,remoteBullets:20});
+  assert.equal(d.hp,10);
+ });
+ test('commanded pen=1 friendly projectile remains transparent at '+hz+'Hz',()=>{
+  const {g,d}=shotWorld(hz,{command:true,pen:1,friendly:true});
+  assert.equal(d.hp,30);assert.equal(g.hitOwners.includes(1),false);
+ });
+ test('commanded pen=1 dash cannot borrow FORM certificate at '+hz+'Hz',()=>{
+  const {g,d}=shotWorld(hz,{command:true,pen:1,phase:'dash'});
+  assert.notEqual(d.__novaChronoCommandBoundedEpoch,g.__novaShapeSweepEpoch);
+  assert.equal(g.hitOwners.includes(2),false);
+ });
+ test('commanded pen=1 shot defers to competing projectile at '+hz+'Hz',()=>{
+  const {g}=shotWorld(hz,{command:true,pen:1,otherBullets:[{kind:'bullet',
+   id:101,ownerId:3,x:20,y:10,vx:0,vy:0,r:3,dmg:2,ttl:1,
+   pen:0,hits:0,dead:false,shell:false,beam:false}]});
+  assert.equal(g.hitOwners.includes(2),false);
+ });
+ test('commanded pen=1 shot cannot steal earlier tank contact at '+hz+'Hz',()=>{
+  const {g}=shotWorld(hz,{command:true,pen:1,frontTank:23});
+  assert.equal(g.hitOwners.includes(2),false);
  });
  test('commanded target beyond physical TTL is unharmed at '+hz+'Hz',()=>{
   const {g}=shotWorld(hz,{command:true,x:24});
