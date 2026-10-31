@@ -3106,7 +3106,27 @@ function certifiedMultiShotCoverPriority(g,dt){
  var terrainOrder=certifiedTwoShotCoverPriority(this,dt)||certifiedMultiShotCoverPriority(this,dt);for(var terrainStep=0;terrainStep<this.bullets.length;terrainStep++){var i=terrainOrder?terrainOrder[terrainStep]:terrainStep;var b=this.bullets[i];if(!b||b.dead)continue;var ox=b.x,oy=b.y,sweepDt=dt;/* Terrain beyond physical projectile lifetime is unreachable, including shells. */if(Number.isFinite(b.ttl)){if(b.ttl<=0)continue;sweepDt=Math.min(dt,b.ttl);}var nx=ox+(b.vx||0)*sweepDt,ny=oy+(b.vy||0)*sweepDt,fh=firstSolidHit(this,ox,oy,nx,ny,(b.r||2)*.45);if(!fh)continue;if(fuseDefinitelyBeforeTerrain(this,b,dt,ox,oy,nx,ny,fh.hit))continue;if(certifiedTankBeforeFirstSolid(this,b,dt,ox,oy,nx,ny,fh)===1)continue;if(certifiedSquareBeforeFirstSolid(this,b,dt,ox,oy,nx,ny,fh)===1)continue;var s=fh.solid,h=fh.hit;b.x=h.x;b.y=h.y;b.px=b.x;b.py=b.y;var broken=false;if(s.destructible){broken=damageCover(this,s,b.dmg,b.ownerId,h.x,h.y,b);if(broken&&b.pen>=2){/* Integrity belongs to the launch build, not the post-breach pen. */if(this.initBulletIntegrity)this.initBulletIntegrity(b);b.pen-=2;if(this.weakenBullet)this.weakenBullet(b,(b.maxHp||b.dmg)*.38);if(!b.dead){if(certifiedBreachLaterSolid(this,b,dt,ox,oy,nx,ny,fh))continue;b.__novaBreachAtTime=this.time;b.x=ox;b.y=oy;b.px=ox;b.py=oy;continue;}}}
    /* The core still advances a dead bullet before removing it; a shell may
      * expire or leave the arena in that pass. Consume its one-time burst now. */
-    if(b.shell&&this.clusterBurst){var childStart=this.bullets.length;this.clusterBurst(b);clearTerrainBurstChildren(this,s,h,childStart);b.shell=false;}if(b.splash&&this.splashAt)this.splashAt(h.x,h.y,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.dead=true;if(this.addFlash)this.addFlash(h.x,h.y,s.destructible?'#8fd4ff':'#b9c7e7',Math.min(46,14+(b.dmg||0)*.24));if(this.cam&&b.dmg>42)this.cam.shake=Math.max(this.cam.shake,.08);/* The materialized core still advances dead bullets before removing them. Freeze a terrain-killed projectile at its impact so its final trail cannot leak through cover. Breaching live shots keep their velocity above. */b.vx=0;b.vy=0;
+    if(b.shell&&this.clusterBurst){
+      var childStart=this.bullets.length;
+      this.clusterBurst(b);
+      clearTerrainBurstChildren(this,s,h,childStart);
+      /* Terrain resolves the parent before the core advances newborn bullets.
+       * The children exist only AFTER this swept first wall contact, so their
+       * first-frame displacement and TTL must use the remaining subframe.
+       * Preserve full velocities for the next frame, as physical-TTL expiry
+       * already does. Do not alter the parent's damage, burst or cover rules. */
+      var bornAt=Number(h.t)*sweepDt;
+      if(dt>0&&Number.isFinite(bornAt)&&bornAt>=0&&bornAt<=dt){
+       var childFraction=(dt-bornAt)/dt;
+       for(var born=childStart;born<this.bullets.length;born++){
+        var child=this.bullets[born];if(!child||child.dead)continue;
+        ttlChildren.push({child:child,vx:child.vx,vy:child.vy});
+        child.vx*=childFraction;child.vy*=childFraction;
+        if(Number.isFinite(child.ttl))child.ttl+=bornAt;
+       }
+      }
+      b.shell=false;
+     }if(b.splash&&this.splashAt)this.splashAt(h.x,h.y,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.dead=true;if(this.addFlash)this.addFlash(h.x,h.y,s.destructible?'#8fd4ff':'#b9c7e7',Math.min(46,14+(b.dmg||0)*.24));if(this.cam&&b.dmg>42)this.cam.shake=Math.max(this.cam.shake,.08);/* The materialized core still advances dead bullets before removing them. Freeze a terrain-killed projectile at its impact so its final trail cannot leak through cover. Breaching live shots keep their velocity above. */b.vx=0;b.vy=0;
  }
  var out;try{out=oldUpdateBullets.call(this,dt);}finally{for(var ci=0;ci<ttlChildren.length;ci++){var saved=ttlChildren[ci];saved.child.vx=saved.vx;saved.child.vy=saved.vy;}}for(var j=0;j<terrain.length;j++){var q=terrain[j];if(q.flash>0)q.flash=Math.max(0,q.flash-dt);}return out;};
 
