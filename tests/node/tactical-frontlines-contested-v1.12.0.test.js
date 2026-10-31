@@ -261,3 +261,12 @@ test('tactical camera cannot reveal an enemy outside the rendered viewport',()=>
  g.cam.x=-560;
  assert.equal(T.contestCandidate(g,st),true);
 });
+
+test('many visible rivals require only one neutral-pocket terrain scan per Director sample',()=>{
+ const {T,g,st}=scene();
+ g.shapes[0].type='circle'; // 5 XP is not a meaningful visible BLOOM pocket.
+ for(let i=0;i<7;i++)g.tanks.push({id:100+i,x:-510+i*2,y:-540,hp:100,alive:true});
+ let los=0;g.hasLineOfSight=()=>{los++;return true;};
+ assert.equal(T.contestCandidate(g,st),false);
+ assert.equal(los,2,'one rival witness and one pocket ray, not eight duplicate scans');
+});
