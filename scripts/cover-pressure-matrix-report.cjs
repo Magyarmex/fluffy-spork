@@ -3,7 +3,7 @@
  * Never turn censored/dead trials into successes or assume pilot attribution
  * for cover damaged by bots. No natural-match baseline is overwritten. */
 const fs=require('node:fs'),path=require('node:path');
-const KEYS=['coverBroken','coverDamage','certifiedActivations','aimSamples','moveSamples','noTargetSamples'];
+const KEYS=['coverBroken','coverDamage','certifiedActivations','playerShotsFired','aimSamples','moveSamples','noTargetSamples'];
 function arm(a,label){
  if(!a||!a.game||!a.projectileDensityAudit||!a.coverPressure)
   throw Error(label+': missing real-game evidence');
@@ -30,7 +30,7 @@ function collect(root,expected=6){
  if(dirs.length!==expected)throw Error('incomplete cover-pressure matrix '+dirs.length+'/'+expected);
  const seen=new Set(),rows=[],totals={OFF:{},ON:{}};
  for(const mode of ['OFF','ON'])totals[mode]={
-  simulatedSeconds:0,earlyDeaths:0,coverBroken:0,coverDamage:0,certifiedActivations:0,
+  simulatedSeconds:0,earlyDeaths:0,coverBroken:0,coverDamage:0,certifiedActivations:0,playerShotsFired:0,
   aimSamples:0,moveSamples:0,noTargetSamples:0,bulletUpdateCalls:0,
   basicEligibleFrames:0,coverBreaksAtBasicGate:0};
  for(const dir of dirs){
@@ -64,7 +64,7 @@ function collect(root,expected=6){
    'Deaths censor exposure and are included in denominators',
    'Cover damage/breaks include other tanks and are not exclusively pilot-caused',
    'Certified activations are measured, but downstream player-relevant hits are not attributed',
-   'Input sample counts are not firing seconds, hits, or a human comprehension measure']};
+   'Actual player projectile emissions are counted; they are not guaranteed hits or damage attribution']};
 }
 if(require.main===module){
  try{
