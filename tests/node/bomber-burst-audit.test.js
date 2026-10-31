@@ -149,8 +149,8 @@ test('Actual Three Disciplines module produces witnessed clear-corridor advances
   if(spec==='./classes')return classes;throw Error('unexpected dependency '+spec);
  });
  const Patched=module.exports.Game;
- function make(mode){
-  const g=new Patched(),dt=1/60,speed=2000;
+ function make(mode,hz){
+  const g=new Patched(),dt=1/hz,speed=2000;
   g.tanks=[{id:1,cls:'bomber',alive:true,x:-500,y:-500}];
   if(mode==='near')g.shapes=[{id:50,hp:100,r:10,x:150,y:0,vx:0,vy:0}];
   g.bullets=[{id:70,ownerId:1,x:150-speed*dt*.35,y:0,vx:speed,vy:0,
@@ -161,11 +161,12 @@ test('Actual Three Disciplines module produces witnessed clear-corridor advances
    px:900,py:900,vx:0,vy:0,r:3,ttl:1,dead:false});
   return g;
  }
- for(const mode of ['clear','near','two']){
-  const baseline=make(mode),g=make(mode),a=audit.create(1);
+ for(const hz of [30,60,120,240])for(const mode of ['clear','near','two']){
+  const baseline=make(mode,hz),g=make(mode,hz),a=audit.create(1);
   audit.install(g,a,()=> 'Error\n at Game.updateBullets (https://host/nova-updates/disciplines-v1.7.0.js:500:12)');
-  baseline.updateBullets(1/60);g.updateBullets(1/60);
-  assert.deepEqual(g.bullets,baseline.bullets,'research observer changed '+mode+' physical game');
+  baseline.updateBullets(1/hz);g.updateBullets(1/hz);
+  assert.deepEqual(g.bullets,baseline.bullets,
+   'research observer changed '+mode+' physical game at '+hz+'Hz');
   assert.equal(a.bySource.disciplines,1);
   assert.equal(a.airburst.calls,1);
   assert.equal(a.airburst.sole,mode==='two'?0:1);
