@@ -10,7 +10,10 @@ function audit(n){
   bySite:n?{'battlefield-v1.6.0.js:999':n}:{},examples:[],
   airburst:{calls:0,sole:0,advanced:0,stationary:0,mixed:0,noChildren:0,
    children:0,advancedChildren:0,advancedDistance:0,
-   byOwner:{pilot:0,other:0,unknown:0},examples:[],observerErrors:0}};
+   byOwner:{pilot:0,other:0,unknown:0},examples:[],observerErrors:0,
+   gates:{soleWithoutRewound:0,soleRewoundNotClean:0,soleCleanNearAny:0,
+    soleCleanNoNearby:0,soleCleanNearShape:0,soleCleanNearTank:0,
+    soleCleanNearDrone:0}}};
 }
 test('burst matrix validator rejects impossible owner and source counts',()=>{
  const a=audit(3);check(a,'valid');
@@ -57,7 +60,7 @@ test('matrix validates genuine witnessed airburst movement and rejects inconsist
  a.bySite={'battlefield-v1.6.0.js:999':2,'disciplines-v1.7.0.js:500':1};
  Object.assign(a.airburst,{calls:1,sole:1,advanced:1,children:6,
   advancedChildren:6,advancedDistance:16.5});
- a.airburst.byOwner.pilot=1;
+ a.airburst.byOwner.pilot=1;a.airburst.gates.soleCleanNoNearby=1;
  check(a,'valid movement');
  a.airburst.advancedChildren=7;
  assert.throws(()=>check(a,'bad movement'),/invalid airburst/);

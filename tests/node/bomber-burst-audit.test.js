@@ -114,6 +114,8 @@ test('Airburst witness counts actual birth-frame movement, abstention and mixed 
   assert.equal(a.airburst[mode==='empty'?'noChildren':mode],1);
   assert.equal(a.airburst.advancedChildren,mode==='advanced'?2:mode==='mixed'?1:0);
   assert.equal(a.airburst.observerErrors,0);
+  assert.equal(a.airburst.gates.soleWithoutRewound,1,
+   'non-Cannon synthetic parent cannot pretend to be a physical fuse crossing');
  }
 });
 
@@ -173,6 +175,9 @@ test('Actual Three Disciplines module produces witnessed clear-corridor advances
   assert.equal(a.airburst.advanced,mode==='clear'?1:0);
   assert.equal(a.airburst.stationary,mode==='clear'?0:1);
   assert.equal(a.airburst.advancedChildren,mode==='clear'?6:0);
+  assert.equal(a.airburst.gates.soleCleanNoNearby,mode==='clear'?1:0);
+  assert.equal(a.airburst.gates.soleCleanNearShape,mode==='near'?1:0);
+  assert.equal(a.airburst.gates.soleCleanNearAny,mode==='near'?1:0);
   assert.equal(a.airburst.observerErrors,0);
  }
 });

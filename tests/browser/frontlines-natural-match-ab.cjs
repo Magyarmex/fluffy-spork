@@ -406,6 +406,12 @@ async function arm(browser,enabled,label){
     'every actual Disciplines airburst must be witnessed inside the frame');
    assert.ok(b.advancedChildren<=b.children);
    assert.equal(Object.values(b.byOwner).reduce((x,y)=>x+y,0),b.calls);
+   const q=b.gates;
+   assert.ok(q,'read-only airburst gate witness required');
+   assert.equal(q.soleWithoutRewound+q.soleRewoundNotClean+
+    q.soleCleanNearAny+q.soleCleanNoNearby,b.sole);
+   for(const k of ['soleCleanNearShape','soleCleanNearTank','soleCleanNearDrone'])
+    assert.ok(q[k]<=q.soleCleanNearAny);
   }
   assert.ok(result.commitmentAudit.eligibleWindow<=result.commitmentAudit.publicMemory);
   assert.ok(result.commitmentAudit.precombatIntersection<=result.commitmentAudit.eligibleWindow);
