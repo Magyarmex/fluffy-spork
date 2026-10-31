@@ -228,7 +228,7 @@ test('opt-in cover research attributes effective damage and breaches without alt
       breaks: g.__novaBattlefield.coverBroken, bulletX: g.bullets[0].x,
       pen: g.bullets[0].pen, witness };
   }
-  const fresh = () => ({ schema: 1, allEffectiveDamage: 0,
+  const fresh = () => ({ schema: 1, pilotId: 1, allEffectiveDamage: 0,
     playerEffectiveDamage: 0, allBreaks: 0, playerBreaks: 0 });
   const pilot = world(1, 400, 25, fresh());
   const baseline = world(1, 400, 25, null);
@@ -246,7 +246,7 @@ test('opt-in cover research attributes effective damage and breaches without alt
   assert.equal(rival.witness.playerEffectiveDamage, 0);
   assert.equal(rival.witness.allBreaks, 0);
   assert.equal(rival.witness.playerBreaks, 0);
-  const invalid = { schema: 1, allEffectiveDamage: NaN,
+  const invalid = { schema: 1, pilotId: 1, allEffectiveDamage: NaN,
     playerEffectiveDamage: 0, allBreaks: 0, playerBreaks: 0 };
   const ignored = world(1, 400, 25, invalid);
   assert.ok(Number.isNaN(ignored.witness.allEffectiveDamage));
@@ -262,7 +262,7 @@ test('cover research accumulates partial hits and credits only the actual breake
   g.__novaBattlefield = { coverBroken: 0, coverTotal: 1, name: 'TEST' };
   g.__novaTerrain = [{ id: -1, shape: 'rect', x: 0, y: 0, w: 20, h: 160,
     solid: true, destructible: true, hp: 50, maxHp: 50 }];
-  g.__novaCoverDamageResearch = { schema: 1, allEffectiveDamage: 0,
+  g.__novaCoverDamageResearch = { schema: 1, pilotId: 1, allEffectiveDamage: 0,
     playerEffectiveDamage: 0, allBreaks: 0, playerBreaks: 0 };
   g.weakenBullet = () => {};
   function fire(ownerId, dmg) {
@@ -293,7 +293,7 @@ test('cover research includes splash damage with the same owner and overkill rul
   g.__novaBattlefield = { coverBroken: 0, coverTotal: 1, name: 'TEST' };
   g.__novaTerrain = [{ id: -1, shape: 'rect', x: 0, y: 0, w: 20, h: 160,
     solid: true, destructible: true, hp: 100, maxHp: 100 }];
-  g.__novaCoverDamageResearch = { schema: 1, allEffectiveDamage: 0,
+  g.__novaCoverDamageResearch = { schema: 1, pilotId: 1, allEffectiveDamage: 0,
     playerEffectiveDamage: 0, allBreaks: 0, playerBreaks: 0 };
   g.splashAt(0, 0, 100, 1, 1, 0, '#fff', 40);
   assert.ok(Math.abs(g.__novaTerrain[0].hp - 46) < 1e-9);
