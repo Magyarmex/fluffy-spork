@@ -155,3 +155,22 @@ test('solid contest marker never outlives the witnessed pilot, sector, or public
  assert.ok(!s.draws.some(d=>d.type==='text'&&d.value==='!'),
   'normal Director invalidation still clears the marker');
 });
+
+
+test('dashed pre-entry witness belongs to one public BLOOM, not a later same-sector announcement',()=>{
+ const s=scene();
+ assert.equal(s.T.updateContest(s.g,s.st),false);
+ assert.ok(s.st.approachSignal,'original visible approach must be witnessed');
+ assert.equal(s.st.approachSignal.announcedAt,98);
+ s.g.drawMinimap();
+ assert.ok(s.draws.some(d=>d.type==='text'&&d.value==='!'));
+ s.draws.length=0;
+ s.st.signal={...s.st.signal,started:99,until:105};
+ s.g.drawMinimap();
+ assert.ok(!s.draws.some(d=>d.type==='text'&&d.value==='!'),
+  'a previous visible rival must not become radar for a newly announced BLOOM');
+ s.st.signal={...s.st.signal,started:98,until:104};
+ s.draws.length=0;s.g.drawMinimap();
+ assert.ok(s.draws.some(d=>d.type==='text'&&d.value==='!'),
+  'restoring the original valid public witness restores the dashed warning');
+});
