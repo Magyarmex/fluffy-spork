@@ -365,6 +365,42 @@ async function arm(browser,enabled,label){
        if(g.__novaCausalFirstAdvanceTime==null&&
           g.__novaBomberBurstAudit?.airburst?.advanced>0)
         g.__novaCausalFirstAdvanceTime=g.time;
+       if(n%6===0){
+        /* Five-Hz read-only causality trace. Projectile coordinates and RNG
+         * are excluded: a moved fragment alone must not masquerade as
+         * damage, entity movement, or player progression. Health includes
+         * membership to witness deaths/spawns; it is not a hit attribution. */
+        const tanks=g.tanks.map(t=>[t.id,t.hp,t.alive,t.score,t.kills]),
+         shapes=g.shapes.map(t=>[t.id,t.hp,t.type]),
+         drones=g.drones.map(t=>[t.id,t.hp,t.ownerId]),
+         cover=(g.__novaTerrain||[]).map(t=>[t.id,t.hp,t.solid,t.destructible]),
+         pilot=[g.player?.id,g.player?.hp,g.player?.score,
+          g.player?.kills,g.player?.level,g.player?.xp,g.player?.alive];
+        const digest=value=>{
+         const str=JSON.stringify(value);
+         let h1=2166136261,h2=0x9e3779b9;
+         for(let k=0;k<str.length;k++){
+          const c=str.charCodeAt(k);
+          h1=Math.imul(h1^c,16777619);
+          h2=Math.imul(h2^c,2246822519);
+         }
+         return (h1>>>0).toString(16)+':'+(h2>>>0).toString(16);
+        };
+        const health=[pilot,tanks,shapes,drones,cover];
+        const bodies=[
+         g.tanks.map(t=>[t.id,t.x,t.y,t.hp,t.alive,t.cls]),
+         g.shapes.map(t=>[t.id,t.x,t.y,t.hp,t.type]),
+         g.drones.map(t=>[t.id,t.x,t.y,t.hp,t.ownerId]),
+         cover,(g.powerups||[]).map(t=>[t.id,t.x,t.y,t.type]),
+         (g.orbs||[]).map(t=>[t.id,t.x,t.y,t.value]),pilot
+        ];
+        (g.__novaCausalCombatTrace||(g.__novaCausalCombatTrace=[])).push({
+         time:+g.time.toFixed(3),
+         bodyHash:digest(bodies),healthHash:digest(health),
+         categories:{pilot:digest(pilot),tanks:digest(tanks),
+          shapes:digest(shapes),drones:digest(drones),cover:digest(cover)}
+        });
+       }
        if(n%30===0){
         /* Read-only 1-second physical-state fingerprints, including RNG.
          * This is a divergence witness, not a claim of improved player fun. */
@@ -410,7 +446,8 @@ async function arm(browser,enabled,label){
     projectileDensityAudit:g.__novaProjectileDensityAudit,
     ...(g.__novaExperimentABMode==='bomber-physics'?{bomberPhysicsTrace:{
      firstAdvanceTime:g.__novaCausalFirstAdvanceTime??null,
-     samples:g.__novaCausalTrace||[]}}:{}),
+     samples:g.__novaCausalTrace||[],
+     combatSamples:g.__novaCausalCombatTrace||[]}}:{}),
     ...(g.__novaBomberBurstAudit?{bomberBurstAudit:g.__novaBomberBurstAudit}:{}),
     coverPressure:{coverBroken:g.__novaBattlefield?.coverBroken||0,
      allEffectiveDamage:g.__novaCoverDamageResearch?.allEffectiveDamage||0,
@@ -516,7 +553,31 @@ async function arm(browser,enabled,label){
      firstDifferent=after[i].time;break;
     }
    }
+   const combatBefore=off.result.bomberPhysicsTrace.combatSamples,
+    combatAfter=on.result.bomberPhysicsTrace.combatSamples;
+   const combatShared=Math.min(combatBefore.length,combatAfter.length);
+   let firstBody=null,firstHealth=null,firstHealthCategory=null;
+   for(let i=0;i<combatShared;i++){
+    assert.equal(combatBefore[i].time,combatAfter[i].time,
+     'matched non-projectile samples must share timestamps');
+    if(firstBody===null&&combatBefore[i].bodyHash!==combatAfter[i].bodyHash)
+     firstBody=combatAfter[i].time;
+    if(firstHealth===null&&combatBefore[i].healthHash!==combatAfter[i].healthHash){
+     firstHealth=combatAfter[i].time;
+     firstHealthCategory=Object.keys(combatAfter[i].categories).filter(k=>
+      combatBefore[i].categories[k]!==combatAfter[i].categories[k]);
+     assert.ok(firstHealthCategory.length,
+      'health divergence must identify at least one category');
+    }
+   }
    const firstAdvance=on.result.bomberPhysicsTrace.firstAdvanceTime;
+   for(const [name,time] of [['body',firstBody],['health',firstHealth]]){
+    if(time!==null)assert.ok(firstAdvance!==null&&time+1e-6>=firstAdvance,
+     name+' divergence preceded the first corrected airburst');
+   }
+   if(on.result.bomberBurstAudit.airburst.advanced===0)
+    assert.deepEqual(combatAfter,combatBefore,
+     'unexposed worlds must retain non-projectile parity');
    if(firstDifferent!==null){
     assert.ok(firstAdvance!==null&&firstDifferent+1e-6>=firstAdvance,
      'physical divergence preceded the first corrected airburst');
@@ -527,7 +588,10 @@ async function arm(browser,enabled,label){
    bomberPhysicsCausal={sourcePatchVerified:true,
     offAdvanced:0,onAdvanced:on.result.bomberBurstAudit.airburst.advanced,
     firstAdvanceTime:firstAdvance,firstPhysicalDifferenceTime:firstDifferent,
-    sharedPhysicalSamples:shared,
+    sharedPhysicalSamples:shared,sharedCombatSamples:combatShared,
+    firstNonProjectileDifferenceTime:firstBody,
+    firstHealthDifferenceTime:firstHealth,
+    firstHealthDifferenceCategories:firstHealthCategory,
     physicalDifferenceObserved:firstDifferent!==null,
     noAdvanceNoDifference:on.result.bomberBurstAudit.airburst.advanced>0?null:
      JSON.stringify(after)===JSON.stringify(before)};
