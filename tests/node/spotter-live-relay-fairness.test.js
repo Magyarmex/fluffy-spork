@@ -106,3 +106,22 @@ test('composed Fair Engagement loses offscreen relay when the actual Observer lo
   assert.equal(canPerceive(w.g, classes, w.owner, w.target), false,
     'Fair Engagement cannot use the old contact ID to follow a hidden offscreen tank');
 });
+
+test('30/60/120/240 Hz updates never keep a target that left the cone', () => {
+  for (const hz of [30, 60, 120, 240]) {
+    const w = world(); acquire(w);
+    w.target.x = 0; w.target.y = 400;
+    w.g.time += 1 / hz; w.g.updateDrones(1 / hz);
+    assert.equal(w.owner.__novaSpotterContactId, -1, hz + ' Hz lost-sight relay');
+    assert.equal(w.drone.__novaLastKnownX, 400, hz + ' Hz last-seen x');
+    assert.equal(w.drone.__novaLastKnownY, 0, hz + ' Hz last-seen y');
+  }
+});
+
+test('legitimate close-range omnidirectional Observer sight remains available', () => {
+  const w = world();
+  w.target.x = 0; w.target.y = 100;
+  w.g.updateDrones(0);
+  assert.equal(w.owner.__novaSpotterContactId, 2,
+    'the existing within-135u proximity exception remains part of the sensor');
+});
