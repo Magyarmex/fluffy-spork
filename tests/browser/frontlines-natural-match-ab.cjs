@@ -12,12 +12,12 @@ const LAYOUT_INDEX=Number(process.env.NOVA_LAYOUT_INDEX??0);
 const SEED_INDEX=Number(process.env.NOVA_SEED_INDEX??0);
 const PILOT_POLICY=process.env.NOVA_PILOT_POLICY||'wander';
 const AB_MODE=process.env.NOVA_AB_MODE||'memory';
-if(!['memory','live-turn'].includes(AB_MODE))throw Error('NOVA_AB_MODE must be memory or live-turn');
+if(!['memory','live-turn','cover-pressure'].includes(AB_MODE))throw Error('NOVA_AB_MODE must be memory, live-turn, or cover-pressure');
 if(!Number.isInteger(LAYOUT_INDEX)||LAYOUT_INDEX<0||LAYOUT_INDEX>=LAYOUTS.length)
  throw Error('NOVA_LAYOUT_INDEX must be 0, 1, or 2');
 if(!Number.isInteger(SEED_INDEX)||SEED_INDEX<0||SEED_INDEX>1000)
  throw Error('NOVA_SEED_INDEX must be an integer from 0 to 1000');
-if(!['wander','public-bloom','public-bloom-harvest','public-bloom-harvest-defense'].includes(PILOT_POLICY))
+if(!['wander','public-bloom','public-bloom-harvest','public-bloom-harvest-defense','cover-pressure'].includes(PILOT_POLICY))
  throw Error('NOVA_PILOT_POLICY must be wander, public-bloom, public-bloom-harvest, or public-bloom-harvest-defense');
 const LAYOUT=LAYOUTS[LAYOUT_INDEX],TERRAIN_SEED=LAYOUT_INDEX;
 const GAME_SEED=(0x1d4a3f21^Math.imul(SEED_INDEX,0x9e3779b9))>>>0;
@@ -33,6 +33,7 @@ async function arm(browser,enabled,label){
   await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({state:'visible',timeout:45000});
   await page.addScriptTag({url:'/tests/browser/projectile-density-audit.js'});
   await page.addScriptTag({url:'/tests/browser/frontlines-public-pilot.js'});
+  await page.addScriptTag({url:'/tests/browser/cover-pressure-pilot.js'});
   await page.addScriptTag({url:'/tests/browser/frontlines-visible-defense.js'});
   await page.addScriptTag({url:'/tests/browser/frontlines-commitment-audit.js'});
   await page.addScriptTag({url:'/tests/browser/frontlines-live-turn-intervention.js'});
@@ -102,7 +103,7 @@ async function arm(browser,enabled,label){
    if(g.__novaBattlefield?.name!==['CROSSFIRE','SPLIT HORIZON','FOUR GATES'][terrainIndex])throw Error('uncontrolled layout '+g.__novaBattlefield?.name);
    const ai=window.__novaMakeRequire('')('game/ai');
    if(!ai||typeof ai.updateAI!=='function')throw Error('missing composed AI');
-   if(!enabled){
+   if(!enabled&&abMode!=='cover-pressure'){
     const original=ai.updateAI;
     if(abMode==='memory'){
      // Historical experiment: suppress stale memory (live turns still ON).
@@ -264,6 +265,26 @@ async function arm(browser,enabled,label){
      return{x:Math.cos(g.time*.73),y:Math.sin(g.time*.73)};
     };
    }
+   if(abMode==='cover-pressure'){
+    if(pilotPolicy!=='cover-pressure')throw Error('cover-pressure experiment requires its named policy');
+    const helper=window.__novaResearchCoverPressurePilot,
+     F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
+    if(!helper||typeof helper.select!=='function'||!F)
+     throw Error('missing public cover-pressure pilot or viewport contract');
+    if(enabled){
+     g.input.moveVec=()=>{
+      const v=helper.move(g,p,F);
+      if(v){g.__novaCoverPressureMoveSamples=(g.__novaCoverPressureMoveSamples||0)+1;return v;}
+      return wander();
+     };
+     g.input.aimVec=()=>{
+      const v=helper.aim(g,p,F);
+      if(v){g.__novaCoverPressureAimSamples=(g.__novaCoverPressureAimSamples||0)+1;return v;}
+      g.__novaCoverPressureNoTargetSamples=(g.__novaCoverPressureNoTargetSamples||0)+1;
+      return{x:Math.cos(g.time*.73),y:Math.sin(g.time*.73)};
+     };
+    }
+   }
    const fingerprint=JSON.stringify({layout:g.__novaBattlefield.name,
     pilot:{x:+p.x.toFixed(3),y:+p.y.toFixed(3),cls:p.cls},
     bots:g.tanks.filter(t=>t.ai).map(t=>[t.id,+t.x.toFixed(3),+t.y.toFixed(3),t.cls]),
@@ -294,6 +315,12 @@ async function arm(browser,enabled,label){
      pilotAlive:!!p.alive,score:p.score,kills:p.kills,level:p.level,
      botCount:g.tanks.filter(t=>t.ai&&t.alive).length},
     projectileDensityAudit:g.__novaProjectileDensityAudit,
+    coverPressure:{coverBroken:g.__novaBattlefield?.coverBroken||0,
+     coverDamage:(g.__novaTerrain||[]).filter(t=>t.destructible).reduce((sum,t)=>
+      sum+Math.max(0,(t.maxHp||0)-Math.max(0,t.hp||0)),0),
+     aimSamples:g.__novaCoverPressureAimSamples||0,
+     moveSamples:g.__novaCoverPressureMoveSamples||0,
+     noTargetSamples:g.__novaCoverPressureNoTargetSamples||0},
      contestGateAudit:g.__novaContestAudit,
     commitmentAudit:window.__novaResearchCommitmentAudit.summary(g.__novaCommitmentAudit),
     naturalBlooms:s.stats.blooms||0,publicBloomCommandSamples:g.__novaPublicBloomCommands||0,
@@ -353,17 +380,19 @@ async function arm(browser,enabled,label){
     assert.deepEqual(on.result[key],off.result[key],
      'no-treatment live-turn arms must have identical '+key);
   }
-  const report={method:AB_MODE==='live-turn'?'paired natural full-match live-turn causal intervention (not human fun)':'scripted full-match natural Director research; not human fun; public-bloom is closed-loop policy',
+  const report={method:AB_MODE==='cover-pressure'?'paired ordinary Scout cover-seeking versus wander in the full shipping game; not human play':AB_MODE==='live-turn'?'paired natural full-match live-turn causal intervention (not human fun)':'scripted full-match natural Director research; not human fun; public-bloom is closed-loop policy',
    abMode:AB_MODE,verifiedLiveStart,
    initialWorldIdentical:true,initialFingerprint:off.initial.fingerprint,offReplayIdentical:same,
    naturalOpportunityObserved,
-   interpretation:AB_MODE==='live-turn'?(verifiedLiveStart&&naturalOpportunityObserved?'Live-turn intervention activated; interpret matched-policy differences cautiously because later public signals can diverge endogenously.':'INCONCLUSIVE: no verified ON live start or natural BLOOM exposure in both arms; retain the pair.'):(naturalOpportunityObserved?'Descriptive only: natural BLOOM observed; inspect opportunity timing, deaths and public pilot commands before causal interpretation.':'INCONCLUSIVE: at least one arm had no natural BLOOM; retain this censored pair.'),
+   interpretation:AB_MODE==='cover-pressure'?'Descriptive matched initial worlds; ordinary cover-seeking input may change survival and subsequent AI/world states. Report early deaths and all no-target periods.':AB_MODE==='live-turn'?(verifiedLiveStart&&naturalOpportunityObserved?'Live-turn intervention activated; interpret matched-policy differences cautiously because later public signals can diverge endogenously.':'INCONCLUSIVE: no verified ON live start or natural BLOOM exposure in both arms; retain the pair.'):(naturalOpportunityObserved?'Descriptive only: natural BLOOM observed; inspect opportunity timing, deaths and public pilot commands before causal interpretation.':'INCONCLUSIVE: at least one arm had no natural BLOOM; retain this censored pair.'),
    off:off.result,on:on.result,offReplay:offReplay.result,
    limits:['No artificial BLOOM or forced survival','One layout/seed/pilot-policy per invocation; matrix must aggregate independently',
     'A deterministic Scout script is not a human player',
     'Public-bloom commands can differ after ON/OFF worlds diverge; this is matched policy, not fixed inputs',
     'Public-bloom command samples are input calls, not measured seconds or proof of physical progress',
     'Seed replay is checked, not assumed',
+    'Cover-pressure mode changes only pilot inputs; coverDamage includes AI damage and cannot be attributed solely to Scout',
+    'Cover-pressure aim/move counts are input calls, not seconds fired or verified hits',
      'Projectile density is read-only and counts necessary eligibility gates, not actual certificate activations or player benefit',
      'Only cover breaks inside the bullet owner are counted; scripted Scout trials are not human-match frequencies',
     'In live-turn mode, only live-start authority is intervened on; later natural signals can differ as treatment outcomes']};
