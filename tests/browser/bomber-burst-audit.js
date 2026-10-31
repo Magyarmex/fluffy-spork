@@ -22,13 +22,54 @@
    childrenCreated:0,byOwner:{pilot:0,other:0,unknown:0},
    bySource:{battlefield:0,core:0,disciplines:0,other:0,unknown:0},
    byTTL:{positive:0,expired:0,unknown:0},
-   bySite:{},examples:[]};
+   bySite:{},examples:[],airburst:{calls:0,sole:0,advanced:0,stationary:0,mixed:0,
+    noChildren:0,children:0,advancedChildren:0,advancedDistance:0,
+    byOwner:{pilot:0,other:0,unknown:0},examples:[],observerErrors:0}};
  }
  function install(g,a,stackProvider){
   if(!g||typeof g.clusterBurst!=='function'||!Array.isArray(g.bullets))
    throw Error('real composed Bomber burst owner missing');
   if(!a||a.schema!==1)throw Error('invalid burst audit');
   const original=g.clusterBurst;
+  /* Frame-local observation only. The production update remains the sole
+   * authority for fragment movement, lifetime and contact resolution. */
+  let active=null;
+  if(typeof g.updateBullets==='function'){
+   const originalUpdate=g.updateBullets;
+   g.updateBullets=function(){
+    const previous=active,frame={sole:this.bullets.length===1,events:[]};
+    active=frame;
+    try{return originalUpdate.apply(this,arguments);}
+    finally{
+     try{
+      for(const event of frame.events){
+       const bucket=a.airburst;bucket.calls++;
+       if(event.sole)bucket.sole++;
+       bucket.byOwner[event.owner]++;
+       if(!event.children.length){bucket.noChildren++;continue;}
+       bucket.children+=event.children.length;
+       let advanced=0,stationary=0,distance=0;
+       for(const c of event.children){
+        const b=c.ref,dx=b.x-c.x,dy=b.y-c.y,age=c.ttl-b.ttl;
+        if(!Number.isFinite(dx)||!Number.isFinite(dy)||!Number.isFinite(age))continue;
+        if(Math.abs(dx)<1e-8&&Math.abs(dy)<1e-8&&Math.abs(age)<1e-8){stationary++;continue;}
+        if(age>0&&Math.abs(dx-c.vx*age)<1e-5&&Math.abs(dy-c.vy*age)<1e-5){
+         advanced++;distance+=Math.hypot(dx,dy);
+        }
+       }
+       bucket.advancedChildren+=advanced;bucket.advancedDistance+=distance;
+       const status=advanced===event.children.length?'advanced':
+        stationary===event.children.length?'stationary':'mixed';
+       bucket[status]++;
+       if(bucket.examples.length<20)bucket.examples.push({owner:event.owner,
+        sole:event.sole,status,children:event.children.length,
+        advanced,stationary,time:event.time});
+      }
+     }catch(_){a.airburst.observerErrors++;}
+     active=previous;
+    }
+   };
+  }
   const stack=typeof stackProvider==='function'?stackProvider:()=>new Error().stack;
   g.clusterBurst=function(parent){
    if(!parent)return original.apply(this,arguments);
@@ -41,6 +82,11 @@
    const before=Array.isArray(this.bullets)?this.bullets.length:0;
    const result=original.apply(this,arguments);
    const added=Math.max(0,(Array.isArray(this.bullets)?this.bullets.length:0)-before);
+   if(!wasConsumed&&kind==='disciplines'&&active){
+    active.events.push({owner,sole:active.sole,time:Number.isFinite(this.time)?this.time:null,
+     children:this.bullets.slice(before).map(c=>({ref:c,x:c.x,y:c.y,
+      ttl:c.ttl,vx:c.vx,vy:c.vy}))});
+   }
    a.calls++;
    if(wasConsumed){a.suppressedCalls++;return result;}
    a.firstBursts++;a.childrenCreated+=added;
