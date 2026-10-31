@@ -462,7 +462,11 @@ function contestCandidate(g,st){
   var t=ts[i];if(!t||t===p||t.id===p.id||!alive(t)||t.spawnShieldT>0||sectorIndex(t.x,t.y)!==op.sector)continue;
   if(!contestHostile(g,p,t))continue;
   /* Only scan the neutral pocket after a legitimate hostile is witnessed. */
-  if(visible(g,p,t)&&inRenderedCamera(g,p,t,ext)&&observedPocketValue(g,st,p,op.sector,155)>=155)return true;
+  /* The visible pocket is independent of WHICH hostile was witnessed.
+   * Once one legitimate rival is visible, a failed pocket scan cannot
+   * become true by repeating the same terrain rays for seven more bots. */
+  if(inRenderedCamera(g,p,t,ext)&&visible(g,p,t))
+   return observedPocketValue(g,st,p,op.sector,155)>=155;
  }
  return false;
 }
