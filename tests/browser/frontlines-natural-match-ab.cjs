@@ -375,7 +375,10 @@ async function arm(browser,enabled,label){
          tanks:g.tanks.map(t=>[t.id,t.x,t.y,t.hp,t.alive,t.cls]),
          shapes:g.shapes.map(t=>[t.id,t.x,t.y,t.hp,t.type]),
          drones:g.drones.map(t=>[t.id,t.x,t.y,t.hp,t.ownerId]),
-         bullets:g.bullets.map(t=>[t.id,t.x,t.y,t.ttl,t.dead,t.ownerId])
+         bullets:g.bullets.map(t=>[t.id,t.x,t.y,t.ttl,t.dead,t.ownerId]),
+         terrain:(g.__novaTerrain||[]).map(t=>[t.id,t.hp,t.solid,t.destructible]),
+         powerups:(g.powerups||[]).map(t=>[t.id,t.x,t.y,t.type]),
+         orbs:(g.orbs||[]).map(t=>[t.id,t.x,t.y,t.value])
         });
         let h1=2166136261,h2=0x9e3779b9;
         for(let k=0;k<state.length;k++){
