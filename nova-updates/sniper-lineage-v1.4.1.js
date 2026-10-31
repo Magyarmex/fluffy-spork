@@ -96,7 +96,10 @@
     var direct = dist2(t.x,t.y,target.x,target.y) <= DIRECT_VISION*DIRECT_VISION;
     if (direct) return true;
     if (t.__novaSpotterDownUntil && t.__novaSpotterDownUntil > g.time) return false;
-    return t.__novaSpotterContactId === target.id && t.__novaSpotterContactUntil > g.time;
+    /* A remembered contact is not permission to fire at its hidden live
+     * coordinates after the Observer loses sight between drone scans. */
+    var live=window.__NOVA_SPOTTER_LIVE_RELAY__;
+    return typeof live==='function'&&live(g,t,target);
   }
   function isThreateningPlayer(g, t, target) {
     if (!g.player || !target || target.id !== g.player.id) return false;
