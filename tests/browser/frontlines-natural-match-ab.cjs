@@ -237,6 +237,8 @@ async function arm(browser,enabled,label){
     if(!classes?.bomber?.bullet?.cluster)throw Error('canonical Bomber unavailable');
     if(typeof g.setClass!=='function')throw Error('canonical class evolution owner missing');
     g.setClass(p,'bomber'); // canonical tier, HP, ability and drone refit
+    if(p.tier!==classes.bomber.tier||p.maxHp!==g.maxHpFor(p))
+     throw Error('Bomber pilot did not receive canonical class stats');
     g.__novaExperimentPilotClass='bomber';
     p.fireCd=0;p.barrelIdx=0;
     const witness=window.__novaBomberBurstAudit;
