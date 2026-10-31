@@ -174,6 +174,77 @@ test('dashed pre-entry witness belongs to one public BLOOM, not a later same-sec
   'a previous visible rival must not become radar for a newly announced BLOOM');
  s.st.signal={...s.st.signal,started:98,until:104};
  s.draws.length=0;s.g.drawMinimap();
+ assert.ok(!s.draws.some(d=>d.type==='text'&&d.value==='!'),
+  'an invalidated visual witness must not be resurrected by restoring old metadata');
+ s.g.time+=.17;s.draws.length=0;s.g.drawMinimap();
  assert.ok(s.draws.some(d=>d.type==='text'&&d.value==='!'),
-  'restoring the original valid public witness restores the dashed warning');
+  'a new local visibility sample may legitimately reestablish the warning');
+});
+
+
+test('minimap gives a witnessed pre-entry warning before the next 720ms Director sample',()=>{
+ const s=scene();
+ assert.equal(s.st.approachSignal,undefined,'Director has not yet sampled the visible approach');
+ assert.equal(s.g.drawMinimap(),'base');
+ assert.ok(s.st.approachSignal,'first minimap update must sample the locally visible threat');
+ assert.equal(s.st.approachSignal.pilotRef,s.p);
+ assert.ok(s.draws.some(d=>d.type==='text'&&d.value==='!'));
+ assert.ok(s.draws.some(d=>d.type==='dash'&&d.v.length>0));
+ assert.equal(s.st.stats.contests||0,0,'early warning is not a sector entry or a contested reward');
+});
+
+test('early warning expires promptly when visibility is lost, without waiting for Director',()=>{
+ const s=scene();
+ s.g.drawMinimap();
+ assert.ok(s.st.approachSignal,'initial warning must exist');
+ s.g.time+=.20;
+ s.g.hasLineOfSight=()=>false;
+ s.draws.length=0;
+ s.g.drawMinimap();
+ assert.equal(s.st.approachSignal,null,'a no-longer-visible threat cannot retain a fresh visual badge');
+ assert.ok(!s.draws.some(d=>d.type==='text'&&d.value==='!'));
+});
+
+test('early warning is bounded, pilot-specific and cannot use hidden sector totals',()=>{
+ const s=scene();
+ let rays=0;s.g.hasLineOfSight=()=>{rays++;return true;};
+ for(let i=0;i<50;i++){
+  s.g.time=100+i*.02;
+  s.g.drawMinimap();
+ }
+ assert.ok(rays>0,'the real visible rival and harvestable pocket were checked');
+ assert.ok(rays<35,'sampling at minimap cadence must be bounded, not one LOS scan per draw');
+ assert.ok(s.st.approachSignal);
+ s.g.player={...s.p};s.draws.length=0;s.g.drawMinimap();
+ assert.ok(!s.draws.some(d=>d.type==='text'&&d.value==='!'),
+  'new player incarnation cannot inherit old local visual intelligence');
+ s.g.time+=.2;s.g.shapes=[];s.st.sectors[5].value=999999;
+ s.draws.length=0;s.g.drawMinimap();
+ assert.ok(!s.draws.some(d=>d.type==='text'&&d.value==='!'),
+  'hidden ecological totals never create a visual witness');
+});
+
+test('fast warning respects spawn protection and unrelated Director signals',()=>{
+ const s=scene();
+ s.p.spawnShieldT=1;s.g.drawMinimap();
+ assert.equal(s.st.approachSignal,null);
+ s.p.spawnShieldT=0;s.g.time+=.2;
+ s.st.signal={type:'MIGRATION',from:1,to:2,started:100,until:105};
+ s.draws.length=0;s.g.drawMinimap();
+ assert.ok(!s.draws.some(d=>d.type==='text'&&d.value==='!'));
+});
+
+test('newly visible approach is sampled within 160ms, never every minimap draw',()=>{
+ const s=scene();
+ let rays=0,clear=false;
+ s.g.hasLineOfSight=()=>{rays++;return clear;};
+ s.g.drawMinimap();
+ assert.equal(s.st.approachSignal,null);
+ clear=true;s.g.time=100.08;
+ s.g.drawMinimap();
+ assert.equal(s.st.approachSignal,null,'no redundant ray scan before cadence deadline');
+ assert.equal(rays,1);
+ s.g.time=100.16;s.g.drawMinimap();
+ assert.ok(s.st.approachSignal,'new visual witness must be sampled by 160ms');
+ assert.equal(rays,3,'one hostile ray and one harvestable-pocket ray after deadline');
 });

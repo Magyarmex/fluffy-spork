@@ -665,6 +665,40 @@ LF.wrap('game/ai',function(ai,require){var old=ai.updateAI;if(!old||old.__novaLi
  return move.call(g,tt,x/m*sp,y/m*sp,dd);
 };try{return old(t,g,dt);}finally{if(move){if(own)g.moveTank=move;else delete g.moveTank;}}}patched.__novaLivingFront=true;ai.updateAI=patched;});
 
+/* A visible pre-entry threat must be actionable before the 0.72s Director
+ * sample. The canonical minimap is already refreshed at ~0.08s; reuse its
+ * draw owner to sample the EXISTING local visual witness at most every 0.16s.
+ * This is not a second Director, hidden-sector radar, or a new UI system.
+ * The scan is gated by a public BLOOM, an unshielded living pilot outside
+ * its sector, and proximity to its boundary before any tank/shape rays.
+ * A prior contest remains authoritative until the Director clears it. */
+function refreshApproachCue(g,st,op,now){
+ if(!st||!g||g.status!=='playing'||g.__novaDecorativeWorld)return;
+ var p=g.player,eligible=!!(op&&p&&alive(p)&&!(p.spawnShieldT>0)&&
+   Number.isFinite(p.x)&&Number.isFinite(p.y)&&
+   sectorIndex(p.x,p.y)!==op.sector&&nearBloomEdge(p,op.sector));
+ var old=st.approachSignal;
+ if(old&&(!eligible||old.pilotRef!==p||old.sector!==op.sector||
+    old.announcedAt!==op.announcedAt)){
+  st.approachSignal=null;
+  st.__lfApproachNextAt=now+.16;
+  return; /* Do not immediately reissue a witness for a new pilot/BLOOM. */
+ }
+ if(!eligible||st.contestSignal){
+  st.approachSignal=null;
+  st.__lfApproachNextAt=0;
+  return;
+ }
+ /* A clock reset cannot retain a later-life sampling deadline. */
+ if(Number.isFinite(st.__lfApproachLastAt)&&now<st.__lfApproachLastAt)
+  st.__lfApproachNextAt=0;
+ st.__lfApproachLastAt=now;
+ if(Number.isFinite(st.__lfApproachNextAt)&&now<st.__lfApproachNextAt)return;
+ st.__lfApproachNextAt=now+.16;
+ st.approachSignal=preEntryCandidate(g,st)?
+  {sector:op.sector,until:Math.min(op.until,now+1.4),
+   announcedAt:op.announcedAt,pilotRef:p}:null;
+}
 /* The core minimap already draws the public BLOOM. Add a short local contest
  * accent after it, without introducing a new HUD, minimap authority or input. */
 LF.wrap('game/engine',function(engine){
@@ -728,6 +762,7 @@ function migrationPhysicalArrival(g,t,bx,by,ax,ay,dt){
  var oldMap=Game.prototype.drawMinimap;if(!oldMap)return;
  Game.prototype.drawMinimap=function(){
   var out=oldMap.apply(this,arguments),st=this.__lfState,c=st&&st.contestSignal,ctx=this.mmCtx,now=this.time||0,op=publicBloom(st,now);
+  if(ctx)refreshApproachCue(this,st,op,now);
   /* A live MIGRATION lasts 4.4s, too briefly for a distant pilot to
    * plan an intercept. Keep its PUBLIC, frozen sector-to-sector route as
    * a fading dashed minimap afterimage for 16s from announcement. The
