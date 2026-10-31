@@ -509,7 +509,7 @@ function updateContest(g,st){
   st.contestSignal=null;
   var op=publicBloom(st,g&&g.time||0);
   st.approachSignal=op&&preEntryCandidate(g,st)?
-   {sector:op.sector,until:Math.min(op.until,(g.time||0)+1.4),pilotRef:g.player}:null;
+   {sector:op.sector,until:Math.min(op.until,(g.time||0)+1.4),announcedAt:op.announcedAt,pilotRef:g.player}:null;
   return false;
  }
  st.approachSignal=null;
@@ -760,7 +760,7 @@ function migrationPhysicalArrival(g,t,bx,by,ax,ay,dt){
   }
   /* A solid CONTESTED badge is a live, pilot-specific witness, not stale\n   * sector radar. Director sampling is decimated: the player can leave, die,\n   * redeploy, or see a new same-sector BLOOM before the next sample. */\n  var inside=!!(c&&now<c.until&&c.sector===op.sector&&\n   c.announcedAt===op.announcedAt&&this.status==='playing'&&\n   this.player&&c.pilotRef===this.player&&alive(this.player)&&\n   !(this.player.spawnShieldT>0)&&\n   sectorIndex(this.player.x,this.player.y)===op.sector),
    a=st&&st.approachSignal,
-   approaching=!inside&&!!(a&&now<a.until&&a.sector===op.sector&&
+   approaching=!inside&&!!(a&&now<a.until&&a.sector===op.sector&&\n    a.announcedAt===op.announcedAt&&
     this.status==='playing'&&this.player&&a.pilotRef===this.player&&alive(this.player)&&
     sectorIndex(this.player.x,this.player.y)!==op.sector&&
     nearBloomEdge(this.player,op.sector));
