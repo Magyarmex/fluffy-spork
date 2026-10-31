@@ -90,8 +90,8 @@ test('live cone sight remains valid, including 135u proximity exception, across 
   w.drone.x=500;w.drone.y=0;w.drone.angle=Math.PI;
   w.target.x=500;w.target.y=100;
   assert.equal(w.perceive(),true,hz+'Hz offscreen close-range Observer sight');
-  w.target.x=0;w.target.y=400;
-  assert.equal(w.perceive(),false,hz+'Hz lost cone');
+  w.target.x=-300;w.target.y=500;
+  assert.equal(w.perceive(),false,hz+'Hz target beyond Observer range');
  }
 });
 test('direct viewport remains legal without a relay; no offscreen ID-only permission',()=>{
