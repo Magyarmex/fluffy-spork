@@ -73,6 +73,8 @@ test('a shell pending removal is conservatively retained, then retired after arr
  g.time=1;api.rememberDamagedOwnerProjectileRelations(g);
  assert.equal(m.has('1|1200'),true,'dead-flagged shell can still be in the fragmentation pipeline');
  g.bullets=[];g.time=6;
+ /* This is a pressure-triggered sweep, not a per-frame map cleanup. */
+ for(let id=2000;id<2300;id++)m.set('1|'+id,true);
  api.rememberDamagedOwnerProjectileRelations(g);
  assert.equal(m.has('1|1200'),false);
  assert.equal(m.size,0);
