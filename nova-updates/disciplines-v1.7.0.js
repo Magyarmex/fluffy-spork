@@ -413,6 +413,26 @@ wrap('game/engine',function(engine,require){
        !Array.isArray(g.__novaTerrain)||!Array.isArray(g.bullets))return;
     var remaining=dt*(1-cross),count=g.bullets.length-first;
     if(count<3||count>12)return;
+    /* A single conservative union box certifies obviously remote drones
+     * for ALL parent/fragment corridors. Reuse the result within this
+     * burst instead of repeating 7× the same distant-drone proof. */
+    var bounds={minX:Math.min(parent.px,parent.x),maxX:Math.max(parent.px,parent.x),
+      minY:Math.min(parent.py,parent.y),maxY:Math.max(parent.py,parent.y),
+      maxR:parent.r};
+    for(var ci=first;ci<g.bullets.length;ci++){
+      var bc=g.bullets[ci];
+      if(!bc||!Number.isFinite(bc.x)||!Number.isFinite(bc.y)||
+         !Number.isFinite(bc.vx)||!Number.isFinite(bc.vy)||
+         !Number.isFinite(bc.r)){bounds=null;break;}
+      var cx=bc.x+bc.vx*remaining,cy=bc.y+bc.vy*remaining;
+      if(!Number.isFinite(cx)||!Number.isFinite(cy)){bounds=null;break;}
+      bounds.minX=Math.min(bounds.minX,bc.x,cx);
+      bounds.maxX=Math.max(bounds.maxX,bc.x,cx);
+      bounds.minY=Math.min(bounds.minY,bc.y,cy);
+      bounds.maxY=Math.max(bounds.maxY,bc.y,cy);
+      bounds.maxR=Math.max(bounds.maxR,bc.r);
+    }
+    var remoteDrones=new Set();
     for(var q=0;q<first;q++)
       if(g.bullets[q]&&g.bullets[q]!==parent&&!g.bullets[q].dead)return;
     var plans=[];
@@ -452,7 +472,18 @@ wrap('game/engine',function(engine,require){
                                 e.y-e.__novaChronoDronePrevY);
         if(!Number.isFinite(bound)||bound>4000||traveled>96||
            traveled>bound*dt+1e-6)return false;
-        var envelope=r+childR+Math.max(120,30+dt*(bound+1600));
+        var pad=Math.max(120,30+dt*(bound+1600));
+        if(remoteDrones.has(e))return true;
+        if(bounds&&Number.isFinite(bounds.minX)&&Number.isFinite(bounds.maxX)&&
+           Number.isFinite(bounds.minY)&&Number.isFinite(bounds.maxY)){
+          var wide=r+bounds.maxR+pad,px=e.__novaChronoDronePrevX,
+              py=e.__novaChronoDronePrevY;
+          if(px<bounds.minX-wide||px>bounds.maxX+wide||
+             py<bounds.minY-wide||py>bounds.maxY+wide){
+            remoteDrones.add(e);return true;
+          }
+        }
+        var envelope=r+childR+pad;
         return !near(ax,ay,bx,by,e.__novaChronoDronePrevX,
                      e.__novaChronoDronePrevY,envelope)&&
                !near(ax,ay,bx,by,e.x,e.y,envelope);
