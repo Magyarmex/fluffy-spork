@@ -73,6 +73,20 @@ const {chromium}=require('playwright');
      if(st.stats.contests!==undefined&&(st.stats.contests||0)!==before)
       throw Error('early warning awarded contest credit');
      if(st.contestSignal)throw Error('early warning fabricated a contest');
+     /* The Director can still hold a genuine inside-sector contest from a
+      * recent exit. Its stale cache must not hide a newly visible outside
+      * warning while waiting for the next 0.72s Director update. */
+     st.contestSignal={sector:5,until:g.time+1.4,
+       announcedAt:st.bloomMemory.announcedAt,pilotRef:p};
+     st.approachSignal=null;g.time+=.20;
+     badge=false;dashed=false;
+     mm.fillText=function(v){if(v==='!')badge=true;return oldText.apply(this,arguments);};
+     mm.setLineDash=function(v){if(v?.[0]===7&&v?.[1]===5)dashed=true;return oldDash.apply(this,arguments);};
+     try{g.drawMinimap();}finally{mm.fillText=oldText;mm.setLineDash=oldDash;}
+     if(!badge||!dashed||!st.approachSignal)
+      throw Error('stale inside contest incorrectly suppressed fresh outside warning');
+     if((st.stats.contests||0)!==before)
+      throw Error('outside warning fabricated contest credit');
      e.x=1800;e.y=1800;g.time+=.20;
      badge=false;
      mm.fillText=function(v){if(v==='!')badge=true;return oldText.apply(this,arguments);};

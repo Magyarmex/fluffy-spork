@@ -684,7 +684,10 @@ function refreshApproachCue(g,st,op,now){
   st.__lfApproachNextAt=now+.16;
   return; /* Do not immediately reissue a witness for a new pilot/BLOOM. */
  }
- if(!eligible||st.contestSignal){
+ /* A previous inside-sector contest can remain cached until the slower
+  * Director tick. Outside the BLOOM, that old witness is not current
+  * information and must not suppress a newly visible approach. */
+ if(!eligible){
   st.approachSignal=null;
   st.__lfApproachNextAt=0;
   return;

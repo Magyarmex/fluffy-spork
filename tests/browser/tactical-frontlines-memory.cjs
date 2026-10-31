@@ -166,7 +166,10 @@ const {chromium}=require('playwright');
    }
    if(solidBadgeCount()!==1)throw Error('fresh real-game contest must show one solid badge');
    const oldX=p.x;p.x=-1150;
-   if(solidBadgeCount()!==0)throw Error('stale CONTESTED survived pilot sector exit before Director tick');
+   const outsideExpected=T.preEntryCandidate(g,st);
+   const outsideBadges=solidBadgeCount();
+   if(outsideBadges!==(outsideExpected?1:0))
+    throw Error('sector exit must show only a fresh, visible outside warning, never stale CONTESTED');
    p.x=oldX;
    const oldBloom=st.bloomMemory;
    st.bloomMemory={...oldBloom,announcedAt:oldBloom.announcedAt+.5};
