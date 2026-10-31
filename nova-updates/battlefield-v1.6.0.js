@@ -662,11 +662,19 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   * exceeds the global 900-comparison estimate. Its own full-entity scan
   * remains capped; multi-shot local batches must pass a shared preflight. */
  var ISOLATED_RECOVERY_SCAN_CAP=1200;
+ function hasSingleLivePriorTankVictim(b){
+  if(!b||b.hits!==1||!(b.__novaDirectVictims instanceof Set)||
+     b.__novaDirectVictims.size!==1)return false;
+  var previous=b.__novaDirectVictims.values().next().value;
+  return !!(previous&&previous.kind==='tank'&&previous.alive&&previous.hp>0);
+ }
  function isolatedTTLStationaryPiercingChain(g,b,dt,nonExpiring,localOthers,allowSingle){
   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
      b.__novaBreachAtTime===g.time||
      !(dt>0)||!(b.ttl>0)||
-     (nonExpiring ? !(b.ttl>dt&&(b.pen===1||b.pen===2)&&b.hits===0) : !(b.ttl<=dt))||
+     (nonExpiring ? !(b.ttl>dt&&(
+       ((b.pen===1||b.pen===2)&&b.hits===0)||
+       (b.pen===1&&hasSingleLivePriorTankVictim(b)))) : !(b.ttl<=dt))||
      !(Number.isSafeInteger(b.pen)&&b.pen>=0)||
      !(b.hits>=0)||(b.hits===0&&b.pen===0)||
      (b.hits>0&&!(b.__novaDirectVictims instanceof Set))||
@@ -727,7 +735,12 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    if(!(enter>1e-9))return false;
    contacts.push({e:t,t:enter});
   }
-  /* Ordinarily a non-expiring round must exhaust its pen=1/2 budget
+  /* A pen=2 round with one prior certified victim may exhaust its remaining
+   * pen=1 budget against two new stationary hulls in the current frame.
+   * Require its exact one-victim ledger: never re-award the earlier hit or
+   * infer continuity from a malformed/stale projectile. The existing
+   * corridor/cover/competition proof still governs both later contacts.
+   * Ordinarily a non-expiring round must exhaust its pen=1/2 budget
    * inside this frame. The narrowly certified pen=2 two-hull prefix below
    * is the sole exception; it leaves the final penetration to the core.
    * A TTL-expiring round may settle a partial remaining budget because it
@@ -3008,7 +3021,9 @@ function certifiedMultiShotCoverPriority(g,dt){
   var eb=this.bullets[countI];
   if(eb&&!eb.dead&&!eb.shell&&!eb.beam&&!eb.splash&&!eb.__v17Cannon&&eb.ttl>0&&eb.ttl<=dt)expiring++;
   if(eb&&!eb.dead&&!eb.shell&&!eb.beam&&!eb.splash&&!eb.__v17Cannon&&
-     eb.ttl>dt&&(eb.pen===1||eb.pen===2)&&(eb.hits||0)===0)paired++;
+     eb.ttl>dt&&(
+       ((eb.pen===1||eb.pen===2)&&(eb.hits||0)===0)||
+       (eb.pen===1&&hasSingleLivePriorTankVictim(eb))))paired++;
  }
  var bodyWork=this.bullets.length+(this.tanks||[]).length+
    (this.shapes||[]).length+(this.drones||[]).length;
@@ -3060,6 +3075,8 @@ function certifiedMultiShotCoverPriority(g,dt){
     isolatedTTLBodyContact(this,expiringBullet,dt);
   }
  /* Non-expiring pen=1 shots may exhaust both contacts within this frame.
+  * This also covers a pen=2 shot with one prior victim and a validated
+  * direct-victim ledger, preventing FPS-dependent skipped middle hulls.
   * Reuse the identical physical-first-contact proof, but only when the
   * entire penetration budget is consumed before the frame boundary.
   * A surviving or uncertain round stays with the original engine. */
