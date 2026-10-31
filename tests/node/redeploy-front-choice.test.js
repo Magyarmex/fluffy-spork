@@ -480,3 +480,29 @@ test('RETURN local seed changes with witnessed death time or location, not hidde
  assert.equal(api.returnStream(0),null);
  assert.equal(api.returnStream(NaN),null);
 });
+
+test('RETURN sampler covers both map bearing and distance bands without global draws',()=>{
+ const {api}=boot({random:()=>{throw Error('combat RNG touched');}});
+ const bins=[Array(8).fill(0),Array(8).fill(0)],seen=new Set();
+ for(let i=0;i<8192;i++){
+  const p={x:-2000+(i*1427%4000),y:-2000+(i*2279%4000)};
+  const seed=api.returnSeed(p,4.3+i*.017,i%100,i+100);
+  assert.ok(!seen.has(seed),'sampled death contexts should not collapse to one seed');
+  seen.add(seed);
+  const rand=api.returnStream(seed);
+  bins[0][Math.floor(rand()*8)]++;
+  bins[1][Math.floor(rand()*8)]++;
+ }
+ for(const group of bins)for(const count of group)
+  assert.ok(count>=850&&count<=1200,'bounded deterministic sampling must cover every octant');
+});
+test('RETURN fails closed if the stored death seed is corrupted',()=>{
+ let draws=0;
+ const {Game}=boot({random:()=>{draws++;return .5;}}),g=new Game();
+ g.killTank(victim(100,200));g.update();
+ g.__novaRedeploySeed=NaN;
+ g.__novaRedeployChoice='return';g.redeploy();
+ assert.equal(g.player.x,1900,'invalid local seed uses the original safe spawn');
+ assert.equal(g.__novaLastFrontMarker,null);
+ assert.equal(draws,0,'invalid seed cannot fall back to global combat RNG');
+});
