@@ -3,14 +3,16 @@
  * Never turn censored/dead trials into successes or assume pilot attribution
  * for cover damaged by bots. No natural-match baseline is overwritten. */
 const fs=require('node:fs'),path=require('node:path');
-const KEYS=['coverBroken','coverDamage','certifiedActivations','playerShotsFired','aimSamples','moveSamples','noTargetSamples'];
+const KEYS=['coverBroken','coverDamage','allEffectiveDamage','playerEffectiveDamage','allBreaks','playerBreaks','certifiedActivations','playerShotsFired','aimSamples','moveSamples','noTargetSamples'];
 function arm(a,label){
  if(!a||!a.game||!a.projectileDensityAudit||!a.coverPressure)
   throw Error(label+': missing real-game evidence');
  const c=a.coverPressure,d=a.projectileDensityAudit;
  for(const k of KEYS)if(!Number.isFinite(c[k])||c[k]<0||
-    (k!=='coverDamage'&&!Number.isSafeInteger(c[k])))
+    (!['coverDamage','allEffectiveDamage','playerEffectiveDamage'].includes(k)&&!Number.isSafeInteger(c[k])))
   throw Error(label+': invalid '+k);
+ if(c.playerEffectiveDamage>c.allEffectiveDamage+1e-7||c.playerBreaks>c.allBreaks||c.allBreaks>c.coverBroken)
+  throw Error(label+': inconsistent owner attribution');
  if(!Number.isSafeInteger(d.bulletUpdateCalls)||d.bulletUpdateCalls<1||
     !Number.isSafeInteger(d.coverBreaks)||d.coverBreaks<0||
     !Number.isSafeInteger(d.basicEligibleFrames)||d.basicEligibleFrames<0||
@@ -30,7 +32,7 @@ function collect(root,expected=6){
  if(dirs.length!==expected)throw Error('incomplete cover-pressure matrix '+dirs.length+'/'+expected);
  const seen=new Set(),rows=[],totals={OFF:{},ON:{}};
  for(const mode of ['OFF','ON'])totals[mode]={
-  simulatedSeconds:0,earlyDeaths:0,coverBroken:0,coverDamage:0,certifiedActivations:0,playerShotsFired:0,
+  simulatedSeconds:0,earlyDeaths:0,coverBroken:0,coverDamage:0,allEffectiveDamage:0,playerEffectiveDamage:0,allBreaks:0,playerBreaks:0,certifiedActivations:0,playerShotsFired:0,
   aimSamples:0,moveSamples:0,noTargetSamples:0,bulletUpdateCalls:0,
   basicEligibleFrames:0,coverBreaksAtBasicGate:0};
  for(const dir of dirs){
@@ -62,7 +64,8 @@ function collect(root,expected=6){
   pairs:rows.length,rows,totals,
   limits:['Scripted Scout policies are not representative human players',
    'Deaths censor exposure and are included in denominators',
-   'Cover damage/breaks include other tanks and are not exclusively pilot-caused',
+   'Legacy coverDamage and coverBroken include other tanks; owner-specific effective damage and breaks use the authoritative cover hit owner',
+   'Owner attribution follows projectile owner ID, including posthumous shots; it is not evidence of tactical intent',
    'Certified activations are measured, but downstream player-relevant hits are not attributed',
    'Actual player projectile emissions are counted; they are not guaranteed hits or damage attribution']};
 }
