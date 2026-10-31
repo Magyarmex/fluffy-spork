@@ -32,9 +32,9 @@ function empty(){
   bySource:Object.fromEntries(CATS.bySource.map(k=>[k,0])),
   byTTL:Object.fromEntries(CATS.byTTL.map(k=>[k,0])),
   bySite:{},simulatedSeconds:0,earlyDeaths:0,noBurstTrials:0,
-  shellsFired:0,noShellTrials:0};
+  shellsFired:0,noShellTrials:0,evolvedTrials:0};
 }
-function add(dst,a,game,shellsFired){
+function add(dst,a,game,shellsFired,finalClass){
  for(const k of KEYS)dst[k]+=a[k];
  for(const [field,keys] of Object.entries(CATS))
   for(const k of keys)dst[field][k]+=a[field][k];
@@ -44,6 +44,7 @@ function add(dst,a,game,shellsFired){
  dst.noBurstTrials+=Number(a.firstBursts===0);
  dst.shellsFired+=shellsFired;
  dst.noShellTrials+=Number(shellsFired===0);
+ dst.evolvedTrials+=Number(finalClass!=='bomber');
 }
 function collect(root,expected=6){
  if(!Number.isSafeInteger(expected)||expected<1)throw Error('invalid pair count');
@@ -61,7 +62,8 @@ function collect(root,expected=6){
   const off=r.off?.metadata,on=r.on?.metadata;
   if(!off||!on||off.pilotClass!=='bomber'||on.pilotClass!=='bomber'||
      off.layout!==on.layout||off.seed!==on.seed||
-     off.pilotPolicy!=='cover-pressure'||on.pilotPolicy!=='cover-pressure')
+     off.pilotPolicy!=='cover-pressure'||on.pilotPolicy!=='cover-pressure'||
+     typeof off.pilotClassFinal!=='string'||typeof on.pilotClassFinal!=='string')
    throw Error(dir+': mismatched Bomber worlds');
   const key=off.layout+'|'+off.seed;
   if(seen.has(key))throw Error('duplicate layout/seed '+key);
@@ -74,10 +76,11 @@ function collect(root,expected=6){
    const shells=arm.coverPressure?.playerShellsFired;
    if(!Number.isSafeInteger(shells)||shells<0)
     throw Error(dir+': missing actual Bomber shell emissions');
-   add(totals[mode],a,arm.game,shells);
+   add(totals[mode],a,arm.game,shells,arm.metadata.pilotClassFinal);
    row[mode]={status:arm.game.status,time:arm.game.time,
     calls:a.calls,firstBursts:a.firstBursts,childrenCreated:a.childrenCreated,
     shellsFired:arm.coverPressure.playerShellsFired,
+    finalClass:arm.metadata.pilotClassFinal,
     byOwner:a.byOwner,bySource:a.bySource,byTTL:a.byTTL,bySite:a.bySite};
   }
   rows.push(row);
@@ -87,6 +90,7 @@ function collect(root,expected=6){
   limits:['Only a standard Bomber scripted pilot; no human-play frequency inference',
    'Callsite source and TTL state are diagnostic, not physical-first-event classifications',
    'Other AI classes can also create shells; byOwner distinguishes pilot from other shooters',
+   'The initial scripted class is Bomber; final class and evolution are reported, not silently assumed',
    'Death-censored, no-shell and no-burst trials remain in denominators',
    'Each pair shares the same initial world, but policies change later world states',
    'Zero burst count does not imply zero player skill opportunity or zero physical defect']};
