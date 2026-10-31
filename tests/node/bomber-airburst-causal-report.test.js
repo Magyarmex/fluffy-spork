@@ -87,3 +87,21 @@ test('six-pair collector preserves zero-exposure and death-censored trials',()=>
   assert.throws(()=>collect(root,7),/incomplete causal matrix/);
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
+
+test('causal OFF changes exactly one callsite in the real shipping Disciplines source',()=>{
+ const vm=require('node:vm');
+ const source=fs.readFileSync(path.join(__dirname,
+  '../../nova-updates/disciplines-v1.7.0.js'),'utf8');
+ const needle='advanceClearFuseChildren(this,b,childStart,dt,physicalCross,sole);';
+ assert.equal(source.split(needle).length,2,
+  'the browser experiment must not silently patch a different version');
+ const off=source.replace(needle,
+  '/* research-only causal OFF: leave newborn fragments at birth */');
+ assert.equal(off.length,source.length-needle.length+
+  '/* research-only causal OFF: leave newborn fragments at birth */'.length);
+ assert.ok(off.includes('function advanceClearFuseChildren('),
+  'the OFF arm must preserve the helper definition and all other gameplay');
+ assert.ok(!off.includes(needle));
+ assert.doesNotThrow(()=>new vm.Script(off),
+  'delivered OFF script must remain syntactically valid');
+});
