@@ -495,8 +495,8 @@ function preEntryCandidate(g,st){
   var t=ts[i];if(!t||t===p||t.id===p.id||!alive(t)||
      t.spawnShieldT>0||!Number.isFinite(t.x)||!Number.isFinite(t.y)||
      sectorIndex(t.x,t.y)!==op.sector||!contestHostile(g,p,t))continue;
-  if(visible(g,p,t)&&inRenderedCamera(g,p,t,ext)&&
-     observedPocketValue(g,st,p,op.sector,155)>=155)return true;
+  if(visible(g,p,t)&&inRenderedCamera(g,p,t,ext))
+   return observedPocketValue(g,st,p,op.sector,155)>=155;
  }
  return false;
 }
@@ -505,7 +505,7 @@ function updateContest(g,st){
   st.contestSignal=null;
   var op=publicBloom(st,g&&g.time||0);
   st.approachSignal=op&&preEntryCandidate(g,st)?
-   {sector:op.sector,until:Math.min(op.until,(g.time||0)+1.4)}:null;
+   {sector:op.sector,until:Math.min(op.until,(g.time||0)+1.4),pilotRef:g.player}:null;
   return false;
  }
  st.approachSignal=null;
@@ -757,7 +757,7 @@ function migrationPhysicalArrival(g,t,bx,by,ax,ay,dt){
   var inside=!!(c&&now<c.until&&c.sector===op.sector),
    a=st&&st.approachSignal,
    approaching=!inside&&!!(a&&now<a.until&&a.sector===op.sector&&
-    this.status==='playing'&&this.player&&alive(this.player)&&
+    this.status==='playing'&&this.player&&a.pilotRef===this.player&&alive(this.player)&&
     sectorIndex(this.player.x,this.player.y)!==op.sector&&
     nearBloomEdge(this.player,op.sector));
   if(!inside&&!approaching)return out;
