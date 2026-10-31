@@ -229,7 +229,7 @@
   };
   return a;
  }
- const api={create,install,siteFromStack,source};
+ const api={create,install,siteFromStack,source,vetoEvidence};
  if(typeof module!=='undefined'&&module.exports)module.exports=api;
  if(root)root.__novaBomberBurstAudit=api;
 })(typeof window!=='undefined'?window:globalThis);
