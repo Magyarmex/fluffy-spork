@@ -90,3 +90,19 @@ test('missing Observer and disabled Observer clear stale relay without removing 
   assert.equal(w.owner.__novaSpotterContactId, -1);
   assert.equal(w.owner.__novaSpotterContactUntil, 0);
 });
+
+test('composed Fair Engagement loses offscreen relay when the actual Observer loses sight', () => {
+  const fair = fs.readFileSync(path.join(root, 'nova-updates/fair-engagement-v1.11.2.js'), 'utf8');
+  const window = { __novaModules: {} };
+  vm.runInNewContext(fair, { window, Math, Number, Object, Array,
+    console: { info() {}, error() {} } }, { filename: 'fair-engagement-v1.11.2.js' });
+  const canPerceive = window.__NOVA_FAIR_ENGAGEMENT_TEST__.canPerceive;
+  const classes = { lineageForClass: () => 'sniper' };
+  const w = world(); acquire(w);
+  assert.equal(canPerceive(w.g, classes, w.owner, w.target), true,
+    'genuinely seen remote target is a legitimate relay');
+  w.target.x = 0; w.target.y = 400;
+  w.g.time += .1; w.g.updateDrones(0);
+  assert.equal(canPerceive(w.g, classes, w.owner, w.target), false,
+    'Fair Engagement cannot use the old contact ID to follow a hidden offscreen tank');
+});
