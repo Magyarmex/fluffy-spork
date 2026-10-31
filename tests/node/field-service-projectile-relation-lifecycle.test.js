@@ -104,7 +104,7 @@ test('large legitimate caches are swept at most once per four game seconds',()=>
  m.forEach=function(fn){sweeps++;return each(fn);};
  g.time=1;api.rememberDamagedOwnerProjectileRelations(g);
  assert.equal(sweeps,1);
- for(let step=0;step<100;step++){
+ for(let step=0;step<300;step++){
   m.set('1|'+(2000+step),true);
   g.time=1.01+step*.01;
   api.rememberDamagedOwnerProjectileRelations(g);
