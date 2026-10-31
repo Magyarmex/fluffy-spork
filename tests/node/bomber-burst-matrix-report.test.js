@@ -5,7 +5,7 @@ const {check,collect}=require('../../scripts/bomber-burst-matrix-report.cjs');
 function audit(n){
  return {schema:1,pilotId:1,calls:n,firstBursts:n,suppressedCalls:0,
   childrenCreated:n*6,byOwner:{pilot:n,other:0,unknown:0},
-  bySource:{battlefield:n,core:0,unknown:0},
+  bySource:{battlefield:n,core:0,disciplines:0,other:0,unknown:0},
   byTTL:{positive:n,expired:0,unknown:0},
   bySite:n?{'battlefield-v1.6.0.js:999':n}:{},examples:[]};
 }
