@@ -1,0 +1,80 @@
+name: NOVA Bomber Airburst Causal Research
+
+on:
+  pull_request:
+    paths:
+      - 'tests/browser/frontlines-natural-match-ab.cjs'
+      - 'tests/browser/bomber-burst-audit.js'
+      - 'nova-updates/disciplines-v1.7.0.js'
+      - 'scripts/bomber-airburst-causal-report.cjs'
+      - 'tests/node/bomber-airburst-causal-report.test.js'
+      - '.github/workflows/bomber-airburst-causal.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  paired-physics:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        layout: [0, 1, 2]
+        seed: [0, 1]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --no-audit --no-fund --no-package-lock
+      - run: npm install --no-save --no-audit --no-fund --no-package-lock playwright@1.56.1
+      - run: npx playwright install chromium
+      - name: Serve exact materialized NOVA game
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/nova-bomber-causal-http.log 2>&1 &
+      - name: Compare identical cover-seeking Bomber with newborn fragment advance OFF/ON/OFF replay
+        env:
+          NOVA_LAYOUT_INDEX: ${{ matrix.layout }}
+          NOVA_SEED_INDEX: ${{ matrix.seed }}
+          NOVA_PILOT_POLICY: cover-pressure
+          NOVA_AB_MODE: bomber-physics
+          NOVA_BOMBER_RESEARCH: '1'
+        run: node tests/browser/frontlines-natural-match-ab.cjs
+      - name: Preserve every trial, including zero-activation and early death
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-bomber-physics-${{ matrix.layout }}-${{ matrix.seed }}
+          path: artifacts/browser/frontlines-natural-*
+          if-no-files-found: warn
+          retention-days: 14
+
+  collate:
+    needs: paired-physics
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: nova-bomber-physics-*
+          path: artifacts/bomber-physics
+          merge-multiple: false
+      - name: Require six reproducible, matched and causal trials
+        run: node scripts/bomber-airburst-causal-report.cjs artifacts/bomber-physics 6
+      - name: Preserve causal exposure and physical divergence report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-bomber-physics-summary
+          path: artifacts/bomber-physics/bomber-airburst-causal-summary.json
+          if-no-files-found: warn
+          retention-days: 14
