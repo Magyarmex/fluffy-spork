@@ -20,7 +20,7 @@ test('paired Bomber matrix preserves zero exposure and censored deaths',()=>{
   for(let i=0;i<2;i++){
    const dir=path.join(root,'nova-bomber-burst-'+i);fs.mkdirSync(dir);
    const meta={layout:i?'FOUR GATES':'CROSSFIRE',seed:'seed-'+i,
-    pilotClass:'bomber',pilotPolicy:'cover-pressure'};
+    pilotClass:'bomber',pilotClassFinal:'bomber',pilotPolicy:'cover-pressure'};
    const off={metadata:meta,game:{time:25,status:i?'dead':'playing'},
     bomberBurstAudit:audit(i),coverPressure:{playerShellsFired:i}};
    const on={metadata:meta,game:{time:35,status:'playing'},
