@@ -23,15 +23,18 @@
   return{x:clamp(p.x,c.x-hw,c.x+hw),y:c.y+Math.sign(dy)*(hh+8)};
  }
  function select(g,p,F){
-  if(!g||!p||![p.x,p.y].every(finite)||
+  if(!g||!p||p.alive===false||(p.hp!=null&&!(finite(p.hp)&&p.hp>0))||
+     (g.player&&g.player!==p)||![p.x,p.y].every(finite)||
      !Array.isArray(g.__novaTerrain)||typeof g.hasLineOfSight!=='function'||
      !F||typeof F.viewportHalfExtents!=='function')return null;
   const ext=F.viewportHalfExtents(g);
   if(!ext||!(finite(ext.x)&&ext.x>0&&finite(ext.y)&&ext.y>0))return null;
-  const cam=g.cam||{},cx=finite(cam.x)?cam.x:p.x,cy=finite(cam.y)?cam.y:p.y;
+  const cam=g.cam;
+  if(!cam||!finite(cam.x)||!finite(cam.y))return null;
+  const cx=cam.x,cy=cam.y;
   let best=null,bestDist=Infinity,bestId=Infinity;
   for(const c of g.__novaTerrain){
-   if(!c||c.destructible!==true||c.solid===false||!(c.hp>0)||
+   if(!c||c.destructible!==true||c.solid!==true||!(finite(c.hp)&&c.hp>0)||
       !Number.isSafeInteger(c.id))continue;
    const f=face(p,c);if(!f)continue;
    if(Math.abs(f.x-p.x)>ext.x||Math.abs(f.y-p.y)>ext.y||
