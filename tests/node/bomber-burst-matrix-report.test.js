@@ -45,6 +45,9 @@ test('paired Bomber matrix preserves zero exposure and censored deaths',()=>{
   assert.equal(report.totals.ON.shellsFired,3);
   assert.equal(report.totals.ON.bySource.battlefield,3);
   assert.equal(report.totals.ON.simulatedSeconds,70);
+  assert.equal(report.rates.OFF.correctedBurstsPerMinute,0);
+  assert.equal(report.rates.ON.correctedFraction,null,
+   'no actual airburst exposure must not be reported as zero effectiveness');
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
 
