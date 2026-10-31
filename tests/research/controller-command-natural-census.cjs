@@ -51,7 +51,10 @@ function before(g,dt){
  const witnessed=expiring.filter(b=>g.__novaFrameStartBulletEpoch===epoch&&
   Number.isSafeInteger(b.id)&&b.id<g.__novaFrameStartBulletIdCeiling);
  let possible=0,guaranteed=0;
- for(const d of certified)for(const b of witnessed){
+ /* A projectile fired before drone movement can be valid even when its
+  * id exceeds the pre-frame ceiling (see same-frame birth shipping test).
+  * Count geometric candidates separately from chronological authority. */
+ for(const d of certified)for(const b of expiring){
   if(b.ownerId===d.ownerId||!finite(d.__novaChronoDronePrevX)||
      !finite(d.__novaChronoDronePrevY)||!(d.r>0))continue;
   const sx=d.__novaChronoDronePrevX,sy=d.__novaChronoDronePrevY,
