@@ -431,6 +431,16 @@ function inRenderedCamera(g,p,s,e){
  var cam=g.cam||{},cx=Number.isFinite(cam.x)?cam.x:p.x,cy=Number.isFinite(cam.y)?cam.y:p.y;
  return Math.abs(s.x-cx)<=e.x&&Math.abs(s.y-cy)<=e.y;
 }
+/* Player-facing Frontlines intelligence follows the ACTUAL rendered camera.
+ * Fair Engagement's inGameplayViewport is intentionally hull-centered for
+ * bot perception, but Long Glass can pan the player's camera away from the
+ * hull. Do not reject a rival visibly rendered on that camera. Keep the
+ * same terrain LoS from the real pilot; this grants no through-cover radar
+ * and does not alter AI perception or targeting. */
+function pilotVisualWitness(g,p,s,e){
+ return !!(g&&p&&s&&e&&inRenderedCamera(g,p,s,e)&&
+   g.hasLineOfSight(p.x,p.y,s.x,s.y,2));
+}
 function observedPocketValue(g,st,p,sector,required){
  var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__,defs=st&&st.defs||LF.defs;
  if(!F||typeof F.viewportHalfExtents!=='function'||!g||typeof g.hasLineOfSight!=='function'||!defs)return 0;
@@ -439,7 +449,7 @@ function observedPocketValue(g,st,p,sector,required){
  var sh=g.shapes||[],value=0;
  for(var i=0;i<sh.length;i++){
   var s=sh[i];if(!s||!(s.hp>0)||sectorIndex(s.x,s.y)!==sector)continue;
-  if(Math.abs(s.x-p.x)>e.x||Math.abs(s.y-p.y)>e.y||!inRenderedCamera(g,p,s,e))continue;
+  if(!inRenderedCamera(g,p,s,e))continue;
   var base=xp(defs,s.type);if(!(base>0))continue;
   if(!g.hasLineOfSight(p.x,p.y,s.x,s.y,2))continue;
   value+=base+(s.type==='crasher'?(Number(s.__lfBounty)||0):0)
@@ -465,7 +475,7 @@ function contestCandidate(g,st){
   /* The visible pocket is independent of WHICH hostile was witnessed.
    * Once one legitimate rival is visible, a failed pocket scan cannot
    * become true by repeating the same terrain rays for seven more bots. */
-  if(inRenderedCamera(g,p,t,ext)&&visible(g,p,t))
+  if(pilotVisualWitness(g,p,t,ext))
    return observedPocketValue(g,st,p,op.sector,155)>=155;
  }
  return false;
@@ -499,7 +509,7 @@ function preEntryCandidate(g,st){
   var t=ts[i];if(!t||t===p||t.id===p.id||!alive(t)||
      t.spawnShieldT>0||!Number.isFinite(t.x)||!Number.isFinite(t.y)||
      sectorIndex(t.x,t.y)!==op.sector||!contestHostile(g,p,t))continue;
-  if(visible(g,p,t)&&inRenderedCamera(g,p,t,ext))
+  if(pilotVisualWitness(g,p,t,ext))
    return observedPocketValue(g,st,p,op.sector,155)>=155;
  }
  return false;
