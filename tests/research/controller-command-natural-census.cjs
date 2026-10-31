@@ -27,7 +27,7 @@ function create(){
   framesWithCommandCertificate:0,certifiedWithExpiringShot:0,
   possiblePairs:0,geometricGuarantees:0,
   certifiedDroneHpLossEvents:0,certifiedDroneHpLost:0,
-  observedCertifiedDroneDeaths:0,observerErrors:0,examples:[]};
+  observedCertifiedDroneDeaths:0,observerErrors:0,rawExpiringShots:0,rawExpiringNonShell:0,rawExpiringPenZero:0,rawExpiringHitsZero:0,examples:[],bulletSamples:[]};
 }
 function before(g,dt){
  const epoch=g.__novaShapeSweepEpoch,ds=g.drones||[],bs=g.bullets||[];
@@ -41,6 +41,7 @@ function before(g,dt){
   d.__novaChronoCommandRawEndX===d.x&&
   d.__novaChronoCommandRawEndY===d.y&&
   finite(d.__novaChronoCommandSpeedBound)&&d.__novaChronoCommandSpeedBound>0);
+ const rawExpiring=bs.filter(b=>b&&finite(b.ttl)&&b.ttl>0&&b.ttl<=dt);
  const expiring=bs.filter(b=>b&&!b.dead&&!b.shell&&!b.beam&&!b.splash&&
   !b.__v17Cannon&&b.pen===0&&(b.hits||0)===0&&
   finite(b.ttl)&&b.ttl>0&&b.ttl<=dt&&
@@ -64,12 +65,24 @@ function before(g,dt){
   }
  }
  return {raw:raw.length,certified,expiring:expiring.length,
-  bullets:bs.length,possible,guaranteed,time:g.time};
+  bullets:bs.length,possible,guaranteed,time:g.time,
+  rawExpiring:rawExpiring.length,
+  rawNonShell:rawExpiring.filter(b=>!b.shell&&!b.beam&&!b.splash).length,
+  rawPenZero:rawExpiring.filter(b=>b.pen===0).length,
+  rawHitsZero:rawExpiring.filter(b=>(b.hits||0)===0).length,
+  bulletSample:bs.length?{ttl:bs[0].ttl,pen:bs[0].pen,hits:bs[0].hits,
+   shell:!!bs[0].shell,beam:!!bs[0].beam,splash:bs[0].splash,
+   dead:!!bs[0].dead,kind:bs[0].kind}:null};
 }
 function after(a,s){
  a.frames++;if(s.bullets)a.bulletFrames++;
  if(s.expiring)a.expiringShotFrames++;
  a.expiringShots+=s.expiring;
+ a.rawExpiringShots+=s.rawExpiring;
+ a.rawExpiringNonShell+=s.rawNonShell;
+ a.rawExpiringPenZero+=s.rawPenZero;
+ a.rawExpiringHitsZero+=s.rawHitsZero;
+ if(s.bulletSample&&a.bulletSamples.length<6)a.bulletSamples.push(s.bulletSample);
  a.commandRawDrones+=s.raw;
  a.commandCertifiedDrones+=s.certified.length;
  if(s.certified.length)a.framesWithCommandCertificate++;
