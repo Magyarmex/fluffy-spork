@@ -27,7 +27,7 @@ function create(){
   framesWithCommandCertificate:0,certifiedWithExpiringShot:0,
   possiblePairs:0,geometricGuarantees:0,
   certifiedDroneHpLossEvents:0,certifiedDroneHpLost:0,
-  observedCertifiedDroneDeaths:0,observerErrors:0,rawExpiringShots:0,rawExpiringNonShell:0,rawExpiringPenZero:0,rawExpiringHitsZero:0,examples:[],bulletSamples:[]};
+  observedCertifiedDroneDeaths:0,observerErrors:0,rawExpiringShots:0,rawExpiringNonShell:0,rawExpiringPenZero:0,rawExpiringHitsZero:0,rawPenZeroHitsZero:0,rawPenZeroHitsPositive:0,rawPenPositiveHitsZero:0,rawPenPositiveHitsPositive:0,rawDead:0,rawCannon:0,playerCommandInputFrames:0,playerDroneFrames:0,playerFormDroneFrames:0,examples:[],bulletSamples:[]};
 }
 function before(g,dt){
  const epoch=g.__novaShapeSweepEpoch,ds=g.drones||[],bs=g.bullets||[];
@@ -42,6 +42,7 @@ function before(g,dt){
   d.__novaChronoCommandRawEndY===d.y&&
   finite(d.__novaChronoCommandSpeedBound)&&d.__novaChronoCommandSpeedBound>0);
  const rawExpiring=bs.filter(b=>b&&finite(b.ttl)&&b.ttl>0&&b.ttl<=dt);
+ const playerDrones=ds.filter(d=>d&&d.hp>0&&d.ownerId===g.player?.id);
  const expiring=bs.filter(b=>b&&!b.dead&&!b.shell&&!b.beam&&!b.splash&&
   !b.__v17Cannon&&b.pen===0&&(b.hits||0)===0&&
   finite(b.ttl)&&b.ttl>0&&b.ttl<=dt&&
@@ -70,6 +71,15 @@ function before(g,dt){
   rawNonShell:rawExpiring.filter(b=>!b.shell&&!b.beam&&!b.splash).length,
   rawPenZero:rawExpiring.filter(b=>b.pen===0).length,
   rawHitsZero:rawExpiring.filter(b=>(b.hits||0)===0).length,
+  rawPenZeroHitsZero:rawExpiring.filter(b=>b.pen===0&&(b.hits||0)===0).length,
+  rawPenZeroHitsPositive:rawExpiring.filter(b=>b.pen===0&&(b.hits||0)>0).length,
+  rawPenPositiveHitsZero:rawExpiring.filter(b=>b.pen>0&&(b.hits||0)===0).length,
+  rawPenPositiveHitsPositive:rawExpiring.filter(b=>b.pen>0&&(b.hits||0)>0).length,
+  rawDead:rawExpiring.filter(b=>b.dead).length,
+  rawCannon:rawExpiring.filter(b=>b.__v17Cannon).length,
+  playerCommandInput:!!(g.player?.cls==='carrier'&&g.input?.aim?.active),
+  playerDrones:playerDrones.length,
+  playerFormDrones:playerDrones.filter(d=>d.__novaPhase==='form').length,
   bulletSample:bs.length?{ttl:bs[0].ttl,pen:bs[0].pen,hits:bs[0].hits,
    shell:!!bs[0].shell,beam:!!bs[0].beam,splash:bs[0].splash,
    dead:!!bs[0].dead,kind:bs[0].kind}:null};
@@ -82,6 +92,14 @@ function after(a,s){
  a.rawExpiringNonShell+=s.rawNonShell;
  a.rawExpiringPenZero+=s.rawPenZero;
  a.rawExpiringHitsZero+=s.rawHitsZero;
+ a.rawPenZeroHitsZero+=s.rawPenZeroHitsZero;
+ a.rawPenZeroHitsPositive+=s.rawPenZeroHitsPositive;
+ a.rawPenPositiveHitsZero+=s.rawPenPositiveHitsZero;
+ a.rawPenPositiveHitsPositive+=s.rawPenPositiveHitsPositive;
+ a.rawDead+=s.rawDead;a.rawCannon+=s.rawCannon;
+ if(s.playerCommandInput)a.playerCommandInputFrames++;
+ a.playerDroneFrames+=s.playerDrones;
+ a.playerFormDroneFrames+=s.playerFormDrones;
  if(s.bulletSample&&a.bulletSamples.length<6)a.bulletSamples.push(s.bulletSample);
  a.commandRawDrones+=s.raw;
  a.commandCertifiedDrones+=s.certified.length;
