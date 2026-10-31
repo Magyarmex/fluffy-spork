@@ -267,9 +267,12 @@ wrap('game/engine',function(engine,require){
   function steerToward(g,d,x,y,speed,dt){
     /* Repair/peel is a SECOND physical integration. Even if the final
      * endpoint coincides, a raw idle Swarm segment is no longer complete. */
-    if(g.__novaDroneChronoTraceEnabled===true&&g.__novaShapeSweepActive===true&&
-       d.__novaChronoIdleRawEpoch===g.__novaShapeSweepEpoch)
-      d.__novaChronoIdleInvalidEpoch=g.__novaShapeSweepEpoch;
+    if(g.__novaDroneChronoTraceEnabled===true&&g.__novaShapeSweepActive===true){
+      if(d.__novaChronoIdleRawEpoch===g.__novaShapeSweepEpoch)
+        d.__novaChronoIdleInvalidEpoch=g.__novaShapeSweepEpoch;
+      if(d.__novaChronoCommandRawEpoch===g.__novaShapeSweepEpoch)
+        d.__novaChronoCommandInvalidEpoch=g.__novaShapeSweepEpoch;
+    }
     if(g.hasLineOfSight&&!g.hasLineOfSight(d.x,d.y,x,y,Math.max(2,(d.r||8)*.45))&&g.novaBattlefieldWaypoint){
       var wp=g.novaBattlefieldWaypoint(d.x,d.y,x,y,(d.r||8)+5,d.id);if(wp){x=wp.x;y=wp.y;}
     }
@@ -478,6 +481,46 @@ wrap('game/engine',function(engine,require){
               (d.r||8)+5);
             if(!block)d.__novaChronoIdleUnmodifiedEpoch=epoch;
           }catch(ignored){/* diagnostics fail closed; combat stays intact */}
+        }
+        /* Separate commanded FORM certificate: only one actual integration,
+         * unchanged through terrain, cached routing, separation and peel.
+         * A bounded-speed proof is safe without assuming the drone's path. */
+        d.__novaChronoCommandBoundedEpoch=-1;
+        if(d.hp>0&&d.__novaChronoCommandRawEpoch===epoch&&
+           d.__novaChronoCommandInvalidEpoch!==epoch&&
+           d.__novaChronoDroneRouteEpoch===epoch&&
+           d.__novaChronoCommandRawDt===dt&&dt>0&&
+           d.__novaChronoDronePrevPhase==='form'&&
+           d.__novaPhase==='form'&&!d.__novaCommitted&&
+           !d.__novaTerrainBump&&
+           Number.isFinite(d.__novaChronoCommandSpeedBound)&&
+           d.__novaChronoCommandSpeedBound>0&&
+           d.__novaChronoCommandSpeedBound<=4000&&
+           Number.isFinite(d.__novaChronoCommandRawX)&&
+           Number.isFinite(d.__novaChronoCommandRawY)&&
+           Number.isFinite(d.__novaChronoCommandRawEndX)&&
+           Number.isFinite(d.__novaChronoCommandRawEndY)&&
+           d.__novaChronoDronePrevX===d.__novaChronoCommandRawX&&
+           d.__novaChronoDronePrevY===d.__novaChronoCommandRawY&&
+           d.__novaChronoDroneBaseX===d.__novaChronoCommandRawEndX&&
+           d.__novaChronoDroneBaseY===d.__novaChronoCommandRawEndY&&
+           d.__novaChronoDroneTerrainX===d.__novaChronoCommandRawEndX&&
+           d.__novaChronoDroneTerrainY===d.__novaChronoCommandRawEndY&&
+           d.__novaChronoDroneRouteX===d.__novaChronoCommandRawEndX&&
+           d.__novaChronoDroneRouteY===d.__novaChronoCommandRawEndY&&
+           d.x===d.__novaChronoCommandRawEndX&&
+           d.y===d.__novaChronoCommandRawEndY&&
+           Math.hypot(d.x-d.__novaChronoCommandRawX,
+             d.y-d.__novaChronoCommandRawY)<=
+             d.__novaChronoCommandSpeedBound*dt+1e-6&&
+           typeof this.firstTerrainHit==='function'){
+          try{
+            var commandBlock=this.firstTerrainHit(
+              d.__novaChronoCommandRawX,d.__novaChronoCommandRawY,
+              d.__novaChronoCommandRawEndX,d.__novaChronoCommandRawEndY,
+              (d.r||8)+5);
+            if(!commandBlock)d.__novaChronoCommandBoundedEpoch=epoch;
+          }catch(ignoredCommand){/* unknown terrain fails closed */}
         }
       }
     }

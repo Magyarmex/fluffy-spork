@@ -921,7 +921,22 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       * drone-corridor veto still protects an earlier tank/shape contact. */
      return;
     }
-    var speedBound=Math.max(1200,e.speed*6,
+    /* A single commanded FORM integration, certified by every later
+     * movement owner, has a tighter rigorous speed envelope. The generic
+     * 1200u/s unknown-motion guard remains unchanged for all other drones. */
+    var commandCertified=
+      g.__novaDroneChronoTraceEnabled===true&&
+      e.__novaChronoCommandBoundedEpoch===g.__novaShapeSweepEpoch&&
+      e.__novaChronoCommandRawEpoch===g.__novaShapeSweepEpoch&&
+      e.__novaChronoCommandRawDt===dt&&
+      e.__novaChronoCommandRawX===dsx&&
+      e.__novaChronoCommandRawY===dsy&&
+      e.__novaChronoCommandRawEndX===e.x&&
+      e.__novaChronoCommandRawEndY===e.y&&
+      Number.isFinite(e.__novaChronoCommandSpeedBound)&&
+      e.__novaChronoCommandSpeedBound>0;
+    var speedBound=commandCertified?e.__novaChronoCommandSpeedBound:
+      Math.max(1200,e.speed*6,
       (e.__novaChronoDronePrevSpeed||0)*6,
       (e.__novaChronoDronePrevV||0)*2,
       Math.hypot(e.__novaVX||0,e.__novaVY||0)*2,
@@ -3186,8 +3201,12 @@ function certifiedMultiShotCoverPriority(g,dt){
  var traced=traceOn&&d&&d.__novaChronoDroneEpoch===this.__novaShapeSweepEpoch;
  if(traced){d.__novaChronoDroneBaseX=d.x;d.__novaChronoDroneBaseY=d.y;}
  var hit=circleResolve(this,d,(d.r||8)+1);if(hit){
-  if(traced&&d.__novaChronoIdleRawEpoch===this.__novaShapeSweepEpoch)
-   d.__novaChronoIdleInvalidEpoch=this.__novaShapeSweepEpoch;
+  if(traced){
+   if(d.__novaChronoIdleRawEpoch===this.__novaShapeSweepEpoch)
+    d.__novaChronoIdleInvalidEpoch=this.__novaShapeSweepEpoch;
+   if(d.__novaChronoCommandRawEpoch===this.__novaShapeSweepEpoch)
+    d.__novaChronoCommandInvalidEpoch=this.__novaShapeSweepEpoch;
+  }
   if(d.__novaPhase==='dash'){d.__novaPhase='recover';d.__novaPhaseT=Math.max(.28,d.__novaPhaseT||0);d.__novaCommitted=false;d.__novaTarget=null;if(this.addParticles)this.addParticles(d.x,d.y,d.color,4,65,'spark');}var n=d.__novaTerrainBump,side=d.__novaTerrainBias||(((d.id||0)&1)?1:-1);d.__novaTerrainBias=side;if(n){d.x+=-n.y*side*28*dt;d.y+=n.x*side*28*dt;}circleResolve(this,d,(d.r||8)+1);
   /* Rectangle/circle contact is inclusive in isTerrainSafe. The legacy
    * resolver lands exactly on the padded face, which the later Live Vector
@@ -3235,6 +3254,9 @@ function certifiedMultiShotCoverPriority(g,dt){
    * collision gate; optional stages are kept separate from this authority. */
   if(this.__novaDroneChronoTraceEnabled===true){
    cd.__novaChronoDroneTraceEpoch=-1;cd.__novaChronoDroneRouteEpoch=-1;cd.__novaChronoDroneLiveEpoch=-1;
+   cd.__novaChronoCommandRawEpoch=-1;
+   cd.__novaChronoCommandInvalidEpoch=-1;
+   cd.__novaChronoCommandBoundedEpoch=-1;
    /* Raw Swarm integration witnesses are per-epoch diagnostics, never
     * collision authority. Invalidate before any drone owner moves. */
    cd.__novaChronoIdleRawEpoch=-1;

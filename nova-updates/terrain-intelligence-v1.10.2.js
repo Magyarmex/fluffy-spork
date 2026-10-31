@@ -181,10 +181,18 @@ function applyEscape(state,vx,vy){var sp=Math.hypot(vx||0,vy||0);if(!state||sp<1
 function droneIntent(d){
   var vx=d.__novaVX||0,vy=d.__novaVY||0;if(d.__novaSpotter&&Math.hypot(d.__novaScoutVX||0,d.__novaScoutVY||0)>24){vx=d.__novaScoutVX||0;vy=d.__novaScoutVY||0;}return{x:vx,y:vy};
 }
-function separateSwarm(group){
+function separateSwarm(group,g){
   for(var i=0;i<group.length;i++){var a=group[i];if(!a||a.hp<=0||a.__novaPhase==='dash'||a.__novaPhase==='windup')continue;var sx=0,sy=0,n=0;
     for(var j=0;j<group.length;j++){if(i===j)continue;var b=group[j];if(!b||b.hp<=0)continue;var dd=d2(a.x,a.y,b.x,b.y);if(dd<=1||dd>30*30)continue;var m=Math.sqrt(dd);sx+=(a.x-b.x)/m*(1-m/30);sy+=(a.y-b.y)/m*(1-m/30);n++;}
-    if(n){var vx=a.__novaVX||0,vy=a.__novaVY||0,speed=Math.hypot(vx,vy);if(speed>1e-6){var sm=Math.hypot(sx,sy)||1,nx=vx+sx/sm*speed*.075,ny=vy+sy/sm*speed*.075,nm=Math.hypot(nx,ny);if(nm>1e-6){a.__novaVX=nx/nm*speed;a.__novaVY=ny/nm*speed;}}}
+    if(n){var vx=a.__novaVX||0,vy=a.__novaVY||0,speed=Math.hypot(vx,vy);if(speed>1e-6){var sm=Math.hypot(sx,sy)||1,nx=vx+sx/sm*speed*.075,ny=vy+sy/sm*speed*.075,nm=Math.hypot(nx,ny);if(nm>1e-6){
+      a.__novaVX=nx/nm*speed;a.__novaVY=ny/nm*speed;
+      /* Post-integration separation changes steering authority. Even
+       * though this frame's endpoint is unchanged, refuse the optional
+       * commanded-motion certificate rather than trust a mixed owner. */
+      if(g&&g.__novaDroneChronoTraceEnabled===true&&
+         a.__novaChronoCommandRawEpoch===g.__novaShapeSweepEpoch)
+        a.__novaChronoCommandInvalidEpoch=g.__novaShapeSweepEpoch;
+    }}}
   }
 }
 function idleControllerGoal(d){
@@ -260,7 +268,11 @@ wrap('game/engine',function(engine,require){
           d.__novaChronoIdleInvalidEpoch=this.__novaShapeSweepEpoch;
       }
       var intent=droneIntent(d),sp=Math.hypot(intent.x,intent.y),st=sampleStuck(this,d,intent.x,intent.y,pad,d.id,d.__v1102Nav||(d.__v1102Nav={}));
-      if(st.escapeUntil>now&&sp>1){var e=applyEscape(st,intent.x,intent.y);if(d.__novaSpotter){d.__novaScoutVX=e.x;d.__novaScoutVY=e.y;}else{d.__novaVX=e.x;d.__novaVY=e.y;}}
+      if(st.escapeUntil>now&&sp>1){
+        if(this.__novaDroneChronoTraceEnabled===true&&
+           d.__novaChronoCommandRawEpoch===this.__novaShapeSweepEpoch)
+          d.__novaChronoCommandInvalidEpoch=this.__novaShapeSweepEpoch;
+        var e=applyEscape(st,intent.x,intent.y);if(d.__novaSpotter){d.__novaScoutVX=e.x;d.__novaScoutVY=e.y;}else{d.__novaVX=e.x;d.__novaVY=e.y;}}
       if(d.__novaSpotter&&sp>28&&now>=(d.__v1102SpotterPlanAt||0)){
         d.__v1102SpotterPlanAt=now+.125+((Math.abs(d.id||0)%3)*.014);var ux=intent.x/sp,uy=intent.y/sp,gx=d.x+ux*360,gy=d.y+uy*360;
         if(this.hasLineOfSight&&!this.hasLineOfSight(d.x,d.y,gx,gy,Math.max(2,pad*.35))){
@@ -268,7 +280,19 @@ wrap('game/engine',function(engine,require){
         }
       }
     }
-    Object.keys(groups).forEach(function(k){separateSwarm(groups[k]);});
+    Object.keys(groups).forEach(function(k){separateSwarm(groups[k],this);},this);
+    /* Separation or rerouting after the Controller integrator invalidates
+     * its single-step witness even if a later wrapper restores the endpoint. */
+    if(this.__novaDroneChronoTraceEnabled===true&&this.__novaShapeSweepActive===true){
+      var commandEpoch=this.__novaShapeSweepEpoch;
+      for(var si=0;si<ds.length;si++){
+        var moved=ds[si];
+        if(moved&&moved.__novaChronoCommandRawEpoch===commandEpoch&&
+           (moved.x!==moved.__novaChronoCommandRawEndX||
+            moved.y!==moved.__novaChronoCommandRawEndY))
+          moved.__novaChronoCommandInvalidEpoch=commandEpoch;
+      }
+    }
     /* Optional checkpoint after routing/separation, between Battlefield's
      * terrain stage and Live Vector's repair/peel stage. It is a position
      * observation, NOT a time-stamped physical collision trajectory. */

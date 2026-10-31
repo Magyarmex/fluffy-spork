@@ -73,6 +73,7 @@ jobs:
           node tests/browser/crasher-recovery-cue.cjs
           node tests/browser/bomber-terrain-child-birth.cjs
           node tests/browser/bomber-airburst-child-birth.cjs
+          node tests/browser/controller-command-ttl-contact.cjs
           node tests/browser/hybrid-button-handoff.cjs
           node tests/browser/shipping-ui-smoke.cjs
           node tests/browser/tactical-frontlines-memory.cjs

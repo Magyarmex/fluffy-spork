@@ -211,9 +211,12 @@ wrap('game/engine',function(engine,require){
       if((d.__v172WaypointUntil||0)<(g.time||0)||d2(d.x,d.y,wp.x,wp.y)<24*24){d.__v172Waypoint=null;d.__v172Routing=false;continue;}
       var q=norm(wp.x-d.x,wp.y-d.y),speed=Math.max(80,Math.hypot(d.__novaVX||0,d.__novaVY||0));
       d.__novaVX=(d.__novaVX||0)*.42+q.x*speed*.58;d.__novaVY=(d.__novaVY||0)*.42+q.y*speed*.58;
-      if(g.__novaDroneChronoTraceEnabled===true&&g.__novaShapeSweepActive===true&&
-         d.__novaChronoIdleRawEpoch===g.__novaShapeSweepEpoch)
-        d.__novaChronoIdleInvalidEpoch=g.__novaShapeSweepEpoch;
+      if(g.__novaDroneChronoTraceEnabled===true&&g.__novaShapeSweepActive===true){
+        if(d.__novaChronoIdleRawEpoch===g.__novaShapeSweepEpoch)
+          d.__novaChronoIdleInvalidEpoch=g.__novaShapeSweepEpoch;
+        if(d.__novaChronoCommandRawEpoch===g.__novaShapeSweepEpoch)
+          d.__novaChronoCommandInvalidEpoch=g.__novaShapeSweepEpoch;
+      }
       d.x+=q.x*22*dt;d.y+=q.y*22*dt;d.__v172Routing=true;
     }
   }
