@@ -127,9 +127,15 @@ function setSignal(g,st,d){var now=g.time||0,sig={type:d.type,started:now,until:
   }
   st.cooldowns.star=58;s.__lfPublicAnnounced=true;
   sig.starId=s.id;sig.x=s.x;sig.y=s.y;
+  /* Only the announced coordinate is public. Retain it as a deliberately
+   * stale, bounded intercept clue; never update from the living Star. */
+  st.starMemory={x:sig.x,y:sig.y,starId:sig.starId,
+   announcedAt:now,until:now+17};
   st.lastMeaningfulAt=now;
   st.stats.starAnnouncements=(st.stats.starAnnouncements||0)+1;
- }if(d.type!=='MIGRATION')st.migrationMemory=null;st.signal=sig;st.lastSignal=d.type;st.lastSignalAt=now;if(d.type==='BLOOM')ensureFrontline(g,st);if(g.toast)g.toast(d.type==='BLOOM'?bloomToast(g,d.sector):d.type==='MIGRATION'?migrationToast(g,d.from,d.to):rogueStarToast(g,sig),'info');if(g.sfx&&g.sfx.novaLivingSignal)g.sfx.novaLivingSignal(d.type,g.player?clamp((sig.x-g.player.x)/900,-1,1):0);}
+ }if(d.type!=='MIGRATION')st.migrationMemory=null;
+ if(d.type!=='ROGUE STAR')st.starMemory=null;
+ st.signal=sig;st.lastSignal=d.type;st.lastSignalAt=now;if(d.type==='BLOOM')ensureFrontline(g,st);if(g.toast)g.toast(d.type==='BLOOM'?bloomToast(g,d.sector):d.type==='MIGRATION'?migrationToast(g,d.from,d.to):rogueStarToast(g,sig),'info');if(g.sfx&&g.sfx.novaLivingSignal)g.sfx.novaLivingSignal(d.type,g.player?clamp((sig.x-g.player.x)/900,-1,1):0);}
 LF.directorTick=function(g,st){var t0=LF.ms(),hasStar=false,adoptStarId=null,sh=g.shapes||[],now=g.time||0;
  for(var i=0;i<sh.length;i++){
   var s=sh[i];if(!s||!(s.hp>0)||s.type!=='star')continue;
@@ -138,7 +144,7 @@ LF.directorTick=function(g,st){var t0=LF.ms(),hasStar=false,adoptStarId=null,sh=
   if(!s.__lfPublicAnnounced&&Number.isFinite(s.__lfStarBorn)&&age>=0&&age<=8)
    adoptStarId=s.id;
  }
- if(st.signal&&st.signal.type==='ROGUE STAR'&&st.signal.starId&&g.getShape&&!g.getShape(st.signal.starId))st.signal=null;var d=decision(st,{enabled:st.directorEnabled,now:g.time||0,hasStar:hasStar,adoptStarId:adoptStarId});if(d)setSignal(g,st,d);if(st.signal&&(g.time||0)>=st.signal.until)st.signal=null;var observed=updateContest(g,st);frontlineTick(g,st,observed);LF.planSample(st,LF.ms()-t0);};
+ if(st.signal&&st.signal.type==='ROGUE STAR'&&st.signal.starId&&g.getShape&&!g.getShape(st.signal.starId)){st.signal=null;st.starMemory=null;}var d=decision(st,{enabled:st.directorEnabled,now:g.time||0,hasStar:hasStar,adoptStarId:adoptStarId});if(d)setSignal(g,st,d);if(st.signal&&(g.time||0)>=st.signal.until)st.signal=null;var observed=updateContest(g,st);frontlineTick(g,st,observed);LF.planSample(st,LF.ms()-t0);};
 function visible(g,t,s){var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;var inView=F&&F.inGameplayViewport?F.inGameplayViewport(g,t,s):(function(){var z=(g.cam&&g.cam.zoom)||1,hx=(g.w||800)/(2*z),hy=(g.h||600)/(2*z);return Math.abs(s.x-t.x)<=hx&&Math.abs(s.y-t.y)<=hy;})();return !!inView&&(!g.hasLineOfSight||g.hasLineOfSight(t.x,t.y,s.x,s.y,2));}
 
 /* Tactical Frontlines: a BLOOM is contested only when the human pilot and a
@@ -752,6 +758,29 @@ function migrationPhysicalArrival(g,t,bx,by,ax,ay,dt){
    ctx.lineTo(bx,by);
    ctx.lineTo(bx-Math.cos(angle+.6)*8,by-Math.sin(angle+.6)*8);
    ctx.stroke();ctx.restore();
+  }
+  /* The live Star announcement is only seven seconds long. Afterwards,
+   * preserve its FROZEN public coordinate as an explicitly uncertain clue
+   * for ten more seconds. Never query the living Star, even to learn whether
+   * it died or moved. A new live signal takes priority; this is not radar. */
+  var starMem=st&&st.starMemory;
+  if(ctx&&starMem&&st.directorEnabled!==false&&
+     this.status==='playing'&&this.player&&alive(this.player)&&!live&&
+     Number.isFinite(starMem.announcedAt)&&
+     now>=starMem.announcedAt+7&&now<starMem.until&&
+     Number.isFinite(starMem.x)&&Number.isFinite(starMem.y)&&
+     Math.abs(starMem.x)<=LF.ARENA&&Math.abs(starMem.y)<=LF.ARENA){
+   var ss=216/(LF.ARENA*2),sx=(starMem.x+LF.ARENA)*ss,
+       sy=(starMem.y+LF.ARENA)*ss,
+       sf=clamp((starMem.until-now)/10,0,1);
+   ctx.save();ctx.globalAlpha=.18+.42*sf;
+   ctx.strokeStyle='#ffe066';ctx.lineWidth=2.8;
+   if(ctx.setLineDash)ctx.setLineDash([4,5]);
+   ctx.beginPath();ctx.arc(sx,sy,14,0,Math.PI*2);ctx.stroke();
+   if(ctx.setLineDash)ctx.setLineDash([]);
+   ctx.font='900 27px Rajdhani,system-ui';ctx.textAlign='center';
+   ctx.textBaseline='middle';ctx.fillStyle='#ffe066';
+   ctx.fillText('?',sx,sy-1);ctx.restore();
   }
   if(!ctx||!op)return out;
   var center=sectorCenter(op.sector),scale=216/(LF.ARENA*2),x=(center.x+LF.ARENA)*scale,y=(center.y+LF.ARENA)*scale;

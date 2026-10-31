@@ -129,6 +129,45 @@ const {chromium}=require('playwright');
      'Star dot should remain available when physically visible: '+JSON.stringify(marker));
     assert.equal(marker.cameraShiftedDots.length,0,
      'Long Glass camera offset must not reveal an off-screen Star: '+JSON.stringify(marker));
+    // Verify the real rendered afterimage at both phone widths. Its "?"
+    // refers to the FROZEN public report, never to a hidden live Star.
+    const ghost=await page.evaluate(()=>{
+     const g=window.__novaStarCompassGame,st=g.__lfState,mem=st.starMemory;
+     if(!mem)throw Error('public Star memory missing');
+     const star=g.getShape(mem.starId),ctx=g.mmCtx;
+     const saved={time:g.time,signal:st.signal,x:star.x,y:star.y};
+     const arc=ctx.arc,fillText=ctx.fillText,fillRect=ctx.fillRect;
+     const rings=[],texts=[],dots=[];
+     g.setPaused(true);
+     try{
+      ctx.arc=function(x,y,r){if(Math.abs(r-14)<1e-6)rings.push([x,y]);return arc.apply(this,arguments);};
+      ctx.fillText=function(t,x,y){if(t==='?')texts.push([x,y]);return fillText.apply(this,arguments);};
+      ctx.fillRect=function(x,y,w,h){if(w===2&&h===2&&this.fillStyle==='#ffe066')dots.push([x,y]);return fillRect.apply(this,arguments);};
+      const sample=()=>{rings.length=0;texts.length=0;dots.length=0;g.drawMinimap();return{rings:rings.slice(),texts:texts.slice(),dots:dots.slice()};};
+      star.x=g.player.x>0?-2100:2100;star.y=g.player.y>0?-2100:2100;
+      g.time=mem.announcedAt+8;st.signal=null;
+      const after=sample();
+      g.time=mem.until+.001;const expired=sample();
+      g.time=mem.announcedAt+8;
+      st.signal={type:'BLOOM',sector:4,started:g.time-1,until:g.time+3};
+      const superseded=sample();
+      return{after,expired,superseded,
+       expected:[(mem.x+2250)*216/4500,(mem.y+2250)*216/4500],
+       hidden:[(star.x+2250)*216/4500,(star.y+2250)*216/4500],
+       until:mem.until,announcedAt:mem.announcedAt};
+     }finally{
+      ctx.arc=arc;ctx.fillText=fillText;ctx.fillRect=fillRect;
+      g.time=saved.time;st.signal=saved.signal;
+      star.x=saved.x;star.y=saved.y;g.setPaused(false);
+     }
+    });
+    assert.equal(ghost.after.rings.length,1,'one stale public ring: '+JSON.stringify(ghost));
+    assert.equal(ghost.after.texts.length,1,'one uncertainty glyph: '+JSON.stringify(ghost));
+    assert.equal(ghost.after.dots.length,0,'no hidden live Star dot: '+JSON.stringify(ghost));
+    assert.ok(near(ghost.after.rings[0],ghost.expected),'ring must use reported coordinate');
+    assert.ok(!near(ghost.after.rings[0],ghost.hidden),'ring must not track hidden Star');
+    assert.equal(ghost.expired.rings.length,0,'memory must expire');
+    assert.equal(ghost.superseded.rings.length,0,'new public signal takes priority');
     assert.match(signal.emitted,/^★ ROGUE STAR · REPORTED (?:E|SE|S|SW|W|NW|N|NE|NEAR YOU) · cut its route$/);
     assert.equal(signal.viewport,width);
     await page.waitForFunction(message=>[...document.querySelectorAll('.panel.anim-pop')].
