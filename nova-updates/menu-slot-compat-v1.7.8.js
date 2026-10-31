@@ -549,6 +549,7 @@ function validOrigin(p){
  * Hash only witnessed death state into an independent local xorshift stream.
  * FRESH retains its exact legacy random stream and spawn behavior. */
 function returnSeed(p,time,id,nextId){
+ if(!validOrigin(p)||!Number.isFinite(time)||!Number.isFinite(id))return 0;
  var inputs=[Math.round(p.x*1024)|0,Math.round(p.y*1024)|0,
   Math.round((Number(time)||0)*1000)|0,(Number(id)||0)|0,(Number(nextId)||0)|0];
  var h=0x9e3779b9;
