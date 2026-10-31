@@ -813,6 +813,38 @@ function migrationPhysicalArrival(g,t,bx,by,ax,ay,dt){
     this.status==='playing'&&this.player&&a.pilotRef===this.player&&alive(this.player)&&
     sectorIndex(this.player.x,this.player.y)!==op.sector&&
     nearBloomEdge(this.player,op.sector));
+  /* Director alone owns contest credit. A cached solid badge must also
+   * have a recent, direct Fair Engagement visual witness. The camera can
+   * jump independently of the hull (Long Glass), so large camera jumps,
+   * zoom changes and viewport resizes invalidate the cache immediately.
+   * Ordinary small camera motion is bounded by the 160ms visual cadence. */
+  if(!inside){
+   if(st){st.__lfContestVisualFresh=false;st.__lfContestVisualNextAt=0;}
+  }else{
+   var key=op.sector+':'+op.announcedAt,
+    cam=this.cam||{},cx=Number.isFinite(cam.x)?cam.x:this.player.x,
+    cy=Number.isFinite(cam.y)?cam.y:this.player.y,
+    zoom=Number.isFinite(cam.zoom)&&cam.zoom>0?cam.zoom:1,
+    jumpX=Math.max(40,(this.w||0)/(4*zoom)),
+    jumpY=Math.max(40,(this.h||0)/(4*zoom));
+   if(st.__lfContestVisualPilot!==this.player||st.__lfContestVisualKey!==key||
+      st.__lfContestVisualW!==this.w||st.__lfContestVisualH!==this.h||
+      st.__lfContestVisualZoom!==zoom||
+      Math.abs(cx-st.__lfContestVisualCamX)>jumpX||
+      Math.abs(cy-st.__lfContestVisualCamY)>jumpY||
+      !Number.isFinite(st.__lfContestVisualNextAt)||
+      now<(st.__lfContestVisualLastAt||0)||now>=st.__lfContestVisualNextAt){
+    st.__lfContestVisualPilot=this.player;
+    st.__lfContestVisualKey=key;
+    st.__lfContestVisualW=this.w;st.__lfContestVisualH=this.h;
+    st.__lfContestVisualZoom=zoom;
+    st.__lfContestVisualCamX=cx;st.__lfContestVisualCamY=cy;
+    st.__lfContestVisualLastAt=now;
+    st.__lfContestVisualNextAt=now+.16;
+    st.__lfContestVisualFresh=contestCandidate(this,st);
+   }
+   inside=!!st.__lfContestVisualFresh;
+  }
   if(!inside&&!approaching)return out;
   /* NOVA_VISUAL_INTENT: spatial minimap threat — a dashed ! means a
    * witnessed visible rival BEFORE entry; the solid ! is the original
