@@ -403,8 +403,107 @@ wrap('game/engine',function(engine,require){
     return d;
   };
 
+  /* A post-core fuse crossing creates shrapnel too late for the ordinary
+   * bullet pass. In an independently clear corridor, advance the newborn
+   * children through ONLY the time after physical fuse crossing. Any possible
+   * first contact retains the existing collision owner (#147/#193); never
+   * teleport shrapnel across cover or silently invent damage here. */
+  function advanceClearFuseChildren(g,parent,first,dt,cross,sole){
+    if(!sole||!(dt>0&&dt<=.05&&cross>1e-9&&cross<1-1e-9)||
+       !Array.isArray(g.__novaTerrain)||!Array.isArray(g.bullets))return;
+    var remaining=dt*(1-cross),count=g.bullets.length-first;
+    if(count<3||count>12)return;
+    for(var q=0;q<first;q++)
+      if(g.bullets[q]&&g.bullets[q]!==parent&&!g.bullets[q].dead)return;
+    var plans=[];
+    function near(ax,ay,bx,by,x,y,r){
+      if(!Number.isFinite(x)||!Number.isFinite(y)||!(r>=0))return true;
+      var dx=bx-ax,dy=by-ay,den=dx*dx+dy*dy;
+      var t=den>1e-12?clamp(((x-ax)*dx+(y-ay)*dy)/den,0,1):0;
+      var px=ax+dx*t-x,py=ay+dy*t-y;
+      return px*px+py*py<=r*r;
+    }
+    function entityClear(e,r,ax,ay,bx,by,childR){
+      if(!e||!Number.isFinite(e.x)||!Number.isFinite(e.y)||
+         !Number.isFinite(e.vx)||!Number.isFinite(e.vy)||
+         !(Number.isFinite(r)&&r>0))return false;
+      var speed=Math.hypot(e.vx,e.vy);
+      if(!(speed<=2400))return false;
+      /* Existing movement witnesses are checked when available. Unknown
+       * movement receives a deliberately generous 1600u/s allowance. */
+      var pad=r+childR+30+dt*(speed+1600);
+      if(near(ax,ay,bx,by,e.x,e.y,pad))return false;
+      var px=null,py=null;
+      if(e.__novaSweepMoveTime===g.time){
+        px=e.__novaSweepPrevX;py=e.__novaSweepPrevY;
+      }else if(g.__novaShapeSweepActive&&
+               e.__novaShapeSweepEpoch===g.__novaShapeSweepEpoch){
+        px=e.__novaShapeSweepPrevX;py=e.__novaShapeSweepPrevY;
+      }else if(g.__novaShapeSweepActive&&
+               e.__novaChronoDroneEpoch===g.__novaShapeSweepEpoch){
+        px=e.__novaChronoDronePrevX;py=e.__novaChronoDronePrevY;
+      }
+      if(px!==null){
+        if(!Number.isFinite(px)||!Number.isFinite(py)||
+           Math.hypot(px-e.x,py-e.y)>96)return false;
+        if(near(ax,ay,bx,by,px,py,pad))return false;
+      }
+      return true;
+    }
+    for(var i=first;i<g.bullets.length;i++){
+      var c=g.bullets[i];
+      if(!c||c.dead||c.shell||c.beam||c.ownerId!==parent.ownerId||
+         !(c.r>0)||!(c.ttl>remaining)||
+         !Number.isFinite(c.x)||!Number.isFinite(c.y)||
+         !Number.isFinite(c.px)||!Number.isFinite(c.py)||
+         !Number.isFinite(c.vx)||!Number.isFinite(c.vy)||
+         !Number.isFinite(c.ttl)||
+         Math.hypot(c.vx,c.vy)>360)return;
+      var ex=c.x+c.vx*remaining,ey=c.y+c.vy*remaining,pad=c.r+1;
+      if(!Number.isFinite(ex)||!Number.isFinite(ey)||
+         Math.max(Math.abs(c.x),Math.abs(c.y),Math.abs(ex),Math.abs(ey))>=2200)return;
+      for(var ti=0;ti<g.__novaTerrain.length;ti++){
+        var s=g.__novaTerrain[ti];
+        if(!s||s.solid===false||(s.destructible&&!(s.hp>0)))continue;
+        if(!Number.isFinite(s.x)||!Number.isFinite(s.y))return;
+        if(s.shape==='circle'){
+          if(!(s.r>0)||near(c.x,c.y,ex,ey,s.x,s.y,s.r+pad))return;
+        }else if(s.shape==='rect'){
+          if(!(s.w>0&&s.h>0))return;
+          if(Math.max(c.x,ex)+pad>=s.x-s.w*.5&&
+             Math.min(c.x,ex)-pad<=s.x+s.w*.5&&
+             Math.max(c.y,ey)+pad>=s.y-s.h*.5&&
+             Math.min(c.y,ey)-pad<=s.y+s.h*.5)return;
+        }else return;
+      }
+      var tanks=g.tanks||[],shapes=g.shapes||[],drones=g.drones||[];
+      for(var j=0;j<tanks.length;j++){
+        var t=tanks[j];if(!t||!t.alive||t.id===parent.ownerId)continue;
+        var def=C[t.cls];
+        if(!def||!entityClear(t,(def.size||0)+3,c.x,c.y,ex,ey,c.r))return;
+      }
+      for(var k=0;k<shapes.length;k++){
+        var shape=shapes[k];if(!shape||!(shape.hp>0))continue;
+        if(!entityClear(shape,shape.r,c.x,c.y,ex,ey,c.r))return;
+      }
+      for(var di=0;di<drones.length;di++){
+        var drone=drones[di];
+        if(!drone||!(drone.hp>0)||drone.ownerId===parent.ownerId)continue;
+        if(!entityClear(drone,(drone.r||0)+1,c.x,c.y,ex,ey,c.r))return;
+      }
+      plans.push({child:c,x:ex,y:ey});
+    }
+    /* Atomic commit: never move only some children if another is contested.
+     * Keep px/py at their actual birth position for a truthful trail. */
+    for(var n=0;n<plans.length;n++){
+      var p=plans[n];p.child.x=p.x;p.child.y=p.y;
+      p.child.ttl-=remaining;
+    }
+  }
+
   var oldBullets=Game.prototype.updateBullets;
   Game.prototype.updateBullets=function(dt){
+    var sole=this.bullets&&this.bullets.length===1;
     oldBullets.call(this,dt);
     /* Programmable cannon airbursts happen after normal collision resolution:
        direct hits therefore still beat the fuse, while surviving rounds detonate at the programmed distance. */
@@ -419,6 +518,7 @@ wrap('game/engine',function(engine,require){
        * hit or a high-penetration cover-breach path: those require the wider
        * chronological resolver. The historical 2u early-trigger tolerance
        * remains unchanged when the fuse circle was not actually crossed. */
+      var physicalCross=null;
       if((b.hits||0)===0&&(b.pen||0)<2&&b.__novaBreachAtTime!==this.time&&tr>=b.__v17FuseDist&&
          Number.isFinite(b.px)&&Number.isFinite(b.py)&&
          Number.isFinite(b.__v17SpawnX)&&Number.isFinite(b.__v17SpawnY)){
@@ -429,13 +529,17 @@ wrap('game/engine',function(engine,require){
           var h=fx*dx+fy*dy,disc=h*h-a*c;
           if(disc>=0){
             var root=Math.sqrt(disc),t=h>=0?-c/(h+root):(-h+root)/a;
-            if(t>=0&&t<=1){b.x=b.px+dx*t;b.y=b.py+dy*t;}
+            if(t>=0&&t<=1){b.x=b.px+dx*t;b.y=b.py+dy*t;physicalCross=t;}
           }
         }
       }
       var owner=this.getTank&&this.getTank(b.ownerId),frac=b.splashDmg||.36;
       if(!b.__v17FuseArmed)frac*=.72;
-      if(b.shell&&this.clusterBurst)this.clusterBurst(b);
+      if(b.shell&&this.clusterBurst){
+        var childStart=this.bullets.length;
+        this.clusterBurst(b);
+        advanceClearFuseChildren(this,b,childStart,dt,physicalCross,sole);
+      }
       if((b.splash||0)>0&&this.splashAt)this.splashAt(b.x,b.y,b.splash,frac,b.ownerId,b.knock||0,b.color,b.dmg);
       if(this.addRing)this.addRing(b.x,b.y,b.color,Math.max(28,(b.splash||48)*.42));
       if(owner&&owner.isPlayer&&this.addText)this.addText(b.x,b.y-20,'AIRBURST',b.color,9);
