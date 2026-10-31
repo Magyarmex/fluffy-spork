@@ -8,6 +8,8 @@ on:
       - 'tests/browser/frontlines-visible-defense.js'
       - 'tests/browser/frontlines-commitment-audit.js'
       - 'scripts/frontlines-natural-matrix-report.cjs'
+      - 'scripts/projectile-density-report.cjs'
+      - 'tests/browser/projectile-density-audit.js'
       - 'scripts/frontlines-defense-matrix-report.cjs'
       - 'scripts/frontlines-ab-batch.cjs'
       - 'scripts/frontlines-ab-report.cjs'
@@ -144,11 +146,15 @@ jobs:
           merge-multiple: false
       - name: Validate all attempted pairs and preserve bloom-less censored trials
         run: node scripts/frontlines-natural-matrix-report.cjs artifacts/matrix 18
+      - name: Collate projectile density and cover-break upper-bound exposure
+        run: node scripts/projectile-density-report.cjs artifacts/matrix 18
       - name: Preserve audited matrix summary
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: nova-frontlines-natural-matrix-summary
-          path: artifacts/matrix/frontlines-natural-matrix-summary.json
+          path: |
+            artifacts/matrix/frontlines-natural-matrix-summary.json
+            artifacts/matrix/projectile-density-summary.json
           if-no-files-found: warn
           retention-days: 14
