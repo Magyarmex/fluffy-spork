@@ -1546,7 +1546,9 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   for(var i=0;i<bullets.length;i++){
    var b=bullets[i];
    if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon)continue;
-   if(nonExpiring ? b.ttl>dt&&(b.pen===1||b.pen===2)&&(b.hits||0)===0 :
+   if(nonExpiring ? b.ttl>dt&&(
+       ((b.pen===1||b.pen===2)&&(b.hits||0)===0)||
+       (b.pen===1&&hasSingleLivePriorTankVictim(b))) :
       b.ttl>0&&b.ttl<=dt&&
        (b.pen>=1||(b.pen===0&&(b.hits||0)>0)))shots.push(b);
   }
