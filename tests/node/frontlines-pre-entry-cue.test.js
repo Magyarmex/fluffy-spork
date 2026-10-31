@@ -417,3 +417,16 @@ test('dense 30-hostile visual denial remains bounded at 240 Hz with no false con
  assert.ok(!s.draws.some(d=>d.type==='text'&&d.value==='!'));
  assert.equal(s.st.stats.contests,1,'visual denial never changes Director scoring');
 });
+
+test('temporarily missing public BLOOM cannot resurrect an old solid visual witness',()=>{
+ const s=scene();s.p.x=-1110;s.g.cam.x=s.p.x;
+ assert.equal(s.T.updateContest(s.g,s.st),true);
+ s.g.drawMinimap();assert.ok(s.draws.some(d=>d.type==='text'&&d.value==='!'));
+ s.st.directorEnabled=false;s.draws.length=0;s.g.drawMinimap();
+ assert.ok(!s.draws.some(d=>d.type==='text'&&d.value==='!'));
+ s.enemy.x=1800;s.enemy.y=1800;
+ s.st.directorEnabled=true;s.g.time+=.04;s.draws.length=0;s.g.drawMinimap();
+ assert.equal(s.T.contestCandidate(s.g,s.st),false);
+ assert.ok(!s.draws.some(d=>d.type==='text'&&d.value==='!'),
+  'a temporarily absent public opportunity must invalidate its prior visual proof');
+});
