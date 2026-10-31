@@ -55,3 +55,11 @@ test('selection never reads private neutral ecology or enemy data',()=>{
  Object.defineProperty(g,'tanks',{get(){throw Error('private AI access');}});
  assert.equal(pilot.select(g,p,F).cover.id,-1);
 });
+test('stale, dead and invalid-camera pilots cannot acquire cover',()=>{
+ const g=game([rect(-1,200,0)]),live={...p,hp:100,alive:true};
+ g.player=live;
+ assert.equal(pilot.select(g,p,F),null,'stale pre-redeploy tank cannot steer');
+ live.alive=false;assert.equal(pilot.select(g,live,F),null);
+ live.alive=true;live.hp=0;assert.equal(pilot.select(g,live,F),null);
+ live.hp=100;g.cam.x=NaN;assert.equal(pilot.select(g,live,F),null);
+});
