@@ -235,7 +235,8 @@ async function arm(browser,enabled,label){
      * is a scripted class exposure experiment, not a human match. */
     const classes=window.__novaMakeRequire('')('game/classes').CLASSES;
     if(!classes?.bomber?.bullet?.cluster)throw Error('canonical Bomber unavailable');
-    p.cls='bomber';p.tier=1;p.color=classes.bomber.color;
+    if(typeof g.setClass!=='function')throw Error('canonical class evolution owner missing');
+    g.setClass(p,'bomber'); // canonical tier, HP, ability and drone refit
     g.__novaExperimentPilotClass='bomber';
     p.fireCd=0;p.barrelIdx=0;
     const witness=window.__novaBomberBurstAudit;
