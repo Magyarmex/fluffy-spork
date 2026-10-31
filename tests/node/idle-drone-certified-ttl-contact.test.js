@@ -157,8 +157,20 @@ for(const hz of [30,60,120,240]){
   const {g}=shotWorld(hz,{friendly:true});
   assert.equal(g.hitOwners.includes(1),false);
  });
- test('uncertified commanded movement never invents contact at '+hz+'Hz',()=>{
-  const {g}=shotWorld(hz,{command:true});
+ test('certified commanded movement must recover guaranteed pre-TTL hit at '+hz+'Hz',()=>{
+  const {g,d}=shotWorld(hz,{command:true});
+  assert.equal(d.__novaChronoCommandBoundedEpoch,g.__novaShapeSweepEpoch,
+   'all shipping movement owners must certify one commanded form integration');
+  assert.deepEqual(g.hitOwners,[2]);
+  assert.equal(d.hp,10);
+ });
+ test('commanded target beyond physical TTL is unharmed at '+hz+'Hz',()=>{
+  const {g}=shotWorld(hz,{command:true,x:24});
+  assert.equal(g.hitOwners.includes(2),false);
+ });
+ test('commanded cached-steering displacement invalidates TTL certificate at '+hz+'Hz',()=>{
+  const {g,d}=shotWorld(hz,{command:true,cachedSteering:true,trace:true});
+  assert.notEqual(d.__novaChronoCommandBoundedEpoch,g.__novaShapeSweepEpoch);
   assert.equal(g.hitOwners.includes(2),false);
  });
  test('earlier tank contact vetoes a later certified drone shortcut at '+hz+'Hz',()=>{
