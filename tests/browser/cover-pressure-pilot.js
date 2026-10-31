@@ -26,6 +26,7 @@
   if(!g||!p||p.alive===false||(p.hp!=null&&!(finite(p.hp)&&p.hp>0))||
      (g.player&&g.player!==p)||![p.x,p.y].every(finite)||
      !Array.isArray(g.__novaTerrain)||typeof g.hasLineOfSight!=='function'||
+     typeof g.firstTerrainHit!=='function'||
      !F||typeof F.viewportHalfExtents!=='function')return null;
   const ext=F.viewportHalfExtents(g);
   if(!ext||!(finite(ext.x)&&ext.x>0&&finite(ext.y)&&ext.y>0))return null;
@@ -41,6 +42,10 @@
       Math.abs(f.x-cx)>ext.x||Math.abs(f.y-cy)>ext.y)continue;
    const d=Math.hypot(f.x-p.x,f.y-p.y);
    if(!(d>1)||!g.hasLineOfSight(p.x,p.y,f.x,f.y,2))continue;
+   /* An exposed face can be visible while a center-line shot clips a
+    * different wall. Require the actual first projectile terrain contact. */
+   const first=g.firstTerrainHit(p.x,p.y,c.x,c.y,1.5);
+   if(!first||first.solid!==c)continue;
    if(d<bestDist-1e-6||(Math.abs(d-bestDist)<=1e-6&&c.id<bestId)){
     best={cover:c,face:f,distance:d};bestDist=d;bestId=c.id;
    }
