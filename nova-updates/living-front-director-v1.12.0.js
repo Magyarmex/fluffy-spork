@@ -791,7 +791,13 @@ function migrationPhysicalArrival(g,t,bx,by,ax,ay,dt){
    ctx.lineTo(bx-Math.cos(angle+.6)*8,by-Math.sin(angle+.6)*8);
    ctx.stroke();ctx.restore();
   }
-  if(!ctx||!op)return out;
+  /* No visible minimap or no current public BLOOM means there is no
+   * transferable visual proof. Do not resurrect a cached inside badge if
+   * the Director is briefly disabled or a new opportunity replaces it. */
+  if(!ctx||!op){
+   if(st){st.__lfContestVisualFresh=false;st.__lfContestVisualNextAt=0;}
+   return out;
+  }
   var center=sectorCenter(op.sector),scale=216/(LF.ARENA*2),x=(center.x+LF.ARENA)*scale,y=(center.y+LF.ARENA)*scale;
   if(!op.live){
    var fade=clamp((op.until-now)/24,0,1);
