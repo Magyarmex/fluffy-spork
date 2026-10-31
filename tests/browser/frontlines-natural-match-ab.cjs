@@ -28,7 +28,8 @@ const TRIAL_RNG=(0x7d27e91b^Math.imul(SEED_INDEX,0x85ebca6b))>>>0;
 const SEED_ID='natural-20261027-'+LAYOUT_INDEX+'-'+SEED_INDEX;
 const SECONDS=165,DT=1/30,CHUNK=450;
 async function arm(browser,enabled,label){
- const context=await browser.newContext({viewport:{width:900,height:700},serviceWorkers:'block'});
+ const context=await browser.newContext({viewport:{width:900,height:700},
+  ...(AB_MODE==='bomber-physics'?{serviceWorkers:'block'}:{})});
  const page=await context.newPage(),errors=[];
  let patchedCount=0;
  page.on('pageerror',e=>errors.push(String(e.stack||e)));
