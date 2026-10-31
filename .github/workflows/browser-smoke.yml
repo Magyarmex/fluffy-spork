@@ -78,6 +78,7 @@ jobs:
           node tests/browser/hybrid-button-handoff.cjs
           node tests/browser/shipping-ui-smoke.cjs
           node tests/browser/tactical-frontlines-memory.cjs
+          node tests/browser/frontlines-early-warning.cjs
           node tests/browser/frontlines-bloom-compass.cjs
           node tests/browser/frontlines-migration-route-memory.cjs
           node tests/browser/frontlines-migration-ai-audit.cjs
