@@ -23,7 +23,7 @@ function scene(fair=true){
   enemy={id:2,x:-520,y:-540,hp:100,alive:true};
  const calls=[],ctx={save(){},restore(){},beginPath(){},arc(x,y,r){calls.push({type:'arc',x,y,r});},stroke(){},fill(){},moveTo(){},lineTo(){},
   fillText(s){calls.push(s);calls.push({type:'text',value:s,font:this.font});}};
- Object.assign(g,{time:100,player:p,tanks:[p,enemy],shapes:[{id:44,type:'hexagon',x:-540,y:-550,hp:200}],w:800,h:600,cam:{zoom:1},
+ Object.assign(g,{time:100,status:'playing',player:p,tanks:[p,enemy],shapes:[{id:44,type:'hexagon',x:-540,y:-550,hp:200}],w:800,h:600,cam:{zoom:1},
   mmCtx:ctx,hasLineOfSight:()=>true,areHostile:(a,b)=>a.id!==b.id,areAllies:()=>false});
  g.__lfState={defs:{hexagon:{xp:200},square:{xp:50},pentagon:{xp:100},circle:{xp:5}},signal:{type:'BLOOM',sector:5,started:98,until:104},stats:{},sectors:Array.from({length:16},(_,i)=>({value:i===5?500:0,maturity:0,pressure:0})),
   lastSignalAt:99,cooldowns:{bloom:24,migration:20,star:58},migrationHeat:0,planMsEma:0,planMsPeak:0};
@@ -52,10 +52,13 @@ test('60px CSS minimap gets a readable contest badge rather than a 2.5px label',
  assert.ok(!calls.includes('CONTESTED'),'the old 2.5 CSS px text is not a usable signal');
 });
 test('contest badge preserves the actual sector center and stays on the map at every latitude',()=>{
- const {g,st,calls}=scene();
+ const {g,st,calls,LF}=scene();
  for(const sector of [1,5,9,13]){
   calls.length=0;
-  st.signal.sector=sector;st.contestSignal={sector,until:104};
+  const center=LF.sectorCenter(sector);
+  g.player.x=center.x;g.player.y=center.y;
+  st.signal.sector=sector;
+  st.contestSignal={sector,until:104,announcedAt:st.signal.started,pilotRef:g.player};
   g.drawMinimap();
   const badge=calls.find(v=>v&&v.type==='arc'&&v.r===22);
   assert.ok(badge,'visible contest draws a 12px CSS badge');

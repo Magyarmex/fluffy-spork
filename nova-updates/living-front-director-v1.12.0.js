@@ -509,13 +509,13 @@ function updateContest(g,st){
   st.contestSignal=null;
   var op=publicBloom(st,g&&g.time||0);
   st.approachSignal=op&&preEntryCandidate(g,st)?
-   {sector:op.sector,until:Math.min(op.until,(g.time||0)+1.4),pilotRef:g.player}:null;
+   {sector:op.sector,until:Math.min(op.until,(g.time||0)+1.4),announcedAt:op.announcedAt,pilotRef:g.player}:null;
   return false;
  }
  st.approachSignal=null;
  var now=g.time||0,op=publicBloom(st,now),key=op.sector+':'+op.announcedAt;
  if(st.__lfLastContestKey!==key){st.__lfLastContestKey=key;st.stats=st.stats||{};st.stats.contests=(st.stats.contests||0)+1;}
- st.contestSignal={sector:op.sector,until:Math.min(op.until,now+1.4)};
+ st.contestSignal={sector:op.sector,until:Math.min(op.until,now+1.4),announcedAt:op.announcedAt,pilotRef:g.player};
  return true;
 }
 function saturation(g,key,id){var n=0,ts=g.tanks||[];for(var i=0;i<ts.length;i++){var q=ts[i];if(q&&q.id!==id&&q.ai&&alive(q)&&q.ai.__lfEcoKey===key&&q.ai.__lfEcoWeight>.05)n++;}return n;}
@@ -758,9 +758,17 @@ function migrationPhysicalArrival(g,t,bx,by,ax,ay,dt){
    if(ctx.setLineDash)ctx.setLineDash([3,4]);
    ctx.beginPath();ctx.arc(x,y,17,0,Math.PI*2);ctx.stroke();ctx.restore();
   }
-  var inside=!!(c&&now<c.until&&c.sector===op.sector),
+  /* A solid CONTESTED badge is a live, pilot-specific witness, not stale
+   * sector radar. Director sampling is decimated: the player can leave, die,
+   * redeploy, or see a new same-sector BLOOM before the next sample. */
+  var inside=!!(c&&now<c.until&&c.sector===op.sector&&
+   c.announcedAt===op.announcedAt&&this.status==='playing'&&
+   this.player&&c.pilotRef===this.player&&alive(this.player)&&
+   !(this.player.spawnShieldT>0)&&
+   sectorIndex(this.player.x,this.player.y)===op.sector),
    a=st&&st.approachSignal,
    approaching=!inside&&!!(a&&now<a.until&&a.sector===op.sector&&
+    a.announcedAt===op.announcedAt&&
     this.status==='playing'&&this.player&&a.pilotRef===this.player&&alive(this.player)&&
     sectorIndex(this.player.x,this.player.y)!==op.sector&&
     nearBloomEdge(this.player,op.sector));

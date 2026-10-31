@@ -124,3 +124,56 @@ test('Fieldcraft distinguishes the early warning from an entered contest',()=>{
  assert.match(file,/A dashed red ! at a BLOOM warns of a visible rival ahead/);
  assert.match(file,/solid ! means you entered the contest/);
 });
+
+
+test('solid contest marker never outlives the witnessed pilot, sector, or public BLOOM',()=>{
+ const mutations=[
+  ['pilot leaves the sector before the next Director sample',s=>{s.p.x=-1170;s.g.cam.x=s.p.x;}],
+  ['pilot dies before the next Director sample',s=>{s.p.hp=0;s.p.alive=false;}],
+  ['a new pilot incarnation replaces the old one',s=>{s.g.player={...s.p};}],
+  ['a new public BLOOM replaces the old one in the same sector',s=>{
+   s.st.signal={...s.st.signal,started:99,until:105};
+  }],
+  ['match leaves playing state',s=>{s.g.status='dead';}],
+  ['pilot gains spawn protection',s=>{s.p.spawnShieldT=1;}]
+ ];
+ for(const [reason,change] of mutations){
+  const s=scene();s.p.x=-1110;s.g.cam.x=s.p.x;
+  assert.equal(s.T.updateContest(s.g,s.st),true,'real visible contest must be established: '+reason);
+  s.g.drawMinimap();
+  assert.ok(s.draws.some(d=>d.type==='text'&&d.value==='!'),'initial solid marker must render: '+reason);
+  s.draws.length=0;
+  change(s);
+  s.g.drawMinimap();
+  assert.ok(!s.draws.some(d=>d.type==='text'&&d.value==='!'),
+   'stale solid CONTESTED must not mislead the player: '+reason);
+ }
+ const s=scene();s.p.x=-1110;s.g.cam.x=s.p.x;
+ s.T.updateContest(s.g,s.st);s.p.x=-1170;s.g.cam.x=s.p.x;
+ s.T.updateContest(s.g,s.st);
+ assert.equal(s.st.contestSignal,null,'leaving clears the solid contest witness');
+ s.draws.length=0;s.g.drawMinimap();
+ assert.ok(s.draws.some(d=>d.type==='text'&&d.value==='!'),
+  'a fresh visible rival can legitimately create an outside warning');
+ assert.ok(s.draws.some(d=>d.type==='dash'&&d.v.length>0),
+  'after leaving, a new warning must be dashed rather than solid');
+});
+
+
+test('dashed pre-entry witness belongs to one public BLOOM, not a later same-sector announcement',()=>{
+ const s=scene();
+ assert.equal(s.T.updateContest(s.g,s.st),false);
+ assert.ok(s.st.approachSignal,'original visible approach must be witnessed');
+ assert.equal(s.st.approachSignal.announcedAt,98);
+ s.g.drawMinimap();
+ assert.ok(s.draws.some(d=>d.type==='text'&&d.value==='!'));
+ s.draws.length=0;
+ s.st.signal={...s.st.signal,started:99,until:105};
+ s.g.drawMinimap();
+ assert.ok(!s.draws.some(d=>d.type==='text'&&d.value==='!'),
+  'a previous visible rival must not become radar for a newly announced BLOOM');
+ s.st.signal={...s.st.signal,started:98,until:104};
+ s.draws.length=0;s.g.drawMinimap();
+ assert.ok(s.draws.some(d=>d.type==='text'&&d.value==='!'),
+  'restoring the original valid public witness restores the dashed warning');
+});
