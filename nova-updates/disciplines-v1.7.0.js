@@ -476,7 +476,7 @@ wrap('game/engine',function(engine,require){
         var pad=Math.max(120,30+dt*(bound+1600));
         if(bounds&&Number.isFinite(bounds.minX)&&Number.isFinite(bounds.maxX)&&
            Number.isFinite(bounds.minY)&&Number.isFinite(bounds.maxY)){
-          var wide=r+bounds.maxR+pad,px=e.__novaChronoDronePrevX,
+          var wide=r+bounds.maxR+pad+bound*dt,px=e.__novaChronoDronePrevX,
               py=e.__novaChronoDronePrevY;
           if(px<bounds.minX-wide||px>bounds.maxX+wide||
              py<bounds.minY-wide||py>bounds.maxY+wide){
