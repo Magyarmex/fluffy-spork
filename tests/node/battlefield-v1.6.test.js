@@ -284,3 +284,24 @@ test('cover research accumulates partial hits and credits only the actual breake
   assert.equal(g.__novaCoverDamageResearch.playerBreaks, 0,
     'the player damaged the cover but did not deliver the breaking hit');
 });
+
+
+test('cover research includes splash damage with the same owner and overkill rules', () => {
+  const { Game } = loadBattlefield();
+  const g = new Game();
+  g.time = 1; g.player = { id: 1, alive: true };
+  g.__novaBattlefield = { coverBroken: 0, coverTotal: 1, name: 'TEST' };
+  g.__novaTerrain = [{ id: -1, shape: 'rect', x: 0, y: 0, w: 20, h: 160,
+    solid: true, destructible: true, hp: 100, maxHp: 100 }];
+  g.__novaCoverDamageResearch = { schema: 1, allEffectiveDamage: 0,
+    playerEffectiveDamage: 0, allBreaks: 0, playerBreaks: 0 };
+  g.splashAt(0, 0, 100, 1, 1, 0, '#fff', 40);
+  assert.ok(Math.abs(g.__novaTerrain[0].hp - 46) < 1e-9);
+  assert.ok(Math.abs(g.__novaCoverDamageResearch.playerEffectiveDamage - 54) < 1e-9);
+  g.splashAt(0, 0, 100, 1, 2, 0, '#fff', 50);
+  assert.equal(g.__novaTerrain[0].hp, 0);
+  assert.ok(Math.abs(g.__novaCoverDamageResearch.allEffectiveDamage - 100) < 1e-9);
+  assert.ok(Math.abs(g.__novaCoverDamageResearch.playerEffectiveDamage - 54) < 1e-9);
+  assert.equal(g.__novaCoverDamageResearch.allBreaks, 1);
+  assert.equal(g.__novaCoverDamageResearch.playerBreaks, 0);
+});
