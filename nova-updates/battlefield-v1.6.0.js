@@ -2859,6 +2859,12 @@ function certifiedMultiShotCoverPriority(g,dt){
    }
   }
  }
+ /* Opt-in, research-only witness. Count only fully certified chronological
+  * reorders, never cheap eligibility. No normal-match state is touched. */
+ var witness=g.__novaCoverPriorityResearch;
+ if(witness&&witness.schema===1&&Number.isSafeInteger(witness.activations)&&
+    witness.activations>=0&&witness.activations<Number.MAX_SAFE_INTEGER)
+  witness.activations++;
  return contacts.map(function(x){return x.i;});
 }
  var oldUpdateBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var terrain=ensureTerrain(this);

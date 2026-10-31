@@ -78,6 +78,7 @@ function boot(optimized){
 
 function trial8(Game,order,hz=30,{extraBullet=false,liveDrone=false,newborn=false,credit=false,coverHP=65,breakerPen=1}={}){
  const g=new Game(),dt=1/hz;
+ g.__novaCoverPriorityResearch={schema:1,activations:0};
  if(credit){g.coverXP=[];g.getTank=id=>({id,alive:true,isPlayer:false});
   g.gainXP=(owner,amount)=>g.coverXP.push([owner.id,amount]);}
  const tank={kind:'tank',id:2,cls:'scout',x:110,y:0,hp:100,alive:true,
@@ -119,7 +120,7 @@ function trial8(Game,order,hz=30,{extraBullet=false,liveDrone=false,newborn=fals
   g.updateBullets(dt);g.time+=dt;
  }
  return {tankHp:tank.hp,coverHp:g.__novaTerrain[0]?.hp,hits:g.hits,
-  coverXP:g.coverXP||[]};
+  coverXP:g.coverXP||[],certifiedActivations:g.__novaCoverPriorityResearch.activations};
 }
 function orders(){
  const base='ABCDEGHF',out=new Set([base,'FABCDEGH','FHGEDCBA','HGFEDCBA']);
@@ -172,5 +173,17 @@ for(const optimized of [false,true]){
  ])test(label+': eight-shot certificate abstains on '+name,()=>{
   const r=trial8(Game,'FABCDEGH',30,opts);
   assert.equal(r.tankHp,100,'uncertain ordering must retain conservative fallback');
+ });
+}
+
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'full shipping overlays':'Battlefield';
+ test(label+': research witness counts only certified multi-shot chronology',()=>{
+  const good=trial8(Game,'FABCDEGH',30);
+  assert.ok(good.certifiedActivations>=1,'valid eight-shot reorder must be witnessed');
+  const veto=trial8(Game,'FABCDEGH',30,{extraBullet:true});
+  assert.equal(veto.certifiedActivations,0,'uncertain extra shot must not count');
+  const insufficient=trial8(Game,'FABCDEGH',30,{coverHP:75});
+  assert.equal(insufficient.certifiedActivations,0,'nonlethal cover cannot be counted');
  });
 }
