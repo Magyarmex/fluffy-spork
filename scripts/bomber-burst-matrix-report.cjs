@@ -49,7 +49,7 @@ function check(a,label){
   !b.veto||!Number.isSafeInteger(b.veto.eligible)||
   b.veto.eligible!==b.gates.soleCleanNoNearby||
   !b.veto.counts||VETO.some(k=>!Number.isSafeInteger(b.veto.counts[k])||
-   b.veto.counts[k]<0||b.veto.counts[k]>b.veto.eligible)
+   b.veto.counts[k]<0||b.veto.counts[k]>b.veto.eligible))
   throw Error(label+': invalid airburst activation witness');
  return a;
 }
