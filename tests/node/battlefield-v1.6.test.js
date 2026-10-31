@@ -253,3 +253,34 @@ test('opt-in cover research attributes effective damage and breaches without alt
   assert.equal(ignored.witness.playerEffectiveDamage, 0);
   assert.equal(ignored.witness.allBreaks, 0);
 });
+
+
+test('cover research accumulates partial hits and credits only the actual breaker', () => {
+  const { Game } = loadBattlefield();
+  const g = new Game();
+  g.time = 1; g.player = { id: 1, alive: true };
+  g.__novaBattlefield = { coverBroken: 0, coverTotal: 1, name: 'TEST' };
+  g.__novaTerrain = [{ id: -1, shape: 'rect', x: 0, y: 0, w: 20, h: 160,
+    solid: true, destructible: true, hp: 50, maxHp: 50 }];
+  g.__novaCoverDamageResearch = { schema: 1, allEffectiveDamage: 0,
+    playerEffectiveDamage: 0, allBreaks: 0, playerBreaks: 0 };
+  g.weakenBullet = () => {};
+  function fire(ownerId, dmg) {
+    g.bullets = [{ x: -100, y: 0, vx: 1000, vy: 0, r: 4,
+      dmg, ownerId, pen: 3, dead: false }];
+    g.updateBullets(0.2);
+    g.time += 0.2;
+  }
+  fire(1, 30);
+  assert.equal(g.__novaTerrain[0].hp, 20);
+  assert.equal(g.__novaCoverDamageResearch.playerEffectiveDamage, 30);
+  assert.equal(g.__novaCoverDamageResearch.playerBreaks, 0);
+  fire(2, 40);
+  assert.equal(g.__novaTerrain[0].hp, 0);
+  assert.equal(g.__novaBattlefield.coverBroken, 1);
+  assert.equal(g.__novaCoverDamageResearch.allEffectiveDamage, 50);
+  assert.equal(g.__novaCoverDamageResearch.playerEffectiveDamage, 30);
+  assert.equal(g.__novaCoverDamageResearch.allBreaks, 1);
+  assert.equal(g.__novaCoverDamageResearch.playerBreaks, 0,
+    'the player damaged the cover but did not deliver the breaking hit');
+});
