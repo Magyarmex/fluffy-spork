@@ -219,3 +219,69 @@ test('seeded 4,000-world FPS differential never fabricates a pen-2 contact',()=>
  assert.ok(certified>100,'oracle must exercise many genuine full chains');
  assert.equal(proved,certified);
 });
+
+/* Run 497: a pen=2 round may have struck one hull in a previous frame.
+ * Two later stationary hulls can then lie in the same frame's physical path;
+ * endpoint-only core resolution must not skip the middle hull. */
+for(const optimized of [false,true])for(const fps of [30,60,120,240]){
+ test('pen=2 continuation preserves both later physical contacts at '+fps+'Hz optimized='+optimized,()=>{
+  const positions=[93.7598181758076,139.03676807903686,184.3137179822661];
+  const velocity=3363.217242434621,ttl=.2043253394891508;
+  const result=scenario(boot(optimized),{fps,positions,velocity,ttl,
+   frames:Math.ceil(ttl*fps)+2});
+  assert.deepEqual(result.byId,{2:1,3:1,4:1},
+   'all three nonlethal stationary hulls are reached before expiry');
+ });
+}
+
+test('continuing pen=2 round cannot damage hulls behind permanent cover',()=>{
+ for(const optimized of [false,true])for(const fps of [30,60,120,240]){
+  const result=scenario(boot(optimized),{
+   fps,positions:[93.7598181758076,139.03676807903686,184.3137179822661],
+   velocity:3363.217242434621,ttl:.2043253394891508,
+   wall:120,frames:Math.ceil(.2043253394891508*fps)+2});
+  assert.deepEqual(result.byId,{2:1,3:0,4:0},
+   'wall must stop continued shot before both later hulls at '+fps+'Hz');
+ }
+});
+
+test('seeded nonlethal stationary pen=2 contacts agree with physical reach at every FPS',()=>{
+ let seed=3191707;
+ const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ for(const optimized of [false,true]){
+  const Game=boot(optimized);
+  for(let i=0;i<500;i++){
+   const velocity=600+rand()*4000,spacing=45+rand()*45,
+    x1=24+rand()*90,positions=[x1,x1+spacing,x1+2*spacing],
+    ttl=.1+rand()*.15;
+   const expected=positions.map(x=>(x-21)/velocity<ttl?1:0);
+   for(const fps of [30,60,120,240]){
+    const result=scenario(Game,{fps,positions,velocity,ttl,
+     frames:Math.ceil(ttl*fps)+2});
+    assert.deepEqual(Object.values(result.byId),expected,
+     'no missed/phantom contact at fps='+fps+' seed='+i+' optimized='+optimized);
+   }
+  }
+ }
+});
+
+test('continued two-hit shortcut requires a single live prior tank victim',()=>{
+ for(const optimized of [false,true])for(const valid of [true,false]){
+  const Game=boot(optimized),g=new Game();
+  const prior={kind:'tank',id:2,x:93.7598181758076,y:0,
+   cls:'scout',hp:100,alive:true,hitCount:0};
+  const middle={kind:'tank',id:3,x:139.03676807903686,y:0,
+   cls:'scout',hp:100,alive:true,hitCount:0};
+  const last={kind:'tank',id:4,x:184.3137179822661,y:0,
+   cls:'scout',hp:100,alive:true,hitCount:0};
+  g.tanks=[prior,middle,last];
+  const oldVictim=valid?prior:{kind:'shape',id:22,hp:100};
+  g.bullets=[{kind:'bullet',id:1,ownerId:1,x:112.10724141448736,y:0,
+   vx:3363.217242434621,vy:0,r:3,dmg:20,ttl:.17,pen:1,hits:1,
+   dead:false,shell:false,beam:false,__novaDirectVictims:new Set([oldVictim])}];
+  g.updateBullets(1/30);
+  if(valid){assert.equal(middle.hitCount,1);assert.equal(last.hitCount,1);}
+  else assert.ok(middle.hitCount+last.hitCount<=1,
+   'shape-only history cannot authorize a two-tank continuation');
+ }
+});
