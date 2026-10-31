@@ -102,7 +102,7 @@ async function arm(browser,enabled,label){
    g.__novaExperimentABMode=abMode;
    if(abMode==='cover-pressure'){
     g.__novaCoverPriorityResearch={schema:1,activations:0};
-    g.__novaCoverDamageResearch={schema:1,allEffectiveDamage:0,
+    g.__novaCoverDamageResearch={schema:1,pilotId:g.player.id,allEffectiveDamage:0,
      playerEffectiveDamage:0,allBreaks:0,playerBreaks:0};
     /* Observe actual player projectiles created by the composed weapon
      * owner. An aim-input sample is not proof that a shot was fired. */
