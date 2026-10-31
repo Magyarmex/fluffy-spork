@@ -215,7 +215,7 @@ function closeFrontline(g,st,reason){
   f.pilotDeathCensored=true;f.counts.pilotDeathCensors=(f.counts.pilotDeathCensors||0)+1;
   frontlineTrace(f,g,'pilot-death-censor');
  }
- f.closed=true;f.counts.resolved++;
+ f.closed=true;f.counts.resolved++;f.__cueActive=false;f.__cueAt=null;f.__cuePilot=null;
  /* Do not retain tank references after the public opportunity closes. */
  f.aiPhysicalMotion={};f.aiPhysicalLast={};f.aiPhysicalIdentity={};
  if(f.seenContest&&!f.deathRecorded&&g.player&&alive(g.player)){
@@ -230,7 +230,7 @@ function ensureFrontline(g,st){
  var f=st.frontlineTelemetry;
  if(!f)f=st.frontlineTelemetry={currentKey:null,sector:-1,announcedAt:-1,playerInside:false,
   seenContest:false,aiSeen:{},aiStartDist:{},aiApproachSeen:{},aiPhysicalLast:{},aiPhysicalMotion:{},aiPhysicalIdentity:{},aiPhysicalArrived:{},aiPhysicalApproachSeen:{},events:[],counts:{announcements:0,resolved:0,contestSurvivals:0,playerSeconds:0,playerApproaches:0,aiApproaches:0,playerEntries:0,playerExits:0,
-  observedContests:0,playerDeaths:0,pilotDeathCensors:0,sampledSeconds:0,pilotAliveSeconds:0,hostileBotSeconds:0,hostileOutsideBotSeconds:0,aiArrivals:0,aiPhysicalArrivals:0,aiPhysicalApproaches:0,aiPhysicalRejectedCrossings:0,neutralXP:0}};
+  observedContests:0,playerDeaths:0,pilotDeathCensors:0,cuePresentations:0,cuedPhysicalEntries:0,uncuedPhysicalEntries:0,cueUnder200Ms:0,cueLeadMsSum:0,cueLeadMsMin:null,cueLeadMsMax:null,sampledSeconds:0,pilotAliveSeconds:0,hostileBotSeconds:0,hostileOutsideBotSeconds:0,aiArrivals:0,aiPhysicalArrivals:0,aiPhysicalApproaches:0,aiPhysicalRejectedCrossings:0,neutralXP:0}};
  var key=op.sector+':'+op.announcedAt;
  /* A disabled Director resolves this public observation. Re-enabling it
   * during the same announcement must not resurrect closed telemetry: that
@@ -240,7 +240,7 @@ function ensureFrontline(g,st){
  if(f.currentKey!==key){
   closeFrontline(g,st,'replaced');
   f.currentKey=key;f.sector=op.sector;f.announcedAt=op.announcedAt;
-  f.playerInside=false;f.seenContest=false;f.deathRecorded=false;f.pilotDeathCensored=false;f.pilotWasAlive=!!(g.player&&alive(g.player));f.closed=false;f.lastSampleTime=Number(g.time)||0;f.playerStartDist=null;f.playerApproachSeen=false;f.aiSeen={};f.aiStartDist={};f.aiApproachSeen={};f.aiPhysicalLast={};f.aiPhysicalMotion={};f.aiPhysicalIdentity={};f.aiPhysicalArrived={};f.aiPhysicalApproachSeen={};
+  f.__cueActive=false;f.__cueAt=null;f.__cuePilot=null;f.playerInside=false;f.seenContest=false;f.deathRecorded=false;f.pilotDeathCensored=false;f.pilotWasAlive=!!(g.player&&alive(g.player));f.closed=false;f.lastSampleTime=Number(g.time)||0;f.playerStartDist=null;f.playerApproachSeen=false;f.aiSeen={};f.aiStartDist={};f.aiApproachSeen={};f.aiPhysicalLast={};f.aiPhysicalMotion={};f.aiPhysicalIdentity={};f.aiPhysicalArrived={};f.aiPhysicalApproachSeen={};
   f.counts.announcements++;frontlineTrace(f,g,'announced',op.live?'live':'memory');
  }
  return f;
@@ -742,6 +742,39 @@ function migrationPhysicalArrival(g,t,bx,by,ax,ay,dt){
  var stats=st.stats||(st.stats={});
  stats.migrationAiPhysicalArrivals=(stats.migrationAiPhysicalArrivals||0)+1;
 }
+/* Measure whether a visible warning was actionable before the *physical*
+ * boundary crossing. Director's 720ms sampling cannot resolve a 200ms
+ * reaction window. This witness is observation-only: no movement, combat,
+ * camera, AI or warning decision reads these fields. */
+function recordPilotPhysicalEntry(g,st,f,p,bx,by,ax,ay,dt){
+ if(!f||f.closed||!f.currentKey||st.directorEnabled===false||
+    !p||p!==g.player||!alive(p)||p.spawnShieldT>0||
+    !Number.isFinite(bx)||!Number.isFinite(by)||
+    !Number.isFinite(ax)||!Number.isFinite(ay)||
+    !(Number.isFinite(dt)&&dt>0)||
+    sectorIndex(bx,by)===f.sector||sectorIndex(ax,ay)!==f.sector)return;
+ var op=publicBloom(st,Number(g.time)||0);
+ if(!op||op.sector!==f.sector||op.announcedAt!==f.announcedAt)return;
+ var speed=typeof g.tankSpeed==='function'?Number(g.tankSpeed(p)):NaN;
+ /* Reject teleports/uncertified movements rather than inventing reaction
+  * time. A missing speed owner cannot prove a physical crossing. */
+ if(!(speed>0)||Math.hypot(ax-bx,ay-by)>speed*dt*1.3+1)return;
+ var now=Number(g.time)||0,lead=f.__cueActive&&f.__cuePilot===p&&
+   Number.isFinite(f.__cueAt)?now-f.__cueAt:NaN;
+ if(Number.isFinite(lead)&&lead>=0&&lead<=1.5){
+  var ms=Math.round(lead*1000);
+  f.counts.cuedPhysicalEntries++;
+  f.counts.cueLeadMsSum+=ms;
+  f.counts.cueLeadMsMin=f.counts.cueLeadMsMin==null?ms:Math.min(f.counts.cueLeadMsMin,ms);
+  f.counts.cueLeadMsMax=f.counts.cueLeadMsMax==null?ms:Math.max(f.counts.cueLeadMsMax,ms);
+  if(ms<200)f.counts.cueUnder200Ms++;
+  frontlineTrace(f,g,'pilot-entry-after-cue');
+ }else{
+  f.counts.uncuedPhysicalEntries++;
+  frontlineTrace(f,g,'pilot-entry-without-cue');
+ }
+ f.__cueActive=false;f.__cueAt=null;f.__cuePilot=null;
+}
  var oldMove=Game.prototype.moveTank;
  if(oldMove&&!oldMove.__novaFrontlineWitness){
   function witnessedMove(t,vx,vy,dt){
@@ -750,8 +783,11 @@ function migrationPhysicalArrival(g,t,bx,by,ax,ay,dt){
    var sig=st&&st.signal,now=Number(this.time)||0;
    var migrationWitness=!!(t&&t.ai&&sig&&sig.type==='MIGRATION'&&
     now>=sig.started&&now<sig.until&&st.directorEnabled!==false);
-   var bx=(eligible||migrationWitness)?t.x:0,by=(eligible||migrationWitness)?t.y:0;
+   var pilotWitness=!!(f&&!f.closed&&f.currentKey&&t===this.player&&alive(t)&&st.directorEnabled!==false);
+   var bx=(eligible||migrationWitness||pilotWitness)?t.x:0,by=(eligible||migrationWitness||pilotWitness)?t.y:0;
    var result=oldMove.apply(this,arguments);
+   if(pilotWitness&&this.__lfState===st&&st.frontlineTelemetry===f)
+    recordPilotPhysicalEntry(this,st,f,t,bx,by,t.x,t.y,dt);
    if(migrationWitness)migrationPhysicalArrival(this,t,bx,by,t.x,t.y,dt);
    if(!eligible||!this.__lfState||this.__lfState.frontlineTelemetry!==f)return result;
    var ax=t.x,ay=t.y,id=String(t.id),m=f.aiPhysicalMotion||(f.aiPhysicalMotion={}),w=m[id];
@@ -805,7 +841,8 @@ function migrationPhysicalArrival(g,t,bx,by,ax,ay,dt){
    * transferable visual proof. Do not resurrect a cached inside badge if
    * the Director is briefly disabled or a new opportunity replaces it. */
   if(!ctx||!op){
-   if(st){st.__lfContestVisualFresh=false;st.__lfContestVisualNextAt=0;}
+   if(st){st.__lfContestVisualFresh=false;st.__lfContestVisualNextAt=0;
+    if(st.frontlineTelemetry){st.frontlineTelemetry.__cueActive=false;st.frontlineTelemetry.__cueAt=null;st.frontlineTelemetry.__cuePilot=null;}}
    return out;
   }
   var center=sectorCenter(op.sector),scale=216/(LF.ARENA*2),x=(center.x+LF.ARENA)*scale,y=(center.y+LF.ARENA)*scale;
@@ -861,6 +898,18 @@ function migrationPhysicalArrival(g,t,bx,by,ax,ay,dt){
    }
    inside=!!st.__lfContestVisualFresh;
   }
+  /* Count a cue only when the existing minimap really draws it. A Director
+   * candidate that was never rendered is not player-visible evidence. */
+  if(st&&st.frontlineTelemetry&&!st.frontlineTelemetry.closed){
+   var f=st.frontlineTelemetry,validKey=op.sector+':'+op.announcedAt;
+   if(approaching&&f.currentKey===validKey){
+    if(!f.__cueActive||f.__cuePilot!==this.player){
+     f.__cueActive=true;f.__cuePilot=this.player;f.__cueAt=now;
+     f.counts.cuePresentations++;
+     frontlineTrace(f,this,'approach-cue-shown');
+    }
+   }else{f.__cueActive=false;f.__cueAt=null;f.__cuePilot=null;}
+  }
   if(!inside&&!approaching)return out;
   /* NOVA_VISUAL_INTENT: spatial minimap threat — a dashed ! means a
    * witnessed visible rival BEFORE entry; the solid ! is the original
@@ -883,7 +932,7 @@ function migrationPhysicalArrival(g,t,bx,by,ax,ay,dt){
  };
 });
 function diag(){var g=LF.getActive(),s=g?LF.snapshot(g):LF.getLast()||{active:false,version:V};return'NOVA TANKS · LIVING FRONT '+V+'\n'+JSON.stringify(s,null,2);}
-function debugSummary(s){if(!s||!s.active)return'LIVING FRONT · no active/recorded match telemetry yet';var st=s.stats||{},counts=s.counts||{};return'LIVING FRONT v'+V+' · age '+s.age+'s · ceiling '+s.ceiling+' · '+s.director+' / last '+s.lastSignal+' · total XP '+s.totalXP+' · player neutral '+s.playerNeutralXPPerMin+' XP/min · plan '+s.planMsEma+'ms EMA / '+s.planMsPeak+'ms peak\nSHAPES C'+(counts.circle||0)+' T'+(counts.triangle||0)+' S'+(counts.square||0)+' P'+(counts.pentagon||0)+' H'+(counts.hexagon||0)+' ★'+(counts.star||0)+' CR'+(counts.crasher||0)+' · EVADE '+(st.triangleEvasions||0)+' · CRASH '+(st.crasherCharges||0)+'/'+(st.crasherHits||0)+'/'+(st.crasherMisses||0)+' · OVER '+(st.crasherOvershoots||0)+' · BOUNTY '+Math.round(st.bountyAbsorbed||0)+'/'+Math.round(st.bountyReleased||0)+' · STAR '+(st.starsIntercepted||0)+'/'+(st.starsSpawned||0)+' · BLOOM '+(st.blooms||0)+' · MIG '+(st.migrations||0)+' · AI ROT '+(st.aiRotations||0)+' · AI INTENT '+(st.aiFrontlineCommitments||0)+' · MIG AI '+(st.migrationAiSteered||0)+'/'+(st.migrationAiSamples||0)+' · MIG ARR '+(st.migrationAiPhysicalArrivals||0)+' · CONTEST '+(st.contests||0)+' · HEX AVG '+s.hexAvgNeighbors+'\n'+s.sectors.map(function(q){return q.i+':M'+q.m.toFixed(2)+' P'+q.p.toFixed(2)+' N'+q.n+' XP'+q.xp+' H'+q.harvest.toFixed(2)+' C'+q.combat.toFixed(2)+' '+q.in.toFixed(1)+'→/'+q.out.toFixed(1)+'←';}).join(' · ')+(s.frontline?' | FRONTLINES · ANN '+s.frontline.counts.announcements+' · ENTRY '+s.frontline.counts.playerEntries+' · CONTEST '+s.frontline.counts.observedContests+' · AI PHYS '+(s.frontline.counts.aiPhysicalArrivals||0)+' · BOT-S '+(s.frontline.counts.hostileBotSeconds||0).toFixed(1)+' · OUT-S '+(s.frontline.counts.hostileOutsideBotSeconds||0).toFixed(1)+' · ALIVE-S '+(s.frontline.counts.pilotAliveSeconds||0).toFixed(1)+' · CENSORED '+(s.frontline.counts.pilotDeathCensors||0)+' · REJECT '+(s.frontline.counts.aiPhysicalRejectedCrossings||0)+' · AI MEM '+(s.frontline.counts.aiArrivals||0)+' · NEUTRAL XP '+Math.round(s.frontline.counts.neutralXP)+' · SURVIVED '+s.frontline.counts.contestSurvivals+' · IN ZONE '+s.frontline.counts.playerSeconds.toFixed(1)+'s':'');}
+function debugSummary(s){if(!s||!s.active)return'LIVING FRONT · no active/recorded match telemetry yet';var st=s.stats||{},counts=s.counts||{};return'LIVING FRONT v'+V+' · age '+s.age+'s · ceiling '+s.ceiling+' · '+s.director+' / last '+s.lastSignal+' · total XP '+s.totalXP+' · player neutral '+s.playerNeutralXPPerMin+' XP/min · plan '+s.planMsEma+'ms EMA / '+s.planMsPeak+'ms peak\nSHAPES C'+(counts.circle||0)+' T'+(counts.triangle||0)+' S'+(counts.square||0)+' P'+(counts.pentagon||0)+' H'+(counts.hexagon||0)+' ★'+(counts.star||0)+' CR'+(counts.crasher||0)+' · EVADE '+(st.triangleEvasions||0)+' · CRASH '+(st.crasherCharges||0)+'/'+(st.crasherHits||0)+'/'+(st.crasherMisses||0)+' · OVER '+(st.crasherOvershoots||0)+' · BOUNTY '+Math.round(st.bountyAbsorbed||0)+'/'+Math.round(st.bountyReleased||0)+' · STAR '+(st.starsIntercepted||0)+'/'+(st.starsSpawned||0)+' · BLOOM '+(st.blooms||0)+' · MIG '+(st.migrations||0)+' · AI ROT '+(st.aiRotations||0)+' · AI INTENT '+(st.aiFrontlineCommitments||0)+' · MIG AI '+(st.migrationAiSteered||0)+'/'+(st.migrationAiSamples||0)+' · MIG ARR '+(st.migrationAiPhysicalArrivals||0)+' · CONTEST '+(st.contests||0)+' · HEX AVG '+s.hexAvgNeighbors+'\n'+s.sectors.map(function(q){return q.i+':M'+q.m.toFixed(2)+' P'+q.p.toFixed(2)+' N'+q.n+' XP'+q.xp+' H'+q.harvest.toFixed(2)+' C'+q.combat.toFixed(2)+' '+q.in.toFixed(1)+'→/'+q.out.toFixed(1)+'←';}).join(' · ')+(s.frontline?' | FRONTLINES · ANN '+s.frontline.counts.announcements+' · ENTRY '+s.frontline.counts.playerEntries+' · CONTEST '+s.frontline.counts.observedContests+' · AI PHYS '+(s.frontline.counts.aiPhysicalArrivals||0)+' · BOT-S '+(s.frontline.counts.hostileBotSeconds||0).toFixed(1)+' · OUT-S '+(s.frontline.counts.hostileOutsideBotSeconds||0).toFixed(1)+' · ALIVE-S '+(s.frontline.counts.pilotAliveSeconds||0).toFixed(1)+' · CENSORED '+(s.frontline.counts.pilotDeathCensors||0)+' · REJECT '+(s.frontline.counts.aiPhysicalRejectedCrossings||0)+' · AI MEM '+(s.frontline.counts.aiArrivals||0)+' · NEUTRAL XP '+Math.round(s.frontline.counts.neutralXP)+' · SURVIVED '+s.frontline.counts.contestSurvivals+' · IN ZONE '+s.frontline.counts.playerSeconds.toFixed(1)+'s · CUE '+(s.frontline.counts.cuePresentations||0)+' · CUE→ENTRY '+(s.frontline.counts.cuedPhysicalEntries||0)+' · UNCUE '+(s.frontline.counts.uncuedPhysicalEntries||0)+' · <200ms '+(s.frontline.counts.cueUnder200Ms||0):'');}
 function fill(root){if(!root)return;var h=root.querySelector('.nv-lf-debug');if(!h){h=document.createElement('div');h.className='nv-lf-debug';h.style.cssText='margin-top:8px;padding:8px;border:1px solid rgba(255,201,77,.18);border-radius:10px;background:rgba(12,16,26,.7);font:600 9px/1.25 Rajdhani,system-ui;color:#aebed0;white-space:pre-wrap;';var a=root.querySelector('.nv-debug-actions');a?root.insertBefore(h,a):root.appendChild(h);}var s=LF.getActive()?LF.snapshot(LF.getActive()):LF.getLast();h.textContent=debugSummary(s);var b=document.createElement('button');b.type='button';b.dataset.lfCopy='1';b.className='nv-debug-btn';b.textContent='COPY ECOLOGY';b.style.marginTop='7px';b.onclick=function(){if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(diag()).catch(function(){});};h.appendChild(document.createElement('br'));h.appendChild(b);}
 function registerTips(){var api=window.NOVATips;if(!api||typeof api.registerMany!=='function'||window.__NOVA_LIVING_FRONT_TIPS_REGISTERED__)return false;window.__NOVA_LIVING_FRONT_TIPS_REGISTERED__=true;api.registerMany(TIP_DEFS);return true;}
 function bindTipLine(){return registerTips();} // compatibility shim: canonical Fieldcraft owns rendering, cadence, and shuffle bags.
