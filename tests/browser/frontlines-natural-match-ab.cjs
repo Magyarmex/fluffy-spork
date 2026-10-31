@@ -236,6 +236,7 @@ async function arm(browser,enabled,label){
     const classes=window.__novaMakeRequire('')('game/classes').CLASSES;
     if(!classes?.bomber?.bullet?.cluster)throw Error('canonical Bomber unavailable');
     p.cls='bomber';p.tier=1;p.color=classes.bomber.color;
+    g.__novaExperimentPilotClass='bomber';
     p.fireCd=0;p.barrelIdx=0;
     const witness=window.__novaBomberBurstAudit;
     if(!witness)throw Error('research-only burst witness missing');
@@ -345,7 +346,8 @@ async function arm(browser,enabled,label){
   const result=await page.evaluate(()=>{
    const g=window.__novaNaturalMatchGame,s=window.NOVALivingFront.snapshot(),p=g.player;
    return{metadata:{layout:g.__novaBattlefield.name,seed:g.__novaExperimentSeed,pilotPolicy:g.__novaExperimentPolicy,abMode:g.__novaExperimentABMode,
-     ...(g.__novaBomberBurstAudit?{pilotClass:g.player.cls}:{})},
+     ...(g.__novaBomberBurstAudit?{pilotClass:g.__novaExperimentPilotClass,
+      pilotClassFinal:g.player.cls}:{})},
     frontline:s.frontline,stats:s.stats,game:{time:+g.time.toFixed(3),status:g.status,
      pilotAlive:!!p.alive,score:p.score,kills:p.kills,level:p.level,
      botCount:g.tanks.filter(t=>t.ai&&t.alive).length},
