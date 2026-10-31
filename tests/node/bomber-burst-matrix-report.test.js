@@ -22,9 +22,9 @@ test('paired Bomber matrix preserves zero exposure and censored deaths',()=>{
    const meta={layout:i?'FOUR GATES':'CROSSFIRE',seed:'seed-'+i,
     pilotClass:'bomber',pilotPolicy:'cover-pressure'};
    const off={metadata:meta,game:{time:25,status:i?'dead':'playing'},
-    bomberBurstAudit:audit(i)};
+    bomberBurstAudit:audit(i),coverPressure:{playerShellsFired:i}};
    const on={metadata:meta,game:{time:35,status:'playing'},
-    bomberBurstAudit:audit(i+1)};
+    bomberBurstAudit:audit(i+1),coverPressure:{playerShellsFired:i+1}};
    fs.writeFileSync(path.join(dir,'frontlines-natural-match-ab.json'),
     JSON.stringify({bomberResearch:true,abMode:'cover-pressure',
      initialWorldIdentical:true,offReplayIdentical:true,
@@ -36,6 +36,8 @@ test('paired Bomber matrix preserves zero exposure and censored deaths',()=>{
   assert.equal(report.totals.OFF.earlyDeaths,1);
   assert.equal(report.totals.ON.firstBursts,3);
   assert.equal(report.totals.ON.childrenCreated,18);
+  assert.equal(report.totals.OFF.noShellTrials,1);
+  assert.equal(report.totals.ON.shellsFired,3);
   assert.equal(report.totals.ON.bySource.battlefield,3);
   assert.equal(report.totals.ON.simulatedSeconds,70);
  }finally{fs.rmSync(root,{recursive:true,force:true});}
