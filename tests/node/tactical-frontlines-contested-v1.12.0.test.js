@@ -69,6 +69,17 @@ test('contest badge preserves the actual sector center and stays on the map at e
   assert.ok(badge.y>=22&&badge.y<=194,'badge must stay inside minimap canvas');
  }
 });
+test('solid contest honors the actual shifted rendered camera, not an invisible hull-centered box',()=>{
+ const {T,g,p,enemy,st}=scene();g.w=320;g.h=568;
+ enemy.x=-350;g.shapes[0].x=-340;g.cam.x=-420;g.cam.y=-560;
+ assert.ok(Math.abs(enemy.x-p.x)>g.w/2&&Math.abs(g.shapes[0].x-p.x)>g.w/2);
+ assert.ok(Math.abs(enemy.x-g.cam.x)<g.w/2&&Math.abs(g.shapes[0].x-g.cam.x)<g.w/2);
+ assert.equal(T.contestCandidate(g,st),true,'the visible contested pocket must count');
+ g.cam.x=-900;
+ assert.equal(T.contestCandidate(g,st),false,'camera pan cannot reveal an offscreen contest');
+ g.cam.x=-420;g.hasLineOfSight=()=>false;
+ assert.equal(T.contestCandidate(g,st),false,'terrain-occluded contest remains hidden');
+});
 test('terrain occlusion suppresses signal and clears stale contest',()=>{
  const {T,g,st,calls}=scene();T.updateContest(g,st);
  g.hasLineOfSight=()=>false;assert.equal(T.updateContest(g,st),false);
