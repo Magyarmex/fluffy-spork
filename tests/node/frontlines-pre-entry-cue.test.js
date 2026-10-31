@@ -274,3 +274,31 @@ test('re-entering a BLOOM after a witnessed contest receives a fresh outside war
  assert.equal(s.st.approachSignal,null,'fresh visual loss clears the warning even with stale contest state');
  assert.ok(!s.draws.some(d=>d.type==='text'&&d.value==='!'));
 });
+
+test('cached contest never creates hidden outside radar or suppresses a new visible witness',()=>{
+ let state=0x17c0ffee;
+ const rand=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return(state>>>0)/4294967296;};
+ let visible=0,hidden=0;
+ for(let i=0;i<256;i++){
+  const s=scene();
+  s.st.contestSignal={sector:5,until:101,announcedAt:98,pilotRef:s.p};
+  if(rand()<.3)s.enemy.hp=0;
+  if(rand()<.25)s.enemy.spawnShieldT=1;
+  if(rand()<.3)s.enemy.x=-1170;
+  if(rand()<.3)s.shape.hp=0;
+  if(rand()<.3)s.p.spawnShieldT=1;
+  if(rand()<.3)s.g.hasLineOfSight=()=>false;
+  if(rand()<.3)s.g.w=160;
+  if(rand()<.2)s.st.directorEnabled=false;
+  const expected=s.T.preEntryCandidate(s.g,s.st);
+  s.g.drawMinimap();
+  const badge=s.draws.some(d=>d.type==='text'&&d.value==='!');
+  assert.equal(badge,expected,'outside badge must equal fresh visible witness in world '+i);
+  assert.equal(!!s.st.approachSignal,expected,'no stale cache or hidden signal in world '+i);
+  if(expected){visible++;
+   assert.ok(s.draws.some(d=>d.type==='dash'&&d.v.length>0),'outside cue must be dashed');
+  }else hidden++;
+  assert.equal(s.st.stats.contests||0,0,'minimap cannot award contest credit');
+ }
+ assert.ok(visible>0&&hidden>0,'both visible and hidden worlds exercised');
+});
