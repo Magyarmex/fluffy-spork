@@ -545,10 +545,31 @@ function validOrigin(p){
  return !!(p&&Number.isFinite(p.x)&&Number.isFinite(p.y)&&
   Math.abs(p.x)<=2250&&Math.abs(p.y)<=2250);
 }
+/* RETURN is a geographic decision, not permission to advance the combat RNG.
+ * Hash only witnessed death state into an independent local xorshift stream.
+ * FRESH retains its exact legacy random stream and spawn behavior. */
+function returnSeed(p,time,id,nextId){
+ if(!validOrigin(p)||!Number.isFinite(time)||!Number.isFinite(id))return 0;
+ var inputs=[Math.round(p.x*1024)|0,Math.round(p.y*1024)|0,
+  Math.round((Number(time)||0)*1000)|0,(Number(id)||0)|0,(Number(nextId)||0)|0];
+ var h=0x9e3779b9;
+ for(var k=0;k<inputs.length;k++){
+  h=Math.imul(h^inputs[k],0x85ebca6b)>>>0;
+  h^=h>>>13;
+ }
+ return h||0x6d2b79f5;
+}
+function returnStream(seed){
+ if(!Number.isInteger(seed)||seed===0)return null;
+ var s=seed>>>0;
+ return function(){s^=s<<13;s^=s>>>17;s^=s<<5;return (s>>>0)/4294967296;};
+}
 function sampleReturn(g,p){
  if(!validOrigin(p)||!g||typeof g.isTerrainSafe!=='function')return null;
+ var rand=returnStream(g.__novaRedeploySeed);
+ if(!rand)return null;
  for(var i=0;i<64;i++){
-  var a=Math.random()*PI2,r=420+Math.random()*430;
+  var a=rand()*PI2,r=420+rand()*430;
   var x=p.x+Math.cos(a)*r,y=p.y+Math.sin(a)*r;
   if(Math.abs(x)>2050||Math.abs(y)>2050)continue;
   var safe=false;
@@ -719,6 +740,7 @@ mods['game/engine']=function(module,exports,require){
   }
   if(player&&victim.alive===false&&validOrigin(pos)){
    this.__novaRedeployOrigin=pos;
+   this.__novaRedeploySeed=returnSeed(pos,this.time,victim.id,this.nextId);
    this.__novaRedeployChoice='fresh';
    this.__novaFrontMounted=false;
   }
@@ -778,9 +800,10 @@ mods['game/engine']=function(module,exports,require){
    cleanup(this);
    this.__novaFrontlineRecap=null;
    this.__novaRedeployOrigin=null;
+   this.__novaRedeploySeed=null;
    this.__novaRedeployChoice='fresh';
   }
  };
 };
-window.__NOVA_FRONT_CHOICE_TEST__={sampleReturn:sampleReturn,validOrigin:validOrigin,readFrontlineRecap:readFrontlineRecap,paint:paint,cleanup:cleanup};
+window.__NOVA_FRONT_CHOICE_TEST__={sampleReturn:sampleReturn,returnSeed:returnSeed,returnStream:returnStream,validOrigin:validOrigin,readFrontlineRecap:readFrontlineRecap,paint:paint,cleanup:cleanup};
 })();

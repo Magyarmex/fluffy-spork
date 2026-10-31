@@ -365,30 +365,31 @@ async function runCoverCue(browser){
      window.__novaCoverSmokeGame=this;
     return update.apply(this,arguments);
    };
-   const randSpawn=Game.prototype.randSpawnPos;
-   Game.prototype.randSpawnPos=function(minDist){
-    if(this.__novaFrontSpawnArmed&&minDist===900){
-     const previous=Math.random;let draws=0;
-     Math.random=()=>draws++<2?0:previous(); // Only RETURN angle/radius.
-     try{return randSpawn.apply(this,arguments);}finally{Math.random=previous;}
-    }
-    return randSpawn.apply(this,arguments);
-   };
   });
   await page.getByRole('button',{name:/DEPLOY/i}).first().click();
   await page.waitForFunction(()=>window.__novaCoverSmokeGame?.status==='playing',null,{timeout:30000});
   const setup=await page.evaluate(()=>{
    const g=window.__novaCoverSmokeGame;
    let chosen=null;
+   const api=window.__NOVA_FRONT_CHOICE_TEST__;
+   if(!api||typeof api.returnSeed!=='function')throw Error('independent RETURN sampler missing');
    for(const wall of g.__novaTerrain||[]){
     if(!wall||wall.shape!=='rect'||!wall.destructible||!(wall.hp>0))continue;
-    const origin={x:wall.x-210,y:wall.y},spawn={x:wall.x+210,y:wall.y};
-    if(Math.abs(origin.x)>2050||Math.abs(spawn.x)>2050)continue;
-    if(!g.isTerrainSafe(origin.x,origin.y,75)||!g.isTerrainSafe(spawn.x,spawn.y,75))continue;
-    if(g.hasLineOfSight(origin.x,origin.y,spawn.x,spawn.y,24))continue;
-    chosen={origin,spawn,wallId:wall.id};break;
+    for(const [dx,dy] of [[-210,0],[210,0],[0,-210],[0,210],[-260,-90],[260,90]]){
+     const origin={x:wall.x+dx,y:wall.y+dy};
+     if(Math.abs(origin.x)>2050||Math.abs(origin.y)>2050||
+        !g.isTerrainSafe(origin.x,origin.y,75))continue;
+     const seed=api.returnSeed(origin,g.time,g.player.id,g.nextId);
+     const spawn=api.sampleReturn({
+      __novaRedeploySeed:seed,
+      isTerrainSafe:(x,y,pad)=>g.isTerrainSafe(x,y,pad)
+     },origin);
+     if(!spawn||g.hasLineOfSight(origin.x,origin.y,spawn.x,spawn.y,24))continue;
+     chosen={origin,spawn,wallId:wall.id};break;
+    }
+    if(chosen)break;
    }
-   if(!chosen)throw Error('no intact real-cover eastward RETURN scenario');
+   if(!chosen)throw Error('no intact real-cover deterministic RETURN scenario');
    g.player.x=chosen.origin.x;g.player.y=chosen.origin.y;
    g.killTank(g.player,null);
    return chosen;
@@ -404,10 +405,14 @@ async function runCoverCue(browser){
     marker:!!g.__novaLastFrontMarker};
   },setup.origin);
   assert.ok(Math.abs(result.x-setup.spawn.x)<1e-6&&Math.abs(result.y-setup.spawn.y)<1e-6,
-   'test must force the intended 420u physical RETURN position: '+JSON.stringify({setup,result}));
+   'actual RETURN must use the independently predicted terrain-safe spawn: '+JSON.stringify({setup,result}));
   assert.equal(result.directBlocked,true,'real intact cover must obstruct direct return');
   assert.equal(result.marker,true,'blocked direct line must retain the front waypoint');
-  const cue='↩ RETURN · FRONT W · ~420u · COVER';
+  const directions=['E','SE','S','SW','W','NW','N','NE'];
+  const angle=Math.atan2(setup.origin.y-result.y,setup.origin.x-result.x);
+  const bearing=directions[(Math.round(angle/(Math.PI/4))+8)%8];
+  const direct=Math.round(Math.hypot(setup.origin.x-result.x,setup.origin.y-result.y)/10)*10;
+  const cue='↩ RETURN · FRONT '+bearing+' · ~'+direct+'u · COVER';
   const el=page.getByText(cue,{exact:true});
   await el.waitFor({state:'visible',timeout:2500});
   const fit=await el.evaluate(node=>{const r=node.getBoundingClientRect();
