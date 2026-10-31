@@ -515,7 +515,7 @@ function updateContest(g,st){
  st.approachSignal=null;
  var now=g.time||0,op=publicBloom(st,now),key=op.sector+':'+op.announcedAt;
  if(st.__lfLastContestKey!==key){st.__lfLastContestKey=key;st.stats=st.stats||{};st.stats.contests=(st.stats.contests||0)+1;}
- st.contestSignal={sector:op.sector,until:Math.min(op.until,now+1.4)};
+ st.contestSignal={sector:op.sector,until:Math.min(op.until,now+1.4),announcedAt:op.announcedAt,pilotRef:g.player};
  return true;
 }
 function saturation(g,key,id){var n=0,ts=g.tanks||[];for(var i=0;i<ts.length;i++){var q=ts[i];if(q&&q.id!==id&&q.ai&&alive(q)&&q.ai.__lfEcoKey===key&&q.ai.__lfEcoWeight>.05)n++;}return n;}
@@ -758,7 +758,7 @@ function migrationPhysicalArrival(g,t,bx,by,ax,ay,dt){
    if(ctx.setLineDash)ctx.setLineDash([3,4]);
    ctx.beginPath();ctx.arc(x,y,17,0,Math.PI*2);ctx.stroke();ctx.restore();
   }
-  var inside=!!(c&&now<c.until&&c.sector===op.sector),
+  /* A solid CONTESTED badge is a live, pilot-specific witness, not stale\n   * sector radar. Director sampling is decimated: the player can leave, die,\n   * redeploy, or see a new same-sector BLOOM before the next sample. */\n  var inside=!!(c&&now<c.until&&c.sector===op.sector&&\n   c.announcedAt===op.announcedAt&&this.status==='playing'&&\n   this.player&&c.pilotRef===this.player&&alive(this.player)&&\n   !(this.player.spawnShieldT>0)&&\n   sectorIndex(this.player.x,this.player.y)===op.sector),
    a=st&&st.approachSignal,
    approaching=!inside&&!!(a&&now<a.until&&a.sector===op.sector&&
     this.status==='playing'&&this.player&&a.pilotRef===this.player&&alive(this.player)&&
