@@ -18,9 +18,11 @@ function fairDroneInView(g,owner,target){var fair=window.__NOVA_FAIR_ENGAGEMENT_
 var SNIPER_IDS={marksman:1,railgun:1,ghost:1,singularity:1,prism:1,specter:1,assassin:1};
 function fairTankPerceived(g,owner,t){
  if(fairDroneInView(g,owner,t))return true;
+ /* A drone consumes its cached target before the Spotter scan this frame.
+  * A contact ID/TTL from the last scan is not current offscreen sight. */
+ var live=window.__NOVA_SPOTTER_LIVE_RELAY__;
  return !!(owner&&owner.ai&&!owner.isPlayer&&t&&SNIPER_IDS[owner.cls]&&
-   owner.__novaSpotterContactId===t.id&&
-   Number(owner.__novaSpotterContactUntil)>Number(g&&g.time||0));
+   typeof live==='function'&&live(g,owner,t));
 }
 function visible(g,a,b){if(!a||!b)return false;if(typeof g.hasLineOfSight==='function')return !!g.hasLineOfSight(a.x,a.y,b.x,b.y,2);var solids=g.__novaTerrain||[];for(var i=0;i<solids.length;i++){var s=solids[i];if(s&&s.solid!==false&&(!s.destructible||s.hp>0))return false;}return true;}
 function combatFallback(g,d,owner,leash){var limit=leash||d.leash||500,best=null,bd=Math.pow(Math.min(limit,520),2),ownerBd=limit*limit,i,t,q;var tanks=g.tanks||[];for(i=0;i<tanks.length;i++){t=tanks[i];if(!hostile(g,owner,t)||t.spawnShieldT>0||d2(owner.x,owner.y,t.x,t.y)>ownerBd)continue;q=d2(d.x,d.y,t.x,t.y);if(q<bd&&fairTankPerceived(g,owner,t)&&visible(g,d,t)){bd=q;best=t;}}var drones=g.drones||[];for(i=0;i<drones.length;i++){t=drones[i];if(!t||t===d||t.hp<=0||t.__novaSpotter)continue;var other=ownerOf(g,t);if(!other||!hostile(g,owner,other)||d2(owner.x,owner.y,t.x,t.y)>ownerBd)continue;q=d2(d.x,d.y,t.x,t.y);if(q<bd&&fairDroneInView(g,owner,t)&&visible(g,d,t)){bd=q;best=t;}}return best;}

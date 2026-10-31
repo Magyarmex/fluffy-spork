@@ -24,6 +24,9 @@ function boot() {
     { filename: 'spotter-intelligence-v1.5.1.js' });
   const m = { exports: {} };
   modules['game/engine'](m, m.exports, () => ({}));
+  /* The Fair Engagement integration test must use the real Spotter
+   * authority from this same source boot, not an ID-only test double. */
+  m.exports.Game.__novaLiveRelay = window.__NOVA_SPOTTER_LIVE_RELAY__;
   return m.exports.Game;
 }
 function world() {
@@ -93,12 +96,13 @@ test('missing Observer and disabled Observer clear stale relay without removing 
 
 test('composed Fair Engagement loses offscreen relay when the actual Observer loses sight', () => {
   const fair = fs.readFileSync(path.join(root, 'nova-updates/fair-engagement-v1.11.2.js'), 'utf8');
-  const window = { __novaModules: {} };
+  const w = world(); acquire(w);
+  const window = { __novaModules: {},
+    __NOVA_SPOTTER_LIVE_RELAY__: w.g.constructor.__novaLiveRelay };
   vm.runInNewContext(fair, { window, Math, Number, Object, Array,
     console: { info() {}, error() {} } }, { filename: 'fair-engagement-v1.11.2.js' });
   const canPerceive = window.__NOVA_FAIR_ENGAGEMENT_TEST__.canPerceive;
   const classes = { lineageForClass: () => 'sniper' };
-  const w = world(); acquire(w);
   assert.equal(canPerceive(w.g, classes, w.owner, w.target), true,
     'genuinely seen remote target is a legitimate relay');
   w.target.x = 0; w.target.y = 400;

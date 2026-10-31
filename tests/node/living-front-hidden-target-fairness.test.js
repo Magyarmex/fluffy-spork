@@ -7,7 +7,13 @@ const path = require('node:path');
 const vm = require('node:vm');
 const root = path.resolve(__dirname, '../..');
 function boot(withFairViewport = true) {
-  const window = { __novaModules: {} };
+  /* Isolated ecology unit harness: represent a separately verified Observer
+   * sight certificate. The real Spotter geometry is tested in
+   * living-front-spotter-current-sight.test.js. */
+  const window = { __novaModules: {},
+    __NOVA_SPOTTER_LIVE_RELAY__: (g,owner,target) =>
+      owner.__novaSpotterContactId===target.id &&
+      owner.__novaSpotterContactUntil>g.time };
   if (withFairViewport) window.__NOVA_FAIR_ENGAGEMENT_TEST__ = {
     inGameplayViewport(g, observer, target) {
       return Math.abs(target.x - observer.x) <= g.w / (2 * g.cam.zoom) &&

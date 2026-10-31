@@ -30,7 +30,7 @@ function tacticalPoints(g){var pl=g.player,out=[];if(!pl||!pl.alive)return out;
  if(isController(pl)&&pl.__novaSwarm&&pl.__novaSwarm.active&&finitePoint(pl.__novaSwarm.nodeX,pl.__novaSwarm.nodeY))out.push({x:pl.__novaSwarm.nodeX,y:pl.__novaSwarm.nodeY,kind:'controller-node'});
  if(isSniper(pl)){
    var sid=Number.isFinite(pl.__novaSpotterDroneId)?pl.__novaSpotterDroneId:-1,spot=findDrone(g,sid,pl.id);if(spot&&spot.hp>0&&finitePoint(spot.x,spot.y))out.push({x:spot.x,y:spot.y,kind:'spotter',entity:spot});
-   var now=Number.isFinite(g.time)?g.time:0;if(pl.__novaSpotterContactId>=0&&pl.__novaSpotterContactUntil>now&&g.getTank){var t=g.getTank(pl.__novaSpotterContactId);if(t&&t.alive&&finitePoint(t.x,t.y))out.push({x:t.x,y:t.y,kind:'relay-target',entity:t});}
+   var now=Number.isFinite(g.time)?g.time:0;if(pl.__novaSpotterContactId>=0&&pl.__novaSpotterContactUntil>now&&g.getTank){var t=g.getTank(pl.__novaSpotterContactId),live=window.__NOVA_SPOTTER_LIVE_RELAY__;if(t&&t.alive&&finitePoint(t.x,t.y)&&typeof live==='function'&&live(g,pl,t))out.push({x:t.x,y:t.y,kind:'relay-target',entity:t});}
  }
  return out;}
 function fitFor(g,points,nativeZoom,wasActive){var pl=g.player,z=Number.isFinite(nativeZoom)&&nativeZoom>0?nativeZoom:1;if(!pl||!points.length)return{active:false,zoom:z,x:pl?normalCenter(pl).x:0,y:pl?normalCenter(pl).y:0,points:points};

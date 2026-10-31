@@ -20,7 +20,12 @@ function boot(native){
     'game/engine':m=>{m.exports={Game};},
     'game/ai':m=>{m.exports={updateAI(){}};}
   };
-  const window={__novaModules:modules};
+  /* Isolated viewport test double: the real Spotter+drone integration is
+   * exercised in spotter-drone-pre-scan-sight.test.js. */
+  const window={__novaModules:modules,
+    __NOVA_SPOTTER_LIVE_RELAY__:(g,owner,target)=>
+      owner.__novaSpotterContactId===target.id&&
+      owner.__novaSpotterContactUntil>g.time};
   const context={window,Math,Map,Set,Number,Object,Date,
     console:{info(){},warn(){},error(){}}};
   for(const file of ['drone-targeting-v1.5.1.js','fair-engagement-v1.11.2.js']){

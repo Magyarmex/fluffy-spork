@@ -546,7 +546,10 @@ function fairEcoTarget(g,t,target){
  var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
  var seen=F&&F.inGameplayViewport?F.inGameplayViewport(g,t,target):
   (function(){var z=(g.cam&&g.cam.zoom)||1,hx=(g.w||800)/(2*z),hy=(g.h||600)/(2*z);return Math.abs(target.x-t.x)<=hx&&Math.abs(target.y-t.y)<=hy;})();
- var relay=!!ECO_SNIPER_CLASSES[t.cls]&&t.__novaSpotterContactId===target.id&&Number(t.__novaSpotterContactUntil)>Number(g.time||0);
+ /* The public ecology planner runs against current battlefield state: a
+  * previous-frame Observer ID must not suppress an otherwise valid rotation. */
+ var live=window.__NOVA_SPOTTER_LIVE_RELAY__;
+ var relay=!!ECO_SNIPER_CLASSES[t.cls]&&typeof live==='function'&&live(g,t,target);
  /* A held target within viewport but behind terrain is not current sight. Do not read its live hidden position to suppress ecology; a legitimate active Observer relay remains valid. */return !!(seen&&(!g.hasLineOfSight||g.hasLineOfSight(t.x,t.y,target.x,target.y,2)))||relay;
 }
 /* Observation-only migration AI gate audit. These are DECISION SAMPLES, not

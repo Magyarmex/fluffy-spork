@@ -211,7 +211,8 @@
     function authorizedTarget(t, target, g) {
       if (!target || !target.alive || target.id === t.id) return false;
       if (dist2(t.x,t.y,target.x,target.y) <= DIRECT_VISION*DIRECT_VISION) return true;
-      return !!(t.__novaSpotterContactId === target.id && t.__novaSpotterContactUntil > g.time);
+      var live=window.__NOVA_SPOTTER_LIVE_RELAY__;
+      return typeof live==='function'&&live(g,t,target);
     }
     function selectTarget(t, g) {
       var direct = null, best = DIRECT_VISION*DIRECT_VISION;
@@ -223,8 +224,12 @@
       }
       if(direct) return direct;
       if(t.__novaSpotterContactId>=0 && t.__novaSpotterContactUntil>g.time) {
+        /* Fair Engagement narrows g.tanks, but g.getTank still indexes the
+         * full world. Validate live sight before using that global lookup. */
         var spotted=g.getTank(t.__novaSpotterContactId);
-        if(spotted&&spotted.alive&&spotted.spawnShieldT<=0) return spotted;
+        var live=window.__NOVA_SPOTTER_LIVE_RELAY__;
+        if(spotted&&spotted.alive&&spotted.spawnShieldT<=0&&
+           typeof live==='function'&&live(g,t,spotted))return spotted;
       }
       return null;
     }

@@ -88,6 +88,10 @@ test('current camera zoom changes AI sight by the same world-space factor as the
 
 test('Forward Observer relay is the only deliberate off-viewport tank exception', () => {
   const { window } = boot();
+  /* This unit harness loads Fair Engagement alone. The integration regression
+   * spotter-ai-pre-drone-sight loads the real authoritative Spotter module. */
+  window.__NOVA_SPOTTER_LIVE_RELAY__ = (g, owner, target) =>
+    owner.__novaSpotterContactId === target.id && owner.__novaSpotterContactUntil > g.time;
   const T = window.__NOVA_FAIR_ENGAGEMENT_TEST__;
   const C = classes();
   const g = game(400, 300, 1); g.time = 5;
@@ -98,6 +102,10 @@ test('Forward Observer relay is the only deliberate off-viewport tank exception'
   assert.equal(T.canPerceive(g, C, gunner, remote), false);
   sniper.__novaSpotterContactUntil = 4.9;
   assert.equal(T.canPerceive(g, C, sniper, remote), false, 'expired relay memory must not become permanent radar');
+  sniper.__novaSpotterContactUntil = 6;
+  delete window.__NOVA_SPOTTER_LIVE_RELAY__;
+  assert.equal(T.canPerceive(g, C, sniper, remote), false,
+    'a missing sensor authority cannot turn a stored contact ID into radar');
 });
 
 test('target scoring is identity-neutral: toggling isPlayer alone changes nothing', () => {
