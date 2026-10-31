@@ -3230,6 +3230,27 @@ wrap('game/ai',function(ai){var old=ai.updateAI;if(!old||old.__novaBattlefieldAI
 
 wrap('game/render',function(render){var old=render.render;if(!old||old.__novaBattlefieldRender)return;function patched(g,w,h){old(g,w,h);if(g&&g.ctx)drawTerrain(g.ctx,g,w,h);}patched.__novaBattlefieldRender=true;render.render=patched;});
 
+/* Tank body-collision cooldowns are keyed by monotonically increasing
+ * tank IDs. Once a tank is unregistered, none of its old pair keys can
+ * influence a future contact. Retire them at the actual lifecycle owner
+ * instead of retaining them for an entire long match. This does not alter
+ * live pair cooldowns, collision response or damage ordering. */
+wrap('game/engine',function(engine){
+ var Game=engine.Game,old=Game&&Game.prototype.unregisterTank;
+ if(!old||Game.prototype.__novaBodyCdRetirement)return;
+ Game.prototype.__novaBodyCdRetirement=true;
+ Game.prototype.unregisterTank=function(t){
+  var out=old.apply(this,arguments),m=this.bodyCd;
+  if(!t||!Number.isSafeInteger(t.id)||!m||typeof m.forEach!=='function')return out;
+  var first=String(t.id)+'-',last='-'+String(t.id);
+  m.forEach(function(_time,key){
+   if(typeof key==='string'&&
+      (key.indexOf(first)===0||key.slice(-last.length)===last))m.delete(key);
+  });
+  return out;
+ };
+});
+
 window.__NOVA_BATTLEFIELD_PERF_TEST__={candidateCount:function(g,x,y,pad){return terrainCandidates(g,x,y,x,y,pad||0).length;},circleResolve:circleResolve};
 console.info('[NOVA TANKS] v'+VERSION+' '+CODENAME+' terrain and line-of-sight online');
 })();
