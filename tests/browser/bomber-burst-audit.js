@@ -6,7 +6,7 @@
  function siteFromStack(stack){
   const lines=String(stack||'').split('\n');
   for(const line of lines){
-   const match=line.match(/(?:^|\/)([a-zA-Z0-9_-]+\.(?:js|html)):(\d+):\d+/);
+   const match=line.match(/(?:^|\/)([a-zA-Z0-9_.-]+\.(?:js|html)):(\d+):\d+/);
    if(match&&match[1]!=='bomber-burst-audit.js')return match[1]+':'+match[2];
   }
   return 'unknown';
