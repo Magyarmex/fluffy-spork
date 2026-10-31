@@ -41,6 +41,87 @@
   }
   return {rewound,clean,near};
  }
+
+ /* Independent read-only lower-bound veto census for sole, physically
+  * rewound airbursts with no nearby body at the burst point. A true flag
+  * means the shipping clearance code must abstain; false flags never
+  * certify a safe path. Overlapping flags are intentionally retained. */
+ const VETO_KEYS=['missingShapeVelocity','missingTankVelocity',
+  'missingDroneVelocity','excessEntitySpeed','parentShapeProximity',
+  'parentTankProximity','parentDroneProximity','fragmentShapeProximity',
+  'fragmentTankProximity','fragmentDroneProximity','fragmentTerrainProximity',
+  'fragmentInvalid','fragmentBounds','noWitnessedSufficientVeto'];
+ function vetoEvidence(g,p,dt,children){
+  const flags=Object.fromEntries(VETO_KEYS.map(k=>[k,false]));
+  const speed=Math.hypot(p.vx,p.vy);
+  const used=Math.hypot(p.x-p.px,p.y-p.py);
+  const remaining=dt-used/speed;
+  const near=(ax,ay,bx,by,x,y,r)=>{
+   if(!Number.isFinite(x)||!Number.isFinite(y)||!(r>=0))return true;
+   const dx=bx-ax,dy=by-ay,den=dx*dx+dy*dy;
+   const t=den>1e-12?Math.max(0,Math.min(1,((x-ax)*dx+(y-ay)*dy)/den)):0;
+   return (ax+dx*t-x)**2+(ay+dy*t-y)**2<=r*r;
+  };
+  const groups=[
+   ['Shape',g.shapes||[],e=>e&&e.hp>0,e=>e.r],
+   ['Tank',g.tanks||[],e=>e&&e.alive&&e.id!==p.ownerId,
+    e=>1 /* strict lower bound on every canonical tank collision radius */],
+   ['Drone',g.drones||[],e=>e&&e.hp>0&&e.ownerId!==p.ownerId,
+    e=>(e.r||0)+1]
+  ];
+  for(const [kind,items,active,radius] of groups){
+   for(const e of items){
+    if(!active(e))continue;
+    if(!Number.isFinite(e.vx)||!Number.isFinite(e.vy)){
+     flags['missing'+kind+'Velocity']=true;continue;
+    }
+    const es=Math.hypot(e.vx,e.vy);
+    if(es>2400){flags.excessEntitySpeed=true;continue;}
+    const r=radius(e),padBase=Math.max(120,30+dt*(es+1600));
+    if(Number.isFinite(r)&&r>0&&
+       near(p.px,p.py,p.x,p.y,e.x,e.y,r+p.r+padBase))
+     flags['parent'+kind+'Proximity']=true;
+    for(const c of children){
+     if(!c||!Number.isFinite(c.vx)||!Number.isFinite(c.vy))continue;
+     const ex=c.x+c.vx*remaining,ey=c.y+c.vy*remaining;
+     if(Number.isFinite(r)&&r>0&&
+        near(c.x,c.y,ex,ey,e.x,e.y,r+c.r+padBase))
+      flags['fragment'+kind+'Proximity']=true;
+    }
+   }
+  }
+  if(!(remaining>0&&remaining<dt)||children.length<3||children.length>12)
+   flags.fragmentInvalid=true;
+  for(const c of children){
+   if(!c||c.dead||c.shell||c.beam||c.ownerId!==p.ownerId||
+      !(c.r>0)||!(c.ttl>remaining)||!Number.isFinite(c.x)||
+      !Number.isFinite(c.y)||!Number.isFinite(c.px)||
+      !Number.isFinite(c.py)||!Number.isFinite(c.vx)||
+      !Number.isFinite(c.vy)||!Number.isFinite(c.ttl)||
+      Math.hypot(c.vx,c.vy)>360){flags.fragmentInvalid=true;continue;}
+   const ex=c.x+c.vx*remaining,ey=c.y+c.vy*remaining,pad=c.r+1;
+   if(!Number.isFinite(ex)||!Number.isFinite(ey)||
+      Math.max(Math.abs(c.x),Math.abs(c.y),Math.abs(ex),Math.abs(ey))>=2200)
+    flags.fragmentBounds=true;
+   for(const t of g.__novaTerrain||[]){
+    if(!t||t.solid===false||(t.destructible&&!(t.hp>0)))continue;
+    if(t.shape==='circle'){
+     if(!(t.r>0)||near(c.x,c.y,ex,ey,t.x,t.y,t.r+pad))
+      flags.fragmentTerrainProximity=true;
+    }else if(t.shape==='rect'){
+     if(!(t.w>0&&t.h>0)||
+        Math.max(c.x,ex)+pad>=t.x-t.w*.5&&
+        Math.min(c.x,ex)-pad<=t.x+t.w*.5&&
+        Math.max(c.y,ey)+pad>=t.y-t.h*.5&&
+        Math.min(c.y,ey)-pad<=t.y+t.h*.5)
+      flags.fragmentTerrainProximity=true;
+    }else flags.fragmentTerrainProximity=true;
+   }
+  }
+  flags.noWitnessedSufficientVeto=!VETO_KEYS.some(k=>
+   k!=='noWitnessedSufficientVeto'&&flags[k]);
+  return flags;
+ }
  function create(pilotId){
   return {schema:1,pilotId,calls:0,firstBursts:0,suppressedCalls:0,
    childrenCreated:0,byOwner:{pilot:0,other:0,unknown:0},
@@ -51,7 +132,7 @@
     byOwner:{pilot:0,other:0,unknown:0},examples:[],observerErrors:0,
     gates:{soleWithoutRewound:0,soleRewoundNotClean:0,soleCleanNearAny:0,
      soleCleanNoNearby:0,soleCleanNearShape:0,soleCleanNearTank:0,
-     soleCleanNearDrone:0}}};
+     soleCleanNearDrone:0},veto:{eligible:0,counts:Object.fromEntries(VETO_KEYS.map(k=>[k,0]))}}};
  }
  function install(g,a,stackProvider){
   if(!g||typeof g.clusterBurst!=='function'||!Array.isArray(g.bullets))
@@ -81,7 +162,10 @@
          if(e.near.tank)q.soleCleanNearTank++;
          if(e.near.drone)q.soleCleanNearDrone++;
          if(e.near.shape||e.near.tank||e.near.drone)q.soleCleanNearAny++;
-         else q.soleCleanNoNearby++;
+         else {q.soleCleanNoNearby++;
+          if(e.veto){bucket.veto.eligible++;
+           for(const k of VETO_KEYS)bucket.veto.counts[k]+=Number(e.veto[k]);}
+         }
         }
        }
        bucket.byOwner[event.owner]++;
@@ -122,6 +206,9 @@
    const gate=!wasConsumed&&kind==='disciplines'&&active&&active.sole?
     gateEvidence(this,parent,active.dt):null;
    const result=original.apply(this,arguments);
+   if(gate&&gate.clean&&!gate.near.shape&&!gate.near.tank&&!gate.near.drone){
+    gate.veto=vetoEvidence(this,parent,active.dt,this.bullets.slice(before));
+   }
    const added=Math.max(0,(Array.isArray(this.bullets)?this.bullets.length:0)-before);
    if(!wasConsumed&&kind==='disciplines'&&active){
     active.events.push({owner,sole:active.sole,gate,
@@ -142,7 +229,7 @@
   };
   return a;
  }
- const api={create,install,siteFromStack,source};
+ const api={create,install,siteFromStack,source,vetoEvidence};
  if(typeof module!=='undefined'&&module.exports)module.exports=api;
  if(root)root.__novaBomberBurstAudit=api;
 })(typeof window!=='undefined'?window:globalThis);

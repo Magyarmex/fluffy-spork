@@ -13,7 +13,12 @@ function audit(n){
    byOwner:{pilot:0,other:0,unknown:0},examples:[],observerErrors:0,
    gates:{soleWithoutRewound:0,soleRewoundNotClean:0,soleCleanNearAny:0,
     soleCleanNoNearby:0,soleCleanNearShape:0,soleCleanNearTank:0,
-    soleCleanNearDrone:0}}};
+    soleCleanNearDrone:0},veto:{eligible:0,counts:Object.fromEntries(
+    ['missingShapeVelocity','missingTankVelocity','missingDroneVelocity',
+     'excessEntitySpeed','parentShapeProximity','parentTankProximity',
+     'parentDroneProximity','fragmentShapeProximity','fragmentTankProximity',
+     'fragmentDroneProximity','fragmentTerrainProximity','fragmentInvalid',
+     'fragmentBounds','noWitnessedSufficientVeto'].map(k=>[k,0]))}}};
 }
 test('burst matrix validator rejects impossible owner and source counts',()=>{
  const a=audit(3);check(a,'valid');
@@ -61,9 +66,24 @@ test('matrix validates genuine witnessed airburst movement and rejects inconsist
  Object.assign(a.airburst,{calls:1,sole:1,advanced:1,children:6,
   advancedChildren:6,advancedDistance:16.5});
  a.airburst.byOwner.pilot=1;a.airburst.gates.soleCleanNoNearby=1;
+ a.airburst.veto.eligible=1;
+ a.airburst.veto.counts.noWitnessedSufficientVeto=1;
  check(a,'valid movement');
  a.airburst.advancedChildren=7;
  assert.throws(()=>check(a,'bad movement'),/invalid airburst/);
  a.airburst.advancedChildren=6;a.airburst.observerErrors=1;
  assert.throws(()=>check(a,'observer failed'),/invalid airburst/);
+});
+
+test('veto matrix rejects counts beyond the eligible witnessed cohort',()=>{
+ const a=audit(1);
+ a.bySource.battlefield=0;a.bySource.disciplines=1;
+ a.bySite={'disciplines-v1.7.0.js:500':1};
+ Object.assign(a.airburst,{calls:1,sole:1,stationary:1,children:6});
+ a.airburst.byOwner.pilot=1;a.airburst.gates.soleCleanNoNearby=1;
+ a.airburst.veto.eligible=1;
+ a.airburst.veto.counts.missingDroneVelocity=1;
+ check(a,'valid sufficient veto');
+ a.airburst.veto.counts.missingDroneVelocity=2;
+ assert.throws(()=>check(a,'invalid overcount'),/invalid airburst/);
 });
