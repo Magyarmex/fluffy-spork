@@ -3171,7 +3171,11 @@ function certifiedMultiShotCoverPriority(g,dt){
   for(var bi=0;bi<bs.length&&!autoTrace&&minDX!==Infinity;bi++){
    var pb=bs[bi];
    if(!pb||pb.dead||pb.shell||pb.beam||pb.splash||
-      pb.__v17Cannon||pb.pen!==0||(pb.hits||0)!==0||
+      /* One untouched penetration remains eligible: the existing
+       * guaranteed-drone solver already proves the ENTIRE later TTL
+       * corridor clear before awarding any piercing contact. This trace
+       * merely witnesses commanded motion; it grants no damage. */
+      pb.__v17Cannon||(pb.pen!==0&&pb.pen!==1)||(pb.hits||0)!==0||
       !(pb.ttl>0&&pb.ttl<=dt)||
       !Number.isFinite(pb.x)||!Number.isFinite(pb.y)||
       !Number.isFinite(pb.vx)||!Number.isFinite(pb.vy))continue;
