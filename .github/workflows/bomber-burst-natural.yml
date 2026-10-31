@@ -1,0 +1,80 @@
+name: NOVA Bomber Natural Burst Research
+
+on:
+  pull_request:
+    paths:
+      - 'tests/browser/bomber-burst-audit.js'
+      - 'tests/browser/frontlines-natural-match-ab.cjs'
+      - 'tests/node/bomber-burst-audit.test.js'
+      - 'tests/node/bomber-burst-matrix-report.test.js'
+      - 'scripts/bomber-burst-matrix-report.cjs'
+      - '.github/workflows/bomber-burst-natural.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || (github.event_name == 'workflow_dispatch' && github.run_id) || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  bomber-burst-pairs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        layout: [0, 1, 2]
+        seed: [0, 1]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --no-audit --no-fund --no-package-lock
+      - run: npm install --no-save --no-audit --no-fund --no-package-lock playwright@1.56.1
+      - run: npx playwright install chromium
+      - name: Serve exact 48-overlay shipping composition
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/nova-bomber-burst-http.log 2>&1 &
+      - name: Run standard Bomber cover-seeking versus wander with OFF replay
+        env:
+          NOVA_LAYOUT_INDEX: ${{ matrix.layout }}
+          NOVA_SEED_INDEX: ${{ matrix.seed }}
+          NOVA_PILOT_POLICY: cover-pressure
+          NOVA_AB_MODE: cover-pressure
+          NOVA_BOMBER_RESEARCH: '1'
+        run: node tests/browser/frontlines-natural-match-ab.cjs
+      - name: Preserve every trial including no-burst and deaths
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-bomber-burst-${{ matrix.layout }}-${{ matrix.seed }}
+          path: artifacts/browser/frontlines-natural-*
+          if-no-files-found: warn
+          retention-days: 14
+
+  collate:
+    needs: bomber-burst-pairs
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: nova-bomber-burst-*
+          path: artifacts/bomber-burst
+          merge-multiple: false
+      - name: Require six complete paired/replayed trials
+        run: node scripts/bomber-burst-matrix-report.cjs artifacts/bomber-burst 6
+      - name: Preserve complete source-provenance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-bomber-burst-summary
+          path: artifacts/bomber-burst/bomber-burst-summary.json
+          if-no-files-found: warn
+          retention-days: 14
