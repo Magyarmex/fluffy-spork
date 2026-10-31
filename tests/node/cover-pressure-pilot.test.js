@@ -4,7 +4,8 @@ const pilot=require('../browser/cover-pressure-pilot.js');
 const F={viewportHalfExtents:()=>({x:450,y:350})};
 const p={x:0,y:0,id:1};
 function rect(id,x,y,hp=290){return{id,x,y,w:100,h:60,shape:'rect',destructible:true,solid:true,hp,maxHp:290};}
-function game(terrain){return{__novaTerrain:terrain,cam:{x:0,y:0},hasLineOfSight:()=>true};}
+function game(terrain){return{__novaTerrain:terrain,cam:{x:0,y:0},hasLineOfSight:()=>true,
+ firstTerrainHit:(_ax,_ay,tx,ty)=>({solid:terrain.find(t=>t.x===tx&&t.y===ty)})};}
 test('visible destructible cover is targeted through ordinary aim and standoff movement',()=>{
  const g=game([rect(-1001,300,0)]),s=pilot.select(g,p,F);
  assert.equal(s.cover.id,-1001);
@@ -62,4 +63,12 @@ test('stale, dead and invalid-camera pilots cannot acquire cover',()=>{
  live.alive=false;assert.equal(pilot.select(g,live,F),null);
  live.alive=true;live.hp=0;assert.equal(pilot.select(g,live,F),null);
  live.hp=100;g.cam.x=NaN;assert.equal(pilot.select(g,live,F),null);
+});
+test('an exposed face is rejected when the shot first hits another wall',()=>{
+ const c=rect(-1,250,0),wall={...rect(-2,120,0),destructible:false};
+ const g=game([c,wall]);
+ g.firstTerrainHit=()=>({solid:wall});
+ assert.equal(pilot.select(g,p,F),null,'face LOS alone cannot authorize firing through wall');
+ g.firstTerrainHit=()=>({solid:c});
+ assert.equal(pilot.select(g,p,F).cover.id,-1);
 });
