@@ -388,7 +388,7 @@ async function arm(browser,enabled,label){
         };
         const health=[pilot,tanks,shapes,drones,cover];
         const bodies=[
-         g.tanks.map(t=>[t.id,t.x,t.y,t.hp,t.alive,t.cls]),
+         g.tanks.map(t=>[t.id,t.x,t.y,t.hp,t.alive,t.cls,t.score,t.kills]),
          g.shapes.map(t=>[t.id,t.x,t.y,t.hp,t.type]),
          g.drones.map(t=>[t.id,t.x,t.y,t.hp,t.ownerId]),
          cover,(g.powerups||[]).map(t=>[t.id,t.x,t.y,t.type]),
