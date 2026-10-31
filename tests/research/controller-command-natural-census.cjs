@@ -23,7 +23,7 @@ function distanceSegment(x,y,ax,ay,bx,by){
 }
 function create(){
  return {schema:1,frames:0,bulletFrames:0,expiringShotFrames:0,
-  expiringShots:0,commandRawDrones:0,commandCertifiedDrones:0,
+  expiringShots:0,witnessedExpiringShots:0,commandRawDrones:0,commandCertifiedDrones:0,
   framesWithCommandCertificate:0,certifiedWithExpiringShot:0,
   possiblePairs:0,geometricGuarantees:0,
   certifiedDroneHpLossEvents:0,certifiedDroneHpLost:0,
@@ -31,7 +31,8 @@ function create(){
 }
 function before(g,dt){
  const epoch=g.__novaShapeSweepEpoch,ds=g.drones||[],bs=g.bullets||[];
- const live=ds.filter(d=>d&&d.hp>0&&d.__novaChronoDroneEpoch===epoch);
+ const live=g.__novaShapeSweepActive===true?
+  ds.filter(d=>d&&d.hp>0&&d.__novaChronoDroneEpoch===epoch):[];
  const raw=live.filter(d=>d.__novaChronoCommandRawEpoch===epoch);
  const certified=live.filter(d=>d.__novaChronoCommandBoundedEpoch===epoch&&
   d.__novaChronoCommandRawEpoch===epoch&&
@@ -47,8 +48,10 @@ function before(g,dt){
   !b.__v17Cannon&&b.pen===0&&(b.hits||0)===0&&
   finite(b.ttl)&&b.ttl>0&&b.ttl<=dt&&
   [b.x,b.y,b.vx,b.vy,b.r].every(finite)&&b.r>0);
+ const witnessed=expiring.filter(b=>g.__novaFrameStartBulletEpoch===epoch&&
+  Number.isSafeInteger(b.id)&&b.id<g.__novaFrameStartBulletIdCeiling);
  let possible=0,guaranteed=0;
- for(const d of certified)for(const b of expiring){
+ for(const d of certified)for(const b of witnessed){
   if(b.ownerId===d.ownerId||!finite(d.__novaChronoDronePrevX)||
      !finite(d.__novaChronoDronePrevY)||!(d.r>0))continue;
   const sx=d.__novaChronoDronePrevX,sy=d.__novaChronoDronePrevY,
@@ -66,6 +69,7 @@ function before(g,dt){
   }
  }
  return {raw:raw.length,certified,expiring:expiring.length,
+  witnessed: witnessed.length,
   bullets:bs.length,possible,guaranteed,time:g.time,
   rawExpiring:rawExpiring.length,
   rawNonShell:rawExpiring.filter(b=>!b.shell&&!b.beam&&!b.splash).length,
@@ -88,6 +92,7 @@ function after(a,s){
  a.frames++;if(s.bullets)a.bulletFrames++;
  if(s.expiring)a.expiringShotFrames++;
  a.expiringShots+=s.expiring;
+ a.witnessedExpiringShots+=s.witnessed;
  a.rawExpiringShots+=s.rawExpiring;
  a.rawExpiringNonShell+=s.rawNonShell;
  a.rawExpiringPenZero+=s.rawPenZero;
