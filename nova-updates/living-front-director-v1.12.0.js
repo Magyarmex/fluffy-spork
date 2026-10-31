@@ -825,8 +825,8 @@ function migrationPhysicalArrival(g,t,bx,by,ax,ay,dt){
     cam=this.cam||{},cx=Number.isFinite(cam.x)?cam.x:this.player.x,
     cy=Number.isFinite(cam.y)?cam.y:this.player.y,
     zoom=Number.isFinite(cam.zoom)&&cam.zoom>0?cam.zoom:1,
-    jumpX=Math.max(40,(this.w||0)/(4*zoom)),
-    jumpY=Math.max(40,(this.h||0)/(4*zoom));
+    jumpX=Math.max(8,(this.w||0)/(4*zoom)),
+    jumpY=Math.max(8,(this.h||0)/(4*zoom));
    if(st.__lfContestVisualPilot!==this.player||st.__lfContestVisualKey!==key||
       st.__lfContestVisualW!==this.w||st.__lfContestVisualH!==this.h||
       st.__lfContestVisualZoom!==zoom||
