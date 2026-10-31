@@ -7,12 +7,17 @@ function audit(n){
   childrenCreated:n*6,byOwner:{pilot:n,other:0,unknown:0},
   bySource:{battlefield:n,core:0,disciplines:0,other:0,unknown:0},
   byTTL:{positive:n,expired:0,unknown:0},
-  bySite:n?{'battlefield-v1.6.0.js:999':n}:{},examples:[]};
+  bySite:n?{'battlefield-v1.6.0.js:999':n}:{},examples:[],
+  airburst:{calls:0,sole:0,advanced:0,stationary:0,mixed:0,noChildren:0,
+   children:0,advancedChildren:0,advancedDistance:0,
+   byOwner:{pilot:0,other:0,unknown:0},examples:[],observerErrors:0}};
 }
 test('burst matrix validator rejects impossible owner and source counts',()=>{
  const a=audit(3);check(a,'valid');
  a.bySource.core=1;assert.throws(()=>check(a,'bad'),/invalid bySource/);
  a.bySource.core=0;a.firstBursts=4;assert.throws(()=>check(a,'bad'),/inconsistent/);
+ a.firstBursts=3;a.airburst.calls=1;
+ assert.throws(()=>check(a,'bad'),/invalid airburst/);
 });
 test('paired Bomber matrix preserves zero exposure and censored deaths',()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'nova-bomber-matrix-'));
@@ -40,5 +45,22 @@ test('paired Bomber matrix preserves zero exposure and censored deaths',()=>{
   assert.equal(report.totals.ON.shellsFired,3);
   assert.equal(report.totals.ON.bySource.battlefield,3);
   assert.equal(report.totals.ON.simulatedSeconds,70);
+  assert.equal(report.rates.OFF.correctedBurstsPerMinute,0);
+  assert.equal(report.rates.ON.correctedFraction,null,
+   'no actual airburst exposure must not be reported as zero effectiveness');
  }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('matrix validates genuine witnessed airburst movement and rejects inconsistent fragments',()=>{
+ const a=audit(3);
+ a.bySource.battlefield=2;a.bySource.disciplines=1;
+ a.bySite={'battlefield-v1.6.0.js:999':2,'disciplines-v1.7.0.js:500':1};
+ Object.assign(a.airburst,{calls:1,sole:1,advanced:1,children:6,
+  advancedChildren:6,advancedDistance:16.5});
+ a.airburst.byOwner.pilot=1;
+ check(a,'valid movement');
+ a.airburst.advancedChildren=7;
+ assert.throws(()=>check(a,'bad movement'),/invalid airburst/);
+ a.airburst.advancedChildren=6;a.airburst.observerErrors=1;
+ assert.throws(()=>check(a,'observer failed'),/invalid airburst/);
 });
