@@ -103,7 +103,7 @@ function world({trace=true,terrain=[],damaged=false,command=false}={}){
 
 function shotWorld(hz,{terrain=[],command=false,trace=false,x=20,y=0,
   vx=2500,ttl=.004,otherBullets=[],friendly=false,phase='form',idleVY=null,bornThisFrame=false,frontTank=null,cachedSteering=false,
-  remoteBullets=0,reverseBullets=false}={}){
+  remoteBullets=0,reverseBullets=false,extraDrone=false}={}){
  const {g,d,owner}=world({trace,terrain,command});
  owner.x=-200;owner.y=0;
  const shooter={id:2,cls:'basic',kind:'tank',alive:true,x:-1000,y:0,hp:100};
@@ -112,6 +112,8 @@ function shotWorld(hz,{terrain=[],command=false,trace=false,x=20,y=0,
  if(frontTank!==null){const t={id:3,cls:'basic',kind:'tank',alive:true,
   x:frontTank,y:0,hp:100};g.tanks.push(t);g.tankById.set(3,t);}
  d.x=x;d.y=y;d.__novaPhase=phase;
+ if(extraDrone)g.drones.push({...d,id:11,x:x+5,y:y,slot:1,
+  __novaPhase:'form',__novaPhaseT:0,attackCd:999});
  if(idleVY!==null)d.__novaIdleVY=idleVY;
  if(cachedSteering){g.__novaPerfDronePlanAt=g.time+1;
   d.__v172Waypoint={x:150,y:0};d.__v172WaypointUntil=g.time+2;}
@@ -203,6 +205,13 @@ for(const hz of [30,60,120,240]){
  test('commanded dash never inherits ordinary form certificate at '+hz+'Hz',()=>{
   const {g,d}=shotWorld(hz,{command:true,phase:'dash'});
   assert.notEqual(d.__novaChronoCommandBoundedEpoch,g.__novaShapeSweepEpoch);
+ });
+ test('commanded swarm separation invalidates mixed steering certificate at '+hz+'Hz',()=>{
+  const {g,d}=shotWorld(hz,{command:true,extraDrone:true,trace:true});
+  assert.equal(d.__novaChronoCommandInvalidEpoch,g.__novaShapeSweepEpoch,
+   'real Terrain Intelligence separation must explicitly reject a mixed owner');
+  assert.notEqual(d.__novaChronoCommandBoundedEpoch,g.__novaShapeSweepEpoch);
+  assert.equal(g.hitOwners.includes(2),false);
  });
  test('earlier tank contact vetoes a later certified drone shortcut at '+hz+'Hz',()=>{
   const {g}=shotWorld(hz,{frontTank:23});
