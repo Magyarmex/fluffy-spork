@@ -7,7 +7,7 @@ function sample(mode,seed){
    pilotPolicy:'cover-pressure',abMode:'cover-pressure'},
   game:{status:'dead',time:12},
   coverPressure:{coverBroken:mode==='ON'?1:0,coverDamage:mode==='ON'?290:0,
-   certifiedActivations:mode==='ON'?1:0,
+   certifiedActivations:mode==='ON'?1:0,playerShotsFired:mode==='ON'?9:3,
    aimSamples:mode==='ON'?12:0,moveSamples:mode==='ON'?6:0,noTargetSamples:2},
   projectileDensityAudit:{bulletUpdateCalls:360,coverBreaks:mode==='ON'?1:0,
    basicEligibleFrames:50,coverBreaksBasicEligible:0}};
@@ -30,6 +30,7 @@ test('collator retains early deaths and separate cover pressure arms',()=>{
   assert.equal(r.totals.OFF.earlyDeaths,1);
   assert.equal(r.totals.ON.aimSamples,12);
   assert.equal(r.totals.ON.certifiedActivations,1);
+  assert.equal(r.totals.ON.playerShotsFired,9);
  }finally{fs.rmSync(f.root,{recursive:true,force:true});}
 });
 test('collator rejects incomplete matrix and mismatched replay',()=>{
