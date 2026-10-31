@@ -101,3 +101,26 @@ test('pre-entry signal is bounded to a recent witnessed sample and cannot overwr
  s.draws.length=0;s.g.drawMinimap();
  assert.ok(!s.draws.some(d=>d.type==='text'&&d.value==='!'));
 });
+
+test('a new pilot incarnation cannot inherit a previous pilots visual witness',()=>{
+ const s=scene();s.T.updateContest(s.g,s.st);
+ assert.equal(s.st.approachSignal.pilotRef,s.p);
+ s.g.player={...s.p};
+ s.draws.length=0;s.g.drawMinimap();
+ assert.ok(!s.draws.some(d=>d.type==='text'&&d.value==='!'),
+  'new pilot must earn a new visible witness rather than inherit stale threat');
+});
+test('multiple visible hostiles do not multiply neutral terrain visibility scans',()=>{
+ const s=scene();s.shape.type='circle';s.st.defs.circle={xp:5};
+ s.g.tanks.push({id:3,x:-1040,y:-540,hp:100,alive:true});
+ let los=0;s.g.hasLineOfSight=()=>{los++;return true;};
+ assert.equal(s.T.preEntryCandidate(s.g,s.st),false);
+ assert.equal(los,2,'one enemy witness plus one pocket scan, not one scan per rival');
+});
+test('Fieldcraft distinguishes the early warning from an entered contest',()=>{
+ const s=scene();
+ const tips=s.T.registerTips;assert.equal(typeof tips,'function');
+ const file=fs.readFileSync(path.join(root,'nova-updates/living-front-director-v1.12.0.js'),'utf8');
+ assert.match(file,/A dashed red ! at a BLOOM warns of a visible rival ahead/);
+ assert.match(file,/solid ! means you entered the contest/);
+});
