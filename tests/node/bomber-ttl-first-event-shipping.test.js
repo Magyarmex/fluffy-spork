@@ -253,3 +253,63 @@ for(const optimized of [false,true]){
   });
  }
 }
+
+
+/* A shell striking solid cover partway through a frame creates fragments at
+ * the physical impact instant, not at the beginning of that frame. The
+ * pre-core terrain owner creates these children before the core advances
+ * every bullet. The original implementation advances them a whole dt,
+ * overstating reach and draining their lifetime too early. This regression
+ * uses the actual materialized core and shipping Battlefield wrapper. */
+function runTerrainChildBirth(Game,hz,ttl=2,wallX=20){
+ const g=new Game(),dt=1/hz,created=[];
+ g.time=1;g.__novaBattlefield={coverBroken:0};
+ g.__novaTerrain=[{id:-81,shape:'rect',x:wallX,y:0,w:4,h:80,
+   solid:true,destructible:false,hp:0}];
+ g.weakenBullet=()=>{};
+ g.clusterBurst=function(parent){
+  const child={kind:'bullet',id:778,ownerId:1,x:parent.x-10,y:0,
+   vx:-300,vy:0,r:3,dmg:2,ttl:1,pen:0,hits:0,dead:false,
+   shell:false,beam:false,splash:0};
+  created.push({child,startX:child.x,startTTL:child.ttl});
+  this.bullets.push(child);
+ };
+ const shell={kind:'bullet',id:777,ownerId:1,x:0,y:0,
+   vx:6000,vy:0,r:3,dmg:26,ttl,pen:0,hits:0,dead:false,
+   shell:true,beam:false,splash:0};
+ g.bullets=[shell];
+ g.updateBullets(dt);
+ return {g,dt,shell,created};
+}
+for(const optimized of [false,true]){
+ const Game=boot(optimized),label=optimized?'optimized':'baseline';
+ for(const hz of [30,60,120,240]){
+  for(const ttl of [2,.0035]){
+   test('[terrain child birth] '+label+' '+hz+'Hz TTL='+ttl+
+    ' advances fragments only after physical wall contact',()=>{
+    const {g,dt,shell,created}=runTerrainChildBirth(Game,hz,ttl);
+    assert.equal(created.length,1,'one physical wall burst');
+    assert.equal(shell.dead,true);
+    const {child,startX,startTTL}=created[0];
+    const impactT=shell.x/6000;
+    assert.ok(impactT>0&&impactT<Math.min(dt,ttl),
+      'wall must be struck before shell TTL and frame end');
+    assert.ok(Math.abs(child.x-(startX-300*(dt-impactT)))<1e-7,
+      'child traveled before it was born: x='+child.x+
+      ' expected '+(startX-300*(dt-impactT)));
+    assert.ok(Math.abs(child.ttl-(startTTL-(dt-impactT)))<1e-8,
+      'child lost pre-birth lifetime');
+    assert.equal(child.vx,-300,'full fragment speed restored for next frame');
+    assert.equal(g.bullets.length,1,'outward fragment survives; parent consumed');
+   });
+  }
+ }
+ test('[terrain child birth] '+label+' wall impact at frame endpoint yields zero newborn travel',()=>{
+  const hz=60,dt=1/hz,wallX=6000*dt+2+3*.45;
+  const {created}=runTerrainChildBirth(Game,hz,2,wallX);
+  assert.equal(created.length,1);
+  assert.ok(Math.abs(created[0].child.x-created[0].startX)<1e-6,
+    'newborn fragment must not travel before frame-end impact');
+  assert.ok(Math.abs(created[0].child.ttl-created[0].startTTL)<1e-8);
+ });
+}
