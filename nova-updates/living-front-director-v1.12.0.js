@@ -933,6 +933,76 @@ function recordPilotPhysicalEntry(g,st,f,p,bx,by,ax,ay,dt){
   ctx.restore();return out;
  };
 });
+/* Public BLOOM threshold affordance. This is a reminder of an ALREADY
+ * ANNOUNCED sector, never an enemy warning or a claim that XP still exists.
+ * Draw on the existing battlefield canvas without moving the camera, changing
+ * aim projection, sampling private ecology, or adding an input surface. */
+function publicBloomApproach(g,w,h){
+ var p=g&&g.player,st=g&&g.__lfState,cam=g&&g.cam,now=Number(g&&g.time);
+ if(!g||!p||!alive(p)||p.spawnShieldT>0||!st||st.directorEnabled===false||
+    g.status!=='playing'||g.__novaDecorativeWorld||!cam||
+    !Number.isFinite(now)||!Number.isFinite(w)||!Number.isFinite(h)||
+    w<260||w>420||h<=w||
+    (g.__novaTacticalCamera&&(g.__novaTacticalCamera.active||g.__novaTacticalCamera.transition)))return null;
+ /* An unrelated live Director report takes priority over stale BLOOM memory. */
+ if(st.signal&&Number.isFinite(st.signal.started)&&now>=st.signal.started&&
+    now<st.signal.until&&st.signal.type!=='BLOOM')return null;
+ var op=publicBloom(st,now);
+ if(!op||!Number.isInteger(op.sector)||op.sector<0||op.sector>=16||
+    !Number.isFinite(p.x)||!Number.isFinite(p.y)||
+    !Number.isFinite(p.vx)||!Number.isFinite(p.vy)||
+    sectorIndex(p.x,p.y)===op.sector)return null;
+ var b=LF.sectorBounds(op.sector),nx=clamp(p.x,b.x0,b.x1),ny=clamp(p.y,b.y0,b.y1),
+  dx=nx-p.x,dy=ny-p.y,d=Math.hypot(dx,dy),sp=Math.hypot(p.vx,p.vy);
+ /* The marker appears early and yields to local combat visibility near the
+  * boundary. Its bearing is the player's own approach to PUBLIC geometry. */
+ if(!(d>=110&&d<=420&&sp>=140)||
+    (p.vx*dx+p.vy*dy)/(sp*d)<.6)return null;
+ var z=Number(cam.zoom),cx=Number(cam.x),cy=Number(cam.y);
+ if(!(z>0)||!Number.isFinite(z)||!Number.isFinite(cx)||!Number.isFinite(cy))return null;
+ var px=(p.x-cx)*z+w*.5,py=(p.y-cy)*z+h*.5;
+ if(!Number.isFinite(px)||!Number.isFinite(py))return null;
+ /* Reserve the top HUD and the bottom touch-control band. The marker is
+  * small, static, and directional; it never captures pointer events. */
+ var x=clamp(px+dx/d*w*.43,57,w-57),y=clamp(py+dy/d*h*.43,106,h-150);
+ return{x:x,y:y,distance:Math.round(d/25)*25,live:op.live};
+}
+function drawPublicBloomApproach(g,w,h){
+ var cue=publicBloomApproach(g,w,h),ctx=g&&g.ctx;
+ if(!cue||!ctx||typeof ctx.save!=='function')return;
+ var dpr=Number.isFinite(g.dpr)&&g.dpr>0?g.dpr:1;
+ ctx.save();
+ try{
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.globalAlpha=cue.live?.92:.73;
+  ctx.fillStyle='rgba(23,20,10,.88)';ctx.strokeStyle='#ffc94d';ctx.lineWidth=1.5;
+  if(!cue.live&&ctx.setLineDash)ctx.setLineDash([4,3]);
+  ctx.beginPath();
+  if(ctx.roundRect)ctx.roundRect(cue.x-52,cue.y-15,104,30,9);
+  else ctx.rect(cue.x-52,cue.y-15,104,30);
+  ctx.fill();ctx.stroke();
+  if(!cue.live&&ctx.setLineDash)ctx.setLineDash([]);
+  ctx.fillStyle='#ffe6a2';ctx.font='800 10px Rajdhani,system-ui';
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText((cue.live?'BLOOM ':'BLOOM? ')+cue.distance+' AWAY',cue.x,cue.y+1);
+ }finally{ctx.restore();}
+}
+/* Last overlay in the shipping runtime: the actual game/render module is
+ * booted only after these overlays, so this composes with existing IFF. */
+var oldBloomRenderModule=mods['game/render'];
+if(oldBloomRenderModule)mods['game/render']=function(module,exports,require){
+ oldBloomRenderModule(module,exports,require);
+ var originalRender=module.exports&&module.exports.render;
+ if(typeof originalRender!=='function'||module.exports.__novaPublicBloomApproach)return;
+ module.exports.__novaPublicBloomApproach=true;
+ var approachRender=function(g,w,h){
+  var out=originalRender(g,w,h);drawPublicBloomApproach(g,w,h);return out;
+ };
+ /* Late-binding tests and later visual layers identify the existing render
+  * owner through function metadata. Preserve every enumerable owner marker. */
+ Object.assign(approachRender,originalRender);
+ module.exports.render=approachRender;
+};
 function diag(){var g=LF.getActive(),s=g?LF.snapshot(g):LF.getLast()||{active:false,version:V};return'NOVA TANKS · LIVING FRONT '+V+'\n'+JSON.stringify(s,null,2);}
 function debugSummary(s){if(!s||!s.active)return'LIVING FRONT · no active/recorded match telemetry yet';var st=s.stats||{},counts=s.counts||{};return'LIVING FRONT v'+V+' · age '+s.age+'s · ceiling '+s.ceiling+' · '+s.director+' / last '+s.lastSignal+' · total XP '+s.totalXP+' · player neutral '+s.playerNeutralXPPerMin+' XP/min · plan '+s.planMsEma+'ms EMA / '+s.planMsPeak+'ms peak\nSHAPES C'+(counts.circle||0)+' T'+(counts.triangle||0)+' S'+(counts.square||0)+' P'+(counts.pentagon||0)+' H'+(counts.hexagon||0)+' ★'+(counts.star||0)+' CR'+(counts.crasher||0)+' · EVADE '+(st.triangleEvasions||0)+' · CRASH '+(st.crasherCharges||0)+'/'+(st.crasherHits||0)+'/'+(st.crasherMisses||0)+' · OVER '+(st.crasherOvershoots||0)+' · BOUNTY '+Math.round(st.bountyAbsorbed||0)+'/'+Math.round(st.bountyReleased||0)+' · STAR '+(st.starsIntercepted||0)+'/'+(st.starsSpawned||0)+' · BLOOM '+(st.blooms||0)+' · MIG '+(st.migrations||0)+' · AI ROT '+(st.aiRotations||0)+' · AI INTENT '+(st.aiFrontlineCommitments||0)+' · MIG AI '+(st.migrationAiSteered||0)+'/'+(st.migrationAiSamples||0)+' · MIG ARR '+(st.migrationAiPhysicalArrivals||0)+' · CONTEST '+(st.contests||0)+' · HEX AVG '+s.hexAvgNeighbors+'\n'+s.sectors.map(function(q){return q.i+':M'+q.m.toFixed(2)+' P'+q.p.toFixed(2)+' N'+q.n+' XP'+q.xp+' H'+q.harvest.toFixed(2)+' C'+q.combat.toFixed(2)+' '+q.in.toFixed(1)+'→/'+q.out.toFixed(1)+'←';}).join(' · ')+(s.frontline?' | FRONTLINES · ANN '+s.frontline.counts.announcements+' · ENTRY '+s.frontline.counts.playerEntries+' · CONTEST '+s.frontline.counts.observedContests+' · AI PHYS '+(s.frontline.counts.aiPhysicalArrivals||0)+' · BOT-S '+(s.frontline.counts.hostileBotSeconds||0).toFixed(1)+' · OUT-S '+(s.frontline.counts.hostileOutsideBotSeconds||0).toFixed(1)+' · ALIVE-S '+(s.frontline.counts.pilotAliveSeconds||0).toFixed(1)+' · CENSORED '+(s.frontline.counts.pilotDeathCensors||0)+' · REJECT '+(s.frontline.counts.aiPhysicalRejectedCrossings||0)+' · AI MEM '+(s.frontline.counts.aiArrivals||0)+' · NEUTRAL XP '+Math.round(s.frontline.counts.neutralXP)+' · SURVIVED '+s.frontline.counts.contestSurvivals+' · IN ZONE '+s.frontline.counts.playerSeconds.toFixed(1)+'s · CUE '+(s.frontline.counts.cuePresentations||0)+' · CUE→ENTRY '+(s.frontline.counts.cuedPhysicalEntries||0)+' · UNCUE '+(s.frontline.counts.uncuedPhysicalEntries||0)+' · UNCERT '+(s.frontline.counts.pilotPhysicalRejectedCrossings||0)+' · <200ms '+(s.frontline.counts.cueUnder200Ms||0):'');}
 function fill(root){if(!root)return;var h=root.querySelector('.nv-lf-debug');if(!h){h=document.createElement('div');h.className='nv-lf-debug';h.style.cssText='margin-top:8px;padding:8px;border:1px solid rgba(255,201,77,.18);border-radius:10px;background:rgba(12,16,26,.7);font:600 9px/1.25 Rajdhani,system-ui;color:#aebed0;white-space:pre-wrap;';var a=root.querySelector('.nv-debug-actions');a?root.insertBefore(h,a):root.appendChild(h);}var s=LF.getActive()?LF.snapshot(LF.getActive()):LF.getLast();h.textContent=debugSummary(s);var b=document.createElement('button');b.type='button';b.dataset.lfCopy='1';b.className='nv-debug-btn';b.textContent='COPY ECOLOGY';b.style.marginTop='7px';b.onclick=function(){if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(diag()).catch(function(){});};h.appendChild(document.createElement('br'));h.appendChild(b);}
