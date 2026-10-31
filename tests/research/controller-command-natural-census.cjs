@@ -85,7 +85,7 @@ function after(a,s){
  }
  if(a.examples.length<16&&(s.guaranteed||s.possible||
    (s.certified.length&&s.expiring)))
-  a.examples.push({time:+s.time.toFixed(3),certified:s.certified.length,
+  a.examples.push({time:finite(s.time)?+s.time.toFixed(3):null,certified:s.certified.length,
    expiring:s.expiring,possible:s.possible,guaranteed:s.guaranteed});
 }
 function install(g,a){
