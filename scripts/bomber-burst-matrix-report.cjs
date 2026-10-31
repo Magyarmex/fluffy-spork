@@ -98,7 +98,8 @@ function collect(root,expected=6){
     calls:a.calls,firstBursts:a.firstBursts,childrenCreated:a.childrenCreated,
     shellsFired:arm.coverPressure.playerShellsFired,
     finalClass:arm.metadata.pilotClassFinal,
-    byOwner:a.byOwner,bySource:a.bySource,byTTL:a.byTTL,bySite:a.bySite};
+    byOwner:a.byOwner,bySource:a.bySource,byTTL:a.byTTL,bySite:a.bySite,
+    airburst:a.airburst};
   }
   rows.push(row);
  }
