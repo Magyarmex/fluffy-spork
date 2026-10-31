@@ -208,3 +208,106 @@ test('Battlefield CCD preserves the first tank position across same-tick movemen
   assert.equal(target.__novaSweepPrevY, -21.2);
   assert.equal(target.__novaSweepMoveTime, 1);
 });
+
+
+test('opt-in cover research attributes effective damage and breaches without altering combat', () => {
+  const { Game } = loadBattlefield();
+  function world(ownerId, damage, hp, witness) {
+    const g = new Game();
+    g.time = 1;
+    g.player = { id: 1, alive: true };
+    g.__novaBattlefield = { coverBroken: 0, coverTotal: 1, name: 'TEST' };
+    g.__novaTerrain = [{ id: -1, shape: 'rect', x: 0, y: 0, w: 20, h: 160,
+      solid: true, destructible: true, hp, maxHp: hp }];
+    g.bullets = [{ x: -100, y: 0, vx: 1000, vy: 0, r: 4, dmg: damage,
+      ownerId, pen: 3, dead: false }];
+    g.weakenBullet = () => {};
+    if (witness) g.__novaCoverDamageResearch = witness;
+    g.updateBullets(0.2);
+    return { hp: g.__novaTerrain[0].hp, solid: g.__novaTerrain[0].solid,
+      breaks: g.__novaBattlefield.coverBroken, bulletX: g.bullets[0].x,
+      pen: g.bullets[0].pen, witness };
+  }
+  const fresh = () => ({ schema: 1, pilotId: 1, allEffectiveDamage: 0,
+    playerEffectiveDamage: 0, allBreaks: 0, playerBreaks: 0 });
+  const pilot = world(1, 400, 25, fresh());
+  const baseline = world(1, 400, 25, null);
+  assert.equal(pilot.witness.allEffectiveDamage, 25, 'overkill must not count');
+  assert.equal(pilot.witness.playerEffectiveDamage, 25);
+  assert.equal(pilot.witness.allBreaks, 1);
+  assert.equal(pilot.witness.playerBreaks, 1);
+  assert.deepEqual({ hp: pilot.hp, solid: pilot.solid, breaks: pilot.breaks,
+    bulletX: pilot.bulletX, pen: pilot.pen },
+    { hp: baseline.hp, solid: baseline.solid, breaks: baseline.breaks,
+      bulletX: baseline.bulletX, pen: baseline.pen },
+    'research witness must not affect the game');
+  const rival = world(2, 20, 100, fresh());
+  assert.equal(rival.witness.allEffectiveDamage, 20);
+  assert.equal(rival.witness.playerEffectiveDamage, 0);
+  assert.equal(rival.witness.allBreaks, 0);
+  assert.equal(rival.witness.playerBreaks, 0);
+  const invalid = { schema: 1, pilotId: 1, allEffectiveDamage: NaN,
+    playerEffectiveDamage: 0, allBreaks: 0, playerBreaks: 0 };
+  const ignored = world(1, 400, 25, invalid);
+  assert.ok(Number.isNaN(ignored.witness.allEffectiveDamage));
+  assert.equal(ignored.witness.playerEffectiveDamage, 0);
+  assert.equal(ignored.witness.allBreaks, 0);
+  const missingPilot = { schema: 1, allEffectiveDamage: 0,
+    playerEffectiveDamage: 0, allBreaks: 0, playerBreaks: 0 };
+  world(1, 400, 25, missingPilot);
+  assert.equal(missingPilot.allEffectiveDamage, 0, 'unknown pilot identity must fail closed');
+  assert.equal(missingPilot.allBreaks, 0);
+});
+
+
+test('cover research accumulates partial hits and credits only the actual breaker', () => {
+  const { Game } = loadBattlefield();
+  const g = new Game();
+  g.time = 1; g.player = { id: 1, alive: true };
+  g.__novaBattlefield = { coverBroken: 0, coverTotal: 1, name: 'TEST' };
+  g.__novaTerrain = [{ id: -1, shape: 'rect', x: 0, y: 0, w: 20, h: 160,
+    solid: true, destructible: true, hp: 50, maxHp: 50 }];
+  g.__novaCoverDamageResearch = { schema: 1, pilotId: 1, allEffectiveDamage: 0,
+    playerEffectiveDamage: 0, allBreaks: 0, playerBreaks: 0 };
+  g.weakenBullet = () => {};
+  function fire(ownerId, dmg) {
+    g.bullets = [{ x: -100, y: 0, vx: 1000, vy: 0, r: 4,
+      dmg, ownerId, pen: 3, dead: false }];
+    g.updateBullets(0.2);
+    g.time += 0.2;
+  }
+  fire(1, 30);
+  assert.equal(g.__novaTerrain[0].hp, 20);
+  assert.equal(g.__novaCoverDamageResearch.playerEffectiveDamage, 30);
+  assert.equal(g.__novaCoverDamageResearch.playerBreaks, 0);
+  fire(2, 40);
+  assert.equal(g.__novaTerrain[0].hp, 0);
+  assert.equal(g.__novaBattlefield.coverBroken, 1);
+  assert.equal(g.__novaCoverDamageResearch.allEffectiveDamage, 50);
+  assert.equal(g.__novaCoverDamageResearch.playerEffectiveDamage, 30);
+  assert.equal(g.__novaCoverDamageResearch.allBreaks, 1);
+  assert.equal(g.__novaCoverDamageResearch.playerBreaks, 0,
+    'the player damaged the cover but did not deliver the breaking hit');
+});
+
+
+test('cover research includes splash damage with the same owner and overkill rules', () => {
+  const { Game } = loadBattlefield();
+  const g = new Game();
+  g.time = 1; g.player = { id: 1, alive: true };
+  g.__novaBattlefield = { coverBroken: 0, coverTotal: 1, name: 'TEST' };
+  g.__novaTerrain = [{ id: -1, shape: 'rect', x: 0, y: 0, w: 20, h: 160,
+    solid: true, destructible: true, hp: 100, maxHp: 100 }];
+  g.__novaCoverDamageResearch = { schema: 1, pilotId: 1, allEffectiveDamage: 0,
+    playerEffectiveDamage: 0, allBreaks: 0, playerBreaks: 0 };
+  g.player = { id: 99, alive: true }; // Redeployed pointer must not erase old shot ownership.
+  g.splashAt(0, 0, 100, 1, 1, 0, '#fff', 40);
+  assert.ok(Math.abs(g.__novaTerrain[0].hp - 46) < 1e-9);
+  assert.ok(Math.abs(g.__novaCoverDamageResearch.playerEffectiveDamage - 54) < 1e-9);
+  g.splashAt(0, 0, 100, 1, 2, 0, '#fff', 50);
+  assert.equal(g.__novaTerrain[0].hp, 0);
+  assert.ok(Math.abs(g.__novaCoverDamageResearch.allEffectiveDamage - 100) < 1e-9);
+  assert.ok(Math.abs(g.__novaCoverDamageResearch.playerEffectiveDamage - 54) < 1e-9);
+  assert.equal(g.__novaCoverDamageResearch.allBreaks, 1);
+  assert.equal(g.__novaCoverDamageResearch.playerBreaks, 0);
+});

@@ -227,7 +227,23 @@ function circleResolve(g,e,r){
  if(hitAny){var dot=(e.vx||0)*lastNx+(e.vy||0)*lastNy;if(dot<0){e.vx-=lastNx*dot;e.vy-=lastNy*dot;}var n=e.__novaTerrainBump||(e.__novaTerrainBump={x:0,y:0});n.x=lastNx;n.y=lastNy;e.__novaTerrainBumpT=.22;}
  return hitAny;
 }
-function damageCover(g,s,dmg,ownerId,x,y,bullet){if(!s||!s.destructible||s.hp<=0)return false;var mult=bullet&&bullet.shell?1.35:bullet&&bullet.beam?.92:1;s.hp-=dmg*mult;s.flash=.16;if(g.addImpactDebris)g.addImpactDebris(x,y,bullet?bullet.vx:0,bullet?bullet.vy:0,'#8fd4ff',4);if(g.sfx&&g.sfx.novaCoverHit)g.sfx.novaCoverHit((x-(g.player?g.player.x:x))/700,Math.min(1,dmg/70));if(s.hp<=0){s.hp=0;s.solid=false;s.brokenAt=g.time;(g.__novaTerrainRubble||(g.__novaTerrainRubble=[])).push({x:s.x,y:s.y,w:s.w||s.r*2,h:s.h||s.r*2,r:s.r||0,shape:s.shape,life:999});if(g.addParticles)g.addParticles(s.x,s.y,'#8fd4ff',16,180,'spark');if(g.addRing)g.addRing(s.x,s.y,'#8fd4ff',Math.min(100,(s.w||s.r*2)*.45));if(g.sfx&&g.sfx.novaCoverBreak)g.sfx.novaCoverBreak((s.x-(g.player?g.player.x:s.x))/700);if(g.__novaBattlefield)g.__novaBattlefield.coverBroken++;var killer=ownerId>=0&&g.getTank?g.getTank(ownerId):null;if(killer&&killer.alive){if(g.gainXP)g.gainXP(killer,18);if(killer.isPlayer&&g.addText)g.addText(s.x,s.y-24,'BREACHED +18','#9fe8ff',10);}return true;}return false;}
+function damageCover(g,s,dmg,ownerId,x,y,bullet){if(!s||!s.destructible||s.hp<=0)return false;var mult=bullet&&bullet.shell?1.35:bullet&&bullet.beam?.92:1;var oldHp=s.hp;s.hp-=dmg*mult;
+ /* Research-only, opt-in accounting at the authoritative damage owner.
+  * Effective damage is capped by remaining HP; overkill is not progress.
+  * Never modify the hit, destruction, XP or projectile result. */
+ var research=g.__novaCoverDamageResearch;
+ var track=research&&research.schema===1&&
+  Number.isSafeInteger(research.pilotId)&&research.pilotId>=0&&
+  Number.isFinite(research.allEffectiveDamage)&&Number.isFinite(research.playerEffectiveDamage)&&
+  Number.isSafeInteger(research.allBreaks)&&research.allBreaks>=0&&
+  Number.isSafeInteger(research.playerBreaks)&&research.playerBreaks>=0;
+ var playerOwned=!!(track&&Number.isSafeInteger(research.pilotId)&&research.pilotId>=0&&ownerId===research.pilotId);
+ if(track){
+  var effective=Math.max(0,Math.min(oldHp,oldHp-s.hp));
+  if(Number.isFinite(effective)){research.allEffectiveDamage+=effective;
+   if(playerOwned)research.playerEffectiveDamage+=effective;}
+ }
+ s.flash=.16;if(g.addImpactDebris)g.addImpactDebris(x,y,bullet?bullet.vx:0,bullet?bullet.vy:0,'#8fd4ff',4);if(g.sfx&&g.sfx.novaCoverHit)g.sfx.novaCoverHit((x-(g.player?g.player.x:x))/700,Math.min(1,dmg/70));if(s.hp<=0){if(track){if(research.allBreaks<Number.MAX_SAFE_INTEGER)research.allBreaks++;if(playerOwned&&research.playerBreaks<Number.MAX_SAFE_INTEGER)research.playerBreaks++;}s.hp=0;s.solid=false;s.brokenAt=g.time;(g.__novaTerrainRubble||(g.__novaTerrainRubble=[])).push({x:s.x,y:s.y,w:s.w||s.r*2,h:s.h||s.r*2,r:s.r||0,shape:s.shape,life:999});if(g.addParticles)g.addParticles(s.x,s.y,'#8fd4ff',16,180,'spark');if(g.addRing)g.addRing(s.x,s.y,'#8fd4ff',Math.min(100,(s.w||s.r*2)*.45));if(g.sfx&&g.sfx.novaCoverBreak)g.sfx.novaCoverBreak((s.x-(g.player?g.player.x:s.x))/700);if(g.__novaBattlefield)g.__novaBattlefield.coverBroken++;var killer=ownerId>=0&&g.getTank?g.getTank(ownerId):null;if(killer&&killer.alive){if(g.gainXP)g.gainXP(killer,18);if(killer.isPlayer&&g.addText)g.addText(s.x,s.y-24,'BREACHED +18','#9fe8ff',10);}return true;}return false;}
 /* A terrain-triggered shell burst creates its children during the pre-core
  * projectile pass. Only outward-facing children may clear the collision
  * padding of the surface they were born against. Inward fragments still hit

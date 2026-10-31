@@ -102,6 +102,8 @@ async function arm(browser,enabled,label){
    g.__novaExperimentABMode=abMode;
    if(abMode==='cover-pressure'){
     g.__novaCoverPriorityResearch={schema:1,activations:0};
+    g.__novaCoverDamageResearch={schema:1,pilotId:g.player.id,allEffectiveDamage:0,
+     playerEffectiveDamage:0,allBreaks:0,playerBreaks:0};
     /* Observe actual player projectiles created by the composed weapon
      * owner. An aim-input sample is not proof that a shot was fired. */
     const fire=g.tryFire;
@@ -329,6 +331,10 @@ async function arm(browser,enabled,label){
      botCount:g.tanks.filter(t=>t.ai&&t.alive).length},
     projectileDensityAudit:g.__novaProjectileDensityAudit,
     coverPressure:{coverBroken:g.__novaBattlefield?.coverBroken||0,
+     allEffectiveDamage:g.__novaCoverDamageResearch?.allEffectiveDamage||0,
+     playerEffectiveDamage:g.__novaCoverDamageResearch?.playerEffectiveDamage||0,
+     allBreaks:g.__novaCoverDamageResearch?.allBreaks||0,
+     playerBreaks:g.__novaCoverDamageResearch?.playerBreaks||0,
      playerShotsFired:g.__novaResearchPlayerShots||0,
      certifiedActivations:g.__novaCoverPriorityResearch?.activations||0,
      coverDamage:(g.__novaTerrain||[]).filter(t=>t.destructible).reduce((sum,t)=>
