@@ -93,3 +93,23 @@ test('retired drone owners and redeploy clear old relations without poisoning a 
  assert.equal(m.size,0);
  assert.equal(g.__novaFieldServicePruneAt,0);
 });
+
+test('large legitimate caches are swept at most once per four game seconds',()=>{
+ const {g,api}=boot(),m=new Map();
+ g.__novaFieldServiceRelations=m;
+ g.bullets=[{ownerId:1200}];
+ for(let id=1000;id<1400;id++)m.set('1|'+id,true);
+ let sweeps=0;
+ const each=m.forEach.bind(m);
+ m.forEach=function(fn){sweeps++;return each(fn);};
+ g.time=1;api.rememberDamagedOwnerProjectileRelations(g);
+ assert.equal(sweeps,1);
+ for(let step=0;step<100;step++){
+  m.set('1|'+(2000+step),true);
+  g.time=1.01+step*.01;
+  api.rememberDamagedOwnerProjectileRelations(g);
+ }
+ assert.equal(sweeps,1,'large active battles must not pay for a full map sweep every frame');
+ g.time=5.01;api.rememberDamagedOwnerProjectileRelations(g);
+ assert.equal(sweeps,2,'a later bounded sweep can retire stale entries');
+});
