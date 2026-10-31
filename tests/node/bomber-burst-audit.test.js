@@ -116,3 +116,62 @@ test('Airburst witness counts actual birth-frame movement, abstention and mixed 
   assert.equal(a.airburst.observerErrors,0);
  }
 });
+
+
+test('Actual Three Disciplines module produces witnessed clear-corridor advances and safe abstentions',()=>{
+ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+ const source=fs.readFileSync(path.join(__dirname,'../../nova-updates/disciplines-v1.7.0.js'),'utf8');
+ function Game(){
+  this.time=10;this.bullets=[];this.__novaTerrain=[];this.tanks=[];
+  this.shapes=[];this.drones=[];this.cam={};this.sfx={novaFuseBurst(){}};
+ }
+ Game.prototype.firstTerrainHit=()=>null;
+ Game.prototype.getTank=function(id){return this.tanks.find(t=>t.id===id);};
+ Game.prototype.updateBullets=function(dt){
+  for(const b of this.bullets){b.px=b.x;b.py=b.y;b.x+=b.vx*dt;b.y+=b.vy*dt;b.ttl-=dt;}
+ };
+ Game.prototype.clusterBurst=function(parent){
+  if(parent.__novaClusterBurstConsumed)return;
+  parent.__novaClusterBurstConsumed=true;
+  for(let i=0;i<6;i++)this.bullets.push({id:100+i,ownerId:parent.ownerId,
+   x:parent.x,y:parent.y,px:parent.x,py:parent.y,
+   vx:100+i*15,vy:0,r:2,ttl:.7,dead:false});
+ };
+ for(const n of ['tryFire','useAbility','damageTank','bodyDamage','update','addRing','addText'])
+  Game.prototype[n]=function(){};
+ const classes={CLASSES:{bomber:{size:17,bullet:{cluster:6}},scout:{size:14}},
+  lineageForClass:cls=>cls==='bomber'?'cannon':'scout'};
+ const mods={'game/classes':module=>{module.exports=classes;},
+  'game/engine':module=>{module.exports={Game};}};
+ vm.runInNewContext(source,{window:{__novaModules:mods},console:{error(){},info(){}}});
+ const module={exports:{}};
+ mods['game/engine'](module,module.exports,spec=>{
+  if(spec==='./classes')return classes;throw Error('unexpected dependency '+spec);
+ });
+ const Patched=module.exports.Game;
+ function make(mode){
+  const g=new Patched(),dt=1/60,speed=2000;
+  g.tanks=[{id:1,cls:'bomber',alive:true,x:-500,y:-500}];
+  if(mode==='near')g.shapes=[{id:50,hp:100,r:10,x:150,y:0,vx:0,vy:0}];
+  g.bullets=[{id:70,ownerId:1,x:150-speed*dt*.35,y:0,vx:speed,vy:0,
+   r:3,ttl:1,pen:0,hits:0,shell:true,dead:false,
+   __v17Cannon:true,__v17FuseDist:150,__v17SpawnX:0,__v17SpawnY:0,
+   __v17FuseArmed:true}];
+  if(mode==='two')g.bullets.push({id:90,ownerId:5,x:900,y:900,
+   px:900,py:900,vx:0,vy:0,r:3,ttl:1,dead:false});
+  return g;
+ }
+ for(const mode of ['clear','near','two']){
+  const baseline=make(mode),g=make(mode),a=audit.create(1);
+  audit.install(g,a,()=> 'Error\n at Game.updateBullets (https://host/nova-updates/disciplines-v1.7.0.js:500:12)');
+  baseline.updateBullets(1/60);g.updateBullets(1/60);
+  assert.deepEqual(g.bullets,baseline.bullets,'research observer changed '+mode+' physical game');
+  assert.equal(a.bySource.disciplines,1);
+  assert.equal(a.airburst.calls,1);
+  assert.equal(a.airburst.sole,mode==='two'?0:1);
+  assert.equal(a.airburst.advanced,mode==='clear'?1:0);
+  assert.equal(a.airburst.stationary,mode==='clear'?0:1);
+  assert.equal(a.airburst.advancedChildren,mode==='clear'?6:0);
+  assert.equal(a.airburst.observerErrors,0);
+ }
+});
