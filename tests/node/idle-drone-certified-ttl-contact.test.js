@@ -245,6 +245,37 @@ for(const hz of [30,60,120,240]){
   assert.deepEqual(g.hitOwners,[2]);
  });
 }
+/* Independent conservative speed-ball oracle: only cases guaranteed
+ * to overlap despite ANY drone path <=200u/s are required to hit.
+ * Do not confuse uncertified possible contacts with guaranteed ones. */
+for(const hz of [30,60,120,240]){
+ test('seeded commanded guaranteed-contact speed envelopes at '+hz+'Hz',()=>{
+  let seed=0x12345+hz;
+  const rand=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+  let certified=0;
+  for(let i=0;i<240;i++){
+   const x=13.5+rand()*11,y=(rand()-.5)*10;
+   const vx=2000+rand()*2000,ttl=.002+rand()*.002;
+   const radius=12,speedBound=200;
+   let guaranteed=false;
+   for(let k=1;k<=80;k++){
+    const t=ttl*k/80;
+    if(Math.hypot(vx*t-x,y)+speedBound*t<radius-.015){
+     guaranteed=true;break;
+    }
+   }
+   if(!guaranteed)continue;
+   const {g,d}=shotWorld(hz,{command:true,x,y,vx,ttl});
+   assert.equal(d.__novaChronoCommandBoundedEpoch,g.__novaShapeSweepEpoch,
+    'single commanded movement must be witnessed in clear world '+JSON.stringify({hz,x,y,vx,ttl}));
+   assert.deepEqual(g.hitOwners,[2],
+    'guaranteed physical contact must not vanish at TTL '+JSON.stringify({hz,x,y,vx,ttl}));
+   certified++;
+  }
+  assert.ok(certified>=12,'seed must exercise multiple guaranteed command contacts: '+certified);
+ });
+}
+
 test('non-expiring shots do not activate the optional motion witness',()=>{
  const {g,d}=shotWorld(60,{ttl:1,x:100});
  assert.equal(d.__novaChronoIdleRawEpoch,undefined);
