@@ -391,3 +391,18 @@ test('solid contest rechecks visual freshness at 30, 60, 120 and 240 Hz without 
   assert.equal(s.st.stats.contests,1,'minimap cannot award contest credit');
  }
 });
+
+test('zoomed tactical camera invalidates a badge when a short pan hides the last visible rival',()=>{
+ const s=scene();s.p.x=-1110;s.g.cam.x=s.p.x;
+ s.g.cam.zoom=10;
+ s.enemy.x=-1102;s.enemy.y=-550;
+ s.shape.x=-1101;s.shape.y=-550;
+ assert.equal(s.T.contestCandidate(s.g,s.st),true);
+ assert.equal(s.T.updateContest(s.g,s.st),true);
+ s.g.drawMinimap();assert.ok(s.draws.some(d=>d.type==='text'&&d.value==='!'));
+ s.g.cam.x=-1150;s.draws.length=0;
+ assert.equal(s.T.contestCandidate(s.g,s.st),false);
+ s.g.drawMinimap();
+ assert.ok(!s.draws.some(d=>d.type==='text'&&d.value==='!'),
+  'a small pan can exceed a zoomed viewport even when under 40 world units');
+});
