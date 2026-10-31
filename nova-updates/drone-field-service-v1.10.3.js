@@ -28,7 +28,34 @@ function rememberProjectileRelation(g,owner,t){var h=relationHostile(g,owner,t,f
 function projectileHostile(g,owner,t){return rememberProjectileRelation(g,owner,t);}
 function rememberedProjectileHostile(g,owner,ownerId){var m=g.__novaFieldServiceRelations,k=relationKey(owner.id,ownerId);return !!(m&&m.has(k)&&m.get(k));}
 function rememberOwnerProjectileRelations(g,owner){if(!g||!owner||isController(owner))return;var bs=g.bullets||[];for(var i=0;i<bs.length;i++){var b=bs[i];if(!b||b.dead||b.alive===false||b.ownerId==null||b.ownerId===owner.id)continue;var shotOwner=ownerOf(g,b);if(shotOwner)rememberProjectileRelation(g,owner,shotOwner);}}
-function rememberDamagedOwnerProjectileRelations(g,ds){if(!g)return;ds=ds||g.drones||[];var owners=new Map();for(var i=0;i<ds.length;i++){var d=ds[i];if(!d||d.hp<=0)continue;var owner=ownerOf(g,d);if(!owner||isController(owner))continue;var s=stateFor(g,d),max=Math.max(s.maxHp,Number(d.maxHp)||0);if(max>0&&d.hp<max-.01){s.sampleX=d.x;s.sampleY=d.y;if(!owners.has(owner.id))owners.set(owner.id,owner);}}owners.forEach(function(owner){rememberOwnerProjectileRelations(g,owner);});}
+/* Shooter relations are needed only while an actual projectile from that
+ * shooter remains in the game and a surviving repair-capable drone owner can
+ * use them. Long matches continually create new tank IDs: without retiring
+ * old pairs this map grows for the entire life, even after every shot dies.
+ * Prune rarely and conservatively; retain even dead-flagged shells until
+ * their array entry is removed so pending fragments cannot lose allegiance. */
+function pruneProjectileRelations(g){
+ var m=g&&g.__novaFieldServiceRelations;
+ if(!m||m.size<=256)return;
+ var tm=now(g);
+ if(tm<(g.__novaFieldServicePruneAt||0))return;
+ g.__novaFieldServicePruneAt=tm+4;
+ var owners=new Set(),shooters=new Set(),ds=g.drones||[],bs=g.bullets||[];
+ for(var i=0;i<ds.length;i++){
+  var d=ds[i];if(!d||!(d.hp>0))continue;
+  var owner=ownerOf(g,d);
+  if(owner&&!isController(owner))owners.add(String(owner.id));
+ }
+ for(var j=0;j<bs.length;j++){
+  var b=bs[j];if(b&&b.ownerId!=null)shooters.add(String(b.ownerId));
+ }
+ m.forEach(function(_relation,key){
+  var sep=key.indexOf('|');
+  if(sep<0||!owners.has(key.slice(0,sep))||
+     !shooters.has(key.slice(sep+1)))m.delete(key);
+ });
+}
+function rememberDamagedOwnerProjectileRelations(g,ds){if(!g)return;ds=ds||g.drones||[];var owners=new Map();for(var i=0;i<ds.length;i++){var d=ds[i];if(!d||d.hp<=0)continue;var owner=ownerOf(g,d);if(!owner||isController(owner))continue;var s=stateFor(g,d),max=Math.max(s.maxHp,Number(d.maxHp)||0);if(max>0&&d.hp<max-.01){s.sampleX=d.x;s.sampleY=d.y;if(!owners.has(owner.id))owners.set(owner.id,owner);}}owners.forEach(function(owner){rememberOwnerProjectileRelations(g,owner);});pruneProjectileRelations(g);}
 function lineClear(g,ax,ay,bx,by){return !g.hasLineOfSight||g.hasLineOfSight(ax,ay,bx,by,2);}
 /* Ordinary projectiles cannot threaten repair beyond their lifetime. Shells retain the full danger horizon because expiration spawns live cluster fragments. */
 function projectileThreat(g,d,owner){var bs=g.bullets||[],clear=Math.max(8,Number(d.r)||8)+PROJECTILE_CLEARANCE,clear2=clear*clear,service=d.__novaFieldService,ownVX=service&&Number.isFinite(service.motionVX)?service.motionVX:(Number(d.__novaVX)||0),ownVY=service&&Number.isFinite(service.motionVY)?service.motionVY:(Number(d.__novaVY)||0);for(var i=0;i<bs.length;i++){var b=bs[i];if(!b||b.dead||b.alive===false||(Number.isFinite(b.ttl)&&b.ttl<=0&&!b.shell))continue;if(b.ownerId===owner.id||b.ownerId===d.id)continue;var shotOwner=ownerOf(g,b),isHostile=shotOwner?projectileHostile(g,owner,shotOwner):rememberedProjectileHostile(g,owner,b.ownerId);if(!isHostile)continue;var dx=(Number(b.x)||0)-d.x,dy=(Number(b.y)||0)-d.y;var vx=(Number(b.vx)||0)-ownVX,vy=(Number(b.vy)||0)-ownVY,v2=vx*vx+vy*vy,closing=dx*vx+dy*vy<0,overlap=Math.max(8,Number(d.r)||8)+Math.max(0,Number(b.r)||0)+1;if(dx*dx+dy*dy<=(closing||v2<1?clear2:overlap*overlap)&&lineClear(g,d.x,d.y,b.x,b.y))return true;if(v2<1)continue;var t=-(dx*vx+dy*vy)/v2;if(t<=0)continue;var horizon=Number.isFinite(b.ttl)&&!b.shell?Math.min(PROJECTILE_HORIZON,b.ttl):PROJECTILE_HORIZON;if(t>horizon)t=horizon;var cx=dx+vx*t,cy=dy+vy*t;if(cx*cx+cy*cy<=clear2&&lineClear(g,d.x,d.y,b.x,b.y))return true;}return false;}
@@ -43,7 +70,7 @@ function registerTips(){var api=window.NOVATips;if(!api||typeof api.registerMany
  {id:'drone-field-repair',contexts:['gameplay','controller'],text:'A damaged drone self-repairs only after combat genuinely breaks. Fresh damage, nearby visible hostility, or incoming fire resets the recovery window.',reviewed:'2026-08-17'},
  {id:'controller-repair-advantage',contexts:['gameplay','controller'],text:'Controller drones recycle much faster than ordinary drones. Pull damaged hunters out before the screen collapses instead of trading every hull to zero.',reviewed:'2026-08-09'}
 ]);}
-wrap('game/engine',function(engine){var Game=engine.Game;if(!Game||Game.prototype.__novaFieldService)return;Game.prototype.__novaFieldService=true;/* A full redeploy discards every projectile but reuses Game: retire all prior-life shooter relations only after that reset succeeds. */var oldRedeploy=Game.prototype.redeploy;if(oldRedeploy)Game.prototype.redeploy=function(){var out=oldRedeploy.apply(this,arguments);if(this.__novaFieldServiceRelations)this.__novaFieldServiceRelations.clear();return out;};var oldDamage=Game.prototype.damageDrone;if(oldDamage)Game.prototype.damageDrone=function(d){var before=d?Number(d.hp)||0:0,s=d?stateFor(this,d):null,out=oldDamage.apply(this,arguments);if(d&&s&&(Number(d.hp)||0)<before-.001){s.lastDamageAt=now(this);s.threat=true;s.projectileThreat=true;s.nextThreatAt=now(this)+THREAT_INTERVAL;s.nextProjectileAt=now(this)+PROJECTILE_INTERVAL;}return out;};var oldUpdate=Game.prototype.updateDrones;if(oldUpdate)Game.prototype.updateDrones=function(dt){var ds=this.drones||[];rememberDamagedOwnerProjectileRelations(this,ds);var out=oldUpdate.apply(this,arguments);ds=this.drones||[];for(var i=0;i<ds.length;i++){var d=ds[i];if(!d||d.hp<=0)continue;var s=stateFor(this,d),owner=ownerOf(this,d);if(Number.isFinite(dt)&&dt>0&&Number.isFinite(s.sampleX)&&Number.isFinite(s.sampleY)&&Number.isFinite(d.x)&&Number.isFinite(d.y)){
+wrap('game/engine',function(engine){var Game=engine.Game;if(!Game||Game.prototype.__novaFieldService)return;Game.prototype.__novaFieldService=true;/* A full redeploy discards every projectile but reuses Game: retire all prior-life shooter relations only after that reset succeeds. */var oldRedeploy=Game.prototype.redeploy;if(oldRedeploy)Game.prototype.redeploy=function(){var out=oldRedeploy.apply(this,arguments);if(this.__novaFieldServiceRelations)this.__novaFieldServiceRelations.clear();this.__novaFieldServicePruneAt=0;return out;};var oldDamage=Game.prototype.damageDrone;if(oldDamage)Game.prototype.damageDrone=function(d){var before=d?Number(d.hp)||0:0,s=d?stateFor(this,d):null,out=oldDamage.apply(this,arguments);if(d&&s&&(Number(d.hp)||0)<before-.001){s.lastDamageAt=now(this);s.threat=true;s.projectileThreat=true;s.nextThreatAt=now(this)+THREAT_INTERVAL;s.nextProjectileAt=now(this)+PROJECTILE_INTERVAL;}return out;};var oldUpdate=Game.prototype.updateDrones;if(oldUpdate)Game.prototype.updateDrones=function(dt){var ds=this.drones||[];rememberDamagedOwnerProjectileRelations(this,ds);var out=oldUpdate.apply(this,arguments);ds=this.drones||[];for(var i=0;i<ds.length;i++){var d=ds[i];if(!d||d.hp<=0)continue;var s=stateFor(this,d),owner=ownerOf(this,d);if(Number.isFinite(dt)&&dt>0&&Number.isFinite(s.sampleX)&&Number.isFinite(s.sampleY)&&Number.isFinite(d.x)&&Number.isFinite(d.y)){
   var moveX=d.x-s.sampleX,moveY=d.y-s.sampleY;
   /* A discontinuous relocation is not evidence of sustained velocity.
    * Match Battlefield's 96u frame-jump gate rather than projecting a
