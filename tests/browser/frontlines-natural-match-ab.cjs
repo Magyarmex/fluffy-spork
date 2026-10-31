@@ -113,9 +113,12 @@ async function arm(browser,enabled,label){
     const fire=g.tryFire;
     g.tryFire=function(t){
      const before=this.bullets.length,out=fire.apply(this,arguments);
-     if(t===this.player&&this.bullets.length>before)
+     if(t===this.player&&this.bullets.length>before){
       this.__novaResearchPlayerShots=(this.__novaResearchPlayerShots||0)+
        this.bullets.length-before;
+      if(bomberResearch)this.__novaResearchPlayerShells=(this.__novaResearchPlayerShells||0)+
+       this.bullets.slice(before).filter(b=>b&&b.shell).length;
+     }
      return out;
     };
    }
@@ -354,6 +357,7 @@ async function arm(browser,enabled,label){
      allBreaks:g.__novaCoverDamageResearch?.allBreaks||0,
      playerBreaks:g.__novaCoverDamageResearch?.playerBreaks||0,
      playerShotsFired:g.__novaResearchPlayerShots||0,
+     ...(g.__novaBomberBurstAudit?{playerShellsFired:g.__novaResearchPlayerShells||0}:{}),
      certifiedActivations:g.__novaCoverPriorityResearch?.activations||0,
      coverDamage:(g.__novaTerrain||[]).filter(t=>t.destructible).reduce((sum,t)=>
       sum+Math.max(0,(t.maxHp||0)-Math.max(0,t.hp||0)),0),
@@ -380,6 +384,11 @@ async function arm(browser,enabled,label){
   if(BOMBER_RESEARCH){
    const a=result.bomberBurstAudit;
    assert.equal(a?.schema,1,'composed Bomber observer required');
+   assert.ok(Number.isSafeInteger(result.coverPressure.playerShellsFired));
+   assert.ok(result.coverPressure.playerShellsFired>=0);
+   if(result.coverPressure.playerShotsFired>0)
+    assert.ok(result.coverPressure.playerShellsFired>0,
+     'standard Bomber emitted projectiles but no actual shells');
    assert.equal(a.firstBursts+a.suppressedCalls,a.calls);
    assert.equal(Object.values(a.byOwner).reduce((x,y)=>x+y,0),a.firstBursts);
    assert.equal(Object.values(a.bySource).reduce((x,y)=>x+y,0),a.firstBursts);
