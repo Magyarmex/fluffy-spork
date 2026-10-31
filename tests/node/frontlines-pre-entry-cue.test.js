@@ -233,3 +233,18 @@ test('fast warning respects spawn protection and unrelated Director signals',()=
  s.draws.length=0;s.g.drawMinimap();
  assert.ok(!s.draws.some(d=>d.type==='text'&&d.value==='!'));
 });
+
+test('newly visible approach is sampled within 160ms, never every minimap draw',()=>{
+ const s=scene();
+ let rays=0,clear=false;
+ s.g.hasLineOfSight=()=>{rays++;return clear;};
+ s.g.drawMinimap();
+ assert.equal(s.st.approachSignal,null);
+ clear=true;s.g.time=100.08;
+ s.g.drawMinimap();
+ assert.equal(s.st.approachSignal,null,'no redundant ray scan before cadence deadline');
+ assert.equal(rays,1);
+ s.g.time=100.16;s.g.drawMinimap();
+ assert.ok(s.st.approachSignal,'new visual witness must be sampled by 160ms');
+ assert.equal(rays,3,'one hostile ray and one harvestable-pocket ray after deadline');
+});
