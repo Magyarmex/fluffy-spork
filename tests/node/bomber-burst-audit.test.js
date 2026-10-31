@@ -83,3 +83,36 @@ test('5,000 seeded burst sequences preserve projectile state and random-stream c
  assert.equal(report.bySource.core,5000);
  assert.ok(report.examples.length<=20,'bounded artifact examples');
 });
+
+
+test('Airburst witness counts actual birth-frame movement, abstention and mixed outcomes without changing simulation',()=>{
+ function world(mode){
+  const shell={id:1,ownerId:7,x:100,y:0,px:95,py:0,ttl:.5,shell:true};
+  return {time:9,bullets:[shell],
+   clusterBurst(parent){
+    parent.__novaClusterBurstConsumed=true;
+    const n=mode==='empty'?0:2;
+    for(let i=0;i<n;i++)this.bullets.push({id:10+i,ownerId:7,
+     x:100,y:0,px:100,py:0,ttl:.7,vx:120+i*40,vy:0});
+   },
+   updateBullets(dt){
+    this.clusterBurst(this.bullets[0]);
+    for(let i=1;i<this.bullets.length;i++){
+     if(mode==='stationary'||mode==='empty'||(mode==='mixed'&&i===2))continue;
+     const c=this.bullets[i];c.x+=c.vx*dt*.65;c.ttl-=dt*.65;
+    }
+   }};
+ }
+ for(const mode of ['advanced','stationary','mixed','empty']){
+  const base=world(mode),g=world(mode),a=audit.create(7);
+  audit.install(g,a,()=> 'Error\n at Game.updateBullets (https://host/nova-updates/disciplines-v1.7.0.js:500:12)');
+  base.updateBullets(1/60);g.updateBullets(1/60);
+  assert.deepEqual(g.bullets,base.bullets,mode+' must preserve actual projectiles');
+  assert.equal(a.airburst.calls,1);
+  assert.equal(a.airburst.sole,1);
+  assert.equal(a.airburst.byOwner.pilot,1);
+  assert.equal(a.airburst[mode==='empty'?'noChildren':mode],1);
+  assert.equal(a.airburst.advancedChildren,mode==='advanced'?2:mode==='mixed'?1:0);
+  assert.equal(a.airburst.observerErrors,0);
+ }
+});
