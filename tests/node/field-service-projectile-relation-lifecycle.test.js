@@ -113,3 +113,19 @@ test('large legitimate caches are swept at most once per four game seconds',()=>
  g.time=5.01;api.rememberDamagedOwnerProjectileRelations(g);
  assert.equal(sweeps,2,'a later bounded sweep can retire stale entries');
 });
+
+test('actual Game.updateDrones still blocks repair from a dead shooters live hostile projectile',()=>{
+ for(const hostile of [true,false]){
+  const {g,owner}=boot(),d=g.drones[0];
+  g.time=7;g.tanks=[owner];g.bullets=[{
+   ownerId:2,x:0,y:0,vx:600,vy:0,ttl:.5,r:3,dead:false
+  }];
+  const m=g.__novaFieldServiceRelations=new Map();
+  m.set('1|2',hostile);
+  for(let id=1000;id<1400;id++)m.set('1|'+id,true);
+  g.updateDrones(.1);
+  assert.equal(m.get('1|2'),hostile,'live projectile retains its prior allegiance');
+  if(hostile)assert.equal(d.hp,50,'dead hostile shooter still prevents field repair');
+  else assert.ok(d.hp>50,'dead allied shooter does not prevent field repair');
+ }
+});
