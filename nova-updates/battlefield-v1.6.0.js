@@ -233,6 +233,7 @@ function damageCover(g,s,dmg,ownerId,x,y,bullet){if(!s||!s.destructible||s.hp<=0
   * Never modify the hit, destruction, XP or projectile result. */
  var research=g.__novaCoverDamageResearch;
  var track=research&&research.schema===1&&
+  Number.isSafeInteger(research.pilotId)&&research.pilotId>=0&&
   Number.isFinite(research.allEffectiveDamage)&&Number.isFinite(research.playerEffectiveDamage)&&
   Number.isSafeInteger(research.allBreaks)&&research.allBreaks>=0&&
   Number.isSafeInteger(research.playerBreaks)&&research.playerBreaks>=0;
