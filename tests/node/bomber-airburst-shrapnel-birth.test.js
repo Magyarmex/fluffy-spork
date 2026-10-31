@@ -87,6 +87,12 @@ function fire(Game,hz,opts={}){
   x:150,y:15,r:3,hp:100,vx:0,vy:0});
  if(opts.remoteShape)g.shapes.push({id:11,kind:'shape',type:'circle',
   x:900,y:900,r:12,hp:100,vx:0,vy:0});
+ if(opts.terrain)g.__novaTerrain=[{id:-52,shape:'rect',x:150,y:4,
+  w:8,h:4,solid:true,destructible:false,hp:0}];
+ if(opts.drone)g.drones.push({id:12,kind:'drone',ownerId:9,
+  x:150,y:15,r:5,hp:100,vx:0,vy:0});
+ if(opts.tank)g.tanks.push({id:2,kind:'tank',cls:'scout',
+  x:150,y:45,alive:true,vx:0,vy:0});
  g.bullets=[shell];
  if(opts.otherBullet)g.bullets.push({id:71,kind:'bullet',ownerId:9,
   x:1000,y:1000,vx:0,vy:0,r:3,dmg:1,ttl:1,pen:0,hits:0,
@@ -124,6 +130,30 @@ for(const optimized of [false,true]){
    const {children,remain}=fire(Game,60,{remoteShape:true});
    assert.equal(children.length,6);
    assert.ok(children.every(c=>Math.abs(c.x-c.px-c.vx*remain)<1e-6));
+  });
+  for(const [kind,opts] of [
+   ['terrain',{terrain:true}],['hostile drone',{drone:true}],
+   ['near tank',{tank:true}]
+  ]){
+   test(label+' '+kind+' cannot be bypassed by late shrapnel',()=>{
+    const {children}=fire(Game,60,opts);
+    assert.equal(children.length,6);
+    assert.ok(children.every(c=>c.x===c.px&&c.y===c.py),
+     'potential first contact must retain normal collision authority');
+    assert.ok(children.every(c=>Math.abs(c.ttl-.7)<1e-8));
+   });
+  }
+  test(label+' next frame uses full fragment velocity',()=>{
+   const {g,children,dt}=fire(Game,60);
+   assert.equal(children.length,6);
+   const before=children.map(c=>({c,x:c.x,y:c.y,ttl:c.ttl,vx:c.vx,vy:c.vy}));
+   g.time+=dt;g.updateBullets(dt);
+   for(const b of before){
+    assert.ok(Math.abs(b.c.x-b.x-b.vx*dt)<1e-6);
+    assert.ok(Math.abs(b.c.y-b.y-b.vy*dt)<1e-6);
+    assert.ok(Math.abs(b.c.ttl-(b.ttl-dt))<1e-6);
+    assert.equal(b.c.vx,b.vx);assert.equal(b.c.vy,b.vy);
+   }
   });
   test(label+' competing projectile retains legacy ordering',()=>{
    const {children}=fire(Game,60,{otherBullet:true});
