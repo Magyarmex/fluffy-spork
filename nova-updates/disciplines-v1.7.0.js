@@ -425,8 +425,39 @@ wrap('game/engine',function(engine,require){
     }
     function entityClear(e,r,ax,ay,bx,by,childR){
       if(!e||!Number.isFinite(e.x)||!Number.isFinite(e.y)||
-         !Number.isFinite(e.vx)||!Number.isFinite(e.vy)||
          !(Number.isFinite(r)&&r>0))return false;
+      /* Drones have __novaVX, not ordinary vx/vy. Never treat a missing
+       * velocity as zero. A remote, non-dashing drone can be excluded only
+       * using the current Battlefield frame-start witness plus a generous
+       * bounded-motion ball; unknown, new, committed or discontinuous motion
+       * still abstains. The same ball protects parent and EVERY fragment. */
+      if(e.kind==='drone'&&(!Number.isFinite(e.vx)||!Number.isFinite(e.vy))){
+        if(!g.__novaShapeSweepActive||
+           e.__novaChronoDroneEpoch!==g.__novaShapeSweepEpoch||
+           !Number.isFinite(e.__novaChronoDronePrevX)||
+           !Number.isFinite(e.__novaChronoDronePrevY)||
+           !Number.isFinite(e.speed)||!(e.speed>0)||
+           !Number.isFinite(e.__novaChronoDronePrevSpeed)||
+           !(e.__novaChronoDronePrevSpeed>0)||
+           !Number.isFinite(e.__novaChronoDronePrevV)||
+           e.__novaPhase==='dash'||e.__novaChronoDronePrevPhase==='dash'||
+           e.__novaCommitted||e.__novaChronoDronePrevCommitted||
+           e.__novaSpotter||e.__novaTerrainBump)return false;
+        var bound=Math.max(1200,e.speed*6,e.__novaChronoDronePrevSpeed*6,
+          e.__novaChronoDronePrevV*2,
+          Math.hypot(e.__novaVX||0,e.__novaVY||0)*2,
+          Math.hypot(e.__lvVX||0,e.__lvVY||0)*2,
+          Math.hypot(e.__novaIdleVX||0,e.__novaIdleVY||0)*2);
+        var traveled=Math.hypot(e.x-e.__novaChronoDronePrevX,
+                                e.y-e.__novaChronoDronePrevY);
+        if(!Number.isFinite(bound)||bound>4000||traveled>96||
+           traveled>bound*dt+1e-6)return false;
+        var envelope=r+childR+Math.max(120,30+dt*(bound+1600));
+        return !near(ax,ay,bx,by,e.__novaChronoDronePrevX,
+                     e.__novaChronoDronePrevY,envelope)&&
+               !near(ax,ay,bx,by,e.x,e.y,envelope);
+      }
+      if(!Number.isFinite(e.vx)||!Number.isFinite(e.vy))return false;
       var speed=Math.hypot(e.vx,e.vy);
       if(!(speed<=2400))return false;
       /* Existing movement witnesses are checked when available. Unknown
