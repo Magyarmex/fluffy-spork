@@ -24,6 +24,16 @@ function check(a,label){
   throw Error(label+': invalid source sites');
  if(!Array.isArray(a.examples)||a.examples.length>20)
   throw Error(label+': invalid bounded examples');
+ const b=a.airburst;
+ if(!b||!['calls','sole','advanced','stationary','mixed','noChildren',
+  'children','advancedChildren','observerErrors'].every(k=>Number.isSafeInteger(b[k])&&b[k]>=0)||
+  !Number.isFinite(b.advancedDistance)||b.advancedDistance<0||
+  b.advanced+b.stationary+b.mixed+b.noChildren!==b.calls||
+  b.sole>b.calls||b.calls>a.bySource.disciplines||b.advancedChildren>b.children||
+  !b.byOwner||CATS.byOwner.some(k=>!Number.isSafeInteger(b.byOwner[k])||b.byOwner[k]<0)||
+  CATS.byOwner.reduce((n,k)=>n+b.byOwner[k],0)!==b.calls||
+  !Array.isArray(b.examples)||b.examples.length>20||b.observerErrors!==0)
+  throw Error(label+': invalid airburst activation witness');
  return a;
 }
 function empty(){
@@ -31,7 +41,10 @@ function empty(){
   byOwner:Object.fromEntries(CATS.byOwner.map(k=>[k,0])),
   bySource:Object.fromEntries(CATS.bySource.map(k=>[k,0])),
   byTTL:Object.fromEntries(CATS.byTTL.map(k=>[k,0])),
-  bySite:{},simulatedSeconds:0,earlyDeaths:0,noBurstTrials:0,
+  bySite:{},airburst:{calls:0,sole:0,advanced:0,stationary:0,mixed:0,
+   noChildren:0,children:0,advancedChildren:0,advancedDistance:0,
+   byOwner:{pilot:0,other:0,unknown:0},observerErrors:0},
+  simulatedSeconds:0,earlyDeaths:0,noBurstTrials:0,
   shellsFired:0,noShellTrials:0,evolvedTrials:0};
 }
 function add(dst,a,game,shellsFired,finalClass){
@@ -39,6 +52,10 @@ function add(dst,a,game,shellsFired,finalClass){
  for(const [field,keys] of Object.entries(CATS))
   for(const k of keys)dst[field][k]+=a[field][k];
  for(const [k,v] of Object.entries(a.bySite))dst.bySite[k]=(dst.bySite[k]||0)+v;
+ for(const k of ['calls','sole','advanced','stationary','mixed','noChildren',
+  'children','advancedChildren','advancedDistance','observerErrors'])
+  dst.airburst[k]+=a.airburst[k];
+ for(const k of CATS.byOwner)dst.airburst.byOwner[k]+=a.airburst.byOwner[k];
  dst.simulatedSeconds+=game.time;
  dst.earlyDeaths+=Number(game.status==='dead');
  dst.noBurstTrials+=Number(a.firstBursts===0);
@@ -88,6 +105,9 @@ function collect(root,expected=6){
  return {schema:1,method:'real composed Bomber weapon, matched scripted cover-seeking vs wander; source-callsite census',
   pairs:rows.length,rows,totals,
   limits:['Only a standard Bomber scripted pilot; no human-play frequency inference',
+   'Airburst activation counts use actual post-update fragment displacement and TTL; stationary does not prove a defect',
+   'Only Disciplines callsites inside a witnessed update frame count toward activation; any others remain source-only',
+   'No collision, damage or player-value causality can be inferred from read-only displacement alone',
    'Callsite source and TTL state are diagnostic, not physical-first-event classifications',
    'Other AI classes can also create shells; byOwner distinguishes pilot from other shooters',
    'The initial scripted class is Bomber; final class and evolution are reported, not silently assumed',
