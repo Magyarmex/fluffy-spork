@@ -29,7 +29,8 @@ function check(a,label){
   'children','advancedChildren','observerErrors'].every(k=>Number.isSafeInteger(b[k])&&b[k]>=0)||
   !Number.isFinite(b.advancedDistance)||b.advancedDistance<0||
   b.advanced+b.stationary+b.mixed+b.noChildren!==b.calls||
-  b.sole>b.calls||b.calls>a.bySource.disciplines||b.advancedChildren>b.children||
+  b.sole>b.calls||b.calls!==a.bySource.disciplines||b.advancedChildren>b.children||
+  b.children>a.childrenCreated||
   !b.byOwner||CATS.byOwner.some(k=>!Number.isSafeInteger(b.byOwner[k])||b.byOwner[k]<0)||
   CATS.byOwner.reduce((n,k)=>n+b.byOwner[k],0)!==b.calls||
   !Array.isArray(b.examples)||b.examples.length>20||b.observerErrors!==0)
