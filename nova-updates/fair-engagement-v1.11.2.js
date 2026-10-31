@@ -57,7 +57,11 @@ function gameplayViewportFilter(g,observer){
 }
 function hasSpotterRelay(g,classes,observer,target){
   if(!g||!observer||!target||!isSniper(classes,observer))return false;
-  return observer.__novaSpotterContactId===target.id&&Number(observer.__novaSpotterContactUntil)>Number(g.time||0);
+  /* A stored ID is not live sight: AI runs before the drone scan and can
+   * otherwise consume the previous frame's remote coordinates. The Spotter
+   * owner checks the actual active Observer, current cone and terrain LoS. */
+  var live=window.__NOVA_SPOTTER_LIVE_RELAY__;
+  return typeof live==='function'&&live(g,observer,target);
 }
 function canPerceive(g,classes,observer,target){
   return inGameplayViewport(g,observer,target)||hasSpotterRelay(g,classes,observer,target);
