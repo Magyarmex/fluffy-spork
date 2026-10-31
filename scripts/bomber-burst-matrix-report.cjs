@@ -5,7 +5,7 @@
 const fs=require('node:fs'),path=require('node:path');
 const KEYS=['calls','firstBursts','suppressedCalls','childrenCreated'];
 const CATS={byOwner:['pilot','other','unknown'],
- bySource:['battlefield','core','unknown'],
+ bySource:['battlefield','core','disciplines','other','unknown'],
  byTTL:['positive','expired','unknown']};
 function check(a,label){
  if(!a||a.schema!==1||!Number.isSafeInteger(a.pilotId))
