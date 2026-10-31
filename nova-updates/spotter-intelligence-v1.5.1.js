@@ -66,19 +66,24 @@ function scan(g,owner,d){var best=null,bs=Infinity;for(var i=0;i<g.tanks.length;
  if(best){var changed=owner.__novaSpotterContactId!==best.id||owner.__novaSpotterContactUntil<=g.time;owner.__novaSpotterContactId=best.id;owner.__novaSpotterContactUntil=g.time+CONTACT_MEMORY;owner.__novaSpotterDroneId=d.id;d.__novaSuspectAngle=Math.atan2(best.y-d.y,best.x-d.x);d.__novaSuspectStrength=1;d.__novaLastKnownX=best.x;d.__novaLastKnownY=best.y;if(changed){d.__novaContactPulseUntil=g.time+.62;if(g.addRing)g.addRing(d.x,d.y,owner.isPlayer?'#8fe8ff':'#c493ff',34);if(owner.isPlayer){if(g.addText)g.addText(best.x,best.y-35,'CONTACT RELAY','#bceeff',10);if(g.sfx&&g.sfx.novaSpotterContact)g.sfx.novaSpotterContact(pan(g,d.x),false)}else if(best.isPlayer){if(g.addText)g.addText(best.x,best.y-33,'SPOTTED · RELAY','#ffd98a',10);if(g.sfx&&g.sfx.novaSpotterContact)g.sfx.novaSpotterContact(pan(g,d.x),true)}}}else if(owner.__novaSpotterContactId>=0){clearContact(owner);}}
 wrap('game/engine',function(engine){var Game=engine.Game;if(!Game||Game.prototype.__novaSpotterIntelligence)return;Game.prototype.__novaSpotterIntelligence=true;var old=Game.prototype.updateDrones;Game.prototype.updateDrones=function(dt){
  old.call(this,dt);
- var active=Object.create(null),drones=this.drones||[],tanks=this.tanks||[];
+ /* Reuse a monotonically increasing owner witness instead of allocating
+  * a fresh Set/map on every combat frame. */
+ var epoch=(this.__novaSpotterScanEpoch||0)+1;
+ this.__novaSpotterScanEpoch=Number.isSafeInteger(epoch)?epoch:1;
+ var drones=this.drones||[],tanks=this.tanks||[];
  for(var i=0;i<drones.length;i++){
   var d=drones[i],owner=d&&ownerOf(this,d);
   if(!d||!d.__novaSpotter||!(d.hp>0)||!owner||!owner.alive||!sniper(owner))continue;
   if(owner.__novaSpotterDownUntil&&owner.__novaSpotterDownUntil>this.time)continue;
-  active[owner.id]=true;
+  owner.__novaSpotterScanEpoch=this.__novaSpotterScanEpoch;
   steerSearch(this,owner,d,dt);scan(this,owner,d);
  }
  /* Death, despawn or disabled Observer must invalidate a live relay even
   * when no drone remains to execute the scan above. */
  for(var j=0;j<tanks.length;j++){
   var o=tanks[j];
-  if(o&&o.alive&&sniper(o)&&o.__novaSpotterContactId>=0&&!active[o.id])
+  if(o&&o.alive&&sniper(o)&&o.__novaSpotterContactId>=0&&
+     o.__novaSpotterScanEpoch!==this.__novaSpotterScanEpoch)
    clearContact(o);
  }
 };});
