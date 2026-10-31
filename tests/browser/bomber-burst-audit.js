@@ -6,19 +6,21 @@
  function siteFromStack(stack){
   const lines=String(stack||'').split('\n');
   for(const line of lines){
-   const match=line.match(/(?:^|\/)(battlefield-v1\.6\.0\.js|index\.html):(\d+):\d+/);
-   if(match)return match[1]+':'+match[2];
+   const match=line.match(/(?:^|\/)([a-zA-Z0-9_-]+\.(?:js|html)):(\d+):\d+/);
+   if(match&&match[1]!=='bomber-burst-audit.js')return match[1]+':'+match[2];
   }
   return 'unknown';
  }
  function source(site){
   return site.startsWith('battlefield-v1.6.0.js:')?'battlefield':
-   site.startsWith('index.html:')?'core':'unknown';
+   site.startsWith('index.html:')?'core':
+   site.startsWith('disciplines-v1.7.0.js:')?'disciplines':
+   site==='unknown'?'unknown':'other';
  }
  function create(pilotId){
   return {schema:1,pilotId,calls:0,firstBursts:0,suppressedCalls:0,
    childrenCreated:0,byOwner:{pilot:0,other:0,unknown:0},
-   bySource:{battlefield:0,core:0,unknown:0},
+   bySource:{battlefield:0,core:0,disciplines:0,other:0,unknown:0},
    byTTL:{positive:0,expired:0,unknown:0},
    bySite:{},examples:[]};
  }
