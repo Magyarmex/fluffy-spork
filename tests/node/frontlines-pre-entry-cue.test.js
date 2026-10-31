@@ -174,8 +174,11 @@ test('dashed pre-entry witness belongs to one public BLOOM, not a later same-sec
   'a previous visible rival must not become radar for a newly announced BLOOM');
  s.st.signal={...s.st.signal,started:98,until:104};
  s.draws.length=0;s.g.drawMinimap();
+ assert.ok(!s.draws.some(d=>d.type==='text'&&d.value==='!'),
+  'an invalidated visual witness must not be resurrected by restoring old metadata');
+ s.g.time+=.17;s.draws.length=0;s.g.drawMinimap();
  assert.ok(s.draws.some(d=>d.type==='text'&&d.value==='!'),
-  'restoring the original valid public witness restores the dashed warning');
+  'a new local visibility sample may legitimately reestablish the warning');
 });
 
 
