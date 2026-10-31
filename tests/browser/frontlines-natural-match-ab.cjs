@@ -341,7 +341,8 @@ async function arm(browser,enabled,label){
   }
   const result=await page.evaluate(()=>{
    const g=window.__novaNaturalMatchGame,s=window.NOVALivingFront.snapshot(),p=g.player;
-   return{metadata:{layout:g.__novaBattlefield.name,seed:g.__novaExperimentSeed,pilotPolicy:g.__novaExperimentPolicy,abMode:g.__novaExperimentABMode},
+   return{metadata:{layout:g.__novaBattlefield.name,seed:g.__novaExperimentSeed,pilotPolicy:g.__novaExperimentPolicy,abMode:g.__novaExperimentABMode,
+     ...(g.__novaBomberBurstAudit?{pilotClass:g.player.cls}:{})},
     frontline:s.frontline,stats:s.stats,game:{time:+g.time.toFixed(3),status:g.status,
      pilotAlive:!!p.alive,score:p.score,kills:p.kills,level:p.level,
      botCount:g.tanks.filter(t=>t.ai&&t.alive).length},
