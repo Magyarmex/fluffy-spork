@@ -431,7 +431,7 @@ wrap('game/engine',function(engine,require){
       if(!(speed<=2400))return false;
       /* Existing movement witnesses are checked when available. Unknown
        * movement receives a deliberately generous 1600u/s allowance. */
-      var pad=r+childR+30+dt*(speed+1600);
+      var pad=r+childR+Math.max(120,30+dt*(speed+1600));
       if(near(ax,ay,bx,by,e.x,e.y,pad))return false;
       var px=null,py=null;
       if(e.__novaSweepMoveTime===g.time){
