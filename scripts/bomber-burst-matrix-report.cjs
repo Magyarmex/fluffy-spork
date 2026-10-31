@@ -31,9 +31,10 @@ function empty(){
   byOwner:Object.fromEntries(CATS.byOwner.map(k=>[k,0])),
   bySource:Object.fromEntries(CATS.bySource.map(k=>[k,0])),
   byTTL:Object.fromEntries(CATS.byTTL.map(k=>[k,0])),
-  bySite:{},simulatedSeconds:0,earlyDeaths:0,noBurstTrials:0};
+  bySite:{},simulatedSeconds:0,earlyDeaths:0,noBurstTrials:0,
+  shellsFired:0,noShellTrials:0};
 }
-function add(dst,a,game){
+function add(dst,a,game,shellsFired){
  for(const k of KEYS)dst[k]+=a[k];
  for(const [field,keys] of Object.entries(CATS))
   for(const k of keys)dst[field][k]+=a[field][k];
@@ -41,6 +42,8 @@ function add(dst,a,game){
  dst.simulatedSeconds+=game.time;
  dst.earlyDeaths+=Number(game.status==='dead');
  dst.noBurstTrials+=Number(a.firstBursts===0);
+ dst.shellsFired+=shellsFired;
+ dst.noShellTrials+=Number(shellsFired===0);
 }
 function collect(root,expected=6){
  if(!Number.isSafeInteger(expected)||expected<1)throw Error('invalid pair count');
@@ -68,9 +71,13 @@ function collect(root,expected=6){
    const arm=r[mode.toLowerCase()],a=check(arm?.bomberBurstAudit,dir+' '+mode);
    if(!arm.game||!Number.isFinite(arm.game.time)||arm.game.time<0||
       arm.game.time>165.1)throw Error(dir+': invalid simulated time');
-   add(totals[mode],a,arm.game);
+   const shells=arm.coverPressure?.playerShellsFired;
+   if(!Number.isSafeInteger(shells)||shells<0)
+    throw Error(dir+': missing actual Bomber shell emissions');
+   add(totals[mode],a,arm.game,shells);
    row[mode]={status:arm.game.status,time:arm.game.time,
     calls:a.calls,firstBursts:a.firstBursts,childrenCreated:a.childrenCreated,
+    shellsFired:arm.coverPressure.playerShellsFired,
     byOwner:a.byOwner,bySource:a.bySource,byTTL:a.byTTL,bySite:a.bySite};
   }
   rows.push(row);
@@ -80,7 +87,7 @@ function collect(root,expected=6){
   limits:['Only a standard Bomber scripted pilot; no human-play frequency inference',
    'Callsite source and TTL state are diagnostic, not physical-first-event classifications',
    'Other AI classes can also create shells; byOwner distinguishes pilot from other shooters',
-   'Death-censored and no-burst trials remain in denominators',
+   'Death-censored, no-shell and no-burst trials remain in denominators',
    'Each pair shares the same initial world, but policies change later world states',
    'Zero burst count does not imply zero player skill opportunity or zero physical defect']};
 }
