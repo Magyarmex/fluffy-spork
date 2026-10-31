@@ -104,8 +104,18 @@ function collect(root,expected=6){
   }
   rows.push(row);
  }
- return {schema:1,method:'real composed Bomber weapon, matched scripted cover-seeking vs wander; source-callsite census',
-  pairs:rows.length,rows,totals,
+ const rates={};
+ for(const mode of ['OFF','ON']){
+  const t=totals[mode],b=t.airburst;
+  rates[mode]={
+   airburstsPerMinute:t.simulatedSeconds>0?b.calls*60/t.simulatedSeconds:null,
+   correctedBurstsPerMinute:t.simulatedSeconds>0?b.advanced*60/t.simulatedSeconds:null,
+   correctedFraction:b.calls>0?b.advanced/b.calls:null,
+   soleProjectileFraction:b.calls>0?b.sole/b.calls:null,
+   correctedChildrenFraction:b.children>0?b.advancedChildren/b.children:null};
+ }
+ return {schema:1,method:'real composed Bomber weapon, matched scripted cover-seeking vs wander; source-callsite and birth-frame activation census',
+  pairs:rows.length,rows,totals,rates,
   limits:['Only a standard Bomber scripted pilot; no human-play frequency inference',
    'Airburst activation counts use actual post-update fragment displacement and TTL; stationary does not prove a defect',
    'Only Disciplines callsites inside a witnessed update frame count toward activation; any others remain source-only',
