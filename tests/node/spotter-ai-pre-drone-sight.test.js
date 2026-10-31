@@ -85,8 +85,11 @@ test('live cone sight remains valid, including 135u proximity exception, across 
  for(const hz of [30,60,120,240]){
   const w=boot();w.g.updateDrones(0);w.g.time+=1/hz;
   assert.equal(w.perceive(),true,hz+'Hz remote sight');
-  w.target.x=0;w.target.y=100;
-  assert.equal(w.perceive(),true,hz+'Hz close-range sight');
+  /* Keep the target off the hull viewport, but within 135u of the
+   * Observer: proximity sight legitimately ignores the Observer cone. */
+  w.drone.x=500;w.drone.y=0;w.drone.angle=Math.PI;
+  w.target.x=500;w.target.y=100;
+  assert.equal(w.perceive(),true,hz+'Hz offscreen close-range Observer sight');
   w.target.x=0;w.target.y=400;
   assert.equal(w.perceive(),false,hz+'Hz lost cone');
  }
