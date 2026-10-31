@@ -49,6 +49,21 @@ test('visible hostile guarding a public BLOOM warns BEFORE entry but does not co
  assert.ok(s.draws.some(d=>d.type==='text'&&d.value==='!'));
  assert.ok(!s.draws.some(d=>d.type==='dash'&&d.v.length>0),'inside contest uses solid original badge');
 });
+test('portrait Long Glass camera recognizes an actually rendered rival and pocket beyond hull-centered viewport',()=>{
+ const s=scene();s.g.w=320;s.g.h=568;
+ s.enemy.x=-970;s.shape.x=-960;s.g.cam.x=-1080;
+ const F=s.g.w/(2*s.g.cam.zoom);
+ assert.ok(Math.abs(s.enemy.x-s.p.x)>F&&Math.abs(s.shape.x-s.p.x)>F,
+  'both witnesses lie outside the old player-centered sight box');
+ assert.ok(Math.abs(s.enemy.x-s.g.cam.x)<F&&Math.abs(s.shape.x-s.g.cam.x)<F,
+  'both witnesses are actually rendered within the shifted camera');
+ assert.equal(s.T.preEntryCandidate(s.g,s.st),true,
+  'the visible warning must not disappear merely because Long Glass shifts the camera');
+ s.g.cam.x=-1300;
+ assert.equal(s.T.preEntryCandidate(s.g,s.st),false,'offscreen contacts are not radar');
+ s.g.cam.x=-1080;s.g.hasLineOfSight=()=>false;
+ assert.equal(s.T.preEntryCandidate(s.g,s.st),false,'terrain still blocks the visual witness');
+});
 test('public warning is independent of hidden sector totals and private rival position after visibility fails',()=>{
  const s=scene();
  s.st.sectors[5].value=100000;
