@@ -236,7 +236,7 @@ function damageCover(g,s,dmg,ownerId,x,y,bullet){if(!s||!s.destructible||s.hp<=0
   Number.isFinite(research.allEffectiveDamage)&&Number.isFinite(research.playerEffectiveDamage)&&
   Number.isSafeInteger(research.allBreaks)&&research.allBreaks>=0&&
   Number.isSafeInteger(research.playerBreaks)&&research.playerBreaks>=0;
- var playerOwned=!!(g.player&&Number.isSafeInteger(ownerId)&&ownerId>=0&&g.player.id===ownerId);
+ var playerOwned=!!(track&&Number.isSafeInteger(research.pilotId)&&research.pilotId>=0&&ownerId===research.pilotId);
  if(track){
   var effective=Math.max(0,Math.min(oldHp,oldHp-s.hp));
   if(Number.isFinite(effective)){research.allEffectiveDamage+=effective;
