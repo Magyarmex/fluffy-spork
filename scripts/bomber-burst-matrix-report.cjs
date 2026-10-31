@@ -6,6 +6,11 @@ const fs=require('node:fs'),path=require('node:path');
 const KEYS=['calls','firstBursts','suppressedCalls','childrenCreated'];
 const GATES=['soleWithoutRewound','soleRewoundNotClean','soleCleanNearAny',
  'soleCleanNoNearby','soleCleanNearShape','soleCleanNearTank','soleCleanNearDrone'];
+const VETO=['missingShapeVelocity','missingTankVelocity','missingDroneVelocity',
+ 'excessEntitySpeed','parentShapeProximity','parentTankProximity',
+ 'parentDroneProximity','fragmentShapeProximity','fragmentTankProximity',
+ 'fragmentDroneProximity','fragmentTerrainProximity','fragmentInvalid',
+ 'fragmentBounds','noWitnessedSufficientVeto'];
 const CATS={byOwner:['pilot','other','unknown'],
  bySource:['battlefield','core','disciplines','other','unknown'],
  byTTL:['positive','expired','unknown']};
@@ -40,7 +45,11 @@ function check(a,label){
   b.gates.soleWithoutRewound+b.gates.soleRewoundNotClean+
    b.gates.soleCleanNearAny+b.gates.soleCleanNoNearby!==b.sole||
   ['soleCleanNearShape','soleCleanNearTank','soleCleanNearDrone'].some(k=>
-   b.gates[k]>b.gates.soleCleanNearAny))
+   b.gates[k]>b.gates.soleCleanNearAny)||
+  !b.veto||!Number.isSafeInteger(b.veto.eligible)||
+  b.veto.eligible!==b.gates.soleCleanNoNearby||
+  !b.veto.counts||VETO.some(k=>!Number.isSafeInteger(b.veto.counts[k])||
+   b.veto.counts[k]<0||b.veto.counts[k]>b.veto.eligible))
   throw Error(label+': invalid airburst activation witness');
  return a;
 }
@@ -52,7 +61,8 @@ function empty(){
   bySite:{},airburst:{calls:0,sole:0,advanced:0,stationary:0,mixed:0,
    noChildren:0,children:0,advancedChildren:0,advancedDistance:0,
    byOwner:{pilot:0,other:0,unknown:0},observerErrors:0,
-   gates:Object.fromEntries(GATES.map(k=>[k,0]))},
+   gates:Object.fromEntries(GATES.map(k=>[k,0])),
+   veto:{eligible:0,counts:Object.fromEntries(VETO.map(k=>[k,0]))}},
   simulatedSeconds:0,earlyDeaths:0,noBurstTrials:0,
   shellsFired:0,noShellTrials:0,evolvedTrials:0};
 }
@@ -66,6 +76,8 @@ function add(dst,a,game,shellsFired,finalClass){
   dst.airburst[k]+=a.airburst[k];
  for(const k of CATS.byOwner)dst.airburst.byOwner[k]+=a.airburst.byOwner[k];
  for(const k of GATES)dst.airburst.gates[k]+=a.airburst.gates[k];
+ dst.airburst.veto.eligible+=a.airburst.veto.eligible;
+ for(const k of VETO)dst.airburst.veto.counts[k]+=a.airburst.veto.counts[k];
  dst.simulatedSeconds+=game.time;
  dst.earlyDeaths+=Number(game.status==='dead');
  dst.noBurstTrials+=Number(a.firstBursts===0);
@@ -128,6 +140,7 @@ function collect(root,expected=6){
   limits:['Only a standard Bomber scripted pilot; no human-play frequency inference',
    'Airburst activation counts use actual post-update fragment displacement and TTL; stationary does not prove a defect',
    'Parent rewind is inferred from witnessed fuse geometry; near-body flags are sufficient lower-bound vetoes, not a complete first-blocker oracle',
+   'Veto counts overlap; every true flag is a sufficient conservative abstention under the shipping helper, but a zero flag does not prove safety',
    'Only Disciplines callsites inside a witnessed update frame count toward activation; any others remain source-only',
    'No collision, damage or player-value causality can be inferred from read-only displacement alone',
    'Callsite source and TTL state are diagnostic, not physical-first-event classifications',
