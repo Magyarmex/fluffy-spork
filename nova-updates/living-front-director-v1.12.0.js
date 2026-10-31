@@ -466,8 +466,49 @@ function contestCandidate(g,st){
  }
  return false;
 }
+/* A near-side warning is useful BEFORE the pilot crosses the BLOOM boundary.
+ * This is a fresh local visual witness, not sector radar: both the hostile
+ * and at least 155 XP of harvestable prey must already be visible on the
+ * actual rendered camera, through terrain. The only public location is the
+ * previously announced BLOOM; no hostile coordinates enter the minimap. */
+function nearBloomEdge(p,sector){
+ if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.y)||
+    !Number.isInteger(sector)||sector<0||sector>=LF.GRID*LF.GRID)return false;
+ var c=sectorCenter(sector),half=LF.ARENA/LF.GRID;
+ var dx=Math.max(0,Math.abs(p.x-c.x)-half),
+     dy=Math.max(0,Math.abs(p.y-c.y)-half);
+ return Math.hypot(dx,dy)<=260;
+}
+function preEntryCandidate(g,st){
+ var now=Number(g&&g.time)||0,op=publicBloom(st,now),p=g&&g.player;
+ if(!op||!g||g.status!=='playing'||g.__novaDecorativeWorld||
+    !p||!alive(p)||p.spawnShieldT>0||
+    !Number.isFinite(p.x)||!Number.isFinite(p.y)||
+    sectorIndex(p.x,p.y)===op.sector||!nearBloomEdge(p,op.sector))return false;
+ var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
+ if(!F||typeof F.inGameplayViewport!=='function'||
+    typeof F.viewportHalfExtents!=='function'||
+    typeof g.hasLineOfSight!=='function')return false;
+ var ext=F.viewportHalfExtents(g);if(!ext||!(ext.x>0)||!(ext.y>0))return false;
+ var ts=g.tanks||[];
+ for(var i=0;i<ts.length;i++){
+  var t=ts[i];if(!t||t===p||t.id===p.id||!alive(t)||
+     t.spawnShieldT>0||!Number.isFinite(t.x)||!Number.isFinite(t.y)||
+     sectorIndex(t.x,t.y)!==op.sector||!contestHostile(g,p,t))continue;
+  if(visible(g,p,t)&&inRenderedCamera(g,p,t,ext)&&
+     observedPocketValue(g,st,p,op.sector,155)>=155)return true;
+ }
+ return false;
+}
 function updateContest(g,st){
- if(!contestCandidate(g,st)){st.contestSignal=null;return false;}
+ if(!contestCandidate(g,st)){
+  st.contestSignal=null;
+  var op=publicBloom(st,g&&g.time||0);
+  st.approachSignal=op&&preEntryCandidate(g,st)?
+   {sector:op.sector,until:Math.min(op.until,(g.time||0)+1.4)}:null;
+  return false;
+ }
+ st.approachSignal=null;
  var now=g.time||0,op=publicBloom(st,now),key=op.sector+':'+op.announcedAt;
  if(st.__lfLastContestKey!==key){st.__lfLastContestKey=key;st.stats=st.stats||{};st.stats.contests=(st.stats.contests||0)+1;}
  st.contestSignal={sector:op.sector,until:Math.min(op.until,now+1.4)};
@@ -713,7 +754,16 @@ function migrationPhysicalArrival(g,t,bx,by,ax,ay,dt){
    if(ctx.setLineDash)ctx.setLineDash([3,4]);
    ctx.beginPath();ctx.arc(x,y,17,0,Math.PI*2);ctx.stroke();ctx.restore();
   }
-  if(!c||now>=c.until||c.sector!==op.sector)return out;
+  var inside=!!(c&&now<c.until&&c.sector===op.sector),
+   a=st&&st.approachSignal,
+   approaching=!inside&&!!(a&&now<a.until&&a.sector===op.sector&&
+    this.status==='playing'&&this.player&&alive(this.player)&&
+    sectorIndex(this.player.x,this.player.y)!==op.sector&&
+    nearBloomEdge(this.player,op.sector));
+  if(!inside&&!approaching)return out;
+  /* NOVA_VISUAL_INTENT: spatial minimap threat — a dashed ! means a
+   * witnessed visible rival BEFORE entry; the solid ! is the original
+   * inside-sector contest. Both reuse one BLOOM marker, never enemy radar. */
   /* The shipping minimap is 216 canvas pixels but only 60 CSS pixels wide.
    * A 9px canvas label was 2.5 CSS px: present in screenshots, unreadable in play.
    * Keep one static, high-contrast 12px CSS badge instead of adding a HUD/toast. */
@@ -721,8 +771,11 @@ function migrationPhysicalArrival(g,t,bx,by,ax,ay,dt){
    * actual resource location remain visible; flip below near the north edge. */
   var badgeY=y<54?y+28:y-28;
   ctx.save();ctx.globalAlpha=1;
-  ctx.fillStyle='rgba(48,10,25,.94)';ctx.strokeStyle='#ff788b';ctx.lineWidth=4;
+  ctx.fillStyle=inside?'rgba(48,10,25,.94)':'rgba(48,10,25,.78)';
+  ctx.strokeStyle=inside?'#ff788b':'#ffb08b';ctx.lineWidth=4;
+  if(approaching&&ctx.setLineDash)ctx.setLineDash([7,5]);
   ctx.beginPath();ctx.arc(x,badgeY,22,0,Math.PI*2);ctx.fill();ctx.stroke();
+  if(approaching&&ctx.setLineDash)ctx.setLineDash([]);
   ctx.font='900 35px Rajdhani,system-ui';ctx.textAlign='center';ctx.textBaseline='middle';
   ctx.fillStyle='#fff7f8';ctx.fillText('!',x,badgeY+2);
   ctx.restore();return out;
@@ -741,6 +794,6 @@ window.__NOVA_VERSION=V;window.__NOVA_LIVING_FRONT__={version:V,codename:'Living
 window.__NOVA_LIVING_FRONT_RELEASE__={version:V,codename:'Living Front',date:'2026-08-30',headline:'Fighting changes the farm. Farming changes where fights happen.',groups:{'Ecology Core':['Sixteen invisible sectors mature under quiet and lose value concentration under harvesting and combat pressure.','The existing 62/30/16/8/4 shape quotas remain authoritative; Living Front changes safe geography, not requested types or XP multipliers.','A shared match-age ceiling now gates high-value clustering as well as maturity, keeping early arenas distributed before later pockets emerge.'],'Wild Instincts':['Circles school gently, Triangles get one readable evade, Squares remain simple, cascades inherit impact direction and Hexagons become bounded terrain-visible keystones.','Stars are interception prey; Crashers telegraph, commit, explicitly overshoot, obey terrain, and store capped XP bounty from neutral prey without gaining combat stats.','Migration and herding are physical, bounded, terrain-constrained and self-limiting; near fire and explosions can move skittish prey with diminishing response.'],'Front Director':['BLOOM reports existing value only after ecological age makes a true mature pocket possible; MIGRATION reports actual crossings; ROGUE STAR can report a fresh existing Star after strategic quiet without duplication; its rarer created-Star fallback remains when no Star lives.','Signals are brief minimap/world information, not capture zones, event meters, currencies, quests or forced contests.'],'Strategy & Performance':['Human Controller automation remains local and never chooses a distant ecology objective. AI consumes only terrain-visible Fair Engagement viewport shapes and public signals, with health, route cost, saturation and skill-level judgment gates.','Sector, shape, Director and AI planning are decimated and local candidate work reuses the canonical entity hash.'],'Fieldcraft':['Seven Living Front tactical tips register through the canonical NOVATips shuffle-bag API, inheriting the game-wide randomized cadence instead of rewriting the rendered tip line.']}};
 window.__NOVA_LIVING_FRONT_TIPS__=TIP_DEFS.map(function(t){return{id:t.id,text:t.text,tags:t.tags.slice(),reviewed:t.reviewed,source:t.source};});
 window.NOVALivingFront={version:V,snapshot:function(){var g=LF.getActive();return g?LF.snapshot(g):LF.getLast()||{active:false,version:V};},diagnostics:diag};
-window.__NOVA_LIVING_FRONT_TEST__={GRID:LF.GRID,ARENA:LF.ARENA,SECTOR_PERIOD:LF.SECTOR_PERIOD,BEHAVIOR_PERIOD:LF.BEHAVIOR_PERIOD,DIRECTOR_PERIOD:LF.DIRECTOR_PERIOD,AI_PERIOD:LF.AI_PERIOD,BOUNTY_CAP:LF.BOUNTY_CAP,STAR_SPEED_MULT:LF.STAR_SPEED_MULT,sectorIndex:LF.sectorIndex,sectorCenter:LF.sectorCenter,neighbors:LF.neighbors,maturityCeiling:LF.maturityCeiling,ageProgress:LF.ageProgress,makeSector:LF.makeSector,advanceSector:LF.advanceSector,chooseSpawnSector:LF.chooseSpawnSector,bulletThreat:LF.bulletThreat,triangleEvadeVector:LF.evadeVector,advanceCrasherState:LF.crasherState,awardBounty:LF.awardBounty,bloomAgeEligible:bloomAgeEligible,bloomCandidate:bloomCandidate,directorDecision:decision,rogueStarToast:rogueStarToast,publicEcoBias:publicEcoBias,routeCost:routeCost,debugSummary:debugSummary,registerTips:registerTips,rejectedScope:REJECTED.slice(),contestCandidate:contestCandidate,updateContest:updateContest,shapeTargets:Object.assign({},LF.TARGETS)};
+window.__NOVA_LIVING_FRONT_TEST__={GRID:LF.GRID,ARENA:LF.ARENA,SECTOR_PERIOD:LF.SECTOR_PERIOD,BEHAVIOR_PERIOD:LF.BEHAVIOR_PERIOD,DIRECTOR_PERIOD:LF.DIRECTOR_PERIOD,AI_PERIOD:LF.AI_PERIOD,BOUNTY_CAP:LF.BOUNTY_CAP,STAR_SPEED_MULT:LF.STAR_SPEED_MULT,sectorIndex:LF.sectorIndex,sectorCenter:LF.sectorCenter,neighbors:LF.neighbors,maturityCeiling:LF.maturityCeiling,ageProgress:LF.ageProgress,makeSector:LF.makeSector,advanceSector:LF.advanceSector,chooseSpawnSector:LF.chooseSpawnSector,bulletThreat:LF.bulletThreat,triangleEvadeVector:LF.evadeVector,advanceCrasherState:LF.crasherState,awardBounty:LF.awardBounty,bloomAgeEligible:bloomAgeEligible,bloomCandidate:bloomCandidate,directorDecision:decision,rogueStarToast:rogueStarToast,publicEcoBias:publicEcoBias,routeCost:routeCost,debugSummary:debugSummary,registerTips:registerTips,rejectedScope:REJECTED.slice(),contestCandidate:contestCandidate,preEntryCandidate:preEntryCandidate,updateContest:updateContest,shapeTargets:Object.assign({},LF.TARGETS)};
 console.info('[NOVA TANKS] v'+V+' Living Front director/strategy online');
 })();
