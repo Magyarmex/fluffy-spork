@@ -100,6 +100,7 @@ async function arm(browser,enabled,label){
    g.__novaExperimentSeed='natural-20261027-'+terrainIndex+'-'+seedIndex;
    g.__novaExperimentPolicy=pilotPolicy;
    g.__novaExperimentABMode=abMode;
+   if(abMode==='cover-pressure')g.__novaCoverPriorityResearch={schema:1,activations:0};
    if(g.__novaBattlefield?.name!==['CROSSFIRE','SPLIT HORIZON','FOUR GATES'][terrainIndex])throw Error('uncontrolled layout '+g.__novaBattlefield?.name);
    const ai=window.__novaMakeRequire('')('game/ai');
    if(!ai||typeof ai.updateAI!=='function')throw Error('missing composed AI');
@@ -316,6 +317,7 @@ async function arm(browser,enabled,label){
      botCount:g.tanks.filter(t=>t.ai&&t.alive).length},
     projectileDensityAudit:g.__novaProjectileDensityAudit,
     coverPressure:{coverBroken:g.__novaBattlefield?.coverBroken||0,
+     certifiedActivations:g.__novaCoverPriorityResearch?.activations||0,
      coverDamage:(g.__novaTerrain||[]).filter(t=>t.destructible).reduce((sum,t)=>
       sum+Math.max(0,(t.maxHp||0)-Math.max(0,t.hp||0)),0),
      aimSamples:g.__novaCoverPressureAimSamples||0,
