@@ -91,6 +91,28 @@ function fire(Game,hz,opts={}){
   w:8,h:4,solid:true,destructible:false,hp:0}];
  if(opts.drone)g.drones.push({id:12,kind:'drone',ownerId:9,
   x:150,y:15,r:5,hp:100,vx:0,vy:0});
+ if(opts.remoteDrone){
+  const d={id:13,kind:'drone',ownerId:9,r:7,hp:100,
+   x:opts.remoteDrone==='near'?150:opts.remoteDrone==='crossing'?260:900,
+   y:opts.remoteDrone==='near'?15:opts.remoteDrone==='crossing'?0:900,
+   speed:240,__novaChronoDronePrevSpeed:240,
+   __novaChronoDronePrevV:200,__novaPhase:'form',
+   __novaChronoDronePrevPhase:'form',__novaCommitted:false,
+   __novaChronoDronePrevCommitted:false};
+  if(opts.remoteDrone!=='unknown'){
+   g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=7;
+   d.__novaChronoDroneEpoch=7;
+   d.__novaChronoDronePrevX=opts.remoteDrone==='teleport'?600:
+    opts.remoteDrone==='crossing'?330:d.x;
+   d.__novaChronoDronePrevY=d.y;
+  }
+  if(opts.remoteDrone==='dash')d.__novaPhase='dash';
+  if(opts.remoteDrone==='speed')d.speed=900;
+  if(opts.remoteDrone==='crossing'){
+   d.speed=400;d.__novaChronoDronePrevSpeed=400;
+  }
+  g.drones.push(d);
+ }
  if(opts.tank)g.tanks.push({id:2,kind:'tank',cls:'scout',
   x:150,y:45,alive:true,vx:0,vy:0});
  g.bullets=[shell];
@@ -117,6 +139,24 @@ for(const optimized of [false,true]){
      assert.ok(Math.abs(c.ttl-(.7-remain))<1e-6,
       'birth-frame TTL must match actual physical age');
     }
+   });
+  }
+
+  for(const hz of [30,60,120,240]){
+   test(label+' witnessed remote ordinary drone permits safe Cannon fragment birth at '+hz+'Hz',()=>{
+    const {children,remain}=fire(Game,hz,{remoteDrone:'witnessed'});
+    assert.equal(children.length,6);
+    assert.ok(children.every(c=>Math.abs(c.x-c.px-c.vx*remain)<1e-6));
+    assert.ok(children.every(c=>Math.abs(c.ttl-(.7-remain))<1e-6));
+   });
+  }
+  for(const mode of ['unknown','near','dash','teleport','speed','crossing']){
+   test(label+' remote-drone certificate fails closed for '+mode,()=>{
+    const {children}=fire(Game,mode==='crossing'?30:60,{remoteDrone:mode});
+    assert.equal(children.length,6);
+    assert.ok(children.every(c=>c.x===c.px&&c.y===c.py),
+     'uncertified or nearby drone must retain normal collision authority');
+    assert.ok(children.every(c=>Math.abs(c.ttl-.7)<1e-8));
    });
   }
   test(label+' near neutral prevents speculative child advance',()=>{

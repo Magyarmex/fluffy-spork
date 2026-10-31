@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'tests/browser/bomber-burst-audit.js'
+      - 'nova-updates/disciplines-v1.7.0.js'
+      - 'tests/node/bomber-airburst-shrapnel-birth.test.js'
       - 'tests/browser/frontlines-natural-match-ab.cjs'
       - 'tests/node/bomber-burst-audit.test.js'
       - 'tests/node/bomber-burst-matrix-report.test.js'
