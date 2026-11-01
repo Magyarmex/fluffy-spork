@@ -6,27 +6,34 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '../../nova-updates/upgrade-dwell-v1.9.2.js'), 'utf8');
 
-function boot() {
-  let hookState;
-  let cleanup = null;
+function boot(compact = false) {
+  const hookStates = [];
+  const cleanups = [];
+  let hookIndex = 0;
+  let effectIndex = 0;
+  const styles = [];
   const timers = [];
   const cleared = new Set();
   const listeners = new Map();
   const React = {
-    createElement(type, props) { return { type, props }; },
+    createElement(type, props, ...children) { return { type, props: { ...props, ...(children.length ? { children: children[0] } : {}) } }; },
     useState(initial) {
-      if (hookState === undefined) hookState = initial;
-      return [hookState, (next) => { hookState = typeof next === 'function' ? next(hookState) : next; }];
+      const i = hookIndex++;
+      if (!(i in hookStates)) hookStates[i] = initial;
+      return [hookStates[i], (next) => { hookStates[i] = typeof next === 'function' ? next(hookStates[i]) : next; }];
     },
     useEffect(effect) {
-      if (cleanup) cleanup();
-      cleanup = effect() || null;
+      const i = effectIndex++;
+      if (cleanups[i]) cleanups[i]();
+      cleanups[i] = effect() || null;
     }
   };
   const document = {
-    addEventListener(type, fn, capture) { listeners.set(type, { fn, capture }); }
+    addEventListener(type, fn, capture) { listeners.set(type, { fn, capture }); },
+    createElement(tag) { const node = { tag }; styles.push(node); return node; },
+    head: { appendChild() {} }
   };
-  const window = { React };
+  const window = { React, matchMedia() { return { matches: compact }; } };
   const context = {
     window,
     document,
@@ -38,7 +45,16 @@ function boot() {
     Array
   };
   vm.runInNewContext(source, context, { filename: 'upgrade-dwell-v1.9.2.js' });
-  return { window, React, timers, cleared, listeners, getState: () => hookState };
+  function render(wrapped) {
+    hookIndex = 0;
+    effectIndex = 0;
+    const root = wrapped.type(wrapped.props);
+    assert.equal(root.type, 'div');
+    assert.equal(root.props['data-nova-upgrade-tray'], true);
+    return { root, inner: root.props.children };
+  }
+  return { window, React, timers, cleared, listeners, styles, render,
+    getState: () => hookStates[0], getOptIn: () => hookStates[1] };
 }
 
 function classList(...values) {
@@ -67,11 +83,11 @@ test('release installs a strict 500 ms upgrade dwell', () => {
 });
 
 test('UpgradeTray is wrapped and remains collapsed while the dwell timer is pending', () => {
-  const { React, timers } = boot();
+  const { React, timers, render } = boot();
   function UpgradeTray() {}
   const wrapped = React.createElement(UpgradeTray, { sticksActive: false, marker: 7 });
   assert.notEqual(wrapped.type, UpgradeTray);
-  const inner = wrapped.type(wrapped.props);
+  const { inner } = render(wrapped);
   assert.equal(inner.type, UpgradeTray);
   assert.equal(inner.props.marker, 7);
   assert.equal(inner.props.sticksActive, true);
@@ -80,27 +96,27 @@ test('UpgradeTray is wrapped and remains collapsed while the dwell timer is pend
 });
 
 test('renewed stick input cancels the pending dwell and keeps collapse immediate', () => {
-  const { React, timers, cleared } = boot();
+  const { React, timers, cleared, render } = boot();
   function UpgradeTray() {}
   let wrapped = React.createElement(UpgradeTray, { sticksActive: false });
-  wrapped.type(wrapped.props);
+  render(wrapped);
   assert.equal(timers.length, 1);
 
   wrapped = React.createElement(UpgradeTray, { sticksActive: true });
-  const inner = wrapped.type(wrapped.props);
+  const { inner } = render(wrapped);
   assert.equal(cleared.has(timers[0].id), true);
   assert.equal(inner.props.sticksActive, true);
 });
 
 test('the tray is released after the half-second timer completes', () => {
-  const { React, timers, getState } = boot();
+  const { React, timers, getState, render } = boot();
   function UpgradeTray() {}
   let wrapped = React.createElement(UpgradeTray, { sticksActive: false });
-  wrapped.type(wrapped.props);
+  render(wrapped);
   timers[0].fn();
   assert.equal(getState(), false);
   wrapped = React.createElement(UpgradeTray, { sticksActive: false });
-  const inner = wrapped.type(wrapped.props);
+  const { inner } = render(wrapped);
   assert.equal(inner.props.sticksActive, false);
 });
 
@@ -222,4 +238,49 @@ test('ultimate stylus activation cannot double-fire from a pen compatibility cli
     sourceCapabilities: { firesTouchEvents: false }, target: fx.target, cancelable: true,
     preventDefault() { swallowed++; }, stopImmediatePropagation() { swallowed++; } });
   assert.equal(swallowed, 2, 'pen follow-up click is not an independent mouse click');
+});
+
+test('compact touch defaults to a chip even after dwell; deliberate tap opens the tray', () => {
+  const { React, timers, render, getOptIn, styles } = boot(true);
+  function UpgradeTray() {}
+  const props = { sticksActive: false, hud: { statPoints: 1 } };
+  let wrapped = React.createElement(UpgradeTray, props);
+  let { root, inner } = render(wrapped);
+  assert.equal(inner.props.sticksActive, true, 'first touch must not be blocked by a newly earned upgrade');
+  timers[0].fn();
+  ({ root, inner } = render(React.createElement(UpgradeTray, props)));
+  assert.equal(inner.props.sticksActive, true, 'dwell alone cannot open a compact touch tray');
+  root.props.onClickCapture();
+  assert.equal(getOptIn(), true);
+  ({ inner } = render(React.createElement(UpgradeTray, props)));
+  assert.equal(inner.props.sticksActive, false, 'explicit chip activation opens stat choices');
+  assert.ok(styles.some(s => s.id === 'nova-touch-upgrade-clearance' && s.textContent.includes('top:82px')));
+});
+
+test('touch movement re-arms first-touch clearance and a spent point resets opt-in', () => {
+  const { React, timers, render, getOptIn } = boot(true);
+  function UpgradeTray() {}
+  const idle = { sticksActive: false, hud: { statPoints: 1 } };
+  render(React.createElement(UpgradeTray, idle));
+  timers[0].fn();
+  let { root } = render(React.createElement(UpgradeTray, idle));
+  root.props.onClickCapture();
+  assert.equal(getOptIn(), true);
+  let { inner } = render(React.createElement(UpgradeTray, { ...idle, sticksActive: true }));
+  assert.equal(inner.props.sticksActive, true);
+  assert.equal(getOptIn(), false);
+  ({ inner } = render(React.createElement(UpgradeTray, idle)));
+  assert.equal(inner.props.sticksActive, true, 'input cannot silently reopen tray');
+  render(React.createElement(UpgradeTray, { sticksActive: false, hud: { statPoints: 0 } }));
+  assert.equal(getOptIn(), false);
+});
+
+test('desktop remains automatic after dwell without an extra click', () => {
+  const { React, timers, render } = boot(false);
+  function UpgradeTray() {}
+  const props = { sticksActive: false, hud: { statPoints: 1 } };
+  render(React.createElement(UpgradeTray, props));
+  timers[0].fn();
+  const { inner } = render(React.createElement(UpgradeTray, props));
+  assert.equal(inner.props.sticksActive, false);
 });
