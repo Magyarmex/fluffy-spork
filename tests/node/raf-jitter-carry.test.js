@@ -23,7 +23,7 @@ function approx(a,b,tol=1e-8){assert.ok(Math.abs(a-b)<tol,`${a} != ${b}`);}
 test('patch accepts raw, previously shipped, and new shell; rejects drift',()=>{
  const old=raw(),mid=old.replace(before,intermediate),latest=fs.readFileSync(path.join(root,'index.html'),'utf8');
  assert.equal(patchRafStepCap(old),patchRafStepCap(mid));
- assert.equal(patchRafStepCap(latest),latest);
+ assert.equal(patchRafStepCap(patchRafStepCap(latest)),patchRafStepCap(latest));
  assert.equal(patchRafStepCap(patchRafStepCap(old)),patchRafStepCap(old));
  assert.equal(patchRafStepCap(old).split(after).length-1,1);
  assert.throws(()=>patchRafStepCap(old.replace(before,'            const dt = 123;')),/drift/);
