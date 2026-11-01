@@ -67,7 +67,11 @@ class ChronologicalInput {
       const evt = {type:e.kind, pointerId:d.pointerId, pointerType:d.pointerType,
         clientX:d.clientX, clientY:d.clientY, buttons:d.buttons,
         button:d.button, key:d.key, repeat:!!d.repeat,
-        target:{closest:()=>null}, preventDefault() {}};
+        defaultPrevented:!!d.defaultPrevented,
+        target:{tagName:d.targetTagName || '', isContentEditable:!!d.targetEditable,
+          closest:()=>d.targetIsUI ? {} : null},
+        sourceCapabilities:d.sourceFiresTouchEvents == null ? undefined :
+          {firesTouchEvents:!!d.sourceFiresTouchEvents}, preventDefault() {}};
       if (e.kind === 'pointerdown') this.input.pd(evt);
       else if (e.kind === 'pointermove') this.input.pm(evt);
       else if (e.kind === 'pointerup' || e.kind === 'pointercancel') this.input.pu(evt);
@@ -81,11 +85,12 @@ class ChronologicalInput {
   }
 }
 class FixedStepPresentation {
-  constructor(game, timeline, {maxSteps = 2, render = null} = {}) {
+  constructor(game, timeline, {maxSteps = 2, render = null, strictPause = false} = {}) {
     if (!game || !timeline || !Number.isInteger(maxSteps) || maxSteps < 1)
       throw Error('invalid fixed-step presentation');
     this.game = game; this.timeline = timeline; this.maxSteps = maxSteps;
-    this.render = render; this.ticks = 0; this.lastFrame = 0;
+    this.render = render; this.strictPause = !!strictPause;
+    this.ticks = 0; this.lastFrame = 0;
     this.droppedTicks = 0; this.paused = false; this.epoch = 0;
   }
   frame(at, {naiveFrameInput = false} = {}) {
@@ -106,8 +111,11 @@ class FixedStepPresentation {
     if (naiveFrameInput) this.timeline.consumeThrough(at);
     while (this.ticks < target) {
       if (!naiveFrameInput) this.timeline.consumeThrough(this.epoch + (this.ticks + 1) * STEP);
-      if (this.game.paused && this.game.pendingOffer) this.game.dismissOffer();
+      if (this.strictPause && this.game.paused) break;
+      if (!this.strictPause && this.game.paused && this.game.pendingOffer)
+        this.game.dismissOffer();
       this.game.update(STEP); this.ticks++;
+      if (this.strictPause && this.game.paused) break;
     }
     if (this.render) this.render(this.game, this.game.w, this.game.h);
   }
@@ -117,6 +125,8 @@ class FixedStepPresentation {
   }
   resume(at) {
     if (!Number.isFinite(at) || at < this.lastFrame - EPS) throw Error('invalid resume');
+    if (this.strictPause && this.game.pendingOffer)
+      throw Error('cannot resume before player resolves evolution offer');
     this.timeline.reset(); this.timeline.last = at; this.timeline.sampled = at;
     this.lastFrame = at; this.epoch = at - this.ticks * STEP;
     this.timeline.tickOrigin = this.epoch; this.paused = false;
