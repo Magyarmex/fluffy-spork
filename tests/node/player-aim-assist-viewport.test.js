@@ -66,3 +66,27 @@ test('terrain occlusion still blocks the visible player aim candidate',()=>{
  g.tanks.push(target);g.hasLineOfSight=()=>false;
  assert.equal(g.nearestTank(0,0,480,1),null);
 });
+
+test('visible-target nearest selection matches legacy owner across 400 seeded scenes',()=>{
+ let state=0x6c6f7665;
+ const rand=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return(state>>>0)/4294967296};
+ for(const [w,h,z] of [[320,568,1],[360,740,.8],[568,320,1],[800,600,1.2]]){
+  for(let scene=0;scene<100;scene++){
+   const Game=boot(),g=new Game();g.w=w;g.h=h;g.cam.zoom=z;
+   const halfW=w/(2*z),halfH=h/(2*z);
+   for(let i=0;i<10;i++){
+    const t=tank(i+2,(rand()*2-1)*Math.min(halfW-20,420),(rand()*2-1)*Math.min(halfH-20,420));
+    g.tanks.push(t);
+   }
+   let best=null,bd=480*480;
+   for(const t of g.tanks){if(t.id===1)continue;
+    const d=t.x*t.x+t.y*t.y;if(d<bd){bd=d;best=t;}}
+   assert.equal(g.nearestTank(0,0,480,1),best);
+  }
+ }
+});
+test('invalid camera metadata falls back to legacy nearest query without throwing',()=>{
+ const Game=boot(),g=new Game(),target=tank(2,185,165);g.tanks.push(target);
+ g.cam.zoom=NaN;assert.equal(g.nearestTank(0,0,480,1),target);
+ g.cam.zoom=1;g.cam.x=NaN;assert.equal(g.nearestTank(0,0,480,1),target);
+});
