@@ -9,6 +9,9 @@ class Timeline {
  constructor(){this.events=[];this.index=0;this.last=-Infinity;this.state={mx:0,my:0,ax:0,ay:0,fire:false};}
  push(time,patch){
   if(!Number.isFinite(time)||time<this.last||!patch||typeof patch!=='object')throw Error('invalid event');
+  // Bound *pending* events, not lifetime events. An ordinary long match
+  // produces thousands of pointer samples; consumed entries must be recycled.
+  if(this.index>0){this.events.splice(0,this.index);this.index=0;}
   if(this.events.length>=128)throw Error('input queue full');
   this.events.push({time,patch});this.last=time;
  }
@@ -20,6 +23,7 @@ class Timeline {
    if(p.ability)abilities++;
    for(const key of ['mx','my','ax','ay','fire'])if(key in p)this.state[key]=p[key];
   }
+  if(this.index>=64){this.events.splice(0,this.index);this.index=0;}
   return {...this.state,abilities};
  }
  reset(){this.events=[];this.index=0;this.last=-Infinity;this.lastSampled=-Infinity;
@@ -68,6 +72,25 @@ test('timeline bounds, ordering and one-shot ability edges',()=>{
  t.reset();
  assert.deepEqual(t.sample(.3),{mx:0,my:0,ax:0,ay:0,fire:false,abilities:0},
   'pause, blur or redeploy must not replay stale firing or ability edges');
+});
+test('long-lived input queue reclaims consumed entries and preserves ability/release edges',()=>{
+ const t=new Timeline();let abilities=0;
+ for(let i=0;i<10000;i++){
+  const at=i/120;
+  t.push(at,{mx:i%2?1:-1,fire:i%7===0,ability:i%41===0});
+  const sample=t.sample(at+1/240);
+  abilities+=sample.abilities;
+  assert.equal(sample.mx,i%2?1:-1);
+  assert.equal(sample.fire,i%7===0);
+  assert.ok(t.events.length<=128,'queue must remain bounded over a long match');
+ }
+ assert.equal(abilities,Math.ceil(10000/41));
+ assert.equal(t.sample(100).abilities,0,'one-shot ability must never replay');
+ const blocked=new Timeline();for(let i=0;i<128;i++)blocked.push(i/1000,{mx:1});
+ assert.throws(()=>blocked.push(.129,{fire:false}),/input queue full/,
+  'genuinely unconsumed backlog remains bounded');
+ blocked.sample(.127);blocked.push(.129,{fire:false});
+ assert.equal(blocked.sample(.129).fire,false,'release after backlog compaction survives');
 });
 test('timestamped fixed 60Hz Game preserves 60Hz play and cross-render physical hashes',()=>{
  for(const seed of [1517800,1517802,1517810]){
