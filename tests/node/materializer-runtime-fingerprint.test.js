@@ -23,6 +23,8 @@ test('materialized HTML fingerprint changes when a local runtime input changes',
   assert.match(deploy,/'sw\.js'/);
   assert.match(deploy,/'manifest\.webmanifest'/);
   assert.match(deploy,/'nova-updates\/releases\.json'/);
+  assert.match(deploy,/'\.github\/nova-tailwind\.css'/,
+    'CSS-only releases must invalidate the materialized runtime build stamp');
   assert.match(deploy,/digest\.update\(input_path\.read_bytes\(\)\)/);
   assert.match(deploy,/runtime_build = digest\.hexdigest\(\)\[:24\]/);
   assert.match(deploy,/name="nova-runtime-build"/);
