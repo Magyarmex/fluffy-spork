@@ -53,3 +53,18 @@ for(let layout=0;layout<3;layout++)test(['Crossfire','Split Horizon','Four Gates
  if(g.hasLineOfSight(p.x,p.y,f.edge,p.y,24))
   assert.deepEqual(s.render(),['BLOOM? 150 AWAY']);
 });
+
+
+test('Four Gates destructible cover breach restores the real public distance immediately',()=>{
+ const s=boot(2),{g}=s,p=g.player;
+ Object.assign(p,{x:-1387.5,y:350,vx:0,vy:-350});g.cam.x=p.x;g.cam.y=p.y;
+ g.__lfState={directorEnabled:true,signal:{type:'BLOOM',sector:4,started:99,until:104},
+  bloomMemory:{sector:4,announcedAt:99,until:123}};
+ const hit=g.firstTerrainHit(p.x,p.y,p.x,0,24);
+ assert.equal(hit&&hit.solid&&hit.solid.destructible,true,'the obstacle is breachable physical cover');
+ assert.equal(g.hasLineOfSight(p.x,p.y,p.x,0,24),false);
+ assert.deepEqual(s.render(),['BLOOM · COVER']);
+ hit.solid.hp=0;hit.solid.solid=false;
+ assert.equal(g.hasLineOfSight(p.x,p.y,p.x,0,24),true,'the same direct lane opens after physical destruction');
+ assert.deepEqual(s.render(),['BLOOM 350 AWAY'],'a breached route must not retain a stale obstruction');
+});
