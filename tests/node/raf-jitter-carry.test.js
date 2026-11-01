@@ -35,10 +35,11 @@ test('steady 30, 60, 120 and 240Hz retain one update per draw and exact time',()
   for(const dt of d.dts)approx(dt,1/hz,1e-9);
  }});
 test('alternating 60Hz/20Hz frames with 30Hz mean recovers bounded wall time',()=>{
- const old=driver(raw()),fixed=driver(patchRafStepCap(raw()));
+ const previous=raw().replace(before,intermediate);
+ const old=driver(previous),fixed=driver(patchRafStepCap(raw()));
  for(let i=0;i<9000;i++){for(const ms of [1000/60,1000/20]){old.frame(ms);fixed.frame(ms);}}
  const oldTime=total(old.dts),fixedTime=total(fixed.dts);
- approx(oldTime,447,1e-5); // old loses 153 seconds of a 600-second interval
+ approx(oldTime,450,1e-5); // current production loses 150 seconds of a 600-second interval
  approx(fixedTime,600-1/60,1e-5); // only the last frame's bounded carry remains
  assert.equal(fixed.dts.length,18000);assert.equal(fixed.draws,18000);
 });
