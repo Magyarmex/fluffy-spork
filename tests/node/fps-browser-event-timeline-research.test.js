@@ -174,3 +174,38 @@ test('strict browser scheduler stops within a 30Hz frame on an evolution offer',
   driver.frame(2/30+1/60);
   assert.equal(driver.ticks,2);
 });
+
+test('replayed keyboard events preserve focused UI exclusion',()=>{
+  const h=setup();h.setNow(1020);
+  h.browser.capture(event('keydown',1010,{key:'w',target:{tagName:'INPUT',closest:()=>({})}}));
+  h.timeline.consumeThrough(.02);
+  assert.equal(h.game.input.keyboard.up,false);
+  h.setNow(1040);
+  h.browser.capture(event('keyup',1030,{key:'w',target:{tagName:'INPUT',closest:()=>({})}}));
+  h.timeline.consumeThrough(.04);
+  assert.equal(h.game.input.keyboard.up,false);
+});
+test('ten thousand jittered browser events preserve monotonic bounded pending input',()=>{
+  const h=setup();let state=0x1234abcd, lastSample=0;
+  function random(){state^=state<<13;state^=state>>>17;state^=state<<5;
+    return (state>>>0)/4294967296;}
+  for(let i=1;i<=10000;i++){
+    const now=1000+i*5;
+    h.setNow(now);
+    const jitter=(random()-.5)*50;
+    h.browser.capture(event('pointermove',now+jitter,{clientX:100+i%60}));
+    if(i%4===0){
+      const sample=(now-1000)/1000-.01;
+      h.timeline.consumeThrough(sample);
+      lastSample=sample;
+    }
+    assert.ok(h.timeline.events.length<=128);
+    assert.ok(h.timeline.events.slice(h.timeline.index).every(e=>e.at>=lastSample-1e-9));
+    for(let j=1;j<h.timeline.events.length;j++)
+      assert.ok(h.timeline.events[j].at>=h.timeline.events[j-1].at-1e-9);
+  }
+  assert.equal(h.browser.staleClamps,0);
+  assert.ok(h.browser.reorderedClamps>0);
+  assert.ok(h.browser.lateClamps>0);
+  assert.equal(h.timeline.overflowCount,0);
+});
