@@ -120,3 +120,29 @@ test('terrain-check failure never blocks render or manufactures a cover claim',(
  s.p.vx=0;
  assert.equal(s.render().length,0,'no cover query should create a cue when the pilot is not approaching');
 });
+
+/* The canonical unevolved Scout has 124u/s maximum speed, so the old
+ * absolute 140u/s gate silently hid the cue throughout the starter life.
+ * Compare speed to the actual tank's own movement capability instead of a
+ * fast-class-only threshold. This changes information, never movement. */
+test('starter Scout can read a public BLOOM while genuinely moving at normal speed',()=>{
+ const s=scene();s.g.tankSpeed=()=>124;s.p.vx=124;
+ assert.equal(s.render()[0]?.text,'BLOOM 375 AWAY',
+  'a full-speed unupgraded Scout must not be excluded by a 140u/s gate');
+ s.p.vx=65;
+ assert.equal(s.render().length,0,'a slow drift is not a committed approach');
+ s.p.vx=90;
+ assert.equal(s.render()[0]?.text,'BLOOM 375 AWAY','normal Scout acceleration earns the cue');
+ s.p.vx=-124;
+ assert.equal(s.render().length,0,'the cue never signals motion away from public geometry');
+});
+test('speed-aware cue stays bounded for fast classes and fails closed on bad speed APIs',()=>{
+ const s=scene();s.g.tankSpeed=()=>350;s.p.vx=139;
+ assert.equal(s.render().length,0,'fast classes keep the established 140u/s anti-clutter gate');
+ s.p.vx=140;assert.equal(s.render()[0]?.text,'BLOOM 375 AWAY');
+ s.g.tankSpeed=()=>NaN;s.p.vx=124;
+ assert.equal(s.render().length,0,'invalid speed cannot invent a low threshold');
+ s.g.tankSpeed=()=>{throw Error('transient class lookup');};
+ assert.doesNotThrow(()=>s.render());
+ assert.equal(s.render().length,0,'render fallback must preserve the original conservative gate');
+});
