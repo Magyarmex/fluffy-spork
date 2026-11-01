@@ -956,8 +956,21 @@ function publicBloomApproach(g,w,h){
   dx=nx-p.x,dy=ny-p.y,d=Math.hypot(dx,dy),sp=Math.hypot(p.vx,p.vy);
  /* The marker appears early and yields to local combat visibility near the
   * boundary. Its bearing is the player's own approach to PUBLIC geometry. */
- if(!(d>=110&&d<=420&&sp>=140)||
+ if(!(d>=110&&d<=420&&sp>0)||
     (p.vx*dx+p.vy*dy)/(sp*d)<.6)return null;
+ /* An unevolved Scout moves at only 124u/s. A fixed 140u/s gate made the
+  * public approach cue unreachable throughout an ordinary starter life,
+  * and for slower evolved hulls. Require meaningful motion relative to the
+  * tank's real speed, while retaining the original 140u/s cap for fast
+  * builds. Never infer speed from hidden enemies or ecology; a missing or
+  * failing speed owner preserves the conservative original threshold. */
+ var speedGate=140;
+ if(typeof g.tankSpeed==='function')try{
+  var tankMax=g.tankSpeed(p);
+  if(Number.isFinite(tankMax)&&tankMax>0)
+   speedGate=Math.min(140,Math.max(65,tankMax*.72));
+ }catch(ignore){} // A presentation hint must never veto gameplay/render.
+ if(sp<speedGate)return null;
  var z=Number(cam.zoom),cx=Number(cam.x),cy=Number(cam.y);
  if(!(z>0)||!Number.isFinite(z)||!Number.isFinite(cx)||!Number.isFinite(cy))return null;
  var px=(p.x-cx)*z+w*.5,py=(p.y-cy)*z+h*.5;
