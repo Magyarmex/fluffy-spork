@@ -3302,16 +3302,22 @@ wrap('game/engine',function(engine){
  Game.prototype.__novaPermanentMinimap=true;
  Game.prototype.drawMinimap=function(){
   var ctx=this.mmCtx,terrain=this.__novaTerrain,markers=[],originalFill=ctx&&ctx.fillRect,
-   hadOwnFill=!!(ctx&&Object.prototype.hasOwnProperty.call(ctx,'fillRect')),tracked=false,out;
+   hadOwnFill=!!(ctx&&Object.prototype.hasOwnProperty.call(ctx,'fillRect')),tracked=false,out,
+   canLayer=!!(ctx&&terrain&&terrain.length&&typeof ctx.save==='function'&&
+     typeof ctx.strokeRect==='function'&&typeof ctx.arc==='function');
   /* Preserve the core minimap's actual information filters (especially the
    * no-global-Star-radar rule). Capture only dots it REALLY drew, rather than
    * re-reading hidden entities to reconstruct markers after wall outlines. */
-  if(ctx&&typeof originalFill==='function'){
+  if(canLayer&&typeof originalFill==='function'){
    try{
     ctx.fillRect=function(x,y,w,h){
-     if(((w===2&&h===2)||(w===3&&h===3)||(w===4&&h===4))&&
-        this.fillStyle!=='#ffe066') // Rogue Star's single visibility-gated dot is authoritative.
+     var star=w===2&&h===2&&this.fillStyle==='#ffe066';
+     if(star||(w===2&&h===2)||(w===3&&h===3)||(w===4&&h===4))
       markers.push({x:x,y:y,w:w,h:h,color:this.fillStyle,alpha:this.globalAlpha});
+     /* A legitimately visible Star must be painted exactly once, above the
+      * public walls. Defer the core's already visibility-gated dot instead
+      * of replaying it a second time or reading hidden shape positions. */
+     if(star)return;
      return originalFill.apply(this,arguments);
     };
     tracked=ctx.fillRect!==originalFill;
