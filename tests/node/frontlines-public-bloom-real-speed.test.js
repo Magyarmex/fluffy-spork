@@ -35,3 +35,27 @@ test('materialized Scout and slower hulls can see the public approach cue at rea
  assert.deepEqual(cue(),[expected],'slower evolved classes retain the same public choice');
  g.paused=true;assert.deepEqual(cue(),[],'pause still hides the cue');
 });
+
+test('all 36 canonical unupgraded classes can receive a public cue at their real full speed',()=>{
+ const g=bootGame(),p=g.player;
+ const classes=g.__testWindow.__novaMakeRequire('')('game/classes').CLASSES;
+ assert.equal(Object.keys(classes).length,36,'class roster is canonical');
+ g.w=320;g.h=568;g.dpr=1;g.time=100;g.paused=false;
+ Object.assign(p,{x:-1500,y:-560,vy:0,spawnShieldT:0});
+ Object.assign(g.cam,{x:p.x,y:p.y,zoom:1});
+ const st=g.__lfState||(g.__lfState={});
+ st.directorEnabled=true;
+ st.signal={type:'BLOOM',sector:5,started:99,until:104};
+ st.bloomMemory={sector:5,announcedAt:99,until:123};
+ const render=g.__testWindow.__novaMakeRequire('')('game/render').render;
+ const labels=[],old=g.ctx.fillText;
+ g.ctx.fillText=function(text){if(/^BLOOM/.test(String(text)))labels.push(String(text));return old.apply(this,arguments);};
+ const misses=[];
+ for(const cls of Object.keys(classes)){
+  p.cls=cls;p.vx=g.tankSpeed(p);labels.length=0;
+  render(g,g.w,g.h);
+  if(labels.length!==1||!/^BLOOM/.test(labels[0]))misses.push({cls,speed:p.vx,labels:labels.slice()});
+ }
+ assert.deepEqual(misses,[],
+  'a normal full-speed hull should not lose public tactical information because of class speed');
+});
