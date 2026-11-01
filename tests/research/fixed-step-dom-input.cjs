@@ -67,6 +67,7 @@ class ChronologicalInput {
       const evt = {type:e.kind, pointerId:d.pointerId, pointerType:d.pointerType,
         clientX:d.clientX, clientY:d.clientY, buttons:d.buttons,
         button:d.button, key:d.key, repeat:!!d.repeat,
+        defaultPrevented:!!d.defaultPrevented,
         target:{tagName:d.targetTagName || '', isContentEditable:!!d.targetEditable,
           closest:()=>d.targetIsUI ? {} : null},
         sourceCapabilities:d.sourceFiresTouchEvents == null ? undefined :
