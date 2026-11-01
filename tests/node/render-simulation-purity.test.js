@@ -21,7 +21,7 @@ function simulationSnapshot(g){
   worldTime:g.time,paused:g.paused,status:g.status,nextId:g.nextId
  });
 }
-function probe(seed,renderHz){return withSeed(seed,draws=>{
+function probe(seed,renderHz,scenario='natural',seconds=3){return withSeed(seed,draws=>{
  const g=bootGame(),render=g.__testWindow.__novaMakeRequire('')('game/render').render;
  assert.equal(g.__novaSimulationTankOrder,true,'simulation ordering owner missing');
  assert.equal(g.__novaOrderReady,undefined,'new world already ticked');
@@ -29,9 +29,13 @@ function probe(seed,renderHz){return withSeed(seed,draws=>{
  g.input.moveVec=()=>({x:1,y:0});g.input.aimVec=()=>null;
  let ticks=0,drawCount=0,miniCount=0;
  const initial=simulationSnapshot(g);
- for(let frame=1;frame<=renderHz*3;frame++){
+ for(let frame=1;frame<=renderHz*seconds;frame++){
   const goal=Math.floor(frame*60/renderHz+1e-9);
-  while(ticks<goal){if(g.paused&&g.pendingOffer)g.dismissOffer();g.update(1/60);ticks++;}
+  while(ticks<goal){
+   if(g.paused&&g.pendingOffer)g.dismissOffer();g.update(1/60);ticks++;
+   if(ticks===121&&scenario==='redeploy')g.redeploy();
+   if(ticks===121&&scenario==='spawn')g.spawnAITank(6,'brawler',false);
+  }
   const before=simulationSnapshot(g),rng=draws(),order=g.tanks.map(t=>t.id);
   render(g,g.w,g.h);drawCount++;
   assert.equal(simulationSnapshot(g),before,`render mutated simulation at seed ${seed}, ${renderHz}Hz, frame ${frame}`);
@@ -52,6 +56,15 @@ test('composed render and minimap remain read-only across seeds and display rate
   assert.ok(results.every(x=>x.initial===results[0].initial));
   assert.ok(results.every(x=>x.final===results[0].final&&x.draws===results[0].draws),
    `drawing frequency changed gameplay or RNG at seed ${seed}`);
+ }
+});
+test('out-of-band spawn and redeploy stay independent of rendering frequency',()=>{
+ for(const scenario of ['spawn','redeploy'])for(const seed of SEEDS.slice(0,3)){
+  const results=CLOCKS.map(hz=>probe(seed,hz,scenario,4));
+  assert.ok(results.every(x=>x.ticks===240));
+  assert.ok(results.every(x=>x.initial===results[0].initial));
+  assert.ok(results.every(x=>x.final===results[0].final&&x.draws===results[0].draws),
+   `${scenario} changed gameplay with rendering cadence at seed ${seed}`);
  }
 });
 test('purity witness detects deliberately reintroduced live-array depth sort',()=>{
