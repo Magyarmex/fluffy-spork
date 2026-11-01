@@ -67,13 +67,13 @@ function cannonInputDepth(g,t){
   }
   return null;
 }
-/* The shipping RAF clamps simulation steps to 0.033s. A fuse beyond the
+/* The shipping RAF clamps simulation steps to 1/30s. A fuse beyond the
  * last surviving step can never fire: core TTL expiry removes the projectile
  * before Three Disciplines can detonate it. Only cap otherwise unreachable
  * programs; do not change mid-depth fuses or weapon speed/lifetime. */
 function cannonReachableFuse(raw,speed,ttl){
   if(!Number.isFinite(speed)||speed<=0||!Number.isFinite(ttl))return raw;
-  return Math.min(raw,Math.max(0,speed*(ttl-.033)));
+  return Math.min(raw,Math.max(0,speed*(ttl-1/30)));
 }
 function cannonFuseDistance(g,t,depth,def){
   var range=g.weaponRange?g.weaponRange(t):650;
