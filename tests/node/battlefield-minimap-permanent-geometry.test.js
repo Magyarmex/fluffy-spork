@@ -62,3 +62,39 @@ test('the already-public player dot stays above wall outlines near a wall',()=>{
  assert.ok(Math.abs(last.y-((g.player.y+2250)*sc-2.5))<1e-8);
  assert.equal(last.w,5);assert.equal(last.h,5);
 });
+
+test('permanent wall strokes never hide existing public neutral, hostile, or powerup markers',()=>{
+ const g=bootGame();if(!g.player)g.redeploy();
+ const wall=g.__novaTerrain.find(s=>!s.destructible&&s.shape==='rect');
+ const x=wall.x+wall.w*.5,y=wall.y;
+ // These entities already appear on the canonical minimap. They are placed
+ // precisely on the permanent wall stroke to make paint order observable.
+ const shape=g.shapes.find(s=>s.type!=='star');
+ shape.x=x;shape.y=y;
+ const hostile=g.tanks.find(t=>t.alive&&!t.isPlayer);
+ assert.ok(hostile);hostile.x=x+9;hostile.y=y;
+ const pu={type:'health',x:x+18,y};g.powerups.push(pu);
+ const ctx=g.mmCtx,ops=[],oldFill=ctx.fillRect,oldRect=ctx.strokeRect;
+ ctx.fillRect=function(a,b,w,h){ops.push({kind:'fill',x:a,y:b,w,h,alpha:this.globalAlpha,color:this.fillStyle});return oldFill.apply(this,arguments);};
+ ctx.strokeRect=function(){if(this.lineWidth===2.8)ops.push({kind:'wall'});return oldRect.apply(this,arguments);};
+ g.drawMinimap();
+ const lastWall=ops.findLastIndex(o=>o.kind==='wall');
+ assert.ok(lastWall>=0);
+ for(const [size,label] of [[2,'neutral'],[3,'hostile'],[4,'powerup']]){
+  assert.ok(ops.slice(lastWall+1).some(o=>o.kind==='fill'&&o.w===size&&o.h===size),
+   label+' minimap marker must remain visible above the wall outline');
+ }
+});
+
+test('permanent minimap overlay cannot reveal an offscreen Rogue Star through marker replay',()=>{
+ const g=bootGame();if(!g.player)g.redeploy();
+ const star=g.shapes.find(s=>s.type==='star');
+ assert.ok(star);
+ star.x=2100;star.y=2100;
+ g.cam.x=-2000;g.cam.y=-2000;g.cam.zoom=1;g.w=320;g.h=568;
+ const ctx=g.mmCtx,ops=[],oldFill=ctx.fillRect;
+ ctx.fillRect=function(x,y,w,h){if(w===2&&h===2)ops.push([x,y]);return oldFill.apply(this,arguments);};
+ g.drawMinimap();
+ const sx=(star.x+2250)*216/4500-1,sy=(star.y+2250)*216/4500-1;
+ assert.equal(ops.filter(([x,y])=>Math.abs(x-sx)<1e-6&&Math.abs(y-sy)<1e-6).length,0);
+});
