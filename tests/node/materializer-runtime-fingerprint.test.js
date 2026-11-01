@@ -19,6 +19,8 @@ test('materialized HTML fingerprint changes when a local runtime input changes',
   assert.match(deploy,/import hashlib/);
   assert.match(deploy,/runtime_inputs = \[/);
   assert.match(deploy,/\*script_paths/);
+  assert.match(deploy,/Path\('nova-gz'\)\.glob\('\*\.b64'\)/,
+    'changing the compressed base game must also invalidate the runtime stamp');
   assert.match(deploy,/'pwa-register\.js'/);
   assert.match(deploy,/'sw\.js'/);
   assert.match(deploy,/'manifest\.webmanifest'/);
