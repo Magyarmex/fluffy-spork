@@ -29,6 +29,18 @@ class SubtickFirePulse {
     input.pm = function(e) {
       if (self.pending && e && (self.pending.type === 'mouse' ? e.pointerType === 'mouse' :
         e.pointerId === self.pending.id && e.pointerType === self.pending.type)) self.release();
+      // With a secondary button held, Pointer Events report the primary-button
+      // release as a pointermove(buttons=2) BEFORE native mouseup. The existing
+      // Input.pm clears firing there. Preserve the deliberate short primary
+      // press until one simulation tick instead of losing it to event order.
+      if (self.down && self.down.type === 'mouse' && e && e.pointerType === 'mouse' &&
+          typeof e.buttons === 'number' && !(e.buttons & 1) && input.firing &&
+          self.game.status === 'playing' && !self.game.paused && !input.__novaInputPaused) {
+        self.pending = {event:{type:'pointerup',pointerType:'mouse',button:0,buttons:0,
+          pointerId:self.down.id},type:'mouse',id:self.down.id};
+        self.down = null;
+        return; // The later native mouseup/pointerup is also suppressed.
+      }
       return self.old.pm.call(this,e);
     };
     input.pu = function(e) {
