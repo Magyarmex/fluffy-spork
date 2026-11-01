@@ -20,6 +20,7 @@ on:
       - 'scripts/patch-cosmetic-rng.cjs'
       - 'scripts/patch-audio-rng.cjs'
       - 'scripts/patch-perk-offer.cjs'
+      - 'scripts/patch-render-tank-order.cjs'
   workflow_dispatch:
 
 permissions:
@@ -78,6 +79,7 @@ jobs:
           node scripts/patch-cosmetic-rng.cjs index.html.new
           node scripts/patch-audio-rng.cjs index.html.new
           node scripts/patch-perk-offer.cjs index.html.new
+          node scripts/patch-render-tank-order.cjs index.html.new
 
           python3 - <<'PY'
           from pathlib import Path
@@ -158,6 +160,7 @@ jobs:
               './nova-updates/living-front-core-v1.12.0.js',
               './nova-updates/living-front-instincts-v1.12.0.js',
               './nova-updates/living-front-director-v1.12.0.js',
+              './nova-updates/simulation-owned-tank-order-v1.12.1.js',
           ]
           missing = []
           script_paths = []
@@ -186,6 +189,7 @@ jobs:
               'scripts/patch-cosmetic-rng.cjs',
               'scripts/patch-audio-rng.cjs',
               'scripts/patch-perk-offer.cjs',
+              'scripts/patch-render-tank-order.cjs',
               'pwa-register.js',
               'sw.js',
               'manifest.webmanifest',
@@ -304,6 +308,8 @@ jobs:
           grep -q 'nova-updates/living-front-core-v1.12.0.js' index.html.new
           grep -q 'nova-updates/living-front-instincts-v1.12.0.js' index.html.new
           grep -q 'nova-updates/living-front-director-v1.12.0.js' index.html.new
+          grep -q 'nova-updates/simulation-owned-tank-order-v1.12.1.js' index.html.new
+          grep -Fq 'const drawTanks = g.tanks.slice().sort' index.html.new
           ! grep -q 'nova-updates/lobby-battlefield-v1.10.1.js' index.html.new
           ! grep -q 'nova-updates/lobby-battlefield-v1.10.9.js' index.html.new
           ! grep -q 'nova-updates/controller-command-weave-v1.10.0.js' index.html.new
