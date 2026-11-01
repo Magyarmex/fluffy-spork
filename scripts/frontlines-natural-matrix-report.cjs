@@ -38,10 +38,39 @@ function collectMatrix(root,expected=12){
   if(JSON.stringify(report.on)!==JSON.stringify(on)||JSON.stringify(report.off)!==JSON.stringify(off))
    throw Error(dir+': report and persisted snapshots disagree');
   const key={layout:row.layout,seed:row.seed,pilotPolicy:row.pilotPolicy};
+  // New research schema: a censored evolution offer is NOT a survivor and
+  // must not enter the denominator of complete-match comparisons. Legacy
+  // historical artifacts without offerPolicy remain readable as legacy.
+  const hasOfferPolicy=Object.hasOwn(row,'offerPolicy');
+  if(hasOfferPolicy){
+   if(!['defer','censor'].includes(row.offerPolicy)&&
+      !/^tier1:(cannon|twin|marksman|carrier|guard)$/.test(row.offerPolicy))
+    throw Error(dir+': invalid declared offer policy');
+   if(report.offerPolicy!==row.offerPolicy)
+    throw Error(dir+': report offer policy differs from manifest');
+  }
+  const offerCensors=[];
   for(const [arm,s] of [['ON',on],['OFF',off]]){
    if(s.metadata?.layout!==key.layout||s.metadata?.seed!==key.seed||
       s.metadata?.pilotPolicy!==key.pilotPolicy)
     throw Error(dir+': '+arm+' metadata disagrees with declared pairing');
+   if(hasOfferPolicy){
+    if(s.metadata.offerPolicy!==row.offerPolicy||!s.offerResearch||
+       !Array.isArray(s.offerResearch.actions)||
+       !Number.isSafeInteger(s.offerResearch.frames)||s.offerResearch.frames<0||
+       typeof s.offerResearch.pausedWithOffer!=='boolean')
+     throw Error(dir+': '+arm+' missing audited evolution-offer metadata');
+    const censor=s.offerResearch.censor;
+    if(censor){
+     if(row.offerPolicy!=='censor'||censor.choice!=='censor'||
+        !Number.isFinite(censor.time)||censor.time<0||
+        !Number.isInteger(censor.tier)||censor.tier<1||censor.tier>5||
+        s.game?.status!=='playing')
+      throw Error(dir+': '+arm+' invalid evolution-offer censor');
+     offerCensors.push({arm,tier:censor.tier,time:censor.time});
+    }else if(s.offerResearch.pausedWithOffer)
+     throw Error(dir+': '+arm+' silently advanced an unresolved evolution offer');
+   }
    nonnegative(s.naturalBlooms,arm+' natural BLOOM count');
    nonnegative(s.publicBloomCommandSamples,arm+' public pilot command samples');
    if(s.visibleNeutralAimSamples!=null)nonnegative(s.visibleNeutralAimSamples,arm+' visible-neutral aim samples');
@@ -51,7 +80,9 @@ function collectMatrix(root,expected=12){
   const onHas=!!on.frontline?.counts,offHas=!!off.frontline?.counts;
   if((on.naturalBlooms>0&&!onHas)||(off.naturalBlooms>0&&!offHas))
    throw Error(dir+': natural BLOOM occurred but Frontlines counters are missing');
-  if(onHas&&offHas) pairs.push({...key,on:path.join(dir,row.on),off:path.join(dir,row.off)});
+  if(offerCensors.length)censored.push({...key,reason:'Evolution offer censored before the trial ended',
+    offerCensors});
+  else if(onHas&&offHas) pairs.push({...key,on:path.join(dir,row.on),off:path.join(dir,row.off)});
   else censored.push({...key,reason:'No natural BLOOM in at least one arm; no physical-arrival exposure denominator'});
   observations.push({...key,off:{time:off.game?.time,status:off.game?.status,
     blooms:off.naturalBlooms,publicBloomCommandSamples:off.publicBloomCommandSamples,
@@ -68,6 +99,7 @@ function collectMatrix(root,expected=12){
  const warnings=[...(batch?.warnings||[]),
   ...(censored.length?[censored.length+' predeclared paired trials had no analyzable natural-BLOOM exposure; retained as censored evidence.']:[]),
   'A public-bloom scripted pilot reacts to changing public announcements; ON/OFF commands may diverge after the worlds diverge.',
+  'Evolution-offer censors are excluded from completed-match comparisons, never counted as survivors.',
   'No policy here models a human player, real-device controls, strategic fun or statistically representative matchmaking.'];
  return{method:'reproducible natural full-match matrix, actual materialized NOVA TANKS',
   expectedPairs:expected,observedPairs:dirs.length,analyzablePairs:pairs.length,censored,observations,batch,warnings};
