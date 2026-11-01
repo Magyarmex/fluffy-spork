@@ -93,21 +93,29 @@ function run(seed,hz,seconds=1,observe=true){
 function compare(a,b){
  if(a.seed!==b.seed||a.seconds!==b.seconds||a.initial!==b.initial)
   throw Error('unmatched initial worlds');
- const n=Math.min(a.checkpoints.length,b.checkpoints.length),fields=['player','enemyMotionHash','enemyDecisionHash','shapeHash','bulletHash','neutralXP','draws'];
- const first={};
+ // Deaths and offers can stop one arm between 30-Hz checkpoints. Match by
+ // actual simulated time, NEVER by array index or nominal frame number.
+ const byTime=new Map(b.checkpoints.map(c=>[c.time.toFixed(6),c]));
+ const pairs=a.checkpoints.map(c=>[c,byTime.get(c.time.toFixed(6))])
+  .filter(pair=>pair[1]&&Math.abs(pair[0].time-pair[1].time)<1e-6);
+ if(!pairs.length)throw Error('no common simulated-time checkpoint');
+ const fields=['player','enemyMotionHash','enemyDecisionHash','shapeHash',
+  'bulletHash','neutralXP','draws'],first={};
  for(const field of fields){
-  const i=Array.from({length:n},(_,j)=>j).find(j=>JSON.stringify(a.checkpoints[j][field])!==JSON.stringify(b.checkpoints[j][field]));
-  first[field]=i===undefined?null:{checkpoint:i,time:a.checkpoints[i].time};
+  const i=pairs.findIndex(pair=>JSON.stringify(pair[0][field])!==JSON.stringify(pair[1][field]));
+  first[field]=i<0?null:{checkpoint:i,time:pairs[i][0].time};
  }
- const lastA=a.checkpoints[n-1],lastB=b.checkpoints[n-1];
+ const last=pairs[pairs.length-1],firstLive=pairs[1];
+ const diff=pair=>pair?{time:pair[0].time,
+  dx:pair[0].player.x-pair[1].player.x,
+  dvx:pair[0].player.vx-pair[1].player.vx,
+  rngDrawDifference:pair[0].draws-pair[1].draws}:null;
  return {seed:a.seed,comparedHz:[a.hz,b.hz],sameInitial:true,
-  first,firstCommon:{time:a.checkpoints[1]?.time||null,
-   dx:(a.checkpoints[1]?.player.x||0)-(b.checkpoints[1]?.player.x||0),
-   dvx:(a.checkpoints[1]?.player.vx||0)-(b.checkpoints[1]?.player.vx||0),
-   rngDrawDifference:(a.checkpoints[1]?.draws||0)-(b.checkpoints[1]?.draws||0)},
-  lastCommon:{time:lastA.time,dx:lastA.player.x-lastB.player.x,
-   dvx:lastA.player.vx-lastB.player.vx,
-   rngDrawDifference:lastA.draws-lastB.draws}};
+  comparedSamples:pairs.length,
+  censored:last[0].time<a.seconds-1e-6||
+   last[0].time<a.checkpoints[a.checkpoints.length-1].time-1e-6||
+   last[0].time<b.checkpoints[b.checkpoints.length-1].time-1e-6,
+  first,firstCommon:diff(firstLive),lastCommon:diff(last)};
 }
 function parseList(s,fallback){if(!s)return fallback;const v=s.split(',').map(Number);
  if(v.length<1||v.some(x=>!Number.isSafeInteger(x)))throw Error('invalid list');return v;}
