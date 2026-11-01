@@ -98,3 +98,30 @@ test('permanent minimap overlay cannot reveal an offscreen Rogue Star through ma
  const sx=(star.x+2250)*216/4500-1,sy=(star.y+2250)*216/4500-1;
  assert.equal(ops.filter(([x,y])=>Math.abs(x-sx)<1e-6&&Math.abs(y-sy)<1e-6).length,0);
 });
+
+test('marker replay retains canonical color/alpha and restores the canvas method',()=>{
+ const g=bootGame();if(!g.player)g.redeploy();
+ const ctx=g.mmCtx,original=ctx.fillRect,hadOwn=Object.hasOwn(ctx,'fillRect');
+ const ops=[],oldFill=ctx.fillRect,oldRect=ctx.strokeRect;
+ ctx.fillRect=function(x,y,w,h){if(w===2&&h===2)ops.push({x,y,w,h,color:this.fillStyle,alpha:this.globalAlpha});return oldFill.apply(this,arguments);};
+ const spy=ctx.fillRect;
+ ctx.strokeRect=function(){if(this.lineWidth===2.8)ops.push({wall:true});return oldRect.apply(this,arguments);};
+ g.drawMinimap();
+ assert.equal(ctx.fillRect,spy,'preexisting instrumentation must survive the overlay');
+ const firstWall=ops.findIndex(o=>o.wall),lastWall=ops.findLastIndex(o=>o.wall);
+ assert.ok(firstWall>0&&lastWall>=firstWall);
+ const before=ops.slice(0,firstWall).filter(o=>o.w===2);
+ const after=ops.slice(lastWall+1).filter(o=>o.w===2);
+ assert.deepEqual(after,before,'all originally drawn neutral dots retain exact paint data');
+ ctx.fillRect=original;
+ if(!hadOwn)delete ctx.fillRect;
+});
+
+test('minimap capture does not leave an own fillRect override on an uninstrumented canvas',()=>{
+ const g=bootGame();if(!g.player)g.redeploy();
+ const ctx=g.mmCtx,hadOwn=Object.hasOwn(ctx,'fillRect'),method=ctx.fillRect;
+ g.drawMinimap();
+ assert.equal(ctx.fillRect,method);
+ assert.equal(Object.hasOwn(ctx,'fillRect'),hadOwn,
+  'the overlay must not permanently shadow a native canvas method');
+});
