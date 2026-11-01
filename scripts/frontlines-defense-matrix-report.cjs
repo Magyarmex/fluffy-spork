@@ -23,6 +23,10 @@ function loadPair(root,folder,layout,seed,policy){
  assert.ok(report.initialFingerprint.length>20,folder+': initial fingerprint too short');
  assert.equal(manifest.pairs?.length,1,folder+': one declared pair required');
  const m=manifest.pairs[0];
+ if(Object.hasOwn(m,'offerPolicy')){
+  assert.equal(report.offerPolicy,m.offerPolicy,folder+': report offer policy mismatch');
+  assert.equal(m.offerPolicy,'defer',folder+': survival comparison requires explicit legal Later policy');
+ }
  assert.equal(m.layout,LAYOUTS[layout],folder+': layout mismatch');
  assert.equal(m.seed,expectedSeed,folder+': seed mismatch');
  assert.equal(m.pilotPolicy,policy,folder+': policy mismatch');
@@ -37,6 +41,13 @@ function loadPair(root,folder,layout,seed,policy){
   assert.equal(snapshot.metadata?.seed,m.seed);
   assert.equal(snapshot.metadata?.pilotPolicy,policy);
   assert.equal(snapshot.metadata?.abMode,'memory');
+  if(Object.hasOwn(m,'offerPolicy')){
+   assert.equal(snapshot.metadata?.offerPolicy,m.offerPolicy);
+   assert.ok(snapshot.offerResearch&&Array.isArray(snapshot.offerResearch.actions),
+    folder+': offer actions missing');
+   assert.equal(snapshot.offerResearch.censor,null,folder+': offer-censored trial is not a survivor');
+   assert.equal(snapshot.offerResearch.pausedWithOffer,false,folder+': unresolved offer');
+  }
   const g=snapshot.game||{};
   assert.ok(g.status==='playing'||g.status==='dead',folder+': unexpected game status');
   nonnegative(g.time,folder+': game time');
@@ -57,7 +68,7 @@ function loadPair(root,folder,layout,seed,policy){
    hostileAimSamples:snapshot.visibleHostileAimSamples
   };
  }
- return{fingerprint:report.initialFingerprint,arms};
+ return{fingerprint:report.initialFingerprint,offerPolicy:m.offerPolicy??null,arms};
 }
 function collect(defenseRoot,baselineRoot,expected=6){
  if(!Number.isInteger(expected)||expected<1||expected>6)throw Error('expected must be 1..6');
@@ -77,6 +88,7 @@ function collect(defenseRoot,baselineRoot,expected=6){
   const defense=loadPair(defenseRoot,d,layout,seed,POLICIES.defense);
   const baseline=loadPair(baselineRoot,b,layout,seed,POLICIES.baseline);
   assert.equal(defense.fingerprint,baseline.fingerprint,'cross-policy initial-world mismatch '+layout+'-'+seed);
+  assert.equal(defense.offerPolicy,baseline.offerPolicy,'cross-policy offer-resolution mismatch '+layout+'-'+seed);
   for(const arm of ['off','on'])exercised+=defense.arms[arm].dodgeSamples+defense.arms[arm].hostileAimSamples;
   rows.push({layout:LAYOUTS[layout],seed,baseline:baseline.arms,defense:defense.arms});
  }
