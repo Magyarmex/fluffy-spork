@@ -15,6 +15,7 @@ on:
       - 'scripts/patch-cosmetic-rng.cjs'
       - 'scripts/patch-audio-rng.cjs'
       - 'scripts/patch-perk-offer.cjs'
+      - 'scripts/patch-render-tank-order.cjs'
   pull_request:
     paths:
       - 'nova-updates/**'
@@ -32,6 +33,7 @@ on:
       - 'scripts/patch-cosmetic-rng.cjs'
       - 'scripts/patch-audio-rng.cjs'
       - 'scripts/patch-perk-offer.cjs'
+      - 'scripts/patch-render-tank-order.cjs'
   workflow_dispatch:
 
 # Supersede obsolete PR/feature-branch checks; never cancel a mainline
@@ -68,6 +70,25 @@ jobs:
         run: node scripts/patch-audio-rng.cjs index.html
       - name: Sample mastery perks fairly before browser tests
         run: node scripts/patch-perk-offer.cjs index.html
+      - name: Keep renderer read-only and load the final simulation order owner
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/patch-render-tank-order.cjs index.html
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          html=p.read_text(encoding='utf-8')
+          anchor='<script src="./nova-updates/living-front-director-v1.12.0.js"></script>'
+          owner='<script src="./nova-updates/simulation-owned-tank-order-v1.12.1.js"></script>'
+          if html.count(anchor)!=1 or html.count(owner)>1:
+              raise SystemExit('NOVA tank-order browser smoke anchor drift')
+          if owner not in html:
+              html=html.replace(anchor,anchor+'\n'+owner)
+          p.write_text(html,encoding='utf-8')
+          PY
+          grep -Fq 'const drawTanks = g.tanks.slice().sort' index.html
+          grep -Fq 'simulation-owned-tank-order-v1.12.1.js' index.html
       - name: Compile the same canonical Tailwind CSS used by production
         shell: bash
         run: |
