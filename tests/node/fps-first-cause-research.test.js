@@ -34,3 +34,17 @@ test('research FPS comparator rejects mismatched worlds and invalid timebases',(
  const a=run(1517802,60),b=run(1517800,60);
  assert.throws(()=>compare(a,b),/unmatched/);
 });
+
+test('early death or off-grid checkpoint is censored, not compared against a different time',()=>{
+ const snap=(time,x)=>({time,player:{x,vx:0},draws:0});
+ const a={seed:1,seconds:2,initial:'same',hz:30,checkpoints:[
+  snap(0,0),snap(.033333333,1),snap(.05,2)]};
+ const b={seed:1,seconds:2,initial:'same',hz:60,checkpoints:[
+  snap(0,0),snap(.033333333,1),snap(.066666667,999)]};
+ const r=compare(a,b);
+ assert.equal(r.comparedSamples,2);
+ assert.equal(r.censored,true);
+ assert.equal(r.lastCommon.time,.033333333);
+ assert.equal(r.lastCommon.dx,0);
+ assert.equal(r.first.player,null);
+});
