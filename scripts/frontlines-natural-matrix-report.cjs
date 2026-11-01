@@ -42,6 +42,8 @@ function collectMatrix(root,expected=12){
   // must not enter the denominator of complete-match comparisons. Legacy
   // historical artifacts without offerPolicy remain readable as legacy.
   const hasOfferPolicy=Object.hasOwn(row,'offerPolicy');
+  if(hasOfferPolicy!==Object.hasOwn(report,'offerPolicy'))
+   throw Error(dir+': manifest/report offer policy schema mismatch');
   if(hasOfferPolicy){
    if(!['defer','censor'].includes(row.offerPolicy)&&
       !/^tier1:(cannon|twin|marksman|carrier|guard)$/.test(row.offerPolicy))
@@ -54,6 +56,9 @@ function collectMatrix(root,expected=12){
    if(s.metadata?.layout!==key.layout||s.metadata?.seed!==key.seed||
       s.metadata?.pilotPolicy!==key.pilotPolicy)
     throw Error(dir+': '+arm+' metadata disagrees with declared pairing');
+   if(!hasOfferPolicy&&(Object.hasOwn(s.metadata||{},'offerPolicy')||
+      Object.hasOwn(s,'offerResearch')))
+    throw Error(dir+': '+arm+' undeclared offer policy metadata');
    if(hasOfferPolicy){
     if(s.metadata.offerPolicy!==row.offerPolicy||!s.offerResearch||
        !Array.isArray(s.offerResearch.actions)||
