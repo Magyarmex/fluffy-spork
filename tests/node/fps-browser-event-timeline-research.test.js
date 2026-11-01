@@ -209,3 +209,10 @@ test('ten thousand jittered browser events preserve monotonic bounded pending in
   assert.ok(h.browser.lateClamps>0);
   assert.equal(h.timeline.overflowCount,0);
 });
+
+test('a browser-prevented keyboard event cannot bypass composed UI ownership',()=>{
+  const h=setup();h.setNow(1020);
+  h.browser.capture(event('keydown',1010,{key:'w',defaultPrevented:true}));
+  h.timeline.consumeThrough(.02);
+  assert.equal(h.game.input.keyboard.up,false);
+});
