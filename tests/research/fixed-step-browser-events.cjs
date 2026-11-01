@@ -74,6 +74,7 @@ class BrowserEventTimeline {
       clientX: event.clientX, clientY: event.clientY,
       button: event.button, buttons: event.buttons,
       key: event.key, repeat: !!event.repeat,
+      defaultPrevented: !!event.defaultPrevented,
       sourceFiresTouchEvents: event.sourceCapabilities &&
         event.sourceCapabilities.firesTouchEvents,
       targetTagName: target && target.tagName,
