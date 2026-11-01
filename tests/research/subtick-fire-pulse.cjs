@@ -12,7 +12,8 @@ class SubtickFirePulse {
     const self = this, input = this.input;
     input.pd = function(e) {
       const samePending = self.pending && e &&
-        (self.pending.type === 'mouse' ? e.pointerType === 'mouse' : e.pointerId === self.pending.id);
+        (self.pending.type === 'mouse' ? e.pointerType === 'mouse' :
+         e.pointerId === self.pending.id && e.pointerType === self.pending.type);
       if (samePending) self.release();
       const priorAimId = input.stickId && input.stickId.aim;
       const priorFire = input.firing;
@@ -26,7 +27,8 @@ class SubtickFirePulse {
       return out;
     };
     input.pm = function(e) {
-      if (self.pending && e && e.pointerId === self.pending.id) self.release();
+      if (self.pending && e && (self.pending.type === 'mouse' ? e.pointerType === 'mouse' :
+        e.pointerId === self.pending.id && e.pointerType === self.pending.type)) self.release();
       return self.old.pm.call(this,e);
     };
     input.pu = function(e) {
@@ -34,11 +36,13 @@ class SubtickFirePulse {
       const cancel = e.type === 'pointercancel';
       if (cancel) {
         const same = self.down && (self.down.type === 'mouse' ? e.pointerType === 'mouse' : self.down.id === e.pointerId);
-        const pending = self.pending && (self.pending.type === 'mouse' ? e.pointerType === 'mouse' : self.pending.id === e.pointerId);
+        const pending = self.pending && (self.pending.type === 'mouse' ? e.pointerType === 'mouse' :
+          self.pending.id === e.pointerId && self.pending.type === e.pointerType);
         if (pending) self.release(); if (same) self.down = null;
         self.canceled++; return self.old.pu.call(this,e);
       }
-      if (self.pending && (self.pending.type === 'mouse' || self.pending.id === e.pointerId))
+      if (self.pending && (self.pending.type === 'mouse' ? e.pointerType === 'mouse' :
+          self.pending.id === e.pointerId && self.pending.type === e.pointerType))
         return; // Native mouseup + compatibility pointerup may both arrive.
       const down = self.down;
       const same = down && (down.type === 'mouse' ? e.pointerType === 'mouse' :
