@@ -13,3 +13,9 @@
   --color-danger: #ff4d6d;
   --color-gold: #ffc94d;
 }
+
+/* The leaderboard is read-only. It must not steal the right virtual stick
+   on compact landscape screens, while the separate TopBar toggle stays live. */
+#root .anim-pop.panel.absolute.right-2[class~="top-[82px]"].z-30.w-44 {
+  pointer-events: none;
+}

@@ -68,6 +68,25 @@ jobs:
         run: node scripts/patch-audio-rng.cjs index.html
       - name: Sample mastery perks fairly before browser tests
         run: node scripts/patch-perk-offer.cjs index.html
+      - name: Compile the same canonical Tailwind CSS used by production
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp index.html index.html.new
+          npx @tailwindcss/cli -i .github/nova-tailwind.css -o /tmp/nova-tailwind-smoke.css --minify
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          path = Path('index.html')
+          html = path.read_text(encoding='utf-8')
+          css = Path('/tmp/nova-tailwind-smoke.css').read_text(encoding='utf-8')
+          pattern = r'<style id="nova-tailwind-static">.*?</style>'
+          html, count = re.subn(pattern, lambda _: '<style id="nova-tailwind-static">' + css + '</style>', html, count=1, flags=re.S)
+          if count != 1:
+              raise SystemExit('Expected exactly one production Tailwind style in browser smoke')
+          path.write_text(html, encoding='utf-8')
+          PY
+          rm -f index.html.new /tmp/nova-tailwind-smoke.css
       - name: Serve shipping runtime
         run: |
           python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/nova-browser-http.log 2>&1 &

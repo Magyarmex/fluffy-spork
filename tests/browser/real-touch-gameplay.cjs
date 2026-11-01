@@ -79,6 +79,17 @@ async function run(browser,label,viewport){
   });
   await upgradeChip.waitFor({state:'visible',timeout:10000});
   assert.ok((await stickClear()).every(v=>v.canvas),label+': next earned point also preserves first-touch clearance');
+  // Regression #617: the read-only leaderboard must not capture the right
+  // joystick. Keep it visible through real two-finger movement and firing.
+  const leaderboardToggle=page.getByRole('button',{name:'Leaderboard'});
+  await leaderboardToggle.tap();
+  const leaderboardLabel=page.getByText('LEADERBOARD',{exact:true});
+  await leaderboardLabel.waitFor({state:'visible',timeout:10000});
+  const leaderboardPanel=page.locator('.anim-pop.panel.absolute.right-2').filter({has:leaderboardLabel});
+  assert.equal(await leaderboardPanel.evaluate(el=>getComputedStyle(el).pointerEvents),'none',
+   label+': informational leaderboard is pointer-transparent');
+  assert.ok((await stickClear()).every(v=>v.canvas),
+   label+': open leaderboard cannot intercept either stick landing point');
   const left={x:rect.x+rect.width*.20,y:rect.y+rect.height*.68,id:11,radiusX:1,radiusY:1,force:1};
   const right={x:rect.x+rect.width*.78,y:rect.y+rect.height*.68,id:12,radiusX:1,radiusY:1,force:1};
   const leftMoved={...left,x:left.x+Math.min(42,rect.width*.13)};
@@ -157,6 +168,11 @@ async function run(browser,label,viewport){
   assert.equal(cancelled.move.active,false,label+': cancel clears movement');
   assert.equal(cancelled.aim.active,false,label+': cancel clears aim');
   assert.equal(cancelled.firing,false,label+': cancel clears firing');
+  // Closing the informational overlay remains possible after dual-touch.
+  await leaderboardToggle.tap();
+  await leaderboardLabel.waitFor({state:'hidden',timeout:10000});
+  assert.ok((await stickClear()).every(v=>v.canvas),
+   label+': closing leaderboard preserves both joystick hit targets');
   // Warden command must be driven by the actual right touch, not merely a hull turn.
   await page.evaluate(()=>{
    if(window.innerWidth>window.innerHeight&&window.innerHeight<500){
