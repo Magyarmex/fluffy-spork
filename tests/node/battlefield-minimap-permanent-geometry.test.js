@@ -46,6 +46,18 @@ test('missing and malformed terrain fail closed',()=>{
  assert.doesNotThrow(()=>g.drawMinimap());g.__novaTerrain=before;
 });
 
+test('malformed terrain is ignored by the real performance LoS index, including wide queries',()=>{
+ const g=bootGame();if(!g.player)g.redeploy();
+ g.__novaTerrain=[null,{shape:'rect',x:NaN,y:0,w:200,h:40},
+  {shape:'circle',x:0,y:0,r:NaN},
+  {shape:'rect',x:0,y:0,w:100,h:100,solid:true,destructible:false}];
+ g.__novaPerfTerrainIndex=null;
+ assert.equal(g.hasLineOfSight(-200,0,200,0),false);
+ assert.equal(g.hasLineOfSight(-200,200,200,200),true);
+ assert.doesNotThrow(()=>g.hasLineOfSight(-2200,0,2200,0));
+ assert.doesNotThrow(()=>g.drawMinimap());
+});
+
 test('the already-public player dot stays above wall outlines near a wall',()=>{
  const g=bootGame();if(!g.player)g.redeploy();
  const wall=g.__novaTerrain.find(s=>!s.destructible&&s.shape==='rect');
