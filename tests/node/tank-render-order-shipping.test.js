@@ -6,10 +6,15 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');
 const root=path.resolve(__dirname,'../..');
 const patch=require('../../scripts/patch-render-tank-order.cjs');
-const source=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const materialized=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const owner='nova-updates/simulation-owned-tank-order-v1.12.1.js';
 const anchor='<script src="./nova-updates/living-front-director-v1.12.0.js"></script>';
 const tag=`<script src="./${owner}"></script>`;
+// On post-materialization CI, reconstruct the exact historical baseline so
+// the negative control still detects the old renderer mutation.
+const source=materialized.includes(patch.newLoop)
+ ? materialized.replace(patch.newComment,patch.oldComment).replace(patch.newLoop,patch.oldLoop).replace(tag,'')
+ : materialized;
 const patched=patch.patchRenderTankOrder(source);
 assert.equal(patched.split(anchor).length-1,1,'canonical overlay anchor drift');
 assert.ok(fs.existsSync(path.join(root,owner)),'simulation owner must exist');
