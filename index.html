@@ -247,7 +247,7 @@ canvas {
     <link rel="icon" href="./nova-icon.svg" type="image/svg+xml" />
     <meta name="application-name" content="NOVA TANKS" />
     <script defer src="./pwa-register.js"></script>
-      <meta name="nova-runtime-build" content="fa03aeeb8149cc26d119de79" />
+      <meta name="nova-runtime-build" content="614ca463df4f1066d4a7126e" />
   </head>
   <body>
     <div id="root"></div>
@@ -2394,7 +2394,7 @@ class Game {
         this.sfx.startMusic();
         const loop = (ts) => {
             this.raf = requestAnimationFrame(loop);
-            const dt = Math.min(0.033, (ts - this.last) / 1000);
+            const dt = Math.min(1 / 30, (ts - this.last) / 1000);
             this.last = ts;
             if (!this.paused)
                 this.update(dt);
