@@ -3301,7 +3301,8 @@ wrap('game/engine',function(engine){
  if(!old||Game.prototype.__novaPermanentMinimap)return;
  Game.prototype.__novaPermanentMinimap=true;
  Game.prototype.drawMinimap=function(){
-  var ctx=this.mmCtx,terrain=this.__novaTerrain,markers=[],originalFill=ctx&&ctx.fillRect,tracked=false,out;
+  var ctx=this.mmCtx,terrain=this.__novaTerrain,markers=[],originalFill=ctx&&ctx.fillRect,
+   hadOwnFill=!!(ctx&&Object.prototype.hasOwnProperty.call(ctx,'fillRect')),tracked=false,out;
   /* Preserve the core minimap's actual information filters (especially the
    * no-global-Star-radar rule). Capture only dots it REALLY drew, rather than
    * re-reading hidden entities to reconstruct markers after wall outlines. */
@@ -3316,7 +3317,7 @@ wrap('game/engine',function(engine){
    }catch(ignore){} // Non-extensible canvas contexts retain prior behavior.
   }
   try{out=old.apply(this,arguments);}
-  finally{if(tracked)ctx.fillRect=originalFill;}
+  finally{if(tracked){if(hadOwnFill)ctx.fillRect=originalFill;else delete ctx.fillRect;}}
   if(!ctx||!terrain||!terrain.length||typeof ctx.save!=='function'||
      typeof ctx.strokeRect!=='function'||typeof ctx.arc!=='function')return out;
   var scale=216/(MAP_LIMIT*2),count=0;
