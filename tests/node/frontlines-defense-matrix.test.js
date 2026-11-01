@@ -77,3 +77,45 @@ test('baseline cannot secretly use defensive actions',t=>{
  write(path.join(dir,'frontlines-natural-on.json'),r.on);write(p,r);
  assert.throws(()=>collect(f.defense,f.baseline,6),/baseline used defensive dodges/);
 });
+test('defensive survival comparison rejects a censored offer instead of counting it as survival',t=>{
+ const f=fixture();t.after(()=>fs.rmSync(f.root,{recursive:true,force:true}));
+ const dir=path.join(f.defense,'nova-frontlines-visible-defense-probe-0-0');
+ const mpath=path.join(dir,'frontlines-natural-manifest.json');
+ const rpath=path.join(dir,'frontlines-natural-match-ab.json');
+ const m=JSON.parse(fs.readFileSync(mpath)),r=JSON.parse(fs.readFileSync(rpath));
+ m.pairs[0].offerPolicy='defer';r.offerPolicy='defer';
+ for(const arm of ['on','off','offReplay']){
+  r[arm].metadata.offerPolicy='defer';
+  r[arm].offerResearch={actions:[],frames:200,pausedWithOffer:false,censor:null};
+  if(arm!=='offReplay')write(path.join(dir,'frontlines-natural-'+arm+'.json'),r[arm]);
+ }
+ write(mpath,m);write(rpath,r);
+ assert.throws(()=>collect(f.defense,f.baseline,6),/cross-policy offer-resolution mismatch/);
+ // A comparable baseline policy is necessary, but still insufficient if censored.
+ const bdir=path.join(f.baseline,'nova-frontlines-natural-ab-0-public-bloom-harvest-0');
+ const bmpath=path.join(bdir,'frontlines-natural-manifest.json');
+ const brpath=path.join(bdir,'frontlines-natural-match-ab.json');
+ const bm=JSON.parse(fs.readFileSync(bmpath)),br=JSON.parse(fs.readFileSync(brpath));
+ bm.pairs[0].offerPolicy='defer';br.offerPolicy='defer';
+ for(const arm of ['on','off','offReplay']){
+  br[arm].metadata.offerPolicy='defer';
+  br[arm].offerResearch={actions:[],frames:200,pausedWithOffer:false,censor:null};
+  if(arm!=='offReplay')write(path.join(bdir,'frontlines-natural-'+arm+'.json'),br[arm]);
+ }
+ write(bmpath,bm);write(brpath,br);
+ assert.equal(collect(f.defense,f.baseline,6).observed,6);
+ r.off.offerResearch.censor={time:71,tier:1,choice:'censor'};
+ r.offReplay.offerResearch.censor={time:71,tier:1,choice:'censor'};
+ write(path.join(dir,'frontlines-natural-off.json'),r.off);write(rpath,r);
+ assert.throws(()=>collect(f.defense,f.baseline,6),/offer-censored trial is not a survivor/);
+});
+test('defense matrix rejects new-schema offer metadata disguised as legacy',t=>{
+ const f=fixture();t.after(()=>fs.rmSync(f.root,{recursive:true,force:true}));
+ const dir=path.join(f.defense,'nova-frontlines-visible-defense-probe-0-0');
+ const p=path.join(dir,'frontlines-natural-match-ab.json'),r=JSON.parse(fs.readFileSync(p));
+ r.offerPolicy='defer';write(p,r);
+ assert.throws(()=>collect(f.defense,f.baseline,6),/manifest\/report offer policy schema mismatch/);
+ delete r.offerPolicy;r.off.metadata.offerPolicy='defer';r.offReplay.metadata.offerPolicy='defer';
+ write(p,r);write(path.join(dir,'frontlines-natural-off.json'),r.off);
+ assert.throws(()=>collect(f.defense,f.baseline,6),/undeclared offer policy metadata/);
+});

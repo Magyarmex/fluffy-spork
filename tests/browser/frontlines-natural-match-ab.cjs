@@ -13,6 +13,9 @@ const SEED_INDEX=Number(process.env.NOVA_SEED_INDEX??0);
 const PILOT_POLICY=process.env.NOVA_PILOT_POLICY||'wander';
 const AB_MODE=process.env.NOVA_AB_MODE||'memory';
 const BOMBER_RESEARCH=process.env.NOVA_BOMBER_RESEARCH==='1';
+// Every manual-match result must disclose its legal offer policy.
+const OFFER_POLICY=process.env.NOVA_OFFER_POLICY||'defer';
+const offerPolicy=require('./frontlines-offer-policy.js').parse(OFFER_POLICY);
 if(BOMBER_RESEARCH&&(!['cover-pressure','bomber-physics'].includes(AB_MODE)||PILOT_POLICY!=='cover-pressure'))
  throw Error('Bomber research requires paired cover-pressure policy');
 if(!['memory','live-turn','cover-pressure','bomber-physics'].includes(AB_MODE))throw Error('NOVA_AB_MODE must be memory, live-turn, cover-pressure, or bomber-physics');
@@ -26,7 +29,9 @@ const LAYOUT=LAYOUTS[LAYOUT_INDEX],TERRAIN_SEED=LAYOUT_INDEX;
 const GAME_SEED=(0x1d4a3f21^Math.imul(SEED_INDEX,0x9e3779b9))>>>0;
 const TRIAL_RNG=(0x7d27e91b^Math.imul(SEED_INDEX,0x85ebca6b))>>>0;
 const SEED_ID='natural-20261027-'+LAYOUT_INDEX+'-'+SEED_INDEX;
-const SECONDS=165,DT=1/30,CHUNK=450;
+const SECONDS=Number(process.env.NOVA_SECONDS??165),DT=1/30,CHUNK=450;
+if(!(SECONDS>=1&&SECONDS<=300))throw Error('NOVA_SECONDS must be 1..300');
+if(BOMBER_RESEARCH&&offerPolicy.kind==='tier1')throw Error('Bomber research cannot also choose a tier-1 class');
 async function arm(browser,enabled,label){
  const context=await browser.newContext({viewport:{width:900,height:700},
   ...(AB_MODE==='bomber-physics'?{serviceWorkers:'block'}:{})});
@@ -59,6 +64,7 @@ async function arm(browser,enabled,label){
   await page.addScriptTag({url:'/tests/browser/frontlines-visible-defense.js'});
   await page.addScriptTag({url:'/tests/browser/frontlines-commitment-audit.js'});
   await page.addScriptTag({url:'/tests/browser/frontlines-live-turn-intervention.js'});
+  await page.addScriptTag({url:'/tests/browser/frontlines-offer-policy.js'});
   await page.evaluate(({terrainSeed,gameSeed})=>{
    let state=gameSeed>>>0;
    const seeded=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return (state>>>0)/4294967296;};
@@ -103,7 +109,7 @@ async function arm(browser,enabled,label){
   },{terrainSeed:TERRAIN_SEED,gameSeed:GAME_SEED});
   await page.getByRole('button',{name:/DEPLOY/i}).first().click();
   await page.waitForFunction(()=>window.__novaNaturalMatchGame?.status==='playing'&&!!window.__novaNaturalMatchGame.__lfState,{timeout:30000});
-  const initial=await page.evaluate(({enabled,pilotPolicy,trialRng,terrainIndex,seedIndex,abMode,bomberResearch})=>{
+  const initial=await page.evaluate(({enabled,pilotPolicy,trialRng,terrainIndex,seedIndex,abMode,bomberResearch,offerPolicyRaw})=>{
    const g=window.__novaNaturalMatchGame;
    g.setPaused(true); // Advance actual Game.update ourselves.
     /* Sample the real composed bullet owner; do not touch game decisions. */
@@ -122,6 +128,7 @@ async function arm(browser,enabled,label){
    g.__novaExperimentSeed='natural-20261027-'+terrainIndex+'-'+seedIndex;
    g.__novaExperimentPolicy=pilotPolicy;
    g.__novaExperimentABMode=abMode;
+   g.__novaResearchOfferPolicyRaw=offerPolicyRaw;
    if(abMode==='cover-pressure'||abMode==='bomber-physics'){
     g.__novaCoverPriorityResearch={schema:1,activations:0};
     g.__novaCoverDamageResearch={schema:1,pilotId:g.player.id,allEffectiveDamage:0,
@@ -346,11 +353,14 @@ async function arm(browser,enabled,label){
     bots:g.tanks.filter(t=>t.ai).map(t=>[t.id,+t.x.toFixed(3),+t.y.toFixed(3),t.cls]),
     shapes:g.shapes.slice(0,32).map(s=>[s.id,s.type,+s.x.toFixed(3),+s.y.toFixed(3)])});
    return{fingerprint,initialBotCount:g.tanks.filter(t=>t.ai).length,initialShapes:g.shapes.length};
-  },{enabled,pilotPolicy:PILOT_POLICY,trialRng:TRIAL_RNG,terrainIndex:LAYOUT_INDEX,seedIndex:SEED_INDEX,abMode:AB_MODE,bomberResearch:BOMBER_RESEARCH});
+  },{enabled,pilotPolicy:PILOT_POLICY,trialRng:TRIAL_RNG,terrainIndex:LAYOUT_INDEX,seedIndex:SEED_INDEX,abMode:AB_MODE,bomberResearch:BOMBER_RESEARCH,offerPolicyRaw:OFFER_POLICY});
   let last=null;
   for(let i=0;i<Math.ceil(SECONDS/DT/CHUNK);i++){
-   last=await page.evaluate(({steps,dt})=>{
+   last=await page.evaluate(({steps,dt,offerPolicyRaw})=>{
     const g=window.__novaNaturalMatchGame;
+    const offer=window.__novaResearchOfferPolicy;
+    if(!offer)throw Error('research-only offer policy helper missing');
+    const policy=offer.parse(offerPolicyRaw);
     const previousRandom=Math.random;
     Math.random=()=>{
      let state=g.__novaTrialRng>>>0;
@@ -359,8 +369,13 @@ async function arm(browser,enabled,label){
      return g.__novaTrialRng/4294967296;
     };
     try{
-     for(let j=0;j<steps&&g.status!=='dead';j++){
+     for(let j=0;j<steps&&g.status!=='dead'&&!g.__novaResearchOfferCensor;j++){
+      // The engine's real RAF refuses to update a paused evolution offer.
+      // A manual simulation must resolve or censor before advancing.
+      if(offer.handle(g,policy).censored)break;
       g.update(dt);
+      g.__novaResearchFrames=(g.__novaResearchFrames||0)+1;
+      if(offer.handle(g,policy).censored)break;
       if(g.__novaExperimentABMode==='bomber-physics'){
        const n=(g.__novaCausalFrames=(g.__novaCausalFrames||0)+1);
        if(g.__novaCausalFirstAdvanceTime==null&&
@@ -403,16 +418,21 @@ async function arm(browser,enabled,label){
      }
     }
     finally{Math.random=previousRandom;}
-    return{time:g.time,status:g.status,blooms:g.__lfState?.stats?.blooms||0};
-   },{steps:Math.min(CHUNK,Math.ceil(SECONDS/DT)-i*CHUNK),dt:DT});
-   if(last.status==='dead')break;
+    return{time:g.time,status:g.status,blooms:g.__lfState?.stats?.blooms||0,
+     offerCensored:!!g.__novaResearchOfferCensor};
+   },{steps:Math.min(CHUNK,Math.ceil(SECONDS/DT)-i*CHUNK),dt:DT,offerPolicyRaw:OFFER_POLICY});
+   if(last.status==='dead'||last.offerCensored)break;
   }
   const result=await page.evaluate(()=>{
    const g=window.__novaNaturalMatchGame,s=window.NOVALivingFront.snapshot(),p=g.player;
    return{metadata:{layout:g.__novaBattlefield.name,seed:g.__novaExperimentSeed,pilotPolicy:g.__novaExperimentPolicy,abMode:g.__novaExperimentABMode,
+     offerPolicy:g.__novaResearchOfferPolicyRaw,
      ...(g.__novaBomberBurstAudit?{pilotClass:g.__novaExperimentPilotClass,
       pilotClassFinal:g.player.cls}:{})},
-    frontline:s.frontline,stats:s.stats,game:{time:+g.time.toFixed(3),status:g.status,
+    frontline:s.frontline,stats:s.stats,offerResearch:{
+     actions:g.__novaResearchOfferActions||[],censor:g.__novaResearchOfferCensor||null,
+     frames:g.__novaResearchFrames||0,pausedWithOffer:!!(g.paused&&g.pendingOffer)},
+    game:{time:+g.time.toFixed(3),status:g.status,
      pilotAlive:!!p.alive,score:p.score,kills:p.kills,level:p.level,
      botCount:g.tanks.filter(t=>t.ai&&t.alive).length},
     projectileDensityAudit:g.__novaProjectileDensityAudit,
@@ -443,6 +463,9 @@ async function arm(browser,enabled,label){
     events:s.frontline?.events||[]};
   });
   if(result.naturalBlooms>0)assert.ok(result.contestGateAudit.samples>0,'announced BLOOM must be audited');
+  if(result.offerResearch.pausedWithOffer&&!result.offerResearch.censor)
+   throw Error('research ended while an evolution offer was paused but uncensored');
+  if(result.offerResearch.censor)assert.equal(OFFER_POLICY,'censor');
   assert.equal(result.contestGateAudit.gateMismatches,0,'audit must agree with shipping CONTESTED');
   assert.ok(result.commitmentAudit.samples>0,'real composed AI must be observed');
    const density=result.projectileDensityAudit;
@@ -582,8 +605,9 @@ async function arm(browser,enabled,label){
      'no-treatment live-turn arms must have identical '+key);
   }
   const report={bomberPhysicsCausal,method:AB_MODE==='bomber-physics'?'matched standard Bomber, identical scripted cover-seeking pilot; research-only single-call fragment-advance intervention':BOMBER_RESEARCH?'paired standard Bomber cover-seeking versus wander in the full shipping game; not human play':AB_MODE==='cover-pressure'?'paired ordinary Scout cover-seeking versus wander in the full shipping game; not human play':AB_MODE==='live-turn'?'paired natural full-match live-turn causal intervention (not human fun)':'scripted full-match natural Director research; not human fun; public-bloom is closed-loop policy',
-   abMode:AB_MODE,bomberResearch:BOMBER_RESEARCH,verifiedLiveStart,
+   abMode:AB_MODE,bomberResearch:BOMBER_RESEARCH,offerPolicy:OFFER_POLICY,verifiedLiveStart,
    initialWorldIdentical:true,initialFingerprint:off.initial.fingerprint,offReplayIdentical:same,
+   offerCensorCount:[off,on,offReplay].filter(a=>a.result.offerResearch.censor).length,
    naturalOpportunityObserved,
    interpretation:AB_MODE==='bomber-physics'?'Causal ON/OFF difference is only the certified newborn-fragment movement; later combat, AI and RNG may diverge as downstream effects. Human fun and physical-device performance are unmeasured.':AB_MODE==='cover-pressure'?'Descriptive matched initial worlds; ordinary cover-seeking input may change survival and subsequent AI/world states. Report early deaths and all no-target periods.':AB_MODE==='live-turn'?(verifiedLiveStart&&naturalOpportunityObserved?'Live-turn intervention activated; interpret matched-policy differences cautiously because later public signals can diverge endogenously.':'INCONCLUSIVE: no verified ON live start or natural BLOOM exposure in both arms; retain the pair.'):(naturalOpportunityObserved?'Descriptive only: natural BLOOM observed; inspect opportunity timing, deaths and public pilot commands before causal interpretation.':'INCONCLUSIVE: at least one arm had no natural BLOOM; retain this censored pair.'),
    off:off.result,on:on.result,offReplay:offReplay.result,
@@ -592,6 +616,7 @@ async function arm(browser,enabled,label){
     'Public-bloom commands can differ after ON/OFF worlds diverge; this is matched policy, not fixed inputs',
     'Public-bloom command samples are input calls, not measured seconds or proof of physical progress',
     'Seed replay is checked, not assumed',
+    'Evolution offers are explicitly censored or resolved by a legal scripted choice; Later grants 1.8s normal protection',
     'Cover-pressure mode changes only pilot inputs; coverDamage includes AI damage and cannot be attributed solely to the player pilot',
     'Cover-pressure aim/move counts are input calls, not seconds fired or verified hits',
     ...(AB_MODE==='bomber-physics'?['OFF intercepts exactly one delivered Disciplines call, not repository source; production remains unchanged',
@@ -608,10 +633,10 @@ async function arm(browser,enabled,label){
   fs.writeFileSync(path.join(dir,'frontlines-natural-off.json'),JSON.stringify(off.result,null,2));
   fs.writeFileSync(path.join(dir,'frontlines-natural-manifest.json'),JSON.stringify({
    pairs:[{layout:LAYOUT,seed:SEED_ID,pilotPolicy:PILOT_POLICY,abMode:AB_MODE,bomberResearch:BOMBER_RESEARCH,
-    on:'frontlines-natural-on.json',off:'frontlines-natural-off.json'}]
+    offerPolicy:OFFER_POLICY,on:'frontlines-natural-on.json',off:'frontlines-natural-off.json'}]
   },null,2));
   console.log('NOVA_FRONTLINES_NATURAL_MATCH_AB '+JSON.stringify({initialWorldIdentical:true,offReplayIdentical:same,
-   naturalOpportunityObserved,abMode:AB_MODE,verifiedLiveStart,
+   naturalOpportunityObserved,abMode:AB_MODE,offerPolicy:OFFER_POLICY,verifiedLiveStart,
    config:{layout:LAYOUT,seed:SEED_ID,pilotPolicy:PILOT_POLICY},
    off:{time:off.result.game.time,status:off.result.game.status,blooms:off.result.naturalBlooms,publicBloomCommands:off.result.publicBloomCommandSamples,frontline:off.result.frontline?.counts,contestGateAudit:Object.fromEntries(Object.entries(off.result.contestGateAudit).filter(([k])=>k!=='coLocationExamples'))},
    on:{time:on.result.game.time,status:on.result.game.status,blooms:on.result.naturalBlooms,publicBloomCommands:on.result.publicBloomCommandSamples,frontline:on.result.frontline?.counts,contestGateAudit:Object.fromEntries(Object.entries(on.result.contestGateAudit).filter(([k])=>k!=='coLocationExamples'))}}));
