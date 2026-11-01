@@ -59,3 +59,29 @@ test('all 36 canonical unupgraded classes can receive a public cue at their real
  assert.deepEqual(misses,[],
   'a normal full-speed hull should not lose public tactical information because of class speed');
 });
+
+test('real Scout acceleration earns the public cue promptly at 30/60/120/240 FPS',()=>{
+ for(const hz of [30,60,120,240]){
+  const g=bootGame(),p=g.player;
+  g.w=320;g.h=568;g.dpr=1;g.time=100;g.paused=false;
+  Object.assign(p,{x:-1500,y:-560,vx:0,vy:0,spawnShieldT:0});
+  Object.assign(g.cam,{x:p.x,y:p.y,zoom:1});
+  const st=g.__lfState||(g.__lfState={});
+  st.directorEnabled=true;
+  st.signal={type:'BLOOM',sector:5,started:99,until:104};
+  st.bloomMemory={sector:5,announcedAt:99,until:123};
+  const render=g.__testWindow.__novaMakeRequire('')('game/render').render;
+  const labels=[],old=g.ctx.fillText;
+  g.ctx.fillText=function(t){if(/^BLOOM/.test(String(t)))labels.push(String(t));return old.apply(this,arguments);};
+  labels.length=0;render(g,g.w,g.h);
+  assert.equal(labels.length,0,'stationary pilot has no approach cue at '+hz+'Hz');
+  let first=null;
+  for(let i=0;i<Math.ceil(hz*.25);i++){
+   g.moveTank(p,g.tankSpeed(p),0,1/hz);
+   g.cam.x=p.x;g.cam.y=p.y;labels.length=0;
+   render(g,g.w,g.h);
+   if(labels.length){first=(i+1)/hz;break;}
+  }
+  assert.ok(first!==null&&first<=.2,'Scout must see the public cue within 200ms of committed movement at '+hz+'Hz; got '+first);
+ }
+});
