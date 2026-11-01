@@ -3293,6 +3293,39 @@ function certifiedMultiShotCoverPriority(g,dt){
 
 wrap('game/ai',function(ai){var old=ai.updateAI;if(!old||old.__novaBattlefieldAI)return;function patched(t,g,dt){if(t&&t.ai&&t.ai.targetId>=0){var tar=g.getTank&&g.getTank(t.ai.targetId);if(tar&&tar.alive&&g.hasLineOfSight&&!g.hasLineOfSight(t.x,t.y,tar.x,tar.y,3)){t.ai.__novaOccluded=(t.ai.__novaOccluded||0)+dt;if(t.ai.__novaOccluded>.28){t.ai.targetId=-1;t.ai.state='wander';t.ai.thinkT=0;t.ai.fireHold=Math.max(t.ai.fireHold||0,.18);}}else t.ai.__novaOccluded=Math.max(0,(t.ai.__novaOccluded||0)-dt*2);}var out=old(t,g,dt);if(t&&t.__novaTerrainBumpT>0){t.__novaTerrainBumpT-=dt;if(t.ai&&t.__novaTerrainBumpT>0&&Math.random()<dt*4){t.ai.strafe=(t.ai.strafe||1)*-1;t.ai.thinkT=0;}}return out;}patched.__novaBattlefieldAI=true;ai.updateAI=patched;});
 
+/* Static Battlefield topology on the existing minimap. Permanent fortifications
+ * are public layout geometry; never reveal offscreen destructible-cover state,
+ * enemies, neutral value or any other live hidden information. */
+wrap('game/engine',function(engine){
+ var Game=engine.Game,old=Game&&Game.prototype.drawMinimap;
+ if(!old||Game.prototype.__novaPermanentMinimap)return;
+ Game.prototype.__novaPermanentMinimap=true;
+ Game.prototype.drawMinimap=function(){
+  var out=old.apply(this,arguments),ctx=this.mmCtx,terrain=this.__novaTerrain;
+  if(!ctx||!terrain||!terrain.length||typeof ctx.save!=='function'||
+     typeof ctx.strokeRect!=='function'||typeof ctx.arc!=='function')return out;
+  var scale=216/(MAP_LIMIT*2),count=0;
+  ctx.save();
+  try{
+   ctx.globalAlpha=.72;ctx.strokeStyle='#9cb5d5';ctx.lineWidth=2.8;
+   for(var i=0;i<terrain.length;i++){
+    var s=terrain[i];if(!s||s.destructible||s.solid===false||
+       !Number.isFinite(s.x)||!Number.isFinite(s.y))continue;
+    var x=(s.x+MAP_LIMIT)*scale,y=(s.y+MAP_LIMIT)*scale;
+    if(s.shape==='circle'){
+     if(!(Number.isFinite(s.r)&&s.r>0))continue;
+     ctx.beginPath();ctx.arc(x,y,s.r*scale,0,TAU);ctx.stroke();
+    }else if(s.shape==='rect'){
+     if(!(Number.isFinite(s.w)&&s.w>0&&Number.isFinite(s.h)&&s.h>0))continue;
+     ctx.strokeRect(x-s.w*scale*.5,y-s.h*scale*.5,s.w*scale,s.h*scale);
+    }else continue;
+    if(++count>=32)break;
+   }
+  }finally{ctx.restore();}
+  return out;
+ };
+});
+
 wrap('game/render',function(render){var old=render.render;if(!old||old.__novaBattlefieldRender)return;function patched(g,w,h){old(g,w,h);if(g&&g.ctx)drawTerrain(g.ctx,g,w,h);}patched.__novaBattlefieldRender=true;render.render=patched;});
 
 /* Tank body-collision cooldowns are keyed by monotonically increasing
