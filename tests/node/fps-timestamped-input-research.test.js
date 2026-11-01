@@ -75,3 +75,30 @@ test('timestamped fixed 60Hz Game preserves 60Hz play and cross-render physical 
   assert.ok(naive30.premature>0,'naive replay consumes events from a later tick');
  }
 });
+
+test('fixed-step catch-up stops at an actual in-frame evolution pause',()=>{
+ const g=withSeed(1517800,()=>bootGame());
+ g.sfx.muted=true;
+ const update=g.update;
+ g.update=function(dt){
+  update.call(this,dt);
+  if(this.time>=1/60-1e-9 && !this.pendingOffer)this.tryOffer(1);
+ };
+ let ticks=0;
+ // One 30Hz presentation frame would normally require two 60Hz updates.
+ for(let substep=0;substep<2;substep++){
+  if(g.paused)break;
+  g.update(1/60);ticks++;
+ }
+ assert.equal(ticks,1,'no second update after the offer pauses the game');
+ assert.equal(g.pendingOffer,1);
+ assert.equal(g.paused,true);
+ assert.ok(Math.abs(g.time-1/60)<1e-9,'paused game time must not advance');
+ const bad=withSeed(1517800,()=>bootGame());
+ bad.sfx.muted=true;
+ const badUpdate=bad.update;
+ bad.update=function(dt){badUpdate.call(this,dt);if(this.time>=1/60-1e-9&&!this.pendingOffer)this.tryOffer(1);};
+ bad.update(1/60);bad.update(1/60);
+ assert.ok(bad.paused&&Math.abs(bad.time-2/60)<1e-9,
+  'unguarded catch-up demonstrably advances the paused world');
+});
