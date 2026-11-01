@@ -22,6 +22,8 @@ class Timeline {
   }
   return {...this.state,abilities};
  }
+ reset(){this.events=[];this.index=0;this.last=-Infinity;this.lastSampled=-Infinity;
+  this.state={mx:0,my:0,ax:0,ay:0,fire:false};}
 }
 function events(){
  const e=[{time:0,patch:{mx:1,my:0,ax:1,ay:0,fire:true}}];
@@ -62,6 +64,10 @@ test('timeline bounds, ordering and one-shot ability edges',()=>{
  assert.equal(t.sample(3/60).fire,true);
  assert.throws(()=>t.push(.01,{mx:0}),/invalid event/);
  assert.throws(()=>t.sample(.01),/nonmonotonic tick/);
+ t.push(.2,{mx:1,fire:true,ability:true});
+ t.reset();
+ assert.deepEqual(t.sample(.3),{mx:0,my:0,ax:0,ay:0,fire:false,abilities:0},
+  'pause, blur or redeploy must not replay stale firing or ability edges');
 });
 test('timestamped fixed 60Hz Game preserves 60Hz play and cross-render physical hashes',()=>{
  for(const seed of [1517800,1517802,1517810]){
