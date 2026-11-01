@@ -58,6 +58,8 @@ test('AI planner preserves the previous 60 Hz reaction-frame schedule exactly',(
 test('120 Hz AI does not think faster than the established 60 Hz schedule',()=>{
  const thirty=run(30),sixty=run(60),high=run(120);
  assert.deepEqual(high.counts,sixty.counts);
+ assert.deepEqual(high.events.map(e=>[e.id,e.time]),sixty.events.map(e=>[e.id,e.time]),
+  '120 Hz must plan on the same simulated timestamps as 60 Hz');
  assert.ok(thirty.counts.every((n,i)=>n<=sixty.counts[i]));
  assert.ok(sixty.events.length>300);
 });
@@ -99,5 +101,7 @@ test('90/144/240 Hz displays cannot exceed the 60 Hz AI planning budget',()=>{
   for(let i=0;i<result.counts.length;i++)assert.ok(
    result.counts[i]<=reference.counts[i],
    `high refresh ${hz} Hz gained extra plans for bot ${i+1}`);
+  if(hz===240)assert.deepEqual(result.events.map(e=>[e.id,e.time]),
+   reference.events.map(e=>[e.id,e.time]),'240 Hz must retain 60 Hz decision timestamps');
  }
 });
