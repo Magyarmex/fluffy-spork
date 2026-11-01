@@ -110,3 +110,19 @@ test('normal long-press 60Hz gameplay remains physically identical to baseline',
   assert.deepEqual(runEvents(events,{seed}),baseline);
  }
 });
+test('pointer-ID collision across mouse/touch does not swallow unrelated release',()=>{
+ const events=[
+  [.001,'pointerdown',{pointerType:'touch',pointerId:1,clientX:600,clientY:200}],
+  [.002,'pointermove',{pointerType:'touch',pointerId:1,clientX:640,clientY:200}],
+  [.003,'pointerdown',{pointerType:'touch',pointerId:2,clientX:100,clientY:200}],
+  [.004,'pointerup',{pointerType:'touch',pointerId:1,clientX:640,clientY:200}],
+  // Compatibility mouse has same pointer ID as the already released touch;
+  // it must not flush the pending aim pulse or steal its ownership.
+  [.005,'pointermove',{pointerType:'mouse',pointerId:1,clientX:700,clientY:250}],
+  [.006,'pointerup',{pointerType:'touch',pointerId:2,clientX:100,clientY:200}]
+ ];
+ for(const hz of [30,60,120,240]){
+  const r=runEvents(events,{hz});assert.equal(r.pulses,1);assert.equal(r.maxBullets,1);
+  assert.equal(r.aim,false);assert.equal(r.move,false);assert.equal(r.firing,false);
+ }
+});
