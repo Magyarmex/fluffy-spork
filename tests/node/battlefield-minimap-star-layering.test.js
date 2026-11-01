@@ -9,12 +9,24 @@ const {bootGame,withSeed,digest,physical}=require('../research/audio-rng-causal-
 function scene(seed){return withSeed(seed,()=>{
  const g=bootGame();if(!g.player)g.redeploy();
  const star=g.shapes.find(s=>s.type==='star');
- const wall=g.__novaTerrain.find(s=>!s.destructible&&s.shape==='rect');
- assert.ok(star&&wall,'shipping world has Star and permanent wall');
- star.x=wall.x;star.y=wall.y;
- g.player.x=wall.x+25;g.player.y=wall.y+25;
- g.cam.x=wall.x;g.cam.y=wall.y;g.cam.zoom=1;g.w=800;g.h=600;
- const sight=g.hasLineOfSight;g.hasLineOfSight=()=>true;
+ assert.ok(star,'shipping world has Rogue Star');
+ // A physically safe Star near a wall overlaps the 2.8px minimap outline.
+ let point=null;
+ for(const wall of g.__novaTerrain.filter(s=>!s.destructible&&s.shape==='rect')){
+  for(const side of [-1,1]){
+   const x=wall.x+side*(wall.w/2+(star.r||24)+3),y=wall.y,pilotX=x+side*80;
+   if(g.isTerrainSafe(x,y,(star.r||24)+1)&&g.isTerrainSafe(pilotX,y,30)&&
+      g.hasLineOfSight(pilotX,y,x,y,3)){
+    point={x,y,pilotX,edge:wall.x+side*wall.w/2};break;
+   }
+  }if(point)break;
+ }
+ assert.ok(point,'terrain-safe Star/wall proximity is reachable');
+ assert.ok(Math.abs(point.x-point.edge)*216/4500<2.4,'Star dot overlaps wall outline');
+ star.x=point.x;star.y=point.y;
+ g.player.x=point.pilotX;g.player.y=point.y;
+ g.cam.x=point.x;g.cam.y=point.y;g.cam.zoom=1;g.w=800;g.h=600;
+ const sight=g.hasLineOfSight;
  const ctx=g.mmCtx,fill=ctx.fillRect,stroke=ctx.strokeRect,arc=ctx.arc,events=[];
  ctx.fillRect=function(x,y,w,h){
   if(w===2&&h===2&&this.fillStyle==='#ffe066')
