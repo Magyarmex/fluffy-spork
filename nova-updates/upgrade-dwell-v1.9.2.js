@@ -22,7 +22,10 @@ var touchGuardButton=null,touchGuardUntil=0,dispatchingUltimateClick=false;
 
 function DwellUpgradeTray(props){
   var pair=React.useState(true),holdCollapsed=pair[0],setHoldCollapsed=pair[1];
+  var opt=React.useState(false),touchOptIn=opt[0],setTouchOptIn=opt[1];
   var inputActive=!!(props&&props.sticksActive);
+  var compactTouch=!!(window.matchMedia&&window.matchMedia('(pointer: coarse) and (max-width: 900px)').matches);
+  var points=props&&props.hud&&props.hud.statPoints||0;
   React.useEffect(function(){
     if(inputActive){
       setHoldCollapsed(true);
@@ -31,8 +34,17 @@ function DwellUpgradeTray(props){
     var timer=setTimeout(function(){setHoldCollapsed(false);},DWELL_MS);
     return function(){clearTimeout(timer);};
   },[inputActive]);
-  var nextProps=Object.assign({},props,{sticksActive:inputActive||holdCollapsed});
-  return originalCreateElement(upgradeTrayType,nextProps);
+  React.useEffect(function(){
+    if(inputActive||points<=0)setTouchOptIn(false);
+  },[inputActive,points]);
+  // A newly earned point must not place an expanded panel over the FIRST touch.
+  // The player can deliberately open the chip; movement re-arms this guard.
+  var nextProps=Object.assign({},props,{sticksActive:inputActive||holdCollapsed||(compactTouch&&!touchOptIn)});
+  return originalCreateElement('div',{
+    'data-nova-upgrade-tray':true,
+    style:{display:'contents'},
+    onClickCapture:function(){if(compactTouch&&!inputActive)setTouchOptIn(true);}
+  },originalCreateElement(upgradeTrayType,nextProps));
 }
 
 function findUltimateButton(target){
@@ -91,6 +103,14 @@ React.createElement=function(type,props){
 };
 
 if(typeof document!=='undefined'&&document&&typeof document.addEventListener==='function'){
+  // Keep even the expanded, deliberately opened tray above both mobile sticks.
+  // Target only the expanded panel; keep the small collapsed chip at its familiar position.
+  if(document.createElement&&document.head){
+    var upgradeStyle=document.createElement('style');
+    upgradeStyle.id='nova-touch-upgrade-clearance';
+    upgradeStyle.textContent='@media (pointer:coarse) and (max-width:900px){[data-nova-upgrade-tray] > div:has(> .panel){top:82px!important;bottom:auto!important;}}@media (pointer:coarse) and (orientation:landscape) and (max-height:400px){[data-nova-upgrade-tray] > div:has(> .panel){top:64px!important;}}';
+    document.head.appendChild(upgradeStyle);
+  }
   document.addEventListener('pointerdown',onUltimatePointerDown,true);
   document.addEventListener('click',onUltimateClickCapture,true);
 }
@@ -101,12 +121,13 @@ window.__NOVA_UPGRADE_DWELL__={
   codename:CODENAME,
   date:'2026-08-08',
   dwellMs:DWELL_MS,
-  behavior:'The stat-upgrade tray remains collapsed until joystick input has been inactive continuously for 500 ms; renewed input cancels and resets the dwell.'
+  behavior:'500 ms joystick dwell; compact touch screens require explicit chip activation and keep the opened tray above the joystick landing zones.'
 };
 window.__NOVA_UPGRADE_DWELL_TEST__={
   dwellMs:DWELL_MS,
   targetName:'UpgradeTray',
-  effectiveInputActive:function(inputActive,holdCollapsed){return !!inputActive||!!holdCollapsed;}
+  effectiveInputActive:function(inputActive,holdCollapsed){return !!inputActive||!!holdCollapsed;},
+  compactEffectiveInputActive:function(inputActive,holdCollapsed,compactTouch,optIn){return !!inputActive||!!holdCollapsed||(!!compactTouch&&!optIn);}
 };
 window.__NOVA_MULTITOUCH_ULTIMATE__={
   version:VERSION,

@@ -45,8 +45,40 @@ async function run(browser,label,viewport){
   // A real finger cannot reach the canvas until the veil finishes leaving.
   await page.locator('.nv-loading').waitFor({state:'hidden',timeout:20000});
   await page.evaluate(()=>{const g=window.__novaTouchGame;g.input.autofire=false;g.player.spawnShieldT=20;});
+  // Regression #615: earn a REAL level point before the first joystick touch.
+  // A pending upgrade must never trap either stick, even after the dwell expires.
+  await page.evaluate(()=>{
+   const g=window.__novaTouchGame;
+   const types=window.__novaMakeRequire('')('game/types');
+   g.gainXP(g.player,types.xpForLevel(g.player.level));
+  });
+  const upgradeChip=page.getByRole('button',{name:/UPGRADE READY/i});
+  await upgradeChip.waitFor({state:'visible',timeout:10000});
   const rect=await canvas.boundingBox();
   assert.ok(rect&&rect.width>200&&rect.height>200,label+': game canvas has real dimensions');
+  const stickClear=()=>page.evaluate(()=>[.20,.78].map(f=>{
+   const e=document.elementFromPoint(innerWidth*f,innerHeight*.68);
+   return {canvas:!!e?.matches?.('canvas.absolute.inset-0'),tag:e?.tagName,cls:String(e?.className||'').slice(0,100)};
+  }));
+  assert.ok((await stickClear()).every(v=>v.canvas),label+': newly earned upgrade cannot cover first joystick contact');
+  await upgradeChip.tap();
+  const minimize=page.getByRole('button',{name:'MINIMIZE'});
+  await minimize.waitFor({state:'visible',timeout:10000});
+  assert.ok((await stickClear()).every(v=>v.canvas),label+': even deliberately opened upgrade tray must not cover either stick');
+  await minimize.tap();
+  await upgradeChip.waitFor({state:'visible',timeout:10000});
+  await upgradeChip.tap();
+  await minimize.waitFor({state:'visible',timeout:10000});
+  const beforeStat=await page.evaluate(()=>window.__novaTouchGame.statPoints);
+  await page.locator('[data-nova-upgrade-tray] .stat-btn').first().tap();
+  assert.equal(await page.evaluate(()=>window.__novaTouchGame.statPoints),beforeStat-1,label+': touch upgrade spends exactly one earned point');
+  await page.evaluate(()=>{
+   const g=window.__novaTouchGame;
+   const types=window.__novaMakeRequire('')('game/types');
+   g.gainXP(g.player,types.xpForLevel(g.player.level));
+  });
+  await upgradeChip.waitFor({state:'visible',timeout:10000});
+  assert.ok((await stickClear()).every(v=>v.canvas),label+': next earned point also preserves first-touch clearance');
   const left={x:rect.x+rect.width*.20,y:rect.y+rect.height*.68,id:11,radiusX:1,radiusY:1,force:1};
   const right={x:rect.x+rect.width*.78,y:rect.y+rect.height*.68,id:12,radiusX:1,radiusY:1,force:1};
   const leftMoved={...left,x:left.x+Math.min(42,rect.width*.13)};
