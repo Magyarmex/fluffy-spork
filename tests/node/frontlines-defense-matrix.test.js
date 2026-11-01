@@ -109,3 +109,13 @@ test('defensive survival comparison rejects a censored offer instead of counting
  write(path.join(dir,'frontlines-natural-off.json'),r.off);write(rpath,r);
  assert.throws(()=>collect(f.defense,f.baseline,6),/offer-censored trial is not a survivor/);
 });
+test('defense matrix rejects new-schema offer metadata disguised as legacy',t=>{
+ const f=fixture();t.after(()=>fs.rmSync(f.root,{recursive:true,force:true}));
+ const dir=path.join(f.defense,'nova-frontlines-visible-defense-probe-0-0');
+ const p=path.join(dir,'frontlines-natural-match-ab.json'),r=JSON.parse(fs.readFileSync(p));
+ r.offerPolicy='defer';write(p,r);
+ assert.throws(()=>collect(f.defense,f.baseline,6),/manifest\/report offer policy schema mismatch/);
+ delete r.offerPolicy;r.off.metadata.offerPolicy='defer';r.offReplay.metadata.offerPolicy='defer';
+ write(p,r);write(path.join(dir,'frontlines-natural-off.json'),r.off);
+ assert.throws(()=>collect(f.defense,f.baseline,6),/undeclared offer policy metadata/);
+});
