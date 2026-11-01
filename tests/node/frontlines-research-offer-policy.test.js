@@ -90,3 +90,17 @@ test('canonical manual match integrates both pre-step and post-step offer guards
  assert.match(harness,/offerResearch:\{/);
  assert.match(harness,/offerPolicy:OFFER_POLICY/);
 });
+test('real level-10 XP milestone pauses the actual game and is resolved without another update',()=>{
+ withSeed(1517802,()=>{
+  const g=bootGame(),p=g.player;
+  const types=g.__testWindow.__novaMakeRequire('')('game/types');
+  p.level=9;p.xp=0;g.status='playing';
+  g.gainXP(p,types.xpForLevel(9));
+  assert.equal(p.level,10);assert.equal(g.pendingOffer,1);assert.equal(g.paused,true);
+  const t=g.time,hash=policy.physicalHash(g);
+  const r=policy.handle(g,policy.parse('tier1:marksman'));
+  assert.equal(r.action,'class');assert.equal(p.cls,'marksman');assert.equal(p.tier,1);
+  assert.equal(g.time,t,'legal class choice is not an invisible physics step');
+  assert.equal(g.__novaResearchOfferActions[0].beforePhysicalHash,hash);
+ });
+});
