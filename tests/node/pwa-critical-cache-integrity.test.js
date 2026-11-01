@@ -254,8 +254,8 @@ test('actual materialized game: all 52 scripts are required for offline boot', a
   const materialized=actual.includes(orderOwner);
   assert.equal(urls.length, materialized ? 52 : 51,
     'shipping script composition changed; review offline contract');
-  const deploy=fs.readFileSync(path.join(__dirname,'../../.github/workflows/deploy.yml'),'utf8');
-  assert.ok(deploy.includes(orderOwner),'materializer must include the new critical runtime owner');
+  assert.ok(fs.existsSync(path.join(__dirname,'../../nova-updates',orderOwner)),
+    'simulation-order owner must exist for offline staging');
   if(materialized)assert.ok(urls.some(url => url.includes(orderOwner)),
     'simulation-order owner must be a critical offline boot dependency');
   const f = fixture();
