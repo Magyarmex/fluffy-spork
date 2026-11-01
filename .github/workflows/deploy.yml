@@ -189,6 +189,8 @@ jobs:
               'manifest.webmanifest',
               'nova-icon.svg',
               'nova-updates/releases.json',
+              # Compiled inline into index.html; a CSS-only release must stamp a new build.
+              '.github/nova-tailwind.css',
           ]
           digest = hashlib.sha256()
           for value in runtime_inputs:
