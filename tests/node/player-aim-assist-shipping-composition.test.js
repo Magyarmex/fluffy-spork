@@ -38,3 +38,19 @@ test('full shipping Game.update steers touch gun toward visible rather than hidd
  assert.ok(Math.abs(p.angle-expected)<1e-6,
    'actual composed Game.update should rotate toward the visible hull');
 });
+
+test('actual shipping Game.update ignores nearer spawn-protected tank while assisting visible exposed opponent',()=>{
+ const g=bootGame();if(!g.player)g.redeploy();
+ const p=g.player;p.x=0;p.y=0;p.angle=0;p.vx=0;p.vy=0;p.cls='scout';p.alive=true;p.hp=100;
+ const protectedTank=actor(8301,100,15),exposed=actor(8302,180,-10);
+ protectedTank.spawnShieldT=2;exposed.spawnShieldT=0;
+ protectedTank.isPlayer=true;exposed.isPlayer=true;
+ g.tanks=[p,protectedTank,exposed];g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];
+ g.cam.x=0;g.cam.y=0;g.cam.zoom=1;g.zoom=1;g.w=568;g.h=320;
+ g.status='playing';g.paused=false;g.hasLineOfSight=()=>true;
+ g.input.moveVec=()=>({x:0,y:0});g.input.aimVec=()=>({x:180,y:-11});
+ g.input.mouseActive=false;g.input.firing=false;g.input.autofire=false;g.input.abilityQueued=false;
+ g.update(1/60);
+ const expected=Math.atan2(-10,180)*(13/60);
+ assert.ok(Math.abs(p.angle-expected)<1e-6,'full composed Game.update must not snap to invulnerable spawn');
+});

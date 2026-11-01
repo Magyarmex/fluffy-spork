@@ -304,7 +304,12 @@ wrap('game/engine',function(engine,require){
     var best=null,bd=max*max,ts=this.tanks||[],hw=w/(2*z),hh=h/(2*z);
     for(var i=0;i<ts.length;i++){
       var t=ts[i];if(!t||!alive(t)||t.id===exclude||
-        !Number.isFinite(t.x)||!Number.isFinite(t.y))continue;
+        !Number.isFinite(t.x)||!Number.isFinite(t.y)||
+        /* Spawn protection is non-damageable. Never redirect a human aim
+         * gesture toward an invulnerable spawn when a live target is visible.
+         * Respect explicit teams, while keeping non-assist nearest queries
+         * (AI, Crashers, drones) on their original owner. */
+        t.spawnShieldT>0||!hostile(this,p,t))continue;
       /* A partly visible hull is a legitimate aim target; an entirely
        * hidden one is not. The 32u cap prevents corrupt radius metadata
        * from turning the viewport into long-range offscreen assistance. */
