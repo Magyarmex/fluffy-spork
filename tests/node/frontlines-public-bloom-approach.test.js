@@ -93,3 +93,30 @@ test('engine pause flag hides the public approach cue even when game status rema
  s.g.paused=false;
  assert.equal(s.render().length,1,'cue returns when the same match resumes');
 });
+
+
+test('public BLOOM cue distinguishes an obstructed straight approach from a traversable one',()=>{
+ const s=scene();
+ s.st.signal.sector=4;s.st.bloomMemory.sector=4;
+ s.p.x=-975;s.p.y=-562.5;s.p.vx=-350;s.p.vy=0;
+ s.g.cam.x=s.p.x;s.g.cam.y=s.p.y;
+ const probes=[];
+ s.g.hasLineOfSight=(ax,ay,bx,by,pad)=>{probes.push({ax,ay,bx,by,pad});return false;};
+ assert.equal(s.render()[0].text,'BLOOM · COVER','do not present a straight-line distance as a clear approach through solid terrain');
+ assert.equal(probes.length,1,'bounded terrain check only when cue is otherwise eligible');
+ assert.equal(probes[0].bx,-1125,'probe the closest public sector boundary, not hidden ecology or an enemy');
+ assert.equal(probes[0].by,-562.5);
+ s.g.hasLineOfSight=()=>true;
+ assert.equal(s.render()[0].text,'BLOOM 150 AWAY','clear approach preserves the existing distance');
+ s.g.hasLineOfSight=()=>false;s.st.signal=null;s.g.time=110;
+ assert.equal(s.render()[0].text,'BLOOM? · COVER','stale announcement stays explicitly stale even with cover');
+});
+
+test('terrain-check failure never blocks render or manufactures a cover claim',()=>{
+ const s=scene();s.g.hasLineOfSight=()=>{throw Error('transient terrain API');};
+ assert.equal(s.render()[0].text,'BLOOM 375 AWAY');
+ s.g.hasLineOfSight=undefined;
+ assert.equal(s.render()[0].text,'BLOOM 375 AWAY');
+ s.p.vx=0;
+ assert.equal(s.render().length,0,'no cover query should create a cue when the pilot is not approaching');
+});
