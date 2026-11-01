@@ -54,7 +54,12 @@ class ChronologicalInput {
       }
     }
     if (this.events.length >= this.limit) {
-      this.overflowCount++; this.reset({quarantine:true}); return false;
+      this.overflowCount++;
+      // A release/cancel/blur arriving at the hard cap must clear the held
+      // state without leaving input quarantined after the final release.
+      const release = kind === 'pointerup' || kind === 'pointercancel' ||
+        kind === 'keyup' || kind === 'blur';
+      this.reset({quarantine:!release}); return false;
     }
     this.events.push({at, kind, data}); return true;
   }
