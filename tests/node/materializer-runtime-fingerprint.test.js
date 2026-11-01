@@ -19,10 +19,14 @@ test('materialized HTML fingerprint changes when a local runtime input changes',
   assert.match(deploy,/import hashlib/);
   assert.match(deploy,/runtime_inputs = \[/);
   assert.match(deploy,/\*script_paths/);
+  assert.match(deploy,/Path\('nova-gz'\)\.glob\('\*\.b64'\)/,
+    'changing the compressed base game must also invalidate the runtime stamp');
   assert.match(deploy,/'pwa-register\.js'/);
   assert.match(deploy,/'sw\.js'/);
   assert.match(deploy,/'manifest\.webmanifest'/);
   assert.match(deploy,/'nova-updates\/releases\.json'/);
+  assert.match(deploy,/'\.github\/nova-tailwind\.css'/,
+    'CSS-only releases must invalidate the materialized runtime build stamp');
   assert.match(deploy,/digest\.update\(input_path\.read_bytes\(\)\)/);
   assert.match(deploy,/runtime_build = digest\.hexdigest\(\)\[:24\]/);
   assert.match(deploy,/name="nova-runtime-build"/);
