@@ -4,8 +4,16 @@
  */
 (function(){
   'use strict';
-  const Game = window.__novaMakeRequire('')('game/engine').Game;
-  if (!Game || Game.prototype.__novaSimulationTankOrder) return;
+  const modules = window.__novaModules;
+  const previousFactory = modules && modules['game/engine'];
+  if (typeof previousFactory !== 'function') {
+    console.error('[NOVA tank order] canonical engine module missing');
+    return;
+  }
+  modules['game/engine'] = function(module,exports,require){
+    previousFactory(module,exports,require);
+    const Game = module.exports.Game;
+    if (!Game || Game.prototype.__novaSimulationTankOrder) return;
   const order = g => { if (Array.isArray(g.tanks)) g.tanks.sort((a,b)=>a.y-b.y); };
   const update = Game.prototype.update;
   const redeploy = Game.prototype.redeploy;
@@ -40,5 +48,6 @@
     if(this.__novaOrderReady && !this.__novaOrderTickActive && !this.__novaOrderRedeployActive) order(this);
     return result;
   };
-  Object.defineProperty(Game.prototype,'__novaSimulationTankOrder',{value:true});
+    Object.defineProperty(Game.prototype,'__novaSimulationTankOrder',{value:true});
+  };
 })();
