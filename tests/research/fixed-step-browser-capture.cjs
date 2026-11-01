@@ -4,16 +4,20 @@
 // The production Input is temporarily detached, so its native mouse chord
 // handlers cannot mutate firing before the queued simulation tick.
 class BrowserInputCapture {
-  constructor(input, canvas, timeline, bridge, {window: win, document: doc} = {}) {
+  constructor(input, canvas, timeline, bridge, {window: win, document: doc, game = null} = {}) {
     if (!input || !canvas || !timeline || !bridge || !win || !doc ||
         timeline.input !== input || bridge.timeline !== timeline ||
         typeof input.attach !== 'function' || typeof input.detach !== 'function' ||
         typeof win.addEventListener !== 'function' ||
-        typeof doc.addEventListener !== 'function' || input.canvas !== canvas)
+        typeof doc.addEventListener !== 'function' || input.canvas !== canvas ||
+        (game && (game.input !== input || typeof game.destroy !== 'function')))
       throw Error('invalid browser input capture owner');
     this.input = input; this.canvas = canvas; this.timeline = timeline;
     this.bridge = bridge; this.window = win; this.document = doc;
-    this.listeners = []; this.active = false;
+    this.listeners = []; this.active = false; this.game = game;
+    this.originalDestroy = game && game.destroy;
+    this.destroyHadOwn = !!(game && Object.prototype.hasOwnProperty.call(game,'destroy'));
+    this.destroyWrapper = null;
     const capture = e => {
       if (!this.active) return;
       if (this.document.hidden) { this.timeline.reset(); return; }
@@ -52,6 +56,13 @@ class BrowserInputCapture {
         target.addEventListener(type,fn);
         this.listeners.push([target,type,fn]);
       }
+      if (game) {
+        this.destroyWrapper = (...args) => {
+          this.detach();
+          return this.originalDestroy.apply(game,args);
+        };
+        game.destroy = this.destroyWrapper;
+      }
     } catch (error) {
       this.detach();
       throw error;
@@ -63,6 +74,10 @@ class BrowserInputCapture {
     for (const [target,type,fn] of this.listeners.reverse())
       target.removeEventListener(type,fn);
     this.listeners.length = 0;
+    if (this.game && this.game.destroy === this.destroyWrapper) {
+      if (this.destroyHadOwn) this.game.destroy = this.originalDestroy;
+      else delete this.game.destroy;
+    }
     this.timeline.reset();
     this.input.canvas = null;
     this.input.attach(this.canvas); // restore original production event owners
