@@ -39,3 +39,14 @@ test('runtime fingerprint stamp is produced before the service-worker-visible sh
   const commit=deploy.indexOf('- name: Commit the plain page');
   assert.ok(stamp>=0 && write>stamp && commit>write);
 });
+
+test('render-order owner is last, shell patch runs before composition, and both are fingerprinted',()=>{
+  const director="'./nova-updates/living-front-director-v1.12.0.js'";
+  const owner="'./nova-updates/simulation-owned-tank-order-v1.12.1.js'";
+  assert.ok(deploy.indexOf(owner)>deploy.indexOf(director),
+    'simulation-owned tank ordering must wrap the final gameplay engine');
+  assert.match(deploy,/node scripts\/patch-render-tank-order\.cjs index\.html\.new/);
+  assert.match(deploy,/'scripts\/patch-render-tank-order\.cjs'/);
+  assert.match(deploy,/grep -Fq 'const drawTanks = g\.tanks\.slice\(\)\.sort' index\.html\.new/);
+  assert.match(deploy,/grep -q 'nova-updates\/simulation-owned-tank-order-v1\.12\.1\.js' index\.html\.new/);
+});
