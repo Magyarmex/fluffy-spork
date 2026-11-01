@@ -126,3 +126,18 @@ test('pointer-ID collision across mouse/touch does not swallow unrelated release
   assert.equal(r.aim,false);assert.equal(r.move,false);assert.equal(r.firing,false);
  }
 });
+test('secondary-primary mouse chord survives Pointer Events move-before-native-up ordering',()=>{
+ const events=[
+  [.001,'pointerdown',{pointerType:'mouse',pointerId:1,button:2,buttons:2,clientX:600,clientY:200}],
+  [.002,'pointermove',{pointerType:'mouse',pointerId:1,button:-1,buttons:3,clientX:600,clientY:200}],
+  [.003,'pointerdown',{pointerType:'mouse',pointerId:1,button:0,buttons:3,clientX:600,clientY:200}],
+  [.004,'pointermove',{pointerType:'mouse',pointerId:1,button:-1,buttons:2,clientX:600,clientY:200}],
+  [.005,'pointerup',{pointerType:'mouse',pointerId:1,button:0,buttons:2,clientX:600,clientY:200}],
+  [.006,'pointerup',{pointerType:'mouse',pointerId:1,button:2,buttons:0,clientX:600,clientY:200}]
+ ];
+ for(const hz of [30,60,120,240]){
+  const baseline=runEvents(events,{hz,pulseEnabled:false});assert.equal(baseline.maxBullets,0);
+  const r=runEvents(events,{hz});assert.equal(r.pulses,1);assert.equal(r.maxBullets,1);
+  assert.equal(r.firing,false);
+ }
+});
