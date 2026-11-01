@@ -104,11 +104,11 @@ React.createElement=function(type,props){
 
 if(typeof document!=='undefined'&&document&&typeof document.addEventListener==='function'){
   // Keep even the expanded, deliberately opened tray above both mobile sticks.
-  // Target only the UpgradeTray owner; desktop and other HUD panels are untouched.
+  // Target only the expanded panel; keep the small collapsed chip at its familiar position.
   if(document.createElement&&document.head){
     var upgradeStyle=document.createElement('style');
     upgradeStyle.id='nova-touch-upgrade-clearance';
-    upgradeStyle.textContent='@media (pointer:coarse) and (max-width:900px){[data-nova-upgrade-tray] > div{top:82px!important;bottom:auto!important;}}@media (pointer:coarse) and (orientation:landscape) and (max-height:400px){[data-nova-upgrade-tray] > div{top:64px!important;}}';
+    upgradeStyle.textContent='@media (pointer:coarse) and (max-width:900px){[data-nova-upgrade-tray] > div:has(> .panel){top:82px!important;bottom:auto!important;}}@media (pointer:coarse) and (orientation:landscape) and (max-height:400px){[data-nova-upgrade-tray] > div:has(> .panel){top:64px!important;}}';
     document.head.appendChild(upgradeStyle);
   }
   document.addEventListener('pointerdown',onUltimatePointerDown,true);
