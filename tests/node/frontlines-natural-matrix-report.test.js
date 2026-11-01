@@ -130,3 +130,16 @@ test('a falsified or omitted evolution-offer policy fails closed',()=>sandbox(ro
  a.row.offerPolicy='censor';save();
  assert.throws(()=>collectMatrix(root,1),/offer policy differs/);
 }));
+test('new-schema offer metadata cannot masquerade as a legacy artifact by dropping manifest policy',()=>sandbox(root=>{
+ const a=writePair(root,'CROSSFIRE','wander','s0');
+ a.report.offerPolicy='defer';
+ a.on.metadata.offerPolicy='defer';a.off.metadata.offerPolicy='defer';
+ a.report.on=a.on;a.report.off=a.off;a.report.offReplay=structuredClone(a.off);
+ for(const [file,data] of [['frontlines-natural-on.json',a.on],['frontlines-natural-off.json',a.off],
+  ['frontlines-natural-match-ab.json',a.report]])
+  fs.writeFileSync(path.join(a.dir,file),JSON.stringify(data));
+ assert.throws(()=>collectMatrix(root,1),/manifest\/report offer policy schema mismatch/);
+ delete a.report.offerPolicy;
+ fs.writeFileSync(path.join(a.dir,'frontlines-natural-match-ab.json'),JSON.stringify(a.report));
+ assert.throws(()=>collectMatrix(root,1),/undeclared offer policy metadata/);
+}));
