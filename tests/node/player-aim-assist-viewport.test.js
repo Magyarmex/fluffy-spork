@@ -90,3 +90,32 @@ test('invalid camera metadata falls back to legacy nearest query without throwin
  g.cam.zoom=NaN;assert.equal(g.nearestTank(0,0,480,1),target);
  g.cam.zoom=1;g.cam.x=NaN;assert.equal(g.nearestTank(0,0,480,1),target);
 });
+
+test('touch assist skips spawn-protected hulls and selects an exposed visible opponent',()=>{
+ const Game=boot(),g=new Game();
+ const protectedTank=tank(2,100,15),exposed=tank(3,180,-10);
+ protectedTank.spawnShieldT=2.0;exposed.spawnShieldT=0;
+ g.w=568;g.h=320;g.tanks.push(protectedTank,exposed);
+ assert.equal(g.nearestTank(0,0,480,1),exposed,
+   'a closer spawn-protected tank must not consume the only aim-assist candidate');
+ g.input.aimVec=()=>({x:180,y:-11});
+ g.update();
+ assert.ok(Math.abs(g.player.angle-Math.atan2(-10,180))<1e-10,
+   'assist must follow the exposed target, not the protected hull');
+ protectedTank.spawnShieldT=0;
+ assert.equal(g.nearestTank(0,0,480,1),protectedTank,
+   'ordinary unshielded nearest-target behavior must remain unchanged');
+});
+
+test('touch assist respects explicit team relations without changing legacy AI nearest queries',()=>{
+ const Game=boot(),g=new Game(),ally=tank(2,90,0),enemy=tank(3,180,0);
+ g.w=568;g.h=320;g.tanks.push(ally,enemy);
+ g.areAllies=(a,b)=>b.id===ally.id;
+ assert.equal(g.nearestTank(0,0,480,1),enemy,
+   'friendly hull must not steal the human aim assist');
+ assert.equal(g.nearestTank(0,0,900,1),ally,
+   'legacy non-assist queries retain their original selection');
+ g.areAllies=undefined;g.areHostile=(a,b)=>b.id!==ally.id;
+ assert.equal(g.nearestTank(0,0,480,1),enemy,
+   'explicit non-hostile relations must also be respected');
+});
