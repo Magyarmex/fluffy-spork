@@ -940,7 +940,7 @@ function recordPilotPhysicalEntry(g,st,f,p,bx,by,ax,ay,dt){
 function publicBloomApproach(g,w,h){
  var p=g&&g.player,st=g&&g.__lfState,cam=g&&g.cam,now=Number(g&&g.time);
  if(!g||!p||!alive(p)||p.spawnShieldT>0||!st||st.directorEnabled===false||
-    g.status!=='playing'||g.__novaDecorativeWorld||!cam||
+    (g.status!=='playing'||g.paused)||g.__novaDecorativeWorld||!cam||
     !Number.isFinite(now)||!Number.isFinite(w)||!Number.isFinite(h)||
     w<260||w>420||h<=w||
     (g.__novaTacticalCamera&&(g.__novaTacticalCamera.active||g.__novaTacticalCamera.transition)))return null;
