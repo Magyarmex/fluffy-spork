@@ -3321,6 +3321,13 @@ wrap('game/engine',function(engine){
     }else continue;
     if(++count>=32)break;
    }
+   /* A tank may hug a permanent wall. Repaint the already-public player dot
+    * above its outline so route guidance never hides the player's own hull. */
+   var p=this.player;
+   if(p&&p.alive&&Number.isFinite(p.x)&&Number.isFinite(p.y)){
+    ctx.globalAlpha=1;ctx.fillStyle='#7df3ff';
+    ctx.fillRect((p.x+MAP_LIMIT)*scale-2.5,(p.y+MAP_LIMIT)*scale-2.5,5,5);
+   }
   }finally{ctx.restore();}
   return out;
  };
