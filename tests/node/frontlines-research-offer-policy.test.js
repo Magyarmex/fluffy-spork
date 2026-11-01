@@ -4,7 +4,13 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const policy=require('../browser/frontlines-offer-policy.js');
+// The shared 48-overlay fixture also registers a separate audio causal experiment
+// on import. Suppress only that unrelated experiment while loading the fixture.
+const previousAudioGate=process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL;
+process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
 const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+if(previousAudioGate===undefined)delete process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL;
+else process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL=previousAudioGate;
 const harness=fs.readFileSync(path.join(__dirname,'../browser/frontlines-natural-match-ab.cjs'),'utf8');
 function offered(tier=1,level=10){
  return withSeed(1517802,()=>{
