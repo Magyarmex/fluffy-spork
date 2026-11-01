@@ -216,3 +216,17 @@ test('a browser-prevented keyboard event cannot bypass composed UI ownership',()
   h.timeline.consumeThrough(.02);
   assert.equal(h.game.input.keyboard.up,false);
 });
+test('a release at queue capacity clears held input without permanent quarantine',()=>{
+  const h=setup();const t=new ChronologicalInput(h.game.input,4);
+  t.push(0,'pointerdown',{pointerId:1,pointerType:'touch',clientX:100,clientY:200});
+  t.consumeThrough(0);assert.equal(h.game.input.move.active,true);
+  for(let i=1;i<=4;i++)assert.equal(t.push(i/100,'keydown',{key:'w'}),true);
+  assert.equal(t.events.length,4);
+  assert.equal(t.push(.05,'pointerup',{pointerId:1,pointerType:'touch'}),false);
+  assert.equal(t.overflowCount,1);
+  assert.equal(t.quarantined,false);
+  assert.equal(h.game.input.move.active,false);
+  assert.equal(h.game.input.firing,false);
+  assert.equal(t.push(.06,'pointerdown',{pointerId:2,pointerType:'touch',clientX:100,clientY:200}),true);
+  t.consumeThrough(.07);assert.equal(h.game.input.move.active,true);
+});
