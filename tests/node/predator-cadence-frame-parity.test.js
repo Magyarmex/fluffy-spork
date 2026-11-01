@@ -92,3 +92,12 @@ test('reaction floor holds for elite, novice and expert bots at every frame rate
   }
  }
 });
+test('90/144/240 Hz displays cannot exceed the 60 Hz AI planning budget',()=>{
+ const reference=run(60,8);
+ for(const hz of [90,144,240]){
+  const result=run(hz,8);
+  for(let i=0;i<result.counts.length;i++)assert.ok(
+   result.counts[i]<=reference.counts[i],
+   `high refresh ${hz} Hz gained extra plans for bot ${i+1}`);
+ }
+});
