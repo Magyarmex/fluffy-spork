@@ -246,11 +246,18 @@ test('offline navigation rejects missing same-origin critical stylesheet', async
 });
 
 
-test('actual materialized game: all 51 scripts are required for offline boot', async () => {
+test('actual materialized game: all 52 scripts are required for offline boot', async () => {
   const actual = fs.readFileSync(path.join(__dirname, '../../index.html'), 'utf8');
   const urls = [...actual.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi)]
     .map(match => new URL(match[1], base).href);
-  assert.equal(urls.length, 51, 'shipping script composition changed; review offline contract');
+  const orderOwner='simulation-owned-tank-order-v1.12.1.js';
+  const materialized=actual.includes(orderOwner);
+  assert.equal(urls.length, materialized ? 52 : 51,
+    'shipping script composition changed; review offline contract');
+  assert.ok(fs.existsSync(path.join(__dirname,'../../nova-updates',orderOwner)),
+    'simulation-order owner must exist for offline staging');
+  if(materialized)assert.ok(urls.some(url => url.includes(orderOwner)),
+    'simulation-order owner must be a critical offline boot dependency');
   const f = fixture();
   await f.seed({ html: actual });
   const cache = f.cache(OLD);
