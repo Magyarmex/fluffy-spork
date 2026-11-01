@@ -107,7 +107,7 @@ for(const cls of ['cannon','bomber'])for(const fps of [30,60,120,240]){
  const {g,t,render,bursts}=boot(cls,'stick',.32);
  g.input.aim.dx=65;g.input.aim.dy=0;
  const preview=render();g.tryFire(t);
- const b=g.bullets[0],maxTravel=Math.hypot(b.vx,b.vy)*Math.max(0,b.ttl-.033);
+ const b=g.bullets[0],maxTravel=Math.hypot(b.vx,b.vy)*Math.max(0,b.ttl-1/30);
  assert.ok(b.__v17FuseDist<=maxTravel+1e-6,
    'programmed distance '+b.__v17FuseDist+' exceeds safe lifetime travel '+maxTravel);
  for(let i=0;i<Math.ceil(1.2*fps)&&g.bullets.length;i++){
@@ -121,7 +121,7 @@ for(const cls of ['cannon','bomber'])for(const fps of [30,60,120,240]){
 test('moving hull reduces reachable fuse distance without changing mid-depth',()=>{
  const {g,t,render}=boot('bomber','stick',0,-200,0);
  g.input.aim.dx=65;g.input.aim.dy=0;const p=render();g.tryFire(t);
- const b=g.bullets[0],travel=Math.hypot(b.vx,b.vy)*(b.ttl-.033);
+ const b=g.bullets[0],travel=Math.hypot(b.vx,b.vy)*(b.ttl-1/30);
  assert.ok(b.__v17FuseDist<=travel+1e-6);
  const q=predicted(b);near(p.x,q.x,'moving x');near(p.y,q.y,'moving y');
 });
@@ -131,4 +131,23 @@ test('ordinary mid-depth fuse program retains its original range formula',()=>{
  const depth=(32.5-5)/55,range=g.weaponRange(t);
  const original=Math.max(150,Math.min(range*.965,range*(.20+.78*depth)));
  near(g.bullets[0].__v17FuseDist,original,'unchanged mid-depth');
+});
+
+/* Exact 30Hz TTL boundary: a stale .033 safety margin exceeds the last
+ * surviving frame by >2 world units at high projectile speed. The old
+ * source loses the airburst; the exact 1/30 margin must trigger in time. */
+for(const cls of ['cannon','bomber'])test(cls+' high-speed 30Hz TTL boundary: fuse survives the last safe step',()=>{
+ const ttl=.23333333333333328,old=CLASSES[cls].bullet.ttl;
+ CLASSES[cls].bullet.ttl=ttl;
+ try{
+  const {g,t,bursts}=boot(cls,'stick',0);
+  g.bulletSpeed=()=>7000;g.weaponRange=()=>7000*ttl+40;
+  g.input.aim.dx=65;g.input.aim.dy=0;g.tryFire(t);
+  assert.equal(g.bullets.length,1);
+  const b=g.bullets[0];
+  assert.ok(b.__v17FuseDist<=7000*(ttl-1/30)+1e-6);
+  for(let i=0;i<7&&g.bullets.length;i++){g.updateBullets(1/30);g.time+=1/30;}
+  assert.ok(bursts.some(x=>x.kind===(cls==='bomber'?'cluster':'splash')),
+   'programmed fuse must not be silently removed by core TTL expiry');
+ }finally{CLASSES[cls].bullet.ttl=old;}
 });
