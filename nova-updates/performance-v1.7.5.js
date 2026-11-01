@@ -101,9 +101,13 @@ function ensureIndex(g){
   var terrain=g.__novaTerrain;if(!terrain)return null;
   var ix=g.__novaPerfTerrainIndex;
   if(ix&&ix.terrain===terrain&&ix.length===terrain.length)return ix;
-  ix={terrain:terrain,length:terrain.length,cells:Object.create(null),stamp:0,cell:CELL,scratch:[]};
+  ix={terrain:terrain,length:terrain.length,validTerrain:[],cells:Object.create(null),stamp:0,cell:CELL,scratch:[]};
   for(var i=0;i<terrain.length;i++){
-    var s=terrain[i],b=bounds(s,0),x0=Math.floor(b.x0/CELL),x1=Math.floor(b.x1/CELL),y0=Math.floor(b.y0/CELL),y1=Math.floor(b.y1/CELL);
+    var s=terrain[i];
+    if(!s||(s.shape!=='rect'&&s.shape!=='circle')||!Number.isFinite(s.x)||!Number.isFinite(s.y)||
+       (s.shape==='circle'?(!Number.isFinite(s.r)||s.r<0):(!Number.isFinite(s.w)||!Number.isFinite(s.h)||s.w<0||s.h<0)))continue;
+    ix.validTerrain.push(s);
+    var b=bounds(s,0),x0=Math.floor(b.x0/CELL),x1=Math.floor(b.x1/CELL),y0=Math.floor(b.y0/CELL),y1=Math.floor(b.y1/CELL);
     for(var x=x0;x<=x1;x++)for(var y=y0;y<=y1;y++){
       var k=cellKey(x,y),bucket=ix.cells[k];if(!bucket)bucket=ix.cells[k]=[];bucket.push(s);
     }
@@ -115,8 +119,8 @@ function segmentCandidates(g,ax,ay,bx,by,pad){
   var ix=ensureIndex(g);if(!ix)return null;
   pad=pad||0;
   var x0=Math.floor((Math.min(ax,bx)-pad)/CELL),x1=Math.floor((Math.max(ax,bx)+pad)/CELL),y0=Math.floor((Math.min(ay,by)-pad)/CELL),y1=Math.floor((Math.max(ay,by)+pad)/CELL);
-  var cells=(x1-x0+1)*(y1-y0+1);if(cells>80)return ix.terrain;
-  var out=ix.scratch;out.length=0;var stamp=++ix.stamp;if(stamp>0x3fffffff){ix.stamp=stamp=1;for(var r=0;r<ix.terrain.length;r++)ix.terrain[r].__novaPerfStamp=0;}
+  var cells=(x1-x0+1)*(y1-y0+1);if(cells>80)return ix.validTerrain;
+  var out=ix.scratch;out.length=0;var stamp=++ix.stamp;if(stamp>0x3fffffff){ix.stamp=stamp=1;for(var r=0;r<ix.validTerrain.length;r++)ix.validTerrain[r].__novaPerfStamp=0;}
   for(var x=x0;x<=x1;x++)for(var y=y0;y<=y1;y++){
     var bucket=ix.cells[cellKey(x,y)];if(!bucket)continue;
     for(var i=0;i<bucket.length;i++){var s=bucket[i];if(s.__novaPerfStamp===stamp)continue;s.__novaPerfStamp=stamp;out.push(s);}
