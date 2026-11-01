@@ -11,6 +11,7 @@ on:
       - 'scripts/patch-star-minimap.cjs'
       - 'scripts/patch-saved-records.cjs'
       - 'scripts/patch-ai-strafe-timebase.cjs'
+      - 'scripts/patch-raf-step-cap.cjs'
       - 'scripts/patch-cosmetic-rng.cjs'
       - 'scripts/patch-audio-rng.cjs'
       - 'scripts/patch-perk-offer.cjs'
@@ -27,6 +28,7 @@ on:
       - 'scripts/patch-star-minimap.cjs'
       - 'scripts/patch-saved-records.cjs'
       - 'scripts/patch-ai-strafe-timebase.cjs'
+      - 'scripts/patch-raf-step-cap.cjs'
       - 'scripts/patch-cosmetic-rng.cjs'
       - 'scripts/patch-audio-rng.cjs'
       - 'scripts/patch-perk-offer.cjs'
@@ -58,6 +60,8 @@ jobs:
         run: node scripts/patch-saved-records.cjs index.html
       - name: Apply canonical AI strafe timebase before browser tests
         run: node scripts/patch-ai-strafe-timebase.cjs index.html
+      - name: Correct 30Hz simulation wall-time loss before browser tests
+        run: node scripts/patch-raf-step-cap.cjs index.html
       - name: Isolate cosmetic RNG before browser tests
         run: node scripts/patch-cosmetic-rng.cjs index.html
       - name: Isolate core audio RNG before browser tests
