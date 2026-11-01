@@ -110,8 +110,8 @@ test('marker replay retains canonical color/alpha and restores the canvas method
  assert.equal(ctx.fillRect,spy,'preexisting instrumentation must survive the overlay');
  const firstWall=ops.findIndex(o=>o.wall),lastWall=ops.findLastIndex(o=>o.wall);
  assert.ok(firstWall>0&&lastWall>=firstWall);
- const before=ops.slice(0,firstWall).filter(o=>o.w===2);
- const after=ops.slice(lastWall+1).filter(o=>o.w===2);
+ const before=ops.slice(0,firstWall).filter(o=>o.w===2&&o.color!=='#ffe066');
+ const after=ops.slice(lastWall+1).filter(o=>o.w===2&&o.color!=='#ffe066');
  assert.deepEqual(after,before,'all originally drawn neutral dots retain exact paint data');
  ctx.fillRect=original;
  if(!hadOwn)delete ctx.fillRect;
@@ -124,4 +124,16 @@ test('minimap capture does not leave an own fillRect override on an uninstrument
  assert.equal(ctx.fillRect,method);
  assert.equal(Object.hasOwn(ctx,'fillRect'),hadOwn,
   'the overlay must not permanently shadow a native canvas method');
+});
+
+test('a legitimately visible Rogue Star keeps exactly one original minimap dot',()=>{
+ const g=bootGame();if(!g.player)g.redeploy();
+ const star=g.shapes.find(s=>s.type==='star');assert.ok(star);
+ star.x=g.player.x;star.y=g.player.y+50;
+ g.cam.x=g.player.x;g.cam.y=g.player.y;g.cam.zoom=1;g.w=800;g.h=600;
+ const oldSight=g.hasLineOfSight;g.hasLineOfSight=()=>true;
+ const ctx=g.mmCtx,oldFill=ctx.fillRect,dots=[];
+ ctx.fillRect=function(x,y,w,h){if(w===2&&h===2&&this.fillStyle==='#ffe066')dots.push([x,y]);return oldFill.apply(this,arguments);};
+ try{g.drawMinimap();}finally{g.hasLineOfSight=oldSight;}
+ assert.equal(dots.length,1,'one visible Star must not become two markers');
 });
