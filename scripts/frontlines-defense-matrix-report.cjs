@@ -23,6 +23,8 @@ function loadPair(root,folder,layout,seed,policy){
  assert.ok(report.initialFingerprint.length>20,folder+': initial fingerprint too short');
  assert.equal(manifest.pairs?.length,1,folder+': one declared pair required');
  const m=manifest.pairs[0];
+ if(Object.hasOwn(m,'offerPolicy')!==Object.hasOwn(report,'offerPolicy'))
+  throw Error(folder+': manifest/report offer policy schema mismatch');
  if(Object.hasOwn(m,'offerPolicy')){
   assert.equal(report.offerPolicy,m.offerPolicy,folder+': report offer policy mismatch');
   assert.equal(m.offerPolicy,'defer',folder+': survival comparison requires explicit legal Later policy');
@@ -41,6 +43,9 @@ function loadPair(root,folder,layout,seed,policy){
   assert.equal(snapshot.metadata?.seed,m.seed);
   assert.equal(snapshot.metadata?.pilotPolicy,policy);
   assert.equal(snapshot.metadata?.abMode,'memory');
+  if(!Object.hasOwn(m,'offerPolicy')&&
+     (Object.hasOwn(snapshot.metadata||{},'offerPolicy')||Object.hasOwn(snapshot,'offerResearch')))
+   throw Error(folder+': undeclared offer policy metadata');
   if(Object.hasOwn(m,'offerPolicy')){
    assert.equal(snapshot.metadata?.offerPolicy,m.offerPolicy);
    assert.ok(snapshot.offerResearch&&Array.isArray(snapshot.offerResearch.actions),
