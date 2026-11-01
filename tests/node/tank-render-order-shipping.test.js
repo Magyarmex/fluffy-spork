@@ -20,17 +20,19 @@ assert.equal(patched.split(anchor).length-1,1,'canonical overlay anchor drift');
 assert.ok(fs.existsSync(path.join(root,owner)),'simulation owner must exist');
 const html=patched.includes(tag)?patched:patched.replace(anchor,anchor+'\n'+tag);
 const fixturePath=require.resolve('../research/audio-rng-causal-pilot.cjs');
-const baseline=require(fixturePath);
-delete require.cache[fixturePath];
-const read=fs.readFileSync;
-let candidate;
-try {
- fs.readFileSync=function(file,...args){
-  if(path.resolve(String(file))===path.join(root,'index.html'))return html;
-  return read.call(this,file,...args);
- };
- candidate=require(fixturePath);
-} finally {fs.readFileSync=read;}
+function loadFixture(sourceHtml){
+ delete require.cache[fixturePath];
+ const read=fs.readFileSync;
+ try {
+  fs.readFileSync=function(file,...args){
+   if(path.resolve(String(file))===path.join(root,'index.html'))return sourceHtml;
+   return read.call(this,file,...args);
+  };
+  return require(fixturePath);
+ } finally {fs.readFileSync=read;}
+}
+const baseline=loadFixture(source);
+const candidate=loadFixture(html);
 const seeds=[1517800,1517802,1517810,1517814,1517820,1517825];
 function run(fixture,seed,hz,scenario='natural',seconds=4){return baseline.withSeed(seed,draws=>{
  const g=fixture.bootGame(),render=g.__testWindow.__novaMakeRequire('')('game/render').render;
