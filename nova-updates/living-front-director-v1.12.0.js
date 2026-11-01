@@ -965,7 +965,17 @@ function publicBloomApproach(g,w,h){
  /* Reserve the top HUD and the bottom touch-control band. The marker is
   * small, static, and directional; it never captures pointer events. */
  var x=clamp(px+dx/d*w*.43,57,w-57),y=clamp(py+dy/d*h*.43,106,h-150);
- return{x:x,y:y,distance:Math.round(d/25)*25,live:op.live};
+ /* A Euclidean boundary distance is not a traversable route. If the hull's
+  * direct lane is blocked by existing terrain, keep the SAME public cue but
+  * replace the misleading distance with a cover warning. Do not invent a
+  * flank waypoint, reveal opponents or turn this visual into auto-navigation.
+  * One bounded terrain probe runs only while the cue is otherwise eligible. */
+ var cover=false;
+ if(typeof g.hasLineOfSight==='function'){
+  try{cover=!g.hasLineOfSight(p.x,p.y,nx,ny,Math.max(12,Math.min(30,(p.r||14)+6)));}
+  catch(ignore){} /* Missing terrain evidence is not proof of an obstruction. */
+ }
+ return{x:x,y:y,distance:Math.round(d/25)*25,live:op.live,cover:cover};
 }
 function drawPublicBloomApproach(g,w,h){
  var cue=publicBloomApproach(g,w,h),ctx=g&&g.ctx;
@@ -984,7 +994,7 @@ function drawPublicBloomApproach(g,w,h){
   if(!cue.live&&ctx.setLineDash)ctx.setLineDash([]);
   ctx.fillStyle='#ffe6a2';ctx.font='800 10px Rajdhani,system-ui';
   ctx.textAlign='center';ctx.textBaseline='middle';
-  ctx.fillText((cue.live?'BLOOM ':'BLOOM? ')+cue.distance+' AWAY',cue.x,cue.y+1);
+  ctx.fillText(cue.cover?(cue.live?'BLOOM':'BLOOM?')+' · COVER':(cue.live?'BLOOM ':'BLOOM? ')+cue.distance+' AWAY',cue.x,cue.y+1);
  }finally{ctx.restore();}
 }
 /* Last overlay in the shipping runtime: the actual game/render module is
