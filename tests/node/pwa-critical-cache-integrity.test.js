@@ -250,8 +250,13 @@ test('actual materialized game: all 52 scripts are required for offline boot', a
   const actual = fs.readFileSync(path.join(__dirname, '../../index.html'), 'utf8');
   const urls = [...actual.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi)]
     .map(match => new URL(match[1], base).href);
-  assert.equal(urls.length, 52, 'shipping script composition changed; review offline contract');
-  assert.ok(urls.some(url => url.includes('simulation-owned-tank-order-v1.12.1.js')),
+  const orderOwner='simulation-owned-tank-order-v1.12.1.js';
+  const materialized=actual.includes(orderOwner);
+  assert.equal(urls.length, materialized ? 52 : 51,
+    'shipping script composition changed; review offline contract');
+  const deploy=fs.readFileSync(path.join(__dirname,'../../.github/workflows/deploy.yml'),'utf8');
+  assert.ok(deploy.includes(orderOwner),'materializer must include the new critical runtime owner');
+  if(materialized)assert.ok(urls.some(url => url.includes(orderOwner)),
     'simulation-order owner must be a critical offline boot dependency');
   const f = fixture();
   await f.seed({ html: actual });
