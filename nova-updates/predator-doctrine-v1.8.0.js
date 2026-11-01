@@ -74,6 +74,9 @@ function skillOf(t,a){
   var level=clamp(((t&&t.level)||1)-1,0,49)/49;
   return clamp(.28+level*.46+(a&&a.isElite?.13:0)+clamp((a&&a.aggression)||.5,0,1.25)*.07,.28,.92);
 }
+/* 60 Hz is the established reference: higher refresh rates must not give
+ * rivals extra planning opportunities, while low FPS retains real reaction floors. */
+function referenceDelay(seconds){return Math.ceil(seconds*60-1e-9)/60;}
 function reactionFor(t,a){
   var s=skillOf(t,a),base=lerp(.175,.105,s);
   if(a&&a.isElite)base-=.018;
@@ -306,7 +309,7 @@ wrap('game/engine',function(engine){
     var before=this.tanks?this.tanks.length:0,out=oldSpawn.apply(this,arguments),after=this.tanks?this.tanks.length:0;
     for(var i=before;i<after;i++){
       var t=this.tanks[i];if(!t||!t.ai)continue;
-      t.ai.__v180FlankSide=(((t.id||0)*1103515245+12345)&1)?1:-1;t.ai.__v180TargetId=-1;t.ai.__v180PlanT=.025+((t.id||0)%6)*.013;
+      t.ai.__v180FlankSide=(((t.id||0)*1103515245+12345)&1)?1:-1;t.ai.__v180TargetId=-1;t.ai.__v180PlanT=referenceDelay(.025+((t.id||0)%6)*.013);
     }
     return out;
   };
@@ -319,8 +322,14 @@ wrap('game/ai',function(ai,require){
     if(!t||!t.ai)return old(t,g,dt);
     var a=t.ai,now=g.time||0;
     a.__v180PlanT=(a.__v180PlanT==null?0:a.__v180PlanT)-dt;
-    if(a.__v180PlanT<=0)plan(t,g,classes,C,a,now);
-    else a.thinkT=Math.max(a.thinkT||0,.07);
+    if(a.__v180PlanT<=1e-10){
+      var overshoot=a.__v180PlanT;
+      plan(t,g,classes,C,a,now);
+      /* Keep the existing 60 Hz planning schedule; carry subframe debt
+       * only when it cannot violate the actual reaction-time floor. */
+      var reaction=a.__v180PlanT,delay=referenceDelay(reaction);
+      a.__v180PlanT=Math.max(reaction,delay+Math.max(-1/30,overshoot));
+    }else a.thinkT=Math.max(a.thinkT||0,.07);
 
     var ownMove=Object.prototype.hasOwnProperty.call(g,'moveTank'),ownFire=Object.prototype.hasOwnProperty.call(g,'tryFire'),ownAbility=Object.prototype.hasOwnProperty.call(g,'useAbility');
     var move=g.moveTank,fire=g.tryFire,use=g.useAbility,target=a.__v180TargetId>=0&&g.getTank?g.getTank(a.__v180TargetId):null;
