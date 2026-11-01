@@ -83,3 +83,13 @@ test('portrait positions reserve the top HUD and lower touch band; renderer owne
   assert.equal(s.renderModule.render.__novaLivingFront,true,'preserve existing late-bound VFX owner');
  }
 });
+
+test('engine pause flag hides the public approach cue even when game status remains playing',()=>{
+ const s=scene();
+ assert.equal(s.render().length,1,'precondition: cue is active');
+ s.g.paused=true;
+ assert.equal(s.g.status,'playing','engine pause leaves status playing');
+ assert.equal(s.render().length,0,'no cue may draw behind a pause or upgrade overlay');
+ s.g.paused=false;
+ assert.equal(s.render().length,1,'cue returns when the same match resumes');
+});
