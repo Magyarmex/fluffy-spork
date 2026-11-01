@@ -247,7 +247,7 @@ canvas {
     <link rel="icon" href="./nova-icon.svg" type="image/svg+xml" />
     <meta name="application-name" content="NOVA TANKS" />
     <script defer src="./pwa-register.js"></script>
-      <meta name="nova-runtime-build" content="8b8e4057cd868895d65c845f" />
+      <meta name="nova-runtime-build" content="83f147a074b823564cd07aee" />
   </head>
   <body>
     <div id="root"></div>
@@ -4911,11 +4911,10 @@ function render(g, w, h) {
         }
     }
     // ---- tanks (sorted by y) ----
-    // PERF: sort g.tanks in place instead of spreading into a fresh array every
-    // frame — draw order is the only thing that depends on this ordering, and
-    // nothing else in the engine relies on tanks[] being in insertion order.
-    g.tanks.sort((a, b) => a.y - b.y);
-    for (const t of g.tanks) {
+    // Render-only depth sort: simulation tank iteration order must not depend on
+    // display refresh cadence. The simulation owner maintains gameplay order.
+    const drawTanks = g.tanks.slice().sort((a, b) => a.y - b.y);
+    for (const t of drawTanks) {
         if (!t.alive)
             continue;
         if (!onScreen(t.x, t.y))
@@ -5450,6 +5449,7 @@ function lsSet(key, value) {
 <script src="./nova-updates/living-front-core-v1.12.0.js"></script>
 <script src="./nova-updates/living-front-instincts-v1.12.0.js"></script>
 <script src="./nova-updates/living-front-director-v1.12.0.js"></script>
+<script src="./nova-updates/simulation-owned-tank-order-v1.12.1.js"></script>
 <script>
 window.__bootModule('main');
 
