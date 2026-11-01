@@ -247,7 +247,7 @@ canvas {
     <link rel="icon" href="./nova-icon.svg" type="image/svg+xml" />
     <meta name="application-name" content="NOVA TANKS" />
     <script defer src="./pwa-register.js"></script>
-      <meta name="nova-runtime-build" content="9a5f518beaaf2b50216b29ea" />
+      <meta name="nova-runtime-build" content="f7eed32ab75167c5c08df936" />
   </head>
   <body>
     <div id="root"></div>
@@ -2392,12 +2392,18 @@ class Game {
     start() {
         this.last = performance.now();
         this.sfx.startMusic();
+        let carry = 0;
         const loop = (ts) => {
             this.raf = requestAnimationFrame(loop);
-            const dt = Math.min(1 / 30, (ts - this.last) / 1000);
+            const elapsed = Math.max(0, (ts - this.last) / 1000);
+            const dt = Math.min(1 / 30, elapsed + carry);
+            const excess = elapsed + carry - dt;
+            carry = excess > 1e-9 ? Math.min(1 / 30, excess) : 0;
             this.last = ts;
             if (!this.paused)
                 this.update(dt);
+            if (this.paused)
+                carry = 0;
             (0, render_1.render)(this, this.w, this.h);
             // minimap only needs ~12fps — saves a full 216² clear+redraw most frames
             this.mmTimer -= dt;
