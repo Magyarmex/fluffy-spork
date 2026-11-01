@@ -289,6 +289,35 @@ wrap('game/engine',function(engine,require){
   Game.prototype.__novaFairEngagement=true;
   var classes=require('./classes')||{},C=classes.CLASSES||{};
 
+  /* The canonical touch aim assist asks nearestTank(player.x, player.y,
+   * 480, player.id). Terrain already filters occluded tanks, but a fully
+   * off-camera tank can still win the nearest query and silently bend a
+   * player's visible aim away from a farther on-screen opponent. Keep the
+   * legacy query untouched for AI, Crashers, drones and every other caller.
+   * Use the actual render camera, not a player-centered imaginary viewport. */
+  var originalNearest=Game.prototype.nearestTank;
+  if(typeof originalNearest==='function')Game.prototype.nearestTank=function(x,y,max,exclude){
+    var p=this.player,cam=this.cam,z=Number(cam&&cam.zoom),w=Number(this.w),h=Number(this.h);
+    if(!p||!alive(p)||exclude!==p.id||max!==480||x!==p.x||y!==p.y||
+       !cam||!Number.isFinite(cam.x)||!Number.isFinite(cam.y)||
+       !(z>0)||!(w>0)||!(h>0))return originalNearest.apply(this,arguments);
+    var best=null,bd=max*max,ts=this.tanks||[],hw=w/(2*z),hh=h/(2*z);
+    for(var i=0;i<ts.length;i++){
+      var t=ts[i];if(!t||!alive(t)||t.id===exclude||
+        !Number.isFinite(t.x)||!Number.isFinite(t.y))continue;
+      /* A partly visible hull is a legitimate aim target; an entirely
+       * hidden one is not. The 32u cap prevents corrupt radius metadata
+       * from turning the viewport into long-range offscreen assistance. */
+      var r=clamp(Number(t.r)||0,0,32);
+      if(Math.abs(t.x-cam.x)>hw+r||Math.abs(t.y-cam.y)>hh+r)continue;
+      var d=d2(x,y,t.x,t.y);if(!(d<bd))continue;
+      if(typeof this.hasLineOfSight==='function'&&
+         !this.hasLineOfSight(x,y,t.x,t.y,3))continue;
+      best=t;bd=d;
+    }
+    return best;
+  };
+
   function targetFor(owner,g){
     var id=owner&&owner.ai&&owner.ai.__v1112TargetId;
     var t=id>=0&&g.getTank?g.getTank(id):null;
