@@ -3301,7 +3301,24 @@ wrap('game/engine',function(engine){
  if(!old||Game.prototype.__novaPermanentMinimap)return;
  Game.prototype.__novaPermanentMinimap=true;
  Game.prototype.drawMinimap=function(){
-  var out=old.apply(this,arguments),ctx=this.mmCtx,terrain=this.__novaTerrain;
+  var ctx=this.mmCtx,terrain=this.__novaTerrain,markers=[],originalFill=ctx&&ctx.fillRect,
+   hadOwnFill=!!(ctx&&Object.prototype.hasOwnProperty.call(ctx,'fillRect')),tracked=false,out;
+  /* Preserve the core minimap's actual information filters (especially the
+   * no-global-Star-radar rule). Capture only dots it REALLY drew, rather than
+   * re-reading hidden entities to reconstruct markers after wall outlines. */
+  if(ctx&&typeof originalFill==='function'){
+   try{
+    ctx.fillRect=function(x,y,w,h){
+     if(((w===2&&h===2)||(w===3&&h===3)||(w===4&&h===4))&&
+        this.fillStyle!=='#ffe066') // Rogue Star's single visibility-gated dot is authoritative.
+      markers.push({x:x,y:y,w:w,h:h,color:this.fillStyle,alpha:this.globalAlpha});
+     return originalFill.apply(this,arguments);
+    };
+    tracked=ctx.fillRect!==originalFill;
+   }catch(ignore){} // Non-extensible canvas contexts retain prior behavior.
+  }
+  try{out=old.apply(this,arguments);}
+  finally{if(tracked){if(hadOwnFill)ctx.fillRect=originalFill;else delete ctx.fillRect;}}
   if(!ctx||!terrain||!terrain.length||typeof ctx.save!=='function'||
      typeof ctx.strokeRect!=='function'||typeof ctx.arc!=='function')return out;
   var scale=216/(MAP_LIMIT*2),count=0;
@@ -3321,8 +3338,14 @@ wrap('game/engine',function(engine){
     }else continue;
     if(++count>=32)break;
    }
+   /* Keep pre-existing resource, tank and powerup dots legible on top of
+    * terrain, with their original colors/alpha and original visibility gate. */
+   for(var j=0;j<markers.length;j++){
+    var m=markers[j];ctx.globalAlpha=m.alpha;ctx.fillStyle=m.color;
+    ctx.fillRect(m.x,m.y,m.w,m.h);
+   }
    /* A tank may hug a permanent wall. Repaint the already-public player dot
-    * above its outline so route guidance never hides the player's own hull. */
+    * last so route guidance never hides the player's own hull. */
    var p=this.player;
    if(p&&p.alive&&Number.isFinite(p.x)&&Number.isFinite(p.y)){
     ctx.globalAlpha=1;ctx.fillStyle='#7df3ff';
