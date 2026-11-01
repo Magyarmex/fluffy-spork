@@ -3309,7 +3309,8 @@ wrap('game/engine',function(engine){
   if(ctx&&typeof originalFill==='function'){
    try{
     ctx.fillRect=function(x,y,w,h){
-     if((w===2&&h===2)||(w===3&&h===3)||(w===4&&h===4))
+     if(((w===2&&h===2)||(w===3&&h===3)||(w===4&&h===4))&&
+        this.fillStyle!=='#ffe066') // Rogue Star's single visibility-gated dot is authoritative.
       markers.push({x:x,y:y,w:w,h:h,color:this.fillStyle,alpha:this.globalAlpha});
      return originalFill.apply(this,arguments);
     };
