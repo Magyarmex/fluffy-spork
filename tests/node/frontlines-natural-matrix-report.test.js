@@ -92,3 +92,41 @@ test('opt-in visible-defense policy is separately identifiable and validates dod
  fs.writeFileSync(path.join(p.dir,'frontlines-natural-match-ab.json'),JSON.stringify(p.report));
  assert.throws(()=>collectMatrix(root,1),/invalid ON visible-threat dodge samples/);
 }));
+
+test('a real evolution-offer censor is retained but never counted as a completed trial',()=>sandbox(root=>{
+ const a=writePair(root,'CROSSFIRE','public-bloom','s0',3);
+ a.row.offerPolicy='censor';a.report.offerPolicy='censor';
+ for(const arm of [a.on,a.off]){
+  arm.metadata.offerPolicy='censor';arm.game.status='playing';arm.game.time=71.167;
+  arm.offerResearch={actions:[],frames:2135,pausedWithOffer:true,
+   censor:{time:71.166667,tier:1,level:10,choice:'censor',beforePhysicalHash:'aabbccdd:11223344'}};
+ }
+ a.report.on=a.on;a.report.off=a.off;a.report.offReplay=structuredClone(a.off);
+ for(const [file,data] of [['frontlines-natural-on.json',a.on],['frontlines-natural-off.json',a.off],
+  ['frontlines-natural-manifest.json',{pairs:[a.row]}],['frontlines-natural-match-ab.json',a.report]])
+  fs.writeFileSync(path.join(a.dir,file),JSON.stringify(data));
+ const r=collectMatrix(root,1);
+ assert.equal(r.observedPairs,1);assert.equal(r.analyzablePairs,0);
+ assert.equal(r.censored.length,1);assert.match(r.censored[0].reason,/Evolution offer censored/);
+ assert.equal(r.censored[0].offerCensors.length,2);
+ assert.equal(r.batch,null);
+}));
+test('a falsified or omitted evolution-offer policy fails closed',()=>sandbox(root=>{
+ const a=writePair(root,'CROSSFIRE','wander','s0');
+ a.row.offerPolicy='defer';a.report.offerPolicy='defer';
+ for(const arm of [a.on,a.off]){
+  arm.metadata.offerPolicy='defer';arm.offerResearch={actions:[],frames:900,pausedWithOffer:false,censor:null};
+ }
+ a.report.on=a.on;a.report.off=a.off;a.report.offReplay=structuredClone(a.off);
+ const save=()=>{
+  for(const [file,data] of [['frontlines-natural-on.json',a.on],['frontlines-natural-off.json',a.off],
+   ['frontlines-natural-manifest.json',{pairs:[a.row]}],['frontlines-natural-match-ab.json',a.report]])
+   fs.writeFileSync(path.join(a.dir,file),JSON.stringify(data));
+ };
+ save();assert.equal(collectMatrix(root,1).analyzablePairs,1);
+ a.on.offerResearch.pausedWithOffer=true;a.report.on=a.on;save();
+ assert.throws(()=>collectMatrix(root,1),/unresolved evolution offer/);
+ a.on.offerResearch.pausedWithOffer=false;a.report.on=a.on;
+ a.row.offerPolicy='censor';save();
+ assert.throws(()=>collectMatrix(root,1),/offer policy differs/);
+}));
