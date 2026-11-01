@@ -45,3 +45,20 @@ test('missing and malformed terrain fail closed',()=>{
   {destructible:false,shape:'circle',x:0,y:0,r:NaN}];
  assert.doesNotThrow(()=>g.drawMinimap());g.__novaTerrain=before;
 });
+
+test('the already-public player dot stays above wall outlines near a wall',()=>{
+ const g=bootGame();if(!g.player)g.redeploy();
+ const wall=g.__novaTerrain.find(s=>!s.destructible&&s.shape==='rect');
+ g.player.x=wall.x+wall.w*.5+25;g.player.y=wall.y;
+ const ctx=g.mmCtx,ops=[],origFill=ctx.fillRect,origRect=ctx.strokeRect,origArc=ctx.arc;
+ ctx.fillRect=function(x,y,w,h){ops.push({kind:'fill',x,y,w,h,alpha:this.globalAlpha,color:this.fillStyle});return origFill.apply(this,arguments);};
+ ctx.strokeRect=function(){if(this.lineWidth===2.8)ops.push({kind:'wall'});return origRect.apply(this,arguments);};
+ ctx.arc=function(){if(this.lineWidth===2.8)ops.push({kind:'wall'});return origArc.apply(this,arguments);};
+ g.drawMinimap();const last=ops[ops.length-1],wallIndex=ops.findLastIndex(o=>o.kind==='wall');
+ assert.ok(wallIndex>=0&&ops.length-1>wallIndex);
+ assert.equal(last.kind,'fill');assert.equal(last.color,'#7df3ff');assert.equal(last.alpha,1);
+ const sc=216/4500;
+ assert.ok(Math.abs(last.x-((g.player.x+2250)*sc-2.5))<1e-8);
+ assert.ok(Math.abs(last.y-((g.player.y+2250)*sc-2.5))<1e-8);
+ assert.equal(last.w,5);assert.equal(last.h,5);
+});
