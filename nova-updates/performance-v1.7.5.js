@@ -146,14 +146,40 @@ function timingSample(p,key,value){
   r.values[r.next]=value;r.next=(r.next+1)%PERF_WINDOW;
   if(r.count<PERF_WINDOW)r.count++;
 }
+/* Measure simulation progress against observed wall time, not just render FPS.
+ * A 20Hz display can still report 20 FPS while the clamped 30Hz game loop
+ * advances only 2/3 of real time. Pair each rendered interval with the sum
+ * of actual Game.update(dt) time consumed since the preceding presentation. */
+function recordSimulation(g,dt){
+  if(!g||g.__novaDecorativeWorld||g.paused||g.status!=='playing'||
+     !Number.isFinite(dt)||dt<=0)return;
+  var p=perfState(g);
+  p.simulatedSincePresentation=(p.simulatedSincePresentation||0)+dt*1000;
+  p.simulationStepsSincePresentation=(p.simulationStepsSincePresentation||0)+1;
+}
+function resetSimulationWindow(p){
+  p.presentationTimes=null;p.simulationTimes=null;p.simulationSteps=null;
+  p.simulatedSincePresentation=0;p.simulationStepsSincePresentation=0;
+}
 function recordPresentation(g,now){
   if(!g||g.__novaDecorativeWorld||!Number.isFinite(now))return;
-  var p=perfState(g),previous=p.lastPresentationAt;
+  var p=perfState(g);
+  /* A paused, ended or menu-only game has no meaningful simulation pace.
+   * Do not let those idle intervals contaminate the next live match. */
+  if(g.paused||g.status!=='playing'){
+    p.lastPresentationAt=null;resetSimulationWindow(p);return;
+  }
+  var previous=p.lastPresentationAt;
   p.lastPresentationAt=now;
-  if(previous==null)return;
+  if(previous==null){
+    p.simulatedSincePresentation=0;p.simulationStepsSincePresentation=0;return;
+  }
   var delta=now-previous;
-  if(!(delta>0)||delta>250){p.presentationTimes=null;return;}
+  if(!(delta>0)||delta>250){resetSimulationWindow(p);return;}
   timingSample(p,'presentationTimes',delta);
+  timingSample(p,'simulationTimes',p.simulatedSincePresentation||0);
+  timingSample(p,'simulationSteps',p.simulationStepsSincePresentation||0);
+  p.simulatedSincePresentation=0;p.simulationStepsSincePresentation=0;
 }
 function timingPercentile(r,q){
   if(!r||!r.count)return null;
@@ -163,11 +189,18 @@ function timingPercentile(r,q){
 function timingWindow(p){
   var r=p.presentationTimes,n=r&&r.count||0,total=0,over50=0;
   for(var i=0;i<n;i++){var v=r.values[i];total+=v;if(v>50)over50++;}
+  var sim=p.simulationTimes,steps=p.simulationSteps,simTotal=0,stepTotal=0;
+  var aligned=n>=5&&sim&&steps&&sim.count===n&&steps.count===n;
+  if(aligned)for(var j=0;j<n;j++){
+    simTotal+=sim.values[j];stepTotal+=steps.values[j];
+  }
   var mean=n?total/n:0;
   return {frameSamples:n,
     fps:n>=5&&mean>0?+(1000/mean).toFixed(1):null,
     frameP95Ms:n>=5?+timingPercentile(r,.95).toFixed(2):null,
     frameOver50Pct:n>=5?+(over50*100/n).toFixed(1):null,
+    simulationHz:aligned&&total>0?+(stepTotal*1000/total).toFixed(1):null,
+    simulationPacePct:aligned&&total>0?+(simTotal*100/total).toFixed(1):null,
     updateP95Ms:p.updateTimes&&p.updateTimes.count>=5?
       +timingPercentile(p.updateTimes,.95).toFixed(2):null,
     renderP95Ms:p.renderTimes&&p.renderTimes.count>=5?
@@ -178,7 +211,7 @@ function record(g,key,ms){
   p[key]=ema(p[key],ms,.08);p[peak]=Math.max(p[peak]*.997,ms);p.samples++;
   if(!g.__novaDecorativeWorld)timingSample(p,key==='updateMs'?'updateTimes':'renderTimes',ms);
   var now=typeof performance!=='undefined'&&performance.now?performance.now():Date.now();
-  if(now-p.lastSnapshotAt>2000){p.lastSnapshotAt=now;if(!g.__novaDecorativeWorld)window.__NOVA_PERF_LAST__=Object.assign({version:VERSION,updateMs:+p.updateMs.toFixed(2),renderMs:+p.renderMs.toFixed(2),updatePeakMs:+p.updatePeakMs.toFixed(2),renderPeakMs:+p.renderPeakMs.toFixed(2),terrainQueries:p.terrainQueries,avgTerrainCandidates:p.terrainQueries?+(p.terrainCandidates/p.terrainQueries).toFixed(2):0,aiRouteFramesSkipped:p.aiRouteFramesSkipped,droneRouteFramesSkipped:p.droneRouteFramesSkipped,tanks:g.tanks?g.tanks.length:0,drones:g.drones?g.drones.length:0,bullets:g.bullets?g.bullets.length:0,shapes:g.shapes?g.shapes.length:0},timingWindow(p));}
+  if(now-p.lastSnapshotAt>2000){p.lastSnapshotAt=now;if(!g.__novaDecorativeWorld&&g.status==='playing'&&!g.paused&&timingWindow(p).frameSamples>=5)window.__NOVA_PERF_LAST__=Object.assign({version:VERSION,updateMs:+p.updateMs.toFixed(2),renderMs:+p.renderMs.toFixed(2),updatePeakMs:+p.updatePeakMs.toFixed(2),renderPeakMs:+p.renderPeakMs.toFixed(2),terrainQueries:p.terrainQueries,avgTerrainCandidates:p.terrainQueries?+(p.terrainCandidates/p.terrainQueries).toFixed(2):0,aiRouteFramesSkipped:p.aiRouteFramesSkipped,droneRouteFramesSkipped:p.droneRouteFramesSkipped,tanks:g.tanks?g.tanks.length:0,drones:g.drones?g.drones.length:0,bullets:g.bullets?g.bullets.length:0,shapes:g.shapes?g.shapes.length:0},timingWindow(p));}
 }
 function callWithoutFirstHit(g,fn,a,b,c,d){
   var own=Object.prototype.hasOwnProperty.call(g,'firstTerrainHit'),prev=g.firstTerrainHit;
@@ -281,7 +314,7 @@ wrap('game/engine',function(engine,require){
   };
 
   var oldUpdate=Game.prototype.update;
-  if(oldUpdate)Game.prototype.update=function(dt){var st=performance.now(),out=oldUpdate.call(this,dt);record(this,'updateMs',performance.now()-st);return out;};
+  if(oldUpdate)Game.prototype.update=function(dt){var st=performance.now(),out=oldUpdate.call(this,dt);recordSimulation(this,dt);record(this,'updateMs',performance.now()-st);return out;};
 
   Game.prototype.novaPerfSnapshot=function(){
     var p=perfState(this);return Object.assign({version:VERSION,updateMs:p.updateMs,renderMs:p.renderMs,updatePeakMs:p.updatePeakMs,renderPeakMs:p.renderPeakMs,terrainQueries:p.terrainQueries,terrainCandidates:p.terrainCandidates,terrainNarrowTests:p.terrainNarrowTests,aiRouteFramesSkipped:p.aiRouteFramesSkipped,aiRouteFramesPlanned:p.aiRouteFramesPlanned,droneRouteFramesSkipped:p.droneRouteFramesSkipped,droneRouteFramesPlanned:p.droneRouteFramesPlanned},timingWindow(p));
