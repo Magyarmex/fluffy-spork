@@ -130,3 +130,102 @@ test('all Controller descendants keep the original drone recall when no shot is 
   assert.equal(JSON.stringify(run('direct')),JSON.stringify(run('baseline')),cls+'/'+seed);
  }
 });
+
+
+test('secondary mouse release cannot consume a pending primary shot (real Input)',()=>{
+ const mouse=(type,button,buttons)=>({type,pointerType:'mouse',pointerId:1,button,buttons,
+   clientX:420,clientY:220,target:{closest:()=>null}});
+ for(const first of ['primary','secondary']){
+  const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
+  const o=new DirectShotIntent(g,{window:g.__testWindow,document:g.__testWindow.document});
+  const i=g.input;let shots=0;const fire=g.tryFire;
+  g.tryFire=function(t){const n=this.bullets.length,r=fire.apply(this,arguments);
+    if(t===g.player&&this.bullets.length>n)shots++;return r;};
+  if(first==='primary')i.pd(mouse('pointerdown',0,1));
+  else {i.pd(mouse('pointerdown',2,2));o.nativeDown({button:0});
+    i.__novaPrimaryPressCaptured=true;i.mouseActive=true;i.firing=true;}
+  assert.ok(o.down,'tracked primary press');
+  i.pu(mouse('pointerup',2,1));
+  assert.ok(o.down,'secondary/stale release must preserve primary ownership');
+  assert.equal(o.pending,null,'no premature shot');
+  i.pu(mouse('pointerup',0,2)); // primary released while secondary stays held
+  assert.ok(o.pending,'real primary release should record one short shot');
+  g.update(1/60);g.update(1/60);
+  assert.equal(o.intents,1,first);assert.equal(shots,1);
+  assert.equal(o.pending,null);assert.equal(i.__novaShotIntent,undefined);
+  g.destroy();
+ }
+});
+
+test('secondary release during a sampled primary hold never adds a ghost shot',()=>{
+ const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
+ const o=new DirectShotIntent(g,{window:g.__testWindow,document:g.__testWindow.document});
+ const i=g.input;const mouse=(type,button,buttons)=>({type,pointerType:'mouse',pointerId:1,
+   button,buttons,clientX:420,clientY:220,target:{closest:()=>null}});
+ i.pd(mouse('pointerdown',0,3));g.update(1/60);
+ assert.ok(o.down&&o.down.sampled);
+ i.pu(mouse('pointerup',2,1));assert.ok(o.down&&o.down.sampled);
+ i.pu(mouse('pointerup',0,0));assert.equal(o.pending,null);
+ g.update(1/60);assert.equal(o.intents,0);
+ g.destroy();
+});
+
+test('pointercancel still revokes a tracked primary mouse press',()=>{
+ const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
+ const o=new DirectShotIntent(g,{window:g.__testWindow,document:g.__testWindow.document});
+ const i=g.input;
+ i.pd({type:'pointerdown',pointerType:'mouse',pointerId:1,button:0,buttons:1,
+   clientX:420,clientY:220,target:{closest:()=>null}});
+ i.pu({type:'pointercancel',pointerType:'mouse',pointerId:1,button:-1,buttons:1});
+ assert.equal(o.down,null);assert.equal(o.pending,null);
+ g.update(1/60);assert.equal(o.intents,0);
+ g.destroy();
+});
+
+test('touch/pen release coordinates recover a short aimed flick with no delivered pointermove',()=>{
+ for(const kind of ['touch','pen'])for(const delta of [9,20,40,90]){
+  const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
+  const o=new DirectShotIntent(g,{window:g.__testWindow,document:g.__testWindow.document});
+  const i=g.input;let shots=0;const fire=g.tryFire;
+  g.tryFire=function(t){const n=this.bullets.length,r=fire.apply(this,arguments);
+    if(t===g.player&&this.bullets.length>n)shots++;return r;};
+  i.pd(event('pointerdown',kind,600));
+  // No pointermove event; release carries the final physical coordinate.
+  i.pu(event('pointerup',kind,600+delta));
+  assert.ok(o.pending,kind+'/'+delta+' release should retain an aimed flick');
+  g.update(1/60);g.update(1/60);
+  assert.equal(o.intents,1);assert.equal(shots,1);
+  assert.equal(i.firing,false);assert.equal(i.aim.active,false);
+  g.destroy();
+ }
+});
+
+test('dead-zone release and canceled flick never create a shot intent',()=>{
+ for(const kind of ['touch','pen'])for(const reason of ['dead-zone','cancel']){
+  const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
+  const o=new DirectShotIntent(g,{window:g.__testWindow,document:g.__testWindow.document});
+  const i=g.input;i.pd(event('pointerdown',kind,600));
+  i.pu(event(reason==='cancel'?'pointercancel':'pointerup',kind,reason==='cancel'?650:605));
+  assert.equal(o.pending,null);g.update(1/60);assert.equal(o.intents,0);
+  g.destroy();
+ }
+});
+
+test('release-only touch/pen flick matches full pointermove across all 36 classes',()=>{
+ const sample=bootGame(),classes=Object.keys(sample.__testWindow.__novaMakeRequire('')('game/classes').CLASSES);
+ sample.destroy();assert.equal(classes.length,36);
+ for(const cls of classes)for(const kind of ['touch','pen']){
+  function run(withMove){return withSeed(1517802,draws=>{
+   const g=bootGame();g.sfx.muted=true;g.input.autofire=false;g.setClass(g.player,cls);
+   const o=new DirectShotIntent(g,{window:g.__testWindow,document:g.__testWindow.document});
+   const i=g.input;i.pd(event('pointerdown',kind,600));
+   if(withMove)i.pm(event('pointermove',kind,640));
+   i.pu(event('pointerup',kind,640));
+   g.update(1/60);g.update(1/60);
+   const out={state:digest(physical(g)),draws:draws(),intents:o.intents,
+    held:i.aim.active||i.firing,leak:i.__novaShotIntent};
+   g.destroy();return out;
+  });}
+  assert.deepEqual(run(false),run(true),cls+'/'+kind);
+ }
+});
