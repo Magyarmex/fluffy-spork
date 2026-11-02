@@ -72,3 +72,34 @@ test('a nearby competing shot preserves the original contact behavior',()=>{
  const r=scenario(30,{extraBullet:{x:24,y:0}});
  assert.deepEqual(r.hits,[0,0]);assert.deepEqual(r.hp,[79,100]);
 });
+
+// Reachable default-class case: ordinary player weapons start with pen=1.
+// A lethal first contact consumes one penetration, leaving pen=0/hits=1;
+// the following frame must not choose a later endpoint-overlapping neutral.
+test('ordinary pen=1 shot retains first-contact order after a lethal prior hit',()=>{
+ const r=withSeed(1517802,()=>{
+  const g=bootGame();if(!g.player)g.redeploy();g.sfx.muted=true;
+  const p=g.player;p.x=1000;p.y=1000;p.hp=1000;p.alive=true;
+  g.tanks=[p];g.tankById=new Map([[p.id,p]]);g.drones=[];g.__novaTerrain=[];
+  const ss=g.shapes.filter(s=>s.type==='circle').slice(0,3);
+  ss.forEach((s,i)=>{s.x=[20,50,80][i];s.y=0;s.type='square';
+   s.r=12;s.hp=i?100:10;s.born=0;s.vx=0;s.vy=0;s.wanderT=999;});
+  const refs=ss.slice();g.shapes=ss;g.time=0;
+  g.input.firing=false;g.input.autofire=false;
+  g.input.moveVec=()=>({x:0,y:0});g.input.aimVec=()=>null;
+  const hits=[],old=g.damageShape;
+  g.damageShape=function(shape,...args){
+   if(refs.includes(shape))hits.push(refs.indexOf(shape));
+   return old.call(this,shape,...args);
+  };
+  g.bullets=[{kind:'bullet',id:100,ownerId:p.id,x:0,y:0,
+   vx:1000,vy:0,r:3,dmg:20,ttl:1,pen:1,hits:0,
+   dead:false,shell:false,beam:false,color:'#fff'}];
+  g.update(1/30);g.update(1/30);
+  return {hits,hp:refs.map(s=>s.hp)};
+ });
+ assert.deepEqual(r.hits,[0,1]);
+ assert.ok(r.hp[0]<=0);
+ assert.equal(r.hp[1],80);
+ assert.equal(r.hp[2],100);
+});
