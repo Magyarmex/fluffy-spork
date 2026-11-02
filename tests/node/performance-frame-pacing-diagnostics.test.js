@@ -210,3 +210,24 @@ test('paused rendering cannot overwrite the last real-match diagnostic snapshot'
  assert.equal(t.window.__NOVA_PERF_LAST__,previous,
   'a paused game must not erase the last meaningful live-match performance snapshot');
 });
+
+test('materialized 49-overlay Game actually wires simulation steps into the presentation owner',()=>{
+ const flag=process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL;
+ process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
+ const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+ if(flag===undefined)delete process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL;
+ else process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL=flag;
+ withSeed(1517800,()=>{
+  const g=bootGame();g.sfx.muted=true;g.status='playing';
+  const render=g.__testWindow.__novaMakeRequire('')('game/render').render;
+  for(let i=0;i<12;i++){g.update(1/60);render(g,g.w,g.h);}
+  const p=g.__novaPerf;
+  assert.ok(p&&p.simulationTimes&&p.simulationSteps,'actual Game owner must record simulation steps');
+  assert.ok(p.simulationTimes.count>=5);
+  for(let i=0;i<p.simulationSteps.count;i++)assert.equal(p.simulationSteps.values[i],1);
+  for(let i=0;i<p.simulationTimes.count;i++)assert.ok(Math.abs(p.simulationTimes.values[i]-1000/60)<1e-6);
+  const snapshot=g.novaPerfSnapshot();
+  assert.ok(snapshot.simulationHz>0&&snapshot.simulationPacePct>0);
+  g.destroy();
+ });
+});
