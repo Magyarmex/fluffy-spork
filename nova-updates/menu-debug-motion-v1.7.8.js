@@ -59,6 +59,8 @@ function snapshot(){var st=window.__NOVA_UPDATE_STATUS||{},ready=window.__NOVA_U
  /* Last observed match window, not an invented device benchmark. No telemetry
   * is uploaded: COPY DIAGNOSTICS is explicitly initiated by the player. */
  'GAME FPS':perf.fps==null?'n/a · play a match':perf.fps+' observed',
+ 'SIMULATION RATE':perf.simulationHz==null?'n/a':perf.simulationHz+' updates/s',
+ 'SIMULATION PACE':perf.simulationPacePct==null?'n/a':perf.simulationPacePct+'% real time',
  'FRAME P95':perf.frameP95Ms==null?'n/a':perf.frameP95Ms+' ms',
  'FRAMES >50MS':perf.frameOver50Pct==null?'n/a':perf.frameOver50Pct+'%',
  'SIMULATION P95':perf.updateP95Ms==null?'n/a':perf.updateP95Ms+' ms',
