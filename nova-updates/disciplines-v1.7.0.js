@@ -300,7 +300,8 @@ wrap('game/engine',function(engine,require){
        * pre-shot cooling slice. Repay only the excess over the canonical
        * 60Hz step, before this shot adds heat. Never modify the 60Hz path. */
       var step=this.__v17FiringStepDt||0;
-      var repay=Math.max(0,Math.min(1/60,step-1/60));
+      var repay=Math.max(0,Math.min(1/60,step-1/60,
+        this.time-(t.__v17FiredAt==null?this.time:t.__v17FiredAt)-.08));
       if(repay>1e-9&&t.__v17FiredAt!=null&&this.time-t.__v17FiredAt>.08){
         var cool=shotMode(t)==='minigun'?.48:.62;
         t.__v17Heat=Math.max(0,(t.__v17Heat||0)-repay*cool);
