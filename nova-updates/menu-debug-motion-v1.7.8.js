@@ -47,6 +47,9 @@ function closeEverything(except){if(except!=='blackglass')closeBlackglass();if(e
 function updaterState(){var s=window.__NOVA_UPDATE_STATUS||{};if(!navigator.onLine)return 'OFFLINE';if(s.ok===false)return 'ERROR';if(s.changed)return 'UPDATED';if(s.ok)return 'CURRENT';return 'IDLE'}
 function snapshot(){var st=window.__NOVA_UPDATE_STATUS||{},ready=window.__NOVA_UPDATE_READY||{},sw=navigator.serviceWorker&&navigator.serviceWorker.controller,perf=window.__NOVA_PERF_LAST__||{};return{
  'BUILD':'v'+VERSION+' · '+CODENAME,
+ 'GAME FPS':perf.fps==null?'n/a · play a match':perf.fps+' observed',
+ 'SIMULATION RATE':perf.simulationHz==null?'n/a':perf.simulationHz+' updates/s',
+ 'SIMULATION PACE':perf.simulationPacePct==null?'n/a':perf.simulationPacePct+'% real time',
  'LOBBY':window.__NOVA_LOBBY_RELEASE__?'v'+window.__NOVA_LOBBY_RELEASE__.version+' · '+window.__NOVA_LOBBY_RELEASE__.codename:'n/a',
  'PERFORMANCE':window.__NOVA_PERFORMANCE_RELEASE__?'v'+window.__NOVA_PERFORMANCE_RELEASE__.version:'n/a',
  'DRONE IFF':window.__NOVA_DRONE_IFF_RELEASE__?'v'+window.__NOVA_DRONE_IFF_RELEASE__.version:'n/a',
@@ -58,9 +61,6 @@ function snapshot(){var st=window.__NOVA_UPDATE_STATUS||{},ready=window.__NOVA_U
  'TOUCH':String(navigator.maxTouchPoints||0)+' points',
  /* Last observed match window, not an invented device benchmark. No telemetry
   * is uploaded: COPY DIAGNOSTICS is explicitly initiated by the player. */
- 'GAME FPS':perf.fps==null?'n/a · play a match':perf.fps+' observed',
- 'SIMULATION RATE':perf.simulationHz==null?'n/a':perf.simulationHz+' updates/s',
- 'SIMULATION PACE':perf.simulationPacePct==null?'n/a':perf.simulationPacePct+'% real time',
  'FRAME P95':perf.frameP95Ms==null?'n/a':perf.frameP95Ms+' ms',
  'FRAMES >50MS':perf.frameOver50Pct==null?'n/a':perf.frameOver50Pct+'%',
  'SIMULATION P95':perf.updateP95Ms==null?'n/a':perf.updateP95Ms+' ms',
