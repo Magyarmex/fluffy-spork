@@ -557,7 +557,9 @@ function needsMovingShapeRecovery(g,ix,b,candidates){
  * swept fallback resolve the first surface instead. Other combat stays with
  * the canonical core until chronological multi-projectile arbitration exists. */
 function needsEarlierStationaryNeutralRecovery(g,b,candidates){
- if(!b||b.pen!==0||b.hits||b.shell||b.beam||b.splash||b.__v17Cannon||
+ if(!b||b.pen!==0||
+    (b.hits&&!(b.hits===1&&b.__novaDirectVictims&&
+      b.__novaDirectVictims.size===1))||b.shell||b.beam||b.splash||b.__v17Cannon||
     b.dead||!Number.isFinite(b.ttl)||!(b.ttl>0)||
     !Number.isFinite(b.dmg)||!(b.dmg>0)||
     !g.bullets||g.bullets.length>64||!candidates||candidates.length<2||
