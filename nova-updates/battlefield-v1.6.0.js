@@ -559,6 +559,7 @@ function needsMovingShapeRecovery(g,ix,b,candidates){
 function needsEarlierStationaryNeutralRecovery(g,b,candidates){
  if(!b||b.pen!==0||b.hits||b.shell||b.beam||b.splash||b.__v17Cannon||
     b.dead||!Number.isFinite(b.ttl)||!(b.ttl>0)||
+    !Number.isFinite(b.dmg)||!(b.dmg>0)||
     !g.bullets||g.bullets.length!==1||!candidates||candidates.length<2||
     !Number.isFinite(b.px)||!Number.isFinite(b.py)||
     !Number.isFinite(b.x)||!Number.isFinite(b.y)||
@@ -568,7 +569,9 @@ function needsEarlierStationaryNeutralRecovery(g,b,candidates){
  var first=null,endpoint=null,firstT=2,endpointT=2;
  for(var i=0;i<candidates.length;i++){
   var s=candidates[i];
-  if(!s||s.kind!=='shape'||!(s.hp>0)||
+  if(!s||s.kind!=='shape'||
+     (s.type!=='circle'&&s.type!=='square')||
+     !Number.isFinite(s.hp)||!(s.hp>0)||
      !Number.isFinite(s.x)||!Number.isFinite(s.y)||
      !Number.isFinite(s.r)||!(s.r>0)||
      shapeSweepStart(g,s)||shapeWasTeleported(g,s))return false;
