@@ -7,14 +7,14 @@ const {bootGame,withSeed,digest,physical}=require('../research/audio-rng-causal-
 const {ChronologicalInput,STEP}=require('../research/fixed-step-dom-input.cjs');
 const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs');
 const {FixedStepRafOwner,STEP_MS}=require('../research/fixed-step-raf-owner.cjs');
-function setup(game,{render=null}={}){
+function setup(game,{render=null,maxSteps=2}={}){
  let now=1000,next=0,active=new Map(),cancelled=[];
  const timeline=new ChronologicalInput(game.input);
  const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
  game.sfx.startMusic=()=>{};
  const owner=new FixedStepRafOwner(game,timeline,bridge,{
   now:()=>now,request:fn=>{active.set(++next,fn);return next;},
-  cancel:id=>{cancelled.push(id);active.delete(id);},
+  cancel:id=>{cancelled.push(id);active.delete(id);},maxSteps,
   render:(g,w,h,alpha)=>{assert.ok(alpha>=0&&alpha<=1);if(render)render(g,w,h);}
  });
  owner.start();
@@ -282,4 +282,132 @@ test('duplicate browser-pilot start and restart after detach fail closed',()=>{
  assert.ok([...listeners.values()].every(s=>s.size===0)||g.input.canvas===g.canvas,
   'stopped pilot restores production input listeners');
  g.destroy();
+});
+
+test('30Hz presentation jitter must not silently discard healthy simulation time',()=>{
+  const g=bootGame(),h=setup(g);try{
+    let at=0;
+    for(let i=0;i<90;i++){
+      at+=34;h.frame(at);
+      at+=1000/15-34;h.frame(at);
+    }
+    assert.equal(h.owner.ticks,360,'6 seconds of 30Hz jitter must advance 360 fixed ticks');
+    assert.equal(h.owner.droppedFrames,0,'ordinary sub-millisecond jitter is not a stall');
+    assert.ok(Math.abs(h.owner.simAtSec-6)<1e-7);
+  }finally{h.close()}
+});
+test('real 49-overlay Game stays physically identical under 30Hz jitter and 60Hz presentation',()=>{
+ function run(seed,intervals){return withSeed(seed,draws=>{
+  const g=bootGame(),h=setup(g);g.sfx.muted=true;let at=0,index=0;
+  try{
+   for(const delta of intervals){
+    at+=delta;h.setNow(at);
+    while(index<trace.length && trace[index][0]<=at+1e-7){
+     const [t,kind,data]=trace[index++];assert.equal(h.capture(kind,t,data),true);
+    }
+    h.frame(at);
+   }
+   return {hash:digest(physical(g)),draws:draws(),ticks:h.owner.ticks,
+    dropped:h.owner.droppedFrames,applied:h.timeline.applied};
+  }finally{h.close()}
+ });}
+ const baseline=Array(360).fill(1000/60);
+ const jitter=Array.from({length:90},()=>[34,1000/15-34]).flat();
+ for(const seed of [1517800,1517802,1517810]){
+  const a=run(seed,baseline),b=run(seed,jitter);
+  assert.equal(a.ticks,360);assert.equal(a.dropped,0);
+  assert.deepEqual(b,a,`ordinary 30Hz jitter changed real gameplay at seed ${seed}`);
+ }
+});
+test('sustained 25Hz overload remains bounded without losing genuine held controls',()=>{
+ const g=bootGame(),h=setup(g);try{
+  h.setNow(5);h.capture('keydown',5,{key:'w'});
+  for(let i=1;i<=125;i++)h.frame(i*40);
+  assert.ok(h.owner.ticks<=250,'never exceed the two-step per-frame CPU budget');
+  assert.ok(h.owner.droppedFrames>0,'overload must be measured, not silently accumulated');
+  assert.ok(h.owner.droppedMs>0);
+  assert.ok(h.owner.lagMs<=(h.owner.maxSteps+2)*STEP_MS+1e-6);
+  assert.equal(g.input.keyboard.up,true,'genuinely held movement must survive bounded overload');
+  h.setNow(5005);h.capture('keyup',5005,{key:'w'});h.frame(5040);
+  assert.equal(g.input.keyboard.up,false,'a genuine release must still stop movement');
+ }finally{h.close()}
+});
+test('stall accounting includes unsimulated fractional lag from before the stall',()=>{
+ const g=bootGame(),h=setup(g);try{
+  h.frame(8);assert.equal(h.owner.ticks,0);
+  h.frame(1008);
+  const accounted=h.owner.ticks*STEP_MS+h.owner.lagMs+h.owner.droppedMs;
+  assert.ok(Math.abs(accounted-1008)<1e-5,
+   `elapsed 1008ms must equal simulated + queued + discarded time; got ${accounted}`);
+ }finally{h.close()}
+});
+test('bounded overload must not erase a fresh input occurring after skipped time',()=>{
+ const g=bootGame(),h=setup(g);try{
+  for(let i=1;i<=5;i++)h.frame(i*40);
+  h.setNow(210);h.capture('keydown',210,{key:'d'});
+  h.frame(240);
+  assert.ok(h.owner.droppedFrames>0,'exercise the bounded backlog-drop branch');
+  assert.equal(g.input.keyboard.right,true,'a fresh keydown after the skipped tick must survive');
+ }finally{h.close()}
+});
+test('a short burst of slow 30Hz frames can be repaid by faster frames without losing ticks',()=>{
+ const g=bootGame(),h=setup(g);try{
+  let at=0;
+  for(const delta of [...Array(5).fill(40),...Array(5).fill(80/3)]){
+   at+=delta;h.frame(at);
+  }
+  assert.equal(h.owner.ticks,20);
+  assert.equal(h.owner.droppedFrames,0,'temporary 30Hz jitter must not be classified as overload');
+ }finally{h.close()}
+});
+
+test('opt-in three-step recovery prevents extended 30Hz jitter bursts without altering 60Hz gameplay',()=>{
+ function run(seed,intervals,maxSteps){return withSeed(seed,draws=>{
+  const g=bootGame(),h=setup(g,{maxSteps});g.sfx.muted=true;let at=0;
+  try{for(const delta of intervals){at+=delta;h.frame(at)}
+   return {hash:digest(physical(g)),draws:draws(),ticks:h.owner.ticks,
+    dropped:h.owner.droppedFrames};
+  }finally{h.close()}
+ });}
+ const pattern=Array.from({length:5},()=>[...Array(12).fill(40),...Array(12).fill(80/3)]).flat();
+ const baseline=Array(240).fill(1000/60);
+ for(const seed of [1517800,1517810]){
+  const expected=run(seed,baseline,2),recovered=run(seed,pattern,3),limited=run(seed,pattern,2);
+  assert.equal(recovered.ticks,240);assert.equal(recovered.dropped,0);
+  assert.deepEqual(recovered,expected,'three-step recovery must match the real 60Hz world');
+  assert.ok(limited.dropped>0,'two-step CPU cap cannot fully repay prolonged 30Hz jitter');
+ }
+});
+
+test('bounded RAF conserves elapsed time across randomized jitter, overload and long stalls',()=>{
+ for(const maxSteps of [1,2,3,4])for(let seed=1;seed<=20;seed++){
+  let x=seed>>>0,now=1000,sampled=-Infinity;
+  const rand=()=>{x=(1664525*x+1013904223)>>>0;return x/4294967296};
+  const game={input:{},sfx:{startMusic(){}},update(){},destroy(){},w:100,h:100,paused:false};
+  const timeline={input:game.input,reset(){},consumeThrough(t){
+   assert.ok(t>=sampled-1e-8,'input chronology must never move backward');sampled=t;
+  }};
+  const bridge={timeline,startMs:1000};
+  const owner=new FixedStepRafOwner(game,timeline,bridge,{now:()=>now,
+   request:()=>1,cancel:()=>{},render:()=>{},maxSteps});
+  owner.start();
+  for(let i=0;i<120;i++){
+   now+=rand()<.04?200+200*rand():Math.max(1,1000/30+(rand()-.5)*30);
+   owner.advance(now);
+   const accounted=owner.ticks*STEP_MS+owner.lagMs+owner.droppedMs;
+   assert.ok(Math.abs(accounted-(now-1000))<1e-5,
+    `lost simulation time at maxSteps=${maxSteps} seed=${seed} frame=${i}`);
+  }
+  owner.stop();
+ }
+});
+
+test('150ms suspension clears stale held input even with four-step opt-in budget',()=>{
+ const g=bootGame(),h=setup(g,{maxSteps:4});try{
+  h.setNow(10);h.capture('keydown',10,{key:'w'});h.frame(1000/60);
+  assert.equal(g.input.keyboard.up,true);
+  h.frame(1000/60+150);
+  assert.equal(g.input.keyboard.up,false,'a 150ms suspension must not replay old movement');
+  assert.equal(h.owner.droppedFrames,1);
+ }finally{h.close()}
 });

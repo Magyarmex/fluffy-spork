@@ -85,15 +85,32 @@ class FixedStepRafOwner {
       this.timeline.consumeThrough(this.simAtSec);
     }else{
       const maxMs=this.maxSteps*STEP_MS;
-      if(raw>maxMs+EPS){
-        // Bounded catch-up: a long stall cannot create a 1-second simulation
-        // burst, nor replay held fire/abilities from before the stall.
-        this.droppedMs+=raw-maxMs;this.droppedFrames++;
+      if(raw>100+EPS){
+        // Genuine long stall: discard old controls and bound catch-up. A
+        // healthy 30Hz frame can be a little longer than two 60Hz steps;
+        // treating that ordinary jitter as a stall loses whole updates.
+        this.droppedMs+=this.lagMs+raw-maxMs;this.droppedFrames++;
         this.timeline.reset();this.lagMs=0;
         this.simAtSec=(ts-this.bridge.startMs-maxMs)/1000;
         this.timeline.consumeThrough(this.simAtSec);
+        this.lagMs=maxMs;
+      }else{
+        this.lagMs+=raw;
+        // Keep at most two extra full steps of backlog for transient jitter.
+        // Under sustained overload, skip only whole ticks, retaining
+        // chronological input edges that are still valid after the skip.
+        const maxBacklog=(this.maxSteps+2)*STEP_MS;
+        if(this.lagMs>maxBacklog+EPS){
+          const skipped=Math.ceil((this.lagMs-maxBacklog-EPS)/STEP_MS)*STEP_MS;
+          this.lagMs-=skipped;
+          this.droppedMs+=skipped;this.droppedFrames++;
+          // Keep later events: only the skipped tick is lost. Replaying
+          // chronological edges through that boundary leaves the correct
+          // held state for the first surviving simulation step.
+          this.simAtSec+=skipped/1000;
+          this.timeline.consumeThrough(this.simAtSec);
+        }
       }
-      this.lagMs+=Math.min(raw,maxMs);
       while(this.lagMs+EPS>=STEP_MS && this.lastSteps<this.maxSteps && !g.paused && this.started){
         const end=this.simAtSec+STEP;
         this.timeline.consumeThrough(end);
