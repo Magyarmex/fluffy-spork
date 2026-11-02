@@ -311,3 +311,81 @@ for(const fps of [30,60,120]){
   assert.equal(denseSinglePen1World(fps,{interceptor:true}).hits,0);
  });
 }
+
+/* Run 534: an expiring canonical pen=1 shot must preserve BOTH physically
+ * reachable nonlethal circle contacts. The existing non-expiring shape-pair
+ * proof cannot be bypassed by TTL expiry or by a later third body. */
+function expiringShapePairWorld(fps,{optimized=false,reverse=false,
+  far=false,wall=false,moving=false,competitor=false,lethal=false,
+  third=false,remote=0}={}){
+ const g=new (optimized?OptimizedGame:Game)();
+ g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=1;
+ g.shapes=[18,far?64:43].map((x,i)=>({kind:'shape',id:20+i,
+  type:'circle',x,y:0,r:12,hp:lethal?15:100,
+  __novaShapeSweepEpoch:1,__novaShapeSweepPrevX:x-(moving&&i===0?3:0),
+  __novaShapeSweepPrevY:0,born:0}));
+ if(third)g.shapes.push({kind:'shape',id:25,type:'circle',x:27,y:0,r:12,hp:100,
+  __novaShapeSweepEpoch:1,__novaShapeSweepPrevX:27,__novaShapeSweepPrevY:0,born:0});
+ if(wall)g.__novaTerrain=[{id:-1,shape:'rect',x:25,y:0,w:3,h:50,
+  solid:true,destructible:false}];
+ const bullet={kind:'bullet',id:1,ownerId:1,x:0,y:0,
+  vx:fps===240?10000:6000,vy:0,r:3,dmg:20,
+  ttl:fps===240?.0035:.005,pen:1,hits:0,
+  dead:false,shell:false,beam:false};
+ g.bullets=[bullet];
+ if(competitor)g.bullets.push({kind:'bullet',id:2,ownerId:3,
+  x:24,y:0,vx:0,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false});
+ for(let i=0;i<remote;i++)g.bullets.push({kind:'bullet',id:100+i,ownerId:3,
+  x:1000+i,y:1000,vx:0,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false});
+ if(reverse)g.bullets.reverse();
+ g.contacts=[];g.damageShape=function(s){this.contacts.push(s.id);this.hits++;};
+ g.updateBullets(1/fps);
+ return g;
+}
+for(const fps of [30,60,120,240])for(const optimized of [false,true]){
+ test('TTL pen=1 preserves two nonlethal circles '+fps+'Hz optimized='+optimized,()=>{
+  const g=expiringShapePairWorld(fps,{optimized});
+  assert.deepEqual(g.contacts,[20,21],
+   'two physical first contacts before expiry must survive one frame');
+ });
+ test('TTL pen=1 cannot invent second circle beyond expiry '+fps+'Hz optimized='+optimized,()=>{
+  const g=expiringShapePairWorld(fps,{optimized,far:true});
+  assert.deepEqual(g.contacts,[20]);
+ });
+}
+for(const fps of [30,60,120,240])for(const optimized of [false,true]){
+ test('TTL shape-pair refuses earlier solid cover '+fps+'Hz optimized='+optimized,()=>{
+  const g=expiringShapePairWorld(fps,{optimized,wall:true});
+  assert.ok(!g.contacts.includes(21),
+   'second circle behind earlier permanent cover must remain unharmed');
+ });
+ test('TTL shape-pair refuses uncertain shape motion '+fps+'Hz optimized='+optimized,()=>{
+  const g=expiringShapePairWorld(fps,{optimized,moving:true});
+  assert.ok(!g.contacts.includes(21),
+   'moving-first shape cannot authorize speculative second contact');
+ });
+ test('TTL shape-pair refuses ambiguous third shape '+fps+'Hz optimized='+optimized,()=>{
+  const g=expiringShapePairWorld(fps,{optimized,third:true});
+  assert.ok(!g.contacts.includes(21),
+   'three overlapping first-event candidates require chronological arbitration');
+ });
+ test('TTL shape-pair refuses potentially lethal contact '+fps+'Hz optimized='+optimized,()=>{
+  const g=expiringShapePairWorld(fps,{optimized,lethal:true});
+  assert.ok(!g.contacts.includes(21),
+   'no speculative XP/death settlement');
+ });
+ test('TTL shape-pair refuses competing local shot '+fps+'Hz optimized='+optimized,()=>{
+  const g=expiringShapePairWorld(fps,{optimized,competitor:true});
+  assert.ok(!g.contacts.includes(21),
+   'no speculative damage under competing projectile contact');
+ });
+ test('TTL shape-pair is unaffected by remote fire '+fps+'Hz optimized='+optimized,()=>{
+  const g=expiringShapePairWorld(fps,{optimized,remote:120});
+  assert.deepEqual(g.contacts,[20,21],
+   'remote unrelated fire should not suppress two certified contacts');
+ });
+ test('TTL shape-pair does not depend on remote bullet array order '+fps+'Hz optimized='+optimized,()=>{
+  const g=expiringShapePairWorld(fps,{optimized,remote:120,reverse:true});
+  assert.deepEqual(g.contacts,[20,21]);
+ });
+}
