@@ -1757,23 +1757,16 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    /* If two shots might contact the same hull, their damage and defense
     * changes are not independent. Defer the whole batch rather than let
     * projectile array order decide which shortcut runs first. */
-   var tanks=g.tanks||[];
-   for(var ti=0;ti<tanks.length;ti++){
-    var t=tanks[ti];if(!t||!t.alive||t.id===b.ownerId)continue;
-    var def=CLASSES[t.cls],size=def&&Number.isFinite(def.size)?
-       Math.max(0,def.size):120;
-    var pad=b.r+size+3,tx=t.x,ty=t.y,
-        px=t.__novaSweepMoveTime===g.time?t.__novaSweepPrevX:tx,
-        py=t.__novaSweepMoveTime===g.time?t.__novaSweepPrevY:ty;
-    if(!Number.isFinite(tx)||!Number.isFinite(ty)||
-       !Number.isFinite(px)||!Number.isFinite(py))return null;
-    if(Math.max(tx,px)+pad>=minx&&Math.min(tx,px)-pad<=maxx&&
-       Math.max(ty,py)+pad>=miny&&Math.min(ty,py)-pad<=maxy){
-     if(seenTargets.has(t))return null;
-     seenTargets.add(t);
-    }
-   }
+   /* Reuse the identical swept-AABB hull candidates certified in the
+    * batch preflight. A second all-tank scan here repeated the same work
+    * for every eligible shot, including validity checks already made.
+    * Keep shared-victim rejection across shots before any proof commits. */
    var threatTargets=possible&&possible.get(b)||[];
+   for(var ti=0;ti<threatTargets.length;ti++){
+    var t=threatTargets[ti];
+    if(seenTargets.has(t))return null;
+    seenTargets.add(t);
+   }
    for(var bi=0;bi<bullets.length;bi++){
     var o=bullets[bi];if(!o||o===b||o.dead)continue;
     var ox=o.x,oy=o.y,tx=ox+(o.vx||0)*dt,
