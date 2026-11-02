@@ -171,3 +171,12 @@ test('ordinary pen=1 projectile honors unique starting overlap after its first l
   assert.ok(r.hp[0]<=0);assert.equal(r.hp[1],80);assert.equal(r.hp[2],100);
  }
 });
+
+test('an initial overlap outside endpoint hash cells still vetoes unique-first proof',()=>{
+ for(const reverseShapes of [false,true]){
+  const r=scenario(30,{firstX:12,secondX:-10,thirdX:65,
+   bulletVx:1800,reverseShapes});
+  assert.deepEqual(r.hits,[2],
+   'two t=0 victims cannot be certified from endpoint candidates alone');
+ }
+});
