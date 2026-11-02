@@ -73,7 +73,14 @@ class DirectShotIntent {
       return result;
     };
     game.update=function(...args){
-      if(self.down&&i.firing&&(self.down.type==='mouse'||i.aim.active))self.down.sampled=true;
+      // A pressed right stick with zero deflection cannot fire: Game.aimVec
+      // returns null. Do not consume the tap merely because an un-aimed tick
+      // occurred before the final release coordinate arrived.
+      if(self.down&&game.status==='playing'&&!game.paused&&!doc.hidden&&
+         !i.__novaInputPaused&&i.firing&&
+         (self.down.type==='mouse'?i.mouseActive:
+           i.aim.active&&Math.hypot(i.aim.dx,i.aim.dy)>=9))
+        self.down.sampled=true;
       const intent=self.pending;self.pending=null;
       if(!intent||game.status!=='playing'||game.paused||doc.hidden||
          i.__novaInputPaused||i.aim.active||i.firing)return self.old.update.apply(this,args);
