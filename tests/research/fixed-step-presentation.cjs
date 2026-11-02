@@ -25,6 +25,7 @@ class FixedStepPosePresentation {
    throw Error('invalid fixed-step presentation game');
   this.game=game;this.enabled=enabled===true;
   this.current=snapshot(game);this.previous=this.current;
+  this.playerRef=game.player;this.status=game.status;
   this.originalUpdate=game.update;this.originalDestroy=game.destroy;
   this.updateHadOwn=Object.prototype.hasOwnProperty.call(game,'update');
   this.destroyHadOwn=Object.prototype.hasOwnProperty.call(game,'destroy');
@@ -33,7 +34,12 @@ class FixedStepPosePresentation {
   this.updateWrapper=function(...args){
    // A failed update is never allowed to leave a speculative visual pose.
    const out=self.originalUpdate.apply(this,args);
-   if(self.active){self.previous=self.current;self.current=snapshot(this);}
+   if(self.active){
+    const replaced=this.player!==self.playerRef||this.status!==self.status;
+    self.previous=self.current;self.current=snapshot(this);
+    if(replaced)self.previous=self.current;
+    self.playerRef=this.player;self.status=this.status;
+   }
    return out;
   };
   this.destroyWrapper=function(...args){
