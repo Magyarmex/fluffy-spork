@@ -35,3 +35,11 @@ test('cooling correction does not pretend to solve Tempest cadence',()=>{
  const slow=run('tempest',1517800,30),ref=run('tempest',1517800,60);
  assert.equal(slow.volleys,55);assert.equal(ref.volleys,73);
 });
+test('twelve-second sustained Gunner heat remains bounded at 30Hz',()=>{
+ for(const cls of ['twin','minigun']){
+  const slow=run(cls,1517800,30,12),ref=run(cls,1517800,60,12);
+  assert.equal(slow.volleys,ref.volleys,cls+' sustained volleys');
+  assert.ok(Math.abs(slow.heat-ref.heat)<.012,cls+' sustained heat parity');
+  assert.ok(Math.abs(slow.heatPeak-ref.heatPeak)<1e-8,cls+' sustained peak heat');
+ }
+});
