@@ -247,7 +247,7 @@ canvas {
     <link rel="icon" href="./nova-icon.svg" type="image/svg+xml" />
     <meta name="application-name" content="NOVA TANKS" />
     <script defer src="./pwa-register.js"></script>
-      <meta name="nova-runtime-build" content="b455318c6a7dfef9bdd1df80" />
+      <meta name="nova-runtime-build" content="c97d82ecb33ba7820510a688" />
   </head>
   <body>
     <div id="root"></div>
@@ -2393,8 +2393,10 @@ class Game {
         this.last = performance.now();
         this.sfx.startMusic();
         let carry = 0;
+        let priorWork = 0, earlierWork = 0;
         const loop = (ts) => {
             this.raf = requestAnimationFrame(loop);
+            const workStart = performance.now();
             const elapsed = Math.max(0, (ts - this.last) / 1000);
             const dt = Math.min(1 / 30, elapsed + carry);
             const excess = elapsed + carry - dt;
@@ -2402,6 +2404,14 @@ class Game {
             this.last = ts;
             if (!this.paused)
                 this.update(dt);
+            /* A slow but active display may need two safe updates to avoid
+             * 20 Hz time dilation. Never repay a long suspension in one draw. */
+            if (!this.paused && elapsed <= 1 / 12 && carry >= 1 / 30 - 1e-9 &&
+                priorWork < 18 && earlierWork < 18) {
+                this.update(1 / 30);
+                this.mmTimer -= 1 / 30;
+                carry = Math.max(0, carry - 1 / 30);
+            }
             if (this.paused)
                 carry = 0;
             (0, render_1.render)(this, this.w, this.h);
@@ -2411,6 +2421,8 @@ class Game {
                 this.mmTimer = 0.08;
                 this.drawMinimap();
             }
+            earlierWork = priorWork;
+            priorWork = performance.now() - workStart;
         };
         this.raf = requestAnimationFrame(loop);
     }
