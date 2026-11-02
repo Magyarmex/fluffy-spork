@@ -25,6 +25,9 @@ class FixedStepRafOwner {
     this.originalDestroy=game.destroy;
     this.destroyHadOwn=Object.prototype.hasOwnProperty.call(game,'destroy');
     this.destroyWrapper=null;
+    this.originalSetPaused=game.setPaused;
+    this.pauseHadOwn=Object.prototype.hasOwnProperty.call(game,'setPaused');
+    this.pauseWrapper=null;
   }
   start(){
     if(this.started)throw Error('fixed-step RAF already started');
@@ -42,8 +45,23 @@ class FixedStepRafOwner {
       return self.originalDestroy.apply(this,args);
     };
     this.game.destroy=this.destroyWrapper;
+    if(typeof this.originalSetPaused==='function'){
+      this.pauseWrapper=function(...args){
+        const was=!!this.paused;
+        const out=self.originalSetPaused.apply(this,args);
+        if(was!==!!this.paused && self.started)self.transition(!!this.paused,self.now());
+        return out;
+      };
+      this.game.setPaused=this.pauseWrapper;
+    }
     try{this.raf=this.request(this._loop)}
     catch(error){this.stop();throw error}
+  }
+  transition(paused,at){
+    if(!Number.isFinite(at)||at<this.lastMs-EPS)throw Error('invalid pause clock');
+    this.timeline.reset();this.lagMs=0;this.paused=paused;
+    this.lastMs=at;this.simAtSec=(at-this.bridge.startMs)/1000;
+    this.timeline.consumeThrough(this.simAtSec);
   }
   frame(ts){
     if(!this.started)throw Error('fixed-step RAF is not running');
@@ -99,6 +117,10 @@ class FixedStepRafOwner {
     this.started=false;
     if(this.raf!=null)this.cancel(this.raf);
     this.raf=null;this.timeline.reset();this.lagMs=0;
+    if(this.game.setPaused===this.pauseWrapper){
+      if(this.pauseHadOwn)this.game.setPaused=this.originalSetPaused;
+      else delete this.game.setPaused;
+    }
     if(this.game.destroy===this.destroyWrapper){
       if(this.destroyHadOwn)this.game.destroy=this.originalDestroy;
       else delete this.game.destroy;
@@ -124,7 +146,11 @@ function createFixedStepBrowserPilot(game,{window:win,document:doc,clock,
     {now:clock.now,request,cancel,render})}
   catch(error){capture.detach();throw error}
   return {timeline,bridge,capture,owner,
-    start(){try{owner.start()}catch(error){capture.detach();throw error}},
+    start(){
+      if(owner.started)throw Error('browser pilot already running');
+      if(!capture.active)throw Error('browser pilot capture detached');
+      try{owner.start()}catch(error){capture.detach();throw error}
+    },
     stop(){owner.stop();capture.detach()}};
 }
 module.exports={FixedStepRafOwner,createFixedStepBrowserPilot,STEP_MS};
