@@ -231,3 +231,13 @@ test('materialized 49-overlay Game actually wires simulation steps into the pres
   g.destroy();
  });
 });
+
+test('mobile Debug prioritizes game and simulation pace before updater metadata',()=>{
+ const a=menu.indexOf('function snapshot()'),b=menu.indexOf('function fillDebug()',a);
+ const window={innerWidth:320,innerHeight:568,__NOVA_PERF_LAST__:{fps:20,simulationHz:20,simulationPacePct:66.7}},
+  navigator={onLine:true,maxTouchPoints:5,userAgent:'test'};
+ vm.runInNewContext(menu.slice(a,b)+'\nwindow.__snap=snapshot;',
+  {window,navigator,VERSION:'1.7.8',CODENAME:'Signal Flow',updaterState:()=> 'CURRENT'});
+ const keys=Object.keys(window.__snap());
+ assert.deepEqual(keys.slice(0,4),['BUILD','GAME FPS','SIMULATION RATE','SIMULATION PACE']);
+});
