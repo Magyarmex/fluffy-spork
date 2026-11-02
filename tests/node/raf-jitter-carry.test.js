@@ -10,10 +10,10 @@ function method(html){const s=html.indexOf('    start() {'),e=html.indexOf('    
  assert.ok(s>=0&&e>s,'canonical start/destroy owner');const body=html.slice(s,e),a=body.indexOf('{'),b=body.indexOf('\n    }',a);
  assert.ok(b>a);return new Function('performance','requestAnimationFrame','render_1',
   'return ({start(){'+body.slice(a+1,b)+'\n}}).start');}
-function driver(html){let now=0,raf=null,draws=0,mini=0;const dts=[];
- const start=method(html)({now:()=>now},fn=>{raf=fn;return 1;},{render:()=>draws++});
+function driver(html,workMs=0){let now=0,workClock=0,raf=null,draws=0,mini=0;const dts=[];
+ const start=method(html)({now:()=>now+workClock},fn=>{raf=fn;return 1;},{render:()=>draws++});
  const g={last:0,sfx:{startMusic(){}},w:320,h:568,mmTimer:0,paused:false,
-  update(dt){assert.ok(Number.isFinite(dt)&&dt>=0&&dt<=1/30+1e-12,'safe dt');dts.push(dt);},
+  update(dt){assert.ok(Number.isFinite(dt)&&dt>=0&&dt<=1/30+1e-12,'safe dt');dts.push(dt);workClock+=workMs;},
   drawMinimap(){mini++;}};
  start.call(g);return {g,dts,frame(ms){now+=ms;const cb=raf;cb(now);},
   get draws(){return draws;},get mini(){return mini;}};
@@ -90,4 +90,10 @@ test('slow-frame catchup stops immediately if first update pauses or opens an of
 test('long 120ms frame never triggers the additional catchup update',()=>{
  const d=driver(patchRafStepCap(raw()));d.frame(120);
  assert.equal(d.dts.length,1);approx(d.dts[0],1/30);
+});
+
+test('expensive frames decline optional recovery rather than multiplying CPU overload',()=>{
+ const d=driver(patchRafStepCap(raw()),22);for(let i=0;i<40;i++)d.frame(50);
+ assert.equal(d.draws,40);assert.equal(d.dts.length,40);
+ approx(total(d.dts),40/30);
 });
