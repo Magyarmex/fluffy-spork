@@ -236,3 +236,62 @@ test('Fair Engagement Controller replan respects an existing think interval',()=
   assert.equal(owner.__novaLiveVectorAI.targetId,nearer.id,
     'after the scheduled think, the fair target must update');
 });
+
+
+/* Issue #581: a target being inside the observer-sized viewport must not
+ * disclose its current coordinates through intact opaque Battlefield cover.
+ * This tests the actual Fair Engagement AI wrapper, not just its score. */
+test('occluded new hull is never handed to the legacy AI; actual sight reacquires it',()=>{
+  const {load}=boot(),ai=load('game/ai'),observer=tank(1,-100,0),
+    human=tank(2,100,0,{isPlayer:true}),g=game(800,600,1);
+  g.tanks=[observer,human];g.player=human;
+  g.__novaTerrain=[{shape:'rect',x:0,y:0,w:24,h:140,solid:true}];
+  g.hasLineOfSight=()=>false;
+  ai.updateAI(observer,g,1/60);
+  assert.equal(observer.ai.__v1112TargetId,-1,'opaque cover cannot grant a new hull target');
+  assert.deepEqual(Array.from(g.__legacyVisibleIds),[1],
+    'legacy AI must not receive the occluded live hull');
+  g.hasLineOfSight=()=>true;g.time+=.3;
+  ai.updateAI(observer,g,1/60);
+  assert.equal(observer.ai.__v1112TargetId,human.id,'direct visual contact reacquires the rival');
+  assert.deepEqual(Array.from(g.__legacyVisibleIds),[1,2]);
+});
+test('occlusion gate applies to AI and player targets equally, independent of tank array order',()=>{
+  for(const reverse of [false,true]){
+    const {load}=boot(),ai=load('game/ai'),observer=tank(1,0,0),
+      npc=tank(2,100,0),human=tank(3,-100,0,{isPlayer:true}),g=game(800,600,1);
+    g.tanks=reverse?[human,npc,observer]:[observer,npc,human];g.player=human;
+    g.__novaTerrain=[{shape:'rect',x:0,y:0,w:24,h:140,solid:true}];
+    g.hasLineOfSight=(ax,ay,bx)=>bx<0;
+    ai.updateAI(observer,g,1/60);
+    assert.equal(observer.ai.__v1112TargetId,human.id,
+      'the visible target must win regardless of human identity or list order');
+    npc.x=-120;human.x=120;observer.ai.__v1112NextThink=0;g.time+=.3;
+    ai.updateAI(observer,g,1/60);
+    assert.equal(observer.ai.__v1112TargetId,npc.id,
+      'a visible NPC must replace an occluded human without player-specific priority');
+  }
+});
+test('terrain-aware perception fails closed when terrain exists but its LOS owner is absent',()=>{
+  const {window}=boot(),T=window.__NOVA_FAIR_ENGAGEMENT_TEST__,
+    C=classes(),observer=tank(1,0,0),target=tank(2,100,0),g=game(800,600,1);
+  g.__novaTerrain=[{solid:true}];
+  assert.equal(T.canPerceive(g,C,observer,target),false);
+  g.__novaTerrain=[];
+  assert.equal(T.canPerceive(g,C,observer,target),true,
+    'legacy clear-arena harness remains usable without a Battlefield overlay');
+});
+test('a currently certified Sniper Observer relay remains legal through hull occlusion',()=>{
+  const {window}=boot(),T=window.__NOVA_FAIR_ENGAGEMENT_TEST__,
+    C=classes(),observer=tank(1,0,0,{cls:'marksman'}),
+    target=tank(2,100,0),g=game(800,600,1);
+  g.hasLineOfSight=()=>false;
+  window.__NOVA_SPOTTER_LIVE_RELAY__=(_g,o,t)=>o===observer&&t===target;
+  assert.equal(T.canPerceive(g,C,observer,target),true);
+  observer.cls='gunner';
+  assert.equal(T.canPerceive(g,C,observer,target),false,
+    'a non-Sniper cannot borrow an Observer relay');
+  observer.cls='marksman';delete window.__NOVA_SPOTTER_LIVE_RELAY__;
+  assert.equal(T.canPerceive(g,C,observer,target),false,
+    'expired or missing relay authority cannot resurrect hidden coordinates');
+});
