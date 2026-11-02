@@ -302,7 +302,7 @@ wrap('game/engine',function(engine,require){
       var step=this.__v17FiringStepDt||0;
       var repay=Math.max(0,Math.min(1/60,step-1/60,
         this.time-(t.__v17FiredAt==null?this.time:t.__v17FiredAt)-.08));
-      if(repay>1e-9&&t.__v17FiredAt!=null&&this.time-t.__v17FiredAt>.08){
+      if(this.__v17CoarseStreak>=3&&repay>1e-9&&t.__v17FiredAt!=null&&this.time-t.__v17FiredAt>.08){
         var cool=shotMode(t)==='minigun'?.48:.62;
         t.__v17Heat=Math.max(0,(t.__v17Heat||0)-repay*cool);
       }
@@ -654,6 +654,9 @@ wrap('game/engine',function(engine,require){
      * outside the simulation must not inherit stale frame duration. */
     var priorStep=this.__v17FiringStepDt||0;
     this.__v17FiringStepDt=dt;
+    /* Require sustained near-30Hz updates. A mixed 33/17ms sequence can
+     * already cool enough; per-shot repayment there would overcool. */
+    this.__v17CoarseStreak=dt>=.032?Math.min(8,(this.__v17CoarseStreak||0)+1):0;
     try{oldUpdate.call(this,dt);}finally{this.__v17FiringStepDt=priorStep;}
     if(!this.tanks)return;
     for(var i=0;i<this.tanks.length;i++){
