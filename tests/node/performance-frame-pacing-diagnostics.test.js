@@ -79,6 +79,18 @@ test('slow frames and expensive simulation are visible in copied diagnostics',()
  assert.equal(s['FRAMES >50MS'],'10%');
  assert.match(s['TIMING SAMPLES'],/last game window/);
 });
+test('decorative War Room cannot overwrite the last playable-match sample',()=>{
+ const t=telemetry(),real={},decorative={__novaDecorativeWorld:true};
+ t.recordPresentation(real,0);
+ for(let i=0;i<140;i++)sample(t,real,1000/60);
+ const previous=t.window.__NOVA_PERF_LAST__;
+ assert.ok(previous&&previous.fps>50);
+ t.recordPresentation(decorative,t.clock.now);
+ for(let i=0;i<150;i++)sample(t,decorative,1000/12,20,8);
+ assert.equal(t.window.__NOVA_PERF_LAST__,previous,
+  'War Room must never replace real-game diagnostics with its decorative 12Hz budget');
+ assert.equal(t.timingWindow(t.perfState(decorative)).frameSamples,0);
+});
 test('no-match debug displays n/a rather than inventing frame rates',()=>{
  const a=menu.indexOf('function snapshot()'),b=menu.indexOf('function fillDebug()',a);
  const window={innerWidth:320,innerHeight:568,devicePixelRatio:1},
