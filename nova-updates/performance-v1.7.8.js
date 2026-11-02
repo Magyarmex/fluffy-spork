@@ -696,7 +696,7 @@ wrap('game/engine',function(engine,require){
   var oldUpdate=Base.prototype.update;
   if(oldUpdate)Base.prototype.update=function(dt){
     var out=oldUpdate.call(this,dt),last=window.__NOVA_PERF_LAST__;
-    if(last&&last!==this.__novaPerf2LastGlobal){this.__novaPerf2LastGlobal=last;var p=this.__novaPerf||{},q=p.battlefieldQueries||0;last.battlefieldQueries=q;last.battlefieldAvgCandidates=q?+((p.battlefieldCandidates||0)/q).toFixed(2):0;last.entityHashBucketCreates=this.hash&&this.hash.__novaBucketCreates||0;}
+    if(!this.__novaDecorativeWorld&&last&&last!==this.__novaPerf2LastGlobal){this.__novaPerf2LastGlobal=last;var p=this.__novaPerf||{},q=p.battlefieldQueries||0;last.battlefieldQueries=q;last.battlefieldAvgCandidates=q?+((p.battlefieldCandidates||0)/q).toFixed(2):0;last.entityHashBucketCreates=this.hash&&this.hash.__novaBucketCreates||0;}
     return out;
   };
 
