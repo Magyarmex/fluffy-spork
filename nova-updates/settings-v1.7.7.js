@@ -62,7 +62,7 @@ function setSetting(key,value){
   };
   var r=ranges[key];if(!r)return;
   state[key]=clamp(Number(value)||0,r[0],r[1]);
-  saveSettings();applyVisualSettings();applyRenderScale();refreshUI();
+  saveSettings();applyVisualSettings();if(key==='renderScale')applyRenderScale();refreshUI();
 }
 function resetSettings(){state=Object.assign({},DEFAULTS);saveSettings();applyVisualSettings();applyRenderScale();refreshUI();}
 function wrap(id,after){var old=mods[id];if(!old)return;mods[id]=function(module,exports,require){old(module,exports,require);after(module.exports,require);};}
