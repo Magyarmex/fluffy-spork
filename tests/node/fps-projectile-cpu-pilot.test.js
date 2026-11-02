@@ -8,6 +8,9 @@ test('CPU instrumentation is physically and RNG transparent in actual composed g
   assert.equal(base.physicalHash,timed.physicalHash);
   assert.equal(base.rngDraws,timed.rngDraws);
   assert.equal(base.peakProjectiles,timed.peakProjectiles);
+  assert.equal(base.playerVolleys,timed.playerVolleys);
+  assert.equal(base.playerEmittedProjectiles,timed.playerEmittedProjectiles);
+  assert.ok(timed.playerVolleys>0);
   assert.equal(base.terrainQueries,timed.terrainQueries);
   assert.ok(timed.updateMs>0&&timed.bulletsMs>=timed.collisionMs);
  }
