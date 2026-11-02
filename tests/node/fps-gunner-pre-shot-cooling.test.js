@@ -49,7 +49,7 @@ test('partial eligibility never overcools a just-recovered firing window',()=>{
   const actual=withSeed(1517800,()=>{
    const g=bootGame(),p=g.player;g.setClass(p,'twin');
    g.tanks=[p];g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];
-   g.status='playing';g.time=1;p.fireCd=0;p.__v17Heat=.5;
+   g.status='playing';g.time=1;p.fireCd=0;p.__v17Heat=.5;g.__v17CoarseStreak=3;
    p.__v17FiredAt=1-since;g.__v17FiringStepDt=1/30;
    g.tryFire(p);const out={heat:p.__v17Heat,bullets:g.bullets.length};
    g.destroy();return out;
@@ -57,5 +57,20 @@ test('partial eligibility never overcools a just-recovered firing window',()=>{
   assert.equal(actual.bullets,1,'the shot must still occur');
   assert.ok(Math.abs(actual.heat-(.5+.13-repay*.62))<1e-9,
    `eligibility ${since} must cool only the available pre-shot interval`);
+ }
+});
+test('mixed 33/17ms presentation never receives sustained-30Hz cooling credit',()=>{
+ const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+ for(const [cls,heat] of [['twin',.25533333333333325],['minigun',.066]]){
+  const actual=withSeed(1517800,()=>{
+   const g=bootGame(),p=g.player;g.setClass(p,cls);
+   g.tanks=[p];g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];
+   g.status='playing';g.input.firing=true;g.input.autofire=false;
+   g.input.aim.active=true;g.input.aim.dx=40;
+   for(let i=0;i<160;i++)g.update(i%2?1/60:1/30);
+   const out={heat:p.__v17Heat,streak:g.__v17CoarseStreak};g.destroy();return out;
+  });
+  assert.ok(Math.abs(actual.heat-heat)<1e-8,cls+' must not overcool under mixed frame intervals');
+  assert.equal(actual.streak,0);
  }
 });
