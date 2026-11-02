@@ -36,13 +36,35 @@ class DirectShotIntent {
     };
     i.pu=function(e){
       const d=self.down;
-      const same=!!(d&&e&&e.pointerType===d.type&&
-        (d.type==='mouse'||e.pointerId===d.id));
       const canceled=!!(e&&e.type==='pointercancel');
+      // If a platform or synthesized event reports secondary-button pointerup
+      // while primary remains held, do not mistake it for primary release.
+      // Conforming mouse Pointer Events normally report only the final up.
+      const primaryReleased=!!(e&&(e.button==null||e.button===0)&&
+        (e.buttons==null||(e.buttons&1)===0));
+      const same=!!(d&&e&&e.pointerType===d.type&&
+        (d.type==='mouse'?(canceled||primaryReleased):e.pointerId===d.id));
       const valid=!!(same&&!d.sampled&&!canceled&&game.status==='playing'&&
         !game.paused&&!doc.hidden&&!i.__novaInputPaused);
-      const dx=i.aim.dx,dy=i.aim.dy,len=Math.hypot(dx,dy);
       const mouse=d&&d.type==='mouse';
+      let dx=i.aim.dx,dy=i.aim.dy;
+      // Browsers may coalesce a very brief touch/pen movement into the final
+      // pointerup, without delivering a separate pointermove. Read that final
+      // coordinate through the same 64px stick clamp and 9px dead zone as
+      // Input.updateStick, without reviving the released physical stick.
+      if(same&&!mouse&&!canceled&&i.canvas&&
+         Number.isFinite(e.clientX)&&Number.isFinite(e.clientY)&&
+         typeof i.canvas.getBoundingClientRect==='function'){
+        const rect=i.canvas.getBoundingClientRect();
+        const x=e.clientX-rect.left-i.aim.ox,y=e.clientY-rect.top-i.aim.oy;
+        const radius=Math.hypot(x,y);
+        if(Number.isFinite(radius)){
+          if(radius<9){dx=0;dy=0;}
+          else if(radius>64){dx=x*64/radius;dy=y*64/radius;}
+          else{dx=x;dy=y;}
+        }
+      }
+      const len=Math.hypot(dx,dy);
       const eligible=valid&&(mouse?i.firing&&i.mouseActive:
         i.stickId.aim===d.id&&i.aim.active&&Number.isFinite(len)&&len>=9);
       const result=self.old.pu.call(this,e);
