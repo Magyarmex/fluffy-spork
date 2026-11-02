@@ -3518,9 +3518,13 @@ wrap('game/engine',function(engine){
      for(var k=0;k<markers.length;k++){
       if(k===j)continue;
       var n=markers[k];
-      if((n.w===3||n.w===4||n.w===5)&&
-         Math.abs((n.x+n.w*.5)-(m.x+1.5))<9&&
-         Math.abs((n.y+n.h*.5)-(m.y+1.5))<9){isolated=false;break;}
+      var dx=Math.abs((n.x+n.w*.5)-(m.x+1.5)),
+       dy=Math.abs((n.y+n.h*.5)-(m.y+1.5));
+      /* Keep a public neutral/Star dot readable underneath the keyline. */
+      if((n.w===2&&n.h===2&&dx<5&&dy<5)||
+         ((n.w===3||n.w===4||n.w===5)&&dx<9&&dy<9)){
+       isolated=false;break;
+      }
      }
      if(isolated){
       ctx.globalAlpha=.88;ctx.fillStyle='#020a18';
