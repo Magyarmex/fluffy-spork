@@ -1,0 +1,130 @@
+'use strict';
+// RESEARCH ONLY. An opt-in, bounded requestAnimationFrame owner for the real
+// Game and chronological Input. Never patches Game.prototype.start or shipping
+// input/renderer. Production promotion requires device CPU/latency and visual
+// interpolation gates.
+const {STEP}=require('./fixed-step-dom-input.cjs');
+const STEP_MS=STEP*1000, EPS=1e-7;
+class FixedStepRafOwner {
+  constructor(game,timeline,bridge,{now,request,cancel,render,maxSteps=2}={}) {
+    if (!game || typeof game.update!=='function' || !game.sfx ||
+        !timeline || timeline.input!==game.input ||
+        typeof timeline.consumeThrough!=='function' ||
+        !bridge || bridge.timeline!==timeline || !Number.isFinite(bridge.startMs) ||
+        typeof now!=='function' || typeof request!=='function' ||
+        typeof cancel!=='function' || typeof render!=='function' ||
+        !Number.isInteger(maxSteps) || maxSteps<1 || maxSteps>4)
+      throw Error('invalid fixed-step RAF owner');
+    this.game=game;this.timeline=timeline;this.bridge=bridge;
+    this.now=now;this.request=request;this.cancel=cancel;this.render=render;
+    this.maxSteps=maxSteps;this.started=false;this.raf=null;
+    this.lastMs=0;this.simAtSec=0;this.lagMs=0;this.ticks=0;
+    this.droppedMs=0;this.droppedFrames=0;this.paused=false;
+    this.alpha=0;this.lastSteps=0;this.minimapTimer=0;
+    this._loop=ts=>this.frame(ts);
+    this.originalDestroy=game.destroy;
+    this.destroyHadOwn=Object.prototype.hasOwnProperty.call(game,'destroy');
+    this.destroyWrapper=null;
+  }
+  start(){
+    if(this.started)throw Error('fixed-step RAF already started');
+    if(this.game.raf)throw Error('production RAF already owns this game');
+    const at=this.now();if(!Number.isFinite(at)||at<this.bridge.startMs-EPS)
+      throw Error('invalid fixed-step start time');
+    this.started=true;this.lastMs=at;this.simAtSec=(at-this.bridge.startMs)/1000;
+    this.timeline.reset();this.timeline.consumeThrough(this.simAtSec);
+    this.paused=!!this.game.paused;
+    try{this.game.sfx.startMusic()}
+    catch(error){this.started=false;this.timeline.reset();throw error}
+    const self=this;
+    this.destroyWrapper=function(...args){
+      self.stop();
+      return self.originalDestroy.apply(this,args);
+    };
+    this.game.destroy=this.destroyWrapper;
+    try{this.raf=this.request(this._loop)}
+    catch(error){this.stop();throw error}
+  }
+  frame(ts){
+    if(!this.started)throw Error('fixed-step RAF is not running');
+    if(!Number.isFinite(ts)||ts<this.lastMs-EPS)throw Error('nonmonotonic RAF timestamp');
+    try{this.raf=this.request(this._loop);this.advance(ts)}
+    catch(error){this.stop();throw error}
+  }
+  advance(ts){
+    const g=this.game;
+    const raw=Math.max(0,ts-this.lastMs);
+    this.lastMs=ts;
+    this.lastSteps=0;
+    if(g.paused){
+      if(!this.paused){this.timeline.reset();this.lagMs=0;this.paused=true;}
+      this.simAtSec=(ts-this.bridge.startMs)/1000;
+    }else if(this.paused){
+      // Resume without consuming the elapsed menu/evolution time. Input must
+      // be re-armed by fresh browser events, never by a stale held command.
+      this.timeline.reset();this.lagMs=0;this.paused=false;
+      this.simAtSec=(ts-this.bridge.startMs)/1000;
+      this.timeline.consumeThrough(this.simAtSec);
+    }else{
+      const maxMs=this.maxSteps*STEP_MS;
+      if(raw>maxMs+EPS){
+        // Bounded catch-up: a long stall cannot create a 1-second simulation
+        // burst, nor replay held fire/abilities from before the stall.
+        this.droppedMs+=raw-maxMs;this.droppedFrames++;
+        this.timeline.reset();this.lagMs=0;
+        this.simAtSec=(ts-this.bridge.startMs-maxMs)/1000;
+        this.timeline.consumeThrough(this.simAtSec);
+      }
+      this.lagMs+=Math.min(raw,maxMs);
+      while(this.lagMs+EPS>=STEP_MS && this.lastSteps<this.maxSteps && !g.paused && this.started){
+        const end=this.simAtSec+STEP;
+        this.timeline.consumeThrough(end);
+        g.update(STEP);
+        this.simAtSec=end;
+        this.lagMs=Math.max(0,this.lagMs-STEP_MS);
+        this.lastSteps++;this.ticks++;
+      }
+      if(g.paused){this.timeline.reset();this.lagMs=0;this.paused=true;}
+    }
+    if(!this.started)return; // Game.destroy may run inside Game.update.
+    this.alpha=Math.max(0,Math.min(1,this.lagMs/STEP_MS));
+    this.render(g,g.w,g.h,this.alpha);
+    this.minimapTimer-=this.lastSteps*STEP;
+    if(this.minimapTimer<=0 && typeof g.drawMinimap==='function'){
+      this.minimapTimer=.08;g.drawMinimap();
+    }
+  }
+  stop(){
+    if(!this.started)return;
+    this.started=false;
+    if(this.raf!=null)this.cancel(this.raf);
+    this.raf=null;this.timeline.reset();this.lagMs=0;
+    if(this.game.destroy===this.destroyWrapper){
+      if(this.destroyHadOwn)this.game.destroy=this.originalDestroy;
+      else delete this.game.destroy;
+    }
+  }
+}
+// Compose the existing production Input handlers with chronological DOM
+// ownership, then attach the bounded RAF. This factory remains opt-in and
+// does not change the game's production startup path.
+function createFixedStepBrowserPilot(game,{window:win,document:doc,clock,
+    request,cancel,render,canvas=game&&game.canvas}={}){
+  if(!game || game.raf || !clock || typeof clock.now!=='function')
+    throw Error('invalid browser fixed-step pilot');
+  const {ChronologicalInput}=require('./fixed-step-dom-input.cjs');
+  const {BrowserEventTimeline}=require('./fixed-step-browser-events.cjs');
+  const {BrowserInputCapture}=require('./fixed-step-browser-capture.cjs');
+  const timeline=new ChronologicalInput(game.input);
+  const bridge=new BrowserEventTimeline(timeline,clock);
+  const capture=new BrowserInputCapture(game.input,canvas,timeline,bridge,
+    {window:win,document:doc,game});
+  let owner;
+  try{owner=new FixedStepRafOwner(game,timeline,bridge,
+    {now:clock.now,request,cancel,render})}
+  catch(error){capture.detach();throw error}
+  return {timeline,bridge,capture,owner,
+    start(){try{owner.start()}catch(error){capture.detach();throw error}},
+    stop(){owner.stop();capture.detach()}};
+}
+module.exports={FixedStepRafOwner,createFixedStepBrowserPilot,STEP_MS};

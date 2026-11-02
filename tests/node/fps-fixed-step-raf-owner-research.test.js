@@ -1,0 +1,241 @@
+'use strict';
+// Opt-in RAF research uses the actual 49-overlay Game and its Input, but does
+// not modify the production Game.start loop. Not a mobile device benchmark.
+process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
+const test=require('node:test'),assert=require('node:assert/strict');
+const {bootGame,withSeed,digest,physical}=require('../research/audio-rng-causal-pilot.cjs');
+const {ChronologicalInput,STEP}=require('../research/fixed-step-dom-input.cjs');
+const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs');
+const {FixedStepRafOwner,STEP_MS}=require('../research/fixed-step-raf-owner.cjs');
+function setup(game,{render=null}={}){
+ let now=1000,next=0,active=new Map(),cancelled=[];
+ const timeline=new ChronologicalInput(game.input);
+ const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
+ game.sfx.startMusic=()=>{};
+ const owner=new FixedStepRafOwner(game,timeline,bridge,{
+  now:()=>now,request:fn=>{active.set(++next,fn);return next;},
+  cancel:id=>{cancelled.push(id);active.delete(id);},
+  render:(g,w,h,alpha)=>{assert.ok(alpha>=0&&alpha<=1);if(render)render(g,w,h);}
+ });
+ owner.start();
+ function frame(ms){now=1000+ms;const [id,fn]=[...active].at(-1);active.delete(id);fn(now);}
+ function capture(kind,at,data={}){
+  const e={type:kind,timeStamp:1000+at,target:{tagName:'CANVAS',closest:()=>null},
+   pointerId:11,pointerType:'touch',clientX:100,clientY:200,
+   button:0,buttons:1,...data};
+  return bridge.capture(e);
+ }
+ return {owner,timeline,bridge,frame,capture,setNow:ms=>{now=1000+ms;},
+  active,cancelled,close(){owner.stop();game.destroy()}};
+}
+const trace=[
+ [0,'keydown',{key:'w'}],[120,'pointerdown',{pointerId:11,pointerType:'touch',clientX:100}],
+ [180,'pointermove',{pointerId:11,pointerType:'touch',clientX:155}],
+ [270,'pointerdown',{pointerId:22,pointerType:'touch',clientX:600}],
+ [360,'pointermove',{pointerId:22,pointerType:'touch',clientX:650}],
+ [580,'keyup',{key:'w'}],[730,'pointerup',{pointerId:11,pointerType:'touch'}],
+ [910,'pointerup',{pointerId:22,pointerType:'touch'}],
+ [1140,'keydown',{key:'d'}],[1410,'keyup',{key:'d'}]
+];
+function arm(seed,hz){return withSeed(seed,draws=>{
+ const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
+ const h=setup(g);let index=0;try{
+  for(let f=1;f<=2*hz;f++){
+   const at=f*1000/hz;h.setNow(at);
+   while(index<trace.length&&trace[index][0]<=at+1e-7){
+    const [t,kind,data]=trace[index++];assert.equal(h.capture(kind,t,data),true);
+   }
+   h.frame(at);
+  }
+  return {hash:digest(physical(g)),draws:draws(),ticks:h.owner.ticks,
+   dropped:h.owner.droppedFrames,applied:h.timeline.applied};
+ }finally{h.close()}
+});}
+test('real Game chronological input and physical states agree at 30/60/120/240Hz',()=>{
+ for(const seed of [1517800,1517802,1517810]){
+  const results=[30,60,120,240].map(hz=>arm(seed,hz));
+  assert.equal(results[0].ticks,120);
+  assert.ok(results.every(r=>r.ticks===120&&r.dropped===0&&r.applied===trace.length));
+  assert.ok(results.every(r=>r.hash===results[0].hash&&r.draws===results[0].draws),
+   `cross-refresh gameplay changed for seed ${seed}: ${JSON.stringify(results)}`);
+ }
+});
+test('30Hz owner advances two complete 60Hz steps, not one coarse step',()=>{
+ const g=bootGame(),h=setup(g),dts=[];g.sfx.muted=true;
+ const update=g.update;g.update=function(dt){dts.push(dt);return update.call(this,dt)};
+ try{
+  h.frame(1000/30);assert.equal(dts.length,2);
+  for(const dt of dts)assert.equal(dt,STEP);
+  assert.equal(h.owner.lastSteps,2);assert.ok(Math.abs(h.owner.simAtSec-1/30)<1e-8);
+ }finally{h.close()}
+});
+test('actual Tempest firing cadence at 30Hz presentation matches native 60Hz',()=>{
+ function run(seed,hz,mode,cls){return withSeed(seed,()=>{
+  const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
+  g.setClass(g.player,cls);g.tanks=[g.player];g.tankById=new Map([[g.player.id,g.player]]);
+  g.shapes=[];g.drones=[];g.powerups=[];
+  g.input.aim.active=true;g.input.aim.dx=40;g.input.firing=true;
+  let volleys=0;const original=g.tryFire;
+  g.tryFire=function(t){const before=this.bullets.length;const result=original.apply(this,arguments);
+   if(t===g.player&&this.bullets.length>before)volleys++;return result;};
+  if(mode==='native')for(let i=0;i<6*hz;i++)g.update(1/hz);
+  else{
+   const h=setup(g);g.input.aim.active=true;g.input.aim.dx=40;g.input.firing=true;
+   try{for(let i=1;i<=6*hz;i++)h.frame(i*1000/hz);}
+   finally{h.owner.stop()}
+  }
+  const result={volleys,hash:digest(physical(g)),
+   weapon:{heat:g.player.__v17Heat,stability:g.player.__v17Stability,
+    fireCd:g.player.fireCd,overheatT:g.player.overheatT,
+    shotIndex:g.player.__v17ShotIndex}};
+  g.destroy();return result;
+ });}
+ for(const cls of ['tempest','minigun','needlestorm'])for(const seed of [1517800,1517810]){
+  const fixed30=run(seed,30,'fixed',cls),native60=run(seed,60,'native',cls),
+   native30=run(seed,30,'native',cls);
+  assert.deepEqual(fixed30,native60,`${cls} must preserve 60Hz weapon/physical parity`);
+  if(cls==='tempest')assert.ok(native30.volleys<fixed30.volleys*.8,
+   'must reproduce material 30Hz Tempest deficit');
+  if(cls==='minigun')assert.notEqual(native30.weapon.heat,fixed30.weapon.heat,
+   'must reproduce 30Hz heat imbalance even when shot counts agree');
+ }
+});
+test('evolution pause within first 30Hz frame blocks the second update',()=>{
+ const g=bootGame(),h=setup(g);let calls=0;
+ const update=g.update;g.update=function(dt){calls++;update.call(this,dt);if(calls===1)this.paused=true;};
+ try{
+  h.frame(1000/30);assert.equal(calls,1);assert.equal(h.owner.lastSteps,1);
+  h.frame(2000/30);assert.equal(calls,1);assert.equal(h.owner.ticks,1);
+  g.paused=false;h.frame(3000/30);assert.equal(calls,1,'resume cannot fast-forward');
+  h.frame(4000/30);assert.equal(calls,3,'normal two-step operation resumes');
+ }finally{h.close()}
+});
+test('long stalls are bounded and clear held input before resuming',()=>{
+ const g=bootGame(),h=setup(g);try{
+  h.setNow(10);h.capture('keydown',10,{key:'w'});h.frame(1000/60);
+  assert.equal(g.input.keyboard.up,true);
+  h.frame(1016.667);
+  assert.equal(h.owner.lastSteps,2);
+  assert.ok(h.owner.droppedMs>900&&h.owner.droppedFrames===1);
+  assert.equal(g.input.keyboard.up,false,'stale held movement must not survive stall');
+  assert.equal(h.timeline.events.length,0);
+  assert.ok(h.owner.ticks<=3);
+ }finally{h.close()}
+});
+test('stop is idempotent and cancels scheduled RAF without altering Game.start',()=>{
+ const g=bootGame(),original=g.start,h=setup(g);
+ assert.equal(g.start,original);assert.equal(h.active.size,1);
+ h.owner.stop();h.owner.stop();assert.equal(h.active.size,0);
+ assert.equal(h.cancelled.length,1);assert.equal(h.timeline.events.length,0);
+ g.destroy();
+});
+test('Game.destroy automatically stops opt-in RAF and restores original lifecycle',()=>{
+ const g=bootGame(),original=g.destroy,h=setup(g);
+ assert.notEqual(g.destroy,original);
+ g.destroy();
+ assert.equal(g.destroy,original);
+ assert.equal(h.active.size,0);
+ assert.equal(h.cancelled.length,1);
+ assert.equal(h.owner.started,false);
+});
+test('cannot run research RAF alongside the production animation owner',()=>{
+ const g=bootGame();g.raf=42;
+ const timeline=new ChronologicalInput(g.input);
+ const bridge=new BrowserEventTimeline(timeline,{now:()=>1000});
+ const owner=new FixedStepRafOwner(g,timeline,bridge,{
+  now:()=>1000,request:()=>1,cancel:()=>{},render:()=>{}});
+ assert.throws(()=>owner.start(),/production RAF already owns/);
+ assert.equal(owner.started,false);
+ g.raf=0;g.destroy();
+});
+test('variable sub-30ms frame jitter does not change physical simulation chronology',()=>{
+ function run(seed,pattern){return withSeed(seed,draws=>{
+  const g=bootGame();g.sfx.muted=true;const h=setup(g);
+  try{
+   let t=0;for(const delta of pattern){t+=delta;h.frame(t);}
+   return {hash:digest(physical(g)),draws:draws(),ticks:h.owner.ticks,
+    dropped:h.owner.droppedFrames};
+  }finally{h.close()}
+ });}
+ const baseline=Array(360).fill(1000/60);
+ const jitter=Array.from({length:180},()=>[20,1000/30-20]).flat();
+ for(const seed of [1517800,1517810]){
+  const a=run(seed,baseline),b=run(seed,jitter);
+  assert.deepEqual(b,a,'jitter may change draw times but not simulation state');
+  assert.equal(a.ticks,360);assert.equal(a.dropped,0);
+ }
+});
+test('fresh input after a bounded long stall is accepted without reviving old controls',()=>{
+ const g=bootGame(),h=setup(g);try{
+  h.setNow(10);h.capture('keydown',10,{key:'w'});h.frame(1000/60);
+  assert.equal(g.input.keyboard.up,true);
+  h.frame(1016.667);assert.equal(g.input.keyboard.up,false);
+  h.setNow(1025);assert.equal(h.capture('keydown',1025,{key:'d'}),true);
+  h.frame(1033.334);
+  assert.equal(g.input.keyboard.up,false);assert.equal(g.input.keyboard.right,true);
+ }finally{h.close()}
+});
+test('Game.destroy during the first substep cancels remaining simulation and drawing',()=>{
+ const g=bootGame();let calls=0,renders=0;
+ const h=setup(g,{render:()=>renders++});
+ g.update=function(){calls++;this.destroy();};
+ h.frame(1000/30);
+ assert.equal(calls,1,'never update a destroyed game twice');
+ assert.equal(renders,0,'never draw a destroyed game');
+ assert.equal(h.active.size,0,'no orphaned requestAnimationFrame');
+ assert.equal(h.owner.started,false);
+});
+test('actual composed renderer is simulation-pure across presentation rates',()=>{
+ function run(seed,hz){return withSeed(seed,draws=>{
+  const g=bootGame();g.sfx.muted=true;
+  const render=g.__testWindow.__novaMakeRequire('')('game/render').render;
+  const h=setup(g,{render});try{
+   for(let i=1;i<=2*hz;i++)h.frame(i*1000/hz);
+   return {hash:digest(physical(g)),draws:draws(),ticks:h.owner.ticks};
+  }finally{h.close()}
+ });}
+ for(const seed of [1517800,1517810]){
+  const a=[30,60,120].map(hz=>run(seed,hz));
+  assert.ok(a.every(r=>r.hash===a[0].hash&&r.draws===a[0].draws&&r.ticks===120),
+   `render cadence changed physical world: ${JSON.stringify(a)}`);
+ }
+});
+test('browser pilot composes real Input listeners, chronological RAF, and destroy cleanup',()=>{
+ const {createFixedStepBrowserPilot}=require('../research/fixed-step-raf-owner.cjs');
+ const g=bootGame(),win=g.__testWindow,doc=win.document;
+ function emitter(){const listeners=new Map();return {
+  addEventListener(type,fn){if(!listeners.has(type))listeners.set(type,new Set());listeners.get(type).add(fn)},
+  removeEventListener(type,fn){listeners.get(type)?.delete(fn)},
+  dispatch(e){for(const fn of [...(listeners.get(e.type)||[])])fn(e)},
+  count(){return [...listeners.values()].reduce((n,set)=>n+set.size,0)}
+ };}
+ const w=emitter(),d=emitter(),c=emitter();
+ Object.assign(win,{addEventListener:w.addEventListener,removeEventListener:w.removeEventListener});
+ Object.assign(doc,{addEventListener:d.addEventListener,removeEventListener:d.removeEventListener});
+ Object.assign(g.canvas,{addEventListener:c.addEventListener,removeEventListener:c.removeEventListener});
+ g.input.detach();g.input.attach(g.canvas);
+ let now=1000,callback=null,draws=0;
+ g.sfx.startMusic=()=>{};
+ const pilot=createFixedStepBrowserPilot(g,{window:win,document:doc,
+  clock:{now:()=>now,timeOrigin:1793560000000},
+  request:fn=>{callback=fn;return 7},cancel:()=>{callback=null},
+  render:()=>draws++});
+ pilot.start();
+ const evt=(type,at,extra={})=>({type,timeStamp:1000+at,
+  target:g.canvas,pointerType:'mouse',pointerId:1,button:0,buttons:1,
+  clientX:640,clientY:200,preventDefault(){},...extra});
+ now=1010;c.dispatch(evt('pointerdown',10));
+ assert.equal(g.input.firing,false,'browser event cannot mutate gameplay before tick');
+ now=1033.333333333;callback(now);
+ assert.equal(pilot.owner.lastSteps,2);
+ assert.equal(g.input.firing,true);
+ assert.equal(draws,1);
+ now=1040;w.dispatch(evt('pointerup',40,{buttons:0}));
+ assert.equal(g.input.firing,true,'release remains chronological');
+ now=1050;callback(now);assert.equal(g.input.firing,false);
+ w.dispatch(evt('blur',50));assert.equal(g.input.firing,false);
+ g.destroy();
+ assert.equal(callback,null,'game destroy must cancel research RAF');
+ assert.equal(w.count(),0);assert.equal(d.count(),0);assert.equal(c.count(),0);
+ assert.equal(pilot.owner.started,false);
+});
