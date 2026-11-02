@@ -45,7 +45,7 @@ function closeBlackglass(){var m=menu(),h=slot('intel');if(h&&h.classList.contai
 function closeDebug(){if(debugModal){debugModal.remove();debugModal=null}else{var d=document.querySelector('.nv-debug-overlay');if(d)d.remove()}setOn('debug',false)}
 function closeEverything(except){if(except!=='blackglass')closeBlackglass();if(except!=='controls')closeControls();if(except!=='updates')closeHistory();if(except!=='debug')closeDebug()}
 function updaterState(){var s=window.__NOVA_UPDATE_STATUS||{};if(!navigator.onLine)return 'OFFLINE';if(s.ok===false)return 'ERROR';if(s.changed)return 'UPDATED';if(s.ok)return 'CURRENT';return 'IDLE'}
-function snapshot(){var st=window.__NOVA_UPDATE_STATUS||{},ready=window.__NOVA_UPDATE_READY||{},sw=navigator.serviceWorker&&navigator.serviceWorker.controller;return{
+function snapshot(){var st=window.__NOVA_UPDATE_STATUS||{},ready=window.__NOVA_UPDATE_READY||{},sw=navigator.serviceWorker&&navigator.serviceWorker.controller,perf=window.__NOVA_PERF_LAST__||{};return{
  'BUILD':'v'+VERSION+' · '+CODENAME,
  'LOBBY':window.__NOVA_LOBBY_RELEASE__?'v'+window.__NOVA_LOBBY_RELEASE__.version+' · '+window.__NOVA_LOBBY_RELEASE__.codename:'n/a',
  'PERFORMANCE':window.__NOVA_PERFORMANCE_RELEASE__?'v'+window.__NOVA_PERFORMANCE_RELEASE__.version:'n/a',
@@ -55,7 +55,16 @@ function snapshot(){var st=window.__NOVA_UPDATE_STATUS||{},ready=window.__NOVA_U
  'SERVICE WORKER':sw?'controlled':'not controlled',
  'NETWORK':navigator.onLine?'online':'offline',
  'DISPLAY':window.innerWidth+'×'+window.innerHeight+' @ '+(window.devicePixelRatio||1)+'x',
- 'TOUCH':String(navigator.maxTouchPoints||0)+' points'
+ 'TOUCH':String(navigator.maxTouchPoints||0)+' points',
+ /* Last observed match window, not an invented device benchmark. No telemetry
+  * is uploaded: COPY DIAGNOSTICS is explicitly initiated by the player. */
+ 'GAME FPS':perf.fps==null?'n/a · play a match':perf.fps+' observed',
+ 'FRAME P95':perf.frameP95Ms==null?'n/a':perf.frameP95Ms+' ms',
+ 'FRAMES >50MS':perf.frameOver50Pct==null?'n/a':perf.frameOver50Pct+'%',
+ 'SIMULATION P95':perf.updateP95Ms==null?'n/a':perf.updateP95Ms+' ms',
+ 'RENDER P95':perf.renderP95Ms==null?'n/a':perf.renderP95Ms+' ms',
+ 'TIMING SAMPLES':String(perf.frameSamples||0)+' · last game window',
+ 'COMBAT LOAD':perf.tanks==null?'n/a':perf.tanks+' tanks / '+perf.bullets+' shots / '+perf.drones+' drones'
 }}
 function fillDebug(){if(!debugModal)return;var grid=debugModal.querySelector('.nv-debug-state'),s=snapshot();grid.innerHTML='';Object.keys(s).forEach(function(k){var c=document.createElement('div');c.className='nv-debug-cell';c.innerHTML='<div class="nv-debug-k"></div><div class="nv-debug-v"></div>';c.firstChild.textContent=k;c.lastChild.textContent=s[k];grid.appendChild(c)})}
 function diagnosticText(){var s=snapshot();return 'NOVA TANKS DEBUG\n'+Object.keys(s).map(function(k){return k+': '+s[k]}).join('\n')+'\nUA: '+navigator.userAgent}
