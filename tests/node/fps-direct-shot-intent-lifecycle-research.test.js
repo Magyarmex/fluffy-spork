@@ -229,3 +229,30 @@ test('release-only touch/pen flick matches full pointermove across all 36 classe
   assert.deepEqual(run(false),run(true),cls+'/'+kind);
  }
 });
+
+
+test('release-only direction/depth matches shipping Input stick geometry over 4,000 vectors',()=>{
+ const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
+ const o=new DirectShotIntent(g,{window:g.__testWindow,document:g.__testWindow.document});
+ const i=g.input;let seed=0x4e4f5641;
+ function rand(){seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;return (seed>>>0)/4294967296;}
+ const points=[[0,0],[8.999,0],[9,0],[9.001,0],[64,0],[64.001,0],[-64,0],[0,-64],[64,64],[-80,40]];
+ for(let n=0;n<4000;n++)points.push([(rand()-.5)*500,(rand()-.5)*500]);
+ for(let n=0;n<points.length;n++){
+  const [dx,dy]=points[n],id=n+100;
+  const down={type:'pointerdown',pointerType:'touch',pointerId:id,button:0,buttons:1,
+    clientX:600,clientY:200,target:{closest:()=>null}};
+  i.pd(down);
+  const expected={ox:i.aim.ox,oy:i.aim.oy,dx:0,dy:0};
+  i.updateStick(expected,expected.ox+dx,expected.oy+dy);
+  const up={...down,type:'pointerup',buttons:0,clientX:600+dx,clientY:200+dy};
+  i.pu(up);
+  const length=Math.hypot(expected.dx,expected.dy);
+  if(length<9){assert.equal(o.pending,null,'dead zone '+n);continue;}
+  assert.ok(o.pending,'expected shot '+n);
+  assert.ok(Math.abs(o.pending.aim.x-expected.dx/length)<1e-12,'x '+n);
+  assert.ok(Math.abs(o.pending.aim.y-expected.dy/length)<1e-12,'y '+n);
+  assert.ok(Math.abs(o.pending.depth-Math.max(.08,Math.min(1,(length-5)/55)))<1e-12,'depth '+n);
+ }
+ g.destroy();
+});
