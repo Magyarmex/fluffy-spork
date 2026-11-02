@@ -32,6 +32,15 @@ function arm(seed,hz,mode){
   delete g.__novaBattlefieldIndex;
   const physicalSight=g.hasLineOfSight(e.x,e.y,p.x,p.y,3);
   assert.equal(physicalSight,mode!=='covered','real Battlefield geometry');
+  /* The actual public minimap, not a hypothetical sight model, still draws
+   * this enemy's tank dot behind the wall. This is the legal AI knowledge. */
+  const marks=[],mm=g.mmCtx,originalFill=mm.fillRect;
+  mm.fillRect=function(x,y,w,h){
+    if(w===3&&h===3&&this.fillStyle===e.color)marks.push([x,y]);
+    return originalFill.apply(this,arguments);
+  };
+  try{g.drawMinimap();}finally{mm.fillRect=originalFill;}
+  const publicMapKnown=marks.length>0;
   const ai=g.__testWindow.__novaMakeRequire('')('game/ai');
   ai.updateAI(e,g,1/hz);
   const selected=e.ai.__v1112TargetId;
@@ -41,7 +50,7 @@ function arm(seed,hz,mode){
   g.tryFire(e);
   const fired=g.bullets.filter(b=>b.ownerId===e.id).length;
   const denied=e.__novaTerrainDeniedFire===true;
-  const out={selected,playerId:p.id,restored,physicalSight,fired,denied};
+  const out={selected,playerId:p.id,restored,physicalSight,publicMapKnown,fired,denied};
   g.destroy();return out;
  });
 }
@@ -49,6 +58,8 @@ function arm(seed,hz,mode){
 test('public covered hull stays known while permanent cover blocks shots at 30–240Hz',()=>{
  for(const seed of [1517800,1517802])for(const hz of [30,60,120,240]){
   const covered=arm(seed,hz,'covered'),clear=arm(seed,hz,'clear');
+  assert.equal(covered.publicMapKnown,true,'minimap actually exposes the covered tank');
+  assert.equal(clear.publicMapKnown,true,'minimap exposes the clear tank');
   assert.equal(covered.selected,covered.playerId,
     'on-screen covered hull remains legal public knowledge');
   assert.equal(clear.selected,clear.playerId,'unobstructed hull remains visible');
