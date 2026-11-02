@@ -239,3 +239,20 @@ test('browser pilot composes real Input listeners, chronological RAF, and destro
  assert.equal(w.count(),0);assert.equal(d.count(),0);assert.equal(c.count(),0);
  assert.equal(pilot.owner.started,false);
 });
+test('fresh post-resume input before the first RAF is preserved, paused input is discarded',()=>{
+ const g=bootGame(),original=g.setPaused,h=setup(g);try{
+  h.frame(1000/60);
+  h.setNow(20);g.setPaused(true);
+  h.setNow(25);h.capture('keydown',25,{key:'w'});
+  h.frame(1000/30);h.frame(50);
+  assert.equal(g.input.keyboard.up,false);
+  h.setNow(51);g.setPaused(false);
+  h.setNow(52);h.capture('keydown',52,{key:'d'});
+  h.frame(1000/15);
+  assert.equal(g.input.keyboard.up,false,'paused key must not replay');
+  assert.equal(g.input.keyboard.right,false,'fresh input waits for next simulation tick');
+  h.frame(1000/12);
+  assert.equal(g.input.keyboard.right,true,'post-resume input must survive first RAF');
+ }finally{h.close()}
+ assert.equal(g.setPaused,original,'pause owner must restore lifecycle');
+});
