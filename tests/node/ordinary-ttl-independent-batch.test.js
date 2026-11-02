@@ -320,7 +320,7 @@ function expiringShapePairWorld(fps,{optimized=false,reverse=false,
   third=false,remote=0}={}){
  const g=new (optimized?OptimizedGame:Game)();
  g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=1;
- g.shapes=[18,far?64:43].map((x,i)=>({kind:'shape',id:20+i,
+ g.shapes=[18,far?46.5:43].map((x,i)=>({kind:'shape',id:20+i,
   type:'circle',x,y:0,r:12,hp:lethal?15:100,
   __novaShapeSweepEpoch:1,__novaShapeSweepPrevX:x-(moving&&i===0?3:0),
   __novaShapeSweepPrevY:0,born:0}));
