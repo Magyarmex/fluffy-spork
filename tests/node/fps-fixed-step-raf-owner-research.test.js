@@ -378,3 +378,26 @@ test('opt-in three-step recovery prevents extended 30Hz jitter bursts without al
   assert.ok(limited.dropped>0,'two-step CPU cap cannot fully repay prolonged 30Hz jitter');
  }
 });
+
+test('bounded RAF conserves elapsed time across randomized jitter, overload and long stalls',()=>{
+ for(const maxSteps of [1,2,3,4])for(let seed=1;seed<=20;seed++){
+  let x=seed>>>0,now=1000,sampled=-Infinity;
+  const rand=()=>{x=(1664525*x+1013904223)>>>0;return x/4294967296};
+  const game={input:{},sfx:{startMusic(){}},update(){},destroy(){},w:100,h:100,paused:false};
+  const timeline={input:game.input,reset(){},consumeThrough(t){
+   assert.ok(t>=sampled-1e-8,'input chronology must never move backward');sampled=t;
+  }};
+  const bridge={timeline,startMs:1000};
+  const owner=new FixedStepRafOwner(game,timeline,bridge,{now:()=>now,
+   request:()=>1,cancel:()=>{},render:()=>{},maxSteps});
+  owner.start();
+  for(let i=0;i<120;i++){
+   now+=rand()<.04?200+200*rand():Math.max(1,1000/30+(rand()-.5)*30);
+   owner.advance(now);
+   const accounted=owner.ticks*STEP_MS+owner.lagMs+owner.droppedMs;
+   assert.ok(Math.abs(accounted-(now-1000))<1e-5,
+    `lost simulation time at maxSteps=${maxSteps} seed=${seed} frame=${i}`);
+  }
+  owner.stop();
+ }
+});
