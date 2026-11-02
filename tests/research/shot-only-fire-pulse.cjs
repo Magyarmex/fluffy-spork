@@ -9,11 +9,23 @@ class ShotOnlyFirePulse {
     this.pulse=new SubtickFirePulse(game,timeline);
     this.oldUpdate=game.update;
     this.oldDrones=game.updateDrones;
+    this.oldTryFire=game.tryFire;
+    this.shotAim=null;
     this.oldDestroy=game.destroy;
     this.destroyHadOwn=Object.prototype.hasOwnProperty.call(game,'destroy');
     this.destroyWrapper=null;
     this.shots=0; this.maskDrones=false;
     const self=this;
+    game.tryFire=function(...args) {
+      if (!self.shotAim || args[0]!==game.player) return self.oldTryFire.apply(this,args);
+      // Cannon's fuse depth is sampled inside tryFire, not Game.update.
+      // Restore the physical stick ONLY while resolving this single shot,
+      // never during Controller drone-command updates.
+      const aim=self.input.aim,prior={active:aim.active,dx:aim.dx,dy:aim.dy};
+      aim.active=true;aim.dx=self.shotAim.dx;aim.dy=self.shotAim.dy;
+      try { return self.oldTryFire.apply(this,args); }
+      finally { Object.assign(aim,prior); }
+    };
     game.updateDrones=function(...args) {
       if (!self.maskDrones) return self.oldDrones.apply(this,args);
       const firing=self.input.firing;
@@ -39,9 +51,11 @@ class ShotOnlyFirePulse {
       if (touch) input.aimVec=function(){return {x:dx/length,y:dy/length};};
       input.firing=true;
       self.maskDrones=true;
+      self.shotAim=touch?{dx,dy}:null;
       try { const out=self.oldUpdate.apply(this,args); self.shots++; return out; }
       finally {
         self.maskDrones=false;
+        self.shotAim=null;
         input.firing=oldFiring;
         if (hadOwnAimVec) input.aimVec=oldAimVec;
         else delete input.aimVec;
@@ -57,6 +71,7 @@ class ShotOnlyFirePulse {
     if (!this.pulse) return;
     this.game.update=this.oldUpdate;
     this.game.updateDrones=this.oldDrones;
+    this.game.tryFire=this.oldTryFire;
     this.pulse.detach();
     if (this.game.destroy===this.destroyWrapper) {
       if (this.destroyHadOwn) this.game.destroy=this.oldDestroy;
