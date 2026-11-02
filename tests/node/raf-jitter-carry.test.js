@@ -97,3 +97,17 @@ test('expensive frames decline optional recovery rather than multiplying CPU ove
  assert.equal(d.draws,40);assert.equal(d.dts.length,40);
  approx(total(d.dts),40/30);
 });
+
+test('randomized mixed-load presentation never creates time or exceeds two updates per draw',()=>{
+ for(const workMs of [0,8,22]){
+  const d=driver(patchRafStepCap(raw()),workMs);let elapsed=0,state=0x6a09e667;
+  for(let i=0;i<2400;i++){
+   state^=state<<13;state^=state>>>17;state^=state<<5;
+   const ms=[1000/120,1000/60,1000/30,48,52,80,120][(state>>>0)%7];
+   const before=d.dts.length;d.frame(ms);elapsed+=ms/1000;
+   assert.ok(d.dts.length-before<=2,'bounded work per presentation');
+   assert.ok(total(d.dts)<=elapsed+1e-7,'cannot simulate unearned time');
+  }
+  assert.equal(d.draws,2400);
+ }
+});
