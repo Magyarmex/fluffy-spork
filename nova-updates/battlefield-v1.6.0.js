@@ -3506,17 +3506,40 @@ wrap('game/engine',function(engine){
     if(++count>=32)break;
    }
    /* Keep pre-existing resource, tank and powerup dots legible on top of
-    * terrain, with their original colors/alpha and original visibility gate. */
+    * terrain, with their original colors/alpha and original visibility gate.
+    * The minimap is 216 backing px displayed at 60 CSS px. Rival 3px dots
+    * become subpixel: give isolated ALREADY-DRAWN contacts a small contrast
+    * keyline, but never merge nearby rivals or bury an adjacent powerup.
+    * Only inspect captured public paint commands; never query hidden tanks. */
    for(var j=0;j<markers.length;j++){
-    var m=markers[j];ctx.globalAlpha=m.alpha;ctx.fillStyle=m.color;
+    var m=markers[j];
+    if(m.w===3&&m.h===3&&Number.isFinite(m.x)&&Number.isFinite(m.y)){
+     var isolated=true;
+     for(var k=0;k<markers.length;k++){
+      if(k===j)continue;
+      var n=markers[k];
+      if((n.w===3||n.w===4||n.w===5)&&
+         Math.abs((n.x+n.w*.5)-(m.x+1.5))<9&&
+         Math.abs((n.y+n.h*.5)-(m.y+1.5))<9){isolated=false;break;}
+     }
+     if(isolated){
+      ctx.globalAlpha=.88;ctx.fillStyle='#020a18';
+      ctx.fillRect(m.x-2,m.y-2,7,7);
+      ctx.globalAlpha=.85;ctx.fillStyle='#f4f9ff';
+      ctx.fillRect(m.x-1,m.y-1,5,5);
+     }
+    }
+    ctx.globalAlpha=m.alpha;ctx.fillStyle=m.color;
     ctx.fillRect(m.x,m.y,m.w,m.h);
    }
    /* A tank may hug a permanent wall. Repaint the already-public player dot
     * last so route guidance never hides the player's own hull. */
    var p=this.player;
    if(p&&p.alive&&Number.isFinite(p.x)&&Number.isFinite(p.y)){
-    ctx.globalAlpha=1;ctx.fillStyle='#7df3ff';
-    ctx.fillRect((p.x+MAP_LIMIT)*scale-2.5,(p.y+MAP_LIMIT)*scale-2.5,5,5);
+    var mx=(p.x+MAP_LIMIT)*scale-2.5,my=(p.y+MAP_LIMIT)*scale-2.5;
+    ctx.globalAlpha=.9;ctx.fillStyle='#020a18';ctx.fillRect(mx-2,my-2,9,9);
+    ctx.globalAlpha=.9;ctx.fillStyle='#f4f9ff';ctx.fillRect(mx-1,my-1,7,7);
+    ctx.globalAlpha=1;ctx.fillStyle='#7df3ff';ctx.fillRect(mx,my,5,5);
    }
   }finally{ctx.restore();}
   return out;
