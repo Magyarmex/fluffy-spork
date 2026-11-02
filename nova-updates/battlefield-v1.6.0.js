@@ -1743,7 +1743,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   }
   /* Bound full projectile scans only for shots that can benefit from them. */
   if(!shots.length||shots.length*bullets.length>12000)return null;
-  var plan=new Map(),work=0,seenTargets=new Set();
+  var plan=new Map(),work=0;
   for(var si=0;si<shots.length;si++){
    var b=shots[si],travelT=nonExpiring?dt:b.ttl;
    if(!(travelT>0)||!Number.isFinite(travelT)||
@@ -1754,19 +1754,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    if(!Number.isFinite(ex)||!Number.isFinite(ey))return null;
    var minx=Math.min(b.x,ex),maxx=Math.max(b.x,ex),
        miny=Math.min(b.y,ey),maxy=Math.max(b.y,ey),local=[];
-   /* If two shots might contact the same hull, their damage and defense
-    * changes are not independent. Defer the whole batch rather than let
-    * projectile array order decide which shortcut runs first. */
-   /* Reuse the identical swept-AABB hull candidates certified in the
-    * batch preflight. A second all-tank scan here repeated the same work
-    * for every eligible shot, including validity checks already made.
-    * Keep shared-victim rejection across shots before any proof commits. */
+   /* Shared-hull competition was already vetoed for the entire batch
+    * (including ineligible shots) by targetUsers above. Do not repeat the
+    * same swept-hull scan and per-shot Set work in the expensive proof. */
    var threatTargets=possible&&possible.get(b)||[];
-   for(var ti=0;ti<threatTargets.length;ti++){
-    var t=threatTargets[ti];
-    if(seenTargets.has(t))return null;
-    seenTargets.add(t);
-   }
    for(var bi=0;bi<bullets.length;bi++){
     var o=bullets[bi];if(!o||o===b||o.dead)continue;
     var ox=o.x,oy=o.y,tx=ox+(o.vx||0)*dt,
