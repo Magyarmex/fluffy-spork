@@ -568,7 +568,7 @@ function needsEarlierStationaryNeutralRecovery(g,b,candidates){
     !Number.isFinite(b.r)||!(b.r>0))return false;
  var ax=b.px,ay=b.py,dx=b.x-ax,dy=b.y-ay,A=dx*dx+dy*dy;
  if(!(A>0)||!Number.isFinite(A))return false;
- var first=null,endpoint=null,firstT=2,endpointT=2;
+ var first=null,endpoint=null,firstT=2,endpointT=2,initialOverlaps=0;
  for(var i=0;i<candidates.length;i++){
   var s=candidates[i];
   if(!s||s.kind!=='shape'||
@@ -577,12 +577,19 @@ function needsEarlierStationaryNeutralRecovery(g,b,candidates){
      !Number.isFinite(s.x)||!Number.isFinite(s.y)||
      !Number.isFinite(s.r)||!(s.r>0)||
      shapeSweepStart(g,s)||shapeWasTeleported(g,s))return false;
-  var rr=b.r+s.r,fx=ax-s.x,fy=ay-s.y,C=fx*fx+fy*fy-rr*rr;
-  if(!(C>0))return false; /* Initial overlap is a different contract. */
-  var B=2*(fx*dx+fy*dy),D=B*B-4*A*C;
-  if(!(D>1e-9*(B*B+4*A*C)))continue; /* Near tangency: no speculation. */
-  var t=(-B-Math.sqrt(D))/(2*A);
-  if(!(t>=0&&t<1))continue;
+  var rr=b.r+s.r,fx=ax-s.x,fy=ay-s.y,C=fx*fx+fy*fy-rr*rr,t;
+  if(C<=0){
+   /* A single unambiguous shape already enclosing the shot at frame start
+    * is the earliest physical contact (t=0). Exact/near tangency and two
+    * simultaneous starting victims remain with the existing core owner. */
+   if(!(C<-1e-8*rr*rr)||++initialOverlaps>1)return false;
+   t=0;
+  }else{
+   var B=2*(fx*dx+fy*dy),D=B*B-4*A*C;
+   if(!(D>1e-9*(B*B+4*A*C)))continue; /* Near tangency: no speculation. */
+   t=(-B-Math.sqrt(D))/(2*A);
+   if(!(t>=0&&t<1))continue;
+  }
   if(t<firstT){first=s;firstT=t;}
   if(d2(b.x,b.y,s.x,s.y)<rr*rr&&t<endpointT){endpoint=s;endpointT=t;}
  }
