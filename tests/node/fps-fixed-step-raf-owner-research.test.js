@@ -283,3 +283,80 @@ test('duplicate browser-pilot start and restart after detach fail closed',()=>{
   'stopped pilot restores production input listeners');
  g.destroy();
 });
+
+test('30Hz presentation jitter must not silently discard healthy simulation time',()=>{
+  const g=bootGame(),h=setup(g);try{
+    let at=0;
+    for(let i=0;i<90;i++){
+      at+=34;h.frame(at);
+      at+=1000/15-34;h.frame(at);
+    }
+    assert.equal(h.owner.ticks,360,'6 seconds of 30Hz jitter must advance 360 fixed ticks');
+    assert.equal(h.owner.droppedFrames,0,'ordinary sub-millisecond jitter is not a stall');
+    assert.ok(Math.abs(h.owner.simAtSec-6)<1e-7);
+  }finally{h.close()}
+});
+test('real 49-overlay Game stays physically identical under 30Hz jitter and 60Hz presentation',()=>{
+ function run(seed,intervals){return withSeed(seed,draws=>{
+  const g=bootGame(),h=setup(g);g.sfx.muted=true;let at=0,index=0;
+  try{
+   for(const delta of intervals){
+    at+=delta;h.setNow(at);
+    while(index<trace.length && trace[index][0]<=at+1e-7){
+     const [t,kind,data]=trace[index++];assert.equal(h.capture(kind,t,data),true);
+    }
+    h.frame(at);
+   }
+   return {hash:digest(physical(g)),draws:draws(),ticks:h.owner.ticks,
+    dropped:h.owner.droppedFrames,applied:h.timeline.applied};
+  }finally{h.close()}
+ });}
+ const baseline=Array(360).fill(1000/60);
+ const jitter=Array.from({length:90},()=>[34,1000/15-34]).flat();
+ for(const seed of [1517800,1517802,1517810]){
+  const a=run(seed,baseline),b=run(seed,jitter);
+  assert.equal(a.ticks,360);assert.equal(a.dropped,0);
+  assert.deepEqual(b,a,`ordinary 30Hz jitter changed real gameplay at seed ${seed}`);
+ }
+});
+test('sustained 25Hz overload remains bounded without losing genuine held controls',()=>{
+ const g=bootGame(),h=setup(g);try{
+  h.setNow(5);h.capture('keydown',5,{key:'w'});
+  for(let i=1;i<=125;i++)h.frame(i*40);
+  assert.ok(h.owner.ticks<=250,'never exceed the two-step per-frame CPU budget');
+  assert.ok(h.owner.droppedFrames>0,'overload must be measured, not silently accumulated');
+  assert.ok(h.owner.droppedMs>0);
+  assert.ok(h.owner.lagMs<=(h.owner.maxSteps+2)*STEP_MS+1e-6);
+  assert.equal(g.input.keyboard.up,true,'genuinely held movement must survive bounded overload');
+  h.setNow(5005);h.capture('keyup',5005,{key:'w'});h.frame(5040);
+  assert.equal(g.input.keyboard.up,false,'a genuine release must still stop movement');
+ }finally{h.close()}
+});
+test('stall accounting includes unsimulated fractional lag from before the stall',()=>{
+ const g=bootGame(),h=setup(g);try{
+  h.frame(8);assert.equal(h.owner.ticks,0);
+  h.frame(1008);
+  const accounted=h.owner.ticks*STEP_MS+h.owner.lagMs+h.owner.droppedMs;
+  assert.ok(Math.abs(accounted-1008)<1e-5,
+   `elapsed 1008ms must equal simulated + queued + discarded time; got ${accounted}`);
+ }finally{h.close()}
+});
+test('bounded overload must not erase a fresh input occurring after skipped time',()=>{
+ const g=bootGame(),h=setup(g);try{
+  for(let i=1;i<=5;i++)h.frame(i*40);
+  h.setNow(210);h.capture('keydown',210,{key:'d'});
+  h.frame(240);
+  assert.ok(h.owner.droppedFrames>0,'exercise the bounded backlog-drop branch');
+  assert.equal(g.input.keyboard.right,true,'a fresh keydown after the skipped tick must survive');
+ }finally{h.close()}
+});
+test('a short burst of slow 30Hz frames can be repaid by faster frames without losing ticks',()=>{
+ const g=bootGame(),h=setup(g);try{
+  let at=0;
+  for(const delta of [...Array(5).fill(40),...Array(5).fill(80/3)]){
+   at+=delta;h.frame(at);
+  }
+  assert.equal(h.owner.ticks,20);
+  assert.equal(h.owner.droppedFrames,0,'temporary 30Hz jitter must not be classified as overload');
+ }finally{h.close()}
+});
