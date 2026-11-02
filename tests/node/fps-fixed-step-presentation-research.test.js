@@ -53,6 +53,17 @@ test('120Hz interpolates between consecutive 60Hz poses, while 60Hz is unmodifie
  assert.ok(repeats(fast.rendered)<repeats(base.rendered),
   `camera interpolation did not reduce repeated positions: ${repeats(fast.rendered)} vs ${repeats(base.rendered)}`);
 });
+test('tick-boundary alpha zero draws previous pose, never moves backward mid-frame',()=>{
+ const g={tanks:[{x:0,y:0}],drones:[],shapes:[],cam:{x:0,y:0},
+  update(){this.tanks[0].x+=10;this.cam.x+=10},destroy(){}};
+ const p=new FixedStepPosePresentation(g,{enabled:true});
+ try{g.update();const poses=[];
+  for(const alpha of [0,.5,1])p.draw(game=>poses.push(game.cam.x),g,800,600,alpha);
+  assert.deepEqual(poses,[0,5,10],
+   'interpolation must not jump to the current tick then travel backward');
+  assert.equal(g.cam.x,10);
+ }finally{p.stop()}
+});
 test('interpolation skips teleports, newly created entities and stale samples',()=>{
  const g={tanks:[{x:0,y:0}],drones:[],shapes:[],update(){this.tanks[0].x=200;this.tanks.push({x:10,y:10})},destroy(){}};
  const p=new FixedStepPosePresentation(g,{enabled:true});

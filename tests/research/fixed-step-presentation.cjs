@@ -52,7 +52,7 @@ class FixedStepPosePresentation {
   if(!this.active||g!==this.game||typeof render!=='function')
    throw Error('invalid fixed-step presentation draw');
   this.frames++;
-  if(!this.enabled||g.paused||!(alpha>0&&alpha<1))
+  if(!this.enabled||g.paused||!(alpha>=0&&alpha<=1))
    return render(g,w,h);
   const restored=[];
   try{
