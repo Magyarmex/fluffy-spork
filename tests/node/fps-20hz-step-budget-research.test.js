@@ -44,3 +44,20 @@ test('burst jitter recovers without time loss or physical divergence',()=>{
   assert.equal(recovered.droppedMs,0);
  }
 });
+
+test('virtual presentation-clock audit isolates three existing rail timebase divergences',()=>{
+ const knownRailWallClock=new Set(['railgun','singularity','prism']);
+ const all=['marksman','railgun','ghost','singularity','prism','specter','assassin','tempest'];
+ const observed=[];
+ for(const cls of all){
+  const ref=run({cls,seed:1517800,cadence:'60Hz',maxSteps:2,virtualClock:true});
+  const recovered=run({cls,seed:1517800,cadence:'20Hz-jitter',maxSteps:4,virtualClock:true});
+  for(const key of ['updates','draws','volleys'])assert.equal(recovered[key],ref[key],cls+' '+key);
+  if(recovered.hash!==ref.hash)observed.push(cls);
+  if(!knownRailWallClock.has(cls))assert.equal(recovered.hash,ref.hash,
+   cls+' gained a new wall-clock/presentation-dependent physical divergence');
+ }
+ // Deliberately do not assert that known rail divergences persist: fixing
+ // them should make this research gate greener, not break the test suite.
+ assert.ok(observed.every(cls=>knownRailWallClock.has(cls)));
+});
