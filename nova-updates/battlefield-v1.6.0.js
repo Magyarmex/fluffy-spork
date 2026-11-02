@@ -560,7 +560,7 @@ function needsEarlierStationaryNeutralRecovery(g,b,candidates){
  if(!b||b.pen!==0||b.hits||b.shell||b.beam||b.splash||b.__v17Cannon||
     b.dead||!Number.isFinite(b.ttl)||!(b.ttl>0)||
     !Number.isFinite(b.dmg)||!(b.dmg>0)||
-    !g.bullets||g.bullets.length!==1||!candidates||candidates.length<2||
+    !g.bullets||g.bullets.length>64||!candidates||candidates.length<2||
     !Number.isFinite(b.px)||!Number.isFinite(b.py)||
     !Number.isFinite(b.x)||!Number.isFinite(b.y)||
     !Number.isFinite(b.r)||!(b.r>0))return false;
@@ -585,6 +585,23 @@ function needsEarlierStationaryNeutralRecovery(g,b,candidates){
   if(d2(b.x,b.y,s.x,s.y)<rr*rr&&t<endpointT){endpoint=s;endpointT=t;}
  }
  if(!first||!endpoint||first===endpoint||!(firstT+1e-8<endpointT))return false;
+ /* Reject any other active shot whose frame corridor approaches these
+  * shapes. Remote shots cannot change this local first-contact order. */
+ for(var oi=0;oi<g.bullets.length;oi++){
+  var other=g.bullets[oi];if(!other||other===b||other.dead)continue;
+  var x0=other.px==null?other.x:other.px,
+      y0=other.py==null?other.y:other.py,
+      x1=other.x,y1=other.y;
+  if(!Number.isFinite(x0)||!Number.isFinite(y0)||
+     !Number.isFinite(x1)||!Number.isFinite(y1)||
+     !Number.isFinite(other.r))return false;
+  var pad=64+b.r+Math.max(0,other.r);
+  if(Math.max(x0,x1)+pad<Math.min(ax,b.x)||
+     Math.min(x0,x1)-pad>Math.max(ax,b.x)||
+     Math.max(y0,y1)+pad<Math.min(ay,b.y)||
+     Math.min(y0,y1)-pad>Math.max(ay,b.y))continue;
+  return false;
+ }
  /* Terrain prepass should already have consumed a blocking shot, but
   * verify this corridor is clear before changing the core's hit owner. */
  if(firstSolidHit(g,ax,ay,b.x,b.y,b.r*.45))return false;
