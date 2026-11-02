@@ -1876,7 +1876,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      b.__novaBreachAtTime===g.time||b.pen!==1||(b.hits||0)!==0||
      (b.__novaDirectVictims&&b.__novaDirectVictims.size)||
      !(dt>0)||!Number.isFinite(dt)||!Number.isFinite(b.ttl)||
-     !(b.ttl>dt)||g.__novaShapeSweepActive!==true||
+     !(b.ttl>0)||g.__novaShapeSweepActive!==true||
      !Number.isFinite(g.__novaShapeSweepEpoch)||
      !Number.isFinite(b.x)||!Number.isFinite(b.y)||
      !Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
@@ -1886,7 +1886,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       bullets=g.bullets||[];
   if(shapes.length>180||tanks.length>30||drones.length>80||
      bullets.length>300)return false;
-  var ax=b.x,ay=b.y,dx=b.vx*dt,dy=b.vy*dt,
+  /* An expiring shot only owns the physical part of this frame before TTL.
+   * The same witnessed, two-contact proof applies to that shorter segment. */
+  var travelT=Math.min(dt,b.ttl),
+      ax=b.x,ay=b.y,dx=b.vx*travelT,dy=b.vy*travelT,
       ex=ax+dx,ey=ay+dy,limit=MAP_LIMIT-20;
   if(!(dx*dx+dy*dy>1e-12)||!Number.isFinite(ex)||
      !Number.isFinite(ey)||
@@ -3036,6 +3039,28 @@ function certifiedMultiShotCoverPriority(g,dt){
     localStationaryPiercingPlan(this,dt,false):null;
  var localOrdinaryBatch=!legacyExpiring&&!localExpiring&&expiring>1?
     localOrdinaryTTLBatchPlan(this,dt):null;
+ /* Two witnessed, separated, nonlethal neutral contacts may occur before
+  * an ordinary pen=1 round expires mid-frame. Commit only the complete
+  * two-hit proof before the legacy one-hit TTL fallback can consume it.
+  * This is deliberately one eligible shot per frame, never first-N. */
+ if(expiring===1&&this.bullets.length<=300&&
+    this.shapes&&this.shapes.length<=180){
+  var shapeExpiryCandidate=null;
+  for(var ei=0;ei<this.bullets.length;ei++){
+   var es=this.bullets[ei];
+   if(es&&!es.dead&&!es.shell&&!es.beam&&!es.splash&&
+      !es.__v17Cannon&&es.pen===1&&(es.hits||0)===0&&
+      es.ttl>0&&es.ttl<=dt){shapeExpiryCandidate=es;break;}
+  }
+  /* The existing pair proof itself rejects corridors shorter than two
+   * neutral diameters. Avoid its expensive entity/competition scans on
+   * ordinary expiring shots that cannot possibly pass that same gate. */
+  if(shapeExpiryCandidate&&
+     Math.hypot(shapeExpiryCandidate.vx,shapeExpiryCandidate.vy)*
+       Math.min(dt,shapeExpiryCandidate.ttl)>=2*(12+shapeExpiryCandidate.r)&&
+     isolatedStationaryShapePair(this,shapeExpiryCandidate,dt,true))
+   isolatedStationaryShapePair(this,shapeExpiryCandidate,dt,false);
+ }
  var localSingleBody=null;
  if(!legacyExpiring&&!localExpiring&&!localOrdinaryBatch&&expiring===1)
   for(var candidateI=0;candidateI<this.bullets.length;candidateI++){
