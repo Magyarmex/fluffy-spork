@@ -146,7 +146,11 @@ function createFixedStepBrowserPilot(game,{window:win,document:doc,clock,
     {now:clock.now,request,cancel,render})}
   catch(error){capture.detach();throw error}
   return {timeline,bridge,capture,owner,
-    start(){try{owner.start()}catch(error){capture.detach();throw error}},
+    start(){
+      if(owner.started)throw Error('browser pilot already running');
+      if(!capture.active)throw Error('browser pilot capture detached');
+      try{owner.start()}catch(error){capture.detach();throw error}
+    },
     stop(){owner.stop();capture.detach()}};
 }
 module.exports={FixedStepRafOwner,createFixedStepBrowserPilot,STEP_MS};
