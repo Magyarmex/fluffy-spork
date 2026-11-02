@@ -7,14 +7,14 @@ const {bootGame,withSeed,digest,physical}=require('../research/audio-rng-causal-
 const {ChronologicalInput,STEP}=require('../research/fixed-step-dom-input.cjs');
 const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs');
 const {FixedStepRafOwner,STEP_MS}=require('../research/fixed-step-raf-owner.cjs');
-function setup(game,{render=null}={}){
+function setup(game,{render=null,maxSteps=2}={}){
  let now=1000,next=0,active=new Map(),cancelled=[];
  const timeline=new ChronologicalInput(game.input);
  const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
  game.sfx.startMusic=()=>{};
  const owner=new FixedStepRafOwner(game,timeline,bridge,{
   now:()=>now,request:fn=>{active.set(++next,fn);return next;},
-  cancel:id=>{cancelled.push(id);active.delete(id);},
+  cancel:id=>{cancelled.push(id);active.delete(id);},maxSteps,
   render:(g,w,h,alpha)=>{assert.ok(alpha>=0&&alpha<=1);if(render)render(g,w,h);}
  });
  owner.start();
@@ -359,4 +359,22 @@ test('a short burst of slow 30Hz frames can be repaid by faster frames without l
   assert.equal(h.owner.ticks,20);
   assert.equal(h.owner.droppedFrames,0,'temporary 30Hz jitter must not be classified as overload');
  }finally{h.close()}
+});
+
+test('opt-in three-step recovery prevents extended 30Hz jitter bursts without altering 60Hz gameplay',()=>{
+ function run(seed,intervals,maxSteps){return withSeed(seed,draws=>{
+  const g=bootGame(),h=setup(g,{maxSteps});g.sfx.muted=true;let at=0;
+  try{for(const delta of intervals){at+=delta;h.frame(at)}
+   return {hash:digest(physical(g)),draws:draws(),ticks:h.owner.ticks,
+    dropped:h.owner.droppedFrames};
+  }finally{h.close()}
+ });}
+ const pattern=Array.from({length:5},()=>[...Array(12).fill(40),...Array(12).fill(80/3)]).flat();
+ const baseline=Array(240).fill(1000/60);
+ for(const seed of [1517800,1517810]){
+  const expected=run(seed,baseline,2),recovered=run(seed,pattern,3),limited=run(seed,pattern,2);
+  assert.equal(recovered.ticks,240);assert.equal(recovered.dropped,0);
+  assert.deepEqual(recovered,expected,'three-step recovery must match the real 60Hz world');
+  assert.ok(limited.dropped>0,'two-step CPU cap cannot fully repay prolonged 30Hz jitter');
+ }
 });
