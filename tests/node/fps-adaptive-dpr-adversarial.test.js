@@ -31,3 +31,10 @@ test('a new quality setting is never reverted by research cleanup',()=>{
  assert.equal(pilot.stop(),true);assert.equal(pilot.stop(),false);
  assert.equal(game.dpr,2);assert.equal(game.canvas.width,640);
 });
+test('focus loss cannot leave a temporary low-resolution probe armed',()=>{
+ const {game,pilot}=fixture();step(pilot,0,1000,slow);
+ assert.equal(game.dpr,1);
+ game.paused=true;
+ assert.equal(pilot.sample(1500,slow).kind,'probe-cancelled');
+ assert.equal(game.dpr,1.5);
+});
