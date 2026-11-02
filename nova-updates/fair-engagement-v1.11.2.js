@@ -64,7 +64,17 @@ function hasSpotterRelay(g,classes,observer,target){
   return typeof live==='function'&&live(g,observer,target);
 }
 function canPerceive(g,classes,observer,target){
-  return inGameplayViewport(g,observer,target)||hasSpotterRelay(g,classes,observer,target);
+  /* A hull inside the player-equivalent viewport is not visible through
+   * opaque Battlefield cover. Keep a direct current LOS witness; the
+   * separate live Sniper Observer relay remains the only remote exception.
+   * If Battlefield is absent but solids exist, fail closed rather than
+   * granting live coordinates from an unverified world. */
+  if(inGameplayViewport(g,observer,target)){
+    if(typeof g.hasLineOfSight==='function'){
+      if(g.hasLineOfSight(observer.x,observer.y,target.x,target.y,3))return true;
+    }else if(!g.__novaTerrain||g.__novaTerrain.length===0)return true;
+  }
+  return hasSpotterRelay(g,classes,observer,target);
 }
 function hostile(g,a,b){
   if(!a||!b||a.id===b.id)return false;
