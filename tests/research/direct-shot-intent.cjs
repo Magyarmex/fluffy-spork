@@ -36,13 +36,31 @@ class DirectShotIntent {
     };
     i.pu=function(e){
       const d=self.down;
-      const same=!!(d&&e&&e.pointerType===d.type&&
-        (d.type==='mouse'||e.pointerId===d.id));
       const canceled=!!(e&&e.type==='pointercancel');
+      // If a platform or synthesized event reports secondary-button pointerup
+      // while primary remains held, do not mistake it for primary release.
+      // Conforming mouse Pointer Events normally report only the final up.
+      const primaryReleased=!!(e&&(e.button==null||e.button===0)&&
+        (e.buttons==null||(e.buttons&1)===0));
+      const same=!!(d&&e&&e.pointerType===d.type&&
+        (d.type==='mouse'?(canceled||primaryReleased):e.pointerId===d.id));
       const valid=!!(same&&!d.sampled&&!canceled&&game.status==='playing'&&
         !game.paused&&!doc.hidden&&!i.__novaInputPaused);
-      const dx=i.aim.dx,dy=i.aim.dy,len=Math.hypot(dx,dy);
       const mouse=d&&d.type==='mouse';
+      let dx=i.aim.dx,dy=i.aim.dy;
+      // A short touch/pen flick may end without a separate pointermove.
+      // Read its final coordinate through the REAL Input stick geometry on a
+      // temporary object; never revive the released stick or drone command.
+      if(same&&!mouse&&!canceled&&i.canvas&&
+         Number.isFinite(e.clientX)&&Number.isFinite(e.clientY)&&
+         typeof i.canvas.getBoundingClientRect==='function'&&
+         typeof i.updateStick==='function'){
+        const rect=i.canvas.getBoundingClientRect();
+        const final={ox:i.aim.ox,oy:i.aim.oy,dx:0,dy:0};
+        i.updateStick(final,e.clientX-rect.left,e.clientY-rect.top);
+        dx=final.dx;dy=final.dy;
+      }
+      const len=Math.hypot(dx,dy);
       const eligible=valid&&(mouse?i.firing&&i.mouseActive:
         i.stickId.aim===d.id&&i.aim.active&&Number.isFinite(len)&&len>=9);
       const result=self.old.pu.call(this,e);
@@ -55,7 +73,14 @@ class DirectShotIntent {
       return result;
     };
     game.update=function(...args){
-      if(self.down&&i.firing&&(self.down.type==='mouse'||i.aim.active))self.down.sampled=true;
+      // A pressed right stick with zero deflection cannot fire: Game.aimVec
+      // returns null. Do not consume the tap merely because an un-aimed tick
+      // occurred before the final release coordinate arrived.
+      if(self.down&&game.status==='playing'&&!game.paused&&!doc.hidden&&
+         !i.__novaInputPaused&&i.firing&&
+         (self.down.type==='mouse'?i.mouseActive:
+           i.aim.active&&Math.hypot(i.aim.dx,i.aim.dy)>=9))
+        self.down.sampled=true;
       const intent=self.pending;self.pending=null;
       if(!intent||game.status!=='playing'||game.paused||doc.hidden||
          i.__novaInputPaused||i.aim.active||i.firing)return self.old.update.apply(this,args);
