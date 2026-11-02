@@ -256,3 +256,30 @@ test('fresh post-resume input before the first RAF is preserved, paused input is
  }finally{h.close()}
  assert.equal(g.setPaused,original,'pause owner must restore lifecycle');
 });
+test('duplicate browser-pilot start and restart after detach fail closed',()=>{
+ const {createFixedStepBrowserPilot}=require('../research/fixed-step-raf-owner.cjs');
+ const g=bootGame(),win=g.__testWindow,doc=win.document;
+ const listeners=new Map();const add=(type,fn)=>{
+  if(!listeners.has(type))listeners.set(type,new Set());listeners.get(type).add(fn);
+ };const remove=(type,fn)=>listeners.get(type)?.delete(fn);
+ Object.assign(win,{addEventListener:add,removeEventListener:remove});
+ Object.assign(doc,{addEventListener:add,removeEventListener:remove});
+ Object.assign(g.canvas,{addEventListener:add,removeEventListener:remove});
+ g.input.detach();g.input.attach(g.canvas);
+ let now=1000,callback=null;g.sfx.startMusic=()=>{};
+ const pilot=createFixedStepBrowserPilot(g,{window:win,document:doc,
+  clock:{now:()=>now},request:fn=>(callback=fn,1),
+  cancel:()=>{callback=null},render:()=>{}});
+ pilot.start();
+ assert.throws(()=>pilot.start(),/already running/);
+ assert.equal(pilot.owner.started,true);
+ assert.equal(pilot.capture.active,true,'duplicate start must not detach input');
+ now=1017;callback(now);
+ pilot.stop();
+ assert.equal(pilot.capture.active,false);
+ assert.throws(()=>pilot.start(),/capture detached/);
+ assert.equal(pilot.owner.started,false);
+ assert.ok([...listeners.values()].every(s=>s.size===0)||g.input.canvas===g.canvas,
+  'stopped pilot restores production input listeners');
+ g.destroy();
+});
