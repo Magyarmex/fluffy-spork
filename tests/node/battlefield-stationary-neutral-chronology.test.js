@@ -145,3 +145,29 @@ test('ordinary pen=1 shot retains first-contact order after a lethal prior hit',
  assert.equal(r.hp[1],80);
  assert.equal(r.hp[2],100);
 });
+
+test('ordinary pen=1 projectile honors unique starting overlap after its first lethal contact',()=>{
+ for(const hz of [30,60]){
+  const r=withSeed(1517802,()=>{
+   const g=bootGame();if(!g.player)g.redeploy();g.sfx.muted=true;
+   const p=g.player;p.x=1000;p.y=1000;p.hp=1000;p.alive=true;
+   g.tanks=[p];g.tankById=new Map([[p.id,p]]);g.drones=[];g.__novaTerrain=[];
+   const ss=g.shapes.filter(s=>s.type==='circle').slice(0,3);
+   ss.forEach((s,i)=>{s.x=[20,36,70][i];s.y=0;s.type='square';
+    s.r=12;s.hp=i?100:10;s.born=0;s.vx=0;s.vy=0;s.wanderT=999;});
+   const refs=ss.slice();g.shapes=ss;g.time=0;
+   g.input.firing=false;g.input.autofire=false;
+   g.input.moveVec=()=>({x:0,y:0});g.input.aimVec=()=>null;
+   const hits=[],old=g.damageShape;
+   g.damageShape=function(s,...args){if(refs.includes(s))hits.push(refs.indexOf(s));
+    return old.call(this,s,...args);};
+   g.bullets=[{kind:'bullet',id:100,ownerId:p.id,x:0,y:0,
+    vx:1000,vy:0,r:3,dmg:20,ttl:1,pen:1,hits:0,
+    dead:false,shell:false,beam:false,color:'#fff'}];
+   for(let i=0;i<(hz===30?2:4);i++)g.update(1/hz);
+   return {hits,hp:refs.map(s=>s.hp)};
+  });
+  assert.deepEqual(r.hits.slice(0,2),[0,1],'prior kill then starting overlap at '+hz+'Hz');
+  assert.ok(r.hp[0]<=0);assert.equal(r.hp[1],80);assert.equal(r.hp[2],100);
+ }
+});
