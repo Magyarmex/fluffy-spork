@@ -589,6 +589,7 @@ function needsEarlierStationaryNeutralRecovery(g,b,candidates){
   * shapes. Remote shots cannot change this local first-contact order. */
  for(var oi=0;oi<g.bullets.length;oi++){
   var other=g.bullets[oi];if(!other||other===b||other.dead)continue;
+  if(other.shell||other.beam||other.splash||other.__v17Cannon)return false;
   var x0=other.px==null?other.x:other.px,
       y0=other.py==null?other.y:other.py,
       x1=other.x,y1=other.y;
