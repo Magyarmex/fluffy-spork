@@ -72,6 +72,16 @@ test('camera and hull interpolate together, and both are restored',()=>{
  assert.equal(g.tanks[0].x,20);assert.equal(g.cam.x,10);
  }finally{p.stop()}
 });
+test('redeploy or game-state transition never interpolates stale camera coordinates',()=>{
+ const old={x:0,y:0},replacement={x:5,y:0};
+ const g={tanks:[old],drones:[],shapes:[],cam:{x:0,y:0},player:old,status:'playing',
+  update(){this.player=replacement;this.tanks=[replacement];this.cam.x=10;this.status='dead'},destroy(){}};
+ const p=new FixedStepPosePresentation(g,{enabled:true});
+ try{g.update();p.draw(game=>{
+  assert.equal(game.cam.x,10);assert.equal(game.player.x,5);
+ },g,800,600,.5);
+ }finally{p.stop()}
+});
 test('render exception always restores exact live positions',()=>{
  const g={tanks:[{x:0,y:0}],drones:[],shapes:[],update(){this.tanks[0].x=10},destroy(){}};
  const p=new FixedStepPosePresentation(g,{enabled:true});
