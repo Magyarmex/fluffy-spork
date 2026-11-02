@@ -26,6 +26,10 @@ function scenario(hz,opt={}){
   g.bullets=[{kind:'bullet',id:100,ownerId:p.id,x:0,y:0,
    vx:1000,vy:0,r:3,dmg:20,ttl:1,pen:0,hits:0,
    dead:false,shell:false,beam:false,color:'#fff'}];
+  if(opt.extraBullet)g.bullets.push({kind:'bullet',id:101,ownerId:p.id,
+   x:opt.extraBullet.x,y:opt.extraBullet.y,vx:0,vy:0,
+   r:3,dmg:1,ttl:1,pen:0,hits:0,dead:false,
+   shell:false,beam:false,color:'#fff'});
   g.update(1/hz);
   return {hits,hp:Array.from(refs,s=>s.hp)};
  });
@@ -58,4 +62,13 @@ test('60 varied separated first surfaces outrank later endpoint overlap',()=>{
   assert.deepEqual(r.hits,[0],'wrong first contact at sample '+i);
   assert.deepEqual(r.hp,[80,100]);
  }
+});
+
+test('a distant independent shot does not suppress local first contact',()=>{
+ const r=scenario(30,{extraBullet:{x:1400,y:1400}});
+ assert.deepEqual(r.hits,[0]);assert.deepEqual(r.hp,[80,100]);
+});
+test('a nearby competing shot preserves the original contact behavior',()=>{
+ const r=scenario(30,{extraBullet:{x:24,y:0}});
+ assert.deepEqual(r.hits,[0,0]);assert.deepEqual(r.hp,[79,100]);
 });
