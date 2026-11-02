@@ -94,12 +94,7 @@ wrap('game/engine',function(engine){
   var oldStart=Game.prototype.start, oldDestroy=Game.prototype.destroy,oldResize=Game.prototype.resize;
   if(oldResize)Game.prototype.resize=function(){
     var out=oldResize.apply(this,arguments);
-    if(state.renderScale<100&&this.canvas&&Number.isFinite(this.dpr)){
-      var reduced=Math.max(1,this.dpr*state.renderScale/100);
-      this.dpr=reduced;
-      this.canvas.width=Math.max(1,Math.round(this.w*reduced));
-      this.canvas.height=Math.max(1,Math.round(this.h*reduced));
-    }
+    if(state.renderScale<100)applyBackingScale(this,this.dpr);
     return out;
   };
   if(oldStart)Game.prototype.start=function(){
@@ -136,8 +131,18 @@ wrap('game/render',function(render){
 
 /* Render backing pixels only: CSS viewport, camera, minimap and game logic stay unchanged.
  * Explicit player choice, not an unvalidated automatic quality switch. */
+function applyBackingScale(g,base){
+  if(!g||!g.canvas||!Number.isFinite(base)||!Number.isFinite(g.w)||!Number.isFinite(g.h))return;
+  var dpr=Math.max(1,base*state.renderScale/100);
+  if(g.dpr===dpr&&g.canvas.width===Math.round(g.w*dpr)&&g.canvas.height===Math.round(g.h*dpr))return;
+  g.dpr=dpr;
+  g.canvas.width=Math.max(1,Math.round(g.w*dpr));
+  g.canvas.height=Math.max(1,Math.round(g.h*dpr));
+}
 function applyRenderScale(){
-  if(activeGame&&typeof activeGame.resize==='function')activeGame.resize();
+  if(!activeGame)return;
+  var base=Math.max(1,Math.min(window.devicePixelRatio||1,activeGame.quality==='high'?2:1.5));
+  applyBackingScale(activeGame,base);
 }
 function applyVisualSettings(){
   var root=document.documentElement;
