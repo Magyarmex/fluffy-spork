@@ -199,3 +199,14 @@ test('nonfinite and negative dt cannot poison measured simulation progress',()=>
  const p=t.timingWindow(t.perfState(g));
  assert.equal(p.simulationHz,60);assert.equal(p.simulationPacePct,100);
 });
+
+test('paused rendering cannot overwrite the last real-match diagnostic snapshot',()=>{
+ const t=telemetry(),g={status:'playing',paused:false};t.recordPresentation(g,0);
+ for(let i=0;i<140;i++){t.recordSimulation(g,1/60);sample(t,g,1000/60);}
+ const previous=t.window.__NOVA_PERF_LAST__;
+ assert.ok(previous&&previous.simulationPacePct===100);
+ g.paused=true;
+ for(let i=0;i<200;i++)sample(t,g,1000/60);
+ assert.equal(t.window.__NOVA_PERF_LAST__,previous,
+  'a paused game must not erase the last meaningful live-match performance snapshot');
+});
