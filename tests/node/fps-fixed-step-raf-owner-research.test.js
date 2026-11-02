@@ -401,3 +401,13 @@ test('bounded RAF conserves elapsed time across randomized jitter, overload and 
   owner.stop();
  }
 });
+
+test('150ms suspension clears stale held input even with four-step opt-in budget',()=>{
+ const g=bootGame(),h=setup(g,{maxSteps:4});try{
+  h.setNow(10);h.capture('keydown',10,{key:'w'});h.frame(1000/60);
+  assert.equal(g.input.keyboard.up,true);
+  h.frame(1000/60+150);
+  assert.equal(g.input.keyboard.up,false,'a 150ms suspension must not replay old movement');
+  assert.equal(h.owner.droppedFrames,1);
+ }finally{h.close()}
+});
