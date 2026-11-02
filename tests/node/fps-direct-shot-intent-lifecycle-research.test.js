@@ -256,3 +256,22 @@ test('release-only direction/depth matches shipping Input stick geometry over 4,
  }
  g.destroy();
 });
+
+
+test('an un-aimed touch/pen update does not consume a later release-only flick',()=>{
+ for(const kind of ['touch','pen'])for(const cls of ['scout','carrier','hivemind']){
+  const g=bootGame();g.sfx.muted=true;g.input.autofire=false;g.setClass(g.player,cls);
+  const o=new DirectShotIntent(g,{window:g.__testWindow,document:g.__testWindow.document});
+  const i=g.input;let shots=0;const fire=g.tryFire;
+  g.tryFire=function(t){const n=this.bullets.length,r=fire.apply(this,arguments);
+    if(t===g.player&&this.bullets.length>n)shots++;return r;};
+  i.pd(event('pointerdown',kind,600));
+  g.update(1/60); // stick is held, but no aim direction exists yet
+  assert.ok(o.down&&!o.down.sampled,'zero-vector stick is not a firing opportunity');
+  i.pu(event('pointerup',kind,640));
+  assert.ok(o.pending,'release-only flick must survive un-aimed update');
+  g.update(1/60);assert.equal(o.intents,1);assert.equal(shots,1);
+  assert.equal(i.firing,false);assert.equal(i.aim.active,false);
+  g.destroy();
+ }
+});
