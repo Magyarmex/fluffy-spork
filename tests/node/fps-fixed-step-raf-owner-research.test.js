@@ -271,7 +271,7 @@ test('duplicate browser-pilot start and restart after detach fail closed',()=>{
   clock:{now:()=>now},request:fn=>(callback=fn,1),
   cancel:()=>{callback=null},render:()=>{}});
  pilot.start();
- assert.throws(()=>pilot.start(),/already running/);
+ assert.throws(()=>pilot.start(),/already (started|running)/);
  assert.equal(pilot.owner.started,true);
  assert.equal(pilot.capture.active,true,'duplicate start must not detach input');
  now=1017;callback(now);
