@@ -295,7 +295,18 @@ wrap('game/engine',function(engine,require){
     var lin=lineage(classes,t),before=this.bullets.length,counter=guardian(t)?(t.__v17CounterCharge||0):0;
     oldTry.call(this,t);
     if(this.bullets.length<=before)return;
-    if(lin==='gunner')onGunnerFire(this,t,before);
+    if(lin==='gunner'){
+      /* At a coarse simulation step the firing update skips an extra
+       * pre-shot cooling slice. Repay only the excess over the canonical
+       * 60Hz step, before this shot adds heat. Never modify the 60Hz path. */
+      var step=this.__v17FiringStepDt||0;
+      var repay=Math.max(0,Math.min(1/60,step-1/60));
+      if(repay>1e-9&&t.__v17FiredAt!=null&&this.time-t.__v17FiredAt>.08){
+        var cool=shotMode(t)==='minigun'?.48:.62;
+        t.__v17Heat=Math.max(0,(t.__v17Heat||0)-repay*cool);
+      }
+      onGunnerFire(this,t,before);
+    }
     else if(lin==='cannon')annotateCannon(this,t,before,false);
     else if(lin==='guardian'&&counter>0){
       var used=false;
@@ -638,7 +649,11 @@ wrap('game/engine',function(engine,require){
 
   var oldUpdate=Game.prototype.update;
   Game.prototype.update=function(dt){
-    oldUpdate.call(this,dt);
+    /* Expose the step only during the wrapped update. Direct/manual shots
+     * outside the simulation must not inherit stale frame duration. */
+    var priorStep=this.__v17FiringStepDt||0;
+    this.__v17FiringStepDt=dt;
+    try{oldUpdate.call(this,dt);}finally{this.__v17FiringStepDt=priorStep;}
     if(!this.tanks)return;
     for(var i=0;i<this.tanks.length;i++){
       var t=this.tanks[i];if(!t||!t.alive)continue;
