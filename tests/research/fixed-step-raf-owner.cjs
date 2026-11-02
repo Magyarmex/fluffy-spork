@@ -85,7 +85,7 @@ class FixedStepRafOwner {
       this.timeline.consumeThrough(this.simAtSec);
     }else{
       const maxMs=this.maxSteps*STEP_MS;
-      if(raw>Math.max(100,maxMs*3)+EPS){
+      if(raw>100+EPS){
         // Genuine long stall: discard old controls and bound catch-up. A
         // healthy 30Hz frame can be a little longer than two 60Hz steps;
         // treating that ordinary jitter as a stall loses whole updates.
