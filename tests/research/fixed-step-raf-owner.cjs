@@ -97,8 +97,8 @@ class FixedStepRafOwner {
       }else{
         this.lagMs+=raw;
         // Keep at most two extra full steps of backlog for transient jitter.
-        // Under sustained overload, skip only whole ticks, and invalidate
-        // held input rather than replaying stale commands after the skip.
+        // Under sustained overload, skip only whole ticks, retaining
+        // chronological input edges that are still valid after the skip.
         const maxBacklog=(this.maxSteps+2)*STEP_MS;
         if(this.lagMs>maxBacklog+EPS){
           const skipped=Math.ceil((this.lagMs-maxBacklog-EPS)/STEP_MS)*STEP_MS;
