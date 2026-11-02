@@ -10,10 +10,10 @@ function method(html){const s=html.indexOf('    start() {'),e=html.indexOf('    
  assert.ok(s>=0&&e>s,'canonical start/destroy owner');const body=html.slice(s,e),a=body.indexOf('{'),b=body.indexOf('\n    }',a);
  assert.ok(b>a);return new Function('performance','requestAnimationFrame','render_1',
   'return ({start(){'+body.slice(a+1,b)+'\n}}).start');}
-function driver(html){let now=0,raf=null,draws=0,mini=0;const dts=[];
- const start=method(html)({now:()=>now},fn=>{raf=fn;return 1;},{render:()=>draws++});
+function driver(html,workMs=0){let now=0,workClock=0,raf=null,draws=0,mini=0;const dts=[];
+ const start=method(html)({now:()=>now+workClock},fn=>{raf=fn;return 1;},{render:()=>draws++});
  const g={last:0,sfx:{startMusic(){}},w:320,h:568,mmTimer:0,paused:false,
-  update(dt){assert.ok(Number.isFinite(dt)&&dt>=0&&dt<=1/30+1e-12,'safe dt');dts.push(dt);},
+  update(dt){assert.ok(Number.isFinite(dt)&&dt>=0&&dt<=1/30+1e-12,'safe dt');dts.push(dt);workClock+=workMs;},
   drawMinimap(){mini++;}};
  start.call(g);return {g,dts,frame(ms){now+=ms;const cb=raf;cb(now);},
   get draws(){return draws;},get mini(){return mini;}};
@@ -66,4 +66,48 @@ test('pause, evolution pause, and resume do not leak stale time debt',()=>{
 test('clock regression never produces a negative simulation step',()=>{
  const d=driver(patchRafStepCap(raw()));d.frame(1000/60);d.frame(-10);d.frame(10);
  assert.ok(d.dts.every(x=>x>=0));
+});
+
+
+test('sustained 20Hz presentation repays one bounded 30Hz step every other draw',()=>{
+ const d=driver(patchRafStepCap(raw()));for(let i=0;i<40;i++)d.frame(50);
+ approx(total(d.dts),2);assert.equal(d.dts.length,60);
+ assert.equal(d.draws,40);
+ assert.ok(d.dts.every(x=>x<=1/30+1e-12));
+});
+test('48/52ms presentation jitter recovers exact 30Hz simulation without unbounded steps',()=>{
+ const d=driver(patchRafStepCap(raw()));for(let i=0;i<40;i++)d.frame(i%2?52:48);
+ approx(total(d.dts),2);assert.equal(d.dts.length,60);
+ assert.equal(d.draws,40);
+});
+test('slow-frame catchup stops immediately if first update pauses or opens an offer',()=>{
+ const d=driver(patchRafStepCap(raw()));d.frame(50);
+ const old=d.g.update;d.g.update=function(dt){old.call(this,dt);this.paused=true;};
+ d.frame(50);assert.equal(d.dts.length,2,'no second step after pause');
+ d.g.paused=false;d.g.update=old;d.frame(1000/60);
+ approx(d.dts.at(-1),1/60);
+});
+test('long 120ms frame never triggers the additional catchup update',()=>{
+ const d=driver(patchRafStepCap(raw()));d.frame(120);
+ assert.equal(d.dts.length,1);approx(d.dts[0],1/30);
+});
+
+test('expensive frames decline optional recovery rather than multiplying CPU overload',()=>{
+ const d=driver(patchRafStepCap(raw()),22);for(let i=0;i<40;i++)d.frame(50);
+ assert.equal(d.draws,40);assert.equal(d.dts.length,40);
+ approx(total(d.dts),40/30);
+});
+
+test('randomized mixed-load presentation never creates time or exceeds two updates per draw',()=>{
+ for(const workMs of [0,8,22]){
+  const d=driver(patchRafStepCap(raw()),workMs);let elapsed=0,state=0x6a09e667;
+  for(let i=0;i<2400;i++){
+   state^=state<<13;state^=state>>>17;state^=state<<5;
+   const ms=[1000/120,1000/60,1000/30,48,52,80,120][(state>>>0)%7];
+   const before=d.dts.length;d.frame(ms);elapsed+=ms/1000;
+   assert.ok(d.dts.length-before<=2,'bounded work per presentation');
+   assert.ok(total(d.dts)<=elapsed+1e-7,'cannot simulate unearned time');
+  }
+  assert.equal(d.draws,2400);
+ }
 });
