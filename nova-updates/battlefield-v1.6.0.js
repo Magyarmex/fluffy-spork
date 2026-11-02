@@ -1872,9 +1872,17 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   * two proven stationary contacts; leave every contested event to the
   * existing engine rather than inventing a general chronology. */
  function isolatedStationaryShapePair(g,b,dt,dryRun){
+  /* A surviving pen=0 round with one witnessed, already-damaged neutral
+   * may finish its final contact in the TTL frame. Never replay the first
+   * victim or infer a missing ledger from the hit counter. */
+  var continuation=!!(b&&b.pen===0&&b.hits===1);
+  var prior=continuation&&b.__novaDirectVictims instanceof Set&&
+      b.__novaDirectVictims.size===1&&b.__novaDirectVictims.values().next().value;
   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
-     b.__novaBreachAtTime===g.time||b.pen!==1||(b.hits||0)!==0||
-     (b.__novaDirectVictims&&b.__novaDirectVictims.size)||
+     b.__novaBreachAtTime===g.time||
+     !(continuation||(b.pen===1&&(b.hits||0)===0))||
+     (continuation ? !(prior&&prior.kind==='shape'&&prior.hp>0) :
+       !!(b.__novaDirectVictims&&b.__novaDirectVictims.size))||
      !(dt>0)||!Number.isFinite(dt)||!Number.isFinite(b.ttl)||
      !(b.ttl>0)||g.__novaShapeSweepActive!==true||
      !Number.isFinite(g.__novaShapeSweepEpoch)||
@@ -1884,7 +1892,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      !Number.isFinite(b.dmg)||!(b.dmg>0))return false;
   var shapes=g.shapes||[],tanks=g.tanks||[],drones=g.drones||[],
       bullets=g.bullets||[];
-  if(shapes.length>180||tanks.length>30||drones.length>80||
+  if((continuation&&(shapes.indexOf(prior)<0||
+       prior.__novaShapeSweepEpoch!==g.__novaShapeSweepEpoch||
+       shapeWasTeleported(g,prior)))||
+     shapes.length>180||tanks.length>30||drones.length>80||
      bullets.length>300)return false;
   /* An expiring shot only owns the physical part of this frame before TTL.
    * The same witnessed, two-contact proof applies to that shorter segment. */
@@ -1894,7 +1905,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   if(!(dx*dx+dy*dy>1e-12)||!Number.isFinite(ex)||
      !Number.isFinite(ey)||
      Math.max(Math.abs(ax),Math.abs(ay),Math.abs(ex),Math.abs(ey))>=limit||
-     Math.hypot(dx,dy)<2*(12+b.r))return false;
+     (!continuation&&Math.hypot(dx,dy)<2*(12+b.r)))return false;
   function near(x,y,tx,ty,pad){
    if(!Number.isFinite(x)||!Number.isFinite(y)||
       !Number.isFinite(tx)||!Number.isFinite(ty)||
@@ -1915,6 +1926,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       s.__novaShapeSweepEpoch!==g.__novaShapeSweepEpoch||
       !Number.isFinite(sx)||!Number.isFinite(sy)||
       !Number.isFinite(s.x)||!Number.isFinite(s.y))return false;
+   if(continuation&&s===prior)continue; /* already hit by core */
    if(!near(sx,sy,s.x,s.y,rr+4))continue;
    /* Ordinary Circles/Squares drift at <=10u/s. The observed frame
     * displacement bounds their entire straight core integration; use a
@@ -1947,11 +1959,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       !(guaranteed>1e-9)||!(guaranteed<1-1e-9))return false;
    if(!Number.isFinite(s.hp)||s.hp<=b.dmg*2)return false;
    contacts.push({e:s,t:guaranteed,earliest:possible});
-   if(contacts.length>2)return false;
+   if(contacts.length>(continuation?1:2))return false;
   }
-  if(contacts.length!==2)return false;
+  if(contacts.length!==(continuation?1:2))return false;
   contacts.sort(function(a,c){return a.t-c.t;});
-  if(contacts[1].earliest<=contacts[0].t+1e-7)return false;
+  if(!continuation&&contacts[1].earliest<=contacts[0].t+1e-7)return false;
   for(var ti=0;ti<tanks.length;ti++){
    var t=tanks[ti];if(!t||!t.alive||t.id===b.ownerId)continue;
    var def=CLASSES[t.cls];
@@ -3060,6 +3072,39 @@ function certifiedMultiShotCoverPriority(g,dt){
        Math.min(dt,shapeExpiryCandidate.ttl)>=2*(12+shapeExpiryCandidate.r)&&
      isolatedStationaryShapePair(this,shapeExpiryCandidate,dt,true))
    isolatedStationaryShapePair(this,shapeExpiryCandidate,dt,false);
+  /* A prior core neutral hit may leave exactly one penetration contact.
+   * Certify its TTL-frame continuation only when no competing expiring shot
+   * can alter event order; the shared proof vetoes all local competitors. */
+  var continuationCandidate=null;
+  for(var ci=0;ci<this.bullets.length;ci++){
+   var cb=this.bullets[ci];
+   if(cb&&!cb.dead&&cb.pen===0&&cb.hits===1&&
+      cb.ttl>0&&cb.ttl<=dt){
+    if(continuationCandidate){continuationCandidate=null;break;}
+    continuationCandidate=cb;
+   }
+  }
+  if(continuationCandidate){
+   /* Cheap read-only corridor prefilter. A remote expired shot must not
+    * scan the entire neutral population just to reject a missing target. */
+   var cReach=Math.hypot(continuationCandidate.vx,
+       continuationCandidate.vy)*Math.min(dt,continuationCandidate.ttl),
+       plausible=Number.isFinite(cReach)&&cReach>0;
+   if(plausible&&this.hash&&typeof this.hash.query==='function'){
+    var cNearby=[],cx=continuationCandidate.x+
+       continuationCandidate.vx*Math.min(dt,continuationCandidate.ttl)*.5,
+        cy=continuationCandidate.y+
+       continuationCandidate.vy*Math.min(dt,continuationCandidate.ttl)*.5;
+    this.hash.query(cx,cy,cReach*.5+continuationCandidate.r+45,cNearby);
+    plausible=cNearby.some(function(e){return e&&e.kind==='shape'&&
+      e.hp>continuationCandidate.dmg*2&&
+      (e.type==='circle'||e.type==='square')&&
+      !(continuationCandidate.__novaDirectVictims&&
+        continuationCandidate.__novaDirectVictims.has(e));});
+   }
+   if(plausible&&isolatedStationaryShapePair(this,continuationCandidate,dt,true))
+    isolatedStationaryShapePair(this,continuationCandidate,dt,false);
+  }
  }
  var localSingleBody=null;
  if(!legacyExpiring&&!localExpiring&&!localOrdinaryBatch&&expiring===1)
