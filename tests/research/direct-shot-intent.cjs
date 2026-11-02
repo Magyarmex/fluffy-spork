@@ -48,21 +48,17 @@ class DirectShotIntent {
         !game.paused&&!doc.hidden&&!i.__novaInputPaused);
       const mouse=d&&d.type==='mouse';
       let dx=i.aim.dx,dy=i.aim.dy;
-      // Browsers may coalesce a very brief touch/pen movement into the final
-      // pointerup, without delivering a separate pointermove. Read that final
-      // coordinate through the same 64px stick clamp and 9px dead zone as
-      // Input.updateStick, without reviving the released physical stick.
+      // A short touch/pen flick may end without a separate pointermove.
+      // Read its final coordinate through the REAL Input stick geometry on a
+      // temporary object; never revive the released stick or drone command.
       if(same&&!mouse&&!canceled&&i.canvas&&
          Number.isFinite(e.clientX)&&Number.isFinite(e.clientY)&&
-         typeof i.canvas.getBoundingClientRect==='function'){
+         typeof i.canvas.getBoundingClientRect==='function'&&
+         typeof i.updateStick==='function'){
         const rect=i.canvas.getBoundingClientRect();
-        const x=e.clientX-rect.left-i.aim.ox,y=e.clientY-rect.top-i.aim.oy;
-        const radius=Math.hypot(x,y);
-        if(Number.isFinite(radius)){
-          if(radius<9){dx=0;dy=0;}
-          else if(radius>64){dx=x*64/radius;dy=y*64/radius;}
-          else{dx=x;dy=y;}
-        }
+        const final={ox:i.aim.ox,oy:i.aim.oy,dx:0,dy:0};
+        i.updateStick(final,e.clientX-rect.left,e.clientY-rect.top);
+        dx=final.dx;dy=final.dy;
       }
       const len=Math.hypot(dx,dy);
       const eligible=valid&&(mouse?i.firing&&i.mouseActive:
