@@ -147,7 +147,7 @@ function timingSample(p,key,value){
   if(r.count<PERF_WINDOW)r.count++;
 }
 function recordPresentation(g,now){
-  if(!g||!Number.isFinite(now))return;
+  if(!g||g.__novaDecorativeWorld||!Number.isFinite(now))return;
   var p=perfState(g),previous=p.lastPresentationAt;
   p.lastPresentationAt=now;
   if(previous==null)return;
@@ -176,9 +176,9 @@ function timingWindow(p){
 function record(g,key,ms){
   if(!g)return;var p=perfState(g),peak=key==='updateMs'?'updatePeakMs':'renderPeakMs';
   p[key]=ema(p[key],ms,.08);p[peak]=Math.max(p[peak]*.997,ms);p.samples++;
-  timingSample(p,key==='updateMs'?'updateTimes':'renderTimes',ms);
+  if(!g.__novaDecorativeWorld)timingSample(p,key==='updateMs'?'updateTimes':'renderTimes',ms);
   var now=typeof performance!=='undefined'&&performance.now?performance.now():Date.now();
-  if(now-p.lastSnapshotAt>2000){p.lastSnapshotAt=now;window.__NOVA_PERF_LAST__=Object.assign({version:VERSION,updateMs:+p.updateMs.toFixed(2),renderMs:+p.renderMs.toFixed(2),updatePeakMs:+p.updatePeakMs.toFixed(2),renderPeakMs:+p.renderPeakMs.toFixed(2),terrainQueries:p.terrainQueries,avgTerrainCandidates:p.terrainQueries?+(p.terrainCandidates/p.terrainQueries).toFixed(2):0,aiRouteFramesSkipped:p.aiRouteFramesSkipped,droneRouteFramesSkipped:p.droneRouteFramesSkipped,tanks:g.tanks?g.tanks.length:0,drones:g.drones?g.drones.length:0,bullets:g.bullets?g.bullets.length:0,shapes:g.shapes?g.shapes.length:0},timingWindow(p));}
+  if(now-p.lastSnapshotAt>2000){p.lastSnapshotAt=now;if(!g.__novaDecorativeWorld)window.__NOVA_PERF_LAST__=Object.assign({version:VERSION,updateMs:+p.updateMs.toFixed(2),renderMs:+p.renderMs.toFixed(2),updatePeakMs:+p.updatePeakMs.toFixed(2),renderPeakMs:+p.renderPeakMs.toFixed(2),terrainQueries:p.terrainQueries,avgTerrainCandidates:p.terrainQueries?+(p.terrainCandidates/p.terrainQueries).toFixed(2):0,aiRouteFramesSkipped:p.aiRouteFramesSkipped,droneRouteFramesSkipped:p.droneRouteFramesSkipped,tanks:g.tanks?g.tanks.length:0,drones:g.drones?g.drones.length:0,bullets:g.bullets?g.bullets.length:0,shapes:g.shapes?g.shapes.length:0},timingWindow(p));}
 }
 function callWithoutFirstHit(g,fn,a,b,c,d){
   var own=Object.prototype.hasOwnProperty.call(g,'firstTerrainHit'),prev=g.firstTerrainHit;
