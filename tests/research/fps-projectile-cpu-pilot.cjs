@@ -12,7 +12,7 @@ function run({seed=1517800,hz=60,seconds=4,extraShots=0,instrument=true,cls='tem
     typeof cls!=='string'||!cls||typeof instrument!=='boolean')
   throw Error('invalid FPS projectile pilot configuration');
  return withSeed(seed,draws=>{
-  const g=bootGame();let originalBullets,originalCollisions;
+  const g=bootGame();let originalBullets,originalCollisions,originalFire;
   try{
    g.sfx.muted=true;g.sfx.startMusic=()=>{};
    g.setClass(g.player,cls);
@@ -29,6 +29,16 @@ function run({seed=1517800,hz=60,seconds=4,extraShots=0,instrument=true,cls='tem
      shell:false,beam:false,hits:0,dead:false});
    }
    const timing={updateMs:0,bulletsMs:0,collisionMs:0};
+   let playerVolleys=0,playerEmittedProjectiles=0;
+   originalFire=g.tryFire;
+   g.tryFire=function(t,...args){
+    const before=this.bullets.length;
+    const result=originalFire.call(this,t,...args);
+    if(t===this.player&&this.bullets.length>before){
+     playerVolleys++;playerEmittedProjectiles+=this.bullets.length-before;
+    }
+    return result;
+   };
    if(instrument){
     originalBullets=g.updateBullets;originalCollisions=g.resolveBulletCollisions;
     g.resolveBulletCollisions=function(...args){
@@ -51,11 +61,17 @@ function run({seed=1517800,hz=60,seconds=4,extraShots=0,instrument=true,cls='tem
    return {seed,hz,seconds,cls,extraShots,instrument,ticks,
     peakProjectiles:peak,meanProjectiles:projectileSamples/ticks,
     finalProjectiles:g.bullets.length,
-    physicalHash:digest(physical(g)),rngDraws:draws(),
+    physicalHash:digest({world:physical(g),weapon:{
+     cls:g.player.cls,fireCd:g.player.fireCd,fireSpin:g.player.fireSpin,
+     barrelIdx:g.player.barrelIdx,heat:g.player.__v17Heat,
+     stability:g.player.__v17Stability,cadence:g.player.__v17Cadence,
+     shotIndex:g.player.__v17ShotIndex,overheatT:g.player.overheatT}}),
+    playerVolleys,playerEmittedProjectiles,rngDraws:draws(),
     terrainQueries:g.__novaPerf?.battlefieldQueries??null,
     terrainCandidates:g.__novaPerf?.battlefieldCandidates??null,
     ...timing};
   }finally{
+   if(originalFire)g.tryFire=originalFire;
    if(originalBullets)g.updateBullets=originalBullets;
    if(originalCollisions)g.resolveBulletCollisions=originalCollisions;
    g.destroy();
