@@ -3052,7 +3052,12 @@ function certifiedMultiShotCoverPriority(g,dt){
       !es.__v17Cannon&&es.pen===1&&(es.hits||0)===0&&
       es.ttl>0&&es.ttl<=dt){shapeExpiryCandidate=es;break;}
   }
+  /* The existing pair proof itself rejects corridors shorter than two
+   * neutral diameters. Avoid its expensive entity/competition scans on
+   * ordinary expiring shots that cannot possibly pass that same gate. */
   if(shapeExpiryCandidate&&
+     Math.hypot(shapeExpiryCandidate.vx,shapeExpiryCandidate.vy)*
+       Math.min(dt,shapeExpiryCandidate.ttl)>=2*(12+shapeExpiryCandidate.r)&&
      isolatedStationaryShapePair(this,shapeExpiryCandidate,dt,true))
    isolatedStationaryShapePair(this,shapeExpiryCandidate,dt,false);
  }
