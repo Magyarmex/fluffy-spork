@@ -18,7 +18,7 @@ if(window.__NOVA_PILOT_CONSOLE__)return;
 
 var VERSION='1.7.7', CODENAME='Pilot Console';
 var STORAGE_KEY='novatanks_pilot_settings_v1';
-var DEFAULTS={aimSensitivity:100,moveSensitivity:100,stickSize:100,stickOpacity:82,screenShake:100};
+var DEFAULTS={aimSensitivity:100,moveSensitivity:100,stickSize:100,stickOpacity:82,screenShake:100,renderScale:100};
 var state=loadSettings();
 var activeGame=null;
 var gearButton=null;
@@ -38,6 +38,7 @@ window.__NOVA_PILOT_CONSOLE__={
 
 function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
 function num(v,fallback,min,max){v=Number(v);return Number.isFinite(v)?clamp(v,min,max):fallback;}
+function renderClarity(v){var n=Number(v);return v==null||!Number.isFinite(n)||n<65||n>100?100:n;}
 function loadSettings(){
   var raw=null;
   try{raw=JSON.parse(localStorage.getItem(STORAGE_KEY)||'null');}catch(_){raw=null;}
@@ -47,7 +48,8 @@ function loadSettings(){
     moveSensitivity:num(raw.moveSensitivity,DEFAULTS.moveSensitivity,60,160),
     stickSize:num(raw.stickSize,DEFAULTS.stickSize,80,130),
     stickOpacity:num(raw.stickOpacity,DEFAULTS.stickOpacity,30,100),
-    screenShake:num(raw.screenShake,DEFAULTS.screenShake,0,100)
+    screenShake:num(raw.screenShake,DEFAULTS.screenShake,0,100),
+    renderScale:renderClarity(raw.renderScale)
   };
 }
 function saveSettings(){
@@ -56,13 +58,13 @@ function saveSettings(){
 function setSetting(key,value){
   var ranges={
     aimSensitivity:[60,160],moveSensitivity:[60,160],stickSize:[80,130],
-    stickOpacity:[30,100],screenShake:[0,100]
+    stickOpacity:[30,100],screenShake:[0,100],renderScale:[65,100]
   };
   var r=ranges[key];if(!r)return;
   state[key]=clamp(Number(value)||0,r[0],r[1]);
-  saveSettings();applyVisualSettings();refreshUI();
+  saveSettings();applyVisualSettings();applyRenderScale();refreshUI();
 }
-function resetSettings(){state=Object.assign({},DEFAULTS);saveSettings();applyVisualSettings();refreshUI();}
+function resetSettings(){state=Object.assign({},DEFAULTS);saveSettings();applyVisualSettings();applyRenderScale();refreshUI();}
 function wrap(id,after){var old=mods[id];if(!old)return;mods[id]=function(module,exports,require){old(module,exports,require);after(module.exports,require);};}
 
 /* Touch-stick response. The base game already hard-clamps stick travel and
@@ -89,7 +91,17 @@ wrap('game/input',function(input){
 wrap('game/engine',function(engine){
   var Game=engine.Game;if(!Game||Game.prototype.__novaPilotConsole)return;
   Game.prototype.__novaPilotConsole=true;
-  var oldStart=Game.prototype.start, oldDestroy=Game.prototype.destroy;
+  var oldStart=Game.prototype.start, oldDestroy=Game.prototype.destroy,oldResize=Game.prototype.resize;
+  if(oldResize)Game.prototype.resize=function(){
+    var out=oldResize.apply(this,arguments);
+    if(state.renderScale<100&&this.canvas&&Number.isFinite(this.dpr)){
+      var reduced=Math.max(1,this.dpr*state.renderScale/100);
+      this.dpr=reduced;
+      this.canvas.width=Math.max(1,Math.round(this.w*reduced));
+      this.canvas.height=Math.max(1,Math.round(this.h*reduced));
+    }
+    return out;
+  };
   if(oldStart)Game.prototype.start=function(){
     activeGame=this;
     var out=oldStart.apply(this,arguments);
@@ -122,6 +134,11 @@ wrap('game/render',function(render){
   render.render=pilotRender;
 });
 
+/* Render backing pixels only: CSS viewport, camera, minimap and game logic stay unchanged.
+ * Explicit player choice, not an unvalidated automatic quality switch. */
+function applyRenderScale(){
+  if(activeGame&&typeof activeGame.resize==='function')activeGame.resize();
+}
 function applyVisualSettings(){
   var root=document.documentElement;
   if(!root)return;
@@ -213,9 +230,10 @@ function installUI(){
   makeSlider(panel,'Joystick size','stickSize',80,130,5);
   makeSlider(panel,'Joystick opacity','stickOpacity',30,100,5);
   makeSlider(panel,'Screen shake','screenShake',0,100,5);
+  makeSlider(panel,'Render clarity','renderScale',65,100,5);
 
   var note=document.createElement('div');note.className='nova-pilot-note';
-  note.textContent='Fair-play only: sensitivity changes touch-stick response, while size, opacity and shake are visual. No aim assist, zoom, enemy intel, hitbox or combat-stat controls are available.';
+  note.textContent='Render clarity trades sharpness for smoother frames on some devices (100% is the original). All settings are presentation or control comfort only: no aim assist, zoom, enemy intel, hitbox or combat-stat changes.';
   panel.appendChild(note);
 
   var actions=document.createElement('div');actions.className='nova-pilot-actions';
