@@ -5,12 +5,17 @@ process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
 const test=require('node:test'),assert=require('node:assert/strict');
 const {bootGame,withSeed,digest,physical}=require('../research/audio-rng-causal-pilot.cjs');
 const SCALE=216/4500;
-function scene(seed,{crowded=false,powerup=false}={}){
+function scene(seed,{crowded=false,powerup=false,neutral=false}={}){
  return withSeed(seed,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   const enemies=g.tanks.filter(t=>t.alive&&!t.isPlayer);
   assert.ok(enemies.length>=2,'real match contains rivals');
   g.player.x=-1800;g.player.y=-1800;
+  /* Isolate the contact from incidental random neutral spawns. */
+  for(let i=0;i<g.shapes.length;i++){
+   g.shapes[i].x=-1800+(i%12)*35;
+   g.shapes[i].y=1400+Math.floor(i/12)*35;
+  }
   for(let i=0;i<enemies.length;i++){
    enemies[i].x=1300+(i%4)*180;
    enemies[i].y=1200+Math.floor(i/4)*180;
@@ -18,6 +23,7 @@ function scene(seed,{crowded=false,powerup=false}={}){
   const target=enemies[0];target.x=0;target.y=0;
   if(crowded){enemies[1].x=70;enemies[1].y=0;}
   if(powerup)g.powerups.push({type:'health',x:75,y:0});
+  if(neutral){const sh=g.shapes.find(s=>s.type!=='star');assert.ok(sh);sh.x=75;sh.y=0;}
   const ctx=g.mmCtx,orig=ctx.fillRect,rect=ctx.strokeRect,ops=[];
   ctx.fillRect=function(x,y,w,h){ops.push({kind:'fill',x,y,w,h,color:this.fillStyle,alpha:this.globalAlpha});return orig.apply(this,arguments);};
   ctx.strokeRect=function(){if(this.lineWidth===2.8)ops.push({kind:'wall'});return rect.apply(this,arguments);};
@@ -55,6 +61,12 @@ test('powerup next to rival prevents halo obscuring its public marker',()=>{
  const dot=ops.findLastIndex(o=>near(o,x,y,3,3));assert.ok(dot>0);
  assert.ok(!near(ops[dot-1],x-1,y-1,5,5));
  assert.ok(ops.some(o=>o.kind==='fill'&&o.w===4&&o.h===4),'powerup remains painted');
+});
+test('neutral resources near a rival remain visible instead of being covered by its halo',()=>{
+ const {ops,enemyX:x,enemyY:y}=scene(1517802,{neutral:true});
+ const dot=ops.findLastIndex(o=>near(o,x,y,3,3));assert.ok(dot>0);
+ assert.ok(!near(ops[dot-1],x-1,y-1,5,5));
+ assert.ok(ops.some(o=>o.kind==='fill'&&o.w===2&&o.h===2),'resource dot remains painted');
 });
 test('public player contact retains original cyan 5px dot, with a final high-contrast keyline',()=>{
  const {ops,playerX:x,playerY:y}=scene(1517802);
