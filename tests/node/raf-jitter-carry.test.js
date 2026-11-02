@@ -67,3 +67,27 @@ test('clock regression never produces a negative simulation step',()=>{
  const d=driver(patchRafStepCap(raw()));d.frame(1000/60);d.frame(-10);d.frame(10);
  assert.ok(d.dts.every(x=>x>=0));
 });
+
+
+test('sustained 20Hz presentation repays one bounded 30Hz step every other draw',()=>{
+ const d=driver(patchRafStepCap(raw()));for(let i=0;i<40;i++)d.frame(50);
+ approx(total(d.dts),2);assert.equal(d.dts.length,60);
+ assert.equal(d.draws,40);
+ assert.ok(d.dts.every(x=>x<=1/30+1e-12));
+});
+test('48/52ms presentation jitter recovers exact 30Hz simulation without unbounded steps',()=>{
+ const d=driver(patchRafStepCap(raw()));for(let i=0;i<40;i++)d.frame(i%2?52:48);
+ approx(total(d.dts),2);assert.equal(d.dts.length,60);
+ assert.equal(d.draws,40);
+});
+test('slow-frame catchup stops immediately if first update pauses or opens an offer',()=>{
+ const d=driver(patchRafStepCap(raw()));d.frame(50);
+ const old=d.g.update;d.g.update=function(dt){old.call(this,dt);this.paused=true;};
+ d.frame(50);assert.equal(d.dts.length,2,'no second step after pause');
+ d.g.paused=false;d.g.update=old;d.frame(1000/60);
+ approx(d.dts.at(-1),1/60);
+});
+test('long 120ms frame never triggers the additional catchup update',()=>{
+ const d=driver(patchRafStepCap(raw()));d.frame(120);
+ assert.equal(d.dts.length,1);approx(d.dts[0],1/30);
+});
