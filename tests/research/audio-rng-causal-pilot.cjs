@@ -12,8 +12,10 @@ const {createPublicRoam} = require('../research/redeploy-public-roam.cjs');
 const {playPublicPrelude} = require('../research/redeploy-public-prelife.cjs');
 const root = path.resolve(__dirname, '../..');
 const sourceHtml = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-const html = process.env.NOVA_AUDIO_RNG_PATCHED==='1' ?
+const audioHtml = process.env.NOVA_AUDIO_RNG_PATCHED==='1' ?
  require('../../scripts/patch-audio-rng.cjs').patchAudioRng(sourceHtml) : sourceHtml;
+const html = process.env.NOVA_EXPLICIT_SHOT_INTENT_RESEARCH==='1' ?
+ require('./explicit-shot-intent.cjs').patchEngineHtml(audioHtml) : audioHtml;
 const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)]
   .map(m => m[1]).find(s => s.includes('window.__defineModule("game/engine"'));
 const overlays = [...html.matchAll(/<script[^>]+src=["']\.\/(nova-updates\/[^"']+)["']/g)]
@@ -68,8 +70,11 @@ function bootGame() {
     URL, Blob, TextEncoder, TextDecoder});
   vm.runInContext(inline, context, {filename: 'index.html#canonical-engine', timeout: 12000});
   for (const script of overlays) {
-    vm.runInContext(fs.readFileSync(path.join(root, script), 'utf8'), context,
-      {filename: script, timeout: 5000});
+    let overlaySource=fs.readFileSync(path.join(root, script), 'utf8');
+    if(process.env.NOVA_EXPLICIT_SHOT_INTENT_RESEARCH==='1' &&
+       script==='nova-updates/disciplines-v1.7.0.js')
+      overlaySource=require('./explicit-shot-intent.cjs').patchDisciplines(overlaySource);
+    vm.runInContext(overlaySource, context, {filename: script, timeout: 5000});
   }
   const requireGame = window.__novaMakeRequire('');
   const Game = requireGame('game/engine').Game;
