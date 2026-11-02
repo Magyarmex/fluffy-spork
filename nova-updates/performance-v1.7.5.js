@@ -136,11 +136,49 @@ function perfState(g){
   });
 }
 function ema(old,v,a){return old?old+(v-old)*a:v;}
+/* Read-only, fixed-memory timing windows. Frame intervals are sampled at the
+ * actual render owner, not inferred from Game.update(dt), which can clamp time.
+ * A tab suspension is a discontinuity, not evidence of a slow game frame. */
+var PERF_WINDOW=120;
+function timingSample(p,key,value){
+  if(!Number.isFinite(value)||value<0)return;
+  var r=p[key]||(p[key]={values:new Array(PERF_WINDOW),next:0,count:0});
+  r.values[r.next]=value;r.next=(r.next+1)%PERF_WINDOW;
+  if(r.count<PERF_WINDOW)r.count++;
+}
+function recordPresentation(g,now){
+  if(!g||g.__novaDecorativeWorld||!Number.isFinite(now))return;
+  var p=perfState(g),previous=p.lastPresentationAt;
+  p.lastPresentationAt=now;
+  if(previous==null)return;
+  var delta=now-previous;
+  if(!(delta>0)||delta>250){p.presentationTimes=null;return;}
+  timingSample(p,'presentationTimes',delta);
+}
+function timingPercentile(r,q){
+  if(!r||!r.count)return null;
+  var sorted=r.values.slice(0,r.count).sort(function(a,b){return a-b;});
+  return sorted[Math.max(0,Math.ceil(sorted.length*q)-1)];
+}
+function timingWindow(p){
+  var r=p.presentationTimes,n=r&&r.count||0,total=0,over50=0;
+  for(var i=0;i<n;i++){var v=r.values[i];total+=v;if(v>50)over50++;}
+  var mean=n?total/n:0;
+  return {frameSamples:n,
+    fps:n>=5&&mean>0?+(1000/mean).toFixed(1):null,
+    frameP95Ms:n>=5?+timingPercentile(r,.95).toFixed(2):null,
+    frameOver50Pct:n>=5?+(over50*100/n).toFixed(1):null,
+    updateP95Ms:p.updateTimes&&p.updateTimes.count>=5?
+      +timingPercentile(p.updateTimes,.95).toFixed(2):null,
+    renderP95Ms:p.renderTimes&&p.renderTimes.count>=5?
+      +timingPercentile(p.renderTimes,.95).toFixed(2):null};
+}
 function record(g,key,ms){
   if(!g)return;var p=perfState(g),peak=key==='updateMs'?'updatePeakMs':'renderPeakMs';
   p[key]=ema(p[key],ms,.08);p[peak]=Math.max(p[peak]*.997,ms);p.samples++;
+  if(!g.__novaDecorativeWorld)timingSample(p,key==='updateMs'?'updateTimes':'renderTimes',ms);
   var now=typeof performance!=='undefined'&&performance.now?performance.now():Date.now();
-  if(now-p.lastSnapshotAt>2000){p.lastSnapshotAt=now;window.__NOVA_PERF_LAST__={version:VERSION,updateMs:+p.updateMs.toFixed(2),renderMs:+p.renderMs.toFixed(2),updatePeakMs:+p.updatePeakMs.toFixed(2),renderPeakMs:+p.renderPeakMs.toFixed(2),terrainQueries:p.terrainQueries,avgTerrainCandidates:p.terrainQueries?+(p.terrainCandidates/p.terrainQueries).toFixed(2):0,aiRouteFramesSkipped:p.aiRouteFramesSkipped,droneRouteFramesSkipped:p.droneRouteFramesSkipped,tanks:g.tanks?g.tanks.length:0,drones:g.drones?g.drones.length:0,bullets:g.bullets?g.bullets.length:0,shapes:g.shapes?g.shapes.length:0};}
+  if(now-p.lastSnapshotAt>2000){p.lastSnapshotAt=now;if(!g.__novaDecorativeWorld)window.__NOVA_PERF_LAST__=Object.assign({version:VERSION,updateMs:+p.updateMs.toFixed(2),renderMs:+p.renderMs.toFixed(2),updatePeakMs:+p.updatePeakMs.toFixed(2),renderPeakMs:+p.renderPeakMs.toFixed(2),terrainQueries:p.terrainQueries,avgTerrainCandidates:p.terrainQueries?+(p.terrainCandidates/p.terrainQueries).toFixed(2):0,aiRouteFramesSkipped:p.aiRouteFramesSkipped,droneRouteFramesSkipped:p.droneRouteFramesSkipped,tanks:g.tanks?g.tanks.length:0,drones:g.drones?g.drones.length:0,bullets:g.bullets?g.bullets.length:0,shapes:g.shapes?g.shapes.length:0},timingWindow(p));}
 }
 function callWithoutFirstHit(g,fn,a,b,c,d){
   var own=Object.prototype.hasOwnProperty.call(g,'firstTerrainHit'),prev=g.firstTerrainHit;
@@ -246,13 +284,13 @@ wrap('game/engine',function(engine,require){
   if(oldUpdate)Game.prototype.update=function(dt){var st=performance.now(),out=oldUpdate.call(this,dt);record(this,'updateMs',performance.now()-st);return out;};
 
   Game.prototype.novaPerfSnapshot=function(){
-    var p=perfState(this);return{version:VERSION,updateMs:p.updateMs,renderMs:p.renderMs,updatePeakMs:p.updatePeakMs,renderPeakMs:p.renderPeakMs,terrainQueries:p.terrainQueries,terrainCandidates:p.terrainCandidates,terrainNarrowTests:p.terrainNarrowTests,aiRouteFramesSkipped:p.aiRouteFramesSkipped,aiRouteFramesPlanned:p.aiRouteFramesPlanned,droneRouteFramesSkipped:p.droneRouteFramesSkipped,droneRouteFramesPlanned:p.droneRouteFramesPlanned};
+    var p=perfState(this);return Object.assign({version:VERSION,updateMs:p.updateMs,renderMs:p.renderMs,updatePeakMs:p.updatePeakMs,renderPeakMs:p.renderPeakMs,terrainQueries:p.terrainQueries,terrainCandidates:p.terrainCandidates,terrainNarrowTests:p.terrainNarrowTests,aiRouteFramesSkipped:p.aiRouteFramesSkipped,aiRouteFramesPlanned:p.aiRouteFramesPlanned,droneRouteFramesSkipped:p.droneRouteFramesSkipped,droneRouteFramesPlanned:p.droneRouteFramesPlanned},timingWindow(p));
   };
 });
 
 wrap('game/render',function(render){
   var old=render.render;if(!old||old.__novaFrameBudget)return;
-  function patched(g,w,h){var st=performance.now(),out=old(g,w,h);record(g,'renderMs',performance.now()-st);return out;}
+  function patched(g,w,h){var st=performance.now(),out=old(g,w,h),now=performance.now();recordPresentation(g,now);record(g,'renderMs',now-st);return out;}
   patched.__novaFrameBudget=true;render.render=patched;
 });
 
