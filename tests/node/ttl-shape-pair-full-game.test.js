@@ -17,7 +17,7 @@ function run(hz,far){
   assert.equal(circles.length,2,'real game must contain canonical Circles');
   g.time=1;g.__novaShapeSweepEpoch=123;g.__novaShapeSweepActive=true;
   circles.forEach((s,i)=>{
-   s.x=i?(far?64:43):18;s.y=0;s.r=12;s.hp=100;
+   s.x=i?(far?46.5:43):18;s.y=0;s.r=12;s.hp=100;
    s.__novaShapeSweepEpoch=123;
    s.__novaShapeSweepPrevX=s.x;s.__novaShapeSweepPrevY=s.y;
    s.born=0;s.vx=0;s.vy=0;
