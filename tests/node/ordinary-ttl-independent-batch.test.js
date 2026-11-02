@@ -329,8 +329,8 @@ function expiringShapePairWorld(fps,{optimized=false,reverse=false,
  if(wall)g.__novaTerrain=[{id:-1,shape:'rect',x:25,y:0,w:3,h:50,
   solid:true,destructible:false}];
  const bullet={kind:'bullet',id:1,ownerId:1,x:0,y:0,
-  vx:fps===240?10000:6000,vy:0,r:3,dmg:20,
-  ttl:fps===240?.0035:.005,pen:1,hits:0,
+  vx:36*fps,vy:0,r:3,dmg:20,
+  ttl:1/(fps*1.2),pen:1,hits:0,
   dead:false,shell:false,beam:false};
  g.bullets=[bullet];
  if(competitor)g.bullets.push({kind:'bullet',id:2,ownerId:3,
