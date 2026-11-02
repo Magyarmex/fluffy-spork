@@ -10,7 +10,7 @@ function hull(id,x,y,startX=x,startY=y){return {id,cls:'scout',alive:true,x,y,__
 function world(shots,tanks){return {time:1,bullets:shots,tanks,shapes:[],drones:[]};}
 for(const live of [false,true]){
  test('moving hulls remain eligible with swept start positions ('+(live?'live':'expiry')+')',()=>{
-  const s=shot(0,live),g=world([s],[hull(2,105,0,40,0),hull(3,95,0,65,0)]);
+  const s=shot(0,live),g=world([s],[hull(2,160,0,40,0),hull(3,180,0,65,0)]);
   const p=plan(g,1/60,live);
   assert.ok(p&&p.has(s),'moving hulls may enter the shot corridor even when final positions are farther');
   assert.deepEqual([...p.get(s)],[]);
