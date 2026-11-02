@@ -43,3 +43,19 @@ test('twelve-second sustained Gunner heat remains bounded at 30Hz',()=>{
   assert.ok(Math.abs(slow.heatPeak-ref.heatPeak)<1e-8,cls+' sustained peak heat');
  }
 });
+test('partial eligibility never overcools a just-recovered firing window',()=>{
+ const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+ for(const [since,repay] of [[.05,0],[.083,.003],[.2,1/60]]){
+  const actual=withSeed(1517800,()=>{
+   const g=bootGame(),p=g.player;g.setClass(p,'twin');
+   g.tanks=[p];g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];
+   g.status='playing';g.time=1;p.fireCd=0;p.__v17Heat=.5;
+   p.__v17FiredAt=1-since;g.__v17FiringStepDt=1/30;
+   g.tryFire(p);const out={heat:p.__v17Heat,bullets:g.bullets.length};
+   g.destroy();return out;
+  });
+  assert.equal(actual.bullets,1,'the shot must still occur');
+  assert.ok(Math.abs(actual.heat-(.5+.13-repay*.62))<1e-9,
+   `eligibility ${since} must cool only the available pre-shot interval`);
+ }
+});
