@@ -111,3 +111,22 @@ test('native mouse chord and lifecycle cancellation remain single-owner',()=>{
   g.destroy();assert.equal(o.old,null);
  }
 });
+test('all Controller descendants keep the original drone recall when no shot is possible',()=>{
+ const classes=['carrier','overlord','warden','hivemind','broodmother','citadel','valkyrie'];
+ for(const cls of classes)for(const seed of [1517800,1517802,1517810]){
+  function run(mode){return withSeed(seed,draws=>{
+   const g=bootGame();g.sfx.muted=true;g.setClass(g.player,cls);g.input.autofire=false;
+   const i=g.input,owner=mode==='direct'?new DirectShotIntent(g,{window:g.__testWindow,document:g.__testWindow.document}):null;
+   g.tryFire=()=>{};
+   i.pd(event('pointerdown','touch',600));i.pm(event('pointermove','touch',640));
+   i.pu(event('pointerup','touch',640));
+   g.update(1/60);g.update(1/60);
+   const state=physical(g),me=state.tanks.find(t=>t[0]===g.player.id);
+   if(me)me[5]=null; // a deliberate one-tick shot intent may turn the player hull
+   const out={physical:digest(state),rng:draws(),drones:g.drones.filter(d=>d.ownerId===g.player.id)
+    .map(d=>[d.id,d.x,d.y,d.hp,d.__novaPhase]),recall:g.player.__novaSwarm?.recallUntil};
+   if(owner)owner.detach();g.destroy();return out;
+  });}
+  assert.equal(JSON.stringify(run('direct')),JSON.stringify(run('baseline')),cls+'/'+seed);
+ }
+});
