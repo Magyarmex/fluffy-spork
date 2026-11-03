@@ -86,3 +86,13 @@ test('reentrant production start during render fails closed and tears down pilot
  assert.equal(g.start,proto.start,'production method must be restored');
  assert.equal(counts().productionStarts,0,'no production RAF may be launched reentrantly');
 });
+
+test('exclusive pilot ownership is per game, not global',()=>{
+ const a=scene(false),b=scene(false);
+ a.owner.start();
+ assert.throws(()=>a.g.start(),/already owns this game/);
+ assert.equal(b.g.start(),'production','unrelated game may still start normally');
+ assert.equal(a.counts().productionStarts,0);
+ assert.equal(b.counts().productionStarts,1);
+ a.owner.stop();
+});
