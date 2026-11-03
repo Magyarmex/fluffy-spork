@@ -36,7 +36,7 @@ function fixture(html,trigger){
   input:{detach(){events.push('input-detach');}},
   update(dt){events.push('update');if(trigger==='first-update'||
     (trigger==='second-update'&&events.filter(x=>x==='update').length===2))this.destroy();},
-  drawMinimap(){events.push('minimap');}});
+  drawMinimap(){events.push('minimap');if(trigger==='minimap')this.destroy();}});
  game.start();
  now=70;callback(now);
  return {game,events,canceled,callback};
@@ -47,19 +47,19 @@ test('materializer lifecycle guards are unique and idempotent on raw and shippin
  assert.equal(patchRafStepCap(raw),raw);
  assert.equal(patchRafStepCap(shipping),shipping);
  for(const html of [raw,shipping]){
-  assert.equal((methods(html).match(/if \(this\.__novaDestroyed\) return;/g)||[]).length,5);
+  assert.equal((methods(html).match(/if \(this\.__novaDestroyed\) return;/g)||[]).length,6);
   assert.equal((methods(html).match(/this\.__novaDestroyed = true;/g)||[]).length,1);
  }
 });
 test('production RAF stops after destruction in first update, second update, or render',()=>{
  const html=patchRafStepCap(rawShell());
- for(const trigger of ['first-update','second-update','render']){
+ for(const trigger of ['first-update','second-update','render','minimap']){
   const {game,events,canceled,callback}=fixture(html,trigger);
   assert.equal(game.__novaDestroyed,true,trigger);
-  assert.equal(events.filter(x=>x==='render').length,trigger==='render'?1:0,trigger);
-  assert.equal(events.filter(x=>x==='minimap').length,0,trigger);
+  assert.equal(events.filter(x=>x==='render').length,trigger==='render'||trigger==='minimap'?1:0,trigger);
+  assert.equal(events.filter(x=>x==='minimap').length,trigger==='minimap'?1:0,trigger);
   assert.equal(events.filter(x=>x==='update').length,trigger==='first-update'?1:
-   trigger==='second-update'||trigger==='render'?2:1,trigger);
+   trigger==='second-update'||trigger==='render'||trigger==='minimap'?2:1,trigger);
   assert.equal(canceled.length,1,'scheduled future RAF cancelled');
   for(const type of ['input-detach','audio-dispose','window-detach','document-detach'])
    assert.equal(events.filter(x=>x===type).length,1,type);
