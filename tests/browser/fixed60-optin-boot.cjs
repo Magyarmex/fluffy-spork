@@ -16,8 +16,8 @@ const {chromium}=require('playwright');
     await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({state:'visible',timeout:45000});
     await page.evaluate(()=>{
      const Game=window.__novaMakeRequire('')('game/engine').Game;
-     const original=Game.prototype.update;
-     Game.prototype.update=function(dt){
+     const original=Game.prototype.start;
+     Game.prototype.start=function(){
       if(!this.__novaDecorativeWorld)window.__novaFixed60Game=this;
       return original.apply(this,arguments);
      };
@@ -31,13 +31,17 @@ const {chromium}=require('playwright');
      };
     });
     await page.getByRole('button',{name:/DEPLOY/i}).first().click();
-    await page.waitForFunction(()=>window.__novaFixed60Game?.status==='playing' ||
-     window.__novaBootDiagnostics?.some(x=>x.includes('Failed to boot game:')),
-     null,{timeout:20000});
+    await page.waitForTimeout(1200);
     const boot=await page.evaluate(()=>({
      ready:window.__novaFixed60Game?.status==='playing',
      errors:window.__novaBootDiagnostics,
-     hasPilot:!!window.__novaFixed60Research
+     hasPilot:!!window.__novaFixed60Research,
+     hasGame:!!window.__novaFixed60Game,
+     pilotAttached:!!window.__novaFixed60Game?.__novaFixed60Pilot,
+     menu:!!document.querySelector('#root .menu-grid-bg'),
+     screenCanvas:!!document.querySelector('canvas.absolute.inset-0'),
+     raf:window.__novaFixed60Game?.raf,
+     ticks:window.__novaFixed60Game?.__novaFixed60Pilot?.owner.ticks
     }));
     assert.equal(boot.ready,true,'actual pilot boot failed: '+JSON.stringify(boot));
     await page.waitForTimeout(600);
