@@ -390,8 +390,12 @@ class FixedStepRafOwner {
     catch(error){this.started=false;this.timeline.reset();throw error}
     const self=this;
     this.destroyWrapper=function(...args){
-      self.stop();
-      return self.originalDestroy.apply(this,args);
+      // Teardown must reach the actual Game even if a host cancellation fails.
+      let stopError;
+      try{self.stop()}catch(error){stopError=error}
+      const result=self.originalDestroy.apply(this,args);
+      if(stopError)throw stopError;
+      return result;
     };
     this.game.destroy=this.destroyWrapper;
     // A second production RAF would advance the same world twice and break
@@ -493,7 +497,12 @@ class FixedStepRafOwner {
   stop(){
     if(!this.started)return;
     this.started=false;this._generation++;this._requestSeq++;
-    if(this.raf!=null)this.cancel(this.raf);
+    // A host may throw while cancelling a queued browser callback. Even then,
+    // release all lifecycle hooks: leaving Game.start/destroy wrapped after
+    // stop would strand the playable game behind an inactive research owner.
+    let cancelError;
+    try{if(this.raf!=null)this.cancel(this.raf)}
+    catch(error){cancelError=error}
     this.raf=null;this.timeline.reset();this.lagMs=0;
     if(this.game.start===this.startWrapper){
       if(this.startHadOwn)this.game.start=this.originalStart;
@@ -507,6 +516,7 @@ class FixedStepRafOwner {
       if(this.destroyHadOwn)this.game.destroy=this.originalDestroy;
       else delete this.game.destroy;
     }
+    if(cancelError)throw cancelError;
   }
 }
 // Compose the existing production Input handlers with chronological DOM
@@ -533,7 +543,10 @@ function createFixedStepBrowserPilot(game,{window:win,document:doc,clock,
       if(!capture.active)throw Error('browser pilot capture detached');
       try{owner.start()}catch(error){capture.detach();throw error}
     },
-    stop(){owner.stop();capture.detach()}};
+    stop(){
+      // Release DOM ownership even when a hostile RAF host rejects cancel().
+      try{owner.stop()}finally{capture.detach()}
+    }};
 }
 module.exports={FixedStepRafOwner,createFixedStepBrowserPilot,STEP_MS};
 
