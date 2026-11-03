@@ -12,8 +12,6 @@ try{selected=new URLSearchParams(win.location.search).get('nova_fixed60')==='pil
 catch(_){return}
 if(!selected)return;
 const api=win.__novaFixed60Research;
-if(!api || typeof api.createFixedStepBrowserPilot!=='function')
-  throw Error('fixed60 pilot requested but browser research bundle is missing');
 const previous=mods['game/engine'];
 mods['game/engine']=function(module,exports,require){
   previous(module,exports,require);
@@ -23,6 +21,8 @@ mods['game/engine']=function(module,exports,require){
   if(typeof productionStart!=='function')
     throw Error('fixed60 pilot requires canonical Game.start');
   Game.prototype.start=function(){
+    if(!api || typeof api.createFixedStepBrowserPilot!=='function')
+      throw Error('fixed60 pilot requested but browser research bundle is missing');
     if(this.__novaFixed60Pilot)throw Error('fixed60 pilot already attached');
     if(this.raf)throw Error('production RAF already owns this Game');
     const renderer=require('game/render');
