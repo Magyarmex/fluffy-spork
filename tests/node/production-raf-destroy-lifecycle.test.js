@@ -59,7 +59,7 @@ test('production RAF stops after destruction in first update, second update, or 
   assert.equal(events.filter(x=>x==='render').length,trigger==='render'?1:0,trigger);
   assert.equal(events.filter(x=>x==='minimap').length,0,trigger);
   assert.equal(events.filter(x=>x==='update').length,trigger==='first-update'?1:
-   trigger==='second-update'?2:1,trigger);
+   trigger==='second-update'||trigger==='render'?2:1,trigger);
   assert.equal(canceled.length,1,'scheduled future RAF cancelled');
   for(const type of ['input-detach','audio-dispose','window-detach','document-detach'])
    assert.equal(events.filter(x=>x===type).length,1,type);
