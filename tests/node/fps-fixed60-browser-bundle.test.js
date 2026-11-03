@@ -1,4 +1,5 @@
 'use strict';
+process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
 // The research browser artifact must be an exact, inert packaging of the
 // canonical CJS owners, not a second implementation or an implicit opt-in.
 const test=require('node:test');
@@ -78,4 +79,51 @@ test('bundle builder rejects dynamic requires rather than shipping a broken load
   if(name==='fixed-step-raf-owner.cjs')return "const name='./fixed-step-dom-input.cjs';require(name);";
   return fs.readFileSync(path.join(root,name),'utf8');
  }),/dynamic fixed60 browser import/);
+});
+
+test('browser artifact preserves real 49-overlay Tempest state against native60',()=>{
+ const {bootGame,withSeed,digest,physical}=
+   require('../research/audio-rng-causal-pilot.cjs');
+ const window={};
+ vm.runInNewContext(fs.readFileSync(artifact,'utf8'),{window},{timeout:1000});
+ const Owner=window.__novaFixed60Research.FixedStepRafOwner;
+ function run(seed,fixed){
+  return withSeed(seed,draws=>{
+   const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
+   g.setClass(g.player,'tempest');
+   let id=0,volleys=0;
+   const callbacks=new Map();
+   const original=g.tryFire;
+   g.tryFire=function(t){
+    const before=this.bullets.length;
+    const result=original.apply(this,arguments);
+    if(t===g.player&&this.bullets.length>before)volleys++;
+    return result;
+   };
+   let owner;
+   try{
+    if(fixed){
+     const timeline={input:g.input,reset(){},consumeThrough(){}};
+     owner=new Owner(g,timeline,{timeline,startMs:1000},{
+      now:()=>1000,request:fn=>(callbacks.set(++id,fn),id),
+      cancel:()=>{},render:()=>{},maxSteps:2
+     });
+     owner.start();
+    }
+    g.input.aim.active=true;g.input.aim.dx=40;
+    g.input.firing=true;g.input.autofire=false;
+    if(fixed){
+     for(let i=1;i<=60;i++)callbacks.get(i)(1000+i*1000/30);
+     assert.equal(owner.ticks,120);
+    }else for(let i=0;i<120;i++)g.update(1/60);
+    return {hash:digest(physical(g)),draws:draws(),volleys};
+   }finally{if(owner)owner.stop();g.destroy()}
+  });
+ }
+ for(const seed of [1517800,1517802]){
+  const baseline=run(seed,false),candidate=run(seed,true);
+  assert.ok(baseline.volleys>0);
+  assert.deepEqual(candidate,baseline,
+   'browser artifact must not diverge from native60 combat state or RNG');
+ }
 });
