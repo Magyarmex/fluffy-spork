@@ -7,7 +7,7 @@ const {chromium}=require('playwright');
  const browser=await chromium.launch({headless:true,args:['--disable-dev-shm-usage','--no-sandbox']});
  try{
   for(const enabled of [false,true]){
-   const context=await browser.newContext({viewport:{width:800,height:600}});
+   const context=await browser.newContext({viewport:{width:800,height:600},hasTouch:enabled,isMobile:false});
    const page=await context.newPage(),errors=[];
    page.on('pageerror',error=>errors.push(String(error.stack||error)));
    try{
