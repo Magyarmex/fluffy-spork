@@ -428,19 +428,18 @@ class FixedStepRafOwner {
   }
   frame(ts){
     if(!this.started)throw Error('fixed-step RAF is not running');
-    if(!Number.isFinite(ts))throw Error('nonmonotonic RAF timestamp');
-    // A browser's RAF timestamp describes the beginning of its presentation
-    // frame. Game.start() can execute later in that same frame, so the first
-    // delivered RAF timestamp may precede performance.now() at activation.
-    // Accept only a bounded startup skew; never simulate negative time or
-    // relax monotonicity once the frame clock has caught up.
-    if(ts<this.lastMs-EPS){
-      if(!this._awaitingForwardFrame || this.lastMs-ts>50)
-        throw Error('nonmonotonic RAF timestamp');
-      ts=this.lastMs;
-    }else this._awaitingForwardFrame=false;
-    try{this.schedule();this.advance(ts)}
-    catch(error){this.stop();throw error}
+    try{
+      if(!Number.isFinite(ts))throw Error('nonmonotonic RAF timestamp');
+      // RAF timestamps describe frame beginnings; startup can occur later
+      // within the same frame. Clamp only bounded initial skew, not later
+      // backward delivery. Invalid timestamps must also release ownership.
+      if(ts<this.lastMs-EPS){
+        if(!this._awaitingForwardFrame || this.lastMs-ts>50)
+          throw Error('nonmonotonic RAF timestamp');
+        ts=this.lastMs;
+      }else this._awaitingForwardFrame=false;
+      this.schedule();this.advance(ts);
+    }catch(error){this.stop();throw error}
   }
   advance(ts){
     const g=this.game;
