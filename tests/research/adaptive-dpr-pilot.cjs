@@ -34,7 +34,7 @@ class AdaptiveDprPilot {
     const {fps,frameP95Ms,renderP95Ms,updateP95Ms,simulationPacePct}=snapshot;
     // Lowering resolution cannot repair CPU-bound simulation.
     const renderLimited=fps<52&&frameP95Ms>19&&renderP95Ms>=8&&
-      renderP95Ms>=updateP95Ms*1.5&&simulationPacePct>=90;
+      renderP95Ms>=updateP95Ms*1.5&&updateP95Ms<=10;
     const healthy=fps>=57&&frameP95Ms<=19&&renderP95Ms<=7&&
       simulationPacePct>=98;
     this.downStreak=renderLimited?this.downStreak+1:0;
