@@ -35,6 +35,8 @@ class FixedStepRafOwner {
   start(){
     if(this.started)throw Error('fixed-step RAF already started');
     if(this.game.raf)throw Error('production RAF already owns this game');
+    if(this.game.start!==this.originalStart)
+      throw Error('production start owner changed before fixed-step activation');
     const at=this.now();if(!Number.isFinite(at)||at<this.bridge.startMs-EPS)
       throw Error('invalid fixed-step start time');
     this.started=true;this.lastMs=at;this.simAtSec=(at-this.bridge.startMs)/1000;
