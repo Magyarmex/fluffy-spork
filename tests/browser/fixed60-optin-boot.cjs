@@ -190,7 +190,10 @@ const {chromium}=require('playwright');
       },null,{timeout:3000,polling:'raf'});
       const measured=await page.evaluate(()=>{
        const m=window.__novaRepeatTouch;
-       return {downMs:m.downAppliedAt-m.downAt,upMs:m.upAppliedAt-m.upAt};
+       const o=window.__novaFixed60Game.__novaFixed60Pilot.owner;
+       return {downMs:m.downAppliedAt-m.downAt,upMs:m.upAppliedAt-m.upAt,
+        droppedMs:o.droppedMs,droppedFrames:o.droppedFrames,
+        lagMs:o.lagMs,ticks:o.ticks};
       });
       assert.ok(Object.values(measured).every(x=>Number.isFinite(x)&&x>=0),
        'repeat touch event application must have finite nonnegative latency');
@@ -208,6 +211,10 @@ const {chromium}=require('playwright');
       downP95:percentile(samples.map(x=>x.downMs),.95),
       upP50:percentile(samples.map(x=>x.upMs),.5),
       upP95:percentile(samples.map(x=>x.upMs),.95),
+      droppedMsAtEnd:samples.at(-1).droppedMs,
+      droppedFramesAtEnd:samples.at(-1).droppedFrames,
+      lagMsAtEnd:samples.at(-1).lagMs,
+      ticksAtEnd:samples.at(-1).ticks,
       samples
      });
      const baseline=await sampleTouches(8);
