@@ -1667,10 +1667,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    * one-hull shot can still kill a victim before another shot arrives. */
   if(!shots.length)return null;
   var tanks=g.tanks||[];
-  /* Conservative research candidate: a fresh non-expiring piercing shot
-   * cannot contact two hulls if no pair is reachable within its swept span.
-   * Never infer absence from a missing/stale spatial hash. */
-  if(nonExpiring&&tanks.length>1&&g.hash&&typeof g.hash.query==='function'&&
+  /* A direct, bounded hull-pair proof avoids trusting spatial query
+   * completeness. With the canonical small tank population this is cheaper
+   * than certifying hash membership and querying every hull. When geometry
+   * is unknown, retain the original all-hull proof below. */
+  if(nonExpiring&&tanks.length>1&&
      shots.every(function(b){return b&&(b.hits||0)===0&&(b.pen===1||b.pen===2);})){
    var maxTravel=0,maxBulletR=0,maxHullR=0,maxMotion=0,valid=true,live=[];
    for(var pi=0;pi<shots.length;pi++){
@@ -1687,28 +1688,12 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
        !Number.isFinite(motion)||motion>96){valid=false;break;}
     maxHullR=Math.max(maxHullR,tc.size);maxMotion=Math.max(maxMotion,motion);live.push(t);
    }
-   /* Hash membership is an explicit precondition. Direct updateBullets
-    * calls or hulls spawned after the index rebuild must fall back. */
-   if(valid){
-    if(!g.hash.map||!(g.hash.cell>0))valid=false;
-    else for(var mi=0;mi<live.length;mi++){
-     var mt=live[mi],mcx=Math.floor(mt.x/g.hash.cell)+2000,
-       mcy=Math.floor(mt.y/g.hash.cell)+2000,
-       bucket=g.hash.map.get(mcx*10000+mcy);
-     if(!bucket||bucket.indexOf(mt)<0){valid=false;break;}
-     var probe=[];g.hash.query(mt.x,mt.y,0,probe);
-     if(probe.indexOf(mt)<0){valid=false;break;}
-    }
-   }
    if(valid&&live.length>1){
     var threshold=maxTravel+2*maxBulletR+2*maxHullR+6+2*maxMotion,
-      near=[],anyPair=false;
+      anyPair=false,limit=threshold*threshold;
     for(var hi=0;hi<live.length&&!anyPair;hi++){
-     near.length=0;g.hash.query(live[hi].x,live[hi].y,threshold,near);
-     for(var ni=0;ni<near.length;ni++){
-      var other=near[ni];
-      if(other&&other.kind==='tank'&&other.id!==live[hi].id&&other.alive&&
-         d2(live[hi].x,live[hi].y,other.x,other.y)<=threshold*threshold){
+     for(var hj=hi+1;hj<live.length;hj++){
+      if(d2(live[hi].x,live[hi].y,live[hj].x,live[hj].y)<=limit){
        anyPair=true;break;
       }
      }
