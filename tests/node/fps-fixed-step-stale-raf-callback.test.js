@@ -40,7 +40,7 @@ test('cancelled callback from a previous run cannot advance restarted owner',()=
  s.owner.stop();
  s.at(2000);s.owner.start();
  const before=s.counts();
- obsolete(2017);
+ assert.doesNotThrow(()=>obsolete(1017),'obsolete timestamp must not trip current monotonic clock');
  assert.deepEqual(s.counts(),before,'prior generation must be inert');
  s.callbacks.get(2)(2017);
  assert.equal(s.counts().updates,1,'current generation remains playable');
@@ -81,4 +81,16 @@ test('actual 49-overlay Game rejects an obsolete browser RAF after restart',()=>
   callbacks.get(2)(2017);
   assert.equal(updates,baseline+1,'current callback must update real Game');
  }finally{owner.stop();g.destroy()}
+});
+
+test('synchronous destroy during update invalidates already scheduled next RAF',()=>{
+ const s=scene();
+ s.g.update=function(){s.g.destroy()};
+ s.owner.start();
+ s.callbacks.get(1)(1017);
+ assert.equal(s.owner.started,false);
+ assert.equal(s.counts().next,2,'next callback was scheduled before update');
+ const before=s.counts();
+ assert.doesNotThrow(()=>s.callbacks.get(2)(1034));
+ assert.deepEqual(s.counts(),before,'destroyed game must not render or reschedule');
 });
