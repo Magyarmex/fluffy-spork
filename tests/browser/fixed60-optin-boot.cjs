@@ -93,5 +93,25 @@ const {chromium}=require('playwright');
     console.log('NOVA_FIXED60_BOOT '+JSON.stringify({enabled,initial}));
    }finally{await context.close()}
   }
+  // A missing experimental bundle must recover to the menu, never launch
+  // an unannounced production-rate match under the pilot query flag.
+  const context=await browser.newContext({viewport:{width:800,height:600}});
+  const page=await context.newPage();
+  try{
+   await page.route('**/fixed60-research-browser.js',route=>route.abort());
+   await page.goto('http://127.0.0.1:8765/?nova_fixed60=pilot',
+    {waitUntil:'domcontentloaded',timeout:45000});
+   const deploy=page.getByRole('button',{name:/DEPLOY/i}).first();
+   await deploy.waitFor({state:'visible',timeout:45000});
+   await deploy.click();
+   await deploy.waitFor({state:'visible',timeout:15000});
+   const result=await page.evaluate(()=>({
+    pilotLoaded:!!window.__novaFixed60Research,
+    productionGameStarted:!!window.__novaFixed60Game,
+    menuVisible:!!document.querySelector('#root .menu-grid-bg')
+   }));
+   assert.deepEqual(result,{pilotLoaded:false,productionGameStarted:false,menuVisible:true},
+    'missing pilot artifact must not silently launch production simulation');
+  }finally{await context.close()}
  }finally{await browser.close()}
 })().catch(error=>{console.error(error);process.exitCode=1});
