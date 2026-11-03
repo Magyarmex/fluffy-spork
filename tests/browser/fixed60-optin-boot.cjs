@@ -103,7 +103,17 @@ const {chromium}=require('playwright');
     {waitUntil:'domcontentloaded',timeout:45000});
    const deploy=page.getByRole('button',{name:/DEPLOY/i}).first();
    await deploy.waitFor({state:'visible',timeout:45000});
+   await page.evaluate(()=>{
+    window.__novaBootErrors=[];
+    const original=console.error;
+    console.error=function(...args){
+     window.__novaBootErrors.push(args.map(String).join(' '));
+     return original.apply(this,args);
+    };
+   });
    await deploy.click();
+   await page.waitForFunction(()=>window.__novaBootErrors?.some(x=>
+    x.includes('Failed to boot game:')),null,{timeout:15000});
    await deploy.waitFor({state:'visible',timeout:15000});
    const result=await page.evaluate(()=>({
     pilotLoaded:!!window.__novaFixed60Research,
