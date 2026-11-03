@@ -42,8 +42,20 @@ for(const inherited of [false,true]){
 }
 test('destroy path invokes core destruction even if cancel throws',()=>{
   const {game,owner}=scene();
-  owner.start();
+  let destroyed=0;
+  const coreDestroy=game.destroy;
+  game.destroy=function(...args){destroyed++;return coreDestroy.apply(this,args)};
+  // Constructor snapshots lifecycle owners, so create a fresh owner after
+  // instrumentation rather than mutating a live owner under test.
+  const input=game.input;
+  const timeline={input,reset(){},consumeThrough(){}};
+  const instrumented=new FixedStepRafOwner(game,timeline,{timeline,startMs:1000},{
+    now:()=>1000,request:()=>19,cancel:()=>{throw Error('RAF cancel unavailable')},
+    render:()=>{}
+  });
+  instrumented.start();
   assert.throws(()=>game.destroy(),/RAF cancel unavailable/);
-  assert.equal(owner.started,false);
+  assert.equal(destroyed,1,'actual core Game.destroy must still run');
+  assert.equal(instrumented.started,false);
   assert.equal(game.start(),'production-start');
 });
