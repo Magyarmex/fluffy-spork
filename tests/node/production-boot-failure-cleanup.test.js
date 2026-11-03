@@ -22,6 +22,20 @@ function execute(html,mode){
   start(){events.push('start');if(mode==='start-throws')throw Error('startup failed')},
   destroy(){events.push('destroy');if(mode==='destroy-throws')throw Error('cleanup failed')}
  };
+ if(mode==='start-throws-real-destroy'){
+  game.raf=9;game.resizeFn=()=>{};game.visFn=()=>{};
+  game.input.detach=()=>events.push('input-detach');
+  game.sfx.dispose=()=>events.push('audio-dispose');
+  const begin=html.indexOf('    destroy() {');
+  const end=html.indexOf('\n    resize() {',begin);
+  assert.ok(begin>=0&&end>begin,'actual composed Game.destroy exists');
+  const body=html.slice(begin+'    destroy() {'.length,end).replace(/\n    }\s*$/,'');
+  game.destroy=new Function('cancelAnimationFrame','window','document',
+   'return function destroy(){'+body+'\n}')(
+   ()=>events.push('cancel-raf'),
+   {removeEventListener:()=>events.push('window-detach')},
+   {removeEventListener:()=>events.push('document-detach')});
+ }
  const Game=class{
   constructor(){events.push('construct');if(mode==='constructor-throws')throw Error('constructor failed');return game}
  };
@@ -79,4 +93,13 @@ test('malformed boot cleanup patch refuses silent partial materialization',()=>{
  const patched=protectBootCleanup(rawShell());
  const drift=patched.replace('            bootGame = game;','            bootGame = unknown;');
  assert.throws(()=>protectBootCleanup(drift),/boot cleanup owner drift/);
+});
+
+test('boot failure invokes actual composed Game.destroy listener/audio/RAF teardown',()=>{
+ const x=execute(patchRafStepCap(rawShell()),'start-throws-real-destroy');
+ assert.deepEqual(x.events,['construct','audio-resume','start','cancel-raf',
+  'window-detach','document-detach','input-detach','audio-dispose']);
+ assert.equal(x.errors.length,1);
+ assert.deepEqual(x.screen,['menu']);
+ assert.equal(x.ref.current,null);
 });
