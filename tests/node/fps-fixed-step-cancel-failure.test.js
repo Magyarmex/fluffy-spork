@@ -1,4 +1,5 @@
 'use strict';
+process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
 // A hostile RAF host must not strand the real Game behind research wrappers
 // when cancellation itself throws during a stop or destruction.
 const test=require('node:test');
@@ -58,4 +59,27 @@ test('destroy path invokes core destruction even if cancel throws',()=>{
   assert.equal(destroyed,1,'actual core Game.destroy must still run');
   assert.equal(instrumented.started,false);
   assert.equal(game.start(),'production-start');
+});
+
+test('composed browser pilot detaches chronological capture after RAF cancellation fails',()=>{
+  const {bootGame}=require('../research/audio-rng-causal-pilot.cjs');
+  const {createFixedStepBrowserPilot}=require('../research/fixed-step-raf-owner.cjs');
+  const g=bootGame(),win=g.__testWindow,doc=win.document;
+  const emitter=()=>({addEventListener(){},removeEventListener(){}});
+  Object.assign(win,emitter());Object.assign(doc,emitter());
+  Object.assign(g.canvas,emitter());
+  g.input.detach();g.input.attach(g.canvas);
+  g.sfx.startMusic=()=>{};
+  const pilot=createFixedStepBrowserPilot(g,{window:win,document:doc,
+    clock:{now:()=>1000,timeOrigin:1793560000000},
+    request:()=>7,cancel:()=>{throw Error('RAF cancel unavailable')},
+    render:()=>{}});
+  try{
+    pilot.start();
+    assert.equal(pilot.capture.active,true);
+    assert.throws(()=>pilot.stop(),/RAF cancel unavailable/);
+    assert.equal(pilot.capture.active,false,'capture must release DOM input ownership');
+    assert.equal(pilot.owner.started,false);
+    assert.equal(g.input.canvas,g.canvas,'production Input must be restored');
+  }finally{g.destroy()}
 });
