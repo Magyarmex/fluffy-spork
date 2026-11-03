@@ -56,7 +56,11 @@ const bootCatchBefore="            console.error('Failed to boot game:', err);\n
 const bootCatchAfter="            console.error('Failed to boot game:', err);\n            if (bootGame) {\n                try { bootGame.destroy(); }\n                catch (cleanupError) { console.error('Failed to clean up game after boot failure:', cleanupError); }\n            }\n            gameRef.current = null;";
 function protectBootCleanup(html){
  const hasBoot=html.includes("Failed to boot game:");
- if(!hasBoot)return html; // standalone RAF owner fixtures do not contain React
+ if(!hasBoot){
+  if(html.includes('new engine_1.Game(canvas, mm'))
+   throw Error('canonical React boot cleanup owner drift; refuse materialization');
+  return html; // standalone RAF owner fixtures do not contain React
+ }
  if(count(html,bootAfter)===1&&count(html,bootConstructorGuard)===1&&count(html,bootCatchAfter)===1)return html;
  if(count(html,bootBefore)!==1||count(html,bootConstructorEnd)!==1||
     count(html,bootCatchBefore)!==1||count(html,bootAfter)!==0||
