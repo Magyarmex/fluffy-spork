@@ -213,6 +213,9 @@ function createFixedStepBrowserPilot(game,{window:win,document:doc,clock,
       if(!capture.active)throw Error('browser pilot capture detached');
       try{owner.start()}catch(error){capture.detach();throw error}
     },
-    stop(){owner.stop();capture.detach()}};
+    stop(){
+      // Release DOM ownership even when a hostile RAF host rejects cancel().
+      try{owner.stop()}finally{capture.detach()}
+    }};
 }
 module.exports={FixedStepRafOwner,createFixedStepBrowserPilot,STEP_MS};
