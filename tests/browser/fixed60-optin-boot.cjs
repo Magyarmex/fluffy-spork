@@ -225,13 +225,18 @@ const {chromium}=require('playwright');
      // benchmark. Always restore normal browser speed before teardown.
      await cdp.send('Emulation.setCPUThrottlingRate',{rate:3});
      try{
-      const throttled=await sampleTouches(4);
+      const throttled=await sampleTouches(8);
       console.log('NOVA_FIXED60_TOUCH_LATENCY_SERIES '+JSON.stringify({
        cpuThrottle:3,...summarize(throttled)
       }));
      }finally{
       await cdp.send('Emulation.setCPUThrottlingRate',{rate:1});
      }
+     // Return to baseline after CPU pressure to expose order/carryover effects.
+     const recovered=await sampleTouches(8);
+     console.log('NOVA_FIXED60_TOUCH_LATENCY_SERIES '+JSON.stringify({
+      cpuThrottle:1,phase:'recovery',...summarize(recovered)
+     }));
      // The fixed-step DOM owner must preserve the recently shipped physical
      // mouse-after-touch handoff, not merely isolated touch-stick behavior.
      await page.mouse.move(box.x+box.width*.65,box.y+box.height*.4);
@@ -242,7 +247,7 @@ const {chromium}=require('playwright');
      await page.waitForFunction(()=>window.__novaFixed60Game?.input.firing===false,
       null,{timeout:3000,polling:'raf'});
      console.log('NOVA_FIXED60_HYBRID_HANDOFF '+JSON.stringify({
-      touchTrials:12,physicalMouseFireRestored:true
+      touchTrials:24,physicalMouseFireRestored:true
      }));
      const teardown=await page.evaluate(()=>{
       const g=window.__novaFixed60Game,p=g.__novaFixed60Pilot;
