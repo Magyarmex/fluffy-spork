@@ -7,15 +7,17 @@ process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
 const assert=require('node:assert/strict');
 const crypto=require('node:crypto');
 const {bootGame,withSeed}=require('./audio-rng-causal-pilot.cjs');
-const seeds=[1517800,1517802,1517810],classes=['tempest','minigun'];
+const fullWorld=process.env.NOVA_CHRONOLOGY_FULL_WORLD==='1';
+const seeds=fullWorld?[1517800]:[1517800,1517802,1517810];
+const classes=fullWorld?['tempest']:['tempest','minigun'];
 const seconds=5;
 const digest=x=>crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex');
 const round=x=>Number.isFinite(x)?+x.toFixed(7):x;
 function run(seed,cls,mode){return withSeed(seed,draws=>{
  const g=bootGame(),p=g.player;
  g.sfx.muted=true;g.setClass(p,cls);
- g.tanks=[p];g.tankById=new Map([[p.id,p]]);
- g.shapes=[];g.drones=[];g.powerups=[];
+ if(!fullWorld){g.tanks=[p];g.tankById=new Map([[p.id,p]]);
+  g.shapes=[];g.drones=[];g.powerups=[];}
  g.input.aim.active=true;g.input.aim.dx=40;g.input.firing=true;g.input.autofire=false;
  p.stats.reload=8;p.perk='alacrity';g.useAbility(p);
  const births=[];const old=g.tryFire;
@@ -36,6 +38,8 @@ function run(seed,cls,mode){return withSeed(seed,draws=>{
  const state={time:round(g.time),player:{x:round(p.x),y:round(p.y),
   angle:round(p.angle),fireCd:round(p.fireCd),heat:round(p.__v17Heat||0)},
   bullets:g.bullets.map(b=>[b.id,round(b.x),round(b.y),round(b.vx),round(b.vy),round(b.ttl)]),
+  tanks:g.tanks.map(t=>[t.id,round(t.x),round(t.y),round(t.hp),t.alive]),
+  shapes:g.shapes.map(s=>[s.id,round(s.x),round(s.y),round(s.hp),s.dead]),
   rngDraws:draws()};
  const out={seed,cls,mode,volleyCount:births.length,
   birthHash:digest(births),stateHash:digest(state),births,state};
@@ -58,4 +62,4 @@ for(const seed of seeds)for(const cls of classes){
   referenceRngDraws:native.state.rngDraws,coarseRngDraws:coarse.state.rngDraws});
 }
 console.log(JSON.stringify({method:'composed Game, isolated held aim; direct 30Hz versus two 60Hz updates per presentation frame',
- caveat:'synthetic update schedule, not browser FPS or actual target damage',report},null,2));
+ fullWorld,caveat:'synthetic update schedule, not browser FPS or actual target damage',report},null,2));
