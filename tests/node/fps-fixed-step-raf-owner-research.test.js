@@ -411,3 +411,18 @@ test('150ms suspension clears stale held input even with four-step opt-in budget
   assert.equal(h.owner.droppedFrames,1);
  }finally{h.close()}
 });
+
+test('render-triggered game destruction must not draw minimap afterward',()=>{
+ const g=bootGame();let renders=0,minimapAfterDestroy=0,destroyed=false;
+ const originalDrawMinimap=g.drawMinimap;
+ g.drawMinimap=function(...args){
+  if(destroyed)minimapAfterDestroy++;
+  return originalDrawMinimap.apply(this,args);
+ };
+ const h=setup(g,{render:()=>{renders++;destroyed=true;g.destroy()}});
+ h.frame(1000/60);
+ assert.equal(renders,1,'exercise synchronous destruction during render');
+ assert.equal(h.owner.started,false);
+ assert.equal(h.active.size,0,'destroy must cancel the next RAF');
+ assert.equal(minimapAfterDestroy,0,'never touch minimap after game teardown');
+});
