@@ -75,3 +75,23 @@ test('normal production RAF remains active and draws minimap',()=>{
  assert.ok(events.includes('render'));
  assert.ok(events.includes('minimap'));
 });
+
+test('synchronous game-over teardown exits actual Game.update before AI and physics',()=>{
+ const html=patchRafStepCap(rawShell());
+ const start=html.indexOf('    update(dt) {');
+ assert.ok(start>0,'canonical Game.update owner present');
+ const open=html.indexOf('{',start),close=html.indexOf('\n    }',open);
+ assert.ok(close>open);
+ const update=new Function('classes_1','storage_1',
+  'return function update(dt){'+html.slice(open+1,close)+'\n};')(
+   {CLASSES:{scout:{name:'Scout'}}},{lsSet(){}});
+ let fired=0;
+ const game={time:5,status:'dying',gameOverSent:false,dyingAt:0,
+  player:{score:10,kills:0,level:1,cls:'scout'},best:100,
+  cb:{event(){fired++;game.__novaDestroyed=true;}}};
+ Object.defineProperty(game,'tanks',{get(){throw Error('AI continued after teardown');}});
+ update.call(game,1/30);
+ assert.equal(fired,1);
+ assert.equal(game.status,'dead');
+ assert.equal(game.__novaDestroyed,true);
+});
