@@ -124,6 +124,9 @@ class FixedStepRafOwner {
     if(!this.started)return; // Game.destroy may run inside Game.update.
     this.alpha=Math.max(0,Math.min(1,this.lagMs/STEP_MS));
     this.render(g,g.w,g.h,this.alpha);
+    // Rendering can synchronously destroy the game (for example, a host
+    // teardown). Never draw a minimap or touch game state after that.
+    if(!this.started)return;
     this.minimapTimer-=this.lastSteps*STEP;
     if(this.minimapTimer<=0 && typeof g.drawMinimap==='function'){
       this.minimapTimer=.08;g.drawMinimap();
