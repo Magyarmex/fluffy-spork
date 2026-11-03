@@ -17,7 +17,7 @@ function run(seed,cls,mode){return withSeed(seed,draws=>{
  g.tanks=[p];g.tankById=new Map([[p.id,p]]);
  g.shapes=[];g.drones=[];g.powerups=[];
  g.input.aim.active=true;g.input.aim.dx=40;g.input.firing=true;g.input.autofire=false;
- p.stats.reload=8;
+ p.stats.reload=8;p.perk='alacrity';g.useAbility(p);
  const births=[];const old=g.tryFire;
  g.tryFire=function(t){
   const before=this.bullets.length;
@@ -41,7 +41,7 @@ function run(seed,cls,mode){return withSeed(seed,draws=>{
   birthHash:digest(births),stateHash:digest(state),births,state};
  g.destroy();return out;
  });}
-const report=[];
+const intervalCounts=births=>{\n const bins=new Map();for(const b of births){const k=Math.max(0,Math.ceil(Math.round(b.time*60)/2));bins.set(k,(bins.get(k)||0)+1);}\n return {intervalsWithTwoOrMore:[...bins.values()].filter(n=>n>=2).length,\n  maxBirthsInInterval:Math.max(0,...bins.values())};\n};\nconst report=[];
 for(const seed of seeds)for(const cls of classes){
  const coarse=run(seed,cls,'coarse30');
  const split=run(seed,cls,'split60');
@@ -49,7 +49,7 @@ for(const seed of seeds)for(const cls of classes){
  assert.equal(JSON.stringify(split.births),JSON.stringify(native.births),'split60 must reproduce native 60Hz projectile births');
  assert.equal(JSON.stringify(split.state),JSON.stringify(native.state),'split60 must reproduce native 60Hz physical state');
  const firstMismatch=coarse.births.findIndex((b,i)=>JSON.stringify(b)!==JSON.stringify(native.births[i]));
- report.push({seed,cls,seconds,coarse30:coarse.volleyCount,
+ report.push({seed,cls,seconds,coarse30:coarse.volleyCount,coarseIntervalBirths:intervalCounts(coarse.births),\n  referenceIntervalBirths:intervalCounts(native.births),
   native60:native.volleyCount,split60:split.volleyCount,
   firstBirthMismatch:firstMismatch===-1&&coarse.births.length!==native.births.length?
    Math.min(coarse.births.length,native.births.length):firstMismatch,
