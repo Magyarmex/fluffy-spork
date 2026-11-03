@@ -44,6 +44,7 @@ const {chromium}=require('playwright');
      ticks:window.__novaFixed60Game?.__novaFixed60Pilot?.owner.ticks
     }));
     assert.equal(boot.ready,true,'actual pilot boot failed: '+JSON.stringify(boot));
+    assert.equal(boot.hasPilot,enabled,'default boot must not initialize fixed60 research modules');
     await page.waitForTimeout(600);
     const initial=await page.evaluate(()=>{
      const g=window.__novaFixed60Game,p=g.__novaFixed60Pilot;
