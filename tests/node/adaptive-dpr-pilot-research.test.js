@@ -54,6 +54,15 @@ test('pause, hidden tab, menu, stale or malformed snapshots cannot change qualit
  assert.equal(c.observe(renderBound,13000),1.5);
  assert.equal(c.observe(renderBound,14000),1.25);
 });
+test('missing, nonfinite or negative telemetry must never trigger a DPR reduction',()=>{
+ const bad=[{frameSamples:undefined},{frameSamples:NaN},{frameSamples:Infinity},
+  {frameSamples:59.5},{updateP95Ms:-1},{renderP95Ms:-1},
+  {simulationPacePct:-1},{fps:0},{frameP95Ms:-1}];
+ for(const patch of bad){
+  const c=new AdaptiveDprPilot(),s={...renderBound,...patch};
+  c.observe(s,0);assert.equal(c.observe(s,1000),1.5,JSON.stringify(patch));
+ }
+});
 test('repeated per-frame reads of one sliding telemetry window cannot fake sustained pressure',()=>{
  const c=new AdaptiveDprPilot();
  for(let i=0;i<59;i++)c.observe(renderBound,i*16.667);
