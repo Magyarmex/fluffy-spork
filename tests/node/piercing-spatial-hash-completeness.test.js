@@ -58,3 +58,20 @@ test('self-query certification does not prove neighboring query completeness',()
  assert.ok(result&&result.size===1,
   'self-only hash query cannot certify absence of a reachable second hull');
 });
+
+// The optimization is allowed to abstain when a pair is provably too far
+// apart, independently of the hash's completeness or implementation.
+test('distant hulls require no spatial-query trust for a safe abstention',()=>{
+ const g=world(false);
+ g.tanks[1].x=5000;
+ g.hash.query=function(){throw Error('pair proof must not consult hash');};
+ assert.equal(plan(g,.011,true),null);
+});
+
+test('unknown hull geometry retains the conservative original proof',()=>{
+ const g=world(false);
+ g.tanks[1].x=NaN;
+ // A missing/invalid coordinate cannot certify separation; the normal
+ // all-hull envelope rejects it rather than guessing a collision result.
+ assert.equal(plan(g,.011,true),null);
+});
