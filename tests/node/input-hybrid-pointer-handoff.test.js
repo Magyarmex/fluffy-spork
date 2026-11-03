@@ -127,3 +127,18 @@ test('touch compatibility mousemove and active touch cannot steal hover ownershi
  assert.equal(input.stickId.move,12);
  assert.equal(input.mouseActive,false);
 });
+
+test('delayed touch compatibility mouse cannot re-arm firing after real hover handoff',()=>{
+ const {input,event,setNow,listeners}=boot();
+ setNow(100);input.pd(event('touch',11,100));input.pu(event('touch',11,100));
+ const realMove={clientX:500,clientY:100,buttons:0,
+   sourceCapabilities:{firesTouchEvents:false}};
+ for(const fn of listeners.window.get('mousemove')||[])fn(realMove);
+ assert.equal(input.touchSeen,false);
+ assert.equal(input.firing,false);
+ const delayedGhost={button:0,clientX:500,clientY:100,
+   sourceCapabilities:{firesTouchEvents:true}};
+ for(const fn of listeners.canvas.get('mousedown')||[])fn(delayedGhost);
+ assert.equal(input.firing,false,'delayed synthetic click cannot fire');
+ assert.equal(input.__novaPrimaryPressCaptured,false);
+});
