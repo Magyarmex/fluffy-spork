@@ -31,6 +31,8 @@ const lifecycleGuards=[
   '            (0, render_1.render)(this, this.w, this.h);\n            if (this.__novaDestroyed) return;\n            // minimap'],
  ['                this.drawMinimap();\n            }\n            earlierWork = priorWork;',
   '                this.drawMinimap();\n                if (this.__novaDestroyed) return;\n            }\n            earlierWork = priorWork;'],
+ ['            this.cb.event({ type: \'gameover\', stats });\n        }\n        // player',
+  '            this.cb.event({ type: \'gameover\', stats });\n            if (this.__novaDestroyed) return;\n        }\n        // player'],
  ['    destroy() {\n        cancelAnimationFrame(this.raf);',
   '    destroy() {\n        if (this.__novaDestroyed) return;\n        this.__novaDestroyed = true;\n        cancelAnimationFrame(this.raf);']
 ];
