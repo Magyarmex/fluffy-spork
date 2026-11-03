@@ -19,7 +19,7 @@ function execute(html,mode){
  const game={
   input:{},sfx:{resume(){events.push('audio-resume')},
    setMuted(){},setMusicMuted(){}},
-  start(){events.push('start');if(mode==='start-throws')throw Error('startup failed')},
+  start(){events.push('start');if(mode==='start-throws'||mode==='start-throws-real-destroy')throw Error('startup failed')},
   destroy(){events.push('destroy');if(mode==='destroy-throws')throw Error('cleanup failed')}
  };
  if(mode==='start-throws-real-destroy'){
