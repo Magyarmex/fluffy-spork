@@ -101,10 +101,22 @@ const {chromium}=require('playwright');
         pointerType:e.pointerType,clientX:e.clientX,clientY:e.clientY
        }),true);
      });
-     const touchAt=await page.evaluate(()=>performance.now());
+     // Measure latency from the actual browser event, not CDP command dispatch:
+     // command transport and browser scheduling are separate from simulation lag.
+     await page.evaluate(()=>{
+      window.__novaInputLatency={};
+      document.addEventListener('pointerdown',e=>{
+       if(e.pointerType==='touch' && window.__novaInputLatency.downAt===undefined)
+        window.__novaInputLatency.downAt=performance.now();
+      },{capture:true,once:true});
+     });
      await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[touch]});
-     await page.waitForFunction(()=>window.__novaFixed60Game.input.move.active,
-      null,{timeout:3000});
+     await page.waitForFunction(()=>{
+      const g=window.__novaFixed60Game, m=window.__novaInputLatency;
+      if(!g?.input.move.active)return false;
+      if(m.downAppliedAt===undefined)m.downAppliedAt=performance.now();
+      return true;
+     },null,{timeout:3000,polling:'raf'});
      const touchState=await page.evaluate(()=>{
       const g=window.__novaFixed60Game,p=g.__novaFixed60Pilot;
       return {move:g.input.move.active,stickId:g.input.stickId.move,
@@ -113,13 +125,38 @@ const {chromium}=require('playwright');
        sampled:p.timeline.sampled,ownerTicks:p.owner.ticks,
        inputCanvas:g.input.canvas===g.canvas};
      });
-     touchState.deliveryLatencyMs=await page.evaluate(at=>performance.now()-at,touchAt);
+     touchState.deliveryLatencyMs=await page.evaluate(()=>{
+      const m=window.__novaInputLatency;
+      return m.downAppliedAt-m.downAt;
+     });
+     assert.ok(Number.isFinite(touchState.deliveryLatencyMs)&&touchState.deliveryLatencyMs>=0,
+      'browser touch-down must have a measurable application delay');
      console.log('NOVA_FIXED60_TOUCH_DIAGNOSTIC '+JSON.stringify(touchState));
      assert.equal(touchState.move,true,
       'touch movement reaches fixed60 simulation: '+JSON.stringify(touchState));
+     await page.evaluate(()=>{
+      document.addEventListener('pointerup',e=>{
+       if(e.pointerType==='touch' && window.__novaInputLatency.upAt===undefined)
+        window.__novaInputLatency.upAt=performance.now();
+      },{capture:true,once:true});
+     });
      await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
-     await page.waitForFunction(()=>!window.__novaFixed60Game.input.move.active,
-      null,{timeout:3000});
+     await page.waitForFunction(()=>{
+      const g=window.__novaFixed60Game,m=window.__novaInputLatency;
+      if(g?.input.move.active)return false;
+      if(m.upAppliedAt===undefined)m.upAppliedAt=performance.now();
+      return true;
+     },null,{timeout:3000,polling:'raf'});
+     const releaseLatency=await page.evaluate(()=>{
+      const m=window.__novaInputLatency;
+      return m.upAppliedAt-m.upAt;
+     });
+     assert.ok(Number.isFinite(releaseLatency)&&releaseLatency>=0,
+      'browser touch-up must have a measurable application delay');
+     console.log('NOVA_FIXED60_TOUCH_LATENCY '+JSON.stringify({
+      downMs:touchState.deliveryLatencyMs,upMs:releaseLatency,
+      queued:touchState.queued,ownerTicks:touchState.ownerTicks
+     }));
      assert.equal(await page.evaluate(()=>window.__novaFixed60Game.input.move.active),
       false,'touch release clears fixed60 movement');
      const teardown=await page.evaluate(()=>{
