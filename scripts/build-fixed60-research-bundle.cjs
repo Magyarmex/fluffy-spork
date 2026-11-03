@@ -16,6 +16,9 @@ function buildBrowserBundle(read=name=>fs.readFileSync(path.join(ROOT,name),'utf
     if(typeof source!=='string'||!source.trim())throw Error('empty fixed60 module: '+name);
     // All imports must stay inside this explicitly audited four-module graph.
     const imports=[...source.matchAll(/\brequire\s*\(\s*(['"])(.*?)\1\s*\)/g)];
+    const calls=source.match(/\brequire\s*\(/g)||[];
+    if(calls.length!==imports.length)
+      throw Error('dynamic fixed60 browser import in '+name);
     for(const [, ,requested] of imports){
       if(!requested.startsWith('./')||!MODULES.includes(requested.slice(2)))
         throw Error('unapproved fixed60 browser import: '+requested+' in '+name);
