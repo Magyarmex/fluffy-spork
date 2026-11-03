@@ -29,6 +29,9 @@ function buildBrowserBundle(read=name=>fs.readFileSync(path.join(ROOT,name),'utf
     '/* Generated fixed60 research browser bundle. NOT enabled in production. */',
     '(function(root){',
     "'use strict';",
+    // The artifact is present for explicit pilots, but default matches must
+    // not initialize the research module graph on every player startup.
+    "if(root.location && new URLSearchParams(root.location.search).get('nova_fixed60')!=='pilot')return;",
     'const factories={'+entries.join(',\n')+'};',
     'const cache=Object.create(null);',
     'function load(name){',
