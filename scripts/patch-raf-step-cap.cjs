@@ -45,6 +45,8 @@ function patchRafStepCap(html){
  if(typeof html!=='string')throw new TypeError('expected UTF-8 HTML');
  if(!html.includes('    start() {')||!html.includes('this.raf = requestAnimationFrame(loop);'))
   throw Error('canonical game RAF owner missing');
+ if(count(html,after)===1&&count(html,withCarry)===1&&
+    lifecycleGuards.every(([,guard])=>count(html,guard)===1))return html;
  if(count(html,after)===1&&count(html,withCarry)===1&&count(html,newStep)===1&&
     count(html,newLoopTail)===1&&count(html,before)===0&&count(html,intermediate)===0)return protectLifecycle(html);
  /* The materializer always starts from the compressed canonical shell.
