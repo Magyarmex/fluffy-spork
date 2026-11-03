@@ -71,14 +71,31 @@ function protectBootCleanup(html){
   .replace(bootCatchBefore,bootCatchAfter);
 }
 
+
+const blurBefore="        window.addEventListener('blur', () => {\n            this.keyboard.up = this.keyboard.down = this.keyboard.left = this.keyboard.right = false;\n            this.firing = false;\n        });";
+const blurAfter="        if (!this.__novaBlurHandler) this.__novaBlurHandler = () => {\n            this.keyboard.up = this.keyboard.down = this.keyboard.left = this.keyboard.right = false;\n            this.firing = false;\n        };\n        window.addEventListener('blur', this.__novaBlurHandler);";
+const detachBefore="        window.removeEventListener('keyup', this.ku);\n        this.canvas = null;";
+const detachAfter="        window.removeEventListener('keyup', this.ku);\n        window.removeEventListener('blur', this.__novaBlurHandler);\n        this.canvas = null;";
+function protectInputBlurCleanup(html){
+ if(!html.includes('class Input {'))return html;
+ if(count(html,blurAfter)===1&&count(html,detachAfter)===1)return html;
+ if(count(html,blurBefore)!==1||count(html,detachBefore)!==1||
+    count(html,blurAfter)!==0||count(html,detachAfter)!==0)
+  throw Error('canonical Input blur lifecycle owner drift; refuse materialization');
+ return html.replace(blurBefore,blurAfter).replace(detachBefore,detachAfter);
+}
+function protectLifecycleCleanup(html){
+ return protectInputBlurCleanup(protectBootCleanup(html));
+}
+
 function patchRafStepCap(html){
  if(typeof html!=='string')throw new TypeError('expected UTF-8 HTML');
  if(!html.includes('    start() {')||!html.includes('this.raf = requestAnimationFrame(loop);'))
   throw Error('canonical game RAF owner missing');
  if(count(html,after)===1&&count(html,withCarry)===1&&
-    lifecycleGuards.every(([,guard])=>count(html,guard)===1))return protectBootCleanup(html);
+    lifecycleGuards.every(([,guard])=>count(html,guard)===1))return protectLifecycleCleanup(html);
  if(count(html,after)===1&&count(html,withCarry)===1&&count(html,newStep)===1&&
-    count(html,newLoopTail)===1&&count(html,before)===0&&count(html,intermediate)===0)return protectBootCleanup(protectLifecycle(html));
+    count(html,newLoopTail)===1&&count(html,before)===0&&count(html,intermediate)===0)return protectLifecycleCleanup(protectLifecycle(html));
  /* The materializer always starts from the compressed canonical shell.
   * Existing materialized HTML can also be upgraded idempotently in tests. */
  const old=count(html,before),mid=count(html,intermediate),prior=count(html,priorStep);
@@ -87,7 +104,7 @@ function patchRafStepCap(html){
   throw Error('canonical RAF time cap drift; refuse materialization');
  if(prior===1){
   if(count(html,priorCarry)!==1)throw Error('canonical RAF time cap drift; refuse materialization');
-  return protectBootCleanup(protectLifecycle(html.replace(priorCarry,withCarry)
+  return protectLifecycleCleanup(protectLifecycle(html.replace(priorCarry,withCarry)
    .replace(priorStep,newStep).replace(priorLoop,priorLoop+'\n            const workStart = performance.now();').replace(loopTail,newLoopTail)));
  }
  if(count(html,priorCarry)!==0||count(html,anchor)!==1||count(html,oldStep)!==1)
@@ -96,10 +113,10 @@ function patchRafStepCap(html){
  const legacy=html.replace(anchor,priorCarry).replace(original,
   '            const elapsed = Math.max(0, (ts - this.last) / 1000);\n'+after)
   .replace(oldStep,priorStep);
- return protectBootCleanup(protectLifecycle(legacy.replace(priorCarry,withCarry)
+ return protectLifecycleCleanup(protectLifecycle(legacy.replace(priorCarry,withCarry)
   .replace(priorStep,newStep).replace(priorLoop,priorLoop+'\n            const workStart = performance.now();').replace(loopTail,newLoopTail)));
 }
-module.exports={patchRafStepCap,protectBootCleanup,before,intermediate,after};
+module.exports={patchRafStepCap,protectBootCleanup,protectInputBlurCleanup,before,intermediate,after};
 if(require.main===module){
  const file=process.argv[2];if(!file)throw Error('Usage: node scripts/patch-raf-step-cap.cjs <index.html>');
  const html=fs.readFileSync(file,'utf8'),out=patchRafStepCap(html);
