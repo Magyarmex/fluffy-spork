@@ -1,5 +1,5 @@
 'use strict';
-/* Preserve established 60Hz Tempest cadence across real build modifiers.
+/* Preserve established 60Hz Tempest cadence across legal build modifiers.
  * A coarse-frame negative-cooldown carry can appear to fix stock Tempest at
  * 30Hz while overfiring upgraded Tempest. Stock 60Hz goldens alone cannot
  * catch that regression. Uses the composed 49-overlay Game. */
@@ -8,10 +8,13 @@ const test=require('node:test');const assert=require('node:assert/strict');
 const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 const cases={
  stock:{count:153,setup(){}},
+ reload1:{count:155,setup(p){p.stats.reload=1;}},
+ reload2:{count:159,setup(p){p.stats.reload=2;}},
  reload3:{count:162,setup(p){p.stats.reload=3;}},
+ reload4:{count:163,setup(p){p.stats.reload=4;}},
+ reload5:{count:234,setup(p){p.stats.reload=5;}},
  reload7:{count:236,setup(p){p.stats.reload=7;}},
- reload12:{count:239,setup(p){p.stats.reload=12;}},
- reload20:{count:248,setup(p){p.stats.reload=20;}},
+ reload8:{count:236,setup(p){p.stats.reload=8;}},
  alacrity:{count:160,setup(p){p.perk='alacrity';}},
  gunnerGene:{count:117,setup(p){p.gene='gunner';}},
  initialOverheat:{count:188,setup(p){p.overheatT=3;}},
