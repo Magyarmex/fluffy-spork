@@ -65,7 +65,9 @@ test('pilot startup failure releases capture and preserves original error',()=>{
  assert.equal(g.raf,0);
 });
 test('missing requested research bundle fails closed, never silently runs 30Hz',()=>{
- assert.throws(()=>boot('?nova_fixed60=pilot',{missingApi:true}),/bundle is missing/);
+ const h=boot('?nova_fixed60=pilot',{missingApi:true}),g=new h.Game();
+ assert.throws(()=>g.start(),/bundle is missing/);
+ assert.deepEqual(h.calls,['settings-start'],'must not fall back to production RAF');
 });
 test('requested pilot cannot attach after production RAF starts',()=>{
  const h=boot('?nova_fixed60=pilot'),g=new h.Game();
