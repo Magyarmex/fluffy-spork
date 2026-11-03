@@ -101,8 +101,10 @@ const {chromium}=require('playwright');
         pointerType:e.pointerType,clientX:e.clientX,clientY:e.clientY
        }),true);
      });
+     const touchAt=await page.evaluate(()=>performance.now());
      await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[touch]});
-     await page.waitForTimeout(180);
+     await page.waitForFunction(()=>window.__novaFixed60Game.input.move.active,
+      null,{timeout:3000});
      const touchState=await page.evaluate(()=>{
       const g=window.__novaFixed60Game,p=g.__novaFixed60Pilot;
       return {move:g.input.move.active,stickId:g.input.stickId.move,
@@ -111,11 +113,13 @@ const {chromium}=require('playwright');
        sampled:p.timeline.sampled,ownerTicks:p.owner.ticks,
        inputCanvas:g.input.canvas===g.canvas};
      });
+     touchState.deliveryLatencyMs=await page.evaluate(at=>performance.now()-at,touchAt);
      console.log('NOVA_FIXED60_TOUCH_DIAGNOSTIC '+JSON.stringify(touchState));
      assert.equal(touchState.move,true,
       'touch movement reaches fixed60 simulation: '+JSON.stringify(touchState));
      await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
-     await page.waitForTimeout(120);
+     await page.waitForFunction(()=>!window.__novaFixed60Game.input.move.active,
+      null,{timeout:3000});
      assert.equal(await page.evaluate(()=>window.__novaFixed60Game.input.move.active),
       false,'touch release clears fixed60 movement');
      const teardown=await page.evaluate(()=>{
