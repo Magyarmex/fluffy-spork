@@ -21,7 +21,10 @@ class FixedStepRafOwner {
     this.lastMs=0;this.simAtSec=0;this.lagMs=0;this.ticks=0;
     this.droppedMs=0;this.droppedFrames=0;this.paused=false;
     this.alpha=0;this.lastSteps=0;this.minimapTimer=0;
-    this._loop=ts=>this.frame(ts);
+    // Every scheduled callback has a unique ticket. Cancelled callbacks may
+    // still be delivered by a host after stop/restart; they must never
+    // advance a newly started world or schedule a second RAF chain.
+    this._generation=0;this._requestSeq=0;
     this.originalDestroy=game.destroy;
     this.destroyHadOwn=Object.prototype.hasOwnProperty.call(game,'destroy');
     this.destroyWrapper=null;
@@ -32,6 +35,15 @@ class FixedStepRafOwner {
     this.startHadOwn=Object.prototype.hasOwnProperty.call(game,'start');
     this.startWrapper=null;
   }
+  schedule(){
+    const generation=this._generation,seq=++this._requestSeq;
+    this.raf=this.request(ts=>{
+      if(!this.started || generation!==this._generation ||
+         seq!==this._requestSeq)return;
+      this.raf=null;
+      this.frame(ts);
+    });
+  }
   start(){
     if(this.started)throw Error('fixed-step RAF already started');
     if(this.game.raf)throw Error('production RAF already owns this game');
@@ -41,7 +53,7 @@ class FixedStepRafOwner {
       throw Error('game lifecycle owner changed before fixed-step activation');
     const at=this.now();if(!Number.isFinite(at)||at<this.bridge.startMs-EPS)
       throw Error('invalid fixed-step start time');
-    this.started=true;this.lastMs=at;this.simAtSec=(at-this.bridge.startMs)/1000;
+    this._generation++;this.started=true;this.lastMs=at;this.simAtSec=(at-this.bridge.startMs)/1000;
     this.timeline.reset();this.timeline.consumeThrough(this.simAtSec);
     this.paused=!!this.game.paused;
     try{this.game.sfx.startMusic()}
@@ -70,7 +82,7 @@ class FixedStepRafOwner {
       };
       this.game.setPaused=this.pauseWrapper;
     }
-    try{this.raf=this.request(this._loop)}
+    try{this.schedule()}
     catch(error){this.stop();throw error}
   }
   transition(paused,at){
@@ -82,7 +94,7 @@ class FixedStepRafOwner {
   frame(ts){
     if(!this.started)throw Error('fixed-step RAF is not running');
     if(!Number.isFinite(ts)||ts<this.lastMs-EPS)throw Error('nonmonotonic RAF timestamp');
-    try{this.raf=this.request(this._loop);this.advance(ts)}
+    try{this.schedule();this.advance(ts)}
     catch(error){this.stop();throw error}
   }
   advance(ts){
@@ -150,7 +162,7 @@ class FixedStepRafOwner {
   }
   stop(){
     if(!this.started)return;
-    this.started=false;
+    this.started=false;this._generation++;this._requestSeq++;
     if(this.raf!=null)this.cancel(this.raf);
     this.raf=null;this.timeline.reset();this.lagMs=0;
     if(this.game.start===this.startWrapper){
