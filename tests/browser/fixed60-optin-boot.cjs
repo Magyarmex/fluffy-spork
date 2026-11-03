@@ -49,8 +49,12 @@ const {chromium}=require('playwright');
      const g=window.__novaFixed60Game,p=g.__novaFixed60Pilot;
      return {pilot:!!p,started:!!p?.owner.started,ticks:p?.owner.ticks||0,
       raf:g.raf||0,capture:!!p?.capture.active,
-      inputOwner:!!g.input,gameStatus:g.status};
+      inputOwner:!!g.input,gameStatus:g.status,paused:g.paused,
+      pendingOffer:!!g.pendingOffer,lastMs:p?.owner.lastMs,
+      lagMs:p?.owner.lagMs,framesDropped:p?.owner.droppedFrames,
+      lastSteps:p?.owner.lastSteps,gameTime:g.time};
     });
+    console.log('NOVA_FIXED60_BOOT_DIAGNOSTIC '+JSON.stringify({enabled,initial,errors,boot}));
     assert.equal(initial.pilot,enabled,'only explicit query may activate pilot');
     assert.equal(initial.gameStatus,'playing');
     if(enabled){
