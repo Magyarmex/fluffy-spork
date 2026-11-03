@@ -63,7 +63,8 @@ for(const seed of seeds)for(const cls of classes){
  assert.equal(JSON.stringify(split.births),JSON.stringify(native.births),'split60 must reproduce native 60Hz projectile births');
  assert.equal(JSON.stringify(split.state),JSON.stringify(native.state),'split60 must reproduce native 60Hz physical state');
  const firstMismatch=coarse.births.findIndex((b,i)=>JSON.stringify(b)!==JSON.stringify(native.births[i]));
- report.push({seed,cls,seconds,coarse30:coarse.volleyCount,coarseIntervalBirths:intervalCounts(coarse.births),\n  referenceIntervalBirths:intervalCounts(native.births),
+ report.push({seed,cls,seconds,coarse30:coarse.volleyCount,coarseIntervalBirths:intervalCounts(coarse.births),
+  referenceIntervalBirths:intervalCounts(native.births),
   native60:native.volleyCount,split60:split.volleyCount,
   firstBirthMismatch:firstMismatch===-1&&coarse.births.length!==native.births.length?
    Math.min(coarse.births.length,native.births.length):firstMismatch,
