@@ -35,7 +35,9 @@ function measure(seed,hz,reload){return withSeed(seed,()=>{
  }
  const out={seed,hz,reload,seconds,volleys,heat:p.__v17Heat||0,heatPeak,
   fireCd:p.fireCd,lateShotCooldown:postShotCooldowns.length?+postShotCooldowns[postShotCooldowns.length-1].toFixed(7):null,
-  lateCooldownVsStep:postShotCooldowns.length?+(postShotCooldowns[postShotCooldowns.length-1]-1/hz).toFixed(7):null,firstShotTimes:shotTimes.slice(0,16).map(n=>+n.toFixed(7)),
+  lateCooldownVsStep:postShotCooldowns.length?+(postShotCooldowns[postShotCooldowns.length-1]-1/hz).toFixed(7):null,
+  predictedSteadyHz:postShotCooldowns.length?+(hz/Math.max(1,Math.ceil(postShotCooldowns[postShotCooldowns.length-1]*hz-1e-10))).toFixed(5):null,
+  lastIntervals:shotTimes.slice(-16).slice(1).map((n,i)=>+(n-shotTimes.slice(-16)[i]).toFixed(7)),firstShotTimes:shotTimes.slice(0,16).map(n=>+n.toFixed(7)),
   firstIntervals:shotTimes.slice(1,16).map((n,i)=>+(n-shotTimes[i]).toFixed(7))};
  g.destroy();return out;
 });}
