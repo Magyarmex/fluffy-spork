@@ -18,6 +18,13 @@ test('render pressure can justify downshift even when simulation pace has alread
  const slow={...renderBound,fps:22,frameP95Ms:55,simulationPacePct:67};
  c.observe(slow,0);assert.equal(c.observe(slow,1000),1.25);
 });
+test('update cost within one 60Hz tick may recover; cost beyond it must not',()=>{
+ const borderline={...renderBound,fps:22,frameP95Ms:50,renderP95Ms:25,updateP95Ms:12,simulationPacePct:67};
+ const good=new AdaptiveDprPilot(),bad=new AdaptiveDprPilot();
+ good.observe(borderline,0);assert.equal(good.observe(borderline,1000),1.25);
+ const cpu={...borderline,updateP95Ms:20};
+ bad.observe(cpu,0);assert.equal(bad.observe(cpu,1000),1.5);
+});
 test('CPU-bound slow simulation and ordinary 30Hz do not trigger blur',()=>{
  const c=new AdaptiveDprPilot();
  for(let t=0;t<20000;t+=1000)assert.equal(c.observe(simBound,t),1.5);
