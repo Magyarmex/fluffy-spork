@@ -134,6 +134,8 @@ jobs:
               './nova-updates/blackglass-mirror-v1.10.6.js',
               './nova-updates/performance-v1.7.5.js',
               './nova-updates/drone-allegiance-glow-v1.7.6.js',
+              './nova-updates/fixed60-research-browser.js',
+              './nova-updates/fixed60-optin-boot.js',
               './nova-updates/settings-v1.7.7.js',
               './nova-updates/performance-v1.7.8.js',
               './nova-updates/lobby-history.js',
@@ -282,6 +284,8 @@ jobs:
           grep -q 'nova-updates/blackglass-mirror-v1.10.6.js' index.html.new
           grep -q 'nova-updates/performance-v1.7.5.js' index.html.new
           grep -q 'nova-updates/drone-allegiance-glow-v1.7.6.js' index.html.new
+          grep -q 'nova-updates/fixed60-research-browser.js' index.html.new
+          grep -q 'nova-updates/fixed60-optin-boot.js' index.html.new
           grep -q 'nova-updates/settings-v1.7.7.js' index.html.new
           grep -q 'nova-updates/performance-v1.7.8.js' index.html.new
           grep -q 'nova-updates/lobby-history.js' index.html.new
