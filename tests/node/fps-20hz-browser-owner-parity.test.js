@@ -44,12 +44,16 @@ test('20Hz fixed-step browser owner needs three simulation steps per exact frame
  for(const seed of [1517800,1517802]){
   const reference=run(seed,Array(120).fill(1000/60),2);
   const correct=run(seed,Array(40).fill(50),4);
+  const exactThree=run(seed,Array(40).fill(50),3);
   const capped=run(seed,Array(40).fill(50),2);
   assert.equal(reference.ticks,120);
   assert.equal(correct.ticks,120);
   assert.equal(correct.droppedFrames,0);
   assert.equal(correct.hash,reference.hash);
   assert.equal(correct.draws,reference.draws);
+  assert.equal(exactThree.ticks,120,'three steps suffice for perfectly spaced 20Hz');
+  assert.equal(exactThree.hash,reference.hash);
+  assert.equal(exactThree.draws,reference.draws);
   assert.ok(capped.ticks<120,'two-step cap must not silently pass as 60Hz parity');
   assert.notEqual(capped.hash,reference.hash);
  }
@@ -58,6 +62,9 @@ test('20Hz 48/52ms presentation jitter recovers a fourth step without changing w
  for(const seed of [1517800,1517802]){
   const reference=run(seed,Array(120).fill(1000/60),2);
   const jitter=run(seed,Array.from({length:20},()=>[48,52]).flat(),4);
+  const cappedThree=run(seed,Array.from({length:20},()=>[48,52]).flat(),3);
+  assert.ok(cappedThree.ticks<120,'jitter requires an occasional fourth step');
+  assert.notEqual(cappedThree.hash,reference.hash);
   assert.equal(jitter.ticks,120);
   assert.equal(jitter.droppedFrames,0);
   assert.equal(jitter.hash,reference.hash);
