@@ -113,8 +113,16 @@ test('20Hz 30/70ms burst phase exposes bounded but unfinished tick at capture bo
   const endsSlow=run(seed,Array.from({length:20},()=>[30,70]).flat(),4);
   const endsFast=run(seed,Array.from({length:20},()=>[70,30]).flat(),4);
   assert.equal(endsSlow.droppedFrames,0);
-  assert.equal(endsSlow.ticks,119);
-  assert.notEqual(endsSlow.hash,reference.hash);
+  assert.ok(endsSlow.ticks===119||endsSlow.ticks===120);
+  if(endsSlow.ticks===119){
+   assert.ok(endsSlow.backlogMs>0,'unfinished tick must remain as bounded lag');
+   assert.notEqual(endsSlow.hash,reference.hash);
+  }else{
+   // A future scheduler that safely finishes the fourth/fifth step should
+   // improve this test, not be rejected for fixing the known limitation.
+   assert.equal(endsSlow.hash,reference.hash);
+   assert.equal(endsSlow.draws,reference.draws);
+  }
   assert.equal(endsFast.ticks,120);
   assert.equal(endsFast.hash,reference.hash);
   assert.equal(endsFast.draws,reference.draws);
