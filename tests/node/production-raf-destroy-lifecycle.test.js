@@ -5,7 +5,7 @@ const {patchRafStepCap}=require('../../scripts/patch-raf-step-cap.cjs');
 const root=path.resolve(__dirname,'../..');
 function rawShell(){
  const b=fs.readdirSync(path.join(root,'nova-gz')).filter(x=>x.endsWith('.b64')).sort()
-  .map(x=>fs.readFileSync(path.join(root,'nova-gz',x),'utf8')).join('').replace(/\\s+/g,'');
+  .map(x=>fs.readFileSync(path.join(root,'nova-gz',x),'utf8')).join('').replace(/\s+/g,'');
  return zlib.gunzipSync(Buffer.from(b,'base64')).toString('utf8');
 }
 function methods(html){
@@ -19,7 +19,6 @@ function fixture(html,trigger){
  const canceled=[],events=[];
  const owner=methods(html);
  const start=owner.slice(owner.indexOf('    start() {')+'    start() {'.length,owner.indexOf('    destroy() {'));
- const destroy=owner.slice(owner.indexOf('    destroy() {')+'    destroy() {'.length,owner.lastIndexOf('    }'));
  // Extract destroy body only, not any intervening method.
  const destroyBody=owner.slice(owner.indexOf('    destroy() {')+'    destroy() {'.length);
  const close=destroyBody.indexOf('\n    }');
