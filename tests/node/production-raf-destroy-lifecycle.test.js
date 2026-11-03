@@ -38,7 +38,7 @@ function fixture(html,trigger){
     (trigger==='second-update'&&events.filter(x=>x==='update').length===2))this.destroy();},
   drawMinimap(){events.push('minimap');}});
  game.start();
- now=50;callback(now);
+ now=70;callback(now);
  return {game,events,canceled,callback};
 }
 test('materializer lifecycle guards are unique and idempotent on raw and shipping paths',()=>{
