@@ -76,6 +76,13 @@ test('high-quality profile can preserve its distinct DPR ceiling',()=>{
  c.observe(renderBound,2000);assert.equal(c.observe(renderBound,5000),1.5);
  assert.equal(c.observe(renderBound,9000),1.5);
 });
+test('rounding cannot exceed a non-millistep DPR ceiling',()=>{
+ const c=new AdaptiveDprPilot({initial:1.23456,floor:1,ceiling:1.23456,step:.4});
+ c.observe(renderBound,0);c.observe(renderBound,1000);
+ c.observe(healthy,5000);c.observe(healthy,6000);c.observe(healthy,7000);
+ assert.ok(c.dpr<=c.ceiling&&c.dpr>=c.floor);
+ assert.equal(c.dpr,c.ceiling);
+});
 test('invalid settings and nonmonotonic samples fail closed',()=>{
  for(const config of [{floor:0},{ceiling:.8},{initial:2},{step:0},{downWindows:0},{dwellMs:-1},{sampleMs:0}])
   assert.throws(()=>new AdaptiveDprPilot(config),/invalid/);
