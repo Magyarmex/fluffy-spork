@@ -1,5 +1,8 @@
 'use strict';
 /* Research harness for #648: find cadence aliasing, not merely 30/60 differences.
+ * Direct Game.update(1/hz) is NOT the production RAF scheduler: production caps
+ * frame dt at 1/30 and may perform bounded recovery. Frequencies below 30Hz
+ * are synthetic large-step stress tests, NOT measured 20-25 FPS gameplay.
  * Uses the actual materialized Game and every HTML-ordered overlay.
  * No gameplay patches or synthetic reload formula. Run from repository root:
  * node tests/research/tempest-cadence-frequency-map.cjs
@@ -43,4 +46,5 @@ for(const r of results){const baseline=ref.get(`${r.seed}:${r.reload}`);
  r.pctVs60=baseline==null?null:+((r.volleys/baseline-1)*100).toFixed(2);
 }
 console.log(JSON.stringify({method:'composed production Game, held aim, isolated no-target',
- source:'current local materialized index.html plus ordered overlays',seconds,seeds,hzList,reloadList,results},null,2));
+ source:'current local materialized index.html plus ordered overlays',
+ caveat:'direct Game.update(1/hz), not RAF; below 30Hz is synthetic stress only',seconds,seeds,hzList,reloadList,results},null,2));
