@@ -112,3 +112,8 @@ test('audio resume failure before Game.start still destroys constructed Game',()
  assert.deepEqual(x.screen,['menu']);
  assert.equal(x.ref.current,null);
 });
+
+test('missing React boot error owner fails closed rather than silently skipping cleanup',()=>{
+ const drift=rawShell().replace("Failed to boot game:","Unexpected boot error:");
+ assert.throws(()=>protectBootCleanup(drift),/boot cleanup owner drift/);
+});
