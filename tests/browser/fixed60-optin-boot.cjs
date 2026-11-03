@@ -159,6 +159,54 @@ const {chromium}=require('playwright');
      }));
      assert.equal(await page.evaluate(()=>window.__novaFixed60Game.input.move.active),
       false,'touch release clears fixed60 movement');
+     // Repeated browser-event-to-state measurements expose tail latency that a
+     // single successful touch cannot establish. This is Chromium-only, not
+     // input-to-photon or physical Android evidence.
+     const repeated=[];
+     for(let trial=0;trial<8;trial++){
+      await page.evaluate(()=>{
+       window.__novaRepeatTouch={};
+       document.addEventListener('pointerdown',e=>{
+        if(e.pointerType==='touch')window.__novaRepeatTouch.downAt=performance.now();
+       },{capture:true,once:true});
+      });
+      await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{...touch,id:40+trial}]});
+      await page.waitForFunction(()=>{
+       const g=window.__novaFixed60Game,m=window.__novaRepeatTouch;
+       if(!g?.input.move.active||m.downAt===undefined)return false;
+       m.downAppliedAt??=performance.now();return true;
+      },null,{timeout:3000,polling:'raf'});
+      await page.evaluate(()=>{
+       document.addEventListener('pointerup',e=>{
+        if(e.pointerType==='touch')window.__novaRepeatTouch.upAt=performance.now();
+       },{capture:true,once:true});
+      });
+      await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+      await page.waitForFunction(()=>{
+       const g=window.__novaFixed60Game,m=window.__novaRepeatTouch;
+       if(g?.input.move.active||m.upAt===undefined)return false;
+       m.upAppliedAt??=performance.now();return true;
+      },null,{timeout:3000,polling:'raf'});
+      const measured=await page.evaluate(()=>{
+       const m=window.__novaRepeatTouch;
+       return {downMs:m.downAppliedAt-m.downAt,upMs:m.upAppliedAt-m.upAt};
+      });
+      assert.ok(Object.values(measured).every(x=>Number.isFinite(x)&&x>=0),
+       'repeat touch event application must have finite nonnegative latency');
+      repeated.push(measured);
+     }
+     const percentile=(values,p)=>{
+      const sorted=[...values].sort((a,b)=>a-b);
+      return sorted[Math.ceil(p*sorted.length)-1];
+     };
+     console.log('NOVA_FIXED60_TOUCH_LATENCY_SERIES '+JSON.stringify({
+      trials:repeated.length,
+      downP50:percentile(repeated.map(x=>x.downMs),.5),
+      downP95:percentile(repeated.map(x=>x.downMs),.95),
+      upP50:percentile(repeated.map(x=>x.upMs),.5),
+      upP95:percentile(repeated.map(x=>x.upMs),.95),
+      samples:repeated
+     }));
      const teardown=await page.evaluate(()=>{
       const g=window.__novaFixed60Game,p=g.__novaFixed60Pilot;
       g.destroy();
