@@ -22,8 +22,24 @@ const {chromium}=require('playwright');
       return original.apply(this,arguments);
      };
     });
+    await page.evaluate(()=>{
+     window.__novaBootDiagnostics=[];
+     const prior=console.error;
+     console.error=function(...args){
+      window.__novaBootDiagnostics.push(args.map(String).join(' '));
+      return prior.apply(this,args);
+     };
+    });
     await page.getByRole('button',{name:/DEPLOY/i}).first().click();
-    await page.waitForFunction(()=>window.__novaFixed60Game?.status==='playing',null,{timeout:20000});
+    await page.waitForFunction(()=>window.__novaFixed60Game?.status==='playing' ||
+     window.__novaBootDiagnostics?.some(x=>x.includes('Failed to boot game:')),
+     null,{timeout:20000});
+    const boot=await page.evaluate(()=>({
+     ready:window.__novaFixed60Game?.status==='playing',
+     errors:window.__novaBootDiagnostics,
+     hasPilot:!!window.__novaFixed60Research
+    }));
+    assert.equal(boot.ready,true,'actual pilot boot failed: '+JSON.stringify(boot));
     await page.waitForTimeout(600);
     const initial=await page.evaluate(()=>{
      const g=window.__novaFixed60Game,p=g.__novaFixed60Pilot;
