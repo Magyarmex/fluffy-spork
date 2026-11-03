@@ -22,9 +22,10 @@ class AdaptiveDprPilot {
       throw Error('nonmonotonic DPR sample');
     this.lastSample=now;
     // Never adapt in menus, paused/hidden tabs, or incomplete/invalid windows.
-    if(!active||!snapshot||snapshot.frameSamples<60||
+    if(!active||!snapshot||!Number.isInteger(snapshot.frameSamples)||snapshot.frameSamples<60||
        !['fps','frameP95Ms','renderP95Ms','updateP95Ms','simulationPacePct']
-         .every(k=>Number.isFinite(snapshot[k]))) {
+         .every(k=>Number.isFinite(snapshot[k]))||snapshot.fps<=0||snapshot.frameP95Ms<=0||
+       snapshot.renderP95Ms<0||snapshot.updateP95Ms<0||snapshot.simulationPacePct<0) {
       this.downStreak=0;this.upStreak=0;return this.dpr;
     }
     // A sliding 120-frame window is not independent evidence on every RAF.
