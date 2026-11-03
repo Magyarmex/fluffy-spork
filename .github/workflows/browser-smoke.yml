@@ -89,6 +89,27 @@ jobs:
           PY
           grep -Fq 'const drawTanks = g.tanks.slice().sort' index.html
           grep -Fq 'simulation-owned-tank-order-v1.12.1.js' index.html
+      - name: Compose opt-in fixed60 scripts in exact production order
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          html=p.read_text(encoding='utf-8')
+          anchor='<script src="./nova-updates/settings-v1.7.7.js"></script>'
+          scripts=('<script src="./nova-updates/fixed60-research-browser.js"></script>\n'
+                   '<script src="./nova-updates/fixed60-optin-boot.js"></script>\n')
+          if html.count(anchor)!=1:
+              raise SystemExit('fixed60 Pilot Console browser-smoke anchor drift')
+          if scripts not in html:
+              if 'fixed60-optin-boot.js' in html or 'fixed60-research-browser.js' in html:
+                  raise SystemExit('partial fixed60 browser composition')
+              html=html.replace(anchor,scripts+anchor)
+          p.write_text(html,encoding='utf-8')
+          PY
+          grep -q 'fixed60-optin-boot.js' index.html
+
       - name: Compile the same canonical Tailwind CSS used by production
         shell: bash
         run: |
@@ -114,6 +135,7 @@ jobs:
           echo $! > /tmp/nova-browser-http.pid
       - name: Run real React + Chromium smoke
         run: |
+          node tests/browser/fixed60-optin-boot.cjs
           node tests/browser/real-touch-gameplay.cjs
           node tests/browser/crasher-recovery-cue.cjs
           node tests/browser/bomber-terrain-child-birth.cjs
