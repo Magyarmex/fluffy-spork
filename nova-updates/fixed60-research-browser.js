@@ -355,6 +355,7 @@ class FixedStepRafOwner {
     // still be delivered by a host after stop/restart; they must never
     // advance a newly started world or schedule a second RAF chain.
     this._generation=0;this._requestSeq=0;
+    this._awaitingForwardFrame=false;
     this.originalDestroy=game.destroy;
     this.destroyHadOwn=Object.prototype.hasOwnProperty.call(game,'destroy');
     this.destroyWrapper=null;
@@ -383,7 +384,7 @@ class FixedStepRafOwner {
       throw Error('game lifecycle owner changed before fixed-step activation');
     const at=this.now();if(!Number.isFinite(at)||at<this.bridge.startMs-EPS)
       throw Error('invalid fixed-step start time');
-    this._generation++;this.started=true;this.lastMs=at;this.simAtSec=(at-this.bridge.startMs)/1000;
+    this._generation++;this.started=true;this.lastMs=at;this._awaitingForwardFrame=true;this.simAtSec=(at-this.bridge.startMs)/1000;
     this.timeline.reset();this.timeline.consumeThrough(this.simAtSec);
     this.paused=!!this.game.paused;
     try{this.game.sfx.startMusic()}
@@ -427,7 +428,17 @@ class FixedStepRafOwner {
   }
   frame(ts){
     if(!this.started)throw Error('fixed-step RAF is not running');
-    if(!Number.isFinite(ts)||ts<this.lastMs-EPS)throw Error('nonmonotonic RAF timestamp');
+    if(!Number.isFinite(ts))throw Error('nonmonotonic RAF timestamp');
+    // A browser's RAF timestamp describes the beginning of its presentation
+    // frame. Game.start() can execute later in that same frame, so the first
+    // delivered RAF timestamp may precede performance.now() at activation.
+    // Accept only a bounded startup skew; never simulate negative time or
+    // relax monotonicity once the frame clock has caught up.
+    if(ts<this.lastMs-EPS){
+      if(!this._awaitingForwardFrame || this.lastMs-ts>50)
+        throw Error('nonmonotonic RAF timestamp');
+      ts=this.lastMs;
+    }else this._awaitingForwardFrame=false;
     try{this.schedule();this.advance(ts)}
     catch(error){this.stop();throw error}
   }
