@@ -43,3 +43,20 @@ for(const inherited of [false,true]){
   assert.equal(counts().cancelled,1);
  });
 }
+
+test('failed RAF scheduling releases production start and destroy wrappers',()=>{
+ const {g,proto}=scene(true);
+ const timeline={input:g.input,sampled:-Infinity,last:-Infinity,
+   reset(){},consumeThrough(at){this.sampled=at}};
+ const bridge={timeline,startMs:1000};
+ const originalDestroy=g.destroy;
+ const owner=new FixedStepRafOwner(g,timeline,bridge,{
+   now:()=>1000,request:()=>{throw Error('RAF unavailable')},
+   cancel:()=>{},render:()=>{}});
+ assert.throws(()=>owner.start(),/RAF unavailable/);
+ assert.equal(owner.started,false);
+ assert.equal(g.start,proto.start);
+ assert.equal(Object.hasOwn(g,'start'),false);
+ assert.equal(g.destroy,originalDestroy);
+ assert.equal(g.start(),'production');
+});
