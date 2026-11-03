@@ -53,6 +53,9 @@ const {chromium}=require('playwright');
   // A genuine mouse must reclaim the same Game session immediately, even
   // though the core Input.touchSeen flag was set by the previous touch.
   await page.mouse.move(right.x,right.y);
+  const hover=await state();
+  assert.equal(hover.mouseActive,true,'trusted physical mousemove restores hover aim');
+  assert.equal(hover.firing,false,'hover does not fire');
   await page.mouse.down({button:'left'});
   const mouse=await state();
   const diagnostic=await page.evaluate(({x,y})=>({events:window.__novaHybridEvents,
