@@ -66,3 +66,93 @@ test('after blur, a physical mouse can reclaim control without stale stick IDs',
  input.pd(event('mouse',50,500,{sourceCapabilities:{firesTouchEvents:false}}));
  assert.equal(input.mouseActive,true);
 });
+
+test('real native mousedown reclaims after touch when pointerdown has no capabilities',()=>{
+ const {input,event,setNow,listeners}=boot();
+ setNow(100);input.pd(event('touch',11,100));input.pu(event('touch',11,100));
+ setNow(120);input.pd(event('mouse',50,500));
+ assert.equal(input.mouseActive,false,'pointerdown alone cannot identify physical mouse');
+ const native={button:0,clientX:500,clientY:100,
+   sourceCapabilities:{firesTouchEvents:false}};
+ for(const fn of listeners.canvas.get('mousedown')||[])fn(native);
+ assert.equal(input.touchSeen,false);
+ assert.equal(input.mouseActive,true);
+ assert.equal(input.firing,true);
+ for(const fn of listeners.window.get('mouseup')||[])fn(native);
+ assert.equal(input.firing,false,'native primary release stops firing');
+});
+test('synthetic compatibility mousedown cannot steal touch ownership',()=>{
+ const {input,event,setNow,listeners}=boot();
+ setNow(100);input.pd(event('touch',11,100));input.pu(event('touch',11,100));
+ const ghost={button:0,clientX:500,clientY:100,
+   sourceCapabilities:{firesTouchEvents:true}};
+ for(const fn of listeners.canvas.get('mousedown')||[])fn(ghost);
+ assert.equal(input.touchSeen,true);
+ assert.equal(input.mouseActive,false);
+ assert.equal(input.firing,false);
+ // Even an explicitly real mouse cannot steal an actively held touch stick.
+ input.pd(event('touch',12,100));
+ for(const fn of listeners.canvas.get('mousedown')||[])fn({
+   ...ghost,sourceCapabilities:{firesTouchEvents:false}});
+ assert.equal(input.stickId.move,12);
+ assert.equal(input.mouseActive,false);
+ assert.equal(input.firing,false);
+});
+
+test('native physical mousemove restores hover aim but not firing after touch',()=>{
+ const {input,event,setNow,listeners}=boot();
+ setNow(100);input.pd(event('touch',11,100));input.pu(event('touch',11,100));
+ setNow(120);input.pm(event('mouse',50,500));
+ assert.equal(input.mouseActive,false,'capability-free pointermove is ambiguous');
+ const native={clientX:500,clientY:100,buttons:0,
+   sourceCapabilities:{firesTouchEvents:false}};
+ for(const fn of listeners.window.get('mousemove')||[])fn(native);
+ assert.equal(input.touchSeen,false);
+ assert.equal(input.mouseActive,true);
+ assert.equal(input.mouseX,500);
+ assert.equal(input.firing,false,'hover cannot invent a shot');
+ input.detach();
+ assert.equal(listeners.window.get('mousemove')?.size||0,0,'no native move listener leak');
+});
+test('touch compatibility mousemove and active touch cannot steal hover ownership',()=>{
+ const {input,event,setNow,listeners}=boot();
+ setNow(100);input.pd(event('touch',11,100));input.pu(event('touch',11,100));
+ const native={clientX:500,clientY:100,buttons:0,
+   sourceCapabilities:{firesTouchEvents:true}};
+ for(const fn of listeners.window.get('mousemove')||[])fn(native);
+ assert.equal(input.touchSeen,true);assert.equal(input.mouseActive,false);
+ input.pd(event('touch',12,100));
+ for(const fn of listeners.window.get('mousemove')||[])fn({
+   ...native,sourceCapabilities:{firesTouchEvents:false}});
+ assert.equal(input.stickId.move,12);
+ assert.equal(input.mouseActive,false);
+});
+
+test('delayed touch compatibility mouse cannot re-arm firing after real hover handoff',()=>{
+ const {input,event,setNow,listeners}=boot();
+ setNow(100);input.pd(event('touch',11,100));input.pu(event('touch',11,100));
+ const realMove={clientX:500,clientY:100,buttons:0,
+   sourceCapabilities:{firesTouchEvents:false}};
+ for(const fn of listeners.window.get('mousemove')||[])fn(realMove);
+ assert.equal(input.touchSeen,false);
+ assert.equal(input.firing,false);
+ const delayedGhost={button:0,clientX:500,clientY:100,
+   sourceCapabilities:{firesTouchEvents:true}};
+ for(const fn of listeners.canvas.get('mousedown')||[])fn(delayedGhost);
+ assert.equal(input.firing,false,'delayed synthetic click cannot fire');
+ assert.equal(input.__novaPrimaryPressCaptured,false);
+});
+
+test('late compatibility mouseup cannot cancel a genuine held mouse press',()=>{
+ const {input,event,setNow,listeners}=boot();
+ setNow(100);input.pd(event('touch',11,100));input.pu(event('touch',11,100));
+ const real={button:0,clientX:500,clientY:100,
+   sourceCapabilities:{firesTouchEvents:false}};
+ for(const fn of listeners.canvas.get('mousedown')||[])fn(real);
+ assert.equal(input.firing,true);
+ const ghost={...real,sourceCapabilities:{firesTouchEvents:true}};
+ for(const fn of listeners.window.get('mouseup')||[])fn(ghost);
+ assert.equal(input.firing,true,'touch compatibility release cannot cancel real mouse');
+ for(const fn of listeners.window.get('mouseup')||[])fn(real);
+ assert.equal(input.firing,false);
+});

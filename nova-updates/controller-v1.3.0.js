@@ -193,20 +193,43 @@
       /* Native mouse events report individual button transitions even when
        * Pointer Events suppress additional pointerdown/up during a chord. */
       this.__novaPrimaryMouseDown = function (event) {
-        if (!event || event.button !== 0 || self.touchSeen) return;
+        if (!event || event.button !== 0 ||
+            (event.sourceCapabilities && event.sourceCapabilities.firesTouchEvents === true)) return;
+        // Chromium's trusted mouse pointerdown can omit sourceCapabilities,
+        // while the following native mousedown identifies a real mouse.
+        // Do not mistake touch-generated compatibility mousedown for one.
+        if (self.touchSeen) {
+          if (self.stickId.move !== -1 || self.stickId.aim !== -1 ||
+              !event.sourceCapabilities ||
+              event.sourceCapabilities.firesTouchEvents !== false) return;
+          self.touchSeen = false;
+        }
         self.__novaPrimaryPressCaptured = true;
         self.mouseActive = true;
         if (Number.isFinite(event.clientX)) self.mouseX = event.clientX;
         if (Number.isFinite(event.clientY)) self.mouseY = event.clientY;
         self.firing = true;
       };
+      // PointerEvent movement may lack sourceCapabilities even when the
+      // following native MouseEvent identifies a physical mouse. Restore
+      // hover aim without turning touch-generated compatibility motion into
+      // mouse control or stealing an active touch stick.
+      this.__novaPhysicalMouseMove = function (event) {
+        if (!event || !self.touchSeen || self.stickId.move !== -1 ||
+            self.stickId.aim !== -1 || !event.sourceCapabilities ||
+            event.sourceCapabilities.firesTouchEvents !== false) return;
+        self.pm({pointerType:'mouse',clientX:event.clientX,clientY:event.clientY,
+          buttons:event.buttons,sourceCapabilities:event.sourceCapabilities});
+      };
       this.__novaPrimaryMouseUp = function (event) {
-        if (!event || event.button !== 0) return;
+        if (!event || event.button !== 0 ||
+            (event.sourceCapabilities && event.sourceCapabilities.firesTouchEvents === true)) return;
         self.__novaPrimaryPressCaptured = false;
         if (!self.touchSeen) self.firing = false;
       };
       canvas.addEventListener('mousedown', this.__novaPrimaryMouseDown);
       window.addEventListener('mouseup', this.__novaPrimaryMouseUp);
+      window.addEventListener('mousemove', this.__novaPhysicalMouseMove);
       function reset() {
         var held = self.move.active || self.aim.active ||
           self.stickId.move !== -1 || self.stickId.aim !== -1;
@@ -229,7 +252,9 @@
         this.canvas.removeEventListener('mousedown', this.__novaPrimaryMouseDown);
       if (this.__novaPrimaryMouseUp)
         window.removeEventListener('mouseup', this.__novaPrimaryMouseUp);
-      this.__novaPrimaryMouseDown = this.__novaPrimaryMouseUp = null;
+      if (this.__novaPhysicalMouseMove)
+        window.removeEventListener('mousemove', this.__novaPhysicalMouseMove);
+      this.__novaPrimaryMouseDown = this.__novaPrimaryMouseUp = this.__novaPhysicalMouseMove = null;
       this.__novaPrimaryPressCaptured = false;
       if (this.__novaBlurReset) window.removeEventListener('blur', this.__novaBlurReset);
       if (this.__novaVisibilityReset) document.removeEventListener('visibilitychange', this.__novaVisibilityReset);
