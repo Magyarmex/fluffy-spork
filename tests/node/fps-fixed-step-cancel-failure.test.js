@@ -83,3 +83,22 @@ test('composed browser pilot detaches chronological capture after RAF cancellati
     assert.equal(g.input.canvas,g.canvas,'production Input must be restored');
   }finally{g.destroy()}
 });
+
+test('uncancelled callback after failed cancellation cannot restart the world',()=>{
+ const input={},callbacks=new Map();
+ let updates=0,scheduled=0;
+ const g={input,raf:null,paused:false,sfx:{startMusic(){}},
+   start(){},destroy(){},setPaused(){},update(){updates++},w:100,h:100};
+ const timeline={input,reset(){},consumeThrough(){}};
+ const owner=new FixedStepRafOwner(g,timeline,{timeline,startMs:1000},{
+   now:()=>1000,request:fn=>(callbacks.set(++scheduled,fn),scheduled),
+   cancel:()=>{throw Error('RAF cancel unavailable')},render:()=>{}
+ });
+ owner.start();
+ const callback=callbacks.get(1);
+ assert.throws(()=>owner.stop(),/RAF cancel unavailable/);
+ const before={updates,scheduled};
+ assert.doesNotThrow(()=>callback(1017));
+ assert.deepEqual({updates,scheduled},before,
+  'a callback retained by the host must be inert after failed cancel');
+});
