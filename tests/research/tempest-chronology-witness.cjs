@@ -46,8 +46,8 @@ for(const seed of seeds)for(const cls of classes){
  const coarse=run(seed,cls,'coarse30');
  const split=run(seed,cls,'split60');
  const native=run(seed,cls,'native60');
- assert.deepEqual(split.births,native.births,'split60 must reproduce native 60Hz projectile births');
- assert.deepEqual(split.state,native.state,'split60 must reproduce native 60Hz physical state');
+ assert.equal(JSON.stringify(split.births),JSON.stringify(native.births),'split60 must reproduce native 60Hz projectile births');
+ assert.equal(JSON.stringify(split.state),JSON.stringify(native.state),'split60 must reproduce native 60Hz physical state');
  const firstMismatch=coarse.births.findIndex((b,i)=>JSON.stringify(b)!==JSON.stringify(native.births[i]));
  report.push({seed,cls,seconds,coarse30:coarse.volleyCount,
   native60:native.volleyCount,split60:split.volleyCount,
