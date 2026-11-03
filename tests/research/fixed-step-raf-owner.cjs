@@ -163,7 +163,12 @@ class FixedStepRafOwner {
   stop(){
     if(!this.started)return;
     this.started=false;this._generation++;this._requestSeq++;
-    if(this.raf!=null)this.cancel(this.raf);
+    // A host may throw while cancelling a queued browser callback. Even then,
+    // release all lifecycle hooks: leaving Game.start/destroy wrapped after
+    // stop would strand the playable game behind an inactive research owner.
+    let cancelError;
+    try{if(this.raf!=null)this.cancel(this.raf)}
+    catch(error){cancelError=error}
     this.raf=null;this.timeline.reset();this.lagMs=0;
     if(this.game.start===this.startWrapper){
       if(this.startHadOwn)this.game.start=this.originalStart;
@@ -177,6 +182,7 @@ class FixedStepRafOwner {
       if(this.destroyHadOwn)this.game.destroy=this.originalDestroy;
       else delete this.game.destroy;
     }
+    if(cancelError)throw cancelError;
   }
 }
 // Compose the existing production Input handlers with chronological DOM
