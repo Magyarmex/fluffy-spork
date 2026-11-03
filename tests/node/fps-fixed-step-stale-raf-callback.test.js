@@ -1,4 +1,6 @@
 'use strict';
+// Import the composed-game fixture without registering its independent audio A/B suite.
+process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
 // #648: a cancelled or already-delivered RAF callback must never advance
 // the current simulation, especially after an opt-in fixed60 restart.
 const test=require('node:test');
