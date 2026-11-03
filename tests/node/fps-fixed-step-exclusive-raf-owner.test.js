@@ -60,3 +60,16 @@ test('failed RAF scheduling releases production start and destroy wrappers',()=>
  assert.equal(g.destroy,originalDestroy);
  assert.equal(g.start(),'production');
 });
+
+test('restart pilot does not stack start wrappers or leak production ownership',()=>{
+ const {g,owner,proto,counts}=scene(false);
+ for(let i=0;i<3;i++){
+  owner.start();
+  assert.throws(()=>g.start(),/already owns this game/);
+  owner.stop();
+  assert.equal(g.start,proto.start);
+ }
+ assert.equal(counts().cancelled,3);
+ g.start();
+ assert.equal(counts().productionStarts,1);
+});
