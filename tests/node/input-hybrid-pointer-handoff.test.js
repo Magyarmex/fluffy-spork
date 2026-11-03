@@ -142,3 +142,17 @@ test('delayed touch compatibility mouse cannot re-arm firing after real hover ha
  assert.equal(input.firing,false,'delayed synthetic click cannot fire');
  assert.equal(input.__novaPrimaryPressCaptured,false);
 });
+
+test('late compatibility mouseup cannot cancel a genuine held mouse press',()=>{
+ const {input,event,setNow,listeners}=boot();
+ setNow(100);input.pd(event('touch',11,100));input.pu(event('touch',11,100));
+ const real={button:0,clientX:500,clientY:100,
+   sourceCapabilities:{firesTouchEvents:false}};
+ for(const fn of listeners.canvas.get('mousedown')||[])fn(real);
+ assert.equal(input.firing,true);
+ const ghost={...real,sourceCapabilities:{firesTouchEvents:true}};
+ for(const fn of listeners.window.get('mouseup')||[])fn(ghost);
+ assert.equal(input.firing,true,'touch compatibility release cannot cancel real mouse');
+ for(const fn of listeners.window.get('mouseup')||[])fn(real);
+ assert.equal(input.firing,false);
+});
