@@ -162,8 +162,9 @@ const {chromium}=require('playwright');
      // Repeated browser-event-to-state measurements expose tail latency that a
      // single successful touch cannot establish. This is Chromium-only, not
      // input-to-photon or physical Android evidence.
-     const repeated=[];
-     for(let trial=0;trial<8;trial++){
+     const sampleTouches=async(count)=>{
+      const repeated=[];
+      for(let trial=0;trial<count;trial++){
       await page.evaluate(()=>{
        window.__novaRepeatTouch={};
        document.addEventListener('pointerdown',e=>{
@@ -195,18 +196,35 @@ const {chromium}=require('playwright');
        'repeat touch event application must have finite nonnegative latency');
       repeated.push(measured);
      }
+      return repeated;
+     };
      const percentile=(values,p)=>{
       const sorted=[...values].sort((a,b)=>a-b);
       return sorted[Math.ceil(p*sorted.length)-1];
      };
+     const summarize=(samples)=>({
+      trials:samples.length,
+      downP50:percentile(samples.map(x=>x.downMs),.5),
+      downP95:percentile(samples.map(x=>x.downMs),.95),
+      upP50:percentile(samples.map(x=>x.upMs),.5),
+      upP95:percentile(samples.map(x=>x.upMs),.95),
+      samples
+     });
+     const baseline=await sampleTouches(8);
      console.log('NOVA_FIXED60_TOUCH_LATENCY_SERIES '+JSON.stringify({
-      trials:repeated.length,
-      downP50:percentile(repeated.map(x=>x.downMs),.5),
-      downP95:percentile(repeated.map(x=>x.downMs),.95),
-      upP50:percentile(repeated.map(x=>x.upMs),.5),
-      upP95:percentile(repeated.map(x=>x.upMs),.95),
-      samples:repeated
+      cpuThrottle:1,...summarize(baseline)
      }));
+     // Deliberately constructed CPU pressure: diagnostic only, not an Android
+     // benchmark. Always restore normal browser speed before teardown.
+     await cdp.send('Emulation.setCPUThrottlingRate',{rate:3});
+     try{
+      const throttled=await sampleTouches(4);
+      console.log('NOVA_FIXED60_TOUCH_LATENCY_SERIES '+JSON.stringify({
+       cpuThrottle:3,...summarize(throttled)
+      }));
+     }finally{
+      await cdp.send('Emulation.setCPUThrottlingRate',{rate:1});
+     }
      const teardown=await page.evaluate(()=>{
       const g=window.__novaFixed60Game,p=g.__novaFixed60Pilot;
       g.destroy();
