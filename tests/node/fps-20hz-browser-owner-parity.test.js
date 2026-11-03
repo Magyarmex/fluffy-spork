@@ -160,7 +160,13 @@ test('opt-in browser pilot forwards four-step catch-up without changing default'
  try{
   pilot=createFixedStepBrowserPilot(g,{...opts,maxSteps:4});
   assert.equal(pilot.owner.maxSteps,4);
+  const productionStart=g.start;
+  g.sfx.startMusic=()=>{};
+  pilot.start();
+  assert.throws(()=>g.start(),/fixed-step RAF already owns this game/,
+   'composed Game must not run a second production RAF');
   pilot.stop();pilot=null;
+  assert.equal(g.start,productionStart,'composed Game startup must be restored');
   const defaultPilot=createFixedStepBrowserPilot(g,opts);
   assert.equal(defaultPilot.owner.maxSteps,2);
   defaultPilot.stop();
