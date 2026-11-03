@@ -96,3 +96,13 @@ test('exclusive pilot ownership is per game, not global',()=>{
  assert.equal(b.counts().productionStarts,1);
  a.owner.stop();
 });
+
+test('startup owner changed between construction and activation fails closed',()=>{
+ const {g,owner}=scene(false);
+ const replacement=function(){return 'new production owner'};
+ g.start=replacement;
+ assert.throws(()=>owner.start(),/start owner changed/);
+ assert.equal(owner.started,false);
+ assert.equal(g.start,replacement,'do not clobber newer production startup');
+ assert.equal(g.start(),'new production owner');
+});
