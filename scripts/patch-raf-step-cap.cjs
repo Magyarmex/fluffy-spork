@@ -17,12 +17,36 @@ const oldStep='            this.last = ts;\n            if (!this.paused)\n     
 const priorStep='            const excess = elapsed + carry - dt;\n            carry = excess > 1e-9 ? Math.min(1 / 30, excess) : 0;\n            this.last = ts;\n            if (!this.paused)\n                this.update(dt);\n            if (this.paused)\n                carry = 0;';
 const newStep='            const excess = elapsed + carry - dt;\n            carry = excess > 1e-9 ? Math.min(1 / 30, excess) : 0;\n            this.last = ts;\n            if (!this.paused)\n                this.update(dt);\n            /* A slow but active display may need two safe updates to avoid\n             * 20 Hz time dilation. Never repay a long suspension in one draw. */\n            if (!this.paused && elapsed <= 1 / 12 && carry >= 1 / 30 - 1e-9 &&\n                priorWork < 18 && earlierWork < 18) {\n                this.update(1 / 30);\n                this.mmTimer -= 1 / 30;\n                carry = Math.max(0, carry - 1 / 30);\n            }\n            if (this.paused)\n                carry = 0;';
 function count(s,needle){return s.split(needle).length-1;}
+
+// The shipping RAF is already queued before update. Cancelling that future RAF
+// does not abort the callback currently executing, so guard every boundary.
+const lifecycleGuards=[
+ ['            this.raf = requestAnimationFrame(loop);\n            const workStart = performance.now();',
+  '            if (this.__novaDestroyed) return;\n            this.raf = requestAnimationFrame(loop);\n            const workStart = performance.now();'],
+ ['                this.update(dt);\n            /* A slow but active display',
+  '                this.update(dt);\n            if (this.__novaDestroyed) return;\n            /* A slow but active display'],
+ ['                this.update(1 / 30);\n                this.mmTimer -= 1 / 30;',
+  '                this.update(1 / 30);\n                if (this.__novaDestroyed) return;\n                this.mmTimer -= 1 / 30;'],
+ ['            (0, render_1.render)(this, this.w, this.h);\n            // minimap',
+  '            (0, render_1.render)(this, this.w, this.h);\n            if (this.__novaDestroyed) return;\n            // minimap'],
+ ['    destroy() {\n        cancelAnimationFrame(this.raf);',
+  '    destroy() {\n        if (this.__novaDestroyed) return;\n        this.__novaDestroyed = true;\n        cancelAnimationFrame(this.raf);']
+];
+function protectLifecycle(html){
+ const complete=lifecycleGuards.every(([,after])=>count(html,after)===1);
+ if(complete)return html;
+ if(!lifecycleGuards.every(([before,after])=>count(html,before)===1&&count(html,after)===0))
+  throw Error('canonical RAF lifecycle owner drift; refuse materialization');
+ for(const [before,after] of lifecycleGuards)html=html.replace(before,after);
+ return html;
+}
+
 function patchRafStepCap(html){
  if(typeof html!=='string')throw new TypeError('expected UTF-8 HTML');
  if(!html.includes('    start() {')||!html.includes('this.raf = requestAnimationFrame(loop);'))
   throw Error('canonical game RAF owner missing');
  if(count(html,after)===1&&count(html,withCarry)===1&&count(html,newStep)===1&&
-    count(html,newLoopTail)===1&&count(html,before)===0&&count(html,intermediate)===0)return html;
+    count(html,newLoopTail)===1&&count(html,before)===0&&count(html,intermediate)===0)return protectLifecycle(html);
  /* The materializer always starts from the compressed canonical shell.
   * Existing materialized HTML can also be upgraded idempotently in tests. */
  const old=count(html,before),mid=count(html,intermediate),prior=count(html,priorStep);
@@ -31,8 +55,8 @@ function patchRafStepCap(html){
   throw Error('canonical RAF time cap drift; refuse materialization');
  if(prior===1){
   if(count(html,priorCarry)!==1)throw Error('canonical RAF time cap drift; refuse materialization');
-  return html.replace(priorCarry,withCarry)
-   .replace(priorStep,newStep).replace(priorLoop,priorLoop+'\n            const workStart = performance.now();').replace(loopTail,newLoopTail);
+  return protectLifecycle(html.replace(priorCarry,withCarry)
+   .replace(priorStep,newStep).replace(priorLoop,priorLoop+'\n            const workStart = performance.now();').replace(loopTail,newLoopTail));
  }
  if(count(html,priorCarry)!==0||count(html,anchor)!==1||count(html,oldStep)!==1)
   throw Error('canonical RAF time cap drift; refuse materialization');
@@ -40,8 +64,8 @@ function patchRafStepCap(html){
  const legacy=html.replace(anchor,priorCarry).replace(original,
   '            const elapsed = Math.max(0, (ts - this.last) / 1000);\n'+after)
   .replace(oldStep,priorStep);
- return legacy.replace(priorCarry,withCarry)
-  .replace(priorStep,newStep).replace(priorLoop,priorLoop+'\n            const workStart = performance.now();').replace(loopTail,newLoopTail);
+ return protectLifecycle(legacy.replace(priorCarry,withCarry)
+  .replace(priorStep,newStep).replace(priorLoop,priorLoop+'\n            const workStart = performance.now();').replace(loopTail,newLoopTail));
 }
 module.exports={patchRafStepCap,before,intermediate,after};
 if(require.main===module){
