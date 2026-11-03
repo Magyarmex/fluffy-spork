@@ -71,3 +71,11 @@ test('bundle builder refuses unknown module imports',()=>{
   return fs.readFileSync(path.join(root,name),'utf8');
  }),/unapproved fixed60 browser import/);
 });
+
+test('bundle builder rejects dynamic requires rather than shipping a broken loader',()=>{
+ const root=path.resolve(__dirname,'../research');
+ assert.throws(()=>buildBrowserBundle(name=>{
+  if(name==='fixed-step-raf-owner.cjs')return "const name='./fixed-step-dom-input.cjs';require(name);";
+  return fs.readFileSync(path.join(root,name),'utf8');
+ }),/dynamic fixed60 browser import/);
+});
