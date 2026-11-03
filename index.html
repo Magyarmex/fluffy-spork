@@ -247,7 +247,7 @@ canvas {
     <link rel="icon" href="./nova-icon.svg" type="image/svg+xml" />
     <meta name="application-name" content="NOVA TANKS" />
     <script defer src="./pwa-register.js"></script>
-      <meta name="nova-runtime-build" content="a7de2665263e983c238be146" />
+      <meta name="nova-runtime-build" content="f1b584f3b313ff9ffd684a54" />
   </head>
   <body>
     <div id="root"></div>
@@ -2395,6 +2395,7 @@ class Game {
         let carry = 0;
         let priorWork = 0, earlierWork = 0;
         const loop = (ts) => {
+            if (this.__novaDestroyed) return;
             this.raf = requestAnimationFrame(loop);
             const workStart = performance.now();
             const elapsed = Math.max(0, (ts - this.last) / 1000);
@@ -2404,22 +2405,26 @@ class Game {
             this.last = ts;
             if (!this.paused)
                 this.update(dt);
+            if (this.__novaDestroyed) return;
             /* A slow but active display may need two safe updates to avoid
              * 20 Hz time dilation. Never repay a long suspension in one draw. */
             if (!this.paused && elapsed <= 1 / 12 && carry >= 1 / 30 - 1e-9 &&
                 priorWork < 18 && earlierWork < 18) {
                 this.update(1 / 30);
+                if (this.__novaDestroyed) return;
                 this.mmTimer -= 1 / 30;
                 carry = Math.max(0, carry - 1 / 30);
             }
             if (this.paused)
                 carry = 0;
             (0, render_1.render)(this, this.w, this.h);
+            if (this.__novaDestroyed) return;
             // minimap only needs ~12fps — saves a full 216² clear+redraw most frames
             this.mmTimer -= dt;
             if (this.mmTimer <= 0) {
                 this.mmTimer = 0.08;
                 this.drawMinimap();
+                if (this.__novaDestroyed) return;
             }
             earlierWork = priorWork;
             priorWork = performance.now() - workStart;
@@ -2427,6 +2432,8 @@ class Game {
         this.raf = requestAnimationFrame(loop);
     }
     destroy() {
+        if (this.__novaDestroyed) return;
+        this.__novaDestroyed = true;
         cancelAnimationFrame(this.raf);
         window.removeEventListener('resize', this.resizeFn);
         document.removeEventListener('visibilitychange', this.visFn);
@@ -3472,6 +3479,7 @@ class Game {
                 (0, storage_1.lsSet)('novatanks_best', String(this.best));
             }
             this.cb.event({ type: 'gameover', stats });
+            if (this.__novaDestroyed) return;
         }
         // player
         if (this.status === 'playing') {
