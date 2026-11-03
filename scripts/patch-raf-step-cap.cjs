@@ -29,6 +29,8 @@ const lifecycleGuards=[
   '                this.update(1 / 30);\n                if (this.__novaDestroyed) return;\n                this.mmTimer -= 1 / 30;'],
  ['            (0, render_1.render)(this, this.w, this.h);\n            // minimap',
   '            (0, render_1.render)(this, this.w, this.h);\n            if (this.__novaDestroyed) return;\n            // minimap'],
+ ['                this.drawMinimap();\n            }\n            earlierWork = priorWork;',
+  '                this.drawMinimap();\n                if (this.__novaDestroyed) return;\n            }\n            earlierWork = priorWork;'],
  ['    destroy() {\n        cancelAnimationFrame(this.raf);',
   '    destroy() {\n        if (this.__novaDestroyed) return;\n        this.__novaDestroyed = true;\n        cancelAnimationFrame(this.raf);']
 ];
