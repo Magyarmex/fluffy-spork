@@ -145,3 +145,24 @@ test('20Hz presentation preserves legal Tempest Overheat firing chronology',()=>
   }
  }
 });
+
+test('opt-in browser pilot forwards four-step catch-up without changing default',()=>{
+ const {createFixedStepBrowserPilot}=require('../research/fixed-step-raf-owner.cjs');
+ const g=bootGame(),win=g.__testWindow,doc=win.document;
+ const emitter=()=>({addEventListener(){},removeEventListener(){}});
+ Object.assign(win,emitter());Object.assign(doc,emitter());
+ Object.assign(g.canvas,emitter());
+ g.input.detach();g.input.attach(g.canvas);
+ const opts={window:win,document:doc,
+  clock:{now:()=>1000,timeOrigin:1793560000000},
+  request:()=>7,cancel:()=>{},render:()=>{}};
+ let pilot;
+ try{
+  pilot=createFixedStepBrowserPilot(g,{...opts,maxSteps:4});
+  assert.equal(pilot.owner.maxSteps,4);
+  pilot.stop();pilot=null;
+  const defaultPilot=createFixedStepBrowserPilot(g,opts);
+  assert.equal(defaultPilot.owner.maxSteps,2);
+  defaultPilot.stop();
+ }finally{if(pilot)pilot.stop();g.destroy()}
+});
