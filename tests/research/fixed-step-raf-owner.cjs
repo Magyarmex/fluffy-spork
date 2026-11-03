@@ -61,8 +61,11 @@ class FixedStepRafOwner {
     const self=this;
     this.destroyWrapper=function(...args){
       // Teardown must reach the actual Game even if a host cancellation fails.
-      try{self.stop()}
-      finally{return self.originalDestroy.apply(this,args)}
+      let stopError;
+      try{self.stop()}catch(error){stopError=error}
+      const result=self.originalDestroy.apply(this,args);
+      if(stopError)throw stopError;
+      return result;
     };
     this.game.destroy=this.destroyWrapper;
     // A second production RAF would advance the same world twice and break
