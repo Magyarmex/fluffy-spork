@@ -9,9 +9,16 @@ const {bootGame,withSeed,digest,physical}=require('../research/audio-rng-causal-
 const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
 const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs');
 const {FixedStepRafOwner}=require('../research/fixed-step-raf-owner.cjs');
-function run(seed,intervals,maxSteps,events=[]){
+function run(seed,intervals,maxSteps,events=[],fireTempest=false){
  return withSeed(seed,draws=>{
   const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
+  if(fireTempest){g.setClass(g.player,'tempest');g.player.stats.reload=8;
+   g.player.perk='alacrity';g.useAbility(g.player);}
+  let volleys=0;const originalTryFire=g.tryFire;
+  g.tryFire=function(t){const before=this.bullets.length;
+   const out=originalTryFire.apply(this,arguments);
+   if(t===this.player&&this.bullets.length>before)volleys+=this.bullets.length-before;
+   return out;};
   let now=1000,id=0;
   const active=new Map();
   const timeline=new ChronologicalInput(g.input);
@@ -22,6 +29,8 @@ function run(seed,intervals,maxSteps,events=[]){
   });
   try{
    owner.start();
+   if(fireTempest){g.input.aim.active=true;g.input.aim.dx=40;
+    g.input.firing=true;g.input.autofire=false;}
    let elapsed=0, nextEvent=0;
    for(const ms of intervals){
     elapsed+=ms;now=1000+elapsed;
@@ -34,7 +43,7 @@ function run(seed,intervals,maxSteps,events=[]){
     assert.equal(typeof fn,'function','RAF must remain scheduled');
     active.delete(key);fn(now);
    }
-   return {hash:digest(physical(g)),draws:draws(),ticks:owner.ticks,
+   return {hash:digest(physical(g)),draws:draws(),ticks:owner.ticks,volleys,
     droppedFrames:owner.droppedFrames,droppedMs:owner.droppedMs,
     backlogMs:owner.lagMs};
   }finally{owner.stop();g.destroy()}
@@ -109,5 +118,20 @@ test('20Hz 30/70ms burst phase exposes bounded but unfinished tick at capture bo
   assert.equal(endsFast.ticks,120);
   assert.equal(endsFast.hash,reference.hash);
   assert.equal(endsFast.draws,reference.draws);
+ }
+});
+
+test('20Hz presentation preserves legal Tempest Overheat firing chronology',()=>{
+ for(const seed of [1517800,1517802]){
+  const reference=run(seed,Array(120).fill(1000/60),2,[],true);
+  const twenty=run(seed,Array(40).fill(50),4,[],true);
+  const jitter=run(seed,Array.from({length:20},()=>[48,52]).flat(),4,[],true);
+  assert.ok(reference.volleys>0,'must exercise actual player weapon');
+  for(const candidate of [twenty,jitter]){
+   assert.equal(candidate.ticks,120);
+   assert.equal(candidate.volleys,reference.volleys);
+   assert.equal(candidate.hash,reference.hash);
+   assert.equal(candidate.draws,reference.draws);
+  }
  }
 });
