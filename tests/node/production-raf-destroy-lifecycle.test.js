@@ -86,7 +86,7 @@ test('synchronous game-over teardown exits actual Game.update before AI and phys
   'return function update(dt){'+html.slice(open+1,close)+'\n};')(
    {CLASSES:{scout:{name:'Scout'}}},{lsSet(){}});
  let fired=0;
- const game={time:5,status:'dying',gameOverSent:false,dyingAt:0,
+ const game={time:5,status:'dying',gameOverSent:false,dyingAt:0,input:{abilityQueued:false},
   player:{score:10,kills:0,level:1,cls:'scout'},best:100,
   cb:{event(){fired++;game.__novaDestroyed=true;}}};
  Object.defineProperty(game,'tanks',{get(){throw Error('AI continued after teardown');}});
