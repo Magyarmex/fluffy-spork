@@ -28,6 +28,9 @@ class FixedStepRafOwner {
     this.originalSetPaused=game.setPaused;
     this.pauseHadOwn=Object.prototype.hasOwnProperty.call(game,'setPaused');
     this.pauseWrapper=null;
+    this.originalStart=game.start;
+    this.startHadOwn=Object.prototype.hasOwnProperty.call(game,'start');
+    this.startWrapper=null;
   }
   start(){
     if(this.started)throw Error('fixed-step RAF already started');
@@ -45,6 +48,15 @@ class FixedStepRafOwner {
       return self.originalDestroy.apply(this,args);
     };
     this.game.destroy=this.destroyWrapper;
+    // A second production RAF would advance the same world twice and break
+    // combat chronology. Reserve Game.start while the opt-in pilot owns it.
+    if(typeof this.originalStart==='function'){
+      this.startWrapper=function(...args){
+        if(self.started)throw Error('fixed-step RAF already owns this game');
+        return self.originalStart.apply(this,args);
+      };
+      this.game.start=this.startWrapper;
+    }
     if(typeof this.originalSetPaused==='function'){
       this.pauseWrapper=function(...args){
         const was=!!this.paused;
@@ -137,6 +149,10 @@ class FixedStepRafOwner {
     this.started=false;
     if(this.raf!=null)this.cancel(this.raf);
     this.raf=null;this.timeline.reset();this.lagMs=0;
+    if(this.game.start===this.startWrapper){
+      if(this.startHadOwn)this.game.start=this.originalStart;
+      else delete this.game.start;
+    }
     if(this.game.setPaused===this.pauseWrapper){
       if(this.pauseHadOwn)this.game.setPaused=this.originalSetPaused;
       else delete this.game.setPaused;
