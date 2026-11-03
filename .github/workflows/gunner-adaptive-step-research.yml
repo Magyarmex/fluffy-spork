@@ -15,8 +15,12 @@ jobs:
           node-version: '22'
       - name: Compare adaptive, fixed and native schedules
         run: node tests/research/gunner-adaptive-step-pilot.cjs | tee gunner-adaptive-step.json
+      - name: Zero-projectile player-input timebase falsifier
+        run: node tests/research/gunner-input-timebase-falsifier.cjs | tee gunner-timebase-falsifier.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: gunner-adaptive-step-results
-          path: gunner-adaptive-step.json
+          path: |
+            gunner-adaptive-step.json
+            gunner-timebase-falsifier.json
