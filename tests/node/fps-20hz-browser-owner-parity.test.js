@@ -94,3 +94,20 @@ test('20Hz input delivery preserves chronological keyboard edges against 60Hz',(
   }
  }
 });
+
+test('20Hz 30/70ms burst phase exposes bounded but unfinished tick at capture boundary',()=>{
+ // Equal elapsed time does not guarantee equal completed simulation ticks
+ // when the final 70ms presentation frame needs >4 updates. This is a
+ // known latency/backlog limit, not a dropped-tick correctness success.
+ for(const seed of [1517800,1517802]){
+  const reference=run(seed,Array(120).fill(1000/60),2);
+  const endsSlow=run(seed,Array.from({length:20},()=>[30,70]).flat(),4);
+  const endsFast=run(seed,Array.from({length:20},()=>[70,30]).flat(),4);
+  assert.equal(endsSlow.droppedFrames,0);
+  assert.equal(endsSlow.ticks,119);
+  assert.notEqual(endsSlow.hash,reference.hash);
+  assert.equal(endsFast.ticks,120);
+  assert.equal(endsFast.hash,reference.hash);
+  assert.equal(endsFast.draws,reference.draws);
+ }
+});
