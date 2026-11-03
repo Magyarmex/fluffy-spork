@@ -35,3 +35,10 @@ test('two nearby certified hulls retain the normal piercing proof',()=>{
  const g=world(true),result=plan(g,.011,true);
  assert.ok(result&&result.size===1);
 });
+
+test('hash membership alone is insufficient when query omits indexed hulls',()=>{
+ const g=world(true);
+ g.hash.query=function(x,y,r,out){out.length=0;};
+ const result=plan(g,.011,true);
+ assert.ok(result&&result.size===1,'query inconsistency must fall back to original proof');
+});
