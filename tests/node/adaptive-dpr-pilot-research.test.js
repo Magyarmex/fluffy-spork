@@ -61,6 +61,12 @@ test('repeated per-frame reads of one sliding telemetry window cannot fake susta
  c.observe(renderBound,1017);
  assert.equal(c.dpr,1.25);
 });
+test('high-quality profile can preserve its distinct DPR ceiling',()=>{
+ const c=new AdaptiveDprPilot({initial:2,ceiling:2,floor:1.5});
+ c.observe(renderBound,0);assert.equal(c.observe(renderBound,1000),1.75);
+ c.observe(renderBound,2000);assert.equal(c.observe(renderBound,5000),1.5);
+ assert.equal(c.observe(renderBound,9000),1.5);
+});
 test('invalid settings and nonmonotonic samples fail closed',()=>{
  for(const config of [{floor:0},{ceiling:.8},{initial:2},{step:0},{downWindows:0},{dwellMs:-1},{sampleMs:0}])
   assert.throws(()=>new AdaptiveDprPilot(config),/invalid/);
