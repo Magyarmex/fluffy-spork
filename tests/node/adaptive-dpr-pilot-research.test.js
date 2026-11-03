@@ -13,6 +13,11 @@ test('only sustained render pressure lowers the proposed backing DPR',()=>{
  assert.equal(c.observe(renderBound,10000),1,'hard readability floor');
  assert.equal(c.changes,2);
 });
+test('render pressure can justify downshift even when simulation pace has already fallen',()=>{
+ const c=new AdaptiveDprPilot();
+ const slow={...renderBound,fps:22,frameP95Ms:55,simulationPacePct:67};
+ c.observe(slow,0);assert.equal(c.observe(slow,1000),1.25);
+});
 test('CPU-bound slow simulation and ordinary 30Hz do not trigger blur',()=>{
  const c=new AdaptiveDprPilot();
  for(let t=0;t<20000;t+=1000)assert.equal(c.observe(simBound,t),1.5);
