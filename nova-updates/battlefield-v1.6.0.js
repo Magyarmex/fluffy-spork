@@ -1696,6 +1696,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
        mcy=Math.floor(mt.y/g.hash.cell)+2000,
        bucket=g.hash.map.get(mcx*10000+mcy);
      if(!bucket||bucket.indexOf(mt)<0){valid=false;break;}
+     var probe=[];g.hash.query(mt.x,mt.y,0,probe);
+     if(probe.indexOf(mt)<0){valid=false;break;}
     }
    }
    if(valid&&live.length>1){
