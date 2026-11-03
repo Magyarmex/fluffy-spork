@@ -27,14 +27,15 @@ function measure(seed,hz,reload){return withSeed(seed,()=>{
  g.shapes=[];g.drones=[];g.powerups=[];
  g.input.aim.active=true;g.input.aim.dx=40;g.input.firing=true;g.input.autofire=false;
  p.stats.reload=reload;
- let volleys=0,heatPeak=0;const shotTimes=[];const oldFire=g.tryFire;
+ let volleys=0,heatPeak=0;const shotTimes=[],postShotCooldowns=[];const oldFire=g.tryFire;
  g.tryFire=function(t){const before=this.bullets.length;const result=oldFire.apply(this,arguments);
-  if(t===p&&this.bullets.length>before){volleys++;shotTimes.push(this.time);}return result;};
+  if(t===p&&this.bullets.length>before){volleys++;shotTimes.push(this.time);postShotCooldowns.push(p.fireCd);}return result;};
  for(let i=0;i<seconds*hz;i++){
   g.update(1/hz);heatPeak=Math.max(heatPeak,p.__v17Heat||0);
  }
  const out={seed,hz,reload,seconds,volleys,heat:p.__v17Heat||0,heatPeak,
-  fireCd:p.fireCd,firstShotTimes:shotTimes.slice(0,16).map(n=>+n.toFixed(7)),
+  fireCd:p.fireCd,lateShotCooldown:postShotCooldowns.length?+postShotCooldowns[postShotCooldowns.length-1].toFixed(7):null,
+  lateCooldownVsStep:postShotCooldowns.length?+(postShotCooldowns[postShotCooldowns.length-1]-1/hz).toFixed(7):null,firstShotTimes:shotTimes.slice(0,16).map(n=>+n.toFixed(7)),
   firstIntervals:shotTimes.slice(1,16).map((n,i)=>+(n-shotTimes[i]).toFixed(7))};
  g.destroy();return out;
 });}
