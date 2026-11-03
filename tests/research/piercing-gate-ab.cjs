@@ -59,7 +59,7 @@ function run({seed,hz,seconds=3,gate=true,fire=true,dense=false}){
  });
 }
 function median(a){const v=a.slice().sort((x,y)=>x-y);return v[Math.floor(v.length/2)];}
-function suite({seeds=[1517800,1517802,1517810],passes=3,seconds=3}={}){
+function suite({seeds=[1517800,1517802,1517810],passes=10,seconds=3}={}){
  const rows=[];
  for(let pass=0;pass<passes;pass++){
   const cases=[];
