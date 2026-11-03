@@ -17,7 +17,7 @@ function bootBody(html){
 function execute(html,mode){
  const events=[],errors=[],ref={current:null},screen=[];
  const game={
-  input:{},sfx:{resume(){events.push('audio-resume')},
+  input:{},sfx:{resume(){events.push('audio-resume');if(mode==='audio-throws')throw Error('audio resume failed')},
    setMuted(){},setMusicMuted(){}},
   start(){events.push('start');if(mode==='start-throws'||mode==='start-throws-real-destroy')throw Error('startup failed')},
   destroy(){events.push('destroy');if(mode==='destroy-throws')throw Error('cleanup failed')}
@@ -100,6 +100,15 @@ test('boot failure invokes actual composed Game.destroy listener/audio/RAF teard
  assert.deepEqual(x.events,['construct','audio-resume','start','cancel-raf',
   'window-detach','document-detach','input-detach','audio-dispose']);
  assert.equal(x.errors.length,1);
+ assert.deepEqual(x.screen,['menu']);
+ assert.equal(x.ref.current,null);
+});
+
+test('audio resume failure before Game.start still destroys constructed Game',()=>{
+ const x=execute(patchRafStepCap(rawShell()),'audio-throws');
+ assert.deepEqual(x.events,['construct','audio-resume','destroy']);
+ assert.equal(x.errors.length,1);
+ assert.match(String(x.errors[0][1]),/audio resume failed/);
  assert.deepEqual(x.screen,['menu']);
  assert.equal(x.ref.current,null);
 });
