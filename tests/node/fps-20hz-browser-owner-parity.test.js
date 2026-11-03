@@ -166,3 +166,36 @@ test('opt-in browser pilot forwards four-step catch-up without changing default'
   defaultPilot.stop();
  }finally{if(pilot)pilot.stop();g.destroy()}
 });
+
+test('20Hz jitter preserves Tempest fire chronology while movement input changes muzzle origin',()=>{
+ // A static firing test can pass while moving muzzle positions or keyboard
+ // event timing differ. Exercise both systems in the same composed world.
+ const events=[
+  {at:25,type:'keydown',key:'w'},
+  {at:275,type:'keydown',key:'d'},
+  {at:525,type:'keyup',key:'w'},
+  {at:775,type:'keyup',key:'d'},
+  {at:1025,type:'keydown',key:'s'},
+  {at:1425,type:'keyup',key:'s'}
+ ];
+ const baseline=Array(120).fill(1000/60);
+ const presentations=[
+  Array(40).fill(50),
+  Array.from({length:20},()=>[48,52]).flat()
+ ];
+ for(const seed of [1517800,1517802]){
+  const reference=run(seed,baseline,2,events,true);
+  assert.ok(reference.volleys>0,'must exercise actual Tempest firing');
+  for(const intervals of presentations){
+   const candidate=run(seed,intervals,4,events,true);
+   assert.equal(candidate.ticks,reference.ticks);
+   assert.equal(candidate.droppedFrames,0);
+   assert.equal(candidate.volleys,reference.volleys,
+    'movement must not alter chronological shot count by presentation rate');
+   assert.equal(candidate.hash,reference.hash,
+    'moving projectile origins and combat world must match fixed60');
+   assert.equal(candidate.draws,reference.draws,
+    'moving combat must not consume presentation-dependent gameplay RNG');
+  }
+ }
+});
