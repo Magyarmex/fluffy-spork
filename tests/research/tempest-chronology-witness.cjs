@@ -45,7 +45,17 @@ function run(seed,cls,mode){return withSeed(seed,draws=>{
   birthHash:digest(births),stateHash:digest(state),births,state};
  g.destroy();return out;
  });}
-const intervalCounts=births=>{\n const bins=new Map();for(const b of births){const k=Math.max(0,Math.ceil(Math.round(b.time*60)/2));bins.set(k,(bins.get(k)||0)+1);}\n return {intervalsWithTwoOrMore:[...bins.values()].filter(n=>n>=2).length,\n  maxBirthsInInterval:Math.max(0,...bins.values())};\n};\nconst report=[];
+const intervalCounts=births=>{
+ const bins=new Map();for(const b of births){const k=Math.max(0,Math.ceil(Math.round(b.time*60)/2));
+  if(!bins.has(k))bins.set(k,[]);bins.get(k).push(b);}
+ const pairs=[...bins.values()].filter(a=>a.length>=2);
+ return {intervalsWithTwoOrMore:pairs.length,
+  maxBirthsInInterval:Math.max(0,...[...bins.values()].map(a=>a.length)),
+  distinctOriginPairs:pairs.filter(a=>a[0].x!==a[1].x||a[0].y!==a[1].y).length,
+  distinctVelocityPairs:pairs.filter(a=>a[0].vx!==a[1].vx||a[0].vy!==a[1].vy).length,
+  distinctBirthTimePairs:pairs.filter(a=>a[0].time!==a[1].time).length};
+};
+const report=[];
 for(const seed of seeds)for(const cls of classes){
  const coarse=run(seed,cls,'coarse30');
  const split=run(seed,cls,'split60');
