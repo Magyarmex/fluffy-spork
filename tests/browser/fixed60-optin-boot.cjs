@@ -63,6 +63,29 @@ const {chromium}=require('playwright');
      assert.equal(resumed.paused,false);
      assert.equal(resumed.active,true);
      assert.ok(resumed.ticks>initial.ticks);
+     const canvas=page.locator('canvas.absolute.inset-0');
+     const box=await canvas.boundingBox();
+     assert.ok(box&&box.width>200);
+     const cdp=await context.newCDPSession(page);
+     const touch={x:box.x+box.width*.18,y:box.y+box.height*.72,
+      id:17,radiusX:1,radiusY:1,force:1};
+     await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[touch]});
+     await page.waitForTimeout(120);
+     assert.equal(await page.evaluate(()=>window.__novaFixed60Game.input.move.active),
+      true,'touch movement reaches fixed60 simulation');
+     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+     await page.waitForTimeout(120);
+     assert.equal(await page.evaluate(()=>window.__novaFixed60Game.input.move.active),
+      false,'touch release clears fixed60 movement');
+     const teardown=await page.evaluate(()=>{
+      const g=window.__novaFixed60Game,p=g.__novaFixed60Pilot;
+      g.destroy();
+      return {started:p.owner.started,capture:p.capture.active,
+       destroyed:g.__novaDestroyed,raf:p.owner.raf};
+     });
+     assert.deepEqual(teardown,{started:false,capture:false,destroyed:true,raf:null},
+      'Game.destroy must release both simulation and DOM owners');
+
     }else{
      assert.ok(initial.raf>0,'default game retains production RAF');
     }
