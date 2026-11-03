@@ -1,6 +1,7 @@
 /* Generated fixed60 research browser bundle. NOT enabled in production. */
 (function(root){
 'use strict';
+if(root.location && new URLSearchParams(root.location.search).get('nova_fixed60')!=='pilot')return;
 const factories={"fixed-step-dom-input.cjs":function(require,module,exports){
 'use strict';
 // RESEARCH ONLY: the real composed Input receives chronological browser-shaped
