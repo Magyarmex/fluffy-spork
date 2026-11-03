@@ -4,7 +4,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const source=fs.readFileSync(path.join(__dirname,'../../nova-updates/battlefield-v1.6.0.js'),'utf8');
 const a=source.indexOf(' function localStationaryPiercingPlan('),z=source.indexOf('\n var oldUpdateBullets=',a);
 assert.ok(a>=0&&z>a);
-const plan=new Function('CLASSES','ISOLATED_RECOVERY_SCAN_CAP',source.slice(a,z)+'\nreturn localStationaryPiercingPlan;')({scout:{size:15}},1200);
+const plan=new Function('CLASSES','ISOLATED_RECOVERY_SCAN_CAP','d2',source.slice(a,z)+'\nreturn localStationaryPiercingPlan;')({scout:{size:15}},1200,(x,y,a,b)=>(x-a)**2+(y-b)**2);
 function shot(y,live){return {kind:'bullet',x:0,y,vx:6000,vy:0,r:3,ttl:live?.2:.01,pen:live?2:1,hits:0,dead:false,shell:false,beam:false,splash:false};}
 function hull(id,x,y,startX=x,startY=y){return {id,cls:'scout',alive:true,x,y,__novaSweepMoveTime:1,__novaSweepPrevX:startX,__novaSweepPrevY:startY};}
 function world(shots,tanks){return {time:1,bullets:shots,tanks,shapes:[],drones:[]};}
