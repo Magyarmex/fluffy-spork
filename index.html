@@ -247,7 +247,7 @@ canvas {
     <link rel="icon" href="./nova-icon.svg" type="image/svg+xml" />
     <meta name="application-name" content="NOVA TANKS" />
     <script defer src="./pwa-register.js"></script>
-      <meta name="nova-runtime-build" content="f1b584f3b313ff9ffd684a54" />
+      <meta name="nova-runtime-build" content="5ef0629cf395a3bf2f30955f" />
   </head>
   <body>
     <div id="root"></div>
@@ -752,6 +752,7 @@ function App() {
             const id = requestAnimationFrame(() => setBootTick((t) => t + 1));
             return () => cancelAnimationFrame(id);
         }
+        let bootGame = null;
         try {
             const game = new engine_1.Game(canvas, mm, {
                 hud: (h) => setHud(h),
@@ -769,6 +770,7 @@ function App() {
                     }
                 },
             }, qualityRef.current);
+            bootGame = game;
             game.input.onStickChange = (kind, s) => {
                 if (kind === 'move')
                     stickMove.current = { ...s };
@@ -790,6 +792,10 @@ function App() {
         }
         catch (err) {
             console.error('Failed to boot game:', err);
+            if (bootGame) {
+                try { bootGame.destroy(); }
+                catch (cleanupError) { console.error('Failed to clean up game after boot failure:', cleanupError); }
+            }
             gameRef.current = null;
             setScreen('menu');
         }
@@ -4538,10 +4544,11 @@ class Input {
         window.addEventListener('pointercancel', this.pu);
         window.addEventListener('keydown', this.kd);
         window.addEventListener('keyup', this.ku);
-        window.addEventListener('blur', () => {
+        if (!this.__novaBlurHandler) this.__novaBlurHandler = () => {
             this.keyboard.up = this.keyboard.down = this.keyboard.left = this.keyboard.right = false;
             this.firing = false;
-        });
+        };
+        window.addEventListener('blur', this.__novaBlurHandler);
     }
     detach() {
         if (!this.canvas)
@@ -4552,6 +4559,7 @@ class Input {
         window.removeEventListener('pointercancel', this.pu);
         window.removeEventListener('keydown', this.kd);
         window.removeEventListener('keyup', this.ku);
+        window.removeEventListener('blur', this.__novaBlurHandler);
         this.canvas = null;
     }
     // Returns normalized movement vector
