@@ -37,11 +37,13 @@ const trace=[
  [910,'pointerup',{pointerId:22,pointerType:'touch'}],
  [1140,'keydown',{key:'d'}],[1410,'keyup',{key:'d'}]
 ];
-function arm(seed,hz){return withSeed(seed,draws=>{
+function arm(seed,hz,maxSteps=2,intervals=null){return withSeed(seed,draws=>{
  const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
- const h=setup(g);let index=0;try{
+ const h=setup(g,{maxSteps});let index=0;try{
+  let jitterElapsed=0;
   for(let f=1;f<=2*hz;f++){
-   const at=f*1000/hz;h.setNow(at);
+   if(intervals)jitterElapsed+=intervals[f-1];
+   const at=intervals?jitterElapsed:f*1000/hz;h.setNow(at);
    while(index<trace.length&&trace[index][0]<=at+1e-7){
     const [t,kind,data]=trace[index++];assert.equal(h.capture(kind,t,data),true);
    }
@@ -425,4 +427,22 @@ test('render-triggered game destruction must not draw minimap afterward',()=>{
  assert.equal(h.owner.started,false);
  assert.equal(h.active.size,0,'destroy must cancel the next RAF');
  assert.equal(minimapAfterDestroy,0,'never touch minimap after game teardown');
+});
+
+test('20Hz four-step RAF preserves real touch-stick and keyboard trace against 60Hz',()=>{
+ // Existing 30/60/120/240Hz trace includes two touch pointer owners,
+ // pointer movement, releases, and WASD. Verify it also survives the
+ // slower presentation cadence without dropping or reordering input.
+ for(const seed of [1517800,1517802,1517810]){
+  const baseline=arm(seed,60);
+  const twenty=arm(seed,20,4);
+  const jitter=arm(seed,20,4,Array.from({length:20},()=>[48,52]).flat());
+  for(const candidate of [twenty,jitter]){
+   assert.equal(candidate.ticks,120);
+   assert.equal(candidate.dropped,0);
+   assert.equal(candidate.applied,trace.length);
+   assert.deepEqual(candidate,baseline,
+    '20Hz touch-stick replay must preserve the real 60Hz world and RNG');
+  }
+ }
 });
