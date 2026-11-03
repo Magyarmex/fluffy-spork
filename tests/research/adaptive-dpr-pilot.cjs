@@ -44,7 +44,7 @@ class AdaptiveDprPilot {
     let next=this.dpr;
     if(this.downStreak>=this.downWindows)next=Math.max(this.floor,this.dpr-this.step);
     else if(this.upStreak>=this.upWindows)next=Math.min(this.ceiling,this.dpr+this.step);
-    next=Math.round(next*1000)/1000;
+    next=Math.max(this.floor,Math.min(this.ceiling,Math.round(next*1000)/1000));
     if(next!==this.dpr) {
       this.dpr=next;this.lastChange=now;this.changes++;
       this.downStreak=0;this.upStreak=0;
