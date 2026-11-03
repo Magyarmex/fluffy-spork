@@ -5,7 +5,7 @@
  */
 process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
 const {bootGame,withSeed,digest,physical}=require('./audio-rng-causal-pilot.cjs');
-function run(seed,held,seconds=4){
+function run(seed,held,seconds=4,force60=false){
  return withSeed(seed,draws=>{
   const g=bootGame(),p=g.player;
   g.sfx.muted=true;g.input.autofire=false;g.input.aim.active=true;g.input.aim.dx=40;
@@ -19,7 +19,7 @@ function run(seed,held,seconds=4){
   g.input.firing=held;
   const initial=digest(physical(g));
   for(let frame=0;frame<seconds*30;frame++){
-   const steps=held?2:1;
+   const steps=force60||held?2:1;
    for(let j=0;j<steps;j++)g.update(1/(steps===2?60:30));
   }
   const result={seed,held,seconds,initial,final:digest(physical(g)),
@@ -32,12 +32,17 @@ function run(seed,held,seconds=4){
 function suite(){
  const rows=[];
  for(const seed of [1517800,1517802,1517810]){
-  const idle=run(seed,false),held=run(seed,true);
+  const idle=run(seed,false),held=run(seed,true),
+   fixedIdle=run(seed,false,4,true),fixedHeld=run(seed,true,4,true);
   if(idle.initial!==held.initial)throw Error('unmatched initial worlds');
   if(idle.playerProjectiles!==0||held.playerProjectiles!==0)
    throw Error('player shots escaped negative control');
-  rows.push({seed,sameFinal:idle.final===held.final,
+  rows.push({seed,fixed60InputControlEqual:fixedIdle.final===fixedHeld.final&&
+    fixedIdle.rngDraws===fixedHeld.rngDraws,
+   sameFinal:idle.final===held.final,
    sameRng:idle.rngDraws===held.rngDraws,
+   fixed60Idle:{final:fixedIdle.final,rngDraws:fixedIdle.rngDraws},
+   fixed60Held:{final:fixedHeld.final,rngDraws:fixedHeld.rngDraws},
    idle:{final:idle.final,rngDraws:idle.rngDraws,aiAttempts:idle.aiAttempts},
    held:{final:held.final,rngDraws:held.rngDraws,aiAttempts:held.aiAttempts}});
  }
