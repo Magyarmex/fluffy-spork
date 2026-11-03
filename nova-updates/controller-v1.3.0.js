@@ -193,7 +193,16 @@
       /* Native mouse events report individual button transitions even when
        * Pointer Events suppress additional pointerdown/up during a chord. */
       this.__novaPrimaryMouseDown = function (event) {
-        if (!event || event.button !== 0 || self.touchSeen) return;
+        if (!event || event.button !== 0) return;
+        // Chromium's trusted mouse pointerdown can omit sourceCapabilities,
+        // while the following native mousedown identifies a real mouse.
+        // Do not mistake touch-generated compatibility mousedown for one.
+        if (self.touchSeen) {
+          if (self.stickId.move !== -1 || self.stickId.aim !== -1 ||
+              !event.sourceCapabilities ||
+              event.sourceCapabilities.firesTouchEvents !== false) return;
+          self.touchSeen = false;
+        }
         self.__novaPrimaryPressCaptured = true;
         self.mouseActive = true;
         if (Number.isFinite(event.clientX)) self.mouseX = event.clientX;
