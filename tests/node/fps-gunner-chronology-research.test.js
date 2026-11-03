@@ -15,7 +15,10 @@ test('chronological Gunner research reproduces native60 births and state with sp
  const data=JSON.parse(r.stdout);
  assert.equal(data.report.length,6);
  for(const row of data.report){
-  assert.equal(row.native60,row.split60);\n  assert.ok(row.referenceIntervalBirths.intervalsWithTwoOrMore>0,\n   'legal Overheat reference must demonstrate multiple births within coarse frames');\n  assert.equal(row.referenceIntervalBirths.maxBirthsInInterval,2);
+  assert.equal(row.native60,row.split60);
+  assert.ok(row.referenceIntervalBirths.intervalsWithTwoOrMore>0,
+   'legal Overheat reference must demonstrate multiple births within coarse frames');
+  assert.equal(row.referenceIntervalBirths.maxBirthsInInterval,2);
   assert.equal(row.referenceIntervalBirths.distinctOriginPairs,row.referenceIntervalBirths.intervalsWithTwoOrMore);
   assert.equal(row.referenceIntervalBirths.distinctBirthTimePairs,row.referenceIntervalBirths.intervalsWithTwoOrMore);
   assert.equal(row.referenceRngDraws>=0,true);
