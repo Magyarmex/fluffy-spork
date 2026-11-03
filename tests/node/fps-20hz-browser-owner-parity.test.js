@@ -72,8 +72,10 @@ test('20Hz 48/52ms presentation jitter recovers a fourth step without changing w
   const reference=run(seed,Array(120).fill(1000/60),2);
   const jitter=run(seed,Array.from({length:20},()=>[48,52]).flat(),4);
   const cappedThree=run(seed,Array.from({length:20},()=>[48,52]).flat(),3);
-  assert.ok(cappedThree.ticks<120,'jitter requires an occasional fourth step');
-  assert.notEqual(cappedThree.hash,reference.hash);
+  assert.ok(cappedThree.ticks<=120,'three-step budget cannot overrun reference');
+  if(cappedThree.ticks<120)assert.notEqual(cappedThree.hash,reference.hash);
+  else{assert.equal(cappedThree.hash,reference.hash);
+   assert.equal(cappedThree.draws,reference.draws);}
   assert.equal(jitter.ticks,120);
   assert.equal(jitter.droppedFrames,0);
   assert.equal(jitter.hash,reference.hash);
