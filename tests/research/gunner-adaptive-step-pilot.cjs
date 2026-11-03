@@ -11,7 +11,7 @@ const {bootGame,withSeed,digest,physical}=require('./audio-rng-causal-pilot.cjs'
 const SEEDS=[1517800,1517802,1517810];
 function run({seed,mode,scenario='mixed',seconds=6}){
  assert.ok(SEEDS.includes(seed)&&['native30','fixed60','adaptive'].includes(mode)&&
-  ['mixed','held'].includes(scenario)&&seconds===6);
+  ['mixed','held','pulse'].includes(scenario)&&seconds===6);
  return withSeed(seed,draws=>{
   const g=bootGame(),p=g.player;
   assert.ok(p&&p.alive);
@@ -32,9 +32,10 @@ function run({seed,mode,scenario='mixed',seconds=6}){
   try{
    for(let frame=0;frame<seconds*30;frame++){
     const t=frame/30;
-    const fire=scenario==='held'||(t>=2&&t<5);
+    const fire=scenario==='held'||(scenario==='mixed'&&t>=2&&t<5)||
+     (scenario==='pulse'&&frame%2===0);
     g.input.firing=fire;
-    if((scenario==='held'&&frame===0)||(scenario==='mixed'&&frame===60))
+    if(((scenario==='held'||scenario==='pulse')&&frame===0)||(scenario==='mixed'&&frame===60))
       g.useAbility(p);
     const ticks=mode==='fixed60'||(mode==='adaptive'&&fire)?2:1;
     for(let k=0;k<ticks;k++){
@@ -55,7 +56,7 @@ function suite(){
  const rows=[];
  for(let pass=0;pass<3;pass++){
   const configs=[];
-  for(const seed of SEEDS)for(const scenario of ['mixed','held'])
+  for(const seed of SEEDS)for(const scenario of ['mixed','held','pulse'])
    for(const mode of ['native30','fixed60','adaptive'])
     configs.push({seed,scenario,mode});
   if(pass===1)configs.reverse();
@@ -63,7 +64,7 @@ function suite(){
   for(const c of configs)rows.push({...run(c),pass});
  }
  const groups=[];
- for(const scenario of ['mixed','held'])for(const seed of SEEDS)
+ for(const scenario of ['mixed','held','pulse'])for(const seed of SEEDS)
   for(let pass=0;pass<3;pass++){
    const arm=mode=>rows.find(r=>r.scenario===scenario&&r.seed===seed&&r.pass===pass&&r.mode===mode);
    const native=arm('native30'),fixed=arm('fixed60'),adaptive=arm('adaptive');
