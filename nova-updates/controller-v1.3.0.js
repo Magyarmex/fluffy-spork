@@ -222,7 +222,8 @@
           buttons:event.buttons,sourceCapabilities:event.sourceCapabilities});
       };
       this.__novaPrimaryMouseUp = function (event) {
-        if (!event || event.button !== 0) return;
+        if (!event || event.button !== 0 ||
+            (event.sourceCapabilities && event.sourceCapabilities.firesTouchEvents === true)) return;
         self.__novaPrimaryPressCaptured = false;
         if (!self.touchSeen) self.firing = false;
       };
