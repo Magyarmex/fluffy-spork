@@ -73,3 +73,16 @@ test('restart pilot does not stack start wrappers or leak production ownership',
  g.start();
  assert.equal(counts().productionStarts,1);
 });
+
+test('reentrant production start during render fails closed and tears down pilot',()=>{
+ const {g,proto,counts}=scene(false);
+ const t={input:g.input,reset(){},consumeThrough(){}};
+ const o=new FixedStepRafOwner(g,t,{timeline:t,startMs:1000},{
+   now:()=>1000,request:()=>9,cancel:()=>{},
+   render:()=>g.start()});
+ o.start();
+ assert.throws(()=>o.frame(1017),/fixed-step RAF already owns this game/);
+ assert.equal(o.started,false,'render failure must stop research RAF');
+ assert.equal(g.start,proto.start,'production method must be restored');
+ assert.equal(counts().productionStarts,0,'no production RAF may be launched reentrantly');
+});
