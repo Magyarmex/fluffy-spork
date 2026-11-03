@@ -124,7 +124,7 @@ test('long stalls are bounded and clear held input before resuming',()=>{
   assert.ok(h.owner.ticks<=3);
  }finally{h.close()}
 });
-test('stop is idempotent and cancels scheduled RAF without altering Game.start',()=>{
+test('stop is idempotent and restores reserved Game.start after cancelling RAF',()=>{
  const g=bootGame(),original=g.start,h=setup(g);
  assert.notEqual(g.start,original,'pilot must reserve the production start method');
  assert.throws(()=>g.start(),/fixed-step RAF already owns this game/);
