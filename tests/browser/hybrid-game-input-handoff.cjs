@@ -27,6 +27,12 @@ const {chromium}=require('playwright');
   await page.evaluate(()=>{
    const g=window.__novaHybridGame;
    g.input.autofire=false;g.player.spawnShieldT=20;
+   window.__novaHybridEvents=[];
+   for(const type of ['pointerdown','mousedown','pointerup','mouseup'])
+    document.addEventListener(type,e=>window.__novaHybridEvents.push({type,
+     trusted:e.isTrusted,pointerType:e.pointerType,button:e.button,
+     touchCapability:e.sourceCapabilities?.firesTouchEvents??null,
+     target:e.target?.tagName,cls:String(e.target?.className||'').slice(0,100)}),true);
   });
   const box=await canvas.boundingBox();
   assert.ok(box&&box.width>300&&box.height>300);
@@ -49,7 +55,11 @@ const {chromium}=require('playwright');
   await page.mouse.move(right.x,right.y);
   await page.mouse.down({button:'left'});
   const mouse=await state();
-  assert.equal(mouse.mouseActive,true,'real mouse reclaimed hybrid input');
+  const diagnostic=await page.evaluate(({x,y})=>({events:window.__novaHybridEvents,
+   hit:document.elementFromPoint(x,y)?.outerHTML?.slice(0,250),
+   input:window.__novaHybridGame.input.touchSeen}),right);
+  console.log('NOVA_HYBRID_INPUT_DIAGNOSTIC '+JSON.stringify(diagnostic));
+  assert.equal(mouse.mouseActive,true,'real mouse reclaimed hybrid input: '+JSON.stringify(diagnostic));
   assert.equal(mouse.firing,true,'physical primary mouse button fires');
   assert.equal(mouse.move,false,'no phantom touch movement');
   await page.mouse.up({button:'left'});
