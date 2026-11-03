@@ -232,6 +232,18 @@ const {chromium}=require('playwright');
      }finally{
       await cdp.send('Emulation.setCPUThrottlingRate',{rate:1});
      }
+     // The fixed-step DOM owner must preserve the recently shipped physical
+     // mouse-after-touch handoff, not merely isolated touch-stick behavior.
+     await page.mouse.move(box.x+box.width*.65,box.y+box.height*.4);
+     await page.mouse.down();
+     await page.waitForFunction(()=>window.__novaFixed60Game?.input.firing===true,
+      null,{timeout:3000,polling:'raf'});
+     await page.mouse.up();
+     await page.waitForFunction(()=>window.__novaFixed60Game?.input.firing===false,
+      null,{timeout:3000,polling:'raf'});
+     console.log('NOVA_FIXED60_HYBRID_HANDOFF '+JSON.stringify({
+      touchTrials:12,physicalMouseFireRestored:true
+     }));
      const teardown=await page.evaluate(()=>{
       const g=window.__novaFixed60Game,p=g.__novaFixed60Pilot;
       g.destroy();
