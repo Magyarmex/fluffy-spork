@@ -101,8 +101,19 @@ test('startup owner changed between construction and activation fails closed',()
  const {g,owner}=scene(false);
  const replacement=function(){return 'new production owner'};
  g.start=replacement;
- assert.throws(()=>owner.start(),/start owner changed/);
+ assert.throws(()=>owner.start(),/lifecycle owner changed/);
  assert.equal(owner.started,false);
  assert.equal(g.start,replacement,'do not clobber newer production startup');
  assert.equal(g.start(),'new production owner');
 });
+
+for(const method of ['destroy','setPaused']){
+ test('changed '+method+' owner cannot be silently overwritten',()=>{
+  const {g,owner}=scene(false);
+  const replacement=function(){return 'new '+method};
+  g[method]=replacement;
+  assert.throws(()=>owner.start(),/lifecycle owner changed/);
+  assert.equal(owner.started,false);
+  assert.equal(g[method],replacement);
+ });
+}
