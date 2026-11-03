@@ -148,7 +148,7 @@ class FixedStepRafOwner {
 // ownership, then attach the bounded RAF. This factory remains opt-in and
 // does not change the game's production startup path.
 function createFixedStepBrowserPilot(game,{window:win,document:doc,clock,
-    request,cancel,render,canvas=game&&game.canvas}={}){
+    request,cancel,render,canvas=game&&game.canvas,maxSteps=2}={}){
   if(!game || game.raf || !clock || typeof clock.now!=='function')
     throw Error('invalid browser fixed-step pilot');
   const {ChronologicalInput}=require('./fixed-step-dom-input.cjs');
@@ -160,7 +160,7 @@ function createFixedStepBrowserPilot(game,{window:win,document:doc,clock,
     {window:win,document:doc,game});
   let owner;
   try{owner=new FixedStepRafOwner(game,timeline,bridge,
-    {now:clock.now,request,cancel,render})}
+    {now:clock.now,request,cancel,render,maxSteps})}
   catch(error){capture.detach();throw error}
   return {timeline,bridge,capture,owner,
     start(){
