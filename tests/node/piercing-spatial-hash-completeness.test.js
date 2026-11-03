@@ -42,3 +42,19 @@ test('hash membership alone is insufficient when query omits indexed hulls',()=>
  const result=plan(g,.011,true);
  assert.ok(result&&result.size===1,'query inconsistency must fall back to original proof');
 });
+
+test('self-query certification does not prove neighboring query completeness',()=>{
+ const g=world(true),tanks=g.tanks;
+ // A malformed spatial query can return each tank at radius zero while
+ // omitting its reachable neighbor from a larger radius query. Every
+ // membership probe passes; the no-pair shortcut must still fail closed.
+ g.hash.query=function(x,y,r,out){
+  out.length=0;
+  if(r===0){
+   for(const t of tanks)if(t.x===x&&t.y===y)out.push(t);
+  }
+ };
+ const result=plan(g,.011,true);
+ assert.ok(result&&result.size===1,
+  'self-only hash query cannot certify absence of a reachable second hull');
+});
