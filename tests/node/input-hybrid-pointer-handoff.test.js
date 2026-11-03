@@ -66,3 +66,35 @@ test('after blur, a physical mouse can reclaim control without stale stick IDs',
  input.pd(event('mouse',50,500,{sourceCapabilities:{firesTouchEvents:false}}));
  assert.equal(input.mouseActive,true);
 });
+
+test('real native mousedown reclaims after touch when pointerdown has no capabilities',()=>{
+ const {input,event,setNow,listeners}=boot();
+ setNow(100);input.pd(event('touch',11,100));input.pu(event('touch',11,100));
+ setNow(120);input.pd(event('mouse',50,500));
+ assert.equal(input.mouseActive,false,'pointerdown alone cannot identify physical mouse');
+ const native={button:0,clientX:500,clientY:100,
+   sourceCapabilities:{firesTouchEvents:false}};
+ for(const fn of listeners.canvas.get('mousedown')||[])fn(native);
+ assert.equal(input.touchSeen,false);
+ assert.equal(input.mouseActive,true);
+ assert.equal(input.firing,true);
+ for(const fn of listeners.window.get('mouseup')||[])fn(native);
+ assert.equal(input.firing,false,'native primary release stops firing');
+});
+test('synthetic compatibility mousedown cannot steal touch ownership',()=>{
+ const {input,event,setNow,listeners}=boot();
+ setNow(100);input.pd(event('touch',11,100));input.pu(event('touch',11,100));
+ const ghost={button:0,clientX:500,clientY:100,
+   sourceCapabilities:{firesTouchEvents:true}};
+ for(const fn of listeners.canvas.get('mousedown')||[])fn(ghost);
+ assert.equal(input.touchSeen,true);
+ assert.equal(input.mouseActive,false);
+ assert.equal(input.firing,false);
+ // Even an explicitly real mouse cannot steal an actively held touch stick.
+ input.pd(event('touch',12,100));
+ for(const fn of listeners.canvas.get('mousedown')||[])fn({
+   ...ghost,sourceCapabilities:{firesTouchEvents:false}});
+ assert.equal(input.stickId.move,12);
+ assert.equal(input.mouseActive,false);
+ assert.equal(input.firing,false);
+});
