@@ -98,3 +98,32 @@ test('synthetic compatibility mousedown cannot steal touch ownership',()=>{
  assert.equal(input.mouseActive,false);
  assert.equal(input.firing,false);
 });
+
+test('native physical mousemove restores hover aim but not firing after touch',()=>{
+ const {input,event,setNow,listeners}=boot();
+ setNow(100);input.pd(event('touch',11,100));input.pu(event('touch',11,100));
+ setNow(120);input.pm(event('mouse',50,500));
+ assert.equal(input.mouseActive,false,'capability-free pointermove is ambiguous');
+ const native={clientX:500,clientY:100,buttons:0,
+   sourceCapabilities:{firesTouchEvents:false}};
+ for(const fn of listeners.window.get('mousemove')||[])fn(native);
+ assert.equal(input.touchSeen,false);
+ assert.equal(input.mouseActive,true);
+ assert.equal(input.mouseX,500);
+ assert.equal(input.firing,false,'hover cannot invent a shot');
+ input.detach();
+ assert.equal(listeners.window.get('mousemove')?.size||0,0,'no native move listener leak');
+});
+test('touch compatibility mousemove and active touch cannot steal hover ownership',()=>{
+ const {input,event,setNow,listeners}=boot();
+ setNow(100);input.pd(event('touch',11,100));input.pu(event('touch',11,100));
+ const native={clientX:500,clientY:100,buttons:0,
+   sourceCapabilities:{firesTouchEvents:true}};
+ for(const fn of listeners.window.get('mousemove')||[])fn(native);
+ assert.equal(input.touchSeen,true);assert.equal(input.mouseActive,false);
+ input.pd(event('touch',12,100));
+ for(const fn of listeners.window.get('mousemove')||[])fn({
+   ...native,sourceCapabilities:{firesTouchEvents:false}});
+ assert.equal(input.stickId.move,12);
+ assert.equal(input.mouseActive,false);
+});
