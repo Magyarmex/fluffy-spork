@@ -56,3 +56,29 @@ test('stale callback after destroy does not resurrect RAF or render',()=>{
  assert.deepEqual(s.counts(),before);
  assert.equal(s.owner.started,false);
 });
+
+test('actual 49-overlay Game rejects an obsolete browser RAF after restart',()=>{
+ const {bootGame}=require('../research/audio-rng-causal-pilot.cjs');
+ const g=bootGame();
+ g.sfx.muted=true;g.sfx.startMusic=()=>{};
+ const callbacks=new Map();
+ let id=0,now=1000,updates=0;
+ const originalUpdate=g.update;
+ g.update=function(dt){updates++;return originalUpdate.call(this,dt)};
+ const timeline={input:g.input,reset(){},consumeThrough(){}};
+ const bridge={timeline,startMs:1000};
+ const owner=new FixedStepRafOwner(g,timeline,bridge,{
+  now:()=>now,request:fn=>{callbacks.set(++id,fn);return id},
+  cancel:()=>{},render:()=>{}
+ });
+ try{
+  owner.start();const obsolete=callbacks.get(1);
+  owner.stop();now=2000;owner.start();
+  const baseline=updates;
+  obsolete(2017);
+  assert.equal(updates,baseline,'stale callback must not update composed world');
+  assert.equal(id,2,'stale callback must not create another RAF');
+  callbacks.get(2)(2017);
+  assert.equal(updates,baseline+1,'current callback must update real Game');
+ }finally{owner.stop();g.destroy()}
+});
