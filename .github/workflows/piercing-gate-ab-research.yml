@@ -1,0 +1,22 @@
+name: NOVA Piercing Gate Exact-Source A/B Research
+on:
+  push:
+    branches:
+      - research/guarded-piercing-spatial-preflight-20261103
+  workflow_dispatch:
+jobs:
+  paired-ab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Exact-source composed-world A/B and parity
+        run: node tests/research/piercing-gate-ab.cjs | tee piercing-gate-ab.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: piercing-gate-ab-results
+          path: piercing-gate-ab.json
