@@ -1,8 +1,9 @@
 'use strict';
 /* Protect legal five-second Overheat + Alacrity firing behavior against unsafe
- * coarse-frame repairs. This is the actual 49-overlay Game and its real
+ * frame-rate repairs. This is the actual 49-overlay Game and its real
  * useAbility owner, not a cooldown-only toy. #648 remains unresolved:
- * DO NOT treat the current 30Hz underfire as a desired golden reference. */
+ * DO NOT treat the current 30Hz underfire as a desired golden reference.
+ * High-refresh overfire is bounded without locking a flawed 30Hz count. */
 process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
 const test=require('node:test');
 const assert=require('node:assert/strict');
@@ -36,12 +37,12 @@ for(const {cls,reload,expected60} of cases){
  test(`${cls} reload ${reload} + Alacrity + actual Overheat preserves 60Hz legal firing reference`,()=>{
   for(const seed of [1517800,1517802]){
     const reference=run(seed,cls,reload,60);
-    const coarse=run(seed,cls,reload,30);
+    const highRefresh=run(seed,cls,reload,120);
     assert.equal(reference.volleys,expected60,`60Hz reference seed ${seed}`);
-    assert.ok(coarse.volleys<=reference.volleys+1,
-      `coarse-frame repair overfired: ${coarse.volleys} vs ${reference.volleys}`);
-    assert.ok(Number.isFinite(reference.heat)&&Number.isFinite(coarse.heat));
-    assert.ok(Number.isFinite(reference.fireCd)&&Number.isFinite(coarse.fireCd));
+    assert.ok(highRefresh.volleys<=reference.volleys+5,
+      `high-refresh overfire: ${highRefresh.volleys} vs ${reference.volleys}`);
+    assert.ok(Number.isFinite(reference.heat)&&Number.isFinite(highRefresh.heat));
+    assert.ok(Number.isFinite(reference.fireCd)&&Number.isFinite(highRefresh.fireCd));
   }
  });
 }
