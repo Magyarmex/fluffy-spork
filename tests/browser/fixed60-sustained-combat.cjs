@@ -69,8 +69,8 @@ const origin='http://127.0.0.1:8765/';
      };
      const update=g.update,fire=g.tryFire;
      const updateBullets=g.updateBullets,collisions=g.resolveBulletCollisions;
-     assert.equal(typeof updateBullets,'function');
-     assert.equal(typeof collisions,'function');
+     if(typeof updateBullets!=='function'||typeof collisions!=='function')
+      throw Error('materialized projectile/collision owners unavailable');
      g.updateBullets=function(...args){
       const t=performance.now();
       try{return updateBullets.apply(this,args)}
