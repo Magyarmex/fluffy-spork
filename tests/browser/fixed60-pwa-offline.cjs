@@ -42,8 +42,19 @@ const origin = 'http://127.0.0.1:8765/';
    await context.setOffline(true);
    await page.goto(origin,{waitUntil:'domcontentloaded',timeout:45000});
    await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({state:'visible',timeout:20000});
-   await page.evaluate(()=>{\n    const Game=window.__novaMakeRequire('')('game/engine').Game;\n    const start=Game.prototype.start;\n    Game.prototype.start=function(){\n     if(!this.__novaDecorativeWorld)window.__novaOfflineGame=this;\n     return start.apply(this,arguments);\n    };\n   });\n   await page.getByRole('button',{name:/DEPLOY/i}).first().click();\n   await page.waitForFunction(()=>window.__novaOfflineGame?.status==='playing' &&\n    !!window.__novaOfflineGame.raf,null,{timeout:15000});
-   assert.equal(errors.length,0,'offline default gameplay must not throw: '+errors.join('; '));\n   await page.evaluate(()=>window.__novaOfflineGame.destroy());
+   await page.evaluate(()=>{
+    const Game=window.__novaMakeRequire('')('game/engine').Game;
+    const start=Game.prototype.start;
+    Game.prototype.start=function(){
+     if(!this.__novaDecorativeWorld)window.__novaOfflineGame=this;
+     return start.apply(this,arguments);
+    };
+   });
+   await page.getByRole('button',{name:/DEPLOY/i}).first().click();
+   await page.waitForFunction(()=>window.__novaOfflineGame?.status==='playing' &&
+    !!window.__novaOfflineGame.raf,null,{timeout:15000});
+   assert.equal(errors.length,0,'offline default gameplay must not throw: '+errors.join('; '));
+   await page.evaluate(()=>window.__novaOfflineGame.destroy());
    // Pilot bundle is deliberately optional and absent offline. It must fail
    // closed to the menu instead of secretly launching a normal-rate match.
    await page.goto(origin+'?nova_fixed60=pilot',{waitUntil:'domcontentloaded',timeout:45000});
