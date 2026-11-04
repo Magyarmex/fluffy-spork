@@ -597,41 +597,79 @@ const {chromium}=require('playwright');
     console.log('NOVA_FIXED60_MOBILE_VIEWPORT '+JSON.stringify(state));
    }finally{await context.close()}
   }
-  // Actual materialized-game smoke for the explicit research-only catch-up
-  // budget. This must not change the ordinary pilot's four-step default.
+  // Compare both research-only catch-up budgets in the actual materialized
+  // browser Game. Diagnostic, not a release gate or a matched-world A/B.
+  // A low budget may help presentation while silently losing combat time.
   {
-   const context=await browser.newContext({viewport:{width:800,height:600}});
-   const page=await context.newPage(),errors=[];
-   page.on('pageerror',error=>errors.push(String(error)));
-   try{
-    await page.goto('http://127.0.0.1:8765/?nova_fixed60=pilot&nova_fixed60_steps=3',
-     {waitUntil:'domcontentloaded',timeout:45000});
-    const deploy=page.getByRole('button',{name:/DEPLOY/i}).first();
-    await deploy.waitFor({state:'visible',timeout:20000});
-    await page.evaluate(()=>{
-     const Game=window.__novaMakeRequire('')('game/engine').Game;
-     const start=Game.prototype.start;
-     Game.prototype.start=function(){
-      if(!this.__novaDecorativeWorld)window.__novaThreeStepGame=this;
-      return start.apply(this,arguments);
-     };
-    });
-    await deploy.click();
-    await page.waitForFunction(()=>{
-     const g=window.__novaThreeStepGame;
-     return g?.status==='playing'&&g.__novaFixed60Pilot?.owner.ticks>5;
-    },null,{timeout:20000});
-    const state=await page.evaluate(()=>{
-     const g=window.__novaThreeStepGame,o=g.__novaFixed60Pilot.owner;
-     return {budget:o.maxSteps,ticks:o.ticks,raf:g.raf||0,started:o.started};
-    });
-    assert.equal(state.budget,3,'three-step query must reach the actual browser owner');
-    assert.equal(state.raf,0,'research budget must not create a second RAF');
-    assert.ok(state.started&&state.ticks>5,'three-step pilot must advance real Game');
-    assert.deepEqual(errors,[],'three-step browser pilot must not throw');
-    await page.evaluate(()=>window.__novaThreeStepGame.destroy());
-    console.log('NOVA_FIXED60_THREE_STEP_BOOT '+JSON.stringify(state));
-   }finally{await context.close()}
+   const observations=[];
+   for(const budget of [4,3]){
+    const context=await browser.newContext({viewport:{width:800,height:600}});
+    const page=await context.newPage(),errors=[];
+    page.on('pageerror',error=>errors.push(String(error)));
+    const cdp=await context.newCDPSession(page);
+    try{
+     await page.goto('http://127.0.0.1:8765/?nova_fixed60=pilot&nova_fixed60_steps='+budget,
+      {waitUntil:'domcontentloaded',timeout:45000});
+     const deploy=page.getByRole('button',{name:/DEPLOY/i}).first();
+     await deploy.waitFor({state:'visible',timeout:20000});
+     await page.evaluate(()=>{
+      const Game=window.__novaMakeRequire('')('game/engine').Game;
+      const start=Game.prototype.start;
+      Game.prototype.start=function(){
+       if(!this.__novaDecorativeWorld)window.__novaStepBudgetGame=this;
+       return start.apply(this,arguments);
+      };
+     });
+     await deploy.click();
+     await page.waitForFunction(()=>{
+      const g=window.__novaStepBudgetGame;
+      return g?.status==='playing'&&g.__novaFixed60Pilot?.owner.ticks>5;
+     },null,{timeout:20000});
+     const initial=await page.evaluate(()=>{
+      const g=window.__novaStepBudgetGame,o=g.__novaFixed60Pilot.owner;
+      if(o.maxSteps!==Number(new URLSearchParams(location.search).get('nova_fixed60_steps')))
+       throw Error('research step budget did not reach actual owner');
+      if(g.raf)throw Error('production RAF co-owns pilot Game');
+      const renderer=window.__novaMakeRequire('')('game/render');
+      const render=renderer.render;
+      window.__novaStepBudgetRenders=0;
+      renderer.render=function(...args){
+       const result=render.apply(this,args);
+       if(args[0]===g)window.__novaStepBudgetRenders++;
+       return result;
+      };
+      return {at:performance.now(),ticks:o.ticks,droppedMs:o.droppedMs,
+       renders:window.__novaStepBudgetRenders};
+     });
+     await cdp.send('Emulation.setCPUThrottlingRate',{rate:6});
+     await page.waitForTimeout(3000);
+     const measured=await page.evaluate(()=>{
+      const g=window.__novaStepBudgetGame,o=g.__novaFixed60Pilot.owner;
+      return {at:performance.now(),ticks:o.ticks,droppedMs:o.droppedMs,
+       renders:window.__novaStepBudgetRenders,started:o.started,
+       paused:g.paused,raf:g.raf||0};
+     });
+     const wallMs=measured.at-initial.at;
+     const observation={budget,wallMs,
+      ticks:measured.ticks-initial.ticks,
+      droppedMs:measured.droppedMs-initial.droppedMs,
+      renders:measured.renders-initial.renders,
+      fps:(measured.renders-initial.renders)*1000/wallMs,
+      simulatedTimeRatio:(measured.ticks-initial.ticks)*(1000/60)/wallMs};
+     assert.ok(wallMs>=2500&&observation.ticks>0&&observation.renders>0,
+      'both research budgets must advance actual combat and presentation');
+     assert.ok(measured.started&&!measured.paused&&!measured.raf,
+      'budget experiment must retain exclusive active Game ownership');
+     assert.deepEqual(errors,[],'budget browser experiment must not throw');
+     observations.push(observation);
+     await page.evaluate(()=>window.__novaStepBudgetGame.destroy());
+    }finally{
+     await cdp.send('Emulation.setCPUThrottlingRate',{rate:1}).catch(()=>{});
+     await context.close();
+    }
+   }
+   assert.deepEqual(observations.map(x=>x.budget),[4,3]);
+   console.log('NOVA_FIXED60_STEP_BUDGET_COMPARISON '+JSON.stringify(observations));
   }
   // A missing experimental bundle must recover to the menu, never launch
   // an unannounced production-rate match under the pilot query flag.
