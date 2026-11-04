@@ -4,11 +4,13 @@ const {FixedStepRafOwner}=require('../research/fixed-step-raf-owner.cjs');
 const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
 function setup(){
  let id=0;const callbacks=new Map();
- const input={move:{active:false},stickId:{move:-1},keyboard:{},
-  pd(e){this.move.active=true;this.stickId.move=e.pointerId},
+ const input={move:{active:false},stickId:{move:-1},keyboard:{},firing:false,
+  pd(e){if(e.pointerId===8){this.firing=true;return}
+    this.move.active=true;this.stickId.move=e.pointerId},
   pm(e){if(this.stickId.move===e.pointerId)this.move.active=true},
-  pu(e){if(this.stickId.move===e.pointerId){this.move.active=false;this.stickId.move=-1}},
-  __novaBlurReset(){this.move.active=false;this.stickId.move=-1}};
+  pu(e){if(e.pointerId===8){this.firing=false;return}
+    if(this.stickId.move===e.pointerId){this.move.active=false;this.stickId.move=-1}},
+  __novaBlurReset(){this.move.active=false;this.stickId.move=-1;this.firing=false}};
  const game={input,sfx:{startMusic(){}},paused:false,raf:0,w:800,h:600,
   update(){},destroy(){},setPaused(v){this.paused=v}};
  const timeline=new ChronologicalInput(input),bridge={timeline,startMs:1000};
@@ -59,5 +61,22 @@ test('explicit blur reset after a recovered stall releases held input',()=>{
  assert.equal(x.input.move.active,false);
  x.edge(145,'pointermove');x.frame(160);
  assert.equal(x.input.move.active,false,'movement alone must not re-arm a blurred stick');
+ x.owner.stop();
+});
+
+test('held firing survives short stall but queued release prevents phantom shots',()=>{
+ const x=setup();
+ x.timeline.push(.03,'pointerdown',{pointerId:8,pointerType:'touch'});
+ x.frame(40);assert.equal(x.input.firing,true);
+ x.frame(160);assert.equal(x.input.firing,true);
+ x.timeline.push(.165,'pointerup',{pointerId:8,pointerType:'touch'});
+ x.frame(180);assert.equal(x.input.firing,false);
+ x.owner.stop();
+});
+test('long suspension clears firing even without a delivered release',()=>{
+ const x=setup();
+ x.timeline.push(.03,'pointerdown',{pointerId:8,pointerType:'touch'});
+ x.frame(40);assert.equal(x.input.firing,true);
+ x.frame(340);assert.equal(x.input.firing,false);
  x.owner.stop();
 });
