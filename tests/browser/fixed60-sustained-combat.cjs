@@ -196,6 +196,7 @@ const origin='http://127.0.0.1:8765/';
       Number.isFinite(result.stepsPerRenderP95),
       'real composed combat and renderer must advance');
      assert.equal(result.playerClass,'tempest','real combat must use Tempest');
+     assert.equal(result.alive,true,'player death must not censor a sustained combat trial');
      assert.ok(result.fireCalls>0 && result.projectiles>0,
       'Tempest must spawn actual projectiles in composed browser Game');
      if(fixed60)assert.equal(await page.evaluate(()=>window.__novaCombatBenchGame.raf||0),0,
