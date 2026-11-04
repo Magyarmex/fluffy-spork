@@ -373,6 +373,56 @@ const {chromium}=require('playwright');
     await page.evaluate(()=>window.__novaOutageDefaultGame.destroy());
    }finally{await context.close()}
   }
+  // Narrow mobile-viewport pilot smoke: actual responsive canvas, touch
+  // ownership and release at phone dimensions, not a desktop-only contract.
+  {
+   const context=await browser.newContext({viewport:{width:320,height:568},
+    deviceScaleFactor:3,hasTouch:true,isMobile:true});
+   const page=await context.newPage(),errors=[];
+   page.on('pageerror',error=>errors.push(String(error)));
+   try{
+    await page.goto('http://127.0.0.1:8765/?nova_fixed60=pilot',
+     {waitUntil:'domcontentloaded',timeout:45000});
+    const deploy=page.getByRole('button',{name:/DEPLOY/i}).first();
+    await deploy.waitFor({state:'visible',timeout:45000});
+    await page.evaluate(()=>{
+     const Game=window.__novaMakeRequire('')('game/engine').Game;
+     const start=Game.prototype.start;
+     Game.prototype.start=function(){
+      if(!this.__novaDecorativeWorld)window.__novaMobilePilotGame=this;
+      return start.apply(this,arguments);
+     };
+    });
+    await deploy.click();
+    await page.waitForFunction(()=>{
+     const g=window.__novaMobilePilotGame;
+     return g?.status==='playing' && g.__novaFixed60Pilot?.owner.ticks>5;
+    },null,{timeout:15000});
+    const canvas=page.locator('canvas.absolute.inset-0');
+    const box=await canvas.boundingBox();
+    assert.ok(box && box.width>=200 && box.height>=300,
+     'mobile pilot must have a usable gameplay canvas');
+    const cdp=await context.newCDPSession(page);
+    const touch={x:box.x+box.width*.18,y:box.y+box.height*.72,
+     id:91,radiusX:1,radiusY:1,force:1};
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[touch]});
+    await page.waitForFunction(()=>window.__novaMobilePilotGame?.input.move.active,
+     null,{timeout:3000,polling:'raf'});
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+    await page.waitForFunction(()=>window.__novaMobilePilotGame?.input.move.active===false,
+     null,{timeout:3000,polling:'raf'});
+    const state=await page.evaluate(()=>{
+     const g=window.__novaMobilePilotGame;
+     return {ticks:g.__novaFixed60Pilot.owner.ticks,
+      raf:g.raf||0,move:g.input.move.active};
+    });
+    assert.equal(state.raf,0,'mobile pilot must exclusively own simulation');
+    assert.ok(state.ticks>5 && !state.move);
+    assert.deepEqual(errors,[],'mobile pilot must not throw');
+    await page.evaluate(()=>window.__novaMobilePilotGame.destroy());
+    console.log('NOVA_FIXED60_MOBILE_VIEWPORT '+JSON.stringify(state));
+   }finally{await context.close()}
+  }
   // A missing experimental bundle must recover to the menu, never launch
   // an unannounced production-rate match under the pilot query flag.
   const context=await browser.newContext({viewport:{width:800,height:600}});
