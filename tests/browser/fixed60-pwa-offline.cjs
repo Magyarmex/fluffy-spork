@@ -99,15 +99,27 @@ const origin = 'http://127.0.0.1:8765/';
    // The menu is visible before deployment; it cannot count as successful
    // fail-closed recovery until the real Game.start was actually attempted.
    await deploy.click();
-   await page.waitForFunction(()=>{
-    const g=window.__novaOfflinePilotGame;
-    if(!g)return false;
-    // Once a pilot exists, do not mistake a still-visible transition menu
-    // for failure; require actual simulated gameplay before evaluating it.
-    if(g.__novaFixed60Pilot)
-     return g.status==='playing' && g.__novaFixed60Pilot.owner.ticks>5;
-    return !!document.querySelector('#root .menu-grid-bg');
-   },null,{timeout:20000});
+   try {
+    await page.waitForFunction(()=>{
+     const g=window.__novaOfflinePilotGame;
+     if(!g)return false;
+     // The menu may remain visible during a successful transition. Resolve
+     // only after real fixed60 ticks OR completed failed-start destruction.
+     if(g.__novaFixed60Pilot)
+      return g.status==='playing' && g.__novaFixed60Pilot.owner.ticks>5;
+     return !!g.__novaDestroyed && !!document.querySelector('#root .menu-grid-bg');
+    },null,{timeout:20000});
+   } catch(error) {
+    const diagnostic=await page.evaluate(()=>{
+     const g=window.__novaOfflinePilotGame,p=g?.__novaFixed60Pilot;
+     return {hasGame:!!g,status:g?.status,destroyed:!!g?.__novaDestroyed,
+      pilot:!!p,started:p?.owner?.started,ticks:p?.owner?.ticks,
+      raf:g?.raf||0,menu:!!document.querySelector('#root .menu-grid-bg'),
+      research:!!window.__novaFixed60Research,
+      online:navigator.onLine,controlled:!!navigator.serviceWorker.controller};
+    });
+    throw Error('offline pilot did not settle: '+JSON.stringify({diagnostic,errors,cause:String(error)}));
+   }
    const pilot=await page.evaluate(()=>{
     const g=window.__novaOfflinePilotGame,p=g?.__novaFixed60Pilot;
     return {menu:!!document.querySelector('#root .menu-grid-bg'),
@@ -119,7 +131,7 @@ const origin = 'http://127.0.0.1:8765/';
    });
    assert.equal(pilot.controlled,true,'offline pilot navigation must remain SW-controlled');
    assert.equal(pilot.offline,true,'browser must report offline for this test');
-   if(pilot.menu){
+   if(!pilot.pilot){
     // Game.status starts as 'playing' in the constructor and is not changed
     // by destroy(); the actual fail-closed invariant is teardown + menu.
     assert.equal(pilot.destroyed,true,'failed pilot must destroy its attempted Game before returning to menu');
