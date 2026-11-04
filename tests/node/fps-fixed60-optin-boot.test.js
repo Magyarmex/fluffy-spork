@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const root=path.resolve(__dirname,'../..');
 const source=fs.readFileSync(path.join(root,'nova-updates/fixed60-optin-boot.js'),'utf8');
-function boot(query,{missingApi=false,failStart=false}={}){
+function boot(query,{missingApi=false,failStart=false,missingFingerprint=false}={}){
  const calls=[],writes=[],pending=new Map();let raf=0;
  class Game{
   constructor(){this.raf=0;this.canvas={};this.input={};this.sfx={};}
@@ -12,7 +12,9 @@ function boot(query,{missingApi=false,failStart=false}={}){
  const original=Game.prototype.start;
  const mods={'game/engine':(module)=>{module.exports.Game=Game}};
  const win={
-  location:{search:query},document:{readyState:'loading',write:html=>writes.push(html)},performance:{now:()=>1000,timeOrigin:1793560000000},
+  location:{search:query},document:{readyState:'loading',write:html=>writes.push(html),
+   querySelector:selector=>selector==='meta[name="nova-runtime-build"]'&&!missingFingerprint?
+    {content:'0123456789abcdef01234567'}:null},performance:{now:()=>1000,timeOrigin:1793560000000},
   requestAnimationFrame:fn=>{pending.set(++raf,fn);return raf},
   cancelAnimationFrame:id=>{calls.push('cancel');pending.delete(id)},
   console:{error:()=>calls.push('cleanup-error')},
@@ -90,7 +92,9 @@ test('pilot loads optional bundle only on explicit query and installs guard firs
  assert.deepEqual(ordinary.writes,[]);
  const pilot=boot('?nova_fixed60=pilot',{missingApi:true});
  assert.equal(pilot.writes.length,1);
- assert.match(pilot.writes[0],/fixed60-research-browser\.js/);
+ assert.match(pilot.writes[0],/fixed60-research-browser\.js\?nova_build=0123456789abcdef01234567/);
+ assert.throws(()=>boot('?nova_fixed60=pilot',{missingFingerprint:true}),
+  /fingerprinted canonical shell/,'pilot must not load an unversioned research asset');
  const sw=fs.readFileSync(path.join(root,'sw.js'),'utf8');
  assert.match(sw,/discoverCriticalAssets/);
  assert.equal(sw.includes("'./nova-updates/fixed60-research-browser.js'"),false,
