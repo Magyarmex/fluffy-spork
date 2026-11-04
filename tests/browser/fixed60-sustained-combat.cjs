@@ -92,6 +92,14 @@ const origin='http://127.0.0.1:8765/';
     });
     for(const throttle of (repeat?[3,1]:[1,3])){
      await cdp.send('Emulation.setCPUThrottlingRate',{rate:throttle});
+     // Do not attribute the interval spanning a throttle transition or the
+     // Playwright/CDP setup pause to either measured presentation phase.
+     // The next completed render establishes the phase-local origin.
+     await page.evaluate(()=>{
+      const m=window.__novaCombatBench;
+      m.lastRender=null;
+      m.lastFrame=null;
+     });
      const before=await page.evaluate(()=>{
       const m=window.__novaCombatBench,g=window.__novaCombatBenchGame;
       return {updates:m.updates,simMs:m.simMs,work:m.updateWorkMs,
@@ -140,6 +148,7 @@ const origin='http://127.0.0.1:8765/';
       fireCalls:delta('fireCalls'),frames,frameGapP95Ms:p95,
       frameGapSamples:gaps.length,
       renderGapP95Ms,renderGapMaxMs,renderGapSamples:renderGaps.length,
+      renderGapsOver50Ms:renderGaps.filter(ms=>ms>50).length,
       presentationFps:renders*1000/wallMs,
       observerRafFps:frames*1000/wallMs,
       simulationHz:updates*1000/wallMs,
@@ -192,6 +201,8 @@ const origin='http://127.0.0.1:8765/';
     fixed60RenderGapP95Ms:mean(pilot,'renderGapP95Ms'),
     baselineRenderGapMaxMs:mean(baseline,'renderGapMaxMs'),
     fixed60RenderGapMaxMs:mean(pilot,'renderGapMaxMs'),
+    baselineRenderGapsOver50Ms:mean(baseline,'renderGapsOver50Ms'),
+    fixed60RenderGapsOver50Ms:mean(pilot,'renderGapsOver50Ms'),
     baselineUpdateCostMs:mean(baseline,'updateCostMs'),
     fixed60UpdateCostMs:mean(pilot,'updateCostMs'),
     baselineProjectilesPerSimSecond:mean(baseline,'projectilesPerSimSecond'),
