@@ -127,7 +127,7 @@ test('real compressed shipping payload materializes with high-refresh cap', () =
       .filter(name => name.endsWith('.b64')).sort();
     assert.ok(chunks.length > 0, 'canonical compressed shipping payload missing');
     const encoded = chunks.map(name => fs.readFileSync(path.join(root, 'nova-gz', name), 'utf8')).join('')
-      .replace(/[\\r\\n\\t ]/g, '');
+      .replace(/\s+/g, '');
     const shell = zlib.gunzipSync(Buffer.from(encoded, 'base64')).toString('utf8');
     const destination = path.join(dir, 'index.html');
     fs.writeFileSync(destination, shell);
