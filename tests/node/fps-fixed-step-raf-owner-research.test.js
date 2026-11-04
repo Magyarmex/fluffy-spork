@@ -286,6 +286,24 @@ test('pause/resume during skipped foreground time cannot resurrect stale catch-u
  }finally{h.close()}
 });
 
+test('pause triggered inside Game.update retains the transition clock and stops remaining substeps',()=>{
+ const g=bootGame(),h=setup(g);let updates=0;
+ const original=g.update;
+ g.update=function(...args){
+  updates++;
+  if(updates===1)this.setPaused(true);
+  return original.apply(this,args);
+ };
+ try{
+  h.setNow(1000/30);h.frame(1000/30);
+  assert.equal(g.paused,true);
+  assert.equal(updates,1,'pause during update must block the second substep');
+  assert.equal(h.owner.ticks,1);
+  assert.ok(h.owner.simAtSec>=1/30-1e-6,
+   'completed update must not overwrite the pause transition clock');
+ }finally{h.close()}
+});
+
 test('actual composed renderer is simulation-pure across presentation rates',()=>{
  function run(seed,hz){return withSeed(seed,draws=>{
   const g=bootGame();g.sfx.muted=true;
