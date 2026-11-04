@@ -12,7 +12,7 @@ function createAdaptiveDprPilot(game, options={}) {
   let lastApplied=original, width=game.w, height=game.h, phase='baseline';
   let slowSince=null, fastSince=null, lastTransition=-Infinity, lastSample=null;
   let trialStart=null, baseline=null, warmupUntil=-Infinity, stopped=false;
-  let cooldownUntil=-Infinity;
+  let cooldownUntil=-Infinity, externalOwner=false;
   const visible=typeof options.visible==='function'?options.visible:
     ()=>typeof document==='undefined'||!document.hidden;
   const result=(kind,changed=false)=>({kind,changed,dpr:game.dpr,phase});
@@ -32,7 +32,16 @@ function createAdaptiveDprPilot(game, options={}) {
   }
   function sample(now,p){
     if(stopped)return result('stopped');
+    // A player setting or another owner changed DPR. Never take it back.
+    if(externalOwner)return result('external-owner');
     if(!Number.isFinite(now)||(lastSample!==null&&now<=lastSample))return result('invalid-time');
+    // Observe external DPR ownership BEFORE a long-gap rollback can restore
+    // stale pixels over a user's explicit clarity choice.
+    if(game.dpr!==lastApplied){
+      externalOwner=true;width=game.w;height=game.h;lastApplied=game.dpr;
+      phase='baseline';baseline=null;trialStart=null;resetStreaks();
+      return result('external-resize');
+    }
     if(lastSample!==null&&now-lastSample>3500){
       resetStreaks();warmupUntil=now+2500;
       if(phase==='probing')return result('probe-interrupted',rollback(now));
@@ -41,6 +50,7 @@ function createAdaptiveDprPilot(game, options={}) {
     if(game.w!==width||game.h!==height||game.dpr!==lastApplied||
       game.canvas.width!==Math.max(1,Math.round(game.w*lastApplied))||
       game.canvas.height!==Math.max(1,Math.round(game.h*lastApplied))){
+      if(game.dpr!==lastApplied)externalOwner=true;
       width=game.w;height=game.h;lastApplied=game.dpr;
       phase='baseline';baseline=null;trialStart=null;resetStreaks();
       warmupUntil=now+2500;cooldownUntil=now+8000;
@@ -91,7 +101,7 @@ function createAdaptiveDprPilot(game, options={}) {
   function stop(){
     if(stopped)return false;
     stopped=true;
-    if(game.quality==='low'&&game.dpr===lastApplied&&game.w===width&&game.h===height&&
+    if(!externalOwner&&game.quality==='low'&&game.dpr===lastApplied&&game.w===width&&game.h===height&&
        game.canvas.width===Math.round(game.w*lastApplied)&&
        game.canvas.height===Math.round(game.h*lastApplied)&&
        game.dpr!==original)apply(original,lastSample||0);
