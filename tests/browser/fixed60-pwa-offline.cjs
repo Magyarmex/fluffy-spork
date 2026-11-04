@@ -125,7 +125,22 @@ const origin = 'http://127.0.0.1:8765/';
    }
    // Either optional pilot outcome must not corrupt the active offline shell.
    await page.goto(origin,{waitUntil:'domcontentloaded',timeout:45000});
-   await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({state:'visible',timeout:20000});
+   const recoveredDeploy=page.getByRole('button',{name:/DEPLOY/i}).first();
+   await recoveredDeploy.waitFor({state:'visible',timeout:20000});
+   await page.evaluate(()=>{
+    const Game=window.__novaMakeRequire('')('game/engine').Game;
+    const start=Game.prototype.start;
+    Game.prototype.start=function(){
+     if(!this.__novaDecorativeWorld)window.__novaRecoveredOfflineGame=this;
+     return start.apply(this,arguments);
+    };
+   });
+   await recoveredDeploy.click();
+   await page.waitForFunction(()=>{
+    const g=window.__novaRecoveredOfflineGame;
+    return g?.status==='playing' && !!g.raf;
+   },null,{timeout:15000});
+   await page.evaluate(()=>window.__novaRecoveredOfflineGame.destroy());
    // Reconnection should restore opt-in availability without changing the
    // validated offline default shell or promoting a partial research build.
    await context.setOffline(false);
