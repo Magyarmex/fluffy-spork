@@ -93,7 +93,7 @@ const origin='http://127.0.0.1:8765/';
       minimaps:0,minimapWorkMs:0,projectiles:0,fireCalls:0,
       bulletWorkMs:0,collisionWorkMs:0,
       bulletSeconds:0,bulletVfxCalls:0,bulletVfxParticles:0,inBulletUpdate:false,
-      trailCandidates:0,suppressedTrails:0,
+      trailCandidates:0,suppressedTrails:0,trailOverwrites:0,trailCriticalOverwrites:0,
       frameGaps:[],rafDispatchLags:[],lastFrame:null,frames:0,active:true,
       renderGaps:[],lastRender:null,stepsPerRender:[],lastRenderUpdates:null,
       updateCostSamples:[],renderCostSamples:[],
@@ -120,6 +120,15 @@ const origin='http://127.0.0.1:8765/';
       const ordinaryTrail=m.inBulletUpdate&&args[3]===1&&args[4]===20&&args[5]==='glow';
       if(ordinaryTrail){
        m.trailCandidates++;
+       if(trailMode!=='suppressed'){
+        // The canonical n=1 writer replaces exactly the next circular slot.
+        // Count displacement of still-live cues, not merely pool occupancy.
+        const victim=this.parts[this.partIdx];
+        if(victim?.active){
+         m.trailOverwrites++;
+         if(victim.kind==='ring'||victim.kind==='flash')m.trailCriticalOverwrites++;
+        }
+       }
        if(trailMode==='suppressed'){
         // The canonical one-particle glow consumes four cosmetic draws.
         // Preserve its isolated RNG sequence without creating a visual particle.
@@ -223,7 +232,9 @@ const origin='http://127.0.0.1:8765/';
        bulletSeconds:m.bulletSeconds,bulletVfxCalls:m.bulletVfxCalls,
        bulletVfxParticles:m.bulletVfxParticles,
        trailCandidates:m.trailCandidates,suppressedTrails:m.suppressedTrails,
+       trailOverwrites:m.trailOverwrites,trailCriticalOverwrites:m.trailCriticalOverwrites,
        activeParticles:g.parts.filter(p=>p.active).length,
+       quality:g.quality,particlePoolCapacity:g.parts.length,
        gaps:m.frameGaps.length,dispatchLags:m.rafDispatchLags.length,
        renderGaps:m.renderGaps.length,
        stepsPerRender:m.stepsPerRender.length,
@@ -247,7 +258,9 @@ const origin='http://127.0.0.1:8765/';
        bulletSeconds:m.bulletSeconds,bulletVfxCalls:m.bulletVfxCalls,
        bulletVfxParticles:m.bulletVfxParticles,
        trailCandidates:m.trailCandidates,suppressedTrails:m.suppressedTrails,
+       trailOverwrites:m.trailOverwrites,trailCriticalOverwrites:m.trailCriticalOverwrites,
        activeParticles:g.parts.filter(p=>p.active).length,
+       quality:g.quality,particlePoolCapacity:g.parts.length,
        gaps:m.frameGaps.length,ticks:g.__novaFixed60Pilot?.owner.ticks||0,
        droppedMs:g.__novaFixed60Pilot?.owner.droppedMs||0,
        frameGaps:m.frameGaps.slice(gapStart),
@@ -317,6 +330,9 @@ const origin='http://127.0.0.1:8765/';
      // when the world has different heat, targets, or startup histories.
      const result={repeat,renderScale,fixed60,trailMode,throttle,wallMs,
       trailCandidates:delta('trailCandidates'),suppressedTrails:delta('suppressedTrails'),
+      trailOverwrites:delta('trailOverwrites'),
+      trailCriticalOverwrites:delta('trailCriticalOverwrites'),
+      quality:after.quality,particlePoolCapacity:after.particlePoolCapacity,
       activeParticles:after.activeParticles,
       longTaskSupported:after.longTaskSupported,
       longTaskCount:longTasks.length,longTaskTotalMs,longTaskMaxMs,
@@ -362,6 +378,11 @@ const origin='http://127.0.0.1:8765/';
       Number.isFinite(result.updatePlusRenderP95Ms) &&
       Number.isFinite(result.bulletWorkMs) && Number.isFinite(result.collisionWorkMs) &&
       Number.isFinite(result.bulletVfxCallsPerBulletSecond) &&
+      Number.isInteger(result.trailOverwrites) &&
+      Number.isInteger(result.trailCriticalOverwrites) &&
+      result.trailCriticalOverwrites<=result.trailOverwrites &&
+      result.trailOverwrites<=result.trailCandidates &&
+      result.particlePoolCapacity>0 &&
       Number.isFinite(result.bulletVfxParticlesPerBulletSecond) &&
       result.renderGapSamples>0 && Number.isFinite(result.renderGapP95Ms) &&
       Number.isFinite(result.dispatchLagP95Ms) && Number.isFinite(result.dispatchLagMaxMs) &&
