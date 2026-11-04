@@ -160,8 +160,8 @@ const {chromium}=require('playwright');
       'controlled foreground stall must exercise dropped-frame recovery');
      assert.equal(stallAfter.held,true,
       'held touch must survive a 130ms foreground RAF stall without new pointerdown');
-     assert.equal(stallAfter.stickId,17,
-      'foreground stall must retain original touch-stick ownership');
+     assert.equal(stallAfter.stickId,touchState.stickId,
+      'foreground stall must retain browser-assigned touch-stick ownership');
 
      await page.evaluate(()=>{
       document.addEventListener('pointerup',e=>{
