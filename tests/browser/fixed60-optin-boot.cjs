@@ -135,6 +135,31 @@ const {chromium}=require('playwright');
      console.log('NOVA_FIXED60_TOUCH_DIAGNOSTIC '+JSON.stringify(touchState));
      assert.equal(touchState.move,true,
       'touch movement reaches fixed60 simulation: '+JSON.stringify(touchState));
+     // Real composed browser regression: a brief blocked foreground main
+     // thread must not silently discard a finger that is still down.
+     // The queued touchEnd below also checks release after recovery.
+     const stallBefore=await page.evaluate(()=>{
+      const o=window.__novaFixed60Game.__novaFixed60Pilot.owner;
+      return {dropped:o.droppedFrames,ticks:o.ticks};
+     });
+     await page.evaluate(()=>{
+      const until=performance.now()+130;
+      while(performance.now()<until){} // deliberately block one foreground RAF
+     });
+     await page.waitForTimeout(90);
+     const stallAfter=await page.evaluate(()=>{
+      const g=window.__novaFixed60Game,o=g.__novaFixed60Pilot.owner;
+      return {held:g.input.move.active,stickId:g.input.stickId.move,
+       dropped:o.droppedFrames,ticks:o.ticks,started:o.started};
+     });
+     assert.equal(stallAfter.started,true,'pilot must survive foreground RAF stall');
+     assert.ok(stallAfter.dropped>stallBefore.dropped,
+      'controlled foreground stall must exercise dropped-frame recovery');
+     assert.equal(stallAfter.held,true,
+      'held touch must survive a 130ms foreground RAF stall without new pointerdown');
+     assert.equal(stallAfter.stickId,17,
+      'foreground stall must retain original touch-stick ownership');
+
      await page.evaluate(()=>{
       document.addEventListener('pointerup',e=>{
        if(e.pointerType==='touch' && window.__novaInputLatency.upAt===undefined)
