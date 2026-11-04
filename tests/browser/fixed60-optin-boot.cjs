@@ -9,6 +9,11 @@ const {chromium}=require('playwright');
   for(const enabled of [false,true]){
    const context=await browser.newContext({viewport:{width:800,height:600},hasTouch:enabled,isMobile:false});
    const page=await context.newPage(),errors=[];
+   const researchRequests=[];
+   page.on('request',request=>{
+    if(new URL(request.url()).pathname.endsWith('/nova-updates/fixed60-research-browser.js'))
+     researchRequests.push(request.url());
+   });
    page.on('pageerror',error=>errors.push(String(error.stack||error)));
    try{
     const url='http://127.0.0.1:8765/'+(enabled?'?nova_fixed60=pilot':'');
@@ -45,6 +50,8 @@ const {chromium}=require('playwright');
     }));
     assert.equal(boot.ready,true,'actual pilot boot failed: '+JSON.stringify(boot));
     assert.equal(boot.hasPilot,enabled,'default boot must not initialize fixed60 research modules');
+    assert.equal(researchRequests.length,enabled?1:0,
+     'ordinary startup must not fetch the optional fixed60 research bundle; pilot must fetch exactly once');
     await page.waitForTimeout(600);
     const initial=await page.evaluate(()=>{
      const g=window.__novaFixed60Game,p=g.__novaFixed60Pilot;
