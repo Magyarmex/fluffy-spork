@@ -320,6 +320,44 @@ const {chromium}=require('playwright');
     console.log('NOVA_FIXED60_BOOT '+JSON.stringify({enabled,initial}));
    }finally{await context.close()}
   }
+  // Optional pilot outage must not degrade the ordinary playable game.
+  // This is a real browser network failure, not just a source-level parser check.
+  {
+   const context=await browser.newContext({viewport:{width:800,height:600}});
+   const page=await context.newPage();
+   let researchRequests=0;
+   try{
+    await page.route('**/fixed60-research-browser.js',route=>{
+     researchRequests++;
+     return route.abort();
+    });
+    await page.goto('http://127.0.0.1:8765/',
+     {waitUntil:'domcontentloaded',timeout:45000});
+    const deploy=page.getByRole('button',{name:/DEPLOY/i}).first();
+    await deploy.waitFor({state:'visible',timeout:45000});
+    await page.evaluate(()=>{
+     const Game=window.__novaMakeRequire('')('game/engine').Game;
+     const original=Game.prototype.start;
+     Game.prototype.start=function(){
+      if(!this.__novaDecorativeWorld)window.__novaOutageDefaultGame=this;
+      return original.apply(this,arguments);
+     };
+    });
+    await deploy.click();
+    await page.waitForFunction(()=>window.__novaOutageDefaultGame?.status==='playing',
+     null,{timeout:15000});
+    const state=await page.evaluate(()=>{
+     const g=window.__novaOutageDefaultGame;
+     return {playing:g.status==='playing',raf:!!g.raf,
+      pilot:!!g.__novaFixed60Pilot,research:!!window.__novaFixed60Research};
+    });
+    assert.deepEqual(state,{playing:true,raf:true,pilot:false,research:false},
+     'ordinary Game must boot under pilot-bundle network outage');
+    assert.equal(researchRequests,0,
+     'default path must never request unavailable optional research bytes');
+    await page.evaluate(()=>window.__novaOutageDefaultGame.destroy());
+   }finally{await context.close()}
+  }
   // A missing experimental bundle must recover to the menu, never launch
   // an unannounced production-rate match under the pilot query flag.
   const context=await browser.newContext({viewport:{width:800,height:600}});
