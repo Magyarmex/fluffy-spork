@@ -43,10 +43,10 @@ function trial(seed,hz){
  });
 }
 
-test('research: composed Tempest projectile VFX timebase at 30/60Hz',()=>{
+test('research: composed Tempest projectile VFX timebase at 30/60/120Hz',()=>{
  const observations=[];
  for(const seed of [1517800,1517802,1517804])
-  for(const hz of [30,60])observations.push(trial(seed,hz));
+  for(const hz of [30,60,120])observations.push(trial(seed,hz));
  for(const row of observations){
   assert.ok(Number.isFinite(row.callsPerBulletSecond));
   assert.ok(Number.isFinite(row.particlesPerBulletSecond));
@@ -55,9 +55,11 @@ test('research: composed Tempest projectile VFX timebase at 30/60Hz',()=>{
  const mean=(rows,key)=>rows.reduce((n,x)=>n+x[key],0)/rows.length;
  const rate30=mean(byHz(30),'callsPerBulletSecond');
  const rate60=mean(byHz(60),'callsPerBulletSecond');
+ const rate120=mean(byHz(120),'callsPerBulletSecond');
  console.log('NOVA_PROJECTILE_TRAIL_TIMEBASE '+JSON.stringify({
-  rate30,rate60,ratio60to30:rate60/rate30,observations,
+  rate30,rate60,rate120,ratio60to30:rate60/rate30,
+  ratio120to60:rate120/rate60,observations,
   caveat:'Independently evolving seeded combat, not paired deterministic replay; includes all addParticles calls inside updateBullets, not only ordinary trails.'
  }));
- assert.ok(rate30>0&&rate60>0);
+ assert.ok(rate30>0&&rate60>0&&rate120>0);
 });
