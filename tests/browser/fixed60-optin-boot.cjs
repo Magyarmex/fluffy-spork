@@ -597,6 +597,42 @@ const {chromium}=require('playwright');
     console.log('NOVA_FIXED60_MOBILE_VIEWPORT '+JSON.stringify(state));
    }finally{await context.close()}
   }
+  // Actual materialized-game smoke for the explicit research-only catch-up
+  // budget. This must not change the ordinary pilot's four-step default.
+  {
+   const context=await browser.newContext({viewport:{width:800,height:600}});
+   const page=await context.newPage(),errors=[];
+   page.on('pageerror',error=>errors.push(String(error)));
+   try{
+    await page.goto('http://127.0.0.1:8765/?nova_fixed60=pilot&nova_fixed60_steps=3',
+     {waitUntil:'domcontentloaded',timeout:45000});
+    const deploy=page.getByRole('button',{name:/DEPLOY/i}).first();
+    await deploy.waitFor({state:'visible',timeout:20000});
+    await page.evaluate(()=>{
+     const Game=window.__novaMakeRequire('')('game/engine').Game;
+     const start=Game.prototype.start;
+     Game.prototype.start=function(){
+      if(!this.__novaDecorativeWorld)window.__novaThreeStepGame=this;
+      return start.apply(this,arguments);
+     };
+    });
+    await deploy.click();
+    await page.waitForFunction(()=>{
+     const g=window.__novaThreeStepGame;
+     return g?.status==='playing'&&g.__novaFixed60Pilot?.owner.ticks>5;
+    },null,{timeout:20000});
+    const state=await page.evaluate(()=>{
+     const g=window.__novaThreeStepGame,o=g.__novaFixed60Pilot.owner;
+     return {budget:o.maxSteps,ticks:o.ticks,raf:g.raf||0,started:o.started};
+    });
+    assert.equal(state.budget,3,'three-step query must reach the actual browser owner');
+    assert.equal(state.raf,0,'research budget must not create a second RAF');
+    assert.ok(state.started&&state.ticks>5,'three-step pilot must advance real Game');
+    assert.deepEqual(errors,[],'three-step browser pilot must not throw');
+    await page.evaluate(()=>window.__novaThreeStepGame.destroy());
+    console.log('NOVA_FIXED60_THREE_STEP_BOOT '+JSON.stringify(state));
+   }finally{await context.close()}
+  }
   // A missing experimental bundle must recover to the menu, never launch
   // an unannounced production-rate match under the pilot query flag.
   const context=await browser.newContext({viewport:{width:800,height:600}});
