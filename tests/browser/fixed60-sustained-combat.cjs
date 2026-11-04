@@ -330,6 +330,27 @@ const origin='http://127.0.0.1:8765/';
     assert.ok(typeof value==='number'&&Number.isFinite(value),
      'combat comparison must not silently serialize invalid '+key+' as null');
   }
+  // Aggregate means can conceal opposite outcomes in independent Battlefield
+  // worlds. Keep each within-layout, within-throttle pair visible; this is
+  // descriptive evidence, not a deterministic A/B or a release threshold.
+  const paired=[];
+  for(const repeat of [0,1])for(const throttle of [1,3,6]){
+   const baseline=observations.find(x=>x.repeat===repeat&&x.throttle===throttle&&!x.fixed60);
+   const pilot=observations.find(x=>x.repeat===repeat&&x.throttle===throttle&&x.fixed60);
+   assert.ok(baseline&&pilot&&baseline.layout===pilot.layout,
+    'paired scheduler trials must share the same real Battlefield layout');
+   paired.push({repeat,throttle,layout:baseline.layout,
+    baselinePresentationFps:baseline.presentationFps,
+    fixed60PresentationFps:pilot.presentationFps,
+    presentationFpsDelta:pilot.presentationFps-baseline.presentationFps,
+    baselineRenderGapP95Ms:baseline.renderGapP95Ms,
+    fixed60RenderGapP95Ms:pilot.renderGapP95Ms,
+    renderGapP95DeltaMs:pilot.renderGapP95Ms-baseline.renderGapP95Ms,
+    simulatedTimeRatioDelta:pilot.simulatedTimeRatio-baseline.simulatedTimeRatio,
+    projectilesPerSimSecondDelta:pilot.projectilesPerSimSecond-baseline.projectilesPerSimSecond});
+  }
+  assert.equal(paired.length,6,'all counterbalanced layout/load pairs must be reported');
+  console.log('NOVA_FIXED60_COMBAT_PAIRED '+JSON.stringify(paired));
   console.log('NOVA_FIXED60_COMBAT_COMPARISON '+JSON.stringify(summaries));
   console.log('NOVA_FIXED60_SUSTAINED_COMBAT '+JSON.stringify(observations));
  }finally{await browser.close()}
