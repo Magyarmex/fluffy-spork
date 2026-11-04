@@ -66,7 +66,7 @@ const origin='http://127.0.0.1:8765/';
       updates:0,simMs:0,updateWorkMs:0,renders:0,renderWorkMs:0,
       minimaps:0,minimapWorkMs:0,projectiles:0,fireCalls:0,
       bulletWorkMs:0,collisionWorkMs:0,
-      frameGaps:[],lastFrame:null,frames:0,active:true,
+      frameGaps:[],rafDispatchLags:[],lastFrame:null,frames:0,active:true,
       renderGaps:[],lastRender:null,stepsPerRender:[],lastRenderUpdates:null,
       updateCostSamples:[],renderCostSamples:[],
       updatePlusRenderSamples:[],lastRenderUpdateWorkMs:null,
@@ -140,6 +140,9 @@ const origin='http://127.0.0.1:8765/';
      const frame=at=>{
       if(!m.active)return;
       if(m.lastFrame!==null)m.frameGaps.push(at-m.lastFrame);
+      // RAF timestamp and performance.now share the browser time origin.
+      // Dispatch lag distinguishes delayed callbacks from sparse RAF scheduling.
+      m.rafDispatchLags.push(Math.max(0,performance.now()-at));
       m.lastFrame=at;m.frames++;
       requestAnimationFrame(frame);
      };
@@ -165,7 +168,8 @@ const origin='http://127.0.0.1:8765/';
        minimaps:m.minimaps,minimapWork:m.minimapWorkMs,
        projectiles:m.projectiles,fireCalls:m.fireCalls,frames:m.frames,
        bulletWorkMs:m.bulletWorkMs,collisionWorkMs:m.collisionWorkMs,
-       gaps:m.frameGaps.length,renderGaps:m.renderGaps.length,
+       gaps:m.frameGaps.length,dispatchLags:m.rafDispatchLags.length,
+       renderGaps:m.renderGaps.length,
        stepsPerRender:m.stepsPerRender.length,
        updateCosts:m.updateCostSamples.length,renderCosts:m.renderCostSamples.length,
        updatePlusRender:m.updatePlusRenderSamples.length,
@@ -173,7 +177,7 @@ const origin='http://127.0.0.1:8765/';
        droppedMs:g.__novaFixed60Pilot?.owner.droppedMs||0};
      });
      await page.waitForTimeout(3000);
-     const after=await page.evaluate(({gapStart,renderGapStart,stepsStart,updateCostStart,renderCostStart,updatePlusRenderStart})=>{
+     const after=await page.evaluate(({gapStart,dispatchLagStart,renderGapStart,stepsStart,updateCostStart,renderCostStart,updatePlusRenderStart})=>{
       const m=window.__novaCombatBench,g=window.__novaCombatBenchGame;
       if(m.longTaskObserver)for(const entry of m.longTaskObserver.takeRecords())
        m.longTasks.push({start:entry.startTime,duration:entry.duration});
@@ -187,6 +191,7 @@ const origin='http://127.0.0.1:8765/';
        gaps:m.frameGaps.length,ticks:g.__novaFixed60Pilot?.owner.ticks||0,
        droppedMs:g.__novaFixed60Pilot?.owner.droppedMs||0,
        frameGaps:m.frameGaps.slice(gapStart),
+       rafDispatchLags:m.rafDispatchLags.slice(dispatchLagStart),
        renderGaps:m.renderGaps.slice(renderGapStart),
        stepsPerRender:m.stepsPerRender.slice(stepsStart),
        updateCostSamples:m.updateCostSamples.slice(updateCostStart),
@@ -198,7 +203,8 @@ const origin='http://127.0.0.1:8765/';
        entityCounts:{tanks:g.tanks?.length||0,drones:g.drones?.length||0,
         bullets:g.bullets?.length||0,shapes:g.shapes?.length||0},
        layout:g.__novaBattlefield?.name||null};
-     },{gapStart:before.gaps,renderGapStart:before.renderGaps,
+     },{gapStart:before.gaps,dispatchLagStart:before.dispatchLags,
+       renderGapStart:before.renderGaps,
        stepsStart:before.stepsPerRender,
        updateCostStart:before.updateCosts,renderCostStart:before.renderCosts,
        updatePlusRenderStart:before.updatePlusRender});
@@ -215,6 +221,10 @@ const origin='http://127.0.0.1:8765/';
      const gaps=after.frameGaps;
      const sorted=gaps.slice().sort((a,b)=>a-b);
      const p95=sorted.length?sorted[Math.ceil(.95*sorted.length)-1]:null;
+     const dispatchLags=after.rafDispatchLags;
+     const dispatchLagP95Ms=dispatchLags.length?
+      dispatchLags.slice().sort((a,b)=>a-b)[Math.ceil(.95*dispatchLags.length)-1]:null;
+     const dispatchLagMaxMs=dispatchLags.length?Math.max(...dispatchLags):null;
      const renderGaps=after.renderGaps;
      const sortedRenderGaps=renderGaps.slice().sort((a,b)=>a-b);
      const renderGapP95Ms=sortedRenderGaps.length?
@@ -252,6 +262,7 @@ const origin='http://127.0.0.1:8765/';
       collisionWorkMs:delta('collisionWorkMs'),minimaps:delta('minimaps'),
       minimapWorkMs:delta('minimapWork'),projectiles,
       fireCalls:delta('fireCalls'),frames,frameGapP95Ms:p95,
+      dispatchLagP95Ms,dispatchLagMaxMs,
       frameGapSamples:gaps.length,
       renderGapP95Ms,renderGapMaxMs,renderGapSamples:renderGaps.length,
       renderGapsOver50Ms:renderGaps.filter(ms=>ms>50).length,
@@ -282,6 +293,7 @@ const origin='http://127.0.0.1:8765/';
       Number.isFinite(result.updatePlusRenderP95Ms) &&
       Number.isFinite(result.bulletWorkMs) && Number.isFinite(result.collisionWorkMs) &&
       result.renderGapSamples>0 && Number.isFinite(result.renderGapP95Ms) &&
+      Number.isFinite(result.dispatchLagP95Ms) && Number.isFinite(result.dispatchLagMaxMs) &&
       Number.isFinite(result.stepsPerRenderP95),
       'real composed combat and renderer must advance');
      assert.equal(typeof result.longTaskSupported,'boolean',
@@ -354,6 +366,8 @@ const origin='http://127.0.0.1:8765/';
     fixed60LongTaskTotalMs:mean(pilot,'longTaskTotalMs'),
     baselineLongTaskMaxMs:mean(baseline,'longTaskMaxMs'),
     fixed60LongTaskMaxMs:mean(pilot,'longTaskMaxMs'),
+    baselineDispatchLagP95Ms:mean(baseline,'dispatchLagP95Ms'),
+    fixed60DispatchLagP95Ms:mean(pilot,'dispatchLagP95Ms'),
     baselineRenderGapP95Ms:mean(baseline,'renderGapP95Ms'),
     fixed60RenderGapP95Ms:mean(pilot,'renderGapP95Ms'),
     baselineRenderGapMaxMs:mean(baseline,'renderGapMaxMs'),
@@ -407,6 +421,8 @@ const origin='http://127.0.0.1:8765/';
     baselinePresentationFps:baseline.presentationFps,
     fixed60PresentationFps:pilot.presentationFps,
     presentationFpsDelta:pilot.presentationFps-baseline.presentationFps,
+    baselineDispatchLagP95Ms:baseline.dispatchLagP95Ms,
+    fixed60DispatchLagP95Ms:pilot.dispatchLagP95Ms,
     baselineObserverGapP95Ms:baseline.frameGapP95Ms,
     fixed60ObserverGapP95Ms:pilot.frameGapP95Ms,
     observerGapP95DeltaMs:pilot.frameGapP95Ms-baseline.frameGapP95Ms,
