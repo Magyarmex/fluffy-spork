@@ -106,6 +106,36 @@ const {chromium}=require('playwright');
        ownerTicks:window.__novaFixed60Game?.__novaFixed60Pilot?.owner.ticks
       }))}));
      assert.ok(resumed.ticks>initial.ticks);
+     // The real Game -> React evolution offer must pause the chronological
+     // owner, preserve the player's choice, then resume that SAME owner.
+     // A green pause-button test alone cannot validate this lifecycle.
+     const beforeOffer=await page.evaluate(()=>{
+      const g=window.__novaFixed60Game;
+      const ticks=g.__novaFixed60Pilot.owner.ticks;
+      g.pendingOffer=1;g.openOffer();
+      return ticks;
+     });
+     const evolution=page.getByText('EVOLVE — CHOOSE YOUR PATH',{exact:true});
+     await evolution.waitFor({state:'visible',timeout:8000});
+     const duringOffer=await page.evaluate(()=>{
+      const g=window.__novaFixed60Game,p=g.__novaFixed60Pilot;
+      return {paused:g.paused,ownerPaused:p.owner.paused,
+       started:p.owner.started,capture:p.capture.active,raf:g.raf||0};
+     });
+     assert.equal(duringOffer.paused,true,'real evolution offer pauses Game');
+     assert.equal(duringOffer.started,true,'offer must not destroy fixed60 owner');
+     assert.equal(duringOffer.raf,0,'offer must not start production RAF');
+     await evolution.locator('xpath=..').getByRole('button',{name:/DECIDE LATER/i}).click();
+     await evolution.waitFor({state:'detached',timeout:8000});
+     await page.waitForFunction(before=>{
+      const g=window.__novaFixed60Game,p=g?.__novaFixed60Pilot;
+      return g&&!g.paused&&p?.owner.started&&p.capture.active&&
+       p.owner.ticks>before&&!g.raf;
+     },beforeOffer,{timeout:8000});
+     console.log('NOVA_FIXED60_EVOLUTION_LIFECYCLE '+JSON.stringify({
+      duringOffer,afterTicks:await page.evaluate(()=>
+       window.__novaFixed60Game.__novaFixed60Pilot.owner.ticks)
+     }));
      const canvas=page.locator('canvas.absolute.inset-0');
      const box=await canvas.boundingBox();
      assert.ok(box&&box.width>200);
