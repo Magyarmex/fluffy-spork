@@ -96,6 +96,9 @@ class FixedStepRafOwner {
     if(!Number.isFinite(at)||at<this.lastMs-EPS)throw Error('invalid pause clock');
     this.timeline.reset();this.lagMs=0;this.paused=paused;
     this.lastMs=at;this.simAtSec=(at-this.bridge.startMs)/1000;
+    // Like startup, a pause transition can sample performance.now() after
+    // the current RAF frame began. Allow one bounded initial timestamp skew.
+    this._awaitingForwardFrame=true;
     this.timeline.consumeThrough(this.simAtSec);
   }
   frame(ts){
