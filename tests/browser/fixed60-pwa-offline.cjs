@@ -163,10 +163,22 @@ const origin = 'http://127.0.0.1:8765/';
     };
    });
    await onlineDeploy.click();
-   await page.waitForFunction(()=>{
-    const g=window.__novaOnlinePilotGame;
-    return g?.status==='playing' && g.__novaFixed60Pilot?.owner.ticks>5;
-   },null,{timeout:15000});
+   try{
+    await page.waitForFunction(()=>{
+     const g=window.__novaOnlinePilotGame;
+     return g?.status==='playing' && g.__novaFixed60Pilot?.owner.ticks>5;
+    },null,{timeout:15000});
+   }catch(error){
+    const diagnostic=await page.evaluate(()=>{
+     const g=window.__novaOnlinePilotGame,p=g?.__novaFixed60Pilot;
+     return {hasGame:!!g,status:g?.status,hasPilot:!!p,
+      started:p?.owner.started,ticks:p?.owner.ticks,
+      raf:g?.raf||0,research:!!window.__novaFixed60Research,
+      menu:!!document.querySelector('#root .menu-grid-bg'),
+      online:navigator.onLine,controlled:!!navigator.serviceWorker.controller};
+    });
+    throw Error('reconnected pilot did not start: '+JSON.stringify({diagnostic,errors,cause:String(error)}));
+   }
    const online=await page.evaluate(()=>{
     const g=window.__novaOnlinePilotGame;
     const result={ticks:g.__novaFixed60Pilot.owner.ticks,productionRAF:g.raf||0};
