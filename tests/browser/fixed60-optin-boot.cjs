@@ -657,6 +657,14 @@ const {chromium}=require('playwright');
       g.player.hp=1000000;
       g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
       g.input.firing=true;g.input.autofire=false;
+      window.__novaBudgetProjectiles=0;
+      const fire=g.tryFire;
+      g.tryFire=function(tank){
+       const before=this.bullets.length;
+       try{return fire.apply(this,arguments)}
+       finally{if(tank===this.player)
+        window.__novaBudgetProjectiles+=Math.max(0,this.bullets.length-before)}
+      };
       if(o.maxSteps!==Number(new URLSearchParams(location.search).get('nova_fixed60_steps')))
        throw Error('research step budget did not reach actual owner');
       if(g.raf)throw Error('production RAF co-owns pilot Game');
@@ -670,13 +678,14 @@ const {chromium}=require('playwright');
       };
       return {at:performance.now(),ticks:o.ticks,droppedMs:o.droppedMs,
        renders:window.__novaStepBudgetRenders,
-       world:g.__novaBudgetWorld};
+       projectiles:window.__novaBudgetProjectiles,world:g.__novaBudgetWorld};
      });
      await page.waitForTimeout(3000);
      const measured=await page.evaluate(()=>{
       const g=window.__novaStepBudgetGame,o=g.__novaFixed60Pilot.owner;
       return {at:performance.now(),ticks:o.ticks,droppedMs:o.droppedMs,
-       renders:window.__novaStepBudgetRenders,started:o.started,
+       renders:window.__novaStepBudgetRenders,
+       projectiles:window.__novaBudgetProjectiles,started:o.started,
        paused:g.paused,raf:g.raf||0};
      });
      const wallMs=measured.at-initial.at;
@@ -684,9 +693,11 @@ const {chromium}=require('playwright');
       ticks:measured.ticks-initial.ticks,
       droppedMs:measured.droppedMs-initial.droppedMs,
       renders:measured.renders-initial.renders,
+      projectiles:measured.projectiles-initial.projectiles,
       fps:(measured.renders-initial.renders)*1000/wallMs,
       simulatedTimeRatio:(measured.ticks-initial.ticks)*(1000/60)/wallMs};
-     assert.ok(wallMs>=2500&&observation.ticks>0&&observation.renders>0,
+     assert.ok(wallMs>=2500&&observation.ticks>0&&observation.renders>0&&
+      observation.projectiles>0,
       'both research budgets must advance actual combat and presentation');
      assert.ok(measured.started&&!measured.paused&&!measured.raf,
       'budget experiment must retain exclusive active Game ownership');
