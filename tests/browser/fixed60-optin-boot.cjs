@@ -93,7 +93,13 @@ const {chromium}=require('playwright');
        active:g.__novaFixed60Pilot.capture.active};
      });
      assert.equal(resumed.paused,false);
-     assert.equal(resumed.active,true);
+     assert.equal(resumed.active,true,'pilot lost input capture during pause/resume: '+
+      JSON.stringify({resumed,errors,diagnostics:await page.evaluate(()=>({
+       bootErrors:window.__novaBootDiagnostics,
+       ownerStarted:window.__novaFixed60Game?.__novaFixed60Pilot?.owner.started,
+       ownerLastMs:window.__novaFixed60Game?.__novaFixed60Pilot?.owner.lastMs,
+       ownerTicks:window.__novaFixed60Game?.__novaFixed60Pilot?.owner.ticks
+      }))}));
      assert.ok(resumed.ticks>initial.ticks);
      const canvas=page.locator('canvas.absolute.inset-0');
      const box=await canvas.boundingBox();
