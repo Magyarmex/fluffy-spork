@@ -90,7 +90,7 @@ test('pilot loads optional bundle only on explicit query and installs guard firs
  assert.deepEqual(ordinary.writes,[]);
  const pilot=boot('?nova_fixed60=pilot',{missingApi:true});
  assert.equal(pilot.writes.length,1);
- assert.match(pilot.writes[0],/fixed60-research-browser\\.js/);
+ assert.match(pilot.writes[0],/fixed60-research-browser\.js/);
  const sw=fs.readFileSync(path.join(root,'sw.js'),'utf8');
  assert.match(sw,/discoverCriticalAssets/);
  assert.equal(sw.includes("'./nova-updates/fixed60-research-browser.js'"),false,
