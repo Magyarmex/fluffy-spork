@@ -96,11 +96,14 @@ const origin = 'http://127.0.0.1:8765/';
      return start.apply(this,arguments);
     };
    });
+   // The menu is visible before deployment; it cannot count as successful
+   // fail-closed recovery until the real Game.start was actually attempted.
    await deploy.click();
    await page.waitForFunction(()=>{
     const g=window.__novaOfflinePilotGame;
+    if(!g)return false;
     return !!document.querySelector('#root .menu-grid-bg') ||
-     (g?.status==='playing' && g.__novaFixed60Pilot?.owner.ticks>5);
+     (g.status==='playing' && g.__novaFixed60Pilot?.owner.ticks>5);
    },null,{timeout:20000});
    const pilot=await page.evaluate(()=>{
     const g=window.__novaOfflinePilotGame,p=g?.__novaFixed60Pilot;
