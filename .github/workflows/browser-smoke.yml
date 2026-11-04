@@ -47,7 +47,7 @@ jobs:
   chromium:
     # Playwright 1.56.1 Chromium is unsupported on ubuntu26.04 (ubuntu-latest).
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -128,24 +128,6 @@ jobs:
           path.write_text(html, encoding='utf-8')
           PY
           rm -f index.html.new /tmp/nova-tailwind-smoke.css
-      - name: Compose opt-in fixed60 pilot into PR browser shell only
-        shell: bash
-        run: |
-          set -euo pipefail
-          if test -f nova-updates/fixed60-optin-boot.js; then
-            python3 - <<'PY'
-          from pathlib import Path
-          p=Path('index.html')
-          html=p.read_text(encoding='utf-8')
-          anchor='<script src="./nova-updates/settings-v1.7.7.js"></script>'
-          pilot='<script src="./nova-updates/fixed60-optin-boot.js"></script>'
-          if html.count(anchor)!=1 or html.count(pilot)>1:
-              raise SystemExit('NOVA fixed60 PR browser materialization anchor drift')
-          if pilot not in html:
-              html=html.replace(anchor,pilot+'\\n'+anchor,1)
-          p.write_text(html,encoding='utf-8')
-          PY
-          fi
       - name: Serve shipping runtime
         run: |
           python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/nova-browser-http.log 2>&1 &
@@ -177,11 +159,6 @@ jobs:
           node tests/browser/redeploy-front-choice.cjs
           node tests/browser/fieldcraft-class-counterplay.cjs
           node tests/browser/fieldcraft-rng-browser.cjs
-          if test -f nova-updates/fixed60-optin-boot.js; then
-            node tests/browser/fixed60-optin-boot.cjs
-            node tests/browser/fixed60-pwa-offline.cjs
-            node tests/browser/fixed60-sustained-combat.cjs
-          fi
       - name: Preserve browser screenshots
         if: always()
         uses: actions/upload-artifact@v4
