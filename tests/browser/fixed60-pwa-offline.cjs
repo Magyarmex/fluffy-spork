@@ -80,34 +80,50 @@ const origin = 'http://127.0.0.1:8765/';
    const restored=await page.goto(origin,{waitUntil:'domcontentloaded',timeout:45000});
    assert.equal(restored.status(),200,'restored mandatory runtime must recover offline shell');
    await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({state:'visible',timeout:20000});
-   // Pilot bundle is deliberately optional and absent offline. It must fail
-   // closed to the menu instead of secretly launching a normal-rate match.
+   // Optional pilot bytes are NOT mandatory in the staged build. Browser
+   // HTTP caches or service-worker fetch behavior may nevertheless supply
+   // them while network emulation is offline. Both outcomes are legitimate:
+   // a real exclusive fixed60 pilot, or a fail-closed menu. Never a silent
+   // production-RAF match under the explicit pilot flag.
    await page.goto(origin+'?nova_fixed60=pilot',{waitUntil:'domcontentloaded',timeout:45000});
    const deploy=page.getByRole('button',{name:/DEPLOY/i}).first();
    await deploy.waitFor({state:'visible',timeout:20000});
+   await page.evaluate(()=>{
+    const Game=window.__novaMakeRequire('')('game/engine').Game;
+    const start=Game.prototype.start;
+    Game.prototype.start=function(){
+     if(!this.__novaDecorativeWorld)window.__novaOfflinePilotGame=this;
+     return start.apply(this,arguments);
+    };
+   });
    await deploy.click();
-   try{await deploy.waitFor({state:'visible',timeout:15000})}
-   catch(error){
-    const diagnostic=await page.evaluate(()=>({
-     readyState:document.readyState,
-     menu:!!document.querySelector('#root .menu-grid-bg'),
-     pilot:!!window.__novaFixed60Research,
-     bodyText:document.body?.innerText?.slice(0,1000),
-     loading:!!document.querySelector('.nv-loading'),
-     canvas:!!document.querySelector('canvas.absolute.inset-0'),
-     rootChildren:document.querySelector('#root')?.children.length
-    }));
-    console.error('NOVA_FIXED60_PWA_OFFLINE_PILOT_FAILURE '+JSON.stringify({diagnostic,errors}));
-    throw error;
+   await page.waitForFunction(()=>{
+    const g=window.__novaOfflinePilotGame;
+    return !!document.querySelector('#root .menu-grid-bg') ||
+     (g?.status==='playing' && g.__novaFixed60Pilot?.owner.ticks>5);
+   },null,{timeout:20000});
+   const pilot=await page.evaluate(()=>{
+    const g=window.__novaOfflinePilotGame,p=g?.__novaFixed60Pilot;
+    return {menu:!!document.querySelector('#root .menu-grid-bg'),
+     research:!!window.__novaFixed60Research,
+     playing:g?.status==='playing',pilot:!!p,
+     started:!!p?.owner.started,ticks:p?.owner.ticks||0,
+     productionRAF:g?.raf||0,
+     controlled:!!navigator.serviceWorker.controller,offline:!navigator.onLine};
+   });
+   assert.equal(pilot.controlled,true,'offline pilot navigation must remain SW-controlled');
+   assert.equal(pilot.offline,true,'browser must report offline for this test');
+   if(pilot.menu){
+    assert.equal(pilot.playing,false,'failed pilot must return to menu');
+    assert.equal(pilot.productionRAF,0,'failed pilot must never run production RAF');
+   }else{
+    assert.equal(pilot.pilot,true,'offline pilot gameplay must use fixed60 owner');
+    assert.equal(pilot.started,true,'offline fixed60 owner must be running');
+    assert.ok(pilot.ticks>5,'offline fixed60 must advance real Game');
+    assert.equal(pilot.productionRAF,0,'offline pilot must never start production RAF');
+    await page.evaluate(()=>window.__novaOfflinePilotGame.destroy());
    }
-   const pilot=await page.evaluate(()=>({
-    menu:!!document.querySelector('#root .menu-grid-bg'),
-    pilot:!!window.__novaFixed60Research,
-    gameplay:!!document.querySelector('canvas.absolute.inset-0')
-   }));
-   assert.equal(pilot.menu,true,'offline pilot without bundle must recover to menu');
-   assert.equal(pilot.pilot,false,'missing pilot bundle must not initialize research');
-   // A failed optional pilot boot must not corrupt the active offline shell.
+   // Either optional pilot outcome must not corrupt the active offline shell.
    await page.goto(origin,{waitUntil:'domcontentloaded',timeout:45000});
    await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({state:'visible',timeout:20000});
    // Reconnection should restore opt-in availability without changing the
