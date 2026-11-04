@@ -146,7 +146,10 @@ const {chromium}=require('playwright');
       const until=performance.now()+130;
       while(performance.now()<until){} // deliberately block one foreground RAF
      });
-     await page.waitForTimeout(90);
+     await page.waitForFunction(before=>{
+      const o=window.__novaFixed60Game?.__novaFixed60Pilot?.owner;
+      return o && o.droppedFrames>before;
+     },stallBefore.dropped,{timeout:3000,polling:'raf'});
      const stallAfter=await page.evaluate(()=>{
       const g=window.__novaFixed60Game,o=g.__novaFixed60Pilot.owner;
       return {held:g.input.move.active,stickId:g.input.stickId.move,
