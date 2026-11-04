@@ -303,6 +303,18 @@ const origin='http://127.0.0.1:8765/';
    assert.equal(new Set(worlds.map(x=>x.layout)).size,1,
     'scheduler comparisons within a repeat must share Battlefield layout');
   }
+  // Confirm the player's setting actually reduces rendered pixels while
+  // preserving the same tactical viewport. Otherwise an apparent performance
+  // improvement could be a test setup illusion rather than a game setting.
+  for(const repeat of [0,1])for(const fixed60 of [false,true]){
+   const hi=observations.find(x=>x.repeat===repeat&&x.fixed60===fixed60&&x.renderScale===100);
+   const lo=observations.find(x=>x.repeat===repeat&&x.fixed60===fixed60&&x.renderScale===67);
+   assert.ok(hi&&lo,'both clarity modes must be measured');
+   assert.deepEqual(lo.canvasCss,hi.canvasCss,
+    'Render clarity must not change CSS viewport or input geometry');
+   assert.ok(lo.canvasBacking[0]*lo.canvasBacking[1]<hi.canvasBacking[0]*hi.canvasBacking[1]*.55,
+    'reduced Render clarity must materially reduce backing pixel area');
+  }
   // Render clarity uses the shipped Pilot Console setting at fixed browser DPR.
   // Synthetic CPU throttling is not a physical Android acceptance gate.
   const summaries=[];
