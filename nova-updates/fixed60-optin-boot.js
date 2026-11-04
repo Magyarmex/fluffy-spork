@@ -14,8 +14,7 @@ if(!selected)return;
 // Explicit research-only catch-up budget for a falsifiable 3-vs-4 test.
 // Never persist this parameter or alter ordinary production startup.
 const stepBudget=new URLSearchParams(win.location.search).get('nova_fixed60_steps');
-if(stepBudget!==null && stepBudget!=='3' && stepBudget!=='4')
-  throw Error('fixed60 pilot requires a supported step budget');
+const invalidBudget=stepBudget!==null && stepBudget!=='3' && stepBudget!=='4';
 const maxSteps=stepBudget==='3'?3:4;
 const previous=mods['game/engine'];
 mods['game/engine']=function(module,exports,require){
@@ -26,6 +25,10 @@ mods['game/engine']=function(module,exports,require){
   if(typeof productionStart!=='function')
     throw Error('fixed60 pilot requires canonical Game.start');
   Game.prototype.start=function(){
+    // Reject invalid research parameters only AFTER installing the exclusive
+    // Game.start guard. Throwing at script evaluation would leave production
+    // Game.start untouched and could silently launch the wrong scheduler.
+    if(invalidBudget)throw Error('fixed60 pilot requires a supported step budget');
     const api=win.__novaFixed60Research;
     if(!api || typeof api.createFixedStepBrowserPilot!=='function')
       throw Error('fixed60 pilot requested but browser research bundle is missing');
