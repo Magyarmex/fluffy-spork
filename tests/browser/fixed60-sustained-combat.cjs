@@ -146,7 +146,6 @@ const origin='http://127.0.0.1:8765/';
        minimaps:m.minimaps,minimapWork:m.minimapWorkMs,
        projectiles:m.projectiles,fireCalls:m.fireCalls,frames:m.frames,
        bulletWorkMs:m.bulletWorkMs,collisionWorkMs:m.collisionWorkMs,
-       bulletWorkMs:m.bulletWorkMs,collisionWorkMs:m.collisionWorkMs,
        gaps:m.frameGaps.length,renderGaps:m.renderGaps.length,
        stepsPerRender:m.stepsPerRender.length,
        updateCosts:m.updateCostSamples.length,renderCosts:m.renderCostSamples.length,
@@ -162,6 +161,7 @@ const origin='http://127.0.0.1:8765/';
        renders:m.renders,renderWork:m.renderWorkMs,
        minimaps:m.minimaps,minimapWork:m.minimapWorkMs,
        projectiles:m.projectiles,fireCalls:m.fireCalls,frames:m.frames,
+       bulletWorkMs:m.bulletWorkMs,collisionWorkMs:m.collisionWorkMs,
        gaps:m.frameGaps.length,ticks:g.__novaFixed60Pilot?.owner.ticks||0,
        droppedMs:g.__novaFixed60Pilot?.owner.droppedMs||0,
        frameGaps:m.frameGaps.slice(gapStart),
@@ -235,6 +235,7 @@ const origin='http://127.0.0.1:8765/';
      assert.ok(result.updates>0 && result.simulatedMs>0 && result.renders>0 &&
       Number.isFinite(result.updateWorkMs) && Number.isFinite(result.renderWorkMs) &&
       Number.isFinite(result.updateCostP95Ms) && Number.isFinite(result.renderCostP95Ms) &&
+      Number.isFinite(result.bulletWorkMs) && Number.isFinite(result.collisionWorkMs) &&
       result.renderGapSamples>0 && Number.isFinite(result.renderGapP95Ms) &&
       Number.isFinite(result.stepsPerRenderP95),
       'real composed combat and renderer must advance');
