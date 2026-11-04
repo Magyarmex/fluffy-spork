@@ -502,11 +502,7 @@ class FixedStepRafOwner {
           // chronological edges through that boundary leaves the correct
           // held state for the first surviving simulation step.
           this.simAtSec+=skipped/1000;
-          const backlogEpoch=this._pauseEpoch;
           this.timeline.consumeThrough(this.simAtSec);
-          // The skipped input boundary may itself pause/resume Game.
-          // Invalidate backlog accumulated before that transition.
-          if(!this.started || this._pauseEpoch!==backlogEpoch)this.lagMs=0;
         }
       }
       while(this.lagMs+EPS>=STEP_MS && this.lastSteps<this.maxSteps && !g.paused && this.started){
