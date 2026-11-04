@@ -77,6 +77,11 @@ function patchCosmeticRng(html){
    if(old===expected&&newCount===0)part=part.split(before).join(after);
    else if(old===0&&newCount===expected){} // idempotent
    else if(old===expected&&newCount===expected&&after.includes(before)){} // guarded fallback contains original expression
+   else if(start==='    updateBullets('&&before==='else if (Math.random() < 0.22)'&&
+           count(part,'(!b.beam && dt < 1 / 60 ? 0.22 * Math.max(0, dt * 60) : 0.22)')===1&&
+           count(part,'(typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random())')>=2){}
+     // Materialized high-refresh ordinary-trail cap already uses cosmetic RNG.
+     // Keep legacy source migration intact; do not overwrite the new threshold.
    else {
     // Older materialized shells already contain the direct cosmetic call.
     // Upgrade them without weakening the canonical Game path; isolated
@@ -90,6 +95,20 @@ function patchCosmeticRng(html){
   }
   out=out.slice(0,a)+part+out.slice(b);
  }
+ // Rebuilds start from the compressed canonical shell, not checked-in index.html.
+ // Apply the high-refresh cap to that source as well; otherwise materialization
+ // silently removes the gameplay-safe cosmetic optimization.
+ const ordinaryLegacy='else if ((typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) < 0.22)';
+ const ordinaryCapped='else if ((typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) <\n                (!b.beam && dt < 1 / 60 ? 0.22 * Math.max(0, dt * 60) : 0.22))';
+ const ordinaryStart=out.indexOf('    updateBullets(');
+ const ordinaryEnd=out.indexOf('    splashAt(',ordinaryStart);
+ if(ordinaryStart<0||ordinaryEnd<ordinaryStart)throw Error('canonical projectile trail owner missing');
+ let ordinaryRegion=out.slice(ordinaryStart,ordinaryEnd);
+ if(count(ordinaryRegion,ordinaryCapped)===1&&count(ordinaryRegion,ordinaryLegacy)===0){} // already materialized
+ else if(count(ordinaryRegion,ordinaryLegacy)===1&&count(ordinaryRegion,ordinaryCapped)===0){
+  ordinaryRegion=ordinaryRegion.replace(ordinaryLegacy,ordinaryCapped);
+  out=out.slice(0,ordinaryStart)+ordinaryRegion+out.slice(ordinaryEnd);
+ }else throw Error('canonical projectile trail cap drift');
  const beforeRing='if (ah + bh > 40 || Math.random() < 0.18)';
  const afterRing='if (ah + bh > 40 || this.cosmeticRandom() < 0.18)';
  if(count(out,beforeRing)===1&&count(out,afterRing)===0)

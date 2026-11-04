@@ -22,7 +22,8 @@ test('cosmetic RNG patch is unique, idempotent and applies to canonical source a
  assert.equal(patched.split('    cosmeticRandom() {').length-1,1);
  assert.equal(patched.split('    cosmeticRnd(a = 1, b) {').length-1,1);
   assert.ok(patched.includes('if (b.beam && (typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) < 0.85)'));
-  assert.ok(patched.includes('else if ((typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) < 0.22)'));
+  assert.ok(patched.includes('else if ((typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) <\n                (!b.beam && dt < 1 / 60 ? 0.22 * Math.max(0, dt * 60) : 0.22))'),
+    'materialized cosmetic gate must preserve the >60Hz ordinary-trail cap');
  assert.match(patched,/g\.cosmeticRandom\(\) - 0\.5/);
  assert.match(patched,/Math\.random\(\) < 0\.004/,'gameplay AI strafe RNG must remain intact');
  assert.match(patched,/const spread = .*types_1\.rnd/,'weapon spread remains gameplay RNG');
