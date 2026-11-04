@@ -72,7 +72,33 @@ const origin = 'http://127.0.0.1:8765/';
    // A failed optional pilot boot must not corrupt the active offline shell.
    await page.goto(origin,{waitUntil:'domcontentloaded',timeout:45000});
    await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({state:'visible',timeout:20000});
-   console.log('NOVA_FIXED60_PWA_OFFLINE '+JSON.stringify({active:state.active.cacheName,cached,pilot,defaultRecovered:true}));
+   // Reconnection should restore opt-in availability without changing the
+   // validated offline default shell or promoting a partial research build.
+   await context.setOffline(false);
+   await page.goto(origin+'?nova_fixed60=pilot',{waitUntil:'domcontentloaded',timeout:45000});
+   const onlineDeploy=page.getByRole('button',{name:/DEPLOY/i}).first();
+   await onlineDeploy.waitFor({state:'visible',timeout:20000});
+   await page.evaluate(()=>{
+    const Game=window.__novaMakeRequire('')('game/engine').Game;
+    const start=Game.prototype.start;
+    Game.prototype.start=function(){
+     if(!this.__novaDecorativeWorld)window.__novaOnlinePilotGame=this;
+     return start.apply(this,arguments);
+    };
+   });
+   await onlineDeploy.click();
+   await page.waitForFunction(()=>{
+    const g=window.__novaOnlinePilotGame;
+    return g?.status==='playing' && g.__novaFixed60Pilot?.owner.ticks>5;
+   },null,{timeout:15000});
+   const online=await page.evaluate(()=>{
+    const g=window.__novaOnlinePilotGame;
+    const result={ticks:g.__novaFixed60Pilot.owner.ticks,productionRAF:g.raf||0};
+    g.destroy();
+    return result;
+   });
+   assert.equal(online.productionRAF,0,'reconnected pilot must own simulation exclusively');
+   console.log('NOVA_FIXED60_PWA_OFFLINE '+JSON.stringify({active:state.active.cacheName,cached,pilot,defaultRecovered:true,online}));
   }finally{await context.close()}
  }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});
