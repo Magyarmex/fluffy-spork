@@ -405,6 +405,11 @@ const {chromium}=require('playwright');
     const box=await canvas.boundingBox();
     assert.ok(box && box.width>=200 && box.height>=300,
      'mobile pilot must have a usable gameplay canvas');
+    const targetIsCanvas=await page.evaluate(({x,y})=>
+     !!document.elementFromPoint(x,y)?.matches?.('canvas.absolute.inset-0'),
+     {x:box.x+box.width*.18,y:box.y+box.height*.72});
+    assert.equal(targetIsCanvas,true,
+     'mobile touch must land on actual gameplay canvas, not HUD or loading veil');
     const cdp=await context.newCDPSession(page);
     const touch={x:box.x+box.width*.18,y:box.y+box.height*.72,
      id:91,radiusX:1,radiusY:1,force:1};
