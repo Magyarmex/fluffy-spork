@@ -45,3 +45,19 @@ test('long suspension fails closed and cannot revive old held stick',()=>{
  assert.equal(x.input.move.active,false);
  x.owner.stop();
 });
+
+test('queued pointercancel through stall cannot leave phantom movement',()=>{
+ const x=setup();x.edge(90,'pointercancel');x.frame(140);
+ assert.equal(x.input.move.active,false);
+ assert.equal(x.input.stickId.move,-1);
+ x.owner.stop();
+});
+test('explicit blur reset after a recovered stall releases held input',()=>{
+ const x=setup();x.frame(140);
+ assert.equal(x.input.move.active,true);
+ x.timeline.reset(); // BrowserInputCapture blur/visibilitychange contract.
+ assert.equal(x.input.move.active,false);
+ x.edge(145,'pointermove');x.frame(160);
+ assert.equal(x.input.move.active,false,'movement alone must not re-arm a blurred stick');
+ x.owner.stop();
+});
