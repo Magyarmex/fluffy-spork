@@ -26,7 +26,7 @@ class FixedStepRafOwner {
     // Every scheduled callback has a unique ticket. Cancelled callbacks may
     // still be delivered by a host after stop/restart; they must never
     // advance a newly started world or schedule a second RAF chain.
-    this._generation=0;this._requestSeq=0;
+    this._generation=0;this._requestSeq=0;this._pauseEpoch=0;
     this._awaitingForwardFrame=false;
     this.originalDestroy=game.destroy;
     this.destroyHadOwn=Object.prototype.hasOwnProperty.call(game,'destroy');
@@ -94,6 +94,7 @@ class FixedStepRafOwner {
   }
   transition(paused,at){
     if(!Number.isFinite(at)||at<this.lastMs-EPS)throw Error('invalid pause clock');
+    this._pauseEpoch++;
     this.timeline.reset();this.lagMs=0;this.paused=paused;
     this.lastMs=at;this.simAtSec=(at-this.bridge.startMs)/1000;
     // Like startup, a pause transition can sample performance.now() after
@@ -171,10 +172,11 @@ class FixedStepRafOwner {
       }
       while(this.lagMs+EPS>=STEP_MS && this.lastSteps<this.maxSteps && !g.paused && this.started){
         const end=this.simAtSec+STEP;
+        const pauseEpoch=this._pauseEpoch;
         this.timeline.consumeThrough(end);
-        // A replayed input edge can synchronously unmount/destroy Game.
-        // Never advance a world whose lifecycle owner was released mid-edge.
-        if(!this.started || g.paused)break;
+        // A replayed edge can destroy Game or pause and resume it within
+        // one event batch. Never apply the pre-transition simulation tick.
+        if(!this.started || g.paused || this._pauseEpoch!==pauseEpoch)break;
         g.update(STEP);
         this.simAtSec=end;
         this.lagMs=Math.max(0,this.lagMs-STEP_MS);
