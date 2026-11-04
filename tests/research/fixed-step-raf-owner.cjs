@@ -106,10 +106,10 @@ class FixedStepRafOwner {
     try{
       if(!Number.isFinite(ts))throw Error('nonmonotonic RAF timestamp');
       // RAF timestamps describe frame beginnings; startup can occur later
-      // within the same frame. Clamp only bounded initial skew, not later
+      // within the same frame. Clamp at most one foreground-stall-sized (250ms) initial skew, not later
       // backward delivery. Invalid timestamps must also release ownership.
       if(ts<this.lastMs-EPS){
-        if(!this._awaitingForwardFrame || this.lastMs-ts>50)
+        if(!this._awaitingForwardFrame || this.lastMs-ts>250)
           throw Error('nonmonotonic RAF timestamp');
         ts=this.lastMs;
       }else this._awaitingForwardFrame=false;
