@@ -177,7 +177,8 @@ const origin='http://127.0.0.1:8765/';
       const m=window.__novaCombatBench,g=window.__novaCombatBenchGame;
       if(m.longTaskObserver)for(const entry of m.longTaskObserver.takeRecords())
        m.longTasks.push({start:entry.startTime,duration:entry.duration});
-      return {at:performance.now(),longTasks:m.longTasks.slice(),canvasBacking:[g.canvas.width,g.canvas.height],
+      return {at:performance.now(),longTaskSupported:!!m.longTaskObserver,
+       longTasks:m.longTasks.slice(),canvasBacking:[g.canvas.width,g.canvas.height],
        canvasCss:[g.canvas.clientWidth,g.canvas.clientHeight],dpr:g.dpr,updates:m.updates,simMs:m.simMs,work:m.updateWorkMs,
        renders:m.renders,renderWork:m.renderWorkMs,
        minimaps:m.minimaps,minimapWork:m.minimapWorkMs,
@@ -244,6 +245,7 @@ const origin='http://127.0.0.1:8765/';
      // Normalize to simulated game time. Raw projectile totals are misleading
      // when the world has different heat, targets, or startup histories.
      const result={repeat,renderScale,fixed60,throttle,wallMs,
+      longTaskSupported:after.longTaskSupported,
       longTaskCount:longTasks.length,longTaskTotalMs,longTaskMaxMs,
       updates,simulatedMs,updateWorkMs,
       renders,renderWorkMs,bulletWorkMs:delta('bulletWorkMs'),
@@ -282,6 +284,8 @@ const origin='http://127.0.0.1:8765/';
       result.renderGapSamples>0 && Number.isFinite(result.renderGapP95Ms) &&
       Number.isFinite(result.stepsPerRenderP95),
       'real composed combat and renderer must advance');
+     assert.equal(typeof result.longTaskSupported,'boolean',
+      'browser must report whether long-task observation is supported');
      assert.ok(result.canvasBacking.every(Number.isFinite) && result.canvasCss.every(Number.isFinite) &&
       Number.isFinite(result.actualDpr), 'real composed canvas scale must be measurable');
      assert.ok(Math.abs(result.actualDpr-Math.max(1,1.5*renderScale/100))<0.01,
