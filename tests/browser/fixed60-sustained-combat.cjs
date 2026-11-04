@@ -104,7 +104,7 @@ const origin='http://127.0.0.1:8765/';
      const wallStart=Date.now();
      await page.waitForTimeout(3000);
      const wallMs=Date.now()-wallStart;
-     const after=await page.evaluate((gapStart,renderGapStart)=>{
+     const after=await page.evaluate(({gapStart,renderGapStart})=>{
       const m=window.__novaCombatBench,g=window.__novaCombatBenchGame;
       return {updates:m.updates,simMs:m.simMs,work:m.updateWorkMs,
        renders:m.renders,renderWork:m.renderWorkMs,
@@ -115,7 +115,7 @@ const origin='http://127.0.0.1:8765/';
        frameGaps:m.frameGaps.slice(gapStart),
        renderGaps:m.renderGaps.slice(renderGapStart),heat:g.player?.__v17Heat||0,
        alive:g.player?.hp>0,playerClass:g.player?.cls};
-     },before.gaps,before.renderGaps);
+     },{gapStart:before.gaps,renderGapStart:before.renderGaps});
      const delta=(k)=>after[k]-before[k];
      const gaps=after.frameGaps;
      const sorted=gaps.slice().sort((a,b)=>a-b);
