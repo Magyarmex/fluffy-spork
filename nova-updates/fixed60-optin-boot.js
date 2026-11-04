@@ -57,6 +57,9 @@ mods['game/engine']=function(module,exports,require){
   };
   Object.defineProperty(Game.prototype,'__novaFixed60BootDelegate',{value:true});
 };
+// Invalid research budgets retain the fail-closed delegate without fetching
+// an optional bundle that must never be allowed to start the match.
+if(invalidBudget)return;
 // Parser-time, query-only loading: default players neither fetch nor parse the
 // research bundle, and the PWA's atomic shell validation does not require it.
 // The fail-closed Game.start delegate above is installed FIRST, so a missing
