@@ -115,6 +115,9 @@ const origin='http://127.0.0.1:8765/';
      if(typeof ai?.updateAI!=='function')throw Error('materialized AI owner unavailable');
      const originalAI=ai.updateAI;
      ai.updateAI=function(...args){
+      // The decorative War Room shares this module. Exclude its AI work
+      // from the live Battlefield benchmark rather than inflating the cost.
+      if(args[1]!==g)return originalAI.apply(this,args);
       const t=performance.now(),dt=Number(args[2]);
       if(Number.isFinite(dt)&&dt>0)m.aiTankSeconds+=dt;
       try{return originalAI.apply(this,args)}
