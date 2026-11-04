@@ -76,7 +76,7 @@ test('beam telegraph and fallback gates are unchanged at high refresh', () => {
 
 test('production materializer restores capped trail gate from compressed-shell legacy source', () => {
   const { patchCosmeticRng } = require('../../scripts/patch-cosmetic-rng.cjs');
-  const capped = 'else if ((typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) <\\n                (!b.beam && dt < 1 / 60 ? 0.22 * Math.max(0, dt * 60) : 0.22))';
+  const capped = 'else if ((typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) <\n                (!b.beam && dt < 1 / 60 ? 0.22 * Math.max(0, dt * 60) : 0.22))';
   const legacy = 'else if ((typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) < 0.22)';
   assert.equal(html.split(capped).length - 1, 1, 'shipping HTML must have exactly one capped gate');
   const legacyShell = html.replace(capped, legacy);
