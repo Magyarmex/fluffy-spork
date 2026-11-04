@@ -427,6 +427,47 @@ const {chromium}=require('playwright');
     await page.evaluate(()=>window.__novaOutageDefaultGame.destroy());
    }finally{await context.close()}
   }
+  // Fail-closed pilot outage: the explicit opt-in must never fall back to
+  // production RAF when its optional bundle cannot be fetched. This test
+  // disables service workers so a cached response cannot mask the outage.
+  {
+   const context=await browser.newContext({viewport:{width:800,height:600},serviceWorkers:'block'});
+   const page=await context.newPage();
+   let blocked=0;
+   try{
+    await page.route('**/fixed60-research-browser.js',route=>{
+     blocked++;
+     return route.abort('failed');
+    });
+    await page.goto('http://127.0.0.1:8765/?nova_fixed60=pilot',
+     {waitUntil:'domcontentloaded',timeout:45000});
+    const deploy=page.getByRole('button',{name:/DEPLOY/i}).first();
+    await deploy.waitFor({state:'visible',timeout:45000});
+    await page.evaluate(()=>{
+     const Game=window.__novaMakeRequire('')('game/engine').Game;
+     const start=Game.prototype.start;
+     Game.prototype.start=function(){
+      if(!this.__novaDecorativeWorld)window.__novaMissingBundleGame=this;
+      return start.apply(this,arguments);
+     };
+    });
+    await deploy.click();
+    await page.waitForFunction(()=>!!document.querySelector('#root .menu-grid-bg'),
+     null,{timeout:15000});
+    const failed=await page.evaluate(()=>{
+     const g=window.__novaMissingBundleGame;
+     return {research:!!window.__novaFixed60Research,
+      productionRAF:g?.raf||0,started:!!g?.__novaFixed60Pilot?.owner.started,
+      menu:!!document.querySelector('#root .menu-grid-bg')};
+    });
+    assert.ok(blocked>0,'pilot outage must exercise an actual failed research request');
+    assert.equal(failed.research,false,'missing optional bundle must not initialize');
+    assert.equal(failed.productionRAF,0,'missing pilot must not start production RAF');
+    assert.equal(failed.started,false,'missing pilot must not leave simulation running');
+    assert.equal(failed.menu,true,'missing pilot must return to menu');
+    console.log('NOVA_FIXED60_MISSING_BUNDLE '+JSON.stringify({blocked,failed}));
+   }finally{await context.close()}
+  }
   // Narrow mobile-viewport pilot smoke: actual responsive canvas, touch
   // ownership and release at phone dimensions, not a desktop-only contract.
   {
