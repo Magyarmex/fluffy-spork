@@ -97,3 +97,23 @@ test('actual composed 49-overlay Game retains physical state and RNG when DPR ch
   assert.deepEqual(a.world,b.world);
  }
 });
+
+test('external player Render clarity takes precedence over adaptive DPR cleanup and future probes',()=>{
+ const g=game(),p=createAdaptiveDprPilot(g);
+ p.sample(0,fast);
+ // Pilot Console changes backing DPR without changing CSS/world dimensions.
+ g.dpr=1.2;g.canvas.width=Math.round(g.w*1.2);
+ g.canvas.height=Math.round(g.h*1.2);
+ assert.equal(p.sample(500,slow).kind,'external-resize');
+ assert.equal(p.sample(1000,slow).kind,'external-owner');
+ assert.equal(p.sample(9000,slow).kind,'external-owner');
+ assert.equal(p.stop(),true);
+ assert.equal(g.dpr,1.2);
+ assert.deepEqual([g.canvas.width,g.canvas.height],[384,682]);
+ const h=game(),q=createAdaptiveDprPilot(h);
+ drive(q,0,1000,slow);
+ assert.equal(h.dpr,1,'research probe must be active before external override');
+ h.dpr=1.2;h.canvas.width=384;h.canvas.height=682;
+ assert.equal(q.sample(1500,slow).kind,'external-resize');
+ q.stop();assert.equal(h.dpr,1.2,'stop must not restore stale original DPR');
+});
