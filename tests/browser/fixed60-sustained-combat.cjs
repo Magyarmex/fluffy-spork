@@ -350,6 +350,11 @@ const origin='http://127.0.0.1:8765/';
     projectilesPerSimSecondDelta:pilot.projectilesPerSimSecond-baseline.projectilesPerSimSecond});
   }
   assert.equal(paired.length,6,'all counterbalanced layout/load pairs must be reported');
+  for(const pair of paired)for(const [key,value] of Object.entries(pair)){
+   if(key==='layout')continue;
+   assert.ok(typeof value==='number'&&Number.isFinite(value),
+    'paired combat comparison must not silently serialize invalid '+key);
+  }
   console.log('NOVA_FIXED60_COMBAT_PAIRED '+JSON.stringify(paired));
   console.log('NOVA_FIXED60_COMBAT_COMPARISON '+JSON.stringify(summaries));
   console.log('NOVA_FIXED60_SUSTAINED_COMBAT '+JSON.stringify(observations));
