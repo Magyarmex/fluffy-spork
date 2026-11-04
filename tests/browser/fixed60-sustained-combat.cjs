@@ -12,10 +12,13 @@ const origin='http://127.0.0.1:8765/';
   // intended to expose sub-60Hz presentation if the runner is fast enough;
   // actual measured FPS, not the throttle multiplier, determines that.
   // This remains a synthetic proxy, not a physical-device release gate.
-  for(const repeat of [0,1])for(const targetDpr of (repeat?[1,1.5]:[1.5,1]))for(const fixed60 of (repeat?[true,false]:[false,true])){
-   const context=await browser.newContext({viewport:{width:800,height:600},deviceScaleFactor:targetDpr});
+  for(const repeat of [0,1])for(const renderScale of (repeat?[67,100]:[100,67]))for(const fixed60 of (repeat?[true,false]:[false,true])){
+   const context=await browser.newContext({viewport:{width:800,height:600},deviceScaleFactor:1.5});
    const page=await context.newPage(),errors=[];
    page.on('pageerror',e=>errors.push(String(e)));
+   // Use the shipping Pilot Console Render clarity setting at fixed device DPR.
+   await page.addInitScript(scale=>localStorage.setItem('novatanks_pilot_settings_v1',
+    JSON.stringify({renderScale:scale})),renderScale);
    const cdp=await context.newCDPSession(page);
    try{
     await page.goto(origin+(fixed60?'?nova_fixed60=pilot':''),{waitUntil:'domcontentloaded',timeout:45000});
@@ -225,7 +228,7 @@ const origin='http://127.0.0.1:8765/';
      // RAF observer is only a browser scheduling diagnostic.
      // Normalize to simulated game time. Raw projectile totals are misleading
      // when the world has different heat, targets, or startup histories.
-     const result={repeat,targetDpr,fixed60,throttle,wallMs,updates,simulatedMs,updateWorkMs,
+     const result={repeat,renderScale,fixed60,throttle,wallMs,updates,simulatedMs,updateWorkMs,
       renders,renderWorkMs,bulletWorkMs:delta('bulletWorkMs'),
       collisionWorkMs:delta('collisionWorkMs'),minimaps:delta('minimaps'),
       minimapWorkMs:delta('minimapWork'),projectiles,
@@ -264,8 +267,8 @@ const origin='http://127.0.0.1:8765/';
       'real composed combat and renderer must advance');
      assert.ok(result.canvasBacking.every(Number.isFinite) && result.canvasCss.every(Number.isFinite) &&
       Number.isFinite(result.actualDpr), 'real composed canvas scale must be measurable');
-     assert.ok(Math.abs(result.actualDpr-targetDpr)<0.01,
-      'device scale factor must reach actual game DPR, not just browser emulation');
+     assert.ok(Math.abs(result.actualDpr-Math.max(1,1.5*renderScale/100))<0.01,
+      'Render clarity must reach actual game DPR');
      assert.equal(result.playerClass,'tempest','real combat must use Tempest');
      assert.equal(result.alive,true,'player death must not censor a sustained combat trial');
      assert.equal(result.paused,false,'evolution or menu pause must not censor combat measurement');
@@ -287,29 +290,29 @@ const origin='http://127.0.0.1:8765/';
     await context.close();
    }
   }
-  assert.equal(observations.length,24,'two passes across two DPRs, two schedulers and three CPU loads');
-  for(const targetDpr of [1,1.5])for(const fixed60 of [false,true])for(const throttle of [1,3,6])
-   assert.equal(observations.filter(x=>x.targetDpr===targetDpr&&x.fixed60===fixed60&&x.throttle===throttle).length,2,
+  assert.equal(observations.length,24,'two passes across two clarity levels, two schedulers and three CPU loads');
+  for(const renderScale of [67,100])for(const fixed60 of [false,true])for(const throttle of [1,3,6])
+   assert.equal(observations.filter(x=>x.renderScale===renderScale&&x.fixed60===fixed60&&x.throttle===throttle).length,2,
     'each scheduler/load pair must have independent replicates');
   // Layouts are paired within each repeat, but entity spawns, AI decisions,
   // and combat histories remain independent. This is not deterministic A/B.
-  for(const repeat of [0,1])for(const targetDpr of [1,1.5]){
-   const worlds=observations.filter(x=>x.repeat===repeat&&x.targetDpr===targetDpr);
+  for(const repeat of [0,1])for(const renderScale of [67,100]){
+   const worlds=observations.filter(x=>x.repeat===repeat&&x.renderScale===renderScale);
    assert.ok(worlds.every(x=>typeof x.layout==='string'&&x.layout.length>0),
     'paired browser worlds must expose a real Battlefield layout');
    assert.equal(new Set(worlds.map(x=>x.layout)).size,1,
     'scheduler comparisons within a repeat must share Battlefield layout');
   }
-  // DPR here is a controlled browser device-scale proxy, not proof of the in-game
-  // Render clarity setting or a physical Android acceptance gate.
+  // Render clarity uses the shipped Pilot Console setting at fixed browser DPR.
+  // Synthetic CPU throttling is not a physical Android acceptance gate.
   const summaries=[];
-  for(const targetDpr of [1,1.5])for(const throttle of [1,3,6]){
-   const baseline=observations.filter(x=>x.targetDpr===targetDpr&&!x.fixed60&&x.throttle===throttle);
-   const pilot=observations.filter(x=>x.targetDpr===targetDpr&&x.fixed60&&x.throttle===throttle);
+  for(const renderScale of [67,100])for(const throttle of [1,3,6]){
+   const baseline=observations.filter(x=>x.renderScale===renderScale&&!x.fixed60&&x.throttle===throttle);
+   const pilot=observations.filter(x=>x.renderScale===renderScale&&x.fixed60&&x.throttle===throttle);
    const mean=(xs,key)=>xs.reduce((sum,x)=>sum+x[key],0)/xs.length;
    const baseFps=mean(baseline,'presentationFps');
    const pilotFps=mean(pilot,'presentationFps');
-   summaries.push({targetDpr,throttle,baselinePresentationFps:baseFps,
+   summaries.push({renderScale,throttle,baselinePresentationFps:baseFps,
     fixed60PresentationFps:pilotFps,
     fixed60PresentationRatio:pilotFps/baseFps,
     baselineRenderGapP95Ms:mean(baseline,'renderGapP95Ms'),
@@ -354,12 +357,12 @@ const origin='http://127.0.0.1:8765/';
   // worlds. Keep each within-layout, within-throttle pair visible; this is
   // descriptive evidence, not a deterministic A/B or a release threshold.
   const paired=[];
-  for(const repeat of [0,1])for(const targetDpr of [1,1.5])for(const throttle of [1,3,6]){
-   const baseline=observations.find(x=>x.repeat===repeat&&x.targetDpr===targetDpr&&x.throttle===throttle&&!x.fixed60);
-   const pilot=observations.find(x=>x.repeat===repeat&&x.targetDpr===targetDpr&&x.throttle===throttle&&x.fixed60);
+  for(const repeat of [0,1])for(const renderScale of [67,100])for(const throttle of [1,3,6]){
+   const baseline=observations.find(x=>x.repeat===repeat&&x.renderScale===renderScale&&x.throttle===throttle&&!x.fixed60);
+   const pilot=observations.find(x=>x.repeat===repeat&&x.renderScale===renderScale&&x.throttle===throttle&&x.fixed60);
    assert.ok(baseline&&pilot&&baseline.layout===pilot.layout,
     'paired scheduler trials must share the same real Battlefield layout');
-   paired.push({repeat,targetDpr,throttle,layout:baseline.layout,
+   paired.push({repeat,renderScale,throttle,layout:baseline.layout,
     baselinePresentationFps:baseline.presentationFps,
     fixed60PresentationFps:pilot.presentationFps,
     presentationFpsDelta:pilot.presentationFps-baseline.presentationFps,
@@ -376,7 +379,7 @@ const origin='http://127.0.0.1:8765/';
     simulatedTimeRatioDelta:pilot.simulatedTimeRatio-baseline.simulatedTimeRatio,
     projectilesPerSimSecondDelta:pilot.projectilesPerSimSecond-baseline.projectilesPerSimSecond});
   }
-  assert.equal(paired.length,12,'all counterbalanced layout/DPR/load pairs must be reported');
+  assert.equal(paired.length,12,'all counterbalanced layout/clarity/load pairs must be reported');
   for(const pair of paired)for(const [key,value] of Object.entries(pair)){
    if(key==='layout')continue;
    assert.ok(typeof value==='number'&&Number.isFinite(value),
