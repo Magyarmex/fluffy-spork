@@ -62,11 +62,25 @@ const origin='http://127.0.0.1:8765/';
      const m=window.__novaCombatBench={
       updates:0,simMs:0,updateWorkMs:0,renders:0,renderWorkMs:0,
       minimaps:0,minimapWorkMs:0,projectiles:0,fireCalls:0,
+      bulletWorkMs:0,collisionWorkMs:0,
       frameGaps:[],lastFrame:null,frames:0,active:true,
       renderGaps:[],lastRender:null,stepsPerRender:[],lastRenderUpdates:null,
       updateCostSamples:[],renderCostSamples:[]
      };
      const update=g.update,fire=g.tryFire;
+     const updateBullets=g.updateBullets,collisions=g.resolveBulletCollisions;
+     assert.equal(typeof updateBullets,'function');
+     assert.equal(typeof collisions,'function');
+     g.updateBullets=function(...args){
+      const t=performance.now();
+      try{return updateBullets.apply(this,args)}
+      finally{m.bulletWorkMs+=performance.now()-t}
+     };
+     g.resolveBulletCollisions=function(...args){
+      const t=performance.now();
+      try{return collisions.apply(this,args)}
+      finally{m.collisionWorkMs+=performance.now()-t}
+     };
      const renderer=window.__novaMakeRequire('')('game/render');
      const render=renderer.render;
      renderer.render=function(...args){
@@ -131,6 +145,8 @@ const origin='http://127.0.0.1:8765/';
        renders:m.renders,renderWork:m.renderWorkMs,
        minimaps:m.minimaps,minimapWork:m.minimapWorkMs,
        projectiles:m.projectiles,fireCalls:m.fireCalls,frames:m.frames,
+       bulletWorkMs:m.bulletWorkMs,collisionWorkMs:m.collisionWorkMs,
+       bulletWorkMs:m.bulletWorkMs,collisionWorkMs:m.collisionWorkMs,
        gaps:m.frameGaps.length,renderGaps:m.renderGaps.length,
        stepsPerRender:m.stepsPerRender.length,
        updateCosts:m.updateCostSamples.length,renderCosts:m.renderCostSamples.length,
@@ -192,7 +208,8 @@ const origin='http://127.0.0.1:8765/';
      // Normalize to simulated game time. Raw projectile totals are misleading
      // when the world has different heat, targets, or startup histories.
      const result={repeat,fixed60,throttle,wallMs,updates,simulatedMs,updateWorkMs,
-      renders,renderWorkMs,minimaps:delta('minimaps'),
+      renders,renderWorkMs,bulletWorkMs:delta('bulletWorkMs'),
+      collisionWorkMs:delta('collisionWorkMs'),minimaps:delta('minimaps'),
       minimapWorkMs:delta('minimapWork'),projectiles,
       fireCalls:delta('fireCalls'),frames,frameGapP95Ms:p95,
       frameGapSamples:gaps.length,
@@ -278,6 +295,10 @@ const origin='http://127.0.0.1:8765/';
     fixed60StepsPerRenderP95:mean(pilot,'stepsPerRenderP95'),
     baselineMultiStepRenderFrames:mean(baseline,'multiStepRenderFrames'),
     fixed60MultiStepRenderFrames:mean(pilot,'multiStepRenderFrames'),
+    baselineBulletWorkMs:mean(baseline,'bulletWorkMs'),
+    fixed60BulletWorkMs:mean(pilot,'bulletWorkMs'),
+    baselineCollisionWorkMs:mean(baseline,'collisionWorkMs'),
+    fixed60CollisionWorkMs:mean(pilot,'collisionWorkMs'),
     baselineUpdateCostMs:mean(baseline,'updateCostMs'),
     baselineUpdateCostP95Ms:mean(baseline,'updateCostP95Ms'),
     fixed60UpdateCostP95Ms:mean(pilot,'updateCostP95Ms'),
