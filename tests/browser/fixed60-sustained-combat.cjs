@@ -397,6 +397,34 @@ const origin='http://127.0.0.1:8765/';
    assert.ok(typeof value==='number'&&Number.isFinite(value),
     'paired combat comparison must not silently serialize invalid '+key);
   }
+  // A scheduler A/B alone cannot answer whether the existing Render clarity
+  // control recovers smoothness. Report the within-scheduler clarity effect
+  // for each paired Battlefield and CPU load without claiming causality.
+  const clarityPairs=[];
+  for(const repeat of [0,1])for(const fixed60 of [false,true])for(const throttle of [1,3,6]){
+   const hi=observations.find(x=>x.repeat===repeat&&x.fixed60===fixed60&&x.throttle===throttle&&x.renderScale===100);
+   const lo=observations.find(x=>x.repeat===repeat&&x.fixed60===fixed60&&x.throttle===throttle&&x.renderScale===67);
+   assert.ok(hi&&lo&&hi.layout===lo.layout,
+    'Render clarity comparisons must use paired Battlefield layouts');
+   clarityPairs.push({repeat,fixed60,throttle,layout:hi.layout,
+    highPresentationFps:hi.presentationFps,lowPresentationFps:lo.presentationFps,
+    presentationFpsDelta:lo.presentationFps-hi.presentationFps,
+    highRenderGapP95Ms:hi.renderGapP95Ms,lowRenderGapP95Ms:lo.renderGapP95Ms,
+    renderGapP95DeltaMs:lo.renderGapP95Ms-hi.renderGapP95Ms,
+    highSimulatedTimeRatio:hi.simulatedTimeRatio,lowSimulatedTimeRatio:lo.simulatedTimeRatio,
+    highProjectileRate:hi.projectilesPerSimSecond,lowProjectileRate:lo.projectilesPerSimSecond,
+    highUpdateWorkFraction:hi.updateWorkMs/hi.wallMs,
+    lowUpdateWorkFraction:lo.updateWorkMs/lo.wallMs,
+    highRenderWorkFraction:hi.renderWorkMs/hi.wallMs,
+    lowRenderWorkFraction:lo.renderWorkMs/lo.wallMs});
+  }
+  assert.equal(clarityPairs.length,12,'every scheduler/layout/load clarity pair must be reported');
+  for(const pair of clarityPairs)for(const [key,value] of Object.entries(pair)){
+   if(key==='layout')continue;
+   assert.ok(typeof value==='number'&&Number.isFinite(value),
+    'clarity comparison must not silently serialize invalid '+key);
+  }
+  console.log('NOVA_FIXED60_COMBAT_CLARITY '+JSON.stringify(clarityPairs));
   console.log('NOVA_FIXED60_COMBAT_PAIRED '+JSON.stringify(paired));
   console.log('NOVA_FIXED60_COMBAT_COMPARISON '+JSON.stringify(summaries));
   console.log('NOVA_FIXED60_SUSTAINED_COMBAT '+JSON.stringify(observations));
