@@ -657,6 +657,17 @@ const {chromium}=require('playwright');
       g.player.hp=1000000;
       g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
       g.input.firing=true;g.input.autofire=false;
+      window.__novaBudgetWork={updates:0,updateMs:0,liveBullets:0,maxBullets:0};
+      const update=g.update;
+      g.update=function(...args){
+       const t=performance.now(),count=this.bullets.length;
+       try{return update.apply(this,args)}
+       finally{
+        const m=window.__novaBudgetWork;
+        m.updates++;m.updateMs+=performance.now()-t;
+        m.liveBullets+=count;m.maxBullets=Math.max(m.maxBullets,count);
+       }
+      };
       window.__novaBudgetProjectiles=0;
       const fire=g.tryFire;
       g.tryFire=function(tank){
@@ -678,14 +689,16 @@ const {chromium}=require('playwright');
       };
       return {at:performance.now(),ticks:o.ticks,droppedMs:o.droppedMs,
        renders:window.__novaStepBudgetRenders,
-       projectiles:window.__novaBudgetProjectiles,world:g.__novaBudgetWorld};
+       projectiles:window.__novaBudgetProjectiles,
+       work:{...window.__novaBudgetWork},world:g.__novaBudgetWorld};
      });
      await page.waitForTimeout(3000);
      const measured=await page.evaluate(()=>{
       const g=window.__novaStepBudgetGame,o=g.__novaFixed60Pilot.owner;
       return {at:performance.now(),ticks:o.ticks,droppedMs:o.droppedMs,
        renders:window.__novaStepBudgetRenders,
-       projectiles:window.__novaBudgetProjectiles,started:o.started,
+       projectiles:window.__novaBudgetProjectiles,
+       work:{...window.__novaBudgetWork},started:o.started,
        paused:g.paused,raf:g.raf||0};
      });
      const wallMs=measured.at-initial.at;
@@ -694,10 +707,16 @@ const {chromium}=require('playwright');
       droppedMs:measured.droppedMs-initial.droppedMs,
       renders:measured.renders-initial.renders,
       projectiles:measured.projectiles-initial.projectiles,
+      updateWorkMs:measured.work.updateMs-initial.work.updateMs,
+      meanLiveBullets:(measured.work.liveBullets-initial.work.liveBullets)/
+       (measured.work.updates-initial.work.updates),
+      maxLiveBullets:measured.work.maxBullets,
       fps:(measured.renders-initial.renders)*1000/wallMs,
-      simulatedTimeRatio:(measured.ticks-initial.ticks)*(1000/60)/wallMs};
+      simulatedTimeRatio:(measured.ticks-initial.ticks)*(1000/60)/wallMs,
+      updateWorkFraction:(measured.work.updateMs-initial.work.updateMs)/wallMs};
      assert.ok(wallMs>=2500&&observation.ticks>0&&observation.renders>0&&
-      observation.projectiles>0,
+      observation.projectiles>0&&Number.isFinite(observation.meanLiveBullets)&&
+      Number.isFinite(observation.updateWorkFraction),
       'both research budgets must advance actual combat and presentation');
      assert.ok(measured.started&&!measured.paused&&!measured.raf,
       'budget experiment must retain exclusive active Game ownership');
@@ -729,7 +748,11 @@ const {chromium}=require('playwright');
      fourSimulatedTimeRatio:four.simulatedTimeRatio,
      simulatedTimeRatioDelta:three.simulatedTimeRatio-four.simulatedTimeRatio,
      threeDroppedMs:three.droppedMs,fourDroppedMs:four.droppedMs,
-     threeProjectiles:three.projectiles,fourProjectiles:four.projectiles};
+     threeProjectiles:three.projectiles,fourProjectiles:four.projectiles,
+     threeUpdateWorkFraction:three.updateWorkFraction,
+     fourUpdateWorkFraction:four.updateWorkFraction,
+     threeMeanLiveBullets:three.meanLiveBullets,
+     fourMeanLiveBullets:four.meanLiveBullets};
    });
    assert.ok(paired.every(p=>Object.entries(p).every(([key,value])=>
     key==='layout'||typeof value==='number'&&Number.isFinite(value))),
