@@ -36,6 +36,18 @@ test('startup skew above 250ms is rejected, not replayed as a stale frame',()=>{
  assert.throws(()=>x.deliver(1100),/nonmonotonic RAF timestamp/);
  assert.equal(x.owner.started,false);assert.equal(x.owner.ticks,0);
 });
+test('pause and resume also tolerate bounded same-frame startup work',()=>{
+ const x=setup();x.owner.start();
+ x.now(1100);x.game.setPaused(true);
+ x.deliver(1040);
+ assert.equal(x.owner.started,true);assert.equal(x.owner.paused,true);
+ x.now(1200);x.game.setPaused(false);
+ x.deliver(1140);
+ assert.equal(x.owner.started,true);assert.equal(x.owner.paused,false);
+ x.deliver(1217);
+ assert.equal(x.owner.ticks,1);
+ x.owner.stop();
+});
 test('after clock catches up, backward RAF timestamps remain invalid',()=>{
  const x=setup();x.owner.start();
  x.deliver(1017);
