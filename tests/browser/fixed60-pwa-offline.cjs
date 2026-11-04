@@ -102,8 +102,11 @@ const origin = 'http://127.0.0.1:8765/';
    await page.waitForFunction(()=>{
     const g=window.__novaOfflinePilotGame;
     if(!g)return false;
-    return !!document.querySelector('#root .menu-grid-bg') ||
-     (g.status==='playing' && g.__novaFixed60Pilot?.owner.ticks>5);
+    // Once a pilot exists, do not mistake a still-visible transition menu
+    // for failure; require actual simulated gameplay before evaluating it.
+    if(g.__novaFixed60Pilot)
+     return g.status==='playing' && g.__novaFixed60Pilot.owner.ticks>5;
+    return !!document.querySelector('#root .menu-grid-bg');
    },null,{timeout:20000});
    const pilot=await page.evaluate(()=>{
     const g=window.__novaOfflinePilotGame,p=g?.__novaFixed60Pilot;
