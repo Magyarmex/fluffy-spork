@@ -113,14 +113,25 @@ const origin='http://127.0.0.1:8765/';
      const gaps=after.frameGaps;
      const sorted=gaps.slice().sort((a,b)=>a-b);
      const p95=sorted.length?sorted[Math.ceil(.95*sorted.length)-1]:null;
-     const result={repeat,fixed60,throttle,wallMs,updates:delta('updates'),
-      simulatedMs:delta('simMs'),updateWorkMs:delta('work'),
-      renders:delta('renders'),renderWorkMs:delta('renderWork'),
-      minimaps:delta('minimaps'),minimapWorkMs:delta('minimapWork'),
-      projectiles:delta('projectiles'),fireCalls:delta('fireCalls'),
-      frames:delta('frames'),frameGapP95Ms:p95,heat:after.heat,
-      alive:after.alive,playerClass:after.playerClass,droppedMs:delta('droppedMs'),
-      ticks:delta('ticks')};
+     const simulatedMs=delta('simMs');
+     const updates=delta('updates'),renders=delta('renders'),frames=delta('frames');
+     const updateWorkMs=delta('work'),renderWorkMs=delta('renderWork');
+     const projectiles=delta('projectiles');
+     // Normalize to simulated game time. Raw projectile totals are misleading
+     // when the world has different heat, targets, or startup histories.
+     const result={repeat,fixed60,throttle,wallMs,updates,simulatedMs,updateWorkMs,
+      renders,renderWorkMs,minimaps:delta('minimaps'),
+      minimapWorkMs:delta('minimapWork'),projectiles,
+      fireCalls:delta('fireCalls'),frames,frameGapP95Ms:p95,
+      frameGapSamples:gaps.length,
+      presentationFps:frames*1000/wallMs,
+      simulationHz:updates*1000/wallMs,
+      renderPerUpdate:renders/updates,
+      updateCostMs:updateWorkMs/updates,
+      renderCostMs:renderWorkMs/renders,
+      projectilesPerSimSecond:projectiles*1000/simulatedMs,
+      heat:after.heat,alive:after.alive,playerClass:after.playerClass,
+      droppedMs:delta('droppedMs'),ticks:delta('ticks')};
      console.log('NOVA_FIXED60_COMBAT_PHASE '+JSON.stringify(result));
      assert.ok(result.updates>0 && result.simulatedMs>0 && result.renders>0 &&
       Number.isFinite(result.updateWorkMs) && Number.isFinite(result.renderWorkMs),
@@ -147,6 +158,26 @@ const origin='http://127.0.0.1:8765/';
   for(const fixed60 of [false,true])for(const throttle of [1,3])
    assert.equal(observations.filter(x=>x.fixed60===fixed60&&x.throttle===throttle).length,2,
     'each scheduler/load pair must have independent replicates');
+  // Descriptive only: these worlds are not seeded identically, and Chromium
+  // CPU throttling is not a physical Android performance acceptance gate.
+  const summaries=[];
+  for(const throttle of [1,3]){
+   const baseline=observations.filter(x=>!x.fixed60&&x.throttle===throttle);
+   const pilot=observations.filter(x=>x.fixed60&&x.throttle===throttle);
+   const mean=(xs,key)=>xs.reduce((sum,x)=>sum+x[key],0)/xs.length;
+   const baseFps=mean(baseline,'presentationFps');
+   const pilotFps=mean(pilot,'presentationFps');
+   summaries.push({throttle,baselinePresentationFps:baseFps,
+    fixed60PresentationFps:pilotFps,
+    fixed60PresentationRatio:pilotFps/baseFps,
+    baselineUpdateCostMs:mean(baseline,'updateCostMs'),
+    fixed60UpdateCostMs:mean(pilot,'updateCostMs'),
+    baselineProjectilesPerSimSecond:mean(baseline,'projectilesPerSimSecond'),
+    fixed60ProjectilesPerSimSecond:mean(pilot,'projectilesPerSimSecond'),
+    baselineRenderPerUpdate:mean(baseline,'renderPerUpdate'),
+    fixed60RenderPerUpdate:mean(pilot,'renderPerUpdate')});
+  }
+  console.log('NOVA_FIXED60_COMBAT_COMPARISON '+JSON.stringify(summaries));
   console.log('NOVA_FIXED60_SUSTAINED_COMBAT '+JSON.stringify(observations));
  }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});
