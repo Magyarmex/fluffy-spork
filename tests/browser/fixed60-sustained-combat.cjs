@@ -155,6 +155,8 @@ const origin='http://127.0.0.1:8765/';
        renderCostSamples:m.renderCostSamples.slice(renderCostStart),
        heat:g.player?.__v17Heat||0,
        alive:g.player?.hp>0,playerClass:g.player?.cls,
+       entityCounts:{tanks:g.tanks?.length||0,drones:g.drones?.length||0,
+        bullets:g.bullets?.length||0,shapes:g.shapes?.length||0},
        layout:g.__novaBattlefield?.name||null};
      },{gapStart:before.gaps,renderGapStart:before.renderGaps,
        stepsStart:before.stepsPerRender,
@@ -211,7 +213,7 @@ const origin='http://127.0.0.1:8765/';
       renderCostMs:renderWorkMs/renders,
       projectilesPerSimSecond:projectiles*1000/simulatedMs,
       heat:after.heat,alive:after.alive,playerClass:after.playerClass,
-      layout:after.layout,droppedMs:delta('droppedMs'),ticks:delta('ticks')};
+      entityCounts:after.entityCounts,layout:after.layout,droppedMs:delta('droppedMs'),ticks:delta('ticks')};
      console.log('NOVA_FIXED60_COMBAT_PHASE '+JSON.stringify(result));
      assert.ok(result.updates>0 && result.simulatedMs>0 && result.renders>0 &&
       Number.isFinite(result.updateWorkMs) && Number.isFinite(result.renderWorkMs) &&
