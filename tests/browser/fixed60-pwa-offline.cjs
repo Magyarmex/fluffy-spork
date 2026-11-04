@@ -81,7 +81,20 @@ const origin = 'http://127.0.0.1:8765/';
    const deploy=page.getByRole('button',{name:/DEPLOY/i}).first();
    await deploy.waitFor({state:'visible',timeout:20000});
    await deploy.click();
-   await deploy.waitFor({state:'visible',timeout:15000});
+   try{await deploy.waitFor({state:'visible',timeout:15000})}
+   catch(error){
+    const diagnostic=await page.evaluate(()=>({
+     readyState:document.readyState,
+     menu:!!document.querySelector('#root .menu-grid-bg'),
+     pilot:!!window.__novaFixed60Research,
+     bodyText:document.body?.innerText?.slice(0,1000),
+     loading:!!document.querySelector('.nv-loading'),
+     canvas:!!document.querySelector('canvas.absolute.inset-0'),
+     rootChildren:document.querySelector('#root')?.children.length
+    }));
+    console.error('NOVA_FIXED60_PWA_OFFLINE_PILOT_FAILURE '+JSON.stringify({diagnostic,errors}));
+    throw error;
+   }
    const pilot=await page.evaluate(()=>({
     menu:!!document.querySelector('#root .menu-grid-bg'),
     pilot:!!window.__novaFixed60Research,
