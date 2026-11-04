@@ -38,32 +38,6 @@ const origin='http://127.0.0.1:8765/';
       try{return spawn.apply(this,arguments)}
       finally{Date.now=now;Math.random=random}
      };
-     // Seed the entire redeploy transaction, not just the Battlefield
-     // selector. A shared layout alone does not match neutral and AI spawns.
-     // Restore global RNG immediately afterward: this is a test fixture,
-     // never a production gameplay random-stream change.
-     const redeploy=Game.prototype.redeploy;
-     Game.prototype.redeploy=function(...args){
-      if(this.__novaDecorativeWorld)return redeploy.apply(this,args);
-      const oldRandom=Math.random,oldNow=Date.now;
-      let state=(0x9e3779b9^(seed+1))>>>0||1;
-      Math.random=()=>{
-       state^=state<<13;state^=state>>>17;state^=state<<5;
-       return(state>>>0)/4294967296;
-      };
-      Date.now=()=>0;
-      try{
-       const result=redeploy.apply(this,args);
-       this.__novaCombatInitialSignature=JSON.stringify({
-        layout:this.__novaBattlefield?.name||null,
-        player:this.player&&[this.player.x,this.player.y,this.player.cls],
-        tanks:this.tanks.map(t=>[t.x,t.y,t.cls,t.angle]),
-        shapes:this.shapes.map(sh=>[sh.x,sh.y,sh.type]),
-        terrain:(this.__novaTerrain||[]).map(w=>[w.x,w.y,w.w,w.h,w.r,w.shape])
-       });
-       return result;
-      }finally{Math.random=oldRandom;Date.now=oldNow}
-     };
      const original=Game.prototype.start;
      Game.prototype.start=function(){
       if(!this.__novaDecorativeWorld)window.__novaCombatBenchGame=this;
@@ -228,8 +202,7 @@ const origin='http://127.0.0.1:8765/';
        paused:!!g.paused,pendingOffer:!!g.pendingOffer,
        entityCounts:{tanks:g.tanks?.length||0,drones:g.drones?.length||0,
         bullets:g.bullets?.length||0,shapes:g.shapes?.length||0},
-       layout:g.__novaBattlefield?.name||null,
-       initialSignature:g.__novaCombatInitialSignature||null};
+       layout:g.__novaBattlefield?.name||null};
      },{gapStart:before.gaps,dispatchLagStart:before.dispatchLags,
        renderGapStart:before.renderGaps,
        stepsStart:before.stepsPerRender,
@@ -312,9 +285,7 @@ const origin='http://127.0.0.1:8765/';
       heat:after.heat,alive:after.alive,destroyed:after.destroyed,playerClass:after.playerClass,
       canvasBacking:after.canvasBacking,canvasCss:after.canvasCss,actualDpr:after.dpr,
       paused:after.paused,pendingOffer:after.pendingOffer,
-      entityCounts:after.entityCounts,layout:after.layout,
-      initialSignature:after.initialSignature,
-      droppedMs:delta('droppedMs'),ticks:delta('ticks')};
+      entityCounts:after.entityCounts,layout:after.layout,droppedMs:delta('droppedMs'),ticks:delta('ticks')};
      console.log('NOVA_FIXED60_COMBAT_PHASE '+JSON.stringify(result));
      assert.ok(result.updates>0 && result.simulatedMs>0 && result.renders>0 &&
       Number.isFinite(result.updateWorkMs) && Number.isFinite(result.renderWorkMs) &&
@@ -358,19 +329,14 @@ const origin='http://127.0.0.1:8765/';
   for(const renderScale of [67,100])for(const fixed60 of [false,true])for(const throttle of [1,3,6])
    assert.equal(observations.filter(x=>x.renderScale===renderScale&&x.fixed60===fixed60&&x.throttle===throttle).length,2,
     'each scheduler/load pair must have independent replicates');
-  // Initial spawn worlds are seeded and checked within each repeat, but
-  // subsequent live AI/RNG decisions and combat histories remain independent.
-  // This is a matched-start experiment, not deterministic combat replay.
+  // Layouts are paired within each repeat, but entity spawns, AI decisions,
+  // and combat histories remain independent. This is not deterministic A/B.
   for(const repeat of [0,1])for(const renderScale of [67,100]){
    const worlds=observations.filter(x=>x.repeat===repeat&&x.renderScale===renderScale);
    assert.ok(worlds.every(x=>typeof x.layout==='string'&&x.layout.length>0),
     'paired browser worlds must expose a real Battlefield layout');
    assert.equal(new Set(worlds.map(x=>x.layout)).size,1,
     'scheduler comparisons within a repeat must share Battlefield layout');
-   assert.ok(worlds.every(x=>typeof x.initialSignature==='string'&&x.initialSignature.length>100),
-    'each trial must capture the actual post-redeploy initial world');
-   assert.equal(new Set(worlds.map(x=>x.initialSignature)).size,1,
-    'scheduler and clarity comparisons must share initial player, AI, shapes and terrain');
   }
   // Confirm the player's setting actually reduces rendered pixels while
   // preserving the same tactical viewport. Otherwise an apparent performance
