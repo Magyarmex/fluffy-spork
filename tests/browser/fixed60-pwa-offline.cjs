@@ -112,7 +112,7 @@ const origin = 'http://127.0.0.1:8765/';
     const g=window.__novaOfflinePilotGame,p=g?.__novaFixed60Pilot;
     return {menu:!!document.querySelector('#root .menu-grid-bg'),
      research:!!window.__novaFixed60Research,
-     playing:g?.status==='playing',pilot:!!p,
+     playing:g?.status==='playing',destroyed:!!g?.__novaDestroyed,pilot:!!p,
      started:!!p?.owner.started,ticks:p?.owner.ticks||0,
      productionRAF:g?.raf||0,
      controlled:!!navigator.serviceWorker.controller,offline:!navigator.onLine};
@@ -120,7 +120,9 @@ const origin = 'http://127.0.0.1:8765/';
    assert.equal(pilot.controlled,true,'offline pilot navigation must remain SW-controlled');
    assert.equal(pilot.offline,true,'browser must report offline for this test');
    if(pilot.menu){
-    assert.equal(pilot.playing,false,'failed pilot must return to menu, not strand a playing game without a simulation owner');
+    // Game.status starts as 'playing' in the constructor and is not changed
+    // by destroy(); the actual fail-closed invariant is teardown + menu.
+    assert.equal(pilot.destroyed,true,'failed pilot must destroy its attempted Game before returning to menu');
     assert.equal(pilot.started,false,'failed pilot must not leave an active fixed60 owner');
     assert.equal(pilot.productionRAF,0,'failed pilot must never run production RAF');
    }else{
