@@ -80,16 +80,16 @@ const origin='http://127.0.0.1:8765/';
      const wallStart=Date.now();
      await page.waitForTimeout(3000);
      const wallMs=Date.now()-wallStart;
-     const after=await page.evaluate(()=>{
+     const after=await page.evaluate(gapStart=>{
       const m=window.__novaCombatBench,g=window.__novaCombatBenchGame;
       return {updates:m.updates,simMs:m.simMs,work:m.updateWorkMs,
        projectiles:m.projectiles,fireCalls:m.fireCalls,frames:m.frames,
        gaps:m.frameGaps.length,ticks:g.__novaFixed60Pilot?.owner.ticks||0,
        droppedMs:g.__novaFixed60Pilot?.owner.droppedMs||0,
-       frameGaps:m.frameGaps.slice(-240)};
-     });
+       frameGaps:m.frameGaps.slice(gapStart)};
+     },before.gaps);
      const delta=(k)=>after[k]-before[k];
-     const gaps=after.frameGaps.slice(Math.max(0,before.gaps-(after.gaps-after.frameGaps.length)));
+     const gaps=after.frameGaps;
      const sorted=gaps.slice().sort((a,b)=>a-b);
      const p95=sorted.length?sorted[Math.ceil(.95*sorted.length)-1]:null;
      const result={fixed60,throttle,wallMs,updates:delta('updates'),
