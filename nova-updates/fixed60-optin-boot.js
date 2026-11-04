@@ -52,6 +52,14 @@ mods['game/engine']=function(module,exports,require){
 // research bundle, and the PWA's atomic shell validation does not require it.
 // The fail-closed Game.start delegate above is installed FIRST, so a missing
 // optional pilot asset cannot silently fall back to production simulation.
-if(win.document.readyState==='loading' && typeof win.document.write==='function')
-  win.document.write('<script src="./nova-updates/fixed60-research-browser.js"></'+'script>');
+if(win.document.readyState==='loading' && typeof win.document.write==='function'){
+  // The optional bundle is not in the SW's atomic critical-asset cache.
+  // Key its browser HTTP-cache identity to the validated shell fingerprint,
+  // otherwise a returning pilot can execute stale research code after update.
+  const stamp=win.document.querySelector('meta[name="nova-runtime-build"]')?.content;
+  if(!stamp || !/^[a-f0-9]{16,64}$/i.test(stamp))
+    throw Error('fixed60 pilot requires a fingerprinted canonical shell');
+  const url='./nova-updates/fixed60-research-browser.js?nova_build='+encodeURIComponent(stamp);
+  win.document.write('<script src="'+url+'"></'+'script>');
+}
 })();
