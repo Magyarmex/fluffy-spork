@@ -246,12 +246,13 @@ const {chromium}=require('playwright');
       // A state change is not yet visible. Timestamp the next real composed
       // render invocation after each applied edge (still not screen photons).
       owner.render=function(...args){
+       const result=originalRender.apply(this,args);
        const m=window.__novaRepeatTouch,at=performance.now();
        if(m?.downAppliedAt!==undefined && m.downRenderedAt===undefined)
         m.downRenderedAt=at;
        if(m?.upAppliedAt!==undefined && m.upRenderedAt===undefined)
         m.upRenderedAt=at;
-       return originalRender.apply(this,args);
+       return result;
       };
       const originalDown=input.pd,originalUp=input.pu;
       document.addEventListener('pointercancel',e=>{
