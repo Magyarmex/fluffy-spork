@@ -86,7 +86,8 @@ const origin='http://127.0.0.1:8765/';
        projectiles:m.projectiles,fireCalls:m.fireCalls,frames:m.frames,
        gaps:m.frameGaps.length,ticks:g.__novaFixed60Pilot?.owner.ticks||0,
        droppedMs:g.__novaFixed60Pilot?.owner.droppedMs||0,
-       frameGaps:m.frameGaps.slice(gapStart)};
+       frameGaps:m.frameGaps.slice(gapStart),heat:g.player?.__v17Heat||0,
+       alive:g.player?.hp>0,playerClass:g.player?.cls};
      },before.gaps);
      const delta=(k)=>after[k]-before[k];
      const gaps=after.frameGaps;
@@ -95,11 +96,14 @@ const origin='http://127.0.0.1:8765/';
      const result={fixed60,throttle,wallMs,updates:delta('updates'),
       simulatedMs:delta('simMs'),updateWorkMs:delta('work'),
       projectiles:delta('projectiles'),fireCalls:delta('fireCalls'),
-      frames:delta('frames'),frameGapP95Ms:p95,droppedMs:delta('droppedMs'),
+      frames:delta('frames'),frameGapP95Ms:p95,heat:after.heat,
+      alive:after.alive,playerClass:after.playerClass,droppedMs:delta('droppedMs'),
       ticks:delta('ticks')};
      assert.ok(result.updates>0 && result.simulatedMs>0 &&
       Number.isFinite(result.updateWorkMs),'real combat must advance');
-     assert.ok(result.fireCalls>0,'Tempest must attempt to fire in real browser Game');
+     assert.equal(result.playerClass,'tempest','real combat must use Tempest');
+     assert.ok(result.fireCalls>0 && result.projectiles>0,
+      'Tempest must spawn actual projectiles in composed browser Game');
      if(fixed60)assert.equal(await page.evaluate(()=>window.__novaCombatBenchGame.raf||0),0,
       'fixed60 must never coexist with production RAF');
      observations.push(result);
