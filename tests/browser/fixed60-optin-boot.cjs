@@ -452,6 +452,10 @@ const {chromium}=require('playwright');
      };
     });
     await deploy.click();
+    // The menu already exists before DEPLOY. Require proof that the real
+    // Game.start was attempted before accepting fail-closed recovery.
+    await page.waitForFunction(()=>!!window.__novaMissingBundleGame,
+     null,{timeout:15000});
     await page.waitForFunction(()=>!!document.querySelector('#root .menu-grid-bg'),
      null,{timeout:15000});
     const failed=await page.evaluate(()=>{
