@@ -310,10 +310,8 @@ const origin='http://127.0.0.1:8765/';
       updates,simulatedMs,updateWorkMs,
       renders,renderWorkMs,bulletWorkMs:delta('bulletWorkMs'),
       droneWorkMs:delta('droneWorkMs'),droneCalls:delta('droneCalls'),
-      // Residual update cost includes AI, terrain, neutral ecology and other
-      // simulation owners. Nested instrumentation can overlap; never claim
-      // that this subtraction is an exclusive CPU profile.
-      otherUpdateWorkMs:Math.max(0,updateWorkMs-delta('bulletWorkMs')-delta('collisionWorkMs')-delta('droneWorkMs')),
+      // The sampled owners can call one another; do not subtract their
+      // inclusive times to fabricate an exclusive "other" CPU bucket.
       collisionWorkMs:delta('collisionWorkMs'),minimaps:delta('minimaps'),
       bulletSeconds:delta('bulletSeconds'),bulletVfxCalls:delta('bulletVfxCalls'),
       bulletVfxParticles:delta('bulletVfxParticles'),
@@ -455,8 +453,6 @@ const origin='http://127.0.0.1:8765/';
     fixed60MultiStepRenderFrames:mean(pilot,'multiStepRenderFrames'),
     baselineDroneWorkMs:mean(baseline,'droneWorkMs'),
     fixed60DroneWorkMs:mean(pilot,'droneWorkMs'),
-    baselineOtherUpdateWorkMs:mean(baseline,'otherUpdateWorkMs'),
-    fixed60OtherUpdateWorkMs:mean(pilot,'otherUpdateWorkMs'),
     baselineBulletWorkMs:mean(baseline,'bulletWorkMs'),
     baselineBulletVfxRate:mean(baseline,'bulletVfxCallsPerBulletSecond'),
     fixed60BulletVfxRate:mean(pilot,'bulletVfxCallsPerBulletSecond'),
