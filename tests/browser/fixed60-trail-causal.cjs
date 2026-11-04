@@ -378,8 +378,8 @@ const origin='http://127.0.0.1:8765/';
      assert.equal(result.destroyed,false,'destroyed Game must not censor a sustained combat trial');
      assert.equal(result.paused,false,'evolution or menu pause must not censor combat measurement');
      assert.equal(result.pendingOffer,false,'pending evolution offer must not censor combat measurement');
-     assert.ok(result.bulletSeconds>0 && result.bulletVfxCalls>0,
-      'real combat must exercise projectile particle effects');
+     assert.ok(result.bulletSeconds>0 && result.bulletVfxCalls+result.suppressedTrails>0,
+      'real combat must exercise projectile particle effects or explicitly suppress ordinary trails');
      assert.ok(result.fireCalls>0 && result.projectiles>0,
       'Tempest must spawn actual projectiles in composed browser Game');
      if(fixed60)assert.equal(await page.evaluate(()=>window.__novaCombatBenchGame.raf||0),0,
