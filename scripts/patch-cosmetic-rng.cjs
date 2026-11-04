@@ -77,6 +77,11 @@ function patchCosmeticRng(html){
    if(old===expected&&newCount===0)part=part.split(before).join(after);
    else if(old===0&&newCount===expected){} // idempotent
    else if(old===expected&&newCount===expected&&after.includes(before)){} // guarded fallback contains original expression
+   else if(start==='    updateBullets('&&before==='else if (Math.random() < 0.22)'&&
+           count(part,'(!b.beam && dt < 1 / 60 ? 0.22 * Math.max(0, dt * 60) : 0.22)')===1&&
+           count(part,'(typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random())')>=2){}
+     // Materialized high-refresh ordinary-trail cap already uses cosmetic RNG.
+     // Keep legacy source migration intact; do not overwrite the new threshold.
    else {
     // Older materialized shells already contain the direct cosmetic call.
     // Upgrade them without weakening the canonical Game path; isolated
