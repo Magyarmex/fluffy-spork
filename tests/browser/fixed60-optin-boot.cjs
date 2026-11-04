@@ -61,6 +61,7 @@ const {chromium}=require('playwright');
     const initial=await page.evaluate(()=>{
      const g=window.__novaFixed60Game,p=g.__novaFixed60Pilot;
      return {pilot:!!p,started:!!p?.owner.started,ticks:p?.owner.ticks||0,
+      maxSteps:p?.owner.maxSteps||null,
       raf:g.raf||0,capture:!!p?.capture.active,
       inputOwner:!!g.input,gameStatus:g.status,paused:g.paused,
       pendingOffer:!!g.pendingOffer,lastMs:p?.owner.lastMs,
@@ -71,6 +72,8 @@ const {chromium}=require('playwright');
     assert.equal(initial.pilot,enabled,'only explicit query may activate pilot');
     assert.equal(initial.gameStatus,'playing');
     if(enabled){
+     assert.equal(initial.maxSteps,4,
+      'ordinary pilot URL must preserve the four-step research default');
      assert.equal(initial.started,true);
      assert.equal(initial.capture,true);
      assert.equal(initial.raf,0,'production RAF must not run beside pilot');
