@@ -73,3 +73,43 @@ test('beam telegraph and fallback gates are unchanged at high refresh', () => {
   assert.ok(reference.ordinary > 15 && high.ordinary > reference.ordinary * 1.5,
     'beam fallback remains unchanged');
 });
+
+test('production materializer restores capped trail gate from compressed-shell legacy source', () => {
+  const { patchCosmeticRng } = require('../../scripts/patch-cosmetic-rng.cjs');
+  const capped = 'else if ((typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) <\\n                (!b.beam && dt < 1 / 60 ? 0.22 * Math.max(0, dt * 60) : 0.22))';
+  const legacy = 'else if ((typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) < 0.22)';
+  assert.equal(html.split(capped).length - 1, 1, 'shipping HTML must have exactly one capped gate');
+  const legacyShell = html.replace(capped, legacy);
+  const restored = patchCosmeticRng(legacyShell);
+  assert.equal(restored, html, 'materialization must reproduce shipping capped HTML');
+  assert.equal(patchCosmeticRng(restored), restored, 'repeated materialization must be idempotent');
+});
+
+test('mixed 120Hz and 30Hz frame intervals retain bounded trail density', () => {
+  let seed = 0x19a7e531, draws = 0, ordinary = 0;
+  const bullet = { x: 0, y: 0, vx: 0, vy: 0, r: 2, ttl: 21,
+    ownerId: 1, beam: false, dead: false, color: '#fff' };
+  const game = {
+    bullets: [bullet], tmp: [], hash: { query(x, y, r, out) { out.length = 0; } },
+    initBulletIntegrity() {}, resolveBulletCollisions() {},
+    cosmeticRandom() {
+      draws++;
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return seed / 4294967296;
+    },
+    addParticles(x, y, color, n, speed, kind) {
+      assert.equal(speed, 20);
+      ordinary++;
+    },
+  };
+  // Each pair advances 1/120 + 1/30 = 1/24 seconds, for 20s total.
+  for (let i = 0; i < 480; i++) {
+    method.call(game, 1 / 120);
+    method.call(game, 1 / 30);
+  }
+  assert.equal(draws, 960);
+  assert.ok(Math.abs(bullet.ttl - 1) < 1e-9);
+  const reference = trial(60);
+  assert.ok(Math.abs(ordinary - reference.ordinary) < reference.ordinary * 0.25,
+    JSON.stringify({ ordinary, reference: reference.ordinary }));
+});
