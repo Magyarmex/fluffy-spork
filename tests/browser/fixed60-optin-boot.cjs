@@ -243,6 +243,10 @@ const {chromium}=require('playwright');
      await page.evaluate(()=>{
       const input=window.__novaFixed60Game.input;
       const originalDown=input.pd,originalUp=input.pu;
+      document.addEventListener('pointercancel',e=>{
+       if(e.pointerType==='touch' && window.__novaRepeatTouch)
+        window.__novaRepeatTouch.cancelAt=performance.now();
+      },true);
       input.pd=function(event){
        const result=originalDown.call(this,event),m=window.__novaRepeatTouch;
        if(m && event.pointerType==='touch' && event.pointerId===m.pointerId &&
@@ -268,11 +272,6 @@ const {chromium}=require('playwright');
          window.__novaRepeatTouch.downAt=performance.now();
          window.__novaRepeatTouch.pointerId=e.pointerId;
         }
-       },{capture:true,once:true});
-      });
-      await page.evaluate(()=>{
-       document.addEventListener('pointercancel',e=>{
-        if(e.pointerType==='touch')window.__novaRepeatTouch.cancelAt=performance.now();
        },{capture:true,once:true});
       });
       await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{...touch,id:40+trial}]});
