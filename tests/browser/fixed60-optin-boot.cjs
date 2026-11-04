@@ -602,7 +602,7 @@ const {chromium}=require('playwright');
   // A low budget may help presentation while silently losing combat time.
   {
    const observations=[];
-   for(const budget of [4,3]){
+   for(const repeat of [0,1])for(const budget of (repeat?[3,4]:[4,3])){
     const context=await browser.newContext({viewport:{width:800,height:600}});
     const page=await context.newPage(),errors=[];
     page.on('pageerror',error=>errors.push(String(error)));
@@ -612,7 +612,7 @@ const {chromium}=require('playwright');
       {waitUntil:'domcontentloaded',timeout:45000});
      const deploy=page.getByRole('button',{name:/DEPLOY/i}).first();
      await deploy.waitFor({state:'visible',timeout:20000});
-     await page.evaluate(()=>{
+     await page.evaluate(seed=>{
       const engine=window.__novaMakeRequire('')('game/engine');
       const Game=engine.Game,start=Game.prototype.start;
       Game.prototype.start=function(){
@@ -624,7 +624,7 @@ const {chromium}=require('playwright');
       engine.Game=class SeededBudgetGame extends Game{
        constructor(...args){
         const oldRandom=Math.random,oldNow=Date.now;
-        let state=(0x9e3779b9^(1517800+1))>>>0||1;
+        let state=(0x9e3779b9^(seed+1))>>>0||1;
         Math.random=()=>{
          state^=state<<13;state^=state>>>17;state^=state<<5;
          return(state>>>0)/4294967296;
@@ -639,7 +639,7 @@ const {chromium}=require('playwright');
         });
        }
       };
-     });
+     },1517800+repeat);
      await deploy.click();
      await page.waitForFunction(()=>{
       const g=window.__novaStepBudgetGame;
@@ -689,7 +689,7 @@ const {chromium}=require('playwright');
        paused:g.paused,raf:g.raf||0};
      });
      const wallMs=measured.at-initial.at;
-     const observation={budget,wallMs,world:initial.world,
+     const observation={repeat,budget,wallMs,world:initial.world,
       ticks:measured.ticks-initial.ticks,
       droppedMs:measured.droppedMs-initial.droppedMs,
       renders:measured.renders-initial.renders,
@@ -709,11 +709,16 @@ const {chromium}=require('playwright');
      await context.close();
     }
    }
-   assert.deepEqual(observations.map(x=>x.budget),[4,3]);
+   assert.deepEqual(observations.map(x=>x.budget),[4,3,3,4],
+    'budget order must be counterbalanced across independent repeats');
    assert.ok(observations.every(x=>typeof x.world==='string'&&x.world.length>100),
-    'both budget trials must capture the real constructor-spawned world');
-   assert.equal(new Set(observations.map(x=>x.world)).size,1,
-    'catch-up budget comparisons must start from identical Battlefield worlds');
+    'every budget trial must capture the real constructor-spawned world');
+   for(const repeat of [0,1]){
+    const pair=observations.filter(x=>x.repeat===repeat);
+    assert.equal(pair.length,2);
+    assert.equal(new Set(pair.map(x=>x.world)).size,1,
+     'catch-up budget comparisons must start from identical Battlefield worlds');
+   }
    console.log('NOVA_FIXED60_STEP_BUDGET_COMPARISON '+JSON.stringify(observations));
   }
   // A missing experimental bundle must recover to the menu, never launch
