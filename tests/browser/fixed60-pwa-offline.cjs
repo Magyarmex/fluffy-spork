@@ -114,7 +114,7 @@ const origin = 'http://127.0.0.1:8765/';
    assert.equal(pilot.controlled,true,'offline pilot navigation must remain SW-controlled');
    assert.equal(pilot.offline,true,'browser must report offline for this test');
    if(pilot.menu){
-    assert.equal(pilot.playing,false,'failed pilot must return to menu');
+    assert.equal(pilot.started,false,'failed pilot must not leave an active fixed60 owner');
     assert.equal(pilot.productionRAF,0,'failed pilot must never run production RAF');
    }else{
     assert.equal(pilot.pilot,true,'offline pilot gameplay must use fixed60 owner');
