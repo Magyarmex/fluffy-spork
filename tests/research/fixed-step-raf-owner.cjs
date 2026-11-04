@@ -151,8 +151,12 @@ class FixedStepRafOwner {
         if(raw>250+EPS || this.isHidden())this.timeline.reset();
         this.lagMs=0;
         this.simAtSec=(ts-this.bridge.startMs-maxMs)/1000;
+        const skipEpoch=this._pauseEpoch;
         this.timeline.consumeThrough(this.simAtSec);
-        this.lagMs=maxMs;
+        // A queued event may pause/resume while skipped time is consumed.
+        // Preserve the new transition clock and do not manufacture stale
+        // catch-up ticks from the pre-transition presentation interval.
+        this.lagMs=(this.started && this._pauseEpoch===skipEpoch)?maxMs:0;
       }else{
         this.lagMs+=raw;
         // Keep at most two extra full steps of backlog for transient jitter.
