@@ -12,7 +12,7 @@ const origin='http://127.0.0.1:8765/';
   // intended to expose sub-60Hz presentation if the runner is fast enough;
   // actual measured FPS, not the throttle multiplier, determines that.
   // This remains a synthetic proxy, not a physical-device release gate.
-  for(const repeat of [0,1])for(const renderScale of (repeat?[67,100]:[100,67]))for(const trailMode of (repeat?['suppressed','sham','sham2']:['sham2','sham','suppressed'])){
+  for(const repeat of [0,1])for(const renderScale of (repeat?[67,100]:[100,67]))for(const quality of (repeat?['low','high']:['high','low']))for(const trailMode of (repeat?['suppressed','sham','sham2']:['sham2','sham','suppressed'])){
    const fixed60=true;
    const context=await browser.newContext({viewport:{width:800,height:600},deviceScaleFactor:1.5});
    const page=await context.newPage(),errors=[];
@@ -20,6 +20,7 @@ const origin='http://127.0.0.1:8765/';
    // Use the shipping Pilot Console Render clarity setting at fixed device DPR.
    await page.addInitScript(scale=>localStorage.setItem('novatanks_pilot_settings_v1',
     JSON.stringify({renderScale:scale})),renderScale);
+   await page.addInitScript(q=>localStorage.setItem('novatanks_quality',q),quality);
    const cdp=await context.newCDPSession(page);
    try{
     await page.goto(origin+(fixed60?'?nova_fixed60=pilot':''),{waitUntil:'domcontentloaded',timeout:45000});
@@ -382,7 +383,7 @@ const origin='http://127.0.0.1:8765/';
       Number.isInteger(result.trailCriticalOverwrites) &&
       result.trailCriticalOverwrites<=result.trailOverwrites &&
       result.trailOverwrites<=result.trailCandidates &&
-      result.particlePoolCapacity>0 &&
+      result.particlePoolCapacity===(quality==='low'?200:400) &&
       Number.isFinite(result.bulletVfxParticlesPerBulletSecond) &&
       result.renderGapSamples>0 && Number.isFinite(result.renderGapP95Ms) &&
       Number.isFinite(result.dispatchLagP95Ms) && Number.isFinite(result.dispatchLagMaxMs) &&
@@ -419,23 +420,27 @@ const origin='http://127.0.0.1:8765/';
     await context.close();
    }
   }
-  assert.equal(observations.length,12,'two layouts x two clarity levels x three causal arms');
+  assert.equal(observations.length,24,'two layouts x two clarity levels x two particle qualities x three causal arms');
   for(const x of observations){
    assert.ok(x.trailCandidates>0,'real Tempest bullet trails must occur');
    assert.equal(x.suppressedTrails,x.trailMode==='suppressed'?x.trailCandidates:0,
     'only the suppression arm may discard ordinary trails');
    assert.ok(Number.isFinite(x.activeParticles),'real particle pool must be measurable');
+   assert.equal(x.particlePoolCapacity,x.quality==='low'?200:400,
+    'real game must honor both canonical particle-pool quality modes');
+   if(x.trailMode==='suppressed')assert.equal(x.trailOverwrites,0,
+    'suppressed trails must not displace existing visual cues');
   }
   const paired=[];
-  for(const repeat of [0,1])for(const renderScale of [67,100]){
-   const group=observations.filter(x=>x.repeat===repeat&&x.renderScale===renderScale);
+  for(const repeat of [0,1])for(const renderScale of [67,100])for(const quality of ['low','high']){
+   const group=observations.filter(x=>x.repeat===repeat&&x.renderScale===renderScale&&x.quality===quality);
    const sham=group.find(x=>x.trailMode==='sham');
    const sham2=group.find(x=>x.trailMode==='sham2');
    const suppressed=group.find(x=>x.trailMode==='suppressed');
    assert.ok(sham&&sham2&&suppressed,'each paired world requires A/A and intervention');
    assert.equal(sham.initialSignature,sham2.initialSignature,'A/A starts must match');
    assert.equal(sham.initialSignature,suppressed.initialSignature,'A/B starts must match');
-   paired.push({repeat,renderScale,layout:sham.layout,
+   paired.push({repeat,renderScale,quality,layout:sham.layout,
     aaFpsDelta:sham2.presentationFps-sham.presentationFps,
     suppressionFpsDelta:suppressed.presentationFps-sham.presentationFps,
     aaRenderGapP95DeltaMs:sham2.renderGapP95Ms-sham.renderGapP95Ms,
@@ -444,7 +449,10 @@ const origin='http://127.0.0.1:8765/';
     suppressionSimulatedTimeRatioDelta:suppressed.simulatedTimeRatio-sham.simulatedTimeRatio,
     shamActiveParticles:sham.activeParticles,
     suppressedActiveParticles:suppressed.activeParticles,
-    suppressedTrailCount:suppressed.suppressedTrails});
+    suppressedTrailCount:suppressed.suppressedTrails,
+    shamTrailOverwrites:sham.trailOverwrites,
+    shamCriticalCueOverwrites:sham.trailCriticalOverwrites,
+    suppressedTrailOverwrites:suppressed.trailOverwrites});
   }
   console.log('NOVA_TRAIL_CAUSAL_PAIRED '+JSON.stringify(paired));
   console.log('NOVA_TRAIL_CAUSAL_PHASES '+JSON.stringify(observations));
