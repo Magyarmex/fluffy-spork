@@ -421,7 +421,7 @@ const {chromium}=require('playwright');
    const page=await context.newPage();
    let researchRequests=0;
    try{
-    await page.route('**/fixed60-research-browser.js',route=>{
+    await page.route('**/fixed60-research-browser.js*',route=>{
      researchRequests++;
      return route.abort();
     });
@@ -460,7 +460,7 @@ const {chromium}=require('playwright');
    const page=await context.newPage();
    let blocked=0;
    try{
-    await page.route('**/fixed60-research-browser.js',route=>{
+    await page.route('**/fixed60-research-browser.js*',route=>{
      blocked++;
      return route.abort('failed');
     });
@@ -567,7 +567,7 @@ const {chromium}=require('playwright');
   const context=await browser.newContext({viewport:{width:800,height:600}});
   const page=await context.newPage();
   try{
-   await page.route('**/fixed60-research-browser.js',route=>route.abort());
+   await page.route('**/fixed60-research-browser.js*',route=>route.abort());
    await page.goto('http://127.0.0.1:8765/?nova_fixed60=pilot',
     {waitUntil:'domcontentloaded',timeout:45000});
    const deploy=page.getByRole('button',{name:/DEPLOY/i}).first();
