@@ -702,7 +702,9 @@ const {chromium}=require('playwright');
        renders:window.__novaStepBudgetRenders,
        projectiles:window.__novaBudgetProjectiles,
        work:{...window.__novaBudgetWork},started:o.started,
-       paused:g.paused,raf:g.raf||0};
+       paused:g.paused,pendingOffer:!!g.pendingOffer,
+       alive:g.player?.hp>0,destroyed:!!g.__novaDestroyed,
+       raf:g.raf||0};
      });
      const wallMs=measured.at-initial.at;
      const observation={repeat,budget,wallMs,world:initial.world,
@@ -721,8 +723,9 @@ const {chromium}=require('playwright');
       observation.projectiles>0&&Number.isFinite(observation.meanLiveBullets)&&
       Number.isFinite(observation.updateWorkFraction),
       'both research budgets must advance actual combat and presentation');
-     assert.ok(measured.started&&!measured.paused&&!measured.raf,
-      'budget experiment must retain exclusive active Game ownership');
+     assert.ok(measured.started&&!measured.paused&&!measured.pendingOffer&&
+      measured.alive&&!measured.destroyed&&!measured.raf,
+      'budget experiment must retain an uninterrupted live combat world');
      assert.deepEqual(errors,[],'budget browser experiment must not throw');
      observations.push(observation);
      await page.evaluate(()=>window.__novaStepBudgetGame.destroy());
