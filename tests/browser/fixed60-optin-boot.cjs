@@ -120,11 +120,16 @@ const {chromium}=require('playwright');
      const duringOffer=await page.evaluate(()=>{
       const g=window.__novaFixed60Game,p=g.__novaFixed60Pilot;
       return {paused:g.paused,ownerPaused:p.owner.paused,
-       started:p.owner.started,capture:p.capture.active,raf:g.raf||0};
+       started:p.owner.started,capture:p.capture.active,raf:g.raf||0,
+       ticks:p.owner.ticks};
      });
      assert.equal(duringOffer.paused,true,'real evolution offer pauses Game');
      assert.equal(duringOffer.started,true,'offer must not destroy fixed60 owner');
      assert.equal(duringOffer.raf,0,'offer must not start production RAF');
+     await page.waitForTimeout(160);
+     assert.equal(await page.evaluate(()=>
+      window.__novaFixed60Game.__novaFixed60Pilot.owner.ticks),duringOffer.ticks,
+      'evolution choice must freeze combat simulation until the player decides');
      await evolution.locator('xpath=..').getByRole('button',{name:/DECIDE LATER/i}).click();
      await evolution.waitFor({state:'detached',timeout:8000});
      await page.waitForFunction(before=>{
