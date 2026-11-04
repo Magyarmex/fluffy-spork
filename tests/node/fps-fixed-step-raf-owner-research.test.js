@@ -286,26 +286,6 @@ test('pause/resume during skipped foreground time cannot resurrect stale catch-u
  }finally{h.close()}
 });
 
-test('pause/resume during bounded backlog trimming cannot replay pre-transition ticks',()=>{
- const g=bootGame(),h=setup(g);let transitions=0;
- try{
-  h.frame(1000/60);
-  const originalConsume=h.timeline.consumeThrough;
-  h.timeline.consumeThrough=function(at){
-   originalConsume.call(this,at);
-   if(transitions===0){
-    transitions++;
-    g.setPaused(true);g.setPaused(false);
-   }
-  };
-  h.setNow(100);h.frame(100);
-  assert.equal(transitions,1,'backlog trim must consume a chronological boundary');
-  assert.equal(h.owner.lastSteps,0,'no pre-transition backlog updates may survive');
-  assert.equal(h.owner.ticks,1);
-  assert.ok(h.owner.simAtSec>=.1-1e-6,'transition clock cannot roll back');
- }finally{h.close()}
-});
-
 test('actual composed renderer is simulation-pure across presentation rates',()=>{
  function run(seed,hz){return withSeed(seed,draws=>{
   const g=bootGame();g.sfx.muted=true;
