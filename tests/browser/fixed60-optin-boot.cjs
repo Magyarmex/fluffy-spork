@@ -52,6 +52,11 @@ const {chromium}=require('playwright');
     assert.equal(boot.hasPilot,enabled,'default boot must not initialize fixed60 research modules');
     assert.equal(researchRequests.length,enabled?1:0,
      'ordinary startup must not fetch the optional fixed60 research bundle; pilot must fetch exactly once');
+    if(enabled){
+     const fingerprint=await page.locator('meta[name="nova-runtime-build"]').getAttribute('content');
+     assert.equal(new URL(researchRequests[0]).searchParams.get('nova_build'),fingerprint,
+      'pilot research HTTP cache must be keyed to validated shell fingerprint');
+    }
     await page.waitForTimeout(600);
     const initial=await page.evaluate(()=>{
      const g=window.__novaFixed60Game,p=g.__novaFixed60Pilot;
