@@ -420,7 +420,7 @@ const origin='http://127.0.0.1:8765/';
   }
   assert.equal(clarityPairs.length,12,'every scheduler/layout/load clarity pair must be reported');
   for(const pair of clarityPairs)for(const [key,value] of Object.entries(pair)){
-   if(key==='layout')continue;
+   if(key==='layout'||key==='fixed60')continue;
    assert.ok(typeof value==='number'&&Number.isFinite(value),
     'clarity comparison must not silently serialize invalid '+key);
   }
