@@ -4,7 +4,7 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const root=path.resolve(__dirname,'../..');
 const source=fs.readFileSync(path.join(root,'nova-updates/fixed60-optin-boot.js'),'utf8');
 function boot(query,{missingApi=false,failStart=false}={}){
- const calls=[],pending=new Map();let raf=0;
+ const calls=[],writes=[],pending=new Map();let raf=0;
  class Game{
   constructor(){this.raf=0;this.canvas={};this.input={};this.sfx={};}
   start(){calls.push('production-start');this.raf=++raf}
@@ -12,7 +12,7 @@ function boot(query,{missingApi=false,failStart=false}={}){
  const original=Game.prototype.start;
  const mods={'game/engine':(module)=>{module.exports.Game=Game}};
  const win={
-  location:{search:query},document:{},performance:{now:()=>1000,timeOrigin:1793560000000},
+  location:{search:query},document:{readyState:'loading',write:html=>writes.push(html)},performance:{now:()=>1000,timeOrigin:1793560000000},
   requestAnimationFrame:fn=>{pending.set(++raf,fn);return raf},
   cancelAnimationFrame:id=>{calls.push('cancel');pending.delete(id)},
   console:{error:()=>calls.push('cleanup-error')},
@@ -39,7 +39,7 @@ function boot(query,{missingApi=false,failStart=false}={}){
  // delegate, not vice versa, and must observe exactly one start.
  const old=Game.prototype.start;
  Game.prototype.start=function(){calls.push('settings-start');return old.apply(this,arguments)};
- return {Game,original,calls,win,pending};
+ return {Game,original,calls,writes,win,pending};
 }
 test('OFF and invalid query preserve canonical Game.start exactly',()=>{
  for(const query of ['', '?nova_fixed60=off','?nova_fixed60=PILOT','?nova_fixed60=pilotish']){
@@ -75,12 +75,24 @@ test('requested pilot cannot attach after production RAF starts',()=>{
  assert.throws(()=>g.start(),/production RAF already owns/);
  assert.deepEqual(h.calls,['production-start','settings-start']);
 });
-test('materializer orders browser bundle and delegate before Pilot Console',()=>{
+test('materializer installs only the pilot loader before Pilot Console',()=>{
  const workflow=fs.readFileSync(path.join(root,'.github/workflows/deploy.yml'),'utf8');
- const names=['fixed60-research-browser.js','fixed60-optin-boot.js',
-  'settings-v1.7.7.js'];
- const offsets=names.map(n=>workflow.indexOf("'./nova-updates/"+n+"'"));
- assert.ok(offsets.every(x=>x>=0),'both opt-in scripts must be materialized');
- assert.ok(offsets[0]<offsets[1]&&offsets[1]<offsets[2],
-  'Pilot Console must wrap the already installed fixed60 delegate');
+ const loader=workflow.indexOf("'./nova-updates/fixed60-optin-boot.js'");
+ const settings=workflow.indexOf("'./nova-updates/settings-v1.7.7.js'");
+ assert.ok(loader>=0&&settings>loader,'pilot guard precedes Pilot Console');
+ assert.equal(workflow.includes("'./nova-updates/fixed60-research-browser.js'"),false,
+  'pilot bundle must not be an unconditional HTML script');
+ assert.ok(workflow.includes("'nova-updates/fixed60-research-browser.js'"),
+  'optional research bytes must still invalidate the runtime fingerprint');
+});
+test('pilot loads optional bundle only on explicit query and installs guard first',()=>{
+ const ordinary=boot('',{missingApi:true});
+ assert.deepEqual(ordinary.writes,[]);
+ const pilot=boot('?nova_fixed60=pilot',{missingApi:true});
+ assert.equal(pilot.writes.length,1);
+ assert.match(pilot.writes[0],/fixed60-research-browser\\.js/);
+ const sw=fs.readFileSync(path.join(root,'sw.js'),'utf8');
+ assert.match(sw,/discoverCriticalAssets/);
+ assert.equal(sw.includes("'./nova-updates/fixed60-research-browser.js'"),false,
+  'default PWA staging must not depend on experimental bundle');
 });
