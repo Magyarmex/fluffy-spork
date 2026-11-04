@@ -11,6 +11,12 @@ let selected=false;
 try{selected=new URLSearchParams(win.location.search).get('nova_fixed60')==='pilot'}
 catch(_){return}
 if(!selected)return;
+// Explicit research-only catch-up budget for a falsifiable 3-vs-4 test.
+// Never persist this parameter or alter ordinary production startup.
+const stepBudget=new URLSearchParams(win.location.search).get('nova_fixed60_steps');
+if(stepBudget!==null && stepBudget!=='3' && stepBudget!=='4')
+  throw Error('fixed60 pilot requires a supported step budget');
+const maxSteps=stepBudget==='3'?3:4;
 const previous=mods['game/engine'];
 mods['game/engine']=function(module,exports,require){
   previous(module,exports,require);
@@ -34,7 +40,7 @@ mods['game/engine']=function(module,exports,require){
       request:fn=>win.requestAnimationFrame(fn),
       cancel:id=>win.cancelAnimationFrame(id),
       render:(g,w,h)=>renderer.render(g,w,h),
-      canvas:this.canvas,maxSteps:4
+      canvas:this.canvas,maxSteps
     });
     this.__novaFixed60Pilot=pilot;
     try{pilot.start()}
