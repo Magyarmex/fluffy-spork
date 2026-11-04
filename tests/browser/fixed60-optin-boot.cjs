@@ -762,6 +762,46 @@ const {chromium}=require('playwright');
     'budget comparison must not silently serialize invalid metrics');
    console.log('NOVA_FIXED60_STEP_BUDGET_COMPARISON '+JSON.stringify({observations,paired}));
   }
+  // Invalid research parameters must fail closed in the actual React boot.
+  // Rejecting before the module delegate is installed could silently run
+  // production combat under an explicitly requested but invalid pilot URL.
+  {
+   const context=await browser.newContext({viewport:{width:800,height:600}});
+   const page=await context.newPage();
+   const requests=[];
+   page.on('request',r=>{
+    if(r.url().includes('fixed60-research-browser.js'))requests.push(r.url());
+   });
+   try{
+    await page.goto('http://127.0.0.1:8765/?nova_fixed60=pilot&nova_fixed60_steps=5',
+     {waitUntil:'domcontentloaded',timeout:45000});
+    const deploy=page.getByRole('button',{name:/DEPLOY/i}).first();
+    await deploy.waitFor({state:'visible',timeout:20000});
+    await page.evaluate(()=>{
+     window.__novaInvalidBudgetErrors=[];
+     const old=console.error;
+     console.error=function(...args){
+      window.__novaInvalidBudgetErrors.push(args.map(String).join(' '));
+      return old.apply(this,args);
+     };
+    });
+    await deploy.click();
+    await page.waitForFunction(()=>window.__novaInvalidBudgetErrors?.some(x=>
+     x.includes('Failed to boot game:')),null,{timeout:15000});
+    await deploy.waitFor({state:'visible',timeout:15000});
+    const state=await page.evaluate(()=>({
+     menu:!!document.querySelector('#root .menu-grid-bg'),
+     errors:window.__novaInvalidBudgetErrors,
+     researchLoaded:!!window.__novaFixed60Research
+    }));
+    assert.equal(state.menu,true,'invalid pilot budget must recover to menu');
+    assert.equal(state.researchLoaded,false,
+     'invalid budget must not initialize optional research modules');
+    assert.equal(requests.length,0,'invalid budget must not fetch research bundle');
+    assert.ok(state.errors.some(x=>x.includes('supported step budget')),
+     'invalid budget must explain why pilot startup was refused');
+   }finally{await context.close()}
+  }
   // A missing experimental bundle must recover to the menu, never launch
   // an unannounced production-rate match under the pilot query flag.
   const context=await browser.newContext({viewport:{width:800,height:600}});
