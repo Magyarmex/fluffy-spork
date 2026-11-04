@@ -80,3 +80,20 @@ test('long suspension clears firing even without a delivered release',()=>{
  x.frame(340);assert.equal(x.input.firing,false);
  x.owner.stop();
 });
+
+test('firing release queued inside skipped foreground time prevents phantom fire',()=>{
+ const x=setup();
+ x.timeline.push(.03,'pointerdown',{pointerId:8,pointerType:'touch'});
+ x.frame(40);assert.equal(x.input.firing,true);
+ x.timeline.push(.08,'pointerup',{pointerId:8,pointerType:'touch'});
+ x.frame(160);assert.equal(x.input.firing,false);
+ x.owner.stop();
+});
+test('firing cancellation queued inside skipped foreground time prevents phantom fire',()=>{
+ const x=setup();
+ x.timeline.push(.03,'pointerdown',{pointerId:8,pointerType:'touch'});
+ x.frame(40);assert.equal(x.input.firing,true);
+ x.timeline.push(.08,'pointercancel',{pointerId:8,pointerType:'touch'});
+ x.frame(160);assert.equal(x.input.firing,false);
+ x.owner.stop();
+});
