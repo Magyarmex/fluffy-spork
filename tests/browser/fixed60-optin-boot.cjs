@@ -270,6 +270,11 @@ const {chromium}=require('playwright');
         }
        },{capture:true,once:true});
       });
+      await page.evaluate(()=>{
+       document.addEventListener('pointercancel',e=>{
+        if(e.pointerType==='touch')window.__novaRepeatTouch.cancelAt=performance.now();
+       },{capture:true,once:true});
+      });
       await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{...touch,id:40+trial}]});
       await page.waitForFunction(()=>{
        const g=window.__novaFixed60Game,m=window.__novaRepeatTouch;
@@ -338,7 +343,7 @@ const {chromium}=require('playwright');
         const p=g?.__novaFixed60Pilot;
         return {move:g?.input.move.active,stickId:g?.input.stickId.move,
          pointerId:m?.pointerId,downAt:m?.downAt,downAppliedAt:m?.downAppliedAt,
-         upAt:m?.upAt,upAppliedAt:m?.upAppliedAt,
+         upAt:m?.upAt,upAppliedAt:m?.upAppliedAt,cancelAt:m?.cancelAt,
          ownerStarted:p?.owner.started,ticks:p?.owner.ticks,
          droppedFrames:p?.owner.droppedFrames,lagMs:p?.owner.lagMs,
          queued:p?.timeline.events.length,applied:p?.timeline.applied};
