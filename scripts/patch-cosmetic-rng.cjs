@@ -99,7 +99,7 @@ function patchCosmeticRng(html){
  // Apply the high-refresh cap to that source as well; otherwise materialization
  // silently removes the gameplay-safe cosmetic optimization.
  const ordinaryLegacy='else if ((typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) < 0.22)';
- const ordinaryCapped='else if ((typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) <\\n                (!b.beam && dt < 1 / 60 ? 0.22 * Math.max(0, dt * 60) : 0.22))';
+ const ordinaryCapped='else if ((typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) <\n                (!b.beam && dt < 1 / 60 ? 0.22 * Math.max(0, dt * 60) : 0.22))';
  const ordinaryStart=out.indexOf('    updateBullets(');
  const ordinaryEnd=out.indexOf('    splashAt(',ordinaryStart);
  if(ordinaryStart<0||ordinaryEnd<ordinaryStart)throw Error('canonical projectile trail owner missing');
