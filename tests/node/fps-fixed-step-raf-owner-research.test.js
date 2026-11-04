@@ -485,3 +485,23 @@ test('fatal composed RAF render releases DOM capture and restores production Inp
  for(const entries of listeners.values())for(const fns of entries.values())
   assert.equal(fns.size,0,'no input listener may survive game destruction');
 });
+
+test('pause and resume accept bounded same-frame RAF timestamp skew',()=>{
+ const g=bootGame(),h=setup(g);try{
+  h.frame(1000/60);
+  h.setNow(25);g.setPaused(true);
+  let [id,frame]=[...h.active].at(-1);h.active.delete(id);
+  assert.doesNotThrow(()=>frame(1020),
+   'RAF frame beginning may precede the later pause performance.now sample');
+  assert.equal(h.owner.started,true);
+  assert.equal(h.owner.paused,true);
+  h.setNow(40);g.setPaused(false);
+  [id,frame]=[...h.active].at(-1);h.active.delete(id);
+  assert.doesNotThrow(()=>frame(1038),
+   'RAF frame beginning may precede the later resume performance.now sample');
+  assert.equal(h.owner.started,true);
+  assert.equal(h.owner.paused,false);
+  h.frame(60);
+  assert.ok(h.owner.ticks>=2,'normal simulation resumes after clock catches up');
+ }finally{h.close()}
+});
