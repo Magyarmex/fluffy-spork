@@ -65,7 +65,8 @@ const origin='http://127.0.0.1:8765/';
       bulletWorkMs:0,collisionWorkMs:0,
       frameGaps:[],lastFrame:null,frames:0,active:true,
       renderGaps:[],lastRender:null,stepsPerRender:[],lastRenderUpdates:null,
-      updateCostSamples:[],renderCostSamples:[]
+      updateCostSamples:[],renderCostSamples:[],
+      updatePlusRenderSamples:[],lastRenderUpdateWorkMs:null
      };
      const update=g.update,fire=g.tryFire;
      const updateBullets=g.updateBullets,collisions=g.resolveBulletCollisions;
@@ -98,6 +99,9 @@ const origin='http://127.0.0.1:8765/';
        m.lastRender=completed;
        m.renders++;m.renderWorkMs+=completed-t;
        m.renderCostSamples.push(completed-t);
+       if(m.lastRenderUpdateWorkMs!==null)
+        m.updatePlusRenderSamples.push(m.updateWorkMs-m.lastRenderUpdateWorkMs+completed-t);
+       m.lastRenderUpdateWorkMs=m.updateWorkMs;
       }
      };
      const drawMinimap=g.drawMinimap;
@@ -137,6 +141,7 @@ const origin='http://127.0.0.1:8765/';
       const m=window.__novaCombatBench;
       m.lastRender=null;
       m.lastRenderUpdates=null;
+      m.lastRenderUpdateWorkMs=null;
       m.lastFrame=null;
      });
      const before=await page.evaluate(()=>{
@@ -149,11 +154,12 @@ const origin='http://127.0.0.1:8765/';
        gaps:m.frameGaps.length,renderGaps:m.renderGaps.length,
        stepsPerRender:m.stepsPerRender.length,
        updateCosts:m.updateCostSamples.length,renderCosts:m.renderCostSamples.length,
+       updatePlusRender:m.updatePlusRenderSamples.length,
        ticks:g.__novaFixed60Pilot?.owner.ticks||0,
        droppedMs:g.__novaFixed60Pilot?.owner.droppedMs||0};
      });
      await page.waitForTimeout(3000);
-     const after=await page.evaluate(({gapStart,renderGapStart,stepsStart,updateCostStart,renderCostStart})=>{
+     const after=await page.evaluate(({gapStart,renderGapStart,stepsStart,updateCostStart,renderCostStart,updatePlusRenderStart})=>{
       const m=window.__novaCombatBench,g=window.__novaCombatBenchGame;
       return {at:performance.now(),updates:m.updates,simMs:m.simMs,work:m.updateWorkMs,
        renders:m.renders,renderWork:m.renderWorkMs,
@@ -167,6 +173,7 @@ const origin='http://127.0.0.1:8765/';
        stepsPerRender:m.stepsPerRender.slice(stepsStart),
        updateCostSamples:m.updateCostSamples.slice(updateCostStart),
        renderCostSamples:m.renderCostSamples.slice(renderCostStart),
+       updatePlusRenderSamples:m.updatePlusRenderSamples.slice(updatePlusRenderStart),
        heat:g.player?.__v17Heat||0,
        alive:g.player?.hp>0,playerClass:g.player?.cls,
        paused:!!g.paused,pendingOffer:!!g.pendingOffer,
@@ -175,7 +182,8 @@ const origin='http://127.0.0.1:8765/';
        layout:g.__novaBattlefield?.name||null};
      },{gapStart:before.gaps,renderGapStart:before.renderGaps,
        stepsStart:before.stepsPerRender,
-       updateCostStart:before.updateCosts,renderCostStart:before.renderCosts});
+       updateCostStart:before.updateCosts,renderCostStart:before.renderCosts,
+       updatePlusRenderStart:before.updatePlusRender});
      // Snapshot on the browser's own clock: under CPU pressure Playwright's
      // post-timeout evaluate may wait for the busy main thread. Its delay
      // contributes real game work and must be included in the denominator.
@@ -204,6 +212,9 @@ const origin='http://127.0.0.1:8765/';
      };
      const updateCostP95Ms=percentile(after.updateCostSamples,.95);
      const renderCostP95Ms=percentile(after.renderCostSamples,.95);
+     // Actual measured update+render work accumulated between completed
+     // game frames. Excludes browser scheduling, minimap and other tasks.
+     const updatePlusRenderP95Ms=percentile(after.updatePlusRenderSamples,.95);
      const simulatedMs=delta('simMs');
      const updates=delta('updates'),renders=delta('renders'),frames=delta('frames');
      const updateWorkMs=delta('work'),renderWorkMs=delta('renderWork');
@@ -233,7 +244,7 @@ const origin='http://127.0.0.1:8765/';
       simulatedTimeDeficitMs:wallMs-simulatedMs,
       renderPerUpdate:renders/updates,
       updateCostMs:updateWorkMs/updates,
-      updateCostP95Ms,renderCostP95Ms,
+      updateCostP95Ms,renderCostP95Ms,updatePlusRenderP95Ms,
       renderCostMs:renderWorkMs/renders,
       projectilesPerSimSecond:projectiles*1000/simulatedMs,
       heat:after.heat,alive:after.alive,playerClass:after.playerClass,
@@ -243,6 +254,7 @@ const origin='http://127.0.0.1:8765/';
      assert.ok(result.updates>0 && result.simulatedMs>0 && result.renders>0 &&
       Number.isFinite(result.updateWorkMs) && Number.isFinite(result.renderWorkMs) &&
       Number.isFinite(result.updateCostP95Ms) && Number.isFinite(result.renderCostP95Ms) &&
+      Number.isFinite(result.updatePlusRenderP95Ms) &&
       Number.isFinite(result.bulletWorkMs) && Number.isFinite(result.collisionWorkMs) &&
       result.renderGapSamples>0 && Number.isFinite(result.renderGapP95Ms) &&
       Number.isFinite(result.stepsPerRenderP95),
@@ -346,6 +358,8 @@ const origin='http://127.0.0.1:8765/';
     baselineObserverGapP95Ms:baseline.frameGapP95Ms,
     fixed60ObserverGapP95Ms:pilot.frameGapP95Ms,
     observerGapP95DeltaMs:pilot.frameGapP95Ms-baseline.frameGapP95Ms,
+    baselineUpdatePlusRenderP95Ms:baseline.updatePlusRenderP95Ms,
+    fixed60UpdatePlusRenderP95Ms:pilot.updatePlusRenderP95Ms,
     baselineMeasuredWorkFraction:(baseline.updateWorkMs+baseline.renderWorkMs)/baseline.wallMs,
     fixed60MeasuredWorkFraction:(pilot.updateWorkMs+pilot.renderWorkMs)/pilot.wallMs,
     baselineRenderGapP95Ms:baseline.renderGapP95Ms,
