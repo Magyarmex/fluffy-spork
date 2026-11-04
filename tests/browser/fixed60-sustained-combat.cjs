@@ -69,8 +69,18 @@ const origin='http://127.0.0.1:8765/';
       frameGaps:[],lastFrame:null,frames:0,active:true,
       renderGaps:[],lastRender:null,stepsPerRender:[],lastRenderUpdates:null,
       updateCostSamples:[],renderCostSamples:[],
-      updatePlusRenderSamples:[],lastRenderUpdateWorkMs:null
+      updatePlusRenderSamples:[],lastRenderUpdateWorkMs:null,
+      longTasks:[],longTaskObserver:null
      };
+     // Diagnose RAF stalls not explained by measured update/render work.
+     // Long tasks can originate outside Game and do not prove causation.
+     if(typeof PerformanceObserver==='function' &&
+        PerformanceObserver.supportedEntryTypes?.includes('longtask')){
+      m.longTaskObserver=new PerformanceObserver(list=>{
+       for(const entry of list.getEntries())m.longTasks.push({start:entry.startTime,duration:entry.duration});
+      });
+      m.longTaskObserver.observe({type:'longtask',buffered:true});
+     }
      const update=g.update,fire=g.tryFire;
      const updateBullets=g.updateBullets,collisions=g.resolveBulletCollisions;
      if(typeof updateBullets!=='function'||typeof collisions!=='function')
@@ -165,7 +175,9 @@ const origin='http://127.0.0.1:8765/';
      await page.waitForTimeout(3000);
      const after=await page.evaluate(({gapStart,renderGapStart,stepsStart,updateCostStart,renderCostStart,updatePlusRenderStart})=>{
       const m=window.__novaCombatBench,g=window.__novaCombatBenchGame;
-      return {at:performance.now(),canvasBacking:[g.canvas.width,g.canvas.height],
+      if(m.longTaskObserver)for(const entry of m.longTaskObserver.takeRecords())
+       m.longTasks.push({start:entry.startTime,duration:entry.duration});
+      return {at:performance.now(),longTasks:m.longTasks.slice(),canvasBacking:[g.canvas.width,g.canvas.height],
        canvasCss:[g.canvas.clientWidth,g.canvas.clientHeight],dpr:g.dpr,updates:m.updates,simMs:m.simMs,work:m.updateWorkMs,
        renders:m.renders,renderWork:m.renderWorkMs,
        minimaps:m.minimaps,minimapWork:m.minimapWorkMs,
@@ -192,6 +204,9 @@ const origin='http://127.0.0.1:8765/';
      // Snapshot on the browser's own clock: under CPU pressure Playwright's
      // post-timeout evaluate may wait for the busy main thread. Its delay
      // contributes real game work and must be included in the denominator.
+     const longTasks=after.longTasks.filter(x=>x.start>=before.at&&x.start<=after.at);
+     const longTaskTotalMs=longTasks.reduce((sum,x)=>sum+x.duration,0);
+     const longTaskMaxMs=longTasks.reduce((max,x)=>Math.max(max,x.duration),0);
      const wallMs=after.at-before.at;
      assert.ok(Number.isFinite(wallMs)&&wallMs>=2500,
       'combat measurement interval must use actual browser elapsed time');
@@ -228,7 +243,9 @@ const origin='http://127.0.0.1:8765/';
      // RAF observer is only a browser scheduling diagnostic.
      // Normalize to simulated game time. Raw projectile totals are misleading
      // when the world has different heat, targets, or startup histories.
-     const result={repeat,renderScale,fixed60,throttle,wallMs,updates,simulatedMs,updateWorkMs,
+     const result={repeat,renderScale,fixed60,throttle,wallMs,
+      longTaskCount:longTasks.length,longTaskTotalMs,longTaskMaxMs,
+      updates,simulatedMs,updateWorkMs,
       renders,renderWorkMs,bulletWorkMs:delta('bulletWorkMs'),
       collisionWorkMs:delta('collisionWorkMs'),minimaps:delta('minimaps'),
       minimapWorkMs:delta('minimapWork'),projectiles,
@@ -283,6 +300,7 @@ const origin='http://127.0.0.1:8765/';
     await cdp.send('Emulation.setCPUThrottlingRate',{rate:1});
     await page.evaluate(()=>{
      window.__novaCombatBench.active=false;
+     window.__novaCombatBench.longTaskObserver?.disconnect();
      window.__novaCombatBenchGame.destroy();
     });
     assert.deepEqual(errors,[],'combat browser errors: '+errors.join('; '));
@@ -328,6 +346,10 @@ const origin='http://127.0.0.1:8765/';
    summaries.push({renderScale,throttle,baselinePresentationFps:baseFps,
     fixed60PresentationFps:pilotFps,
     fixed60PresentationRatio:pilotFps/baseFps,
+    baselineLongTaskTotalMs:mean(baseline,'longTaskTotalMs'),
+    fixed60LongTaskTotalMs:mean(pilot,'longTaskTotalMs'),
+    baselineLongTaskMaxMs:mean(baseline,'longTaskMaxMs'),
+    fixed60LongTaskMaxMs:mean(pilot,'longTaskMaxMs'),
     baselineRenderGapP95Ms:mean(baseline,'renderGapP95Ms'),
     fixed60RenderGapP95Ms:mean(pilot,'renderGapP95Ms'),
     baselineRenderGapMaxMs:mean(baseline,'renderGapMaxMs'),
@@ -376,6 +398,8 @@ const origin='http://127.0.0.1:8765/';
    assert.ok(baseline&&pilot&&baseline.layout===pilot.layout,
     'paired scheduler trials must share the same real Battlefield layout');
    paired.push({repeat,renderScale,throttle,layout:baseline.layout,
+    baselineLongTaskTotalMs:baseline.longTaskTotalMs,
+    fixed60LongTaskTotalMs:pilot.longTaskTotalMs,
     baselinePresentationFps:baseline.presentationFps,
     fixed60PresentationFps:pilot.presentationFps,
     presentationFpsDelta:pilot.presentationFps-baseline.presentationFps,
