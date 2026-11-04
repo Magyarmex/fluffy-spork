@@ -117,6 +117,8 @@ const origin='http://127.0.0.1:8765/';
      const updates=delta('updates'),renders=delta('renders'),frames=delta('frames');
      const updateWorkMs=delta('work'),renderWorkMs=delta('renderWork');
      const projectiles=delta('projectiles');
+     // Game render throughput is the presentation metric; the independent
+     // RAF observer is only a browser scheduling diagnostic.
      // Normalize to simulated game time. Raw projectile totals are misleading
      // when the world has different heat, targets, or startup histories.
      const result={repeat,fixed60,throttle,wallMs,updates,simulatedMs,updateWorkMs,
@@ -124,7 +126,8 @@ const origin='http://127.0.0.1:8765/';
       minimapWorkMs:delta('minimapWork'),projectiles,
       fireCalls:delta('fireCalls'),frames,frameGapP95Ms:p95,
       frameGapSamples:gaps.length,
-      presentationFps:frames*1000/wallMs,
+      presentationFps:renders*1000/wallMs,
+      observerRafFps:frames*1000/wallMs,
       simulationHz:updates*1000/wallMs,
       renderPerUpdate:renders/updates,
       updateCostMs:updateWorkMs/updates,
