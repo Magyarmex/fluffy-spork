@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {FixedStepRafOwner}=require('../research/fixed-step-raf-owner.cjs');
 const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
-function setup(){
+function setup(isHidden=()=>false){
  let id=0;const callbacks=new Map();
  const input={move:{active:false},stickId:{move:-1},keyboard:{},firing:false,
   pd(e){if(e.pointerId===8){this.firing=true;return}
@@ -16,7 +16,7 @@ function setup(){
  const timeline=new ChronologicalInput(input),bridge={timeline,startMs:1000};
  const owner=new FixedStepRafOwner(game,timeline,bridge,{now:()=>1000,
   request:cb=>{callbacks.set(++id,cb);return id},
-  cancel:key=>callbacks.delete(key),render(){},maxSteps:4});
+  cancel:key=>callbacks.delete(key),render(){},maxSteps:4,isHidden});
  const frame=ms=>{const cb=callbacks.get(id);assert.ok(cb);callbacks.delete(id);cb(1000+ms)};
  const edge=(ms,kind)=>timeline.push(ms/1000,kind,{pointerId:7,pointerType:'touch'});
  owner.start();edge(0,'pointerdown');frame(20);
@@ -95,5 +95,15 @@ test('firing cancellation queued inside skipped foreground time prevents phantom
  x.frame(40);assert.equal(x.input.firing,true);
  x.timeline.push(.08,'pointercancel',{pointerId:8,pointerType:'touch'});
  x.frame(160);assert.equal(x.input.firing,false);
+ x.owner.stop();
+});
+
+test('hidden document fails closed even when RAF gap is under 250ms',()=>{
+ let hidden=false;
+ const x=setup(()=>hidden);
+ hidden=true;
+ x.frame(140);
+ assert.equal(x.input.move.active,false);
+ assert.equal(x.input.stickId.move,-1);
  x.owner.stop();
 });
