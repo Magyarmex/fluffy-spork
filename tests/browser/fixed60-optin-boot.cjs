@@ -630,6 +630,13 @@ const {chromium}=require('playwright');
      await page.waitForTimeout(300);
      const initial=await page.evaluate(()=>{
       const g=window.__novaStepBudgetGame,o=g.__novaFixed60Pilot.owner;
+      g.setClass(g.player,'tempest');
+      g.player.stats.reload=8;
+      g.player.perk='alacrity';
+      g.useAbility(g.player);
+      g.player.hp=1000000;
+      g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
+      g.input.firing=true;g.input.autofire=false;
       if(o.maxSteps!==Number(new URLSearchParams(location.search).get('nova_fixed60_steps')))
        throw Error('research step budget did not reach actual owner');
       if(g.raf)throw Error('production RAF co-owns pilot Game');
