@@ -180,7 +180,7 @@ const origin='http://127.0.0.1:8765/';
        renderCostSamples:m.renderCostSamples.slice(renderCostStart),
        updatePlusRenderSamples:m.updatePlusRenderSamples.slice(updatePlusRenderStart),
        heat:g.player?.__v17Heat||0,
-       alive:g.player?.hp>0,playerClass:g.player?.cls,
+       alive:g.player?.hp>0,destroyed:!!g.__novaDestroyed,playerClass:g.player?.cls,
        paused:!!g.paused,pendingOffer:!!g.pendingOffer,
        entityCounts:{tanks:g.tanks?.length||0,drones:g.drones?.length||0,
         bullets:g.bullets?.length||0,shapes:g.shapes?.length||0},
@@ -252,7 +252,7 @@ const origin='http://127.0.0.1:8765/';
       updateCostP95Ms,renderCostP95Ms,updatePlusRenderP95Ms,
       renderCostMs:renderWorkMs/renders,
       projectilesPerSimSecond:projectiles*1000/simulatedMs,
-      heat:after.heat,alive:after.alive,playerClass:after.playerClass,
+      heat:after.heat,alive:after.alive,destroyed:after.destroyed,playerClass:after.playerClass,
       canvasBacking:after.canvasBacking,canvasCss:after.canvasCss,actualDpr:after.dpr,
       paused:after.paused,pendingOffer:after.pendingOffer,
       entityCounts:after.entityCounts,layout:after.layout,droppedMs:delta('droppedMs'),ticks:delta('ticks')};
@@ -271,6 +271,7 @@ const origin='http://127.0.0.1:8765/';
       'Render clarity must reach actual game DPR');
      assert.equal(result.playerClass,'tempest','real combat must use Tempest');
      assert.equal(result.alive,true,'player death must not censor a sustained combat trial');
+     assert.equal(result.destroyed,false,'destroyed Game must not censor a sustained combat trial');
      assert.equal(result.paused,false,'evolution or menu pause must not censor combat measurement');
      assert.equal(result.pendingOffer,false,'pending evolution offer must not censor combat measurement');
      assert.ok(result.fireCalls>0 && result.projectiles>0,
