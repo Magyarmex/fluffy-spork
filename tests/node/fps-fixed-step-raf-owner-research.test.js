@@ -407,13 +407,16 @@ test('bounded RAF conserves elapsed time across randomized jitter, overload and 
  }
 });
 
-test('150ms suspension clears stale held input even with four-step opt-in budget',()=>{
+test('150ms foreground gap retains held keyboard, but long suspension releases it',()=>{
  const g=bootGame(),h=setup(g,{maxSteps:4});try{
   h.setNow(10);h.capture('keydown',10,{key:'w'});h.frame(1000/60);
   assert.equal(g.input.keyboard.up,true);
   h.frame(1000/60+150);
-  assert.equal(g.input.keyboard.up,false,'a 150ms suspension must not replay old movement');
+  assert.equal(g.input.keyboard.up,true,'a bounded foreground gap must preserve held movement');
   assert.equal(h.owner.droppedFrames,1);
+  h.frame(1000/60+150+300);
+  assert.equal(g.input.keyboard.up,false,'a long suspension must release stale movement');
+  assert.equal(h.owner.droppedFrames,2);
  }finally{h.close()}
 });
 
