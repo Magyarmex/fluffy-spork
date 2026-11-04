@@ -11,7 +11,6 @@ let selected=false;
 try{selected=new URLSearchParams(win.location.search).get('nova_fixed60')==='pilot'}
 catch(_){return}
 if(!selected)return;
-const api=win.__novaFixed60Research;
 const previous=mods['game/engine'];
 mods['game/engine']=function(module,exports,require){
   previous(module,exports,require);
@@ -21,6 +20,7 @@ mods['game/engine']=function(module,exports,require){
   if(typeof productionStart!=='function')
     throw Error('fixed60 pilot requires canonical Game.start');
   Game.prototype.start=function(){
+    const api=win.__novaFixed60Research;
     if(!api || typeof api.createFixedStepBrowserPilot!=='function')
       throw Error('fixed60 pilot requested but browser research bundle is missing');
     if(this.__novaFixed60Pilot)throw Error('fixed60 pilot already attached');
@@ -48,4 +48,10 @@ mods['game/engine']=function(module,exports,require){
   };
   Object.defineProperty(Game.prototype,'__novaFixed60BootDelegate',{value:true});
 };
+// Parser-time, query-only loading: default players neither fetch nor parse the
+// research bundle, and the PWA's atomic shell validation does not require it.
+// The fail-closed Game.start delegate above is installed FIRST, so a missing
+// optional pilot asset cannot silently fall back to production simulation.
+if(win.document.readyState==='loading' && typeof win.document.write==='function')
+  win.document.write('<script src="./nova-updates/fixed60-research-browser.js"></'+'script>');
 })();
