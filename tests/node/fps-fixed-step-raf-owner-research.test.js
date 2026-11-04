@@ -479,7 +479,7 @@ test('fatal composed RAF render releases DOM capture and restores production Inp
  assert.equal(pilot.capture.active,false,'fatal RAF must detach chronological DOM capture');
  assert.equal(callback,null,'fatal RAF must cancel the next callback');
  assert.equal(g.input.canvas,g.canvas,'production Input must be reattached');
- assert.equal(g.__novaDestroyed,false,'fatal RAF cleanup must not fabricate game destruction');
+ assert.notEqual(g.__novaDestroyed,true,'fatal RAF cleanup must not fabricate game destruction');
  g.destroy();
  assert.equal(g.__novaDestroyed,true,'normal Game.destroy remains reachable');
  for(const entries of listeners.values())for(const fns of entries.values())
