@@ -44,10 +44,24 @@ const origin='http://127.0.0.1:8765/';
      g.input.firing=true;
      g.input.autofire=false;
      const m=window.__novaCombatBench={
-      updates:0,simMs:0,updateWorkMs:0,projectiles:0,fireCalls:0,
+      updates:0,simMs:0,updateWorkMs:0,renders:0,renderWorkMs:0,
+      minimaps:0,minimapWorkMs:0,projectiles:0,fireCalls:0,
       frameGaps:[],lastFrame:null,frames:0,active:true
      };
      const update=g.update,fire=g.tryFire;
+     const renderer=window.__novaMakeRequire('')('game/render');
+     const render=renderer.render;
+     renderer.render=function(...args){
+      const t=performance.now();
+      try{return render.apply(this,args)}
+      finally{m.renders++;m.renderWorkMs+=performance.now()-t}
+     };
+     const drawMinimap=g.drawMinimap;
+     g.drawMinimap=function(...args){
+      const t=performance.now();
+      try{return drawMinimap.apply(this,args)}
+      finally{m.minimaps++;m.minimapWorkMs+=performance.now()-t}
+     };
      g.update=function(dt){
       const t=performance.now();
       try{return update.apply(this,arguments)}
@@ -73,6 +87,8 @@ const origin='http://127.0.0.1:8765/';
      const before=await page.evaluate(()=>{
       const m=window.__novaCombatBench,g=window.__novaCombatBenchGame;
       return {updates:m.updates,simMs:m.simMs,work:m.updateWorkMs,
+       renders:m.renders,renderWork:m.renderWorkMs,
+       minimaps:m.minimaps,minimapWork:m.minimapWorkMs,
        projectiles:m.projectiles,fireCalls:m.fireCalls,frames:m.frames,
        gaps:m.frameGaps.length,ticks:g.__novaFixed60Pilot?.owner.ticks||0,
        droppedMs:g.__novaFixed60Pilot?.owner.droppedMs||0};
@@ -95,12 +111,16 @@ const origin='http://127.0.0.1:8765/';
      const p95=sorted.length?sorted[Math.ceil(.95*sorted.length)-1]:null;
      const result={fixed60,throttle,wallMs,updates:delta('updates'),
       simulatedMs:delta('simMs'),updateWorkMs:delta('work'),
+      renders:delta('renders'),renderWorkMs:delta('renderWork'),
+      minimaps:delta('minimaps'),minimapWorkMs:delta('minimapWork'),
       projectiles:delta('projectiles'),fireCalls:delta('fireCalls'),
       frames:delta('frames'),frameGapP95Ms:p95,heat:after.heat,
       alive:after.alive,playerClass:after.playerClass,droppedMs:delta('droppedMs'),
       ticks:delta('ticks')};
-     assert.ok(result.updates>0 && result.simulatedMs>0 &&
-      Number.isFinite(result.updateWorkMs),'real combat must advance');
+     assert.ok(result.updates>0 && result.simulatedMs>0 && result.renders>0 &&
+      Number.isFinite(result.updateWorkMs) && Number.isFinite(result.renderWorkMs),
+      'real composed combat and renderer must advance');
+     console.log('NOVA_FIXED60_COMBAT_PHASE '+JSON.stringify(result));
      assert.equal(result.playerClass,'tempest','real combat must use Tempest');
      assert.ok(result.fireCalls>0 && result.projectiles>0,
       'Tempest must spawn actual projectiles in composed browser Game');
