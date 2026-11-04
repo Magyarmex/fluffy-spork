@@ -121,8 +121,11 @@ const origin='http://127.0.0.1:8765/';
      };
      g.updateBullets=function(...args){
       const t=performance.now(),dt=Number(args[0]);
-      if(Number.isFinite(dt)&&dt>0)
-       m.bulletSeconds+=this.bullets.filter(b=>b&&!b.dead).length*dt;
+      if(Number.isFinite(dt)&&dt>0){
+       let live=0;
+       for(const b of this.bullets)if(b&&!b.dead)live++;
+       m.bulletSeconds+=live*dt;
+      }
       m.inBulletUpdate=true;
       try{return updateBullets.apply(this,args)}
       finally{m.inBulletUpdate=false;m.bulletWorkMs+=performance.now()-t}
