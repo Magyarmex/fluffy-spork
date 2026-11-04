@@ -61,7 +61,7 @@ const origin='http://127.0.0.1:8765/';
       updates:0,simMs:0,updateWorkMs:0,renders:0,renderWorkMs:0,
       minimaps:0,minimapWorkMs:0,projectiles:0,fireCalls:0,
       frameGaps:[],lastFrame:null,frames:0,active:true,
-      renderGaps:[],lastRender:null
+      renderGaps:[],lastRender:null,stepsPerRender:[],lastRenderUpdates:null
      };
      const update=g.update,fire=g.tryFire;
      const renderer=window.__novaMakeRequire('')('game/render');
@@ -72,6 +72,9 @@ const origin='http://127.0.0.1:8765/';
       finally{
        const completed=performance.now();
        if(m.lastRender!==null)m.renderGaps.push(completed-m.lastRender);
+       if(m.lastRenderUpdates!==null)
+        m.stepsPerRender.push(m.updates-m.lastRenderUpdates);
+       m.lastRenderUpdates=m.updates;
        m.lastRender=completed;
        m.renders++;m.renderWorkMs+=completed-t;
       }
@@ -110,6 +113,7 @@ const origin='http://127.0.0.1:8765/';
      await page.evaluate(()=>{
       const m=window.__novaCombatBench;
       m.lastRender=null;
+      m.lastRenderUpdates=null;
       m.lastFrame=null;
      });
      const before=await page.evaluate(()=>{
@@ -118,13 +122,14 @@ const origin='http://127.0.0.1:8765/';
        renders:m.renders,renderWork:m.renderWorkMs,
        minimaps:m.minimaps,minimapWork:m.minimapWorkMs,
        projectiles:m.projectiles,fireCalls:m.fireCalls,frames:m.frames,
-       gaps:m.frameGaps.length,renderGaps:m.renderGaps.length,ticks:g.__novaFixed60Pilot?.owner.ticks||0,
+       gaps:m.frameGaps.length,renderGaps:m.renderGaps.length,
+       stepsPerRender:m.stepsPerRender.length,ticks:g.__novaFixed60Pilot?.owner.ticks||0,
        droppedMs:g.__novaFixed60Pilot?.owner.droppedMs||0};
      });
      const wallStart=Date.now();
      await page.waitForTimeout(3000);
      const wallMs=Date.now()-wallStart;
-     const after=await page.evaluate(({gapStart,renderGapStart})=>{
+     const after=await page.evaluate(({gapStart,renderGapStart,stepsStart})=>{
       const m=window.__novaCombatBench,g=window.__novaCombatBenchGame;
       return {updates:m.updates,simMs:m.simMs,work:m.updateWorkMs,
        renders:m.renders,renderWork:m.renderWorkMs,
@@ -133,10 +138,12 @@ const origin='http://127.0.0.1:8765/';
        gaps:m.frameGaps.length,ticks:g.__novaFixed60Pilot?.owner.ticks||0,
        droppedMs:g.__novaFixed60Pilot?.owner.droppedMs||0,
        frameGaps:m.frameGaps.slice(gapStart),
-       renderGaps:m.renderGaps.slice(renderGapStart),heat:g.player?.__v17Heat||0,
+       renderGaps:m.renderGaps.slice(renderGapStart),
+       stepsPerRender:m.stepsPerRender.slice(stepsStart),heat:g.player?.__v17Heat||0,
        alive:g.player?.hp>0,playerClass:g.player?.cls,
        layout:g.__novaBattlefield?.name||null};
-     },{gapStart:before.gaps,renderGapStart:before.renderGaps});
+     },{gapStart:before.gaps,renderGapStart:before.renderGaps,
+       stepsStart:before.stepsPerRender});
      const delta=(k)=>after[k]-before[k];
      const gaps=after.frameGaps;
      const sorted=gaps.slice().sort((a,b)=>a-b);
@@ -147,6 +154,12 @@ const origin='http://127.0.0.1:8765/';
       sortedRenderGaps[Math.ceil(.95*sortedRenderGaps.length)-1]:null;
      const renderGapMaxMs=sortedRenderGaps.length?
       sortedRenderGaps[sortedRenderGaps.length-1]:null;
+     const stepsPerRender=after.stepsPerRender;
+     const sortedSteps=stepsPerRender.slice().sort((a,b)=>a-b);
+     const stepsPerRenderP95=sortedSteps.length?
+      sortedSteps[Math.ceil(.95*sortedSteps.length)-1]:null;
+     const stepsPerRenderMax=sortedSteps.length?
+      sortedSteps[sortedSteps.length-1]:null;
      const simulatedMs=delta('simMs');
      const updates=delta('updates'),renders=delta('renders'),frames=delta('frames');
      const updateWorkMs=delta('work'),renderWorkMs=delta('renderWork');
@@ -162,6 +175,8 @@ const origin='http://127.0.0.1:8765/';
       frameGapSamples:gaps.length,
       renderGapP95Ms,renderGapMaxMs,renderGapSamples:renderGaps.length,
       renderGapsOver50Ms:renderGaps.filter(ms=>ms>50).length,
+      stepsPerRenderP95,stepsPerRenderMax,
+      multiStepRenderFrames:stepsPerRender.filter(n=>n>=2).length,
       presentationFps:renders*1000/wallMs,
       observerRafFps:frames*1000/wallMs,
       simulationHz:updates*1000/wallMs,
@@ -174,7 +189,8 @@ const origin='http://127.0.0.1:8765/';
      console.log('NOVA_FIXED60_COMBAT_PHASE '+JSON.stringify(result));
      assert.ok(result.updates>0 && result.simulatedMs>0 && result.renders>0 &&
       Number.isFinite(result.updateWorkMs) && Number.isFinite(result.renderWorkMs) &&
-      result.renderGapSamples>0 && Number.isFinite(result.renderGapP95Ms),
+      result.renderGapSamples>0 && Number.isFinite(result.renderGapP95Ms) &&
+      Number.isFinite(result.stepsPerRenderP95),
       'real composed combat and renderer must advance');
      assert.equal(result.playerClass,'tempest','real combat must use Tempest');
      assert.ok(result.fireCalls>0 && result.projectiles>0,
@@ -224,6 +240,10 @@ const origin='http://127.0.0.1:8765/';
     fixed60RenderGapMaxMs:mean(pilot,'renderGapMaxMs'),
     baselineRenderGapsOver50Ms:mean(baseline,'renderGapsOver50Ms'),
     fixed60RenderGapsOver50Ms:mean(pilot,'renderGapsOver50Ms'),
+    baselineStepsPerRenderP95:mean(baseline,'stepsPerRenderP95'),
+    fixed60StepsPerRenderP95:mean(pilot,'stepsPerRenderP95'),
+    baselineMultiStepRenderFrames:mean(baseline,'multiStepRenderFrames'),
+    fixed60MultiStepRenderFrames:mean(pilot,'multiStepRenderFrames'),
     baselineUpdateCostMs:mean(baseline,'updateCostMs'),
     fixed60UpdateCostMs:mean(pilot,'updateCostMs'),
     baselineProjectilesPerSimSecond:mean(baseline,'projectilesPerSimSecond'),
