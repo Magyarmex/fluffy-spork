@@ -246,6 +246,26 @@ test('same-batch pause then resume invalidates the pre-transition tick',()=>{
  }finally{h.close()}
 });
 
+test('pause/resume during Game.update cannot roll back the simulation clock or run a stale substep',()=>{
+ const g=bootGame(),h=setup(g);let updates=0;
+ const original=g.update;
+ g.update=function(...args){
+  updates++;
+  if(updates===1){this.setPaused(true);this.setPaused(false);}
+  return original.apply(this,args);
+ };
+ try{
+  h.setNow(1000/30);
+  h.frame(1000/30);
+  assert.equal(updates,1,'same-frame resume must not run a second pre-transition update');
+  assert.equal(h.owner.ticks,1,'the completed first update still counts');
+  assert.ok(h.owner.simAtSec>=1/30-1e-6,
+   'update-time pause transition must not roll the clock backward');
+  h.frame(1000/15);
+  assert.ok(h.owner.simAtSec>=1/30-1e-6);
+ }finally{h.close()}
+});
+
 test('actual composed renderer is simulation-pure across presentation rates',()=>{
  function run(seed,hz){return withSeed(seed,draws=>{
   const g=bootGame();g.sfx.muted=true;
