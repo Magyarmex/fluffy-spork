@@ -459,11 +459,14 @@ class FixedStepRafOwner {
     }else{
       const maxMs=this.maxSteps*STEP_MS;
       if(raw>100+EPS){
-        // Genuine long stall: discard old controls and bound catch-up. A
-        // healthy 30Hz frame can be a little longer than two 60Hz steps;
-        // treating that ordinary jitter as a stall loses whole updates.
+        // A short foreground stall must not silently release a finger still
+        // held on a stick. Advance the chronological timeline across skipped
+        // time so queued releases/cancels take effect before surviving ticks.
+        // Long suspension still fails closed: stale held commands must not
+        // survive a background-sized gap without a fresh input edge.
         this.droppedMs+=this.lagMs+raw-maxMs;this.droppedFrames++;
-        this.timeline.reset();this.lagMs=0;
+        if(raw>250+EPS)this.timeline.reset();
+        this.lagMs=0;
         this.simAtSec=(ts-this.bridge.startMs-maxMs)/1000;
         this.timeline.consumeThrough(this.simAtSec);
         this.lagMs=maxMs;
