@@ -398,6 +398,9 @@ const {chromium}=require('playwright');
      const g=window.__novaMobilePilotGame;
      return g?.status==='playing' && g.__novaFixed60Pilot?.owner.ticks>5;
     },null,{timeout:15000});
+    // The real React loading veil can outlive Game.status='playing'.
+    // Wait for an actual finger-reachable canvas, not only simulation ticks.
+    await page.locator('.nv-loading').waitFor({state:'hidden',timeout:20000});
     const canvas=page.locator('canvas.absolute.inset-0');
     const box=await canvas.boundingBox();
     assert.ok(box && box.width>=200 && box.height>=300,
