@@ -209,6 +209,24 @@ test('input replay teardown cannot update or render a destroyed Game',()=>{
  assert.equal(h.active.size,0,'no orphan RAF after input teardown');
 });
 
+test('input replay pause prevents an extra combat update',()=>{
+ const g=bootGame();let updates=0;
+ const h=setup(g);const originalUpdate=g.update;
+ g.update=function(...args){updates++;return originalUpdate.apply(this,args)};
+ const originalConsume=h.timeline.consumeThrough;
+ h.timeline.consumeThrough=function(at){
+  originalConsume.call(this,at);
+  if(!g.paused)g.setPaused(true);
+ };
+ try{
+  h.frame(1000/30);
+  assert.equal(g.paused,true,'input replay must exercise the real pause owner');
+  assert.equal(updates,0,'no combat tick after replay pauses Game');
+  assert.equal(h.owner.ticks,0);
+  assert.equal(h.owner.started,true,'pause must retain the scheduler for resume');
+ }finally{h.close()}
+});
+
 test('actual composed renderer is simulation-pure across presentation rates',()=>{
  function run(seed,hz){return withSeed(seed,draws=>{
   const g=bootGame();g.sfx.muted=true;
