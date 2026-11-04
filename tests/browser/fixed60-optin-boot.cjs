@@ -476,18 +476,25 @@ const {chromium}=require('playwright');
     // Game.start was attempted before accepting fail-closed recovery.
     await page.waitForFunction(()=>!!window.__novaMissingBundleGame,
      null,{timeout:15000});
-    await page.waitForFunction(()=>!!document.querySelector('#root .menu-grid-bg'),
-     null,{timeout:15000});
+    // A menu may remain visible while React is still transitioning. Require
+    // teardown of the attempted real Game before accepting fail-closed boot.
+    await page.waitForFunction(()=>{
+     const g=window.__novaMissingBundleGame;
+     return !!g?.__novaDestroyed &&
+      !!document.querySelector('#root .menu-grid-bg');
+    },null,{timeout:15000});
     const failed=await page.evaluate(()=>{
      const g=window.__novaMissingBundleGame;
      return {research:!!window.__novaFixed60Research,
       productionRAF:g?.raf||0,started:!!g?.__novaFixed60Pilot?.owner.started,
+      destroyed:!!g?.__novaDestroyed,
       menu:!!document.querySelector('#root .menu-grid-bg')};
     });
     assert.ok(blocked>0,'pilot outage must exercise an actual failed research request');
     assert.equal(failed.research,false,'missing optional bundle must not initialize');
     assert.equal(failed.productionRAF,0,'missing pilot must not start production RAF');
     assert.equal(failed.started,false,'missing pilot must not leave simulation running');
+    assert.equal(failed.destroyed,true,'missing pilot must destroy attempted Game');
     assert.equal(failed.menu,true,'missing pilot must return to menu');
     console.log('NOVA_FIXED60_MISSING_BUNDLE '+JSON.stringify({blocked,failed}));
    }finally{await context.close()}
