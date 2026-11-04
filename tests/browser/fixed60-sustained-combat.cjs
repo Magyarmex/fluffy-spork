@@ -8,7 +8,9 @@ const origin='http://127.0.0.1:8765/';
  const browser=await chromium.launch({headless:true,args:['--disable-dev-shm-usage','--no-sandbox']});
  try{
   const observations=[];
-  for(const fixed60 of [false,true]){
+  // Counterbalance mode order across independent worlds. The browser remains
+  // a synthetic performance proxy, not a deterministic or physical-device gate.
+  for(const repeat of [0,1])for(const fixed60 of (repeat?[true,false]:[false,true])){
    const context=await browser.newContext({viewport:{width:800,height:600}});
    const page=await context.newPage(),errors=[];
    page.on('pageerror',e=>errors.push(String(e)));
@@ -82,7 +84,7 @@ const origin='http://127.0.0.1:8765/';
      };
      requestAnimationFrame(frame);
     });
-    for(const throttle of [1,3]){
+    for(const throttle of (repeat?[3,1]:[1,3])){
      await cdp.send('Emulation.setCPUThrottlingRate',{rate:throttle});
      const before=await page.evaluate(()=>{
       const m=window.__novaCombatBench,g=window.__novaCombatBenchGame;
@@ -111,7 +113,7 @@ const origin='http://127.0.0.1:8765/';
      const gaps=after.frameGaps;
      const sorted=gaps.slice().sort((a,b)=>a-b);
      const p95=sorted.length?sorted[Math.ceil(.95*sorted.length)-1]:null;
-     const result={fixed60,throttle,wallMs,updates:delta('updates'),
+     const result={repeat,fixed60,throttle,wallMs,updates:delta('updates'),
       simulatedMs:delta('simMs'),updateWorkMs:delta('work'),
       renders:delta('renders'),renderWorkMs:delta('renderWork'),
       minimaps:delta('minimaps'),minimapWorkMs:delta('minimapWork'),
@@ -141,6 +143,10 @@ const origin='http://127.0.0.1:8765/';
     await context.close();
    }
   }
+  assert.equal(observations.length,8,'two counterbalanced passes across two schedulers and CPU loads');
+  for(const fixed60 of [false,true])for(const throttle of [1,3])
+   assert.equal(observations.filter(x=>x.fixed60===fixed60&&x.throttle===throttle).length,2,
+    'each scheduler/load pair must have independent replicates');
   console.log('NOVA_FIXED60_SUSTAINED_COMBAT '+JSON.stringify(observations));
  }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});
