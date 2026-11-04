@@ -91,6 +91,7 @@ const origin='http://127.0.0.1:8765/';
       updates:0,simMs:0,updateWorkMs:0,renders:0,renderWorkMs:0,
       minimaps:0,minimapWorkMs:0,projectiles:0,fireCalls:0,
       bulletWorkMs:0,collisionWorkMs:0,
+      bulletSeconds:0,bulletVfxCalls:0,bulletVfxParticles:0,inBulletUpdate:false,
       frameGaps:[],rafDispatchLags:[],lastFrame:null,frames:0,active:true,
       renderGaps:[],lastRender:null,stepsPerRender:[],lastRenderUpdates:null,
       updateCostSamples:[],renderCostSamples:[],
@@ -110,10 +111,21 @@ const origin='http://127.0.0.1:8765/';
      const updateBullets=g.updateBullets,collisions=g.resolveBulletCollisions;
      if(typeof updateBullets!=='function'||typeof collisions!=='function')
       throw Error('materialized projectile/collision owners unavailable');
+     const addParticles=g.addParticles;
+     g.addParticles=function(...args){
+      if(m.inBulletUpdate){
+       m.bulletVfxCalls++;
+       m.bulletVfxParticles+=Number(args[3])||0;
+      }
+      return addParticles.apply(this,args);
+     };
      g.updateBullets=function(...args){
-      const t=performance.now();
+      const t=performance.now(),dt=Number(args[0]);
+      if(Number.isFinite(dt)&&dt>0)
+       m.bulletSeconds+=this.bullets.filter(b=>b&&!b.dead).length*dt;
+      m.inBulletUpdate=true;
       try{return updateBullets.apply(this,args)}
-      finally{m.bulletWorkMs+=performance.now()-t}
+      finally{m.inBulletUpdate=false;m.bulletWorkMs+=performance.now()-t}
      };
      g.resolveBulletCollisions=function(...args){
       const t=performance.now();
@@ -193,6 +205,8 @@ const origin='http://127.0.0.1:8765/';
        minimaps:m.minimaps,minimapWork:m.minimapWorkMs,
        projectiles:m.projectiles,fireCalls:m.fireCalls,frames:m.frames,
        bulletWorkMs:m.bulletWorkMs,collisionWorkMs:m.collisionWorkMs,
+       bulletSeconds:m.bulletSeconds,bulletVfxCalls:m.bulletVfxCalls,
+       bulletVfxParticles:m.bulletVfxParticles,
        gaps:m.frameGaps.length,dispatchLags:m.rafDispatchLags.length,
        renderGaps:m.renderGaps.length,
        stepsPerRender:m.stepsPerRender.length,
@@ -213,6 +227,8 @@ const origin='http://127.0.0.1:8765/';
        minimaps:m.minimaps,minimapWork:m.minimapWorkMs,
        projectiles:m.projectiles,fireCalls:m.fireCalls,frames:m.frames,
        bulletWorkMs:m.bulletWorkMs,collisionWorkMs:m.collisionWorkMs,
+       bulletSeconds:m.bulletSeconds,bulletVfxCalls:m.bulletVfxCalls,
+       bulletVfxParticles:m.bulletVfxParticles,
        gaps:m.frameGaps.length,ticks:g.__novaFixed60Pilot?.owner.ticks||0,
        droppedMs:g.__novaFixed60Pilot?.owner.droppedMs||0,
        frameGaps:m.frameGaps.slice(gapStart),
@@ -286,6 +302,8 @@ const origin='http://127.0.0.1:8765/';
       updates,simulatedMs,updateWorkMs,
       renders,renderWorkMs,bulletWorkMs:delta('bulletWorkMs'),
       collisionWorkMs:delta('collisionWorkMs'),minimaps:delta('minimaps'),
+      bulletSeconds:delta('bulletSeconds'),bulletVfxCalls:delta('bulletVfxCalls'),
+      bulletVfxParticles:delta('bulletVfxParticles'),
       minimapWorkMs:delta('minimapWork'),projectiles,
       fireCalls:delta('fireCalls'),frames,frameGapP95Ms:p95,
       dispatchLagP95Ms,dispatchLagMaxMs,
@@ -308,6 +326,8 @@ const origin='http://127.0.0.1:8765/';
       updateCostP95Ms,renderCostP95Ms,updatePlusRenderP95Ms,
       renderCostMs:renderWorkMs/renders,
       projectilesPerSimSecond:projectiles*1000/simulatedMs,
+      bulletVfxCallsPerBulletSecond:delta('bulletVfxCalls')/Math.max(1e-9,delta('bulletSeconds')),
+      bulletVfxParticlesPerBulletSecond:delta('bulletVfxParticles')/Math.max(1e-9,delta('bulletSeconds')),
       heat:after.heat,alive:after.alive,destroyed:after.destroyed,playerClass:after.playerClass,
       canvasBacking:after.canvasBacking,canvasCss:after.canvasCss,actualDpr:after.dpr,
       paused:after.paused,pendingOffer:after.pendingOffer,
@@ -320,6 +340,8 @@ const origin='http://127.0.0.1:8765/';
       Number.isFinite(result.updateCostP95Ms) && Number.isFinite(result.renderCostP95Ms) &&
       Number.isFinite(result.updatePlusRenderP95Ms) &&
       Number.isFinite(result.bulletWorkMs) && Number.isFinite(result.collisionWorkMs) &&
+      Number.isFinite(result.bulletVfxCallsPerBulletSecond) &&
+      Number.isFinite(result.bulletVfxParticlesPerBulletSecond) &&
       result.renderGapSamples>0 && Number.isFinite(result.renderGapP95Ms) &&
       Number.isFinite(result.dispatchLagP95Ms) && Number.isFinite(result.dispatchLagMaxMs) &&
       Number.isFinite(result.stepsPerRenderP95),
