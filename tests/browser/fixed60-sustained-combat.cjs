@@ -360,6 +360,8 @@ const origin='http://127.0.0.1:8765/';
      assert.equal(result.destroyed,false,'destroyed Game must not censor a sustained combat trial');
      assert.equal(result.paused,false,'evolution or menu pause must not censor combat measurement');
      assert.equal(result.pendingOffer,false,'pending evolution offer must not censor combat measurement');
+     assert.ok(result.bulletSeconds>0 && result.bulletVfxCalls>0,
+      'real combat must exercise projectile particle effects');
      assert.ok(result.fireCalls>0 && result.projectiles>0,
       'Tempest must spawn actual projectiles in composed browser Game');
      if(fixed60)assert.equal(await page.evaluate(()=>window.__novaCombatBenchGame.raf||0),0,
@@ -441,6 +443,10 @@ const origin='http://127.0.0.1:8765/';
     baselineMultiStepRenderFrames:mean(baseline,'multiStepRenderFrames'),
     fixed60MultiStepRenderFrames:mean(pilot,'multiStepRenderFrames'),
     baselineBulletWorkMs:mean(baseline,'bulletWorkMs'),
+    baselineBulletVfxRate:mean(baseline,'bulletVfxCallsPerBulletSecond'),
+    fixed60BulletVfxRate:mean(pilot,'bulletVfxCallsPerBulletSecond'),
+    baselineBulletVfxParticlesRate:mean(baseline,'bulletVfxParticlesPerBulletSecond'),
+    fixed60BulletVfxParticlesRate:mean(pilot,'bulletVfxParticlesPerBulletSecond'),
     fixed60BulletWorkMs:mean(pilot,'bulletWorkMs'),
     baselineCollisionWorkMs:mean(baseline,'collisionWorkMs'),
     fixed60CollisionWorkMs:mean(pilot,'collisionWorkMs'),
@@ -487,6 +493,9 @@ const origin='http://127.0.0.1:8765/';
     baselineUpdatePlusRenderP95Ms:baseline.updatePlusRenderP95Ms,
     fixed60UpdatePlusRenderP95Ms:pilot.updatePlusRenderP95Ms,
     baselineMeasuredWorkFraction:(baseline.updateWorkMs+baseline.renderWorkMs)/baseline.wallMs,
+    baselineBulletVfxRate:baseline.bulletVfxCallsPerBulletSecond,
+    fixed60BulletVfxRate:pilot.bulletVfxCallsPerBulletSecond,
+    bulletVfxRateDelta:pilot.bulletVfxCallsPerBulletSecond-baseline.bulletVfxCallsPerBulletSecond,
     fixed60MeasuredWorkFraction:(pilot.updateWorkMs+pilot.renderWorkMs)/pilot.wallMs,
     baselineRenderGapP95Ms:baseline.renderGapP95Ms,
     fixed60RenderGapP95Ms:pilot.renderGapP95Ms,
