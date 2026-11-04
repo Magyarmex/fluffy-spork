@@ -613,11 +613,31 @@ const {chromium}=require('playwright');
      const deploy=page.getByRole('button',{name:/DEPLOY/i}).first();
      await deploy.waitFor({state:'visible',timeout:20000});
      await page.evaluate(()=>{
-      const Game=window.__novaMakeRequire('')('game/engine').Game;
-      const start=Game.prototype.start;
+      const engine=window.__novaMakeRequire('')('game/engine');
+      const Game=engine.Game,start=Game.prototype.start;
       Game.prototype.start=function(){
        if(!this.__novaDecorativeWorld)window.__novaStepBudgetGame=this;
        return start.apply(this,arguments);
+      };
+      // Match the entire constructor-spawned Battlefield, AI and shapes.
+      // Subsequent live combat RNG remains unpaired; this is not replay.
+      engine.Game=class SeededBudgetGame extends Game{
+       constructor(...args){
+        const oldRandom=Math.random,oldNow=Date.now;
+        let state=(0x9e3779b9^(1517800+1))>>>0||1;
+        Math.random=()=>{
+         state^=state<<13;state^=state>>>17;state^=state<<5;
+         return(state>>>0)/4294967296;
+        };
+        Date.now=()=>0;
+        try{super(...args)}finally{Math.random=oldRandom;Date.now=oldNow}
+        this.__novaBudgetWorld=JSON.stringify({
+         layout:this.__novaBattlefield?.name||null,
+         tanks:this.tanks.map(t=>[t.x,t.y,t.cls,t.angle]),
+         shapes:this.shapes.map(sh=>[sh.x,sh.y,sh.type]),
+         terrain:(this.__novaTerrain||[]).map(w=>[w.x,w.y,w.w,w.h,w.r,w.shape])
+        });
+       }
       };
      });
      await deploy.click();
@@ -649,7 +669,8 @@ const {chromium}=require('playwright');
        return result;
       };
       return {at:performance.now(),ticks:o.ticks,droppedMs:o.droppedMs,
-       renders:window.__novaStepBudgetRenders};
+       renders:window.__novaStepBudgetRenders,
+       world:g.__novaBudgetWorld};
      });
      await page.waitForTimeout(3000);
      const measured=await page.evaluate(()=>{
@@ -659,7 +680,7 @@ const {chromium}=require('playwright');
        paused:g.paused,raf:g.raf||0};
      });
      const wallMs=measured.at-initial.at;
-     const observation={budget,wallMs,
+     const observation={budget,wallMs,world:initial.world,
       ticks:measured.ticks-initial.ticks,
       droppedMs:measured.droppedMs-initial.droppedMs,
       renders:measured.renders-initial.renders,
@@ -678,6 +699,10 @@ const {chromium}=require('playwright');
     }
    }
    assert.deepEqual(observations.map(x=>x.budget),[4,3]);
+   assert.ok(observations.every(x=>typeof x.world==='string'&&x.world.length>100),
+    'both budget trials must capture the real constructor-spawned world');
+   assert.equal(new Set(observations.map(x=>x.world)).size,1,
+    'catch-up budget comparisons must start from identical Battlefield worlds');
    console.log('NOVA_FIXED60_STEP_BUDGET_COMPARISON '+JSON.stringify(observations));
   }
   // A missing experimental bundle must recover to the menu, never launch
