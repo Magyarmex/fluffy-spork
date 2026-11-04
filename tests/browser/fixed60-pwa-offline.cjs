@@ -68,10 +68,10 @@ const origin = 'http://127.0.0.1:8765/';
    },state.active.cacheName);
    const denied=await page.goto(origin,{waitUntil:'domcontentloaded',timeout:45000});
    assert.equal(denied.status(),503,'missing mandatory runtime must reject offline shell');
-   await page.evaluate(async ({url,body,headers},name)=>{
+   await page.evaluate(async ({critical,name})=>{
     const cache=await caches.open(name);
-    await cache.put(url,new Response(body,{status:200,headers}));
-   },criticalCheck,state.active.cacheName);
+    await cache.put(critical.url,new Response(critical.body,{status:200,headers:critical.headers}));
+   },{critical:criticalCheck,name:state.active.cacheName});
    const restored=await page.goto(origin,{waitUntil:'domcontentloaded',timeout:45000});
    assert.equal(restored.status(),200,'restored mandatory runtime must recover offline shell');
    await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({state:'visible',timeout:20000});
