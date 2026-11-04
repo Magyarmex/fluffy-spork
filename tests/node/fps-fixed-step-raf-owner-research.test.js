@@ -452,3 +452,36 @@ test('20Hz four-step RAF preserves real touch-stick and keyboard trace against 6
   }
  }
 });
+
+test('fatal composed RAF render releases DOM capture and restores production Input',()=>{
+ const {createFixedStepBrowserPilot}=require('../research/fixed-step-raf-owner.cjs');
+ const g=bootGame(),win=g.__testWindow,doc=win.document;
+ const targets=[win,doc,g.canvas],listeners=new Map();
+ for(const target of targets){
+  const entries=new Map();listeners.set(target,entries);
+  target.addEventListener=(type,fn)=>{
+   if(!entries.has(type))entries.set(type,new Set());
+   entries.get(type).add(fn);
+  };
+  target.removeEventListener=(type,fn)=>entries.get(type)?.delete(fn);
+ }
+ g.input.detach();g.input.attach(g.canvas);
+ let now=1000,callback=null;g.sfx.startMusic=()=>{};
+ const pilot=createFixedStepBrowserPilot(g,{window:win,document:doc,
+  clock:{now:()=>now,timeOrigin:1793560000000},
+  request:fn=>(callback=fn,1),cancel:()=>{callback=null},
+  render:()=>{throw Error('injected composed renderer failure')}});
+ pilot.start();
+ assert.equal(pilot.capture.active,true);
+ const frame=callback;now=1017;
+ assert.throws(()=>frame(now),/injected composed renderer failure/);
+ assert.equal(pilot.owner.started,false,'fatal RAF must stop its simulation owner');
+ assert.equal(pilot.capture.active,false,'fatal RAF must detach chronological DOM capture');
+ assert.equal(callback,null,'fatal RAF must cancel the next callback');
+ assert.equal(g.input.canvas,g.canvas,'production Input must be reattached');
+ assert.equal(g.__novaDestroyed,false,'fatal RAF cleanup must not fabricate game destruction');
+ g.destroy();
+ assert.equal(g.__novaDestroyed,true,'normal Game.destroy remains reachable');
+ for(const entries of listeners.values())for(const fns of entries.values())
+  assert.equal(fns.size,0,'no input listener may survive game destruction');
+});
