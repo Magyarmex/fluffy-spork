@@ -8,7 +8,7 @@ const origin='http://127.0.0.1:8765/';
  const browser=await chromium.launch({headless:true,args:['--disable-dev-shm-usage','--no-sandbox']});
  try{
   const observations=[];
-  // Counterbalance scheduler, DPR, and CPU-load order. The 6x stress phase is
+  // Counterbalance scheduler, player Render clarity, and CPU-load order. The 6x stress phase is
   // intended to expose sub-60Hz presentation if the runner is fast enough;
   // actual measured FPS, not the throttle multiplier, determines that.
   // This remains a synthetic proxy, not a physical-device release gate.
