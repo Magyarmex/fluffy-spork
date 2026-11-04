@@ -70,8 +70,14 @@ test('research catch-up budget is explicit and never changes ordinary startup',(
  fourGame.start();
  assert.deepEqual(four.calls,['settings-start','create-pilot','pilot-start']);
  for(const invalid of ['0','2','5','3.5','foo','']){
-  assert.throws(()=>boot('?nova_fixed60=pilot&nova_fixed60_steps='+invalid),
-   /supported step budget/,'invalid budget must fail closed');
+  const h=boot('?nova_fixed60=pilot&nova_fixed60_steps='+invalid);
+  const g=new h.Game();
+  assert.throws(()=>g.start(),/supported step budget/,
+   'invalid budget must fail closed at the guarded Game.start');
+  assert.deepEqual(h.calls,['settings-start'],
+   'invalid pilot budget must never run production RAF or research pilot');
+  assert.deepEqual(h.writes,[],
+   'invalid budget must not request optional research bytes');
  }
  const ordinary=boot('?nova_fixed60_steps=3',{missingApi:true});
  const g=new ordinary.Game();g.start();
