@@ -190,6 +190,25 @@ test('Game.destroy during the first substep cancels remaining simulation and dra
  assert.equal(h.active.size,0,'no orphaned requestAnimationFrame');
  assert.equal(h.owner.started,false);
 });
+test('input replay teardown cannot update or render a destroyed Game',()=>{
+ const g=bootGame();let updates=0,renders=0;
+ const h=setup(g,{render:()=>renders++});
+ const originalUpdate=g.update;
+ g.update=function(...args){updates++;return originalUpdate.apply(this,args)};
+ const originalConsume=h.timeline.consumeThrough;
+ let destroyed=false;
+ h.timeline.consumeThrough=function(at){
+  originalConsume.call(this,at);
+  if(!destroyed){destroyed=true;g.destroy()}
+ };
+ h.frame(1000/30);
+ assert.equal(destroyed,true,'the replayed input edge must exercise teardown');
+ assert.equal(updates,0,'no update after input replay destroys the Game');
+ assert.equal(renders,0,'no render after input replay destroys the Game');
+ assert.equal(h.owner.started,false);
+ assert.equal(h.active.size,0,'no orphan RAF after input teardown');
+});
+
 test('actual composed renderer is simulation-pure across presentation rates',()=>{
  function run(seed,hz){return withSeed(seed,draws=>{
   const g=bootGame();g.sfx.muted=true;
