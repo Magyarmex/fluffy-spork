@@ -162,7 +162,8 @@ const origin='http://127.0.0.1:8765/';
      await page.waitForTimeout(3000);
      const after=await page.evaluate(({gapStart,renderGapStart,stepsStart,updateCostStart,renderCostStart,updatePlusRenderStart})=>{
       const m=window.__novaCombatBench,g=window.__novaCombatBenchGame;
-      return {at:performance.now(),updates:m.updates,simMs:m.simMs,work:m.updateWorkMs,
+      return {at:performance.now(),canvasBacking:[g.canvas.width,g.canvas.height],
+       canvasCss:[g.canvas.clientWidth,g.canvas.clientHeight],dpr:g.dpr,updates:m.updates,simMs:m.simMs,work:m.updateWorkMs,
        renders:m.renders,renderWork:m.renderWorkMs,
        minimaps:m.minimaps,minimapWork:m.minimapWorkMs,
        projectiles:m.projectiles,fireCalls:m.fireCalls,frames:m.frames,
@@ -261,6 +262,10 @@ const origin='http://127.0.0.1:8765/';
       result.renderGapSamples>0 && Number.isFinite(result.renderGapP95Ms) &&
       Number.isFinite(result.stepsPerRenderP95),
       'real composed combat and renderer must advance');
+     assert.ok(result.canvasBacking.every(Number.isFinite) && result.canvasCss.every(Number.isFinite) &&
+      Number.isFinite(result.actualDpr), 'real composed canvas scale must be measurable');
+     assert.ok(Math.abs(result.actualDpr-targetDpr)<0.01,
+      'device scale factor must reach actual game DPR, not just browser emulation');
      assert.equal(result.playerClass,'tempest','real combat must use Tempest');
      assert.equal(result.alive,true,'player death must not censor a sustained combat trial');
      assert.equal(result.paused,false,'evolution or menu pause must not censor combat measurement');
