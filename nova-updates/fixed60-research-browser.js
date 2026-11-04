@@ -337,19 +337,19 @@ module.exports = {BrowserInputCapture};
 const {STEP}=require('./fixed-step-dom-input.cjs');
 const STEP_MS=STEP*1000, EPS=1e-7;
 class FixedStepRafOwner {
-  constructor(game,timeline,bridge,{now,request,cancel,render,maxSteps=2,isHidden=()=>false}={}) {
+  constructor(game,timeline,bridge,{now,request,cancel,render,maxSteps=2,isHidden=()=>false,onFatal=()=>{}}={}) {
     if (!game || typeof game.update!=='function' || !game.sfx ||
         !timeline || timeline.input!==game.input ||
         typeof timeline.consumeThrough!=='function' ||
         !bridge || bridge.timeline!==timeline || !Number.isFinite(bridge.startMs) ||
         typeof now!=='function' || typeof request!=='function' ||
         typeof cancel!=='function' || typeof render!=='function' ||
-        typeof isHidden!=='function' ||
+        typeof isHidden!=='function' || typeof onFatal!=='function' ||
         !Number.isInteger(maxSteps) || maxSteps<1 || maxSteps>4)
       throw Error('invalid fixed-step RAF owner');
     this.game=game;this.timeline=timeline;this.bridge=bridge;
     this.now=now;this.request=request;this.cancel=cancel;this.render=render;
-    this.isHidden=isHidden;
+    this.isHidden=isHidden;this.onFatal=onFatal;
     this.maxSteps=maxSteps;this.started=false;this.raf=null;
     this.lastMs=0;this.simAtSec=0;this.lagMs=0;this.ticks=0;
     this.droppedMs=0;this.droppedFrames=0;this.paused=false;
@@ -442,7 +442,15 @@ class FixedStepRafOwner {
         ts=this.lastMs;
       }else this._awaitingForwardFrame=false;
       this.schedule();this.advance(ts);
-    }catch(error){this.stop();throw error}
+    }catch(error){
+      // A fatal browser frame must release DOM capture as well as RAF/lifecycle
+      // ownership. Otherwise Input remains detached and the game softlocks.
+      let cleanupError;
+      try{this.stop()}catch(failure){cleanupError=failure}
+      try{this.onFatal()}catch(failure){cleanupError??=failure}
+      if(cleanupError && error && typeof error==='object')error.cleanupError=cleanupError;
+      throw error;
+    }
   }
   advance(ts){
     const g=this.game;
@@ -552,7 +560,7 @@ function createFixedStepBrowserPilot(game,{window:win,document:doc,clock,
   let owner;
   try{owner=new FixedStepRafOwner(game,timeline,bridge,
     {now:clock.now,request,cancel,render,maxSteps,
-     isHidden:()=>!!doc.hidden})}
+     isHidden:()=>!!doc.hidden,onFatal:()=>capture.detach()})}
   catch(error){capture.detach();throw error}
   return {timeline,bridge,capture,owner,
     start(){
