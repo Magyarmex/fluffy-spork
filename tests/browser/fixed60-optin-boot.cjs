@@ -241,7 +241,18 @@ const {chromium}=require('playwright');
      // Timestamp the exact Input replay, not the next Playwright RAF poll.
      // Under CPU throttling RAF polling itself can be delayed by >100ms.
      await page.evaluate(()=>{
-      const input=window.__novaFixed60Game.input;
+      const game=window.__novaFixed60Game,input=game.input;
+      const owner=game.__novaFixed60Pilot.owner,originalRender=owner.render;
+      // A state change is not yet visible. Timestamp the next real composed
+      // render invocation after each applied edge (still not screen photons).
+      owner.render=function(...args){
+       const m=window.__novaRepeatTouch,at=performance.now();
+       if(m?.downAppliedAt!==undefined && m.downRenderedAt===undefined)
+        m.downRenderedAt=at;
+       if(m?.upAppliedAt!==undefined && m.upRenderedAt===undefined)
+        m.upRenderedAt=at;
+       return originalRender.apply(this,args);
+      };
       const originalDown=input.pd,originalUp=input.pu;
       document.addEventListener('pointercancel',e=>{
        if(e.pointerType==='touch' && window.__novaRepeatTouch)
@@ -279,6 +290,7 @@ const {chromium}=require('playwright');
        const g=window.__novaFixed60Game,m=window.__novaRepeatTouch;
        if(!g?.input.move.active || m.downAt===undefined ||
           m.downAppliedAt===undefined)return false;
+       if(m.downRenderedAt===undefined)return false;
        m.downObservedAt??=performance.now();return true;
       },null,{timeout:3000,polling:'raf'});
       await page.evaluate(()=>{
@@ -291,12 +303,15 @@ const {chromium}=require('playwright');
        const g=window.__novaFixed60Game,m=window.__novaRepeatTouch;
        if(g?.input.move.active!==false || m.upAt===undefined ||
           m.upAppliedAt===undefined)return false;
+       if(m.upRenderedAt===undefined)return false;
        m.upObservedAt??=performance.now();return true;
       },null,{timeout:3000,polling:'raf'});
       const measured=await page.evaluate(()=>{
        const m=window.__novaRepeatTouch;
        const o=window.__novaFixed60Game.__novaFixed60Pilot.owner;
        return {downMs:m.downAppliedAt-m.downAt,upMs:m.upAppliedAt-m.upAt,
+        downToRenderMs:m.downRenderedAt-m.downAt,
+        upToRenderMs:m.upRenderedAt-m.upAt,
         downPollOverheadMs:m.downObservedAt-m.downAppliedAt,
         upPollOverheadMs:m.upObservedAt-m.upAppliedAt,
         droppedMs:o.droppedMs,droppedFrames:o.droppedFrames,
@@ -318,6 +333,10 @@ const {chromium}=require('playwright');
       downP95:percentile(samples.map(x=>x.downMs),.95),
       upP50:percentile(samples.map(x=>x.upMs),.5),
       upP95:percentile(samples.map(x=>x.upMs),.95),
+      downToRenderP50:percentile(samples.map(x=>x.downToRenderMs),.5),
+      downToRenderP95:percentile(samples.map(x=>x.downToRenderMs),.95),
+      upToRenderP50:percentile(samples.map(x=>x.upToRenderMs),.5),
+      upToRenderP95:percentile(samples.map(x=>x.upToRenderMs),.95),
       downPollOverheadP95:percentile(samples.map(x=>x.downPollOverheadMs),.95),
       upPollOverheadP95:percentile(samples.map(x=>x.upPollOverheadMs),.95),
       droppedMsAtEnd:samples.at(-1).droppedMs,
