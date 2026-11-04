@@ -178,9 +178,14 @@ class FixedStepRafOwner {
         // one event batch. Never apply the pre-transition simulation tick.
         if(!this.started || g.paused || this._pauseEpoch!==pauseEpoch)break;
         g.update(STEP);
+        this.lastSteps++;this.ticks++;
+        // Game.update may synchronously pause/resume via setPaused().
+        // That transition establishes a new simulation clock; never
+        // overwrite it with the pre-transition tick boundary or run
+        // another stale substep in the same presentation frame.
+        if(!this.started || this._pauseEpoch!==pauseEpoch)break;
         this.simAtSec=end;
         this.lagMs=Math.max(0,this.lagMs-STEP_MS);
-        this.lastSteps++;this.ticks++;
       }
       if(g.paused){this.timeline.reset();this.lagMs=0;this.paused=true;}
     }
