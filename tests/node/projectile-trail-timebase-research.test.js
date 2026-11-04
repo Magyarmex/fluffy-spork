@@ -17,9 +17,13 @@ function trial(seed,hz){
   g.input.firing=true;g.input.autofire=false;
   const oldUpdate=g.updateBullets,oldParticles=g.addParticles;
   let inBullets=false,bulletSeconds=0,bulletUpdates=0;
-  let visualCalls=0,visualParticles=0;
-  g.addParticles=function(_x,_y,_color,n){
-   if(inBullets){visualCalls++;visualParticles+=Number(n)||0;}
+  let visualCalls=0,visualParticles=0,ordinaryTrails=0,beamTrails=0;
+  g.addParticles=function(_x,_y,_color,n,speed,kind){
+   if(inBullets){
+    visualCalls++;visualParticles+=Number(n)||0;
+    if(n===1&&kind==='glow'&&speed===20)ordinaryTrails++;
+    if(n===1&&kind==='glow'&&speed===30)beamTrails++;
+   }
    return oldParticles.apply(this,arguments);
   };
   g.updateBullets=function(dt){
@@ -37,6 +41,9 @@ function trial(seed,hz){
     'trial must actually advance live projectiles');
    assert.ok(visualCalls>0,'trial must exercise projectile VFX');
    return {seed,hz,bulletUpdates,bulletSeconds,visualCalls,visualParticles,
+    ordinaryTrails,beamTrails,
+    ordinaryTrailsPerBulletSecond:ordinaryTrails/bulletSeconds,
+    beamTrailsPerBulletSecond:beamTrails/bulletSeconds,
     callsPerBulletSecond:visualCalls/bulletSeconds,
     particlesPerBulletSecond:visualParticles/bulletSeconds};
   }finally{g.destroy();}
@@ -50,15 +57,21 @@ test('research: composed Tempest projectile VFX timebase at 30/60/120Hz',()=>{
  for(const row of observations){
   assert.ok(Number.isFinite(row.callsPerBulletSecond));
   assert.ok(Number.isFinite(row.particlesPerBulletSecond));
+  assert.equal(row.visualCalls>=row.ordinaryTrails+row.beamTrails,true,
+   'classified trails must be a subset of actual projectile VFX');
  }
  const byHz=hz=>observations.filter(x=>x.hz===hz);
  const mean=(rows,key)=>rows.reduce((n,x)=>n+x[key],0)/rows.length;
  const rate30=mean(byHz(30),'callsPerBulletSecond');
  const rate60=mean(byHz(60),'callsPerBulletSecond');
  const rate120=mean(byHz(120),'callsPerBulletSecond');
+ const ordinaryRates=Object.fromEntries([30,60,120].map(hz=>
+  [hz,mean(byHz(hz),'ordinaryTrailsPerBulletSecond')]));
+ const beamRates=Object.fromEntries([30,60,120].map(hz=>
+  [hz,mean(byHz(hz),'beamTrailsPerBulletSecond')]));
  console.log('NOVA_PROJECTILE_TRAIL_TIMEBASE '+JSON.stringify({
   rate30,rate60,rate120,ratio60to30:rate60/rate30,
-  ratio120to60:rate120/rate60,observations,
+  ratio120to60:rate120/rate60,ordinaryRates,beamRates,observations,
   caveat:'Independently evolving seeded combat, not paired deterministic replay; includes all addParticles calls inside updateBullets, not only ordinary trails.'
  }));
  assert.ok(rate30>0&&rate60>0&&rate120>0);
