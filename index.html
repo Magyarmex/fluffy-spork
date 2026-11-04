@@ -247,7 +247,7 @@ canvas {
     <link rel="icon" href="./nova-icon.svg" type="image/svg+xml" />
     <meta name="application-name" content="NOVA TANKS" />
     <script defer src="./pwa-register.js"></script>
-      <meta name="nova-runtime-build" content="684f925d4b104ded1ed2e756" />
+      <meta name="nova-runtime-build" content="4bcc3537cb8af4ef4c59eb4e" />
   </head>
   <body>
     <div id="root"></div>
@@ -3785,9 +3785,6 @@ class Game {
             if (b.beam && (typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) < 0.85) {
                 this.addParticles(b.x, b.y, b.color, 1, 30, 'glow');
             }
-            // Ordinary trails are cosmetic. At >60 updates/s, cap their density
-            // per simulated second without increasing work on slower devices.
-            // Keep the 60Hz gate and beam fallback exactly as before.
             else if ((typeof this.cosmeticRandom === "function" ? this.cosmeticRandom() : Math.random()) <
                 (!b.beam && dt < 1 / 60 ? 0.22 * Math.max(0, dt * 60) : 0.22)) {
                 this.addParticles(b.x, b.y, b.color, 1, 20, 'glow');
