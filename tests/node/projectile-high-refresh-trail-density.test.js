@@ -115,3 +115,43 @@ test('mixed 120Hz and 30Hz frame intervals retain bounded trail density', () => 
   assert.ok(Math.abs(ordinary - expected) < expected * 0.25,
     JSON.stringify({ ordinary, expected }));
 });
+
+test('real compressed shipping payload materializes with high-refresh cap', () => {
+  const os = require('node:os');
+  const zlib = require('node:zlib');
+  const { execFileSync } = require('node:child_process');
+  const root = path.join(__dirname, '../..');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nova-trail-materialize-'));
+  try {
+    const chunks = fs.readdirSync(path.join(root, 'nova-gz'))
+      .filter(name => name.endsWith('.b64')).sort();
+    assert.ok(chunks.length > 0, 'canonical compressed shipping payload missing');
+    const encoded = chunks.map(name => fs.readFileSync(path.join(root, 'nova-gz', name), 'utf8')).join('')
+      .replace(/[\\r\\n\\t ]/g, '');
+    const shell = zlib.gunzipSync(Buffer.from(encoded, 'base64')).toString('utf8');
+    const destination = path.join(dir, 'index.html');
+    fs.writeFileSync(destination, shell);
+    const patches = [
+      'patch-star-minimap.cjs',
+      'patch-saved-records.cjs',
+      'patch-ai-strafe-timebase.cjs',
+      'patch-raf-step-cap.cjs',
+      'patch-cosmetic-rng.cjs',
+      'patch-audio-rng.cjs',
+      'patch-perk-offer.cjs',
+      'patch-render-tank-order.cjs',
+    ];
+    for (const patch of patches) {
+      execFileSync(process.execPath, [path.join(root, 'scripts', patch), destination],
+        { timeout: 30000, stdio: 'pipe' });
+    }
+    const output = fs.readFileSync(destination, 'utf8');
+    const capped = '(!b.beam && dt < 1 / 60 ? 0.22 * Math.max(0, dt * 60) : 0.22)';
+    assert.equal(output.split(capped).length - 1, 1,
+      'real production materializer must preserve exactly one capped projectile trail gate');
+    assert.ok(!output.includes('else if (Math.random() < 0.22)'),
+      'legacy ordinary projectile trail gate must not survive materialization');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
