@@ -330,7 +330,22 @@ const {chromium}=require('playwright');
      // benchmark. Always restore normal browser speed before teardown.
      await cdp.send('Emulation.setCPUThrottlingRate',{rate:3});
      try{
-      const throttled=await sampleTouches(8);
+      let throttled;
+      try{throttled=await sampleTouches(8)}
+      catch(error){
+       const diagnostic=await page.evaluate(()=>{
+        const g=window.__novaFixed60Game,m=window.__novaRepeatTouch;
+        const p=g?.__novaFixed60Pilot;
+        return {move:g?.input.move.active,stickId:g?.input.stickId.move,
+         pointerId:m?.pointerId,downAt:m?.downAt,downAppliedAt:m?.downAppliedAt,
+         upAt:m?.upAt,upAppliedAt:m?.upAppliedAt,
+         ownerStarted:p?.owner.started,ticks:p?.owner.ticks,
+         droppedFrames:p?.owner.droppedFrames,lagMs:p?.owner.lagMs,
+         queued:p?.timeline.events.length,applied:p?.timeline.applied};
+       });
+       console.error('NOVA_FIXED60_THROTTLE_FAILURE '+JSON.stringify({diagnostic,error:String(error)}));
+       throw error;
+      }
       console.log('NOVA_FIXED60_TOUCH_LATENCY_SERIES '+JSON.stringify({
        cpuThrottle:3,...summarize(throttled)
       }));
