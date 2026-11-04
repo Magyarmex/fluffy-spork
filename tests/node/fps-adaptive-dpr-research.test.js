@@ -117,3 +117,13 @@ test('external player Render clarity takes precedence over adaptive DPR cleanup 
  assert.equal(q.sample(1500,slow).kind,'external-resize');
  q.stop();assert.equal(h.dpr,1.2,'stop must not restore stale original DPR');
 });
+
+test('long-gap rollback must not overwrite a newly chosen external Render clarity',()=>{
+ const g=game(),p=createAdaptiveDprPilot(g);
+ drive(p,0,1000,slow);assert.equal(g.dpr,1);
+ g.dpr=1.2;g.canvas.width=384;g.canvas.height=682;
+ assert.equal(p.sample(6000,slow).kind,'external-resize');
+ assert.equal(g.dpr,1.2,'stale probe rollback must not override user choice');
+ assert.equal(p.sample(6500,slow).kind,'external-owner');
+ p.stop();assert.equal(g.dpr,1.2);
+});
