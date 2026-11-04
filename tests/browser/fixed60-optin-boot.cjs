@@ -214,6 +214,21 @@ const {chromium}=require('playwright');
       false,'long suspension must release old touch ownership');
      await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
 
+     // Focus loss must fail closed even when a finger is still down: no
+     // phantom movement/firing can survive switching away from the game.
+     await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{...touch,id:19}]});
+     await page.waitForFunction(()=>window.__novaFixed60Game?.input.move.active,
+      null,{timeout:3000,polling:'raf'});
+     await page.evaluate(()=>window.dispatchEvent(new Event('blur')));
+     const blurState=await page.evaluate(()=>{
+      const g=window.__novaFixed60Game;
+      return {move:g.input.move.active,aim:g.input.aim.active,
+       firing:g.input.firing,moveStick:g.input.stickId.move};
+     });
+     assert.deepEqual(blurState,{move:false,aim:false,firing:false,moveStick:-1},
+      'window blur must release held touch and firing state');
+     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+
      // Repeated browser-event-to-state measurements expose tail latency that a
      // single successful touch cannot establish. This is Chromium-only, not
      // input-to-photon or physical Android evidence.
