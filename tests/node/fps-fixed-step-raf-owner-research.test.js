@@ -266,6 +266,26 @@ test('pause/resume during Game.update cannot roll back the simulation clock or r
  }finally{h.close()}
 });
 
+test('pause/resume during skipped foreground time cannot resurrect stale catch-up ticks',()=>{
+ const g=bootGame(),h=setup(g);let transitions=0;
+ try{
+  h.frame(1000/60);
+  const originalConsume=h.timeline.consumeThrough;
+  h.timeline.consumeThrough=function(at){
+   originalConsume.call(this,at);
+   if(transitions===0){
+    transitions++;
+    g.setPaused(true);g.setPaused(false);
+   }
+  };
+  h.setNow(200);h.frame(200);
+  assert.equal(transitions,1,'skipped input replay must trigger the lifecycle transition');
+  assert.equal(h.owner.lastSteps,0,'no stale catch-up ticks after pause/resume in skipped time');
+  assert.equal(h.owner.ticks,1,'only the earlier completed frame should count');
+  assert.ok(h.owner.simAtSec>=.2-1e-6,'skip transition must retain the new clock');
+ }finally{h.close()}
+});
+
 test('actual composed renderer is simulation-pure across presentation rates',()=>{
  function run(seed,hz){return withSeed(seed,draws=>{
   const g=bootGame();g.sfx.muted=true;
