@@ -15,7 +15,8 @@ const origin = 'http://127.0.0.1:8765/';
    await page.goto(origin,{waitUntil:'domcontentloaded',timeout:45000});
    await page.evaluate(async()=>{
     const reg = await navigator.serviceWorker.register('./sw.js');
-    await navigator.serviceWorker.ready;
+    await Promise.race([navigator.serviceWorker.ready,
+     new Promise((_,reject)=>setTimeout(()=>reject(Error('service worker activation timed out')),30000))]);
     if (!reg.active) throw Error('installed service worker not active');
    });
    // Claim the page, then verify the active build is actually staged.
