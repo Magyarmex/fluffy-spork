@@ -90,7 +90,7 @@ const origin='http://127.0.0.1:8765/';
      const m=window.__novaCombatBench={
       updates:0,simMs:0,updateWorkMs:0,renders:0,renderWorkMs:0,
       minimaps:0,minimapWorkMs:0,projectiles:0,fireCalls:0,
-      bulletWorkMs:0,collisionWorkMs:0,
+      bulletWorkMs:0,collisionWorkMs:0,droneWorkMs:0,droneCalls:0,
       bulletSeconds:0,bulletVfxCalls:0,bulletVfxParticles:0,inBulletUpdate:false,
       frameGaps:[],rafDispatchLags:[],lastFrame:null,frames:0,active:true,
       renderGaps:[],lastRender:null,stepsPerRender:[],lastRenderUpdates:null,
@@ -109,7 +109,8 @@ const origin='http://127.0.0.1:8765/';
      }
      const update=g.update,fire=g.tryFire;
      const updateBullets=g.updateBullets,collisions=g.resolveBulletCollisions;
-     if(typeof updateBullets!=='function'||typeof collisions!=='function')
+     const updateDrones=g.updateDrones;
+     if(typeof updateBullets!=='function'||typeof collisions!=='function'||typeof updateDrones!=='function')
       throw Error('materialized projectile/collision owners unavailable');
      const addParticles=g.addParticles;
      g.addParticles=function(...args){
@@ -118,6 +119,11 @@ const origin='http://127.0.0.1:8765/';
        m.bulletVfxParticles+=Number(args[3])||0;
       }
       return addParticles.apply(this,args);
+     };
+     g.updateDrones=function(...args){
+      const t=performance.now();
+      try{return updateDrones.apply(this,args)}
+      finally{m.droneCalls++;m.droneWorkMs+=performance.now()-t}
      };
      g.updateBullets=function(...args){
       const t=performance.now(),dt=Number(args[0]);
@@ -205,6 +211,7 @@ const origin='http://127.0.0.1:8765/';
        minimaps:m.minimaps,minimapWork:m.minimapWorkMs,
        projectiles:m.projectiles,fireCalls:m.fireCalls,frames:m.frames,
        bulletWorkMs:m.bulletWorkMs,collisionWorkMs:m.collisionWorkMs,
+       droneWorkMs:m.droneWorkMs,droneCalls:m.droneCalls,
        bulletSeconds:m.bulletSeconds,bulletVfxCalls:m.bulletVfxCalls,
        bulletVfxParticles:m.bulletVfxParticles,
        gaps:m.frameGaps.length,dispatchLags:m.rafDispatchLags.length,
@@ -227,6 +234,7 @@ const origin='http://127.0.0.1:8765/';
        minimaps:m.minimaps,minimapWork:m.minimapWorkMs,
        projectiles:m.projectiles,fireCalls:m.fireCalls,frames:m.frames,
        bulletWorkMs:m.bulletWorkMs,collisionWorkMs:m.collisionWorkMs,
+       droneWorkMs:m.droneWorkMs,droneCalls:m.droneCalls,
        bulletSeconds:m.bulletSeconds,bulletVfxCalls:m.bulletVfxCalls,
        bulletVfxParticles:m.bulletVfxParticles,
        gaps:m.frameGaps.length,ticks:g.__novaFixed60Pilot?.owner.ticks||0,
@@ -301,6 +309,11 @@ const origin='http://127.0.0.1:8765/';
       longTaskCount:longTasks.length,longTaskTotalMs,longTaskMaxMs,
       updates,simulatedMs,updateWorkMs,
       renders,renderWorkMs,bulletWorkMs:delta('bulletWorkMs'),
+      droneWorkMs:delta('droneWorkMs'),droneCalls:delta('droneCalls'),
+      // Residual update cost includes AI, terrain, neutral ecology and other
+      // simulation owners. Nested instrumentation can overlap; never claim
+      // that this subtraction is an exclusive CPU profile.
+      otherUpdateWorkMs:Math.max(0,updateWorkMs-delta('bulletWorkMs')-delta('collisionWorkMs')-delta('droneWorkMs')),
       collisionWorkMs:delta('collisionWorkMs'),minimaps:delta('minimaps'),
       bulletSeconds:delta('bulletSeconds'),bulletVfxCalls:delta('bulletVfxCalls'),
       bulletVfxParticles:delta('bulletVfxParticles'),
@@ -340,6 +353,7 @@ const origin='http://127.0.0.1:8765/';
       Number.isFinite(result.updateCostP95Ms) && Number.isFinite(result.renderCostP95Ms) &&
       Number.isFinite(result.updatePlusRenderP95Ms) &&
       Number.isFinite(result.bulletWorkMs) && Number.isFinite(result.collisionWorkMs) &&
+      Number.isFinite(result.droneWorkMs) && result.droneCalls>0 &&
       Number.isFinite(result.bulletVfxCallsPerBulletSecond) &&
       Number.isFinite(result.bulletVfxParticlesPerBulletSecond) &&
       result.renderGapSamples>0 && Number.isFinite(result.renderGapP95Ms) &&
@@ -439,6 +453,10 @@ const origin='http://127.0.0.1:8765/';
     fixed60StepsPerRenderP95:mean(pilot,'stepsPerRenderP95'),
     baselineMultiStepRenderFrames:mean(baseline,'multiStepRenderFrames'),
     fixed60MultiStepRenderFrames:mean(pilot,'multiStepRenderFrames'),
+    baselineDroneWorkMs:mean(baseline,'droneWorkMs'),
+    fixed60DroneWorkMs:mean(pilot,'droneWorkMs'),
+    baselineOtherUpdateWorkMs:mean(baseline,'otherUpdateWorkMs'),
+    fixed60OtherUpdateWorkMs:mean(pilot,'otherUpdateWorkMs'),
     baselineBulletWorkMs:mean(baseline,'bulletWorkMs'),
     baselineBulletVfxRate:mean(baseline,'bulletVfxCallsPerBulletSecond'),
     fixed60BulletVfxRate:mean(pilot,'bulletVfxCallsPerBulletSecond'),
