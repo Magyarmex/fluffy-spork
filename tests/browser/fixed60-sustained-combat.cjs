@@ -91,6 +91,7 @@ const origin='http://127.0.0.1:8765/';
       updates:0,simMs:0,updateWorkMs:0,renders:0,renderWorkMs:0,
       minimaps:0,minimapWorkMs:0,projectiles:0,fireCalls:0,
       bulletWorkMs:0,collisionWorkMs:0,droneWorkMs:0,droneCalls:0,droneSeconds:0,
+      aiWorkMs:0,aiCalls:0,aiTankSeconds:0,
       bulletSeconds:0,bulletVfxCalls:0,bulletVfxParticles:0,inBulletUpdate:false,
       frameGaps:[],rafDispatchLags:[],lastFrame:null,frames:0,active:true,
       renderGaps:[],lastRender:null,stepsPerRender:[],lastRenderUpdates:null,
@@ -107,6 +108,18 @@ const origin='http://127.0.0.1:8765/';
       });
       m.longTaskObserver.observe({type:'longtask',buffered:true});
      }
+     // Game.update invokes the shared game/ai module export for each living AI
+     // tank. Instrument that exact owner rather than guessing AI cost from
+     // the unaccounted remainder of Game.update.
+     const ai=window.__novaMakeRequire('')('game/ai');
+     if(typeof ai?.updateAI!=='function')throw Error('materialized AI owner unavailable');
+     const originalAI=ai.updateAI;
+     ai.updateAI=function(...args){
+      const t=performance.now(),dt=Number(args[2]);
+      if(Number.isFinite(dt)&&dt>0)m.aiTankSeconds+=dt;
+      try{return originalAI.apply(this,args)}
+      finally{m.aiCalls++;m.aiWorkMs+=performance.now()-t}
+     };
      const update=g.update,fire=g.tryFire;
      const updateBullets=g.updateBullets,collisions=g.resolveBulletCollisions;
      const updateDrones=g.updateDrones;
@@ -213,6 +226,7 @@ const origin='http://127.0.0.1:8765/';
        projectiles:m.projectiles,fireCalls:m.fireCalls,frames:m.frames,
        bulletWorkMs:m.bulletWorkMs,collisionWorkMs:m.collisionWorkMs,
        droneWorkMs:m.droneWorkMs,droneCalls:m.droneCalls,droneSeconds:m.droneSeconds,
+       aiWorkMs:m.aiWorkMs,aiCalls:m.aiCalls,aiTankSeconds:m.aiTankSeconds,
        bulletSeconds:m.bulletSeconds,bulletVfxCalls:m.bulletVfxCalls,
        bulletVfxParticles:m.bulletVfxParticles,
        gaps:m.frameGaps.length,dispatchLags:m.rafDispatchLags.length,
@@ -236,6 +250,7 @@ const origin='http://127.0.0.1:8765/';
        projectiles:m.projectiles,fireCalls:m.fireCalls,frames:m.frames,
        bulletWorkMs:m.bulletWorkMs,collisionWorkMs:m.collisionWorkMs,
        droneWorkMs:m.droneWorkMs,droneCalls:m.droneCalls,droneSeconds:m.droneSeconds,
+       aiWorkMs:m.aiWorkMs,aiCalls:m.aiCalls,aiTankSeconds:m.aiTankSeconds,
        bulletSeconds:m.bulletSeconds,bulletVfxCalls:m.bulletVfxCalls,
        bulletVfxParticles:m.bulletVfxParticles,
        gaps:m.frameGaps.length,ticks:g.__novaFixed60Pilot?.owner.ticks||0,
@@ -310,6 +325,10 @@ const origin='http://127.0.0.1:8765/';
       longTaskCount:longTasks.length,longTaskTotalMs,longTaskMaxMs,
       updates,simulatedMs,updateWorkMs,
       renders,renderWorkMs,bulletWorkMs:delta('bulletWorkMs'),
+      aiWorkMs:delta('aiWorkMs'),aiCalls:delta('aiCalls'),
+      aiTankSeconds:delta('aiTankSeconds'),
+      aiMsPerSimSecond:simulatedMs>0?delta('aiWorkMs')*1000/simulatedMs:null,
+      aiMsPerTankSecond:delta('aiTankSeconds')>0?delta('aiWorkMs')/delta('aiTankSeconds'):null,
       droneWorkMs:delta('droneWorkMs'),droneCalls:delta('droneCalls'),
       droneSeconds:delta('droneSeconds'),
       meanLiveDrones:simulatedMs>0?delta('droneSeconds')*1000/simulatedMs:null,
@@ -359,6 +378,8 @@ const origin='http://127.0.0.1:8765/';
       Number.isFinite(result.bulletWorkMs) && Number.isFinite(result.collisionWorkMs) &&
       Number.isFinite(result.droneWorkMs) && result.droneCalls>0 &&
       Number.isFinite(result.droneMsPerSimSecond) && Number.isFinite(result.meanLiveDrones) &&
+      Number.isFinite(result.aiWorkMs) && result.aiCalls>0 &&
+      Number.isFinite(result.aiMsPerSimSecond) && Number.isFinite(result.aiMsPerTankSecond) &&
       Number.isFinite(result.bulletVfxCallsPerBulletSecond) &&
       Number.isFinite(result.bulletVfxParticlesPerBulletSecond) &&
       result.renderGapSamples>0 && Number.isFinite(result.renderGapP95Ms) &&
@@ -458,6 +479,10 @@ const origin='http://127.0.0.1:8765/';
     fixed60StepsPerRenderP95:mean(pilot,'stepsPerRenderP95'),
     baselineMultiStepRenderFrames:mean(baseline,'multiStepRenderFrames'),
     fixed60MultiStepRenderFrames:mean(pilot,'multiStepRenderFrames'),
+    baselineAiMsPerSimSecond:mean(baseline,'aiMsPerSimSecond'),
+    fixed60AiMsPerSimSecond:mean(pilot,'aiMsPerSimSecond'),
+    baselineAiMsPerTankSecond:mean(baseline,'aiMsPerTankSecond'),
+    fixed60AiMsPerTankSecond:mean(pilot,'aiMsPerTankSecond'),
     baselineMeanLiveDrones:mean(baseline,'meanLiveDrones'),
     fixed60MeanLiveDrones:mean(pilot,'meanLiveDrones'),
     baselineDroneMsPerSimSecond:mean(baseline,'droneMsPerSimSecond'),
