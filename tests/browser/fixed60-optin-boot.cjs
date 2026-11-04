@@ -267,8 +267,9 @@ const {chromium}=require('playwright');
       await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{...touch,id:40+trial}]});
       await page.waitForFunction(()=>{
        const g=window.__novaFixed60Game,m=window.__novaRepeatTouch;
-       return !!g?.input.move.active && m.downAt!==undefined &&
-        m.downAppliedAt!==undefined;
+       if(!g?.input.move.active || m.downAt===undefined ||
+          m.downAppliedAt===undefined)return false;
+       m.downObservedAt??=performance.now();return true;
       },null,{timeout:3000,polling:'raf'});
       await page.evaluate(()=>{
        document.addEventListener('pointerup',e=>{
@@ -278,13 +279,16 @@ const {chromium}=require('playwright');
       await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
       await page.waitForFunction(()=>{
        const g=window.__novaFixed60Game,m=window.__novaRepeatTouch;
-       return g?.input.move.active===false && m.upAt!==undefined &&
-        m.upAppliedAt!==undefined;
+       if(g?.input.move.active!==false || m.upAt===undefined ||
+          m.upAppliedAt===undefined)return false;
+       m.upObservedAt??=performance.now();return true;
       },null,{timeout:3000,polling:'raf'});
       const measured=await page.evaluate(()=>{
        const m=window.__novaRepeatTouch;
        const o=window.__novaFixed60Game.__novaFixed60Pilot.owner;
        return {downMs:m.downAppliedAt-m.downAt,upMs:m.upAppliedAt-m.upAt,
+        downPollOverheadMs:m.downObservedAt-m.downAppliedAt,
+        upPollOverheadMs:m.upObservedAt-m.upAppliedAt,
         droppedMs:o.droppedMs,droppedFrames:o.droppedFrames,
         lagMs:o.lagMs,ticks:o.ticks};
       });
@@ -304,6 +308,8 @@ const {chromium}=require('playwright');
       downP95:percentile(samples.map(x=>x.downMs),.95),
       upP50:percentile(samples.map(x=>x.upMs),.5),
       upP95:percentile(samples.map(x=>x.upMs),.95),
+      downPollOverheadP95:percentile(samples.map(x=>x.downPollOverheadMs),.95),
+      upPollOverheadP95:percentile(samples.map(x=>x.upPollOverheadMs),.95),
       droppedMsAtEnd:samples.at(-1).droppedMs,
       droppedFramesAtEnd:samples.at(-1).droppedFrames,
       lagMsAtEnd:samples.at(-1).lagMs,
