@@ -503,6 +503,9 @@ class FixedStepRafOwner {
       while(this.lagMs+EPS>=STEP_MS && this.lastSteps<this.maxSteps && !g.paused && this.started){
         const end=this.simAtSec+STEP;
         this.timeline.consumeThrough(end);
+        // A replayed input edge can synchronously unmount/destroy Game.
+        // Never advance a world whose lifecycle owner was released mid-edge.
+        if(!this.started)break;
         g.update(STEP);
         this.simAtSec=end;
         this.lagMs=Math.max(0,this.lagMs-STEP_MS);
