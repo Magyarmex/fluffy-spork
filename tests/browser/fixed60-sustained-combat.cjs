@@ -19,14 +19,26 @@ const origin='http://127.0.0.1:8765/';
     await page.goto(origin+(fixed60?'?nova_fixed60=pilot':''),{waitUntil:'domcontentloaded',timeout:45000});
     const deploy=page.getByRole('button',{name:/DEPLOY/i}).first();
     await deploy.waitFor({state:'visible',timeout:20000});
-    await page.evaluate(()=>{
+    await page.evaluate(seed=>{
      const Game=window.__novaMakeRequire('')('game/engine').Game;
+     const spawn=Game.prototype.spawnPlayer;
+     // Pair the canonical Battlefield layout between schedulers within each
+     // repeat. Do not seed the entire match: that would override live RNG.
+     Game.prototype.spawnPlayer=function(){
+      if(this.__novaTerrain)return spawn.apply(this,arguments);
+      const now=Date.now,random=Math.random;
+      let first=true;
+      Date.now=()=>0;
+      Math.random=()=>first?(first=false,seed/0x7fffffff):random();
+      try{return spawn.apply(this,arguments)}
+      finally{Date.now=now;Math.random=random}
+     };
      const original=Game.prototype.start;
      Game.prototype.start=function(){
       if(!this.__novaDecorativeWorld)window.__novaCombatBenchGame=this;
       return original.apply(this,arguments);
      };
-    });
+    },repeat);
     await deploy.click();
     await page.waitForFunction(expected=>{
      const g=window.__novaCombatBenchGame;
@@ -122,7 +134,8 @@ const origin='http://127.0.0.1:8765/';
        droppedMs:g.__novaFixed60Pilot?.owner.droppedMs||0,
        frameGaps:m.frameGaps.slice(gapStart),
        renderGaps:m.renderGaps.slice(renderGapStart),heat:g.player?.__v17Heat||0,
-       alive:g.player?.hp>0,playerClass:g.player?.cls};
+       alive:g.player?.hp>0,playerClass:g.player?.cls,
+       layout:g.__novaBattlefield?.name||null};
      },{gapStart:before.gaps,renderGapStart:before.renderGaps});
      const delta=(k)=>after[k]-before[k];
      const gaps=after.frameGaps;
@@ -157,7 +170,7 @@ const origin='http://127.0.0.1:8765/';
       renderCostMs:renderWorkMs/renders,
       projectilesPerSimSecond:projectiles*1000/simulatedMs,
       heat:after.heat,alive:after.alive,playerClass:after.playerClass,
-      droppedMs:delta('droppedMs'),ticks:delta('ticks')};
+      layout:after.layout,droppedMs:delta('droppedMs'),ticks:delta('ticks')};
      console.log('NOVA_FIXED60_COMBAT_PHASE '+JSON.stringify(result));
      assert.ok(result.updates>0 && result.simulatedMs>0 && result.renders>0 &&
       Number.isFinite(result.updateWorkMs) && Number.isFinite(result.renderWorkMs) &&
@@ -185,8 +198,14 @@ const origin='http://127.0.0.1:8765/';
   for(const fixed60 of [false,true])for(const throttle of [1,3])
    assert.equal(observations.filter(x=>x.fixed60===fixed60&&x.throttle===throttle).length,2,
     'each scheduler/load pair must have independent replicates');
-  // Descriptive only: these worlds are not seeded identically, and Chromium
-  // CPU throttling is not a physical Android performance acceptance gate.
+  // Layouts are paired within each repeat, but entity spawns, AI decisions,
+  // and combat histories remain independent. This is not deterministic A/B.
+  for(const repeat of [0,1]){
+   const worlds=observations.filter(x=>x.repeat===repeat);
+   assert.equal(new Set(worlds.map(x=>x.layout)).size,1,
+    'scheduler comparisons within a repeat must share Battlefield layout');
+  }
+  // Chromium CPU throttling is not a physical Android acceptance gate.
   const summaries=[];
   for(const throttle of [1,3]){
    const baseline=observations.filter(x=>!x.fixed60&&x.throttle===throttle);
