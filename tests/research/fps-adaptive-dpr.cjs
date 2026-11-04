@@ -35,6 +35,13 @@ function createAdaptiveDprPilot(game, options={}) {
     // A player setting or another owner changed DPR. Never take it back.
     if(externalOwner)return result('external-owner');
     if(!Number.isFinite(now)||(lastSample!==null&&now<=lastSample))return result('invalid-time');
+    // Observe external DPR ownership BEFORE a long-gap rollback can restore
+    // stale pixels over a user's explicit clarity choice.
+    if(game.dpr!==lastApplied){
+      externalOwner=true;width=game.w;height=game.h;lastApplied=game.dpr;
+      phase='baseline';baseline=null;trialStart=null;resetStreaks();
+      return result('external-resize');
+    }
     if(lastSample!==null&&now-lastSample>3500){
       resetStreaks();warmupUntil=now+2500;
       if(phase==='probing')return result('probe-interrupted',rollback(now));
