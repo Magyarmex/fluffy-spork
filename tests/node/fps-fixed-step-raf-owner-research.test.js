@@ -227,6 +227,25 @@ test('input replay pause prevents an extra combat update',()=>{
  }finally{h.close()}
 });
 
+test('same-batch pause then resume invalidates the pre-transition tick',()=>{
+ const g=bootGame(),h=setup(g);let updates=0,once=false;
+ const oldUpdate=g.update,oldConsume=h.timeline.consumeThrough;
+ g.update=function(...args){updates++;return oldUpdate.apply(this,args)};
+ h.timeline.consumeThrough=function(at){
+  oldConsume.call(this,at);
+  if(!once){once=true;g.setPaused(true);g.setPaused(false)}
+ };
+ try{
+  h.setNow(1000/30);h.frame(1000/30);
+  assert.equal(once,true);
+  assert.equal(updates,0,'pre-transition update must not run after a pause/resume pair');
+  assert.equal(h.owner.ticks,0);
+  assert.equal(h.owner.started,true);
+  assert.ok(h.owner.simAtSec>=1/30-1e-6,
+   'replay must not roll the simulation clock back before the transition');
+ }finally{h.close()}
+});
+
 test('actual composed renderer is simulation-pure across presentation rates',()=>{
  function run(seed,hz){return withSeed(seed,draws=>{
   const g=bootGame();g.sfx.muted=true;
