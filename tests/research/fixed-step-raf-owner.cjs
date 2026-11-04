@@ -6,17 +6,19 @@
 const {STEP}=require('./fixed-step-dom-input.cjs');
 const STEP_MS=STEP*1000, EPS=1e-7;
 class FixedStepRafOwner {
-  constructor(game,timeline,bridge,{now,request,cancel,render,maxSteps=2}={}) {
+  constructor(game,timeline,bridge,{now,request,cancel,render,maxSteps=2,isHidden=()=>false}={}) {
     if (!game || typeof game.update!=='function' || !game.sfx ||
         !timeline || timeline.input!==game.input ||
         typeof timeline.consumeThrough!=='function' ||
         !bridge || bridge.timeline!==timeline || !Number.isFinite(bridge.startMs) ||
         typeof now!=='function' || typeof request!=='function' ||
         typeof cancel!=='function' || typeof render!=='function' ||
+        typeof isHidden!=='function' ||
         !Number.isInteger(maxSteps) || maxSteps<1 || maxSteps>4)
       throw Error('invalid fixed-step RAF owner');
     this.game=game;this.timeline=timeline;this.bridge=bridge;
     this.now=now;this.request=request;this.cancel=cancel;this.render=render;
+    this.isHidden=isHidden;
     this.maxSteps=maxSteps;this.started=false;this.raf=null;
     this.lastMs=0;this.simAtSec=0;this.lagMs=0;this.ticks=0;
     this.droppedMs=0;this.droppedFrames=0;this.paused=false;
@@ -134,7 +136,7 @@ class FixedStepRafOwner {
         // Long suspension still fails closed: stale held commands must not
         // survive a background-sized gap without a fresh input edge.
         this.droppedMs+=this.lagMs+raw-maxMs;this.droppedFrames++;
-        if(raw>250+EPS)this.timeline.reset();
+        if(raw>250+EPS || this.isHidden())this.timeline.reset();
         this.lagMs=0;
         this.simAtSec=(ts-this.bridge.startMs-maxMs)/1000;
         this.timeline.consumeThrough(this.simAtSec);
@@ -218,7 +220,8 @@ function createFixedStepBrowserPilot(game,{window:win,document:doc,clock,
     {window:win,document:doc,game});
   let owner;
   try{owner=new FixedStepRafOwner(game,timeline,bridge,
-    {now:clock.now,request,cancel,render,maxSteps})}
+    {now:clock.now,request,cancel,render,maxSteps,
+     isHidden:()=>!!doc.hidden})}
   catch(error){capture.detach();throw error}
   return {timeline,bridge,capture,owner,
     start(){
