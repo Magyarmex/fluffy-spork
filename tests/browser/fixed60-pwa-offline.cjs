@@ -56,6 +56,25 @@ const origin = 'http://127.0.0.1:8765/';
     !!window.__novaOfflineGame.raf,null,{timeout:15000});
    assert.equal(errors.length,0,'offline default gameplay must not throw: '+errors.join('; '));
    await page.evaluate(()=>window.__novaOfflineGame.destroy());
+   // Corrupt a *mandatory* staged script while offline. Unlike the optional
+   // pilot bundle, a missing canonical boot dependency must fail closed.
+   const criticalCheck=await page.evaluate(async name=>{
+    const cache=await caches.open(name);
+    const url=new URL('./nova-updates/fixed60-optin-boot.js',location.href).href;
+    const saved=await cache.match(url);
+    if(!saved) throw Error('mandatory opt-in delegate absent from staged shell');
+    await cache.delete(url);
+    return {url,body:await saved.text(),headers:[...saved.headers.entries()]};
+   },state.active.cacheName);
+   const denied=await page.goto(origin,{waitUntil:'domcontentloaded',timeout:45000});
+   assert.equal(denied.status(),503,'missing mandatory runtime must reject offline shell');
+   await page.evaluate(async ({url,body,headers},name)=>{
+    const cache=await caches.open(name);
+    await cache.put(url,new Response(body,{status:200,headers}));
+   },criticalCheck,state.active.cacheName);
+   const restored=await page.goto(origin,{waitUntil:'domcontentloaded',timeout:45000});
+   assert.equal(restored.status(),200,'restored mandatory runtime must recover offline shell');
+   await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({state:'visible',timeout:20000});
    // Pilot bundle is deliberately optional and absent offline. It must fail
    // closed to the menu instead of secretly launching a normal-rate match.
    await page.goto(origin+'?nova_fixed60=pilot',{waitUntil:'domcontentloaded',timeout:45000});
