@@ -1,6 +1,7 @@
 'use strict';
 // Research-only composed-game census: quantify projectile VFX per live bullet-second.
 // This is NOT a proposed production change or a gameplay-balance assertion.
+process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
