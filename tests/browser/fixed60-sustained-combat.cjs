@@ -48,7 +48,8 @@ const origin='http://127.0.0.1:8765/';
      const m=window.__novaCombatBench={
       updates:0,simMs:0,updateWorkMs:0,renders:0,renderWorkMs:0,
       minimaps:0,minimapWorkMs:0,projectiles:0,fireCalls:0,
-      frameGaps:[],lastFrame:null,frames:0,active:true
+      frameGaps:[],lastFrame:null,frames:0,active:true,
+      renderGaps:[],lastRender:null
      };
      const update=g.update,fire=g.tryFire;
      const renderer=window.__novaMakeRequire('')('game/render');
@@ -56,7 +57,12 @@ const origin='http://127.0.0.1:8765/';
      renderer.render=function(...args){
       const t=performance.now();
       try{return render.apply(this,args)}
-      finally{m.renders++;m.renderWorkMs+=performance.now()-t}
+      finally{
+       const completed=performance.now();
+       if(m.lastRender!==null)m.renderGaps.push(completed-m.lastRender);
+       m.lastRender=completed;
+       m.renders++;m.renderWorkMs+=completed-t;
+      }
      };
      const drawMinimap=g.drawMinimap;
      g.drawMinimap=function(...args){
@@ -92,13 +98,13 @@ const origin='http://127.0.0.1:8765/';
        renders:m.renders,renderWork:m.renderWorkMs,
        minimaps:m.minimaps,minimapWork:m.minimapWorkMs,
        projectiles:m.projectiles,fireCalls:m.fireCalls,frames:m.frames,
-       gaps:m.frameGaps.length,ticks:g.__novaFixed60Pilot?.owner.ticks||0,
+       gaps:m.frameGaps.length,renderGaps:m.renderGaps.length,ticks:g.__novaFixed60Pilot?.owner.ticks||0,
        droppedMs:g.__novaFixed60Pilot?.owner.droppedMs||0};
      });
      const wallStart=Date.now();
      await page.waitForTimeout(3000);
      const wallMs=Date.now()-wallStart;
-     const after=await page.evaluate(gapStart=>{
+     const after=await page.evaluate((gapStart,renderGapStart)=>{
       const m=window.__novaCombatBench,g=window.__novaCombatBenchGame;
       return {updates:m.updates,simMs:m.simMs,work:m.updateWorkMs,
        renders:m.renders,renderWork:m.renderWorkMs,
@@ -106,13 +112,20 @@ const origin='http://127.0.0.1:8765/';
        projectiles:m.projectiles,fireCalls:m.fireCalls,frames:m.frames,
        gaps:m.frameGaps.length,ticks:g.__novaFixed60Pilot?.owner.ticks||0,
        droppedMs:g.__novaFixed60Pilot?.owner.droppedMs||0,
-       frameGaps:m.frameGaps.slice(gapStart),heat:g.player?.__v17Heat||0,
+       frameGaps:m.frameGaps.slice(gapStart),
+       renderGaps:m.renderGaps.slice(renderGapStart),heat:g.player?.__v17Heat||0,
        alive:g.player?.hp>0,playerClass:g.player?.cls};
-     },before.gaps);
+     },before.gaps,before.renderGaps);
      const delta=(k)=>after[k]-before[k];
      const gaps=after.frameGaps;
      const sorted=gaps.slice().sort((a,b)=>a-b);
      const p95=sorted.length?sorted[Math.ceil(.95*sorted.length)-1]:null;
+     const renderGaps=after.renderGaps;
+     const sortedRenderGaps=renderGaps.slice().sort((a,b)=>a-b);
+     const renderGapP95Ms=sortedRenderGaps.length?
+      sortedRenderGaps[Math.ceil(.95*sortedRenderGaps.length)-1]:null;
+     const renderGapMaxMs=sortedRenderGaps.length?
+      sortedRenderGaps[sortedRenderGaps.length-1]:null;
      const simulatedMs=delta('simMs');
      const updates=delta('updates'),renders=delta('renders'),frames=delta('frames');
      const updateWorkMs=delta('work'),renderWorkMs=delta('renderWork');
@@ -126,6 +139,7 @@ const origin='http://127.0.0.1:8765/';
       minimapWorkMs:delta('minimapWork'),projectiles,
       fireCalls:delta('fireCalls'),frames,frameGapP95Ms:p95,
       frameGapSamples:gaps.length,
+      renderGapP95Ms,renderGapMaxMs,renderGapSamples:renderGaps.length,
       presentationFps:renders*1000/wallMs,
       observerRafFps:frames*1000/wallMs,
       simulationHz:updates*1000/wallMs,
@@ -137,7 +151,8 @@ const origin='http://127.0.0.1:8765/';
       droppedMs:delta('droppedMs'),ticks:delta('ticks')};
      console.log('NOVA_FIXED60_COMBAT_PHASE '+JSON.stringify(result));
      assert.ok(result.updates>0 && result.simulatedMs>0 && result.renders>0 &&
-      Number.isFinite(result.updateWorkMs) && Number.isFinite(result.renderWorkMs),
+      Number.isFinite(result.updateWorkMs) && Number.isFinite(result.renderWorkMs) &&
+      result.renderGapSamples>0 && Number.isFinite(result.renderGapP95Ms),
       'real composed combat and renderer must advance');
      assert.equal(result.playerClass,'tempest','real combat must use Tempest');
      assert.ok(result.fireCalls>0 && result.projectiles>0,
