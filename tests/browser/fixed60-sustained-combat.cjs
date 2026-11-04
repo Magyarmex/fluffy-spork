@@ -317,6 +317,11 @@ const origin='http://127.0.0.1:8765/';
     baselineRenderPerUpdate:mean(baseline,'renderPerUpdate'),
     fixed60RenderPerUpdate:mean(pilot,'renderPerUpdate')});
   }
+  for(const summary of summaries){
+   for(const [key,value] of Object.entries(summary))
+    assert.ok(typeof value==='number'&&Number.isFinite(value),
+     'combat comparison must not silently serialize invalid '+key+' as null');
+  }
   console.log('NOVA_FIXED60_COMBAT_COMPARISON '+JSON.stringify(summaries));
   console.log('NOVA_FIXED60_SUSTAINED_COMBAT '+JSON.stringify(observations));
  }finally{await browser.close()}
