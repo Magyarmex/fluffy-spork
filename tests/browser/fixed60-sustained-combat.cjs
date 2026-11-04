@@ -99,6 +99,8 @@ const origin='http://127.0.0.1:8765/';
      const after=await page.evaluate(gapStart=>{
       const m=window.__novaCombatBench,g=window.__novaCombatBenchGame;
       return {updates:m.updates,simMs:m.simMs,work:m.updateWorkMs,
+       renders:m.renders,renderWork:m.renderWorkMs,
+       minimaps:m.minimaps,minimapWork:m.minimapWorkMs,
        projectiles:m.projectiles,fireCalls:m.fireCalls,frames:m.frames,
        gaps:m.frameGaps.length,ticks:g.__novaFixed60Pilot?.owner.ticks||0,
        droppedMs:g.__novaFixed60Pilot?.owner.droppedMs||0,
