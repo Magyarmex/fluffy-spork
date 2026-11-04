@@ -625,6 +625,9 @@ const {chromium}=require('playwright');
       const g=window.__novaStepBudgetGame;
       return g?.status==='playing'&&g.__novaFixed60Pilot?.owner.ticks>5;
      },null,{timeout:20000});
+     await cdp.send('Emulation.setCPUThrottlingRate',{rate:6});
+     // Keep the throttle transition out of the measured interval.
+     await page.waitForTimeout(300);
      const initial=await page.evaluate(()=>{
       const g=window.__novaStepBudgetGame,o=g.__novaFixed60Pilot.owner;
       if(o.maxSteps!==Number(new URLSearchParams(location.search).get('nova_fixed60_steps')))
@@ -641,7 +644,6 @@ const {chromium}=require('playwright');
       return {at:performance.now(),ticks:o.ticks,droppedMs:o.droppedMs,
        renders:window.__novaStepBudgetRenders};
      });
-     await cdp.send('Emulation.setCPUThrottlingRate',{rate:6});
      await page.waitForTimeout(3000);
      const measured=await page.evaluate(()=>{
       const g=window.__novaStepBudgetGame,o=g.__novaFixed60Pilot.owner;
