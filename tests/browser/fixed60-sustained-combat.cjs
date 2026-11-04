@@ -310,6 +310,9 @@ const origin='http://127.0.0.1:8765/';
       updates,simulatedMs,updateWorkMs,
       renders,renderWorkMs,bulletWorkMs:delta('bulletWorkMs'),
       droneWorkMs:delta('droneWorkMs'),droneCalls:delta('droneCalls'),
+      // Compare work per simulated second, not only per browser wall second:
+      // fixed60 may advance substantially more game time under CPU pressure.
+      droneMsPerSimSecond:simulatedMs>0?delta('droneWorkMs')*1000/simulatedMs:null,
       // The sampled owners can call one another; do not subtract their
       // inclusive times to fabricate an exclusive "other" CPU bucket.
       collisionWorkMs:delta('collisionWorkMs'),minimaps:delta('minimaps'),
@@ -352,6 +355,7 @@ const origin='http://127.0.0.1:8765/';
       Number.isFinite(result.updatePlusRenderP95Ms) &&
       Number.isFinite(result.bulletWorkMs) && Number.isFinite(result.collisionWorkMs) &&
       Number.isFinite(result.droneWorkMs) && result.droneCalls>0 &&
+      Number.isFinite(result.droneMsPerSimSecond) &&
       Number.isFinite(result.bulletVfxCallsPerBulletSecond) &&
       Number.isFinite(result.bulletVfxParticlesPerBulletSecond) &&
       result.renderGapSamples>0 && Number.isFinite(result.renderGapP95Ms) &&
@@ -451,6 +455,8 @@ const origin='http://127.0.0.1:8765/';
     fixed60StepsPerRenderP95:mean(pilot,'stepsPerRenderP95'),
     baselineMultiStepRenderFrames:mean(baseline,'multiStepRenderFrames'),
     fixed60MultiStepRenderFrames:mean(pilot,'multiStepRenderFrames'),
+    baselineDroneMsPerSimSecond:mean(baseline,'droneMsPerSimSecond'),
+    fixed60DroneMsPerSimSecond:mean(pilot,'droneMsPerSimSecond'),
     baselineDroneWorkMs:mean(baseline,'droneWorkMs'),
     fixed60DroneWorkMs:mean(pilot,'droneWorkMs'),
     baselineBulletWorkMs:mean(baseline,'bulletWorkMs'),
