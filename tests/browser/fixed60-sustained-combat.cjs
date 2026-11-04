@@ -67,6 +67,9 @@ const origin='http://127.0.0.1:8765/';
      const renderer=window.__novaMakeRequire('')('game/render');
      const render=renderer.render;
      renderer.render=function(...args){
+      // The module is shared with decorative/lobby worlds. Only completed
+      // renders of the measured live Game belong in its frame statistics.
+      if(args[0]!==g)return render.apply(this,args);
       const t=performance.now();
       try{return render.apply(this,args)}
       finally{
