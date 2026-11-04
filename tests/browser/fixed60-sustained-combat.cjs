@@ -202,6 +202,8 @@ const origin='http://127.0.0.1:8765/';
   // and combat histories remain independent. This is not deterministic A/B.
   for(const repeat of [0,1]){
    const worlds=observations.filter(x=>x.repeat===repeat);
+   assert.ok(worlds.every(x=>typeof x.layout==='string'&&x.layout.length>0),
+    'paired browser worlds must expose a real Battlefield layout');
    assert.equal(new Set(worlds.map(x=>x.layout)).size,1,
     'scheduler comparisons within a repeat must share Battlefield layout');
   }
