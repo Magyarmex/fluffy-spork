@@ -135,6 +135,7 @@ jobs:
       - name: Run real React + Chromium smoke
         run: |
           node tests/browser/fixed60-optin-boot.cjs
+          node tests/browser/fixed60-pwa-offline.cjs
           node tests/browser/real-touch-gameplay.cjs
           node tests/browser/crasher-recovery-cue.cjs
           node tests/browser/bomber-terrain-child-birth.cjs
