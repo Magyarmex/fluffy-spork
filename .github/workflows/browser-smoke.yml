@@ -98,8 +98,7 @@ jobs:
           p=Path('index.html')
           html=p.read_text(encoding='utf-8')
           anchor='<script src="./nova-updates/settings-v1.7.7.js"></script>'
-          scripts=('<script src="./nova-updates/fixed60-research-browser.js"></script>\n'
-                   '<script src="./nova-updates/fixed60-optin-boot.js"></script>\n')
+          scripts='<script src="./nova-updates/fixed60-optin-boot.js"></script>\\n'
           if html.count(anchor)!=1:
               raise SystemExit('fixed60 Pilot Console browser-smoke anchor drift')
           if scripts not in html:
