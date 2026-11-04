@@ -8,8 +8,10 @@ const origin='http://127.0.0.1:8765/';
  const browser=await chromium.launch({headless:true,args:['--disable-dev-shm-usage','--no-sandbox']});
  try{
   const observations=[];
-  // Counterbalance mode order across independent worlds. The browser remains
-  // a synthetic performance proxy, not a deterministic or physical-device gate.
+  // Counterbalance scheduler and CPU-load order. The 6x stress phase is
+  // intended to expose sub-60Hz presentation if the runner is fast enough;
+  // actual measured FPS, not the throttle multiplier, determines that.
+  // This remains a synthetic proxy, not a physical-device release gate.
   for(const repeat of [0,1])for(const fixed60 of (repeat?[true,false]:[false,true])){
    const context=await browser.newContext({viewport:{width:800,height:600}});
    const page=await context.newPage(),errors=[];
@@ -112,7 +114,7 @@ const origin='http://127.0.0.1:8765/';
      };
      requestAnimationFrame(frame);
     });
-    for(const throttle of (repeat?[3,1]:[1,3])){
+    for(const throttle of (repeat?[6,3,1]:[1,3,6])){
      await cdp.send('Emulation.setCPUThrottlingRate',{rate:throttle});
      // Do not attribute the interval spanning a throttle transition or the
      // Playwright/CDP setup pause to either measured presentation phase.
@@ -236,8 +238,8 @@ const origin='http://127.0.0.1:8765/';
     await context.close();
    }
   }
-  assert.equal(observations.length,8,'two counterbalanced passes across two schedulers and CPU loads');
-  for(const fixed60 of [false,true])for(const throttle of [1,3])
+  assert.equal(observations.length,12,'two counterbalanced passes across two schedulers and three CPU loads');
+  for(const fixed60 of [false,true])for(const throttle of [1,3,6])
    assert.equal(observations.filter(x=>x.fixed60===fixed60&&x.throttle===throttle).length,2,
     'each scheduler/load pair must have independent replicates');
   // Layouts are paired within each repeat, but entity spawns, AI decisions,
@@ -251,7 +253,7 @@ const origin='http://127.0.0.1:8765/';
   }
   // Chromium CPU throttling is not a physical Android acceptance gate.
   const summaries=[];
-  for(const throttle of [1,3]){
+  for(const throttle of [1,3,6]){
    const baseline=observations.filter(x=>!x.fixed60&&x.throttle===throttle);
    const pilot=observations.filter(x=>x.fixed60&&x.throttle===throttle);
    const mean=(xs,key)=>xs.reduce((sum,x)=>sum+x[key],0)/xs.length;
