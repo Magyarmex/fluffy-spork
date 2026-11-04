@@ -188,6 +188,25 @@ const {chromium}=require('playwright');
      }));
      assert.equal(await page.evaluate(()=>window.__novaFixed60Game.input.move.active),
       false,'touch release clears fixed60 movement');
+     // A background-sized gap must fail closed instead: old touch ownership
+     // cannot remain held forever if the browser drops the release event.
+     await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{...touch,id:18}]});
+     await page.waitForFunction(()=>window.__novaFixed60Game?.input.move.active,
+      null,{timeout:3000,polling:'raf'});
+     const longBefore=await page.evaluate(()=>
+      window.__novaFixed60Game.__novaFixed60Pilot.owner.droppedFrames);
+     await page.evaluate(()=>{
+      const until=performance.now()+320;
+      while(performance.now()<until){}
+     });
+     await page.waitForFunction(before=>{
+      const o=window.__novaFixed60Game?.__novaFixed60Pilot?.owner;
+      return o&&o.droppedFrames>before;
+     },longBefore,{timeout:3000,polling:'raf'});
+     assert.equal(await page.evaluate(()=>window.__novaFixed60Game.input.move.active),
+      false,'long suspension must release old touch ownership');
+     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+
      // Repeated browser-event-to-state measurements expose tail latency that a
      // single successful touch cannot establish. This is Chromium-only, not
      // input-to-photon or physical Android evidence.
