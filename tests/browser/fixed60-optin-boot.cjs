@@ -232,20 +232,43 @@ const {chromium}=require('playwright');
      // Repeated browser-event-to-state measurements expose tail latency that a
      // single successful touch cannot establish. This is Chromium-only, not
      // input-to-photon or physical Android evidence.
+     // Timestamp the exact Input replay, not the next Playwright RAF poll.
+     // Under CPU throttling RAF polling itself can be delayed by >100ms.
+     await page.evaluate(()=>{
+      const input=window.__novaFixed60Game.input;
+      const originalDown=input.pd,originalUp=input.pu;
+      input.pd=function(event){
+       const result=originalDown.call(this,event),m=window.__novaRepeatTouch;
+       if(m && event.pointerType==='touch' && event.pointerId===m.pointerId &&
+          this.move.active && m.downAppliedAt===undefined)
+        m.downAppliedAt=performance.now();
+       return result;
+      };
+      input.pu=function(event){
+       const result=originalUp.call(this,event),m=window.__novaRepeatTouch;
+       if(m && event.pointerType==='touch' && event.pointerId===m.pointerId &&
+          !this.move.active && m.upAppliedAt===undefined)
+        m.upAppliedAt=performance.now();
+       return result;
+      };
+     });
      const sampleTouches=async(count)=>{
       const repeated=[];
       for(let trial=0;trial<count;trial++){
       await page.evaluate(()=>{
        window.__novaRepeatTouch={};
        document.addEventListener('pointerdown',e=>{
-        if(e.pointerType==='touch')window.__novaRepeatTouch.downAt=performance.now();
+        if(e.pointerType==='touch'){
+         window.__novaRepeatTouch.downAt=performance.now();
+         window.__novaRepeatTouch.pointerId=e.pointerId;
+        }
        },{capture:true,once:true});
       });
       await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{...touch,id:40+trial}]});
       await page.waitForFunction(()=>{
        const g=window.__novaFixed60Game,m=window.__novaRepeatTouch;
-       if(!g?.input.move.active||m.downAt===undefined)return false;
-       m.downAppliedAt??=performance.now();return true;
+       return !!g?.input.move.active && m.downAt!==undefined &&
+        m.downAppliedAt!==undefined;
       },null,{timeout:3000,polling:'raf'});
       await page.evaluate(()=>{
        document.addEventListener('pointerup',e=>{
@@ -255,8 +278,8 @@ const {chromium}=require('playwright');
       await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
       await page.waitForFunction(()=>{
        const g=window.__novaFixed60Game,m=window.__novaRepeatTouch;
-       if(g?.input.move.active||m.upAt===undefined)return false;
-       m.upAppliedAt??=performance.now();return true;
+       return g?.input.move.active===false && m.upAt!==undefined &&
+        m.upAppliedAt!==undefined;
       },null,{timeout:3000,polling:'raf'});
       const measured=await page.evaluate(()=>{
        const m=window.__novaRepeatTouch;
