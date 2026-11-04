@@ -141,7 +141,7 @@ const origin='http://127.0.0.1:8765/';
      });
      const before=await page.evaluate(()=>{
       const m=window.__novaCombatBench,g=window.__novaCombatBenchGame;
-      return {updates:m.updates,simMs:m.simMs,work:m.updateWorkMs,
+      return {at:performance.now(),updates:m.updates,simMs:m.simMs,work:m.updateWorkMs,
        renders:m.renders,renderWork:m.renderWorkMs,
        minimaps:m.minimaps,minimapWork:m.minimapWorkMs,
        projectiles:m.projectiles,fireCalls:m.fireCalls,frames:m.frames,
@@ -152,12 +152,10 @@ const origin='http://127.0.0.1:8765/';
        ticks:g.__novaFixed60Pilot?.owner.ticks||0,
        droppedMs:g.__novaFixed60Pilot?.owner.droppedMs||0};
      });
-     const wallStart=Date.now();
      await page.waitForTimeout(3000);
-     const wallMs=Date.now()-wallStart;
      const after=await page.evaluate(({gapStart,renderGapStart,stepsStart,updateCostStart,renderCostStart})=>{
       const m=window.__novaCombatBench,g=window.__novaCombatBenchGame;
-      return {updates:m.updates,simMs:m.simMs,work:m.updateWorkMs,
+      return {at:performance.now(),updates:m.updates,simMs:m.simMs,work:m.updateWorkMs,
        renders:m.renders,renderWork:m.renderWorkMs,
        minimaps:m.minimaps,minimapWork:m.minimapWorkMs,
        projectiles:m.projectiles,fireCalls:m.fireCalls,frames:m.frames,
@@ -177,6 +175,12 @@ const origin='http://127.0.0.1:8765/';
      },{gapStart:before.gaps,renderGapStart:before.renderGaps,
        stepsStart:before.stepsPerRender,
        updateCostStart:before.updateCosts,renderCostStart:before.renderCosts});
+     // Snapshot on the browser's own clock: under CPU pressure Playwright's
+     // post-timeout evaluate may wait for the busy main thread. Its delay
+     // contributes real game work and must be included in the denominator.
+     const wallMs=after.at-before.at;
+     assert.ok(Number.isFinite(wallMs)&&wallMs>=2500,
+      'combat measurement interval must use actual browser elapsed time');
      const delta=(k)=>after[k]-before[k];
      const gaps=after.frameGaps;
      const sorted=gaps.slice().sort((a,b)=>a-b);
