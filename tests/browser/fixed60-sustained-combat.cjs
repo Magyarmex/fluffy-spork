@@ -224,6 +224,8 @@ const origin='http://127.0.0.1:8765/';
       presentationFps:renders*1000/wallMs,
       observerRafFps:frames*1000/wallMs,
       simulationHz:updates*1000/wallMs,
+      simulatedTimeRatio:simulatedMs/wallMs,
+      simulatedTimeDeficitMs:wallMs-simulatedMs,
       renderPerUpdate:renders/updates,
       updateCostMs:updateWorkMs/updates,
       updateCostP95Ms,renderCostP95Ms,
@@ -308,6 +310,10 @@ const origin='http://127.0.0.1:8765/';
     fixed60UpdateCostMs:mean(pilot,'updateCostMs'),
     baselineProjectilesPerSimSecond:mean(baseline,'projectilesPerSimSecond'),
     fixed60ProjectilesPerSimSecond:mean(pilot,'projectilesPerSimSecond'),
+    baselineSimulatedTimeRatio:mean(baseline,'simulatedTimeRatio'),
+    fixed60SimulatedTimeRatio:mean(pilot,'simulatedTimeRatio'),
+    baselineSimulatedTimeDeficitMs:mean(baseline,'simulatedTimeDeficitMs'),
+    fixed60SimulatedTimeDeficitMs:mean(pilot,'simulatedTimeDeficitMs'),
     baselineRenderPerUpdate:mean(baseline,'renderPerUpdate'),
     fixed60RenderPerUpdate:mean(pilot,'renderPerUpdate')});
   }
