@@ -719,7 +719,22 @@ const {chromium}=require('playwright');
     assert.equal(new Set(pair.map(x=>x.world)).size,1,
      'catch-up budget comparisons must start from identical Battlefield worlds');
    }
-   console.log('NOVA_FIXED60_STEP_BUDGET_COMPARISON '+JSON.stringify(observations));
+   const paired=[0,1].map(repeat=>{
+    const trials=observations.filter(x=>x.repeat===repeat);
+    const three=trials.find(x=>x.budget===3),four=trials.find(x=>x.budget===4);
+    return {repeat,layout:JSON.parse(three.world).layout,
+     threeFps:three.fps,fourFps:four.fps,
+     fpsDeltaThreeMinusFour:three.fps-four.fps,
+     threeSimulatedTimeRatio:three.simulatedTimeRatio,
+     fourSimulatedTimeRatio:four.simulatedTimeRatio,
+     simulatedTimeRatioDelta:three.simulatedTimeRatio-four.simulatedTimeRatio,
+     threeDroppedMs:three.droppedMs,fourDroppedMs:four.droppedMs,
+     threeProjectiles:three.projectiles,fourProjectiles:four.projectiles};
+   });
+   assert.ok(paired.every(p=>Object.entries(p).every(([key,value])=>
+    key==='layout'||typeof value==='number'&&Number.isFinite(value))),
+    'budget comparison must not silently serialize invalid metrics');
+   console.log('NOVA_FIXED60_STEP_BUDGET_COMPARISON '+JSON.stringify({observations,paired}));
   }
   // A missing experimental bundle must recover to the menu, never launch
   // an unannounced production-rate match under the pilot query flag.
