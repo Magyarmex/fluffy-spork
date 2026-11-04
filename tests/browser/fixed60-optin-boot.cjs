@@ -685,9 +685,16 @@ const {chromium}=require('playwright');
       const renderer=window.__novaMakeRequire('')('game/render');
       const render=renderer.render;
       window.__novaStepBudgetRenders=0;
+      window.__novaBudgetRenderGaps=[];
+      let lastRender=null;
       renderer.render=function(...args){
        const result=render.apply(this,args);
-       if(args[0]===g)window.__novaStepBudgetRenders++;
+       if(args[0]===g){
+        const completed=performance.now();
+        if(lastRender!==null)window.__novaBudgetRenderGaps.push(completed-lastRender);
+        lastRender=completed;
+        window.__novaStepBudgetRenders++;
+       }
        return result;
       };
       return {at:performance.now(),ticks:o.ticks,droppedMs:o.droppedMs,
@@ -700,6 +707,7 @@ const {chromium}=require('playwright');
       const g=window.__novaStepBudgetGame,o=g.__novaFixed60Pilot.owner;
       return {at:performance.now(),ticks:o.ticks,droppedMs:o.droppedMs,
        renders:window.__novaStepBudgetRenders,
+       renderGaps:window.__novaBudgetRenderGaps.slice(),
        projectiles:window.__novaBudgetProjectiles,
        work:{...window.__novaBudgetWork},started:o.started,
        paused:g.paused,pendingOffer:!!g.pendingOffer,
@@ -707,6 +715,8 @@ const {chromium}=require('playwright');
        raf:g.raf||0};
      });
      const wallMs=measured.at-initial.at;
+     const gaps=measured.renderGaps.slice().sort((a,b)=>a-b);
+     const renderGapP95Ms=gaps.length?gaps[Math.ceil(.95*gaps.length)-1]:null;
      const observation={repeat,budget,wallMs,world:initial.world,
       ticks:measured.ticks-initial.ticks,
       droppedMs:measured.droppedMs-initial.droppedMs,
@@ -717,11 +727,13 @@ const {chromium}=require('playwright');
        (measured.work.updates-initial.work.updates),
       maxLiveBullets:measured.work.maxBullets,
       fps:(measured.renders-initial.renders)*1000/wallMs,
+      renderGapP95Ms,renderGapsOver50Ms:gaps.filter(ms=>ms>50).length,
       simulatedTimeRatio:(measured.ticks-initial.ticks)*(1000/60)/wallMs,
       updateWorkFraction:(measured.work.updateMs-initial.work.updateMs)/wallMs};
      assert.ok(wallMs>=2500&&observation.ticks>0&&observation.renders>0&&
       observation.projectiles>0&&Number.isFinite(observation.meanLiveBullets)&&
-      Number.isFinite(observation.updateWorkFraction),
+      Number.isFinite(observation.updateWorkFraction)&&
+      Number.isFinite(observation.renderGapP95Ms),
       'both research budgets must advance actual combat and presentation');
      assert.ok(measured.started&&!measured.paused&&!measured.pendingOffer&&
       measured.alive&&!measured.destroyed&&!measured.raf,
@@ -750,6 +762,9 @@ const {chromium}=require('playwright');
     return {repeat,layout:JSON.parse(three.world).layout,
      threeFps:three.fps,fourFps:four.fps,
      fpsDeltaThreeMinusFour:three.fps-four.fps,
+     threeRenderGapP95Ms:three.renderGapP95Ms,
+     fourRenderGapP95Ms:four.renderGapP95Ms,
+     renderGapP95DeltaMs:three.renderGapP95Ms-four.renderGapP95Ms,
      threeSimulatedTimeRatio:three.simulatedTimeRatio,
      fourSimulatedTimeRatio:four.simulatedTimeRatio,
      simulatedTimeRatioDelta:three.simulatedTimeRatio-four.simulatedTimeRatio,
