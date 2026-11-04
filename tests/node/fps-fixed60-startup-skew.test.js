@@ -23,9 +23,17 @@ test('browser frame-start timestamp slightly before start performance.now is bou
  assert.deepEqual(x.updates,[1/60]);
  x.owner.stop();
 });
-test('startup skew above 50ms is rejected, not replayed as a stale frame',()=>{
+test('foreground startup work may exceed 50ms without invalidating first RAF',()=>{
  const x=setup();x.now(1100);x.owner.start();
- assert.throws(()=>x.deliver(1040),/nonmonotonic RAF timestamp/);
+ x.deliver(1040); // 60ms of same-frame startup work, no backward simulation.
+ assert.equal(x.owner.started,true);assert.equal(x.owner.ticks,0);
+ x.deliver(1117);
+ assert.equal(x.owner.started,true);assert.equal(x.owner.ticks,1);
+ x.owner.stop();
+});
+test('startup skew above 250ms is rejected, not replayed as a stale frame',()=>{
+ const x=setup();x.now(1400);x.owner.start();
+ assert.throws(()=>x.deliver(1100),/nonmonotonic RAF timestamp/);
  assert.equal(x.owner.started,false);assert.equal(x.owner.ticks,0);
 });
 test('after clock catches up, backward RAF timestamps remain invalid',()=>{
