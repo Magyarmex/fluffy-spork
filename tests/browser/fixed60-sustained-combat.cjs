@@ -178,6 +178,10 @@ const origin='http://127.0.0.1:8765/';
       frameGapSamples:gaps.length,
       renderGapP95Ms,renderGapMaxMs,renderGapSamples:renderGaps.length,
       renderGapsOver50Ms:renderGaps.filter(ms=>ms>50).length,
+      renderGapsOver100Ms:renderGaps.filter(ms=>ms>100).length,
+      // Sum only the excess beyond a 30Hz presentation budget. This is
+      // diagnostic exposure, not a substitute for input-to-photon latency.
+      renderGapExcessOver33Ms:renderGaps.reduce((sum,ms)=>sum+Math.max(0,ms-1000/30),0),
       stepsPerRenderP95,stepsPerRenderMax,
       multiStepRenderFrames:stepsPerRender.filter(n=>n>=2).length,
       presentationFps:renders*1000/wallMs,
@@ -244,6 +248,10 @@ const origin='http://127.0.0.1:8765/';
     fixed60RenderGapMaxMs:mean(pilot,'renderGapMaxMs'),
     baselineRenderGapsOver50Ms:mean(baseline,'renderGapsOver50Ms'),
     fixed60RenderGapsOver50Ms:mean(pilot,'renderGapsOver50Ms'),
+    baselineRenderGapsOver100Ms:mean(baseline,'renderGapsOver100Ms'),
+    fixed60RenderGapsOver100Ms:mean(pilot,'renderGapsOver100Ms'),
+    baselineRenderGapExcessOver33Ms:mean(baseline,'renderGapExcessOver33Ms'),
+    fixed60RenderGapExcessOver33Ms:mean(pilot,'renderGapExcessOver33Ms'),
     baselineStepsPerRenderP95:mean(baseline,'stepsPerRenderP95'),
     fixed60StepsPerRenderP95:mean(pilot,'stepsPerRenderP95'),
     baselineMultiStepRenderFrames:mean(baseline,'multiStepRenderFrames'),
