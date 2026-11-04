@@ -23,7 +23,7 @@ function boot(query,{missingApi=false,failStart=false,missingFingerprint=false}=
  if(!missingApi)win.__novaFixed60Research={
   createFixedStepBrowserPilot:(game,options)=>{
    calls.push('create-pilot');
-   assert.equal(options.maxSteps,4);
+   assert.equal(options.maxSteps,query.includes('nova_fixed60_steps=3')?3:4);
    assert.equal(options.canvas,game.canvas);
    assert.equal(options.window,win);
    assert.equal(options.document,win.document);
@@ -58,6 +58,25 @@ test('explicit pilot owns start and leaves production RAF unstarted',()=>{
  assert.equal(g.raf,0);
  assert.ok(g.__novaFixed60Pilot);
  assert.throws(()=>g.start(),/already attached/);
+});
+test('research catch-up budget is explicit and never changes ordinary startup',()=>{
+ const baseline=boot('?nova_fixed60=pilot'),defaultGame=new baseline.Game();
+ defaultGame.start();
+ assert.deepEqual(baseline.calls,['settings-start','create-pilot','pilot-start']);
+ const three=boot('?nova_fixed60=pilot&nova_fixed60_steps=3'),threeGame=new three.Game();
+ threeGame.start();
+ assert.deepEqual(three.calls,['settings-start','create-pilot','pilot-start']);
+ const four=boot('?nova_fixed60=pilot&nova_fixed60_steps=4'),fourGame=new four.Game();
+ fourGame.start();
+ assert.deepEqual(four.calls,['settings-start','create-pilot','pilot-start']);
+ for(const invalid of ['0','2','5','3.5','foo','']){
+  assert.throws(()=>boot('?nova_fixed60=pilot&nova_fixed60_steps='+invalid),
+   /supported step budget/,'invalid budget must fail closed');
+ }
+ const ordinary=boot('?nova_fixed60_steps=3',{missingApi:true});
+ const g=new ordinary.Game();g.start();
+ assert.deepEqual(ordinary.calls,['settings-start','production-start']);
+ assert.deepEqual(ordinary.writes,[]);
 });
 test('pilot startup failure releases capture and preserves original error',()=>{
  const h=boot('?nova_fixed60=pilot',{failStart:true}),g=new h.Game();
