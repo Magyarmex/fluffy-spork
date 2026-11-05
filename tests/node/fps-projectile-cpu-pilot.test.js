@@ -47,7 +47,7 @@ test('suite carries explicit research limits and unambiguous stress metadata',()
 
 test('rail occupancy is measured from actual composed projectile objects',()=>{
  const a=run({seed:1517800,hz:60,seconds:3,extraShots:0,cls:'railgun',prechargeRail:true});
- const b=run({seed:1517800,hz:60,seconds:3,extraShots:0,cls:'railgun'});
+ const b=run({seed:1517800,hz:60,seconds:3,extraShots:0,cls:'railgun',prechargeRail:true});
  assert.ok(a.playerVolleys>0,'real railgun firing must occur');
  assert.equal(a.prechargeRail,true,'wall-clock focus is a declared synthetic research control');
  assert.ok(a.playerRailEmitted>0,'the shipping rail marker must be observed at actual shot creation');
