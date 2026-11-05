@@ -97,3 +97,26 @@ test('composed 49-overlay Game emits warning at genuine held touch stall',()=>{
     assert.equal(notices.length,1);
   }finally{owner.stop();g.destroy()}
 });
+
+test('queued intentional release before stalled RAF suppresses false reset warning',()=>{
+  const s=fixture();s.owner.start();
+  try{
+    s.down(1005);s.frame(1017);
+    assert.equal(s.input.firing,true);
+    s.up(1020); // Captured before the delayed frame, not yet consumed.
+    s.frame(1137);
+    assert.equal(s.notices.length,0);
+    assert.equal(s.input.firing,false);
+    assert.equal(s.input.stickId.move,-1);
+  }finally{s.owner.stop()}
+});
+test('queued pointer cancellation also suppresses false reset warning',()=>{
+  const s=fixture();s.owner.start();
+  try{
+    s.down(1005);s.frame(1017);
+    s.timeline.push(.020,'pointercancel',{pointerId:7,pointerType:'touch'});
+    s.frame(1137);
+    assert.equal(s.notices.length,0);
+    assert.equal(s.input.firing,false);
+  }finally{s.owner.stop()}
+});
