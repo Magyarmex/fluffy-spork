@@ -42,7 +42,7 @@ function buildGame(bullets, options = {}) {
   game.tankById = new Map([
     [1, { id: 1, team: options.playerTeam || 'blue' }],
     [2, { id: 2, team: options.railTeam || 'red' }],
-    [3, { id: 3, team: 'red' }]
+    [3, { id: 3, team: 'green' }]
   ]);
   game.cam = { shake: 0 };
   game.addText = (...args) => { (game.texts ||= []).push(args); };
