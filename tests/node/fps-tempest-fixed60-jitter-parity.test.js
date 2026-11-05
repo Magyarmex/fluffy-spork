@@ -88,9 +88,9 @@ function runTouch(seed,intervals){
    now:()=>now,request:fn=>{callback=fn;return 1;},
    cancel:()=>{callback=null},render:()=>{},maxSteps:2
   });
-  const edges=[[250,'pointerdown'],[1750,'pointerup'],
-   [2250,'pointerdown'],[4250,'pointerup'],
-   [5000,'pointerdown'],[7750,'pointerup']];
+  const edges=[[250,'pointerdown'],[260,'pointermove'],[1750,'pointerup'],
+   [2250,'pointerdown'],[2260,'pointermove'],[4250,'pointerup'],
+   [5000,'pointerdown'],[5010,'pointermove'],[7750,'pointerup']];
   let index=0,volleys=0;const shotTimes=[],original=g.tryFire;
   g.tryFire=function(t){
    const before=this.bullets.length,result=original.apply(this,arguments);
@@ -105,7 +105,7 @@ function runTouch(seed,intervals){
     while(index<edges.length&&edges[index][0]<=at+1e-7){
      const [eventMs,kind]=edges[index++];
      const event={type:kind,timeStamp:1000+eventMs,
-      pointerId:11,pointerType:'touch',clientX:640,clientY:200,
+      pointerId:11,pointerType:'touch',clientX:kind==='pointerdown'?640:680,clientY:200,
       button:0,buttons:kind==='pointerdown'?1:0,
       target:{tagName:'CANVAS',closest:()=>null}};
      assert.equal(bridge.capture(event),true,'event must remain chronological');
@@ -124,7 +124,7 @@ function runTouch(seed,intervals){
 test('fixed60 preserves touch press/release shot chronology across adversarial RAF schedules',()=>{
  const native=Array(480).fill(2);
  const baseline=runTouch(1517800,native);
- assert.equal(baseline.applied,6);
+ assert.equal(baseline.applied,9);
  assert.ok(baseline.volleys>0,'touch input must actually fire');
  assert.equal(baseline.ticks,480);assert.equal(baseline.dropped,0);
  for(const [name,pattern] of Object.entries(patterns))
