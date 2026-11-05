@@ -159,3 +159,21 @@ test('malformed event getter cannot throw through read-only observer', () => {
   assert.equal(r.reason, 'certificate-error');
   assert.equal(r.certified.length, 0);
 });
+
+test('nearby unsupported shell invalidates an otherwise positive pair certificate', () => {
+  const a = shot(1, -20, 1000), b = shot(2, 20, -1000);
+  const shell = shot(3, 0, 0);
+  shell.shell = true;
+  const r = observeProjectilePairs({ bullets: [a, b, shell] }, .05, verified);
+  assert.equal(r.incomplete, true);
+  assert.equal(r.reason, 'unsupported-competing-projectile');
+  assert.equal(r.certified.length, 0);
+});
+test('distant unsupported shell cannot veto an isolated certified pair', () => {
+  const a = shot(1, -20, 1000), b = shot(2, 20, -1000);
+  const shell = shot(3, 1000, 0, 1000);
+  shell.shell = true;
+  const r = observeProjectilePairs({ bullets: [a, b, shell] }, .05, verified);
+  assert.equal(r.incomplete, false);
+  assert.equal(r.certified.length, 1);
+});
