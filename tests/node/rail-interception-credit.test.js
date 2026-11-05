@@ -152,3 +152,32 @@ test('contact feedback survives missing particle renderer and reversed broad-pha
   assert.ok(Math.abs(game.rings[0][0] - 50) < 1e-8);
   assert.ok(Math.abs(game.rings[0][1] - 30) < 1e-8);
 });
+
+test('first player contact takes priority over earlier enemy contact on same rail', () => {
+  const rail = bullet(90, 2, 100, 0, { px: 0, __novaRail: true, hp: 5 });
+  const playerShot = bullet(91, 1, 75, 0, { hp: 1 });
+  const enemyShot = bullet(92, 3, 25, 0, { hp: 1 });
+  const game = buildGame([rail, playerShot, enemyShot]);
+  game.resolveBulletCollisions();
+  assert.equal(rail.hp, 3);
+  assert.deepEqual(game.creditEvents, [true]);
+  assert.ok(rail.__novaRailContactX < 40, 'generic first contact is enemy shot');
+  assert.ok(rail.__novaPlayerRailContactX > 60, 'player contact occurs later in pair order');
+  assert.ok(game.rings[0][0] > 60, 'player-earned feedback follows player contact');
+});
+
+test('contact markers expire across ticks and do not borrow earlier coordinates', () => {
+  const rail = bullet(93, 2, 100, 0, { px: 0, __novaRail: true, hp: 4 });
+  const playerShot = bullet(94, 1, 75, 0, { hp: 1 });
+  const game = buildGame([rail, playerShot]);
+  game.resolveBulletCollisions();
+  const firstX = game.rings[0][0];
+  assert.ok(firstX > 60 && firstX < 90);
+  game.time += 1 / 60;
+  rail.x = 100; rail.px = 100;
+  const enemyShot = bullet(95, 3, 100, 0, { hp: 1 });
+  game.bullets = [rail, enemyShot];
+  game.resolveBulletCollisions();
+  assert.deepEqual(game.creditEvents, [true, false]);
+  assert.ok(Math.abs(game.rings[1][0] - 100) < 1e-8);
+});
