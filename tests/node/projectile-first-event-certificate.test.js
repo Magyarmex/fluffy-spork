@@ -6,7 +6,8 @@ const assert = require('node:assert/strict');
 function firstContact(a,b,dt,context) {
   if (!(dt>0) || !Number.isFinite(dt) || !context || context.complete!==true ||
       context.allied!==false || context.unscanned!==false) return null;
-  for (const s of [a,b]) if (!s || s.dead || s.shell || !(s.ttl>0) ||
+  for (const s of [a,b]) if (!s || s.dead || s.shell || s.beam || s.splash || s.__v17Cannon ||
+      s.__novaRail || s.pen!==0 || (s.hits||0)!==0 || !(s.ttl>0) ||
       !(s.r>0) || !['x','y','vx','vy','ttl','r','ownerId'].every(k=>Number.isFinite(s[k]))) return null;
   if (a.ownerId===b.ownerId) return null;
   const dx=a.x-b.x, dy=a.y-b.y, vx=a.vx-b.vx, vy=a.vy-b.vy;
@@ -35,7 +36,7 @@ function firstContact(a,b,dt,context) {
   }
   return t;
 }
-const shot=(x,vx,ownerId,ttl=.005,y=0,vy=0)=>({x,y,vx,vy,ownerId,ttl,r:3,dead:false,shell:false});
+const shot=(x,vx,ownerId,ttl=.005,y=0,vy=0)=>({x,y,vx,vy,ownerId,ttl,r:3,pen:0,hits:0,dead:false,shell:false});
 const a=()=>shot(-20,6000,1), b=()=>shot(20,-6000,2), complete={
   allied:false,complete:true,unscanned:false,aTerrain:null,bTerrain:null,
   aBody:null,bBody:null,aOtherProjectile:null,bOtherProjectile:null
@@ -66,7 +67,7 @@ test('allied and same-owner shots do not intercept',()=>{
   assert.equal(firstContact(a(),{...b(),ownerId:1},1/30,complete),null);
 });
 test('shell, dead, expired, nonfinite and malformed shots abstain',()=>{
-  for(const patch of [{shell:true},{dead:true},{ttl:0},{vx:NaN},{r:-1},{ownerId:undefined}])
+  for(const patch of [{shell:true},{beam:true},{splash:true},{__v17Cannon:true},{__novaRail:true},{pen:1},{hits:1},{dead:true},{ttl:0},{vx:NaN},{r:-1},{ownerId:undefined}])
     assert.equal(firstContact({...a(),...patch},b(),1/30,complete),null);
 });
 test('first contact beyond TTL or frame is not certified',()=>{
