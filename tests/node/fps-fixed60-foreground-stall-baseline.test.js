@@ -81,8 +81,8 @@ test('composed 49-overlay Game loses a genuine held movement pointer after visib
     now:()=>now,request:fn=>{callback=fn;return 1;},
     cancel:()=>{callback=null},render:()=>{}
   });
-  function pointer(type,ms,x=100){
-    return bridge.capture({type,timeStamp:ms,pointerId:11,pointerType:'touch',
+  function pointer(type,ms,x=100,id=11){
+    return bridge.capture({type,timeStamp:ms,pointerId:id,pointerType:'touch',
       clientX:x,clientY:200,button:0,buttons:type==='pointerup'||type==='pointercancel'?0:1,
       target:{tagName:'CANVAS',closest:()=>null}});
   }
@@ -91,17 +91,27 @@ test('composed 49-overlay Game loses a genuine held movement pointer after visib
     owner.start();
     assert.equal(pointer('pointerdown',1005),true);
     assert.equal(pointer('pointermove',1010,140),true);
+    assert.equal(pointer('pointerdown',1011,640,12),true);
+    assert.equal(pointer('pointermove',1012,680,12),true);
     frame(1017);
     assert.equal(g.input.stickId.move,11,'real Game should own the movement stick');
     assert.equal(g.input.move.active,true);
+    assert.equal(g.input.stickId.aim,12);
+    assert.equal(g.input.aim.active,true);
+    assert.equal(g.input.firing,true);
     frame(1137);
     assert.equal(owner.droppedFrames,1);
     assert.equal(g.input.stickId.move,-1,'reproduced silent pointer ownership loss');
     assert.equal(g.input.move.active,false);
+    assert.equal(g.input.stickId.aim,-1);
+    assert.equal(g.input.aim.active,false);
     assert.equal(g.input.firing,false,'no phantom firing after reset');
     assert.equal(pointer('pointerup',1140),true);
+    assert.equal(pointer('pointerup',1141,680,12),true);
     frame(1154);
     assert.equal(g.input.stickId.move,-1,'late release remains safe');
+    assert.equal(g.input.stickId.aim,-1);
+    assert.equal(g.input.firing,false);
     assert.equal(pointer('pointerdown',1160),true);
     frame(1171);
     assert.equal(g.input.stickId.move,11,'genuine new touch reacquires movement');
@@ -109,5 +119,6 @@ test('composed 49-overlay Game loses a genuine held movement pointer after visib
     frame(1188);
     assert.equal(g.input.stickId.move,-1);
     assert.equal(g.input.move.active,false);
+    assert.equal(g.input.firing,false);
   }finally{owner.stop();g.destroy()}
 });
