@@ -220,3 +220,14 @@ test('missing one competing-event field invalidates an otherwise complete contex
   assert.equal(r.reason, 'unverified-pair');
   assert.equal(r.certified.length, 0);
 });
+
+test('chronological ordering beats projectile array enumeration', () => {
+  const lateA = shot(1, -30, 1000, 100), lateB = shot(2, 30, -1000, 100);
+  const earlyA = shot(3, -20, 1000), earlyB = shot(4, 20, -1000);
+  const r = observeProjectilePairs({ bullets: [lateA, lateB, earlyA, earlyB] },
+    .05, verified);
+  assert.equal(r.incomplete, false);
+  assert.equal(r.certified.length, 1);
+  assert.deepEqual([r.certified[0].i, r.certified[0].j], [2, 3]);
+  assert.ok(Math.abs(r.certified[0].time - .01625) < 1e-12);
+});
