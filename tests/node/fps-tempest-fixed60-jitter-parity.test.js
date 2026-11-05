@@ -70,3 +70,62 @@ test('opt-in fixed60 preserves Tempest chronology under equal-mean adversarial R
   }
  }
 });
+
+function runTouch(seed,intervals){
+ return withSeed(seed,draws=>{
+  const g=bootGame(),p=g.player;g.sfx.muted=true;
+  g.setClass(p,'tempest');g.tanks=[p];g.tankById=new Map([[p.id,p]]);
+  g.shapes=[];g.drones=[];g.powerups=[];p.stats.reload=8;
+  g.input.autofire=false;
+  let now=1000,callback=null;
+  const timeline=new ChronologicalInput(g.input);
+  const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
+  g.sfx.startMusic=()=>{};
+  const owner=new FixedStepRafOwner(g,timeline,bridge,{
+   now:()=>now,request:fn=>{callback=fn;return 1;},
+   cancel:()=>{callback=null},render:()=>{},maxSteps:2
+  });
+  const edges=[[250,'pointerdown'],[1750,'pointerup'],
+   [2250,'pointerdown'],[4250,'pointerup'],
+   [5000,'pointerdown'],[7750,'pointerup']];
+  let index=0,volleys=0;const shotTimes=[],original=g.tryFire;
+  g.tryFire=function(t){
+   const before=this.bullets.length,result=original.apply(this,arguments);
+   if(t===p&&this.bullets.length>before){volleys++;shotTimes.push(+this.time.toFixed(8));}
+   return result;
+  };
+  try{
+   owner.start();
+   let elapsed=0;
+   for(const ticks of intervals){
+    elapsed+=ticks;const at=elapsed*1000/120;now=1000+at;
+    while(index<edges.length&&edges[index][0]<=at+1e-7){
+     const [eventMs,kind]=edges[index++];
+     const event={type:kind,timeStamp:1000+eventMs,
+      pointerId:11,pointerType:'touch',clientX:640,clientY:200,
+      button:0,buttons:kind==='pointerdown'?1:0,
+      target:{tagName:'CANVAS',closest:()=>null}};
+     assert.equal(bridge.capture(event),true,'event must remain chronological');
+    }
+    const next=callback;assert.equal(typeof next,'function');
+    callback=null;next(now);
+   }
+   return {volleys,shotTimes,hash:digest(physical(g)),draws:draws(),
+    ticks:owner.ticks,dropped:owner.droppedFrames,applied:timeline.applied,
+    lateClamps:bridge.lateClamps};
+  }finally{owner.stop();g.destroy();}
+ });
+}
+test('fixed60 preserves touch press/release shot chronology across adversarial RAF schedules',()=>{
+ const native=Array(480).fill(2);
+ const baseline=runTouch(1517800,native);
+ assert.equal(baseline.applied,6);
+ assert.ok(baseline.volleys>0,'touch input must actually fire');
+ assert.equal(baseline.ticks,480);assert.equal(baseline.dropped,0);
+ for(const [name,pattern] of Object.entries(patterns))
+  for(const phase of [0,1,2]){
+   const observed=runTouch(1517800,schedule(pattern,phase));
+   assert.deepEqual(observed,baseline,
+    'touch chronology changed for '+name+' phase='+phase);
+  }
+});
