@@ -31,7 +31,9 @@ async function run(browser,width,dpr){
    path:path.join(naturalOut,'minimap-natural-'+width+'-dpr'+dpr+'.png')});
   const result=await page.evaluate(()=>{
    const g=window.__novaMinimapAuditGame;
-   g.setPaused(true);
+   // Freeze world updates without mounting the opaque React PAUSED veil;
+   // otherwise element screenshots would measure the veil, not live HUD pixels.
+   g.paused=true;
    const enemies=g.tanks.filter(t=>t.alive&&!t.isPlayer);
    if(!g.player||enemies.length<2||!g.mmCtx?.canvas)throw Error('live composed Game/minimap missing');
    const target=enemies[0];
