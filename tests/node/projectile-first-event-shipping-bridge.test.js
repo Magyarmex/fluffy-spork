@@ -125,3 +125,31 @@ test('unequal-TTL endpoint clamping creates a false simultaneous interception', 
   assert.equal(firstContact(a, b, 1 / 30, clear), null,
     'chronological certificate correctly rejects the post-expiry contact');
 });
+
+test('three-way interception exposes descending-array order versus physical time', () => {
+  const g = boot(), a = shot(1, 1, -20, 6000, .005);
+  const b = shot(2, 2, 0, 0, .005);
+  const c = shot(3, 3, 25, -6000, .005);
+  a.hp = a.maxHp = 3;
+  b.hp = b.maxHp = 2;
+  c.hp = c.maxHp = 1;
+  const ab = firstContact(a, b, 1 / 240, clear);
+  const bc = firstContact(b, c, 1 / 240, clear);
+  const ac = firstContact(a, c, 1 / 240, clear);
+  assert.ok(ab < bc && bc < ac && ac < 1 / 240,
+    'all three contacts are physically ordered inside one frame');
+  const weakened = [], original = g.weakenBullet.bind(g);
+  g.weakenBullet = function(bullet, damage) {
+    weakened.push(bullet.id);
+    return original(bullet, damage);
+  };
+  g.bullets = [a, b, c];
+  g.updateBullets(1 / 240);
+  // Current Sniper resolver loops from the end of the bullet array:
+  // it resolves the LATER B-C contact before the EARLIER A-B contact.
+  // This is an observation, not an acceptance criterion for future code.
+  assert.deepEqual(weakened.slice(0, 2), [3, 2]);
+  assert.equal(a.hp, 2, 'current array-order resolution leaves A alive');
+  // A chronological resolver would process A-B first, then A-C:
+  // with these integrity values, A, B and C would all be destroyed.
+});
