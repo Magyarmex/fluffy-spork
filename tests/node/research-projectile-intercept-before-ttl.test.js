@@ -75,7 +75,9 @@ function boot(full = false) {
   const files = ['sniper-v1.2.0.js'];
   if (full) files.push('polish-v1.3.1.js');
   files.push('battlefield-v1.6.0.js');
-  if (full) files.push('apex-disciplines-v1.7.1.js', 'performance-v1.7.5.js');
+  if (full) files.push('apex-disciplines-v1.7.1.js',
+    'performance-v1.7.5.js', 'performance-v1.7.8.js',
+    'precision-contact-v1.8.3.js');
   for (const file of files) vm.runInNewContext(
     fs.readFileSync(path.join(root, 'nova-updates', file), 'utf8'),
     context, { filename: file });
