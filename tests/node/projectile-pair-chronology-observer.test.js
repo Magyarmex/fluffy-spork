@@ -147,3 +147,15 @@ test('three-way chronology chooses earliest A-B over later B-C and A-C', () => {
   assert.deepEqual([r.certified[0].i, r.certified[0].j], [0, 1]);
   assert.ok(Math.abs(r.certified[0].time - ab) < 1e-12);
 });
+
+test('malformed event getter cannot throw through read-only observer', () => {
+  const g = { bullets: [shot(1, -20, 1000), shot(2, 20, -1000)] };
+  const context = verified();
+  Object.defineProperty(context, 'aTerrain', {
+    get() { throw Error('broken event source'); }
+  });
+  const r = observeProjectilePairs(g, .05, () => context);
+  assert.equal(r.incomplete, true);
+  assert.equal(r.reason, 'certificate-error');
+  assert.equal(r.certified.length, 0);
+});
