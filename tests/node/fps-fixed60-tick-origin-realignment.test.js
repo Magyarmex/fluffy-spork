@@ -88,3 +88,31 @@ test('regression: 120ms foreground stall reanchors the next surviving movement t
    assert.equal(f.timeline.overflowCount,0);
  }finally{f.owner.stop()}
 });
+
+test('composed Game preserves movement on both sides of resumed simulation tick',()=>{
+ process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
+ const {bootGame}=require('../research/audio-rng-causal-pilot.cjs');
+ const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
+ let now=1000;
+ const timeline=new ChronologicalInput(g.input,3);
+ const owner=new FixedStepRafOwner(g,timeline,{timeline,startMs:1000},{
+   now:()=>now,request:()=>1,cancel(){},render(){}
+ });
+ const event=(at,kind,x)=>timeline.push(at,kind,{
+   pointerId:11,pointerType:'touch',clientX:x,clientY:200,
+   button:0,buttons:1,targetTagName:'CANVAS'
+ });
+ try{
+   owner.start();
+   now=1500;g.setPaused(true);
+   now=1508;g.setPaused(false);
+   event(.509,'pointerdown',100);
+   event(.523,'pointermove',140);
+   event(.525,'pointermove',160);
+   timeline.consumeThrough(.524);
+   assert.equal(g.input.stickId.move,11);
+   assert.equal(g.input.move.dx,40,'first move must reach the real Input before the next tick');
+   timeline.consumeThrough(.530);
+   assert.equal(g.input.move.dx,60,'second move must arrive in the following tick');
+ }finally{owner.stop();g.destroy()}
+});
