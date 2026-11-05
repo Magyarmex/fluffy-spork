@@ -2,6 +2,18 @@
 // Research-only read-only pre-update observer; never authorizes combat effects.
 const { firstContact } = require('./projectile-first-event-certificate.cjs');
 const MAX_PAIRS = 256;
+const EVENT_KEYS = ['aTerrain','bTerrain','aBody','bBody',
+  'aOtherProjectile','bOtherProjectile'];
+function completeContext(c) {
+  if (!c || c.complete !== true || c.unscanned !== false || c.allied !== false)
+    return false;
+  for (const key of EVENT_KEYS) {
+    if (!Object.hasOwn(c, key)) return false;
+    const t = c[key];
+    if (t !== null && (!Number.isFinite(t) || t < 0)) return false;
+  }
+  return true;
+}
 function supported(s) {
   return !!s && s.kind === 'bullet' && s.dead === false &&
     s.shell === false && s.beam === false && !s.splash &&
@@ -57,8 +69,10 @@ function observeProjectilePairs(game, dt, eventsForPair) {
     let context;
     try { context = eventsForPair(shots[i], shots[j], i, j, dt); }
     catch (_) { result.incomplete = true; result.reason = 'event-provider-error'; break outer; }
-    if (!context || context.complete !== true || context.unscanned !== false ||
-        context.allied !== false) {
+    let verified;
+    try { verified = completeContext(context); }
+    catch (_) { result.incomplete = true; result.reason = 'event-provider-error'; break outer; }
+    if (!verified) {
       result.incomplete = true; result.reason = 'unverified-pair'; break outer;
     }
     let time;
