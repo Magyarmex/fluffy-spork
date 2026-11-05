@@ -108,3 +108,20 @@ test('certificate abstains when terrain precedence is unknown', () => {
   assert.equal(firstContact(a, b, 1 / 30, { ...clear, aTerrain: .002 }), null);
   assert.equal(firstContact(a, b, 1 / 30, { ...clear, complete: false }), null);
 });
+
+test('unequal-TTL endpoint clamping creates a false simultaneous interception', () => {
+  const a = shot(1, 1, -20, 6000, .001);
+  const b = shot(2, 2, 20, -6000, .005);
+  const physicalFirst = (40 - a.r - b.r - 1.5) / (a.vx - b.vx);
+  assert.ok(physicalFirst > a.ttl && physicalFirst < b.ttl);
+  // A tempting shortcut is to clamp each shot independently at its TTL
+  // and pass those endpoints into the existing swept collision predicate.
+  // Those endpoints represent DIFFERENT physical times: this would create
+  // an interception that never happened while both shots were alive.
+  const aEnd = a.x + a.vx * a.ttl;
+  const bEnd = b.x + b.vx * b.ttl;
+  assert.ok(Math.abs(aEnd - bEnd) < a.r + b.r + 1.5,
+    'asynchronous endpoints falsely overlap');
+  assert.equal(firstContact(a, b, 1 / 30, clear), null,
+    'chronological certificate correctly rejects the post-expiry contact');
+});
