@@ -115,3 +115,15 @@ test('player credit expires before a later enemy-only rail hit', () => {
   game.resolveBulletCollisions();
   assert.deepEqual(game.creditEvents, [true, false]);
 });
+
+test('reversed rail pair order remains credited through 32+ projectile broad phase', () => {
+  const playerShot = bullet(60, 1, 0, 0, { px: 100 });
+  const rail = bullet(61, 2, 100, 0, { px: 0, __novaRail: true, hp: 1 });
+  const distant = Array.from({ length: 40 }, (_, i) =>
+    bullet(100 + i, 3, 1000 + i * 30, 1000));
+  const game = buildGame([playerShot, rail, ...distant]);
+  game.resolveBulletCollisions();
+  assert.equal(rail.dead, true);
+  assert.deepEqual(game.creditEvents, [true]);
+  assert.equal(game.texts[0][2], 'RAIL DENIED');
+});
