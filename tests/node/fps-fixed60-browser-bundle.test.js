@@ -37,6 +37,19 @@ test('browser artifact loads without CommonJS or starting a game',()=>{
   'only the explicit browser namespace is installed');
 });
 
+test('default browser URL does not initialize fixed60 research modules',()=>{
+ const source=fs.readFileSync(artifact,'utf8');
+ for(const search of ['', '?nova_fixed60=off', '?nova_fixed60=pilotish']){
+  const window={location:{search}};
+  vm.runInNewContext(source,{window,URLSearchParams},{timeout:1000});
+  assert.equal(window.__novaFixed60Research,undefined,
+   'ordinary browser URL must not initialize fixed60: '+search);
+ }
+ const window={location:{search:'?nova_fixed60=pilot'}};
+ vm.runInNewContext(source,{window,URLSearchParams},{timeout:1000});
+ assert.equal(typeof window.__novaFixed60Research?.createFixedStepBrowserPilot,'function');
+});
+
 test('browser owner executes exactly the same bounded steps as source owner',()=>{
  const sandbox={window:{}};
  vm.runInNewContext(fs.readFileSync(artifact,'utf8'),sandbox,{timeout:1000});

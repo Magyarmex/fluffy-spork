@@ -6,17 +6,19 @@
 const {STEP}=require('./fixed-step-dom-input.cjs');
 const STEP_MS=STEP*1000, EPS=1e-7;
 class FixedStepRafOwner {
-  constructor(game,timeline,bridge,{now,request,cancel,render,maxSteps=2}={}) {
+  constructor(game,timeline,bridge,{now,request,cancel,render,maxSteps=2,isHidden=()=>false,onFatal=()=>{}}={}) {
     if (!game || typeof game.update!=='function' || !game.sfx ||
         !timeline || timeline.input!==game.input ||
         typeof timeline.consumeThrough!=='function' ||
         !bridge || bridge.timeline!==timeline || !Number.isFinite(bridge.startMs) ||
         typeof now!=='function' || typeof request!=='function' ||
         typeof cancel!=='function' || typeof render!=='function' ||
+        typeof isHidden!=='function' || typeof onFatal!=='function' ||
         !Number.isInteger(maxSteps) || maxSteps<1 || maxSteps>4)
       throw Error('invalid fixed-step RAF owner');
     this.game=game;this.timeline=timeline;this.bridge=bridge;
     this.now=now;this.request=request;this.cancel=cancel;this.render=render;
+    this.isHidden=isHidden;this.onFatal=onFatal;
     this.maxSteps=maxSteps;this.started=false;this.raf=null;
     this.lastMs=0;this.simAtSec=0;this.lagMs=0;this.ticks=0;
     this.droppedMs=0;this.droppedFrames=0;this.paused=false;
@@ -24,7 +26,8 @@ class FixedStepRafOwner {
     // Every scheduled callback has a unique ticket. Cancelled callbacks may
     // still be delivered by a host after stop/restart; they must never
     // advance a newly started world or schedule a second RAF chain.
-    this._generation=0;this._requestSeq=0;
+    this._generation=0;this._requestSeq=0;this._pauseEpoch=0;
+    this._awaitingForwardFrame=false;
     this.originalDestroy=game.destroy;
     this.destroyHadOwn=Object.prototype.hasOwnProperty.call(game,'destroy');
     this.destroyWrapper=null;
@@ -53,7 +56,7 @@ class FixedStepRafOwner {
       throw Error('game lifecycle owner changed before fixed-step activation');
     const at=this.now();if(!Number.isFinite(at)||at<this.bridge.startMs-EPS)
       throw Error('invalid fixed-step start time');
-    this._generation++;this.started=true;this.lastMs=at;this.simAtSec=(at-this.bridge.startMs)/1000;
+    this._generation++;this.started=true;this.lastMs=at;this._awaitingForwardFrame=true;this.simAtSec=(at-this.bridge.startMs)/1000;
     this.timeline.reset();this.timeline.consumeThrough(this.simAtSec);
     this.paused=!!this.game.paused;
     try{this.game.sfx.startMusic()}
@@ -91,15 +94,36 @@ class FixedStepRafOwner {
   }
   transition(paused,at){
     if(!Number.isFinite(at)||at<this.lastMs-EPS)throw Error('invalid pause clock');
+    this._pauseEpoch++;
     this.timeline.reset();this.lagMs=0;this.paused=paused;
     this.lastMs=at;this.simAtSec=(at-this.bridge.startMs)/1000;
+    // Like startup, a pause transition can sample performance.now() after
+    // the current RAF frame began. Allow one bounded initial timestamp skew.
+    this._awaitingForwardFrame=true;
     this.timeline.consumeThrough(this.simAtSec);
   }
   frame(ts){
     if(!this.started)throw Error('fixed-step RAF is not running');
-    if(!Number.isFinite(ts)||ts<this.lastMs-EPS)throw Error('nonmonotonic RAF timestamp');
-    try{this.schedule();this.advance(ts)}
-    catch(error){this.stop();throw error}
+    try{
+      if(!Number.isFinite(ts))throw Error('nonmonotonic RAF timestamp');
+      // RAF timestamps describe frame beginnings; startup can occur later
+      // within the same frame. Clamp at most one foreground-stall-sized (250ms) initial skew, not later
+      // backward delivery. Invalid timestamps must also release ownership.
+      if(ts<this.lastMs-EPS){
+        if(!this._awaitingForwardFrame || this.lastMs-ts>250)
+          throw Error('nonmonotonic RAF timestamp');
+        ts=this.lastMs;
+      }else this._awaitingForwardFrame=false;
+      this.schedule();this.advance(ts);
+    }catch(error){
+      // A fatal browser frame must release DOM capture as well as RAF/lifecycle
+      // ownership. Otherwise Input remains detached and the game softlocks.
+      let cleanupError;
+      try{this.stop()}catch(failure){cleanupError=failure}
+      try{this.onFatal()}catch(failure){cleanupError??=failure}
+      if(cleanupError && error && typeof error==='object')error.cleanupError=cleanupError;
+      throw error;
+    }
   }
   advance(ts){
     const g=this.game;
@@ -118,14 +142,21 @@ class FixedStepRafOwner {
     }else{
       const maxMs=this.maxSteps*STEP_MS;
       if(raw>100+EPS){
-        // Genuine long stall: discard old controls and bound catch-up. A
-        // healthy 30Hz frame can be a little longer than two 60Hz steps;
-        // treating that ordinary jitter as a stall loses whole updates.
+        // A short foreground stall must not silently release a finger still
+        // held on a stick. Advance the chronological timeline across skipped
+        // time so queued releases/cancels take effect before surviving ticks.
+        // Long suspension still fails closed: stale held commands must not
+        // survive a background-sized gap without a fresh input edge.
         this.droppedMs+=this.lagMs+raw-maxMs;this.droppedFrames++;
-        this.timeline.reset();this.lagMs=0;
+        if(raw>250+EPS || this.isHidden())this.timeline.reset();
+        this.lagMs=0;
         this.simAtSec=(ts-this.bridge.startMs-maxMs)/1000;
+        const skipEpoch=this._pauseEpoch;
         this.timeline.consumeThrough(this.simAtSec);
-        this.lagMs=maxMs;
+        // A queued event may pause/resume while skipped time is consumed.
+        // Preserve the new transition clock and do not manufacture stale
+        // catch-up ticks from the pre-transition presentation interval.
+        this.lagMs=(this.started && this._pauseEpoch===skipEpoch)?maxMs:0;
       }else{
         this.lagMs+=raw;
         // Keep at most two extra full steps of backlog for transient jitter.
@@ -145,11 +176,20 @@ class FixedStepRafOwner {
       }
       while(this.lagMs+EPS>=STEP_MS && this.lastSteps<this.maxSteps && !g.paused && this.started){
         const end=this.simAtSec+STEP;
+        const pauseEpoch=this._pauseEpoch;
         this.timeline.consumeThrough(end);
+        // A replayed edge can destroy Game or pause and resume it within
+        // one event batch. Never apply the pre-transition simulation tick.
+        if(!this.started || g.paused || this._pauseEpoch!==pauseEpoch)break;
         g.update(STEP);
+        this.lastSteps++;this.ticks++;
+        // Game.update may synchronously pause/resume via setPaused().
+        // That transition establishes a new simulation clock; never
+        // overwrite it with the pre-transition tick boundary or run
+        // another stale substep in the same presentation frame.
+        if(!this.started || this._pauseEpoch!==pauseEpoch)break;
         this.simAtSec=end;
         this.lagMs=Math.max(0,this.lagMs-STEP_MS);
-        this.lastSteps++;this.ticks++;
       }
       if(g.paused){this.timeline.reset();this.lagMs=0;this.paused=true;}
     }
@@ -205,7 +245,8 @@ function createFixedStepBrowserPilot(game,{window:win,document:doc,clock,
     {window:win,document:doc,game});
   let owner;
   try{owner=new FixedStepRafOwner(game,timeline,bridge,
-    {now:clock.now,request,cancel,render,maxSteps})}
+    {now:clock.now,request,cancel,render,maxSteps,
+     isHidden:()=>!!doc.hidden,onFatal:()=>capture.detach()})}
   catch(error){capture.detach();throw error}
   return {timeline,bridge,capture,owner,
     start(){

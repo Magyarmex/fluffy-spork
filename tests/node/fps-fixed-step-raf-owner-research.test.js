@@ -190,6 +190,120 @@ test('Game.destroy during the first substep cancels remaining simulation and dra
  assert.equal(h.active.size,0,'no orphaned requestAnimationFrame');
  assert.equal(h.owner.started,false);
 });
+test('input replay teardown cannot update or render a destroyed Game',()=>{
+ const g=bootGame();let updates=0,renders=0;
+ const h=setup(g,{render:()=>renders++});
+ const originalUpdate=g.update;
+ g.update=function(...args){updates++;return originalUpdate.apply(this,args)};
+ const originalConsume=h.timeline.consumeThrough;
+ let destroyed=false;
+ h.timeline.consumeThrough=function(at){
+  originalConsume.call(this,at);
+  if(!destroyed){destroyed=true;g.destroy()}
+ };
+ h.frame(1000/30);
+ assert.equal(destroyed,true,'the replayed input edge must exercise teardown');
+ assert.equal(updates,0,'no update after input replay destroys the Game');
+ assert.equal(renders,0,'no render after input replay destroys the Game');
+ assert.equal(h.owner.started,false);
+ assert.equal(h.active.size,0,'no orphan RAF after input teardown');
+});
+
+test('input replay pause prevents an extra combat update',()=>{
+ const g=bootGame();let updates=0;
+ const h=setup(g);const originalUpdate=g.update;
+ g.update=function(...args){updates++;return originalUpdate.apply(this,args)};
+ const originalConsume=h.timeline.consumeThrough;
+ h.timeline.consumeThrough=function(at){
+  originalConsume.call(this,at);
+  if(!g.paused)g.setPaused(true);
+ };
+ try{
+  h.frame(1000/30);
+  assert.equal(g.paused,true,'input replay must exercise the real pause owner');
+  assert.equal(updates,0,'no combat tick after replay pauses Game');
+  assert.equal(h.owner.ticks,0);
+  assert.equal(h.owner.started,true,'pause must retain the scheduler for resume');
+ }finally{h.close()}
+});
+
+test('same-batch pause then resume invalidates the pre-transition tick',()=>{
+ const g=bootGame(),h=setup(g);let updates=0,once=false;
+ const oldUpdate=g.update,oldConsume=h.timeline.consumeThrough;
+ g.update=function(...args){updates++;return oldUpdate.apply(this,args)};
+ h.timeline.consumeThrough=function(at){
+  oldConsume.call(this,at);
+  if(!once){once=true;g.setPaused(true);g.setPaused(false)}
+ };
+ try{
+  h.setNow(1000/30);h.frame(1000/30);
+  assert.equal(once,true);
+  assert.equal(updates,0,'pre-transition update must not run after a pause/resume pair');
+  assert.equal(h.owner.ticks,0);
+  assert.equal(h.owner.started,true);
+  assert.ok(h.owner.simAtSec>=1/30-1e-6,
+   'replay must not roll the simulation clock back before the transition');
+ }finally{h.close()}
+});
+
+test('pause/resume during Game.update cannot roll back the simulation clock or run a stale substep',()=>{
+ const g=bootGame(),h=setup(g);let updates=0;
+ const original=g.update;
+ g.update=function(...args){
+  updates++;
+  if(updates===1){this.setPaused(true);this.setPaused(false);}
+  return original.apply(this,args);
+ };
+ try{
+  h.setNow(1000/30);
+  h.frame(1000/30);
+  assert.equal(updates,1,'same-frame resume must not run a second pre-transition update');
+  assert.equal(h.owner.ticks,1,'the completed first update still counts');
+  assert.ok(h.owner.simAtSec>=1/30-1e-6,
+   'update-time pause transition must not roll the clock backward');
+  h.frame(1000/15);
+  assert.ok(h.owner.simAtSec>=1/30-1e-6);
+ }finally{h.close()}
+});
+
+test('pause/resume during skipped foreground time cannot resurrect stale catch-up ticks',()=>{
+ const g=bootGame(),h=setup(g);let transitions=0;
+ try{
+  h.frame(1000/60);
+  const originalConsume=h.timeline.consumeThrough;
+  h.timeline.consumeThrough=function(at){
+   originalConsume.call(this,at);
+   if(transitions===0){
+    transitions++;
+    g.setPaused(true);g.setPaused(false);
+   }
+  };
+  h.setNow(200);h.frame(200);
+  assert.equal(transitions,1,'skipped input replay must trigger the lifecycle transition');
+  assert.equal(h.owner.lastSteps,0,'no stale catch-up ticks after pause/resume in skipped time');
+  assert.equal(h.owner.ticks,1,'only the earlier completed frame should count');
+  assert.ok(h.owner.simAtSec>=.2-1e-6,'skip transition must retain the new clock');
+ }finally{h.close()}
+});
+
+test('pause triggered inside Game.update retains the transition clock and stops remaining substeps',()=>{
+ const g=bootGame(),h=setup(g);let updates=0;
+ const original=g.update;
+ g.update=function(...args){
+  updates++;
+  if(updates===1)this.setPaused(true);
+  return original.apply(this,args);
+ };
+ try{
+  h.setNow(1000/30);h.frame(1000/30);
+  assert.equal(g.paused,true);
+  assert.equal(updates,1,'pause during update must block the second substep');
+  assert.equal(h.owner.ticks,1);
+  assert.ok(h.owner.simAtSec>=1/30-1e-6,
+   'completed update must not overwrite the pause transition clock');
+ }finally{h.close()}
+});
+
 test('actual composed renderer is simulation-pure across presentation rates',()=>{
  function run(seed,hz){return withSeed(seed,draws=>{
   const g=bootGame();g.sfx.muted=true;
@@ -407,13 +521,16 @@ test('bounded RAF conserves elapsed time across randomized jitter, overload and 
  }
 });
 
-test('150ms suspension clears stale held input even with four-step opt-in budget',()=>{
+test('150ms foreground gap retains held keyboard, but long suspension releases it',()=>{
  const g=bootGame(),h=setup(g,{maxSteps:4});try{
   h.setNow(10);h.capture('keydown',10,{key:'w'});h.frame(1000/60);
   assert.equal(g.input.keyboard.up,true);
   h.frame(1000/60+150);
-  assert.equal(g.input.keyboard.up,false,'a 150ms suspension must not replay old movement');
+  assert.equal(g.input.keyboard.up,true,'a bounded foreground gap must preserve held movement');
   assert.equal(h.owner.droppedFrames,1);
+  h.frame(1000/60+150+300);
+  assert.equal(g.input.keyboard.up,false,'a long suspension must release stale movement');
+  assert.equal(h.owner.droppedFrames,2);
  }finally{h.close()}
 });
 
@@ -448,4 +565,57 @@ test('20Hz four-step RAF preserves real touch-stick and keyboard trace against 6
     '20Hz touch-stick replay must preserve the real 60Hz world and RNG');
   }
  }
+});
+
+test('fatal composed RAF render releases DOM capture and restores production Input',()=>{
+ const {createFixedStepBrowserPilot}=require('../research/fixed-step-raf-owner.cjs');
+ const g=bootGame(),win=g.__testWindow,doc=win.document;
+ const targets=[win,doc,g.canvas],listeners=new Map();
+ for(const target of targets){
+  const entries=new Map();listeners.set(target,entries);
+  target.addEventListener=(type,fn)=>{
+   if(!entries.has(type))entries.set(type,new Set());
+   entries.get(type).add(fn);
+  };
+  target.removeEventListener=(type,fn)=>entries.get(type)?.delete(fn);
+ }
+ g.input.detach();g.input.attach(g.canvas);
+ let now=1000,callback=null;g.sfx.startMusic=()=>{};
+ const pilot=createFixedStepBrowserPilot(g,{window:win,document:doc,
+  clock:{now:()=>now,timeOrigin:1793560000000},
+  request:fn=>(callback=fn,1),cancel:()=>{callback=null},
+  render:()=>{throw Error('injected composed renderer failure')}});
+ pilot.start();
+ assert.equal(pilot.capture.active,true);
+ const frame=callback;now=1017;
+ assert.throws(()=>frame(now),/injected composed renderer failure/);
+ assert.equal(pilot.owner.started,false,'fatal RAF must stop its simulation owner');
+ assert.equal(pilot.capture.active,false,'fatal RAF must detach chronological DOM capture');
+ assert.equal(callback,null,'fatal RAF must cancel the next callback');
+ assert.equal(g.input.canvas,g.canvas,'production Input must be reattached');
+ assert.notEqual(g.__novaDestroyed,true,'fatal RAF cleanup must not fabricate game destruction');
+ g.destroy();
+ assert.equal(g.__novaDestroyed,true,'normal Game.destroy remains reachable');
+ for(const entries of listeners.values())for(const fns of entries.values())
+  assert.equal(fns.size,0,'no input listener may survive game destruction');
+});
+
+test('pause and resume accept bounded same-frame RAF timestamp skew',()=>{
+ const g=bootGame(),h=setup(g);try{
+  h.frame(1000/60);
+  h.setNow(25);g.setPaused(true);
+  let [id,frame]=[...h.active].at(-1);h.active.delete(id);
+  assert.doesNotThrow(()=>frame(1020),
+   'RAF frame beginning may precede the later pause performance.now sample');
+  assert.equal(h.owner.started,true);
+  assert.equal(h.owner.paused,true);
+  h.setNow(40);g.setPaused(false);
+  [id,frame]=[...h.active].at(-1);h.active.delete(id);
+  assert.doesNotThrow(()=>frame(1038),
+   'RAF frame beginning may precede the later resume performance.now sample');
+  assert.equal(h.owner.started,true);
+  assert.equal(h.owner.paused,false);
+  h.frame(60);
+  assert.ok(h.owner.ticks>=2,'normal simulation resumes after clock catches up');
+ }finally{h.close()}
 });

@@ -134,6 +134,7 @@ jobs:
               './nova-updates/blackglass-mirror-v1.10.6.js',
               './nova-updates/performance-v1.7.5.js',
               './nova-updates/drone-allegiance-glow-v1.7.6.js',
+              './nova-updates/fixed60-optin-boot.js',
               './nova-updates/settings-v1.7.7.js',
               './nova-updates/performance-v1.7.8.js',
               './nova-updates/lobby-history.js',
@@ -177,6 +178,8 @@ jobs:
           # change cannot look like a no-op to returning/offline clients.
           runtime_inputs = [
               *script_paths,
+              # Optional pilot bytes still invalidate the exact runtime fingerprint.
+              'nova-updates/fixed60-research-browser.js',
               # The compressed canonical shell is also an executable runtime input.
               *sorted(str(p) for p in Path('nova-gz').glob('*.b64')),
               # Dynamically loaded Owner HUD is optional for offline staging,
@@ -282,6 +285,7 @@ jobs:
           grep -q 'nova-updates/blackglass-mirror-v1.10.6.js' index.html.new
           grep -q 'nova-updates/performance-v1.7.5.js' index.html.new
           grep -q 'nova-updates/drone-allegiance-glow-v1.7.6.js' index.html.new
+          grep -q 'nova-updates/fixed60-optin-boot.js' index.html.new
           grep -q 'nova-updates/settings-v1.7.7.js' index.html.new
           grep -q 'nova-updates/performance-v1.7.8.js' index.html.new
           grep -q 'nova-updates/lobby-history.js' index.html.new
