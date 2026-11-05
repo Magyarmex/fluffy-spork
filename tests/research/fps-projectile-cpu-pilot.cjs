@@ -29,11 +29,14 @@ function run({seed=1517800,hz=60,seconds=4,extraShots=0,instrument=true,cls='tem
      shell:false,beam:false,hits:0,dead:false});
    }
    const timing={updateMs:0,bulletsMs:0,collisionMs:0};
-   let playerVolleys=0,playerEmittedProjectiles=0;
+   let playerVolleys=0,playerEmittedProjectiles=0,railEmitted=0,playerRailEmitted=0;
    originalFire=g.tryFire;
    g.tryFire=function(t,...args){
     const before=this.bullets.length;
     const result=originalFire.call(this,t,...args);
+    for(let k=before;k<this.bullets.length;k++)if(this.bullets[k]?.__novaRail){
+     railEmitted++;if(t===this.player)playerRailEmitted++;
+    }
     if(t===this.player&&this.bullets.length>before){
      playerVolleys++;playerEmittedProjectiles+=this.bullets.length-before;
     }
@@ -69,7 +72,7 @@ function run({seed=1517800,hz=60,seconds=4,extraShots=0,instrument=true,cls='tem
      barrelIdx:g.player.barrelIdx,heat:g.player.__v17Heat,
      stability:g.player.__v17Stability,cadence:g.player.__v17Cadence,
      shotIndex:g.player.__v17ShotIndex,overheatT:g.player.overheatT}}),
-    playerVolleys,playerEmittedProjectiles,rngDraws:draws(),
+    playerVolleys,playerEmittedProjectiles,railEmitted,playerRailEmitted,rngDraws:draws(),
     terrainQueries:g.__novaPerf?.battlefieldQueries??null,
     terrainCandidates:g.__novaPerf?.battlefieldCandidates??null,
     ...timing};
