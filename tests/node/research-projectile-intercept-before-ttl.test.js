@@ -111,6 +111,12 @@ for (const full of [false, true]) {
       const left = bullet(9001, 1, -20, 6000, 1, false);
       const right = bullet(9002, 2, 20, -6000, 3, false);
       left.ttl = right.ttl = .005;
+      const physicalContactTime = (right.x - left.x -
+        (left.r + right.r + 1.5)) / (left.vx - right.vx);
+      assert.ok(physicalContactTime > 0 && physicalContactTime < left.ttl,
+        'first hostile-disc contact must physically precede expiry');
+      assert.ok(physicalContactTime < 1 / fps,
+        'contact must occur within the observed simulation frame');
       g.bullets = [left, right];
       g.updateBullets(1 / fps);
       assert.equal(contacts.length, 2,
