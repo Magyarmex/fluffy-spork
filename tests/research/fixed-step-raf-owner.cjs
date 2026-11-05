@@ -150,7 +150,7 @@ class FixedStepRafOwner {
           }
           return true;
         });
-        if(unreleased && !pendingBlur && this.isVisible() &&
+        if(unreleased && !pendingBlur && (!g.status || g.status==='playing') && this.isVisible() &&
            typeof g.toast==='function' && ts-this.lastTouchResetNoticeMs>=8000){
           this.lastTouchResetNoticeMs=ts;
           g.toast('Touch controls reset — touch again','warn');
