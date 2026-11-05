@@ -2,6 +2,13 @@
 // Research-only read-only pre-update observer; never authorizes combat effects.
 const { firstContact } = require('./projectile-first-event-certificate.cjs');
 const MAX_PAIRS = 256;
+function supported(s) {
+  return !!s && s.kind === 'bullet' && s.dead === false &&
+    s.shell === false && s.beam === false && !s.splash &&
+    !s.__v17Cannon && !s.__novaRail && s.pen === 0 &&
+    Number.isFinite(s.hits) && s.hits === 0 && s.ttl > 0 && s.r > 0 &&
+    ['x','y','vx','vy','ttl','r','ownerId'].every(k => Number.isFinite(s[k]));
+}
 // Conservative full-frame swept boxes: a disjoint pair cannot intercept.
 // Use the whole frame (not independent TTL endpoints) to avoid false negatives.
 function definitelyDisjoint(a, b, dt) {
@@ -38,8 +45,14 @@ function observeProjectilePairs(game, dt, eventsForPair) {
   result.scanned = shots.length;
   outer: for (let i = 0; i < shots.length; i++) for (let j = i + 1; j < shots.length; j++) {
     result.pairs++;
+    if (shots[i] && shots[i].dead === true || shots[j] && shots[j].dead === true) {
+      result.abstained++; continue;
+    }
     if (definitelyDisjoint(shots[i], shots[j], dt)) {
       result.abstained++; continue;
+    }
+    if (!supported(shots[i]) || !supported(shots[j])) {
+      result.incomplete = true; result.reason = 'unsupported-competing-projectile'; break outer;
     }
     let context;
     try { context = eventsForPair(shots[i], shots[j], i, j, dt); }
