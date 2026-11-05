@@ -66,3 +66,46 @@ test('late release after a 120ms stall stays safe and fresh touch can reacquire'
     assert.equal(s.counts().releases,2);
   }finally{s.owner.stop()}
 });
+
+
+test('composed 49-overlay Game loses a genuine held movement pointer after visible 120ms stall',()=>{
+  const {bootGame}=require('../research/audio-rng-causal-pilot.cjs');
+  const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs');
+  const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
+  let now=1000,callback=null;
+  const timeline=new ChronologicalInput(g.input);
+  const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
+  const owner=new FixedStepRafOwner(g,timeline,bridge,{
+    now:()=>now,request:fn=>{callback=fn;return 1;},
+    cancel:()=>{callback=null},render:()=>{}
+  });
+  function pointer(type,ms,x=100){
+    return bridge.capture({type,timeStamp:ms,pointerId:11,pointerType:'touch',
+      clientX:x,clientY:200,button:0,buttons:type==='pointerup'||type==='pointercancel'?0:1,
+      target:{tagName:'CANVAS',closest:()=>null}});
+  }
+  function frame(ms){now=ms;const fn=callback;callback=null;assert.equal(typeof fn,'function');fn(ms);}
+  try{
+    owner.start();
+    assert.equal(pointer('pointerdown',1005),true);
+    assert.equal(pointer('pointermove',1010,140),true);
+    frame(1017);
+    assert.equal(g.input.stickId.move,11,'real Game should own the movement stick');
+    assert.equal(g.input.move.active,true);
+    frame(1137);
+    assert.equal(owner.droppedFrames,1);
+    assert.equal(g.input.stickId.move,-1,'reproduced silent pointer ownership loss');
+    assert.equal(g.input.move.active,false);
+    assert.equal(g.input.firing,false,'no phantom firing after reset');
+    assert.equal(pointer('pointerup',1140),true);
+    frame(1154);
+    assert.equal(g.input.stickId.move,-1,'late release remains safe');
+    assert.equal(pointer('pointerdown',1160),true);
+    frame(1171);
+    assert.equal(g.input.stickId.move,11,'genuine new touch reacquires movement');
+    assert.equal(pointer('pointercancel',1175),true);
+    frame(1188);
+    assert.equal(g.input.stickId.move,-1);
+    assert.equal(g.input.move.active,false);
+  }finally{owner.stop();g.destroy()}
+});
