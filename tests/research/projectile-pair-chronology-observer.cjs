@@ -15,7 +15,7 @@ function observeProjectilePairs(game, dt, eventsForPair) {
     result.incomplete = true; result.reason = 'pair-budget'; return result;
   }
   // Snapshot before the shipping updater mutates TTL, positions, or dead flags.
-  const shots = bullets.map(b => b && ({
+  const shots = bullets.map(b => b && Object.freeze({
     kind: b.kind, dead: b.dead, shell: b.shell, beam: b.beam,
     splash: b.splash, __v17Cannon: b.__v17Cannon, __novaRail: b.__novaRail,
     pen: b.pen, hits: b.hits, x: b.x, y: b.y, vx: b.vx, vy: b.vy,
@@ -25,7 +25,7 @@ function observeProjectilePairs(game, dt, eventsForPair) {
   outer: for (let i = 0; i < shots.length; i++) for (let j = i + 1; j < shots.length; j++) {
     result.pairs++;
     let context;
-    try { context = eventsForPair(shots[i], shots[j], i, j, game, dt); }
+    try { context = eventsForPair(shots[i], shots[j], i, j, dt); }
     catch (_) { result.incomplete = true; result.reason = 'event-provider-error'; break outer; }
     if (!context || context.complete !== true || context.unscanned !== false ||
         context.allied !== false) {
