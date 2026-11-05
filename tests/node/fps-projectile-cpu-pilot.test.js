@@ -30,7 +30,7 @@ test('repeated seeded pilot produces identical state at 30Hz and 60Hz',()=>{
  }
 });
 test('pilot rejects invalid or unbounded workloads',()=>{
- for(const input of [{hz:0},{seconds:31},{extraShots:601},{seed:0},{instrument:1}])
+ for(const input of [{hz:0},{seconds:31},{extraShots:601},{seed:0},{instrument:1},{prechargeRail:true}])
   assert.throws(()=>run(input),/invalid FPS projectile pilot/);
 });
 test('suite carries explicit research limits and unambiguous stress metadata',()=>{
@@ -46,9 +46,10 @@ test('suite carries explicit research limits and unambiguous stress metadata',()
 });
 
 test('rail occupancy is measured from actual composed projectile objects',()=>{
- const a=run({seed:1517800,hz:60,seconds:3,extraShots:0,cls:'railgun'});
+ const a=run({seed:1517800,hz:60,seconds:3,extraShots:0,cls:'railgun',prechargeRail:true});
  const b=run({seed:1517800,hz:60,seconds:3,extraShots:0,cls:'railgun'});
  assert.ok(a.playerVolleys>0,'real railgun firing must occur');
+ assert.equal(a.prechargeRail,true,'wall-clock focus is a declared synthetic research control');
  assert.ok(a.playerRailEmitted>0,'the shipping rail marker must be observed at actual shot creation');
  assert.ok(a.railEmitted>=a.playerRailEmitted);
  assert.ok(a.meanRails>=0&&a.meanRails<=a.peakRails,
