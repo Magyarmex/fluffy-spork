@@ -177,3 +177,14 @@ test('distant unsupported shell cannot veto an isolated certified pair', () => {
   assert.equal(r.incomplete, false);
   assert.equal(r.certified.length, 1);
 });
+
+test('undefined competing-event time in later pair revokes earlier certificate', () => {
+  const g = { bullets: [shot(1, -20, 1000), shot(2, 20, -1000),
+    shot(3, 0, 0)] };
+  let calls = 0;
+  const r = observeProjectilePairs(g, .05, () =>
+    ++calls === 1 ? verified() : { ...verified(), aTerrain: undefined });
+  assert.equal(r.incomplete, true);
+  assert.equal(r.reason, 'unverified-pair');
+  assert.equal(r.certified.length, 0);
+});
