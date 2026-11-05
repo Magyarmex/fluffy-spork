@@ -227,8 +227,8 @@ for (const partition of [
 }
 
 /* Canonical-scale counterpart to the deliberately short-TTL stress case.
- * The materialized base shotgun uses 540u/s and 0.42s TTL. Two such
- * hostile shots 452.46u apart contact at 0.412s, before 0.42s expiry.
+ * The materialized base shotgun uses 540u/s, radius 4.2u and 0.42s TTL.
+ * Two such hostile shots 454.86u apart contact at 0.412s before expiry.
  * 30Hz is expected RED; 60/120/240Hz are positive controls. */
 for (const fps of [30, 60, 120, 240]) {
   test('KNOWN RED: canonical-scale 540u/s 0.42s TTL interception at ' +
@@ -239,8 +239,9 @@ for (const fps of [30, 60, 120, 240]) {
       b.hp -= damage;
       if (b.hp <= 0) b.dead = true;
     };
-    const left = bullet(9401, 1, -226.23, 540, 1);
-    const right = bullet(9402, 2, 226.23, -540, 3);
+    const left = bullet(9401, 1, -227.43, 540, 1);
+    const right = bullet(9402, 2, 227.43, -540, 3);
+    left.r = right.r = 4.2;
     left.ttl = right.ttl = .42;
     const firstContactTime = (right.x - left.x -
       (left.r + right.r + 1.5)) / (left.vx - right.vx);
