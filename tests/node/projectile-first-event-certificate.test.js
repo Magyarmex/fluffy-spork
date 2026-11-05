@@ -78,3 +78,25 @@ test('10,000 seeded certificates have physical contact before all known cutoffs'
   }
   assert.ok(certified>10,'seed must exercise real interceptions');
 });
+
+test('three-projectile certificate requires unique earliest contact, not array order',()=>{
+  const A=shot(-20,6000,1), B=shot(0,0,2), C=shot(25,-6000,3);
+  const ab=(20-7.5)/6000,bc=(25-7.5)/6000,ac=(45-7.5)/12000;
+  assert.ok(ab<bc&&bc<ac&&ac<1/240);
+  const first=firstContact(A,B,1/240,
+    {...complete,aOtherProjectile:ac,bOtherProjectile:bc});
+  assert.ok(Math.abs(first-ab)<1e-12,
+    'earliest A-B is certifiable when both competing contacts are later');
+  assert.equal(firstContact(B,C,1/240,
+    {...complete,aOtherProjectile:ab,bOtherProjectile:ac}),null,
+    'later B-C must abstain when B already has an earlier contact');
+  const symmetric=shot(20,-6000,3);
+  assert.equal(firstContact(A,B,1/240,
+    {...complete,aOtherProjectile:(40-7.5)/12000,
+      bOtherProjectile:ab}),null,
+    'simultaneous A-B and B-C must abstain, never choose by array index');
+  assert.equal(firstContact(B,symmetric,1/240,
+    {...complete,aOtherProjectile:ab,
+      bOtherProjectile:(40-7.5)/12000}),null,
+    'both sides of a simultaneous three-way contact must abstain');
+});
