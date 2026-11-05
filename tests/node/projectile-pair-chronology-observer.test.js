@@ -270,3 +270,11 @@ test('live pair budget still rejects dense encounters with dead shots present', 
   assert.equal(r.certified.length, 0);
   assert.equal(calls, 0);
 });
+
+test('missing projectile slot cannot be mistaken for dead debris', () => {
+  const g = { bullets: [shot(1, -20, 1000), null, shot(2, 20, -1000)] };
+  const r = observeProjectilePairs(g, .05, verified);
+  assert.equal(r.incomplete, true);
+  assert.equal(r.reason, 'invalid-projectile-entry');
+  assert.equal(r.certified.length, 0);
+});
