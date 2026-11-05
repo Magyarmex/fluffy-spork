@@ -20,7 +20,10 @@ const TICKS=960; // exactly 8 simulated seconds at a 120Hz integer timebase
 const patterns={
  native30:[4],native60:[2],native120:[1],
  mixedSlow:[2,4,1,1,2,2],mixedFast:[1,3,2,1,3,2],
- bursty:[4,1,1,2,2,2],alternating:[1,4,1,2,2,2]
+ bursty:[4,1,1,2,2,2],alternating:[1,4,1,2,2,2],
+ // Adversarial equal-mean sequences selected from a simple cooldown-only
+ // enumeration; these are stress controls, not natural-device measurements.
+ aliasFast:[1,1,2,3,2,3],aliasSlow:[1,1,1,3,3,3]
 };
 function schedule(pattern){
  const out=[];let elapsed=0,i=0;
