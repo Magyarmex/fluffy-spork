@@ -108,3 +108,24 @@ test('swept boxes do not skip fast crossings with distant endpoints', () => {
   assert.equal(calls, 1);
   assert.equal(r.certified.length, 1);
 });
+
+test('reversing projectile storage order preserves physical first-contact time', () => {
+  const a = shot(1, -20, 1000), b = shot(2, 20, -1000);
+  const forward = observeProjectilePairs({ bullets: [a, b] }, .05, verified);
+  const reversed = observeProjectilePairs({ bullets: [b, a] }, .05, verified);
+  assert.equal(forward.certified.length, 1);
+  assert.equal(reversed.certified.length, 1);
+  assert.ok(Math.abs(forward.certified[0].time - reversed.certified[0].time) < 1e-12);
+});
+test('no positive certificate before a future-frame crossing', () => {
+  const g = { bullets: [shot(1, -20, 1000), shot(2, 20, -1000)] };
+  const r = observeProjectilePairs(g, 1 / 120, verified);
+  assert.equal(r.incomplete, false);
+  assert.equal(r.certified.length, 0);
+});
+test('expiration before physical contact never creates an interception', () => {
+  const a = shot(1, -20, 1000), b = shot(2, 20, -1000);
+  a.ttl = .005;
+  const r = observeProjectilePairs({ bullets: [a, b] }, .05, verified);
+  assert.equal(r.certified.length, 0);
+});
