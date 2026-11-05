@@ -11,7 +11,7 @@ function fixture({visible=true}={}){
     move:{active:false},aim:{active:false},firing:false,
     __novaBlurReset(){this.stickId.move=-1;this.stickId.aim=-1;
       this.move.active=false;this.aim.active=false;this.firing=false;},
-    pd(e){const stick=e.pointerId===8?'aim':'move';this.stickId[stick]=e.pointerId;this[stick].active=true;this.firing=true;},
+    pd(e){const stick=e.pointerId===8?'aim':'move';this.stickId[stick]=e.pointerId;this[stick].active=true;if(stick==='aim')this.firing=true;},
     pm(){},pu(){this.__novaBlurReset()},kd(){},ku(){}};
   const game={input,raf:null,paused:false,sfx:{startMusic(){}},
     start(){},destroy(){},setPaused(v){this.paused=v},
@@ -33,7 +33,7 @@ test('only a genuine held touch reset produces one short warning',()=>{
   try{
     s.frame(1120);assert.equal(s.notices.length,0,'idle stall is silent');
     s.down(1125);s.frame(1140);
-    assert.equal(s.input.firing,true);
+    assert.equal(s.input.move.active,true);
     s.frame(1260);
     assert.deepEqual(s.notices,[['Touch controls reset — touch again','warn']]);
     assert.equal(s.input.firing,false);
@@ -50,7 +50,7 @@ test('normal jitter, hidden document, and pause do not display a reset warning',
   const s=fixture({visible:false});s.owner.start();
   try{
     s.down(1005);s.frame(1017);s.frame(1097);
-    assert.equal(s.input.firing,true,'80ms jitter retains ownership');
+    assert.equal(s.input.move.active,true,'80ms jitter retains ownership');
     s.frame(1217);assert.equal(s.notices.length,0,'hidden document stays silent');
     assert.equal(s.input.firing,false);
     s.game.setPaused(true);
