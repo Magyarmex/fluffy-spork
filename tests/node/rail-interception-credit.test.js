@@ -194,3 +194,15 @@ test('nonfinite swept history falls back to rail endpoint without inventing cont
   assert.equal(game.texts[0][0], 100);
   assert.equal(game.texts[0][1], 42);
 });
+
+test('enemy-only swept rail damage places generic feedback at contact without player credit', () => {
+  const rail = bullet(98, 2, 100, 60, { px: 0, py: 0, __novaRail: true, hp: 1 });
+  const enemyShot = bullet(99, 3, 0, 0, { px: 100, py: 60, hp: 1 });
+  const game = buildGame([rail, enemyShot]);
+  game.resolveBulletCollisions();
+  assert.equal(rail.dead, true);
+  assert.deepEqual(game.creditEvents, [false]);
+  assert.equal((game.texts || []).length, 0);
+  assert.ok(Math.abs(game.rings[0][0] - 50) < 1e-8);
+  assert.ok(Math.abs(game.rings[0][1] - 30) < 1e-8);
+});
