@@ -5,10 +5,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 function firstContact(a,b,dt,context) {
   if (!(dt>0) || !Number.isFinite(dt) || !context || context.complete!==true ||
-      context.allied===undefined || context.unscanned) return null;
+      context.allied!==false || context.unscanned!==false) return null;
   for (const s of [a,b]) if (!s || s.dead || s.shell || !(s.ttl>0) ||
-      !(s.r>0) || !['x','y','vx','vy','ttl','r'].every(k=>Number.isFinite(s[k]))) return null;
-  if (a.ownerId===b.ownerId || context.allied) return null;
+      !(s.r>0) || !['x','y','vx','vy','ttl','r','ownerId'].every(k=>Number.isFinite(s[k]))) return null;
+  if (a.ownerId===b.ownerId) return null;
   const dx=a.x-b.x, dy=a.y-b.y, vx=a.vx-b.vx, vy=a.vy-b.vy;
   const radius=a.r+b.r+1.5, c=dx*dx+dy*dy-radius*radius;
   let t=0;
@@ -28,14 +28,18 @@ function firstContact(a,b,dt,context) {
     }
   }
   for (const key of ['aTerrain','bTerrain','aBody','bBody','aOtherProjectile','bOtherProjectile']) {
+    if (!Object.hasOwn(context,key)) return null;
     const event=context[key];
-    if (event===undefined || event===null) continue;
+    if (event===null) continue;
     if (!Number.isFinite(event) || event<0 || event<=t+1e-9) return null;
   }
   return t;
 }
 const shot=(x,vx,ownerId,ttl=.005,y=0,vy=0)=>({x,y,vx,vy,ownerId,ttl,r:3,dead:false,shell:false});
-const a=()=>shot(-20,6000,1), b=()=>shot(20,-6000,2), complete={allied:false,complete:true};
+const a=()=>shot(-20,6000,1), b=()=>shot(20,-6000,2), complete={
+  allied:false,complete:true,unscanned:false,aTerrain:null,bTerrain:null,
+  aBody:null,bBody:null,aOtherProjectile:null,bOtherProjectile:null
+};
 test('30/60/120/240Hz preserve same certified first-contact time',()=>{
   for(const fps of [30,60,120,240]) assert.ok(Math.abs(firstContact(a(),b(),1/fps,complete)-32.5/12000)<1e-12);
 });
@@ -53,13 +57,16 @@ test('unknown allegiance or incomplete obstacle scan abstains',()=>{
   assert.equal(firstContact(a(),b(),1/30,{allied:false}),null);
   assert.equal(firstContact(a(),b(),1/30,{complete:true}),null);
   assert.equal(firstContact(a(),b(),1/30,{...complete,unscanned:true}),null);
+  assert.equal(firstContact(a(),b(),1/30,{...complete,allied:null}),null);
+  const {aBody,...incomplete}=complete;
+  assert.equal(firstContact(a(),b(),1/30,incomplete),null);
 });
 test('allied and same-owner shots do not intercept',()=>{
   assert.equal(firstContact(a(),b(),1/30,{...complete,allied:true}),null);
   assert.equal(firstContact(a(),{...b(),ownerId:1},1/30,complete),null);
 });
 test('shell, dead, expired, nonfinite and malformed shots abstain',()=>{
-  for(const patch of [{shell:true},{dead:true},{ttl:0},{vx:NaN},{r:-1}])
+  for(const patch of [{shell:true},{dead:true},{ttl:0},{vx:NaN},{r:-1},{ownerId:undefined}])
     assert.equal(firstContact({...a(),...patch},b(),1/30,complete),null);
 });
 test('first contact beyond TTL or frame is not certified',()=>{
