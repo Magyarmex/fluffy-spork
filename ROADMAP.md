@@ -79,7 +79,7 @@ The lobby looks onto a live but decorative level-30 battlefield containing all 3
 ### v1.10.3 — Field Service
 **Status:** shipped with this completion pass.
 
-Surviving non-Controller drones slowly repair after **4.6 seconds** without fresh damage and only after nearby visible hostility has cleared. Healing stops during committed attacks or weapon recovery. Healthy drones do no threat scan; damaged candidates refresh danger on a staggered interval. Terrain Intelligence remains the sole routing owner. Controller drones keep Command Weave's faster repair advantage.
+Surviving non-Controller drones slowly repair after **4.6 seconds** without fresh damage and only after nearby visible hostility has cleared. Healing stops during committed attacks or weapon recovery. Healthy drones do no threat scan; damaged candidates refresh danger on a staggered interval. Terrain Intelligence remains the sole routing owner. Controller drones retain their faster repair advantage under the active Live Vector stack; the retired Command Weave command-pad module is not a shipping dependency.
 
 ### Production materializer reliability
 **Status:** hardened with this completion pass.
