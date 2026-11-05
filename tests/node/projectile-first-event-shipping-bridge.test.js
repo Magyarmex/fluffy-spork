@@ -133,9 +133,14 @@ test('three-way interception exposes descending-array order versus physical time
   a.hp = a.maxHp = 3;
   b.hp = b.maxHp = 2;
   c.hp = c.maxHp = 1;
-  const ab = firstContact(a, b, 1 / 240, clear);
-  const bc = firstContact(b, c, 1 / 240, clear);
-  const ac = firstContact(a, c, 1 / 240, clear);
+  // Pairwise geometry is NOT a safety certificate in a three-shot world:
+  // each pair has another projectile that must enter its event context.
+  const pairTime = (x, y) =>
+    (Math.abs(x.x - y.x) - x.r - y.r - 1.5) / Math.abs(x.vx - y.vx);
+  const ab = pairTime(a, b), bc = pairTime(b, c), ac = pairTime(a, c);
+  assert.equal(firstContact(a, b, 1 / 240,
+    { ...clear, aOtherProjectile: ac, bOtherProjectile: bc }), null,
+    'incomplete or competing three-way context cannot be blindly certified');
   assert.ok(ab < bc && bc < ac && ac < 1 / 240,
     'all three contacts are physically ordered inside one frame');
   const weakened = [], original = g.weakenBullet.bind(g);
