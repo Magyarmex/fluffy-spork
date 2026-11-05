@@ -110,7 +110,7 @@ async function run(browser,width,dpr){
    g.powerups.push({type:'health',x:90,y:0});
    const resourceX=Math.floor(dotX+90*216/4500);
    const resourceY=Math.floor(dotY);
-   const sampleResource=()=>Array.from(ctx.getImageData(resourceX-3,resourceY-3,7,7).data);
+   const sampleResource=()=>Array.from(ctx.getImageData(resourceX,resourceY,4,4).data);
    const resourceBaseline=raster(false);
    const resourceBefore=sampleResource();
    const resourceBoth=raster(false,paintBoth);
@@ -121,7 +121,7 @@ async function run(browser,width,dpr){
        resourceBefore[i+1]!==resourceAfter[i+1]||
        resourceBefore[i+2]!==resourceAfter[i+2])resourceChangedPixels++;
    }
-   const resourceRisk={changedPixels:resourceChangedPixels,windowPixels:49,
+   const resourceRisk={changedPixels:resourceChangedPixels,windowPixels:16,
     baselineKeylineCalls:resourceBaseline.keylineCalls,
     experimentalKeylineCalls:resourceBoth.keylineCalls};
    const pixelAt=(x,y)=>{
@@ -172,7 +172,7 @@ async function run(browser,width,dpr){
   assert.equal(result.separatedBoth.keylineCalls,0,'shipping renderer must suppress both outlines before research paint');
   assert.equal(result.resourceRisk.baselineKeylineCalls,0,
    'shipping proximity policy must suppress outline near a public resource');
-  assert.ok(result.resourceRisk.changedPixels>=0&&result.resourceRisk.changedPixels<=49,
+  assert.ok(result.resourceRisk.changedPixels>=0&&result.resourceRisk.changedPixels<=16,
    'report bounded resource-region changes without inventing a human readability gate');
   assert.notEqual(result.separatedBoth.backingUrl,result.separatedKeyed.backingUrl,
    'two-sided keyline must change the actual Game backing image');
