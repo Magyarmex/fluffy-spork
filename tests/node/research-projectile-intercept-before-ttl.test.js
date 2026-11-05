@@ -106,10 +106,12 @@ for (const full of [false, true]) {
     test('KNOWN RED: hostile projectile interception precedes both TTLs ' +
       (full ? 'full stack ' : 'Sniper/Battlefield ') + fps + 'Hz', () => {
       const g = boot(full), contacts = [];
+      const originalWeaken = g.weakenBullet.bind(g);
+
       g.weakenBullet = function(b, damage) {
         contacts.push({ id: b.id, damage });
-        b.hp -= damage;
-        if (b.hp <= 0) b.dead = true;
+        return originalWeaken(b, damage);
+
       };
       const left = bullet(9001, 1, -20, 6000, 1, false);
       const right = bullet(9002, 2, 20, -6000, 3, false);
@@ -141,10 +143,12 @@ for (const fps of [30, 60, 120, 240]) {
   ]) {
     test('research safety: ' + name + ' at ' + fps + 'Hz', () => {
       const g = boot(true), contacts = [];
+      const originalWeaken = g.weakenBullet.bind(g);
+
       g.weakenBullet = function(b, damage) {
         contacts.push(b.id);
-        b.hp -= damage;
-        if (b.hp <= 0) b.dead = true;
+        return originalWeaken(b, damage);
+
       };
       const left = bullet(9101, 1, -x, 6000, 1);
       const right = bullet(9102, owner, x, -6000, 3);
@@ -173,10 +177,12 @@ for (const fps of [30, 60, 120, 240]) {
   test('research safety: shorter-lived hostile shot cannot intercept after expiry ' +
     fps + 'Hz', () => {
     const g = boot(true), contacts = [];
+    const originalWeaken = g.weakenBullet.bind(g);
+
     g.weakenBullet = function(b, damage) {
       contacts.push(b.id);
-      b.hp -= damage;
-      if (b.hp <= 0) b.dead = true;
+      return originalWeaken(b, damage);
+
     };
     const left = bullet(9201, 1, -20, 6000, 1);
     const right = bullet(9202, 2, 20, -6000, 3);
@@ -208,10 +214,12 @@ for (const partition of [
   test('KNOWN RED: hostile TTL interception is frame-partition invariant ' +
     partition.join('+'), () => {
     const g = boot(true), contacts = [];
+    const originalWeaken = g.weakenBullet.bind(g);
+
     g.weakenBullet = function(b, damage) {
       contacts.push(b.id);
-      b.hp -= damage;
-      if (b.hp <= 0) b.dead = true;
+      return originalWeaken(b, damage);
+
     };
     const left = bullet(9301, 1, -20, 6000, 1);
     const right = bullet(9302, 2, 20, -6000, 3);
@@ -234,10 +242,12 @@ for (const fps of [30, 60, 120, 240]) {
   test('KNOWN RED: canonical-scale 540u/s 0.42s TTL interception at ' +
     fps + 'Hz', () => {
     const g = boot(true), contacts = [];
+    const originalWeaken = g.weakenBullet.bind(g);
+
     g.weakenBullet = function(b, damage) {
       contacts.push(b.id);
-      b.hp -= damage;
-      if (b.hp <= 0) b.dead = true;
+      return originalWeaken(b, damage);
+
     };
     const left = bullet(9401, 1, -227.43, 540, 1);
     const right = bullet(9402, 2, 227.43, -540, 3);
