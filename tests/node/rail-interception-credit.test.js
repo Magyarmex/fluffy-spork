@@ -48,7 +48,8 @@ function buildGame(bullets, options = {}) {
   game.addText = (...args) => { (game.texts ||= []).push(args); };
   game.addRing = (...args) => { (game.rings ||= []).push(args); };
   game.addParticles = () => {};
-  game.sfx = { novaRailInterceptPolish: (_pan, _destroyed, playerDidIt) => {
+  game.sfx = { novaRailInterceptPolish: (pan, _destroyed, playerDidIt) => {
+    (game.panEvents ||= []).push(pan);
     (game.creditEvents ||= []).push(playerDidIt);
   }};
   return game;
@@ -132,9 +133,12 @@ test('diagonal swept player rail interception anchors ring and credit text at co
   const rail = bullet(70, 2, 100, 60, { px: 0, py: 0, __novaRail: true, hp: 1 });
   const playerShot = bullet(71, 1, 0, 0, { px: 100, py: 60 });
   const game = buildGame([rail, playerShot]);
+  game.w = 800;
+  game.player.x = 0;
   game.resolveBulletCollisions();
   assert.equal(rail.dead, true);
   assert.deepEqual(game.creditEvents, [true]);
+  assert.ok(Math.abs(game.panEvents[0] - 50 / 800) < 1e-8);
   assert.ok(Math.abs(game.rings[0][0] - 50) < 1e-8);
   assert.ok(Math.abs(game.rings[0][1] - 30) < 1e-8);
   assert.ok(Math.abs(game.texts[0][0] - 50) < 1e-8);
