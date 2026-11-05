@@ -70,7 +70,7 @@ test('disabled/missing observer context never calls the updater', () => {
 
 test('late missing context clears earlier positive certificates', () => {
   const g = { bullets: [shot(1, -20, 1000), shot(2, 20, -1000),
-    shot(3, 300, 0, 100)] };
+    shot(3, 0, 0, 0)] };
   let calls = 0;
   const r = observeProjectilePairs(g, .05, () => ++calls === 1 ? verified() : null);
   assert.equal(r.incomplete, true);
@@ -89,4 +89,22 @@ test('event provider cannot mutate frozen snapshots or receive Game', () => {
   assert.equal(r.incomplete, true);
   assert.equal(r.certified.length, 0);
   assert.equal(JSON.stringify(g), before);
+});
+
+test('swept disjoint pairs skip expensive competing-event provider safely', () => {
+  const g = { bullets: Array.from({ length: 23 }, (_, i) =>
+    shot(i + 1, i * 100, 0, i * 100)) };
+  let calls = 0;
+  const r = observeProjectilePairs(g, .05, () => { calls++; return verified(); });
+  assert.equal(r.incomplete, false);
+  assert.equal(r.certified.length, 0);
+  assert.equal(r.pairs, 253);
+  assert.equal(calls, 0);
+});
+test('swept boxes do not skip fast crossings with distant endpoints', () => {
+  const g = { bullets: [shot(1, -100, 6000), shot(2, 100, -6000)] };
+  let calls = 0;
+  const r = observeProjectilePairs(g, .05, () => { calls++; return verified(); });
+  assert.equal(calls, 1);
+  assert.equal(r.certified.length, 1);
 });
