@@ -198,3 +198,25 @@ test('malformed projectile getter cannot interrupt the real Game update', () => 
   assert.equal(r.reason, 'snapshot-error');
   assert.equal(r.certified.length, 0);
 });
+
+test('event provider receives frozen snapshots, independently witnessed', () => {
+  const g = { bullets: [shot(1, -20, 1000), shot(2, 20, -1000)] };
+  let frozen = false, sawGame = false;
+  const r = observeProjectilePairs(g, .05, (a, b, i, j, dt, game) => {
+    frozen = Object.isFrozen(a) && Object.isFrozen(b);
+    sawGame = game !== undefined;
+    return verified();
+  });
+  assert.equal(frozen, true);
+  assert.equal(sawGame, false);
+  assert.equal(r.certified.length, 1);
+});
+test('missing one competing-event field invalidates an otherwise complete context', () => {
+  const g = { bullets: [shot(1, -20, 1000), shot(2, 20, -1000)] };
+  const context = verified();
+  delete context.bOtherProjectile;
+  const r = observeProjectilePairs(g, .05, () => context);
+  assert.equal(r.incomplete, true);
+  assert.equal(r.reason, 'unverified-pair');
+  assert.equal(r.certified.length, 0);
+});
