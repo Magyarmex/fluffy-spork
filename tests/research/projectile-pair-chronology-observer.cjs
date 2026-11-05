@@ -57,6 +57,13 @@ function observeProjectilePairs(game, dt, eventsForPair) {
   })); }
   catch (_) { result.incomplete = true; result.reason = 'snapshot-error'; return result; }
   result.scanned = shots.length;
+  // Shells, rails and other unsupported shots may create mid-frame children
+  // that do not exist in this snapshot. Spatial separation alone cannot
+  // certify those future events, so abstain for the entire frame.
+  if (shots.some(s => s && s.dead !== true && !supported(s))) {
+    result.incomplete = true; result.reason = 'unsupported-projectile-present';
+    return result;
+  }
   outer: for (let i = 0; i < shots.length; i++) for (let j = i + 1; j < shots.length; j++) {
     result.pairs++;
     if (shots[i] && shots[i].dead === true || shots[j] && shots[j].dead === true) {
