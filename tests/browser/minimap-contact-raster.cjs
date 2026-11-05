@@ -111,6 +111,32 @@ async function run(browser,width,dpr){
    path:path.join(out,'minimap-css-clone-'+width+'-dpr'+dpr+'-bare.png')});
   assert.notDeepEqual(cloneKeyed,cloneBare,
    'independent CSS-composited 60px copies of real Game paint must differ');
+  // Measure the *composited device-pixel* image, not only a fixed 60x60
+  // offscreen downsample. DPR 2/3 must analyze 120/180 physical pixels.
+  const displayed=await page.evaluate(async ({keyed,bare,dpr})=>{
+   async function measure(base64){
+    const image=new Image();image.src='data:image/png;base64,'+base64;
+    await image.decode();
+    const canvas=document.createElement('canvas');
+    canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;
+    const ctx=canvas.getContext('2d',{willReadFrequently:true});
+    ctx.drawImage(image,0,0);
+    const w=canvas.width,h=canvas.height,data=ctx.getImageData(0,0,w,h).data;
+    const pixel=(x,y)=>{const i=(y*w+x)*4;return [...data.slice(i,i+3)];};
+    const x=Math.floor(w/2),y=Math.floor(h/2),r=Math.max(1,Math.round(4*dpr));
+    const center=pixel(x,y),neighbors=[pixel(x-r,y),pixel(x+r,y),pixel(x,y-r),pixel(x,y+r)];
+    const contrast=Math.max(...neighbors.map(p=>Math.hypot(...center.map((v,i)=>v-p[i]))));
+    return {width:w,height:h,center,contrast};
+   }
+   return {keyed:await measure(keyed),bare:await measure(bare)};
+  },{keyed:cloneKeyed.toString('base64'),bare:cloneBare.toString('base64'),dpr});
+  for(const mode of ['keyed','bare']){
+   assert.equal(displayed[mode].width,60*dpr,'CSS capture must use actual device pixel width');
+   assert.equal(displayed[mode].height,60*dpr,'CSS capture must use actual device pixel height');
+  }
+  assert.notDeepEqual(displayed.keyed.center,displayed.bare.center,
+   'keyline must affect the real DPR-scaled contact-center pixels');
+  result.displayed=displayed;
   delete result.keyed.backingUrl;delete result.bare.backingUrl;
   console.log('NOVA_MINIMAP_COMPOSITOR '+JSON.stringify({width,dpr,
    independentBackings:true,sameOwner:ownership.same}));
