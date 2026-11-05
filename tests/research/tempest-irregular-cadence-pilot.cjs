@@ -39,11 +39,11 @@ function run(seed,reload,name,steps){
   g.input.aim.active=true;g.input.aim.dx=40;g.input.firing=true;g.input.autofire=false;
   p.stats.reload=reload;
   let volleys=0,peakHeat=0,peakCooldown=0;
-  const shotTimes=[];const original=g.tryFire;
+  const shotTimes=[],shotAngles=[],shotHeats=[];const original=g.tryFire;
   g.tryFire=function(t){
    const before=this.bullets.length;
    const result=original.apply(this,arguments);
-   if(t===p&&this.bullets.length>before){volleys++;shotTimes.push(this.time);}
+   if(t===p&&this.bullets.length>before){volleys++;shotTimes.push(this.time);shotAngles.push(p.angle);shotHeats.push(p.__v17Heat||0);}
    return result;
   };
   try{
@@ -56,7 +56,9 @@ function run(seed,reload,name,steps){
     heat:+(p.__v17Heat||0).toFixed(6),peakHeat:+peakHeat.toFixed(6),
     fireCd:+(p.fireCd||0).toFixed(6),peakCooldown:+peakCooldown.toFixed(6),
     firstShots:shotTimes.slice(0,8).map(n=>+n.toFixed(6)),
-    lastShots:shotTimes.slice(-8).map(n=>+n.toFixed(6))};
+    lastShots:shotTimes.slice(-8).map(n=>+n.toFixed(6)),
+    firstShotAngles:shotAngles.slice(0,8).map(n=>+n.toFixed(6)),
+    firstShotHeats:shotHeats.slice(0,8).map(n=>+n.toFixed(6))};
   }finally{g.destroy();}
  });
 }
