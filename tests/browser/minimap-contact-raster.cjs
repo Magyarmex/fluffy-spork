@@ -172,7 +172,7 @@ async function run(browser,width,dpr){
   assert.equal(result.separatedKeyed.keylineCalls,2,'research-only keyline must paint exactly two familiar layers');
   for(const mode of ['keyed','bare','crowded','separatedBare','separatedKeyed','separatedBoth','diagonalBare','diagonalBoth'])
    assert.ok(result[mode].targetDotCalls>=1,mode+' must still paint the actual public rival');
-  assert.equal(result.separatedBoth.keylineCalls,0,'shipping renderer must suppress both outlines before research paint');
+  assert.equal(result.separatedBoth.keylineCalls,2,'two-sided research must paint the target keyline layers');
   assert.ok(result.resourceRisk.baselinePowerupCalls>=1,
    'the health pickup must actually paint through the composed Game minimap');
   assert.equal(result.resourceRisk.baselineKeylineCalls,0,
