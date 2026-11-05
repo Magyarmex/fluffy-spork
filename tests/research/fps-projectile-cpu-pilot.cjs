@@ -63,6 +63,9 @@ function run({seed=1517800,hz=60,seconds=4,extraShots=0,instrument=true,cls='tem
    let peak=0,projectileSamples=0,railSamples=0,peakRails=0;
    const ticks=hz*seconds;
    for(let i=0;i<ticks;i++){
+    /* A precharged research rail is exactly one opening shot. Never let
+     * wall-clock CI runtime silently turn it into a second charged shot. */
+    if(prechargeRail&&i===1)g.input.firing=false;
     peak=Math.max(peak,g.bullets.length);
     projectileSamples+=g.bullets.length;
     const rails=g.bullets.reduce((n,b)=>n+(b&&b.__novaRail&&!b.dead?1:0),0);
