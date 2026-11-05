@@ -58,3 +58,17 @@ test('release and cancellation edges remain intact when queue reaches its cap',(
  assert.equal(t.overflowCount,1);
  assert.equal(t.quarantined,false,'release at cap must fail closed without stuck quarantine');
 });
+
+test('keyboard and pointer-cancel edges also fence movement coalescing',()=>{
+ for(const edge of ['keydown','keyup','pointercancel']){
+   const input={__novaBlurReset(){},pd(){},pm(){},pu(){},kd(){},ku(){}};
+   const t=new ChronologicalInput(input,4);
+   event(t,.001,'pointermove',11,120);
+   t.push(.002,edge,edge==='pointercancel'?{pointerId:12,pointerType:'touch'}:{key:'w'});
+   event(t,.003,'pointermove',12,640);
+   event(t,.004,'pointermove',11,140);
+   assert.deepEqual(t.events.map(e=>e.at),[.001,.002,.003,.004],
+     edge+' must prevent moving the first sample after the discrete edge');
+   assert.equal(t.overflowCount,0);
+ }
+});
