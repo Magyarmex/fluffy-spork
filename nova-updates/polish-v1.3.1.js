@@ -203,14 +203,10 @@
         if (r.__novaPolishInterceptFxFrame === this.time) continue;
         r.__novaPolishInterceptFxFrame = this.time;
 
-        var playerDidIt = false;
-        if (pl && r.ownerId !== pl.id) {
-          for (var k = 0; k < this.bullets.length; k++) {
-            var pb = this.bullets[k];
-            if (!pb || pb.ownerId !== pl.id || pb.id === r.id) continue;
-            if (dist2(pb.x, pb.y, r.x, r.y) < 58 * 58) { playerDidIt = true; break; }
-          }
-        }
+        /* Only the actual Sniper collision pair can award a player denial.
+         * Endpoint proximity is neither necessary nor sufficient for swept hits. */
+        var playerDidIt = !!(pl && r.ownerId !== pl.id &&
+          r.__novaPlayerRailInterceptAt === this.time);
         var destroyed = !!r.dead || r.hp <= 0;
         if (this.addParticles) this.addParticles(r.x, r.y, destroyed ? '#ffffff' : '#d8c0ff', destroyed ? 9 : 5, destroyed ? 125 : 80, 'glow');
         if (this.addRing) this.addRing(r.x, r.y, destroyed ? '#ffffff' : '#c493ff', destroyed ? 34 : 22);
