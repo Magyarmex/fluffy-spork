@@ -15,6 +15,7 @@ test('CPU instrumentation is physically and RNG transparent in actual composed g
   assert.ok(timed.updateMs>0&&timed.bulletsMs>=timed.collisionMs);
   assert.equal(base.meanRails,timed.meanRails,'read-only timing must not change live rail occupancy');
   assert.equal(base.peakRails,timed.peakRails);
+  assert.equal(base.railEmitted,timed.railEmitted);
   assert.ok(Number.isFinite(timed.meanRails)&&timed.meanRails>=0);
   assert.ok(timed.peakRails<=timed.peakProjectiles);
  }
@@ -41,14 +42,15 @@ test('suite carries explicit research limits and unambiguous stress metadata',()
  assert.deepEqual(mixed.observations.map(x=>x.cls),['tempest','railgun']);
  assert.equal(mixed.classes.length,2);
  assert.ok(mixed.observations[1].peakRails>0);
- console.log('NOVA_RAIL_DENSITY '+JSON.stringify(mixed.observations.map(({cls,meanProjectiles,meanRails,peakRails,playerVolleys})=>({cls,meanProjectiles,meanRails,peakRails,playerVolleys}))));
+ console.log('NOVA_RAIL_DENSITY '+JSON.stringify(mixed.observations.map(({cls,meanProjectiles,meanRails,peakRails,playerVolleys,railEmitted,playerRailEmitted})=>({cls,meanProjectiles,meanRails,peakRails,playerVolleys,railEmitted,playerRailEmitted}))));
 });
 
 test('rail occupancy is measured from actual composed projectile objects',()=>{
  const a=run({seed:1517800,hz:60,seconds:3,extraShots:0,cls:'railgun'});
  const b=run({seed:1517800,hz:60,seconds:3,extraShots:0,cls:'railgun'});
  assert.ok(a.playerVolleys>0,'real railgun firing must occur');
- assert.ok(a.peakRails>0,'the shipping rail marker must be observed');
+ assert.ok(a.playerRailEmitted>0,'the shipping rail marker must be observed at actual shot creation');
+ assert.ok(a.railEmitted>=a.playerRailEmitted);
  assert.ok(a.meanRails>0&&a.meanRails<=a.peakRails);
  assert.equal(a.peakRails,b.peakRails);
  assert.equal(a.meanRails,b.meanRails);
