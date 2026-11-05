@@ -476,6 +476,13 @@
           if (dx * dx + dy * dy > rr * rr && !sweptBulletHit(a, b, rr)) continue;
           if (alliedProjectileOwners(this, a, b)) continue;
           var ah = a.hp || 0, bh = b.hp || 0;
+          /* Credit actual swept projectile contacts, not nearby unrelated shots.
+           * Signal Bloom reads these presentation-only markers after resolution. */
+          var playerId = this.player && this.player.id;
+          if (playerId != null) {
+            if (a.__novaRail && b.ownerId === playerId && bh > 0) a.__novaPlayerRailInterceptAt = this.time;
+            if (b.__novaRail && a.ownerId === playerId && ah > 0) b.__novaPlayerRailInterceptAt = this.time;
+          }
           this.weakenBullet(a, bh); this.weakenBullet(b, ah);
           /* Preserve the core's Cannon shell-on-interception contract. The
            * Battlefield burst guard prevents repeated fragments per shell.
