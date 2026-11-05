@@ -107,8 +107,14 @@ async function run(browser,width,dpr){
     return Array.from(rgba.slice(0,3));
    };
    const bothCenters={first:pixelAt(dotX,dotY),second:pixelAt(secondX,dotY)};
+   const rgb=color=>{
+    const swatch=document.createElement('canvas');swatch.width=swatch.height=1;
+    const sc=swatch.getContext('2d');sc.fillStyle=color;sc.fillRect(0,0,1,1);
+    return Array.from(sc.getImageData(0,0,1,1).data.slice(0,3));
+   };
+   const expectedCenters={first:rgb(target.color),second:rgb(enemies[1].color)};
    return {width:innerWidth,dpr:devicePixelRatio,backing:[backing.width,backing.height],
-    enemyColor:target.color,secondColor:enemies[1].color,bothCenters,
+    enemyColor:target.color,secondColor:enemies[1].color,bothCenters,expectedCenters,
     keyed,bare,crowded,separatedBare,separatedKeyed,separatedBoth};
   });
   assert.equal(result.width,width);
@@ -121,13 +127,15 @@ async function run(browser,width,dpr){
   assert.equal(result.separatedKeyed.keylineCalls,2,'research-only keyline must paint exactly two familiar layers');
   for(const mode of ['keyed','bare','crowded','separatedBare','separatedKeyed','separatedBoth'])
    assert.ok(result[mode].targetDotCalls>=1,mode+' must still paint the actual public rival');
-  assert.equal(result.separatedBoth.keylineCalls,2,'shipping renderer must still suppress both outlines before research paint');
+  assert.equal(result.separatedBoth.keylineCalls,0,'shipping renderer must suppress both outlines before research paint');
   assert.notEqual(result.separatedBoth.backingUrl,result.separatedKeyed.backingUrl,
    'two-sided keyline must change the actual Game backing image');
   // The second marker must survive the two-sided experiment as a colored
   // public contact; never accept a bright outline in place of a class dot.
-  assert.ok(result.bothCenters.first.every(Number.isFinite));
-  assert.ok(result.bothCenters.second.every(Number.isFinite));
+  assert.deepEqual(result.bothCenters.first,result.expectedCenters.first,
+   'first public rival core must retain its exact class color');
+  assert.deepEqual(result.bothCenters.second,result.expectedCenters.second,
+   'second public rival core must retain its exact class color');
   assert.notEqual(result.keyed.url,result.bare.url,'keyline must change actual 60px browser raster');
   const out=path.join('artifacts','browser');fs.mkdirSync(out,{recursive:true});
   for(const mode of ['keyed','bare','crowded','separatedBare','separatedKeyed','separatedBoth']){
