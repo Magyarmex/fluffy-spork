@@ -6,16 +6,23 @@ process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
 const {performance}=require('node:perf_hooks');
 const {bootGame,withSeed,digest,physical}=require('./audio-rng-causal-pilot.cjs');
 function positiveInteger(n,min,max){return Number.isInteger(n)&&n>=min&&n<=max;}
-function run({seed=1517800,hz=60,seconds=4,extraShots=0,instrument=true,cls='tempest'}={}){
+function run({seed=1517800,hz=60,seconds=4,extraShots=0,instrument=true,cls='tempest',prechargeRail=false}={}){
  if(!positiveInteger(seed,1,0xffffffff)||![30,60,120].includes(hz)||
     !positiveInteger(seconds,1,30)||!positiveInteger(extraShots,0,600)||
-    typeof cls!=='string'||!cls||typeof instrument!=='boolean')
+    typeof cls!=='string'||!cls||typeof instrument!=='boolean'||typeof prechargeRail!=='boolean'||
+    (prechargeRail&&cls!=='railgun'))
   throw Error('invalid FPS projectile pilot configuration');
  return withSeed(seed,draws=>{
   const g=bootGame();let originalBullets,originalCollisions,originalFire;
   try{
    g.sfx.muted=true;g.sfx.startMusic=()=>{};
    g.setClass(g.player,cls);
+   /* Research control: player rail focus uses wall-clock performance.now(),
+    * not simulated Game.time. Accelerated Node ticks cannot charge a rail
+    * naturally; explicitly precharge ONE opening shot, never imply this is
+    * natural sustained railgun cadence or a browser/device measurement. */
+   if(prechargeRail){g.player.__novaFocusStart=performance.now()-1000;
+    g.player.__novaFocusLast=performance.now()-16;g.player.fireCd=0;}
    g.input.autofire=false;g.input.firing=true;
    g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
    /* All extras are explicit out-of-world-owner stress controls. They
@@ -63,7 +70,7 @@ function run({seed=1517800,hz=60,seconds=4,extraShots=0,instrument=true,cls='tem
     const t=performance.now();g.update(1/hz);
     timing.updateMs+=performance.now()-t;
    }
-   return {seed,hz,seconds,cls,extraShots,instrument,ticks,
+   return {seed,hz,seconds,cls,extraShots,instrument,prechargeRail,ticks,
     peakProjectiles:peak,meanProjectiles:projectileSamples/ticks,
     peakRails,meanRails:railSamples/ticks,
     finalProjectiles:g.bullets.length,
@@ -86,10 +93,11 @@ function run({seed=1517800,hz=60,seconds=4,extraShots=0,instrument=true,cls='tem
 }
 function suite({seeds=[1517800,1517802,1517810],hzs=[30,60],seconds=4,extras=[0,240,480],classes=['tempest']}={}){
  const out=[];for(const cls of classes)for(const seed of seeds)for(const hz of hzs)for(const extraShots of extras)
-  out.push(run({seed,hz,seconds,extraShots,cls}));
+  out.push(run({seed,hz,seconds,extraShots,cls,prechargeRail:cls==='railgun'}));
  return {schema:1,method:'exact 49-overlay materialized Game, Node no-op Canvas',classes,
   limitations:['CPU measurements include instrumentation overhead and are not device frame times',
    'Synthetic extra shots are an artificial stress distribution, not natural encounter incidence',
+   'Railgun cohort precharges one opening shot because accelerated Node ticks do not advance wall-clock focus; not sustained natural railgun cadence',
    'Physical hashes and RNG draws are correctness checks, not evidence of fun or FPS parity'],
   observations:out};
 }
