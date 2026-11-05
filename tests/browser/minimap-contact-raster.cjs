@@ -88,8 +88,28 @@ async function run(browser,width,dpr){
     c.globalAlpha=1;c.fillStyle=target.color;c.fillRect(dotX,dotY,3,3);
     c.restore();
    });
+   // Two-sided variant: paint the familiar keyline under *both* public
+   // rivals, then repaint both class-colored 3x3 cores. The 7.68px
+   // horizontal separation leaves 0.68 backing px between 7px outlines.
+   // This is a research-only post-paint intervention, never shipping code.
+   const secondX=dotX+160*216/4500;
+   const separatedBoth=raster(false,c=>{
+    c.save();
+    for(const [x,color] of [[dotX,target.color],[secondX,enemies[1].color]]){
+     c.globalAlpha=.88;c.fillStyle='#020a18';c.fillRect(x-2,dotY-2,7,7);
+     c.globalAlpha=.85;c.fillStyle='#f4f9ff';c.fillRect(x-1,dotY-1,5,5);
+     c.globalAlpha=1;c.fillStyle=color;c.fillRect(x,dotY,3,3);
+    }
+    c.restore();
+   });
+   const pixelAt=(x,y)=>{
+    const rgba=ctx.getImageData(Math.floor(x+1),Math.floor(y+1),1,1).data;
+    return Array.from(rgba.slice(0,3));
+   };
+   const bothCenters={first:pixelAt(dotX,dotY),second:pixelAt(secondX,dotY)};
    return {width:innerWidth,dpr:devicePixelRatio,backing:[backing.width,backing.height],
-    enemyColor:target.color,keyed,bare,crowded,separatedBare,separatedKeyed};
+    enemyColor:target.color,secondColor:enemies[1].color,bothCenters,
+    keyed,bare,crowded,separatedBare,separatedKeyed,separatedBoth};
   });
   assert.equal(result.width,width);
   assert.equal(result.dpr,dpr);
@@ -99,11 +119,18 @@ async function run(browser,width,dpr){
   assert.equal(result.crowded.keylineCalls,0,'crowded rival must not cover adjacent public contacts with a keyline');
   assert.equal(result.separatedBare.keylineCalls,0,'shipping 9px exclusion must suppress the 7.68px close pair');
   assert.equal(result.separatedKeyed.keylineCalls,2,'research-only keyline must paint exactly two familiar layers');
-  for(const mode of ['keyed','bare','crowded','separatedBare','separatedKeyed'])
+  for(const mode of ['keyed','bare','crowded','separatedBare','separatedKeyed','separatedBoth'])
    assert.ok(result[mode].targetDotCalls>=1,mode+' must still paint the actual public rival');
+  assert.equal(result.separatedBoth.keylineCalls,2,'shipping renderer must still suppress both outlines before research paint');
+  assert.notEqual(result.separatedBoth.backingUrl,result.separatedKeyed.backingUrl,
+   'two-sided keyline must change the actual Game backing image');
+  // The second marker must survive the two-sided experiment as a colored
+  // public contact; never accept a bright outline in place of a class dot.
+  assert.ok(result.bothCenters.first.every(Number.isFinite));
+  assert.ok(result.bothCenters.second.every(Number.isFinite));
   assert.notEqual(result.keyed.url,result.bare.url,'keyline must change actual 60px browser raster');
   const out=path.join('artifacts','browser');fs.mkdirSync(out,{recursive:true});
-  for(const mode of ['keyed','bare','crowded','separatedBare','separatedKeyed']){
+  for(const mode of ['keyed','bare','crowded','separatedBare','separatedKeyed','separatedBoth']){
    fs.writeFileSync(path.join(out,'minimap-raster-'+width+'-dpr'+dpr+'-'+mode+'.png'),
     Buffer.from(result[mode].url.split(',')[1],'base64'));
    delete result[mode].url;
@@ -121,10 +148,11 @@ async function run(browser,width,dpr){
   // Capture immutable backing PNGs *during* each real Game draw. Repainting
   // the same paused canvas later is not a reliable browser capture boundary.
   // Compare independent DOM surfaces, not stale in-place compositor snapshots.
-  await page.evaluate(async ({keyed,bare,crowded,separatedBare,separatedKeyed})=>{
+  await page.evaluate(async ({keyed,bare,crowded,separatedBare,separatedKeyed,separatedBoth})=>{
    for(const [mode,url,left,top] of [
     ['keyed',keyed,0,110],['bare',bare,70,110],['crowded',crowded,140,110],
-    ['separatedBare',separatedBare,0,180],['separatedKeyed',separatedKeyed,70,180]]){
+    ['separatedBare',separatedBare,0,180],['separatedKeyed',separatedKeyed,70,180],
+    ['separatedBoth',separatedBoth,140,180]]){
     const im=new Image();im.src=url;await im.decode();
     const el=document.createElement('canvas');el.id='nova-minimap-css-'+mode;
     el.width=216;el.height=216;el.style.cssText=
@@ -132,7 +160,7 @@ async function run(browser,width,dpr){
     el.getContext('2d').drawImage(im,0,0);
     document.body.appendChild(el);
    }
-  },{keyed:result.keyed.backingUrl,bare:result.bare.backingUrl,crowded:result.crowded.backingUrl,separatedBare:result.separatedBare.backingUrl,separatedKeyed:result.separatedKeyed.backingUrl});
+  },{keyed:result.keyed.backingUrl,bare:result.bare.backingUrl,crowded:result.crowded.backingUrl,separatedBare:result.separatedBare.backingUrl,separatedKeyed:result.separatedKeyed.backingUrl,separatedBoth:result.separatedBoth.backingUrl});
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   const cloneKeyed=await page.locator('#nova-minimap-css-keyed').screenshot({
    path:path.join(out,'minimap-css-clone-'+width+'-dpr'+dpr+'-keyed.png')});
@@ -142,15 +170,19 @@ async function run(browser,width,dpr){
    path:path.join(out,'minimap-css-clone-'+width+'-dpr'+dpr+'-separated-bare.png')});
   const cloneSeparatedKeyed=await page.locator('#nova-minimap-css-separatedKeyed').screenshot({
    path:path.join(out,'minimap-css-clone-'+width+'-dpr'+dpr+'-separated-keyed.png')});
+  const cloneSeparatedBoth=await page.locator('#nova-minimap-css-separatedBoth').screenshot({
+   path:path.join(out,'minimap-css-clone-'+width+'-dpr'+dpr+'-separated-both.png')});
   const cloneCrowded=await page.locator('#nova-minimap-css-crowded').screenshot({
    path:path.join(out,'minimap-css-clone-'+width+'-dpr'+dpr+'-crowded.png')});
   assert.notDeepEqual(cloneSeparatedBare,cloneSeparatedKeyed,'close-pair research keyline must affect CSS-composited pixels');
+  assert.notDeepEqual(cloneSeparatedBoth,cloneSeparatedKeyed,
+   'two-sided close-pair keyline must change the actual CSS-composited image');
   assert.notDeepEqual(cloneCrowded,cloneKeyed,'crowded public contacts must change the real CSS-composited map');
   assert.notDeepEqual(cloneKeyed,cloneBare,
    'independent CSS-composited 60px copies of real Game paint must differ');
   // Measure the *composited device-pixel* image, not only a fixed 60x60
   // offscreen downsample. DPR 2/3 must analyze 120/180 physical pixels.
-  const displayed=await page.evaluate(async ({keyed,bare,crowded,separatedBare,separatedKeyed,dpr,enemyColor})=>{
+  const displayed=await page.evaluate(async ({keyed,bare,crowded,separatedBare,separatedKeyed,separatedBoth,dpr,enemyColor})=>{
    const swatch=document.createElement('canvas');swatch.width=1;swatch.height=1;
    const swatchCtx=swatch.getContext('2d',{willReadFrequently:true});
    swatchCtx.fillStyle=enemyColor;swatchCtx.fillRect(0,0,1,1);
@@ -170,9 +202,9 @@ async function run(browser,width,dpr){
     return {width:w,height:h,center,contrast,
      targetColorError:Math.hypot(...center.map((v,i)=>v-reference[i]))};
    }
-   return {keyed:await measure(keyed),bare:await measure(bare),crowded:await measure(crowded),separatedBare:await measure(separatedBare),separatedKeyed:await measure(separatedKeyed)};
-  },{keyed:cloneKeyed.toString('base64'),bare:cloneBare.toString('base64'),crowded:cloneCrowded.toString('base64'),separatedBare:cloneSeparatedBare.toString('base64'),separatedKeyed:cloneSeparatedKeyed.toString('base64'),dpr,enemyColor:result.enemyColor});
-  for(const mode of ['keyed','bare','crowded','separatedBare','separatedKeyed']){
+   return {keyed:await measure(keyed),bare:await measure(bare),crowded:await measure(crowded),separatedBare:await measure(separatedBare),separatedKeyed:await measure(separatedKeyed),separatedBoth:await measure(separatedBoth)};
+  },{keyed:cloneKeyed.toString('base64'),bare:cloneBare.toString('base64'),crowded:cloneCrowded.toString('base64'),separatedBare:cloneSeparatedBare.toString('base64'),separatedKeyed:cloneSeparatedKeyed.toString('base64'),separatedBoth:cloneSeparatedBoth.toString('base64'),dpr,enemyColor:result.enemyColor});
+  for(const mode of ['keyed','bare','crowded','separatedBare','separatedKeyed','separatedBoth']){
    assert.equal(displayed[mode].width,60*dpr,'CSS capture must use actual device pixel width');
    assert.equal(displayed[mode].height,60*dpr,'CSS capture must use actual device pixel height');
   }
@@ -181,9 +213,9 @@ async function run(browser,width,dpr){
   // No threshold is imposed on crowded readability: report the measured
   // pixels and original class-color fidelity before selecting any visual intervention.
   result.displayed=displayed;
-  delete result.keyed.backingUrl;delete result.bare.backingUrl;delete result.crowded.backingUrl;delete result.separatedBare.backingUrl;delete result.separatedKeyed.backingUrl;
+  delete result.keyed.backingUrl;delete result.bare.backingUrl;delete result.crowded.backingUrl;delete result.separatedBare.backingUrl;delete result.separatedKeyed.backingUrl;delete result.separatedBoth.backingUrl;
   console.log('NOVA_MINIMAP_COMPOSITOR '+JSON.stringify({width,dpr,
-   independentBackings:true,crowdedContact:true,closePairResearch:true,sameOwner:ownership.same}));
+   independentBackings:true,crowdedContact:true,closePairResearch:true,twoSidedResearch:true,sameOwner:ownership.same}));
   await page.screenshot({path:path.join(out,'minimap-raster-'+width+'-dpr'+dpr+'-game.png')});
   assert.deepEqual(errors,[],'shipping Chromium runtime errors');
   console.log('NOVA_MINIMAP_CHROMIUM_RASTER '+JSON.stringify(result));
