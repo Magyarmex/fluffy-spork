@@ -158,6 +158,17 @@ test('three-way interception exposes descending-array order versus physical time
   // This is an observation, not an acceptance criterion for future code.
   assert.deepEqual(weakened.slice(0, 2), [3, 2]);
   assert.equal(a.hp, 2, 'current array-order resolution leaves A alive');
+  const reversed = boot(), ra = shot(1, 1, -20, 6000, .005);
+  const rb = shot(2, 2, 0, 0, .005), rc = shot(3, 3, 25, -6000, .005);
+  ra.hp = ra.maxHp = 3;
+  rb.hp = rb.maxHp = 2;
+  rc.hp = rc.maxHp = 1;
+  reversed.bullets = [rc, rb, ra];
+  reversed.updateBullets(1 / 240);
+  assert.equal(ra.dead, true,
+    'reversing only the projectile array changes which shot survives');
+  assert.equal(a.dead, false,
+    'same physical encounter must not depend on insertion order');
   // A chronological resolver would process A-B first, then A-C:
   // with these integrity values, A, B and C would all be destroyed.
 });
