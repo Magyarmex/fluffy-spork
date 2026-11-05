@@ -505,9 +505,8 @@
             my = (ay0 + (a.y - ay0) * firstTime + by0 + (b.y - by0) * firstTime) * 0.5;
           }
           if (Number.isFinite(mx) && Number.isFinite(my)) {
-            var rails = [a, b];
-            for (var ri = 0; ri < rails.length; ri++) {
-              var rail = rails[ri], other = rails[1 - ri];
+            for (var ri = 0; ri < 2; ri++) {
+              var rail = ri === 0 ? a : b, other = ri === 0 ? b : a;
               if (!rail.__novaRail || !(other.hp != null)) continue;
               if (rail.__novaRailContactAt !== this.time) {
                 rail.__novaRailContactAt = this.time;
