@@ -136,7 +136,8 @@ class FixedStepRafOwner {
             input[stick] && input[stick].active).map(stick=>input.stickId[stick]) : [];
         // An already-captured release is intentional. A release of one stick
         // must not conceal an involuntary reset of the OTHER held stick.
-        const pending=this.timeline.events.slice(this.timeline.index);
+        const pending=ownedTouchIds.length && Array.isArray(this.timeline.events) ?
+          this.timeline.events.slice(this.timeline.index||0) : [];
         const pendingBlur=pending.some(e=>e.kind==='blur');
         const unreleased=ownedTouchIds.some(id=>!pending.some(e=>
           (e.kind==='pointerup'||e.kind==='pointercancel') && e.data.pointerId===id));
