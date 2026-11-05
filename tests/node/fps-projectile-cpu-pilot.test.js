@@ -37,6 +37,10 @@ test('suite carries explicit research limits and unambiguous stress metadata',()
  assert.equal(s.schema,1);assert.equal(s.observations.length,1);
  assert.equal(s.observations[0].extraShots,0);
  assert.ok(s.limitations.some(x=>x.includes('not device')));
+ const mixed=suite({seeds:[1517800],hzs:[60],seconds:2,extras:[0],classes:['tempest','railgun']});
+ assert.deepEqual(mixed.observations.map(x=>x.cls),['tempest','railgun']);
+ assert.equal(mixed.classes.length,2);
+ assert.ok(mixed.observations[1].peakRails>0);
 });
 
 test('rail occupancy is measured from actual composed projectile objects',()=>{
