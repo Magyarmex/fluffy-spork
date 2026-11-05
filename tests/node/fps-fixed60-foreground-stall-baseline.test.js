@@ -1,4 +1,6 @@
 'use strict';
+// Import composed Game fixture without registering its independent audio A/B suite.
+process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
 // Research-only: establish the exact 120ms foreground-stall input contract
 // before attempting a touch-stick recovery fix. This intentionally documents
 // the current loss of ownership; it does NOT authorize production promotion.
