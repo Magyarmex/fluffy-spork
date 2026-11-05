@@ -16,6 +16,8 @@ const parse=(name,fallback,min,max)=>{
 };
 const seeds=parse('NOVA_JITTER_SEEDS','1517800,1517802,1517810',0,2147483647);
 const reloads=parse('NOVA_JITTER_RELOAD','0,4,5,8',0,8);
+// Phase rotations preserve each six-step schedule's interval multiset and total time.
+const phases=parse('NOVA_JITTER_PHASES','0',0,5);
 const TICKS=960; // exactly 8 simulated seconds at a 120Hz integer timebase
 const patterns={
  native30:[4],native60:[2],native120:[1],
@@ -25,8 +27,8 @@ const patterns={
  // enumeration; these are stress controls, not natural-device measurements.
  aliasFast:[1,1,2,3,2,3],aliasSlow:[1,1,1,3,3,3]
 };
-function schedule(pattern){
- const out=[];let elapsed=0,i=0;
+function schedule(pattern,phase=0){
+ const out=[];let elapsed=0,i=phase;
  while(elapsed<TICKS){
   const ticks=Math.min(pattern[i++%pattern.length],TICKS-elapsed);
   out.push(ticks);elapsed+=ticks;
@@ -67,7 +69,17 @@ function run(seed,reload,name,steps){
 }
 const all=[];
 for(const seed of seeds)for(const reload of reloads){
- const cohort=Object.entries(patterns).map(([name,pattern])=>run(seed,reload,name,schedule(pattern)));
+ const cohort=Object.entries(patterns).flatMap(([name,pattern])=>
+  (pattern.length===1?[0]:phases).map(phase=>{
+   const steps=schedule(pattern,phase);
+   const row=run(seed,reload,phase===0?name:name+'@'+phase,steps);
+   row.pattern=name;row.phase=phase;
+   row.intervalHistogram=steps.reduce((counts,ticks)=>{
+    counts[ticks]=(counts[ticks]||0)+1;return counts;
+   },{});
+   row.simulatedTicks=steps.reduce((sum,ticks)=>sum+ticks,0);
+   return row;
+  }));
  const reference=cohort.find(r=>r.name==='native60');
  for(const r of cohort){
   r.deltaVs60=r.volleys-reference.volleys;
@@ -76,4 +88,4 @@ for(const seed of seeds)for(const reload of reloads){
  }
 }
 console.log(JSON.stringify({method:'actual materialized 49-overlay Game; held aim/fire; no targets',
- caveats:['research-only, no browser input event timestamps','all schedules cover exactly 8 simulated seconds','variable dt changes world update chronology, not merely presentation FPS','no player-facing patch'],patterns,seeds,reloads,results:all},null,2));
+ phases,caveats:['research-only, no browser input event timestamps','all schedules cover exactly 8 simulated seconds','variable dt changes world update chronology, not merely presentation FPS','no player-facing patch'],patterns,seeds,reloads,results:all},null,2));
