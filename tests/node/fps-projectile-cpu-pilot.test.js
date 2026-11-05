@@ -24,14 +24,7 @@ test('repeated seeded pilot produces identical state at 30Hz and 60Hz',()=>{
  for(const hz of [30,60]){
   const a=run({seed:1517802,hz,seconds:2,extraShots:0});
   const b=run({seed:1517802,hz,seconds:2,extraShots:0});
-  /* Player rail focus is tied to real performance.now(), not the accelerated
-  * Node simulation clock. Two precharged research runs can have different
-  * later physical hashes despite identical rail emission/occupancy; do not
-  * manufacture a deterministic gameplay claim from this synthetic control.
-  * The Tempest instrument ON/OFF test above retains strict physical parity. */
- assert.equal(a.playerRailEmitted,b.playerRailEmitted);
- assert.equal(a.railEmitted,b.railEmitted);
- assert.equal(a.playerVolleys,b.playerVolleys);
+  assert.equal(a.physicalHash,b.physicalHash);
   assert.equal(a.rngDraws,b.rngDraws);
   assert.equal(a.ticks,2*hz);
  }
@@ -63,5 +56,10 @@ test('rail occupancy is measured from actual composed projectile objects',()=>{
   'same-tick rail death may legitimately leave zero pre-update occupancy');
  assert.equal(a.peakRails,b.peakRails);
  assert.equal(a.meanRails,b.meanRails);
- assert.equal(a.physicalHash,b.physicalHash);
+ /* This accelerated Node pilot does not virtualize Sniper's performance.now()
+  * player-focus clock. One-shot rail counts/occupancy are meaningful, but a
+  * full physical replay hash is not a valid cross-run railgun invariant. */
+ assert.equal(a.playerRailEmitted,b.playerRailEmitted);
+ assert.equal(a.railEmitted,b.railEmitted);
+ assert.equal(a.playerVolleys,b.playerVolleys);
 });
