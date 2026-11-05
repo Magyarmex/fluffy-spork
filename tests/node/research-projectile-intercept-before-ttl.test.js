@@ -1,7 +1,8 @@
 'use strict';
-// A swept Sniper projectile interception must retain the core Cannon/Bomber
-// contract: a shell destroyed by hostile fire releases its fragments exactly once.
-// Exercise the real materialized bullet updater and the shipping overlay order.
+// KNOWN-RED research gate: hostile projectile first contact must occur before
+// either projectile's physical TTL expiry, independent of frame partition.
+// Exercise the real materialized bullet updater and shipping combat overlays.
+// No production gameplay or test expectations are weakened.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
