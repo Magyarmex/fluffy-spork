@@ -44,13 +44,14 @@ class ChronologicalInput {
       // press/release/ability edge. Preserve chronological order after removal.
       for (let i = this.events.length - 1; i >= 0; i--) {
         const e = this.events[i];
+        // Never move a continuous sample across ANY discrete edge, even one
+        // owned by another pointer or the keyboard. Edge order is gameplay.
+        if (e.kind !== 'pointermove') break;
         if (e.data.pointerId !== data.pointerId) continue;
-        // Only coalesce within the SAME simulation tick. Replacing a
-        // movement sample from an earlier tick changes actual gameplay.
+        // Only coalesce within the SAME actual simulation tick.
         if (Math.floor((e.at - this.tickOrigin + EPS) / STEP) !==
             Math.floor((at - this.tickOrigin + EPS) / STEP)) break;
-        if (e.kind === 'pointerdown' || e.kind === 'pointerup' || e.kind === 'pointercancel') break;
-        if (e.kind === 'pointermove') { this.events.splice(i, 1); break; }
+        this.events.splice(i, 1); break;
       }
     }
     if (this.events.length >= this.limit) {
