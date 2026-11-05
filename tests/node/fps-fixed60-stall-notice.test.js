@@ -65,3 +65,35 @@ test('mouse-only input does not create a touch reset warning',()=>{
     assert.equal(s.input.firing,false);
   }finally{s.owner.stop()}
 });
+
+test('composed 49-overlay Game emits warning at genuine held touch stall',()=>{
+  process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
+  const {bootGame}=require('../research/audio-rng-causal-pilot.cjs');
+  const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs');
+  const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
+  let now=1000;const notices=[];g.toast=(...args)=>notices.push(args);
+  const timeline=new ChronologicalInput(g.input);
+  const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
+  const owner=new FixedStepRafOwner(g,timeline,bridge,{
+    now:()=>now,request:()=>1,cancel:()=>{},render:()=>{}
+  });
+  function event(type,ms,x=100,id=11){
+    now=ms;
+    return bridge.capture({type,timeStamp:ms,pointerId:id,pointerType:'touch',
+      clientX:x,clientY:200,button:0,buttons:type==='pointerup'?0:1,
+      target:{tagName:'CANVAS',closest:()=>null}});
+  }
+  try{
+    owner.start();
+    event('pointerdown',1005);now=1017;owner.frame(now);
+    assert.equal(g.input.stickId.move,11);
+    assert.equal(g.input.move.active,true);
+    now=1137;owner.frame(now);
+    assert.deepEqual(notices,[['Touch controls reset — touch again','warn']]);
+    assert.equal(g.input.stickId.move,-1);
+    assert.equal(g.input.firing,false);
+    event('pointerup',1140);now=1154;owner.frame(now);
+    assert.equal(g.input.stickId.move,-1);
+    assert.equal(notices.length,1);
+  }finally{owner.stop();g.destroy()}
+});
