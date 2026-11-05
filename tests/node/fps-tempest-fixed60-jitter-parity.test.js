@@ -41,7 +41,7 @@ function run(seed,reload,intervals){
   };
   try{
    owner.start();
-   g.input.aim.active=true;g.input.aim.dx=40;g.input.firing=true;
+   g.input.aim.active=true;g.input.aim.dx=40;g.input.firing=true;g.input.autofire=false;
    let elapsed=0;
    for(const ticks of intervals){
     elapsed+=ticks;now=1000+elapsed*1000/120;
