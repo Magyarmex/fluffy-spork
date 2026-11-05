@@ -43,18 +43,18 @@ function run(seed,reload,name,steps){
   g.tryFire=function(t){
    const before=this.bullets.length;
    const result=original.apply(this,arguments);
-   if(t===p&&this.bullets.length>before){volleys++;shotTimes.push(this.time);shotAngles.push(p.angle);shotHeats.push(p.__v17Heat||0);}
+   if(t===p&&this.bullets.length>before){volleys++;shotTimes.push(this.time);shotAngles.push(p.angle);shotHeats.push(p.__v17Heat??0);}
    return result;
   };
   try{
    for(const ticks of steps){
     g.update(ticks/120);
-    peakHeat=Math.max(peakHeat,p.__v17Heat||0);
-    peakCooldown=Math.max(peakCooldown,p.fireCd||0);
+    peakHeat=Math.max(peakHeat,p.__v17Heat??0);
+    peakCooldown=Math.max(peakCooldown,p.fireCd??0);
    }
    return {seed,reload,name,frames:steps.length,volleys,
-    heat:+(p.__v17Heat||0).toFixed(6),peakHeat:+peakHeat.toFixed(6),
-    fireCd:+(p.fireCd||0).toFixed(6),peakCooldown:+peakCooldown.toFixed(6),
+    heat:+(p.__v17Heat??0).toFixed(6),peakHeat:+peakHeat.toFixed(6),
+    fireCd:+(p.fireCd??0).toFixed(6),peakCooldown:+peakCooldown.toFixed(6),
     firstShots:shotTimes.slice(0,8).map(n=>+n.toFixed(6)),
     lastShots:shotTimes.slice(-8).map(n=>+n.toFixed(6)),
     firstShotAngles:shotAngles.slice(0,8).map(n=>+n.toFixed(6)),
