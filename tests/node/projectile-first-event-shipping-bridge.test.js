@@ -138,9 +138,12 @@ test('three-way interception exposes descending-array order versus physical time
   const pairTime = (x, y) =>
     (Math.abs(x.x - y.x) - x.r - y.r - 1.5) / Math.abs(x.vx - y.vx);
   const ab = pairTime(a, b), bc = pairTime(b, c), ac = pairTime(a, c);
-  assert.equal(firstContact(a, b, 1 / 240,
-    { ...clear, aOtherProjectile: ac, bOtherProjectile: bc }), null,
-    'incomplete or competing three-way context cannot be blindly certified');
+  assert.ok(Math.abs(firstContact(a, b, 1 / 240,
+    { ...clear, aOtherProjectile: ac, bOtherProjectile: bc }) - ab) < 1e-12,
+    'A-B is the certified earliest pair when both competing times are known');
+  assert.equal(firstContact(b, c, 1 / 240,
+    { ...clear, aOtherProjectile: ab, bOtherProjectile: ac }), null,
+    'later B-C must be vetoed by the earlier A-B event');
   assert.ok(ab < bc && bc < ac && ac < 1 / 240,
     'all three contacts are physically ordered inside one frame');
   const weakened = [], original = g.weakenBullet.bind(g);
