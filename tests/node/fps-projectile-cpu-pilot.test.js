@@ -41,6 +41,7 @@ test('suite carries explicit research limits and unambiguous stress metadata',()
  assert.deepEqual(mixed.observations.map(x=>x.cls),['tempest','railgun']);
  assert.equal(mixed.classes.length,2);
  assert.ok(mixed.observations[1].peakRails>0);
+ console.log('NOVA_RAIL_DENSITY '+JSON.stringify(mixed.observations.map(({cls,meanProjectiles,meanRails,peakRails,playerVolleys})=>({cls,meanProjectiles,meanRails,peakRails,playerVolleys}))));
 });
 
 test('rail occupancy is measured from actual composed projectile objects',()=>{
