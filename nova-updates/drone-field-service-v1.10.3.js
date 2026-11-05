@@ -1,6 +1,6 @@
 /* NOVA TANKS v1.10.3 — Field Service
  * Universal slow out-of-combat repair for surviving non-Controller drones.
- * Terrain Intelligence owns routing; Command Weave keeps the Controller lineage's faster repair advantage.
+ * Terrain Intelligence owns routing; Second Body Live Vector keeps the Controller lineage's faster repair advantage.
  */
 (function(){
 'use strict';
@@ -11,7 +11,7 @@ var CONTROLLER={carrier:1,overlord:1,warden:1,hivemind:1,broodmother:1,citadel:1
 var REPAIR_DELAY=4.6,REPAIR_RATE=.045,THREAT_INTERVAL=.34,PROJECTILE_INTERVAL=.12,THREAT_RADIUS=310,PROJECTILE_HORIZON=.38,PROJECTILE_CLEARANCE=26;
 window.__NOVA_VERSION=VERSION;
 window.__NOVA_FIELD_SERVICE_RELEASE__={version:VERSION,codename:CODENAME,date:'2026-08-09',headline:'Drones that survive a fight can recover for the next one instead of carrying chip damage forever.',groups:{
- 'Field Repair':['Every surviving non-Controller drone slowly repairs after 4.6 seconds without taking damage, but only after nearby visible hostility and genuinely incoming hostile fire have cleared.','Fresh damage, a committed attack phase, active weapon recovery, or a hostile projectile already on an intercept course immediately prevents repair.','Controller drones stay on Command Weave\'s faster logistics path, preserving the lineage advantage requested for dedicated swarm commanders.'],
+ 'Field Repair':['Every surviving non-Controller drone slowly repairs after 4.6 seconds without taking damage, but only after nearby visible hostility and genuinely incoming hostile fire have cleared.','Fresh damage, a committed attack phase, active weapon recovery, or a hostile projectile already on an intercept course immediately prevents repair.','Controller drones stay on Second Body Live Vector\'s faster logistics path, preserving the lineage advantage requested for dedicated swarm commanders.'],
  'Readability':['Actual healing emits sparse mint service particles and a soft ring; healthy drones never carry a permanent repair effect.','Two tactical Tips explain the repair break and the Controller recycling advantage without turning healing into another HUD panel.'],
  'Performance and Ownership':['Healthy drones exit before any threat work. Damaged repair candidates refresh nearby-unit danger on a staggered interval, while incoming-projectile danger gets a tighter bounded refresh so fresh fire interrupts healing promptly.','Projectile allegiance discovery is deduplicated per damaged drone owner, so large damaged swarms do not repeatedly rediscover the same shooter relationships before each repair pass.','Projectile danger uses a bounded closest-approach check over less than half a second; friendly, departing, blocked and wide-miss shots do not suppress repair.','Terrain Intelligence remains the sole advanced routing owner; Field Service does not steer, teleport, replan, or modify drone targets.']
 }};
@@ -81,7 +81,7 @@ wrap('game/engine',function(engine){var Game=engine.Game;if(!Game||Game.prototyp
    s.nextThreatAt=0;s.nextProjectileAt=0;}
  }else{s.motionDiscontinuous=false;s.motionVX=0;s.motionVY=0;}if(canRepair(this,d,owner,s))heal(this,d,s,dt);}registerTips();return out;};});
 registerTips();
-window.__NOVA_FIELD_SERVICE__={version:VERSION,codename:CODENAME,repairDelay:REPAIR_DELAY,repairRate:REPAIR_RATE,controllerUsesCommandWeave:true,routingOwner:'Terrain Intelligence',projectileHorizon:PROJECTILE_HORIZON,projectileInterval:PROJECTILE_INTERVAL};
+window.__NOVA_FIELD_SERVICE__={version:VERSION,codename:CODENAME,repairDelay:REPAIR_DELAY,repairRate:REPAIR_RATE,controllerUsesCommandWeave:false,controllerUsesLiveVector:true,routingOwner:'Terrain Intelligence',projectileHorizon:PROJECTILE_HORIZON,projectileInterval:PROJECTILE_INTERVAL};
 window.__NOVA_FIELD_SERVICE_TEST__={isController:isController,stateFor:stateFor,visibleThreat:visibleThreat,projectileThreat:projectileThreat,projectileHostile:projectileHostile,rememberedProjectileHostile:rememberedProjectileHostile,rememberOwnerProjectileRelations:rememberOwnerProjectileRelations,rememberDamagedOwnerProjectileRelations:rememberDamagedOwnerProjectileRelations,committed:committed,canRepair:canRepair,heal:heal,repairDelay:REPAIR_DELAY,repairRate:REPAIR_RATE,threatRadius:THREAT_RADIUS,projectileHorizon:PROJECTILE_HORIZON,projectileInterval:PROJECTILE_INTERVAL};
 console.info('[NOVA TANKS] v'+VERSION+' '+CODENAME+' drone repair online');
 })();
