@@ -3,7 +3,7 @@
 function firstContact(a,b,dt,context) {
   if (!(dt>0) || !Number.isFinite(dt) || !context || context.complete!==true ||
       context.allied!==false || context.unscanned!==false) return null;
-  for (const s of [a,b]) if (!s || s.dead || s.shell || s.beam || s.splash || s.__v17Cannon ||
+  for (const s of [a,b]) if (!s || s.kind!=='bullet' || s.dead || s.shell || s.beam || s.splash || s.__v17Cannon ||
       s.__novaRail || s.pen!==0 || (s.hits||0)!==0 || !(s.ttl>0) ||
       !(s.r>0) || !['x','y','vx','vy','ttl','r','ownerId'].every(k=>Number.isFinite(s[k]))) return null;
   if (a.ownerId===b.ownerId) return null;
