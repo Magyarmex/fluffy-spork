@@ -49,7 +49,9 @@ function run(seed,reload,intervals){
     callback=null;next(now);
    }
    return {volleys,shotTimes,hash:digest(physical(g)),draws:draws(),
-    ticks:owner.ticks,dropped:owner.droppedFrames,droppedMs:owner.droppedMs};
+    ticks:owner.ticks,dropped:owner.droppedFrames,droppedMs:owner.droppedMs,
+    weapon:{fireCd:p.fireCd,heat:p.__v17Heat,stability:p.__v17Stability,
+     shotIndex:p.__v17ShotIndex,overheatT:p.overheatT}};
   }finally{owner.stop();g.destroy();}
  });
 }
@@ -112,6 +114,8 @@ function runTouch(seed,intervals){
    }
    return {volleys,shotTimes,hash:digest(physical(g)),draws:draws(),
     ticks:owner.ticks,dropped:owner.droppedFrames,applied:timeline.applied,
+    weapon:{fireCd:p.fireCd,heat:p.__v17Heat,stability:p.__v17Stability,
+     shotIndex:p.__v17ShotIndex,overheatT:p.overheatT},
     lateClamps:bridge.lateClamps};
   }finally{owner.stop();g.destroy();}
  });
