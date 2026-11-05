@@ -188,3 +188,13 @@ test('undefined competing-event time in later pair revokes earlier certificate',
   assert.equal(r.reason, 'unverified-pair');
   assert.equal(r.certified.length, 0);
 });
+
+test('malformed projectile getter cannot interrupt the real Game update', () => {
+  const bad = shot(1, -20, 1000);
+  Object.defineProperty(bad, 'x', { get() { throw Error('invalid projectile'); } });
+  const g = { bullets: [bad, shot(2, 20, -1000)] };
+  const r = observeProjectilePairs(g, .05, verified);
+  assert.equal(r.incomplete, true);
+  assert.equal(r.reason, 'snapshot-error');
+  assert.equal(r.certified.length, 0);
+});
