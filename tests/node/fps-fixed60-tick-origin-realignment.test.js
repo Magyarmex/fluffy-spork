@@ -58,3 +58,18 @@ test('coalescing keeps distinct actual ticks and removes only same-tick movement
    assert.equal(f.timeline.overflowCount,0);
  }finally{f.owner.stop()}
 });
+
+test('regression: resume at 508ms must not erase a move across the 524.667ms tick',()=>{
+ const f=fixture();f.owner.start();
+ try {
+   f.clock(1500);f.game.setPaused(true);
+   f.clock(1508);f.game.setPaused(false);
+   const event=(at,kind)=>f.timeline.push(at,kind,{pointerId:7,pointerType:'touch'});
+   event(.509,'pointerdown');
+   event(.523,'pointermove');
+   event(.525,'pointermove');
+   assert.deepEqual(f.timeline.events.filter(e=>e.kind==='pointermove').map(e=>e.at),
+     [.523,.525], 'old unshifted tick origin incorrectly erases the .523s sample');
+   assert.equal(f.timeline.overflowCount,0);
+ }finally{f.owner.stop()}
+});
