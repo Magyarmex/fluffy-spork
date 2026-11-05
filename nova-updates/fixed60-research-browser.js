@@ -337,7 +337,7 @@ module.exports = {BrowserInputCapture};
 const {STEP}=require('./fixed-step-dom-input.cjs');
 const STEP_MS=STEP*1000, EPS=1e-7;
 class FixedStepRafOwner {
-  constructor(game,timeline,bridge,{now,request,cancel,render,maxSteps=2}={}) {
+  constructor(game,timeline,bridge,{now,request,cancel,render,maxSteps=2,isVisible=()=>true}={}) {
     if (!game || typeof game.update!=='function' || !game.sfx ||
         !timeline || timeline.input!==game.input ||
         typeof timeline.consumeThrough!=='function' ||
@@ -348,10 +348,12 @@ class FixedStepRafOwner {
       throw Error('invalid fixed-step RAF owner');
     this.game=game;this.timeline=timeline;this.bridge=bridge;
     this.now=now;this.request=request;this.cancel=cancel;this.render=render;
+    this.isVisible=isVisible;
     this.maxSteps=maxSteps;this.started=false;this.raf=null;
     this.lastMs=0;this.simAtSec=0;this.lagMs=0;this.ticks=0;
     this.droppedMs=0;this.droppedFrames=0;this.paused=false;
     this.alpha=0;this.lastSteps=0;this.minimapTimer=0;
+    this.lastTouchResetNoticeMs=-Infinity;
     // Every scheduled callback has a unique ticket. Cancelled callbacks may
     // still be delivered by a host after stop/restart; they must never
     // advance a newly started world or schedule a second RAF chain.
@@ -457,6 +459,33 @@ class FixedStepRafOwner {
         // healthy 30Hz frame can be a little longer than two 60Hz steps;
         // treating that ordinary jitter as a stall loses whole updates.
         this.droppedMs+=this.lagMs+raw-maxMs;this.droppedFrames++;
+        // A foreground stall invalidates held touch ownership for safety.
+        // Explain the involuntary reset once, without changing input state.
+        const input=g.input;
+        const ownedTouchIds=input && input.touchSeen && input.stickId ?
+          ['move','aim'].filter(stick=>input.stickId[stick]!==-1 &&
+            input[stick] && input[stick].active).map(stick=>input.stickId[stick]) : [];
+        // An already-captured release is intentional. A release of one stick
+        // must not conceal an involuntary reset of the OTHER held stick.
+        const pending=ownedTouchIds.length && Array.isArray(this.timeline.events) ?
+          this.timeline.events.slice(this.timeline.index||0) : [];
+        const pendingBlur=pending.some(e=>e.kind==='blur');
+        const unreleased=ownedTouchIds.some(id=>{
+          // The last captured edge wins: a fresh down after a queued release
+          // is still a real held touch that the stall will invalidate.
+          for(let i=pending.length-1;i>=0;i--){
+            const e=pending[i];
+            if(e.data.pointerId!==id)continue;
+            if(e.kind==='pointerdown')return true;
+            if(e.kind==='pointerup'||e.kind==='pointercancel')return false;
+          }
+          return true;
+        });
+        if(unreleased && !pendingBlur && (!g.status || g.status==='playing') && this.isVisible() &&
+           typeof g.toast==='function' && ts-this.lastTouchResetNoticeMs>=8000){
+          this.lastTouchResetNoticeMs=ts;
+          g.toast('Touch controls reset — touch again','warn');
+        }
         this.timeline.reset();this.lagMs=0;
         this.simAtSec=(ts-this.bridge.startMs-maxMs)/1000;
         this.timeline.tickOrigin=this.simAtSec;
@@ -541,7 +570,7 @@ function createFixedStepBrowserPilot(game,{window:win,document:doc,clock,
     {window:win,document:doc,game});
   let owner;
   try{owner=new FixedStepRafOwner(game,timeline,bridge,
-    {now:clock.now,request,cancel,render,maxSteps})}
+    {now:clock.now,request,cancel,render,maxSteps,isVisible:()=>!doc.hidden})}
   catch(error){capture.detach();throw error}
   return {timeline,bridge,capture,owner,
     start(){
