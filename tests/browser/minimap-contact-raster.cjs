@@ -55,6 +55,15 @@ async function run(browser,width,dpr){
     const contrast=Math.max(...neighbors.map(p=>Math.hypot(...center.map((v,i)=>v-p[i]))));
     return {url:scaled.toDataURL('image/png'),center,neighbors,contrast,suppressed};
    }
+   window.__novaMinimapPaint=function(skipKeyline){
+    const old=ctx.fillRect;
+    if(skipKeyline)ctx.fillRect=function(x,y,w,h){
+     if((w===7&&h===7&&Math.abs(x-(dotX-2))<.01&&Math.abs(y-(dotY-2))<.01)||
+        (w===5&&h===5&&Math.abs(x-(dotX-1))<.01&&Math.abs(y-(dotY-1))<.01))return;
+     return old.apply(this,arguments);
+    };
+    try{g.drawMinimap();}finally{ctx.fillRect=old;}
+   };
    const keyed=raster(false),bare=raster(true);
    return {width:innerWidth,dpr:devicePixelRatio,backing:[backing.width,backing.height],
     enemyColor:target.color,keyed,bare};
@@ -70,6 +79,13 @@ async function run(browser,width,dpr){
     Buffer.from(result[mode].url.split(',')[1],'base64'));
    delete result[mode].url;
   }
+  const visible=page.locator('canvas[width="216"][height="216"]').first();
+  assert.equal(await visible.count(),1,'real 216px minimap canvas must be mounted in React');
+  await page.evaluate(()=>window.__novaMinimapPaint(false));
+  const cssKeyed=await visible.screenshot({path:path.join(out,'minimap-css-'+width+'-dpr'+dpr+'-keyed.png')});
+  await page.evaluate(()=>window.__novaMinimapPaint(true));
+  const cssBare=await visible.screenshot({path:path.join(out,'minimap-css-'+width+'-dpr'+dpr+'-bare.png')});
+  assert.notDeepEqual(cssKeyed,cssBare,'actual CSS-composited minimap must respond to keyline');
   await page.screenshot({path:path.join(out,'minimap-raster-'+width+'-dpr'+dpr+'-game.png')});
   assert.deepEqual(errors,[],'shipping Chromium runtime errors');
   console.log('NOVA_MINIMAP_CHROMIUM_RASTER '+JSON.stringify(result));
