@@ -54,7 +54,10 @@ function buildGame(bullets, options = {}) {
   return game;
 }
 function bullet(id, ownerId, x, y, extra = {}) {
-  return { id, ownerId, x, y, px: x, py: y, r: 2, hp: 2, dead: false, ...extra };
+  const shot = { id, ownerId, x, y, px: x, py: y, r: 2, hp: 2, dmg: 1, dead: false, ...extra };
+  shot.maxHp = shot.hp;
+  shot.baseDmg = shot.dmg;
+  return shot;
 }
 
 test('nearby unrelated player fire cannot claim enemy rail interception', () => {
