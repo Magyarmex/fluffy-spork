@@ -48,7 +48,7 @@ test('suite carries explicit research limits and unambiguous stress metadata',()
  const mixed=suite({seeds:[1517800],hzs:[60],seconds:2,extras:[0],classes:['tempest','railgun']});
  assert.deepEqual(mixed.observations.map(x=>x.cls),['tempest','railgun']);
  assert.equal(mixed.classes.length,2);
- assert.ok(mixed.observations[1].playerRailEmitted>0);
+ assert.equal(mixed.observations[1].playerRailEmitted,1);
  console.log('NOVA_RAIL_DENSITY '+JSON.stringify(mixed.observations.map(({cls,meanProjectiles,meanRails,peakRails,playerVolleys,railEmitted,playerRailEmitted})=>({cls,meanProjectiles,meanRails,peakRails,playerVolleys,railEmitted,playerRailEmitted}))));
 });
 
@@ -57,7 +57,7 @@ test('rail occupancy is measured from actual composed projectile objects',()=>{
  const b=run({seed:1517800,hz:60,seconds:3,extraShots:0,cls:'railgun',prechargeRail:true});
  assert.ok(a.playerVolleys>0,'real railgun firing must occur');
  assert.equal(a.prechargeRail,true,'wall-clock focus is a declared synthetic research control');
- assert.ok(a.playerRailEmitted>0,'the shipping rail marker must be observed at actual shot creation');
+ assert.equal(a.playerRailEmitted,1,'synthetic precharge must produce exactly one marked opening rail');
  assert.ok(a.railEmitted>=a.playerRailEmitted);
  assert.ok(a.meanRails>=0&&a.meanRails<=a.peakRails,
   'same-tick rail death may legitimately leave zero pre-update occupancy');
