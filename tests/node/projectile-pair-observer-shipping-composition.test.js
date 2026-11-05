@@ -103,7 +103,7 @@ test('composed Game observer abstains when cover ordering is unknown', () => {
   const observed = observeProjectilePairs(g, 1 / 30,
     () => ({ ...clear, aTerrain: undefined }));
   assert.equal(observed.certified.length, 0);
-  assert.equal(observed.incomplete, false);
+  assert.equal(observed.incomplete, true);
 });
 test('composed Game observer refuses dense unverified pair work', () => {
   const g = boot();
