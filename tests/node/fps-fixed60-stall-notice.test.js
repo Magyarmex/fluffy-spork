@@ -102,7 +102,7 @@ test('queued intentional release before stalled RAF suppresses false reset warni
   const s=fixture();s.owner.start();
   try{
     s.down(1005);s.frame(1017);
-    assert.equal(s.input.firing,true);
+    assert.equal(s.input.move.active,true);
     s.up(1020); // Captured before the delayed frame, not yet consumed.
     s.frame(1137);
     assert.equal(s.notices.length,0);
