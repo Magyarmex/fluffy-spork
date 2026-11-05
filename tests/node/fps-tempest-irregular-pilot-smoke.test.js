@@ -28,6 +28,7 @@ test('Tempest irregular-frame research measures equal simulated time and preserv
   assert.equal(row.deltaVs60,row.volleys-153);
   assert.ok(row.firstShots.length>0&&row.lastShots.length>0);
  }
+ console.log('Tempest irregular cadence research:',JSON.stringify(report.results.map(({name,frames,volleys,deltaVs60,heat,peakHeat})=>({name,frames,volleys,deltaVs60,heat,peakHeat}))));
  for(const name of ['mixedSlow','mixedFast','bursty','alternating'])
   assert.ok(byName.get(name).frames>240&&byName.get(name).frames<960);
 });
