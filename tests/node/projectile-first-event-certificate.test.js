@@ -4,7 +4,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {firstContact}=require('../research/projectile-first-event-certificate.cjs');
-const shot=(x,vx,ownerId,ttl=.005,y=0,vy=0)=>({x,y,vx,vy,ownerId,ttl,r:3,pen:0,hits:0,dead:false,shell:false});
+const shot=(x,vx,ownerId,ttl=.005,y=0,vy=0)=>({kind:'bullet',x,y,vx,vy,ownerId,ttl,r:3,pen:0,hits:0,dead:false,shell:false});
 const a=()=>shot(-20,6000,1), b=()=>shot(20,-6000,2), complete={
   allied:false,complete:true,unscanned:false,aTerrain:null,bTerrain:null,
   aBody:null,bBody:null,aOtherProjectile:null,bOtherProjectile:null
@@ -36,7 +36,7 @@ test('allied and same-owner shots do not intercept',()=>{
   assert.equal(firstContact(a(),{...b(),ownerId:1},1/30,complete),null);
 });
 test('shell, dead, expired, nonfinite and malformed shots abstain',()=>{
-  for(const patch of [{shell:true},{beam:true},{splash:true},{__v17Cannon:true},{__novaRail:true},{pen:1},{hits:1},{dead:true},{ttl:0},{vx:NaN},{r:-1},{ownerId:undefined}])
+  for(const patch of [{kind:'shape'},{shell:true},{beam:true},{splash:true},{__v17Cannon:true},{__novaRail:true},{pen:1},{hits:1},{dead:true},{ttl:0},{vx:NaN},{r:-1},{ownerId:undefined}])
     assert.equal(firstContact({...a(),...patch},b(),1/30,complete),null);
 });
 test('first contact beyond TTL or frame is not certified',()=>{
