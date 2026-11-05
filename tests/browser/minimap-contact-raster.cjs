@@ -93,7 +93,7 @@ async function run(browser,width,dpr){
    // horizontal separation leaves 0.68 backing px between 7px outlines.
    // This is a research-only post-paint intervention, never shipping code.
    const secondX=dotX+160*216/4500;
-   const separatedBoth=raster(false,c=>{
+   const paintBoth=c=>{
     c.save();
     for(const [x,color] of [[dotX,target.color],[secondX,enemies[1].color]]){
      c.globalAlpha=.88;c.fillStyle='#020a18';c.fillRect(x-2,dotY-2,7,7);
@@ -101,7 +101,29 @@ async function run(browser,width,dpr){
      c.globalAlpha=1;c.fillStyle=color;c.fillRect(x,dotY,3,3);
     }
     c.restore();
-   });
+   };
+   const separatedBoth=raster(false,paintBoth);
+   // Adversarial public-resource overlap: a health pickup 90 world units
+   // from the first rival lies inside its 7px keyline footprint. Compare
+   // the actual Game raster before/after the research post-paint; never
+   // assume a two-sided outline is safe merely because rival dots survive.
+   g.powerups.push({type:'health',x:90,y:0});
+   const resourceX=Math.floor(dotX+90*216/4500);
+   const resourceY=Math.floor(dotY);
+   const sampleResource=()=>Array.from(ctx.getImageData(resourceX-3,resourceY-3,7,7).data);
+   const resourceBaseline=raster(false);
+   const resourceBefore=sampleResource();
+   const resourceBoth=raster(false,paintBoth);
+   const resourceAfter=sampleResource();
+   let resourceChangedPixels=0;
+   for(let i=0;i<resourceBefore.length;i+=4){
+    if(resourceBefore[i]!==resourceAfter[i]||
+       resourceBefore[i+1]!==resourceAfter[i+1]||
+       resourceBefore[i+2]!==resourceAfter[i+2])resourceChangedPixels++;
+   }
+   const resourceRisk={changedPixels:resourceChangedPixels,windowPixels:49,
+    baselineKeylineCalls:resourceBaseline.keylineCalls,
+    experimentalKeylineCalls:resourceBoth.keylineCalls};
    const pixelAt=(x,y)=>{
     const rgba=ctx.getImageData(Math.floor(x+1),Math.floor(y+1),1,1).data;
     return Array.from(rgba.slice(0,3));
@@ -114,7 +136,7 @@ async function run(browser,width,dpr){
    };
    const expectedCenters={first:rgb(target.color),second:rgb(enemies[1].color)};
    return {width:innerWidth,dpr:devicePixelRatio,backing:[backing.width,backing.height],
-    enemyColor:target.color,secondColor:enemies[1].color,bothCenters,expectedCenters,
+    enemyColor:target.color,secondColor:enemies[1].color,bothCenters,expectedCenters,resourceRisk,
     keyed,bare,crowded,separatedBare,separatedKeyed,separatedBoth};
   });
   assert.equal(result.width,width);
@@ -128,6 +150,10 @@ async function run(browser,width,dpr){
   for(const mode of ['keyed','bare','crowded','separatedBare','separatedKeyed','separatedBoth'])
    assert.ok(result[mode].targetDotCalls>=1,mode+' must still paint the actual public rival');
   assert.equal(result.separatedBoth.keylineCalls,0,'shipping renderer must suppress both outlines before research paint');
+  assert.equal(result.resourceRisk.baselineKeylineCalls,0,
+   'shipping proximity policy must suppress outline near a public resource');
+  assert.ok(result.resourceRisk.changedPixels>=0&&result.resourceRisk.changedPixels<=49,
+   'report bounded resource-region changes without inventing a human readability gate');
   assert.notEqual(result.separatedBoth.backingUrl,result.separatedKeyed.backingUrl,
    'two-sided keyline must change the actual Game backing image');
   // The second marker must survive the two-sided experiment as a colored
