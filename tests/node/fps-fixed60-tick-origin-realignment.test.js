@@ -79,8 +79,10 @@ test('regression: 120ms foreground stall reanchors the next surviving movement t
  try {
    f.frame(1017);f.frame(1137);
    const origin=f.timeline.tickOrigin;
-   const first=origin+0.015,second=origin+0.018;
-   f.timeline.push(origin+.001,'pointerdown',{pointerId:7,pointerType:'touch'});
+   // The stall already consumed two surviving ticks; future events must
+   // follow timeline.sampled, then straddle the NEXT tick boundary.
+   const first=origin+3*STEP-.001,second=origin+3*STEP+.001;
+   f.timeline.push(origin+2*STEP+.001,'pointerdown',{pointerId:7,pointerType:'touch'});
    f.timeline.push(first,'pointermove',{pointerId:7,pointerType:'touch'});
    f.timeline.push(second,'pointermove',{pointerId:7,pointerType:'touch'});
    assert.deepEqual(f.timeline.events.filter(e=>e.kind==='pointermove').map(e=>e.at),
