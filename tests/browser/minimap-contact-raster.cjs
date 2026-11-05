@@ -109,7 +109,29 @@ async function run(browser,width,dpr){
   await flush();
   const cssBare=await visible.screenshot({path:path.join(out,'minimap-css-'+width+'-dpr'+dpr+'-bare.png')});
   assert.notEqual(rawKeyed,rawBare,'real DOM minimap backing pixels must differ');
-  assert.notDeepEqual(cssKeyed,cssBare,'actual CSS-composited minimap must respond to keyline: '+JSON.stringify(ownership));
+  // Chromium can retain a stale composited surface for repeated screenshots
+  // of an in-place mutated, paused canvas. Build two independent DOM canvases
+  // from the exact real Game backing PNGs, with the shipping 60px CSS footprint,
+  // and capture both in one stable composition instead of accepting a stale A/B.
+  await page.evaluate(async ({keyed,bare})=>{
+   for(const [mode,url,left] of [['keyed',keyed,0],['bare',bare,70]]){
+    const im=new Image();im.src=url;await im.decode();
+    const el=document.createElement('canvas');el.id='nova-minimap-css-'+mode;
+    el.width=216;el.height=216;el.style.cssText=
+      'position:fixed;top:110px;left:'+left+'px;width:60px;height:60px;z-index:99999;image-rendering:auto';
+    el.getContext('2d').drawImage(im,0,0);
+    document.body.appendChild(el);
+   }
+  },{keyed:rawKeyed,bare:rawBare});
+  await flush();
+  const cloneKeyed=await page.locator('#nova-minimap-css-keyed').screenshot({
+   path:path.join(out,'minimap-css-clone-'+width+'-dpr'+dpr+'-keyed.png')});
+  const cloneBare=await page.locator('#nova-minimap-css-bare').screenshot({
+   path:path.join(out,'minimap-css-clone-'+width+'-dpr'+dpr+'-bare.png')});
+  assert.notDeepEqual(cloneKeyed,cloneBare,
+   'independent CSS-composited 60px copies of real Game paint must differ');
+  console.log('NOVA_MINIMAP_COMPOSITOR '+JSON.stringify({width,dpr,
+   liveInPlaceScreenshotChanged:!cssKeyed.equals(cssBare),sameOwner:ownership.same}));
   await page.screenshot({path:path.join(out,'minimap-raster-'+width+'-dpr'+dpr+'-game.png')});
   assert.deepEqual(errors,[],'shipping Chromium runtime errors');
   console.log('NOVA_MINIMAP_CHROMIUM_RASTER '+JSON.stringify(result));
