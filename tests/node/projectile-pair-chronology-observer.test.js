@@ -129,3 +129,21 @@ test('expiration before physical contact never creates an interception', () => {
   const r = observeProjectilePairs({ bullets: [a, b] }, .05, verified);
   assert.equal(r.certified.length, 0);
 });
+
+test('three-way chronology chooses earliest A-B over later B-C and A-C', () => {
+  const a = shot(1, -20, 6000), b = shot(2, 0, 0), c = shot(3, 25, -6000);
+  const ab = (20 - 7.5) / 6000;
+  const bc = (25 - 7.5) / 6000;
+  const ac = (45 - 7.5) / 12000;
+  const events = (x, y) => {
+    const ids = [x.ownerId, y.ownerId].sort((p, q) => p - q).join('-');
+    if (ids === '1-2') return { ...verified(), aOtherProjectile: ac, bOtherProjectile: bc };
+    if (ids === '2-3') return { ...verified(), aOtherProjectile: ab, bOtherProjectile: ac };
+    return { ...verified(), aOtherProjectile: ab, bOtherProjectile: bc };
+  };
+  const r = observeProjectilePairs({ bullets: [a, b, c] }, 1 / 240, events);
+  assert.equal(r.incomplete, false);
+  assert.equal(r.certified.length, 1);
+  assert.deepEqual([r.certified[0].i, r.certified[0].j], [0, 1]);
+  assert.ok(Math.abs(r.certified[0].time - ab) < 1e-12);
+});
