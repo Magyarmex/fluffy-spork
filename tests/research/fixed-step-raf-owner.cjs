@@ -139,8 +139,17 @@ class FixedStepRafOwner {
         const pending=ownedTouchIds.length && Array.isArray(this.timeline.events) ?
           this.timeline.events.slice(this.timeline.index||0) : [];
         const pendingBlur=pending.some(e=>e.kind==='blur');
-        const unreleased=ownedTouchIds.some(id=>!pending.some(e=>
-          (e.kind==='pointerup'||e.kind==='pointercancel') && e.data.pointerId===id));
+        const unreleased=ownedTouchIds.some(id=>{
+          // The last captured edge wins: a fresh down after a queued release
+          // is still a real held touch that the stall will invalidate.
+          for(let i=pending.length-1;i>=0;i--){
+            const e=pending[i];
+            if(e.data.pointerId!==id)continue;
+            if(e.kind==='pointerdown')return true;
+            if(e.kind==='pointerup'||e.kind==='pointercancel')return false;
+          }
+          return true;
+        });
         if(unreleased && !pendingBlur && this.isVisible() &&
            typeof g.toast==='function' && ts-this.lastTouchResetNoticeMs>=8000){
           this.lastTouchResetNoticeMs=ts;
