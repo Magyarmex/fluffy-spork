@@ -50,16 +50,19 @@ function run({seed=1517800,hz=60,seconds=4,extraShots=0,instrument=true,cls='tem
      finally{timing.bulletsMs+=performance.now()-t;}
     };
    }
-   let peak=0,projectileSamples=0;
+   let peak=0,projectileSamples=0,railSamples=0,peakRails=0;
    const ticks=hz*seconds;
    for(let i=0;i<ticks;i++){
     peak=Math.max(peak,g.bullets.length);
     projectileSamples+=g.bullets.length;
+    const rails=g.bullets.reduce((n,b)=>n+(b&&b.__novaRail&&!b.dead?1:0),0);
+    railSamples+=rails;peakRails=Math.max(peakRails,rails);
     const t=performance.now();g.update(1/hz);
     timing.updateMs+=performance.now()-t;
    }
    return {seed,hz,seconds,cls,extraShots,instrument,ticks,
     peakProjectiles:peak,meanProjectiles:projectileSamples/ticks,
+    peakRails,meanRails:railSamples/ticks,
     finalProjectiles:g.bullets.length,
     physicalHash:digest({world:physical(g),weapon:{
      cls:g.player.cls,fireCd:g.player.fireCd,fireSpin:g.player.fireSpin,
