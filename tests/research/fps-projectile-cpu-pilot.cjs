@@ -81,10 +81,10 @@ function run({seed=1517800,hz=60,seconds=4,extraShots=0,instrument=true,cls='tem
   }
  });
 }
-function suite({seeds=[1517800,1517802,1517810],hzs=[30,60],seconds=4,extras=[0,240,480]}={}){
- const out=[];for(const seed of seeds)for(const hz of hzs)for(const extraShots of extras)
-  out.push(run({seed,hz,seconds,extraShots}));
- return {schema:1,method:'exact 49-overlay materialized Game, Node no-op Canvas',
+function suite({seeds=[1517800,1517802,1517810],hzs=[30,60],seconds=4,extras=[0,240,480],classes=['tempest']}={}){
+ const out=[];for(const cls of classes)for(const seed of seeds)for(const hz of hzs)for(const extraShots of extras)
+  out.push(run({seed,hz,seconds,extraShots,cls}));
+ return {schema:1,method:'exact 49-overlay materialized Game, Node no-op Canvas',classes,
   limitations:['CPU measurements include instrumentation overhead and are not device frame times',
    'Synthetic extra shots are an artificial stress distribution, not natural encounter incidence',
    'Physical hashes and RNG draws are correctness checks, not evidence of fun or FPS parity'],
