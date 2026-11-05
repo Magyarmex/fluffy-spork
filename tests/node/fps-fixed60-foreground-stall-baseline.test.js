@@ -122,3 +122,20 @@ test('composed 49-overlay Game loses a genuine held movement pointer after visib
     assert.equal(g.input.firing,false);
   }finally{owner.stop();g.destroy()}
 });
+
+
+test('80ms foreground jitter preserves held input and does not masquerade as a long stall',()=>{
+  const s=scene();s.owner.start();
+  try{
+    s.event(1005,'pointerdown');s.at(1017);
+    const before=s.counts();
+    s.at(1097); // 80ms gap is below the existing 100ms stall boundary.
+    assert.equal(s.input.held,true);
+    assert.equal(s.input.firing,true);
+    assert.equal(s.counts().blurResets,before.blurResets);
+    assert.ok(s.owner.lastSteps<=2,'bounded scheduler still limits CPU catch-up');
+    s.event(1100,'pointerup');s.at(1114);
+    assert.equal(s.input.held,false);
+    assert.equal(s.input.firing,false);
+  }finally{s.owner.stop()}
+});
