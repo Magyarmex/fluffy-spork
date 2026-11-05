@@ -97,7 +97,7 @@ These items require actual phone/tablet/desktop play and must not be marked comp
 2. Tune Cannon fuse-depth mapping on real phones; verify FUSE → IMPACT readability, Cluster King sector control, Siege Bomber structural pressure, Annihilator commitment and Quake displacement.
 3. Tune Guardian Perfect Guard timing for touch latency, Bastion choke strength, Aegis flow duration and Meteor/Ravager steering loss.
 4. Validate Sniper and Controller matchups against the three Disciplines across every Battlefield layout.
-5. Validate Command Weave under real multi-touch: aim and CMD ownership must never steal each other's pointer during frantic movement/ultimate use.
+5. Validate **Second Body Live Vector** under real multi-touch: right-stick aim/swarm ownership, movement stick and ultimate input must not steal each other's pointer during frantic combat; the retired CMD pad is not in the playable game.
 6. Validate generic Field Service timing/readability and Controller's faster repair advantage in actual fights; repair should reward disengagement, not create mid-duel sustain.
 7. Validate reinforced drone IFF at phone size in dense Controller-vs-Controller fights without overpowering class-color identity.
 8. Validate Impact Language audio/visual density with automatic weapons, large drone fights and low health; it should clarify events rather than become another notification layer.
@@ -123,8 +123,11 @@ The enhanced game still materializes a stable compressed payload plus a deep sta
 
 Create a new canonical source baseline containing the shipped v1.2–v1.10 systems, preserve the existing regression suite, and reduce runtime overlays to genuinely incremental releases. Consolidation must be behavior-preserving before any cleanup/refactor ambition is allowed into the same change.
 
-### P1 — Living Arena
-Upgrade neutral shapes from passive XP rocks into a low-stakes mechanical ecosystem and introduce announced contested events through an Arena Director. Do this only after current device/balance validation has evidence; it is new scope, not unfinished v1.x cleanup.
+### v1.12.0 — Living Front
+**Status:** shipped. The 4×4 ecological sectors, neutral instincts, physical migration, Crasher grammar, Rogue Star interception and bounded Front Director signals are live. See `CURRENT_RELEASE.md`, `LIVING_FRONT.md` and `LIVING_FRONT_AUDIT.md`. Do not revive the superseded Living Arena proposal as unfinished work.
+
+### P1 — Verify between-life insertion strategy
+FRESH/RETURN is already playable. Before adding more choices or resources, use the matched-world and human-comprehension acceptance plan in #461 to determine whether the two existing options produce meaningful route and risk decisions. Preserve safe spawn clearance, public information and the current class progression.
 
 ### P1 — Apex identity parity
 Bring remaining Sniper and Controller Tier-3 branches to the same mastery standard as the Three Disciplines: geometry, information, timing, commitment or sequencing should change—not merely stats.
