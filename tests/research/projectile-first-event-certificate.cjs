@@ -3,8 +3,8 @@
 function firstContact(a,b,dt,context) {
   if (!(dt>0) || !Number.isFinite(dt) || !context || context.complete!==true ||
       context.allied!==false || context.unscanned!==false) return null;
-  for (const s of [a,b]) if (!s || s.kind!=='bullet' || s.dead || s.shell || s.beam || s.splash || s.__v17Cannon ||
-      s.__novaRail || s.pen!==0 || (s.hits||0)!==0 || !(s.ttl>0) ||
+  for (const s of [a,b]) if (!s || s.kind!=='bullet' || s.dead!==false || s.shell!==false || s.beam!==false || s.splash || s.__v17Cannon ||
+      s.__novaRail || s.pen!==0 || !Number.isFinite(s.hits) || s.hits!==0 || !(s.ttl>0) ||
       !(s.r>0) || !['x','y','vx','vy','ttl','r','ownerId'].every(k=>Number.isFinite(s[k]))) return null;
   if (a.ownerId===b.ownerId) return null;
   const dx=a.x-b.x, dy=a.y-b.y, vx=a.vx-b.vx, vy=a.vy-b.vy;
