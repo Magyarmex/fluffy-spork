@@ -67,3 +67,26 @@ test('disabled/missing observer context never calls the updater', () => {
   assert.equal(r.incomplete, true);
   assert.equal(r.certified.length, 0);
 });
+
+test('late missing context clears earlier positive certificates', () => {
+  const g = { bullets: [shot(1, -20, 1000), shot(2, 20, -1000),
+    shot(3, 300, 0, 100)] };
+  let calls = 0;
+  const r = observeProjectilePairs(g, .05, () => ++calls === 1 ? verified() : null);
+  assert.equal(r.incomplete, true);
+  assert.equal(r.certified.length, 0);
+  assert.equal(r.reason, 'unverified-pair');
+});
+test('event provider cannot mutate frozen snapshots or receive Game', () => {
+  const g = { bullets: [shot(1, -20, 1000), shot(2, 20, -1000)] };
+  const before = JSON.stringify(g);
+  const r = observeProjectilePairs(g, .05, (a, b, i, j, dt, game) => {
+    assert.equal(game, undefined);
+    assert.equal(Object.isFrozen(a), true);
+    a.x = 100;
+    return verified();
+  });
+  assert.equal(r.incomplete, true);
+  assert.equal(r.certified.length, 0);
+  assert.equal(JSON.stringify(g), before);
+});
