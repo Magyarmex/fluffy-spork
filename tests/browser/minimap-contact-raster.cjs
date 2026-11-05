@@ -64,17 +64,8 @@ async function run(browser,width,dpr){
     const pixel=(xx,yy)=>{const i=(yy*60+xx)*4;return [...data.slice(i,i+3)];};
     const center=pixel(x,y),neighbors=[pixel(26,30),pixel(34,30),pixel(30,26),pixel(30,34)];
     const contrast=Math.max(...neighbors.map(p=>Math.hypot(...center.map((v,i)=>v-p[i]))));
-    return {url:scaled.toDataURL('image/png'),center,neighbors,contrast,suppressed};
+    return {url:scaled.toDataURL('image/png'),backingUrl:backing.toDataURL('image/png'),center,neighbors,contrast,suppressed};
    }
-   window.__novaMinimapPaint=function(skipKeyline){
-    const old=ctx.fillRect;
-    if(skipKeyline)ctx.fillRect=function(x,y,w,h){
-     if((w===7&&h===7&&Math.abs(x-(dotX-2))<.01&&Math.abs(y-(dotY-2))<.01)||
-        (w===5&&h===5&&Math.abs(x-(dotX-1))<.01&&Math.abs(y-(dotY-1))<.01))return;
-     return old.apply(this,arguments);
-    };
-    try{g.drawMinimap();}finally{ctx.fillRect=old;}
-   };
    const keyed=raster(false),bare=raster(true);
    return {width:innerWidth,dpr:devicePixelRatio,backing:[backing.width,backing.height],
     enemyColor:target.color,keyed,bare};
@@ -89,6 +80,7 @@ async function run(browser,width,dpr){
    fs.writeFileSync(path.join(out,'minimap-raster-'+width+'-dpr'+dpr+'-'+mode+'.png'),
     Buffer.from(result[mode].url.split(',')[1],'base64'));
    delete result[mode].url;
+   // Retain only on the browser side until independent CSS composition finishes.
   }
   const visible=page.locator('canvas[width="216"][height="216"]').first();
   assert.equal(await visible.count(),1,'real 216px minimap canvas must be mounted in React');
@@ -99,20 +91,9 @@ async function run(browser,width,dpr){
   }));
   assert.equal(ownership.same,true,'sampled DOM canvas must be the real Game minimap');
   assert.ok(Math.abs(ownership.box.width-60)<1,'minimap must actually display at 60 CSS px');
-  const flush=()=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-  await page.evaluate(()=>window.__novaMinimapPaint(false));
-  const rawKeyed=await visible.evaluate(el=>el.toDataURL('image/png'));
-  await flush();
-  const cssKeyed=await visible.screenshot({path:path.join(out,'minimap-css-'+width+'-dpr'+dpr+'-keyed.png')});
-  await page.evaluate(()=>window.__novaMinimapPaint(true));
-  const rawBare=await visible.evaluate(el=>el.toDataURL('image/png'));
-  await flush();
-  const cssBare=await visible.screenshot({path:path.join(out,'minimap-css-'+width+'-dpr'+dpr+'-bare.png')});
-  assert.notEqual(rawKeyed,rawBare,'real DOM minimap backing pixels must differ');
-  // Chromium can retain a stale composited surface for repeated screenshots
-  // of an in-place mutated, paused canvas. Build two independent DOM canvases
-  // from the exact real Game backing PNGs, with the shipping 60px CSS footprint,
-  // and capture both in one stable composition instead of accepting a stale A/B.
+  // Capture immutable backing PNGs *during* each real Game draw. Repainting
+  // the same paused canvas later is not a reliable browser capture boundary.
+  // Compare independent DOM surfaces, not stale in-place compositor snapshots.
   await page.evaluate(async ({keyed,bare})=>{
    for(const [mode,url,left] of [['keyed',keyed,0],['bare',bare,70]]){
     const im=new Image();im.src=url;await im.decode();
@@ -122,16 +103,17 @@ async function run(browser,width,dpr){
     el.getContext('2d').drawImage(im,0,0);
     document.body.appendChild(el);
    }
-  },{keyed:rawKeyed,bare:rawBare});
-  await flush();
+  },{keyed:result.keyed.backingUrl,bare:result.bare.backingUrl});
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   const cloneKeyed=await page.locator('#nova-minimap-css-keyed').screenshot({
    path:path.join(out,'minimap-css-clone-'+width+'-dpr'+dpr+'-keyed.png')});
   const cloneBare=await page.locator('#nova-minimap-css-bare').screenshot({
    path:path.join(out,'minimap-css-clone-'+width+'-dpr'+dpr+'-bare.png')});
   assert.notDeepEqual(cloneKeyed,cloneBare,
    'independent CSS-composited 60px copies of real Game paint must differ');
+  delete result.keyed.backingUrl;delete result.bare.backingUrl;
   console.log('NOVA_MINIMAP_COMPOSITOR '+JSON.stringify({width,dpr,
-   liveInPlaceScreenshotChanged:!cssKeyed.equals(cssBare),sameOwner:ownership.same}));
+   independentBackings:true,sameOwner:ownership.same}));
   await page.screenshot({path:path.join(out,'minimap-raster-'+width+'-dpr'+dpr+'-game.png')});
   assert.deepEqual(errors,[],'shipping Chromium runtime errors');
   console.log('NOVA_MINIMAP_CHROMIUM_RASTER '+JSON.stringify(result));
