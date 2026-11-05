@@ -504,7 +504,7 @@
             mx = (ax0 + (a.x - ax0) * firstTime + bx0 + (b.x - bx0) * firstTime) * 0.5;
             my = (ay0 + (a.y - ay0) * firstTime + by0 + (b.y - by0) * firstTime) * 0.5;
           }
-          if (Number.isFinite(mx) && Number.isFinite(my)) {
+          if (firstTime != null && Number.isFinite(mx) && Number.isFinite(my)) {
             for (var ri = 0; ri < 2; ri++) {
               var rail = ri === 0 ? a : b, other = ri === 0 ? b : a;
               if (!rail.__novaRail || !(other.hp != null)) continue;
