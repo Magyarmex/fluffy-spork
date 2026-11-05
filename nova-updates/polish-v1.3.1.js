@@ -208,13 +208,21 @@
         var playerDidIt = !!(pl && r.ownerId !== pl.id &&
           r.__novaPlayerRailInterceptAt === this.time);
         var destroyed = !!r.dead || r.hp <= 0;
-        if (this.addParticles) this.addParticles(r.x, r.y, destroyed ? '#ffffff' : '#d8c0ff', destroyed ? 9 : 5, destroyed ? 125 : 80, 'glow');
-        if (this.addRing) this.addRing(r.x, r.y, destroyed ? '#ffffff' : '#c493ff', destroyed ? 34 : 22);
+        var playerContact = playerDidIt && r.__novaPlayerRailContactAt === this.time &&
+          Number.isFinite(r.__novaPlayerRailContactX) && Number.isFinite(r.__novaPlayerRailContactY);
+        var genericContact = r.__novaRailContactAt === this.time &&
+          Number.isFinite(r.__novaRailContactX) && Number.isFinite(r.__novaRailContactY);
+        var fxX = playerContact ? r.__novaPlayerRailContactX :
+          genericContact ? r.__novaRailContactX : r.x;
+        var fxY = playerContact ? r.__novaPlayerRailContactY :
+          genericContact ? r.__novaRailContactY : r.y;
+        if (this.addParticles) this.addParticles(fxX, fxY, destroyed ? '#ffffff' : '#d8c0ff', destroyed ? 9 : 5, destroyed ? 125 : 80, 'glow');
+        if (this.addRing) this.addRing(fxX, fxY, destroyed ? '#ffffff' : '#c493ff', destroyed ? 34 : 22);
         if (this.sfx && this.sfx.novaRailInterceptPolish) {
-          this.sfx.novaRailInterceptPolish(panFrom(this, r.x), destroyed, playerDidIt);
+          this.sfx.novaRailInterceptPolish(panFrom(this, fxX), destroyed, playerDidIt);
         }
         if (playerDidIt && destroyed && this.addText) {
-          this.addText(r.x, r.y - 18, 'RAIL DENIED', '#d9f7ff', 10);
+          this.addText(fxX, fxY - 18, 'RAIL DENIED', '#d9f7ff', 10);
           this.cam.shake = Math.max(this.cam.shake || 0, 0.10);
           vibrate(7);
         }
