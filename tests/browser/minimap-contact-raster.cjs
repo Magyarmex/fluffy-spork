@@ -150,7 +150,11 @@ async function run(browser,width,dpr){
    'independent CSS-composited 60px copies of real Game paint must differ');
   // Measure the *composited device-pixel* image, not only a fixed 60x60
   // offscreen downsample. DPR 2/3 must analyze 120/180 physical pixels.
-  const displayed=await page.evaluate(async ({keyed,bare,crowded,separatedBare,separatedKeyed,dpr})=>{
+  const displayed=await page.evaluate(async ({keyed,bare,crowded,separatedBare,separatedKeyed,dpr,enemyColor})=>{
+   const swatch=document.createElement('canvas');swatch.width=1;swatch.height=1;
+   const swatchCtx=swatch.getContext('2d',{willReadFrequently:true});
+   swatchCtx.fillStyle=enemyColor;swatchCtx.fillRect(0,0,1,1);
+   const reference=[...swatchCtx.getImageData(0,0,1,1).data].slice(0,3);
    async function measure(base64){
     const image=new Image();image.src='data:image/png;base64,'+base64;
     await image.decode();
@@ -163,10 +167,11 @@ async function run(browser,width,dpr){
     const x=Math.floor(w/2),y=Math.floor(h/2),r=Math.max(1,Math.round(4*dpr));
     const center=pixel(x,y),neighbors=[pixel(x-r,y),pixel(x+r,y),pixel(x,y-r),pixel(x,y+r)];
     const contrast=Math.max(...neighbors.map(p=>Math.hypot(...center.map((v,i)=>v-p[i]))));
-    return {width:w,height:h,center,contrast};
+    return {width:w,height:h,center,contrast,
+     targetColorError:Math.hypot(...center.map((v,i)=>v-reference[i]))};
    }
    return {keyed:await measure(keyed),bare:await measure(bare),crowded:await measure(crowded),separatedBare:await measure(separatedBare),separatedKeyed:await measure(separatedKeyed)};
-  },{keyed:cloneKeyed.toString('base64'),bare:cloneBare.toString('base64'),crowded:cloneCrowded.toString('base64'),separatedBare:cloneSeparatedBare.toString('base64'),separatedKeyed:cloneSeparatedKeyed.toString('base64'),dpr});
+  },{keyed:cloneKeyed.toString('base64'),bare:cloneBare.toString('base64'),crowded:cloneCrowded.toString('base64'),separatedBare:cloneSeparatedBare.toString('base64'),separatedKeyed:cloneSeparatedKeyed.toString('base64'),dpr,enemyColor:result.enemyColor});
   for(const mode of ['keyed','bare','crowded','separatedBare','separatedKeyed']){
    assert.equal(displayed[mode].width,60*dpr,'CSS capture must use actual device pixel width');
    assert.equal(displayed[mode].height,60*dpr,'CSS capture must use actual device pixel height');
@@ -174,7 +179,7 @@ async function run(browser,width,dpr){
   assert.notDeepEqual(displayed.keyed.center,displayed.bare.center,
    'keyline must affect the real DPR-scaled contact-center pixels');
   // No threshold is imposed on crowded readability: report the measured
-  // pixels before selecting any visual intervention or claiming human benefit.
+  // pixels and original class-color fidelity before selecting any visual intervention.
   result.displayed=displayed;
   delete result.keyed.backingUrl;delete result.bare.backingUrl;delete result.crowded.backingUrl;delete result.separatedBare.backingUrl;delete result.separatedKeyed.backingUrl;
   console.log('NOVA_MINIMAP_COMPOSITOR '+JSON.stringify({width,dpr,
