@@ -57,7 +57,13 @@ function observeProjectilePairs(game, dt, eventsForPair) {
   // retaining original array indices in every emitted certificate.
   const active = [];
   for (let i = 0; i < shots.length; i++) {
-    if (shots[i] && shots[i].dead !== true) active.push(i);
+    // A missing entry is not a certified dead projectile: abstain instead
+    // of accidentally treating a malformed Game array as harmless debris.
+    if (!shots[i]) {
+      result.incomplete = true; result.reason = 'invalid-projectile-entry';
+      return result;
+    }
+    if (shots[i].dead !== true) active.push(i);
   }
   if (active.length * (active.length - 1) / 2 > MAX_PAIRS) {
     result.incomplete = true; result.reason = 'pair-budget'; return result;
