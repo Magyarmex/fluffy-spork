@@ -143,3 +143,14 @@ test('fresh down after queued release remains an involuntary stall reset',()=>{
     assert.equal(s.input.firing,false);
   }finally{s.owner.stop()}
 });
+
+test('game-over state does not display a combat touch reset notice',()=>{
+  const s=fixture();s.owner.start();
+  try{
+    s.down(1005);s.frame(1017);
+    s.game.status='dead';
+    s.frame(1137);
+    assert.equal(s.notices.length,0);
+    assert.equal(s.input.move.active,false,'safety reset still applies');
+  }finally{s.owner.stop()}
+});
