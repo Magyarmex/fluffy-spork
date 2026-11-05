@@ -54,7 +54,8 @@ class FixedStepRafOwner {
     const at=this.now();if(!Number.isFinite(at)||at<this.bridge.startMs-EPS)
       throw Error('invalid fixed-step start time');
     this._generation++;this.started=true;this.lastMs=at;this.simAtSec=(at-this.bridge.startMs)/1000;
-    this.timeline.reset();this.timeline.consumeThrough(this.simAtSec);
+    this.timeline.reset();this.timeline.tickOrigin=this.simAtSec;
+    this.timeline.consumeThrough(this.simAtSec);
     this.paused=!!this.game.paused;
     try{this.game.sfx.startMusic()}
     catch(error){this.started=false;this.timeline.reset();throw error}
@@ -93,6 +94,8 @@ class FixedStepRafOwner {
     if(!Number.isFinite(at)||at<this.lastMs-EPS)throw Error('invalid pause clock');
     this.timeline.reset();this.lagMs=0;this.paused=paused;
     this.lastMs=at;this.simAtSec=(at-this.bridge.startMs)/1000;
+    // A new simulation epoch changes the tick grid used for safe pointermove coalescing.
+    this.timeline.tickOrigin=this.simAtSec;
     this.timeline.consumeThrough(this.simAtSec);
   }
   frame(ts){
@@ -114,6 +117,7 @@ class FixedStepRafOwner {
       // be re-armed by fresh browser events, never by a stale held command.
       this.timeline.reset();this.lagMs=0;this.paused=false;
       this.simAtSec=(ts-this.bridge.startMs)/1000;
+      this.timeline.tickOrigin=this.simAtSec;
       this.timeline.consumeThrough(this.simAtSec);
     }else{
       const maxMs=this.maxSteps*STEP_MS;
@@ -124,6 +128,7 @@ class FixedStepRafOwner {
         this.droppedMs+=this.lagMs+raw-maxMs;this.droppedFrames++;
         this.timeline.reset();this.lagMs=0;
         this.simAtSec=(ts-this.bridge.startMs-maxMs)/1000;
+        this.timeline.tickOrigin=this.simAtSec;
         this.timeline.consumeThrough(this.simAtSec);
         this.lagMs=maxMs;
       }else{
