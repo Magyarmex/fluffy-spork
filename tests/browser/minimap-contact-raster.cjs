@@ -47,9 +47,11 @@ async function run(browser,width,dpr){
    const backing=g.mmCtx.canvas,ctx=g.mmCtx;
    const dotX=106.5,dotY=106.5; // (0+2250)*216/4500 - 1.5
    function raster(skipKeyline,postPaint){
-    const old=ctx.fillRect;let suppressed=0,keylineCalls=0,targetDotCalls=0;
+    const old=ctx.fillRect;let suppressed=0,keylineCalls=0,targetDotCalls=0,powerupDotCalls=0;
     ctx.fillRect=function(x,y,w,h){
      if(w===3&&h===3&&Math.abs(x-dotX)<.01&&Math.abs(y-dotY)<.01)targetDotCalls++;
+     if(w===4&&h===4&&Math.abs(x-(dotX+90*216/4500-.5))<.01&&
+        Math.abs(y-(dotY-.5))<.01)powerupDotCalls++;
      if((w===7&&h===7&&Math.abs(x-(dotX-2))<.01&&Math.abs(y-(dotY-2))<.01)||
         (w===5&&h===5&&Math.abs(x-(dotX-1))<.01&&Math.abs(y-(dotY-1))<.01)){
       keylineCalls++;
@@ -66,7 +68,7 @@ async function run(browser,width,dpr){
     const pixel=(xx,yy)=>{const i=(yy*60+xx)*4;return [...data.slice(i,i+3)];};
     const center=pixel(x,y),neighbors=[pixel(26,30),pixel(34,30),pixel(30,26),pixel(30,34)];
     const contrast=Math.max(...neighbors.map(p=>Math.hypot(...center.map((v,i)=>v-p[i]))));
-    return {url:scaled.toDataURL('image/png'),backingUrl:backing.toDataURL('image/png'),center,neighbors,contrast,suppressed,keylineCalls,targetDotCalls};
+    return {url:scaled.toDataURL('image/png'),backingUrl:backing.toDataURL('image/png'),center,neighbors,contrast,suppressed,keylineCalls,targetDotCalls,powerupDotCalls};
    }
    const keyed=raster(false),bare=raster(true);
    // Crowded natural-combat proxy: preserve real Game rendering, but place
@@ -123,6 +125,7 @@ async function run(browser,width,dpr){
    }
    const resourceRisk={changedPixels:resourceChangedPixels,windowPixels:16,
     baselineKeylineCalls:resourceBaseline.keylineCalls,
+    baselinePowerupCalls:resourceBaseline.powerupDotCalls,
     experimentalKeylineCalls:resourceBoth.keylineCalls};
    const pixelAt=(x,y)=>{
     const rgba=ctx.getImageData(Math.floor(x+1),Math.floor(y+1),1,1).data;
@@ -170,6 +173,8 @@ async function run(browser,width,dpr){
   for(const mode of ['keyed','bare','crowded','separatedBare','separatedKeyed','separatedBoth','diagonalBare','diagonalBoth'])
    assert.ok(result[mode].targetDotCalls>=1,mode+' must still paint the actual public rival');
   assert.equal(result.separatedBoth.keylineCalls,0,'shipping renderer must suppress both outlines before research paint');
+  assert.ok(result.resourceRisk.baselinePowerupCalls>=1,
+   'the health pickup must actually paint through the composed Game minimap');
   assert.equal(result.resourceRisk.baselineKeylineCalls,0,
    'shipping proximity policy must suppress outline near a public resource');
   assert.ok(result.resourceRisk.changedPixels>=0&&result.resourceRisk.changedPixels<=16,
