@@ -127,3 +127,38 @@ for (const full of [false, true]) {
     });
   }
 }
+
+/* GREEN controls: chronological recovery must not manufacture contacts.
+ * The far pair cannot meet until 7.708ms, after both 5ms TTLs.
+ * Allied projectiles must not intercept even when geometry overlaps. */
+for (const fps of [30, 60, 120, 240]) {
+  for (const [name, x, owner] of [
+    ['contact after expiry', 50, 2],
+    ['allied owner', 20, 1]
+  ]) {
+    test('research safety: ' + name + ' at ' + fps + 'Hz', () => {
+      const g = boot(true), contacts = [];
+      g.weakenBullet = function(b, damage) {
+        contacts.push(b.id);
+        b.hp -= damage;
+        if (b.hp <= 0) b.dead = true;
+      };
+      const left = bullet(9101, 1, -x, 6000, 1);
+      const right = bullet(9102, owner, x, -6000, 3);
+      left.ttl = right.ttl = .005;
+      const firstContactTime = (2 * x - left.r - right.r - 1.5) / 12000;
+      if (name === 'contact after expiry') {
+        assert.ok(firstContactTime > left.ttl);
+      } else {
+        assert.ok(firstContactTime < left.ttl);
+      }
+      g.bullets = [left, right];
+      for (let frame = 0; frame < Math.ceil(fps / 30); frame++) {
+        g.updateBullets(1 / fps);
+        if (!g.bullets.length) break;
+      }
+      assert.deepEqual(contacts, [],
+        'no hostile interception is physically valid before TTL');
+    });
+  }
+}
