@@ -249,12 +249,14 @@ async function run(browser,width,dpr){
    'independent CSS-composited 60px copies of real Game paint must differ');
   // Measure the *composited device-pixel* image, not only a fixed 60x60
   // offscreen downsample. DPR 2/3 must analyze 120/180 physical pixels.
-  const displayed=await page.evaluate(async ({keyed,bare,crowded,separatedBare,separatedKeyed,separatedBoth,diagonalBare,diagonalBoth,dpr,enemyColor})=>{
+  const displayed=await page.evaluate(async ({keyed,bare,crowded,separatedBare,separatedKeyed,separatedBoth,diagonalBare,diagonalBoth,dpr,enemyColor,secondColor})=>{
    const swatch=document.createElement('canvas');swatch.width=1;swatch.height=1;
    const swatchCtx=swatch.getContext('2d',{willReadFrequently:true});
    swatchCtx.fillStyle=enemyColor;swatchCtx.fillRect(0,0,1,1);
    const reference=[...swatchCtx.getImageData(0,0,1,1).data].slice(0,3);
-   async function measure(base64){
+   swatchCtx.fillStyle=secondColor;swatchCtx.fillRect(0,0,1,1);
+   const secondReference=[...swatchCtx.getImageData(0,0,1,1).data].slice(0,3);
+   async function measure(base64,mode){
     const image=new Image();image.src='data:image/png;base64,'+base64;
     await image.decode();
     const canvas=document.createElement('canvas');
@@ -266,11 +268,17 @@ async function run(browser,width,dpr){
     const x=Math.floor(w/2),y=Math.floor(h/2),r=Math.max(1,Math.round(4*dpr));
     const center=pixel(x,y),neighbors=[pixel(x-r,y),pixel(x+r,y),pixel(x,y-r),pixel(x,y+r)];
     const contrast=Math.max(...neighbors.map(p=>Math.hypot(...center.map((v,i)=>v-p[i]))));
+    const isDiagonal=mode.startsWith('diagonal');
+    const isPair=isDiagonal||mode.startsWith('separated');
+    const offset=(160*216/4500)*(60/216)*dpr/(isDiagonal?Math.SQRT2:1);
+    const secondCenter=isPair?pixel(Math.floor(x+offset),Math.floor(y+(isDiagonal?offset:0))):null;
     return {width:w,height:h,center,contrast,
-     targetColorError:Math.hypot(...center.map((v,i)=>v-reference[i]))};
+     targetColorError:Math.hypot(...center.map((v,i)=>v-reference[i])),
+     secondCenter,
+     secondColorError:secondCenter?Math.hypot(...secondCenter.map((v,i)=>v-secondReference[i])):null};
    }
-   return {keyed:await measure(keyed),bare:await measure(bare),crowded:await measure(crowded),separatedBare:await measure(separatedBare),separatedKeyed:await measure(separatedKeyed),separatedBoth:await measure(separatedBoth),diagonalBare:await measure(diagonalBare),diagonalBoth:await measure(diagonalBoth)};
-  },{keyed:cloneKeyed.toString('base64'),bare:cloneBare.toString('base64'),crowded:cloneCrowded.toString('base64'),separatedBare:cloneSeparatedBare.toString('base64'),separatedKeyed:cloneSeparatedKeyed.toString('base64'),separatedBoth:cloneSeparatedBoth.toString('base64'),diagonalBare:cloneDiagonalBare.toString('base64'),diagonalBoth:cloneDiagonalBoth.toString('base64'),dpr,enemyColor:result.enemyColor});
+   return {keyed:await measure(keyed,'keyed'),bare:await measure(bare,'bare'),crowded:await measure(crowded,'crowded'),separatedBare:await measure(separatedBare,'separatedBare'),separatedKeyed:await measure(separatedKeyed,'separatedKeyed'),separatedBoth:await measure(separatedBoth,'separatedBoth'),diagonalBare:await measure(diagonalBare,'diagonalBare'),diagonalBoth:await measure(diagonalBoth,'diagonalBoth')};
+  },{keyed:cloneKeyed.toString('base64'),bare:cloneBare.toString('base64'),crowded:cloneCrowded.toString('base64'),separatedBare:cloneSeparatedBare.toString('base64'),separatedKeyed:cloneSeparatedKeyed.toString('base64'),separatedBoth:cloneSeparatedBoth.toString('base64'),diagonalBare:cloneDiagonalBare.toString('base64'),diagonalBoth:cloneDiagonalBoth.toString('base64'),dpr,enemyColor:result.enemyColor,secondColor:result.secondColor});
   for(const mode of ['keyed','bare','crowded','separatedBare','separatedKeyed','separatedBoth','diagonalBare','diagonalBoth']){
    assert.equal(displayed[mode].width,60*dpr,'CSS capture must use actual device pixel width');
    assert.equal(displayed[mode].height,60*dpr,'CSS capture must use actual device pixel height');
