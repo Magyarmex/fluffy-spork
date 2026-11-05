@@ -30,5 +30,5 @@ test('Tempest irregular-frame research measures equal simulated time and preserv
  }
  console.log('Tempest irregular cadence research:',JSON.stringify(report.results.map(({name,frames,volleys,deltaVs60,heat,peakHeat})=>({name,frames,volleys,deltaVs60,heat,peakHeat}))));
  for(const name of ['mixedSlow','mixedFast','bursty','alternating'])
-  assert.ok(byName.get(name).frames>240&&byName.get(name).frames<960);
+  assert.equal(byName.get(name).frames,480,'jitter must match 60Hz mean frame frequency');
 });
