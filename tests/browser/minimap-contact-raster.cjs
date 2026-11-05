@@ -92,11 +92,24 @@ async function run(browser,width,dpr){
   }
   const visible=page.locator('canvas[width="216"][height="216"]').first();
   assert.equal(await visible.count(),1,'real 216px minimap canvas must be mounted in React');
+  const ownership=await visible.evaluate(el=>({
+   same:el===window.__novaMinimapAuditGame.mm,
+   box:el.getBoundingClientRect().toJSON(),
+   covering:document.elementFromPoint(el.getBoundingClientRect().x+30,el.getBoundingClientRect().y+30)?.tagName
+  }));
+  assert.equal(ownership.same,true,'sampled DOM canvas must be the real Game minimap');
+  assert.ok(Math.abs(ownership.box.width-60)<1,'minimap must actually display at 60 CSS px');
+  const flush=()=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   await page.evaluate(()=>window.__novaMinimapPaint(false));
+  const rawKeyed=await visible.evaluate(el=>el.toDataURL('image/png'));
+  await flush();
   const cssKeyed=await visible.screenshot({path:path.join(out,'minimap-css-'+width+'-dpr'+dpr+'-keyed.png')});
   await page.evaluate(()=>window.__novaMinimapPaint(true));
+  const rawBare=await visible.evaluate(el=>el.toDataURL('image/png'));
+  await flush();
   const cssBare=await visible.screenshot({path:path.join(out,'minimap-css-'+width+'-dpr'+dpr+'-bare.png')});
-  assert.notDeepEqual(cssKeyed,cssBare,'actual CSS-composited minimap must respond to keyline');
+  assert.notEqual(rawKeyed,rawBare,'real DOM minimap backing pixels must differ');
+  assert.notDeepEqual(cssKeyed,cssBare,'actual CSS-composited minimap must respond to keyline: '+JSON.stringify(ownership));
   await page.screenshot({path:path.join(out,'minimap-raster-'+width+'-dpr'+dpr+'-game.png')});
   assert.deepEqual(errors,[],'shipping Chromium runtime errors');
   console.log('NOVA_MINIMAP_CHROMIUM_RASTER '+JSON.stringify(result));
