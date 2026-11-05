@@ -462,16 +462,17 @@ class FixedStepRafOwner {
         // A foreground stall invalidates held touch ownership for safety.
         // Explain the involuntary reset once, without changing input state.
         const input=g.input;
-        const heldTouch=!!(input && input.touchSeen && input.stickId &&
-          ((input.stickId.move!==-1 && input.move && input.move.active) ||
-           (input.stickId.aim!==-1 && input.aim && input.aim.active)));
-        // A release already captured but not yet simulated is intentional, not
-        // an unexplained loss of touch ownership. Do not warn for that case.
-        const pendingRelease=heldTouch && this.timeline.events.slice(this.timeline.index)
-          .some(e=>e.kind==='blur' || ((e.kind==='pointerup'||e.kind==='pointercancel') &&
-            (e.data.pointerId===input.stickId.move || e.data.pointerId===input.stickId.aim)));
-        if(heldTouch && !pendingRelease && this.isVisible() && typeof g.toast==='function' &&
-           ts-this.lastTouchResetNoticeMs>=8000){
+        const ownedTouchIds=input && input.touchSeen && input.stickId ?
+          ['move','aim'].filter(stick=>input.stickId[stick]!==-1 &&
+            input[stick] && input[stick].active).map(stick=>input.stickId[stick]) : [];
+        // An already-captured release is intentional. A release of one stick
+        // must not conceal an involuntary reset of the OTHER held stick.
+        const pending=this.timeline.events.slice(this.timeline.index);
+        const pendingBlur=pending.some(e=>e.kind==='blur');
+        const unreleased=ownedTouchIds.some(id=>!pending.some(e=>
+          (e.kind==='pointerup'||e.kind==='pointercancel') && e.data.pointerId===id));
+        if(unreleased && !pendingBlur && this.isVisible() &&
+           typeof g.toast==='function' && ts-this.lastTouchResetNoticeMs>=8000){
           this.lastTouchResetNoticeMs=ts;
           g.toast('Touch controls reset — touch again','warn');
         }
