@@ -156,7 +156,7 @@ test('malformed event getter cannot throw through read-only observer', () => {
   });
   const r = observeProjectilePairs(g, .05, () => context);
   assert.equal(r.incomplete, true);
-  assert.equal(r.reason, 'certificate-error');
+  assert.equal(r.reason, 'event-provider-error');
   assert.equal(r.certified.length, 0);
 });
 
