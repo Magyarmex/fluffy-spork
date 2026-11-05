@@ -47,11 +47,13 @@ async function run(browser,width,dpr){
    const backing=g.mmCtx.canvas,ctx=g.mmCtx;
    const dotX=106.5,dotY=106.5; // (0+2250)*216/4500 - 1.5
    function raster(skipKeyline){
-    const old=ctx.fillRect;let suppressed=0;
-    if(skipKeyline)ctx.fillRect=function(x,y,w,h){
+    const old=ctx.fillRect;let suppressed=0,keylineCalls=0,targetDotCalls=0;
+    ctx.fillRect=function(x,y,w,h){
+     if(w===3&&h===3&&Math.abs(x-dotX)<.01&&Math.abs(y-dotY)<.01)targetDotCalls++;
      if((w===7&&h===7&&Math.abs(x-(dotX-2))<.01&&Math.abs(y-(dotY-2))<.01)||
         (w===5&&h===5&&Math.abs(x-(dotX-1))<.01&&Math.abs(y-(dotY-1))<.01)){
-      suppressed++;return;
+      keylineCalls++;
+      if(skipKeyline){suppressed++;return;}
      }
      return old.apply(this,arguments);
     };
@@ -64,19 +66,29 @@ async function run(browser,width,dpr){
     const pixel=(xx,yy)=>{const i=(yy*60+xx)*4;return [...data.slice(i,i+3)];};
     const center=pixel(x,y),neighbors=[pixel(26,30),pixel(34,30),pixel(30,26),pixel(30,34)];
     const contrast=Math.max(...neighbors.map(p=>Math.hypot(...center.map((v,i)=>v-p[i]))));
-    return {url:scaled.toDataURL('image/png'),backingUrl:backing.toDataURL('image/png'),center,neighbors,contrast,suppressed};
+    return {url:scaled.toDataURL('image/png'),backingUrl:backing.toDataURL('image/png'),center,neighbors,contrast,suppressed,keylineCalls,targetDotCalls};
    }
    const keyed=raster(false),bare=raster(true);
+   // Crowded natural-combat proxy: preserve real Game rendering, but place
+   // another public rival and an ordinary powerup within the keyline radius.
+   // This is a deliberately adverse visibility scene, not encounter frequency.
+   enemies[1].x=70;enemies[1].y=0;
+   g.powerups.push({type:'health',x:75,y:0});
+   const crowded=raster(false);
    return {width:innerWidth,dpr:devicePixelRatio,backing:[backing.width,backing.height],
-    enemyColor:target.color,keyed,bare};
+    enemyColor:target.color,keyed,bare,crowded};
   });
   assert.equal(result.width,width);
   assert.equal(result.dpr,dpr);
   assert.deepEqual(result.backing,[216,216],'shipping minimap backing geometry changed');
   assert.equal(result.bare.suppressed,2,'actual isolated rival keyline must be present');
+  assert.equal(result.keyed.keylineCalls,2,'isolated rival must receive both keyline layers');
+  assert.equal(result.crowded.keylineCalls,0,'crowded rival must not cover adjacent public contacts with a keyline');
+  for(const mode of ['keyed','bare','crowded'])
+   assert.ok(result[mode].targetDotCalls>=1,mode+' must still paint the actual public rival');
   assert.notEqual(result.keyed.url,result.bare.url,'keyline must change actual 60px browser raster');
   const out=path.join('artifacts','browser');fs.mkdirSync(out,{recursive:true});
-  for(const mode of ['keyed','bare']){
+  for(const mode of ['keyed','bare','crowded']){
    fs.writeFileSync(path.join(out,'minimap-raster-'+width+'-dpr'+dpr+'-'+mode+'.png'),
     Buffer.from(result[mode].url.split(',')[1],'base64'));
    delete result[mode].url;
@@ -94,8 +106,8 @@ async function run(browser,width,dpr){
   // Capture immutable backing PNGs *during* each real Game draw. Repainting
   // the same paused canvas later is not a reliable browser capture boundary.
   // Compare independent DOM surfaces, not stale in-place compositor snapshots.
-  await page.evaluate(async ({keyed,bare})=>{
-   for(const [mode,url,left] of [['keyed',keyed,0],['bare',bare,70]]){
+  await page.evaluate(async ({keyed,bare,crowded})=>{
+   for(const [mode,url,left] of [['keyed',keyed,0],['bare',bare,70],['crowded',crowded,140]]){
     const im=new Image();im.src=url;await im.decode();
     const el=document.createElement('canvas');el.id='nova-minimap-css-'+mode;
     el.width=216;el.height=216;el.style.cssText=
@@ -103,17 +115,20 @@ async function run(browser,width,dpr){
     el.getContext('2d').drawImage(im,0,0);
     document.body.appendChild(el);
    }
-  },{keyed:result.keyed.backingUrl,bare:result.bare.backingUrl});
+  },{keyed:result.keyed.backingUrl,bare:result.bare.backingUrl,crowded:result.crowded.backingUrl});
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   const cloneKeyed=await page.locator('#nova-minimap-css-keyed').screenshot({
    path:path.join(out,'minimap-css-clone-'+width+'-dpr'+dpr+'-keyed.png')});
   const cloneBare=await page.locator('#nova-minimap-css-bare').screenshot({
    path:path.join(out,'minimap-css-clone-'+width+'-dpr'+dpr+'-bare.png')});
+  const cloneCrowded=await page.locator('#nova-minimap-css-crowded').screenshot({
+   path:path.join(out,'minimap-css-clone-'+width+'-dpr'+dpr+'-crowded.png')});
+  assert.notDeepEqual(cloneCrowded,cloneKeyed,'crowded public contacts must change the real CSS-composited map');
   assert.notDeepEqual(cloneKeyed,cloneBare,
    'independent CSS-composited 60px copies of real Game paint must differ');
   // Measure the *composited device-pixel* image, not only a fixed 60x60
   // offscreen downsample. DPR 2/3 must analyze 120/180 physical pixels.
-  const displayed=await page.evaluate(async ({keyed,bare,dpr})=>{
+  const displayed=await page.evaluate(async ({keyed,bare,crowded,dpr})=>{
    async function measure(base64){
     const image=new Image();image.src='data:image/png;base64,'+base64;
     await image.decode();
@@ -128,18 +143,20 @@ async function run(browser,width,dpr){
     const contrast=Math.max(...neighbors.map(p=>Math.hypot(...center.map((v,i)=>v-p[i]))));
     return {width:w,height:h,center,contrast};
    }
-   return {keyed:await measure(keyed),bare:await measure(bare)};
-  },{keyed:cloneKeyed.toString('base64'),bare:cloneBare.toString('base64'),dpr});
-  for(const mode of ['keyed','bare']){
+   return {keyed:await measure(keyed),bare:await measure(bare),crowded:await measure(crowded)};
+  },{keyed:cloneKeyed.toString('base64'),bare:cloneBare.toString('base64'),crowded:cloneCrowded.toString('base64'),dpr});
+  for(const mode of ['keyed','bare','crowded']){
    assert.equal(displayed[mode].width,60*dpr,'CSS capture must use actual device pixel width');
    assert.equal(displayed[mode].height,60*dpr,'CSS capture must use actual device pixel height');
   }
   assert.notDeepEqual(displayed.keyed.center,displayed.bare.center,
    'keyline must affect the real DPR-scaled contact-center pixels');
+  // No threshold is imposed on crowded readability: report the measured
+  // pixels before selecting any visual intervention or claiming human benefit.
   result.displayed=displayed;
-  delete result.keyed.backingUrl;delete result.bare.backingUrl;
+  delete result.keyed.backingUrl;delete result.bare.backingUrl;delete result.crowded.backingUrl;
   console.log('NOVA_MINIMAP_COMPOSITOR '+JSON.stringify({width,dpr,
-   independentBackings:true,sameOwner:ownership.same}));
+   independentBackings:true,crowdedContact:true,sameOwner:ownership.same}));
   await page.screenshot({path:path.join(out,'minimap-raster-'+width+'-dpr'+dpr+'-game.png')});
   assert.deepEqual(errors,[],'shipping Chromium runtime errors');
   console.log('NOVA_MINIMAP_CHROMIUM_RASTER '+JSON.stringify(result));
