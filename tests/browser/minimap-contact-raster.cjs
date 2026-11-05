@@ -22,6 +22,7 @@ async function run(browser,width,dpr){
   });
   await page.getByRole('button',{name:/DEPLOY/i}).first().click();
   await page.waitForFunction(()=>window.__novaMinimapAuditGame?.status==='playing',null,{timeout:30000});
+  await page.waitForFunction(()=>window.__novaMinimapAuditGame?.time>0.25,null,{timeout:15000});
   // Capture an untouched real-match contact distribution before constructing
   // the isolated A/B scene. This is observational, not a gameplay assertion.
   const naturalOut=path.join('artifacts','browser');
