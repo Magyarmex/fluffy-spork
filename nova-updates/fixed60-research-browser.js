@@ -465,7 +465,12 @@ class FixedStepRafOwner {
         const heldTouch=!!(input && input.touchSeen && input.stickId &&
           ((input.stickId.move!==-1 && input.move && input.move.active) ||
            (input.stickId.aim!==-1 && input.aim && input.aim.active)));
-        if(heldTouch && this.isVisible() && typeof g.toast==='function' &&
+        // A release already captured but not yet simulated is intentional, not
+        // an unexplained loss of touch ownership. Do not warn for that case.
+        const pendingRelease=heldTouch && this.timeline.events.slice(this.timeline.index)
+          .some(e=>e.kind==='blur' || ((e.kind==='pointerup'||e.kind==='pointercancel') &&
+            (e.data.pointerId===input.stickId.move || e.data.pointerId===input.stickId.aim)));
+        if(heldTouch && !pendingRelease && this.isVisible() && typeof g.toast==='function' &&
            ts-this.lastTouchResetNoticeMs>=8000){
           this.lastTouchResetNoticeMs=ts;
           g.toast('Touch controls reset — touch again','warn');
