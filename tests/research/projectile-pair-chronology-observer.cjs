@@ -22,14 +22,14 @@ function observeProjectilePairs(game, dt, eventsForPair) {
     ttl: b.ttl, r: b.r, ownerId: b.ownerId
   }));
   result.scanned = shots.length;
-  for (let i = 0; i < shots.length; i++) for (let j = i + 1; j < shots.length; j++) {
+  outer: for (let i = 0; i < shots.length; i++) for (let j = i + 1; j < shots.length; j++) {
     result.pairs++;
     let context;
     try { context = eventsForPair(shots[i], shots[j], i, j, game, dt); }
-    catch (_) { result.incomplete = true; result.reason = 'event-provider-error'; break; }
+    catch (_) { result.incomplete = true; result.reason = 'event-provider-error'; break outer; }
     if (!context || context.complete !== true || context.unscanned !== false ||
         context.allied !== false) {
-      result.incomplete = true; result.reason = 'unverified-pair'; break;
+      result.incomplete = true; result.reason = 'unverified-pair'; break outer;
     }
     const time = firstContact(shots[i], shots[j], dt, context);
     if (time === null) { result.abstained++; continue; }
