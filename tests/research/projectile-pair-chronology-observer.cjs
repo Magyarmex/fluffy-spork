@@ -36,7 +36,7 @@ function observeProjectilePairs(game, dt, eventsForPair) {
     result.certified.push({ i, j, time });
   }
   if (result.incomplete) {
-    result.abstained += result.certified.length;
+    result.abstained = result.pairs;
     result.certified = [];
     return result;
   }
