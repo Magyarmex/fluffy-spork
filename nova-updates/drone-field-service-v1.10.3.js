@@ -1,6 +1,6 @@
 /* NOVA TANKS v1.10.3 — Field Service
  * Universal slow out-of-combat repair for surviving non-Controller drones.
- * Terrain Intelligence owns routing; Command Weave keeps the Controller lineage's faster repair advantage.
+ * Terrain Intelligence owns routing; Second Body Live Vector keeps the Controller lineage's faster repair advantage.
  */
 (function(){
 'use strict';
@@ -81,7 +81,7 @@ wrap('game/engine',function(engine){var Game=engine.Game;if(!Game||Game.prototyp
    s.nextThreatAt=0;s.nextProjectileAt=0;}
  }else{s.motionDiscontinuous=false;s.motionVX=0;s.motionVY=0;}if(canRepair(this,d,owner,s))heal(this,d,s,dt);}registerTips();return out;};});
 registerTips();
-window.__NOVA_FIELD_SERVICE__={version:VERSION,codename:CODENAME,repairDelay:REPAIR_DELAY,repairRate:REPAIR_RATE,controllerUsesCommandWeave:true,routingOwner:'Terrain Intelligence',projectileHorizon:PROJECTILE_HORIZON,projectileInterval:PROJECTILE_INTERVAL};
+window.__NOVA_FIELD_SERVICE__={version:VERSION,codename:CODENAME,repairDelay:REPAIR_DELAY,repairRate:REPAIR_RATE,controllerUsesCommandWeave:false,controllerUsesLiveVector:true,routingOwner:'Terrain Intelligence',projectileHorizon:PROJECTILE_HORIZON,projectileInterval:PROJECTILE_INTERVAL};
 window.__NOVA_FIELD_SERVICE_TEST__={isController:isController,stateFor:stateFor,visibleThreat:visibleThreat,projectileThreat:projectileThreat,projectileHostile:projectileHostile,rememberedProjectileHostile:rememberedProjectileHostile,rememberOwnerProjectileRelations:rememberOwnerProjectileRelations,rememberDamagedOwnerProjectileRelations:rememberDamagedOwnerProjectileRelations,committed:committed,canRepair:canRepair,heal:heal,repairDelay:REPAIR_DELAY,repairRate:REPAIR_RATE,threatRadius:THREAT_RADIUS,projectileHorizon:PROJECTILE_HORIZON,projectileInterval:PROJECTILE_INTERVAL};
 console.info('[NOVA TANKS] v'+VERSION+' '+CODENAME+' drone repair online');
 })();
