@@ -19,8 +19,8 @@ const reloads=parse('NOVA_JITTER_RELOAD','0,4,5,8',0,8);
 const TICKS=960; // exactly 8 simulated seconds at a 120Hz integer timebase
 const patterns={
  native30:[4],native60:[2],native120:[1],
- mixedSlow:[2,4,1,3,2],mixedFast:[1,3,2,4,2],
- bursty:[4,4,1,1,2],alternating:[1,4,1,4,2]
+ mixedSlow:[2,4,1,1,2,2],mixedFast:[1,3,2,1,3,2],
+ bursty:[4,1,1,2,2,2],alternating:[1,4,1,2,2,2]
 };
 function schedule(pattern){
  const out=[];let elapsed=0,i=0;
