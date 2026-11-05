@@ -162,3 +162,31 @@ for (const fps of [30, 60, 120, 240]) {
     });
   }
 }
+
+/* A one-sided expiry is also an ordering boundary. The 1ms projectile
+ * disappears before the 2.708ms first contact even if its opponent lives
+ * long enough. A future resolver must not revive that expired shot. */
+for (const fps of [30, 60, 120, 240]) {
+  test('research safety: shorter-lived hostile shot cannot intercept after expiry ' +
+    fps + 'Hz', () => {
+    const g = boot(true), contacts = [];
+    g.weakenBullet = function(b, damage) {
+      contacts.push(b.id);
+      b.hp -= damage;
+      if (b.hp <= 0) b.dead = true;
+    };
+    const left = bullet(9201, 1, -20, 6000, 1);
+    const right = bullet(9202, 2, 20, -6000, 3);
+    left.ttl = .001;
+    right.ttl = .01;
+    const firstContactTime = (40 - left.r - right.r - 1.5) / 12000;
+    assert.ok(left.ttl < firstContactTime && firstContactTime < right.ttl);
+    g.bullets = [left, right];
+    for (let frame = 0; frame < Math.ceil(fps / 30); frame++) {
+      g.updateBullets(1 / fps);
+      if (!g.bullets.length) break;
+    }
+    assert.deepEqual(contacts, [],
+      'a projectile cannot intercept after its own physical expiry');
+  });
+}
