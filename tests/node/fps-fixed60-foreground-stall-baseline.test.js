@@ -106,8 +106,10 @@ test('composed 49-overlay Game loses a genuine held movement pointer after visib
     assert.equal(g.input.stickId.aim,-1);
     assert.equal(g.input.aim.active,false);
     assert.equal(g.input.firing,false,'no phantom firing after reset');
+    // A queued aim release may carry an older event timestamp after RAF resumes.
+    assert.equal(pointer('pointerup',1100,680,12),true);
     assert.equal(pointer('pointerup',1140),true);
-    assert.equal(pointer('pointerup',1141,680,12),true);
+    assert.ok(bridge.lateClamps>=1,'delayed release must clamp to the sampled tick');
     frame(1154);
     assert.equal(g.input.stickId.move,-1,'late release remains safe');
     assert.equal(g.input.stickId.aim,-1);
