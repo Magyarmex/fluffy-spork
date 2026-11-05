@@ -11,7 +11,7 @@ function fixture({visible=true}={}){
     move:{active:false},aim:{active:false},firing:false,
     __novaBlurReset(){this.stickId.move=-1;this.stickId.aim=-1;
       this.move.active=false;this.aim.active=false;this.firing=false;},
-    pd(e){this.stickId.move=e.pointerId;this.move.active=true;this.firing=true;},
+    pd(e){const stick=e.pointerId===8?'aim':'move';this.stickId[stick]=e.pointerId;this[stick].active=true;this.firing=true;},
     pm(){},pu(){this.__novaBlurReset()},kd(){},ku(){}};
   const game={input,raf:null,paused:false,sfx:{startMusic(){}},
     start(){},destroy(){},setPaused(v){this.paused=v},
@@ -117,6 +117,18 @@ test('queued pointer cancellation also suppresses false reset warning',()=>{
     s.timeline.push(.020,'pointercancel',{pointerId:7,pointerType:'touch'});
     s.frame(1137);
     assert.equal(s.notices.length,0);
+    assert.equal(s.input.firing,false);
+  }finally{s.owner.stop()}
+});
+
+test('one queued stick release does not conceal another involuntary touch reset',()=>{
+  const s=fixture();s.owner.start();
+  try{
+    s.down(1005,7);s.down(1006,8);s.frame(1017);
+    assert.equal(s.input.stickId.aim,8);
+    s.up(1020,7);
+    s.frame(1137);
+    assert.equal(s.notices.length,1,'unreleased aim still needs reacquisition');
     assert.equal(s.input.firing,false);
   }finally{s.owner.stop()}
 });
