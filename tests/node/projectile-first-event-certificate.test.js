@@ -59,6 +59,7 @@ test('unknown allegiance or incomplete obstacle scan abstains',()=>{
   assert.equal(firstContact(a(),b(),1/30,{complete:true}),null);
   assert.equal(firstContact(a(),b(),1/30,{...complete,unscanned:true}),null);
   assert.equal(firstContact(a(),b(),1/30,{...complete,allied:null}),null);
+  assert.equal(firstContact(a(),b(),1/30,{...complete,complete:false}),null);
   const {aBody,...incomplete}=complete;
   assert.equal(firstContact(a(),b(),1/30,incomplete),null);
 });
@@ -76,6 +77,7 @@ test('first contact beyond TTL or frame is not certified',()=>{
 });
 test('arena exit before contact vetoes certification',()=>{
   assert.equal(firstContact(shot(2225,6000,1),shot(2265,-6000,2),1/30,complete),null);
+  assert.equal(firstContact(shot(2200,6000,1,.05),shot(2220,5000,2,.05),1/30,complete),null);
 });
 test('physical near miss remains a miss',()=>{
   assert.equal(firstContact(a(),{...b(),y:8},1/30,complete),null);
