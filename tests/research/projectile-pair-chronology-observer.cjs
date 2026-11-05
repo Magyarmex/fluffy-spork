@@ -48,7 +48,9 @@ function observeProjectilePairs(game, dt, eventsForPair) {
         context.allied !== false) {
       result.incomplete = true; result.reason = 'unverified-pair'; break outer;
     }
-    const time = firstContact(shots[i], shots[j], dt, context);
+    let time;
+    try { time = firstContact(shots[i], shots[j], dt, context); }
+    catch (_) { result.incomplete = true; result.reason = 'certificate-error'; break outer; }
     if (time === null) { result.abstained++; continue; }
     result.certified.push({ i, j, time });
   }
