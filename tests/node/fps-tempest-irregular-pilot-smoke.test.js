@@ -14,7 +14,7 @@ test('Tempest irregular-frame research measures equal simulated time and preserv
   encoding:'utf8',timeout:120000,maxBuffer:2*1024*1024
  });
  const report=JSON.parse(raw);
- assert.equal(report.results.length,7);
+ assert.equal(report.results.length,9);
  const byName=new Map(report.results.map(row=>[row.name,row]));
  assert.equal(byName.get('native60').volleys,153);
  assert.equal(byName.get('native30').frames,240);
@@ -33,6 +33,6 @@ test('Tempest irregular-frame research measures equal simulated time and preserv
   assert.ok(row.firstShotHeats.every(Number.isFinite));
  }
  console.log('Tempest irregular cadence research:',JSON.stringify(report.results.map(({name,frames,volleys,deltaVs60,heat,peakHeat})=>({name,frames,volleys,deltaVs60,heat,peakHeat}))));
- for(const name of ['mixedSlow','mixedFast','bursty','alternating'])
+ for(const name of ['mixedSlow','mixedFast','bursty','alternating','aliasFast','aliasSlow'])
   assert.equal(byName.get(name).frames,480,'jitter must match 60Hz mean frame frequency');
 });
