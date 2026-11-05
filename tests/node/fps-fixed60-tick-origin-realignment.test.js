@@ -73,3 +73,18 @@ test('regression: resume at 508ms must not erase a move across the 524.667ms tic
    assert.equal(f.timeline.overflowCount,0);
  }finally{f.owner.stop()}
 });
+
+test('regression: 120ms foreground stall reanchors the next surviving movement ticks',()=>{
+ const f=fixture();f.owner.start();
+ try {
+   f.frame(1017);f.frame(1137);
+   const origin=f.timeline.tickOrigin;
+   const first=origin+0.015,second=origin+0.018;
+   f.timeline.push(origin+.001,'pointerdown',{pointerId:7,pointerType:'touch'});
+   f.timeline.push(first,'pointermove',{pointerId:7,pointerType:'touch'});
+   f.timeline.push(second,'pointermove',{pointerId:7,pointerType:'touch'});
+   assert.deepEqual(f.timeline.events.filter(e=>e.kind==='pointermove').map(e=>e.at),
+     [first,second], 'samples on opposite sides of the surviving tick boundary must persist');
+   assert.equal(f.timeline.overflowCount,0);
+ }finally{f.owner.stop()}
+});
