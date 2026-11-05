@@ -126,6 +126,9 @@ Create a new canonical source baseline containing the shipped v1.2–v1.10 syste
 ### v1.12.0 — Living Front
 **Status:** shipped. The 4×4 ecological sectors, neutral instincts, physical migration, Crasher grammar, Rogue Star interception and bounded Front Director signals are live. See `CURRENT_RELEASE.md`, `LIVING_FRONT.md` and `LIVING_FRONT_AUDIT.md`. Do not revive the superseded Living Arena proposal as unfinished work.
 
+### Tactical Frontlines — public opportunity contest
+**Status:** first playable information/commitment slices shipped. A witnessed CONTESTED cue, bounded public BLOOM memory, existing Debug/COPY ECOLOGY telemetry, and constrained AI approach logic are in the materialized Living Front director. The remaining gate is whether natural contests and player route choices improve, not another unmeasured steering coefficient; see #375 and #371.
+
 ### P1 — Verify between-life insertion strategy
 FRESH/RETURN is already playable. Before adding more choices or resources, use the matched-world and human-comprehension acceptance plan in #461 to determine whether the two existing options produce meaningful route and risk decisions. Preserve safe spawn clearance, public information and the current class progression.
 
