@@ -22,6 +22,12 @@ async function run(browser,width,dpr){
   });
   await page.getByRole('button',{name:/DEPLOY/i}).first().click();
   await page.waitForFunction(()=>window.__novaMinimapAuditGame?.status==='playing',null,{timeout:30000});
+  // Capture an untouched real-match contact distribution before constructing
+  // the isolated A/B scene. This is observational, not a gameplay assertion.
+  const naturalOut=path.join('artifacts','browser');
+  fs.mkdirSync(naturalOut,{recursive:true});
+  await page.locator('canvas[width="216"][height="216"]').first().screenshot({
+   path:path.join(naturalOut,'minimap-natural-'+width+'-dpr'+dpr+'.png')});
   const result=await page.evaluate(()=>{
    const g=window.__novaMinimapAuditGame;
    g.setPaused(true);
