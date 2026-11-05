@@ -181,3 +181,16 @@ test('contact markers expire across ticks and do not borrow earlier coordinates'
   assert.deepEqual(game.creditEvents, [true, false]);
   assert.ok(Math.abs(game.rings[1][0] - 100) < 1e-8);
 });
+
+test('nonfinite swept history falls back to rail endpoint without inventing contact', () => {
+  const rail = bullet(96, 2, 100, 60, { px: NaN, py: 0, __novaRail: true, hp: 1 });
+  const playerShot = bullet(97, 1, 100, 60, { hp: 1 });
+  const game = buildGame([rail, playerShot]);
+  game.resolveBulletCollisions();
+  assert.equal(rail.dead, true);
+  assert.deepEqual(game.creditEvents, [true]);
+  assert.equal(game.rings[0][0], 100);
+  assert.equal(game.rings[0][1], 60);
+  assert.equal(game.texts[0][0], 100);
+  assert.equal(game.texts[0][1], 42);
+});
