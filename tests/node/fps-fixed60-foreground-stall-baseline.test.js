@@ -82,6 +82,9 @@ test('composed 49-overlay Game loses a genuine held movement pointer after visib
     cancel:()=>{callback=null},render:()=>{}
   });
   function pointer(type,ms,x=100,id=11){
+    // Delivery clock advances with real-time events, except deliberately late
+    // queued releases whose original timestamp precedes current delivery.
+    now=Math.max(now,ms);
     return bridge.capture({type,timeStamp:ms,pointerId:id,pointerType:'touch',
       clientX:x,clientY:200,button:0,buttons:type==='pointerup'||type==='pointercancel'?0:1,
       target:{tagName:'CANVAS',closest:()=>null}});
