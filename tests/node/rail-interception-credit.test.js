@@ -46,9 +46,10 @@ function buildGame(bullets, options = {}) {
   ]);
   game.cam = { shake: 0 };
   game.addText = (...args) => { (game.texts ||= []).push(args); };
-  game.addRing = () => {};
+  game.addRing = (...args) => { (game.rings ||= []).push(args); };
   game.addParticles = () => {};
-  game.sfx = { novaRailInterceptPolish: (_pan, _destroyed, playerDidIt) => {
+  game.sfx = { novaRailInterceptPolish: (pan, _destroyed, playerDidIt) => {
+    (game.panEvents ||= []).push(pan);
     (game.creditEvents ||= []).push(playerDidIt);
   }};
   return game;
@@ -126,4 +127,86 @@ test('reversed rail pair order remains credited through 32+ projectile broad pha
   assert.equal(rail.dead, true);
   assert.deepEqual(game.creditEvents, [true]);
   assert.equal(game.texts[0][2], 'RAIL DENIED');
+});
+
+test('diagonal swept player rail interception anchors ring and credit text at contact', () => {
+  const rail = bullet(70, 2, 100, 60, { px: 0, py: 0, __novaRail: true, hp: 1 });
+  const playerShot = bullet(71, 1, 0, 0, { px: 100, py: 60 });
+  const game = buildGame([rail, playerShot]);
+  game.w = 800;
+  game.player.x = 0;
+  game.resolveBulletCollisions();
+  assert.equal(rail.dead, true);
+  assert.deepEqual(game.creditEvents, [true]);
+  assert.ok(Math.abs(game.panEvents[0] - 50 / 800) < 1e-8);
+  assert.ok(Math.abs(game.rings[0][0] - 50) < 1e-8);
+  assert.ok(Math.abs(game.rings[0][1] - 30) < 1e-8);
+  assert.ok(Math.abs(game.texts[0][0] - 50) < 1e-8);
+  assert.ok(Math.abs(game.texts[0][1] - 12) < 1e-8);
+});
+
+test('contact feedback survives missing particle renderer and reversed broad-phase order', () => {
+  const playerShot = bullet(80, 1, 0, 0, { px: 100, py: 60 });
+  const rail = bullet(81, 2, 100, 60, { px: 0, py: 0, __novaRail: true, hp: 1 });
+  const distant = Array.from({ length: 40 }, (_, i) => bullet(200 + i, 3, 1000 + i * 30, 1000));
+  const game = buildGame([playerShot, rail, ...distant]);
+  game.addParticles = null;
+  game.resolveBulletCollisions();
+  assert.equal(rail.dead, true);
+  assert.ok(Math.abs(game.rings[0][0] - 50) < 1e-8);
+  assert.ok(Math.abs(game.rings[0][1] - 30) < 1e-8);
+});
+
+test('first player contact takes priority over earlier enemy contact on same rail', () => {
+  const rail = bullet(90, 2, 100, 0, { px: 0, __novaRail: true, hp: 5 });
+  const playerShot = bullet(91, 1, 75, 0, { hp: 1 });
+  const enemyShot = bullet(92, 3, 25, 0, { hp: 1 });
+  const game = buildGame([rail, playerShot, enemyShot]);
+  game.resolveBulletCollisions();
+  assert.equal(rail.hp, 3);
+  assert.deepEqual(game.creditEvents, [true]);
+  assert.ok(rail.__novaRailContactX < 40, 'generic first contact is enemy shot');
+  assert.ok(rail.__novaPlayerRailContactX > 60, 'player contact occurs later in pair order');
+  assert.ok(game.rings[0][0] > 60, 'player-earned feedback follows player contact');
+});
+
+test('contact markers expire across ticks and do not borrow earlier coordinates', () => {
+  const rail = bullet(93, 2, 100, 0, { px: 0, __novaRail: true, hp: 4 });
+  const playerShot = bullet(94, 1, 75, 0, { hp: 1 });
+  const game = buildGame([rail, playerShot]);
+  game.resolveBulletCollisions();
+  const firstX = game.rings[0][0];
+  assert.ok(firstX > 60 && firstX < 90);
+  game.time += 1 / 60;
+  rail.x = 100; rail.px = 100;
+  const enemyShot = bullet(95, 3, 100, 0, { hp: 1 });
+  game.bullets = [rail, enemyShot];
+  game.resolveBulletCollisions();
+  assert.deepEqual(game.creditEvents, [true, false]);
+  assert.ok(Math.abs(game.rings[1][0] - 100) < 1e-8);
+});
+
+test('nonfinite swept history falls back to rail endpoint without inventing contact', () => {
+  const rail = bullet(96, 2, 100, 60, { px: NaN, py: 0, __novaRail: true, hp: 1 });
+  const playerShot = bullet(97, 1, 100, 60, { hp: 1 });
+  const game = buildGame([rail, playerShot]);
+  game.resolveBulletCollisions();
+  assert.equal(rail.dead, true);
+  assert.deepEqual(game.creditEvents, [true]);
+  assert.equal(game.rings[0][0], 100);
+  assert.equal(game.rings[0][1], 60);
+  assert.equal(game.texts[0][0], 100);
+  assert.equal(game.texts[0][1], 42);
+});
+
+test('enemy-only swept rail damage places generic feedback at contact without player credit', () => {
+  const rail = bullet(98, 2, 100, 60, { px: 0, py: 0, __novaRail: true, hp: 1 });
+  const enemyShot = bullet(99, 3, 0, 0, { px: 100, py: 60, hp: 1 });
+  const game = buildGame([rail, enemyShot]);
+  game.resolveBulletCollisions();
+  assert.equal(rail.dead, true);
+  assert.deepEqual(game.creditEvents, [false]);
+  assert.equal((game.texts || []).length, 0);
+  assert.ok(Math.abs(game.rings[0][0] - 50) < 1e-8);
+  assert.ok(Math.abs(game.rings[0][1] - 30) < 1e-8);
 });

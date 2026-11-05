@@ -493,16 +493,39 @@
             if (a.dead && a.shell) burstShellAtContact(this, a, firstTime);
             if (b.dead && b.shell) burstShellAtContact(this, b, firstTime);
           }
-          if (this.addParticles) {
-            var mx = (a.x + b.x) * 0.5, my = (a.y + b.y) * 0.5;
-            if (firstTime != null) {
-              var ax0 = a.px == null ? a.x : a.px, ay0 = a.py == null ? a.y : a.py;
-              var bx0 = b.px == null ? b.x : b.px, by0 = b.py == null ? b.y : b.py;
-              mx = (ax0 + (a.x - ax0) * firstTime + bx0 + (b.x - bx0) * firstTime) * 0.5;
-              my = (ay0 + (a.y - ay0) * firstTime + by0 + (b.y - by0) * firstTime) * 0.5;
-            }
-            this.addParticles(mx, my, '#d9f7ff', 3, 55, 'glow');
+          /* Keep presentation feedback at the same swept contact as the
+           * collision burst. Store the first rail contact of this tick;
+           * prefer the first real player contact for earned denial credit.
+           * No allocations, damage changes, or cosmetic RNG draws. */
+          var mx = (a.x + b.x) * 0.5, my = (a.y + b.y) * 0.5;
+          if (firstTime != null) {
+            var ax0 = a.px == null ? a.x : a.px, ay0 = a.py == null ? a.y : a.py;
+            var bx0 = b.px == null ? b.x : b.px, by0 = b.py == null ? b.y : b.py;
+            mx = (ax0 + (a.x - ax0) * firstTime + bx0 + (b.x - bx0) * firstTime) * 0.5;
+            my = (ay0 + (a.y - ay0) * firstTime + by0 + (b.y - by0) * firstTime) * 0.5;
           }
+          if ((a.__novaRail || b.__novaRail) && firstTime != null &&
+              Number.isFinite(mx) && Number.isFinite(my)) {
+            for (var ri = 0; ri < 2; ri++) {
+              var rail = ri === 0 ? a : b, other = ri === 0 ? b : a;
+              if (!rail.__novaRail || !(other.hp != null)) continue;
+              if (rail.__novaRailContactAt !== this.time) {
+                rail.__novaRailContactAt = this.time;
+                rail.__novaRailContactX = mx;
+                rail.__novaRailContactY = my;
+              }
+              if (playerId != null && other.ownerId === playerId &&
+                  (other === a ? ah > 0 : bh > 0)) {
+                /* Player marker is independent of the first generic contact. */
+                if (rail.__novaPlayerRailContactAt !== this.time) {
+                  rail.__novaPlayerRailContactAt = this.time;
+                  rail.__novaPlayerRailContactX = mx;
+                  rail.__novaPlayerRailContactY = my;
+                }
+              }
+            }
+          }
+          if (this.addParticles) this.addParticles(mx, my, '#d9f7ff', 3, 55, 'glow');
           if (a.dead) break;
         }
       }
