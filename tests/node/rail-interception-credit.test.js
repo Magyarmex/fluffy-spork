@@ -100,3 +100,18 @@ test('multiple actual player hits on one rail produce one feedback event', () =>
   assert.deepEqual(game.creditEvents, [true]);
   assert.equal(game.texts.length, 1);
 });
+
+test('player credit expires before a later enemy-only rail hit', () => {
+  const rail = bullet(50, 2, 0, 0, { __novaRail: true, hp: 5 });
+  const playerShot = bullet(51, 1, 0, 0, { hp: 1 });
+  const game = buildGame([rail, playerShot]);
+  game.resolveBulletCollisions();
+  assert.deepEqual(game.creditEvents, [true]);
+  assert.equal(rail.hp, 4);
+
+  game.time += 1 / 60;
+  const enemyShot = bullet(52, 3, 0, 0, { hp: 1 });
+  game.bullets = [rail, enemyShot];
+  game.resolveBulletCollisions();
+  assert.deepEqual(game.creditEvents, [true, false]);
+});
