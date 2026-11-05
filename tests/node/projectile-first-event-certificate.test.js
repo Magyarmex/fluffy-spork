@@ -1,0 +1,84 @@
+'use strict';
+// Read-only research certificate for projectile interception before TTL.
+// Does not change combat; deliberately abstains without complete obstacle data.
+const test = require('node:test');
+const assert = require('node:assert/strict');
+function firstContact(a,b,dt,context) {
+  if (!(dt>0) || !Number.isFinite(dt) || !context || context.complete!==true ||
+      context.allied===undefined || context.unscanned) return null;
+  for (const s of [a,b]) if (!s || s.dead || s.shell || !(s.ttl>0) ||
+      !(s.r>0) || !['x','y','vx','vy','ttl','r'].every(k=>Number.isFinite(s[k]))) return null;
+  if (a.ownerId===b.ownerId || context.allied) return null;
+  const dx=a.x-b.x, dy=a.y-b.y, vx=a.vx-b.vx, vy=a.vy-b.vy;
+  const radius=a.r+b.r+1.5, c=dx*dx+dy*dy-radius*radius;
+  let t=0;
+  if (c>0) {
+    const speed2=vx*vx+vy*vy, dot=dx*vx+dy*vy;
+    if (!(speed2>0) || !(dot<0)) return null;
+    const disc=dot*dot-speed2*c;
+    if (!(disc>64*Number.EPSILON*(Math.abs(dot*dot)+Math.abs(speed2*c)))) return null;
+    t=c/(-dot+Math.sqrt(disc));
+  }
+  if (!Number.isFinite(t) || t<0 || t>=Math.min(dt,a.ttl,b.ttl)-1e-9) return null;
+  for (const s of [a,b]) {
+    if (Math.abs(s.x)>=2230 || Math.abs(s.y)>=2230) return null;
+    for (const [p,v] of [[s.x,s.vx],[s.y,s.vy]]) {
+      const exit=v>0?(2230-p)/v:v<0?(-2230-p)/v:Infinity;
+      if (exit<=t+1e-9) return null;
+    }
+  }
+  for (const key of ['aTerrain','bTerrain','aBody','bBody','aOtherProjectile','bOtherProjectile']) {
+    const event=context[key];
+    if (event===undefined || event===null) continue;
+    if (!Number.isFinite(event) || event<0 || event<=t+1e-9) return null;
+  }
+  return t;
+}
+const shot=(x,vx,ownerId,ttl=.005,y=0,vy=0)=>({x,y,vx,vy,ownerId,ttl,r:3,dead:false,shell:false});
+const a=()=>shot(-20,6000,1), b=()=>shot(20,-6000,2), complete={allied:false,complete:true};
+test('30/60/120/240Hz preserve same certified first-contact time',()=>{
+  for(const fps of [30,60,120,240]) assert.ok(Math.abs(firstContact(a(),b(),1/fps,complete)-32.5/12000)<1e-12);
+});
+test('earlier terrain, body or third projectile veto certification',()=>{
+  for(const key of ['aTerrain','bTerrain','aBody','bBody','aOtherProjectile','bOtherProjectile'])
+    assert.equal(firstContact(a(),b(),1/30,{...complete,[key]:.002}),null);
+});
+test('later obstacles cannot erase earlier contact',()=>{
+  assert.ok(firstContact(a(),b(),1/30,{...complete,aTerrain:.004,bBody:.0045})>0);
+});
+test('ties abstain rather than choosing an arbitrary collision',()=>{
+  assert.equal(firstContact(a(),b(),1/30,{...complete,aTerrain:32.5/12000}),null);
+});
+test('unknown allegiance or incomplete obstacle scan abstains',()=>{
+  assert.equal(firstContact(a(),b(),1/30,{allied:false}),null);
+  assert.equal(firstContact(a(),b(),1/30,{complete:true}),null);
+  assert.equal(firstContact(a(),b(),1/30,{...complete,unscanned:true}),null);
+});
+test('allied and same-owner shots do not intercept',()=>{
+  assert.equal(firstContact(a(),b(),1/30,{...complete,allied:true}),null);
+  assert.equal(firstContact(a(),{...b(),ownerId:1},1/30,complete),null);
+});
+test('shell, dead, expired, nonfinite and malformed shots abstain',()=>{
+  for(const patch of [{shell:true},{dead:true},{ttl:0},{vx:NaN},{r:-1}])
+    assert.equal(firstContact({...a(),...patch},b(),1/30,complete),null);
+});
+test('first contact beyond TTL or frame is not certified',()=>{
+  assert.equal(firstContact({...a(),ttl:.001},b(),1/30,complete),null);
+  assert.equal(firstContact(a(),b(),.001,complete),null);
+});
+test('arena exit before contact vetoes certification',()=>{
+  assert.equal(firstContact(shot(2225,6000,1),shot(2265,-6000,2),1/30,complete),null);
+});
+test('physical near miss remains a miss',()=>{
+  assert.equal(firstContact(a(),{...b(),y:8},1/30,complete),null);
+});
+test('partitioning preserves the same absolute first-contact time',()=>{
+  const x=a(),y=b(),before=firstContact(x,y,1/30,complete),dt=.002;
+  const x2={...x,x:x.x+x.vx*dt,ttl:x.ttl-dt},y2={...y,x:y.x+y.vx*dt,ttl:y.ttl-dt};
+  assert.ok(Math.abs(before-dt-firstContact(x2,y2,1/30-dt,complete))<1e-12);
+});
+test('classification never mutates the supplied projectile state',()=>{
+  const x=a(),y=b(),before=JSON.stringify([x,y]);
+  firstContact(x,y,1/30,complete);
+  assert.equal(JSON.stringify([x,y]),before);
+});
