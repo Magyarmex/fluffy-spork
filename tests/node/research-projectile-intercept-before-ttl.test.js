@@ -192,3 +192,35 @@ for (const fps of [30, 60, 120, 240]) {
       'a projectile cannot intercept after its own physical expiry');
   });
 }
+
+/* Same physical world, same total simulated time, different presentation
+ * partitions. Correct first-contact arbitration must not depend on whether
+ * the 2.708ms interception falls inside a long or short update interval. */
+for (const partition of [
+  [.008],
+  [.004, .004],
+  [.002, .002, .004],
+  [.001, .007],
+  [.001, .002, .005],
+  [.003, .005]
+]) {
+  test('KNOWN RED: hostile TTL interception is frame-partition invariant ' +
+    partition.join('+'), () => {
+    const g = boot(true), contacts = [];
+    g.weakenBullet = function(b, damage) {
+      contacts.push(b.id);
+      b.hp -= damage;
+      if (b.hp <= 0) b.dead = true;
+    };
+    const left = bullet(9301, 1, -20, 6000, 1);
+    const right = bullet(9302, 2, 20, -6000, 3);
+    left.ttl = right.ttl = .005;
+    g.bullets = [left, right];
+    for (const dt of partition) {
+      g.updateBullets(dt);
+      if (!g.bullets.length) break;
+    }
+    assert.deepEqual(contacts.sort(), [9301, 9302],
+      'interception before 5ms TTL must survive equivalent time partitions');
+  });
+}
