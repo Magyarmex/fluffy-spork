@@ -60,6 +60,7 @@ test('opt-in fixed60 preserves Tempest chronology under equal-mean adversarial R
  for(const reload of [0,4,8]){
   const baseline=run(1517800,reload,native);
   assert.equal(baseline.ticks,480);assert.equal(baseline.dropped,0);
+  assert.ok(baseline.volleys>0,'held manual fire must actually emit shots');
   for(const [name,pattern] of Object.entries(patterns)){
    for(const phase of [0,1,2]){
     const steps=schedule(pattern,phase);
