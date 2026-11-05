@@ -166,16 +166,16 @@ test('nearby unsupported shell invalidates an otherwise positive pair certificat
   shell.shell = true;
   const r = observeProjectilePairs({ bullets: [a, b, shell] }, .05, verified);
   assert.equal(r.incomplete, true);
-  assert.equal(r.reason, 'unsupported-competing-projectile');
+  assert.equal(r.reason, 'unsupported-projectile-present');
   assert.equal(r.certified.length, 0);
 });
-test('distant unsupported shell cannot veto an isolated certified pair', () => {
+test('distant unsupported shell still invalidates unobserved fragment births', () => {
   const a = shot(1, -20, 1000), b = shot(2, 20, -1000);
   const shell = shot(3, 1000, 0, 1000);
   shell.shell = true;
   const r = observeProjectilePairs({ bullets: [a, b, shell] }, .05, verified);
-  assert.equal(r.incomplete, false);
-  assert.equal(r.certified.length, 1);
+  assert.equal(r.incomplete, true);
+  assert.equal(r.certified.length, 0);
 });
 
 test('undefined competing-event time in later pair revokes earlier certificate', () => {
