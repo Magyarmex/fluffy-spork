@@ -82,3 +82,21 @@ test('classification never mutates the supplied projectile state',()=>{
   firstContact(x,y,1/30,complete);
   assert.equal(JSON.stringify([x,y]),before);
 });
+
+test('10,000 seeded certificates have physical contact before all known cutoffs',()=>{
+  let seed=0x1a2b3c4d;
+  const rand=()=>{seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;return (seed>>>0)/4294967296;};
+  let certified=0;
+  for(let i=0;i<10000;i++){
+    const x=shot(-100+rand()*100,200+rand()*1000,1,.003+rand()*.06,-100+rand()*200,-1000+rand()*2000);
+    const y=shot(rand()*100,-200-rand()*1000,2,.003+rand()*.06,-100+rand()*200,-1000+rand()*2000);
+    const dt=[.004,1/240,1/120,1/60,1/30][i%5];
+    const t=firstContact(x,y,dt,complete);
+    if(t===null)continue;
+    certified++;
+    const dx=x.x+x.vx*t-y.x-y.vx*t,dy=x.y+x.vy*t-y.y-y.vy*t;
+    assert.ok(Math.abs(Math.hypot(dx,dy)-x.r-y.r-1.5)<1e-5);
+    assert.ok(t<Math.min(dt,x.ttl,y.ttl));
+  }
+  assert.ok(certified>10,'seed must exercise real interceptions');
+});
