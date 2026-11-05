@@ -46,7 +46,7 @@ function buildGame(bullets, options = {}) {
   ]);
   game.cam = { shake: 0 };
   game.addText = (...args) => { (game.texts ||= []).push(args); };
-  game.addRing = () => {};
+  game.addRing = (...args) => { (game.rings ||= []).push(args); };
   game.addParticles = () => {};
   game.sfx = { novaRailInterceptPolish: (_pan, _destroyed, playerDidIt) => {
     (game.creditEvents ||= []).push(playerDidIt);
@@ -126,4 +126,29 @@ test('reversed rail pair order remains credited through 32+ projectile broad pha
   assert.equal(rail.dead, true);
   assert.deepEqual(game.creditEvents, [true]);
   assert.equal(game.texts[0][2], 'RAIL DENIED');
+});
+
+test('diagonal swept player rail interception anchors ring and credit text at contact', () => {
+  const rail = bullet(70, 2, 100, 60, { px: 0, py: 0, __novaRail: true, hp: 1 });
+  const playerShot = bullet(71, 1, 0, 0, { px: 100, py: 60 });
+  const game = buildGame([rail, playerShot]);
+  game.resolveBulletCollisions();
+  assert.equal(rail.dead, true);
+  assert.deepEqual(game.creditEvents, [true]);
+  assert.ok(Math.abs(game.rings[0][0] - 50) < 1e-8);
+  assert.ok(Math.abs(game.rings[0][1] - 30) < 1e-8);
+  assert.ok(Math.abs(game.texts[0][0] - 50) < 1e-8);
+  assert.ok(Math.abs(game.texts[0][1] - 12) < 1e-8);
+});
+
+test('contact feedback survives missing particle renderer and reversed broad-phase order', () => {
+  const playerShot = bullet(80, 1, 0, 0, { px: 100, py: 60 });
+  const rail = bullet(81, 2, 100, 60, { px: 0, py: 0, __novaRail: true, hp: 1 });
+  const distant = Array.from({ length: 40 }, (_, i) => bullet(200 + i, 3, 1000 + i * 30, 1000));
+  const game = buildGame([playerShot, rail, ...distant]);
+  game.addParticles = null;
+  game.resolveBulletCollisions();
+  assert.equal(rail.dead, true);
+  assert.ok(Math.abs(game.rings[0][0] - 50) < 1e-8);
+  assert.ok(Math.abs(game.rings[0][1] - 30) < 1e-8);
 });
