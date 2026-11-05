@@ -129,6 +129,26 @@ async function run(browser,width,dpr){
     return Array.from(rgba.slice(0,3));
    };
    const bothCenters={first:pixelAt(dotX,dotY),second:pixelAt(secondX,dotY)};
+   // Same radial 160-world-unit separation, rotated 45 degrees.
+   // Axis projections are ~5.43 backing px, so the two 7px square
+   // outlines overlap even though the horizontal pair was disjoint.
+   g.powerups.length=0;
+   enemies[1].x=160/Math.SQRT2;enemies[1].y=160/Math.SQRT2;
+   const diagonalDelta=160*216/4500/Math.SQRT2;
+   const diagonalBare=raster(false);
+   const diagonalBoth=raster(false,c=>{
+    c.save();
+    for(const [x,y,color] of [[dotX,dotY,target.color],
+      [dotX+diagonalDelta,dotY+diagonalDelta,enemies[1].color]]){
+     c.globalAlpha=.88;c.fillStyle='#020a18';c.fillRect(x-2,y-2,7,7);
+     c.globalAlpha=.85;c.fillStyle='#f4f9ff';c.fillRect(x-1,y-1,5,5);
+     c.globalAlpha=1;c.fillStyle=color;c.fillRect(x,y,3,3);
+    }
+    c.restore();
+   });
+   const diagonalCenters={first:pixelAt(dotX,dotY),
+    second:pixelAt(dotX+diagonalDelta,dotY+diagonalDelta)};
+   const diagonalOverlapBacking=Math.max(0,7-diagonalDelta);
    const rgb=color=>{
     const swatch=document.createElement('canvas');swatch.width=swatch.height=1;
     const sc=swatch.getContext('2d');sc.fillStyle=color;sc.fillRect(0,0,1,1);
@@ -136,8 +156,8 @@ async function run(browser,width,dpr){
    };
    const expectedCenters={first:rgb(target.color),second:rgb(enemies[1].color)};
    return {width:innerWidth,dpr:devicePixelRatio,backing:[backing.width,backing.height],
-    enemyColor:target.color,secondColor:enemies[1].color,bothCenters,expectedCenters,resourceRisk,
-    keyed,bare,crowded,separatedBare,separatedKeyed,separatedBoth};
+    enemyColor:target.color,secondColor:enemies[1].color,bothCenters,expectedCenters,diagonalCenters,diagonalOverlapBacking,resourceRisk,
+    keyed,bare,crowded,separatedBare,separatedKeyed,separatedBoth,diagonalBare,diagonalBoth};
   });
   assert.equal(result.width,width);
   assert.equal(result.dpr,dpr);
@@ -147,7 +167,7 @@ async function run(browser,width,dpr){
   assert.equal(result.crowded.keylineCalls,0,'crowded rival must not cover adjacent public contacts with a keyline');
   assert.equal(result.separatedBare.keylineCalls,0,'shipping 9px exclusion must suppress the 7.68px close pair');
   assert.equal(result.separatedKeyed.keylineCalls,2,'research-only keyline must paint exactly two familiar layers');
-  for(const mode of ['keyed','bare','crowded','separatedBare','separatedKeyed','separatedBoth'])
+  for(const mode of ['keyed','bare','crowded','separatedBare','separatedKeyed','separatedBoth','diagonalBare','diagonalBoth'])
    assert.ok(result[mode].targetDotCalls>=1,mode+' must still paint the actual public rival');
   assert.equal(result.separatedBoth.keylineCalls,0,'shipping renderer must suppress both outlines before research paint');
   assert.equal(result.resourceRisk.baselineKeylineCalls,0,
@@ -162,9 +182,15 @@ async function run(browser,width,dpr){
    'first public rival core must retain its exact class color');
   assert.deepEqual(result.bothCenters.second,result.expectedCenters.second,
    'second public rival core must retain its exact class color');
+  assert.ok(result.diagonalOverlapBacking>1&&result.diagonalOverlapBacking<2,
+   'same-distance diagonal keylines must have a real backing-pixel overlap');
+  assert.deepEqual(result.diagonalCenters.first,result.expectedCenters.first,
+   'diagonal first rival core must retain its class color');
+  assert.deepEqual(result.diagonalCenters.second,result.expectedCenters.second,
+   'diagonal second rival core must retain its class color');
   assert.notEqual(result.keyed.url,result.bare.url,'keyline must change actual 60px browser raster');
   const out=path.join('artifacts','browser');fs.mkdirSync(out,{recursive:true});
-  for(const mode of ['keyed','bare','crowded','separatedBare','separatedKeyed','separatedBoth']){
+  for(const mode of ['keyed','bare','crowded','separatedBare','separatedKeyed','separatedBoth','diagonalBare','diagonalBoth']){
    fs.writeFileSync(path.join(out,'minimap-raster-'+width+'-dpr'+dpr+'-'+mode+'.png'),
     Buffer.from(result[mode].url.split(',')[1],'base64'));
    delete result[mode].url;
@@ -182,11 +208,12 @@ async function run(browser,width,dpr){
   // Capture immutable backing PNGs *during* each real Game draw. Repainting
   // the same paused canvas later is not a reliable browser capture boundary.
   // Compare independent DOM surfaces, not stale in-place compositor snapshots.
-  await page.evaluate(async ({keyed,bare,crowded,separatedBare,separatedKeyed,separatedBoth})=>{
+  await page.evaluate(async ({keyed,bare,crowded,separatedBare,separatedKeyed,separatedBoth,diagonalBare,diagonalBoth})=>{
    for(const [mode,url,left,top] of [
     ['keyed',keyed,0,110],['bare',bare,70,110],['crowded',crowded,140,110],
     ['separatedBare',separatedBare,0,180],['separatedKeyed',separatedKeyed,70,180],
-    ['separatedBoth',separatedBoth,140,180]]){
+    ['separatedBoth',separatedBoth,140,180],
+    ['diagonalBare',diagonalBare,0,250],['diagonalBoth',diagonalBoth,70,250]]){
     const im=new Image();im.src=url;await im.decode();
     const el=document.createElement('canvas');el.id='nova-minimap-css-'+mode;
     el.width=216;el.height=216;el.style.cssText=
@@ -194,7 +221,7 @@ async function run(browser,width,dpr){
     el.getContext('2d').drawImage(im,0,0);
     document.body.appendChild(el);
    }
-  },{keyed:result.keyed.backingUrl,bare:result.bare.backingUrl,crowded:result.crowded.backingUrl,separatedBare:result.separatedBare.backingUrl,separatedKeyed:result.separatedKeyed.backingUrl,separatedBoth:result.separatedBoth.backingUrl});
+  },{keyed:result.keyed.backingUrl,bare:result.bare.backingUrl,crowded:result.crowded.backingUrl,separatedBare:result.separatedBare.backingUrl,separatedKeyed:result.separatedKeyed.backingUrl,separatedBoth:result.separatedBoth.backingUrl,diagonalBare:result.diagonalBare.backingUrl,diagonalBoth:result.diagonalBoth.backingUrl});
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   const cloneKeyed=await page.locator('#nova-minimap-css-keyed').screenshot({
    path:path.join(out,'minimap-css-clone-'+width+'-dpr'+dpr+'-keyed.png')});
@@ -206,17 +233,23 @@ async function run(browser,width,dpr){
    path:path.join(out,'minimap-css-clone-'+width+'-dpr'+dpr+'-separated-keyed.png')});
   const cloneSeparatedBoth=await page.locator('#nova-minimap-css-separatedBoth').screenshot({
    path:path.join(out,'minimap-css-clone-'+width+'-dpr'+dpr+'-separated-both.png')});
+  const cloneDiagonalBare=await page.locator('#nova-minimap-css-diagonalBare').screenshot({
+   path:path.join(out,'minimap-css-clone-'+width+'-dpr'+dpr+'-diagonal-bare.png')});
+  const cloneDiagonalBoth=await page.locator('#nova-minimap-css-diagonalBoth').screenshot({
+   path:path.join(out,'minimap-css-clone-'+width+'-dpr'+dpr+'-diagonal-both.png')});
   const cloneCrowded=await page.locator('#nova-minimap-css-crowded').screenshot({
    path:path.join(out,'minimap-css-clone-'+width+'-dpr'+dpr+'-crowded.png')});
   assert.notDeepEqual(cloneSeparatedBare,cloneSeparatedKeyed,'close-pair research keyline must affect CSS-composited pixels');
   assert.notDeepEqual(cloneSeparatedBoth,cloneSeparatedKeyed,
    'two-sided close-pair keyline must change the actual CSS-composited image');
+  assert.notDeepEqual(cloneDiagonalBare,cloneDiagonalBoth,
+   'diagonal two-sided keyline must affect CSS-composited pixels');
   assert.notDeepEqual(cloneCrowded,cloneKeyed,'crowded public contacts must change the real CSS-composited map');
   assert.notDeepEqual(cloneKeyed,cloneBare,
    'independent CSS-composited 60px copies of real Game paint must differ');
   // Measure the *composited device-pixel* image, not only a fixed 60x60
   // offscreen downsample. DPR 2/3 must analyze 120/180 physical pixels.
-  const displayed=await page.evaluate(async ({keyed,bare,crowded,separatedBare,separatedKeyed,separatedBoth,dpr,enemyColor})=>{
+  const displayed=await page.evaluate(async ({keyed,bare,crowded,separatedBare,separatedKeyed,separatedBoth,diagonalBare,diagonalBoth,dpr,enemyColor})=>{
    const swatch=document.createElement('canvas');swatch.width=1;swatch.height=1;
    const swatchCtx=swatch.getContext('2d',{willReadFrequently:true});
    swatchCtx.fillStyle=enemyColor;swatchCtx.fillRect(0,0,1,1);
@@ -236,9 +269,9 @@ async function run(browser,width,dpr){
     return {width:w,height:h,center,contrast,
      targetColorError:Math.hypot(...center.map((v,i)=>v-reference[i]))};
    }
-   return {keyed:await measure(keyed),bare:await measure(bare),crowded:await measure(crowded),separatedBare:await measure(separatedBare),separatedKeyed:await measure(separatedKeyed),separatedBoth:await measure(separatedBoth)};
-  },{keyed:cloneKeyed.toString('base64'),bare:cloneBare.toString('base64'),crowded:cloneCrowded.toString('base64'),separatedBare:cloneSeparatedBare.toString('base64'),separatedKeyed:cloneSeparatedKeyed.toString('base64'),separatedBoth:cloneSeparatedBoth.toString('base64'),dpr,enemyColor:result.enemyColor});
-  for(const mode of ['keyed','bare','crowded','separatedBare','separatedKeyed','separatedBoth']){
+   return {keyed:await measure(keyed),bare:await measure(bare),crowded:await measure(crowded),separatedBare:await measure(separatedBare),separatedKeyed:await measure(separatedKeyed),separatedBoth:await measure(separatedBoth),diagonalBare:await measure(diagonalBare),diagonalBoth:await measure(diagonalBoth)};
+  },{keyed:cloneKeyed.toString('base64'),bare:cloneBare.toString('base64'),crowded:cloneCrowded.toString('base64'),separatedBare:cloneSeparatedBare.toString('base64'),separatedKeyed:cloneSeparatedKeyed.toString('base64'),separatedBoth:cloneSeparatedBoth.toString('base64'),diagonalBare:cloneDiagonalBare.toString('base64'),diagonalBoth:cloneDiagonalBoth.toString('base64'),dpr,enemyColor:result.enemyColor});
+  for(const mode of ['keyed','bare','crowded','separatedBare','separatedKeyed','separatedBoth','diagonalBare','diagonalBoth']){
    assert.equal(displayed[mode].width,60*dpr,'CSS capture must use actual device pixel width');
    assert.equal(displayed[mode].height,60*dpr,'CSS capture must use actual device pixel height');
   }
@@ -247,9 +280,9 @@ async function run(browser,width,dpr){
   // No threshold is imposed on crowded readability: report the measured
   // pixels and original class-color fidelity before selecting any visual intervention.
   result.displayed=displayed;
-  delete result.keyed.backingUrl;delete result.bare.backingUrl;delete result.crowded.backingUrl;delete result.separatedBare.backingUrl;delete result.separatedKeyed.backingUrl;delete result.separatedBoth.backingUrl;
+  delete result.keyed.backingUrl;delete result.bare.backingUrl;delete result.crowded.backingUrl;delete result.separatedBare.backingUrl;delete result.separatedKeyed.backingUrl;delete result.separatedBoth.backingUrl;delete result.diagonalBare.backingUrl;delete result.diagonalBoth.backingUrl;
   console.log('NOVA_MINIMAP_COMPOSITOR '+JSON.stringify({width,dpr,
-   independentBackings:true,crowdedContact:true,closePairResearch:true,twoSidedResearch:true,sameOwner:ownership.same}));
+   independentBackings:true,crowdedContact:true,closePairResearch:true,twoSidedResearch:true,diagonalOverlapResearch:true,sameOwner:ownership.same}));
   await page.screenshot({path:path.join(out,'minimap-raster-'+width+'-dpr'+dpr+'-game.png')});
   assert.deepEqual(errors,[],'shipping Chromium runtime errors');
   console.log('NOVA_MINIMAP_CHROMIUM_RASTER '+JSON.stringify(result));
