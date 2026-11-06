@@ -60,3 +60,10 @@ test('reported tick time, skipped time, and backlog conserve wall time',()=>{
     }
   }
 });
+
+test('replay preserves capture termination metadata for interpretation',()=>{
+ const capture={reason:'hidden',frames:2,foregroundOnly:true};
+ const report=analyze({frameIntervalsMs:[16,17],capture});
+ assert.deepEqual(report.capture,capture);
+ assert.equal(analyze([16,17]).capture,null);
+});
