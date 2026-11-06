@@ -56,3 +56,31 @@ test('failed recovery attach retains original detach exception and secondary evi
   // If the host's own attach() throws, recovery cannot be certified.
   assert.equal(input.canvas,null);
 });
+
+test('partial composed detach must finish cached listener cleanup before reattach',()=>{
+  const win=emitter(),doc=emitter(),canvas=emitter();
+  let detaches=0,attaches=0;
+  const input={canvas,kd(){},resize(){},cached:false,
+    attach(c){
+      attaches++;this.canvas=c;win.addEventListener('keydown',this.kd);
+      if(!this.cached){win.addEventListener('resize',this.resize);this.cached=true}
+    },
+    detach(){
+      detaches++;win.removeEventListener('keydown',this.kd);
+      win.removeEventListener('resize',this.resize);
+      if(detaches===1)throw Error('partial detach before cache reset');
+      this.cached=false;this.canvas=null;
+    }};
+  input.attach(canvas);
+  const timeline={input,reset(){}};
+  let caught;
+  try{new BrowserInputCapture(input,canvas,timeline,{timeline},
+    {window:win,document:doc})}catch(error){caught=error}
+  assert.match(caught?.message||'',/partial detach before cache reset/);
+  assert.equal(detaches,2,'retry must complete idempotent cleanup');
+  assert.equal(attaches,2,'normal input must be reattached');
+  assert.equal(input.canvas,canvas);
+  assert.equal(win.count(),2,'keyboard and cached geometry listener both restored');
+  assert.equal(doc.count(),0);
+  assert.equal(canvas.count(),0);
+});
