@@ -290,7 +290,23 @@ class BrowserInputCapture {
       [win,'blur',release],[doc,'visibilitychange',hidden]
     ];
     this.timeline.reset();
-    input.detach();
+    try{input.detach()}
+    catch(error){
+      // The composed Input detach may have stopped halfway through its
+      // performance/DOM cleanup. Retry that idempotent teardown once before
+      // reattaching, so cached geometry listeners are rebuilt as well.
+      let cleanupError;
+      try{input.detach()}catch(secondary){cleanupError=secondary}
+      try{input.attach(canvas)}catch(secondary){
+        // Failed reattachment is the most actionable cleanup failure:
+        // normal controls may still be unavailable.
+        cleanupError=secondary;
+      }
+      if(cleanupError && error && typeof error==='object'){
+        try{error.cleanupError=cleanupError}catch(_ignored){}
+      }
+      throw error;
+    }
     input.canvas = canvas; // preserve Input's original stick geometry owner
     this.active = true;
     try {
@@ -404,11 +420,20 @@ class FixedStepRafOwner {
       throw Error('invalid fixed-step start time');
     this._generation++;this.started=true;this.lastMs=at;
     this._awaitingForwardFrame=true;this.simAtSec=(at-this.bridge.startMs)/1000;
-    this.timeline.reset();this.timeline.tickOrigin=this.simAtSec;
-    this.timeline.consumeThrough(this.simAtSec);
-    this.paused=!!this.game.paused;
-    try{this.game.sfx.startMusic()}
-    catch(error){this.started=false;this.timeline.reset();throw error}
+    try{
+      this.timeline.reset();this.timeline.tickOrigin=this.simAtSec;
+      this.timeline.consumeThrough(this.simAtSec);
+      this.paused=!!this.game.paused;
+      this.game.sfx.startMusic();
+    }catch(error){
+      this.started=false;
+      try{this.timeline.reset()}catch(cleanupError){
+        if(error && typeof error==='object'){
+          try{error.cleanupError=cleanupError}catch(_ignored){}
+        }
+      }
+      throw error;
+    }
     const self=this;
     this.destroyWrapper=function(...args){
       // Teardown must reach the actual Game even if a host cancellation fails.
@@ -640,7 +665,14 @@ function createFixedStepBrowserPilot(game,{window:win,document:doc,clock,
     start(){
       if(owner.started)throw Error('browser pilot already running');
       if(!capture.active)throw Error('browser pilot capture detached');
-      try{owner.start()}catch(error){capture.detach();throw error}
+      try{owner.start()}catch(error){
+        try{capture.detach()}catch(cleanupError){
+          if(error && typeof error==='object'){
+            try{error.cleanupError=cleanupError}catch(_ignored){}
+          }
+        }
+        throw error;
+      }
     },
     stop(){
       // Release DOM ownership even when a hostile RAF host rejects cancel().
