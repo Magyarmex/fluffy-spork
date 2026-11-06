@@ -263,3 +263,32 @@ test('terrain provider rejects replacement of live bullet array after snapshot',
  assert.equal(result.incomplete,true);
  assert.equal(result.certified.length,0);
 });
+
+test('unknown permanent or destructible terrain shape fails closed instead of certifying a clear corridor',()=>{
+ const dt=.04;
+ for(const destructible of [false,true]){
+  const g=fixture(null);
+  g.__novaTerrain=[{shape:'polygon',x:0,y:0,solid:true,destructible,hp:20,
+    w:4,h:40}];
+  // A shipping first-hit implementation that does not recognize a new shape
+  // could report no wall, but the observer must not interpret that as clear.
+  g.firstTerrainHit=()=>null;
+  assert.equal(makePermanentTerrainProvider(g,dt),null,
+    'unknown '+(destructible?'active cover':'permanent wall')+' geometry');
+ }
+});
+
+test('known rectangular and circular permanent terrain remain valid research geometry',()=>{
+ const dt=.04;
+ for(const shape of ['rect','circle']){
+  const g=fixture(null);
+  g.__novaTerrain=[shape==='rect'?{...wall(),x:100,y:100}:
+    {shape:'circle',x:100,y:100,r:5,solid:true,destructible:false}];
+  g.firstTerrainHit=()=>null;
+  const provider=makePermanentTerrainProvider(g,dt);
+  assert.equal(typeof provider,'function',shape);
+  const r=observeProjectilePairs(g,dt,provider);
+  assert.equal(r.incomplete,false,shape);
+  assert.equal(r.certified.length,1,shape);
+ }
+});
