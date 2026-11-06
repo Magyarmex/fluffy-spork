@@ -144,3 +144,29 @@ test('composed Game refuses open-field certificate when terrain is present', () 
     shapes: g.shapes, drones: g.drones, terrain: g.__novaTerrain };
   assert.equal(makeOpenFieldProvider(fixture, 1 / 30), null);
 });
+
+for (const fps of [30, 60, 120, 240]) {
+  test('composed Game ignores same-owner crowd before hostile interception at ' + fps + 'Hz', () => {
+    const g = boot();
+    const crowd = Array.from({ length: 24 }, (_, i) => {
+      const s = shot(100 + i, 7, 1000, 0, .42);
+      s.y = 1000;
+      return s;
+    });
+    g.bullets = [...crowd, shot(1, 1, -20, 6000, .42),
+      shot(2, 2, 20, -6000, .42)];
+    const dt = 1 / fps;
+    const fixture = { bullets: g.bullets, tanks: g.tanks,
+      shapes: g.shapes, drones: g.drones, terrain: g.__novaTerrain };
+    const provider = makeOpenFieldProvider(fixture, dt);
+    assert.equal(typeof provider, 'function');
+    const before = JSON.stringify(g.bullets);
+    const observed = observeProjectilePairs(g, dt, provider);
+    assert.equal(observed.incomplete, false);
+    assert.equal(observed.certified.length, 1);
+    assert.deepEqual([observed.certified[0].i, observed.certified[0].j], [24, 25]);
+    assert.ok(Math.abs(observed.certified[0].time - 32.5 / 12000) < 1e-12);
+    assert.equal(JSON.stringify(g.bullets), before);
+    assert.doesNotThrow(() => g.updateBullets(dt));
+  });
+}
