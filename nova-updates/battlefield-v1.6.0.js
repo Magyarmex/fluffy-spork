@@ -3106,8 +3106,11 @@ function certifiedMultiShotCoverPriority(g,dt){
       other.shell!==false||other.beam!==false||other.splash||
       other.__v17Cannon||other.__novaRail||
       !Number.isSafeInteger(other.id)||other.id>=ceiling||
-      ![other.x,other.y,other.vx,other.vy,other.r,other.ttl].every(Number.isFinite)||
-      !(other.r>0&&other.ttl>dt))return false;
+      other.id===a.id||other.id===b.id||
+      ![other.x,other.y,other.vx,other.vy,other.r,other.ttl,
+        other.ownerId,other.hp,other.maxHp,other.baseDmg].every(Number.isFinite)||
+      !(other.r>0&&other.ttl>dt&&other.hp>0&&
+        other.maxHp>=other.hp&&other.baseDmg>0))return false;
    var ox=other.x+other.vx*dt,oy=other.y+other.vy*dt;
    if(!Number.isFinite(ox)||!Number.isFinite(oy))return false;
    for(var ri=0;ri<2;ri++){
