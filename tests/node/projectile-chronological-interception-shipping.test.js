@@ -302,3 +302,41 @@ test('mutual TTL preflight abstains on allied, unknown and competing contexts', 
       __novaShapeSweepPrevY:700}];
   }), [1,2], 'remote witnessed neutral must not veto');
 });
+
+
+test('mutual TTL recovery respects both lifetime and integrity budgets', () => {
+  function run(ttlA,ttlB,hpA,hpB,wall) {
+    const g=boot(),a=shot(1,1,-20,6000,ttlA),b=shot(2,2,20,-6000,ttlB);
+    a.hp=a.maxHp=hpA;b.hp=b.maxHp=hpB;
+    g.tankById.set(1,{id:1,team:1});
+    g.tankById.set(2,{id:2,team:2});
+    g.bullets=[a,b];
+    if(wall)g.__novaTerrain=[wall];
+    const hits=[],original=g.weakenBullet.bind(g);
+    g.weakenBullet=function(s,damage){hits.push(s.id);return original(s,damage);};
+    g.updateBullets(1/30);
+    return hits;
+  }
+  assert.deepEqual(run(.001,.005,1,1),[],
+    'contact beyond A lifetime is not a collision');
+  assert.deepEqual(run(.005,.001,1,1),[],
+    'contact beyond B lifetime is not a collision');
+  assert.deepEqual(run(.005,.005,2,1),[],
+    'nonmutual integrity requires the full chronological event owner');
+  assert.deepEqual(run(.005,.005,1,1,
+    {shape:'rect',x:40,y:0,w:3,h:50,solid:true,destructible:false}),
+    [1,2], 'wall beyond first contact must not erase interception');
+});
+test('mutual TTL preflight refuses separately referenced player at contact',()=>{
+  const g=boot(),a=shot(1,1,-20,6000,.005),b=shot(2,2,20,-6000,.005);
+  a.hp=a.maxHp=b.hp=b.maxHp=1;
+  g.tankById.set(1,{id:1,team:1});
+  g.tankById.set(2,{id:2,team:2});
+  g.bullets=[a,b];
+  g.player={id:3,cls:'scout',alive:true,x:0,y:0,
+    __novaSweepMoveTime:g.time,__novaSweepPrevX:0,__novaSweepPrevY:0};
+  const hits=[],original=g.weakenBullet.bind(g);
+  g.weakenBullet=function(s,damage){hits.push(s.id);return original(s,damage);};
+  g.updateBullets(1/30);
+  assert.deepEqual(hits,[]);
+});
