@@ -50,12 +50,16 @@ class BrowserInputCapture {
     this.timeline.reset();
     try{input.detach()}
     catch(error){
-      // A hostile/partial production detach must not leave the real game
-      // without controls before research capture even becomes active.
-      try{input.attach(canvas)}catch(cleanupError){
-        if(error && typeof error==='object'){
-          try{error.cleanupError=cleanupError}catch(_ignored){}
-        }
+      // The composed Input detach may have stopped halfway through its
+      // performance/DOM cleanup. Retry that idempotent teardown once before
+      // reattaching, so cached geometry listeners are rebuilt as well.
+      let cleanupError;
+      try{input.detach()}catch(secondary){cleanupError=secondary}
+      try{input.attach(canvas)}catch(secondary){
+        if(!cleanupError)cleanupError=secondary;
+      }
+      if(cleanupError && error && typeof error==='object'){
+        try{error.cleanupError=cleanupError}catch(_ignored){}
       }
       throw error;
     }
