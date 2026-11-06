@@ -20,7 +20,7 @@ function makePermanentTerrainProvider(game, dt) {
     terrainTimes.push(event.time);
   }
   return (a,b,i,j,step) => {
-    let unchanged;\n    try { unchanged = terrainState() === initialTerrain; } catch (_) { return null; }\n    if (!unchanged) return null;\n    const context = base(a,b,i,j,step);
+    let unchanged;\n    try { unchanged = terrainState() === initialTerrain; } catch (_) { return null; }\n    if (!unchanged || game.__novaResearchHostilityFixture !== true ||\n        game.player != null ||\n        !['tanks','shapes','drones'].every(k => Array.isArray(game[k]) && game[k].length === 0) ||\n        (game.powerups != null && (!Array.isArray(game.powerups) || game.powerups.length !== 0)) ||\n        (game.terrain != null && (!Array.isArray(game.terrain) ||\n          (game.terrain !== game.__novaTerrain && game.terrain.length !== 0)))) return null;\n    const context = base(a,b,i,j,step);
     if (!context || !Number.isInteger(i) || !Number.isInteger(j) ||
         i < 0 || j <= i || j >= terrainTimes.length) return null;
     return { ...context, aTerrain: terrainTimes[i], bTerrain: terrainTimes[j] };
