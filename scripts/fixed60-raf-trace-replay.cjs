@@ -67,7 +67,7 @@ function replay(intervals,maxSteps=2){
 // scheduler replay; neither proves that the game was unpaused or interactive.
 function captureProvenance(intervals,capture){
   if(!capture||typeof capture!=='object'||Array.isArray(capture))
-    return {status:'unverified',visibilityGuarded:false,gameplayActiveVerified:false};
+    return {status:'unverified',visibilityGuardClaimed:false,gameplayActiveVerified:false};
   const total=intervals.reduce((sum,value)=>sum+value,0);
   const consistent=Number.isInteger(capture.frames)&&capture.frames===intervals.length&&
     Number.isFinite(capture.durationMs)&&
@@ -76,7 +76,7 @@ function captureProvenance(intervals,capture){
     ['running','manual','hidden','limit','invalid-timestamp','nonmonotonic',
      'raf-error','start-error'].includes(capture.reason);
   return {status:consistent?(capture.reason==='running'?'partial':'consistent'):'inconsistent',
-    visibilityGuarded:capture.foregroundOnly===true,
+    visibilityGuardClaimed:capture.foregroundOnly===true,
     gameplayActiveVerified:false};
 }
 function analyze(data){
