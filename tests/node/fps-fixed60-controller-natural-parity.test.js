@@ -50,6 +50,8 @@ function run(cls,seed,fixed30){
      p.__novaSwarm.power,p.__novaSwarm.nodeX,p.__novaSwarm.nodeY,
      p.__novaSwarm.angle,p.__novaSwarm.recallUntil] : []),
     droneCount:g.drones.length,
+    enemyCount:g.tanks.filter(t=>t!==p&&t.alive).length,
+    neutralCount:g.shapes.length,
     playerDrones:g.drones.filter(d=>d.ownerId===p.id).length,
     playerHp:p.hp,playerScore:p.score};
   }finally{if(owner)owner.stop();g.destroy();}
@@ -60,7 +62,9 @@ test('fixed60 30Hz presentation preserves natural Controller/drone world vs nati
  for(const cls of CLASSES)for(const seed of [1517800,1517802]){
   const native60=run(cls,seed,false);
   const fixed30=run(cls,seed,true);
-  assert.ok(native60.droneCount>0,cls+' must exercise live drone simulation');
+  assert.ok(native60.playerDrones>0,cls+' must exercise player-owned drones');
+  assert.ok(native60.enemyCount>0,cls+' must retain real enemy tanks');
+  assert.ok(native60.neutralCount>0,cls+' must retain real neutral ecology');
   assert.deepEqual(fixed30,native60,
    cls+' seed '+seed+' changed the real physical world or RNG');
  }
