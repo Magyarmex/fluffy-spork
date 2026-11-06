@@ -2,6 +2,8 @@
 // Research-only read-only pre-update observer; never authorizes combat effects.
 const { firstContact } = require('./projectile-first-event-certificate.cjs');
 const MAX_PAIRS = 256;
+// Bound cheap swept-box comparisons separately from expensive event certification.
+const MAX_BROADPHASE_PAIRS = 4096;
 const EVENT_KEYS = ['aTerrain','bTerrain','aBody','bBody',
   'aOtherProjectile','bOtherProjectile'];
 function completeContext(c) {
@@ -65,8 +67,9 @@ function observeProjectilePairs(game, dt, eventsForPair) {
     }
     if (shots[i].dead !== true) active.push(i);
   }
-  if (active.length * (active.length - 1) / 2 > MAX_PAIRS) {
-    result.incomplete = true; result.reason = 'pair-budget'; return result;
+  const totalPairs = active.length * (active.length - 1) / 2;
+  if (totalPairs > MAX_BROADPHASE_PAIRS) {
+    result.incomplete = true; result.reason = 'broadphase-budget'; return result;
   }
   // Shells, rails and other unsupported shots may create mid-frame children
   // that do not exist in this snapshot. Spatial separation alone cannot
@@ -75,12 +78,22 @@ function observeProjectilePairs(game, dt, eventsForPair) {
     result.incomplete = true; result.reason = 'unsupported-projectile-present';
     return result;
   }
-  outer: for (let a = 0; a < active.length; a++) for (let b = a + 1; b < active.length; b++) {
+  // Complete the cheap broad phase before asking any event provider to certify
+  // a pair. An overflow must revoke the entire frame, never a partial result.
+  const candidates = [];
+  for (let a = 0; a < active.length; a++) for (let b = a + 1; b < active.length; b++) {
     const i = active[a], j = active[b];
     result.pairs++;
     if (definitelyDisjoint(shots[i], shots[j], dt)) {
       result.abstained++; continue;
     }
+    candidates.push([i, j]);
+    if (candidates.length > MAX_PAIRS) {
+      result.incomplete = true; result.reason = 'pair-budget';
+      result.certified = []; return result;
+    }
+  }
+  outer: for (const [i, j] of candidates) {
     if (!supported(shots[i]) || !supported(shots[j])) {
       result.incomplete = true; result.reason = 'unsupported-competing-projectile'; break outer;
     }
@@ -118,4 +131,4 @@ function observeProjectilePairs(game, dt, eventsForPair) {
   }
   return result;
 }
-module.exports = { observeProjectilePairs, MAX_PAIRS };
+module.exports = { observeProjectilePairs, MAX_PAIRS, MAX_BROADPHASE_PAIRS };
