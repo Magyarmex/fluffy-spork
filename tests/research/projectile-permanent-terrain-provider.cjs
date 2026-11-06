@@ -4,7 +4,7 @@
 // against detached, pre-update Battlefield terrain times. Never changes combat.
 const { makeOpenFieldProvider } = require('./projectile-open-field-event-provider.cjs');
 const { firstContact } = require('./projectile-first-event-certificate.cjs');
-const { firstDetachedPermanentTerrainEvent } = require('./projectile-detached-permanent-terrain.cjs');
+const { makeDetachedPermanentTerrainQuery } = require('./projectile-detached-permanent-terrain.cjs');
 function makePermanentTerrainProvider(game, dt) {
   if (!game || game.__novaResearchHostilityFixture !== true || !Array.isArray(game.bullets) || !Array.isArray(game.__novaTerrain) ||
       (game.terrain != null && (!Array.isArray(game.terrain) ||
@@ -22,9 +22,12 @@ function makePermanentTerrainProvider(game, dt) {
     s && [s.id,s.shape,s.x,s.y,s.w,s.h,s.r,s.solid,s.destructible,s.hp]));
   let initialTerrain;
   try { initialTerrain = terrainState(); } catch (_) { return null; }
+  // One detached spatial index per immutable frame snapshot, not per shot.
+  const queryTerrain = makeDetachedPermanentTerrainQuery(game);
+  if (!queryTerrain) return null;
   const terrainTimes = [];
   for (const bullet of game.bullets) {
-    const event = firstDetachedPermanentTerrainEvent(game, bullet, dt);
+    const event = queryTerrain(bullet, dt);
     if (!event.complete) return null;
     terrainTimes.push(event.time);
   }

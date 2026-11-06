@@ -213,3 +213,49 @@ test('actual Battlefield cover contacts are never excluded by swept AABB',()=>{
  }
  assert.ok(contacts>10,'oracle must exercise real cover contacts');
 });
+
+test('actual Battlefield reuses one detached index for a multi-shot chronology snapshot',()=>{
+ const {makePermanentTerrainProvider}=require('../research/projectile-permanent-terrain-provider.cjs');
+ const {observeProjectilePairs}=require('../research/projectile-pair-chronology-observer.cjs');
+ const g=boot(),dt=.04;
+ const bullet=(ownerId,x,vx)=>({kind:'bullet',dead:false,shell:false,beam:false,
+   pen:0,hits:0,ttl:.42,r:3,ownerId,x,y:0,vx,vy:0});
+ g.__novaResearchHostilityFixture=true;g.player=null;g.powerups=[];g.terrain=[];
+ g.bullets=[bullet(1,-17.5,1000),bullet(2,0,0),bullet(3,27.5,-1000)];
+ g.__novaTerrain=[{...rect(),x:-12,w:2}];
+ const before=JSON.stringify(g.__novaTerrain),original=g.firstTerrainHit,owners=[];
+ g.firstTerrainHit=function(...args){owners.push(this);return original.apply(this,args);};
+ const provider=makePermanentTerrainProvider(g,dt);
+ assert.equal(typeof provider,'function');
+ assert.equal(owners.length,3);
+ assert.ok(owners.every(owner=>owner===owners[0]));
+ assert.notStrictEqual(owners[0],g);
+ assert.equal(JSON.stringify(g.__novaTerrain),before);
+ assert.equal(Object.hasOwn(g,'__novaBattlefieldIndex'),false);
+ const result=observeProjectilePairs(g,dt,provider);
+ assert.equal(result.incomplete,false);
+ assert.deepEqual([result.certified[0].i,result.certified[0].j],[1,2]);
+});
+
+test('seeded actual Battlefield shared-index results match fresh-index reference',()=>{
+ const {makeDetachedPermanentTerrainQuery}=require('../research/projectile-detached-permanent-terrain.cjs');
+ let seed=0x739147;
+ const random=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ const g=boot(),dt=.04;
+ g.__novaTerrain=[rect(),{...rect(),id:22,x:40,y:30,w:14,h:10},
+   {id:23,shape:'circle',x:-55,y:-30,r:13,solid:true,destructible:false},
+   {...rect(),id:24,x:100,y:100,destructible:true,hp:20}];
+ const before=JSON.stringify(g.__novaTerrain),shared=makeDetachedPermanentTerrainQuery(g);
+ assert.equal(typeof shared,'function');
+ let hits=0;
+ for(let i=0;i<200;i++){
+   const b={...shot(),x:(random()-.5)*160,y:(random()-.5)*120,
+     vx:(random()-.5)*4500,vy:(random()-.5)*4500};
+   const actual=shared(b,dt),reference=query(g,b,dt);
+   assert.deepEqual(actual,reference,'shot '+i);
+   if(actual.time!==null)hits++;
+ }
+ assert.ok(hits>10,'fixture must exercise real terrain hits');
+ assert.equal(JSON.stringify(g.__novaTerrain),before);
+ assert.equal(Object.hasOwn(g,'__novaBattlefieldIndex'),false);
+});
