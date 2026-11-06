@@ -222,3 +222,44 @@ test('distant active cover preserves earliest contact across 30–240Hz and stor
    assert.ok(Math.abs(r.certified[0].time-.00125)<1e-9,hz+'Hz');
  }
 });
+
+
+test('terrain-qualified event provider rejects stale third-projectile geometry',()=>{
+ const g=fixture(null),dt=.04;
+ g.__novaTerrain=[];g.firstTerrainHit=()=>null;
+ g.bullets=[shot(1,-20,1000),shot(2,20,-1000),shot(3,200,0)];
+ const provider=makePermanentTerrainProvider(g,dt);
+ assert.equal(typeof provider,'function');
+ g.bullets[2].x=0;
+ const result=observeProjectilePairs(g,dt,provider);
+ assert.equal(result.incomplete,true);
+ assert.equal(result.certified.length,0);
+});
+
+
+test('terrain provider invalidates replaced terrain owner and first-hit method',()=>{
+ const dt=.04;
+ for(const mutate of [
+   g=>{g.__novaTerrain=g.__novaTerrain.map(s=>({...s}));},
+   g=>{g.firstTerrainHit=()=>null;}
+ ]){
+   const g=fixture(.9);
+   const provider=makePermanentTerrainProvider(g,dt);
+   assert.equal(typeof provider,'function');
+   mutate(g);
+   const result=observeProjectilePairs(g,dt,provider);
+   assert.equal(result.incomplete,true);
+   assert.equal(result.certified.length,0);
+ }
+});
+
+
+test('terrain provider rejects replacement of live bullet array after snapshot',()=>{
+ const g=fixture(.9),dt=.04;
+ const provider=makePermanentTerrainProvider(g,dt);
+ assert.equal(typeof provider,'function');
+ g.bullets=g.bullets.map(b=>({...b}));
+ const result=observeProjectilePairs(g,dt,provider);
+ assert.equal(result.incomplete,true);
+ assert.equal(result.certified.length,0);
+});
