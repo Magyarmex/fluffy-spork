@@ -23,7 +23,11 @@ function firstDetachedPermanentTerrainEvent(game, shot, dt) {
           (s.shape === 'circle' ? !(Number.isFinite(s.r) && s.r > 0) :
            s.shape === 'rect' ? !(Number.isFinite(s.w) && s.w > 0 && Number.isFinite(s.h) && s.h > 0) : true))
         return unknown('unsupported-terrain');
-      const copy = { ...s };\n      // The detached index starts at stamp 1. Reusing a live stamp of 1\n      // would silently skip this wall during its first spatial query.\n      delete copy.__novaBattlefieldStamp;\n      terrain.push(copy);
+      const copy = { ...s };
+      // The detached index starts at stamp 1. Reusing a live stamp of 1
+      // would silently skip this wall during its first spatial query.
+      delete copy.__novaBattlefieldStamp;
+      terrain.push(copy);
     }
     // firstTerrainHit builds a spatial index and stamps solids. Both mutations
     // must remain confined to this disposable detached object.
