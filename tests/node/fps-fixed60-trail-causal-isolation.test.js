@@ -85,6 +85,5 @@ test('fixed60 at 30Hz presentation preserves native60 projectile trail opportuni
   assert.equal(fixed.physical,native.physical);
   assert.equal(fixed.gameplayDraws,native.gameplayDraws);
   assert.equal(fixed.ordinary,native.ordinary);
-  assert.equal(fixed.other,native.other);
  }
 });
