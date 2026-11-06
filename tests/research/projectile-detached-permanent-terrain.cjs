@@ -4,6 +4,7 @@
 function makeDetachedPermanentTerrainQuery(game) {
   if (!game || typeof game.firstTerrainHit !== 'function' ||
       !Array.isArray(game.__novaTerrain) || game.__novaTerrain.length > 256) return null;
+  const firstHit = game.firstTerrainHit;
   const permanent = [], active = [];
   try {
     for (let i = 0; i < game.__novaTerrain.length; i++) {
@@ -45,7 +46,7 @@ function makeDetachedPermanentTerrainQuery(game) {
         if (!(maxX<s.x-s.halfW-epsilon || minX>s.x+s.halfW+epsilon ||
               maxY<s.y-s.halfH-epsilon || minY>s.y+s.halfH+epsilon))
           return unknown('active-cover-corridor');
-      const hit=game.firstTerrainHit.call(detached,shot.x,shot.y,endX,endY,pad);
+      const hit=firstHit.call(detached,shot.x,shot.y,endX,endY,pad);
       if (hit==null) return { complete:true,time:null,reason:null };
       if (!hit.hit || !Number.isFinite(hit.hit.t) ||
           hit.hit.t<0 || hit.hit.t>1 || !permanent.includes(hit.solid))
