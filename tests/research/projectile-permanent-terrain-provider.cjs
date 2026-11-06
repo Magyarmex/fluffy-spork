@@ -13,14 +13,14 @@ function makePermanentTerrainProvider(game, dt) {
     terrain: [], __novaTerrain: [] };
   const base = makeOpenFieldProvider(emptyFixture, dt);
   if (!base) return null;
-  const terrainTimes = [];
+  // A callback must never certify against walls changed after its snapshot.\n  const terrainState = () => JSON.stringify(game.__novaTerrain.map(s =>\n    s && [s.id,s.shape,s.x,s.y,s.w,s.h,s.r,s.solid,s.destructible,s.hp]));\n  let initialTerrain;\n  try { initialTerrain = terrainState(); } catch (_) { return null; }\n  const terrainTimes = [];
   for (const bullet of game.bullets) {
     const event = firstDetachedPermanentTerrainEvent(game, bullet, dt);
     if (!event.complete) return null;
     terrainTimes.push(event.time);
   }
   return (a,b,i,j,step) => {
-    const context = base(a,b,i,j,step);
+    let unchanged;\n    try { unchanged = terrainState() === initialTerrain; } catch (_) { return null; }\n    if (!unchanged) return null;\n    const context = base(a,b,i,j,step);
     if (!context || !Number.isInteger(i) || !Number.isInteger(j) ||
         i < 0 || j <= i || j >= terrainTimes.length) return null;
     return { ...context, aTerrain: terrainTimes[i], bTerrain: terrainTimes[j] };
