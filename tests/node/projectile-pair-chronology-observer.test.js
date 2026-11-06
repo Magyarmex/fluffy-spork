@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { observeProjectilePairs, MAX_PAIRS } =
+const { observeProjectilePairs, MAX_PAIRS, MAX_BROADPHASE_PAIRS } =
   require('../research/projectile-pair-chronology-observer.cjs');
 const blockers = { aTerrain: null, bTerrain: null, aBody: null,
   bBody: null, aOtherProjectile: null, bOtherProjectile: null };
@@ -38,7 +38,7 @@ test('event-provider failure fails closed', () => {
   assert.equal(r.certified.length, 0);
 });
 test('pair budget fails closed before expensive work', () => {
-  const g = { bullets: Array.from({ length: 24 }, (_, i) => shot(i, i * 10, 0)) };
+  const g = { bullets: Array.from({ length: 24 }, (_, i) => shot(i, 0, 0)) };
   let calls = 0;
   const r = observeProjectilePairs(g, .05, () => { calls++; return verified(); });
   assert.ok(24 * 23 / 2 > MAX_PAIRS);
@@ -262,7 +262,7 @@ test('live pair budget still rejects dense encounters with dead shots present', 
   const dead = shot(99, 0, 0);
   dead.dead = true;
   const g = { bullets: [dead, ...Array.from({ length: 24 }, (_, i) =>
-    shot(i + 1, i * 10, 0))] };
+    shot(i + 1, 0, 0))] };
   let calls = 0;
   const r = observeProjectilePairs(g, .05, () => { calls++; return verified(); });
   assert.equal(r.incomplete, true);
@@ -299,4 +299,58 @@ test('live shell still vetoes the whole frame even with dead debris', () => {
   assert.equal(r.incomplete, true);
   assert.equal(r.reason, 'unsupported-projectile-present');
   assert.equal(r.certified.length, 0);
+});
+
+test('spatially separated active shots no longer exhaust event budget', () => {
+  const g = { bullets: Array.from({ length: 60 }, (_, i) =>
+    shot(i + 1, i * 100, 0, i * 100)) };
+  let calls = 0;
+  const r = observeProjectilePairs(g, .05, () => { calls++; return verified(); });
+  assert.equal(r.incomplete, false);
+  assert.equal(r.pairs, 1770);
+  assert.equal(r.certified.length, 0);
+  assert.equal(calls, 0);
+});
+
+test('sparse crowded frame still certifies uniquely earliest active interception', () => {
+  const shots = Array.from({ length: 40 }, (_, i) =>
+    shot(i + 10, i * 100 + 1000, 0, i * 100 + 1000));
+  shots.push(shot(1, -20, 1000), shot(2, 20, -1000));
+  const r = observeProjectilePairs({ bullets: shots }, .05, verified);
+  assert.equal(r.incomplete, false);
+  assert.equal(r.certified.length, 1);
+  assert.deepEqual([r.certified[0].i, r.certified[0].j], [40, 41]);
+});
+
+test('dense swept candidates abstain without calling event provider', () => {
+  const g = { bullets: Array.from({ length: 24 }, (_, i) =>
+    shot(i + 1, 0, 0)) };
+  let calls = 0;
+  const r = observeProjectilePairs(g, .05, () => { calls++; return verified(); });
+  assert.equal(r.incomplete, true);
+  assert.equal(r.reason, 'pair-budget');
+  assert.equal(r.certified.length, 0);
+  assert.equal(calls, 0);
+});
+
+test('oversized broad phase abstains before quadratic scanning', () => {
+  const count = Math.ceil((1 + Math.sqrt(1 + 8 * MAX_BROADPHASE_PAIRS)) / 2) + 1;
+  const g = { bullets: Array.from({ length: count }, (_, i) =>
+    shot(i + 1, i * 100, 0)) };
+  let calls = 0;
+  const r = observeProjectilePairs(g, .05, () => { calls++; return verified(); });
+  assert.equal(r.incomplete, true);
+  assert.equal(r.reason, 'broadphase-budget');
+  assert.equal(r.certified.length, 0);
+  assert.equal(calls, 0);
+});
+
+test('swept candidate budget does not suppress distant-endpoint crossings', () => {
+  const shots = Array.from({ length: 30 }, (_, i) =>
+    shot(i + 10, i * 100 + 1000, 0, i * 100 + 1000));
+  shots.push(shot(1, -100, 6000), shot(2, 100, -6000));
+  const r = observeProjectilePairs({ bullets: shots }, .05, verified);
+  assert.equal(r.incomplete, false);
+  assert.equal(r.certified.length, 1);
+  assert.deepEqual([r.certified[0].i, r.certified[0].j], [30, 31]);
 });
