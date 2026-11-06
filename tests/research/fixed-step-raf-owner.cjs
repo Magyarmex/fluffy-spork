@@ -27,6 +27,7 @@ class FixedStepRafOwner {
     // still be delivered by a host after stop/restart; they must never
     // advance a newly started world or schedule a second RAF chain.
     this._generation=0;this._requestSeq=0;
+    this._awaitingForwardFrame=false;
     this.originalDestroy=game.destroy;
     this.destroyHadOwn=Object.prototype.hasOwnProperty.call(game,'destroy');
     this.destroyWrapper=null;
@@ -55,7 +56,8 @@ class FixedStepRafOwner {
       throw Error('game lifecycle owner changed before fixed-step activation');
     const at=this.now();if(!Number.isFinite(at)||at<this.bridge.startMs-EPS)
       throw Error('invalid fixed-step start time');
-    this._generation++;this.started=true;this.lastMs=at;this.simAtSec=(at-this.bridge.startMs)/1000;
+    this._generation++;this.started=true;this.lastMs=at;
+    this._awaitingForwardFrame=true;this.simAtSec=(at-this.bridge.startMs)/1000;
     this.timeline.reset();this.timeline.tickOrigin=this.simAtSec;
     this.timeline.consumeThrough(this.simAtSec);
     this.paused=!!this.game.paused;
@@ -95,16 +97,24 @@ class FixedStepRafOwner {
   transition(paused,at){
     if(!Number.isFinite(at)||at<this.lastMs-EPS)throw Error('invalid pause clock');
     this.timeline.reset();this.lagMs=0;this.paused=paused;
-    this.lastMs=at;this.simAtSec=(at-this.bridge.startMs)/1000;
+    this._awaitingForwardFrame=true;this.lastMs=at;this.simAtSec=(at-this.bridge.startMs)/1000;
     // A new simulation epoch changes the tick grid used for safe pointermove coalescing.
     this.timeline.tickOrigin=this.simAtSec;
     this.timeline.consumeThrough(this.simAtSec);
   }
   frame(ts){
     if(!this.started)throw Error('fixed-step RAF is not running');
-    if(!Number.isFinite(ts)||ts<this.lastMs-EPS)throw Error('nonmonotonic RAF timestamp');
-    try{this.schedule();this.advance(ts)}
-    catch(error){this.stop();throw error}
+    try{
+      if(!Number.isFinite(ts))throw Error('nonmonotonic RAF timestamp');
+      // The first RAF timestamp may represent the beginning of a frame in
+      // which performance.now() was sampled later. Never simulate backwards.
+      if(ts<this.lastMs-EPS){
+        if(!this._awaitingForwardFrame||this.lastMs-ts>250)
+          throw Error('nonmonotonic RAF timestamp');
+        ts=this.lastMs;
+      }else this._awaitingForwardFrame=false;
+      this.schedule();this.advance(ts);
+    }catch(error){this.stop();throw error}
   }
   advance(ts){
     const g=this.game;
@@ -200,7 +210,8 @@ class FixedStepRafOwner {
   }
   stop(){
     if(!this.started)return;
-    this.started=false;this._generation++;this._requestSeq++;
+    this.started=false;this._awaitingForwardFrame=false;
+    this._generation++;this._requestSeq++;
     // A host may throw while cancelling a queued browser callback. Even then,
     // release all lifecycle hooks: leaving Game.start/destroy wrapped after
     // stop would strand the playable game behind an inactive research owner.
