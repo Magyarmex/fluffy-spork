@@ -250,6 +250,7 @@ function ttlWitness(g) {
 function ttlFixture(ttlA=.005,ttlB=.005,hpA=1,hpB=1) {
   const g=boot(),a=shot(1,1,-20,6000,ttlA),b=shot(2,2,20,-6000,ttlB);
   a.hp=a.maxHp=hpA;b.hp=b.maxHp=hpB;
+  a.baseDmg=a.dmg;b.baseDmg=b.dmg;
   ttlWitness(g);
   g.tankById.set(1,{id:1,team:1});
   g.tankById.set(2,{id:2,team:2});
@@ -413,11 +414,18 @@ test('canonical Scout bullet size, speed and integrity reach FFA TTL recovery',(
     const {g,a,b,hits}=ttlFixture();
     g.tankById.set(1,{id:1});g.tankById.set(2,{id:2});
     const scoutHp=12*(0.72+5*0.08)*(1+0.055);
-    Object.assign(a,{x:-7,vx:440,r:5,dmg:12,pen:1,hp:scoutHp,maxHp:scoutHp});
-    Object.assign(b,{x:7,vx:-440,r:5,dmg:12,pen:1,hp:scoutHp,maxHp:scoutHp});
+    Object.assign(a,{x:-7,vx:440,r:5,dmg:12,baseDmg:12,pen:1,hp:scoutHp,maxHp:scoutHp});
+    Object.assign(b,{x:7,vx:-440,r:5,dmg:12,baseDmg:12,pen:1,hp:scoutHp,maxHp:scoutHp});
     g.updateBullets(1/fps);
     assert.deepEqual(hits.sort(),[1,2],
       'real Scout-size/speed/integrity at '+fps+'Hz');
     assert.equal(a.dead,true);assert.equal(b.dead,true);
   }
+});
+
+test('mutual TTL recovery refuses incomplete integrity initialization',()=>{
+  const {g,a,hits}=ttlFixture();
+  delete a.baseDmg;
+  g.updateBullets(1/30);
+  assert.deepEqual(hits,[]);
 });
