@@ -45,6 +45,9 @@ function replay(intervals,maxSteps=2){
     }
     const round=x=>Math.round(x*1000)/1000;
     return {frames:intervals.length,wallMs:round(total),maxSteps,
+      maxFrameGapMs:round(intervals.reduce((peak,v)=>Math.max(peak,v),0)),
+      p95FrameGapMs:round(percentile(intervals,.95)),
+      foregroundStallFrames:intervals.filter(v=>v>100+1e-7).length,
       simulatedTicks:owner.ticks,simulatedMs:round(owner.ticks*STEP_MS),
       droppedMs:round(owner.droppedMs),droppedFrames:owner.droppedFrames,
       remainingBacklogMs:round(owner.lagMs),
