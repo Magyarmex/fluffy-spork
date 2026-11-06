@@ -154,3 +154,28 @@ test('game-over state does not display a combat touch reset notice',()=>{
     assert.equal(s.input.move.active,false,'safety reset still applies');
   }finally{s.owner.stop()}
 });
+
+test('mouse pointerup sharing a touch id cannot conceal involuntary touch reset',()=>{
+  const s=fixture();s.owner.start();
+  try{
+    s.down(1005,7);s.frame(1017);
+    assert.equal(s.input.move.active,true);
+    // Pointer IDs are only meaningful within their pointer type. A mouse
+    // release with the same numeric id must not count as a touch release.
+    s.timeline.push(.020,'pointerup',{pointerId:7,pointerType:'mouse'});
+    s.frame(1137);
+    assert.equal(s.notices.length,1,'held touch was still involuntarily reset');
+    assert.equal(s.input.stickId.move,-1);
+    assert.equal(s.input.firing,false);
+  }finally{s.owner.stop()}
+});
+test('malformed queued pointer metadata cannot crash foreground recovery',()=>{
+  const s=fixture();s.owner.start();
+  try{
+    s.down(1005);s.frame(1017);
+    s.timeline.events.push({at:.020,kind:'pointerup',data:null});
+    s.frame(1137);
+    assert.equal(s.notices.length,1);
+    assert.equal(s.input.move.active,false);
+  }finally{s.owner.stop()}
+});
