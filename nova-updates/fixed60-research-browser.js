@@ -543,7 +543,7 @@ class FixedStepRafOwner {
           // is still a real held touch that the stall will invalidate.
           for(let i=pending.length-1;i>=0;i--){
             const e=pending[i];
-            if(!e.data || (e.data.pointerType!=='touch' && e.data.pointerType!=='pen') || e.data.pointerId!==id)continue;
+            if(!e.data || typeof e.data.pointerType!=='string' || e.data.pointerType==='mouse' || e.data.pointerId!==id)continue;
             if(e.kind==='pointerdown')return true;
             if(e.kind==='pointerup'||e.kind==='pointercancel')return false;
           }
