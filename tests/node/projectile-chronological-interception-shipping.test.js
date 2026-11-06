@@ -241,16 +241,21 @@ test('simultaneous allied crossing cannot suppress an earlier hostile contact', 
 });
 
 
+function ttlWitness(g) {
+  g.__novaShapeSweepEpoch = 1;
+  g.__novaFrameStartBulletEpoch = 1;
+  g.__novaFrameStartBulletIdCeiling = 4;
+}
 /* Issue #147: an ordinary pair must meet before both physical TTLs even
  * when the core would discard both at the end of a low-refresh frame.
  * This narrow first release requires a complete, isolated two-shot proof. */
 for (const fps of [30, 60, 120, 240]) {
   test('isolated mutually fatal projectile interception precedes TTL at ' + fps + 'Hz', () => {
     for (const reverse of [false, true]) {
-      const g = boot(), a = shot(1, 1, -20, 6000, .005);
+      const g = boot(), a = shot(1, 1, -20, 6000, .005);\n      ttlWitness(g);
       const b = shot(2, 2, 20, -6000, .005);
       a.hp = a.maxHp = b.hp = b.maxHp = 1;
-      g.tankById.set(1, {id:1, team:1});
+      ttlWitness(g);\n    g.tankById.set(1, {id:1, team:1});
       g.tankById.set(2, {id:2, team:2});
       g.bullets = reverse ? [b, a] : [a, b];
       const hits=[], original = g.weakenBullet.bind(g);
@@ -270,7 +275,7 @@ test('mutual TTL preflight abstains on allied, unknown and competing contexts', 
     const g = boot(), a = shot(1, 1, -20, 6000, .005),
       b = shot(2, 2, 20, -6000, .005);
     a.hp = a.maxHp = b.hp = b.maxHp = 1;
-    g.tankById.set(1, {id:1, team:1});
+    ttlWitness(g);\n    g.tankById.set(1, {id:1, team:1});
     g.tankById.set(2, {id:2, team:2});
     g.bullets = [a,b];
     const hits=[], original=g.weakenBullet.bind(g);
@@ -308,7 +313,7 @@ test('mutual TTL recovery respects both lifetime and integrity budgets', () => {
   function run(ttlA,ttlB,hpA,hpB,wall) {
     const g=boot(),a=shot(1,1,-20,6000,ttlA),b=shot(2,2,20,-6000,ttlB);
     a.hp=a.maxHp=hpA;b.hp=b.maxHp=hpB;
-    g.tankById.set(1,{id:1,team:1});
+    ttlWitness(g);\n    ttlWitness(g);\n  g.tankById.set(1,{id:1,team:1});
     g.tankById.set(2,{id:2,team:2});
     g.bullets=[a,b];
     if(wall)g.__novaTerrain=[wall];
@@ -330,7 +335,7 @@ test('mutual TTL recovery respects both lifetime and integrity budgets', () => {
 test('mutual TTL preflight refuses separately referenced player at contact',()=>{
   const g=boot(),a=shot(1,1,-20,6000,.005),b=shot(2,2,20,-6000,.005);
   a.hp=a.maxHp=b.hp=b.maxHp=1;
-  g.tankById.set(1,{id:1,team:1});
+  ttlWitness(g);\n  g.tankById.set(1,{id:1,team:1});
   g.tankById.set(2,{id:2,team:2});
   g.bullets=[a,b];
   g.player={id:3,cls:'scout',alive:true,x:0,y:0,
