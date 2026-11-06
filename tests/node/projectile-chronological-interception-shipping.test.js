@@ -528,3 +528,21 @@ test('seeded remote projectile translations do not change mutual TTL result',()=
     assert.equal(third.dead,false);
   }
 });
+
+test('remote third projectile never bypasses earlier wall or body priority',()=>{
+  for(const obstruct of [
+    g=>{g.__novaTerrain=[{shape:'rect',x:-12,y:0,w:3,h:50,
+      solid:true,destructible:false}];},
+    g=>{g.__novaShapeSweepActive=true;
+      g.shapes=[{kind:'shape',x:-12,y:0,r:10,hp:100,
+        __novaShapeSweepEpoch:1,__novaShapeSweepPrevX:-12,
+        __novaShapeSweepPrevY:0}];}
+  ]){
+    const {g,a,b,hits}=ttlFixture();
+    const remote=shot(3,3,600,0,1);
+    remote.y=600;remote.baseDmg=remote.dmg;
+    g.bullets=[a,b,remote];obstruct(g);
+    g.updateBullets(1/30);
+    assert.deepEqual(hits,[],'existing first-contact precedence must survive extension');
+  }
+});
