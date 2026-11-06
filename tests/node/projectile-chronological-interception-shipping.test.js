@@ -239,3 +239,66 @@ test('simultaneous allied crossing cannot suppress an earlier hostile contact', 
   assert.deepEqual(g.bullets.map(b => [b.hp, !!b.dead]),
     [[-1, true], [5, false], [-1, true], [1, false]]);
 });
+
+
+/* Issue #147: an ordinary pair must meet before both physical TTLs even
+ * when the core would discard both at the end of a low-refresh frame.
+ * This narrow first release requires a complete, isolated two-shot proof. */
+for (const fps of [30, 60, 120, 240]) {
+  test('isolated mutually fatal projectile interception precedes TTL at ' + fps + 'Hz', () => {
+    for (const reverse of [false, true]) {
+      const g = boot(), a = shot(1, 1, -20, 6000, .005);
+      const b = shot(2, 2, 20, -6000, .005);
+      a.hp = a.maxHp = b.hp = b.maxHp = 1;
+      g.tankById.set(1, {id:1, team:1});
+      g.tankById.set(2, {id:2, team:2});
+      g.bullets = reverse ? [b, a] : [a, b];
+      const hits=[], original = g.weakenBullet.bind(g);
+      g.weakenBullet = function (s, damage) {
+        hits.push(s.id);
+        return original(s, damage);
+      };
+      g.updateBullets(1 / fps);
+      assert.deepEqual(hits.sort(), [1,2], 'interception must occur before expiry');
+      assert.equal(a.dead, true);
+      assert.equal(b.dead, true);
+    }
+  });
+}
+test('mutual TTL preflight abstains on allied, unknown and competing contexts', () => {
+  function run(setup) {
+    const g = boot(), a = shot(1, 1, -20, 6000, .005),
+      b = shot(2, 2, 20, -6000, .005);
+    a.hp = a.maxHp = b.hp = b.maxHp = 1;
+    g.tankById.set(1, {id:1, team:1});
+    g.tankById.set(2, {id:2, team:2});
+    g.bullets = [a,b];
+    const hits=[], original=g.weakenBullet.bind(g);
+    g.weakenBullet = function(s,damage) {hits.push(s.id);return original(s,damage);};
+    setup(g,a,b);
+    g.updateBullets(1/30);
+    return hits;
+  }
+  assert.deepEqual(run(g=>g.tankById.get(2).team=1), [],
+    'allied projectiles never intercept');
+  assert.deepEqual(run(g=>g.tankById.delete(2)), [],
+    'unknown ownership cannot prove hostility');
+  assert.deepEqual(run(g=>g.bullets.push(shot(3,3,400,0,.005))), [],
+    'unscanned third projectile must veto');
+  assert.deepEqual(run(g=>{
+    g.__novaTerrain=[{shape:'rect',x:-12,y:0,w:3,h:50,
+      solid:true,destructible:false}];
+  }), [], 'earlier permanent wall must veto');
+  assert.deepEqual(run(g=>{
+    g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=2;
+    g.shapes=[{kind:'shape',x:-12,y:0,r:10,hp:100,
+      __novaShapeSweepEpoch:2,__novaShapeSweepPrevX:-12,
+      __novaShapeSweepPrevY:0}];
+  }), [], 'earlier body must veto');
+  assert.deepEqual(run(g=>{
+    g.__novaShapeSweepActive=true;g.__novaShapeSweepEpoch=2;
+    g.shapes=[{kind:'shape',x:700,y:700,r:10,hp:100,
+      __novaShapeSweepEpoch:2,__novaShapeSweepPrevX:700,
+      __novaShapeSweepPrevY:700}];
+  }), [1,2], 'remote witnessed neutral must not veto');
+});
