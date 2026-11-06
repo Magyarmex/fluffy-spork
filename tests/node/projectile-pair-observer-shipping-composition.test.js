@@ -170,3 +170,42 @@ for (const fps of [30, 60, 120, 240]) {
     assert.doesNotThrow(() => g.updateBullets(dt));
   });
 }
+
+test('full shipping overlay composition supports detached permanent-wall timing', () => {
+  const { firstDetachedPermanentTerrainEvent } =
+    require('../research/projectile-detached-permanent-terrain.cjs');
+  const g = boot();
+  g.__novaTerrain = [{ id: -5, shape: 'rect', x: 0, y: 0,
+    w: 4, h: 40, solid: true, destructible: false, __novaBattlefieldStamp: 1 }];
+  const before = JSON.stringify(g.__novaTerrain);
+  const s = shot(1, 1, -20, 1000, .42);
+  const result = firstDetachedPermanentTerrainEvent(g, s, .04);
+  assert.equal(result.complete, true);
+  assert.ok(Math.abs(result.time - .01665) < 1e-10);
+  assert.equal(JSON.stringify(g.__novaTerrain), before);
+  assert.equal(Object.hasOwn(g, '__novaBattlefieldIndex'), false);
+});
+
+for (const fps of [30, 60, 120, 240]) {
+  test('composed Game orders permanent wall against hostile interception at ' + fps + 'Hz', () => {
+    const { makePermanentTerrainProvider } =
+      require('../research/projectile-permanent-terrain-provider.cjs');
+    for (const [wallX, expected] of [[-10, 0], [0, 1]]) {
+      const g = boot();
+      g.__novaResearchHostilityFixture = true;
+      g.terrain = [];
+      g.__novaTerrain = [{ id: -5, shape: 'rect', x: wallX, y: 0,
+        w: 4, h: 40, solid: true, destructible: false }];
+      g.bullets = [shot(1, 1, -20, 6000, .42), shot(2, 2, 20, -6000, .42)];
+      const before = JSON.stringify(g.__novaTerrain);
+      const dt = 1 / fps;
+      const provider = makePermanentTerrainProvider(g, dt);
+      assert.equal(typeof provider, 'function');
+      const result = observeProjectilePairs(g, dt, provider);
+      assert.equal(result.incomplete, false);
+      assert.equal(result.certified.length, expected);
+      assert.equal(JSON.stringify(g.__novaTerrain), before);
+      assert.equal(Object.hasOwn(g, '__novaBattlefieldIndex'), false);
+    }
+  });
+}
