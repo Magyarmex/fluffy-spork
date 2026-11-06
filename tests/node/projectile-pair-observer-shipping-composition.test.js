@@ -170,3 +170,18 @@ for (const fps of [30, 60, 120, 240]) {
     assert.doesNotThrow(() => g.updateBullets(dt));
   });
 }
+
+test('full shipping overlay composition supports detached permanent-wall timing', () => {
+  const { firstDetachedPermanentTerrainEvent } =
+    require('../research/projectile-detached-permanent-terrain.cjs');
+  const g = boot();
+  g.__novaTerrain = [{ id: -5, shape: 'rect', x: 0, y: 0,
+    w: 4, h: 40, solid: true, destructible: false }];
+  const before = JSON.stringify(g.__novaTerrain);
+  const s = shot(1, 1, -20, 1000, .42);
+  const result = firstDetachedPermanentTerrainEvent(g, s, .04);
+  assert.equal(result.complete, true);
+  assert.ok(Math.abs(result.time - .01665) < 1e-10);
+  assert.equal(JSON.stringify(g.__novaTerrain), before);
+  assert.equal(Object.hasOwn(g, '__novaBattlefieldIndex'), false);
+});
