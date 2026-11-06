@@ -3,12 +3,16 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const source=fs.readFileSync(path.resolve(__dirname,'../../scripts/fixed60-raf-trace-capture.js'),'utf8');
 function harness(){
- let callback=null,cancelled=0;
- const window={document:{hidden:false},
+ let callback=null,cancelled=0;const listeners=new Map();
+ const document={hidden:false,
+  addEventListener(type,fn){listeners.set(type,fn);},
+  removeEventListener(type,fn){if(listeners.get(type)===fn)listeners.delete(type);}};
+ const window={document,
   requestAnimationFrame(fn){callback=fn;return 1;},
   cancelAnimationFrame(){cancelled++;callback=null;}};
  vm.runInNewContext(source,{window},{timeout:1000});
- return {window,hide(){document.hidden=true;listeners.get('visibilitychange')?.();},\n  get listenerCount(){return listeners.size;},next(ts){const fn=callback;callback=null;
+ return {window,hide(){document.hidden=true;listeners.get('visibilitychange')?.();},
+  get listenerCount(){return listeners.size;},next(ts){const fn=callback;callback=null;
    assert.equal(typeof fn,'function');fn(ts);},get cancelled(){return cancelled;}};
 }
 test('opt-in browser recorder captures only foreground RAF intervals',()=>{
@@ -30,7 +34,8 @@ test('hidden tab ends capture without inventing background frame gaps',()=>{
  c.start();h.next(100);h.next(133);
  h.hide();
  assert.equal(c.active,false);
- assert.equal(c.snapshot().capture.reason,'hidden');\n assert.equal(h.listenerCount,0);
+ assert.equal(c.snapshot().capture.reason,'hidden');
+ assert.equal(h.listenerCount,0);
  assert.deepEqual(Array.from(c.snapshot().frameIntervalsMs),[33]);
 });
 test('RAF capture rejects invalid configuration and duplicate starts',()=>{
@@ -45,7 +50,8 @@ test('RAF capture rejects invalid configuration and duplicate starts',()=>{
  assert.throws(()=>c.start(),/already active/);
  c.stop();
  assert.equal(c.active,false);
- assert.ok(h.cancelled>=1);\n assert.equal(h.listenerCount,0);
+ assert.ok(h.cancelled>=1);
+ assert.equal(h.listenerCount,0);
 });
 
 test('host RAF scheduling failure cannot strand an active recorder',()=>{
