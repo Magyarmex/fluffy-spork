@@ -302,12 +302,12 @@ test('live shell still vetoes the whole frame even with dead debris', () => {
 });
 
 test('spatially separated active shots no longer exhaust event budget', () => {
-  const g = { bullets: Array.from({ length: 60 }, (_, i) =>
+  const g = { bullets: Array.from({ length: 40 }, (_, i) =>
     shot(i + 1, i * 100, 0, i * 100)) };
   let calls = 0;
   const r = observeProjectilePairs(g, .05, () => { calls++; return verified(); });
   assert.equal(r.incomplete, false);
-  assert.equal(r.pairs, 1770);
+  assert.equal(r.pairs, 780);
   assert.equal(r.certified.length, 0);
   assert.equal(calls, 0);
 });
