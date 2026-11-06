@@ -75,6 +75,8 @@ function trial(seed,mode,fixed30,quality='low'){
    return {physical:digest(physical(g)),gameplayDraws:draws(),
     ordinary,other,poolWrites,activeOverwrites,
     cosmeticState:g.__novaCosmeticRngState,
+    gunner:[p.fireCd,p.__v17Heat,p.__v17Stability,p.__v17ShotIndex,
+     p.__v17FiredAt,g.__v17FiringStepDt],
     bullets:g.bullets.length};
   }finally{if(owner)owner.stop();g.destroy();}
  });
@@ -98,6 +100,8 @@ test('actual composed Tempest: ordinary-trail suppression is simulation- and RNG
     'record live-particle replacement pressure without assuming it improves');
    assert.equal(suppressed.cosmeticState,a.cosmeticState,'cosmetic RNG sequence must be preserved');
    assert.equal(suppressed.physical,a.physical,'cosmetic suppression changed physical Game');
+   assert.deepEqual(suppressed.gunner,a.gunner,
+    'cosmetic suppression changed Tempest heat, stability or cadence state');
    assert.equal(suppressed.gameplayDraws,a.gameplayDraws,'cosmetic suppression changed gameplay RNG');
    console.log('NOVA_TRAIL_POOL_CENSUS '+JSON.stringify({seed,fixed30,quality,
     ordinary:a.ordinary,baselineWrites:a.poolWrites,
