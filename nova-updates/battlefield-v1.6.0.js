@@ -3026,11 +3026,11 @@ function certifiedMultiShotCoverPriority(g,dt){
   * the core's expiration pass. Any unknown competing event abstains. */
  function certifiedMutualTTLInterception(g,dt){
   var shots=g.bullets;
-  if(!(dt>0&&dt<=.05)||!shots||shots.length!==2||
+  if(!(dt>0&&dt<=.05)||!Array.isArray(shots)||
+     shots.length<2||shots.length>12||
      !Array.isArray(g.tanks)||!Array.isArray(g.shapes)||
      !Array.isArray(g.drones)||!g.hash||
      typeof g.hash.query!=='function')return false;
-  var a=shots[0],b=shots[1];
   function ordinary(s){
    return s&&s.dead===false&&s.kind==='bullet'&&
     s.shell===false&&s.beam===false&&!s.splash&&!s.__v17Cannon&&
@@ -3041,8 +3041,13 @@ function certifiedMultiShotCoverPriority(g,dt){
     Number.isFinite(s.r)&&s.r>0&&
     [s.x,s.y,s.vx,s.vy,s.ownerId].every(Number.isFinite);
   }
-  if(!ordinary(a)||!ordinary(b)||a.ownerId===b.ownerId||
-     a.hp!==b.hp||a.id===b.id)return false;
+  /* Exactly two expiring ordinary rounds are eligible. Other live shots
+   * are allowed only when their complete frame corridor is provably remote;
+   * never pick an arbitrary pair out of several competing expiry events. */
+  var expiring=shots.filter(ordinary);
+  if(expiring.length!==2)return false;
+  var a=expiring[0],b=expiring[1];
+  if(a.ownerId===b.ownerId||a.hp!==b.hp||a.id===b.id)return false;
   /* Projectiles fired later during this tick cannot be backdated to its
    * beginning. Reuse the actual Game.update frame-start ID witness. */
   var ceiling=g.__novaFrameStartBulletIdCeiling;
@@ -3090,6 +3095,32 @@ function certifiedMultiShotCoverPriority(g,dt){
    return {s:s,ex:ex,ey:ey};
   });
   if(!reach[0]||!reach[1])return false;
+  /* A third shot may be irrelevant even when present in the global array.
+   * Require an ordinary, pre-existing, nonexpiring projectile whose entire
+   * full-frame swept AABB cannot touch either participant's pre-contact path.
+   * This intentionally over-rejects crossing corridors and special shots. */
+  for(var oi=0;oi<shots.length;oi++){
+   var other=shots[oi];
+   if(other===a||other===b)continue;
+   if(!other||other.dead!==false||other.kind!=='bullet'||
+      other.shell!==false||other.beam!==false||other.splash||
+      other.__v17Cannon||other.__novaRail||
+      !Number.isSafeInteger(other.id)||other.id>=ceiling||
+      other.id===a.id||other.id===b.id||
+      ![other.x,other.y,other.vx,other.vy,other.r,other.ttl,
+        other.ownerId,other.hp,other.maxHp,other.baseDmg].every(Number.isFinite)||
+      !(other.r>0&&other.ttl>dt&&other.hp>0&&
+        other.maxHp>=other.hp&&other.baseDmg>0))return false;
+   var ox=other.x+other.vx*dt,oy=other.y+other.vy*dt;
+   if(!Number.isFinite(ox)||!Number.isFinite(oy))return false;
+   for(var ri=0;ri<2;ri++){
+    var pp=reach[ri],ss=pp.s,pad=other.r+ss.r+3;
+    if(Math.max(other.x,ox)+pad>=Math.min(ss.x,pp.ex)&&
+       Math.min(other.x,ox)-pad<=Math.max(ss.x,pp.ex)&&
+       Math.max(other.y,oy)+pad>=Math.min(ss.y,pp.ey)&&
+       Math.min(other.y,oy)-pad<=Math.max(ss.y,pp.ey))return false;
+   }
+  }
   for(var i=0;i<2;i++){
    var p=reach[i],s=p.s;
    if(firstSolidHit(g,s.x,s.y,p.ex,p.ey,s.r*.45))return false;

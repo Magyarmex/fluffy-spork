@@ -429,3 +429,120 @@ test('mutual TTL recovery refuses incomplete integrity initialization',()=>{
   g.updateBullets(1/30);
   assert.deepEqual(hits,[]);
 });
+
+test('isolated mutual TTL contact survives a remote unrelated ordinary projectile',()=>{
+  for(const fps of [30,60,120,240]){
+    for(const reverse of [false,true]){
+      const {g,a,b,hits}=ttlFixture();
+      g.tankById.set(1,{id:1});g.tankById.set(2,{id:2});
+      const remote=shot(3,3,600,0,1);
+      remote.y=600;remote.baseDmg=remote.dmg;
+      g.bullets=[a,b,remote];
+      if(reverse)g.bullets.reverse();
+      g.updateBullets(1/fps);
+      assert.deepEqual(hits.sort(),[1,2],'remote shot must not suppress physical interception at '+fps+'Hz');
+      assert.equal(a.dead,true);assert.equal(b.dead,true);
+      assert.equal(remote.dead,false);
+    }
+  }
+});
+test('mutual TTL preflight abstains when third projectile can reach either participant',()=>{
+  const {g,a,b,hits}=ttlFixture();
+  const third=shot(3,3,-18,6000,1);
+  third.baseDmg=third.dmg;
+  g.bullets=[a,b,third];
+  g.updateBullets(1/30);
+  assert.deepEqual(hits,[],'third projectile must not be silently ignored');
+});
+
+test('remote-shot extension refuses special, newborn, extra-expiring and dense volleys',()=>{
+  for(const mutate of [
+    s=>{s.shell=true;},
+    s=>{s.beam=true;},
+    s=>{s.splash=true;},
+    s=>{s.__novaRail=true;},
+    s=>{s.ttl=.005;},
+    s=>{s.id=4;},
+    s=>{s.vx=NaN;},
+    s=>{s.r=NaN;}
+  ]){
+    const {g,a,b,hits}=ttlFixture();
+    const third=shot(3,3,600,0,1);
+    third.y=600;third.baseDmg=third.dmg;
+    mutate(third);
+    g.bullets=[a,b,third];
+    g.updateBullets(1/30);
+    assert.deepEqual(hits,[],'unsupported third-party projectile must veto');
+  }
+  const {g,a,b,hits}=ttlFixture();
+  g.bullets=[a,b,...Array.from({length:11},(_,i)=>{
+    const s=shot(10+i,10+i,700+i*20,0,1);
+    s.y=700;s.baseDmg=s.dmg;return s;
+  })];
+  g.updateBullets(1/30);
+  assert.deepEqual(hits,[],'work bound must not be exceeded');
+});
+
+test('maximum bounded twelve-shot volley keeps remote ordinary rounds independent',()=>{
+  const {g,a,b,hits}=ttlFixture();
+  g.__novaFrameStartBulletIdCeiling=20;
+  const remote=Array.from({length:10},(_,i)=>{
+    const s=shot(3+i,3+i,600+i*20,0,1);
+    s.y=600;s.baseDmg=s.dmg;return s;
+  });
+  g.bullets=[...remote.slice(0,5),a,...remote.slice(5),b];
+  g.updateBullets(1/30);
+  assert.deepEqual(hits.sort(),[1,2]);
+  assert.equal(a.dead,true);assert.equal(b.dead,true);
+  assert.ok(remote.every(s=>!s.dead));
+});
+test('remote projectile with stale identity or incomplete integrity cannot certify pair',()=>{
+  for(const mutate of [
+    s=>{s.id=1;},
+    s=>{s.ownerId=NaN;},
+    s=>{delete s.baseDmg;},
+    s=>{s.hp=0;},
+    s=>{s.maxHp=-1;}
+  ]){
+    const {g,a,b,hits}=ttlFixture();
+    const third=shot(3,3,600,0,1);
+    third.y=600;third.baseDmg=third.dmg;
+    mutate(third);g.bullets=[a,b,third];g.updateBullets(1/30);
+    assert.deepEqual(hits,[]);
+  }
+});
+
+test('seeded remote projectile translations do not change mutual TTL result',()=>{
+  let seed=0x7442026;
+  const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+  for(let i=0;i<160;i++){
+    const {g,a,b,hits}=ttlFixture();
+    const third=shot(3,3,400+rand()*900,(rand()-.5)*100,1);
+    third.y=400+rand()*900;
+    third.vy=(rand()-.5)*100;
+    third.baseDmg=third.dmg;
+    g.bullets=i%2?[third,b,a]:[a,third,b];
+    g.updateBullets(i%3===0?1/30:1/60);
+    assert.deepEqual(hits.sort(),[1,2],'seeded remote world '+i);
+    assert.equal(a.dead,true);assert.equal(b.dead,true);
+    assert.equal(third.dead,false);
+  }
+});
+
+test('remote third projectile never bypasses earlier wall or body priority',()=>{
+  for(const obstruct of [
+    g=>{g.__novaTerrain=[{shape:'rect',x:-12,y:0,w:3,h:50,
+      solid:true,destructible:false}];},
+    g=>{g.__novaShapeSweepActive=true;
+      g.shapes=[{kind:'shape',x:-12,y:0,r:10,hp:100,
+        __novaShapeSweepEpoch:1,__novaShapeSweepPrevX:-12,
+        __novaShapeSweepPrevY:0}];}
+  ]){
+    const {g,a,b,hits}=ttlFixture();
+    const remote=shot(3,3,600,0,1);
+    remote.y=600;remote.baseDmg=remote.dmg;
+    g.bullets=[a,b,remote];obstruct(g);
+    g.updateBullets(1/30);
+    assert.deepEqual(hits,[],'existing first-contact precedence must survive extension');
+  }
+});
