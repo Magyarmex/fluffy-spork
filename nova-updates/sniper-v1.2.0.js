@@ -466,7 +466,8 @@
       if (count >= 3 && count <= 12 && this.bullets.every(function (b) {
         return b && !b.dead && b.kind === 'bullet' && !b.shell &&
           !b.beam && !b.__novaRail && !b.__v17Cannon &&
-          !b.splash && !(b.pen > 0) && b.ttl > 0 &&
+          !b.splash && b.pen === 0 && b.ttl > 0 &&
+          Number.isFinite(b.hp) && b.hp > 0 &&
           Number.isFinite(b.x) && Number.isFinite(b.y) &&
           Number.isFinite(b.px) && Number.isFinite(b.py) &&
           Number.isFinite(b.r) && b.r > 0;
