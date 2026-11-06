@@ -47,3 +47,12 @@ test('RAF capture rejects invalid configuration and duplicate starts',()=>{
  assert.equal(c.active,false);
  assert.ok(h.cancelled>=1);
 });
+
+test('host RAF scheduling failure cannot strand an active recorder',()=>{
+ const h=harness(),c=h.window.__novaRafTraceCapture.create();
+ c.start();h.next(100);
+ h.window.requestAnimationFrame=()=>{throw Error('host RAF failure');};
+ assert.throws(()=>h.next(133),/host RAF failure/);
+ assert.equal(c.active,false);
+ assert.equal(c.snapshot().capture.reason,'raf-error');
+});
