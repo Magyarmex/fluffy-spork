@@ -3,7 +3,7 @@
 // FixedStepRafOwner, not an independent approximation of its catch-up logic.
 // Usage: node scripts/fixed60-raf-trace-replay.cjs path/to/intervals.json
 // JSON: [33.3, 34.1, ...] or {"frameIntervalsMs":[...]}.
-// No game, input, renderer, or production file is modified.
+// Phase lag is NOT input latency: skipped simulation time can make it zero.\n// Always read droppedMs and remainingBacklogMs alongside it.\n// No game, input, renderer, or production file is modified.
 const fs=require('node:fs');
 const {FixedStepRafOwner}=require('../tests/research/fixed-step-raf-owner.cjs');
 const STEP_MS=1000/60;
@@ -29,7 +29,7 @@ function replay(intervals,maxSteps=2){
     now:()=>now,request:fn=>{callback=fn;return 1},
     cancel:()=>{callback=null},render(){},maxSteps
   });
-  const lag=[],wallDelay=[];
+  const lag=[],phaseLag=[];
   let total=0,catchupFrames=0,peakSteps=0;
   try{
     owner.start();
@@ -39,7 +39,7 @@ function replay(intervals,maxSteps=2){
       if(typeof next!=='function')throw Error('RAF owner lost scheduled callback');
       next(now);
       lag.push(owner.lagMs);
-      wallDelay.push(Math.max(0,now-bridge.startMs-owner.simAtSec*1000));
+      phaseLag.push(Math.max(0,now-bridge.startMs-owner.simAtSec*1000));
       if(owner.lastSteps>2)catchupFrames++;
       peakSteps=Math.max(peakSteps,owner.lastSteps);
     }
@@ -50,8 +50,8 @@ function replay(intervals,maxSteps=2){
       remainingBacklogMs:round(owner.lagMs),
       peakBacklogMs:round(lag.reduce((peak,v)=>Math.max(peak,v),0)),
       p95BacklogMs:round(percentile(lag,.95)),
-      p95WallToSimulationMs:round(percentile(wallDelay,.95)),
-      p99WallToSimulationMs:round(percentile(wallDelay,.99)),
+      p95SimulationPhaseLagMs:round(percentile(phaseLag,.95)),
+      p99SimulationPhaseLagMs:round(percentile(phaseLag,.99)),
       catchupFrames,peakSteps};
   }finally{owner.stop();}
 }
