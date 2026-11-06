@@ -68,3 +68,15 @@ test('live spatial-hash stamp 1 must not hide a permanent wall in a fresh detach
  assert.ok(Math.abs(o.time-.01665)<1e-10);
  assert.equal(JSON.stringify(g.__novaTerrain),before);
 });
+
+test('detached first-hit query preserves an existing live Battlefield index and stamp',()=>{
+ const g=boot();g.__novaTerrain=[{...rect(),__novaBattlefieldStamp:1}];
+ const original={terrain:g.__novaTerrain,length:1,cells:new Map(),scratch:[],stamp:1};
+ g.__novaBattlefieldIndex=original;
+ const o=query(g,shot(),.04);
+ assert.equal(o.complete,true);
+ assert.ok(Math.abs(o.time-.01665)<1e-10);
+ assert.strictEqual(g.__novaBattlefieldIndex,original);
+ assert.equal(original.stamp,1);
+ assert.equal(g.__novaTerrain[0].__novaBattlefieldStamp,1);
+});
