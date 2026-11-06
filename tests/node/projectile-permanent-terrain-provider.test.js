@@ -209,3 +209,28 @@ test('same-owner contact earlier than hostile pair cannot preempt it',()=>{
  assert.equal(result.certified.length,1);
  assert.deepEqual([result.certified[0].i,result.certified[0].j],[1,2]);
 });
+
+
+test('terrain-qualified provider matches open-field oracle with repeated owners',()=>{
+ const {makeOpenFieldProvider}=require('../research/projectile-open-field-event-provider.cjs');
+ let seed=0x736147;
+ const random=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ const dt=.04;
+ for(let world=0;world<1000;world++){
+   const g=fixture(null);
+   g.__novaTerrain=[];g.firstTerrainHit=()=>null;
+   g.bullets=Array.from({length:3+Math.floor(random()*6)},()=>{
+     const s=shot(1+Math.floor(random()*3),(random()-.5)*80,(random()-.5)*2000);
+     s.y=(random()-.5)*80;s.vy=(random()-.5)*2000;
+     return s;
+   });
+   const open=makeOpenFieldProvider({...g,terrain:[],__novaTerrain:[]},dt);
+   const terrain=makePermanentTerrainProvider(g,dt);
+   assert.equal(terrain===null,open===null,'world '+world);
+   if(!open)continue;
+   const expected=observeProjectilePairs(g,dt,open);
+   const actual=observeProjectilePairs(g,dt,terrain);
+   assert.deepEqual(actual.certified,expected.certified,'world '+world);
+   assert.equal(actual.incomplete,expected.incomplete,'world '+world);
+ }
+});
