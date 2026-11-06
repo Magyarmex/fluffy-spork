@@ -67,29 +67,43 @@ function observeProjectilePairs(game, dt, eventsForPair) {
     }
     if (shots[i].dead !== true) active.push(i);
   }
-  const totalPairs = active.length * (active.length - 1) / 2;
-  if (totalPairs > MAX_BROADPHASE_PAIRS) {
-    result.incomplete = true; result.reason = 'broadphase-budget'; return result;
-  }
-  // Shells, rails and other unsupported shots may create mid-frame children
-  // that do not exist in this snapshot. Spatial separation alone cannot
-  // certify those future events, so abstain for the entire frame.
+  // All active projectile types must be supported before owner-based pruning:
+  // an unsupported shell may create new projectiles during this frame.
   if (shots.some(s => s && s.dead !== true && !supported(s))) {
     result.incomplete = true; result.reason = 'unsupported-projectile-present';
     return result;
   }
-  // Complete the cheap broad phase before asking any event provider to certify
-  // a pair. An overflow must revoke the entire frame, never a partial result.
+  // The shipping interception resolver skips same-owner pairs. Group them
+  // first so a large friendly volley does not exhaust the cheap pair budget.
+  // Only cross-owner pairs are enumerated, keeping actual work <= 1024.
+  const groups = new Map();
+  for (const i of active) {
+    const id = shots[i].ownerId;
+    if (!groups.has(id)) groups.set(id, []);
+    groups.get(id).push(i);
+  }
+  const groupList = [...groups.values()];
+  const totalPairs = active.length * (active.length - 1) / 2;
+  let crossPairs = 0;
+  for (let g = 0; g < groupList.length; g++)
+    for (let h = g + 1; h < groupList.length; h++)
+      crossPairs += groupList[g].length * groupList[h].length;
+  if (!Number.isSafeInteger(totalPairs) || !Number.isSafeInteger(crossPairs) ||
+      crossPairs > MAX_BROADPHASE_PAIRS) {
+    result.incomplete = true; result.reason = 'broadphase-budget'; return result;
+  }
+  result.pairs = totalPairs;
+  result.abstained = totalPairs - crossPairs;
+  // Restore original source-index ordering so event providers observe the
+  // same pair sequence as the previous nested loop, independent of grouping.
+  const cross = [];
+  for (let g = 0; g < groupList.length; g++)
+    for (let h = g + 1; h < groupList.length; h++)
+      for (const i of groupList[g]) for (const j of groupList[h])
+        cross.push([Math.min(i, j), Math.max(i, j)]);
+  cross.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
   const candidates = [];
-  for (let a = 0; a < active.length; a++) for (let b = a + 1; b < active.length; b++) {
-    const i = active[a], j = active[b];
-    result.pairs++;
-    // A projectile cannot intercept another shot from its own owner.
-    // Exclude those pairs before consuming the expensive event budget;
-    // the first-contact oracle already enforces this allegiance invariant.
-    if (shots[i].ownerId === shots[j].ownerId) {
-      result.abstained++; continue;
-    }
+  for (const [i, j] of cross) {
     if (definitelyDisjoint(shots[i], shots[j], dt)) {
       result.abstained++; continue;
     }
