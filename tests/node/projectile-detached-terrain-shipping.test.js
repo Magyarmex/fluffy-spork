@@ -96,3 +96,22 @@ test('detached pillar chronology rejects embedded origins even when heading outw
  const o=query(g,{...shot(),x:-4.999,y:0,vx:-1000},.04);
  assert.deepEqual(o,{complete:true,time:0,reason:null});
 });
+
+test('actual Battlefield wall-blocked early pair leaves later clear projectile contact',()=>{
+ const {makePermanentTerrainProvider}=require('../research/projectile-permanent-terrain-provider.cjs');
+ const {observeProjectilePairs}=require('../research/projectile-pair-chronology-observer.cjs');
+ const g=boot(),dt=.04;
+ const bullet=(ownerId,x,vx)=>({kind:'bullet',dead:false,shell:false,beam:false,
+   pen:0,hits:0,ttl:.42,r:3,ownerId,x,y:0,vx,vy:0});
+ g.__novaResearchHostilityFixture=true;
+ g.player=null;g.powerups=[];g.terrain=[];
+ g.bullets=[bullet(1,-17.5,1000),bullet(2,0,0),bullet(3,27.5,-1000)];
+ g.__novaTerrain=[{...rect(),x:-12,w:2}];
+ const provider=makePermanentTerrainProvider(g,dt);
+ assert.equal(typeof provider,'function');
+ const result=observeProjectilePairs(g,dt,provider);
+ assert.equal(result.incomplete,false);
+ assert.equal(result.certified.length,1);
+ assert.deepEqual([result.certified[0].i,result.certified[0].j],[1,2]);
+ assert.ok(Math.abs(result.certified[0].time-.02)<1e-9);
+});
