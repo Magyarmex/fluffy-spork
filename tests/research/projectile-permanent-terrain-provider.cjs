@@ -1,7 +1,7 @@
 'use strict';
 // Research-only fixture: static permanent terrain, no bodies or powerups.
-// Reuses open-field third-projectile arbitration and supplies detached,
-// pre-update Battlefield terrain times. Never changes live combat.
+// Reuses open-field snapshot verification, then arbitrates competing contacts
+// against detached, pre-update Battlefield terrain times. Never changes combat.
 const { makeOpenFieldProvider } = require('./projectile-open-field-event-provider.cjs');
 const { firstContact } = require('./projectile-first-event-certificate.cjs');
 const { firstDetachedPermanentTerrainEvent } = require('./projectile-detached-permanent-terrain.cjs');
