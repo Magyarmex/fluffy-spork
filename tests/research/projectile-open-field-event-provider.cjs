@@ -11,6 +11,9 @@ const empty = () => ({ complete:true, allied:false, unscanned:false,
 function makeOpenFieldProvider(game, dt) {
   if (!game || !Number.isFinite(dt) || !(dt>0) ||
       !Array.isArray(game.bullets) || game.bullets.length>MAX_SHOTS ||
+      game.player != null ||
+      (game.__novaTerrain != null && (!Array.isArray(game.__novaTerrain) || game.__novaTerrain.length>0)) ||
+      (game.powerups != null && (!Array.isArray(game.powerups) || game.powerups.length>0)) ||
       !['tanks','shapes','drones','terrain'].every(key =>
         Array.isArray(game[key]) && game[key].length===0)) return null;
   // The caller must provide an intentionally constructed open-field fixture,
