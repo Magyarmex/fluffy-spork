@@ -103,3 +103,33 @@ test('initial queued input replay failure cannot strand the RAF owner',()=>{
   assert.equal(resets,2,'cleanup reset follows failed replay');
   assert.doesNotThrow(()=>owner.stop());
 });
+
+test('browser capture restores production input after initial owner reset fails',()=>{
+  const win=emitter(),doc=emitter(),canvas=emitter();
+  const input={canvas,keyboard:{},move:{},aim:{},stickId:{move:-1,aim:-1},
+    firing:false,abilityQueued:false,autofire:false,
+    kd(){},ku(){},pd(){},pm(){},pu(){},
+    attach(c){this.canvas=c;win.addEventListener('keydown',this.kd)},
+    detach(){win.removeEventListener('keydown',this.kd);this.canvas=null}};
+  input.attach(canvas);
+  const game={input,raf:null,paused:false,sfx:{startMusic(){}},
+    start(){},destroy(){},setPaused(){},update(){},w:320,h:568};
+  const originals={start:game.start,destroy:game.destroy,setPaused:game.setPaused};
+  let requests=0;
+  const pilot=createFixedStepBrowserPilot(game,{window:win,document:doc,canvas,
+    clock:{now:()=>1000,timeOrigin:1793560000000},
+    request(){requests++;return 7},cancel(){},render(){}});
+  const reset=pilot.timeline.reset.bind(pilot.timeline);
+  pilot.timeline.reset=function(){reset();throw Error('initial reset failed')};
+  let caught;
+  try{pilot.start()}catch(error){caught=error}
+  assert.match(caught?.message||'',/initial reset failed/);
+  assert.equal(pilot.owner.started,false);
+  assert.equal(pilot.capture.active,false);
+  assert.equal(requests,0);
+  assert.equal(input.canvas,canvas);
+  assert.equal(win.count(),1,'original keyboard listener restored');
+  assert.equal(doc.count(),0);
+  assert.equal(canvas.count(),0);
+  for(const name of Object.keys(originals))assert.equal(game[name],originals[name]);
+});
