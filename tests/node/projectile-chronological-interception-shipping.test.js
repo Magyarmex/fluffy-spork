@@ -139,6 +139,7 @@ test('bounded ordinary volley agrees with independent chronological event oracle
   let seed = 0x7412026;
   const random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
   const dt = 1 / 120;
+  const g = boot();
   let checked = 0;
   function first(a, b) {
     const rr = a.r + b.r + 1.5;
@@ -184,7 +185,6 @@ test('bounded ordinary volley agrees with independent chronological event oracle
       a.hp -= bh; b.hp -= ah;
       a.dead = a.hp <= 0; b.dead = b.hp <= 0;
     }
-    const g = boot();
     g.bullets = shots;
     g.resolveBulletCollisions();
     for (let i = 0; i < shots.length; i++) {
