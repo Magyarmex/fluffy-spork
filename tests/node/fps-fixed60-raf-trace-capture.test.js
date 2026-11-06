@@ -89,3 +89,27 @@ test('custom recorder stop remains replayable without a false provenance certifi
  assert.equal(report.captureProvenance.gameplayActiveVerified,false);
  assert.equal(report.results.length,3);
 });
+
+test('cancel failure and late RAF delivery cannot contaminate a restarted capture',()=>{
+ let queue=[],seq=0;
+ const document={hidden:false,addEventListener(){},removeEventListener(){}};
+ const window={document,
+  requestAnimationFrame(fn){queue.push(fn);return ++seq;},
+  cancelAnimationFrame(){throw Error('host cancel failure');}};
+ vm.runInNewContext(source,{window},{timeout:1000});
+ const c=window.__novaRafTraceCapture.create();
+ c.start();
+ queue.shift()(100);
+ const stale=queue.shift();
+ assert.throws(()=>c.stop(),/host cancel failure/);
+ assert.equal(c.active,false);
+ c.start();
+ const fresh=queue.shift();
+ stale(120); // Delivered after a failed cancellation: must be ignored.
+ fresh(130);
+ fresh(131); // Duplicate delivery of a superseded ticket must be ignored.
+ queue.shift()(163);
+ assert.deepEqual(Array.from(c.snapshot().frameIntervalsMs),[33]);
+ assert.equal(c.snapshot().capture.frames,1);
+ assert.equal(c.snapshot().capture.durationMs,33);
+});
