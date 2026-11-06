@@ -108,3 +108,27 @@ test('terrain witness ignores unrelated projectile payload getters',()=>{
  assert.equal(r.incomplete,false);
  assert.equal(r.certified.length,1);
 });
+
+test('terrain-qualified provider preserves open-field certificates when no walls exist',()=>{
+ const {makeOpenFieldProvider}=require('../research/projectile-open-field-event-provider.cjs');
+ let seed=0x5eed1234;
+ const random=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ const dt=.04;
+ for(let world=0;world<500;world++){
+   const g=fixture(null);
+   g.__novaTerrain=[];g.firstTerrainHit=()=>null;
+   g.bullets=Array.from({length:3+Math.floor(random()*4)},(_,i)=>{
+     const s=shot(i+1,(random()-.5)*100,(random()-.5)*2400);
+     s.y=(random()-.5)*100;s.vy=(random()-.5)*2400;
+     return s;
+   });
+   const baseline=makeOpenFieldProvider({...g,terrain:[],__novaTerrain:[]},dt);
+   const terrain=makePermanentTerrainProvider(g,dt);
+   assert.equal(terrain===null,baseline===null,'world '+world);
+   if(baseline===null)continue;
+   const expected=observeProjectilePairs(g,dt,baseline);
+   const actual=observeProjectilePairs(g,dt,terrain);
+   assert.deepEqual(actual.certified,expected.certified,'world '+world);
+   assert.equal(actual.incomplete,expected.incomplete,'world '+world);
+ }
+});
