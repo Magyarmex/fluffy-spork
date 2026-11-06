@@ -119,5 +119,13 @@ test('fixed60 at 30Hz presentation preserves native60 projectile trail opportuni
   assert.equal(fixed.physical,native.physical);
   assert.equal(fixed.gameplayDraws,native.gameplayDraws);
   assert.equal(fixed.ordinary,native.ordinary);
+  assert.equal(fixed.poolWrites,native.poolWrites,
+   'fixed60 presentation changed real addParticles pool-write count');
+  assert.equal(fixed.activeOverwrites,native.activeOverwrites,
+   'fixed60 presentation changed live-particle replacement chronology');
+  assert.equal(fixed.cosmeticState,native.cosmeticState,
+   'fixed60 presentation changed cosmetic RNG sequence');
+  assert.deepEqual(fixed.gunner,native.gunner,
+   'fixed60 presentation changed Tempest heat or cadence state');
  }
 });
