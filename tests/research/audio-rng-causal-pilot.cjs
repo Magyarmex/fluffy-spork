@@ -37,7 +37,8 @@ function canvas() {
   c.getContext = () => ctx;
   return c;
 }
-function bootGame() {
+function bootGame(quality = 'low') {
+  if (quality !== 'low' && quality !== 'high') throw Error('unsupported fixture quality');
   const errors = [];
   const store = new Map();
   const document = {hidden: false, visibilityState: 'visible',
@@ -78,7 +79,7 @@ function bootGame() {
   }
   const requireGame = window.__novaMakeRequire('');
   const Game = requireGame('game/engine').Game;
-  const game = new Game(canvas(), canvas(), {hud: noop, event: noop}, 'low');
+  const game = new Game(canvas(), canvas(), {hud: noop, event: noop}, quality);
   Object.defineProperty(game, '__testLivingFront', {value: window.__NOVA_LIVING_FRONT_INTERNAL__});
   Object.defineProperty(game, '__testFair', {value: window.__NOVA_FAIR_ENGAGEMENT_TEST__});
   Object.defineProperty(game,'__testWindow',{value:window});
