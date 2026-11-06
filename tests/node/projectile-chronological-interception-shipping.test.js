@@ -378,3 +378,32 @@ test('FFA mutual TTL recovery composes with the canonical remote neutral populat
   assert.deepEqual(hits.sort(),[1,2]);
   assert.equal(a.dead,true);assert.equal(b.dead,true);
 });
+
+test('canonical untouched pen-one FFA rounds intercept before TTL at low refresh',()=>{
+  for(const fps of [30,60,120,240]){
+    for(const reverse of [false,true]){
+      const {g,a,b,hits}=ttlFixture();
+      g.tankById.set(1,{id:1});
+      g.tankById.set(2,{id:2});
+      a.pen=1;b.pen=1;
+      if(reverse)g.bullets.reverse();
+      g.updateBullets(1/fps);
+      assert.deepEqual(hits.sort(),[1,2],
+        'ordinary pen-one FFA projectile at '+fps+'Hz');
+      assert.equal(a.dead,true);assert.equal(b.dead,true);
+    }
+  }
+});
+test('mutual TTL preflight refuses spent or higher-penetration projectiles',()=>{
+  for(const setup of [
+    (a,b)=>{a.pen=2;b.pen=1;},
+    (a,b)=>{a.pen=1;b.pen=2;},
+    (a,b)=>{a.pen=1;b.pen=1;a.hits=1;},
+    (a,b)=>{a.pen=1;b.pen=1;b.hits=1;}
+  ]){
+    const {g,a,b,hits}=ttlFixture();
+    g.tankById.set(1,{id:1});g.tankById.set(2,{id:2});
+    setup(a,b);g.updateBullets(1/30);
+    assert.deepEqual(hits,[]);
+  }
+});
