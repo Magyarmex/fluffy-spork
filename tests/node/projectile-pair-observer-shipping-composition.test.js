@@ -176,7 +176,7 @@ test('full shipping overlay composition supports detached permanent-wall timing'
     require('../research/projectile-detached-permanent-terrain.cjs');
   const g = boot();
   g.__novaTerrain = [{ id: -5, shape: 'rect', x: 0, y: 0,
-    w: 4, h: 40, solid: true, destructible: false }];
+    w: 4, h: 40, solid: true, destructible: false, __novaBattlefieldStamp: 1 }];
   const before = JSON.stringify(g.__novaTerrain);
   const s = shot(1, 1, -20, 1000, .42);
   const result = firstDetachedPermanentTerrainEvent(g, s, .04);
