@@ -20,7 +20,7 @@ function schedule(pattern,phase){
  }
  return result;
 }
-function run(seed,reload,intervals){
+function run(seed,reload,intervals,maxSteps=2){
  return withSeed(seed,draws=>{
   const g=bootGame(),p=g.player;g.sfx.muted=true;
   g.setClass(p,'tempest');g.tanks=[p];g.tankById=new Map([[p.id,p]]);
@@ -31,7 +31,7 @@ function run(seed,reload,intervals){
   g.sfx.startMusic=()=>{};
   const owner=new FixedStepRafOwner(g,timeline,bridge,{
    now:()=>now,request:fn=>{callback=fn;return 1;},
-   cancel:()=>{callback=null},render:()=>{},maxSteps:2
+   cancel:()=>{callback=null},render:()=>{},maxSteps
   });
   let volleys=0;const shotTimes=[],original=g.tryFire;
   g.tryFire=function(t){
@@ -133,4 +133,24 @@ test('fixed60 preserves touch press/release shot chronology across adversarial R
    assert.deepEqual(observed,baseline,
     'touch chronology changed for '+name+' phase='+phase);
   }
+});
+
+// A three-step cap is not a universal solution for equal-mean 30Hz jitter:
+// alternating 1/7 120Hz ticks can leave a whole simulation tick behind
+// without incrementing droppedMs. This is a research gate, not a rollout.
+test('bursty equal-mean RAF exposes hidden backlog despite zero dropped time',()=>{
+ const native=Array(480).fill(2);
+ const burst=Array.from({length:240},(_,i)=>i%2===0?1:7);
+ assert.equal(burst.reduce((a,b)=>a+b,0),960);
+ const baseline=run(1517800,8,native);
+ assert.equal(baseline.ticks,480);
+ const two=run(1517800,8,burst,2);
+ const three=run(1517800,8,burst,3);
+ const four=run(1517800,8,burst,4);
+ assert.equal(two.droppedMs,0);
+ assert.equal(three.droppedMs,0);
+ assert.ok(two.ticks<three.ticks && three.ticks<baseline.ticks,
+  'no droppedMs does not imply the simulation caught up');
+ assert.deepEqual(four,baseline,
+  'four-step research control must recover the full canonical 60Hz state');
 });
