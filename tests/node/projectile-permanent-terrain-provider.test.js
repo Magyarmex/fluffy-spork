@@ -54,3 +54,23 @@ test('provider refuses bodies or withdrawn fixture authorization after snapshot'
    assert.equal(r.certified.length,0);
  }
 });
+
+test('earlier wall-blocked projectile contact cannot veto later clear hostile interception',()=>{
+ const g=fixture(null),dt=.04;
+ g.bullets=[shot(1,-17.5,1000),shot(2,0,0),shot(3,27.5,-1000)];
+ g.__novaTerrain=[{...wall(),x:-12,w:2}];
+ // Use the actual firstTerrainHit geometry in the composed Battlefield test;
+ // this synthetic query explicitly models the earlier wall hit for shot A.
+ g.firstTerrainHit=function(ax,ay,bx,by,pad){
+   if(ax!==-17.5)return null;
+   return {solid:this.__novaTerrain[0],hit:{t:.08}};
+ };
+ const provider=makePermanentTerrainProvider(g,dt);
+ assert.equal(typeof provider,'function');
+ const r=observeProjectilePairs(g,dt,provider);
+ assert.equal(r.incomplete,false);
+ assert.equal(r.certified.length,1);
+ assert.equal(r.certified[0].i,1);
+ assert.equal(r.certified[0].j,2);
+ assert.ok(Math.abs(r.certified[0].time-.02)<1e-9);
+});
