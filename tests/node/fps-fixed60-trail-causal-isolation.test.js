@@ -98,6 +98,11 @@ test('actual composed Tempest: ordinary-trail suppression is simulation- and RNG
    assert.equal(suppressed.cosmeticState,a.cosmeticState,'cosmetic RNG sequence must be preserved');
    assert.equal(suppressed.physical,a.physical,'cosmetic suppression changed physical Game');
    assert.equal(suppressed.gameplayDraws,a.gameplayDraws,'cosmetic suppression changed gameplay RNG');
+   console.log('NOVA_TRAIL_POOL_CENSUS '+JSON.stringify({seed,fixed30,
+    ordinary:a.ordinary,baselineWrites:a.poolWrites,
+    suppressedWrites:suppressed.poolWrites,
+    baselineActiveOverwrites:a.activeOverwrites,
+    suppressedActiveOverwrites:suppressed.activeOverwrites}));
   }
  }
 });
