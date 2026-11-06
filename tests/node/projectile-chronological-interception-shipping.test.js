@@ -429,3 +429,28 @@ test('mutual TTL recovery refuses incomplete integrity initialization',()=>{
   g.updateBullets(1/30);
   assert.deepEqual(hits,[]);
 });
+
+test('isolated mutual TTL contact survives a remote unrelated ordinary projectile',()=>{
+  for(const fps of [30,60,120,240]){
+    for(const reverse of [false,true]){
+      const {g,a,b,hits}=ttlFixture();
+      g.tankById.set(1,{id:1});g.tankById.set(2,{id:2});
+      const remote=shot(3,3,600,0,1);
+      remote.y=600;remote.baseDmg=remote.dmg;
+      g.bullets=[a,b,remote];
+      if(reverse)g.bullets.reverse();
+      g.updateBullets(1/fps);
+      assert.deepEqual(hits.sort(),[1,2],'remote shot must not suppress physical interception at '+fps+'Hz');
+      assert.equal(a.dead,true);assert.equal(b.dead,true);
+      assert.equal(remote.dead,false);
+    }
+  }
+});
+test('mutual TTL preflight abstains when third projectile can reach either participant',()=>{
+  const {g,a,b,hits}=ttlFixture();
+  const third=shot(3,3,-18,6000,1);
+  third.baseDmg=third.dmg;
+  g.bullets=[a,b,third];
+  g.updateBullets(1/30);
+  assert.deepEqual(hits,[],'third projectile must not be silently ignored');
+});
