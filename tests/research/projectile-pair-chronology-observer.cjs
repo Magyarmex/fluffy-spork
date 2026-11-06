@@ -103,13 +103,17 @@ function observeProjectilePairs(game, dt, eventsForPair) {
       groups.get(id).push(i);
     }
     const groupList = [...groups.values()];
-    let crossPairs = 0;
-    for (let g = 0; g < groupList.length; g++)
-      for (let h = g + 1; h < groupList.length; h++)
-        crossPairs += groupList[g].length * groupList[h].length;
-    if (!Number.isSafeInteger(crossPairs) ||
-        crossPairs > MAX_BROADPHASE_PAIRS) {
-      result.incomplete = true; result.reason = 'broadphase-budget'; return result;
+    // Count cross-owner pairs in O(number of owners), not O(owner groups²).
+    // Abort as soon as the work cap is exceeded, before enumerating pairs.
+    let crossPairs = 0, preceding = 0;
+    for (const group of groupList) {
+      crossPairs += preceding * group.length;
+      if (!Number.isSafeInteger(crossPairs) ||
+          crossPairs > MAX_BROADPHASE_PAIRS) {
+        result.incomplete = true; result.reason = 'broadphase-budget';
+        return result;
+      }
+      preceding += group.length;
     }
     result.pairs = totalPairs;
     result.abstained = totalPairs - crossPairs;
