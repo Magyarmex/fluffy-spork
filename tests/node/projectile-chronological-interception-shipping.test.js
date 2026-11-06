@@ -482,3 +482,32 @@ test('remote-shot extension refuses special, newborn, extra-expiring and dense v
   g.updateBullets(1/30);
   assert.deepEqual(hits,[],'work bound must not be exceeded');
 });
+
+test('maximum bounded twelve-shot volley keeps remote ordinary rounds independent',()=>{
+  const {g,a,b,hits}=ttlFixture();
+  g.__novaFrameStartBulletIdCeiling=20;
+  const remote=Array.from({length:10},(_,i)=>{
+    const s=shot(3+i,3+i,600+i*20,0,1);
+    s.y=600;s.baseDmg=s.dmg;return s;
+  });
+  g.bullets=[...remote.slice(0,5),a,...remote.slice(5),b];
+  g.updateBullets(1/30);
+  assert.deepEqual(hits.sort(),[1,2]);
+  assert.equal(a.dead,true);assert.equal(b.dead,true);
+  assert.ok(remote.every(s=>!s.dead));
+});
+test('remote projectile with stale identity or incomplete integrity cannot certify pair',()=>{
+  for(const mutate of [
+    s=>{s.id=1;},
+    s=>{s.ownerId=NaN;},
+    s=>{delete s.baseDmg;},
+    s=>{s.hp=0;},
+    s=>{s.maxHp=-1;}
+  ]){
+    const {g,a,b,hits}=ttlFixture();
+    const third=shot(3,3,600,0,1);
+    third.y=600;third.baseDmg=third.dmg;
+    mutate(third);g.bullets=[a,b,third];g.updateBullets(1/30);
+    assert.deepEqual(hits,[]);
+  }
+});
