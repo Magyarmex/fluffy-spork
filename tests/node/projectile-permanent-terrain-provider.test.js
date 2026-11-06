@@ -182,3 +182,30 @@ test('seeded one-dimensional wall chronology agrees with independent first-conta
    assert.ok(Math.abs(actual.certified[0].time-expected.time)<1e-9,'world '+world);
  }
 });
+
+
+test('same-owner geometric ties cannot veto a later hostile interception',()=>{
+ const g=fixture(null),dt=.04;
+ // A and B meet C at the same instant, but A and B are from one shooter.
+ // Their mutual geometric overlap must not become a competing event.
+ g.bullets=[shot(1,-17.5,1000),shot(1,17.5,-1000),shot(2,0,0)];
+ g.__novaTerrain=[];g.firstTerrainHit=()=>null;
+ const provider=makePermanentTerrainProvider(g,dt);
+ assert.equal(typeof provider,'function');
+ const result=observeProjectilePairs(g,dt,provider);
+ assert.equal(result.incomplete,false);
+ // The two genuinely hostile contacts are simultaneous and remain ambiguous.
+ assert.equal(result.certified.length,0);
+});
+
+test('same-owner contact earlier than hostile pair cannot preempt it',()=>{
+ const g=fixture(null),dt=.04;
+ g.bullets=[shot(1,-12,1000),shot(1,0,0),shot(2,30,-1000)];
+ g.__novaTerrain=[];g.firstTerrainHit=()=>null;
+ const provider=makePermanentTerrainProvider(g,dt);
+ assert.equal(typeof provider,'function');
+ const result=observeProjectilePairs(g,dt,provider);
+ assert.equal(result.incomplete,false);
+ assert.equal(result.certified.length,1);
+ assert.deepEqual([result.certified[0].i,result.certified[0].j],[1,2]);
+});
