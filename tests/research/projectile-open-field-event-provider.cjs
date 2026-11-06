@@ -31,7 +31,10 @@ function makeOpenFieldProvider(game, dt) {
   } catch (_) { return null; }
   const n = shots.length, times = Array.from({length:n},() => Array(n).fill(null));
   for (let i=0;i<n;i++) for (let j=i+1;j<n;j++) {
-    const t = firstContact(shots[i], shots[j], dt, empty());
+    // Same-owner shots cannot intercept in the shipping resolver or oracle.
+    // Avoid quadratic certificate work for a crowded single-owner volley.
+    const t = shots[i].ownerId === shots[j].ownerId ? null :
+      firstContact(shots[i], shots[j], dt, empty());
     times[i][j]=times[j][i]=t;
   }
   // A simultaneous earliest multi-shot event has no unique physical winner.
