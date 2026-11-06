@@ -263,3 +263,71 @@ test('terrain provider rejects replacement of live bullet array after snapshot',
  assert.equal(result.incomplete,true);
  assert.equal(result.certified.length,0);
 });
+
+test('unknown permanent or destructible terrain shape fails closed instead of certifying a clear corridor',()=>{
+ const dt=.04;
+ for(const destructible of [false,true]){
+  const g=fixture(null);
+  g.__novaTerrain=[{shape:'polygon',x:0,y:0,solid:true,destructible,hp:20,
+    w:4,h:40}];
+  // A shipping first-hit implementation that does not recognize a new shape
+  // could report no wall, but the observer must not interpret that as clear.
+  g.firstTerrainHit=()=>null;
+  assert.equal(makePermanentTerrainProvider(g,dt),null,
+    'unknown '+(destructible?'active cover':'permanent wall')+' geometry');
+ }
+});
+
+test('known rectangular and circular permanent terrain remain valid research geometry',()=>{
+ const dt=.04;
+ for(const shape of ['rect','circle']){
+  const g=fixture(null);
+  g.__novaTerrain=[shape==='rect'?{...wall(),x:100,y:100}:
+    {shape:'circle',x:100,y:100,r:5,solid:true,destructible:false}];
+  g.firstTerrainHit=()=>null;
+  const provider=makePermanentTerrainProvider(g,dt);
+  assert.equal(typeof provider,'function',shape);
+  const r=observeProjectilePairs(g,dt,provider);
+  assert.equal(r.incomplete,false,shape);
+  assert.equal(r.certified.length,1,shape);
+ }
+});
+
+test('prototype-inherited geometry cannot silently disappear from detached terrain',()=>{
+ const dt=.04;
+ for(const shape of ['rect','circle']){
+  const g=fixture(null);
+  const inherited=Object.create({shape});
+  Object.assign(inherited,{x:0,y:0,w:4,h:40,r:5,solid:true,destructible:false});
+  g.__novaTerrain=[inherited];
+  g.firstTerrainHit=()=>null;
+  // Spreading inherited shape into a detached index loses the shape.
+  // Do not interpret the resulting incomplete geometry as clear terrain.
+  assert.equal(makePermanentTerrainProvider(g,dt),null,shape);
+ }
+});
+
+test('prototype-inherited solidity and dimensions also fail closed',()=>{
+ const dt=.04;
+ for(const key of ['solid','w','h','x','destructible']){
+  const g=fixture(null),own={...wall()};
+  const inherited=Object.create({[key]:own[key]});
+  delete own[key];Object.assign(inherited,own);
+  g.__novaTerrain=[inherited];g.firstTerrainHit=()=>null;
+  assert.equal(makePermanentTerrainProvider(g,dt),null,key);
+ }
+});
+
+test('non-enumerable or accessor terrain geometry cannot vanish or change during cloning',()=>{
+ const dt=.04;
+ for(const mode of ['hidden-shape','getter-shape','hidden-width','getter-solid']){
+  const g=fixture(null),s={...wall()};
+  const key=mode.endsWith('shape')?'shape':mode.endsWith('width')?'w':'solid';
+  const value=s[key];
+  if(mode.startsWith('hidden'))
+   Object.defineProperty(s,key,{value,enumerable:false,configurable:true});
+  else Object.defineProperty(s,key,{get(){return value;},enumerable:true,configurable:true});
+  g.__novaTerrain=[s];g.firstTerrainHit=()=>null;
+  assert.equal(makePermanentTerrainProvider(g,dt),null,mode);
+ }
+});

@@ -259,3 +259,20 @@ test('seeded actual Battlefield shared-index results match fresh-index reference
  assert.equal(JSON.stringify(g.__novaTerrain),before);
  assert.equal(Object.hasOwn(g,'__novaBattlefieldIndex'),false);
 });
+
+test('actual Battlefield inherited circle geometry cannot become a false clear path',()=>{
+ const g=boot();
+ const terrain=Object.assign(Object.create({shape:'circle'}),
+   {id:-741,x:0,y:0,r:30,w:2,h:2,solid:true,destructible:false,hp:0});
+ g.__novaTerrain=[terrain];
+ const b={...shot(),x:-40,y:20,vx:2000};
+ const dt=.04;
+ // Live Battlefield sees the inherited circle and intersects its wide rim.
+ const real=g.firstTerrainHit(b.x,b.y,b.x+b.vx*dt,b.y, b.r*.45);
+ assert.ok(real&&real.hit&&real.hit.t>0&&real.hit.t<1);
+ // Spreading the object into a detached index would lose its inherited shape
+ // and silently treat the tiny w/h rectangle as a clear path.
+ const observed=query(g,b,dt);
+ assert.equal(observed.complete,false);
+ assert.equal(observed.time,null);
+});
