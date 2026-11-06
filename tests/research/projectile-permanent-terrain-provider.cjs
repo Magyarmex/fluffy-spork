@@ -3,6 +3,7 @@
 // Reuses open-field third-projectile arbitration and supplies detached,
 // pre-update Battlefield terrain times. Never changes live combat.
 const { makeOpenFieldProvider } = require('./projectile-open-field-event-provider.cjs');
+const { firstContact } = require('./projectile-first-event-certificate.cjs');
 const { firstDetachedPermanentTerrainEvent } = require('./projectile-detached-permanent-terrain.cjs');
 function makePermanentTerrainProvider(game, dt) {
   if (!game || game.__novaResearchHostilityFixture !== true || !Array.isArray(game.bullets) || !Array.isArray(game.__novaTerrain) ||
@@ -24,6 +25,31 @@ function makePermanentTerrainProvider(game, dt) {
     if (!event.complete) return null;
     terrainTimes.push(event.time);
   }
+  // Geometry-only competing contacts can be physically impossible when a
+  // permanent wall stops one of their participants first. Build the competing
+  // event ledger using terrain-qualified contact times, not the open-field
+  // ledger, or an impossible earlier contact can hide a later real one.
+  const shots = game.bullets.map(s => ({ ...s }));
+  const times = Array.from({ length: shots.length }, () => Array(shots.length).fill(null));
+  for (let i = 0; i < shots.length; i++) for (let j = i + 1; j < shots.length; j++) {
+    const context = { complete: true, allied: false, unscanned: false,
+      aTerrain: terrainTimes[i], bTerrain: terrainTimes[j],
+      aBody: null, bBody: null, aOtherProjectile: null, bOtherProjectile: null };
+    const t = firstContact(shots[i], shots[j], dt, context);
+    times[i][j] = times[j][i] = t;
+  }
+  const events = [];
+  for (let i = 0; i < shots.length; i++) for (let j = i + 1; j < shots.length; j++)
+    if (times[i][j] !== null) events.push({ i, j, t: times[i][j] });
+  events.sort((a, b) => a.t - b.t);
+  if (events.length > 1) {
+    const earliest = events[0].t;
+    for (let a = 0; a < events.length && events[a].t <= earliest + 1e-9; a++)
+      for (let b = a + 1; b < events.length && events[b].t <= earliest + 1e-9; b++) {
+        const x = events[a], y = events[b];
+        if (x.i === y.i || x.i === y.j || x.j === y.i || x.j === y.j) return null;
+      }
+  }
   return (a,b,i,j,step) => {
     let unchanged;
     try { unchanged = terrainState() === initialTerrain; } catch (_) { return null; }
@@ -36,7 +62,14 @@ function makePermanentTerrainProvider(game, dt) {
     const context = base(a,b,i,j,step);
     if (!context || !Number.isInteger(i) || !Number.isInteger(j) ||
         i < 0 || j <= i || j >= terrainTimes.length) return null;
-    return { ...context, aTerrain: terrainTimes[i], bTerrain: terrainTimes[j] };
+    let aOther = null, bOther = null;
+    for (let k = 0; k < times.length; k++) if (k !== i && k !== j) {
+      const x = times[i][k], y = times[j][k];
+      if (x !== null && (aOther === null || x < aOther)) aOther = x;
+      if (y !== null && (bOther === null || y < bOther)) bOther = y;
+    }
+    return { ...context, aTerrain: terrainTimes[i], bTerrain: terrainTimes[j],
+      aOtherProjectile: aOther, bOtherProjectile: bOther };
   };
 }
 module.exports = { makePermanentTerrainProvider };
