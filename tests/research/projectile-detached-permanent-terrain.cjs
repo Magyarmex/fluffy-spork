@@ -16,7 +16,9 @@ function firstDetachedPermanentTerrainEvent(game, shot, dt) {
     for (let i = 0; i < game.__novaTerrain.length; i++) {
       if (!Object.hasOwn(game.__novaTerrain, i)) return unknown('sparse-terrain');
       const s = game.__novaTerrain[i];
-      if (!s || s.destructible !== false || s.solid !== true ||
+      if (!s || (s.destructible === true && !(Number.isFinite(s.hp) && s.hp <= 0)) ||
+          (s.destructible !== true && s.destructible !== false) ||
+          (s.destructible === false && s.solid !== true) ||
           !['x','y'].every(k => Number.isFinite(s[k])) ||
           (s.shape === 'circle' ? !(Number.isFinite(s.r) && s.r > 0) :
            s.shape === 'rect' ? !(Number.isFinite(s.w) && s.w > 0 && Number.isFinite(s.h) && s.h > 0) : true))
