@@ -3055,15 +3055,21 @@ function certifiedMultiShotCoverPriority(g,dt){
   };
   var oa=getOwner(a),ob=getOwner(b);
   if(!oa||!ob)return false;
+  /* Match Sniper's shipping allegiance rule, including free-for-all tanks
+   * without team tags. A separate explicit hostility veto always wins. */
+  if(oa===ob||oa.id===ob.id)return false;
   if(typeof g.areAllies==='function'){
    try{if(g.areAllies(oa,ob))return false;}catch(_e){return false;}
-  }else{
-   var keys=['teamId','team','factionId','faction','side'],known=false;
+  }
+  if(typeof g.areHostile==='function'){
+   try{if(!g.areHostile(oa,ob))return false;}catch(_e){return false;}
+  }
+  if(typeof g.areAllies!=='function'){
+   var keys=['teamId','team','factionId','faction','side'];
    for(var k=0;k<keys.length;k++)if(oa[keys[k]]!=null&&ob[keys[k]]!=null){
     if(oa[keys[k]]===ob[keys[k]])return false;
-    known=true;break;
+    break;
    }
-   if(!known)return false;
   }
   var rx=a.x-b.x,ry=a.y-b.y,vx=a.vx-b.vx,vy=a.vy-b.vy,
       radius=a.r+b.r+1.5,c=rx*rx+ry*ry-radius*radius,
