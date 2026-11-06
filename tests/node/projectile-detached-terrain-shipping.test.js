@@ -51,3 +51,11 @@ test('actual Battlefield pillar uses circular swept padding',()=>{
  assert.ok(Math.abs(o.time-.01365)<1e-10);
  assert.equal(Object.hasOwn(g,'__novaBattlefieldIndex'),false);
 });
+
+test('actual Battlefield inert destroyed cover cannot block detached projectile',()=>{
+ const g=boot();g.__novaTerrain=[{...rect(),destructible:true,solid:false,hp:0}];
+ const before=JSON.stringify(g.__novaTerrain);
+ assert.deepEqual(query(g,shot(),.04),{complete:true,time:null,reason:null});
+ assert.equal(JSON.stringify(g.__novaTerrain),before);
+ assert.equal(Object.hasOwn(g,'__novaBattlefieldIndex'),false);
+});
