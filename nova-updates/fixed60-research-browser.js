@@ -445,7 +445,17 @@ class FixedStepRafOwner {
         ts=this.lastMs;
       }else this._awaitingForwardFrame=false;
       this.schedule();this.advance(ts);
-    }catch(error){this.stop();throw error}
+    }catch(error){
+      // Keep the initiating simulation/render failure as the primary error.
+      // A hostile RAF host may also throw during cancellation; cleanup still
+      // runs and the secondary failure remains available for diagnosis.
+      try{this.stop()}catch(cleanupError){
+        if(error && typeof error==='object'){
+          try{error.cleanupError=cleanupError}catch(_ignored){}
+        }
+      }
+      throw error;
+    }
   }
   advance(ts){
     const g=this.game;
