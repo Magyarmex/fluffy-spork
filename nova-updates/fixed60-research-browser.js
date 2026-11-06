@@ -313,16 +313,24 @@ class BrowserInputCapture {
   detach() {
     if (!this.active) return;
     this.active = false;
-    for (const [target,type,fn] of this.listeners.reverse())
-      target.removeEventListener(type,fn);
+    let failure;
+    for (const [target,type,fn] of this.listeners.reverse()) {
+      try { target.removeEventListener(type,fn); }
+      catch (error) { if (!failure) failure = error; }
+    }
     this.listeners.length = 0;
     if (this.game && this.game.destroy === this.destroyWrapper) {
       if (this.destroyHadOwn) this.game.destroy = this.originalDestroy;
       else delete this.game.destroy;
     }
-    this.timeline.reset();
+    // Reattach production input even when a hostile DOM listener or a
+    // game/UI reset callback fails. Never strand a live game without controls.
+    try { this.timeline.reset(); }
+    catch (error) { if (!failure) failure = error; }
     this.input.canvas = null;
-    this.input.attach(this.canvas); // restore original production event owners
+    try { this.input.attach(this.canvas); }
+    catch (error) { if (!failure) failure = error; }
+    if (failure) throw failure;
   }
 }
 module.exports = {BrowserInputCapture};
@@ -559,7 +567,12 @@ class FixedStepRafOwner {
     let cancelError;
     try{if(this.raf!=null)this.cancel(this.raf)}
     catch(error){cancelError=error}
-    this.raf=null;this.timeline.reset();this.lagMs=0;
+    this.raf=null;
+    // Input reset may invoke game/UI hooks. Even a failing reset must never
+    // leave the production lifecycle trapped behind the stopped pilot.
+    let resetError;
+    try{this.timeline.reset()}catch(error){resetError=error}
+    this.lagMs=0;
     if(this.game.start===this.startWrapper){
       if(this.startHadOwn)this.game.start=this.originalStart;
       else delete this.game.start;
@@ -572,7 +585,13 @@ class FixedStepRafOwner {
       if(this.destroyHadOwn)this.game.destroy=this.originalDestroy;
       else delete this.game.destroy;
     }
-    if(cancelError)throw cancelError;
+    if(cancelError){
+      if(resetError && cancelError && typeof cancelError==='object'){
+        try{cancelError.cleanupError=resetError}catch(_ignored){}
+      }
+      throw cancelError;
+    }
+    if(resetError)throw resetError;
   }
 }
 // Compose the existing production Input handlers with chronological DOM
