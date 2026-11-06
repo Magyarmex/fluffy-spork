@@ -317,3 +317,17 @@ test('prototype-inherited solidity and dimensions also fail closed',()=>{
   assert.equal(makePermanentTerrainProvider(g,dt),null,key);
  }
 });
+
+test('non-enumerable or accessor terrain geometry cannot vanish or change during cloning',()=>{
+ const dt=.04;
+ for(const mode of ['hidden-shape','getter-shape','hidden-width','getter-solid']){
+  const g=fixture(null),s={...wall()};
+  const key=mode.endsWith('shape')?'shape':mode.endsWith('width')?'w':'solid';
+  const value=s[key];
+  if(mode.startsWith('hidden'))
+   Object.defineProperty(s,key,{value,enumerable:false,configurable:true});
+  else Object.defineProperty(s,key,{get(){return value;},enumerable:true,configurable:true});
+  g.__novaTerrain=[s];g.firstTerrainHit=()=>null;
+  assert.equal(makePermanentTerrainProvider(g,dt),null,mode);
+ }
+});
