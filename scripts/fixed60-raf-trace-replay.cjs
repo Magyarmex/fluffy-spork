@@ -3,7 +3,11 @@
 // FixedStepRafOwner, not an independent approximation of its catch-up logic.
 // Usage: node scripts/fixed60-raf-trace-replay.cjs path/to/intervals.json
 // JSON: [33.3, 34.1, ...] or {"frameIntervalsMs":[...]}.
-// Phase lag is NOT input latency: skipped simulation time can make it zero.\n// Always read droppedMs and remainingBacklogMs alongside it.\n// Input traces must cover an active, unpaused, foreground match; raw RAF gaps\n// cannot identify hidden-tab, pause, or player-input transitions.\n// No game, input, renderer, or production file is modified.
+// Phase lag is NOT input latency: skipped simulation time can make it zero.
+// Always read droppedMs and remainingBacklogMs alongside it.
+// Input traces must cover an active, unpaused, foreground match; raw RAF gaps
+// cannot identify hidden-tab, pause, or player-input transitions.
+// No game, input, renderer, or production file is modified.
 const fs=require('node:fs');
 const {FixedStepRafOwner}=require('../tests/research/fixed-step-raf-owner.cjs');
 const STEP_MS=1000/60;
