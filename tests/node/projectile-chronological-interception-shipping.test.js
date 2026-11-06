@@ -407,3 +407,17 @@ test('mutual TTL preflight refuses spent or higher-penetration projectiles',()=>
     assert.deepEqual(hits,[]);
   }
 });
+
+test('canonical Scout bullet size, speed and integrity reach FFA TTL recovery',()=>{
+  for(const fps of [30,60,120,240]){
+    const {g,a,b,hits}=ttlFixture();
+    g.tankById.set(1,{id:1});g.tankById.set(2,{id:2});
+    const scoutHp=12*(0.72+5*0.08)*(1+0.055);
+    Object.assign(a,{x:-7,vx:440,r:5,pen:1,hp:scoutHp,maxHp:scoutHp});
+    Object.assign(b,{x:7,vx:-440,r:5,pen:1,hp:scoutHp,maxHp:scoutHp});
+    g.updateBullets(1/fps);
+    assert.deepEqual(hits.sort(),[1,2],
+      'real Scout-size/speed/integrity at '+fps+'Hz');
+    assert.equal(a.dead,true);assert.equal(b.dead,true);
+  }
+});
