@@ -205,3 +205,20 @@ test('moving distant active cover into corridor invalidates snapshot',()=>{
  assert.equal(r.incomplete,true);
  assert.equal(r.certified.length,0);
 });
+
+
+test('distant active cover preserves earliest contact across 30–240Hz and storage order',()=>{
+ for(const hz of [30,60,120,240])for(const reversed of [false,true]){
+   const g=fixture(null),dt=1/hz;
+   const a=shot(1,-5,1000),b=shot(2,5,-1000);
+   g.bullets=reversed?[b,a]:[a,b];
+   g.__novaTerrain=[{...wall(),x:200,y:200,destructible:true,hp:20}];
+   g.firstTerrainHit=()=>null;
+   const provider=makePermanentTerrainProvider(g,dt);
+   assert.equal(typeof provider,'function',hz+'Hz');
+   const r=observeProjectilePairs(g,dt,provider);
+   assert.equal(r.incomplete,false,hz+'Hz');
+   assert.equal(r.certified.length,1,hz+'Hz');
+   assert.ok(Math.abs(r.certified[0].time-.00125)<1e-9,hz+'Hz');
+ }
+});
