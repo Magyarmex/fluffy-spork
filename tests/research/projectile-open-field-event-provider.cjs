@@ -29,6 +29,14 @@ function makeOpenFieldProvider(game, dt) {
     const t = firstContact(shots[i], shots[j], dt, empty());
     times[i][j]=times[j][i]=t;
   }
+  // A simultaneous earliest multi-shot event has no unique physical winner.
+  // Pair-local blockers can suppress those tied contacts while accidentally
+  // allowing an unrelated later pair to appear first: veto the whole frame.
+  const allTimes = [];
+  for (let i=0;i<n;i++) for (let j=i+1;j<n;j++)
+    if (times[i][j]!==null) allTimes.push(times[i][j]);
+  allTimes.sort((a,b)=>a-b);
+  if (allTimes.length>1 && allTimes[1]<=allTimes[0]+1e-9) return null;
   return (a,b,i,j,step) => {
     if (step!==dt || !Number.isInteger(i) || !Number.isInteger(j) ||
         i<0 || j<=i || j>=n || !a || !b) return null;
