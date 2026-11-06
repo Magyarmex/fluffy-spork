@@ -30,9 +30,14 @@ function trial(seed,mode,fixed30){
   const add=g.addParticles;
   g.addParticles=function(x,y,color,n,speed,kind){
    // Never suppress another system's glow with the same particle signature.
-   if(inBulletUpdate&&speed===20&&kind==='glow'){
+   if(inBulletUpdate&&n===1&&speed===20&&kind==='glow'){
     ordinary+=n;
-    if(mode==='suppress-trails')return;
+    if(mode==='suppress-trails'){
+     // Canonical single-glow addParticles consumes four cosmetic draws.
+     // Burn the same draws so downstream visual choices remain paired.
+     for(let i=0;i<4;i++)this.cosmeticRandom();
+     return;
+    }
    }else other+=n;
    return add.apply(this,arguments);
   };
@@ -58,7 +63,8 @@ function trial(seed,mode,fixed30){
     assert.equal(owner.droppedFrames,0);
    }else for(let tick=0;tick<TICKS;tick++)g.update(1/60);
    return {physical:digest(physical(g)),gameplayDraws:draws(),
-    ordinary,other,bullets:g.bullets.length};
+    ordinary,other,cosmeticState:g.__novaCosmeticRngState,
+    bullets:g.bullets.length};
   }finally{if(owner)owner.stop();g.destroy();}
  });
 }
@@ -71,7 +77,9 @@ test('actual composed Tempest: ordinary-trail suppression is simulation- and RNG
    const suppressed=trial(seed,'suppress-trails',fixed30);
    assert.deepEqual(aa,a,'A/A control must be deterministic');
    assert.ok(a.ordinary>0,'fixture must actually emit ordinary trails');
-   assert.ok(suppressed.ordinary>0,'intervention must reach real projectile trails');
+   assert.equal(suppressed.ordinary,a.ordinary,'same trail opportunities must be sampled');
+   assert.equal(suppressed.other,a.other,'other feedback call sites must remain paired');
+   assert.equal(suppressed.cosmeticState,a.cosmeticState,'cosmetic RNG sequence must be preserved');
    assert.equal(suppressed.physical,a.physical,'cosmetic suppression changed physical Game');
    assert.equal(suppressed.gameplayDraws,a.gameplayDraws,'cosmetic suppression changed gameplay RNG');
   }
