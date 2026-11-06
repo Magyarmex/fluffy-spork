@@ -48,7 +48,7 @@ function replay(intervals,maxSteps=2){
       simulatedTicks:owner.ticks,simulatedMs:round(owner.ticks*STEP_MS),
       droppedMs:round(owner.droppedMs),droppedFrames:owner.droppedFrames,
       remainingBacklogMs:round(owner.lagMs),
-      peakBacklogMs:round(Math.max(...lag)),
+      peakBacklogMs:round(lag.reduce((peak,v)=>Math.max(peak,v),0)),
       p95BacklogMs:round(percentile(lag,.95)),
       p95WallToSimulationMs:round(percentile(wallDelay,.95)),
       p99WallToSimulationMs:round(percentile(wallDelay,.99)),
