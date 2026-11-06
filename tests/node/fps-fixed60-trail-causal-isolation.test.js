@@ -11,9 +11,10 @@ const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
 const {FixedStepRafOwner}=require('../research/fixed-step-raf-owner.cjs');
 const TICKS=120;
 
-function trial(seed,mode,fixed30){
+function trial(seed,mode,fixed30,quality='low'){
  return withSeed(seed,draws=>{
-  const g=bootGame(),p=g.player;
+  const g=bootGame(quality),p=g.player;
+  assert.equal(g.parts.length,quality==='low'?200:400,'shipping particle pool size');
   g.sfx.muted=true;g.sfx.startMusic=()=>{};
   g.setClass(p,'tempest');
   // Retain actual enemy, ecology and projectile systems.
@@ -80,11 +81,11 @@ function trial(seed,mode,fixed30){
 }
 
 test('actual composed Tempest: ordinary-trail suppression is simulation- and RNG-neutral',()=>{
- for(const seed of [1517800,1517802]){
+ for(const quality of ['low','high'])for(const seed of [1517800,1517802]){
   for(const fixed30 of [false,true]){
-   const a=trial(seed,'baseline',fixed30);
-   const aa=trial(seed,'baseline',fixed30);
-   const suppressed=trial(seed,'suppress-trails',fixed30);
+   const a=trial(seed,'baseline',fixed30,quality);
+   const aa=trial(seed,'baseline',fixed30,quality);
+   const suppressed=trial(seed,'suppress-trails',fixed30,quality);
    assert.deepEqual(aa,a,'A/A control must be deterministic');
    assert.ok(a.ordinary>0,'fixture must actually emit ordinary trails');
    assert.equal(suppressed.ordinary,a.ordinary,'same trail opportunities must be sampled');
@@ -98,7 +99,7 @@ test('actual composed Tempest: ordinary-trail suppression is simulation- and RNG
    assert.equal(suppressed.cosmeticState,a.cosmeticState,'cosmetic RNG sequence must be preserved');
    assert.equal(suppressed.physical,a.physical,'cosmetic suppression changed physical Game');
    assert.equal(suppressed.gameplayDraws,a.gameplayDraws,'cosmetic suppression changed gameplay RNG');
-   console.log('NOVA_TRAIL_POOL_CENSUS '+JSON.stringify({seed,fixed30,
+   console.log('NOVA_TRAIL_POOL_CENSUS '+JSON.stringify({seed,fixed30,quality,
     ordinary:a.ordinary,baselineWrites:a.poolWrites,
     suppressedWrites:suppressed.poolWrites,
     baselineActiveOverwrites:a.activeOverwrites,
@@ -108,9 +109,9 @@ test('actual composed Tempest: ordinary-trail suppression is simulation- and RNG
 });
 
 test('fixed60 at 30Hz presentation preserves native60 projectile trail opportunities',()=>{
- for(const seed of [1517800,1517802]){
-  const native=trial(seed,'baseline',false);
-  const fixed=trial(seed,'baseline',true);
+ for(const quality of ['low','high'])for(const seed of [1517800,1517802]){
+  const native=trial(seed,'baseline',false,quality);
+  const fixed=trial(seed,'baseline',true,quality);
   assert.equal(fixed.physical,native.physical);
   assert.equal(fixed.gameplayDraws,native.gameplayDraws);
   assert.equal(fixed.ordinary,native.ordinary);
