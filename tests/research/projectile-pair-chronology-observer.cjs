@@ -67,36 +67,72 @@ function observeProjectilePairs(game, dt, eventsForPair) {
     }
     if (shots[i].dead !== true) active.push(i);
   }
-  const totalPairs = active.length * (active.length - 1) / 2;
-  if (totalPairs > MAX_BROADPHASE_PAIRS) {
-    result.incomplete = true; result.reason = 'broadphase-budget'; return result;
-  }
-  // Shells, rails and other unsupported shots may create mid-frame children
-  // that do not exist in this snapshot. Spatial separation alone cannot
-  // certify those future events, so abstain for the entire frame.
+  // All active projectile types must be supported before owner-based pruning:
+  // an unsupported shell may create new projectiles during this frame.
   if (shots.some(s => s && s.dead !== true && !supported(s))) {
     result.incomplete = true; result.reason = 'unsupported-projectile-present';
     return result;
   }
-  // Complete the cheap broad phase before asking any event provider to certify
-  // a pair. An overflow must revoke the entire frame, never a partial result.
+  const totalPairs = active.length * (active.length - 1) / 2;
+  if (!Number.isSafeInteger(totalPairs)) {
+    result.incomplete = true; result.reason = 'broadphase-budget'; return result;
+  }
   const candidates = [];
-  for (let a = 0; a < active.length; a++) for (let b = a + 1; b < active.length; b++) {
-    const i = active[a], j = active[b];
-    result.pairs++;
-    // A projectile cannot intercept another shot from its own owner.
-    // Exclude those pairs before consuming the expensive event budget;
-    // the first-contact oracle already enforces this allegiance invariant.
-    if (shots[i].ownerId === shots[j].ownerId) {
-      result.abstained++; continue;
+  if (totalPairs <= MAX_BROADPHASE_PAIRS) {
+    // Preserve the existing fast path for ordinary small volleys.
+    for (let a = 0; a < active.length; a++) for (let b = a + 1; b < active.length; b++) {
+      const i = active[a], j = active[b];
+      result.pairs++;
+      if (shots[i].ownerId === shots[j].ownerId ||
+          definitelyDisjoint(shots[i], shots[j], dt)) {
+        result.abstained++; continue;
+      }
+      candidates.push([i, j]);
+      if (candidates.length > MAX_PAIRS) {
+        result.incomplete = true; result.reason = 'pair-budget';
+        result.certified = []; return result;
+      }
     }
-    if (definitelyDisjoint(shots[i], shots[j], dt)) {
-      result.abstained++; continue;
+  } else {
+    // High-count same-owner volleys should not exhaust the work budget.
+    // Grouping enumerates only cross-owner pairs, bounded to 1024.
+    const groups = new Map();
+    for (const i of active) {
+      const id = shots[i].ownerId;
+      if (!groups.has(id)) groups.set(id, []);
+      groups.get(id).push(i);
     }
-    candidates.push([i, j]);
-    if (candidates.length > MAX_PAIRS) {
-      result.incomplete = true; result.reason = 'pair-budget';
-      result.certified = []; return result;
+    const groupList = [...groups.values()];
+    // Count cross-owner pairs in O(number of owners), not O(owner groups²).
+    // Abort as soon as the work cap is exceeded, before enumerating pairs.
+    let crossPairs = 0, preceding = 0;
+    for (const group of groupList) {
+      crossPairs += preceding * group.length;
+      if (!Number.isSafeInteger(crossPairs) ||
+          crossPairs > MAX_BROADPHASE_PAIRS) {
+        result.incomplete = true; result.reason = 'broadphase-budget';
+        return result;
+      }
+      preceding += group.length;
+    }
+    result.pairs = totalPairs;
+    result.abstained = totalPairs - crossPairs;
+    const cross = [];
+    for (let g = 0; g < groupList.length; g++)
+      for (let h = g + 1; h < groupList.length; h++)
+        for (const i of groupList[g]) for (const j of groupList[h])
+          cross.push([Math.min(i, j), Math.max(i, j)]);
+    // Preserve original source-index order for stateful event providers.
+    cross.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    for (const [i, j] of cross) {
+      if (definitelyDisjoint(shots[i], shots[j], dt)) {
+        result.abstained++; continue;
+      }
+      candidates.push([i, j]);
+      if (candidates.length > MAX_PAIRS) {
+        result.incomplete = true; result.reason = 'pair-budget';
+        result.certified = []; return result;
+      }
     }
   }
   outer: for (const [i, j] of candidates) {
