@@ -278,3 +278,25 @@ test('missing projectile slot cannot be mistaken for dead debris', () => {
   assert.equal(r.reason, 'invalid-projectile-entry');
   assert.equal(r.certified.length, 0);
 });
+
+test('dead shell cannot veto a valid ordinary live pair', () => {
+  const shell = shot(3, 0, 0);
+  shell.shell = true;
+  shell.dead = true;
+  const g = { bullets: [shot(1, -20, 1000), shell, shot(2, 20, -1000)] };
+  const r = observeProjectilePairs(g, .05, verified);
+  assert.equal(r.incomplete, false);
+  assert.deepEqual([r.certified[0].i, r.certified[0].j], [0, 2]);
+});
+
+test('live shell still vetoes the whole frame even with dead debris', () => {
+  const shell = shot(3, 0, 0);
+  shell.shell = true;
+  const dead = shot(4, 0, 0);
+  dead.dead = true;
+  const g = { bullets: [shot(1, -20, 1000), dead, shell, shot(2, 20, -1000)] };
+  const r = observeProjectilePairs(g, .05, verified);
+  assert.equal(r.incomplete, true);
+  assert.equal(r.reason, 'unsupported-projectile-present');
+  assert.equal(r.certified.length, 0);
+});
