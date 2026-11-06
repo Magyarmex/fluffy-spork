@@ -154,3 +154,95 @@ test('game-over state does not display a combat touch reset notice',()=>{
     assert.equal(s.input.move.active,false,'safety reset still applies');
   }finally{s.owner.stop()}
 });
+
+test('mouse pointerup sharing a touch id cannot conceal involuntary touch reset',()=>{
+  const s=fixture();s.owner.start();
+  try{
+    s.down(1005,7);s.frame(1017);
+    assert.equal(s.input.move.active,true);
+    // Pointer IDs are only meaningful within their pointer type. A mouse
+    // release with the same numeric id must not count as a touch release.
+    s.timeline.push(.020,'pointerup',{pointerId:7,pointerType:'mouse'});
+    s.frame(1137);
+    assert.equal(s.notices.length,1,'held touch was still involuntarily reset');
+    assert.equal(s.input.stickId.move,-1);
+    assert.equal(s.input.firing,false);
+  }finally{s.owner.stop()}
+});
+test('malformed queued pointer metadata cannot crash foreground recovery',()=>{
+  const s=fixture();s.owner.start();
+  try{
+    s.down(1005);s.frame(1017);
+    s.timeline.events.push({at:.020,kind:'pointerup',data:null});
+    s.frame(1137);
+    assert.equal(s.notices.length,1);
+    assert.equal(s.input.move.active,false);
+  }finally{s.owner.stop()}
+});
+
+test('composed Game warns when queued mouse release shares held touch id',()=>{
+  process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
+  const {bootGame}=require('../research/audio-rng-causal-pilot.cjs');
+  const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs');
+  const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
+  let now=1000;const notices=[];g.toast=(...args)=>notices.push(args);
+  const timeline=new ChronologicalInput(g.input);
+  const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
+  const owner=new FixedStepRafOwner(g,timeline,bridge,{
+    now:()=>now,request:()=>1,cancel:()=>{},render:()=>{}
+  });
+  const event=(type,ms,pointerType)=>{
+    now=ms;
+    return bridge.capture({type,timeStamp:ms,pointerId:11,pointerType,
+      clientX:100,clientY:200,button:0,buttons:type==='pointerup'?0:1,
+      target:{tagName:'CANVAS',closest:()=>null}});
+  };
+  try{
+    owner.start();
+    assert.equal(event('pointerdown',1005,'touch'),true);
+    now=1017;owner.frame(now);
+    assert.equal(g.input.stickId.move,11);
+    assert.equal(event('pointerup',1020,'mouse'),true);
+    now=1137;owner.frame(now);
+    assert.deepEqual(notices,[['Touch controls reset — touch again','warn']]);
+    assert.equal(g.input.stickId.move,-1);
+    assert.equal(g.input.firing,false);
+  }finally{owner.stop();g.destroy()}
+});
+
+test('pen-owned stick release suppresses false reset notice, unlike mouse release',()=>{
+  for(const kind of ['pointerup','pointercancel']){
+    const s=fixture();s.owner.start();
+    try{
+      s.timeline.push(.005,'pointerdown',{pointerId:7,pointerType:'pen',
+        clientX:100,clientY:100,button:0,buttons:1});
+      s.frame(1017);
+      assert.equal(s.input.move.active,true);
+      s.timeline.push(.020,kind,{pointerId:7,pointerType:'pen'});
+      s.frame(1137);
+      assert.equal(s.notices.length,0,'genuine pen release is intentional');
+      assert.equal(s.input.move.active,false);
+    }finally{s.owner.stop()}
+  }
+});
+
+test('unknown non-mouse pointer type follows production stick release semantics',()=>{
+  const s=fixture();s.owner.start();
+  try{
+    s.down(1005);s.frame(1017);
+    s.timeline.push(.020,'pointerup',{pointerId:7,pointerType:''});
+    s.frame(1137);
+    assert.equal(s.notices.length,0,'Input.pu releases any non-mouse pointer');
+    assert.equal(s.input.move.active,false);
+  }finally{s.owner.stop()}
+});
+test('missing pointer type cannot masquerade as a confirmed touch release',()=>{
+  const s=fixture();s.owner.start();
+  try{
+    s.down(1005);s.frame(1017);
+    s.timeline.push(.020,'pointerup',{pointerId:7});
+    s.frame(1137);
+    assert.equal(s.notices.length,1,'incomplete metadata is not proof of release');
+    assert.equal(s.input.move.active,false);
+  }finally{s.owner.stop()}
+});
