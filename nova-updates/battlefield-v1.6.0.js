@@ -3019,7 +3019,168 @@ function certifiedMultiShotCoverPriority(g,dt){
   witness.activations++;
  return contacts.map(function(x){return x.i;});
 }
- var oldUpdateBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var terrain=ensureTerrain(this);
+
+ /* A deliberately narrow first-event recovery: two expiring ordinary rounds
+  * that provably destroy EACH OTHER before either TTL, wall, body or arena
+  * contact. Resolve through the existing integrity/feedback owners before
+  * the core's expiration pass. Any unknown competing event abstains. */
+ function certifiedMutualTTLInterception(g,dt){
+  var shots=g.bullets;
+  if(!(dt>0&&dt<=.05)||!shots||shots.length!==2||
+     !Array.isArray(g.tanks)||!Array.isArray(g.shapes)||
+     !Array.isArray(g.drones)||!g.hash||
+     typeof g.hash.query!=='function')return false;
+  var a=shots[0],b=shots[1];
+  function ordinary(s){
+   return s&&s.dead===false&&s.kind==='bullet'&&
+    s.shell===false&&s.beam===false&&!s.splash&&!s.__v17Cannon&&
+    !s.__novaRail&&s.pen===0&&Number.isFinite(s.hits)&&s.hits===0&&
+    Number.isFinite(s.hp)&&s.hp>0&&Number.isFinite(s.maxHp)&&
+    s.maxHp>=s.hp&&Number.isFinite(s.ttl)&&s.ttl>0&&s.ttl<=dt&&
+    Number.isFinite(s.r)&&s.r>0&&
+    [s.x,s.y,s.vx,s.vy,s.ownerId].every(Number.isFinite);
+  }
+  if(!ordinary(a)||!ordinary(b)||a.ownerId===b.ownerId||
+     a.hp!==b.hp||a.id===b.id)return false;
+  /* Projectiles fired later during this tick cannot be backdated to its
+   * beginning. Reuse the actual Game.update frame-start ID witness. */
+  var ceiling=g.__novaFrameStartBulletIdCeiling;
+  if(!Number.isSafeInteger(ceiling)||ceiling<=0||
+     g.__novaFrameStartBulletEpoch!==g.__novaShapeSweepEpoch||
+     !Number.isSafeInteger(a.id)||!Number.isSafeInteger(b.id)||
+     a.id>=ceiling||b.id>=ceiling)return false;
+  var getOwner=function(s){
+   var owner=g.tankById&&g.tankById.get&&g.tankById.get(s.ownerId);
+   return owner||(typeof g.getTank==='function'?g.getTank(s.ownerId):null);
+  };
+  var oa=getOwner(a),ob=getOwner(b);
+  if(!oa||!ob)return false;
+  if(typeof g.areAllies==='function'){
+   try{if(g.areAllies(oa,ob))return false;}catch(_e){return false;}
+  }else{
+   var keys=['teamId','team','factionId','faction','side'],known=false;
+   for(var k=0;k<keys.length;k++)if(oa[keys[k]]!=null&&ob[keys[k]]!=null){
+    if(oa[keys[k]]===ob[keys[k]])return false;
+    known=true;break;
+   }
+   if(!known)return false;
+  }
+  var rx=a.x-b.x,ry=a.y-b.y,vx=a.vx-b.vx,vy=a.vy-b.vy,
+      radius=a.r+b.r+1.5,c=rx*rx+ry*ry-radius*radius,
+      speed2=vx*vx+vy*vy,dot=rx*vx+ry*vy;
+  if(!(c>0&&speed2>0&&dot<0))return false;
+  var disc=dot*dot-speed2*c;
+  if(!(disc>64*Number.EPSILON*(Math.abs(dot*dot)+Math.abs(speed2*c))))
+   return false;
+  var t=c/(-dot+Math.sqrt(disc));
+  if(!Number.isFinite(t)||!(t>1e-9)||
+     !(t<Math.min(dt,a.ttl,b.ttl)-1e-9))return false;
+  var reach=[a,b].map(function(s){
+   var ex=s.x+s.vx*t,ey=s.y+s.vy*t;
+   if(!Number.isFinite(ex)||!Number.isFinite(ey)||
+      Math.max(Math.abs(s.x),Math.abs(s.y),Math.abs(ex),Math.abs(ey))>=
+       MAP_LIMIT-s.r-20)return null;
+   return {s:s,ex:ex,ey:ey};
+  });
+  if(!reach[0]||!reach[1])return false;
+  for(var i=0;i<2;i++){
+   var p=reach[i],s=p.s;
+   if(firstSolidHit(g,s.x,s.y,p.ex,p.ey,s.r*.45))return false;
+  }
+  /* Check the entire known motion envelope of every possible victim.
+   * A stale/missing motion witness is uncertainty, never empty space. */
+  if(g.tanks.length+g.shapes.length+g.drones.length>260)return false;
+  function overlaps(p,x0,y0,x1,y1,pad){
+   var s=p.s;
+   if(![x0,y0,x1,y1,pad].every(Number.isFinite))return true;
+   return Math.max(s.x,p.ex)+pad>=Math.min(x0,x1)&&
+          Math.min(s.x,p.ex)-pad<=Math.max(x0,x1)&&
+          Math.max(s.y,p.ey)+pad>=Math.min(y0,y1)&&
+          Math.min(s.y,p.ey)-pad<=Math.max(y0,y1);
+  }
+  for(var ti=0;ti<g.tanks.length;ti++){
+   var tank=g.tanks[ti];if(!tank||!tank.alive)continue;
+   var def=CLASSES[tank.cls];
+   if(!def||!(Number.isFinite(def.size)&&def.size>0)||
+      tank.__novaSweepMoveTime!==g.time||
+      Math.hypot(tank.x-tank.__novaSweepPrevX,
+       tank.y-tank.__novaSweepPrevY)>320)return false;
+   for(var pi=0;pi<2;pi++){
+    if(tank.id===reach[pi].s.ownerId)continue;
+    if(overlaps(reach[pi],tank.__novaSweepPrevX,
+       tank.__novaSweepPrevY,tank.x,tank.y,
+       reach[pi].s.r+def.size+320))return false;
+   }
+  }
+  /* The player may be separately referenced by an older core owner. */
+  if(g.player&&g.player.alive){
+   var pl=g.player,pdef=CLASSES[pl.cls];
+   if(!pdef||!(Number.isFinite(pdef.size)&&pdef.size>0)||
+      pl.__novaSweepMoveTime!==g.time||
+      Math.hypot(pl.x-pl.__novaSweepPrevX,
+       pl.y-pl.__novaSweepPrevY)>320)return false;
+   for(var qi=0;qi<2;qi++){
+    if(pl.id===reach[qi].s.ownerId)continue;
+    if(overlaps(reach[qi],pl.__novaSweepPrevX,
+      pl.__novaSweepPrevY,pl.x,pl.y,
+      reach[qi].s.r+pdef.size+320))return false;
+   }
+  }
+  if(g.shapes.length&&!g.__novaShapeSweepActive)return false;
+  for(var si=0;si<g.shapes.length;si++){
+   var sh=g.shapes[si];if(!sh||!(sh.hp>0))continue;
+   if(sh.__novaShapeSweepEpoch!==g.__novaShapeSweepEpoch||
+      shapeWasTeleported(g,sh)||!Number.isFinite(sh.r)||
+      !(sh.r>0))return false;
+   for(var qi=0;qi<2;qi++)
+    if(overlaps(reach[qi],sh.__novaShapeSweepPrevX,
+      sh.__novaShapeSweepPrevY,sh.x,sh.y,reach[qi].s.r+sh.r+120))
+     return false;
+  }
+  for(var di=0;di<g.drones.length;di++){
+   var drone=g.drones[di];if(!drone||!(drone.hp>0))continue;
+   if(!g.__novaShapeSweepActive||
+      drone.__novaChronoDroneEpoch!==g.__novaShapeSweepEpoch||
+      !Number.isFinite(drone.r)||!(drone.r>0)||
+      Math.hypot(drone.x-drone.__novaChronoDronePrevX,
+       drone.y-drone.__novaChronoDronePrevY)>160)return false;
+   for(var qi=0;qi<2;qi++){
+    if(drone.ownerId===reach[qi].s.ownerId)continue;
+    if(overlaps(reach[qi],drone.__novaChronoDronePrevX,
+      drone.__novaChronoDronePrevY,drone.x,drone.y,
+      reach[qi].s.r+drone.r+160))return false;
+   }
+  }
+  /* Core's hash can retain bodies already removed from live arrays.
+   * Never certify around a stale local collision candidate. */
+  for(var qi=0;qi<2;qi++){
+   var p=reach[qi],s=p.s,nearby=[],mx=(s.x+p.ex)*.5,
+       my=(s.y+p.ey)*.5,span=Math.hypot(p.ex-s.x,p.ey-s.y);
+   try{g.hash.query(mx,my,span*.5+s.r+48,nearby);}
+   catch(_e){return false;}
+   if(nearby.length>260)return false;
+   for(var hi=0;hi<nearby.length;hi++){
+    var e=nearby[hi];if(!e)continue;
+    if(e.kind==='tank'&&e.id===s.ownerId)continue;
+    if(e.kind==='drone'&&e.ownerId===s.ownerId)continue;
+    if(e.kind!=='tank'&&e.kind!=='drone'&&e.kind!=='shape')continue;
+    var er=e.kind==='tank'?
+      (CLASSES[e.cls]&&CLASSES[e.cls].size):
+      (e.r||15);
+    if(!Number.isFinite(er)||overlaps(p,e.x,e.y,e.x,e.y,
+       s.r+er+48))return false;
+   }
+  }
+  /* The canonical Sniper resolver transfers the opponent's original
+   * integrity simultaneously and emits a single contact glow. */
+  var ah=a.hp,bh=b.hp;
+  g.weakenBullet(a,bh);g.weakenBullet(b,ah);
+  var mx=(reach[0].ex+reach[1].ex)*.5,
+      my=(reach[0].ey+reach[1].ey)*.5;
+  if(g.addParticles)g.addParticles(mx,my,'#d9f7ff',3,55,'glow');
+  return true;
+ }
+ var oldUpdateBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=function(dt){var terrain=ensureTerrain(this);certifiedMutualTTLInterception(this,dt);
  /* Snapshot all live competing shots BEFORE any shell/TTL/terrain pre-pass.
   * A later shot cannot gain speculative priority because an earlier shot
   * has already been killed, moved or spent by another pre-pass. */

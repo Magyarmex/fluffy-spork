@@ -239,3 +239,84 @@ test('simultaneous allied crossing cannot suppress an earlier hostile contact', 
   assert.deepEqual(g.bullets.map(b => [b.hp, !!b.dead]),
     [[-1, true], [5, false], [-1, true], [1, false]]);
 });
+
+
+
+function ttlWitness(g) {
+  g.__novaShapeSweepEpoch = 1;
+  g.__novaFrameStartBulletEpoch = 1;
+  g.__novaFrameStartBulletIdCeiling = 4;
+}
+function ttlFixture(ttlA=.005,ttlB=.005,hpA=1,hpB=1) {
+  const g=boot(),a=shot(1,1,-20,6000,ttlA),b=shot(2,2,20,-6000,ttlB);
+  a.hp=a.maxHp=hpA;b.hp=b.maxHp=hpB;
+  ttlWitness(g);
+  g.tankById.set(1,{id:1,team:1});
+  g.tankById.set(2,{id:2,team:2});
+  g.bullets=[a,b];
+  const hits=[],original=g.weakenBullet.bind(g);
+  g.weakenBullet=function(s,damage){hits.push(s.id);return original(s,damage);};
+  return {g,a,b,hits};
+}
+/* Issue #147: a complete isolated mutual interception must precede TTL
+ * even when the shipping core would discard both in a low-refresh frame. */
+for(const fps of [30,60,120,240]) {
+  test('isolated mutually fatal interception precedes TTL at '+fps+'Hz',()=>{
+    for(const reverse of [false,true]){
+      const {g,a,b,hits}=ttlFixture();
+      if(reverse)g.bullets.reverse();
+      g.updateBullets(1/fps);
+      assert.deepEqual(hits.sort(),[1,2]);
+      assert.equal(a.dead,true);assert.equal(b.dead,true);
+    }
+  });
+}
+test('mutual TTL preflight refuses allied, unknown, newborn and third-party contexts',()=>{
+  function run(setup){
+    const {g,a,b,hits}=ttlFixture();
+    setup(g,a,b);g.updateBullets(1/30);return hits;
+  }
+  assert.deepEqual(run(g=>g.tankById.get(2).team=1),[]);
+  assert.deepEqual(run(g=>g.tankById.delete(2)),[]);
+  assert.deepEqual(run(g=>g.bullets.push(shot(3,3,400,0,.005))),[]);
+  assert.deepEqual(run(g=>{g.__novaFrameStartBulletIdCeiling=2;}),[],
+    'newborn second shot cannot be backdated');
+  assert.deepEqual(run(g=>{g.__novaFrameStartBulletEpoch=-1;}),[],
+    'missing frame-start witness must abstain');
+});
+test('mutual TTL recovery respects lifetime, integrity, terrain and body precedence',()=>{
+  function run(ttlA,ttlB,hpA,hpB,setup=()=>{}){
+    const {g,a,b,hits}=ttlFixture(ttlA,ttlB,hpA,hpB);
+    setup(g,a,b);g.updateBullets(1/30);return hits;
+  }
+  assert.deepEqual(run(.001,.005,1,1),[]);
+  assert.deepEqual(run(.005,.001,1,1),[]);
+  assert.deepEqual(run(.005,.005,2,1),[]);
+  assert.deepEqual(run(.005,.005,1,1,g=>{
+    g.__novaTerrain=[{shape:'rect',x:-12,y:0,w:3,h:50,
+      solid:true,destructible:false}];
+  }),[],'earlier permanent wall must veto');
+  assert.deepEqual(run(.005,.005,1,1,g=>{
+    g.__novaTerrain=[{shape:'rect',x:40,y:0,w:3,h:50,
+      solid:true,destructible:false}];
+  }),[1,2],'later wall cannot erase earlier interception');
+  assert.deepEqual(run(.005,.005,1,1,g=>{
+    g.__novaShapeSweepActive=true;
+    g.shapes=[{kind:'shape',x:-12,y:0,r:10,hp:100,
+      __novaShapeSweepEpoch:1,__novaShapeSweepPrevX:-12,
+      __novaShapeSweepPrevY:0}];
+  }),[],'earlier body must veto');
+  assert.deepEqual(run(.005,.005,1,1,g=>{
+    g.__novaShapeSweepActive=true;
+    g.shapes=[{kind:'shape',x:700,y:700,r:10,hp:100,
+      __novaShapeSweepEpoch:1,__novaShapeSweepPrevX:700,
+      __novaShapeSweepPrevY:700}];
+  }),[1,2],'remote witnessed neutral cannot veto');
+});
+test('mutual TTL preflight refuses separately referenced player at contact',()=>{
+  const {g,hits}=ttlFixture();
+  g.player={id:3,cls:'scout',alive:true,x:0,y:0,
+    __novaSweepMoveTime:g.time,__novaSweepPrevX:0,__novaSweepPrevY:0};
+  g.updateBullets(1/30);
+  assert.deepEqual(hits,[]);
+});
