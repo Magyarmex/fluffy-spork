@@ -29,7 +29,7 @@ function run(seed,reload,steps,carry){
   g.input.aim.active=true;g.input.aim.dx=40;g.input.firing=true;g.input.autofire=false;
   p.stats.reload=reload;
   const original=g.tryFire;
-  let dt=0,volleys=0,carriedMs=0,firstShot=null,peakHeat=0,negativeAfterShot=0;
+  let previousDt=0,volleys=0,carriedMs=0,firstShot=null,peakHeat=0,negativeAfterShot=0;
   g.tryFire=function(t){
    const before=this.bullets.length,oldCd=t.fireCd;
    const result=original.apply(this,arguments);
@@ -38,7 +38,7 @@ function run(seed,reload,steps,carry){
     // Only an already established uninterrupted held-fire sequence qualifies.
     // Never bank an idle-ready cooldown or grant multiple shots in one update.
     if(carry&&volleys>0&&oldCd<0){
-     const debt=Math.min(dt,Math.max(0,-oldCd));
+     const debt=Math.min(previousDt,Math.max(0,-oldCd));
      t.fireCd-=debt;carriedMs+=debt*1000;
      if(t.fireCd<0)negativeAfterShot++;
     }
@@ -48,8 +48,9 @@ function run(seed,reload,steps,carry){
   };
   try{
    for(const ticks of steps){
-    dt=ticks/120;
+    const dt=ticks/120;
     g.update(dt);
+    previousDt=dt;
     peakHeat=Math.max(peakHeat,p.__v17Heat||0);
    }
    return {volleys,firstShot:+firstShot.toFixed(6),
