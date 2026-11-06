@@ -182,3 +182,16 @@ test('seeded one-dimensional wall chronology agrees with independent first-conta
    assert.ok(Math.abs(actual.certified[0].time-expected.time)<1e-9,'world '+world);
  }
 });
+
+
+test('terrain-qualified event provider rejects stale third-projectile geometry',()=>{
+ const g=fixture(null),dt=.04;
+ g.__novaTerrain=[];g.firstTerrainHit=()=>null;
+ g.bullets=[shot(1,-20,1000),shot(2,20,-1000),shot(3,200,0)];
+ const provider=makePermanentTerrainProvider(g,dt);
+ assert.equal(typeof provider,'function');
+ g.bullets[2].x=0;
+ const result=observeProjectilePairs(g,dt,provider);
+ assert.equal(result.incomplete,true);
+ assert.equal(result.certified.length,0);
+});
