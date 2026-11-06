@@ -12,10 +12,15 @@ function create({durationMs=120000,maxFrames=200000}={}){
  if(!Number.isFinite(durationMs)||durationMs<=0||durationMs>600000||
     !Number.isInteger(maxFrames)||maxFrames<1||maxFrames>200000)
    throw Error('invalid RAF capture bounds');
- var active=false,first=null,last=null,raf=null,intervals=[],reason=null;\n var visibilityGuarded=false;\n function onVisibility(){if(root.document&&root.document.hidden)stop('hidden');}
+ var active=false,first=null,last=null,raf=null,intervals=[],reason=null;
+ var visibilityGuarded=false;
+ function onVisibility(){if(root.document&&root.document.hidden)stop('hidden');}
  function stop(why){
   if(!active)return snapshot();
-  active=false;reason=why||'manual';\n  if(visibilityGuarded&&root.document&&typeof root.document.removeEventListener==='function'){\n   try{root.document.removeEventListener('visibilitychange',onVisibility);}catch(_ignored){}\n  }
+  active=false;reason=why||'manual';
+  if(visibilityGuarded&&root.document&&typeof root.document.removeEventListener==='function'){
+   try{root.document.removeEventListener('visibilitychange',onVisibility);}catch(_ignored){}
+  }
   if(raf!=null)root.cancelAnimationFrame(raf);
   raf=null;return snapshot();
  }
@@ -46,8 +51,12 @@ function create({durationMs=120000,maxFrames=200000}={}){
   if(active)throw Error('RAF capture already active');
   if(root.document&&root.document.hidden)throw Error('capture requires foreground tab');
   active=true;first=null;last=null;reason=null;intervals=[];
-  try{raf=root.requestAnimationFrame(tick);}
-  catch(error){stop('start-error');throw error;}
+  visibilityGuarded=!!(root.document&&typeof root.document.addEventListener==='function'&&
+   typeof root.document.removeEventListener==='function');
+  try{
+   if(visibilityGuarded)root.document.addEventListener('visibilitychange',onVisibility);
+   raf=root.requestAnimationFrame(tick);
+  }catch(error){stop('start-error');throw error;}
  },stop:stop,snapshot:snapshot,get active(){return active;}};
 }
 root.__novaRafTraceCapture={create:create};
