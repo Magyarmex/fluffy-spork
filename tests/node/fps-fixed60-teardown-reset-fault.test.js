@@ -86,3 +86,42 @@ test('fatal simulation remains primary error despite owner and capture reset fau
  assert.equal(canvas.count(),0);
  for(const name of Object.keys(originals))assert.equal(game[name],originals[name]);
 });
+
+test('capture registration error remains primary when listener cleanup also fails',()=>{
+ const win=emitter(),doc=emitter(),canvas=emitter();
+ let attached=0;
+ const input={canvas,attach(c){attached++;this.canvas=c},
+  detach(){this.canvas=null}};
+ const timeline={input,reset(){}};
+ win.addEventListener=function(type){
+  if(type==='pointermove')throw Error('registration failed');
+ };
+ canvas.removeEventListener=function(){throw Error('listener removal failed')};
+ let caught;
+ try{new BrowserInputCapture(input,canvas,timeline,{timeline},
+  {window:win,document:doc});}
+ catch(error){caught=error}
+ assert.ok(caught);
+ assert.match(caught.message,/registration failed/);
+ assert.match(caught.cleanupError?.message||'',/listener removal failed/);
+ assert.equal(input.canvas,canvas);
+ assert.equal(attached,1,'production input restored after failed activation');
+});
+
+test('RAF scheduling error stays primary when teardown reset also throws',()=>{
+ const input={},game={input,raf:null,sfx:{startMusic(){}},
+  update(){},start(){},destroy(){},setPaused(){}};
+ const originals={start:game.start,destroy:game.destroy,setPaused:game.setPaused};
+ let resets=0;
+ const timeline={input,reset(){if(++resets>1)throw Error('reset failed')},
+  consumeThrough(){}};
+ const owner=new FixedStepRafOwner(game,timeline,{timeline,startMs:1000},{
+  now:()=>1000,request:()=>{throw Error('RAF request failed')},
+  cancel:()=>{},render:()=>{}});
+ let caught;
+ try{owner.start()}catch(error){caught=error}
+ assert.match(caught?.message||'',/RAF request failed/);
+ assert.match(caught.cleanupError?.message||'',/reset failed/);
+ assert.equal(owner.started,false);
+ for(const name of Object.keys(originals))assert.equal(game[name],originals[name]);
+});
