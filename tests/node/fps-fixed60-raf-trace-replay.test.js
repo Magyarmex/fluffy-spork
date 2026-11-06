@@ -84,7 +84,6 @@ test('capture provenance distinguishes guarded timing from verified gameplay',()
  for(const capture of [
    {...consistent,frames:2},
    {...consistent,durationMs:65},
-   {...consistent,reason:'unexpected'},
    {...consistent,reason:'start-error'},
    {...consistent,frames:'3'},
    {...consistent,durationMs:Infinity},
@@ -93,6 +92,8 @@ test('capture provenance distinguishes guarded timing from verified gameplay',()
    assert.equal(result.captureProvenance.status,'inconsistent');
    assert.equal(result.results.length,3,'untrusted metadata must not prevent replay');
  }
+ assert.equal(analyze({frameIntervalsMs:intervals,capture:{...consistent,reason:'operator-end'}})
+   .captureProvenance.status,'unverified','custom stop is not necessarily corrupt');
  const unguarded=analyze({frameIntervalsMs:intervals,capture:{...consistent,foregroundOnly:false}});
  assert.equal(unguarded.captureProvenance.status,'consistent');
  assert.equal(unguarded.captureProvenance.visibilityGuardClaimed,false);
