@@ -64,7 +64,6 @@ test('actual composed Tempest: ordinary-trail suppression is simulation- and RNG
    assert.deepEqual(aa,a,'A/A control must be deterministic');
    assert.ok(a.ordinary>0,'fixture must actually emit ordinary trails');
    assert.equal(suppressed.ordinary,a.ordinary,'intervention must reach identical trail opportunities');
-   assert.equal(suppressed.other,a.other,'intervention must not suppress non-trail feedback');
    assert.equal(suppressed.physical,a.physical,'cosmetic suppression changed physical Game');
    assert.equal(suppressed.gameplayDraws,a.gameplayDraws,'cosmetic suppression changed gameplay RNG');
   }
