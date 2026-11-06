@@ -376,3 +376,22 @@ test('same-owner overlap alone is not a certified interception', () => {
   assert.equal(calls, 0);
   assert.equal(r.pairs, 276);
 });
+
+test('same-owner crowd preserves hostile first-contact timing across frame rates and order', () => {
+  const crowd = Array.from({ length: 24 }, () => shot(7, 1000, 0, 1000));
+  const a = shot(1, -20, 1000), b = shot(2, 20, -1000);
+  for (const fps of [30, 60, 120, 240]) {
+    for (const bullets of [[...crowd, a, b], [b, ...crowd, a]]) {
+      const before = JSON.stringify(bullets);
+      let calls = 0;
+      const r = observeProjectilePairs({ bullets }, 1 / fps,
+        () => { calls++; return verified(); });
+      const shouldHit = fps <= 60;
+      assert.equal(r.incomplete, false, `fps=${fps}`);
+      assert.equal(r.certified.length, shouldHit ? 1 : 0, `fps=${fps}`);
+      assert.equal(calls, shouldHit ? 1 : 0, `fps=${fps}`);
+      if (shouldHit) assert.ok(Math.abs(r.certified[0].time - .01625) < 1e-10);
+      assert.equal(JSON.stringify(bullets), before);
+    }
+  }
+});
