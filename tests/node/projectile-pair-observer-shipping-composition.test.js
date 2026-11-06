@@ -8,6 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { observeProjectilePairs } = require('../research/projectile-pair-chronology-observer.cjs');
+const { makeOpenFieldProvider } = require('../research/projectile-open-field-event-provider.cjs');
 const root = path.resolve(__dirname, '../..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const marker = '    updateBullets(dt) {';
@@ -113,4 +114,33 @@ test('composed Game observer refuses dense unverified pair work', () => {
   assert.equal(observed.incomplete, true);
   assert.equal(observed.reason, 'pair-budget');
   assert.equal(calls, 0);
+});
+
+for (const fps of [30, 60, 120, 240]) {
+  test('composed Game derives third-projectile precedence at ' + fps + 'Hz', () => {
+    const g = boot();
+    g.bullets = [shot(1, 1, -20, 6000, .42),
+      shot(2, 2, 0, 0, .42), shot(3, 3, 25, -6000, .42)];
+    const dt = 1 / fps;
+    const fixture = { bullets: g.bullets, tanks: g.tanks,
+      shapes: g.shapes, drones: g.drones, terrain: g.__novaTerrain };
+    const provider = makeOpenFieldProvider(fixture, dt);
+    assert.equal(typeof provider, 'function');
+    const before = JSON.stringify(g.bullets);
+    const observed = observeProjectilePairs(g, dt, provider);
+    assert.equal(observed.incomplete, false);
+    assert.equal(observed.certified.length, 1);
+    assert.deepEqual([observed.certified[0].i, observed.certified[0].j], [0, 1]);
+    assert.ok(Math.abs(observed.certified[0].time - 12.5 / 6000) < 1e-12);
+    assert.equal(JSON.stringify(g.bullets), before);
+    assert.doesNotThrow(() => g.updateBullets(dt));
+  });
+}
+test('composed Game refuses open-field certificate when terrain is present', () => {
+  const g = boot();
+  g.bullets = [shot(1, 1, -20, 6000), shot(2, 2, 20, -6000)];
+  g.__novaTerrain.push({ id: -1, solid: true, x: 0, y: 0 });
+  const fixture = { bullets: g.bullets, tanks: g.tanks,
+    shapes: g.shapes, drones: g.drones, terrain: g.__novaTerrain };
+  assert.equal(makeOpenFieldProvider(fixture, 1 / 30), null);
 });
