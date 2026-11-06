@@ -101,3 +101,44 @@ test('fixture terrain array alone must veto without engine terrain alias', () =>
   game.terrain.push({solid:true,x:0,y:0});
   assert.equal(makeOpenFieldProvider(game,.05),null);
 });
+
+
+test('third-projectile mutation invalidates an otherwise valid first-contact certificate',()=>{
+ const dt=.05;
+ for(const mutate of [
+   g=>{g.bullets[2].x=0;},
+   g=>{g.bullets[2].vx=1000;},
+   g=>{g.bullets[2].ownerId=1;},
+   g=>{g.bullets[2].dead=true;},
+   g=>{g.bullets.splice(2,1);},
+   g=>{g.bullets=g.bullets.map(b=>({...b}));}
+ ]){
+   const game=fixture([shot(1,-20,1000),shot(2,20,-1000),shot(3,200,0)]);
+   const provider=makeOpenFieldProvider(game,dt);
+   assert.equal(typeof provider,'function');
+   mutate(game);
+   const result=observeProjectilePairs(game,dt,provider);
+   assert.equal(result.incomplete,true);
+   assert.equal(result.certified.length,0);
+ }
+});
+test('open-field provider invalidates late battlefield materialization',()=>{
+ const dt=.05;
+ for(const mutate of [
+   g=>{g.tanks.push({id:9,x:0,y:0});},
+   g=>{g.shapes.push({x:0,y:0});},
+   g=>{g.drones.push({x:0,y:0});},
+   g=>{g.terrain.push({solid:true});},
+   g=>{g.__novaTerrain=[{solid:true}];},
+   g=>{g.powerups=[{x:0,y:0}];},
+   g=>{g.player={id:9,x:0,y:0};}
+ ]){
+   const game=fixture([shot(1,-20,1000),shot(2,20,-1000)]);
+   const provider=makeOpenFieldProvider(game,dt);
+   assert.equal(typeof provider,'function');
+   mutate(game);
+   const result=observeProjectilePairs(game,dt,provider);
+   assert.equal(result.incomplete,true);
+   assert.equal(result.certified.length,0);
+ }
+});
