@@ -8,7 +8,7 @@ const FIELDS = ['kind','dead','shell','beam','splash','__v17Cannon',
 const empty = () => ({ complete:true, allied:false, unscanned:false,
   aTerrain:null,bTerrain:null,aBody:null,bBody:null,
   aOtherProjectile:null,bOtherProjectile:null });
-function makeOpenFieldProvider(game, dt) {
+function makeOpenFieldProvider(game, dt, options) {
   if (!game || !Number.isFinite(dt) || !(dt>0) ||
       !Array.isArray(game.bullets) || game.bullets.length>MAX_SHOTS ||
       game.player != null ||
@@ -44,7 +44,9 @@ function makeOpenFieldProvider(game, dt) {
   for (let i=0;i<n;i++) for (let j=i+1;j<n;j++)
     if (times[i][j]!==null) allTimes.push({i,j,t:times[i][j]});
   allTimes.sort((a,b)=>a.t-b.t);
-  if (allTimes.length>1) {
+  // A terrain-aware caller must arbitrate ties after wall-blocked contacts
+  // are removed. The default open-field witness retains its original veto.
+  if (!(options && options.deferSharedEarliestTie === true) && allTimes.length>1) {
     const earliest=allTimes[0].t;
     for (let a=0;a<allTimes.length && allTimes[a].t<=earliest+1e-9;a++)
       for (let b=a+1;b<allTimes.length && allTimes[b].t<=earliest+1e-9;b++) {
