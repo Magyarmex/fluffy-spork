@@ -3057,7 +3057,7 @@ function certifiedMultiShotCoverPriority(g,dt){
   if(!oa||!ob)return false;
   /* Match Sniper's shipping allegiance rule, including free-for-all tanks
    * without team tags. A separate explicit hostility veto always wins. */
-  if(oa===ob||oa.id===ob.id)return false;
+  if(oa===ob||oa.id!==a.ownerId||ob.id!==b.ownerId||oa.id===ob.id)return false;
   if(typeof g.areAllies==='function'){
    try{if(g.areAllies(oa,ob))return false;}catch(_e){return false;}
   }
