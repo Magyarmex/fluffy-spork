@@ -55,3 +55,14 @@ test('unsupported projectile cannot become a false certified interception', () =
   assert.equal(r.certified.length,0);
   assert.equal(r.incomplete,true);
 });
+
+test('shared-shot simultaneous earliest contacts veto unrelated later certificate', () => {
+  const game=fixture([shot(1,0,0),shot(2,0,0),shot(3,0,0),
+    shot(4,-20,1000,100),shot(5,20,-1000,100)]);
+  const dt=.05;
+  const provider=makeOpenFieldProvider(game,dt);
+  assert.equal(provider,null);
+  const r=observeProjectilePairs(game,dt,provider);
+  assert.equal(r.incomplete,true);
+  assert.equal(r.certified.length,0);
+});
