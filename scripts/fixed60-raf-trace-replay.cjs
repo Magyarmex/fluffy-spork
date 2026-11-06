@@ -69,14 +69,17 @@ function captureProvenance(intervals,capture){
   if(!capture||typeof capture!=='object'||Array.isArray(capture))
     return {status:'unverified',visibilityGuardClaimed:false,gameplayActiveVerified:false};
   const total=intervals.reduce((sum,value)=>sum+value,0);
-  const consistent=Number.isInteger(capture.frames)&&capture.frames===intervals.length&&
+  const shapeOk=Number.isInteger(capture.frames)&&capture.frames===intervals.length&&
     Number.isFinite(capture.durationMs)&&
     Math.abs(capture.durationMs-total)<=0.01&&
-    typeof capture.reason==='string'&&
-    ['running','manual','hidden','limit','invalid-timestamp','nonmonotonic',
-     'raf-error'].includes(capture.reason);
-  return {status:consistent?(capture.reason==='running'?'partial':'consistent'):'inconsistent',
-    visibilityGuardClaimed:capture.foregroundOnly===true,
+    typeof capture.reason==='string'&&capture.reason.length>0;
+  // stop(why) deliberately accepts custom operator reasons. They are valid
+  // recorder output but cannot certify a standard termination condition.
+  const known=['manual','hidden','limit','invalid-timestamp','nonmonotonic','raf-error'];
+  const status=!shapeOk||capture.reason==='start-error'?'inconsistent':
+    capture.reason==='running'?'partial':
+    known.includes(capture.reason)?'consistent':'unverified';
+  return {status,visibilityGuardClaimed:capture.foregroundOnly===true,
     gameplayActiveVerified:false};
 }
 function analyze(data){
