@@ -61,6 +61,9 @@ function makeOpenFieldProvider(game, dt, options) {
         i<0 || j<=i || j>=n || !a || !b) return null;
     // Competing events depend on *every* projectile, not only the pair
     // being certified. Reject stale third shots and changed fixture state.
+    // This bounded 32-shot research guard is intentionally NOT a live-frame
+    // optimization: its O(n) work per callback must be amortized before any
+    // future opt-in production diagnostic.
     if (game.bullets !== sourceBullets || game.bullets.length !== n ||
         game.player != null ||
         (game.__novaTerrain != null && (!Array.isArray(game.__novaTerrain) || game.__novaTerrain.length !== 0)) ||
