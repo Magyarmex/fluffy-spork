@@ -15,7 +15,7 @@ function boot(){
  const m={exports:{}};modules['game/engine'](m,m.exports,spec=>spec.includes('classes')?{CLASSES:{scout:{size:15}},lineageForClass:()=>null}:{ARENA_HALF:2250});
  return new m.exports.Game();
 }
-const shot=()=>({x:-20,y:0,vx:1000,vy:0,r:3,ttl:.5});
+const shot=()=>({kind:'bullet',dead:false,shell:false,beam:false,pen:0,hits:0,x:-20,y:0,vx:1000,vy:0,r:3,ttl:.5});
 const rect=(y=0)=>({id:-1,shape:'rect',x:0,y,w:4,h:40,solid:true,destructible:false});
 test('actual Battlefield permanent wall first contact does not mutate live terrain index',()=>{
  const g=boot();g.__novaTerrain=[rect()];const before=JSON.stringify(g.__novaTerrain);
