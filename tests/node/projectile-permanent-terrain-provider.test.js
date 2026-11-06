@@ -182,3 +182,26 @@ test('seeded one-dimensional wall chronology agrees with independent first-conta
    assert.ok(Math.abs(actual.certified[0].time-expected.time)<1e-9,'world '+world);
  }
 });
+
+
+test('distant active cover permits wall-qualified hostile interception',()=>{
+ const g=fixture(null),dt=.04;
+ g.__novaTerrain=[{...wall(),x:100,y:100,destructible:true,hp:20}];
+ g.firstTerrainHit=()=>null;
+ const provider=makePermanentTerrainProvider(g,dt);
+ assert.equal(typeof provider,'function');
+ const r=observeProjectilePairs(g,dt,provider);
+ assert.equal(r.incomplete,false);
+ assert.equal(r.certified.length,1);
+});
+test('moving distant active cover into corridor invalidates snapshot',()=>{
+ const g=fixture(null),dt=.04;
+ g.__novaTerrain=[{...wall(),x:100,y:100,destructible:true,hp:20}];
+ g.firstTerrainHit=()=>null;
+ const provider=makePermanentTerrainProvider(g,dt);
+ assert.equal(typeof provider,'function');
+ g.__novaTerrain[0].y=0;
+ const r=observeProjectilePairs(g,dt,provider);
+ assert.equal(r.incomplete,true);
+ assert.equal(r.certified.length,0);
+});
