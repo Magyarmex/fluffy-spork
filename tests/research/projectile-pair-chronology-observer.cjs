@@ -3,7 +3,7 @@
 const { firstContact } = require('./projectile-first-event-certificate.cjs');
 const MAX_PAIRS = 256;
 // Bound cheap swept-box comparisons separately from expensive event certification.
-const MAX_BROADPHASE_PAIRS = 4096;
+const MAX_BROADPHASE_PAIRS = 1024;
 const EVENT_KEYS = ['aTerrain','bTerrain','aBody','bBody',
   'aOtherProjectile','bOtherProjectile'];
 function completeContext(c) {
