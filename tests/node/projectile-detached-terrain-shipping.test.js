@@ -190,3 +190,26 @@ test('seeded distant active cover preserves Battlefield first-hit geometry',()=>
    assert.equal(Object.hasOwn(g,'__novaBattlefieldIndex'),false,'world '+world);
  }
 });
+
+
+test('actual Battlefield cover contacts are never excluded by swept AABB',()=>{
+ let seed=0x147737;
+ const random=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ let contacts=0;
+ for(let world=0;world<500;world++){
+   const g=boot(),dt=.04;
+   const circle=random()<.5;
+   const x=(random()-.5)*100,y=(random()-.5)*100;
+   const cover=circle?
+     {id:1,shape:'circle',x,y,r:2+random()*18,solid:true,destructible:true,hp:20}:
+     {id:1,shape:'rect',x,y,w:2+random()*36,h:2+random()*36,
+       solid:true,destructible:true,hp:20};
+   g.__novaTerrain=[cover];
+   const b={...shot(),x:(random()-.5)*100,y:(random()-.5)*100,
+     vx:(random()-.5)*4000,vy:(random()-.5)*4000};
+   const actual=g.firstTerrainHit(b.x,b.y,b.x+b.vx*dt,b.y+b.vy*dt,b.r*.45);
+   const result=query(g,b,dt);
+   if(actual){contacts++;assert.equal(result.complete,false,'world '+world);}
+ }
+ assert.ok(contacts>10,'oracle must exercise real cover contacts');
+});
