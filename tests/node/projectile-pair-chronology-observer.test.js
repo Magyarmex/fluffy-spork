@@ -443,3 +443,15 @@ test('unsupported live shell still vetoes owner-grouped sparse certification', (
   assert.equal(r.reason, 'unsupported-projectile-present');
   assert.equal(r.certified.length, 0);
 });
+
+test('many distinct owners fail the cheap budget without enumerating their pairs', () => {
+  const bullets = Array.from({ length: 1000 }, (_, i) =>
+    shot(i + 1, i * 100, 0));
+  let calls = 0;
+  const r = observeProjectilePairs({ bullets }, .05,
+    () => { calls++; return verified(); });
+  assert.equal(r.incomplete, true);
+  assert.equal(r.reason, 'broadphase-budget');
+  assert.equal(r.certified.length, 0);
+  assert.equal(calls, 0);
+});
