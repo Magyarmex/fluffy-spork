@@ -200,7 +200,7 @@ test('same-owner geometric ties cannot veto a later hostile interception',()=>{
 
 test('same-owner contact earlier than hostile pair cannot preempt it',()=>{
  const g=fixture(null),dt=.04;
- g.bullets=[shot(1,-12,1000),shot(1,0,0),shot(2,30,-1000)];
+ g.bullets=[shot(1,0,-1000),shot(1,0,0),shot(2,30,-1000)];
  g.__novaTerrain=[];g.firstTerrainHit=()=>null;
  const provider=makePermanentTerrainProvider(g,dt);
  assert.equal(typeof provider,'function');
