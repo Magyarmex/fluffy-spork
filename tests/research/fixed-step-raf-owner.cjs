@@ -252,6 +252,15 @@ function createFixedStepBrowserPilot(game,{window:win,document:doc,clock,
   try{owner=new FixedStepRafOwner(game,timeline,bridge,
     {now:clock.now,request,cancel,render,maxSteps,isVisible:()=>!doc.hidden})}
   catch(error){capture.detach();throw error}
+  // A fatal RAF/update/render failure calls owner.stop() directly, bypassing
+  // the pilot's public stop(). Release captured DOM input on every exit path.
+  const stopOwner=owner.stop.bind(owner);
+  owner.stop=function(){
+    let failure;
+    try{stopOwner()}catch(error){failure=error}
+    try{capture.detach()}catch(error){if(!failure)failure=error}
+    if(failure)throw failure;
+  };
   return {timeline,bridge,capture,owner,
     start(){
       if(owner.started)throw Error('browser pilot already running');
