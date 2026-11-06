@@ -3042,6 +3042,13 @@ function certifiedMultiShotCoverPriority(g,dt){
   }
   if(!ordinary(a)||!ordinary(b)||a.ownerId===b.ownerId||
      a.hp!==b.hp)return false;
+  /* Projectiles fired later during this tick cannot be backdated to its
+   * beginning. Reuse the actual Game.update frame-start ID witness. */
+  var ceiling=g.__novaFrameStartBulletIdCeiling;
+  if(!Number.isSafeInteger(ceiling)||ceiling<=0||
+     g.__novaFrameStartBulletEpoch!==g.__novaShapeSweepEpoch||
+     !Number.isSafeInteger(a.id)||!Number.isSafeInteger(b.id)||
+     a.id>=ceiling||b.id>=ceiling)return false;
   var getOwner=function(s){
    var owner=g.tankById&&g.tankById.get&&g.tankById.get(s.ownerId);
    return owner||(typeof g.getTank==='function'?g.getTank(s.ownerId):null);
