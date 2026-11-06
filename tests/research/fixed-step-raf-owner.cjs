@@ -62,7 +62,15 @@ class FixedStepRafOwner {
     this.timeline.consumeThrough(this.simAtSec);
     this.paused=!!this.game.paused;
     try{this.game.sfx.startMusic()}
-    catch(error){this.started=false;this.timeline.reset();throw error}
+    catch(error){
+      this.started=false;
+      try{this.timeline.reset()}catch(cleanupError){
+        if(error && typeof error==='object'){
+          try{error.cleanupError=cleanupError}catch(_ignored){}
+        }
+      }
+      throw error;
+    }
     const self=this;
     this.destroyWrapper=function(...args){
       // Teardown must reach the actual Game even if a host cancellation fails.
@@ -294,7 +302,14 @@ function createFixedStepBrowserPilot(game,{window:win,document:doc,clock,
     start(){
       if(owner.started)throw Error('browser pilot already running');
       if(!capture.active)throw Error('browser pilot capture detached');
-      try{owner.start()}catch(error){capture.detach();throw error}
+      try{owner.start()}catch(error){
+        try{capture.detach()}catch(cleanupError){
+          if(error && typeof error==='object'){
+            try{error.cleanupError=cleanupError}catch(_ignored){}
+          }
+        }
+        throw error;
+      }
     },
     stop(){
       // Release DOM ownership even when a hostile RAF host rejects cancel().
