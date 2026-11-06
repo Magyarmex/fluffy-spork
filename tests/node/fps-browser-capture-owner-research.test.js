@@ -180,6 +180,10 @@ test('composed Input listeners recover after fatal browser-pilot render failure'
   assert.equal(h.input.firing,true);
   h.fire(h.win,'pointerup',1041,{button:0,buttons:0});
   assert.equal(h.input.firing,false);
+  h.fire(h.canvas,'pointerdown',1050,{pointerType:'touch',pointerId:21,clientX:100});
+  assert.equal(h.input.move.active,true,'restored touch movement must reach Input');
+  h.fire(h.win,'pointerup',1051,{pointerType:'touch',pointerId:21,clientX:100});
+  assert.equal(h.input.move.active,false,'restored touch release must reach Input');
  }finally{
   if(pilot)pilot.stop();
   h.close();
