@@ -42,6 +42,9 @@ test('phase reversal is a negative control, not an assumed universal backlog',()
 test('foreground RAF stall is accounted separately from queued backlog',()=>{
   const result=replay([1000/30,150,1000/30],2);
   assert.equal(result.droppedFrames,1);
+ assert.equal(result.foregroundStallFrames,1);
+ assert.equal(result.maxFrameGapMs,150);
+ assert.ok(result.p95FrameGapMs>=100);
   assert.ok(result.droppedMs>0);
   assert.ok(result.simulatedTicks>0);
 });
