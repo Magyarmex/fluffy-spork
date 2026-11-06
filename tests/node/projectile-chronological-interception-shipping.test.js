@@ -511,3 +511,20 @@ test('remote projectile with stale identity or incomplete integrity cannot certi
     assert.deepEqual(hits,[]);
   }
 });
+
+test('seeded remote projectile translations do not change mutual TTL result',()=>{
+  let seed=0x7442026;
+  const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+  for(let i=0;i<160;i++){
+    const {g,a,b,hits}=ttlFixture();
+    const third=shot(3,3,400+rand()*900,(rand()-.5)*100,1);
+    third.y=400+rand()*900;
+    third.vy=(rand()-.5)*100;
+    third.baseDmg=third.dmg;
+    g.bullets=i%2?[third,b,a]:[a,third,b];
+    g.updateBullets(i%3===0?1/30:1/60);
+    assert.deepEqual(hits.sort(),[1,2],'seeded remote world '+i);
+    assert.equal(a.dead,true);assert.equal(b.dead,true);
+    assert.equal(third.dead,false);
+  }
+});
