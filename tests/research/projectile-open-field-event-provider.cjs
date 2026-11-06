@@ -36,10 +36,14 @@ function makeOpenFieldProvider(game, dt) {
   for (let i=0;i<n;i++) for (let j=i+1;j<n;j++)
     if (times[i][j]!==null) allTimes.push({i,j,t:times[i][j]});
   allTimes.sort((a,b)=>a.t-b.t);
-  if (allTimes.length>1 && allTimes[1].t<=allTimes[0].t+1e-9) {
-    const first=allTimes[0], second=allTimes[1];
-    if (first.i===second.i || first.i===second.j ||
-        first.j===second.i || first.j===second.j) return null;
+  if (allTimes.length>1) {
+    const earliest=allTimes[0].t;
+    for (let a=0;a<allTimes.length && allTimes[a].t<=earliest+1e-9;a++)
+      for (let b=a+1;b<allTimes.length && allTimes[b].t<=earliest+1e-9;b++) {
+        const x=allTimes[a], y=allTimes[b];
+        if (x.i===y.i || x.i===y.j || x.j===y.i || x.j===y.j)
+          return null;
+      }
   }
   return (a,b,i,j,step) => {
     if (step!==dt || !Number.isInteger(i) || !Number.isInteger(j) ||
