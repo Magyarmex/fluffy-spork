@@ -67,3 +67,39 @@ test('browser pilot startup error remains primary if capture cleanup fails',()=>
   assert.equal(canvas.count(),0);
   for(const name of Object.keys(originals))assert.equal(game[name],originals[name]);
 });
+
+test('initial input reset failure never leaves RAF owner marked running',()=>{
+  const input={};
+  const game={input,raf:null,sfx:{startMusic(){}},update(){},
+    start(){},destroy(){},setPaused(){}};
+  const originals={start:game.start,destroy:game.destroy,setPaused:game.setPaused};
+  const timeline={input,reset(){throw Error('initial reset failed')},
+    consumeThrough(){}};
+  let requests=0;
+  const owner=new FixedStepRafOwner(game,timeline,{timeline,startMs:1000},{
+    now:()=>1000,request(){requests++;return 7},cancel(){},render(){}});
+  let caught;
+  try{owner.start()}catch(error){caught=error}
+  assert.match(caught?.message||'',/initial reset failed/);
+  assert.match(caught.cleanupError?.message||'',/initial reset failed/);
+  assert.equal(owner.started,false);
+  assert.equal(requests,0,'no RAF scheduled after failed initial input reset');
+  for(const name of Object.keys(originals))assert.equal(game[name],originals[name]);
+});
+
+test('initial queued input replay failure cannot strand the RAF owner',()=>{
+  const input={};
+  const game={input,raf:null,sfx:{startMusic(){}},update(){},
+    start(){},destroy(){},setPaused(){}};
+  let resets=0;
+  const timeline={input,reset(){resets++},
+    consumeThrough(){throw Error('initial replay failed')}};
+  const owner=new FixedStepRafOwner(game,timeline,{timeline,startMs:1000},{
+    now:()=>1000,request:()=>7,cancel(){},render(){}});
+  let caught;
+  try{owner.start()}catch(error){caught=error}
+  assert.match(caught?.message||'',/initial replay failed/);
+  assert.equal(owner.started,false);
+  assert.equal(resets,2,'cleanup reset follows failed replay');
+  assert.doesNotThrow(()=>owner.stop());
+});
