@@ -32,6 +32,28 @@ test('steady 30Hz trace reaches native60 tick budget without dropping time',()=>
   assert.equal(result.catchupFrames,0);
 });
 
+test('per-frame work concentration exposes catch-up pressure without pretending CPU timing',()=>{
+  const steady=replay(Array(120).fill(1000/30),2);
+  assert.equal(steady.framesAtStepCap,120);
+  assert.equal(steady.framesWithZeroSteps,0);
+  assert.equal(steady.p95StepsPerFrame,2);
+  assert.equal(steady.p99StepsPerFrame,2);
+  const burst=Array.from({length:240},(_,i)=>i%2===0?1000/120:7000/120);
+  for(const cap of [2,3,4]){
+    const result=replay(burst,cap);
+    assert.ok(result.framesAtStepCap>=0&&result.framesAtStepCap<=result.frames);
+    assert.ok(result.framesWithZeroSteps>=0&&result.framesWithZeroSteps<=result.frames);
+    assert.ok(result.p95StepsPerFrame<=result.peakSteps);
+    assert.ok(result.p99StepsPerFrame<=result.peakSteps);
+    assert.ok(result.p99StepsPerFrame>=result.p95StepsPerFrame);
+    assert.ok(result.peakSteps<=cap);
+  }
+  const aggressive=replay(burst,4);
+  assert.equal(aggressive.peakSteps,4);
+  assert.ok(aggressive.framesAtStepCap>0,
+    'the zero-backlog four-step arm must disclose its concentrated work');
+});
+
 test('phase reversal is a negative control, not an assumed universal backlog',()=>{
   const reversed=Array.from({length:240},(_,i)=>i%2===0?7000/120:1000/120);
   const result=replay(reversed,2);
