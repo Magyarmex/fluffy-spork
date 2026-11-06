@@ -7,7 +7,7 @@
  * This is NOT a proposed balance change: 60Hz cadence may also change.
  */
 process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
-const {bootGame,withSeed}=require('./audio-rng-causal-pilot.cjs');
+const {bootGame,withSeed,digest,physical}=require('./audio-rng-causal-pilot.cjs');
 const TICKS=960; // eight seconds on a 120Hz integer timebase
 const patterns={
  native30:[4],native60:[2],native120:[1],
@@ -28,6 +28,7 @@ function run(seed,reload,steps,carry){
   g.shapes=[];g.drones=[];g.powerups=[];
   g.input.aim.active=true;g.input.aim.dx=40;g.input.firing=true;g.input.autofire=false;
   p.stats.reload=reload;
+  const initial=digest(physical(g));
   const original=g.tryFire;
   let previousDt=0,volleys=0,carriedMs=0,firstShot=null,peakHeat=0,negativeAfterShot=0;
   g.tryFire=function(t){
@@ -53,7 +54,7 @@ function run(seed,reload,steps,carry){
     previousDt=dt;
     peakHeat=Math.max(peakHeat,p.__v17Heat||0);
    }
-   return {volleys,firstShot:+firstShot.toFixed(6),
+   return {initial,volleys,firstShot:+firstShot.toFixed(6),
     heat:+(p.__v17Heat||0).toFixed(6),
     peakHeat:+peakHeat.toFixed(6),
     fireCd:+p.fireCd.toFixed(6),
