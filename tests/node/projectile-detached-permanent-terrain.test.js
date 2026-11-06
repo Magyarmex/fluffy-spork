@@ -60,3 +60,11 @@ test('unsupported shell and stale projectile cannot certify permanent-terrain pr
     assert.equal(query(g, invalid, .04).complete, false);
   }
 });
+
+test('oversized terrain snapshot fails closed before invoking geometry', () => {
+  const g = game(Array.from({ length: 257 }, wall));
+  let called = false;
+  g.firstTerrainHit = () => { called = true; return null; };
+  assert.equal(query(g, shot(), .04).complete, false);
+  assert.equal(called, false);
+});
