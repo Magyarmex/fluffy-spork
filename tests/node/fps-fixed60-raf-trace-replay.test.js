@@ -76,7 +76,7 @@ test('capture provenance distinguishes guarded timing from verified gameplay',()
  const consistent={reason:'hidden',frames:3,durationMs:66,foregroundOnly:true};
  const report=analyze({frameIntervalsMs:intervals,capture:consistent});
  assert.equal(report.captureProvenance.status,'consistent');
- assert.equal(report.captureProvenance.visibilityGuarded,true);
+ assert.equal(report.captureProvenance.visibilityGuardClaimed,true);
  assert.equal(report.captureProvenance.gameplayActiveVerified,false);
  assert.equal(analyze(intervals).captureProvenance.status,'unverified');
  assert.equal(analyze({frameIntervalsMs:intervals,capture:{...consistent,reason:'running'}})
@@ -94,5 +94,5 @@ test('capture provenance distinguishes guarded timing from verified gameplay',()
  }
  const unguarded=analyze({frameIntervalsMs:intervals,capture:{...consistent,foregroundOnly:false}});
  assert.equal(unguarded.captureProvenance.status,'consistent');
- assert.equal(unguarded.captureProvenance.visibilityGuarded,false);
+ assert.equal(unguarded.captureProvenance.visibilityGuardClaimed,false);
 });
