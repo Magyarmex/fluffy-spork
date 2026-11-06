@@ -9,6 +9,8 @@ function makePermanentTerrainProvider(game, dt) {
   if (!game || game.__novaResearchHostilityFixture !== true || !Array.isArray(game.bullets) || !Array.isArray(game.__novaTerrain) ||
       (game.terrain != null && (!Array.isArray(game.terrain) ||
         (game.terrain !== game.__novaTerrain && game.terrain.length > 0)))) return null;
+  const sourceTerrain = game.__novaTerrain;
+  const sourceTerrainQuery = game.firstTerrainHit;
   const emptyFixture = { bullets: game.bullets, tanks: game.tanks, shapes: game.shapes,
     drones: game.drones, powerups: game.powerups, player: game.player,
     terrain: [], __novaTerrain: [] };
@@ -63,7 +65,9 @@ function makePermanentTerrainProvider(game, dt) {
   return (a,b,i,j,step) => {
     let unchanged;
     try { unchanged = terrainState() === initialTerrain; } catch (_) { return null; }
-    if (!unchanged || game.__novaResearchHostilityFixture !== true ||
+    if (!unchanged || game.__novaTerrain !== sourceTerrain ||
+        game.firstTerrainHit !== sourceTerrainQuery ||
+        game.__novaResearchHostilityFixture !== true ||
         game.player != null ||
         !['tanks','shapes','drones'].every(k => Array.isArray(game[k]) && game[k].length === 0) ||
         (game.powerups != null && (!Array.isArray(game.powerups) || game.powerups.length !== 0)) ||
