@@ -320,3 +320,36 @@ test('mutual TTL preflight refuses separately referenced player at contact',()=>
   g.updateBullets(1/30);
   assert.deepEqual(hits,[]);
 });
+
+test('mutual TTL recovery works for canonical free-for-all owners without team tags',()=>{
+  for(const fps of [30,60,120,240]){
+    for(const reverse of [false,true]){
+      const {g,a,b,hits}=ttlFixture();
+      g.tankById.set(1,{id:1});
+      g.tankById.set(2,{id:2});
+      if(reverse)g.bullets.reverse();
+      g.updateBullets(1/fps);
+      assert.deepEqual(hits.sort(),[1,2],
+        'FFA interception must match shipping Sniper at '+fps+'Hz');
+      assert.equal(a.dead,true);assert.equal(b.dead,true);
+    }
+  }
+});
+test('mutual TTL recovery respects explicit nonhostility even with distinct team tags',()=>{
+  const {g,hits}=ttlFixture();
+  g.areAllies=()=>false;
+  g.areHostile=()=>false;
+  g.updateBullets(1/30);
+  assert.deepEqual(hits,[]);
+});
+test('mutual TTL recovery refuses conflicting owner identities and throwing hostility',()=>{
+  for(const setup of [
+    g=>g.tankById.set(2,g.tankById.get(1)),
+    g=>g.areHostile=()=>{throw Error('unavailable');},
+    g=>g.areAllies=()=>{throw Error('unavailable');}
+  ]){
+    const {g,hits}=ttlFixture();
+    setup(g);g.updateBullets(1/30);
+    assert.deepEqual(hits,[]);
+  }
+});
