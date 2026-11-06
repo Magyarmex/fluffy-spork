@@ -13,16 +13,24 @@ function create({durationMs=120000,maxFrames=200000}={}){
     !Number.isInteger(maxFrames)||maxFrames<1||maxFrames>200000)
    throw Error('invalid RAF capture bounds');
  var active=false,first=null,last=null,raf=null,intervals=[],reason=null;
- var visibilityGuarded=false;
+ var visibilityGuarded=false,generation=0,requestSeq=0;
+ function schedule(){
+  const epoch=generation,seq=++requestSeq;
+  raf=root.requestAnimationFrame(ts=>{
+   if(!active||epoch!==generation||seq!==requestSeq)return;
+   tick(ts);
+  });
+ }
  function onVisibility(){if(root.document&&root.document.hidden)stop('hidden');}
  function stop(why){
   if(!active)return snapshot();
-  active=false;reason=why||'manual';
+  active=false;reason=why||'manual';generation++;requestSeq++;
   if(visibilityGuarded&&root.document&&typeof root.document.removeEventListener==='function'){
    try{root.document.removeEventListener('visibilitychange',onVisibility);}catch(_ignored){}
   }
-  if(raf!=null)root.cancelAnimationFrame(raf);
-  raf=null;return snapshot();
+  const pending=raf;raf=null;
+  if(pending!=null)root.cancelAnimationFrame(pending);
+  return snapshot();
  }
  function snapshot(){
   return {frameIntervalsMs:intervals.slice(),capture:{
@@ -44,19 +52,23 @@ function create({durationMs=120000,maxFrames=200000}={}){
   if(intervals.length>=maxFrames||ts-first>=durationMs){
    stop('limit');return;
   }
-  try{raf=root.requestAnimationFrame(tick);}
-  catch(error){stop('raf-error');throw error;}
+  try{schedule();}
+  catch(error){try{stop('raf-error')}catch(cleanupError){
+   if(error&&typeof error==='object')try{error.cleanupError=cleanupError}catch(_ignored){}
+  }throw error;}
  }
  return {start:function(){
   if(active)throw Error('RAF capture already active');
   if(root.document&&root.document.hidden)throw Error('capture requires foreground tab');
-  active=true;first=null;last=null;reason=null;intervals=[];
+  active=true;generation++;requestSeq++;first=null;last=null;reason=null;intervals=[];
   visibilityGuarded=!!(root.document&&typeof root.document.addEventListener==='function'&&
    typeof root.document.removeEventListener==='function');
   try{
    if(visibilityGuarded)root.document.addEventListener('visibilitychange',onVisibility);
-   raf=root.requestAnimationFrame(tick);
-  }catch(error){stop('start-error');throw error;}
+   schedule();
+  }catch(error){try{stop('start-error')}catch(cleanupError){
+   if(error&&typeof error==='object')try{error.cleanupError=cleanupError}catch(_ignored){}
+  }throw error;}
  },stop:stop,snapshot:snapshot,get active(){return active;}};
 }
 root.__novaRafTraceCapture={create:create};
