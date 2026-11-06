@@ -33,3 +33,21 @@ test('actual Battlefield destructible cover must abstain',()=>{
  const g=boot();g.__novaTerrain=[{...rect(),destructible:true,hp:20}];
  assert.equal(query(g,shot(),.04).complete,false);
 });
+
+test('actual Battlefield selects earliest permanent obstacle regardless of array order',()=>{
+ const a={...rect(),id:-11,x:-10},b={...rect(),id:-12,x:10};
+ for(const terrain of [[a,b],[b,a]]){
+  const g=boot();g.__novaTerrain=terrain;
+  const o=query(g,shot(),.04);
+  assert.equal(o.complete,true);
+  assert.ok(Math.abs(o.time-.00665)<1e-10);
+  assert.equal(Object.hasOwn(g,'__novaBattlefieldIndex'),false);
+ }
+});
+test('actual Battlefield pillar uses circular swept padding',()=>{
+ const g=boot();g.__novaTerrain=[{id:-13,shape:'circle',x:0,y:0,r:5,solid:true,destructible:false}];
+ const o=query(g,shot(),.04);
+ assert.equal(o.complete,true);
+ assert.ok(Math.abs(o.time-.01365)<1e-10);
+ assert.equal(Object.hasOwn(g,'__novaBattlefieldIndex'),false);
+});
