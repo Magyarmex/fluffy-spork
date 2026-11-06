@@ -19,6 +19,7 @@ test('local cooldown-debt hypothesis runs on actual composed Tempest without rew
    assert.ok(Number.isFinite(arm.peakHeat)&&Number.isFinite(arm.carriedMs));
    assert.ok(arm.negativeAfterShot>=0);
   }
+  assert.equal(row.baseline.initial,row.candidate.initial,'paired worlds must start physically identical');
   assert.equal(row.baseline.carriedMs,0);
   assert.equal(row.baseline.negativeAfterShot,0);
   assert.equal(row.deltaVolleys,row.candidate.volleys-row.baseline.volleys);
