@@ -4,7 +4,7 @@
 function firstDetachedPermanentTerrainEvent(game, shot, dt) {
   const unknown = reason => ({ complete: false, time: null, reason });
   if (!game || typeof game.firstTerrainHit !== 'function' ||
-      !Array.isArray(game.__novaTerrain) || !shot ||
+      !Array.isArray(game.__novaTerrain) || game.__novaTerrain.length > 256 || !shot ||
       !Number.isFinite(dt) || dt <= 0 ||
       !['x','y','vx','vy','r','ttl'].every(k => Number.isFinite(shot[k])) ||
       shot.r <= 0 || shot.ttl <= 0 || shot.kind !== 'bullet' ||
