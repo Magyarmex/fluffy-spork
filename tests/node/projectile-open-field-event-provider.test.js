@@ -95,3 +95,9 @@ test('hidden player, materialized cover or pickups revoke empty-field certificat
   game.powerups=[{x:0,y:0}];
   assert.equal(makeOpenFieldProvider(game,.05),null);
 });
+
+test('fixture terrain array alone must veto without engine terrain alias', () => {
+  const game=fixture([shot(1,-20,1000),shot(2,20,-1000)]);
+  game.terrain.push({solid:true,x:0,y:0});
+  assert.equal(makeOpenFieldProvider(game,.05),null);
+});
