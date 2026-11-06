@@ -83,3 +83,15 @@ test('sparse projectile arrays cannot be mistaken for complete context', () => {
   delete bullets[1];
   assert.equal(makeOpenFieldProvider(fixture(bullets),.05),null);
 });
+
+test('hidden player, materialized cover or pickups revoke empty-field certificate', () => {
+  const game=fixture([shot(1,-20,1000),shot(2,20,-1000)]);
+  game.player={id:1,x:0,y:0};
+  assert.equal(makeOpenFieldProvider(game,.05),null);
+  delete game.player;
+  game.__novaTerrain=[{solid:true}];
+  assert.equal(makeOpenFieldProvider(game,.05),null);
+  delete game.__novaTerrain;
+  game.powerups=[{x:0,y:0}];
+  assert.equal(makeOpenFieldProvider(game,.05),null);
+});
