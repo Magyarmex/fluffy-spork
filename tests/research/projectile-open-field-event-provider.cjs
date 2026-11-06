@@ -18,18 +18,19 @@ function makeOpenFieldProvider(game, dt, options) {
         Array.isArray(game[key]) && game[key].length===0)) return null;
   // The caller must provide an intentionally constructed open-field fixture,
   // not a live Game whose unenumerated walls or bodies might be missed.
+  const sourceBullets = game.bullets;
   let shots;
   try {
-    for (let i=0;i<game.bullets.length;i++)
-      if (!Object.hasOwn(game.bullets,i)) throw Error('missing projectile slot');
-    shots = game.bullets.map(s => {
+    for (let i=0;i<sourceBullets.length;i++)
+      if (!Object.hasOwn(sourceBullets,i)) throw Error('missing projectile slot');
+    shots = sourceBullets.map(s => {
       if (!s || s.dead!==false) throw Error('invalid active shot');
       const copy = {};
       for (const key of FIELDS) copy[key] = s[key];
       return Object.freeze(copy);
     });
   } catch (_) { return null; }
-  const sourceBullets = game.bullets;
+  if (game.bullets !== sourceBullets) return null;
   const n = shots.length, times = Array.from({length:n},() => Array(n).fill(null));
   for (let i=0;i<n;i++) for (let j=i+1;j<n;j++) {
     // Same-owner shots cannot intercept in the shipping resolver or oracle.
