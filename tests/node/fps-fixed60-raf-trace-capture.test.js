@@ -73,4 +73,7 @@ test('browser capture JSON is directly consumable by real RAF-owner replay',()=>
  assert.equal(report.results[0].frames,3);
  assert.equal(report.results[0].simulatedTicks,6);
  assert.equal(report.results[0].droppedMs,0);
+ assert.equal(report.captureProvenance.status,'consistent');
+ assert.equal(report.captureProvenance.visibilityGuardClaimed,true);
+ assert.equal(report.captureProvenance.gameplayActiveVerified,false);
 });
