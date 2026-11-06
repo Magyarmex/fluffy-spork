@@ -219,3 +219,23 @@ test('allied earlier geometric contacts cannot steal later hostile interceptions
   assert.deepEqual(forward, reversed);
   assert.deepEqual(forward, [3, 1, -1, false, false, true]);
 });
+
+test('simultaneous allied crossing cannot suppress an earlier hostile contact', () => {
+  const g = boot();
+  const points = [
+    [3, 31.616202648729086, -16.679326933808625, -1.4414978679269552, -62.02501654624939, 2],
+    [5, 34.144912799820304, -15.415081824176013, 68.67832350544631, 33.64649759605527, 5],
+    [4, 30.172903882339597, -23.558451398275793, 22.465986153110862, -57.18489857390523, 1],
+    [2, 34.26265250891447, -34.72580185625702, -7.465336425229907, 8.100388757884502, 2]
+  ];
+  g.bullets = points.map(([ownerId, px, py, x, y, hp], i) => ({
+    id: i + 1, kind: 'bullet', ownerId, px, py, x, y,
+    vx: 0, vy: 0, r: 3, hp, maxHp: hp, ttl: 1, pen: 0,
+    dead: false, shell: false, beam: false
+  }));
+  g.tankById = new Map([2, 3, 4, 5].map(id => [id, { id, team: id % 2 }]));
+  g.areAllies = (a, b) => a.team === b.team;
+  g.resolveBulletCollisions();
+  assert.deepEqual(g.bullets.map(b => [b.hp, !!b.dead]),
+    [[-1, true], [5, false], [-1, true], [1, false]]);
+});
