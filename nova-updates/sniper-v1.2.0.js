@@ -457,11 +457,48 @@
           bounds[off+3] = Math.max(py, shot.y);
         }
       }
-      for (var i = count - 1; i >= 0; i--) {
+      /* A small ordinary volley can contain multiple overlapping swept
+       * contacts in one tick. Process its physical first contacts in time
+       * order rather than in projectile insertion order. Keep the established
+       * resolver untouched for shells, rails, penetration and dense volleys.
+       * This deliberately does not attempt to repair TTL-clipped contacts. */
+      var chronology = null;
+      if (count >= 3 && count <= 12 && this.bullets.every(function (b) {
+        return b && !b.dead && b.kind === 'bullet' && !b.shell &&
+          !b.beam && !b.__novaRail && !b.__v17Cannon &&
+          !b.splash && !(b.pen > 0) && b.ttl > 0 &&
+          Number.isFinite(b.x) && Number.isFinite(b.y) &&
+          Number.isFinite(b.px) && Number.isFinite(b.py) &&
+          Number.isFinite(b.r) && b.r > 0;
+      })) {
+        var proposed = [];
+        for (var ci = count - 1; ci >= 0; ci--)
+          for (var cj = ci - 1; cj >= 0; cj--) {
+            var ca = this.bullets[ci], cb = this.bullets[cj];
+            var cr = ca.r + cb.r + 1.5;
+            var ct = ca.ownerId === cb.ownerId ? null :
+              firstProjectileContactTime(ca, cb, cr);
+            proposed.push({ i: ci, j: cj, time: ct == null ? Infinity : ct });
+          }
+        proposed.sort(function (a, b) { return a.time - b.time; });
+        /* Equal-time shared contacts require a global tie policy. Retain
+         * legacy behavior until that policy can be proved safe. */
+        var ambiguous = false;
+        for (var ck = 1; ck < proposed.length; ck++)
+          if (Number.isFinite(proposed[ck].time) &&
+              Math.abs(proposed[ck].time - proposed[ck-1].time) <= 1e-9)
+            { ambiguous = true; break; }
+        if (!ambiguous) chronology = proposed;
+      }
+      var outerCount = chronology ? chronology.length : count;
+      for (var oi = 0; oi < outerCount; oi++) {
+        var i = chronology ? chronology[oi].i : count - 1 - oi;
         var a = this.bullets[i];
         if (!a || a.dead) continue;
         this.initBulletIntegrity(a);
-        for (var j = i - 1; j >= 0; j--) {
+        var innerCount = chronology ? 1 : i;
+        for (var oj = 0; oj < innerCount; oj++) {
+          var j = chronology ? chronology[oi].j : i - 1 - oj;
           var b = this.bullets[j];
           if (!b || b.dead || b.ownerId === a.ownerId) continue;
           this.initBulletIntegrity(b);
