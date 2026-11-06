@@ -75,7 +75,8 @@ function experiment(){
  }
  return {method:'real 49-overlay composed Tempest; continuous held fire; local post-volley cooldown debt only',
   researchOnly:true,productionModified:false,
-  caveats:['No enemies, movement, touch, pause or natural encounter exposure',
+  caveats:['Initial nonplayer tanks/shapes removed; normal ecology respawn still runs',
+   'No scripted movement, touch, pause or natural-match exposure',
    'A local debt carry changes the existing 60Hz reference and may increase heat/recoil',
    'No same-frame multi-volley support; one update still fires at most once',
    'Never ship without preserving canonical 60Hz balance and validating all classes'],
