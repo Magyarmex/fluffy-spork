@@ -43,10 +43,6 @@ function observeProjectilePairs(game, dt, eventsForPair) {
     result.incomplete = true; result.reason = 'missing-context'; return result;
   }
   const bullets = game.bullets;
-  const total = bullets.length * (bullets.length - 1) / 2;
-  if (total > MAX_PAIRS) {
-    result.incomplete = true; result.reason = 'pair-budget'; return result;
-  }
   // Snapshot before the shipping updater mutates TTL, positions, or dead flags.
   let shots;
   try { shots = bullets.map(b => b && Object.freeze({
@@ -57,6 +53,21 @@ function observeProjectilePairs(game, dt, eventsForPair) {
   })); }
   catch (_) { result.incomplete = true; result.reason = 'snapshot-error'; return result; }
   result.scanned = shots.length;
+  // Dead shots cannot collide or create children. Budget live candidates,
+  // retaining original array indices in every emitted certificate.
+  const active = [];
+  for (let i = 0; i < shots.length; i++) {
+    // A missing entry is not a certified dead projectile: abstain instead
+    // of accidentally treating a malformed Game array as harmless debris.
+    if (!shots[i]) {
+      result.incomplete = true; result.reason = 'invalid-projectile-entry';
+      return result;
+    }
+    if (shots[i].dead !== true) active.push(i);
+  }
+  if (active.length * (active.length - 1) / 2 > MAX_PAIRS) {
+    result.incomplete = true; result.reason = 'pair-budget'; return result;
+  }
   // Shells, rails and other unsupported shots may create mid-frame children
   // that do not exist in this snapshot. Spatial separation alone cannot
   // certify those future events, so abstain for the entire frame.
@@ -64,11 +75,9 @@ function observeProjectilePairs(game, dt, eventsForPair) {
     result.incomplete = true; result.reason = 'unsupported-projectile-present';
     return result;
   }
-  outer: for (let i = 0; i < shots.length; i++) for (let j = i + 1; j < shots.length; j++) {
+  outer: for (let a = 0; a < active.length; a++) for (let b = a + 1; b < active.length; b++) {
+    const i = active[a], j = active[b];
     result.pairs++;
-    if (shots[i] && shots[i].dead === true || shots[j] && shots[j].dead === true) {
-      result.abstained++; continue;
-    }
     if (definitelyDisjoint(shots[i], shots[j], dt)) {
       result.abstained++; continue;
     }

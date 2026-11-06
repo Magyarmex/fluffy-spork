@@ -231,3 +231,72 @@ test('chronological ordering beats projectile array enumeration', () => {
   assert.deepEqual([r.certified[0].i, r.certified[0].j], [2, 3]);
   assert.ok(Math.abs(r.certified[0].time - .01625) < 1e-12);
 });
+
+test('dead projectile backlog does not consume active pair budget', () => {
+  const dead = Array.from({ length: 50 }, (_, i) => {
+    const b = shot(100 + i, i * 20, 0);
+    b.dead = true;
+    return b;
+  });
+  const g = { bullets: [...dead, shot(1, -20, 1000), shot(2, 20, -1000)] };
+  let calls = 0;
+  const r = observeProjectilePairs(g, .05, () => { calls++; return verified(); });
+  assert.equal(r.incomplete, false);
+  assert.equal(r.scanned, 52);
+  assert.equal(r.pairs, 1);
+  assert.equal(calls, 1);
+  assert.deepEqual([r.certified[0].i, r.certified[0].j], [50, 51]);
+});
+
+test('dead shots interleaved with active contacts preserve source indices', () => {
+  const dead = shot(99, 0, 0);
+  dead.dead = true;
+  const g = { bullets: [shot(1, -20, 1000), dead, shot(2, 20, -1000)] };
+  const r = observeProjectilePairs(g, .05, verified);
+  assert.equal(r.incomplete, false);
+  assert.equal(r.pairs, 1);
+  assert.deepEqual([r.certified[0].i, r.certified[0].j], [0, 2]);
+});
+
+test('live pair budget still rejects dense encounters with dead shots present', () => {
+  const dead = shot(99, 0, 0);
+  dead.dead = true;
+  const g = { bullets: [dead, ...Array.from({ length: 24 }, (_, i) =>
+    shot(i + 1, i * 10, 0))] };
+  let calls = 0;
+  const r = observeProjectilePairs(g, .05, () => { calls++; return verified(); });
+  assert.equal(r.incomplete, true);
+  assert.equal(r.reason, 'pair-budget');
+  assert.equal(r.certified.length, 0);
+  assert.equal(calls, 0);
+});
+
+test('missing projectile slot cannot be mistaken for dead debris', () => {
+  const g = { bullets: [shot(1, -20, 1000), null, shot(2, 20, -1000)] };
+  const r = observeProjectilePairs(g, .05, verified);
+  assert.equal(r.incomplete, true);
+  assert.equal(r.reason, 'invalid-projectile-entry');
+  assert.equal(r.certified.length, 0);
+});
+
+test('dead shell cannot veto a valid ordinary live pair', () => {
+  const shell = shot(3, 0, 0);
+  shell.shell = true;
+  shell.dead = true;
+  const g = { bullets: [shot(1, -20, 1000), shell, shot(2, 20, -1000)] };
+  const r = observeProjectilePairs(g, .05, verified);
+  assert.equal(r.incomplete, false);
+  assert.deepEqual([r.certified[0].i, r.certified[0].j], [0, 2]);
+});
+
+test('live shell still vetoes the whole frame even with dead debris', () => {
+  const shell = shot(3, 0, 0);
+  shell.shell = true;
+  const dead = shot(4, 0, 0);
+  dead.dead = true;
+  const g = { bullets: [shot(1, -20, 1000), dead, shell, shot(2, 20, -1000)] };
+  const r = observeProjectilePairs(g, .05, verified);
+  assert.equal(r.incomplete, true);
+  assert.equal(r.reason, 'unsupported-projectile-present');
+  assert.equal(r.certified.length, 0);
+});
