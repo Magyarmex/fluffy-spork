@@ -132,3 +132,53 @@ test('terrain-qualified provider preserves open-field certificates when no walls
    assert.equal(actual.incomplete,expected.incomplete,'world '+world);
  }
 });
+
+test('seeded one-dimensional wall chronology agrees with independent first-contact oracle',()=>{
+ let seed=0x147735;
+ const random=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ const dt=.04, radius=7.5, boundary=2.35;
+ const wallTime=(x,v)=>{
+   if(Math.abs(x)<=boundary)return 0;
+   if(x< -boundary && v>0)return (-boundary-x)/v;
+   if(x>boundary && v<0)return (boundary-x)/v;
+   return null;
+ };
+ const contact=(a,b)=>{
+   const dx=a.x-b.x,dv=a.vx-b.vx;
+   if(Math.abs(dx)<=radius)return 0;
+   if(dx*dv>=0)return null;
+   const t=(Math.abs(dx)-radius)/Math.abs(dv);
+   return t<dt-1e-9?t:null;
+ };
+ for(let world=0;world<1000;world++){
+   const g=fixture(null);
+   const positions=[-50,-30,30,50];
+   g.bullets=positions.map((x,i)=>shot(i+1,x,(random()-.5)*3000));
+   g.__novaTerrain=[{...wall(),x:0,w:2}];
+   g.firstTerrainHit=function(ax,ay,bx,by,pad){
+     const v=(bx-ax)/dt,t=wallTime(ax,v);
+     return t!==null && t<=dt?
+       {solid:this.__novaTerrain[0],hit:{t:t/dt}}:null;
+   };
+   const events=[];
+   for(let i=0;i<4;i++)for(let j=i+1;j<4;j++){
+     const a=g.bullets[i],b=g.bullets[j],t=contact(a,b);
+     if(t===null)continue;
+     const wa=wallTime(a.x,a.vx),wb=wallTime(b.x,b.vx);
+     if((wa!==null && wa<=t+1e-9)||(wb!==null && wb<=t+1e-9))continue;
+     events.push({i,j,time:t});
+   }
+   events.sort((a,b)=>a.time-b.time);
+   const expected=events.length && !(events.length>1 &&
+     events[1].time<=events[0].time+1e-9)?events[0]:null;
+   const provider=makePermanentTerrainProvider(g,dt);
+   assert.equal(typeof provider,'function','world '+world);
+   const actual=observeProjectilePairs(g,dt,provider);
+   assert.equal(actual.incomplete,false,'world '+world);
+   if(!expected){assert.equal(actual.certified.length,0,'world '+world);continue;}
+   assert.equal(actual.certified.length,1,'world '+world);
+   assert.deepEqual([actual.certified[0].i,actual.certified[0].j],
+     [expected.i,expected.j],'world '+world);
+   assert.ok(Math.abs(actual.certified[0].time-expected.time)<1e-9,'world '+world);
+ }
+});
