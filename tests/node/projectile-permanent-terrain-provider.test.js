@@ -98,3 +98,13 @@ test('unblocked simultaneous shared-projectile tie remains conservatively uncert
  g.firstTerrainHit=()=>null;
  assert.equal(makePermanentTerrainProvider(g,dt),null);
 });
+
+test('terrain witness ignores unrelated projectile payload getters',()=>{
+ const g=fixture(.9),dt=.04;
+ Object.defineProperty(g.bullets[0],'unrelated',{enumerable:true,get(){throw Error('not geometry');}});
+ const provider=makePermanentTerrainProvider(g,dt);
+ assert.equal(typeof provider,'function');
+ const r=observeProjectilePairs(g,dt,provider);
+ assert.equal(r.incomplete,false);
+ assert.equal(r.certified.length,1);
+});
