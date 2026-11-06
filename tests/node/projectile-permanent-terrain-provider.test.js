@@ -90,3 +90,11 @@ test('wall resolves geometric shared-projectile tie before valid-contact arbitra
  assert.deepEqual([r.certified[0].i,r.certified[0].j],[1,2]);
  assert.ok(Math.abs(r.certified[0].time-.01)<1e-9);
 });
+
+test('unblocked simultaneous shared-projectile tie remains conservatively uncertified',()=>{
+ const g=fixture(null),dt=.04;
+ g.bullets=[shot(1,-17.5,1000),shot(2,0,0),shot(3,17.5,-1000)];
+ g.__novaTerrain=[{...wall(),x:200}];
+ g.firstTerrainHit=()=>null;
+ assert.equal(makePermanentTerrainProvider(g,dt),null);
+});
