@@ -345,6 +345,7 @@ test('mutual TTL recovery respects explicit nonhostility even with distinct team
 test('mutual TTL recovery refuses conflicting owner identities and throwing hostility',()=>{
   for(const setup of [
     g=>g.tankById.set(2,g.tankById.get(1)),
+    g=>g.tankById.set(2,{id:999,team:2}),
     g=>g.areHostile=()=>{throw Error('unavailable');},
     g=>g.areAllies=()=>{throw Error('unavailable');}
   ]){
