@@ -41,3 +41,16 @@ test('provider rejects terrain that changes between snapshot and certificate',()
  assert.equal(r.incomplete,true);
  assert.equal(r.certified.length,0);
 });
+
+test('provider refuses bodies or withdrawn fixture authorization after snapshot',()=>{
+ for (const mutation of [g=>g.tanks.push({id:9,x:0,y:0}),
+   g=>{g.__novaResearchHostilityFixture=false;},
+   g=>{g.terrain.push(wall());}]) {
+   const g=fixture(.9),dt=.04,provider=makePermanentTerrainProvider(g,dt);
+   assert.equal(typeof provider,'function');
+   mutation(g);
+   const r=observeProjectilePairs(g,dt,provider);
+   assert.equal(r.incomplete,true);
+   assert.equal(r.certified.length,0);
+ }
+});
