@@ -408,3 +408,38 @@ test('invalid owner identity still fails closed before same-owner pruning', () =
   assert.equal(r.certified.length, 0);
   assert.equal(calls, 0);
 });
+
+test('large single-owner volley does not consume cross-owner broadphase budget', () => {
+  const crowd = Array.from({ length: 80 }, () => shot(7, 1000, 0, 1000));
+  const a = shot(1, -20, 1000), b = shot(2, 20, -1000);
+  for (const bullets of [[...crowd, a, b], [b, ...crowd, a]]) {
+    let calls = 0;
+    const r = observeProjectilePairs({ bullets }, .05,
+      () => { calls++; return verified(); });
+    assert.equal(r.incomplete, false);
+    assert.equal(r.pairs, 82 * 81 / 2);
+    assert.equal(r.certified.length, 1);
+    assert.equal(calls, 1);
+    assert.ok(Math.abs(r.certified[0].time - .01625) < 1e-10);
+  }
+});
+test('cross-owner broadphase still refuses more than 1024 real pairs', () => {
+  const bullets = Array.from({ length: 46 }, (_, i) => shot(i + 1, i * 100, 0));
+  let calls = 0;
+  const r = observeProjectilePairs({ bullets }, .05,
+    () => { calls++; return verified(); });
+  assert.equal(r.incomplete, true);
+  assert.equal(r.reason, 'broadphase-budget');
+  assert.equal(r.certified.length, 0);
+  assert.equal(calls, 0);
+});
+test('unsupported live shell still vetoes owner-grouped sparse certification', () => {
+  const crowd = Array.from({ length: 80 }, () => shot(7, 1000, 0, 1000));
+  const shell = shot(7, 1000, 0, 1000);
+  shell.shell = true;
+  const bullets = [...crowd, shell, shot(1, -20, 1000), shot(2, 20, -1000)];
+  const r = observeProjectilePairs({ bullets }, .05, verified);
+  assert.equal(r.incomplete, true);
+  assert.equal(r.reason, 'unsupported-projectile-present');
+  assert.equal(r.certified.length, 0);
+});
