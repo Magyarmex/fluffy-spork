@@ -3035,6 +3035,7 @@ function certifiedMultiShotCoverPriority(g,dt){
    return s&&s.dead===false&&s.kind==='bullet'&&
     s.shell===false&&s.beam===false&&!s.splash&&!s.__v17Cannon&&
     !s.__novaRail&&(s.pen===0||s.pen===1)&&Number.isFinite(s.hits)&&s.hits===0&&
+    Number.isFinite(s.baseDmg)&&s.baseDmg>0&&
     Number.isFinite(s.hp)&&s.hp>0&&Number.isFinite(s.maxHp)&&
     s.maxHp>=s.hp&&Number.isFinite(s.ttl)&&s.ttl>0&&s.ttl<=dt&&
     Number.isFinite(s.r)&&s.r>0&&
