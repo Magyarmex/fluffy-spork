@@ -73,44 +73,62 @@ function observeProjectilePairs(game, dt, eventsForPair) {
     result.incomplete = true; result.reason = 'unsupported-projectile-present';
     return result;
   }
-  // The shipping interception resolver skips same-owner pairs. Group them
-  // first so a large friendly volley does not exhaust the cheap pair budget.
-  // Only cross-owner pairs are enumerated, keeping actual work <= 1024.
-  const groups = new Map();
-  for (const i of active) {
-    const id = shots[i].ownerId;
-    if (!groups.has(id)) groups.set(id, []);
-    groups.get(id).push(i);
-  }
-  const groupList = [...groups.values()];
   const totalPairs = active.length * (active.length - 1) / 2;
-  let crossPairs = 0;
-  for (let g = 0; g < groupList.length; g++)
-    for (let h = g + 1; h < groupList.length; h++)
-      crossPairs += groupList[g].length * groupList[h].length;
-  if (!Number.isSafeInteger(totalPairs) || !Number.isSafeInteger(crossPairs) ||
-      crossPairs > MAX_BROADPHASE_PAIRS) {
+  if (!Number.isSafeInteger(totalPairs)) {
     result.incomplete = true; result.reason = 'broadphase-budget'; return result;
   }
-  result.pairs = totalPairs;
-  result.abstained = totalPairs - crossPairs;
-  // Restore original source-index ordering so event providers observe the
-  // same pair sequence as the previous nested loop, independent of grouping.
-  const cross = [];
-  for (let g = 0; g < groupList.length; g++)
-    for (let h = g + 1; h < groupList.length; h++)
-      for (const i of groupList[g]) for (const j of groupList[h])
-        cross.push([Math.min(i, j), Math.max(i, j)]);
-  cross.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
   const candidates = [];
-  for (const [i, j] of cross) {
-    if (definitelyDisjoint(shots[i], shots[j], dt)) {
-      result.abstained++; continue;
+  if (totalPairs <= MAX_BROADPHASE_PAIRS) {
+    // Preserve the existing fast path for ordinary small volleys.
+    for (let a = 0; a < active.length; a++) for (let b = a + 1; b < active.length; b++) {
+      const i = active[a], j = active[b];
+      result.pairs++;
+      if (shots[i].ownerId === shots[j].ownerId ||
+          definitelyDisjoint(shots[i], shots[j], dt)) {
+        result.abstained++; continue;
+      }
+      candidates.push([i, j]);
+      if (candidates.length > MAX_PAIRS) {
+        result.incomplete = true; result.reason = 'pair-budget';
+        result.certified = []; return result;
+      }
     }
-    candidates.push([i, j]);
-    if (candidates.length > MAX_PAIRS) {
-      result.incomplete = true; result.reason = 'pair-budget';
-      result.certified = []; return result;
+  } else {
+    // High-count same-owner volleys should not exhaust the work budget.
+    // Grouping enumerates only cross-owner pairs, bounded to 1024.
+    const groups = new Map();
+    for (const i of active) {
+      const id = shots[i].ownerId;
+      if (!groups.has(id)) groups.set(id, []);
+      groups.get(id).push(i);
+    }
+    const groupList = [...groups.values()];
+    let crossPairs = 0;
+    for (let g = 0; g < groupList.length; g++)
+      for (let h = g + 1; h < groupList.length; h++)
+        crossPairs += groupList[g].length * groupList[h].length;
+    if (!Number.isSafeInteger(crossPairs) ||
+        crossPairs > MAX_BROADPHASE_PAIRS) {
+      result.incomplete = true; result.reason = 'broadphase-budget'; return result;
+    }
+    result.pairs = totalPairs;
+    result.abstained = totalPairs - crossPairs;
+    const cross = [];
+    for (let g = 0; g < groupList.length; g++)
+      for (let h = g + 1; h < groupList.length; h++)
+        for (const i of groupList[g]) for (const j of groupList[h])
+          cross.push([Math.min(i, j), Math.max(i, j)]);
+    // Preserve original source-index order for stateful event providers.
+    cross.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    for (const [i, j] of cross) {
+      if (definitelyDisjoint(shots[i], shots[j], dt)) {
+        result.abstained++; continue;
+      }
+      candidates.push([i, j]);
+      if (candidates.length > MAX_PAIRS) {
+        result.incomplete = true; result.reason = 'pair-budget';
+        result.certified = []; return result;
+      }
     }
   }
   outer: for (const [i, j] of candidates) {
