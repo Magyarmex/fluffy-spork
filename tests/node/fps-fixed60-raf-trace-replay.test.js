@@ -45,3 +45,18 @@ test('foreground RAF stall is accounted separately from queued backlog',()=>{
   assert.ok(result.droppedMs>0);
   assert.ok(result.simulatedTicks>0);
 });
+
+test('reported tick time, skipped time, and backlog conserve wall time',()=>{
+  for(let seed=1;seed<=50;seed++){
+    let state=seed;
+    const random=()=>{state=(Math.imul(1664525,state)+1013904223)>>>0;
+      return state/4294967296;};
+    const intervals=Array.from({length:120},()=>5+90*random());
+    for(const cap of [2,3,4]){
+      const result=replay(intervals,cap);
+      const accounted=result.simulatedMs+result.droppedMs+result.remainingBacklogMs;
+      assert.ok(Math.abs(accounted-result.wallMs)<.005,
+        'time accounting must include skipped and queued work: '+JSON.stringify({seed,cap,result}));
+    }
+  }
+});
