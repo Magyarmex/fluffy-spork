@@ -151,3 +151,41 @@ test('real fixed-step Game stays physically identical under native mouse, touch 
   for(const hz of [30,120])assert.deepEqual(run(seed,hz),baseline,`seed=${seed},hz=${hz}`);
  }
 });
+
+test('composed Input listeners recover after fatal browser-pilot render failure',()=>{
+ const {createFixedStepBrowserPilot}=require('../research/fixed-step-raf-owner.cjs');
+ const h=setup();let pilot;
+ try{
+  h.owner.detach();
+  assert.deepEqual(h.win.counts(),h.baseline.win);
+  assert.deepEqual(h.doc.counts(),h.baseline.doc);
+  assert.deepEqual(h.canvas.counts(),h.baseline.canvas);
+  let now=1000,callback;
+  h.game.sfx.startMusic=()=>{};
+  pilot=createFixedStepBrowserPilot(h.game,{
+   window:h.game.__testWindow,document:h.game.__testWindow.document,
+   canvas:h.canvas,clock:{now:()=>now},
+   request:fn=>(callback=fn,1),cancel:()=>{},
+   render:()=>{throw Error('injected composed render failure')}
+  });
+  pilot.start();now=1034;
+  assert.throws(()=>callback(now),/injected composed render failure/);
+  assert.equal(pilot.owner.started,false);
+  assert.equal(pilot.capture.active,false);
+  assert.deepEqual(h.win.counts(),h.baseline.win);
+  assert.deepEqual(h.doc.counts(),h.baseline.doc);
+  assert.deepEqual(h.canvas.counts(),h.baseline.canvas);
+  // The original Input must accept a fresh mouse edge after recovery.
+  h.fire(h.canvas,'pointerdown',1040,{button:0,buttons:1});
+  assert.equal(h.input.firing,true);
+  h.fire(h.win,'pointerup',1041,{button:0,buttons:0});
+  assert.equal(h.input.firing,false);
+  h.fire(h.canvas,'pointerdown',1050,{pointerType:'touch',pointerId:21,clientX:100});
+  assert.equal(h.input.move.active,true,'restored touch movement must reach Input');
+  h.fire(h.win,'pointerup',1051,{pointerType:'touch',pointerId:21,clientX:100});
+  assert.equal(h.input.move.active,false,'restored touch release must reach Input');
+ }finally{
+  if(pilot)pilot.stop();
+  h.close();
+ }
+});

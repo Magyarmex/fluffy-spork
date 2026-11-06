@@ -445,7 +445,17 @@ class FixedStepRafOwner {
         ts=this.lastMs;
       }else this._awaitingForwardFrame=false;
       this.schedule();this.advance(ts);
-    }catch(error){this.stop();throw error}
+    }catch(error){
+      // Keep the initiating simulation/render failure as the primary error.
+      // A hostile RAF host may also throw during cancellation; cleanup still
+      // runs and the secondary failure remains available for diagnosis.
+      try{this.stop()}catch(cleanupError){
+        if(error && typeof error==='object'){
+          try{error.cleanupError=cleanupError}catch(_ignored){}
+        }
+      }
+      throw error;
+    }
   }
   advance(ts){
     const g=this.game;
@@ -583,6 +593,15 @@ function createFixedStepBrowserPilot(game,{window:win,document:doc,clock,
   try{owner=new FixedStepRafOwner(game,timeline,bridge,
     {now:clock.now,request,cancel,render,maxSteps,isVisible:()=>!doc.hidden})}
   catch(error){capture.detach();throw error}
+  // A fatal RAF/update/render failure calls owner.stop() directly, bypassing
+  // the pilot's public stop(). Release captured DOM input on every exit path.
+  const stopOwner=owner.stop.bind(owner);
+  owner.stop=function(){
+    let failure;
+    try{stopOwner()}catch(error){failure=error}
+    try{capture.detach()}catch(error){if(!failure)failure=error}
+    if(failure)throw failure;
+  };
   return {timeline,bridge,capture,owner,
     start(){
       if(owner.started)throw Error('browser pilot already running');
