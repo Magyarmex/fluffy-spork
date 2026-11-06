@@ -33,7 +33,7 @@ function replay(intervals,maxSteps=2){
     now:()=>now,request:fn=>{callback=fn;return 1},
     cancel:()=>{callback=null},render(){},maxSteps
   });
-  const lag=[],phaseLag=[];
+  const lag=[],phaseLag=[],stepsPerFrame=[];
   let total=0,catchupFrames=0,peakSteps=0;
   try{
     owner.start();
@@ -44,6 +44,7 @@ function replay(intervals,maxSteps=2){
       next(now);
       lag.push(owner.lagMs);
       phaseLag.push(Math.max(0,now-bridge.startMs-owner.simAtSec*1000));
+      stepsPerFrame.push(owner.lastSteps);
       if(owner.lastSteps>2)catchupFrames++;
       peakSteps=Math.max(peakSteps,owner.lastSteps);
     }
@@ -59,7 +60,13 @@ function replay(intervals,maxSteps=2){
       p95BacklogMs:round(percentile(lag,.95)),
       p95SimulationPhaseLagMs:round(percentile(phaseLag,.95)),
       p99SimulationPhaseLagMs:round(percentile(phaseLag,.99)),
-      catchupFrames,peakSteps};
+      catchupFrames,peakSteps,
+      // Work concentration matters even when no simulation time is dropped.
+      // These are tick counts, NOT measured CPU milliseconds or input latency.
+      framesAtStepCap:stepsPerFrame.filter(n=>n===maxSteps).length,
+      framesWithZeroSteps:stepsPerFrame.filter(n=>n===0).length,
+      p95StepsPerFrame:percentile(stepsPerFrame,.95),
+      p99StepsPerFrame:percentile(stepsPerFrame,.99)};
   }finally{owner.stop();}
 }
 // A trace can be replayable without being trustworthy evidence of an active,
