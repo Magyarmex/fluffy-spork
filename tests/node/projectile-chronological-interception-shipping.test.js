@@ -353,3 +353,27 @@ test('mutual TTL recovery refuses conflicting owner identities and throwing host
     assert.deepEqual(hits,[]);
   }
 });
+
+test('FFA mutual TTL recovery composes with the canonical remote neutral population',()=>{
+  const {g,a,b,hits}=ttlFixture();
+  const owners=[{id:1,cls:'scout',alive:true,x:-900,y:900},
+                {id:2,cls:'scout',alive:true,x:900,y:900}];
+  for(const owner of owners){
+    owner.__novaSweepMoveTime=g.time;
+    owner.__novaSweepPrevX=owner.x;
+    owner.__novaSweepPrevY=owner.y;
+  }
+  g.tanks=owners;
+  g.player=owners[0];
+  g.tankById=new Map(owners.map(o=>[o.id,o]));
+  g.__novaShapeSweepActive=true;
+  g.shapes=Array.from({length:120},(_,i)=>({
+    kind:'shape',hp:100,r:10,x:700+(i%12)*15,y:700+Math.floor(i/12)*15,
+    __novaShapeSweepEpoch:g.__novaShapeSweepEpoch,
+    __novaShapeSweepPrevX:700+(i%12)*15,
+    __novaShapeSweepPrevY:700+Math.floor(i/12)*15
+  }));
+  g.updateBullets(1/30);
+  assert.deepEqual(hits.sort(),[1,2]);
+  assert.equal(a.dead,true);assert.equal(b.dead,true);
+});
