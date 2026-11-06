@@ -8,7 +8,7 @@ function harness(){
   requestAnimationFrame(fn){callback=fn;return 1;},
   cancelAnimationFrame(){cancelled++;callback=null;}};
  vm.runInNewContext(source,{window},{timeout:1000});
- return {window,next(ts){const fn=callback;callback=null;
+ return {window,hide(){document.hidden=true;listeners.get('visibilitychange')?.();},\n  get listenerCount(){return listeners.size;},next(ts){const fn=callback;callback=null;
    assert.equal(typeof fn,'function');fn(ts);},get cancelled(){return cancelled;}};
 }
 test('opt-in browser recorder captures only foreground RAF intervals',()=>{
@@ -28,9 +28,9 @@ test('opt-in browser recorder captures only foreground RAF intervals',()=>{
 test('hidden tab ends capture without inventing background frame gaps',()=>{
  const h=harness(),c=h.window.__novaRafTraceCapture.create();
  c.start();h.next(100);h.next(133);
- h.window.document.hidden=true;h.next(2000);
+ h.hide();
  assert.equal(c.active,false);
- assert.equal(c.snapshot().capture.reason,'hidden');
+ assert.equal(c.snapshot().capture.reason,'hidden');\n assert.equal(h.listenerCount,0);
  assert.deepEqual(Array.from(c.snapshot().frameIntervalsMs),[33]);
 });
 test('RAF capture rejects invalid configuration and duplicate starts',()=>{
@@ -45,7 +45,7 @@ test('RAF capture rejects invalid configuration and duplicate starts',()=>{
  assert.throws(()=>c.start(),/already active/);
  c.stop();
  assert.equal(c.active,false);
- assert.ok(h.cancelled>=1);
+ assert.ok(h.cancelled>=1);\n assert.equal(h.listenerCount,0);
 });
 
 test('host RAF scheduling failure cannot strand an active recorder',()=>{
