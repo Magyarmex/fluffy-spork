@@ -79,11 +79,12 @@ const clear = Object.freeze({ allied: false, complete: true, unscanned: false,
   aOtherProjectile: null, bOtherProjectile: null });
 
 
-test('three ordinary projectiles resolve earliest contact independently of storage order', () => {
+for (const fps of [30, 60, 120, 240]) {
+test('three ordinary projectiles resolve earliest contact independently of storage order at ' + fps + 'Hz', () => {
   function run(reverse) {
-    const g = boot(), a = shot(1, 1, -20, 6000, .005);
-    const b = shot(2, 2, 0, 0, .005);
-    const c = shot(3, 3, 25, -6000, .005);
+    const g = boot(), a = shot(1, 1, -20, 6000, 1);
+    const b = shot(2, 2, 0, 0, 1);
+    const c = shot(3, 3, 25, -6000, 1);
     a.hp = a.maxHp = 3;
     b.hp = b.maxHp = 2;
     c.hp = c.maxHp = 1;
@@ -93,7 +94,7 @@ test('three ordinary projectiles resolve earliest contact independently of stora
       weakened.push(bullet.id);
       return original(bullet, damage);
     };
-    g.updateBullets(1 / 240);
+    g.updateBullets(1 / fps);
     return { a: [a.hp, a.dead], b: [b.hp, b.dead], c: [c.hp, c.dead], weakened };
   }
   const forward = run(false), reverse = run(true);
@@ -104,6 +105,7 @@ test('three ordinary projectiles resolve earliest contact independently of stora
   assert.equal(forward.b[1], true, 'A-B should destroy B');
   assert.equal(forward.c[1], true, 'A-C should destroy C');
 });
+}
 
 test('two ordinary shots retain the established interception path', () => {
   const g = boot(), a = shot(1, 1, -20, 6000, 1);
