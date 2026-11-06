@@ -228,7 +228,12 @@ class FixedStepRafOwner {
     let cancelError;
     try{if(this.raf!=null)this.cancel(this.raf)}
     catch(error){cancelError=error}
-    this.raf=null;this.timeline.reset();this.lagMs=0;
+    this.raf=null;
+    // Input reset may invoke game/UI hooks. Even a failing reset must never
+    // leave the production lifecycle trapped behind the stopped pilot.
+    let resetError;
+    try{this.timeline.reset()}catch(error){resetError=error}
+    this.lagMs=0;
     if(this.game.start===this.startWrapper){
       if(this.startHadOwn)this.game.start=this.originalStart;
       else delete this.game.start;
@@ -241,7 +246,13 @@ class FixedStepRafOwner {
       if(this.destroyHadOwn)this.game.destroy=this.originalDestroy;
       else delete this.game.destroy;
     }
-    if(cancelError)throw cancelError;
+    if(cancelError){
+      if(resetError && cancelError && typeof cancelError==='object'){
+        try{cancelError.cleanupError=resetError}catch(_ignored){}
+      }
+      throw cancelError;
+    }
+    if(resetError)throw resetError;
   }
 }
 // Compose the existing production Input handlers with chronological DOM
