@@ -354,3 +354,25 @@ test('swept candidate budget does not suppress distant-endpoint crossings', () =
   assert.equal(r.certified.length, 1);
   assert.deepEqual([r.certified[0].i, r.certified[0].j], [30, 31]);
 });
+
+test('same-owner crowd cannot exhaust the expensive interception budget', () => {
+  const allied = Array.from({ length: 24 }, () => shot(7, 1000, 0, 1000));
+  const g = { bullets: [...allied, shot(1, -20, 1000), shot(2, 20, -1000)] };
+  let calls = 0;
+  const r = observeProjectilePairs(g, .05, () => { calls++; return verified(); });
+  assert.equal(r.incomplete, false);
+  assert.equal(r.certified.length, 1);
+  assert.deepEqual([r.certified[0].i, r.certified[0].j], [24, 25]);
+  assert.equal(calls, 1);
+  assert.equal(r.pairs, 325);
+});
+
+test('same-owner overlap alone is not a certified interception', () => {
+  const g = { bullets: Array.from({ length: 24 }, () => shot(7, 0, 0)) };
+  let calls = 0;
+  const r = observeProjectilePairs(g, .05, () => { calls++; return verified(); });
+  assert.equal(r.incomplete, false);
+  assert.equal(r.certified.length, 0);
+  assert.equal(calls, 0);
+  assert.equal(r.pairs, 276);
+});
