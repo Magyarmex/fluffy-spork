@@ -479,6 +479,9 @@
             var cr = ca.r + cb.r + 1.5;
             var ct = ca.ownerId === cb.ownerId ? null :
               firstProjectileContactTime(ca, cb, cr);
+            /* Allied geometric crossings are not combat events and must
+             * not create artificial simultaneous-contact ambiguity. */
+            if (ct != null && alliedProjectileOwners(this, ca, cb)) ct = null;
             proposed.push({ i: ci, j: cj, time: ct == null ? Infinity : ct });
           }
         proposed.sort(function (a, b) { return a.time - b.time; });
