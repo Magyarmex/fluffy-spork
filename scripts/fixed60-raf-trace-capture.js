@@ -12,17 +12,17 @@ function create({durationMs=120000,maxFrames=200000}={}){
  if(!Number.isFinite(durationMs)||durationMs<=0||durationMs>600000||
     !Number.isInteger(maxFrames)||maxFrames<1||maxFrames>200000)
    throw Error('invalid RAF capture bounds');
- var active=false,first=null,last=null,raf=null,intervals=[],reason=null;
+ var active=false,first=null,last=null,raf=null,intervals=[],reason=null;\n var visibilityGuarded=false;\n function onVisibility(){if(root.document&&root.document.hidden)stop('hidden');}
  function stop(why){
   if(!active)return snapshot();
-  active=false;reason=why||'manual';
+  active=false;reason=why||'manual';\n  if(visibilityGuarded&&root.document&&typeof root.document.removeEventListener==='function'){\n   try{root.document.removeEventListener('visibilitychange',onVisibility);}catch(_ignored){}\n  }
   if(raf!=null)root.cancelAnimationFrame(raf);
   raf=null;return snapshot();
  }
  function snapshot(){
   return {frameIntervalsMs:intervals.slice(),capture:{
    reason:reason||'running',durationMs:first==null?0:last-first,
-   frames:intervals.length,foregroundOnly:true}};
+   frames:intervals.length,foregroundOnly:visibilityGuarded}};
  }
  function tick(ts){
   if(!active)return;
@@ -47,7 +47,7 @@ function create({durationMs=120000,maxFrames=200000}={}){
   if(root.document&&root.document.hidden)throw Error('capture requires foreground tab');
   active=true;first=null;last=null;reason=null;intervals=[];
   try{raf=root.requestAnimationFrame(tick);}
-  catch(error){active=false;throw error;}
+  catch(error){stop('start-error');throw error;}
  },stop:stop,snapshot:snapshot,get active(){return active;}};
 }
 root.__novaRafTraceCapture={create:create};
