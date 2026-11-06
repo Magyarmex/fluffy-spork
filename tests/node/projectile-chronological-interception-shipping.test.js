@@ -250,6 +250,7 @@ function ttlWitness(g) {
 function ttlFixture(ttlA=.005,ttlB=.005,hpA=1,hpB=1) {
   const g=boot(),a=shot(1,1,-20,6000,ttlA),b=shot(2,2,20,-6000,ttlB);
   a.hp=a.maxHp=hpA;b.hp=b.maxHp=hpB;
+  a.baseDmg=a.dmg;b.baseDmg=b.dmg;
   ttlWitness(g);
   g.tankById.set(1,{id:1,team:1});
   g.tankById.set(2,{id:2,team:2});
@@ -317,6 +318,114 @@ test('mutual TTL preflight refuses separately referenced player at contact',()=>
   const {g,hits}=ttlFixture();
   g.player={id:3,cls:'scout',alive:true,x:0,y:0,
     __novaSweepMoveTime:g.time,__novaSweepPrevX:0,__novaSweepPrevY:0};
+  g.updateBullets(1/30);
+  assert.deepEqual(hits,[]);
+});
+
+test('mutual TTL recovery works for canonical free-for-all owners without team tags',()=>{
+  for(const fps of [30,60,120,240]){
+    for(const reverse of [false,true]){
+      const {g,a,b,hits}=ttlFixture();
+      g.tankById.set(1,{id:1});
+      g.tankById.set(2,{id:2});
+      if(reverse)g.bullets.reverse();
+      g.updateBullets(1/fps);
+      assert.deepEqual(hits.sort(),[1,2],
+        'FFA interception must match shipping Sniper at '+fps+'Hz');
+      assert.equal(a.dead,true);assert.equal(b.dead,true);
+    }
+  }
+});
+test('mutual TTL recovery respects explicit nonhostility even with distinct team tags',()=>{
+  const {g,hits}=ttlFixture();
+  g.areAllies=()=>false;
+  g.areHostile=()=>false;
+  g.updateBullets(1/30);
+  assert.deepEqual(hits,[]);
+});
+test('mutual TTL recovery refuses conflicting owner identities and throwing hostility',()=>{
+  for(const setup of [
+    g=>g.tankById.set(2,g.tankById.get(1)),
+    g=>g.tankById.set(2,{id:999,team:2}),
+    g=>g.areHostile=()=>{throw Error('unavailable');},
+    g=>g.areAllies=()=>{throw Error('unavailable');}
+  ]){
+    const {g,hits}=ttlFixture();
+    setup(g);g.updateBullets(1/30);
+    assert.deepEqual(hits,[]);
+  }
+});
+
+test('FFA mutual TTL recovery composes with the canonical remote neutral population',()=>{
+  const {g,a,b,hits}=ttlFixture();
+  const owners=[{id:1,cls:'scout',alive:true,x:-900,y:900},
+                {id:2,cls:'scout',alive:true,x:900,y:900}];
+  for(const owner of owners){
+    owner.__novaSweepMoveTime=g.time;
+    owner.__novaSweepPrevX=owner.x;
+    owner.__novaSweepPrevY=owner.y;
+  }
+  g.tanks=owners;
+  g.player=owners[0];
+  g.tankById=new Map(owners.map(o=>[o.id,o]));
+  g.__novaShapeSweepActive=true;
+  g.shapes=Array.from({length:120},(_,i)=>({
+    kind:'shape',hp:100,r:10,x:700+(i%12)*15,y:700+Math.floor(i/12)*15,
+    __novaShapeSweepEpoch:g.__novaShapeSweepEpoch,
+    __novaShapeSweepPrevX:700+(i%12)*15,
+    __novaShapeSweepPrevY:700+Math.floor(i/12)*15
+  }));
+  g.updateBullets(1/30);
+  assert.deepEqual(hits.sort(),[1,2]);
+  assert.equal(a.dead,true);assert.equal(b.dead,true);
+});
+
+test('canonical untouched pen-one FFA rounds intercept before TTL at low refresh',()=>{
+  for(const fps of [30,60,120,240]){
+    for(const reverse of [false,true]){
+      const {g,a,b,hits}=ttlFixture();
+      g.tankById.set(1,{id:1});
+      g.tankById.set(2,{id:2});
+      a.pen=1;b.pen=1;
+      if(reverse)g.bullets.reverse();
+      g.updateBullets(1/fps);
+      assert.deepEqual(hits.sort(),[1,2],
+        'ordinary pen-one FFA projectile at '+fps+'Hz');
+      assert.equal(a.dead,true);assert.equal(b.dead,true);
+    }
+  }
+});
+test('mutual TTL preflight refuses spent or higher-penetration projectiles',()=>{
+  for(const setup of [
+    (a,b)=>{a.pen=2;b.pen=1;},
+    (a,b)=>{a.pen=1;b.pen=2;},
+    (a,b)=>{a.pen=1;b.pen=1;a.hits=1;},
+    (a,b)=>{a.pen=1;b.pen=1;b.hits=1;}
+  ]){
+    const {g,a,b,hits}=ttlFixture();
+    g.tankById.set(1,{id:1});g.tankById.set(2,{id:2});
+    setup(a,b);g.updateBullets(1/30);
+    assert.deepEqual(hits,[]);
+  }
+});
+
+test('canonical Scout bullet size, speed and integrity reach FFA TTL recovery',()=>{
+  for(const fps of [30,60,120,240]){
+    const {g,a,b,hits}=ttlFixture();
+    g.tankById.set(1,{id:1});g.tankById.set(2,{id:2});
+    const scoutHp=12*(0.72+5*0.08)*(1+0.055);
+    Object.assign(a,{x:-7,vx:440,r:5,dmg:12,baseDmg:12,pen:1,hp:scoutHp,maxHp:scoutHp});
+    Object.assign(b,{x:7,vx:-440,r:5,dmg:12,baseDmg:12,pen:1,hp:scoutHp,maxHp:scoutHp});
+    g.updateBullets(1/fps);
+    assert.deepEqual(hits.sort(),[1,2],
+      'real Scout-size/speed/integrity at '+fps+'Hz');
+    assert.equal(a.dead,true);assert.equal(b.dead,true);
+  }
+});
+
+test('mutual TTL recovery refuses incomplete integrity initialization',()=>{
+  const {g,a,hits}=ttlFixture();
+  delete a.baseDmg;
   g.updateBullets(1/30);
   assert.deepEqual(hits,[]);
 });

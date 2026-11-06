@@ -3034,7 +3034,8 @@ function certifiedMultiShotCoverPriority(g,dt){
   function ordinary(s){
    return s&&s.dead===false&&s.kind==='bullet'&&
     s.shell===false&&s.beam===false&&!s.splash&&!s.__v17Cannon&&
-    !s.__novaRail&&s.pen===0&&Number.isFinite(s.hits)&&s.hits===0&&
+    !s.__novaRail&&(s.pen===0||s.pen===1)&&Number.isFinite(s.hits)&&s.hits===0&&
+    Number.isFinite(s.baseDmg)&&s.baseDmg>0&&
     Number.isFinite(s.hp)&&s.hp>0&&Number.isFinite(s.maxHp)&&
     s.maxHp>=s.hp&&Number.isFinite(s.ttl)&&s.ttl>0&&s.ttl<=dt&&
     Number.isFinite(s.r)&&s.r>0&&
@@ -3055,15 +3056,21 @@ function certifiedMultiShotCoverPriority(g,dt){
   };
   var oa=getOwner(a),ob=getOwner(b);
   if(!oa||!ob)return false;
+  /* Match Sniper's shipping allegiance rule, including free-for-all tanks
+   * without team tags. A separate explicit hostility veto always wins. */
+  if(oa===ob||oa.id!==a.ownerId||ob.id!==b.ownerId||oa.id===ob.id)return false;
   if(typeof g.areAllies==='function'){
    try{if(g.areAllies(oa,ob))return false;}catch(_e){return false;}
-  }else{
-   var keys=['teamId','team','factionId','faction','side'],known=false;
+  }
+  if(typeof g.areHostile==='function'){
+   try{if(!g.areHostile(oa,ob))return false;}catch(_e){return false;}
+  }
+  if(typeof g.areAllies!=='function'){
+   var keys=['teamId','team','factionId','faction','side'];
    for(var k=0;k<keys.length;k++)if(oa[keys[k]]!=null&&ob[keys[k]]!=null){
     if(oa[keys[k]]===ob[keys[k]])return false;
-    known=true;break;
+    break;
    }
-   if(!known)return false;
   }
   var rx=a.x-b.x,ry=a.y-b.y,vx=a.vx-b.vx,vy=a.vy-b.vy,
       radius=a.r+b.r+1.5,c=rx*rx+ry*ry-radius*radius,
