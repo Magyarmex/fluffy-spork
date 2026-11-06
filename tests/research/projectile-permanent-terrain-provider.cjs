@@ -45,7 +45,10 @@ function makePermanentTerrainProvider(game, dt) {
     const context = { complete: true, allied: false, unscanned: false,
       aTerrain: terrainTimes[i], bTerrain: terrainTimes[j],
       aBody: null, bBody: null, aOtherProjectile: null, bOtherProjectile: null };
-    const t = firstContact(shots[i], shots[j], dt, context);
+    // Match the shipping resolver and open-field oracle: a shooter's own
+    // projectiles cannot intercept or preempt a hostile interception.
+    const t = shots[i].ownerId === shots[j].ownerId ? null :
+      firstContact(shots[i], shots[j], dt, context);
     times[i][j] = times[j][i] = t;
   }
   const events = [];
