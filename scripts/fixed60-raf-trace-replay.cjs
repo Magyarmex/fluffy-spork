@@ -62,10 +62,32 @@ function replay(intervals,maxSteps=2){
       catchupFrames,peakSteps};
   }finally{owner.stop();}
 }
+// A trace can be replayable without being trustworthy evidence of an active,
+// foreground match. Validate the recorder's own accounting separately from the
+// scheduler replay; neither proves that the game was unpaused or interactive.
+function captureProvenance(intervals,capture){
+  if(!capture||typeof capture!=='object'||Array.isArray(capture))
+    return {status:'unverified',visibilityGuarded:false,gameplayActiveVerified:false};
+  const total=intervals.reduce((sum,value)=>sum+value,0);
+  const consistent=Number.isInteger(capture.frames)&&capture.frames===intervals.length&&
+    Number.isFinite(capture.durationMs)&&
+    Math.abs(capture.durationMs-total)<=0.01&&
+    typeof capture.reason==='string'&&
+    ['running','manual','hidden','limit','invalid-timestamp','nonmonotonic',
+     'raf-error','start-error'].includes(capture.reason);
+  return {status:consistent?(capture.reason==='running'?'partial':'consistent'):'inconsistent',
+    visibilityGuarded:capture.foregroundOnly===true,
+    gameplayActiveVerified:false};
+}
 function analyze(data){
   const intervals=Array.isArray(data)?data:data&&data.frameIntervalsMs;
+  // Validate before interpreting metadata, including when capture is absent.
+  if(!Array.isArray(intervals)||!intervals.length||intervals.length>200000||
+     intervals.some(v=>!Number.isFinite(v)||v<=0||v>10000))
+    throw Error('expected 1..200000 finite positive RAF intervals <=10000ms');
+  const capture=Array.isArray(data)?null:(data&&data.capture||null);
   return {researchOnly:true,source:'actual FixedStepRafOwner',
-    capture:Array.isArray(data)?null:(data&&data.capture||null),
+    capture,captureProvenance:captureProvenance(intervals,capture),
     results:[2,3,4].map(cap=>replay(intervals,cap))};
 }
 if(require.main===module){
