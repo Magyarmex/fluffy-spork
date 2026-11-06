@@ -48,7 +48,17 @@ class BrowserInputCapture {
       [win,'blur',release],[doc,'visibilitychange',hidden]
     ];
     this.timeline.reset();
-    input.detach();
+    try{input.detach()}
+    catch(error){
+      // A hostile/partial production detach must not leave the real game
+      // without controls before research capture even becomes active.
+      try{input.attach(canvas)}catch(cleanupError){
+        if(error && typeof error==='object'){
+          try{error.cleanupError=cleanupError}catch(_ignored){}
+        }
+      }
+      throw error;
+    }
     input.canvas = canvas; // preserve Input's original stick geometry owner
     this.active = true;
     try {
