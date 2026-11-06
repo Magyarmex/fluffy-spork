@@ -20,6 +20,7 @@ function trial(seed,mode,fixed30){
   p.spawnShieldT=20;
   g.status='playing';g.paused=false;
   let now=1000,callback=null,owner,ordinary=0,other=0;
+  let poolWrites=0,activeOverwrites=0;
   let inBulletUpdate=false;
   const updateBullets=g.updateBullets;
   g.updateBullets=function(){
@@ -39,6 +40,14 @@ function trial(seed,mode,fixed30){
      return;
     }
    }else other+=n;
+   // Count actual writes to the shipping circular particle pool, not just
+   // requested effects. The low-quality pool still writes one trail particle.
+   const writes=this.quality==='low'?Math.max(1,Math.round(n*0.5)):n;
+   for(let i=0;i<writes;i++){
+    const slot=this.parts[(this.partIdx+i)%this.parts.length];
+    if(slot.active&&slot.life>0)activeOverwrites++;
+   }
+   poolWrites+=writes;
    return add.apply(this,arguments);
   };
   try{
@@ -63,7 +72,8 @@ function trial(seed,mode,fixed30){
     assert.equal(owner.droppedFrames,0);
    }else for(let tick=0;tick<TICKS;tick++)g.update(1/60);
    return {physical:digest(physical(g)),gameplayDraws:draws(),
-    ordinary,other,cosmeticState:g.__novaCosmeticRngState,
+    ordinary,other,poolWrites,activeOverwrites,
+    cosmeticState:g.__novaCosmeticRngState,
     bullets:g.bullets.length};
   }finally{if(owner)owner.stop();g.destroy();}
  });
@@ -79,6 +89,12 @@ test('actual composed Tempest: ordinary-trail suppression is simulation- and RNG
    assert.ok(a.ordinary>0,'fixture must actually emit ordinary trails');
    assert.equal(suppressed.ordinary,a.ordinary,'same trail opportunities must be sampled');
    assert.equal(suppressed.other,a.other,'other feedback call sites must remain paired');
+   assert.equal(a.poolWrites-suppressed.poolWrites,a.ordinary,
+    'each suppressed ordinary trail must eliminate exactly one real particle-pool write');
+   assert.ok(a.poolWrites>suppressed.poolWrites,
+    'cosmetic intervention must actually reduce circular particle-pool writes');
+   assert.ok(a.activeOverwrites>=0&&suppressed.activeOverwrites>=0,
+    'record live-particle replacement pressure without assuming it improves');
    assert.equal(suppressed.cosmeticState,a.cosmeticState,'cosmetic RNG sequence must be preserved');
    assert.equal(suppressed.physical,a.physical,'cosmetic suppression changed physical Game');
    assert.equal(suppressed.gameplayDraws,a.gameplayDraws,'cosmetic suppression changed gameplay RNG');
