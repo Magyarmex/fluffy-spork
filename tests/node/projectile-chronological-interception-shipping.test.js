@@ -134,3 +134,64 @@ test('shells preserve the existing legacy resolver path', () => {
   g.updateBullets(1 / 240);
   assert.deepEqual(weakened.sort(), [1, 2]);
 });
+
+test('bounded ordinary volley agrees with independent chronological event oracle', () => {
+  let seed = 0x7412026;
+  const random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
+  const dt = 1 / 120;
+  let checked = 0;
+  function first(a, b) {
+    const rr = a.r + b.r + 1.5;
+    const px = a.px - b.px, py = a.py - b.py;
+    const vx = (a.x - a.px) - (b.x - b.px);
+    const vy = (a.y - a.py) - (b.y - b.py);
+    const c = px * px + py * py - rr * rr;
+    if (c <= 0) return 0;
+    const aa = vx * vx + vy * vy;
+    if (aa < 1e-12) return null;
+    const bb = 2 * (px * vx + py * vy);
+    const d = bb * bb - 4 * aa * c;
+    if (d < 0) return null;
+    const t = (-bb - Math.sqrt(d)) / (2 * aa);
+    return t >= 0 && t <= 1 ? t : null;
+  }
+  for (let world = 0; world < 500; world++) {
+    const shots = [0, 1, 2, 3].map(i => {
+      const x = (i - 1.5) * 20 + (random() - .5) * 10;
+      const y = (random() - .5) * 12;
+      const vx = (1.5 - i) * 3500 + (random() - .5) * 2000;
+      const vy = (random() - .5) * 2000;
+      const b = shot(i + 1, i + 1, x, vx, 1);
+      b.y = y; b.vy = vy; b.px = x; b.py = y;
+      b.x += vx * dt; b.y += vy * dt;
+      b.hp = b.maxHp = 1 + Math.floor(random() * 4);
+      return b;
+    });
+    const expected = shots.map(b => ({ hp: b.hp, dead: false }));
+    const events = [];
+    for (let i = 0; i < shots.length; i++)
+      for (let j = i + 1; j < shots.length; j++) {
+        const time = first(shots[i], shots[j]);
+        if (time !== null) events.push({ i, j, time });
+      }
+    events.sort((a, b) => a.time - b.time);
+    if (events.some((e, i) => i > 0 && Math.abs(e.time - events[i-1].time) <= 1e-9))
+      continue;
+    for (const e of events) {
+      const a = expected[e.i], b = expected[e.j];
+      if (a.dead || b.dead) continue;
+      const ah = a.hp, bh = b.hp;
+      a.hp -= bh; b.hp -= ah;
+      a.dead = a.hp <= 0; b.dead = b.hp <= 0;
+    }
+    const g = boot();
+    g.bullets = shots;
+    g.resolveBulletCollisions();
+    for (let i = 0; i < shots.length; i++) {
+      assert.equal(shots[i].hp, expected[i].hp, 'integrity mismatch world ' + world + ', projectile ' + i);
+      assert.equal(shots[i].dead, expected[i].dead, 'survival mismatch world ' + world + ', projectile ' + i);
+    }
+    checked++;
+  }
+  assert.ok(checked >= 450);
+});
