@@ -5,7 +5,7 @@
 const { makeOpenFieldProvider } = require('./projectile-open-field-event-provider.cjs');
 const { firstDetachedPermanentTerrainEvent } = require('./projectile-detached-permanent-terrain.cjs');
 function makePermanentTerrainProvider(game, dt) {
-  if (!game || !Array.isArray(game.bullets) || !Array.isArray(game.__novaTerrain) ||
+  if (!game || game.__novaResearchHostilityFixture !== true || !Array.isArray(game.bullets) || !Array.isArray(game.__novaTerrain) ||
       (game.terrain != null && (!Array.isArray(game.terrain) ||
         (game.terrain !== game.__novaTerrain && game.terrain.length > 0)))) return null;
   const emptyFixture = { bullets: game.bullets, tanks: game.tanks, shapes: game.shapes,
