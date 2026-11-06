@@ -7,7 +7,10 @@ function firstDetachedPermanentTerrainEvent(game, shot, dt) {
       !Array.isArray(game.__novaTerrain) || !shot ||
       !Number.isFinite(dt) || dt <= 0 ||
       !['x','y','vx','vy','r','ttl'].every(k => Number.isFinite(shot[k])) ||
-      shot.r <= 0 || shot.ttl <= 0) return unknown('missing-context');
+      shot.r <= 0 || shot.ttl <= 0 || shot.kind !== 'bullet' ||
+      shot.dead !== false || shot.shell !== false || shot.beam !== false ||
+      shot.splash || shot.__v17Cannon || shot.__novaRail ||
+      shot.pen !== 0 || shot.hits !== 0) return unknown('missing-context');
   const terrain = [];
   try {
     for (let i = 0; i < game.__novaTerrain.length; i++) {
