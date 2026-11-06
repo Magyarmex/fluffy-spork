@@ -166,3 +166,27 @@ test('active cover outside swept bounding box does not hide a permanent pillar',
  assert.equal(result.complete,true);
  assert.ok(Math.abs(result.time-.01365)<1e-10);
 });
+
+
+test('seeded distant active cover preserves Battlefield first-hit geometry',()=>{
+ let seed=0x737147;
+ const random=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ const reference=boot();reference.__novaTerrain=[rect()];
+ const expected=query(reference,shot(),.04);
+ assert.equal(expected.complete,true);
+ for(let world=0;world<200;world++){
+   const g=boot();g.__novaTerrain=[rect()];
+   for(let i=0;i<12;i++){
+     const circle=random()<.5;
+     const x=(random()-.5)*400,y=(random()<.5?-1:1)*(60+random()*150);
+     g.__novaTerrain.push(circle?
+       {id:100+i,shape:'circle',x,y,r:1+random()*15,solid:true,destructible:true,hp:20}:
+       {id:100+i,shape:'rect',x,y,w:1+random()*30,h:1+random()*30,
+        solid:true,destructible:true,hp:20});
+   }
+   const before=JSON.stringify(g.__novaTerrain);
+   assert.deepEqual(query(g,shot(),.04),expected,'world '+world);
+   assert.equal(JSON.stringify(g.__novaTerrain),before,'world '+world);
+   assert.equal(Object.hasOwn(g,'__novaBattlefieldIndex'),false,'world '+world);
+ }
+});
