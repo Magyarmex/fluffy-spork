@@ -70,3 +70,29 @@ test('replay preserves capture termination metadata for interpretation',()=>{
  assert.deepEqual(report.capture,capture);
  assert.equal(analyze([16,17]).capture,null);
 });
+
+test('capture provenance distinguishes guarded timing from verified gameplay',()=>{
+ const intervals=[16,17,33];
+ const consistent={reason:'hidden',frames:3,durationMs:66,foregroundOnly:true};
+ const report=analyze({frameIntervalsMs:intervals,capture:consistent});
+ assert.equal(report.captureProvenance.status,'consistent');
+ assert.equal(report.captureProvenance.visibilityGuarded,true);
+ assert.equal(report.captureProvenance.gameplayActiveVerified,false);
+ assert.equal(analyze(intervals).captureProvenance.status,'unverified');
+ assert.equal(analyze({frameIntervalsMs:intervals,capture:{...consistent,reason:'running'}})
+   .captureProvenance.status,'partial');
+ for(const capture of [
+   {...consistent,frames:2},
+   {...consistent,durationMs:65},
+   {...consistent,reason:'unexpected'},
+   {...consistent,frames:'3'},
+   {...consistent,durationMs:Infinity},
+ ]){
+   const result=analyze({frameIntervalsMs:intervals,capture});
+   assert.equal(result.captureProvenance.status,'inconsistent');
+   assert.equal(result.results.length,3,'untrusted metadata must not prevent replay');
+ }
+ const unguarded=analyze({frameIntervalsMs:intervals,capture:{...consistent,foregroundOnly:false}});
+ assert.equal(unguarded.captureProvenance.status,'consistent');
+ assert.equal(unguarded.captureProvenance.visibilityGuarded,false);
+});
