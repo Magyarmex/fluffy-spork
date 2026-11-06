@@ -213,3 +213,26 @@ test('actual Battlefield cover contacts are never excluded by swept AABB',()=>{
  }
  assert.ok(contacts>10,'oracle must exercise real cover contacts');
 });
+
+test('actual Battlefield reuses one detached index for a multi-shot chronology snapshot',()=>{
+ const {makePermanentTerrainProvider}=require('../research/projectile-permanent-terrain-provider.cjs');
+ const {observeProjectilePairs}=require('../research/projectile-pair-chronology-observer.cjs');
+ const g=boot(),dt=.04;
+ const bullet=(ownerId,x,vx)=>({kind:'bullet',dead:false,shell:false,beam:false,
+   pen:0,hits:0,ttl:.42,r:3,ownerId,x,y:0,vx,vy:0});
+ g.__novaResearchHostilityFixture=true;g.player=null;g.powerups=[];g.terrain=[];
+ g.bullets=[bullet(1,-17.5,1000),bullet(2,0,0),bullet(3,27.5,-1000)];
+ g.__novaTerrain=[{...rect(),x:-12,w:2}];
+ const before=JSON.stringify(g.__novaTerrain),original=g.firstTerrainHit,owners=[];
+ g.firstTerrainHit=function(...args){owners.push(this);return original.apply(this,args);};
+ const provider=makePermanentTerrainProvider(g,dt);
+ assert.equal(typeof provider,'function');
+ assert.equal(owners.length,3);
+ assert.ok(owners.every(owner=>owner===owners[0]));
+ assert.notStrictEqual(owners[0],g);
+ assert.equal(JSON.stringify(g.__novaTerrain),before);
+ assert.equal(Object.hasOwn(g,'__novaBattlefieldIndex'),false);
+ const result=observeProjectilePairs(g,dt,provider);
+ assert.equal(result.incomplete,false);
+ assert.deepEqual([result.certified[0].i,result.certified[0].j],[1,2]);
+});
