@@ -136,11 +136,11 @@ test('fixed60 preserves touch press/release shot chronology across adversarial R
 });
 
 // A three-step cap is not a universal solution for equal-mean 30Hz jitter:
-// alternating 1/7 120Hz ticks can leave a whole simulation tick behind
+// alternating 7/1 120Hz ticks can leave a whole simulation tick behind
 // without incrementing droppedMs. This is a research gate, not a rollout.
 test('bursty equal-mean RAF exposes hidden backlog despite zero dropped time',()=>{
  const native=Array(480).fill(2);
- const burst=Array.from({length:240},(_,i)=>i%2===0?1:7);
+ const burst=Array.from({length:240},(_,i)=>i%2===0?7:1);
  assert.equal(burst.reduce((a,b)=>a+b,0),960);
  const baseline=run(1517800,8,native);
  assert.equal(baseline.ticks,480);
