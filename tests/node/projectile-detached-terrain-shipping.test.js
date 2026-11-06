@@ -136,3 +136,33 @@ test('wall-qualified first contact is invariant to projectile storage order',()=
    assert.ok(Math.abs(hit.time-.02)<1e-9);
  }
 });
+
+
+test('distant active cover cannot suppress a clear detached Battlefield corridor',()=>{
+ const g=boot();g.__novaTerrain=[{...rect(150),id:10,destructible:true,hp:20}];
+ const before=JSON.stringify(g.__novaTerrain);
+ assert.deepEqual(query(g,shot(),.04),{complete:true,time:null,reason:null});
+ assert.equal(JSON.stringify(g.__novaTerrain),before);
+ assert.equal(Object.hasOwn(g,'__novaBattlefieldIndex'),false);
+});
+test('distant active cover preserves earlier permanent wall contact',()=>{
+ const g=boot();g.__novaTerrain=[{...rect(150),id:10,destructible:true,hp:20},rect()];
+ const result=query(g,shot(),.04);
+ assert.equal(result.complete,true);
+ assert.ok(Math.abs(result.time-.01665)<1e-10);
+});
+test('near-corridor active cover remains uncertified even if it is beyond a wall',()=>{
+ const g=boot();g.__novaTerrain=[rect(),{...rect(),id:10,x:12,destructible:true,hp:20}];
+ assert.equal(query(g,shot(),.04).complete,false);
+});
+test('active circular cover at swept bounding-box tangent remains uncertain',()=>{
+ const g=boot();g.__novaTerrain=[{id:11,shape:'circle',x:0,y:6.35,r:5,solid:true,destructible:true,hp:20}];
+ assert.equal(query(g,shot(),.04).complete,false);
+});
+test('active cover outside swept bounding box does not hide a permanent pillar',()=>{
+ const g=boot();g.__novaTerrain=[{id:12,shape:'circle',x:0,y:100,r:5,solid:true,destructible:true,hp:20},
+   {id:-13,shape:'circle',x:0,y:0,r:5,solid:true,destructible:false}];
+ const result=query(g,shot(),.04);
+ assert.equal(result.complete,true);
+ assert.ok(Math.abs(result.time-.01365)<1e-10);
+});
