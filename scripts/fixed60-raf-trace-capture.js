@@ -39,7 +39,8 @@ function create({durationMs=120000,maxFrames=200000}={}){
   if(intervals.length>=maxFrames||ts-first>=durationMs){
    stop('limit');return;
   }
-  raf=root.requestAnimationFrame(tick);
+  try{raf=root.requestAnimationFrame(tick);}
+  catch(error){stop('raf-error');throw error;}
  }
  return {start:function(){
   if(active)throw Error('RAF capture already active');
