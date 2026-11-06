@@ -3103,6 +3103,18 @@ function certifiedMultiShotCoverPriority(g,dt){
        reach[pi].s.r+def.size+8))return false;
    }
   }
+  /* The player may be separately referenced by an older core owner. */
+  if(g.player&&g.player.alive){
+   var pl=g.player,pdef=CLASSES[pl.cls];
+   if(!pdef||!(Number.isFinite(pdef.size)&&pdef.size>0)||
+      pl.__novaSweepMoveTime!==g.time)return false;
+   for(var qi=0;qi<2;qi++){
+    if(pl.id===reach[qi].s.ownerId)continue;
+    if(overlaps(reach[qi],pl.__novaSweepPrevX,
+      pl.__novaSweepPrevY,pl.x,pl.y,
+      reach[qi].s.r+pdef.size+8))return false;
+   }
+  }
   if(g.shapes.length&&!g.__novaShapeSweepActive)return false;
   for(var si=0;si<g.shapes.length;si++){
    var sh=g.shapes[si];if(!sh||!(sh.hp>0))continue;
