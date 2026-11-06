@@ -235,3 +235,20 @@ test('terrain-qualified event provider rejects stale third-projectile geometry',
  assert.equal(result.incomplete,true);
  assert.equal(result.certified.length,0);
 });
+
+
+test('terrain provider invalidates replaced terrain owner and first-hit method',()=>{
+ const dt=.04;
+ for(const mutate of [
+   g=>{g.__novaTerrain=g.__novaTerrain.map(s=>({...s}));},
+   g=>{g.firstTerrainHit=()=>null;}
+ ]){
+   const g=fixture(.9);
+   const provider=makePermanentTerrainProvider(g,dt);
+   assert.equal(typeof provider,'function');
+   mutate(g);
+   const result=observeProjectilePairs(g,dt,provider);
+   assert.equal(result.incomplete,true);
+   assert.equal(result.certified.length,0);
+ }
+});
