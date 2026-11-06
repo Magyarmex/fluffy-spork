@@ -13,16 +13,35 @@ function firstDetachedPermanentTerrainEvent(game, shot, dt) {
       shot.pen !== 0 || shot.hits !== 0) return unknown('missing-context');
   const terrain = [];
   try {
+    const endX = shot.x + shot.vx * dt, endY = shot.y + shot.vy * dt;
+    if (![endX,endY].every(Number.isFinite)) return unknown('invalid-trajectory');
+    // A necessary-only swept bounding-box check: an active cover object
+    // outside this entire padded corridor cannot affect this projectile.
+    // Every possibly intersecting active cover still forces abstention.
+    const pad = shot.r * .45;
+    const minX = Math.min(shot.x,endX) - pad, maxX = Math.max(shot.x,endX) + pad;
+    const minY = Math.min(shot.y,endY) - pad, maxY = Math.max(shot.y,endY) + pad;
     for (let i = 0; i < game.__novaTerrain.length; i++) {
       if (!Object.hasOwn(game.__novaTerrain, i)) return unknown('sparse-terrain');
       const s = game.__novaTerrain[i];
-      if (!s || (s.destructible === true && !(Number.isFinite(s.hp) && s.hp <= 0)) ||
+      if (!s ||
           (s.destructible !== true && s.destructible !== false) ||
           (s.destructible === false && s.solid !== true) ||
           !['x','y'].every(k => Number.isFinite(s[k])) ||
           (s.shape === 'circle' ? !(Number.isFinite(s.r) && s.r > 0) :
            s.shape === 'rect' ? !(Number.isFinite(s.w) && s.w > 0 && Number.isFinite(s.h) && s.h > 0) : true))
         return unknown('unsupported-terrain');
+      if (s.destructible === true && !(Number.isFinite(s.hp) && s.hp <= 0)) {
+        // The expanded AABB is intentionally larger than the exact circle
+        // or rectangle: false positives abstain, false negatives are unsafe.
+        const halfW = s.shape === 'circle' ? s.r : s.w / 2;
+        const halfH = s.shape === 'circle' ? s.r : s.h / 2;
+        const epsilon = 1e-7;
+        if (!(maxX < s.x - halfW - epsilon || minX > s.x + halfW + epsilon ||
+              maxY < s.y - halfH - epsilon || minY > s.y + halfH + epsilon))
+          return unknown('active-cover-corridor');
+        continue;
+      }
       const copy = { ...s };
       // The detached index starts at stamp 1. Reusing a live stamp of 1
       // would silently skip this wall during its first spatial query.

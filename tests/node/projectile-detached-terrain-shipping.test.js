@@ -136,3 +136,80 @@ test('wall-qualified first contact is invariant to projectile storage order',()=
    assert.ok(Math.abs(hit.time-.02)<1e-9);
  }
 });
+
+
+test('distant active cover cannot suppress a clear detached Battlefield corridor',()=>{
+ const g=boot();g.__novaTerrain=[{...rect(150),id:10,destructible:true,hp:20}];
+ const before=JSON.stringify(g.__novaTerrain);
+ assert.deepEqual(query(g,shot(),.04),{complete:true,time:null,reason:null});
+ assert.equal(JSON.stringify(g.__novaTerrain),before);
+ assert.equal(Object.hasOwn(g,'__novaBattlefieldIndex'),false);
+});
+test('distant active cover preserves earlier permanent wall contact',()=>{
+ const g=boot();g.__novaTerrain=[{...rect(150),id:10,destructible:true,hp:20},rect()];
+ const result=query(g,shot(),.04);
+ assert.equal(result.complete,true);
+ assert.ok(Math.abs(result.time-.01665)<1e-10);
+});
+test('near-corridor active cover remains uncertified even if it is beyond a wall',()=>{
+ const g=boot();g.__novaTerrain=[rect(),{...rect(),id:10,x:12,destructible:true,hp:20}];
+ assert.equal(query(g,shot(),.04).complete,false);
+});
+test('active circular cover at swept bounding-box tangent remains uncertain',()=>{
+ const g=boot();g.__novaTerrain=[{id:11,shape:'circle',x:0,y:6.35,r:5,solid:true,destructible:true,hp:20}];
+ assert.equal(query(g,shot(),.04).complete,false);
+});
+test('active cover outside swept bounding box does not hide a permanent pillar',()=>{
+ const g=boot();g.__novaTerrain=[{id:12,shape:'circle',x:0,y:100,r:5,solid:true,destructible:true,hp:20},
+   {id:-13,shape:'circle',x:0,y:0,r:5,solid:true,destructible:false}];
+ const result=query(g,shot(),.04);
+ assert.equal(result.complete,true);
+ assert.ok(Math.abs(result.time-.01365)<1e-10);
+});
+
+
+test('seeded distant active cover preserves Battlefield first-hit geometry',()=>{
+ let seed=0x737147;
+ const random=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ const reference=boot();reference.__novaTerrain=[rect()];
+ const expected=query(reference,shot(),.04);
+ assert.equal(expected.complete,true);
+ for(let world=0;world<200;world++){
+   const g=boot();g.__novaTerrain=[rect()];
+   for(let i=0;i<12;i++){
+     const circle=random()<.5;
+     const x=(random()-.5)*400,y=(random()<.5?-1:1)*(60+random()*150);
+     g.__novaTerrain.push(circle?
+       {id:100+i,shape:'circle',x,y,r:1+random()*15,solid:true,destructible:true,hp:20}:
+       {id:100+i,shape:'rect',x,y,w:1+random()*30,h:1+random()*30,
+        solid:true,destructible:true,hp:20});
+   }
+   const before=JSON.stringify(g.__novaTerrain);
+   assert.deepEqual(query(g,shot(),.04),expected,'world '+world);
+   assert.equal(JSON.stringify(g.__novaTerrain),before,'world '+world);
+   assert.equal(Object.hasOwn(g,'__novaBattlefieldIndex'),false,'world '+world);
+ }
+});
+
+
+test('actual Battlefield cover contacts are never excluded by swept AABB',()=>{
+ let seed=0x147737;
+ const random=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ let contacts=0;
+ for(let world=0;world<500;world++){
+   const g=boot(),dt=.04;
+   const circle=random()<.5;
+   const x=(random()-.5)*100,y=(random()-.5)*100;
+   const cover=circle?
+     {id:1,shape:'circle',x,y,r:2+random()*18,solid:true,destructible:true,hp:20}:
+     {id:1,shape:'rect',x,y,w:2+random()*36,h:2+random()*36,
+       solid:true,destructible:true,hp:20};
+   g.__novaTerrain=[cover];
+   const b={...shot(),x:(random()-.5)*100,y:(random()-.5)*100,
+     vx:(random()-.5)*4000,vy:(random()-.5)*4000};
+   const actual=g.firstTerrainHit(b.x,b.y,b.x+b.vx*dt,b.y+b.vy*dt,b.r*.45);
+   const result=query(g,b,dt);
+   if(actual){contacts++;assert.equal(result.complete,false,'world '+world);}
+ }
+ assert.ok(contacts>10,'oracle must exercise real cover contacts');
+});
