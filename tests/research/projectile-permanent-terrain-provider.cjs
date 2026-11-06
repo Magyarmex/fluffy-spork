@@ -12,7 +12,7 @@ function makePermanentTerrainProvider(game, dt) {
   const emptyFixture = { bullets: game.bullets, tanks: game.tanks, shapes: game.shapes,
     drones: game.drones, powerups: game.powerups, player: game.player,
     terrain: [], __novaTerrain: [] };
-  const base = makeOpenFieldProvider(emptyFixture, dt);
+  const base = makeOpenFieldProvider(emptyFixture, dt, { deferSharedEarliestTie: true });
   if (!base) return null;
   // A callback must never certify against walls changed after its snapshot.
   const terrainState = () => JSON.stringify(game.__novaTerrain.map(s =>
