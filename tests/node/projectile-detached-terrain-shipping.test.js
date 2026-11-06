@@ -80,3 +80,19 @@ test('detached first-hit query preserves an existing live Battlefield index and 
  assert.equal(original.stamp,1);
  assert.equal(g.__novaTerrain[0].__novaBattlefieldStamp,1);
 });
+
+test('detached pillar chronology distinguishes exact-face departure from inward entry',()=>{
+ const g=boot();g.__novaTerrain=[{id:-14,shape:'circle',x:0,y:0,r:5,solid:true,destructible:false}];
+ const base={...shot(),x:-5,y:0};
+ const outward=query(g,{...base,vx:-1000},.04);
+ const inward=query(g,{...base,vx:1000},.04);
+ const tangent=query(g,{...base,vx:0,vy:1000},.04);
+ assert.deepEqual(outward,{complete:true,time:null,reason:null});
+ assert.deepEqual(tangent,{complete:true,time:null,reason:null});
+ assert.deepEqual(inward,{complete:true,time:0,reason:null});
+});
+test('detached pillar chronology rejects embedded origins even when heading outward',()=>{
+ const g=boot();g.__novaTerrain=[{id:-15,shape:'circle',x:0,y:0,r:5,solid:true,destructible:false}];
+ const o=query(g,{...shot(),x:-4.999,y:0,vx:-1000},.04);
+ assert.deepEqual(o,{complete:true,time:0,reason:null});
+});
