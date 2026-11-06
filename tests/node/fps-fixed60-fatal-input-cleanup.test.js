@@ -40,7 +40,11 @@ function run(createPilot,mode){
  assert.ok(win.count()>0 && canvas.count()>0);
  pilot.start();
  now=1034;
- assert.throws(()=>callback(now),/failure/);
+ let primary;
+ try{callback(now)}catch(error){primary=error}
+ assert.ok(primary,'fatal callback must surface its original failure');
+ assert.equal(primary.message,mode==='update'?'update failure':'render failure');
+ if(mode==='cancel')assert.equal(primary.cleanupError?.message,'cancel failure');
  assert.equal(pilot.owner.started,false);
  assert.equal(pilot.capture.active,false);
  assert.equal(input.attached,true);
