@@ -10,7 +10,11 @@ function makeDetachedPermanentTerrainQuery(game) {
     for (let i = 0; i < game.__novaTerrain.length; i++) {
       if (!Object.hasOwn(game.__novaTerrain, i)) return null;
       const s = game.__novaTerrain[i];
-      if (!s || (s.shape !== 'circle' && s.shape !== 'rect') ||
+      if (!s || !['shape','x','y','solid','destructible'].every(k => Object.hasOwn(s,k)) ||
+          !(s.shape === 'circle' ? Object.hasOwn(s,'r') :
+            Object.hasOwn(s,'w') && Object.hasOwn(s,'h')) ||
+          (s.destructible === true && !Object.hasOwn(s,'hp')) ||
+          (s.shape !== 'circle' && s.shape !== 'rect') ||
           (s.destructible !== true && s.destructible !== false) ||
           (s.destructible === false && s.solid !== true) ||
           !['x','y'].every(k => Number.isFinite(s[k])) ||
