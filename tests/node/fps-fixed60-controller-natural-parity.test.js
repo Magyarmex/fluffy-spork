@@ -44,6 +44,11 @@ function run(cls,seed,fixed30){
     assert.equal(owner.droppedMs,0);
    }else for(let tick=0;tick<TICKS;tick++)g.update(1/60);
    return {hash:digest(physical(g)),draws:draws(),
+    droneBehaviorHash:digest(g.drones.map(d=>[d.id,d.ownerId,d.__novaPhase,
+     d.__novaCommitted,d.__novaTargetId,d.__novaRepairT])),
+    swarmHash:digest(p.__novaSwarm ? [p.__novaSwarm.active,
+     p.__novaSwarm.power,p.__novaSwarm.nodeX,p.__novaSwarm.nodeY,
+     p.__novaSwarm.angle,p.__novaSwarm.recallUntil] : []),
     droneCount:g.drones.length,
     playerDrones:g.drones.filter(d=>d.ownerId===p.id).length,
     playerHp:p.hp,playerScore:p.score};
