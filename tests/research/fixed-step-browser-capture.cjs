@@ -56,7 +56,9 @@ class BrowserInputCapture {
       let cleanupError;
       try{input.detach()}catch(secondary){cleanupError=secondary}
       try{input.attach(canvas)}catch(secondary){
-        if(!cleanupError)cleanupError=secondary;
+        // Failed reattachment is the most actionable cleanup failure:
+        // normal controls may still be unavailable.
+        cleanupError=secondary;
       }
       if(cleanupError && error && typeof error==='object'){
         try{error.cleanupError=cleanupError}catch(_ignored){}
