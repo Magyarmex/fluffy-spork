@@ -52,3 +52,11 @@ test('query failures abstain without touching live terrain', () => {
   assert.equal(query(g, shot(), .04).complete, false);
   assert.equal(g.__novaTerrain[0].x, 0);
 });
+
+test('unsupported shell and stale projectile cannot certify permanent-terrain precedence', () => {
+  const g = game([wall()]);
+  for (const invalid of [{ ...shot(), shell: true }, { ...shot(), dead: true },
+    { ...shot(), pen: 1 }, { ...shot(), kind: 'beam' }]) {
+    assert.equal(query(g, invalid, .04).complete, false);
+  }
+});
