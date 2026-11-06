@@ -195,3 +195,27 @@ test('bounded ordinary volley agrees with independent chronological event oracle
   }
   assert.ok(checked >= 450);
 });
+
+test('allied earlier geometric contacts cannot steal later hostile interceptions', () => {
+  function run(reverse) {
+    const g = boot();
+    const a = shot(1, 1, -20, 6000, 1);
+    const b = shot(2, 2, 0, 0, 1);
+    const c = shot(3, 3, 25, -6000, 1);
+    a.hp = a.maxHp = 3;
+    b.hp = b.maxHp = 2;
+    c.hp = c.maxHp = 1;
+    g.tankById = new Map([
+      [1, { id: 1, team: 'blue' }],
+      [2, { id: 2, team: 'blue' }],
+      [3, { id: 3, team: 'red' }]
+    ]);
+    g.areAllies = (x, y) => x.team === y.team;
+    g.bullets = reverse ? [c, b, a] : [a, b, c];
+    g.updateBullets(1 / 240);
+    return [a.hp, b.hp, c.hp, !!a.dead, !!b.dead, !!c.dead];
+  }
+  const forward = run(false), reversed = run(true);
+  assert.deepEqual(forward, reversed);
+  assert.deepEqual(forward, [3, 1, -1, false, false, true]);
+});
