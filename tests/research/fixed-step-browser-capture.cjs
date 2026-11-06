@@ -64,7 +64,14 @@ class BrowserInputCapture {
         game.destroy = this.destroyWrapper;
       }
     } catch (error) {
-      this.detach();
+      // A secondary teardown failure must not hide the listener registration
+      // error that caused capture activation to fail.
+      try { this.detach(); }
+      catch (cleanupError) {
+        if (error && typeof error === 'object') {
+          try { error.cleanupError = cleanupError; } catch (_ignored) {}
+        }
+      }
       throw error;
     }
   }
