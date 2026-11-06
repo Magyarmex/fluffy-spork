@@ -77,3 +77,15 @@ test('browser capture JSON is directly consumable by real RAF-owner replay',()=>
  assert.equal(report.captureProvenance.visibilityGuardClaimed,true);
  assert.equal(report.captureProvenance.gameplayActiveVerified,false);
 });
+
+test('custom recorder stop remains replayable without a false provenance certificate',()=>{
+ const {analyze}=require('../../scripts/fixed60-raf-trace-replay.cjs');
+ const h=harness(),c=h.window.__novaRafTraceCapture.create();
+ c.start();h.next(100);h.next(133);c.stop('operator-end');
+ const report=analyze(JSON.parse(JSON.stringify(c.snapshot())));
+ assert.equal(report.capture.reason,'operator-end');
+ assert.equal(report.captureProvenance.status,'unverified');
+ assert.equal(report.captureProvenance.visibilityGuardClaimed,true);
+ assert.equal(report.captureProvenance.gameplayActiveVerified,false);
+ assert.equal(report.results.length,3);
+});
