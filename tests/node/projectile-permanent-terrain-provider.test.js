@@ -252,3 +252,14 @@ test('terrain provider invalidates replaced terrain owner and first-hit method',
    assert.equal(result.certified.length,0);
  }
 });
+
+
+test('terrain provider rejects replacement of live bullet array after snapshot',()=>{
+ const g=fixture(.9),dt=.04;
+ const provider=makePermanentTerrainProvider(g,dt);
+ assert.equal(typeof provider,'function');
+ g.bullets=g.bullets.map(b=>({...b}));
+ const result=observeProjectilePairs(g,dt,provider);
+ assert.equal(result.incomplete,true);
+ assert.equal(result.certified.length,0);
+});
