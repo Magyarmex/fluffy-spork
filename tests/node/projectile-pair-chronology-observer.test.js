@@ -354,3 +354,57 @@ test('swept candidate budget does not suppress distant-endpoint crossings', () =
   assert.equal(r.certified.length, 1);
   assert.deepEqual([r.certified[0].i, r.certified[0].j], [30, 31]);
 });
+
+test('same-owner crowd cannot exhaust the expensive interception budget', () => {
+  const allied = Array.from({ length: 24 }, () => shot(7, 1000, 0, 1000));
+  const g = { bullets: [...allied, shot(1, -20, 1000), shot(2, 20, -1000)] };
+  let calls = 0;
+  const r = observeProjectilePairs(g, .05, () => { calls++; return verified(); });
+  assert.equal(r.incomplete, false);
+  assert.equal(r.certified.length, 1);
+  assert.deepEqual([r.certified[0].i, r.certified[0].j], [24, 25]);
+  assert.equal(calls, 1);
+  assert.equal(r.pairs, 325);
+});
+
+test('same-owner overlap alone is not a certified interception', () => {
+  const g = { bullets: Array.from({ length: 24 }, () => shot(7, 0, 0)) };
+  let calls = 0;
+  const r = observeProjectilePairs(g, .05, () => { calls++; return verified(); });
+  assert.equal(r.incomplete, false);
+  assert.equal(r.certified.length, 0);
+  assert.equal(calls, 0);
+  assert.equal(r.pairs, 276);
+});
+
+test('same-owner crowd preserves hostile first-contact timing across frame rates and order', () => {
+  const crowd = Array.from({ length: 24 }, () => shot(7, 1000, 0, 1000));
+  const a = shot(1, -20, 1000), b = shot(2, 20, -1000);
+  for (const fps of [30, 60, 120, 240]) {
+    for (const bullets of [[...crowd, a, b], [b, ...crowd, a]]) {
+      const before = JSON.stringify(bullets);
+      let calls = 0;
+      const r = observeProjectilePairs({ bullets }, 1 / fps,
+        () => { calls++; return verified(); });
+      const shouldHit = fps <= 60;
+      assert.equal(r.incomplete, false, `fps=${fps}`);
+      assert.equal(r.certified.length, shouldHit ? 1 : 0, `fps=${fps}`);
+      assert.equal(calls, shouldHit ? 1 : 0, `fps=${fps}`);
+      if (shouldHit) assert.ok(Math.abs(r.certified[0].time - .01625) < 1e-10);
+      assert.equal(JSON.stringify(bullets), before);
+    }
+  }
+});
+
+test('invalid owner identity still fails closed before same-owner pruning', () => {
+  const a = shot(1, -20, 1000), b = shot(2, 20, -1000);
+  a.ownerId = NaN;
+  b.ownerId = NaN;
+  let calls = 0;
+  const r = observeProjectilePairs({ bullets: [a, b] }, .05,
+    () => { calls++; return verified(); });
+  assert.equal(r.incomplete, true);
+  assert.equal(r.reason, 'unsupported-projectile-present');
+  assert.equal(r.certified.length, 0);
+  assert.equal(calls, 0);
+});

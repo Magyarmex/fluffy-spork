@@ -84,6 +84,12 @@ function observeProjectilePairs(game, dt, eventsForPair) {
   for (let a = 0; a < active.length; a++) for (let b = a + 1; b < active.length; b++) {
     const i = active[a], j = active[b];
     result.pairs++;
+    // A projectile cannot intercept another shot from its own owner.
+    // Exclude those pairs before consuming the expensive event budget;
+    // the first-contact oracle already enforces this allegiance invariant.
+    if (shots[i].ownerId === shots[j].ownerId) {
+      result.abstained++; continue;
+    }
     if (definitelyDisjoint(shots[i], shots[j], dt)) {
       result.abstained++; continue;
     }
