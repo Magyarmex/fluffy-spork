@@ -454,3 +454,31 @@ test('mutual TTL preflight abstains when third projectile can reach either parti
   g.updateBullets(1/30);
   assert.deepEqual(hits,[],'third projectile must not be silently ignored');
 });
+
+test('remote-shot extension refuses special, newborn, extra-expiring and dense volleys',()=>{
+  for(const mutate of [
+    s=>{s.shell=true;},
+    s=>{s.beam=true;},
+    s=>{s.splash=true;},
+    s=>{s.__novaRail=true;},
+    s=>{s.ttl=.005;},
+    s=>{s.id=4;},
+    s=>{s.vx=NaN;},
+    s=>{s.r=NaN;}
+  ]){
+    const {g,a,b,hits}=ttlFixture();
+    const third=shot(3,3,600,0,1);
+    third.y=600;third.baseDmg=third.dmg;
+    mutate(third);
+    g.bullets=[a,b,third];
+    g.updateBullets(1/30);
+    assert.deepEqual(hits,[],'unsupported third-party projectile must veto');
+  }
+  const {g,a,b,hits}=ttlFixture();
+  g.bullets=[a,b,...Array.from({length:11},(_,i)=>{
+    const s=shot(10+i,10+i,700+i*20,0,1);
+    s.y=700;s.baseDmg=s.dmg;return s;
+  })];
+  g.updateBullets(1/30);
+  assert.deepEqual(hits,[],'work bound must not be exceeded');
+});
