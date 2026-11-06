@@ -1,6 +1,12 @@
 'use strict';
 // Research-only geometry: one detached Battlefield index can serve multiple
 // projectile queries. The live Game and its spatial hash are never queried.
+// Spreading terrain drops inherited/non-enumerable fields and can invoke getters.
+// Only stable, enumerable own data fields may authorize a clear-path witness.
+function ownData(s, key) {
+  const d = Object.getOwnPropertyDescriptor(s, key);
+  return !!d && d.enumerable === true && Object.hasOwn(d, 'value');
+}
 function makeDetachedPermanentTerrainQuery(game) {
   if (!game || typeof game.firstTerrainHit !== 'function' ||
       !Array.isArray(game.__novaTerrain) || game.__novaTerrain.length > 256) return null;
@@ -10,10 +16,10 @@ function makeDetachedPermanentTerrainQuery(game) {
     for (let i = 0; i < game.__novaTerrain.length; i++) {
       if (!Object.hasOwn(game.__novaTerrain, i)) return null;
       const s = game.__novaTerrain[i];
-      if (!s || !['shape','x','y','solid','destructible'].every(k => Object.hasOwn(s,k)) ||
-          !(s.shape === 'circle' ? Object.hasOwn(s,'r') :
-            Object.hasOwn(s,'w') && Object.hasOwn(s,'h')) ||
-          (s.destructible === true && !Object.hasOwn(s,'hp')) ||
+      if (!s || !['shape','x','y','solid','destructible'].every(k => ownData(s,k)) ||
+          !(s.shape === 'circle' ? ownData(s,'r') :
+            ownData(s,'w') && ownData(s,'h')) ||
+          (s.destructible === true && !ownData(s,'hp')) ||
           (s.shape !== 'circle' && s.shape !== 'rect') ||
           (s.destructible !== true && s.destructible !== false) ||
           (s.destructible === false && s.solid !== true) ||
