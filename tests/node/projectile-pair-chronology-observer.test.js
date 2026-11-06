@@ -395,3 +395,16 @@ test('same-owner crowd preserves hostile first-contact timing across frame rates
     }
   }
 });
+
+test('invalid owner identity still fails closed before same-owner pruning', () => {
+  const a = shot(1, -20, 1000), b = shot(2, 20, -1000);
+  a.ownerId = NaN;
+  b.ownerId = NaN;
+  let calls = 0;
+  const r = observeProjectilePairs({ bullets: [a, b] }, .05,
+    () => { calls++; return verified(); });
+  assert.equal(r.incomplete, true);
+  assert.equal(r.reason, 'unsupported-projectile-present');
+  assert.equal(r.certified.length, 0);
+  assert.equal(calls, 0);
+});
