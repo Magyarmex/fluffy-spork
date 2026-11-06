@@ -34,9 +34,13 @@ function makeOpenFieldProvider(game, dt) {
   // allowing an unrelated later pair to appear first: veto the whole frame.
   const allTimes = [];
   for (let i=0;i<n;i++) for (let j=i+1;j<n;j++)
-    if (times[i][j]!==null) allTimes.push(times[i][j]);
-  allTimes.sort((a,b)=>a-b);
-  if (allTimes.length>1 && allTimes[1]<=allTimes[0]+1e-9) return null;
+    if (times[i][j]!==null) allTimes.push({i,j,t:times[i][j]});
+  allTimes.sort((a,b)=>a.t-b.t);
+  if (allTimes.length>1 && allTimes[1].t<=allTimes[0].t+1e-9) {
+    const first=allTimes[0], second=allTimes[1];
+    if (first.i===second.i || first.i===second.j ||
+        first.j===second.i || first.j===second.j) return null;
+  }
   return (a,b,i,j,step) => {
     if (step!==dt || !Number.isInteger(i) || !Number.isInteger(j) ||
         i<0 || j<=i || j>=n || !a || !b) return null;
