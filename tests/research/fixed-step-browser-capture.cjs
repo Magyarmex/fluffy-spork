@@ -64,23 +64,38 @@ class BrowserInputCapture {
         game.destroy = this.destroyWrapper;
       }
     } catch (error) {
-      this.detach();
+      // A secondary teardown failure must not hide the listener registration
+      // error that caused capture activation to fail.
+      try { this.detach(); }
+      catch (cleanupError) {
+        if (error && typeof error === 'object') {
+          try { error.cleanupError = cleanupError; } catch (_ignored) {}
+        }
+      }
       throw error;
     }
   }
   detach() {
     if (!this.active) return;
     this.active = false;
-    for (const [target,type,fn] of this.listeners.reverse())
-      target.removeEventListener(type,fn);
+    let failure;
+    for (const [target,type,fn] of this.listeners.reverse()) {
+      try { target.removeEventListener(type,fn); }
+      catch (error) { if (!failure) failure = error; }
+    }
     this.listeners.length = 0;
     if (this.game && this.game.destroy === this.destroyWrapper) {
       if (this.destroyHadOwn) this.game.destroy = this.originalDestroy;
       else delete this.game.destroy;
     }
-    this.timeline.reset();
+    // Reattach production input even when a hostile DOM listener or a
+    // game/UI reset callback fails. Never strand a live game without controls.
+    try { this.timeline.reset(); }
+    catch (error) { if (!failure) failure = error; }
     this.input.canvas = null;
-    this.input.attach(this.canvas); // restore original production event owners
+    try { this.input.attach(this.canvas); }
+    catch (error) { if (!failure) failure = error; }
+    if (failure) throw failure;
   }
 }
 module.exports = {BrowserInputCapture};
