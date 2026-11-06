@@ -80,3 +80,59 @@ test('detached first-hit query preserves an existing live Battlefield index and 
  assert.equal(original.stamp,1);
  assert.equal(g.__novaTerrain[0].__novaBattlefieldStamp,1);
 });
+
+test('detached pillar chronology distinguishes exact-face departure from inward entry',()=>{
+ const g=boot();g.__novaTerrain=[{id:-14,shape:'circle',x:0,y:0,r:5,solid:true,destructible:false}];
+ const base={...shot(),x:-5,y:0};
+ const outward=query(g,{...base,vx:-1000},.04);
+ const inward=query(g,{...base,vx:1000},.04);
+ const tangent=query(g,{...base,vx:0,vy:1000},.04);
+ assert.deepEqual(outward,{complete:true,time:null,reason:null});
+ assert.deepEqual(tangent,{complete:true,time:null,reason:null});
+ assert.deepEqual(inward,{complete:true,time:0,reason:null});
+});
+test('detached pillar chronology rejects embedded origins even when heading outward',()=>{
+ const g=boot();g.__novaTerrain=[{id:-15,shape:'circle',x:0,y:0,r:5,solid:true,destructible:false}];
+ const o=query(g,{...shot(),x:-4.999,y:0,vx:-1000},.04);
+ assert.deepEqual(o,{complete:true,time:0,reason:null});
+});
+
+test('actual Battlefield wall-blocked early pair leaves later clear projectile contact',()=>{
+ const {makePermanentTerrainProvider}=require('../research/projectile-permanent-terrain-provider.cjs');
+ const {observeProjectilePairs}=require('../research/projectile-pair-chronology-observer.cjs');
+ const g=boot(),dt=.04;
+ const bullet=(ownerId,x,vx)=>({kind:'bullet',dead:false,shell:false,beam:false,
+   pen:0,hits:0,ttl:.42,r:3,ownerId,x,y:0,vx,vy:0});
+ g.__novaResearchHostilityFixture=true;
+ g.player=null;g.powerups=[];g.terrain=[];
+ g.bullets=[bullet(1,-17.5,1000),bullet(2,0,0),bullet(3,27.5,-1000)];
+ g.__novaTerrain=[{...rect(),x:-12,w:2}];
+ const provider=makePermanentTerrainProvider(g,dt);
+ assert.equal(typeof provider,'function');
+ const result=observeProjectilePairs(g,dt,provider);
+ assert.equal(result.incomplete,false);
+ assert.equal(result.certified.length,1);
+ assert.deepEqual([result.certified[0].i,result.certified[0].j],[1,2]);
+ assert.ok(Math.abs(result.certified[0].time-.02)<1e-9);
+});
+
+test('wall-qualified first contact is invariant to projectile storage order',()=>{
+ const {makePermanentTerrainProvider}=require('../research/projectile-permanent-terrain-provider.cjs');
+ const {observeProjectilePairs}=require('../research/projectile-pair-chronology-observer.cjs');
+ for(const order of [[0,1,2],[2,1,0],[1,0,2],[2,0,1]]) {
+   const g=boot(),dt=.04;
+   const bullet=(ownerId,x,vx)=>({kind:'bullet',dead:false,shell:false,beam:false,
+     pen:0,hits:0,ttl:.42,r:3,ownerId,x,y:0,vx,vy:0});
+   const shots=[bullet(1,-17.5,1000),bullet(2,0,0),bullet(3,27.5,-1000)];
+   g.__novaResearchHostilityFixture=true;g.player=null;g.powerups=[];g.terrain=[];
+   g.bullets=order.map(i=>shots[i]);g.__novaTerrain=[{...rect(),x:-12,w:2}];
+   const provider=makePermanentTerrainProvider(g,dt);
+   assert.equal(typeof provider,'function');
+   const result=observeProjectilePairs(g,dt,provider);
+   assert.equal(result.incomplete,false);
+   assert.equal(result.certified.length,1);
+   const hit=result.certified[0];
+   assert.deepEqual([g.bullets[hit.i].ownerId,g.bullets[hit.j].ownerId].sort(),[2,3]);
+   assert.ok(Math.abs(hit.time-.02)<1e-9);
+ }
+});
