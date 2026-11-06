@@ -59,3 +59,12 @@ test('actual Battlefield inert destroyed cover cannot block detached projectile'
  assert.equal(JSON.stringify(g.__novaTerrain),before);
  assert.equal(Object.hasOwn(g,'__novaBattlefieldIndex'),false);
 });
+
+test('live spatial-hash stamp 1 must not hide a permanent wall in a fresh detached index',()=>{
+ const g=boot();g.__novaTerrain=[{...rect(),__novaBattlefieldStamp:1}];
+ const before=JSON.stringify(g.__novaTerrain);
+ const o=query(g,shot(),.04);
+ assert.equal(o.complete,true);
+ assert.ok(Math.abs(o.time-.01665)<1e-10);
+ assert.equal(JSON.stringify(g.__novaTerrain),before);
+});
