@@ -74,3 +74,19 @@ test('earlier wall-blocked projectile contact cannot veto later clear hostile in
  assert.equal(r.certified[0].j,2);
  assert.ok(Math.abs(r.certified[0].time-.02)<1e-9);
 });
+
+test('wall resolves geometric shared-projectile tie before valid-contact arbitration',()=>{
+ const g=fixture(null),dt=.04;
+ g.bullets=[shot(1,-17.5,1000),shot(2,0,0),shot(3,17.5,-1000)];
+ g.__novaTerrain=[{...wall(),x:-12,w:2}];
+ g.firstTerrainHit=function(ax){
+   return ax===-17.5?{solid:this.__novaTerrain[0],hit:{t:.08}}:null;
+ };
+ const provider=makePermanentTerrainProvider(g,dt);
+ assert.equal(typeof provider,'function');
+ const r=observeProjectilePairs(g,dt,provider);
+ assert.equal(r.incomplete,false);
+ assert.equal(r.certified.length,1);
+ assert.deepEqual([r.certified[0].i,r.certified[0].j],[1,2]);
+ assert.ok(Math.abs(r.certified[0].time-.01)<1e-9);
+});
