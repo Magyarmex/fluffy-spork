@@ -66,3 +66,14 @@ test('shared-shot simultaneous earliest contacts veto unrelated later certificat
   assert.equal(r.incomplete,true);
   assert.equal(r.certified.length,0);
 });
+
+test('third earliest tied pair sharing a shot also vetoes the frame', () => {
+  const game=fixture([shot(1,0,0,0),shot(2,0,0,0),
+    shot(3,0,0,100),shot(4,0,0,100),shot(5,0,0,100),
+    shot(6,-20,1000,200),shot(7,20,-1000,200)]);
+  const dt=.05;
+  assert.equal(makeOpenFieldProvider(game,dt),null);
+  const r=observeProjectilePairs(game,dt,makeOpenFieldProvider(game,dt));
+  assert.equal(r.certified.length,0);
+  assert.equal(r.incomplete,true);
+});
