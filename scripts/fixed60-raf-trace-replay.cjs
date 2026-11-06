@@ -58,6 +58,7 @@ function replay(intervals,maxSteps=2){
 function analyze(data){
   const intervals=Array.isArray(data)?data:data&&data.frameIntervalsMs;
   return {researchOnly:true,source:'actual FixedStepRafOwner',
+    capture:Array.isArray(data)?null:(data&&data.capture||null),
     results:[2,3,4].map(cap=>replay(intervals,cap))};
 }
 if(require.main===module){
