@@ -3095,24 +3095,28 @@ function certifiedMultiShotCoverPriority(g,dt){
    var tank=g.tanks[ti];if(!tank||!tank.alive)continue;
    var def=CLASSES[tank.cls];
    if(!def||!(Number.isFinite(def.size)&&def.size>0)||
-      tank.__novaSweepMoveTime!==g.time)return false;
+      tank.__novaSweepMoveTime!==g.time||
+      Math.hypot(tank.x-tank.__novaSweepPrevX,
+       tank.y-tank.__novaSweepPrevY)>320)return false;
    for(var pi=0;pi<2;pi++){
     if(tank.id===reach[pi].s.ownerId)continue;
     if(overlaps(reach[pi],tank.__novaSweepPrevX,
        tank.__novaSweepPrevY,tank.x,tank.y,
-       reach[pi].s.r+def.size+8))return false;
+       reach[pi].s.r+def.size+320))return false;
    }
   }
   /* The player may be separately referenced by an older core owner. */
   if(g.player&&g.player.alive){
    var pl=g.player,pdef=CLASSES[pl.cls];
    if(!pdef||!(Number.isFinite(pdef.size)&&pdef.size>0)||
-      pl.__novaSweepMoveTime!==g.time)return false;
+      pl.__novaSweepMoveTime!==g.time||
+      Math.hypot(pl.x-pl.__novaSweepPrevX,
+       pl.y-pl.__novaSweepPrevY)>320)return false;
    for(var qi=0;qi<2;qi++){
     if(pl.id===reach[qi].s.ownerId)continue;
     if(overlaps(reach[qi],pl.__novaSweepPrevX,
       pl.__novaSweepPrevY,pl.x,pl.y,
-      reach[qi].s.r+pdef.size+8))return false;
+      reach[qi].s.r+pdef.size+320))return false;
    }
   }
   if(g.shapes.length&&!g.__novaShapeSweepActive)return false;
@@ -3123,19 +3127,21 @@ function certifiedMultiShotCoverPriority(g,dt){
       !(sh.r>0))return false;
    for(var qi=0;qi<2;qi++)
     if(overlaps(reach[qi],sh.__novaShapeSweepPrevX,
-      sh.__novaShapeSweepPrevY,sh.x,sh.y,reach[qi].s.r+sh.r+8))
+      sh.__novaShapeSweepPrevY,sh.x,sh.y,reach[qi].s.r+sh.r+120))
      return false;
   }
   for(var di=0;di<g.drones.length;di++){
    var drone=g.drones[di];if(!drone||!(drone.hp>0))continue;
    if(!g.__novaShapeSweepActive||
       drone.__novaChronoDroneEpoch!==g.__novaShapeSweepEpoch||
-      !Number.isFinite(drone.r)||!(drone.r>0))return false;
+      !Number.isFinite(drone.r)||!(drone.r>0)||
+      Math.hypot(drone.x-drone.__novaChronoDronePrevX,
+       drone.y-drone.__novaChronoDronePrevY)>160)return false;
    for(var qi=0;qi<2;qi++){
     if(drone.ownerId===reach[qi].s.ownerId)continue;
     if(overlaps(reach[qi],drone.__novaChronoDronePrevX,
       drone.__novaChronoDronePrevY,drone.x,drone.y,
-      reach[qi].s.r+drone.r+40))return false;
+      reach[qi].s.r+drone.r+160))return false;
    }
   }
   /* Core's hash can retain bodies already removed from live arrays.
