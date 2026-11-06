@@ -85,6 +85,7 @@ test('capture provenance distinguishes guarded timing from verified gameplay',()
    {...consistent,frames:2},
    {...consistent,durationMs:65},
    {...consistent,reason:'unexpected'},
+   {...consistent,reason:'start-error'},
    {...consistent,frames:'3'},
    {...consistent,durationMs:Infinity},
  ]){
