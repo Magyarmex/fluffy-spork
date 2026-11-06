@@ -77,3 +77,9 @@ test('third earliest tied pair sharing a shot also vetoes the frame', () => {
   assert.equal(r.certified.length,0);
   assert.equal(r.incomplete,true);
 });
+
+test('sparse projectile arrays cannot be mistaken for complete context', () => {
+  const bullets=[shot(1,-20,1000),shot(2,0,0),shot(3,20,-1000)];
+  delete bullets[1];
+  assert.equal(makeOpenFieldProvider(fixture(bullets),.05),null);
+});
