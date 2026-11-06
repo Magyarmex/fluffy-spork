@@ -3034,14 +3034,14 @@ function certifiedMultiShotCoverPriority(g,dt){
   function ordinary(s){
    return s&&s.dead===false&&s.kind==='bullet'&&
     s.shell===false&&s.beam===false&&!s.splash&&!s.__v17Cannon&&
-    !s.__novaRail&&s.pen===0&&(s.hits||0)===0&&
+    !s.__novaRail&&s.pen===0&&Number.isFinite(s.hits)&&s.hits===0&&
     Number.isFinite(s.hp)&&s.hp>0&&Number.isFinite(s.maxHp)&&
     s.maxHp>=s.hp&&Number.isFinite(s.ttl)&&s.ttl>0&&s.ttl<=dt&&
     Number.isFinite(s.r)&&s.r>0&&
     [s.x,s.y,s.vx,s.vy,s.ownerId].every(Number.isFinite);
   }
   if(!ordinary(a)||!ordinary(b)||a.ownerId===b.ownerId||
-     a.hp!==b.hp)return false;
+     a.hp!==b.hp||a.id===b.id)return false;
   /* Projectiles fired later during this tick cannot be backdated to its
    * beginning. Reuse the actual Game.update frame-start ID witness. */
   var ceiling=g.__novaFrameStartBulletIdCeiling;
@@ -3056,7 +3056,7 @@ function certifiedMultiShotCoverPriority(g,dt){
   var oa=getOwner(a),ob=getOwner(b);
   if(!oa||!ob)return false;
   if(typeof g.areAllies==='function'){
-   if(g.areAllies(oa,ob))return false;
+   try{if(g.areAllies(oa,ob))return false;}catch(_e){return false;}
   }else{
    var keys=['teamId','team','factionId','faction','side'],known=false;
    for(var k=0;k<keys.length;k++)if(oa[keys[k]]!=null&&ob[keys[k]]!=null){
