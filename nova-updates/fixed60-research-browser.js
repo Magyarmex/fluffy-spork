@@ -404,11 +404,12 @@ class FixedStepRafOwner {
       throw Error('invalid fixed-step start time');
     this._generation++;this.started=true;this.lastMs=at;
     this._awaitingForwardFrame=true;this.simAtSec=(at-this.bridge.startMs)/1000;
-    this.timeline.reset();this.timeline.tickOrigin=this.simAtSec;
-    this.timeline.consumeThrough(this.simAtSec);
-    this.paused=!!this.game.paused;
-    try{this.game.sfx.startMusic()}
-    catch(error){
+    try{
+      this.timeline.reset();this.timeline.tickOrigin=this.simAtSec;
+      this.timeline.consumeThrough(this.simAtSec);
+      this.paused=!!this.game.paused;
+      this.game.sfx.startMusic();
+    }catch(error){
       this.started=false;
       try{this.timeline.reset()}catch(cleanupError){
         if(error && typeof error==='object'){
