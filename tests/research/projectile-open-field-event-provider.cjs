@@ -17,6 +17,8 @@ function makeOpenFieldProvider(game, dt) {
   // not a live Game whose unenumerated walls or bodies might be missed.
   let shots;
   try {
+    for (let i=0;i<game.bullets.length;i++)
+      if (!Object.hasOwn(game.bullets,i)) throw Error('missing projectile slot');
     shots = game.bullets.map(s => {
       if (!s || s.dead!==false) throw Error('invalid active shot');
       const copy = {};
