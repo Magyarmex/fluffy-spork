@@ -29,7 +29,17 @@ function makePermanentTerrainProvider(game, dt) {
   // permanent wall stops one of their participants first. Build the competing
   // event ledger using terrain-qualified contact times, not the open-field
   // ledger, or an impossible earlier contact can hide a later real one.
-  const shots = game.bullets.map(s => ({ ...s }));
+  // Snapshot only the immutable fields used by the contact oracle. Avoid
+  // copying unrelated bullet payloads or invoking unrelated property getters.
+  let shots;
+  try {
+    shots = game.bullets.map(s => Object.freeze({
+      kind: s.kind, dead: s.dead, shell: s.shell, beam: s.beam,
+      splash: s.splash, __v17Cannon: s.__v17Cannon, __novaRail: s.__novaRail,
+      pen: s.pen, hits: s.hits, x: s.x, y: s.y, vx: s.vx, vy: s.vy,
+      ttl: s.ttl, r: s.r, ownerId: s.ownerId
+    }));
+  } catch (_) { return null; }
   const times = Array.from({ length: shots.length }, () => Array(shots.length).fill(null));
   for (let i = 0; i < shots.length; i++) for (let j = i + 1; j < shots.length; j++) {
     const context = { complete: true, allied: false, unscanned: false,
