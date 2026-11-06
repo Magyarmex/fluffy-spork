@@ -209,3 +209,19 @@ test('composed Game warns when queued mouse release shares held touch id',()=>{
     assert.equal(g.input.firing,false);
   }finally{owner.stop();g.destroy()}
 });
+
+test('pen-owned stick release suppresses false reset notice, unlike mouse release',()=>{
+  for(const kind of ['pointerup','pointercancel']){
+    const s=fixture();s.owner.start();
+    try{
+      s.timeline.push(.005,'pointerdown',{pointerId:7,pointerType:'pen',
+        clientX:100,clientY:100,button:0,buttons:1});
+      s.frame(1017);
+      assert.equal(s.input.move.active,true);
+      s.timeline.push(.020,kind,{pointerId:7,pointerType:'pen'});
+      s.frame(1137);
+      assert.equal(s.notices.length,0,'genuine pen release is intentional');
+      assert.equal(s.input.move.active,false);
+    }finally{s.owner.stop()}
+  }
+});
