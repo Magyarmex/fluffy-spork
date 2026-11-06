@@ -225,3 +225,24 @@ test('pen-owned stick release suppresses false reset notice, unlike mouse releas
     }finally{s.owner.stop()}
   }
 });
+
+test('unknown non-mouse pointer type follows production stick release semantics',()=>{
+  const s=fixture();s.owner.start();
+  try{
+    s.down(1005);s.frame(1017);
+    s.timeline.push(.020,'pointerup',{pointerId:7,pointerType:''});
+    s.frame(1137);
+    assert.equal(s.notices.length,0,'Input.pu releases any non-mouse pointer');
+    assert.equal(s.input.move.active,false);
+  }finally{s.owner.stop()}
+});
+test('missing pointer type cannot masquerade as a confirmed touch release',()=>{
+  const s=fixture();s.owner.start();
+  try{
+    s.down(1005);s.frame(1017);
+    s.timeline.push(.020,'pointerup',{pointerId:7});
+    s.frame(1137);
+    assert.equal(s.notices.length,1,'incomplete metadata is not proof of release');
+    assert.equal(s.input.move.active,false);
+  }finally{s.owner.stop()}
+});
