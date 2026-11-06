@@ -20,9 +20,17 @@ function trial(seed,mode,fixed30){
   p.spawnShieldT=20;
   g.status='playing';g.paused=false;
   let now=1000,callback=null,owner,ordinary=0,other=0;
+  let inBulletUpdate=false;
+  const updateBullets=g.updateBullets;
+  g.updateBullets=function(){
+   const was=inBulletUpdate;inBulletUpdate=true;
+   try{return updateBullets.apply(this,arguments);}
+   finally{inBulletUpdate=was;}
+  };
   const add=g.addParticles;
   g.addParticles=function(x,y,color,n,speed,kind){
-   if(speed===20&&kind==='glow'){
+   // Never suppress another system's glow with the same particle signature.
+   if(inBulletUpdate&&speed===20&&kind==='glow'){
     ordinary+=n;
     if(mode==='suppress-trails')return;
    }else other+=n;
