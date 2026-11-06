@@ -72,9 +72,11 @@ function makeOpenFieldProvider(game, dt, options) {
         !['tanks','shapes','drones','terrain'].every(key =>
           Array.isArray(game[key]) && game[key].length === 0)) return null;
     for (let k=0;k<n;k++) {
-      if (!Object.hasOwn(game.bullets,k) || !game.bullets[k]) return null;
+      if (!Object.hasOwn(game.bullets,k)) return null;
+      const current = game.bullets[k], original = shots[k];
+      if (!current) return null;
       for (const key of FIELDS)
-        if (!Object.is(game.bullets[k][key],shots[k][key])) return null;
+        if (!Object.is(current[key],original[key])) return null;
     }
     for (const key of FIELDS)
       if (!Object.is(a[key],shots[i][key]) ||
