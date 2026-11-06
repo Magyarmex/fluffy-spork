@@ -148,7 +148,7 @@ test('composed Game refuses open-field certificate when terrain is present', () 
 for (const fps of [30, 60, 120, 240]) {
   test('composed Game ignores same-owner crowd before hostile interception at ' + fps + 'Hz', () => {
     const g = boot();
-    const crowd = Array.from({ length: 24 }, (_, i) => {
+    const crowd = Array.from({ length: 30 }, (_, i) => {
       const s = shot(100 + i, 7, 1000, 0, .42);
       s.y = 1000;
       return s;
@@ -164,7 +164,7 @@ for (const fps of [30, 60, 120, 240]) {
     const observed = observeProjectilePairs(g, dt, provider);
     assert.equal(observed.incomplete, false);
     assert.equal(observed.certified.length, 1);
-    assert.deepEqual([observed.certified[0].i, observed.certified[0].j], [24, 25]);
+    assert.deepEqual([observed.certified[0].i, observed.certified[0].j], [30, 31]);
     assert.ok(Math.abs(observed.certified[0].time - 32.5 / 12000) < 1e-12);
     assert.equal(JSON.stringify(g.bullets), before);
     assert.doesNotThrow(() => g.updateBullets(dt));
