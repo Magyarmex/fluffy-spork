@@ -62,3 +62,15 @@ test('host RAF scheduling failure cannot strand an active recorder',()=>{
  assert.equal(c.active,false);
  assert.equal(c.snapshot().capture.reason,'raf-error');
 });
+
+test('browser capture JSON is directly consumable by real RAF-owner replay',()=>{
+ const {analyze}=require('../../scripts/fixed60-raf-trace-replay.cjs');
+ const h=harness(),c=h.window.__novaRafTraceCapture.create({maxFrames:3});
+ c.start();
+ for(const t of [100,100+1000/30,100+2000/30,200])h.next(t);
+ const capture=c.snapshot(),report=analyze(JSON.parse(JSON.stringify(capture)));
+ assert.equal(report.capture.reason,'limit');
+ assert.equal(report.results[0].frames,3);
+ assert.equal(report.results[0].simulatedTicks,6);
+ assert.equal(report.results[0].droppedMs,0);
+});
