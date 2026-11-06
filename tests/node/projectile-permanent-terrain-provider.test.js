@@ -31,3 +31,13 @@ test('unmarked live Game is not treated as a hostile-owner fixture',()=>{
  const g=fixture(.9);delete g.__novaResearchHostilityFixture;
  assert.equal(makePermanentTerrainProvider(g,.04),null);
 });
+
+test('provider rejects terrain that changes between snapshot and certificate',()=>{
+ const g=fixture(.9),dt=.04;
+ const provider=makePermanentTerrainProvider(g,dt);
+ assert.equal(typeof provider,'function');
+ g.__novaTerrain[0].x=7;
+ const r=observeProjectilePairs(g,dt,provider);
+ assert.equal(r.incomplete,true);
+ assert.equal(r.certified.length,0);
+});
