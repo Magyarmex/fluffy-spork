@@ -31,3 +31,17 @@ test('steady 30Hz trace reaches native60 tick budget without dropping time',()=>
   assert.equal(result.remainingBacklogMs,0);
   assert.equal(result.catchupFrames,0);
 });
+
+test('phase reversal is a negative control, not an assumed universal backlog',()=>{
+  const reversed=Array.from({length:240},(_,i)=>i%2===0?7000/120:1000/120);
+  const result=replay(reversed,2);
+  assert.equal(result.simulatedTicks,480);
+  assert.equal(result.droppedMs,0);
+  assert.equal(result.remainingBacklogMs,0);
+});
+test('foreground RAF stall is accounted separately from queued backlog',()=>{
+  const result=replay([1000/30,150,1000/30],2);
+  assert.equal(result.droppedFrames,1);
+  assert.ok(result.droppedMs>0);
+  assert.ok(result.simulatedTicks>0);
+});
