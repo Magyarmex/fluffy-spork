@@ -74,7 +74,7 @@ function captureProvenance(intervals,capture){
     Math.abs(capture.durationMs-total)<=0.01&&
     typeof capture.reason==='string'&&
     ['running','manual','hidden','limit','invalid-timestamp','nonmonotonic',
-     'raf-error','start-error'].includes(capture.reason);
+     'raf-error'].includes(capture.reason);
   return {status:consistent?(capture.reason==='running'?'partial':'consistent'):'inconsistent',
     visibilityGuardClaimed:capture.foregroundOnly===true,
     gameplayActiveVerified:false};
