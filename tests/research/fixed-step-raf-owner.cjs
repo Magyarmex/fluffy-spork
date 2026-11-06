@@ -92,7 +92,15 @@ class FixedStepRafOwner {
       this.game.setPaused=this.pauseWrapper;
     }
     try{this.schedule()}
-    catch(error){this.stop();throw error}
+    catch(error){
+      // Preserve the original RAF request failure if teardown also fails.
+      try{this.stop()}catch(cleanupError){
+        if(error && typeof error==='object'){
+          try{error.cleanupError=cleanupError}catch(_ignored){}
+        }
+      }
+      throw error;
+    }
   }
   transition(paused,at){
     if(!Number.isFinite(at)||at<this.lastMs-EPS)throw Error('invalid pause clock');
