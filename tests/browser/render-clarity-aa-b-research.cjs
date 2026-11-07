@@ -1,13 +1,17 @@
 'use strict';
 // Opt-in research only: real shipping Chromium Render clarity A/A/B.
+// NOVA_TRAIL_CAUSAL=1 instead runs matched-start ordinary-glow A/A/B;
+// default clarity measurements remain free of extra particle wrappers.
 // Not a fixed60 test, matched-world comparison, Android benchmark, or input-latency gate.
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {chromium}=require('playwright');
 const {injectBattlefieldSeed}=require('../research/battlefield-layout-fixture.cjs');
 // Six-arm ABBA-like order limits linear run-order bias (mean index differs by 1/3 phase).
-const phases=[100,65,65,100,65,100];
-const viewports=[{name:'desktop',width:1280,height:800},{name:'mobile',width:320,height:640}];
+const trailMode=process.env.NOVA_TRAIL_CAUSAL==='1';
+const phases=trailMode?[100,100,100,100,100,100]:[100,65,65,100,65,100];
+const viewports=trailMode?[{name:'desktop',width:1280,height:800}]:
+ [{name:'desktop',width:1280,height:800},{name:'mobile',width:320,height:640}];
 const pct=(xs,p)=>{const s=[...xs].sort((a,b)=>a-b);return s[Math.ceil(s.length*p)-1];};
 // Opt-in, bounded DevTools trace of one real composed combat phase.
 // Chrome trace events are inclusive: category totals must not be added together.
@@ -63,7 +67,8 @@ async function stopTrace(cdp,outputPath){
   warning:'Inclusive main-thread trace event durations overlap; never sum categories as exclusive CPU time.'};
 }
 async function measure(browser,viewport,scale,index){
- const layoutFixture=process.env.NOVA_RESEARCH_LAYOUT_SEED==='1';
+ const layoutFixture=process.env.NOVA_RESEARCH_LAYOUT_SEED==='1'||trailMode;
+ const suppressOrdinaryTrails=trailMode&&[1,2,4].includes(index);
  const layoutSeed=0x12345678;
  const context=await browser.newContext({viewport:{width:viewport.width,height:viewport.height},
   deviceScaleFactor:2,isMobile:viewport.name==='mobile',hasTouch:viewport.name==='mobile',
@@ -76,7 +81,9 @@ async function measure(browser,viewport,scale,index){
   layoutIntercepts++;
   await route.fulfill({response,body:patched});
  });
- await context.addInitScript(({scale,layoutFixture})=>{
+ await context.addInitScript(({scale,layoutFixture,trailMode,suppressOrdinaryTrails})=>{
+  window.__novaTrailResearchMode=trailMode;
+  window.__novaTrailResearchSuppress=suppressOrdinaryTrails;
   localStorage.setItem('novatanks_pilot_settings_v1',JSON.stringify({renderScale:scale}));
   if(layoutFixture){
    // Research-only deterministic global RNG for initial-world equivalence
@@ -86,7 +93,7 @@ async function measure(browser,viewport,scale,index){
    Math.random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;
     return (state>>>0)/4294967296;};
   }
- },{scale,layoutFixture});
+ },{scale,layoutFixture,trailMode,suppressOrdinaryTrails});
  const page=await context.newPage(),errors=[];
  const cdp=await context.newCDPSession(page);
  const traceThisPhase=process.env.NOVA_CLARITY_TRACE==='1'&&viewport.name==='desktop'&&(index===0||index===1);
@@ -148,6 +155,8 @@ async function measure(browser,viewport,scale,index){
    traceStarted=true;
   });
   const data=await page.evaluate(async()=>{
+   const trailMode=window.__novaTrailResearchMode===true;
+   const suppressOrdinaryTrails=window.__novaTrailResearchSuppress===true;
    const g=window.__novaClarityResearchGame;
    // Same legal Tempest build and held aim/firing intent in each independent
    // game. These are still NOT matched physical worlds or player trajectories.
@@ -155,6 +164,23 @@ async function measure(browser,viewport,scale,index){
    g.player.stats.reload=8;
    g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
    g.input.firing=true;g.input.autofire=false;
+   // Causal intervention only during the measured window: all arms have
+   // identical ordinary-trail warmup. Preserve cosmetic RNG chronology.
+   let trailSampling=false,trailStage=false,ordinaryOpportunities=0,ordinarySuppressed=0;
+   if(trailMode){
+   const originalBulletUpdate=g.updateBullets;
+   g.updateBullets=function(){const prior=trailStage;trailStage=true;
+    try{return originalBulletUpdate.apply(this,arguments);}finally{trailStage=prior;}};
+   const originalParticles=g.addParticles;
+   g.addParticles=function(x,y,color,n,speed,kind){
+    if(trailSampling&&trailStage&&n===1&&speed===20&&kind==='glow'){
+     ordinaryOpportunities++;
+     if(suppressOrdinaryTrails){ordinarySuppressed++;
+      for(let k=0;k<4;k++)this.cosmeticRandom();return;}
+    }
+    return originalParticles.apply(this,arguments);
+   };
+   }
    // Measure the final composed methods, outside all previously installed
    // gameplay/visual wrappers. NovaPerf measures earlier inner layers.
    // This is opt-in research instrumentation, never a production hook.
@@ -197,7 +223,7 @@ async function measure(browser,viewport,scale,index){
     await window.__novaResearchBeginMeasuredTrace();
    const begin=performance.now(),gameTime=g.time,shotsAtBegin=shots,
     volleysAtBegin=volleys,heatAtBegin=Number.isFinite(g.player?.__v17Heat)?g.player.__v17Heat:null,gaps=[];
-   sampling=true;
+   sampling=true;trailSampling=true;
    const interruptions=[],longTasks=[];
    // Low-cost exposure counters distinguish clarity effects from different
    // independently evolving combat populations; not matched-world proof.
@@ -232,7 +258,7 @@ async function measure(browser,viewport,scale,index){
      }
      requestAnimationFrame(frame);
     });
-   }finally{sampling=false;observer?.disconnect();document.removeEventListener('visibilitychange',visibilityChanged);}
+   }finally{sampling=false;trailSampling=false;observer?.disconnect();document.removeEventListener('visibilitychange',visibilityChanged);}
    const end=performance.now();
    const longTaskInWindow=longTasks.map(t=>({
     startMs:Math.max(0,t.startMs),
@@ -246,8 +272,14 @@ async function measure(browser,viewport,scale,index){
     volleys:volleys-volleysAtBegin,warmupVolleys:volleysAtBegin,
     heatAtBegin,heatAtEnd:Number.isFinite(g.player?.__v17Heat)?g.player.__v17Heat:null,
     gaps,interruptions,longTaskSupported,longTasks:longTaskInWindow,entities,
+    ordinaryOpportunities,ordinarySuppressed,
     outer,perf:window.NovaPerf?.snapshot(g)||null,status:g.status};
   });
+  if(trailMode){
+   assert.ok(data.ordinaryOpportunities>0,'actual combat must emit ordinary trails');
+   assert.equal(data.ordinarySuppressed,suppressOrdinaryTrails?data.ordinaryOpportunities:0,
+    'causal intervention must suppress exactly the sampled ordinary trails');
+  }
   if(layoutFixture)assert.equal(layoutIntercepts,1,'research must intercept exactly one shipping Battlefield overlay');
   if(traceThisPhase)assert.equal(traceStarted,true,'measured trace must have started after warmup');
   const trace=traceStarted?await stopTrace(cdp,`artifacts/browser/render-clarity-combat-trace-${scale}-phase-${index}.json`):null;
@@ -277,6 +309,8 @@ async function measure(browser,viewport,scale,index){
   const observedRafMs=total,unobservedWallMs=Math.max(0,data.wallMs-observedRafMs);
   const rafTimestampLeadMs=Math.max(0,observedRafMs-data.wallMs);
   return {viewport:viewport.name,index,scale,cpuThrottle:3,quality:data.quality,dpr:data.dpr,
+   trailCausal:trailMode,ordinarySuppressed:data.ordinarySuppressed,
+   ordinaryOpportunities:data.ordinaryOpportunities,
    layoutFixture,layoutSeed:data.battlefieldSeed,battlefieldName:data.battlefieldName,
    initialFingerprint:data.initialFingerprint,
    css:data.css,backing:data.backing,frames:data.gaps.length,
@@ -318,14 +352,19 @@ async function measure(browser,viewport,scale,index){
    const scale=viewport.name==='mobile'?(phases[i]===100?65:100):phases[i];
    const result=await measure(browser,viewport,scale,i);
    records.push(result);
-   console.log('NOVA_CLARITY_PHASE '+JSON.stringify(result));
+   console.log((trailMode?'NOVA_TRAIL_CAUSAL_PHASE ':'NOVA_CLARITY_PHASE ')+JSON.stringify(result));
   }
   const fingerprints=records.filter(r=>r.layoutFixture).map(r=>r.initialFingerprint);
   const matchedInitialWorlds=fingerprints.length===records.length&&
    new Set(fingerprints).size===1;
-  const evidence={researchOnly:true,commit:process.env.GITHUB_SHA||null,
+  if(trailMode)assert.equal(matchedInitialWorlds,true,
+   'causal A/A/B requires the same selected initial physical world');
+  const evidence={researchOnly:true,trailCausal:trailMode,commit:process.env.GITHUB_SHA||null,
    matchedInitialWorlds,distinctInitialWorlds:new Set(fingerprints).size,
    caveats:['independent worlds not matched even with identical Battlefield layouts',
+    ...(trailMode?['ordinary trail suppression is measurement-window only and burns four cosmetic draws',
+     'A/A/B browser arms may diverge after identical initial fingerprints due to scheduling',
+     'no claim of causal FPS benefit until A/A variance and physical exposure are compared']:[]),
     'layout fixture resets the RNG at the first post-hook Game spawn; later gameplay can diverge with frame scheduling',
     'initial-world fingerprint covers selected public physical fields, not complete mutable state',
     'shots counts synchronous projectile-array growth; volleys counts successful player tryFire invocations, not hits or damage',
@@ -342,8 +381,9 @@ async function measure(browser,viewport,scale,index){
     'opt-in DevTools trace begins after warmup and ends after measured RAF completion; trailing CDP turnaround may remain',
     'opt-in DevTools trace event durations overlap and are not exclusive CPU attribution'],records};
   fs.mkdirSync('artifacts/browser',{recursive:true});
-  fs.writeFileSync('artifacts/browser/render-clarity-research.json',
+  fs.writeFileSync(trailMode?'artifacts/browser/trail-causal-research.json':
+   'artifacts/browser/render-clarity-research.json',
    JSON.stringify(evidence,null,2)+'\n');
-  console.log('NOVA_CLARITY_RESEARCH '+JSON.stringify(evidence));
+  console.log((trailMode?'NOVA_TRAIL_CAUSAL_RESEARCH ':'NOVA_CLARITY_RESEARCH ')+JSON.stringify(evidence));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e.stack||e);process.exitCode=1;});
