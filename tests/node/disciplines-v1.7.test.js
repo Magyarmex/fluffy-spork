@@ -7,11 +7,12 @@ const path = require('node:path');
 function loadDisciplines(coreUpdater) {
   const CLASSES = {
     twin:{id:'twin',fireMode:'single',bullet:{splash:0},size:14},
+    tempest:{id:'tempest',fireMode:'minigun',bullet:{splash:0},size:15},
     cannon:{id:'cannon',fireMode:'single',bullet:{splash:70,splashDmg:.4},size:16},
     guard:{id:'guard',fireMode:'single',bullet:{splash:0},size:16,ability:'bulwark'},
     juggernaut:{id:'juggernaut',fireMode:'single',bullet:{splash:0},size:17,ability:'stampede'}
   };
-  function lineageForClass(id){ return id==='twin'?'gunner':id==='cannon'?'cannon':(id==='guard'||id==='juggernaut')?'guardian':'scout'; }
+  function lineageForClass(id){ return (id==='twin'||id==='tempest')?'gunner':id==='cannon'?'cannon':(id==='guard'||id==='juggernaut')?'guardian':'scout'; }
 
   function Game() {
     this.bullets=[]; this.tanks=[]; this.time=10; this.player=null;
@@ -70,8 +71,8 @@ function loadDisciplines(coreUpdater) {
   const classes=load('game/classes');
   const engine=load('game/engine');
   load('game/audio');
-  load('game/render');
-  return {context,Game:engine.Game,CLASSES:classes.CLASSES};
+  const render=load('game/render').render;
+  return {context,Game:engine.Game,CLASSES:classes.CLASSES,render};
 }
 
 test('Three Disciplines publishes v1.7.0',()=>{
@@ -83,6 +84,35 @@ test('Gunner cadence has a deterministic sweet spot',()=>{
   const {context}=loadDisciplines(), q=context.window.__NOVA_DISCIPLINES_TEST__;
   assert.ok(q.gunSweet(.56)>.99);
   assert.ok(q.gunSweet(.95)<.01);
+});
+test('Tempest bright heat cue matches its actual Apex cooldown gate',()=>{
+  const {context}=loadDisciplines(), cue=context.window.__NOVA_DISCIPLINES_TEST__.gunnerCue;
+  const tempest={cls:'tempest'}, twin={cls:'twin'};
+  // Apex: (1 - abs(heat-.56)/.36) > .58 AND stability > .52.
+  assert.equal(cue(tempest,.56,.53),true);
+  assert.equal(cue(tempest,.41,.53),true);
+  assert.equal(cue(tempest,.71,.53),true);
+  assert.equal(cue(tempest,.40,.53),false);
+  assert.equal(cue(tempest,.72,.53),false);
+  assert.equal(cue(tempest,.56,.52),false);
+  // A non-Tempest Gunner must retain its previous broad readability cue.
+  assert.equal(cue(twin,.30,.60),true);
+  assert.equal(cue(twin,.90,.60),false);
+});
+test('actual Gunner render draws Tempest bright cue only inside Apex gate',()=>{
+  const {Game,render}=loadDisciplines(),g=new Game();
+  const arcs=[];
+  g.ctx={save(){},restore(){},setTransform(){},beginPath(){},arc(x,y,r,a0,a1){arcs.push({r,a0,a1});},stroke(){},
+    set globalCompositeOperation(v){},set lineCap(v){},set globalAlpha(v){},set strokeStyle(v){},set lineWidth(v){}};
+  const t={id:1,cls:'tempest',x:0,y:0,alive:true,__v17Stability:.8,__v17Heat:.56};
+  g.player=t;g.tanks=[t];
+  render(g,400,800);assert.equal(arcs.length,2,'heat arc plus bright Apex cue');
+  arcs.length=0;t.__v17Heat=.30;
+  render(g,400,800);assert.equal(arcs.length,1,'outside Apex: heat arc only');
+  arcs.length=0;t.__v17Heat=.56;t.__v17Stability=.50;
+  render(g,400,800);assert.equal(arcs.length,1,'unstable Tempest: no false bright cue');
+  arcs.length=0;t.cls='twin';t.__v17Heat=.30;t.__v17Stability=.8;
+  render(g,400,800);assert.equal(arcs.length,2,'other Gunners retain their broad cue');
 });
 test('Guardian frontal arc is directional',()=>{
   const {context}=loadDisciplines(), q=context.window.__NOVA_DISCIPLINES_TEST__;

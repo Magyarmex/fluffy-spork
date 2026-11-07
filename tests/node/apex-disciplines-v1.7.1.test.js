@@ -106,6 +106,17 @@ function tank(id,cls,extra={}) {
   return Object.assign({id,cls,x:0,y:0,angle:0,fireCd:0,vx:0,vy:0,isPlayer:true,alive:true,hp:1000,bulwarkT:0,tauntT:0,stampedeT:0,abilityCd:0},extra);
 }
 
+test('Tempest rendered cue and shipping Apex boost cannot drift apart',()=>{
+  const {context}=loadApex();
+  const cue=context.window.__NOVA_DISCIPLINES_TEST__.gunnerCue;
+  const apex=context.window.__NOVA_APEX_TEST__.tempestBand;
+  for(let i=0;i<=118;i++)for(const stability of [0,.5,.52,.53,.8,1]){
+    const heat=i/100;
+    assert.equal(cue({cls:'tempest'},Math.min(heat,1),stability),
+      apex(heat)>.58&&stability>.52,
+      'Tempest cue mismatch at heat '+heat+' stability '+stability);
+  }
+});
 test('Apex Doctrine publishes v1.7.1',()=>{
   const {context}=loadApex();
   assert.equal(context.window.__NOVA_APEX_RELEASE__.version,'1.7.1');
