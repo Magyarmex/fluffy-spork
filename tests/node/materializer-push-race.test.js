@@ -23,7 +23,7 @@ function git(cwd, ...args) {
   return r.stdout.trim();
 }
 
-for (const scenario of ['tests-only', 'runtime', 'index', 'transport', 'exhaustion']) {
+for (const scenario of ['tests-only', 'runtime', 'index', 'transport', 'red-tests', 'exhaustion']) {
   test('materializer post-fetch/pre-push recovery: ' + scenario, () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nova-push-race-'));
     try {
@@ -37,7 +37,7 @@ for (const scenario of ['tests-only', 'runtime', 'index', 'transport', 'exhausti
       fs.writeFileSync(path.join(producer, 'nova-updates', 'sample.js'), 'original runtime');
       fs.writeFileSync(path.join(producer, 'index.html'), 'old page');
       fs.writeFileSync(path.join(producer, 'package.json'), JSON.stringify({
-        scripts: { test: 'node -e "require(\'fs\').writeFileSync(\'validation.marker\', \'ran\')"' },
+        scripts: { test: 'node -e "require(\'fs\').writeFileSync(\'validation.marker\', \'ran\')" && node --test tests/node/*.test.js' },
       }));
       git(producer, 'add', '.');
       git(producer, 'commit', '-m', 'original runtime');
@@ -65,7 +65,11 @@ if [ "\${RACE_KIND}" = "exhaustion" ] || [ "$count" -eq 1 ]; then
     echo newer > "\${RACE_PRODUCER}/index.html"
   else
     mkdir -p "\${RACE_PRODUCER}/tests/node"
-    echo "$count" > "\${RACE_PRODUCER}/tests/node/concurrent-$count.test.js"
+    if [ "\${RACE_KIND}" = "red-tests" ]; then
+      echo "throw new Error('new regression')" > "\${RACE_PRODUCER}/tests/node/concurrent-$count.test.js"
+    else
+      echo "$count" > "\${RACE_PRODUCER}/tests/node/concurrent-$count.test.js"
+    fi
   fi
   git -C "\${RACE_PRODUCER}" add .
   git -C "\${RACE_PRODUCER}" commit -m "competing change $count" >/dev/null
@@ -84,7 +88,7 @@ fi
           GIT_COMMITTER_NAME: 'Fixture', GIT_COMMITTER_EMAIL: 'fixture@example.invalid',
         },
       });
-      assert.equal(r.status, ['exhaustion', 'transport'].includes(scenario) ? 1 : 0, r.stderr || r.stdout);
+      assert.equal(r.status, ['exhaustion', 'transport', 'red-tests'].includes(scenario) ? 1 : 0, r.stderr || r.stdout);
       git(producer, 'fetch', 'origin', 'main');
       const published = git(producer, 'show', 'origin/main:index.html');
       assert.equal(published, scenario === 'tests-only' ? 'tested new page' : scenario === 'index' ? 'newer' : 'old page');
@@ -96,6 +100,9 @@ fi
       }
       if (scenario === 'tests-only') {
         assert.equal(fs.readFileSync(path.join(worker, 'validation.marker'), 'utf8'), 'ran');
+      }
+      if (scenario === 'red-tests') {
+        assert.match(r.stderr + r.stdout, /new regression/);
       }
       if (scenario === 'transport') {
         assert.match(r.stderr, /reason other than a non-fast-forward race/);
