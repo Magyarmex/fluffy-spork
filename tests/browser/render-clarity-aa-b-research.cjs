@@ -109,7 +109,7 @@ async function measure(browser,viewport,scale,index){
        player:this.player&&[this.player.x,this.player.y,this.player.cls],
        tanks:compact(this.tanks,['id','x','y','cls','hp']),
        shapes:compact(this.shapes,['id','x','y','type','hp']),
-       terrain:compact(this.__novaTerrain,['id','x','y','hp'])
+       terrain:compact(this.__novaTerrain,['id','x','y','w','h','r','type','hp','solid'])
       });
       let hash=2166136261;
       for(let i=0;i<snapshot.length;i++){
