@@ -83,6 +83,9 @@ test('opt-in 80% clarity midpoint pilot is balanced and preserves legacy control
  const phases=JSON.parse(match[1]);
  assert.equal(phases.length,9);
  for(const scale of [65,80,100])assert.equal(phases.filter(v=>v===scale).length,3);
+ for(const scale of [65,80,100])assert.equal(
+  phases.reduce((sum,v,index)=>sum+(v===scale?index:0),0),12,
+  'all clarity arms must have identical mean run index to cancel linear drift');
  assert.deepEqual(phases.slice(0,3).sort((a,b)=>a-b),[65,80,100]);
  assert.deepEqual(phases.slice(3,6).sort((a,b)=>a-b),[65,80,100]);
  assert.deepEqual(phases.slice(6,9).sort((a,b)=>a-b),[65,80,100]);
