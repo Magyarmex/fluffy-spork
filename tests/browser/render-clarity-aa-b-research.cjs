@@ -82,6 +82,7 @@ async function measure(browser,viewport,scale,index){
    // Research-only deterministic global RNG for initial-world equivalence
    // testing. Do not infer identical subsequent combat from identical starts.
    let state=0x9e3779b9;
+   window.__novaResearchResetRng=()=>{state=0x9e3779b9;};
    Math.random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;
     return (state>>>0)/4294967296;};
   }
@@ -98,6 +99,19 @@ async function measure(browser,viewport,scale,index){
   await deploy.waitFor({state:'visible',timeout:45000});
   await page.evaluate(()=>{
    const Game=window.__novaMakeRequire('')('game/engine').Game;
+   // War Room constructs its own Game before DEPLOY and can advance global
+   // RNG unpredictably. Reset at the real Game's first spawnPlayer entry,
+   // before Battlefield and core player/neutral/AI initialization.
+   if(window.__novaResearchResetRng){
+    const oldSpawn=Game.prototype.spawnPlayer;
+    Game.prototype.spawnPlayer=function(){
+     if(!this.__novaResearchInitialSpawnSeeded){
+      window.__novaResearchResetRng();
+      this.__novaResearchInitialSpawnSeeded=true;
+     }
+     return oldSpawn.apply(this,arguments);
+    };
+   }
    const old=Game.prototype.update;
    Game.prototype.update=function(dt){
     if(!this.__novaDecorativeWorld){
@@ -296,7 +310,7 @@ async function measure(browser,viewport,scale,index){
   const evidence={researchOnly:true,commit:process.env.GITHUB_SHA||null,
    matchedInitialWorlds,distinctInitialWorlds:new Set(fingerprints).size,
    caveats:['independent worlds not matched even with identical Battlefield layouts',
-    'layout fixture controls Battlefield seed and initial Math.random stream, not time-dependent initialization',
+    'layout fixture resets the RNG at the first post-hook Game spawn; later gameplay can diverge with frame scheduling',
     'initial-world fingerprint covers selected public physical fields, not complete mutable state',
     'fixture mode blocks service workers so route interception cannot be bypassed',
     'not fixed60','not physical Android',
