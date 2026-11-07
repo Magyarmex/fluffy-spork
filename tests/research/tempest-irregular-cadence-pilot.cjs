@@ -128,6 +128,16 @@ for(const seed of seeds)for(const reload of reloads){
    const steps=schedule(pattern,phase);
    const row=run(seed,reload,phase===0?name:name+'@'+phase,steps);
    row.pattern=name;row.phase=phase;
+   // Counterfactual only: how much fire time a once-per-frame input sampler
+   // would assign when it observes the state at each frame's START.
+   // This does not emulate DOM event delivery or a production RAF run.
+   let frameCursor=0,frameSampledFiringTicks=0;
+   for(const ticks of steps){
+    if(!burst||frameCursor%(burst[0]+burst[1])<burst[0])frameSampledFiringTicks+=ticks;
+    frameCursor+=ticks;
+   }
+   row.frameSampledFiringTicks=frameSampledFiringTicks;
+   row.frameSampledDutyDeltaTicks=frameSampledFiringTicks-row.firingTicks;
    row.intervalHistogram=steps.reduce((counts,ticks)=>{
     counts[ticks]=(counts[ticks]||0)+1;return counts;
    },{});
