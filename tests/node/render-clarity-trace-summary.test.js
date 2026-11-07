@@ -65,7 +65,9 @@ test('DevTools trace begins after warmup and before measured RAF timing',()=>{
 // A future refactor must not silently add particle wrappers to ordinary A/A/B.
 test('ordinary-trail causal research remains opt-in and preserves default clarity measurements',()=>{
  assert.match(source,/const trailMode=process\.env\.NOVA_TRAIL_CAUSAL==='1'/);
- assert.match(source,/const phases=trailMode\?\[100,100,100,100,100,100\]:\[100,65,65,100,65,100\]/);
+ assert.match(source,/const midpointMode=process\.env\.NOVA_CLARITY_MIDPOINT==='1'/);
+ assert.match(source,/const phases=trailMode\?\[100,100,100,100,100,100\]:/);
+ assert.match(source,/midpointMode\?midpointPhases:\[100,65,65,100,65,100\]/);
  assert.match(source,/const suppressOrdinaryTrails=trailMode&&\[1,2,4\]\.includes\(index\)/);
  assert.match(source,/if\(trailMode\)\{\s*const originalBulletUpdate=g\.updateBullets/,
   'extra projectile instrumentation must not run in ordinary clarity mode');
@@ -73,4 +75,71 @@ test('ordinary-trail causal research remains opt-in and preserves default clarit
  assert.match(source,/window\.__novaTrailResearchSuppress=suppressOrdinaryTrails/);
  assert.match(source,/const data=await page\.evaluate\(async\(\)=>\{/,
   'preserve the measured-window trace boundary contract');
+});
+
+test('opt-in 80% clarity midpoint pilot is balanced and preserves legacy controls',()=>{
+ const match=source.match(/const midpointPhases=(\[[^;]+\]);/);
+ assert.ok(match,'midpoint research phase schedule must be explicit');
+ const phases=JSON.parse(match[1]);
+ assert.equal(phases.length,9);
+ for(const scale of [65,80,100])assert.equal(phases.filter(v=>v===scale).length,3);
+ for(const scale of [65,80,100])assert.equal(
+  phases.reduce((sum,v,index)=>sum+(v===scale?index:0),0),12,
+  'all clarity arms must have identical mean run index to cancel linear drift');
+ assert.deepEqual(phases.slice(0,3).sort((a,b)=>a-b),[65,80,100]);
+ assert.deepEqual(phases.slice(3,6).sort((a,b)=>a-b),[65,80,100]);
+ assert.deepEqual(phases.slice(6,9).sort((a,b)=>a-b),[65,80,100]);
+ assert.match(source,/assert\.ok\(!\(trailMode&&midpointMode\)/,
+  'causal trail pilot and midpoint pilot must not be mixed');
+ assert.match(source,/\|\|trailMode\|\|midpointMode/,
+  'midpoint arms must use deterministic initial-world fixture');
+ assert.match(source,/if\(trailMode\|\|midpointMode\)assert\.equal\(matchedInitialWorlds,true/,
+  'midpoint pilot must reject mismatched initial fingerprints');
+ assert.match(source,/phases\[i\]===65\?100:80/,
+  'mobile order must invert endpoints while retaining the midpoint');
+ assert.match(source,/index<\(midpointMode\?phases\.length:2\)/,
+  'trace all nine midpoint desktop phases while preserving legacy two-arm trace');
+ assert.match(source,/const midpointSummary=midpointMode\?/,
+  'midpoint pilot must emit descriptive per-arm summary');
+ assert.match(source,/minFps:Math\.min\(\.\.\.fps\),maxFps:Math\.max\(\.\.\.fps\)/,
+  'report the full observed FPS spread, not only a favorable median');
+ assert.match(source,/assert\.equal\(group\.length,3/,
+  'never summarize incomplete midpoint arms');
+ assert.match(source,/assert\.equal\(commits\.length,3/,
+  'do not silently summarize incomplete desktop Commit trace cohorts');
+ assert.match(source,/medianCommitMs:commits\.length\?pct\(commits,\.5\):null/,
+  'summarize measured Commit medians, not a pixel-model estimate');
+
+});
+
+test('midpoint summary executes on three real-like samples per arm and rejects missing traces',()=>{
+ const begin=source.indexOf('  const midpointSummary=midpointMode?');
+ const end=source.indexOf('  const evidence={',begin);
+ assert.ok(begin>=0&&end>begin,'extract the real summary and validation');
+ const evaluate=vm.runInNewContext('(function(records,viewports,midpointMode,process){'+
+  source.slice(begin,end)+'return midpointSummary;})',{
+  assert,Number,Math,Object,Set,pct:percentile
+ });
+ const records=[];
+ for(const viewport of ['desktop','mobile'])for(const scale of [65,80,100])
+  for(let i=0;i<3;i++)records.push({
+   viewport,scale,quality:'high',fps:scale/2+i,simulationPace:1,
+   p95GapMs:30,backing:[scale*10,scale*10],
+   trace:viewport==='desktop'?{inclusiveMainThreadEventCosts:{Commit:{medianMs:scale/5+i}}}:null
+  });
+ const views=[{name:'desktop'},{name:'mobile'}],env={env:{NOVA_CLARITY_TRACE:'1'}};
+ const summary=evaluate(records,views,true,env);
+ assert.equal(summary.desktop[80].n,3);
+ assert.equal(summary.desktop[80].medianFps,41);
+ assert.equal(summary.desktop[80].minFps,40);
+ assert.equal(summary.desktop[80].maxFps,42);
+ assert.equal(summary.desktop[80].commitTraceSamples,3);
+ assert.equal(summary.desktop[80].medianCommitMs,17);
+ assert.equal(summary.mobile[80].medianCommitMs,null);
+ const missing=records.map(r=>({...r}));
+ missing.find(r=>r.viewport==='desktop'&&r.scale===80).trace=null;
+ assert.throws(()=>evaluate(missing,views,true,env),/three valid Commit traces/);
+ const badBacking=records.map(r=>({...r,backing:[...r.backing]}));
+ badBacking.find(r=>r.viewport==='mobile'&&r.scale===80).backing[0]=650;
+ assert.throws(()=>evaluate(badBacking,views,true,env),/stable within each clarity arm/);
 });

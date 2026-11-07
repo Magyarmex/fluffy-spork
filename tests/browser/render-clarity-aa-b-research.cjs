@@ -9,7 +9,13 @@ const {chromium}=require('playwright');
 const {injectBattlefieldSeed}=require('../research/battlefield-layout-fixture.cjs');
 // Six-arm ABBA-like order limits linear run-order bias (mean index differs by 1/3 phase).
 const trailMode=process.env.NOVA_TRAIL_CAUSAL==='1';
-const phases=trailMode?[100,100,100,100,100,100]:[100,65,65,100,65,100];
+// Opt-in midpoint pilot: three observations per clarity setting, balanced
+// across early/middle/late phases. The legacy A/A/B remains unchanged.
+const midpointMode=process.env.NOVA_CLARITY_MIDPOINT==='1';
+assert.ok(!(trailMode&&midpointMode),'run one research intervention at a time');
+const midpointPhases=[100,80,65,65,100,80,80,65,100];
+const phases=trailMode?[100,100,100,100,100,100]:
+ midpointMode?midpointPhases:[100,65,65,100,65,100];
 const viewports=trailMode?[{name:'desktop',width:1280,height:800}]:
  [{name:'desktop',width:1280,height:800},{name:'mobile',width:320,height:640}];
 const pct=(xs,p)=>{const s=[...xs].sort((a,b)=>a-b);return s[Math.ceil(s.length*p)-1];};
@@ -67,7 +73,7 @@ async function stopTrace(cdp,outputPath){
   warning:'Inclusive main-thread trace event durations overlap; never sum categories as exclusive CPU time.'};
 }
 async function measure(browser,viewport,scale,index){
- const layoutFixture=process.env.NOVA_RESEARCH_LAYOUT_SEED==='1'||trailMode;
+ const layoutFixture=process.env.NOVA_RESEARCH_LAYOUT_SEED==='1'||trailMode||midpointMode;
  const suppressOrdinaryTrails=trailMode&&[1,2,4].includes(index);
  const layoutSeed=0x12345678;
  const context=await browser.newContext({viewport:{width:viewport.width,height:viewport.height},
@@ -96,7 +102,7 @@ async function measure(browser,viewport,scale,index){
  },{scale,layoutFixture,trailMode,suppressOrdinaryTrails});
  const page=await context.newPage(),errors=[];
  const cdp=await context.newCDPSession(page);
- const traceThisPhase=process.env.NOVA_CLARITY_TRACE==='1'&&viewport.name==='desktop'&&(index===0||index===1);
+ const traceThisPhase=process.env.NOVA_CLARITY_TRACE==='1'&&viewport.name==='desktop'&&index<(midpointMode?phases.length:2);
  let traceStarted=false;
  await cdp.send('Emulation.setCPUThrottlingRate',{rate:3});
  page.on('pageerror',e=>errors.push(String(e)));
@@ -349,7 +355,7 @@ async function measure(browser,viewport,scale,index){
   const records=[];
   for(const viewport of viewports)for(let i=0;i<phases.length;i++){
    // Reverse arms for the second viewport to balance overall time/order exposure.
-   const scale=viewport.name==='mobile'?(phases[i]===100?65:100):phases[i];
+   const scale=viewport.name==='mobile'?(phases[i]===100?65:phases[i]===65?100:80):phases[i];
    const result=await measure(browser,viewport,scale,i);
    records.push(result);
    console.log((trailMode?'NOVA_TRAIL_CAUSAL_PHASE ':'NOVA_CLARITY_PHASE ')+JSON.stringify(result));
@@ -357,11 +363,44 @@ async function measure(browser,viewport,scale,index){
   const fingerprints=records.filter(r=>r.layoutFixture).map(r=>r.initialFingerprint);
   const matchedInitialWorlds=fingerprints.length===records.length&&
    new Set(fingerprints).size===1;
-  if(trailMode)assert.equal(matchedInitialWorlds,true,
-   'causal A/A/B requires the same selected initial physical world');
-  const evidence={researchOnly:true,trailCausal:trailMode,commit:process.env.GITHUB_SHA||null,
+  if(trailMode||midpointMode)assert.equal(matchedInitialWorlds,true,
+   'seeded research arms require the same selected initial physical world');
+  // Descriptive summaries are not causal estimates: preserve all individual
+  // phase records, including outliers, for order/drift and exposure review.
+  const midpointSummary=midpointMode?Object.fromEntries(viewports.map(v=>[
+   v.name,Object.fromEntries([65,80,100].map(scale=>{
+    const group=records.filter(r=>r.viewport===v.name&&r.scale===scale);
+    assert.equal(group.length,3,'midpoint pilot needs three real phases per arm');
+    const fps=group.map(r=>r.fps),pace=group.map(r=>r.simulationPace);
+    const commits=group.map(r=>r.trace?.inclusiveMainThreadEventCosts?.Commit?.medianMs)
+     .filter(Number.isFinite);
+    if(process.env.NOVA_CLARITY_TRACE==='1'&&v.name==='desktop')
+     assert.equal(commits.length,3,'each midpoint desktop arm needs three valid Commit traces');
+    return [scale,{n:group.length,medianFps:pct(fps,.5),
+     commitTraceSamples:commits.length,medianCommitMs:commits.length?pct(commits,.5):null,
+     minFps:Math.min(...fps),maxFps:Math.max(...fps),
+     medianSimulationPace:pct(pace,.5),
+     medianP95GapMs:pct(group.map(r=>r.p95GapMs),.5),
+     backingPixels:group.map(r=>r.backing[0]*r.backing[1])}];
+   }))
+  ])):null;
+  if(midpointMode)for(const viewport of viewports){
+   const arm=midpointSummary[viewport.name];
+   const pixels=scale=>arm[scale].backingPixels;
+   for(const scale of [65,80,100])assert.equal(new Set(pixels(scale)).size,1,
+    'backing pixel count must be stable within each clarity arm');
+   assert.ok(pixels(100)[0]>pixels(80)[0]&&pixels(80)[0]>pixels(65)[0],
+    '80% pilot must actually create an intermediate canvas backing size');
+   assert.equal(new Set(records.filter(r=>r.viewport===viewport.name).map(r=>r.quality)).size,1,
+    'clarity arms must not accidentally compare different quality modes');
+  }
+  const evidence={researchOnly:true,trailCausal:trailMode,midpointMode,
+   phaseOrder:phases,midpointSummary,commit:process.env.GITHUB_SHA||null,
    matchedInitialWorlds,distinctInitialWorlds:new Set(fingerprints).size,
    caveats:['independent worlds not matched even with identical Battlefield layouts',
+    ...(midpointMode?['80% clarity is a research arm, not an adaptive-resolution controller',
+     'nine phases per viewport do not eliminate time drift or establish physical-device readability',
+     'matched initial fingerprint does not imply matched state after warmup']:[]),
     ...(trailMode?['ordinary trail suppression is measurement-window only and burns four cosmetic draws',
      'A/A/B browser arms may diverge after identical initial fingerprints due to scheduling',
      'no claim of causal FPS benefit until A/A variance and physical exposure are compared']:[]),
