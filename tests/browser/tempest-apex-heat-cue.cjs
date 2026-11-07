@@ -48,7 +48,7 @@ const {chromium}=require('playwright');
      },state);
      assert.equal(data.classId,'tempest');
      assert.equal(data.cues,state.expected,'real canvas cue gate '+state.name);
-     assert.match(data.canvas,/^data:image\\/png;base64,/);
+     assert.ok(data.canvas.startsWith('data:image/png;base64,'),'canvas PNG capture');
      fs.writeFileSync(path.join(dir,'tempest-cue-'+viewport.width+'x'+viewport.height+'-'+state.name+'.png'),
       Buffer.from(data.canvas.split(',')[1],'base64'));
      results.push({viewport,state:state.name,cues:data.cues});
