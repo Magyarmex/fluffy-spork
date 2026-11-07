@@ -111,3 +111,35 @@ test('opt-in 80% clarity midpoint pilot is balanced and preserves legacy control
   'summarize measured Commit medians, not a pixel-model estimate');
 
 });
+
+test('midpoint summary executes on three real-like samples per arm and rejects missing traces',()=>{
+ const begin=source.indexOf('  const midpointSummary=midpointMode?');
+ const end=source.indexOf('  const evidence={',begin);
+ assert.ok(begin>=0&&end>begin,'extract the real summary and validation');
+ const evaluate=vm.runInNewContext('(function(records,viewports,midpointMode,process){'+
+  source.slice(begin,end)+'return midpointSummary;})',{
+  assert,Number,Math,Object,Set,pct:percentile
+ });
+ const records=[];
+ for(const viewport of ['desktop','mobile'])for(const scale of [65,80,100])
+  for(let i=0;i<3;i++)records.push({
+   viewport,scale,quality:'high',fps:scale/2+i,simulationPace:1,
+   p95GapMs:30,backing:[scale*10,scale*10],
+   trace:viewport==='desktop'?{inclusiveMainThreadEventCosts:{Commit:{medianMs:scale/5+i}}}:null
+  });
+ const views=[{name:'desktop'},{name:'mobile'}],env={env:{NOVA_CLARITY_TRACE:'1'}};
+ const summary=evaluate(records,views,true,env);
+ assert.equal(summary.desktop[80].n,3);
+ assert.equal(summary.desktop[80].medianFps,41);
+ assert.equal(summary.desktop[80].minFps,40);
+ assert.equal(summary.desktop[80].maxFps,42);
+ assert.equal(summary.desktop[80].commitTraceSamples,3);
+ assert.equal(summary.desktop[80].medianCommitMs,17);
+ assert.equal(summary.mobile[80].medianCommitMs,null);
+ const missing=records.map(r=>({...r}));
+ missing.find(r=>r.viewport==='desktop'&&r.scale===80).trace=null;
+ assert.throws(()=>evaluate(missing,views,true,env),/three valid Commit traces/);
+ const badBacking=records.map(r=>({...r,backing:[...r.backing]}));
+ badBacking.find(r=>r.viewport==='mobile'&&r.scale===80).backing[0]=650;
+ assert.throws(()=>evaluate(badBacking,views,true,env),/stable within each clarity arm/);
+});
