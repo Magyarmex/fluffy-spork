@@ -28,11 +28,16 @@ for(const [pattern,on,off,expectedFireTicks,completeRests] of [
    assert.equal(row.restTicks,960-expectedFireTicks);
    assert.equal(row.restVolleys,0,'released firing input cannot emit volleys');
    assert.equal(row.restHeatWindows.length,completeRests);
+   assert.equal(row.restSpinWindows.length,completeRests);
    assert.ok(row.updateCalls>=row.frames);
    assert.equal(row.extraInputBoundaryUpdates,row.updateCalls-row.frames);
    assert.ok(row.volleys>0);
    assert.ok(row.minimumHeat<=row.peakHeat);
    assert.ok(row.restHeatWindows.every(w=>Number.isFinite(w.drop)&&w.drop>=-0.000002));
+   assert.ok(row.restSpinWindows.every(w=>Number.isFinite(w.drop)&&w.drop>=-0.000002));
+   assert.ok(row.restSpinWindows.every(w=>w.start>=0&&w.end>=0&&w.start<=1&&w.end<=1));
+   assert.ok(row.firstShotSpins.every(n=>n>=0&&n<=1));
+   assert.ok(row.lastShotSpins.every(n=>n>=0&&n<=1));
    assert.ok(row.baseCadenceEligibleVolleys<=row.volleys);
    assert.ok(row.tempestApexBoostVolleys<=row.volleys);
    assert.ok(row.tempestRedlinePenaltyVolleys<=row.volleys);
@@ -48,7 +53,8 @@ for(const [pattern,on,off,expectedFireTicks,completeRests] of [
   console.log('TEMPEST_SHORT_BURST_RESEARCH '+JSON.stringify(report.results.map(r=>({
    pattern,reload:r.reload,schedule:r.name,volleys:r.volleys,
    heat:r.heat,peakHeat:r.peakHeat,apexBoost:r.tempestApexBoostVolleys,
-   redline:r.tempestRedlinePenaltyVolleys,restHeatDrops:r.restHeatWindows.map(w=>w.drop)
+   redline:r.tempestRedlinePenaltyVolleys,restHeatDrops:r.restHeatWindows.map(w=>w.drop),
+   restSpinDrops:r.restSpinWindows.map(w=>w.drop)
   }))));
  });
 }
