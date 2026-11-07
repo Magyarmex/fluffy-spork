@@ -7,6 +7,9 @@
 process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
 const {bootGame,withSeed}=require('./audio-rng-causal-pilot.cjs');
 const seed=1517800, duration=20, reloads=[4,8];
+// Opt-in delayed observation: model a human seeing the existing heat indicator
+// 100/200ms late. This is NOT an actual screenshot or touch-latency measurement.
+const delayPilot=process.env.NOVA_HEAT_DELAY_PILOT==='1';
 const schedules={native30:[4],native60:[2],native120:[1],irregular:[1,3,2,1,3,2,1,3]};
 function run(reload,name,pattern,policy){
  return withSeed(seed,()=>{
@@ -29,7 +32,9 @@ function run(reload,name,pattern,policy){
   const out={seed,reload,schedule:name,policy,frames:0,updates:0,volleys:0,
    apexVolleys:0,redlineVolleys:0,vents:0,ventSeconds:0,fireSeconds:0,
    bandSeconds:0,peakHeat:0,heatIntegral:0,spinIntegral:0,
-   lastHeat:0,lastSpin:0,firstVentAt:null,worldLeaks:0,firstLeak:null};
+   lastHeat:0,lastSpin:0,firstVentAt:null,worldLeaks:0,firstLeak:null,
+   observationDelayMs:policy==='bandWideDelay100'?100:policy==='bandWideDelay200'?200:0,
+   maxHeatObservationError:0,delayedSamples:0};
   const original=g.tryFire;g.tryFire=function(t){
    const before=this.bullets.length,result=original.apply(this,arguments);
    if(t===p&&this.bullets.length>before){
@@ -42,9 +47,22 @@ function run(reload,name,pattern,policy){
   };
   try{
    let ticks=0,index=0,venting=false;
+   // Tick-indexed snapshots are immutable; only previously completed updates
+   // are observable. A delayed policy must not read the current true heat.
+   const history=[{tick:0,heat:p.__v17Heat||0}];
    while(ticks<duration*120){
     const slice=Math.min(pattern[index++%pattern.length],duration*120-ticks);
-    const heat=p.__v17Heat||0;
+    const actualHeat=p.__v17Heat||0;
+    const cutoff=ticks-Math.round(out.observationDelayMs*120/1000);
+    let heat=actualHeat;
+    if(out.observationDelayMs){
+     for(let j=history.length-1;j>=0;j--){
+      if(history[j].tick<=cutoff){heat=history[j].heat;break;}
+      if(j===0)heat=history[0].heat;
+     }
+     out.delayedSamples++;
+     out.maxHeatObservationError=Math.max(out.maxHeatObservationError,Math.abs(heat-actualHeat));
+    }
     if(policy!=='continuous'){
      const high=policy==='bandTight'?.65:.69,low=policy==='bandTight'?.50:.47;
      if(!venting&&heat>=high){venting=true;out.vents++;if(out.firstVentAt===null)out.firstVentAt=ticks/120;}
@@ -65,10 +83,11 @@ function run(reload,name,pattern,policy){
     out.peakHeat=Math.max(out.peakHeat,h);
     out.heatIntegral+=h*dt;out.spinIntegral+=(p.fireSpin||0)*dt;
     ticks+=slice;out.frames++;out.updates++;
+    history.push({tick:ticks,heat:h});
    }
    out.lastHeat=+(p.__v17Heat||0).toFixed(5);
    out.lastSpin=+(p.fireSpin||0).toFixed(5);
-   for(const key of ['fireSeconds','ventSeconds','bandSeconds','peakHeat','heatIntegral','spinIntegral'])
+   for(const key of ['fireSeconds','ventSeconds','bandSeconds','peakHeat','heatIntegral','spinIntegral','maxHeatObservationError'])
     out[key]=+out[key].toFixed(5);
    return out;
   }finally{g.destroy();}
@@ -76,6 +95,8 @@ function run(reload,name,pattern,policy){
 }
 const results=[];
 for(const reload of reloads)for(const [name,pattern] of Object.entries(schedules))
- for(const policy of ['continuous','bandWide','bandTight'])results.push(run(reload,name,pattern,policy));
+ for(const policy of (delayPilot?
+  ['continuous','bandWide','bandTight','bandWideDelay100','bandWideDelay200']:
+  ['continuous','bandWide','bandTight']))results.push(run(reload,name,pattern,policy));
 console.log(JSON.stringify({method:'actual composed Game; deterministic seed; no targets; frame-start feedback',duration,results,
- caveats:['feedback policies have perfect heat readout, unlike human player','fixed aim and no targets cannot measure hit quality or survival','variable-step chronology differs across schedules','no physical touch or input-to-photon measurement','not a gameplay patch']},null,2));
+ caveats:['baseline policies have perfect heat readout; delay pilot uses lagged internal heat as a proxy, not visual perception','fixed aim and no targets cannot measure hit quality or survival','variable-step chronology differs across schedules','no physical touch or input-to-photon measurement','not a gameplay patch']},null,2));
