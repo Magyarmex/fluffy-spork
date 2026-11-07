@@ -316,3 +316,22 @@ test('post-blur new pointer ID still receives a reset warning',()=>{
     assert.equal(s.input.stickId.move,-1);
   }finally{s.owner.stop()}
 });
+
+
+test('post-blur UI or mouse down cannot masquerade as a held touch',()=>{
+  for(const data of [
+    {pointerId:9,pointerType:'touch',targetIsUI:true},
+    {pointerId:9,pointerType:'mouse',targetIsUI:false}
+  ]){
+    const s=fixture();s.owner.start();
+    try{
+      s.down(1005);s.frame(1017);
+      s.timeline.push(.020,'blur',{});
+      s.timeline.push(.025,'pointerdown',data);
+      s.frame(1137);
+      assert.equal(s.notices.length,0,'non-stick input must not produce a reset warning');
+      assert.equal(s.input.move.active,false);
+      assert.equal(s.input.firing,false);
+    }finally{s.owner.stop()}
+  }
+});
