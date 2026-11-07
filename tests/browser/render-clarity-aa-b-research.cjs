@@ -102,7 +102,7 @@ async function measure(browser,viewport,scale,index){
  },{scale,layoutFixture,trailMode,suppressOrdinaryTrails});
  const page=await context.newPage(),errors=[];
  const cdp=await context.newCDPSession(page);
- const traceThisPhase=process.env.NOVA_CLARITY_TRACE==='1'&&viewport.name==='desktop'&&index<(midpointMode?3:2);
+ const traceThisPhase=process.env.NOVA_CLARITY_TRACE==='1'&&viewport.name==='desktop'&&index<(midpointMode?phases.length:2);
  let traceStarted=false;
  await cdp.send('Emulation.setCPUThrottlingRate',{rate:3});
  page.on('pageerror',e=>errors.push(String(e)));
