@@ -121,6 +121,7 @@ jobs:
         timeout-minutes: 5
         env:
           NOVA_CLARITY_MIDPOINT: '1'
+          NOVA_CLARITY_TRACE: '1'
         run: node tests/browser/render-clarity-aa-b-research.cjs
       - name: Run real React + Chromium smoke
         run: |
