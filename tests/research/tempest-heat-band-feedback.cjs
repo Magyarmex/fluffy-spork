@@ -13,6 +13,9 @@ function run(reload,name,pattern,policy){
   const g=bootGame(),p=g.player;g.sfx.muted=true;
   g.setClass(p,'tempest');g.tanks=[p];g.tankById=new Map([[p.id,p]]);
   g.shapes=[];g.drones=[];g.powerups=[];
+  // The initial Zero Churn shape index and spatial hash can retain ghosts.
+  if(g.shapeById)g.shapeById.clear();
+  if(g.hash&&g.hash.clear)g.hash.clear();
   // Unlike merely clearing arrays, prevent the core's half-second shape
   // replenishment, powerup timer and elite/AI respawns during this isolation.
   g.shapeTimer=Infinity;g.powerupTimer=Infinity;g.eliteTimer=Infinity;
