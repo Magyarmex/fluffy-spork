@@ -23,7 +23,7 @@ function git(cwd, ...args) {
   return r.stdout.trim();
 }
 
-for (const scenario of ['tests-only', 'runtime', 'exhaustion']) {
+for (const scenario of ['tests-only', 'runtime', 'index', 'transport', 'exhaustion']) {
   test('materializer post-fetch/pre-push recovery: ' + scenario, () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nova-push-race-'));
     try {
@@ -55,6 +55,7 @@ count=0
 if [ -f "$count_file" ]; then count=$(cat "$count_file"); fi
 count=$((count + 1))
 echo "$count" > "$count_file"
+if [ "${RACE_KIND}" = "transport" ]; then exit 1; fi
 if [ "\${RACE_KIND}" = "exhaustion" ] || [ "$count" -eq 1 ]; then
   git -C "\${RACE_PRODUCER}" fetch origin main >/dev/null 2>&1
   git -C "\${RACE_PRODUCER}" reset --hard origin/main >/dev/null
@@ -81,11 +82,11 @@ fi
           GIT_COMMITTER_NAME: 'Fixture', GIT_COMMITTER_EMAIL: 'fixture@example.invalid',
         },
       });
-      assert.equal(r.status, scenario === 'exhaustion' ? 1 : 0, r.stderr || r.stdout);
+      assert.equal(r.status, ['exhaustion', 'transport'].includes(scenario) ? 1 : 0, r.stderr || r.stdout);
       git(producer, 'fetch', 'origin', 'main');
       const published = git(producer, 'show', 'origin/main:index.html');
-      assert.equal(published, scenario === 'tests-only' ? 'tested new page' : 'old page');
-      if (scenario !== 'runtime') {
+      assert.equal(published, scenario === 'tests-only' ? 'tested new page' : scenario === 'index' ? 'newer' : 'old page');
+      if (scenario === 'tests-only' || scenario === 'exhaustion') {
         assert.equal(git(producer, 'show', 'origin/main:tests/node/concurrent-1.test.js'), '1');
       }
       if (scenario === 'runtime') {
@@ -93,6 +94,10 @@ fi
       }
       if (scenario === 'tests-only') {
         assert.equal(fs.readFileSync(path.join(worker, 'validation.marker'), 'utf8'), 'ran');
+      }
+      if (scenario === 'transport') {
+        assert.match(r.stderr, /reason other than a non-fast-forward race/);
+        assert.equal(fs.readFileSync(path.join(root, 'count'), 'utf8').trim(), '1');
       }
       if (scenario === 'exhaustion') {
         assert.match(r.stderr, /exhausted three safe push attempts/);
