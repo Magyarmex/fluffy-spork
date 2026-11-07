@@ -401,3 +401,28 @@ test('composed Game warns when a first touch is queued before a stalled RAF',()=
     assert.equal(g.input.firing,false);
   }finally{owner.stop();g.destroy()}
 });
+
+
+test('ignored third touch does not falsely claim a stick reset after intentional release',()=>{
+  const s=fixture();s.game.canvas={getBoundingClientRect:()=>({left:0,width:800})};
+  // Match shipping Input.pd: the left half has one owner, and a second
+  // left-side press is ignored even when the aim stick is unoccupied.
+  s.input.pd=function(e){
+    const stick=e.clientX<360?'move':'aim';
+    if(this.stickId[stick]!==-1)return;
+    this.stickId[stick]=e.pointerId;this[stick].active=true;
+    if(stick==='aim')this.firing=true;
+  };
+  s.owner.start();
+  try{
+    s.down(1005,7);s.frame(1017);
+    assert.equal(s.input.stickId.move,7);
+    s.down(1020,9); // Same left-side zone: Input would ignore this press.
+    s.up(1025,7);   // Actual owner intentionally released before the stall.
+    s.frame(1137);
+    assert.equal(s.notices.length,0,
+      'ignored touch must not be reported as a cancelled stick');
+    assert.equal(s.input.stickId.move,-1);
+    assert.equal(s.input.firing,false);
+  }finally{s.owner.stop()}
+});
