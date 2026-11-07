@@ -31,9 +31,11 @@ const burst=burstDurations[firePattern]||null;
 // Held aim models desktop fire release; release clears aim during rests and
 // instantly restores a full 40px aim vector at the next firing boundary.
 // Real touch pointerdown begins at dx=0 and needs pointermove beyond deadzone;
-// this is an optimistic input-state control, not a DOM gesture simulation.
+// release is an optimistic input-state control, not a DOM gesture simulation.
+// Center mode holds the touch firing flag while returning the aim vector to
+// zero: Game.update must suppress shots when aimVec() returns null.
 const aimMode=process.env.NOVA_JITTER_AIM_MODE||'held';
-if(!['held','release'].includes(aimMode))throw new Error('NOVA_JITTER_AIM_MODE must be held or release');
+if(!['held','release','center'].includes(aimMode))throw new Error('NOVA_JITTER_AIM_MODE must be held, release or center');
 const patterns={
  native30:[4],native60:[2],native120:[1],
  mixedSlow:[2,4,1,1,2,2],mixedFast:[1,3,2,1,3,2],
@@ -65,12 +67,12 @@ function run(seed,reload,name,steps){
   g.shapes=[];g.drones=[];g.powerups=[];
   g.input.aim.active=true;g.input.aim.dx=40;g.input.firing=true;g.input.autofire=false;
   p.stats.reload=reload;
-  let volleys=0,restVolleys=0,peakHeat=0,peakCooldown=0,minHeat=Infinity,elapsedTicks=0,firingTicks=0,restTicks=0,updateCalls=0,restStartHeat=null,restStartSpin=null,restHeatWindows=[],restSpinWindows=[];
+  let volleys=0,restVolleys=0,intendedActive=true,peakHeat=0,peakCooldown=0,minHeat=Infinity,elapsedTicks=0,firingTicks=0,restTicks=0,updateCalls=0,restStartHeat=null,restStartSpin=null,restHeatWindows=[],restSpinWindows=[];
   const shotTimes=[],shotAngles=[],shotHeats=[],shotStabilities=[],shotSpins=[];const original=g.tryFire;
   g.tryFire=function(t){
    const before=this.bullets.length;
    const result=original.apply(this,arguments);
-   if(t===p&&this.bullets.length>before){volleys++;if(!g.input.firing)restVolleys++;shotTimes.push(this.time);shotAngles.push(p.angle);shotHeats.push(p.__v17Heat??0);shotStabilities.push(p.__v17Stability??1);shotSpins.push(p.fireSpin??0);}
+   if(t===p&&this.bullets.length>before){volleys++;if(!intendedActive)restVolleys++;shotTimes.push(this.time);shotAngles.push(p.angle);shotHeats.push(p.__v17Heat??0);shotStabilities.push(p.__v17Stability??1);shotSpins.push(p.fireSpin??0);}
    return result;
   };
   try{
@@ -87,8 +89,10 @@ function run(seed,reload,name,steps){
       (active?burst[0]-position:period-position);
      const slice=Math.min(remaining,untilBoundary);
      if(!active&&restStartHeat===null){restStartHeat=p.__v17Heat??0;restStartSpin=p.fireSpin??0;}
-     g.input.firing=active;
+     intendedActive=active;
+     g.input.firing=aimMode==='center'?true:active;
      if(aimMode==='release'){g.input.aim.active=active;g.input.aim.dx=active?40:0;}
+     if(aimMode==='center'){g.input.aim.active=true;g.input.aim.dx=active?40:0;}
      g.update(slice/120);updateCalls++;
      peakHeat=Math.max(peakHeat,p.__v17Heat??0);
      minHeat=Math.min(minHeat,p.__v17Heat??0);
@@ -154,4 +158,4 @@ for(const seed of seeds)for(const reload of reloads){
  }
 }
 console.log(JSON.stringify({method:'actual materialized 49-overlay Game; held aim/fire; no targets',
- phases,firePattern,aimMode,selectedPatterns,caveats:['research-only: release mode instantly restores aim, unlike real touch pointerdown deadzone','exact input-boundary splitting can add Game.update calls beyond presentation frames','all schedules cover exactly 8 simulated seconds','0.7s burst rhythm ends in a partial rest excluded from completed rest windows','variable dt changes world update chronology, not merely presentation FPS','no player-facing patch'],patterns,seeds,reloads,results:all},null,2));
+ phases,firePattern,aimMode,selectedPatterns,caveats:['research-only: release mode instantly restores aim, unlike real touch pointerdown deadzone','center mode models a held stick dragged to neutral, not a real gesture','exact input-boundary splitting can add Game.update calls beyond presentation frames','all schedules cover exactly 8 simulated seconds','0.7s burst rhythm ends in a partial rest excluded from completed rest windows','variable dt changes world update chronology, not merely presentation FPS','no player-facing patch'],patterns,seeds,reloads,results:all},null,2));
