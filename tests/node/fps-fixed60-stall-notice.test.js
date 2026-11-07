@@ -276,3 +276,128 @@ test('exact 100ms foreground gap is not classified as a long stall',()=>{
     assert.equal(s.input.firing,false);
   }finally{s.owner.stop()}
 });
+
+
+test('blur then fresh touch down is reported when the same stall discards it',()=>{
+  const s=fixture();s.owner.start();
+  try{
+    s.down(1005);s.frame(1017);
+    s.timeline.push(.020,'blur',{});
+    s.down(1025);
+    s.frame(1137);
+    assert.deepEqual(s.notices,[['Touch controls reset — touch again','warn']]);
+    assert.equal(s.input.stickId.move,-1);
+    assert.equal(s.input.firing,false);
+  }finally{s.owner.stop()}
+});
+
+test('blur then new touch release stays silent and cannot leave phantom fire',()=>{
+  const s=fixture();s.owner.start();
+  try{
+    s.down(1005);s.frame(1017);
+    s.timeline.push(.020,'blur',{});
+    s.down(1025,9);
+    s.up(1030,9);
+    s.frame(1137);
+    assert.equal(s.notices.length,0);
+    assert.equal(s.input.move.active,false);
+    assert.equal(s.input.firing,false);
+  }finally{s.owner.stop()}
+});
+
+test('post-blur new pointer ID still receives a reset warning',()=>{
+  const s=fixture();s.owner.start();
+  try{
+    s.down(1005,7);s.frame(1017);
+    s.timeline.push(.020,'blur',{});
+    s.down(1025,9);
+    s.frame(1137);
+    assert.equal(s.notices.length,1,'fresh touch must not be hidden by old blur');
+    assert.equal(s.input.stickId.move,-1);
+  }finally{s.owner.stop()}
+});
+
+
+test('post-blur UI or mouse down cannot masquerade as a held touch',()=>{
+  for(const data of [
+    {pointerId:9,pointerType:'touch',targetIsUI:true},
+    {pointerId:9,pointerType:'mouse',targetIsUI:false}
+  ]){
+    const s=fixture();s.owner.start();
+    try{
+      s.down(1005);s.frame(1017);
+      s.timeline.push(.020,'blur',{});
+      s.timeline.push(.025,'pointerdown',data);
+      s.frame(1137);
+      assert.equal(s.notices.length,0,'non-stick input must not produce a reset warning');
+      assert.equal(s.input.move.active,false);
+      assert.equal(s.input.firing,false);
+    }finally{s.owner.stop()}
+  }
+});
+
+
+test('queued first touch lost to foreground stall is explicitly reported',()=>{
+  const s=fixture();s.owner.start();
+  try{
+    s.frame(1017);
+    s.down(1020,7); // Captured by DOM, not yet sampled by Game.
+    assert.equal(s.input.stickId.move,-1);
+    s.frame(1137);
+    assert.deepEqual(s.notices,[['Touch controls reset — touch again','warn']]);
+    assert.equal(s.input.stickId.move,-1,'stall must not resurrect queued input');
+    assert.equal(s.input.firing,false);
+  }finally{s.owner.stop()}
+});
+
+test('unowned queued UI, mouse, release, or blur is not a lost touch',()=>{
+  const cases=[
+    [{kind:'pointerdown',data:{pointerId:7,pointerType:'touch',targetIsUI:true}}],
+    [{kind:'pointerdown',data:{pointerId:1,pointerType:'mouse'}}],
+    [{kind:'pointerdown',data:{pointerId:7,pointerType:'touch'}},
+     {kind:'pointerup',data:{pointerId:7,pointerType:'touch'}}],
+    [{kind:'pointerdown',data:{pointerId:7,pointerType:'touch'}},
+     {kind:'blur',data:{}}]
+  ];
+  for(const events of cases){
+    const s=fixture();s.owner.start();
+    try{
+      s.frame(1017);
+      let at=.020;
+      for(const event of events){s.timeline.push(at,event.kind,event.data);at+=.005;}
+      s.frame(1137);
+      assert.equal(s.notices.length,0,'no held touch remains after queued edges');
+      assert.equal(s.input.stickId.move,-1);
+      assert.equal(s.input.firing,false);
+    }finally{s.owner.stop()}
+  }
+});
+
+
+test('composed Game warns when a first touch is queued before a stalled RAF',()=>{
+  process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
+  const {bootGame}=require('../research/audio-rng-causal-pilot.cjs');
+  const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs');
+  const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
+  let now=1000;const notices=[];g.toast=(...args)=>notices.push(args);
+  const timeline=new ChronologicalInput(g.input);
+  const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
+  const owner=new FixedStepRafOwner(g,timeline,bridge,{
+    now:()=>now,request:()=>1,cancel:()=>{},render:()=>{}
+  });
+  try{
+    owner.start();
+    now=1017;owner.frame(now);
+    assert.equal(g.input.stickId.move,-1);
+    now=1020;
+    assert.equal(bridge.capture({type:'pointerdown',timeStamp:1020,
+      pointerId:11,pointerType:'touch',clientX:100,clientY:200,
+      button:0,buttons:1,target:{tagName:'CANVAS',closest:()=>null}}),true);
+    assert.equal(g.input.stickId.move,-1,'input must still await its simulation tick');
+    now=1137;owner.frame(now);
+    assert.equal(owner.droppedFrames,1);
+    assert.deepEqual(notices,[['Touch controls reset — touch again','warn']]);
+    assert.equal(g.input.stickId.move,-1,'never resurrect discarded touch');
+    assert.equal(g.input.firing,false);
+  }finally{owner.stop();g.destroy()}
+});
