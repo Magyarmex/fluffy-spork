@@ -4,7 +4,8 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {chromium}=require('playwright');
-const phases=[100,65,100,100,65,65];
+// Six-arm ABBA-like order limits linear run-order bias (mean index differs by 1/3 phase).
+const phases=[100,65,65,100,65,100];
 const viewports=[{name:'desktop',width:1280,height:800},{name:'mobile',width:320,height:640}];
 const pct=(xs,p)=>{const s=[...xs].sort((a,b)=>a-b);return s[Math.ceil(s.length*p)-1];};
 async function measure(browser,viewport,scale,index){
