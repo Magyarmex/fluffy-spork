@@ -8,6 +8,23 @@ const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
 const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs');
 const {FixedStepRafOwner}=require('../research/fixed-step-raf-owner.cjs');
 const TICKS=960;
+// Both RAF and touch-chronology arms intentionally exclude targets. Prevent
+// silent shape/escort replenishment and stale spatial/ID ghosts.
+function isolateNoTarget(g,p){
+ g.shapes=[];g.drones=[];g.powerups=[];
+ if(g.shapeById)g.shapeById.clear();
+ if(g.hash&&g.hash.clear)g.hash.clear();
+ g.shapeTimer=Infinity;g.powerupTimer=Infinity;g.eliteTimer=Infinity;
+ g.crasherTimer=Infinity;g.aiRespawns=[];
+ g.spawnShape=()=>null;g.spawnPowerup=()=>null;g.spawnAITank=()=>null;
+ p.droneRespawnT=Infinity;g.spawnDrone=()=>null;
+}
+function assertNoTarget(g){
+ assert.equal(g.tanks.length,1,'unexpected AI tank in isolated fixed60 test');
+ assert.equal(g.shapes.length,0,'unexpected neutral shape in isolated fixed60 test');
+ assert.equal(g.drones.length,0,'unexpected native escort drone in isolated fixed60 test');
+ assert.equal(g.powerups.length,0,'unexpected powerup in isolated fixed60 test');
+}
 const patterns={
  mixedSlow:[2,4,1,1,2,2],mixedFast:[1,3,2,1,3,2],
  alternating:[1,4,1,2,2,2],aliasSlow:[1,1,1,3,3,3]
@@ -24,7 +41,7 @@ function run(seed,reload,intervals,maxSteps=2){
  return withSeed(seed,draws=>{
   const g=bootGame(),p=g.player;g.sfx.muted=true;
   g.setClass(p,'tempest');g.tanks=[p];g.tankById=new Map([[p.id,p]]);
-  g.shapes=[];g.drones=[];g.powerups=[];p.stats.reload=reload;
+  isolateNoTarget(g,p);p.stats.reload=reload;
   let now=1000,callback=null;
   const timeline=new ChronologicalInput(g.input);
   const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
@@ -48,6 +65,7 @@ function run(seed,reload,intervals,maxSteps=2){
     const next=callback;assert.equal(typeof next,'function');
     callback=null;next(now);
    }
+   assertNoTarget(g);
    return {volleys,shotTimes,hash:digest(physical(g)),draws:draws(),
     ticks:owner.ticks,dropped:owner.droppedFrames,droppedMs:owner.droppedMs,
     weapon:{fireCd:p.fireCd,heat:p.__v17Heat,stability:p.__v17Stability,
@@ -78,7 +96,7 @@ function runTouch(seed,intervals){
  return withSeed(seed,draws=>{
   const g=bootGame(),p=g.player;g.sfx.muted=true;
   g.setClass(p,'tempest');g.tanks=[p];g.tankById=new Map([[p.id,p]]);
-  g.shapes=[];g.drones=[];g.powerups=[];p.stats.reload=8;
+  isolateNoTarget(g,p);p.stats.reload=8;
   g.input.autofire=false;
   let now=1000,callback=null;
   const timeline=new ChronologicalInput(g.input);
@@ -113,6 +131,7 @@ function runTouch(seed,intervals){
     const next=callback;assert.equal(typeof next,'function');
     callback=null;next(now);
    }
+   assertNoTarget(g);
    return {volleys,shotTimes,hash:digest(physical(g)),draws:draws(),
     ticks:owner.ticks,dropped:owner.droppedFrames,applied:timeline.applied,
     weapon:{fireCd:p.fireCd,heat:p.__v17Heat,stability:p.__v17Stability,

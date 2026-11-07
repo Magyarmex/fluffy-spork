@@ -21,6 +21,20 @@ function run(cls,seed,presentationHz){
   g.setClass(p,cls);
   g.tanks=[p];g.tankById=new Map([[p.id,p]]);
   g.shapes=[];g.drones=[];g.powerups=[];g.bullets=[];
+  // This is a no-target cadence reference. Clearing arrays alone leaves
+  // Zero Churn lookups and the core's replenishment timers alive.
+  if(g.shapeById)g.shapeById.clear();
+  if(g.hash&&g.hash.clear)g.hash.clear();
+  g.shapeTimer=Infinity;g.powerupTimer=Infinity;g.eliteTimer=Infinity;
+  g.crasherTimer=Infinity;g.aiRespawns=[];
+  g.spawnShape=()=>null;g.spawnPowerup=()=>null;g.spawnAITank=()=>null;
+  p.droneRespawnT=Infinity;g.spawnDrone=()=>null;
+  const assertIsolated=()=>{
+   assert.equal(g.tanks.length,1,'no AI respawns in fixed60 Gunner reference');
+   assert.equal(g.shapes.length,0,'no neutral replenishment in Gunner reference');
+   assert.equal(g.drones.length,0,'no native escort respawns in Gunner reference');
+   assert.equal(g.powerups.length,0,'no powerup replenishment in Gunner reference');
+  };
   g.status='playing';g.paused=false;
   let owner,now=1000,callback=null,volleys=0;
   const original=g.tryFire;
@@ -52,8 +66,10 @@ function run(cls,seed,presentationHz){
     assert.equal(owner.ticks,TICKS,'no 60Hz simulation tick may disappear');
     assert.equal(owner.droppedFrames,0,'healthy 30Hz must not drop simulation time');
     assert.equal(owner.droppedMs,0);
+    assertIsolated();
    }else{
     for(let tick=0;tick<TICKS;tick++)g.update(1/60);
+    assertIsolated();
    }
    return {volleys,hash:digest(physical(g)),draws:draws(),
     heat:p.__v17Heat||0,fireCd:p.fireCd,
