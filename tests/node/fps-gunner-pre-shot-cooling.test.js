@@ -65,9 +65,19 @@ test('mixed 33/17ms presentation never receives sustained-30Hz cooling credit',(
   const actual=withSeed(1517800,()=>{
    const g=bootGame(),p=g.player;g.setClass(p,cls);
    g.tanks=[p];g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];
+   // This mixed-frame heat check must not acquire replenished neutral
+   // shapes or native escort drones midway through the measurement.
+   g.shapeTimer=Infinity;g.powerupTimer=Infinity;g.eliteTimer=Infinity;
+   g.crasherTimer=Infinity;g.aiRespawns=[];
+   g.spawnShape=()=>null;g.spawnPowerup=()=>null;g.spawnAITank=()=>null;
+   p.droneRespawnT=Infinity;g.spawnDrone=()=>null;
    g.status='playing';g.input.firing=true;g.input.autofire=false;
    g.input.aim.active=true;g.input.aim.dx=40;
-   for(let i=0;i<160;i++)g.update(i%2?1/60:1/30);
+   for(let i=0;i<160;i++){
+    g.update(i%2?1/60:1/30);
+    assert.equal(g.tanks.length,1);
+    assert.equal(g.shapes.length+g.drones.length+g.powerups.length,0);
+   }
    const out={heat:p.__v17Heat,streak:g.__v17CoarseStreak};g.destroy();return out;
   });
   assert.ok(Math.abs(actual.heat-heat)<1e-8,cls+' must not overcool under mixed frame intervals');
