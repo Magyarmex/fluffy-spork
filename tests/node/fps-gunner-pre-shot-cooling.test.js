@@ -64,7 +64,7 @@ test('mixed 33/17ms presentation never receives sustained-30Hz cooling credit',(
  for(const [cls,heat] of [['twin',.25533333333333325],['minigun',.066]]){
   const actual=withSeed(1517800,()=>{
    const g=bootGame(),p=g.player;g.setClass(p,cls);
-   g.tanks=[p];g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];
+   g.tanks=[p];g.tankById=new Map([[p.id,p]]);g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];
    // This mixed-frame heat check must not acquire replenished neutral
    // shapes or native escort drones midway through the measurement.
    g.shapeTimer=Infinity;g.powerupTimer=Infinity;g.eliteTimer=Infinity;
