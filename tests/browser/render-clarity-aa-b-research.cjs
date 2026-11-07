@@ -138,11 +138,15 @@ async function measure(browser,viewport,scale,index){
   });
   await deploy.click();
   await page.waitForFunction(()=>window.__novaClarityResearchGame?.status==='playing',{timeout:30000});
-  if(traceThisPhase){
+  // Start tracing only after the game's warmup, at the exact beginning of
+  // the measured RAF window. Earlier traces included warmup and could not be
+  // compared directly with the four-second simulation/long-task counters.
+  if(traceThisPhase)await page.exposeFunction('__novaResearchBeginMeasuredTrace',async()=>{
+   assert.equal(traceStarted,false,'trace must begin exactly once per phase');
    await cdp.send('Tracing.start',{transferMode:'ReturnAsStream',
     categories:'devtools.timeline,blink.user_timing,v8,disabled-by-default-devtools.timeline'});
    traceStarted=true;
-  }
+  });
   const data=await page.evaluate(async()=>{
    const g=window.__novaClarityResearchGame;
    // Same legal Tempest build and held aim/firing intent in each independent
@@ -186,6 +190,8 @@ async function measure(browser,viewport,scale,index){
    };
    // Fresh game per arm: no settings menu, pause, or rolling perf history crossover.
    await new Promise(resolve=>setTimeout(resolve,1800));
+   if(window.__novaResearchBeginMeasuredTrace)
+    await window.__novaResearchBeginMeasuredTrace();
    const begin=performance.now(),gameTime=g.time,shotsAtBegin=shots,gaps=[];
    sampling=true;
    const interruptions=[],longTasks=[];
@@ -237,6 +243,7 @@ async function measure(browser,viewport,scale,index){
     outer,perf:window.NovaPerf?.snapshot(g)||null,status:g.status};
   });
   if(layoutFixture)assert.equal(layoutIntercepts,1,'research must intercept exactly one shipping Battlefield overlay');
+  if(traceThisPhase)assert.equal(traceStarted,true,'measured trace must have started after warmup');
   const trace=traceStarted?await stopTrace(cdp,`artifacts/browser/render-clarity-combat-trace-${scale}-phase-${index}.json`):null;
   traceStarted=false;
   assert.equal(data.scale,scale);
@@ -321,6 +328,7 @@ async function measure(browser,viewport,scale,index){
     'minimap drawing occurs outside update/render in the shipping RAF; background browser tasks remain unaccounted',
     'Long Tasks API may be unsupported or miss tasks below its threshold',
     'RAF timestamps and PerformanceObserver are browser-clock observations, not input-to-photon latency',
+    'opt-in DevTools trace begins after warmup and ends after measured RAF completion; trailing CDP turnaround may remain',
     'opt-in DevTools trace event durations overlap and are not exclusive CPU attribution'],records};
   fs.mkdirSync('artifacts/browser',{recursive:true});
   fs.writeFileSync('artifacts/browser/render-clarity-research.json',
