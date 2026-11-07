@@ -18,6 +18,9 @@ function run(reload,name,pattern,policy){
   g.shapeTimer=Infinity;g.powerupTimer=Infinity;g.eliteTimer=Infinity;
   g.crasherTimer=Infinity;g.aiRespawns=[];
   g.spawnShape=()=>null;g.spawnPowerup=()=>null;g.spawnAITank=()=>null;
+  // Tempest itself owns three ESCORT drones in the shipping class definition.
+  // Disable their respawn explicitly for a truly no-target cadence trial.
+  p.droneRespawnT=Infinity;g.spawnDrone=()=>null;
   p.stats.reload=reload;g.input.aim.active=true;g.input.aim.dx=40;
   g.input.autofire=false;
   const out={seed,reload,schedule:name,policy,frames:0,updates:0,volleys:0,
