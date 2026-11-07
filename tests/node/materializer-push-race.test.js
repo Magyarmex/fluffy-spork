@@ -55,12 +55,14 @@ count=0
 if [ -f "$count_file" ]; then count=$(cat "$count_file"); fi
 count=$((count + 1))
 echo "$count" > "$count_file"
-if [ "${RACE_KIND}" = "transport" ]; then exit 1; fi
+if [ "\${RACE_KIND}" = "transport" ]; then exit 1; fi
 if [ "\${RACE_KIND}" = "exhaustion" ] || [ "$count" -eq 1 ]; then
   git -C "\${RACE_PRODUCER}" fetch origin main >/dev/null 2>&1
   git -C "\${RACE_PRODUCER}" reset --hard origin/main >/dev/null
   if [ "\${RACE_KIND}" = "runtime" ]; then
     echo changed > "\${RACE_PRODUCER}/nova-updates/sample.js"
+  elif [ "\${RACE_KIND}" = "index" ]; then
+    echo newer > "\${RACE_PRODUCER}/index.html"
   else
     mkdir -p "\${RACE_PRODUCER}/tests/node"
     echo "$count" > "\${RACE_PRODUCER}/tests/node/concurrent-$count.test.js"
