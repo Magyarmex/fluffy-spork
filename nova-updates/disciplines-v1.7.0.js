@@ -712,11 +712,16 @@ wrap('game/render',function(renderMod,require){
   function arc(ctx,x,y,r,a0,a1,col,w,alpha){
     ctx.save();ctx.globalAlpha=alpha==null?1:alpha;ctx.strokeStyle=col;ctx.lineWidth=w||2;ctx.beginPath();ctx.arc(x,y,r,a0,a1);ctx.stroke();ctx.restore();
   }
+  // Tempest's bright cue must mean its *actual* Apex cooldown gate is live.
+  // Other Gunners retain their existing broad cadence hint.
+  function gunnerCue(t,h,st){
+    return t.cls==='tempest' ? Math.max(0,1-Math.abs(h-.56)/.36)>.58&&st>.52 : h>.26&&h<.86&&st>.54;
+  }
   function drawGunner(ctx,g,t){
     var h=clamp(t.__v17Heat||0,0,1),st=clamp(t.__v17Stability==null?1:t.__v17Stability,0,1),def=C[t.cls],r=(def&&def.size||15)+12;
     ctx.save();ctx.globalCompositeOperation='lighter';
     ctx.lineCap='round';arc(ctx,t.x,t.y,r,-Math.PI*.78,-Math.PI*.78+Math.PI*1.56*h,'#68ecff',2.3,.72);
-    if(h>.26&&h<.86&&st>.54)arc(ctx,t.x,t.y,r+3,-Math.PI*.10,Math.PI*.10,'#d9fbff',2.8,.72);
+    if(gunnerCue(t,h,st))arc(ctx,t.x,t.y,r+3,-Math.PI*.10,Math.PI*.10,'#d9fbff',2.8,.72);
     if(h>.84)arc(ctx,t.x,t.y,r+1,Math.PI*.30,Math.PI*.72,'#ff9d7a',2.1,.58+.18*Math.sin(g.time*12));
     ctx.restore();
   }
@@ -780,6 +785,7 @@ wrap('game/render',function(renderMod,require){
 window.__NOVA_DISCIPLINES_TEST__={
   angleDelta:ad,
   gunSweet:function(h){return clamp(1-Math.abs(h-.56)/.30,0,1);},
+  gunnerCue:gunnerCue,
   guardFront:function(facing,bearing,arc){return Math.abs(ad(bearing,facing))<=arc*.5;},
   fuse:function(range,depth){return clamp(range*(.20+.78*clamp(depth,.08,1)),150,range*.965);}
 };
