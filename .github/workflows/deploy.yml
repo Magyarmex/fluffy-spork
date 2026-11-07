@@ -357,6 +357,7 @@ jobs:
             fi
             echo 'Only non-runtime commits arrived; rebasing the tested page onto latest main.'
             cp index.html "${RUNNER_TEMP}/nova-materialized-index.html"
+            git restore -- index.html
             git switch -C nova-materialize-latest origin/main
             cp "${RUNNER_TEMP}/nova-materialized-index.html" index.html
           fi
