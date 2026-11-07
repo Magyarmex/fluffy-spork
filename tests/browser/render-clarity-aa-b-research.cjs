@@ -365,8 +365,22 @@ async function measure(browser,viewport,scale,index){
    new Set(fingerprints).size===1;
   if(trailMode||midpointMode)assert.equal(matchedInitialWorlds,true,
    'seeded research arms require the same selected initial physical world');
+  // Descriptive summaries are not causal estimates: preserve all individual
+  // phase records, including outliers, for order/drift and exposure review.
+  const midpointSummary=midpointMode?Object.fromEntries(viewports.map(v=>[
+   v.name,Object.fromEntries([65,80,100].map(scale=>{
+    const group=records.filter(r=>r.viewport===v.name&&r.scale===scale);
+    assert.equal(group.length,3,'midpoint pilot needs three real phases per arm');
+    const fps=group.map(r=>r.fps),pace=group.map(r=>r.simulationPace);
+    return [scale,{n:group.length,medianFps:pct(fps,.5),
+     minFps:Math.min(...fps),maxFps:Math.max(...fps),
+     medianSimulationPace:pct(pace,.5),
+     medianP95GapMs:pct(group.map(r=>r.p95GapMs),.5),
+     backingPixels:group.map(r=>r.backing[0]*r.backing[1])}];
+   }))
+  ])):null;
   const evidence={researchOnly:true,trailCausal:trailMode,midpointMode,
-   phaseOrder:phases,commit:process.env.GITHUB_SHA||null,
+   phaseOrder:phases,midpointSummary,commit:process.env.GITHUB_SHA||null,
    matchedInitialWorlds,distinctInitialWorlds:new Set(fingerprints).size,
    caveats:['independent worlds not matched even with identical Battlefield layouts',
     ...(midpointMode?['80% clarity is a research arm, not an adaptive-resolution controller',
