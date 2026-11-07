@@ -226,7 +226,9 @@ class BrowserEventTimeline {
       // A queued first touch may be lost before its first simulation tick;
       // a same-side second touch is ignored by shipping Input.
       let rect=null,geometryRead=false;
-      for(const queued of this.timeline.events.slice(this.timeline.index||0)){
+      const pending=Array.isArray(this.timeline.events) ?
+        this.timeline.events.slice(this.timeline.index||0) : [];
+      for(const queued of pending){
         const d=queued.data;
         if(queued.kind==='blur'){
           held.clear();slots.move=null;slots.aim=null;continue;
