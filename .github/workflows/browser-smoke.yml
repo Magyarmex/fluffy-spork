@@ -113,10 +113,8 @@ jobs:
           python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/nova-browser-http.log 2>&1 &
           echo $! > /tmp/nova-browser-http.pid
       - name: Research-only Render clarity A/A/B (real shipping Tempest)
-        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' }}
-        timeout-minutes: 5
-        env:
-          NOVA_CLARITY_TRACE: '1'
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        timeout-minutes: 3
         run: node tests/browser/render-clarity-aa-b-research.cjs
       - name: Run real React + Chromium smoke
         run: |
