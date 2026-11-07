@@ -581,3 +581,37 @@ test('stale bridge reset respects queued first touch, releases, and ignored same
     }finally{owner.stop();g.destroy()}
   }
 });
+
+test('stale reset notification is cleared only by trustworthy lifecycle evidence',()=>{
+  process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
+  const {bootGame}=require('../research/audio-rng-causal-pilot.cjs');
+  const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs');
+  for(const scenario of ['blur','malformed-release']){
+    const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
+    let now=1000;const notices=[];g.toast=(...args)=>notices.push(args);
+    const timeline=new ChronologicalInput(g.input);
+    const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
+    const owner=new FixedStepRafOwner(g,timeline,bridge,{
+      now:()=>now,request:()=>1,cancel:()=>{},render:()=>{}
+    });
+    const event=(type,delivered,stamp=delivered,pointerType='touch')=>{
+      now=delivered;
+      return bridge.capture({type,timeStamp:stamp,pointerId:11,pointerType,
+        clientX:100,clientY:200,button:0,buttons:type==='pointerup'?0:1,
+        target:{tagName:'CANVAS',closest:()=>null}});
+    };
+    try{
+      owner.start();
+      assert.equal(event('pointerdown',1005),true);
+      now=1017;owner.frame(now);
+      assert.equal(g.input.stickId.move,11);
+      assert.equal(event('pointermove',4100,1025),false);
+      if(scenario==='blur')assert.equal(event('blur',4105),false);
+      else { now=4105; assert.equal(bridge.capture({type:'pointerup',timeStamp:4105,pointerId:11}),false); }
+      now=4117;owner.frame(now);
+      assert.equal(notices.length,scenario==='blur'?0:1,scenario);
+      assert.equal(g.input.stickId.move,-1);
+      assert.equal(g.input.firing,false);
+    }finally{owner.stop();g.destroy()}
+  }
+});
