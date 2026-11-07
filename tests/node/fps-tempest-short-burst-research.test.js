@@ -25,6 +25,7 @@ for(const [pattern,on,off,expectedFireTicks,completeRests] of [
    assert.deepEqual(row.burstTicks,{on,off});
    assert.equal(row.simulatedTicks,960);
    assert.equal(row.firingTicks,expectedFireTicks);
+   assert.equal(row.frameSampledDutyDeltaTicks,row.frameSampledFiringTicks-row.firingTicks);
    assert.equal(row.restTicks,960-expectedFireTicks);
    assert.equal(row.restVolleys,0,'released firing input cannot emit volleys');
    assert.equal(row.restHeatWindows.length,completeRests);
@@ -45,8 +46,12 @@ for(const [pattern,on,off,expectedFireTicks,completeRests] of [
   for(const reload of [0,4,8]){
    const rows=report.results.filter(r=>r.reload===reload);
    assert.equal(rows.length,4);
-   if(pattern==='burst250ms')assert.ok(rows.find(r=>r.name==='native30').extraInputBoundaryUpdates>0,
-    '0.25s input edges do not align to every 30Hz frame; split overhead must be disclosed');
+   if(pattern==='burst250ms'){
+    assert.equal(rows.find(r=>r.name==='native30').extraInputBoundaryUpdates,8,
+     'quarter-second input edges require eight additional 30Hz Game updates');
+    assert.equal(rows.find(r=>r.name==='native30').frameSampledDutyDeltaTicks,16,
+     'unsplit frame-start sampling overstates firing duty by 16/120 seconds');
+   }else assert.equal(rows.find(r=>r.name==='native30').frameSampledDutyDeltaTicks,0);
    assert.ok(rows.find(r=>r.name==='boundaryCross').extraInputBoundaryUpdates>0,
     'adversarial schedule must cross an input boundary');
    assert.ok(rows.find(r=>r.name==='native60').restHeatWindows.some(w=>w.drop>0),
@@ -56,7 +61,8 @@ for(const [pattern,on,off,expectedFireTicks,completeRests] of [
    pattern,reload:r.reload,schedule:r.name,volleys:r.volleys,
    heat:r.heat,peakHeat:r.peakHeat,apexBoost:r.tempestApexBoostVolleys,
    redline:r.tempestRedlinePenaltyVolleys,restHeatDrops:r.restHeatWindows.map(w=>w.drop),
-   restSpinDrops:r.restSpinWindows.map(w=>w.drop)
+   restSpinDrops:r.restSpinWindows.map(w=>w.drop),
+   frameSampledDutyDeltaTicks:r.frameSampledDutyDeltaTicks
   }))));
  });
 }
