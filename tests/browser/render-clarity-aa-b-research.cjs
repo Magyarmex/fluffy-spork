@@ -37,7 +37,7 @@ async function stopTrace(cdp,outputPath){
   'Chrome must return parseable trace events');
  fs.mkdirSync('artifacts/browser',{recursive:true});
  fs.writeFileSync(outputPath,raw);
- const interesting=/^(RunTask|FunctionCall|EvaluateScript|Paint|Layout|UpdateLayerTree|CompositeLayers|MinorGC|MajorGC|V8\.GC.*)$/;
+ const interesting=/^(RunTask|Commit|FunctionCall|EvaluateScript|Paint|Layout|UpdateLayerTree|CompositeLayers|MinorGC|MajorGC|V8\.GC.*)$/;
  const rendererMainThreads=new Set(trace.traceEvents.filter(e=>
   e.ph==='M'&&e.name==='thread_name'&&e.args?.name==='CrRendererMain'
  ).map(e=>e.pid+':'+e.tid));
