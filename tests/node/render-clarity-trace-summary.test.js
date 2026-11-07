@@ -57,6 +57,6 @@ test('DevTools trace begins after warmup and before measured RAF timing',()=>{
  const evaluate=source.indexOf('const data=await page.evaluate(async()=>{');
  assert.ok(exposure>=0&&exposure<evaluate,
   'trace-start bridge must exist before the page enters its measurement');
- assert.ok(!source.slice(exposure,evaluate).includes("await cdp.send('Tracing.start'"),
-  'CDP tracing must be invoked by the page after warmup, not eagerly by Node');
+ assert.match(source.slice(exposure,evaluate),/await cdp\.send\('Tracing\.start'/,
+  'CDP tracing must be inside the page-exposed callback, not started eagerly');
 });
