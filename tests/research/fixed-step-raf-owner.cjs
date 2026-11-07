@@ -189,11 +189,9 @@ class FixedStepRafOwner {
           if(input && input.stickId && input[stick] && input[stick].active &&
              stillHeld.has(input.stickId[stick]))slots[stick]=input.stickId[stick];
         }
-        const canvas=(input && input.canvas)||g.canvas;
-        const rect=canvas && typeof canvas.getBoundingClientRect==='function' ?
-          canvas.getBoundingClientRect() : null;
-        const hasRect=rect && Number.isFinite(rect.left) &&
-          Number.isFinite(rect.width) && rect.width>0;
+        // A stall without queued stick presses must not force a DOM layout
+        // read merely to decide whether to show a notice.
+        let rect=null,hasRect=false,geometryRead=false;
         for(const e of pending){
           if(e.kind==='blur'){
             stillHeld.clear();slots.move=null;slots.aim=null;continue;
@@ -202,6 +200,14 @@ class FixedStepRafOwner {
           if(!d || typeof d.pointerType!=='string' ||
              d.pointerType==='mouse' || d.pointerId==null)continue;
           if(e.kind==='pointerdown' && !d.targetIsUI){
+            if(!geometryRead){
+              geometryRead=true;
+              const canvas=(input && input.canvas)||g.canvas;
+              rect=canvas && typeof canvas.getBoundingClientRect==='function' ?
+                canvas.getBoundingClientRect() : null;
+              hasRect=!!(rect && Number.isFinite(rect.left) &&
+                Number.isFinite(rect.width) && rect.width>0);
+            }
             if(hasRect && Number.isFinite(d.clientX)){
               const side=d.clientX-rect.left<rect.width*.45?'move':'aim';
               if(slots[side]==null){
