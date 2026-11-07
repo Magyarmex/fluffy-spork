@@ -1,5 +1,7 @@
 'use strict';
 // Opt-in research only: real shipping Chromium Render clarity A/A/B.
+// NOVA_TRAIL_CAUSAL=1 instead runs matched-start ordinary-glow A/A/B;
+// default clarity measurements remain free of extra particle wrappers.
 // Not a fixed60 test, matched-world comparison, Android benchmark, or input-latency gate.
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
@@ -79,7 +81,9 @@ async function measure(browser,viewport,scale,index){
   layoutIntercepts++;
   await route.fulfill({response,body:patched});
  });
- await context.addInitScript(({scale,layoutFixture})=>{
+ await context.addInitScript(({scale,layoutFixture,trailMode,suppressOrdinaryTrails})=>{
+  window.__novaTrailResearchMode=trailMode;
+  window.__novaTrailResearchSuppress=suppressOrdinaryTrails;
   localStorage.setItem('novatanks_pilot_settings_v1',JSON.stringify({renderScale:scale}));
   if(layoutFixture){
    // Research-only deterministic global RNG for initial-world equivalence
@@ -89,7 +93,7 @@ async function measure(browser,viewport,scale,index){
    Math.random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;
     return (state>>>0)/4294967296;};
   }
- },{scale,layoutFixture});
+ },{scale,layoutFixture,trailMode,suppressOrdinaryTrails});
  const page=await context.newPage(),errors=[];
  const cdp=await context.newCDPSession(page);
  const traceThisPhase=process.env.NOVA_CLARITY_TRACE==='1'&&viewport.name==='desktop'&&(index===0||index===1);
@@ -150,7 +154,9 @@ async function measure(browser,viewport,scale,index){
     categories:'devtools.timeline,blink.user_timing,v8,disabled-by-default-devtools.timeline'});
    traceStarted=true;
   });
-  const data=await page.evaluate(async(suppressOrdinaryTrails)=>{
+  const data=await page.evaluate(async()=>{
+   const trailMode=window.__novaTrailResearchMode===true;
+   const suppressOrdinaryTrails=window.__novaTrailResearchSuppress===true;
    const g=window.__novaClarityResearchGame;
    // Same legal Tempest build and held aim/firing intent in each independent
    // game. These are still NOT matched physical worlds or player trajectories.
@@ -161,6 +167,7 @@ async function measure(browser,viewport,scale,index){
    // Causal intervention only during the measured window: all arms have
    // identical ordinary-trail warmup. Preserve cosmetic RNG chronology.
    let trailSampling=false,trailStage=false,ordinaryOpportunities=0,ordinarySuppressed=0;
+   if(trailMode){
    const originalBulletUpdate=g.updateBullets;
    g.updateBullets=function(){const prior=trailStage;trailStage=true;
     try{return originalBulletUpdate.apply(this,arguments);}finally{trailStage=prior;}};
@@ -173,6 +180,7 @@ async function measure(browser,viewport,scale,index){
     }
     return originalParticles.apply(this,arguments);
    };
+   }
    // Measure the final composed methods, outside all previously installed
    // gameplay/visual wrappers. NovaPerf measures earlier inner layers.
    // This is opt-in research instrumentation, never a production hook.
@@ -266,7 +274,7 @@ async function measure(browser,viewport,scale,index){
     gaps,interruptions,longTaskSupported,longTasks:longTaskInWindow,entities,
     ordinaryOpportunities,ordinarySuppressed,
     outer,perf:window.NovaPerf?.snapshot(g)||null,status:g.status};
-  },suppressOrdinaryTrails);
+  });
   if(trailMode){
    assert.ok(data.ordinaryOpportunities>0,'actual combat must emit ordinary trails');
    assert.equal(data.ordinarySuppressed,suppressOrdinaryTrails?data.ordinaryOpportunities:0,
