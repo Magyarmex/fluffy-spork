@@ -23,7 +23,7 @@ function git(cwd, ...args) {
   return r.stdout.trim();
 }
 
-for (const scenario of ['tests-only', 'runtime', 'index', 'transport', 'red-tests', 'exhaustion']) {
+for (const scenario of ['tests-only', 'pre-and-post', 'runtime', 'index', 'transport', 'red-tests', 'exhaustion']) {
   test('materializer post-fetch/pre-push recovery: ' + scenario, () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nova-push-race-'));
     try {
@@ -43,6 +43,13 @@ for (const scenario of ['tests-only', 'runtime', 'index', 'transport', 'red-test
       git(producer, 'commit', '-m', 'original runtime');
       git(producer, 'push', '-u', 'origin', 'main');
       git(root, 'clone', '--branch', 'main', remote, worker);
+      if (scenario === 'pre-and-post') {
+        fs.mkdirSync(path.join(producer, 'tests/node'), { recursive: true });
+        fs.writeFileSync(path.join(producer, 'tests/node/earlier.test.js'), '1');
+        git(producer, 'add', '.');
+        git(producer, 'commit', '-m', 'earlier tests-only merge');
+        git(producer, 'push', 'origin', 'main');
+      }
       fs.writeFileSync(path.join(worker, 'index.html'), 'tested new page');
 
       // The hook creates a real competing commit *inside* git push, after the
@@ -91,14 +98,17 @@ fi
       assert.equal(r.status, ['exhaustion', 'transport', 'red-tests'].includes(scenario) ? 1 : 0, r.stderr || r.stdout);
       git(producer, 'fetch', 'origin', 'main');
       const published = git(producer, 'show', 'origin/main:index.html');
-      assert.equal(published, scenario === 'tests-only' ? 'tested new page' : scenario === 'index' ? 'newer' : 'old page');
-      if (scenario === 'tests-only' || scenario === 'exhaustion') {
+      assert.equal(published, ['tests-only', 'pre-and-post'].includes(scenario) ? 'tested new page' : scenario === 'index' ? 'newer' : 'old page');
+      if (['tests-only', 'pre-and-post', 'exhaustion'].includes(scenario)) {
         assert.equal(git(producer, 'show', 'origin/main:tests/node/concurrent-1.test.js'), '1');
       }
       if (scenario === 'runtime') {
         assert.equal(git(producer, 'show', 'origin/main:nova-updates/sample.js'), 'changed');
       }
-      if (scenario === 'tests-only') {
+      if (scenario === 'pre-and-post') {
+        assert.equal(git(producer, 'show', 'origin/main:tests/node/earlier.test.js'), '1');
+      }
+      if (scenario === 'tests-only' || scenario === 'pre-and-post') {
         assert.equal(fs.readFileSync(path.join(worker, 'validation.marker'), 'utf8'), 'ran');
       }
       if (scenario === 'red-tests') {
