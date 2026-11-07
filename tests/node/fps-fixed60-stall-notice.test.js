@@ -372,3 +372,32 @@ test('unowned queued UI, mouse, release, or blur is not a lost touch',()=>{
     }finally{s.owner.stop()}
   }
 });
+
+
+test('composed Game warns when a first touch is queued before a stalled RAF',()=>{
+  process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
+  const {bootGame}=require('../research/audio-rng-causal-pilot.cjs');
+  const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs');
+  const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
+  let now=1000;const notices=[];g.toast=(...args)=>notices.push(args);
+  const timeline=new ChronologicalInput(g.input);
+  const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
+  const owner=new FixedStepRafOwner(g,timeline,bridge,{
+    now:()=>now,request:()=>1,cancel:()=>{},render:()=>{}
+  });
+  try{
+    owner.start();
+    now=1017;owner.frame(now);
+    assert.equal(g.input.stickId.move,-1);
+    now=1020;
+    assert.equal(bridge.capture({type:'pointerdown',timeStamp:1020,
+      pointerId:11,pointerType:'touch',clientX:100,clientY:200,
+      button:0,buttons:1,target:{tagName:'CANVAS',closest:()=>null}}),true);
+    assert.equal(g.input.stickId.move,-1,'input must still await its simulation tick');
+    now=1137;owner.frame(now);
+    assert.equal(owner.droppedFrames,1);
+    assert.deepEqual(notices,[['Touch controls reset — touch again','warn']]);
+    assert.equal(g.input.stickId.move,-1,'never resurrect discarded touch');
+    assert.equal(g.input.firing,false);
+  }finally{owner.stop();g.destroy()}
+});
