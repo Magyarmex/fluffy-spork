@@ -10,7 +10,8 @@ function target(){
  const listeners=new Map();return {
   addEventListener(k,fn){if(!listeners.has(k))listeners.set(k,new Set());listeners.get(k).add(fn)},
   removeEventListener(k,fn){listeners.get(k)?.delete(fn)},
-  counts(){return Object.fromEntries([...listeners].filter(([,v])=>v.size).map(([k,v])=>[k,v.size]))}
+  counts(){return Object.fromEntries([...listeners].filter(([,v])=>v.size).map(([k,v])=>[k,v.size]))},
+  emit(k,event={}){for(const fn of listeners.get(k)||[])fn(event)}
  };
 }
 function setup(){
@@ -42,4 +43,16 @@ test('manual capture teardown restores prototype Game.destroy before normal dest
  h.game.destroy();
  assert.deepEqual(h.w.counts(),{});assert.deepEqual(h.d.counts(),{});
  assert.deepEqual(h.c.counts(),{});
+});
+
+test('browser lifecycle blur clears pending stale-touch notice evidence',()=>{
+ const h=setup();
+ try{
+  h.owner.bridge.pendingStaleTouchIds.add(11);
+  h.w.emit('blur');
+  assert.equal(h.owner.bridge.pendingStaleTouchIds.size,0,
+    'explicit blur already explains the touch reset');
+  assert.equal(h.input.firing,false);
+  assert.equal(h.input.stickId.move,-1);
+ }finally{h.game.destroy()}
 });
