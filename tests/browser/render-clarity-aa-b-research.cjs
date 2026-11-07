@@ -11,22 +11,27 @@ const pct=(xs,p)=>{const s=[...xs].sort((a,b)=>a-b);return s[Math.ceil(s.length*
 // Opt-in, bounded DevTools trace of one real composed combat phase.
 // Chrome trace events are inclusive: category totals must not be added together.
 async function stopTrace(cdp,outputPath){
+ let timer;
  const completed=new Promise((resolve,reject)=>{
-  const timer=setTimeout(()=>reject(new Error('DevTools trace completion timed out')),30000);
-  cdp.once('Tracing.tracingComplete',event=>{clearTimeout(timer);resolve(event.stream);});
+  timer=setTimeout(()=>reject(new Error('DevTools trace completion timed out')),30000);
+  cdp.once('Tracing.tracingComplete',event=>resolve(event.stream));
  });
- await cdp.send('Tracing.end');
- const stream=await completed;
+ let stream;
+ try{await cdp.send('Tracing.end');stream=await completed;}
+ finally{clearTimeout(timer);}
  assert.ok(stream,'Chrome must provide a trace stream');
- let raw='',eof=false;
+ const chunks=[];let totalBytes=0,eof=false;
  try{
   while(!eof){
    const part=await cdp.send('IO.read',{handle:stream,size:1048576});
-   raw+=part.base64Encoded?Buffer.from(part.data,'base64').toString('utf8'):part.data;
-   assert.ok(Buffer.byteLength(raw)<32*1024*1024,'trace exceeds 32 MiB research cap');
+   const chunk=Buffer.from(part.data,part.base64Encoded?'base64':'utf8');
+   chunks.push(chunk);totalBytes+=chunk.length;
+   assert.ok(totalBytes<32*1024*1024,'trace exceeds 32 MiB research cap');
    eof=!!part.eof;
   }
  }finally{await cdp.send('IO.close',{handle:stream});}
+ // Decode once: a UTF-8 character can straddle adjacent IO.read chunks.
+ const raw=Buffer.concat(chunks,totalBytes).toString('utf8');
  const trace=JSON.parse(raw);
  assert.ok(Array.isArray(trace.traceEvents)&&trace.traceEvents.length>0,
   'Chrome must return parseable trace events');
