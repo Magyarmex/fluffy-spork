@@ -349,6 +349,8 @@ async function measure(browser,viewport,scale,index){
   const fingerprints=records.filter(r=>r.layoutFixture).map(r=>r.initialFingerprint);
   const matchedInitialWorlds=fingerprints.length===records.length&&
    new Set(fingerprints).size===1;
+  if(trailMode)assert.equal(matchedInitialWorlds,true,
+   'causal A/A/B requires the same selected initial physical world');
   const evidence={researchOnly:true,trailCausal:trailMode,commit:process.env.GITHUB_SHA||null,
    matchedInitialWorlds,distinctInitialWorlds:new Set(fingerprints).size,
    caveats:['independent worlds not matched even with identical Battlefield layouts',
@@ -371,8 +373,9 @@ async function measure(browser,viewport,scale,index){
     'opt-in DevTools trace begins after warmup and ends after measured RAF completion; trailing CDP turnaround may remain',
     'opt-in DevTools trace event durations overlap and are not exclusive CPU attribution'],records};
   fs.mkdirSync('artifacts/browser',{recursive:true});
-  fs.writeFileSync('artifacts/browser/render-clarity-research.json',
+  fs.writeFileSync(trailMode?'artifacts/browser/trail-causal-research.json':
+   'artifacts/browser/render-clarity-research.json',
    JSON.stringify(evidence,null,2)+'\n');
-  console.log('NOVA_CLARITY_RESEARCH '+JSON.stringify(evidence));
+  console.log((trailMode?'NOVA_TRAIL_CAUSAL_RESEARCH ':'NOVA_CLARITY_RESEARCH ')+JSON.stringify(evidence));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e.stack||e);process.exitCode=1;});
