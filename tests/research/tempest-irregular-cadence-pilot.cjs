@@ -48,11 +48,11 @@ function run(seed,reload,name,steps){
   g.input.aim.active=true;g.input.aim.dx=40;g.input.firing=true;g.input.autofire=false;
   p.stats.reload=reload;
   let volleys=0,peakHeat=0,peakCooldown=0,minHeat=Infinity,elapsedTicks=0,firingTicks=0,restTicks=0,restStartHeat=null,restHeatWindows=[];
-  const shotTimes=[],shotAngles=[],shotHeats=[];const original=g.tryFire;
+  const shotTimes=[],shotAngles=[],shotHeats=[],shotStabilities=[];const original=g.tryFire;
   g.tryFire=function(t){
    const before=this.bullets.length;
    const result=original.apply(this,arguments);
-   if(t===p&&this.bullets.length>before){volleys++;shotTimes.push(this.time);shotAngles.push(p.angle);shotHeats.push(p.__v17Heat??0);}
+   if(t===p&&this.bullets.length>before){volleys++;shotTimes.push(this.time);shotAngles.push(p.angle);shotHeats.push(p.__v17Heat??0);shotStabilities.push(p.__v17Stability??1);}
    return result;
   };
   try{
@@ -83,7 +83,9 @@ function run(seed,reload,name,steps){
     peakCooldown=Math.max(peakCooldown,p.fireCd??0);
    }
    return {seed,reload,name,firePattern,frames:steps.length,simulatedTicks:elapsedTicks,
-    firingTicks,restTicks,restHeatWindows,volleys,minimumHeat:+minHeat.toFixed(6),
+    firingTicks,restTicks,restHeatWindows,volleys,
+    cadenceEligibleVolleys:shotHeats.filter((h,i)=>Math.max(0,1-Math.abs(h-.56)/.30)>.62&&shotStabilities[i]>.56).length,
+    redlineVolleys:shotHeats.filter(h=>h>.93).length,minimumHeat:+minHeat.toFixed(6),
     heat:+(p.__v17Heat??0).toFixed(6),peakHeat:+peakHeat.toFixed(6),
     fireCd:+(p.fireCd??0).toFixed(6),peakCooldown:+peakCooldown.toFixed(6),
     firstShots:shotTimes.slice(0,8).map(n=>+n.toFixed(6)),
