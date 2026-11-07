@@ -120,6 +120,7 @@ jobs:
         run: |
           node tests/browser/real-touch-gameplay.cjs
           node tests/browser/crasher-recovery-cue.cjs
+          node tests/browser/tempest-apex-heat-cue.cjs
           node tests/browser/bomber-terrain-child-birth.cjs
           node tests/browser/bomber-airburst-child-birth.cjs
           node tests/browser/controller-command-ttl-contact.cjs
