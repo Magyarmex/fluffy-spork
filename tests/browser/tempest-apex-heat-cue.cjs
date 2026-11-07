@@ -58,7 +58,7 @@ const {chromium}=require('playwright');
        }else if(this===g.ctx&&Math.abs(x-g.player.x)<.001&&Math.abs(y-g.player.y)<.001&&
           Math.abs(a+Math.PI*.10)<1e-5&&Math.abs(b-Math.PI*.10)<1e-5){
         if(Math.abs(this.lineWidth-2.8)>1e-8||Math.abs(this.globalAlpha-.72)>1e-8)
-         throw Error('Other Gunner cue geometry or opacity changed');
+         throw Error('Other Gunner cue geometry or opacity changed: '+this.lineWidth+' / '+this.globalAlpha+' for '+g.player.cls+' '+state.name);
         otherCues++;
        }
        return orig.apply(this,arguments);
