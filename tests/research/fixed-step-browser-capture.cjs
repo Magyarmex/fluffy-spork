@@ -20,7 +20,10 @@ class BrowserInputCapture {
     this.destroyWrapper = null;
     const capture = e => {
       if (!this.active) return;
-      if (this.document.hidden) { this.timeline.reset(); return; }
+      if (this.document.hidden) { this.timeline.reset();
+        if (typeof this.bridge.takeStaleTouchResetNotice === 'function')
+          this.bridge.takeStaleTouchResetNotice();
+        return; }
       this.bridge.capture(e);
     };
     // Native mouse events are required for button chords: Pointer Events do
@@ -29,14 +32,21 @@ class BrowserInputCapture {
     // do not invent an independent firing state or bypass Input's touch gate.
     const native = type => e => {
       if (!this.active || !e || e.button !== 0) return;
-      if (this.document.hidden) { this.timeline.reset(); return; }
+      if (this.document.hidden) { this.timeline.reset();
+        if (typeof this.bridge.takeStaleTouchResetNotice === 'function')
+          this.bridge.takeStaleTouchResetNotice();
+        return; }
       this.bridge.capture({type, timeStamp:e.timeStamp, pointerType:'mouse',
         pointerId:1, button:e.button, buttons:e.buttons,
         clientX:e.clientX, clientY:e.clientY, target:e.target,
         defaultPrevented:e.defaultPrevented,
         sourceCapabilities:e.sourceCapabilities});
     };
-    const release = () => { if (this.active) this.timeline.reset(); };
+    const release = () => { if (this.active) {
+      this.timeline.reset();
+      if (typeof this.bridge.takeStaleTouchResetNotice === 'function')
+        this.bridge.takeStaleTouchResetNotice();
+    } };
     const hidden = () => { if (this.document.hidden) release(); };
     const spec = [
       [canvas,'pointerdown',capture],

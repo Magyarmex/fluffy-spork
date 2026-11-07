@@ -172,9 +172,23 @@ class BrowserEventTimeline {
     this.lateClamps = 0;
     this.reorderedClamps = 0;
     this.invalidTimestamps = 0;
+    // A stale DOM event can revoke a held touch before the next RAF sees it.
+    // Retain only notification evidence, never the revoked input itself.
+    this.pendingStaleTouchIds = new Set();
+  }
+  takeStaleTouchResetNotice() {
+    const lost = this.pendingStaleTouchIds.size > 0;
+    this.pendingStaleTouchIds.clear();
+    return lost;
   }
   capture(event) {
     if (!event || !KINDS.has(event.type)) throw Error('unsupported browser input event');
+    // A subsequent real release/blur explains the cancellation, even when
+    // it arrives before the next presentation frame.
+    if (event.type === 'blur') this.pendingStaleTouchIds.clear();
+    else if ((event.type === 'pointerup' || event.type === 'pointercancel') &&
+             typeof event.pointerType === 'string' && event.pointerType !== 'mouse')
+      this.pendingStaleTouchIds.delete(event.pointerId);
     const now = this.clock.now();
     if (!Number.isFinite(now)) throw Error('invalid browser clock');
     let stamp = Number(event.timeStamp);
@@ -197,6 +211,53 @@ class BrowserEventTimeline {
       // resurrect a held control after a browser stall. Fail closed until
       // a fresh release/blur arrives.
       this.staleClamps++;
+      const input=this.timeline.input;
+      const held=new Set(this.pendingStaleTouchIds);
+      const slots={move:null,aim:null};
+      if(input && input.touchSeen && input.stickId){
+        for(const stick of ['move','aim']){
+          if(input[stick] && input[stick].active && input.stickId[stick]!==-1){
+            slots[stick]=input.stickId[stick];
+            held.add(input.stickId[stick]);
+          }
+        }
+      }
+      // Reconstruct accepted stick ownership, not merely pointer existence.
+      // A queued first touch may be lost before its first simulation tick;
+      // a same-side second touch is ignored by shipping Input.
+      let rect=null,geometryRead=false;
+      const pending=Array.isArray(this.timeline.events) ?
+        this.timeline.events.slice(this.timeline.index||0) : [];
+      for(const queued of pending){
+        const d=queued.data;
+        if(queued.kind==='blur'){
+          held.clear();slots.move=null;slots.aim=null;continue;
+        }
+        if(!d || d.pointerId==null || typeof d.pointerType!=='string' ||
+           d.pointerType==='mouse')continue;
+        if(queued.kind==='pointerdown' && !d.targetIsUI){
+          if(!geometryRead){
+            geometryRead=true;
+            const canvas=input && input.canvas;
+            rect=canvas && typeof canvas.getBoundingClientRect==='function' ?
+              canvas.getBoundingClientRect() : null;
+          }
+          if(rect && Number.isFinite(rect.left) &&
+             Number.isFinite(rect.width) && rect.width>0 &&
+             Number.isFinite(d.clientX)){
+            const side=d.clientX-rect.left<rect.width*.45?'move':'aim';
+            if(slots[side]==null){slots[side]=d.pointerId;held.add(d.pointerId);}
+          }else if(held.size<2)held.add(d.pointerId);
+        }else if(queued.kind==='pointerup'||queued.kind==='pointercancel'){
+          held.delete(d.pointerId);
+          if(slots.move===d.pointerId)slots.move=null;
+          if(slots.aim===d.pointerId)slots.aim=null;
+        }
+      }
+      if(event.type==='blur') held.clear();
+      else if((event.type==='pointerup'||event.type==='pointercancel') &&
+              typeof event.pointerType==='string' && event.pointerType!=='mouse') held.delete(event.pointerId);
+      this.pendingStaleTouchIds=held;
       this.timeline.reset({quarantine:true});
       if (event.type === 'pointerup' || event.type === 'pointercancel' ||
           event.type === 'keyup' || event.type === 'blur')
@@ -262,7 +323,10 @@ class BrowserInputCapture {
     this.destroyWrapper = null;
     const capture = e => {
       if (!this.active) return;
-      if (this.document.hidden) { this.timeline.reset(); return; }
+      if (this.document.hidden) { this.timeline.reset();
+        if (typeof this.bridge.takeStaleTouchResetNotice === 'function')
+          this.bridge.takeStaleTouchResetNotice();
+        return; }
       this.bridge.capture(e);
     };
     // Native mouse events are required for button chords: Pointer Events do
@@ -271,14 +335,21 @@ class BrowserInputCapture {
     // do not invent an independent firing state or bypass Input's touch gate.
     const native = type => e => {
       if (!this.active || !e || e.button !== 0) return;
-      if (this.document.hidden) { this.timeline.reset(); return; }
+      if (this.document.hidden) { this.timeline.reset();
+        if (typeof this.bridge.takeStaleTouchResetNotice === 'function')
+          this.bridge.takeStaleTouchResetNotice();
+        return; }
       this.bridge.capture({type, timeStamp:e.timeStamp, pointerType:'mouse',
         pointerId:1, button:e.button, buttons:e.buttons,
         clientX:e.clientX, clientY:e.clientY, target:e.target,
         defaultPrevented:e.defaultPrevented,
         sourceCapabilities:e.sourceCapabilities});
     };
-    const release = () => { if (this.active) this.timeline.reset(); };
+    const release = () => { if (this.active) {
+      this.timeline.reset();
+      if (typeof this.bridge.takeStaleTouchResetNotice === 'function')
+        this.bridge.takeStaleTouchResetNotice();
+    } };
     const hidden = () => { if (this.document.hidden) release(); };
     const spec = [
       [canvas,'pointerdown',capture],
@@ -421,6 +492,8 @@ class FixedStepRafOwner {
     this._generation++;this.started=true;this.lastMs=at;
     this._awaitingForwardFrame=true;this.simAtSec=(at-this.bridge.startMs)/1000;
     try{
+      if(typeof this.bridge.takeStaleTouchResetNotice==='function')
+        this.bridge.takeStaleTouchResetNotice();
       this.timeline.reset();this.timeline.tickOrigin=this.simAtSec;
       this.timeline.consumeThrough(this.simAtSec);
       this.paused=!!this.game.paused;
@@ -475,6 +548,8 @@ class FixedStepRafOwner {
   }
   transition(paused,at){
     if(!Number.isFinite(at)||at<this.lastMs-EPS)throw Error('invalid pause clock');
+    if(typeof this.bridge.takeStaleTouchResetNotice==='function')
+      this.bridge.takeStaleTouchResetNotice();
     this.timeline.reset();this.lagMs=0;this.paused=paused;
     this._awaitingForwardFrame=true;this.lastMs=at;this.simAtSec=(at-this.bridge.startMs)/1000;
     // A new simulation epoch changes the tick grid used for safe pointermove coalescing.
@@ -510,6 +585,16 @@ class FixedStepRafOwner {
     const raw=Math.max(0,ts-this.lastMs);
     this.lastMs=ts;
     this.lastSteps=0;
+    // BrowserEventTimeline may have fail-closed BEFORE this RAF, leaving no
+    // owned stick for the ordinary foreground-stall warning to inspect.
+    const staleTouchReset=typeof this.bridge.takeStaleTouchResetNotice==='function' &&
+      this.bridge.takeStaleTouchResetNotice();
+    if(staleTouchReset && !g.paused && (!g.status || g.status==='playing') &&
+       this.isVisible() && typeof g.toast==='function' &&
+       ts-this.lastTouchResetNoticeMs>=8000){
+      this.lastTouchResetNoticeMs=ts;
+      g.toast('Touch controls reset — touch again','warn');
+    }
     if(g.paused){
       if(!this.paused){this.timeline.reset();this.lagMs=0;this.paused=true;}
       this.simAtSec=(ts-this.bridge.startMs)/1000;
@@ -645,6 +730,8 @@ class FixedStepRafOwner {
     // leave the production lifecycle trapped behind the stopped pilot.
     let resetError;
     try{this.timeline.reset()}catch(error){resetError=error}
+    if(typeof this.bridge.takeStaleTouchResetNotice==='function')
+      this.bridge.takeStaleTouchResetNotice();
     this.lagMs=0;
     if(this.game.start===this.startWrapper){
       if(this.startHadOwn)this.game.start=this.originalStart;
