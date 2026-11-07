@@ -51,6 +51,8 @@ async function measure(browser,viewport,scale,index){
    await new Promise(resolve=>setTimeout(resolve,1800));
    const begin=performance.now(),gameTime=g.time,gaps=[];
    const interruptions=[],longTasks=[];
+   const visibilityChanged=()=>interruptions.push({atMs:performance.now()-begin,hidden:document.hidden,reason:'visibilitychange'});
+   document.addEventListener('visibilitychange',visibilityChanged);
    const longTaskSupported=PerformanceObserver.supportedEntryTypes?.includes('longtask')===true;
    let observer=null;
    if(longTaskSupported){
@@ -66,15 +68,18 @@ async function measure(browser,viewport,scale,index){
      function frame(ts){
       if(prior!==null)gaps.push(ts-prior);
       prior=ts;
-      if(document.hidden||g.status!=='playing')
-       interruptions.push({atMs:ts-begin,hidden:document.hidden,status:g.status});
+      if(document.hidden||g.status!=='playing'||g.paused)
+       interruptions.push({atMs:ts-begin,hidden:document.hidden,status:g.status,paused:!!g.paused});
       if(ts-begin<4200)requestAnimationFrame(frame);else resolve();
      }
      requestAnimationFrame(frame);
     });
-   }finally{observer?.disconnect();}
+   }finally{observer?.disconnect();document.removeEventListener('visibilitychange',visibilityChanged);}
    const end=performance.now();
-   const longTaskInWindow=longTasks.filter(t=>t.startMs>=0&&t.startMs<end-begin);
+   const longTaskInWindow=longTasks.map(t=>({
+    startMs:Math.max(0,t.startMs),
+    durationMs:Math.max(0,Math.min(end-begin,t.startMs+t.durationMs)-Math.max(0,t.startMs))
+   })).filter(t=>t.durationMs>0);
    return {scale:JSON.parse(localStorage.getItem('novatanks_pilot_settings_v1')).renderScale,
     quality:g.quality,dpr:g.dpr,css:[g.w,g.h],backing:[g.canvas.width,g.canvas.height],
     gameSeconds:g.time-gameTime,wallMs:end-begin,shots,
@@ -90,11 +95,14 @@ async function measure(browser,viewport,scale,index){
   assert.equal(errors.length,0,'page errors: '+errors.join('; '));
   const total=data.gaps.reduce((a,b)=>a+b,0);
   const longTaskMs=data.longTasks.reduce((sum,t)=>sum+t.durationMs,0);
+  const observedRafMs=total,unobservedWallMs=Math.max(0,data.wallMs-observedRafMs);
   return {viewport:viewport.name,index,scale,cpuThrottle:3,quality:data.quality,dpr:data.dpr,
    css:data.css,backing:data.backing,frames:data.gaps.length,
    fps:1000*data.gaps.length/total,p50GapMs:pct(data.gaps,.5),
    p95GapMs:pct(data.gaps,.95),p99GapMs:pct(data.gaps,.99),
-   gameSeconds:data.gameSeconds,wallMs:data.wallMs,simulationPace:data.gameSeconds/(data.wallMs/1000),
+   gameSeconds:data.gameSeconds,wallMs:data.wallMs,observedRafMs,unobservedWallMs,
+   rafCoveragePct:100*observedRafMs/data.wallMs,
+   simulationPace:data.gameSeconds/(data.wallMs/1000),
    stallFramesOver250Ms:data.gaps.filter(ms=>ms>250).length,
    maxFrameGapMs:Math.max(...data.gaps),
    longTaskSupported:data.longTaskSupported,longTaskCount:data.longTasks.length,
