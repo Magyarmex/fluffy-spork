@@ -4,6 +4,7 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {chromium}=require('playwright');
+const {injectBattlefieldSeed}=require('../research/battlefield-layout-fixture.cjs');
 // Six-arm ABBA-like order limits linear run-order bias (mean index differs by 1/3 phase).
 const phases=[100,65,65,100,65,100];
 const viewports=[{name:'desktop',width:1280,height:800},{name:'mobile',width:320,height:640}];
@@ -62,11 +63,30 @@ async function stopTrace(cdp,outputPath){
   warning:'Inclusive main-thread trace event durations overlap; never sum categories as exclusive CPU time.'};
 }
 async function measure(browser,viewport,scale,index){
+ const layoutFixture=process.env.NOVA_RESEARCH_LAYOUT_SEED==='1';
+ const layoutSeed=0x12345678;
  const context=await browser.newContext({viewport:{width:viewport.width,height:viewport.height},
-  deviceScaleFactor:2,isMobile:viewport.name==='mobile',hasTouch:viewport.name==='mobile'});
- await context.addInitScript(v=>{
-  localStorage.setItem('novatanks_pilot_settings_v1',JSON.stringify({renderScale:v}));
- },scale);
+  deviceScaleFactor:2,isMobile:viewport.name==='mobile',hasTouch:viewport.name==='mobile',
+  ...(layoutFixture?{serviceWorkers:'block'}:{})});
+ let layoutIntercepts=0;
+ if(layoutFixture)await context.route('**/nova-updates/battlefield-v1.6.0.js',async route=>{
+  const response=await route.fetch();
+  assert.equal(response.status(),200,'research Battlefield overlay must load successfully');
+  const patched=injectBattlefieldSeed(await response.text(),layoutSeed);
+  layoutIntercepts++;
+  await route.fulfill({response,body:patched});
+ });
+ await context.addInitScript(({scale,layoutFixture})=>{
+  localStorage.setItem('novatanks_pilot_settings_v1',JSON.stringify({renderScale:scale}));
+  if(layoutFixture){
+   // Research-only deterministic global RNG for initial-world equivalence
+   // testing. Do not infer identical subsequent combat from identical starts.
+   let state=0x9e3779b9;
+   window.__novaResearchResetRng=()=>{state=0x9e3779b9;};
+   Math.random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;
+    return (state>>>0)/4294967296;};
+  }
+ },{scale,layoutFixture});
  const page=await context.newPage(),errors=[];
  const cdp=await context.newCDPSession(page);
  const traceThisPhase=process.env.NOVA_CLARITY_TRACE==='1'&&viewport.name==='desktop'&&(index===0||index===1);
@@ -79,9 +99,40 @@ async function measure(browser,viewport,scale,index){
   await deploy.waitFor({state:'visible',timeout:45000});
   await page.evaluate(()=>{
    const Game=window.__novaMakeRequire('')('game/engine').Game;
+   // War Room constructs its own Game before DEPLOY and can advance global
+   // RNG unpredictably. Reset at the real Game's first spawnPlayer entry,
+   // before Battlefield and core player/neutral/AI initialization.
+   if(window.__novaResearchResetRng){
+    const oldSpawn=Game.prototype.spawnPlayer;
+    Game.prototype.spawnPlayer=function(){
+     if(!this.__novaResearchInitialSpawnSeeded){
+      window.__novaResearchResetRng();
+      this.__novaResearchInitialSpawnSeeded=true;
+     }
+     return oldSpawn.apply(this,arguments);
+    };
+   }
    const old=Game.prototype.update;
    Game.prototype.update=function(dt){
-    if(!this.__novaDecorativeWorld)window.__novaClarityResearchGame=this;
+    if(!this.__novaDecorativeWorld){
+     window.__novaClarityResearchGame=this;
+     if(!this.__novaResearchInitialFingerprint){
+      const compact=(arr,keys)=>(arr||[]).map(o=>keys.map(k=>o?.[k]??null));
+      const snapshot=JSON.stringify({
+       battlefield:this.__novaBattlefield?.seed??null,
+       player:this.player&&[this.player.x,this.player.y,this.player.cls],
+       tanks:compact(this.tanks,['id','x','y','cls','hp']),
+       shapes:compact(this.shapes,['id','x','y','type','hp']),
+       terrain:compact(this.__novaTerrain,['id','x','y','w','h','r','type','hp','solid'])
+      });
+      let hash=2166136261;
+      for(let i=0;i<snapshot.length;i++){
+       hash^=snapshot.charCodeAt(i);hash=Math.imul(hash,16777619);
+      }
+      this.__novaResearchInitialFingerprint=(hash>>>0).toString(16).padStart(8,'0')+
+       ':'+snapshot.length;
+     }
+    }
     return old.apply(this,arguments);
    };
   });
@@ -179,13 +230,20 @@ async function measure(browser,viewport,scale,index){
    })).filter(t=>t.durationMs>0);
    return {scale:JSON.parse(localStorage.getItem('novatanks_pilot_settings_v1')).renderScale,
     quality:g.quality,dpr:g.dpr,css:[g.w,g.h],backing:[g.canvas.width,g.canvas.height],
+    battlefieldSeed:g.__novaBattlefield?.seed??null,battlefieldName:g.__novaBattlefield?.name??null,
+    initialFingerprint:g.__novaResearchInitialFingerprint??null,
     gameSeconds:g.time-gameTime,wallMs:end-begin,shots:shots-shotsAtBegin,warmupShots:shotsAtBegin,
     gaps,interruptions,longTaskSupported,longTasks:longTaskInWindow,entities,
     outer,perf:window.NovaPerf?.snapshot(g)||null,status:g.status};
   });
+  if(layoutFixture)assert.equal(layoutIntercepts,1,'research must intercept exactly one shipping Battlefield overlay');
   const trace=traceStarted?await stopTrace(cdp,`artifacts/browser/render-clarity-combat-trace-${scale}-phase-${index}.json`):null;
   traceStarted=false;
   assert.equal(data.scale,scale);
+  if(layoutFixture){
+   assert.equal(data.battlefieldSeed,layoutSeed,'research layout fixture must reach the composed game');
+   assert.match(data.initialFingerprint,/^[0-9a-f]{8}:[0-9]+$/,'initial-world fingerprint must be captured');
+  }
   // Very slow but active frames are the phenomenon under investigation.
   // Do not censor a 5-FPS phase just because it yields fewer than 21 gaps;
   // preserve low-sample percentile uncertainty explicitly instead.
@@ -205,6 +263,8 @@ async function measure(browser,viewport,scale,index){
   const observedRafMs=total,unobservedWallMs=Math.max(0,data.wallMs-observedRafMs);
   const rafTimestampLeadMs=Math.max(0,observedRafMs-data.wallMs);
   return {viewport:viewport.name,index,scale,cpuThrottle:3,quality:data.quality,dpr:data.dpr,
+   layoutFixture,layoutSeed:data.battlefieldSeed,battlefieldName:data.battlefieldName,
+   initialFingerprint:data.initialFingerprint,
    css:data.css,backing:data.backing,frames:data.gaps.length,
    fps:1000*data.gaps.length/total,percentileSampleAdequate:data.gaps.length>=30,
    p50GapMs:pct(data.gaps,.5),
@@ -244,8 +304,16 @@ async function measure(browser,viewport,scale,index){
    records.push(result);
    console.log('NOVA_CLARITY_PHASE '+JSON.stringify(result));
   }
+  const fingerprints=records.filter(r=>r.layoutFixture).map(r=>r.initialFingerprint);
+  const matchedInitialWorlds=fingerprints.length===records.length&&
+   new Set(fingerprints).size===1;
   const evidence={researchOnly:true,commit:process.env.GITHUB_SHA||null,
-   caveats:['independent worlds not matched','not fixed60','not physical Android',
+   matchedInitialWorlds,distinctInitialWorlds:new Set(fingerprints).size,
+   caveats:['independent worlds not matched even with identical Battlefield layouts',
+    'layout fixture resets the RNG at the first post-hook Game spawn; later gameplay can diverge with frame scheduling',
+    'initial-world fingerprint covers selected public physical fields, not complete mutable state',
+    'fixture mode blocks service workers so route interception cannot be bypassed',
+    'not fixed60','not physical Android',
     'no human touch latency','CI hardware is not a phone','3x synthetic CPU throttle is not GPU throttling',
     'NovaPerf rolling windows can include warmup on slow frames',
     'RAF percentiles from fewer than 30 intervals are descriptive only',
