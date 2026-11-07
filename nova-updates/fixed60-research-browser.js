@@ -551,8 +551,9 @@ class FixedStepRafOwner {
           if(input && input.stickId && input[stick] && input[stick].active &&
              stillHeld.has(input.stickId[stick]))slots[stick]=input.stickId[stick];
         }
-        const rect=g.canvas && typeof g.canvas.getBoundingClientRect==='function' ?
-          g.canvas.getBoundingClientRect() : null;
+        const canvas=(input && input.canvas)||g.canvas;
+        const rect=canvas && typeof canvas.getBoundingClientRect==='function' ?
+          canvas.getBoundingClientRect() : null;
         const hasRect=rect && Number.isFinite(rect.left) &&
           Number.isFinite(rect.width) && rect.width>0;
         for(const e of pending){
