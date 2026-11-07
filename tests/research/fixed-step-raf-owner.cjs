@@ -175,19 +175,21 @@ class FixedStepRafOwner {
         // must not conceal an involuntary reset of the OTHER held stick.
         const pending=ownedTouchIds.length && Array.isArray(this.timeline.events) ?
           this.timeline.events.slice(this.timeline.index||0) : [];
-        const pendingBlur=pending.some(e=>e.kind==='blur');
-        const unreleased=ownedTouchIds.some(id=>{
-          // The last captured edge wins: a fresh down after a queued release
-          // is still a real held touch that the stall will invalidate.
-          for(let i=pending.length-1;i>=0;i--){
-            const e=pending[i];
-            if(!e.data || typeof e.data.pointerType!=='string' || e.data.pointerType==='mouse' || e.data.pointerId!==id)continue;
-            if(e.kind==='pointerdown')return true;
-            if(e.kind==='pointerup'||e.kind==='pointercancel')return false;
-          }
-          return true;
-        });
-        if(unreleased && !pendingBlur && (!g.status || g.status==='playing') && this.isVisible() &&
+        // Replay queued lifecycle edges only for NOTICE classification.
+        // Input itself remains fail-closed: the long stall still resets it.
+        // A blur clears old ownership, but a later fresh touch down can be
+        // cancelled by the same stall and deserves an explicit warning.
+        const stillHeld=new Set(ownedTouchIds);
+        for(const e of pending){
+          if(e.kind==='blur'){stillHeld.clear();continue;}
+          const d=e.data;
+          if(!d || typeof d.pointerType!=='string' ||
+             d.pointerType==='mouse' || d.pointerId==null)continue;
+          if(e.kind==='pointerdown' && !d.targetIsUI)stillHeld.add(d.pointerId);
+          else if(e.kind==='pointerup'||e.kind==='pointercancel')
+            stillHeld.delete(d.pointerId);
+        }
+        if(stillHeld.size>0 && (!g.status || g.status==='playing') && this.isVisible() &&
            typeof g.toast==='function' && ts-this.lastTouchResetNoticeMs>=8000){
           this.lastTouchResetNoticeMs=ts;
           g.toast('Touch controls reset — touch again','warn');
