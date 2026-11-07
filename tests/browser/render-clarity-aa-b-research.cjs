@@ -8,6 +8,52 @@ const {chromium}=require('playwright');
 const phases=[100,65,65,100,65,100];
 const viewports=[{name:'desktop',width:1280,height:800},{name:'mobile',width:320,height:640}];
 const pct=(xs,p)=>{const s=[...xs].sort((a,b)=>a-b);return s[Math.ceil(s.length*p)-1];};
+// Opt-in, bounded DevTools trace of one real composed combat phase.
+// Chrome trace events are inclusive: category totals must not be added together.
+async function stopTrace(cdp,outputPath){
+ let timer;
+ const completed=new Promise((resolve,reject)=>{
+  timer=setTimeout(()=>reject(new Error('DevTools trace completion timed out')),30000);
+  cdp.once('Tracing.tracingComplete',event=>resolve(event.stream));
+ });
+ let stream;
+ try{await cdp.send('Tracing.end');stream=await completed;}
+ finally{clearTimeout(timer);}
+ assert.ok(stream,'Chrome must provide a trace stream');
+ const chunks=[];let totalBytes=0,eof=false;
+ try{
+  while(!eof){
+   const part=await cdp.send('IO.read',{handle:stream,size:1048576});
+   const chunk=Buffer.from(part.data,part.base64Encoded?'base64':'utf8');
+   chunks.push(chunk);totalBytes+=chunk.length;
+   assert.ok(totalBytes<32*1024*1024,'trace exceeds 32 MiB research cap');
+   eof=!!part.eof;
+  }
+ }finally{await cdp.send('IO.close',{handle:stream});}
+ // Decode once: a UTF-8 character can straddle adjacent IO.read chunks.
+ const raw=Buffer.concat(chunks,totalBytes).toString('utf8');
+ const trace=JSON.parse(raw);
+ assert.ok(Array.isArray(trace.traceEvents)&&trace.traceEvents.length>0,
+  'Chrome must return parseable trace events');
+ fs.mkdirSync('artifacts/browser',{recursive:true});
+ fs.writeFileSync(outputPath,raw);
+ const interesting=/^(RunTask|FunctionCall|EvaluateScript|Paint|Layout|UpdateLayerTree|CompositeLayers|MinorGC|MajorGC|V8\.GC.*)$/;
+ const rendererMainThreads=new Set(trace.traceEvents.filter(e=>
+  e.ph==='M'&&e.name==='thread_name'&&e.args?.name==='CrRendererMain'
+ ).map(e=>e.pid+':'+e.tid));
+ assert.ok(rendererMainThreads.size>0,'trace must identify a Chromium renderer main thread');
+ const byName={};
+ for(const event of trace.traceEvents){
+  if(event.ph!=='X'||!Number.isFinite(event.dur)||!interesting.test(event.name))continue;
+  if(!rendererMainThreads.has(event.pid+':'+event.tid))continue;
+  const entry=byName[event.name]||(byName[event.name]={count:0,inclusiveMs:0,maxMs:0});
+  const ms=event.dur/1000;
+  entry.count++;entry.inclusiveMs+=ms;entry.maxMs=Math.max(entry.maxMs,ms);
+ }
+ return {file:outputPath,events:trace.traceEvents.length,bytes:Buffer.byteLength(raw),
+  rendererMainThreadCount:rendererMainThreads.size,inclusiveMainThreadEventCosts:byName,
+  warning:'Inclusive main-thread trace event durations overlap; never sum categories as exclusive CPU time.'};
+}
 async function measure(browser,viewport,scale,index){
  const context=await browser.newContext({viewport:{width:viewport.width,height:viewport.height},
   deviceScaleFactor:2,isMobile:viewport.name==='mobile',hasTouch:viewport.name==='mobile'});
@@ -16,6 +62,8 @@ async function measure(browser,viewport,scale,index){
  },scale);
  const page=await context.newPage(),errors=[];
  const cdp=await context.newCDPSession(page);
+ const traceThisPhase=process.env.NOVA_CLARITY_TRACE==='1'&&viewport.name==='desktop'&&index===0;
+ let traceStarted=false;
  await cdp.send('Emulation.setCPUThrottlingRate',{rate:3});
  page.on('pageerror',e=>errors.push(String(e)));
  try{
@@ -32,6 +80,11 @@ async function measure(browser,viewport,scale,index){
   });
   await deploy.click();
   await page.waitForFunction(()=>window.__novaClarityResearchGame?.status==='playing',{timeout:30000});
+  if(traceThisPhase){
+   await cdp.send('Tracing.start',{transferMode:'ReturnAsStream',
+    categories:'devtools.timeline,blink.user_timing,v8,disabled-by-default-devtools.timeline'});
+   traceStarted=true;
+  }
   const data=await page.evaluate(async()=>{
    const g=window.__novaClarityResearchGame;
    // Same legal Tempest build and held aim/firing intent in each independent
@@ -123,6 +176,8 @@ async function measure(browser,viewport,scale,index){
     gaps,interruptions,longTaskSupported,longTasks:longTaskInWindow,entities,
     outer,perf:window.NovaPerf?.snapshot(g)||null,status:g.status};
   });
+  const trace=traceStarted?await stopTrace(cdp,'artifacts/browser/render-clarity-combat-trace.json'):null;
+  traceStarted=false;
   assert.equal(data.scale,scale);
   // Very slow but active frames are the phenomenon under investigation.
   // Do not censor a 5-FPS phase just because it yields fewer than 21 gaps;
@@ -158,6 +213,7 @@ async function measure(browser,viewport,scale,index){
    meanEntities:Object.fromEntries(['bullets','tanks','drones','shapes'].map(key=>
     [key,data.entities[key]/data.entities.samples])),
    peakBullets:data.entities.peakBullets,
+   trace,
    outerCost:Object.fromEntries(['update','render','minimap'].map(key=>{
     const samples=data.outer[key];
     return [key,{calls:samples.length,meanMs:samples.length?samples.reduce((a,b)=>a+b,0)/samples.length:null,
@@ -165,7 +221,10 @@ async function measure(browser,viewport,scale,index){
      p99Ms:samples.length?pct(samples,.99):null,
      maxMs:samples.length?Math.max(...samples):null}];
    })),perf:data.perf};
- }finally{await context.close();}
+ }finally{
+  if(traceStarted){try{await cdp.send('Tracing.end');}catch{ /* preserve original failure */ }}
+  await context.close();
+ }
 }
 (async()=>{
  const browser=await chromium.launch({headless:true,args:['--disable-dev-shm-usage']});
@@ -186,7 +245,8 @@ async function measure(browser,viewport,scale,index){
     'outermost JS method durations are inclusive and do not measure GPU completion or input-to-photon',
     'minimap drawing occurs outside update/render in the shipping RAF; background browser tasks remain unaccounted',
     'Long Tasks API may be unsupported or miss tasks below its threshold',
-    'RAF timestamps and PerformanceObserver are browser-clock observations, not input-to-photon latency'],records};
+    'RAF timestamps and PerformanceObserver are browser-clock observations, not input-to-photon latency',
+    'opt-in DevTools trace event durations overlap and are not exclusive CPU attribution'],records};
   fs.mkdirSync('artifacts/browser',{recursive:true});
   fs.writeFileSync('artifacts/browser/render-clarity-research.json',
    JSON.stringify(evidence,null,2)+'\n');
