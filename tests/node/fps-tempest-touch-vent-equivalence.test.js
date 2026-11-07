@@ -26,13 +26,18 @@ test('actual composed Tempest compares released-fire and held-stick centered ven
    const held=rows.find(r=>r.policy===kind+'Held');
    assert.ok(released&&held);
    assert.ok(released.vents>0&&held.vents>0);
+   assert.match(released.combatStateHash,/^[0-9a-f]{20}$/);
+   assert.match(held.combatStateHash,/^[0-9a-f]{20}$/);
    assert.equal(released.heldFiringVentSeconds,0);
    assert.ok(Math.abs(held.heldFiringVentSeconds-held.ventSeconds)<1e-3);
    deltas.push({reload,schedule,kind,volleys:held.volleys-released.volleys,
     apex:held.apexVolleys-released.apexVolleys,
     redline:held.redlineVolleys-released.redlineVolleys,
     spin:+(held.spinIntegral-released.spinIntegral).toFixed(5),
-    heat:+(held.heatIntegral-released.heatIntegral).toFixed(5)});
+    heat:+(held.heatIntegral-released.heatIntegral).toFixed(5),
+    fireCd:+(held.lastFireCd-released.lastFireCd).toFixed(8),
+    stability:+(held.lastStability-released.lastStability).toFixed(8),
+    sameCombatState:held.combatStateHash===released.combatStateHash});
   }
  }
  // This is a falsifier, not a golden assertion that the two input paths
