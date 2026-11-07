@@ -335,3 +335,40 @@ test('post-blur UI or mouse down cannot masquerade as a held touch',()=>{
     }finally{s.owner.stop()}
   }
 });
+
+
+test('queued first touch lost to foreground stall is explicitly reported',()=>{
+  const s=fixture();s.owner.start();
+  try{
+    s.frame(1017);
+    s.down(1020,7); // Captured by DOM, not yet sampled by Game.
+    assert.equal(s.input.stickId.move,-1);
+    s.frame(1137);
+    assert.deepEqual(s.notices,[['Touch controls reset — touch again','warn']]);
+    assert.equal(s.input.stickId.move,-1,'stall must not resurrect queued input');
+    assert.equal(s.input.firing,false);
+  }finally{s.owner.stop()}
+});
+
+test('unowned queued UI, mouse, release, or blur is not a lost touch',()=>{
+  const cases=[
+    [{kind:'pointerdown',data:{pointerId:7,pointerType:'touch',targetIsUI:true}}],
+    [{kind:'pointerdown',data:{pointerId:1,pointerType:'mouse'}}],
+    [{kind:'pointerdown',data:{pointerId:7,pointerType:'touch'}},
+     {kind:'pointerup',data:{pointerId:7,pointerType:'touch'}}],
+    [{kind:'pointerdown',data:{pointerId:7,pointerType:'touch'}},
+     {kind:'blur',data:{}}]
+  ];
+  for(const events of cases){
+    const s=fixture();s.owner.start();
+    try{
+      s.frame(1017);
+      let at=.020;
+      for(const event of events){s.timeline.push(at,event.kind,event.data);at+=.005;}
+      s.frame(1137);
+      assert.equal(s.notices.length,0,'no held touch remains after queued edges');
+      assert.equal(s.input.stickId.move,-1);
+      assert.equal(s.input.firing,false);
+    }finally{s.owner.stop()}
+  }
+});
