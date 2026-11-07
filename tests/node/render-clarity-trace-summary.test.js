@@ -65,7 +65,9 @@ test('DevTools trace begins after warmup and before measured RAF timing',()=>{
 // A future refactor must not silently add particle wrappers to ordinary A/A/B.
 test('ordinary-trail causal research remains opt-in and preserves default clarity measurements',()=>{
  assert.match(source,/const trailMode=process\.env\.NOVA_TRAIL_CAUSAL==='1'/);
- assert.match(source,/const phases=trailMode\?\[100,100,100,100,100,100\]:\[100,65,65,100,65,100\]/);
+ assert.match(source,/const midpointMode=process\.env\.NOVA_CLARITY_MIDPOINT==='1'/);
+ assert.match(source,/const phases=trailMode\?\[100,100,100,100,100,100\]:/);
+ assert.match(source,/midpointMode\?midpointPhases:\[100,65,65,100,65,100\]/);
  assert.match(source,/const suppressOrdinaryTrails=trailMode&&\[1,2,4\]\.includes\(index\)/);
  assert.match(source,/if\(trailMode\)\{\s*const originalBulletUpdate=g\.updateBullets/,
   'extra projectile instrumentation must not run in ordinary clarity mode');
@@ -73,4 +75,23 @@ test('ordinary-trail causal research remains opt-in and preserves default clarit
  assert.match(source,/window\.__novaTrailResearchSuppress=suppressOrdinaryTrails/);
  assert.match(source,/const data=await page\.evaluate\(async\(\)=>\{/,
   'preserve the measured-window trace boundary contract');
+});
+
+test('opt-in 80% clarity midpoint pilot is balanced and preserves legacy controls',()=>{
+ const match=source.match(/const midpointPhases=(\[[^;]+\]);/);
+ assert.ok(match,'midpoint research phase schedule must be explicit');
+ const phases=JSON.parse(match[1]);
+ assert.equal(phases.length,9);
+ for(const scale of [65,80,100])assert.equal(phases.filter(v=>v===scale).length,3);
+ assert.deepEqual(phases.slice(0,3).sort((a,b)=>a-b),[65,80,100]);
+ assert.deepEqual(phases.slice(3,6).sort((a,b)=>a-b),[65,80,100]);
+ assert.deepEqual(phases.slice(6,9).sort((a,b)=>a-b),[65,80,100]);
+ assert.match(source,/assert\.ok\(!\(trailMode&&midpointMode\)/,
+  'causal trail pilot and midpoint pilot must not be mixed');
+ assert.match(source,/\|\|trailMode\|\|midpointMode/,
+  'midpoint arms must use deterministic initial-world fixture');
+ assert.match(source,/if\(trailMode\|\|midpointMode\)assert\.equal\(matchedInitialWorlds,true/,
+  'midpoint pilot must reject mismatched initial fingerprints');
+ assert.match(source,/phases\[i\]===65\?100:80/,
+  'mobile order must invert endpoints while retaining the midpoint');
 });
