@@ -34,7 +34,8 @@ function run(reload,name,pattern,policy){
    bandSeconds:0,apexSeconds:0,redlineSeconds:0,peakHeat:0,
    heatIntegral:0,spinIntegral:0,stabilityIntegral:0,
    lastHeat:0,lastSpin:0,firstVentAt:null,worldLeaks:0,firstLeak:null,
-   observationDelayMs:policy==='bandWideDelay100'?100:policy==='bandWideDelay200'?200:0,
+   observationDelayMs:policy.endsWith('Delay100')?100:policy.endsWith('Delay200')?200:0,
+   observationKind:policy.startsWith('cueArc')?'eightBinHeatArc':'exactHeat',
    maxHeatObservationError:0,delayedSamples:0};
   const original=g.tryFire;g.tryFire=function(t){
    const before=this.bullets.length,result=original.apply(this,arguments);
@@ -64,8 +65,11 @@ function run(reload,name,pattern,policy){
      out.delayedSamples++;
      out.maxHeatObservationError=Math.max(out.maxHeatObservationError,Math.abs(heat-actualHeat));
     }
+    if(out.observationKind==='eightBinHeatArc')
+     heat=Math.round(Math.max(0,Math.min(1,heat))*8)/8;
     if(policy!=='continuous'){
-     const high=policy==='bandTight'?.65:.69,low=policy==='bandTight'?.50:.47;
+     const high=policy==='bandTight'?.65:policy.startsWith('cueArc')?.625:.69;
+     const low=policy==='bandTight'?.50:policy.startsWith('cueArc')?.375:.47;
      if(!venting&&heat>=high){venting=true;out.vents++;if(out.firstVentAt===null)out.firstVentAt=ticks/120;}
      if(venting&&heat<=low)venting=false;
     }
@@ -102,7 +106,8 @@ function run(reload,name,pattern,policy){
 const results=[];
 for(const reload of reloads)for(const [name,pattern] of Object.entries(schedules))
  for(const policy of (delayPilot?
-  ['continuous','bandWide','bandTight','bandWideDelay100','bandWideDelay200']:
+  ['continuous','bandWide','bandTight','bandWideDelay100','bandWideDelay200',
+   'cueArcDelay100','cueArcDelay200']:
   ['continuous','bandWide','bandTight']))results.push(run(reload,name,pattern,policy));
 console.log(JSON.stringify({method:'actual composed Game; deterministic seed; no targets; frame-start feedback',duration,results,
- caveats:['baseline policies have perfect heat readout; delay pilot uses lagged internal heat as a proxy, not visual perception','fixed aim and no targets cannot measure hit quality or survival','variable-step chronology differs across schedules','no physical touch or input-to-photon measurement','not a gameplay patch']},null,2));
+ caveats:['baseline policies have perfect heat readout; delay pilot compares lagged exact heat and eight-bin heat-arc surrogates; neither is a measured human cue read','fixed aim and no targets cannot measure hit quality or survival','variable-step chronology differs across schedules','no physical touch or input-to-photon measurement','not a gameplay patch']},null,2));
