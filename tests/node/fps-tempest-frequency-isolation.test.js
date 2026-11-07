@@ -21,3 +21,19 @@ test('Tempest frequency map never admits replenished shapes or escort drones',()
     assert.ok(Number.isFinite(row.heat));
   }
 });
+
+test('irregular Tempest cadence trial also stays truly isolated',()=>{
+  const script=path.resolve(__dirname,'../research/tempest-irregular-cadence-pilot.cjs');
+  const output=execFileSync(process.execPath,[script],{
+    cwd:path.resolve(__dirname,'../..'),encoding:'utf8',timeout:120000,maxBuffer:1024*1024,
+    env:{...process.env,NOVA_JITTER_SEEDS:'1517800',NOVA_JITTER_RELOAD:'4',
+      NOVA_JITTER_PATTERNS:'native30,native60',NOVA_JITTER_FIRE_PATTERN:'continuous'}
+  });
+  const report=JSON.parse(output);
+  assert.equal(report.results.length,2);
+  for(const row of report.results){
+    assert.equal(row.worldLeaks,0);
+    assert.equal(row.simulatedTicks,960);
+    assert.ok(row.volleys>0);
+  }
+});
