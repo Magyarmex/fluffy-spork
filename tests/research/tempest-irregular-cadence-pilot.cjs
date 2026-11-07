@@ -19,8 +19,8 @@ const reloads=parse('NOVA_JITTER_RELOAD','0,4,5,8',0,8);
 // Phase rotations preserve each six-step schedule's interval multiset and total time.
 const phases=parse('NOVA_JITTER_PHASES','0',0,5);
 const TICKS=960; // exactly 8 simulated seconds at a 120Hz integer timebase
-// Optional 1s-on/1s-off held-fire experiment. Transitions use integer
-// simulated ticks, never floating-point wall time or browser presentation FPS.
+// Optional exact-tick burst experiments. Transitions use integer simulated
+// ticks, never floating-point wall time or browser presentation FPS.
 const firePattern=process.env.NOVA_JITTER_FIRE_PATTERN||'continuous';
 // Durations are exact 120Hz ticks. The 0.2s/0.5s rhythm has a
 // 0.7s period, so its last rest is intentionally incomplete at 8s.
@@ -142,4 +142,4 @@ for(const seed of seeds)for(const reload of reloads){
  }
 }
 console.log(JSON.stringify({method:'actual materialized 49-overlay Game; held aim/fire; no targets',
- phases,firePattern,aimMode,selectedPatterns,caveats:['research-only, no browser input event timestamps','all schedules cover exactly 8 simulated seconds','variable dt changes world update chronology, not merely presentation FPS','no player-facing patch'],patterns,seeds,reloads,results:all},null,2));
+ phases,firePattern,aimMode,selectedPatterns,caveats:['research-only: no DOM pointer timestamps or human reacquisition latency','exact input-boundary splitting can add Game.update calls beyond presentation frames','all schedules cover exactly 8 simulated seconds','0.7s burst rhythm ends in a partial rest excluded from completed rest windows','variable dt changes world update chronology, not merely presentation FPS','no player-facing patch'],patterns,seeds,reloads,results:all},null,2));
