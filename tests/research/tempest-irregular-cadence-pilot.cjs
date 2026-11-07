@@ -19,14 +19,25 @@ const reloads=parse('NOVA_JITTER_RELOAD','0,4,5,8',0,8);
 // Phase rotations preserve each six-step schedule's interval multiset and total time.
 const phases=parse('NOVA_JITTER_PHASES','0',0,5);
 const TICKS=960; // exactly 8 simulated seconds at a 120Hz integer timebase
+// Optional 1s-on/1s-off held-fire experiment. Transitions use integer
+// simulated ticks, never floating-point wall time or browser presentation FPS.
+const firePattern=process.env.NOVA_JITTER_FIRE_PATTERN||'continuous';
+if(!['continuous','burst1s'].includes(firePattern))throw new Error('NOVA_JITTER_FIRE_PATTERN must be continuous or burst1s');
 const patterns={
  native30:[4],native60:[2],native120:[1],
  mixedSlow:[2,4,1,1,2,2],mixedFast:[1,3,2,1,3,2],
  bursty:[4,1,1,2,2,2],alternating:[1,4,1,2,2,2],
  // Adversarial equal-mean sequences selected from a simple cooldown-only
  // enumeration; these are stress controls, not natural-device measurements.
- aliasFast:[1,1,2,3,2,3],aliasSlow:[1,1,1,3,3,3]
+ aliasFast:[1,1,2,3,2,3],aliasSlow:[1,1,1,3,3,3],
+ // Eight-step/16-tick period still averages 60Hz, but 1s fire boundaries
+ // land inside a frame for some rotations; exercises the event-split path.
+ boundaryCross:[1,3,2,1,3,2,1,3]
 };
+const selectedPatterns=(process.env.NOVA_JITTER_PATTERNS||Object.keys(patterns).join(','))
+ .split(',').map(s=>s.trim());
+if(!selectedPatterns.length||selectedPatterns.some(name=>!Object.hasOwn(patterns,name))||!selectedPatterns.includes('native60'))
+ throw new Error('NOVA_JITTER_PATTERNS must name known patterns and include native60');
 function schedule(pattern,phase=0){
  const out=[];let elapsed=0,i=phase;
  while(elapsed<TICKS){
@@ -43,21 +54,46 @@ function run(seed,reload,name,steps){
   g.shapes=[];g.drones=[];g.powerups=[];
   g.input.aim.active=true;g.input.aim.dx=40;g.input.firing=true;g.input.autofire=false;
   p.stats.reload=reload;
-  let volleys=0,peakHeat=0,peakCooldown=0;
-  const shotTimes=[],shotAngles=[],shotHeats=[];const original=g.tryFire;
+  let volleys=0,restVolleys=0,peakHeat=0,peakCooldown=0,minHeat=Infinity,elapsedTicks=0,firingTicks=0,restTicks=0,updateCalls=0,restStartHeat=null,restHeatWindows=[];
+  const shotTimes=[],shotAngles=[],shotHeats=[],shotStabilities=[];const original=g.tryFire;
   g.tryFire=function(t){
    const before=this.bullets.length;
    const result=original.apply(this,arguments);
-   if(t===p&&this.bullets.length>before){volleys++;shotTimes.push(this.time);shotAngles.push(p.angle);shotHeats.push(p.__v17Heat??0);}
+   if(t===p&&this.bullets.length>before){volleys++;if(!g.input.firing)restVolleys++;shotTimes.push(this.time);shotAngles.push(p.angle);shotHeats.push(p.__v17Heat??0);shotStabilities.push(p.__v17Stability??1);}
    return result;
   };
   try{
    for(const ticks of steps){
-    g.update(ticks/120);
-    peakHeat=Math.max(peakHeat,p.__v17Heat??0);
-    peakCooldown=Math.max(peakCooldown,p.fireCd??0);
+    // Split any frame crossing a burst boundary so the intended input
+    // chronology is independent of frame partitioning. This is an explicit
+    // input-event test, not a claim that native browser input does this.
+    let remaining=ticks;
+    while(remaining>0){
+     const active=firePattern==='continuous'||elapsedTicks%240<120;
+     const untilBoundary=firePattern==='continuous'?remaining:
+      (active?120-elapsedTicks%240:240-elapsedTicks%240);
+     const slice=Math.min(remaining,untilBoundary);
+     if(!active&&restStartHeat===null)restStartHeat=p.__v17Heat??0;
+     g.input.firing=active;
+     g.update(slice/120);updateCalls++;
+     peakHeat=Math.max(peakHeat,p.__v17Heat??0);
+     minHeat=Math.min(minHeat,p.__v17Heat??0);
+     peakCooldown=Math.max(peakCooldown,p.fireCd??0);
+     if(active)firingTicks+=slice;else restTicks+=slice;
+     elapsedTicks+=slice;remaining-=slice;
+     if(!active&&elapsedTicks%240===0){
+      const end=p.__v17Heat??0;
+      restHeatWindows.push({start:+restStartHeat.toFixed(6),end:+end.toFixed(6),
+       drop:+(restStartHeat-end).toFixed(6)});
+      restStartHeat=null;
+     }
+    }
    }
-   return {seed,reload,name,frames:steps.length,volleys,
+   return {seed,reload,name,firePattern,frames:steps.length,updateCalls,extraInputBoundaryUpdates:updateCalls-steps.length,simulatedTicks:elapsedTicks,
+    firingTicks,restTicks,restHeatWindows,volleys,restVolleys,
+    baseCadenceEligibleVolleys:shotHeats.filter((h,i)=>Math.max(0,1-Math.abs(h-.56)/.30)>.62&&shotStabilities[i]>.56).length,
+    tempestApexBoostVolleys:shotHeats.filter((h,i)=>Math.max(0,1-Math.abs(h-.56)/.36)>.58&&shotStabilities[i]>.52).length,
+    tempestRedlinePenaltyVolleys:shotHeats.filter(h=>h>.90).length,minimumHeat:+minHeat.toFixed(6),
     heat:+(p.__v17Heat??0).toFixed(6),peakHeat:+peakHeat.toFixed(6),
     fireCd:+(p.fireCd??0).toFixed(6),peakCooldown:+peakCooldown.toFixed(6),
     firstShots:shotTimes.slice(0,8).map(n=>+n.toFixed(6)),
@@ -69,7 +105,7 @@ function run(seed,reload,name,steps){
 }
 const all=[];
 for(const seed of seeds)for(const reload of reloads){
- const cohort=Object.entries(patterns).flatMap(([name,pattern])=>
+ const cohort=Object.entries(patterns).filter(([name])=>selectedPatterns.includes(name)).flatMap(([name,pattern])=>
   (pattern.length===1?[0]:phases).map(phase=>{
    const steps=schedule(pattern,phase);
    const row=run(seed,reload,phase===0?name:name+'@'+phase,steps);
@@ -88,4 +124,4 @@ for(const seed of seeds)for(const reload of reloads){
  }
 }
 console.log(JSON.stringify({method:'actual materialized 49-overlay Game; held aim/fire; no targets',
- phases,caveats:['research-only, no browser input event timestamps','all schedules cover exactly 8 simulated seconds','variable dt changes world update chronology, not merely presentation FPS','no player-facing patch'],patterns,seeds,reloads,results:all},null,2));
+ phases,firePattern,selectedPatterns,caveats:['research-only, no browser input event timestamps','all schedules cover exactly 8 simulated seconds','variable dt changes world update chronology, not merely presentation FPS','no player-facing patch'],patterns,seeds,reloads,results:all},null,2));
