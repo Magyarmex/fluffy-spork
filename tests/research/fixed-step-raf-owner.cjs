@@ -59,6 +59,8 @@ class FixedStepRafOwner {
     this._generation++;this.started=true;this.lastMs=at;
     this._awaitingForwardFrame=true;this.simAtSec=(at-this.bridge.startMs)/1000;
     try{
+      if(typeof this.bridge.takeStaleTouchResetNotice==='function')
+        this.bridge.takeStaleTouchResetNotice();
       this.timeline.reset();this.timeline.tickOrigin=this.simAtSec;
       this.timeline.consumeThrough(this.simAtSec);
       this.paused=!!this.game.paused;
@@ -113,6 +115,8 @@ class FixedStepRafOwner {
   }
   transition(paused,at){
     if(!Number.isFinite(at)||at<this.lastMs-EPS)throw Error('invalid pause clock');
+    if(typeof this.bridge.takeStaleTouchResetNotice==='function')
+      this.bridge.takeStaleTouchResetNotice();
     this.timeline.reset();this.lagMs=0;this.paused=paused;
     this._awaitingForwardFrame=true;this.lastMs=at;this.simAtSec=(at-this.bridge.startMs)/1000;
     // A new simulation epoch changes the tick grid used for safe pointermove coalescing.
@@ -148,6 +152,16 @@ class FixedStepRafOwner {
     const raw=Math.max(0,ts-this.lastMs);
     this.lastMs=ts;
     this.lastSteps=0;
+    // BrowserEventTimeline may have fail-closed BEFORE this RAF, leaving no
+    // owned stick for the ordinary foreground-stall warning to inspect.
+    const staleTouchReset=typeof this.bridge.takeStaleTouchResetNotice==='function' &&
+      this.bridge.takeStaleTouchResetNotice();
+    if(staleTouchReset && !g.paused && (!g.status || g.status==='playing') &&
+       this.isVisible() && typeof g.toast==='function' &&
+       ts-this.lastTouchResetNoticeMs>=8000){
+      this.lastTouchResetNoticeMs=ts;
+      g.toast('Touch controls reset — touch again','warn');
+    }
     if(g.paused){
       if(!this.paused){this.timeline.reset();this.lagMs=0;this.paused=true;}
       this.simAtSec=(ts-this.bridge.startMs)/1000;
@@ -283,6 +297,8 @@ class FixedStepRafOwner {
     // leave the production lifecycle trapped behind the stopped pilot.
     let resetError;
     try{this.timeline.reset()}catch(error){resetError=error}
+    if(typeof this.bridge.takeStaleTouchResetNotice==='function')
+      this.bridge.takeStaleTouchResetNotice();
     this.lagMs=0;
     if(this.game.start===this.startWrapper){
       if(this.startHadOwn)this.game.start=this.originalStart;
