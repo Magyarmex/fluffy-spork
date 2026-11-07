@@ -34,6 +34,10 @@ const patterns={
  // land inside a frame for some rotations; exercises the event-split path.
  boundaryCross:[1,3,2,1,3,2,1,3]
 };
+const selectedPatterns=(process.env.NOVA_JITTER_PATTERNS||Object.keys(patterns).join(','))
+ .split(',').map(s=>s.trim());
+if(!selectedPatterns.length||selectedPatterns.some(name=>!Object.hasOwn(patterns,name))||!selectedPatterns.includes('native60'))
+ throw new Error('NOVA_JITTER_PATTERNS must name known patterns and include native60');
 function schedule(pattern,phase=0){
  const out=[];let elapsed=0,i=phase;
  while(elapsed<TICKS){
@@ -101,7 +105,7 @@ function run(seed,reload,name,steps){
 }
 const all=[];
 for(const seed of seeds)for(const reload of reloads){
- const cohort=Object.entries(patterns).flatMap(([name,pattern])=>
+ const cohort=Object.entries(patterns).filter(([name])=>selectedPatterns.includes(name)).flatMap(([name,pattern])=>
   (pattern.length===1?[0]:phases).map(phase=>{
    const steps=schedule(pattern,phase);
    const row=run(seed,reload,phase===0?name:name+'@'+phase,steps);
@@ -120,4 +124,4 @@ for(const seed of seeds)for(const reload of reloads){
  }
 }
 console.log(JSON.stringify({method:'actual materialized 49-overlay Game; held aim/fire; no targets',
- phases,firePattern,caveats:['research-only, no browser input event timestamps','all schedules cover exactly 8 simulated seconds','variable dt changes world update chronology, not merely presentation FPS','no player-facing patch'],patterns,seeds,reloads,results:all},null,2));
+ phases,firePattern,selectedPatterns,caveats:['research-only, no browser input event timestamps','all schedules cover exactly 8 simulated seconds','variable dt changes world update chronology, not merely presentation FPS','no player-facing patch'],patterns,seeds,reloads,results:all},null,2));
