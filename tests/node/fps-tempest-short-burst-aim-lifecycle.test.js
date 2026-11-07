@@ -37,6 +37,8 @@ for(const pattern of ['burst250ms','burst200ms']){
    assert.equal(a.restSpinWindows.length,c.restSpinWindows.length);
    assert.ok(b.restSpinWindows.every(w=>w.drop>=-0.000002));
    assert.ok(c.restSpinWindows.every(w=>w.drop>=-0.000002));
+   assert.ok(c.restHeatWindows.some(w=>w.drop>0),
+    'neutral-held aim must actually vent heat, not merely suppress shots');
    assert.ok(Number.isFinite(b.heat)&&Number.isFinite(b.fireCd));
    assert.ok(Number.isFinite(c.heat)&&Number.isFinite(c.fireCd));
    console.log('TEMPEST_AIM_RELEASE_RESEARCH '+JSON.stringify({
