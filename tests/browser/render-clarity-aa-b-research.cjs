@@ -9,7 +9,13 @@ const {chromium}=require('playwright');
 const {injectBattlefieldSeed}=require('../research/battlefield-layout-fixture.cjs');
 // Six-arm ABBA-like order limits linear run-order bias (mean index differs by 1/3 phase).
 const trailMode=process.env.NOVA_TRAIL_CAUSAL==='1';
-const phases=trailMode?[100,100,100,100,100,100]:[100,65,65,100,65,100];
+// Opt-in midpoint pilot: three observations per clarity setting, balanced
+// across early/middle/late phases. The legacy A/A/B remains unchanged.
+const midpointMode=process.env.NOVA_CLARITY_MIDPOINT==='1';
+assert.ok(!(trailMode&&midpointMode),'run one research intervention at a time');
+const midpointPhases=[100,80,65,65,80,100,80,65,100];
+const phases=trailMode?[100,100,100,100,100,100]:
+ midpointMode?midpointPhases:[100,65,65,100,65,100];
 const viewports=trailMode?[{name:'desktop',width:1280,height:800}]:
  [{name:'desktop',width:1280,height:800},{name:'mobile',width:320,height:640}];
 const pct=(xs,p)=>{const s=[...xs].sort((a,b)=>a-b);return s[Math.ceil(s.length*p)-1];};
@@ -67,7 +73,7 @@ async function stopTrace(cdp,outputPath){
   warning:'Inclusive main-thread trace event durations overlap; never sum categories as exclusive CPU time.'};
 }
 async function measure(browser,viewport,scale,index){
- const layoutFixture=process.env.NOVA_RESEARCH_LAYOUT_SEED==='1'||trailMode;
+ const layoutFixture=process.env.NOVA_RESEARCH_LAYOUT_SEED==='1'||trailMode||midpointMode;
  const suppressOrdinaryTrails=trailMode&&[1,2,4].includes(index);
  const layoutSeed=0x12345678;
  const context=await browser.newContext({viewport:{width:viewport.width,height:viewport.height},
@@ -349,7 +355,7 @@ async function measure(browser,viewport,scale,index){
   const records=[];
   for(const viewport of viewports)for(let i=0;i<phases.length;i++){
    // Reverse arms for the second viewport to balance overall time/order exposure.
-   const scale=viewport.name==='mobile'?(phases[i]===100?65:100):phases[i];
+   const scale=viewport.name==='mobile'?(phases[i]===100?65:phases[i]===65?100:80):phases[i];
    const result=await measure(browser,viewport,scale,i);
    records.push(result);
    console.log((trailMode?'NOVA_TRAIL_CAUSAL_PHASE ':'NOVA_CLARITY_PHASE ')+JSON.stringify(result));
@@ -357,11 +363,15 @@ async function measure(browser,viewport,scale,index){
   const fingerprints=records.filter(r=>r.layoutFixture).map(r=>r.initialFingerprint);
   const matchedInitialWorlds=fingerprints.length===records.length&&
    new Set(fingerprints).size===1;
-  if(trailMode)assert.equal(matchedInitialWorlds,true,
+  if(trailMode||midpointMode)assert.equal(matchedInitialWorlds,true,
    'causal A/A/B requires the same selected initial physical world');
-  const evidence={researchOnly:true,trailCausal:trailMode,commit:process.env.GITHUB_SHA||null,
+  const evidence={researchOnly:true,trailCausal:trailMode,midpointMode,
+   phaseOrder:phases,commit:process.env.GITHUB_SHA||null,
    matchedInitialWorlds,distinctInitialWorlds:new Set(fingerprints).size,
    caveats:['independent worlds not matched even with identical Battlefield layouts',
+    ...(midpointMode?['80% clarity is a research arm, not an adaptive-resolution controller',
+     'nine phases per viewport do not eliminate time drift or establish physical-device readability',
+     'matched initial fingerprint does not imply matched state after warmup']:[]),
     ...(trailMode?['ordinary trail suppression is measurement-window only and burns four cosmetic draws',
      'A/A/B browser arms may diverge after identical initial fingerprints due to scheduling',
      'no claim of causal FPS benefit until A/A variance and physical exposure are compared']:[]),
