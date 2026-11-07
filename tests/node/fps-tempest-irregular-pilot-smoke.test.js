@@ -14,11 +14,11 @@ test('Tempest irregular-frame research measures equal simulated time across lega
   encoding:'utf8',timeout:120000,maxBuffer:2*1024*1024
  });
  const report=JSON.parse(raw);
- assert.equal(report.results.length,63);
+ assert.equal(report.results.length,72);
  const expected60=new Map([[0,153],[4,163],[8,236]]);
  for(const [reload,reference] of expected60){
   const cohort=report.results.filter(row=>row.reload===reload);
-  assert.equal(cohort.length,21);
+  assert.equal(cohort.length,24);
   const byName=new Map(cohort.map(row=>[row.name,row]));
   assert.equal(byName.get('native60').volleys,reference);
   assert.equal(byName.get('native30').frames,240);
@@ -36,7 +36,7 @@ test('Tempest irregular-frame research measures equal simulated time across lega
    assert.ok(row.firstShotAngles.every(Number.isFinite));
    assert.ok(row.firstShotHeats.every(Number.isFinite));
   }
-  for(const name of ['mixedSlow','mixedFast','bursty','alternating','aliasFast','aliasSlow']){
+  for(const name of ['mixedSlow','mixedFast','bursty','alternating','aliasFast','aliasSlow','boundaryCross']){
    const baseline=byName.get(name);
    assert.equal(baseline.frames,480,'jitter must match 60Hz mean frame frequency');
    for(const phase of [1,2]){
