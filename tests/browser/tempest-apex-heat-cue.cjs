@@ -38,32 +38,41 @@ const {chromium}=require('playwright');
       {name:'upper-band',heat:.7110,stability:.8,expected:1},
       {name:'above-band',heat:.7113,stability:.8,expected:0},
       {name:'stability-edge',heat:.56,stability:.52,expected:0},
-      {name:'stability-inside',heat:.56,stability:.5201,expected:1}]){
+      {name:'stability-inside',heat:.56,stability:.5201,expected:1},
+      // The Tempest-specific contrast must not alter other Gunners' original hint.
+      {name:'twin-original',classId:'twin',heat:.56,stability:.8,expected:0,otherExpected:1},
+      {name:'twin-no-cue',classId:'twin',heat:.9,stability:.8,expected:0,otherExpected:0}]){
      const data=await page.evaluate(state=>{
       const g=window.__novaTempestCueGame;
       const render=window.__novaMakeRequire('')('game/render').render;
       if(!g?.player||!render||!g.ctx)throw Error('composed renderer unavailable');
-      g.setPaused(true);g.setClass(g.player,'tempest');
+      g.setPaused(true);g.setClass(g.player,state.classId||'tempest');
       g.player.__v17Heat=state.heat;g.player.__v17Stability=state.stability;
-      const orig=CanvasRenderingContext2D.prototype.arc;let cues=0;
+      const orig=CanvasRenderingContext2D.prototype.arc;let cues=0,otherCues=0;
       CanvasRenderingContext2D.prototype.arc=function(x,y,r,a,b){
        if(this===g.ctx&&Math.abs(x-g.player.x)<.001&&Math.abs(y-g.player.y)<.001&&
           Math.abs(a+Math.PI*.15)<1e-5&&Math.abs(b-Math.PI*.15)<1e-5){
         if(this.lineWidth<3.4||this.globalAlpha<.9)
          throw Error('Tempest Apex arc lost phone-scale width or contrast');
         cues++;
+       }else if(this===g.ctx&&Math.abs(x-g.player.x)<.001&&Math.abs(y-g.player.y)<.001&&
+          Math.abs(a+Math.PI*.10)<1e-5&&Math.abs(b-Math.PI*.10)<1e-5){
+        if(Math.abs(this.lineWidth-2.8)>1e-8||Math.abs(this.globalAlpha-.72)>1e-8)
+         throw Error('Other Gunner cue geometry or opacity changed');
+        otherCues++;
        }
        return orig.apply(this,arguments);
       };
       try{render(g,g.w,g.h);}finally{CanvasRenderingContext2D.prototype.arc=orig;}
-      return {cues,canvas:g.ctx.canvas.toDataURL('image/png'),classId:g.player.cls};
+      return {cues,otherCues,canvas:g.ctx.canvas.toDataURL('image/png'),classId:g.player.cls};
      },state);
-     assert.equal(data.classId,'tempest');
-     assert.equal(data.cues,state.expected,'real canvas cue gate '+state.name);
+     assert.equal(data.classId,state.classId||'tempest');
+     assert.equal(data.cues,state.expected,'real canvas Tempest cue gate '+state.name);
+     assert.equal(data.otherCues,state.otherExpected||0,'other Gunner cue gate '+state.name);
      assert.ok(data.canvas.startsWith('data:image/png;base64,'),'canvas PNG capture');
      fs.writeFileSync(path.join(dir,'tempest-cue-'+viewport.width+'x'+viewport.height+'-'+state.name+'.png'),
       Buffer.from(data.canvas.split(',')[1],'base64'));
-     results.push({viewport,state:state.name,cues:data.cues});
+     results.push({viewport,state:state.name,cues:data.cues,otherCues:data.otherCues});
     }
     assert.deepEqual(errors,[],'no Chromium runtime errors');
    }finally{await page.close();}
