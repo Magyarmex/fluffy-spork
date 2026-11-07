@@ -368,4 +368,52 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add index.html
           git commit -m 'Materialize NOVA TANKS runtime release'
-          git push origin HEAD:main
+          # Keep the exact tested source as the comparison anchor. HEAD may be
+          # replaced by a newer tests-only commit during recovery.
+          tested_source="$(git rev-parse HEAD^)"
+          cp index.html "${RUNNER_TEMP}/nova-materialized-index-retry.html"
+          for attempt in 1 2 3; do
+            push_output="$(mktemp)"
+            if git push --porcelain origin HEAD:main >"$push_output" 2>&1; then
+              cat "$push_output"
+              rm -f "$push_output"
+              echo "Materialized page published on attempt $attempt."
+              exit 0
+            fi
+            cat "$push_output" >&2
+            # Never retry authentication, transport, or policy failures.
+            if ! grep -Eq '\[rejected\].*(non-fast-forward|fetch first)' "$push_output"; then
+              rm -f "$push_output"
+              echo 'Push failed for a reason other than a non-fast-forward race.' >&2
+              exit 1
+            fi
+            rm -f "$push_output"
+            if [ "$attempt" -eq 3 ]; then
+              echo 'Materializer exhausted three safe push attempts.' >&2
+              exit 1
+            fi
+            git fetch origin main
+            # A rewritten or unrelated mainline is not a safe reattachment.
+            if ! git merge-base --is-ancestor "$tested_source" origin/main; then
+              echo 'Main no longer descends from tested source; refusing publication.' >&2
+              exit 1
+            fi
+            # Compare the original tested inputs, not the unpushed HTML commit.
+            if ! git diff --quiet "$tested_source" origin/main -- \
+              nova-gz nova-updates manifest.webmanifest nova-icon.svg \
+              pwa-register.js sw.js package.json .github/nova-tailwind.css \
+              .github/workflows/deploy.yml scripts/patch-star-minimap.cjs \
+              scripts/patch-saved-records.cjs scripts/patch-ai-strafe-timebase.cjs \
+              scripts/patch-raf-step-cap.cjs scripts/patch-cosmetic-rng.cjs \
+              scripts/patch-audio-rng.cjs scripts/patch-perk-offer.cjs \
+              scripts/patch-render-tank-order.cjs index.html; then
+              echo 'Newer runtime inputs or page detected during push; stale build vetoed.' >&2
+              exit 0
+            fi
+            echo "Only tests/docs advanced during push; validating fresh main (attempt $((attempt + 1)))."
+            git switch -C nova-materialize-latest origin/main
+            cp "${RUNNER_TEMP}/nova-materialized-index-retry.html" index.html
+            npm run test
+            git add index.html
+            git commit -m 'Materialize NOVA TANKS runtime release'
+          done
