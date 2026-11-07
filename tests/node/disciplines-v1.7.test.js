@@ -84,6 +84,20 @@ test('Gunner cadence has a deterministic sweet spot',()=>{
   assert.ok(q.gunSweet(.56)>.99);
   assert.ok(q.gunSweet(.95)<.01);
 });
+test('Tempest bright heat cue matches its actual Apex cooldown gate',()=>{
+  const {context}=loadDisciplines(), cue=context.window.__NOVA_DISCIPLINES_TEST__.gunnerCue;
+  const tempest={cls:'tempest'}, twin={cls:'twin'};
+  // Apex: (1 - abs(heat-.56)/.36) > .58 AND stability > .52.
+  assert.equal(cue(tempest,.56,.53),true);
+  assert.equal(cue(tempest,.41,.53),true);
+  assert.equal(cue(tempest,.71,.53),true);
+  assert.equal(cue(tempest,.40,.53),false);
+  assert.equal(cue(tempest,.72,.53),false);
+  assert.equal(cue(tempest,.56,.52),false);
+  // A non-Tempest Gunner must retain its previous broad readability cue.
+  assert.equal(cue(twin,.30,.60),true);
+  assert.equal(cue(twin,.90,.60),false);
+});
 test('Guardian frontal arc is directional',()=>{
   const {context}=loadDisciplines(), q=context.window.__NOVA_DISCIPLINES_TEST__;
   assert.equal(q.guardFront(0,0,Math.PI/2),true);
