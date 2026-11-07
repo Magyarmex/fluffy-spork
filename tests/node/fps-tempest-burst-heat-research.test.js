@@ -52,4 +52,10 @@ test('Tempest 1s-on/1s-off cadence preserves input duty and exposes heat recover
   assert.ok(cohort.find(row=>row.name==='native60').restHeatWindows.some(w=>w.drop>0.2),
    'a full one-second firing rest must materially cool the gunner');
  }
+ console.log('TEMPEST_BURST_RESEARCH '+JSON.stringify(report.results.map(row=>({
+  reload:row.reload,name:row.name,volleys:row.volleys,
+  baseCadence:row.baseCadenceEligibleVolleys,apexBoost:row.tempestApexBoostVolleys,
+  redlinePenalty:row.tempestRedlinePenaltyVolleys,
+  restHeatDrops:row.restHeatWindows.map(w=>w.drop),extraUpdates:row.extraInputBoundaryUpdates
+ }))));
 });
