@@ -498,3 +498,42 @@ test('idle and release-only stalls never force a canvas layout read',()=>{
     }finally{s.owner.stop()}
   }
 });
+
+test('stale browser event reset warns once without restoring phantom touch',()=>{
+  process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
+  const {bootGame}=require('../research/audio-rng-causal-pilot.cjs');
+  const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs');
+  for(const scenario of ['stale-move','queued-release','stale-release','late-release']){
+    const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
+    let now=1000;const notices=[];g.toast=(...args)=>notices.push(args);
+    const timeline=new ChronologicalInput(g.input);
+    const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
+    const owner=new FixedStepRafOwner(g,timeline,bridge,{
+      now:()=>now,request:()=>1,cancel:()=>{},render:()=>{}
+    });
+    const event=(type,delivered,stamp=delivered)=>{
+      now=delivered;
+      return bridge.capture({type,timeStamp:stamp,pointerId:11,pointerType:'touch',
+        clientX:100,clientY:200,button:0,buttons:type==='pointerup'?0:1,
+        target:{tagName:'CANVAS',closest:()=>null}});
+    };
+    try{
+      owner.start();
+      assert.equal(event('pointerdown',1005),true);
+      now=1017;owner.frame(now);
+      assert.equal(g.input.stickId.move,11);
+      if(scenario==='queued-release')assert.equal(event('pointerup',1020),true);
+      const staleKind=scenario==='stale-release'?'pointerup':'pointermove';
+      assert.equal(event(staleKind,4100,1025),false);
+      assert.equal(g.input.stickId.move,-1,'stale event fails closed immediately');
+      assert.equal(g.input.firing,false);
+      if(scenario==='late-release')assert.equal(event('pointerup',4110),false);
+      now=4117;owner.frame(now);
+      assert.equal(notices.length,scenario==='stale-move'?1:0,scenario);
+      assert.equal(g.input.stickId.move,-1);
+      assert.equal(g.input.firing,false);
+      now=4133;owner.frame(now);
+      assert.equal(notices.length,scenario==='stale-move'?1:0,'no repeated warning');
+    }finally{owner.stop();g.destroy()}
+  }
+});
