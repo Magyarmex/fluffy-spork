@@ -13,7 +13,7 @@ const trailMode=process.env.NOVA_TRAIL_CAUSAL==='1';
 // across early/middle/late phases. The legacy A/A/B remains unchanged.
 const midpointMode=process.env.NOVA_CLARITY_MIDPOINT==='1';
 assert.ok(!(trailMode&&midpointMode),'run one research intervention at a time');
-const midpointPhases=[100,80,65,65,80,100,80,65,100];
+const midpointPhases=[100,80,65,65,100,80,80,65,100];
 const phases=trailMode?[100,100,100,100,100,100]:
  midpointMode?midpointPhases:[100,65,65,100,65,100];
 const viewports=trailMode?[{name:'desktop',width:1280,height:800}]:
