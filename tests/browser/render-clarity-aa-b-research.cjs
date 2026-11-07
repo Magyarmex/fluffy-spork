@@ -2,6 +2,7 @@
 // Opt-in research only: real shipping Chromium Render clarity A/A/B.
 // Not a fixed60 test, matched-world comparison, Android benchmark, or input-latency gate.
 const assert=require('node:assert/strict');
+const fs=require('node:fs');
 const {chromium}=require('playwright');
 const phases=[100,65,100,100,65,65];
 const viewports=[{name:'desktop',width:1280,height:800},{name:'mobile',width:320,height:640}];
@@ -83,8 +84,13 @@ async function measure(browser,viewport,scale,index){
    records.push(result);
    console.log('NOVA_CLARITY_PHASE '+JSON.stringify(result));
   }
-  console.log('NOVA_CLARITY_RESEARCH '+JSON.stringify({researchOnly:true,
+  const evidence={researchOnly:true,commit:process.env.GITHUB_SHA||null,
    caveats:['independent worlds not matched','not fixed60','not physical Android',
-    'no human touch latency','CI hardware is not a phone'],records}));
+    'no human touch latency','CI hardware is not a phone',
+    'NovaPerf rolling windows can include warmup on slow frames'],records};
+  fs.mkdirSync('artifacts/browser',{recursive:true});
+  fs.writeFileSync('artifacts/browser/render-clarity-research.json',
+   JSON.stringify(evidence,null,2)+'\\n');
+  console.log('NOVA_CLARITY_RESEARCH '+JSON.stringify(evidence));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e.stack||e);process.exitCode=1;});
