@@ -22,6 +22,12 @@ test('Tempest 1s-on/1s-off cadence preserves input duty and exposes heat recover
   assert.equal(row.simulatedTicks,960);
   assert.equal(row.firingTicks,480);
   assert.equal(row.restTicks,480);
+  assert.equal(row.restHeatWindows.length,4,'four complete one-second cooling windows');
+  for(const window of row.restHeatWindows){
+   assert.ok(Number.isFinite(window.start)&&Number.isFinite(window.end));
+   assert.ok(Number.isFinite(window.drop));
+   assert.ok(Math.abs((window.start-window.end)-window.drop)<0.000002);
+  }
   assert.ok(row.volleys>0);
   assert.ok(Number.isFinite(row.minimumHeat)&&Number.isFinite(row.peakHeat));
   assert.ok(row.minimumHeat<=row.peakHeat);
