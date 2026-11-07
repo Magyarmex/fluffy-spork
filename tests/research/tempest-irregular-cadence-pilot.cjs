@@ -59,12 +59,12 @@ function run(seed,reload,name,steps){
   g.shapes=[];g.drones=[];g.powerups=[];
   g.input.aim.active=true;g.input.aim.dx=40;g.input.firing=true;g.input.autofire=false;
   p.stats.reload=reload;
-  let volleys=0,restVolleys=0,peakHeat=0,peakCooldown=0,minHeat=Infinity,elapsedTicks=0,firingTicks=0,restTicks=0,updateCalls=0,restStartHeat=null,restHeatWindows=[];
-  const shotTimes=[],shotAngles=[],shotHeats=[],shotStabilities=[];const original=g.tryFire;
+  let volleys=0,restVolleys=0,peakHeat=0,peakCooldown=0,minHeat=Infinity,elapsedTicks=0,firingTicks=0,restTicks=0,updateCalls=0,restStartHeat=null,restStartSpin=null,restHeatWindows=[],restSpinWindows=[];
+  const shotTimes=[],shotAngles=[],shotHeats=[],shotStabilities=[],shotSpins=[];const original=g.tryFire;
   g.tryFire=function(t){
    const before=this.bullets.length;
    const result=original.apply(this,arguments);
-   if(t===p&&this.bullets.length>before){volleys++;if(!g.input.firing)restVolleys++;shotTimes.push(this.time);shotAngles.push(p.angle);shotHeats.push(p.__v17Heat??0);shotStabilities.push(p.__v17Stability??1);}
+   if(t===p&&this.bullets.length>before){volleys++;if(!g.input.firing)restVolleys++;shotTimes.push(this.time);shotAngles.push(p.angle);shotHeats.push(p.__v17Heat??0);shotStabilities.push(p.__v17Stability??1);shotSpins.push(p.fireSpin??0);}
    return result;
   };
   try{
@@ -80,7 +80,7 @@ function run(seed,reload,name,steps){
      const untilBoundary=!burst?remaining:
       (active?burst[0]-position:period-position);
      const slice=Math.min(remaining,untilBoundary);
-     if(!active&&restStartHeat===null)restStartHeat=p.__v17Heat??0;
+     if(!active&&restStartHeat===null){restStartHeat=p.__v17Heat??0;restStartSpin=p.fireSpin??0;}
      g.input.firing=active;
      g.update(slice/120);updateCalls++;
      peakHeat=Math.max(peakHeat,p.__v17Heat??0);
@@ -92,12 +92,15 @@ function run(seed,reload,name,steps){
       const end=p.__v17Heat??0;
       restHeatWindows.push({start:+restStartHeat.toFixed(6),end:+end.toFixed(6),
        drop:+(restStartHeat-end).toFixed(6)});
-      restStartHeat=null;
+      const endSpin=p.fireSpin??0;
+      restSpinWindows.push({start:+restStartSpin.toFixed(6),end:+endSpin.toFixed(6),
+       drop:+(restStartSpin-endSpin).toFixed(6)});
+      restStartHeat=null;restStartSpin=null;
      }
     }
    }
    return {seed,reload,name,firePattern,burstTicks:burst?{on:burst[0],off:burst[1]}:null,frames:steps.length,updateCalls,extraInputBoundaryUpdates:updateCalls-steps.length,simulatedTicks:elapsedTicks,
-    firingTicks,restTicks,restHeatWindows,volleys,restVolleys,
+    firingTicks,restTicks,restHeatWindows,restSpinWindows,volleys,restVolleys,
     baseCadenceEligibleVolleys:shotHeats.filter((h,i)=>Math.max(0,1-Math.abs(h-.56)/.30)>.62&&shotStabilities[i]>.56).length,
     tempestApexBoostVolleys:shotHeats.filter((h,i)=>Math.max(0,1-Math.abs(h-.56)/.36)>.58&&shotStabilities[i]>.52).length,
     tempestRedlinePenaltyVolleys:shotHeats.filter(h=>h>.90).length,minimumHeat:+minHeat.toFixed(6),
@@ -106,7 +109,10 @@ function run(seed,reload,name,steps){
     firstShots:shotTimes.slice(0,8).map(n=>+n.toFixed(6)),
     lastShots:shotTimes.slice(-8).map(n=>+n.toFixed(6)),
     firstShotAngles:shotAngles.slice(0,8).map(n=>+n.toFixed(6)),
-    firstShotHeats:shotHeats.slice(0,8).map(n=>+n.toFixed(6))};
+    firstShotHeats:shotHeats.slice(0,8).map(n=>+n.toFixed(6)),
+    firstShotSpins:shotSpins.slice(0,8).map(n=>+n.toFixed(6)),
+    lastShotSpins:shotSpins.slice(-8).map(n=>+n.toFixed(6)),
+    finalSpin:+(p.fireSpin??0).toFixed(6)};
   }finally{g.destroy();}
  });
 }
