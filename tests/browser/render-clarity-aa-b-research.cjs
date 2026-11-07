@@ -90,7 +90,7 @@ async function measure(browser,viewport,scale,index){
     'NovaPerf rolling windows can include warmup on slow frames'],records};
   fs.mkdirSync('artifacts/browser',{recursive:true});
   fs.writeFileSync('artifacts/browser/render-clarity-research.json',
-   JSON.stringify(evidence,null,2)+'\\n');
+   JSON.stringify(evidence,null,2)+'\n');
   console.log('NOVA_CLARITY_RESEARCH '+JSON.stringify(evidence));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e.stack||e);process.exitCode=1;});
