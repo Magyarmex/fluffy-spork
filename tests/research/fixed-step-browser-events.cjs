@@ -38,7 +38,7 @@ class BrowserEventTimeline {
     // it arrives before the next presentation frame.
     if (event.type === 'blur') this.pendingStaleTouchIds.clear();
     else if ((event.type === 'pointerup' || event.type === 'pointercancel') &&
-             event.pointerType !== 'mouse')
+             typeof event.pointerType === 'string' && event.pointerType !== 'mouse')
       this.pendingStaleTouchIds.delete(event.pointerId);
     const now = this.clock.now();
     if (!Number.isFinite(now)) throw Error('invalid browser clock');
@@ -105,7 +105,7 @@ class BrowserEventTimeline {
       }
       if(event.type==='blur') held.clear();
       else if((event.type==='pointerup'||event.type==='pointercancel') &&
-              event.pointerType!=='mouse') held.delete(event.pointerId);
+              typeof event.pointerType==='string' && event.pointerType!=='mouse') held.delete(event.pointerId);
       this.pendingStaleTouchIds=held;
       this.timeline.reset({quarantine:true});
       if (event.type === 'pointerup' || event.type === 'pointercancel' ||
