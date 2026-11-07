@@ -56,7 +56,7 @@ async function measure(browser,viewport,scale,index){
    renderModule.render=function(){
     const started=performance.now();
     try{return originalRender.apply(this,arguments);}
-    finally{if(sampling)outer.render.push(performance.now()-started);}
+    finally{if(sampling&&arguments[0]===g)outer.render.push(performance.now()-started);}
    };
    // The shipping RAF draws the minimap after render.render(), outside
    // both the old NovaPerf renderer wrapper and the final renderer method.
