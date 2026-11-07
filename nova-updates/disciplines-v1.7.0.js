@@ -722,7 +722,13 @@ wrap('game/render',function(renderMod,require){
     var h=clamp(t.__v17Heat||0,0,1),st=clamp(t.__v17Stability==null?1:t.__v17Stability,0,1),def=C[t.cls],r=(def&&def.size||15)+12;
     ctx.save();ctx.globalCompositeOperation='lighter';
     ctx.lineCap='round';arc(ctx,t.x,t.y,r,-Math.PI*.78,-Math.PI*.78+Math.PI*1.56*h,'#68ecff',2.3,.72);
-    if(gunnerCue(t,h,st))arc(ctx,t.x,t.y,r+3,-Math.PI*.10,Math.PI*.10,'#d9fbff',2.8,.72);
+    // Tempest's true Apex gate is narrow; a slightly longer, brighter
+    // existing arc survives phone-size downscaling without adding HUD clutter.
+    // Other Gunner cues retain their established geometry and intensity.
+    if(gunnerCue(t,h,st)){
+      if(t.cls==='tempest')arc(ctx,t.x,t.y,r+3,-Math.PI*.15,Math.PI*.15,'#d9fbff',3.4,.90);
+      else arc(ctx,t.x,t.y,r+3,-Math.PI*.10,Math.PI*.10,'#d9fbff',2.8,.72);
+    }
     if(h>.84)arc(ctx,t.x,t.y,r+1,Math.PI*.30,Math.PI*.72,'#ff9d7a',2.1,.58+.18*Math.sin(g.time*12));
     ctx.restore();
   }
