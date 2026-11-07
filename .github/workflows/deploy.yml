@@ -360,6 +360,9 @@ jobs:
             git restore -- index.html
             git switch -C nova-materialize-latest origin/main
             cp "${RUNNER_TEMP}/nova-materialized-index.html" index.html
+            # A newer tests-only commit may tighten the acceptance contract.
+            # Validate the generated page against those latest tests before publish.
+            npm run test
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
