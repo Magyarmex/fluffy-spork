@@ -537,3 +537,47 @@ test('stale browser event reset warns once without restoring phantom touch',()=>
     }finally{owner.stop();g.destroy()}
   }
 });
+
+test('stale bridge reset respects queued first touch, releases, and ignored same-side press',()=>{
+  process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
+  const {bootGame}=require('../research/audio-rng-causal-pilot.cjs');
+  const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs');
+  for(const scenario of ['first-down','first-down-release','ignored-same-side']){
+    const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
+    const rect=()=>({left:0,top:0,width:800,height:600});
+    g.input.canvas.getBoundingClientRect=rect;
+    let now=1000;const notices=[];g.toast=(...args)=>notices.push(args);
+    const timeline=new ChronologicalInput(g.input);
+    const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
+    const owner=new FixedStepRafOwner(g,timeline,bridge,{
+      now:()=>now,request:()=>1,cancel:()=>{},render:()=>{}
+    });
+    const event=(type,delivered,id=11,stamp=delivered)=>{
+      now=delivered;
+      return bridge.capture({type,timeStamp:stamp,pointerId:id,pointerType:'touch',
+        clientX:100,clientY:200,button:0,buttons:type==='pointerup'?0:1,
+        target:{tagName:'CANVAS',closest:()=>null}});
+    };
+    try{
+      owner.start();
+      now=1017;owner.frame(now);
+      if(scenario==='ignored-same-side'){
+        assert.equal(event('pointerdown',1020,11),true);
+        now=1034;owner.frame(now);
+        assert.equal(g.input.stickId.move,11);
+        assert.equal(event('pointerdown',1040,12),true);
+        assert.equal(event('pointerup',1045,11),true);
+      }else{
+        assert.equal(event('pointerdown',1020),true);
+        if(scenario==='first-down-release')
+          assert.equal(event('pointerup',1025),true);
+      }
+      assert.equal(event('pointermove',4100,11,1050),false);
+      assert.equal(g.input.stickId.move,-1);
+      now=4117;owner.frame(now);
+      assert.equal(notices.length,scenario==='first-down'?1:0,scenario);
+      assert.equal(g.input.firing,false);
+      assert.equal(g.input.stickId.move,-1);
+    }finally{owner.stop();g.destroy()}
+  }
+});
