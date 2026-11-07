@@ -19,10 +19,23 @@ const reloads=parse('NOVA_JITTER_RELOAD','0,4,5,8',0,8);
 // Phase rotations preserve each six-step schedule's interval multiset and total time.
 const phases=parse('NOVA_JITTER_PHASES','0',0,5);
 const TICKS=960; // exactly 8 simulated seconds at a 120Hz integer timebase
-// Optional 1s-on/1s-off held-fire experiment. Transitions use integer
-// simulated ticks, never floating-point wall time or browser presentation FPS.
+// Optional exact-tick burst experiments. Transitions use integer simulated
+// ticks, never floating-point wall time or browser presentation FPS.
 const firePattern=process.env.NOVA_JITTER_FIRE_PATTERN||'continuous';
-if(!['continuous','burst1s'].includes(firePattern))throw new Error('NOVA_JITTER_FIRE_PATTERN must be continuous or burst1s');
+// Durations are exact 120Hz ticks. The 0.2s/0.5s rhythm has a
+// 0.7s period, so its last rest is intentionally incomplete at 8s.
+const burstDurations={burst1s:[120,120],burst250ms:[30,90],burst200ms:[24,60]};
+if(firePattern!=='continuous'&&!Object.hasOwn(burstDurations,firePattern))
+ throw new Error('NOVA_JITTER_FIRE_PATTERN must be continuous, burst1s, burst250ms or burst200ms');
+const burst=burstDurations[firePattern]||null;
+// Held aim models desktop fire release; release clears aim during rests and
+// instantly restores a full 40px aim vector at the next firing boundary.
+// Real touch pointerdown begins at dx=0 and needs pointermove beyond deadzone;
+// release is an optimistic input-state control, not a DOM gesture simulation.
+// Center mode holds the touch firing flag while returning the aim vector to
+// zero: Game.update must suppress shots when aimVec() returns null.
+const aimMode=process.env.NOVA_JITTER_AIM_MODE||'held';
+if(!['held','release','center'].includes(aimMode))throw new Error('NOVA_JITTER_AIM_MODE must be held, release or center');
 const patterns={
  native30:[4],native60:[2],native120:[1],
  mixedSlow:[2,4,1,1,2,2],mixedFast:[1,3,2,1,3,2],
@@ -54,12 +67,12 @@ function run(seed,reload,name,steps){
   g.shapes=[];g.drones=[];g.powerups=[];
   g.input.aim.active=true;g.input.aim.dx=40;g.input.firing=true;g.input.autofire=false;
   p.stats.reload=reload;
-  let volleys=0,restVolleys=0,peakHeat=0,peakCooldown=0,minHeat=Infinity,elapsedTicks=0,firingTicks=0,restTicks=0,updateCalls=0,restStartHeat=null,restHeatWindows=[];
-  const shotTimes=[],shotAngles=[],shotHeats=[],shotStabilities=[];const original=g.tryFire;
+  let volleys=0,restVolleys=0,intendedActive=true,peakHeat=0,peakCooldown=0,minHeat=Infinity,elapsedTicks=0,firingTicks=0,restTicks=0,updateCalls=0,restStartHeat=null,restStartSpin=null,restHeatWindows=[],restSpinWindows=[];
+  const shotTimes=[],shotAngles=[],shotHeats=[],shotStabilities=[],shotSpins=[];const original=g.tryFire;
   g.tryFire=function(t){
    const before=this.bullets.length;
    const result=original.apply(this,arguments);
-   if(t===p&&this.bullets.length>before){volleys++;if(!g.input.firing)restVolleys++;shotTimes.push(this.time);shotAngles.push(p.angle);shotHeats.push(p.__v17Heat??0);shotStabilities.push(p.__v17Stability??1);}
+   if(t===p&&this.bullets.length>before){volleys++;if(!intendedActive)restVolleys++;shotTimes.push(this.time);shotAngles.push(p.angle);shotHeats.push(p.__v17Heat??0);shotStabilities.push(p.__v17Stability??1);shotSpins.push(p.fireSpin??0);}
    return result;
   };
   try{
@@ -69,28 +82,36 @@ function run(seed,reload,name,steps){
     // input-event test, not a claim that native browser input does this.
     let remaining=ticks;
     while(remaining>0){
-     const active=firePattern==='continuous'||elapsedTicks%240<120;
-     const untilBoundary=firePattern==='continuous'?remaining:
-      (active?120-elapsedTicks%240:240-elapsedTicks%240);
+     const period=burst?burst[0]+burst[1]:0;
+     const position=burst?elapsedTicks%period:0;
+     const active=!burst||position<burst[0];
+     const untilBoundary=!burst?remaining:
+      (active?burst[0]-position:period-position);
      const slice=Math.min(remaining,untilBoundary);
-     if(!active&&restStartHeat===null)restStartHeat=p.__v17Heat??0;
-     g.input.firing=active;
+     if(!active&&restStartHeat===null){restStartHeat=p.__v17Heat??0;restStartSpin=p.fireSpin??0;}
+     intendedActive=active;
+     g.input.firing=aimMode==='center'?true:active;
+     if(aimMode==='release'){g.input.aim.active=active;g.input.aim.dx=active?40:0;}
+     if(aimMode==='center'){g.input.aim.active=true;g.input.aim.dx=active?40:0;}
      g.update(slice/120);updateCalls++;
      peakHeat=Math.max(peakHeat,p.__v17Heat??0);
      minHeat=Math.min(minHeat,p.__v17Heat??0);
      peakCooldown=Math.max(peakCooldown,p.fireCd??0);
      if(active)firingTicks+=slice;else restTicks+=slice;
      elapsedTicks+=slice;remaining-=slice;
-     if(!active&&elapsedTicks%240===0){
+     if(!active&&elapsedTicks%(burst[0]+burst[1])===0){
       const end=p.__v17Heat??0;
       restHeatWindows.push({start:+restStartHeat.toFixed(6),end:+end.toFixed(6),
        drop:+(restStartHeat-end).toFixed(6)});
-      restStartHeat=null;
+      const endSpin=p.fireSpin??0;
+      restSpinWindows.push({start:+restStartSpin.toFixed(6),end:+endSpin.toFixed(6),
+       drop:+(restStartSpin-endSpin).toFixed(6)});
+      restStartHeat=null;restStartSpin=null;
      }
     }
    }
-   return {seed,reload,name,firePattern,frames:steps.length,updateCalls,extraInputBoundaryUpdates:updateCalls-steps.length,simulatedTicks:elapsedTicks,
-    firingTicks,restTicks,restHeatWindows,volleys,restVolleys,
+   return {seed,reload,name,firePattern,aimMode,burstTicks:burst?{on:burst[0],off:burst[1]}:null,frames:steps.length,updateCalls,extraInputBoundaryUpdates:updateCalls-steps.length,simulatedTicks:elapsedTicks,
+    firingTicks,restTicks,restHeatWindows,restSpinWindows,volleys,restVolleys,
     baseCadenceEligibleVolleys:shotHeats.filter((h,i)=>Math.max(0,1-Math.abs(h-.56)/.30)>.62&&shotStabilities[i]>.56).length,
     tempestApexBoostVolleys:shotHeats.filter((h,i)=>Math.max(0,1-Math.abs(h-.56)/.36)>.58&&shotStabilities[i]>.52).length,
     tempestRedlinePenaltyVolleys:shotHeats.filter(h=>h>.90).length,minimumHeat:+minHeat.toFixed(6),
@@ -99,7 +120,10 @@ function run(seed,reload,name,steps){
     firstShots:shotTimes.slice(0,8).map(n=>+n.toFixed(6)),
     lastShots:shotTimes.slice(-8).map(n=>+n.toFixed(6)),
     firstShotAngles:shotAngles.slice(0,8).map(n=>+n.toFixed(6)),
-    firstShotHeats:shotHeats.slice(0,8).map(n=>+n.toFixed(6))};
+    firstShotHeats:shotHeats.slice(0,8).map(n=>+n.toFixed(6)),
+    firstShotSpins:shotSpins.slice(0,8).map(n=>+n.toFixed(6)),
+    lastShotSpins:shotSpins.slice(-8).map(n=>+n.toFixed(6)),
+    finalSpin:+(p.fireSpin??0).toFixed(6)};
   }finally{g.destroy();}
  });
 }
@@ -110,6 +134,16 @@ for(const seed of seeds)for(const reload of reloads){
    const steps=schedule(pattern,phase);
    const row=run(seed,reload,phase===0?name:name+'@'+phase,steps);
    row.pattern=name;row.phase=phase;
+   // Counterfactual only: how much fire time a once-per-frame input sampler
+   // would assign when it observes the state at each frame's START.
+   // This does not emulate DOM event delivery or a production RAF run.
+   let frameCursor=0,frameSampledFiringTicks=0;
+   for(const ticks of steps){
+    if(!burst||frameCursor%(burst[0]+burst[1])<burst[0])frameSampledFiringTicks+=ticks;
+    frameCursor+=ticks;
+   }
+   row.frameSampledFiringTicks=frameSampledFiringTicks;
+   row.frameSampledDutyDeltaTicks=frameSampledFiringTicks-row.firingTicks;
    row.intervalHistogram=steps.reduce((counts,ticks)=>{
     counts[ticks]=(counts[ticks]||0)+1;return counts;
    },{});
@@ -124,4 +158,4 @@ for(const seed of seeds)for(const reload of reloads){
  }
 }
 console.log(JSON.stringify({method:'actual materialized 49-overlay Game; held aim/fire; no targets',
- phases,firePattern,selectedPatterns,caveats:['research-only, no browser input event timestamps','all schedules cover exactly 8 simulated seconds','variable dt changes world update chronology, not merely presentation FPS','no player-facing patch'],patterns,seeds,reloads,results:all},null,2));
+ phases,firePattern,aimMode,selectedPatterns,caveats:['research-only: release mode instantly restores aim, unlike real touch pointerdown deadzone','center mode models a held stick dragged to neutral, not a real gesture','exact input-boundary splitting can add Game.update calls beyond presentation frames','all schedules cover exactly 8 simulated seconds','0.7s burst rhythm ends in a partial rest excluded from completed rest windows','variable dt changes world update chronology, not merely presentation FPS','no player-facing patch'],patterns,seeds,reloads,results:all},null,2));
