@@ -1,6 +1,7 @@
 'use strict';
 /* Isolated Game aim-state comparison, NOT a DOM pointer lifecycle test.
- * A released stick can stop turret settling and change stability, so
+ * The release mode restores full aim immediately, unlike a real touch pointerdown
+ * that starts inside the deadzone. Release can stop turret settling, so
  * chronological firing parity must be observed rather than assumed. */
 const test=require('node:test');
 const assert=require('node:assert/strict');
@@ -17,7 +18,7 @@ function run(pattern,aimMode){
  })).results;
 }
 for(const pattern of ['burst250ms','burst200ms']){
- test('Tempest '+pattern+' compares held aim and touch-style aim release safely',()=>{
+ test('Tempest '+pattern+' compares held aim and idealized aim release safely',()=>{
   const held=run(pattern,'held'),released=run(pattern,'release');
   assert.equal(held.length,2);assert.equal(released.length,2);
   for(let i=0;i<held.length;i++){
