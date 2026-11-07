@@ -40,6 +40,32 @@ async function measure(browser,viewport,scale,index){
    g.player.stats.reload=8;
    g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
    g.input.firing=true;g.input.autofire=false;
+   // Measure the final composed methods, outside all previously installed
+   // gameplay/visual wrappers. NovaPerf measures earlier inner layers.
+   // This is opt-in research instrumentation, never a production hook.
+   const outer={update:[],render:[],minimap:[]};
+   let sampling=false;
+   const originalUpdate=g.update;
+   g.update=function(){
+    const started=performance.now();
+    try{return originalUpdate.apply(this,arguments);}
+    finally{if(sampling)outer.update.push(performance.now()-started);}
+   };
+   const renderModule=window.__novaMakeRequire('')('game/render');
+   const originalRender=renderModule.render;
+   renderModule.render=function(){
+    const started=performance.now();
+    try{return originalRender.apply(this,arguments);}
+    finally{if(sampling&&arguments[0]===g)outer.render.push(performance.now()-started);}
+   };
+   // The shipping RAF draws the minimap after render.render(), outside
+   // both the old NovaPerf renderer wrapper and the final renderer method.
+   const originalMinimap=g.drawMinimap;
+   g.drawMinimap=function(){
+    const started=performance.now();
+    try{return originalMinimap.apply(this,arguments);}
+    finally{if(sampling)outer.minimap.push(performance.now()-started);}
+   };
    let shots=0;
    const oldFire=g.tryFire;
    g.tryFire=function(t){
@@ -50,6 +76,7 @@ async function measure(browser,viewport,scale,index){
    // Fresh game per arm: no settings menu, pause, or rolling perf history crossover.
    await new Promise(resolve=>setTimeout(resolve,1800));
    const begin=performance.now(),gameTime=g.time,shotsAtBegin=shots,gaps=[];
+   sampling=true;
    const interruptions=[],longTasks=[];
    // Low-cost exposure counters distinguish clarity effects from different
    // independently evolving combat populations; not matched-world proof.
@@ -84,7 +111,7 @@ async function measure(browser,viewport,scale,index){
      }
      requestAnimationFrame(frame);
     });
-   }finally{observer?.disconnect();document.removeEventListener('visibilitychange',visibilityChanged);}
+   }finally{sampling=false;observer?.disconnect();document.removeEventListener('visibilitychange',visibilityChanged);}
    const end=performance.now();
    const longTaskInWindow=longTasks.map(t=>({
     startMs:Math.max(0,t.startMs),
@@ -94,15 +121,21 @@ async function measure(browser,viewport,scale,index){
     quality:g.quality,dpr:g.dpr,css:[g.w,g.h],backing:[g.canvas.width,g.canvas.height],
     gameSeconds:g.time-gameTime,wallMs:end-begin,shots:shots-shotsAtBegin,warmupShots:shotsAtBegin,
     gaps,interruptions,longTaskSupported,longTasks:longTaskInWindow,entities,
-    perf:window.NovaPerf?.snapshot(g)||null,status:g.status};
+    outer,perf:window.NovaPerf?.snapshot(g)||null,status:g.status};
   });
   assert.equal(data.scale,scale);
-  assert.ok(data.gaps.length>20,'real foreground RAF intervals required');
+  // Very slow but active frames are the phenomenon under investigation.
+  // Do not censor a 5-FPS phase just because it yields fewer than 21 gaps;
+  // preserve low-sample percentile uncertainty explicitly instead.
+  assert.ok(data.wallMs>=4000&&data.gaps.length>=8,
+   'must observe a full active foreground interval with multiple RAF samples');
   assert.ok(data.backing.every(x=>Number.isFinite(x)&&x>0));
   assert.equal(data.status,'playing','must measure active gameplay, not menu');
   assert.equal(data.interruptions.length,0,'hidden/paused frames invalidate active combat comparison');
   assert.ok(data.shots>0,'must exercise actual Tempest firing, not an idle scene');
   assert.equal(errors.length,0,'page errors: '+errors.join('; '));
+  assert.ok(data.outer.update.length>0&&data.outer.render.length>0,
+   'final composed update/render must both execute during active capture');
   const total=data.gaps.reduce((a,b)=>a+b,0);
   const longTaskMs=data.longTasks.reduce((sum,t)=>sum+t.durationMs,0);
   // RAF timestamps and performance.now() are not identical sampling points;
@@ -111,7 +144,8 @@ async function measure(browser,viewport,scale,index){
   const rafTimestampLeadMs=Math.max(0,observedRafMs-data.wallMs);
   return {viewport:viewport.name,index,scale,cpuThrottle:3,quality:data.quality,dpr:data.dpr,
    css:data.css,backing:data.backing,frames:data.gaps.length,
-   fps:1000*data.gaps.length/total,p50GapMs:pct(data.gaps,.5),
+   fps:1000*data.gaps.length/total,percentileSampleAdequate:data.gaps.length>=30,
+   p50GapMs:pct(data.gaps,.5),
    p95GapMs:pct(data.gaps,.95),p99GapMs:pct(data.gaps,.99),
    gameSeconds:data.gameSeconds,wallMs:data.wallMs,observedRafMs,unobservedWallMs,
    rafCoveragePct:Math.min(100,100*observedRafMs/data.wallMs),rafTimestampLeadMs,
@@ -123,7 +157,14 @@ async function measure(browser,viewport,scale,index){
    shots:data.shots,warmupShots:data.warmupShots,
    meanEntities:Object.fromEntries(['bullets','tanks','drones','shapes'].map(key=>
     [key,data.entities[key]/data.entities.samples])),
-   peakBullets:data.entities.peakBullets,perf:data.perf};
+   peakBullets:data.entities.peakBullets,
+   outerCost:Object.fromEntries(['update','render','minimap'].map(key=>{
+    const samples=data.outer[key];
+    return [key,{calls:samples.length,meanMs:samples.length?samples.reduce((a,b)=>a+b,0)/samples.length:null,
+     p95Ms:samples.length?pct(samples,.95):null,
+     p99Ms:samples.length?pct(samples,.99):null,
+     maxMs:samples.length?Math.max(...samples):null}];
+   })),perf:data.perf};
  }finally{await context.close();}
 }
 (async()=>{
@@ -141,6 +182,9 @@ async function measure(browser,viewport,scale,index){
    caveats:['independent worlds not matched','not fixed60','not physical Android',
     'no human touch latency','CI hardware is not a phone','3x synthetic CPU throttle is not GPU throttling',
     'NovaPerf rolling windows can include warmup on slow frames',
+    'RAF percentiles from fewer than 30 intervals are descriptive only',
+    'outermost JS method durations are inclusive and do not measure GPU completion or input-to-photon',
+    'minimap drawing occurs outside update/render in the shipping RAF; background browser tasks remain unaccounted',
     'Long Tasks API may be unsupported or miss tasks below its threshold',
     'RAF timestamps and PerformanceObserver are browser-clock observations, not input-to-photon latency'],records};
   fs.mkdirSync('artifacts/browser',{recursive:true});
