@@ -105,13 +105,16 @@ async function measure(browser,viewport,scale,index){
   assert.equal(errors.length,0,'page errors: '+errors.join('; '));
   const total=data.gaps.reduce((a,b)=>a+b,0);
   const longTaskMs=data.longTasks.reduce((sum,t)=>sum+t.durationMs,0);
+  // RAF timestamps and performance.now() are not identical sampling points;
+  // preserve small positive lead explicitly instead of reporting >100% coverage.
   const observedRafMs=total,unobservedWallMs=Math.max(0,data.wallMs-observedRafMs);
+  const rafTimestampLeadMs=Math.max(0,observedRafMs-data.wallMs);
   return {viewport:viewport.name,index,scale,cpuThrottle:3,quality:data.quality,dpr:data.dpr,
    css:data.css,backing:data.backing,frames:data.gaps.length,
    fps:1000*data.gaps.length/total,p50GapMs:pct(data.gaps,.5),
    p95GapMs:pct(data.gaps,.95),p99GapMs:pct(data.gaps,.99),
    gameSeconds:data.gameSeconds,wallMs:data.wallMs,observedRafMs,unobservedWallMs,
-   rafCoveragePct:100*observedRafMs/data.wallMs,
+   rafCoveragePct:Math.min(100,100*observedRafMs/data.wallMs),rafTimestampLeadMs,
    simulationPace:data.gameSeconds/(data.wallMs/1000),
    stallFramesOver250Ms:data.gaps.filter(ms=>ms>250).length,
    maxFrameGapMs:Math.max(...data.gaps),
