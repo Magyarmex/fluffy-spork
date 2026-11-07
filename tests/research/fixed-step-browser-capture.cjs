@@ -20,7 +20,10 @@ class BrowserInputCapture {
     this.destroyWrapper = null;
     const capture = e => {
       if (!this.active) return;
-      if (this.document.hidden) { this.timeline.reset(); return; }
+      if (this.document.hidden) { this.timeline.reset();
+        if (typeof this.bridge.takeStaleTouchResetNotice === 'function')
+          this.bridge.takeStaleTouchResetNotice();
+        return; }
       this.bridge.capture(e);
     };
     // Native mouse events are required for button chords: Pointer Events do
@@ -36,7 +39,11 @@ class BrowserInputCapture {
         defaultPrevented:e.defaultPrevented,
         sourceCapabilities:e.sourceCapabilities});
     };
-    const release = () => { if (this.active) this.timeline.reset(); };
+    const release = () => { if (this.active) {
+      this.timeline.reset();
+      if (typeof this.bridge.takeStaleTouchResetNotice === 'function')
+        this.bridge.takeStaleTouchResetNotice();
+    } };
     const hidden = () => { if (this.document.hidden) release(); };
     const spec = [
       [canvas,'pointerdown',capture],
