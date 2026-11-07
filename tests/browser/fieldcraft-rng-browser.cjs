@@ -15,6 +15,7 @@ async function run(browser,width,height){
    const api=window.NOVATips;
    if(!api||typeof api.next!=='function')throw Error('shipping Fieldcraft API unavailable');
    const count=api.audit().current;
+   const tempest=api.current().find(t=>t.id==='tempest-redline');
    const original=Math.random;
    let draws=0;
    Math.random=function(){draws++;return original();};
@@ -24,11 +25,15 @@ async function run(browser,width,height){
     next=api.next('browser-rng-isolation').id;
    }finally{Math.random=original;}
    const line=document.querySelector('.nova-tip-line');
-   return {count,unique:new Set(ids).size,antiRepeat:next!==ids[ids.length-1],
+   return {count,tempest:tempest&&{text:tempest.text,tags:tempest.tags},unique:new Set(ids).size,antiRepeat:next!==ids[ids.length-1],
     draws,visible:!!line&&!!line.getBoundingClientRect().width,
     text:line&&line.textContent,scrollWidth:document.documentElement.scrollWidth};
   });
   assert.ok(result.count>=50,'unexpectedly small shipping tip registry');
+  assert.ok(result.tempest?.text.includes('center your held right stick'),
+   'actual shipping Fieldcraft must teach touch-centered Tempest venting');
+  assert.ok(result.tempest?.tags.includes('controls'),
+   'Tempest touch guidance must be eligible for the controls context');
   assert.equal(result.unique,result.count,'real-browser shuffle bag repeated early');
   assert.equal(result.antiRepeat,true,'real-browser shuffle repeated at bag boundary');
   assert.equal(result.draws,0,'real menu rotation advanced combat RNG');
