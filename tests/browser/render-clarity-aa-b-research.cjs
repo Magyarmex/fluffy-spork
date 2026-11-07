@@ -4,7 +4,8 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {chromium}=require('playwright');
-const phases=[100,65,100,100,65,65];
+// Six-arm ABBA-like order limits linear run-order bias (mean index differs by 1/3 phase).
+const phases=[100,65,65,100,65,100];
 const viewports=[{name:'desktop',width:1280,height:800},{name:'mobile',width:320,height:640}];
 const pct=(xs,p)=>{const s=[...xs].sort((a,b)=>a-b);return s[Math.ceil(s.length*p)-1];};
 async function measure(browser,viewport,scale,index){
@@ -48,33 +49,81 @@ async function measure(browser,viewport,scale,index){
    };
    // Fresh game per arm: no settings menu, pause, or rolling perf history crossover.
    await new Promise(resolve=>setTimeout(resolve,1800));
-   const begin=performance.now(),gameTime=g.time,gaps=[];
-   await new Promise(resolve=>{
-    let prior=null;
-    function frame(ts){
-     if(prior!==null)gaps.push(ts-prior);
-     prior=ts;
-     if(ts-begin<4200)requestAnimationFrame(frame);else resolve();
-    }
-    requestAnimationFrame(frame);
-   });
+   const begin=performance.now(),gameTime=g.time,shotsAtBegin=shots,gaps=[];
+   const interruptions=[],longTasks=[];
+   // Low-cost exposure counters distinguish clarity effects from different
+   // independently evolving combat populations; not matched-world proof.
+   const entities={samples:0,bullets:0,tanks:0,drones:0,shapes:0,peakBullets:0};
+   const visibilityChanged=()=>interruptions.push({atMs:performance.now()-begin,hidden:document.hidden,reason:'visibilitychange'});
+   document.addEventListener('visibilitychange',visibilityChanged);
+   const longTaskSupported=PerformanceObserver.supportedEntryTypes?.includes('longtask')===true;
+   let observer=null;
+   if(longTaskSupported){
+    observer=new PerformanceObserver(list=>{
+     for(const entry of list.getEntries())longTasks.push({
+      startMs:entry.startTime-begin,durationMs:entry.duration});
+    });
+    observer.observe({type:'longtask'});
+   }
+   try{
+    await new Promise(resolve=>{
+     let prior=null;
+     function frame(ts){
+      if(prior!==null)gaps.push(ts-prior);
+      prior=ts;
+      entities.samples++;
+      const bullets=g.bullets?.length||0;
+      entities.bullets+=bullets;
+      entities.tanks+=g.tanks?.length||0;
+      entities.drones+=g.drones?.length||0;
+      entities.shapes+=g.shapes?.length||0;
+      if(bullets>entities.peakBullets)entities.peakBullets=bullets;
+      if(document.hidden||g.status!=='playing'||g.paused)
+       interruptions.push({atMs:ts-begin,hidden:document.hidden,status:g.status,paused:!!g.paused});
+      if(ts-begin<4200)requestAnimationFrame(frame);else resolve();
+     }
+     requestAnimationFrame(frame);
+    });
+   }finally{observer?.disconnect();document.removeEventListener('visibilitychange',visibilityChanged);}
+   const end=performance.now();
+   const longTaskInWindow=longTasks.map(t=>({
+    startMs:Math.max(0,t.startMs),
+    durationMs:Math.max(0,Math.min(end-begin,t.startMs+t.durationMs)-Math.max(0,t.startMs))
+   })).filter(t=>t.durationMs>0);
    return {scale:JSON.parse(localStorage.getItem('novatanks_pilot_settings_v1')).renderScale,
     quality:g.quality,dpr:g.dpr,css:[g.w,g.h],backing:[g.canvas.width,g.canvas.height],
-    gameSeconds:g.time-gameTime,wallMs:performance.now()-begin,shots,
-    gaps,perf:window.NovaPerf?.snapshot(g)||null,status:g.status};
+    gameSeconds:g.time-gameTime,wallMs:end-begin,shots:shots-shotsAtBegin,warmupShots:shotsAtBegin,
+    gaps,interruptions,longTaskSupported,longTasks:longTaskInWindow,entities,
+    perf:window.NovaPerf?.snapshot(g)||null,status:g.status};
   });
   assert.equal(data.scale,scale);
   assert.ok(data.gaps.length>20,'real foreground RAF intervals required');
   assert.ok(data.backing.every(x=>Number.isFinite(x)&&x>0));
   assert.equal(data.status,'playing','must measure active gameplay, not menu');
+  assert.equal(data.interruptions.length,0,'hidden/paused frames invalidate active combat comparison');
   assert.ok(data.shots>0,'must exercise actual Tempest firing, not an idle scene');
   assert.equal(errors.length,0,'page errors: '+errors.join('; '));
   const total=data.gaps.reduce((a,b)=>a+b,0);
+  const longTaskMs=data.longTasks.reduce((sum,t)=>sum+t.durationMs,0);
+  // RAF timestamps and performance.now() are not identical sampling points;
+  // preserve small positive lead explicitly instead of reporting >100% coverage.
+  const observedRafMs=total,unobservedWallMs=Math.max(0,data.wallMs-observedRafMs);
+  const rafTimestampLeadMs=Math.max(0,observedRafMs-data.wallMs);
   return {viewport:viewport.name,index,scale,cpuThrottle:3,quality:data.quality,dpr:data.dpr,
    css:data.css,backing:data.backing,frames:data.gaps.length,
    fps:1000*data.gaps.length/total,p50GapMs:pct(data.gaps,.5),
    p95GapMs:pct(data.gaps,.95),p99GapMs:pct(data.gaps,.99),
-   gameSeconds:data.gameSeconds,wallMs:data.wallMs,shots:data.shots,perf:data.perf};
+   gameSeconds:data.gameSeconds,wallMs:data.wallMs,observedRafMs,unobservedWallMs,
+   rafCoveragePct:Math.min(100,100*observedRafMs/data.wallMs),rafTimestampLeadMs,
+   simulationPace:data.gameSeconds/(data.wallMs/1000),
+   stallFramesOver250Ms:data.gaps.filter(ms=>ms>250).length,
+   maxFrameGapMs:Math.max(...data.gaps),
+   longTaskSupported:data.longTaskSupported,longTaskCount:data.longTasks.length,
+   longTaskTotalMs:longTaskMs,longTaskP95Ms:data.longTasks.length?pct(data.longTasks.map(t=>t.durationMs),.95):null,
+   shots:data.shots,warmupShots:data.warmupShots,
+   meanEntities:Object.fromEntries(['bullets','tanks','drones','shapes'].map(key=>
+    [key,data.entities[key]/data.entities.samples])),
+   peakBullets:data.entities.peakBullets,perf:data.perf};
  }finally{await context.close();}
 }
 (async()=>{
@@ -82,14 +131,18 @@ async function measure(browser,viewport,scale,index){
  try{
   const records=[];
   for(const viewport of viewports)for(let i=0;i<phases.length;i++){
-   const result=await measure(browser,viewport,phases[i],i);
+   // Reverse arms for the second viewport to balance overall time/order exposure.
+   const scale=viewport.name==='mobile'?(phases[i]===100?65:100):phases[i];
+   const result=await measure(browser,viewport,scale,i);
    records.push(result);
    console.log('NOVA_CLARITY_PHASE '+JSON.stringify(result));
   }
   const evidence={researchOnly:true,commit:process.env.GITHUB_SHA||null,
    caveats:['independent worlds not matched','not fixed60','not physical Android',
     'no human touch latency','CI hardware is not a phone','3x synthetic CPU throttle is not GPU throttling',
-    'NovaPerf rolling windows can include warmup on slow frames'],records};
+    'NovaPerf rolling windows can include warmup on slow frames',
+    'Long Tasks API may be unsupported or miss tasks below its threshold',
+    'RAF timestamps and PerformanceObserver are browser-clock observations, not input-to-photon latency'],records};
   fs.mkdirSync('artifacts/browser',{recursive:true});
   fs.writeFileSync('artifacts/browser/render-clarity-research.json',
    JSON.stringify(evidence,null,2)+'\n');
