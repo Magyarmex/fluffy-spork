@@ -31,7 +31,8 @@ function run(reload,name,pattern,policy){
   g.input.autofire=false;
   const out={seed,reload,schedule:name,policy,frames:0,updates:0,volleys:0,
    apexVolleys:0,redlineVolleys:0,vents:0,ventSeconds:0,fireSeconds:0,
-   bandSeconds:0,peakHeat:0,heatIntegral:0,spinIntegral:0,
+   bandSeconds:0,apexSeconds:0,redlineSeconds:0,peakHeat:0,
+   heatIntegral:0,spinIntegral:0,stabilityIntegral:0,
    lastHeat:0,lastSpin:0,firstVentAt:null,worldLeaks:0,firstLeak:null,
    observationDelayMs:policy==='bandWideDelay100'?100:policy==='bandWideDelay200'?200:0,
    maxHeatObservationError:0,delayedSamples:0};
@@ -80,6 +81,10 @@ function run(reload,name,pattern,policy){
     const dt=slice/120,h=p.__v17Heat||0;
     if(fire)out.fireSeconds+=dt;else out.ventSeconds+=dt;
     if(h>=.409&&h<=.711)out.bandSeconds+=dt;
+    const stability=p.__v17Stability??1;
+    if(Math.max(0,1-Math.abs(h-.56)/.36)>.58&&stability>.52)out.apexSeconds+=dt;
+    if(h>.90)out.redlineSeconds+=dt;
+    out.stabilityIntegral+=stability*dt;
     out.peakHeat=Math.max(out.peakHeat,h);
     out.heatIntegral+=h*dt;out.spinIntegral+=(p.fireSpin||0)*dt;
     ticks+=slice;out.frames++;out.updates++;
@@ -87,7 +92,8 @@ function run(reload,name,pattern,policy){
    }
    out.lastHeat=+(p.__v17Heat||0).toFixed(5);
    out.lastSpin=+(p.fireSpin||0).toFixed(5);
-   for(const key of ['fireSeconds','ventSeconds','bandSeconds','peakHeat','heatIntegral','spinIntegral','maxHeatObservationError'])
+   for(const key of ['fireSeconds','ventSeconds','bandSeconds','apexSeconds','redlineSeconds','peakHeat','heatIntegral',
+    'spinIntegral','stabilityIntegral','maxHeatObservationError'])
     out[key]=+out[key].toFixed(5);
    return out;
   }finally{g.destroy();}
