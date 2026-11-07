@@ -148,14 +148,18 @@ async function run(browser,label,viewport){
   assert.ok(Math.hypot(neutral.aim.dx,neutral.aim.dy)<2,
    label+': real neutral touch yields zero aim vector: '+JSON.stringify(neutral));
   assert.equal(neutral.move.active,true,label+': centering aim does not release left movement');
+  // AUTO defaults on in shipping. Active neutral right-stick ownership must
+  // suppress movement-derived auto aim while the left stick is still moving.
+  await page.evaluate(()=>{window.__novaTouchGame.input.autofire=true;});
   const neutralShots=neutral.shots;
   await page.waitForFunction(start=>{
    const g=window.__novaTouchGame;
-   return g&&g.status==='playing'&&g.time>=start+0.35;
+   return g&&g.status==='playing'&&g.time>=start+0.8;
   },neutral.time,{timeout:15000});
   const vented=await snapshot();
   assert.equal(vented.shots,neutralShots,
-   label+': neutral-held right stick must not emit player shots with AUTO disabled');
+   label+': neutral-held right stick must not emit player shots with AUTO enabled');
+  await page.evaluate(()=>{window.__novaTouchGame.input.autofire=false;});
   await send('touchMove',[leftMoved,rightMoved]);
   await page.waitForTimeout(100);
   const reextended=await snapshot();
