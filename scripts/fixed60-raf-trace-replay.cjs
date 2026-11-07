@@ -16,6 +16,16 @@ function percentile(values,p){
   const sorted=[...values].sort((a,b)=>a-b);
   return sorted[Math.ceil(p*sorted.length)-1];
 }
+// Exact quantiles for discrete 0..maxSteps tick counts without retaining
+// another 200,000-element per-frame array on long recorded traces.
+function stepPercentile(counts,p){
+  const rank=Math.ceil(counts.reduce((sum,n)=>sum+n,0)*p);
+  let seen=0;
+  for(let i=0;i<counts.length;i++){
+    seen+=counts[i];if(seen>=rank)return i;
+  }
+  return null;
+}
 function replay(intervals,maxSteps=2){
   if(!Array.isArray(intervals)||!intervals.length||intervals.length>200000||
      intervals.some(v=>!Number.isFinite(v)||v<=0||v>10000))
@@ -33,7 +43,7 @@ function replay(intervals,maxSteps=2){
     now:()=>now,request:fn=>{callback=fn;return 1},
     cancel:()=>{callback=null},render(){},maxSteps
   });
-  const lag=[],phaseLag=[],stepsPerFrame=[];
+  const lag=[],phaseLag=[],stepCounts=Array(maxSteps+1).fill(0);
   let total=0,catchupFrames=0,peakSteps=0;
   try{
     owner.start();
@@ -44,7 +54,7 @@ function replay(intervals,maxSteps=2){
       next(now);
       lag.push(owner.lagMs);
       phaseLag.push(Math.max(0,now-bridge.startMs-owner.simAtSec*1000));
-      stepsPerFrame.push(owner.lastSteps);
+      stepCounts[owner.lastSteps]++;
       if(owner.lastSteps>2)catchupFrames++;
       peakSteps=Math.max(peakSteps,owner.lastSteps);
     }
@@ -63,10 +73,10 @@ function replay(intervals,maxSteps=2){
       catchupFrames,peakSteps,
       // Work concentration matters even when no simulation time is dropped.
       // These are tick counts, NOT measured CPU milliseconds or input latency.
-      framesAtStepCap:stepsPerFrame.filter(n=>n===maxSteps).length,
-      framesWithZeroSteps:stepsPerFrame.filter(n=>n===0).length,
-      p95StepsPerFrame:percentile(stepsPerFrame,.95),
-      p99StepsPerFrame:percentile(stepsPerFrame,.99)};
+      framesAtStepCap:stepCounts[maxSteps],
+      framesWithZeroSteps:stepCounts[0],
+      p95StepsPerFrame:stepPercentile(stepCounts,.95),
+      p99StepsPerFrame:stepPercentile(stepCounts,.99)};
   }finally{owner.stop();}
 }
 // A trace can be replayable without being trustworthy evidence of an active,
