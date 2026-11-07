@@ -15,13 +15,22 @@ const script = step.slice(step.indexOf('        run: |') + '        run: |'.leng
 assert.match(script, /for attempt in 1 2 3/);
 
 test('initial and retry freshness guards cover identical runtime paths', () => {
-  const pattern = /git diff --quiet (?:HEAD|"\\$tested_source") origin\\/main -- \\\n([\\s\\S]*?)index\\.html; then/g;
-  const matches = [...workflow.matchAll(pattern)];
-  assert.equal(matches.length, 2, 'both source guards must remain present');
-  const paths = matches.map(match => match[1].replace(/\\\\\\n/g, ' ').trim().split(/\\s+/));
-  assert.deepEqual(paths[0], paths[1], 'retry guard must never omit a runtime input');
+  const lines = workflow.split('\n');
+  const guards = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].includes('if ! git diff --quiet') ||
+        !lines[i].includes('origin/main --')) continue;
+    const paths = [];
+    for (i++; i < lines.length; i++) {
+      const line = lines[i].trim();
+      paths.push(...line.replaceAll('\\', ' ').replace('; then', '').trim().split(/\s+/));
+      if (line.includes('index.html; then')) break;
+    }
+    guards.push(paths);
+  }
+  assert.equal(guards.length, 2, 'both source guards must remain present');
+  assert.deepEqual(guards[0], guards[1], 'retry guard must never omit a runtime input');
 });
-
 
 function git(cwd, ...args) {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8', env: {
