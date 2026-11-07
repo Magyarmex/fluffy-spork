@@ -32,7 +32,10 @@ class BrowserInputCapture {
     // do not invent an independent firing state or bypass Input's touch gate.
     const native = type => e => {
       if (!this.active || !e || e.button !== 0) return;
-      if (this.document.hidden) { this.timeline.reset(); return; }
+      if (this.document.hidden) { this.timeline.reset();
+        if (typeof this.bridge.takeStaleTouchResetNotice === 'function')
+          this.bridge.takeStaleTouchResetNotice();
+        return; }
       this.bridge.capture({type, timeStamp:e.timeStamp, pointerType:'mouse',
         pointerId:1, button:e.button, buttons:e.buttons,
         clientX:e.clientX, clientY:e.clientY, target:e.target,
