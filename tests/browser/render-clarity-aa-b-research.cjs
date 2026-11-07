@@ -14,6 +14,8 @@ async function measure(browser,viewport,scale,index){
   localStorage.setItem('novatanks_pilot_settings_v1',JSON.stringify({renderScale:v}));
  },scale);
  const page=await context.newPage(),errors=[];
+ const cdp=await context.newCDPSession(page);
+ await cdp.send('Emulation.setCPUThrottlingRate',{rate:3});
  page.on('pageerror',e=>errors.push(String(e)));
  try{
   await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded',timeout:45000});
@@ -68,7 +70,7 @@ async function measure(browser,viewport,scale,index){
   assert.ok(data.shots>0,'must exercise actual Tempest firing, not an idle scene');
   assert.equal(errors.length,0,'page errors: '+errors.join('; '));
   const total=data.gaps.reduce((a,b)=>a+b,0);
-  return {viewport:viewport.name,index,scale,quality:data.quality,dpr:data.dpr,
+  return {viewport:viewport.name,index,scale,cpuThrottle:3,quality:data.quality,dpr:data.dpr,
    css:data.css,backing:data.backing,frames:data.gaps.length,
    fps:1000*data.gaps.length/total,p50GapMs:pct(data.gaps,.5),
    p95GapMs:pct(data.gaps,.95),p99GapMs:pct(data.gaps,.99),
@@ -86,7 +88,7 @@ async function measure(browser,viewport,scale,index){
   }
   const evidence={researchOnly:true,commit:process.env.GITHUB_SHA||null,
    caveats:['independent worlds not matched','not fixed60','not physical Android',
-    'no human touch latency','CI hardware is not a phone',
+    'no human touch latency','CI hardware is not a phone','3x synthetic CPU throttle is not GPU throttling',
     'NovaPerf rolling windows can include warmup on slow frames'],records};
   fs.mkdirSync('artifacts/browser',{recursive:true});
   fs.writeFileSync('artifacts/browser/render-clarity-research.json',
