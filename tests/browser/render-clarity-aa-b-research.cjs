@@ -37,7 +37,7 @@ async function stopTrace(cdp,outputPath){
   'Chrome must return parseable trace events');
  fs.mkdirSync('artifacts/browser',{recursive:true});
  fs.writeFileSync(outputPath,raw);
- const interesting=/^(RunTask|FunctionCall|EvaluateScript|Paint|Layout|UpdateLayerTree|CompositeLayers|MinorGC|MajorGC|V8\.GC.*)$/;
+ const interesting=/^(RunTask|Commit|FunctionCall|EvaluateScript|Paint|Layout|UpdateLayerTree|CompositeLayers|MinorGC|MajorGC|V8\.GC.*)$/;
  const rendererMainThreads=new Set(trace.traceEvents.filter(e=>
   e.ph==='M'&&e.name==='thread_name'&&e.args?.name==='CrRendererMain'
  ).map(e=>e.pid+':'+e.tid));
@@ -49,6 +49,13 @@ async function stopTrace(cdp,outputPath){
   const entry=byName[event.name]||(byName[event.name]={count:0,inclusiveMs:0,maxMs:0});
   const ms=event.dur/1000;
   entry.count++;entry.inclusiveMs+=ms;entry.maxMs=Math.max(entry.maxMs,ms);
+  if(event.name==='Commit')(entry.commitDurationsMs||(entry.commitDurationsMs=[])).push(ms);
+ }
+ if(byName.Commit?.commitDurationsMs){
+  const values=byName.Commit.commitDurationsMs;
+  byName.Commit.medianMs=pct(values,.5);
+  byName.Commit.p95Ms=pct(values,.95);
+  delete byName.Commit.commitDurationsMs;
  }
  return {file:outputPath,events:trace.traceEvents.length,bytes:Buffer.byteLength(raw),
   rendererMainThreadCount:rendererMainThreads.size,inclusiveMainThreadEventCosts:byName,
@@ -62,7 +69,7 @@ async function measure(browser,viewport,scale,index){
  },scale);
  const page=await context.newPage(),errors=[];
  const cdp=await context.newCDPSession(page);
- const traceThisPhase=process.env.NOVA_CLARITY_TRACE==='1'&&viewport.name==='desktop'&&index===0;
+ const traceThisPhase=process.env.NOVA_CLARITY_TRACE==='1'&&viewport.name==='desktop'&&(index===0||index===1);
  let traceStarted=false;
  await cdp.send('Emulation.setCPUThrottlingRate',{rate:3});
  page.on('pageerror',e=>errors.push(String(e)));
@@ -176,7 +183,7 @@ async function measure(browser,viewport,scale,index){
     gaps,interruptions,longTaskSupported,longTasks:longTaskInWindow,entities,
     outer,perf:window.NovaPerf?.snapshot(g)||null,status:g.status};
   });
-  const trace=traceStarted?await stopTrace(cdp,'artifacts/browser/render-clarity-combat-trace.json'):null;
+  const trace=traceStarted?await stopTrace(cdp,`artifacts/browser/render-clarity-combat-trace-${scale}-phase-${index}.json`):null;
   traceStarted=false;
   assert.equal(data.scale,scale);
   // Very slow but active frames are the phenomenon under investigation.
