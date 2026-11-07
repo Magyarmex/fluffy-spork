@@ -364,7 +364,7 @@ async function measure(browser,viewport,scale,index){
   const matchedInitialWorlds=fingerprints.length===records.length&&
    new Set(fingerprints).size===1;
   if(trailMode||midpointMode)assert.equal(matchedInitialWorlds,true,
-   'causal A/A/B requires the same selected initial physical world');
+   'seeded research arms require the same selected initial physical world');
   const evidence={researchOnly:true,trailCausal:trailMode,midpointMode,
    phaseOrder:phases,commit:process.env.GITHUB_SHA||null,
    matchedInitialWorlds,distinctInitialWorlds:new Set(fingerprints).size,
