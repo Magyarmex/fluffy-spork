@@ -4,7 +4,7 @@ const {bootGame,withSeed}=require('./audio-rng-causal-pilot.cjs');
 const classes=['twin','minigun','shotgun','tempest','needlestorm','breachlord','flakmaster'];
 function run(cls,seed,hz,seconds=4){return withSeed(seed,()=>{
  const g=bootGame(),p=g.player;
- g.setClass(p,cls);g.tanks=[p];g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];
+ g.setClass(p,cls);g.tanks=[p];g.tankById=new Map([[p.id,p]]);g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];
  // Keep the census a controlled no-target Gunner heat experiment.
  g.shapeTimer=Infinity;g.powerupTimer=Infinity;g.eliteTimer=Infinity;
  g.crasherTimer=Infinity;g.aiRespawns=[];
