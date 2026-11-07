@@ -41,8 +41,8 @@ const {chromium}=require('playwright');
       CanvasRenderingContext2D.prototype.arc=function(x,y,r,a,b){
        if(this===g.ctx&&Math.abs(x-g.player.x)<.001&&Math.abs(y-g.player.y)<.001&&
           Math.abs(a+Math.PI*.15)<1e-5&&Math.abs(b-Math.PI*.15)<1e-5){
-        assert.ok(this.lineWidth>=3.4,'Apex arc retains readable stroke width');
-        assert.ok(this.globalAlpha>=.9,'Apex arc retains readable contrast');
+        if(this.lineWidth<3.4||this.globalAlpha<.9)
+         throw Error('Tempest Apex arc lost phone-scale width or contrast');
         cues++;
        }
        return orig.apply(this,arguments);
