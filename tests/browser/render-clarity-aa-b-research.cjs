@@ -72,9 +72,12 @@ async function measure(browser,viewport,scale,index){
       if(prior!==null)gaps.push(ts-prior);
       prior=ts;
       entities.samples++;
-      for(const key of ['bullets','tanks','drones','shapes'])
-       entities[key]+=Array.isArray(g[key])?g[key].length:0;
-      entities.peakBullets=Math.max(entities.peakBullets,g.bullets?.length||0);
+      const bullets=g.bullets?.length||0;
+      entities.bullets+=bullets;
+      entities.tanks+=g.tanks?.length||0;
+      entities.drones+=g.drones?.length||0;
+      entities.shapes+=g.shapes?.length||0;
+      if(bullets>entities.peakBullets)entities.peakBullets=bullets;
       if(document.hidden||g.status!=='playing'||g.paused)
        interruptions.push({atMs:ts-begin,hidden:document.hidden,status:g.status,paused:!!g.paused});
       if(ts-begin<4200)requestAnimationFrame(frame);else resolve();
