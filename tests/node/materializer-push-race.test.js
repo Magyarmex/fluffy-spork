@@ -55,7 +55,7 @@ for (const scenario of ['tests-only', 'pre-and-post', 'runtime', 'index', 'trans
       fs.writeFileSync(path.join(producer, 'nova-updates', 'sample.js'), 'original runtime');
       fs.writeFileSync(path.join(producer, 'index.html'), 'old page');
       fs.writeFileSync(path.join(producer, 'package.json'), JSON.stringify({
-        scripts: { test: 'node -e "require(\'fs\').writeFileSync(\'validation.marker\', \'ran\')" && node --test tests/node/*.test.js' },
+        scripts: { test: 'node -e "require(\'fs\').writeFileSync(\'validation.marker\', \'ran\')" && for f in tests/node/*.test.js; do node "$f" || exit 1; done' },
       }));
       git(producer, 'add', '.');
       git(producer, 'commit', '-m', 'original runtime');
