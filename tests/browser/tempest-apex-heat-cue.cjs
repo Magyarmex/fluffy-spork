@@ -30,7 +30,15 @@ const {chromium}=require('playwright');
       {name:'cool',heat:.30,stability:.8,expected:0},
       {name:'apex',heat:.56,stability:.8,expected:1},
       {name:'hot',heat:.80,stability:.8,expected:0},
-      {name:'unstable',heat:.56,stability:.50,expected:0}]){
+      {name:'unstable',heat:.56,stability:.50,expected:0},
+      // The true Apex gate is strict: 1 - abs(heat-.56)/.36 > .58
+      // and stability > .52. Guard both edges against visual false positives.
+      {name:'below-band',heat:.4087,stability:.8,expected:0},
+      {name:'lower-band',heat:.4090,stability:.8,expected:1},
+      {name:'upper-band',heat:.7110,stability:.8,expected:1},
+      {name:'above-band',heat:.7113,stability:.8,expected:0},
+      {name:'stability-edge',heat:.56,stability:.52,expected:0},
+      {name:'stability-inside',heat:.56,stability:.5201,expected:1}]){
      const data=await page.evaluate(state=>{
       const g=window.__novaTempestCueGame;
       const render=window.__novaMakeRequire('')('game/render').render;
