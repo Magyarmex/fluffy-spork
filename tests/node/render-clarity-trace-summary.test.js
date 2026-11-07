@@ -43,3 +43,20 @@ test('paired trace summary attributes Commit only to renderer main and preserves
  assert.equal(summary.rendererMainThreadCount,1);
  assert.equal(summary.inclusiveMainThreadEventCosts.Commit.commitDurationsMs,undefined);
 });
+
+// Regression guard for the measured-window boundary. The real Chromium pilot
+// remains the integration gate; this catches accidental reintroduction of
+// warmup-inclusive tracing when the research runner is edited.
+test('DevTools trace begins after warmup and before measured RAF timing',()=>{
+ const warmup=source.indexOf('await new Promise(resolve=>setTimeout(resolve,1800));');
+ const start=source.indexOf('await window.__novaResearchBeginMeasuredTrace();');
+ const begin=source.indexOf('const begin=performance.now(),gameTime=g.time');
+ assert.ok(warmup>=0&&start>warmup&&begin>start,
+  'trace must start after combat warmup and before measured window');
+ const exposure=source.indexOf("page.exposeFunction('__novaResearchBeginMeasuredTrace'");
+ const evaluate=source.indexOf('const data=await page.evaluate(async()=>{');
+ assert.ok(exposure>=0&&exposure<evaluate,
+  'trace-start bridge must exist before the page enters its measurement');
+ assert.ok(!source.slice(exposure,evaluate).includes("await cdp.send('Tracing.start'"),
+  'CDP tracing must be invoked by the page after warmup, not eagerly by Node');
+});
