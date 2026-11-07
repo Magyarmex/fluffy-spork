@@ -40,5 +40,7 @@ test('Tempest 1s-on/1s-off cadence preserves input duty and exposes heat recover
   assert.equal(cohort.find(row=>row.name==='native60').frames,480);
   assert.equal(cohort.find(row=>row.name==='native30').frames,240);
   assert.equal(cohort.find(row=>row.name==='native120').frames,960);
+  assert.ok(cohort.find(row=>row.name==='native60').restHeatWindows.some(w=>w.drop>0.2),
+   'a full one-second firing rest must materially cool the gunner');
  }
 });
