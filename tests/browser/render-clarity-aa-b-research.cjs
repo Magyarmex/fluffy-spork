@@ -116,7 +116,11 @@ async function measure(browser,viewport,scale,index){
     outer,perf:window.NovaPerf?.snapshot(g)||null,status:g.status};
   });
   assert.equal(data.scale,scale);
-  assert.ok(data.gaps.length>20,'real foreground RAF intervals required');
+  // Very slow but active frames are the phenomenon under investigation.
+  // Do not censor a 5-FPS phase just because it yields fewer than 21 gaps;
+  // preserve low-sample percentile uncertainty explicitly instead.
+  assert.ok(data.wallMs>=4000&&data.gaps.length>=8,
+   'must observe a full active foreground interval with multiple RAF samples');
   assert.ok(data.backing.every(x=>Number.isFinite(x)&&x>0));
   assert.equal(data.status,'playing','must measure active gameplay, not menu');
   assert.equal(data.interruptions.length,0,'hidden/paused frames invalidate active combat comparison');
@@ -132,7 +136,8 @@ async function measure(browser,viewport,scale,index){
   const rafTimestampLeadMs=Math.max(0,observedRafMs-data.wallMs);
   return {viewport:viewport.name,index,scale,cpuThrottle:3,quality:data.quality,dpr:data.dpr,
    css:data.css,backing:data.backing,frames:data.gaps.length,
-   fps:1000*data.gaps.length/total,p50GapMs:pct(data.gaps,.5),
+   fps:1000*data.gaps.length/total,percentileSampleAdequate:data.gaps.length>=30,
+   p50GapMs:pct(data.gaps,.5),
    p95GapMs:pct(data.gaps,.95),p99GapMs:pct(data.gaps,.99),
    gameSeconds:data.gameSeconds,wallMs:data.wallMs,observedRafMs,unobservedWallMs,
    rafCoveragePct:Math.min(100,100*observedRafMs/data.wallMs),rafTimestampLeadMs,
@@ -167,6 +172,7 @@ async function measure(browser,viewport,scale,index){
    caveats:['independent worlds not matched','not fixed60','not physical Android',
     'no human touch latency','CI hardware is not a phone','3x synthetic CPU throttle is not GPU throttling',
     'NovaPerf rolling windows can include warmup on slow frames',
+    'RAF percentiles from fewer than 30 intervals are descriptive only',
     'outermost JS method durations are inclusive and do not measure GPU completion or input-to-photon',
     'Long Tasks API may be unsupported or miss tasks below its threshold',
     'RAF timestamps and PerformanceObserver are browser-clock observations, not input-to-photon latency'],records};
