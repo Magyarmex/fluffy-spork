@@ -47,7 +47,7 @@ function run(seed,reload,name,steps){
   g.shapes=[];g.drones=[];g.powerups=[];
   g.input.aim.active=true;g.input.aim.dx=40;g.input.firing=true;g.input.autofire=false;
   p.stats.reload=reload;
-  let volleys=0,restVolleys=0,peakHeat=0,peakCooldown=0,minHeat=Infinity,elapsedTicks=0,firingTicks=0,restTicks=0,restStartHeat=null,restHeatWindows=[];
+  let volleys=0,restVolleys=0,peakHeat=0,peakCooldown=0,minHeat=Infinity,elapsedTicks=0,firingTicks=0,restTicks=0,updateCalls=0,restStartHeat=null,restHeatWindows=[];
   const shotTimes=[],shotAngles=[],shotHeats=[],shotStabilities=[];const original=g.tryFire;
   g.tryFire=function(t){
    const before=this.bullets.length;
@@ -68,7 +68,7 @@ function run(seed,reload,name,steps){
      const slice=Math.min(remaining,untilBoundary);
      if(!active&&restStartHeat===null)restStartHeat=p.__v17Heat??0;
      g.input.firing=active;
-     g.update(slice/120);
+     g.update(slice/120);updateCalls++;
      peakHeat=Math.max(peakHeat,p.__v17Heat??0);
      minHeat=Math.min(minHeat,p.__v17Heat??0);
      peakCooldown=Math.max(peakCooldown,p.fireCd??0);
@@ -82,7 +82,7 @@ function run(seed,reload,name,steps){
      }
     }
    }
-   return {seed,reload,name,firePattern,frames:steps.length,simulatedTicks:elapsedTicks,
+   return {seed,reload,name,firePattern,frames:steps.length,updateCalls,extraInputBoundaryUpdates:updateCalls-steps.length,simulatedTicks:elapsedTicks,
     firingTicks,restTicks,restHeatWindows,volleys,restVolleys,
     baseCadenceEligibleVolleys:shotHeats.filter((h,i)=>Math.max(0,1-Math.abs(h-.56)/.30)>.62&&shotStabilities[i]>.56).length,
     tempestApexBoostVolleys:shotHeats.filter((h,i)=>Math.max(0,1-Math.abs(h-.56)/.36)>.58&&shotStabilities[i]>.52).length,
