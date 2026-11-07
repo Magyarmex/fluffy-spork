@@ -94,6 +94,8 @@ test('opt-in 80% clarity midpoint pilot is balanced and preserves legacy control
   'midpoint pilot must reject mismatched initial fingerprints');
  assert.match(source,/phases\[i\]===65\?100:80/,
   'mobile order must invert endpoints while retaining the midpoint');
+ assert.match(source,/index<\(midpointMode\?3:2\)/,
+  'trace all three midpoint arms without changing legacy two-arm trace');
  assert.match(source,/const midpointSummary=midpointMode\?/,
   'midpoint pilot must emit descriptive per-arm summary');
  assert.match(source,/minFps:Math\.min\(\.\.\.fps\),maxFps:Math\.max\(\.\.\.fps\)/,
