@@ -372,7 +372,12 @@ async function measure(browser,viewport,scale,index){
     const group=records.filter(r=>r.viewport===v.name&&r.scale===scale);
     assert.equal(group.length,3,'midpoint pilot needs three real phases per arm');
     const fps=group.map(r=>r.fps),pace=group.map(r=>r.simulationPace);
+    const commits=group.map(r=>r.trace?.inclusiveMainThreadEventCosts?.Commit?.medianMs)
+     .filter(Number.isFinite);
+    if(process.env.NOVA_CLARITY_TRACE==='1'&&v.name==='desktop')
+     assert.equal(commits.length,3,'each midpoint desktop arm needs three valid Commit traces');
     return [scale,{n:group.length,medianFps:pct(fps,.5),
+     commitTraceSamples:commits.length,medianCommitMs:commits.length?pct(commits,.5):null,
      minFps:Math.min(...fps),maxFps:Math.max(...fps),
      medianSimulationPace:pct(pace,.5),
      medianP95GapMs:pct(group.map(r=>r.p95GapMs),.5),
