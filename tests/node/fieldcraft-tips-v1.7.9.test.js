@@ -69,3 +69,9 @@ test('drone allegiance tip teaches both shape and color rather than color alone'
   assert.match(fieldcraft, /Drone IFF: blue ring = friendly\/allied; red diamond = hostile/);
   assert.match(fieldcraft, /colored drone body still identifies its class/);
 });
+
+
+test('Tempest Fieldcraft tip teaches the real heat-versus-spin venting tradeoff', () => {
+  assert.match(fieldcraft, /tempest-redline[^\n]*releasing fire cools heat, but rotary spin decays too/i);
+  assert.match(fieldcraft, /pushing past redline adds recoil and reload punishment/i);
+});
