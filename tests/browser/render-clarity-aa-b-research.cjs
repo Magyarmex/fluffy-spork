@@ -51,6 +51,9 @@ async function measure(browser,viewport,scale,index){
    await new Promise(resolve=>setTimeout(resolve,1800));
    const begin=performance.now(),gameTime=g.time,shotsAtBegin=shots,gaps=[];
    const interruptions=[],longTasks=[];
+   // Low-cost exposure counters distinguish clarity effects from different
+   // independently evolving combat populations; not matched-world proof.
+   const entities={samples:0,bullets:0,tanks:0,drones:0,shapes:0,peakBullets:0};
    const visibilityChanged=()=>interruptions.push({atMs:performance.now()-begin,hidden:document.hidden,reason:'visibilitychange'});
    document.addEventListener('visibilitychange',visibilityChanged);
    const longTaskSupported=PerformanceObserver.supportedEntryTypes?.includes('longtask')===true;
@@ -68,6 +71,10 @@ async function measure(browser,viewport,scale,index){
      function frame(ts){
       if(prior!==null)gaps.push(ts-prior);
       prior=ts;
+      entities.samples++;
+      for(const key of ['bullets','tanks','drones','shapes'])
+       entities[key]+=Array.isArray(g[key])?g[key].length:0;
+      entities.peakBullets=Math.max(entities.peakBullets,g.bullets?.length||0);
       if(document.hidden||g.status!=='playing'||g.paused)
        interruptions.push({atMs:ts-begin,hidden:document.hidden,status:g.status,paused:!!g.paused});
       if(ts-begin<4200)requestAnimationFrame(frame);else resolve();
@@ -83,7 +90,7 @@ async function measure(browser,viewport,scale,index){
    return {scale:JSON.parse(localStorage.getItem('novatanks_pilot_settings_v1')).renderScale,
     quality:g.quality,dpr:g.dpr,css:[g.w,g.h],backing:[g.canvas.width,g.canvas.height],
     gameSeconds:g.time-gameTime,wallMs:end-begin,shots:shots-shotsAtBegin,warmupShots:shotsAtBegin,
-    gaps,interruptions,longTaskSupported,longTasks:longTaskInWindow,
+    gaps,interruptions,longTaskSupported,longTasks:longTaskInWindow,entities,
     perf:window.NovaPerf?.snapshot(g)||null,status:g.status};
   });
   assert.equal(data.scale,scale);
@@ -107,7 +114,10 @@ async function measure(browser,viewport,scale,index){
    maxFrameGapMs:Math.max(...data.gaps),
    longTaskSupported:data.longTaskSupported,longTaskCount:data.longTasks.length,
    longTaskTotalMs:longTaskMs,longTaskP95Ms:data.longTasks.length?pct(data.longTasks.map(t=>t.durationMs),.95):null,
-   shots:data.shots,warmupShots:data.warmupShots,perf:data.perf};
+   shots:data.shots,warmupShots:data.warmupShots,
+   meanEntities:Object.fromEntries(['bullets','tanks','drones','shapes'].map(key=>
+    [key,data.entities[key]/data.entities.samples])),
+   peakBullets:data.entities.peakBullets,perf:data.perf};
  }finally{await context.close();}
 }
 (async()=>{
