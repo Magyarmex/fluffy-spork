@@ -69,6 +69,9 @@ function run(seed,reload,name,steps){
      if(!active&&restStartHeat===null)restStartHeat=p.__v17Heat??0;
      g.input.firing=active;
      g.update(slice/120);
+     peakHeat=Math.max(peakHeat,p.__v17Heat??0);
+     minHeat=Math.min(minHeat,p.__v17Heat??0);
+     peakCooldown=Math.max(peakCooldown,p.fireCd??0);
      if(active)firingTicks+=slice;else restTicks+=slice;
      elapsedTicks+=slice;remaining-=slice;
      if(!active&&elapsedTicks%240===0){
@@ -78,9 +81,6 @@ function run(seed,reload,name,steps){
       restStartHeat=null;
      }
     }
-    peakHeat=Math.max(peakHeat,p.__v17Heat??0);
-    minHeat=Math.min(minHeat,p.__v17Heat??0);
-    peakCooldown=Math.max(peakCooldown,p.fireCd??0);
    }
    return {seed,reload,name,firePattern,frames:steps.length,simulatedTicks:elapsedTicks,
     firingTicks,restTicks,restHeatWindows,volleys,restVolleys,
