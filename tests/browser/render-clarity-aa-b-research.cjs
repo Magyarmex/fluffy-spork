@@ -49,6 +49,13 @@ async function stopTrace(cdp,outputPath){
   const entry=byName[event.name]||(byName[event.name]={count:0,inclusiveMs:0,maxMs:0});
   const ms=event.dur/1000;
   entry.count++;entry.inclusiveMs+=ms;entry.maxMs=Math.max(entry.maxMs,ms);
+  if(event.name==='Commit')(entry.commitDurationsMs||(entry.commitDurationsMs=[])).push(ms);
+ }
+ if(byName.Commit?.commitDurationsMs){
+  const values=byName.Commit.commitDurationsMs;
+  byName.Commit.medianMs=pct(values,.5);
+  byName.Commit.p95Ms=pct(values,.95);
+  delete byName.Commit.commitDurationsMs;
  }
  return {file:outputPath,events:trace.traceEvents.length,bytes:Buffer.byteLength(raw),
   rendererMainThreadCount:rendererMainThreads.size,inclusiveMainThreadEventCosts:byName,
