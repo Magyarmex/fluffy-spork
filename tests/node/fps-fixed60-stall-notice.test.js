@@ -461,3 +461,24 @@ test('composed Game ignores same-side queued press before intentional owner rele
     assert.equal(g.input.firing,false);
   }finally{owner.stop();g.destroy()}
 });
+
+
+test('queued same-side ownership respects press/release order at a stalled frame',()=>{
+  for(const order of ['ignored-before-release','accepted-after-release']){
+    const s=fixture();s.game.canvas={getBoundingClientRect:()=>({left:0,width:800})};
+    s.owner.start();
+    try{
+      s.frame(1017);
+      s.down(1020,7);
+      if(order==='ignored-before-release'){
+        s.down(1022,9);s.up(1025,7);
+      }else{
+        s.up(1022,7);s.down(1025,9);
+      }
+      s.frame(1137);
+      assert.equal(s.notices.length,order==='accepted-after-release'?1:0,
+        'only a genuine pending stick owner warrants a reset warning');
+      assert.equal(s.input.firing,false);
+    }finally{s.owner.stop()}
+  }
+});
