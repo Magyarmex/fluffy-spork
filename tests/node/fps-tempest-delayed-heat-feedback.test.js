@@ -12,18 +12,20 @@ test('Tempest delayed heat feedback stays isolated and compares matched policies
   maxBuffer:3*1024*1024,env:{...process.env,NOVA_HEAT_DELAY_PILOT:'1'}
  }));
  assert.equal(report.duration,20);
- assert.equal(report.results.length,40);
+ assert.equal(report.results.length,56);
  for(const reload of [4,8])for(const schedule of ['native30','native60','native120','irregular']){
   const rows=report.results.filter(r=>r.reload===reload&&r.schedule===schedule);
-  assert.equal(rows.length,5);
+  assert.equal(rows.length,7);
   const perfect=rows.find(r=>r.policy==='bandWide');
-  const delayed=rows.filter(r=>r.policy.startsWith('bandWideDelay'));
+  const delayed=rows.filter(r=>r.observationDelayMs>0);
   assert.ok(perfect);
-  assert.equal(delayed.length,2);
+  assert.equal(delayed.length,4);
+  assert.equal(delayed.filter(r=>r.observationKind==='eightBinHeatArc').length,2);
   assert.equal(perfect.observationDelayMs,0);
   assert.equal(perfect.delayedSamples,0);
   for(const row of delayed){
    assert.ok([100,200].includes(row.observationDelayMs));
+   assert.ok(['exactHeat','eightBinHeatArc'].includes(row.observationKind));
    assert.equal(row.worldLeaks,0,JSON.stringify(row.firstLeak));
    assert.ok(row.delayedSamples>0);
    assert.ok(row.maxHeatObservationError>0,
