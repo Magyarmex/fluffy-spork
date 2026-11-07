@@ -20,6 +20,12 @@ function run(cls,seed){return withSeed(seed,()=>{
   const g=bootGame(),p=g.player;
   g.setClass(p,cls);
   g.tanks=[p];g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];
+  // Core shape replenishment and native escort respawn would contaminate
+  // this nominally empty-target 60Hz balance reference.
+  g.shapeTimer=Infinity;g.powerupTimer=Infinity;g.eliteTimer=Infinity;
+  g.crasherTimer=Infinity;g.aiRespawns=[];
+  g.spawnShape=()=>null;g.spawnPowerup=()=>null;g.spawnAITank=()=>null;
+  p.droneRespawnT=Infinity;g.spawnDrone=()=>null;
   g.status='playing';g.paused=false;
   g.input.firing=true;g.input.autofire=false;g.input.mouseActive=false;
   g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
@@ -32,6 +38,8 @@ function run(cls,seed){return withSeed(seed,()=>{
   };
   for(let tick=0;tick<240;tick++){
     g.update(1/60);
+    assert.equal(g.tanks.length,1,'no enemy tanks in cadence reference');
+    assert.equal(g.shapes.length+g.drones.length+g.powerups.length,0,'no neutral or drone targets in cadence reference');
     heatPeak=Math.max(heatPeak,p.__v17Heat||0);
   }
   const result={volleys,heat:p.__v17Heat||0,heatPeak};
