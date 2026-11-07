@@ -382,7 +382,7 @@ jobs:
             fi
             cat "$push_output" >&2
             # Git can report a simultaneous ref-lock race as remote rejected\n            # (failed to update ref), not just non-fast-forward/fetch first.\n            # Never retry authentication, transport, or policy failures.
-            if ! grep -Eq '\[rejected\].*(non-fast-forward|fetch first|failed to update ref)' "$push_output"; then
+            if ! grep -Eq '\[(remote )?rejected\].*(non-fast-forward|fetch first|failed to update ref)' "$push_output"; then
               rm -f "$push_output"
               echo 'Push failed for a reason other than a non-fast-forward race.' >&2
               exit 1
