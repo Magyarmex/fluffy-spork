@@ -13,12 +13,17 @@ function run(reload,name,pattern,policy){
   const g=bootGame(),p=g.player;g.sfx.muted=true;
   g.setClass(p,'tempest');g.tanks=[p];g.tankById=new Map([[p.id,p]]);
   g.shapes=[];g.drones=[];g.powerups=[];
+  // Unlike merely clearing arrays, prevent the core's half-second shape
+  // replenishment, powerup timer and elite/AI respawns during this isolation.
+  g.shapeTimer=Infinity;g.powerupTimer=Infinity;g.eliteTimer=Infinity;
+  g.crasherTimer=Infinity;g.aiRespawns=[];
+  g.spawnShape=()=>null;g.spawnPowerup=()=>null;g.spawnAITank=()=>null;
   p.stats.reload=reload;g.input.aim.active=true;g.input.aim.dx=40;
   g.input.autofire=false;
   const out={seed,reload,schedule:name,policy,frames:0,updates:0,volleys:0,
    apexVolleys:0,redlineVolleys:0,vents:0,ventSeconds:0,fireSeconds:0,
    bandSeconds:0,peakHeat:0,heatIntegral:0,spinIntegral:0,
-   lastHeat:0,lastSpin:0,firstVentAt:null};
+   lastHeat:0,lastSpin:0,firstVentAt:null,worldLeaks:0};
   const original=g.tryFire;g.tryFire=function(t){
    const before=this.bullets.length,result=original.apply(this,arguments);
    if(t===p&&this.bullets.length>before){
@@ -42,6 +47,7 @@ function run(reload,name,pattern,policy){
     const fire=policy==='continuous'||!venting;
     g.input.firing=fire;g.input.aim.dx=fire?40:0;
     g.update(slice/120);
+    if(g.tanks.length!==1||g.shapes.length||g.drones.length||g.powerups.length)out.worldLeaks++;
     const dt=slice/120,h=p.__v17Heat||0;
     if(fire)out.fireSeconds+=dt;else out.ventSeconds+=dt;
     if(h>=.409&&h<=.711)out.bandSeconds+=dt;
