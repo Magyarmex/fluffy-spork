@@ -144,7 +144,7 @@ async function run(browser,label,viewport){
   await page.waitForTimeout(100);
   const neutral=await snapshot();
   assert.equal(neutral.aim.active,true,label+': centered right thumb retains aim ownership');
-  assert.equal(neutral.aim.id,right.id,label+': centered thumb retains original pointer ID');
+  assert.equal(neutral.aim.id,held.aim.id,label+': centered thumb retains original DOM pointer ID');
   assert.ok(Math.hypot(neutral.aim.dx,neutral.aim.dy)<2,
    label+': real neutral touch yields zero aim vector: '+JSON.stringify(neutral));
   assert.equal(neutral.move.active,true,label+': centering aim does not release left movement');
@@ -164,7 +164,7 @@ async function run(browser,label,viewport){
   await page.waitForTimeout(100);
   const reextended=await snapshot();
   assert.equal(reextended.aim.active,true,label+': re-extension retains aim ownership');
-  assert.equal(reextended.aim.id,right.id,label+': re-extension does not acquire a new touch');
+  assert.equal(reextended.aim.id,held.aim.id,label+': re-extension does not acquire a new DOM pointer');
   assert.ok(Math.hypot(reextended.aim.dx,reextended.aim.dy)>9,
    label+': re-extension restores usable aim');
   await page.waitForFunction(start=>{
