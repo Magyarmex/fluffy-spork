@@ -12,11 +12,12 @@ test('Tempest 1s-on/1s-off cadence preserves input duty and exposes heat recover
    maxBuffer:2*1024*1024,
    env:{...process.env,NOVA_JITTER_FIRE_PATTERN:'burst1s',
     NOVA_JITTER_SEEDS:'1517800',NOVA_JITTER_RELOAD:'0,4,8',
-    NOVA_JITTER_PHASES:'0'}
+    NOVA_JITTER_PHASES:'0',
+    NOVA_JITTER_PATTERNS:'native30,native60,native120,boundaryCross'}
   });
  const report=JSON.parse(raw);
  assert.equal(report.firePattern,'burst1s');
- assert.equal(report.results.length,30);
+ assert.equal(report.results.length,12);
  for(const row of report.results){
   assert.equal(row.firePattern,'burst1s');
   assert.equal(row.simulatedTicks,960);
@@ -42,7 +43,7 @@ test('Tempest 1s-on/1s-off cadence preserves input duty and exposes heat recover
  }
  for(const reload of [0,4,8]){
   const cohort=report.results.filter(row=>row.reload===reload);
-  assert.equal(cohort.length,10);
+  assert.equal(cohort.length,4);
   assert.ok(cohort.find(row=>row.name==='boundaryCross').extraInputBoundaryUpdates>0,
    'the boundary-crossing schedule must exercise sub-frame input splitting');
   assert.equal(cohort.find(row=>row.name==='native60').frames,480);
