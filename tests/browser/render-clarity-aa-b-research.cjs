@@ -62,7 +62,7 @@ async function measure(browser,viewport,scale,index){
  },scale);
  const page=await context.newPage(),errors=[];
  const cdp=await context.newCDPSession(page);
- const traceThisPhase=process.env.NOVA_CLARITY_TRACE==='1'&&viewport.name==='desktop'&&index===0;
+ const traceThisPhase=process.env.NOVA_CLARITY_TRACE==='1'&&viewport.name==='desktop'&&(index===0||index===1);
  let traceStarted=false;
  await cdp.send('Emulation.setCPUThrottlingRate',{rate:3});
  page.on('pageerror',e=>errors.push(String(e)));
@@ -176,7 +176,7 @@ async function measure(browser,viewport,scale,index){
     gaps,interruptions,longTaskSupported,longTasks:longTaskInWindow,entities,
     outer,perf:window.NovaPerf?.snapshot(g)||null,status:g.status};
   });
-  const trace=traceStarted?await stopTrace(cdp,'artifacts/browser/render-clarity-combat-trace.json'):null;
+  const trace=traceStarted?await stopTrace(cdp,`artifacts/browser/render-clarity-combat-trace-${scale}-phase-${index}.json`):null;
   traceStarted=false;
   assert.equal(data.scale,scale);
   // Very slow but active frames are the phenomenon under investigation.
