@@ -401,3 +401,100 @@ test('composed Game warns when a first touch is queued before a stalled RAF',()=
     assert.equal(g.input.firing,false);
   }finally{owner.stop();g.destroy()}
 });
+
+
+test('ignored third touch does not falsely claim a stick reset after intentional release',()=>{
+  const s=fixture();s.game.canvas={getBoundingClientRect:()=>({left:0,width:800})};
+  // Match shipping Input.pd: the left half has one owner, and a second
+  // left-side press is ignored even when the aim stick is unoccupied.
+  s.input.pd=function(e){
+    const stick=e.clientX<360?'move':'aim';
+    if(this.stickId[stick]!==-1)return;
+    this.stickId[stick]=e.pointerId;this[stick].active=true;
+    if(stick==='aim')this.firing=true;
+  };
+  s.owner.start();
+  try{
+    s.down(1005,7);s.frame(1017);
+    assert.equal(s.input.stickId.move,7);
+    s.down(1020,9); // Same left-side zone: Input would ignore this press.
+    s.up(1025,7);   // Actual owner intentionally released before the stall.
+    s.frame(1137);
+    assert.equal(s.notices.length,0,
+      'ignored touch must not be reported as a cancelled stick');
+    assert.equal(s.input.stickId.move,-1);
+    assert.equal(s.input.firing,false);
+  }finally{s.owner.stop()}
+});
+
+
+test('composed Game ignores same-side queued press before intentional owner release',()=>{
+  process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
+  const {bootGame}=require('../research/audio-rng-causal-pilot.cjs');
+  const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs');
+  const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
+  const rect=()=>({left:0,top:0,width:800,height:600});
+  g.canvas.getBoundingClientRect=rect;
+  g.input.canvas.getBoundingClientRect=rect;
+  let now=1000;const notices=[];g.toast=(...args)=>notices.push(args);
+  const timeline=new ChronologicalInput(g.input);
+  const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
+  const owner=new FixedStepRafOwner(g,timeline,bridge,{
+    now:()=>now,request:()=>1,cancel:()=>{},render:()=>{}
+  });
+  const event=(type,ms,id,x=100)=>{
+    now=ms;
+    return bridge.capture({type,timeStamp:ms,pointerId:id,pointerType:'touch',
+      clientX:x,clientY:200,button:0,buttons:type==='pointerup'?0:1,
+      target:{tagName:'CANVAS',closest:()=>null}});
+  };
+  try{
+    owner.start();
+    assert.equal(event('pointerdown',1005,11),true);
+    now=1017;owner.frame(now);
+    assert.equal(g.input.stickId.move,11);
+    assert.equal(event('pointerdown',1020,12),true);
+    assert.equal(event('pointerup',1025,11),true);
+    now=1137;owner.frame(now);
+    assert.equal(notices.length,0,'ignored same-side touch is not a lost control');
+    assert.equal(g.input.stickId.move,-1);
+    assert.equal(g.input.firing,false);
+  }finally{owner.stop();g.destroy()}
+});
+
+
+test('queued same-side ownership respects press/release order at a stalled frame',()=>{
+  for(const order of ['ignored-before-release','accepted-after-release']){
+    const s=fixture();s.game.canvas={getBoundingClientRect:()=>({left:0,width:800})};
+    s.owner.start();
+    try{
+      s.frame(1017);
+      s.down(1020,7);
+      if(order==='ignored-before-release'){
+        s.down(1022,9);s.up(1025,7);
+      }else{
+        s.up(1022,7);s.down(1025,9);
+      }
+      s.frame(1137);
+      assert.equal(s.notices.length,order==='accepted-after-release'?1:0,
+        'only a genuine pending stick owner warrants a reset warning');
+      assert.equal(s.input.firing,false);
+    }finally{s.owner.stop()}
+  }
+});
+
+
+test('idle and release-only stalls never force a canvas layout read',()=>{
+  for(const releaseOnly of [false,true]){
+    const s=fixture();
+    s.game.canvas={getBoundingClientRect(){throw Error('unneeded layout read')}};
+    s.owner.start();
+    try{
+      s.frame(1017);
+      if(releaseOnly)s.up(1020,7);
+      s.frame(1137);
+      assert.equal(s.notices.length,0);
+      assert.equal(s.owner.droppedFrames,1);
+    }finally{s.owner.stop()}
+  }
+});

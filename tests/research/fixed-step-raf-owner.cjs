@@ -180,14 +180,45 @@ class FixedStepRafOwner {
         // A blur clears old ownership, but a later fresh touch down can be
         // cancelled by the same stall and deserves an explicit warning.
         const stillHeld=new Set(ownedTouchIds);
+        // A captured press is not necessarily an owned stick. Shipping Input
+        // ignores a second press on an occupied side; counting that ignored
+        // pointer as held would display a false reset warning after the real
+        // owner intentionally releases. Replay the same two-slot admission.
+        const slots={move:null,aim:null};
+        for(const stick of ['move','aim']){
+          if(input && input.stickId && input[stick] && input[stick].active &&
+             stillHeld.has(input.stickId[stick]))slots[stick]=input.stickId[stick];
+        }
+        // A stall without queued stick presses must not force a DOM layout
+        // read merely to decide whether to show a notice.
+        let rect=null,hasRect=false,geometryRead=false;
         for(const e of pending){
-          if(e.kind==='blur'){stillHeld.clear();continue;}
+          if(e.kind==='blur'){
+            stillHeld.clear();slots.move=null;slots.aim=null;continue;
+          }
           const d=e.data;
           if(!d || typeof d.pointerType!=='string' ||
              d.pointerType==='mouse' || d.pointerId==null)continue;
-          if(e.kind==='pointerdown' && !d.targetIsUI)stillHeld.add(d.pointerId);
-          else if(e.kind==='pointerup'||e.kind==='pointercancel')
+          if(e.kind==='pointerdown' && !d.targetIsUI){
+            if(!geometryRead){
+              geometryRead=true;
+              const canvas=(input && input.canvas)||g.canvas;
+              rect=canvas && typeof canvas.getBoundingClientRect==='function' ?
+                canvas.getBoundingClientRect() : null;
+              hasRect=!!(rect && Number.isFinite(rect.left) &&
+                Number.isFinite(rect.width) && rect.width>0);
+            }
+            if(hasRect && Number.isFinite(d.clientX)){
+              const side=d.clientX-rect.left<rect.width*.45?'move':'aim';
+              if(slots[side]==null){
+                slots[side]=d.pointerId;stillHeld.add(d.pointerId);
+              }
+            }else if(stillHeld.size<2)stillHeld.add(d.pointerId);
+          }else if(e.kind==='pointerup'||e.kind==='pointercancel'){
             stillHeld.delete(d.pointerId);
+            if(slots.move===d.pointerId)slots.move=null;
+            if(slots.aim===d.pointerId)slots.aim=null;
+          }
         }
         if(stillHeld.size>0 && (!g.status || g.status==='playing') && this.isVisible() &&
            typeof g.toast==='function' && ts-this.lastTouchResetNoticeMs>=8000){
