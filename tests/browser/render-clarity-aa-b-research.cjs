@@ -43,7 +43,7 @@ async function measure(browser,viewport,scale,index){
    // Measure the final composed methods, outside all previously installed
    // gameplay/visual wrappers. NovaPerf measures earlier inner layers.
    // This is opt-in research instrumentation, never a production hook.
-   const outer={update:[],render:[]};
+   const outer={update:[],render:[],minimap:[]};
    let sampling=false;
    const originalUpdate=g.update;
    g.update=function(){
@@ -57,6 +57,14 @@ async function measure(browser,viewport,scale,index){
     const started=performance.now();
     try{return originalRender.apply(this,arguments);}
     finally{if(sampling)outer.render.push(performance.now()-started);}
+   };
+   // The shipping RAF draws the minimap after render.render(), outside
+   // both the old NovaPerf renderer wrapper and the final renderer method.
+   const originalMinimap=g.drawMinimap;
+   g.drawMinimap=function(){
+    const started=performance.now();
+    try{return originalMinimap.apply(this,arguments);}
+    finally{if(sampling)outer.minimap.push(performance.now()-started);}
    };
    let shots=0;
    const oldFire=g.tryFire;
@@ -150,10 +158,12 @@ async function measure(browser,viewport,scale,index){
    meanEntities:Object.fromEntries(['bullets','tanks','drones','shapes'].map(key=>
     [key,data.entities[key]/data.entities.samples])),
    peakBullets:data.entities.peakBullets,
-   outerCost:Object.fromEntries(['update','render'].map(key=>{
+   outerCost:Object.fromEntries(['update','render','minimap'].map(key=>{
     const samples=data.outer[key];
-    return [key,{calls:samples.length,meanMs:samples.reduce((a,b)=>a+b,0)/samples.length,
-     p95Ms:pct(samples,.95),p99Ms:pct(samples,.99),maxMs:Math.max(...samples)}];
+    return [key,{calls:samples.length,meanMs:samples.length?samples.reduce((a,b)=>a+b,0)/samples.length:null,
+     p95Ms:samples.length?pct(samples,.95):null,
+     p99Ms:samples.length?pct(samples,.99):null,
+     maxMs:samples.length?Math.max(...samples):null}];
    })),perf:data.perf};
  }finally{await context.close();}
 }
@@ -174,6 +184,7 @@ async function measure(browser,viewport,scale,index){
     'NovaPerf rolling windows can include warmup on slow frames',
     'RAF percentiles from fewer than 30 intervals are descriptive only',
     'outermost JS method durations are inclusive and do not measure GPU completion or input-to-photon',
+    'minimap drawing occurs outside update/render in the shipping RAF; background browser tasks remain unaccounted',
     'Long Tasks API may be unsupported or miss tasks below its threshold',
     'RAF timestamps and PerformanceObserver are browser-clock observations, not input-to-photon latency'],records};
   fs.mkdirSync('artifacts/browser',{recursive:true});
