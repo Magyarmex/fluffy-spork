@@ -276,3 +276,43 @@ test('exact 100ms foreground gap is not classified as a long stall',()=>{
     assert.equal(s.input.firing,false);
   }finally{s.owner.stop()}
 });
+
+
+test('blur then fresh touch down is reported when the same stall discards it',()=>{
+  const s=fixture();s.owner.start();
+  try{
+    s.down(1005);s.frame(1017);
+    s.timeline.push(.020,'blur',{});
+    s.down(1025);
+    s.frame(1137);
+    assert.deepEqual(s.notices,[['Touch controls reset — touch again','warn']]);
+    assert.equal(s.input.stickId.move,-1);
+    assert.equal(s.input.firing,false);
+  }finally{s.owner.stop()}
+});
+
+test('blur then new touch release stays silent and cannot leave phantom fire',()=>{
+  const s=fixture();s.owner.start();
+  try{
+    s.down(1005);s.frame(1017);
+    s.timeline.push(.020,'blur',{});
+    s.down(1025,9);
+    s.up(1030,9);
+    s.frame(1137);
+    assert.equal(s.notices.length,0);
+    assert.equal(s.input.move.active,false);
+    assert.equal(s.input.firing,false);
+  }finally{s.owner.stop()}
+});
+
+test('post-blur new pointer ID still receives a reset warning',()=>{
+  const s=fixture();s.owner.start();
+  try{
+    s.down(1005,7);s.frame(1017);
+    s.timeline.push(.020,'blur',{});
+    s.down(1025,9);
+    s.frame(1137);
+    assert.equal(s.notices.length,1,'fresh touch must not be hidden by old blur');
+    assert.equal(s.input.stickId.move,-1);
+  }finally{s.owner.stop()}
+});
