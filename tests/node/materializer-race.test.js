@@ -32,6 +32,7 @@ test('materializer guard distinguishes tests-only from newer runtime changes', (
       fs.mkdirSync(path.join(producer, 'nova-updates'));
       fs.writeFileSync(path.join(producer, 'nova-updates', 'sample.js'), 'runtime A');
       fs.writeFileSync(path.join(producer, 'index.html'), 'old shell');
+      fs.writeFileSync(path.join(producer, 'package.json'), JSON.stringify({ scripts: { test: 'node -e "process.exit(0)"' } }));
       run(producer, 'git', ['add', '.']);
       run(producer, 'git', ['commit', '-m', 'runtime A']);
       run(producer, 'git', ['push', '-u', 'origin', 'main']);
