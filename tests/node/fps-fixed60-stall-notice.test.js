@@ -426,3 +426,38 @@ test('ignored third touch does not falsely claim a stick reset after intentional
     assert.equal(s.input.firing,false);
   }finally{s.owner.stop()}
 });
+
+
+test('composed Game ignores same-side queued press before intentional owner release',()=>{
+  process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
+  const {bootGame}=require('../research/audio-rng-causal-pilot.cjs');
+  const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs');
+  const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
+  const rect=()=>({left:0,top:0,width:800,height:600});
+  g.canvas.getBoundingClientRect=rect;
+  g.input.canvas.getBoundingClientRect=rect;
+  let now=1000;const notices=[];g.toast=(...args)=>notices.push(args);
+  const timeline=new ChronologicalInput(g.input);
+  const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
+  const owner=new FixedStepRafOwner(g,timeline,bridge,{
+    now:()=>now,request:()=>1,cancel:()=>{},render:()=>{}
+  });
+  const event=(type,ms,id,x=100)=>{
+    now=ms;
+    return bridge.capture({type,timeStamp:ms,pointerId:id,pointerType:'touch',
+      clientX:x,clientY:200,button:0,buttons:type==='pointerup'?0:1,
+      target:{tagName:'CANVAS',closest:()=>null}});
+  };
+  try{
+    owner.start();
+    assert.equal(event('pointerdown',1005,11),true);
+    now=1017;owner.frame(now);
+    assert.equal(g.input.stickId.move,11);
+    assert.equal(event('pointerdown',1020,12),true);
+    assert.equal(event('pointerup',1025,11),true);
+    now=1137;owner.frame(now);
+    assert.equal(notices.length,0,'ignored same-side touch is not a lost control');
+    assert.equal(g.input.stickId.move,-1);
+    assert.equal(g.input.firing,false);
+  }finally{owner.stop();g.destroy()}
+});
