@@ -19,7 +19,7 @@ test('Tempest heat-band feedback executes actual composed Game without redline',
   assert.ok(continuous&&bands.length===2);
   for(const row of rows){
    assert.ok(row.frames>0&&row.volleys>0);
-   assert.equal(row.worldLeaks,0,'isolated combat must not silently repopulate shapes or AI');
+   assert.equal(row.worldLeaks,0,'isolated combat leak: '+JSON.stringify(row.firstLeak));
    assert.ok(row.apexVolleys<=row.volleys&&row.redlineVolleys<=row.volleys);
    assert.ok(row.peakHeat>=row.lastHeat&&row.peakHeat<=1.18+1e-6);
    assert.ok(Math.abs(row.fireSeconds+row.ventSeconds-20)<1e-3);
