@@ -49,7 +49,7 @@ async function measure(browser,viewport,scale,index){
    };
    // Fresh game per arm: no settings menu, pause, or rolling perf history crossover.
    await new Promise(resolve=>setTimeout(resolve,1800));
-   const begin=performance.now(),gameTime=g.time,gaps=[];
+   const begin=performance.now(),gameTime=g.time,shotsAtBegin=shots,gaps=[];
    const interruptions=[],longTasks=[];
    const visibilityChanged=()=>interruptions.push({atMs:performance.now()-begin,hidden:document.hidden,reason:'visibilitychange'});
    document.addEventListener('visibilitychange',visibilityChanged);
@@ -82,7 +82,7 @@ async function measure(browser,viewport,scale,index){
    })).filter(t=>t.durationMs>0);
    return {scale:JSON.parse(localStorage.getItem('novatanks_pilot_settings_v1')).renderScale,
     quality:g.quality,dpr:g.dpr,css:[g.w,g.h],backing:[g.canvas.width,g.canvas.height],
-    gameSeconds:g.time-gameTime,wallMs:end-begin,shots,
+    gameSeconds:g.time-gameTime,wallMs:end-begin,shots:shots-shotsAtBegin,warmupShots:shotsAtBegin,
     gaps,interruptions,longTaskSupported,longTasks:longTaskInWindow,
     perf:window.NovaPerf?.snapshot(g)||null,status:g.status};
   });
@@ -107,7 +107,7 @@ async function measure(browser,viewport,scale,index){
    maxFrameGapMs:Math.max(...data.gaps),
    longTaskSupported:data.longTaskSupported,longTaskCount:data.longTasks.length,
    longTaskTotalMs:longTaskMs,longTaskP95Ms:data.longTasks.length?pct(data.longTasks.map(t=>t.durationMs),.95):null,
-   shots:data.shots,perf:data.perf};
+   shots:data.shots,warmupShots:data.warmupShots,perf:data.perf};
  }finally{await context.close();}
 }
 (async()=>{
