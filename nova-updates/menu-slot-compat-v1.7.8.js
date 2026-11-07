@@ -51,7 +51,7 @@ var BASE_TIPS=[
  tip('cover-strip',"The battlefield strip reports remaining destructible cover. A falling count means routes and sightlines may have changed even if the breach happened off-screen.",['battlefield','ui']),
  tip('gunner-burst-discipline',"Gunner spread is deterministic: stable aim and controlled bursts tighten fire, while excessive heat adds predictable dispersion and hull recoil.",['gunner','discipline','combat']),
  tip('gunner-midheat',"Base Minigun descendants want sustainable mid-heat cadence. Holding fire until the meter is cooked sacrifices accuracy and forces a worse vent cycle.",['gunner','discipline','combat']),
- tip('tempest-redline',"Tempest peaks inside its broad redline band. Overshooting the band buys severe recoil and recovery rather than extra useful throughput.",['gunner','apex','discipline']),
+ tip('tempest-redline',"Tempest venting is a trade: releasing fire cools heat, but rotary spin decays too. Time shorter pauses to preserve spin; pushing past redline adds recoil and reload punishment.",['gunner','apex','discipline']),
  tip('needle-storm-gate',"Needle Storm has a narrow precision gate: exact heat plus stable tracking makes needles faster, stronger, and harder. Heat alone is not the payoff.",['gunner','apex','discipline']),
  tip('breachlord-brace',"Breachlord rewards a settled, cooled brace volley. Firing the payoff creates a short movement-recovery opening, so choose the firing position before committing.",['gunner','apex','discipline']),
  tip('flakmaster-stability',"Flakmaster converts stability into tighter, faster, longer-lived pellets. Bracing before the shot matters more at range than simply closing distance.",['gunner','apex','discipline']),
