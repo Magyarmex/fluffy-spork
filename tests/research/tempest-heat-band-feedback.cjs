@@ -63,10 +63,11 @@ function run(reload,name,pattern,policy){
       if(j===0)heat=history[0].heat;
      }
      out.delayedSamples++;
-     out.maxHeatObservationError=Math.max(out.maxHeatObservationError,Math.abs(heat-actualHeat));
     }
     if(out.observationKind==='eightBinHeatArc')
      heat=Math.round(Math.max(0,Math.min(1,heat))*8)/8;
+    if(out.observationDelayMs)
+     out.maxHeatObservationError=Math.max(out.maxHeatObservationError,Math.abs(heat-actualHeat));
     if(policy!=='continuous'){
      const high=policy==='bandTight'?.65:policy.startsWith('cueArc')?.625:.69;
      const low=policy==='bandTight'?.50:policy.startsWith('cueArc')?.375:.47;
