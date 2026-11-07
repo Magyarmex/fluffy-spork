@@ -30,7 +30,7 @@ async function run(browser,width,height){
     text:line&&line.textContent,scrollWidth:document.documentElement.scrollWidth};
   });
   assert.ok(result.count>=50,'unexpectedly small shipping tip registry');
-  assert.ok(result.tempest?.text.includes('center your held right stick'),
+  assert.ok(/center your held right stick/i.test(result.tempest?.text||''),
    'actual shipping Fieldcraft must teach touch-centered Tempest venting');
   assert.ok(result.tempest?.tags.includes('controls'),
    'Tempest touch guidance must be eligible for the controls context');
