@@ -19,7 +19,7 @@ const reference={
 function run(cls,seed){return withSeed(seed,()=>{
   const g=bootGame(),p=g.player;
   g.setClass(p,cls);
-  g.tanks=[p];g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];
+  g.tanks=[p];g.tankById=new Map([[p.id,p]]);g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];
   // Core shape replenishment and native escort respawn would contaminate
   // this nominally empty-target 60Hz balance reference.
   g.shapeTimer=Infinity;g.powerupTimer=Infinity;g.eliteTimer=Infinity;
