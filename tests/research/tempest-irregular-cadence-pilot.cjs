@@ -28,8 +28,10 @@ const burstDurations={burst1s:[120,120],burst250ms:[30,90],burst200ms:[24,60]};
 if(firePattern!=='continuous'&&!Object.hasOwn(burstDurations,firePattern))
  throw new Error('NOVA_JITTER_FIRE_PATTERN must be continuous, burst1s, burst250ms or burst200ms');
 const burst=burstDurations[firePattern]||null;
-// Held aim models desktop fire release; release models touch stick lift/reacquire.
-// This controls Game input state only, not DOM pointer-event latency.
+// Held aim models desktop fire release; release clears aim during rests and
+// instantly restores a full 40px aim vector at the next firing boundary.
+// Real touch pointerdown begins at dx=0 and needs pointermove beyond deadzone;
+// this is an optimistic input-state control, not a DOM gesture simulation.
 const aimMode=process.env.NOVA_JITTER_AIM_MODE||'held';
 if(!['held','release'].includes(aimMode))throw new Error('NOVA_JITTER_AIM_MODE must be held or release');
 const patterns={
@@ -152,4 +154,4 @@ for(const seed of seeds)for(const reload of reloads){
  }
 }
 console.log(JSON.stringify({method:'actual materialized 49-overlay Game; held aim/fire; no targets',
- phases,firePattern,aimMode,selectedPatterns,caveats:['research-only: no DOM pointer timestamps or human reacquisition latency','exact input-boundary splitting can add Game.update calls beyond presentation frames','all schedules cover exactly 8 simulated seconds','0.7s burst rhythm ends in a partial rest excluded from completed rest windows','variable dt changes world update chronology, not merely presentation FPS','no player-facing patch'],patterns,seeds,reloads,results:all},null,2));
+ phases,firePattern,aimMode,selectedPatterns,caveats:['research-only: release mode instantly restores aim, unlike real touch pointerdown deadzone','exact input-boundary splitting can add Game.update calls beyond presentation frames','all schedules cover exactly 8 simulated seconds','0.7s burst rhythm ends in a partial rest excluded from completed rest windows','variable dt changes world update chronology, not merely presentation FPS','no player-facing patch'],patterns,seeds,reloads,results:all},null,2));
