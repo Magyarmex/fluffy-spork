@@ -36,6 +36,7 @@ async function stopTrace(cdp,outputPath){
  const rendererMainThreads=new Set(trace.traceEvents.filter(e=>
   e.ph==='M'&&e.name==='thread_name'&&e.args?.name==='CrRendererMain'
  ).map(e=>e.pid+':'+e.tid));
+ assert.ok(rendererMainThreads.size>0,'trace must identify a Chromium renderer main thread');
  const byName={};
  for(const event of trace.traceEvents){
   if(event.ph!=='X'||!Number.isFinite(event.dur)||!interesting.test(event.name))continue;
