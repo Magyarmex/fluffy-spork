@@ -33,15 +33,17 @@ function resolveChronologically(input, horizon) {
   for (const event of events) {
     const [a,b] = event.ids.map(id=>state.get(id));
     if (a.dead || b.dead) continue;
-    // Simplified research integrity rule: one HP per participant per contact.
-    a.hp--; b.hp--;
+    // Shipping Sniper semantics: each shot damages the other by its
+    // pre-contact integrity, not a flat one HP per collision.
+    const ah = a.hp, bh = b.hp;
+    a.hp -= bh; b.hp -= ah;
     if (a.hp <= 0) a.dead = true;
     if (b.hp <= 0) b.dead = true;
     applied.push(event);
   }
   return { state, applied };
 }
-test('three-way: surviving middle shot participates in the second event', () => {
+test('three-way: first collision destroys B; surviving A then intercepts C', () => {
   const a = shot(1, -20, 6000, 3), b = shot(2, 0, 0, 2),
     c = shot(3, 25, -6000, 1);
   const ab = physicalTime(a,b,1/240), bc = physicalTime(b,c,1/240),
@@ -52,9 +54,9 @@ test('three-way: surviving middle shot participates in the second event', () => 
   assert.ok(ab < bc && bc < ac);
   for (const input of [[a,b,c],[c,b,a],[b,a,c]]) {
     const {state,applied} = resolveChronologically(input,1/240);
-    assert.deepEqual(applied.map(e=>e.ids),[[1,2],[2,3]]);
-    assert.deepEqual([1,2,3].map(id=>state.get(id).hp),[2,0,0]);
-    assert.deepEqual([1,2,3].map(id=>state.get(id).dead),[false,true,true]);
+    assert.deepEqual(applied.map(e=>e.ids),[[1,2],[1,3]]);
+    assert.deepEqual([1,2,3].map(id=>state.get(id).hp),[0,-1,0]);
+    assert.deepEqual([1,2,3].map(id=>state.get(id).dead),[true,true,true]);
   }
 });
 test('three-way: if first pair destroys both, no later contact can resurrect them', () => {
