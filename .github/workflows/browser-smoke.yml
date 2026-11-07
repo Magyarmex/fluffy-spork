@@ -116,10 +116,6 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' }}
         timeout-minutes: 3
         run: node tests/browser/render-clarity-aa-b-research.cjs
-      - name: Temporary PR-only ordinary-trail causal research
-        if: ${{ github.event_name == 'pull_request' && github.head_ref == 'research/trail-browser-causal-20261107' }}
-        timeout-minutes: 4
-        run: NOVA_TRAIL_CAUSAL=1 node tests/browser/render-clarity-aa-b-research.cjs
       - name: Run real React + Chromium smoke
         run: |
           node tests/browser/real-touch-gameplay.cjs
