@@ -107,7 +107,9 @@ async function measure(browser,viewport,scale,index){
  try{
   const records=[];
   for(const viewport of viewports)for(let i=0;i<phases.length;i++){
-   const result=await measure(browser,viewport,phases[i],i);
+   // Reverse arms for the second viewport to balance overall time/order exposure.
+   const scale=viewport.name==='mobile'?(phases[i]===100?65:100):phases[i];
+   const result=await measure(browser,viewport,scale,i);
    records.push(result);
    console.log('NOVA_CLARITY_PHASE '+JSON.stringify(result));
   }
