@@ -19,26 +19,31 @@ function run(pattern,aimMode){
 }
 for(const pattern of ['burst250ms','burst200ms']){
  test('Tempest '+pattern+' compares held aim and idealized aim release safely',()=>{
-  const held=run(pattern,'held'),released=run(pattern,'release');
-  assert.equal(held.length,2);assert.equal(released.length,2);
+  const held=run(pattern,'held'),released=run(pattern,'release'),centered=run(pattern,'center');
+  assert.equal(held.length,2);assert.equal(released.length,2);assert.equal(centered.length,2);
   for(let i=0;i<held.length;i++){
-   const a=held[i],b=released[i];
-   assert.equal(a.name,b.name);
-   assert.equal(a.aimMode,'held');assert.equal(b.aimMode,'release');
-   assert.equal(a.simulatedTicks,960);assert.equal(b.simulatedTicks,960);
-   assert.equal(a.firingTicks,b.firingTicks);
-   assert.equal(a.restTicks,b.restTicks);
+   const a=held[i],b=released[i],c=centered[i];
+   assert.equal(a.name,b.name);assert.equal(a.name,c.name);
+   assert.equal(a.aimMode,'held');assert.equal(b.aimMode,'release');assert.equal(c.aimMode,'center');
+   assert.equal(a.simulatedTicks,960);assert.equal(b.simulatedTicks,960);assert.equal(c.simulatedTicks,960);
+   assert.equal(a.firingTicks,b.firingTicks);assert.equal(a.firingTicks,c.firingTicks);
+   assert.equal(a.restTicks,b.restTicks);assert.equal(a.restTicks,c.restTicks);
    assert.equal(a.restVolleys,0);assert.equal(b.restVolleys,0);
-   assert.ok(a.volleys>0&&b.volleys>0);
+   assert.equal(c.restVolleys,0,'centered held aim must suppress firing even with firing flag true');
+   assert.ok(a.volleys>0&&b.volleys>0&&c.volleys>0);
    assert.equal(a.restHeatWindows.length,b.restHeatWindows.length);
+   assert.equal(a.restHeatWindows.length,c.restHeatWindows.length);
    assert.equal(a.restSpinWindows.length,b.restSpinWindows.length);
+   assert.equal(a.restSpinWindows.length,c.restSpinWindows.length);
    assert.ok(b.restSpinWindows.every(w=>w.drop>=-0.000002));
+   assert.ok(c.restSpinWindows.every(w=>w.drop>=-0.000002));
    assert.ok(Number.isFinite(b.heat)&&Number.isFinite(b.fireCd));
+   assert.ok(Number.isFinite(c.heat)&&Number.isFinite(c.fireCd));
    console.log('TEMPEST_AIM_RELEASE_RESEARCH '+JSON.stringify({
-    pattern,schedule:a.name,heldVolleys:a.volleys,releasedVolleys:b.volleys,
-    heldApex:a.tempestApexBoostVolleys,releasedApex:b.tempestApexBoostVolleys,
-    heldHeat:a.heat,releasedHeat:b.heat,
-    heldSpin:a.finalSpin,releasedSpin:b.finalSpin
+    pattern,schedule:a.name,heldVolleys:a.volleys,releasedVolleys:b.volleys,centerVolleys:c.volleys,
+    heldApex:a.tempestApexBoostVolleys,releasedApex:b.tempestApexBoostVolleys,centerApex:c.tempestApexBoostVolleys,
+    heldHeat:a.heat,releasedHeat:b.heat,centerHeat:c.heat,
+    heldSpin:a.finalSpin,releasedSpin:b.finalSpin,centerSpin:c.finalSpin
    }));
   }
  });
