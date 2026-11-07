@@ -29,7 +29,10 @@ const patterns={
  bursty:[4,1,1,2,2,2],alternating:[1,4,1,2,2,2],
  // Adversarial equal-mean sequences selected from a simple cooldown-only
  // enumeration; these are stress controls, not natural-device measurements.
- aliasFast:[1,1,2,3,2,3],aliasSlow:[1,1,1,3,3,3]
+ aliasFast:[1,1,2,3,2,3],aliasSlow:[1,1,1,3,3,3],
+ // Eight-step/16-tick period still averages 60Hz, but 1s fire boundaries
+ // land inside a frame for some rotations; exercises the event-split path.
+ boundaryCross:[1,3,2,1,3,2,1,3]
 };
 function schedule(pattern,phase=0){
  const out=[];let elapsed=0,i=phase;
