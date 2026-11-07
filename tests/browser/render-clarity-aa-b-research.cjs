@@ -379,6 +379,16 @@ async function measure(browser,viewport,scale,index){
      backingPixels:group.map(r=>r.backing[0]*r.backing[1])}];
    }))
   ])):null;
+  if(midpointMode)for(const viewport of viewports){
+   const arm=midpointSummary[viewport.name];
+   const pixels=scale=>arm[scale].backingPixels;
+   for(const scale of [65,80,100])assert.equal(new Set(pixels(scale)).size,1,
+    'backing pixel count must be stable within each clarity arm');
+   assert.ok(pixels(100)[0]>pixels(80)[0]&&pixels(80)[0]>pixels(65)[0],
+    '80% pilot must actually create an intermediate canvas backing size');
+   assert.equal(new Set(records.filter(r=>r.viewport===viewport.name).map(r=>r.quality)).size,1,
+    'clarity arms must not accidentally compare different quality modes');
+  }
   const evidence={researchOnly:true,trailCausal:trailMode,midpointMode,
    phaseOrder:phases,midpointSummary,commit:process.env.GITHUB_SHA||null,
    matchedInitialWorlds,distinctInitialWorlds:new Set(fingerprints).size,
