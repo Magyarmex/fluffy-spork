@@ -40,7 +40,11 @@ const {chromium}=require('playwright');
       const orig=CanvasRenderingContext2D.prototype.arc;let cues=0;
       CanvasRenderingContext2D.prototype.arc=function(x,y,r,a,b){
        if(this===g.ctx&&Math.abs(x-g.player.x)<.001&&Math.abs(y-g.player.y)<.001&&
-          Math.abs(a+Math.PI*.10)<1e-5&&Math.abs(b-Math.PI*.10)<1e-5)cues++;
+          Math.abs(a+Math.PI*.15)<1e-5&&Math.abs(b-Math.PI*.15)<1e-5){
+        assert.ok(this.lineWidth>=3.4,'Apex arc retains readable stroke width');
+        assert.ok(this.globalAlpha>=.9,'Apex arc retains readable contrast');
+        cues++;
+       }
        return orig.apply(this,arguments);
       };
       try{render(g,g.w,g.h);}finally{CanvasRenderingContext2D.prototype.arc=orig;}
