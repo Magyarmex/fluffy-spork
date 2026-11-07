@@ -137,6 +137,38 @@ async function run(browser,label,viewport){
    label+': actual player must move while two fingers are held: '+JSON.stringify({held,moving}));
   assert.ok(moving.shots>held.shots,
    label+': real player projectiles must launch under right-stick fire: '+JSON.stringify({held,moving}));
+  // Real browser contact: centering a held right thumb must vent without
+  // relinquishing pointer ownership, even while the left thumb moves.
+  // A zero vector is not a fire command; the next deliberate extension is.
+  await send('touchMove',[leftMoved,right]);
+  await page.waitForTimeout(100);
+  const neutral=await snapshot();
+  assert.equal(neutral.aim.active,true,label+': centered right thumb retains aim ownership');
+  assert.equal(neutral.aim.id,right.id,label+': centered thumb retains original pointer ID');
+  assert.ok(Math.hypot(neutral.aim.dx,neutral.aim.dy)<2,
+   label+': real neutral touch yields zero aim vector: '+JSON.stringify(neutral));
+  assert.equal(neutral.move.active,true,label+': centering aim does not release left movement');
+  const neutralShots=neutral.shots;
+  await page.waitForFunction(start=>{
+   const g=window.__novaTouchGame;
+   return g&&g.status==='playing'&&g.time>=start+0.35;
+  },neutral.time,{timeout:15000});
+  const vented=await snapshot();
+  assert.equal(vented.shots,neutralShots,
+   label+': neutral-held right stick must not emit player shots with AUTO disabled');
+  await send('touchMove',[leftMoved,rightMoved]);
+  await page.waitForTimeout(100);
+  const reextended=await snapshot();
+  assert.equal(reextended.aim.active,true,label+': re-extension retains aim ownership');
+  assert.equal(reextended.aim.id,right.id,label+': re-extension does not acquire a new touch');
+  assert.ok(Math.hypot(reextended.aim.dx,reextended.aim.dy)>9,
+   label+': re-extension restores usable aim');
+  await page.waitForFunction(start=>{
+   const g=window.__novaTouchGame;
+   return g&&g.status==='playing'&&g.time>=start+0.65;
+  },reextended.time,{timeout:15000});
+  assert.ok((await snapshot()).shots>vented.shots,
+   label+': re-extension resumes actual player projectiles without lifting thumb');
   fs.mkdirSync(path.join('artifacts','browser'),{recursive:true});
   await page.screenshot({path:path.join('artifacts','browser',label+'-dual-touch.png')});
   // Release right first. CDP touchEnd carries the contact being released.
