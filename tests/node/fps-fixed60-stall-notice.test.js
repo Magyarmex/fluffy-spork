@@ -482,3 +482,19 @@ test('queued same-side ownership respects press/release order at a stalled frame
     }finally{s.owner.stop()}
   }
 });
+
+
+test('idle and release-only stalls never force a canvas layout read',()=>{
+  for(const releaseOnly of [false,true]){
+    const s=fixture();
+    s.game.canvas={getBoundingClientRect(){throw Error('unneeded layout read')}};
+    s.owner.start();
+    try{
+      s.frame(1017);
+      if(releaseOnly)s.up(1020,7);
+      s.frame(1137);
+      assert.equal(s.notices.length,0);
+      assert.equal(s.owner.droppedFrames,1);
+    }finally{s.owner.stop()}
+  }
+});
