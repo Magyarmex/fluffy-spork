@@ -18,6 +18,8 @@ function run(seed,cls,reload,hz){return withSeed(seed,()=>{
   g.setClass(p,cls);
   g.tanks=[p];g.tankById=new Map([[p.id,p]]);
   g.shapes=[];g.drones=[];g.powerups=[];g.bullets=[];
+  // Zero Churn retains a shape-id index after clearing the live array.
+  if(g.shapeById)g.shapeById.clear();
   // Prevent neutral shapes and native escort drones from reappearing
   // during the five-second legal-build firing reference.
   g.shapeTimer=Infinity;g.powerupTimer=Infinity;g.eliteTimer=Infinity;
