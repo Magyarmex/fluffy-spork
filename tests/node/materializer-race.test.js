@@ -53,6 +53,15 @@ test('materializer guard distinguishes tests-only from newer runtime changes', (
       assert.equal(result.status, 0, result.stderr || result.stdout);
       assert.equal(run(worker, 'git', ['rev-parse', 'HEAD']), shouldAdvance ? newerHead : oldHead, file);
       assert.equal(fs.readFileSync(path.join(worker, 'index.html'), 'utf8'), 'tested new shell', file);
+      if (shouldAdvance) {
+        run(worker, 'git', ['add', 'index.html']);
+        run(worker, 'git', ['commit', '-m', 'Materialize NOVA TANKS runtime release']);
+        run(worker, 'git', ['push', 'origin', 'HEAD:main']);
+        run(producer, 'git', ['fetch', 'origin', 'main']);
+        assert.equal(run(producer, 'git', ['show', 'origin/main:index.html']), 'tested new shell');
+        assert.equal(run(producer, 'git', ['show', 'origin/main:tests/node/concurrent.test.js']), 'newer commit');
+      }
+
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
