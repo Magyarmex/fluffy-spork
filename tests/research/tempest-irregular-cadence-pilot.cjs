@@ -28,6 +28,10 @@ const burstDurations={burst1s:[120,120],burst250ms:[30,90],burst200ms:[24,60]};
 if(firePattern!=='continuous'&&!Object.hasOwn(burstDurations,firePattern))
  throw new Error('NOVA_JITTER_FIRE_PATTERN must be continuous, burst1s, burst250ms or burst200ms');
 const burst=burstDurations[firePattern]||null;
+// Held aim models desktop fire release; release models touch stick lift/reacquire.
+// This controls Game input state only, not DOM pointer-event latency.
+const aimMode=process.env.NOVA_JITTER_AIM_MODE||'held';
+if(!['held','release'].includes(aimMode))throw new Error('NOVA_JITTER_AIM_MODE must be held or release');
 const patterns={
  native30:[4],native60:[2],native120:[1],
  mixedSlow:[2,4,1,1,2,2],mixedFast:[1,3,2,1,3,2],
@@ -82,6 +86,7 @@ function run(seed,reload,name,steps){
      const slice=Math.min(remaining,untilBoundary);
      if(!active&&restStartHeat===null){restStartHeat=p.__v17Heat??0;restStartSpin=p.fireSpin??0;}
      g.input.firing=active;
+     if(aimMode==='release'){g.input.aim.active=active;g.input.aim.dx=active?40:0;}
      g.update(slice/120);updateCalls++;
      peakHeat=Math.max(peakHeat,p.__v17Heat??0);
      minHeat=Math.min(minHeat,p.__v17Heat??0);
@@ -99,7 +104,7 @@ function run(seed,reload,name,steps){
      }
     }
    }
-   return {seed,reload,name,firePattern,burstTicks:burst?{on:burst[0],off:burst[1]}:null,frames:steps.length,updateCalls,extraInputBoundaryUpdates:updateCalls-steps.length,simulatedTicks:elapsedTicks,
+   return {seed,reload,name,firePattern,aimMode,burstTicks:burst?{on:burst[0],off:burst[1]}:null,frames:steps.length,updateCalls,extraInputBoundaryUpdates:updateCalls-steps.length,simulatedTicks:elapsedTicks,
     firingTicks,restTicks,restHeatWindows,restSpinWindows,volleys,restVolleys,
     baseCadenceEligibleVolleys:shotHeats.filter((h,i)=>Math.max(0,1-Math.abs(h-.56)/.30)>.62&&shotStabilities[i]>.56).length,
     tempestApexBoostVolleys:shotHeats.filter((h,i)=>Math.max(0,1-Math.abs(h-.56)/.36)>.58&&shotStabilities[i]>.52).length,
@@ -137,4 +142,4 @@ for(const seed of seeds)for(const reload of reloads){
  }
 }
 console.log(JSON.stringify({method:'actual materialized 49-overlay Game; held aim/fire; no targets',
- phases,firePattern,selectedPatterns,caveats:['research-only, no browser input event timestamps','all schedules cover exactly 8 simulated seconds','variable dt changes world update chronology, not merely presentation FPS','no player-facing patch'],patterns,seeds,reloads,results:all},null,2));
+ phases,firePattern,aimMode,selectedPatterns,caveats:['research-only, no browser input event timestamps','all schedules cover exactly 8 simulated seconds','variable dt changes world update chronology, not merely presentation FPS','no player-facing patch'],patterns,seeds,reloads,results:all},null,2));
