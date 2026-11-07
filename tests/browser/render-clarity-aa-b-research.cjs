@@ -33,16 +33,20 @@ async function stopTrace(cdp,outputPath){
  fs.mkdirSync('artifacts/browser',{recursive:true});
  fs.writeFileSync(outputPath,raw);
  const interesting=/^(RunTask|FunctionCall|EvaluateScript|Paint|Layout|UpdateLayerTree|CompositeLayers|MinorGC|MajorGC|V8\.GC.*)$/;
+ const rendererMainThreads=new Set(trace.traceEvents.filter(e=>
+  e.ph==='M'&&e.name==='thread_name'&&e.args?.name==='CrRendererMain'
+ ).map(e=>e.pid+':'+e.tid));
  const byName={};
  for(const event of trace.traceEvents){
   if(event.ph!=='X'||!Number.isFinite(event.dur)||!interesting.test(event.name))continue;
+  if(!rendererMainThreads.has(event.pid+':'+event.tid))continue;
   const entry=byName[event.name]||(byName[event.name]={count:0,inclusiveMs:0,maxMs:0});
   const ms=event.dur/1000;
   entry.count++;entry.inclusiveMs+=ms;entry.maxMs=Math.max(entry.maxMs,ms);
  }
  return {file:outputPath,events:trace.traceEvents.length,bytes:Buffer.byteLength(raw),
-  inclusiveEventCosts:byName,
-  warning:'Inclusive trace event durations overlap; never sum categories as exclusive CPU time.'};
+  rendererMainThreadCount:rendererMainThreads.size,inclusiveMainThreadEventCosts:byName,
+  warning:'Inclusive main-thread trace event durations overlap; never sum categories as exclusive CPU time.'};
 }
 async function measure(browser,viewport,scale,index){
  const context=await browser.newContext({viewport:{width:viewport.width,height:viewport.height},
