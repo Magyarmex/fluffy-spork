@@ -340,11 +340,32 @@ jobs:
           fi
           git fetch origin main
           if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
-            echo 'A newer source commit reached main; the newer materializer run owns index.html.'
-            exit 0
+            # A tests/docs-only merge does not trigger another materializer.
+            # Preserve this fully tested build only if every production input
+            # (and the previously materialized page) is identical at latest main.
+            # A newer runtime edit must be rebuilt by its own workflow.
+            if ! git diff --quiet HEAD origin/main -- \
+              nova-gz nova-updates manifest.webmanifest nova-icon.svg \
+              pwa-register.js sw.js package.json .github/nova-tailwind.css \
+              .github/workflows/deploy.yml scripts/patch-star-minimap.cjs \
+              scripts/patch-saved-records.cjs scripts/patch-ai-strafe-timebase.cjs \
+              scripts/patch-raf-step-cap.cjs scripts/patch-cosmetic-rng.cjs \
+              scripts/patch-audio-rng.cjs scripts/patch-perk-offer.cjs \
+              scripts/patch-render-tank-order.cjs index.html; then
+              echo 'Newer runtime inputs or index.html detected; refusing to publish a stale build.'
+              exit 0
+            fi
+            echo 'Only non-runtime commits arrived; rebasing the tested page onto latest main.'
+            cp index.html "${RUNNER_TEMP}/nova-materialized-index.html"
+            git restore -- index.html
+            git switch -C nova-materialize-latest origin/main
+            cp "${RUNNER_TEMP}/nova-materialized-index.html" index.html
+            # A newer tests-only commit may tighten the acceptance contract.
+            # Validate the generated page against those latest tests before publish.
+            npm run test
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add index.html
           git commit -m 'Materialize NOVA TANKS runtime release'
-          git push
+          git push origin HEAD:main
