@@ -23,7 +23,7 @@ function run(reload,name,pattern,policy){
   const out={seed,reload,schedule:name,policy,frames:0,updates:0,volleys:0,
    apexVolleys:0,redlineVolleys:0,vents:0,ventSeconds:0,fireSeconds:0,
    bandSeconds:0,peakHeat:0,heatIntegral:0,spinIntegral:0,
-   lastHeat:0,lastSpin:0,firstVentAt:null,worldLeaks:0};
+   lastHeat:0,lastSpin:0,firstVentAt:null,worldLeaks:0,firstLeak:null};
   const original=g.tryFire;g.tryFire=function(t){
    const before=this.bullets.length,result=original.apply(this,arguments);
    if(t===p&&this.bullets.length>before){
@@ -47,7 +47,12 @@ function run(reload,name,pattern,policy){
     const fire=policy==='continuous'||!venting;
     g.input.firing=fire;g.input.aim.dx=fire?40:0;
     g.update(slice/120);
-    if(g.tanks.length!==1||g.shapes.length||g.drones.length||g.powerups.length)out.worldLeaks++;
+    if(g.tanks.length!==1||g.shapes.length||g.drones.length||g.powerups.length){
+     out.worldLeaks++;
+     if(!out.firstLeak)out.firstLeak={atTick:ticks,tanks:g.tanks.length,
+      shapes:g.shapes.length,drones:g.drones.length,powerups:g.powerups.length,
+      firstShapeType:g.shapes[0]?.type,firstOtherTank:g.tanks.find(t=>t!==p)?.cls};
+    }
     const dt=slice/120,h=p.__v17Heat||0;
     if(fire)out.fireSeconds+=dt;else out.ventSeconds+=dt;
     if(h>=.409&&h<=.711)out.bandSeconds+=dt;
