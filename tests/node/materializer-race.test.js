@@ -32,7 +32,7 @@ test('materializer guard distinguishes tests-only from newer runtime changes', (
       fs.mkdirSync(path.join(producer, 'nova-updates'));
       fs.writeFileSync(path.join(producer, 'nova-updates', 'sample.js'), 'runtime A');
       fs.writeFileSync(path.join(producer, 'index.html'), 'old shell');
-      fs.writeFileSync(path.join(producer, 'package.json'), JSON.stringify({ scripts: { test: 'node -e "process.exit(0)"' } }));
+      fs.writeFileSync(path.join(producer, 'package.json'), JSON.stringify({ scripts: { test: 'node -e "require(\'fs\').writeFileSync(\'validation.marker\', \'ran\')"' } }));
       run(producer, 'git', ['add', '.']);
       run(producer, 'git', ['commit', '-m', 'runtime A']);
       run(producer, 'git', ['push', '-u', 'origin', 'main']);
@@ -54,6 +54,8 @@ test('materializer guard distinguishes tests-only from newer runtime changes', (
       assert.equal(result.status, 0, result.stderr || result.stdout);
       assert.equal(run(worker, 'git', ['rev-parse', 'HEAD']), shouldAdvance ? newerHead : oldHead, file);
       assert.equal(fs.readFileSync(path.join(worker, 'index.html'), 'utf8'), 'tested new shell', file);
+      assert.equal(fs.existsSync(path.join(worker, 'validation.marker')), shouldAdvance,
+        'only a safe latest-main reattachment must rerun acceptance tests');
       if (shouldAdvance) {
         run(worker, 'git', ['add', 'index.html']);
         run(worker, 'git', ['commit', '-m', 'Materialize NOVA TANKS runtime release']);
