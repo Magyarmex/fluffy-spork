@@ -17,7 +17,13 @@ function run(seed,cls,mode){return withSeed(seed,draws=>{
  const g=bootGame(),p=g.player;
  g.sfx.muted=true;g.setClass(p,cls);
  if(!fullWorld){g.tanks=[p];g.tankById=new Map([[p.id,p]]);
-  g.shapes=[];g.drones=[];g.powerups=[];}
+  g.shapes=[];g.drones=[];g.powerups=[];
+  if(g.shapeById)g.shapeById.clear();
+  if(g.hash&&g.hash.clear)g.hash.clear();
+  g.shapeTimer=Infinity;g.powerupTimer=Infinity;g.eliteTimer=Infinity;
+  g.crasherTimer=Infinity;g.aiRespawns=[];
+  g.spawnShape=()=>null;g.spawnPowerup=()=>null;g.spawnAITank=()=>null;
+  p.droneRespawnT=Infinity;g.spawnDrone=()=>null;}
  g.input.aim.active=true;g.input.aim.dx=40;g.input.firing=true;g.input.autofire=false;
  p.stats.reload=8;p.perk='alacrity';g.useAbility(p);
  const births=[];const old=g.tryFire;
@@ -34,6 +40,7 @@ function run(seed,cls,mode){return withSeed(seed,draws=>{
  for(let frame=0;frame<seconds*30;frame++){
   if(mode==='coarse30')g.update(1/30);
   else {g.update(1/60);g.update(1/60);}
+  if(!fullWorld)assert.ok(g.tanks.length===1&&!g.shapes.length&&!g.drones.length&&!g.powerups.length,'chronology isolation leaked entities');
  }
  const state={time:round(g.time),player:{x:round(p.x),y:round(p.y),
   angle:round(p.angle),fireCd:round(p.fireCd),heat:round(p.__v17Heat||0)},

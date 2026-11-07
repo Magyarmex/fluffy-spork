@@ -24,11 +24,25 @@ function arm(seed,hz,setup){return withSeed(seed,()=>{
  const g=bootGame(),p=g.player;g.sfx.muted=true;
  g.setClass(p,'tempest');g.tanks=[p];g.tankById=new Map([[p.id,p]]);
  g.shapes=[];g.drones=[];g.powerups=[];
+ // Zero Churn retains a shape-id index after clearing the live array.
+ if(g.shapeById)g.shapeById.clear();
+ // Core rebuilds this spatial hash after firing; clear ghost targets before the first shot.
+ if(g.hash&&g.hash.clear)g.hash.clear();
+ // Keep the 60Hz golden genuinely no-target: the core replenishes neutral
+ // shapes and Tempest's native ESCORT drones unless explicitly suppressed.
+ g.shapeTimer=Infinity;g.powerupTimer=Infinity;g.eliteTimer=Infinity;
+ g.crasherTimer=Infinity;g.aiRespawns=[];
+ g.spawnShape=()=>null;g.spawnPowerup=()=>null;g.spawnAITank=()=>null;
+ p.droneRespawnT=Infinity;g.spawnDrone=()=>null;
  g.input.aim.active=true;g.input.aim.dx=40;g.input.firing=true;g.input.autofire=false;
  setup(p,g);let volleys=0;const original=g.tryFire;
  g.tryFire=function(t){const n=this.bullets.length;const result=original.apply(this,arguments);
   if(t===p&&this.bullets.length>n)volleys++;return result;};
- for(let i=0;i<8*hz;i++)g.update(1/hz);
+ for(let i=0;i<8*hz;i++){
+  g.update(1/hz);
+  assert.equal(g.tanks.length,1,'isolated Tempest must have only player tank');
+  assert.equal(g.shapes.length+g.drones.length+g.powerups.length,0,'isolated Tempest must have no targets');
+ }
  const out={volleys,heat:p.__v17Heat||0,fireCd:p.fireCd};g.destroy();return out;
 });}
 for(const [name,{count,setup}] of Object.entries(cases)){

@@ -65,6 +65,9 @@ function run(seed,reload,name,steps){
   const g=bootGame(),p=g.player;g.sfx.muted=true;
   g.setClass(p,'tempest');g.tanks=[p];g.tankById=new Map([[p.id,p]]);
   g.shapes=[];g.drones=[];g.powerups=[];
+  // The initial Zero Churn shape index and spatial hash can retain ghosts.
+  if(g.shapeById)g.shapeById.clear();
+  if(g.hash&&g.hash.clear)g.hash.clear();
   // Research-only isolation: suppress core shape replenishment and
   // Tempest's three native ESCORT drone respawns after initial clearing.
   g.shapeTimer=Infinity;g.powerupTimer=Infinity;g.eliteTimer=Infinity;

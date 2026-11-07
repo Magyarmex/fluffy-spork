@@ -18,6 +18,16 @@ function run(seed,cls,reload,hz){return withSeed(seed,()=>{
   g.setClass(p,cls);
   g.tanks=[p];g.tankById=new Map([[p.id,p]]);
   g.shapes=[];g.drones=[];g.powerups=[];g.bullets=[];
+  // Zero Churn retains a shape-id index after clearing the live array.
+  if(g.shapeById)g.shapeById.clear();
+  // Core rebuilds this spatial hash after firing; clear ghost targets before the first shot.
+  if(g.hash&&g.hash.clear)g.hash.clear();
+  // Prevent neutral shapes and native escort drones from reappearing
+  // during the five-second legal-build firing reference.
+  g.shapeTimer=Infinity;g.powerupTimer=Infinity;g.eliteTimer=Infinity;
+  g.crasherTimer=Infinity;g.aiRespawns=[];
+  g.spawnShape=()=>null;g.spawnPowerup=()=>null;g.spawnAITank=()=>null;
+  p.droneRespawnT=Infinity;g.spawnDrone=()=>null;
   p.stats.reload=reload;p.perk='alacrity';
   g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
   g.input.firing=true;g.input.autofire=false;
@@ -29,7 +39,11 @@ function run(seed,cls,reload,hz){return withSeed(seed,()=>{
     if(t===p&&this.bullets.length>before)volleys++;
     return result;
   };
-  for(let i=0;i<5*hz;i++)g.update(1/hz);
+  for(let i=0;i<5*hz;i++){
+    g.update(1/hz);
+    assert.equal(g.tanks.length,1,'no enemy tanks in legal-build reference');
+    assert.equal(g.shapes.length+g.drones.length+g.powerups.length,0,'no targets in legal-build reference');
+  }
   const out={volleys,heat:p.__v17Heat||0,fireCd:p.fireCd};
   g.destroy();return out;
 });}
