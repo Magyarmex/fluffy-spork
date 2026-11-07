@@ -36,7 +36,7 @@ async function measure(browser,viewport,scale,index){
    g.setClass(g.player,'tempest');
    g.player.stats.reload=8;
    g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
-   g.input.firing=true;g.input.autofire=true;
+   g.input.firing=true;g.input.autofire=false;
    let shots=0;
    const oldFire=g.tryFire;
    g.tryFire=function(t){
