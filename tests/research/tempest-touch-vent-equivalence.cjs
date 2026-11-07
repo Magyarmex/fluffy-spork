@@ -5,6 +5,7 @@
  * Inputs are sampled at the start of each simulation update, as in the
  * current shipping Game; no extra subframe updates are inserted. */
 process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
+const {createHash}=require('node:crypto');
 const {bootGame,withSeed}=require('./audio-rng-causal-pilot.cjs');
 const seed=1517800, duration=20, reloads=[4,8];
 const schedules={native30:[4],native60:[2],native120:[1],irregular:[1,3,2,1,3,2,1,3]};
@@ -67,6 +68,16 @@ function run(reload,name,pattern,policy){
    }
    out.lastHeat=+(p.__v17Heat||0).toFixed(5);
    out.lastSpin=+(p.fireSpin||0).toFixed(5);
+   out.lastFireCd=+(p.fireCd||0).toFixed(8);
+   out.lastStability=+(p.__v17Stability??1).toFixed(8);
+   // Bounded combat-state fingerprint, not a claim to hash the entire world.
+   // Excludes cosmetic particles; includes player firing state and live bullets.
+   const combatState={
+    player:[p.x,p.y,p.vx,p.vy,p.angle,p.hp,p.fireCd,p.fireSpin,
+     p.__v17Heat,p.__v17Stability,p.__v17Recoil],
+    bullets:g.bullets.map(b=>[b.x,b.y,b.vx,b.vy,b.ttl,b.ownerId,b.damage,b.dead,b.type])
+   };
+   out.combatStateHash=createHash('sha256').update(JSON.stringify(combatState)).digest('hex').slice(0,20);
    for(const key of ['fireSeconds','ventSeconds','heldFiringVentSeconds','bandSeconds','peakHeat','heatIntegral','spinIntegral'])
     out[key]=+out[key].toFixed(5);
    return out;
