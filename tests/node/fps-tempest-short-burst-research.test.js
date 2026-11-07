@@ -45,6 +45,8 @@ for(const [pattern,on,off,expectedFireTicks,completeRests] of [
   for(const reload of [0,4,8]){
    const rows=report.results.filter(r=>r.reload===reload);
    assert.equal(rows.length,4);
+   if(pattern==='burst250ms')assert.ok(rows.find(r=>r.name==='native30').extraInputBoundaryUpdates>0,
+    '0.25s input edges do not align to every 30Hz frame; split overhead must be disclosed');
    assert.ok(rows.find(r=>r.name==='boundaryCross').extraInputBoundaryUpdates>0,
     'adversarial schedule must cross an input boundary');
    assert.ok(rows.find(r=>r.name==='native60').restHeatWindows.some(w=>w.drop>0),
