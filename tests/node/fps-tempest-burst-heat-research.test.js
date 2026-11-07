@@ -30,7 +30,8 @@ test('Tempest 1s-on/1s-off cadence preserves input duty and exposes heat recover
   }
   assert.ok(row.volleys>0);
   assert.equal(row.restVolleys,0,'release of fire input must prevent volleys during rest');
-  assert.ok(Number.isInteger(row.cadenceEligibleVolleys)&&row.cadenceEligibleVolleys>=0&&row.cadenceEligibleVolleys<=row.volleys);
+  assert.ok(Number.isInteger(row.baseCadenceEligibleVolleys)&&row.cadenceEligibleVolleys>=0&&row.cadenceEligibleVolleys<=row.volleys);
+  assert.ok(Number.isInteger(row.tempestApexBoostVolleys)&&row.tempestApexBoostVolleys>=0&&row.tempestApexBoostVolleys<=row.volleys);
   assert.ok(Number.isInteger(row.redlineVolleys)&&row.redlineVolleys>=0&&row.redlineVolleys<=row.volleys);
   assert.ok(Number.isFinite(row.minimumHeat)&&Number.isFinite(row.peakHeat));
   assert.ok(row.minimumHeat<=row.peakHeat);
