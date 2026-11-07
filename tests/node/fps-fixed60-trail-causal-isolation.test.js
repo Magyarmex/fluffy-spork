@@ -11,7 +11,7 @@ const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
 const {FixedStepRafOwner}=require('../research/fixed-step-raf-owner.cjs');
 const TICKS=120;
 
-function trial(seed,mode,fixed30,quality='low'){
+function trial(seed,mode,fixed30,quality='low',nativeHz=60){
  return withSeed(seed,draws=>{
   const g=bootGame(quality),p=g.player;
   assert.equal(g.parts.length,quality==='low'?200:400,'shipping particle pool size');
@@ -71,7 +71,7 @@ function trial(seed,mode,fixed30,quality='low'){
     }
     assert.equal(owner.ticks,TICKS);
     assert.equal(owner.droppedFrames,0);
-   }else for(let tick=0;tick<TICKS;tick++)g.update(1/60);
+   }else for(let tick=0;tick<TICKS*nativeHz/60;tick++)g.update(1/nativeHz);
    return {physical:digest(physical(g)),gameplayDraws:draws(),
     ordinary,other,poolWrites,activeOverwrites,
     cosmeticState:g.__novaCosmeticRngState,
@@ -127,5 +127,33 @@ test('fixed60 at 30Hz presentation preserves native60 projectile trail opportuni
    'fixed60 presentation changed cosmetic RNG sequence');
   assert.deepEqual(fixed.gunner,native.gunner,
    'fixed60 presentation changed Tempest heat or cadence state');
+ }
+});
+
+// High-refresh cosmetic gating is shipping behavior. Test it through the
+// composed Game rather than relying solely on an isolated updateBullets stub.
+// Compare each rate against its own A/A control: physical trajectories at
+// different update frequencies are not expected to be byte-identical.
+test('actual composed Tempest: 120/240Hz ordinary-trail suppression preserves combat and both RNG streams',()=>{
+ for(const hz of [120,240])for(const quality of ['low','high']){
+  const seed=1517800;
+  const baseline=trial(seed,'baseline',false,quality,hz);
+  const repeat=trial(seed,'baseline',false,quality,hz);
+  const suppressed=trial(seed,'suppress-trails',false,quality,hz);
+  assert.deepEqual(repeat,baseline,'high-refresh A/A control must remain deterministic');
+  assert.ok(baseline.ordinary>0,'high-refresh fixture must emit ordinary trails');
+  assert.equal(suppressed.ordinary,baseline.ordinary,'cosmetic intervention changed emission opportunities');
+  assert.equal(suppressed.other,baseline.other,'non-trail effects changed');
+  assert.equal(baseline.poolWrites-suppressed.poolWrites,baseline.ordinary,
+   'suppression must eliminate one actual pool write per ordinary trail');
+  assert.equal(suppressed.physical,baseline.physical,'high-refresh combat changed');
+  assert.deepEqual(suppressed.gunner,baseline.gunner,'high-refresh Gunner cadence changed');
+  assert.equal(suppressed.gameplayDraws,baseline.gameplayDraws,'gameplay RNG changed');
+  assert.equal(suppressed.cosmeticState,baseline.cosmeticState,'cosmetic RNG changed');
+  console.log('NOVA_HIGH_REFRESH_TRAIL_CAUSAL '+JSON.stringify({hz,quality,
+   ordinary:baseline.ordinary,baselineWrites:baseline.poolWrites,
+   suppressedWrites:suppressed.poolWrites,
+   baselineActiveOverwrites:baseline.activeOverwrites,
+   suppressedActiveOverwrites:suppressed.activeOverwrites}));
  }
 });
