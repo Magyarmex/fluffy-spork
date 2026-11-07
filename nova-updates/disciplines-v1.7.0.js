@@ -705,17 +705,18 @@ wrap('game/engine',function(engine,require){
 });
 
 /* ---------------- Rendering: visible mechanics, no extra controls ---------------- */
+  // Tempest's bright cue must mean its *actual* Apex cooldown gate is live.
+  // Other Gunners retain their existing broad cadence hint.
+  function gunnerCue(t,h,st){
+    return t.cls==='tempest' ? Math.max(0,1-Math.abs(h-.56)/.36)>.58&&st>.52 : h>.26&&h<.86&&st>.54;
+  }
+
 wrap('game/render',function(renderMod,require){
   var old=renderMod.render;if(!old||old.__novaThreeDisciplines)return;
   var classes=require('./classes'),C=classes.CLASSES;
   function lin(t){try{return classes.lineageForClass(t.cls);}catch(_){return null;}}
   function arc(ctx,x,y,r,a0,a1,col,w,alpha){
     ctx.save();ctx.globalAlpha=alpha==null?1:alpha;ctx.strokeStyle=col;ctx.lineWidth=w||2;ctx.beginPath();ctx.arc(x,y,r,a0,a1);ctx.stroke();ctx.restore();
-  }
-  // Tempest's bright cue must mean its *actual* Apex cooldown gate is live.
-  // Other Gunners retain their existing broad cadence hint.
-  function gunnerCue(t,h,st){
-    return t.cls==='tempest' ? Math.max(0,1-Math.abs(h-.56)/.36)>.58&&st>.52 : h>.26&&h<.86&&st>.54;
   }
   function drawGunner(ctx,g,t){
     var h=clamp(t.__v17Heat||0,0,1),st=clamp(t.__v17Stability==null?1:t.__v17Stability,0,1),def=C[t.cls],r=(def&&def.size||15)+12;
