@@ -111,6 +111,8 @@ test('actual Gunner render draws Tempest bright cue only inside Apex gate',()=>{
   render(g,400,800);assert.equal(arcs.length,1,'outside Apex: heat arc only');
   arcs.length=0;t.__v17Heat=.56;t.__v17Stability=.50;
   render(g,400,800);assert.equal(arcs.length,1,'unstable Tempest: no false bright cue');
+  arcs.length=0;t.cls='twin';t.__v17Heat=.30;t.__v17Stability=.8;
+  render(g,400,800);assert.equal(arcs.length,2,'other Gunners retain their broad cue');
 });
 test('Guardian frontal arc is directional',()=>{
   const {context}=loadDisciplines(), q=context.window.__NOVA_DISCIPLINES_TEST__;
