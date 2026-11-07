@@ -5,7 +5,6 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {chromium}=require('playwright');
 const {injectBattlefieldSeed}=require('../research/battlefield-layout-fixture.cjs');
-const {fireDelta}=require('../research/clarity-fire-counters.cjs');
 // Six-arm ABBA-like order limits linear run-order bias (mean index differs by 1/3 phase).
 const phases=[100,65,65,100,65,100];
 const viewports=[{name:'desktop',width:1280,height:800},{name:'mobile',width:320,height:640}];
@@ -188,8 +187,8 @@ async function measure(browser,viewport,scale,index){
    const oldFire=g.tryFire;
    g.tryFire=function(t){
     const before=this.bullets.length,out=oldFire.apply(this,arguments);
-    const delta=fireDelta(before,this.bullets.length,t===this.player);
-    shots+=delta.projectiles;volleys+=delta.volleys;
+    const added=t===this.player?Math.max(0,this.bullets.length-before):0;
+    if(added>0){shots+=added;volleys++;}
     return out;
    };
    // Fresh game per arm: no settings menu, pause, or rolling perf history crossover.
