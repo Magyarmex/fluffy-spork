@@ -25,15 +25,23 @@ function measure(seed,hz,reload){return withSeed(seed,()=>{
  const g=bootGame(),p=g.player;g.sfx.muted=true;
  g.setClass(p,'tempest');g.tanks=[p];g.tankById=new Map([[p.id,p]]);
  g.shapes=[];g.drones=[];g.powerups=[];
+ // Empty initial arrays are NOT isolation: core replenishes shapes and
+ // Tempest respawns three native ESCORT drones. Suppress both in research.
+ g.shapeTimer=Infinity;g.powerupTimer=Infinity;g.eliteTimer=Infinity;
+ g.crasherTimer=Infinity;g.aiRespawns=[];
+ g.spawnShape=()=>null;g.spawnPowerup=()=>null;g.spawnAITank=()=>null;
+ p.droneRespawnT=Infinity;g.spawnDrone=()=>null;
  g.input.aim.active=true;g.input.aim.dx=40;g.input.firing=true;g.input.autofire=false;
  p.stats.reload=reload;
- let volleys=0,heatPeak=0;const shotTimes=[],postShotCooldowns=[];const oldFire=g.tryFire;
+ let volleys=0,heatPeak=0,worldLeaks=0;const shotTimes=[],postShotCooldowns=[];const oldFire=g.tryFire;
  g.tryFire=function(t){const before=this.bullets.length;const result=oldFire.apply(this,arguments);
   if(t===p&&this.bullets.length>before){volleys++;shotTimes.push(this.time);postShotCooldowns.push(p.fireCd);}return result;};
  for(let i=0;i<seconds*hz;i++){
   g.update(1/hz);heatPeak=Math.max(heatPeak,p.__v17Heat||0);
+  if(g.tanks.length!==1||g.shapes.length||g.drones.length||g.powerups.length)worldLeaks++;
  }
- const out={seed,hz,reload,seconds,volleys,heat:p.__v17Heat||0,heatPeak,
+ if(worldLeaks)throw new Error('Tempest frequency trial leaked combat entities: '+JSON.stringify({seed,hz,reload,worldLeaks}));
+ const out={seed,hz,reload,seconds,worldLeaks,volleys,heat:p.__v17Heat||0,heatPeak,
   fireCd:p.fireCd,lateShotCooldown:postShotCooldowns.length?+postShotCooldowns[postShotCooldowns.length-1].toFixed(7):null,
   lateCooldownVsStep:postShotCooldowns.length?+(postShotCooldowns[postShotCooldowns.length-1]-1/hz).toFixed(7):null,
   predictedSteadyHz:postShotCooldowns.length?+(hz/Math.max(1,Math.ceil(postShotCooldowns[postShotCooldowns.length-1]*hz-1e-10))).toFixed(5):null,
