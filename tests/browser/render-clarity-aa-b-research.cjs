@@ -8,6 +8,12 @@ const {chromium}=require('playwright');
 const phases=[100,65,65,100,65,100];
 const viewports=[{name:'desktop',width:1280,height:800},{name:'mobile',width:320,height:640}];
 const pct=(xs,p)=>{const s=[...xs].sort((a,b)=>a-b);return s[Math.ceil(s.length*p)-1];};
+// Optional identical initial RNG stream across independent browser worlds.
+// This does not guarantee matched trajectories once frame schedules diverge.
+const seedText=process.env.NOVA_CLARITY_SEED;
+const researchSeed=seedText===undefined?null:Number(seedText);
+if(seedText!==undefined&&(!Number.isInteger(researchSeed)||researchSeed<1||researchSeed>0xffffffff))
+ throw Error('NOVA_CLARITY_SEED must be a positive 32-bit integer');
 // Opt-in, bounded DevTools trace of one real composed combat phase.
 // Chrome trace events are inclusive: category totals must not be added together.
 async function stopTrace(cdp,outputPath){
@@ -64,9 +70,16 @@ async function stopTrace(cdp,outputPath){
 async function measure(browser,viewport,scale,index){
  const context=await browser.newContext({viewport:{width:viewport.width,height:viewport.height},
   deviceScaleFactor:2,isMobile:viewport.name==='mobile',hasTouch:viewport.name==='mobile'});
- await context.addInitScript(v=>{
-  localStorage.setItem('novatanks_pilot_settings_v1',JSON.stringify({renderScale:v}));
- },scale);
+ await context.addInitScript(({scale,seed})=>{
+  localStorage.setItem('novatanks_pilot_settings_v1',JSON.stringify({renderScale:scale}));
+  if(seed!==null){
+   let state=seed>>>0;
+   Math.random=()=>{
+    state^=state<<13;state^=state>>>17;state^=state<<5;
+    return(state>>>0)/4294967296;
+   };
+  }
+ },{scale,seed:researchSeed});
  const page=await context.newPage(),errors=[];
  const cdp=await context.newCDPSession(page);
  const traceThisPhase=process.env.NOVA_CLARITY_TRACE==='1'&&viewport.name==='desktop'&&(index===0||index===1);
@@ -81,7 +94,20 @@ async function measure(browser,viewport,scale,index){
    const Game=window.__novaMakeRequire('')('game/engine').Game;
    const old=Game.prototype.update;
    Game.prototype.update=function(dt){
-    if(!this.__novaDecorativeWorld)window.__novaClarityResearchGame=this;
+    if(!this.__novaDecorativeWorld){
+     window.__novaClarityResearchGame=this;
+     if(!window.__novaClarityInitialWorld){
+      const signature=JSON.stringify({
+       player:this.player&&[this.player.id,this.player.x,this.player.y],
+       tanks:(this.tanks||[]).map(t=>[t.id,t.x,t.y,t.kind]),
+       shapes:(this.shapes||[]).map(t=>[t.id,t.x,t.y,t.kind]),
+       terrain:(this.__novaTerrain||[]).map(t=>[t.x,t.y,t.w,t.h,t.hp])
+      });
+      let hash=2166136261;
+      for(let i=0;i<signature.length;i++)hash=Math.imul(hash^signature.charCodeAt(i),16777619)>>>0;
+      window.__novaClarityInitialWorld={hash:hash.toString(16).padStart(8,'0'),bytes:signature.length};
+     }
+    }
     return old.apply(this,arguments);
    };
   });
@@ -181,7 +207,8 @@ async function measure(browser,viewport,scale,index){
     quality:g.quality,dpr:g.dpr,css:[g.w,g.h],backing:[g.canvas.width,g.canvas.height],
     gameSeconds:g.time-gameTime,wallMs:end-begin,shots:shots-shotsAtBegin,warmupShots:shotsAtBegin,
     gaps,interruptions,longTaskSupported,longTasks:longTaskInWindow,entities,
-    outer,perf:window.NovaPerf?.snapshot(g)||null,status:g.status};
+    outer,initialWorld:window.__novaClarityInitialWorld||null,
+    perf:window.NovaPerf?.snapshot(g)||null,status:g.status};
   });
   const trace=traceStarted?await stopTrace(cdp,`artifacts/browser/render-clarity-combat-trace-${scale}-phase-${index}.json`):null;
   traceStarted=false;
@@ -204,7 +231,8 @@ async function measure(browser,viewport,scale,index){
   // preserve small positive lead explicitly instead of reporting >100% coverage.
   const observedRafMs=total,unobservedWallMs=Math.max(0,data.wallMs-observedRafMs);
   const rafTimestampLeadMs=Math.max(0,observedRafMs-data.wallMs);
-  return {viewport:viewport.name,index,scale,cpuThrottle:3,quality:data.quality,dpr:data.dpr,
+  return {viewport:viewport.name,index,scale,researchSeed,cpuThrottle:3,
+   initialWorld:data.initialWorld,quality:data.quality,dpr:data.dpr,
    css:data.css,backing:data.backing,frames:data.gaps.length,
    fps:1000*data.gaps.length/total,percentileSampleAdequate:data.gaps.length>=30,
    p50GapMs:pct(data.gaps,.5),
