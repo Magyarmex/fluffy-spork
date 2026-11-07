@@ -50,23 +50,23 @@ for (const scenario of ['tests-only', 'runtime', 'exhaustion']) {
       const hook = path.join(worker, '.git', 'hooks', 'pre-push');
       fs.writeFileSync(hook, `#!/bin/sh
 set -eu
-count_file="${RACE_COUNTER}"
+count_file="\${RACE_COUNTER}"
 count=0
 if [ -f "$count_file" ]; then count=$(cat "$count_file"); fi
 count=$((count + 1))
 echo "$count" > "$count_file"
-if [ "${RACE_KIND}" = "exhaustion" ] || [ "$count" -eq 1 ]; then
-  git -C "${RACE_PRODUCER}" fetch origin main >/dev/null 2>&1
-  git -C "${RACE_PRODUCER}" reset --hard origin/main >/dev/null
-  if [ "${RACE_KIND}" = "runtime" ]; then
-    echo changed > "${RACE_PRODUCER}/nova-updates/sample.js"
+if [ "\${RACE_KIND}" = "exhaustion" ] || [ "$count" -eq 1 ]; then
+  git -C "\${RACE_PRODUCER}" fetch origin main >/dev/null 2>&1
+  git -C "\${RACE_PRODUCER}" reset --hard origin/main >/dev/null
+  if [ "\${RACE_KIND}" = "runtime" ]; then
+    echo changed > "\${RACE_PRODUCER}/nova-updates/sample.js"
   else
-    mkdir -p "${RACE_PRODUCER}/tests/node"
-    echo "$count" > "${RACE_PRODUCER}/tests/node/concurrent-$count.test.js"
+    mkdir -p "\${RACE_PRODUCER}/tests/node"
+    echo "$count" > "\${RACE_PRODUCER}/tests/node/concurrent-$count.test.js"
   fi
-  git -C "${RACE_PRODUCER}" add .
-  git -C "${RACE_PRODUCER}" commit -m "competing change $count" >/dev/null
-  git -C "${RACE_PRODUCER}" push origin main >/dev/null 2>&1
+  git -C "\${RACE_PRODUCER}" add .
+  git -C "\${RACE_PRODUCER}" commit -m "competing change $count" >/dev/null
+  git -C "\${RACE_PRODUCER}" push origin main >/dev/null 2>&1
 fi
 `);
       fs.chmodSync(hook, 0o755);
@@ -85,8 +85,9 @@ fi
       git(producer, 'fetch', 'origin', 'main');
       const published = git(producer, 'show', 'origin/main:index.html');
       assert.equal(published, scenario === 'tests-only' ? 'tested new page' : 'old page');
-      assert.equal(git(producer, 'show', 'origin/main:tests/node/concurrent-1.test.js'),
-        scenario === 'runtime' ? '' : '1');
+      if (scenario !== 'runtime') {
+        assert.equal(git(producer, 'show', 'origin/main:tests/node/concurrent-1.test.js'), '1');
+      }
       if (scenario === 'runtime') {
         assert.equal(git(producer, 'show', 'origin/main:nova-updates/sample.js'), 'changed');
       }
