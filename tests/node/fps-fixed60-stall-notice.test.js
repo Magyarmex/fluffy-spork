@@ -246,3 +246,33 @@ test('missing pointer type cannot masquerade as a confirmed touch release',()=>{
     assert.equal(s.input.move.active,false);
   }finally{s.owner.stop()}
 });
+
+
+test('queued blur before a delayed visible RAF suppresses the touch reset warning',()=>{
+  const s=fixture();s.owner.start();
+  try{
+    s.down(1005,7);s.down(1006,8);s.frame(1017);
+    assert.equal(s.input.move.active,true);
+    assert.equal(s.input.aim.active,true);
+    s.timeline.push(.020,'blur',{});
+    s.frame(1137);
+    assert.equal(s.notices.length,0,'captured lifecycle blur already explains the reset');
+    assert.equal(s.input.stickId.move,-1);
+    assert.equal(s.input.stickId.aim,-1);
+    assert.equal(s.input.firing,false,'blur cannot leave phantom firing');
+  }finally{s.owner.stop()}
+});
+
+test('exact 100ms foreground gap is not classified as a long stall',()=>{
+  const s=fixture();s.owner.start();
+  try{
+    s.down(1005);s.frame(1017);
+    s.frame(1117);
+    assert.equal(s.owner.droppedFrames,1,
+      'bounded backlog may drop old ticks even without long-stall reset');
+    assert.equal(s.input.move.active,true,
+      'the 100ms boundary must not silently revoke an owned touch');
+    assert.equal(s.notices.length,0);
+    assert.equal(s.input.firing,false);
+  }finally{s.owner.stop()}
+});
