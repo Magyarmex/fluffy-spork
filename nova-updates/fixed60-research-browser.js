@@ -535,7 +535,7 @@ class FixedStepRafOwner {
             input[stick] && input[stick].active).map(stick=>input.stickId[stick]) : [];
         // An already-captured release is intentional. A release of one stick
         // must not conceal an involuntary reset of the OTHER held stick.
-        const pending=ownedTouchIds.length && Array.isArray(this.timeline.events) ?
+        const pending=Array.isArray(this.timeline.events) ?
           this.timeline.events.slice(this.timeline.index||0) : [];
         // Replay queued lifecycle edges only for NOTICE classification.
         // Input itself remains fail-closed: the long stall still resets it.
