@@ -72,6 +72,6 @@ test('drone allegiance tip teaches both shape and color rather than color alone'
 
 
 test('Tempest Fieldcraft tip teaches the real heat-versus-spin venting tradeoff', () => {
-  assert.match(fieldcraft, /tempest-redline[^\n]*releasing fire cools heat, but rotary spin decays too/i);
-  assert.match(fieldcraft, /pushing past redline adds recoil and reload punishment/i);
+  assert.match(fieldcraft, /tempest-redline[^\n]*pausing fire cools heat but also drains rotary spin/i);
+  assert.match(fieldcraft, /pushing past redline punishes reload and recoil/i);
 });
