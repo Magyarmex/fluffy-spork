@@ -34,9 +34,10 @@ function run(reload,name,pattern,policy){
    while(ticks<duration*120){
     const slice=Math.min(pattern[index++%pattern.length],duration*120-ticks);
     const heat=p.__v17Heat||0;
-    if(policy==='band'){
-     if(!venting&&heat>=.69){venting=true;out.vents++;if(out.firstVentAt===null)out.firstVentAt=ticks/120;}
-     if(venting&&heat<=.47)venting=false;
+    if(policy!=='continuous'){
+     const high=policy==='bandTight'?.65:.69,low=policy==='bandTight'?.50:.47;
+     if(!venting&&heat>=high){venting=true;out.vents++;if(out.firstVentAt===null)out.firstVentAt=ticks/120;}
+     if(venting&&heat<=low)venting=false;
     }
     const fire=policy==='continuous'||!venting;
     g.input.firing=fire;g.input.aim.dx=fire?40:0;
@@ -58,6 +59,6 @@ function run(reload,name,pattern,policy){
 }
 const results=[];
 for(const reload of reloads)for(const [name,pattern] of Object.entries(schedules))
- for(const policy of ['continuous','band'])results.push(run(reload,name,pattern,policy));
+ for(const policy of ['continuous','bandWide','bandTight'])results.push(run(reload,name,pattern,policy));
 console.log(JSON.stringify({method:'actual composed Game; deterministic seed; no targets; frame-start feedback',duration,results,
- caveats:['feedback policy has perfect heat readout, unlike human player','fixed aim and no targets cannot measure hit quality or survival','variable-step chronology differs across schedules','no physical touch or input-to-photon measurement','not a gameplay patch']},null,2));
+ caveats:['feedback policies have perfect heat readout, unlike human player','fixed aim and no targets cannot measure hit quality or survival','variable-step chronology differs across schedules','no physical touch or input-to-photon measurement','not a gameplay patch']},null,2));
