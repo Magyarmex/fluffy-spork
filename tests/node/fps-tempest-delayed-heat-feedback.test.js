@@ -32,6 +32,10 @@ test('Tempest delayed heat feedback stays isolated and compares matched policies
    assert.ok(row.apexVolleys<=row.volleys);
    assert.ok(row.redlineVolleys<=row.volleys);
    assert.ok(row.peakHeat<=1.18+1e-6);
+   assert.ok(row.apexSeconds>=0&&row.apexSeconds<=20);
+   assert.ok(row.redlineSeconds>=0&&row.redlineSeconds<=20);
+   assert.ok(row.apexSeconds<=row.bandSeconds+1e-5);
+   assert.ok(Number.isFinite(row.stabilityIntegral));
    assert.ok(Math.abs(row.fireSeconds+row.ventSeconds-20)<1e-3);
    assert.ok(Number.isFinite(row.spinIntegral));
   }
