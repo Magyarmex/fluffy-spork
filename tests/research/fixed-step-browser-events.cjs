@@ -64,19 +64,44 @@ class BrowserEventTimeline {
       this.staleClamps++;
       const input=this.timeline.input;
       const held=new Set(this.pendingStaleTouchIds);
+      const slots={move:null,aim:null};
       if(input && input.touchSeen && input.stickId){
         for(const stick of ['move','aim']){
-          if(input[stick] && input[stick].active && input.stickId[stick]!==-1)
+          if(input[stick] && input[stick].active && input.stickId[stick]!==-1){
+            slots[stick]=input.stickId[stick];
             held.add(input.stickId[stick]);
+          }
         }
       }
-      // Queued intentional releases and lifecycle blur precede this stale
-      // event. Do not claim that those controls were involuntarily lost.
+      // Reconstruct accepted stick ownership, not merely pointer existence.
+      // A queued first touch may be lost before its first simulation tick;
+      // a same-side second touch is ignored by shipping Input.
+      let rect=null,geometryRead=false;
       for(const queued of this.timeline.events.slice(this.timeline.index||0)){
-        if(queued.kind==='blur') held.clear();
-        else if((queued.kind==='pointerup'||queued.kind==='pointercancel') &&
-                queued.data && queued.data.pointerType!=='mouse')
-          held.delete(queued.data.pointerId);
+        const d=queued.data;
+        if(queued.kind==='blur'){
+          held.clear();slots.move=null;slots.aim=null;continue;
+        }
+        if(!d || d.pointerId==null || typeof d.pointerType!=='string' ||
+           d.pointerType==='mouse')continue;
+        if(queued.kind==='pointerdown' && !d.targetIsUI){
+          if(!geometryRead){
+            geometryRead=true;
+            const canvas=input && input.canvas;
+            rect=canvas && typeof canvas.getBoundingClientRect==='function' ?
+              canvas.getBoundingClientRect() : null;
+          }
+          if(rect && Number.isFinite(rect.left) &&
+             Number.isFinite(rect.width) && rect.width>0 &&
+             Number.isFinite(d.clientX)){
+            const side=d.clientX-rect.left<rect.width*.45?'move':'aim';
+            if(slots[side]==null){slots[side]=d.pointerId;held.add(d.pointerId);}
+          }else if(held.size<2)held.add(d.pointerId);
+        }else if(queued.kind==='pointerup'||queued.kind==='pointercancel'){
+          held.delete(d.pointerId);
+          if(slots.move===d.pointerId)slots.move=null;
+          if(slots.aim===d.pointerId)slots.aim=null;
+        }
       }
       if(event.type==='blur') held.clear();
       else if((event.type==='pointerup'||event.type==='pointercancel') &&
