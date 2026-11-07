@@ -16,7 +16,7 @@ test('Tempest 1s-on/1s-off cadence preserves input duty and exposes heat recover
   });
  const report=JSON.parse(raw);
  assert.equal(report.firePattern,'burst1s');
- assert.equal(report.results.length,27);
+ assert.equal(report.results.length,30);
  for(const row of report.results){
   assert.equal(row.firePattern,'burst1s');
   assert.equal(row.simulatedTicks,960);
@@ -42,7 +42,9 @@ test('Tempest 1s-on/1s-off cadence preserves input duty and exposes heat recover
  }
  for(const reload of [0,4,8]){
   const cohort=report.results.filter(row=>row.reload===reload);
-  assert.equal(cohort.length,9);
+  assert.equal(cohort.length,10);
+  assert.ok(cohort.find(row=>row.name==='boundaryCross').extraInputBoundaryUpdates>0,
+   'the boundary-crossing schedule must exercise sub-frame input splitting');
   assert.equal(cohort.find(row=>row.name==='native60').frames,480);
   assert.equal(cohort.find(row=>row.name==='native30').frames,240);
   assert.equal(cohort.find(row=>row.name==='native120').frames,960);
