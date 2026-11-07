@@ -26,6 +26,8 @@ function arm(seed,hz,setup){return withSeed(seed,()=>{
  g.shapes=[];g.drones=[];g.powerups=[];
  // Zero Churn retains a shape-id index after clearing the live array.
  if(g.shapeById)g.shapeById.clear();
+ // Core rebuilds this spatial hash after firing; clear ghost targets before the first shot.
+ if(g.hash&&g.hash.clear)g.hash.clear();
  // Keep the 60Hz golden genuinely no-target: the core replenishes neutral
  // shapes and Tempest's native ESCORT drones unless explicitly suppressed.
  g.shapeTimer=Infinity;g.powerupTimer=Infinity;g.eliteTimer=Infinity;

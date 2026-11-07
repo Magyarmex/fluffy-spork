@@ -67,6 +67,8 @@ test('mixed 33/17ms presentation never receives sustained-30Hz cooling credit',(
    g.tanks=[p];g.tankById=new Map([[p.id,p]]);g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];
    // Zero Churn retains a shape-id index after clearing the live array.
    if(g.shapeById)g.shapeById.clear();
+   // Core rebuilds this spatial hash after firing; clear ghost targets before the first shot.
+   if(g.hash&&g.hash.clear)g.hash.clear();
    // This mixed-frame heat check must not acquire replenished neutral
    // shapes or native escort drones midway through the measurement.
    g.shapeTimer=Infinity;g.powerupTimer=Infinity;g.eliteTimer=Infinity;
