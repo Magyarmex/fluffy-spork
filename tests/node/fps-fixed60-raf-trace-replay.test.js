@@ -38,6 +38,12 @@ test('per-frame work concentration exposes catch-up pressure without pretending 
   assert.equal(steady.framesWithZeroSteps,0);
   assert.equal(steady.p95StepsPerFrame,2);
   assert.equal(steady.p99StepsPerFrame,2);
+  const highRefresh=replay(Array(240).fill(1000/120),4);
+  assert.equal(highRefresh.simulatedTicks,120);
+  assert.equal(highRefresh.framesWithZeroSteps,120,
+    '120Hz presentation should reveal zero-update frames at 60Hz simulation');
+  assert.equal(highRefresh.p95StepsPerFrame,1);
+  assert.equal(highRefresh.framesAtStepCap,0);
   const burst=Array.from({length:240},(_,i)=>i%2===0?1000/120:7000/120);
   for(const cap of [2,3,4]){
     const result=replay(burst,cap);
