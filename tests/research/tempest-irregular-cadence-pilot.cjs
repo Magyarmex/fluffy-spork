@@ -89,7 +89,7 @@ function run(seed,reload,name,steps){
     firingTicks,restTicks,restHeatWindows,volleys,restVolleys,
     baseCadenceEligibleVolleys:shotHeats.filter((h,i)=>Math.max(0,1-Math.abs(h-.56)/.30)>.62&&shotStabilities[i]>.56).length,
     tempestApexBoostVolleys:shotHeats.filter((h,i)=>Math.max(0,1-Math.abs(h-.56)/.36)>.58&&shotStabilities[i]>.52).length,
-    redlineVolleys:shotHeats.filter(h=>h>.93).length,minimumHeat:+minHeat.toFixed(6),
+    tempestRedlinePenaltyVolleys:shotHeats.filter(h=>h>.90).length,minimumHeat:+minHeat.toFixed(6),
     heat:+(p.__v17Heat??0).toFixed(6),peakHeat:+peakHeat.toFixed(6),
     fireCd:+(p.fireCd??0).toFixed(6),peakCooldown:+peakCooldown.toFixed(6),
     firstShots:shotTimes.slice(0,8).map(n=>+n.toFixed(6)),
