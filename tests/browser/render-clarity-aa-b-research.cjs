@@ -181,18 +181,22 @@ async function measure(browser,viewport,scale,index){
     try{return originalMinimap.apply(this,arguments);}
     finally{if(sampling)outer.minimap.push(performance.now()-started);}
    };
-   let shots=0;
+   // Distinguish successful firing invocations (volleys) from projectile
+   // payload. A multi-projectile volley is one firing decision, not N.
+   let shots=0,volleys=0;
    const oldFire=g.tryFire;
    g.tryFire=function(t){
     const before=this.bullets.length,out=oldFire.apply(this,arguments);
-    if(t===this.player&&this.bullets.length>before)shots+=this.bullets.length-before;
+    const added=t===this.player?Math.max(0,this.bullets.length-before):0;
+    if(added>0){shots+=added;volleys++;}
     return out;
    };
    // Fresh game per arm: no settings menu, pause, or rolling perf history crossover.
    await new Promise(resolve=>setTimeout(resolve,1800));
    if(window.__novaResearchBeginMeasuredTrace)
     await window.__novaResearchBeginMeasuredTrace();
-   const begin=performance.now(),gameTime=g.time,shotsAtBegin=shots,gaps=[];
+   const begin=performance.now(),gameTime=g.time,shotsAtBegin=shots,
+    volleysAtBegin=volleys,heatAtBegin=Number.isFinite(g.player?.__v17Heat)?g.player.__v17Heat:null,gaps=[];
    sampling=true;
    const interruptions=[],longTasks=[];
    // Low-cost exposure counters distinguish clarity effects from different
@@ -239,6 +243,8 @@ async function measure(browser,viewport,scale,index){
     battlefieldSeed:g.__novaBattlefield?.seed??null,battlefieldName:g.__novaBattlefield?.name??null,
     initialFingerprint:g.__novaResearchInitialFingerprint??null,
     gameSeconds:g.time-gameTime,wallMs:end-begin,shots:shots-shotsAtBegin,warmupShots:shotsAtBegin,
+    volleys:volleys-volleysAtBegin,warmupVolleys:volleysAtBegin,
+    heatAtBegin,heatAtEnd:Number.isFinite(g.player?.__v17Heat)?g.player.__v17Heat:null,
     gaps,interruptions,longTaskSupported,longTasks:longTaskInWindow,entities,
     outer,perf:window.NovaPerf?.snapshot(g)||null,status:g.status};
   });
@@ -259,7 +265,8 @@ async function measure(browser,viewport,scale,index){
   assert.ok(data.backing.every(x=>Number.isFinite(x)&&x>0));
   assert.equal(data.status,'playing','must measure active gameplay, not menu');
   assert.equal(data.interruptions.length,0,'hidden/paused frames invalidate active combat comparison');
-  assert.ok(data.shots>0,'must exercise actual Tempest firing, not an idle scene');
+  assert.ok(data.shots>0&&data.volleys>0&&data.shots>=data.volleys,
+   'must observe successful Tempest volleys and their projectile payload');
   assert.equal(errors.length,0,'page errors: '+errors.join('; '));
   assert.ok(data.outer.update.length>0&&data.outer.render.length>0,
    'final composed update/render must both execute during active capture');
@@ -284,6 +291,8 @@ async function measure(browser,viewport,scale,index){
    longTaskSupported:data.longTaskSupported,longTaskCount:data.longTasks.length,
    longTaskTotalMs:longTaskMs,longTaskP95Ms:data.longTasks.length?pct(data.longTasks.map(t=>t.durationMs),.95):null,
    shots:data.shots,warmupShots:data.warmupShots,
+   volleys:data.volleys,warmupVolleys:data.warmupVolleys,
+   heatAtBegin:data.heatAtBegin,heatAtEnd:data.heatAtEnd,
    meanEntities:Object.fromEntries(['bullets','tanks','drones','shapes'].map(key=>
     [key,data.entities[key]/data.entities.samples])),
    peakBullets:data.entities.peakBullets,
@@ -319,6 +328,8 @@ async function measure(browser,viewport,scale,index){
    caveats:['independent worlds not matched even with identical Battlefield layouts',
     'layout fixture resets the RNG at the first post-hook Game spawn; later gameplay can diverge with frame scheduling',
     'initial-world fingerprint covers selected public physical fields, not complete mutable state',
+    'shots counts synchronous projectile-array growth; volleys counts successful player tryFire invocations, not hits or damage',
+    'heat snapshots are descriptive, not matched-tick heat parity',
     'fixture mode blocks service workers so route interception cannot be bypassed',
     'not fixed60','not physical Android',
     'no human touch latency','CI hardware is not a phone','3x synthetic CPU throttle is not GPU throttling',
