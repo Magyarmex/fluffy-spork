@@ -105,5 +105,9 @@ test('opt-in 80% clarity midpoint pilot is balanced and preserves legacy control
   'report the full observed FPS spread, not only a favorable median');
  assert.match(source,/assert\.equal\(group\.length,3/,
   'never summarize incomplete midpoint arms');
+ assert.match(source,/assert\.equal\(commits\.length,3/,
+  'do not silently summarize incomplete desktop Commit trace cohorts');
+ assert.match(source,/medianCommitMs:commits\.length\?pct\(commits,\.5\):null/,
+  'summarize measured Commit medians, not a pixel-model estimate');
 
 });
