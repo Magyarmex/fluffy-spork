@@ -49,32 +49,56 @@ async function measure(browser,viewport,scale,index){
    // Fresh game per arm: no settings menu, pause, or rolling perf history crossover.
    await new Promise(resolve=>setTimeout(resolve,1800));
    const begin=performance.now(),gameTime=g.time,gaps=[];
-   await new Promise(resolve=>{
-    let prior=null;
-    function frame(ts){
-     if(prior!==null)gaps.push(ts-prior);
-     prior=ts;
-     if(ts-begin<4200)requestAnimationFrame(frame);else resolve();
-    }
-    requestAnimationFrame(frame);
-   });
+   const interruptions=[],longTasks=[];
+   const longTaskSupported=PerformanceObserver.supportedEntryTypes?.includes('longtask')===true;
+   let observer=null;
+   if(longTaskSupported){
+    observer=new PerformanceObserver(list=>{
+     for(const entry of list.getEntries())longTasks.push({
+      startMs:entry.startTime-begin,durationMs:entry.duration});
+    });
+    observer.observe({type:'longtask'});
+   }
+   try{
+    await new Promise(resolve=>{
+     let prior=null;
+     function frame(ts){
+      if(prior!==null)gaps.push(ts-prior);
+      prior=ts;
+      if(document.hidden||g.status!=='playing')
+       interruptions.push({atMs:ts-begin,hidden:document.hidden,status:g.status});
+      if(ts-begin<4200)requestAnimationFrame(frame);else resolve();
+     }
+     requestAnimationFrame(frame);
+    });
+   }finally{observer?.disconnect();}
+   const end=performance.now();
+   const longTaskInWindow=longTasks.filter(t=>t.startMs>=0&&t.startMs<end-begin);
    return {scale:JSON.parse(localStorage.getItem('novatanks_pilot_settings_v1')).renderScale,
     quality:g.quality,dpr:g.dpr,css:[g.w,g.h],backing:[g.canvas.width,g.canvas.height],
-    gameSeconds:g.time-gameTime,wallMs:performance.now()-begin,shots,
-    gaps,perf:window.NovaPerf?.snapshot(g)||null,status:g.status};
+    gameSeconds:g.time-gameTime,wallMs:end-begin,shots,
+    gaps,interruptions,longTaskSupported,longTasks:longTaskInWindow,
+    perf:window.NovaPerf?.snapshot(g)||null,status:g.status};
   });
   assert.equal(data.scale,scale);
   assert.ok(data.gaps.length>20,'real foreground RAF intervals required');
   assert.ok(data.backing.every(x=>Number.isFinite(x)&&x>0));
   assert.equal(data.status,'playing','must measure active gameplay, not menu');
+  assert.equal(data.interruptions.length,0,'hidden/paused frames invalidate active combat comparison');
   assert.ok(data.shots>0,'must exercise actual Tempest firing, not an idle scene');
   assert.equal(errors.length,0,'page errors: '+errors.join('; '));
   const total=data.gaps.reduce((a,b)=>a+b,0);
+  const longTaskMs=data.longTasks.reduce((sum,t)=>sum+t.durationMs,0);
   return {viewport:viewport.name,index,scale,cpuThrottle:3,quality:data.quality,dpr:data.dpr,
    css:data.css,backing:data.backing,frames:data.gaps.length,
    fps:1000*data.gaps.length/total,p50GapMs:pct(data.gaps,.5),
    p95GapMs:pct(data.gaps,.95),p99GapMs:pct(data.gaps,.99),
-   gameSeconds:data.gameSeconds,wallMs:data.wallMs,shots:data.shots,perf:data.perf};
+   gameSeconds:data.gameSeconds,wallMs:data.wallMs,simulationPace:data.gameSeconds/(data.wallMs/1000),
+   stallFramesOver250Ms:data.gaps.filter(ms=>ms>250).length,
+   maxFrameGapMs:Math.max(...data.gaps),
+   longTaskSupported:data.longTaskSupported,longTaskCount:data.longTasks.length,
+   longTaskTotalMs:longTaskMs,longTaskP95Ms:data.longTasks.length?pct(data.longTasks.map(t=>t.durationMs),.95):null,
+   shots:data.shots,perf:data.perf};
  }finally{await context.close();}
 }
 (async()=>{
@@ -89,7 +113,9 @@ async function measure(browser,viewport,scale,index){
   const evidence={researchOnly:true,commit:process.env.GITHUB_SHA||null,
    caveats:['independent worlds not matched','not fixed60','not physical Android',
     'no human touch latency','CI hardware is not a phone','3x synthetic CPU throttle is not GPU throttling',
-    'NovaPerf rolling windows can include warmup on slow frames'],records};
+    'NovaPerf rolling windows can include warmup on slow frames',
+    'Long Tasks API may be unsupported or miss tasks below its threshold',
+    'RAF timestamps and PerformanceObserver are browser-clock observations, not input-to-photon latency'],records};
   fs.mkdirSync('artifacts/browser',{recursive:true});
   fs.writeFileSync('artifacts/browser/render-clarity-research.json',
    JSON.stringify(evidence,null,2)+'\n');
