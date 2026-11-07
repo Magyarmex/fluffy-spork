@@ -60,3 +60,17 @@ test('DevTools trace begins after warmup and before measured RAF timing',()=>{
  assert.match(source.slice(exposure,evaluate),/await cdp\.send\('Tracing\.start'/,
   'CDP tracing must be inside the page-exposed callback, not started eagerly');
 });
+
+// Protect the existing Render clarity benchmark from the opt-in causal pilot.
+// A future refactor must not silently add particle wrappers to ordinary A/A/B.
+test('ordinary-trail causal research remains opt-in and preserves default clarity measurements',()=>{
+ assert.match(source,/const trailMode=process\.env\.NOVA_TRAIL_CAUSAL==='1'/);
+ assert.match(source,/const phases=trailMode\?\[100,100,100,100,100,100\]:\[100,65,65,100,65,100\]/);
+ assert.match(source,/const suppressOrdinaryTrails=trailMode&&\[1,2,4\]\.includes\(index\)/);
+ assert.match(source,/if\(trailMode\)\{\s*const originalBulletUpdate=g\.updateBullets/,
+  'extra projectile instrumentation must not run in ordinary clarity mode');
+ assert.match(source,/window\.__novaTrailResearchMode=trailMode/);
+ assert.match(source,/window\.__novaTrailResearchSuppress=suppressOrdinaryTrails/);
+ assert.match(source,/const data=await page\.evaluate\(async\(\)=>\{/,
+  'preserve the measured-window trace boundary contract');
+});
