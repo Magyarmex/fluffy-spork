@@ -14,6 +14,15 @@ const script = step.slice(step.indexOf('        run: |') + '        run: |'.leng
   .split('\n').slice(1).map(line => line.replace(/^          /, '')).join('\n');
 assert.match(script, /for attempt in 1 2 3/);
 
+test('initial and retry freshness guards cover identical runtime paths', () => {
+  const pattern = /git diff --quiet (?:HEAD|"\\$tested_source") origin\\/main -- \\\n([\\s\\S]*?)index\\.html; then/g;
+  const matches = [...workflow.matchAll(pattern)];
+  assert.equal(matches.length, 2, 'both source guards must remain present');
+  const paths = matches.map(match => match[1].replace(/\\\\\\n/g, ' ').trim().split(/\\s+/));
+  assert.deepEqual(paths[0], paths[1], 'retry guard must never omit a runtime input');
+});
+
+
 function git(cwd, ...args) {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8', env: {
     ...process.env, GIT_AUTHOR_NAME: 'Fixture', GIT_AUTHOR_EMAIL: 'fixture@example.invalid',
