@@ -65,9 +65,15 @@ function run(seed,reload,name,steps){
   const g=bootGame(),p=g.player;g.sfx.muted=true;
   g.setClass(p,'tempest');g.tanks=[p];g.tankById=new Map([[p.id,p]]);
   g.shapes=[];g.drones=[];g.powerups=[];
+  // Research-only isolation: suppress core shape replenishment and
+  // Tempest's three native ESCORT drone respawns after initial clearing.
+  g.shapeTimer=Infinity;g.powerupTimer=Infinity;g.eliteTimer=Infinity;
+  g.crasherTimer=Infinity;g.aiRespawns=[];
+  g.spawnShape=()=>null;g.spawnPowerup=()=>null;g.spawnAITank=()=>null;
+  p.droneRespawnT=Infinity;g.spawnDrone=()=>null;
   g.input.aim.active=true;g.input.aim.dx=40;g.input.firing=true;g.input.autofire=false;
   p.stats.reload=reload;
-  let volleys=0,restVolleys=0,intendedActive=true,peakHeat=0,peakCooldown=0,minHeat=Infinity,elapsedTicks=0,firingTicks=0,restTicks=0,updateCalls=0,restStartHeat=null,restStartSpin=null,restHeatWindows=[],restSpinWindows=[];
+  let volleys=0,restVolleys=0,intendedActive=true,peakHeat=0,peakCooldown=0,minHeat=Infinity,elapsedTicks=0,firingTicks=0,restTicks=0,updateCalls=0,worldLeaks=0,restStartHeat=null,restStartSpin=null,restHeatWindows=[],restSpinWindows=[];
   const shotTimes=[],shotAngles=[],shotHeats=[],shotStabilities=[],shotSpins=[];const original=g.tryFire;
   g.tryFire=function(t){
    const before=this.bullets.length;
@@ -94,6 +100,7 @@ function run(seed,reload,name,steps){
      if(aimMode==='release'){g.input.aim.active=active;g.input.aim.dx=active?40:0;}
      if(aimMode==='center'){g.input.aim.active=true;g.input.aim.dx=active?40:0;}
      g.update(slice/120);updateCalls++;
+     if(g.tanks.length!==1||g.shapes.length||g.drones.length||g.powerups.length)worldLeaks++;
      peakHeat=Math.max(peakHeat,p.__v17Heat??0);
      minHeat=Math.min(minHeat,p.__v17Heat??0);
      peakCooldown=Math.max(peakCooldown,p.fireCd??0);
@@ -110,7 +117,8 @@ function run(seed,reload,name,steps){
      }
     }
    }
-   return {seed,reload,name,firePattern,aimMode,burstTicks:burst?{on:burst[0],off:burst[1]}:null,frames:steps.length,updateCalls,extraInputBoundaryUpdates:updateCalls-steps.length,simulatedTicks:elapsedTicks,
+   if(worldLeaks)throw new Error('Tempest irregular trial leaked combat entities: '+JSON.stringify({seed,reload,name,worldLeaks}));
+   return {seed,reload,name,worldLeaks,firePattern,aimMode,burstTicks:burst?{on:burst[0],off:burst[1]}:null,frames:steps.length,updateCalls,extraInputBoundaryUpdates:updateCalls-steps.length,simulatedTicks:elapsedTicks,
     firingTicks,restTicks,restHeatWindows,restSpinWindows,volleys,restVolleys,
     baseCadenceEligibleVolleys:shotHeats.filter((h,i)=>Math.max(0,1-Math.abs(h-.56)/.30)>.62&&shotStabilities[i]>.56).length,
     tempestApexBoostVolleys:shotHeats.filter((h,i)=>Math.max(0,1-Math.abs(h-.56)/.36)>.58&&shotStabilities[i]>.52).length,
@@ -157,5 +165,5 @@ for(const seed of seeds)for(const reload of reloads){
   all.push(r);
  }
 }
-console.log(JSON.stringify({method:'actual materialized 49-overlay Game; held aim/fire; no targets',
+console.log(JSON.stringify({method:'actual materialized 49-overlay Game; held aim/fire; verified no-target/no-escort isolation',
  phases,firePattern,aimMode,selectedPatterns,caveats:['research-only: release mode instantly restores aim, unlike real touch pointerdown deadzone','center mode models a held stick dragged to neutral, not a real gesture','exact input-boundary splitting can add Game.update calls beyond presentation frames','all schedules cover exactly 8 simulated seconds','0.7s burst rhythm ends in a partial rest excluded from completed rest windows','variable dt changes world update chronology, not merely presentation FPS','no player-facing patch'],patterns,seeds,reloads,results:all},null,2));
