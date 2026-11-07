@@ -22,7 +22,12 @@ const TICKS=960; // exactly 8 simulated seconds at a 120Hz integer timebase
 // Optional 1s-on/1s-off held-fire experiment. Transitions use integer
 // simulated ticks, never floating-point wall time or browser presentation FPS.
 const firePattern=process.env.NOVA_JITTER_FIRE_PATTERN||'continuous';
-if(!['continuous','burst1s'].includes(firePattern))throw new Error('NOVA_JITTER_FIRE_PATTERN must be continuous or burst1s');
+// Durations are exact 120Hz ticks. The 0.2s/0.5s rhythm has a
+// 0.7s period, so its last rest is intentionally incomplete at 8s.
+const burstDurations={burst1s:[120,120],burst250ms:[30,90],burst200ms:[24,60]};
+if(firePattern!=='continuous'&&!Object.hasOwn(burstDurations,firePattern))
+ throw new Error('NOVA_JITTER_FIRE_PATTERN must be continuous, burst1s, burst250ms or burst200ms');
+const burst=burstDurations[firePattern]||null;
 const patterns={
  native30:[4],native60:[2],native120:[1],
  mixedSlow:[2,4,1,1,2,2],mixedFast:[1,3,2,1,3,2],
@@ -69,9 +74,11 @@ function run(seed,reload,name,steps){
     // input-event test, not a claim that native browser input does this.
     let remaining=ticks;
     while(remaining>0){
-     const active=firePattern==='continuous'||elapsedTicks%240<120;
-     const untilBoundary=firePattern==='continuous'?remaining:
-      (active?120-elapsedTicks%240:240-elapsedTicks%240);
+     const period=burst?burst[0]+burst[1]:0;
+     const position=burst?elapsedTicks%period:0;
+     const active=!burst||position<burst[0];
+     const untilBoundary=!burst?remaining:
+      (active?burst[0]-position:period-position);
      const slice=Math.min(remaining,untilBoundary);
      if(!active&&restStartHeat===null)restStartHeat=p.__v17Heat??0;
      g.input.firing=active;
@@ -81,7 +88,7 @@ function run(seed,reload,name,steps){
      peakCooldown=Math.max(peakCooldown,p.fireCd??0);
      if(active)firingTicks+=slice;else restTicks+=slice;
      elapsedTicks+=slice;remaining-=slice;
-     if(!active&&elapsedTicks%240===0){
+     if(!active&&elapsedTicks%(burst[0]+burst[1])===0){
       const end=p.__v17Heat??0;
       restHeatWindows.push({start:+restStartHeat.toFixed(6),end:+end.toFixed(6),
        drop:+(restStartHeat-end).toFixed(6)});
@@ -89,7 +96,7 @@ function run(seed,reload,name,steps){
      }
     }
    }
-   return {seed,reload,name,firePattern,frames:steps.length,updateCalls,extraInputBoundaryUpdates:updateCalls-steps.length,simulatedTicks:elapsedTicks,
+   return {seed,reload,name,firePattern,burstTicks:burst?{on:burst[0],off:burst[1]}:null,frames:steps.length,updateCalls,extraInputBoundaryUpdates:updateCalls-steps.length,simulatedTicks:elapsedTicks,
     firingTicks,restTicks,restHeatWindows,volleys,restVolleys,
     baseCadenceEligibleVolleys:shotHeats.filter((h,i)=>Math.max(0,1-Math.abs(h-.56)/.30)>.62&&shotStabilities[i]>.56).length,
     tempestApexBoostVolleys:shotHeats.filter((h,i)=>Math.max(0,1-Math.abs(h-.56)/.36)>.58&&shotStabilities[i]>.52).length,
