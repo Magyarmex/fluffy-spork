@@ -19,6 +19,10 @@ const reloads=parse('NOVA_JITTER_RELOAD','0,4,5,8',0,8);
 // Phase rotations preserve each six-step schedule's interval multiset and total time.
 const phases=parse('NOVA_JITTER_PHASES','0',0,5);
 const TICKS=960; // exactly 8 simulated seconds at a 120Hz integer timebase
+// Optional 1s-on/1s-off held-fire experiment. Transitions use integer
+// simulated ticks, never floating-point wall time or browser presentation FPS.
+const firePattern=process.env.NOVA_JITTER_FIRE_PATTERN||'continuous';
+if(!['continuous','burst1s'].includes(firePattern))throw new Error('NOVA_JITTER_FIRE_PATTERN must be continuous or burst1s');
 const patterns={
  native30:[4],native60:[2],native120:[1],
  mixedSlow:[2,4,1,1,2,2],mixedFast:[1,3,2,1,3,2],
@@ -43,7 +47,7 @@ function run(seed,reload,name,steps){
   g.shapes=[];g.drones=[];g.powerups=[];
   g.input.aim.active=true;g.input.aim.dx=40;g.input.firing=true;g.input.autofire=false;
   p.stats.reload=reload;
-  let volleys=0,peakHeat=0,peakCooldown=0;
+  let volleys=0,peakHeat=0,peakCooldown=0,minHeat=Infinity,elapsedTicks=0,firingTicks=0,restTicks=0;
   const shotTimes=[],shotAngles=[],shotHeats=[];const original=g.tryFire;
   g.tryFire=function(t){
    const before=this.bullets.length;
@@ -53,11 +57,26 @@ function run(seed,reload,name,steps){
   };
   try{
    for(const ticks of steps){
-    g.update(ticks/120);
+    // Split any frame crossing a burst boundary so the intended input
+    // chronology is independent of frame partitioning. This is an explicit
+    // input-event test, not a claim that native browser input does this.
+    let remaining=ticks;
+    while(remaining>0){
+     const active=firePattern==='continuous'||elapsedTicks%240<120;
+     const untilBoundary=firePattern==='continuous'?remaining:
+      (active?120-elapsedTicks%240:240-elapsedTicks%240);
+     const slice=Math.min(remaining,untilBoundary);
+     g.input.firing=active;
+     g.update(slice/120);
+     if(active)firingTicks+=slice;else restTicks+=slice;
+     elapsedTicks+=slice;remaining-=slice;
+    }
     peakHeat=Math.max(peakHeat,p.__v17Heat??0);
+    minHeat=Math.min(minHeat,p.__v17Heat??0);
     peakCooldown=Math.max(peakCooldown,p.fireCd??0);
    }
-   return {seed,reload,name,frames:steps.length,volleys,
+   return {seed,reload,name,firePattern,frames:steps.length,simulatedTicks:elapsedTicks,
+    firingTicks,restTicks,volleys,minimumHeat:+minHeat.toFixed(6),
     heat:+(p.__v17Heat??0).toFixed(6),peakHeat:+peakHeat.toFixed(6),
     fireCd:+(p.fireCd??0).toFixed(6),peakCooldown:+peakCooldown.toFixed(6),
     firstShots:shotTimes.slice(0,8).map(n=>+n.toFixed(6)),
@@ -88,4 +107,4 @@ for(const seed of seeds)for(const reload of reloads){
  }
 }
 console.log(JSON.stringify({method:'actual materialized 49-overlay Game; held aim/fire; no targets',
- phases,caveats:['research-only, no browser input event timestamps','all schedules cover exactly 8 simulated seconds','variable dt changes world update chronology, not merely presentation FPS','no player-facing patch'],patterns,seeds,reloads,results:all},null,2));
+ phases,firePattern,caveats:['research-only, no browser input event timestamps','all schedules cover exactly 8 simulated seconds','variable dt changes world update chronology, not merely presentation FPS','no player-facing patch'],patterns,seeds,reloads,results:all},null,2));
