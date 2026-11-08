@@ -6,19 +6,20 @@
 const {STEP}=require('./fixed-step-dom-input.cjs');
 const STEP_MS=STEP*1000, EPS=1e-7;
 class FixedStepRafOwner {
-  constructor(game,timeline,bridge,{now,request,cancel,render,maxSteps=2,isVisible=()=>true}={}) {
+  constructor(game,timeline,bridge,{now,request,cancel,render,maxSteps=2,backlogExtraTicks=2,isVisible=()=>true}={}) {
     if (!game || typeof game.update!=='function' || !game.sfx ||
         !timeline || timeline.input!==game.input ||
         typeof timeline.consumeThrough!=='function' ||
         !bridge || bridge.timeline!==timeline || !Number.isFinite(bridge.startMs) ||
         typeof now!=='function' || typeof request!=='function' ||
         typeof cancel!=='function' || typeof render!=='function' ||
-        !Number.isInteger(maxSteps) || maxSteps<1 || maxSteps>4)
+        !Number.isInteger(maxSteps) || maxSteps<1 || maxSteps>4 ||
+        !Number.isInteger(backlogExtraTicks) || backlogExtraTicks<2 || backlogExtraTicks>4)
       throw Error('invalid fixed-step RAF owner');
     this.game=game;this.timeline=timeline;this.bridge=bridge;
     this.now=now;this.request=request;this.cancel=cancel;this.render=render;
     this.isVisible=isVisible;
-    this.maxSteps=maxSteps;this.started=false;this.raf=null;
+    this.maxSteps=maxSteps;this.backlogExtraTicks=backlogExtraTicks;this.started=false;this.raf=null;
     this.lastMs=0;this.simAtSec=0;this.lagMs=0;this.ticks=0;
     this.droppedMs=0;this.droppedFrames=0;this.paused=false;
     this.alpha=0;this.lastSteps=0;this.minimapTimer=0;
@@ -246,10 +247,12 @@ class FixedStepRafOwner {
         this.lagMs=maxMs;
       }else{
         this.lagMs+=raw;
-        // Keep at most two extra full steps of backlog for transient jitter.
+        // Default: two extra full steps of backlog for transient jitter.
+        // Opt-in research may allow up to four, trading more simulation phase
+        // lag for fewer dropped ticks. Never silently change the default.
         // Under sustained overload, skip only whole ticks, retaining
         // chronological input edges that are still valid after the skip.
-        const maxBacklog=(this.maxSteps+2)*STEP_MS;
+        const maxBacklog=(this.maxSteps+this.backlogExtraTicks)*STEP_MS;
         if(this.lagMs>maxBacklog+EPS){
           const skipped=Math.ceil((this.lagMs-maxBacklog-EPS)/STEP_MS)*STEP_MS;
           this.lagMs-=skipped;
