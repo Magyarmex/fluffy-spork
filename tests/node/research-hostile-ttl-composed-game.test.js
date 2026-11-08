@@ -18,7 +18,7 @@ function trial(fps,reverse=false,mode='hostile'){
   const p=g.player;
   p.x=900;p.y=900;p.vx=0;p.vy=0;p.alive=true;
   p.droneRespawnT=999;p.spawnShieldT=0;
-  const owners=[1,2].map((id,i)=>({
+  const owners=[101,102].map((id,i)=>({
    kind:'tank',id,cls:'scout',x:1000+i*100,y:-1000,
    vx:0,vy:0,hp:100,alive:true,spawnShieldT:0,shieldT:0
   }));
@@ -32,10 +32,10 @@ function trial(fps,reverse=false,mode='hostile'){
   g.powerups=[];g.orbs=[];g.aiRespawns=[];
   g.input.firing=false;g.input.autofire=false;
   g.input.moveVec=()=>({x:0,y:0});g.input.aimVec=()=>null;
-  const left={kind:'bullet',id:201,ownerId:1,x:-20,y:0,vx:6000,vy:0,
+  const left={kind:'bullet',id:201,ownerId:101,x:-20,y:0,vx:6000,vy:0,
    r:3,hp:1,maxHp:1,baseDmg:1,dmg:8,ttl:.005,pen:0,hits:0,
    shell:false,beam:false,dead:false,color:'#fff'};
-  const right={kind:'bullet',id:202,ownerId:2,x:mode==='late'?50:20,y:0,
+  const right={kind:'bullet',id:202,ownerId:102,x:mode==='late'?50:20,y:0,
    vx:-6000,vy:0,r:3,hp:1,maxHp:1,baseDmg:1,dmg:8,ttl:.005,
    pen:0,hits:0,shell:false,beam:false,dead:false,color:'#fff'};
   if(mode==='canonical'){
