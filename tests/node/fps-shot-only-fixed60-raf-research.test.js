@@ -10,7 +10,7 @@ const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs'
 const {FixedStepRafOwner}=require('../research/fixed-step-raf-owner.cjs');
 const {ShotOnlyFirePulse}=require('../research/shot-only-fire-pulse.cjs');
 
-function run({shot=false,cls='basic',disableFire=false,releaseType='pointerup'}={}){
+function run({shot=false,cls='basic',disableFire=false,releaseType='pointerup',maxSteps=3}={}){
  return withSeed(1517800,()=>{
   const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
   if(cls!=='basic')g.setClass(g.player,cls);
@@ -31,13 +31,13 @@ function run({shot=false,cls='basic',disableFire=false,releaseType='pointerup'}=
   const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
   const pulse=shot?new ShotOnlyFirePulse(g,timeline):null;
   const owner=new FixedStepRafOwner(g,timeline,bridge,{
-   now:()=>now,maxSteps:3,request:fn=>(callback=fn,1),
+   now:()=>now,maxSteps,request:fn=>(callback=fn,1),
    cancel:()=>{callback=null},render(){}});
   const event=(type,at,x,buttons)=>bridge.capture({
    type,timeStamp:1000+at,pointerType:'touch',pointerId:22,
    clientX:x,clientY:200,button:0,buttons,
    target:{tagName:'CANVAS',closest:()=>null}});
-  let at150=null;
+  let at150=null,at200=null;
   try{
    owner.start();
    for(let frame=1;frame<=8;frame++){
@@ -50,11 +50,12 @@ function run({shot=false,cls='basic',disableFire=false,releaseType='pointerup'}=
     const cb=callback;callback=null;assert.equal(typeof cb,'function');cb(now);
     if(frame===3)at150={bullets:g.bullets.length,shots:pulse?.shots||0,
       aim:g.input.aim.active,firing:g.input.firing};
+    if(frame===4)at200={bullets:g.bullets.length,shots:pulse?.shots||0};
    }
    const drones=g.drones.filter(d=>d.ownerId===g.player.id).map(d=>
      [d.id,d.x,d.y,d.vx,d.vy,d.hp,d.__novaPhase]);
    const swarm=g.player.__novaSwarm;
-   return {at150,drones,recall:swarm?.recallUntil,active:swarm?.active,
+   return {at150,at200,drones,recall:swarm?.recallUntil,active:swarm?.active,
     power:swarm?.power,nodeX:swarm?.nodeX,nodeY:swarm?.nodeY,
     ticks:owner.ticks,droppedMs:owner.droppedMs,
     aim:g.input.aim.active,firing:g.input.firing};
@@ -89,4 +90,13 @@ test('shot-only pulse never changes Controller swarm state when firing is disabl
    assert.deepEqual(recovered[key],baseline[key],cls+' '+key);
   assert.equal(recovered.at150.shots,1);
  }
+});
+
+test('overloaded two-step RAF recovers the same short shot later without phantom commands',()=>{
+ const delayed=run({shot:true,maxSteps:2});
+ assert.equal(delayed.at150.bullets,0,'overload must not invent an early projectile');
+ assert.equal(delayed.at200.bullets,1,'short shot must survive bounded backlog');
+ assert.equal(delayed.at200.shots,1);
+ assert.equal(delayed.ticks,16);assert.ok(delayed.droppedMs>0);
+ assert.equal(delayed.aim,false);assert.equal(delayed.firing,false);
 });
