@@ -43,7 +43,7 @@ function trial(seed,cls,reload,hz,policyName){
   g.input.autofire=false;
   g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
   const policy=policies[policyName],dt=1/hz,seconds=8;
-  let volleys=0,spinSum=0,heatSum=0,spinPeak=0,heatPeak=0;
+  let volleys=0,projectiles=0,nominalDamage=0,spinSum=0,heatSum=0,spinPeak=0,heatPeak=0;
   let firedDuringRelease=0,activeTicks=0;
   const times=[],original=g.tryFire;
   g.tryFire=function(t){
@@ -51,6 +51,9 @@ function trial(seed,cls,reload,hz,policyName){
    const result=original.apply(this,arguments);
    if(t===p&&this.bullets.length>before){
     volleys++;
+    const emitted=this.bullets.slice(before).filter(b=>b&&b.ownerId===p.id);
+    projectiles+=emitted.length;
+    nominalDamage+=emitted.reduce((sum,b)=>sum+(Number.isFinite(b.dmg)?b.dmg:0),0);
     if(!this.input.firing)firedDuringRelease++;
     if(times.length<6)times.push(+this.time.toFixed(7));
    }
@@ -69,10 +72,13 @@ function trial(seed,cls,reload,hz,policyName){
    spinSum+=spin;heatSum+=heat;
    spinPeak=Math.max(spinPeak,spin);heatPeak=Math.max(heatPeak,heat);
   }
-  const out={cls,reload,hz,policy:policyName,volleys,
+  const out={cls,reload,hz,policy:policyName,volleys,projectiles,
+   nominalDamage:+nominalDamage.toFixed(4),
    activeTicks,first:times,spin:+(p.fireSpin||0).toFixed(5),
    spinMean:+(spinSum/(seconds*hz)).toFixed(5),
    spinPeak:+spinPeak.toFixed(5),
+   stability:+(p.__v17Stability==null?1:p.__v17Stability).toFixed(5),
+   recoil:+(p.__v17Recoil||0).toFixed(5),
    heat:+(p.__v17Heat||0).toFixed(5),
    heatMean:+(heatSum/(seconds*hz)).toFixed(5),
    heatPeak:+heatPeak.toFixed(5),firedDuringRelease};
