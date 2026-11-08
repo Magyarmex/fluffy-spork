@@ -14,6 +14,9 @@ test('captured clustered 30Hz trace compares low-work, balanced and low-lag budg
   assert.equal(row.remainingBacklogMs,0);
   assert.equal(row.wallMs,2000);
   assert.ok(row.p95SimulationPhaseLagMs>=0);
+  assert.ok(row.interpolationSaturatedFrames>0,
+   'clustered frame recovery must disclose saturated visual interpolation');
+  assert.ok(row.interpolationSaturatedFrames<=row.frames);
   assert.ok(row.p99StepsPerFrame<=row.maxSteps);
  }
  assert.ok(lowWork.peakBacklogMs>middle.peakBacklogMs);
