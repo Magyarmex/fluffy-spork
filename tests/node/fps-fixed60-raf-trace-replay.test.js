@@ -156,13 +156,13 @@ test('saturation streak and interval exposure distinguish isolated phase risk fr
 
 
 test('interval-weighted saturation uses actual RAF gaps and contiguous streaks',()=>{
-  const r=replay([1000/30,1000/30],1,2);
+  const r=replay([34,34],1,4);
   assert.equal(r.simulatedTicks,2);
   assert.equal(r.droppedMs,0);
   assert.equal(r.interpolationSaturatedFrames,2);
   assert.equal(r.longestSaturationStreakFrames,2);
-  assert.equal(r.longestSaturationStreakMs,66.667);
-  assert.equal(r.saturatedFrameIntervalMs,66.667);
+  assert.equal(r.longestSaturationStreakMs,68);
+  assert.equal(r.saturatedFrameIntervalMs,68);
   assert.equal(r.saturatedFrameIntervalShare,1);
 });
 
