@@ -78,11 +78,12 @@ test('stale DOM press fails closed rather than being assigned a fresh occurrence
   assert.equal(s.bridge.staleClamps,1);
 });
 test('epoch timestamp without a valid origin falls back to bounded delivery time',()=>{
-  let now=1050;const seen=[];
+  let now=1000;const seen=[];
   const input={pd(e){seen.push(e);},keyboard:{},aim:{active:false},move:{active:false},
     stickId:{aim:-1,move:-1}};
   const t=new ChronologicalInput(input);
   const b=new BrowserEventTimeline(t,{now:()=>now});
+  now=1050;
   assert.equal(b.capture(evt('pointerdown',1793560001010)),true);
   t.consumeThrough(.06);
   assert.equal(seen.length,1);
