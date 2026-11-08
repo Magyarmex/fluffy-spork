@@ -159,3 +159,18 @@ test('native 60Hz without interpolation presents movement no later than 20Hz res
    'the low-rate presentation paths should not predate native60 visible response');
  assert.equal(native.droppedMs,0);
 });
+
+test('current browser-pilot render policy (no interpolation) exposes delayed tank response',()=>{
+ const sufficient=run(3,false,{interpolate:false});
+ const overloaded=run(2,false,{interpolate:false});
+ const first=result=>result.rendered.find(f=>f.displaced)?.atMs;
+ assert.ok(Number.isFinite(first(sufficient))&&Number.isFinite(first(overloaded)));
+ assert.ok(first(sufficient)>=sufficient.applied[0].atMs);
+ assert.ok(first(overloaded)>=overloaded.applied[0].atMs);
+ assert.ok(first(overloaded)>first(sufficient),
+   'insufficient 20Hz tick throughput delays the actual un-interpolated pilot pose');
+ for(const result of [sufficient,overloaded]){
+  assert.ok(result.rendered.every(f=>f.alpha>=0&&f.alpha<=1));
+  assert.ok(result.rendered.some(f=>!f.moving&&f.atMs>=result.applied[1].atMs));
+ }
+});
