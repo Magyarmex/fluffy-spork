@@ -94,3 +94,38 @@ for(const owner of ['shot','subtick','explicit']){
   }finally{pulse.detach();}
  });
 }
+
+for(const owner of ['shot','subtick','explicit'])for(const kind of ['touch','mouse']){
+ test(owner+' '+kind+' held old-life input is canceled before new-life update',()=>{
+  const shots=[];
+  const input={touchSeen:kind!=='mouse',firing:false,mouseActive:false,
+   aim:{active:false,dx:0,dy:0},stickId:{aim:-1},
+   pd(e){if(e.pointerType==='mouse'){this.mouseActive=true;this.firing=true;}
+    else{this.stickId.aim=e.pointerId;this.aim.active=true;}},
+   pm(e){if(this.stickId.aim===e.pointerId)this.aim.dx=e.clientX-600;},
+   pu(e){if(e.pointerType==='mouse'){this.mouseActive=false;this.firing=false;}
+    else if(this.stickId.aim===e.pointerId){this.stickId.aim=-1;
+     this.aim.active=false;this.aim.dx=0;}},
+   aimVec(){return{x:1,y:0};}
+  };
+  const old={id:1},fresh={id:2};
+  const game={input,player:old,status:'playing',paused:false,
+   update(){if(input.firing||input.__novaShotIntent?.fire)this.tryFire(this.player);this.updateDrones();},
+   updateDrones(){},tryFire(p){shots.push(p.id);},destroy(){}};
+  const timeline={input,reset(){},releaseAll(){}};
+  const pulse=owner==='shot'?new ShotOnlyFirePulse(game,timeline):
+   owner==='explicit'?new ExplicitShotIntent(game,timeline):new SubtickFirePulse(game,timeline);
+  try{
+   input.pd({type:'pointerdown',pointerType:kind,pointerId:22,button:0,
+    target:{closest(){return null;}}});
+   if(kind==='touch')input.pm({type:'pointermove',pointerType:kind,pointerId:22,clientX:640});
+   game.player=fresh;
+   game.update(1/60);
+   assert.deepEqual(shots,[]);
+   assert.equal(input.firing,false);
+   assert.equal(input.aim.active,false);
+   assert.equal(input.mouseActive,false);
+   assert.equal(!!(pulse.pulse?.down||pulse.down),false);
+  }finally{pulse.detach();}
+ });
+}
