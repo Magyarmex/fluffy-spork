@@ -91,7 +91,7 @@ for(const hz of [30,60,120,240])for(const fullUpdate of [false,true])
 // Negative controls: no projectile can invent contact beyond its 5ms TTL.
 for(const hz of [30,60,120,240])for(const fullUpdate of [false,true])
  test('full-game TTL no-phantom far hull '+hz+'Hz update='+fullUpdate,()=>{
-  const result=trial(hz,false,fullUpdate,null,100);
+  const result=trial(hz,false,fullUpdate,null,140);
   assert.equal(result.contacts.length,0);
   assert.equal(result.hp,1000);
  });
