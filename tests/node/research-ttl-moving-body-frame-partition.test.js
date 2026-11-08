@@ -1,5 +1,5 @@
 'use strict';
-// Research-only physical first-contact oracle for issue #234. This is not a
+// Research-only physical first-contact oracle for issue #234. Away from exact\n// partition/tangency ties it checks temporal consistency. This is not a
 // production collision owner and does not resolve terrain, piercing or damage.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -116,4 +116,13 @@ test('moving-body: exact expiry, start tangency and near-tangency abstain',()=>{
   assert.equal(contact({...a,ttl:.011},{...b,ttl:.011},1/30),.01);
   assert.equal(contact(a,{...b,x:21},1/30),null,'start tangency is ambiguous');
   assert.equal(contact(a,{...b,x:40,y:21},1/30),null,'near tangent is not proof');
+});
+
+test('moving-body: contact exactly on a partition is conservatively ambiguous',()=>{
+  const a=bullet(0,0,6000,0,.005),b=bullet(40,0,0,0,.005,18);
+  const boundary=19/6000;
+  assert.ok(Math.abs(contact(a,b,1/30)-boundary)<1e-12);
+  // The research oracle abstains within 1e-10s of a segment boundary,
+  // rather than inventing event order from floating-point noise.
+  assert.equal(splitContact(a,b,1/30,boundary),null);
 });
