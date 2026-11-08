@@ -46,6 +46,9 @@ function trial(hz,reverse,fullUpdate,only=null,targetX=40,mutate=null){
   if(mutate)mutate(g,p,bullets);
   const selected=only==null?bullets:bullets.filter(b=>b.id===only);
   g.bullets=reverse?selected.reverse():selected;
+  // These pre-existing fixture projectile IDs must precede the live
+  // frame-start allocation ceiling; otherwise they masquerade as newborns.
+  g.nextId=Math.max(g.nextId||0,1200);
   const contacts=[];
   const original=g.damageTank;
   g.damageTank=function(t,damage,ownerId){
