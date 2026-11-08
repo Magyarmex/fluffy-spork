@@ -35,6 +35,7 @@ function run(seed,cls,reload,hz,policy,targeted){
    g.shapes=[victim];
    if(g.shapeById)g.shapeById.set(victim.id,victim);
   }
+  const targetStart=victim?{x:victim.x,y:victim.y}:null;
   const damageShape=g.damageShape;
   g.damageShape=function(s,...args){
    const before=s.hp,ret=damageShape.call(this,s,...args);
@@ -95,7 +96,7 @@ function run(seed,cls,reload,hz,policy,targeted){
    heat:+(heatIntegral/seconds).toFixed(5),
    stability:+(stabilityIntegral/seconds).toFixed(5),
    redline:+redline.toFixed(5),firingDuty:+firingDuty.toFixed(6),
-   targetTravel:victim?+Math.hypot(victim.x-(p.x+175),victim.y-p.y).toFixed(4):null,
+   targetTravel:victim?+Math.hypot(victim.x-targetStart.x,victim.y-targetStart.y).toFixed(4):null,
    finalSpin:+(p.fireSpin||0).toFixed(5),updates,splitEdges};
   g.destroy();return result;
  });
