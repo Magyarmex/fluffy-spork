@@ -3,20 +3,29 @@
 // collision resolver, and it does not establish terrain/body/shell correctness.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { firstContact } = require('../research/projectile-first-event-certificate.cjs');
-const complete = Object.freeze({
-  allied: false, complete: true, unscanned: false,
-  aTerrain: null, bTerrain: null, aBody: null, bBody: null,
-  aOtherProjectile: null, bOtherProjectile: null
-});
+// Pair geometry is intentionally computed independently. The conservative
+// certificate requires a *complete* competing-event context, which a three-shot
+// research oracle cannot fake by passing null for other projectile contacts.
 const shot = (id, x, vx, hp) => ({
   id, ownerId: id, kind: 'bullet', x, y: 0, vx, vy: 0, r: 3,
   ttl: .005, hp, pen: 0, hits: 0, dead: false, shell: false, beam: false
 });
 function physicalTime(a, b, horizon) {
-  // This narrow test has no terrain, body or competing projectile side effects
-  // until its first event; the oracle supplies the same pairwise disc geometry.
-  return firstContact(a, b, horizon, complete);
+  if (a.ownerId === b.ownerId || a.dead || b.dead) return null;
+  const px = a.x - b.x, py = a.y - b.y;
+  const vx = a.vx - b.vx, vy = a.vy - b.vy;
+  const radius = a.r + b.r + 1.5;
+  const c = px * px + py * py - radius * radius;
+  let t = 0;
+  if (c > 0) {
+    const speed2 = vx * vx + vy * vy, dot = px * vx + py * vy;
+    if (!(speed2 > 0) || !(dot < 0)) return null;
+    const disc = dot * dot - speed2 * c;
+    if (!(disc > 64 * Number.EPSILON *
+        (Math.abs(dot * dot) + Math.abs(speed2 * c)))) return null;
+    t = c / (-dot + Math.sqrt(disc));
+  }
+  return t >= 0 && t < Math.min(horizon, a.ttl, b.ttl) - 1e-10 ? t : null;
 }
 function resolveChronologically(input, horizon) {
   const state = new Map(input.map(b => [b.id, { ...b }]));
