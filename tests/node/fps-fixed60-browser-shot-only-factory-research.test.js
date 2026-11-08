@@ -46,7 +46,10 @@ function run({shotOnlyPulse=false,release='pointerup',maxSteps=3,failRequest=fal
   canvas,maxSteps,shotOnlyPulseFactory:shotOnlyPulse?
     (g,t,b)=>new ShotOnlyFirePulse(g,t,{maxPulseAgeMs:ageGateMs,
       nowMs:()=>{if(clockFault==='throw')throw Error('clock unavailable');
-        if(clockFault==='nan')return NaN;return now},startMs:b.startMs}):null});
+        if(clockFault==='nan')return NaN;
+        if(clockFault==='bigint')return 1n;
+        if(clockFault==='symbol')return Symbol('invalid clock');
+        return now},startMs:b.startMs}):null});
  try{
   pilot.start();
   for(let frame=1;frame<=frameCount;frame++){
@@ -146,7 +149,7 @@ test('invalid DOM release timestamp cannot masquerade as a fresh shot',()=>{
 // A failed optional clock must never crash the running game or leave a
 // recovered shot pending for a later frame. Ungated recovery remains intact.
 test('browser clock failure rejects only the recovered shot and preserves RAF progress',()=>{
- for(const clockFault of ['throw','nan']){
+ for(const clockFault of ['throw','nan','bigint','symbol']){
   const result=run({shotOnlyPulse:true,ageGateMs:80,clockFault});
   assert.deepEqual(result.shots,[]);
   assert.equal(result.rejectedStale,1);
