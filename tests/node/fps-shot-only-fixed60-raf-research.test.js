@@ -10,7 +10,7 @@ const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs'
 const {FixedStepRafOwner}=require('../research/fixed-step-raf-owner.cjs');
 const {ShotOnlyFirePulse}=require('../research/shot-only-fire-pulse.cjs');
 
-function run({shot=false,cls='basic',disableFire=false,releaseType='pointerup',maxSteps=3,ageGateMs=Infinity,pauseAtThird=false}={}){
+function run({shot=false,cls='basic',disableFire=false,releaseType='pointerup',maxSteps=3,ageGateMs=Infinity,pauseAtThird=false,renderCanvas=false}={}){
  return withSeed(1517800,()=>{
   const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
   if(cls!=='basic')g.setClass(g.player,cls);
@@ -37,7 +37,7 @@ function run({shot=false,cls='basic',disableFire=false,releaseType='pointerup',m
    now:()=>now,maxSteps,request:fn=>(callback=fn,1),
    cancel:()=>{callback=null},render(game,w,h){
     rendered.push({atMs:now-1000,bullets:game.bullets.length});
-    actualRender(game,w,h);
+    if(renderCanvas)actualRender(game,w,h);
    }});
   const event=(type,at,x,buttons)=>bridge.capture({
    type,timeStamp:1000+at,pointerType:'touch',pointerId:22,
@@ -146,9 +146,9 @@ test('pause before a delayed recovery clears the pulse without a ghost shot',()=
 });
 
 test('actual composed Canvas renderer first receives a recovered projectile only on its legal frame',()=>{
- const fresh=run({shot:true,maxSteps:3,ageGateMs:40});
- const delayed=run({shot:true,maxSteps:2,ageGateMs:80});
- const rejected=run({shot:true,maxSteps:2,ageGateMs:40});
+ const fresh=run({shot:true,maxSteps:3,ageGateMs:40,renderCanvas:true});
+ const delayed=run({shot:true,maxSteps:2,ageGateMs:80,renderCanvas:true});
+ const rejected=run({shot:true,maxSteps:2,ageGateMs:40,renderCanvas:true});
  const firstVisible=result=>result.rendered.find(frame=>frame.bullets>0)?.atMs;
  assert.equal(firstVisible(fresh),150);
  assert.equal(firstVisible(delayed),200);
