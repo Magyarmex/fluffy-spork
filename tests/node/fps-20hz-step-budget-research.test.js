@@ -64,9 +64,12 @@ test('virtual presentation-clock audit isolates three existing rail timebase div
 
 
 test('per-presentation CPU diagnostics measure concentrated Game work without device claims',()=>{
+ const ordinary=run({cls:'tempest',seed:1517800,cadence:'20Hz',maxSteps:3});
+ assert.equal(ordinary.frameCpuSamples,0,'profiling must remain opt-in');
+ assert.equal(ordinary.frameCpuP95Ms,null);
  for(const [maxSteps,backlogExtraTicks] of [[2,4],[3,3],[4,2]]){
   const r=run({cls:'tempest',seed:1517800,cadence:'20Hz-bursts',
-    maxSteps,backlogExtraTicks,render:true});
+    maxSteps,backlogExtraTicks,render:true,profileCpu:true});
   assert.equal(r.frameCpuSamples,40);
   assert.equal(r.backlogExtraTicks,backlogExtraTicks);
   for(const key of ['frameCpuP50Ms','frameCpuP95Ms','frameCpuP99Ms',
