@@ -15,7 +15,8 @@ function target(){
   listenerCount(){return [...handlers.values()].reduce((n,list)=>n+list.length,0)}
  };
 }
-function run({shotOnlyPulse=false,release='pointerup',maxSteps=3,failRequest=false,mouse=false,compat=false,ageGateMs=Infinity,invalidReleaseStamp=false,clockFault=null}={}){
+function run({shotOnlyPulse=false,release='pointerup',maxSteps=3,failRequest=false,mouse=false,compat=false,ageGateMs=Infinity,invalidReleaseStamp=false,clockFault=null,
+ frameMs=50,eventFrame=3,frameCount=8}={}){
  const canvas=target(),win=target(),doc=target();doc.hidden=false;
  let now=1000,callback=null,shots=[],commands=0;
  const input={canvas,touchSeen:!mouse,stickId:{move:-1,aim:-1},
@@ -48,9 +49,9 @@ function run({shotOnlyPulse=false,release='pointerup',maxSteps=3,failRequest=fal
         if(clockFault==='nan')return NaN;return now},startMs:b.startMs}):null});
  try{
   pilot.start();
-  for(let frame=1;frame<=8;frame++){
-   now=1000+frame*50;
-   if(frame===3){
+  for(let frame=1;frame<=frameCount;frame++){
+   now=1000+frame*frameMs;
+   if(frame===eventFrame){
     const events=mouse ? (compat ?
       [['pointerdown',134,600],['mousedown',135,600],
        ['pointerup',140,600],['mouseup',141,600]] :
@@ -156,5 +157,17 @@ test('browser clock failure rejects only the recovered shot and preserves RAF pr
   const ungated=run({shotOnlyPulse:true,clockFault});
   assert.deepEqual(ungated.shots,[150]);
   assert.equal(ungated.rejectedStale,0);
+ }
+});
+
+test('fresh short shots survive ideal 30Hz and 60Hz browser presentation without extra commands',()=>{
+ for(const [frameMs,eventFrame,frameCount] of [[1000/30,5,12],[1000/60,9,18]]){
+  const result=run({shotOnlyPulse:true,maxSteps:2,ageGateMs:40,
+    frameMs,eventFrame,frameCount});
+  assert.equal(result.shots.length,1);
+  assert.equal(result.pulses,1);
+  assert.equal(result.rejectedStale,0);
+  assert.equal(result.commands,0);
+  assert.equal(result.aim,false);assert.equal(result.firing,false);
  }
 });
