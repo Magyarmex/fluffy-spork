@@ -292,7 +292,8 @@ test('mutual TTL recovery respects lifetime, integrity, terrain and body precede
   }
   assert.deepEqual(run(.001,.005,1,1),[]);
   assert.deepEqual(run(.005,.001,1,1),[]);
-  assert.deepEqual(run(.005,.005,2,1),[]);
+  assert.deepEqual(run(.005,.005,2,1),[1,2],
+    'isolated unequal-integrity rounds now exchange damage before TTL');
   assert.deepEqual(run(.005,.005,1,1,g=>{
     g.__novaTerrain=[{shape:'rect',x:-12,y:0,w:3,h:50,
       solid:true,destructible:false}];
