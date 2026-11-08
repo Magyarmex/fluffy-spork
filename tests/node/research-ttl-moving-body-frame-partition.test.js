@@ -27,6 +27,8 @@ function advance(s, dt) {
   return {...s,x:s.x+s.vx*dt,y:s.y+s.vy*dt,ttl:s.ttl-dt};
 }
 function splitContact(a,b,horizon,split) {
+  if (!(split > 0) || !(horizon > 0)) return null;
+  split=Math.min(split,horizon);
   const first=contact(a,b,split);
   if (first !== null) return first;
   if (split >= Math.min(a.ttl,b.ttl,horizon)) return null;
@@ -162,4 +164,11 @@ test('moving-body: 2D crossing and target drift agree with independent bisection
     assert.ok(Math.abs(t-hi)<1e-10,`trial ${i}`);
     assert.ok(Math.abs(splitContact(a,b,1/30,t*.5)-hi)<1e-10);
   }
+});
+
+test('moving-body: partition past frame horizon cannot create future contact',()=>{
+  const a=bullet(0,0,1000,0,.02),b=bullet(26,0,0,0,.02,18);
+  // First contact at 5ms, beyond the 4ms observation horizon.
+  assert.equal(contact(a,b,.004),null);
+  assert.equal(splitContact(a,b,.004,.006),null);
 });
