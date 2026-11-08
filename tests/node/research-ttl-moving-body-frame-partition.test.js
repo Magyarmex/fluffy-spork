@@ -137,3 +137,29 @@ test('moving-body: crossing trajectory contacts before TTL at 30/60/120/240Hz',(
     assert.ok(Math.abs(splitContact(a,b,dt,.002)-t)<1e-12);
   }
 });
+
+test('moving-body: 2D crossing and target drift agree with independent bisection',()=>{
+  let seed=0x1a2b3c4d;
+  const rand=()=>{seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;return(seed>>>0)/4294967296;};
+  for(let i=0;i<5000;i++) {
+    const radius=8+rand()*20, lateral=(rand()-.5)*1.6*radius;
+    const speed=3000+rand()*6000, start=radius+1+rand()*50;
+    const targetVx=(rand()-.5)*1500,targetVy=(rand()-.5)*1500;
+    const expected=(start-Math.sqrt(radius*radius-lateral*lateral))/speed;
+    const ttl=expected+.001+rand()*.01;
+    const a=bullet(start,lateral,targetVx-speed,targetVy,ttl,3);
+    const b=bullet(0,0,targetVx,targetVy,ttl,radius-3);
+    const t=contact(a,b,1/30);
+    assert.notEqual(t,null);
+    let lo=0,hi=start/speed;
+    for(let j=0;j<65;j++) {
+      const mid=(lo+hi)*.5;
+      const dx=(a.x+a.vx*mid)-(b.x+b.vx*mid);
+      const dy=(a.y+a.vy*mid)-(b.y+b.vy*mid);
+      if(Math.hypot(dx,dy)>radius)lo=mid;
+      else hi=mid;
+    }
+    assert.ok(Math.abs(t-hi)<1e-10,`trial ${i}`);
+    assert.ok(Math.abs(splitContact(a,b,1/30,t*.5)-hi)<1e-10);
+  }
+});
