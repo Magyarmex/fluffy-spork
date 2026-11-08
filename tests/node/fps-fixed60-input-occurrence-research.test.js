@@ -99,3 +99,25 @@ test('freshness provenance marks delivery-time fallbacks untrusted',()=>{
  s.timeline.consumeThrough(.06);
  assert.deepEqual(s.seen.map(e=>e.__novaTimestampTrusted),[true,false,false]);
 });
+
+test('bounded future browser skew cannot grant recovered shots extra freshness',()=>{
+  const s=setup();s.setNow(1050);
+  assert.equal(s.bridge.capture(evt('pointerdown',1080)),true);
+  assert.equal(s.bridge.capture(evt('pointerup',1050)),true);
+  s.timeline.consumeThrough(.06);
+  assert.equal(s.seen.length,2);
+  assert.deepEqual(s.seen.map(e=>e.__novaTimestampTrusted),[true,true]);
+  assert.ok(s.seen.every(e=>Math.abs(e.__novaOriginalAt-.05)<1e-10));
+  assert.equal(s.bridge.futureSkewClamps,1);
+  assert.equal(s.bridge.futureClamps,0);
+});
+test('out-of-tolerance future browser stamps remain untrusted',()=>{
+  const s=setup();s.setNow(1050);
+  assert.equal(s.bridge.capture(evt('pointerdown',1083)),true);
+  s.timeline.consumeThrough(.06);
+  assert.equal(s.seen.length,1);
+  assert.equal(s.seen[0].__novaTimestampTrusted,false);
+  assert.ok(Math.abs(s.seen[0].__novaOriginalAt-.05)<1e-10);
+  assert.equal(s.bridge.futureClamps,1);
+  assert.equal(s.bridge.futureSkewClamps,0);
+});
