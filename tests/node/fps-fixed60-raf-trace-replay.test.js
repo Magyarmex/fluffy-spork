@@ -161,3 +161,15 @@ test('interval-weighted saturation uses actual RAF gaps and contiguous streaks',
   assert.equal(r.saturatedFrameIntervalMs,66.667);
   assert.equal(r.saturatedFrameIntervalShare,1);
 });
+
+
+test('lower saturation is not a victory when the scheduler drops simulation time',()=>{
+  const gaps=Array.from({length:15},()=>[85,40,5,1000/7.5-130]).flat();
+  const baseline=replay(gaps,2,2);
+  const retained=replay(gaps,2,4);
+  assert.ok(baseline.droppedMs>0);
+  assert.equal(retained.droppedMs,0);
+  assert.ok(baseline.interpolationSaturatedFrames<retained.interpolationSaturatedFrames,
+    'dropping simulation time can artificially reduce reported phase saturation');
+  assert.ok(baseline.simulatedTicks<retained.simulatedTicks);
+});
