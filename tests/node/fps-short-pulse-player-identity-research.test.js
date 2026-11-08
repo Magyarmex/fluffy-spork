@@ -62,3 +62,33 @@ for(const owner of ['shot','subtick'])for(const kind of ['touch','mouse']){
   assert.equal(result.aim,false);
  });
 }
+
+for(const owner of ['shot','subtick']){
+ test(owner+' mouse-chord synthetic release cannot fire replacement player',()=>{
+  const shots=[];
+  const input={touchSeen:false,mouseActive:false,firing:false,
+   aim:{active:false,dx:0,dy:0},stickId:{aim:-1},
+   pd(){this.mouseActive=true;this.firing=true;},
+   pm(){this.firing=false;},pu(){this.mouseActive=false;this.firing=false;},
+   aimVec(){return{x:1,y:0};}
+  };
+  const old={id:1},fresh={id:2};
+  const game={input,player:old,status:'playing',paused:false,
+   update(){if(input.firing)this.tryFire(this.player);this.updateDrones();},
+   updateDrones(){},tryFire(p){shots.push(p.id);},destroy(){}};
+  const timeline={input,reset(){},releaseAll(){}};
+  const pulse=owner==='shot'?new ShotOnlyFirePulse(game,timeline):new SubtickFirePulse(game,timeline);
+  try{
+   input.pd({type:'pointerdown',pointerType:'mouse',pointerId:1,button:0,buttons:1,
+    target:{closest(){return null;}}});
+   input.pm({type:'pointermove',pointerType:'mouse',pointerId:1,button:-1,buttons:2,
+    __novaOriginalAt:.005,__novaTimestampTrusted:true});
+   assert.ok(pulse.pulse?.pending||pulse.pending);
+   game.player=fresh;
+   game.update(1/60);
+   assert.deepEqual(shots,[]);
+   assert.equal(!!(pulse.pulse?.pending||pulse.pending),false);
+   assert.equal(input.firing,false);
+  }finally{pulse.detach();}
+ });
+}
