@@ -33,10 +33,10 @@ function trial(fps,reverse=false,mode='hostile'){
   g.input.firing=false;g.input.autofire=false;
   g.input.moveVec=()=>({x:0,y:0});g.input.aimVec=()=>null;
   const left={kind:'bullet',id:201,ownerId:101,x:-20,y:0,vx:6000,vy:0,
-   r:3,hp:1,maxHp:1,baseDmg:1,dmg:8,ttl:.005,pen:0,hits:0,
+   r:3,hp:1,maxHp:1,baseDmg:8,dmg:8,ttl:.005,pen:0,hits:0,
    shell:false,beam:false,dead:false,color:'#fff'};
   const right={kind:'bullet',id:202,ownerId:102,x:mode==='late'?50:20,y:0,
-   vx:-6000,vy:0,r:3,hp:1,maxHp:1,baseDmg:1,dmg:8,ttl:.005,
+   vx:-6000,vy:0,r:3,hp:1,maxHp:1,baseDmg:8,dmg:8,ttl:.005,
    pen:0,hits:0,shell:false,beam:false,dead:false,color:'#fff'};
   if(mode==='asym'){
    right.hp=right.maxHp=3;
@@ -73,5 +73,7 @@ for(const fps of [30,60,120,240])for(const reverse of [false,true]){
   assert.equal(left.dead,true);
   assert.equal(right.hp,2,
    'surviving projectile retains two integrity points after interception');
+  assert.ok(Math.abs(right.dmg-8*2/3)<1e-9,
+   'surviving projectile damage scales with remaining integrity');
  });
 }
