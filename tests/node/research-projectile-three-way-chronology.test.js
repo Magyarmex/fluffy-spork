@@ -38,11 +38,14 @@ function resolveChronologically(input, horizon) {
     }
   }
   events.sort((a,b)=>a.t-b.t || a.ids[0]-b.ids[0] || a.ids[1]-b.ids[1]);
-  // A shared simultaneous event needs a separate global tie policy. This
-  // narrow oracle refuses to invent one from array order or projectile IDs.
-  for (let i=1;i<events.length;i++) {
-    if (Math.abs(events[i].t-events[i-1].t)<=1e-9) {
-      throw new Error('ambiguous simultaneous projectile contacts');
+  // Disjoint simultaneous pairs commute. Shared-shot ties need a global
+  // damage policy; refuse those rather than choosing by array order or IDs.
+  for (let i=0;i<events.length;i++) {
+    for (let j=i+1;j<events.length &&
+        events[j].t-events[i].t<=1e-9;j++) {
+      if (events[i].ids.some(id=>events[j].ids.includes(id))) {
+        throw new Error('ambiguous simultaneous projectile contacts');
+      }
     }
   }
   const applied = [];
@@ -134,4 +137,14 @@ test('seeded 1,000 multi-shot worlds preserve chronology under reversal', () => 
   assert.ok(compared>900);
   assert.ok(contacts>100);
   assert.ok(ambiguous>0,'seed must exercise fail-closed simultaneous cases');
+});
+test('disjoint simultaneous contacts commute; shared ties still abstain', () => {
+  const a=shot(1,-20,6000,1),b=shot(2,0,0,1);
+  const c=shot(3,100,6000,1),d=shot(4,120,0,1);
+  for(const shots of [[a,b,c,d],[d,c,b,a]]) {
+    const {applied,state}=resolveChronologically(shots,1/240);
+    assert.deepEqual(applied.map(e=>e.ids),[[1,2],[3,4]]);
+    assert.deepEqual([1,2,3,4].map(id=>state.get(id).dead),
+      [true,true,true,true]);
+  }
 });
