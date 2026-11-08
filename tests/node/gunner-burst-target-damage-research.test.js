@@ -25,6 +25,7 @@ function trial(seed,cls,reload,hz,mode,targetX=200){
   p.droneRespawnT=Infinity;p.spawnShieldT=0;
   Object.assign(target,{cls:'scout',isPlayer:true,alive:true,
    x:targetX,y:0,vx:0,vy:0,hp:1000000,maxHp:1000000,
+   gene:null,perk:null,
    spawnShieldT:0,shieldT:0,bulwarkT:0,tauntT:0,cloakT:0});
   g.tanks=[p,target];g.tankById=new Map([[p.id,p],[target.id,target]]);
   g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];g.orbs=[];
