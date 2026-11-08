@@ -50,6 +50,8 @@ for(const scenario of cases){
   const {bursts,preWall}=trial({...scenario,wall:true});
   assert.ok(preWall&&preWall.hit&&preWall.hit.t>0,
    'the later wall must physically intersect the current frame');
+  assert.ok(preWall.hit.t/scenario.hz>(150-scenario.startX)/scenario.vx+1e-7,
+   'the wall must be later than the physical fuse crossing');
   assert.equal(bursts.length,1,'one shell burst');
   assert.ok(bursts[0].x>=148-1e-6&&bursts[0].x<=150+1e-6,
    'physical fuse must beat later wall; actual x='+bursts[0].x);
