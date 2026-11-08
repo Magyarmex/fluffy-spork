@@ -6,6 +6,7 @@ const assert=require('node:assert/strict');
 const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
 const {SubtickFirePulse}=require('../research/subtick-fire-pulse.cjs');
 const {ShotOnlyFirePulse}=require('../research/shot-only-fire-pulse.cjs');
+const {ExplicitShotIntent}=require('../research/explicit-shot-intent.cjs');
 
 function scenario({kind='touch',owner='shot',replace='afterRelease'}={}){
  const original={id:1,alive:true},replacement={id:2,alive:true};
@@ -27,10 +28,11 @@ function scenario({kind='touch',owner='shot',replace='afterRelease'}={}){
   aimVec(){return {x:1,y:0};}
  };
  const game={input,player:original,status:'playing',paused:false,
-  update(){if(input.firing)this.tryFire(this.player);this.updateDrones();},
+  update(){if(input.firing||input.__novaShotIntent?.fire)this.tryFire(this.player);this.updateDrones();},
   updateDrones(){},tryFire(player){shots.push(player.id);},destroy(){}};
  const timeline=new ChronologicalInput(input);
- const pulse=owner==='shot'?new ShotOnlyFirePulse(game,timeline):new SubtickFirePulse(game,timeline);
+ const pulse=owner==='shot'?new ShotOnlyFirePulse(game,timeline):
+  owner==='explicit'?new ExplicitShotIntent(game,timeline):new SubtickFirePulse(game,timeline);
  const e=(type,x,buttons)=>({type,pointerType:kind,pointerId:22,button:0,
   buttons,clientX:x,clientY:200,target:{closest(){return null;}}});
  try{
@@ -46,7 +48,7 @@ function scenario({kind='touch',owner='shot',replace='afterRelease'}={}){
  }finally{pulse.detach();}
 }
 
-for(const owner of ['shot','subtick'])for(const kind of ['touch','mouse']){
+for(const owner of ['shot','subtick','explicit'])for(const kind of ['touch','mouse']){
  test(owner+' '+kind+' pending shot is canceled on redeploy before next tick',()=>{
   const result=scenario({owner,kind,replace:'afterRelease'});
   assert.deepEqual(result.shots,[]);
@@ -63,7 +65,7 @@ for(const owner of ['shot','subtick'])for(const kind of ['touch','mouse']){
  });
 }
 
-for(const owner of ['shot','subtick']){
+for(const owner of ['shot','subtick','explicit']){
  test(owner+' mouse-chord synthetic release cannot fire replacement player',()=>{
   const shots=[];
   const input={touchSeen:false,mouseActive:false,firing:false,
