@@ -24,6 +24,7 @@ function replayInputDelivery(intervals,events,{maxSteps=2,backlogExtraTicks=2}={
     throw Error('input event outside RAF trace');
   let now=1000,callback=null,elapsed=0,nextEvent=0;
   const delivered=[];
+  const indexedEvents=new Map();
   const input={firing:false,keyboard:{},move:{active:false},aim:{active:false},
     stickId:{move:-1,aim:-1}};
   const apply=(kind,e)=>{
@@ -31,13 +32,13 @@ function replayInputDelivery(intervals,events,{maxSteps=2,backlogExtraTicks=2}={
     // The handler is called by ChronologicalInput.consumeThrough during
     // an actual RAF update or skip. It may run without a simulation tick
     // if the scheduler discards chronology; disclose that separately.
-    delivered.push({kind,key:e.key,atMs:e.atMs,
+    delivered.push({kind,key:e.originalKey,atMs:e.atMs,
       appliedWallMs:now-1000,delayMs:now-1000-e.atMs});
   };
   // The synthetic input records event time via an ID, not by consulting
   // current keyboard state, which would lose repeated presses/releases.
-  input.kd=e=>apply('keydown',{key:e.key,atMs:Number(e.key.slice(1))});
-  input.ku=e=>apply('keyup',{key:e.key,atMs:Number(e.key.slice(1))});
+  input.kd=e=>apply('keydown',indexedEvents.get(e.key));
+  input.ku=e=>apply('keyup',indexedEvents.get(e.key));
   const timeline=new ChronologicalInput(input);
   const bridge={timeline,startMs:1000};
   const game={input,status:'playing',paused:false,sfx:{startMusic(){}},
@@ -54,7 +55,8 @@ function replayInputDelivery(intervals,events,{maxSteps=2,backlogExtraTicks=2}={
         const e=events[nextEvent++];
         // Encode event timestamp in the synthetic key so the real Input
         // handlers can report it without changing the owner or timeline.
-        const key='t'+e.atMs;
+        const key='event'+nextEvent;
+        indexedEvents.set(key,{atMs:e.atMs,originalKey:e.key});
         timeline.push(e.atMs/1000,e.kind,{key});
       }
       const frame=callback;callback=null;
@@ -68,7 +70,7 @@ function replayInputDelivery(intervals,events,{maxSteps=2,backlogExtraTicks=2}={
       p50ApplyDelayMs:percentile(delays,.5),p95ApplyDelayMs:percentile(delays,.95),
       p99ApplyDelayMs:percentile(delays,.99),
       maxApplyDelayMs:delays.length?Math.max(...delays):null,
-      events:delivered.map(e=>({...e,key:events.find(x=>x.atMs===e.atMs&&x.kind===e.kind)?.key||e.key}))};
+      events:delivered};
   }finally{owner.stop();}
 }
 module.exports={replayInputDelivery};
