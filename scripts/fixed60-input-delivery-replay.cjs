@@ -28,7 +28,7 @@ function replayInputDelivery(intervals,events,{maxSteps=2,backlogExtraTicks=2}={
   const input={firing:false,keyboard:{},move:{active:false},aim:{active:false},
     stickId:{move:-1,aim:-1}};
   const apply=(kind,e)=>{
-    input.keyboard[e.key]=kind==='keydown';
+    input.keyboard[e.originalKey]=kind==='keydown';
     // The handler is called by ChronologicalInput.consumeThrough during
     // an actual RAF update or skip. It may run without a simulation tick
     // if the scheduler discards chronology; disclose that separately.
@@ -53,8 +53,8 @@ function replayInputDelivery(intervals,events,{maxSteps=2,backlogExtraTicks=2}={
       elapsed+=interval;now=1000+elapsed;
       while(nextEvent<events.length&&events[nextEvent].atMs<=elapsed+1e-7){
         const e=events[nextEvent++];
-        // Encode event timestamp in the synthetic key so the real Input
-        // handlers can report it without changing the owner or timeline.
+        // Preserve a unique event identity even when timestamps coincide,
+        // without changing the real owner or chronological timeline.
         const key='event'+nextEvent;
         indexedEvents.set(key,{atMs:e.atMs,originalKey:e.key});
         timeline.push(e.atMs/1000,e.kind,{key});
