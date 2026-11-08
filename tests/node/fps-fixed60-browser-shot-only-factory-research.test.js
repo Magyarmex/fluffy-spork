@@ -17,7 +17,7 @@ function target(){
 function run({shotOnlyPulse=false,release='pointerup',maxSteps=3,failRequest=false,mouse=false,compat=false}={}){
  const canvas=target(),win=target(),doc=target();doc.hidden=false;
  let now=1000,callback=null,shots=[],commands=0;
- const input={canvas,touchSeen:true,stickId:{move:-1,aim:-1},
+ const input={canvas,touchSeen:!mouse,stickId:{move:-1,aim:-1},
   aim:{active:false,dx:0,dy:0},move:{active:false,dx:0,dy:0},
   keyboard:{},firing:false,autofire:false,mouseActive:false,
   attach(c){this.canvas=c},detach(){},
