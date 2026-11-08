@@ -209,3 +209,19 @@ test('74Hz composed-Game projectile presentation reduces repeated visual poses w
  assert.ok(smooth.repeats<baseline.repeats,
   `interpolation failed to smooth projectile motion: ${JSON.stringify({baseline,smooth})}`);
 });
+
+test('fast legal projectile motion interpolates but a larger teleport does not',()=>{
+ const bullet={x:0,y:0,vx:7200,vy:0};
+ const g={tanks:[],drones:[],shapes:[],bullets:[bullet],
+  update(){bullet.x+=120},destroy(){}};
+ const p=new FixedStepPosePresentation(g,{enabled:true});
+ try{
+  g.update();
+  p.draw(game=>assert.equal(game.bullets[0].x,60),g,800,600,.5);
+  assert.equal(bullet.x,120);
+  bullet.x=500;g.update(); // 380-unit discontinuity despite fast velocity
+  p.draw(game=>assert.equal(game.bullets[0].x,620),g,800,600,.5);
+  assert.equal(bullet.x,620);
+  assert.equal(p.teleportSkips,1);
+ }finally{p.stop()}
+});
