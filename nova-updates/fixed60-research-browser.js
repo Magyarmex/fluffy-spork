@@ -171,6 +171,7 @@ class BrowserEventTimeline {
     this.maxStaleMs = maxStaleMs;
     this.lastAt = 0;
     this.futureClamps = 0;
+    this.futureSkewClamps = 0;
     this.staleClamps = 0;
     this.lateClamps = 0;
     this.reorderedClamps = 0;
@@ -211,6 +212,12 @@ class BrowserEventTimeline {
       stamp = now;
       timestampTrusted = false;
       this.futureClamps++;
+    } else if (stamp > now) {
+      // A tolerated browser clock skew must not give a recovered shot
+      // negative age or extra freshness budget. Preserve trusted provenance
+      // only for bounded skew, but never claim the event occurred in future.
+      stamp = now;
+      this.futureSkewClamps++;
     }
     if (stamp < now - this.maxStaleMs) {
       // Do not replay a stale press or movement at delivery time: that can
