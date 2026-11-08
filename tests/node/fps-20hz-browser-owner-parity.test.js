@@ -212,3 +212,62 @@ test('20Hz jitter preserves Tempest fire chronology while movement input changes
   }
  }
 });
+
+test('clustered nominal 30Hz frames expose two-step combat time loss; three steps recover this schedule',()=>{
+ // 55/55/11.67/11.67ms is exactly 30Hz on average and never exceeds
+ // the 100ms foreground-stall threshold. Average FPS is not a safety gate.
+ const intervals=Array.from({length:15},()=>[
+  55,55,1000/15-55,1000/15-55
+ ]).flat();
+ assert.ok(intervals.every(ms=>ms>0&&ms<100));
+ for(const seed of [1517800,1517802]){
+  const baseline=run(seed,Array(120).fill(1000/60),2,[],true);
+  const two=run(seed,intervals,2,[],true);
+  const three=run(seed,intervals,3,[],true);
+  assert.ok(baseline.volleys>0,'exercise real Tempest weapon chronology');
+  if(two.droppedMs>0 || two.ticks<baseline.ticks){
+   assert.ok(two.ticks<baseline.ticks);
+   assert.notEqual(two.hash,baseline.hash,
+    'dropped simulation time must not masquerade as combat parity');
+  }else{
+   // A future chronological fix should improve this gate, not fail it.
+   assert.equal(two.ticks,baseline.ticks);
+   assert.equal(two.hash,baseline.hash);
+   assert.equal(two.draws,baseline.draws);
+  }
+  assert.equal(three.ticks,baseline.ticks);
+  assert.equal(three.droppedFrames,0);
+  assert.equal(three.volleys,baseline.volleys);
+  assert.equal(three.hash,baseline.hash);
+  assert.equal(three.draws,baseline.draws);
+ }
+});
+
+test('a harsher sub-100ms 30Hz cluster still exceeds three steps but recovers with four',()=>{
+ // 85/40/5/3.33ms repeats at exactly 30Hz mean. This deliberately
+ // falsifies any claim that three steps universally solve 30Hz jitter.
+ const intervals=Array.from({length:15},()=>[
+  85,40,5,1000/7.5-130
+ ]).flat();
+ assert.ok(intervals.every(ms=>ms>0&&ms<100));
+ for(const seed of [1517800,1517802]){
+  const baseline=run(seed,Array(120).fill(1000/60),2,[],true);
+  const three=run(seed,intervals,3,[],true);
+  const four=run(seed,intervals,4,[],true);
+  if(three.droppedMs>0 || three.ticks<baseline.ticks){
+   assert.ok(three.ticks<baseline.ticks);
+   assert.notEqual(three.hash,baseline.hash,
+    'a three-step time loss must remain visible in actual combat state');
+  }else{
+   // Do not freeze the current three-step deficit as desired behavior.
+   assert.equal(three.ticks,baseline.ticks);
+   assert.equal(three.hash,baseline.hash);
+   assert.equal(three.draws,baseline.draws);
+  }
+  assert.equal(four.ticks,baseline.ticks);
+  assert.equal(four.droppedFrames,0);
+  assert.equal(four.volleys,baseline.volleys);
+  assert.equal(four.hash,baseline.hash);
+  assert.equal(four.draws,baseline.draws);
+ }
+});
