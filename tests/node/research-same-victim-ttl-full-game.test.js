@@ -48,8 +48,10 @@ function trial(hz,reverse,fullUpdate){
    if(t===p)contacts.push({ownerId,damage});
    return original.apply(this,arguments);
   };
-  if(fullUpdate)g.update(1/hz);
-  else g.updateBullets(1/hz);
+  for(let frame=0;frame<20&&g.bullets.some(b=>b.id===201||b.id===202);frame++){
+   if(fullUpdate)g.update(1/hz);
+   else {g.updateBullets(1/hz);g.time+=1/hz;}
+  }
   return {hp:p.hp,contacts,remaining:g.bullets.map(b=>b.id)};
  });
 }
