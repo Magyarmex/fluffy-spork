@@ -35,7 +35,7 @@ class ExplicitShotIntent {
   const self=this;
   game.update=function(...args){
    const p=self.pulse&&self.pulse.pending,input=self.input;
-   const canPlay=!!p&&game.status==='playing'&&!game.paused&&!input.__novaInputPaused&&
+   const canPlay=!!p&&p.player===game.player&&game.status==='playing'&&!game.paused&&!input.__novaInputPaused&&
      !(game.__testWindow&&game.__testWindow.document.hidden);
    if(!canPlay)return self.oldUpdate.apply(this,args);
    const touch=p.type==='touch'||p.type==='pen';

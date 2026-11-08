@@ -40,7 +40,7 @@ class ShotOnlyFirePulse {
     };
     game.update=function(...args) {
       const p=self.pulse.pending, input=self.input;
-      const canPlay=!!p && game.status==='playing' && !game.paused &&
+      const canPlay=!!p && p.player===game.player && game.status==='playing' && !game.paused &&
         !input.__novaInputPaused && !(game.__testWindow && game.__testWindow.document.hidden);
       if (!canPlay) return self.oldUpdate.apply(this,args);
       // Opt-in only: wall/presentation time, NOT lagging simulation time,

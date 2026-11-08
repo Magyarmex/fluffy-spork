@@ -138,3 +138,28 @@ test('invalid freshness clock configuration fails before installing any input wr
   assert.equal(g.update,old);
  }finally{g.destroy();}
 });
+
+// Exercise the actual materialized 49-overlay Game's spawnPlayer/redeploy path.
+// The old life may have a queued sub-tick press, but the new life must never
+// inherit its one-shot firing intention.
+test('composed Game redeploy rejects a queued touch shot from the prior life',()=>{
+ withSeed(1517800,()=>{
+  const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
+  const t=new ChronologicalInput(g.input),p=new ShotOnlyFirePulse(g,t);
+  try{
+   t.push(.001,'pointerdown',{pointerType:'touch',pointerId:22,clientX:600,clientY:200});
+   t.push(.002,'pointermove',{pointerType:'touch',pointerId:22,clientX:640,clientY:200});
+   t.push(.008,'pointerup',{pointerType:'touch',pointerId:22,clientX:640,clientY:200});
+   t.consumeThrough(.009);
+   assert.ok(p.pulse.pending);
+   const oldPlayer=g.player;
+   g.spawnPlayer();
+   assert.notEqual(g.player,oldPlayer);
+   g.update(1/60);
+   assert.equal(p.shots,0);
+   assert.equal(p.pulse.pending,null);
+   assert.equal(g.input.firing,false);
+   assert.equal(g.input.aim.active,false);
+  }finally{p.detach();g.destroy();}
+ });
+});
