@@ -7,7 +7,7 @@ const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
 const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs');
 const {FixedStepRafOwner}=require('../research/fixed-step-raf-owner.cjs');
 const {FixedStepPosePresentation}=require('../research/fixed-step-presentation.cjs');
-function run(maxSteps,touch=false,{frameMs=50,frames=8}={}){
+function run(maxSteps,touch=false,{frameMs=50,frames=8,interpolate=true}={}){
  return withSeed(1517800,()=>{
   const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
   // Keep the real Game movement/collision path but remove unrelated AI,
@@ -24,7 +24,7 @@ function run(maxSteps,touch=false,{frameMs=50,frames=8}={}){
   let now=1000,callback=null,elapsed=0;
   const applied=[],rendered=[];
   const origin={x:g.player.x,y:g.player.y};
-  const presentation=new FixedStepPosePresentation(g,{enabled:true});
+  const presentation=new FixedStepPosePresentation(g,{enabled:interpolate});
   const actualRender=g.__testWindow.__novaMakeRequire('')('game/render').render;
   const kd=g.input.kd,ku=g.input.ku,pd=g.input.pd,pu=g.input.pu;
   g.input.kd=function(e){applied.push({kind:'keydown',key:e.key,atMs:now-1000});
@@ -148,8 +148,8 @@ test('real tank displacement first reaches the rendered frame after the press',(
  // when alpha=0. Do not assert that handler timing orders visible movement.
 });
 
-test('native 60Hz presents real movement earlier than both 20Hz recovery budgets',()=>{
- const native=run(2,false,{frameMs:1000/60,frames:24});
+test('native 60Hz without interpolation presents movement no later than 20Hz research budgets',()=>{
+ const native=run(2,false,{frameMs:1000/60,frames:24,interpolate:false});
  const recovered=run(3),overloaded=run(2);
  const firstMove=result=>result.rendered.find(f=>f.displaced)?.atMs;
  const baseline=firstMove(native),three=firstMove(recovered),two=firstMove(overloaded);
