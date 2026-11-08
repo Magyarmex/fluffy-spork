@@ -3,6 +3,7 @@
 // the RAF owner snapshots Game lifecycle hooks, then fully detached on stop.
 const test=require('node:test'),assert=require('node:assert/strict');
 const {createFixedStepBrowserPilot}=require('../research/fixed-step-raf-owner.cjs');
+const {ShotOnlyFirePulse}=require('../research/shot-only-fire-pulse.cjs');
 
 function target(){
  const handlers=new Map();
@@ -41,7 +42,8 @@ function run({shotOnlyPulse=false,release='pointerup',maxSteps=3,failRequest=fal
   clock:{now:()=>now,timeOrigin:1793560000000},
   request:fn=>{if(failRequest)throw Error('host refused RAF');callback=fn;return 1},
   cancel:()=>{callback=null},render(){},
-  canvas,maxSteps,shotOnlyPulse});
+  canvas,maxSteps,shotOnlyPulseFactory:shotOnlyPulse?
+    (g,t)=>new ShotOnlyFirePulse(g,t):null});
  try{
   pilot.start();
   for(let frame=1;frame<=8;frame++){
