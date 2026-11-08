@@ -55,7 +55,10 @@ function trial(hz,reverse,fullUpdate,only=null,targetX=40){
    if(fullUpdate)g.update(1/hz);
    else {g.updateBullets(1/hz);g.time+=1/hz;}
   }
-  return {hp:p.hp,contacts,remaining:g.bullets.map(b=>b.id)};
+  return {hp:p.hp,contacts,remaining:g.bullets.map(b=>b.id),
+   target:{x:p.x,y:p.y,alive:p.alive,shield:p.spawnShieldT,
+    sweepTime:p.__novaSweepMoveTime,sweepX:p.__novaSweepPrevX},
+   game:{time:g.time,status:g.status,shapeSweep:g.__novaShapeSweepActive}};
  });
 }
 for(const hz of [30,60,120,240])
@@ -87,7 +90,7 @@ for(const hz of [30,60,120,240])for(const fullUpdate of [false,true])
        ' bullet='+id,()=>{
    const result=trial(hz,false,fullUpdate,id);
    assert.equal(result.contacts.length,1,
-    'an isolated pre-expiry hull contact must register');
+    'an isolated pre-expiry hull contact must register: '+JSON.stringify(result));
    assert.equal(result.contacts[0].ownerId,id-100);
    assert.equal(result.contacts[0].damage,20);
   });
