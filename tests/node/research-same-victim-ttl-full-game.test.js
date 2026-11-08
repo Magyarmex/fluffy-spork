@@ -16,7 +16,7 @@ function trial(hz,reverse,fullUpdate){
   if(!g.player)g.redeploy();
   g.sfx.muted=true;
   const p=g.player;
-  p.x=40;p.y=0;p.hp=1000;p.maxHp=1000;p.alive=true;
+  p.x=40;p.y=0;p.cls='scout';p.gene=null;p.hp=1000;p.maxHp=1000;p.alive=true;
   p.spawnShieldT=0;p.shieldT=0;p.invulnT=0;p.bulwarkT=0;p.tauntT=0;
   p.vx=0;p.vy=0;
   const owners=[101,102].map((id,i)=>({
@@ -33,7 +33,7 @@ function trial(hz,reverse,fullUpdate){
    {kind:'bullet',id:201,ownerId:101,x:0,y:0,vx:6000,vy:0,
     r:3,dmg:20,ttl:.005,pen:1,hits:0,dead:false,
     shell:false,beam:false,color:'#fff'},
-   {kind:'bullet',id:202,ownerId:102,x:90,y:0,vx:-6000,vy:0,
+   {kind:'bullet',id:202,ownerId:102,x:89,y:0,vx:-6000,vy:0,
     r:3,dmg:20,ttl:.005,pen:1,hits:0,dead:false,
     shell:false,beam:false,color:'#fff'}
   ];
