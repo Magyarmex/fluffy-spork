@@ -82,12 +82,16 @@ function run(cls,seed,cap,targeted,bursty=false,backlogExtraTicks=2){
  });
 }
 test('20Hz whole-Game three-step recovery restores 60Hz Gunner physics; two steps cannot',()=>{
+ const rows=[];
  for(const cls of ['minigun','needlestorm'])
   for(const targeted of [false,true]){
    const baseline=run(cls,1517800,0,targeted);
    const capped=run(cls,1517800,2,targeted);
    assert.ok(capped.scheduler.ticks<TICKS,
     'two ticks per 50ms frame cannot advance six seconds of 60Hz physics');
+   rows.push({cls,targeted,nativeVolleys:baseline.state.volleys,
+    twoStepVolleys:capped.state.volleys,nativeDamage:baseline.state.damage,
+    twoStepDamage:capped.state.damage,twoStepTicks:capped.scheduler.ticks});
    for(const cap of [3,4]){
     const recovered=run(cls,1517800,cap,targeted);
     assert.equal(recovered.scheduler.ticks,TICKS,
@@ -98,6 +102,7 @@ test('20Hz whole-Game three-step recovery restores 60Hz Gunner physics; two step
      cls+' target='+targeted+' cap='+cap);
    }
   }
+ console.log('NOVA_20HZ_COMPOSED_GUNNER '+JSON.stringify(rows));
 });
 
 test('bursty 20Hz presentation needs a four-step budget to avoid dropping Gunner time',()=>{
