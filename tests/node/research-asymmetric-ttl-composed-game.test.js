@@ -43,10 +43,11 @@ function trial(fps,reverse=false,mode='hostile'){
    if(mode==='asymLate')right.x=50;
    if(mode==='asymSameOwner')right.ownerId=left.ownerId;
   }
-  if(mode==='canonical'){
+  if(mode==='canonical'||mode==='canonicalAsym'){
    left.x=-227.43;right.x=227.43;
    left.vx=540;right.vx=-540;
    left.r=right.r=4.2;left.ttl=right.ttl=.42;
+   if(mode==='canonicalAsym')right.hp=right.maxHp=3;
   }
   if(mode==='asymWall')g.__novaTerrain=[{id:-9501,shape:'rect',x:0,y:0,w:.2,h:70,solid:true,destructible:false}];
   g.bullets=reverse?[right,left]:[left,right];
@@ -58,7 +59,7 @@ function trial(fps,reverse=false,mode='hostile'){
   const weaken=g.weakenBullet.bind(g);
   g.weakenBullet=function(b,dmg){if(b===left||b===right)
     contacts.push({id:b.id,dmg});return weaken(b,dmg);};
-  for(let i=0;i<(mode==='canonical'?fps:3);i++){
+  for(let i=0;i<(['canonical','canonicalAsym'].includes(mode)?fps:3);i++){
    g.update(1/fps);
    if(!g.bullets.some(b=>b===left||b===right))break;
   }
@@ -112,5 +113,18 @@ for(const reverse of [false,true]){
   const {contacts}=trial(30,reverse,'asymThird');
   assert.deepEqual(contacts,[],
    'third projectile requires a complete competing-event certificate');
+ });
+}
+
+/* Canonical-speed near-expiry contact: ordinary 540u/s rounds, 420ms TTL.
+ * This protects the bounded asymmetric resolver beyond the 6000u/s
+ * compressed-time geometry used for the initial regression. */
+for(const fps of [30,60,120,240])for(const reverse of [false,true]){
+ test('canonical-speed asymmetric TTL interception '+fps+'Hz reverse='+reverse,()=>{
+  const {contacts,left,right}=trial(fps,reverse,'canonicalAsym');
+  assert.deepEqual(contacts.map(c=>c.id).sort(),[201,202]);
+  assert.equal(left.dead,true);
+  assert.equal(right.hp,2);
+  assert.ok(Math.abs(right.dmg-8*2/3)<1e-9);
  });
 }
