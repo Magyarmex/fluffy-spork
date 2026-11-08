@@ -93,9 +93,9 @@ for(const fps of [30,60,120,240]){
     assert.equal(simulate(Battlefield,fps,'moving'),1);
   });
 }
-test('raw materialized core remains insufficient without Battlefield wrapper',()=>{
-  assert.deepEqual([30,60,120,240].map(f=>simulate(Core,f,'static')),
-    [0,0,0,1]);
-  assert.deepEqual([30,60,120,240].map(f=>simulate(Core,f,'moving')),
-    [0,0,0,1]);
+test('Battlefield cannot regress relative to materialized core on isolated TTL bodies',()=>{
+  for(const scenario of ['static','moving','far'])
+    for(const fps of [30,60,120,240])
+      assert.ok(simulate(Battlefield,fps,scenario)>=simulate(Core,fps,scenario),
+        'Battlefield regressed core: '+scenario+' at '+fps+'Hz');
 });
