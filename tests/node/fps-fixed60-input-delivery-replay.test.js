@@ -73,3 +73,22 @@ test('simultaneous event timestamps retain distinct original keys',()=>{
  assert.deepEqual(r.events.map(e=>e.key),['w','d','w']);
  assert.equal(r.deliveredCount,3);
 });
+
+test('extra backlog cannot repair sustained 20Hz throughput with a two-step cap',()=>{
+ const intervals=Array(200).fill(50);
+ const events=Array.from({length:80},(_,i)=>({
+   atMs:125*i+10,kind:i%2?'keyup':'keydown',key:'w'}));
+ const defaultBudget=replayInputDelivery(intervals,events,{maxSteps:2,backlogExtraTicks:2});
+ const extraBacklog=replayInputDelivery(intervals,events,{maxSteps:2,backlogExtraTicks:4});
+ const sufficient=replayInputDelivery(intervals,events,{maxSteps:3,backlogExtraTicks:3});
+ assert.equal(defaultBudget.simulatedTicks,400);
+ assert.equal(extraBacklog.simulatedTicks,400,
+   'larger backlog cannot overcome a sustained two-tick-per-frame ceiling');
+ assert.equal(sufficient.simulatedTicks,600);
+ assert.equal(sufficient.droppedMs,0);
+ assert.ok(defaultBudget.droppedMs>0);
+ assert.ok(extraBacklog.droppedMs>0);
+ assert.ok(extraBacklog.p95ApplyDelayMs>=defaultBudget.p95ApplyDelayMs,
+   'extra queue capacity may worsen input application delay');
+ assert.ok(sufficient.p95ApplyDelayMs<extraBacklog.p95ApplyDelayMs);
+});
