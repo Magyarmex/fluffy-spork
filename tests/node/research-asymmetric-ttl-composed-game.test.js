@@ -38,7 +38,7 @@ function trial(fps,reverse=false,mode='hostile'){
   const right={kind:'bullet',id:202,ownerId:102,x:mode==='late'?50:20,y:0,
    vx:-6000,vy:0,r:3,hp:1,maxHp:1,baseDmg:8,dmg:8,ttl:.005,
    pen:0,hits:0,shell:false,beam:false,dead:false,color:'#fff'};
-  if(mode==='asym'||mode==='asymLate'||mode==='asymSameOwner'){
+  if(['asym','asymLate','asymSameOwner','asymWall','asymThird'].includes(mode)){
    right.hp=right.maxHp=3;
    if(mode==='asymLate')right.x=50;
    if(mode==='asymSameOwner')right.ownerId=left.ownerId;
@@ -48,7 +48,11 @@ function trial(fps,reverse=false,mode='hostile'){
    left.vx=540;right.vx=-540;
    left.r=right.r=4.2;left.ttl=right.ttl=.42;
   }
+  if(mode==='asymWall')g.__novaTerrain=[{id:-9501,shape:'rect',x:0,y:0,w:.2,h:70,solid:true,destructible:false}];
   g.bullets=reverse?[right,left]:[left,right];
+  if(mode==='asymThird')g.bullets.push({kind:'bullet',id:303,ownerId:103,
+   x:1500,y:1500,vx:0,vy:0,r:3,hp:1,maxHp:1,baseDmg:8,dmg:8,
+   ttl:1,pen:0,hits:0,shell:false,beam:false,dead:false});
   g.nextId=Math.max(g.nextId||0,1200);
   const contacts=[];
   const weaken=g.weakenBullet.bind(g);
@@ -91,5 +95,22 @@ for(const fps of [30,60,120,240])for(const reverse of [false,true]){
       'Hz reverse='+reverse,()=>{
   const {contacts}=trial(fps,reverse,'asymSameOwner');
   assert.deepEqual(contacts,[]);
+ });
+}
+
+/* Narrow open-field certificate MUST abstain on an earlier/later wall
+ * or a third projectile. These tests intentionally describe this bounded
+ * fast path, not a future general chronological resolver. A broader solver
+ * may replace the abstention with independently proven real contacts. */
+for(const reverse of [false,true]){
+ test('bounded asymmetric certificate abstains at a thin permanent wall reverse='+reverse,()=>{
+  const {contacts}=trial(30,reverse,'asymWall');
+  assert.deepEqual(contacts,[],
+   'no speculative unequal-integrity interception across unproven cover');
+ });
+ test('bounded asymmetric certificate abstains with a third shot reverse='+reverse,()=>{
+  const {contacts}=trial(30,reverse,'asymThird');
+  assert.deepEqual(contacts,[],
+   'third projectile requires a complete competing-event certificate');
  });
 }
