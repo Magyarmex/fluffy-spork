@@ -634,7 +634,8 @@ wrap('game/engine',function(engine,require){
     var pad=b.r*.45;
     if(g.firstTerrainHit(b.x,b.y,x,y,pad))return null;
     var wall=g.firstTerrainHit(b.x,b.y,endX,endY,pad);
-    if(!wall||!wall.hit||!Number.isFinite(wall.hit.t)||
+    if(!wall||!wall.hit||!wall.solid||wall.solid.destructible!==false||
+       wall.solid.solid!==true||!Number.isFinite(wall.hit.t)||
        !(wall.hit.t*dt>t+1e-6))return null;
     function close(e,rad){
       if(!e||![e.x,e.y,rad].every(Number.isFinite)||!(rad>0))return true;
