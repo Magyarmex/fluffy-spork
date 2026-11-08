@@ -1,8 +1,7 @@
 'use strict';
-/* #648: measure the composed shipping Game around Tempest reload thresholds.
+/* #648: measure the composed shipping Game around LEGAL Tempest reload thresholds.
  * This is a no-target firing chronology probe, NOT measured hit DPS.
- * Stats 9/10 are direct research assignments, not a claim that those builds
- * are legally reachable in a normal run. No production behavior is patched. */
+ * Applied Power Parity caps each player stat at eight. No production behavior is patched. */
 process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
 const test=require('node:test');
 const assert=require('node:assert/strict');
@@ -38,8 +37,8 @@ function trial(seed,reload,hz){return withSeed(seed,()=>{
  g.destroy();return result;
 });}
 
-test('composed Tempest reload thresholds 4/5 and 9/10 remain measurable across 30/60/120Hz',()=>{
- const levels=[4,5,9,10],rates=[30,60,120],seeds=[1517800,1517802];
+test('composed Tempest reload thresholds 4/5 and 7/8 remain measurable across 30/60/120Hz',()=>{
+ const levels=[4,5,7,8],rates=[30,60,120],seeds=[1517800,1517802];
  const byKey=new Map();
  for(const reload of levels)for(const hz of rates){
   const a=trial(seeds[0],reload,hz),b=trial(seeds[1],reload,hz);
@@ -52,9 +51,21 @@ test('composed Tempest reload thresholds 4/5 and 9/10 remain measurable across 3
  assert.equal(byKey.get('5:60').volleys,234,'existing 60Hz reload5 reference');
  assert.equal(byKey.get('5:60').volleys-byKey.get('4:60').volleys,71,
   'preserve the established reload4-to-5 discontinuity until a deliberate balance fix');
- // Do not invent a 9/10 golden before observing the actual composed Game.
- // This structured diagnostic lets CI provide the falsification data for #648.
+ // The 9/10 progression hypothesis is invalid: Applied Power Parity caps at 8.
+ // Keep this diagnostic on legal builds; it is not a DPS or encounter estimate.
  console.log('TEMPEST_RELOAD_THRESHOLD_RESEARCH '+JSON.stringify(
   [...byKey.values()].map(({reload,hz,volleys,first,heat})=>({
    reload,hz,volleys,first,heat:+heat.toFixed(5)}))));
+});
+
+
+test('Applied Power Parity rejects an illegal ninth Tempest reload point',()=>{
+ withSeed(1517800,()=>{
+  const g=bootGame(),p=g.player;
+  g.setClass(p,'tempest');p.stats.reload=8;g.statPoints=1;
+  g.upgradeStat('reload');
+  assert.equal(p.stats.reload,8,'reload cannot advance past the legal cap');
+  assert.equal(g.statPoints,1,'rejected upgrade must not spend a point');
+  g.destroy();
+ });
 });
