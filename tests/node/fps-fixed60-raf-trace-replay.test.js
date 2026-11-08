@@ -126,3 +126,27 @@ test('capture provenance distinguishes guarded timing from verified gameplay',()
  assert.equal(unguarded.captureProvenance.status,'consistent');
  assert.equal(unguarded.captureProvenance.visibilityGuardClaimed,false);
 });
+
+
+test('saturation streak and interval exposure distinguish isolated phase risk from sustained backlog',()=>{
+  const smooth=replay(Array(120).fill(1000/30),2);
+  assert.equal(smooth.interpolationSaturatedFrames,0);
+  assert.equal(smooth.longestSaturationStreakFrames,0);
+  assert.equal(smooth.saturatedFrameIntervalMs,0);
+  assert.equal(smooth.saturatedFrameIntervalShare,0);
+  // A bounded clustered schedule must disclose both the number of saturated
+  // render samples and their consecutive duration, without calling it FPS.
+  const gaps=Array.from({length:15},()=>[85,40,5,1000/7.5-130]).flat();
+  const constrained=replay(gaps,2,4);
+  const recovered=replay(gaps,4,2);
+  for(const r of [constrained,recovered]){
+    assert.ok(r.interpolationSaturatedFrames>0);
+    assert.ok(r.longestSaturationStreakFrames>=1);
+    assert.ok(r.longestSaturationStreakFrames<=r.interpolationSaturatedFrames);
+    assert.ok(r.saturatedFrameIntervalMs>0);
+    assert.ok(r.saturatedFrameIntervalMs<=r.wallMs);
+    assert.ok(r.saturatedFrameIntervalShare>0&&r.saturatedFrameIntervalShare<=1);
+  }
+  assert.ok(constrained.saturatedFrameIntervalMs>=recovered.saturatedFrameIntervalMs,
+    'lower step budget should not conceal its greater phase exposure');
+});
