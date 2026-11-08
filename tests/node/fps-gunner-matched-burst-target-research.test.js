@@ -1,7 +1,9 @@
 'use strict';
 /* #799: measure legal rotary-Gunner firing and actual neutral damage under
  * identical wall-clock burst edges in the composed shipping Game. Research
- * observations are NOT balance goldens or physical-device measurements. */
+ * observations are NOT balance goldens or physical-device measurements.
+ * Extra held-fire 50/75/90Hz arms falsify the first-cooldown hypothesis
+ * that higher presentation refresh always yields better rotary spin-up. */
 process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
 const test=require('node:test'),assert=require('node:assert/strict');
 const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
@@ -96,7 +98,8 @@ test('legal rotary Gunner matched-time bursts reveal actual neutral damage and s
  ];
  const rows=[];
  for(const [cls,reload] of [['minigun',1],['needlestorm',3]]){
-  for(const policy of policies)for(const hz of [30,60,120]){
+  for(const policy of policies)for(const hz of (policy.name==='held'?
+   [30,50,60,75,90,120]:[30,60,120])){
    const noTarget=run(1517800,cls,reload,hz,policy,false);
    const target=run(1517800,cls,reload,hz,policy,true);
    const repeat=run(1517802,cls,reload,hz,policy,false);
@@ -120,6 +123,6 @@ test('legal rotary Gunner matched-time bursts reveal actual neutral damage and s
     first:noTarget.first,births:target.births});
   }
  }
- assert.equal(rows.length,18);
+ assert.equal(rows.length,24);
  console.log('GUNNER_MATCHED_BURST_TARGET_RESEARCH '+JSON.stringify(rows));
 });
