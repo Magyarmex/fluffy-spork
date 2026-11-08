@@ -166,6 +166,7 @@ test('74Hz composed-Game projectile presentation reduces repeated visual poses w
   p.droneRespawnT=Infinity;g.spawnDrone=()=>null;
   g.status='playing';g.paused=false;
   const presentation=new FixedStepPosePresentation(g,{enabled});
+  const actualRender=g.__testWindow.__novaMakeRequire('')('game/render').render;
   const timeline=new ChronologicalInput(g.input);
   const bridge={timeline,startMs:1000};
   let now=1000,callback=null,rows=[],physicalViolations=0;
@@ -176,6 +177,7 @@ test('74Hz composed-Game projectile presentation reduces repeated visual poses w
     presentation.draw(game=>{
      const bullet=game.bullets[0];
      if(bullet)rows.push({bullet,x:bullet.x,y:bullet.y});
+     actualRender(game,w,h);
     },game,w,h,alpha);
     if(b&&(b.x!==before[0]||b.y!==before[1]))physicalViolations++;
    }
