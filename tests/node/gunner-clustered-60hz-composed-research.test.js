@@ -1,7 +1,7 @@
 'use strict';
 /* #799 / #648: identical eight-second input and update-count exposure,
  * but different frame partitioning. [4,1,1] at 120Hz means
- * 33.33/8.33/8.33ms: exactly 60 updates/s on average. This is a
+ * 33.33/8.33/8.33ms: exactly 60 simulation updates/s on average. This is a
  * constructed stress schedule, not a measured Android frame trace. */
 const test=require('node:test'),assert=require('node:assert/strict');
 const prev=process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL;
@@ -60,7 +60,7 @@ function run(seed,cls,reload,mode,pattern){
   }finally{g.destroy();}
  });
 }
-test('composed Gunner identical mean FPS and input exposure need not mean identical firing',()=>{
+test('composed Gunner equal mean update rate and input exposure need not mean equal firing',()=>{
  const rows=[];
  for(const [cls,reload] of [['minigun',1],['needlestorm',3]])
   for(const mode of ['held','long','short']){
