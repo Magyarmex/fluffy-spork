@@ -150,3 +150,9 @@ test('opt-in backlog headroom recovers clustered combat chronology but increases
    'recovered chronology carries a real queued-time/latency tradeoff');
  }
 });
+
+test('experimental backlog headroom rejects unsafe or noninteger budgets',()=>{
+ for(const extra of [0,1,5,Infinity,NaN,2.5,'4'])
+  assert.throws(()=>run('minigun',1517800,4,false,false,extra),
+   /invalid fixed-step RAF owner/);
+});
