@@ -20,7 +20,7 @@ function run(seed,cls,reload,hz,seconds=8){return withSeed(seed,()=>{
  p.stats.reload=reload;
  g.input.firing=true;g.input.autofire=false;
  g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
- let volleys=0,heatPeak=0;const first=[];
+ let volleys=0,heatPeak=0,spinPeak=0,spinSum=0;const first=[];
  const original=g.tryFire;
  g.tryFire=function(t){const before=this.bullets.length;
   const result=original.apply(this,arguments);
@@ -31,9 +31,11 @@ function run(seed,cls,reload,hz,seconds=8){return withSeed(seed,()=>{
   assert.equal(g.tanks.length,1,'no AI tank contamination');
   assert.equal(g.shapes.length+g.drones.length+g.powerups.length,0,'no shape/drone contamination');
   heatPeak=Math.max(heatPeak,p.__v17Heat||0);
+  spinPeak=Math.max(spinPeak,p.fireSpin||0);spinSum+=p.fireSpin||0;
  }
  const out={cls,reload,hz,seconds,volleys,first,heat:p.__v17Heat||0,heatPeak,
-  stability:p.__v17Stability==null?1:p.__v17Stability,fireCd:p.fireCd};
+  stability:p.__v17Stability==null?1:p.__v17Stability,fireCd:p.fireCd,
+  spin:p.fireSpin||0,spinPeak,spinMean:spinSum/(seconds*hz)};
  g.destroy();return out;
 });}
 
@@ -51,10 +53,11 @@ test('legal Minigun and Needle Storm reload cliffs are observed without invented
   const a=run(1517800,cls,reload,hz),b=run(1517802,cls,reload,hz);
   assert.equal(a.volleys,b.volleys,`${cls} reload ${reload} hz ${hz}: seed count mismatch`);
   assert.deepEqual(a.first,b.first,`${cls}: first-shot timing must be seed-invariant`);
-  for(const key of ['heat','heatPeak','stability','fireCd'])assert.ok(Number.isFinite(a[key]),key);
+  for(const key of ['heat','heatPeak','stability','fireCd','spin','spinPeak','spinMean'])assert.ok(Number.isFinite(a[key]),key);
   assert.ok(a.volleys>0);
   rows.push({cls,reload,hz,volleys:a.volleys,first:a.first,heat:+a.heat.toFixed(5),
-   heatPeak:+a.heatPeak.toFixed(5)});
+   heatPeak:+a.heatPeak.toFixed(5),spin:+a.spin.toFixed(5),
+   spinMean:+a.spinMean.toFixed(5),spinPeak:+a.spinPeak.toFixed(5)});
  }
  // This is a falsification census, not a mandate to preserve any cadence cliff.
  console.log('GUNNER_LEGAL_RELOAD_CENSUS '+JSON.stringify(rows));
