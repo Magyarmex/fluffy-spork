@@ -124,3 +124,12 @@ test('browser factory passes clock origin to opt-in stale-shot gate',()=>{
   assert.equal(result.commands,0);assert.equal(result.firing,false);assert.equal(result.aim,false);
  }
 });
+
+test('stale mouse shot rejection deduplicates native and compatibility events',()=>{
+ for(const compat of [false,true]){
+  const stale=run({shotOnlyPulse:true,mouse:true,compat,maxSteps:2,ageGateMs:40});
+  assert.deepEqual(stale.shots,[]);
+  assert.equal(stale.rejectedStale,1);
+  assert.equal(stale.commands,0);assert.equal(stale.firing,false);
+ }
+});
