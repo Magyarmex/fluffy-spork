@@ -9,6 +9,7 @@ const path=require('node:path');
 const root=path.resolve(__dirname,'../..');
 const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const battlefield=fs.readFileSync(path.join(root,'nova-updates/battlefield-v1.6.0.js'),'utf8');
+const performanceLayer=fs.readFileSync(path.join(root,'nova-updates/performance-v1.7.5.js'),'utf8');
 function coreBullets(){
   const marker='    updateBullets(dt) {',start=html.indexOf(marker);
   assert.ok(start>=0,'materialized core updateBullets missing');
@@ -25,7 +26,7 @@ function coreBullets(){
     {CLASSES:{scout:{size:15}}},2250);
 }
 const core=coreBullets();
-function boot(wrapped){
+function boot(wrapped,optimized=false){
   class Game{
     constructor(){
       this.time=1;this.bullets=[];this.tmp=[];this.__novaTerrain=[];
@@ -59,6 +60,9 @@ function boot(wrapped){
   new Function('window','console','Math','Map','Set','Date','performance',
     battlefield)(window,{info(){},warn(){},error(){}},Math,Map,Set,Date,
     {now:()=>0});
+  if(optimized)new Function('window','console','Math','Map','Set','Date','performance',
+    performanceLayer)(window,{info(){},warn(){},error(){}},Math,Map,Set,Date,
+    {now:()=>0});
   const module={exports:{}};
   modules['game/engine'](module,module.exports,s=>s==='./classes'
     ?{CLASSES:{scout:{size:15}}}:{ARENA_HALF:2250});
@@ -82,20 +86,25 @@ function simulate(Game,fps,scenario){
   }
   return g.hits;
 }
-const Core=boot(false),Battlefield=boot(true);
+const Core=boot(false),Battlefield=boot(true),Optimized=boot(true,true);
 for(const fps of [30,60,120,240]){
   test('current Battlefield TTL stationary hull first contact '+fps+'Hz',()=>{
     assert.equal(simulate(Battlefield,fps,'static'),1);
+    assert.equal(simulate(Optimized,fps,'static'),1);
     assert.equal(simulate(Battlefield,fps,'far'),0,
+      'never damage a hull beyond physical TTL');
+    assert.equal(simulate(Optimized,fps,'far'),0,
       'never damage a hull beyond physical TTL');
   });
   test('current Battlefield TTL moving hull first contact '+fps+'Hz',()=>{
     assert.equal(simulate(Battlefield,fps,'moving'),1);
+    assert.equal(simulate(Optimized,fps,'moving'),1);
   });
 }
 test('Battlefield cannot regress relative to materialized core on isolated TTL bodies',()=>{
   for(const scenario of ['static','moving','far'])
     for(const fps of [30,60,120,240])
-      assert.ok(simulate(Battlefield,fps,scenario)>=simulate(Core,fps,scenario),
+      assert.ok(simulate(Battlefield,fps,scenario)>=simulate(Core,fps,scenario)&&
+        simulate(Optimized,fps,scenario)>=simulate(Core,fps,scenario),
         'Battlefield regressed core: '+scenario+' at '+fps+'Hz');
 });
