@@ -58,3 +58,12 @@ for(const scenario of cases){
    'unobstructed programmed fuse remains stable; x='+bursts[0].x);
  });
 }
+
+/* Negative control: a permanent wall that is physically earlier than the
+ * programmed fuse retains the existing wall-burst owner. */
+test('full composition earlier wall still beats Cannon fuse',()=>{
+ const {bursts}=trial({hz:30,startX:146,wallX:163,vx:380,wall:true});
+ assert.equal(bursts.length,1);
+ assert.ok(Math.abs(bursts[0].x-149.175)<1e-3,
+  'the earlier padded wall must retain first-contact priority; x='+bursts[0].x);
+});
