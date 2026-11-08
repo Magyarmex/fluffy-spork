@@ -113,3 +113,41 @@ test('destroy cleans wrappers; stop is idempotent',()=>{
  g.destroy();assert.equal(g.done,true);assert.equal(g.update,update);assert.equal(g.destroy,destroy);
  p.stop();p.stop();assert.equal(p.active,false);
 });
+
+test('projectile visual interpolation preserves physical poses and handles birth/death',()=>{
+ const first={x:0,y:0},newborn={x:5,y:0};
+ const g={tanks:[],drones:[],shapes:[],bullets:[first],update(){
+  if(this.bullets.length===1){first.x=10;this.bullets.push(newborn)}
+  else{this.bullets=[newborn];newborn.x=15}
+ },destroy(){}};
+ const p=new FixedStepPosePresentation(g,{enabled:true});
+ try{
+  g.update();
+  p.draw(game=>{
+   assert.equal(game.bullets[0].x,5,'existing projectile must interpolate');
+   assert.equal(game.bullets[1].x,5,'newborn projectile must not interpolate from nothing');
+  },g,800,600,.5);
+  assert.equal(first.x,10,'renderer must not move live projectile');
+  assert.equal(newborn.x,5);
+  g.update();
+  p.draw(game=>{
+   assert.equal(game.bullets.length,1,'removed projectile must not be drawn');
+   assert.equal(game.bullets[0].x,10,'surviving projectile interpolates from prior tick');
+  },g,800,600,.5);
+  assert.equal(newborn.x,15);
+ }finally{p.stop()}
+});
+test('projectile teleports and rendering exceptions never corrupt physical state',()=>{
+ const bullet={x:0,y:0};
+ const g={tanks:[],drones:[],shapes:[],bullets:[bullet],
+  update(){bullet.x=1000},destroy(){}};
+ const p=new FixedStepPosePresentation(g,{enabled:true});
+ try{
+  g.update();
+  p.draw(game=>assert.equal(game.bullets[0].x,1000),g,800,600,.5);
+  assert.equal(p.teleportSkips,1);
+  assert.throws(()=>p.draw(()=>{throw Error('render failed')},g,800,600,.5),
+   /render failed/);
+  assert.equal(bullet.x,1000);
+ }finally{p.stop()}
+});
