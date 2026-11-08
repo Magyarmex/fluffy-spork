@@ -46,6 +46,7 @@ function replay(intervals,maxSteps=2,backlogExtraTicks=2){
     cancel:()=>{callback=null},render(){},maxSteps,backlogExtraTicks
   });
   const lag=[],phaseLag=[],stepCounts=Array(maxSteps+1).fill(0);
+  let saturatedFrames=0,saturatedIntervalMs=0,saturationStreak=0,longestSaturationStreak=0;
   let total=0,catchupFrames=0,peakSteps=0;
   try{
     owner.start();
@@ -55,6 +56,14 @@ function replay(intervals,maxSteps=2,backlogExtraTicks=2){
       if(typeof next!=='function')throw Error('RAF owner lost scheduled callback');
       next(now);
       lag.push(owner.lagMs);
+      // Weight by the interval ending at this rendered frame, not by a
+      // hypothetical constant refresh rate. This is a phase-risk proxy,
+      // NOT a measured freeze, missed presentation, or input-to-photon delay.
+      if(owner.lagMs>=STEP_MS){
+        saturatedFrames++;saturatedIntervalMs+=interval;
+        saturationStreak++;
+        longestSaturationStreak=Math.max(longestSaturationStreak,saturationStreak);
+      }else saturationStreak=0;
       phaseLag.push(Math.max(0,now-bridge.startMs-owner.simAtSec*1000));
       stepCounts[owner.lastSteps]++;
       if(owner.lastSteps>2)catchupFrames++;
@@ -71,7 +80,10 @@ function replay(intervals,maxSteps=2,backlogExtraTicks=2){
       peakBacklogMs:round(lag.reduce((peak,v)=>Math.max(peak,v),0)),
       // The pose presenter receives alpha=min(1, lag/STEP_MS).
       // Saturation is a visual-phase warning, not a measured dropped frame.
-      interpolationSaturatedFrames:lag.filter(v=>Math.min(1,v/STEP_MS)===1).length,
+      interpolationSaturatedFrames:saturatedFrames,
+      longestSaturationStreakFrames:longestSaturationStreak,
+      saturatedFrameIntervalMs:round(saturatedIntervalMs),
+      saturatedFrameIntervalShare:round(saturatedIntervalMs/total),
       p95BacklogMs:round(percentile(lag,.95)),
       p95SimulationPhaseLagMs:round(percentile(phaseLag,.95)),
       p99SimulationPhaseLagMs:round(percentile(phaseLag,.99)),
