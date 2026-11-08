@@ -108,3 +108,28 @@ test('Battlefield cannot regress relative to materialized core on isolated TTL b
         simulate(Optimized,fps,scenario)>=simulate(Core,fps,scenario),
         'Battlefield regressed core: '+scenario+' at '+fps+'Hz');
 });
+
+test('current Battlefield: seeded 300-world isolated TTL parity at all frame rates',()=>{
+  let seed=20261024;
+  const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+  const worlds=Array.from({length:300},()=>({
+    x:30+rand()*120,v:3000+rand()*6000,ttl:.003+rand()*.027
+  }));
+  for(const fps of [30,60,120,240])
+    for(const w of worlds){
+      const expected=(w.x-21)/w.v<w.ttl-1e-10;
+      for(const Game of [Battlefield,Optimized]){
+        const g=new Game();
+        g.tanks=[{kind:'tank',id:2,x:w.x,y:0,
+          cls:'scout',hp:100,alive:true}];
+        g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+          vx:w.v,vy:0,r:3,dmg:20,ttl:w.ttl,pen:0,hits:0,
+          dead:false,shell:false,beam:false}];
+        for(let frame=0;frame<20&&g.bullets.length;frame++){
+          g.updateBullets(1/fps);g.time+=1/fps;
+        }
+        assert.equal(g.hits>0,expected,
+          'TTL parity: '+fps+'Hz x='+w.x+' v='+w.v+' ttl='+w.ttl);
+      }
+    }
+});
