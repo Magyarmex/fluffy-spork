@@ -62,7 +62,7 @@ function run(cls,seed,cap,targeted,bursty=false){
     g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
     g.input.firing=true;
     for(let frame=1;frame<=120;frame++){
-     // 95ms/5ms alternating gaps retain the same six-second wall clock.\n     now=1000+(bursty ? Math.floor(frame/2)*100+(frame%2?95:0) : frame*50);
+     // 95ms/5ms alternating gaps retain the same six-second wall clock.\n     now=1000+(bursty===true ? Math.floor(frame/2)*100+(frame%2?95:0) :\n      typeof bursty==='number' ? Math.floor(frame/2)*100+(frame%2?50+bursty:0) : frame*50);
      const fn=callback;assert.equal(typeof fn,'function');
      callback=null;fn(now);
     }
@@ -107,5 +107,18 @@ test('bursty 20Hz presentation needs a four-step budget to avoid dropping Gunner
   assert.equal(four.scheduler.droppedMs,0);
   assert.deepEqual(four.state,baseline.state,
    cls+' bursty 20Hz must preserve the 60Hz combat state');
+ }
+});
+
+test('paired 20Hz frame jitter preserves complete Gunner state when four ticks are affordable',()=>{
+ for(const cls of ['minigun','needlestorm']){
+  const reference=run(cls,1517810,0,true);
+  for(const jitter of [-10,-7,-3,3,7,10]){
+   const recovered=run(cls,1517810,4,true,jitter);
+   assert.equal(recovered.scheduler.ticks,TICKS);
+   assert.equal(recovered.scheduler.droppedMs,0);
+   assert.deepEqual(recovered.state,reference.state,
+    cls+' paired 20Hz jitter '+jitter+'ms');
+  }
  }
 });
