@@ -23,6 +23,7 @@ function run(seed,maxSteps,backlogExtraTicks){
   g.player.droneRespawnT=Infinity;g.spawnDrone=()=>null;
   g.status='playing';g.paused=false;
   const presentation=new FixedStepPosePresentation(g,{enabled:true});
+  const actualRender=g.__testWindow.__novaMakeRequire('')('game/render').render;
   const timeline=new ChronologicalInput(g.input);
   const bridge={timeline,startMs:1000};
   let now=1000,callback=null,rows=[],violations=0;
@@ -34,6 +35,7 @@ function run(seed,maxSteps,backlogExtraTicks){
     presentation.draw(world=>{
      rows.push({x:world.player.x,y:world.player.y,camX:world.cam.x,
       camY:world.cam.y,alpha,lagMs:owner.lagMs,steps:owner.lastSteps});
+     actualRender(world,w,h);
     },game,w,h,alpha);
     if([game.player.x,game.player.y,game.cam.x,game.cam.y]
        .some((v,i)=>v!==before[i]))violations++;
