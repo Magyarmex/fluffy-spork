@@ -218,3 +218,36 @@ for(const owner of ['shot','subtick','explicit'])for(const kind of ['mouse','tou
   });
  }
 }
+
+
+// Integration through the real chronological replay and bounded presentation
+// driver, not only direct calls to the pulse wrapper.
+for(const kind of ['mouse','touch']){
+ test(kind+' held press sampled by multiple fixed60 ticks cannot cross redeploy',()=>{
+  const {FixedStepPresentation}=require('../research/fixed-step-dom-input.cjs');
+  const shots=[],old={id:1},fresh={id:2};
+  const input={touchSeen:kind!=='mouse',firing:false,mouseActive:false,
+   aim:{active:false,dx:40,dy:0},stickId:{aim:-1},
+   pd(e){if(e.pointerType==='mouse'){this.mouseActive=true;this.firing=true;}
+    else{this.stickId.aim=e.pointerId;this.aim.active=true;this.firing=true;}},
+   pm(){},pu(e){this.firing=false;this.mouseActive=false;
+    this.aim.active=false;this.stickId.aim=-1;}
+  };
+  const game={input,player:old,status:'playing',paused:false,
+   update(){if(input.firing)shots.push(this.player.id);}};
+  const timeline=new ChronologicalInput(input);
+  const pulse=new SubtickFirePulse(game,timeline);
+  const driver=new FixedStepPresentation(game,timeline,{maxSteps:3});
+  try{
+   timeline.push(.002,'pointerdown',{pointerType:kind,pointerId:22,button:0,buttons:1});
+   driver.frame(.05);
+   assert.deepEqual(shots,[1,1,1]);
+   game.player=fresh;
+   driver.frame(.1);
+   assert.deepEqual(shots,[1,1,1]);
+   assert.equal(input.firing,false);
+   assert.equal(input.aim.active,false);
+   assert.equal(input.mouseActive,false);
+  }finally{pulse.detach();}
+ });
+}
