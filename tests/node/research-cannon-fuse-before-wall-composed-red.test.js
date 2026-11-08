@@ -32,10 +32,11 @@ function trial({hz,startX,wallX,vx,wall}){
    __v17SpawnX:0,__v17SpawnY:0,__v17FuseArmed:false,
    splash:72,splashDmg:.4,color:'#ffb45e'};
   g.bullets=[b];g.nextId=Math.max(g.nextId||0,1200);
+  const preWall=wall?g.firstTerrainHit(startX,0,startX+vx/hz,0,b.r*.45):null;
   const bursts=[],orig=g.clusterBurst.bind(g);
   g.clusterBurst=function(shell){if(shell===b)bursts.push({x:shell.x,y:shell.y});return orig(shell);};
   for(let i=0;i<3&&bursts.length===0;i++)g.update(1/hz);
-  return {bursts,bullet:b};
+  return {bursts,bullet:b,preWall};
  });
 }
 const cases=[
@@ -46,7 +47,9 @@ const cases=[
 ];
 for(const scenario of cases){
  test('full 49-overlay Cannon fuse before later wall '+scenario.hz+'Hz',()=>{
-  const {bursts}=trial({...scenario,wall:true});
+  const {bursts,preWall}=trial({...scenario,wall:true});
+  assert.ok(preWall&&preWall.hit&&preWall.hit.t>0,
+   'the later wall must physically intersect the current frame');
   assert.equal(bursts.length,1,'one shell burst');
   assert.ok(bursts[0].x>=148-1e-6&&bursts[0].x<=150+1e-6,
    'physical fuse must beat later wall; actual x='+bursts[0].x);
@@ -58,3 +61,14 @@ for(const scenario of cases){
    'unobstructed programmed fuse remains stable; x='+bursts[0].x);
  });
 }
+
+/* Negative control: a wall physically earlier than the programmed fuse must
+ * retain the original wall burst. This proves the full-game fixture really
+ * exercises terrain instead of bypassing it. */
+test('full 49-overlay earlier wall retains first-contact priority',()=>{
+ const {bursts,preWall}=trial({hz:30,startX:146,wallX:163,vx:380,wall:true});
+ assert.ok(preWall&&preWall.hit&&preWall.hit.t>0);
+ assert.equal(bursts.length,1);
+ assert.ok(Math.abs(bursts[0].x-149.175)<1e-3,
+  'wall must beat later fuse; actual x='+bursts[0].x);
+});
