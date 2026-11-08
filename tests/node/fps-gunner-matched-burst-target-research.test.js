@@ -9,7 +9,8 @@ const EPS=1e-9;
 function run(seed,cls,reload,hz,policy,targeted){
  return withSeed(seed,()=>{
   const g=bootGame(),p=g.player;g.sfx.muted=true;
-  g.setClass(p,cls);g.tanks=[p];g.tankById=new Map([[p.id,p]]);
+  g.setClass(p,cls);p.x=1000;p.y=1000;p.vx=0;p.vy=0;
+  g.tanks=[p];g.tankById=new Map([[p.id,p]]);g.__novaTerrain=[];
   const neutral=g.shapes.find(s=>s.type==='square')||g.shapes[0];
   g.shapes=[];g.drones=[];g.powerups=[];g.bullets=[];
   if(g.shapeById)g.shapeById.clear();
