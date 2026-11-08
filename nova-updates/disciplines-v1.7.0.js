@@ -608,7 +608,8 @@ wrap('game/engine',function(engine,require){
   function certifiedFuseBeforeLaterWall(g,dt){
     if(!(dt>0&&dt<=.05)||!Array.isArray(g.bullets)||
        g.bullets.length!==1||typeof g.firstTerrainHit!=='function'||
-       typeof g.clusterBurst!=='function')return null;
+       typeof g.clusterBurst!=='function'||!g.hash||
+       typeof g.hash.query!=='function')return null;
     var b=g.bullets[0];
     if(!b||b.dead||!b.shell||!b.__v17Cannon||
        !(b.__v17FuseDist>0)||!(b.ttl>0)||!(b.pen<=1)||
