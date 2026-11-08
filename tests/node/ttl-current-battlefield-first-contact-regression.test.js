@@ -133,3 +133,44 @@ test('current Battlefield: seeded 300-world isolated TTL parity at all frame rat
       }
     }
 });
+
+test('current Battlefield: seeded 200-world moving TTL parity at all frame rates',()=>{
+  let seed=0x20261108;
+  const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+  const worlds=Array.from({length:200},()=>({
+    x:30+rand()*120,y:(rand()-.5)*50,v:3000+rand()*6000,
+    ttl:.003+rand()*.027,tvx:(rand()-.5)*400,tvy:(rand()-.5)*400
+  }));
+  function physical(w){
+    const x=-w.x,y=-w.y,vx=w.v-w.tvx,vy=-w.tvy,R=21;
+    const A=vx*vx+vy*vy,H=x*vx+y*vy,C=x*x+y*y-R*R;
+    if(C<0)return true;
+    if(!(A>0&&H<0))return false;
+    const D=H*H-A*C;
+    if(!(D>1e-8))return false;
+    const t=C/(-H+Math.sqrt(D));
+    return t>=0&&t<w.ttl-1e-8;
+  }
+  for(const fps of [30,60,120,240]){
+    const dt=1/fps;
+    for(const w of worlds){
+      const expected=physical(w);
+      for(const Game of [Battlefield,Optimized]){
+        const g=new Game(),tank={kind:'tank',id:2,x:w.x,y:w.y,
+          cls:'scout',hp:100,alive:true};
+        g.tanks=[tank];
+        g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+          vx:w.v,vy:0,r:3,dmg:20,ttl:w.ttl,pen:0,hits:0,
+          dead:false,shell:false,beam:false}];
+        for(let frame=0;frame<20&&g.bullets.length;frame++){
+          tank.__novaSweepMoveTime=g.time;
+          tank.__novaSweepPrevX=tank.x;tank.__novaSweepPrevY=tank.y;
+          tank.x+=w.tvx*dt;tank.y+=w.tvy*dt;
+          g.updateBullets(dt);g.time+=dt;
+        }
+        assert.equal(g.hits>0,expected,
+          'moving TTL parity: '+fps+'Hz x='+w.x+' y='+w.y);
+      }
+    }
+  }
+});
