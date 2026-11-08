@@ -66,12 +66,12 @@ function trial(fps,reverse=false,mode='hostile'){
  });
 }
 
-/* KNOWN-RED research gate. Both opposing bullets physically intersect at
+/* Former known-red regression. Both opposing bullets physically intersect at
  * 2.708ms, strictly before either 5ms TTL. The stronger shot survives
  * with two integrity points. Unlike an isolated updater fixture, this
  * uses the complete Game.update with real frame-start witnesses. */
 for(const fps of [30,60,120,240])for(const reverse of [false,true]){
- test('KNOWN RED: composed asymmetric hostile TTL first contact '+fps+
+ test('composed asymmetric hostile TTL first contact '+fps+
       'Hz reverse='+reverse,()=>{
   const {contacts,left,right}=trial(fps,reverse,'asym');
   assert.deepEqual(contacts.map(c=>c.id).sort(),[201,202],
