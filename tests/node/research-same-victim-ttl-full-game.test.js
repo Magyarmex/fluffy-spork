@@ -1,5 +1,5 @@
 'use strict';
-// KNOWN-RED RESEARCH GATE: two physical pre-expiry contacts with one surviving
+// FULL-GAME REGRESSION GATE: two physical pre-expiry contacts with one surviving
 // tank must not depend on the order of the bullet array. Do not merge until
 // the actual composed Game passes at 30/60/120/240 Hz.
 const test=require('node:test');
@@ -67,7 +67,7 @@ function trial(hz,reverse,fullUpdate,only=null,targetX=40,mutate=null){
 }
 for(const hz of [30,60,120,240])
  for(const fullUpdate of [false,true])
-  test('KNOWN RED: same-victim two-shot TTL chronological parity '+hz+
+  test('same-victim two-shot TTL chronological parity '+hz+
        'Hz fullUpdate='+fullUpdate,()=>{
    const a=trial(hz,false,fullUpdate);
    const b=trial(hz,true,fullUpdate);

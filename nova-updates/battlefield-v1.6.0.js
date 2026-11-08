@@ -1999,6 +1999,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   if(!ac||!bc||ac.length!==1||bc.length!==1||
      ac[0].e!==bc[0].e)return false;
   var target=ac[0].e,at=ac[0].t*a.ttl,bt=bc[0].t*b.ttl;
+  var targetDef=CLASSES[target.cls];
+  if(!targetDef||!(Number.isFinite(targetDef.size)&&targetDef.size>0))return false;
   if(!(at>0&&bt>0&&Math.abs(at-bt)>1e-7)||
      !(target.hp>2*(a.dmg+b.dmg))||
      !Number.isFinite(target.x)||!Number.isFinite(target.y))return false;
@@ -2057,10 +2059,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   if(!fresh||!prior||!certifiedTTLFrameStart(g,fresh)||
      !certifiedTTLFrameStart(g,prior)||
      bullets.some(function(o){return o&&!o.dead&&(o.shell||o.splash||o.beam||o.__v17Cannon);})||
-     !fresh||!prior||fresh.ownerId===prior.ownerId||
+     fresh.ownerId===prior.ownerId||
      (fresh.knock||0)!==0||(prior.knock||0)!==0)return false;
   var target=prior.__novaDirectVictims.values().next().value;
   if(!target||target.kind!=='tank'||!target.alive||
+     !CLASSES[target.cls]||!(CLASSES[target.cls].size>0)||
      !(target.hp>fresh.dmg*2))return false;
   var others=localSingleTTLBodyOthers(g,fresh,dt,true);
   if(!others||others.some(function(o){return o!==prior;}))return false;
