@@ -21,9 +21,9 @@ class SubtickFirePulse {
       if (e && e.target && typeof e.target.closest === 'function' && e.target.closest('[data-ui]')) return out;
       if (e && e.pointerType === 'mouse') {
         if (e.button === 0 && !priorFire && input.firing && !input.touchSeen)
-          self.down = {type:'mouse', id:e.pointerId, player:self.game.player};
+          self.down = {type:'mouse', id:e.pointerId, player:self.game.player, sampled:false};
       } else if (e && input.stickId && input.stickId.aim === e.pointerId &&
-                 input.aim.active && priorAimId !== e.pointerId) self.down = {type:e.pointerType, id:e.pointerId, player:self.game.player};
+                 input.aim.active && priorAimId !== e.pointerId) self.down = {type:e.pointerType, id:e.pointerId, player:self.game.player, sampled:false};
       return out;
     };
     input.pm = function(e) {
@@ -33,7 +33,7 @@ class SubtickFirePulse {
       // release as a pointermove(buttons=2) BEFORE native mouseup. The existing
       // Input.pm clears firing there. Preserve the deliberate short primary
       // press until one simulation tick instead of losing it to event order.
-      if (self.down && self.down.type === 'mouse' && e && e.pointerType === 'mouse' &&
+      if (self.down && !self.down.sampled && self.down.type === 'mouse' && e && e.pointerType === 'mouse' &&
           typeof e.buttons === 'number' && !(e.buttons & 1) && input.firing &&
           self.game.status === 'playing' && !self.game.paused && !input.__novaInputPaused) {
         self.pending = {event:{type:'pointerup',pointerType:'mouse',button:0,buttons:0,
@@ -63,7 +63,7 @@ class SubtickFirePulse {
         e.pointerId === down.id && e.pointerType === down.type);
       const aimValid = down && (down.type === 'mouse' ? input.mouseActive && input.firing :
         input.aim.active && Math.hypot(input.aim.dx,input.aim.dy) >= 9);
-      if (same && aimValid && self.game.status === 'playing' && !self.game.paused &&
+      if (same && !down.sampled && aimValid && self.game.status === 'playing' && !self.game.paused &&
           !input.__novaInputPaused && !(self.game.__testWindow && self.game.__testWindow.document.hidden)) {
         self.pending = {event:e, type:down.type, id:down.id, player:down.player}; self.down = null;
         return; // Hold only through the immediately following Game.update.
@@ -81,12 +81,32 @@ class SubtickFirePulse {
         const down=self.down; self.down=null;
         self.old.pu.call(input,{type:'pointercancel',pointerType:down.type,
           pointerId:down.id,button:0,buttons:0});
+        // Core Input.pu clears mouse firing but deliberately retains mouse aim.
+        // A replaced life must not inherit that old pointer aim ownership.
+        if (down.type === 'mouse') input.mouseActive = false;
       }
       const canPlay = game.status === 'playing' && !game.paused && !input.__novaInputPaused &&
         !(game.__testWindow && game.__testWindow.document.hidden);
-      if (!canPlay) self.release();
+      if (!canPlay) {
+        self.release();
+        // Death, pause and hidden/disabled input must not orphan a held
+        // physical control before the next player life begins.
+        if (self.down) {
+          const down=self.down; self.down=null;
+          self.old.pu.call(input,{type:'pointercancel',pointerType:down.type,
+            pointerId:down.id,button:0,buttons:0});
+          if (down.type === 'mouse') input.mouseActive = false;
+        }
+      }
       try { return self.old.update.apply(this,arguments); }
-      finally { if (canPlay && self.pending) self.pulses++; self.release(); self.down = null; }
+      finally {
+        if (canPlay && self.pending) self.pulses++;
+        self.release();
+        // Keep the press's original player identity across multiple ticks.
+        // Mark it sampled so a later release cannot manufacture a second shot.
+        if (canPlay && self.down) self.down.sampled = true;
+        else self.down = null;
+      }
     };
     timeline.releaseAll = function() { self.release(); self.down = null; self.canceled++; return self.old.releaseAll.apply(this,arguments); };
     timeline.reset = function() { self.release(); self.down = null; return self.old.reset.apply(this,arguments); };

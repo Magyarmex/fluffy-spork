@@ -129,3 +129,159 @@ for(const owner of ['shot','subtick','explicit'])for(const kind of ['touch','mou
   }finally{pulse.detach();}
  });
 }
+
+
+// A held press can outlive several simulation updates. Its life ownership
+// must survive those updates, but an already-sampled release must not create
+// a second firing opportunity.
+for(const owner of ['shot','subtick','explicit'])for(const kind of ['touch','mouse']){
+ for(const redeploy of [false,true]){
+  test(owner+' '+kind+' sampled held input '+(redeploy?'cannot transfer on redeploy':'cannot fire again on release'),()=>{
+   const shots=[],original={id:1},replacement={id:2};
+   const input={touchSeen:kind!=='mouse',firing:false,mouseActive:false,
+    aim:{active:false,dx:0,dy:0},stickId:{aim:-1},
+    pd(e){if(e.pointerType==='mouse'){this.mouseActive=true;this.firing=true;}
+     else{this.stickId.aim=e.pointerId;this.aim.active=true;this.aim.dx=40;this.firing=true;}},
+    pm(){},pu(e){if(e.pointerType==='mouse'){this.mouseActive=false;this.firing=false;}
+     else if(this.stickId.aim===e.pointerId){this.stickId.aim=-1;
+      this.aim.active=false;this.firing=false;}},
+    aimVec(){return{x:1,y:0};}
+   };
+   const game={input,player:original,status:'playing',paused:false,
+    update(){if(input.firing||input.__novaShotIntent?.fire)this.tryFire(this.player);this.updateDrones();},
+    updateDrones(){},tryFire(p){shots.push(p.id);},destroy(){}};
+   const timeline={input,reset(){},releaseAll(){}};
+   const pulse=owner==='shot'?new ShotOnlyFirePulse(game,timeline):
+    owner==='explicit'?new ExplicitShotIntent(game,timeline):new SubtickFirePulse(game,timeline);
+   const event=(type)=>({type,pointerType:kind,pointerId:22,button:0,buttons:type==='pointerup'?0:1,
+    target:{closest(){return null;}}});
+   try{
+    input.pd(event('pointerdown'));
+    game.update(1/60);
+    assert.deepEqual(shots,[1],'the original life receives the first sampled shot');
+    if(redeploy){
+     game.player=replacement;
+     game.update(1/60);
+     assert.deepEqual(shots,[1],'the new life must not inherit held fire');
+     assert.equal(input.firing,false);
+     assert.equal(input.aim.active,false);
+     assert.equal(input.mouseActive,false);
+    }else{
+     input.pu(event('pointerup'));
+     assert.equal(!!(pulse.pulse?.pending||pulse.pending),false,
+      'a sampled press must not become a new short pulse');
+     game.update(1/60);
+     assert.deepEqual(shots,[1],'release cannot duplicate the sampled shot');
+    }
+   }finally{pulse.detach();}
+  });
+ }
+}
+
+
+// A death or pause update can occur between the last old-life combat tick
+// and spawnPlayer(). Never discard the identity marker while leaving its
+// physical fire/aim state held for the replacement life.
+for(const owner of ['shot','subtick','explicit'])for(const kind of ['mouse','touch']){
+ for(const interruption of ['dead','paused']){
+  test(owner+' '+kind+' sampled hold is canceled on '+interruption+' before redeploy',()=>{
+   const shots=[],old={id:1},fresh={id:2};
+   const input={touchSeen:kind!=='mouse',firing:false,mouseActive:false,
+    aim:{active:false,dx:40,dy:0},stickId:{aim:-1},
+    pd(e){if(e.pointerType==='mouse'){this.mouseActive=true;this.firing=true;}
+     else{this.stickId.aim=e.pointerId;this.aim.active=true;this.firing=true;}},
+    pm(){},pu(e){if(e.pointerType==='mouse'){this.mouseActive=false;this.firing=false;}
+     else if(this.stickId.aim===e.pointerId){this.stickId.aim=-1;
+      this.aim.active=false;this.firing=false;}},
+    aimVec(){return{x:1,y:0};}
+   };
+   const game={input,player:old,status:'playing',paused:false,
+    update(){if(input.firing||input.__novaShotIntent?.fire)this.tryFire(this.player);this.updateDrones();},
+    updateDrones(){},tryFire(p){shots.push(p.id);},destroy(){}};
+   const timeline={input,reset(){},releaseAll(){}};
+   const pulse=owner==='shot'?new ShotOnlyFirePulse(game,timeline):
+    owner==='explicit'?new ExplicitShotIntent(game,timeline):new SubtickFirePulse(game,timeline);
+   try{
+    input.pd({type:'pointerdown',pointerType:kind,pointerId:22,button:0,
+     target:{closest(){return null;}}});
+    game.update(1/60);
+    assert.deepEqual(shots,[1]);
+    if(interruption==='dead')game.status='dead';else game.paused=true;
+    game.update(1/60);
+    assert.equal(input.firing,false);
+    assert.equal(input.aim.active,false);
+    assert.equal(input.mouseActive,false);
+    game.player=fresh;game.status='playing';game.paused=false;
+    game.update(1/60);
+    assert.deepEqual(shots,[1],'a new life cannot inherit interrupted old-life fire');
+   }finally{pulse.detach();}
+  });
+ }
+}
+
+
+// Integration through the real chronological replay and bounded presentation
+// driver, not only direct calls to the pulse wrapper.
+for(const kind of ['mouse','touch']){
+ test(kind+' held press sampled by multiple fixed60 ticks cannot cross redeploy',()=>{
+  const {FixedStepPresentation}=require('../research/fixed-step-dom-input.cjs');
+  const shots=[],old={id:1},fresh={id:2};
+  const input={touchSeen:kind!=='mouse',firing:false,mouseActive:false,
+   aim:{active:false,dx:40,dy:0},stickId:{aim:-1},
+   pd(e){if(e.pointerType==='mouse'){this.mouseActive=true;this.firing=true;}
+    else{this.stickId.aim=e.pointerId;this.aim.active=true;this.firing=true;}},
+   pm(){},pu(e){this.firing=false;this.mouseActive=false;
+    this.aim.active=false;this.stickId.aim=-1;}
+  };
+  const game={input,player:old,status:'playing',paused:false,
+   update(){if(input.firing)shots.push(this.player.id);}};
+  const timeline=new ChronologicalInput(input);
+  const pulse=new SubtickFirePulse(game,timeline);
+  const driver=new FixedStepPresentation(game,timeline,{maxSteps:3});
+  try{
+   timeline.push(.002,'pointerdown',{pointerType:kind,pointerId:22,button:0,buttons:1});
+   driver.frame(.05);
+   assert.deepEqual(shots,[1,1,1]);
+   game.player=fresh;
+   driver.frame(.1);
+   assert.deepEqual(shots,[1,1,1]);
+   assert.equal(input.firing,false);
+   assert.equal(input.aim.active,false);
+   assert.equal(input.mouseActive,false);
+  }finally{pulse.detach();}
+ });
+}
+
+
+// The shipping core's mouse pointerup clears firing but intentionally leaves
+// mouseActive set for ordinary hover aiming. A synthetic old-life cancellation
+// needs the stronger lifecycle reset, not just a pointerup call.
+for(const interruption of ['redeploy','dead']){
+ test('sampled old-life mouse hover ownership clears on '+interruption,()=>{
+  const shots=[],old={id:1},fresh={id:2};
+  const input={touchSeen:false,firing:false,mouseActive:false,
+   aim:{active:false,dx:0,dy:0},stickId:{aim:-1},
+   pd(){this.mouseActive=true;this.firing=true;},pm(){},
+   pu(){this.firing=false;}, // matches shipping core mouse pointerup
+   aimVec(){return{x:1,y:0};}
+  };
+  const game={input,player:old,status:'playing',paused:false,
+   update(){if(input.firing)this.tryFire(this.player);this.updateDrones();},
+   updateDrones(){},tryFire(p){shots.push(p.id);},destroy(){}};
+  const timeline={input,reset(){},releaseAll(){}};
+  const pulse=new ShotOnlyFirePulse(game,timeline);
+  try{
+   input.pd({type:'pointerdown',pointerType:'mouse',pointerId:22,button:0,
+    target:{closest(){return null;}}});
+   game.update(1/60);
+   assert.deepEqual(shots,[1]);
+   if(interruption==='redeploy')game.player=fresh;else game.status='dead';
+   game.update(1/60);
+   assert.equal(input.firing,false);
+   assert.equal(input.mouseActive,false,'old-life hover aim must not survive cancellation');
+   game.player=fresh;game.status='playing';
+   game.update(1/60);
+   assert.deepEqual(shots,[1]);
+  }finally{pulse.detach();}
+ });
+}
