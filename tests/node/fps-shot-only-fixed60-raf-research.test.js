@@ -43,8 +43,8 @@ function run({shot=false,cls='basic',disableFire=false,releaseType='pointerup'}=
    for(let frame=1;frame<=8;frame++){
     now=1000+frame*50;
     if(frame===3){
-     assert.equal(event('pointerdown',130,600,1),true);
-     assert.equal(event('pointermove',135,640,1),true);
+     assert.equal(event('pointerdown',134,600,1),true);
+     assert.equal(event('pointermove',137,640,1),true);
      assert.equal(event(releaseType,140,640,0),true);
     }
     const cb=callback;callback=null;assert.equal(typeof cb,'function');cb(now);
