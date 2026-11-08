@@ -225,9 +225,16 @@ test('clustered nominal 30Hz frames expose two-step combat time loss; three step
   const two=run(seed,intervals,2,[],true);
   const three=run(seed,intervals,3,[],true);
   assert.ok(baseline.volleys>0,'exercise real Tempest weapon chronology');
-  assert.ok(two.droppedMs>0 && two.ticks<baseline.ticks,
-   'two-step pilot loses time under clustered 30Hz presentation');
-  assert.notEqual(two.hash,baseline.hash);
+  if(two.droppedMs>0 || two.ticks<baseline.ticks){
+   assert.ok(two.ticks<baseline.ticks);
+   assert.notEqual(two.hash,baseline.hash,
+    'dropped simulation time must not masquerade as combat parity');
+  }else{
+   // A future chronological fix should improve this gate, not fail it.
+   assert.equal(two.ticks,baseline.ticks);
+   assert.equal(two.hash,baseline.hash);
+   assert.equal(two.draws,baseline.draws);
+  }
   assert.equal(three.ticks,baseline.ticks);
   assert.equal(three.droppedFrames,0);
   assert.equal(three.volleys,baseline.volleys);
@@ -247,9 +254,16 @@ test('a harsher sub-100ms 30Hz cluster still exceeds three steps but recovers wi
   const baseline=run(seed,Array(120).fill(1000/60),2,[],true);
   const three=run(seed,intervals,3,[],true);
   const four=run(seed,intervals,4,[],true);
-  assert.ok(three.droppedMs>0 && three.ticks<baseline.ticks,
-   'three-step cap must not be mistaken for a universal 30Hz guarantee');
-  assert.notEqual(three.hash,baseline.hash);
+  if(three.droppedMs>0 || three.ticks<baseline.ticks){
+   assert.ok(three.ticks<baseline.ticks);
+   assert.notEqual(three.hash,baseline.hash,
+    'a three-step time loss must remain visible in actual combat state');
+  }else{
+   // Do not freeze the current three-step deficit as desired behavior.
+   assert.equal(three.ticks,baseline.ticks);
+   assert.equal(three.hash,baseline.hash);
+   assert.equal(three.draws,baseline.draws);
+  }
   assert.equal(four.ticks,baseline.ticks);
   assert.equal(four.droppedFrames,0);
   assert.equal(four.volleys,baseline.volleys);
