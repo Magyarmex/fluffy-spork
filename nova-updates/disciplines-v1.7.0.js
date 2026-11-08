@@ -601,10 +601,104 @@ wrap('game/engine',function(engine,require){
     }
   }
 
+  /* Research candidate: a single uncontested programmed fuse that is
+   * physically earlier than a permanent-wall contact in the SAME frame.
+   * Preflight all competing owners before any terrain/core side effects.
+   * Abstain on uncertain motion, multiple shots, or nearby bodies. */
+  function certifiedFuseBeforeLaterWall(g,dt){
+    if(!(dt>0&&dt<=.05)||!Array.isArray(g.bullets)||
+       g.bullets.length!==1||typeof g.firstTerrainHit!=='function'||
+       typeof g.clusterBurst!=='function')return null;
+    var b=g.bullets[0];
+    if(!b||b.dead||!b.shell||!b.__v17Cannon||
+       !(b.__v17FuseDist>0)||!(b.ttl>0)||!(b.pen<=1)||
+       (b.hits||0)!==0||b.__novaBreachAtTime===g.time||
+       ![b.x,b.y,b.vx,b.vy,b.r,b.__v17SpawnX,
+         b.__v17SpawnY,b.__v17FuseDist,b.ttl].every(Number.isFinite)||
+       !(b.r>0)||!Array.isArray(g.tanks)||
+       !Array.isArray(g.shapes)||!Array.isArray(g.drones)||
+       g.tanks.length+g.shapes.length+g.drones.length>260)return null;
+    var fx=b.x-b.__v17SpawnX,fy=b.y-b.__v17SpawnY,
+        r=b.__v17FuseDist,c=fx*fx+fy*fy-r*r,
+        v2=b.vx*b.vx+b.vy*b.vy,dot=fx*b.vx+fy*b.vy;
+    if(!(c<0&&Math.hypot(fx,fy)+2<r&&v2>1e-12))return null;
+    var disc=dot*dot-v2*c;
+    if(!(disc>0))return null;
+    var root=Math.sqrt(disc),t=dot>=0?-c/(dot+root):(-dot+root)/v2;
+    if(!Number.isFinite(t)||!(t>1e-8&&t<Math.min(dt,b.ttl)-1e-8))return null;
+    var x=b.x+b.vx*t,y=b.y+b.vy*t,
+        endX=b.x+b.vx*dt,endY=b.y+b.vy*dt;
+    if(![x,y,endX,endY].every(Number.isFinite)||
+       Math.max(Math.abs(x),Math.abs(y),Math.abs(endX),Math.abs(endY))>2100)return null;
+    var pad=b.r*.45;
+    if(g.firstTerrainHit(b.x,b.y,x,y,pad))return null;
+    var wall=g.firstTerrainHit(b.x,b.y,endX,endY,pad);
+    if(!wall||!wall.hit||!Number.isFinite(wall.hit.t)||
+       !(wall.hit.t*dt>t+1e-6))return null;
+    function close(e,rad){
+      if(!e||![e.x,e.y,rad].every(Number.isFinite)||!(rad>0))return true;
+      var dx=x-b.x,dy=y-b.y,den=dx*dx+dy*dy,
+          u=den>1e-12?Math.max(0,Math.min(1,
+             ((e.x-b.x)*dx+(e.y-b.y)*dy)/den)):0,
+          ex=b.x+dx*u-e.x,ey=b.y+dy*u-e.y;
+      return ex*ex+ey*ey<=(rad+b.r+320)*(rad+b.r+320);
+    }
+    for(var i=0;i<g.tanks.length;i++){
+      var tank=g.tanks[i];if(!tank||!tank.alive||tank.id===b.ownerId)continue;
+      var def=C[tank.cls];if(!def||close(tank,def.size||20))return null;
+    }
+    for(var j=0;j<g.shapes.length;j++){
+      var sh=g.shapes[j];if(sh&&sh.hp>0&&close(sh,sh.r||20))return null;
+    }
+    for(var k=0;k<g.drones.length;k++){
+      var d=g.drones[k];if(d&&d.hp>0&&d.ownerId!==b.ownerId&&
+         close(d,d.r||20))return null;
+    }
+    /* No unverified posthumous body from the broad phase may precede fuse. */
+    if(g.hash&&typeof g.hash.query==='function'){
+      var near=[],mx=(b.x+x)*.5,my=(b.y+y)*.5;
+      try{g.hash.query(mx,my,Math.hypot(x-b.x,y-b.y)*.5+360,near);}
+      catch(_e){return null;}
+      if(near.length>260)return null;
+      for(var n=0;n<near.length;n++){
+        var e=near[n];if(!e||e.id===b.ownerId)continue;
+        if((e.kind==='tank'||e.kind==='drone'||e.kind==='shape')&&
+           close(e,e.r||(e.kind==='tank'&&C[e.cls]&&C[e.cls].size)||20))return null;
+      }
+    }
+    /* Commit the same complete fuse owner as the normal post-core path. */
+    b.x=x;b.y=y;b.px=x;b.py=y;
+    var start=g.bullets.length,owner=g.getTank&&g.getTank(b.ownerId),
+        frac=b.splashDmg||.36;
+    if(!b.__v17FuseArmed)frac*=.72;
+    g.clusterBurst(b);
+    var children=g.bullets.slice(start),remaining=dt-t,scale=remaining/dt,
+        restore=[];
+    for(var ci=0;ci<children.length;ci++){
+      var child=children[ci];if(!child||child.dead)continue;
+      if(Number.isFinite(child.vx)&&Number.isFinite(child.vy)){
+        restore.push({child:child,vx:child.vx,vy:child.vy});
+        child.vx*=scale;child.vy*=scale;
+        if(Number.isFinite(child.ttl))child.ttl+=t;
+      }
+    }
+    if((b.splash||0)>0&&g.splashAt)
+      g.splashAt(x,y,b.splash,frac,b.ownerId,b.knock||0,b.color,b.dmg);
+    if(g.addRing)g.addRing(x,y,b.color,Math.max(28,(b.splash||48)*.42));
+    if(owner&&owner.isPlayer&&g.addText)g.addText(x,y-20,'AIRBURST',b.color,9);
+    if(g.sfx&&g.sfx.novaFuseBurst)g.sfx.novaFuseBurst(pan(g,x),!!b.__v17FuseHeavy);
+    b.dead=true;g.bullets.splice(0,1);
+    return restore;
+  }
+
   var oldBullets=Game.prototype.updateBullets;
   Game.prototype.updateBullets=function(dt){
     var sole=this.bullets&&this.bullets.length===1;
-    oldBullets.call(this,dt);
+    var restored=certifiedFuseBeforeLaterWall(this,dt);
+    try{oldBullets.call(this,dt);}
+    finally{if(restored)for(var ri=0;ri<restored.length;ri++){
+      var rr=restored[ri];rr.child.vx=rr.vx;rr.child.vy=rr.vy;
+    }}
     /* Programmable cannon airbursts happen after normal collision resolution:
        direct hits therefore still beat the fuse, while surviving rounds detonate at the programmed distance. */
     for(var i=this.bullets.length-1;i>=0;i--){
