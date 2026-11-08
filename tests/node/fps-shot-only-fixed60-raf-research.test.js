@@ -87,7 +87,7 @@ test('shot-only pulse never changes Controller swarm state when firing is disabl
   const baseline=run({cls,disableFire:true});
   const recovered=run({cls,disableFire:true,shot:true});
   for(const key of ['drones','recall','active','power','nodeX','nodeY'])
-   assert.deepEqual(recovered[key],baseline[key],cls+' '+key);
+   assert.equal(JSON.stringify(recovered[key]),JSON.stringify(baseline[key]),cls+' '+key);
   assert.equal(recovered.at150.shots,1);
  }
 });
