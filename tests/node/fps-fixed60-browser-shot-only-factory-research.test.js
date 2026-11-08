@@ -15,7 +15,7 @@ function target(){
   listenerCount(){return [...handlers.values()].reduce((n,list)=>n+list.length,0)}
  };
 }
-function run({shotOnlyPulse=false,release='pointerup',maxSteps=3,failRequest=false,mouse=false,compat=false}={}){
+function run({shotOnlyPulse=false,release='pointerup',maxSteps=3,failRequest=false,mouse=false,compat=false,ageGateMs=Infinity}={}){
  const canvas=target(),win=target(),doc=target();doc.hidden=false;
  let now=1000,callback=null,shots=[],commands=0;
  const input={canvas,touchSeen:!mouse,stickId:{move:-1,aim:-1},
@@ -43,7 +43,8 @@ function run({shotOnlyPulse=false,release='pointerup',maxSteps=3,failRequest=fal
   request:fn=>{if(failRequest)throw Error('host refused RAF');callback=fn;return 1},
   cancel:()=>{callback=null},render(){},
   canvas,maxSteps,shotOnlyPulseFactory:shotOnlyPulse?
-    (g,t)=>new ShotOnlyFirePulse(g,t):null});
+    (g,t,b)=>new ShotOnlyFirePulse(g,t,{maxPulseAgeMs:ageGateMs,
+      nowMs:()=>now,startMs:b.startMs}):null});
  try{
   pilot.start();
   for(let frame=1;frame<=8;frame++){
@@ -64,7 +65,8 @@ function run({shotOnlyPulse=false,release='pointerup',maxSteps=3,failRequest=fal
    }
    const cb=callback;callback=null;assert.equal(typeof cb,'function');cb(now);
   }
-  return {shots,commands,pulses:pilot.pulse?.shots||0,ticks:pilot.owner.ticks,
+  return {shots,commands,pulses:pilot.pulse?.shots||0,rejectedStale:pilot.pulse?.rejectedStale||0,
+   ticks:pilot.owner.ticks,
    droppedMs:pilot.owner.droppedMs,aim:input.aim.active,firing:input.firing};
  }finally{
   pilot.stop();pilot.stop();
@@ -108,5 +110,17 @@ test('native mouse and pointer compatibility events recover only one shot',()=>{
   const result=run({shotOnlyPulse:true,mouse:true,compat});
   assert.deepEqual(result.shots,[150]);assert.equal(result.pulses,1);
   assert.equal(result.commands,0);assert.equal(result.firing,false);
+ }
+});
+
+test('browser factory passes clock origin to opt-in stale-shot gate',()=>{
+ const fresh=run({shotOnlyPulse:true,maxSteps:3,ageGateMs:40});
+ const stale=run({shotOnlyPulse:true,maxSteps:2,ageGateMs:40});
+ const allowed=run({shotOnlyPulse:true,maxSteps:2,ageGateMs:80});
+ assert.deepEqual(fresh.shots,[150]);assert.equal(fresh.rejectedStale,0);
+ assert.deepEqual(stale.shots,[]);assert.equal(stale.rejectedStale,1);
+ assert.deepEqual(allowed.shots,[200]);assert.equal(allowed.rejectedStale,0);
+ for(const result of [fresh,stale,allowed]){
+  assert.equal(result.commands,0);assert.equal(result.firing,false);assert.equal(result.aim,false);
  }
 });
