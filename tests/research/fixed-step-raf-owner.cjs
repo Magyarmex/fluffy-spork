@@ -329,9 +329,9 @@ class FixedStepRafOwner {
 // does not change the game's production startup path.
 function createFixedStepBrowserPilot(game,{window:win,document:doc,clock,
     request,cancel,render,canvas=game&&game.canvas,maxSteps=2,backlogExtraTicks=2,
-    shotOnlyPulse=false}={}){
+    shotOnlyPulseFactory=null}={}){
   if(!game || game.raf || !clock || typeof clock.now!=='function' ||
-     typeof shotOnlyPulse!=='boolean')
+     (shotOnlyPulseFactory!==null && typeof shotOnlyPulseFactory!=='function'))
     throw Error('invalid browser fixed-step pilot');
   const {ChronologicalInput}=require('./fixed-step-dom-input.cjs');
   const {BrowserEventTimeline}=require('./fixed-step-browser-events.cjs');
@@ -345,8 +345,11 @@ function createFixedStepBrowserPilot(game,{window:win,document:doc,clock,
     // The optional research pulse must wrap Game BEFORE FixedStepRafOwner
     // snapshots its lifecycle hooks. Installing it after the factory returns
     // fails the owner's lifecycle-integrity gate.
-    if(shotOnlyPulse)
-      pulse=new (require('./shot-only-fire-pulse.cjs').ShotOnlyFirePulse)(game,timeline);
+    if(shotOnlyPulseFactory){
+      pulse=shotOnlyPulseFactory(game,timeline);
+      if(!pulse || typeof pulse.detach!=='function')
+        throw Error('invalid browser pulse owner');
+    }
     owner=new FixedStepRafOwner(game,timeline,bridge,
       {now:clock.now,request,cancel,render,maxSteps,backlogExtraTicks,isVisible:()=>!doc.hidden});
   }catch(error){
