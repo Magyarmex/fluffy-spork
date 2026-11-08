@@ -29,6 +29,7 @@ function trial(hz,reverse,fullUpdate){
   const originalGetTank=g.getTank.bind(g);
   g.getTank=id=>owners.find(t=>t.id===id)||originalGetTank(id);
   g.shapes=[];g.drones=[];g.__novaTerrain=[];
+  g.hash.clear();for(const tank of g.tanks)g.hash.insert(tank);
   g.time=1;
   g.input.firing=false;g.input.autofire=false;
   g.input.moveVec=()=>({x:0,y:0});g.input.aimVec=()=>null;
