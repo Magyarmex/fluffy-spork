@@ -9,7 +9,7 @@ const {bootGame,withSeed,digest,physical}=
 const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
 const {FixedStepRafOwner}=require('../research/fixed-step-raf-owner.cjs');
 const TICKS=360;
-function run(cls,seed,cap,targeted){
+function run(cls,seed,cap,targeted,bursty=false){
  return withSeed(seed,draws=>{
   const g=bootGame(),p=g.player;g.sfx.muted=true;g.sfx.startMusic=()=>{};
   g.setClass(p,cls);p.x=1000;p.y=1000;p.vx=0;p.vy=0;
@@ -62,7 +62,7 @@ function run(cls,seed,cap,targeted){
     g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
     g.input.firing=true;
     for(let frame=1;frame<=120;frame++){
-     now=1000+frame*50;
+     // 95ms/5ms alternating gaps retain the same six-second wall clock.\n     now=1000+(bursty ? Math.floor(frame/2)*100+(frame%2?95:0) : frame*50);
      const fn=callback;assert.equal(typeof fn,'function');
      callback=null;fn(now);
     }
@@ -94,4 +94,18 @@ test('20Hz whole-Game three-step recovery restores 60Hz Gunner physics; two step
      cls+' target='+targeted+' cap='+cap);
    }
   }
+});
+
+test('bursty 20Hz presentation needs a four-step budget to avoid dropping Gunner time',()=>{
+ for(const cls of ['minigun','needlestorm']){
+  const baseline=run(cls,1517802,0,false);
+  const three=run(cls,1517802,3,false,true);
+  assert.ok(three.scheduler.droppedMs>0 || three.scheduler.ticks<TICKS,
+   '95ms bursts exceed the three-step backlog budget');
+  const four=run(cls,1517802,4,false,true);
+  assert.equal(four.scheduler.ticks,TICKS);
+  assert.equal(four.scheduler.droppedMs,0);
+  assert.deepEqual(four.state,baseline.state,
+   cls+' bursty 20Hz must preserve the 60Hz combat state');
+ }
 });
