@@ -177,3 +177,44 @@ for(const owner of ['shot','subtick','explicit'])for(const kind of ['touch','mou
   });
  }
 }
+
+
+// A death or pause update can occur between the last old-life combat tick
+// and spawnPlayer(). Never discard the identity marker while leaving its
+// physical fire/aim state held for the replacement life.
+for(const owner of ['shot','subtick','explicit'])for(const kind of ['mouse','touch']){
+ for(const interruption of ['dead','paused']){
+  test(owner+' '+kind+' sampled hold is canceled on '+interruption+' before redeploy',()=>{
+   const shots=[],old={id:1},fresh={id:2};
+   const input={touchSeen:kind!=='mouse',firing:false,mouseActive:false,
+    aim:{active:false,dx:40,dy:0},stickId:{aim:-1},
+    pd(e){if(e.pointerType==='mouse'){this.mouseActive=true;this.firing=true;}
+     else{this.stickId.aim=e.pointerId;this.aim.active=true;this.firing=true;}},
+    pm(){},pu(e){if(e.pointerType==='mouse'){this.mouseActive=false;this.firing=false;}
+     else if(this.stickId.aim===e.pointerId){this.stickId.aim=-1;
+      this.aim.active=false;this.firing=false;}},
+    aimVec(){return{x:1,y:0};}
+   };
+   const game={input,player:old,status:'playing',paused:false,
+    update(){if(input.firing||input.__novaShotIntent?.fire)this.tryFire(this.player);this.updateDrones();},
+    updateDrones(){},tryFire(p){shots.push(p.id);},destroy(){}};
+   const timeline={input,reset(){},releaseAll(){}};
+   const pulse=owner==='shot'?new ShotOnlyFirePulse(game,timeline):
+    owner==='explicit'?new ExplicitShotIntent(game,timeline):new SubtickFirePulse(game,timeline);
+   try{
+    input.pd({type:'pointerdown',pointerType:kind,pointerId:22,button:0,
+     target:{closest(){return null;}}});
+    game.update(1/60);
+    assert.deepEqual(shots,[1]);
+    if(interruption==='dead')game.status='dead';else game.paused=true;
+    game.update(1/60);
+    assert.equal(input.firing,false);
+    assert.equal(input.aim.active,false);
+    assert.equal(input.mouseActive,false);
+    game.player=fresh;game.status='playing';game.paused=false;
+    game.update(1/60);
+    assert.deepEqual(shots,[1],'a new life cannot inherit interrupted old-life fire');
+   }finally{pulse.detach();}
+  });
+ }
+}
