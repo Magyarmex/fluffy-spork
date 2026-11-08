@@ -26,12 +26,14 @@ function stepPercentile(counts,p){
   }
   return null;
 }
-function replay(intervals,maxSteps=2){
+function replay(intervals,maxSteps=2,backlogExtraTicks=2){
   if(!Array.isArray(intervals)||!intervals.length||intervals.length>200000||
      intervals.some(v=>!Number.isFinite(v)||v<=0||v>10000))
     throw Error('expected 1..200000 finite positive RAF intervals <=10000ms');
   if(!Number.isInteger(maxSteps)||maxSteps<1||maxSteps>4)
     throw Error('maxSteps must be 1..4');
+  if(!Number.isInteger(backlogExtraTicks)||backlogExtraTicks<2||backlogExtraTicks>4)
+    throw Error('backlogExtraTicks must be 2..4');
   const input={firing:false,keyboard:{},move:{active:false},aim:{active:false},
     stickId:{move:-1,aim:-1}};
   const game={input,paused:false,status:'playing',sfx:{startMusic(){}},
@@ -41,7 +43,7 @@ function replay(intervals,maxSteps=2){
   let now=1000,callback=null;
   const owner=new FixedStepRafOwner(game,timeline,bridge,{
     now:()=>now,request:fn=>{callback=fn;return 1},
-    cancel:()=>{callback=null},render(){},maxSteps
+    cancel:()=>{callback=null},render(){},maxSteps,backlogExtraTicks
   });
   const lag=[],phaseLag=[],stepCounts=Array(maxSteps+1).fill(0);
   let total=0,catchupFrames=0,peakSteps=0;
@@ -59,7 +61,7 @@ function replay(intervals,maxSteps=2){
       peakSteps=Math.max(peakSteps,owner.lastSteps);
     }
     const round=x=>Math.round(x*1000)/1000;
-    return {frames:intervals.length,wallMs:round(total),maxSteps,
+    return {frames:intervals.length,wallMs:round(total),maxSteps,backlogExtraTicks,
       maxFrameGapMs:round(intervals.reduce((peak,v)=>Math.max(peak,v),0)),
       p95FrameGapMs:round(percentile(intervals,.95)),
       foregroundStallFrames:intervals.filter(v=>v>100+1e-7).length,
@@ -108,7 +110,11 @@ function analyze(data){
   const capture=Array.isArray(data)?null:(data&&data.capture||null);
   return {researchOnly:true,source:'actual FixedStepRafOwner',
     capture,captureProvenance:captureProvenance(intervals,capture),
-    results:[2,3,4].map(cap=>replay(intervals,cap))};
+    results:[2,3,4].map(cap=>replay(intervals,cap)),
+    // Comparable full-chronology budgets: low work / balanced / low backlog.
+    // These are scheduling observations, NOT measured CPU or touch latency.
+    recoveryBudgetResults:[[2,4],[3,3],[4,2]].map(([steps,extra])=>
+      replay(intervals,steps,extra))};
 }
 if(require.main===module){
   try{
