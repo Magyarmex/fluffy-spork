@@ -3223,7 +3223,10 @@ function certifiedMultiShotCoverPriority(g,dt){
   var expiring=shots.filter(ordinary);
   if(expiring.length!==2)return false;
   var a=expiring[0],b=expiring[1];
-  if(a.ownerId===b.ownerId||a.hp!==b.hp||a.id===b.id)return false;
+  var unequal=a.hp!==b.hp;
+  /* Unequal integrity leaves one survivor. Only a completely isolated
+   * two-shot TTL frame can certify its entire remaining trajectory. */
+  if(a.ownerId===b.ownerId||a.id===b.id||(unequal&&shots.length!==2))return false;
   /* Projectiles fired later during this tick cannot be backdated to its
    * beginning. Reuse the actual Game.update frame-start ID witness. */
   var ceiling=g.__novaFrameStartBulletIdCeiling;
@@ -3264,11 +3267,14 @@ function certifiedMultiShotCoverPriority(g,dt){
   if(!Number.isFinite(t)||!(t>1e-9)||
      !(t<Math.min(dt,a.ttl,b.ttl)-1e-9))return false;
   var reach=[a,b].map(function(s){
-   var ex=s.x+s.vx*t,ey=s.y+s.vy*t;
+   var ex=s.x+s.vx*t,ey=s.y+s.vy*t,
+       safeEx=unequal?s.x+s.vx*s.ttl:ex,
+       safeEy=unequal?s.y+s.vy*s.ttl:ey;
    if(!Number.isFinite(ex)||!Number.isFinite(ey)||
-      Math.max(Math.abs(s.x),Math.abs(s.y),Math.abs(ex),Math.abs(ey))>=
+      !Number.isFinite(safeEx)||!Number.isFinite(safeEy)||
+      Math.max(Math.abs(s.x),Math.abs(s.y),Math.abs(safeEx),Math.abs(safeEy))>=
        MAP_LIMIT-s.r-20)return null;
-   return {s:s,ex:ex,ey:ey};
+   return {s:s,ex:ex,ey:ey,safeEx:safeEx,safeEy:safeEy};
   });
   if(!reach[0]||!reach[1])return false;
   /* A third shot may be irrelevant even when present in the global array.
@@ -3299,7 +3305,7 @@ function certifiedMultiShotCoverPriority(g,dt){
   }
   for(var i=0;i<2;i++){
    var p=reach[i],s=p.s;
-   if(firstSolidHit(g,s.x,s.y,p.ex,p.ey,s.r*.45))return false;
+   if(firstSolidHit(g,s.x,s.y,p.safeEx,p.safeEy,s.r*.45))return false;
   }
   /* Check the entire known motion envelope of every possible victim.
    * A stale/missing motion witness is uncertainty, never empty space. */
@@ -3307,10 +3313,10 @@ function certifiedMultiShotCoverPriority(g,dt){
   function overlaps(p,x0,y0,x1,y1,pad){
    var s=p.s;
    if(![x0,y0,x1,y1,pad].every(Number.isFinite))return true;
-   return Math.max(s.x,p.ex)+pad>=Math.min(x0,x1)&&
-          Math.min(s.x,p.ex)-pad<=Math.max(x0,x1)&&
-          Math.max(s.y,p.ey)+pad>=Math.min(y0,y1)&&
-          Math.min(s.y,p.ey)-pad<=Math.max(y0,y1);
+   return Math.max(s.x,p.safeEx)+pad>=Math.min(x0,x1)&&
+          Math.min(s.x,p.safeEx)-pad<=Math.max(x0,x1)&&
+          Math.max(s.y,p.safeEy)+pad>=Math.min(y0,y1)&&
+          Math.min(s.y,p.safeEy)-pad<=Math.max(y0,y1);
   }
   for(var ti=0;ti<g.tanks.length;ti++){
    var tank=g.tanks[ti];if(!tank||!tank.alive)continue;
@@ -3368,8 +3374,8 @@ function certifiedMultiShotCoverPriority(g,dt){
   /* Core's hash can retain bodies already removed from live arrays.
    * Never certify around a stale local collision candidate. */
   for(var qi=0;qi<2;qi++){
-   var p=reach[qi],s=p.s,nearby=[],mx=(s.x+p.ex)*.5,
-       my=(s.y+p.ey)*.5,span=Math.hypot(p.ex-s.x,p.ey-s.y);
+   var p=reach[qi],s=p.s,nearby=[],mx=(s.x+p.safeEx)*.5,
+       my=(s.y+p.safeEy)*.5,span=Math.hypot(p.safeEx-s.x,p.safeEy-s.y);
    try{g.hash.query(mx,my,span*.5+s.r+48,nearby);}
    catch(_e){return false;}
    if(nearby.length>260)return false;
