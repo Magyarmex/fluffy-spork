@@ -10,6 +10,7 @@ test('real owner records exact input-handler delay without claiming photon laten
  assert.equal(twenty.deliveredCount,2);
  assert.equal(sixty.pendingCount,0);
  assert.equal(twenty.pendingCount,0);
+ assert.equal(twenty.appliedDuringSkippedTime,0);
  assert.equal(sixty.droppedMs,0);
  assert.equal(twenty.droppedMs,0);
  assert.equal(sixty.simulatedTicks,12);
@@ -42,4 +43,26 @@ test('invalid event clocks and trace boundaries fail closed',()=>{
  ])assert.throws(()=>replayInputDelivery(intervals,events),/input event|chronological|outside/);
  assert.throws(()=>replayInputDelivery([0],[]),/RAF intervals/);
  assert.equal(replayInputDelivery([50],[]).p95ApplyDelayMs,null);
+});
+
+test('skipped simulation time is not misreported as an executed input tick',()=>{
+ const intervals=Array(8).fill(50);
+ const events=[{atMs:140,kind:'keydown',key:'w'},
+   {atMs:310,kind:'keyup',key:'w'}];
+ const low=replayInputDelivery(intervals,events,{maxSteps:2});
+ const sufficient=replayInputDelivery(intervals,events,{maxSteps:3});
+ assert.ok(low.droppedMs>0,'two steps cannot sustain 20Hz over this interval');
+ assert.equal(sufficient.droppedMs,0);
+ assert.equal(sufficient.appliedDuringSkippedTime,0);
+ assert.equal(low.deliveredCount+low.pendingCount,2);
+ assert.equal(sufficient.deliveredCount,2);
+ assert.ok(low.appliedDuringSkippedTime>=0);
+ assert.ok(low.appliedDuringSkippedTime<=low.deliveredCount);
+});
+test('simultaneous event timestamps retain distinct original keys',()=>{
+ const r=replayInputDelivery([50,50],[{atMs:20,kind:'keydown',key:'w'},
+   {atMs:20,kind:'keydown',key:'d'},
+   {atMs:30,kind:'keyup',key:'w'}],{maxSteps:3});
+ assert.deepEqual(r.events.map(e=>e.key),['w','d','w']);
+ assert.equal(r.deliveredCount,3);
 });
