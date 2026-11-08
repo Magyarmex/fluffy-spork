@@ -346,7 +346,7 @@ function createFixedStepBrowserPilot(game,{window:win,document:doc,clock,
     // snapshots its lifecycle hooks. Installing it after the factory returns
     // fails the owner's lifecycle-integrity gate.
     if(shotOnlyPulseFactory){
-      pulse=shotOnlyPulseFactory(game,timeline);
+      pulse=shotOnlyPulseFactory(game,timeline,bridge);
       if(!pulse || typeof pulse.detach!=='function')
         throw Error('invalid browser pulse owner');
     }
