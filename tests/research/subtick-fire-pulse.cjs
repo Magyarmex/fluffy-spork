@@ -75,6 +75,13 @@ class SubtickFirePulse {
       // A queued shot belongs to the life that began the press. Redeploying
       // before the next simulation tick must never fire the replacement tank.
       if (self.pending && self.pending.player !== game.player) self.release();
+      if (self.down && self.down.player !== game.player) {
+        // A held press from a dead/replaced life must not keep firing or
+        // commanding the new life while waiting for a later physical release.
+        const down=self.down; self.down=null;
+        self.old.pu.call(input,{type:'pointercancel',pointerType:down.type,
+          pointerId:down.id,button:0,buttons:0});
+      }
       const canPlay = game.status === 'playing' && !game.paused && !input.__novaInputPaused &&
         !(game.__testWindow && game.__testWindow.document.hidden);
       if (!canPlay) self.release();
