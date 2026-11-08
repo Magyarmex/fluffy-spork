@@ -149,9 +149,10 @@ test('mouse chord synthetic release preserves accepted DOM occurrence time',()=>
   t.push(.002,'pointermove',{pointerType:'mouse',pointerId:1,button:-1,buttons:3,clientX:600,clientY:200});
   t.push(.003,'pointerdown',{pointerType:'mouse',pointerId:1,button:0,buttons:3,clientX:600,clientY:200});
   t.push(.004,'pointermove',{pointerType:'mouse',pointerId:1,button:-1,buttons:2,
-    clientX:600,clientY:200,__novaOriginalAt:.004});
+    clientX:600,clientY:200,__novaOriginalAt:.004,__novaTimestampTrusted:true});
   t.consumeThrough(.0045);
   assert.ok(p.pending,'the chord must retain one pending shot');
   assert.equal(p.pending.event.__novaOriginalAt,.004);
+  assert.equal(p.pending.event.__novaTimestampTrusted,true);
  }finally{p.detach();game.destroy();}
 });
