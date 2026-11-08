@@ -82,12 +82,14 @@ test('cancelled sub-tick touch pulse never creates a ghost shot',()=>{
  assert.equal(cancelled.at150.shots,0);
  assert.equal(cancelled.firing,false);assert.equal(cancelled.aim,false);
 });
+// Rebuild cross-VM arrays in the test realm without lossy JSON serialization.
+const localArrays=value=>Array.isArray(value)?Array.from(value,localArrays):value;
 test('shot-only pulse never changes Controller swarm state when firing is disabled',()=>{
  for(const cls of ['carrier','warden','valkyrie']){
   const baseline=run({cls,disableFire:true});
   const recovered=run({cls,disableFire:true,shot:true});
   for(const key of ['drones','recall','active','power','nodeX','nodeY'])
-   assert.equal(JSON.stringify(recovered[key]),JSON.stringify(baseline[key]),cls+' '+key);
+   assert.deepEqual(localArrays(recovered[key]),localArrays(baseline[key]),cls+' '+key);
   assert.equal(recovered.at150.shots,1);
  }
 });
