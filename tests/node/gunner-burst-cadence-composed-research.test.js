@@ -17,10 +17,12 @@ const policies={
  long:{on:1,off:.25},
  short:{on:.4,off:.4}
 };
-function activeAt(t,policy){
+function activeAtTick(tick,policy){
+ // Exact 120Hz integer event clock: decimal modulo can lose an entire
+ // firing tick at 0.8/1.6s boundaries on nominally matched FPS arms.
  if(policy.off===0)return true;
- const period=policy.on+policy.off;
- return (t%period)<policy.on-1e-9;
+ const on=Math.round(policy.on*120),off=Math.round(policy.off*120);
+ return tick%(on+off)<on;
 }
 function trial(seed,cls,reload,hz,policyName){
  return withSeed(seed,()=>{
@@ -60,7 +62,7 @@ function trial(seed,cls,reload,hz,policyName){
    return result;
   };
   for(let i=0;i<seconds*hz;i++){
-   const active=activeAt(i*dt,policy);
+   const active=activeAtTick(i*(120/hz),policy);
    g.input.firing=active;
    if(active)activeTicks++;
    g.update(dt);
@@ -74,7 +76,7 @@ function trial(seed,cls,reload,hz,policyName){
   }
   const out={cls,reload,hz,policy:policyName,volleys,projectiles,
    nominalDamage:+nominalDamage.toFixed(4),
-   activeTicks,first:times,spin:+(p.fireSpin||0).toFixed(5),
+   activeTicks,activeSeconds:+(activeTicks/hz).toFixed(6),first:times,spin:+(p.fireSpin||0).toFixed(5),
    spinMean:+(spinSum/(seconds*hz)).toFixed(5),
    spinPeak:+spinPeak.toFixed(5),
    stability:+(p.__v17Stability==null?1:p.__v17Stability).toFixed(5),
@@ -111,7 +113,7 @@ test('burst phase uses physical seconds rather than frame counts',()=>{
  for(const policy of ['long','short']){
   for(const hz of [30,60,120]){
    let active=0;
-   for(let i=0;i<8*hz;i++)active+=+activeAt(i/hz,policies[policy]);
+   for(let i=0;i<8*hz;i++)active+=+activeAtTick(i*(120/hz),policies[policy]);
    const duty=policies[policy].on/(policies[policy].on+policies[policy].off);
    assert.ok(Math.abs(active/(8*hz)-duty)<.025,
     'phase sampling must approximate declared physical duty cycle');
