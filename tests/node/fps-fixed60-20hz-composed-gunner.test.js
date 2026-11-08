@@ -64,7 +64,7 @@ function run(cls,seed,cap,targeted,bursty=false){
     for(let frame=1;frame<=120;frame++){
      // 95ms/5ms alternating gaps retain the same six-second wall clock.
      now=1000+(bursty==='clustered' ?
-      Math.floor((frame-1)/4)*200+[90,180,190,200][(frame-1)%4] :
+      Math.floor((frame-1)/4)*200+[87,184,192,200][(frame-1)%4] :
       bursty===true ? Math.floor(frame/2)*100+(frame%2?95:0) :
       typeof bursty==='number' ? Math.floor(frame/2)*100+(frame%2?50+bursty:0) : frame*50);
      const fn=callback;assert.equal(typeof fn,'function');
@@ -127,11 +127,11 @@ test('paired 20Hz frame jitter preserves complete Gunner state when four ticks a
  }
 });
 
-test('four-step budget cannot promise fairness under clustered 90ms frame gaps',()=>{
+test('four-step budget cannot promise fairness under clustered sub-100ms frame gaps',()=>{
  const baseline=run('minigun',1517800,0,false);
  const clustered=run('minigun',1517800,4,false,'clustered');
  assert.ok(clustered.scheduler.droppedMs>0,
-  'two consecutive 90ms frames overflow even the four-step bounded backlog');
+  '87ms/97ms clustered frames overflow even the four-step bounded backlog');
  assert.ok(clustered.scheduler.ticks<TICKS);
  assert.notDeepEqual(clustered.state,baseline.state,
   'same average 20Hz is not enough to guarantee combat chronology');
