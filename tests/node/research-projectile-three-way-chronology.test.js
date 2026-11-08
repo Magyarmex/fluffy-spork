@@ -1,0 +1,161 @@
+'use strict';
+// Research-only chronological three-projectile oracle. This is NOT the shipping
+// collision resolver, and it does not establish terrain/body/shell correctness.
+const test = require('node:test');
+const assert = require('node:assert/strict');
+// Pair geometry is intentionally computed independently. The conservative
+// certificate requires a *complete* competing-event context, which a three-shot
+// research oracle cannot fake by passing null for other projectile contacts.
+const shot = (id, x, vx, hp) => ({
+  id, ownerId: id, kind: 'bullet', x, y: 0, vx, vy: 0, r: 3,
+  ttl: .005, hp, maxHp: hp, baseDmg: 8, dmg: 8,
+  pen: 0, hits: 0, dead: false, shell: false, beam: false
+});
+function physicalTime(a, b, horizon) {
+  if (a.ownerId === b.ownerId || a.dead || b.dead) return null;
+  const px = a.x - b.x, py = a.y - b.y;
+  const vx = a.vx - b.vx, vy = a.vy - b.vy;
+  const radius = a.r + b.r + 1.5;
+  const c = px * px + py * py - radius * radius;
+  let t = 0;
+  if (c > 0) {
+    const speed2 = vx * vx + vy * vy, dot = px * vx + py * vy;
+    if (!(speed2 > 0) || !(dot < 0)) return null;
+    const disc = dot * dot - speed2 * c;
+    if (!(disc > 64 * Number.EPSILON *
+        (Math.abs(dot * dot) + Math.abs(speed2 * c)))) return null;
+    t = c / (-dot + Math.sqrt(disc));
+  }
+  return t >= 0 && t < Math.min(horizon, a.ttl, b.ttl) - 1e-10 ? t : null;
+}
+function resolveChronologically(input, horizon) {
+  const state = new Map(input.map(b => [b.id, { ...b }]));
+  assert.equal(state.size, input.length, 'projectile ids must be unique');
+  const events = [];
+  for (let i = 0; i < input.length; i++) {
+    for (let j = i + 1; j < input.length; j++) {
+      const a = input[i], b = input[j], t = physicalTime(a, b, horizon);
+      if (t !== null) events.push({ t, ids: [a.id, b.id].sort((x,y)=>x-y) });
+    }
+  }
+  events.sort((a,b)=>a.t-b.t || a.ids[0]-b.ids[0] || a.ids[1]-b.ids[1]);
+  // Disjoint simultaneous pairs commute. Shared-shot ties need a global
+  // damage policy; refuse those rather than choosing by array order or IDs.
+  for (let i=0;i<events.length;i++) {
+    for (let j=i+1;j<events.length &&
+        events[j].t-events[i].t<=1e-9;j++) {
+      if (events[i].ids.some(id=>events[j].ids.includes(id))) {
+        throw new Error('ambiguous simultaneous projectile contacts');
+      }
+    }
+  }
+  const applied = [];
+  for (const event of events) {
+    const [a,b] = event.ids.map(id=>state.get(id));
+    if (a.dead || b.dead) continue;
+    // Shipping Sniper semantics: each shot damages the other by its
+    // pre-contact integrity, not a flat one HP per collision.
+    const ah = a.hp, bh = b.hp;
+    a.hp -= bh; b.hp -= ah;
+    if (a.hp <= 0) a.dead = true;
+    else a.dmg = a.baseDmg * Math.min(1,Math.max(0,a.hp/a.maxHp));
+    if (b.hp <= 0) b.dead = true;
+    else b.dmg = b.baseDmg * Math.min(1,Math.max(0,b.hp/b.maxHp));
+    applied.push(event);
+  }
+  return { state, applied };
+}
+test('three-way: first collision destroys B; surviving A then intercepts C', () => {
+  const a = shot(1, -20, 6000, 3), b = shot(2, 0, 0, 2),
+    c = shot(3, 25, -6000, 1);
+  const ab = physicalTime(a,b,1/240), bc = physicalTime(b,c,1/240),
+    ac = physicalTime(a,c,1/240);
+  assert.ok(Math.abs(ab-12.5/6000)<1e-12);
+  assert.ok(Math.abs(bc-17.5/6000)<1e-12);
+  assert.ok(Math.abs(ac-37.5/12000)<1e-12);
+  assert.ok(ab < bc && bc < ac);
+  for (const input of [[a,b,c],[c,b,a],[b,a,c]]) {
+    const {state,applied} = resolveChronologically(input,1/240);
+    assert.deepEqual(applied.map(e=>e.ids),[[1,2],[1,3]]);
+    assert.deepEqual([1,2,3].map(id=>state.get(id).hp),[0,-1,0]);
+    assert.deepEqual([1,2,3].map(id=>state.get(id).dead),[true,true,true]);
+  }
+});
+test('three-way: if first pair destroys both, no later contact can resurrect them', () => {
+  const a=shot(1,-20,6000,1),b=shot(2,0,0,1),c=shot(3,25,-6000,1);
+  const {state,applied}=resolveChronologically([c,b,a],1/240);
+  assert.deepEqual(applied.map(e=>e.ids),[[1,2]]);
+  assert.equal(state.get(3).hp,1);
+});
+test('short TTL contact occurs before expiry; one-sided expiry vetoes it', () => {
+  const a=shot(1,-20,6000,1),b=shot(2,20,-6000,1);
+  for (const hz of [30,60,120,240]) {
+    assert.ok(Math.abs(physicalTime(a,b,1/hz)-32.5/12000)<1e-12);
+    assert.deepEqual(resolveChronologically([a,b],1/hz).applied.map(e=>e.ids),[[1,2]]);
+    assert.equal(physicalTime({...a,ttl:.001},b,1/hz),null);
+  }
+});
+test('oracle never mutates the supplied projectile objects', () => {
+  const a=shot(1,-20,6000,3),b=shot(2,0,0,2),c=shot(3,25,-6000,1);
+  const before=JSON.stringify([a,b,c]);
+  resolveChronologically([a,b,c],1/240);
+  assert.equal(JSON.stringify([a,b,c]),before);
+});
+test('simultaneous three-way contacts abstain instead of using ID order', () => {
+  const a=shot(1,-20,6000,1),b=shot(2,0,0,1),c=shot(3,20,-6000,1);
+  assert.throws(()=>resolveChronologically([a,b,c],1/240),
+    /ambiguous simultaneous projectile contacts/);
+});
+test('seeded 1,000 multi-shot worlds preserve chronology under reversal', () => {
+  let seed=0x19cafe33, compared=0, contacts=0, ambiguous=0;
+  const rand=()=>{seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;
+    return (seed>>>0)/4294967296;};
+  for(let trial=0;trial<1000;trial++) {
+    const n=2+Math.floor(rand()*7),shots=[];
+    for(let i=0;i<n;i++) {
+      shots.push({...shot(i+1,(rand()-.5)*100,(rand()-.5)*10000,
+        1+Math.floor(rand()*5)),y:(rand()-.5)*100,
+        vy:(rand()-.5)*10000,r:2+rand()*3,ttl:.002+rand()*.025});
+    }
+    let a,b;
+    try {
+      a=resolveChronologically(shots,1/30);
+      b=resolveChronologically([...shots].reverse(),1/30);
+    } catch(e) {
+      if(e.message==='ambiguous simultaneous projectile contacts') {
+        ambiguous++;continue;
+      }
+      throw e;
+    }
+    const summary=r=>({
+      events:r.applied.map(e=>[e.t,e.ids.join('-')])
+        .sort((x,y)=>x[0]-y[0]||x[1].localeCompare(y[1])),
+      hp:[...r.state].sort((x,y)=>x[0]-y[0])
+        .map(([id,p])=>[id,p.hp,p.dead])
+    });
+    assert.deepEqual(summary(a),summary(b));
+    contacts+=a.applied.length;
+    compared++;
+  }
+  assert.ok(compared>900);
+  assert.ok(contacts>100);
+  assert.ok(ambiguous>0,'seed must exercise fail-closed simultaneous cases');
+});
+test('disjoint simultaneous contacts commute; shared ties still abstain', () => {
+  const a=shot(1,-20,6000,1),b=shot(2,0,0,1);
+  const c=shot(3,100,6000,1),d=shot(4,120,0,1);
+  for(const shots of [[a,b,c,d],[d,c,b,a]]) {
+    const {applied,state}=resolveChronologically(shots,1/240);
+    assert.deepEqual(applied.map(e=>e.ids),[[1,2],[3,4]]);
+    assert.deepEqual([1,2,3,4].map(id=>state.get(id).dead),
+      [true,true,true,true]);
+  }
+});
+test('surviving projectile loses damage in proportion to integrity', () => {
+  const a=shot(1,-20,6000,5),b=shot(2,0,0,2);
+  const {state,applied}=resolveChronologically([a,b],1/240);
+  assert.deepEqual(applied.map(e=>e.ids),[[1,2]]);
+  assert.equal(state.get(1).hp,3);
+  assert.ok(Math.abs(state.get(1).dmg-8*3/5)<1e-12);
+  assert.equal(state.get(2).dead,true);
+});
