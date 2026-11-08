@@ -61,3 +61,35 @@ test('virtual presentation-clock audit isolates three existing rail timebase div
  // them should make this research gate greener, not break the test suite.
  assert.ok(observed.every(cls=>knownRailWallClock.has(cls)));
 });
+
+
+test('per-presentation CPU diagnostics measure concentrated Game work without device claims',()=>{
+ const ordinary=run({cls:'tempest',seed:1517800,cadence:'20Hz',maxSteps:3});
+ assert.equal(ordinary.frameCpuSamples,0,'profiling must remain opt-in');
+ assert.equal(ordinary.frameCpuP95Ms,null);
+ for(const [maxSteps,backlogExtraTicks] of [[2,4],[3,3],[4,2]]){
+  const r=run({cls:'tempest',seed:1517800,cadence:'20Hz-bursts',
+    maxSteps,backlogExtraTicks,render:true,profileCpu:true});
+  assert.equal(r.frameCpuSamples,40);
+  assert.equal(r.backlogExtraTicks,backlogExtraTicks);
+  for(const key of ['frameCpuP50Ms','frameCpuP95Ms','frameCpuP99Ms',
+    'frameCpuPeakMs','frameUpdateCpuP95Ms','frameRenderCpuP95Ms']){
+    assert.ok(Number.isFinite(r[key])&&r[key]>=0,key+' must be a finite Node CPU sample');
+  }
+  assert.ok(r.frameCpuP50Ms<=r.frameCpuP95Ms);
+  assert.ok(r.frameCpuP95Ms<=r.frameCpuP99Ms);
+  assert.ok(r.frameCpuP99Ms<=r.frameCpuPeakMs);
+  assert.ok(r.simMs>=0&&r.renderMs>=0);
+ }
+});
+
+
+test('opt-in CPU sampling cannot change composed combat or gameplay RNG',()=>{
+ const options={cls:'tempest',seed:1517802,cadence:'20Hz-bursts',
+  maxSteps:4,backlogExtraTicks:2,render:true};
+ const off=run(options),on=run({...options,profileCpu:true});
+ parity(on,off,'CPU profiler purity');
+ assert.equal(off.frameCpuSamples,0);
+ assert.equal(on.frameCpuSamples,40);
+ assert.equal(on.droppedMs,off.droppedMs);
+});
