@@ -100,3 +100,25 @@ test('cancel, blur, cooldown, long holds and Game.destroy cannot leak a shot',()
  for(const key of ['pd','pm','pu'])assert.equal(g.input[key],old[key]);
  assert.equal(g.input.firing,false);assert.equal(g.input.__novaShotIntent,undefined);
 });
+
+test('composed Game redeploy cannot inherit a prior-life explicit firing intent',()=>{
+ withSeed(1517800,()=>{
+  const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
+  const t=new ChronologicalInput(g.input),p=new ExplicitShotIntent(g,t);
+  try{
+   t.push(.001,'pointerdown',{pointerType:'touch',pointerId:22,clientX:600,clientY:200});
+   t.push(.002,'pointermove',{pointerType:'touch',pointerId:22,clientX:640,clientY:200});
+   t.push(.008,'pointerup',{pointerType:'touch',pointerId:22,clientX:640,clientY:200});
+   t.consumeThrough(.009);
+   assert.ok(p.pulse.pending);
+   const oldPlayer=g.player;
+   g.spawnPlayer();
+   assert.notEqual(g.player,oldPlayer);
+   g.update(1/60);
+   assert.equal(p.intents,0);
+   assert.equal(p.pulse.pending,null);
+   assert.equal(g.input.__novaShotIntent,undefined);
+   assert.equal(g.input.firing,false);
+  }finally{p.detach();g.destroy();}
+ });
+});
