@@ -16,10 +16,12 @@ function run(maxSteps,touch=false){
     return kd.call(this,e)};
   g.input.ku=function(e){applied.push({kind:'keyup',key:e.key,atMs:now-1000});
     return ku.call(this,e)};
-  g.input.pd=function(e){applied.push({kind:'pointerdown',key:e.pointerId,atMs:now-1000});
-    return pd.call(this,e)};
-  g.input.pu=function(e){applied.push({kind:'pointerup',key:e.pointerId,atMs:now-1000});
-    return pu.call(this,e)};
+  g.input.pd=function(e){const result=pd.call(this,e);
+    applied.push({kind:'pointerdown',key:e.pointerId,atMs:now-1000,
+      aimActive:!!this.aim.active,aimOwner:this.stickId.aim});return result};
+  g.input.pu=function(e){const result=pu.call(this,e);
+    applied.push({kind:'pointerup',key:e.pointerId,atMs:now-1000,
+      aimActive:!!this.aim.active,aimOwner:this.stickId.aim});return result};
   const timeline=new ChronologicalInput(g.input);
   const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
   const owner=new FixedStepRafOwner(g,timeline,bridge,{
@@ -69,6 +71,12 @@ test('real composed touch press/release application is also delayed by two-step 
  assert.equal(sufficient.applied[0].atMs,150);
  assert.equal(low.applied[0].key,11);
  assert.equal(sufficient.applied[0].key,11);
+ for(const r of [low,sufficient]){
+  assert.equal(r.applied[0].aimActive,true,'touch must actually own the aim stick');
+  assert.equal(r.applied[0].aimOwner,11);
+  assert.equal(r.applied[1].aimActive,false,'release must relinquish aim');
+  assert.equal(r.applied[1].aimOwner,-1);
+ }
  assert.ok(low.ticks<sufficient.ticks);
  assert.equal(sufficient.droppedMs,0);
 });
