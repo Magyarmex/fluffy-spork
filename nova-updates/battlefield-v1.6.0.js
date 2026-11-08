@@ -1994,11 +1994,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   if(!(at>0&&bt>0&&Math.abs(at-bt)>1e-7)||
      !(target.hp>2*(a.dmg+b.dmg))||
      !Number.isFinite(target.x)||!Number.isFinite(target.y))return false;
-  /* The swept pre-contact AABBs must be disjoint even with projectile
+  /* The full TTL swept AABBs must be disjoint even with projectile
    * radii and numerical padding. This is deliberately stronger than
    * an exact pairwise interception test and cheap for ordinary combat. */
-  var ax=a.x+a.vx*at,ay=a.y+a.vy*at,
-      bx=b.x+b.vx*bt,by=b.y+b.vy*bt,
+  var ax=a.x+a.vx*a.ttl,ay=a.y+a.vy*a.ttl,
+      bx=b.x+b.vx*b.ttl,by=b.y+b.vy*b.ttl,
       pad=a.r+b.r+2;
   if(!(Number.isFinite(ax)&&Number.isFinite(ay)&&
        Number.isFinite(bx)&&Number.isFinite(by)&&
@@ -2008,11 +2008,17 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      Math.max(a.y,ay)+pad>=Math.min(b.y,by)&&
      Math.min(a.y,ay)-pad<=Math.max(b.y,by))return false;
   var first=at<bt?a:b,second=at<bt?b:a,
-      tx=target.x,ty=target.y;
+      tx=target.x,ty=target.y,
+      bulletCount=bullets.length,shapeCount=(g.shapes||[]).length,
+      droneCount=(g.drones||[]).length,tankCount=(g.tanks||[]).length;
   if(!isolatedTTLStationaryPiercingChain(g,first,dt,false,[],true))
    return false;
   /* A nonlethal callback must not silently move/replace the victim. */
   if(!target.alive||target.x!==tx||target.y!==ty||
+     bullets.length!==bulletCount||
+     (g.shapes||[]).length!==shapeCount||
+     (g.drones||[]).length!==droneCount||
+     (g.tanks||[]).length!==tankCount||
      !(target.hp>second.dmg*2))return true;
   isolatedTTLStationaryPiercingChain(g,second,dt,false,[],true);
   return true;
