@@ -117,3 +117,20 @@ for(const hz of [30,60,120,240])for(const reverse of [false,true])
   assert.deepEqual(result.contacts.map(c=>c.ownerId),[102],
    'wall blocks left owner while right owner retains its legitimate contact');
  });
+
+/* Dense but remote fire must not change local two-shot chronology or
+ * accidentally invoke a first-N budget shortcut. This is intentionally
+ * below the bounded local preflight's documented 300-entity ceiling. */
+for(const hz of [30,60,120,240])for(const reverse of [false,true])
+ test('same-victim TTL parity with 120 remote rounds '+hz+
+      'Hz reverse='+reverse,()=>{
+  const result=trial(hz,reverse,false,null,40,(_g,_p,bullets)=>{
+   for(let i=0;i<120;i++)bullets.push({
+    kind:'bullet',id:1000+i,ownerId:101,
+    x:1500+i*2,y:1500,vx:0,vy:0,r:3,dmg:5,ttl:1,
+    pen:0,hits:0,dead:false,shell:false,beam:false
+   });
+  });
+  assert.deepEqual(result.contacts.map(c=>c.ownerId).sort(),[101,102],
+   'unrelated remote bullets cannot suppress either legitimate contact');
+ });
