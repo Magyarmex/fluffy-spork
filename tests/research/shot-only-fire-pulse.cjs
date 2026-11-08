@@ -48,7 +48,12 @@ class ShotOnlyFirePulse {
       // Missing or invalid origin metadata fails closed in gated research.
       if (self.maxPulseAgeMs!==Infinity) {
         const original=p.event && p.event.__novaOriginalAt;
-        const ageMs=((self.nowMs()-self.startMs)/1000-original)*1000;
+        // The optional browser clock is an external dependency. If it fails,
+        // reject this recovered shot rather than aborting Game.update and
+        // leaving a pending input alive across subsequent simulation frames.
+        let clockMs=NaN;
+        try { clockMs=self.nowMs(); } catch (_) { /* fail closed below */ }
+        const ageMs=(clockMs-self.startMs)-original*1000;
         if (p.event.__novaTimestampTrusted!==true || !Number.isFinite(original) || !Number.isFinite(ageMs) ||
             ageMs < -32 || ageMs > self.maxPulseAgeMs) {
           self.rejectedStale++;
