@@ -174,3 +174,34 @@ test('current Battlefield: seeded 200-world moving TTL parity at all frame rates
     }
   }
 });
+
+test('current Battlefield: witnessed hull-before-wall and wall-before-hull chronology',()=>{
+  function run(Game,fps,wallX){
+    const g=new Game(),tank={kind:'tank',id:2,x:40,y:0,
+      cls:'scout',hp:100,alive:true};
+    g.tanks=[tank];
+    g.__novaTerrain=[{kind:'terrain',id:-1000,shape:'rect',
+      x:wallX,y:0,w:1,h:60,type:'wall',solid:true,
+      destructible:false,hp:0}];
+    g.bullets=[{kind:'bullet',id:1,ownerId:1,x:0,y:0,
+      vx:6000,vy:0,r:3,dmg:20,ttl:.005,pen:0,hits:0,
+      dead:false,shell:false,beam:false}];
+    for(let frame=0;frame<20&&g.bullets.length;frame++){
+      g.__novaShapeSweepActive=true;
+      g.__novaShapeSweepEpoch=frame+1;
+      g.__novaFrameStartBulletEpoch=frame+1;
+      g.__novaFrameStartBulletIdCeiling=2;
+      tank.__novaSweepMoveTime=g.time;
+      tank.__novaSweepPrevX=40;tank.__novaSweepPrevY=0;
+      g.updateBullets(1/fps);g.time+=1/fps;
+    }
+    return g.hits;
+  }
+  for(const fps of [30,60,120,240])
+    for(const Game of [Battlefield,Optimized]){
+      assert.equal(run(Game,fps,20.8),0,
+        'wall physically first at '+fps+'Hz');
+      assert.equal(run(Game,fps,21.4),1,
+        'witnessed body physically first at '+fps+'Hz');
+    }
+});
