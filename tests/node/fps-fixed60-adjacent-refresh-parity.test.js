@@ -61,6 +61,9 @@ function run(cls,seed,hz,targeted=false){
      cancel:()=>{callback=null},render:()=>{},maxSteps:2
     });
     owner.start();
+    // start() intentionally resets stale input ownership; arm fresh held fire.
+    g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
+    g.input.firing=true;
     for(let frame=1;frame<=SECONDS*hz;frame++){
      now=1000+frame*1000/hz;
      const fn=callback;assert.equal(typeof fn,'function');
