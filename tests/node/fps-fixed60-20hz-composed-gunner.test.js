@@ -62,7 +62,9 @@ function run(cls,seed,cap,targeted,bursty=false){
     g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
     g.input.firing=true;
     for(let frame=1;frame<=120;frame++){
-     // 95ms/5ms alternating gaps retain the same six-second wall clock.\n     now=1000+(bursty===true ? Math.floor(frame/2)*100+(frame%2?95:0) :\n      typeof bursty==='number' ? Math.floor(frame/2)*100+(frame%2?50+bursty:0) : frame*50);
+     // 95ms/5ms alternating gaps retain the same six-second wall clock.
+     now=1000+(bursty===true ? Math.floor(frame/2)*100+(frame%2?95:0) :
+      typeof bursty==='number' ? Math.floor(frame/2)*100+(frame%2?50+bursty:0) : frame*50);
      const fn=callback;assert.equal(typeof fn,'function');
      callback=null;fn(now);
     }
