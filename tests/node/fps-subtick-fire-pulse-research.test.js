@@ -141,3 +141,18 @@ test('secondary-primary mouse chord survives Pointer Events move-before-native-u
   assert.equal(r.firing,false);
  }
 });
+
+test('mouse chord synthetic release preserves accepted DOM occurrence time',()=>{
+ const game=bootGame(),t=new ChronologicalInput(game.input),p=new SubtickFirePulse(game,t);
+ try{
+  t.push(.001,'pointerdown',{pointerType:'mouse',pointerId:1,button:2,buttons:2,clientX:600,clientY:200});
+  t.push(.002,'pointermove',{pointerType:'mouse',pointerId:1,button:-1,buttons:3,clientX:600,clientY:200});
+  t.push(.003,'pointerdown',{pointerType:'mouse',pointerId:1,button:0,buttons:3,clientX:600,clientY:200});
+  t.push(.004,'pointermove',{pointerType:'mouse',pointerId:1,button:-1,buttons:2,
+    clientX:600,clientY:200,__novaOriginalAt:.004,__novaTimestampTrusted:true});
+  t.consumeThrough(.0045);
+  assert.ok(p.pending,'the chord must retain one pending shot');
+  assert.equal(p.pending.event.__novaOriginalAt,.004);
+  assert.equal(p.pending.event.__novaTimestampTrusted,true);
+ }finally{p.detach();game.destroy();}
+});

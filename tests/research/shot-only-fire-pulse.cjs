@@ -4,7 +4,12 @@
 // Uses the existing event ownership/cancellation rules of SubtickFirePulse.
 const {SubtickFirePulse} = require('./subtick-fire-pulse.cjs');
 class ShotOnlyFirePulse {
-  constructor(game, timeline) {
+  constructor(game, timeline, {maxPulseAgeMs=Infinity,nowMs=null,startMs=null}={}) {
+    if (maxPulseAgeMs!==Infinity && (!Number.isFinite(maxPulseAgeMs) || maxPulseAgeMs<0 ||
+        typeof nowMs!=='function' || !Number.isFinite(startMs)))
+      throw Error('invalid shot-only freshness gate');
+    this.maxPulseAgeMs=maxPulseAgeMs;this.nowMs=nowMs;this.startMs=startMs;
+    this.rejectedStale=0;
     this.game=game; this.input=game.input; this.timeline=timeline;
     this.pulse=new SubtickFirePulse(game,timeline);
     this.oldUpdate=game.update;
@@ -38,6 +43,19 @@ class ShotOnlyFirePulse {
       const canPlay=!!p && game.status==='playing' && !game.paused &&
         !input.__novaInputPaused && !(game.__testWindow && game.__testWindow.document.hidden);
       if (!canPlay) return self.oldUpdate.apply(this,args);
+      // Opt-in only: wall/presentation time, NOT lagging simulation time,
+      // decides whether a recovered tap is still a fresh player intention.
+      // Missing or invalid origin metadata fails closed in gated research.
+      if (self.maxPulseAgeMs!==Infinity) {
+        const original=p.event && p.event.__novaOriginalAt;
+        const ageMs=((self.nowMs()-self.startMs)/1000-original)*1000;
+        if (p.event.__novaTimestampTrusted!==true || !Number.isFinite(original) || !Number.isFinite(ageMs) ||
+            ageMs < -32 || ageMs > self.maxPulseAgeMs) {
+          self.rejectedStale++;
+          self.pulse.release();
+          return self.oldUpdate.apply(this,args);
+        }
+      }
       const touch=p.type==='touch'||p.type==='pen';
       const dx=input.aim.dx,dy=input.aim.dy,length=Math.hypot(dx,dy);
       const valid=touch ? length>=9 : p.type==='mouse';

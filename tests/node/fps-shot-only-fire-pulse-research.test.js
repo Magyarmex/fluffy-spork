@@ -117,3 +117,24 @@ test('shot-only aim and first projectile match held-stick firing, without extend
   assert.deepEqual(shot.bullet,original.bullet,`${cls} ${kind} first shot`);
  }
 });
+
+test('opt-in freshness gate fails closed without original DOM timestamp',()=>{
+ const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
+ const t=new ChronologicalInput(g.input),d=new FixedStepPresentation(g,t,{maxSteps:2});
+ const p=new ShotOnlyFirePulse(g,t,{maxPulseAgeMs:40,nowMs:()=>1020,startMs:1000});
+ try{
+  t.push(.001,'pointerdown',{pointerType:'touch',pointerId:22,clientX:600,clientY:200});
+  t.push(.002,'pointermove',{pointerType:'touch',pointerId:22,clientX:640,clientY:200});
+  t.push(.008,'pointerup',{pointerType:'touch',pointerId:22,clientX:640,clientY:200});
+  d.frame(1/60);
+  assert.equal(p.rejectedStale,1);assert.equal(p.shots,0);
+  assert.equal(g.input.firing,false);assert.equal(g.input.aim.active,false);
+ }finally{p.detach();g.destroy();}
+});
+test('invalid freshness clock configuration fails before installing any input wrappers',()=>{
+ const g=bootGame(),t=new ChronologicalInput(g.input),old=g.update;
+ try{
+  assert.throws(()=>new ShotOnlyFirePulse(g,t,{maxPulseAgeMs:40}),/invalid shot-only freshness gate/);
+  assert.equal(g.update,old);
+ }finally{g.destroy();}
+});

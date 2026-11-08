@@ -90,3 +90,12 @@ test('epoch timestamp without a valid origin falls back to bounded delivery time
   assert.ok(Math.abs(seen[0].__novaOriginalAt-.05)<1e-10);
   assert.equal(b.invalidTimestamps,1);
 });
+
+test('freshness provenance marks delivery-time fallbacks untrusted',()=>{
+ const s=setup();s.setNow(1050);
+ assert.equal(s.bridge.capture(evt('pointerdown',1010)),true);
+ assert.equal(s.bridge.capture(evt('pointerup',0)),true);
+ assert.equal(s.bridge.capture(evt('pointerdown',1200)),true);
+ s.timeline.consumeThrough(.06);
+ assert.deepEqual(s.seen.map(e=>e.__novaTimestampTrusted),[true,false,false]);
+});

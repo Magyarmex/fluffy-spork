@@ -37,7 +37,8 @@ class SubtickFirePulse {
           typeof e.buttons === 'number' && !(e.buttons & 1) && input.firing &&
           self.game.status === 'playing' && !self.game.paused && !input.__novaInputPaused) {
         self.pending = {event:{type:'pointerup',pointerType:'mouse',button:0,buttons:0,
-          pointerId:self.down.id},type:'mouse',id:self.down.id};
+          pointerId:self.down.id,__novaOriginalAt:e.__novaOriginalAt,
+          __novaTimestampTrusted:e.__novaTimestampTrusted},type:'mouse',id:self.down.id};
         self.down = null;
         return; // The later native mouseup/pointerup is also suppressed.
       }
