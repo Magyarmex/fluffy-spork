@@ -212,3 +212,48 @@ test('20Hz jitter preserves Tempest fire chronology while movement input changes
   }
  }
 });
+
+test('clustered nominal 30Hz frames expose two-step combat time loss; three steps recover this schedule',()=>{
+ // 55/55/11.67/11.67ms is exactly 30Hz on average and never exceeds
+ // the 100ms foreground-stall threshold. Average FPS is not a safety gate.
+ const intervals=Array.from({length:15},()=>[
+  55,55,1000/15-55,1000/15-55
+ ]).flat();
+ assert.ok(intervals.every(ms=>ms>0&&ms<100));
+ for(const seed of [1517800,1517802]){
+  const baseline=run(seed,Array(120).fill(1000/60),2,[],true);
+  const two=run(seed,intervals,2,[],true);
+  const three=run(seed,intervals,3,[],true);
+  assert.ok(baseline.volleys>0,'exercise real Tempest weapon chronology');
+  assert.ok(two.droppedMs>0 && two.ticks<baseline.ticks,
+   'two-step pilot loses time under clustered 30Hz presentation');
+  assert.notEqual(two.hash,baseline.hash);
+  assert.equal(three.ticks,baseline.ticks);
+  assert.equal(three.droppedFrames,0);
+  assert.equal(three.volleys,baseline.volleys);
+  assert.equal(three.hash,baseline.hash);
+  assert.equal(three.draws,baseline.draws);
+ }
+});
+
+test('a harsher sub-100ms 30Hz cluster still exceeds three steps but recovers with four',()=>{
+ // 85/40/5/3.33ms repeats at exactly 30Hz mean. This deliberately
+ // falsifies any claim that three steps universally solve 30Hz jitter.
+ const intervals=Array.from({length:15},()=>[
+  85,40,5,1000/7.5-130
+ ]).flat();
+ assert.ok(intervals.every(ms=>ms>0&&ms<100));
+ for(const seed of [1517800,1517802]){
+  const baseline=run(seed,Array(120).fill(1000/60),2,[],true);
+  const three=run(seed,intervals,3,[],true);
+  const four=run(seed,intervals,4,[],true);
+  assert.ok(three.droppedMs>0 && three.ticks<baseline.ticks,
+   'three-step cap must not be mistaken for a universal 30Hz guarantee');
+  assert.notEqual(three.hash,baseline.hash);
+  assert.equal(four.ticks,baseline.ticks);
+  assert.equal(four.droppedFrames,0);
+  assert.equal(four.volleys,baseline.volleys);
+  assert.equal(four.hash,baseline.hash);
+  assert.equal(four.draws,baseline.draws);
+ }
+});
