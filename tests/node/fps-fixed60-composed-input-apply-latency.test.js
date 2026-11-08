@@ -10,6 +10,17 @@ const {FixedStepPosePresentation}=require('../research/fixed-step-presentation.c
 function run(maxSteps,touch=false,{frameMs=50,frames=8}={}){
  return withSeed(1517800,()=>{
   const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
+  // Keep the real Game movement/collision path but remove unrelated AI,
+  // neutral impacts and spawns that could move the player before input.
+  g.tanks=[g.player];g.tankById=new Map([[g.player.id,g.player]]);
+  g.shapes=[];g.drones=[];g.powerups=[];g.bullets=[];
+  if(g.shapeById)g.shapeById.clear();
+  if(g.hash&&g.hash.clear)g.hash.clear();
+  g.shapeTimer=Infinity;g.powerupTimer=Infinity;g.eliteTimer=Infinity;
+  g.crasherTimer=Infinity;g.aiRespawns=[];
+  g.spawnShape=()=>null;g.spawnPowerup=()=>null;g.spawnAITank=()=>null;
+  g.player.droneRespawnT=Infinity;g.spawnDrone=()=>null;
+  g.status='playing';g.paused=false;
   let now=1000,callback=null,elapsed=0;
   const applied=[],rendered=[];
   const origin={x:g.player.x,y:g.player.y};
