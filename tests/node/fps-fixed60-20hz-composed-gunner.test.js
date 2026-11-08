@@ -75,7 +75,10 @@ function run(cls,seed,cap,targeted,bursty=false,backlogExtraTicks=2){
    if(targeted)assert.ok(damage>0);
    return {state:{volleys,damage:+damage.toFixed(5),
     hash:digest(physical(g)),draws:draws(),heat:p.__v17Heat||0,
-    spin:p.fireSpin||0,fireCd:p.fireCd},
+    spin:p.fireSpin||0,fireCd:p.fireCd,
+    stability:p.__v17Stability,shotIndex:p.__v17ShotIndex,
+    barrelIdx:p.barrelIdx,overheatT:p.overheatT,
+    bulletSignature:digest(g.bullets.map(b=>[b.id,b.ownerId,b.dmg,b.pen,b.r,b.ttl,b.vx,b.vy]))},
     scheduler:owner?{ticks:owner.ticks,droppedMs:owner.droppedMs,
      droppedFrames:owner.droppedFrames,lagMs:owner.lagMs,peakLagMs}:null};
   }finally{if(owner)owner.stop();g.destroy();}
