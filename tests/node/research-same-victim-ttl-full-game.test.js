@@ -67,6 +67,8 @@ for(const hz of [30,60,120,240])
    for(const result of [a,b]){
     assert.equal(result.contacts.length,2,
       'two independently reachable nonlethal contacts must both register');
+    assert.deepEqual(result.contacts.map(c=>c.ownerId).sort(),[101,102],
+      'one contact from each distinct owner, never a duplicate hit');
     assert.equal(result.contacts.reduce((sum,c)=>sum+c.damage,0),40);
     assert.ok(result.hp>=959.99&&result.hp<960.5,
       'target loses 40 HP, allowing only normal end-of-update regeneration');
