@@ -49,7 +49,7 @@ class ShotOnlyFirePulse {
       if (self.maxPulseAgeMs!==Infinity) {
         const original=p.event && p.event.__novaOriginalAt;
         const ageMs=((self.nowMs()-self.startMs)/1000-original)*1000;
-        if (!Number.isFinite(original) || !Number.isFinite(ageMs) ||
+        if (p.event.__novaTimestampTrusted!==true || !Number.isFinite(original) || !Number.isFinite(ageMs) ||
             ageMs < -32 || ageMs > self.maxPulseAgeMs) {
           self.rejectedStale++;
           self.pulse.release();
