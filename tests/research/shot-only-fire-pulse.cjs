@@ -53,7 +53,7 @@ class ShotOnlyFirePulse {
         // leaving a pending input alive across subsequent simulation frames.
         let clockMs=NaN;
         try { clockMs=self.nowMs(); } catch (_) { /* fail closed below */ }
-        const ageMs=(clockMs-self.startMs)-original*1000;
+        const ageMs=((clockMs-self.startMs)/1000-original)*1000;
         if (p.event.__novaTimestampTrusted!==true || !Number.isFinite(original) || !Number.isFinite(ageMs) ||
             ageMs < -32 || ageMs > self.maxPulseAgeMs) {
           self.rejectedStale++;
