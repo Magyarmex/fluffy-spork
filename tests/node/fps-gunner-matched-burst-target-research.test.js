@@ -57,9 +57,12 @@ function run(seed,cls,reload,hz,policy,targeted){
   for(let f=0;f<seconds*hz;f++){
    const end=(f+1)*frame;
    while(now<end-EPS){
-    const phase=now%period;
+    // Normalize near cycle edges to avoid a zero-length update caused by
+    // floating-point modulo (e.g. 1.6 % .8 ~= .7999999999999999).
+    const cycle=Math.floor((now+EPS)/period);
+    const phase=now-cycle*period;
     const firing=phase<policy.on-EPS;
-    const boundary=now-phase+(firing?policy.on:period);
+    const boundary=cycle*period+(firing?policy.on:period);
     const next=Math.min(end,boundary);
     const dt=next-now;
     assert.ok(dt>EPS,'no zero-length simulation step');
