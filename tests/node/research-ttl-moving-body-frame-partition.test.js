@@ -126,3 +126,14 @@ test('moving-body: contact exactly on a partition is conservatively ambiguous',(
   // rather than inventing event order from floating-point noise.
   assert.equal(splitContact(a,b,1/30,boundary),null);
 });
+
+test('moving-body: crossing trajectory contacts before TTL at 30/60/120/240Hz',()=>{
+  const a=bullet(0,0,6000,0,.005),b=bullet(40,20,0,-6000,.005,18);
+  const t=contact(a,b,1/30);
+  assert.ok(t>0&&t<.005);
+  for(const hz of [30,60,120,240]) {
+    const dt=1/hz;
+    assert.ok(Math.abs(contact(a,b,dt)-t)<1e-12);
+    assert.ok(Math.abs(splitContact(a,b,dt,.002)-t)<1e-12);
+  }
+});
