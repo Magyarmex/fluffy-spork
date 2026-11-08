@@ -84,7 +84,16 @@ class SubtickFirePulse {
       }
       const canPlay = game.status === 'playing' && !game.paused && !input.__novaInputPaused &&
         !(game.__testWindow && game.__testWindow.document.hidden);
-      if (!canPlay) self.release();
+      if (!canPlay) {
+        self.release();
+        // Death, pause and hidden/disabled input must not orphan a held
+        // physical control before the next player life begins.
+        if (self.down) {
+          const down=self.down; self.down=null;
+          self.old.pu.call(input,{type:'pointercancel',pointerType:down.type,
+            pointerId:down.id,button:0,buttons:0});
+        }
+      }
       try { return self.old.update.apply(this,arguments); }
       finally {
         if (canPlay && self.pending) self.pulses++;
