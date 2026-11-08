@@ -10,7 +10,8 @@ function run(maxSteps,touch=false){
  return withSeed(1517800,()=>{
   const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
   let now=1000,callback=null,elapsed=0;
-  const applied=[];
+  const applied=[],rendered=[];
+  const origin={x:g.player.x,y:g.player.y};
   const kd=g.input.kd,ku=g.input.ku,pd=g.input.pd,pu=g.input.pu;
   g.input.kd=function(e){applied.push({kind:'keydown',key:e.key,atMs:now-1000});
     return kd.call(this,e)};
@@ -26,7 +27,10 @@ function run(maxSteps,touch=false){
   const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
   const owner=new FixedStepRafOwner(g,timeline,bridge,{
     now:()=>now,maxSteps,request:fn=>{callback=fn;return 1},
-    cancel:()=>{callback=null},render(){}});
+    cancel:()=>{callback=null},render(){
+      rendered.push({atMs:now-1000,x:g.player.x,y:g.player.y,
+        moving:!!g.input.keyboard.w,aimActive:!!g.input.aim.active});
+    }});
   const events=touch?[{atMs:130,type:'pointerdown'},
     {atMs:310,type:'pointerup'}]:[{atMs:130,type:'keydown',key:'w'},
     {atMs:310,type:'keyup',key:'w'}];
@@ -44,7 +48,7 @@ function run(maxSteps,touch=false){
     }
     const f=callback;callback=null;assert.equal(typeof f,'function');f(now);
    }
-   return {applied,ticks:owner.ticks,droppedMs:owner.droppedMs,
+   return {applied,rendered,origin,ticks:owner.ticks,droppedMs:owner.droppedMs,
     lateClamps:bridge.lateClamps};
   }finally{owner.stop();g.destroy()}
  });
@@ -79,4 +83,33 @@ test('real composed touch press/release application is also delayed by two-step 
  }
  assert.ok(low.ticks<sufficient.ticks);
  assert.equal(sufficient.droppedMs,0);
+});
+
+// Research-only rendered-state witness. A handler firing is not itself a
+// visible response: verify what the real composed Game presents on the RAF.
+test('first rendered keyboard movement follows the delayed input edge',()=>{
+ const low=run(2),sufficient=run(3);
+ for(const result of [low,sufficient]){
+  assert.equal(result.rendered.length,8);
+  const firstHeld=result.rendered.find(f=>f.moving);
+  assert.ok(firstHeld,'rendered input state must eventually reflect press');
+  assert.equal(firstHeld.atMs,result.applied[0].atMs);
+  assert.ok(result.rendered.some(f=>!f.moving&&f.atMs>=result.applied[1].atMs),
+    'rendered state must eventually reflect release');
+ }
+ assert.ok(low.rendered.find(f=>f.moving).atMs>
+   sufficient.rendered.find(f=>f.moving).atMs,
+   'insufficient simulation throughput delays first presented movement intent');
+});
+test('first rendered touch ownership and eventual release follow the real bridge',()=>{
+ const low=run(2,true),sufficient=run(3,true);
+ for(const result of [low,sufficient]){
+  const firstHeld=result.rendered.find(f=>f.aimActive);
+  assert.ok(firstHeld,'aim ownership must reach presentation');
+  assert.equal(firstHeld.atMs,result.applied[0].atMs);
+  assert.ok(result.rendered.some(f=>!f.aimActive&&f.atMs>=result.applied[1].atMs),
+    'touch release must be visible to the renderer');
+ }
+ assert.ok(low.rendered.find(f=>f.aimActive).atMs>
+   sufficient.rendered.find(f=>f.aimActive).atMs);
 });
