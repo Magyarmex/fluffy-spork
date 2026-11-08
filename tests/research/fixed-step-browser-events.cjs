@@ -115,7 +115,7 @@ class BrowserEventTimeline {
         this.timeline.reset();
       return false;
     }
-    let at = Math.max(0, (stamp - this.startMs) / 1000);
+    // Preserve the accepted DOM occurrence time separately from the replay\n    // position. Late/reordered events must not rewrite simulation history,\n    // but downstream research may need their true age to reject stale shots.\n    const originalAt = Math.max(0, (stamp - this.startMs) / 1000);\n    let at = originalAt;
     // A late DOM delivery can never rewrite an already-simulated tick.
     if (at < this.timeline.sampled) {
       at = this.timeline.sampled;
@@ -131,7 +131,7 @@ class BrowserEventTimeline {
     }
     const target = event.target;
     const data = event.type === 'blur' ? {} : {
-      pointerId: event.pointerId, pointerType: event.pointerType,
+      __novaOriginalAt: originalAt,\n      pointerId: event.pointerId, pointerType: event.pointerType,
       clientX: event.clientX, clientY: event.clientY,
       button: event.button, buttons: event.buttons,
       key: event.key, repeat: !!event.repeat,
