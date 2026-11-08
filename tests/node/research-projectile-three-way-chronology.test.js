@@ -38,6 +38,13 @@ function resolveChronologically(input, horizon) {
     }
   }
   events.sort((a,b)=>a.t-b.t || a.ids[0]-b.ids[0] || a.ids[1]-b.ids[1]);
+  // A shared simultaneous event needs a separate global tie policy. This
+  // narrow oracle refuses to invent one from array order or projectile IDs.
+  for (let i=1;i<events.length;i++) {
+    if (Math.abs(events[i].t-events[i-1].t)<=1e-9) {
+      throw new Error('ambiguous simultaneous projectile contacts');
+    }
+  }
   const applied = [];
   for (const event of events) {
     const [a,b] = event.ids.map(id=>state.get(id));
@@ -87,4 +94,9 @@ test('oracle never mutates the supplied projectile objects', () => {
   const before=JSON.stringify([a,b,c]);
   resolveChronologically([a,b,c],1/240);
   assert.equal(JSON.stringify([a,b,c]),before);
+});
+test('simultaneous three-way contacts abstain instead of using ID order', () => {
+  const a=shot(1,-20,6000,1),b=shot(2,0,0,1),c=shot(3,20,-6000,1);
+  assert.throws(()=>resolveChronologically([a,b,c],1/240),
+    /ambiguous simultaneous projectile contacts/);
 });
