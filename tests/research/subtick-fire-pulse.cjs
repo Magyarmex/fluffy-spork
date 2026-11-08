@@ -21,9 +21,9 @@ class SubtickFirePulse {
       if (e && e.target && typeof e.target.closest === 'function' && e.target.closest('[data-ui]')) return out;
       if (e && e.pointerType === 'mouse') {
         if (e.button === 0 && !priorFire && input.firing && !input.touchSeen)
-          self.down = {type:'mouse', id:e.pointerId};
+          self.down = {type:'mouse', id:e.pointerId, player:self.game.player};
       } else if (e && input.stickId && input.stickId.aim === e.pointerId &&
-                 input.aim.active && priorAimId !== e.pointerId) self.down = {type:e.pointerType, id:e.pointerId};
+                 input.aim.active && priorAimId !== e.pointerId) self.down = {type:e.pointerType, id:e.pointerId, player:self.game.player};
       return out;
     };
     input.pm = function(e) {
@@ -38,7 +38,8 @@ class SubtickFirePulse {
           self.game.status === 'playing' && !self.game.paused && !input.__novaInputPaused) {
         self.pending = {event:{type:'pointerup',pointerType:'mouse',button:0,buttons:0,
           pointerId:self.down.id,__novaOriginalAt:e.__novaOriginalAt,
-          __novaTimestampTrusted:e.__novaTimestampTrusted},type:'mouse',id:self.down.id};
+          __novaTimestampTrusted:e.__novaTimestampTrusted},type:'mouse',id:self.down.id,
+          player:self.down.player};
         self.down = null;
         return; // The later native mouseup/pointerup is also suppressed.
       }
@@ -64,13 +65,16 @@ class SubtickFirePulse {
         input.aim.active && Math.hypot(input.aim.dx,input.aim.dy) >= 9);
       if (same && aimValid && self.game.status === 'playing' && !self.game.paused &&
           !input.__novaInputPaused && !(self.game.__testWindow && self.game.__testWindow.document.hidden)) {
-        self.pending = {event:e, type:down.type, id:down.id}; self.down = null;
+        self.pending = {event:e, type:down.type, id:down.id, player:down.player}; self.down = null;
         return; // Hold only through the immediately following Game.update.
       }
       if (same) self.down = null;
       return self.old.pu.call(this,e);
     };
     game.update = function() {
+      // A queued shot belongs to the life that began the press. Redeploying
+      // before the next simulation tick must never fire the replacement tank.
+      if (self.pending && self.pending.player !== game.player) self.release();
       const canPlay = game.status === 'playing' && !game.paused && !input.__novaInputPaused &&
         !(game.__testWindow && game.__testWindow.document.hidden);
       if (!canPlay) self.release();
