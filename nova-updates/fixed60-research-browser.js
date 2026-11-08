@@ -761,8 +761,10 @@ class FixedStepRafOwner {
 // ownership, then attach the bounded RAF. This factory remains opt-in and
 // does not change the game's production startup path.
 function createFixedStepBrowserPilot(game,{window:win,document:doc,clock,
-    request,cancel,render,canvas=game&&game.canvas,maxSteps=2,backlogExtraTicks=2}={}){
-  if(!game || game.raf || !clock || typeof clock.now!=='function')
+    request,cancel,render,canvas=game&&game.canvas,maxSteps=2,backlogExtraTicks=2,
+    shotOnlyPulseFactory=null}={}){
+  if(!game || game.raf || !clock || typeof clock.now!=='function' ||
+     (shotOnlyPulseFactory!==null && typeof shotOnlyPulseFactory!=='function'))
     throw Error('invalid browser fixed-step pilot');
   const {ChronologicalInput}=require('./fixed-step-dom-input.cjs');
   const {BrowserEventTimeline}=require('./fixed-step-browser-events.cjs');
@@ -771,25 +773,47 @@ function createFixedStepBrowserPilot(game,{window:win,document:doc,clock,
   const bridge=new BrowserEventTimeline(timeline,clock);
   const capture=new BrowserInputCapture(game.input,canvas,timeline,bridge,
     {window:win,document:doc,game});
-  let owner;
-  try{owner=new FixedStepRafOwner(game,timeline,bridge,
-    {now:clock.now,request,cancel,render,maxSteps,backlogExtraTicks,isVisible:()=>!doc.hidden})}
-  catch(error){capture.detach();throw error}
-  // A fatal RAF/update/render failure calls owner.stop() directly, bypassing
-  // the pilot's public stop(). Release captured DOM input on every exit path.
+  let owner,pulse=null;
+  try{
+    // The optional research pulse must wrap Game BEFORE FixedStepRafOwner
+    // snapshots its lifecycle hooks. Installing it after the factory returns
+    // fails the owner's lifecycle-integrity gate.
+    if(shotOnlyPulseFactory){
+      pulse=shotOnlyPulseFactory(game,timeline);
+      if(!pulse || typeof pulse.detach!=='function')
+        throw Error('invalid browser pulse owner');
+    }
+    owner=new FixedStepRafOwner(game,timeline,bridge,
+      {now:clock.now,request,cancel,render,maxSteps,backlogExtraTicks,isVisible:()=>!doc.hidden});
+  }catch(error){
+    try{if(pulse)pulse.detach()}catch(cleanupError){
+      if(error && typeof error==='object'){
+        try{error.cleanupError=cleanupError}catch(_ignored){}
+      }
+    }
+    try{capture.detach()}catch(cleanupError){
+      if(error && typeof error==='object'){
+        try{if(!error.cleanupError)error.cleanupError=cleanupError}catch(_ignored){}
+      }
+    }
+    throw error;
+  }
+  // Fatal RAF/update/render failures call owner.stop() directly, bypassing
+  // the pilot's public stop. Release every nested owner on every exit path.
   const stopOwner=owner.stop.bind(owner);
   owner.stop=function(){
     let failure;
     try{stopOwner()}catch(error){failure=error}
+    try{if(pulse)pulse.detach()}catch(error){if(!failure)failure=error}
     try{capture.detach()}catch(error){if(!failure)failure=error}
     if(failure)throw failure;
   };
-  return {timeline,bridge,capture,owner,
+  return {timeline,bridge,capture,owner,pulse,
     start(){
       if(owner.started)throw Error('browser pilot already running');
       if(!capture.active)throw Error('browser pilot capture detached');
       try{owner.start()}catch(error){
-        try{capture.detach()}catch(cleanupError){
+        try{owner.stop()}catch(cleanupError){
           if(error && typeof error==='object'){
             try{error.cleanupError=cleanupError}catch(_ignored){}
           }
@@ -797,10 +821,7 @@ function createFixedStepBrowserPilot(game,{window:win,document:doc,clock,
         throw error;
       }
     },
-    stop(){
-      // Release DOM ownership even when a hostile RAF host rejects cancel().
-      try{owner.stop()}finally{capture.detach()}
-    }};
+    stop(){owner.stop()}};
 }
 module.exports={FixedStepRafOwner,createFixedStepBrowserPilot,STEP_MS};
 
