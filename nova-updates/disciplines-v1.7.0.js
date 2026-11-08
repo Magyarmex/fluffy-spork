@@ -647,6 +647,10 @@ wrap('game/engine',function(engine,require){
       var tank=g.tanks[i];if(!tank||!tank.alive||tank.id===b.ownerId)continue;
       var def=C[tank.cls];if(!def||close(tank,def.size||20))return null;
     }
+    if(g.player&&g.player.alive&&g.player.id!==b.ownerId&&
+       g.tanks.indexOf(g.player)<0){
+      var pd=C[g.player.cls];if(!pd||close(g.player,pd.size||20))return null;
+    }
     for(var j=0;j<g.shapes.length;j++){
       var sh=g.shapes[j];if(sh&&sh.hp>0&&close(sh,sh.r||20))return null;
     }
