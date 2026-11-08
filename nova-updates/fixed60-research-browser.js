@@ -75,6 +75,7 @@ class ChronologicalInput {
       const e = this.events[this.index++];
       const d = e.data;
       const evt = {type:e.kind, __novaOriginalAt:d.__novaOriginalAt,
+        __novaTimestampTrusted:d.__novaTimestampTrusted,
         __novaReplayAt:e.at, __novaSampleAt:end,
         pointerId:d.pointerId, pointerType:d.pointerType,
         clientX:d.clientX, clientY:d.clientY, buttons:d.buttons,
@@ -194,18 +195,21 @@ class BrowserEventTimeline {
     const now = this.clock.now();
     if (!Number.isFinite(now)) throw Error('invalid browser clock');
     let stamp = Number(event.timeStamp);
+    let timestampTrusted = true;
     if (!Number.isFinite(stamp) || stamp <= 0) {
       stamp = now;
+      timestampTrusted = false;
       this.invalidTimestamps++;
     } else if (stamp > 1e11) {
       // Older WebKit browsers reported Unix-epoch milliseconds. Convert only
       // with a valid clock origin; otherwise prefer delivery time.
       const origin = Number(this.clock.timeOrigin);
       if (Number.isFinite(origin) && origin > 1e11) stamp -= origin;
-      else { stamp = now; this.invalidTimestamps++; }
+      else { stamp = now; timestampTrusted = false; this.invalidTimestamps++; }
     }
     if (stamp > now + this.maxFutureMs) {
       stamp = now;
+      timestampTrusted = false;
       this.futureClamps++;
     }
     if (stamp < now - this.maxStaleMs) {
@@ -286,7 +290,7 @@ class BrowserEventTimeline {
     }
     const target = event.target;
     const data = event.type === 'blur' ? {} : {
-      __novaOriginalAt: originalAt,
+      __novaOriginalAt: originalAt, __novaTimestampTrusted: timestampTrusted,
       pointerId: event.pointerId, pointerType: event.pointerType,
       clientX: event.clientX, clientY: event.clientY,
       button: event.button, buttons: event.buttons,
