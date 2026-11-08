@@ -15,7 +15,7 @@ function target(){
   listenerCount(){return [...handlers.values()].reduce((n,list)=>n+list.length,0)}
  };
 }
-function run({shotOnlyPulse=false,release='pointerup',maxSteps=3,failRequest=false,mouse=false,compat=false,ageGateMs=Infinity}={}){
+function run({shotOnlyPulse=false,release='pointerup',maxSteps=3,failRequest=false,mouse=false,compat=false,ageGateMs=Infinity,invalidReleaseStamp=false}={}){
  const canvas=target(),win=target(),doc=target();doc.hidden=false;
  let now=1000,callback=null,shots=[],commands=0;
  const input={canvas,touchSeen:!mouse,stickId:{move:-1,aim:-1},
@@ -57,7 +57,7 @@ function run({shotOnlyPulse=false,release='pointerup',maxSteps=3,failRequest=fal
       [['pointerdown',134,600],['pointermove',137,640],[release,140,640]];
     for(const [type,at,x] of events){
      const place=type==='pointerdown'||type==='mousedown'?canvas:win;
-     place.dispatch({type,timeStamp:1000+at,pointerType:mouse?'mouse':'touch',
+     place.dispatch({type,timeStamp:invalidReleaseStamp&&type==='pointerup'?0:1000+at,pointerType:mouse?'mouse':'touch',
        pointerId:mouse?1:22,clientX:x,clientY:200,button:0,
        buttons:type==='pointerup'||type==='mouseup'||type==='pointercancel'?0:1,
        target:canvas});
@@ -132,4 +132,11 @@ test('stale mouse shot rejection deduplicates native and compatibility events',(
   assert.equal(stale.rejectedStale,1);
   assert.equal(stale.commands,0);assert.equal(stale.firing,false);
  }
+});
+
+test('invalid DOM release timestamp cannot masquerade as a fresh shot',()=>{
+ const result=run({shotOnlyPulse:true,maxSteps:3,ageGateMs:80,invalidReleaseStamp:true});
+ assert.deepEqual(result.shots,[]);
+ assert.equal(result.rejectedStale,1);
+ assert.equal(result.commands,0);assert.equal(result.firing,false);
 });
