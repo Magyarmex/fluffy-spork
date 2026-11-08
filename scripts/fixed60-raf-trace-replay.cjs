@@ -69,6 +69,9 @@ function replay(intervals,maxSteps=2,backlogExtraTicks=2){
       droppedMs:round(owner.droppedMs),droppedFrames:owner.droppedFrames,
       remainingBacklogMs:round(owner.lagMs),
       peakBacklogMs:round(lag.reduce((peak,v)=>Math.max(peak,v),0)),
+      // The pose presenter receives alpha=min(1, lag/STEP_MS).
+      // Saturation is a visual-phase warning, not a measured dropped frame.
+      interpolationSaturatedFrames:lag.filter(v=>v>=STEP_MS-1e-7).length,
       p95BacklogMs:round(percentile(lag,.95)),
       p95SimulationPhaseLagMs:round(percentile(phaseLag,.95)),
       p99SimulationPhaseLagMs:round(percentile(phaseLag,.99)),
