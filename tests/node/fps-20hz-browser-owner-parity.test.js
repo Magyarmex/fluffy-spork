@@ -158,8 +158,10 @@ test('opt-in browser pilot forwards four-step catch-up without changing default'
   request:()=>7,cancel:()=>{},render:()=>{}};
  let pilot;
  try{
-  pilot=createFixedStepBrowserPilot(g,{...opts,maxSteps:4});
+  pilot=createFixedStepBrowserPilot(g,{...opts,maxSteps:4,backlogExtraTicks:4});
   assert.equal(pilot.owner.maxSteps,4);
+  assert.equal(pilot.owner.backlogExtraTicks,4,
+   'browser pilot must expose the same opt-in backlog budget as direct research owner');
   const productionStart=g.start;
   g.sfx.startMusic=()=>{};
   pilot.start();
@@ -169,7 +171,12 @@ test('opt-in browser pilot forwards four-step catch-up without changing default'
   assert.equal(g.start,productionStart,'composed Game startup must be restored');
   const defaultPilot=createFixedStepBrowserPilot(g,opts);
   assert.equal(defaultPilot.owner.maxSteps,2);
+  assert.equal(defaultPilot.owner.backlogExtraTicks,2,
+   'ordinary pilot must retain its existing bounded backlog default');
   defaultPilot.stop();
+  assert.throws(()=>createFixedStepBrowserPilot(g,{...opts,backlogExtraTicks:5}),
+   /invalid fixed-step RAF owner/,
+   'browser factory must reject unbounded research catch-up');
  }finally{if(pilot)pilot.stop();g.destroy()}
 });
 
