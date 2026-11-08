@@ -111,12 +111,16 @@ test('burst policies preserve seeded deterministic input ownership and report le
 });
 test('burst phase uses physical seconds rather than frame counts',()=>{
  for(const policy of ['long','short']){
+  const exposures=[];
   for(const hz of [30,60,120]){
    let active=0;
    for(let i=0;i<8*hz;i++)active+=+activeAtTick(i*(120/hz),policies[policy]);
+   exposures.push(active/hz);
    const duty=policies[policy].on/(policies[policy].on+policies[policy].off);
    assert.ok(Math.abs(active/(8*hz)-duty)<.025,
     'phase sampling must approximate declared physical duty cycle');
   }
+  assert.equal(new Set(exposures).size,1,
+   'same physical firing exposure across all frame-rate arms');
  }
 });
