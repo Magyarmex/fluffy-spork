@@ -29,7 +29,7 @@ function run(maxSteps,touch=false){
     now:()=>now,maxSteps,request:fn=>{callback=fn;return 1},
     cancel:()=>{callback=null},render(){
       rendered.push({atMs:now-1000,x:g.player.x,y:g.player.y,
-        moving:!!g.input.keyboard.w,aimActive:!!g.input.aim.active});
+        moving:!!g.input.keyboard.up,aimActive:!!g.input.aim.active});
     }});
   const events=touch?[{atMs:130,type:'pointerdown'},
     {atMs:310,type:'pointerup'}]:[{atMs:130,type:'keydown',key:'w'},
