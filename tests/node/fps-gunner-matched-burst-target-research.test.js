@@ -54,7 +54,9 @@ function run(seed,cls,reload,hz,policy,targeted){
    return ret;
   };
   const seconds=6,frame=1/hz,period=policy.on+policy.off;
-  let now=0,spinIntegral=0,heatIntegral=0,redline=0,updates=0,splitEdges=0;
+  const startGameTime=g.time;
+  let now=0,spinIntegral=0,heatIntegral=0,stabilityIntegral=0;
+  let redline=0,firingDuty=0,updates=0,splitEdges=0;
   // Split presentation frames at the SAME absolute input-event timestamps
   // for all rates; do not silently extend a press to the next 30Hz frame.
   for(let f=0;f<seconds*hz;f++){
@@ -70,22 +72,30 @@ function run(seed,cls,reload,hz,policy,targeted){
     const dt=next-now;
     assert.ok(dt>EPS,'no zero-length simulation step');
     g.input.firing=firing;
+    if(firing)firingDuty+=dt;
     g.update(dt);updates++;
     spinIntegral+=(p.fireSpin||0)*dt;
     heatIntegral+=(p.__v17Heat||0)*dt;
+    stabilityIntegral+=(p.__v17Stability==null?1:p.__v17Stability)*dt;
     if((p.__v17Heat||0)>=1.18-EPS)redline+=dt;
     now=next;
     if(next<end-EPS)splitEdges++;
    }
   }
   assert.ok(Math.abs(now-seconds)<1e-7);
+  assert.ok(Math.abs((g.time-startGameTime)-seconds)<1e-6,'real Game elapsed time');
+  const expectedDuty=policy.name==='held'?6:policy.name==='one-on-quarter-off'?5:3.2;
+  assert.ok(Math.abs(firingDuty-expectedDuty)<1e-7,'identical firing duty at all refresh rates');
   assert.equal(g.tanks.length,1,'no AI contamination');
   assert.equal(g.shapes.length,targeted?1:0,'no neutral respawn contamination');
   assert.equal(g.drones.length+g.powerups.length,0,'no drone/powerup contamination');
   const result={seed,cls,reload,hz,policy:policy.name,targeted,
    volleys:shotTimes.length,first:shotTimes.slice(0,5),births,
    hits,damage:+damage.toFixed(5),spin:+(spinIntegral/seconds).toFixed(5),
-   heat:+(heatIntegral/seconds).toFixed(5),redline:+redline.toFixed(5),
+   heat:+(heatIntegral/seconds).toFixed(5),
+   stability:+(stabilityIntegral/seconds).toFixed(5),
+   redline:+redline.toFixed(5),firingDuty:+firingDuty.toFixed(6),
+   targetTravel:victim?+Math.hypot(victim.x-(p.x+175),victim.y-p.y).toFixed(4):null,
    finalSpin:+(p.fireSpin||0).toFixed(5),updates,splitEdges};
   g.destroy();return result;
  });
@@ -119,6 +129,8 @@ test('legal rotary Gunner matched-time bursts reveal actual neutral damage and s
     hits:target.hits,damage:target.damage,
     spinNoTarget:noTarget.spin,spinTarget:target.spin,
     heatNoTarget:noTarget.heat,heatTarget:target.heat,
+    stabilityNoTarget:noTarget.stability,stabilityTarget:target.stability,
+    targetTravel:target.targetTravel,firingDuty:target.firingDuty,
     redline:target.redline,splitEdges:target.splitEdges,
     first:noTarget.first,births:target.births});
   }
