@@ -38,8 +38,10 @@ function trial(fps,reverse=false,mode='hostile'){
   const right={kind:'bullet',id:202,ownerId:102,x:mode==='late'?50:20,y:0,
    vx:-6000,vy:0,r:3,hp:1,maxHp:1,baseDmg:8,dmg:8,ttl:.005,
    pen:0,hits:0,shell:false,beam:false,dead:false,color:'#fff'};
-  if(mode==='asym'){
+  if(mode==='asym'||mode==='asymLate'||mode==='asymSameOwner'){
    right.hp=right.maxHp=3;
+   if(mode==='asymLate')right.x=50;
+   if(mode==='asymSameOwner')right.ownerId=left.ownerId;
   }
   if(mode==='canonical'){
    left.x=-227.43;right.x=227.43;
@@ -75,5 +77,19 @@ for(const fps of [30,60,120,240])for(const reverse of [false,true]){
    'surviving projectile retains two integrity points after interception');
   assert.ok(Math.abs(right.dmg-8*2/3)<1e-9,
    'surviving projectile damage scales with remaining integrity');
+ });
+}
+
+/* Safety: unequal HP cannot manufacture a collision after either TTL,
+ * and two shots owned by the same tank must never intercept. */
+for(const fps of [30,60,120,240])for(const reverse of [false,true]){
+ test('asymmetric no post-TTL interception '+fps+'Hz reverse='+reverse,()=>{
+  const {contacts}=trial(fps,reverse,'asymLate');
+  assert.deepEqual(contacts,[]);
+ });
+ test('asymmetric same-owner shots do not intercept '+fps+
+      'Hz reverse='+reverse,()=>{
+  const {contacts}=trial(fps,reverse,'asymSameOwner');
+  assert.deepEqual(contacts,[]);
  });
 }
