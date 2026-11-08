@@ -1,6 +1,6 @@
 'use strict';
-// Research only. Measures browser-event timestamp -> actual Input handler
-// invocation in the real fixed-step RAF owner. This is NOT input-to-photon
+// Research only. Measures synthetic event timestamp -> stub Input handler
+// invocation through the real fixed-step RAF owner and timeline. NOT input-to-photon
 // latency: there is no browser event dispatch, GPU, or physical device here.
 const {FixedStepRafOwner}=require('../tests/research/fixed-step-raf-owner.cjs');
 const {ChronologicalInput}=require('../tests/research/fixed-step-dom-input.cjs');
