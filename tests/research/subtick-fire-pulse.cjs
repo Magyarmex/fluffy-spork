@@ -81,6 +81,9 @@ class SubtickFirePulse {
         const down=self.down; self.down=null;
         self.old.pu.call(input,{type:'pointercancel',pointerType:down.type,
           pointerId:down.id,button:0,buttons:0});
+        // Core Input.pu clears mouse firing but deliberately retains mouse aim.
+        // A replaced life must not inherit that old pointer aim ownership.
+        if (down.type === 'mouse') input.mouseActive = false;
       }
       const canPlay = game.status === 'playing' && !game.paused && !input.__novaInputPaused &&
         !(game.__testWindow && game.__testWindow.document.hidden);
@@ -92,6 +95,7 @@ class SubtickFirePulse {
           const down=self.down; self.down=null;
           self.old.pu.call(input,{type:'pointercancel',pointerType:down.type,
             pointerId:down.id,button:0,buttons:0});
+          if (down.type === 'mouse') input.mouseActive = false;
         }
       }
       try { return self.old.update.apply(this,arguments); }
