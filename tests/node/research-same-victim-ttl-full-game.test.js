@@ -31,6 +31,8 @@ function trial(hz,reverse,fullUpdate,only=null,targetX=40){
   g.shapes=[];g.drones=[];g.__novaTerrain=[];
   g.hash.clear();for(const tank of g.tanks)g.hash.insert(tank);
   g.time=1;
+  g.shapeTimer=999;g.powerupTimer=999;g.eliteTimer=999;
+  g.powerups=[];g.orbs=[];g.aiRespawns=[];
   g.input.firing=false;g.input.autofire=false;
   g.input.moveVec=()=>({x:0,y:0});g.input.aimVec=()=>null;
   const bullets=[
