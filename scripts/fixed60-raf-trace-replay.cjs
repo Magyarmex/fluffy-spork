@@ -83,7 +83,7 @@ function replay(intervals,maxSteps=2,backlogExtraTicks=2){
       interpolationSaturatedFrames:saturatedFrames,
       longestSaturationStreakFrames:longestSaturationStreak,
       saturatedFrameIntervalMs:round(saturatedIntervalMs),
-      saturatedFrameIntervalShare:round(saturatedIntervalMs/total),
+      saturatedFrameIntervalShare:saturatedIntervalMs/total,
       p95BacklogMs:round(percentile(lag,.95)),
       p95SimulationPhaseLagMs:round(percentile(phaseLag,.95)),
       p99SimulationPhaseLagMs:round(percentile(phaseLag,.99)),
