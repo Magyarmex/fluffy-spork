@@ -3197,9 +3197,11 @@ function certifiedMultiShotCoverPriority(g,dt){
 }
 
  /* A deliberately narrow first-event recovery: two expiring ordinary rounds
-  * that provably destroy EACH OTHER before either TTL, wall, body or arena
-  * contact. Resolve through the existing integrity/feedback owners before
-  * the core's expiration pass. Any unknown competing event abstains. */
+  * that physically intercept before either TTL, wall, body or arena contact.
+  * Equal-integrity shots destroy each other; unequal integrity is admitted
+  * only with a complete, uncontested post-contact TTL corridor, so the
+  * survivor can expire without missing another physical event. Resolve via
+  * the existing integrity/feedback owners. Uncertainty always abstains. */
  function certifiedMutualTTLInterception(g,dt){
   var shots=g.bullets;
   if(!(dt>0&&dt<=.05)||!Array.isArray(shots)||
