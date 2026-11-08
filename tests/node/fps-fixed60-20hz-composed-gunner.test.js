@@ -9,7 +9,7 @@ const {bootGame,withSeed,digest,physical}=
 const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
 const {FixedStepRafOwner}=require('../research/fixed-step-raf-owner.cjs');
 const TICKS=360;
-function run(cls,seed,cap,targeted,bursty=false){
+function run(cls,seed,cap,targeted,bursty=false,backlogExtraTicks=2){
  return withSeed(seed,draws=>{
   const g=bootGame(),p=g.player;g.sfx.muted=true;g.sfx.startMusic=()=>{};
   g.setClass(p,cls);p.x=1000;p.y=1000;p.vx=0;p.vy=0;
@@ -48,7 +48,7 @@ function run(cls,seed,cap,targeted,bursty=false){
    if(t===p&&this.bullets.length>before)volleys++;
    return result;
   };
-  let owner=null,callback=null,now=1000;
+  let owner=null,callback=null,now=1000,peakLagMs=0;
   try{
    if(cap===0){for(let i=0;i<TICKS;i++)g.update(1/60);}
    else{
@@ -56,7 +56,7 @@ function run(cls,seed,cap,targeted,bursty=false){
     const bridge={timeline,startMs:1000};
     owner=new FixedStepRafOwner(g,timeline,bridge,{
      now:()=>now,request:fn=>(callback=fn,1),
-     cancel:()=>{callback=null},render:()=>{},maxSteps:cap
+     cancel:()=>{callback=null},render:()=>{},maxSteps:cap,backlogExtraTicks
     });
     owner.start();
     g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
@@ -68,7 +68,7 @@ function run(cls,seed,cap,targeted,bursty=false){
       bursty===true ? Math.floor(frame/2)*100+(frame%2?95:0) :
       typeof bursty==='number' ? Math.floor(frame/2)*100+(frame%2?50+bursty:0) : frame*50);
      const fn=callback;assert.equal(typeof fn,'function');
-     callback=null;fn(now);
+     callback=null;fn(now);peakLagMs=Math.max(peakLagMs,owner.lagMs);
     }
    }
    assert.ok(volleys>0);
@@ -77,7 +77,7 @@ function run(cls,seed,cap,targeted,bursty=false){
     hash:digest(physical(g)),draws:draws(),heat:p.__v17Heat||0,
     spin:p.fireSpin||0,fireCd:p.fireCd},
     scheduler:owner?{ticks:owner.ticks,droppedMs:owner.droppedMs,
-     droppedFrames:owner.droppedFrames,lagMs:owner.lagMs}:null};
+     droppedFrames:owner.droppedFrames,lagMs:owner.lagMs,peakLagMs}:null};
   }finally{if(owner)owner.stop();g.destroy();}
  });
 }
@@ -135,4 +135,18 @@ test('four-step budget cannot promise fairness under clustered sub-100ms frame g
  assert.ok(clustered.scheduler.ticks<TICKS);
  assert.notDeepEqual(clustered.state,baseline.state,
   'same average 20Hz is not enough to guarantee combat chronology');
+});
+
+test('opt-in backlog headroom recovers clustered combat chronology but increases phase lag',()=>{
+ for(const cls of ['minigun','needlestorm']){
+  const baseline=run(cls,1517800,0,true);
+  const defaultBudget=run(cls,1517800,4,true,'clustered',2);
+  const expanded=run(cls,1517800,4,true,'clustered',4);
+  assert.ok(defaultBudget.scheduler.droppedMs>0);
+  assert.equal(expanded.scheduler.ticks,TICKS);
+  assert.equal(expanded.scheduler.droppedMs,0);
+  assert.deepEqual(expanded.state,baseline.state);
+  assert.ok(expanded.scheduler.peakLagMs>defaultBudget.scheduler.peakLagMs,
+   'recovered chronology carries a real queued-time/latency tradeoff');
+ }
 });
