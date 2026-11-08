@@ -114,11 +114,14 @@ test('legal rotary Gunner matched-time bursts reveal actual neutral damage and s
    const noTarget=run(1517800,cls,reload,hz,policy,false);
    const target=run(1517800,cls,reload,hz,policy,true);
    const repeat=run(1517802,cls,reload,hz,policy,false);
+   const targetRepeat=run(1517802,cls,reload,hz,policy,true);
    assert.deepEqual(noTarget.first,repeat.first,'seed-independent first firing times');
    assert.equal(noTarget.volleys,repeat.volleys,'seed-independent isolated cadence');
    assert.ok(noTarget.volleys>0);
-   assert.ok(target.volleys>0);
-   assert.ok(target.hits>=0&&target.damage>=0);
+   assert.equal(target.volleys,noTarget.volleys,'target must not alter isolated firing cadence');
+   assert.equal(targetRepeat.volleys,repeat.volleys,'second seed target must not alter cadence');
+   assert.ok(target.hits>0&&target.damage>0,'first seeded target must receive real damage');
+   assert.ok(targetRepeat.hits>0&&targetRepeat.damage>0,'second seeded target must receive real damage');
    assert.ok(target.damage<=1000000,'damage cannot exceed target HP');
    assert.ok(noTarget.spin>=0&&noTarget.spin<=1);
    assert.ok(target.spin>=0&&target.spin<=1);
@@ -128,10 +131,12 @@ test('legal rotary Gunner matched-time bursts reveal actual neutral damage and s
    rows.push({cls,reload,hz,policy:policy.name,
     isolated:noTarget.volleys,targetVolleys:target.volleys,
     hits:target.hits,damage:target.damage,
+    hitsSeed2:targetRepeat.hits,damageSeed2:targetRepeat.damage,
     spinNoTarget:noTarget.spin,spinTarget:target.spin,
     heatNoTarget:noTarget.heat,heatTarget:target.heat,
     stabilityNoTarget:noTarget.stability,stabilityTarget:target.stability,
-    targetTravel:target.targetTravel,firingDuty:target.firingDuty,
+    targetTravel:target.targetTravel,targetTravelSeed2:targetRepeat.targetTravel,
+    firingDuty:target.firingDuty,
     redline:target.redline,splitEdges:target.splitEdges,
     first:noTarget.first,births:target.births});
   }
