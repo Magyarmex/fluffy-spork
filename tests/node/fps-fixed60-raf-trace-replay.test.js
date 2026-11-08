@@ -150,3 +150,14 @@ test('saturation streak and interval exposure distinguish isolated phase risk fr
   assert.ok(constrained.saturatedFrameIntervalMs>=recovered.saturatedFrameIntervalMs,
     'lower step budget should not conceal its greater phase exposure');
 });
+
+
+test('interval-weighted saturation uses actual RAF gaps and contiguous streaks',()=>{
+  const r=replay([1000/30,1000/30],1,2);
+  assert.equal(r.simulatedTicks,2);
+  assert.equal(r.droppedMs,0);
+  assert.equal(r.interpolationSaturatedFrames,2);
+  assert.equal(r.longestSaturationStreakFrames,2);
+  assert.equal(r.saturatedFrameIntervalMs,66.667);
+  assert.equal(r.saturatedFrameIntervalShare,1);
+});
