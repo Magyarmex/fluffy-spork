@@ -132,6 +132,7 @@ test('saturation streak and interval exposure distinguish isolated phase risk fr
   const smooth=replay(Array(120).fill(1000/30),2);
   assert.equal(smooth.interpolationSaturatedFrames,0);
   assert.equal(smooth.longestSaturationStreakFrames,0);
+  assert.equal(smooth.longestSaturationStreakMs,0);
   assert.equal(smooth.saturatedFrameIntervalMs,0);
   assert.equal(smooth.saturatedFrameIntervalShare,0);
   // A bounded clustered schedule must disclose both the number of saturated
@@ -143,6 +144,8 @@ test('saturation streak and interval exposure distinguish isolated phase risk fr
     assert.ok(r.interpolationSaturatedFrames>0);
     assert.ok(r.longestSaturationStreakFrames>=1);
     assert.ok(r.longestSaturationStreakFrames<=r.interpolationSaturatedFrames);
+    assert.ok(r.longestSaturationStreakMs>0);
+    assert.ok(r.longestSaturationStreakMs<=r.saturatedFrameIntervalMs);
     assert.ok(r.saturatedFrameIntervalMs>0);
     assert.ok(r.saturatedFrameIntervalMs<=r.wallMs);
     assert.ok(r.saturatedFrameIntervalShare>0&&r.saturatedFrameIntervalShare<=1);
@@ -158,6 +161,7 @@ test('interval-weighted saturation uses actual RAF gaps and contiguous streaks',
   assert.equal(r.droppedMs,0);
   assert.equal(r.interpolationSaturatedFrames,2);
   assert.equal(r.longestSaturationStreakFrames,2);
+  assert.equal(r.longestSaturationStreakMs,66.667);
   assert.equal(r.saturatedFrameIntervalMs,66.667);
   assert.equal(r.saturatedFrameIntervalShare,1);
 });
