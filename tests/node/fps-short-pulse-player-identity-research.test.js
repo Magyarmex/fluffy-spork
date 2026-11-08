@@ -251,3 +251,37 @@ for(const kind of ['mouse','touch']){
   }finally{pulse.detach();}
  });
 }
+
+
+// The shipping core's mouse pointerup clears firing but intentionally leaves
+// mouseActive set for ordinary hover aiming. A synthetic old-life cancellation
+// needs the stronger lifecycle reset, not just a pointerup call.
+for(const interruption of ['redeploy','dead']){
+ test('sampled old-life mouse hover ownership clears on '+interruption,()=>{
+  const shots=[],old={id:1},fresh={id:2};
+  const input={touchSeen:false,firing:false,mouseActive:false,
+   aim:{active:false,dx:0,dy:0},stickId:{aim:-1},
+   pd(){this.mouseActive=true;this.firing=true;},pm(){},
+   pu(){this.firing=false;}, // matches shipping core mouse pointerup
+   aimVec(){return{x:1,y:0};}
+  };
+  const game={input,player:old,status:'playing',paused:false,
+   update(){if(input.firing)this.tryFire(this.player);this.updateDrones();},
+   updateDrones(){},tryFire(p){shots.push(p.id);},destroy(){}};
+  const timeline={input,reset(){},releaseAll(){}};
+  const pulse=new ShotOnlyFirePulse(game,timeline);
+  try{
+   input.pd({type:'pointerdown',pointerType:'mouse',pointerId:22,button:0,
+    target:{closest(){return null;}}});
+   game.update(1/60);
+   assert.deepEqual(shots,[1]);
+   if(interruption==='redeploy')game.player=fresh;else game.status='dead';
+   game.update(1/60);
+   assert.equal(input.firing,false);
+   assert.equal(input.mouseActive,false,'old-life hover aim must not survive cancellation');
+   game.player=fresh;game.status='playing';
+   game.update(1/60);
+   assert.deepEqual(shots,[1]);
+  }finally{pulse.detach();}
+ });
+}
