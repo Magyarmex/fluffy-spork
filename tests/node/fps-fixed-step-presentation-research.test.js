@@ -151,3 +151,59 @@ test('projectile teleports and rendering exceptions never corrupt physical state
   assert.equal(bullet.x,1000);
  }finally{p.stop()}
 });
+
+test('74Hz composed-Game projectile presentation reduces repeated visual poses without changing physics',()=>{
+ function run(enabled){return withSeed(1517800,draws=>{
+  const g=bootGame(),p=g.player;g.sfx.muted=true;g.sfx.startMusic=()=>{};
+  g.setClass(p,'minigun');
+  g.tanks=[p];g.tankById=new Map([[p.id,p]]);
+  g.shapes=[];g.drones=[];g.powerups=[];g.bullets=[];
+  if(g.shapeById)g.shapeById.clear();
+  if(g.hash&&g.hash.clear)g.hash.clear();
+  g.shapeTimer=Infinity;g.powerupTimer=Infinity;g.eliteTimer=Infinity;
+  g.crasherTimer=Infinity;g.aiRespawns=[];
+  g.spawnShape=()=>null;g.spawnPowerup=()=>null;g.spawnAITank=()=>null;
+  p.droneRespawnT=Infinity;g.spawnDrone=()=>null;
+  g.status='playing';g.paused=false;
+  const presentation=new FixedStepPosePresentation(g,{enabled});
+  const timeline=new ChronologicalInput(g.input);
+  const bridge={timeline,startMs:1000};
+  let now=1000,callback=null,rows=[],physicalViolations=0;
+  const owner=new FixedStepRafOwner(g,timeline,bridge,{
+   now:()=>now,request:fn=>(callback=fn,1),cancel:()=>{callback=null},
+   render:(game,w,h,alpha)=>{
+    const b=game.bullets[0],before=b&&[b.x,b.y];
+    presentation.draw(game=>{
+     const bullet=game.bullets[0];
+     if(bullet)rows.push({bullet,x:bullet.x,y:bullet.y});
+    },game,w,h,alpha);
+    if(b&&(b.x!==before[0]||b.y!==before[1]))physicalViolations++;
+   }
+  });
+  try{
+   owner.start();
+   g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
+   g.input.firing=true;g.input.autofire=false;
+   for(let frame=1;frame<=148;frame++){
+    now=1000+frame*1000/74;
+    const fn=callback;callback=null;fn(now);
+   }
+   const repeats=rows.slice(1).filter((r,i)=>{
+    const prior=rows[i];
+    return r.bullet===prior.bullet&&
+     Math.hypot(r.x-prior.x,r.y-prior.y)<1e-7;
+   }).length;
+   return {repeats,frames:rows.length,ticks:owner.ticks,
+    hash:digest(physical(g)),draws:draws(),physicalViolations};
+  }finally{owner.stop();presentation.stop();g.destroy()}
+ });}
+ const baseline=run(false),smooth=run(true);
+ assert.equal(baseline.ticks,120);assert.equal(smooth.ticks,120);
+ assert.equal(baseline.physicalViolations,0);assert.equal(smooth.physicalViolations,0);
+ assert.equal(baseline.hash,smooth.hash,'visual interpolation must not change physical world');
+ assert.equal(baseline.draws,smooth.draws,'visual interpolation must not draw RNG');
+ assert.ok(baseline.frames>30,'real Game must produce enough projectile observations');
+ assert.ok(baseline.repeats>0,'74Hz must expose repeated 60Hz projectile poses');
+ assert.ok(smooth.repeats<baseline.repeats,
+  `interpolation failed to smooth projectile motion: ${JSON.stringify({baseline,smooth})}`);
+});
