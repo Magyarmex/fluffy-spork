@@ -14,7 +14,7 @@ function target(){
   listenerCount(){return [...handlers.values()].reduce((n,list)=>n+list.length,0)}
  };
 }
-function run({shotOnlyPulse=false,release='pointerup',maxSteps=3}={}){
+function run({shotOnlyPulse=false,release='pointerup',maxSteps=3,failRequest=false}={}){
  const canvas=target(),win=target(),doc=target();doc.hidden=false;
  let now=1000,callback=null,shots=[],commands=0;
  const input={canvas,touchSeen:true,stickId:{move:-1,aim:-1},
@@ -37,7 +37,8 @@ function run({shotOnlyPulse=false,release='pointerup',maxSteps=3}={}){
  const originals={update:game.update,destroy:game.destroy,pd:input.pd};
  const pilot=createFixedStepBrowserPilot(game,{window:win,document:doc,
   clock:{now:()=>now,timeOrigin:1793560000000},
-  request:fn=>(callback=fn,1),cancel:()=>{callback=null},render(){},
+  request:fn=>{if(failRequest)throw Error('host refused RAF');callback=fn;return 1},
+  cancel:()=>{callback=null},render(){},
   canvas,maxSteps,shotOnlyPulse});
  try{
   pilot.start();
@@ -85,4 +86,8 @@ test('two-step overloaded browser factory delays but does not duplicate the shot
  assert.deepEqual(delayed.shots,[200]);assert.equal(delayed.pulses,1);
  assert.equal(delayed.ticks,16);assert.ok(delayed.droppedMs>0);
  assert.equal(delayed.commands,0);
+});
+
+test('failed first RAF request unwinds pulse, capture and Game lifecycle hooks',()=>{
+ assert.throws(()=>run({shotOnlyPulse:true,failRequest:true}),/host refused RAF/);
 });
