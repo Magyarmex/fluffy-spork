@@ -126,3 +126,54 @@ test('capture provenance distinguishes guarded timing from verified gameplay',()
  assert.equal(unguarded.captureProvenance.status,'consistent');
  assert.equal(unguarded.captureProvenance.visibilityGuardClaimed,false);
 });
+
+
+test('saturation streak and interval exposure distinguish isolated phase risk from sustained backlog',()=>{
+  const smooth=replay(Array(120).fill(1000/30),2);
+  assert.equal(smooth.interpolationSaturatedFrames,0);
+  assert.equal(smooth.longestSaturationStreakFrames,0);
+  assert.equal(smooth.longestSaturationStreakMs,0);
+  assert.equal(smooth.saturatedFrameIntervalMs,0);
+  assert.equal(smooth.saturatedFrameIntervalShare,0);
+  // A bounded clustered schedule must disclose both the number of saturated
+  // render samples and their consecutive duration, without calling it FPS.
+  const gaps=Array.from({length:15},()=>[85,40,5,1000/7.5-130]).flat();
+  const constrained=replay(gaps,2,4);
+  const recovered=replay(gaps,4,2);
+  for(const r of [constrained,recovered]){
+    assert.ok(r.interpolationSaturatedFrames>0);
+    assert.ok(r.longestSaturationStreakFrames>=1);
+    assert.ok(r.longestSaturationStreakFrames<=r.interpolationSaturatedFrames);
+    assert.ok(r.longestSaturationStreakMs>0);
+    assert.ok(r.longestSaturationStreakMs<=r.saturatedFrameIntervalMs);
+    assert.ok(r.saturatedFrameIntervalMs>0);
+    assert.ok(r.saturatedFrameIntervalMs<=r.wallMs);
+    assert.ok(r.saturatedFrameIntervalShare>0&&r.saturatedFrameIntervalShare<=1);
+  }
+  assert.ok(constrained.saturatedFrameIntervalMs>=recovered.saturatedFrameIntervalMs,
+    'lower step budget should not conceal its greater phase exposure');
+});
+
+
+test('interval-weighted saturation uses actual RAF gaps and contiguous streaks',()=>{
+  const r=replay([34,34],1,4);
+  assert.equal(r.simulatedTicks,2);
+  assert.equal(r.droppedMs,0);
+  assert.equal(r.interpolationSaturatedFrames,2);
+  assert.equal(r.longestSaturationStreakFrames,2);
+  assert.equal(r.longestSaturationStreakMs,68);
+  assert.equal(r.saturatedFrameIntervalMs,68);
+  assert.equal(r.saturatedFrameIntervalShare,1);
+});
+
+
+test('lower saturation is not a victory when the scheduler drops simulation time',()=>{
+  const gaps=Array.from({length:15},()=>[85,40,5,1000/7.5-130]).flat();
+  const baseline=replay(gaps,2,2);
+  const retained=replay(gaps,2,4);
+  assert.ok(baseline.droppedMs>0);
+  assert.equal(retained.droppedMs,0);
+  assert.ok(baseline.interpolationSaturatedFrames<retained.interpolationSaturatedFrames,
+    'dropping simulation time can artificially reduce reported phase saturation');
+  assert.ok(baseline.simulatedTicks<retained.simulatedTicks);
+});
