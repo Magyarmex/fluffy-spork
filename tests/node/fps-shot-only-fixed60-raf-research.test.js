@@ -10,7 +10,7 @@ const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs'
 const {FixedStepRafOwner}=require('../research/fixed-step-raf-owner.cjs');
 const {ShotOnlyFirePulse}=require('../research/shot-only-fire-pulse.cjs');
 
-function run({shot=false,cls='basic',disableFire=false,releaseType='pointerup',maxSteps=3}={}){
+function run({shot=false,cls='basic',disableFire=false,releaseType='pointerup',maxSteps=3,ageGateMs=Infinity}={}){
  return withSeed(1517800,()=>{
   const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
   if(cls!=='basic')g.setClass(g.player,cls);
@@ -29,7 +29,8 @@ function run({shot=false,cls='basic',disableFire=false,releaseType='pointerup',m
   const timeline=new ChronologicalInput(g.input);
   let now=1000,callback=null;
   const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
-  const pulse=shot?new ShotOnlyFirePulse(g,timeline):null;
+  const pulse=shot?new ShotOnlyFirePulse(g,timeline,{maxPulseAgeMs:ageGateMs,
+    nowMs:()=>now,startMs:bridge.startMs}):null;
   const owner=new FixedStepRafOwner(g,timeline,bridge,{
    now:()=>now,maxSteps,request:fn=>(callback=fn,1),
    cancel:()=>{callback=null},render(){}});
@@ -57,7 +58,7 @@ function run({shot=false,cls='basic',disableFire=false,releaseType='pointerup',m
    const swarm=g.player.__novaSwarm;
    return {at150,at200,drones,recall:swarm?.recallUntil,active:swarm?.active,
     power:swarm?.power,nodeX:swarm?.nodeX,nodeY:swarm?.nodeY,
-    ticks:owner.ticks,droppedMs:owner.droppedMs,
+    ticks:owner.ticks,droppedMs:owner.droppedMs,rejectedStale:pulse?.rejectedStale||0,
     aim:g.input.aim.active,firing:g.input.firing};
   }finally{
    owner.stop();if(pulse)pulse.detach();g.destroy();
@@ -101,4 +102,29 @@ test('overloaded two-step RAF recovers the same short shot later without phantom
  assert.equal(delayed.at200.shots,1);
  assert.equal(delayed.ticks,16);assert.ok(delayed.droppedMs>0);
  assert.equal(delayed.aim,false);assert.equal(delayed.firing,false);
+});
+
+test('opt-in wall-clock gate accepts a fresh pulse and rejects a delayed shot',()=>{
+ const fresh=run({shot:true,maxSteps:3,ageGateMs:40});
+ const stale=run({shot:true,maxSteps:2,ageGateMs:40});
+ const allowed=run({shot:true,maxSteps:2,ageGateMs:80});
+ assert.equal(fresh.at150.bullets,1);
+ assert.equal(fresh.rejectedStale,0);
+ assert.equal(stale.at200.bullets,0,'stale recovery must not fire after release');
+ assert.equal(stale.at200.shots,0);
+ assert.equal(stale.rejectedStale,1);
+ assert.equal(stale.aim,false);assert.equal(stale.firing,false);
+ assert.equal(allowed.at200.bullets,1);
+ assert.equal(allowed.rejectedStale,0);
+});
+test('age-gated cancellation remains shot-free and Controller commands remain unchanged',()=>{
+ const canceled=run({shot:true,releaseType:'pointercancel',ageGateMs:40});
+ assert.equal(canceled.at200.bullets,0);assert.equal(canceled.rejectedStale,0);
+ for(const cls of ['carrier','warden','valkyrie']){
+  const baseline=run({cls,disableFire:true,maxSteps:2});
+  const stale=run({cls,disableFire:true,shot:true,maxSteps:2,ageGateMs:40});
+  for(const key of ['drones','recall','active','power','nodeX','nodeY'])
+   assert.deepEqual(localArrays(stale[key]),localArrays(baseline[key]),cls+' '+key);
+  assert.equal(stale.rejectedStale,1);
+ }
 });
