@@ -29,7 +29,8 @@ function run(maxSteps,touch=false){
     now:()=>now,maxSteps,request:fn=>{callback=fn;return 1},
     cancel:()=>{callback=null},render(){
       rendered.push({atMs:now-1000,x:g.player.x,y:g.player.y,
-        moving:!!g.input.keyboard.up,aimActive:!!g.input.aim.active});
+        moving:!!g.input.keyboard.up,aimActive:!!g.input.aim.active,
+        displaced:Math.hypot(g.player.x-origin.x,g.player.y-origin.y)>1e-6});
     }});
   const events=touch?[{atMs:130,type:'pointerdown'},
     {atMs:310,type:'pointerup'}]:[{atMs:130,type:'keydown',key:'w'},
@@ -112,4 +113,18 @@ test('first rendered touch ownership and eventual release follow the real bridge
  }
  assert.ok(low.rendered.find(f=>f.aimActive).atMs>
    sufficient.rendered.find(f=>f.aimActive).atMs);
+});
+
+test('real tank displacement first reaches the rendered frame after the press',()=>{
+ const low=run(2),sufficient=run(3);
+ for(const result of [low,sufficient]){
+  const first=result.rendered.find(f=>f.displaced);
+  assert.ok(first,'held W must move the real player in the composed world');
+  assert.ok(first.atMs>=result.applied[0].atMs,
+    'rendered tank movement cannot precede the input handler');
+ }
+ const lowFirst=low.rendered.find(f=>f.displaced).atMs;
+ const recoveredFirst=sufficient.rendered.find(f=>f.displaced).atMs;
+ assert.ok(lowFirst>recoveredFirst,
+   'two-step overload must delay first physically rendered tank movement');
 });
