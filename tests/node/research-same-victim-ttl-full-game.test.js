@@ -10,7 +10,7 @@ const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 if(previous===undefined)delete process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL;
 else process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL=previous;
 
-function trial(hz,reverse,fullUpdate,only=null,targetX=40){
+function trial(hz,reverse,fullUpdate,only=null,targetX=40,mutate=null){
  return withSeed(1517802,()=>{
   const g=bootGame();
   if(!g.player)g.redeploy();
@@ -43,6 +43,7 @@ function trial(hz,reverse,fullUpdate,only=null,targetX=40){
     r:3,dmg:20,ttl:.005,pen:1,hits:0,dead:false,
     shell:false,beam:false,color:'#fff'}
   ];
+  if(mutate)mutate(g,p,bullets);
   const selected=only==null?bullets:bullets.filter(b=>b.id===only);
   g.bullets=reverse?selected.reverse():selected;
   const contacts=[];
@@ -101,4 +102,18 @@ for(const hz of [30,60,120,240])for(const fullUpdate of [false,true])
   const result=trial(hz,false,fullUpdate,null,140);
   assert.equal(result.contacts.length,0);
   assert.equal(result.hp,1000);
+ });
+
+/* Adjacent safety gate: an earlier permanent wall must still intercept
+ * the left shot; the independently reachable right shot must not be
+ * erased by the now-dead competitor or granted a phantom wall bypass. */
+for(const hz of [30,60,120,240])for(const reverse of [false,true])
+ test('same-victim TTL pair preserves earlier permanent wall '+hz+
+      'Hz reverse='+reverse,()=>{
+  const result=trial(hz,reverse,false,null,40,g=>{
+   g.__novaTerrain=[{id:-9101,shape:'rect',x:10,y:0,w:4,h:70,
+    solid:true,destructible:false}];
+  });
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102],
+   'wall blocks left owner while right owner retains its legitimate contact');
  });
