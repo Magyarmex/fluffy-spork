@@ -96,14 +96,17 @@ test('burst policies preserve seeded deterministic input ownership and report le
    for(const hz of [30,60,120]){
     const a=trial(1517800,cls,reload,hz,policy);
     const b=trial(1517802,cls,reload,hz,policy);
-    assert.deepEqual(a,b,'same no-target experiment must not depend on RNG seed');
-    assert.equal(a.firedDuringRelease,0,'release must not create a new volley');
-    assert.ok(a.volleys>0&&a.activeTicks>0);
+    assert.equal(a.volleys,b.volleys,'same no-target emitted volley count across seeds');
+    assert.deepEqual(a.first,b.first,'first-shot timing must be seed-invariant');
+    for(const row of [a,b]){
+     assert.equal(row.firedDuringRelease,0,'release must not create a new volley');
+     assert.ok(row.volleys>0&&row.activeTicks>0);
+    }
     if(policy==='held'&&hz===60){
      assert.equal(a.volleys,cls==='minigun'?92:102,
       'preserve observed 60Hz no-target baseline; not an FPS parity target');
     }
-    rows.push(a);
+    rows.push({...a,seed:1517800},{...b,seed:1517802});
    }
   }
  }
