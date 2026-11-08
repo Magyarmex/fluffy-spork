@@ -2,8 +2,11 @@
 // RESEARCH ONLY. Render-time pose interpolation for an opt-in fixed-step Game.
 // Never patches the production renderer or RAF; simulation state is restored
 // before returning even if a renderer throws. At 60Hz use the original render.
-const TRACKED=['tanks','drones','shapes'];
-const MAX_STEP={tanks:96,drones:96,shapes:96,camera:96};
+// Bullets need the same visual-only pose smoothing as moving bodies when
+// presentation exceeds the fixed 60Hz simulation rate. Object identity
+// naturally excludes newborn/fragmented bullets from stale interpolation.
+const TRACKED=['tanks','drones','shapes','bullets'];
+const MAX_STEP={tanks:96,drones:96,shapes:96,bullets:96,camera:96};
 const finite=n=>typeof n==='number'&&Number.isFinite(n);
 function snapshot(game){
  const map=new Map();
