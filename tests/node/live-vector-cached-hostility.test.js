@@ -180,3 +180,35 @@ test('shipping Live Vector + Fair Engagement releases when all targets become pr
  assert.equal(w.owner.__novaLiveVectorAI.targetId,-1);
  assert.equal(w.owner.__novaLiveVectorAI.active,false);
 });
+
+
+// Player identity must not silently outweigh actual distance when the AI
+// Controller chooses between equally sensed, hostile, unshielded hulls.
+test('Live Vector selector does not prefer a farther human over a nearer rival',()=>{
+ const w=boot();w.enemy.x=100;w.other.x=105;w.other.isPlayer=true;
+ w.g.player=w.other;
+ for(const order of [[w.owner,w.enemy,w.other],[w.other,w.owner,w.enemy]]){
+  w.g.tanks=order;
+  assert.equal(w.win.__testLiveVectorBestObserved(w.g,w.owner,null),w.enemy);
+ }
+ w.enemy.x=110;w.other.x=95;
+ assert.equal(w.win.__testLiveVectorBestObserved(w.g,w.owner,null),w.other,
+  'the player remains a valid target when legitimately closer');
+});
+
+test('shipping Live Vector plus Fair Engagement chooses nearer rival over farther human',()=>{
+ const w=bootShippingComposition();
+ w.enemy.x=100;w.other.x=105;w.other.isPlayer=true;w.g.player=w.other;
+ w.owner.ai.targetId=-1;w.owner.ai.__v1112TargetId=-1;
+ w.g.updateDrones(1/60);
+ assert.equal(w.owner.__novaLiveVectorAI.targetId,w.enemy.id);
+ assert.equal(w.owner.ai.targetId,w.enemy.id);
+});
+
+test('shipping Live Vector still chooses a legitimately nearer human target',()=>{
+ const w=bootShippingComposition();
+ w.enemy.x=110;w.other.x=95;w.other.isPlayer=true;w.g.player=w.other;
+ w.owner.ai.targetId=-1;w.owner.ai.__v1112TargetId=-1;
+ w.g.updateDrones(1/60);
+ assert.equal(w.owner.__novaLiveVectorAI.targetId,w.other.id);
+});
