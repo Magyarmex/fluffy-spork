@@ -10,13 +10,13 @@ const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 if(previous===undefined)delete process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL;
 else process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL=previous;
 
-function trial(hz,reverse,fullUpdate,only=null){
+function trial(hz,reverse,fullUpdate,only=null,targetX=40){
  return withSeed(1517802,()=>{
   const g=bootGame();
   if(!g.player)g.redeploy();
   g.sfx.muted=true;
   const p=g.player;
-  p.x=40;p.y=0;p.cls='scout';p.gene=null;p.hp=1000;p.maxHp=1000;p.alive=true;
+  p.x=targetX;p.y=0;p.cls='scout';p.gene=null;p.hp=1000;p.maxHp=1000;p.alive=true;
   p.spawnShieldT=0;p.shieldT=0;p.invulnT=0;p.bulwarkT=0;p.tauntT=0;
   p.regenDelay=10;
   p.vx=0;p.vy=0;
@@ -87,3 +87,11 @@ for(const hz of [30,60,120,240])for(const fullUpdate of [false,true])
    assert.equal(result.contacts[0].ownerId,id-100);
    assert.equal(result.contacts[0].damage,20);
   });
+
+// Negative controls: no projectile can invent contact beyond its 5ms TTL.
+for(const hz of [30,60,120,240])for(const fullUpdate of [false,true])
+ test('full-game TTL no-phantom far hull '+hz+'Hz update='+fullUpdate,()=>{
+  const result=trial(hz,false,fullUpdate,null,100);
+  assert.equal(result.contacts.length,0);
+  assert.equal(result.hp,1000);
+ });
