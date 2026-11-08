@@ -1,9 +1,10 @@
 'use strict';
 // Research only. Measures synthetic event timestamp -> stub Input handler
-// invocation through the real fixed-step RAF owner and timeline. NOT input-to-photon
+// invocation through the real browser bridge, timeline and RAF owner. NOT input-to-photon
 // latency: there is no browser event dispatch, GPU, or physical device here.
 const {FixedStepRafOwner}=require('../tests/research/fixed-step-raf-owner.cjs');
 const {ChronologicalInput}=require('../tests/research/fixed-step-dom-input.cjs');
+const {BrowserEventTimeline}=require('../tests/research/fixed-step-browser-events.cjs');
 function percentile(values,p){
   if(!values.length)return null;
   const sorted=[...values].sort((a,b)=>a-b);
@@ -51,7 +52,8 @@ function replayInputDelivery(intervals,events,{maxSteps=2,backlogExtraTicks=2}={
       end<=owner.simAtSec+1e-8);
     try{return consume(end)}finally{applyingSkippedBoundary=false}
   };
-  const bridge={timeline,startMs:1000};
+  const bridge=new BrowserEventTimeline(timeline,{now:()=>now,
+    timeOrigin:1793560000000});
   const game={input,status:'playing',paused:false,sfx:{startMusic(){}},
     update(){},destroy(){},start(){},setPaused(v){this.paused=v}};
   owner=new FixedStepRafOwner(game,timeline,bridge,{
@@ -68,7 +70,9 @@ function replayInputDelivery(intervals,events,{maxSteps=2,backlogExtraTicks=2}={
         // without changing the real owner or chronological timeline.
         const key='event'+nextEvent;
         indexedEvents.set(key,{atMs:e.atMs,originalKey:e.key});
-        timeline.push(e.atMs/1000,e.kind,{key});
+        if(!bridge.capture({type:e.kind,timeStamp:1000+e.atMs,key,
+          target:{tagName:'CANVAS',closest:()=>null}}))
+          throw Error('synthetic keyboard event rejected by browser bridge');
       }
       const frame=callback;callback=null;
       if(typeof frame!=='function')throw Error('RAF callback missing');
@@ -77,6 +81,8 @@ function replayInputDelivery(intervals,events,{maxSteps=2,backlogExtraTicks=2}={
     const delays=delivered.map(e=>e.delayMs);
     return {frames:intervals.length,wallMs,simulatedTicks:owner.ticks,
       droppedMs:owner.droppedMs,remainingBacklogMs:owner.lagMs,
+      lateTimestampClamps:bridge.lateClamps,
+      staleTimestampClamps:bridge.staleClamps,
       deliveredCount:delivered.length,pendingCount:events.length-delivered.length,
       appliedDuringSkippedTime:skippedAppliedCount,
       p50ApplyDelayMs:percentile(delays,.5),p95ApplyDelayMs:percentile(delays,.95),
