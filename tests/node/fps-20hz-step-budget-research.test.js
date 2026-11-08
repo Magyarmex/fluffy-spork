@@ -82,3 +82,14 @@ test('per-presentation CPU diagnostics measure concentrated Game work without de
   assert.ok(r.simMs>=0&&r.renderMs>=0);
  }
 });
+
+
+test('opt-in CPU sampling cannot change composed combat or gameplay RNG',()=>{
+ const options={cls:'tempest',seed:1517802,cadence:'20Hz-bursts',
+  maxSteps:4,backlogExtraTicks:2,render:true};
+ const off=run(options),on=run({...options,profileCpu:true});
+ parity(on,off,'CPU profiler purity');
+ assert.equal(off.frameCpuSamples,0);
+ assert.equal(on.frameCpuSamples,40);
+ assert.equal(on.droppedMs,off.droppedMs);
+});
