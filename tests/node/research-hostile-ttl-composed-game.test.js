@@ -38,13 +38,18 @@ function trial(fps,reverse=false,mode='hostile'){
   const right={kind:'bullet',id:202,ownerId:2,x:mode==='late'?50:20,y:0,
    vx:-6000,vy:0,r:3,hp:1,maxHp:1,baseDmg:1,dmg:8,ttl:.005,
    pen:0,hits:0,shell:false,beam:false,dead:false,color:'#fff'};
+  if(mode==='canonical'){
+   left.x=-227.43;right.x=227.43;
+   left.vx=540;right.vx=-540;
+   left.r=right.r=4.2;left.ttl=right.ttl=.42;
+  }
   g.bullets=reverse?[right,left]:[left,right];
   g.nextId=Math.max(g.nextId||0,1200);
   const contacts=[];
   const weaken=g.weakenBullet.bind(g);
   g.weakenBullet=function(b,dmg){if(b===left||b===right)
     contacts.push({id:b.id,dmg});return weaken(b,dmg);};
-  for(let i=0;i<3;i++){
+  for(let i=0;i<(mode==='canonical'?fps:3);i++){
    g.update(1/fps);
    if(!g.bullets.some(b=>b===left||b===right))break;
   }
@@ -64,4 +69,15 @@ for(const fps of [30,60,120,240]){
     'no projectile may be revived for a contact after physical expiry');
   });
  }
+}
+
+// Canonical-scale ordinary shots: 540u/s, radius 4.2, TTL .42s.
+// First disc contact is .412s, strictly before expiry.
+for(const fps of [30,60,120,240])for(const reverse of [false,true]){
+ test('composed canonical-scale hostile TTL interception '+fps+
+      'Hz reverse='+reverse,()=>{
+  const {contacts}=trial(fps,reverse,'canonical');
+  assert.deepEqual(contacts.map(c=>c.id).sort(),[201,202],
+   'natural-scale pre-expiry hostile interception must be frame invariant');
+ });
 }
