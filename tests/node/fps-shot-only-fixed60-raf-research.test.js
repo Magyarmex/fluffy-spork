@@ -10,7 +10,7 @@ const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs'
 const {FixedStepRafOwner}=require('../research/fixed-step-raf-owner.cjs');
 const {ShotOnlyFirePulse}=require('../research/shot-only-fire-pulse.cjs');
 
-function run({shot=false,cls='basic',disableFire=false,releaseType='pointerup',maxSteps=3,ageGateMs=Infinity}={}){
+function run({shot=false,cls='basic',disableFire=false,releaseType='pointerup',maxSteps=3,ageGateMs=Infinity,pauseAtThird=false}={}){
  return withSeed(1517800,()=>{
   const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
   if(cls!=='basic')g.setClass(g.player,cls);
@@ -47,6 +47,7 @@ function run({shot=false,cls='basic',disableFire=false,releaseType='pointerup',m
      assert.equal(event('pointerdown',134,600,1),true);
      assert.equal(event('pointermove',137,640,1),true);
      assert.equal(event(releaseType,140,640,0),true);
+     if(pauseAtThird)g.setPaused(true);
     }
     const cb=callback;callback=null;assert.equal(typeof cb,'function');cb(now);
     if(frame===3)at150={bullets:g.bullets.length,shots:pulse?.shots||0,
@@ -126,5 +127,15 @@ test('age-gated cancellation remains shot-free and Controller commands remain un
   for(const key of ['drones','recall','active','power','nodeX','nodeY'])
    assert.deepEqual(localArrays(stale[key]),localArrays(baseline[key]),cls+' '+key);
   assert.equal(stale.rejectedStale,1);
+ }
+});
+
+test('pause before a delayed recovery clears the pulse without a ghost shot',()=>{
+ for(const ageGateMs of [40,80,Infinity]){
+  const result=run({shot:true,maxSteps:2,ageGateMs,pauseAtThird:true});
+  assert.equal(result.at200.bullets,0);
+  assert.equal(result.at200.shots,0);
+  assert.equal(result.rejectedStale,0,'pause is cancellation, not age rejection');
+  assert.equal(result.firing,false);assert.equal(result.aim,false);
  }
 });
