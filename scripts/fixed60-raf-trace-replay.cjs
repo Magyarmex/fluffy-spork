@@ -47,6 +47,7 @@ function replay(intervals,maxSteps=2,backlogExtraTicks=2){
   });
   const lag=[],phaseLag=[],stepCounts=Array(maxSteps+1).fill(0);
   let saturatedFrames=0,saturatedIntervalMs=0,saturationStreak=0,longestSaturationStreak=0;
+  let saturationStreakMs=0,longestSaturationStreakMs=0;
   let total=0,catchupFrames=0,peakSteps=0;
   try{
     owner.start();
@@ -61,9 +62,10 @@ function replay(intervals,maxSteps=2,backlogExtraTicks=2){
       // NOT a measured freeze, missed presentation, or input-to-photon delay.
       if(owner.lagMs>=STEP_MS){
         saturatedFrames++;saturatedIntervalMs+=interval;
-        saturationStreak++;
+        saturationStreak++;saturationStreakMs+=interval;
         longestSaturationStreak=Math.max(longestSaturationStreak,saturationStreak);
-      }else saturationStreak=0;
+        longestSaturationStreakMs=Math.max(longestSaturationStreakMs,saturationStreakMs);
+      }else{saturationStreak=0;saturationStreakMs=0;}
       phaseLag.push(Math.max(0,now-bridge.startMs-owner.simAtSec*1000));
       stepCounts[owner.lastSteps]++;
       if(owner.lastSteps>2)catchupFrames++;
@@ -82,6 +84,7 @@ function replay(intervals,maxSteps=2,backlogExtraTicks=2){
       // Saturation is a visual-phase warning, not a measured dropped frame.
       interpolationSaturatedFrames:saturatedFrames,
       longestSaturationStreakFrames:longestSaturationStreak,
+      longestSaturationStreakMs:round(longestSaturationStreakMs),
       saturatedFrameIntervalMs:round(saturatedIntervalMs),
       saturatedFrameIntervalShare:saturatedIntervalMs/total,
       p95BacklogMs:round(percentile(lag,.95)),
