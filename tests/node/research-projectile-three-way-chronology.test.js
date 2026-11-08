@@ -8,7 +8,8 @@ const assert = require('node:assert/strict');
 // research oracle cannot fake by passing null for other projectile contacts.
 const shot = (id, x, vx, hp) => ({
   id, ownerId: id, kind: 'bullet', x, y: 0, vx, vy: 0, r: 3,
-  ttl: .005, hp, pen: 0, hits: 0, dead: false, shell: false, beam: false
+  ttl: .005, hp, maxHp: hp, baseDmg: 8, dmg: 8,
+  pen: 0, hits: 0, dead: false, shell: false, beam: false
 });
 function physicalTime(a, b, horizon) {
   if (a.ownerId === b.ownerId || a.dead || b.dead) return null;
@@ -57,7 +58,9 @@ function resolveChronologically(input, horizon) {
     const ah = a.hp, bh = b.hp;
     a.hp -= bh; b.hp -= ah;
     if (a.hp <= 0) a.dead = true;
+    else a.dmg = a.baseDmg * Math.min(1,Math.max(0,a.hp/a.maxHp));
     if (b.hp <= 0) b.dead = true;
+    else b.dmg = b.baseDmg * Math.min(1,Math.max(0,b.hp/b.maxHp));
     applied.push(event);
   }
   return { state, applied };
@@ -147,4 +150,12 @@ test('disjoint simultaneous contacts commute; shared ties still abstain', () => 
     assert.deepEqual([1,2,3,4].map(id=>state.get(id).dead),
       [true,true,true,true]);
   }
+});
+test('surviving projectile loses damage in proportion to integrity', () => {
+  const a=shot(1,-20,6000,5),b=shot(2,0,0,2);
+  const {state,applied}=resolveChronologically([a,b],1/240);
+  assert.deepEqual(applied.map(e=>e.ids),[[1,2]]);
+  assert.equal(state.get(1).hp,3);
+  assert.ok(Math.abs(state.get(1).dmg-8*3/5)<1e-12);
+  assert.equal(state.get(2).dead,true);
 });
