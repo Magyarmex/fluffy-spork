@@ -10,7 +10,7 @@ const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
 const {FixedStepRafOwner}=require('../research/fixed-step-raf-owner.cjs');
 
 const SECONDS=6, TICKS=SECONDS*60;
-function run(cls,seed,hz,targeted=false){
+function run(cls,seed,hz,targeted=false,jitter=false){
  return withSeed(seed,draws=>{
   const g=bootGame(),p=g.player;g.sfx.muted=true;g.sfx.startMusic=()=>{};
   g.setClass(p,cls);p.x=1000;p.y=1000;p.vx=0;p.vy=0;p.stats.reload=
@@ -65,7 +65,8 @@ function run(cls,seed,hz,targeted=false){
     g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
     g.input.firing=true;
     for(let frame=1;frame<=SECONDS*hz;frame++){
-     now=1000+frame*1000/hz;
+     // Alternating 15% early/late frame spacing, same exact end time.
+     now=1000+(frame+(jitter&&frame%2?0.15:0))*1000/hz;
      const fn=callback;assert.equal(typeof fn,'function');
      callback=null;fn(now);
     }
@@ -93,6 +94,11 @@ test('fixed60 removes 60-to-61 and 73-to-74 Gunner chronology cliffs in composed
      const actual=run(cls,seed,hz,targeted);
      assert.deepEqual(actual,reference,
       `${cls} seed ${seed} target ${targeted} at ${hz}Hz`);
+     if(hz===61||hz===74){
+      const irregular=run(cls,seed,hz,targeted,true);
+      assert.deepEqual(irregular,reference,
+       `${cls} seed ${seed} target ${targeted} jitter at ${hz}Hz`);
+     }
     }
    }
 });
