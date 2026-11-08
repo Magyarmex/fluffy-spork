@@ -10,7 +10,7 @@ const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 if(previous===undefined)delete process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL;
 else process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL=previous;
 
-function trial(hz,reverse,fullUpdate){
+function trial(hz,reverse,fullUpdate,only=null){
  return withSeed(1517802,()=>{
   const g=bootGame();
   if(!g.player)g.redeploy();
@@ -41,7 +41,8 @@ function trial(hz,reverse,fullUpdate){
     r:3,dmg:20,ttl:.005,pen:1,hits:0,dead:false,
     shell:false,beam:false,color:'#fff'}
   ];
-  g.bullets=reverse?bullets.reverse():bullets;
+  const selected=only==null?bullets:bullets.filter(b=>b.id===only);
+  g.bullets=reverse?selected.reverse():selected;
   const contacts=[];
   const original=g.damageTank;
   g.damageTank=function(t,damage,ownerId){
@@ -72,4 +73,17 @@ for(const hz of [30,60,120,240])
     a.contacts.map(c=>c.ownerId).sort(),
     b.contacts.map(c=>c.ownerId).sort(),
     'insertion order cannot change contact ownership');
+  });
+
+// Positive controls distinguish a broken fixture from the shared-victim
+// arbitration defect. Each projectile must hit in isolation before expiry.
+for(const hz of [30,60,120,240])for(const fullUpdate of [false,true])
+ for(const id of [201,202])
+  test('isolated full-game TTL control '+hz+'Hz update='+fullUpdate+
+       ' bullet='+id,()=>{
+   const result=trial(hz,false,fullUpdate,id);
+   assert.equal(result.contacts.length,1,
+    'an isolated pre-expiry hull contact must register');
+   assert.equal(result.contacts[0].ownerId,id-100);
+   assert.equal(result.contacts[0].damage,20);
   });
