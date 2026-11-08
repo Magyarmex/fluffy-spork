@@ -8,8 +8,10 @@ test('real owner records exact input-handler delay without claiming photon laten
  const twenty=replayInputDelivery(Array(4).fill(50),events,{maxSteps:3});
  assert.equal(sixty.deliveredCount,2);
  assert.equal(twenty.deliveredCount,2);
- assert.equal(sixty.pendingCount,0);
- assert.equal(twenty.pendingCount,0);
+ assert.equal(sixty.unappliedCount,0);
+ assert.equal(twenty.unappliedCount,0);
+ assert.equal(twenty.queuedCount,0);
+ assert.equal(twenty.discardedCount,0);
  assert.equal(twenty.appliedDuringSkippedTime,0);
  assert.equal(sixty.droppedMs,0);
  assert.equal(twenty.droppedMs,0);
@@ -30,7 +32,7 @@ test('insufficient step budget discloses deferred input independently of dropped
  assert.ok(limited.simulatedTicks<12);
  assert.ok(limited.droppedMs>=0);
  assert.ok(limited.deliveredCount<=events.length);
- assert.equal(limited.deliveredCount+limited.pendingCount,events.length);
+ assert.equal(limited.deliveredCount+limited.unappliedCount,events.length);
 });
 test('invalid event clocks and trace boundaries fail closed',()=>{
  const intervals=[50,50];
@@ -54,7 +56,7 @@ test('skipped simulation time is not misreported as an executed input tick',()=>
  assert.ok(low.droppedMs>0,'two steps cannot sustain 20Hz over this interval');
  assert.equal(sufficient.droppedMs,0);
  assert.equal(sufficient.appliedDuringSkippedTime,0);
- assert.equal(low.deliveredCount+low.pendingCount,2);
+ assert.equal(low.deliveredCount+low.unappliedCount,2);
  assert.equal(sufficient.deliveredCount,2);
  assert.ok(low.appliedDuringSkippedTime>0,
    'a queued key edge can be consumed by skipped chronology without an update');
@@ -91,4 +93,13 @@ test('extra backlog cannot repair sustained 20Hz throughput with a two-step cap'
  assert.ok(extraBacklog.p95ApplyDelayMs>=defaultBudget.p95ApplyDelayMs,
    'extra queue capacity may worsen input application delay');
  assert.ok(sufficient.p95ApplyDelayMs<extraBacklog.p95ApplyDelayMs);
+});
+
+test('foreground stall discards queued input rather than mislabeling it pending',()=>{
+ const r=replayInputDelivery([50,150,50],[{atMs:80,kind:'keydown',key:'w'}]);
+ assert.equal(r.deliveredCount,0);
+ assert.equal(r.unappliedCount,1);
+ assert.equal(r.queuedCount,0);
+ assert.equal(r.discardedCount,1);
+ assert.ok(r.droppedMs>0);
 });
