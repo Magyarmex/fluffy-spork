@@ -47,7 +47,7 @@ test('invalid event clocks and trace boundaries fail closed',()=>{
 
 test('skipped simulation time is not misreported as an executed input tick',()=>{
  const intervals=Array(8).fill(50);
- const events=[{atMs:140,kind:'keydown',key:'w'},
+ const events=[{atMs:130,kind:'keydown',key:'w'},
    {atMs:310,kind:'keyup',key:'w'}];
  const low=replayInputDelivery(intervals,events,{maxSteps:2});
  const sufficient=replayInputDelivery(intervals,events,{maxSteps:3});
@@ -56,7 +56,8 @@ test('skipped simulation time is not misreported as an executed input tick',()=>
  assert.equal(sufficient.appliedDuringSkippedTime,0);
  assert.equal(low.deliveredCount+low.pendingCount,2);
  assert.equal(sufficient.deliveredCount,2);
- assert.ok(low.appliedDuringSkippedTime>=0);
+ assert.ok(low.appliedDuringSkippedTime>0,
+   'a queued key edge can be consumed by skipped chronology without an update');
  assert.ok(low.appliedDuringSkippedTime<=low.deliveredCount);
 });
 test('simultaneous event timestamps retain distinct original keys',()=>{
