@@ -18,13 +18,16 @@ function trial(hz,reverse,fullUpdate){
   const p=g.player;
   p.x=40;p.y=0;p.cls='scout';p.gene=null;p.hp=1000;p.maxHp=1000;p.alive=true;
   p.spawnShieldT=0;p.shieldT=0;p.invulnT=0;p.bulwarkT=0;p.tauntT=0;
+  p.regenDelay=10;
   p.vx=0;p.vy=0;
   const owners=[101,102].map((id,i)=>({
    kind:'tank',id,cls:'scout',x:-1200,y:i?1000:-1000,
    hp:100,alive:true,vx:0,vy:0,spawnShieldT:0,shieldT:0
   }));
-  g.tanks=[p,...owners];
-  g.tankById=new Map(g.tanks.map(t=>[t.id,t]));
+  g.tanks=[p];
+  g.tankById=new Map([[p.id,p]]);
+  const originalGetTank=g.getTank.bind(g);
+  g.getTank=id=>owners.find(t=>t.id===id)||originalGetTank(id);
   g.shapes=[];g.drones=[];g.__novaTerrain=[];
   g.time=1;
   g.input.firing=false;g.input.autofire=false;
@@ -59,7 +62,8 @@ for(const hz of [30,60,120,240])
     assert.equal(result.contacts.length,2,
       'two independently reachable nonlethal contacts must both register');
     assert.equal(result.contacts.reduce((sum,c)=>sum+c.damage,0),40);
-    assert.equal(result.hp,960,'surviving target should lose exactly 40 HP');
+    assert.ok(result.hp>=959.99&&result.hp<960.5,
+      'target loses 40 HP, allowing only normal end-of-update regeneration');
    }
    assert.deepEqual(
     a.contacts.map(c=>c.ownerId).sort(),
