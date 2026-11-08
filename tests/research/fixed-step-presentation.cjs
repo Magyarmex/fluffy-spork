@@ -63,7 +63,12 @@ class FixedStepPosePresentation {
     const old=this.previous.get(obj);
     if(!old||old.kind!==now.kind||!finite(obj.x)||!finite(obj.y)||
        obj.x!==now.x||obj.y!==now.y)continue;
-    const dx=now.x-old.x,dy=now.y-old.y,limit=MAX_STEP[now.kind];
+    const dx=now.x-old.x,dy=now.y-old.y;
+    // Legal upgraded Sniper rounds can travel >96 units in one 60Hz tick.
+    // Admit velocity-consistent motion without allowing unbounded teleports.
+    const limit=now.kind==='bullets'&&finite(obj.vx)&&finite(obj.vy)?
+      Math.max(MAX_STEP.bullets,Math.min(240,Math.hypot(obj.vx,obj.vy)*1.5/60)):
+      MAX_STEP[now.kind];
     if(dx*dx+dy*dy>limit*limit){this.teleportSkips++;continue;}
     const x=old.x+dx*alpha,y=old.y+dy*alpha;
     if(x===now.x&&y===now.y)continue;
