@@ -9,7 +9,7 @@ const {bootGame,withSeed,digest,physical}=require('../research/audio-rng-causal-
 const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
 const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs');
 const {FixedStepRafOwner}=require('../research/fixed-step-raf-owner.cjs');
-function run(seed,intervals,maxSteps,events=[],fireTempest=false){
+function run(seed,intervals,maxSteps,events=[],fireTempest=false,backlogExtraTicks=2){
  return withSeed(seed,draws=>{
   const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
   if(fireTempest){g.setClass(g.player,'tempest');g.player.stats.reload=8;
@@ -19,12 +19,12 @@ function run(seed,intervals,maxSteps,events=[],fireTempest=false){
    const out=originalTryFire.apply(this,arguments);
    if(t===this.player&&this.bullets.length>before)volleys+=this.bullets.length-before;
    return out;};
-  let now=1000,id=0;
+  let now=1000,id=0,peakLagMs=0;
   const active=new Map();
   const timeline=new ChronologicalInput(g.input);
   const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
   const owner=new FixedStepRafOwner(g,timeline,bridge,{
-   now:()=>now,maxSteps,request:fn=>{active.set(++id,fn);return id;},
+   now:()=>now,maxSteps,backlogExtraTicks,request:fn=>{active.set(++id,fn);return id;},
    cancel:key=>active.delete(key),render:()=>{}
   });
   try{
@@ -42,10 +42,11 @@ function run(seed,intervals,maxSteps,events=[],fireTempest=false){
     const [key,fn]=[...active].at(-1);
     assert.equal(typeof fn,'function','RAF must remain scheduled');
     active.delete(key);fn(now);
+    peakLagMs=Math.max(peakLagMs,owner.lagMs);
    }
    return {hash:digest(physical(g)),draws:draws(),ticks:owner.ticks,volleys,
     droppedFrames:owner.droppedFrames,droppedMs:owner.droppedMs,
-    backlogMs:owner.lagMs};
+    backlogMs:owner.lagMs,peakLagMs};
   }finally{owner.stop();g.destroy()}
  });
 }
@@ -269,5 +270,31 @@ test('a harsher sub-100ms 30Hz cluster still exceeds three steps but recovers wi
   assert.equal(four.volleys,baseline.volleys);
   assert.equal(four.hash,baseline.hash);
   assert.equal(four.draws,baseline.draws);
+ }
+});
+
+test('30Hz recovery budgets trade per-frame work for queued simulation phase',()=>{
+ // This is source-executed scheduling/combat research, NOT CPU timing or
+ // touch-to-photon latency on a real device. All gaps are <100ms.
+ const intervals=Array.from({length:15},()=>[
+  85,40,5,1000/7.5-130
+ ]).flat();
+ for(const seed of [1517800,1517802]){
+  const baseline=run(seed,Array(120).fill(1000/60),2,[],true);
+  const lowWork=run(seed,intervals,2,[],true,4);
+  const middle=run(seed,intervals,3,[],true,3);
+  const lowLag=run(seed,intervals,4,[],true,2);
+  for(const candidate of [lowWork,middle,lowLag]){
+   assert.equal(candidate.ticks,baseline.ticks);
+   assert.equal(candidate.droppedFrames,0);
+   assert.equal(candidate.droppedMs,0);
+   assert.equal(candidate.volleys,baseline.volleys);
+   assert.equal(candidate.hash,baseline.hash);
+   assert.equal(candidate.draws,baseline.draws);
+  }
+  assert.ok(lowWork.peakLagMs>middle.peakLagMs,
+   'two-step work cap preserves ticks only by tolerating more queued time');
+  assert.ok(middle.peakLagMs>lowLag.peakLagMs,
+   'four-step catch-up reduces phase lag at higher per-frame work risk');
  }
 });
