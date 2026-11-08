@@ -22,7 +22,7 @@ function frameTimes(kind){
  if(kind==='20Hz-bursts')return Array.from({length:40},(_,i)=>[65,35,54,46][i%4]);
  throw Error('unknown presentation cadence');
 }
-function run({seed=1517800,cls='tempest',cadence='20Hz-jitter',maxSteps=4,backlogExtraTicks=2,render=false,virtualClock=false}={}){
+function run({seed=1517800,cls='tempest',cadence='20Hz-jitter',maxSteps=4,backlogExtraTicks=2,render=false,virtualClock=false,profileCpu=false}={}){
  return withSeed(seed,draws=>{
   const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
   g.setClass(g.player,cls);g.input.autofire=false;
@@ -49,11 +49,13 @@ function run({seed=1517800,cls='tempest',cadence='20Hz-jitter',maxSteps=4,backlo
    const durations=frameTimes(cadence);
    for(const d of durations){
     now+=d;const frame=callback;callback=null;
-    const beforeUpdate=simMs,beforeRender=renderMs,start=realNow();
-    frame(now);
-    frameCpu.push(realNow()-start);
-    frameUpdateCpu.push(simMs-beforeUpdate);
-    frameRenderCpu.push(renderMs-beforeRender);
+    if(profileCpu){
+     const beforeUpdate=simMs,beforeRender=renderMs,start=realNow();
+     frame(now);
+     frameCpu.push(realNow()-start);
+     frameUpdateCpu.push(simMs-beforeUpdate);
+     frameRenderCpu.push(renderMs-beforeRender);
+    }else frame(now);
     peakSteps=Math.max(peakSteps,owner.lastSteps);
    }
    const wallMs=durations.reduce((a,b)=>a+b,0);
@@ -67,7 +69,7 @@ function run({seed=1517800,cls='tempest',cadence='20Hz-jitter',maxSteps=4,backlo
     frameCpuP50Ms:percentile(frameCpu,.5),
     frameCpuP95Ms:percentile(frameCpu,.95),
     frameCpuP99Ms:percentile(frameCpu,.99),
-    frameCpuPeakMs:Math.max(...frameCpu),
+    frameCpuPeakMs:frameCpu.length?Math.max(...frameCpu):null,
     frameUpdateCpuP95Ms:percentile(frameUpdateCpu,.95),
     frameRenderCpuP95Ms:percentile(frameRenderCpu,.95),
     hash:digest(physical(g)),draws:draws()};
