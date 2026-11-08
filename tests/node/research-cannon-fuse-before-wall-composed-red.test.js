@@ -1,7 +1,8 @@
 'use strict';
-// Research-only KNOWN-RED full-composition acceptance for #270.
-// Do not merge until the earliest physical Cannon fuse beats later permanent
-// cover in the real 49-overlay Game.update path, including fragment birth.
+// Full 49-overlay regression for the existing Battlefield fuse-first guard.
+// Earlier research #270 was red on its historical branch, but current main
+// already certifies isolated Cannon fuse crossings before later terrain.
+// Preserve the real Game.update order and both wall-first/fuse-first controls.
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const previous=process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL;
