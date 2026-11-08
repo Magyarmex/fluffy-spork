@@ -775,7 +775,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   var previous=b.__novaDirectVictims.values().next().value;
   return !!(previous&&previous.kind==='tank'&&previous.alive&&previous.hp>0);
  }
- function isolatedTTLStationaryPiercingChain(g,b,dt,nonExpiring,localOthers,allowSingle){
+ function isolatedTTLStationaryPiercingChain(g,b,dt,nonExpiring,localOthers,allowSingle,dryRun,ignoreCover){
   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
      b.__novaBreachAtTime===g.time||
      !(dt>0)||!(b.ttl>0)||
@@ -924,12 +924,13 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
        Math.min(o.y,ty)-radius<=target.y)return false;
    }
   }
-  if(firstSolidHit(g,ax,ay,ex,ey,b.r*.45))return false;
+  if(!ignoreCover&&firstSolidHit(g,ax,ay,ex,ey,b.r*.45))return false;
   /* The core normally initializes projectile integrity before any hits.
    * A surviving partial prefix must preserve the ORIGINAL pen=2 integrity
    * rather than let core first initialize after we consume penetration. */
   if(partialNonExpiring&&typeof g.initBulletIntegrity==='function')
    g.initBulletIntegrity(b);
+  if(dryRun)return contacts; /* immutable certificate before any callback */
   /* Reuse the real damage owner, never fabricate HP or kill credit. */
   var ang=Math.atan2(b.vy,b.vx),kx=Math.cos(ang)*(b.knock||0)*.006,
       ky=Math.sin(ang)*(b.knock||0)*.006;
@@ -1958,6 +1959,181 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   return plan;
  }
 
+ /* Two expiring ordinary rounds with the SAME stationary surviving hull
+  * need an atomic preflight: sequential TTL fallback sees the other shot's
+  * still-live corridor or its already-dead state depending on array order.
+  * Prove both independent contacts against the unchanged frame first,
+  * then settle in physical order. Any uncertain third party, terrain,
+  * interception, defense, motion, kill, knockback or callback side effect
+  * abstains. No generic shared-victim planner is implied. */
+ function certifiedTTLFrameStart(g,b){
+  return !g.__novaShapeSweepActive||
+   (Number.isSafeInteger(b.id)&&
+    g.__novaFrameStartBulletEpoch===g.__novaShapeSweepEpoch&&
+    b.id<g.__novaFrameStartBulletIdCeiling);
+ }
+ function certifiedSameVictimTTLPair(g,dt){
+  if(!(dt>0&&dt<=.05)||!Number.isFinite(dt))return false;
+  var bullets=g.bullets||[],pair=[];
+  for(var i=0;i<bullets.length;i++){
+   var b=bullets[i];
+   if(!b||b.dead)continue;
+   if(b.ttl>0&&b.ttl<=dt&&!b.shell&&!b.beam&&!b.splash&&
+      !b.__v17Cannon&&b.pen===1&&(b.hits||0)===0)pair.push(b);
+  }
+  if(pair.length!==2)return false;
+  var a=pair[0],b=pair[1];
+  if(!certifiedTTLFrameStart(g,a)||!certifiedTTLFrameStart(g,b)||
+     bullets.some(function(o){return o&&!o.dead&&(o.shell||o.splash||o.beam||o.__v17Cannon);})||
+     a.ownerId===b.ownerId||(a.knock||0)!==0||(b.knock||0)!==0||
+     !Number.isFinite(a.dmg)||!Number.isFinite(b.dmg)||
+     !(a.dmg>0&&b.dmg>0))return false;
+  var ao=localSingleTTLBodyOthers(g,a,dt,true),
+      bo=localSingleTTLBodyOthers(g,b,dt,true);
+  if(!ao||!bo||ao.some(function(o){return o!==b;})||
+     bo.some(function(o){return o!==a;}))return false;
+  /* Existing stationary-hull/shape/drone/cover/defense proof is reused
+   * in read-only mode. Exclude ONLY the mutually certified partner. */
+  var ac=isolatedTTLStationaryPiercingChain(g,a,dt,false,[],true,true),
+      bc=isolatedTTLStationaryPiercingChain(g,b,dt,false,[],true,true);
+  if(!ac||!bc||ac.length!==1||bc.length!==1||
+     ac[0].e!==bc[0].e)return false;
+  var target=ac[0].e,at=ac[0].t*a.ttl,bt=bc[0].t*b.ttl;
+  var targetDef=CLASSES[target.cls];
+  if(!targetDef||!(Number.isFinite(targetDef.size)&&targetDef.size>0))return false;
+  if(!(at>0&&bt>0&&Math.abs(at-bt)>1e-7)||
+     !(target.hp>2*(a.dmg+b.dmg))||
+     !Number.isFinite(target.x)||!Number.isFinite(target.y))return false;
+  /* The full TTL swept AABBs must be disjoint even with projectile
+   * radii and numerical padding. This is deliberately stronger than
+   * an exact pairwise interception test and cheap for ordinary combat. */
+  var ax=a.x+a.vx*a.ttl,ay=a.y+a.vy*a.ttl,
+      bx=b.x+b.vx*b.ttl,by=b.y+b.vy*b.ttl,
+      pad=a.r+b.r+2;
+  if(!(Number.isFinite(ax)&&Number.isFinite(ay)&&
+       Number.isFinite(bx)&&Number.isFinite(by)&&
+       Number.isFinite(pad)&&pad>0))return false;
+  if(Math.max(a.x,ax)+pad>=Math.min(b.x,bx)&&
+     Math.min(a.x,ax)-pad<=Math.max(b.x,bx)&&
+     Math.max(a.y,ay)+pad>=Math.min(b.y,by)&&
+     Math.min(a.y,ay)-pad<=Math.max(b.y,by))return false;
+  var first=at<bt?a:b,second=at<bt?b:a,
+      tx=target.x,ty=target.y,
+      bulletRefs=bullets.slice(),bulletCount=bullets.length,
+      shapeCount=(g.shapes||[]).length,
+      droneCount=(g.drones||[]).length,tankCount=(g.tanks||[]).length;
+  if(!isolatedTTLStationaryPiercingChain(g,first,dt,false,[],true))
+   return false;
+  /* A nonlethal callback must not silently move/replace the victim. */
+  if(!target.alive||target.x!==tx||target.y!==ty||
+     bullets.length!==bulletCount||
+     bullets.some(function(o,i){return o!==bulletRefs[i];})||
+     (g.shapes||[]).length!==shapeCount||
+     (g.drones||[]).length!==droneCount||
+     (g.tanks||[]).length!==tankCount||
+     !(target.hp>second.dmg*2))return true;
+  isolatedTTLStationaryPiercingChain(g,second,dt,false,[],true);
+  return true;
+ }
+ /* A prior-frame pen=1 hull hit can leave a still-live pen=0 round
+  * blocking a second independent TTL contact on that same hull. Do not
+  * replay the prior hit: certify only the fresh contact against its exact
+  * one-victim ledger and disjoint remaining projectile corridors. */
+ function certifiedPriorVictimTTLContinuation(g,dt){
+  if(!(dt>0&&dt<=.05)||!Number.isFinite(dt))return false;
+  var bullets=g.bullets||[],fresh=null,prior=null;
+  for(var i=0;i<bullets.length;i++){
+   var b=bullets[i];
+   if(!b||b.dead||!(b.ttl>0&&b.ttl<=dt))continue;
+   if(b.shell||b.beam||b.splash||b.__v17Cannon)continue;
+   if(b.pen===1&&(b.hits||0)===0){
+    if(fresh)return false;
+    fresh=b;
+   }else if(b.pen===0&&b.hits===1&&
+      b.__novaDirectVictims instanceof Set&&
+      b.__novaDirectVictims.size===1){
+    if(prior)return false;
+    prior=b;
+   }
+  }
+  if(!fresh||!prior||!certifiedTTLFrameStart(g,fresh)||
+     !certifiedTTLFrameStart(g,prior)||
+     bullets.some(function(o){return o&&!o.dead&&(o.shell||o.splash||o.beam||o.__v17Cannon);})||
+     fresh.ownerId===prior.ownerId||
+     (fresh.knock||0)!==0||(prior.knock||0)!==0)return false;
+  var target=prior.__novaDirectVictims.values().next().value;
+  if(!target||target.kind!=='tank'||!target.alive||
+     !CLASSES[target.cls]||!(CLASSES[target.cls].size>0)||
+     !(target.hp>fresh.dmg*2))return false;
+  var others=localSingleTTLBodyOthers(g,fresh,dt,true);
+  if(!others||others.some(function(o){return o!==prior;}))return false;
+  var contacts=isolatedTTLStationaryPiercingChain(g,fresh,dt,false,[],true,true);
+  if(!contacts||contacts.length!==1||contacts[0].e!==target)return false;
+  /* The spent shot still has physical presence until TTL expires.
+   * Exclude it only if its entire remaining corridor cannot intercept
+   * the fresh shot, including AFTER its previous hull contact. */
+  var ax=prior.x+prior.vx*prior.ttl,ay=prior.y+prior.vy*prior.ttl,
+      bx=fresh.x+fresh.vx*fresh.ttl,by=fresh.y+fresh.vy*fresh.ttl,
+      pad=prior.r+fresh.r+2;
+  if(!(Number.isFinite(ax)&&Number.isFinite(ay)&&
+       Number.isFinite(bx)&&Number.isFinite(by)&&
+       Number.isFinite(pad)&&pad>0))return false;
+  if(Math.max(prior.x,ax)+pad>=Math.min(fresh.x,bx)&&
+     Math.min(prior.x,ax)-pad<=Math.max(fresh.x,bx)&&
+     Math.max(prior.y,ay)+pad>=Math.min(fresh.y,by)&&
+     Math.min(prior.y,ay)-pad<=Math.max(fresh.y,by))return false;
+  return !!isolatedTTLStationaryPiercingChain(g,fresh,dt,false,[],true);
+ }
+ /* One permanent wall may physically stop a competing TTL shot
+  * before its hull contact. That wall cannot be breached, so the other
+  * independent shot must not lose its valid hull contact merely because
+  * the blocked shot remains live until the terrain pre-pass. */
+ function certifiedPermanentWallBlockedTTLPartner(g,dt){
+  if(!(dt>0&&dt<=.05)||!Number.isFinite(dt))return false;
+  var bullets=g.bullets||[],pair=[];
+  for(var i=0;i<bullets.length;i++){
+   var b=bullets[i];
+   if(b&&!b.dead&&b.ttl>0&&b.ttl<=dt&&!b.shell&&!b.beam&&
+      !b.splash&&!b.__v17Cannon&&b.pen===1&&(b.hits||0)===0)
+    pair.push(b);
+  }
+  if(pair.length!==2)return false;
+  var a=pair[0],b=pair[1];
+  if(!certifiedTTLFrameStart(g,a)||!certifiedTTLFrameStart(g,b)||
+     a.ownerId===b.ownerId||(a.knock||0)!==0||(b.knock||0)!==0||
+     bullets.some(function(o){return o&&!o.dead&&
+      (o.shell||o.splash||o.beam||o.__v17Cannon);}))return false;
+  var ac=isolatedTTLStationaryPiercingChain(g,a,dt,false,[],true,true,true),
+      bc=isolatedTTLStationaryPiercingChain(g,b,dt,false,[],true,true,true);
+  if(!ac||!bc||ac.length!==1||bc.length!==1||
+     ac[0].e!==bc[0].e)return false;
+  var target=ac[0].e,def=CLASSES[target.cls];
+  if(!def||!(Number.isFinite(def.size)&&def.size>0))return false;
+  var ax=a.x+a.vx*a.ttl,ay=a.y+a.vy*a.ttl,
+      bx=b.x+b.vx*b.ttl,by=b.y+b.vy*b.ttl,
+      pad=a.r+b.r+2;
+  if(!(Number.isFinite(ax)&&Number.isFinite(ay)&&
+       Number.isFinite(bx)&&Number.isFinite(by)&&
+       Number.isFinite(pad)&&pad>0))return false;
+  if(Math.max(a.x,ax)+pad>=Math.min(b.x,bx)&&
+     Math.min(a.x,ax)-pad<=Math.max(b.x,bx)&&
+     Math.max(a.y,ay)+pad>=Math.min(b.y,by)&&
+     Math.min(a.y,ay)-pad<=Math.max(b.y,by))return false;
+  var wa=firstSolidHit(g,a.x,a.y,ax,ay,a.r*.45),
+      wb=firstSolidHit(g,b.x,b.y,bx,by,b.r*.45);
+  if(!!wa===!!wb)return false;
+  var wall=wa||wb,blocked=wa?a:b,open=wa?b:a,
+      blockedContact=wa?ac[0]:bc[0];
+  if(!wall.solid||wall.solid.destructible||
+     !wall.hit||!(wall.hit.t>1e-9&&
+       wall.hit.t<blockedContact.t-1e-7)||
+     !(target.hp>2*open.dmg))return false;
+  var others=localSingleTTLBodyOthers(g,open,dt,true);
+  if(!others||others.some(function(o){return o!==blocked;}))return false;
+  /* The existing full stationary/terrain proof settles ONLY the open
+   * shot. The blocked shot remains for the normal permanent-wall owner. */
+  return !!isolatedTTLStationaryPiercingChain(g,open,dt,false,[],true);
+ }
  /* Witnessed nonlethal neutral piercing pair. The core and swept fallback
   * can lose the second Circle/Square contact at low FPS. Resolve only
   * two proven stationary contacts; leave every contested event to the
@@ -3409,6 +3585,13 @@ function certifiedMultiShotCoverPriority(g,dt){
     break;
    }
   }
+ /* Commit a certified same-victim pair before the sequential TTL pass. */
+ if(expiring===2&&legacyExpiring&&bodyWork<=300&&
+    !this.__novaWallProofHadShell){
+  certifiedSameVictimTTLPair(this,dt)||
+   certifiedPriorVictimTTLContinuation(this,dt)||
+   certifiedPermanentWallBlockedTTLPartner(this,dt);
+ }
  if(legacyExpiring||localExpiring||localOrdinaryBatch||localSingleBody)
   for(var pre=this.bullets.length-1;pre>=0;pre--){
    var expiringBullet=this.bullets[pre];
