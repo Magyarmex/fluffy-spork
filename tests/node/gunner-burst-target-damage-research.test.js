@@ -83,6 +83,8 @@ test('real composed target-damage census for legal rotary upgrades under timed b
     for(const seed of [1517800,1517802]){
      const row=trial(seed,cls,reload,hz,mode);
      assert.ok(row.volleys>0);
+     if(mode==='held'&&hz===60)assert.ok(row.hits>0&&row.damage>0,
+      'positive control: canonical 60Hz held shots must actually hit the target');
      assert.ok(row.hits<=row.volleys,
       'one-target ordinary rotary shots cannot hit more often than volleys');
      rows.push(row);
