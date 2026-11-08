@@ -10,6 +10,7 @@ function run(seed,cls,reload,hz,policy,targeted){
  return withSeed(seed,()=>{
   const g=bootGame(),p=g.player;g.sfx.muted=true;
   g.setClass(p,cls);g.tanks=[p];g.tankById=new Map([[p.id,p]]);
+  const neutral=g.shapes.find(s=>s.type==='square')||g.shapes[0];
   g.shapes=[];g.drones=[];g.powerups=[];g.bullets=[];
   if(g.shapeById)g.shapeById.clear();
   if(g.hash&&g.hash.clear)g.hash.clear();
@@ -24,7 +25,8 @@ function run(seed,cls,reload,hz,policy,targeted){
   // Keep the target stationary; do not mock damage, collision or projectile updates.
   let victim=null,damage=0,hits=0;
   if(targeted){
-   victim={...g.makeShape?.('square'),kind:'shape',type:'square',
+   assert.ok(neutral,'composed Game must supply a neutral target fixture');
+   victim={...neutral,kind:'shape',type:'square',
     id:987654,x:p.x+175,y:p.y,r:24,hp:1000000,maxHp:1000000,
     vx:0,vy:0,born:0,wanderT:Infinity,dead:false};
    g.shapes=[victim];
