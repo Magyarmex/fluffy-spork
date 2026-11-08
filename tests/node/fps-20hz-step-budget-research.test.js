@@ -61,3 +61,21 @@ test('virtual presentation-clock audit isolates three existing rail timebase div
  // them should make this research gate greener, not break the test suite.
  assert.ok(observed.every(cls=>knownRailWallClock.has(cls)));
 });
+
+
+test('per-presentation CPU diagnostics measure concentrated Game work without device claims',()=>{
+ for(const [maxSteps,backlogExtraTicks] of [[2,4],[3,3],[4,2]]){
+  const r=run({cls:'tempest',seed:1517800,cadence:'20Hz-bursts',
+    maxSteps,backlogExtraTicks,render:true});
+  assert.equal(r.frameCpuSamples,40);
+  assert.equal(r.backlogExtraTicks,backlogExtraTicks);
+  for(const key of ['frameCpuP50Ms','frameCpuP95Ms','frameCpuP99Ms',
+    'frameCpuPeakMs','frameUpdateCpuP95Ms','frameRenderCpuP95Ms']){
+    assert.ok(Number.isFinite(r[key])&&r[key]>=0,key+' must be a finite Node CPU sample');
+  }
+  assert.ok(r.frameCpuP50Ms<=r.frameCpuP95Ms);
+  assert.ok(r.frameCpuP95Ms<=r.frameCpuP99Ms);
+  assert.ok(r.frameCpuP99Ms<=r.frameCpuPeakMs);
+  assert.ok(r.simMs>=0&&r.renderMs>=0);
+ }
+});
