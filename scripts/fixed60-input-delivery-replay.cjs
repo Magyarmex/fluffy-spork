@@ -25,6 +25,7 @@ function replayInputDelivery(intervals,events,{maxSteps=2,backlogExtraTicks=2}={
   let now=1000,callback=null,elapsed=0,nextEvent=0;
   const delivered=[];
   const indexedEvents=new Map();
+  let owner,applyingSkippedBoundary=false,skippedAppliedCount=0;
   const input={firing:false,keyboard:{},move:{active:false},aim:{active:false},
     stickId:{move:-1,aim:-1}};
   const apply=(kind,e)=>{
@@ -32,7 +33,9 @@ function replayInputDelivery(intervals,events,{maxSteps=2,backlogExtraTicks=2}={
     // The handler is called by ChronologicalInput.consumeThrough during
     // an actual RAF update or skip. It may run without a simulation tick
     // if the scheduler discards chronology; disclose that separately.
+    if(applyingSkippedBoundary)skippedAppliedCount++;
     delivered.push({kind,key:e.originalKey,atMs:e.atMs,
+      appliedDuringSkip:applyingSkippedBoundary,
       appliedWallMs:now-1000,delayMs:now-1000-e.atMs});
   };
   // The synthetic input records event time via an ID, not by consulting
@@ -40,10 +43,18 @@ function replayInputDelivery(intervals,events,{maxSteps=2,backlogExtraTicks=2}={
   input.kd=e=>apply('keydown',indexedEvents.get(e.key));
   input.ku=e=>apply('keyup',indexedEvents.get(e.key));
   const timeline=new ChronologicalInput(input);
+  const consume=timeline.consumeThrough.bind(timeline);
+  timeline.consumeThrough=function(end){
+    // Normal update samples the NEXT tick; skipped-time reconciliation
+    // samples the ALREADY advanced simAtSec without a corresponding update.
+    applyingSkippedBoundary=!!(owner&&owner.started&&end>0&&
+      end<=owner.simAtSec+1e-8);
+    try{return consume(end)}finally{applyingSkippedBoundary=false}
+  };
   const bridge={timeline,startMs:1000};
   const game={input,status:'playing',paused:false,sfx:{startMusic(){}},
     update(){},destroy(){},start(){},setPaused(v){this.paused=v}};
-  const owner=new FixedStepRafOwner(game,timeline,bridge,{
+  owner=new FixedStepRafOwner(game,timeline,bridge,{
     now:()=>now,request:fn=>{callback=fn;return 1;},
     cancel:()=>{callback=null;},render(){},maxSteps,backlogExtraTicks
   });
@@ -67,6 +78,7 @@ function replayInputDelivery(intervals,events,{maxSteps=2,backlogExtraTicks=2}={
     return {frames:intervals.length,wallMs,simulatedTicks:owner.ticks,
       droppedMs:owner.droppedMs,remainingBacklogMs:owner.lagMs,
       deliveredCount:delivered.length,pendingCount:events.length-delivered.length,
+      appliedDuringSkippedTime:skippedAppliedCount,
       p50ApplyDelayMs:percentile(delays,.5),p95ApplyDelayMs:percentile(delays,.95),
       p99ApplyDelayMs:percentile(delays,.99),
       maxApplyDelayMs:delays.length?Math.max(...delays):null,
