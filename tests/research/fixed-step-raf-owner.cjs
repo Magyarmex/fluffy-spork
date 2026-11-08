@@ -351,10 +351,14 @@ function createFixedStepBrowserPilot(game,{window:win,document:doc,clock,
       {now:clock.now,request,cancel,render,maxSteps,backlogExtraTicks,isVisible:()=>!doc.hidden});
   }catch(error){
     try{if(pulse)pulse.detach()}catch(cleanupError){
-      if(error && typeof error==='object')error.cleanupError=cleanupError;
+      if(error && typeof error==='object'){
+        try{error.cleanupError=cleanupError}catch(_ignored){}
+      }
     }
     try{capture.detach()}catch(cleanupError){
-      if(error && typeof error==='object'&&!error.cleanupError)error.cleanupError=cleanupError;
+      if(error && typeof error==='object'){
+        try{if(!error.cleanupError)error.cleanupError=cleanupError}catch(_ignored){}
+      }
     }
     throw error;
   }
