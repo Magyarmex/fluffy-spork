@@ -62,3 +62,18 @@ test('manual chronological inputs remain compatible without original DOM metadat
   assert.equal(s.seen[0].__novaReplayAt,.01);
   assert.equal(s.seen[0].__novaSampleAt,.02);
 });
+test('epoch-style WebKit timestamp converts to the same bounded occurrence time',()=>{
+  const s=setup();s.setNow(1050);
+  assert.equal(s.bridge.capture(evt('pointerdown',1793560000000+1010)),true);
+  s.timeline.consumeThrough(.02);
+  assert.equal(s.seen.length,1);
+  assert.ok(Math.abs(s.seen[0].__novaOriginalAt-.01)<1e-10);
+  assert.ok(Math.abs(s.seen[0].__novaReplayAt-.01)<1e-10);
+});
+test('stale DOM press fails closed rather than being assigned a fresh occurrence',()=>{
+  const s=setup();s.setNow(4000);
+  assert.equal(s.bridge.capture(evt('pointerdown',1010)),false);
+  s.timeline.consumeThrough(.01);
+  assert.equal(s.seen.length,0);
+  assert.equal(s.bridge.staleClamps,1);
+});
