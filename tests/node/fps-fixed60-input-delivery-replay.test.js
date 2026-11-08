@@ -58,6 +58,12 @@ test('skipped simulation time is not misreported as an executed input tick',()=>
  assert.equal(sufficient.deliveredCount,2);
  assert.ok(low.appliedDuringSkippedTime>0,
    'a queued key edge can be consumed by skipped chronology without an update');
+ assert.equal(low.events[0].appliedWallMs,200);
+ assert.equal(low.events[0].delayMs,70);
+ assert.equal(low.events[0].appliedDuringSkip,true);
+ assert.equal(sufficient.events[0].appliedWallMs,150);
+ assert.equal(sufficient.events[0].delayMs,20);
+ assert.equal(sufficient.events[0].appliedDuringSkip,false);
  assert.ok(low.appliedDuringSkippedTime<=low.deliveredCount);
 });
 test('simultaneous event timestamps retain distinct original keys',()=>{
