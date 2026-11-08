@@ -100,3 +100,38 @@ test('simultaneous three-way contacts abstain instead of using ID order', () => 
   assert.throws(()=>resolveChronologically([a,b,c],1/240),
     /ambiguous simultaneous projectile contacts/);
 });
+test('seeded 1,000 multi-shot worlds preserve chronology under reversal', () => {
+  let seed=0x19cafe33, compared=0, contacts=0, ambiguous=0;
+  const rand=()=>{seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;
+    return (seed>>>0)/4294967296;};
+  for(let trial=0;trial<1000;trial++) {
+    const n=2+Math.floor(rand()*7),shots=[];
+    for(let i=0;i<n;i++) {
+      shots.push({...shot(i+1,(rand()-.5)*100,(rand()-.5)*10000,
+        1+Math.floor(rand()*5)),y:(rand()-.5)*100,
+        vy:(rand()-.5)*10000,r:2+rand()*3,ttl:.002+rand()*.025});
+    }
+    let a,b;
+    try {
+      a=resolveChronologically(shots,1/30);
+      b=resolveChronologically([...shots].reverse(),1/30);
+    } catch(e) {
+      if(e.message==='ambiguous simultaneous projectile contacts') {
+        ambiguous++;continue;
+      }
+      throw e;
+    }
+    const summary=r=>({
+      events:r.applied.map(e=>[e.t,e.ids.join('-')])
+        .sort((x,y)=>x[0]-y[0]||x[1].localeCompare(y[1])),
+      hp:[...r.state].sort((x,y)=>x[0]-y[0])
+        .map(([id,p])=>[id,p.hp,p.dead])
+    });
+    assert.deepEqual(summary(a),summary(b));
+    contacts+=a.applied.length;
+    compared++;
+  }
+  assert.ok(compared>900);
+  assert.ok(contacts>100);
+  assert.ok(ambiguous>0,'seed must exercise fail-closed simultaneous cases');
+});
