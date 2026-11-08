@@ -27,13 +27,18 @@ function run({shot=false,cls='basic',disableFire=false,releaseType='pointerup',m
   g.spawnShape=()=>null;g.spawnPowerup=()=>null;g.spawnAITank=()=>null;
   g.status='playing';g.paused=false;
   const timeline=new ChronologicalInput(g.input);
+  const actualRender=g.__testWindow.__novaMakeRequire('')('game/render').render;
+  const rendered=[];
   let now=1000,callback=null;
   const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
   const pulse=shot?new ShotOnlyFirePulse(g,timeline,{maxPulseAgeMs:ageGateMs,
     nowMs:()=>now,startMs:bridge.startMs}):null;
   const owner=new FixedStepRafOwner(g,timeline,bridge,{
    now:()=>now,maxSteps,request:fn=>(callback=fn,1),
-   cancel:()=>{callback=null},render(){}});
+   cancel:()=>{callback=null},render(game,w,h){
+    rendered.push({atMs:now-1000,bullets:game.bullets.length});
+    actualRender(game,w,h);
+   }});
   const event=(type,at,x,buttons)=>bridge.capture({
    type,timeStamp:1000+at,pointerType:'touch',pointerId:22,
    clientX:x,clientY:200,button:0,buttons,
@@ -57,7 +62,7 @@ function run({shot=false,cls='basic',disableFire=false,releaseType='pointerup',m
    const drones=g.drones.filter(d=>d.ownerId===g.player.id).map(d=>
      [d.id,d.x,d.y,d.vx,d.vy,d.hp,d.__novaPhase]);
    const swarm=g.player.__novaSwarm;
-   return {at150,at200,drones,recall:swarm?.recallUntil,active:swarm?.active,
+   return {at150,at200,rendered,drones,recall:swarm?.recallUntil,active:swarm?.active,
     power:swarm?.power,nodeX:swarm?.nodeX,nodeY:swarm?.nodeY,
     ticks:owner.ticks,droppedMs:owner.droppedMs,rejectedStale:pulse?.rejectedStale||0,
     aim:g.input.aim.active,firing:g.input.firing};
@@ -137,5 +142,19 @@ test('pause before a delayed recovery clears the pulse without a ghost shot',()=
   assert.equal(result.at200.shots,0);
   assert.equal(result.rejectedStale,0,'pause is cancellation, not age rejection');
   assert.equal(result.firing,false);assert.equal(result.aim,false);
+ }
+});
+
+test('actual composed Canvas renderer first receives a recovered projectile only on its legal frame',()=>{
+ const fresh=run({shot:true,maxSteps:3,ageGateMs:40});
+ const delayed=run({shot:true,maxSteps:2,ageGateMs:80});
+ const rejected=run({shot:true,maxSteps:2,ageGateMs:40});
+ const firstVisible=result=>result.rendered.find(frame=>frame.bullets>0)?.atMs;
+ assert.equal(firstVisible(fresh),150);
+ assert.equal(firstVisible(delayed),200);
+ assert.equal(firstVisible(rejected),undefined);
+ for(const result of [fresh,delayed,rejected]){
+  assert.equal(result.rendered.length,8);
+  assert.equal(result.aim,false);assert.equal(result.firing,false);
  }
 });
