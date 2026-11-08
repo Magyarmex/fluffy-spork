@@ -1977,7 +1977,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   }
   if(pair.length!==2)return false;
   var a=pair[0],b=pair[1];
-  if(a.ownerId===b.ownerId||(a.knock||0)!==0||(b.knock||0)!==0||
+  if(bullets.some(function(o){return o&&!o.dead&&(o.shell||o.splash||o.beam||o.__v17Cannon);})||
+     a.ownerId===b.ownerId||(a.knock||0)!==0||(b.knock||0)!==0||
      !Number.isFinite(a.dmg)||!Number.isFinite(b.dmg)||
      !(a.dmg>0&&b.dmg>0))return false;
   var ao=localSingleTTLBodyOthers(g,a,dt,true),
@@ -2022,6 +2023,52 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      !(target.hp>second.dmg*2))return true;
   isolatedTTLStationaryPiercingChain(g,second,dt,false,[],true);
   return true;
+ }
+ /* A prior-frame pen=1 hull hit can leave a still-live pen=0 round
+  * blocking a second independent TTL contact on that same hull. Do not
+  * replay the prior hit: certify only the fresh contact against its exact
+  * one-victim ledger and disjoint remaining projectile corridors. */
+ function certifiedPriorVictimTTLContinuation(g,dt){
+  if(!(dt>0&&dt<=.05)||!Number.isFinite(dt))return false;
+  var bullets=g.bullets||[],fresh=null,prior=null;
+  for(var i=0;i<bullets.length;i++){
+   var b=bullets[i];
+   if(!b||b.dead||!(b.ttl>0&&b.ttl<=dt))continue;
+   if(b.shell||b.beam||b.splash||b.__v17Cannon)continue;
+   if(b.pen===1&&(b.hits||0)===0){
+    if(fresh)return false;
+    fresh=b;
+   }else if(b.pen===0&&b.hits===1&&
+      b.__novaDirectVictims instanceof Set&&
+      b.__novaDirectVictims.size===1){
+    if(prior)return false;
+    prior=b;
+   }
+  }
+  if(bullets.some(function(o){return o&&!o.dead&&(o.shell||o.splash||o.beam||o.__v17Cannon);})||
+     !fresh||!prior||fresh.ownerId===prior.ownerId||
+     (fresh.knock||0)!==0||(prior.knock||0)!==0)return false;
+  var target=prior.__novaDirectVictims.values().next().value;
+  if(!target||target.kind!=='tank'||!target.alive||
+     !(target.hp>fresh.dmg*2))return false;
+  var others=localSingleTTLBodyOthers(g,fresh,dt,true);
+  if(!others||others.some(function(o){return o!==prior;}))return false;
+  var contacts=isolatedTTLStationaryPiercingChain(g,fresh,dt,false,[],true,true);
+  if(!contacts||contacts.length!==1||contacts[0].e!==target)return false;
+  /* The spent shot still has physical presence until TTL expires.
+   * Exclude it only if its entire remaining corridor cannot intercept
+   * the fresh shot, including AFTER its previous hull contact. */
+  var ax=prior.x+prior.vx*prior.ttl,ay=prior.y+prior.vy*prior.ttl,
+      bx=fresh.x+fresh.vx*fresh.ttl,by=fresh.y+fresh.vy*fresh.ttl,
+      pad=prior.r+fresh.r+2;
+  if(!(Number.isFinite(ax)&&Number.isFinite(ay)&&
+       Number.isFinite(bx)&&Number.isFinite(by)&&
+       Number.isFinite(pad)&&pad>0))return false;
+  if(Math.max(prior.x,ax)+pad>=Math.min(fresh.x,bx)&&
+     Math.min(prior.x,ax)-pad<=Math.max(fresh.x,bx)&&
+     Math.max(prior.y,ay)+pad>=Math.min(fresh.y,by)&&
+     Math.min(prior.y,ay)-pad<=Math.max(fresh.y,by))return false;
+  return !!isolatedTTLStationaryPiercingChain(g,fresh,dt,false,[],true);
  }
  /* Witnessed nonlethal neutral piercing pair. The core and swept fallback
   * can lose the second Circle/Square contact at low FPS. Resolve only
@@ -3475,7 +3522,11 @@ function certifiedMultiShotCoverPriority(g,dt){
    }
   }
  /* Commit a certified same-victim pair before the sequential TTL pass. */
- certifiedSameVictimTTLPair(this,dt);
+ if(expiring===2&&legacyExpiring&&bodyWork<=300&&
+    !this.__novaWallProofHadShell){
+  certifiedSameVictimTTLPair(this,dt)||
+   certifiedPriorVictimTTLContinuation(this,dt);
+ }
  if(legacyExpiring||localExpiring||localOrdinaryBatch||localSingleBody)
   for(var pre=this.bullets.length-1;pre>=0;pre--){
    var expiringBullet=this.bullets[pre];
