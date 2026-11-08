@@ -6,7 +6,7 @@ const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
 const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs');
 const {FixedStepRafOwner}=require('../research/fixed-step-raf-owner.cjs');
-function run(maxSteps,touch=false){
+function run(maxSteps,touch=false,{frameMs=50,frames=8}={}){
  return withSeed(1517800,()=>{
   const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
   let now=1000,callback=null,elapsed=0;
@@ -38,8 +38,8 @@ function run(maxSteps,touch=false){
   let next=0;
   try{
    owner.start();
-   for(let frame=0;frame<8;frame++){
-    elapsed+=50;now=1000+elapsed;
+   for(let frame=0;frame<frames;frame++){
+    elapsed+=frameMs;now=1000+elapsed;
     while(next<events.length&&events[next].atMs<=elapsed){
      const e=events[next++];
      assert.equal(bridge.capture({type:e.type,timeStamp:1000+e.atMs,key:e.key,
@@ -127,4 +127,16 @@ test('real tank displacement first reaches the rendered frame after the press',(
  const recoveredFirst=sufficient.rendered.find(f=>f.displaced).atMs;
  assert.ok(lowFirst>recoveredFirst,
    'two-step overload must delay first physically rendered tank movement');
+});
+
+test('native 60Hz presents real movement earlier than both 20Hz recovery budgets',()=>{
+ const native=run(2,false,{frameMs:1000/60,frames:24});
+ const recovered=run(3),overloaded=run(2);
+ const firstMove=result=>result.rendered.find(f=>f.displaced)?.atMs;
+ const baseline=firstMove(native),three=firstMove(recovered),two=firstMove(overloaded);
+ assert.ok(Number.isFinite(baseline));
+ assert.ok(baseline>=130 && baseline<150,'native 60Hz first movement must follow press promptly');
+ assert.ok(baseline<three && three<two,
+   'rendered physical response should worsen as frame budget becomes insufficient');
+ assert.equal(native.droppedMs,0);
 });
