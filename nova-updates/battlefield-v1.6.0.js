@@ -1966,6 +1966,12 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   * then settle in physical order. Any uncertain third party, terrain,
   * interception, defense, motion, kill, knockback or callback side effect
   * abstains. No generic shared-victim planner is implied. */
+ function certifiedTTLFrameStart(g,b){
+  return !g.__novaShapeSweepActive||
+   (Number.isSafeInteger(b.id)&&
+    g.__novaFrameStartBulletEpoch===g.__novaShapeSweepEpoch&&
+    b.id<g.__novaFrameStartBulletIdCeiling);
+ }
  function certifiedSameVictimTTLPair(g,dt){
   if(!(dt>0&&dt<=.05)||!Number.isFinite(dt))return false;
   var bullets=g.bullets||[],pair=[];
@@ -1977,7 +1983,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   }
   if(pair.length!==2)return false;
   var a=pair[0],b=pair[1];
-  if(bullets.some(function(o){return o&&!o.dead&&(o.shell||o.splash||o.beam||o.__v17Cannon);})||
+  if(!certifiedTTLFrameStart(g,a)||!certifiedTTLFrameStart(g,b)||
+     bullets.some(function(o){return o&&!o.dead&&(o.shell||o.splash||o.beam||o.__v17Cannon);})||
      a.ownerId===b.ownerId||(a.knock||0)!==0||(b.knock||0)!==0||
      !Number.isFinite(a.dmg)||!Number.isFinite(b.dmg)||
      !(a.dmg>0&&b.dmg>0))return false;
@@ -2010,13 +2017,15 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      Math.min(a.y,ay)-pad<=Math.max(b.y,by))return false;
   var first=at<bt?a:b,second=at<bt?b:a,
       tx=target.x,ty=target.y,
-      bulletCount=bullets.length,shapeCount=(g.shapes||[]).length,
+      bulletRefs=bullets.slice(),bulletCount=bullets.length,
+      shapeCount=(g.shapes||[]).length,
       droneCount=(g.drones||[]).length,tankCount=(g.tanks||[]).length;
   if(!isolatedTTLStationaryPiercingChain(g,first,dt,false,[],true))
    return false;
   /* A nonlethal callback must not silently move/replace the victim. */
   if(!target.alive||target.x!==tx||target.y!==ty||
      bullets.length!==bulletCount||
+     bullets.some(function(o,i){return o!==bulletRefs[i];})||
      (g.shapes||[]).length!==shapeCount||
      (g.drones||[]).length!==droneCount||
      (g.tanks||[]).length!==tankCount||
@@ -2045,7 +2054,9 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
     prior=b;
    }
   }
-  if(bullets.some(function(o){return o&&!o.dead&&(o.shell||o.splash||o.beam||o.__v17Cannon);})||
+  if(!fresh||!prior||!certifiedTTLFrameStart(g,fresh)||
+     !certifiedTTLFrameStart(g,prior)||
+     bullets.some(function(o){return o&&!o.dead&&(o.shell||o.splash||o.beam||o.__v17Cannon);})||
      !fresh||!prior||fresh.ownerId===prior.ownerId||
      (fresh.knock||0)!==0||(prior.knock||0)!==0)return false;
   var target=prior.__novaDirectVictims.values().next().value;
