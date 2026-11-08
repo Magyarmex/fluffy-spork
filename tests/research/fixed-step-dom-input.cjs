@@ -70,7 +70,9 @@ class ChronologicalInput {
     while (this.index < this.events.length && this.events[this.index].at <= end + EPS) {
       const e = this.events[this.index++];
       const d = e.data;
-      const evt = {type:e.kind, __novaOriginalAt:d.__novaOriginalAt,\n        __novaReplayAt:e.at, __novaSampleAt:end,\n        pointerId:d.pointerId, pointerType:d.pointerType,
+      const evt = {type:e.kind, __novaOriginalAt:d.__novaOriginalAt,
+        __novaReplayAt:e.at, __novaSampleAt:end,
+        pointerId:d.pointerId, pointerType:d.pointerType,
         clientX:d.clientX, clientY:d.clientY, buttons:d.buttons,
         button:d.button, key:d.key, repeat:!!d.repeat,
         defaultPrevented:!!d.defaultPrevented,
