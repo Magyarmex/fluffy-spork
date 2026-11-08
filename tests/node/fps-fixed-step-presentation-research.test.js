@@ -225,3 +225,22 @@ test('fast legal projectile motion interpolates but a larger teleport does not',
   assert.equal(p.teleportSkips,1);
  }finally{p.stop()}
 });
+
+test('bounded projectile pose threshold covers canonical max-stat class velocities',()=>{
+ const g=bootGame();
+ try{
+  const classes=Object.keys(g.__testWindow.__novaMakeRequire('')('game/classes').CLASSES);
+  assert.equal(classes.length,36);
+  let fastest=0;
+  for(const cls of classes){
+   g.setClass(g.player,cls);
+   g.player.stats.bulletspeed=8;
+   g.player.gene='sniper'; // conservative multiplier even for other lineages
+   fastest=Math.max(fastest,g.bulletSpeed(g.player));
+  }
+  assert.ok(fastest/60>96,
+   'fixture must exercise the old 96-world-unit fixed displacement limit');
+  assert.ok(fastest*1.5/60<=240,
+   'research bullet interpolation cap must be reconsidered for new class speeds');
+ }finally{g.destroy()}
+});
