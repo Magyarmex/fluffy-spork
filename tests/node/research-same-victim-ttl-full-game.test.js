@@ -18,7 +18,7 @@ function trial(hz,reverse,fullUpdate,only=null,targetX=40){
   const p=g.player;
   p.x=targetX;p.y=0;p.cls='scout';p.gene=null;p.hp=1000;p.maxHp=1000;p.alive=true;
   p.spawnShieldT=0;p.shieldT=0;p.invulnT=0;p.bulwarkT=0;p.tauntT=0;
-  p.regenDelay=10;
+  p.regenDelay=10;p.droneRespawnT=999;
   p.vx=0;p.vy=0;
   const owners=[101,102].map((id,i)=>({
    kind:'tank',id,cls:'scout',x:-1200,y:i?1000:-1000,
