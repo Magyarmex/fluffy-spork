@@ -129,3 +129,51 @@ for(const owner of ['shot','subtick','explicit'])for(const kind of ['touch','mou
   }finally{pulse.detach();}
  });
 }
+
+
+// A held press can outlive several simulation updates. Its life ownership
+// must survive those updates, but an already-sampled release must not create
+// a second firing opportunity.
+for(const owner of ['shot','subtick','explicit'])for(const kind of ['touch','mouse']){
+ for(const redeploy of [false,true]){
+  test(owner+' '+kind+' sampled held input '+(redeploy?'cannot transfer on redeploy':'cannot fire again on release'),()=>{
+   const shots=[],original={id:1},replacement={id:2};
+   const input={touchSeen:kind!=='mouse',firing:false,mouseActive:false,
+    aim:{active:false,dx:0,dy:0},stickId:{aim:-1},
+    pd(e){if(e.pointerType==='mouse'){this.mouseActive=true;this.firing=true;}
+     else{this.stickId.aim=e.pointerId;this.aim.active=true;this.aim.dx=40;this.firing=true;}},
+    pm(){},pu(e){if(e.pointerType==='mouse'){this.mouseActive=false;this.firing=false;}
+     else if(this.stickId.aim===e.pointerId){this.stickId.aim=-1;
+      this.aim.active=false;this.firing=false;}},
+    aimVec(){return{x:1,y:0};}
+   };
+   const game={input,player:original,status:'playing',paused:false,
+    update(){if(input.firing||input.__novaShotIntent?.fire)this.tryFire(this.player);this.updateDrones();},
+    updateDrones(){},tryFire(p){shots.push(p.id);},destroy(){}};
+   const timeline={input,reset(){},releaseAll(){}};
+   const pulse=owner==='shot'?new ShotOnlyFirePulse(game,timeline):
+    owner==='explicit'?new ExplicitShotIntent(game,timeline):new SubtickFirePulse(game,timeline);
+   const event=(type)=>({type,pointerType:kind,pointerId:22,button:0,buttons:type==='pointerup'?0:1,
+    target:{closest(){return null;}}});
+   try{
+    input.pd(event('pointerdown'));
+    game.update(1/60);
+    assert.deepEqual(shots,[1],'the original life receives the first sampled shot');
+    if(redeploy){
+     game.player=replacement;
+     game.update(1/60);
+     assert.deepEqual(shots,[1],'the new life must not inherit held fire');
+     assert.equal(input.firing,false);
+     assert.equal(input.aim.active,false);
+     assert.equal(input.mouseActive,false);
+    }else{
+     input.pu(event('pointerup'));
+     assert.equal(!!(pulse.pulse?.pending||pulse.pending),false,
+      'a sampled press must not become a new short pulse');
+     game.update(1/60);
+     assert.deepEqual(shots,[1],'release cannot duplicate the sampled shot');
+    }
+   }finally{pulse.detach();}
+  });
+ }
+}
