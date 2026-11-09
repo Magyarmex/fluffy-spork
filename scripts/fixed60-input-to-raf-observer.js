@@ -45,7 +45,7 @@ function create({durationMs=60000,maxSamples=5000}={}){
   for(const type of TYPES){
    const values=samples[type]||[];
    kinds[type]={count:values.length,p50Ms:percentile(values,.5),
-    p95Ms:percentile(values,.95),maxMs:values.length?
+    p95Ms:percentile(values,.95),p99Ms:percentile(values,.99),\n    maxMs:values.length?
       Math.round(Math.max(...values)*1000)/1000:null};
   }
   return {researchOnly:true,metric:'DOM delivery to next RAF callback',
