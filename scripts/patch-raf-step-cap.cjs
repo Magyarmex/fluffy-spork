@@ -121,19 +121,19 @@ function patchRafStepCapLegacy(html){
  * The old order silently discarded excess time that the existing bounded
  * second update was about to consume. No extra update, broader eligibility,
  * larger debt bucket or long-stall repayment is introduced. */
-const capAfterStep=newStep.replace(
- 'carry = excess > 1e-9 ? Math.min(1 / 30, excess) : 0;',
- 'carry = excess > 1e-9 ? excess : 0;')
- .replace('            if (this.paused)\n                carry = 0;',
-  '            carry = Math.min(1 / 30, carry);\n            if (this.paused)\n                carry = 0;');
+const oldCarryLine='carry = excess > 1e-9 ? Math.min(1 / 30, excess) : 0;';
+const newCarryLine='carry = excess > 1e-9 ? excess : 0;';
+const oldPauseLine='            if (this.paused)\\n                carry = 0;';
+const postClampLine='            carry = Math.min(1 / 30, carry);\\n';
 function patchRafStepCap(html){
  const out=patchRafStepCapLegacy(html);
- if(count(out,capAfterStep)===1)return out;
- if(count(out,newStep)!==1)
+ if(count(out,newCarryLine)===1&&count(out,postClampLine)===1)return out;
+ if(count(out,oldCarryLine)!==1||count(out,oldPauseLine)!==1||
+    count(out,newCarryLine)!==0||count(out,postClampLine)!==0)
   throw Error('canonical RAF post-second carry owner drift; refuse materialization');
- return out.replace(newStep,capAfterStep);
+ return out.replace(oldCarryLine,newCarryLine)
+  .replace(oldPauseLine,postClampLine+oldPauseLine);
 }
-
 module.exports={patchRafStepCap,protectBootCleanup,protectInputBlurCleanup,before,intermediate,after};
 if(require.main===module){
  const file=process.argv[2];if(!file)throw Error('Usage: node scripts/patch-raf-step-cap.cjs <index.html>');
