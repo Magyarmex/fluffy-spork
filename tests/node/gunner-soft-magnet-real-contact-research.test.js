@@ -47,13 +47,13 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
    const nearest=g.nearestTank,originalDrones=g.updateDrones;
    let eligible=0,queries=0,movementWitness=0,hits=0,damage=0,volleys=0,maxTrajectoryDrift=0;
    let tick=-1,firstHitTick=null,leadStartDeg=null,leadEndDeg=null;
-   let previousVisible=null,adaptiveSoftTicks=0,adaptiveHardTicks=0;
+   let previousVisible=null,adaptiveSoftTicks=0,adaptiveHardTicks=0,adaptiveUseSoft=false;
    const rngTrace=[],rngDrawsBeforeCombat=draws();
    g.nearestTank=function(x,y,r,exclude){
     const found=nearest.apply(this,arguments);
     if(exclude===p.id&&r===480&&x===p.x&&y===p.y){
      queries++;if(found===t)eligible++;
-     if(policy!=='hard')return null;
+     if(policy!=='hard'&&!(policy==='adaptive'&&!adaptiveUseSoft))return null;
     }
     return found;
    };
@@ -115,7 +115,10 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
     const signedLead=wrap(requested-targetBearing);
     const forwardLead=observedVy*signedLead>0&&Math.abs(signedLead)>.01;
     const useSoft=policy==='soft'||(policy==='adaptive'&&Math.abs(observedVy)>20&&forwardLead);
-    if(policy==='adaptive')useSoft?adaptiveSoftTicks++:adaptiveHardTicks++;
+    if(policy==='adaptive'){
+     adaptiveUseSoft=useSoft;
+     useSoft?adaptiveSoftTicks++:adaptiveHardTicks++;
+    }
     const effective=useSoft?softBearing(requested,targetBearing):requested;
     g.input.aim.dx=40*Math.cos(effective);
     g.input.aim.dy=40*Math.sin(effective);
