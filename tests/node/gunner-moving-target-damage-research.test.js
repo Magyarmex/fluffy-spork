@@ -146,14 +146,14 @@ test('moving lateral target exposes hit and damage sensitivity under matched wal
 // public-viewport eligibility checks, and vary only the target's start phase.
 test('moving-target Gunner damage remains measurable across counterbalanced crossing phases',()=>{
  const rows=[];
- const phases=[0,Math.PI/2,Math.PI,3*Math.PI/2];
+ const phases=[0,Math.PI/2,Math.PI,3*Math.PI/2]; // four phases × two seeds
  for(const cls of ['minigun','needlestorm']){
   const reload=cls==='minigun'?1:3;
   for(const mode of ['held','short']){
    for(const hz of [30,60,120]){
     const samples=[];
-    for(const phase of phases){
-     const result=trial(1517800,cls,reload,hz,mode,200,'crossing','shipping',phase);
+    for(const seed of [1517800,1517802])for(const phase of phases){
+     const result=trial(seed,cls,reload,hz,mode,200,'crossing','shipping',phase);
      assert.equal(result.assistEligible,result.assistQueries,
       'counterbalanced target must remain publicly visible');
      assert.ok(result.damage>=0&&Number.isFinite(result.damage));
@@ -163,7 +163,7 @@ test('moving-target Gunner damage remains measurable across counterbalanced cros
     assert.equal(volleyCounts.size,1,
      'target phase must not affect the class firing chronology');
     rows.push({cls,mode,hz,volleys:samples[0].volleys,
-     phases:samples.map(s=>({phase:+((phases[samples.indexOf(s)]/Math.PI)).toFixed(2),hits:s.hits,damage:s.damage})),
+     phases:samples.map((s,j)=>({seed:s.seed,phase:+((phases[j%phases.length]/Math.PI)).toFixed(2),hits:s.hits,damage:s.damage})),
      meanDamage:+(samples.reduce((n,s)=>n+s.damage,0)/samples.length).toFixed(4),
      minDamage:Math.min(...samples.map(s=>s.damage)),
      maxDamage:Math.max(...samples.map(s=>s.damage))});
