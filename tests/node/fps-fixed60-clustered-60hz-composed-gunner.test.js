@@ -9,15 +9,33 @@ const {bootGame,withSeed,digest,physical}=
   require('../research/audio-rng-causal-pilot.cjs');
 const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
 const {FixedStepRafOwner}=require('../research/fixed-step-raf-owner.cjs');
-function run(cls,seed,clustered){
+function run(cls,seed,clustered,targeted=false){
  return withSeed(seed,draws=>{
   const g=bootGame(),p=g.player;
   g.sfx.muted=true;g.sfx.startMusic=()=>{};
   g.setClass(p,cls);p.stats.reload=cls==='minigun'?1:3;
+  p.x=1000;p.y=1000;p.vx=0;p.vy=0;
+  g.__novaTerrain=[];g.__novaBattlefieldIndex=null;
+  const sample=g.shapes.find(s=>s.type==='square')||g.shapes[0];
   g.tanks=[p];g.tankById=new Map([[p.id,p]]);
   g.shapes=[];g.drones=[];g.powerups=[];g.bullets=[];
   if(g.shapeById)g.shapeById.clear();
   if(g.hash&&g.hash.clear)g.hash.clear();
+  let damage=0;
+  if(targeted){
+   assert.ok(sample,'composed Game must supply a neutral shape template');
+   const victim={...sample,kind:'shape',type:'square',id:987654,
+    x:p.x+175,y:p.y,r:24,hp:1000000,maxHp:1000000,
+    vx:0,vy:0,born:0,wanderT:Infinity,dead:false};
+   g.shapes=[victim];
+   if(g.shapeById)g.shapeById.set(victim.id,victim);
+   const damageShape=g.damageShape;
+   g.damageShape=function(shape,...args){
+    const before=shape.hp,out=damageShape.call(this,shape,...args);
+    if(shape===victim)damage+=Math.max(0,before-shape.hp);
+    return out;
+   };
+  }
   g.shapeTimer=Infinity;g.powerupTimer=Infinity;g.eliteTimer=Infinity;
   g.crasherTimer=Infinity;g.aiRespawns=[];
   g.spawnShape=()=>null;g.spawnPowerup=()=>null;
@@ -60,7 +78,8 @@ function run(cls,seed,clustered){
     assert.equal(owner.droppedMs,0);
    }
    assert.ok(volleys>0);
-   return {volleys,world:digest(physical(g)),draws:draws(),
+   if(targeted)assert.ok(damage>0,'canonical target must take real damage');
+   return {volleys,damage:+damage.toFixed(5),world:digest(physical(g)),draws:draws(),
     heat:p.__v17Heat||0,spin:p.fireSpin||0,fireCd:p.fireCd,
     shotIndex:p.__v17ShotIndex,barrelIdx:p.barrelIdx,
     bulletSignature:digest(g.bullets.map(b=>
@@ -70,9 +89,11 @@ function run(cls,seed,clustered){
 }
 test('clustered mean-60Hz presentation preserves complete fixed60 Gunner chronology',()=>{
  for(const cls of ['minigun','needlestorm'])
-  for(const seed of [1517800,1517802]){
-   const native=run(cls,seed,false);
-   const clustered=run(cls,seed,true);
-   assert.deepEqual(clustered,native,cls+' seed='+seed);
+  for(const seed of [1517800,1517802])
+   for(const targeted of [false,true]){
+    const native=run(cls,seed,false,targeted);
+    const clustered=run(cls,seed,true,targeted);
+    assert.deepEqual(clustered,native,
+     cls+' seed='+seed+' targeted='+targeted);
   }
 });
