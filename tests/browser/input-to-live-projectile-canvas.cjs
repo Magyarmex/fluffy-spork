@@ -1,7 +1,7 @@
 'use strict';
 // Research-only real-browser witness: trusted touch delivery -> real player
-// projectile birth in the shipping React/Game path. Includes first projectile-core Canvas fill; NOT GPU presentation,
-// GPU presentation, or physical touch-to-photon latency.
+// projectile birth and the first projectile-core Canvas fill in the shipping
+// React/Game path. NOT GPU presentation or physical touch-to-photon latency.
 const assert=require('node:assert/strict');
 const {chromium}=require('playwright');
 
