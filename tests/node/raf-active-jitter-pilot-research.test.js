@@ -18,10 +18,10 @@ assert.equal(shipping.split(oldCap).length-1,1,'shipping final carry cap owner')
 const pilot=shipping.replace(oldGate,'elapsed <= 0.1')
  .replace(oldCap,'carry = Math.min(elapsed <= 0.1 ? 2 / 30 : 1 / 30, carry);');
 function run(startBody,gaps,seconds=10,workMs=0){
- let now=0,work=0,raf=null,sim=0,updates=0,draws=0,frameSteps=0,maxSteps=0;
+ let now=0,work=0,raf=null,sim=0,updates=0,draws=0,frameSteps=0,maxSteps=0,firstFrameSteps=null;
  const start=new Function('performance','requestAnimationFrame','render_1',
   'return ({'+startBody+'}).start')({now:()=>now+work},
-  fn=>{raf=fn;return 1;},{render(){draws++;maxSteps=Math.max(maxSteps,frameSteps);frameSteps=0;}});
+  fn=>{raf=fn;return 1;},{render(){if(firstFrameSteps===null)firstFrameSteps=frameSteps;draws++;maxSteps=Math.max(maxSteps,frameSteps);frameSteps=0;}});
  const game={paused:false,__novaDestroyed:false,mmTimer:0,
   sfx:{startMusic(){}},update(dt){
    assert.ok(dt>=0&&dt<=1/30+1e-9,'collision dt bounded');
@@ -35,7 +35,7 @@ function run(startBody,gaps,seconds=10,workMs=0){
  }
  assert.ok(sim<=seconds+1e-7,'no future time');
  assert.ok(maxSteps<=2,'no more than two simulation updates per render');
- return {sim,updates,draws,maxSteps};
+ return {sim,updates,draws,maxSteps,firstFrameSteps};
 }
 const worst=[20.91151399025735,10.023170844306332,19.252641284801797,
  99.18706951738324,89.60306031033099,2.794867239606748,
@@ -102,4 +102,27 @@ test('three consecutive 99ms frames falsify complete recovery with a 2/30 carry 
  assert.ok(after.sim<9.5,'the pilot is NOT a complete chronology solution');
  assert.ok(after.maxSteps<=2,'preserve bounded update budget');
  assert.equal(after.draws,before.draws);
+});
+
+// A separate opt-in guard experiment. The shipping and active-jitter pilot
+// both check only the previous two frames' CPU work. The first update in the
+// current frame may be expensive; the next update must be evaluated against
+// that cost before any production change can claim a bounded frame budget.
+test('current-update CPU gate prevents a second expensive step on the first frame',()=>{
+ const oldCpuGate='priorWork < 18 && earlierWork < 18';
+ assert.equal(pilot.split(oldCpuGate).length-1,1,'unique existing CPU gate');
+ const guarded=pilot.replace(oldCpuGate,
+  oldCpuGate+' && performance.now() - workStart < 18');
+ for(const gaps of [[70],[99,99,99,.5,.5,.5,.5,.5,.5]]){
+  const unguarded=run(pilot,gaps,1,22);
+  const safe=run(guarded,gaps,1,22);
+  assert.equal(unguarded.firstFrameSteps,2,
+   'existing prior-frame-only guard permits a second expensive first-frame step');
+  assert.equal(safe.firstFrameSteps,1,
+   'current-work-aware guard prevents that second update');
+  assert.ok(safe.maxSteps<=2&&unguarded.maxSteps<=2);
+  assert.equal(safe.draws,unguarded.draws);
+  assert.ok(safe.sim<=unguarded.sim+1e-7,
+   'lower current-frame CPU work may trade off simulation progress');
+ }
 });
