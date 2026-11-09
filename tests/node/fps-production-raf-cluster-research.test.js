@@ -45,6 +45,18 @@ test('desired: 55/55/11.67/11.67ms 30Hz must not silently lose 7.5% world time',
 test('desired: 85/40/5/3.33ms 30Hz must not silently lose 18.75% world time',()=>{
  const r=run(shipping,harsh);approx(r.sim,10);
 });
+// Strong adversarial counterexample: mean 30Hz and every gap <100ms, but
+// the simple 2/30 carry-cap prototype also loses time cumulatively here.
+const eightGap=[14.207085933918753,12.760071936027344,4.133955086476322,
+ 50.264174640298336,96.0277607031713,83.86484405207489,
+ 4.301894803222718,1.1068795114770285];
+test('desired: eight-gap sub-100ms mean-30Hz must not discard active world time',()=>{
+ const r=run(shipping,eightGap,60);approx(r.sim,60);
+});
+test('falsifier: merely doubling carry cap still loses time on eight-gap 30Hz',()=>{
+ const r=run(prototype,eightGap,60);
+ assert.ok(r.sim<50,'the conditional cap is not a universal chronology fix');
+});
 test('research-only conditional cap restores clustered chronology in zero-cost owner',()=>{
  for(const gaps of [moderate,harsh,[1000/30],[1000/60],[50]]){
   const r=run(prototype,gaps);approx(r.sim,10);
