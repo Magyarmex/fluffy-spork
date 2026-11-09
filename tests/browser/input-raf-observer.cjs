@@ -31,7 +31,7 @@ const {chromium}=require('playwright');
   const box=await canvas.boundingBox();
   assert.ok(box&&box.width>200&&box.height>200);
   await canvas.tap({position:{x:box.width*.78,y:box.height*.68}});
-  await page.evaluate(()=>new Promise(resolve=>
+  // Browser-dispatched cancellation exercises the real passive DOM observer.\n  // It is not a physical touch cancellation or a gameplay latency measurement.\n  await canvas.evaluate(node=>node.dispatchEvent(new PointerEvent('pointercancel',{\n   bubbles:true,pointerId:77,pointerType:'touch',clientX:135,clientY:270})));\n  await page.evaluate(()=>new Promise(resolve=>
    requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   const result=await page.evaluate(()=>{
    const o=window.__novaInputRafProbe;
@@ -40,7 +40,7 @@ const {chromium}=require('playwright');
   });
   assert.ok(result.before.kinds.pointerdown.count>=1,
    'actual browser touch must reach passive pointerdown observer');
-  assert.ok(result.before.kinds.pointerup.count>=1,
+  assert.ok(result.before.kinds.pointercancel.count>=1,\n   'browser pointer cancellation must be visible to timing observer');\n  assert.ok(result.before.kinds.pointerup.count>=1,
    'actual browser touch release must reach passive pointerup observer');
   assert.ok(Number.isFinite(result.before.kinds.pointerdown.p95Ms));
   assert.ok(Number.isFinite(result.before.kinds.pointerup.p95Ms));
