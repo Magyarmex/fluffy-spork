@@ -92,6 +92,7 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
     const nominalY=scenario==='moving'?direction*(-35+45*i/hz):0;
     let requested=wrap(Math.atan2(nominalY,200)+
      (scenario==='moving'?.08*direction:scenario==='stationary-wide'?.12:.008));
+    if(scenario==='moving'&&leadMode==='underlead')requested=wrap(Math.atan2(nominalY,200)-.04*direction);
     if(scenario==='moving'&&leadMode==='intercept'){
      // Public straight-line geometry reference, not a gameplay auto-lead.
      // Keep the nominal physical input independent of damage knockback.
@@ -230,4 +231,18 @@ test('soft-magnet contact with class-specific geometric intercept inputs',()=>{
      }
   assert.equal(rows.length,12);
   console.log('VISIBLE_MOTION_AIM_INTENT_RESEARCH '+JSON.stringify(rows));
+ });
+
+ // Negative control: a player aiming behind a moving target must not be
+ // classified as intentional predictive lead just because the target moves.
+ test('visible-motion gate does not soften deliberate underlead',()=>{
+  for(const cls of ['minigun','needlestorm'])
+   for(const hz of [30,60])
+    for(const direction of [-1,1]){
+     const hard=trial(1517801,cls,hz,'moving','hard',direction,'underlead');
+     const adaptive=trial(1517801,cls,hz,'moving','adaptive',direction,'underlead');
+     assert.equal(adaptive.adaptiveSoftTicks,0);
+     assert.equal(adaptive.damage,hard.damage);
+     assert.equal(rngDivergence(hard,adaptive),null);
+    }
  });
