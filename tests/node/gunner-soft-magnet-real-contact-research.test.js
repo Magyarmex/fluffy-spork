@@ -39,7 +39,7 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
    g.input.autofire=false;g.input.aim.active=true;
    const nearest=g.nearestTank,originalDrones=g.updateDrones;
    let eligible=0,queries=0,movementWitness=0,hits=0,damage=0,volleys=0,maxTrajectoryDrift=0;
-   let tick=-1,firstHitTick=null;
+   let tick=-1,firstHitTick=null,leadStartDeg=null,leadEndDeg=null;
    g.nearestTank=function(x,y,r,exclude){
     const found=nearest.apply(this,arguments);
     if(exclude===p.id&&r===480&&x===p.x&&y===p.y){
@@ -94,6 +94,11 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
      assert.ok(flight>0&&Number.isFinite(flight));
      requested=Math.atan2(nominalY+vy*flight,200);
     }
+    if(scenario==='moving'){
+     const leadDeg=wrap(requested-Math.atan2(nominalY,200))*180/Math.PI;
+     if(i===0)leadStartDeg=+leadDeg.toFixed(4);
+     if(i===activeTicks-1)leadEndDeg=+leadDeg.toFixed(4);
+    }
     const effective=policy==='soft'?softBearing(requested,targetBearing):requested;
     g.input.aim.dx=40*Math.cos(effective);
     g.input.aim.dy=40*Math.sin(effective);
@@ -108,7 +113,7 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
     'moving-body certificate must survive every composed update');
    assert.ok(Number.isFinite(damage)&&damage>=0);
    assert.ok(hits>=0&&volleys>0);
-   return {seed,cls,hz,scenario,policy,direction,leadMode,hits,volleys,
+   return {seed,cls,hz,scenario,policy,direction,leadMode,leadStartDeg,leadEndDeg,hits,volleys,
     damage:+damage.toFixed(4),firstHitSec:firstHitTick===null?null:+((firstHitTick+1)/hz).toFixed(5),eligible,movementWitness,
     maxTrajectoryDrift:+maxTrajectoryDrift.toFixed(4)};
   }finally{g.destroy();}
