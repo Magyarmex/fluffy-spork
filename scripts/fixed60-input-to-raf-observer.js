@@ -60,8 +60,9 @@ function create({durationMs=60000,maxSamples=5000}={}){
   if(root.document&&typeof root.document.removeEventListener==='function')
    root.document.removeEventListener('visibilitychange',onVisibility);
   const id=raf;raf=null;
-  if(id!=null)root.cancelAnimationFrame(id);
-  pending.length=0;
+  try{if(id!=null)root.cancelAnimationFrame(id)}
+  catch(_){reason='cancel-error'}
+  finally{pending.length=0}
   return snapshot();
  }
  function schedule(){
