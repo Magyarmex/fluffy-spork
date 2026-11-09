@@ -267,5 +267,5 @@ test('visible-motion intent history expires and uses sight-relative motion',()=>
  // Pure radial approach is not predictive lateral motion.
  assert.equal(visibleMotionIntent(.08,0,{id:1,x:199,y:0,at:1/60,visible:true},prior),false);
  // Rotating the sight ray by 90 degrees rotates the eligible lateral axis.
- assert.equal(visibleMotionIntent(.08,Math.PI/2,{id:1,x:199,y:0,at:1/60,visible:true},prior),true);
+ assert.equal(visibleMotionIntent(Math.PI/2+.08,Math.PI/2,{id:1,x:199,y:0,at:1/60,visible:true},prior),true);
 });
