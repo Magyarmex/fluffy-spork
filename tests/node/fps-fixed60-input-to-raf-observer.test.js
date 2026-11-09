@@ -105,3 +105,28 @@ test('cancel failure cannot leave observer active or retain queued input',()=>{
  assert.equal(r.observedEvents,0);
  assert.equal(h.listeners,0);
 });
+
+test('equal-mean 60Hz schedules expose materially different p95 input-to-RAF waits',()=>{
+ function measure(gaps){
+  const h=harness(),o=h.window.__novaInputRafObserver.create({
+   durationMs:2000,maxSamples:2000});
+  o.start();let t=1000;
+  for(const gap of gaps){
+   for(let i=0;i<20;i++){
+    h.setTime(t+gap*(i+.5)/20);
+    h.event('keydown',{key:'never-record-this'});
+   }
+   t+=gap;h.next(t);
+  }
+  const report=local(o.snapshot());o.stop();
+  assert.equal(report.observedEvents,gaps.length*20);
+  return report.kinds.keydown.p95Ms;
+ }
+ const uniform=measure(Array(60).fill(1000/60));
+ const clustered=measure(Array.from({length:20},()=>[
+  1000/30,1000/120,1000/120]).flat());
+ assert.ok(uniform>15&&uniform<17,'uniform 60Hz expected p95 wait');
+ assert.ok(clustered>30&&clustered<32,'clustered 60Hz-mean expected p95 wait');
+ assert.ok(clustered>uniform*1.8,
+  'equal average frame rate must not hide the long-gap tail');
+});
