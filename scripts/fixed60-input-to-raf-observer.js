@@ -26,7 +26,7 @@ function create({durationMs=60000,maxSamples=5000}={}){
     typeof root.addEventListener!=='function'||
     typeof root.removeEventListener!=='function')
   throw Error('browser timing APIs unavailable');
- let active=false,startedAt=0,reason='idle',raf=null,generation=0,seq=0;
+ let active=false,startedAt=null,endedAt=null,reason='idle',raf=null,generation=0,seq=0;
  let pending=[],samples={},count=0;
  const clock=()=>root.performance.now();
  function onEvent(e){
@@ -50,11 +50,11 @@ function create({durationMs=60000,maxSamples=5000}={}){
   return {researchOnly:true,metric:'DOM delivery to next RAF callback',
    notMeasured:['simulation application','first rendered projectile','GPU/photon latency'],
    status:reason,observedEvents:count,pendingEvents:pending.length,
-   elapsedMs:Math.round(Math.max(0,clock()-startedAt)*1000)/1000,kinds};
+   elapsedMs:startedAt===null?0:Math.round(Math.max(0,\n    (endedAt===null?clock():endedAt)-startedAt)*1000)/1000,kinds};
  }
  function stop(why){
   if(!active)return snapshot();
-  active=false;reason=why||'manual';generation++;seq++;
+  active=false;reason=why||'manual';endedAt=clock();generation++;seq++;
   for(const type of TYPES)root.removeEventListener(type,onEvent,true);
   if(root.document&&typeof root.document.removeEventListener==='function')
    root.document.removeEventListener('visibilitychange',onVisibility);
@@ -92,7 +92,7 @@ function create({durationMs=60000,maxSamples=5000}={}){
   if(active)throw Error('observer already active');
   if(root.document&&root.document.hidden)throw Error('observer requires foreground tab');
   const now=clock();if(!Number.isFinite(now))throw Error('invalid browser clock');
-  active=true;generation++;seq++;startedAt=now;reason='running';
+  active=true;generation++;seq++;startedAt=now;endedAt=null;reason='running';
   pending=[];samples=Object.fromEntries(TYPES.map(type=>[type,[]]));count=0;
   try{
    for(const type of TYPES)root.addEventListener(type,onEvent,true);
