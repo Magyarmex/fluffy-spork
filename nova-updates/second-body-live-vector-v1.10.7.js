@@ -183,7 +183,7 @@ wrap('game/engine',function(engine,require){
     var best=null,score=Infinity,ts=g.tanks||[];
     for(var i=0;i<ts.length;i++){
       var t=ts[i];if(!t||!t.alive||t.id===owner.id||t.spawnShieldT>0||!hostileOwners(g,owner,t)||!sensorSees(g,owner,t))continue;
-      var s=dist2(owner.x,owner.y,t.x,t.y)*(t.isPlayer?.88:1);if(s<score){score=s;best=t;}
+      var s=dist2(owner.x,owner.y,t.x,t.y);if(s<score){score=s;best=t;}
     }
     return best;
   }
