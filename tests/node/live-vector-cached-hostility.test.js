@@ -92,6 +92,29 @@ test('selector rejects a cached ally even when its coordinates are still sensed'
  assert.equal(w.win.__testLiveVectorBestObserved(w.g,w.owner,w.enemy),w.other);
 });
 
+test('AI Controller fallback does not prefer a farther human over a nearer rival',()=>{
+ const w=boot();
+ w.enemy.x=120;w.other.x=125;w.other.isPlayer=true;
+ assert.equal(w.win.__testLiveVectorBestObserved(w.g,w.owner,null),w.enemy,
+  'human identity must not act as an invisible distance multiplier');
+ w.enemy.isPlayer=true;w.other.isPlayer=false;
+ assert.equal(w.win.__testLiveVectorBestObserved(w.g,w.owner,null),w.enemy,
+  'same geometry must select the same tank when identity flips');
+ w.enemy.x=130;w.other.x=125;
+ assert.equal(w.win.__testLiveVectorBestObserved(w.g,w.owner,null),w.other,
+  'closer hostile wins independent of human flag');
+});
+
+test('AI Controller cached target commitment remains valid regardless of human identity',()=>{
+ const w=boot();
+ w.enemy.x=300;w.other.x=125;w.enemy.isPlayer=true;
+ assert.equal(w.win.__testLiveVectorBestObserved(w.g,w.owner,w.enemy),w.enemy,
+  'existing legitimate visible target retains its normal commitment');
+ w.enemy.spawnShieldT=1;
+ assert.equal(w.win.__testLiveVectorBestObserved(w.g,w.owner,w.enemy),w.other,
+  'spawn protection still invalidates committed human target');
+});
+
 test('the corrected Live Vector module is wired into the materialized game',()=>{
  const html=fs.readFileSync(path.join(__dirname,'../../index.html'),'utf8');
  const base=html.indexOf('src="./nova-updates/controller-v1.3.0.js"');
