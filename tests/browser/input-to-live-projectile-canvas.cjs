@@ -184,6 +184,20 @@ const {chromium}=require('playwright');
   assert.equal(releaseState.aimOwner,-1,'release must clear right-stick owner');
   assert.equal(releaseState.births,birthsAfterRelease,
    'no new player shot may be born after touch release is processed');
+  // The same physical right-stick gesture must work again after release:
+  // preventing phantom fire must not strand the next deliberate shot.
+  await page.evaluate(()=>{window.__novaBirthGame.player.fireCd=0;});
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[origin]});
+  await page.waitForFunction(()=>window.__novaBirthGame?.input.aim.active===true,
+   null,{timeout:5000});
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[extended]});
+  await page.waitForFunction(expected=>window.__novaBirths.length>expected,
+   birthsAfterRelease,{timeout:12000});
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  await page.waitForFunction(()=>{
+   const i=window.__novaBirthGame?.input;
+   return i&&!i.aim.active&&!i.firing&&i.stickId.aim===-1;
+  },null,{timeout:5000});
   assert.deepEqual(errors,[],'the real game must not throw');
   console.log('NOVA_TOUCH_TO_PROJECTILE_BIRTH '+JSON.stringify({
    viewport:'320x700',trusted:true,deliveryToBirthMs:Math.round(delay*1000)/1000,
