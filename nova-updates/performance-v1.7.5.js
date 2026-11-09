@@ -158,8 +158,12 @@ function recordSimulation(g,dt){
   p.simulationStepsSincePresentation=(p.simulationStepsSincePresentation||0)+1;
 }
 function resetSimulationWindow(p){
+  /* CPU P95 and presentation/simulation pace must describe the same active
+   * epoch. Keep cumulative route/terrain counters and EMA diagnostics intact. */
   p.presentationTimes=null;p.simulationTimes=null;p.simulationSteps=null;
+  p.updateTimes=null;p.renderTimes=null;
   p.simulatedSincePresentation=0;p.simulationStepsSincePresentation=0;
+  window.__NOVA_PERF_LAST__=null;
 }
 function recordPresentation(g,now){
   if(!g||g.__novaDecorativeWorld||!Number.isFinite(now))return;
@@ -167,15 +171,20 @@ function recordPresentation(g,now){
   /* A paused, ended or menu-only game has no meaningful simulation pace.
    * Do not let those idle intervals contaminate the next live match. */
   if(g.paused||g.status!=='playing'){
-    p.lastPresentationAt=null;resetSimulationWindow(p);return;
+    p.lastPresentationAt=null;p.__novaSkipRenderTiming=true;
+    resetSimulationWindow(p);return;
   }
   var previous=p.lastPresentationAt;
   p.lastPresentationAt=now;
   if(previous==null){
+    p.__novaSkipRenderTiming=true;
     p.simulatedSincePresentation=0;p.simulationStepsSincePresentation=0;return;
   }
   var delta=now-previous;
-  if(!(delta>0)||delta>250){resetSimulationWindow(p);return;}
+  if(!(delta>0)||delta>250){
+    p.__novaSkipRenderTiming=true;resetSimulationWindow(p);return;
+  }
+  p.__novaSkipRenderTiming=false;
   timingSample(p,'presentationTimes',delta);
   timingSample(p,'simulationTimes',p.simulatedSincePresentation||0);
   timingSample(p,'simulationSteps',p.simulationStepsSincePresentation||0);
@@ -209,7 +218,9 @@ function timingWindow(p){
 function record(g,key,ms){
   if(!g)return;var p=perfState(g),peak=key==='updateMs'?'updatePeakMs':'renderPeakMs';
   p[key]=ema(p[key],ms,.08);p[peak]=Math.max(p[peak]*.997,ms);p.samples++;
-  if(!g.__novaDecorativeWorld)timingSample(p,key==='updateMs'?'updateTimes':'renderTimes',ms);
+  if(!g.__novaDecorativeWorld&&!g.paused&&g.status==='playing'&&
+     !(key==='renderMs'&&p.__novaSkipRenderTiming))
+    timingSample(p,key==='updateMs'?'updateTimes':'renderTimes',ms);
   var now=typeof performance!=='undefined'&&performance.now?performance.now():Date.now();
   if(now-p.lastSnapshotAt>2000){p.lastSnapshotAt=now;if(!g.__novaDecorativeWorld&&g.status==='playing'&&!g.paused&&timingWindow(p).frameSamples>=5)window.__NOVA_PERF_LAST__=Object.assign({version:VERSION,updateMs:+p.updateMs.toFixed(2),renderMs:+p.renderMs.toFixed(2),updatePeakMs:+p.updatePeakMs.toFixed(2),renderPeakMs:+p.renderPeakMs.toFixed(2),terrainQueries:p.terrainQueries,avgTerrainCandidates:p.terrainQueries?+(p.terrainCandidates/p.terrainQueries).toFixed(2):0,aiRouteFramesSkipped:p.aiRouteFramesSkipped,droneRouteFramesSkipped:p.droneRouteFramesSkipped,tanks:g.tanks?g.tanks.length:0,drones:g.drones?g.drones.length:0,bullets:g.bullets?g.bullets.length:0,shapes:g.shapes?g.shapes.length:0},timingWindow(p));}
 }
@@ -310,6 +321,11 @@ wrap('game/engine',function(engine,require){
   if(oldRedeploy)Game.prototype.redeploy=function(){
     var out=oldRedeploy.apply(this,arguments);
     this.__novaPerfDronePlanAt=null;
+    if(this.__novaPerf){
+      resetSimulationWindow(this.__novaPerf);
+      this.__novaPerf.lastPresentationAt=null;
+      this.__novaPerf.__novaSkipRenderTiming=true;
+    }
     return out;
   };
 
