@@ -190,6 +190,8 @@ const {chromium}=require('playwright');
   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[origin]});
   await page.waitForFunction(()=>window.__novaBirthGame?.input.aim.active===true,
    null,{timeout:5000});
+  assert.equal(await page.evaluate(()=>window.__novaBirths.length),
+   birthsAfterRelease,'centered re-arm must not inherit stale firing');
   await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[extended]});
   await page.waitForFunction(expected=>window.__novaBirths.length>expected,
    birthsAfterRelease,{timeout:12000});
