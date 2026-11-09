@@ -124,8 +124,8 @@ function patchRafStepCapLegacy(html){
 const capAfterStep=newStep.replace(
  'carry = excess > 1e-9 ? Math.min(1 / 30, excess) : 0;',
  'carry = excess > 1e-9 ? excess : 0;')
- .replace('            if (this.paused)\\n                carry = 0;',
-  '            carry = Math.min(1 / 30, carry);\\n            if (this.paused)\\n                carry = 0;');
+ .replace('            if (this.paused)\n                carry = 0;',
+  '            carry = Math.min(1 / 30, carry);\n            if (this.paused)\n                carry = 0;');
 function patchRafStepCap(html){
  const out=patchRafStepCapLegacy(html);
  if(count(out,capAfterStep)===1)return out;
