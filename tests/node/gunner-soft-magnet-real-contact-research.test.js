@@ -16,6 +16,31 @@ function rngDivergence(a,b){
  const i=a.rngTrace.findIndex((n,j)=>n!==b.rngTrace[j]);
  return i<0?null:i;
 }
+// Research-only visible-history gate; identity switches cannot inherit speed.
+function visibleMotionIntent(requested,bearing,now,prior){
+ if(!now||!prior||!now.visible||!prior.visible||prior.id!==now.id)return false;
+ const dt=now.at-prior.at;
+ if(!(dt>0&&dt<=.2))return false;
+ // Tangential motion relative to the observed sight ray, not global Y motion.
+ const dx=(now.x-prior.x)/dt,dy=(now.y-prior.y)/dt;
+ const lateral=-Math.sin(bearing)*dx+Math.cos(bearing)*dy;
+ const signedLead=wrap(requested-bearing);
+ return Math.abs(lateral)>20&&lateral*signedLead>0&&Math.abs(signedLead)>.01;
+}
+function smoothstep(x,lo,hi){
+ const t=Math.max(0,Math.min(1,(x-lo)/(hi-lo)));
+ return t*t*(3-2*t);
+}
+function visibleMotionWeight(requested,bearing,now,prior){
+ if(!now||!prior||!now.visible||!prior.visible||now.id!==prior.id)return 0;
+ const dt=now.at-prior.at;
+ if(!(dt>0&&dt<=.2))return 0;
+ const dx=(now.x-prior.x)/dt,dy=(now.y-prior.y)/dt;
+ const lateral=-Math.sin(bearing)*dx+Math.cos(bearing)*dy;
+ const lead=wrap(requested-bearing);
+ if(lateral*lead<=0||Math.abs(lead)>=.22)return 0;
+ return smoothstep(Math.abs(lateral),15,40)*smoothstep(Math.abs(lead),.01,.04);
+}
 const softBearing=(requested,target)=>{
  const delta=wrap(requested-target);
  return wrap(requested-delta*.45*Math.exp(-((delta/.06)**2)));
@@ -47,12 +72,13 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
    const nearest=g.nearestTank,originalDrones=g.updateDrones;
    let eligible=0,queries=0,movementWitness=0,hits=0,damage=0,volleys=0,maxTrajectoryDrift=0;
    let tick=-1,firstHitTick=null,leadStartDeg=null,leadEndDeg=null;
+   let previousVisible=null,adaptiveSoftTicks=0,adaptiveHardTicks=0,adaptiveUseSoft=false,smoothWeightSum=0;
    const rngTrace=[],rngDrawsBeforeCombat=draws();
    g.nearestTank=function(x,y,r,exclude){
     const found=nearest.apply(this,arguments);
     if(exclude===p.id&&r===480&&x===p.x&&y===p.y){
      queries++;if(found===t)eligible++;
-     if(policy!=='hard')return null;
+     if(policy!=='hard'&&!(policy==='adaptive'&&!adaptiveUseSoft))return null;
     }
     return found;
    };
@@ -91,6 +117,8 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
     const nominalY=scenario==='moving'?direction*(-35+45*i/hz):0;
     let requested=wrap(Math.atan2(nominalY,200)+
      (scenario==='moving'?.08*direction:scenario==='stationary-wide'?.12:.008));
+    if(scenario==='moving'&&leadMode==='underlead')requested=wrap(Math.atan2(nominalY,200)-.04*direction);
+    if(scenario==='moving'&&leadMode==='overlead')requested=wrap(Math.atan2(nominalY,200)+.20*direction);
     if(scenario==='moving'&&leadMode==='intercept'){
      // Public straight-line geometry reference, not a gameplay auto-lead.
      // Keep the nominal physical input independent of damage knockback.
@@ -107,7 +135,23 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
      if(i===0)leadStartDeg=+leadDeg.toFixed(4);
      if(i===activeTicks-1)leadEndDeg=+leadDeg.toFixed(4);
     }
-    const effective=policy==='soft'?softBearing(requested,targetBearing):requested;
+    // Research-only: use observed position history, not target velocity or future state.
+    // The source Game's public target filter must certify visibility before
+    // motion history may influence aim; do not infer sight from raw coordinates.
+    const publiclyEligible=nearest.call(g,p.x,p.y,480,p.id)===t;
+    const visible={id:t.id,x:t.x,y:t.y,at:i/hz,visible:publiclyEligible};
+    const adaptiveGate=visibleMotionIntent(requested,targetBearing,visible,previousVisible);
+    const weight=visibleMotionWeight(requested,targetBearing,visible,previousVisible);
+    previousVisible=visible;
+    const useSoft=policy==='soft'||(policy==='adaptive'&&adaptiveGate);
+    if(policy==='smooth')smoothWeightSum+=weight;
+    if(policy==='adaptive'){
+     adaptiveUseSoft=useSoft;
+     useSoft?adaptiveSoftTicks++:adaptiveHardTicks++;
+    }
+    const effective=policy==='smooth'?(publiclyEligible&&Math.abs(wrap(requested-targetBearing))<.22?
+     wrap(targetBearing+weight*wrap(softBearing(requested,targetBearing)-targetBearing)):requested):
+     (useSoft?softBearing(requested,targetBearing):requested);
     g.input.aim.dx=40*Math.cos(effective);
     g.input.aim.dy=40*Math.sin(effective);
     g.input.firing=i<activeTicks;
@@ -125,7 +169,7 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
    const result={seed,cls,hz,scenario,policy,direction,leadMode,leadStartDeg,leadEndDeg,hits,volleys,
     damage:+damage.toFixed(4),firstHitSec:firstHitTick===null?null:+((firstHitTick+1)/hz).toFixed(5),eligible,movementWitness,
     rngDrawsBeforeCombat,rngDrawsEnd:draws(),
-    maxTrajectoryDrift:+maxTrajectoryDrift.toFixed(4)};
+    maxTrajectoryDrift:+maxTrajectoryDrift.toFixed(4),adaptiveSoftTicks,adaptiveHardTicks,smoothWeightSum:+smoothWeightSum.toFixed(4)};
    // Preserve full chronology for in-test comparisons without bloating CI JSON.
    Object.defineProperty(result,'rngTrace',{value:rngTrace});
    return result;
@@ -195,3 +239,93 @@ test('soft-magnet contact with class-specific geometric intercept inputs',()=>{
  assert.equal(rows.length,16);
  console.log('SOFT_MAGNET_INTERCEPT_CONTACT_RESEARCH '+JSON.stringify(rows));
 });
+
+ // This experimental gate is not shipping gameplay or a production acceptance rule.
+ test('visible-motion intent gate preserves stationary snap and measures moving lead',()=>{
+  const rows=[];
+  for(const cls of ['minigun','needlestorm'])
+   for(const hz of [30,60])
+    for(const scenario of ['stationary','stationary-wide','moving'])
+     for(const direction of (scenario==='moving'?[-1,1]:[1])){
+      const arms=['hard','soft','adaptive','smooth'].map(policy=>
+       trial(1517800,cls,hz,scenario,policy,direction,'intercept'));
+      assert.equal(new Set(arms.map(x=>x.volleys)).size,1);
+      assert.equal(rngDivergence(arms[0],arms[2]),null);
+      if(scenario!=='moving'){
+       assert.equal(arms[2].adaptiveSoftTicks,0);
+       assert.equal(arms[2].damage,arms[0].damage);
+       assert.equal(arms[3].damage,arms[0].damage);
+      }else{
+       assert.ok(arms[2].adaptiveSoftTicks>0);
+       assert.ok(arms[3].smoothWeightSum>0);
+       assert.ok(arms[2].adaptiveHardTicks>0);
+      }
+      rows.push({cls,hz,scenario,direction,arms});
+     }
+  assert.equal(rows.length,16);
+  console.log('VISIBLE_MOTION_AIM_INTENT_RESEARCH '+JSON.stringify(rows));
+ });
+
+ // Negative control: a player aiming behind a moving target must not be
+ // classified as intentional predictive lead just because the target moves.
+ test('visible-motion gate does not soften deliberate underlead',()=>{
+  for(const cls of ['minigun','needlestorm'])
+   for(const hz of [30,60])
+    for(const direction of [-1,1]){
+     const hard=trial(1517801,cls,hz,'moving','hard',direction,'underlead');
+     const adaptive=trial(1517801,cls,hz,'moving','adaptive',direction,'underlead');
+     const smooth=trial(1517801,cls,hz,'moving','smooth',direction,'underlead');
+     assert.equal(adaptive.adaptiveSoftTicks,0);
+     assert.equal(adaptive.damage,hard.damage);
+     assert.equal(smooth.damage,hard.damage);
+     assert.equal(smooth.smoothWeightSum,0);
+     assert.equal(rngDivergence(hard,adaptive),null);
+    }
+ });
+
+test('visible-motion intent history expires and uses sight-relative motion',()=>{
+ const prior={id:1,x:200,y:0,at:0,visible:true};
+ assert.equal(visibleMotionIntent(.08,0,{id:1,x:200,y:1,at:1/60,visible:true},prior),true);
+ assert.equal(visibleMotionIntent(.08,0,{id:2,x:200,y:1,at:1/60,visible:true},prior),false);
+ assert.equal(visibleMotionIntent(.08,0,{id:1,x:200,y:0,at:1/60,visible:true},prior),false);
+ assert.equal(visibleMotionIntent(-.08,0,{id:1,x:200,y:1,at:1/60,visible:true},prior),false);
+ assert.equal(visibleMotionIntent(.08,0,{id:1,x:200,y:20,at:1,visible:true},prior),false);
+ assert.equal(visibleMotionIntent(.08,0,{id:1,x:200,y:1,at:1/60,visible:false},prior),false);
+ // Pure radial approach is not predictive lateral motion.
+ assert.equal(visibleMotionIntent(.08,0,{id:1,x:199,y:0,at:1/60,visible:true},prior),false);
+ // Rotating the sight ray by 90 degrees rotates the eligible lateral axis.
+ assert.equal(visibleMotionIntent(Math.PI/2+.08,Math.PI/2,{id:1,x:199,y:0,at:1/60,visible:true},prior),true);
+});
+
+test('continuous visible-motion weight has bounded threshold response',()=>{
+ const prior={id:1,x:200,y:0,at:0,visible:true};
+ const weight=(speed,lead=.08)=>visibleMotionWeight(lead,0,
+  {id:1,x:200,y:speed/60,at:1/60,visible:true},prior);
+ assert.equal(weight(0),0);
+ assert.equal(weight(15),0);
+ assert.equal(weight(40),1);
+ assert.equal(weight(45,-.08),0);
+ assert.equal(weight(45,.005),0);
+ let previous=weight(0),maxJump=0;
+ for(let speed=.1;speed<=50;speed+=.1){
+  const current=weight(speed);
+  maxJump=Math.max(maxJump,Math.abs(current-previous));
+  previous=current;
+ }
+ assert.ok(maxJump<.007,'speed threshold must not recreate a hard snap');
+ assert.equal(visibleMotionWeight(.08,0,{id:2,x:200,y:1,at:1/60,visible:true},prior),0);
+});
+
+ // Intent cannot be inferred from target movement alone: a large forward
+ // overlead can be a player error. Preserve this as a descriptive falsifier.
+ test('moving-target overlead exposes false-positive intent risk',()=>{
+  const rows=[];
+  for(const direction of [-1,1]){
+   const arms=['hard','adaptive','smooth'].map(policy=>
+    trial(1517801,'minigun',30,'moving',policy,direction,'overlead'));
+   assert.equal(new Set(arms.map(x=>x.volleys)).size,1);
+   assert.ok(arms[1].adaptiveSoftTicks>0&&arms[2].smoothWeightSum>0);
+   rows.push({direction,arms});
+  }
+  console.log('VISIBLE_MOTION_OVERLEAD_RISK '+JSON.stringify(rows));
+ });
