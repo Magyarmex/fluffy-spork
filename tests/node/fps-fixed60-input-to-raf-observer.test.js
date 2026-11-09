@@ -22,7 +22,8 @@ function harness(){
   next(t){now=t;const e=queue.shift();assert.ok(e,'expected RAF');e.fn(t)},
   hide(){document.hidden=true;docListeners.get('visibilitychange')?.()},
   get listeners(){return listeners.size+docListeners.size},
-  fireStale(fn,t){now=t;fn(t)},get lastCallback(){return lastCallback},\n  get pendingRaf(){return queue.length}};
+  fireStale(fn,t){now=t;fn(t)},get lastCallback(){return lastCallback},
+  get pendingRaf(){return queue.length}};
 }
 const local=value=>JSON.parse(JSON.stringify(value));
 test('reports DOM-to-RAF opportunities only, without retaining sensitive event fields',()=>{
@@ -71,12 +72,14 @@ test('bounded event cap and duration stop recording without unbounded samples',(
 });
 test('restart cannot be advanced by a stale callback',()=>{
  const h=harness(),o=h.window.__novaInputRafObserver.create();
- o.start();h.next(1010);
+ o.start();h.next(1010);const stale=h.lastCallback;
  o.stop();o.start();
+ h.fireStale(stale,1012);
  h.setTime(1015);h.event('pointerup');
  h.next(1020);
  assert.equal(local(o.snapshot()).observedEvents,1);
  o.stop();assert.equal(h.listeners,0);
+ assert.equal(local(o.snapshot()).elapsedMs,10);
 });
 test('invalid settings, duplicate start and hidden start are rejected',()=>{
  const h=harness();
