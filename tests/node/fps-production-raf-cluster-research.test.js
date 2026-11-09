@@ -53,6 +53,14 @@ const eightGap=[14.207085933918753,12.760071936027344,4.133955086476322,
 test('desired: eight-gap sub-100ms mean-30Hz must not discard active world time',()=>{
  const r=run(shipping,eightGap,60);approx(r.sim,60);
 });
+// Every gap is below the shipping 83.33ms catch-up gate. The defect is
+// therefore not merely a threshold mismatch between 83ms and 100ms.
+const belowCatchupGate=[5.941416705947619,23.41420116160293,
+ 10.312324158230117,55.478651640124,80.274986251358,
+ 78.51104381735914,2.4928051806983254,10.24123775134658];
+test('desired: sub-83ms eight-gap mean-30Hz must preserve 60s world time',()=>{
+ const r=run(shipping,belowCatchupGate,60);approx(r.sim,60);
+});
 test('falsifier: merely doubling carry cap still loses time on eight-gap 30Hz',()=>{
  const r=run(prototype,eightGap,60);
  assert.ok(r.sim<50,'the conditional cap is not a universal chronology fix');
