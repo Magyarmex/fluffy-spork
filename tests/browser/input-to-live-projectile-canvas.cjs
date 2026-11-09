@@ -134,7 +134,7 @@ const {chromium}=require('playwright');
     shots:window.__novaBirths.slice(),
     events:window.__novaTouchDelivery.slice()};
   });
-  await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[extended]});
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   assert.equal(during.aimActive,true,'trusted right touch must own the aim stick');
   // Chromium remaps CDP contact ids to DOM pointerId values; asserting the
   // CDP-supplied id (42) would confuse transport identity with DOM ownership.
