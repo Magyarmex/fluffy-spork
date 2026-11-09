@@ -292,3 +292,22 @@ test('visible-motion intent history expires and uses sight-relative motion',()=>
  // Rotating the sight ray by 90 degrees rotates the eligible lateral axis.
  assert.equal(visibleMotionIntent(Math.PI/2+.08,Math.PI/2,{id:1,x:199,y:0,at:1/60,visible:true},prior),true);
 });
+
+test('continuous visible-motion weight has bounded threshold response',()=>{
+ const prior={id:1,x:200,y:0,at:0,visible:true};
+ const weight=(speed,lead=.08)=>visibleMotionWeight(lead,0,
+  {id:1,x:200,y:speed/60,at:1/60,visible:true},prior);
+ assert.equal(weight(0),0);
+ assert.equal(weight(15),0);
+ assert.equal(weight(40),1);
+ assert.equal(weight(45,-.08),0);
+ assert.equal(weight(45,.005),0);
+ let previous=weight(0),maxJump=0;
+ for(let speed=.1;speed<=50;speed+=.1){
+  const current=weight(speed);
+  maxJump=Math.max(maxJump,Math.abs(current-previous));
+  previous=current;
+ }
+ assert.ok(maxJump<.007,'speed threshold must not recreate a hard snap');
+ assert.equal(visibleMotionWeight(.08,0,{id:2,x:200,y:1,at:1/60,visible:true},prior),0);
+});
