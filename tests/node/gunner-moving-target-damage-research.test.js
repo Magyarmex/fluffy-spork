@@ -2,7 +2,9 @@
 /* #799: composed 49-overlay moving-target damage research.
  * Unlike nominal shot damage, this measures canonical HP changes against a
  * high-HP Scout target in open terrain, held stationary or scripted along a
- * lateral sinusoid. It is NOT natural-match DPS: the target does not choose
+ * lateral sinusoid. A manual-aim control suppresses only the player nearestTank
+ * assist query to separate target motion from shipping touch aim assistance.
+ * It is NOT natural-match DPS: the target does not choose
  * evasive tactics, shoot, or use cover; motion is externally prescribed. */
 const test=require('node:test'),assert=require('node:assert/strict');
 const previous=process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL;
@@ -16,7 +18,7 @@ function activeAt(tick,mode){
  const on=mode==='long'?120:48,off=mode==='long'?30:48;
  return tick%(on+off)<on;
 }
-function trial(seed,cls,reload,hz,mode,targetX=200,motion='stationary'){
+function trial(seed,cls,reload,hz,mode,targetX=200,motion='stationary',assist='shipping'){
  return withSeed(seed,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   const p=g.player;g.sfx.muted=true;g.setClass(p,cls);
@@ -41,6 +43,15 @@ function trial(seed,cls,reload,hz,mode,targetX=200,motion='stationary'){
   p.stats.reload=reload;
   g.input.autofire=false;g.input.aim.active=true;
   g.input.aim.dx=40;g.input.aim.dy=0;
+  // Controlled manual-aim counterfactual. Normal arm retains the complete
+  // shipping Fair Engagement / viewport / nearestTank assist stack.
+  if(assist==='manual'){
+   const nearest=g.nearestTank;
+   g.nearestTank=function(x,y,radius,except){
+    if(except===p.id)return null;
+    return nearest.apply(this,arguments);
+   };
+  }
   let volleys=0,hits=0,damage=0,activeTicks=0;
   const fire=g.tryFire,originalDamage=g.damageTank;
   g.tryFire=function(t){
@@ -71,7 +82,7 @@ function trial(seed,cls,reload,hz,mode,targetX=200,motion='stationary'){
     assert.equal(g.shapes.length+g.drones.length+g.powerups.length,0);
    }
    assert.ok(Number.isFinite(damage)&&damage>=0);
-   return {seed,cls,reload,hz,mode,motion,activeSeconds:activeTicks/hz,
+   return {seed,cls,reload,hz,mode,motion,assist,activeSeconds:activeTicks/hz,
     volleys,hits,damage:+damage.toFixed(4),
     spin:+(p.fireSpin||0).toFixed(5),
     heat:+(p.__v17Heat||0).toFixed(5)};
@@ -87,17 +98,23 @@ test('moving lateral target exposes hit and damage sensitivity under matched wal
     for(const seed of [1517800,1517802]){
      const stationary=trial(seed,cls,reload,hz,mode,200,'stationary');
      const crossing=trial(seed,cls,reload,hz,mode,200,'crossing');
+     const manual=trial(seed,cls,reload,hz,mode,200,'crossing','manual');
      assert.equal(crossing.activeSeconds,stationary.activeSeconds,
       'matched input duty must not depend on target motion');
      assert.equal(crossing.volleys,stationary.volleys,
       'target movement must not alter firing chronology');
+     assert.equal(manual.activeSeconds,crossing.activeSeconds);
+     assert.equal(manual.volleys,crossing.volleys,
+      'manual aim counterfactual must preserve the same firing cadence');
      assert.ok(crossing.hits>=0&&crossing.damage>=0);
+     assert.ok(manual.hits>=0&&manual.damage>=0);
      assert.ok(crossing.damage<=1000000);
      assert.ok(stationary.hits>0&&stationary.damage>0,
       'stationary positive control must take real projectile damage');
      rows.push({cls,reload,mode,hz,seed,
       stationary:{hits:stationary.hits,damage:stationary.damage,volleys:stationary.volleys},
-      crossing:{hits:crossing.hits,damage:crossing.damage,volleys:crossing.volleys}});
+      crossing:{hits:crossing.hits,damage:crossing.damage,volleys:crossing.volleys},
+      manual:{hits:manual.hits,damage:manual.damage,volleys:manual.volleys}});
     }
  }
  assert.equal(rows.length,24);
