@@ -41,6 +41,22 @@ function visibleMotionWeight(requested,bearing,now,prior){
  if(lateral*lead<=0||Math.abs(lead)>=.22)return 0;
  return smoothstep(Math.abs(lateral),15,40)*smoothstep(Math.abs(lead),.01,.04);
 }
+// Research-only plausibility bound: never compute or apply an intercept angle.
+// Public consecutive target positions provide lateral speed; the selected
+// weapon's known projectile speed limits how much *requested* lead is trusted.
+// This is a classifier experiment, not a production aiming policy.
+function plausibleVisibleLead(requested,bearing,now,prior,projectileSpeed,playerX=0,playerY=0){
+ if(!visibleMotionIntent(requested,bearing,now,prior))return false;
+ if(!(Number.isFinite(projectileSpeed)&&projectileSpeed>0))return false;
+ const dt=now.at-prior.at;
+ const vx=(now.x-prior.x)/dt,vy=(now.y-prior.y)/dt;
+ const lateral=Math.abs(-Math.sin(bearing)*vx+Math.cos(bearing)*vy);
+ const lead=Math.abs(wrap(requested-bearing));
+ // For lateral motion, atan(v_lateral / v_projectile) approximates
+ // a plausible straight-line intercept without steering the gun for the player.
+ const expected=Math.atan2(lateral,projectileSpeed);
+ return lead<=Math.min(.22,Math.max(.025,1.5*expected+.015));
+}
 const softBearing=(requested,target)=>{
  const delta=wrap(requested-target);
  return wrap(requested-delta*.45*Math.exp(-((delta/.06)**2)));
@@ -78,7 +94,7 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
     const found=nearest.apply(this,arguments);
     if(exclude===p.id&&r===480&&x===p.x&&y===p.y){
      queries++;if(found===t)eligible++;
-     if(policy!=='hard'&&!(policy==='adaptive'&&!adaptiveUseSoft))return null;
+     if(policy!=='hard'&&!((policy==='adaptive'||policy==='plausible')&&!adaptiveUseSoft))return null;
     }
     return found;
    };
@@ -142,10 +158,11 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
     const visible={id:t.id,x:t.x,y:t.y,at:i/hz,visible:publiclyEligible};
     const adaptiveGate=visibleMotionIntent(requested,targetBearing,visible,previousVisible);
     const weight=visibleMotionWeight(requested,targetBearing,visible,previousVisible);
+    const plausibleGate=publiclyEligible&&plausibleVisibleLead(requested,targetBearing,visible,previousVisible,cls==='minigun'?480:690,p.x,p.y);
     previousVisible=visible;
-    const useSoft=policy==='soft'||(policy==='adaptive'&&adaptiveGate);
+    const useSoft=policy==='soft'||(policy==='adaptive'&&adaptiveGate)||(policy==='plausible'&&plausibleGate);
     if(policy==='smooth')smoothWeightSum+=weight;
-    if(policy==='adaptive'){
+    if(policy==='adaptive'||policy==='plausible'){
      adaptiveUseSoft=useSoft;
      useSoft?adaptiveSoftTicks++:adaptiveHardTicks++;
     }
@@ -329,3 +346,47 @@ test('continuous visible-motion weight has bounded threshold response',()=>{
   }
   console.log('VISIBLE_MOTION_OVERLEAD_RISK '+JSON.stringify(rows));
  });
+
+test('plausible visible lead rejects excessive lead without losing stationary snap',()=>{
+ const rows=[];
+ for(const cls of ['minigun','needlestorm'])
+  for(const hz of [30,60])
+   for(const direction of [-1,1])
+    for(const leadMode of ['intercept','overlead','underlead']){
+     const hard=trial(1517801,cls,hz,'moving','hard',direction,leadMode);
+     const candidate=trial(1517801,cls,hz,'moving','plausible',direction,leadMode);
+     assert.equal(candidate.volleys,hard.volleys);
+     assert.equal(rngDivergence(hard,candidate),null);
+     if(leadMode==='overlead'||leadMode==='underlead'){
+      assert.equal(candidate.adaptiveSoftTicks,0,
+       'implausible or backwards lead must retain shipping hard snap');
+      assert.equal(candidate.damage,hard.damage);
+     }else{
+      assert.ok(candidate.adaptiveSoftTicks>0,
+       'class-specific geometric lead should remain available');
+     }
+     rows.push({cls,hz,direction,leadMode,hardDamage:hard.damage,
+      candidateDamage:candidate.damage,softTicks:candidate.adaptiveSoftTicks});
+    }
+ for(const cls of ['minigun','needlestorm'])
+  for(const hz of [30,60]){
+   const hard=trial(1517801,cls,hz,'stationary-wide','hard');
+   const candidate=trial(1517801,cls,hz,'stationary-wide','plausible');
+   assert.equal(candidate.adaptiveSoftTicks,0);
+   assert.equal(candidate.damage,hard.damage);
+  }
+ assert.equal(rows.length,24);
+ console.log('PLAUSIBLE_VISIBLE_LEAD_RESEARCH '+JSON.stringify(rows));
+});
+
+test('plausible visible lead requires public history and finite projectile speed',()=>{
+ const prior={id:1,x:200,y:0,at:0,visible:true};
+ const now={id:1,x:200,y:.75,at:1/60,visible:true};
+ assert.equal(plausibleVisibleLead(.09,0,now,prior,480),true);
+ assert.equal(plausibleVisibleLead(.2,0,now,prior,480),false);
+ assert.equal(plausibleVisibleLead(-.09,0,now,prior,480),false);
+ assert.equal(plausibleVisibleLead(.09,0,{...now,visible:false},prior,480),false);
+ assert.equal(plausibleVisibleLead(.09,0,{...now,id:2},prior,480),false);
+ assert.equal(plausibleVisibleLead(.09,0,now,prior,0),false);
+ assert.equal(plausibleVisibleLead(.09,0,now,prior,NaN),false);
+});
