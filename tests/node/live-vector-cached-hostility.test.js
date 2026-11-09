@@ -180,3 +180,28 @@ test('shipping Live Vector + Fair Engagement releases when all targets become pr
  assert.equal(w.owner.__novaLiveVectorAI.targetId,-1);
  assert.equal(w.owner.__novaLiveVectorAI.active,false);
 });
+
+// Fair Engagement promises no player-identity target magnet. Live Vector has
+// its own Controller swarm selector and must honor the same contract.
+test('AI Controller swarm target ranking ignores player identity',()=>{
+ const w=boot();
+ w.enemy.x=100;w.other.x=105;
+ w.enemy.isPlayer=false;w.other.isPlayer=true;
+ assert.equal(w.win.__testLiveVectorBestObserved(w.g,w.owner,null),w.enemy,
+  'the nearer visible hostile wins even when the farther hostile is human');
+ w.enemy.isPlayer=true;w.other.isPlayer=false;
+ assert.equal(w.win.__testLiveVectorBestObserved(w.g,w.owner,null),w.enemy,
+  'swapping player identity without moving tanks cannot change target');
+ w.enemy.isPlayer=false;w.other.isPlayer=false;
+ assert.equal(w.win.__testLiveVectorBestObserved(w.g,w.owner,null),w.enemy,
+  'ordinary AI-vs-AI proximity remains unchanged');
+});
+
+test('shipping Live Vector plus Fair Engagement keeps swarm choice identity-neutral',()=>{
+ const w=bootShippingComposition();
+ w.enemy.x=100;w.other.x=105;
+ w.enemy.isPlayer=false;w.other.isPlayer=true;
+ w.g.updateDrones(1/60);
+ assert.equal(w.owner.__novaLiveVectorAI.targetId,w.enemy.id,
+  'the composed shipping overlays must not resurrect a human target bonus');
+});
