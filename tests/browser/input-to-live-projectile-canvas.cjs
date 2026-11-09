@@ -172,6 +172,16 @@ assert.ok([65,100].includes(renderScale),'only the certified 65% and default 100
    assert.deepEqual(changed.after.backing,
     changed.after.css.map(v=>Math.round(v*changed.after.dpr)));
    await page.waitForTimeout(70);
+   const stable=await page.evaluate(()=>{
+    const g=window.__novaBirthGame;
+    return {dpr:g.dpr,backing:[g.canvas.width,g.canvas.height],
+     aimOwner:g.input.stickId.aim,aimActive:g.input.aim.active};
+   });
+   assert.equal(stable.dpr,changed.after.dpr,
+    'active render must not silently undo the backing resolution trial');
+   assert.deepEqual(stable.backing,changed.after.backing);
+   assert.equal(stable.aimOwner,changed.after.owner);
+   assert.equal(stable.aimActive,true);
    assert.equal(await page.evaluate(()=>window.__novaBirths.length),0,
     'DPR change must not invent a centered-stick shot');
   }
