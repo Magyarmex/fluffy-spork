@@ -18,7 +18,7 @@ function activeAt(tick,mode){
  const on=mode==='long'?120:48,off=mode==='long'?30:48;
  return tick%(on+off)<on;
 }
-function trial(seed,cls,reload,hz,mode,targetX=200,motion='stationary',assist='shipping',phase=0){
+function trial(seed,cls,reload,hz,mode,targetX=200,motion='stationary',assist='shipping',phase=0,drainSeconds=0){
  return withSeed(seed,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   const p=g.player;g.sfx.muted=true;g.setClass(p,cls);
@@ -61,7 +61,7 @@ function trial(seed,cls,reload,hz,mode,targetX=200,motion='stationary',assist='s
    }
    return result;
   };
-  let volleys=0,hits=0,damage=0,activeTicks=0,aimErrorSum=0,maxTargetDrift=0;
+  let volleys=0,hits=0,damage=0,activeTicks=0,aimErrorSum=0,maxTargetDrift=0,bulletsAtStop=0;
   const fire=g.tryFire,originalDamage=g.damageTank;
   g.tryFire=function(t){
    const before=this.bullets.length,out=fire.apply(this,arguments);
@@ -77,18 +77,19 @@ function trial(seed,cls,reload,hz,mode,targetX=200,motion='stationary',assist='s
    return result;
   };
   try{
-   for(let i=0;i<8*hz;i++){
+   for(let i=0;i<(8+drainSeconds)*hz;i++){
     const targetY=motion==='crossing'?36*Math.sin(Math.PI*2*i/(2*hz)+phase):0;
     target.y=targetY;
-    const active=activeAt(i*(120/hz),mode);
+    const active=i<8*hz&&activeAt(i*(120/hz),mode);
     g.input.firing=active;
     activeTicks+=+active;
     g.update(1/hz);
+    if(i===8*hz-1)bulletsAtStop=g.bullets.length;
     // A nominally scripted target can still receive real hit knockback or
     // other movement inside Game.update. Quantify that before resetting it.
     maxTargetDrift=Math.max(maxTargetDrift,Math.hypot(target.x-targetX,target.y-targetY));
     const targetBearing=Math.atan2(targetY,targetX);
-    aimErrorSum+=Math.abs(Math.atan2(Math.sin(p.angle-targetBearing),
+    if(i<8*hz)aimErrorSum+=Math.abs(Math.atan2(Math.sin(p.angle-targetBearing),
      Math.cos(p.angle-targetBearing)));
     // The experiment controls target motion; real bullet physics/damage
     // remain active. Restore its location after each complete game step.
@@ -97,7 +98,8 @@ function trial(seed,cls,reload,hz,mode,targetX=200,motion='stationary',assist='s
     assert.equal(g.shapes.length+g.drones.length+g.powerups.length,0);
    }
    assert.ok(Number.isFinite(damage)&&damage>=0);
-   return {seed,cls,reload,hz,mode,motion,assist,assistQueries,assistEligible,activeSeconds:activeTicks/hz,
+   return {seed,cls,reload,hz,mode,motion,assist,phase,drainSeconds,assistQueries,assistEligible,activeSeconds:activeTicks/hz,
+    bulletsAtStop,bulletsAfterDrain:g.bullets.length,
     volleys,hits,damage:+damage.toFixed(4),
     meanAimErrorRad:+(aimErrorSum/(8*hz)).toFixed(5),
     maxTargetDrift:+maxTargetDrift.toFixed(5),
@@ -144,7 +146,8 @@ test('moving lateral target exposes hit and damage sensitivity under matched wal
  console.log('GUNNER_MOVING_TARGET_DAMAGE_RESEARCH '+JSON.stringify(rows));
 });
 
-// #799: phase counterbalance. The earlier two-seed experiment reused a
+// #799: phase counterbalance with a two-second no-fire projectile drain.
+// The earlier two-seed experiment reused a
 // single target phase, so a favorable projectile/target crossing could be
 // mistaken for a general frame-rate effect. Keep the shipping Game owner and
 // public-viewport eligibility checks, and vary only the target's start phase.
@@ -157,7 +160,7 @@ test('moving-target Gunner damage remains measurable across counterbalanced cros
    for(const hz of [30,60,120]){
     const samples=[];
     for(const seed of [1517800,1517802])for(const phase of phases){
-     const result=trial(seed,cls,reload,hz,mode,200,'crossing','shipping',phase);
+     const result=trial(seed,cls,reload,hz,mode,200,'crossing','shipping',phase,2);
      assert.equal(result.assistEligible,result.assistQueries,
       'counterbalanced target must remain publicly visible');
      assert.ok(result.damage>=0&&Number.isFinite(result.damage));
@@ -167,7 +170,8 @@ test('moving-target Gunner damage remains measurable across counterbalanced cros
     assert.equal(volleyCounts.size,1,
      'target phase must not affect the class firing chronology');
     rows.push({cls,mode,hz,volleys:samples[0].volleys,
-     phases:samples.map((s,j)=>({seed:s.seed,phase:+((phases[j%phases.length]/Math.PI)).toFixed(2),hits:s.hits,damage:s.damage,maxTargetDrift:s.maxTargetDrift})),
+     phases:samples.map((s,j)=>({seed:s.seed,phase:+((phases[j%phases.length]/Math.PI)).toFixed(2),hits:s.hits,damage:s.damage,maxTargetDrift:s.maxTargetDrift,
+      bulletsAtStop:s.bulletsAtStop,bulletsAfterDrain:s.bulletsAfterDrain})),
      meanDamage:+(samples.reduce((n,s)=>n+s.damage,0)/samples.length).toFixed(4),
      minDamage:Math.min(...samples.map(s=>s.damage)),
      maxDamage:Math.max(...samples.map(s=>s.damage))});
