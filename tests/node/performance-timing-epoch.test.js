@@ -97,3 +97,13 @@ test('decorative-world render and update work never enters active timing rings',
  assert.equal(s.renderP95Ms,null);
  assert.equal(f.window.__NOVA_PERF_LAST__,undefined);
 });
+
+test('ended/menu-only rendering does not contaminate the next match epoch',()=>{
+ const f=fixture();warm(f);expectFresh(f,10);
+ f.game.status='ended';f.step(33,0);
+ assert.equal(f.snapshot().frameSamples,0);
+ assert.equal(f.snapshot().updateP95Ms,null);
+ assert.equal(f.snapshot().renderP95Ms,null);
+ f.cost(1,1);f.game.status='playing';warm(f);
+ expectFresh(f,1);
+});
