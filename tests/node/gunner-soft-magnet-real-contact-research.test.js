@@ -38,7 +38,7 @@ function trial(seed,cls,hz,scenario,policy){
    g.status='playing';g.paused=false;
    g.input.autofire=false;g.input.aim.active=true;
    const nearest=g.nearestTank,originalDrones=g.updateDrones;
-   let eligible=0,queries=0,movementWitness=0,hits=0,damage=0,volleys=0;
+   let eligible=0,queries=0,movementWitness=0,hits=0,damage=0,volleys=0,maxTrajectoryDrift=0;
    g.nearestTank=function(x,y,r,exclude){
     const found=nearest.apply(this,arguments);
     if(exclude===p.id&&r===480&&x===p.x&&y===p.y){
@@ -73,12 +73,18 @@ function trial(seed,cls,hz,scenario,policy){
     // against the moving Scout; stationary controls use both 0.008-rad
     // micro-error and 0.12-rad wide error to expose accessibility loss.
     const targetBearing=Math.atan2(t.y-p.y,t.x-p.x);
-    const requested=wrap(targetBearing+(scenario==='moving'?.08:scenario==='stationary-wide'?.12:.008));
+    // Physical stick intent follows the same nominal path in all arms,
+    // even if hit knockback changes the real target's subsequent position.
+    const nominalY=scenario==='moving'?-35+45*i/hz:0;
+    const requested=wrap(Math.atan2(nominalY,200)+
+     (scenario==='moving'?.08:scenario==='stationary-wide'?.12:.008));
     const effective=policy==='soft'?softBearing(requested,targetBearing):requested;
     g.input.aim.dx=40*Math.cos(effective);
     g.input.aim.dy=40*Math.sin(effective);
     g.input.firing=i<activeTicks;
     g.update(1/hz);
+    const expectedY=scenario==='moving'?-35+45*(i+1)/hz:0;
+    maxTrajectoryDrift=Math.max(maxTrajectoryDrift,Math.hypot(t.x-200,t.y-expectedY));
    }
    assert.ok(queries>0,'shipping assist must be consulted');
    assert.equal(eligible,queries,'target must be publicly eligible throughout');
@@ -87,7 +93,8 @@ function trial(seed,cls,hz,scenario,policy){
    assert.ok(Number.isFinite(damage)&&damage>=0);
    assert.ok(hits>=0&&volleys>0);
    return {seed,cls,hz,scenario,policy,hits,volleys,
-    damage:+damage.toFixed(4),eligible,movementWitness};
+    damage:+damage.toFixed(4),eligible,movementWitness,
+    maxTrajectoryDrift:+maxTrajectoryDrift.toFixed(4)};
   }finally{g.destroy();}
  });
 }
