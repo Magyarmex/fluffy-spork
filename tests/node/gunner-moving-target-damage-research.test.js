@@ -61,7 +61,7 @@ function trial(seed,cls,reload,hz,mode,targetX=200,motion='stationary',assist='s
    }
    return result;
   };
-  let volleys=0,hits=0,damage=0,activeTicks=0,aimErrorSum=0;
+  let volleys=0,hits=0,damage=0,activeTicks=0,aimErrorSum=0,maxTargetDrift=0;
   const fire=g.tryFire,originalDamage=g.damageTank;
   g.tryFire=function(t){
    const before=this.bullets.length,out=fire.apply(this,arguments);
@@ -84,6 +84,9 @@ function trial(seed,cls,reload,hz,mode,targetX=200,motion='stationary',assist='s
     g.input.firing=active;
     activeTicks+=+active;
     g.update(1/hz);
+    // A nominally scripted target can still receive real hit knockback or
+    // other movement inside Game.update. Quantify that before resetting it.
+    maxTargetDrift=Math.max(maxTargetDrift,Math.hypot(target.x-targetX,target.y-targetY));
     const targetBearing=Math.atan2(targetY,targetX);
     aimErrorSum+=Math.abs(Math.atan2(Math.sin(p.angle-targetBearing),
      Math.cos(p.angle-targetBearing)));
@@ -97,6 +100,7 @@ function trial(seed,cls,reload,hz,mode,targetX=200,motion='stationary',assist='s
    return {seed,cls,reload,hz,mode,motion,assist,assistQueries,assistEligible,activeSeconds:activeTicks/hz,
     volleys,hits,damage:+damage.toFixed(4),
     meanAimErrorRad:+(aimErrorSum/(8*hz)).toFixed(5),
+    maxTargetDrift:+maxTargetDrift.toFixed(5),
     spin:+(p.fireSpin||0).toFixed(5),
     heat:+(p.__v17Heat||0).toFixed(5)};
   }finally{g.destroy();}
@@ -163,7 +167,7 @@ test('moving-target Gunner damage remains measurable across counterbalanced cros
     assert.equal(volleyCounts.size,1,
      'target phase must not affect the class firing chronology');
     rows.push({cls,mode,hz,volleys:samples[0].volleys,
-     phases:samples.map((s,j)=>({seed:s.seed,phase:+((phases[j%phases.length]/Math.PI)).toFixed(2),hits:s.hits,damage:s.damage})),
+     phases:samples.map((s,j)=>({seed:s.seed,phase:+((phases[j%phases.length]/Math.PI)).toFixed(2),hits:s.hits,damage:s.damage,maxTargetDrift:s.maxTargetDrift})),
      meanDamage:+(samples.reduce((n,s)=>n+s.damage,0)/samples.length).toFixed(4),
      minDamage:Math.min(...samples.map(s=>s.damage)),
      maxDamage:Math.max(...samples.map(s=>s.damage))});
