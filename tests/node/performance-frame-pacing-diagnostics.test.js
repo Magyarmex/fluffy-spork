@@ -270,6 +270,6 @@ test('clustered mean-60Hz frames disclose 33ms p95 despite nominal 60 FPS',()=>{
  });
  const copied=win.__snap();
  assert.match(copied['GAME FPS'],/60/);
- assert.equal(copied['FRAME P95'],'33 ms',
+ assert.equal(copied['FRAME P95'],'33.33 ms',
   'copied player diagnostics must reveal uneven frame pacing');
 });
