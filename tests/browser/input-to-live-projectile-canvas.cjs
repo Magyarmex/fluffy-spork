@@ -74,6 +74,7 @@ const {chromium}=require('playwright');
    // witness. Do not modify class reload, projectile physics or firing logic.
    g.player.fireCd=0;
    window.__novaBirths.length=0; // Exclude any pre-interaction AUTO shots.
+   window.__novaCanvasSubmit.length=0; // Exclude pre-interaction draw activity.
    window.__novaFirstFireSample=null;
    window.__novaAimExtensionAt=null;
   });
