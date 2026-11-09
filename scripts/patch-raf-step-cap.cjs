@@ -15,7 +15,9 @@ const loopTail='                this.drawMinimap();\n            }\n        };\n
 const newLoopTail='                this.drawMinimap();\n            }\n            earlierWork = priorWork;\n            priorWork = performance.now() - workStart;\n        };\n        this.raf = requestAnimationFrame(loop);';
 const oldStep='            this.last = ts;\n            if (!this.paused)\n                this.update(dt);';
 const priorStep='            const excess = elapsed + carry - dt;\n            carry = excess > 1e-9 ? Math.min(1 / 30, excess) : 0;\n            this.last = ts;\n            if (!this.paused)\n                this.update(dt);\n            if (this.paused)\n                carry = 0;';
-const newStep='            const excess = elapsed + carry - dt;\n            carry = excess > 1e-9 ? Math.min(1 / 30, excess) : 0;\n            this.last = ts;\n            if (!this.paused)\n                this.update(dt);\n            /* A slow but active display may need two safe updates to avoid\n             * 20 Hz time dilation. Never repay a long suspension in one draw. */\n            if (!this.paused && elapsed <= 1 / 12 && carry >= 1 / 30 - 1e-9 &&\n                priorWork < 18 && earlierWork < 18) {\n                this.update(1 / 30);\n                this.mmTimer -= 1 / 30;\n                carry = Math.max(0, carry - 1 / 30);\n            }\n            if (this.paused)\n                carry = 0;';
+const newStep='            const excess = elapsed + carry - dt;\n            carry = excess > 1e-9 ? Math.min(1 / 30, excess) : 0;\n            this.last = ts;\n            if (!this.paused)\n                this.update(dt);\n            /* A slow but active display may need two safe updates to avoid\n             * 20 Hz time dilation. Never repay a long suspension in one draw. */\n            if (!this.paused && elapsed <= 1 / 12 && carry >= 1 / 30 - 1e-9 &&\n                priorWork < 18 && earlierWork < 18 && performance.now() - workStart < 18) {\n                this.update(1 / 30);\n                this.mmTimer -= 1 / 30;\n                carry = Math.max(0, carry - 1 / 30);\n            }\n            if (this.paused)\n                carry = 0;';
+const oldCpuGate='priorWork < 18 && earlierWork < 18) {';
+const newCpuGate='priorWork < 18 && earlierWork < 18 && performance.now() - workStart < 18) {';
 function count(s,needle){return s.split(needle).length-1;}
 
 // The shipping RAF is already queued before update. Cancelling that future RAF
@@ -90,6 +92,8 @@ function protectLifecycleCleanup(html){
 
 function patchRafStepCapLegacy(html){
  if(typeof html!=='string')throw new TypeError('expected UTF-8 HTML');
+ /* Upgrade an already materialized pre-fix shell as well as fresh compressed input. */
+ if(count(html,oldCpuGate)===1&&count(html,newCpuGate)===0)html=html.replace(oldCpuGate,newCpuGate);
  if(!html.includes('    start() {')||!html.includes('this.raf = requestAnimationFrame(loop);'))
   throw Error('canonical game RAF owner missing');
  if(count(html,after)===1&&count(html,withCarry)===1&&
