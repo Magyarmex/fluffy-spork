@@ -11,6 +11,11 @@ const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 if(prev===undefined)delete process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL;
 else process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL=prev;
 const shipping=fs.readFileSync(path.resolve(__dirname,'../../index.html'),'utf8');
+const corrected=patchRafStepCap(shipping);
+const legacy=corrected.replace('carry = excess > 1e-9 ? excess : 0;',
+ 'carry = excess > 1e-9 ? Math.min(1 / 30, excess) : 0;')
+ .replace('            carry = Math.min(1 / 30, carry);\n','');
+assert.notEqual(legacy,corrected,'must retain a meaningful old-scheduler control');
 function body(html){
  const a=html.indexOf('    start() {',html.indexOf('window.__defineModule("game/engine"'));
  const b=html.indexOf('    destroy() {',a);
@@ -64,7 +69,7 @@ function trial(seed,startBody,gaps,seconds=4){
  });
 }
 test('composed 49-overlay Game recovers moderate active time without extra updates',()=>{
- const old=body(shipping),next=body(patchRafStepCap(shipping));
+ const old=body(legacy),next=body(corrected);
  const moderate=[55,55,1000/15-55,1000/15-55];
  for(const seed of [1517800,1517802]){
   const before=trial(seed,old,moderate),after=trial(seed,next,moderate);
