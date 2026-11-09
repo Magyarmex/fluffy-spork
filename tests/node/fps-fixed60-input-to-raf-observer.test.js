@@ -192,3 +192,19 @@ test('failed browser clock yields finite-or-null elapsed telemetry, never NaN',(
  assert.equal(h.pendingRaf,0);
  assert.equal(JSON.stringify(snapshot).includes('NaN'),false);
 });
+
+
+test('clock failure inside RAF callback cannot export NaN or leave input listeners',()=>{
+ const h=harness(),o=h.window.__novaInputRafObserver.create();
+ o.start();h.setTime(1004);h.event('pointerdown');
+ h.failClock();
+ assert.doesNotThrow(()=>h.next(1016));
+ const r=local(o.snapshot());
+ assert.equal(r.status,'invalid-clock');
+ assert.equal(r.elapsedMs,null);
+ assert.equal(r.observedEvents,0);
+ assert.equal(r.pendingEvents,0);
+ assert.equal(o.active,false);
+ assert.equal(h.listeners,0);
+ assert.equal(h.pendingRaf,0);
+});
