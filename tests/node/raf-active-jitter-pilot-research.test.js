@@ -185,3 +185,18 @@ test('active-jitter pilot discards paused-frame debt on resume',()=>{
  assert.equal(after.draws,before.draws);
  assert.ok(after.maxSteps<=2);
 });
+
+// Falsifier: the 100ms active/stall classification is discontinuous. A 0.1ms
+// change in a sustained frame interval can nearly halve simulated game time.
+// This test documents a reason NOT to promote the pilot without redesign.
+test('100ms eligibility boundary produces a large sustained chronology cliff',()=>{
+ const eligible=run(pilot,[100],10,0);
+ const ineligible=run(pilot,[100.1],10,0);
+ assert.ok(eligible.sim>6.6&&eligible.sim<6.8,
+  'exactly 100ms remains eligible for the second bounded update');
+ assert.ok(ineligible.sim>3.2&&ineligible.sim<3.5,
+  '100.1ms is classified as a stall and loses most active time');
+ assert.ok(eligible.sim>ineligible.sim*1.9,
+  'tiny presentation change creates an unacceptable ~2x timebase cliff');
+ assert.ok(eligible.maxSteps<=2&&ineligible.maxSteps<=2);
+});
