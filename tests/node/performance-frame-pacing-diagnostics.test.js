@@ -241,3 +241,35 @@ test('mobile Debug prioritizes game and simulation pace before updater metadata'
  const keys=Object.keys(window.__snap());
  assert.deepEqual(keys.slice(0,4),['BUILD','GAME FPS','SIMULATION RATE','SIMULATION PACE']);
 });
+
+
+test('clustered mean-60Hz frames disclose 33ms p95 despite nominal 60 FPS',()=>{
+ // #799: 33.33/8.33/8.33ms presentation, 480 frames in exactly eight
+ // seconds. This is synthetic timing, not a measured Android trace.
+ const t=telemetry(),g={status:'playing',paused:false};
+ t.recordPresentation(g,0);
+ for(let frame=0;frame<480;frame++){
+  const dt=[4,1,1][frame%3]*1000/120;
+  t.recordSimulation(g,1/60);
+  sample(t,g,dt);
+ }
+ const p=t.timingWindow(t.perfState(g));
+ assert.equal(p.frameSamples,120);
+ assert.ok(Math.abs(p.fps-60)<.2,'mean FPS must remain 60');
+ assert.ok(Math.abs(p.frameP95Ms-1000/30)<.02,
+  'p95 must expose the long third of presentation gaps');
+ assert.equal(p.frameOver50Pct,0,'no 50ms jank threshold crossed');
+ assert.ok(Math.abs(p.simulationHz-60)<.2);
+ assert.ok(Math.abs(p.simulationPacePct-100)<.2);
+ const a=menu.indexOf('function snapshot()'),b=menu.indexOf('function fillDebug()',a);
+ const win={__NOVA_PERF_LAST__:p,innerWidth:360,innerHeight:740,devicePixelRatio:2};
+ const nav={onLine:true,maxTouchPoints:5,userAgent:'test'};
+ vm.runInNewContext(menu.slice(a,b)+'\nwindow.__snap=snapshot;',{
+  window:win,navigator:nav,VERSION:'1.7.8',CODENAME:'Signal Flow',
+  updaterState:()=> 'CURRENT'
+ });
+ const copied=win.__snap();
+ assert.match(copied['GAME FPS'],/60/);
+ assert.equal(copied['FRAME P95'],'33.33 ms',
+  'copied player diagnostics must reveal uneven frame pacing');
+});
