@@ -83,3 +83,23 @@ test('real Gunner Game exposes the pilot 100ms timebase discontinuity',()=>{
    eligible,ineligible}));
  }
 });
+
+// Production-only adversarial witness: the 83.33ms boundary is a real Game
+// combat timebase discontinuity, not just a scheduler stub artifact. Keep
+// this test research-only: it describes the existing defect, not acceptance.
+test('shipping 83.33ms threshold halves real Gunner update chronology',()=>{
+ for(const [cls,reload] of [['minigun',1],['needlestorm',3]]){
+  const eligible=run(cls,reload,1517800,shipping,[83.333]);
+  const ineligible=run(cls,reload,1517800,shipping,[83.334]);
+  assert.ok(eligible.sim>ineligible.sim*1.9,
+   'a one-microsecond RAF interval shift changes actual Game time by ~2x');
+  assert.ok(eligible.updates>ineligible.updates*1.9,
+   'the Game must execute correspondingly fewer world updates');
+  assert.ok(eligible.volleys>0&&ineligible.volleys>0,
+   'both schedules still exercise real player weapons');
+  assert.ok(eligible.sim<=4+1e-7&&ineligible.sim<=4+1e-7,
+   'no simulation future time is invented');
+  console.log('RAF_SHIPPING_83MS_GUNNER_FALSIFIER '+JSON.stringify({cls,reload,
+   eligible,ineligible}));
+ }
+});
