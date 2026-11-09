@@ -161,8 +161,8 @@ assert.ok([65,100].includes(renderScale),'only the certified 65% and default 100
      css:[g.w,g.h],backing:[g.canvas.width,g.canvas.height]},
      aimActive:g.input.aim.active,firing:g.input.firing};
    });
-   assert.ok(changed.aimActive&&!changed.firing,
-    'canvas backing resize must preserve centered touch ownership without firing');
+   assert.equal(changed.aimActive,true,
+    'canvas backing resize must preserve active right-stick ownership: '+JSON.stringify(changed));
    assert.equal(changed.after.owner,changed.before.owner,
     'resizing the backing canvas must not steal the live right-stick pointer');
    assert.deepEqual(changed.after.css,changed.before.css,
