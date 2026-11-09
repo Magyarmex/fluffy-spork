@@ -1,6 +1,6 @@
 'use strict';
 // Research-only real-browser witness: trusted touch delivery -> real player
-// projectile birth in the shipping React/Game path. Includes first gameplay Canvas draw while a player projectile is live; NOT exact projectile paint,
+// projectile birth in the shipping React/Game path. Includes first projectile-core Canvas fill; NOT GPU presentation,
 // GPU presentation, or physical touch-to-photon latency.
 const assert=require('node:assert/strict');
 const {chromium}=require('playwright');
@@ -31,19 +31,39 @@ const {chromium}=require('playwright');
    const originalTryFire=Game.prototype.tryFire;
    window.__novaBirths=[];
    window.__novaCanvasSubmit=[];
+   // Exact shipping game/render bullet-core signature:
+   // ctx.arc(b.x,b.y,br*0.55,0,TAU); ctx.fill() under lighter/white.
+   // This excludes unrelated Canvas draws and does not claim GPU display.
    const canvasProto=CanvasRenderingContext2D.prototype;
-   for(const method of ['fill','stroke','drawImage']){
-    const original=canvasProto[method];
-    canvasProto[method]=function(...args){
+   const originalArc=canvasProto.arc,originalFill=canvasProto.fill;
+   let pendingBulletCore=false;
+   canvasProto.arc=function(x,y,r,start,end,...rest){
+    pendingBulletCore=false;
+    const g=window.__novaBirthGame;
+    if(g&&g.status==='playing'&&window.__novaAimExtensionAt!==null&&
+       window.__novaBirths.length>0&&window.__novaCanvasSubmit.length===0&&
+       this.canvas?.matches?.('canvas.absolute.inset-0')&&
+       this.globalCompositeOperation==='lighter'&&this.fillStyle==='#ffffff'&&
+       Math.abs(start)<1e-8&&Math.abs(end-Math.PI*2)<1e-6){
+     pendingBulletCore=g.bullets.some(b=>{
+      if(!b||b.beam||b.ownerId!==g.player.id)return false;
+      const hpFrac=b.maxHp?Math.max(.18,Math.min(1,(b.hp??b.maxHp)/b.maxHp)):1;
+      const br=b.r*(.72+hpFrac*.28);
+      return Math.abs(x-b.x)<1e-6&&Math.abs(y-b.y)<1e-6&&
+       Math.abs(r-br*.55)<1e-6;
+     });
+    }
+    return originalArc.call(this,x,y,r,start,end,...rest);
+   };
+   canvasProto.fill=function(...args){
+    if(pendingBulletCore&&window.__novaCanvasSubmit.length===0){
      const g=window.__novaBirthGame;
-     if(g&&g.status==='playing'&&window.__novaAimExtensionAt!==null&&
-        window.__novaBirths.length>0&&g.bullets.some(b=>b&&b.ownerId===g.player.id)&&
-        this.canvas?.matches?.('canvas.absolute.inset-0')&&
-        window.__novaCanvasSubmit.length===0)
-      window.__novaCanvasSubmit.push({at:performance.now(),method,gameTime:g.time});
-     return original.apply(this,args);
-    };
-   }
+     window.__novaCanvasSubmit.push({at:performance.now(),method:'bullet-core-fill',
+      gameTime:g.time});
+    }
+    pendingBulletCore=false;
+    return originalFill.apply(this,args);
+   };
    Game.prototype.tryFire=function(t,...args){
     const before=this.bullets.length;
     const result=originalTryFire.call(this,t,...args);
@@ -115,7 +135,7 @@ const {chromium}=require('playwright');
   await page.waitForFunction(()=>window.__novaCanvasSubmit.length>0,null,{timeout:12000});
   const canvasSubmit=await page.evaluate(()=>window.__novaCanvasSubmit[0]);
   assert.ok(Number.isFinite(canvasSubmit.at)&&canvasSubmit.at>=birth.at,
-   'a real gameplay Canvas draw with a live player projectile must follow projectile birth');
+   'the exact player projectile core fill must follow projectile birth');
   assert.ok(Number.isFinite(birth.at)&&Number.isFinite(birth.gameTime));
   assert.ok(during.firstFireSample&&Number.isFinite(during.firstFireSample.at),
    'the actual Game.update must observe held fire before projectile birth');
@@ -136,7 +156,7 @@ const {chromium}=require('playwright');
    deliveryToCanvasSubmitMs:Math.round((canvasSubmit.at-move.at)*1000)/1000,
    birthToCanvasSubmitMs:Math.round((canvasSubmit.at-birth.at)*1000)/1000,
    canvasMethod:canvasSubmit.method,
-   notMeasured:['exact projectile paint call','GPU presentation','physical photon latency']
+   notMeasured:['GPU presentation','physical photon latency']
   }));
  }finally{await context.close();await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
