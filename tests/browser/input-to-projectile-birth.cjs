@@ -26,7 +26,8 @@ const {chromium}=require('playwright');
    Game.prototype.tryFire=function(t,...args){
     const before=this.bullets.length;
     const result=originalTryFire.call(this,t,...args);
-    if(t&&t.isPlayer&&this.bullets.length>before)
+    if(!this.__novaDecorativeWorld&&this===window.__novaBirthGame&&
+       t&&t.isPlayer&&this.bullets.length>before)
      window.__novaBirths.push({at:performance.now(),gameTime:this.time});
     return result;
    };
