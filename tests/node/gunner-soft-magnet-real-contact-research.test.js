@@ -262,7 +262,7 @@ test('soft-magnet contact with class-specific geometric intercept inputs',()=>{
       }
       rows.push({cls,hz,scenario,direction,arms});
      }
-  assert.equal(rows.length,12);
+  assert.equal(rows.length,16);
   console.log('VISIBLE_MOTION_AIM_INTENT_RESEARCH '+JSON.stringify(rows));
  });
 
