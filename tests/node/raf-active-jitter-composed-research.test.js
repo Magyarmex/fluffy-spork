@@ -100,3 +100,16 @@ test('composed Game still loses active time during consecutive 99ms frames',()=>
   assert.ok(Number.isFinite(after.travel));
  }
 });
+
+// The current production 1/12s catch-up gate has a sharp threshold. Reproduce
+// its world-time impact in the actual 49-overlay Game, not just a RAF stub.
+test('composed shipping Game reproduces the 83.33ms active-time cliff',()=>{
+ for(const seed of [1517800,1517802]){
+  const eligible=trial(seed,shipping,[83.333]);
+  const ineligible=trial(seed,shipping,[83.334]);
+  assert.ok(eligible.sim>ineligible.sim*1.8,
+   'tiny RAF gap change nearly halves real Game simulation progress');
+  assert.ok(eligible.updates>ineligible.updates*1.8);
+  assert.ok(Number.isFinite(eligible.travel)&&Number.isFinite(ineligible.travel));
+ }
+});
