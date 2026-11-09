@@ -23,6 +23,7 @@ function harness(){
   hide(){document.hidden=true;docListeners.get('visibilitychange')?.()},
   get listeners(){return listeners.size+docListeners.size},
   fireStale(fn,t){now=t;fn(t)},get lastCallback(){return lastCallback},
+  failCancel(){window.cancelAnimationFrame=()=>{throw Error('host cancel failure')}},
   get pendingRaf(){return queue.length}};
 }
 const local=value=>JSON.parse(JSON.stringify(value));
@@ -90,4 +91,17 @@ test('invalid settings, duplicate start and hidden start are rejected',()=>{
  o.start();assert.throws(()=>o.start(),/already active/);o.stop();
  h.window.document.hidden=true;
  assert.throws(()=>o.start(),/foreground/);
+});
+
+test('cancel failure cannot leave observer active or retain queued input',()=>{
+ const h=harness(),o=h.window.__novaInputRafObserver.create();
+ o.start();h.setTime(1005);h.event('pointerdown',{key:'SECRET'});
+ h.failCancel();
+ assert.doesNotThrow(()=>o.stop());
+ const r=local(o.snapshot());
+ assert.equal(o.active,false);
+ assert.equal(r.status,'cancel-error');
+ assert.equal(r.pendingEvents,0);
+ assert.equal(r.observedEvents,0);
+ assert.equal(h.listeners,0);
 });
