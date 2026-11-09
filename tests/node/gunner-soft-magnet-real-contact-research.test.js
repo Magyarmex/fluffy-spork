@@ -136,7 +136,10 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
      if(i===activeTicks-1)leadEndDeg=+leadDeg.toFixed(4);
     }
     // Research-only: use observed position history, not target velocity or future state.
-    const visible={id:t.id,x:t.x,y:t.y,at:i/hz,visible:true};
+    // The source Game's public target filter must certify visibility before
+    // motion history may influence aim; do not infer sight from raw coordinates.
+    const publiclyEligible=nearest.call(g,p.x,p.y,480,p.id)===t;
+    const visible={id:t.id,x:t.x,y:t.y,at:i/hz,visible:publiclyEligible};
     const adaptiveGate=visibleMotionIntent(requested,targetBearing,visible,previousVisible);
     const weight=visibleMotionWeight(requested,targetBearing,visible,previousVisible);
     previousVisible=visible;
@@ -146,7 +149,7 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
      adaptiveUseSoft=useSoft;
      useSoft?adaptiveSoftTicks++:adaptiveHardTicks++;
     }
-    const effective=policy==='smooth'?(Math.abs(wrap(requested-targetBearing))<.22?
+    const effective=policy==='smooth'?(publiclyEligible&&Math.abs(wrap(requested-targetBearing))<.22?
      wrap(targetBearing+weight*wrap(softBearing(requested,targetBearing)-targetBearing)):requested):
      (useSoft?softBearing(requested,targetBearing):requested);
     g.input.aim.dx=40*Math.cos(effective);
