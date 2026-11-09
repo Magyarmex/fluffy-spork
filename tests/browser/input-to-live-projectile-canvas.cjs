@@ -4,11 +4,16 @@
 // React/Game path. Includes backing-store pixel verification; NOT GPU presentation or physical touch-to-photon latency.
 const assert=require('node:assert/strict');
 const {chromium}=require('playwright');
+const renderScale=process.env.NOVA_TOUCH_RENDER_SCALE?Number(process.env.NOVA_TOUCH_RENDER_SCALE):100;
+assert.ok([65,100].includes(renderScale),'only the certified 65% and default 100% clarity arms are supported');
 
 (async()=>{
  const browser=await chromium.launch({headless:true,args:['--disable-dev-shm-usage','--no-sandbox']});
  const context=await browser.newContext({viewport:{width:320,height:700},
   deviceScaleFactor:2,isMobile:true,hasTouch:true});
+ if(renderScale===65)await context.addInitScript(()=>{
+  localStorage.setItem('novatanks_pilot_settings_v1',JSON.stringify({renderScale:65}));
+ });
  const page=await context.newPage(),errors=[];
  page.on('pageerror',e=>errors.push(String(e.stack||e)));
  try{
@@ -101,6 +106,18 @@ const {chromium}=require('playwright');
   await canvas.waitFor({state:'visible',timeout:30000});
   await page.waitForFunction(()=>window.__novaBirthGame?.status==='playing',null,{timeout:20000});
   await page.locator('.nv-loading').waitFor({state:'hidden',timeout:20000});
+  const clarity=await page.evaluate(()=>{
+   const g=window.__novaBirthGame;
+   return {stored:JSON.parse(localStorage.getItem('novatanks_pilot_settings_v1')||'{}').renderScale,
+    dpr:g.dpr,css:[g.w,g.h],backing:[g.canvas.width,g.canvas.height]};
+  });
+  assert.ok(Number.isFinite(clarity.dpr)&&clarity.dpr>=1,'active Game must have legal DPR');
+  assert.deepEqual(clarity.backing,clarity.css.map(v=>Math.max(1,Math.round(v*clarity.dpr))),
+   'the actual Canvas backing must match the Game DPR');
+  if(renderScale===65){
+   assert.equal(clarity.stored,65,'opt-in clarity setting must reach the shipping Game');
+   assert.ok(clarity.dpr<=1.5,'65% research arm must reduce backing resolution');
+  }
   await page.evaluate(()=>{
    const g=window.__novaBirthGame;
    g.input.autofire=false;g.player.spawnShieldT=20;
@@ -202,7 +219,9 @@ const {chromium}=require('playwright');
   },null,{timeout:5000});
   assert.deepEqual(errors,[],'the real game must not throw');
   console.log('NOVA_TOUCH_TO_PROJECTILE_BIRTH '+JSON.stringify({
-   viewport:'320x700',trusted:true,deliveryToBirthMs:Math.round(delay*1000)/1000,
+   viewport:'320x700',trusted:true,renderScale,dpr:clarity.dpr,
+   css:clarity.css,backing:clarity.backing,
+   deliveryToBirthMs:Math.round(delay*1000)/1000,
    deliveryToSimulationMs:Math.round(inputToSample*1000)/1000,
    simulationToBirthMs:Math.round(sampleToBirth*1000)/1000,
    birthGameTime:birth.gameTime,projectilesObserved:during.shots.length,
