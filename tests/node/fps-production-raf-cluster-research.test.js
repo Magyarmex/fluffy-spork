@@ -12,9 +12,9 @@ const b=html.indexOf('    destroy() {',a);
 assert.ok(a>=0&&b>a,'real materialized Game.start owner exists');
 const shipping=html.slice(a,b).trim();
 const oldCap='Math.min(1 / 30, excess)';
-assert.equal(shipping.split(oldCap).length-1,1,'canonical carry-cap owner must not drift');
-const prototype=shipping.replace(oldCap,
- 'Math.min(elapsed <= 0.1 ? 2 / 30 : 1 / 30, excess)');
+const hasOldCap=shipping.includes(oldCap);
+const prototype=hasOldCap?shipping.replace(oldCap,
+ 'Math.min(elapsed <= 0.1 ? 2 / 30 : 1 / 30, excess)'):null;
 function run(body,gaps,seconds=10,workMs=0){
  let now=0,work=0,raf=null,sim=0,updates=0,draws=0,maxSteps=0,steps=0;
  const start=new Function('performance','requestAnimationFrame','render_1',
@@ -61,25 +61,37 @@ const belowCatchupGate=[5.941416705947619,23.41420116160293,
 test('desired: sub-83ms eight-gap mean-30Hz must preserve 60s world time',()=>{
  const r=run(shipping,belowCatchupGate,60);approx(r.sim,60);
 });
-test('falsifier: merely doubling carry cap still loses time on eight-gap 30Hz',()=>{
+if(hasOldCap)test('falsifier: merely doubling carry cap still loses time on eight-gap 30Hz',()=>{
  const r=run(prototype,eightGap,60);
  assert.ok(r.sim<50,'the conditional cap is not a universal chronology fix');
 });
-test('research-only conditional cap restores clustered chronology in zero-cost owner',()=>{
+if(hasOldCap)test('research-only conditional cap restores clustered chronology in zero-cost owner',()=>{
  for(const gaps of [moderate,harsh,[1000/30],[1000/60],[50]]){
   const r=run(prototype,gaps);approx(r.sim,10);
   assert.ok(r.maxSteps<=2);
  }
 });
-test('conditional cap does not repay long >100ms foreground stalls',()=>{
+if(hasOldCap)test('conditional cap does not repay long >100ms foreground stalls',()=>{
  const gaps=[120,1000/60,1000/60,1000/60];
  const a=run(shipping,gaps),b=run(prototype,gaps);
  approx(a.sim,b.sim);assert.ok(a.sim<8);
 });
-test('optional second update remains CPU-bounded under 22ms synthetic work',()=>{
+if(hasOldCap)test('optional second update remains CPU-bounded under 22ms synthetic work',()=>{
  for(const gaps of [moderate,harsh,[50]]){
   const a=run(shipping,gaps,10,22),b=run(prototype,gaps,10,22);
   assert.equal(a.maxSteps,1);assert.equal(b.maxSteps,1);
   assert.ok(b.sim>=a.sim-1e-8);
+ }
+});
+
+// Permanent safety gates must survive the eventual scheduler correction.
+test('shipping scheduler never repays a long >100ms foreground stall',()=>{
+ const r=run(shipping,[120,1000/60,1000/60,1000/60]);
+ assert.ok(r.sim<8,'do not replay suspended wall time as live combat');
+ assert.ok(r.maxSteps<=2);
+});
+test('shipping scheduler keeps optional CPU-heavy catch-up bounded',()=>{
+ for(const gaps of [moderate,harsh,[50]]){
+  const r=run(shipping,gaps,10,22);assert.equal(r.maxSteps,1);
  }
 });
