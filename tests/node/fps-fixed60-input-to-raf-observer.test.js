@@ -5,14 +5,14 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const source=fs.readFileSync(path.resolve(__dirname,
  '../../scripts/fixed60-input-to-raf-observer.js'),'utf8');
 function harness(){
- let now=1000,queue=[],nextId=0;
+ let now=1000,queue=[],nextId=0,lastCallback=null;
  const listeners=new Map();
  const docListeners=new Map();
  const document={hidden:false,
   addEventListener(k,fn){docListeners.set(k,fn)},
   removeEventListener(k,fn){if(docListeners.get(k)===fn)docListeners.delete(k)}};
  const window={document,performance:{now:()=>now},
-  requestAnimationFrame(fn){queue.push({id:++nextId,fn});return nextId},
+  requestAnimationFrame(fn){lastCallback=fn;queue.push({id:++nextId,fn});return nextId},
   cancelAnimationFrame(id){queue=queue.filter(e=>e.id!==id)},
   addEventListener(k,fn){listeners.set(k,fn)},
   removeEventListener(k,fn){if(listeners.get(k)===fn)listeners.delete(k)}};
@@ -22,7 +22,7 @@ function harness(){
   next(t){now=t;const e=queue.shift();assert.ok(e,'expected RAF');e.fn(t)},
   hide(){document.hidden=true;docListeners.get('visibilitychange')?.()},
   get listeners(){return listeners.size+docListeners.size},
-  get pendingRaf(){return queue.length}};
+  fireStale(fn,t){now=t;fn(t)},get lastCallback(){return lastCallback},\n  get pendingRaf(){return queue.length}};
 }
 const local=value=>JSON.parse(JSON.stringify(value));
 test('reports DOM-to-RAF opportunities only, without retaining sensitive event fields',()=>{
