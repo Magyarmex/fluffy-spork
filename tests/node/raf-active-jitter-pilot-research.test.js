@@ -242,3 +242,49 @@ test('shipping 83.33ms second-step boundary has a near-twofold timebase cliff',(
   'a 0.001ms RAF interval change nearly halves shipped simulation progress');
  assert.ok(eligible.maxSteps<=2&&ineligible.maxSteps<=2);
 });
+
+// Research-only loss ledger: instrument the exact extracted shipping RAF after
+// its second-update decision. Distinguish sub-100ms active jitter from longer
+// suspension-like gaps. Do not mistake intentionally discarded stall debt for
+// an active-game fairness regression, or vice versa.
+test('exact shipping RAF accounts for active-jitter loss separately from stalls',()=>{
+ const marker='carry = Math.min(1 / 30, carry);';
+ assert.equal(shipping.split(marker).length-1,1,'unique shipping carry clamp');
+ const instrumented=shipping.replace(marker,
+  'const __novaBeforeClamp = carry;\\n            '+marker+
+  '\\n            const __novaDiscarded = Math.max(0, __novaBeforeClamp - carry);'+
+  '\\n            if (elapsed <= 0.1) this.__novaResearchActiveLoss += __novaDiscarded;'+
+  '\\n            else this.__novaResearchStallLoss += __novaDiscarded;'+
+  '\\n            this.__novaResearchCarry = carry;');
+ function ledger(gaps,seconds=10){
+  let now=0,raf=null,sim=0,updates=0;
+  const start=new Function('performance','requestAnimationFrame','render_1',
+   'return ({'+instrumented+'}).start')({now:()=>now},
+   fn=>{raf=fn;return 1;},{render(){}});
+  const g={paused:false,__novaDestroyed:false,mmTimer:0,
+   __novaResearchActiveLoss:0,__novaResearchStallLoss:0,__novaResearchCarry:0,
+   sfx:{startMusic(){}},update(dt){sim+=dt;updates++;},drawMinimap(){}};
+  start.call(g);
+  let i=0;
+  while(now<seconds*1000-1e-7){
+   now+=Math.min(gaps[i++%gaps.length],seconds*1000-now);
+   const cb=raf;raf=null;assert.equal(typeof cb,'function');cb(now);
+  }
+  return {sim,updates,active:g.__novaResearchActiveLoss,
+   stall:g.__novaResearchStallLoss,carry:g.__novaResearchCarry};
+ }
+ const uniform=ledger([1000/30]);
+ const active=ledger([85,40,5,1000/7.5-130]);
+ const stalled=ledger([120,1000/60,1000/60,1000/60]);
+ assert.ok(uniform.active<1e-7&&uniform.stall<1e-7,
+  'uniform 30Hz should not discard active or stall debt');
+ assert.ok(active.active>0.1&&active.stall<1e-7,
+  'clustered sub-100ms presentation discards genuinely active game time');
+ assert.ok(stalled.stall>0.1,
+  '120ms gaps are separately classified as suspension-like discards');
+ for(const [label,s] of [['uniform',uniform],['active',active],['stalled',stalled]]){
+  assert.ok(Math.abs(10-s.sim-s.carry-s.active-s.stall)<1e-5,
+   label+' must conserve wall time across updates, retained carry and discard');
+ }
+ console.log('RAF_SHIPPING_LOSS_LEDGER '+JSON.stringify({uniform,active,stalled}));
+});
