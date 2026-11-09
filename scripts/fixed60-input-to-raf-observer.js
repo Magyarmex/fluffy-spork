@@ -1,7 +1,7 @@
 /* Research-only, opt-in browser timing observer.
  * Measures DOM event delivery -> next RAF callback opportunity, NOT
  * Game input application, projectile rendering, GPU presentation, or photon.
- * No keys, coordinates, pointer IDs, targets, game state, or raw timestamps
+ * Includes pointercancel so cancelled touch sequences are not invisible.\n * No keys, coordinates, pointer IDs, targets, game state, or raw timestamps
  * are exported. Never loaded by the shipping NOVA runtime.
  *
  * DevTools: const o=__novaInputRafObserver.create({durationMs:60000});
@@ -10,7 +10,7 @@
 (function(root){
 'use strict';
 if(root.__novaInputRafObserver)return;
-const TYPES=['pointerdown','pointerup','keydown','keyup'];
+const TYPES=['pointerdown','pointerup','pointercancel','keydown','keyup'];
 const percentile=(arr,p)=>{
  if(!arr.length)return null;
  const sorted=arr.slice().sort((a,b)=>a-b);
