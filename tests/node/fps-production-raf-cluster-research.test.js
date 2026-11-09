@@ -15,22 +15,26 @@ const oldCap='Math.min(1 / 30, excess)';
 const hasOldCap=shipping.includes(oldCap);
 const prototype=hasOldCap?shipping.replace(oldCap,
  'Math.min(elapsed <= 0.1 ? 2 / 30 : 1 / 30, excess)'):null;
-function run(body,gaps,seconds=10,workMs=0){
- let now=0,work=0,raf=null,sim=0,updates=0,draws=0,maxSteps=0,steps=0,maxLag=0;
+function run(body,gaps,seconds=10,workMs=0,trackInput=false){
+ let now=0,work=0,raf=null,sim=0,updates=0,draws=0,maxSteps=0,steps=0,maxLag=0,triggerTime=null,firstInputUpdate=null;
  const start=new Function('performance','requestAnimationFrame','render_1',
   'return ({'+body+'}).start')({now:()=>now+work},fn=>{raf=fn;return 1;},
   {render(){draws++;maxSteps=Math.max(maxSteps,steps);steps=0;maxLag=Math.max(maxLag,now/1000-sim);}});
- const g={paused:false,__novaDestroyed:false,mmTimer:.08,
+ const g={paused:false,__novaDestroyed:false,mmTimer:.08,firing:false,
   sfx:{startMusic(){}},update(dt){
    assert.ok(dt>=0&&dt<=1/30+1e-10,'each update must stay physically bounded');
    sim+=dt;updates++;steps++;work+=workMs;
+   if(g.firing&&firstInputUpdate===null)firstInputUpdate=sim;
   },drawMinimap(){}};
  start.call(g);
  let i=0;while(now<seconds*1000-1e-7){
   now+=Math.min(gaps[i++%gaps.length],seconds*1000-now);
+  if(trackInput&&triggerTime===null&&now/1000-sim>0.15){
+   triggerTime=now/1000;g.firing=true;
+  }
   const cb=raf;raf=null;assert.equal(typeof cb,'function');cb(now);
  }
- return {sim,updates,draws,maxSteps,maxLag};
+ return {sim,updates,draws,maxSteps,maxLag,triggerTime,firstInputUpdate};
 }
 const approx=(a,b)=>assert.ok(Math.abs(a-b)<1e-6,`${a} != ${b}`);
 const moderate=[55,55,1000/15-55,1000/15-55];
@@ -119,4 +123,14 @@ if(hasOldCap)test('falsifier: 250ms carry repairs eight-gap time only by retaini
  // The bound is a separate, deliberately visible risk: current input is
  // sampled during catch-up, not replayed from a timestamped event history.
  // Do not infer that a >100ms backlog is safe for touch or Controller orders.
+});
+
+if(hasOldCap)test('falsifier: wide carry can apply a newly delivered input >100ms into the simulated past',()=>{
+ const wide=shipping.replace(oldCap,'Math.min(elapsed <= 0.1 ? 1 / 4 : 1 / 30, excess)');
+ const r=run(wide,eightGap,60,0,true);
+ assert.ok(r.triggerTime!==null&&r.firstInputUpdate!==null,'input must be delivered and sampled');
+ assert.ok(r.triggerTime-r.firstInputUpdate>0.1,
+  'current input state is sampled by an update representing >100ms-old world time');
+ // This is a scheduler/input-policy counterexample, not a simulated shot
+ // or proof that real players experience a specific delay.
 });
