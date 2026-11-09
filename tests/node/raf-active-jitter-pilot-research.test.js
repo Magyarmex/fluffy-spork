@@ -156,3 +156,17 @@ test('current-work-aware guard is neutral on cheap frames',()=>{
    'current CPU guard must not change cheap-frame chronology');
  }
 });
+
+// A first-update-only check is necessary but not sufficient for a strict
+// per-frame CPU budget: a second 17ms update can take a 17ms first update to
+// 34ms. This is a deliberately preserved negative result, not a release gate.
+test('current-work guard does not guarantee total frame CPU below 18ms',()=>{
+ const oldCpuGate='priorWork < 18 && earlierWork < 18';
+ const guarded=pilot.replace(oldCpuGate,
+  oldCpuGate+' && performance.now() - workStart < 18');
+ const observed=run(guarded,[70],1,17);
+ assert.equal(observed.firstFrameSteps,2,
+  '17ms first update is still eligible for a second update');
+ assert.ok(observed.firstFrameSteps*17>18,
+  'two individually affordable updates can exceed the total frame budget');
+});
