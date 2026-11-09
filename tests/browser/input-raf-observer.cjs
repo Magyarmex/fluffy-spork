@@ -31,7 +31,14 @@ const {chromium}=require('playwright');
   const box=await canvas.boundingBox();
   assert.ok(box&&box.width>200&&box.height>200);
   await canvas.tap({position:{x:box.width*.78,y:box.height*.68}});
-  // CDP produces browser-trusted touch cancellation on the real Game canvas.\n  // This still measures DOM-to-RAF only, not physical touch-to-photon.\n  const cdp=await context.newCDPSession(page);\n  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{\n   x:box.x+box.width*.78,y:box.y+box.height*.68,id:77,\n   radiusX:1,radiusY:1,force:1}]});\n  await cdp.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});\n  await page.evaluate(()=>new Promise(resolve=>
+  // CDP produces browser-trusted touch cancellation on the real Game canvas.
+  // This still measures DOM-to-RAF only, not physical touch-to-photon.
+  const cdp=await context.newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{
+   x:box.x+box.width*.78,y:box.y+box.height*.68,id:77,
+   radiusX:1,radiusY:1,force:1}]});
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});
+  await page.evaluate(()=>new Promise(resolve=>
    requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   const result=await page.evaluate(()=>{
    const o=window.__novaInputRafProbe;
@@ -40,7 +47,9 @@ const {chromium}=require('playwright');
   });
   assert.ok(result.before.kinds.pointerdown.count>=1,
    'actual browser touch must reach passive pointerdown observer');
-  assert.ok(result.before.kinds.pointercancel.count>=1,\n   'browser pointer cancellation must be visible to timing observer');\n  assert.ok(result.before.kinds.pointerup.count>=1,
+  assert.ok(result.before.kinds.pointercancel.count>=1,
+   'browser pointer cancellation must be visible to timing observer');
+  assert.ok(result.before.kinds.pointerup.count>=1,
    'actual browser touch release must reach passive pointerup observer');
   assert.ok(Number.isFinite(result.before.kinds.pointerdown.p95Ms));
   assert.ok(Number.isFinite(result.before.kinds.pointerup.p95Ms));
