@@ -61,6 +61,13 @@ const belowCatchupGate=[5.941416705947619,23.41420116160293,
 test('desired: sub-83ms eight-gap mean-30Hz must preserve 60s world time',()=>{
  const r=run(shipping,belowCatchupGate,60);approx(r.sim,60);
 });
+// Mean 60Hz is not a sufficient guarantee when frames arrive unevenly.
+const irregularMean60=[7.462545447209942,91.1690205691155,
+ 10.223294786501562,3.0005384001705946,2.9156630931681042,
+ 5.552244930873242,9.82486238212232,3.1851637241720603];
+test('desired: irregular mean-60Hz must not discard active game time',()=>{
+ const r=run(shipping,irregularMean60,10);approx(r.sim,10);
+});
 if(hasOldCap)test('falsifier: merely doubling carry cap still loses time on eight-gap 30Hz',()=>{
  const r=run(prototype,eightGap,60);
  assert.ok(r.sim<50,'the conditional cap is not a universal chronology fix');
