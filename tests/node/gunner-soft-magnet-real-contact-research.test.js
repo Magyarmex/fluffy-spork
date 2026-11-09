@@ -188,7 +188,9 @@ test('soft-magnet contact with class-specific geometric intercept inputs',()=>{
      assert.equal(new Set(arms.map(x=>x.volleys)).size,1);
      assert.ok(arms.every(x=>x.eligible>0&&x.movementWitness===6*hz));
      assert.ok(arms.every(x=>x.maxTrajectoryDrift<1e-5));
-     rows.push({seed,direction,cls,hz,arms});
+     rows.push({seed,direction,cls,hz,arms,
+      rngDivergenceTicks:{soft:rngDivergence(arms[0],arms[1]),
+       manual:rngDivergence(arms[0],arms[2])}});
     }
  assert.equal(rows.length,16);
  console.log('SOFT_MAGNET_INTERCEPT_CONTACT_RESEARCH '+JSON.stringify(rows));
