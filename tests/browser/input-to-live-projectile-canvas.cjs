@@ -164,6 +164,26 @@ const {chromium}=require('playwright');
   const inputToSample=during.firstFireSample.at-move.at;
   const sampleToBirth=birth.at-during.firstFireSample.at;
   assert.ok(delay>=0&&delay<12000,'a held touch must eventually produce a real projectile');
+  // A real touch release must relinquish right-stick ownership and prevent
+  // a delayed/phantom shot. Check after the Game has processed the release,
+  // not merely after CDP acknowledges delivery to the browser.
+  await page.waitForFunction(()=>{
+   const g=window.__novaBirthGame;
+   return g?.status==='playing'&&!g.input.aim.active&&!g.input.firing&&
+    g.input.stickId.aim===null;
+  },null,{timeout:5000});
+  const birthsAfterRelease=await page.evaluate(()=>window.__novaBirths.length);
+  await page.waitForTimeout(600); // More than an ordinary Scout reload cycle.
+  const releaseState=await page.evaluate(()=>{
+   const g=window.__novaBirthGame;
+   return {aimActive:g.input.aim.active,firing:g.input.firing,
+    aimOwner:g.input.stickId.aim,births:window.__novaBirths.length};
+  });
+  assert.equal(releaseState.aimActive,false,'released right stick must stay inactive');
+  assert.equal(releaseState.firing,false,'release must not leave held fire active');
+  assert.equal(releaseState.aimOwner,null,'release must clear right-stick owner');
+  assert.equal(releaseState.births,birthsAfterRelease,
+   'no new player shot may be born after touch release is processed');
   assert.deepEqual(errors,[],'the real game must not throw');
   console.log('NOVA_TOUCH_TO_PROJECTILE_BIRTH '+JSON.stringify({
    viewport:'320x700',trusted:true,deliveryToBirthMs:Math.round(delay*1000)/1000,
