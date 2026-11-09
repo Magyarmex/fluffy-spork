@@ -88,7 +88,7 @@ function protectLifecycleCleanup(html){
  return protectInputBlurCleanup(protectBootCleanup(html));
 }
 
-function patchRafStepCap(html){
+function patchRafStepCapLegacy(html){
  if(typeof html!=='string')throw new TypeError('expected UTF-8 HTML');
  if(!html.includes('    start() {')||!html.includes('this.raf = requestAnimationFrame(loop);'))
   throw Error('canonical game RAF owner missing');
@@ -115,6 +115,25 @@ function patchRafStepCap(html){
   .replace(oldStep,priorStep);
  return protectLifecycleCleanup(protectLifecycle(legacy.replace(priorCarry,withCarry)
   .replace(priorStep,newStep).replace(priorLoop,priorLoop+'\n            const workStart = performance.now();').replace(loopTail,newLoopTail)));
+}
+
+/* Recover already-eligible active time BEFORE clamping the remaining carry.
+ * The old order silently discarded excess time that the existing bounded
+ * second update was about to consume. The per-frame two-update limit,
+ * eligibility gate, final debt cap and long-stall policy stay unchanged.
+ * Recovering time can cause additional eligible updates on later frames. */
+const oldCarryLine='carry = excess > 1e-9 ? Math.min(1 / 30, excess) : 0;';
+const newCarryLine='carry = excess > 1e-9 ? excess : 0;';
+const oldPauseLine='            if (this.paused)\n                carry = 0;';
+const postClampLine='            carry = Math.min(1 / 30, carry);\n';
+function patchRafStepCap(html){
+ const out=patchRafStepCapLegacy(html);
+ if(count(out,newCarryLine)===1&&count(out,postClampLine)===1)return out;
+ if(count(out,oldCarryLine)!==1||count(out,oldPauseLine)!==1||
+    count(out,newCarryLine)!==0||count(out,postClampLine)!==0)
+  throw Error('canonical RAF post-second carry owner drift; refuse materialization');
+ return out.replace(oldCarryLine,newCarryLine)
+  .replace(oldPauseLine,postClampLine+oldPauseLine);
 }
 module.exports={patchRafStepCap,protectBootCleanup,protectInputBlurCleanup,before,intermediate,after};
 if(require.main===module){
