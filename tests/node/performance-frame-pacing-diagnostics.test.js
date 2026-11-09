@@ -264,7 +264,7 @@ test('clustered mean-60Hz frames disclose 33ms p95 despite nominal 60 FPS',()=>{
  const a=menu.indexOf('function snapshot()'),b=menu.indexOf('function fillDebug()',a);
  const win={__NOVA_PERF_LAST__:p,innerWidth:360,innerHeight:740,devicePixelRatio:2};
  const nav={onLine:true,maxTouchPoints:5,userAgent:'test'};
- vm.runInNewContext(menu.slice(a,b)+'\\nwindow.__snap=snapshot;',{
+ vm.runInNewContext(menu.slice(a,b)+'\nwindow.__snap=snapshot;',{
   window:win,navigator:nav,VERSION:'1.7.8',CODENAME:'Signal Flow',
   updaterState:()=> 'CURRENT'
  });
