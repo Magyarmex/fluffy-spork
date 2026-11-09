@@ -28,13 +28,14 @@ function create({durationMs=60000,maxSamples=5000}={}){
   throw Error('browser timing APIs unavailable');
  let active=false,startedAt=null,endedAt=null,reason='idle',raf=null,generation=0,seq=0;
  let pending=[],samples={},count=0;
- const clock=()=>root.performance.now();
+ const clock=()=>{try{return root.performance.now()}catch(_){return NaN}};
  function onEvent(e){
   if(!active||!e||!TYPES.includes(e.type))return;
   // A bounded queue prevents a burst of browser events from consuming memory.
   if(count+pending.length>=maxSamples)return;
   const at=clock();
-  if(Number.isFinite(at))pending.push({kind:e.type,at});
+  if(!Number.isFinite(at)){stop('invalid-clock');return;}
+  pending.push({kind:e.type,at});
  }
  function onVisibility(){
   if(root.document&&root.document.hidden)stop('hidden');
