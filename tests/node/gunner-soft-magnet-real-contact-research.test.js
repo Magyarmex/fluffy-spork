@@ -21,9 +21,11 @@ function visibleMotionIntent(requested,bearing,now,prior){
  if(!now||!prior||!now.visible||!prior.visible||prior.id!==now.id)return false;
  const dt=now.at-prior.at;
  if(!(dt>0&&dt<=.2))return false;
- const observedVy=(now.y-prior.y)/dt;
+ // Tangential motion relative to the observed sight ray, not global Y motion.
+ const dx=(now.x-prior.x)/dt,dy=(now.y-prior.y)/dt;
+ const lateral=-Math.sin(bearing)*dx+Math.cos(bearing)*dy;
  const signedLead=wrap(requested-bearing);
- return Math.abs(observedVy)>20&&observedVy*signedLead>0&&Math.abs(signedLead)>.01;
+ return Math.abs(lateral)>20&&lateral*signedLead>0&&Math.abs(signedLead)>.01;
 }
 const softBearing=(requested,target)=>{
  const delta=wrap(requested-target);
@@ -254,7 +256,7 @@ test('soft-magnet contact with class-specific geometric intercept inputs',()=>{
     }
  });
 
-test('visible-motion intent history expires on target identity switch',()=>{
+test('visible-motion intent history expires and uses sight-relative motion',()=>{
  const prior={id:1,x:200,y:0,at:0,visible:true};
  assert.equal(visibleMotionIntent(.08,0,{id:1,x:200,y:1,at:1/60,visible:true},prior),true);
  assert.equal(visibleMotionIntent(.08,0,{id:2,x:200,y:1,at:1/60,visible:true},prior),false);
@@ -262,4 +264,8 @@ test('visible-motion intent history expires on target identity switch',()=>{
  assert.equal(visibleMotionIntent(-.08,0,{id:1,x:200,y:1,at:1/60,visible:true},prior),false);
  assert.equal(visibleMotionIntent(.08,0,{id:1,x:200,y:20,at:1,visible:true},prior),false);
  assert.equal(visibleMotionIntent(.08,0,{id:1,x:200,y:1,at:1/60,visible:false},prior),false);
+ // Pure radial approach is not predictive lateral motion.
+ assert.equal(visibleMotionIntent(.08,0,{id:1,x:199,y:0,at:1/60,visible:true},prior),false);
+ // Rotating the sight ray by 90 degrees rotates the eligible lateral axis.
+ assert.equal(visibleMotionIntent(.08,Math.PI/2,{id:1,x:199,y:0,at:1/60,visible:true},prior),true);
 });
