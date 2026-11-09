@@ -24,6 +24,9 @@ test('patch accepts raw, previously shipped, and new shell; rejects drift',()=>{
  const old=raw(),mid=old.replace(before,intermediate),latest=fs.readFileSync(path.join(root,'index.html'),'utf8');
  assert.equal(patchRafStepCap(old),patchRafStepCap(mid));
  assert.equal(patchRafStepCap(patchRafStepCap(latest)),patchRafStepCap(latest));
+ const upgraded=patchRafStepCap(latest);
+ assert.equal(upgraded.split('priorWork < 18 && earlierWork < 18 && performance.now() - workStart < 18').length-1,1,
+  'already materialized production shell must acquire the current-frame budget exactly once');
  assert.equal(patchRafStepCap(patchRafStepCap(old)),patchRafStepCap(old));
  assert.equal(patchRafStepCap(old).split(after).length-1,1);
  assert.throws(()=>patchRafStepCap(old.replace(before,'            const dt = 123;')),/drift/);
