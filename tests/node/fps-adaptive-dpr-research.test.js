@@ -5,10 +5,10 @@ const {createAdaptiveDprPilot}=require('../research/fps-adaptive-dpr.cjs');
 function game(){return {quality:'low',status:'playing',paused:false,dpr:1.5,w:320,h:568,
  zoom:.8,canvas:{width:480,height:852,clientWidth:320,clientHeight:568},
  mm:{width:216,height:216},time:12,input:{firing:true}};}
-const slow={frameSamples:120,fps:35,frameP95Ms:40,updateP95Ms:10,renderP95Ms:7};
-const improved={frameSamples:120,fps:55,frameP95Ms:22,updateP95Ms:5,renderP95Ms:5};
-const fast={frameSamples:120,fps:60,frameP95Ms:16.7,updateP95Ms:2,renderP95Ms:4};
-const cpu={frameSamples:120,fps:27,frameP95Ms:55,updateP95Ms:31,renderP95Ms:7};
+const slow={frameSamples:120,fps:35,frameP95Ms:40,updateP95Ms:10,renderP95Ms:7,simulationPacePct:70};
+const improved={frameSamples:120,fps:55,frameP95Ms:22,updateP95Ms:5,renderP95Ms:5,simulationPacePct:95};
+const fast={frameSamples:120,fps:60,frameP95Ms:16.7,updateP95Ms:2,renderP95Ms:4,simulationPacePct:100};
+const cpu={frameSamples:120,fps:27,frameP95Ms:55,updateP95Ms:31,renderP95Ms:7,simulationPacePct:55};
 function drive(p,from,to,perf,step=500){let r;for(let t=from;t<=to;t+=step)r=p.sample(t,perf);return r;}
 function accept(p){drive(p,0,1000,slow);assert.equal(p.state.phase,'probing');
  drive(p,1500,7000,improved);assert.equal(p.state.phase,'low');}
