@@ -46,6 +46,9 @@ const {chromium}=require('playwright');
   await page.evaluate(()=>{
    const g=window.__novaBirthGame;
    g.input.autofire=false;g.player.spawnShieldT=20;
+   // Eliminate prior AUTO cooldown as a confound in this single-shot timing
+   // witness. Do not modify class reload, projectile physics or firing logic.
+   g.player.fireCd=0;
    window.__novaBirths.length=0; // Exclude any pre-interaction AUTO shots.
   });
   const box=await canvas.boundingBox();
