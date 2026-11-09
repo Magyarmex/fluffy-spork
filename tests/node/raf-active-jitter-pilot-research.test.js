@@ -126,3 +126,18 @@ test('current-update CPU gate prevents a second expensive step on the first fram
    'lower current-frame CPU work may trade off simulation progress');
  }
 });
+
+// The proposed 100ms gate is a sharp policy boundary. Explicitly preserve
+// its intended side of the threshold; do not accidentally repay suspended
+// time when floating-point RAF timestamps land just above the boundary.
+test('active-jitter eligibility has a bounded 100ms timestamp boundary',()=>{
+ for(const [gap,expected] of [[99.9,2],[100,2],[100.1,1],[120,1]]){
+  const observed=run(pilot,[gap],1,0);
+  assert.equal(observed.firstFrameSteps,expected,
+   'first-frame update count for '+gap+'ms presentation gap');
+  assert.ok(observed.maxSteps<=2);
+ }
+ const current=run(shipping,[99.9],1,0);
+ assert.equal(current.firstFrameSteps,1,
+  'shipping 83.33ms gate must not be mistaken for pilot 100ms gate');
+});
