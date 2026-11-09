@@ -61,7 +61,7 @@ const softBearing=(requested,target)=>{
  const delta=wrap(requested-target);
  return wrap(requested-delta*.45*Math.exp(-((delta/.06)**2)));
 };
-function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
+function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed',speedStat=0){
  return withSeed(seed,draws=>{
   const g=bootGame();if(!g.player)g.redeploy();
   try{
@@ -69,6 +69,7 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
    g.sfx.muted=true;g.setClass(p,cls);
    Object.assign(p,{x:0,y:0,vx:0,vy:0,angle:0,spawnShieldT:0,droneRespawnT:Infinity});
    p.stats.reload=cls==='minigun'?1:3;
+   p.stats.bulletspeed=speedStat;
    Object.assign(t,{cls:'scout',isPlayer:true,alive:true,x:200,
     y:scenario==='moving'?-35*direction:0,vx:0,vy:0,hp:1000000,maxHp:1000000,
     gene:null,perk:null,spawnShieldT:0,shieldT:0,bulwarkT:0,
@@ -138,7 +139,7 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
     if(scenario==='moving'&&leadMode==='intercept'){
      // Public straight-line geometry reference, not a gameplay auto-lead.
      // Keep the nominal physical input independent of damage knockback.
-     const speed=cls==='minigun'?480:690,vy=45*direction;
+     const speed=g.bulletSpeed(p),vy=45*direction;
      const a=vy*vy-speed*speed,b=2*nominalY*vy,c=200*200+nominalY*nominalY;
      const discriminant=b*b-4*a*c;
      assert.ok(discriminant>0);
@@ -158,7 +159,7 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
     const visible={id:t.id,x:t.x,y:t.y,at:i/hz,visible:publiclyEligible};
     const adaptiveGate=visibleMotionIntent(requested,targetBearing,visible,previousVisible);
     const weight=visibleMotionWeight(requested,targetBearing,visible,previousVisible);
-    const plausibleGate=publiclyEligible&&plausibleVisibleLead(requested,targetBearing,visible,previousVisible,cls==='minigun'?480:690,p.x,p.y);
+    const plausibleGate=publiclyEligible&&plausibleVisibleLead(requested,targetBearing,visible,previousVisible,g.bulletSpeed(p),p.x,p.y);
     previousVisible=visible;
     const useSoft=policy==='soft'||(policy==='adaptive'&&adaptiveGate)||(policy==='plausible'&&plausibleGate);
     if(policy==='smooth')smoothWeightSum+=weight;
@@ -389,4 +390,36 @@ test('plausible visible lead requires public history and finite projectile speed
  assert.equal(plausibleVisibleLead(.09,0,{...now,id:2},prior,480),false);
  assert.equal(plausibleVisibleLead(.09,0,now,prior,0),false);
  assert.equal(plausibleVisibleLead(.09,0,now,prior,NaN),false);
+});
+
+test('plausibility gate tracks legal projectile-speed upgrades in actual Game',()=>{
+ const rows=[];
+ for(const cls of ['minigun','needlestorm'])
+  for(const hz of [30,60])
+   for(const direction of [-1,1]){
+    for(const leadMode of ['intercept','overlead']){
+     const hard=trial(1517802,cls,hz,'moving','hard',direction,leadMode,8);
+     const candidate=trial(1517802,cls,hz,'moving','plausible',direction,leadMode,8);
+     assert.equal(candidate.volleys,hard.volleys);
+     assert.equal(rngDivergence(hard,candidate),null);
+     if(leadMode==='intercept')assert.ok(candidate.adaptiveSoftTicks>0,
+      'legal bullet-speed upgrade must retain its own valid geometric lead');
+     else{
+      assert.equal(candidate.adaptiveSoftTicks,0,
+       'wide overlead must not become plausible after speed upgrade');
+      assert.equal(candidate.damage,hard.damage);
+     }
+     rows.push({cls,hz,direction,leadMode,hard:hard.damage,
+      candidate:candidate.damage,softTicks:candidate.adaptiveSoftTicks});
+    }
+   }
+ assert.equal(rows.length,16);
+ console.log('UPGRADED_BULLET_SPEED_AIM_RESEARCH '+JSON.stringify(rows));
+});
+
+test('plausibility threshold uses current speed rather than fixed class baseline',()=>{
+ const prior={id:1,x:200,y:0,at:0,visible:true};
+ const now={id:1,x:200,y:.75,at:1/60,visible:true};
+ assert.equal(plausibleVisibleLead(.11,0,now,prior,480),true);
+ assert.equal(plausibleVisibleLead(.11,0,now,prior,480*(1+.085*8)),false);
 });
