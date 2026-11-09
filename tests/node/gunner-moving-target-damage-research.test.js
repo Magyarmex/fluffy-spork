@@ -1,8 +1,9 @@
 'use strict';
 /* #799: composed 49-overlay moving-target damage research.
  * Unlike nominal shot damage, this measures canonical HP changes against a
- * deliberately stationary, high-HP Scout target in open terrain. It is NOT
- * natural-match DPS: the target does not evade, shoot, or use cover. */
+ * high-HP Scout target in open terrain, held stationary or scripted along a
+ * lateral sinusoid. It is NOT natural-match DPS: the target does not choose
+ * evasive tactics, shoot, or use cover; motion is externally prescribed. */
 const test=require('node:test'),assert=require('node:assert/strict');
 const previous=process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL;
 process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
