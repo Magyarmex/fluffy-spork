@@ -170,7 +170,7 @@ const {chromium}=require('playwright');
   await page.waitForFunction(()=>{
    const g=window.__novaBirthGame;
    return g?.status==='playing'&&!g.input.aim.active&&!g.input.firing&&
-    g.input.stickId.aim===null;
+    g.input.stickId.aim===-1;
   },null,{timeout:5000});
   const birthsAfterRelease=await page.evaluate(()=>window.__novaBirths.length);
   await page.waitForTimeout(600); // More than an ordinary Scout reload cycle.
@@ -181,7 +181,7 @@ const {chromium}=require('playwright');
   });
   assert.equal(releaseState.aimActive,false,'released right stick must stay inactive');
   assert.equal(releaseState.firing,false,'release must not leave held fire active');
-  assert.equal(releaseState.aimOwner,null,'release must clear right-stick owner');
+  assert.equal(releaseState.aimOwner,-1,'release must clear right-stick owner');
   assert.equal(releaseState.births,birthsAfterRelease,
    'no new player shot may be born after touch release is processed');
   assert.deepEqual(errors,[],'the real game must not throw');
