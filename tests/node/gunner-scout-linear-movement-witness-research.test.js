@@ -80,15 +80,21 @@ test('composed Game.update preserves the Scout witness at the bullet phase',()=>
     p.spawnShieldT=0;p.droneRespawnT=Infinity;
     g.input.firing=false;g.input.autofire=false;
     let observed=null;
-    const old=g.updateBullets;
+    // Move during the drones phase, before the core rebuilds its spatial
+    // hash. Moving at updateBullets would leave the hash stale and produce
+    // a misleading collision fixture.
+    const oldDrones=g.updateDrones,oldBullets=g.updateBullets;
+    let sx=t.x,sy=t.y;
+    g.updateDrones=function(dt){
+     sx=t.x;sy=t.y;this.moveTank(t,0,60,dt);
+     return oldDrones.apply(this,arguments);
+    };
     g.updateBullets=function(dt){
-     const sx=t.x,sy=t.y;
-     this.moveTank(t,0,60,dt);
      observed={time:this.time,epoch:t.__novaLinearMoveEpoch,
       valid:t.__novaLinearMoveValid,calls:t.__novaLinearMoveCalls,
       dt:t.__novaLinearMoveDt,
       dx:t.x-sx,dy:t.y-sy};
-     return old.apply(this,arguments);
+     return oldBullets.apply(this,arguments);
     };
     g.update(1/hz);
     assert.ok(observed,'real Game.update must execute the projectile phase');
@@ -137,10 +143,14 @@ test('Gunner projectiles encounter a Scout moving through real Game.moveTank',()
       g.input.autofire=false;g.input.firing=true;
       g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
       let witnessed=0,invalid=0,hits=0,damage=0;
+      const originalDrones=g.updateDrones;
       const originalBullets=g.updateBullets,originalDamage=g.damageTank;
-      g.updateBullets=function(dt){
+      g.updateDrones=function(dt){
        t.vx=0;t.vy=60;
        this.moveTank(t,0,60,dt);
+       return originalDrones.apply(this,arguments);
+      };
+      g.updateBullets=function(dt){
        if(t.__novaLinearMoveValid===true&&
           t.__novaLinearMoveEpoch===this.time&&
           t.__novaLinearMoveCalls===1)witnessed++;
