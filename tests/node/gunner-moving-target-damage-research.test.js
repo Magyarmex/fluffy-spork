@@ -25,6 +25,10 @@ function trial(seed,cls,reload,hz,mode,targetX=200,motion='stationary',assist='s
   const target=g.tanks.find(t=>t!==p);
   assert.ok(target,'real composed game must provide a target tank');
   p.x=0;p.y=0;p.vx=0;p.vy=0;p.angle=0;
+  // The seeded initial spawn may leave the camera hundreds of units away.
+  // Center the controlled public viewport before comparing aim assistance;
+  // otherwise seed-dependent camera travel confounds the first shots.
+  g.cam.x=0;g.cam.y=0;g.cam.zoom=1;g.zoom=1;g.w=800;g.h=600;
   p.droneRespawnT=Infinity;p.spawnShieldT=0;
   Object.assign(target,{cls:'scout',isPlayer:true,alive:true,
    x:targetX,y:0,vx:0,vy:0,hp:1000000,maxHp:1000000,
@@ -113,8 +117,9 @@ test('moving lateral target exposes hit and damage sensitivity under matched wal
      assert.equal(crossing.volleys,stationary.volleys,
       'target movement must not alter firing chronology');
      assert.equal(manual.activeSeconds,crossing.activeSeconds);
-     assert.ok(crossing.assistQueries>0&&crossing.assistEligible>0,
-      'the shipping arm must actually find the visible hostile moving target');
+     assert.ok(crossing.assistQueries>0);
+     assert.equal(crossing.assistEligible,crossing.assistQueries,
+      'fixed public viewport must expose the hostile moving target every query');
      assert.equal(manual.assistQueries,crossing.assistQueries);
      assert.equal(manual.assistEligible,crossing.assistEligible,
       'the manual arm must retain the same shipping eligibility witness');
