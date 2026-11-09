@@ -1,7 +1,7 @@
 'use strict';
 // Research-only real-browser witness: trusted touch delivery -> real player
 // projectile birth and the first projectile-core Canvas fill in the shipping
-// React/Game path. NOT GPU presentation or physical touch-to-photon latency.
+// React/Game path. Includes backing-store pixel verification; NOT GPU presentation or physical touch-to-photon latency.
 const assert=require('node:assert/strict');
 const {chromium}=require('playwright');
 
@@ -37,9 +37,9 @@ const {chromium}=require('playwright');
    // This excludes unrelated Canvas draws and does not claim GPU display.
    const canvasProto=CanvasRenderingContext2D.prototype;
    const originalArc=canvasProto.arc,originalFill=canvasProto.fill;
-   let pendingBulletCore=false;
+   let pendingBulletCore=false,pendingCenter=null;
    canvasProto.arc=function(x,y,r,start,end,...rest){
-    pendingBulletCore=false;
+    pendingBulletCore=false;pendingCenter=null;
     const g=window.__novaBirthGame;
     if(g&&g.status==='playing'&&window.__novaAimExtensionAt!==null&&
        window.__novaBirths.length>0&&window.__novaCanvasSubmit.length===0&&
@@ -55,16 +55,25 @@ const {chromium}=require('playwright');
        Math.abs(r-br*.55)<1e-6;
      });
     }
+    if(pendingBulletCore)pendingCenter={x,y};
     return originalArc.call(this,x,y,r,start,end,...rest);
    };
    canvasProto.fill=function(...args){
-    if(pendingBulletCore&&window.__novaCanvasSubmit.length===0){
+    const matched=pendingBulletCore&&window.__novaCanvasSubmit.length===0;
+    const center=matched?this.getTransform().transformPoint(pendingCenter):null;
+    pendingBulletCore=false;pendingCenter=null;
+    const result=originalFill.apply(this,args);
+    if(matched){
      const g=window.__novaBirthGame;
-     window.__novaCanvasSubmit.push({at:performance.now(),method:'bullet-core-fill',
-      gameTime:g.time});
+     const px=Math.max(0,Math.min(this.canvas.width-1,Math.floor(center.x)));
+     const py=Math.max(0,Math.min(this.canvas.height-1,Math.floor(center.y)));
+     const paintAt=performance.now(); // Capture before synchronous GPU/Canvas readback.
+     const rgba=Array.from(this.getImageData(px,py,1,1).data);
+     const rasterReadMs=performance.now()-paintAt;
+     window.__novaCanvasSubmit.push({at:paintAt,method:'bullet-core-fill',
+      gameTime:g.time,rgba,rasterReadMs});
     }
-    pendingBulletCore=false;
-    return originalFill.apply(this,args);
+    return result;
    };
    Game.prototype.tryFire=function(t,...args){
     const before=this.bullets.length;
@@ -139,6 +148,9 @@ const {chromium}=require('playwright');
   const birth=during.shots[0];
   await page.waitForFunction(()=>window.__novaCanvasSubmit.length>0,null,{timeout:12000});
   const canvasSubmit=await page.evaluate(()=>window.__novaCanvasSubmit[0]);
+  assert.ok(canvasSubmit.rgba.length===4&&
+   canvasSubmit.rgba.slice(0,3).every(c=>c>=200)&&canvasSubmit.rgba[3]>=200,
+   'actual player projectile core must produce a bright opaque backing pixel');
   assert.ok(Number.isFinite(canvasSubmit.at)&&canvasSubmit.at>=birth.at,
    'the exact player projectile core fill must follow projectile birth');
   assert.ok(Number.isFinite(birth.at)&&Number.isFinite(birth.gameTime));
@@ -160,7 +172,8 @@ const {chromium}=require('playwright');
    birthGameTime:birth.gameTime,projectilesObserved:during.shots.length,
    deliveryToCanvasSubmitMs:Math.round((canvasSubmit.at-move.at)*1000)/1000,
    birthToCanvasSubmitMs:Math.round((canvasSubmit.at-birth.at)*1000)/1000,
-   canvasMethod:canvasSubmit.method,
+   canvasMethod:canvasSubmit.method,canvasCoreRgba:canvasSubmit.rgba,
+   rasterReadMs:Math.round(canvasSubmit.rasterReadMs*1000)/1000,
    notMeasured:['GPU presentation','physical photon latency']
   }));
  }finally{await context.close();await browser.close();}
