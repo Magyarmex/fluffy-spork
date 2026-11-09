@@ -109,9 +109,14 @@ assert.ok([65,100].includes(renderScale),'only the certified 65% and default 100
   const clarity=await page.evaluate(()=>{
    const g=window.__novaBirthGame;
    return {stored:JSON.parse(localStorage.getItem('novatanks_pilot_settings_v1')||'{}').renderScale,
-    dpr:g.dpr,css:[g.w,g.h],backing:[g.canvas.width,g.canvas.height]};
+    dpr:g.dpr,deviceDpr:window.devicePixelRatio,quality:g.quality,
+    css:[g.w,g.h],backing:[g.canvas.width,g.canvas.height]};
   });
   assert.ok(Number.isFinite(clarity.dpr)&&clarity.dpr>=1,'active Game must have legal DPR');
+  const expectedBase=Math.max(1,Math.min(clarity.deviceDpr,clarity.quality==='high'?2:1.5));
+  const expectedDpr=Math.max(1,expectedBase*renderScale/100);
+  assert.ok(Math.abs(clarity.dpr-expectedDpr)<1e-9,
+   'shipping clarity owner must apply the exact selected backing scale');
   assert.deepEqual(clarity.backing,clarity.css.map(v=>Math.max(1,Math.round(v*clarity.dpr))),
    'the actual Canvas backing must match the Game DPR');
   if(renderScale===65){
