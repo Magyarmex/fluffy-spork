@@ -155,3 +155,18 @@ if(hasOldCap)test('research: sub-100ms two-step gate plus 100ms debt reduces wid
  // catch-up threshold, CPU pressure and input event chronology require
  // composed-game and physical-device acceptance before any shipping use.
 });
+
+if(hasOldCap)test('falsifier: bounded 100ms pilot still loses time when catch-up CPU is unavailable',()=>{
+ const oldGate='elapsed <= 1 / 12';
+ const candidate=shipping.replace(oldCap,
+  'Math.min(elapsed < 0.1 ? 0.1 : 1 / 30, excess)')
+  .replace(oldGate,'elapsed < 0.1');
+ const moderateWork=run(candidate,eightGap,60,9);
+ assert.ok(moderateWork.maxLag>0.08,
+  'two 9ms updates consume the existing 18ms catch-up work threshold');
+ const heavyWork=run(candidate,eightGap,60,22);
+ assert.ok(heavyWork.sim<58,
+  'no safe two-step capacity means time preservation cannot be promised');
+ assert.equal(heavyWork.maxSteps,1,
+  'the existing CPU-work gate must still reject expensive second updates');
+});
