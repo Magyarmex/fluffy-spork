@@ -36,7 +36,8 @@ const {chromium}=require('playwright');
     const original=canvasProto[method];
     canvasProto[method]=function(...args){
      const g=window.__novaBirthGame;
-     if(g&&g.status==='playing'&&g.bullets.some(b=>b&&b.ownerId===g.player.id)&&
+     if(g&&g.status==='playing'&&window.__novaAimExtensionAt!==null&&
+        window.__novaBirths.length>0&&g.bullets.some(b=>b&&b.ownerId===g.player.id)&&
         this.canvas?.matches?.('canvas.absolute.inset-0')&&
         window.__novaCanvasSubmit.length===0)
       window.__novaCanvasSubmit.push({at:performance.now(),method,gameTime:g.time});
