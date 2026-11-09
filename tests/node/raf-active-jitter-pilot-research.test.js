@@ -230,3 +230,15 @@ test('catch-up steps can consume a later input state before its event time',()=>
  assert.ok(baseline.every(u=>u.firing&&u.sim<.09),
   'the underlying sampling limitation also exists in shipping');
 });
+
+// Existing production has the same structural problem at its 1/12s gate.
+// Document the shipped limitation independently of the proposed 100ms pilot.
+test('shipping 83.33ms second-step boundary has a near-twofold timebase cliff',()=>{
+ const eligible=run(shipping,[83.333],10,0);
+ const ineligible=run(shipping,[83.334],10,0);
+ assert.ok(eligible.sim>7.9&&eligible.sim<8.2);
+ assert.ok(ineligible.sim>3.9&&ineligible.sim<4.2);
+ assert.ok(eligible.sim>ineligible.sim*1.9,
+  'a 0.001ms RAF interval change nearly halves shipped simulation progress');
+ assert.ok(eligible.maxSteps<=2&&ineligible.maxSteps<=2);
+});
