@@ -55,3 +55,53 @@ test('real Scout movement certifies one segment and rejects two same-epoch moves
  assert.equal(rows.length,6);
  console.log('SCOUT_MOVING_BODY_WITNESS_RESEARCH '+JSON.stringify(rows));
 });
+
+test('composed Game.update preserves the Scout witness at the bullet phase',()=>{
+ const rows=[];
+ for(const seed of [1517800,1517802])for(const hz of [30,60,120]){
+  rows.push(withSeed(seed,()=>{
+   const g=bootGame();if(!g.player)g.redeploy();
+   try{
+    const p=g.player,t=g.tanks.find(x=>x!==p);
+    assert.ok(t);
+    g.sfx.muted=true;
+    g.tanks=[p,t];g.tankById=new Map([[p.id,p],[t.id,t]]);
+    g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];g.orbs=[];
+    g.__novaTerrain=[];g.__novaBattlefieldIndex=null;
+    if(g.hash&&g.hash.clear)g.hash.clear();
+    t.cls='scout';t.isPlayer=true;t.alive=true;
+    t.x=200;t.y=-30;t.vx=0;t.vy=60;
+    t.spawnShieldT=0;t.shieldT=0;
+    g.status='playing';g.paused=false;
+    g.shapeTimer=Infinity;g.powerupTimer=Infinity;g.eliteTimer=Infinity;
+    g.crasherTimer=Infinity;g.aiRespawns=[];
+    g.spawnShape=()=>null;g.spawnPowerup=()=>null;
+    g.spawnAITank=()=>null;g.spawnDrone=()=>null;
+    p.spawnShieldT=0;p.droneRespawnT=Infinity;
+    g.input.firing=false;g.input.autofire=false;
+    let observed=null;
+    const old=g.updateBullets;
+    g.updateBullets=function(dt){
+     const sx=t.x,sy=t.y;
+     this.moveTank(t,0,60,dt);
+     observed={time:this.time,epoch:t.__novaLinearMoveEpoch,
+      valid:t.__novaLinearMoveValid,calls:t.__novaLinearMoveCalls,
+      dt:t.__novaLinearMoveDt,
+      dx:t.x-sx,dy:t.y-sy};
+     return old.apply(this,arguments);
+    };
+    g.update(1/hz);
+    assert.ok(observed,'real Game.update must execute the projectile phase');
+    assert.equal(observed.epoch,observed.time);
+    assert.equal(observed.valid,true);
+    assert.equal(observed.calls,1);
+    assert.equal(observed.dt,1/hz);
+    assert.ok(Math.abs(observed.dx)<1e-6);
+    assert.ok(Math.abs(observed.dy-60/hz)<1e-6);
+    return {seed,hz,dy:+observed.dy.toFixed(6),epoch:observed.epoch};
+   }finally{g.destroy();}
+  }));
+ }
+ assert.equal(rows.length,6);
+ console.log('SCOUT_GAME_UPDATE_BULLET_PHASE_WITNESS '+JSON.stringify(rows));
+});
