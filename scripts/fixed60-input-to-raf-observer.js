@@ -98,7 +98,7 @@ function create({durationMs=60000,maxSamples=5000}={}){
   active=true;generation++;seq++;startedAt=now;endedAt=null;reason='running';
   pending=[];samples=Object.fromEntries(TYPES.map(type=>[type,[]]));count=0;
   try{
-   for(const type of TYPES)root.addEventListener(type,onEvent,true);
+   for(const type of TYPES)root.addEventListener(type,onEvent,{capture:true,passive:true});
    if(root.document&&typeof root.document.addEventListener==='function')
     root.document.addEventListener('visibilitychange',onVisibility);
    schedule();
