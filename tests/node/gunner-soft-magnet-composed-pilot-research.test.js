@@ -69,6 +69,16 @@ test('continuous soft magnet preserves lead, damps small errors and avoids a har
  }
  assert.ok(minSlope>=.54-1e-3,'near-center correction stays responsive');
  assert.ok(maxSlope<1.205,'local amplification must stay under 20.5 percent');
+ // Target identity may switch even under fair public visibility. The maximum
+ // correction per target must stay bounded so switching cannot recreate the
+ // old 0.22-rad snap, even when candidates sit on opposite sides of the stick.
+ let maxCorrection=0;
+ for(let i=-1000;i<=1000;i++){
+  const d=i*Math.PI/1000;
+  maxCorrection=Math.max(maxCorrection,Math.abs(wrap(softBearing(d,0)-d)));
+ }
+ assert.ok(maxCorrection<.012,'one target may bend aim by at most 0.69 degrees');
+ assert.ok(2*maxCorrection<.024,'opposite target switch stays under 1.38 degrees');
 
 });
 test('shipping hard snap versus opt-in soft and manual bearing in composed Game',()=>{
