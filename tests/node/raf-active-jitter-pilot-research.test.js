@@ -61,12 +61,16 @@ test('harsh clustered 30Hz improves without changing update count',()=>{
  assert.ok(after.sim>before.sim+1,'recover lost active time');
  assert.equal(after.updates,before.updates);
 });
-test('CPU-heavy frames never trigger optional second update',()=>{
+test('current-frame CPU spikes can still double-update; both policies remain bounded',()=>{
+ // The existing gate observes the PREVIOUS two frames, not the current
+ // first update. A 22ms first update may therefore be followed by another
+ // update when earlier frames were cheap. Preserve this measured risk rather
+ // than falsely claiming that the CPU gate forbids all double updates.
  for(const gaps of [worst,harsh]){
   const before=run(shipping,gaps,10,22),after=run(pilot,gaps,10,22);
-  assert.equal(before.maxSteps,1);
-  assert.equal(after.maxSteps,1);
+  assert.ok(before.maxSteps<=2&&after.maxSteps<=2);
   assert.ok(after.sim>=before.sim-1e-7);
+  assert.ok(after.updates>=after.draws,'at least one update per presentation');
  }
 });
 test('seeded mixed schedules retain bounded work and never lose more simulated time',()=>{
