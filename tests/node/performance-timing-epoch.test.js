@@ -45,7 +45,8 @@ test('pause/resume CPU P95 cannot retain previous session and paused render is e
  expectFresh(f,10);
  f.window.__NOVA_PERF_LAST__={frameSamples:99,updateP95Ms:10};
  f.game.paused=true;f.step(33,0);
- assert.equal(f.window.__NOVA_PERF_LAST__,null,'published telemetry must not outlive its epoch');
+ assert.deepEqual(f.window.__NOVA_PERF_LAST__,{frameSamples:99,updateP95Ms:10},
+  'paused rendering must preserve the last complete live-match snapshot');
  assert.equal(f.snapshot().frameSamples,0);
  assert.equal(f.snapshot().updateP95Ms,null);
  assert.equal(f.snapshot().renderP95Ms,null);
@@ -61,7 +62,8 @@ test('long presentation discontinuity starts fresh CPU and simulation windows',(
  const f=fixture();warm(f);expectFresh(f,10);
  f.window.__NOVA_PERF_LAST__={frameSamples:99,renderP95Ms:10};
  f.cost(1,1);f.step(300,0);
- assert.equal(f.window.__NOVA_PERF_LAST__,null);
+ assert.deepEqual(f.window.__NOVA_PERF_LAST__,{frameSamples:99,renderP95Ms:10},
+  'last complete snapshot must not be partially rewritten');
  assert.equal(f.snapshot().frameSamples,0);
  assert.equal(f.snapshot().renderP95Ms,null);
  warm(f);expectFresh(f,1);
@@ -71,7 +73,8 @@ test('redeploy clears CPU timing without resetting cumulative terrain counters',
  f.game.__novaPerf.terrainQueries=17;
  f.window.__NOVA_PERF_LAST__={frameSamples:99,renderP95Ms:10};
  f.game.redeploy();
- assert.equal(f.window.__NOVA_PERF_LAST__,null);
+ assert.deepEqual(f.window.__NOVA_PERF_LAST__,{frameSamples:99,renderP95Ms:10},
+  'last complete snapshot must not be partially rewritten');
  assert.equal(f.snapshot().frameSamples,0);
  assert.equal(f.snapshot().updateP95Ms,null);
  assert.equal(f.snapshot().renderP95Ms,null);
