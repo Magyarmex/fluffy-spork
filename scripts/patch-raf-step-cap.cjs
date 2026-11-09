@@ -88,7 +88,7 @@ function protectLifecycleCleanup(html){
  return protectInputBlurCleanup(protectBootCleanup(html));
 }
 
-function patchRafStepCap(html){
+function patchRafStepCapLegacy(html){
  if(typeof html!=='string')throw new TypeError('expected UTF-8 HTML');
  if(!html.includes('    start() {')||!html.includes('this.raf = requestAnimationFrame(loop);'))
   throw Error('canonical game RAF owner missing');
@@ -116,6 +116,24 @@ function patchRafStepCap(html){
  return protectLifecycleCleanup(protectLifecycle(legacy.replace(priorCarry,withCarry)
   .replace(priorStep,newStep).replace(priorLoop,priorLoop+'\n            const workStart = performance.now();').replace(loopTail,newLoopTail)));
 }
+
+/* Recover already-eligible active time BEFORE clamping the remaining carry.
+ * The old order silently discarded excess time that the existing bounded
+ * second update was about to consume. No extra update, broader eligibility,
+ * larger debt bucket or long-stall repayment is introduced. */
+const capAfterStep=newStep.replace(
+ 'carry = excess > 1e-9 ? Math.min(1 / 30, excess) : 0;',
+ 'carry = excess > 1e-9 ? excess : 0;')
+ .replace('            if (this.paused)\\n                carry = 0;',
+  '            carry = Math.min(1 / 30, carry);\\n            if (this.paused)\\n                carry = 0;');
+function patchRafStepCap(html){
+ const out=patchRafStepCapLegacy(html);
+ if(count(out,capAfterStep)===1)return out;
+ if(count(out,newStep)!==1)
+  throw Error('canonical RAF post-second carry owner drift; refuse materialization');
+ return out.replace(newStep,capAfterStep);
+}
+
 module.exports={patchRafStepCap,protectBootCleanup,protectInputBlurCleanup,before,intermediate,after};
 if(require.main===module){
  const file=process.argv[2];if(!file)throw Error('Usage: node scripts/patch-raf-step-cap.cjs <index.html>');
