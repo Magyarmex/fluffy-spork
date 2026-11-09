@@ -163,7 +163,6 @@ function resetSimulationWindow(p){
   p.presentationTimes=null;p.simulationTimes=null;p.simulationSteps=null;
   p.updateTimes=null;p.renderTimes=null;
   p.simulatedSincePresentation=0;p.simulationStepsSincePresentation=0;
-  window.__NOVA_PERF_LAST__=null;
 }
 function recordPresentation(g,now){
   if(!g||g.__novaDecorativeWorld||!Number.isFinite(now))return;
