@@ -51,6 +51,11 @@ test('pause/resume CPU P95 cannot retain previous session and paused render is e
  assert.equal(f.snapshot().renderP95Ms,null);
  f.cost(1,1);f.game.paused=false;warm(f);
  expectFresh(f,1);
+ for(let i=0;i<65;i++)f.step();
+ const published=f.window.__NOVA_PERF_LAST__;
+ assert.ok(published&&published.frameSamples>=5,'new active epoch must publish telemetry');
+ assert.equal(published.updateP95Ms,1);
+ assert.equal(published.renderP95Ms,1);
 });
 test('long presentation discontinuity starts fresh CPU and simulation windows',()=>{
  const f=fixture();warm(f);expectFresh(f,10);
