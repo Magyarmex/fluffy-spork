@@ -200,3 +200,33 @@ test('100ms eligibility boundary produces a large sustained chronology cliff',()
   'tiny presentation change creates an unacceptable ~2x timebase cliff');
  assert.ok(eligible.maxSteps<=2&&ineligible.maxSteps<=2);
 });
+
+// Synthetic input-provenance counterexample, NOT a real touch test. The RAF
+// receives the latest input snapshot before replaying earlier elapsed time.
+// Without timestamped event history, extra catch-up steps can apply a press
+// to simulation time that predates the physical event.
+test('catch-up steps can consume a later input state before its event time',()=>{
+ function firstFrame(body){
+  let now=0,raf=null,sim=0,updates=[];
+  const start=new Function('performance','requestAnimationFrame','render_1',
+   'return ({'+body+'}).start')({now:()=>now},
+   fn=>{raf=fn;return 1;},{render(){}});
+  const game={paused:false,__novaDestroyed:false,mmTimer:0,
+   sfx:{startMusic(){}},firing:false,
+   update(dt){sim+=dt;updates.push({sim,firing:this.firing});},
+   drawMinimap(){}};
+  start.call(game);
+  // A physical press arrives at 90ms, before the first RAF at 99ms.
+  // The update owner sees the current held state, not its event timestamp.
+  now=90;game.firing=true;
+  now=99;const cb=raf;raf=null;cb(now);
+  return updates;
+ }
+ const baseline=firstFrame(shipping),candidate=firstFrame(pilot);
+ assert.equal(baseline.length,1);
+ assert.equal(candidate.length,2);
+ assert.ok(candidate.every(u=>u.firing&&u.sim<.09),
+  'pilot applies a 90ms press during two earlier simulation slices');
+ assert.ok(baseline.every(u=>u.firing&&u.sim<.09),
+  'the underlying sampling limitation also exists in shipping');
+});
