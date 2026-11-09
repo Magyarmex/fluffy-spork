@@ -2,8 +2,8 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const {createAdaptiveDprPilot}=require('../research/fps-adaptive-dpr.cjs');
-const slow={frameSamples:120,fps:32,frameP95Ms:45,updateP95Ms:9,renderP95Ms:6};
-const better={frameSamples:120,fps:52,frameP95Ms:30,updateP95Ms:5,renderP95Ms:4};
+const slow={frameSamples:120,fps:32,frameP95Ms:45,updateP95Ms:9,renderP95Ms:6,simulationPacePct:70};
+const better={frameSamples:120,fps:52,frameP95Ms:30,updateP95Ms:5,renderP95Ms:4,simulationPacePct:95};
 function fixture(){const game={quality:'low',status:'playing',paused:false,dpr:1.5,w:320,h:568,
  canvas:{width:480,height:852,clientWidth:320,clientHeight:568}};
  const pilot=createAdaptiveDprPilot(game);return {game,pilot};}
@@ -58,4 +58,32 @@ test('actual shipping two-stick touch geometry and ownership are DPR-independent
  step(pilot,0,1000,slow);assert.equal(g.dpr,1);
  assert.deepEqual(trace(),baseline);
  pilot.stop();g.destroy();
+});
+
+test('DPR probe cannot accept better FPS at the cost of slower simulation',()=>{
+ const {game,pilot}=fixture();step(pilot,0,1000,slow);
+ assert.equal(game.dpr,1,'slow baseline should start a reversible probe');
+ const r=step(pilot,1500,7000,{...better,simulationPacePct:60});
+ assert.equal(r.kind,'probe-rejected');
+ assert.equal(game.dpr,1.5,'rejected probe must restore original clarity');
+});
+test('missing simulation-pace telemetry cannot authorize a DPR reduction',()=>{
+ const {game,pilot}=fixture();
+ const {simulationPacePct,...withoutPace}=slow;
+ const r=step(pilot,0,2000,withoutPace);
+ assert.equal(r.kind,'insufficient-evidence');
+ assert.equal(game.dpr,1.5);
+});
+
+test('a slow rolling window cannot certify a DPR probe before old samples expire',()=>{
+ const {game,pilot}=fixture();
+ const slowTen={...slow,fps:10,frameP95Ms:120};
+ const betterTwenty={...better,fps:20,frameP95Ms:60};
+ step(pilot,0,1000,slowTen);
+ assert.equal(game.dpr,1);
+ const early=step(pilot,1500,7000,betterTwenty);
+ assert.equal(early.kind,'probing','a six-second window cannot flush 120 frames at 10 FPS');
+ const late=step(pilot,7500,9000,betterTwenty);
+ assert.equal(late.kind,'probe-window-too-slow');
+ assert.equal(game.dpr,1.5,'unverifiable clarity reduction must roll back');
 });
