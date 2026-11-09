@@ -31,7 +31,7 @@ const {chromium}=require('playwright');
   const box=await canvas.boundingBox();
   assert.ok(box&&box.width>200&&box.height>200);
   await canvas.tap({position:{x:box.width*.78,y:box.height*.68}});
-  // Browser-dispatched cancellation exercises the real passive DOM observer.\n  // It is not a physical touch cancellation or a gameplay latency measurement.\n  await canvas.evaluate(node=>node.dispatchEvent(new PointerEvent('pointercancel',{\n   bubbles:true,pointerId:77,pointerType:'touch',clientX:135,clientY:270})));\n  await page.evaluate(()=>new Promise(resolve=>
+  // CDP produces browser-trusted touch cancellation on the real Game canvas.\n  // This still measures DOM-to-RAF only, not physical touch-to-photon.\n  const cdp=await context.newCDPSession(page);\n  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{\n   x:box.x+box.width*.78,y:box.y+box.height*.68,id:77,\n   radiusX:1,radiusY:1,force:1}]});\n  await cdp.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});\n  await page.evaluate(()=>new Promise(resolve=>
    requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   const result=await page.evaluate(()=>{
    const o=window.__novaInputRafProbe;
