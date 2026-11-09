@@ -134,7 +134,7 @@ const {chromium}=require('playwright');
     shots:window.__novaBirths.slice(),
     events:window.__novaTouchDelivery.slice()};
   });
-  await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[extended]});
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   assert.equal(during.aimActive,true,'trusted right touch must own the aim stick');
   // Chromium remaps CDP contact ids to DOM pointerId values; asserting the
   // CDP-supplied id (42) would confuse transport identity with DOM ownership.
@@ -164,6 +164,42 @@ const {chromium}=require('playwright');
   const inputToSample=during.firstFireSample.at-move.at;
   const sampleToBirth=birth.at-during.firstFireSample.at;
   assert.ok(delay>=0&&delay<12000,'a held touch must eventually produce a real projectile');
+  // A real touch release must relinquish right-stick ownership and prevent
+  // a delayed/phantom shot. Check after the Game has processed the release,
+  // not merely after CDP acknowledges delivery to the browser.
+  await page.waitForFunction(()=>{
+   const g=window.__novaBirthGame;
+   return g?.status==='playing'&&!g.input.aim.active&&!g.input.firing&&
+    g.input.stickId.aim===-1;
+  },null,{timeout:5000});
+  const birthsAfterRelease=await page.evaluate(()=>window.__novaBirths.length);
+  await page.waitForTimeout(600); // More than an ordinary Scout reload cycle.
+  const releaseState=await page.evaluate(()=>{
+   const g=window.__novaBirthGame;
+   return {aimActive:g.input.aim.active,firing:g.input.firing,
+    aimOwner:g.input.stickId.aim,births:window.__novaBirths.length};
+  });
+  assert.equal(releaseState.aimActive,false,'released right stick must stay inactive');
+  assert.equal(releaseState.firing,false,'release must not leave held fire active');
+  assert.equal(releaseState.aimOwner,-1,'release must clear right-stick owner');
+  assert.equal(releaseState.births,birthsAfterRelease,
+   'no new player shot may be born after touch release is processed');
+  // The same physical right-stick gesture must work again after release:
+  // preventing phantom fire must not strand the next deliberate shot.
+  await page.evaluate(()=>{window.__novaBirthGame.player.fireCd=0;});
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[origin]});
+  await page.waitForFunction(()=>window.__novaBirthGame?.input.aim.active===true,
+   null,{timeout:5000});
+  assert.equal(await page.evaluate(()=>window.__novaBirths.length),
+   birthsAfterRelease,'centered re-arm must not inherit stale firing');
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[extended]});
+  await page.waitForFunction(expected=>window.__novaBirths.length>expected,
+   birthsAfterRelease,{timeout:12000});
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  await page.waitForFunction(()=>{
+   const i=window.__novaBirthGame?.input;
+   return i&&!i.aim.active&&!i.firing&&i.stickId.aim===-1;
+  },null,{timeout:5000});
   assert.deepEqual(errors,[],'the real game must not throw');
   console.log('NOVA_TOUCH_TO_PROJECTILE_BIRTH '+JSON.stringify({
    viewport:'320x700',trusted:true,deliveryToBirthMs:Math.round(delay*1000)/1000,
