@@ -10,7 +10,7 @@ else process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL=previous;
 function wrap(a){return Math.atan2(Math.sin(a),Math.cos(a));}
 function softBearing(requested,target){
  const d=wrap(requested-target);
- return wrap(requested-d*.55*Math.exp(-((d/.06)**2)));
+ return wrap(requested-d*.45*Math.exp(-((d/.06)**2)));
 }
 function sample(seed,hz,requested,mode){
  return withSeed(seed,()=>{
