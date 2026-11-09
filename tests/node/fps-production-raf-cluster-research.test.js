@@ -102,3 +102,20 @@ test('shipping scheduler keeps optional CPU-heavy catch-up bounded',()=>{
   const r=run(shipping,gaps,10,22);assert.equal(r.maxSteps,1);
  }
 });
+
+// Adversarial tradeoff: an oversized carry bucket can avoid dropping time
+// only by retaining an older-than-100ms simulation debt. Without an explicit
+// input-history policy this must NOT be mistaken for a safe production fix.
+// The candidate is a research-only source transform; shipping is unchanged.
+if(hasOldCap)test('falsifier: 250ms carry repairs eight-gap time only by retaining >100ms debt',()=>{
+ const wide=shipping.replace(oldCap,'Math.min(elapsed <= 0.1 ? 1 / 4 : 1 / 30, excess)');
+ assert.notEqual(wide,shipping,'research candidate must actually replace shipping carry cap');
+ const original=run(shipping,eightGap,60);
+ const candidate=run(wide,eightGap,60);
+ assert.ok(original.sim<40,'original eight-gap deficit must remain reproduced');
+ assert.ok(candidate.sim>59.9,'wide debt bucket should repay the tested active schedule');
+ assert.ok(candidate.maxSteps<=2,'the candidate still has a per-frame work bound');
+ // The bound is a separate, deliberately visible risk: current input is
+ // sampled during catch-up, not replayed from a timestamped event history.
+ // Do not infer that a >100ms backlog is safe for touch or Controller orders.
+});
