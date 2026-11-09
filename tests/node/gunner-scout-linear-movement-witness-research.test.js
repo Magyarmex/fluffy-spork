@@ -105,3 +105,66 @@ test('composed Game.update preserves the Scout witness at the bullet phase',()=>
  assert.equal(rows.length,6);
  console.log('SCOUT_GAME_UPDATE_BULLET_PHASE_WITNESS '+JSON.stringify(rows));
 });
+
+test('Gunner projectiles encounter a Scout moving through real Game.moveTank',()=>{
+ const rows=[];
+ for(const cls of ['minigun','needlestorm'])
+  for(const hz of [30,60,120])
+   for(const seed of [1517800,1517802]){
+    rows.push(withSeed(seed,()=>{
+     const g=bootGame();if(!g.player)g.redeploy();
+     try{
+      const p=g.player,t=g.tanks.find(x=>x!==p);
+      assert.ok(t);
+      g.sfx.muted=true;g.setClass(p,cls);
+      p.x=0;p.y=0;p.vx=0;p.vy=0;p.angle=0;
+      p.stats.reload=cls==='minigun'?1:3;
+      p.spawnShieldT=0;p.droneRespawnT=Infinity;
+      g.cam.x=0;g.cam.y=0;g.cam.zoom=1;g.zoom=1;g.w=800;g.h=600;
+      Object.assign(t,{cls:'scout',isPlayer:true,alive:true,
+       x:200,y:-40,vx:0,vy:60,hp:1000000,maxHp:1000000,
+       gene:null,perk:null,spawnShieldT:0,shieldT:0,bulwarkT:0,
+       tauntT:0,cloakT:0});
+      g.tanks=[p,t];g.tankById=new Map([[p.id,p],[t.id,t]]);
+      g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];g.orbs=[];
+      g.__novaTerrain=[];g.__novaBattlefieldIndex=null;
+      if(g.hash&&g.hash.clear)g.hash.clear();
+      g.shapeTimer=Infinity;g.powerupTimer=Infinity;g.eliteTimer=Infinity;
+      g.crasherTimer=Infinity;g.aiRespawns=[];
+      g.spawnShape=()=>null;g.spawnPowerup=()=>null;
+      g.spawnAITank=()=>null;g.spawnDrone=()=>null;
+      g.status='playing';g.paused=false;
+      g.input.autofire=false;g.input.firing=true;
+      g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
+      let witnessed=0,invalid=0,hits=0,damage=0;
+      const originalBullets=g.updateBullets,originalDamage=g.damageTank;
+      g.updateBullets=function(dt){
+       t.vx=0;t.vy=60;
+       this.moveTank(t,0,60,dt);
+       if(t.__novaLinearMoveValid===true&&
+          t.__novaLinearMoveEpoch===this.time&&
+          t.__novaLinearMoveCalls===1)witnessed++;
+       else invalid++;
+       return originalBullets.apply(this,arguments);
+      };
+      g.damageTank=function(victim){
+       const hp=victim.hp,result=originalDamage.apply(this,arguments);
+       if(victim===t&&victim.hp<hp){hits++;damage+=hp-victim.hp;}
+       return result;
+      };
+      const ticks=2*hz;
+      for(let i=0;i<ticks;i++)g.update(1/hz);
+      assert.equal(witnessed,ticks,
+       'every unobstructed Scout movement must have a real per-tick certificate');
+      assert.equal(invalid,0);
+      assert.ok(Number.isFinite(t.x)&&Number.isFinite(t.y));
+      assert.ok(Number.isFinite(damage)&&damage>=0);
+      assert.ok(t.y>-40,'target must advance physically, not teleport each frame');
+      return {seed,cls,hz,witnessed,hits,damage:+damage.toFixed(4),
+       endX:+t.x.toFixed(4),endY:+t.y.toFixed(4)};
+     }finally{g.destroy();}
+    }));
+   }
+ assert.equal(rows.length,12);
+ console.log('GUNNER_REAL_MOVING_SCOUT_DAMAGE_RESEARCH '+JSON.stringify(rows));
+});
