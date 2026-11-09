@@ -47,6 +47,7 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
    const nearest=g.nearestTank,originalDrones=g.updateDrones;
    let eligible=0,queries=0,movementWitness=0,hits=0,damage=0,volleys=0,maxTrajectoryDrift=0;
    let tick=-1,firstHitTick=null,leadStartDeg=null,leadEndDeg=null;
+   let previousVisible=null,adaptiveSoftTicks=0,adaptiveHardTicks=0;
    const rngTrace=[],rngDrawsBeforeCombat=draws();
    g.nearestTank=function(x,y,r,exclude){
     const found=nearest.apply(this,arguments);
@@ -107,7 +108,15 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
      if(i===0)leadStartDeg=+leadDeg.toFixed(4);
      if(i===activeTicks-1)leadEndDeg=+leadDeg.toFixed(4);
     }
-    const effective=policy==='soft'?softBearing(requested,targetBearing):requested;
+    // Research-only: use observed position history, not target velocity or future state.
+    const visible={x:t.x,y:t.y};
+    const observedVy=previousVisible?(visible.y-previousVisible.y)*hz:0;
+    previousVisible=visible;
+    const signedLead=wrap(requested-targetBearing);
+    const forwardLead=observedVy*signedLead>0&&Math.abs(signedLead)>.01;
+    const useSoft=policy==='soft'||(policy==='adaptive'&&Math.abs(observedVy)>20&&forwardLead);
+    if(policy==='adaptive')useSoft?adaptiveSoftTicks++:adaptiveHardTicks++;
+    const effective=useSoft?softBearing(requested,targetBearing):requested;
     g.input.aim.dx=40*Math.cos(effective);
     g.input.aim.dy=40*Math.sin(effective);
     g.input.firing=i<activeTicks;
@@ -125,7 +134,7 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
    const result={seed,cls,hz,scenario,policy,direction,leadMode,leadStartDeg,leadEndDeg,hits,volleys,
     damage:+damage.toFixed(4),firstHitSec:firstHitTick===null?null:+((firstHitTick+1)/hz).toFixed(5),eligible,movementWitness,
     rngDrawsBeforeCombat,rngDrawsEnd:draws(),
-    maxTrajectoryDrift:+maxTrajectoryDrift.toFixed(4)};
+    maxTrajectoryDrift:+maxTrajectoryDrift.toFixed(4),adaptiveSoftTicks,adaptiveHardTicks};
    // Preserve full chronology for in-test comparisons without bloating CI JSON.
    Object.defineProperty(result,'rngTrace',{value:rngTrace});
    return result;
@@ -195,3 +204,27 @@ test('soft-magnet contact with class-specific geometric intercept inputs',()=>{
  assert.equal(rows.length,16);
  console.log('SOFT_MAGNET_INTERCEPT_CONTACT_RESEARCH '+JSON.stringify(rows));
 });
+
+ // This experimental gate is not shipping gameplay or a production acceptance rule.
+ test('visible-motion intent gate preserves stationary snap and measures moving lead',()=>{
+  const rows=[];
+  for(const cls of ['minigun','needlestorm'])
+   for(const hz of [30,60])
+    for(const scenario of ['stationary-wide','moving'])
+     for(const direction of (scenario==='moving'?[-1,1]:[1])){
+      const arms=['hard','soft','adaptive'].map(policy=>
+       trial(1517800,cls,hz,scenario,policy,direction,'intercept'));
+      assert.equal(new Set(arms.map(x=>x.volleys)).size,1);
+      assert.equal(rngDivergence(arms[0],arms[2]),null);
+      if(scenario==='stationary-wide'){
+       assert.equal(arms[2].adaptiveSoftTicks,0);
+       assert.equal(arms[2].damage,arms[0].damage);
+      }else{
+       assert.ok(arms[2].adaptiveSoftTicks>0);
+       assert.ok(arms[2].adaptiveHardTicks>0);
+      }
+      rows.push({cls,hz,scenario,direction,arms});
+     }
+  assert.equal(rows.length,12);
+  console.log('VISIBLE_MOTION_AIM_INTENT_RESEARCH '+JSON.stringify(rows));
+ });
