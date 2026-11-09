@@ -70,6 +70,9 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed',speedSta
    Object.assign(p,{x:0,y:0,vx:0,vy:0,angle:0,spawnShieldT:0,droneRespawnT:Infinity});
    p.stats.reload=cls==='minigun'?1:3;
    p.stats.bulletspeed=speedStat;
+   // The upgraded arm represents a reachable evolved build with enough earned
+   // points for Reload 1/3 plus Bullet Speed 8, not a level-1 stat injection.
+   if(speedStat>0)p.level=Math.max(p.level,30);
    Object.assign(t,{cls:'scout',isPlayer:true,alive:true,x:200,
     y:scenario==='moving'?-35*direction:0,vx:0,vy:0,hp:1000000,maxHp:1000000,
     gene:null,perk:null,spawnShieldT:0,shieldT:0,bulwarkT:0,
