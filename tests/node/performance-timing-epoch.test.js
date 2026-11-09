@@ -43,7 +43,9 @@ function expectFresh(f,expected){
 test('pause/resume CPU P95 cannot retain previous session and paused render is excluded',()=>{
  const f=fixture();warm(f);
  expectFresh(f,10);
+ f.window.__NOVA_PERF_LAST__={frameSamples:99,updateP95Ms:10};
  f.game.paused=true;f.step(33,0);
+ assert.equal(f.window.__NOVA_PERF_LAST__,null,'published telemetry must not outlive its epoch');
  assert.equal(f.snapshot().frameSamples,0);
  assert.equal(f.snapshot().updateP95Ms,null);
  assert.equal(f.snapshot().renderP95Ms,null);
@@ -52,7 +54,9 @@ test('pause/resume CPU P95 cannot retain previous session and paused render is e
 });
 test('long presentation discontinuity starts fresh CPU and simulation windows',()=>{
  const f=fixture();warm(f);expectFresh(f,10);
+ f.window.__NOVA_PERF_LAST__={frameSamples:99,renderP95Ms:10};
  f.cost(1,1);f.step(300,0);
+ assert.equal(f.window.__NOVA_PERF_LAST__,null);
  assert.equal(f.snapshot().frameSamples,0);
  assert.equal(f.snapshot().renderP95Ms,null);
  warm(f);expectFresh(f,1);
@@ -60,7 +64,9 @@ test('long presentation discontinuity starts fresh CPU and simulation windows',(
 test('redeploy clears CPU timing without resetting cumulative terrain counters',()=>{
  const f=fixture();warm(f);expectFresh(f,10);
  f.game.__novaPerf.terrainQueries=17;
+ f.window.__NOVA_PERF_LAST__={frameSamples:99,renderP95Ms:10};
  f.game.redeploy();
+ assert.equal(f.window.__NOVA_PERF_LAST__,null);
  assert.equal(f.snapshot().frameSamples,0);
  assert.equal(f.snapshot().updateP95Ms,null);
  assert.equal(f.snapshot().renderP95Ms,null);
@@ -74,4 +80,15 @@ test('continuous play retains a bounded rolling CPU window',()=>{
  for(let i=0;i<120;i++)f.step();
  expectFresh(f,1);
  assert.equal(f.snapshot().frameSamples,120);
+});
+
+test('decorative-world render and update work never enters active timing rings',()=>{
+ const f=fixture();
+ f.game.__novaDecorativeWorld=true;
+ warm(f);
+ const s=f.snapshot();
+ assert.equal(s.frameSamples,0);
+ assert.equal(s.updateP95Ms,null);
+ assert.equal(s.renderP95Ms,null);
+ assert.equal(f.window.__NOVA_PERF_LAST__,undefined);
 });
