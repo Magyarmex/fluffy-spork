@@ -251,11 +251,11 @@ test('exact shipping RAF accounts for active-jitter loss separately from stalls'
  const marker='carry = Math.min(1 / 30, carry);';
  assert.equal(shipping.split(marker).length-1,1,'unique shipping carry clamp');
  const instrumented=shipping.replace(marker,
-  'const __novaBeforeClamp = carry;\\n            '+marker+
-  '\\n            const __novaDiscarded = Math.max(0, __novaBeforeClamp - carry);'+
-  '\\n            if (elapsed <= 0.1) this.__novaResearchActiveLoss += __novaDiscarded;'+
-  '\\n            else this.__novaResearchStallLoss += __novaDiscarded;'+
-  '\\n            this.__novaResearchCarry = carry;');
+  'const __novaBeforeClamp = carry;\n            '+marker+
+  '\n            const __novaDiscarded = Math.max(0, __novaBeforeClamp - carry);'+
+  '\n            if (elapsed <= 0.1) this.__novaResearchActiveLoss += __novaDiscarded;'+
+  '\n            else this.__novaResearchStallLoss += __novaDiscarded;'+
+  '\n            this.__novaResearchCarry = carry;');
  function ledger(gaps,seconds=10){
   let now=0,raf=null,sim=0,updates=0;
   const start=new Function('performance','requestAnimationFrame','render_1',
