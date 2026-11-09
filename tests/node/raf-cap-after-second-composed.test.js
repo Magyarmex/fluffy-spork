@@ -80,3 +80,16 @@ test('composed 49-overlay Game recovers moderate active time without extra updat
   assert.ok(Number.isFinite(before.travel)&&Number.isFinite(after.travel));
  }
 });
+
+test('composed Game preserves bounded improvement under harsh clustered presentation',()=>{
+ const old=body(legacy),next=body(corrected);
+ const harsh=[85,40,5,1000/7.5-130];
+ for(const seed of [1517800,1517802]){
+  const before=trial(seed,old,harsh),after=trial(seed,next,harsh);
+  assert.ok(after.sim>before.sim+0.1,'recover useful active game time');
+  assert.ok(after.sim<=4+1e-5,'never invent simulation time');
+  assert.ok(after.updates<=after.draws*2,'preserve bounded work');
+  assert.equal(after.draws,before.draws,'same presentation cadence');
+  assert.ok(Number.isFinite(after.travel));
+ }
+});
