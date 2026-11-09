@@ -147,6 +147,7 @@ assert.ok([65,100].includes(renderScale),'only the certified 65% and default 100
   const during=await page.evaluate(()=>{
    const g=window.__novaBirthGame;
    return {aimActive:g.input.aim.active,aimOwner:g.input.stickId.aim,
+    aimDx:g.input.aim.dx,aimDy:g.input.aim.dy,
     firing:g.input.firing,firstFireSample:window.__novaFirstFireSample,
     shots:window.__novaBirths.slice(),
     events:window.__novaTouchDelivery.slice()};
@@ -158,6 +159,8 @@ assert.ok([65,100].includes(renderScale),'only the certified 65% and default 100
   assert.ok(Number.isInteger(during.aimOwner)&&during.aimOwner>=0,
    'the right stick must retain a real DOM pointer owner');
   assert.equal(during.firing,true,'extended right touch must request fire');
+  assert.ok(during.aimDx>0&&during.aimDy<0,
+   'CSS-space northeast touch extension must preserve its aim direction at either DPR');
   assert.ok(during.events.every(e=>e.trusted),'all recorded touches must be browser trusted');
   const down=during.events.find(e=>e.type==='pointerdown');
   const move=during.events.find(e=>e.type==='pointermove');
