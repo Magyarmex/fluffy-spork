@@ -78,3 +78,18 @@ test('post-second carry clamp preserves CPU-heavy catch-up gate',()=>{
   assert.ok(after.sim>=before.sim-1e-7);
  }
 });
+
+test('adversarial clustered cadence may need more bounded updates to recover time',()=>{
+ // A constructed mean-30Hz schedule where preserving previously discarded
+ // carry triggers one more legal second update in 10s. Do not claim global
+ // CPU-neutrality merely because the named moderate/harsh cases tie.
+ const gaps=[70.22197361267777,69.85515032393816,4.208393405113806,
+  1.3476876986254644,35.870264145346084,21.436604746020528,
+  19.39160146743469,44.33499126751018];
+ const before=run(startBody(shipping),gaps,10);
+ const after=run(startBody(patched),gaps,10);
+ assert.ok(after.updates>before.updates,'recovered time may cost another legal update');
+ assert.ok(after.sim>before.sim,'extra update must advance recovered world time');
+ assert.ok(after.maxSteps<=2,'no frame may exceed the existing two-step bound');
+ assert.equal(after.draws,before.draws);
+});
