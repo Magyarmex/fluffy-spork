@@ -51,6 +51,39 @@ test('reports DOM-to-RAF opportunities only, without retaining sensitive event f
  assert.equal(h.listeners,0);
  assert.equal(h.pendingRaf,0);
 });
+test('cancelled touch is measured separately without retaining private pointer identity',()=>{
+ const h=harness(),o=h.window.__novaInputRafObserver.create();
+ o.start();
+ h.setTime(1002);h.event('pointerdown',{pointerId:77,clientX:123});
+ h.setTime(1004);h.event('pointercancel',{pointerId:77,clientX:123});
+ h.next(1012);
+ const r=local(o.snapshot());
+ assert.equal(r.kinds.pointerdown.count,1);
+ assert.equal(r.kinds.pointercancel.count,1);
+ assert.equal(r.kinds.pointercancel.p95Ms,8);
+ assert.equal(r.kinds.pointerup.count,0);
+ assert.equal(r.observedEvents,2);
+ assert.equal(JSON.stringify(r).includes('pointerId'),false);
+ assert.equal(JSON.stringify(r).includes('clientX'),false);
+ o.stop();assert.equal(h.listeners,0);
+});
+test('P99 distinguishes rare long RAF waits from P95 without exporting event data',()=>{
+ const h=harness(),o=h.window.__novaInputRafObserver.create({maxSamples:100});
+ o.start();
+ h.setTime(1005);h.event('keydown',{key:'SECRET'});
+ h.setTime(1025);for(let i=0;i<4;i++)h.event('keydown',{key:'SECRET'});
+ h.setTime(1035);for(let i=0;i<95;i++)h.event('keydown',{key:'SECRET'});
+ h.next(1040);
+ const r=local(o.snapshot());
+ assert.equal(r.kinds.keydown.count,100);
+ assert.equal(r.kinds.keydown.p95Ms,5);
+ assert.equal(r.kinds.keydown.p99Ms,15);
+ assert.equal(r.kinds.keydown.maxMs,35);
+ assert.equal(r.kinds.pointercancel.p99Ms,null);
+ assert.equal(JSON.stringify(r).includes('SECRET'),false);
+ assert.equal(r.status,'limit');
+ assert.equal(h.listeners,0);
+});
 test('visibility loss fails closed and does not attribute hidden time to input delay',()=>{
  const h=harness(),o=h.window.__novaInputRafObserver.create();
  o.start();h.setTime(1004);h.event('pointerdown');
