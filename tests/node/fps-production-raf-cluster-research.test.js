@@ -16,10 +16,10 @@ const hasOldCap=shipping.includes(oldCap);
 const prototype=hasOldCap?shipping.replace(oldCap,
  'Math.min(elapsed <= 0.1 ? 2 / 30 : 1 / 30, excess)'):null;
 function run(body,gaps,seconds=10,workMs=0){
- let now=0,work=0,raf=null,sim=0,updates=0,draws=0,maxSteps=0,steps=0;
+ let now=0,work=0,raf=null,sim=0,updates=0,draws=0,maxSteps=0,steps=0,maxLag=0;
  const start=new Function('performance','requestAnimationFrame','render_1',
   'return ({'+body+'}).start')({now:()=>now+work},fn=>{raf=fn;return 1;},
-  {render(){draws++;maxSteps=Math.max(maxSteps,steps);steps=0;}});
+  {render(){draws++;maxSteps=Math.max(maxSteps,steps);steps=0;maxLag=Math.max(maxLag,now/1000-sim);}});
  const g={paused:false,__novaDestroyed:false,mmTimer:.08,
   sfx:{startMusic(){}},update(dt){
    assert.ok(dt>=0&&dt<=1/30+1e-10,'each update must stay physically bounded');
@@ -30,7 +30,7 @@ function run(body,gaps,seconds=10,workMs=0){
   now+=Math.min(gaps[i++%gaps.length],seconds*1000-now);
   const cb=raf;raf=null;assert.equal(typeof cb,'function');cb(now);
  }
- return {sim,updates,draws,maxSteps};
+ return {sim,updates,draws,maxSteps,maxLag};
 }
 const approx=(a,b)=>assert.ok(Math.abs(a-b)<1e-6,`${a} != ${b}`);
 const moderate=[55,55,1000/15-55,1000/15-55];
@@ -115,6 +115,7 @@ if(hasOldCap)test('falsifier: 250ms carry repairs eight-gap time only by retaini
  assert.ok(original.sim<40,'original eight-gap deficit must remain reproduced');
  assert.ok(candidate.sim>59.9,'wide debt bucket should repay the tested active schedule');
  assert.ok(candidate.maxSteps<=2,'the candidate still has a per-frame work bound');
+ assert.ok(candidate.maxLag>0.1,'candidate carries more than 100ms of stale world time');
  // The bound is a separate, deliberately visible risk: current input is
  // sampled during catch-up, not replayed from a timestamped event history.
  // Do not infer that a >100ms backlog is safe for touch or Controller orders.
