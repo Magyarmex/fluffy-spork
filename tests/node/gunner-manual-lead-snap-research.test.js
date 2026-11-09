@@ -75,3 +75,20 @@ test('current-position touch assist suppresses small manual lead but not outside
  assert.equal(rows.length,12);
  console.log('GUNNER_MANUAL_LEAD_SNAP_RESEARCH '+JSON.stringify(rows));
 });
+
+test('assist cone boundary causes a discontinuous aim response to tiny stick changes',()=>{
+ const rows=[];
+ for(const seed of [1517800,1517802])
+  for(const hz of [30,60,120]){
+   const inside=sample(seed,'minigun',hz,.219);
+   const outside=sample(seed,'minigun',hz,.221);
+   const jump=outside.actual-inside.actual;
+   assert.ok(Math.abs(inside.actual)<1e-5);
+   assert.ok(jump>.02,
+    '0.002rad extra requested aim must not be mistaken for a smooth response');
+   rows.push({seed,hz,inside:+inside.actual.toFixed(6),
+    outside:+outside.actual.toFixed(6),jump:+jump.toFixed(6)});
+  }
+ assert.equal(rows.length,6);
+ console.log('AIM_ASSIST_CONE_DISCONTINUITY_RESEARCH '+JSON.stringify(rows));
+});
