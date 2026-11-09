@@ -13,7 +13,7 @@ const softBearing=(requested,target)=>{
  const delta=wrap(requested-target);
  return wrap(requested-delta*.45*Math.exp(-((delta/.06)**2)));
 };
-function trial(seed,cls,hz,scenario,policy){
+function trial(seed,cls,hz,scenario,policy,direction=1){
  return withSeed(seed,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   try{
@@ -22,7 +22,7 @@ function trial(seed,cls,hz,scenario,policy){
    Object.assign(p,{x:0,y:0,vx:0,vy:0,angle:0,spawnShieldT:0,droneRespawnT:Infinity});
    p.stats.reload=cls==='minigun'?1:3;
    Object.assign(t,{cls:'scout',isPlayer:true,alive:true,x:200,
-    y:scenario==='moving'?-35:0,vx:0,vy:0,hp:1000000,maxHp:1000000,
+    y:scenario==='moving'?-35*direction:0,vx:0,vy:0,hp:1000000,maxHp:1000000,
     gene:null,perk:null,spawnShieldT:0,shieldT:0,bulwarkT:0,
     tauntT:0,cloakT:0});
    g.cam.x=0;g.cam.y=0;g.cam.zoom=1;g.zoom=1;g.w=800;g.h=600;
@@ -49,8 +49,8 @@ function trial(seed,cls,hz,scenario,policy){
    };
    g.updateDrones=function(dt){
     if(scenario==='moving'){
-     t.vx=0;t.vy=45;
-     this.moveTank(t,0,45,dt);
+     t.vx=0;t.vy=45*direction;
+     this.moveTank(t,0,45*direction,dt);
      if(t.__novaLinearMoveValid===true&&t.__novaLinearMoveEpoch===this.time)
       movementWitness++;
     }
@@ -75,15 +75,15 @@ function trial(seed,cls,hz,scenario,policy){
     const targetBearing=Math.atan2(t.y-p.y,t.x-p.x);
     // Physical stick intent follows the same nominal path in all arms,
     // even if hit knockback changes the real target's subsequent position.
-    const nominalY=scenario==='moving'?-35+45*i/hz:0;
+    const nominalY=scenario==='moving'?direction*(-35+45*i/hz):0;
     const requested=wrap(Math.atan2(nominalY,200)+
-     (scenario==='moving'?.08:scenario==='stationary-wide'?.12:.008));
+     (scenario==='moving'?.08*direction:scenario==='stationary-wide'?.12:.008));
     const effective=policy==='soft'?softBearing(requested,targetBearing):requested;
     g.input.aim.dx=40*Math.cos(effective);
     g.input.aim.dy=40*Math.sin(effective);
     g.input.firing=i<activeTicks;
     g.update(1/hz);
-    const expectedY=scenario==='moving'?-35+45*(i+1)/hz:0;
+    const expectedY=scenario==='moving'?direction*(-35+45*(i+1)/hz):0;
     maxTrajectoryDrift=Math.max(maxTrajectoryDrift,Math.hypot(t.x-200,t.y-expectedY));
    }
    assert.ok(queries>0,'shipping assist must be consulted');
@@ -92,7 +92,7 @@ function trial(seed,cls,hz,scenario,policy){
     'moving-body certificate must survive every composed update');
    assert.ok(Number.isFinite(damage)&&damage>=0);
    assert.ok(hits>=0&&volleys>0);
-   return {seed,cls,hz,scenario,policy,hits,volleys,
+   return {seed,cls,hz,scenario,policy,direction,hits,volleys,
     damage:+damage.toFixed(4),eligible,movementWitness,
     maxTrajectoryDrift:+maxTrajectoryDrift.toFixed(4)};
   }finally{g.destroy();}
@@ -112,4 +112,26 @@ test('opt-in soft magnet contact and stationary-error controls use real composed
    }
  assert.equal(rows.length,12);
  console.log('SOFT_MAGNET_REAL_CONTACT_RESEARCH '+JSON.stringify(rows));
+});
+
+// Directional and seed controls are intentionally descriptive: damage is not
+// asserted to improve until independent player-value and device evidence exists.
+test('soft-magnet moving-target contact is counterbalanced by direction and seed',()=>{
+ const rows=[];
+ for(const seed of [1517800,1517801])
+  for(const direction of [-1,1])
+   for(const cls of ['minigun','needlestorm'])
+    for(const hz of [30,60]){
+     const arms=['hard','soft','manual'].map(policy=>
+      trial(seed,cls,hz,'moving',policy,direction));
+     assert.equal(new Set(arms.map(x=>x.volleys)).size,1,
+      'policy must not alter firing cadence within a matched trial');
+     assert.ok(arms.every(x=>x.eligible>0&&x.movementWitness===6*hz),
+      'target must remain publicly eligible and physically moving');
+     assert.ok(arms.every(x=>x.maxTrajectoryDrift<1e-5),
+      'target movement must not depend on aim policy or damage');
+     rows.push({seed,direction,cls,hz,arms});
+    }
+ assert.equal(rows.length,16);
+ console.log('SOFT_MAGNET_DIRECTIONAL_CONTACT_RESEARCH '+JSON.stringify(rows));
 });
