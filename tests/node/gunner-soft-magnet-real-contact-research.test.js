@@ -245,13 +245,13 @@ test('soft-magnet contact with class-specific geometric intercept inputs',()=>{
   const rows=[];
   for(const cls of ['minigun','needlestorm'])
    for(const hz of [30,60])
-    for(const scenario of ['stationary-wide','moving'])
+    for(const scenario of ['stationary','stationary-wide','moving'])
      for(const direction of (scenario==='moving'?[-1,1]:[1])){
       const arms=['hard','soft','adaptive','smooth'].map(policy=>
        trial(1517800,cls,hz,scenario,policy,direction,'intercept'));
       assert.equal(new Set(arms.map(x=>x.volleys)).size,1);
       assert.equal(rngDivergence(arms[0],arms[2]),null);
-      if(scenario==='stationary-wide'){
+      if(scenario!=='moving'){
        assert.equal(arms[2].adaptiveSoftTicks,0);
        assert.equal(arms[2].damage,arms[0].damage);
        assert.equal(arms[3].damage,arms[0].damage);
