@@ -258,14 +258,14 @@ test('exact shipping RAF accounts for active-jitter loss separately from stalls'
   '\n            else this.__novaResearchStallLoss += __novaDiscarded;'+
   '\n            if (this.paused) this.__novaResearchPauseLoss += dt + carry;'+
   '\n            this.__novaResearchCarry = this.paused ? 0 : carry;');
- function ledger(gaps,seconds=10,pauseWindow=null){
-  let now=0,raf=null,sim=0,updates=0;
+ function ledger(gaps,seconds=10,pauseWindow=null,workMs=0){
+  let now=0,work=0,raf=null,sim=0,updates=0;
   const start=new Function('performance','requestAnimationFrame','render_1',
-   'return ({'+instrumented+'}).start')({now:()=>now},
+   'return ({'+instrumented+'}).start')({now:()=>now+work},
    fn=>{raf=fn;return 1;},{render(){}});
   const g={paused:false,__novaDestroyed:false,mmTimer:0,
    __novaResearchActiveLoss:0,__novaResearchStallLoss:0,__novaResearchPauseLoss:0,__novaResearchCarry:0,
-   sfx:{startMusic(){}},update(dt){sim+=dt;updates++;},drawMinimap(){}};
+   sfx:{startMusic(){}},update(dt){sim+=dt;updates++;work+=workMs;},drawMinimap(){}};
   start.call(g);
   let i=0;
   while(now<seconds*1000-1e-7){
@@ -280,17 +280,20 @@ test('exact shipping RAF accounts for active-jitter loss separately from stalls'
  const active=ledger([85,40,5,1000/7.5-130]);
  const stalled=ledger([120,1000/60,1000/60,1000/60]);
  const paused=ledger([50],10,[1000,2000]);
+ const cpuConstrained=ledger([85,40,5,1000/7.5-130],10,null,22);
  assert.ok(uniform.active<1e-7&&uniform.stall<1e-7,
   'uniform 30Hz should not discard active or stall debt');
  assert.ok(active.active>0.1&&active.stall<1e-7,
   'clustered sub-100ms presentation discards genuinely active game time');
  assert.ok(paused.paused>0.9&&paused.active<1e-7&&paused.stall<1e-7,
   'intentional paused time must not masquerade as active jitter loss');
+ assert.ok(cpuConstrained.active>active.active+0.4&&cpuConstrained.stall<1e-7,
+  'the prior-work gate can increase lost active time without a browser stall');
  assert.ok(stalled.stall>0.1,
   '120ms gaps are separately classified as suspension-like discards');
- for(const [label,s] of [['uniform',uniform],['active',active],['stalled',stalled],['paused',paused]]){
+ for(const [label,s] of [['uniform',uniform],['active',active],['stalled',stalled],['paused',paused],['cpuConstrained',cpuConstrained]]){
   assert.ok(Math.abs(10-s.sim-s.carry-s.active-s.stall-s.paused)<1e-5,
    label+' must conserve wall time across updates, retained carry and discard');
  }
- console.log('RAF_SHIPPING_LOSS_LEDGER '+JSON.stringify({uniform,active,stalled,paused}));
+ console.log('RAF_SHIPPING_LOSS_LEDGER '+JSON.stringify({uniform,active,stalled,paused,cpuConstrained}));
 });
