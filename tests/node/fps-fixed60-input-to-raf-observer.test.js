@@ -24,6 +24,7 @@ function harness(){
   get listeners(){return listeners.size+docListeners.size},
   fireStale(fn,t){now=t;fn(t)},get lastCallback(){return lastCallback},
   failCancel(){window.cancelAnimationFrame=()=>{throw Error('host cancel failure')}},
+  failClock(){window.performance.now=()=>{throw Error('host clock failure')}},
   get pendingRaf(){return queue.length}};
 }
 const local=value=>JSON.parse(JSON.stringify(value));
@@ -130,4 +131,14 @@ test('equal-mean 60Hz schedules expose materially different p95 input-to-RAF wai
  assert.ok(clustered>30&&clustered<32,'clustered 60Hz-mean expected p95 wait');
  assert.ok(clustered>uniform*1.8,
   'equal average frame rate must not hide the long-gap tail');
+});
+
+test('browser clock failure during input capture stops observer without touching gameplay',()=>{
+ const h=harness(),o=h.window.__novaInputRafObserver.create();
+ o.start();h.failClock();
+ assert.doesNotThrow(()=>h.event('pointerdown',{key:'SECRET'}));
+ assert.equal(o.active,false);
+ assert.equal(local(o.snapshot()).status,'invalid-clock');
+ assert.equal(local(o.snapshot()).pendingEvents,0);
+ assert.equal(h.listeners,0);
 });
