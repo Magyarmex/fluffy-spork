@@ -141,3 +141,18 @@ test('active-jitter eligibility has a bounded 100ms timestamp boundary',()=>{
  assert.equal(current.firstFrameSteps,1,
   'shipping 83.33ms gate must not be mistaken for pilot 100ms gate');
 });
+
+// Guard cost must be explicit: no-op work should leave the pilot's simulated
+// chronology unchanged, while expensive work is allowed to sacrifice some
+// catch-up in exchange for avoiding two costly updates in the same frame.
+test('current-work-aware guard is neutral on cheap frames',()=>{
+ const oldCpuGate='priorWork < 18 && earlierWork < 18';
+ const guarded=pilot.replace(oldCpuGate,
+  oldCpuGate+' && performance.now() - workStart < 18');
+ for(const gaps of [[1000/60],[1000/30],[50],harsh,worst,
+  [99,99,99,.5,.5,.5,.5,.5,.5]]){
+  const baseline=run(pilot,gaps,3,0),candidate=run(guarded,gaps,3,0);
+  assert.deepEqual(candidate,baseline,
+   'current CPU guard must not change cheap-frame chronology');
+ }
+});
