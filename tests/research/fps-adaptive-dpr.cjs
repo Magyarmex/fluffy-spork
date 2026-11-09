@@ -68,7 +68,15 @@ function createAdaptiveDprPilot(game, options={}) {
       return result('insufficient-evidence');
     }
     if(phase==='probing'){
-      if(now-trialStart<6000||p.frameSamples<110)return result('probing');
+      // A 120-frame rolling window can still contain pre-probe frames at low
+      // FPS. Do not accept a blur decision before the window can turn over.
+      // Reuse the existing eight-second evidence budget instead of holding
+      // a blurry research probe indefinitely on a very slow device.
+      const cleanWindowMs=120000/Math.min(baseline.fps,p.fps);
+      if(cleanWindowMs>8000&&now-trialStart>=8000)
+        return result('probe-window-too-slow',rollback(now));
+      if(now-trialStart<Math.max(6000,cleanWindowMs)||p.frameSamples<110)
+        return result('probing');
       const gain=p.fps-baseline.fps,frameGain=baseline.frameP95Ms-p.frameP95Ms;
       // A faster renderer is not a win if the world advances less per wall second.
       // Require explicit simulation-pace evidence, not just FPS and update cost.
