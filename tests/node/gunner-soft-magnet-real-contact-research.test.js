@@ -13,7 +13,7 @@ const softBearing=(requested,target)=>{
  const delta=wrap(requested-target);
  return wrap(requested-delta*.45*Math.exp(-((delta/.06)**2)));
 };
-function trial(seed,cls,hz,scenario,policy,direction=1){
+function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
  return withSeed(seed,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   try{
@@ -76,8 +76,19 @@ function trial(seed,cls,hz,scenario,policy,direction=1){
     // Physical stick intent follows the same nominal path in all arms,
     // even if hit knockback changes the real target's subsequent position.
     const nominalY=scenario==='moving'?direction*(-35+45*i/hz):0;
-    const requested=wrap(Math.atan2(nominalY,200)+
+    let requested=wrap(Math.atan2(nominalY,200)+
      (scenario==='moving'?.08*direction:scenario==='stationary-wide'?.12:.008));
+    if(scenario==='moving'&&leadMode==='intercept'){
+     // Public straight-line geometry reference, not a gameplay auto-lead.
+     // Keep the nominal physical input independent of damage knockback.
+     const speed=cls==='minigun'?480:690,vy=45*direction;
+     const a=vy*vy-speed*speed,b=2*nominalY*vy,c=200*200+nominalY*nominalY;
+     const discriminant=b*b-4*a*c;
+     assert.ok(discriminant>0);
+     const flight=(-b-Math.sqrt(discriminant))/(2*a);
+     assert.ok(flight>0&&Number.isFinite(flight));
+     requested=Math.atan2(nominalY+vy*flight,200);
+    }
     const effective=policy==='soft'?softBearing(requested,targetBearing):requested;
     g.input.aim.dx=40*Math.cos(effective);
     g.input.aim.dy=40*Math.sin(effective);
@@ -92,7 +103,7 @@ function trial(seed,cls,hz,scenario,policy,direction=1){
     'moving-body certificate must survive every composed update');
    assert.ok(Number.isFinite(damage)&&damage>=0);
    assert.ok(hits>=0&&volleys>0);
-   return {seed,cls,hz,scenario,policy,direction,hits,volleys,
+   return {seed,cls,hz,scenario,policy,direction,leadMode,hits,volleys,
     damage:+damage.toFixed(4),eligible,movementWitness,
     maxTrajectoryDrift:+maxTrajectoryDrift.toFixed(4)};
   }finally{g.destroy();}
@@ -134,4 +145,24 @@ test('soft-magnet moving-target contact is counterbalanced by direction and seed
     }
  assert.equal(rows.length,16);
  console.log('SOFT_MAGNET_DIRECTIONAL_CONTACT_RESEARCH '+JSON.stringify(rows));
+});
+
+// A fixed 0.08-rad lead is not equally appropriate for 480 and 690 unit/s
+// projectiles. This reference uses each class's speed and the public nominal
+// Scout trajectory to avoid mistaking overlead/underlead for assist quality.
+test('soft-magnet contact with class-specific geometric intercept inputs',()=>{
+ const rows=[];
+ for(const seed of [1517800,1517801])
+  for(const direction of [-1,1])
+   for(const cls of ['minigun','needlestorm'])
+    for(const hz of [30,60]){
+     const arms=['hard','soft','manual'].map(policy=>
+      trial(seed,cls,hz,'moving',policy,direction,'intercept'));
+     assert.equal(new Set(arms.map(x=>x.volleys)).size,1);
+     assert.ok(arms.every(x=>x.eligible>0&&x.movementWitness===6*hz));
+     assert.ok(arms.every(x=>x.maxTrajectoryDrift<1e-5));
+     rows.push({seed,direction,cls,hz,arms});
+    }
+ assert.equal(rows.length,16);
+ console.log('SOFT_MAGNET_INTERCEPT_CONTACT_RESEARCH '+JSON.stringify(rows));
 });
