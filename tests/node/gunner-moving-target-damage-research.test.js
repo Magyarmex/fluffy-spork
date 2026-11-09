@@ -18,7 +18,7 @@ function activeAt(tick,mode){
  const on=mode==='long'?120:48,off=mode==='long'?30:48;
  return tick%(on+off)<on;
 }
-function trial(seed,cls,reload,hz,mode,targetX=200,motion='stationary',assist='shipping'){
+function trial(seed,cls,reload,hz,mode,targetX=200,motion='stationary',assist='shipping',phase=0){
  return withSeed(seed,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   const p=g.player;g.sfx.muted=true;g.setClass(p,cls);
@@ -78,7 +78,7 @@ function trial(seed,cls,reload,hz,mode,targetX=200,motion='stationary',assist='s
   };
   try{
    for(let i=0;i<8*hz;i++){
-    const targetY=motion==='crossing'?36*Math.sin(Math.PI*2*i/(2*hz)):0;
+    const targetY=motion==='crossing'?36*Math.sin(Math.PI*2*i/(2*hz)+phase):0;
     target.y=targetY;
     const active=activeAt(i*(120/hz),mode);
     g.input.firing=active;
@@ -138,4 +138,38 @@ test('moving lateral target exposes hit and damage sensitivity under matched wal
  }
  assert.equal(rows.length,24);
  console.log('GUNNER_MOVING_TARGET_DAMAGE_RESEARCH '+JSON.stringify(rows));
+});
+
+// #799: phase counterbalance. The earlier two-seed experiment reused a
+// single target phase, so a favorable projectile/target crossing could be
+// mistaken for a general frame-rate effect. Keep the shipping Game owner and
+// public-viewport eligibility checks, and vary only the target's start phase.
+test('moving-target Gunner damage remains measurable across counterbalanced crossing phases',()=>{
+ const rows=[];
+ const phases=[0,Math.PI/2,Math.PI,3*Math.PI/2];
+ for(const cls of ['minigun','needlestorm']){
+  const reload=cls==='minigun'?1:3;
+  for(const mode of ['held','short']){
+   for(const hz of [30,60,120]){
+    const samples=[];
+    for(const phase of phases){
+     const result=trial(1517800,cls,reload,hz,mode,200,'crossing','shipping',phase);
+     assert.equal(result.assistEligible,result.assistQueries,
+      'counterbalanced target must remain publicly visible');
+     assert.ok(result.damage>=0&&Number.isFinite(result.damage));
+     samples.push(result);
+    }
+    const volleyCounts=new Set(samples.map(s=>s.volleys));
+    assert.equal(volleyCounts.size,1,
+     'target phase must not affect the class firing chronology');
+    rows.push({cls,mode,hz,volleys:samples[0].volleys,
+     phases:samples.map(s=>({phase:+((phases[samples.indexOf(s)]/Math.PI)).toFixed(2),hits:s.hits,damage:s.damage})),
+     meanDamage:+(samples.reduce((n,s)=>n+s.damage,0)/samples.length).toFixed(4),
+     minDamage:Math.min(...samples.map(s=>s.damage)),
+     maxDamage:Math.max(...samples.map(s=>s.damage))});
+   }
+  }
+ }
+ assert.equal(rows.length,12);
+ console.log('GUNNER_PHASE_BALANCED_DAMAGE_RESEARCH '+JSON.stringify(rows));
 });
