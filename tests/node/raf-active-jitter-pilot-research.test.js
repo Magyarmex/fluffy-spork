@@ -87,3 +87,15 @@ test('seeded mixed schedules retain bounded work and never lose more simulated t
   }
  }
 });
+
+test('three consecutive 99ms frames falsify complete recovery with a 2/30 carry cap',()=>{
+ // Nine frames span 300ms (mean 30Hz); the first three arrive at 99ms.
+ // Two updates per frame cannot repay the third long frame without retaining
+ // more than 66.67ms of debt or deliberately dropping time. This pilot drops.
+ const gaps=[99,99,99,.5,.5,.5,.5,.5,.5];
+ const before=run(shipping,gaps),after=run(pilot,gaps);
+ assert.ok(after.sim>before.sim+3,'pilot still improves the old scheduler');
+ assert.ok(after.sim<9.5,'the pilot is NOT a complete chronology solution');
+ assert.ok(after.maxSteps<=2,'preserve bounded update budget');
+ assert.equal(after.draws,before.draws);
+});
