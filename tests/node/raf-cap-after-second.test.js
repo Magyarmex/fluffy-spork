@@ -1,7 +1,8 @@
 'use strict';
 // The shipping materializer must consume already-eligible active RAF time
-// before clamping leftover carry. No extra updates, larger carry bucket,
-// expanded catch-up gate or long-stall replay are authorized.
+// before clamping leftover carry. The per-frame two-step limit, final
+// carry bucket, catch-up gate and long-stall policy remain unchanged.
+// Recovered time can require additional legal updates on later frames.
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');
 const {patchRafStepCap}=require('../../scripts/patch-raf-step-cap.cjs');
