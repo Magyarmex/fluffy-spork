@@ -9,12 +9,19 @@ const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 if(previous===undefined)delete process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL;
 else process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL=previous;
 const wrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
+function rngDivergence(a,b){
+ assert.equal(a.rngDrawsBeforeCombat,b.rngDrawsBeforeCombat,
+  'matched arms must enter combat at the same random-stream offset');
+ assert.equal(a.rngTrace.length,b.rngTrace.length);
+ const i=a.rngTrace.findIndex((n,j)=>n!==b.rngTrace[j]);
+ return i<0?null:i;
+}
 const softBearing=(requested,target)=>{
  const delta=wrap(requested-target);
  return wrap(requested-delta*.45*Math.exp(-((delta/.06)**2)));
 };
 function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
- return withSeed(seed,()=>{
+ return withSeed(seed,draws=>{
   const g=bootGame();if(!g.player)g.redeploy();
   try{
    const p=g.player,t=g.tanks.find(x=>x!==p);assert.ok(t);
@@ -40,6 +47,7 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
    const nearest=g.nearestTank,originalDrones=g.updateDrones;
    let eligible=0,queries=0,movementWitness=0,hits=0,damage=0,volleys=0,maxTrajectoryDrift=0;
    let tick=-1,firstHitTick=null,leadStartDeg=null,leadEndDeg=null;
+   const rngTrace=[],rngDrawsBeforeCombat=draws();
    g.nearestTank=function(x,y,r,exclude){
     const found=nearest.apply(this,arguments);
     if(exclude===p.id&&r===480&&x===p.x&&y===p.y){
@@ -104,6 +112,7 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
     g.input.aim.dy=40*Math.sin(effective);
     g.input.firing=i<activeTicks;
     g.update(1/hz);
+    rngTrace.push(draws());
     const expectedY=scenario==='moving'?direction*(-35+45*(i+1)/hz):0;
     maxTrajectoryDrift=Math.max(maxTrajectoryDrift,Math.hypot(t.x-200,t.y-expectedY));
    }
@@ -113,9 +122,13 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
     'moving-body certificate must survive every composed update');
    assert.ok(Number.isFinite(damage)&&damage>=0);
    assert.ok(hits>=0&&volleys>0);
-   return {seed,cls,hz,scenario,policy,direction,leadMode,leadStartDeg,leadEndDeg,hits,volleys,
+   const result={seed,cls,hz,scenario,policy,direction,leadMode,leadStartDeg,leadEndDeg,hits,volleys,
     damage:+damage.toFixed(4),firstHitSec:firstHitTick===null?null:+((firstHitTick+1)/hz).toFixed(5),eligible,movementWitness,
+    rngDrawsBeforeCombat,rngDrawsEnd:draws(),
     maxTrajectoryDrift:+maxTrajectoryDrift.toFixed(4)};
+   // Preserve full chronology for in-test comparisons without bloating CI JSON.
+   Object.defineProperty(result,'rngTrace',{value:rngTrace});
+   return result;
   }finally{g.destroy();}
  });
 }
@@ -129,7 +142,9 @@ test('opt-in soft magnet contact and stationary-error controls use real composed
      'aim policy must not alter weapon firing cadence');
     assert.ok(arms.every(x=>x.damage>=0&&Number.isFinite(x.damage)));
     assert.ok(arms.every(x=>x.eligible>0));
-    rows.push({cls,hz,scenario,arms});
+    rows.push({cls,hz,scenario,arms,
+     rngDivergenceTicks:{soft:rngDivergence(arms[0],arms[1]),
+      manual:rngDivergence(arms[0],arms[2])}});
    }
  assert.equal(rows.length,12);
  console.log('SOFT_MAGNET_REAL_CONTACT_RESEARCH '+JSON.stringify(rows));
@@ -151,7 +166,9 @@ test('soft-magnet moving-target contact is counterbalanced by direction and seed
       'target must remain publicly eligible and physically moving');
      assert.ok(arms.every(x=>x.maxTrajectoryDrift<1e-5),
       'target movement must not depend on aim policy or damage');
-     rows.push({seed,direction,cls,hz,arms});
+     rows.push({seed,direction,cls,hz,arms,
+      rngDivergenceTicks:{soft:rngDivergence(arms[0],arms[1]),
+       manual:rngDivergence(arms[0],arms[2])}});
     }
  assert.equal(rows.length,16);
  console.log('SOFT_MAGNET_DIRECTIONAL_CONTACT_RESEARCH '+JSON.stringify(rows));
