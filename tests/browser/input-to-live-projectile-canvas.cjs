@@ -5,6 +5,7 @@
 const assert=require('node:assert/strict');
 const {chromium}=require('playwright');
 const renderScale=process.env.NOVA_TOUCH_RENDER_SCALE?Number(process.env.NOVA_TOUCH_RENDER_SCALE):100;
+const midGestureDpr=process.env.NOVA_TOUCH_MID_GESTURE_DPR==='1';
 assert.ok([65,100].includes(renderScale),'only the certified 65% and default 100% clarity arms are supported');
 
 (async()=>{
@@ -147,6 +148,43 @@ assert.ok([65,100].includes(renderScale),'only the certified 65% and default 100
   await page.waitForTimeout(150);
   assert.equal(await page.evaluate(()=>window.__novaBirths.length),0,
    'a centered touch must not create a projectile');
+  if(midGestureDpr){
+   // Mirror the opt-in DPR research pilot's backing-store resize while the
+   // actual browser-trusted right stick still owns the active touch.
+   const changed=await page.evaluate(()=>{
+    const g=window.__novaBirthGame;
+    const before={dpr:g.dpr,owner:g.input.stickId.aim,css:[g.w,g.h]};
+    g.dpr=Math.max(1,g.dpr*.65);
+    g.canvas.width=Math.max(1,Math.round(g.w*g.dpr));
+    g.canvas.height=Math.max(1,Math.round(g.h*g.dpr));
+    return {before,after:{dpr:g.dpr,owner:g.input.stickId.aim,
+     css:[g.w,g.h],backing:[g.canvas.width,g.canvas.height]},
+     aimActive:g.input.aim.active,firing:g.input.firing};
+   });
+   assert.equal(changed.aimActive,true,
+    'canvas backing resize must preserve active right-stick ownership: '+JSON.stringify(changed));
+   assert.equal(changed.after.owner,changed.before.owner,
+    'resizing the backing canvas must not steal the live right-stick pointer');
+   assert.deepEqual(changed.after.css,changed.before.css,
+    'DPR must never alter touch coordinate space');
+   assert.ok(changed.after.dpr<changed.before.dpr,
+    'research arm must actually lower backing resolution');
+   assert.deepEqual(changed.after.backing,
+    changed.after.css.map(v=>Math.round(v*changed.after.dpr)));
+   await page.waitForTimeout(70);
+   const stable=await page.evaluate(()=>{
+    const g=window.__novaBirthGame;
+    return {dpr:g.dpr,backing:[g.canvas.width,g.canvas.height],
+     aimOwner:g.input.stickId.aim,aimActive:g.input.aim.active};
+   });
+   assert.equal(stable.dpr,changed.after.dpr,
+    'active render must not silently undo the backing resolution trial');
+   assert.deepEqual(stable.backing,changed.after.backing);
+   assert.equal(stable.aimOwner,changed.after.owner);
+   assert.equal(stable.aimActive,true);
+   assert.equal(await page.evaluate(()=>window.__novaBirths.length),0,
+    'DPR change must not invent a centered-stick shot');
+  }
   await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[extended]});
   await page.waitForFunction(()=>window.__novaBirths.length>0,null,{timeout:12000});
   const during=await page.evaluate(()=>{
@@ -227,7 +265,7 @@ assert.ok([65,100].includes(renderScale),'only the certified 65% and default 100
   },null,{timeout:5000});
   assert.deepEqual(errors,[],'the real game must not throw');
   console.log('NOVA_TOUCH_TO_PROJECTILE_BIRTH '+JSON.stringify({
-   viewport:'320x700',trusted:true,renderScale,dpr:clarity.dpr,
+   viewport:'320x700',trusted:true,renderScale,midGestureDpr,dpr:clarity.dpr,
    css:clarity.css,backing:clarity.backing,
    deliveryToBirthMs:Math.round(delay*1000)/1000,
    deliveryToSimulationMs:Math.round(inputToSample*1000)/1000,
