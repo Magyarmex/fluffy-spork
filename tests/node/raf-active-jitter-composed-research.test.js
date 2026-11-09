@@ -21,7 +21,7 @@ assert.equal(shipping.split('carry = Math.min(1 / 30, carry);').length-1,1);
 const pilot=shipping.replace('elapsed <= 1 / 12','elapsed <= 0.1')
  .replace('carry = Math.min(1 / 30, carry);',
   'carry = Math.min(elapsed <= 0.1 ? 2 / 30 : 1 / 30, carry);');
-function trial(seed,rafBody,gaps,seconds=4){
+function trial(seed,rafBody,gaps,seconds=4,workMs=0){
  return withSeed(seed,()=>{
   const game=bootGame();
   if(!game.player)game.redeploy();
@@ -40,15 +40,16 @@ function trial(seed,rafBody,gaps,seconds=4){
   game.input.autofire=false;game.input.firing=false;
   game.input.keyboard.right=true;game.drawMinimap=()=>{};
   const initialTime=game.time,initialX=player.x;
-  let now=0,raf=null,sim=0,updates=0,draws=0,frameUpdates=0,maxUpdates=0;
+  let now=0,work=0,raf=null,sim=0,updates=0,draws=0,frameUpdates=0,maxUpdates=0;
   const update=game.update;
   game.update=function(dt){
    assert.ok(dt>=0&&dt<=1/30+1e-9);
    sim+=dt;updates++;frameUpdates++;
-   return update.call(this,dt);
+   const result=update.call(this,dt);
+   work+=workMs;return result;
   };
   const start=new Function('performance','requestAnimationFrame','render_1',
-   'return ({'+rafBody+'}).start')({now:()=>now},
+   'return ({'+rafBody+'}).start')({now:()=>now+work},
     fn=>{raf=fn;return 1;},{render(){draws++;maxUpdates=Math.max(maxUpdates,frameUpdates);frameUpdates=0;}});
   try{
    start.call(game);
@@ -111,5 +112,24 @@ test('composed shipping Game reproduces the 83.33ms active-time cliff',()=>{
    'tiny RAF gap change nearly halves real Game simulation progress');
   assert.ok(eligible.updates>ineligible.updates*1.8);
   assert.ok(Number.isFinite(eligible.travel)&&Number.isFinite(ineligible.travel));
+ }
+});
+
+// The shipping prior-frame CPU gate changes the amount of real world time
+// advanced under identical presentation timestamps. This is synthetic work
+// injection through the exact RAF owner, not an Android performance sample.
+test('composed Game CPU gate can deepen active-jitter time loss',()=>{
+ const gaps=[85,40,5,1000/7.5-130];
+ for(const seed of [1517800,1517802]){
+  const cheap=trial(seed,shipping,gaps,4,0);
+  const costly=trial(seed,shipping,gaps,4,22);
+  assert.equal(costly.draws,cheap.draws,
+   'presentation history is identical across synthetic CPU budgets');
+  assert.ok(costly.sim<cheap.sim-0.1,
+   'expensive previous updates suppress catch-up and deepen lost world time');
+  assert.ok(costly.updates<cheap.updates,
+   'the work gate must actually suppress full-world updates');
+  assert.ok(Number.isFinite(costly.travel)&&Number.isFinite(cheap.travel));
+  console.log('RAF_COMPOSED_CPU_CHRONOLOGY '+JSON.stringify({seed,cheap,costly}));
  }
 });
