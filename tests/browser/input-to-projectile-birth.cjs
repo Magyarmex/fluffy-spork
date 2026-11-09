@@ -46,6 +46,7 @@ const {chromium}=require('playwright');
   await page.evaluate(()=>{
    const g=window.__novaBirthGame;
    g.input.autofire=false;g.player.spawnShieldT=20;
+   window.__novaBirths.length=0; // Exclude any pre-interaction AUTO shots.
   });
   const box=await canvas.boundingBox();
   assert.ok(box&&box.width>200&&box.height>200);
