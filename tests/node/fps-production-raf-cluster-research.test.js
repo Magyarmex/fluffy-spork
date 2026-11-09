@@ -189,3 +189,31 @@ if(hasOldCap)test('falsifier: four consecutive 95ms frames defeat the bounded 10
  // A universal solution requires explicit input chronology and a bounded
  // CPU/backlog policy; neither larger cap is a shippable general cure.
 });
+
+if(hasOldCap)test('research: cap-after-second restores moderate chronology without extra updates',()=>{
+ // Keep exactly the shipping second-step eligibility and CPU-work gates.
+ // Only move the 33.33ms carry clamp AFTER the already-bounded second step.
+ const pause='            if (this.paused)\n                carry = 0;';
+ assert.ok(shipping.includes(pause),'canonical pause/carry reset must exist');
+ const afterSecond=shipping.replace(
+  'carry = excess > 1e-9 ? Math.min(1 / 30, excess) : 0;',
+  'carry = excess > 1e-9 ? excess : 0;')
+  .replace(pause,'            carry = Math.min(1 / 30, carry);\n'+pause);
+ assert.notEqual(afterSecond,shipping);
+ for(const gaps of [[1000/60],[1000/30],moderate,harsh,
+   eightGap,belowCatchupGate,irregularMean60,[120,1000/60,1000/60,1000/60]]){
+  const baseline=run(shipping,gaps,60),pilot=run(afterSecond,gaps,60);
+  assert.equal(pilot.updates,baseline.updates,
+   'cap reordering must not increase Game.update call count');
+  assert.ok(pilot.sim>=baseline.sim-1e-7,
+   'do not lose additional world time under the same presentation schedule');
+  assert.ok(pilot.maxSteps<=2);
+ }
+ approx(run(afterSecond,moderate,60).sim,60);
+ assert.ok(run(afterSecond,harsh,60).sim>51,
+  'partial improvement without changing the 83ms catch-up gate');
+ approx(run(afterSecond,[120,1000/60,1000/60,1000/60]).sim,
+  run(shipping,[120,1000/60,1000/60,1000/60]).sim);
+ // This is a narrow research prototype, not production acceptance:
+ // real Game.update state/RNG, input latency, browser CPU and Android remain.
+});
