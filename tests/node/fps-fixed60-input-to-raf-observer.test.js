@@ -109,17 +109,18 @@ test('cancel failure cannot leave observer active or retain queued input',()=>{
 test('equal-mean 60Hz schedules expose materially different p95 input-to-RAF waits',()=>{
  function measure(gaps){
   const h=harness(),o=h.window.__novaInputRafObserver.create({
-   durationMs:2000,maxSamples:2000});
-  o.start();let t=1000;
+   durationMs:2000,maxSamples:3000});
+  o.start();let t=1000,events=0;
   for(const gap of gaps){
-   for(let i=0;i<20;i++){
-    h.setTime(t+gap*(i+.5)/20);
-    h.event('keydown',{key:'never-record-this'});
+   const n=Math.round(gap*2.4); // Equal synthetic event density per wall millisecond.
+   for(let i=0;i<n;i++){
+    h.setTime(t+gap*(i+.5)/n);
+    h.event('keydown',{key:'never-record-this'});events++;
    }
    t+=gap;h.next(t);
   }
   const report=local(o.snapshot());o.stop();
-  assert.equal(report.observedEvents,gaps.length*20);
+  assert.equal(report.observedEvents,events);
   return report.kinds.keydown.p95Ms;
  }
  const uniform=measure(Array(60).fill(1000/60));
