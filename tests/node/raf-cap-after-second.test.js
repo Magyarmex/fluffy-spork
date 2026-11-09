@@ -8,6 +8,18 @@ const fs=require('node:fs'),path=require('node:path');
 const {patchRafStepCap}=require('../../scripts/patch-raf-step-cap.cjs');
 const shipping=fs.readFileSync(path.resolve(__dirname,'../../index.html'),'utf8');
 const patched=patchRafStepCap(shipping);
+// The materializer rewrites index.html on main after merge. Reconstruct the
+// pre-fix scheduler solely as an adversarial comparison baseline so these
+// regressions also run on the deployed, already-patched production HTML.
+function preFix(html){
+ const fixed='carry = excess > 1e-9 ? excess : 0;';
+ const prior='carry = excess > 1e-9 ? Math.min(1 / 30, excess) : 0;';
+ const clamp='            carry = Math.min(1 / 30, carry);\n';
+ assert.equal(html.split(fixed).length-1,1,'current RAF carries active time before optional update');
+ assert.equal(html.split(clamp).length-1,1,'current RAF clamps after optional update');
+ return html.replace(fixed,prior).replace(clamp,'');
+}
+const legacy=preFix(patched);
 function startBody(html){
  const a=html.indexOf('    start() {',html.indexOf('window.__defineModule("game/engine"'));
  const b=html.indexOf('    destroy() {',a);
@@ -49,7 +61,7 @@ const patterns={
  stall:[120,1000/60,1000/60,1000/60]
 };
 test('materializer upgrades existing guarded shipping RAF idempotently',()=>{
- assert.notEqual(patched,shipping);
+ assert.equal(patchRafStepCap(shipping),patched);
  assert.equal(patchRafStepCap(patched),patched);
  const body=startBody(patched);
  assert.ok(body.includes('carry = excess > 1e-9 ? excess : 0;'));
@@ -58,7 +70,7 @@ test('materializer upgrades existing guarded shipping RAF idempotently',()=>{
  assert.ok(body.includes('priorWork < 18 && earlierWork < 18'),'preserve CPU budget');
 });
 test('post-second carry clamp recovers time without increasing update count',()=>{
- const old=startBody(shipping),next=startBody(patched);
+ const old=startBody(legacy),next=startBody(patched);
  for(const [name,gaps] of Object.entries(patterns)){
   const before=run(old,gaps,60),after=run(next,gaps,60);
   assert.equal(after.updates,before.updates,name+' update count');
@@ -71,7 +83,7 @@ test('post-second carry clamp recovers time without increasing update count',()=
  approx(run(next,patterns.stall,60).sim,run(old,patterns.stall,60).sim);
 });
 test('post-second carry clamp preserves CPU-heavy catch-up gate',()=>{
- const old=startBody(shipping),next=startBody(patched);
+ const old=startBody(legacy),next=startBody(patched);
  for(const name of ['moderate','harsh','eight','under83']){
   const before=run(old,patterns[name],10,22),after=run(next,patterns[name],10,22);
   assert.equal(before.maxSteps,1);
@@ -87,7 +99,7 @@ test('adversarial clustered cadence may need more bounded updates to recover tim
  const gaps=[70.22197361267777,69.85515032393816,4.208393405113806,
   1.3476876986254644,35.870264145346084,21.436604746020528,
   19.39160146743469,44.33499126751018];
- const before=run(startBody(shipping),gaps,10);
+ const before=run(startBody(legacy),gaps,10);
  const after=run(startBody(patched),gaps,10);
  assert.ok(after.updates>before.updates,'recovered time may cost another legal update');
  assert.ok(after.sim>before.sim,'extra update must advance recovered world time');
