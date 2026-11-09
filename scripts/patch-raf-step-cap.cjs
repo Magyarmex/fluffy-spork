@@ -119,8 +119,9 @@ function patchRafStepCapLegacy(html){
 
 /* Recover already-eligible active time BEFORE clamping the remaining carry.
  * The old order silently discarded excess time that the existing bounded
- * second update was about to consume. No extra update, broader eligibility,
- * larger debt bucket or long-stall repayment is introduced. */
+ * second update was about to consume. The per-frame two-update limit,
+ * eligibility gate, final debt cap and long-stall policy stay unchanged.
+ * Recovering time can cause additional eligible updates on later frames. */
 const oldCarryLine='carry = excess > 1e-9 ? Math.min(1 / 30, excess) : 0;';
 const newCarryLine='carry = excess > 1e-9 ? excess : 0;';
 const oldPauseLine='            if (this.paused)\n                carry = 0;';
