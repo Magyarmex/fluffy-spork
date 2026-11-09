@@ -134,3 +134,24 @@ if(hasOldCap)test('falsifier: wide carry can apply a newly delivered input >100m
  // This is a scheduler/input-policy counterexample, not a simulated shot
  // or proof that real players experience a specific delay.
 });
+
+if(hasOldCap)test('research: sub-100ms two-step gate plus 100ms debt reduces wide-cap staleness',()=>{
+ const oldGate='elapsed <= 1 / 12';
+ assert.ok(shipping.includes(oldGate),'exact shipping catch-up gate must be present');
+ const candidate=shipping.replace(oldCap,
+  'Math.min(elapsed < 0.1 ? 0.1 : 1 / 30, excess)')
+  .replace(oldGate,'elapsed < 0.1');
+ for(const gaps of [moderate,harsh,eightGap,belowCatchupGate,irregularMean60]){
+  const r=run(candidate,gaps,60);
+  assert.ok(r.sim>59.9,'bounded active schedule must retain world time');
+  assert.ok(r.maxSteps<=2,'no more than two collision updates per RAF');
+ }
+ const eight=run(candidate,eightGap,60);
+ assert.ok(eight.maxLag<0.08,
+  'named eight-gap candidate should keep rendered world lag under 80ms');
+ const longStall=[120,1000/60,1000/60,1000/60];
+ approx(run(candidate,longStall).sim,run(shipping,longStall).sim);
+ // This is only a zero-cost research candidate. The changed 83-100ms
+ // catch-up threshold, CPU pressure and input event chronology require
+ // composed-game and physical-device acceptance before any shipping use.
+});
