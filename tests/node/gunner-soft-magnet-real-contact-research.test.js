@@ -158,8 +158,8 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
     const visible={id:t.id,x:t.x,y:t.y,at:i/hz,visible:publiclyEligible};
     const adaptiveGate=visibleMotionIntent(requested,targetBearing,visible,previousVisible);
     const weight=visibleMotionWeight(requested,targetBearing,visible,previousVisible);
-    previousVisible=visible;
     const plausibleGate=publiclyEligible&&plausibleVisibleLead(requested,targetBearing,visible,previousVisible,cls==='minigun'?480:690,p.x,p.y);
+    previousVisible=visible;
     const useSoft=policy==='soft'||(policy==='adaptive'&&adaptiveGate)||(policy==='plausible'&&plausibleGate);
     if(policy==='smooth')smoothWeightSum+=weight;
     if(policy==='adaptive'||policy==='plausible'){
