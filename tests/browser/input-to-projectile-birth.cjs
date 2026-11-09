@@ -54,6 +54,11 @@ const {chromium}=require('playwright');
   const extended={...origin,x:origin.x+Math.min(35,box.width*.12),y:origin.y-30};
   const cdp=await context.newCDPSession(page);
   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[origin]});
+  // Centered right-stick ownership is not a fire command. This also ensures
+  // the measured projectile follows deliberate extension, not the initial tap.
+  await page.waitForTimeout(150);
+  assert.equal(await page.evaluate(()=>window.__novaBirths.length),0,
+   'a centered touch must not create a projectile');
   await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[extended]});
   await page.waitForFunction(()=>window.__novaBirths.length>0,null,{timeout:12000});
   const during=await page.evaluate(()=>{
