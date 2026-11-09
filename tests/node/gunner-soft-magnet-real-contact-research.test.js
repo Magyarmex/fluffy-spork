@@ -118,6 +118,7 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
     let requested=wrap(Math.atan2(nominalY,200)+
      (scenario==='moving'?.08*direction:scenario==='stationary-wide'?.12:.008));
     if(scenario==='moving'&&leadMode==='underlead')requested=wrap(Math.atan2(nominalY,200)-.04*direction);
+    if(scenario==='moving'&&leadMode==='overlead')requested=wrap(Math.atan2(nominalY,200)+.20*direction);
     if(scenario==='moving'&&leadMode==='intercept'){
      // Public straight-line geometry reference, not a gameplay auto-lead.
      // Keep the nominal physical input independent of damage knockback.
@@ -311,3 +312,17 @@ test('continuous visible-motion weight has bounded threshold response',()=>{
  assert.ok(maxJump<.007,'speed threshold must not recreate a hard snap');
  assert.equal(visibleMotionWeight(.08,0,{id:2,x:200,y:1,at:1/60,visible:true},prior),0);
 });
+
+ // Intent cannot be inferred from target movement alone: a large forward
+ // overlead can be a player error. Preserve this as a descriptive falsifier.
+ test('moving-target overlead exposes false-positive intent risk',()=>{
+  const rows=[];
+  for(const direction of [-1,1]){
+   const arms=['hard','adaptive','smooth'].map(policy=>
+    trial(1517801,'minigun',30,'moving',policy,direction,'overlead'));
+   assert.equal(new Set(arms.map(x=>x.volleys)).size,1);
+   assert.ok(arms[1].adaptiveSoftTicks>0&&arms[2].smoothWeightSum>0);
+   rows.push({direction,arms});
+  }
+  console.log('VISIBLE_MOTION_OVERLEAD_RISK '+JSON.stringify(rows));
+ });
