@@ -67,9 +67,11 @@ const {chromium}=require('playwright');
      const g=window.__novaBirthGame;
      const px=Math.max(0,Math.min(this.canvas.width-1,Math.floor(center.x)));
      const py=Math.max(0,Math.min(this.canvas.height-1,Math.floor(center.y)));
+     const paintAt=performance.now(); // Capture before synchronous GPU/Canvas readback.
      const rgba=Array.from(this.getImageData(px,py,1,1).data);
-     window.__novaCanvasSubmit.push({at:performance.now(),method:'bullet-core-fill',
-      gameTime:g.time,rgba});
+     const rasterReadMs=performance.now()-paintAt;
+     window.__novaCanvasSubmit.push({at:paintAt,method:'bullet-core-fill',
+      gameTime:g.time,rgba,rasterReadMs});
     }
     return result;
    };
@@ -171,6 +173,7 @@ const {chromium}=require('playwright');
    deliveryToCanvasSubmitMs:Math.round((canvasSubmit.at-move.at)*1000)/1000,
    birthToCanvasSubmitMs:Math.round((canvasSubmit.at-birth.at)*1000)/1000,
    canvasMethod:canvasSubmit.method,canvasCoreRgba:canvasSubmit.rgba,
+   rasterReadMs:Math.round(canvasSubmit.rasterReadMs*1000)/1000,
    notMeasured:['GPU presentation','physical photon latency']
   }));
  }finally{await context.close();await browser.close();}
