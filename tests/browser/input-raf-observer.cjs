@@ -44,6 +44,9 @@ const {chromium}=require('playwright');
    'actual browser touch release must reach passive pointerup observer');
   assert.ok(Number.isFinite(result.before.kinds.pointerdown.p95Ms));
   assert.ok(Number.isFinite(result.before.kinds.pointerup.p95Ms));
+  assert.ok(Number.isFinite(result.before.kinds.pointercancel.p99Ms));
+  assert.ok(result.before.kinds.pointercancel.p99Ms<=
+   result.before.kinds.pointercancel.maxMs);
   assert.equal(result.before.metric,'DOM delivery to next RAF callback');
   assert.equal(result.after.status,'manual');
   assert.equal(result.after.pendingEvents,0);
