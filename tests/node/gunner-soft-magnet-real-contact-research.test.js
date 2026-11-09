@@ -70,9 +70,10 @@ function trial(seed,cls,hz,scenario,policy){
    const activeTicks=4*hz,drainTicks=2*hz;
    for(let i=0;i<activeTicks+drainTicks;i++){
     // Identical requested physical bearing across policies: 0.08-rad lead
-    // against the moving Scout; 0.008-rad thumb error when stationary.
+    // against the moving Scout; stationary controls use both 0.008-rad
+    // micro-error and 0.12-rad wide error to expose accessibility loss.
     const targetBearing=Math.atan2(t.y-p.y,t.x-p.x);
-    const requested=wrap(targetBearing+(scenario==='moving'?.08:.008));
+    const requested=wrap(targetBearing+(scenario==='moving'?.08:scenario==='stationary-wide'?.12:.008));
     const effective=policy==='soft'?softBearing(requested,targetBearing):requested;
     g.input.aim.dx=40*Math.cos(effective);
     g.input.aim.dy=40*Math.sin(effective);
@@ -94,7 +95,7 @@ test('opt-in soft magnet contact and stationary-error controls use real composed
  const rows=[];
  for(const cls of ['minigun','needlestorm'])
   for(const hz of [30,60])
-   for(const scenario of ['stationary','moving']){
+   for(const scenario of ['stationary','stationary-wide','moving']){
     const arms=['hard','soft','manual'].map(policy=>trial(1517800,cls,hz,scenario,policy));
     assert.equal(new Set(arms.map(x=>x.volleys)).size,1,
      'aim policy must not alter weapon firing cadence');
@@ -102,6 +103,6 @@ test('opt-in soft magnet contact and stationary-error controls use real composed
     assert.ok(arms.every(x=>x.eligible>0));
     rows.push({cls,hz,scenario,arms});
    }
- assert.equal(rows.length,8);
+ assert.equal(rows.length,12);
  console.log('SOFT_MAGNET_REAL_CONTACT_RESEARCH '+JSON.stringify(rows));
 });
