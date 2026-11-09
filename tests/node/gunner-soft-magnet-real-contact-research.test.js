@@ -27,6 +27,20 @@ function visibleMotionIntent(requested,bearing,now,prior){
  const signedLead=wrap(requested-bearing);
  return Math.abs(lateral)>20&&lateral*signedLead>0&&Math.abs(signedLead)>.01;
 }
+function smoothstep(x,lo,hi){
+ const t=Math.max(0,Math.min(1,(x-lo)/(hi-lo)));
+ return t*t*(3-2*t);
+}
+function visibleMotionWeight(requested,bearing,now,prior){
+ if(!now||!prior||!now.visible||!prior.visible||now.id!==prior.id)return 0;
+ const dt=now.at-prior.at;
+ if(!(dt>0&&dt<=.2))return 0;
+ const dx=(now.x-prior.x)/dt,dy=(now.y-prior.y)/dt;
+ const lateral=-Math.sin(bearing)*dx+Math.cos(bearing)*dy;
+ const lead=wrap(requested-bearing);
+ if(lateral*lead<=0||Math.abs(lead)>=.22)return 0;
+ return smoothstep(Math.abs(lateral),15,40)*smoothstep(Math.abs(lead),.01,.04);
+}
 const softBearing=(requested,target)=>{
  const delta=wrap(requested-target);
  return wrap(requested-delta*.45*Math.exp(-((delta/.06)**2)));
@@ -58,7 +72,7 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
    const nearest=g.nearestTank,originalDrones=g.updateDrones;
    let eligible=0,queries=0,movementWitness=0,hits=0,damage=0,volleys=0,maxTrajectoryDrift=0;
    let tick=-1,firstHitTick=null,leadStartDeg=null,leadEndDeg=null;
-   let previousVisible=null,adaptiveSoftTicks=0,adaptiveHardTicks=0,adaptiveUseSoft=false;
+   let previousVisible=null,adaptiveSoftTicks=0,adaptiveHardTicks=0,adaptiveUseSoft=false,smoothWeightSum=0;
    const rngTrace=[],rngDrawsBeforeCombat=draws();
    g.nearestTank=function(x,y,r,exclude){
     const found=nearest.apply(this,arguments);
@@ -123,13 +137,17 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
     // Research-only: use observed position history, not target velocity or future state.
     const visible={id:t.id,x:t.x,y:t.y,at:i/hz,visible:true};
     const adaptiveGate=visibleMotionIntent(requested,targetBearing,visible,previousVisible);
+    const weight=visibleMotionWeight(requested,targetBearing,visible,previousVisible);
     previousVisible=visible;
     const useSoft=policy==='soft'||(policy==='adaptive'&&adaptiveGate);
+    if(policy==='smooth')smoothWeightSum+=weight;
     if(policy==='adaptive'){
      adaptiveUseSoft=useSoft;
      useSoft?adaptiveSoftTicks++:adaptiveHardTicks++;
     }
-    const effective=useSoft?softBearing(requested,targetBearing):requested;
+    const effective=policy==='smooth'?(Math.abs(wrap(requested-targetBearing))<.22?
+     wrap(targetBearing+weight*wrap(softBearing(requested,targetBearing)-targetBearing)):requested):
+     (useSoft?softBearing(requested,targetBearing):requested);
     g.input.aim.dx=40*Math.cos(effective);
     g.input.aim.dy=40*Math.sin(effective);
     g.input.firing=i<activeTicks;
@@ -147,7 +165,7 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
    const result={seed,cls,hz,scenario,policy,direction,leadMode,leadStartDeg,leadEndDeg,hits,volleys,
     damage:+damage.toFixed(4),firstHitSec:firstHitTick===null?null:+((firstHitTick+1)/hz).toFixed(5),eligible,movementWitness,
     rngDrawsBeforeCombat,rngDrawsEnd:draws(),
-    maxTrajectoryDrift:+maxTrajectoryDrift.toFixed(4),adaptiveSoftTicks,adaptiveHardTicks};
+    maxTrajectoryDrift:+maxTrajectoryDrift.toFixed(4),adaptiveSoftTicks,adaptiveHardTicks,smoothWeightSum:+smoothWeightSum.toFixed(4)};
    // Preserve full chronology for in-test comparisons without bloating CI JSON.
    Object.defineProperty(result,'rngTrace',{value:rngTrace});
    return result;
@@ -225,15 +243,17 @@ test('soft-magnet contact with class-specific geometric intercept inputs',()=>{
    for(const hz of [30,60])
     for(const scenario of ['stationary-wide','moving'])
      for(const direction of (scenario==='moving'?[-1,1]:[1])){
-      const arms=['hard','soft','adaptive'].map(policy=>
+      const arms=['hard','soft','adaptive','smooth'].map(policy=>
        trial(1517800,cls,hz,scenario,policy,direction,'intercept'));
       assert.equal(new Set(arms.map(x=>x.volleys)).size,1);
       assert.equal(rngDivergence(arms[0],arms[2]),null);
       if(scenario==='stationary-wide'){
        assert.equal(arms[2].adaptiveSoftTicks,0);
        assert.equal(arms[2].damage,arms[0].damage);
+       assert.equal(arms[3].damage,arms[0].damage);
       }else{
        assert.ok(arms[2].adaptiveSoftTicks>0);
+       assert.ok(arms[3].smoothWeightSum>0);
        assert.ok(arms[2].adaptiveHardTicks>0);
       }
       rows.push({cls,hz,scenario,direction,arms});
@@ -250,8 +270,11 @@ test('soft-magnet contact with class-specific geometric intercept inputs',()=>{
     for(const direction of [-1,1]){
      const hard=trial(1517801,cls,hz,'moving','hard',direction,'underlead');
      const adaptive=trial(1517801,cls,hz,'moving','adaptive',direction,'underlead');
+     const smooth=trial(1517801,cls,hz,'moving','smooth',direction,'underlead');
      assert.equal(adaptive.adaptiveSoftTicks,0);
      assert.equal(adaptive.damage,hard.damage);
+     assert.equal(smooth.damage,hard.damage);
+     assert.equal(smooth.smoothWeightSum,0);
      assert.equal(rngDivergence(hard,adaptive),null);
     }
  });
