@@ -74,3 +74,16 @@ test('missing simulation-pace telemetry cannot authorize a DPR reduction',()=>{
  assert.equal(r.kind,'insufficient-evidence');
  assert.equal(game.dpr,1.5);
 });
+
+test('a slow rolling window cannot certify a DPR probe before old samples expire',()=>{
+ const {game,pilot}=fixture();
+ const slowTen={...slow,fps:10,frameP95Ms:120};
+ const betterTwenty={...better,fps:20,frameP95Ms:60};
+ step(pilot,0,1000,slowTen);
+ assert.equal(game.dpr,1);
+ const early=step(pilot,1500,7000,betterTwenty);
+ assert.equal(early.kind,'probing','a six-second window cannot flush 120 frames at 10 FPS');
+ const late=step(pilot,7500,9000,betterTwenty);
+ assert.equal(late.kind,'probe-window-too-slow');
+ assert.equal(game.dpr,1.5,'unverifiable clarity reduction must roll back');
+});
