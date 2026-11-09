@@ -51,7 +51,7 @@ test('reports DOM-to-RAF opportunities only, without retaining sensitive event f
  assert.equal(h.listeners,0);
  assert.equal(h.pendingRaf,0);
 });
-test('visibility loss fails closed and does not attribute hidden time to input delay',()=>{
+test('cancelled touch is measured separately without retaining private pointer identity',()=>{\n const h=harness(),o=h.window.__novaInputRafObserver.create();\n o.start();\n h.setTime(1002);h.event('pointerdown',{pointerId:77,clientX:123});\n h.setTime(1004);h.event('pointercancel',{pointerId:77,clientX:123});\n h.next(1012);\n const r=local(o.snapshot());\n assert.equal(r.kinds.pointerdown.count,1);\n assert.equal(r.kinds.pointercancel.count,1);\n assert.equal(r.kinds.pointercancel.p95Ms,8);\n assert.equal(r.kinds.pointerup.count,0);\n assert.equal(r.observedEvents,2);\n assert.equal(JSON.stringify(r).includes('pointerId'),false);\n assert.equal(JSON.stringify(r).includes('clientX'),false);\n o.stop();assert.equal(h.listeners,0);\n});\ntest('visibility loss fails closed and does not attribute hidden time to input delay',()=>{
  const h=harness(),o=h.window.__novaInputRafObserver.create();
  o.start();h.setTime(1004);h.event('pointerdown');
  h.hide();
