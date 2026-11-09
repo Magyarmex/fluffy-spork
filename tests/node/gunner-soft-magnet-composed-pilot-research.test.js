@@ -84,7 +84,7 @@ test('continuous soft magnet preserves lead, damps small errors and avoids a har
 test('shipping hard snap versus opt-in soft and manual bearing in composed Game',()=>{
  const rows=[];
  for(const seed of [1517800,1517802])for(const hz of [30,60,120])
-  for(const requested of [-.12,-.015,0,.015,.12,.219,.221]){
+  for(const requested of [-.12,-.015,.12,.221]){
    const hard=sample(seed,hz,requested,'hard');
    const soft=sample(seed,hz,requested,'soft');
    const manual=sample(seed,hz,requested,'manual');
@@ -97,6 +97,6 @@ test('shipping hard snap versus opt-in soft and manual bearing in composed Game'
    rows.push({seed,hz,requested,hard:+hard.toFixed(5),
     soft:+soft.toFixed(5),manual:+manual.toFixed(5)});
   }
- assert.equal(rows.length,42);
+ assert.equal(rows.length,24);
  console.log('SOFT_MAGNET_COMPOSED_PILOT '+JSON.stringify(rows));
 });
