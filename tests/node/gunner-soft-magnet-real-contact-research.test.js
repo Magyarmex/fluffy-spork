@@ -16,6 +16,13 @@ function rngDivergence(a,b){
  const i=a.rngTrace.findIndex((n,j)=>n!==b.rngTrace[j]);
  return i<0?null:i;
 }
+// Research-only visible-history gate; identity switches cannot inherit speed.
+function visibleMotionIntent(requested,bearing,now,prior,hz){
+ if(!prior||prior.id!==now.id||!(hz>0))return false;
+ const observedVy=(now.y-prior.y)*hz;
+ const signedLead=wrap(requested-bearing);
+ return Math.abs(observedVy)>20&&observedVy*signedLead>0&&Math.abs(signedLead)>.01;
+}
 const softBearing=(requested,target)=>{
  const delta=wrap(requested-target);
  return wrap(requested-delta*.45*Math.exp(-((delta/.06)**2)));
@@ -110,12 +117,10 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
      if(i===activeTicks-1)leadEndDeg=+leadDeg.toFixed(4);
     }
     // Research-only: use observed position history, not target velocity or future state.
-    const visible={x:t.x,y:t.y};
-    const observedVy=previousVisible?(visible.y-previousVisible.y)*hz:0;
+    const visible={id:t.id,x:t.x,y:t.y};
+    const adaptiveGate=visibleMotionIntent(requested,targetBearing,visible,previousVisible,hz);
     previousVisible=visible;
-    const signedLead=wrap(requested-targetBearing);
-    const forwardLead=observedVy*signedLead>0&&Math.abs(signedLead)>.01;
-    const useSoft=policy==='soft'||(policy==='adaptive'&&Math.abs(observedVy)>20&&forwardLead);
+    const useSoft=policy==='soft'||(policy==='adaptive'&&adaptiveGate);
     if(policy==='adaptive'){
      adaptiveUseSoft=useSoft;
      useSoft?adaptiveSoftTicks++:adaptiveHardTicks++;
@@ -246,3 +251,11 @@ test('soft-magnet contact with class-specific geometric intercept inputs',()=>{
      assert.equal(rngDivergence(hard,adaptive),null);
     }
  });
+
+test('visible-motion intent history expires on target identity switch',()=>{
+ const prior={id:1,x:200,y:0};
+ assert.equal(visibleMotionIntent(.08,0,{id:1,x:200,y:1},prior,60),true);
+ assert.equal(visibleMotionIntent(.08,0,{id:2,x:200,y:1},prior,60),false);
+ assert.equal(visibleMotionIntent(.08,0,{id:1,x:200,y:0},prior,60),false);
+ assert.equal(visibleMotionIntent(-.08,0,{id:1,x:200,y:1},prior,60),false);
+});
