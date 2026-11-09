@@ -175,3 +175,36 @@ test('browser clock failure during input capture stops observer without touching
  assert.equal(local(o.snapshot()).pendingEvents,0);
  assert.equal(h.listeners,0);
 });
+
+
+test('failed browser clock yields finite-or-null elapsed telemetry, never NaN',()=>{
+ const h=harness(),o=h.window.__novaInputRafObserver.create();
+ o.start();h.setTime(1010);h.event('pointerdown');
+ h.failClock();
+ assert.doesNotThrow(()=>h.event('pointerup'));
+ const snapshot=local(o.snapshot());
+ assert.equal(snapshot.status,'invalid-clock');
+ assert.equal(snapshot.elapsedMs,null);
+ assert.equal(snapshot.observedEvents,0);
+ assert.equal(snapshot.pendingEvents,0);
+ assert.equal(o.active,false);
+ assert.equal(h.listeners,0);
+ assert.equal(h.pendingRaf,0);
+ assert.equal(JSON.stringify(snapshot).includes('NaN'),false);
+});
+
+
+test('clock failure inside RAF callback cannot export NaN or leave input listeners',()=>{
+ const h=harness(),o=h.window.__novaInputRafObserver.create();
+ o.start();h.setTime(1004);h.event('pointerdown');
+ h.failClock();
+ assert.doesNotThrow(()=>h.next(1016));
+ const r=local(o.snapshot());
+ assert.equal(r.status,'invalid-clock');
+ assert.equal(r.elapsedMs,null);
+ assert.equal(r.observedEvents,0);
+ assert.equal(r.pendingEvents,0);
+ assert.equal(o.active,false);
+ assert.equal(h.listeners,0);
+ assert.equal(h.pendingRaf,0);
+});

@@ -53,8 +53,11 @@ function create({durationMs=60000,maxSamples=5000}={}){
   return {researchOnly:true,metric:'DOM delivery to next RAF callback',
    notMeasured:['simulation application','first rendered projectile','GPU/photon latency'],
    status:reason,observedEvents:count,pendingEvents:pending.length,
-   elapsedMs:startedAt===null?0:Math.round(Math.max(0,
-    (endedAt===null?clock():endedAt)-startedAt)*1000)/1000,kinds};
+   elapsedMs:(()=>{
+    if(startedAt===null)return 0;
+    const end=endedAt===null?clock():endedAt;
+    return Number.isFinite(end)?Math.round(Math.max(0,end-startedAt)*1000)/1000:null;
+   })(),kinds};
  }
  function stop(why){
   if(!active)return snapshot();
