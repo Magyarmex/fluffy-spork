@@ -61,7 +61,7 @@ function createAdaptiveDprPilot(game, options={}) {
       if(phase==='probing')return result('probe-cancelled',rollback(now));
       return result('inactive');
     }
-    if(!p||p.frameSamples<90||![p.fps,p.frameP95Ms,p.updateP95Ms,p.renderP95Ms]
+    if(!p||p.frameSamples<90||![p.fps,p.frameP95Ms,p.updateP95Ms,p.renderP95Ms,p.simulationPacePct]
       .every(Number.isFinite)){
       resetStreaks();
       if(phase==='probing'&&now-trialStart>8000)return result('probe-no-evidence',rollback(now));
@@ -70,7 +70,10 @@ function createAdaptiveDprPilot(game, options={}) {
     if(phase==='probing'){
       if(now-trialStart<6000||p.frameSamples<110)return result('probing');
       const gain=p.fps-baseline.fps,frameGain=baseline.frameP95Ms-p.frameP95Ms;
-      if(gain>=5&&frameGain>=3&&p.updateP95Ms<=baseline.updateP95Ms+5){
+      // A faster renderer is not a win if the world advances less per wall second.
+      // Require explicit simulation-pace evidence, not just FPS and update cost.
+      const pacePreserved=p.simulationPacePct>=baseline.simulationPacePct-2;
+      if(gain>=5&&frameGain>=3&&p.updateP95Ms<=baseline.updateP95Ms+5&&pacePreserved){
         phase='low';baseline=null;trialStart=null;resetStreaks();
         return result('probe-accepted');
       }
@@ -84,7 +87,8 @@ function createAdaptiveDprPilot(game, options={}) {
     if(phase==='baseline'&&game.dpr>floor&&slow&&now>=cooldownUntil){
       if(slowSince===null)slowSince=now;
       if(now-slowSince>=1000&&now-lastTransition>=8000){
-        baseline={fps:p.fps,frameP95Ms:p.frameP95Ms,updateP95Ms:p.updateP95Ms};
+        baseline={fps:p.fps,frameP95Ms:p.frameP95Ms,updateP95Ms:p.updateP95Ms,
+          simulationPacePct:p.simulationPacePct};
         trialStart=now;phase='probing';apply(floor,now);
         return result('probe-started',true);
       }
