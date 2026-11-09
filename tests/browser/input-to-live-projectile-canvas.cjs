@@ -30,6 +30,7 @@ const {chromium}=require('playwright');
    };
    const originalTryFire=Game.prototype.tryFire;
    window.__novaBirths=[];
+   window.__novaBirthIds=[];
    window.__novaCanvasSubmit=[];
    // Exact shipping game/render bullet-core signature:
    // ctx.arc(b.x,b.y,br*0.55,0,TAU); ctx.fill() under lighter/white.
@@ -46,7 +47,8 @@ const {chromium}=require('playwright');
        this.globalCompositeOperation==='lighter'&&this.fillStyle==='#ffffff'&&
        Math.abs(start)<1e-8&&Math.abs(end-Math.PI*2)<1e-6){
      pendingBulletCore=g.bullets.some(b=>{
-      if(!b||b.beam||b.ownerId!==g.player.id)return false;
+      if(!b||b.beam||b.ownerId!==g.player.id||
+         !window.__novaBirthIds.includes(b.id))return false;
       const hpFrac=b.maxHp?Math.max(.18,Math.min(1,(b.hp??b.maxHp)/b.maxHp)):1;
       const br=b.r*(.72+hpFrac*.28);
       return Math.abs(x-b.x)<1e-6&&Math.abs(y-b.y)<1e-6&&
@@ -68,8 +70,10 @@ const {chromium}=require('playwright');
     const before=this.bullets.length;
     const result=originalTryFire.call(this,t,...args);
     if(!this.__novaDecorativeWorld&&this===window.__novaBirthGame&&
-       t&&t.isPlayer&&this.bullets.length>before)
+       t&&t.isPlayer&&this.bullets.length>before){
+     window.__novaBirthIds.push(...this.bullets.slice(before).map(b=>b.id));
      window.__novaBirths.push({at:performance.now(),gameTime:this.time});
+    }
     return result;
    };
    window.__novaTouchDelivery=[];
@@ -95,6 +99,7 @@ const {chromium}=require('playwright');
    // witness. Do not modify class reload, projectile physics or firing logic.
    g.player.fireCd=0;
    window.__novaBirths.length=0; // Exclude any pre-interaction AUTO shots.
+   window.__novaBirthIds.length=0;
    window.__novaCanvasSubmit.length=0; // Exclude pre-interaction draw activity.
    window.__novaFirstFireSample=null;
    window.__novaAimExtensionAt=null;
