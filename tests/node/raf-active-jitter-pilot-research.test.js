@@ -17,7 +17,7 @@ assert.equal(shipping.split(oldGate).length-1,1,'shipping CPU/catch-up gate owne
 assert.equal(shipping.split(oldCap).length-1,1,'shipping final carry cap owner');
 const pilot=shipping.replace(oldGate,'elapsed <= 0.1')
  .replace(oldCap,'carry = Math.min(elapsed <= 0.1 ? 2 / 30 : 1 / 30, carry);');
-function run(startBody,gaps,seconds=10,workMs=0){
+function run(startBody,gaps,seconds=10,workMs=0,pauseWindow=null){
  let now=0,work=0,raf=null,sim=0,updates=0,draws=0,frameSteps=0,maxSteps=0,firstFrameSteps=null;
  const start=new Function('performance','requestAnimationFrame','render_1',
   'return ({'+startBody+'}).start')({now:()=>now+work},
@@ -31,6 +31,7 @@ function run(startBody,gaps,seconds=10,workMs=0){
  let i=0;
  while(now<seconds*1000-1e-7){
   now+=Math.min(gaps[i++%gaps.length],seconds*1000-now);
+  game.paused=!!(pauseWindow&&now>=pauseWindow[0]&&now<pauseWindow[1]);
   const cb=raf;raf=null;assert.equal(typeof cb,'function');cb(now);
  }
  assert.ok(sim<=seconds+1e-7,'no future time');
@@ -169,4 +170,18 @@ test('current-work guard does not guarantee total frame CPU below 18ms',()=>{
   '17ms first update is still eligible for a second update');
  assert.ok(observed.firstFrameSteps*17>18,
   'two individually affordable updates can exceed the total frame budget');
+});
+
+// Pause/evolution must discard simulation carry rather than replaying it on
+// resume. This checks the RAF owner only, not UI input release semantics.
+test('active-jitter pilot discards paused-frame debt on resume',()=>{
+ const gaps=[50],pauseWindow=[1000,2000];
+ const before=run(shipping,gaps,3,0,pauseWindow);
+ const after=run(pilot,gaps,3,0,pauseWindow);
+ assert.ok(Math.abs(after.sim-before.sim)<1e-6,
+  'pilot must not recover simulated time from a paused second');
+ assert.ok(after.sim>1.9&&after.sim<2.1,
+  'three wall seconds with one paused second should advance about two');
+ assert.equal(after.draws,before.draws);
+ assert.ok(after.maxSteps<=2);
 });
