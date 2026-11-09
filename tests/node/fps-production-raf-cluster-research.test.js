@@ -170,3 +170,22 @@ if(hasOldCap)test('falsifier: bounded 100ms pilot still loses time when catch-up
  assert.equal(heavyWork.maxSteps,1,
   'the existing CPU-work gate must still reject expensive second updates');
 });
+
+if(hasOldCap)test('falsifier: four consecutive 95ms frames defeat the bounded 100ms pilot',()=>{
+ // 4*95 + 8*2.5 = 400ms across 12 frames: exactly mean 30Hz.
+ // Every individual frame is below the 100ms foreground-stall boundary.
+ const burst=[95,95,95,95,...Array(8).fill(2.5)];
+ const oldGate='elapsed <= 1 / 12';
+ const bounded=shipping.replace(oldCap,
+  'Math.min(elapsed < 0.1 ? 0.1 : 1 / 30, excess)')
+  .replace(oldGate,'elapsed < 0.1');
+ const wide=shipping.replace(oldCap,
+  'Math.min(elapsed < 0.1 ? 1 / 4 : 1 / 30, excess)');
+ const b=run(bounded,burst,60),w=run(wide,burst,60);
+ assert.ok(b.sim<55,'100ms carry still loses >=5s of active time in 60s');
+ assert.ok(w.sim>59.9,'250ms carry can repay this synthetic active schedule');
+ assert.ok(w.maxLag>0.2,'wide carry does so with >200ms render-time world lag');
+ assert.ok(b.maxSteps<=2&&w.maxSteps<=2);
+ // A universal solution requires explicit input chronology and a bounded
+ // CPU/backlog policy; neither larger cap is a shippable general cure.
+});
