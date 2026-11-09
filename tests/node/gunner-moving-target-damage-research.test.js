@@ -52,7 +52,7 @@ function trial(seed,cls,reload,hz,mode,targetX=200,motion='stationary',assist='s
     return nearest.apply(this,arguments);
    };
   }
-  let volleys=0,hits=0,damage=0,activeTicks=0;
+  let volleys=0,hits=0,damage=0,activeTicks=0,aimErrorSum=0;
   const fire=g.tryFire,originalDamage=g.damageTank;
   g.tryFire=function(t){
    const before=this.bullets.length,out=fire.apply(this,arguments);
@@ -75,6 +75,9 @@ function trial(seed,cls,reload,hz,mode,targetX=200,motion='stationary',assist='s
     g.input.firing=active;
     activeTicks+=+active;
     g.update(1/hz);
+    const targetBearing=Math.atan2(targetY,targetX);
+    aimErrorSum+=Math.abs(Math.atan2(Math.sin(p.angle-targetBearing),
+     Math.cos(p.angle-targetBearing)));
     // The experiment controls target motion; real bullet physics/damage
     // remain active. Restore its location after each complete game step.
     target.x=targetX;target.y=targetY;target.vx=0;target.vy=0;
@@ -84,6 +87,7 @@ function trial(seed,cls,reload,hz,mode,targetX=200,motion='stationary',assist='s
    assert.ok(Number.isFinite(damage)&&damage>=0);
    return {seed,cls,reload,hz,mode,motion,assist,activeSeconds:activeTicks/hz,
     volleys,hits,damage:+damage.toFixed(4),
+    meanAimErrorRad:+(aimErrorSum/(8*hz)).toFixed(5),
     spin:+(p.fireSpin||0).toFixed(5),
     heat:+(p.__v17Heat||0).toFixed(5)};
   }finally{g.destroy();}
@@ -112,9 +116,9 @@ test('moving lateral target exposes hit and damage sensitivity under matched wal
      assert.ok(stationary.hits>0&&stationary.damage>0,
       'stationary positive control must take real projectile damage');
      rows.push({cls,reload,mode,hz,seed,
-      stationary:{hits:stationary.hits,damage:stationary.damage,volleys:stationary.volleys},
-      crossing:{hits:crossing.hits,damage:crossing.damage,volleys:crossing.volleys},
-      manual:{hits:manual.hits,damage:manual.damage,volleys:manual.volleys}});
+      stationary:{hits:stationary.hits,damage:stationary.damage,volleys:stationary.volleys,aimError:stationary.meanAimErrorRad},
+      crossing:{hits:crossing.hits,damage:crossing.damage,volleys:crossing.volleys,aimError:crossing.meanAimErrorRad},
+      manual:{hits:manual.hits,damage:manual.damage,volleys:manual.volleys,aimError:manual.meanAimErrorRad}});
     }
  }
  assert.equal(rows.length,24);
