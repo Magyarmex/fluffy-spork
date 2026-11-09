@@ -84,3 +84,19 @@ test('composed Game pilot does not change uniform 60Hz physical time',()=>{
   assert.ok(Math.abs(before.travel-after.travel)<1e-6);
  }
 });
+
+// Reproduce the pilot's strongest known limitation through the actual Game,
+// not only through a scheduler-only clock model. A green assertion here is
+// evidence that the candidate is INCOMPLETE, not permission to ship it.
+test('composed Game still loses active time during consecutive 99ms frames',()=>{
+ const gaps=[99,99,99,.5,.5,.5,.5,.5,.5];
+ for(const seed of [1517800,1517802]){
+  const before=trial(seed,shipping,gaps),after=trial(seed,pilot,gaps);
+  assert.ok(after.sim>before.sim+1,
+   'pilot recovers substantial simulated time over shipping');
+  assert.ok(after.sim<3.9,
+   'bounded two-step pilot still loses time in a four-second real Game');
+  assert.equal(after.draws,before.draws);
+  assert.ok(Number.isFinite(after.travel));
+ }
+});
