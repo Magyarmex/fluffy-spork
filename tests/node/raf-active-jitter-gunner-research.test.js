@@ -66,3 +66,20 @@ test('active-time recovery does not pretend to solve rotary weapon cadence',()=>
   console.log('RAF_ACTIVE_GUNNER_RESEARCH '+JSON.stringify({cls,reload,old,candidate,baseline}));
  }
 });
+
+// Source-executed Game falsifier: the pilot's 100ms eligibility cliff is not
+// merely a diagnostic artifact; it changes how much actual combat simulation
+// is executed under nearly identical sustained presentation intervals.
+test('real Gunner Game exposes the pilot 100ms timebase discontinuity',()=>{
+ for(const [cls,reload] of [['minigun',1],['needlestorm',3]]){
+  const eligible=run(cls,reload,1517800,pilot,[100]);
+  const ineligible=run(cls,reload,1517800,pilot,[100.1]);
+  assert.ok(eligible.sim>ineligible.sim*1.8,
+   '0.1ms presentation difference must expose the unsafe timebase cliff');
+  assert.ok(eligible.updates>ineligible.updates*1.8,
+   'real Game update count must expose the same discontinuity');
+  assert.ok(eligible.volleys>0&&ineligible.volleys>0);
+  console.log('RAF_100MS_GUNNER_FALSIFIER '+JSON.stringify({cls,reload,
+   eligible,ineligible}));
+ }
+});
