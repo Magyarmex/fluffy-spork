@@ -59,6 +59,17 @@ test('continuous soft magnet preserves lead, damps small errors and avoids a har
  }
  assert.ok(Math.abs(wrap(softBearing(.221,0)-softBearing(.219,0)))<.003);
  assert.ok(Math.abs(wrap(softBearing(-Math.PI+.01,Math.PI-.01)-(-Math.PI+.01)))<.02);
+ // A soft assist must not create a new narrow steering acceleration spike.
+ // Finite-difference sensitivity is bounded across the entire circle.
+ let maxSlope=0,minSlope=Infinity;
+ for(let i=-1000;i<=1000;i++){
+  const angle=i*Math.PI/1000,eps=1e-5;
+  const slope=wrap(softBearing(angle+eps,0)-softBearing(angle-eps,0))/(2*eps);
+  maxSlope=Math.max(maxSlope,slope);minSlope=Math.min(minSlope,slope);
+ }
+ assert.ok(minSlope>=.54-1e-3,'near-center correction stays responsive');
+ assert.ok(maxSlope<1.205,'local amplification must stay under 20.5 percent');
+
 });
 test('shipping hard snap versus opt-in soft and manual bearing in composed Game',()=>{
  const rows=[];
