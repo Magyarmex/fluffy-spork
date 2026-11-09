@@ -247,7 +247,7 @@ canvas {
     <link rel="icon" href="./nova-icon.svg" type="image/svg+xml" />
     <meta name="application-name" content="NOVA TANKS" />
     <script defer src="./pwa-register.js"></script>
-      <meta name="nova-runtime-build" content="59713f362a44766350f31bdb" />
+      <meta name="nova-runtime-build" content="14d920e79c2c0f20a2ad19f9" />
   </head>
   <body>
     <div id="root"></div>
@@ -2407,7 +2407,7 @@ class Game {
             const elapsed = Math.max(0, (ts - this.last) / 1000);
             const dt = Math.min(1 / 30, elapsed + carry);
             const excess = elapsed + carry - dt;
-            carry = excess > 1e-9 ? Math.min(1 / 30, excess) : 0;
+            carry = excess > 1e-9 ? excess : 0;
             this.last = ts;
             if (!this.paused)
                 this.update(dt);
@@ -2421,6 +2421,7 @@ class Game {
                 this.mmTimer -= 1 / 30;
                 carry = Math.max(0, carry - 1 / 30);
             }
+            carry = Math.min(1 / 30, carry);
             if (this.paused)
                 carry = 0;
             (0, render_1.render)(this, this.w, this.h);
