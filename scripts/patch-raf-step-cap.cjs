@@ -123,8 +123,8 @@ function patchRafStepCapLegacy(html){
  * larger debt bucket or long-stall repayment is introduced. */
 const oldCarryLine='carry = excess > 1e-9 ? Math.min(1 / 30, excess) : 0;';
 const newCarryLine='carry = excess > 1e-9 ? excess : 0;';
-const oldPauseLine='            if (this.paused)\\n                carry = 0;';
-const postClampLine='            carry = Math.min(1 / 30, carry);\\n';
+const oldPauseLine='            if (this.paused)\n                carry = 0;';
+const postClampLine='            carry = Math.min(1 / 30, carry);\n';
 function patchRafStepCap(html){
  const out=patchRafStepCapLegacy(html);
  if(count(out,newCarryLine)===1&&count(out,postClampLine)===1)return out;
