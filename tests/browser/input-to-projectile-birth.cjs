@@ -17,8 +17,15 @@ const {chromium}=require('playwright');
   await page.evaluate(()=>{
    const Game=window.__novaMakeRequire('')('game/engine').Game;
    const originalUpdate=Game.prototype.update;
+   window.__novaAimExtensionAt=null;
+   window.__novaFirstFireSample=null;
    Game.prototype.update=function(...args){
-    if(!this.__novaDecorativeWorld)window.__novaBirthGame=this;
+    if(!this.__novaDecorativeWorld){
+     window.__novaBirthGame=this;
+     if(window.__novaAimExtensionAt!==null&&!window.__novaFirstFireSample&&
+        this.input.firing&&this.input.aim.active)
+      window.__novaFirstFireSample={at:performance.now(),gameTime:this.time};
+    }
     return originalUpdate.apply(this,args);
    };
    const originalTryFire=Game.prototype.tryFire;
@@ -34,8 +41,12 @@ const {chromium}=require('playwright');
    window.__novaTouchDelivery=[];
    for(const type of ['pointerdown','pointermove','pointerup','pointercancel'])
     document.addEventListener(type,e=>{
-     if(e.pointerType==='touch')
-      window.__novaTouchDelivery.push({type,at:performance.now(),trusted:e.isTrusted});
+     if(e.pointerType==='touch'){
+      const at=performance.now();
+      window.__novaTouchDelivery.push({type,at,trusted:e.isTrusted});
+      if(type==='pointermove'&&window.__novaAimExtensionAt===null)
+       window.__novaAimExtensionAt=at;
+     }
     },{capture:true,passive:true});
   });
   await page.getByRole('button',{name:/DEPLOY/i}).first().click();
@@ -50,6 +61,8 @@ const {chromium}=require('playwright');
    // witness. Do not modify class reload, projectile physics or firing logic.
    g.player.fireCd=0;
    window.__novaBirths.length=0; // Exclude any pre-interaction AUTO shots.
+   window.__novaFirstFireSample=null;
+   window.__novaAimExtensionAt=null;
   });
   const box=await canvas.boundingBox();
   assert.ok(box&&box.width>200&&box.height>200);
@@ -68,7 +81,8 @@ const {chromium}=require('playwright');
   const during=await page.evaluate(()=>{
    const g=window.__novaBirthGame;
    return {aimActive:g.input.aim.active,aimOwner:g.input.stickId.aim,
-    firing:g.input.firing,shots:window.__novaBirths.slice(),
+    firing:g.input.firing,firstFireSample:window.__novaFirstFireSample,
+    shots:window.__novaBirths.slice(),
     events:window.__novaTouchDelivery.slice()};
   });
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[extended]});
@@ -84,12 +98,21 @@ const {chromium}=require('playwright');
   assert.ok(down&&move,'real touch press and extension must be delivered');
   const birth=during.shots[0];
   assert.ok(Number.isFinite(birth.at)&&Number.isFinite(birth.gameTime));
-  assert.ok(birth.at>=move.at,'projectile cannot predate the delivered aim extension');
+  assert.ok(during.firstFireSample&&Number.isFinite(during.firstFireSample.at),
+   'the actual Game.update must observe held fire before projectile birth');
+  assert.ok(during.firstFireSample.at>=move.at,
+   'simulation application cannot predate the delivered aim extension');
+  assert.ok(birth.at>=during.firstFireSample.at,
+   'projectile birth cannot predate the first fire-sampling Game.update');
   const delay=birth.at-move.at;
+  const inputToSample=during.firstFireSample.at-move.at;
+  const sampleToBirth=birth.at-during.firstFireSample.at;
   assert.ok(delay>=0&&delay<12000,'a held touch must eventually produce a real projectile');
   assert.deepEqual(errors,[],'the real game must not throw');
   console.log('NOVA_TOUCH_TO_PROJECTILE_BIRTH '+JSON.stringify({
    viewport:'320x700',trusted:true,deliveryToBirthMs:Math.round(delay*1000)/1000,
+   deliveryToSimulationMs:Math.round(inputToSample*1000)/1000,
+   simulationToBirthMs:Math.round(sampleToBirth*1000)/1000,
    birthGameTime:birth.gameTime,projectilesObserved:during.shots.length,
    notMeasured:['first Canvas renderer submission','GPU presentation','physical photon latency']
   }));
