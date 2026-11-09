@@ -121,6 +121,7 @@ jobs:
           node tests/browser/real-touch-gameplay.cjs
           node tests/browser/input-raf-observer.cjs
           node tests/browser/input-to-projectile-birth.cjs
+          node tests/browser/input-to-live-projectile-canvas.cjs
           node tests/browser/crasher-recovery-cue.cjs
           node tests/browser/tempest-apex-heat-cue.cjs
           node tests/browser/bomber-terrain-child-birth.cjs
