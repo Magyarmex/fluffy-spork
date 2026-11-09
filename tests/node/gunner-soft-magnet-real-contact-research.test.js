@@ -39,6 +39,7 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
    g.input.autofire=false;g.input.aim.active=true;
    const nearest=g.nearestTank,originalDrones=g.updateDrones;
    let eligible=0,queries=0,movementWitness=0,hits=0,damage=0,volleys=0,maxTrajectoryDrift=0;
+   let tick=-1,firstHitTick=null;
    g.nearestTank=function(x,y,r,exclude){
     const found=nearest.apply(this,arguments);
     if(exclude===p.id&&r===480&&x===p.x&&y===p.y){
@@ -59,7 +60,10 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
    const originalDamage=g.damageTank,originalFire=g.tryFire;
    g.damageTank=function(victim){
     const before=victim.hp,out=originalDamage.apply(this,arguments);
-    if(victim===t&&victim.hp<before){hits++;damage+=before-victim.hp;}
+    if(victim===t&&victim.hp<before){
+     if(firstHitTick===null)firstHitTick=tick;
+     hits++;damage+=before-victim.hp;
+    }
     return out;
    };
    g.tryFire=function(tank){
@@ -69,6 +73,7 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
    };
    const activeTicks=4*hz,drainTicks=2*hz;
    for(let i=0;i<activeTicks+drainTicks;i++){
+    tick=i;
     // Identical requested physical bearing across policies: 0.08-rad lead
     // against the moving Scout; stationary controls use both 0.008-rad
     // micro-error and 0.12-rad wide error to expose accessibility loss.
@@ -104,7 +109,7 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed'){
    assert.ok(Number.isFinite(damage)&&damage>=0);
    assert.ok(hits>=0&&volleys>0);
    return {seed,cls,hz,scenario,policy,direction,leadMode,hits,volleys,
-    damage:+damage.toFixed(4),eligible,movementWitness,
+    damage:+damage.toFixed(4),firstHitSec:firstHitTick===null?null:+((firstHitTick+1)/hz).toFixed(5),eligible,movementWitness,
     maxTrajectoryDrift:+maxTrajectoryDrift.toFixed(4)};
   }finally{g.destroy();}
  });
