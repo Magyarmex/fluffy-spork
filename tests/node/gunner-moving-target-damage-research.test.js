@@ -43,15 +43,20 @@ function trial(seed,cls,reload,hz,mode,targetX=200,motion='stationary',assist='s
   p.stats.reload=reload;
   g.input.autofire=false;g.input.aim.active=true;
   g.input.aim.dx=40;g.input.aim.dy=0;
-  // Controlled manual-aim counterfactual. Normal arm retains the complete
-  // shipping Fair Engagement / viewport / nearestTank assist stack.
-  if(assist==='manual'){
-   const nearest=g.nearestTank;
-   g.nearestTank=function(x,y,radius,except){
-    if(except===p.id)return null;
-    return nearest.apply(this,arguments);
-   };
-  }
+  // Observe the exact shipping Fair Engagement eligibility before optionally
+  // suppressing the player-only assist result. Other nearestTank callers and
+  // the original visibility/hostility/terrain checks are never replaced.
+  let assistQueries=0,assistEligible=0;
+  const nearest=g.nearestTank;
+  g.nearestTank=function(x,y,radius,except){
+   const result=nearest.apply(this,arguments);
+   if(except===p.id&&radius===480&&x===p.x&&y===p.y){
+    assistQueries++;
+    if(result===target)assistEligible++;
+    if(assist==='manual')return null;
+   }
+   return result;
+  };
   let volleys=0,hits=0,damage=0,activeTicks=0,aimErrorSum=0;
   const fire=g.tryFire,originalDamage=g.damageTank;
   g.tryFire=function(t){
@@ -85,7 +90,7 @@ function trial(seed,cls,reload,hz,mode,targetX=200,motion='stationary',assist='s
     assert.equal(g.shapes.length+g.drones.length+g.powerups.length,0);
    }
    assert.ok(Number.isFinite(damage)&&damage>=0);
-   return {seed,cls,reload,hz,mode,motion,assist,activeSeconds:activeTicks/hz,
+   return {seed,cls,reload,hz,mode,motion,assist,assistQueries,assistEligible,activeSeconds:activeTicks/hz,
     volleys,hits,damage:+damage.toFixed(4),
     meanAimErrorRad:+(aimErrorSum/(8*hz)).toFixed(5),
     spin:+(p.fireSpin||0).toFixed(5),
@@ -108,6 +113,11 @@ test('moving lateral target exposes hit and damage sensitivity under matched wal
      assert.equal(crossing.volleys,stationary.volleys,
       'target movement must not alter firing chronology');
      assert.equal(manual.activeSeconds,crossing.activeSeconds);
+     assert.ok(crossing.assistQueries>0&&crossing.assistEligible>0,
+      'the shipping arm must actually find the visible hostile moving target');
+     assert.equal(manual.assistQueries,crossing.assistQueries);
+     assert.equal(manual.assistEligible,crossing.assistEligible,
+      'the manual arm must retain the same shipping eligibility witness');
      assert.equal(manual.volleys,crossing.volleys,
       'manual aim counterfactual must preserve the same firing cadence');
      assert.ok(crossing.hits>=0&&crossing.damage>=0);
@@ -117,8 +127,8 @@ test('moving lateral target exposes hit and damage sensitivity under matched wal
       'stationary positive control must take real projectile damage');
      rows.push({cls,reload,mode,hz,seed,
       stationary:{hits:stationary.hits,damage:stationary.damage,volleys:stationary.volleys,aimError:stationary.meanAimErrorRad},
-      crossing:{hits:crossing.hits,damage:crossing.damage,volleys:crossing.volleys,aimError:crossing.meanAimErrorRad},
-      manual:{hits:manual.hits,damage:manual.damage,volleys:manual.volleys,aimError:manual.meanAimErrorRad}});
+      crossing:{hits:crossing.hits,damage:crossing.damage,volleys:crossing.volleys,aimError:crossing.meanAimErrorRad,assistEligible:crossing.assistEligible},
+      manual:{hits:manual.hits,damage:manual.damage,volleys:manual.volleys,aimError:manual.meanAimErrorRad,assistEligible:manual.assistEligible}});
     }
  }
  assert.equal(rows.length,24);
