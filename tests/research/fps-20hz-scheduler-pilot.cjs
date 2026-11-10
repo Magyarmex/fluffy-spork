@@ -31,7 +31,7 @@ function run({seed=1517800,cls='tempest',cadence='20Hz-jitter',maxSteps=4,backlo
   const timeline=new ChronologicalInput(g.input);
   const bridge=new BrowserEventTimeline(timeline,{now:()=>1000,timeOrigin:1793560000000});
   let now=1000,callback=null,volleys=0,simMs=0,renderMs=0,peakSteps=0;
-  const frameCpu=[],frameUpdateCpu=[],frameRenderCpu=[];
+  const frameCpu=[],frameUpdateCpu=[],frameRenderCpu=[],frameSteps=[];
   const oldFire=g.tryFire,oldUpdate=g.update;
   g.tryFire=function(t){const n=this.bullets.length;const out=oldFire.apply(this,arguments);
    if(t===g.player&&this.bullets.length>n)volleys++;return out;};
@@ -66,6 +66,7 @@ function run({seed=1517800,cls='tempest',cadence='20Hz-jitter',maxSteps=4,backlo
      const beforeUpdate=simMs,beforeRender=renderMs,start=realNow();
      frame(now);
      frameCpu.push(realNow()-start);
+     frameSteps.push(owner.lastSteps);
      frameUpdateCpu.push(simMs-beforeUpdate);
      frameRenderCpu.push(renderMs-beforeRender);
     }else frame(now);
@@ -79,6 +80,12 @@ function run({seed=1517800,cls='tempest',cadence='20Hz-jitter',maxSteps=4,backlo
     // Real Node wall-clock measurements of this composed-Game fixture only.
     // These are NOT Chromium/Android frame-time or touch latency claims.
     frameCpuSamples:frameCpu.length,
+    // Distinguish costly three-update bursts from one-update frames.
+    // These are Node-host wall-clock observations, not device budgets.
+    threeStepFrameSamples:frameSteps.filter(n=>n===3).length,
+    oneStepFrameSamples:frameSteps.filter(n=>n===1).length,
+    threeStepFrameCpuP95Ms:percentile(frameCpu.filter((_,i)=>frameSteps[i]===3),.95),
+    oneStepFrameCpuP95Ms:percentile(frameCpu.filter((_,i)=>frameSteps[i]===1),.95),
     frameCpuP50Ms:percentile(frameCpu,.5),
     frameCpuP95Ms:percentile(frameCpu,.95),
     frameCpuP99Ms:percentile(frameCpu,.99),
