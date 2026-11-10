@@ -91,3 +91,15 @@ test('sub-microsecond >100ms boundary cannot accidentally widen stall catch-up',
  assert.equal(control.rows[0].steps,pilot.rows[0].steps);
  assert.ok(Math.abs(control.rows[0].dropped-pilot.rows[0].dropped)<EPS);
 });
+
+test('long stall after active three-step frames resets to original two-step safety budget',()=>{
+ const gaps=[1000/60,1000/60,120,1000/60];
+ const control=replay(gaps),pilot=replay(gaps,{activeOnlyThree:true});
+ assert.equal(pilot.rows[0].budget,3);
+ assert.equal(pilot.rows[1].budget,3);
+ assert.equal(pilot.rows[2].budget,2);
+ assert.equal(pilot.rows[2].steps,2);
+ assert.equal(pilot.rows[2].steps,control.rows[2].steps);
+ assert.ok(Math.abs(pilot.rows[2].dropped-control.rows[2].dropped)<EPS);
+ assert.equal(pilot.ticks,control.ticks);
+});
