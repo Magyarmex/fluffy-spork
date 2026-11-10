@@ -139,7 +139,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
   const origin={x:box.x+box.width*.72,y:box.y+box.height*.68,
    id:42,radiusX:1,radiusY:1,force:1};
   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[origin]});
-  await page.waitForTimeout(120);
+  await page.waitForFunction(()=>window.__novaFixedGame?.input?.aim?.active,null,{timeout:5000});
   const centered=await page.evaluate(()=>{
    const g=window.__novaFixedGame;
    return {owner:g.input.stickId.aim,active:g.input.aim.active,
@@ -161,7 +161,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
   assert.ok(held.births>0,'real Game must emit player-owned projectile');
   assert.ok(Math.hypot(held.dx,held.dy)>5,'real analog extension must be sampled');
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
-  await page.waitForTimeout(150);
+  await page.waitForFunction(()=>window.__novaFixedGame?.input?.aim?.active===false,null,{timeout:5000});
   const report=await page.evaluate(()=>{
    const g=window.__novaFixedGame,p=window.__novaFixedPilot;
    const values=a=>{const s=[...a].sort((x,y)=>x-y);
