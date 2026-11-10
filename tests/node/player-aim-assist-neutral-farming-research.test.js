@@ -34,7 +34,7 @@ function trial(seed,hz,mode){
    g.spawnShape('circle',true);
    const circle=g.shapes[0];
    assert.ok(circle&&circle.type==='circle');
-   circle.x=160;circle.y=0;circle.vx=0;circle.vy=0;
+   circle.x=160;circle.y=mode==='corridorOffPath'||mode==='shippingOffPath'?150:0;circle.vx=0;circle.vy=0;
    circle.spin=0;circle.wanderT=Infinity;
    if(g.shapeById)g.shapeById.set(circle.id,circle);
    g.shapeTimer=Infinity;g.powerupTimer=Infinity;
@@ -95,6 +95,8 @@ test('neutral-farming aim interference diagnostic in the actual composed game',(
   const noAligned=trial(seed,hz,'noAligned'),
    legacy=trial(seed,hz,'legacy'),shipping=trial(seed,hz,'shipping'),
    corridor=trial(seed,hz,'corridor'),
+   shippingOffPath=trial(seed,hz,'shippingOffPath'),
+   corridorOffPath=trial(seed,hz,'corridorOffPath'),
    shippingEnemy=trial(seed,hz,'shippingEnemy'),
    corridorEnemy=trial(seed,hz,'corridorEnemy');
   assert.equal(noAligned.hz,legacy.hz);
@@ -106,7 +108,16 @@ test('neutral-farming aim interference diagnostic in the actual composed game',(
   assert.ok(Number.isFinite(shipping.playerAngle),
    'measure shipped steering without freezing a possibly harmful snap');
   assert.ok(Number.isFinite(corridor.playerAngle)&&Number.isFinite(corridorEnemy.playerAngle));
-  rows.push({noAligned,legacy,shipping,corridor,shippingEnemy,corridorEnemy});
+  assert.deepEqual(corridorOffPath.bearings,shippingOffPath.bearings,
+   'a neutral outside the requested firing corridor must not change projectile bearings');
+  assert.equal(corridorOffPath.alignedHp,shippingOffPath.alignedHp,
+   'a neutral outside the corridor must not change hostile damage');
+  assert.deepEqual(corridorEnemy.bearings,shippingEnemy.bearings,
+   'deliberate hostile aim must not be vetoed by a neutral outside its shot corridor');
+  assert.equal(corridorEnemy.alignedHp,shippingEnemy.alignedHp,
+   'deliberate hostile aim must retain its real projectile damage');
+  rows.push({noAligned,legacy,shipping,corridor,shippingEnemy,corridorEnemy,
+   shippingOffPath,corridorOffPath});
  }
  console.log('NOVA_NEUTRAL_AIM_INTERFERENCE '+JSON.stringify(rows));
 });
