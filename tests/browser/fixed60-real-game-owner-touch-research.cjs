@@ -171,6 +171,25 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
   assert.equal(held.active,true);
   assert.ok(held.births>0,'real Game must emit player-owned projectile');
   assert.ok(Math.hypot(held.dx,held.dy)>5,'real analog extension must be sampled');
+  if(process.env.NOVA_FIXED60_ACTIVE_BURST==='1'){
+   // Exercise three-update callbacks while the real right stick is held.
+   for(let i=0;i<2;i++){
+    await page.evaluate(()=>{
+     const end=performance.now()+55;
+     while(performance.now()<end){}
+    });
+    await page.waitForFunction(()=>window.__novaFixedResearch.frames.some(f=>
+     f.steps===3&&f.budget===3&&f.rawGapMs<=100+1e-7),null,{timeout:5000});
+   }
+   const during=await page.evaluate(()=>({
+    owner:window.__novaFixedGame.input.stickId.aim,
+    active:window.__novaFixedGame.input.aim.active,
+    births:window.__novaFixedResearch.births
+   }));
+   assert.equal(during.owner,held.owner,'three-step callbacks must preserve held touch owner');
+   assert.equal(during.active,true,'three-step callbacks must preserve held aim');
+   assert.ok(during.births>=held.births,'three-step callbacks must not undo real projectiles');
+  }
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   await page.waitForFunction(()=>window.__novaFixedGame?.input?.aim?.active===false,null,{timeout:5000});
   // Opt-in research: force active (<100ms) RAF gaps in real Chromium.
