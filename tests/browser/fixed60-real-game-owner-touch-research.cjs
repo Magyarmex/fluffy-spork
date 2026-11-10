@@ -70,8 +70,20 @@ const {chromium}=require('playwright');
    };
   });
   await deploy.click();
-  await page.waitForFunction(()=>window.__novaFixedGame?.status==='playing'&&
-   window.__novaFixedPilot?.owner?.started,null,{timeout:30000});
+  try{
+   await page.waitForFunction(()=>window.__novaFixedGame?.status==='playing'&&
+    window.__novaFixedPilot?.owner?.started,null,{timeout:30000});
+  }catch(error){
+   const diagnostic=await page.evaluate(()=>({
+    gameSeen:!!window.__novaFixedGame,
+    status:window.__novaFixedGame?.status||null,
+    pilotSeen:!!window.__novaFixedPilot,
+    pilotStarted:!!window.__novaFixedPilot?.owner?.started,
+    gameRaf:window.__novaFixedGame?.raf??null,
+    loading:!!document.querySelector('.nv-loading:not([hidden])')
+   }));
+   throw Error('fixed60 boot gate: '+JSON.stringify({diagnostic,errors}),{cause:error});
+  }
   const canvas=page.locator('canvas.absolute.inset-0');
   await canvas.waitFor({state:'visible',timeout:20000});
   await page.locator('.nv-loading').waitFor({state:'hidden',timeout:20000});
