@@ -25,12 +25,12 @@ test('patch accepts raw, previously shipped, and new shell; rejects drift',()=>{
  assert.equal(patchRafStepCap(old),patchRafStepCap(mid));
  assert.equal(patchRafStepCap(patchRafStepCap(latest)),patchRafStepCap(latest));
  const upgraded=patchRafStepCap(latest);
- assert.equal(upgraded.split('priorWork < 18 && earlierWork < 18 && performance.now() - workStart < 18').length-1,1,
+ assert.equal(upgraded.split('priorWork < 18 && earlierWork < 18 && performance.now() - workStart < Math.min(32, Math.max(18, elapsed * 500 - 2))').length-1,1,
   'already materialized production shell must acquire the current-frame budget exactly once');
  assert.equal(patchRafStepCap(patchRafStepCap(old)),patchRafStepCap(old));
  assert.equal(patchRafStepCap(old).split(after).length-1,1);
  const oldGate='priorWork < 18 && earlierWork < 18) {';
- const newGate='priorWork < 18 && earlierWork < 18 && performance.now() - workStart < 18) {';
+ const newGate='priorWork < 18 && earlierWork < 18 && performance.now() - workStart < Math.min(32, Math.max(18, elapsed * 500 - 2))) {';
  assert.throws(()=>patchRafStepCap(latest+oldGate),/CPU budget owner drift/);
  assert.throws(()=>patchRafStepCap(latest+newGate),/CPU budget owner drift/);
  assert.throws(()=>patchRafStepCap(old.replace(before,'            const dt = 123;')),/drift/);
@@ -124,15 +124,17 @@ test('randomized mixed-load presentation never creates time or exceeds two updat
 // safety guard, not a request to change the normal 60Hz firing cadence.
 test('current expensive first update suppresses optional RAF recovery',()=>{
  const html=patchRafStepCap(raw());
- const expensive=driver(html,(_dt,n)=>n===4?22:0);
+ const expensive=driver(html,(_dt,n)=>n===4?35:0);
+ const moderate=driver(html,(_dt,n)=>n===4?22:0);
  const cheap=driver(html);
  for(let i=0;i<3;i++){
-  expensive.frame(1000/60);cheap.frame(1000/60);
+  expensive.frame(1000/60);moderate.frame(1000/60);cheap.frame(1000/60);
  }
- const beforeExpensive=expensive.dts.length,beforeCheap=cheap.dts.length;
- expensive.frame(80);cheap.frame(80);
- assert.equal(expensive.dts.length-beforeExpensive,1,'do not double a 22ms current update');
+ const beforeExpensive=expensive.dts.length,beforeModerate=moderate.dts.length,beforeCheap=cheap.dts.length;
+ expensive.frame(80);moderate.frame(80);cheap.frame(80);
+ assert.equal(expensive.dts.length-beforeExpensive,1,'do not double a 35ms current update');
+ assert.equal(moderate.dts.length-beforeModerate,2,'22ms first update fits bounded 80ms interval');
  assert.equal(cheap.dts.length-beforeCheap,2,'cheap 80ms frame retains bounded catch-up');
- assert.equal(expensive.draws,4);assert.equal(cheap.draws,4);
+ assert.equal(expensive.draws,4);assert.equal(moderate.draws,4);assert.equal(cheap.draws,4);
  assert.ok(expensive.dts.every(dt=>dt<=1/30+1e-12));
 });
