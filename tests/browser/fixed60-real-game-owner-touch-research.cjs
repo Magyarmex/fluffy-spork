@@ -75,6 +75,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
    const baseStart=Game.prototype.start;
    window.__novaFixedResearch={births:0,updates:[],renders:[],errors:[],lifecycle:[],touchEvents:[],frames:[]};
    const profile=window.__novaFixedResearch;
+   profile.gateTimerWakeLags=[];
    const gateGaps=[250/3,50/3,50/3,50/3];
    let gateNext=null,gateIndex=0,gateToken=0;
    const gatePending=new Map();
@@ -158,9 +159,15 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
        // This is an opt-in measurement, never a production scheduler.
        if(timerArmedGate&&gateNext!==null){
         const wait=Math.max(0,gateNext-performance.now()-2);
-        if(wait>3){state.timer=setTimeout(()=>{
-         state.timer=null;if(!state.cancelled)state.id=requestAnimationFrame(deliver);
-        },wait);return;}
+        if(wait>3){
+         const due=performance.now()+wait;
+         profile.gateTimerArms=(profile.gateTimerArms||0)+1;
+         state.timer=setTimeout(()=>{
+          state.timer=null;
+          profile.gateTimerWakeLags.push(performance.now()-due);
+          if(!state.cancelled)state.id=requestAnimationFrame(deliver);
+         },wait);return;
+        }
        }
        state.id=requestAnimationFrame(deliver);
       };
@@ -416,6 +423,8 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     maxSteps:p.owner.maxSteps,ticks:p.owner.ticks,droppedMs:p.owner.droppedMs,
     raf:{frames:frames.length,intervals:values(frameIntervals),controlledLongGaps,
      nativeRafSkipped:window.__novaFixedResearch.gateSkippedNativeRafs||0,
+     timerArms:window.__novaFixedResearch.gateTimerArms||0,
+     timerWakeLagMs:values(window.__novaFixedResearch.gateTimerWakeLags),
      observedWallMs,presentationHz:frameIntervals.length>0&&
       frames[frames.length-1].ts>frames[0].ts?
       frameIntervals.length*1000/(frames[frames.length-1].ts-frames[0].ts):null,
@@ -454,6 +463,11 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
   assert.ok(Number.isFinite(report.touchToCanvasSubmissionMs)&&
    report.touchToCanvasSubmissionMs>=report.touchToProjectileBirthMs,
    'first actual projectile must reach a real Canvas render submission');
+  if(timerArmedGate){
+   assert.ok(report.raf.timerArms>0,'timer gate must actually arm timers');
+   assert.equal(report.raf.timerWakeLagMs.n,report.raf.timerArms,
+    'all armed timers must have woken before report (no leaked gate timer)');
+  }
   assert.equal(report.aimActive,false,'release must clear aim');
   const touches=await page.evaluate(()=>window.__novaFixedResearch.touchEvents.slice());
   assert.ok(touches.some(e=>e.type==='pointerdown'),'real touch down must reach DOM');
