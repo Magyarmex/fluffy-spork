@@ -79,9 +79,14 @@ function trial(seed,cls,reload,mode,offsetMs){
   };
   const timeline=new ChronologicalInput(g.input);
   const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
+  const pendingSampledEvents=[];
+  const renderSubmitLagsMs=[];
   const owner=new FixedStepRafOwner(g,timeline,bridge,{
    now:()=>now,request:fn=>(callback=fn,1),cancel:()=>{callback=null},
-   render:()=>{},maxSteps:2
+   render:()=>{
+    for(const originalAt of pendingSampledEvents.splice(0))
+     renderSubmitLagsMs.push(+(now-1000-originalAt*1000).toFixed(5));
+   },maxSteps:2
   });
   // Presentation cost proxy and chronological input sampling lag are both
   // release gates: equal damage alone does not guarantee responsive touch.
@@ -90,8 +95,10 @@ function trial(seed,cls,reload,mode,offsetMs){
   for(const kind of ['pd','pm','pu']){
    const original=g.input[kind];
    g.input[kind]=function(evt){
-    if(Number.isFinite(evt.__novaSampleAt)&&Number.isFinite(evt.__novaOriginalAt))
+    if(Number.isFinite(evt.__novaSampleAt)&&Number.isFinite(evt.__novaOriginalAt)){
      inputLagsMs.push(+(1000*(evt.__novaSampleAt-evt.__novaOriginalAt)).toFixed(5));
+     pendingSampledEvents.push(evt.__novaOriginalAt);
+    }
     return original.apply(this,arguments);
    };
   }
@@ -125,6 +132,8 @@ function trial(seed,cls,reload,mode,offsetMs){
    assert.equal(bridge.reorderedClamps,0,'normal RAF jitter must not reorder touch');
    assert.equal(bridge.staleClamps,0,'normal RAF jitter must not drop touch');
    assert.equal(inputLagsMs.length,edges.length,'every touch edge has sampled timing');
+   assert.equal(renderSubmitLagsMs.length,edges.length,'every sampled touch edge reaches render submission');
+   assert.ok(renderSubmitLagsMs.every(x=>x>=-0.001&&Number.isFinite(x)));
    assert.ok(inputLagsMs.every(x=>x>=-0.001&&Number.isFinite(x)));
    assert.equal(stepsByFrame.one+stepsByFrame.two*2,360);
    assert.equal(stepsByFrame.zero+stepsByFrame.one+stepsByFrame.two,schedule(mode).length);
@@ -134,6 +143,8 @@ function trial(seed,cls,reload,mode,offsetMs){
     applied:timeline.applied,volleys,hits,damage:+damage.toFixed(5),
     births,stepsByFrame,maxInputSampleLagMs:Math.max(...inputLagsMs),
     meanInputSampleLagMs:+(inputLagsMs.reduce((a,b)=>a+b,0)/inputLagsMs.length).toFixed(5),
+    maxRenderSubmitLagMs:Math.max(...renderSubmitLagsMs),
+    meanRenderSubmitLagMs:+(renderSubmitLagsMs.reduce((a,b)=>a+b,0)/renderSubmitLagsMs.length).toFixed(5),
     spin:+(p.fireSpin||0).toFixed(5),heat:+(p.__v17Heat||0).toFixed(5)};
   }finally{owner.stop();g.destroy();}
  });
