@@ -97,6 +97,15 @@ function trial(seed,hz,mode,opts={}){
      return nearest.apply(this,arguments);
     };
    }
+   const circleHitStates=[],originalDamageShape=g.damageShape;
+   g.damageShape=function(shape,damage,ix,iy){
+    if(shape===circle&&circleHitStates.length<8)circleHitStates.push({
+     time:+this.time.toFixed(5),x:+shape.x.toFixed(5),y:+shape.y.toFixed(5),
+     vx:+shape.vx.toFixed(5),vy:+shape.vy.toFixed(5),
+     hpBefore:+shape.hp.toFixed(5),damage:+damage.toFixed(5),
+     impulseX:+(Number(ix)||0).toFixed(5),impulseY:+(Number(iy)||0).toFixed(5)});
+    return originalDamageShape.apply(this,arguments);
+   };
    let shots=0;const bearings=[],shotShapeStates=[],original=g.tryFire;
    g.tryFire=function(t){
     const before=this.bullets.length,out=original.apply(this,arguments);
@@ -121,7 +130,7 @@ function trial(seed,hz,mode,opts={}){
    assert.ok(Number.isFinite(hp)&&hp>=0&&hp<=14);
    assert.ok(shots>=2,'real Scout firing must occur during the observation');
    return {seed,hz,mode,xpScene,shots,circleHp:+hp.toFixed(5),
-    circleDestroyed:!survivor,playerAngle:+p.angle.toFixed(5),bearings,shotShapeStates,aimQueryStates,
+    circleDestroyed:!survivor,playerAngle:+p.angle.toFixed(5),bearings,shotShapeStates,aimQueryStates,circleHitStates,
     alignedHp:withAligned?+aligned.hp.toFixed(5):null,
     playerXP:+p.xp.toFixed(5),playerScore:+p.score.toFixed(5),
     uncollectedOrbXP:+g.orbs.reduce((a,o)=>a+(Number(o.xp)||0),0).toFixed(5)};
