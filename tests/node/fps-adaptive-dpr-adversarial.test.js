@@ -195,3 +195,15 @@ test('accepted low DPR rolls back after finite but invalid telemetry',()=>{
   assert.equal(game.dpr,1.5);
  }
 });
+
+test('invalid finite telemetry during probing restores original clarity',()=>{
+ const {game,pilot}=fixture();
+ step(pilot,0,1000,slow);
+ assert.equal(pilot.state.phase,'probing');
+ const invalid={...better,fps:0,frameP95Ms:0};
+ let result;
+ for(let t=1500;t<=9500;t+=500)result=pilot.sample(t,invalid);
+ assert.equal(result.kind,'probe-no-evidence');
+ assert.equal(game.dpr,1.5);
+ assert.equal(pilot.state.phase,'baseline');
+});
