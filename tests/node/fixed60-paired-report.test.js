@@ -4,6 +4,7 @@ const assert=require('node:assert/strict');
 const {summarize}=require('../research/fixed60-paired-report.cjs');
 function arm(steps,wall=1000){return {controlledGate:true,configuredMaxSteps:steps,
  initialFingerprint:'09a37c35:8241',ticks:45,droppedMs:240,
+ touchToProjectileBirthMs:21,touchToCanvasSubmissionMs:28,
  updates:{p95:2},renders:{p95:3},raf:{observedWallMs:wall,simulatedMs:750,
  remainingLagMs:10,frames:30,presentationHz:30,controlledLongGaps:4,
  stepCounts:{[steps]:5},longStallDroppedMs:100,backlogDroppedMs:140,
@@ -37,4 +38,13 @@ test('missing actual catch-up path fails closed',()=>{
 test('invalid dropped-time attribution fails closed',()=>{
  const b=arm(3);b.raf.backlogDroppedMs=0;
  assert.throws(()=>summarize(arm(2),b),/causes do not reconcile/);
+});
+
+test('missing real projectile-to-Canvas evidence fails closed',()=>{
+ const b=arm(3);b.touchToCanvasSubmissionMs=null;
+ assert.throws(()=>summarize(arm(2),b),/Canvas submission/);
+});
+test('Canvas submission cannot precede projectile birth',()=>{
+ const b=arm(3);b.touchToCanvasSubmissionMs=10;
+ assert.throws(()=>summarize(arm(2),b),/Canvas submission/);
 });
