@@ -7,12 +7,14 @@ function arm(steps,wall=1000){return {controlledGate:true,configuredMaxSteps:ste
  touchToProjectileBirthMs:21,touchToCanvasSubmissionMs:28,
  updates:{p95:2},renders:{p95:3},raf:{observedWallMs:wall,simulatedMs:750,
  remainingLagMs:10,frames:30,presentationHz:30,controlledLongGaps:4,
+ nativeRafSkipped:12,
  stepCounts:{[steps]:5},longStallDroppedMs:100,longStallWallMs:150,
  backlogDroppedMs:140,
  callbackJs:{p95:5}}};}
 test('paired browser report is descriptive and normalized by actual elapsed time',()=>{
  const result=summarize(arm(2),arm(3,1000));
  assert.equal(result.control.backlogLossMsPerSecond,140);
+ assert.equal(result.control.skippedNativeRafsPerDeliveredFrame,0.4);
  assert.ok(Math.abs(result.control.backlogLossMsPerActiveSecond-140000/850)<1e-9);
  assert.equal(result.matchedObservationDuration,true);
  assert.equal(result.causalClaimAllowed,false);
@@ -54,4 +56,9 @@ test('Canvas submission cannot precede projectile birth',()=>{
 test('active-window denominator cannot be zero or negative',()=>{
  const b=arm(3);b.raf.longStallWallMs=1000;
  assert.throws(()=>summarize(arm(2),b),/active observation window/);
+});
+
+test('invalid native RAF skip counts fail closed',()=>{
+ const b=arm(3);b.raf.nativeRafSkipped=-1;
+ assert.throws(()=>summarize(arm(2),b),/nativeRafSkipped/);
 });
