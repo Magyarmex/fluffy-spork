@@ -26,14 +26,14 @@ const {chromium}=require('playwright');
    const profile=window.__novaFixedResearch;
    const baseUpdate=Game.prototype.update;
    Game.prototype.update=function(...args){
-    if(this.__novaDecorativeWorld)return baseUpdate.apply(this,args);
+    if(this!==window.__novaFixedGame)return baseUpdate.apply(this,args);
     const at=performance.now();
     try{return baseUpdate.apply(this,args);}
     finally{profile.updates.push(performance.now()-at);}
    };
    const baseRender=renderMod.render;
    renderMod.render=function(...args){
-    if(args[0]?.__novaDecorativeWorld)return baseRender.apply(this,args);
+    if(args[0]!==window.__novaFixedGame)return baseRender.apply(this,args);
     const at=performance.now();
     try{return baseRender.apply(this,args);}
     finally{profile.renders.push(performance.now()-at);}
