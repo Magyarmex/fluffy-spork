@@ -260,7 +260,10 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     updates:values(window.__novaFixedResearch.updates),
     renders:values(window.__novaFixedResearch.renders),
     births:window.__novaFixedResearch.births,
-    runtimeScripts:document.querySelectorAll('script[src*="nova-updates/"]').length};
+    runtimeScripts:[...document.querySelectorAll('script[src*="nova-updates/"]')]
+     .filter(s=>!s.src.includes('fixed60-research-browser.js')).length,
+    researchBundles:[...document.querySelectorAll('script[src*="nova-updates/"]')]
+     .filter(s=>s.src.includes('fixed60-research-browser.js')).length};
   });
   assert.equal(report.aimActive,false,'release must clear aim');
   const touches=await page.evaluate(()=>window.__novaFixedResearch.touchEvents.slice());
@@ -302,7 +305,8 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
   assert.ok(Math.abs(report.raf.attributedDroppedMs-report.droppedMs)<1e-5,
    'RAF-level dropped-time attribution must match the actual owner total');
   assert.ok(Number.isFinite(report.updates.p95));
-  assert.ok(report.runtimeScripts>=49,'actual shipping overlays must be loaded');
+  assert.equal(report.runtimeScripts,49,'all 49 canonical shipping overlays must be loaded');
+  assert.equal(report.researchBundles,1,'exactly one opt-in fixed60 bundle must be loaded');
   assert.deepEqual(errors,[],'browser errors');
   assert.deepEqual(consoleErrors,[],'browser console errors');
   const teardown=await page.evaluate(()=>{
