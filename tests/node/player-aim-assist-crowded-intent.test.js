@@ -27,7 +27,7 @@ function scene(rivals,aim={x:1,y:0}){
  return {g,p};
 }
 function close(g){g.destroy();}
-test('crowded cone does not silently choose one of two plausible rivals',()=>{
+for(const hz of [30,60,120])test('crowded cone preserves manual intent at '+hz+'Hz',()=>{
  const offAxis=rival(9401,120,70),above=rival(9402,220,20),
        below=rival(9403,250,-20);
  const {g,p}=scene([offAxis,above,below]);
@@ -35,7 +35,7 @@ test('crowded cone does not silently choose one of two plausible rivals',()=>{
   assert.equal(g.nearestTank(0,0,480,p.id),offAxis,
    'outside the player update the nearest query remains unchanged');
   const before=g.time;
-  g.update(1/60);
+  g.update(1/hz);
   assert.ok(g.time>before,'the real composed Game must advance');
   assert.ok(Math.abs(p.angle)<1e-9,
    'two in-cone candidates must preserve eastward manual aim');
@@ -43,8 +43,8 @@ test('crowded cone does not silently choose one of two plausible rivals',()=>{
   // The same running world becomes unambiguous when one rival leaves.
   // This differential control rules out a vacuous zero-angle result.
   g.tanks=[p,offAxis,above];p.angle=0;
-  g.update(1/60);
-  assert.ok(Math.abs(p.angle-Math.atan2(20,220)*13/60)<1e-6,
+  g.update(1/hz);
+  assert.ok(Math.abs(p.angle-Math.atan2(20,220)*13/hz)<1e-6,
    'removing the second aligned rival must restore unique-target assistance');
  }finally{close(g);}
 });
