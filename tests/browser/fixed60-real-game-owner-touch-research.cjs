@@ -173,6 +173,26 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
   assert.ok(Math.hypot(held.dx,held.dy)>5,'real analog extension must be sampled');
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   await page.waitForFunction(()=>window.__novaFixedGame?.input?.aim?.active===false,null,{timeout:5000});
+  // Opt-in research: force active (<100ms) RAF gaps in real Chromium.
+  // This must exercise the actual three-update Game path, not merely allow it.
+  if(process.env.NOVA_FIXED60_ACTIVE_BURST==='1'){
+   assert.equal(maxSteps,3,'active burst requires three-step research owner');
+   for(let attempt=0;attempt<5;attempt++){
+    const before=await page.evaluate(()=>window.__novaFixedResearch.frames.length);
+    await page.evaluate(()=>{
+     const end=performance.now()+55;
+     while(performance.now()<end){} // intentional research-only foreground work
+    });
+    await page.waitForFunction(before=>window.__novaFixedResearch.frames.length>before,
+     before,{timeout:5000});
+   }
+   const bursts=await page.evaluate(()=>window.__novaFixedResearch.frames
+    .filter(f=>f.steps===3&&f.rawGapMs<=100+1e-7&&f.budget===3)
+    .map(f=>({rawGapMs:f.rawGapMs,steps:f.steps,callbackJsMs:f.callbackJsMs})));
+   assert.ok(bursts.length>0,
+    'controlled active Chromium RAF gaps must exercise real three-update Game callbacks');
+   console.log('NOVA_FIXED60_ACTIVE_THREE_UPDATE_BURSTS '+JSON.stringify(bursts));
+  }
   // Force one genuine foreground RAF gap, after releasing the stick.
   // The active-only three-step policy must revert to two steps on this gap.
   const beforeStall=await page.evaluate(()=>({
