@@ -127,3 +127,33 @@ test('browser artifact preserves real 49-overlay Tempest state against native60'
    'browser artifact must not diverge from native60 combat state or RNG');
  }
 });
+
+
+test('source and browser pilots retain a brand-checked Performance.now receiver',()=>{
+ const {bootGame}=require('../research/audio-rng-causal-pilot.cjs');
+ const {createFixedStepBrowserPilot:sourcePilot}=
+  require('../research/fixed-step-raf-owner.cjs');
+ const window={};
+ vm.runInNewContext(fs.readFileSync(artifact,'utf8'),{window},{timeout:1000});
+ const browserPilot=window.__novaFixed60Research.createFixedStepBrowserPilot;
+ for(const create of [sourcePilot,browserPilot]){
+  const g=bootGame(),win=g.__testWindow,doc=win.document;
+  const emitter=()=>({addEventListener(){},removeEventListener(){}});
+  Object.assign(win,emitter());Object.assign(doc,emitter());
+  Object.assign(g.canvas,emitter());
+  g.input.detach();g.input.attach(g.canvas);
+  g.sfx.startMusic=()=>{};
+  let calls=0;
+  const clock={timeOrigin:1793560000000,now(){
+   assert.equal(this,clock,'Performance.now must keep its receiver');
+   calls++;return 1000;
+  }};
+  const pilot=create(g,{window:win,document:doc,clock,
+   request:()=>19,cancel:()=>{},render:()=>{}});
+  try{
+   pilot.start();
+   assert.equal(pilot.owner.started,true);
+   assert.ok(calls>=2,'bridge construction and RAF startup must sample the clock');
+  }finally{pilot.stop();g.destroy()}
+ }
+});
