@@ -6,8 +6,8 @@ const assert=require('node:assert/strict');
 const path=require('node:path');
 const {chromium}=require('playwright');
 const maxSteps=Number(process.env.NOVA_FIXED60_MAX_STEPS||2);
-// Three-step here is a GLOBAL research cap, including >100ms stalls.
- // The separate active-only three-step policy is not wired into this pilot.
+// Three-step is an opt-in test-only active-jitter policy; >100ms stalls
+// retain the original two-step safety budget.
 assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps');
 (async()=>{
  const browser=await chromium.launch({headless:true,args:['--disable-dev-shm-usage','--no-sandbox']});
@@ -85,7 +85,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
        const frames=profile.frames;
        const previous=frames.length?frames[frames.length-1].ts:null;
        frames.push({ts,intervalMs:previous===null?null:ts-previous,
-        steps:current.ticks-beforeTicks,
+        steps:current.ticks-beforeTicks,budget:current.maxSteps,
         rawGapMs,lagMs:current.lagMs,droppedMs:current.droppedMs-beforeDropped,
         dropReason:current.droppedMs>beforeDropped?
          (rawGapMs>100.0000001?'long-stall':'backlog'):null,
@@ -96,6 +96,15 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
      render:(g,w,h)=>renderMod.render(g,w,h),
      maxSteps:window.__novaFixedMaxSteps,backlogExtraTicks:2});
     window.__novaFixedPilot=pilot;
+    // Reuse PR #888's exact-source active-only policy in the real browser.
+    // This is intentionally NOT installed in production or the bundle.
+    if(window.__novaFixedMaxSteps===3){
+     const baseAdvance=pilot.owner.advance;
+     pilot.owner.advance=function(ts){
+      this.maxSteps=Math.max(0,ts-this.lastMs)>100+1e-7?2:3;
+      return baseAdvance.call(this,ts);
+     };
+    }
     const originalStop=pilot.owner.stop.bind(pilot.owner);
     pilot.owner.stop=function(...stopArgs){
      profile.lifecycle.push({event:'owner-stop',at:performance.now(),status:pilot.owner.game.status,
@@ -178,7 +187,8 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
    const longStallDrops=frames.filter(f=>f.dropReason==='long-stall').length;
    const backlogDrops=frames.filter(f=>f.dropReason==='backlog').length;
    const attributedDroppedMs=frames.reduce((sum,f)=>sum+f.droppedMs,0);
-   return {maxSteps:p.owner.maxSteps,ticks:p.owner.ticks,droppedMs:p.owner.droppedMs,
+   return {configuredMaxSteps:window.__novaFixedMaxSteps,
+    maxSteps:p.owner.maxSteps,ticks:p.owner.ticks,droppedMs:p.owner.droppedMs,
     raf:{frames:frames.length,intervals:values(frameIntervals),
      callbackJs:values(callbackCosts),backlogMs:values(backlogSamples),
      stepCounts,droppedFrameCount,
@@ -200,7 +210,16 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
   const owners=new Set(touches.map(e=>e.pointerId));
   assert.equal(owners.size,1,'touch gesture must retain one DOM pointer owner');
   assert.equal(report.productionRafActive,false,'never run two RAF owners');
-  assert.equal(report.maxSteps,maxSteps,'requested catch-up policy must own real Game');
+  assert.equal(report.configuredMaxSteps,maxSteps,'requested catch-up policy must own real Game');
+  if(maxSteps===3){
+   const frames=await page.evaluate(()=>window.__novaFixedResearch.frames.map(f=>({
+    rawGapMs:f.rawGapMs,budget:f.budget,steps:f.steps
+   })));
+   assert.ok(frames.every(f=>f.budget===(f.rawGapMs>100+1e-7?2:3)),
+    'three-step pilot must retain two-step budget after a foreground stall');
+   assert.ok(frames.every(f=>f.steps<=f.budget),
+    'browser pilot must not exceed its per-frame simulation budget');
+  }
   assert.equal(report.pilotStarted,true,'research owner must remain active');
   assert.ok(report.ticks>0&&report.updates.n>0);
   assert.ok(report.renders.n>0&&Number.isFinite(report.renders.p95));
