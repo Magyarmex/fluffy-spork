@@ -173,13 +173,16 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
   assert.ok(Math.hypot(held.dx,held.dy)>5,'real analog extension must be sampled');
   if(process.env.NOVA_FIXED60_ACTIVE_BURST==='1'){
    // Exercise three-update callbacks while the real right stick is held.
+   const beforeThree=await page.evaluate(()=>window.__novaFixedResearch.frames
+    .filter(f=>f.steps===3&&f.budget===3&&f.rawGapMs<=100+1e-7).length);
    for(let i=0;i<2;i++){
     await page.evaluate(()=>{
      const end=performance.now()+55;
      while(performance.now()<end){}
     });
-    await page.waitForFunction(()=>window.__novaFixedResearch.frames.some(f=>
-     f.steps===3&&f.budget===3&&f.rawGapMs<=100+1e-7),null,{timeout:5000});
+    await page.waitForFunction(before=>window.__novaFixedResearch.frames
+     .filter(f=>f.steps===3&&f.budget===3&&f.rawGapMs<=100+1e-7).length>before,
+     beforeThree,{timeout:5000});
    }
    const during=await page.evaluate(()=>({
     owner:window.__novaFixedGame.input.stickId.aim,
