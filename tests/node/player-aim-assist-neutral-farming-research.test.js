@@ -75,8 +75,8 @@ test('neutral-farming aim interference diagnostic in the actual composed game',(
   assert.equal(control.seed,rescue.seed);
   assert.ok(Math.abs(control.playerAngle)<1e-8,
    'without the aligned hostile the raw eastward aim remains east');
-  assert.ok(rescue.playerAngle>0.08,
-   'the unique aligned hostile must genuinely redirect the gun');
+  assert.ok(Number.isFinite(rescue.playerAngle),
+   'measure the candidate bearing without freezing a possibly harmful snap');
   rows.push({control,rescue});
  }
  console.log('NOVA_NEUTRAL_AIM_INTERFERENCE '+JSON.stringify(rows));
