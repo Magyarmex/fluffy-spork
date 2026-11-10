@@ -6,6 +6,7 @@ const assert=require('node:assert/strict');
 const path=require('node:path');
 const fs=require('node:fs');
 const {chromium}=require('playwright');
+const {injectBattlefieldSeed}=require('../research/battlefield-layout-fixture.cjs');
 const maxSteps=Number(process.env.NOVA_FIXED60_MAX_STEPS||2);
 const controlledGate=process.env.NOVA_FIXED60_CONTROLLED_GATE==='1';
 const controlledExtra=Number(process.env.NOVA_FIXED60_EXTRA_TICKS||2);
@@ -29,6 +30,21 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
  const context=await browser.newContext({viewport:{width:320,height:700},
   deviceScaleFactor:2,isMobile:true,hasTouch:true,serviceWorkers:'block'});
  const errors=[],consoleErrors=[];
+ let layoutIntercepts=0;
+ if(controlledGate){
+  await context.route('**/nova-updates/battlefield-v1.6.0.js',async route=>{
+   const response=await route.fetch();
+   assert.equal(response.status(),200,'seeded Battlefield overlay must load');
+   layoutIntercepts++;
+   await route.fulfill({response,body:injectBattlefieldSeed(await response.text(),0x12345678)});
+  });
+  await context.addInitScript(()=>{
+   let state=0x9e3779b9;
+   window.__novaResearchResetRng=()=>{state=0x9e3779b9;};
+   Math.random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;
+    return (state>>>0)/4294967296;};
+  });
+ }
  try{
   const page=await context.newPage();
   page.on('pageerror',e=>errors.push(String(e.stack||e)));
@@ -42,6 +58,16 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
    window.__novaFixedMaxSteps=maxSteps;
    window.__novaControlledGate=controlledGate;
    const Game=window.__novaMakeRequire('')('game/engine').Game;
+   if(controlledGate){
+    const baseSpawn=Game.prototype.spawnPlayer;
+    Game.prototype.spawnPlayer=function(...args){
+     if(!this.__novaResearchInitialSpawnSeeded){
+      window.__novaResearchResetRng();
+      this.__novaResearchInitialSpawnSeeded=true;
+     }
+     return baseSpawn.apply(this,args);
+    };
+   }
    const renderMod=window.__novaMakeRequire('')('game/render');
    const baseStart=Game.prototype.start;
    window.__novaFixedResearch={births:0,updates:[],renders:[],errors:[],lifecycle:[],touchEvents:[],frames:[]};
@@ -58,6 +84,22 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
    const baseUpdate=Game.prototype.update;
    Game.prototype.update=function(...args){
     if(this!==window.__novaFixedGame)return baseUpdate.apply(this,args);
+    if(controlledGate&&!profile.initialFingerprint){
+     const compact=(arr,keys)=>(arr||[]).map(o=>keys.map(k=>o?.[k]??null));
+     const snapshot=JSON.stringify({
+      battlefield:this.__novaBattlefield?.seed??null,
+      player:this.player&&[this.player.x,this.player.y,this.player.cls],
+      tanks:compact(this.tanks,['id','x','y','cls','hp']),
+      shapes:compact(this.shapes,['id','x','y','type','hp']),
+      terrain:compact(this.__novaTerrain,['id','x','y','w','h','r','type','hp','solid'])
+     });
+     let hash=2166136261;
+     for(let i=0;i<snapshot.length;i++){
+      hash^=snapshot.charCodeAt(i);hash=Math.imul(hash,16777619);
+     }
+     profile.initialFingerprint=(hash>>>0).toString(16).padStart(8,'0')+
+      ':'+snapshot.length;
+    }
     const at=performance.now();
     try{return baseUpdate.apply(this,args);}
     finally{profile.updates.push(performance.now()-at);}
@@ -162,6 +204,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     };
     profile.lifecycle.push({event:'owner-created',at:performance.now(),status:this.status});
     pilot.start();
+    profile.ownerStartMs=pilot.owner.lastMs;
     profile.lifecycle.push({event:'owner-start-returned',at:performance.now(),started:pilot.owner.started});
     return result;
    };
@@ -309,6 +352,9 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     return {n:s.length,p95:s.length?s[Math.ceil(.95*s.length)-1]:null};};
    const frames=window.__novaFixedResearch.frames;
    const frameIntervals=frames.map(f=>f.intervalMs).filter(Number.isFinite);
+   const ownerStartMs=window.__novaFixedResearch.ownerStartMs;
+   const observedWallMs=frames.length&&Number.isFinite(ownerStartMs)?
+    frames[frames.length-1].ts-ownerStartMs:0;
    const controlledLongGaps=frames.filter(f=>f.rawGapMs>=70&&f.rawGapMs<=100).length;
    const callbackCosts=frames.map(f=>f.callbackJsMs);
    const backlogSamples=frames.map(f=>f.lagMs);
@@ -324,8 +370,13 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     .reduce((sum,f)=>sum+f.droppedMs,0);
    return {configuredMaxSteps:window.__novaFixedMaxSteps,
     controlledGate:window.__novaControlledGate,
+    initialFingerprint:window.__novaFixedResearch.initialFingerprint||null,
     maxSteps:p.owner.maxSteps,ticks:p.owner.ticks,droppedMs:p.owner.droppedMs,
     raf:{frames:frames.length,intervals:values(frameIntervals),controlledLongGaps,
+     observedWallMs,presentationHz:observedWallMs>0?
+      frames.length*1000/observedWallMs:null,
+     simulatedMs:p.owner.ticks*1000/60,
+     remainingLagMs:p.owner.lagMs,
      callbackJs:values(callbackCosts),backlogMs:values(backlogSamples),
      stepCounts,droppedFrameCount,
      longStallDrops,backlogDrops,attributedDroppedMs,
@@ -353,6 +404,16 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
   assert.equal(report.configuredMaxSteps,maxSteps,'requested catch-up policy must own real Game');
   assert.equal(report.controlledGate,controlledGate,'research RAF gate configuration drift');
   if(controlledGate){
+   assert.equal(layoutIntercepts,1,'controlled browser must seed one Battlefield overlay');
+   assert.match(report.initialFingerprint,/^[0-9a-f]{8}:[0-9]+$/,
+    'controlled browser must fingerprint the real playable initial world');
+   const fingerprintFile=process.env.NOVA_FIXED60_INITIAL_FINGERPRINT_FILE;
+   if(fingerprintFile){
+    if(fs.existsSync(fingerprintFile))
+     assert.equal(report.initialFingerprint,fs.readFileSync(fingerprintFile,'utf8').trim(),
+      'two controlled scheduler arms must begin from the same playable world');
+    else fs.writeFileSync(fingerprintFile,report.initialFingerprint+'\n');
+   }
    console.log('NOVA_FIXED60_CONTROLLED_GATE_DIAGNOSTIC '+JSON.stringify({
     frames:report.raf.frames,intervals:report.raf.intervals,
     longGaps:report.raf.controlledLongGaps,stepCounts:report.raf.stepCounts,
@@ -368,6 +429,14 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     'controlled RAF must actually delay browser callbacks');
    assert.ok(report.raf.controlledLongGaps>=3,
     'controlled RAF must deliver multiple real 70–100ms active gaps');
+   assert.ok(report.raf.observedWallMs>0&&
+    Number.isFinite(report.raf.presentationHz)&&report.raf.presentationHz>0&&
+    Number.isFinite(report.raf.simulatedMs),
+    'controlled RAF must report normalized presentation and simulation time');
+   const accountedMs=report.raf.simulatedMs+report.droppedMs+
+    report.raf.remainingLagMs;
+   assert.ok(Math.abs(accountedMs-report.raf.observedWallMs)<1,
+    'actual RAF wall time must reconcile simulated, dropped and queued milliseconds');
   }
   if(maxSteps===3){
    const frames=await page.evaluate(()=>window.__novaFixedResearch.frames.map(f=>({
