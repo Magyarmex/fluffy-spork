@@ -4,9 +4,9 @@ const assert=require('node:assert/strict');
 const {createAdaptiveDprPilot}=require('../research/fps-adaptive-dpr.cjs');
 const slow={frameSamples:120,fps:32,frameP95Ms:45,updateP95Ms:9,renderP95Ms:6,simulationPacePct:70};
 const better={frameSamples:120,fps:52,frameP95Ms:30,updateP95Ms:5,renderP95Ms:4,simulationPacePct:95};
-function fixture(){const game={quality:'low',status:'playing',paused:false,dpr:1.5,w:320,h:568,
+function fixture(options={}){const game={quality:'low',status:'playing',paused:false,dpr:1.5,w:320,h:568,
  canvas:{width:480,height:852,clientWidth:320,clientHeight:568}};
- const pilot=createAdaptiveDprPilot(game);return {game,pilot};}
+ const pilot=createAdaptiveDprPilot(game,options);return {game,pilot};}
 function step(p,from,to,perf){let result;for(let t=from;t<=to;t+=500)result=p.sample(t,perf);return result;}
 test('a faster average alone cannot certify a worse 95th-percentile frame',()=>{
  const {game,pilot}=fixture();step(pilot,0,1000,slow);
@@ -207,4 +207,60 @@ test('invalid finite telemetry during probing restores original clarity',()=>{
  assert.equal(result.kind,'probe-no-evidence');
  assert.equal(game.dpr,1.5);
  assert.equal(pilot.state.phase,'baseline');
+});
+
+// A settings event is a change of authority, not necessarily a change of
+// numeric DPR. A player can explicitly choose the pilot's current 1.0 value.
+test('same-value player clarity selection revokes pilot ownership during a probe',()=>{
+ let revision=0;
+ const {game,pilot}=fixture({settingsEpoch:()=>revision});
+ step(pilot,0,1000,slow);
+ assert.equal(game.dpr,1);
+ revision++;
+ assert.equal(pilot.sample(1500,better).kind,'external-owner');
+ assert.equal(pilot.stop(),true);
+ assert.equal(game.dpr,1,'explicit player 1.0 choice must not be rolled back to 1.5');
+ assert.deepEqual([game.canvas.width,game.canvas.height],[320,568]);
+});
+test('same-value player clarity selection wins even if stop precedes next sample',()=>{
+ let revision=7;
+ const {game,pilot}=fixture({settingsEpoch:()=>revision});
+ step(pilot,0,1000,slow);
+ step(pilot,1500,7000,{...better,fps:55,frameP95Ms:22});
+ assert.equal(pilot.state.phase,'low');
+ revision++;
+ assert.equal(pilot.stop(),true);
+ assert.equal(game.dpr,1,'stop must not undo a player setting selected at current low DPR');
+ assert.deepEqual([game.canvas.width,game.canvas.height],[320,568]);
+});
+test('invalid settings revision fails closed without overwriting owned pixels',()=>{
+ let revision=0;
+ const {game,pilot}=fixture({settingsEpoch:()=>revision});
+ step(pilot,0,1000,slow);
+ revision=NaN;
+ assert.equal(pilot.sample(1500,better).kind,'external-owner');
+ pilot.stop();assert.equal(game.dpr,1);
+ assert.throws(()=>fixture({settingsEpoch:()=>-1}),/invalid initial settings epoch/);
+ assert.throws(()=>fixture({settingsEpoch:1}),/settingsEpoch must be/);
+});
+test('stable settings revision retains normal no-evidence rollback behavior',()=>{
+ const {game,pilot}=fixture({settingsEpoch:()=>5});
+ step(pilot,0,1000,slow);
+ const kinds=[];for(let t=1500;t<=10000;t+=500)kinds.push(pilot.sample(t,null).kind);
+ assert.ok(kinds.includes('probe-no-evidence'));
+ assert.equal(game.dpr,1.5);
+ assert.equal(pilot.stop(),true);
+});
+
+test('settings revision callback failure during stop cannot overwrite player pixels',()=>{
+ let broken=false;
+ const {game,pilot}=fixture({settingsEpoch:()=>{
+  if(broken)throw Error('settings owner unavailable');return 3;
+ }});
+ step(pilot,0,1000,slow);
+ assert.equal(game.dpr,1);
+ broken=true;
+ assert.equal(pilot.stop(),true);
+ assert.equal(game.dpr,1);
+ assert.deepEqual([game.canvas.width,game.canvas.height],[320,568]);
 });

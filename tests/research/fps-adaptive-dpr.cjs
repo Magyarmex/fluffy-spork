@@ -13,6 +13,22 @@ function createAdaptiveDprPilot(game, options={}) {
   let slowSince=null, fastSince=null, lastTransition=-Infinity, lastSample=null;
   let trialStart=null, baseline=null, warmupUntil=-Infinity, stopped=false;
   let cooldownUntil=-Infinity, externalOwner=false, lowMissingSince=null;
+  // An explicit player setting can select the SAME numeric DPR as the pilot.
+  // Pixel equality cannot prove ownership; callers may supply a monotonic
+  // settings revision from the real settings UI. Without that signal this
+  // remains a research pilot, not a safe automatic production controller.
+  if(options.settingsEpoch!=null&&typeof options.settingsEpoch!=='function')
+    throw new Error('settingsEpoch must be a revision callback');
+  const readSettingsEpoch=options.settingsEpoch||null;
+  const originalSettingsEpoch=readSettingsEpoch?readSettingsEpoch():null;
+  if(readSettingsEpoch&&(!Number.isSafeInteger(originalSettingsEpoch)||originalSettingsEpoch<0))
+    throw new Error('invalid initial settings epoch');
+  function settingsOwnerChanged(){
+    if(!readSettingsEpoch)return false;
+    try{const current=readSettingsEpoch();
+      return !Number.isSafeInteger(current)||current!==originalSettingsEpoch;
+    }catch(_){return true;}
+  }
   const visible=typeof options.visible==='function'?options.visible:
     ()=>typeof document==='undefined'||!document.hidden;
   const result=(kind,changed=false)=>({kind,changed,dpr:game.dpr,phase});
@@ -32,7 +48,12 @@ function createAdaptiveDprPilot(game, options={}) {
   }
   function sample(now,p){
     if(stopped)return result('stopped');
-    // A player setting or another owner changed DPR. Never take it back.
+    // Settings revision wins even if a player deliberately chooses the
+    // pilot's current numeric DPR. A broken callback also fails closed.
+    if(settingsOwnerChanged()){
+      externalOwner=true;phase='baseline';baseline=null;trialStart=null;
+      resetStreaks();
+    }
     if(externalOwner)return result('external-owner');
     if(!Number.isFinite(now)||(lastSample!==null&&now<=lastSample))return result('invalid-time');
     // Observe external DPR ownership BEFORE a long-gap rollback can restore
@@ -122,6 +143,7 @@ function createAdaptiveDprPilot(game, options={}) {
   function stop(){
     if(stopped)return false;
     stopped=true;
+    if(settingsOwnerChanged())externalOwner=true;
     if(!externalOwner&&game.dpr===lastApplied&&game.w===width&&game.h===height&&
        game.canvas.width===Math.round(game.w*lastApplied)&&
        game.canvas.height===Math.round(game.h*lastApplied)&&
