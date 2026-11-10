@@ -30,11 +30,27 @@ const arms={shipping:html.replace(guarded,shipping),candidate:html};
     await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded',timeout:45000});
     await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({state:'visible',timeout:45000});
     await page.evaluate(()=>{
-     const Game=window.__novaMakeRequire('')('game/engine').Game;
+     const requireNova=window.__novaMakeRequire('');
+     const Game=requireNova('game/engine').Game;
+     const renderModule=requireNova('game/render');
      const update=Game.prototype.update,fire=Game.prototype.tryFire;
-     window.__novaCpuAb={volleys:0,birthAt:null,touches:[],game:null};
+     const originalRender=renderModule.render;
+     window.__novaCpuAb={volleys:0,birthAt:null,touches:[],game:null,
+      frameIndex:0,spikedFrame:-1,inject:false,spikes:0};
+     renderModule.render=function(g,...args){
+      const out=originalRender.call(this,g,...args);
+      if(g===window.__novaCpuAb.game)window.__novaCpuAb.frameIndex++;
+      return out;
+     };
      Game.prototype.update=function(...args){
-      if(!this.__novaDecorativeWorld)window.__novaCpuAb.game=this;
+      if(!this.__novaDecorativeWorld){
+       const s=window.__novaCpuAb;s.game=this;
+       if(s.inject&&s.frameIndex%10===9&&s.spikedFrame!==s.frameIndex){
+        s.spikedFrame=s.frameIndex;s.spikes++;
+        const until=performance.now()+30;
+        while(performance.now()<until){} // controlled current-update CPU spike
+       }
+      }
       return update.apply(this,args);
      };
      Game.prototype.tryFire=function(t,...args){
@@ -60,6 +76,8 @@ const arms={shipping:html.replace(guarded,shipping),candidate:html};
      p.stats.reload=1;p.spawnShieldT=20;p.fireCd=0;
      g.input.autofire=false;window.__novaCpuAb.volleys=0;
      window.__novaCpuAb.birthAt=null;window.__novaCpuAb.touches.length=0;
+     window.__novaCpuAb.frameIndex=0;window.__novaCpuAb.spikedFrame=-1;
+     window.__novaCpuAb.spikes=0;window.__novaCpuAb.inject=true;
     });
     const box=await canvas.boundingBox();
     assert.ok(box&&box.width>200);
@@ -74,7 +92,7 @@ const arms={shipping:html.replace(guarded,shipping),candidate:html};
      return {volleys:s.volleys,birthAt:s.birthAt,touches:s.touches.slice(),
       gameTime:g.time,perf:window.__NOVA_PERF_LAST__||null,
       aimActive:g.input.aim.active,aimOwner:g.input.stickId.aim,
-      firing:g.input.firing};
+      firing:g.input.firing,spikes:s.spikes,renderedFrames:s.frameIndex};
     });
     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
     assert.ok(metrics.volleys>0,'trusted held touch must fire actual Minigun');
@@ -83,6 +101,7 @@ const arms={shipping:html.replace(guarded,shipping),candidate:html};
     assert.ok(Number.isFinite(metrics.gameTime)&&metrics.gameTime>0);
     assert.deepEqual(errors,[],'browser Game must not throw');
     results.push({arm:name,volleys:metrics.volleys,gameTime:metrics.gameTime,
+     injectedSpikes:metrics.spikes,renderedFrames:metrics.renderedFrames,
      touchToFirstBirthMs:metrics.birthAt-metrics.touches[0].at,
      perf:metrics.perf&&{
       fps:metrics.perf.fps,frameP95Ms:metrics.perf.frameP95Ms,
