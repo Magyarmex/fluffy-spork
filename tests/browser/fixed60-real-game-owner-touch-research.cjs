@@ -23,7 +23,7 @@ const {chromium}=require('playwright');
    const Game=window.__novaMakeRequire('')('game/engine').Game;
    const renderMod=window.__novaMakeRequire('')('game/render');
    const baseStart=Game.prototype.start;
-   window.__novaFixedResearch={births:0,updates:[],renders:[],errors:[],lifecycle:[],touchEvents:[]};
+   window.__novaFixedResearch={births:0,updates:[],renders:[],errors:[],lifecycle:[],touchEvents:[],frames:[]};
    const profile=window.__novaFixedResearch;
    for(const type of ['pointerdown','pointermove','pointerup','pointercancel'])
     document.addEventListener(type,e=>{
@@ -67,7 +67,23 @@ const {chromium}=require('playwright');
     this.raf=null;
     const pilot=window.__novaFixed60Research.createFixedStepBrowserPilot(this,{
      window,document,clock:performance,
-     request:fn=>requestAnimationFrame(fn),
+     request:fn=>requestAnimationFrame(ts=>{
+      // Measure real RAF callback spacing and per-callback fixed-step work.
+      // These are browser callback intervals, NOT physical display times.
+      const owner=window.__novaFixedPilot?.owner;
+      const beforeTicks=owner?.ticks??0,beforeDropped=owner?.droppedMs??0;
+      const at=performance.now();
+      fn(ts);
+      const current=window.__novaFixedPilot?.owner;
+      if(current){
+       const frames=profile.frames;
+       const previous=frames.length?frames[frames.length-1].ts:null;
+       frames.push({ts,intervalMs:previous===null?null:ts-previous,
+        steps:current.ticks-beforeTicks,
+        droppedMs:current.droppedMs-beforeDropped,
+        callbackJsMs:performance.now()-at});
+      }
+     }),
      cancel:id=>cancelAnimationFrame(id),
      render:(g,w,h)=>renderMod.render(g,w,h),
      maxSteps:2,backlogExtraTicks:2});
@@ -144,7 +160,16 @@ const {chromium}=require('playwright');
    const g=window.__novaFixedGame,p=window.__novaFixedPilot;
    const values=a=>{const s=[...a].sort((x,y)=>x-y);
     return {n:s.length,p95:s.length?s[Math.ceil(.95*s.length)-1]:null};};
+   const frames=window.__novaFixedResearch.frames;
+   const frameIntervals=frames.map(f=>f.intervalMs).filter(Number.isFinite);
+   const callbackCosts=frames.map(f=>f.callbackJsMs);
+   const stepCounts={};
+   for(const f of frames)stepCounts[f.steps]=(stepCounts[f.steps]||0)+1;
+   const droppedFrameCount=frames.filter(f=>f.droppedMs>0).length;
    return {ticks:p.owner.ticks,droppedMs:p.owner.droppedMs,
+    raf:{frames:frames.length,intervals:values(frameIntervals),
+     callbackJs:values(callbackCosts),stepCounts,droppedFrameCount,
+     maxIntervalMs:frameIntervals.length?Math.max(...frameIntervals):null},
     productionRafActive:!!g.raf,pilotStarted:p.owner.started,
     aimActive:g.input.aim.active,aimOwner:g.input.stickId.aim,
     updates:values(window.__novaFixedResearch.updates),
@@ -164,6 +189,15 @@ const {chromium}=require('playwright');
   assert.equal(report.pilotStarted,true,'research owner must remain active');
   assert.ok(report.ticks>0&&report.updates.n>0);
   assert.ok(report.renders.n>0&&Number.isFinite(report.renders.p95));
+  assert.ok(report.raf.frames>2&&report.raf.intervals.n>0,
+   'actual browser RAF spacing must be observed');
+  assert.ok(Number.isFinite(report.raf.intervals.p95)&&
+   Number.isFinite(report.raf.callbackJs.p95),
+   'real browser callback intervals and JavaScript costs must be finite');
+  assert.equal(Object.values(report.raf.stepCounts).reduce((a,b)=>a+b,0),
+   report.raf.frames,'every observed RAF callback needs a step count');
+  assert.ok(report.raf.droppedFrameCount>=0,
+   'dropped-time attribution must be nonnegative');
   assert.ok(Number.isFinite(report.updates.p95));
   assert.ok(report.runtimeScripts>=49,'actual shipping overlays must be loaded');
   assert.deepEqual(errors,[],'browser errors');
