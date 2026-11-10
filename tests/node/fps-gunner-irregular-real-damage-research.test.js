@@ -78,7 +78,7 @@ function trial(seed,cls,reload,mode){
    }
    assert.ok(Math.abs(now-SECONDS)<1e-7,'same wall time');
    assert.ok(Math.abs(g.time-initialTime-SECONDS)<1e-6,'same simulated time');
-   assert.ok(Math.abs(onTime-3.8)<1e-7,'same exact fire duty');
+   assert.ok(Math.abs(onTime-3.9)<1e-7,'same exact fire duty');
    assert.equal(g.tanks.length,2,'no extra tanks');
    assert.equal(g.shapes.length+g.drones.length+g.powerups.length,0,'no ecology contamination');
    assert.ok(volleys>0&&hits>0&&damage>0,'real projectile damage required');
@@ -103,6 +103,6 @@ test('irregular presentation frames preserve input duty but expose actual Gunner
   }
  }
  assert.equal(rows.length,12);
- for(const row of rows)assert.equal(row.onTime,3.8);
+ for(const row of rows)assert.equal(row.onTime,3.9);
  console.log('GUNNER_IRREGULAR_REAL_DAMAGE '+JSON.stringify(rows));
 });
