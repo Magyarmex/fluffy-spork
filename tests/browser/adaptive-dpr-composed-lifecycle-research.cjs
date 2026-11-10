@@ -31,12 +31,21 @@ const improved={frameSamples:120,fps:55,frameP95Ms:22,updateP95Ms:5,
     if(!this.__novaDecorativeWorld)window.__novaDprResearchGame=this;
     return original.apply(this,arguments);
    };
+   const oldFire=Game.prototype.tryFire;
+   window.__novaDprPlayerBirths=0;
+   Game.prototype.tryFire=function(t){
+    const prior=this.bullets.length,result=oldFire.apply(this,arguments);
+    if(!this.__novaDecorativeWorld&&t===this.player&&this.bullets.length>prior)
+     window.__novaDprPlayerBirths++;
+    return result;
+   };
   });
   await deploy.click();
   await page.waitForFunction(()=>window.__novaDprResearchGame?.status==='playing',
    {timeout:30000});
   await page.evaluate(()=>{const g=window.__novaDprResearchGame;
-   g.quality='low';g.resize();g.input.autofire=false;g.input.firing=false;});
+   g.quality='low';g.resize();g.input.autofire=false;g.input.firing=false;
+   window.__novaDprPlayerBirths=0;});
   const canvas=page.locator('canvas.absolute.inset-0');
   await canvas.waitFor({state:'visible',timeout:20000});
   const box=await canvas.boundingBox();
@@ -62,7 +71,8 @@ const improved={frameSamples:120,fps:55,frameP95Ms:22,updateP95Ms:5,
     return {width:w,height:h,opaqueSamples:opaque};
    };
    await frame();
-   const touchBefore={owner:g.input.stickId.aim,active:g.input.aim.active,firing:g.input.firing};
+   const touchBefore={owner:g.input.stickId.aim,active:g.input.aim.active,
+    births:window.__novaDprPlayerBirths};
    const before=raster();
    pilot.sample(0,slow);const started=pilot.sample(1000,slow);
    await frame();
@@ -74,7 +84,8 @@ const improved={frameSamples:120,fps:55,frameP95Ms:22,updateP95Ms:5,
    let restored;
    for(let t=7500;t<=15500;t+=500)restored=pilot.sample(t,null);
    await frame();
-   const touchAfter={owner:g.input.stickId.aim,active:g.input.aim.active,firing:g.input.firing};
+   const touchAfter={owner:g.input.stickId.aim,active:g.input.aim.active,
+    births:window.__novaDprPlayerBirths};
    const after={dpr:g.dpr,kind:restored.kind,raster:raster(),
     gameTime:g.time,css:[g.w,g.h],phase:pilot.state.phase};
    pilot.stop();
@@ -86,8 +97,8 @@ const improved={frameSamples:120,fps:55,frameP95Ms:22,updateP95Ms:5,
    'right stick must retain an actual DOM pointer owner');
   assert.equal(report.touchAfter.active,true,'DPR transitions must preserve held aim');
   assert.equal(report.touchAfter.owner,report.touchBefore.owner,'pointer ownership must not change');
-  assert.equal(report.touchBefore.firing,false,'centered touch must not fire');
-  assert.equal(report.touchAfter.firing,false,'DPR transitions must not invent a shot');
+  assert.equal(report.touchBefore.births,0,'centered touch must not create a projectile');
+  assert.equal(report.touchAfter.births,0,'DPR transitions must not invent a projectile');
   assert.equal(report.probing.kind,'probe-started');
   assert.equal(report.probing.dpr,1);
   assert.equal(report.low.kind,'probe-accepted');
