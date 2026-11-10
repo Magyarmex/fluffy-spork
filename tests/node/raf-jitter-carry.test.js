@@ -195,3 +195,41 @@ test('research falsifier: repeated current-frame spikes sacrifice active world t
   candidateHeldUpdates:candidateSamples.reduce((a,b)=>a+b,0)
  }));
 });
+
+
+/* Research-only falsifiable alternative: carry at most two legal 30Hz steps
+ * across active presentation gaps, but retain the existing 1-step cap after
+ * a long stall. This is NOT a shipping recommendation: debt can delay input
+ * sampling, and real-device touch/render measurements are still mandatory. */
+test('research pilot: bounded active carry recovers isolated CPU-guard losses',()=>{
+ const candidateHtml=patchRafStepCap(raw());
+ const capLine='carry = Math.min(1 / 30, carry);';
+ assert.equal(candidateHtml.split(capLine).length-1,1);
+ const pilotHtml=candidateHtml.replace(capLine,
+  'carry = Math.min(elapsed <= 1 / 12 ? 2 / 30 : 1 / 30, carry);');
+ let frameIndex=0;
+ const cost=()=>frameIndex%10===9?30:0;
+ const candidate=driver(candidateHtml,cost),pilot=driver(pilotHtml,cost);
+ for(let i=0;i<200;i++){
+  frameIndex=i;
+  const before=pilot.dts.length;
+  candidate.frame(50);pilot.frame(50);
+  assert.ok(pilot.dts.length-before<=2,'pilot must never spiral into >2 updates');
+ }
+ assert.ok(total(pilot.dts)>total(candidate.dts)+.5,
+  'bounded active carry should recover most isolated 20Hz CPU-guard losses');
+ assert.ok(total(pilot.dts)<=10+1e-8,'pilot must not simulate unearned time');
+ assert.ok(10-total(pilot.dts)<.05,'isolated spikes leave at most one pending 30Hz step');
+ // A >83ms stall must never activate a second update or retain 2-step debt.
+ const stalled=driver(pilotHtml);
+ stalled.frame(50);const before=stalled.dts.length;
+ stalled.frame(1000);
+ assert.equal(stalled.dts.length-before,1,'long stall must not catch up');
+ const after=stalled.dts.length;
+ stalled.frame(1000/60);
+ assert.equal(stalled.dts.length-after,1,'resume must not replay stale input twice');
+ console.log('RAF_ACTIVE_CARRY_PILOT '+JSON.stringify({
+  candidateSeconds:total(candidate.dts),pilotSeconds:total(pilot.dts),
+  candidateUpdates:candidate.dts.length,pilotUpdates:pilot.dts.length
+ }));
+});
