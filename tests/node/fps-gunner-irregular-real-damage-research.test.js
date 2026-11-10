@@ -59,11 +59,11 @@ function trial(seed,cls,reload,mode){
    for(const frame of frames(mode)){
     const end=now+frame;
     while(now<end-EPS){
-     // Every mode samples the same exact fire input edges: .5s on, .3s off.
-     const cycle=Math.floor((now+EPS)/.8);
-     const phase=now-cycle*.8;
+     // Every mode samples the same .5s-on/.3s-off edges, offset by 7ms\n     // from frame zero so input events actually split presentation frames.
+     const cycle=Math.floor((now+.007+EPS)/.8);
+     const phase=now+.007-cycle*.8;
      const firing=phase<.5-EPS;
-     const boundary=cycle*.8+(firing?.5:.8);
+     const boundary=cycle*.8+(firing?.5:.8)-.007;
      const next=Math.min(end,boundary);
      const dt=next-now;
      assert.ok(dt>EPS,'input-event split must progress');
