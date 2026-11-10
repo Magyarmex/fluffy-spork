@@ -154,3 +154,44 @@ test('interval-aware current CPU budget distinguishes 22ms from 30ms at 20Hz',()
  assert.equal(heavy.dts.length,5,'30ms current update must not double at 20Hz');
  assert.equal(moderate.draws,4);assert.equal(heavy.draws,4);
 });
+
+
+/* Known limitation, NOT a desired production contract. Reproduce how
+ * a once-per-ten-frame expensive first update can change world time and
+ * held-input sampling despite an identical 20Hz presentation schedule.
+ * The candidate must not ship on CPU safety evidence alone. */
+test('research falsifier: repeated current-frame spikes sacrifice active world time',()=>{
+ const candidateHtml=patchRafStepCap(raw());
+ const newGate='priorWork < 18 && earlierWork < 18 && performance.now() - workStart < Math.min(32, Math.max(18, elapsed * 500 - 2))) {';
+ const oldGate='priorWork < 18 && earlierWork < 18) {';
+ assert.equal(candidateHtml.split(newGate).length-1,1);
+ const shippingHtml=candidateHtml.replace(newGate,oldGate);
+ let frameIndex=0;
+ const cost=()=>frameIndex%10===9?30:0;
+ const shipping=driver(shippingHtml,cost),candidate=driver(candidateHtml,cost);
+ const shippingSamples=[],candidateSamples=[];
+ // The same physical held-fire window spans the first five seconds.
+ for(let i=0;i<200;i++){
+  frameIndex=i;
+  const beforeShipping=shipping.dts.length,beforeCandidate=candidate.dts.length;
+  shipping.frame(50);candidate.frame(50);
+  if(i<100){
+   shippingSamples.push(shipping.dts.length-beforeShipping);
+   candidateSamples.push(candidate.dts.length-beforeCandidate);
+  }
+ }
+ assert.equal(shipping.draws,200);assert.equal(candidate.draws,200);
+ approx(total(shipping.dts),10);
+ assert.ok(total(candidate.dts)<total(shipping.dts)-.5,
+  'guard can discard over half a second of active simulation per 10s');
+ assert.ok(candidate.dts.length<shipping.dts.length,
+  'candidate samples identical physical input on fewer simulation updates');
+ assert.ok(candidateSamples.reduce((a,b)=>a+b,0)<shippingSamples.reduce((a,b)=>a+b,0),
+  'a five-second held input receives fewer candidate updates');
+ console.log('RAF_CURRENT_CPU_GUARD_LIMITATION '+JSON.stringify({
+  wallSeconds:10,shippingSeconds:total(shipping.dts),candidateSeconds:total(candidate.dts),
+  shippingUpdates:shipping.dts.length,candidateUpdates:candidate.dts.length,
+  shippingHeldUpdates:shippingSamples.reduce((a,b)=>a+b,0),
+  candidateHeldUpdates:candidateSamples.reduce((a,b)=>a+b,0)
+ }));
+});
