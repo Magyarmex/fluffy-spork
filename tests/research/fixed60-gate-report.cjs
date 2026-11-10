@@ -17,6 +17,9 @@ function summarize(poll,timer){
    touchCanvas:r.touchToCanvasSubmissionMs
   }))assert.ok(Number.isFinite(n)&&n>=0,label+': invalid '+name);
   assert.ok(r.raf.observedWallMs>0&&r.raf.frames>0,label+': no observation');
+  assert.ok(r.raf.deliveryLateMs?.n===r.raf.frames&&
+   Number.isFinite(r.raf.deliveryLateMs.p95)&&r.raf.deliveryLateMs.p95>=0,
+   label+': missing actual RAF delivery lateness');
   assert.ok(r.touchToCanvasSubmissionMs>=r.touchToProjectileBirthMs,
    label+': Canvas precedes projectile birth');
  }
@@ -34,7 +37,8 @@ function summarize(poll,timer){
   touchToProjectileBirthMs:r.touchToProjectileBirthMs,
   touchToCanvasSubmissionMs:r.touchToCanvasSubmissionMs,
   timerArms:r.raf.timerArms||0,
-  timerWakeP95Ms:r.raf.timerWakeLagMs?.p95??null
+  timerWakeP95Ms:r.raf.timerWakeLagMs?.p95??null,
+  deliveryLateP95Ms:r.raf.deliveryLateMs.p95
  });
  const durationRatio=timer.raf.observedWallMs/poll.raf.observedWallMs;
  return {poll:row(poll),timer:row(timer),durationRatio,
