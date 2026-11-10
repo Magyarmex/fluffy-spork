@@ -78,8 +78,14 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
    profile.pendingGateRequests=()=>gatePending.size;
    for(const type of ['pointerdown','pointermove','pointerup','pointercancel'])
     document.addEventListener(type,e=>{
-     if(e.pointerType==='touch')
+     if(e.pointerType==='touch'){
       profile.touchEvents.push({type,trusted:e.isTrusted,pointerId:e.pointerId});
+      if(type==='pointermove'&&profile.firstAimMoveAt==null&&
+       profile.aimOrigin&&e.pointerId===profile.aimOrigin.id&&
+       Math.hypot(e.clientX-profile.aimOrigin.x,
+        e.clientY-profile.aimOrigin.y)>5)
+       profile.firstAimMoveAt=performance.now();
+     }
     },{capture:true,passive:true});
    const baseUpdate=Game.prototype.update;
    Game.prototype.update=function(...args){
@@ -109,13 +115,20 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     if(args[0]!==window.__novaFixedGame)return baseRender.apply(this,args);
     const at=performance.now();
     try{return baseRender.apply(this,args);}
-    finally{profile.renders.push(performance.now()-at);}
+    finally{
+     profile.renders.push(performance.now()-at);
+     if(profile.firstProjectileBirthAt!=null&&profile.firstProjectileCanvasSubmitAt==null)
+      profile.firstProjectileCanvasSubmitAt=performance.now();
+    }
    };
    const baseFire=Game.prototype.tryFire;
    Game.prototype.tryFire=function(t,...args){
     const before=this.bullets.length,out=baseFire.call(this,t,...args);
-    if(this===window.__novaFixedGame&&t===this.player&&this.bullets.length>before)
+    if(this===window.__novaFixedGame&&t===this.player&&this.bullets.length>before){
      profile.births+=this.bullets.length-before;
+     if(profile.firstProjectileBirthAt==null)
+      profile.firstProjectileBirthAt=performance.now();
+    }
     return out;
    };
    Game.prototype.start=function(...args){
@@ -141,7 +154,10 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
        if(state.cancelled)return;
        if(controlledGate){
         if(gateNext===null)gateNext=ts;
-        if(ts+0.2<gateNext){state.id=requestAnimationFrame(deliver);return;}
+        if(ts+0.2<gateNext){
+         profile.gateSkippedNativeRafs=(profile.gateSkippedNativeRafs||0)+1;
+         state.id=requestAnimationFrame(deliver);return;
+        }
         gateNext+=gateGaps[gateIndex++%4];
        }
        gatePending.delete(token);
@@ -235,6 +251,9 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
    g.input.autofire=false;g.input.firing=false;
    g.player.fireCd=0;g.player.spawnShieldT=10;
    window.__novaFixedResearch.births=0;
+   window.__novaFixedResearch.firstAimMoveAt=null;
+   window.__novaFixedResearch.firstProjectileBirthAt=null;
+   window.__novaFixedResearch.firstProjectileCanvasSubmitAt=null;
   });
   const box=await canvas.boundingBox();
   assert.ok(box&&box.width>200&&box.height>200);
@@ -251,6 +270,9 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
   assert.equal(centered.active,true,'centered trusted touch must own aim');
   assert.ok(centered.owner>=0,'aim must have an actual pointer owner');
   assert.equal(centered.births,0,'centered touch must not fire');
+  await page.evaluate(({x,y,id})=>{
+   window.__novaFixedResearch.aimOrigin={x,y,id};
+  },{x:origin.x,y:origin.y,id:centered.owner});
   await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[
    {...origin,x:origin.x+Math.min(34,box.width*.1),y:origin.y-20}]});
   await page.waitForFunction(()=>window.__novaFixedResearch.births>0,null,{timeout:12000});
@@ -366,6 +388,8 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
    const attributedDroppedMs=frames.reduce((sum,f)=>sum+f.droppedMs,0);
    const longStallDroppedMs=frames.filter(f=>f.dropReason==='long-stall')
     .reduce((sum,f)=>sum+f.droppedMs,0);
+   const longStallWallMs=frames.filter(f=>f.rawGapMs>100+1e-7)
+    .reduce((sum,f)=>sum+f.rawGapMs,0);
    const backlogDroppedMs=frames.filter(f=>f.dropReason==='backlog')
     .reduce((sum,f)=>sum+f.droppedMs,0);
    return {configuredMaxSteps:window.__novaFixedMaxSteps,
@@ -373,25 +397,45 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     initialFingerprint:window.__novaFixedResearch.initialFingerprint||null,
     maxSteps:p.owner.maxSteps,ticks:p.owner.ticks,droppedMs:p.owner.droppedMs,
     raf:{frames:frames.length,intervals:values(frameIntervals),controlledLongGaps,
-     observedWallMs,presentationHz:observedWallMs>0?
-      frames.length*1000/observedWallMs:null,
+     nativeRafSkipped:window.__novaFixedResearch.gateSkippedNativeRafs||0,
+     observedWallMs,presentationHz:frameIntervals.length>0&&
+      frames[frames.length-1].ts>frames[0].ts?
+      frameIntervals.length*1000/(frames[frames.length-1].ts-frames[0].ts):null,
      simulatedMs:p.owner.ticks*1000/60,
      remainingLagMs:p.owner.lagMs,
      callbackJs:values(callbackCosts),backlogMs:values(backlogSamples),
      stepCounts,droppedFrameCount,
      longStallDrops,backlogDrops,attributedDroppedMs,
-     longStallDroppedMs,backlogDroppedMs,
+     longStallDroppedMs,longStallWallMs,backlogDroppedMs,
      maxIntervalMs:frameIntervals.length?Math.max(...frameIntervals):null},
     productionRafActive:!!g.raf,pilotStarted:p.owner.started,
     aimActive:g.input.aim.active,aimOwner:g.input.stickId.aim,
     updates:values(window.__novaFixedResearch.updates),
     renders:values(window.__novaFixedResearch.renders),
     births:window.__novaFixedResearch.births,
+    touchToProjectileBirthMs:window.__novaFixedResearch.firstProjectileBirthAt==null||
+     window.__novaFixedResearch.firstAimMoveAt==null?null:
+     window.__novaFixedResearch.firstProjectileBirthAt-window.__novaFixedResearch.firstAimMoveAt,
+    touchToCanvasSubmissionMs:window.__novaFixedResearch.firstProjectileCanvasSubmitAt==null||
+     window.__novaFixedResearch.firstAimMoveAt==null?null:
+     window.__novaFixedResearch.firstProjectileCanvasSubmitAt-window.__novaFixedResearch.firstAimMoveAt,
     runtimeScriptNames:[...document.querySelectorAll('script[src*="nova-updates/"]')]
      .map(s=>s.src.split('/').pop().split('?')[0]),
     // Playwright addScriptTag({path}) injects inline contents, not a src URL.
     researchFactoryPresent:typeof window.__novaFixed60Research?.createFixedStepBrowserPilot==='function'};
   });
+  if(process.env.NOVA_FIXED60_REPORT_FILE){
+   // Save exact browser observations for a separate, explicitly non-causal
+   // paired comparison. Never manufacture matched wall time from tick count.
+   fs.writeFileSync(process.env.NOVA_FIXED60_REPORT_FILE,
+    JSON.stringify(report)+'\n');
+  }
+  assert.ok(Number.isFinite(report.touchToProjectileBirthMs)&&
+   report.touchToProjectileBirthMs>=0,
+   'trusted aim movement must precede first actual player projectile birth');
+  assert.ok(Number.isFinite(report.touchToCanvasSubmissionMs)&&
+   report.touchToCanvasSubmissionMs>=report.touchToProjectileBirthMs,
+   'first actual projectile must reach a real Canvas render submission');
   assert.equal(report.aimActive,false,'release must clear aim');
   const touches=await page.evaluate(()=>window.__novaFixedResearch.touchEvents.slice());
   assert.ok(touches.some(e=>e.type==='pointerdown'),'real touch down must reach DOM');
