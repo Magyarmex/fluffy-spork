@@ -392,8 +392,9 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     initialFingerprint:window.__novaFixedResearch.initialFingerprint||null,
     maxSteps:p.owner.maxSteps,ticks:p.owner.ticks,droppedMs:p.owner.droppedMs,
     raf:{frames:frames.length,intervals:values(frameIntervals),controlledLongGaps,
-     observedWallMs,presentationHz:observedWallMs>0?
-      frames.length*1000/observedWallMs:null,
+     observedWallMs,presentationHz:frameIntervals.length>0&&
+      frames[frames.length-1].ts>frames[0].ts?
+      frameIntervals.length*1000/(frames[frames.length-1].ts-frames[0].ts):null,
      simulatedMs:p.owner.ticks*1000/60,
      remainingLagMs:p.owner.lagMs,
      callbackJs:values(callbackCosts),backlogMs:values(backlogSamples),
