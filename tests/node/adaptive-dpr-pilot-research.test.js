@@ -121,7 +121,7 @@ test('borderline render pressure cannot rapidly alternate DPR at 60Hz',()=>{
  assert.equal(c.dpr,1.25);
  const near60={...healthy,renderP95Ms:8,updateP95Ms:4};
  for(let ms=2000;ms<=12000;ms+=1000){
-  const snapshot=ms%4000===0?renderBound:near60;
+  const snapshot=ms%3000===0?renderBound:near60;
   c.observe(snapshot,ms);
  }
  assert.equal(c.dpr,1.25,'interrupted recovery evidence must not raise DPR');
