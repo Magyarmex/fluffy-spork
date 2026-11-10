@@ -35,6 +35,14 @@ const improved={frameSamples:120,fps:55,frameP95Ms:22,updateP95Ms:5,
   await deploy.click();
   await page.waitForFunction(()=>window.__novaDprResearchGame?.status==='playing',
    {timeout:30000});
+  const canvas=page.locator('canvas.absolute.inset-0');
+  await canvas.waitFor({state:'visible',timeout:20000});
+  const box=await canvas.boundingBox();
+  assert.ok(box&&box.width>200&&box.height>200);
+  const cdp=await context.newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
+   {x:box.x+box.width*.72,y:box.y+box.height*.68,id:42,radiusX:1,radiusY:1,force:1}]});
+  await page.waitForTimeout(120);
   const report=await page.evaluate(async({slow,improved})=>{
    const g=window.__novaDprResearchGame;
    if(typeof window.__novaDprResearchFactory!=='function')
@@ -53,6 +61,7 @@ const improved={frameSamples:120,fps:55,frameP95Ms:22,updateP95Ms:5,
     return {width:w,height:h,opaqueSamples:opaque};
    };
    await frame();
+   const touchBefore={owner:g.input.stickId.aim,active:g.input.aim.active,firing:g.input.firing};
    const before=raster();
    pilot.sample(0,slow);const started=pilot.sample(1000,slow);
    await frame();
@@ -64,11 +73,18 @@ const improved={frameSamples:120,fps:55,frameP95Ms:22,updateP95Ms:5,
    let restored;
    for(let t=7500;t<=15500;t+=500)restored=pilot.sample(t,null);
    await frame();
+   const touchAfter={owner:g.input.stickId.aim,active:g.input.aim.active,firing:g.input.firing};
    const after={dpr:g.dpr,kind:restored.kind,raster:raster(),
     gameTime:g.time,css:[g.w,g.h],phase:pilot.state.phase};
    pilot.stop();
-   return {initial,before,probing,low,after};
+   return {initial,before,probing,low,after,touchBefore,touchAfter};
   },{slow,improved});
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  assert.equal(report.touchBefore.active,true,'trusted centered right touch must own aim');
+  assert.equal(report.touchAfter.active,true,'DPR transitions must preserve held aim');
+  assert.equal(report.touchAfter.owner,report.touchBefore.owner,'pointer ownership must not change');
+  assert.equal(report.touchBefore.firing,false,'centered touch must not fire');
+  assert.equal(report.touchAfter.firing,false,'DPR transitions must not invent a shot');
   assert.equal(report.probing.kind,'probe-started');
   assert.equal(report.probing.dpr,1);
   assert.equal(report.low.kind,'probe-accepted');
