@@ -318,7 +318,8 @@ wrap('game/engine',function(engine,require){
       if(av&&Number.isFinite(av.x)&&Number.isFinite(av.y)&&Math.hypot(av.x,av.y)>0)
         aimAngle=Math.atan2(av.y,av.x);
     }
-    var best=null,bd=max*max,ts=this.tanks||[],hw=w/(2*z),hh=h/(2*z);
+    var best=null,bd=max*max,coneOnly=null,coneCount=0,
+        ts=this.tanks||[],hw=w/(2*z),hh=h/(2*z);
     for(var i=0;i<ts.length;i++){
       var t=ts[i];if(!t||!alive(t)||t.id===exclude||
         !Number.isFinite(t.x)||!Number.isFinite(t.y)||
@@ -332,19 +333,27 @@ wrap('game/engine',function(engine,require){
        * from turning the viewport into long-range offscreen assistance. */
       var r=clamp(Number(t.r)||0,0,32);
       if(Math.abs(t.x-cam.x)>hw+r||Math.abs(t.y-cam.y)>hh+r)continue;
-      /* Core snaps only inside 0.22 rad. Rank candidates inside that cone
-       * first; an off-axis closer rival must not hide an aligned farther one. */
+      var d=d2(x,y,t.x,t.y);if(!(d<max*max))continue;
+      var inCone=false;
       if(aimAngle!==null){
         var want=Math.atan2(t.y-p.y,t.x-p.x);
-        if(Math.abs(Math.atan2(Math.sin(want-aimAngle),Math.cos(want-aimAngle)))>=.22)
-          continue;
+        inCone=Math.abs(Math.atan2(Math.sin(want-aimAngle),Math.cos(want-aimAngle)))<.22;
       }
-      var d=d2(x,y,t.x,t.y);if(!(d<bd))continue;
+      /* Preserve the legacy nearest selection whenever it already lies
+       * inside the cone. Rescue a farther candidate only when it is the
+       * sole visible in-cone rival; ambiguous crowded scenes retain the
+       * player's unassisted aim rather than introducing a wrong-target snap. */
+      if(!(d<bd)&&!inCone)continue;
       if(typeof this.hasLineOfSight==='function'&&
          !this.hasLineOfSight(x,y,t.x,t.y,3))continue;
-      best=t;bd=d;
+      if(d<bd){best=t;bd=d;}
+      if(inCone){coneCount++;if(coneCount===1)coneOnly=t;}
     }
-    return best;
+    if(aimAngle===null||!best)return best;
+    var bestAngle=Math.atan2(best.y-p.y,best.x-p.x);
+    if(Math.abs(Math.atan2(Math.sin(bestAngle-aimAngle),Math.cos(bestAngle-aimAngle)))<.22)
+      return best;
+    return coneCount===1?coneOnly:null;
   };
 
   function targetFor(owner,g){
