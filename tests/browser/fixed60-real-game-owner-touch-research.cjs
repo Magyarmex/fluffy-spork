@@ -80,7 +80,10 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     document.addEventListener(type,e=>{
      if(e.pointerType==='touch'){
       profile.touchEvents.push({type,trusted:e.isTrusted,pointerId:e.pointerId});
-      if(type==='pointermove'&&profile.firstAimMoveAt==null)
+      if(type==='pointermove'&&profile.firstAimMoveAt==null&&
+       profile.aimOrigin&&e.pointerId===profile.aimOrigin.id&&
+       Math.hypot(e.clientX-profile.aimOrigin.x,
+        e.clientY-profile.aimOrigin.y)>5)
        profile.firstAimMoveAt=performance.now();
      }
     },{capture:true,passive:true});
@@ -264,6 +267,9 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
   assert.equal(centered.active,true,'centered trusted touch must own aim');
   assert.ok(centered.owner>=0,'aim must have an actual pointer owner');
   assert.equal(centered.births,0,'centered touch must not fire');
+  await page.evaluate(({x,y,id})=>{
+   window.__novaFixedResearch.aimOrigin={x,y,id};
+  },{x:origin.x,y:origin.y,id:centered.owner});
   await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[
    {...origin,x:origin.x+Math.min(34,box.width*.1),y:origin.y-20}]});
   await page.waitForFunction(()=>window.__novaFixedResearch.births>0,null,{timeout:12000});
