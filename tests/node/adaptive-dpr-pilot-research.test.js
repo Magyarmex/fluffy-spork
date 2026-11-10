@@ -114,3 +114,16 @@ test('60Hz alone cannot restore clarity if update cost consumes headroom',()=>{
  for(const ms of [2000,3000,4000,5000,6000,7000])c.observe(updateHeavy,ms);
  assert.equal(c.dpr,1.25);
 });
+
+test('borderline render pressure cannot rapidly alternate DPR at 60Hz',()=>{
+ const c=new AdaptiveDprPilot();
+ c.observe(renderBound,0);c.observe(renderBound,1000);
+ assert.equal(c.dpr,1.25);
+ const near60={...healthy,renderP95Ms:8,updateP95Ms:4};
+ for(let ms=2000;ms<=12000;ms+=1000){
+  const snapshot=ms%4000===0?renderBound:near60;
+  c.observe(snapshot,ms);
+ }
+ assert.equal(c.dpr,1.25,'interrupted recovery evidence must not raise DPR');
+ assert.equal(c.changes,1);
+});
