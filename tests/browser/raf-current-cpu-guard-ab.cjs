@@ -13,7 +13,7 @@ const arms={shipping:html.replace(guarded,shipping),candidate:html};
  const browser=await chromium.launch({headless:true,args:['--disable-dev-shm-usage','--no-sandbox']});
  const results=[];
  try{
-  for(const name of ['shipping','candidate']){
+  for(const name of ['shipping','candidate','candidate','shipping','candidate','shipping','shipping','candidate']){
    const context=await browser.newContext({viewport:{width:320,height:700},
     deviceScaleFactor:2,isMobile:true,hasTouch:true,serviceWorkers:'block'});
    const page=await context.newPage(),errors=[];
@@ -36,7 +36,7 @@ const arms={shipping:html.replace(guarded,shipping),candidate:html};
      const update=Game.prototype.update,fire=Game.prototype.tryFire;
      const originalRender=renderModule.render;
      window.__novaCpuAb={volleys:0,birthAt:null,touches:[],game:null,
-      frameIndex:0,spikedFrame:-1,inject:false,spikes:0,outerUpdateMs:[],startAt:null,startGameTime:null};
+      frameIndex:0,spikedFrame:-1,nextSpikeAt:null,inject:false,spikes:0,spikeTimes:[],outerUpdateMs:[],startAt:null,startGameTime:null};
      renderModule.render=function(g,...args){
       const out=originalRender.call(this,g,...args);
       if(g===window.__novaCpuAb.game)window.__novaCpuAb.frameIndex++;
@@ -46,8 +46,9 @@ const arms={shipping:html.replace(guarded,shipping),candidate:html};
       const outerStart=performance.now();
       if(!this.__novaDecorativeWorld){
        const s=window.__novaCpuAb;s.game=this;
-       if(s.inject&&s.frameIndex%10===9&&s.spikedFrame!==s.frameIndex){
-        s.spikedFrame=s.frameIndex;s.spikes++;
+       if(s.inject&&performance.now()>=s.nextSpikeAt){
+        s.spikes++;s.spikeTimes.push(performance.now()-s.startAt);
+        s.nextSpikeAt+=500;
         const until=performance.now()+30;
         while(performance.now()<until){} // controlled current-update CPU spike
        }
@@ -81,8 +82,10 @@ const arms={shipping:html.replace(guarded,shipping),candidate:html};
      g.input.autofire=false;window.__novaCpuAb.volleys=0;
      window.__novaCpuAb.birthAt=null;window.__novaCpuAb.touches.length=0;
      window.__novaCpuAb.frameIndex=0;window.__novaCpuAb.spikedFrame=-1;
-     window.__novaCpuAb.spikes=0;window.__novaCpuAb.outerUpdateMs.length=0;
+     window.__novaCpuAb.spikes=0;window.__novaCpuAb.spikeTimes.length=0;
+     window.__novaCpuAb.outerUpdateMs.length=0;
      window.__novaCpuAb.startAt=performance.now();
+     window.__novaCpuAb.nextSpikeAt=window.__novaCpuAb.startAt+500;
      window.__novaCpuAb.startGameTime=g.time;window.__novaCpuAb.inject=true;
     });
     const box=await canvas.boundingBox();
@@ -102,7 +105,7 @@ const arms={shipping:html.replace(guarded,shipping),candidate:html};
        return a.length?a[Math.ceil(a.length*.95)-1]:null;})(),
       perf:window.__NOVA_PERF_LAST__||null,
       aimActive:g.input.aim.active,aimOwner:g.input.stickId.aim,
-      firing:g.input.firing,spikes:s.spikes,renderedFrames:s.frameIndex};
+      firing:g.input.firing,spikes:s.spikes,spikeTimes:s.spikeTimes.slice(),renderedFrames:s.frameIndex};
     });
     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
     assert.ok(metrics.volleys>0,'trusted held touch must fire actual Minigun');
@@ -114,7 +117,7 @@ const arms={shipping:html.replace(guarded,shipping),candidate:html};
     results.push({arm:name,volleys:metrics.volleys,gameTime:metrics.gameTime,
      observationGameDelta:metrics.gameDelta,observationWindowMs:metrics.windowMs,
      outerUpdateP95Ms:metrics.outerUpdateP95Ms,
-     injectedSpikes:metrics.spikes,renderedFrames:metrics.renderedFrames,
+     injectedSpikes:metrics.spikes,spikeTimesMs:metrics.spikeTimes,renderedFrames:metrics.renderedFrames,
      touchToFirstBirthMs:metrics.birthAt-metrics.touches[0].at,
      perf:metrics.perf&&{
       fps:metrics.perf.fps,frameP95Ms:metrics.perf.frameP95Ms,
@@ -125,7 +128,7 @@ const arms={shipping:html.replace(guarded,shipping),candidate:html};
   }
   console.log('RAF_CPU_GUARD_CHROMIUM_AB '+JSON.stringify({cpuThrottle:4,
    viewport:'320x700',holdMs:5500,results,
-   limitations:['not counterbalanced','not a fixed 20Hz schedule',
+   limitations:['ABBA/BAAB order only; natural worlds are not yet matched','not a fixed 20Hz schedule',
     'shipping performance snapshot is rolling and not observation-window aligned',
     'not physical Android','not GPU presentation or photon latency']}));
  }finally{await browser.close();}
