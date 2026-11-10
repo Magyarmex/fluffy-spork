@@ -122,6 +122,7 @@ jobs:
           node tests/browser/input-raf-observer.cjs
           node tests/browser/input-to-projectile-birth.cjs
           node tests/browser/input-to-live-projectile-canvas.cjs
+          node tests/browser/fixed60-real-game-owner-touch-research.cjs
           NOVA_TOUCH_RENDER_SCALE=65 node tests/browser/input-to-live-projectile-canvas.cjs
           NOVA_TOUCH_MID_GESTURE_DPR=1 node tests/browser/input-to-live-projectile-canvas.cjs
           node tests/browser/adaptive-dpr-composed-lifecycle-research.cjs
