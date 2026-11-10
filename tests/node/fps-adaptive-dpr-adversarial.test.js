@@ -119,3 +119,19 @@ test('accepted-low cleanup never overwrites a player DPR change on resume',()=>{
  assert.equal(game.dpr,2);
  assert.deepEqual([game.canvas.width,game.canvas.height],[640,1136]);
 });
+
+test('accepted-low quality cannot persist indefinitely without valid telemetry',()=>{
+ const {game,pilot}=fixture();
+ const good={...better,fps:55,frameP95Ms:22,updateP95Ms:5,simulationPacePct:95};
+ step(pilot,0,1000,slow);step(pilot,1500,7000,good);
+ assert.equal(pilot.state.phase,'low');
+ assert.equal(pilot.sample(7500,null).kind,'insufficient-evidence');
+ assert.equal(game.dpr,1,'one missing sample must not flicker clarity');
+ assert.equal(pilot.sample(8000,good).kind,'hold',
+  'a valid sample must clear the missing-evidence timer');
+ assert.equal(pilot.sample(8500,null).kind,'insufficient-evidence');
+ let last;
+ for(let t=9000;t<=16500;t+=500)last=pilot.sample(t,null);
+ assert.equal(last.kind,'low-no-evidence-rollback');
+ assert.equal(game.dpr,1.5);
+});
