@@ -15,7 +15,7 @@ function frames(mode){
  if(mode==='alternating40_120')return Array.from({length:180},()=>[1/40,1/120]).flat();
  throw Error('unknown presentation mode');
 }
-function trial(seed,cls,reload,mode){
+function trial(seed,cls,reload,mode,offset){
  return withSeed(seed,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   const p=g.player;g.sfx.muted=true;g.setClass(p,cls);
@@ -64,12 +64,12 @@ function trial(seed,cls,reload,mode){
    for(const frame of frames(mode)){
     const end=now+frame;
     while(now<end-EPS){
-     // Every mode samples the same .5s-on/.3s-off edges, offset by 7ms
+     // Every mode samples the same .5s-on/.3s-off edges, offset by a controlled phase
      // from frame zero so input events actually split presentation frames.
-     const cycle=Math.floor((now+.007+EPS)/.8);
-     const phase=now+.007-cycle*.8;
+     const cycle=Math.floor((now+offset+EPS)/.8);
+     const phase=now+offset-cycle*.8;
      const firing=phase<.5-EPS;
-     const boundary=cycle*.8+(firing?.5:.8)-.007;
+     const boundary=cycle*.8+(firing?.5:.8)-offset;
      const next=Math.min(end,boundary);
      const dt=next-now;
      assert.ok(dt>EPS,'input-event split must progress');
@@ -90,7 +90,7 @@ function trial(seed,cls,reload,mode){
    assert.ok(volleys>0&&hits>0&&damage>0,'real projectile damage required');
    assert.ok(hits<=volleys,'ordinary single-target rotary shots');
    assert.ok(Number.isFinite(damage)&&damage<=1000000);
-   return {seed,cls,reload,mode,updates,edges,volleys,hits,
+   return {seed,cls,reload,mode,offset,updates,edges,volleys,hits,
     damage:+damage.toFixed(4),onTime:+onTime.toFixed(5),firstBirths,
     heat:+(p.__v17Heat||0).toFixed(5),spin:+(p.fireSpin||0).toFixed(5)};
   }finally{g.destroy();}
@@ -108,7 +108,7 @@ test('irregular presentation frames preserve input duty but expose actual Gunner
    }
   }
  }
- assert.equal(rows.length,12);
+ assert.equal(rows.length,24);
  for(const row of rows)assert.equal(row.onTime,3.9);
  console.log('GUNNER_IRREGULAR_REAL_DAMAGE '+JSON.stringify(rows));
 });
