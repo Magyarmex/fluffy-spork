@@ -13,7 +13,8 @@ function rival(id,x,y){
  return {id,x,y,r:14,hp:100,maxHp:100,alive:true,cls:'scout',
   isPlayer:true,vx:0,vy:0,angle:0,stats:{},spawnShieldT:0};
 }
-function trial(seed,hz,withAligned){
+function trial(seed,hz,mode){
+ const withAligned=mode!=='noAligned';
  return withSeed(seed,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   const p=g.player,offAxis=rival(9801,120,70),
@@ -46,6 +47,13 @@ function trial(seed,hz,withAligned){
    g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
    g.input.mouseActive=false;g.input.autofire=false;g.input.firing=true;
    g.input.abilityQueued=false;
+   if(mode==='legacy'){
+    const nearest=g.nearestTank;
+    g.nearestTank=function(x,y,max,exclude){
+     if(exclude===p.id&&max===480&&x===p.x&&y===p.y)return offAxis;
+     return nearest.apply(this,arguments);
+    };
+   }
    let shots=0;const bearings=[],original=g.tryFire;
    g.tryFire=function(t){
     const before=this.bullets.length,out=original.apply(this,arguments);
@@ -61,7 +69,7 @@ function trial(seed,hz,withAligned){
    const hp=survivor?survivor.hp:0;
    assert.ok(Number.isFinite(hp)&&hp>=0&&hp<=14);
    assert.ok(shots>=2,'real Scout firing must occur during the observation');
-   return {seed,hz,withAligned,shots,circleHp:+hp.toFixed(5),
+   return {seed,hz,mode,shots,circleHp:+hp.toFixed(5),
     circleDestroyed:!survivor,playerAngle:+p.angle.toFixed(5),bearings,
     alignedHp:withAligned?+aligned.hp.toFixed(5):null};
   }finally{g.destroy();}
@@ -70,14 +78,17 @@ function trial(seed,hz,withAligned){
 test('neutral-farming aim interference diagnostic in the actual composed game',()=>{
  const rows=[];
  for(const hz of [30,60,120])for(const seed of [1517800,1517802]){
-  const control=trial(seed,hz,false),rescue=trial(seed,hz,true);
-  assert.equal(control.hz,rescue.hz);
-  assert.equal(control.seed,rescue.seed);
-  assert.ok(Math.abs(control.playerAngle)<1e-8,
-   'without the aligned hostile the raw eastward aim remains east');
-  assert.ok(Number.isFinite(rescue.playerAngle),
-   'measure the candidate bearing without freezing a possibly harmful snap');
-  rows.push({control,rescue});
+  const noAligned=trial(seed,hz,'noAligned'),
+   legacy=trial(seed,hz,'legacy'),shipping=trial(seed,hz,'shipping');
+  assert.equal(noAligned.hz,legacy.hz);
+  assert.equal(legacy.hz,shipping.hz);
+  assert.ok(Math.abs(noAligned.playerAngle)<1e-8,
+   'without an aligned hostile the raw eastward aim remains east');
+  assert.ok(Math.abs(legacy.playerAngle)<1e-8,
+   'the same-world legacy nearest-before-cone query leaves raw aim east');
+  assert.ok(Number.isFinite(shipping.playerAngle),
+   'measure shipped steering without freezing a possibly harmful snap');
+  rows.push({noAligned,legacy,shipping});
  }
  console.log('NOVA_NEUTRAL_AIM_INTERFERENCE '+JSON.stringify(rows));
 });
