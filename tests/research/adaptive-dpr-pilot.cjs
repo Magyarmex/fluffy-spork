@@ -39,7 +39,8 @@ class AdaptiveDprPilot {
     // At a reduced DPR, sustained near-60Hz presentation with bounded total
     // render cost is sufficient recovery evidence. Requiring render P95 <=7ms
     // stranded accepted low DPR despite spare frame budget (e.g. 8ms render).
-    // Keep the 10ms ceiling conservative: update <=5ms leaves ~1.7ms slack\n    // against a 16.7ms display interval, before other main-thread work.
+    // Keep the 10ms ceiling conservative: update <=5ms leaves ~1.7ms slack
+    // against a 16.7ms display interval, before other main-thread work.
     // Preserve the original <=7ms render recovery path even if updates
     // exceed 5ms; the expanded 8–10ms path requires cheap updates.
     const healthy=fps>=57&&frameP95Ms<=19&&simulationPacePct>=98&&
