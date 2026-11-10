@@ -376,6 +376,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
      observedWallMs,presentationHz:observedWallMs>0?
       frames.length*1000/observedWallMs:null,
      simulatedMs:p.owner.ticks*1000/60,
+     remainingLagMs:p.owner.lagMs,
      callbackJs:values(callbackCosts),backlogMs:values(backlogSamples),
      stepCounts,droppedFrameCount,
      longStallDrops,backlogDrops,attributedDroppedMs,
@@ -425,6 +426,10 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     Number.isFinite(report.raf.presentationHz)&&report.raf.presentationHz>0&&
     Number.isFinite(report.raf.simulatedMs),
     'controlled RAF must report normalized presentation and simulation time');
+   const accountedMs=report.raf.simulatedMs+report.droppedMs+
+    report.raf.remainingLagMs;
+   assert.ok(Math.abs(accountedMs-report.raf.observedWallMs)<1,
+    'actual RAF wall time must reconcile simulated, dropped and queued milliseconds');
   }
   if(maxSteps===3){
    const frames=await page.evaluate(()=>window.__novaFixedResearch.frames.map(f=>({
