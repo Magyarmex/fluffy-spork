@@ -81,6 +81,8 @@ const improved={frameSamples:120,fps:55,frameP95Ms:22,updateP95Ms:5,
   },{slow,improved});
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   assert.equal(report.touchBefore.active,true,'trusted centered right touch must own aim');
+  assert.ok(Number.isInteger(report.touchBefore.owner)&&report.touchBefore.owner>=0,
+   'right stick must retain an actual DOM pointer owner');
   assert.equal(report.touchAfter.active,true,'DPR transitions must preserve held aim');
   assert.equal(report.touchAfter.owner,report.touchBefore.owner,'pointer ownership must not change');
   assert.equal(report.touchBefore.firing,false,'centered touch must not fire');
