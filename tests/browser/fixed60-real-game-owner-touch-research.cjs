@@ -178,8 +178,12 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
        if(controlledGate){
         if(gateNext===null)gateNext=ts;
         if(ts+0.2<gateNext){
+         const skipAt=performance.now();
          profile.gateSkippedNativeRafs=(profile.gateSkippedNativeRafs||0)+1;
-         arm();return;
+         arm();
+         profile.gateSkippedCallbackJsMs=(profile.gateSkippedCallbackJsMs||0)+
+          performance.now()-skipAt;
+         return;
         }
         profile.gateDeliveryLateMs.push(Math.max(0,ts-gateNext));
         gateNext+=gateGaps[gateIndex++%4];
@@ -425,6 +429,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     maxSteps:p.owner.maxSteps,ticks:p.owner.ticks,droppedMs:p.owner.droppedMs,
     raf:{frames:frames.length,intervals:values(frameIntervals),controlledLongGaps,
      nativeRafSkipped:window.__novaFixedResearch.gateSkippedNativeRafs||0,
+     nativeRafSkipCallbackJsMs:window.__novaFixedResearch.gateSkippedCallbackJsMs||0,
      timerArms:window.__novaFixedResearch.gateTimerArms||0,
      timerWakeLagMs:values(window.__novaFixedResearch.gateTimerWakeLags),
      deliveryLateMs:values(window.__novaFixedResearch.gateDeliveryLateMs),
