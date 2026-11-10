@@ -7,6 +7,9 @@ const path=require('node:path');
 const fs=require('node:fs');
 const {chromium}=require('playwright');
 const maxSteps=Number(process.env.NOVA_FIXED60_MAX_STEPS||2);
+const controlledGate=process.env.NOVA_FIXED60_CONTROLLED_GATE==='1';
+const controlledExtra=Number(process.env.NOVA_FIXED60_EXTRA_TICKS||2);
+assert.ok([2,3,4].includes(controlledExtra),'invalid research backlog');
 // Compare against the materialized shell, not a brittle hardcoded DOM count.
 const expectedOverlays=[...fs.readFileSync(path.resolve(__dirname,'../../index.html'),'utf8')
  .matchAll(/<script\b[^>]*src=["']([^"']*nova-updates\/[^"']+)["']/gi)]
@@ -30,13 +33,17 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
   await deploy.waitFor({state:'visible',timeout:45000});
   await page.addScriptTag({path:path.resolve(__dirname,
    '../../nova-updates/fixed60-research-browser.js')});
-  await page.evaluate(maxSteps=>{
+  await page.evaluate(({maxSteps,controlledGate,controlledExtra})=>{
    window.__novaFixedMaxSteps=maxSteps;
+   window.__novaControlledGate=controlledGate;
    const Game=window.__novaMakeRequire('')('game/engine').Game;
    const renderMod=window.__novaMakeRequire('')('game/render');
    const baseStart=Game.prototype.start;
    window.__novaFixedResearch={births:0,updates:[],renders:[],errors:[],lifecycle:[],touchEvents:[],frames:[]};
    const profile=window.__novaFixedResearch;
+   const gateGaps=[250/3,50/3,50/3,50/3];
+   let gateNext=null,gateIndex=0,gateToken=0;
+   const gatePending=new Map();
    for(const type of ['pointerdown','pointermove','pointerup','pointercancel'])
     document.addEventListener(type,e=>{
      if(e.pointerType==='touch')
@@ -79,7 +86,17 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     this.raf=null;
     const pilot=window.__novaFixed60Research.createFixedStepBrowserPilot(this,{
      window,document,clock:performance,
-     request:fn=>requestAnimationFrame(ts=>{
+     request:fn=>{
+      const token=++gateToken,state={id:null,cancelled:false};
+      gatePending.set(token,state);
+      const deliver=ts=>{
+       if(state.cancelled)return;
+       if(controlledGate){
+        if(gateNext===null)gateNext=ts;
+        if(ts+0.2<gateNext){state.id=requestAnimationFrame(deliver);return;}
+        gateNext+=gateGaps[gateIndex++%4];
+       }
+       gatePending.delete(token);
       // Measure real RAF callback spacing and per-callback fixed-step work.
       // These are browser callback intervals, NOT physical display times.
       const owner=window.__novaFixedPilot?.owner;
@@ -109,10 +126,18 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
          (rawGapMs>100.0000001?'long-stall':'backlog'):null,
         callbackJsMs:performance.now()-at});
       }
-     }),
-     cancel:id=>cancelAnimationFrame(id),
+      };
+      state.id=requestAnimationFrame(deliver);
+      return token;
+     },
+     cancel:token=>{
+      const state=gatePending.get(token);
+      if(!state)return;
+      state.cancelled=true;cancelAnimationFrame(state.id);
+      gatePending.delete(token);
+     },
      render:(g,w,h)=>renderMod.render(g,w,h),
-     maxSteps:window.__novaFixedMaxSteps,backlogExtraTicks:2});
+     maxSteps:window.__novaFixedMaxSteps,backlogExtraTicks:controlledExtra});
     window.__novaFixedPilot=pilot;
     // Reuse PR #888's exact-source active-only policy in the real browser.
     // This is intentionally NOT installed in production or the bundle.
@@ -134,7 +159,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     profile.lifecycle.push({event:'owner-start-returned',at:performance.now(),started:pilot.owner.started});
     return result;
    };
-  },maxSteps);
+  },{maxSteps,controlledGate,controlledExtra});
   await deploy.click();
   try{
    await page.waitForFunction(()=>window.__novaFixedGame?.status==='playing'&&
@@ -291,6 +316,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
    const backlogDroppedMs=frames.filter(f=>f.dropReason==='backlog')
     .reduce((sum,f)=>sum+f.droppedMs,0);
    return {configuredMaxSteps:window.__novaFixedMaxSteps,
+    controlledGate:window.__novaControlledGate,
     maxSteps:p.owner.maxSteps,ticks:p.owner.ticks,droppedMs:p.owner.droppedMs,
     raf:{frames:frames.length,intervals:values(frameIntervals),
      callbackJs:values(callbackCosts),backlogMs:values(backlogSamples),
@@ -318,6 +344,13 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
   assert.equal(owners.size,1,'touch gesture must retain one DOM pointer owner');
   assert.equal(report.productionRafActive,false,'never run two RAF owners');
   assert.equal(report.configuredMaxSteps,maxSteps,'requested catch-up policy must own real Game');
+  assert.equal(report.controlledGate,controlledGate,'research RAF gate configuration drift');
+  if(controlledGate){
+   assert.ok((report.raf.stepCounts['3']||0)>0,
+    'controlled Chromium presentation must exercise real three-update callbacks');
+   assert.ok(report.raf.intervals.p95>=45,
+    'controlled RAF must actually delay browser callbacks');
+  }
   if(maxSteps===3){
    const frames=await page.evaluate(()=>window.__novaFixedResearch.frames.map(f=>({
     rawGapMs:f.rawGapMs,budget:f.budget,steps:f.steps
