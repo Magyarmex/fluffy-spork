@@ -400,10 +400,12 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     updates:values(window.__novaFixedResearch.updates),
     renders:values(window.__novaFixedResearch.renders),
     births:window.__novaFixedResearch.births,
-    touchToProjectileBirthMs:window.__novaFixedResearch.firstProjectileBirthAt-
-     window.__novaFixedResearch.firstAimMoveAt,
-    touchToCanvasSubmissionMs:window.__novaFixedResearch.firstProjectileCanvasSubmitAt-
-     window.__novaFixedResearch.firstAimMoveAt,
+    touchToProjectileBirthMs:window.__novaFixedResearch.firstProjectileBirthAt==null||
+     window.__novaFixedResearch.firstAimMoveAt==null?null:
+     window.__novaFixedResearch.firstProjectileBirthAt-window.__novaFixedResearch.firstAimMoveAt,
+    touchToCanvasSubmissionMs:window.__novaFixedResearch.firstProjectileCanvasSubmitAt==null||
+     window.__novaFixedResearch.firstAimMoveAt==null?null:
+     window.__novaFixedResearch.firstProjectileCanvasSubmitAt-window.__novaFixedResearch.firstAimMoveAt,
     runtimeScriptNames:[...document.querySelectorAll('script[src*="nova-updates/"]')]
      .map(s=>s.src.split('/').pop().split('?')[0]),
     // Playwright addScriptTag({path}) injects inline contents, not a src URL.
