@@ -67,15 +67,16 @@ function trial(seed,hz,mode,opts={}){
       if(mode==='legacy'||mode==='legacyEdge')return offAxis;
       const found=nearest.apply(this,arguments);
       if(found===aligned&&circle.hp>0){
-       if(aimQueryStates.length<24)aimQueryStates.push({
+       const forwardAtQuery=(circle.x-p.x)*dirX+(circle.y-p.y)*dirY;
+       const lateralAtQuery=Math.abs((circle.x-p.x)*dirY-(circle.y-p.y)*dirX);
+       const wouldVeto=forwardAtQuery>0&&forwardAtQuery<Math.hypot(aligned.x-p.x,aligned.y-p.y)&&lateralAtQuery<circle.r+5;
+       const previous=aimQueryStates[aimQueryStates.length-1];
+       if(aimQueryStates.length<24&&(!previous||previous.corridorWouldVeto!==wouldVeto||g.time-previous.time>=.2))aimQueryStates.push({
         time:+g.time.toFixed(5),x:+circle.x.toFixed(5),y:+circle.y.toFixed(5),
         vx:+circle.vx.toFixed(5),vy:+circle.vy.toFixed(5),
         hp:+circle.hp.toFixed(5),r:+circle.r.toFixed(5),
-        lateral:+Math.abs((circle.x-p.x)*dirY-(circle.y-p.y)*dirX).toFixed(5),
-        forward:+((circle.x-p.x)*dirX+(circle.y-p.y)*dirY).toFixed(5),
-        corridorWouldVeto:((circle.x-p.x)*dirX+(circle.y-p.y)*dirY)>0&&
-         ((circle.x-p.x)*dirX+(circle.y-p.y)*dirY)<Math.hypot(aligned.x-p.x,aligned.y-p.y)&&
-         Math.abs((circle.x-p.x)*dirY-(circle.y-p.y)*dirX)<circle.r+5});
+        lateral:+lateralAtQuery.toFixed(5),
+        forward:+forwardAtQuery.toFixed(5),corridorWouldVeto:wouldVeto});
        const dx=circle.x-p.x,dy=circle.y-p.y;
        const targetDist=Math.hypot(aligned.x-p.x,aligned.y-p.y);
        if(mode.startsWith('angular')){
