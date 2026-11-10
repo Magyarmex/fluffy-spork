@@ -174,3 +174,24 @@ test('near-threshold CPU-dominated frames do not authorize a blur probe',()=>{
  assert.equal(pilot.state.phase,'baseline');
  assert.equal(game.dpr,1.5);
 });
+
+test('accepted low DPR rolls back after finite but invalid telemetry',()=>{
+ const invalid=[
+  {...better,fps:0,frameP95Ms:0},
+  {...better,updateP95Ms:-1},
+  {...better,renderP95Ms:-1},
+  {...better,simulationPacePct:-1},
+  {...better,frameSamples:90.5}
+ ];
+ for(const sample of invalid){
+  const {game,pilot}=fixture();
+  step(pilot,0,1000,slow);
+  step(pilot,1500,7000,{...better,fps:55,frameP95Ms:22});
+  assert.equal(pilot.state.phase,'low');
+  assert.equal(pilot.sample(7500,sample).kind,'insufficient-evidence');
+  let final;
+  for(let t=8000;t<=15500;t+=500)final=pilot.sample(t,sample);
+  assert.equal(final.kind,'low-no-evidence-rollback');
+  assert.equal(game.dpr,1.5);
+ }
+});
