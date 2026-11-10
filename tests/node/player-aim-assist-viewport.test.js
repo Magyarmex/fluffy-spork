@@ -119,3 +119,28 @@ test('touch assist respects explicit team relations without changing legacy AI n
  assert.equal(g.nearestTank(0,0,480,1),enemy,
    'explicit non-hostile relations must also be respected');
 });
+
+test('closer visible off-axis rival cannot block farther aligned touch target',()=>{
+ const Game=boot(),g=new Game();g.w=568;g.h=320;
+ const distractor=tank(2,120,70),aligned=tank(3,240,20);
+ g.tanks.push(distractor,aligned);
+ g.input.aimVec=()=>({x:1,y:0});
+ assert.equal(g.nearestTank(0,0,480,1),distractor,
+  'direct nearest queries must preserve distance-only behavior');
+ g.update();
+ assert.ok(Math.abs(g.player.angle-Math.atan2(20,240))<1e-10,
+  'the composed player-aim block must select the farther in-cone target');
+ assert.equal(g.__novaFairAimQuery,undefined,'temporary aim-query marker must be restored');
+});
+test('cone-first assist remains symmetric and rejects outside-cone targets',()=>{
+ const Game=boot();
+ for(const sign of [-1,1]){
+  const g=new Game();g.w=568;g.h=320;
+  const distractor=tank(2,120,70*sign),aligned=tank(3,240,20*sign);
+  g.tanks.push(distractor,aligned);g.input.aimVec=()=>({x:1,y:0});
+  g.update();assert.ok(Math.abs(g.player.angle-Math.atan2(20*sign,240))<1e-10);
+  g.tanks=[g.player,distractor];g.player.angle=0;
+  g.update();assert.equal(g.player.angle,0,
+   'outside-cone rival must not bend raw aim when no aligned target exists');
+ }
+});
