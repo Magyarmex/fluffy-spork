@@ -357,8 +357,13 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     frames:report.raf.frames,intervals:report.raf.intervals,
     longGaps:report.raf.controlledLongGaps,stepCounts:report.raf.stepCounts,
     droppedMs:report.droppedMs,backlogDrops:report.raf.backlogDrops}));
-   assert.ok((report.raf.stepCounts['3']||0)>0,
-    'controlled Chromium presentation must exercise real three-update callbacks');
+   // The two-step control must exercise its own catch-up ceiling, while
+   // the three-step candidate must demonstrate the additional update path.
+   const expectedBurst=maxSteps===3?3:2;
+   assert.ok((report.raf.stepCounts[String(expectedBurst)]||0)>0,
+    'controlled Chromium presentation must exercise its configured catch-up ceiling');
+   assert.ok(!Object.keys(report.raf.stepCounts).some(k=>Number(k)>maxSteps),
+    'controlled browser must never exceed the configured update ceiling');
    assert.ok(report.raf.intervals.p95>=45,
     'controlled RAF must actually delay browser callbacks');
    assert.ok(report.raf.controlledLongGaps>=3,
