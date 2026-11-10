@@ -412,7 +412,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     if(fs.existsSync(fingerprintFile))
      assert.equal(report.initialFingerprint,fs.readFileSync(fingerprintFile,'utf8').trim(),
       'two controlled scheduler arms must begin from the same playable world');
-    else fs.writeFileSync(fingerprintFile,report.initialFingerprint+'\\n');
+    else fs.writeFileSync(fingerprintFile,report.initialFingerprint+'\n');
    }
    console.log('NOVA_FIXED60_CONTROLLED_GATE_DIAGNOSTIC '+JSON.stringify({
     frames:report.raf.frames,intervals:report.raf.intervals,
