@@ -98,7 +98,7 @@ const improved={frameSamples:120,fps:55,frameP95Ms:22,updateP95Ms:5,
   // release. Moving the same trusted pointer must steer the real Game stick.
   await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[
    {x:box.x+box.width*.72,y:box.y+box.height*.43,id:42,radiusX:1,radiusY:1,force:1}]});
-  await page.waitForTimeout(120);
+  await page.waitForFunction(()=>window.__novaDprPlayerBirths>0,null,{timeout:12000});
   const moved=await page.evaluate(()=>{const g=window.__novaDprResearchGame;
    return {owner:g.input.stickId.aim,active:g.input.aim.active,
     dx:g.input.aim.dx,dy:g.input.aim.dy,births:window.__novaDprPlayerBirths};});
@@ -106,7 +106,7 @@ const improved={frameSamples:120,fps:55,frameP95Ms:22,updateP95Ms:5,
   assert.equal(moved.active,true,'moved right stick must remain active');
   assert.ok(Number.isFinite(moved.dy)&&Math.abs(moved.dy-report.touchAfter.dy)>0.05,
    'same trusted pointer must steer aim after DPR rollback');
-  assert.equal(moved.births,0,'moving right stick must not invent a projectile');
+  assert.ok(moved.births>0,'intentional right-stick extension must fire after DPR rollback');
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   await page.waitForTimeout(120);
   const released=await page.evaluate(()=>{const g=window.__novaDprResearchGame;
