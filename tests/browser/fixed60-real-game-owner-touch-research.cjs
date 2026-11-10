@@ -105,6 +105,7 @@ const {chromium}=require('playwright');
    const values=a=>{const s=[...a].sort((x,y)=>x-y);
     return {n:s.length,p95:s.length?s[Math.ceil(.95*s.length)-1]:null};};
    return {ticks:p.owner.ticks,droppedMs:p.owner.droppedMs,
+    productionRafActive:!!g.raf,pilotStarted:p.owner.started,
     aimActive:g.input.aim.active,aimOwner:g.input.stickId.aim,
     updates:values(window.__novaFixedResearch.updates),
     renders:values(window.__novaFixedResearch.renders),
@@ -112,6 +113,8 @@ const {chromium}=require('playwright');
     runtimeScripts:document.querySelectorAll('script[src*="nova-updates/"]').length};
   });
   assert.equal(report.aimActive,false,'release must clear aim');
+  assert.equal(report.productionRafActive,false,'never run two RAF owners');
+  assert.equal(report.pilotStarted,true,'research owner must remain active');
   assert.ok(report.ticks>0&&report.updates.n>0);
   assert.ok(report.renders.n>0&&Number.isFinite(report.renders.p95));
   assert.ok(Number.isFinite(report.updates.p95));
