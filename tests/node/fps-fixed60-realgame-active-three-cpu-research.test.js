@@ -34,6 +34,10 @@ test('clustered mean-30Hz CPU profile measures full Game updates and Canvas subm
   const pilot=run({...options,cadence:'30Hz-clustered',maxSteps:2,activeOnlyThree:true});
   assert.equal(reference.frameCpuSamples,120);
   assert.equal(pilot.frameCpuSamples,60);
+  assert.equal(pilot.threeStepFrameSamples,30);
+  assert.equal(pilot.oneStepFrameSamples,30);
+  assert.ok(Number.isFinite(pilot.threeStepFrameCpuP95Ms));
+  assert.ok(Number.isFinite(pilot.oneStepFrameCpuP95Ms));
   assert.equal(pilot.updates,reference.updates);
   assert.equal(pilot.droppedMs,0);
   for(const arm of [reference,pilot]){
@@ -54,7 +58,9 @@ test('clustered mean-30Hz CPU profile measures full Game updates and Canvas subm
     renderP95:reference.frameRenderCpuP95Ms,frameP95:reference.frameCpuP95Ms},
    clustered:{frames:pilot.frameCpuSamples,peakSteps:pilot.peakSteps,
     updateP95:pilot.frameUpdateCpuP95Ms,renderP95:pilot.frameRenderCpuP95Ms,
-    frameP95:pilot.frameCpuP95Ms,framePeak:pilot.frameCpuPeakMs}
+    frameP95:pilot.frameCpuP95Ms,framePeak:pilot.frameCpuPeakMs,
+    threeStepP95:pilot.threeStepFrameCpuP95Ms,
+    oneStepP95:pilot.oneStepFrameCpuP95Ms}
   }));
  }
 });
