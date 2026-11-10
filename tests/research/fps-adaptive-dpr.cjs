@@ -50,7 +50,10 @@ function createAdaptiveDprPilot(game, options={}) {
     if(stopped)return result('stopped');
     // Settings revision wins even if a player deliberately chooses the
     // pilot's current numeric DPR. A broken callback also fails closed.
-    if(settingsOwnerChanged())externalOwner=true;
+    if(settingsOwnerChanged()){
+      externalOwner=true;phase='baseline';baseline=null;trialStart=null;
+      resetStreaks();
+    }
     if(externalOwner)return result('external-owner');
     if(!Number.isFinite(now)||(lastSample!==null&&now<=lastSample))return result('invalid-time');
     // Observe external DPR ownership BEFORE a long-gap rollback can restore
