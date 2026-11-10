@@ -54,7 +54,11 @@ function trial(seed,hz,mode,opts={}){
    g.__novaTerrain=[];g.__novaBattlefieldIndex=null;
    g.cam.x=0;g.cam.y=0;g.cam.zoom=1;g.zoom=1;
    g.w=xpScene?800:568;g.h=xpScene?400:320;
-   g.status='playing';g.paused=false;g.hasLineOfSight=()=>true;
+   g.status='playing';g.paused=false;
+   // Synthetic perception control: the rival remains visible, but the neutral
+   // endpoint is not. No terrain is added, so this does not model collision.
+   g.hasLineOfSight=(x1,y1,x2,y2)=>
+    !(mode.endsWith('Occluded')&&Math.abs(x2-circle.x)<.01&&Math.abs(y2-circle.y)<.01);
    g.input.moveVec=()=>({x:0,y:0});
    g.input.aimVec=()=>({x:dirX,y:dirY});
    g.input.aim.active=true;g.input.aim.dx=40*dirX;g.input.aim.dy=40*dirY;
@@ -147,6 +151,8 @@ test('neutral-farming aim interference diagnostic in the actual composed game',(
    corridorOffPath=trial(seed,hz,'corridorOffPath'),
    shippingBehind=trial(seed,hz,'shippingBehind'),
    corridorBehind=trial(seed,hz,'corridorBehind'),
+   shippingOccluded=trial(seed,hz,'shippingOccluded'),
+   corridorOccluded=trial(seed,hz,'corridorOccluded'),
    angular=trial(seed,hz,'angular'),
    angularEnemy=trial(seed,hz,'angularEnemy'),
    legacyEdge=trial(seed,hz,'legacyEdge'),
@@ -182,6 +188,12 @@ test('neutral-farming aim interference diagnostic in the actual composed game',(
    'a neutral behind the aligned hostile must not veto the earlier hostile shot');
   assert.equal(corridorBehind.alignedHp,shippingBehind.alignedHp,
    'a neutral behind the hostile must not change real target damage');
+  assert.ok(shippingOccluded.bearings.length>=2&&corridorOccluded.bearings.length>=2,
+   'synthetic neutral-occlusion controls must emit actual projectiles');
+  // This is deliberately diagnostic: the prototype never asks whether the
+  // Circle is visible before allowing it to veto a visible hostile.
+  assert.notDeepEqual(corridorOccluded.bearings,shippingOccluded.bearings,
+   'research witness: hidden neutral still changes corridor pilot gun bearing');
   assert.deepEqual(corridorOffPath.bearings,shippingOffPath.bearings,
    'a neutral outside the requested firing corridor must not change projectile bearings');
   assert.equal(corridorOffPath.alignedHp,shippingOffPath.alignedHp,
@@ -192,7 +204,7 @@ test('neutral-farming aim interference diagnostic in the actual composed game',(
    'deliberate hostile aim must retain its real projectile damage');
   rows.push({noAligned,legacy,shipping,corridor,shippingEnemy,corridorEnemy,
    shippingOffPath,corridorOffPath,shippingBehind,corridorBehind,
-   angular,angularEnemy,legacyEdge,shippingEdge,corridorEdge,angularEdge});
+   shippingOccluded,corridorOccluded,angular,angularEnemy,legacyEdge,shippingEdge,corridorEdge,angularEdge});
  }
  console.log('NOVA_NEUTRAL_AIM_INTERFERENCE '+JSON.stringify(rows));
 });
