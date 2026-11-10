@@ -12,7 +12,8 @@ function summarize(control,candidate){
   const r=report.raf;
   for(const [name,value] of Object.entries({wall:r.observedWallMs,sim:r.simulatedMs,
    dropped:report.droppedMs,queued:r.remainingLagMs,frames:r.frames,
-   longStall:r.longStallDroppedMs,backlog:r.backlogDroppedMs})){
+   longStall:r.longStallDroppedMs,longStallWall:r.longStallWallMs,
+   backlog:r.backlogDroppedMs})){
    assert.ok(Number.isFinite(value)&&value>=0,`${label}: invalid ${name}`);
   }
   assert.ok(Number.isFinite(report.touchToProjectileBirthMs)&&
@@ -20,6 +21,8 @@ function summarize(control,candidate){
   assert.ok(Number.isFinite(report.touchToCanvasSubmissionMs)&&
    report.touchToCanvasSubmissionMs>=report.touchToProjectileBirthMs,
    `${label}: missing touch-to-Canvas submission`);
+  assert.ok(r.longStallWallMs<r.observedWallMs,
+   `${label}: no measured active observation window`);
   assert.ok(r.frames>=5&&r.observedWallMs>0,`${label}: insufficient browser evidence`);
   assert.ok(Math.abs(r.observedWallMs-r.simulatedMs-report.droppedMs-r.remainingLagMs)<1,
    `${label}: wall time does not reconcile`);
@@ -36,6 +39,9 @@ function summarize(control,candidate){
    presentationHz:r.presentationHz,updates:report.ticks,
    droppedMs:report.droppedMs,backlogLossMs:r.backlogDroppedMs,
    longStallLossMs:r.longStallDroppedMs,
+   activeWallMs:r.observedWallMs-r.longStallWallMs,
+   backlogLossMsPerActiveSecond:1000*r.backlogDroppedMs/
+    (r.observedWallMs-r.longStallWallMs),
    backlogLossMsPerSecond:1000*r.backlogDroppedMs/r.observedWallMs,
    longStallLossMsPerSecond:1000*r.longStallDroppedMs/r.observedWallMs,
    queuedMs:r.remainingLagMs,
