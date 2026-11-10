@@ -9,6 +9,8 @@ const {chromium}=require('playwright');
 const {injectBattlefieldSeed}=require('../research/battlefield-layout-fixture.cjs');
 const maxSteps=Number(process.env.NOVA_FIXED60_MAX_STEPS||2);
 const controlledGate=process.env.NOVA_FIXED60_CONTROLLED_GATE==='1';
+const timerArmedGate=process.env.NOVA_FIXED60_TIMER_ARMED_GATE==='1';
+assert.ok(!timerArmedGate||controlledGate,'timer-armed research requires controlled gate');
 const controlledExtra=Number(process.env.NOVA_FIXED60_EXTRA_TICKS||2);
 assert.ok([2,3,4].includes(controlledExtra),'invalid research backlog');
 // Compare against the materialized shell, not a brittle hardcoded DOM count.
@@ -54,9 +56,10 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
   await deploy.waitFor({state:'visible',timeout:45000});
   await page.addScriptTag({path:path.resolve(__dirname,
    '../../nova-updates/fixed60-research-browser.js')});
-  await page.evaluate(({maxSteps,controlledGate,controlledExtra})=>{
+  await page.evaluate(({maxSteps,controlledGate,controlledExtra,timerArmedGate})=>{
    window.__novaFixedMaxSteps=maxSteps;
    window.__novaControlledGate=controlledGate;
+   window.__novaTimerArmedGate=timerArmedGate;
    const Game=window.__novaMakeRequire('')('game/engine').Game;
    if(controlledGate){
     const baseSpawn=Game.prototype.spawnPlayer;
@@ -148,7 +151,19 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     const pilot=window.__novaFixed60Research.createFixedStepBrowserPilot(this,{
      window,document,clock:performance,
      request:fn=>{
-      const token=++gateToken,state={id:null,cancelled:false};
+      const token=++gateToken,state={id:null,timer:null,cancelled:false};
+      const arm=()=>{
+       if(state.cancelled)return;
+       // A timer approaches the target; genuine RAF still owns delivery.
+       // This is an opt-in measurement, never a production scheduler.
+       if(timerArmedGate&&gateNext!==null){
+        const wait=Math.max(0,gateNext-performance.now()-2);
+        if(wait>3){state.timer=setTimeout(()=>{
+         state.timer=null;if(!state.cancelled)state.id=requestAnimationFrame(deliver);
+        },wait);return;}
+       }
+       state.id=requestAnimationFrame(deliver);
+      };
       gatePending.set(token,state);
       const deliver=ts=>{
        if(state.cancelled)return;
@@ -156,7 +171,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
         if(gateNext===null)gateNext=ts;
         if(ts+0.2<gateNext){
          profile.gateSkippedNativeRafs=(profile.gateSkippedNativeRafs||0)+1;
-         state.id=requestAnimationFrame(deliver);return;
+         arm();return;
         }
         gateNext+=gateGaps[gateIndex++%4];
        }
@@ -191,13 +206,15 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
         callbackJsMs:performance.now()-at});
       }
       };
-      state.id=requestAnimationFrame(deliver);
+      arm();
       return token;
      },
      cancel:token=>{
       const state=gatePending.get(token);
       if(!state)return;
-      state.cancelled=true;cancelAnimationFrame(state.id);
+      state.cancelled=true;
+      if(state.timer!==null)clearTimeout(state.timer);
+      if(state.id!==null)cancelAnimationFrame(state.id);
       gatePending.delete(token);
      },
      render:(g,w,h)=>renderMod.render(g,w,h),
@@ -224,7 +241,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     profile.lifecycle.push({event:'owner-start-returned',at:performance.now(),started:pilot.owner.started});
     return result;
    };
-  },{maxSteps,controlledGate,controlledExtra});
+  },{maxSteps,controlledGate,controlledExtra,timerArmedGate});
   await deploy.click();
   try{
    await page.waitForFunction(()=>window.__novaFixedGame?.status==='playing'&&
@@ -394,6 +411,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     .reduce((sum,f)=>sum+f.droppedMs,0);
    return {configuredMaxSteps:window.__novaFixedMaxSteps,
     controlledGate:window.__novaControlledGate,
+    timerArmedGate:window.__novaTimerArmedGate,
     initialFingerprint:window.__novaFixedResearch.initialFingerprint||null,
     maxSteps:p.owner.maxSteps,ticks:p.owner.ticks,droppedMs:p.owner.droppedMs,
     raf:{frames:frames.length,intervals:values(frameIntervals),controlledLongGaps,
