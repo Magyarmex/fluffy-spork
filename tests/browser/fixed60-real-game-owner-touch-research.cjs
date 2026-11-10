@@ -84,7 +84,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
        const previous=frames.length?frames[frames.length-1].ts:null;
        frames.push({ts,intervalMs:previous===null?null:ts-previous,
         steps:current.ticks-beforeTicks,
-        rawGapMs,droppedMs:current.droppedMs-beforeDropped,
+        rawGapMs,lagMs:current.lagMs,droppedMs:current.droppedMs-beforeDropped,
         dropReason:current.droppedMs>beforeDropped?
          (rawGapMs>100.0000001?'long-stall':'backlog'):null,
         callbackJsMs:performance.now()-at});
@@ -169,6 +169,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
    const frames=window.__novaFixedResearch.frames;
    const frameIntervals=frames.map(f=>f.intervalMs).filter(Number.isFinite);
    const callbackCosts=frames.map(f=>f.callbackJsMs);
+   const backlogSamples=frames.map(f=>f.lagMs);
    const stepCounts={};
    for(const f of frames)stepCounts[f.steps]=(stepCounts[f.steps]||0)+1;
    const droppedFrameCount=frames.filter(f=>f.droppedMs>0).length;
@@ -177,7 +178,8 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
    const attributedDroppedMs=frames.reduce((sum,f)=>sum+f.droppedMs,0);
    return {maxSteps:p.owner.maxSteps,ticks:p.owner.ticks,droppedMs:p.owner.droppedMs,
     raf:{frames:frames.length,intervals:values(frameIntervals),
-     callbackJs:values(callbackCosts),stepCounts,droppedFrameCount,
+     callbackJs:values(callbackCosts),backlogMs:values(backlogSamples),
+     stepCounts,droppedFrameCount,
      longStallDrops,backlogDrops,attributedDroppedMs,
      maxIntervalMs:frameIntervals.length?Math.max(...frameIntervals):null},
     productionRafActive:!!g.raf,pilotStarted:p.owner.started,
@@ -203,7 +205,8 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
   assert.ok(report.raf.frames>2&&report.raf.intervals.n>0,
    'actual browser RAF spacing must be observed');
   assert.ok(Number.isFinite(report.raf.intervals.p95)&&
-   Number.isFinite(report.raf.callbackJs.p95),
+   Number.isFinite(report.raf.callbackJs.p95)&&
+   Number.isFinite(report.raf.backlogMs.p95),
    'real browser callback intervals and JavaScript costs must be finite');
   assert.equal(Object.values(report.raf.stepCounts).reduce((a,b)=>a+b,0),
    report.raf.frames,'every observed RAF callback needs a step count');
