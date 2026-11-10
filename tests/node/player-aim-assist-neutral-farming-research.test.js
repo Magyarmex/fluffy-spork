@@ -18,6 +18,7 @@ function trial(seed,hz,mode,opts={}){
  return withSeed(seed,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   const p=g.player,others=g.tanks.filter(t=>t!==p);
+  const aimQueryStates=[];
   assert.ok(others.length>=2,'use real initialized collision-capable tanks');
   const offAxis=others[0],aligned=others[1];
   for(const [t,x,y] of (xpScene?
@@ -66,6 +67,12 @@ function trial(seed,hz,mode,opts={}){
       if(mode==='legacy'||mode==='legacyEdge')return offAxis;
       const found=nearest.apply(this,arguments);
       if(found===aligned&&circle.hp>0){
+       if(aimQueryStates.length<24)aimQueryStates.push({
+        time:+g.time.toFixed(5),x:+circle.x.toFixed(5),y:+circle.y.toFixed(5),
+        vx:+circle.vx.toFixed(5),vy:+circle.vy.toFixed(5),
+        hp:+circle.hp.toFixed(5),r:+circle.r.toFixed(5),
+        lateral:+Math.abs((circle.x-p.x)*dirY-(circle.y-p.y)*dirX).toFixed(5),
+        forward:+((circle.x-p.x)*dirX+(circle.y-p.y)*dirY).toFixed(5)});
        const dx=circle.x-p.x,dy=circle.y-p.y;
        const targetDist=Math.hypot(aligned.x-p.x,aligned.y-p.y);
        if(mode.startsWith('angular')){
@@ -110,7 +117,7 @@ function trial(seed,hz,mode,opts={}){
    assert.ok(Number.isFinite(hp)&&hp>=0&&hp<=14);
    assert.ok(shots>=2,'real Scout firing must occur during the observation');
    return {seed,hz,mode,xpScene,shots,circleHp:+hp.toFixed(5),
-    circleDestroyed:!survivor,playerAngle:+p.angle.toFixed(5),bearings,shotShapeStates,
+    circleDestroyed:!survivor,playerAngle:+p.angle.toFixed(5),bearings,shotShapeStates,aimQueryStates,
     alignedHp:withAligned?+aligned.hp.toFixed(5):null,
     playerXP:+p.xp.toFixed(5),playerScore:+p.score.toFixed(5),
     uncollectedOrbXP:+g.orbs.reduce((a,o)=>a+(Number(o.xp)||0),0).toFixed(5)};
