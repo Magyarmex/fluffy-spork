@@ -89,7 +89,7 @@ function trial(seed,cls,reload,mode,offsetMs){
    },maxSteps:2
   });
   // Per-frame update count and input sampling lag are research gates.
-  // render() below is a NO-OP callback timing witness, not Canvas/GPU paint.
+  // render() above is a NO-OP callback timing witness, not Canvas/GPU paint.
   const stepsByFrame={zero:0,one:0,two:0};
   const inputLagsMs=[];
   for(const kind of ['pd','pm','pu']){
@@ -132,7 +132,7 @@ function trial(seed,cls,reload,mode,offsetMs){
    assert.equal(bridge.reorderedClamps,0,'normal RAF jitter must not reorder touch');
    assert.equal(bridge.staleClamps,0,'normal RAF jitter must not drop touch');
    assert.equal(inputLagsMs.length,edges.length,'every touch edge has sampled timing');
-   assert.equal(renderCallbackLagsMs.length,edges.length,'every sampled touch edge reaches render submission');
+   assert.equal(renderCallbackLagsMs.length,edges.length,'every sampled touch edge reaches the stubbed render callback');
    assert.ok(renderCallbackLagsMs.every(x=>x>=-0.001&&Number.isFinite(x)));
    assert.ok(inputLagsMs.every(x=>x>=-0.001&&Number.isFinite(x)));
    assert.equal(stepsByFrame.one+stepsByFrame.two*2,360);
@@ -161,13 +161,13 @@ test('fixed60 research measures touch-driven real Gunner damage under matched me
      assert.deepEqual(trial(seed,cls,reload,mode,offset),jitter);
      // This is the intended chronology invariant, unlike frame presentation
      // timing: identical touch history and 60Hz ticks must yield equal combat.
-    assert.equal(jitter.damage,baseline.damage,'real hit damage changed with RAF order');
-    assert.equal(jitter.volleys,baseline.volleys,'volley count changed with RAF order');
-    assert.equal(jitter.hits,baseline.hits,'hit count changed with RAF order');
-    assert.deepEqual(jitter.births,baseline.births,'projectile birth chronology changed');
-    assert.equal(jitter.spin,baseline.spin,'Gunner spin changed with RAF order');
-    assert.equal(jitter.heat,baseline.heat,'Gunner heat changed with RAF order');
-    rows.push({cls,seed,offset,baseline,jitter,
+     assert.equal(jitter.damage,baseline.damage,'real hit damage changed with RAF order');
+     assert.equal(jitter.volleys,baseline.volleys,'volley count changed with RAF order');
+     assert.equal(jitter.hits,baseline.hits,'hit count changed with RAF order');
+     assert.deepEqual(jitter.births,baseline.births,'projectile birth chronology changed');
+     assert.equal(jitter.spin,baseline.spin,'Gunner spin changed with RAF order');
+     assert.equal(jitter.heat,baseline.heat,'Gunner heat changed with RAF order');
+     rows.push({cls,seed,offset,baseline,jitter,
       equalDamage:true,equalVolleys:true});
     }
    }
