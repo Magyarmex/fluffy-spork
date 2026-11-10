@@ -7,6 +7,9 @@ const path=require('node:path');
 const fs=require('node:fs');
 const {chromium}=require('playwright');
 const maxSteps=Number(process.env.NOVA_FIXED60_MAX_STEPS||2);
+const controlledGate=process.env.NOVA_FIXED60_CONTROLLED_GATE==='1';
+const controlledExtra=Number(process.env.NOVA_FIXED60_EXTRA_TICKS||2);
+assert.ok([2,3,4].includes(controlledExtra),'invalid research backlog');
 // Compare against the materialized shell, not a brittle hardcoded DOM count.
 const expectedOverlays=[...fs.readFileSync(path.resolve(__dirname,'../../index.html'),'utf8')
  .matchAll(/<script\b[^>]*src=["']([^"']*nova-updates\/[^"']+)["']/gi)]
@@ -17,7 +20,12 @@ assert.ok(expectedOverlays.length>0&&new Set(expectedOverlays).size===expectedOv
 // retain the original two-step safety budget.
 assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps');
 (async()=>{
- const browser=await chromium.launch({headless:true,args:['--disable-dev-shm-usage','--no-sandbox']});
+ // Controlled research requires native callbacks fine enough to deliver
+ // 16.67ms short gaps even on a CI host throttling ordinary RAF to 30Hz.
+ // This flag is NOT a physical display benchmark or a production setting.
+ const launchArgs=['--disable-dev-shm-usage','--no-sandbox'];
+ if(controlledGate)launchArgs.push('--disable-frame-rate-limit');
+ const browser=await chromium.launch({headless:true,args:launchArgs});
  const context=await browser.newContext({viewport:{width:320,height:700},
   deviceScaleFactor:2,isMobile:true,hasTouch:true,serviceWorkers:'block'});
  const errors=[],consoleErrors=[];
@@ -30,13 +38,18 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
   await deploy.waitFor({state:'visible',timeout:45000});
   await page.addScriptTag({path:path.resolve(__dirname,
    '../../nova-updates/fixed60-research-browser.js')});
-  await page.evaluate(maxSteps=>{
+  await page.evaluate(({maxSteps,controlledGate,controlledExtra})=>{
    window.__novaFixedMaxSteps=maxSteps;
+   window.__novaControlledGate=controlledGate;
    const Game=window.__novaMakeRequire('')('game/engine').Game;
    const renderMod=window.__novaMakeRequire('')('game/render');
    const baseStart=Game.prototype.start;
    window.__novaFixedResearch={births:0,updates:[],renders:[],errors:[],lifecycle:[],touchEvents:[],frames:[]};
    const profile=window.__novaFixedResearch;
+   const gateGaps=[250/3,50/3,50/3,50/3];
+   let gateNext=null,gateIndex=0,gateToken=0;
+   const gatePending=new Map();
+   profile.pendingGateRequests=()=>gatePending.size;
    for(const type of ['pointerdown','pointermove','pointerup','pointercancel'])
     document.addEventListener(type,e=>{
      if(e.pointerType==='touch')
@@ -79,7 +92,17 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     this.raf=null;
     const pilot=window.__novaFixed60Research.createFixedStepBrowserPilot(this,{
      window,document,clock:performance,
-     request:fn=>requestAnimationFrame(ts=>{
+     request:fn=>{
+      const token=++gateToken,state={id:null,cancelled:false};
+      gatePending.set(token,state);
+      const deliver=ts=>{
+       if(state.cancelled)return;
+       if(controlledGate){
+        if(gateNext===null)gateNext=ts;
+        if(ts+0.2<gateNext){state.id=requestAnimationFrame(deliver);return;}
+        gateNext+=gateGaps[gateIndex++%4];
+       }
+       gatePending.delete(token);
       // Measure real RAF callback spacing and per-callback fixed-step work.
       // These are browser callback intervals, NOT physical display times.
       const owner=window.__novaFixedPilot?.owner;
@@ -109,10 +132,18 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
          (rawGapMs>100.0000001?'long-stall':'backlog'):null,
         callbackJsMs:performance.now()-at});
       }
-     }),
-     cancel:id=>cancelAnimationFrame(id),
+      };
+      state.id=requestAnimationFrame(deliver);
+      return token;
+     },
+     cancel:token=>{
+      const state=gatePending.get(token);
+      if(!state)return;
+      state.cancelled=true;cancelAnimationFrame(state.id);
+      gatePending.delete(token);
+     },
      render:(g,w,h)=>renderMod.render(g,w,h),
-     maxSteps:window.__novaFixedMaxSteps,backlogExtraTicks:2});
+     maxSteps:window.__novaFixedMaxSteps,backlogExtraTicks:controlledExtra});
     window.__novaFixedPilot=pilot;
     // Reuse PR #888's exact-source active-only policy in the real browser.
     // This is intentionally NOT installed in production or the bundle.
@@ -134,7 +165,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     profile.lifecycle.push({event:'owner-start-returned',at:performance.now(),started:pilot.owner.started});
     return result;
    };
-  },maxSteps);
+  },{maxSteps,controlledGate,controlledExtra});
   await deploy.click();
   try{
    await page.waitForFunction(()=>window.__novaFixedGame?.status==='playing'&&
@@ -278,6 +309,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     return {n:s.length,p95:s.length?s[Math.ceil(.95*s.length)-1]:null};};
    const frames=window.__novaFixedResearch.frames;
    const frameIntervals=frames.map(f=>f.intervalMs).filter(Number.isFinite);
+   const controlledLongGaps=frames.filter(f=>f.rawGapMs>=70&&f.rawGapMs<=100).length;
    const callbackCosts=frames.map(f=>f.callbackJsMs);
    const backlogSamples=frames.map(f=>f.lagMs);
    const stepCounts={};
@@ -291,8 +323,9 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
    const backlogDroppedMs=frames.filter(f=>f.dropReason==='backlog')
     .reduce((sum,f)=>sum+f.droppedMs,0);
    return {configuredMaxSteps:window.__novaFixedMaxSteps,
+    controlledGate:window.__novaControlledGate,
     maxSteps:p.owner.maxSteps,ticks:p.owner.ticks,droppedMs:p.owner.droppedMs,
-    raf:{frames:frames.length,intervals:values(frameIntervals),
+    raf:{frames:frames.length,intervals:values(frameIntervals),controlledLongGaps,
      callbackJs:values(callbackCosts),backlogMs:values(backlogSamples),
      stepCounts,droppedFrameCount,
      longStallDrops,backlogDrops,attributedDroppedMs,
@@ -318,6 +351,19 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
   assert.equal(owners.size,1,'touch gesture must retain one DOM pointer owner');
   assert.equal(report.productionRafActive,false,'never run two RAF owners');
   assert.equal(report.configuredMaxSteps,maxSteps,'requested catch-up policy must own real Game');
+  assert.equal(report.controlledGate,controlledGate,'research RAF gate configuration drift');
+  if(controlledGate){
+   console.log('NOVA_FIXED60_CONTROLLED_GATE_DIAGNOSTIC '+JSON.stringify({
+    frames:report.raf.frames,intervals:report.raf.intervals,
+    longGaps:report.raf.controlledLongGaps,stepCounts:report.raf.stepCounts,
+    droppedMs:report.droppedMs,backlogDrops:report.raf.backlogDrops}));
+   assert.ok((report.raf.stepCounts['3']||0)>0,
+    'controlled Chromium presentation must exercise real three-update callbacks');
+   assert.ok(report.raf.intervals.p95>=45,
+    'controlled RAF must actually delay browser callbacks');
+   assert.ok(report.raf.controlledLongGaps>=3,
+    'controlled RAF must deliver multiple real 70–100ms active gaps');
+  }
   if(maxSteps===3){
    const frames=await page.evaluate(()=>window.__novaFixedResearch.frames.map(f=>({
     rawGapMs:f.rawGapMs,budget:f.budget,steps:f.steps
@@ -364,13 +410,14 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     pauseRestored:g.setPaused===Game.prototype.setPaused};
    g.destroy();
    return {...stopped,destroyed:!!g.__novaDestroyed,
-    musicTimer:g.sfx.musicTimer};
+    musicTimer:g.sfx.musicTimer,
+    pendingGateRequests:window.__novaFixedResearch.pendingGateRequests()};
   });
   assert.deepEqual(teardown,{
    started:false,captureActive:false,raf:null,inputRestored:true,
    startRestored:true,destroyRestored:true,pauseRestored:true,
-   destroyed:true,musicTimer:null
-  },'pilot teardown must restore native controls and release Game/audio ownership');
+   destroyed:true,musicTimer:null,pendingGateRequests:0
+  },'pilot teardown must restore native controls and release Game/audio/RAF ownership');
   console.log('NOVA_FIXED60_CHROMIUM_OWNER_TOUCH '+JSON.stringify(report));
  }finally{await context.close();await browser.close();}
 })().catch(e=>{console.error(e.stack||e);process.exitCode=1;});

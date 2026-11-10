@@ -152,6 +152,8 @@ jobs:
           node tests/browser/fixed60-real-game-owner-touch-research.cjs
           NOVA_FIXED60_MAX_STEPS=3 node tests/browser/fixed60-real-game-owner-touch-research.cjs
           NOVA_FIXED60_MAX_STEPS=3 NOVA_FIXED60_ACTIVE_BURST=1 node tests/browser/fixed60-real-game-owner-touch-research.cjs
+          # Research-only RAF callback gate; no artificial CPU spin.
+          NOVA_FIXED60_MAX_STEPS=3 NOVA_FIXED60_CONTROLLED_GATE=1 node tests/browser/fixed60-real-game-owner-touch-research.cjs
       - name: Preserve browser screenshots
         if: always()
         uses: actions/upload-artifact@v4
