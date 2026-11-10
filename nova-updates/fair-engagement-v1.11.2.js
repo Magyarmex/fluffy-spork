@@ -288,6 +288,18 @@ wrap('game/engine',function(engine,require){
   var Game=engine&&engine.Game;if(!Game||Game.prototype.__novaFairEngagement)return;
   Game.prototype.__novaFairEngagement=true;
   var classes=require('./classes')||{},C=classes.CLASSES||{};
+  /* Only the actual Game.update player-aim query should use cone-first
+   * selection. Preserve direct nearestTank callers, AI, Crashers and tests.
+   * The shipping input moveVec/aimVec accessors are read-only. */
+  var oldPlayerUpdate=Game.prototype.update;
+  if(typeof oldPlayerUpdate==='function')Game.prototype.update=function(){
+    var had=Object.prototype.hasOwnProperty.call(this,'__novaFairAimQuery'),
+        prior=this.__novaFairAimQuery;
+    this.__novaFairAimQuery=true;
+    try{return oldPlayerUpdate.apply(this,arguments);}finally{
+      if(had)this.__novaFairAimQuery=prior;else delete this.__novaFairAimQuery;
+    }
+  };
 
   /* The canonical touch aim assist asks nearestTank(player.x, player.y,
    * 480, player.id). Terrain already filters occluded tanks, but a fully
@@ -301,6 +313,13 @@ wrap('game/engine',function(engine,require){
     if(!p||!alive(p)||exclude!==p.id||max!==480||x!==p.x||y!==p.y||
        !cam||!Number.isFinite(cam.x)||!Number.isFinite(cam.y)||
        !(z>0)||!(w>0)||!(h>0))return originalNearest.apply(this,arguments);
+    var aimAngle=null;
+    if(this.__novaFairAimQuery&&this.input&&
+       typeof this.input.moveVec==='function'&&typeof this.input.aimVec==='function'){
+      var av=this.input.aimVec(this.input.moveVec());
+      if(av&&Number.isFinite(av.x)&&Number.isFinite(av.y)&&Math.hypot(av.x,av.y)>0)
+        aimAngle=Math.atan2(av.y,av.x);
+    }
     var best=null,bd=max*max,ts=this.tanks||[],hw=w/(2*z),hh=h/(2*z);
     for(var i=0;i<ts.length;i++){
       var t=ts[i];if(!t||!alive(t)||t.id===exclude||
@@ -315,6 +334,13 @@ wrap('game/engine',function(engine,require){
        * from turning the viewport into long-range offscreen assistance. */
       var r=clamp(Number(t.r)||0,0,32);
       if(Math.abs(t.x-cam.x)>hw+r||Math.abs(t.y-cam.y)>hh+r)continue;
+      /* Core snaps only inside 0.22 rad. Rank candidates inside that cone
+       * first; an off-axis closer rival must not hide an aligned farther one. */
+      if(aimAngle!==null){
+        var want=Math.atan2(t.y-p.y,t.x-p.x);
+        if(Math.abs(Math.atan2(Math.sin(want-aimAngle),Math.cos(want-aimAngle)))>=.22)
+          continue;
+      }
       var d=d2(x,y,t.x,t.y);if(!(d<bd))continue;
       if(typeof this.hasLineOfSight==='function'&&
          !this.hasLineOfSight(x,y,t.x,t.y,3))continue;
