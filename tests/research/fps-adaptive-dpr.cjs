@@ -58,7 +58,7 @@ function createAdaptiveDprPilot(game, options={}) {
     }
     if(game.quality!=='low'||!visible()||game.paused||game.status!=='playing'){
       resetStreaks();warmupUntil=now+2500;
-      if(phase==='probing')return result('probe-cancelled',rollback(now));
+      if(phase==='probing'||phase==='low')return result('inactive-rollback',rollback(now));
       return result('inactive');
     }
     if(!p||p.frameSamples<90||![p.fps,p.frameP95Ms,p.updateP95Ms,p.renderP95Ms,p.simulationPacePct]
@@ -113,7 +113,7 @@ function createAdaptiveDprPilot(game, options={}) {
   function stop(){
     if(stopped)return false;
     stopped=true;
-    if(!externalOwner&&game.quality==='low'&&game.dpr===lastApplied&&game.w===width&&game.h===height&&
+    if(!externalOwner&&game.dpr===lastApplied&&game.w===width&&game.h===height&&
        game.canvas.width===Math.round(game.w*lastApplied)&&
        game.canvas.height===Math.round(game.h*lastApplied)&&
        game.dpr!==original)apply(original,lastSample||0);
