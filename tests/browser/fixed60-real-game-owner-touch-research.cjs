@@ -9,10 +9,11 @@ const {chromium}=require('playwright');
  const browser=await chromium.launch({headless:true,args:['--disable-dev-shm-usage','--no-sandbox']});
  const context=await browser.newContext({viewport:{width:320,height:700},
   deviceScaleFactor:2,isMobile:true,hasTouch:true,serviceWorkers:'block'});
- const errors=[];
+ const errors=[],consoleErrors=[];
  try{
   const page=await context.newPage();
   page.on('pageerror',e=>errors.push(String(e.stack||e)));
+  page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text())});
   await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded',timeout:45000});
   const deploy=page.getByRole('button',{name:/DEPLOY/i}).first();
   await deploy.waitFor({state:'visible',timeout:45000});
@@ -94,7 +95,7 @@ const {chromium}=require('playwright');
     ticks:window.__novaFixedPilot?.owner?.ticks??null,
     droppedMs:window.__novaFixedPilot?.owner?.droppedMs??null
    }));
-   throw Error('fixed60 boot gate: '+JSON.stringify({diagnostic,errors}),{cause:error});
+   throw Error('fixed60 boot gate: '+JSON.stringify({diagnostic,errors,consoleErrors}),{cause:error});
   }
   const canvas=page.locator('canvas.absolute.inset-0');
   await canvas.waitFor({state:'visible',timeout:20000});
@@ -154,6 +155,7 @@ const {chromium}=require('playwright');
   assert.ok(Number.isFinite(report.updates.p95));
   assert.ok(report.runtimeScripts>=49,'actual shipping overlays must be loaded');
   assert.deepEqual(errors,[],'browser errors');
+  assert.deepEqual(consoleErrors,[],'browser console errors');
   console.log('NOVA_FIXED60_CHROMIUM_OWNER_TOUCH '+JSON.stringify(report));
  }finally{await context.close();await browser.close();}
 })().catch(e=>{console.error(e.stack||e);process.exitCode=1;});
