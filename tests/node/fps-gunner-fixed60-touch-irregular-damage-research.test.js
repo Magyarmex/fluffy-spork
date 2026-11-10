@@ -13,6 +13,11 @@ function schedule(mode){
  if(mode==='uniform60')return Array(360).fill(1000/60);
  if(mode==='alternating40_120')return Array.from({length:180},()=>[25,1000/120]).flat();
  if(mode==='alternating120_40')return Array.from({length:180},()=>[1000/120,25]).flat();
+ if(mode==='uniform30')return Array(180).fill(1000/30);
+ if(mode==='alternating20_60')return Array.from({length:90},()=>[50,1000/60]).flat();
+ if(mode==='alternating60_20')return Array.from({length:90},()=>[1000/60,50]).flat();
+ if(mode==='clustered55_11')return Array.from({length:45},()=>
+  [55,55,1000/15-55,1000/15-55]).flat();
  throw Error('unknown frame schedule');
 }
 function touchEvents(offsetMs){
@@ -28,7 +33,7 @@ function touchEvents(offsetMs){
  }
  return events.sort((a,b)=>a.at-b.at);
 }
-function trial(seed,cls,reload,mode,offsetMs){
+function trial(seed,cls,reload,mode,offsetMs,expectedTicks=360,maxSteps=2,backlogExtraTicks=2){
  return withSeed(seed,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   const p=g.player;g.sfx.muted=true;g.sfx.startMusic=()=>{};
@@ -86,11 +91,11 @@ function trial(seed,cls,reload,mode,offsetMs){
    render:()=>{
     for(const originalAt of pendingSampledEvents.splice(0))
      renderCallbackLagsMs.push(+(now-1000-originalAt*1000).toFixed(5));
-   },maxSteps:2
+   },maxSteps,backlogExtraTicks
   });
   // Per-frame update count and input sampling lag are research gates.
   // render() above is a NO-OP callback timing witness, not Canvas/GPU paint.
-  const stepsByFrame={zero:0,one:0,two:0};
+  const stepsByFrame={zero:0,one:0,two:0,three:0,four:0};
   const inputLagsMs=[];
   for(const kind of ['pd','pm','pu']){
    const original=g.input[kind];
@@ -119,14 +124,19 @@ function trial(seed,cls,reload,mode,offsetMs){
     const next=callback;assert.equal(typeof next,'function','RAF ownership lost');
     callback=null;next(now);
     const steps=owner.lastSteps;
-    assert.ok(steps>=0&&steps<=2,'bounded per-render simulation work');
-    stepsByFrame[steps===0?'zero':steps===1?'one':'two']++;
+    assert.ok(steps>=0&&steps<=maxSteps,'bounded per-render simulation work');
+    stepsByFrame[['zero','one','two','three','four'][steps]]++;
    }
    assert.ok(Math.abs(elapsed-DURATION_MS)<1e-6);
    assert.equal(index,edges.length,'all input edges delivered');
-   assert.equal(owner.droppedFrames,0,'ordinary jitter must not drop frames');
-   assert.equal(owner.droppedMs,0,'ordinary jitter must not discard simulation');
-   assert.equal(owner.ticks,360,'same six seconds of 60Hz Game updates');
+   if(expectedTicks!=='research-drop')
+    assert.equal(owner.droppedFrames,0,'ordinary jitter must not drop frames');
+   if(expectedTicks!=='research-drop')
+    assert.equal(owner.droppedMs,0,'ordinary jitter must not discard simulation');
+   if(expectedTicks==='research-drop')assert.ok(owner.ticks>0&&owner.ticks<=360);
+   else if(expectedTicks===null)assert.ok([359,360].includes(owner.ticks),
+    'reversed final 50ms frame may leave one tick queued, never more');
+   else assert.equal(owner.ticks,expectedTicks,'same six seconds of 60Hz Game updates');
    assert.equal(timeline.applied,edges.length,'all captured input edges replayed');
    assert.equal(bridge.lateClamps,0,'normal RAF jitter must not replay input late');
    assert.equal(bridge.reorderedClamps,0,'normal RAF jitter must not reorder touch');
@@ -135,11 +145,14 @@ function trial(seed,cls,reload,mode,offsetMs){
    assert.equal(renderCallbackLagsMs.length,edges.length,'every sampled touch edge reaches the stubbed render callback');
    assert.ok(renderCallbackLagsMs.every(x=>x>=-0.001&&Number.isFinite(x)));
    assert.ok(inputLagsMs.every(x=>x>=-0.001&&Number.isFinite(x)));
-   assert.equal(stepsByFrame.one+stepsByFrame.two*2,360);
-   assert.equal(stepsByFrame.zero+stepsByFrame.one+stepsByFrame.two,schedule(mode).length);
+   assert.equal(stepsByFrame.one+stepsByFrame.two*2+
+    stepsByFrame.three*3+stepsByFrame.four*4,owner.ticks);
+   assert.equal(Object.values(stepsByFrame).reduce((a,b)=>a+b,0),schedule(mode).length);
    assert.ok(volleys>0,'touch gesture must actually fire');
    assert.ok(hits>0&&damage>0,'actual player-owned projectile hits required');
    return {seed,cls,reload,mode,offsetMs,ticks:owner.ticks,
+    backlogMs:+owner.lagMs.toFixed(5),droppedMs:owner.droppedMs,
+    droppedFrames:owner.droppedFrames,
     applied:timeline.applied,volleys,hits,damage:+damage.toFixed(5),
     births,stepsByFrame,maxInputSampleLagMs:Math.max(...inputLagsMs),
     meanInputSampleLagMs:+(inputLagsMs.reduce((a,b)=>a+b,0)/inputLagsMs.length).toFixed(5),
@@ -175,4 +188,92 @@ test('fixed60 research measures touch-driven real Gunner damage under matched me
  // Enforce combat chronology, not a fixed weapon balance number or an
  // unrealistically identical render-callback delay across frame schedules.
  assert.equal(rows.length,16);
+});
+
+// Research-only falsifier: equal six-second wall time at 30Hz average does
+// not guarantee identical chronology under a two-tick-per-RAF budget. A
+// 50ms presentation gap needs three 60Hz ticks; the next short frame must
+// repay that debt without dropping, clamping or reordering held touch input.
+test('fixed60 research challenges Gunner touch damage at mean 30Hz and 20/60Hz bursts',()=>{
+ const rows=[];
+ for(const [cls,reload] of [['minigun',1],['needlestorm',3]])
+  for(const seed of [1517800,1517802])
+   for(const offset of [7,12]){
+    const reference=trial(seed,cls,reload,'uniform60',offset);
+    for(const mode of ['uniform30','alternating20_60','alternating60_20']){
+     const actual=trial(seed,cls,reload,mode,offset,
+      mode==='alternating60_20'?null:360);
+     if(mode==='alternating60_20'&&actual.ticks===359){
+      // The final 50ms RAF cannot perform all three owed ticks with a
+      // two-step budget. That tick is QUEUED, not silently dropped.
+      assert.equal(actual.droppedMs,0);
+      assert.ok(actual.backlogMs>0);
+      rows.push({cls,seed,offset,mode,ticks:actual.ticks,
+       backlogMs:actual.backlogMs,unfinishedAtCaptureBoundary:true});
+      continue;
+     }
+     assert.equal(actual.ticks,reference.ticks,'30Hz presentation lost simulation ticks');
+     assert.equal(actual.damage,reference.damage,'real Gunner damage diverged at mean 30Hz');
+     assert.equal(actual.volleys,reference.volleys,'Gunner volley chronology diverged');
+     assert.equal(actual.hits,reference.hits,'Gunner collision count diverged');
+     assert.deepEqual(actual.births,reference.births,'projectile birth chronology diverged');
+     rows.push({cls,seed,offset,mode,damage:actual.damage,
+      maxInputSampleLagMs:actual.maxInputSampleLagMs,
+      maxRenderCallbackLagMs:actual.maxRenderCallbackLagMs,
+      stepsByFrame:actual.stepsByFrame,unfinishedAtCaptureBoundary:false});
+    }
+   }
+ console.log('GUNNER_FIXED60_MEAN30_TOUCH_DAMAGE '+JSON.stringify(rows));
+ assert.equal(rows.length,24);
+});
+
+// This is a NEGATIVE CONTROL, not a desired gameplay golden. A repeated
+// 55/55/11.667/11.667ms presentation averages 30Hz, never stalls >100ms,
+// yet can exceed the research owner's two-step + four-tick backlog budget.
+// Capture real player-owned damage to expose the practical cost of time loss.
+test('fixed60 research detects clustered 30Hz dropped combat time rather than claiming universal parity',()=>{
+ const baseline=trial(1517800,'minigun',1,'uniform60',12);
+ const clustered=trial(1517800,'minigun',1,'clustered55_11',12,'research-drop');
+ assert.equal(clustered.applied,baseline.applied,'touch events must remain delivered');
+ if(clustered.droppedMs>0){
+  assert.ok(clustered.ticks<baseline.ticks,
+   'dropped time must be visible as fewer actual Game updates');
+  assert.ok(clustered.droppedFrames>0);
+ }else{
+  // A future safe owner that preserves all ticks should satisfy the
+  // original damage/volley chronology instead of being rejected for fixing it.
+  assert.equal(clustered.ticks,baseline.ticks);
+  assert.equal(clustered.damage,baseline.damage);
+  assert.equal(clustered.volleys,baseline.volleys);
+ }
+ console.log('GUNNER_FIXED60_CLUSTERED30_FALSIFIER '+JSON.stringify({
+  baseline:{ticks:baseline.ticks,damage:baseline.damage,volleys:baseline.volleys},
+  clustered:{ticks:clustered.ticks,damage:clustered.damage,
+   volleys:clustered.volleys,droppedMs:clustered.droppedMs,
+   droppedFrames:clustered.droppedFrames,backlogMs:clustered.backlogMs}}));
+});
+
+// Research alternatives only: either allow one extra queued tick (more
+// simulation-phase latency) or permit three updates in a rendered frame
+// (more CPU burst risk). Neither policy is approved for production.
+test('fixed60 research compares bounded clustered30 recovery budgets with real Gunner damage',()=>{
+ const rows=[];
+ for(const [cls,reload] of [['minigun',1],['needlestorm',3]]){
+  const baseline=trial(1517800,cls,reload,'uniform60',12);
+  for(const [maxSteps,backlogExtraTicks] of [[2,3],[3,2]]){
+   const candidate=trial(1517800,cls,reload,'clustered55_11',12,
+    360,maxSteps,backlogExtraTicks);
+   assert.equal(candidate.droppedMs,0);
+   assert.equal(candidate.damage,baseline.damage,
+    'bounded recovery must preserve actual player-owned damage');
+   assert.equal(candidate.volleys,baseline.volleys);
+   assert.equal(candidate.hits,baseline.hits);
+   assert.deepEqual(candidate.births,baseline.births);
+   rows.push({cls,maxSteps,backlogExtraTicks,damage:candidate.damage,
+    stepsByFrame:candidate.stepsByFrame,
+    meanRenderCallbackLagMs:candidate.meanRenderCallbackLagMs});
+  }
+ }
+ console.log('GUNNER_FIXED60_CLUSTERED30_RECOVERY '+JSON.stringify(rows));
+ assert.equal(rows.length,4);
 });
