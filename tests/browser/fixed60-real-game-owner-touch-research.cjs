@@ -44,6 +44,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
    const gateGaps=[250/3,50/3,50/3,50/3];
    let gateNext=null,gateIndex=0,gateToken=0;
    const gatePending=new Map();
+   profile.pendingGateRequests=()=>gatePending.size;
    for(const type of ['pointerdown','pointermove','pointerup','pointercancel'])
     document.addEventListener(type,e=>{
      if(e.pointerType==='touch')
@@ -397,13 +398,14 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     pauseRestored:g.setPaused===Game.prototype.setPaused};
    g.destroy();
    return {...stopped,destroyed:!!g.__novaDestroyed,
-    musicTimer:g.sfx.musicTimer};
+    musicTimer:g.sfx.musicTimer,
+    pendingGateRequests:window.__novaFixedResearch.pendingGateRequests()};
   });
   assert.deepEqual(teardown,{
    started:false,captureActive:false,raf:null,inputRestored:true,
    startRestored:true,destroyRestored:true,pauseRestored:true,
-   destroyed:true,musicTimer:null
-  },'pilot teardown must restore native controls and release Game/audio ownership');
+   destroyed:true,musicTimer:null,pendingGateRequests:0
+  },'pilot teardown must restore native controls and release Game/audio/RAF ownership');
   console.log('NOVA_FIXED60_CHROMIUM_OWNER_TOUCH '+JSON.stringify(report));
  }finally{await context.close();await browser.close();}
 })().catch(e=>{console.error(e.stack||e);process.exitCode=1;});
