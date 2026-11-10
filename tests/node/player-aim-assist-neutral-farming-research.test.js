@@ -15,6 +15,9 @@ function rival(id,x,y){
 }
 function trial(seed,hz,mode){
  const withAligned=mode!=='noAligned';
+ const enemyIntent=mode.endsWith('Enemy');
+ const intent=enemyIntent?Math.atan2(40,240):0;
+ const dirX=Math.cos(intent),dirY=Math.sin(intent);
  return withSeed(seed,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   const p=g.player,offAxis=rival(9801,120,70),
@@ -43,14 +46,25 @@ function trial(seed,hz,mode){
    g.cam.x=0;g.cam.y=0;g.cam.zoom=1;g.zoom=1;g.w=568;g.h=320;
    g.status='playing';g.paused=false;g.hasLineOfSight=()=>true;
    g.input.moveVec=()=>({x:0,y:0});
-   g.input.aimVec=()=>({x:1,y:0});
-   g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
+   g.input.aimVec=()=>({x:dirX,y:dirY});
+   g.input.aim.active=true;g.input.aim.dx=40*dirX;g.input.aim.dy=40*dirY;
    g.input.mouseActive=false;g.input.autofire=false;g.input.firing=true;
    g.input.abilityQueued=false;
-   if(mode==='legacy'){
+   if(mode==='legacy'||mode.startsWith('corridor')){
     const nearest=g.nearestTank;
     g.nearestTank=function(x,y,max,exclude){
-     if(exclude===p.id&&max===480&&x===p.x&&y===p.y)return offAxis;
+     if(exclude===p.id&&max===480&&x===p.x&&y===p.y){
+      if(mode==='legacy')return offAxis;
+      const found=nearest.apply(this,arguments);
+      if(found===aligned&&circle.hp>0){
+       const dx=circle.x-p.x,dy=circle.y-p.y;
+       const forward=dx*dirX+dy*dirY;
+       const lateral=Math.abs(dx*dirY-dy*dirX);
+       if(forward>0&&forward<Math.hypot(aligned.x-p.x,aligned.y-p.y)&&
+          lateral<circle.r+5)return null;
+      }
+      return found;
+     }
      return nearest.apply(this,arguments);
     };
    }
@@ -79,7 +93,10 @@ test('neutral-farming aim interference diagnostic in the actual composed game',(
  const rows=[];
  for(const hz of [30,60,120])for(const seed of [1517800,1517802]){
   const noAligned=trial(seed,hz,'noAligned'),
-   legacy=trial(seed,hz,'legacy'),shipping=trial(seed,hz,'shipping');
+   legacy=trial(seed,hz,'legacy'),shipping=trial(seed,hz,'shipping'),
+   corridor=trial(seed,hz,'corridor'),
+   shippingEnemy=trial(seed,hz,'shippingEnemy'),
+   corridorEnemy=trial(seed,hz,'corridorEnemy');
   assert.equal(noAligned.hz,legacy.hz);
   assert.equal(legacy.hz,shipping.hz);
   assert.ok(Math.abs(noAligned.playerAngle)<1e-8,
@@ -88,7 +105,8 @@ test('neutral-farming aim interference diagnostic in the actual composed game',(
    'the same-world legacy nearest-before-cone query leaves raw aim east');
   assert.ok(Number.isFinite(shipping.playerAngle),
    'measure shipped steering without freezing a possibly harmful snap');
-  rows.push({noAligned,legacy,shipping});
+  assert.ok(Number.isFinite(corridor.playerAngle)&&Number.isFinite(corridorEnemy.playerAngle));
+  rows.push({noAligned,legacy,shipping,corridor,shippingEnemy,corridorEnemy});
  }
  console.log('NOVA_NEUTRAL_AIM_INTERFERENCE '+JSON.stringify(rows));
 });
