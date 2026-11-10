@@ -175,12 +175,17 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
   await page.waitForFunction(()=>window.__novaFixedGame?.input?.aim?.active===false,null,{timeout:5000});
   // Force one genuine foreground RAF gap, after releasing the stick.
   // The active-only three-step policy must revert to two steps on this gap.
-  const beforeStall=await page.evaluate(()=>window.__novaFixedPilot.owner.droppedFrames);
+  const beforeStall=await page.evaluate(()=>({
+   drops:window.__novaFixedPilot.owner.droppedFrames,
+   long:window.__novaFixedResearch.frames.filter(f=>f.dropReason==='long-stall').length
+  }));
   await page.evaluate(()=>{
    const end=performance.now()+135;
    while(performance.now()<end){} // research-only main-thread stall
   });
-  await page.waitForFunction(before=>window.__novaFixedPilot?.owner?.droppedFrames>before,
+  await page.waitForFunction(before=>
+   window.__novaFixedPilot?.owner?.droppedFrames>before.drops &&
+   window.__novaFixedResearch?.frames?.filter(f=>f.dropReason==='long-stall').length>before.long,
    beforeStall,{timeout:5000});
   const report=await page.evaluate(()=>{
    const g=window.__novaFixedGame,p=window.__novaFixedPilot;
