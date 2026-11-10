@@ -802,7 +802,7 @@ function createFixedStepBrowserPilot(game,{window:win,document:doc,clock,
         throw Error('invalid browser pulse owner');
     }
     owner=new FixedStepRafOwner(game,timeline,bridge,
-      {now:clock.now,request,cancel,render,maxSteps,backlogExtraTicks,isVisible:()=>!doc.hidden});
+      {now:()=>clock.now(),request,cancel,render,maxSteps,backlogExtraTicks,isVisible:()=>!doc.hidden});
   }catch(error){
     try{if(pulse)pulse.detach()}catch(cleanupError){
       if(error && typeof error==='object'){
