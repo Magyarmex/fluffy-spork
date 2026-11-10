@@ -36,13 +36,14 @@ const arms={shipping:html.replace(guarded,shipping),candidate:html};
      const update=Game.prototype.update,fire=Game.prototype.tryFire;
      const originalRender=renderModule.render;
      window.__novaCpuAb={volleys:0,birthAt:null,touches:[],game:null,
-      frameIndex:0,spikedFrame:-1,inject:false,spikes:0};
+      frameIndex:0,spikedFrame:-1,inject:false,spikes:0,outerUpdateMs:[],startAt:null,startGameTime:null};
      renderModule.render=function(g,...args){
       const out=originalRender.call(this,g,...args);
       if(g===window.__novaCpuAb.game)window.__novaCpuAb.frameIndex++;
       return out;
      };
      Game.prototype.update=function(...args){
+      const outerStart=performance.now();
       if(!this.__novaDecorativeWorld){
        const s=window.__novaCpuAb;s.game=this;
        if(s.inject&&s.frameIndex%10===9&&s.spikedFrame!==s.frameIndex){
@@ -51,7 +52,10 @@ const arms={shipping:html.replace(guarded,shipping),candidate:html};
         while(performance.now()<until){} // controlled current-update CPU spike
        }
       }
-      return update.apply(this,args);
+      const result=update.apply(this,args);
+      if(!this.__novaDecorativeWorld&&window.__novaCpuAb.inject)
+       window.__novaCpuAb.outerUpdateMs.push(performance.now()-outerStart);
+      return result;
      };
      Game.prototype.tryFire=function(t,...args){
       const before=this.bullets.length,result=fire.call(this,t,...args);
@@ -77,7 +81,9 @@ const arms={shipping:html.replace(guarded,shipping),candidate:html};
      g.input.autofire=false;window.__novaCpuAb.volleys=0;
      window.__novaCpuAb.birthAt=null;window.__novaCpuAb.touches.length=0;
      window.__novaCpuAb.frameIndex=0;window.__novaCpuAb.spikedFrame=-1;
-     window.__novaCpuAb.spikes=0;window.__novaCpuAb.inject=true;
+     window.__novaCpuAb.spikes=0;window.__novaCpuAb.outerUpdateMs.length=0;
+     window.__novaCpuAb.startAt=performance.now();
+     window.__novaCpuAb.startGameTime=g.time;window.__novaCpuAb.inject=true;
     });
     const box=await canvas.boundingBox();
     assert.ok(box&&box.width>200);
@@ -90,7 +96,11 @@ const arms={shipping:html.replace(guarded,shipping),candidate:html};
     const metrics=await page.evaluate(()=>{
      const s=window.__novaCpuAb,g=s.game;
      return {volleys:s.volleys,birthAt:s.birthAt,touches:s.touches.slice(),
-      gameTime:g.time,perf:window.__NOVA_PERF_LAST__||null,
+      gameTime:g.time,gameDelta:g.time-s.startGameTime,
+      windowMs:performance.now()-s.startAt,
+      outerUpdateP95Ms:(()=>{const a=s.outerUpdateMs.slice().sort((x,y)=>x-y);
+       return a.length?a[Math.ceil(a.length*.95)-1]:null;})(),
+      perf:window.__NOVA_PERF_LAST__||null,
       aimActive:g.input.aim.active,aimOwner:g.input.stickId.aim,
       firing:g.input.firing,spikes:s.spikes,renderedFrames:s.frameIndex};
     });
@@ -102,6 +112,8 @@ const arms={shipping:html.replace(guarded,shipping),candidate:html};
     assert.ok(Number.isFinite(metrics.gameTime)&&metrics.gameTime>0);
     assert.deepEqual(errors,[],'browser Game must not throw');
     results.push({arm:name,volleys:metrics.volleys,gameTime:metrics.gameTime,
+     observationGameDelta:metrics.gameDelta,observationWindowMs:metrics.windowMs,
+     outerUpdateP95Ms:metrics.outerUpdateP95Ms,
      injectedSpikes:metrics.spikes,renderedFrames:metrics.renderedFrames,
      touchToFirstBirthMs:metrics.birthAt-metrics.touches[0].at,
      perf:metrics.perf&&{
@@ -114,6 +126,7 @@ const arms={shipping:html.replace(guarded,shipping),candidate:html};
   console.log('RAF_CPU_GUARD_CHROMIUM_AB '+JSON.stringify({cpuThrottle:4,
    viewport:'320x700',holdMs:5500,results,
    limitations:['not counterbalanced','not a fixed 20Hz schedule',
+    'shipping performance snapshot is rolling and not observation-window aligned',
     'not physical Android','not GPU presentation or photon latency']}));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
