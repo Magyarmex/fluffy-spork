@@ -73,6 +73,18 @@ function trial(seed,cls,reload,mode,offsetMs){
    now:()=>now,request:fn=>(callback=fn,1),cancel:()=>{callback=null},
    render:()=>{},maxSteps:2
   });
+  // Presentation cost proxy and chronological input sampling lag are both
+  // release gates: equal damage alone does not guarantee responsive touch.
+  const stepsByFrame={zero:0,one:0,two:0};
+  const inputLagsMs=[];
+  for(const kind of ['pd','pm','pu']){
+   const original=g.input[kind];
+   g.input[kind]=function(evt){
+    if(Number.isFinite(evt.__novaSampleAt)&&Number.isFinite(evt.__novaOriginalAt))
+     inputLagsMs.push(+(1000*(evt.__novaSampleAt-evt.__novaOriginalAt)).toFixed(5));
+    return original.apply(this,arguments);
+   };
+  }
   let elapsed=0,index=0;
   const edges=touchEvents(offsetMs);
   try{
@@ -89,6 +101,9 @@ function trial(seed,cls,reload,mode,offsetMs){
     }
     const next=callback;assert.equal(typeof next,'function','RAF ownership lost');
     callback=null;next(now);
+    const steps=owner.lastSteps;
+    assert.ok(steps>=0&&steps<=2,'bounded per-render simulation work');
+    stepsByFrame[steps===0?'zero':steps===1?'one':'two']++;
     target.x=200;target.y=0;target.vx=0;target.vy=0;
    }
    assert.ok(Math.abs(elapsed-DURATION_MS)<1e-6);
@@ -97,11 +112,17 @@ function trial(seed,cls,reload,mode,offsetMs){
    assert.equal(owner.droppedMs,0,'ordinary jitter must not discard simulation');
    assert.equal(owner.ticks,360,'same six seconds of 60Hz Game updates');
    assert.equal(timeline.applied,edges.length,'all captured input edges replayed');
+   assert.equal(inputLagsMs.length,edges.length,'every touch edge has sampled timing');
+   assert.ok(inputLagsMs.every(x=>x>=-0.001&&Number.isFinite(x)));
+   assert.equal(stepsByFrame.one+stepsByFrame.two*2,360);
+   assert.equal(stepsByFrame.zero+stepsByFrame.one+stepsByFrame.two,schedule(mode).length);
    assert.ok(volleys>0,'touch gesture must actually fire');
    assert.ok(hits>0&&damage>0,'actual player-owned projectile hits required');
    return {seed,cls,reload,mode,offsetMs,ticks:owner.ticks,
     applied:timeline.applied,volleys,hits,damage:+damage.toFixed(5),
-    births,spin:+(p.fireSpin||0).toFixed(5),heat:+(p.__v17Heat||0).toFixed(5)};
+    births,stepsByFrame,maxInputSampleLagMs:Math.max(...inputLagsMs),
+    meanInputSampleLagMs:+(inputLagsMs.reduce((a,b)=>a+b,0)/inputLagsMs.length).toFixed(5),
+    spin:+(p.fireSpin||0).toFixed(5),heat:+(p.__v17Heat||0).toFixed(5)};
   }finally{owner.stop();g.destroy();}
  });
 }
