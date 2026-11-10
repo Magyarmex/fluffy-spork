@@ -143,7 +143,8 @@ const {chromium}=require('playwright');
   const enemyStart=await page.evaluate(()=>{
    const g=window.__novaNeutralTouchGame,t=window.__novaNeutralTouchAligned;
    if(!g.tanks.includes(t))throw Error('aligned hostile missing from active sorted world');
-   t.hp=100;t.alive=true;t.spawnShieldT=0;
+   Object.assign(t,{x:240,y:40,vx:0,vy:0,hp:100,alive:true,
+    spawnShieldT:0,shieldT:0,bulwarkT:0,cloakT:0});
    g.bullets=[];g.player.fireCd=0;
    window.__novaNeutralTouchBirths=[];
    window.__novaNeutralTouchTankHits=[];
