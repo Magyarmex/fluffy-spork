@@ -81,6 +81,8 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
    let gateNext=null,gateIndex=0,gateToken=0;
    const gatePending=new Map();
    profile.pendingGateRequests=()=>gatePending.size;
+   profile.gateState=()=>({next:gateNext,index:gateIndex,
+    pending:[...gatePending.values()].map(v=>({timer:v.timer,id:v.id,cancelled:v.cancelled}))});
    for(const type of ['pointerdown','pointermove','pointerup','pointercancel'])
     document.addEventListener(type,e=>{
      if(e.pointerType==='touch'){
@@ -291,7 +293,24 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
   const origin={x:box.x+box.width*.72,y:box.y+box.height*.68,
    id:42,radiusX:1,radiusY:1,force:1};
   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[origin]});
-  await page.waitForFunction(()=>window.__novaFixedGame?.input?.aim?.active,null,{timeout:5000});
+  try{
+   await page.waitForFunction(()=>window.__novaFixedGame?.input?.aim?.active,null,{timeout:5000});
+  }catch(error){
+   const diagnostic=await page.evaluate(()=>({
+    gate:window.__novaFixedResearch.gateState(),
+    frames:window.__novaFixedResearch.frames.slice(-8),
+    timerArms:window.__novaFixedResearch.gateTimerArms,
+    wakes:window.__novaFixedResearch.gateTimerWakeLags.slice(-8),
+    touches:window.__novaFixedResearch.touchEvents.slice(-8),
+    owner:{started:window.__novaFixedPilot?.owner?.started,
+     ticks:window.__novaFixedPilot?.owner?.ticks,
+     lastMs:window.__novaFixedPilot?.owner?.lastMs},
+    input:{aim:window.__novaFixedGame?.input?.aim,
+     stickId:window.__novaFixedGame?.input?.stickId},
+    now:performance.now(),hidden:document.hidden
+   }));
+   throw Error('trusted touch acquisition stalled: '+JSON.stringify(diagnostic),{cause:error});
+  }
   const centered=await page.evaluate(()=>{
    const g=window.__novaFixedGame;
    return {owner:g.input.stickId.aim,active:g.input.aim.active,
