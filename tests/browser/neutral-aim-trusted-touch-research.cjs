@@ -45,6 +45,13 @@ const {chromium}=require('playwright');
    g.sfx.muted=true;g.setClass(p,'scout');
    // Record real neutral damage rather than inferring hits from a stale shape reference.
    window.__novaNeutralTouchHits=[];
+   window.__novaNeutralTouchTankHits=[];
+   const originalDamageTank=g.damageTank;
+   g.damageTank=function(t,damage,srcId){
+    if(t===g.tanks[2])window.__novaNeutralTouchTankHits.push({
+     time:this.time,hpBefore:t.hp,damage:Number(damage)||0,srcId});
+    return originalDamageTank.apply(this,arguments);
+   };
    const originalDamageShape=g.damageShape;
    g.damageShape=function(shape,damage,ix,iy){
     if(shape===window.__novaNeutralTouchCircle){
@@ -108,6 +115,7 @@ const {chromium}=require('playwright');
     circleHp:g.shapes.some(s=>s.id===c.id)?c.hp:0,
     circleDestroyed:!g.shapes.some(s=>s.id===c.id),
     circleHits:window.__novaNeutralTouchHits,
+    alignedHits:window.__novaNeutralTouchTankHits,
     playerXP:g.player.xp,playerScore:g.player.score,
     alignedHp:g.tanks[2].hp,
     births:window.__novaNeutralTouchBirths};
@@ -117,6 +125,8 @@ const {chromium}=require('playwright');
   assert.ok(result.births.length>=2,'real player projectiles emitted');
   assert.ok(result.circleHits.every(h=>Number.isFinite(h.hpBefore)&&Number.isFinite(h.damage)),
    'neutral damage instrumentation must record finite physical collision values');
+  assert.ok(result.alignedHits.every(h=>Number.isFinite(h.hpBefore)&&Number.isFinite(h.damage)),
+   'hostile damage instrumentation must record finite physical collision values');
   assert.ok(result.births.some(b=>b.bearing>0.01&&b.bearing<0.22),
    'real right-stick input reaches the shipped unique-hostile rescue');
   assert.ok(result.raw.x>0&&Math.abs(result.raw.y)<0.1,
