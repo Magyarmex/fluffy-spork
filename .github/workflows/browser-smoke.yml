@@ -116,6 +116,10 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' }}
         timeout-minutes: 3
         run: node tests/browser/render-clarity-aa-b-research.cjs
+      - name: Research-only RAF CPU guard A/B on PR 869
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 869 }}
+        timeout-minutes: 3
+        run: node tests/browser/raf-current-cpu-guard-ab.cjs
       - name: Run real React + Chromium smoke
         run: |
           node tests/browser/real-touch-gameplay.cjs
