@@ -396,7 +396,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
    // Save exact browser observations for a separate, explicitly non-causal
    // paired comparison. Never manufacture matched wall time from tick count.
    fs.writeFileSync(process.env.NOVA_FIXED60_REPORT_FILE,
-    JSON.stringify(report)+'\\n');
+    JSON.stringify(report)+'\n');
   }
   assert.equal(report.aimActive,false,'release must clear aim');
   const touches=await page.evaluate(()=>window.__novaFixedResearch.touchEvents.slice());
