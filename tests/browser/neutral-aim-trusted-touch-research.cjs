@@ -43,6 +43,16 @@ const {chromium}=require('playwright');
    const rivals=g.tanks.filter(t=>t!==p);
    if(rivals.length<2)throw Error('need initialized real rival tanks');
    g.sfx.muted=true;g.setClass(p,'scout');
+   // Record real neutral damage rather than inferring hits from a stale shape reference.
+   window.__novaNeutralTouchHits=[];
+   const originalDamageShape=g.damageShape;
+   g.damageShape=function(shape,damage,ix,iy){
+    if(shape===window.__novaNeutralTouchCircle){
+     window.__novaNeutralTouchHits.push({time:this.time,
+      hpBefore:shape.hp,damage:Number(damage)||0,x:shape.x,y:shape.y});
+    }
+    return originalDamageShape.apply(this,arguments);
+   };
    Object.assign(p,{x:0,y:0,vx:0,vy:0,angle:0,fireCd:0,spawnShieldT:0,hp:100});
    p.stats.reload=0;
    for(const [t,x,y] of [[rivals[0],120,70],[rivals[1],240,40]]){
@@ -65,7 +75,8 @@ const {chromium}=require('playwright');
    g.cam.x=0;g.cam.y=0;g.cam.zoom=1;g.zoom=1;
    g.input.autofire=false;g.input.firing=false;g.input.mouseActive=false;
    window.__novaNeutralTouchCircle=c;window.__novaNeutralTouchBirths=[];
-   return {time:g.time,circleHp:c.hp,player:p.id,off:rivals[0].id,aligned:rivals[1].id};
+   return {time:g.time,circleHp:c.hp,player:p.id,off:rivals[0].id,aligned:rivals[1].id,
+    scoutLevel:p.level,scoutDamage:p.stats.damage,scoutReload:p.stats.reload};
   });
   const box=await canvas.boundingBox();
   assert.ok(box&&box.width>250&&box.height>300,'real gameplay canvas');
@@ -94,12 +105,18 @@ const {chromium}=require('playwright');
    const g=window.__novaNeutralTouchGame,c=window.__novaNeutralTouchCircle;
    return {time:g.time,owner:g.input.stickId.aim,active:g.input.aim.active,
     raw:g.input.aimVec(g.input.moveVec()),
-    circleHp:c.hp,alignedHp:g.tanks[2].hp,
+    circleHp:g.shapes.some(s=>s.id===c.id)?c.hp:0,
+    circleDestroyed:!g.shapes.some(s=>s.id===c.id),
+    circleHits:window.__novaNeutralTouchHits,
+    playerXP:g.player.xp,playerScore:g.player.score,
+    alignedHp:g.tanks[2].hp,
     births:window.__novaNeutralTouchBirths};
   });
   assert.equal(result.active,true,'same trusted touch retains aim');
   assert.equal(result.owner,held.owner,'touch owner never changes');
   assert.ok(result.births.length>=2,'real player projectiles emitted');
+  assert.ok(result.circleHits.every(h=>Number.isFinite(h.hpBefore)&&Number.isFinite(h.damage)),
+   'neutral damage instrumentation must record finite physical collision values');
   assert.ok(result.births.some(b=>b.bearing>0.01&&b.bearing<0.22),
    'real right-stick input reaches the shipped unique-hostile rescue');
   assert.ok(result.raw.x>0&&Math.abs(result.raw.y)<0.1,
