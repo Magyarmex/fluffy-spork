@@ -36,7 +36,9 @@ function trial(seed,hz,mode){
    g.spawnShape('circle',true);
    const circle=g.shapes[0];
    assert.ok(circle&&circle.type==='circle');
-   circle.x=160;circle.y=mode==='corridorOffPath'||mode==='shippingOffPath'?150:0;circle.vx=0;circle.vy=0;
+   circle.x=mode==='corridorBehind'||mode==='shippingBehind'?270:160;
+   circle.y=mode==='corridorOffPath'||mode==='shippingOffPath'?150:0;
+   circle.vx=0;circle.vy=0;
    circle.spin=0;circle.wanderT=Infinity;
    if(g.shapeById)g.shapeById.set(circle.id,circle);
    g.shapeTimer=Infinity;g.powerupTimer=Infinity;
@@ -101,6 +103,8 @@ test('neutral-farming aim interference diagnostic in the actual composed game',(
    corridor=trial(seed,hz,'corridor'),
    shippingOffPath=trial(seed,hz,'shippingOffPath'),
    corridorOffPath=trial(seed,hz,'corridorOffPath'),
+   shippingBehind=trial(seed,hz,'shippingBehind'),
+   corridorBehind=trial(seed,hz,'corridorBehind'),
    shippingEnemy=trial(seed,hz,'shippingEnemy'),
    corridorEnemy=trial(seed,hz,'corridorEnemy');
   assert.equal(noAligned.hz,legacy.hz);
@@ -112,6 +116,14 @@ test('neutral-farming aim interference diagnostic in the actual composed game',(
   assert.ok(Number.isFinite(shipping.playerAngle),
    'measure shipped steering without freezing a possibly harmful snap');
   assert.ok(Number.isFinite(corridor.playerAngle)&&Number.isFinite(corridorEnemy.playerAngle));
+  assert.ok(corridor.circleDestroyed&&corridor.circleHp<shipping.circleHp,
+   'the Scout corridor pilot must actually recover the observed neutral kill');
+  assert.ok(shippingEnemy.alignedHp<100&&shippingOffPath.alignedHp<100,
+   'hostile damage controls must hit a real initialized tank, not merely report a bearing');
+  assert.deepEqual(corridorBehind.bearings,shippingBehind.bearings,
+   'a neutral behind the aligned hostile must not veto the earlier hostile shot');
+  assert.equal(corridorBehind.alignedHp,shippingBehind.alignedHp,
+   'a neutral behind the hostile must not change real target damage');
   assert.deepEqual(corridorOffPath.bearings,shippingOffPath.bearings,
    'a neutral outside the requested firing corridor must not change projectile bearings');
   assert.equal(corridorOffPath.alignedHp,shippingOffPath.alignedHp,
@@ -121,7 +133,7 @@ test('neutral-farming aim interference diagnostic in the actual composed game',(
   assert.equal(corridorEnemy.alignedHp,shippingEnemy.alignedHp,
    'deliberate hostile aim must retain its real projectile damage');
   rows.push({noAligned,legacy,shipping,corridor,shippingEnemy,corridorEnemy,
-   shippingOffPath,corridorOffPath});
+   shippingOffPath,corridorOffPath,shippingBehind,corridorBehind});
  }
  console.log('NOVA_NEUTRAL_AIM_INTERFERENCE '+JSON.stringify(rows));
 });
