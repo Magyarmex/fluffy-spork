@@ -159,3 +159,15 @@ test('cone-first aim falls through occluded aligned target to visible aligned ri
  assert.ok(Math.abs(g.player.angle-Math.atan2(18,220))<1e-10,
   'cone-first selection must retain the terrain-visible aligned rival');
 });
+
+// The query scope is temporary, including when a gameplay update throws.
+test('player aim query scope is restored after an exceptional update',()=>{
+ const Game=boot(),g=new Game();g.w=568;g.h=320;
+ const offAxis=tank(50,120,70),aligned=tank(51,240,20);
+ g.tanks.push(offAxis,aligned);
+ g.input.aimVec=()=>{throw new Error('synthetic input failure')};
+ assert.throws(()=>g.update(),/synthetic input failure/);
+ g.input.aimVec=()=>({x:1,y:0});
+ assert.equal(g.nearestTank(0,0,480,1),offAxis,
+  'exception must not leave the player-only cone filter active on direct queries');
+});
