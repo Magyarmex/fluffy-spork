@@ -20,7 +20,12 @@ assert.ok(expectedOverlays.length>0&&new Set(expectedOverlays).size===expectedOv
 // retain the original two-step safety budget.
 assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps');
 (async()=>{
- const browser=await chromium.launch({headless:true,args:['--disable-dev-shm-usage','--no-sandbox']});
+ // Controlled research requires native callbacks fine enough to deliver
+ // 16.67ms short gaps even on a CI host throttling ordinary RAF to 30Hz.
+ // This flag is NOT a physical display benchmark or a production setting.
+ const launchArgs=['--disable-dev-shm-usage','--no-sandbox'];
+ if(controlledGate)launchArgs.push('--disable-frame-rate-limit');
+ const browser=await chromium.launch({headless:true,args:launchArgs});
  const context=await browser.newContext({viewport:{width:320,height:700},
   deviceScaleFactor:2,isMobile:true,hasTouch:true,serviceWorkers:'block'});
  const errors=[],consoleErrors=[];
