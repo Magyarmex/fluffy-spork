@@ -77,6 +77,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
       // These are browser callback intervals, NOT physical display times.
       const owner=window.__novaFixedPilot?.owner;
       const beforeTicks=owner?.ticks??0,beforeDropped=owner?.droppedMs??0;
+      const beforeBirths=profile.births;
       const rawGapMs=owner?Math.max(0,ts-owner.lastMs):null;
       const at=performance.now();
       fn(ts);
@@ -86,6 +87,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
        const previous=frames.length?frames[frames.length-1].ts:null;
        frames.push({ts,intervalMs:previous===null?null:ts-previous,
         steps:current.ticks-beforeTicks,budget:current.maxSteps,
+        playerProjectileBirths:profile.births-beforeBirths,
         rawGapMs,lagMs:current.lagMs,droppedMs:current.droppedMs-beforeDropped,
         dropReason:current.droppedMs>beforeDropped?
          (rawGapMs>100.0000001?'long-stall':'backlog'):null,
@@ -177,6 +179,8 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     .filter(f=>f.steps===3&&f.budget===3&&f.rawGapMs<=100+1e-7).length);
    for(let i=0;i<2;i++){
     await page.evaluate(()=>{
+     // Force a ready player shot before the next genuine three-update RAF.
+     window.__novaFixedGame.player.fireCd=0;
      const end=performance.now()+55;
      while(performance.now()<end){}
     });
@@ -184,6 +188,10 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
      .filter(f=>f.steps===3&&f.budget===3&&f.rawGapMs<=100+1e-7).length>before,
      beforeThree,{timeout:5000});
    }
+   const shotInThree=await page.evaluate(()=>window.__novaFixedResearch.frames
+    .some(f=>f.steps===3&&f.budget===3&&f.playerProjectileBirths>0));
+   assert.equal(shotInThree,true,
+    'a real three-update callback must emit a player-owned projectile while held');
    const during=await page.evaluate(()=>({
     owner:window.__novaFixedGame.input.stickId.aim,
     active:window.__novaFixedGame.input.aim.active,
