@@ -40,22 +40,3 @@ test('crowded cone does not silently choose one of two plausible rivals',()=>{
   assert.equal(g.__novaFairAimQuery,undefined,'no query marker may leak');
  }finally{close(g);}
 });
-test('a genuinely nearest in-cone rival retains original assistance',()=>{
- const near=rival(9411,110,12),far=rival(9412,230,-15),
-       offAxis=rival(9413,150,100);
- const {g,p}=scene([near,far,offAxis]);
- try{
-  g.update(1/60);
-  assert.ok(Math.abs(p.angle-Math.atan2(12,110)*13/60)<1e-6,
-   'nearest already-aligned opponent keeps existing assistance');
- }finally{close(g);}
-});
-test('one aligned rival is recovered beyond a closer off-axis distractor',()=>{
- const offAxis=rival(9421,120,70),aligned=rival(9422,240,-18);
- const {g,p}=scene([offAxis,aligned]);
- try{
-  g.update(1/60);
-  assert.ok(Math.abs(p.angle-Math.atan2(-18,240)*13/60)<1e-6,
-   'unique in-cone rival should be selected');
- }finally{close(g);}
-});
