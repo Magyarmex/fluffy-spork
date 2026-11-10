@@ -112,6 +112,9 @@ function trial(seed,cls,reload,mode,offsetMs){
    assert.equal(owner.droppedMs,0,'ordinary jitter must not discard simulation');
    assert.equal(owner.ticks,360,'same six seconds of 60Hz Game updates');
    assert.equal(timeline.applied,edges.length,'all captured input edges replayed');
+   assert.equal(bridge.lateClamps,0,'normal RAF jitter must not replay input late');
+   assert.equal(bridge.reorderedClamps,0,'normal RAF jitter must not reorder touch');
+   assert.equal(bridge.staleClamps,0,'normal RAF jitter must not drop touch');
    assert.equal(inputLagsMs.length,edges.length,'every touch edge has sampled timing');
    assert.ok(inputLagsMs.every(x=>x>=-0.001&&Number.isFinite(x)));
    assert.equal(stepsByFrame.one+stepsByFrame.two*2,360);
