@@ -63,8 +63,10 @@ function createAdaptiveDprPilot(game, options={}) {
       if(phase==='low')return result('low-inactive-rollback',rollback(now));
       return result('inactive');
     }
-    if(!p||p.frameSamples<90||![p.fps,p.frameP95Ms,p.updateP95Ms,p.renderP95Ms,p.simulationPacePct]
-      .every(Number.isFinite)){
+    if(!p||!Number.isInteger(p.frameSamples)||p.frameSamples<90||
+      ![p.fps,p.frameP95Ms,p.updateP95Ms,p.renderP95Ms,p.simulationPacePct]
+        .every(Number.isFinite)||p.fps<=0||p.frameP95Ms<=0||
+      p.updateP95Ms<0||p.renderP95Ms<0||p.simulationPacePct<=0){
       resetStreaks();
       if(phase==='probing'&&now-trialStart>8000)return result('probe-no-evidence',rollback(now));
       if(phase==='low'){
