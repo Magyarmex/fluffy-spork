@@ -22,7 +22,9 @@ function trial(seed,cls,reload,mode){
   const target=g.tanks.find(t=>t!==p);
   assert.ok(target,'shipping Game must supply a target');
   Object.assign(p,{x:0,y:0,vx:0,vy:0,angle:0,spawnShieldT:0,droneRespawnT:Infinity});
-  // A seeded camera may start far from the fixture; normalize public visibility.\n  g.cam.x=0;g.cam.y=0;g.cam.zoom=1;g.zoom=1;g.w=800;g.h=600;\n  Object.assign(target,{cls:'scout',isPlayer:true,alive:true,
+  // A seeded camera may start far from the fixture; normalize public visibility.
+  g.cam.x=0;g.cam.y=0;g.cam.zoom=1;g.zoom=1;g.w=800;g.h=600;
+  Object.assign(target,{cls:'scout',isPlayer:true,alive:true,
    x:200,y:0,vx:0,vy:0,hp:1000000,maxHp:1000000,
    gene:null,perk:null,spawnShieldT:0,shieldT:0,bulwarkT:0,tauntT:0,cloakT:0});
   g.tanks=[p,target];g.tankById=new Map([[p.id,p],[target.id,target]]);
@@ -50,7 +52,10 @@ function trial(seed,cls,reload,mode){
   };
   g.damageTank=function(t){
    const before=t.hp,result=originalDamage.apply(this,arguments);
-   if(t===target&&t.hp<before){\n    assert.equal(arguments[2],p.id,'damage must be player-owned');\n    hits++;damage+=before-t.hp;\n   }
+   if(t===target&&t.hp<before){
+    assert.equal(arguments[2],p.id,'damage must be player-owned');
+    hits++;damage+=before-t.hp;
+   }
    return result;
   };
   let now=0,updates=0,onTime=0,edges=0;
@@ -59,7 +64,8 @@ function trial(seed,cls,reload,mode){
    for(const frame of frames(mode)){
     const end=now+frame;
     while(now<end-EPS){
-     // Every mode samples the same .5s-on/.3s-off edges, offset by 7ms\n     // from frame zero so input events actually split presentation frames.
+     // Every mode samples the same .5s-on/.3s-off edges, offset by 7ms
+     // from frame zero so input events actually split presentation frames.
      const cycle=Math.floor((now+.007+EPS)/.8);
      const phase=now+.007-cycle*.8;
      const firing=phase<.5-EPS;
