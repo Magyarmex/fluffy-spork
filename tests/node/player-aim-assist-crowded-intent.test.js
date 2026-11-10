@@ -34,9 +34,17 @@ test('crowded cone does not silently choose one of two plausible rivals',()=>{
  try{
   assert.equal(g.nearestTank(0,0,480,p.id),offAxis,
    'outside the player update the nearest query remains unchanged');
+  const before=g.time;
   g.update(1/60);
+  assert.ok(g.time>before,'the real composed Game must advance');
   assert.ok(Math.abs(p.angle)<1e-9,
    'two in-cone candidates must preserve eastward manual aim');
   assert.equal(g.__novaFairAimQuery,undefined,'no query marker may leak');
+  // The same running world becomes unambiguous when one rival leaves.
+  // This differential control rules out a vacuous zero-angle result.
+  g.tanks=[p,offAxis,above];p.angle=0;
+  g.update(1/60);
+  assert.ok(Math.abs(p.angle-Math.atan2(20,220)*13/60)<1e-6,
+   'removing the second aligned rival must restore unique-target assistance');
  }finally{close(g);}
 });
