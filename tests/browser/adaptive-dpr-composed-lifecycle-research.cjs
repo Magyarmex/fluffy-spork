@@ -52,6 +52,7 @@ const improved={frameSamples:120,fps:55,frameP95Ms:22,updateP95Ms:5,
     for(let i=3;i<data.length;i+=4*97)if(data[i]>0)opaque++;
     return {width:w,height:h,opaqueSamples:opaque};
    };
+   await frame();
    const before=raster();
    pilot.sample(0,slow);const started=pilot.sample(1000,slow);
    await frame();
