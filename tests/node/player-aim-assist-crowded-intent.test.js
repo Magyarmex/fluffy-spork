@@ -52,7 +52,7 @@ for(const hz of [30,60,120])test('crowded cone preserves manual intent at '+hz+'
 for(const hz of [30,60,120])test('unique cone rescue respects live shield, terrain and allegiance at '+hz+'Hz',()=>{
  const offAxis=rival(9501,120,70),aligned=rival(9502,220,20);
  const {g,p}=scene([offAxis,aligned]);
- const dt=1/hz,expected=Math.atan2(20,220)*13/hz;
+ const dt=1/hz,expected=Math.atan2(20,220)*13/hz;\n const originalAllies=g.areAllies;
  const tick=()=>{p.angle=0;g.update(dt);assert.equal(g.__novaFairAimQuery,undefined,
    'player-only query scope must not escape the real update');};
  try{
