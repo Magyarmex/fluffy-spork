@@ -12,6 +12,7 @@ const DURATION_MS=6000;
 function schedule(mode){
  if(mode==='uniform60')return Array(360).fill(1000/60);
  if(mode==='alternating40_120')return Array.from({length:180},()=>[25,1000/120]).flat();
+ if(mode==='alternating120_40')return Array.from({length:180},()=>[1000/120,25]).flat();
  throw Error('unknown frame schedule');
 }
 function touchEvents(offsetMs){
@@ -135,15 +136,17 @@ test('fixed60 research measures touch-driven real Gunner damage under matched me
   for(const seed of [1517800,1517802])
    for(const offset of [7,12]){
     const baseline=trial(seed,cls,reload,'uniform60',offset);
-    const jitter=trial(seed,cls,reload,'alternating40_120',offset);
     assert.deepEqual(trial(seed,cls,reload,'uniform60',offset),baseline);
-    assert.deepEqual(trial(seed,cls,reload,'alternating40_120',offset),jitter);
-    rows.push({cls,seed,offset,baseline,jitter,
-     equalDamage:baseline.damage===jitter.damage,
-     equalVolleys:baseline.volleys===jitter.volleys});
+    for(const mode of ['alternating40_120','alternating120_40']){
+     const jitter=trial(seed,cls,reload,mode,offset);
+     assert.deepEqual(trial(seed,cls,reload,mode,offset),jitter);
+     rows.push({cls,seed,offset,baseline,jitter,
+      equalDamage:baseline.damage===jitter.damage,
+      equalVolleys:baseline.volleys===jitter.volleys});
+    }
    }
  console.log('GUNNER_FIXED60_TOUCH_DAMAGE '+JSON.stringify(rows));
  // Deliberately characterize parity instead of freezing a desirable outcome:
  // a failing parity observation must be inspected before scheduler promotion.
- assert.equal(rows.length,8);
+ assert.equal(rows.length,16);
 });
