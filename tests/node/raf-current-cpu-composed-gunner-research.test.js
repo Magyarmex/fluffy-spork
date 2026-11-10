@@ -28,7 +28,8 @@ function trial(seed,cls,html){
   let now=0,cpuClock=0,raf=null,draws=0,updates=0,volleys=0,sim=0,frame=0;
   const g=bootGame();if(!g.player)g.redeploy();
   const p=g.player;g.sfx.muted=true;g.sfx.startMusic=()=>{};
-  g.setClass(p,cls);p.stats.reload=cls==='minigun'?1:3;
+  g.setClass(p,cls);p.level=Math.max(p.level,30);
+  p.stats.reload=cls==='minigun'?1:3;
   g.tanks=[p];g.tankById=new Map([[p.id,p]]);
   g.shapes=[];g.drones=[];g.powerups=[];g.bullets=[];
   if(g.shapeById)g.shapeById.clear();
