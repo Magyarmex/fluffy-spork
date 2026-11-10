@@ -154,7 +154,10 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
        if(state.cancelled)return;
        if(controlledGate){
         if(gateNext===null)gateNext=ts;
-        if(ts+0.2<gateNext){state.id=requestAnimationFrame(deliver);return;}
+        if(ts+0.2<gateNext){
+         profile.gateSkippedNativeRafs=(profile.gateSkippedNativeRafs||0)+1;
+         state.id=requestAnimationFrame(deliver);return;
+        }
         gateNext+=gateGaps[gateIndex++%4];
        }
        gatePending.delete(token);
@@ -394,6 +397,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     initialFingerprint:window.__novaFixedResearch.initialFingerprint||null,
     maxSteps:p.owner.maxSteps,ticks:p.owner.ticks,droppedMs:p.owner.droppedMs,
     raf:{frames:frames.length,intervals:values(frameIntervals),controlledLongGaps,
+     nativeRafSkipped:window.__novaFixedResearch.gateSkippedNativeRafs||0,
      observedWallMs,presentationHz:frameIntervals.length>0&&
       frames[frames.length-1].ts>frames[0].ts?
       frameIntervals.length*1000/(frames[frames.length-1].ts-frames[0].ts):null,
