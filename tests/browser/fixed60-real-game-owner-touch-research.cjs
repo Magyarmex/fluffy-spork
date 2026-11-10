@@ -177,6 +177,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
    // Exercise three-update callbacks while the real right stick is held.
    // RAF alignment varies: a 55ms main-thread block may yield a 33ms
    // callback rather than 50ms. Retry boundedly, but never waive the gate.
+   const heldBurstStart=await page.evaluate(()=>window.__novaFixedResearch.frames.length);
    let shotInThree=false;
    for(let attempt=0;attempt<8&&!shotInThree;attempt++){
     const beforeFrame=await page.evaluate(()=>window.__novaFixedResearch.frames.length);
@@ -188,9 +189,9 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     });
     await page.waitForFunction(before=>window.__novaFixedResearch.frames.length>before,
      beforeFrame,{timeout:5000});
-    shotInThree=await page.evaluate(()=>window.__novaFixedResearch.frames
-     .some(f=>f.steps===3&&f.budget===3&&f.rawGapMs<=100+1e-7&&
-      f.playerProjectileBirths>0));
+    shotInThree=await page.evaluate(start=>window.__novaFixedResearch.frames
+     .slice(start).some(f=>f.steps===3&&f.budget===3&&f.rawGapMs<=100+1e-7&&
+      f.playerProjectileBirths>0),heldBurstStart);
    }
    assert.equal(shotInThree,true,
     'a real three-update callback must emit a player-owned projectile while held');
@@ -209,20 +210,24 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
   // This must exercise the actual three-update Game path, not merely allow it.
   if(process.env.NOVA_FIXED60_ACTIVE_BURST==='1'){
    assert.equal(maxSteps,3,'active burst requires three-step research owner');
-   for(let attempt=0;attempt<5;attempt++){
+   const releasedBurstStart=await page.evaluate(()=>window.__novaFixedResearch.frames.length);
+   const birthsAtRelease=await page.evaluate(()=>window.__novaFixedResearch.births);
+   for(let attempt=0;attempt<8;attempt++){
     const before=await page.evaluate(()=>window.__novaFixedResearch.frames.length);
     await page.evaluate(()=>{
-     const end=performance.now()+55;
+     const end=performance.now()+65;
      while(performance.now()<end){} // intentional research-only foreground work
     });
     await page.waitForFunction(before=>window.__novaFixedResearch.frames.length>before,
      before,{timeout:5000});
    }
-   const bursts=await page.evaluate(()=>window.__novaFixedResearch.frames
-    .filter(f=>f.steps===3&&f.rawGapMs<=100+1e-7&&f.budget===3)
-    .map(f=>({rawGapMs:f.rawGapMs,steps:f.steps,callbackJsMs:f.callbackJsMs})));
+   const bursts=await page.evaluate(start=>window.__novaFixedResearch.frames
+    .slice(start).filter(f=>f.steps===3&&f.rawGapMs<=100+1e-7&&f.budget===3)
+    .map(f=>({rawGapMs:f.rawGapMs,steps:f.steps,callbackJsMs:f.callbackJsMs})),releasedBurstStart);
    assert.ok(bursts.length>0,
-    'controlled active Chromium RAF gaps must exercise real three-update Game callbacks');
+    'post-release active Chromium gaps must independently exercise three-update Game callbacks');
+   assert.equal(await page.evaluate(()=>window.__novaFixedResearch.births),birthsAtRelease,
+    'released right stick must not ghost-fire during three-update catch-up');
    console.log('NOVA_FIXED60_ACTIVE_THREE_UPDATE_BURSTS '+JSON.stringify(bursts));
   }
   // Force one genuine foreground RAF gap, after releasing the stick.
