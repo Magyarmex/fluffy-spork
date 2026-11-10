@@ -152,7 +152,10 @@ jobs:
           node tests/browser/fixed60-real-game-owner-touch-research.cjs
           NOVA_FIXED60_MAX_STEPS=3 node tests/browser/fixed60-real-game-owner-touch-research.cjs
           NOVA_FIXED60_MAX_STEPS=3 NOVA_FIXED60_ACTIVE_BURST=1 node tests/browser/fixed60-real-game-owner-touch-research.cjs
-          # Research-only RAF callback gate; no artificial CPU spin.
+          # Research-only controlled RAF delivery: run the two-step baseline
+          # before the three-step candidate. Both use browser timestamps,
+          # trusted touch, real Game updates, and the same 30Hz gate policy.
+          NOVA_FIXED60_MAX_STEPS=2 NOVA_FIXED60_CONTROLLED_GATE=1 node tests/browser/fixed60-real-game-owner-touch-research.cjs
           NOVA_FIXED60_MAX_STEPS=3 NOVA_FIXED60_CONTROLLED_GATE=1 node tests/browser/fixed60-real-game-owner-touch-research.cjs
       - name: Preserve browser screenshots
         if: always()
