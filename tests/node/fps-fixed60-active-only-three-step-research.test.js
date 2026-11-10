@@ -9,6 +9,9 @@ const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
 const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs');
 const {FixedStepRafOwner}=require('../research/fixed-step-raf-owner.cjs');
 const EPS=1e-6;
+// Match the source owner's 100ms stall comparison exactly, not the looser
+// numerical tolerance used by assertions below.
+const STALL_EPS=1e-7;
 function replay(gaps,{activeOnlyThree=false}={}){
  let now=1000,callback=null,elapsed=0,updates=0;
  const input={firing:false,keyboard:{},move:{active:false},aim:{active:false},
@@ -26,7 +29,7 @@ function replay(gaps,{activeOnlyThree=false}={}){
  const originalAdvance=owner.advance;
  if(activeOnlyThree)owner.advance=function(ts){
   const raw=Math.max(0,ts-this.lastMs);
-  this.maxSteps=raw<=100+EPS?3:2;
+  this.maxSteps=raw>100+STALL_EPS?2:3;
   return originalAdvance.call(this,ts);
  };
  const rows=[];
@@ -79,4 +82,12 @@ test('active-only pilot retains exact two-step cap on a >100ms foreground stall'
  assert.ok(control.rows[0].dropped>0);
  assert.equal(pilot.ticks,control.ticks);
  assert.ok(Math.abs(pilot.droppedMs-control.droppedMs)<EPS);
+});
+
+test('sub-microsecond >100ms boundary cannot accidentally widen stall catch-up',()=>{
+ const gaps=[100+5e-7,1000/60];
+ const control=replay(gaps),pilot=replay(gaps,{activeOnlyThree:true});
+ assert.equal(pilot.rows[0].budget,2);
+ assert.equal(control.rows[0].steps,pilot.rows[0].steps);
+ assert.ok(Math.abs(control.rows[0].dropped-pilot.rows[0].dropped)<EPS);
 });
