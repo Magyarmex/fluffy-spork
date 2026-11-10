@@ -10,7 +10,7 @@ if(prior===undefined)delete process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL;
 else process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL=prior;
 
 function rival(id,x,y){
- return {id,x,y,r:14,hp:100,maxHp:100,alive:true,cls:'scout',
+ return {id,kind:'tank',x,y,r:14,hp:100,maxHp:100,alive:true,cls:'scout',
   isPlayer:true,vx:0,vy:0,angle:0,stats:{},spawnShieldT:0};
 }
 function trial(seed,hz,mode){
