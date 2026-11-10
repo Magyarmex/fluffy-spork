@@ -183,7 +183,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     await page.evaluate(()=>{
      // Force a ready player shot before the next genuine three-update RAF.
      window.__novaFixedGame.player.fireCd=0;
-     const end=performance.now()+55;
+     const end=performance.now()+65;
      while(performance.now()<end){}
     });
     await page.waitForFunction(before=>window.__novaFixedResearch.frames.length>before,
