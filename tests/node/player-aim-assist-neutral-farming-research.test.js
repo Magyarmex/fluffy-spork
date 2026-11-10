@@ -43,7 +43,7 @@ function trial(seed,hz,mode,opts={}){
    circle.x=mode==='corridorBehind'||mode==='shippingBehind'?270:160;
    circle.y=mode.endsWith('Edge')?-16:
     mode==='corridorOffPath'||mode==='shippingOffPath'?150:0;
-   circle.vx=0;circle.vy=0;
+   circle.vx=Number(opts.circleVx)||0;circle.vy=Number(opts.circleVy)||0;
    circle.spin=0;circle.wanderT=Infinity;
    if(g.shapeById)g.shapeById.set(circle.id,circle);
    g.shapeTimer=Infinity;g.powerupTimer=Infinity;
@@ -207,4 +207,25 @@ test('neutral-farming intent and real XP pickup in a player-owned corridor',()=>
   rows.push({shipping,corridor,angular,hostile});
  }
  console.log('NOVA_NEUTRAL_PLAYER_XP '+JSON.stringify(rows));
+});
+
+// Deliberately vary real neutral initial motion without freezing Living Front.
+// These are diagnostic physical outcomes, not goldens for an aim-lock policy.
+test('grazing Circle moving-shape negative controls',()=>{
+ const rows=[];
+ for(const hz of [30,60])for(const circleVy of [-24,0,24]){
+  const opts={circleVy,seconds:1.2};
+  const legacy=trial(1517800,hz,'legacyEdge',opts);
+  const shipping=trial(1517800,hz,'shippingEdge',opts);
+  const corridor=trial(1517800,hz,'corridorEdge',opts);
+  assert.ok(legacy.shots>=2&&shipping.shots>=2&&corridor.shots>=2);
+  for(const arm of [legacy,shipping,corridor]){
+   assert.ok(Number.isFinite(arm.circleHp)&&arm.shotShapeStates.length>=2);
+  }
+  rows.push({hz,circleVy,legacy:{hp:legacy.circleHp,bearings:legacy.bearings,shots:legacy.shotShapeStates},
+   shipping:{hp:shipping.circleHp,bearings:shipping.bearings},
+   corridor:{hp:corridor.circleHp,bearings:corridor.bearings,
+    queries:corridor.aimQueryStates}});
+ }
+ console.log('NOVA_GRAZING_MOTION_NEGATIVE_CONTROLS '+JSON.stringify(rows));
 });
