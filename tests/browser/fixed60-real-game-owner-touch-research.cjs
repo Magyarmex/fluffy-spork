@@ -23,8 +23,13 @@ const {chromium}=require('playwright');
    const Game=window.__novaMakeRequire('')('game/engine').Game;
    const renderMod=window.__novaMakeRequire('')('game/render');
    const baseStart=Game.prototype.start;
-   window.__novaFixedResearch={births:0,updates:[],renders:[],errors:[],lifecycle:[]};
+   window.__novaFixedResearch={births:0,updates:[],renders:[],errors:[],lifecycle:[],touchEvents:[]};
    const profile=window.__novaFixedResearch;
+   for(const type of ['pointerdown','pointermove','pointerup','pointercancel'])
+    document.addEventListener(type,e=>{
+     if(e.pointerType==='touch')
+      profile.touchEvents.push({type,trusted:e.isTrusted,pointerId:e.pointerId});
+    },{capture:true,passive:true});
    const baseUpdate=Game.prototype.update;
    Game.prototype.update=function(...args){
     if(this!==window.__novaFixedGame)return baseUpdate.apply(this,args);
@@ -148,6 +153,13 @@ const {chromium}=require('playwright');
     runtimeScripts:document.querySelectorAll('script[src*="nova-updates/"]').length};
   });
   assert.equal(report.aimActive,false,'release must clear aim');
+  const touches=await page.evaluate(()=>window.__novaFixedResearch.touchEvents.slice());
+  assert.ok(touches.some(e=>e.type==='pointerdown'),'real touch down must reach DOM');
+  assert.ok(touches.some(e=>e.type==='pointermove'),'real touch move must reach DOM');
+  assert.ok(touches.some(e=>e.type==='pointerup'),'real touch release must reach DOM');
+  assert.ok(touches.every(e=>e.trusted),'touches must be browser-trusted, not synthetic Event objects');
+  const owners=new Set(touches.map(e=>e.pointerId));
+  assert.equal(owners.size,1,'touch gesture must retain one DOM pointer owner');
   assert.equal(report.productionRafActive,false,'never run two RAF owners');
   assert.equal(report.pilotStarted,true,'research owner must remain active');
   assert.ok(report.ticks>0&&report.updates.n>0);
@@ -156,6 +168,24 @@ const {chromium}=require('playwright');
   assert.ok(report.runtimeScripts>=49,'actual shipping overlays must be loaded');
   assert.deepEqual(errors,[],'browser errors');
   assert.deepEqual(consoleErrors,[],'browser console errors');
+  const teardown=await page.evaluate(()=>{
+   const g=window.__novaFixedGame,p=window.__novaFixedPilot;
+   const Game=window.__novaMakeRequire('')('game/engine').Game;
+   p.stop();
+   const stopped={started:p.owner.started,captureActive:p.capture.active,
+    raf:g.raf,inputRestored:g.input.canvas===g.canvas,
+    startRestored:g.start===Game.prototype.start,
+    destroyRestored:g.destroy===Game.prototype.destroy,
+    pauseRestored:g.setPaused===Game.prototype.setPaused};
+   g.destroy();
+   return {...stopped,destroyed:!!g.__novaDestroyed,
+    musicTimer:g.sfx.musicTimer};
+  });
+  assert.deepEqual(teardown,{
+   started:false,captureActive:false,raf:null,inputRestored:true,
+   startRestored:true,destroyRestored:true,pauseRestored:true,
+   destroyed:true,musicTimer:null
+  },'pilot teardown must restore native controls and release Game/audio ownership');
   console.log('NOVA_FIXED60_CHROMIUM_OWNER_TOUCH '+JSON.stringify(report));
  }finally{await context.close();await browser.close();}
 })().catch(e=>{console.error(e.stack||e);process.exitCode=1;});
