@@ -81,3 +81,30 @@ for(const hz of [30,60,120])test('unique cone rescue respects live shield, terra
    'restoring hostility must restore the unique rescue');
  }finally{close(g);}
 });
+
+for(const hz of [30,60,120])test('unique cone rescue changes the real emitted shot bearing at '+hz+'Hz',()=>{
+ const offAxis=rival(9601,120,70),aligned=rival(9602,220,20);
+ const {g,p}=scene([offAxis,aligned]);
+ const births=[],original=g.tryFire;
+ try{
+  g.sfx.muted=true;
+  g.input.firing=true;
+  g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
+  g.tryFire=function(t){
+   const before=this.bullets.length;
+   const result=original.apply(this,arguments);
+   if(t===p&&this.bullets.length>before){
+    const b=this.bullets[before];
+    births.push({vx:b.vx,vy:b.vy});
+   }
+   return result;
+  };
+  g.update(1/hz);
+  assert.equal(births.length,1,'one real Scout projectile must be emitted');
+  const expected=Math.atan2(20,220)*13/hz;
+  assert.ok(Math.abs(p.angle-expected)<1e-6,'unique aligned target rotates gun');
+  const bearing=Math.atan2(births[0].vy,births[0].vx);
+  assert.ok(Math.abs(Math.atan2(Math.sin(bearing-expected),Math.cos(bearing-expected)))<1e-5,
+   'actual projectile must launch along the rescued aim, not the raw stick');
+ }finally{close(g);}
+});
