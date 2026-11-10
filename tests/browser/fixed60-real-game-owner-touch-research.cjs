@@ -5,6 +5,10 @@
 const assert=require('node:assert/strict');
 const path=require('node:path');
 const {chromium}=require('playwright');
+const maxSteps=Number(process.env.NOVA_FIXED60_MAX_STEPS||2);
+// Three-step is an opt-in test-only active-jitter policy; >100ms stalls
+// retain the original two-step safety budget.
+assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps');
 (async()=>{
  const browser=await chromium.launch({headless:true,args:['--disable-dev-shm-usage','--no-sandbox']});
  const context=await browser.newContext({viewport:{width:320,height:700},
@@ -19,11 +23,12 @@ const {chromium}=require('playwright');
   await deploy.waitFor({state:'visible',timeout:45000});
   await page.addScriptTag({path:path.resolve(__dirname,
    '../../nova-updates/fixed60-research-browser.js')});
-  await page.evaluate(()=>{
+  await page.evaluate(maxSteps=>{
+   window.__novaFixedMaxSteps=maxSteps;
    const Game=window.__novaMakeRequire('')('game/engine').Game;
    const renderMod=window.__novaMakeRequire('')('game/render');
    const baseStart=Game.prototype.start;
-   window.__novaFixedResearch={births:0,updates:[],renders:[],errors:[],lifecycle:[],touchEvents:[]};
+   window.__novaFixedResearch={births:0,updates:[],renders:[],errors:[],lifecycle:[],touchEvents:[],frames:[]};
    const profile=window.__novaFixedResearch;
    for(const type of ['pointerdown','pointermove','pointerup','pointercancel'])
     document.addEventListener(type,e=>{
@@ -67,11 +72,39 @@ const {chromium}=require('playwright');
     this.raf=null;
     const pilot=window.__novaFixed60Research.createFixedStepBrowserPilot(this,{
      window,document,clock:performance,
-     request:fn=>requestAnimationFrame(fn),
+     request:fn=>requestAnimationFrame(ts=>{
+      // Measure real RAF callback spacing and per-callback fixed-step work.
+      // These are browser callback intervals, NOT physical display times.
+      const owner=window.__novaFixedPilot?.owner;
+      const beforeTicks=owner?.ticks??0,beforeDropped=owner?.droppedMs??0;
+      const rawGapMs=owner?Math.max(0,ts-owner.lastMs):null;
+      const at=performance.now();
+      fn(ts);
+      const current=window.__novaFixedPilot?.owner;
+      if(current){
+       const frames=profile.frames;
+       const previous=frames.length?frames[frames.length-1].ts:null;
+       frames.push({ts,intervalMs:previous===null?null:ts-previous,
+        steps:current.ticks-beforeTicks,budget:current.maxSteps,
+        rawGapMs,lagMs:current.lagMs,droppedMs:current.droppedMs-beforeDropped,
+        dropReason:current.droppedMs>beforeDropped?
+         (rawGapMs>100.0000001?'long-stall':'backlog'):null,
+        callbackJsMs:performance.now()-at});
+      }
+     }),
      cancel:id=>cancelAnimationFrame(id),
      render:(g,w,h)=>renderMod.render(g,w,h),
-     maxSteps:2,backlogExtraTicks:2});
+     maxSteps:window.__novaFixedMaxSteps,backlogExtraTicks:2});
     window.__novaFixedPilot=pilot;
+    // Reuse PR #888's exact-source active-only policy in the real browser.
+    // This is intentionally NOT installed in production or the bundle.
+    if(window.__novaFixedMaxSteps===3){
+     const baseAdvance=pilot.owner.advance;
+     pilot.owner.advance=function(ts){
+      this.maxSteps=Math.max(0,ts-this.lastMs)>100+1e-7?2:3;
+      return baseAdvance.call(this,ts);
+     };
+    }
     const originalStop=pilot.owner.stop.bind(pilot.owner);
     pilot.owner.stop=function(...stopArgs){
      profile.lifecycle.push({event:'owner-stop',at:performance.now(),status:pilot.owner.game.status,
@@ -83,7 +116,7 @@ const {chromium}=require('playwright');
     profile.lifecycle.push({event:'owner-start-returned',at:performance.now(),started:pilot.owner.started});
     return result;
    };
-  });
+  },maxSteps);
   await deploy.click();
   try{
    await page.waitForFunction(()=>window.__novaFixedGame?.status==='playing'&&
@@ -117,7 +150,7 @@ const {chromium}=require('playwright');
   const origin={x:box.x+box.width*.72,y:box.y+box.height*.68,
    id:42,radiusX:1,radiusY:1,force:1};
   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[origin]});
-  await page.waitForTimeout(120);
+  await page.waitForFunction(()=>window.__novaFixedGame?.input?.aim?.active,null,{timeout:5000});
   const centered=await page.evaluate(()=>{
    const g=window.__novaFixedGame;
    return {owner:g.input.stickId.aim,active:g.input.aim.active,
@@ -139,12 +172,47 @@ const {chromium}=require('playwright');
   assert.ok(held.births>0,'real Game must emit player-owned projectile');
   assert.ok(Math.hypot(held.dx,held.dy)>5,'real analog extension must be sampled');
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
-  await page.waitForTimeout(150);
+  await page.waitForFunction(()=>window.__novaFixedGame?.input?.aim?.active===false,null,{timeout:5000});
+  // Force one genuine foreground RAF gap, after releasing the stick.
+  // The active-only three-step policy must revert to two steps on this gap.
+  const beforeStall=await page.evaluate(()=>({
+   drops:window.__novaFixedPilot.owner.droppedFrames,
+   long:window.__novaFixedResearch.frames.filter(f=>f.dropReason==='long-stall').length
+  }));
+  await page.evaluate(()=>{
+   const end=performance.now()+135;
+   while(performance.now()<end){} // research-only main-thread stall
+  });
+  await page.waitForFunction(before=>
+   window.__novaFixedPilot?.owner?.droppedFrames>before.drops &&
+   window.__novaFixedResearch?.frames?.filter(f=>f.dropReason==='long-stall').length>before.long,
+   beforeStall,{timeout:5000});
   const report=await page.evaluate(()=>{
    const g=window.__novaFixedGame,p=window.__novaFixedPilot;
    const values=a=>{const s=[...a].sort((x,y)=>x-y);
     return {n:s.length,p95:s.length?s[Math.ceil(.95*s.length)-1]:null};};
-   return {ticks:p.owner.ticks,droppedMs:p.owner.droppedMs,
+   const frames=window.__novaFixedResearch.frames;
+   const frameIntervals=frames.map(f=>f.intervalMs).filter(Number.isFinite);
+   const callbackCosts=frames.map(f=>f.callbackJsMs);
+   const backlogSamples=frames.map(f=>f.lagMs);
+   const stepCounts={};
+   for(const f of frames)stepCounts[f.steps]=(stepCounts[f.steps]||0)+1;
+   const droppedFrameCount=frames.filter(f=>f.droppedMs>0).length;
+   const longStallDrops=frames.filter(f=>f.dropReason==='long-stall').length;
+   const backlogDrops=frames.filter(f=>f.dropReason==='backlog').length;
+   const attributedDroppedMs=frames.reduce((sum,f)=>sum+f.droppedMs,0);
+   const longStallDroppedMs=frames.filter(f=>f.dropReason==='long-stall')
+    .reduce((sum,f)=>sum+f.droppedMs,0);
+   const backlogDroppedMs=frames.filter(f=>f.dropReason==='backlog')
+    .reduce((sum,f)=>sum+f.droppedMs,0);
+   return {configuredMaxSteps:window.__novaFixedMaxSteps,
+    maxSteps:p.owner.maxSteps,ticks:p.owner.ticks,droppedMs:p.owner.droppedMs,
+    raf:{frames:frames.length,intervals:values(frameIntervals),
+     callbackJs:values(callbackCosts),backlogMs:values(backlogSamples),
+     stepCounts,droppedFrameCount,
+     longStallDrops,backlogDrops,attributedDroppedMs,
+     longStallDroppedMs,backlogDroppedMs,
+     maxIntervalMs:frameIntervals.length?Math.max(...frameIntervals):null},
     productionRafActive:!!g.raf,pilotStarted:p.owner.started,
     aimActive:g.input.aim.active,aimOwner:g.input.stickId.aim,
     updates:values(window.__novaFixedResearch.updates),
@@ -161,9 +229,36 @@ const {chromium}=require('playwright');
   const owners=new Set(touches.map(e=>e.pointerId));
   assert.equal(owners.size,1,'touch gesture must retain one DOM pointer owner');
   assert.equal(report.productionRafActive,false,'never run two RAF owners');
+  assert.equal(report.configuredMaxSteps,maxSteps,'requested catch-up policy must own real Game');
+  if(maxSteps===3){
+   const frames=await page.evaluate(()=>window.__novaFixedResearch.frames.map(f=>({
+    rawGapMs:f.rawGapMs,budget:f.budget,steps:f.steps
+   })));
+   assert.ok(frames.every(f=>f.budget===(f.rawGapMs>100+1e-7?2:3)),
+    'three-step pilot must retain two-step budget after a foreground stall');
+   assert.ok(frames.every(f=>f.steps<=f.budget),
+    'browser pilot must not exceed its per-frame simulation budget');
+  }
   assert.equal(report.pilotStarted,true,'research owner must remain active');
   assert.ok(report.ticks>0&&report.updates.n>0);
   assert.ok(report.renders.n>0&&Number.isFinite(report.renders.p95));
+  assert.ok(report.raf.frames>2&&report.raf.intervals.n>0,
+   'actual browser RAF spacing must be observed');
+  assert.ok(Number.isFinite(report.raf.intervals.p95)&&
+   Number.isFinite(report.raf.callbackJs.p95)&&
+   Number.isFinite(report.raf.backlogMs.p95),
+   'real browser callback intervals and JavaScript costs must be finite');
+  assert.equal(Object.values(report.raf.stepCounts).reduce((a,b)=>a+b,0),
+   report.raf.frames,'every observed RAF callback needs a step count');
+  assert.ok(report.raf.longStallDrops>=1,
+   'controlled >100ms Chromium stall must be classified as a long stall');
+  assert.equal(report.raf.longStallDrops+report.raf.backlogDrops,
+   report.raf.droppedFrameCount,'every dropped-time frame must have a cause');
+  assert.ok(Math.abs(report.raf.longStallDroppedMs+
+   report.raf.backlogDroppedMs-report.droppedMs)<1e-5,
+   'long-stall and ordinary-backlog losses must reconcile');
+  assert.ok(Math.abs(report.raf.attributedDroppedMs-report.droppedMs)<1e-5,
+   'RAF-level dropped-time attribution must match the actual owner total');
   assert.ok(Number.isFinite(report.updates.p95));
   assert.ok(report.runtimeScripts>=49,'actual shipping overlays must be loaded');
   assert.deepEqual(errors,[],'browser errors');
