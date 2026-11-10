@@ -98,3 +98,40 @@ test('same snapshot trace always yields identical decisions and never changes sn
  assert.deepEqual(aa,bb);assert.equal(JSON.stringify(trace),before);
  assert.ok(aa.every(x=>x>=1&&x<=1.5));
 });
+
+test('sustained 60Hz headroom restores clarity even when render P95 exceeds 7ms',()=>{
+ const c=new AdaptiveDprPilot();
+ c.observe(renderBound,0);c.observe(renderBound,1000);
+ assert.equal(c.dpr,1.25);
+ const recovered={...healthy,renderP95Ms:8,updateP95Ms:4};
+ for(const ms of [2000,3000,4000,5000])c.observe(recovered,ms);
+ assert.equal(c.dpr,1.5,'a 60Hz presentation with 12ms combined update/render P95 has headroom');
+});
+test('60Hz alone cannot restore clarity if update cost consumes headroom',()=>{
+ const c=new AdaptiveDprPilot();
+ c.observe(renderBound,0);c.observe(renderBound,1000);
+ const updateHeavy={...healthy,renderP95Ms:8,updateP95Ms:12};
+ for(const ms of [2000,3000,4000,5000,6000,7000])c.observe(updateHeavy,ms);
+ assert.equal(c.dpr,1.25);
+});
+
+test('borderline render pressure cannot rapidly alternate DPR at 60Hz',()=>{
+ const c=new AdaptiveDprPilot();
+ c.observe(renderBound,0);c.observe(renderBound,1000);
+ assert.equal(c.dpr,1.25);
+ const near60={...healthy,renderP95Ms:8,updateP95Ms:4};
+ for(let ms=2000;ms<=12000;ms+=1000){
+  const snapshot=ms%3000===0?renderBound:near60;
+  c.observe(snapshot,ms);
+ }
+ assert.equal(c.dpr,1.25,'interrupted recovery evidence must not raise DPR');
+ assert.equal(c.changes,1);
+});
+
+test('original <=7ms render recovery remains available with moderate update work',()=>{
+ const c=new AdaptiveDprPilot();
+ c.observe(renderBound,0);c.observe(renderBound,1000);
+ const priorHealthy={...healthy,renderP95Ms:4,updateP95Ms:8};
+ for(const ms of [2000,3000,4000,5000])c.observe(priorHealthy,ms);
+ assert.equal(c.dpr,1.5,'expanded recovery must not narrow the original gate');
+});
