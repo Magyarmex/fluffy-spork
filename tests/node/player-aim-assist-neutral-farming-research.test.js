@@ -59,11 +59,11 @@ function trial(seed,hz,mode,opts={}){
    g.input.aim.active=true;g.input.aim.dx=40*dirX;g.input.aim.dy=40*dirY;
    g.input.mouseActive=false;g.input.autofire=false;g.input.firing=true;
    g.input.abilityQueued=false;
-   if(mode==='legacy'||mode.startsWith('corridor')||mode.startsWith('angular')){
+   if(mode==='legacy'||mode==='legacyEdge'||mode.startsWith('corridor')||mode.startsWith('angular')){
     const nearest=g.nearestTank;
     g.nearestTank=function(x,y,max,exclude){
      if(exclude===p.id&&max===480&&x===p.x&&y===p.y){
-      if(mode==='legacy')return offAxis;
+      if(mode==='legacy'||mode==='legacyEdge')return offAxis;
       const found=nearest.apply(this,arguments);
       if(found===aligned&&circle.hp>0){
        const dx=circle.x-p.x,dy=circle.y-p.y;
@@ -86,11 +86,17 @@ function trial(seed,hz,mode,opts={}){
      return nearest.apply(this,arguments);
     };
    }
-   let shots=0;const bearings=[],original=g.tryFire;
+   let shots=0;const bearings=[],shotShapeStates=[],original=g.tryFire;
    g.tryFire=function(t){
     const before=this.bullets.length,out=original.apply(this,arguments);
     if(t===p&&this.bullets.length>before){
      shots++;const b=this.bullets[before];
+     if(shotShapeStates.length<5)shotShapeStates.push({
+      x:+circle.x.toFixed(5),y:+circle.y.toFixed(5),
+      vx:+circle.vx.toFixed(5),vy:+circle.vy.toFixed(5),
+      r:+circle.r.toFixed(5),hp:+circle.hp.toFixed(5),
+      projectileX:+b.x.toFixed(5),projectileY:+b.y.toFixed(5),
+      projectileR:+b.r.toFixed(5)});
      if(bearings.length<5)bearings.push(+Math.atan2(b.vy,b.vx).toFixed(5));
     }
     return out;
@@ -104,7 +110,7 @@ function trial(seed,hz,mode,opts={}){
    assert.ok(Number.isFinite(hp)&&hp>=0&&hp<=14);
    assert.ok(shots>=2,'real Scout firing must occur during the observation');
    return {seed,hz,mode,xpScene,shots,circleHp:+hp.toFixed(5),
-    circleDestroyed:!survivor,playerAngle:+p.angle.toFixed(5),bearings,
+    circleDestroyed:!survivor,playerAngle:+p.angle.toFixed(5),bearings,shotShapeStates,
     alignedHp:withAligned?+aligned.hp.toFixed(5):null,
     playerXP:+p.xp.toFixed(5),playerScore:+p.score.toFixed(5),
     uncollectedOrbXP:+g.orbs.reduce((a,o)=>a+(Number(o.xp)||0),0).toFixed(5)};
@@ -123,6 +129,7 @@ test('neutral-farming aim interference diagnostic in the actual composed game',(
    corridorBehind=trial(seed,hz,'corridorBehind'),
    angular=trial(seed,hz,'angular'),
    angularEnemy=trial(seed,hz,'angularEnemy'),
+   legacyEdge=trial(seed,hz,'legacyEdge'),
    shippingEdge=trial(seed,hz,'shippingEdge'),
    corridorEdge=trial(seed,hz,'corridorEdge'),
    angularEdge=trial(seed,hz,'angularEdge'),
@@ -141,6 +148,10 @@ test('neutral-farming aim interference diagnostic in the actual composed game',(
    'the Scout corridor pilot must actually recover the observed neutral kill');
   assert.ok(shippingEnemy.alignedHp<100&&shippingOffPath.alignedHp<100,
    'hostile damage controls must hit a real initialized tank, not merely report a bearing');
+  assert.ok(legacyEdge.shots>=2&&legacyEdge.shotShapeStates.length>=2,
+   'the raw-east grazing negative control must record multiple real shot positions');
+  assert.ok(legacyEdge.shotShapeStates.every(s=>Number.isFinite(s.x)&&Number.isFinite(s.y)&&Number.isFinite(s.vx)&&Number.isFinite(s.vy)),
+   'the raw-east control must preserve physical neutral-motion evidence');
   assert.ok(angular.circleDestroyed&&angular.circleHp<shipping.circleHp,
    'center-angle neutral candidate must recover the direct-center Circle kill');
   assert.deepEqual(angularEnemy.bearings,shippingEnemy.bearings,
@@ -161,7 +172,7 @@ test('neutral-farming aim interference diagnostic in the actual composed game',(
    'deliberate hostile aim must retain its real projectile damage');
   rows.push({noAligned,legacy,shipping,corridor,shippingEnemy,corridorEnemy,
    shippingOffPath,corridorOffPath,shippingBehind,corridorBehind,
-   angular,angularEnemy,shippingEdge,corridorEdge,angularEdge});
+   angular,angularEnemy,legacyEdge,shippingEdge,corridorEdge,angularEdge});
  }
  console.log('NOVA_NEUTRAL_AIM_INTERFERENCE '+JSON.stringify(rows));
 });
