@@ -9,10 +9,6 @@ const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 if(prior===undefined)delete process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL;
 else process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL=prior;
 
-function rival(id,x,y){
- return {id,kind:'tank',x,y,r:14,hp:100,maxHp:100,alive:true,cls:'scout',
-  isPlayer:true,vx:0,vy:0,angle:0,stats:{},spawnShieldT:0};
-}
 function trial(seed,hz,mode){
  const withAligned=mode!=='noAligned';
  const enemyIntent=mode.endsWith('Enemy');
@@ -20,8 +16,14 @@ function trial(seed,hz,mode){
  const dirX=Math.cos(intent),dirY=Math.sin(intent);
  return withSeed(seed,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
-  const p=g.player,offAxis=rival(9801,120,70),
-   aligned=rival(9802,240,40);
+  const p=g.player,others=g.tanks.filter(t=>t!==p);
+  assert.ok(others.length>=2,'use real initialized collision-capable tanks');
+  const offAxis=others[0],aligned=others[1];
+  for(const [t,x,y] of [[offAxis,120,70],[aligned,240,40]]){
+   Object.assign(t,{x,y,vx:0,vy:0,cls:'scout',isPlayer:true,
+    alive:true,hp:100,maxHp:100,spawnShieldT:0,shieldT:0,
+    bulwarkT:0,tauntT:0,cloakT:0,gene:null,perk:null});
+  }
   try{
    g.sfx.muted=true;g.setClass(p,'scout');
    p.x=0;p.y=0;p.vx=0;p.vy=0;p.angle=0;p.fireCd=0;
@@ -81,6 +83,8 @@ function trial(seed,hz,mode){
    for(let i=0;i<Math.round(1.2*hz);i++)g.update(dt);
    const survivor=g.shapes.find(s=>s.id===circle.id);
    const hp=survivor?survivor.hp:0;
+   assert.ok(Number.isFinite(aligned.hp),
+    'real initialized hostile must retain finite HP after physical projectile collision');
    assert.ok(Number.isFinite(hp)&&hp>=0&&hp<=14);
    assert.ok(shots>=2,'real Scout firing must occur during the observation');
    return {seed,hz,mode,shots,circleHp:+hp.toFixed(5),
