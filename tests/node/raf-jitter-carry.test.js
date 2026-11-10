@@ -138,3 +138,19 @@ test('current expensive first update suppresses optional RAF recovery',()=>{
  assert.equal(expensive.draws,4);assert.equal(moderate.draws,4);assert.equal(cheap.draws,4);
  assert.ok(expensive.dts.every(dt=>dt<=1/30+1e-12));
 });
+
+// At sustained 20Hz, a 50ms frame can have one 30Hz update of carried debt.
+// Preserve moderate work that fits two updates plus a small render reserve,
+// but decline a second update after a truly expensive first one.
+test('interval-aware current CPU budget distinguishes 22ms from 30ms at 20Hz',()=>{
+ const html=patchRafStepCap(raw());
+ const moderate=driver(html,(_dt,n)=>n===5?22:0);
+ const heavy=driver(html,(_dt,n)=>n===5?30:0);
+ for(let i=0;i<3;i++){moderate.frame(50);heavy.frame(50);}
+ assert.equal(moderate.dts.length,4,'20Hz prelude must build bounded carry');
+ assert.equal(heavy.dts.length,4);
+ moderate.frame(50);heavy.frame(50);
+ assert.equal(moderate.dts.length,6,'22ms current update may repay at 20Hz');
+ assert.equal(heavy.dts.length,5,'30ms current update must not double at 20Hz');
+ assert.equal(moderate.draws,4);assert.equal(heavy.draws,4);
+});
