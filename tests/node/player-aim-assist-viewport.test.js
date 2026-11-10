@@ -187,3 +187,15 @@ test('ambiguous in-cone fallback does not introduce a wrong-target snap',()=>{
  g2.update();assert.ok(Math.abs(g2.player.angle-Math.atan2(8,100))<1e-10,
   'when the original nearest is already in-cone, retain legacy selection');
 });
+
+// Keyboard movement can be the shipping aim fallback when no right-stick
+// gesture is active. The cone rescue must use the same fallback vector.
+test('keyboard movement aim fallback uses the same conservative cone',()=>{
+ const Game=boot(),g=new Game();g.w=568;g.h=320;
+ g.tanks.push(tank(80,120,70),tank(81,240,20));
+ g.input.moveVec=()=>({x:1,y:0});
+ g.input.aimVec=move=>move;
+ g.update();
+ assert.ok(Math.abs(g.player.angle-Math.atan2(20,240))<1e-10,
+  'movement fallback should rescue the sole aligned target');
+});
