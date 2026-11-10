@@ -72,6 +72,7 @@ const {chromium}=require('playwright');
       // These are browser callback intervals, NOT physical display times.
       const owner=window.__novaFixedPilot?.owner;
       const beforeTicks=owner?.ticks??0,beforeDropped=owner?.droppedMs??0;
+      const rawGapMs=owner?Math.max(0,ts-owner.lastMs):null;
       const at=performance.now();
       fn(ts);
       const current=window.__novaFixedPilot?.owner;
@@ -80,7 +81,9 @@ const {chromium}=require('playwright');
        const previous=frames.length?frames[frames.length-1].ts:null;
        frames.push({ts,intervalMs:previous===null?null:ts-previous,
         steps:current.ticks-beforeTicks,
-        droppedMs:current.droppedMs-beforeDropped,
+        rawGapMs,droppedMs:current.droppedMs-beforeDropped,
+        dropReason:current.droppedMs>beforeDropped?
+         (rawGapMs>100.0000001?'long-stall':'backlog'):null,
         callbackJsMs:performance.now()-at});
       }
      }),
@@ -166,9 +169,13 @@ const {chromium}=require('playwright');
    const stepCounts={};
    for(const f of frames)stepCounts[f.steps]=(stepCounts[f.steps]||0)+1;
    const droppedFrameCount=frames.filter(f=>f.droppedMs>0).length;
+   const longStallDrops=frames.filter(f=>f.dropReason==='long-stall').length;
+   const backlogDrops=frames.filter(f=>f.dropReason==='backlog').length;
+   const attributedDroppedMs=frames.reduce((sum,f)=>sum+f.droppedMs,0);
    return {ticks:p.owner.ticks,droppedMs:p.owner.droppedMs,
     raf:{frames:frames.length,intervals:values(frameIntervals),
      callbackJs:values(callbackCosts),stepCounts,droppedFrameCount,
+     longStallDrops,backlogDrops,attributedDroppedMs,
      maxIntervalMs:frameIntervals.length?Math.max(...frameIntervals):null},
     productionRafActive:!!g.raf,pilotStarted:p.owner.started,
     aimActive:g.input.aim.active,aimOwner:g.input.stickId.aim,
@@ -196,8 +203,10 @@ const {chromium}=require('playwright');
    'real browser callback intervals and JavaScript costs must be finite');
   assert.equal(Object.values(report.raf.stepCounts).reduce((a,b)=>a+b,0),
    report.raf.frames,'every observed RAF callback needs a step count');
-  assert.ok(report.raf.droppedFrameCount>=0,
-   'dropped-time attribution must be nonnegative');
+  assert.equal(report.raf.longStallDrops+report.raf.backlogDrops,
+   report.raf.droppedFrameCount,'every dropped-time frame must have a cause');
+  assert.ok(Math.abs(report.raf.attributedDroppedMs-report.droppedMs)<1e-5,
+   'RAF-level dropped-time attribution must match the actual owner total');
   assert.ok(Number.isFinite(report.updates.p95));
   assert.ok(report.runtimeScripts>=49,'actual shipping overlays must be loaded');
   assert.deepEqual(errors,[],'browser errors');
