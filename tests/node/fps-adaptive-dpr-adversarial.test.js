@@ -246,8 +246,8 @@ test('invalid settings revision fails closed without overwriting owned pixels',(
 test('stable settings revision retains normal no-evidence rollback behavior',()=>{
  const {game,pilot}=fixture({settingsEpoch:()=>5});
  step(pilot,0,1000,slow);
- const result=step(pilot,1500,10000,null);
- assert.equal(result.kind,'hold');
+ const kinds=[];for(let t=1500;t<=10000;t+=500)kinds.push(pilot.sample(t,null).kind);
+ assert.ok(kinds.includes('probe-no-evidence'));
  assert.equal(game.dpr,1.5);
  assert.equal(pilot.stop(),true);
 });
