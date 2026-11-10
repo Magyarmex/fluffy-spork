@@ -35,7 +35,8 @@ const improved={frameSamples:120,fps:55,frameP95Ms:22,updateP95Ms:5,
   await deploy.click();
   await page.waitForFunction(()=>window.__novaDprResearchGame?.status==='playing',
    {timeout:30000});
-  await page.evaluate(()=>{const g=window.__novaDprResearchGame;g.quality='low';g.resize();});
+  await page.evaluate(()=>{const g=window.__novaDprResearchGame;
+   g.quality='low';g.resize();g.input.autofire=false;g.input.firing=false;});
   const canvas=page.locator('canvas.absolute.inset-0');
   await canvas.waitFor({state:'visible',timeout:20000});
   const box=await canvas.boundingBox();
