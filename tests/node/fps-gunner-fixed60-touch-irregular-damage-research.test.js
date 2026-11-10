@@ -160,7 +160,7 @@ test('fixed60 research measures touch-driven real Gunner damage under matched me
      const jitter=trial(seed,cls,reload,mode,offset);
      assert.deepEqual(trial(seed,cls,reload,mode,offset),jitter);
      // This is the intended chronology invariant, unlike frame presentation
-    // timing: identical touch history and 60Hz ticks must yield equal combat.
+     // timing: identical touch history and 60Hz ticks must yield equal combat.
     assert.equal(jitter.damage,baseline.damage,'real hit damage changed with RAF order');
     assert.equal(jitter.volleys,baseline.volleys,'volley count changed with RAF order');
     assert.equal(jitter.hits,baseline.hits,'hit count changed with RAF order');
@@ -172,7 +172,7 @@ test('fixed60 research measures touch-driven real Gunner damage under matched me
     }
    }
  console.log('GUNNER_FIXED60_TOUCH_DAMAGE '+JSON.stringify(rows));
- // Deliberately characterize parity instead of freezing a desirable outcome:
- // a failing parity observation must be inspected before scheduler promotion.
+ // Enforce combat chronology, not a fixed weapon balance number or an
+ // unrealistically identical render-callback delay across frame schedules.
  assert.equal(rows.length,16);
 });
