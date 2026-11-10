@@ -309,6 +309,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     return {n:s.length,p95:s.length?s[Math.ceil(.95*s.length)-1]:null};};
    const frames=window.__novaFixedResearch.frames;
    const frameIntervals=frames.map(f=>f.intervalMs).filter(Number.isFinite);
+   const observedWallMs=frames.length>1?frames[frames.length-1].ts-frames[0].ts:0;
    const controlledLongGaps=frames.filter(f=>f.rawGapMs>=70&&f.rawGapMs<=100).length;
    const callbackCosts=frames.map(f=>f.callbackJsMs);
    const backlogSamples=frames.map(f=>f.lagMs);
@@ -326,6 +327,9 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     controlledGate:window.__novaControlledGate,
     maxSteps:p.owner.maxSteps,ticks:p.owner.ticks,droppedMs:p.owner.droppedMs,
     raf:{frames:frames.length,intervals:values(frameIntervals),controlledLongGaps,
+     observedWallMs,presentationHz:observedWallMs>0?
+      (frames.length-1)*1000/observedWallMs:null,
+     simulatedMs:p.owner.ticks*1000/60,
      callbackJs:values(callbackCosts),backlogMs:values(backlogSamples),
      stepCounts,droppedFrameCount,
      longStallDrops,backlogDrops,attributedDroppedMs,
@@ -368,6 +372,10 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     'controlled RAF must actually delay browser callbacks');
    assert.ok(report.raf.controlledLongGaps>=3,
     'controlled RAF must deliver multiple real 70–100ms active gaps');
+   assert.ok(report.raf.observedWallMs>0&&
+    Number.isFinite(report.raf.presentationHz)&&report.raf.presentationHz>0&&
+    Number.isFinite(report.raf.simulatedMs),
+    'controlled RAF must report normalized presentation and simulation time');
   }
   if(maxSteps===3){
    const frames=await page.evaluate(()=>window.__novaFixedResearch.frames.map(f=>({
