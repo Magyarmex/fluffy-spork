@@ -13,8 +13,11 @@ const {ShotOnlyFirePulse}=require('../research/shot-only-fire-pulse.cjs');
 
 const uniform=Array(24).fill(1000/60);
 const clustered=Array.from({length:8},()=>[1000/30,1000/120,1000/120]).flat();
+// Mean 30Hz, no individual interval >100ms. The 55ms pair delays a
+// 134-140ms right-stick gesture until the 188.33ms presentation callback.
+const clustered30=Array.from({length:6},()=>[55,55,1000/15-55,1000/15-55]).flat();
 
-function run(gaps,{maxSteps=2,release='pointerup',pulseEnabled=true}={}){
+function run(gaps,{maxSteps=2,release='pointerup',pulseEnabled=true,maxPulseAgeMs=40}={}){
  return withSeed(1517800,()=>{
   const g=bootGame();
   g.sfx.muted=true;g.sfx.startMusic=()=>{};
@@ -32,7 +35,7 @@ function run(gaps,{maxSteps=2,release='pointerup',pulseEnabled=true}={}){
   let now=1000,callback=null,elapsed=0,next=0;
   const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
   const pulse=pulseEnabled?new ShotOnlyFirePulse(g,timeline,{
-    maxPulseAgeMs:40,nowMs:()=>now,startMs:bridge.startMs}):null;
+    maxPulseAgeMs,nowMs:()=>now,startMs:bridge.startMs}):null;
   const renderActual=g.__testWindow.__novaMakeRequire('')('game/render').render;
   const renders=[];
   const owner=new FixedStepRafOwner(g,timeline,bridge,{
@@ -110,6 +113,48 @@ test('cancellation remains shot-free under both schedules and step budgets',()=>
 test('without the opt-in pulse, a released sub-tick touch cannot invent a shot',()=>{
  for(const gaps of [uniform,clustered]){
   const result=run(gaps,{pulseEnabled:false});
+  assert.equal(result.shots,0);
+  assert.equal(result.firstVisible,undefined);
+  assert.equal(result.aim,false);
+  assert.equal(result.firing,false);
+ }
+});
+
+// Research falsifier: a mean-30Hz presentation gap can make a physically
+// legitimate tap older than the 40ms freshness budget before the browser
+// callback is allowed to run. Raising the budget restores that shot but also
+// accepts an older intention. Neither policy is a production recommendation.
+test('clustered mean30 exposes freshness-versus-shot recovery tradeoff in real composed Canvas',()=>{
+ const strict=run(clustered30,{maxPulseAgeMs:40});
+ const permissive=run(clustered30,{maxPulseAgeMs:80});
+ assert.equal(strict.renders.length,24);
+ assert.equal(permissive.renders.length,24);
+ assert.equal(strict.firstDelivery,permissive.firstDelivery);
+ assert.ok(strict.firstDelivery>=188 && strict.firstDelivery<=189,
+   'the first available browser callback follows the 55ms burst');
+ assert.equal(strict.shots,0,'expired input must not create a delayed shot');
+ assert.equal(strict.rejected,1,'freshness gate must explicitly reject the old tap');
+ assert.equal(strict.firstVisible,undefined);
+ assert.equal(permissive.rejected,0);
+ assert.equal(permissive.shots,1,'wider research freshness window recovers the shot');
+ assert.ok(permissive.firstVisible>=permissive.firstDelivery);
+ assert.ok(permissive.renders.some(r=>r.bullets>0),
+   'the actual renderer must receive the recovered projectile');
+ for(const result of [strict,permissive]){
+  assert.equal(result.aim,false);
+  assert.equal(result.firing,false);
+ }
+ console.log('CLUSTERED30_SHOT_FRESHNESS '+JSON.stringify({
+  firstDelivery:strict.firstDelivery,strict:{shots:strict.shots,rejected:strict.rejected,
+   ticks:strict.ticks,droppedMs:strict.droppedMs},
+  permissive:{shots:permissive.shots,rejected:permissive.rejected,
+   ticks:permissive.ticks,droppedMs:permissive.droppedMs,
+   firstVisible:permissive.firstVisible}
+ }));
+});
+test('clustered mean30 cancellation stays shot-free even with wider freshness',()=>{
+ for(const maxPulseAgeMs of [40,80]){
+  const result=run(clustered30,{maxPulseAgeMs,release:'pointercancel'});
   assert.equal(result.shots,0);
   assert.equal(result.firstVisible,undefined);
   assert.equal(result.aim,false);
