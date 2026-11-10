@@ -164,3 +164,13 @@ test('seeded mixed lifecycle sequences preserve external DPR ownership and canva
   if(external)assert.equal(game.dpr,1.2);
  }
 });
+
+test('near-threshold CPU-dominated frames do not authorize a blur probe',()=>{
+ const {game,pilot}=fixture();
+ const cpuDominated={frameSamples:120,fps:30,frameP95Ms:40,
+  updateP95Ms:19,renderP95Ms:3,simulationPacePct:75};
+ const result=step(pilot,0,3000,cpuDominated);
+ assert.equal(result.kind,'hold');
+ assert.equal(pilot.state.phase,'baseline');
+ assert.equal(game.dpr,1.5);
+});
