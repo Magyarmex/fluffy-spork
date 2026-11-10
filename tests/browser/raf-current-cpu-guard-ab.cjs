@@ -96,6 +96,7 @@ const arms={shipping:html.replace(guarded,shipping),candidate:html};
     });
     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
     assert.ok(metrics.volleys>0,'trusted held touch must fire actual Minigun');
+    assert.ok(metrics.spikes>0,'real composed Game must receive controlled CPU spikes');
     assert.ok(metrics.touches.some(t=>t.trusted),'CDP touch must arrive trusted');
     assert.ok(metrics.aimActive&&metrics.firing,'live right stick must own firing');
     assert.ok(Number.isFinite(metrics.gameTime)&&metrics.gameTime>0);
