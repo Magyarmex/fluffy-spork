@@ -54,8 +54,10 @@ test('active-only three-step budget conserves clustered 30Hz ticks without chang
  const pilot=replay(clustered30(),{activeOnlyThree:true});
  assert.equal(normal.ticks,360);
  assert.equal(normal.droppedMs,0);
- assert.equal(control.ticks,315);
- assert.ok(Math.abs(control.droppedMs-750)<EPS);
+ // The default owner's known deficit is a negative control, not a golden.
+ // A future default-owner fix must be allowed to improve or eliminate it.
+ assert.ok(control.ticks>=315&&control.ticks<=360);
+ if(control.droppedMs>0)assert.ok(control.ticks<360);
  assert.equal(pilot.ticks,360);
  assert.equal(pilot.updates,360);
  assert.equal(pilot.droppedMs,0);
