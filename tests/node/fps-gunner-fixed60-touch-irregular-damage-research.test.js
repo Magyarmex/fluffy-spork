@@ -33,7 +33,7 @@ function touchEvents(offsetMs){
  }
  return events.sort((a,b)=>a.at-b.at);
 }
-function trial(seed,cls,reload,mode,offsetMs,expectedTicks=360){
+function trial(seed,cls,reload,mode,offsetMs,expectedTicks=360,maxSteps=2,backlogExtraTicks=2){
  return withSeed(seed,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   const p=g.player;g.sfx.muted=true;g.sfx.startMusic=()=>{};
@@ -91,11 +91,11 @@ function trial(seed,cls,reload,mode,offsetMs,expectedTicks=360){
    render:()=>{
     for(const originalAt of pendingSampledEvents.splice(0))
      renderCallbackLagsMs.push(+(now-1000-originalAt*1000).toFixed(5));
-   },maxSteps:2
+   },maxSteps,backlogExtraTicks
   });
   // Per-frame update count and input sampling lag are research gates.
   // render() above is a NO-OP callback timing witness, not Canvas/GPU paint.
-  const stepsByFrame={zero:0,one:0,two:0};
+  const stepsByFrame={zero:0,one:0,two:0,three:0,four:0};
   const inputLagsMs=[];
   for(const kind of ['pd','pm','pu']){
    const original=g.input[kind];
@@ -124,8 +124,8 @@ function trial(seed,cls,reload,mode,offsetMs,expectedTicks=360){
     const next=callback;assert.equal(typeof next,'function','RAF ownership lost');
     callback=null;next(now);
     const steps=owner.lastSteps;
-    assert.ok(steps>=0&&steps<=2,'bounded per-render simulation work');
-    stepsByFrame[steps===0?'zero':steps===1?'one':'two']++;
+    assert.ok(steps>=0&&steps<=maxSteps,'bounded per-render simulation work');
+    stepsByFrame[['zero','one','two','three','four'][steps]]++;
    }
    assert.ok(Math.abs(elapsed-DURATION_MS)<1e-6);
    assert.equal(index,edges.length,'all input edges delivered');
@@ -145,8 +145,9 @@ function trial(seed,cls,reload,mode,offsetMs,expectedTicks=360){
    assert.equal(renderCallbackLagsMs.length,edges.length,'every sampled touch edge reaches the stubbed render callback');
    assert.ok(renderCallbackLagsMs.every(x=>x>=-0.001&&Number.isFinite(x)));
    assert.ok(inputLagsMs.every(x=>x>=-0.001&&Number.isFinite(x)));
-   assert.equal(stepsByFrame.one+stepsByFrame.two*2,owner.ticks);
-   assert.equal(stepsByFrame.zero+stepsByFrame.one+stepsByFrame.two,schedule(mode).length);
+   assert.equal(stepsByFrame.one+stepsByFrame.two*2+
+    stepsByFrame.three*3+stepsByFrame.four*4,owner.ticks);
+   assert.equal(Object.values(stepsByFrame).reduce((a,b)=>a+b,0),schedule(mode).length);
    assert.ok(volleys>0,'touch gesture must actually fire');
    assert.ok(hits>0&&damage>0,'actual player-owned projectile hits required');
    return {seed,cls,reload,mode,offsetMs,ticks:owner.ticks,
@@ -250,4 +251,29 @@ test('fixed60 research detects clustered 30Hz dropped combat time rather than cl
   clustered:{ticks:clustered.ticks,damage:clustered.damage,
    volleys:clustered.volleys,droppedMs:clustered.droppedMs,
    droppedFrames:clustered.droppedFrames,backlogMs:clustered.backlogMs}}));
+});
+
+// Research alternatives only: either allow one extra queued tick (more
+// simulation-phase latency) or permit three updates in a rendered frame
+// (more CPU burst risk). Neither policy is approved for production.
+test('fixed60 research compares bounded clustered30 recovery budgets with real Gunner damage',()=>{
+ const rows=[];
+ for(const [cls,reload] of [['minigun',1],['needlestorm',3]]){
+  const baseline=trial(1517800,cls,reload,'uniform60',12);
+  for(const [maxSteps,backlogExtraTicks] of [[2,3],[3,2]]){
+   const candidate=trial(1517800,cls,reload,'clustered55_11',12,
+    360,maxSteps,backlogExtraTicks);
+   assert.equal(candidate.droppedMs,0);
+   assert.equal(candidate.damage,baseline.damage,
+    'bounded recovery must preserve actual player-owned damage');
+   assert.equal(candidate.volleys,baseline.volleys);
+   assert.equal(candidate.hits,baseline.hits);
+   assert.deepEqual(candidate.births,baseline.births);
+   rows.push({cls,maxSteps,backlogExtraTicks,damage:candidate.damage,
+    stepsByFrame:candidate.stepsByFrame,
+    meanRenderCallbackLagMs:candidate.meanRenderCallbackLagMs});
+  }
+ }
+ console.log('GUNNER_FIXED60_CLUSTERED30_RECOVERY '+JSON.stringify(rows));
+ assert.equal(rows.length,4);
 });
