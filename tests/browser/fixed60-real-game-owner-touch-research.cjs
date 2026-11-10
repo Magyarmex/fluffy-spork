@@ -5,6 +5,8 @@
 const assert=require('node:assert/strict');
 const path=require('node:path');
 const {chromium}=require('playwright');
+const maxSteps=Number(process.env.NOVA_FIXED60_MAX_STEPS||2);
+assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps');
 (async()=>{
  const browser=await chromium.launch({headless:true,args:['--disable-dev-shm-usage','--no-sandbox']});
  const context=await browser.newContext({viewport:{width:320,height:700},
@@ -19,7 +21,8 @@ const {chromium}=require('playwright');
   await deploy.waitFor({state:'visible',timeout:45000});
   await page.addScriptTag({path:path.resolve(__dirname,
    '../../nova-updates/fixed60-research-browser.js')});
-  await page.evaluate(()=>{
+  await page.evaluate(maxSteps=>{
+   window.__novaFixedMaxSteps=maxSteps;
    const Game=window.__novaMakeRequire('')('game/engine').Game;
    const renderMod=window.__novaMakeRequire('')('game/render');
    const baseStart=Game.prototype.start;
@@ -89,7 +92,7 @@ const {chromium}=require('playwright');
      }),
      cancel:id=>cancelAnimationFrame(id),
      render:(g,w,h)=>renderMod.render(g,w,h),
-     maxSteps:2,backlogExtraTicks:2});
+     maxSteps:window.__novaFixedMaxSteps,backlogExtraTicks:2});
     window.__novaFixedPilot=pilot;
     const originalStop=pilot.owner.stop.bind(pilot.owner);
     pilot.owner.stop=function(...stopArgs){
@@ -102,7 +105,7 @@ const {chromium}=require('playwright');
     profile.lifecycle.push({event:'owner-start-returned',at:performance.now(),started:pilot.owner.started});
     return result;
    };
-  });
+  },maxSteps);
   await deploy.click();
   try{
    await page.waitForFunction(()=>window.__novaFixedGame?.status==='playing'&&
@@ -172,7 +175,7 @@ const {chromium}=require('playwright');
    const longStallDrops=frames.filter(f=>f.dropReason==='long-stall').length;
    const backlogDrops=frames.filter(f=>f.dropReason==='backlog').length;
    const attributedDroppedMs=frames.reduce((sum,f)=>sum+f.droppedMs,0);
-   return {ticks:p.owner.ticks,droppedMs:p.owner.droppedMs,
+   return {maxSteps:p.owner.maxSteps,ticks:p.owner.ticks,droppedMs:p.owner.droppedMs,
     raf:{frames:frames.length,intervals:values(frameIntervals),
      callbackJs:values(callbackCosts),stepCounts,droppedFrameCount,
      longStallDrops,backlogDrops,attributedDroppedMs,
@@ -193,6 +196,7 @@ const {chromium}=require('playwright');
   const owners=new Set(touches.map(e=>e.pointerId));
   assert.equal(owners.size,1,'touch gesture must retain one DOM pointer owner');
   assert.equal(report.productionRafActive,false,'never run two RAF owners');
+  assert.equal(report.maxSteps,maxSteps,'requested catch-up policy must own real Game');
   assert.equal(report.pilotStarted,true,'research owner must remain active');
   assert.ok(report.ticks>0&&report.updates.n>0);
   assert.ok(report.renders.n>0&&Number.isFinite(report.renders.p95));
