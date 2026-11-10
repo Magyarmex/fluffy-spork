@@ -102,7 +102,7 @@ function trial(seed,hz,mode,opts={}){
     if(shape===circle&&circleHitStates.length<8)circleHitStates.push({
      time:+this.time.toFixed(5),x:+shape.x.toFixed(5),y:+shape.y.toFixed(5),
      vx:+shape.vx.toFixed(5),vy:+shape.vy.toFixed(5),
-     hpBefore:+shape.hp.toFixed(5),damage:+damage.toFixed(5),
+     hpBefore:+shape.hp.toFixed(5),damage:+(Number(damage)||0).toFixed(5),
      impulseX:+(Number(ix)||0).toFixed(5),impulseY:+(Number(iy)||0).toFixed(5)});
     return originalDamageShape.apply(this,arguments);
    };
