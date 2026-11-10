@@ -148,6 +148,8 @@ jobs:
           node tests/browser/redeploy-front-choice.cjs
           node tests/browser/fieldcraft-class-counterplay.cjs
           node tests/browser/fieldcraft-rng-browser.cjs
+          # Run experimental fixed60 owner last: do not mask shipping smoke failures.
+          node tests/browser/fixed60-real-game-owner-touch-research.cjs
       - name: Preserve browser screenshots
         if: always()
         uses: actions/upload-artifact@v4
