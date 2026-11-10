@@ -58,7 +58,8 @@ function createAdaptiveDprPilot(game, options={}) {
     }
     if(game.quality!=='low'||!visible()||game.paused||game.status!=='playing'){
       resetStreaks();warmupUntil=now+2500;
-      if(phase==='probing'||phase==='low')return result('inactive-rollback',rollback(now));
+      if(phase==='probing')return result('probe-cancelled',rollback(now));
+      if(phase==='low')return result('low-inactive-rollback',rollback(now));
       return result('inactive');
     }
     if(!p||p.frameSamples<90||![p.fps,p.frameP95Ms,p.updateP95Ms,p.renderP95Ms,p.simulationPacePct]
