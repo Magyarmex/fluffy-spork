@@ -15,6 +15,11 @@ function summarize(control,candidate){
    longStall:r.longStallDroppedMs,backlog:r.backlogDroppedMs})){
    assert.ok(Number.isFinite(value)&&value>=0,`${label}: invalid ${name}`);
   }
+  assert.ok(Number.isFinite(report.touchToProjectileBirthMs)&&
+   report.touchToProjectileBirthMs>=0,`${label}: missing real touch-to-birth measurement`);
+  assert.ok(Number.isFinite(report.touchToCanvasSubmissionMs)&&
+   report.touchToCanvasSubmissionMs>=report.touchToProjectileBirthMs,
+   `${label}: missing touch-to-Canvas submission`);
   assert.ok(r.frames>=5&&r.observedWallMs>0,`${label}: insufficient browser evidence`);
   assert.ok(Math.abs(r.observedWallMs-r.simulatedMs-report.droppedMs-r.remainingLagMs)<1,
    `${label}: wall time does not reconcile`);
@@ -33,7 +38,10 @@ function summarize(control,candidate){
    longStallLossMs:r.longStallDroppedMs,
    backlogLossMsPerSecond:1000*r.backlogDroppedMs/r.observedWallMs,
    longStallLossMsPerSecond:1000*r.longStallDroppedMs/r.observedWallMs,
-   queuedMs:r.remainingLagMs,callbackP95Ms:r.callbackJs.p95,
+   queuedMs:r.remainingLagMs,
+   touchToProjectileBirthMs:report.touchToProjectileBirthMs,
+   touchToCanvasSubmissionMs:report.touchToCanvasSubmissionMs,
+   callbackP95Ms:r.callbackJs.p95,
    updateP95Ms:report.updates.p95,renderP95Ms:report.renders.p95};
  };
  const a=arm(control),b=arm(candidate);
