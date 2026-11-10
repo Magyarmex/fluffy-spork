@@ -348,6 +348,10 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
   assert.equal(report.configuredMaxSteps,maxSteps,'requested catch-up policy must own real Game');
   assert.equal(report.controlledGate,controlledGate,'research RAF gate configuration drift');
   if(controlledGate){
+   console.log('NOVA_FIXED60_CONTROLLED_GATE_DIAGNOSTIC '+JSON.stringify({
+    frames:report.raf.frames,intervals:report.raf.intervals,
+    longGaps:report.raf.controlledLongGaps,stepCounts:report.raf.stepCounts,
+    droppedMs:report.droppedMs,backlogDrops:report.raf.backlogDrops}));
    assert.ok((report.raf.stepCounts['3']||0)>0,
     'controlled Chromium presentation must exercise real three-update callbacks');
    assert.ok(report.raf.intervals.p95>=45,
