@@ -93,7 +93,9 @@ function trial(seed,hz,mode,opts={}){
        }else{
         const forward=dx*dirX+dy*dirY;
         const lateral=Math.abs(dx*dirY-dy*dirX);
-        if(forward>0&&forward<targetDist&&lateral<circle.r+5)return null;
+        if(forward>0&&forward<targetDist&&lateral<circle.r+5&&
+           (mode!=='corridorVisibilitySafeOccluded'||
+            g.hasLineOfSight(p.x,p.y,circle.x,circle.y,3)))return null;
        }
       }
       return found;
@@ -153,6 +155,7 @@ test('neutral-farming aim interference diagnostic in the actual composed game',(
    corridorBehind=trial(seed,hz,'corridorBehind'),
    shippingOccluded=trial(seed,hz,'shippingOccluded'),
    corridorOccluded=trial(seed,hz,'corridorOccluded'),
+   corridorVisibilitySafeOccluded=trial(seed,hz,'corridorVisibilitySafeOccluded'),
    angular=trial(seed,hz,'angular'),
    angularEnemy=trial(seed,hz,'angularEnemy'),
    legacyEdge=trial(seed,hz,'legacyEdge'),
@@ -194,6 +197,8 @@ test('neutral-farming aim interference diagnostic in the actual composed game',(
   // Circle is visible before allowing it to veto a visible hostile.
   assert.notDeepEqual(corridorOccluded.bearings,shippingOccluded.bearings,
    'research witness: hidden neutral still changes corridor pilot gun bearing');
+  assert.deepEqual(corridorVisibilitySafeOccluded.bearings,shippingOccluded.bearings,
+   'visibility-gated corridor counterfactual must preserve visible-hostile bearings');
   assert.deepEqual(corridorOffPath.bearings,shippingOffPath.bearings,
    'a neutral outside the requested firing corridor must not change projectile bearings');
   assert.equal(corridorOffPath.alignedHp,shippingOffPath.alignedHp,
@@ -204,7 +209,7 @@ test('neutral-farming aim interference diagnostic in the actual composed game',(
    'deliberate hostile aim must retain its real projectile damage');
   rows.push({noAligned,legacy,shipping,corridor,shippingEnemy,corridorEnemy,
    shippingOffPath,corridorOffPath,shippingBehind,corridorBehind,
-   shippingOccluded,corridorOccluded,angular,angularEnemy,legacyEdge,shippingEdge,corridorEdge,angularEdge});
+   shippingOccluded,corridorOccluded,corridorVisibilitySafeOccluded,angular,angularEnemy,legacyEdge,shippingEdge,corridorEdge,angularEdge});
  }
  console.log('NOVA_NEUTRAL_AIM_INTERFERENCE '+JSON.stringify(rows));
 });
