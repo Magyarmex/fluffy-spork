@@ -385,6 +385,8 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
    const attributedDroppedMs=frames.reduce((sum,f)=>sum+f.droppedMs,0);
    const longStallDroppedMs=frames.filter(f=>f.dropReason==='long-stall')
     .reduce((sum,f)=>sum+f.droppedMs,0);
+   const longStallWallMs=frames.filter(f=>f.rawGapMs>100+1e-7)
+    .reduce((sum,f)=>sum+f.rawGapMs,0);
    const backlogDroppedMs=frames.filter(f=>f.dropReason==='backlog')
     .reduce((sum,f)=>sum+f.droppedMs,0);
    return {configuredMaxSteps:window.__novaFixedMaxSteps,
@@ -400,7 +402,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
      callbackJs:values(callbackCosts),backlogMs:values(backlogSamples),
      stepCounts,droppedFrameCount,
      longStallDrops,backlogDrops,attributedDroppedMs,
-     longStallDroppedMs,backlogDroppedMs,
+     longStallDroppedMs,longStallWallMs,backlogDroppedMs,
      maxIntervalMs:frameIntervals.length?Math.max(...frameIntervals):null},
     productionRafActive:!!g.raf,pilotStarted:p.owner.started,
     aimActive:g.input.aim.active,aimOwner:g.input.stickId.aim,
