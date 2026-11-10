@@ -251,3 +251,16 @@ test('stable settings revision retains normal no-evidence rollback behavior',()=
  assert.equal(game.dpr,1.5);
  assert.equal(pilot.stop(),true);
 });
+
+test('settings revision callback failure during stop cannot overwrite player pixels',()=>{
+ let broken=false;
+ const {game,pilot}=fixture({settingsEpoch:()=>{
+  if(broken)throw Error('settings owner unavailable');return 3;
+ }});
+ step(pilot,0,1000,slow);
+ assert.equal(game.dpr,1);
+ broken=true;
+ assert.equal(pilot.stop(),true);
+ assert.equal(game.dpr,1);
+ assert.deepEqual([game.canvas.width,game.canvas.height],[320,568]);
+});
