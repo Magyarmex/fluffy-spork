@@ -36,10 +36,13 @@ const arms={shipping:html.replace(guarded,shipping),candidate:html};
      const update=Game.prototype.update,fire=Game.prototype.tryFire;
      const originalRender=renderModule.render;
      window.__novaCpuAb={volleys:0,birthAt:null,touches:[],game:null,
-      frameIndex:0,spikedFrame:-1,nextSpikeAt:null,inject:false,spikes:0,spikeTimes:[],outerUpdateMs:[],startAt:null,startGameTime:null};
+      frameIndex:0,spikedFrame:-1,nextSpikeAt:null,inject:false,spikes:0,spikeTimes:[],renderTimes:[],outerUpdateMs:[],startAt:null,startGameTime:null};
      renderModule.render=function(g,...args){
       const out=originalRender.call(this,g,...args);
-      if(g===window.__novaCpuAb.game)window.__novaCpuAb.frameIndex++;
+      if(g===window.__novaCpuAb.game){
+       window.__novaCpuAb.frameIndex++;
+       if(window.__novaCpuAb.inject)window.__novaCpuAb.renderTimes.push(performance.now());
+      }
       return out;
      };
      Game.prototype.update=function(...args){
@@ -84,6 +87,7 @@ const arms={shipping:html.replace(guarded,shipping),candidate:html};
      window.__novaCpuAb.birthAt=null;window.__novaCpuAb.touches.length=0;
      window.__novaCpuAb.frameIndex=0;window.__novaCpuAb.spikedFrame=-1;
      window.__novaCpuAb.spikes=0;window.__novaCpuAb.spikeTimes.length=0;
+     window.__novaCpuAb.renderTimes.length=0;
      window.__novaCpuAb.outerUpdateMs.length=0;
      window.__novaCpuAb.startAt=performance.now();
      window.__novaCpuAb.nextSpikeAt=window.__novaCpuAb.startAt+500;
@@ -99,7 +103,10 @@ const arms={shipping:html.replace(guarded,shipping),candidate:html};
     await page.waitForTimeout(5500);
     const metrics=await page.evaluate(()=>{
      const s=window.__novaCpuAb,g=s.game;
-     return {volleys:s.volleys,birthAt:s.birthAt,touches:s.touches.slice(),
+     const gaps=s.renderTimes.slice(1).map((t,i)=>t-s.renderTimes[i]);
+     return {renderGapOver83Pct:gaps.length?100*gaps.filter(x=>x>83.333).length/gaps.length:null,
+      renderGapP95Ms:gaps.length?gaps.slice().sort((a,b)=>a-b)[Math.ceil(gaps.length*.95)-1]:null,
+      volleys:s.volleys,birthAt:s.birthAt,touches:s.touches.slice(),
       gameTime:g.time,gameDelta:g.time-s.startGameTime,
       windowMs:performance.now()-s.startAt,
       outerUpdateP95Ms:(()=>{const a=s.outerUpdateMs.slice().sort((x,y)=>x-y);
@@ -120,6 +127,7 @@ const arms={shipping:html.replace(guarded,shipping),candidate:html};
      observationGameDelta:metrics.gameDelta,observationWindowMs:metrics.windowMs,
      outerUpdateP95Ms:metrics.outerUpdateP95Ms,
      injectedSpikes:metrics.spikes,spikeTimesMs:metrics.spikeTimes,renderedFrames:metrics.renderedFrames,
+     renderGapOver83Pct:metrics.renderGapOver83Pct,renderGapP95Ms:metrics.renderGapP95Ms,
      touchToFirstBirthMs:metrics.birthAt-metrics.touches[0].at,
      perf:metrics.perf&&{
       fps:metrics.perf.fps,frameP95Ms:metrics.perf.frameP95Ms,
