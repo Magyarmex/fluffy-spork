@@ -80,16 +80,16 @@ function trial(seed,cls,reload,mode,offsetMs){
   const timeline=new ChronologicalInput(g.input);
   const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
   const pendingSampledEvents=[];
-  const renderSubmitLagsMs=[];
+  const renderCallbackLagsMs=[];
   const owner=new FixedStepRafOwner(g,timeline,bridge,{
    now:()=>now,request:fn=>(callback=fn,1),cancel:()=>{callback=null},
    render:()=>{
     for(const originalAt of pendingSampledEvents.splice(0))
-     renderSubmitLagsMs.push(+(now-1000-originalAt*1000).toFixed(5));
+     renderCallbackLagsMs.push(+(now-1000-originalAt*1000).toFixed(5));
    },maxSteps:2
   });
-  // Presentation cost proxy and chronological input sampling lag are both
-  // release gates: equal damage alone does not guarantee responsive touch.
+  // Per-frame update count and input sampling lag are research gates.
+  // render() below is a NO-OP callback timing witness, not Canvas/GPU paint.
   const stepsByFrame={zero:0,one:0,two:0};
   const inputLagsMs=[];
   for(const kind of ['pd','pm','pu']){
@@ -132,8 +132,8 @@ function trial(seed,cls,reload,mode,offsetMs){
    assert.equal(bridge.reorderedClamps,0,'normal RAF jitter must not reorder touch');
    assert.equal(bridge.staleClamps,0,'normal RAF jitter must not drop touch');
    assert.equal(inputLagsMs.length,edges.length,'every touch edge has sampled timing');
-   assert.equal(renderSubmitLagsMs.length,edges.length,'every sampled touch edge reaches render submission');
-   assert.ok(renderSubmitLagsMs.every(x=>x>=-0.001&&Number.isFinite(x)));
+   assert.equal(renderCallbackLagsMs.length,edges.length,'every sampled touch edge reaches render submission');
+   assert.ok(renderCallbackLagsMs.every(x=>x>=-0.001&&Number.isFinite(x)));
    assert.ok(inputLagsMs.every(x=>x>=-0.001&&Number.isFinite(x)));
    assert.equal(stepsByFrame.one+stepsByFrame.two*2,360);
    assert.equal(stepsByFrame.zero+stepsByFrame.one+stepsByFrame.two,schedule(mode).length);
@@ -143,8 +143,8 @@ function trial(seed,cls,reload,mode,offsetMs){
     applied:timeline.applied,volleys,hits,damage:+damage.toFixed(5),
     births,stepsByFrame,maxInputSampleLagMs:Math.max(...inputLagsMs),
     meanInputSampleLagMs:+(inputLagsMs.reduce((a,b)=>a+b,0)/inputLagsMs.length).toFixed(5),
-    maxRenderSubmitLagMs:Math.max(...renderSubmitLagsMs),
-    meanRenderSubmitLagMs:+(renderSubmitLagsMs.reduce((a,b)=>a+b,0)/renderSubmitLagsMs.length).toFixed(5),
+    maxRenderCallbackLagMs:Math.max(...renderCallbackLagsMs),
+    meanRenderCallbackLagMs:+(renderCallbackLagsMs.reduce((a,b)=>a+b,0)/renderCallbackLagsMs.length).toFixed(5),
     spin:+(p.fireSpin||0).toFixed(5),heat:+(p.__v17Heat||0).toFixed(5)};
   }finally{owner.stop();g.destroy();}
  });
@@ -159,9 +159,16 @@ test('fixed60 research measures touch-driven real Gunner damage under matched me
     for(const mode of ['alternating40_120','alternating120_40']){
      const jitter=trial(seed,cls,reload,mode,offset);
      assert.deepEqual(trial(seed,cls,reload,mode,offset),jitter);
-     rows.push({cls,seed,offset,baseline,jitter,
-      equalDamage:baseline.damage===jitter.damage,
-      equalVolleys:baseline.volleys===jitter.volleys});
+     // This is the intended chronology invariant, unlike frame presentation
+    // timing: identical touch history and 60Hz ticks must yield equal combat.
+    assert.equal(jitter.damage,baseline.damage,'real hit damage changed with RAF order');
+    assert.equal(jitter.volleys,baseline.volleys,'volley count changed with RAF order');
+    assert.equal(jitter.hits,baseline.hits,'hit count changed with RAF order');
+    assert.deepEqual(jitter.births,baseline.births,'projectile birth chronology changed');
+    assert.equal(jitter.spin,baseline.spin,'Gunner spin changed with RAF order');
+    assert.equal(jitter.heat,baseline.heat,'Gunner heat changed with RAF order');
+    rows.push({cls,seed,offset,baseline,jitter,
+      equalDamage:true,equalVolleys:true});
     }
    }
  console.log('GUNNER_FIXED60_TOUCH_DAMAGE '+JSON.stringify(rows));
