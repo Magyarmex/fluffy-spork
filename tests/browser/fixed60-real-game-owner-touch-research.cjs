@@ -407,6 +407,13 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
    assert.equal(layoutIntercepts,1,'controlled browser must seed one Battlefield overlay');
    assert.match(report.initialFingerprint,/^[0-9a-f]{8}:[0-9]+$/,
     'controlled browser must fingerprint the real playable initial world');
+   const fingerprintFile=process.env.NOVA_FIXED60_INITIAL_FINGERPRINT_FILE;
+   if(fingerprintFile){
+    if(fs.existsSync(fingerprintFile))
+     assert.equal(report.initialFingerprint,fs.readFileSync(fingerprintFile,'utf8').trim(),
+      'two controlled scheduler arms must begin from the same playable world');
+    else fs.writeFileSync(fingerprintFile,report.initialFingerprint+'\\n');
+   }
    console.log('NOVA_FIXED60_CONTROLLED_GATE_DIAGNOSTIC '+JSON.stringify({
     frames:report.raf.frames,intervals:report.raf.intervals,
     longGaps:report.raf.controlledLongGaps,stepCounts:report.raf.stepCounts,
