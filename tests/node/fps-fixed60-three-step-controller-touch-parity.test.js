@@ -23,11 +23,13 @@ function run(seed,clusteredMode){
   g.sfx.muted=true;g.sfx.startMusic=()=>{};
   g.setClass(p,'carrier');p.spawnShieldT=20;
   g.input.autofire=false;
-  let aimActiveTicks=0,moveActiveTicks=0,swarmActiveTicks=0;
+  let aimActiveTicks=0,moveActiveTicks=0,swarmActiveTicks=0,aimDeflectedTicks=0,moveDeflectedTicks=0;
   const originalUpdate=g.update;
   g.update=function(dt){
    if(this.input.aim.active)aimActiveTicks++;
    if(this.input.move.active)moveActiveTicks++;
+   if(Math.hypot(this.input.aim.dx,this.input.aim.dy)>=9)aimDeflectedTicks++;
+   if(Math.hypot(this.input.move.dx,this.input.move.dy)>=9)moveDeflectedTicks++;
    const out=originalUpdate.call(this,dt);
    if(p.__novaSwarm?.active)swarmActiveTicks++;
    return out;
@@ -81,7 +83,7 @@ function run(seed,clusteredMode){
     swarm:digest(p.__novaSwarm?[p.__novaSwarm.active,p.__novaSwarm.power,
      p.__novaSwarm.nodeX,p.__novaSwarm.nodeY,p.__novaSwarm.angle]:[]),
     score:p.score,bullets:g.bullets.length,
-    aimActiveTicks,moveActiveTicks,swarmActiveTicks};
+    aimActiveTicks,moveActiveTicks,swarmActiveTicks,aimDeflectedTicks,moveDeflectedTicks};
   }finally{if(owner)owner.stop();g.destroy();}
  });
 }
@@ -92,6 +94,8 @@ test('real Controller two-stick press/move/release chronology matches native60 i
   assert.ok(reference.aimActiveTicks>0,'real aim input must reach Game.update');
   assert.ok(reference.moveActiveTicks>0,'real movement input must reach Game.update');
   assert.ok(reference.swarmActiveTicks>0,'Controller command must activate in the actual Game');
+  assert.ok(reference.aimDeflectedTicks>0,'real right-stick drag must reach the Game');
+  assert.ok(reference.moveDeflectedTicks>0,'real left-stick drag must reach the Game');
   assert.deepEqual(pilot,reference,
    'clustered three-step presentation changed actual Controller physical state');
  }
