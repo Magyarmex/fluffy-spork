@@ -23,6 +23,15 @@ function run(seed,clusteredMode){
   g.sfx.muted=true;g.sfx.startMusic=()=>{};
   g.setClass(p,'carrier');p.spawnShieldT=20;
   g.input.autofire=false;
+  let aimActiveTicks=0,moveActiveTicks=0,swarmActiveTicks=0;
+  const originalUpdate=g.update;
+  g.update=function(dt){
+   if(this.input.aim.active)aimActiveTicks++;
+   if(this.input.move.active)moveActiveTicks++;
+   const out=originalUpdate.call(this,dt);
+   if(p.__novaSwarm?.active)swarmActiveTicks++;
+   return out;
+  };
   const timeline=new ChronologicalInput(g.input);
   let now=1000,cb=null,owner=null,next=0;
   const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
@@ -71,7 +80,8 @@ function run(seed,clusteredMode){
      d.id,d.ownerId,d.__novaPhase,d.__novaCommitted,d.__novaTargetId])),
     swarm:digest(p.__novaSwarm?[p.__novaSwarm.active,p.__novaSwarm.power,
      p.__novaSwarm.nodeX,p.__novaSwarm.nodeY,p.__novaSwarm.angle]:[]),
-    score:p.score,bullets:g.bullets.length};
+    score:p.score,bullets:g.bullets.length,
+    aimActiveTicks,moveActiveTicks,swarmActiveTicks};
   }finally{if(owner)owner.stop();g.destroy();}
  });
 }
@@ -79,6 +89,9 @@ test('real Controller two-stick press/move/release chronology matches native60 i
  for(const seed of [1517800,1517802]){
   const reference=run(seed,false);
   const pilot=run(seed,true);
+  assert.ok(reference.aimActiveTicks>0,'real aim input must reach Game.update');
+  assert.ok(reference.moveActiveTicks>0,'real movement input must reach Game.update');
+  assert.ok(reference.swarmActiveTicks>0,'Controller command must activate in the actual Game');
   assert.deepEqual(pilot,reference,
    'clustered three-step presentation changed actual Controller physical state');
  }
