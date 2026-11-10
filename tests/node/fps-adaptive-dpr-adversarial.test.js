@@ -87,3 +87,90 @@ test('a slow rolling window cannot certify a DPR probe before old samples expire
  assert.equal(late.kind,'probe-window-too-slow');
  assert.equal(game.dpr,1.5,'unverifiable clarity reduction must roll back');
 });
+
+test('accepted low-resolution mode restores owned backing on pause or quality exit',()=>{
+ for(const exit of ['pause','quality','stop-after-quality','hidden-gap']){
+  const {game:g,pilot:p}=fixture();
+  step(p,0,1000,slow);
+  const good={...better,fps:55,frameP95Ms:22,updateP95Ms:5,simulationPacePct:95};
+  step(p,1500,7000,good);
+  assert.equal(p.state.phase,'low');
+  assert.equal(g.dpr,1);
+  if(exit==='pause'){g.paused=true;assert.equal(p.sample(7500,good).kind,'low-inactive-rollback');}
+  else if(exit==='quality'){g.quality='high';assert.equal(p.sample(7500,good).kind,'low-inactive-rollback');}
+  else if(exit==='hidden-gap')assert.equal(p.sample(12000,good).kind,'low-interrupted-rollback');
+  else {g.quality='high';assert.equal(p.stop(),true);}
+  assert.equal(g.dpr,1.5,exit+' must restore original backing DPR');
+  assert.deepEqual([g.canvas.width,g.canvas.height],[480,852]);
+ }
+});
+
+test('accepted-low cleanup never overwrites a player DPR change on resume',()=>{
+ const {game,pilot}=fixture();
+ step(pilot,0,1000,slow);
+ const good={...better,fps:55,frameP95Ms:22,updateP95Ms:5,simulationPacePct:95};
+ step(pilot,1500,7000,good);
+ assert.equal(pilot.state.phase,'low');
+ game.quality='high';game.dpr=2;
+ game.canvas.width=640;game.canvas.height=1136;
+ assert.equal(pilot.sample(12000,good).kind,'external-resize',
+  'external owner must win even when the first sample follows a long hidden gap');
+ assert.equal(pilot.stop(),true);
+ assert.equal(game.dpr,2);
+ assert.deepEqual([game.canvas.width,game.canvas.height],[640,1136]);
+});
+
+test('accepted-low quality cannot persist indefinitely without valid telemetry',()=>{
+ const {game,pilot}=fixture();
+ const good={...better,fps:55,frameP95Ms:22,updateP95Ms:5,simulationPacePct:95};
+ step(pilot,0,1000,slow);step(pilot,1500,7000,good);
+ assert.equal(pilot.state.phase,'low');
+ assert.equal(pilot.sample(7500,null).kind,'insufficient-evidence');
+ assert.equal(game.dpr,1,'one missing sample must not flicker clarity');
+ assert.equal(pilot.sample(8000,good).kind,'hold',
+  'a valid sample must clear the missing-evidence timer');
+ assert.equal(pilot.sample(8500,null).kind,'insufficient-evidence');
+ let last;
+ for(let t=9000;t<=16500;t+=500)last=pilot.sample(t,null);
+ assert.equal(last.kind,'low-no-evidence-rollback');
+ assert.equal(game.dpr,1.5);
+});
+
+test('seeded mixed lifecycle sequences preserve external DPR ownership and canvas dimensions',()=>{
+ let state=0x12345678;
+ const random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;
+  return (state>>>0)/4294967296;};
+ const good={...better,fps:55,frameP95Ms:22,updateP95Ms:5,simulationPacePct:95};
+ const fast={frameSamples:120,fps:60,frameP95Ms:16,updateP95Ms:2,
+  renderP95Ms:3,simulationPacePct:100};
+ for(let run=0;run<50;run++){
+  const {game,pilot}=fixture();let time=0,external=false;
+  for(let i=0;i<100;i++){
+   time+=random()<.015?4000:100+random()*500;
+   const event=random();
+   if(event<.01)game.paused=!game.paused;
+   else if(event<.02)game.quality=game.quality==='low'?'high':'low';
+   else if(event<.025){
+    game.dpr=1.2;game.canvas.width=384;game.canvas.height=682;
+    external=true;
+   }
+   const sample=random()<.04?null:random()<.5?slow:random()<.5?good:fast;
+   pilot.sample(time,sample);
+   if(external)assert.equal(game.dpr,1.2,'player DPR must never be overridden');
+   assert.equal(game.canvas.width,Math.round(game.w*game.dpr));
+   assert.equal(game.canvas.height,Math.round(game.h*game.dpr));
+  }
+  pilot.stop();
+  if(external)assert.equal(game.dpr,1.2);
+ }
+});
+
+test('near-threshold CPU-dominated frames do not authorize a blur probe',()=>{
+ const {game,pilot}=fixture();
+ const cpuDominated={frameSamples:120,fps:30,frameP95Ms:40,
+  updateP95Ms:19,renderP95Ms:3,simulationPacePct:75};
+ const result=step(pilot,0,3000,cpuDominated);
+ assert.equal(result.kind,'hold');
+ assert.equal(pilot.state.phase,'baseline');
+ assert.equal(game.dpr,1.5);
+});

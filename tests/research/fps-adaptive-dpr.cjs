@@ -12,7 +12,7 @@ function createAdaptiveDprPilot(game, options={}) {
   let lastApplied=original, width=game.w, height=game.h, phase='baseline';
   let slowSince=null, fastSince=null, lastTransition=-Infinity, lastSample=null;
   let trialStart=null, baseline=null, warmupUntil=-Infinity, stopped=false;
-  let cooldownUntil=-Infinity, externalOwner=false;
+  let cooldownUntil=-Infinity, externalOwner=false, lowMissingSince=null;
   const visible=typeof options.visible==='function'?options.visible:
     ()=>typeof document==='undefined'||!document.hidden;
   const result=(kind,changed=false)=>({kind,changed,dpr:game.dpr,phase});
@@ -26,7 +26,7 @@ function createAdaptiveDprPilot(game, options={}) {
     resetStreaks();return true;
   }
   function rollback(now){
-    phase='baseline';baseline=null;trialStart=null;
+    phase='baseline';baseline=null;trialStart=null;lowMissingSince=null;
     cooldownUntil=now+30000;
     return apply(original,now);
   }
@@ -45,6 +45,7 @@ function createAdaptiveDprPilot(game, options={}) {
     if(lastSample!==null&&now-lastSample>3500){
       resetStreaks();warmupUntil=now+2500;
       if(phase==='probing')return result('probe-interrupted',rollback(now));
+      if(phase==='low')return result('low-interrupted-rollback',rollback(now));
     }
     lastSample=now;
     if(game.w!==width||game.h!==height||game.dpr!==lastApplied||
@@ -59,14 +60,20 @@ function createAdaptiveDprPilot(game, options={}) {
     if(game.quality!=='low'||!visible()||game.paused||game.status!=='playing'){
       resetStreaks();warmupUntil=now+2500;
       if(phase==='probing')return result('probe-cancelled',rollback(now));
+      if(phase==='low')return result('low-inactive-rollback',rollback(now));
       return result('inactive');
     }
     if(!p||p.frameSamples<90||![p.fps,p.frameP95Ms,p.updateP95Ms,p.renderP95Ms,p.simulationPacePct]
       .every(Number.isFinite)){
       resetStreaks();
       if(phase==='probing'&&now-trialStart>8000)return result('probe-no-evidence',rollback(now));
+      if(phase==='low'){
+        if(lowMissingSince===null)lowMissingSince=now;
+        if(now-lowMissingSince>=8000)return result('low-no-evidence-rollback',rollback(now));
+      }
       return result('insufficient-evidence');
     }
+    lowMissingSince=null;
     if(phase==='probing'){
       // A 120-frame rolling window can still contain pre-probe frames at low
       // FPS. Do not accept a blur decision before the window can turn over.
@@ -89,7 +96,7 @@ function createAdaptiveDprPilot(game, options={}) {
     }
     if(now<warmupUntil)return result('warmup');
     const slow=p.fps<=50&&p.frameP95Ms>=22&&p.updateP95Ms<=20&&
-      p.renderP95Ms>=3;
+      p.renderP95Ms>=5&&p.renderP95Ms>=p.updateP95Ms*0.5;
     const fast=p.fps>=58&&p.frameP95Ms<=19&&p.updateP95Ms<=5&&
       p.renderP95Ms<=5;
     if(phase==='baseline'&&game.dpr>floor&&slow&&now>=cooldownUntil){
@@ -113,7 +120,7 @@ function createAdaptiveDprPilot(game, options={}) {
   function stop(){
     if(stopped)return false;
     stopped=true;
-    if(!externalOwner&&game.quality==='low'&&game.dpr===lastApplied&&game.w===width&&game.h===height&&
+    if(!externalOwner&&game.dpr===lastApplied&&game.w===width&&game.h===height&&
        game.canvas.width===Math.round(game.w*lastApplied)&&
        game.canvas.height===Math.round(game.h*lastApplied)&&
        game.dpr!==original)apply(original,lastSample||0);

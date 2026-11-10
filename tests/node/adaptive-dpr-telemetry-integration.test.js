@@ -4,6 +4,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const {AdaptiveDprPilot}=require('../research/adaptive-dpr-pilot.cjs');
+const {createAdaptiveDprPilot}=require('../research/fps-adaptive-dpr.cjs');
 const perf=fs.readFileSync(path.resolve(__dirname,'../../nova-updates/performance-v1.7.5.js'),'utf8');
 function telemetry() {
  const a=perf.indexOf('function perfState(g)'),b=perf.indexOf('function callWithoutFirstHit',a);
@@ -41,4 +42,21 @@ test('real shipping telemetry does not recommend blur for CPU-bound simulation',
  assert.ok(s.fps<25);
  const c=new AdaptiveDprPilot();
  for(let i=0;i<10;i++)assert.equal(c.observe(s,i*1000),1.5);
+});
+
+test('actual-resize research pilot distinguishes render pressure from update-dominated frames in shipping telemetry',()=>{
+ const renderBound=windowAt({renderMs:19,updateMs:3});
+ const updateBound=windowAt({renderMs:3,updateMs:19});
+ const fixture=()=>({quality:'low',status:'playing',paused:false,dpr:1.5,
+  w:320,h:568,canvas:{width:480,height:852}});
+ const renderGame=fixture(),renderPilot=createAdaptiveDprPilot(renderGame);
+ assert.equal(renderPilot.sample(0,renderBound).kind,'slow');
+ assert.equal(renderPilot.sample(1000,renderBound).kind,'probe-started');
+ assert.equal(renderGame.dpr,1,'measured render pressure may justify a reversible probe');
+ renderPilot.stop();
+ const updateGame=fixture(),updatePilot=createAdaptiveDprPilot(updateGame);
+ assert.equal(updatePilot.sample(0,updateBound).kind,'hold');
+ assert.equal(updatePilot.sample(1000,updateBound).kind,'hold');
+ assert.equal(updateGame.dpr,1.5,'update-dominated frames must not trigger blur');
+ updatePilot.stop();
 });
