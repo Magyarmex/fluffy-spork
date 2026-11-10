@@ -181,6 +181,7 @@ test('accepted low DPR rolls back after finite but invalid telemetry',()=>{
   {...better,updateP95Ms:-1},
   {...better,renderP95Ms:-1},
   {...better,simulationPacePct:-1},
+  {...better,simulationPacePct:0},
   {...better,frameSamples:90.5}
  ];
  for(const sample of invalid){
