@@ -151,6 +151,7 @@ jobs:
           # Run experimental fixed60 owner last: do not mask shipping smoke failures.
           node tests/browser/fixed60-real-game-owner-touch-research.cjs
           NOVA_FIXED60_MAX_STEPS=3 node tests/browser/fixed60-real-game-owner-touch-research.cjs
+          NOVA_FIXED60_MAX_STEPS=3 NOVA_FIXED60_ACTIVE_BURST=1 node tests/browser/fixed60-real-game-owner-touch-research.cjs
       - name: Preserve browser screenshots
         if: always()
         uses: actions/upload-artifact@v4

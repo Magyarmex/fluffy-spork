@@ -4,8 +4,15 @@
 // touch-to-photon, GPU presentation or a production scheduler promotion.
 const assert=require('node:assert/strict');
 const path=require('node:path');
+const fs=require('node:fs');
 const {chromium}=require('playwright');
 const maxSteps=Number(process.env.NOVA_FIXED60_MAX_STEPS||2);
+// Compare against the materialized shell, not a brittle hardcoded DOM count.
+const expectedOverlays=[...fs.readFileSync(path.resolve(__dirname,'../../index.html'),'utf8')
+ .matchAll(/<script\b[^>]*src=["']([^"']*nova-updates\/[^"']+)["']/gi)]
+ .map(m=>m[1].split('/').pop().split('?')[0]);
+assert.ok(expectedOverlays.length>0&&new Set(expectedOverlays).size===expectedOverlays.length,
+ 'materialized shell must declare unique canonical overlays');
 // Three-step is an opt-in test-only active-jitter policy; >100ms stalls
 // retain the original two-step safety budget.
 assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps');
@@ -77,7 +84,17 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
       // These are browser callback intervals, NOT physical display times.
       const owner=window.__novaFixedPilot?.owner;
       const beforeTicks=owner?.ticks??0,beforeDropped=owner?.droppedMs??0;
+      const beforeBirths=profile.births;
       const rawGapMs=owner?Math.max(0,ts-owner.lastMs):null;
+      // Arm the research-only ready shot at the actual RAF boundary.
+      // Arming before a 65ms main-thread block is unsound: a normal
+      // one-step callback can fire before the intended three-step burst.
+      // The scheduler still determines whether three real updates occur.
+      if(profile.armShotOnThree&&owner&&rawGapMs>=48&&rawGapMs<=100+1e-7&&
+       window.__novaFixedGame?.input?.aim?.active){
+       window.__novaFixedGame.player.fireCd=0;
+       profile.armShotOnThree=false;
+      }
       const at=performance.now();
       fn(ts);
       const current=window.__novaFixedPilot?.owner;
@@ -86,6 +103,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
        const previous=frames.length?frames[frames.length-1].ts:null;
        frames.push({ts,intervalMs:previous===null?null:ts-previous,
         steps:current.ticks-beforeTicks,budget:current.maxSteps,
+        playerProjectileBirths:profile.births-beforeBirths,
         rawGapMs,lagMs:current.lagMs,droppedMs:current.droppedMs-beforeDropped,
         dropReason:current.droppedMs>beforeDropped?
          (rawGapMs>100.0000001?'long-stall':'backlog'):null,
@@ -171,8 +189,75 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
   assert.equal(held.active,true);
   assert.ok(held.births>0,'real Game must emit player-owned projectile');
   assert.ok(Math.hypot(held.dx,held.dy)>5,'real analog extension must be sampled');
+  if(process.env.NOVA_FIXED60_ACTIVE_BURST==='1'){
+   // Exercise three-update callbacks while the real right stick is held.
+   // RAF alignment varies: a 55ms main-thread block may yield a 33ms
+   // callback rather than 50ms. Retry boundedly, but never waive the gate.
+   const heldBurstStart=await page.evaluate(()=>window.__novaFixedResearch.frames.length);
+   let shotInThree=false;
+   for(let attempt=0;attempt<8&&!shotInThree;attempt++){
+    const beforeFrame=await page.evaluate(()=>window.__novaFixedResearch.frames.length);
+    await page.evaluate(()=>{
+     // The RAF wrapper arms the ready shot at the burst boundary, not
+     // during this blocked task (which could precede a one-step RAF).
+     window.__novaFixedResearch.armShotOnThree=true;
+     const end=performance.now()+65;
+     while(performance.now()<end){}
+    });
+    await page.waitForFunction(before=>window.__novaFixedResearch.frames.length>before,
+     beforeFrame,{timeout:5000});
+    shotInThree=await page.evaluate(start=>window.__novaFixedResearch.frames
+     .slice(start).some(f=>f.steps===3&&f.budget===3&&f.rawGapMs<=100+1e-7&&
+      f.playerProjectileBirths>0),heldBurstStart);
+   }
+   const heldBurstDiagnostic=await page.evaluate(start=>({
+    frames:window.__novaFixedResearch.frames.slice(start).map(f=>({
+     gap:f.rawGapMs,steps:f.steps,budget:f.budget,births:f.playerProjectileBirths})),
+    aimActive:window.__novaFixedGame.input.aim.active,
+    aimOwner:window.__novaFixedGame.input.stickId.aim,
+    firing:window.__novaFixedGame.input.firing,
+    fireCd:window.__novaFixedGame.player.fireCd,
+    gameStatus:window.__novaFixedGame.status,
+    totalBirths:window.__novaFixedResearch.births
+   }),heldBurstStart);
+   assert.equal(shotInThree,true,
+    'a real three-update callback must emit a player-owned projectile while held: '+
+    JSON.stringify(heldBurstDiagnostic));
+   const during=await page.evaluate(()=>({
+    owner:window.__novaFixedGame.input.stickId.aim,
+    active:window.__novaFixedGame.input.aim.active,
+    births:window.__novaFixedResearch.births
+   }));
+   assert.equal(during.owner,held.owner,'three-step callbacks must preserve held touch owner');
+   assert.equal(during.active,true,'three-step callbacks must preserve held aim');
+   assert.ok(during.births>=held.births,'three-step callbacks must not undo real projectiles');
+  }
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   await page.waitForFunction(()=>window.__novaFixedGame?.input?.aim?.active===false,null,{timeout:5000});
+  // Opt-in research: force active (<100ms) RAF gaps in real Chromium.
+  // This must exercise the actual three-update Game path, not merely allow it.
+  if(process.env.NOVA_FIXED60_ACTIVE_BURST==='1'){
+   assert.equal(maxSteps,3,'active burst requires three-step research owner');
+   const releasedBurstStart=await page.evaluate(()=>window.__novaFixedResearch.frames.length);
+   const birthsAtRelease=await page.evaluate(()=>window.__novaFixedResearch.births);
+   for(let attempt=0;attempt<8;attempt++){
+    const before=await page.evaluate(()=>window.__novaFixedResearch.frames.length);
+    await page.evaluate(()=>{
+     const end=performance.now()+65;
+     while(performance.now()<end){} // intentional research-only foreground work
+    });
+    await page.waitForFunction(before=>window.__novaFixedResearch.frames.length>before,
+     before,{timeout:5000});
+   }
+   const bursts=await page.evaluate(start=>window.__novaFixedResearch.frames
+    .slice(start).filter(f=>f.steps===3&&f.rawGapMs<=100+1e-7&&f.budget===3)
+    .map(f=>({rawGapMs:f.rawGapMs,steps:f.steps,callbackJsMs:f.callbackJsMs})),releasedBurstStart);
+   assert.ok(bursts.length>0,
+    'post-release active Chromium gaps must independently exercise three-update Game callbacks');
+   assert.equal(await page.evaluate(()=>window.__novaFixedResearch.births),birthsAtRelease,
+    'released right stick must not ghost-fire during three-update catch-up');
+   console.log('NOVA_FIXED60_ACTIVE_THREE_UPDATE_BURSTS '+JSON.stringify(bursts));
+  }
   // Force one genuine foreground RAF gap, after releasing the stick.
   // The active-only three-step policy must revert to two steps on this gap.
   const beforeStall=await page.evaluate(()=>({
@@ -218,7 +303,10 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     updates:values(window.__novaFixedResearch.updates),
     renders:values(window.__novaFixedResearch.renders),
     births:window.__novaFixedResearch.births,
-    runtimeScripts:document.querySelectorAll('script[src*="nova-updates/"]').length};
+    runtimeScriptNames:[...document.querySelectorAll('script[src*="nova-updates/"]')]
+     .map(s=>s.src.split('/').pop().split('?')[0]),
+    // Playwright addScriptTag({path}) injects inline contents, not a src URL.
+    researchFactoryPresent:typeof window.__novaFixed60Research?.createFixedStepBrowserPilot==='function'};
   });
   assert.equal(report.aimActive,false,'release must clear aim');
   const touches=await page.evaluate(()=>window.__novaFixedResearch.touchEvents.slice());
@@ -260,7 +348,9 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
   assert.ok(Math.abs(report.raf.attributedDroppedMs-report.droppedMs)<1e-5,
    'RAF-level dropped-time attribution must match the actual owner total');
   assert.ok(Number.isFinite(report.updates.p95));
-  assert.ok(report.runtimeScripts>=49,'actual shipping overlays must be loaded');
+  assert.deepEqual(expectedOverlays.filter(name=>!report.runtimeScriptNames.includes(name)),[],
+   'every canonical materialized overlay must load (optional dynamic scripts are allowed)');
+  assert.equal(report.researchFactoryPresent,true,'opt-in fixed60 research factory must be installed');
   assert.deepEqual(errors,[],'browser errors');
   assert.deepEqual(consoleErrors,[],'browser console errors');
   const teardown=await page.evaluate(()=>{
