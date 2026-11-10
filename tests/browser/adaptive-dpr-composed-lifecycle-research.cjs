@@ -61,6 +61,26 @@ const improved={frameSamples:120,fps:55,frameP95Ms:22,updateP95Ms:5,
    const g=window.__novaDprResearchGame;
    if(typeof window.__novaDprResearchFactory!=='function')
     throw Error('research pilot injection failed');
+   // The prior two-RAF raster check could miss a blank FIRST render after
+   // canvas backing reset. Intercept the actual final composed renderer and
+   // sample the first completed draw, not a later stable frame.
+   const renderModule=window.__novaMakeRequire('')('game/render');
+   const originalRender=renderModule.render;
+   const firstPaint=[];let watchNextPaint=false;
+   renderModule.render=function(){
+    const out=originalRender.apply(this,arguments);
+    if(watchNextPaint&&arguments[0]===g){
+     watchNextPaint=false;
+     const canvas=g.canvas,ctx=canvas.getContext('2d');
+     let opaque=0;
+     for(const y of [.25,.5,.75])for(const x of [.25,.5,.75]){
+      const px=Math.floor((canvas.width-1)*x),py=Math.floor((canvas.height-1)*y);
+      if(ctx.getImageData(px,py,1,1).data[3]>0)opaque++;
+     }
+     firstPaint.push({dpr:g.dpr,backing:[canvas.width,canvas.height],opaque});
+    }
+    return out;
+   };
    const initial={dpr:g.dpr,w:g.w,h:g.h,backing:[g.canvas.width,g.canvas.height],
     gameTime:g.time};
    if(initial.dpr!==1.5)throw Error('expected low-quality DPR 1.5');
@@ -78,6 +98,7 @@ const improved={frameSamples:120,fps:55,frameP95Ms:22,updateP95Ms:5,
     births:window.__novaDprPlayerBirths,dx:g.input.aim.dx,dy:g.input.aim.dy};
    const before=raster();
    pilot.sample(0,slow);const started=pilot.sample(1000,slow);
+   watchNextPaint=true;
    await frame();
    const probing={dpr:g.dpr,kind:started.kind,raster:raster()};
    let accepted;
@@ -86,13 +107,15 @@ const improved={frameSamples:120,fps:55,frameP95Ms:22,updateP95Ms:5,
    const low={dpr:g.dpr,kind:accepted.kind,raster:raster()};
    let restored;
    for(let t=7500;t<=15500;t+=500)restored=pilot.sample(t,null);
+   watchNextPaint=true;
    await frame();
    const touchAfter={owner:g.input.stickId.aim,active:g.input.aim.active,
     births:window.__novaDprPlayerBirths,dx:g.input.aim.dx,dy:g.input.aim.dy};
    const after={dpr:g.dpr,kind:restored.kind,raster:raster(),
     gameTime:g.time,css:[g.w,g.h],phase:pilot.state.phase};
    pilot.stop();
-   return {initial,before,probing,low,after,touchBefore,touchAfter};
+   renderModule.render=originalRender;
+   return {initial,before,probing,low,after,touchBefore,touchAfter,firstPaint};
   },{slow,improved});
   // DPR changes must preserve not only ownership but also live movement and
   // release. Moving the same trusted pointer must steer the real Game stick.
@@ -119,6 +142,14 @@ const improved={frameSamples:120,fps:55,frameP95Ms:22,updateP95Ms:5,
   assert.equal(report.touchAfter.owner,report.touchBefore.owner,'pointer ownership must not change');
   assert.equal(report.touchBefore.births,0,'centered touch must not create a projectile');
   assert.equal(report.touchAfter.births,0,'DPR transitions must not invent a projectile');
+  assert.equal(report.firstPaint.length,2,
+   'each DPR backing reset must produce an observed first composed render');
+  assert.deepEqual(report.firstPaint.map(p=>p.dpr),[1,1.5]);
+  assert.deepEqual(report.firstPaint[0].backing,
+   [Math.round(report.initial.w),Math.round(report.initial.h)]);
+  assert.deepEqual(report.firstPaint[1].backing,report.initial.backing);
+  for(const paint of report.firstPaint)
+   assert.ok(paint.opaque>0,'first post-resize Game render must not be blank');
   assert.equal(report.probing.kind,'probe-started');
   assert.equal(report.probing.dpr,1);
   assert.equal(report.low.kind,'probe-accepted');
