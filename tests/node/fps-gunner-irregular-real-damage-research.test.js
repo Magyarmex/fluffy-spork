@@ -12,7 +12,7 @@ const SECONDS=6;
 function frames(mode){
  if(mode==='native60')return Array.from({length:360},()=>1/60);
  if(mode==='cluster30')return Array.from({length:180},()=>1/30);
- if(mode==='alternating30_120')return Array.from({length:144},()=>[1/30,1/120]).flat();
+ if(mode==='alternating40_120')return Array.from({length:180},()=>[1/40,1/120]).flat();
  throw Error('unknown presentation mode');
 }
 function trial(seed,cls,reload,mode){
@@ -94,7 +94,7 @@ test('irregular presentation frames preserve input duty but expose actual Gunner
  const rows=[];
  for(const [cls,reload] of [['minigun',1],['needlestorm',3]]){
   for(const seed of [1517800,1517802]){
-   for(const mode of ['native60','cluster30','alternating30_120']){
+   for(const mode of ['native60','cluster30','alternating40_120']){
     const row=trial(seed,cls,reload,mode);
     const repeat=trial(seed,cls,reload,mode);
     assert.deepEqual(row,repeat,'seeded composed simulation must reproduce');
