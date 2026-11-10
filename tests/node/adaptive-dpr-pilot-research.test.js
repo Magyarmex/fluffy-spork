@@ -127,3 +127,11 @@ test('borderline render pressure cannot rapidly alternate DPR at 60Hz',()=>{
  assert.equal(c.dpr,1.25,'interrupted recovery evidence must not raise DPR');
  assert.equal(c.changes,1);
 });
+
+test('original <=7ms render recovery remains available with moderate update work',()=>{
+ const c=new AdaptiveDprPilot();
+ c.observe(renderBound,0);c.observe(renderBound,1000);
+ const priorHealthy={...healthy,renderP95Ms:4,updateP95Ms:8};
+ for(const ms of [2000,3000,4000,5000])c.observe(priorHealthy,ms);
+ assert.equal(c.dpr,1.5,'expanded recovery must not narrow the original gate');
+});
