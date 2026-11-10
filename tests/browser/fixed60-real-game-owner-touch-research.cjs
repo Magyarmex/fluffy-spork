@@ -6,6 +6,8 @@ const assert=require('node:assert/strict');
 const path=require('node:path');
 const {chromium}=require('playwright');
 const maxSteps=Number(process.env.NOVA_FIXED60_MAX_STEPS||2);
+// Three-step here is a GLOBAL research cap, including >100ms stalls.
+ // The separate active-only three-step policy is not wired into this pilot.
 assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps');
 (async()=>{
  const browser=await chromium.launch({headless:true,args:['--disable-dev-shm-usage','--no-sandbox']});
