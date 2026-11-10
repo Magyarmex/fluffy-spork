@@ -4,8 +4,15 @@
 // touch-to-photon, GPU presentation or a production scheduler promotion.
 const assert=require('node:assert/strict');
 const path=require('node:path');
+const fs=require('node:fs');
 const {chromium}=require('playwright');
 const maxSteps=Number(process.env.NOVA_FIXED60_MAX_STEPS||2);
+// Compare against the materialized shell, not a brittle hardcoded DOM count.
+const expectedOverlays=[...fs.readFileSync(path.resolve(__dirname,'../../index.html'),'utf8')
+ .matchAll(/<script\b[^>]*src=["']([^"']*nova-updates\/[^"']+)["']/gi)]
+ .map(m=>m[1].split('/').pop().split('?')[0]);
+assert.ok(expectedOverlays.length>0&&new Set(expectedOverlays).size===expectedOverlays.length,
+ 'materialized shell must declare unique canonical overlays');
 // Three-step is an opt-in test-only active-jitter policy; >100ms stalls
 // retain the original two-step safety budget.
 assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps');
@@ -275,8 +282,8 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     updates:values(window.__novaFixedResearch.updates),
     renders:values(window.__novaFixedResearch.renders),
     births:window.__novaFixedResearch.births,
-    runtimeScripts:[...document.querySelectorAll('script[src*="nova-updates/"]')]
-     .filter(s=>!s.src.includes('fixed60-research-browser.js')).length,
+    runtimeScriptNames:[...document.querySelectorAll('script[src*="nova-updates/"]')]
+     .map(s=>s.src.split('/').pop().split('?')[0]),
     // Playwright addScriptTag({path}) injects inline contents, not a src URL.
     researchFactoryPresent:typeof window.__novaFixed60Research?.createFixedStepBrowserPilot==='function'};
   });
@@ -320,7 +327,8 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
   assert.ok(Math.abs(report.raf.attributedDroppedMs-report.droppedMs)<1e-5,
    'RAF-level dropped-time attribution must match the actual owner total');
   assert.ok(Number.isFinite(report.updates.p95));
-  assert.equal(report.runtimeScripts,49,'all 49 canonical shipping overlays must be loaded');
+  assert.deepEqual(expectedOverlays.filter(name=>!report.runtimeScriptNames.includes(name)),[],
+   'every canonical materialized overlay must load (optional dynamic scripts are allowed)');
   assert.equal(report.researchFactoryPresent,true,'opt-in fixed60 research factory must be installed');
   assert.deepEqual(errors,[],'browser errors');
   assert.deepEqual(consoleErrors,[],'browser console errors');
