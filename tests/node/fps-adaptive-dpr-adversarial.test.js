@@ -104,3 +104,18 @@ test('accepted low-resolution mode restores owned backing on pause or quality ex
   assert.deepEqual([g.canvas.width,g.canvas.height],[480,852]);
  }
 });
+
+test('accepted-low cleanup never overwrites a player DPR change on resume',()=>{
+ const {game,pilot}=fixture();
+ step(pilot,0,1000,slow);
+ const good={...better,fps:55,frameP95Ms:22,updateP95Ms:5,simulationPacePct:95};
+ step(pilot,1500,7000,good);
+ assert.equal(pilot.state.phase,'low');
+ game.quality='high';game.dpr=2;
+ game.canvas.width=640;game.canvas.height=1136;
+ assert.equal(pilot.sample(12000,good).kind,'external-resize',
+  'external owner must win even when the first sample follows a long hidden gap');
+ assert.equal(pilot.stop(),true);
+ assert.equal(game.dpr,2);
+ assert.deepEqual([game.canvas.width,game.canvas.height],[640,1136]);
+});
