@@ -569,6 +569,17 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
    startRestored:true,destroyRestored:true,pauseRestored:true,
    destroyed:true,musicTimer:null,pendingGateRequests:0
   },'pilot teardown must restore native controls and release Game/audio/RAF ownership');
+  if(timerArmedGate){
+   // A cancelled timer must not resurrect RAF after Game destruction.
+   const count=await page.evaluate(()=>window.__novaFixedResearch.frames.length);
+   await page.waitForTimeout(120);
+   const after=await page.evaluate(()=>({
+    frames:window.__novaFixedResearch.frames.length,
+    pending:window.__novaFixedResearch.pendingGateRequests()
+   }));
+   assert.deepEqual(after,{frames:count,pending:0},
+    'timer-armed teardown must not resurrect simulation callbacks');
+  }
   console.log('NOVA_FIXED60_CHROMIUM_OWNER_TOUCH '+JSON.stringify(report));
  }finally{await context.close();await browser.close();}
 })().catch(e=>{console.error(e.stack||e);process.exitCode=1;});
