@@ -200,8 +200,19 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
      .slice(start).some(f=>f.steps===3&&f.budget===3&&f.rawGapMs<=100+1e-7&&
       f.playerProjectileBirths>0),heldBurstStart);
    }
+   const heldBurstDiagnostic=await page.evaluate(start=>({
+    frames:window.__novaFixedResearch.frames.slice(start).map(f=>({
+     gap:f.rawGapMs,steps:f.steps,budget:f.budget,births:f.playerProjectileBirths})),
+    aimActive:window.__novaFixedGame.input.aim.active,
+    aimOwner:window.__novaFixedGame.input.stickId.aim,
+    firing:window.__novaFixedGame.input.firing,
+    fireCd:window.__novaFixedGame.player.fireCd,
+    gameStatus:window.__novaFixedGame.status,
+    totalBirths:window.__novaFixedResearch.births
+   }),heldBurstStart);
    assert.equal(shotInThree,true,
-    'a real three-update callback must emit a player-owned projectile while held');
+    'a real three-update callback must emit a player-owned projectile while held: '+
+    JSON.stringify(heldBurstDiagnostic));
    const during=await page.evaluate(()=>({
     owner:window.__novaFixedGame.input.stickId.aim,
     active:window.__novaFixedGame.input.aim.active,
