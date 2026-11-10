@@ -144,3 +144,18 @@ test('cone-first assist remains symmetric and rejects outside-cone targets',()=>
    'outside-cone rival must not bend raw aim when no aligned target exists');
  }
 });
+
+// An aligned, closer hull behind cover must not consume the only candidate.
+// This combines cone-first ranking with the existing terrain-visibility gate.
+test('cone-first aim falls through occluded aligned target to visible aligned rival',()=>{
+ const Game=boot(),g=new Game();g.w=568;g.h=320;
+ const behindCover=tank(40,100,5),visible=tank(41,220,18);
+ g.tanks.push(behindCover,visible);
+ g.input.aimVec=()=>({x:1,y:0});
+ g.hasLineOfSight=(x,y,tx,ty)=>tx!==behindCover.x;
+ assert.equal(g.nearestTank(0,0,480,1),visible,
+  'the direct query must already exclude the occluded closer rival');
+ g.update();
+ assert.ok(Math.abs(g.player.angle-Math.atan2(18,220))<1e-10,
+  'cone-first selection must retain the terrain-visible aligned rival');
+});
