@@ -35,6 +35,7 @@ const improved={frameSamples:120,fps:55,frameP95Ms:22,updateP95Ms:5,
   await deploy.click();
   await page.waitForFunction(()=>window.__novaDprResearchGame?.status==='playing',
    {timeout:30000});
+  await page.evaluate(()=>{const g=window.__novaDprResearchGame;g.quality='low';g.resize();});
   const canvas=page.locator('canvas.absolute.inset-0');
   await canvas.waitFor({state:'visible',timeout:20000});
   const box=await canvas.boundingBox();
@@ -47,7 +48,6 @@ const improved={frameSamples:120,fps:55,frameP95Ms:22,updateP95Ms:5,
    const g=window.__novaDprResearchGame;
    if(typeof window.__novaDprResearchFactory!=='function')
     throw Error('research pilot injection failed');
-   g.quality='low';g.resize();
    const initial={dpr:g.dpr,w:g.w,h:g.h,backing:[g.canvas.width,g.canvas.height],
     gameTime:g.time};
    if(initial.dpr!==1.5)throw Error('expected low-quality DPR 1.5');
