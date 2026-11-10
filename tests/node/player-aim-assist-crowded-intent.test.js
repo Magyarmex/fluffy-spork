@@ -108,3 +108,20 @@ for(const hz of [30,60,120])test('unique cone rescue changes the real emitted sh
    'actual projectile must launch along the rescued aim, not the raw stick');
  }finally{close(g);}
 });
+
+for(const hz of [30,60,120])test('Controller command keeps raw bearing while unique gun rescue turns at '+hz+'Hz',()=>{
+ const offAxis=rival(9701,120,70),aligned=rival(9702,220,20);
+ const {g,p}=scene([offAxis,aligned]);
+ try{
+  g.setClass(p,'warden');
+  g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
+  g.update(1/hz);
+  const expected=Math.atan2(20,220)*13/hz;
+  assert.ok(Math.abs(p.angle-expected)<1e-6,
+   'Controller cannon receives the conservative unique-target correction');
+  assert.ok(p.__novaSwarm&&p.__novaSwarm.active,
+   'real Controller command remains active under the same held right stick');
+  assert.ok(Math.abs(p.__novaSwarm.angle)<1e-8,
+   'swarm command must retain raw east stick bearing, not assisted cannon angle');
+ }finally{close(g);}
+});
