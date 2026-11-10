@@ -93,7 +93,10 @@ function protectLifecycleCleanup(html){
 function patchRafStepCapLegacy(html){
  if(typeof html!=='string')throw new TypeError('expected UTF-8 HTML');
  /* Upgrade an already materialized pre-fix shell as well as fresh compressed input. */
- if(count(html,oldCpuGate)===1&&count(html,newCpuGate)===0)html=html.replace(oldCpuGate,newCpuGate);
+ const oldBudgetCount=count(html,oldCpuGate),newBudgetCount=count(html,newCpuGate);
+ if(oldBudgetCount>1||newBudgetCount>1||oldBudgetCount&&newBudgetCount)
+  throw Error('canonical RAF current-frame CPU budget owner drift; refuse materialization');
+ if(oldBudgetCount===1)html=html.replace(oldCpuGate,newCpuGate);
  if(!html.includes('    start() {')||!html.includes('this.raf = requestAnimationFrame(loop);'))
   throw Error('canonical game RAF owner missing');
  if(count(html,after)===1&&count(html,withCarry)===1&&
