@@ -67,7 +67,8 @@ const {chromium}=require('playwright');
   await page.locator('.nv-loading').waitFor({state:'hidden',timeout:20000});
   await page.evaluate(()=>{
    const g=window.__novaFixedGame;
-   g.input.autofire=false;g.player.fireCd=0;g.player.spawnShieldT=10;
+   g.input.autofire=false;g.input.firing=false;
+   g.player.fireCd=0;g.player.spawnShieldT=10;
    window.__novaFixedResearch.births=0;
   });
   const box=await canvas.boundingBox();
