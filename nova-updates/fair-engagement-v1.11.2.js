@@ -291,14 +291,12 @@ wrap('game/engine',function(engine,require){
   /* Only the actual Game.update player-aim query should use cone-first
    * selection. Preserve direct nearestTank callers, AI, Crashers and tests.
    * The shipping input moveVec/aimVec accessors are read-only. */
-  var oldPlayerUpdate=Game.prototype.update;
+  var activeAimQuery=null,oldPlayerUpdate=Game.prototype.update;
   if(typeof oldPlayerUpdate==='function')Game.prototype.update=function(){
-    var had=Object.prototype.hasOwnProperty.call(this,'__novaFairAimQuery'),
-        prior=this.__novaFairAimQuery;
-    this.__novaFairAimQuery=true;
-    try{return oldPlayerUpdate.apply(this,arguments);}finally{
-      if(had)this.__novaFairAimQuery=prior;else delete this.__novaFairAimQuery;
-    }
+    /* Keep the query scope in the wrapper, not on the Game object: avoid
+     * adding/deleting a property on the hot simulation instance each frame. */
+    var prior=activeAimQuery;activeAimQuery=this;
+    try{return oldPlayerUpdate.apply(this,arguments);}finally{activeAimQuery=prior;}
   };
 
   /* The canonical touch aim assist asks nearestTank(player.x, player.y,
@@ -314,7 +312,7 @@ wrap('game/engine',function(engine,require){
        !cam||!Number.isFinite(cam.x)||!Number.isFinite(cam.y)||
        !(z>0)||!(w>0)||!(h>0))return originalNearest.apply(this,arguments);
     var aimAngle=null;
-    if(this.__novaFairAimQuery&&this.input&&
+    if(activeAimQuery===this&&this.input&&
        typeof this.input.moveVec==='function'&&typeof this.input.aimVec==='function'){
       var av=this.input.aimVec(this.input.moveVec());
       if(av&&Number.isFinite(av.x)&&Number.isFinite(av.y)&&Math.hypot(av.x,av.y)>0)
