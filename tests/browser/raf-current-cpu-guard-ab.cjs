@@ -66,10 +66,11 @@ const arms={shipping:html.replace(guarded,shipping),candidate:html};
       }
       return result;
      };
-     document.addEventListener('pointermove',e=>{
-      if(e.pointerType==='touch')window.__novaCpuAb.touches.push({
-       at:performance.now(),trusted:e.isTrusted,type:e.type});
-     },{capture:true,passive:true});
+     for(const type of ['pointerdown','pointermove'])
+      document.addEventListener(type,e=>{
+       if(e.pointerType==='touch')window.__novaCpuAb.touches.push({
+        at:performance.now(),trusted:e.isTrusted,type:e.type});
+      },{capture:true,passive:true});
     });
     await page.getByRole('button',{name:/DEPLOY/i}).first().click();
     const canvas=page.locator('canvas.absolute.inset-0');
@@ -110,7 +111,8 @@ const arms={shipping:html.replace(guarded,shipping),candidate:html};
     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
     assert.ok(metrics.volleys>0,'trusted held touch must fire actual Minigun');
     assert.ok(metrics.spikes>0,'real composed Game must receive controlled CPU spikes');
-    assert.ok(metrics.touches.some(t=>t.trusted),'CDP touch must arrive trusted');
+    assert.ok(metrics.touches.some(t=>t.trusted&&t.type==='pointerdown'),'CDP touch start must arrive trusted');
+    assert.ok(metrics.birthAt>=metrics.touches[0].at,'projectile birth must follow trusted touch start');
     assert.ok(metrics.aimActive&&metrics.firing,'live right stick must own firing');
     assert.ok(Number.isFinite(metrics.gameTime)&&metrics.gameTime>0);
     assert.deepEqual(errors,[],'browser Game must not throw');
