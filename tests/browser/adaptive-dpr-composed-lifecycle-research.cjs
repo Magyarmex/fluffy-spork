@@ -73,6 +73,10 @@ const improved={frameSamples:120,fps:55,frameP95Ms:22,updateP95Ms:5,
   assert.equal(report.probing.dpr,1);
   assert.equal(report.low.kind,'probe-accepted');
   assert.equal(report.low.dpr,1);
+  assert.deepEqual([report.probing.raster.width,report.probing.raster.height],
+   [Math.round(report.initial.w),Math.round(report.initial.h)]);
+  assert.deepEqual([report.low.raster.width,report.low.raster.height],
+   [Math.round(report.initial.w),Math.round(report.initial.h)]);
   assert.equal(report.after.kind,'low-no-evidence-rollback');
   assert.equal(report.after.dpr,1.5);
   assert.deepEqual(report.after.css,[report.initial.w,report.initial.h]);
