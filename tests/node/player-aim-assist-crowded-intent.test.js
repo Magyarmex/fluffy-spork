@@ -48,3 +48,81 @@ for(const hz of [30,60,120])test('crowded cone preserves manual intent at '+hz+'
    'removing the second aligned rival must restore unique-target assistance');
  }finally{close(g);}
 });
+
+for(const hz of [30,60,120])test('unique cone rescue respects live shield, terrain and allegiance at '+hz+'Hz',()=>{
+ const offAxis=rival(9501,120,70),aligned=rival(9502,220,20);
+ const {g,p}=scene([offAxis,aligned]);
+ const dt=1/hz,expected=Math.atan2(20,220)*13/hz;
+ const originalAllies=g.areAllies;
+ const tick=()=>{p.angle=0;g.update(dt);assert.equal(g.__novaFairAimQuery,undefined,
+   'player-only query scope must not escape the real update');};
+ try{
+  assert.equal(g.nearestTank(0,0,480,p.id),offAxis,
+   'ordinary queries retain the nearer off-axis rival');
+  aligned.spawnShieldT=2;
+  tick();
+  assert.ok(Math.abs(p.angle)<1e-9,'protected aligned rival cannot steal manual aim');
+  aligned.spawnShieldT=0;
+  tick();
+  assert.ok(Math.abs(p.angle-expected)<1e-6,
+   'removing protection must restore the same-world unique rescue');
+  g.hasLineOfSight=(x,y,tx,ty)=>tx!==aligned.x;
+  tick();
+  assert.ok(Math.abs(p.angle)<1e-9,'occluded aligned rival cannot steal manual aim');
+  g.hasLineOfSight=()=>true;
+  tick();
+  assert.ok(Math.abs(p.angle-expected)<1e-6,
+   'restoring line of sight must restore the unique rescue');
+  g.areAllies=(a,b)=>b.id===aligned.id;
+  tick();
+  assert.ok(Math.abs(p.angle)<1e-9,'friendly aligned rival cannot steal manual aim');
+  g.areAllies=originalAllies;
+  tick();
+  assert.ok(Math.abs(p.angle-expected)<1e-6,
+   'restoring hostility must restore the unique rescue');
+ }finally{close(g);}
+});
+
+for(const hz of [30,60,120])test('unique cone rescue changes the real emitted shot bearing at '+hz+'Hz',()=>{
+ const offAxis=rival(9601,120,70),aligned=rival(9602,220,20);
+ const {g,p}=scene([offAxis,aligned]);
+ const births=[],original=g.tryFire;
+ try{
+  g.sfx.muted=true;
+  g.input.firing=true;
+  g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
+  g.tryFire=function(t){
+   const before=this.bullets.length;
+   const result=original.apply(this,arguments);
+   if(t===p&&this.bullets.length>before){
+    const b=this.bullets[before];
+    births.push({vx:b.vx,vy:b.vy});
+   }
+   return result;
+  };
+  g.update(1/hz);
+  assert.equal(births.length,1,'one real Scout projectile must be emitted');
+  const expected=Math.atan2(20,220)*13/hz;
+  assert.ok(Math.abs(p.angle-expected)<1e-6,'unique aligned target rotates gun');
+  const bearing=Math.atan2(births[0].vy,births[0].vx);
+  assert.ok(Math.abs(Math.atan2(Math.sin(bearing-expected),Math.cos(bearing-expected)))<1e-5,
+   'actual projectile must launch along the rescued aim, not the raw stick');
+ }finally{close(g);}
+});
+
+for(const hz of [30,60,120])test('Controller command keeps raw bearing while unique gun rescue turns at '+hz+'Hz',()=>{
+ const offAxis=rival(9701,120,70),aligned=rival(9702,220,20);
+ const {g,p}=scene([offAxis,aligned]);
+ try{
+  g.setClass(p,'warden');
+  g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
+  g.update(1/hz);
+  const expected=Math.atan2(20,220)*13/hz;
+  assert.ok(Math.abs(p.angle-expected)<1e-6,
+   'Controller cannon receives the conservative unique-target correction');
+  assert.ok(p.__novaSwarm&&p.__novaSwarm.active,
+   'real Controller command remains active under the same held right stick');
+  assert.ok(Math.abs(p.__novaSwarm.angle)<1e-8,
+   'swarm command must retain raw east stick bearing, not assisted cannon angle');
+ }finally{close(g);}
+});
