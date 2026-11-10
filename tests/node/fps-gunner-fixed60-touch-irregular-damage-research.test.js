@@ -68,6 +68,15 @@ function trial(seed,cls,reload,mode,offsetMs){
    }
    return out;
   };
+  // The target is a fixed-position damage dummy. Reset after EVERY simulation
+  // tick, not every presented frame: reverse jitter executes two ticks before
+  // one render, and frame-scoped resets would create a false damage disparity.
+  const originalUpdate=g.update;
+  g.update=function(dt){
+   const out=originalUpdate.apply(this,arguments);
+   target.x=200;target.y=0;target.vx=0;target.vy=0;
+   return out;
+  };
   const timeline=new ChronologicalInput(g.input);
   const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
   const owner=new FixedStepRafOwner(g,timeline,bridge,{
@@ -105,7 +114,6 @@ function trial(seed,cls,reload,mode,offsetMs){
     const steps=owner.lastSteps;
     assert.ok(steps>=0&&steps<=2,'bounded per-render simulation work');
     stepsByFrame[steps===0?'zero':steps===1?'one':'two']++;
-    target.x=200;target.y=0;target.vx=0;target.vy=0;
    }
    assert.ok(Math.abs(elapsed-DURATION_MS)<1e-6);
    assert.equal(index,edges.length,'all input edges delivered');
