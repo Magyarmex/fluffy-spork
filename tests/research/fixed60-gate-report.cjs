@@ -11,7 +11,8 @@ function summarize(poll,timer){
   assert.match(r.initialFingerprint||'',/^[a-f0-9]{8}:[0-9]+$/,label+': missing world');
   for(const [name,n] of Object.entries({
    wall:r.raf.observedWallMs,frames:r.raf.frames,
-   skipped:r.raf.nativeRafSkipped,sim:r.raf.simulatedMs,
+   skipped:r.raf.nativeRafSkipped,skipJs:r.raf.nativeRafSkipCallbackJsMs,
+   sim:r.raf.simulatedMs,
    dropped:r.droppedMs,backlog:r.raf.backlogDroppedMs,
    touchBirth:r.touchToProjectileBirthMs,
    touchCanvas:r.touchToCanvasSubmissionMs
@@ -32,6 +33,8 @@ function summarize(poll,timer){
   deliveredFrames:r.raf.frames,
   skippedNativeRafs:r.raf.nativeRafSkipped,
   skippedPerFrame:r.raf.nativeRafSkipped/r.raf.frames,
+  skipCallbackJsMs:r.raf.nativeRafSkipCallbackJsMs,
+  skipCallbackJsMsPerSecond:r.raf.nativeRafSkipCallbackJsMs*1000/r.raf.observedWallMs,
   simulatedMs:r.raf.simulatedMs,
   backlogLossMsPerSecond:r.raf.backlogDroppedMs*1000/r.raf.observedWallMs,
   touchToProjectileBirthMs:r.touchToProjectileBirthMs,
