@@ -52,7 +52,8 @@ for(const hz of [30,60,120])test('crowded cone preserves manual intent at '+hz+'
 for(const hz of [30,60,120])test('unique cone rescue respects live shield, terrain and allegiance at '+hz+'Hz',()=>{
  const offAxis=rival(9501,120,70),aligned=rival(9502,220,20);
  const {g,p}=scene([offAxis,aligned]);
- const dt=1/hz,expected=Math.atan2(20,220)*13/hz;\n const originalAllies=g.areAllies;
+ const dt=1/hz,expected=Math.atan2(20,220)*13/hz;
+ const originalAllies=g.areAllies;
  const tick=()=>{p.angle=0;g.update(dt);assert.equal(g.__novaFairAimQuery,undefined,
    'player-only query scope must not escape the real update');};
  try{
@@ -75,7 +76,7 @@ for(const hz of [30,60,120])test('unique cone rescue respects live shield, terra
   g.areAllies=(a,b)=>b.id===aligned.id;
   tick();
   assert.ok(Math.abs(p.angle)<1e-9,'friendly aligned rival cannot steal manual aim');
-  g.areAllies=undefined;
+  g.areAllies=originalAllies;
   tick();
   assert.ok(Math.abs(p.angle-expected)<1e-6,
    'restoring hostility must restore the unique rescue');
