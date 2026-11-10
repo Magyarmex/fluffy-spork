@@ -201,12 +201,17 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
    const longStallDrops=frames.filter(f=>f.dropReason==='long-stall').length;
    const backlogDrops=frames.filter(f=>f.dropReason==='backlog').length;
    const attributedDroppedMs=frames.reduce((sum,f)=>sum+f.droppedMs,0);
+   const longStallDroppedMs=frames.filter(f=>f.dropReason==='long-stall')
+    .reduce((sum,f)=>sum+f.droppedMs,0);
+   const backlogDroppedMs=frames.filter(f=>f.dropReason==='backlog')
+    .reduce((sum,f)=>sum+f.droppedMs,0);
    return {configuredMaxSteps:window.__novaFixedMaxSteps,
     maxSteps:p.owner.maxSteps,ticks:p.owner.ticks,droppedMs:p.owner.droppedMs,
     raf:{frames:frames.length,intervals:values(frameIntervals),
      callbackJs:values(callbackCosts),backlogMs:values(backlogSamples),
      stepCounts,droppedFrameCount,
      longStallDrops,backlogDrops,attributedDroppedMs,
+     longStallDroppedMs,backlogDroppedMs,
      maxIntervalMs:frameIntervals.length?Math.max(...frameIntervals):null},
     productionRafActive:!!g.raf,pilotStarted:p.owner.started,
     aimActive:g.input.aim.active,aimOwner:g.input.stickId.aim,
@@ -249,6 +254,9 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
    'controlled >100ms Chromium stall must be classified as a long stall');
   assert.equal(report.raf.longStallDrops+report.raf.backlogDrops,
    report.raf.droppedFrameCount,'every dropped-time frame must have a cause');
+  assert.ok(Math.abs(report.raf.longStallDroppedMs+
+   report.raf.backlogDroppedMs-report.droppedMs)<1e-5,
+   'long-stall and ordinary-backlog losses must reconcile');
   assert.ok(Math.abs(report.raf.attributedDroppedMs-report.droppedMs)<1e-5,
    'RAF-level dropped-time attribution must match the actual owner total');
   assert.ok(Number.isFinite(report.updates.p95));
