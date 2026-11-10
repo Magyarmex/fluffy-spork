@@ -119,3 +119,83 @@ test('touch assist respects explicit team relations without changing legacy AI n
  assert.equal(g.nearestTank(0,0,480,1),enemy,
    'explicit non-hostile relations must also be respected');
 });
+
+test('closer visible off-axis rival cannot block farther aligned touch target',()=>{
+ const Game=boot(),g=new Game();g.w=568;g.h=320;
+ const distractor=tank(2,120,70),aligned=tank(3,240,20);
+ g.tanks.push(distractor,aligned);
+ g.input.aimVec=()=>({x:1,y:0});
+ assert.equal(g.nearestTank(0,0,480,1),distractor,
+  'direct nearest queries must preserve distance-only behavior');
+ g.update();
+ assert.ok(Math.abs(g.player.angle-Math.atan2(20,240))<1e-10,
+  'the composed player-aim block must select the farther in-cone target');
+ assert.equal(g.__novaFairAimQuery,undefined,'temporary aim-query marker must be restored');
+});
+test('cone-first assist remains symmetric and rejects outside-cone targets',()=>{
+ const Game=boot();
+ for(const sign of [-1,1]){
+  const g=new Game();g.w=568;g.h=320;
+  const distractor=tank(2,120,70*sign),aligned=tank(3,240,20*sign);
+  g.tanks.push(distractor,aligned);g.input.aimVec=()=>({x:1,y:0});
+  g.update();assert.ok(Math.abs(g.player.angle-Math.atan2(20*sign,240))<1e-10);
+  g.tanks=[g.player,distractor];g.player.angle=0;
+  g.update();assert.equal(g.player.angle,0,
+   'outside-cone rival must not bend raw aim when no aligned target exists');
+ }
+});
+
+// An aligned, closer hull behind cover must not consume the only candidate.
+// This combines cone-first ranking with the existing terrain-visibility gate.
+test('cone-first aim falls through occluded aligned target to visible aligned rival',()=>{
+ const Game=boot(),g=new Game();g.w=568;g.h=320;
+ const behindCover=tank(40,100,5),visible=tank(41,220,18);
+ g.tanks.push(behindCover,visible);
+ g.input.aimVec=()=>({x:1,y:0});
+ g.hasLineOfSight=(x,y,tx,ty)=>tx!==behindCover.x;
+ assert.equal(g.nearestTank(0,0,480,1),visible,
+  'the direct query must already exclude the occluded closer rival');
+ g.update();
+ assert.ok(Math.abs(g.player.angle-Math.atan2(18,220))<1e-10,
+  'cone-first selection must retain the terrain-visible aligned rival');
+});
+
+// The query scope is temporary, including when a gameplay update throws.
+test('player aim query scope is restored after an exceptional update',()=>{
+ const Game=boot(),g=new Game();g.w=568;g.h=320;
+ const offAxis=tank(50,120,70),aligned=tank(51,240,20);
+ g.tanks.push(offAxis,aligned);
+ g.input.aimVec=()=>{throw new Error('synthetic input failure')};
+ assert.throws(()=>g.update(),/synthetic input failure/);
+ g.input.aimVec=()=>({x:1,y:0});
+ assert.equal(g.nearestTank(0,0,480,1),offAxis,
+  'exception must not leave the player-only cone filter active on direct queries');
+});
+
+// The fallback is deliberately conservative: multiple aligned rivals are
+// ambiguous, so preserve manual direction rather than invent a target choice.
+test('ambiguous in-cone fallback does not introduce a wrong-target snap',()=>{
+ const Game=boot(),g=new Game();g.w=568;g.h=320;
+ const offAxis=tank(60,120,70),a=tank(61,220,18),b=tank(62,250,-18);
+ g.tanks.push(offAxis,a,b);g.input.aimVec=()=>({x:1,y:0});
+ assert.equal(g.nearestTank(0,0,480,1),offAxis);
+ g.update();assert.equal(g.player.angle,0,
+  'two in-cone rivals must not trigger a new arbitrary fallback snap');
+ const g2=new Game();g2.w=568;g2.h=320;
+ g2.tanks.push(tank(70,100,8),tank(71,220,-18));
+ g2.input.aimVec=()=>({x:1,y:0});
+ g2.update();assert.ok(Math.abs(g2.player.angle-Math.atan2(8,100))<1e-10,
+  'when the original nearest is already in-cone, retain legacy selection');
+});
+
+// Keyboard movement can be the shipping aim fallback when no right-stick
+// gesture is active. The cone rescue must use the same fallback vector.
+test('keyboard movement aim fallback uses the same conservative cone',()=>{
+ const Game=boot(),g=new Game();g.w=568;g.h=320;
+ g.tanks.push(tank(80,120,70),tank(81,240,20));
+ g.input.moveVec=()=>({x:1,y:0});
+ g.input.aimVec=move=>move;
+ g.update();
+ assert.ok(Math.abs(g.player.angle-Math.atan2(20,240))<1e-10,
+  'movement fallback should rescue the sole aligned target');
+});

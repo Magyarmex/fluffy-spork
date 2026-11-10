@@ -45,7 +45,8 @@ function sample(seed,cls,hz,leadAngle){
     return result;
    };
    g.update(1/hz);
-   assert.ok(eligible>0,'public viewport must authorize this target');
+   assert.equal(nearest.call(g,p.x,p.y,480,p.id),t,
+    'public viewport must authorize the target independently of aim-cone selection');
    return {seed,cls,hz,requested:leadAngle,actual:p.angle,eligible};
   }finally{g.destroy();}
  });

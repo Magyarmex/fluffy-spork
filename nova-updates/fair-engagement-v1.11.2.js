@@ -288,6 +288,16 @@ wrap('game/engine',function(engine,require){
   var Game=engine&&engine.Game;if(!Game||Game.prototype.__novaFairEngagement)return;
   Game.prototype.__novaFairEngagement=true;
   var classes=require('./classes')||{},C=classes.CLASSES||{};
+  /* Only the actual Game.update player-aim query should use cone-first
+   * selection. Preserve direct nearestTank callers, AI, Crashers and tests.
+   * The shipping input moveVec/aimVec accessors are read-only. */
+  var activeAimQuery=null,oldPlayerUpdate=Game.prototype.update;
+  if(typeof oldPlayerUpdate==='function')Game.prototype.update=function(){
+    /* Keep the query scope in the wrapper, not on the Game object: avoid
+     * adding/deleting a property on the hot simulation instance each frame. */
+    var prior=activeAimQuery;activeAimQuery=this;
+    try{return oldPlayerUpdate.apply(this,arguments);}finally{activeAimQuery=prior;}
+  };
 
   /* The canonical touch aim assist asks nearestTank(player.x, player.y,
    * 480, player.id). Terrain already filters occluded tanks, but a fully
@@ -301,7 +311,15 @@ wrap('game/engine',function(engine,require){
     if(!p||!alive(p)||exclude!==p.id||max!==480||x!==p.x||y!==p.y||
        !cam||!Number.isFinite(cam.x)||!Number.isFinite(cam.y)||
        !(z>0)||!(w>0)||!(h>0))return originalNearest.apply(this,arguments);
-    var best=null,bd=max*max,ts=this.tanks||[],hw=w/(2*z),hh=h/(2*z);
+    var aimAngle=null;
+    if(activeAimQuery===this&&this.input&&
+       typeof this.input.moveVec==='function'&&typeof this.input.aimVec==='function'){
+      var av=this.input.aimVec(this.input.moveVec());
+      if(av&&Number.isFinite(av.x)&&Number.isFinite(av.y)&&Math.hypot(av.x,av.y)>0)
+        aimAngle=Math.atan2(av.y,av.x);
+    }
+    var best=null,bd=max*max,coneOnly=null,coneCount=0,
+        ts=this.tanks||[],hw=w/(2*z),hh=h/(2*z);
     for(var i=0;i<ts.length;i++){
       var t=ts[i];if(!t||!alive(t)||t.id===exclude||
         !Number.isFinite(t.x)||!Number.isFinite(t.y)||
@@ -315,12 +333,27 @@ wrap('game/engine',function(engine,require){
        * from turning the viewport into long-range offscreen assistance. */
       var r=clamp(Number(t.r)||0,0,32);
       if(Math.abs(t.x-cam.x)>hw+r||Math.abs(t.y-cam.y)>hh+r)continue;
-      var d=d2(x,y,t.x,t.y);if(!(d<bd))continue;
+      var d=d2(x,y,t.x,t.y);if(!(d<max*max))continue;
+      var inCone=false;
+      if(aimAngle!==null){
+        var want=Math.atan2(t.y-p.y,t.x-p.x);
+        inCone=Math.abs(Math.atan2(Math.sin(want-aimAngle),Math.cos(want-aimAngle)))<.22;
+      }
+      /* Preserve the legacy nearest selection whenever it already lies
+       * inside the cone. Rescue a farther candidate only when it is the
+       * sole visible in-cone rival; ambiguous crowded scenes retain the
+       * player's unassisted aim rather than introducing a wrong-target snap. */
+      if(!(d<bd)&&!inCone)continue;
       if(typeof this.hasLineOfSight==='function'&&
          !this.hasLineOfSight(x,y,t.x,t.y,3))continue;
-      best=t;bd=d;
+      if(d<bd){best=t;bd=d;}
+      if(inCone){coneCount++;if(coneCount===1)coneOnly=t;}
     }
-    return best;
+    if(aimAngle===null||!best)return best;
+    var bestAngle=Math.atan2(best.y-p.y,best.x-p.x);
+    if(Math.abs(Math.atan2(Math.sin(bestAngle-aimAngle),Math.cos(bestAngle-aimAngle)))<.22)
+      return best;
+    return coneCount===1?coneOnly:null;
   };
 
   function targetFor(owner,g){

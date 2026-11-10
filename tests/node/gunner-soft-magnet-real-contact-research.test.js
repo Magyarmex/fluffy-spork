@@ -90,7 +90,7 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed',speedSta
    g.status='playing';g.paused=false;
    g.input.autofire=false;g.input.aim.active=true;
    const nearest=g.nearestTank,originalDrones=g.updateDrones;
-   let eligible=0,queries=0,movementWitness=0,hits=0,damage=0,volleys=0,maxTrajectoryDrift=0;
+   let eligible=0,publicEligibleTicks=0,queries=0,movementWitness=0,hits=0,damage=0,volleys=0,maxTrajectoryDrift=0;
    let tick=-1,firstHitTick=null,leadStartDeg=null,leadEndDeg=null;
    let previousVisible=null,adaptiveSoftTicks=0,adaptiveHardTicks=0,adaptiveUseSoft=false,smoothWeightSum=0;
    const rngTrace=[],rngDrawsBeforeCombat=draws();
@@ -159,6 +159,7 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed',speedSta
     // The source Game's public target filter must certify visibility before
     // motion history may influence aim; do not infer sight from raw coordinates.
     const publiclyEligible=nearest.call(g,p.x,p.y,480,p.id)===t;
+    if(publiclyEligible)publicEligibleTicks++;
     const visible={id:t.id,x:t.x,y:t.y,at:i/hz,visible:publiclyEligible};
     const adaptiveGate=visibleMotionIntent(requested,targetBearing,visible,previousVisible);
     const weight=visibleMotionWeight(requested,targetBearing,visible,previousVisible);
@@ -182,13 +183,15 @@ function trial(seed,cls,hz,scenario,policy,direction=1,leadMode='fixed',speedSta
     maxTrajectoryDrift=Math.max(maxTrajectoryDrift,Math.hypot(t.x-200,t.y-expectedY));
    }
    assert.ok(queries>0,'shipping assist must be consulted');
-   assert.equal(eligible,queries,'target must be publicly eligible throughout');
+   assert.equal(publicEligibleTicks,activeTicks+drainTicks,
+    'public visibility must hold throughout independently of aim-cone filtering');
+   assert.ok(eligible<=queries,'aim-cone selections cannot exceed actual assist queries');
    if(scenario==='moving')assert.equal(movementWitness,activeTicks+drainTicks,
     'moving-body certificate must survive every composed update');
    assert.ok(Number.isFinite(damage)&&damage>=0);
    assert.ok(hits>=0&&volleys>0);
    const result={seed,cls,hz,scenario,policy,direction,leadMode,leadStartDeg,leadEndDeg,hits,volleys,
-    damage:+damage.toFixed(4),firstHitSec:firstHitTick===null?null:+((firstHitTick+1)/hz).toFixed(5),eligible,movementWitness,
+    damage:+damage.toFixed(4),firstHitSec:firstHitTick===null?null:+((firstHitTick+1)/hz).toFixed(5),eligible,publicEligibleTicks,movementWitness,
     rngDrawsBeforeCombat,rngDrawsEnd:draws(),
     maxTrajectoryDrift:+maxTrajectoryDrift.toFixed(4),adaptiveSoftTicks,adaptiveHardTicks,smoothWeightSum:+smoothWeightSum.toFixed(4)};
    // Preserve full chronology for in-test comparisons without bloating CI JSON.
@@ -206,7 +209,7 @@ test('opt-in soft magnet contact and stationary-error controls use real composed
     assert.equal(new Set(arms.map(x=>x.volleys)).size,1,
      'aim policy must not alter weapon firing cadence');
     assert.ok(arms.every(x=>x.damage>=0&&Number.isFinite(x.damage)));
-    assert.ok(arms.every(x=>x.eligible>0));
+    assert.ok(arms.every(x=>x.publicEligibleTicks>0));
     rows.push({cls,hz,scenario,arms,
      rngDivergenceTicks:{soft:rngDivergence(arms[0],arms[1]),
       manual:rngDivergence(arms[0],arms[2])}});
@@ -227,7 +230,7 @@ test('soft-magnet moving-target contact is counterbalanced by direction and seed
       trial(seed,cls,hz,'moving',policy,direction));
      assert.equal(new Set(arms.map(x=>x.volleys)).size,1,
       'policy must not alter firing cadence within a matched trial');
-     assert.ok(arms.every(x=>x.eligible>0&&x.movementWitness===6*hz),
+     assert.ok(arms.every(x=>x.publicEligibleTicks>0&&x.movementWitness===6*hz),
       'target must remain publicly eligible and physically moving');
      assert.ok(arms.every(x=>x.maxTrajectoryDrift<1e-5),
       'target movement must not depend on aim policy or damage');
@@ -251,7 +254,7 @@ test('soft-magnet contact with class-specific geometric intercept inputs',()=>{
      const arms=['hard','soft','manual'].map(policy=>
       trial(seed,cls,hz,'moving',policy,direction,'intercept'));
      assert.equal(new Set(arms.map(x=>x.volleys)).size,1);
-     assert.ok(arms.every(x=>x.eligible>0&&x.movementWitness===6*hz));
+     assert.ok(arms.every(x=>x.publicEligibleTicks>0&&x.movementWitness===6*hz));
      assert.ok(arms.every(x=>x.maxTrajectoryDrift<1e-5));
      rows.push({seed,direction,cls,hz,arms,
       rngDivergenceTicks:{soft:rngDivergence(arms[0],arms[1]),
