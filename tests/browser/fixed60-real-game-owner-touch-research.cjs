@@ -175,21 +175,23 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
   assert.ok(Math.hypot(held.dx,held.dy)>5,'real analog extension must be sampled');
   if(process.env.NOVA_FIXED60_ACTIVE_BURST==='1'){
    // Exercise three-update callbacks while the real right stick is held.
-   const beforeThree=await page.evaluate(()=>window.__novaFixedResearch.frames
-    .filter(f=>f.steps===3&&f.budget===3&&f.rawGapMs<=100+1e-7).length);
-   for(let i=0;i<2;i++){
+   // RAF alignment varies: a 55ms main-thread block may yield a 33ms
+   // callback rather than 50ms. Retry boundedly, but never waive the gate.
+   let shotInThree=false;
+   for(let attempt=0;attempt<8&&!shotInThree;attempt++){
+    const beforeFrame=await page.evaluate(()=>window.__novaFixedResearch.frames.length);
     await page.evaluate(()=>{
      // Force a ready player shot before the next genuine three-update RAF.
      window.__novaFixedGame.player.fireCd=0;
      const end=performance.now()+55;
      while(performance.now()<end){}
     });
-    await page.waitForFunction(before=>window.__novaFixedResearch.frames
-     .filter(f=>f.steps===3&&f.budget===3&&f.rawGapMs<=100+1e-7).length>before,
-     beforeThree,{timeout:5000});
+    await page.waitForFunction(before=>window.__novaFixedResearch.frames.length>before,
+     beforeFrame,{timeout:5000});
+    shotInThree=await page.evaluate(()=>window.__novaFixedResearch.frames
+     .some(f=>f.steps===3&&f.budget===3&&f.rawGapMs<=100+1e-7&&
+      f.playerProjectileBirths>0));
    }
-   const shotInThree=await page.evaluate(()=>window.__novaFixedResearch.frames
-    .some(f=>f.steps===3&&f.budget===3&&f.playerProjectileBirths>0));
    assert.equal(shotInThree,true,
     'a real three-update callback must emit a player-owned projectile while held');
    const during=await page.evaluate(()=>({
