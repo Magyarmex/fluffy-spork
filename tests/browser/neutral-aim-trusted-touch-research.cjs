@@ -48,17 +48,22 @@ const {chromium}=require('playwright');
    window.__novaNeutralTouchTankHits=[];
    const originalDamageTank=g.damageTank;
    g.damageTank=function(t,damage,srcId){
+    const before=t.hp,out=originalDamageTank.apply(this,arguments);
     if(t===window.__novaNeutralTouchAligned)window.__novaNeutralTouchTankHits.push({
-     time:this.time,hpBefore:t.hp,damage:Number(damage)||0,srcId});
-    return originalDamageTank.apply(this,arguments);
+     time:this.time,hpBefore:before,hpAfter:t.hp,
+     applied:Math.max(0,before-t.hp),nominal:Number(damage)||0,srcId});
+    return out;
    };
    const originalDamageShape=g.damageShape;
    g.damageShape=function(shape,damage,ix,iy){
+    const before=shape.hp,out=originalDamageShape.apply(this,arguments);
     if(shape===window.__novaNeutralTouchCircle){
      window.__novaNeutralTouchHits.push({time:this.time,
-      hpBefore:shape.hp,damage:Number(damage)||0,x:shape.x,y:shape.y});
+      hpBefore:before,hpAfter:shape.hp,
+      applied:Math.max(0,before-shape.hp),nominal:Number(damage)||0,
+      x:shape.x,y:shape.y});
     }
-    return originalDamageShape.apply(this,arguments);
+    return out;
    };
    Object.assign(p,{x:0,y:0,vx:0,vy:0,angle:0,fireCd:0,spawnShieldT:0,hp:100});
    p.stats.reload=0;
@@ -125,9 +130,9 @@ const {chromium}=require('playwright');
   assert.equal(result.active,true,'same trusted touch retains aim');
   assert.equal(result.owner,held.owner,'touch owner never changes');
   assert.ok(result.births.length>=2,'real player projectiles emitted');
-  assert.ok(result.circleHits.every(h=>Number.isFinite(h.hpBefore)&&Number.isFinite(h.damage)),
+  assert.ok(result.circleHits.every(h=>Number.isFinite(h.hpBefore)&&Number.isFinite(h.hpAfter)&&Number.isFinite(h.applied)),
    'neutral damage instrumentation must record finite physical collision values');
-  assert.ok(result.alignedHits.every(h=>Number.isFinite(h.hpBefore)&&Number.isFinite(h.damage)),
+  assert.ok(result.alignedHits.every(h=>Number.isFinite(h.hpBefore)&&Number.isFinite(h.hpAfter)&&Number.isFinite(h.applied)),
    'hostile damage instrumentation must record finite physical collision values');
   assert.ok(result.births.some(b=>b.bearing>0.01&&b.bearing<0.22),
    'real right-stick input reaches the shipped unique-hostile rescue');
@@ -137,6 +142,7 @@ const {chromium}=require('playwright');
   // the same browser-trusted pointer but is NOT a matched-world damage A/B.
   const enemyStart=await page.evaluate(()=>{
    const g=window.__novaNeutralTouchGame,t=window.__novaNeutralTouchAligned;
+   if(!g.tanks.includes(t))throw Error('aligned hostile missing from active sorted world');
    t.hp=100;t.alive=true;t.spawnShieldT=0;
    g.bullets=[];g.player.fireCd=0;
    window.__novaNeutralTouchBirths=[];
@@ -164,7 +170,7 @@ const {chromium}=require('playwright');
    'trusted diagonal thumb reports deliberate hostile-facing aim');
   assert.ok(enemyIntent.births.some(b=>b.bearing>.10&&b.bearing<.24),
    'real projectiles follow deliberate hostile-facing thumb direction');
-  assert.ok(enemyIntent.hits.length>0&&enemyIntent.remainingHp<100,
+  assert.ok(enemyIntent.hits.some(h=>h.applied>0)&&enemyIntent.remainingHp<100,
    'deliberate hostile gesture must deal actual composed-game damage');
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   await page.waitForFunction(()=>window.__novaNeutralTouchGame?.input?.aim?.active===false,
