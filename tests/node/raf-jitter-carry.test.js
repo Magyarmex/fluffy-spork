@@ -29,6 +29,10 @@ test('patch accepts raw, previously shipped, and new shell; rejects drift',()=>{
   'already materialized production shell must acquire the current-frame budget exactly once');
  assert.equal(patchRafStepCap(patchRafStepCap(old)),patchRafStepCap(old));
  assert.equal(patchRafStepCap(old).split(after).length-1,1);
+ const oldGate='priorWork < 18 && earlierWork < 18) {';
+ const newGate='priorWork < 18 && earlierWork < 18 && performance.now() - workStart < 18) {';
+ assert.throws(()=>patchRafStepCap(latest+oldGate),/CPU budget owner drift/);
+ assert.throws(()=>patchRafStepCap(latest+newGate),/CPU budget owner drift/);
  assert.throws(()=>patchRafStepCap(old.replace(before,'            const dt = 123;')),/drift/);
 });
 test('steady 30, 60, 120 and 240Hz retain one update per draw and exact time',()=>{
