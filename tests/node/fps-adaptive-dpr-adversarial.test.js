@@ -87,3 +87,25 @@ test('a slow rolling window cannot certify a DPR probe before old samples expire
  assert.equal(late.kind,'probe-window-too-slow');
  assert.equal(game.dpr,1.5,'unverifiable clarity reduction must roll back');
 });
+
+test('accepted low-resolution mode restores owned backing on pause or quality exit',()=>{
+ for(const exit of ['pause','quality','stop']){
+  const {game,pilot}=fixture();
+  step(pilot,0,1000,slow);
+  step(pilot,1500,7000,{...better,frameP95Ms:30});
+  // This evidence is intentionally insufficient for acceptance; use a fresh
+  // accepted fixture with a strong measured improvement instead.
+  assert.equal(game.dpr,1.5);
+  const accepted=fixture(),g=accepted.game,p=accepted.pilot;
+  step(p,0,1000,slow);
+  const good={...better,fps:55,frameP95Ms:22,updateP95Ms:5,simulationPacePct:95};
+  step(p,1500,7000,good);
+  assert.equal(p.state.phase,'low');
+  assert.equal(g.dpr,1);
+  if(exit==='pause'){g.paused=true;assert.equal(p.sample(7500,good).kind,'low-inactive-rollback');}
+  else if(exit==='quality'){g.quality='high';assert.equal(p.sample(7500,good).kind,'low-inactive-rollback');}
+  else assert.equal(p.stop(),true);
+  assert.equal(g.dpr,1.5,exit+' must restore original backing DPR');
+  assert.deepEqual([g.canvas.width,g.canvas.height],[480,852]);
+ }
+});
