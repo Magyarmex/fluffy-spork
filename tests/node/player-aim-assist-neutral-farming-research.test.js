@@ -37,7 +37,8 @@ function trial(seed,hz,mode){
    const circle=g.shapes[0];
    assert.ok(circle&&circle.type==='circle');
    circle.x=mode==='corridorBehind'||mode==='shippingBehind'?270:160;
-   circle.y=mode==='corridorOffPath'||mode==='shippingOffPath'?150:0;
+   circle.y=mode.endsWith('Edge')?-16:
+    mode==='corridorOffPath'||mode==='shippingOffPath'?150:0;
    circle.vx=0;circle.vy=0;
    circle.spin=0;circle.wanderT=Infinity;
    if(g.shapeById)g.shapeById.set(circle.id,circle);
@@ -54,7 +55,7 @@ function trial(seed,hz,mode){
    g.input.aim.active=true;g.input.aim.dx=40*dirX;g.input.aim.dy=40*dirY;
    g.input.mouseActive=false;g.input.autofire=false;g.input.firing=true;
    g.input.abilityQueued=false;
-   if(mode==='legacy'||mode.startsWith('corridor')){
+   if(mode==='legacy'||mode.startsWith('corridor')||mode.startsWith('angular')){
     const nearest=g.nearestTank;
     g.nearestTank=function(x,y,max,exclude){
      if(exclude===p.id&&max===480&&x===p.x&&y===p.y){
@@ -62,10 +63,19 @@ function trial(seed,hz,mode){
       const found=nearest.apply(this,arguments);
       if(found===aligned&&circle.hp>0){
        const dx=circle.x-p.x,dy=circle.y-p.y;
-       const forward=dx*dirX+dy*dirY;
-       const lateral=Math.abs(dx*dirY-dy*dirX);
-       if(forward>0&&forward<Math.hypot(aligned.x-p.x,aligned.y-p.y)&&
-          lateral<circle.r+5)return null;
+       const targetDist=Math.hypot(aligned.x-p.x,aligned.y-p.y);
+       if(mode.startsWith('angular')){
+        const distance=Math.hypot(dx,dy);
+        const shapeAngle=Math.atan2(dy,dx);
+        const error=Math.abs(Math.atan2(Math.sin(shapeAngle-intent),
+         Math.cos(shapeAngle-intent)));
+        if(distance>0&&distance<targetDist&&
+           error<Math.atan2(circle.r,distance))return null;
+       }else{
+        const forward=dx*dirX+dy*dirY;
+        const lateral=Math.abs(dx*dirY-dy*dirX);
+        if(forward>0&&forward<targetDist&&lateral<circle.r+5)return null;
+       }
       }
       return found;
      }
@@ -105,6 +115,11 @@ test('neutral-farming aim interference diagnostic in the actual composed game',(
    corridorOffPath=trial(seed,hz,'corridorOffPath'),
    shippingBehind=trial(seed,hz,'shippingBehind'),
    corridorBehind=trial(seed,hz,'corridorBehind'),
+   angular=trial(seed,hz,'angular'),
+   angularEnemy=trial(seed,hz,'angularEnemy'),
+   shippingEdge=trial(seed,hz,'shippingEdge'),
+   corridorEdge=trial(seed,hz,'corridorEdge'),
+   angularEdge=trial(seed,hz,'angularEdge'),
    shippingEnemy=trial(seed,hz,'shippingEnemy'),
    corridorEnemy=trial(seed,hz,'corridorEnemy');
   assert.equal(noAligned.hz,legacy.hz);
@@ -120,6 +135,12 @@ test('neutral-farming aim interference diagnostic in the actual composed game',(
    'the Scout corridor pilot must actually recover the observed neutral kill');
   assert.ok(shippingEnemy.alignedHp<100&&shippingOffPath.alignedHp<100,
    'hostile damage controls must hit a real initialized tank, not merely report a bearing');
+  assert.ok(angular.circleDestroyed&&angular.circleHp<shipping.circleHp,
+   'center-angle neutral candidate must recover the direct-center Circle kill');
+  assert.deepEqual(angularEnemy.bearings,shippingEnemy.bearings,
+   'center-angle candidate must preserve deliberate hostile projectile bearings');
+  assert.equal(angularEnemy.alignedHp,shippingEnemy.alignedHp,
+   'center-angle candidate must preserve real hostile damage under hostile intent');
   assert.deepEqual(corridorBehind.bearings,shippingBehind.bearings,
    'a neutral behind the aligned hostile must not veto the earlier hostile shot');
   assert.equal(corridorBehind.alignedHp,shippingBehind.alignedHp,
@@ -133,7 +154,8 @@ test('neutral-farming aim interference diagnostic in the actual composed game',(
   assert.equal(corridorEnemy.alignedHp,shippingEnemy.alignedHp,
    'deliberate hostile aim must retain its real projectile damage');
   rows.push({noAligned,legacy,shipping,corridor,shippingEnemy,corridorEnemy,
-   shippingOffPath,corridorOffPath,shippingBehind,corridorBehind});
+   shippingOffPath,corridorOffPath,shippingBehind,corridorBehind,
+   angular,angularEnemy,shippingEdge,corridorEdge,angularEdge});
  }
  console.log('NOVA_NEUTRAL_AIM_INTERFERENCE '+JSON.stringify(rows));
 });
