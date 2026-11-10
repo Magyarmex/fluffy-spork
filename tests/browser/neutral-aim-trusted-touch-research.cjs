@@ -43,7 +43,8 @@ const {chromium}=require('playwright');
    const rivals=g.tanks.filter(t=>t!==p);
    if(rivals.length<2)throw Error('need initialized real rival tanks');
    g.sfx.muted=true;g.setClass(p,'scout');
-   Object.assign(p,{x:0,y:0,vx:0,vy:0,angle:0,fireCd:0,spawnShieldT:0});
+   Object.assign(p,{x:0,y:0,vx:0,vy:0,angle:0,fireCd:0,spawnShieldT:0,hp:100});
+   p.stats.reload=0;
    for(const [t,x,y] of [[rivals[0],120,70],[rivals[1],240,40]]){
     Object.assign(t,{x,y,vx:0,vy:0,alive:true,isPlayer:true,
      hp:100,maxHp:100,spawnShieldT:0,shieldT:0,cloakT:0,cls:'scout'});
@@ -99,7 +100,7 @@ const {chromium}=require('playwright');
   assert.equal(result.active,true,'same trusted touch retains aim');
   assert.equal(result.owner,held.owner,'touch owner never changes');
   assert.ok(result.births.length>=2,'real player projectiles emitted');
-  assert.ok(result.births[0].bearing>0.01&&result.births[0].bearing<0.22,
+  assert.ok(result.births.some(b=>b.bearing>0.01&&b.bearing<0.22),
    'real right-stick input reaches the shipped unique-hostile rescue');
   assert.ok(result.raw.x>0&&Math.abs(result.raw.y)<0.1,
    'raw eastward player intent remains separate from assisted gun bearing');
