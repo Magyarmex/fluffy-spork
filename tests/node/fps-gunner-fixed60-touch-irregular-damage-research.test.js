@@ -16,6 +16,8 @@ function schedule(mode){
  if(mode==='uniform30')return Array(180).fill(1000/30);
  if(mode==='alternating20_60')return Array.from({length:90},()=>[50,1000/60]).flat();
  if(mode==='alternating60_20')return Array.from({length:90},()=>[1000/60,50]).flat();
+ if(mode==='clustered55_11')return Array.from({length:45},()=>
+  [55,55,1000/15-55,1000/15-55]).flat();
  throw Error('unknown frame schedule');
 }
 function touchEvents(offsetMs){
@@ -127,9 +129,12 @@ function trial(seed,cls,reload,mode,offsetMs,expectedTicks=360){
    }
    assert.ok(Math.abs(elapsed-DURATION_MS)<1e-6);
    assert.equal(index,edges.length,'all input edges delivered');
-   assert.equal(owner.droppedFrames,0,'ordinary jitter must not drop frames');
-   assert.equal(owner.droppedMs,0,'ordinary jitter must not discard simulation');
-   if(expectedTicks===null)assert.ok([359,360].includes(owner.ticks),
+   if(expectedTicks!=='research-drop')
+    assert.equal(owner.droppedFrames,0,'ordinary jitter must not drop frames');
+   if(expectedTicks!=='research-drop')
+    assert.equal(owner.droppedMs,0,'ordinary jitter must not discard simulation');
+   if(expectedTicks==='research-drop')assert.ok(owner.ticks>0&&owner.ticks<=360);
+   else if(expectedTicks===null)assert.ok([359,360].includes(owner.ticks),
     'reversed final 50ms frame may leave one tick queued, never more');
    else assert.equal(owner.ticks,expectedTicks,'same six seconds of 60Hz Game updates');
    assert.equal(timeline.applied,edges.length,'all captured input edges replayed');
@@ -146,6 +151,7 @@ function trial(seed,cls,reload,mode,offsetMs,expectedTicks=360){
    assert.ok(hits>0&&damage>0,'actual player-owned projectile hits required');
    return {seed,cls,reload,mode,offsetMs,ticks:owner.ticks,
     backlogMs:+owner.lagMs.toFixed(5),droppedMs:owner.droppedMs,
+    droppedFrames:owner.droppedFrames,
     applied:timeline.applied,volleys,hits,damage:+damage.toFixed(5),
     births,stepsByFrame,maxInputSampleLagMs:Math.max(...inputLagsMs),
     meanInputSampleLagMs:+(inputLagsMs.reduce((a,b)=>a+b,0)/inputLagsMs.length).toFixed(5),
@@ -218,4 +224,30 @@ test('fixed60 research challenges Gunner touch damage at mean 30Hz and 20/60Hz b
    }
  console.log('GUNNER_FIXED60_MEAN30_TOUCH_DAMAGE '+JSON.stringify(rows));
  assert.equal(rows.length,24);
+});
+
+// This is a NEGATIVE CONTROL, not a desired gameplay golden. A repeated
+// 55/55/11.667/11.667ms presentation averages 30Hz, never stalls >100ms,
+// yet can exceed the research owner's two-step + four-tick backlog budget.
+// Capture real player-owned damage to expose the practical cost of time loss.
+test('fixed60 research detects clustered 30Hz dropped combat time rather than claiming universal parity',()=>{
+ const baseline=trial(1517800,'minigun',1,'uniform60',12);
+ const clustered=trial(1517800,'minigun',1,'clustered55_11',12,'research-drop');
+ assert.equal(clustered.applied,baseline.applied,'touch events must remain delivered');
+ if(clustered.droppedMs>0){
+  assert.ok(clustered.ticks<baseline.ticks,
+   'dropped time must be visible as fewer actual Game updates');
+  assert.ok(clustered.droppedFrames>0);
+ }else{
+  // A future safe owner that preserves all ticks should satisfy the
+  // original damage/volley chronology instead of being rejected for fixing it.
+  assert.equal(clustered.ticks,baseline.ticks);
+  assert.equal(clustered.damage,baseline.damage);
+  assert.equal(clustered.volleys,baseline.volleys);
+ }
+ console.log('GUNNER_FIXED60_CLUSTERED30_FALSIFIER '+JSON.stringify({
+  baseline:{ticks:baseline.ticks,damage:baseline.damage,volleys:baseline.volleys},
+  clustered:{ticks:clustered.ticks,damage:clustered.damage,
+   volleys:clustered.volleys,droppedMs:clustered.droppedMs,
+   droppedFrames:clustered.droppedFrames,backlogMs:clustered.backlogMs}}));
 });
