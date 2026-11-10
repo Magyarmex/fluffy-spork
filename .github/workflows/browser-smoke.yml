@@ -158,6 +158,9 @@ jobs:
           NOVA_FIXED60_MAX_STEPS=2 NOVA_FIXED60_CONTROLLED_GATE=1 NOVA_FIXED60_INITIAL_FINGERPRINT_FILE=/tmp/nova-fixed60-initial-world.txt NOVA_FIXED60_REPORT_FILE=/tmp/nova-fixed60-two.json node tests/browser/fixed60-real-game-owner-touch-research.cjs
           NOVA_FIXED60_MAX_STEPS=3 NOVA_FIXED60_CONTROLLED_GATE=1 NOVA_FIXED60_INITIAL_FINGERPRINT_FILE=/tmp/nova-fixed60-initial-world.txt NOVA_FIXED60_REPORT_FILE=/tmp/nova-fixed60-three.json node tests/browser/fixed60-real-game-owner-touch-research.cjs
           node tests/research/fixed60-paired-report.cjs /tmp/nova-fixed60-two.json /tmp/nova-fixed60-three.json
+          # Research-only timer-armed gate: genuine RAF delivery with fewer
+          # speculative native callbacks. This is not a production scheduler.
+          NOVA_FIXED60_MAX_STEPS=3 NOVA_FIXED60_CONTROLLED_GATE=1 NOVA_FIXED60_TIMER_ARMED_GATE=1 node tests/browser/fixed60-real-game-owner-touch-research.cjs
       - name: Preserve browser screenshots
         if: always()
         uses: actions/upload-artifact@v4
