@@ -33,6 +33,8 @@ test('patch accepts raw, previously shipped, and new shell; rejects drift',()=>{
  const newGate='priorWork < 18 && earlierWork < 18 && performance.now() - workStart < Math.min(32, Math.max(18, elapsed * 500 - 2))) {';
  assert.throws(()=>patchRafStepCap(latest+oldGate),/CPU budget owner drift/);
  assert.throws(()=>patchRafStepCap(latest+newGate),/CPU budget owner drift/);
+ assert.throws(()=>patchRafStepCap(latest.replace(oldGate,'priorWork <= 18 && earlierWork < 18) {')),
+  /CPU budget owner drift/,'drifted materialized gate must fail closed');
  assert.throws(()=>patchRafStepCap(old.replace(before,'            const dt = 123;')),/drift/);
 });
 test('steady 30, 60, 120 and 240Hz retain one update per draw and exact time',()=>{
