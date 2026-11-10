@@ -7,6 +7,7 @@ function arm(timer=false,wall=1000){
   initialFingerprint:'09a37c35:8241',droppedMs:120,
   touchToProjectileBirthMs:8,touchToCanvasSubmissionMs:12,
   raf:{observedWallMs:wall,frames:30,nativeRafSkipped:timer?3:900,
+   nativeRafSkipCallbackJsMs:timer?1:15,
    simulatedMs:750,backlogDroppedMs:80,timerArms:timer?25:0,
    timerWakeLagMs:{n:timer?25:0,p95:timer?2:null},
    deliveryLateMs:{n:30,p95:timer?4:1}}};
@@ -18,6 +19,8 @@ test('gate comparison reports actual per-frame native overhead, not causal gain'
  assert.equal(r.matchedObservationDuration,true);
  assert.equal(r.causalClaimAllowed,false);
  assert.equal(r.timer.deliveryLateP95Ms,4);
+ assert.equal(r.poll.skipCallbackJsMsPerSecond,15);
+ assert.equal(r.timer.skipCallbackJsMsPerSecond,1);
 });
 test('different observation windows remain explicit',()=>{
  const r=summarize(arm(),arm(true,1500));
@@ -44,4 +47,9 @@ test('timer must actually wake and touch must reach Canvas',()=>{
 test('missing native delivery-lateness evidence fails closed',()=>{
  const b=arm(true);b.raf.deliveryLateMs.n=0;
  assert.throws(()=>summarize(arm(),b),/delivery lateness/);
+});
+
+test('missing skipped-callback CPU accounting fails closed',()=>{
+ const b=arm(true);delete b.raf.nativeRafSkipCallbackJsMs;
+ assert.throws(()=>summarize(arm(),b),/invalid skipJs/);
 });
