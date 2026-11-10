@@ -86,6 +86,15 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
       const beforeTicks=owner?.ticks??0,beforeDropped=owner?.droppedMs??0;
       const beforeBirths=profile.births;
       const rawGapMs=owner?Math.max(0,ts-owner.lastMs):null;
+      // Arm the research-only ready shot at the actual RAF boundary.
+      // Arming before a 65ms main-thread block is unsound: a normal
+      // one-step callback can fire before the intended three-step burst.
+      // The scheduler still determines whether three real updates occur.
+      if(profile.armShotOnThree&&owner&&rawGapMs>=48&&rawGapMs<=100+1e-7&&
+       window.__novaFixedGame?.input?.aim?.active){
+       window.__novaFixedGame.player.fireCd=0;
+       profile.armShotOnThree=false;
+      }
       const at=performance.now();
       fn(ts);
       const current=window.__novaFixedPilot?.owner;
@@ -189,8 +198,9 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
    for(let attempt=0;attempt<8&&!shotInThree;attempt++){
     const beforeFrame=await page.evaluate(()=>window.__novaFixedResearch.frames.length);
     await page.evaluate(()=>{
-     // Force a ready player shot before the next genuine three-update RAF.
-     window.__novaFixedGame.player.fireCd=0;
+     // The RAF wrapper arms the ready shot at the burst boundary, not
+     // during this blocked task (which could precede a one-step RAF).
+     window.__novaFixedResearch.armShotOnThree=true;
      const end=performance.now()+65;
      while(performance.now()<end){}
     });
