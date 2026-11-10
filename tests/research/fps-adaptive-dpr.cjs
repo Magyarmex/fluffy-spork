@@ -12,7 +12,7 @@ function createAdaptiveDprPilot(game, options={}) {
   let lastApplied=original, width=game.w, height=game.h, phase='baseline';
   let slowSince=null, fastSince=null, lastTransition=-Infinity, lastSample=null;
   let trialStart=null, baseline=null, warmupUntil=-Infinity, stopped=false;
-  let cooldownUntil=-Infinity, externalOwner=false;
+  let cooldownUntil=-Infinity, externalOwner=false, lowMissingSince=null;
   const visible=typeof options.visible==='function'?options.visible:
     ()=>typeof document==='undefined'||!document.hidden;
   const result=(kind,changed=false)=>({kind,changed,dpr:game.dpr,phase});
@@ -26,7 +26,7 @@ function createAdaptiveDprPilot(game, options={}) {
     resetStreaks();return true;
   }
   function rollback(now){
-    phase='baseline';baseline=null;trialStart=null;
+    phase='baseline';baseline=null;trialStart=null;lowMissingSince=null;
     cooldownUntil=now+30000;
     return apply(original,now);
   }
@@ -67,8 +67,13 @@ function createAdaptiveDprPilot(game, options={}) {
       .every(Number.isFinite)){
       resetStreaks();
       if(phase==='probing'&&now-trialStart>8000)return result('probe-no-evidence',rollback(now));
+      if(phase==='low'){
+        if(lowMissingSince===null)lowMissingSince=now;
+        if(now-lowMissingSince>=8000)return result('low-no-evidence-rollback',rollback(now));
+      }
       return result('insufficient-evidence');
     }
+    lowMissingSince=null;
     if(phase==='probing'){
       // A 120-frame rolling window can still contain pre-probe frames at low
       // FPS. Do not accept a blur decision before the window can turn over.
