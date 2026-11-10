@@ -45,6 +45,7 @@ function createAdaptiveDprPilot(game, options={}) {
     if(lastSample!==null&&now-lastSample>3500){
       resetStreaks();warmupUntil=now+2500;
       if(phase==='probing')return result('probe-interrupted',rollback(now));
+      if(phase==='low')return result('low-interrupted-rollback',rollback(now));
     }
     lastSample=now;
     if(game.w!==width||game.h!==height||game.dpr!==lastApplied||
