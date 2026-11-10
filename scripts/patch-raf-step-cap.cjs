@@ -96,6 +96,10 @@ function patchRafStepCapLegacy(html){
  const oldBudgetCount=count(html,oldCpuGate),newBudgetCount=count(html,newCpuGate);
  if(oldBudgetCount>1||newBudgetCount>1||oldBudgetCount&&newBudgetCount)
   throw Error('canonical RAF current-frame CPU budget owner drift; refuse materialization');
+ /* A materialized carry owner must have one recognized CPU gate. Otherwise
+  * a drifted predicate could silently bypass this production safety patch. */
+ if(oldBudgetCount===0&&newBudgetCount===0&&count(html,withCarry)===1&&count(html,after)===1)
+  throw Error('canonical RAF current-frame CPU budget owner drift; refuse materialization');
  if(oldBudgetCount===1)html=html.replace(oldCpuGate,newCpuGate);
  if(!html.includes('    start() {')||!html.includes('this.raf = requestAnimationFrame(loop);'))
   throw Error('canonical game RAF owner missing');
