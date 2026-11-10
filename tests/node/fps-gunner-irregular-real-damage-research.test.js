@@ -100,12 +100,13 @@ test('irregular presentation frames preserve input duty but expose actual Gunner
  const rows=[];
  for(const [cls,reload] of [['minigun',1],['needlestorm',3]]){
   for(const seed of [1517800,1517802]){
-   for(const mode of ['native60','cluster30','alternating40_120']){
-    const row=trial(seed,cls,reload,mode);
-    const repeat=trial(seed,cls,reload,mode);
-    assert.deepEqual(row,repeat,'seeded composed simulation must reproduce');
-    rows.push(row);
-   }
+   for(const offset of [.007,.012])
+    for(const mode of ['native60','cluster30','alternating40_120']){
+     const row=trial(seed,cls,reload,mode,offset);
+     const repeat=trial(seed,cls,reload,mode,offset);
+     assert.deepEqual(row,repeat,'seeded composed simulation must reproduce');
+     rows.push(row);
+    }
   }
  }
  assert.equal(rows.length,24);
