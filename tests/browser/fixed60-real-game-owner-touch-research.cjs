@@ -173,6 +173,15 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
   assert.ok(Math.hypot(held.dx,held.dy)>5,'real analog extension must be sampled');
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   await page.waitForFunction(()=>window.__novaFixedGame?.input?.aim?.active===false,null,{timeout:5000});
+  // Force one genuine foreground RAF gap, after releasing the stick.
+  // The active-only three-step policy must revert to two steps on this gap.
+  const beforeStall=await page.evaluate(()=>window.__novaFixedPilot.owner.droppedFrames);
+  await page.evaluate(()=>{
+   const end=performance.now()+135;
+   while(performance.now()<end){} // research-only main-thread stall
+  });
+  await page.waitForFunction(before=>window.__novaFixedPilot?.owner?.droppedFrames>before,
+   beforeStall,{timeout:5000});
   const report=await page.evaluate(()=>{
    const g=window.__novaFixedGame,p=window.__novaFixedPilot;
    const values=a=>{const s=[...a].sort((x,y)=>x-y);
@@ -231,6 +240,8 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
    'real browser callback intervals and JavaScript costs must be finite');
   assert.equal(Object.values(report.raf.stepCounts).reduce((a,b)=>a+b,0),
    report.raf.frames,'every observed RAF callback needs a step count');
+  assert.ok(report.raf.longStallDrops>=1,
+   'controlled >100ms Chromium stall must be classified as a long stall');
   assert.equal(report.raf.longStallDrops+report.raf.backlogDrops,
    report.raf.droppedFrameCount,'every dropped-time frame must have a cause');
   assert.ok(Math.abs(report.raf.attributedDroppedMs-report.droppedMs)<1e-5,
