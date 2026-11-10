@@ -36,6 +36,10 @@ function run(seed,clusteredMode){
   };
   const timeline=new ChronologicalInput(g.input);
   let now=1000,cb=null,owner=null,next=0;
+  // Controller's hybrid pointer handoff uses global performance.now(), not
+  // the DOM event timestamp. Make that delivery clock deterministic too.
+  const originalClock=Object.getOwnPropertyDescriptor(performance,'now');
+  Object.defineProperty(performance,'now',{configurable:true,value:()=>now});
   const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
   function deliver(elapsed){
    while(next<EVENTS.length&&EVENTS[next][0]<=elapsed+1e-7){
@@ -77,14 +81,35 @@ function run(seed,clusteredMode){
    assert.equal(g.input.stickId.move,-1);
    assert.equal(g.input.aim.active,false);
    assert.equal(g.input.move.active,false);
-   return {hash:digest(physical(g)),draws:draws(),
+   // Browser delivery time legitimately differs from occurrence time. The
+   // clustered first/second RAF delivers the final touch release at 110ms;
+   // native60 delivers it at the 83.333ms tick. Do not claim those clocks
+   // are identical just because physical gameplay state matches.
+   const expectedTouchMs=clusteredMode?1110:1000+5*1000/60;
+   assert.ok(Math.abs(g.input.__novaLastTouchMs-expectedTouchMs)<1e-5,
+    'Controller touch clock must follow deterministic delivery, not Node wall time');
+   const result={hash:digest(physical(g)),draws:draws(),
     drones:digest(g.drones.map(d=>[
      d.id,d.ownerId,d.__novaPhase,d.__novaCommitted,d.__novaTargetId])),
     swarm:digest(p.__novaSwarm?[p.__novaSwarm.active,p.__novaSwarm.power,
      p.__novaSwarm.nodeX,p.__novaSwarm.nodeY,p.__novaSwarm.angle]:[]),
     score:p.score,bullets:g.bullets.length,
     aimActiveTicks,moveActiveTicks,swarmActiveTicks,aimDeflectedTicks,moveDeflectedTicks};
-  }finally{if(owner)owner.stop();g.destroy();}
+   // The hybrid 900ms mouse handoff must be measured against that delivery
+   // clock. A synthetic compatibility mouse event must not steal touch early.
+   const mouse={type:'pointerdown',pointerType:'mouse',clientX:600,clientY:200,
+    button:0,buttons:1,target:{tagName:'CANVAS',closest:()=>null}};
+   now=expectedTouchMs+899;g.input.pd(mouse);
+   assert.equal(g.input.touchSeen,true,'mouse must not take ownership before 900ms');
+   now=expectedTouchMs+901;g.input.pd(mouse);
+   assert.equal(g.input.touchSeen,false,'mouse must regain ownership after 900ms');
+   g.input.pu({...mouse,type:'pointerup',buttons:0});
+   return result;
+  }finally{
+   if(owner)owner.stop();g.destroy();
+   if(originalClock)Object.defineProperty(performance,'now',originalClock);
+   else delete performance.now;
+  }
  });
 }
 test('real Controller two-stick press/move/release chronology matches native60 in three-step cluster',()=>{
