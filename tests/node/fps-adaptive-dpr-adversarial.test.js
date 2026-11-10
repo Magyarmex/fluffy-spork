@@ -135,3 +135,32 @@ test('accepted-low quality cannot persist indefinitely without valid telemetry',
  assert.equal(last.kind,'low-no-evidence-rollback');
  assert.equal(game.dpr,1.5);
 });
+
+test('seeded mixed lifecycle sequences preserve external DPR ownership and canvas dimensions',()=>{
+ let state=0x12345678;
+ const random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;
+  return (state>>>0)/4294967296;};
+ const good={...better,fps:55,frameP95Ms:22,updateP95Ms:5,simulationPacePct:95};
+ const fast={frameSamples:120,fps:60,frameP95Ms:16,updateP95Ms:2,
+  renderP95Ms:3,simulationPacePct:100};
+ for(let run=0;run<50;run++){
+  const {game,pilot}=fixture();let time=0,external=false;
+  for(let i=0;i<100;i++){
+   time+=random()<.015?4000:100+random()*500;
+   const event=random();
+   if(event<.01)game.paused=!game.paused;
+   else if(event<.02)game.quality=game.quality==='low'?'high':'low';
+   else if(event<.025){
+    game.dpr=1.2;game.canvas.width=384;game.canvas.height=682;
+    external=true;
+   }
+   const sample=random()<.04?null:random()<.5?slow:random()<.5?good:fast;
+   pilot.sample(time,sample);
+   if(external)assert.equal(game.dpr,1.2,'player DPR must never be overridden');
+   assert.equal(game.canvas.width,Math.round(game.w*game.dpr));
+   assert.equal(game.canvas.height,Math.round(game.h*game.dpr));
+  }
+  pilot.stop();
+  if(external)assert.equal(game.dpr,1.2);
+ }
+});
