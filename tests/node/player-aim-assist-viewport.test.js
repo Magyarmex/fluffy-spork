@@ -171,3 +171,19 @@ test('player aim query scope is restored after an exceptional update',()=>{
  assert.equal(g.nearestTank(0,0,480,1),offAxis,
   'exception must not leave the player-only cone filter active on direct queries');
 });
+
+// The fallback is deliberately conservative: multiple aligned rivals are
+// ambiguous, so preserve manual direction rather than invent a target choice.
+test('ambiguous in-cone fallback does not introduce a wrong-target snap',()=>{
+ const Game=boot(),g=new Game();g.w=568;g.h=320;
+ const offAxis=tank(60,120,70),a=tank(61,220,18),b=tank(62,250,-18);
+ g.tanks.push(offAxis,a,b);g.input.aimVec=()=>({x:1,y:0});
+ assert.equal(g.nearestTank(0,0,480,1),offAxis);
+ g.update();assert.equal(g.player.angle,0,
+  'two in-cone rivals must not trigger a new arbitrary fallback snap');
+ const g2=new Game();g2.w=568;g2.h=320;
+ g2.tanks.push(tank(70,100,8),tank(71,220,-18));
+ g2.input.aimVec=()=>({x:1,y:0});
+ g2.update();assert.ok(Math.abs(g2.player.angle-Math.atan2(8,100))<1e-10,
+  'when the original nearest is already in-cone, retain legacy selection');
+});
