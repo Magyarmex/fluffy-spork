@@ -49,6 +49,15 @@ const {chromium}=require('playwright');
     if(this.__novaDecorativeWorld)return baseStart.apply(this,args);
     if(window.__novaFixedPilot)throw Error('unexpected second playable fixed60 owner');
     window.__novaFixedGame=this;
+    // Execute the composed shipping start wrappers (including Settings'
+    // active-game registration), then cancel ONLY the core Game RAF before
+    // its first callback. This avoids bypassing legitimate start side effects.
+    const result=baseStart.apply(this,args);
+    const shippingRaf=this.raf;
+    if(!Number.isInteger(shippingRaf)||shippingRaf<=0)
+     throw Error('shipping Game.start did not schedule its expected RAF');
+    cancelAnimationFrame(shippingRaf);
+    this.raf=null;
     const pilot=window.__novaFixed60Research.createFixedStepBrowserPilot(this,{
      window,document,clock:performance,
      request:fn=>requestAnimationFrame(fn),
@@ -57,6 +66,7 @@ const {chromium}=require('playwright');
      maxSteps:2,backlogExtraTicks:2});
     window.__novaFixedPilot=pilot;
     pilot.start();
+    return result;
    };
   });
   await deploy.click();
