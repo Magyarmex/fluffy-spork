@@ -9,17 +9,20 @@ const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 if(prior===undefined)delete process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL;
 else process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL=prior;
 
-function trial(seed,hz,mode){
+function trial(seed,hz,mode,opts={}){
+ const xpScene=!!opts.xpScene;
  const withAligned=mode!=='noAligned';
  const enemyIntent=mode.endsWith('Enemy');
- const intent=enemyIntent?Math.atan2(40,240):0;
+ const intent=enemyIntent?Math.atan2(xpScene?70:40,xpScene?350:240):0;
  const dirX=Math.cos(intent),dirY=Math.sin(intent);
  return withSeed(seed,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   const p=g.player,others=g.tanks.filter(t=>t!==p);
   assert.ok(others.length>=2,'use real initialized collision-capable tanks');
   const offAxis=others[0],aligned=others[1];
-  for(const [t,x,y] of [[offAxis,120,70],[aligned,240,40]]){
+  for(const [t,x,y] of (xpScene?
+   [[offAxis,0,130],[aligned,350,70]]:
+   [[offAxis,120,70],[aligned,240,40]])){
    Object.assign(t,{x,y,vx:0,vy:0,cls:'scout',isPlayer:true,
     alive:true,hp:100,maxHp:100,spawnShieldT:0,shieldT:0,
     bulwarkT:0,tauntT:0,cloakT:0,gene:null,perk:null});
@@ -48,7 +51,8 @@ function trial(seed,hz,mode){
    g.spawnAITank=()=>null;g.spawnDrone=()=>null;
    p.droneRespawnT=Infinity;
    g.__novaTerrain=[];g.__novaBattlefieldIndex=null;
-   g.cam.x=0;g.cam.y=0;g.cam.zoom=1;g.zoom=1;g.w=568;g.h=320;
+   g.cam.x=0;g.cam.y=0;g.cam.zoom=1;g.zoom=1;
+   g.w=xpScene?800:568;g.h=xpScene?400:320;
    g.status='playing';g.paused=false;g.hasLineOfSight=()=>true;
    g.input.moveVec=()=>({x:0,y:0});
    g.input.aimVec=()=>({x:dirX,y:dirY});
@@ -92,16 +96,18 @@ function trial(seed,hz,mode){
     return out;
    };
    const dt=1/hz;
-   for(let i=0;i<Math.round(1.2*hz);i++)g.update(dt);
+   for(let i=0;i<Math.round((opts.seconds||1.2)*hz);i++)g.update(dt);
    const survivor=g.shapes.find(s=>s.id===circle.id);
    const hp=survivor?survivor.hp:0;
    assert.ok(Number.isFinite(aligned.hp),
     'real initialized hostile must retain finite HP after physical projectile collision');
    assert.ok(Number.isFinite(hp)&&hp>=0&&hp<=14);
    assert.ok(shots>=2,'real Scout firing must occur during the observation');
-   return {seed,hz,mode,shots,circleHp:+hp.toFixed(5),
+   return {seed,hz,mode,xpScene,shots,circleHp:+hp.toFixed(5),
     circleDestroyed:!survivor,playerAngle:+p.angle.toFixed(5),bearings,
-    alignedHp:withAligned?+aligned.hp.toFixed(5):null};
+    alignedHp:withAligned?+aligned.hp.toFixed(5):null,
+    playerXP:+p.xp.toFixed(5),playerScore:+p.score.toFixed(5),
+    uncollectedOrbXP:+g.orbs.reduce((a,o)=>a+(Number(o.xp)||0),0).toFixed(5)};
   }finally{g.destroy();}
  });
 }
@@ -158,4 +164,25 @@ test('neutral-farming aim interference diagnostic in the actual composed game',(
    angular,angularEnemy,shippingEdge,corridorEdge,angularEdge});
  }
  console.log('NOVA_NEUTRAL_AIM_INTERFERENCE '+JSON.stringify(rows));
+});
+
+// A neutral kill is not necessarily player progression: XP orbs have a
+// physical nearest-tank magnet. Put the player closer to the Circle than
+// either rival, then measure real pickup under identical 2.4s histories.
+test('neutral-farming intent and real XP pickup in a player-owned corridor',()=>{
+ const rows=[];
+ for(const seed of [1517800,1517802]){
+  const opts={xpScene:true,seconds:2.4};
+  const shipping=trial(seed,60,'shipping',opts),
+   corridor=trial(seed,60,'corridor',opts),
+   angular=trial(seed,60,'angular',opts),
+   hostile=trial(seed,60,'shippingEnemy',opts);
+  for(const arm of [shipping,corridor,angular,hostile]){
+   assert.ok(Number.isFinite(arm.playerScore)&&Number.isFinite(arm.playerXP));
+   assert.ok(Number.isFinite(arm.uncollectedOrbXP));
+   assert.ok(Number.isFinite(arm.alignedHp));
+  }
+  rows.push({shipping,corridor,angular,hostile});
+ }
+ console.log('NOVA_NEUTRAL_PLAYER_XP '+JSON.stringify(rows));
 });
