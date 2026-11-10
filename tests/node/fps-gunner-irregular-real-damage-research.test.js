@@ -22,7 +22,7 @@ function trial(seed,cls,reload,mode){
   const target=g.tanks.find(t=>t!==p);
   assert.ok(target,'shipping Game must supply a target');
   Object.assign(p,{x:0,y:0,vx:0,vy:0,angle:0,spawnShieldT:0,droneRespawnT:Infinity});
-  Object.assign(target,{cls:'scout',isPlayer:true,alive:true,
+  // A seeded camera may start far from the fixture; normalize public visibility.\n  g.cam.x=0;g.cam.y=0;g.cam.zoom=1;g.zoom=1;g.w=800;g.h=600;\n  Object.assign(target,{cls:'scout',isPlayer:true,alive:true,
    x:200,y:0,vx:0,vy:0,hp:1000000,maxHp:1000000,
    gene:null,perk:null,spawnShieldT:0,shieldT:0,bulwarkT:0,tauntT:0,cloakT:0});
   g.tanks=[p,target];g.tankById=new Map([[p.id,p],[target.id,target]]);
@@ -50,7 +50,7 @@ function trial(seed,cls,reload,mode){
   };
   g.damageTank=function(t){
    const before=t.hp,result=originalDamage.apply(this,arguments);
-   if(t===target&&t.hp<before){hits++;damage+=before-t.hp;}
+   if(t===target&&t.hp<before){\n    assert.equal(arguments[2],p.id,'damage must be player-owned');\n    hits++;damage+=before-t.hp;\n   }
    return result;
   };
   let now=0,updates=0,onTime=0,edges=0;
