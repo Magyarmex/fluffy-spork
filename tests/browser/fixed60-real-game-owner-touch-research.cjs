@@ -22,7 +22,7 @@ const {chromium}=require('playwright');
    const Game=window.__novaMakeRequire('')('game/engine').Game;
    const renderMod=window.__novaMakeRequire('')('game/render');
    const baseStart=Game.prototype.start;
-   window.__novaFixedResearch={births:0,updates:[],renders:[],errors:[]};
+   window.__novaFixedResearch={births:0,updates:[],renders:[],errors:[],lifecycle:[]};
    const profile=window.__novaFixedResearch;
    const baseUpdate=Game.prototype.update;
    Game.prototype.update=function(...args){
@@ -49,6 +49,7 @@ const {chromium}=require('playwright');
     if(this.__novaDecorativeWorld)return baseStart.apply(this,args);
     if(window.__novaFixedPilot)throw Error('unexpected second playable fixed60 owner');
     window.__novaFixedGame=this;
+    profile.lifecycle.push({event:'game-start',at:performance.now(),status:this.status});
     // Execute the composed shipping start wrappers (including Settings'
     // active-game registration), then cancel ONLY the core Game RAF before
     // its first callback. This avoids bypassing legitimate start side effects.
@@ -65,7 +66,15 @@ const {chromium}=require('playwright');
      render:(g,w,h)=>renderMod.render(g,w,h),
      maxSteps:2,backlogExtraTicks:2});
     window.__novaFixedPilot=pilot;
+    const originalStop=pilot.owner.stop.bind(pilot.owner);
+    pilot.owner.stop=function(...stopArgs){
+     profile.lifecycle.push({event:'owner-stop',at:performance.now(),status:pilot.owner.game.status,
+      stack:(new Error('owner stopped')).stack});
+     return originalStop(...stopArgs);
+    };
+    profile.lifecycle.push({event:'owner-created',at:performance.now(),status:this.status});
     pilot.start();
+    profile.lifecycle.push({event:'owner-start-returned',at:performance.now(),started:pilot.owner.started});
     return result;
    };
   });
@@ -80,7 +89,10 @@ const {chromium}=require('playwright');
     pilotSeen:!!window.__novaFixedPilot,
     pilotStarted:!!window.__novaFixedPilot?.owner?.started,
     gameRaf:window.__novaFixedGame?.raf??null,
-    loading:!!document.querySelector('.nv-loading:not([hidden])')
+    loading:!!document.querySelector('.nv-loading:not([hidden])'),
+    lifecycle:window.__novaFixedResearch?.lifecycle?.slice(-12),
+    ticks:window.__novaFixedPilot?.owner?.ticks??null,
+    droppedMs:window.__novaFixedPilot?.owner?.droppedMs??null
    }));
    throw Error('fixed60 boot gate: '+JSON.stringify({diagnostic,errors}),{cause:error});
   }
