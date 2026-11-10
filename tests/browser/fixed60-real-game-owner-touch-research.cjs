@@ -204,6 +204,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     };
     profile.lifecycle.push({event:'owner-created',at:performance.now(),status:this.status});
     pilot.start();
+    profile.ownerStartMs=pilot.owner.lastMs;
     profile.lifecycle.push({event:'owner-start-returned',at:performance.now(),started:pilot.owner.started});
     return result;
    };
@@ -351,7 +352,9 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     return {n:s.length,p95:s.length?s[Math.ceil(.95*s.length)-1]:null};};
    const frames=window.__novaFixedResearch.frames;
    const frameIntervals=frames.map(f=>f.intervalMs).filter(Number.isFinite);
-   const observedWallMs=frames.length>1?frames[frames.length-1].ts-frames[0].ts:0;
+   const ownerStartMs=window.__novaFixedResearch.ownerStartMs;
+   const observedWallMs=frames.length&&Number.isFinite(ownerStartMs)?
+    frames[frames.length-1].ts-ownerStartMs:0;
    const controlledLongGaps=frames.filter(f=>f.rawGapMs>=70&&f.rawGapMs<=100).length;
    const callbackCosts=frames.map(f=>f.callbackJsMs);
    const backlogSamples=frames.map(f=>f.lagMs);
@@ -371,7 +374,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     maxSteps:p.owner.maxSteps,ticks:p.owner.ticks,droppedMs:p.owner.droppedMs,
     raf:{frames:frames.length,intervals:values(frameIntervals),controlledLongGaps,
      observedWallMs,presentationHz:observedWallMs>0?
-      (frames.length-1)*1000/observedWallMs:null,
+      frames.length*1000/observedWallMs:null,
      simulatedMs:p.owner.ticks*1000/60,
      callbackJs:values(callbackCosts),backlogMs:values(backlogSamples),
      stepCounts,droppedFrameCount,
