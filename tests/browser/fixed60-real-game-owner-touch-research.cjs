@@ -76,6 +76,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
    window.__novaFixedResearch={births:0,updates:[],renders:[],errors:[],lifecycle:[],touchEvents:[],frames:[]};
    const profile=window.__novaFixedResearch;
    profile.gateTimerWakeLags=[];
+   profile.gateDeliveryLateMs=[];
    const gateGaps=[250/3,50/3,50/3,50/3];
    let gateNext=null,gateIndex=0,gateToken=0;
    const gatePending=new Map();
@@ -180,6 +181,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
          profile.gateSkippedNativeRafs=(profile.gateSkippedNativeRafs||0)+1;
          arm();return;
         }
+        profile.gateDeliveryLateMs.push(Math.max(0,ts-gateNext));
         gateNext+=gateGaps[gateIndex++%4];
        }
        gatePending.delete(token);
@@ -425,6 +427,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
      nativeRafSkipped:window.__novaFixedResearch.gateSkippedNativeRafs||0,
      timerArms:window.__novaFixedResearch.gateTimerArms||0,
      timerWakeLagMs:values(window.__novaFixedResearch.gateTimerWakeLags),
+     deliveryLateMs:values(window.__novaFixedResearch.gateDeliveryLateMs),
      observedWallMs,presentationHz:frameIntervals.length>0&&
       frames[frames.length-1].ts>frames[0].ts?
       frameIntervals.length*1000/(frames[frames.length-1].ts-frames[0].ts):null,
