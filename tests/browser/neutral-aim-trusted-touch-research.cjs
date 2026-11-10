@@ -48,7 +48,7 @@ const {chromium}=require('playwright');
    window.__novaNeutralTouchTankHits=[];
    const originalDamageTank=g.damageTank;
    g.damageTank=function(t,damage,srcId){
-    if(t===g.tanks[2])window.__novaNeutralTouchTankHits.push({
+    if(t===window.__novaNeutralTouchAligned)window.__novaNeutralTouchTankHits.push({
      time:this.time,hpBefore:t.hp,damage:Number(damage)||0,srcId});
     return originalDamageTank.apply(this,arguments);
    };
@@ -81,7 +81,9 @@ const {chromium}=require('playwright');
    g.hasLineOfSight=()=>true;
    g.cam.x=0;g.cam.y=0;g.cam.zoom=1;g.zoom=1;
    g.input.autofire=false;g.input.firing=false;g.input.mouseActive=false;
-   window.__novaNeutralTouchCircle=c;window.__novaNeutralTouchBirths=[];
+   window.__novaNeutralTouchCircle=c;
+   window.__novaNeutralTouchAligned=rivals[1];
+   window.__novaNeutralTouchBirths=[];
    return {time:g.time,circleHp:c.hp,player:p.id,off:rivals[0].id,aligned:rivals[1].id,
     scoutLevel:p.level,scoutDamage:p.stats.damage,scoutReload:p.stats.reload};
   });
@@ -117,7 +119,7 @@ const {chromium}=require('playwright');
     circleHits:window.__novaNeutralTouchHits,
     alignedHits:window.__novaNeutralTouchTankHits,
     playerXP:g.player.xp,playerScore:g.player.score,
-    alignedHp:g.tanks[2].hp,
+    alignedHp:window.__novaNeutralTouchAligned.hp,
     births:window.__novaNeutralTouchBirths};
   });
   assert.equal(result.active,true,'same trusted touch retains aim');
@@ -134,7 +136,7 @@ const {chromium}=require('playwright');
   // A second gesture is a deliberate hostile-aim positive control. It shares
   // the same browser-trusted pointer but is NOT a matched-world damage A/B.
   const enemyStart=await page.evaluate(()=>{
-   const g=window.__novaNeutralTouchGame,t=g.tanks[2];
+   const g=window.__novaNeutralTouchGame,t=window.__novaNeutralTouchAligned;
    t.hp=100;t.alive=true;t.spawnShieldT=0;
    g.bullets=[];g.player.fireCd=0;
    window.__novaNeutralTouchBirths=[];
@@ -153,7 +155,8 @@ const {chromium}=require('playwright');
    const g=window.__novaNeutralTouchGame;
    return {owner:g.input.stickId.aim,raw:g.input.aimVec(g.input.moveVec()),
     births:window.__novaNeutralTouchBirths,
-    hits:window.__novaNeutralTouchTankHits,remainingHp:g.tanks[2].hp};
+    hits:window.__novaNeutralTouchTankHits,
+    remainingHp:window.__novaNeutralTouchAligned.hp};
   });
   assert.equal(enemyIntent.owner,held.owner,
    'same physical pointer retains right-stick ownership through hostile gesture');
