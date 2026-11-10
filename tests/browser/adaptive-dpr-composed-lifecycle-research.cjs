@@ -148,8 +148,11 @@ const improved={frameSamples:120,fps:55,frameP95Ms:22,updateP95Ms:5,
   assert.deepEqual(report.firstPaint[0].backing,
    [Math.round(report.initial.w),Math.round(report.initial.h)]);
   assert.deepEqual(report.firstPaint[1].backing,report.initial.backing);
+  // Shipping game/render fills the entire backing with opaque #04060d.
+  // All nine distributed samples must be covered on the very first render;
+  // one opaque corner could conceal a partially unpainted resized canvas.
   for(const paint of report.firstPaint)
-   assert.ok(paint.opaque>0,'first post-resize Game render must not be blank');
+   assert.equal(paint.opaque,9,'first post-resize render must cover the full backing');
   assert.equal(report.probing.kind,'probe-started');
   assert.equal(report.probing.dpr,1);
   assert.equal(report.low.kind,'probe-accepted');
