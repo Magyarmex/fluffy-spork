@@ -12,7 +12,7 @@ function summarize(control,candidate){
   const r=report.raf;
   for(const [name,value] of Object.entries({wall:r.observedWallMs,sim:r.simulatedMs,
    dropped:report.droppedMs,queued:r.remainingLagMs,frames:r.frames,
-   longStall:r.longStallDroppedMs,longStallWall:r.longStallWallMs,
+   longStall:r.longStallDroppedMs,longStallWall:r.longStallWallMs,nativeRafSkipped:r.nativeRafSkipped,
    backlog:r.backlogDroppedMs})){
    assert.ok(Number.isFinite(value)&&value>=0,`${label}: invalid ${name}`);
   }
@@ -37,6 +37,8 @@ function summarize(control,candidate){
   const r=report.raf;
   return {steps:report.configuredMaxSteps,wallMs:r.observedWallMs,
    presentationHz:r.presentationHz,updates:report.ticks,
+   nativeRafSkipped:r.nativeRafSkipped,
+   skippedNativeRafsPerDeliveredFrame:r.nativeRafSkipped/r.frames,
    droppedMs:report.droppedMs,backlogLossMs:r.backlogDroppedMs,
    longStallLossMs:r.longStallDroppedMs,
    activeWallMs:r.observedWallMs-r.longStallWallMs,
