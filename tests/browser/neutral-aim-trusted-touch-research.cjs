@@ -131,10 +131,42 @@ const {chromium}=require('playwright');
    'real right-stick input reaches the shipped unique-hostile rescue');
   assert.ok(result.raw.x>0&&Math.abs(result.raw.y)<0.1,
    'raw eastward player intent remains separate from assisted gun bearing');
+  // A second gesture is a deliberate hostile-aim positive control. It shares
+  // the same browser-trusted pointer but is NOT a matched-world damage A/B.
+  const enemyStart=await page.evaluate(()=>{
+   const g=window.__novaNeutralTouchGame,t=g.tanks[2];
+   t.hp=100;t.alive=true;t.spawnShieldT=0;
+   g.bullets=[];g.player.fireCd=0;
+   window.__novaNeutralTouchBirths=[];
+   window.__novaNeutralTouchTankHits=[];
+   return g.time;
+  });
+  const enemyMove={...moved,y:moved.y+Math.min(7,box.height*.01)};
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[enemyMove]});
+  await page.waitForFunction(()=>window.__novaNeutralTouchGame?.input?.aim?.dy>3,
+   null,{timeout:10000});
+  await page.waitForFunction(start=>{
+   const g=window.__novaNeutralTouchGame;
+   return g&&g.time>=start+1.1&&window.__novaNeutralTouchBirths.length>=2;
+  },enemyStart,{timeout:20000});
+  const enemyIntent=await page.evaluate(()=>{
+   const g=window.__novaNeutralTouchGame;
+   return {owner:g.input.stickId.aim,raw:g.input.aimVec(g.input.moveVec()),
+    births:window.__novaNeutralTouchBirths,
+    hits:window.__novaNeutralTouchTankHits,remainingHp:g.tanks[2].hp};
+  });
+  assert.equal(enemyIntent.owner,held.owner,
+   'same physical pointer retains right-stick ownership through hostile gesture');
+  assert.ok(enemyIntent.raw.x>.8&&enemyIntent.raw.y>.08,
+   'trusted diagonal thumb reports deliberate hostile-facing aim');
+  assert.ok(enemyIntent.births.some(b=>b.bearing>.10&&b.bearing<.24),
+   'real projectiles follow deliberate hostile-facing thumb direction');
+  assert.ok(enemyIntent.hits.length>0&&enemyIntent.remainingHp<100,
+   'deliberate hostile gesture must deal actual composed-game damage');
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   await page.waitForFunction(()=>window.__novaNeutralTouchGame?.input?.aim?.active===false,
    null,{timeout:10000});
   assert.deepEqual(errors,[],'no browser page errors');
-  console.log('NOVA_NEUTRAL_TRUSTED_TOUCH '+JSON.stringify({setup,held,result}));
+  console.log('NOVA_NEUTRAL_TRUSTED_TOUCH '+JSON.stringify({setup,held,result,enemyIntent}));
  }finally{await context.close();await browser.close();}
 })().catch(e=>{console.error(e.stack||e);process.exitCode=1;});
