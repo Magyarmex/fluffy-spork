@@ -13,6 +13,9 @@ function schedule(mode){
  if(mode==='uniform60')return Array(360).fill(1000/60);
  if(mode==='alternating40_120')return Array.from({length:180},()=>[25,1000/120]).flat();
  if(mode==='alternating120_40')return Array.from({length:180},()=>[1000/120,25]).flat();
+ if(mode==='uniform30')return Array(180).fill(1000/30);
+ if(mode==='alternating20_60')return Array.from({length:90},()=>[50,1000/60]).flat();
+ if(mode==='alternating60_20')return Array.from({length:90},()=>[1000/60,50]).flat();
  throw Error('unknown frame schedule');
 }
 function touchEvents(offsetMs){
@@ -175,4 +178,31 @@ test('fixed60 research measures touch-driven real Gunner damage under matched me
  // Enforce combat chronology, not a fixed weapon balance number or an
  // unrealistically identical render-callback delay across frame schedules.
  assert.equal(rows.length,16);
+});
+
+// Research-only falsifier: equal six-second wall time at 30Hz average does
+// not guarantee identical chronology under a two-tick-per-RAF budget. A
+// 50ms presentation gap needs three 60Hz ticks; the next short frame must
+// repay that debt without dropping, clamping or reordering held touch input.
+test('fixed60 research challenges Gunner touch damage at mean 30Hz and 20/60Hz bursts',()=>{
+ const rows=[];
+ for(const [cls,reload] of [['minigun',1],['needlestorm',3]])
+  for(const seed of [1517800,1517802])
+   for(const offset of [7,12]){
+    const reference=trial(seed,cls,reload,'uniform60',offset);
+    for(const mode of ['uniform30','alternating20_60','alternating60_20']){
+     const actual=trial(seed,cls,reload,mode,offset);
+     assert.equal(actual.ticks,reference.ticks,'30Hz presentation lost simulation ticks');
+     assert.equal(actual.damage,reference.damage,'real Gunner damage diverged at mean 30Hz');
+     assert.equal(actual.volleys,reference.volleys,'Gunner volley chronology diverged');
+     assert.equal(actual.hits,reference.hits,'Gunner collision count diverged');
+     assert.deepEqual(actual.births,reference.births,'projectile birth chronology diverged');
+     rows.push({cls,seed,offset,mode,damage:actual.damage,
+      maxInputSampleLagMs:actual.maxInputSampleLagMs,
+      maxRenderCallbackLagMs:actual.maxRenderCallbackLagMs,
+      stepsByFrame:actual.stepsByFrame});
+    }
+   }
+ console.log('GUNNER_FIXED60_MEAN30_TOUCH_DAMAGE '+JSON.stringify(rows));
+ assert.equal(rows.length,24);
 });
