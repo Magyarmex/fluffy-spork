@@ -48,6 +48,9 @@ const improved={frameSamples:120,fps:55,frameP95Ms:22,updateP95Ms:5,
    window.__novaDprPlayerBirths=0;});
   const canvas=page.locator('canvas.absolute.inset-0');
   await canvas.waitFor({state:'visible',timeout:20000});
+  // A visible canvas can still be covered by the loading layer. Wait for the
+  // same gameplay-ready handoff used by the established trusted-touch smoke.
+  await page.locator('.nv-loading').waitFor({state:'hidden',timeout:20000});
   const box=await canvas.boundingBox();
   assert.ok(box&&box.width>200&&box.height>200);
   const cdp=await context.newCDPSession(page);
