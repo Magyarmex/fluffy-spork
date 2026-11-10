@@ -18,6 +18,10 @@ function schedule(mode){
  if(mode==='alternating60_20')return Array.from({length:90},()=>[1000/60,50]).flat();
  if(mode==='clustered55_11')return Array.from({length:45},()=>
   [55,55,1000/15-55,1000/15-55]).flat();
+ // Real Chromium can quantize an ideal 83.333/16.667ms gate to this shape.
+ // The four-frame group still totals 133.333ms (mean 30Hz), without stalls.
+ if(mode==='quantized83_16')return Array.from({length:45},()=>
+  [83.4,16.6,16.6,1000/7.5-83.4-16.6-16.6]).flat();
  throw Error('unknown frame schedule');
 }
 function touchEvents(offsetMs){
@@ -276,4 +280,33 @@ test('fixed60 research compares bounded clustered30 recovery budgets with real G
  }
  console.log('GUNNER_FIXED60_CLUSTERED30_RECOVERY '+JSON.stringify(rows));
  assert.equal(rows.length,4);
+});
+
+// Research-only real-damage follow-up to #895/#896: a browser-quantized
+// 30Hz pattern can cross a whole-tick backlog threshold despite unchanged
+// mean FPS. Do not freeze dropped ticks as a desired outcome. Each candidate
+// uses the actual composed Game, projectile collisions and chronological touch.
+test('quantized mean-30Hz RAF measures actual Gunner damage across bounded budgets',()=>{
+ const rows=[];
+ for(const [cls,reload] of [['minigun',1],['needlestorm',3]]){
+  const reference=trial(1517800,cls,reload,'uniform60',12);
+  for(const [maxSteps,extra] of [[2,2],[3,2],[3,3],[4,2]]){
+   const result=trial(1517800,cls,reload,'quantized83_16',12,
+    'research-drop',maxSteps,extra);
+   assert.ok(result.ticks<=reference.ticks,'quantized gate cannot invent updates');
+   assert.equal(result.applied,reference.applied,'all chronological touch edges must arrive');
+   if(result.droppedMs===0&&result.ticks===reference.ticks){
+    assert.equal(result.damage,reference.damage,'no-loss policy must preserve applied damage');
+    assert.equal(result.volleys,reference.volleys,'no-loss policy must preserve volley cadence');
+    assert.deepEqual(result.births,reference.births,'no-loss policy must preserve projectile chronology');
+   }
+   rows.push({cls,maxSteps,extra,ticks:result.ticks,
+    droppedMs:result.droppedMs,damage:result.damage,
+    volleys:result.volleys,hits:result.hits,
+    maxRenderCallbackLagMs:result.maxRenderCallbackLagMs,
+    stepsByFrame:result.stepsByFrame});
+  }
+ }
+ assert.equal(rows.length,8);
+ console.log('GUNNER_FIXED60_QUANTIZED30_REAL_DAMAGE '+JSON.stringify(rows));
 });
