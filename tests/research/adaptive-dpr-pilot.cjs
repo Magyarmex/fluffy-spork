@@ -40,8 +40,10 @@ class AdaptiveDprPilot {
     // render cost is sufficient recovery evidence. Requiring render P95 <=7ms
     // stranded accepted low DPR despite spare frame budget (e.g. 8ms render).
     // Keep the 10ms ceiling conservative: update <=5ms leaves ~1.7ms slack\n    // against a 16.7ms display interval, before other main-thread work.
-    const healthy=fps>=57&&frameP95Ms<=19&&renderP95Ms<=10&&
-      updateP95Ms<=5&&simulationPacePct>=98;
+    // Preserve the original <=7ms render recovery path even if updates
+    // exceed 5ms; the expanded 8–10ms path requires cheap updates.
+    const healthy=fps>=57&&frameP95Ms<=19&&simulationPacePct>=98&&
+      (renderP95Ms<=7||(renderP95Ms<=10&&updateP95Ms<=5));
     this.downStreak=renderLimited?this.downStreak+1:0;
     this.upStreak=healthy?this.upStreak+1:0;
     if(now-this.lastChange<this.dwellMs)return this.dpr;
