@@ -96,7 +96,7 @@ function createAdaptiveDprPilot(game, options={}) {
     }
     if(now<warmupUntil)return result('warmup');
     const slow=p.fps<=50&&p.frameP95Ms>=22&&p.updateP95Ms<=20&&
-      p.renderP95Ms>=3;
+      p.renderP95Ms>=5&&p.renderP95Ms>=p.updateP95Ms*0.5;
     const fast=p.fps>=58&&p.frameP95Ms<=19&&p.updateP95Ms<=5&&
       p.renderP95Ms<=5;
     if(phase==='baseline'&&game.dpr>floor&&slow&&now>=cooldownUntil){
