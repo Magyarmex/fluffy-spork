@@ -155,8 +155,9 @@ jobs:
           # Research-only controlled RAF delivery: run the two-step baseline
           # before the three-step candidate. Both use browser timestamps,
           # trusted touch, real Game updates, and the same 30Hz gate policy.
-          NOVA_FIXED60_MAX_STEPS=2 NOVA_FIXED60_CONTROLLED_GATE=1 NOVA_FIXED60_INITIAL_FINGERPRINT_FILE=/tmp/nova-fixed60-initial-world.txt node tests/browser/fixed60-real-game-owner-touch-research.cjs
-          NOVA_FIXED60_MAX_STEPS=3 NOVA_FIXED60_CONTROLLED_GATE=1 NOVA_FIXED60_INITIAL_FINGERPRINT_FILE=/tmp/nova-fixed60-initial-world.txt node tests/browser/fixed60-real-game-owner-touch-research.cjs
+          NOVA_FIXED60_MAX_STEPS=2 NOVA_FIXED60_CONTROLLED_GATE=1 NOVA_FIXED60_INITIAL_FINGERPRINT_FILE=/tmp/nova-fixed60-initial-world.txt NOVA_FIXED60_REPORT_FILE=/tmp/nova-fixed60-two.json node tests/browser/fixed60-real-game-owner-touch-research.cjs
+          NOVA_FIXED60_MAX_STEPS=3 NOVA_FIXED60_CONTROLLED_GATE=1 NOVA_FIXED60_INITIAL_FINGERPRINT_FILE=/tmp/nova-fixed60-initial-world.txt NOVA_FIXED60_REPORT_FILE=/tmp/nova-fixed60-three.json node tests/browser/fixed60-real-game-owner-touch-research.cjs
+          node tests/research/fixed60-paired-report.cjs /tmp/nova-fixed60-two.json /tmp/nova-fixed60-three.json
       - name: Preserve browser screenshots
         if: always()
         uses: actions/upload-artifact@v4
