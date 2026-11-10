@@ -75,7 +75,7 @@ const improved={frameSamples:120,fps:55,frameP95Ms:22,updateP95Ms:5,
    };
    await frame();
    const touchBefore={owner:g.input.stickId.aim,active:g.input.aim.active,
-    births:window.__novaDprPlayerBirths};
+    births:window.__novaDprPlayerBirths,dx:g.input.aim.dx,dy:g.input.aim.dy};
    const before=raster();
    pilot.sample(0,slow);const started=pilot.sample(1000,slow);
    await frame();
@@ -88,13 +88,30 @@ const improved={frameSamples:120,fps:55,frameP95Ms:22,updateP95Ms:5,
    for(let t=7500;t<=15500;t+=500)restored=pilot.sample(t,null);
    await frame();
    const touchAfter={owner:g.input.stickId.aim,active:g.input.aim.active,
-    births:window.__novaDprPlayerBirths};
+    births:window.__novaDprPlayerBirths,dx:g.input.aim.dx,dy:g.input.aim.dy};
    const after={dpr:g.dpr,kind:restored.kind,raster:raster(),
     gameTime:g.time,css:[g.w,g.h],phase:pilot.state.phase};
    pilot.stop();
    return {initial,before,probing,low,after,touchBefore,touchAfter};
   },{slow,improved});
+  // DPR changes must preserve not only ownership but also live movement and
+  // release. Moving the same trusted pointer must steer the real Game stick.
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[
+   {x:box.x+box.width*.72,y:box.y+box.height*.43,id:42,radiusX:1,radiusY:1,force:1}]});
+  await page.waitForTimeout(120);
+  const moved=await page.evaluate(()=>{const g=window.__novaDprResearchGame;
+   return {owner:g.input.stickId.aim,active:g.input.aim.active,
+    dx:g.input.aim.dx,dy:g.input.aim.dy,births:window.__novaDprPlayerBirths};});
+  assert.equal(moved.owner,report.touchBefore.owner,'move must retain same pointer owner');
+  assert.equal(moved.active,true,'moved right stick must remain active');
+  assert.ok(Number.isFinite(moved.dy)&&Math.abs(moved.dy-report.touchAfter.dy)>0.05,
+   'same trusted pointer must steer aim after DPR rollback');
+  assert.equal(moved.births,0,'moving right stick must not invent a projectile');
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  await page.waitForTimeout(120);
+  const released=await page.evaluate(()=>{const g=window.__novaDprResearchGame;
+   return {owner:g.input.stickId.aim,active:g.input.aim.active};});
+  assert.equal(released.active,false,'touch release must deactivate aim after DPR rollback');
   assert.equal(report.touchBefore.active,true,'trusted centered right touch must own aim');
   assert.ok(Number.isInteger(report.touchBefore.owner)&&report.touchBefore.owner>=0,
    'right stick must retain an actual DOM pointer owner');
