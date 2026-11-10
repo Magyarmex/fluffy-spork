@@ -161,3 +161,24 @@ test('clustered mean30 cancellation stays shot-free even with wider freshness',(
   assert.equal(result.firing,false);
  }
 });
+
+// Separate dropped simulation time from browser delivery latency. A three-step
+// budget can preserve all 48 fixed ticks over this 800ms mean-30Hz trace,
+// but it cannot deliver a DOM event before the next browser callback.
+test('even no-drop three-step recovery cannot bypass the wall-clock freshness gate',()=>{
+ const strict=run(clustered30,{maxSteps:3,maxPulseAgeMs:40});
+ const permissive=run(clustered30,{maxSteps:3,maxPulseAgeMs:80});
+ assert.equal(strict.droppedMs,0);
+ assert.equal(permissive.droppedMs,0);
+ assert.equal(strict.ticks,48);
+ assert.equal(permissive.ticks,48);
+ assert.equal(strict.firstDelivery,permissive.firstDelivery);
+ assert.equal(strict.shots,0);
+ assert.equal(strict.rejected,1);
+ assert.equal(strict.firstVisible,undefined);
+ assert.equal(permissive.shots,1);
+ assert.equal(permissive.rejected,0);
+ assert.ok(permissive.firstVisible>=permissive.firstDelivery);
+ assert.equal(strict.aim,false);assert.equal(strict.firing,false);
+ assert.equal(permissive.aim,false);assert.equal(permissive.firing,false);
+});
