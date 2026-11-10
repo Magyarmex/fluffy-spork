@@ -48,3 +48,36 @@ for(const hz of [30,60,120])test('crowded cone preserves manual intent at '+hz+'
    'removing the second aligned rival must restore unique-target assistance');
  }finally{close(g);}
 });
+
+for(const hz of [30,60,120])test('unique cone rescue respects live shield, terrain and allegiance at '+hz+'Hz',()=>{
+ const offAxis=rival(9501,120,70),aligned=rival(9502,220,20);
+ const {g,p}=scene([offAxis,aligned]);
+ const dt=1/hz,expected=Math.atan2(20,220)*13/hz;
+ const tick=()=>{p.angle=0;g.update(dt);assert.equal(g.__novaFairAimQuery,undefined,
+   'player-only query scope must not escape the real update');};
+ try{
+  assert.equal(g.nearestTank(0,0,480,p.id),offAxis,
+   'ordinary queries retain the nearer off-axis rival');
+  aligned.spawnShieldT=2;
+  tick();
+  assert.ok(Math.abs(p.angle)<1e-9,'protected aligned rival cannot steal manual aim');
+  aligned.spawnShieldT=0;
+  tick();
+  assert.ok(Math.abs(p.angle-expected)<1e-6,
+   'removing protection must restore the same-world unique rescue');
+  g.hasLineOfSight=(x,y,tx,ty)=>tx!==aligned.x;
+  tick();
+  assert.ok(Math.abs(p.angle)<1e-9,'occluded aligned rival cannot steal manual aim');
+  g.hasLineOfSight=()=>true;
+  tick();
+  assert.ok(Math.abs(p.angle-expected)<1e-6,
+   'restoring line of sight must restore the unique rescue');
+  g.areAllies=(a,b)=>b.id===aligned.id;
+  tick();
+  assert.ok(Math.abs(p.angle)<1e-9,'friendly aligned rival cannot steal manual aim');
+  g.areAllies=undefined;
+  tick();
+  assert.ok(Math.abs(p.angle-expected)<1e-6,
+   'restoring hostility must restore the unique rescue');
+ }finally{close(g);}
+});
