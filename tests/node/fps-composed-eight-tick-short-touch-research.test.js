@@ -93,7 +93,7 @@ function run(intervals,maxSteps,extra){
    assert.ok(volleys<=1,'single 12ms press must not generate multiple volleys');
    return {ticks:owner.ticks,droppedMs:+owner.droppedMs.toFixed(4),
     queuedMs:+owner.lagMs.toFixed(4),volleys,hits,damage:+damage.toFixed(5),
-    births,firstCanvas:rendered.find(x=>x.volleys>0)?.wall??null,
+    births,firstRenderCallbackMs:rendered.find(x=>x.volleys>0)?.wall??null,
     sampled:sampled.map(e=>({type:e.type,at:e.at,sample:e.sample}))};
   }finally{owner.stop();g.destroy();}
  });
