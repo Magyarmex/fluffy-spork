@@ -10,7 +10,12 @@ const TRACES=[
  {name:'continuous-active-jitter',ticks:[4.5,5.9,.1,.1,1.35,1.35,1.35,1.35]},
  // Exactly 64 native 240Hz display slots over eight delivered frames:
  // 266.667ms at mean 30Hz, no sub-refresh gaps or >100ms stalls.
- {name:'240Hz-display-quantized',ticks:[18,23,1,1,5,5,5,6].map(n=>n/4)}
+ {name:'240Hz-display-quantized',ticks:[18,23,1,1,5,5,5,6].map(n=>n/4)},
+ // Four five-frame groups, each exactly 24 native 144Hz display slots:
+ // 20 callbacks in 666.667ms (mean 30Hz), every gap <100ms.
+ {name:'144Hz-display-quantized',ticks:[
+  8,2,6,7,1, 9,1,1,6,7, 1,1,1,10,11, 13,2,3,4,2
+ ].map(n=>n*60/144)}
 ];
 function run(selective,gaps){
  let now=1000,callback=null,updates=0;
@@ -48,18 +53,19 @@ function run(selective,gaps){
    queuedMs:owner.lagMs,wallMs:now-1000};
  }finally{owner.stop();}
 }
-test('selective fourth-update threshold loses ticks under active and 240Hz-quantized 30Hz delivery',()=>{
+test('selective fourth-update threshold loses ticks under active and native 144/240Hz-quantized 30Hz delivery',()=>{
  for(const trace of TRACES){
-  assert.equal(trace.ticks.length,8);
-  assert.ok(Math.abs(trace.ticks.reduce((a,b)=>a+b,0)-16)<1e-9);
+  const expectedTicks=Math.round(trace.ticks.reduce((a,b)=>a+b,0));
+  assert.ok([16,40].includes(expectedTicks));
+  assert.ok(Math.abs(trace.ticks.reduce((a,b)=>a+b,0)-expectedTicks)<1e-9);
   const full=run(false,trace.ticks),selective=run(true,trace.ticks);
-  assert.ok(Math.abs(full.wallMs-16*STEP_MS)<.002);
+  assert.ok(Math.abs(full.wallMs-expectedTicks*STEP_MS)<.002);
   assert.ok(Math.abs(selective.wallMs-full.wallMs)<.002);
-  assert.equal(full.ticks,16);
-  assert.equal(full.updates,16);
+  assert.equal(full.ticks,expectedTicks);
+  assert.equal(full.updates,expectedTicks);
   assert.equal(full.droppedMs,0);
-  assert.equal(selective.ticks,15);
-  assert.equal(selective.updates,15);
+  assert.equal(selective.ticks,expectedTicks-1);
+  assert.equal(selective.updates,expectedTicks-1);
   assert.ok(Math.abs(selective.droppedMs-STEP_MS)<.002,
    '4.75-tick shortcut loses one entire simulated frame');
   for(const r of [full,selective])
