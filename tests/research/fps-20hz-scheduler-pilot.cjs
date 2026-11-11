@@ -45,6 +45,17 @@ function frameTimes(kind){
   }
   return gaps;
  }
+ // 60Hz-display-quantized mean-30Hz trace: each group contains eight
+ // 16.667ms display slots across four delivered frames (no sub-refresh
+ // callbacks). Constructed adversarial control: 3+3 may drop one tick while
+ // 4+2 recovers it, so CPU cost and earned benefit can be measured together.
+ if(kind==='30Hz-display-quantized'){
+  const groups=[[1,2,2,3],[2,2,3,1],[2,2,3,1],[3,1,2,2],
+   [1,3,3,1],[1,2,1,4],[2,1,1,4],[1,1,3,3],
+   [4,1,2,1],[1,1,2,4],[4,1,2,1],[1,3,3,1],
+   [3,1,3,1],[1,1,1,5],[5,1,1,1]];
+  return groups.flat().map(ticks=>ticks*1000/60);
+ }
  if(kind==='20Hz-jitter')return Array.from({length:40},(_,i)=>i%2?52:48);
  if(kind==='20Hz-bursts')return Array.from({length:40},(_,i)=>[65,35,54,46][i%4]);
  throw Error('unknown presentation cadence');
