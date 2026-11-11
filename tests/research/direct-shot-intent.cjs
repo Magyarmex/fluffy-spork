@@ -4,19 +4,24 @@
  * A short aimed press+release is an intent for ONE next simulation update,
  * never a held physical right stick or a Controller drone command. */
 class DirectShotIntent {
-  constructor(game,{window:win,document:doc}={}) {
+  constructor(game,{window:win,document:doc,maxIntentAgeMs=Infinity,nowMs=null}={}) {
     if(!game||!game.input||!win||!doc||typeof game.update!=='function'||
        typeof game.setPaused!=='function'||typeof win.addEventListener!=='function'||
        typeof win.removeEventListener!=='function'||typeof doc.addEventListener!=='function'||
        typeof doc.removeEventListener!=='function')throw Error('invalid direct shot intent owner');
+    if(maxIntentAgeMs!==Infinity&&(!Number.isFinite(maxIntentAgeMs)||maxIntentAgeMs<0||typeof nowMs!=='function'))
+      throw Error('invalid direct intent freshness gate');
     this.game=game;this.input=game.input;this.win=win;this.doc=doc;
+    this.maxIntentAgeMs=maxIntentAgeMs;this.nowMs=nowMs;
+    this.pendingAt=null;this.rejectedStale=0;
+    this.stamp=()=>{try{return this.nowMs();}catch(_){return NaN;}};
     this.down=null;this.pending=null;this.intents=0;this.canceled=0;
     const i=this.input,self=this;
     this.old={pd:i.pd,pu:i.pu,update:game.update,setPaused:game.setPaused,
       destroy:game.destroy,blurReset:i.__novaBlurReset};
     this.destroyHadOwn=Object.prototype.hasOwnProperty.call(game,'destroy');
     this.blurResetHadOwn=Object.prototype.hasOwnProperty.call(i,'__novaBlurReset');
-    this.clear=()=>{if(self.down||self.pending)self.canceled++;self.down=null;self.pending=null;};
+    this.clear=()=>{if(self.down||self.pending)self.canceled++;self.down=null;self.pending=null;self.pendingAt=null;};
     this.hidden=()=>{if(doc.hidden)self.clear();};
     i.pd=function(e){
       // New physical intent invalidates an unconsumed old one. Never replay a
@@ -27,10 +32,10 @@ class DirectShotIntent {
       if(!e||!e.pointerType||game.status!=='playing'||game.paused||doc.hidden||
          i.__novaInputPaused||e.target&&typeof e.target.closest==='function'&&e.target.closest('[data-ui]'))return result;
       if(e.pointerType==='mouse'){
-        if(e.button===0&&!prior&&i.firing&&!i.touchSeen){self.pending=null;self.down={type:'mouse',id:e.pointerId,sampled:false};}
+        if(e.button===0&&!prior&&i.firing&&!i.touchSeen){self.pending=null;self.pendingAt=null;self.down={type:'mouse',id:e.pointerId,sampled:false};}
       }else if((e.pointerType==='touch'||e.pointerType==='pen')&&
          oldAimId!==e.pointerId&&i.stickId.aim===e.pointerId&&i.aim.active){
-        self.pending=null;self.down={type:e.pointerType,id:e.pointerId,sampled:false};
+        self.pending=null;self.pendingAt=null;self.down={type:e.pointerType,id:e.pointerId,sampled:false};
       }
       return result;
     };
@@ -68,7 +73,8 @@ class DirectShotIntent {
         if(canceled){self.clear();return result;}
         if(eligible){self.pending=Object.freeze({fire:true,
           aim:mouse?null:Object.freeze({x:dx/len,y:dy/len}),
-          depth:mouse?null:Math.max(.08,Math.min(1,(len-5)/55))});}
+          depth:mouse?null:Math.max(.08,Math.min(1,(len-5)/55))});
+          self.pendingAt=self.maxIntentAgeMs===Infinity?null:self.stamp();}
       }else if(canceled&&self.pending)self.clear();
       return result;
     };
@@ -81,7 +87,14 @@ class DirectShotIntent {
          (self.down.type==='mouse'?i.mouseActive:
            i.aim.active&&Math.hypot(i.aim.dx,i.aim.dy)>=9))
         self.down.sampled=true;
-      const intent=self.pending;self.pending=null;
+      const intent=self.pending,at=self.pendingAt;self.pending=null;self.pendingAt=null;
+      if(intent&&self.maxIntentAgeMs!==Infinity){
+        const now=self.stamp(),age=now-at;
+        if(!Number.isFinite(now)||!Number.isFinite(at)||!Number.isFinite(age)||
+           age < -32||age > self.maxIntentAgeMs){
+          self.rejectedStale++;return self.old.update.apply(this,args);
+        }
+      }
       if(!intent||game.status!=='playing'||game.paused||doc.hidden||
          i.__novaInputPaused||i.aim.active||i.firing)return self.old.update.apply(this,args);
       if(i.__novaShotIntent)throw Error('shot intent already owned');
@@ -109,13 +122,14 @@ class DirectShotIntent {
      * Pointer Events pointer: no second pointerdown/up is dispatched. */
     this.nativeDown=e=>{
       if(!e||e.button!==0||i.touchSeen||game.status!=='playing'||game.paused||doc.hidden)return;
-      if(!self.down){self.pending=null;self.down={type:'mouse',id:1,sampled:false};}
+      if(!self.down){self.pending=null;self.pendingAt=null;self.down={type:'mouse',id:1,sampled:false};}
     };
     this.nativeUp=e=>{
       if(!e||e.button!==0||!self.down||self.down.type!=='mouse')return;
       const d=self.down;self.down=null;
       if(!d.sampled&&game.status==='playing'&&!game.paused&&!doc.hidden&&!i.__novaInputPaused&&i.mouseActive)
-        self.pending=Object.freeze({fire:true,aim:null,depth:null});
+        {self.pending=Object.freeze({fire:true,aim:null,depth:null});
+         self.pendingAt=self.maxIntentAgeMs===Infinity?null:self.stamp();}
     };
     if(this.canvas){this.canvas.addEventListener('mousedown',this.nativeDown);
       win.addEventListener('mouseup',this.nativeUp);}
