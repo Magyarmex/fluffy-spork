@@ -33,6 +33,14 @@ function frameTimes(kind){
  // guarantee conservation when alternating large and tiny gaps cluster.
  // Two groups each sum to 133 1/3ms, every individual gap stays <100ms.
  // This is a mathematical stress trace, NOT measured Android incidence.
+ // Two successive long but active frames, then short recovery frames.
+ // This 2s mean-30Hz trace distinguishes 4+3 from 3+4 and defeats a
+ // tempting 4.5-tick selective-fourth-step arithmetic shortcut.
+ if(kind==='30Hz-double-burst'){
+  const cycle=[4.49,5.9,1,1,1,1,.805,.805];
+  return [...Array.from({length:7},()=>cycle).flat(),2,2,2,2]
+   .map(ticks=>ticks*1000/60);
+ }
  if(kind==='30Hz-seven-tick-falsifier'){
   const cycle=[22.792522365760117,8.909842912196837,
    2.6870952012899134,98.94387285408648,
