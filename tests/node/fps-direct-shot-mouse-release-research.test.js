@@ -128,3 +128,21 @@ test('Long Glass camera frame at Game.update start cannot move recovered Control
  assert.deepEqual(framed.bullets,normal.bullets,'camera frame cannot retarget projectile');
  assert.equal(framed.angle,normal.angle,'camera frame cannot retarget hull bearing');
 });
+
+test('projection failure during shot consumption cannot leak synthetic intent',()=>{
+ const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
+ const i=g.input,o=new DirectShotIntent(g,{window:g.__testWindow,document:g.__testWindow.document});
+ const ev=(type,buttons)=>({type,pointerType:'mouse',pointerId:1,
+  button:0,buttons,clientX:400,clientY:200,target:{closest:()=>null}});
+ const rect=i.canvas.getBoundingClientRect;
+ try{
+  i.pd(ev('pointerdown',1));i.pu(ev('pointerup',0));
+  assert.ok(o.pending&&o.pending.world);
+  const live={x:i.mouseX,y:i.mouseY};
+  i.canvas.getBoundingClientRect=()=>{throw Error('projection failure');};
+  assert.throws(()=>g.update(1/60),/projection failure/);
+  assert.equal(i.__novaShotIntent,undefined,'no synthetic input leaks');
+  assert.equal(o.pending,null,'failed projection cannot replay later');
+  assert.equal(i.mouseX,live.x);assert.equal(i.mouseY,live.y);
+ }finally{i.canvas.getBoundingClientRect=rect;o.detach();g.destroy();}
+});
