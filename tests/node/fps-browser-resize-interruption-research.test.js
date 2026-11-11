@@ -48,8 +48,9 @@ test('research falsifier: resize cannot reclassify queued right-stick down as mo
  h.timeline.consumeThrough(.02);
  assert.equal(h.input.stickId.move,-1,'old aim touch must not become movement');
  assert.equal(h.input.move.active,false);
- // A safe resize policy may cancel this gesture or retain its original
- // side, but it must never claim a new left-stick owner.
+ assert.equal(h.input.aim.active,false);
+ assert.equal(h.input.firing,false);
+ assert.equal(h.timeline.quarantined,true,'old resize-crossing gesture must be quarantined');
 });
 
 test('research falsifier: a queued resize-crossing flick cannot fire on wrong stick',()=>{
@@ -91,5 +92,46 @@ test('research control: unchanged canvas retains independent two-stick owners',(
  h.timeline.consumeThrough(.04);
  assert.equal(h.input.stickId.move,-1);
  assert.equal(h.input.stickId.aim,-1);
+ assert.equal(h.input.firing,false);
+});
+
+test('research: resize quarantines both queued sticks, not just the aim pointer',()=>{
+ const h=harness();
+ h.setNow(1020);
+ h.capture('pointerdown',11,100,1010);
+ h.capture('pointerdown',22,600,1011);
+ h.resize(1600);
+ h.timeline.consumeThrough(.02);
+ assert.equal(h.input.stickId.move,-1);
+ assert.equal(h.input.stickId.aim,-1);
+ assert.equal(h.input.move.active,false);
+ assert.equal(h.input.aim.active,false);
+ assert.equal(h.input.firing,false);
+ assert.equal(h.timeline.quarantined,true);
+ h.setNow(1040);
+ assert.equal(h.capture('pointermove',22,620,1030),false,'stale move cannot rearm');
+ assert.equal(h.input.firing,false);
+ h.capture('pointerup',22,620,1031);
+ assert.equal(h.timeline.quarantined,false,'release clears quarantine');
+});
+
+test('research: fresh touch after resize quarantine can still aim normally',()=>{
+ const h=harness();
+ h.setNow(1020);
+ h.capture('pointerdown',22,600,1010);
+ h.resize(1600);
+ h.timeline.consumeThrough(.02);
+ assert.equal(h.timeline.quarantined,true);
+ h.setNow(1040);
+ h.capture('pointerup',22,600,1030);
+ assert.equal(h.timeline.quarantined,false);
+ h.setNow(1060);
+ h.capture('pointerdown',23,1200,1050);
+ h.timeline.consumeThrough(.06);
+ assert.equal(h.input.stickId.aim,23);
+ assert.equal(h.input.stickId.move,-1);
+ assert.equal(h.input.firing,true);
+ h.capture('pointerup',23,1200,1061);
+ h.timeline.consumeThrough(.08);
  assert.equal(h.input.firing,false);
 });
