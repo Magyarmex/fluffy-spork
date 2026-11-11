@@ -178,3 +178,47 @@ test('trusted physical DOM release age, not replay time, gates short-shot recove
   }
  }
 });
+
+test('actual BrowserEventTimeline provenance rejects a late replayed release',()=>{
+ const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
+ const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs');
+ function replay(releaseMs,withOrigin){
+  return withSeed(1517800,()=>{
+   const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
+   g.status='playing';g.paused=false;g.player.fireCd=0;
+   let now=1000,shots=0;
+   const timeline=new ChronologicalInput(g.input);
+   const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
+   const o=new DirectShotIntent(g,{window:g.__testWindow,document:g.__testWindow.document,
+    maxIntentAgeMs:100,nowMs:()=>now,...(withOrigin?{eventOriginMs:bridge.startMs}:{})});
+   const fire=g.tryFire;
+   g.tryFire=function(t){const n=this.bullets.length,out=fire.apply(this,arguments);
+    if(t===g.player&&this.bullets.length>n)shots++;return out;};
+   try{
+    now=1300; // Browser delivered all three DOM edges late but under 2000ms cutoff.
+    for(const [type,at,x,buttons] of [
+     ['pointerdown',releaseMs-20,600,1],
+     ['pointermove',releaseMs-10,640,1],
+     ['pointerup',releaseMs,640,0]]){
+     assert.equal(bridge.capture({type,timeStamp:at,pointerType:'touch',
+      pointerId:11,button:0,buttons,clientX:x,clientY:200,
+      target:{tagName:'CANVAS',closest:()=>null}}),true);
+    }
+    timeline.consumeThrough(.3); // Accepted occurrence metadata reaches real Input.
+    assert.equal(timeline.applied,3);
+    g.update(1/60);
+    return {shots,intents:o.intents,rejected:o.rejectedStale,
+     lateClamps:bridge.lateClamps,leak:g.input.__novaShotIntent};
+   }finally{o.detach();g.destroy();}
+  });
+ }
+ const fresh=replay(1250,true),stale=replay(1150,true),legacy=replay(1150,false);
+ assert.equal(fresh.shots,1,'50ms-old physical release is still fresh');
+ assert.equal(stale.shots,0,'150ms-old physical release must not gain a new replay budget');
+ assert.equal(stale.rejected,1);
+ assert.equal(legacy.shots,1,'legacy replay-clock control demonstrates the failure mode');
+ for(const out of [fresh,stale,legacy]){
+  assert.equal(out.lateClamps,0,'test does not depend on timeline clamping');
+  assert.equal(out.leak,undefined,'synthetic shot state cleaned');
+ }
+});
