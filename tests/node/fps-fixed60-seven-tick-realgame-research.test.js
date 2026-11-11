@@ -60,6 +60,14 @@ test('real composed Gunner and live-drone Hivemind compare seven- and eight-tick
    assert.equal(by['4+3'].peakSteps<=4,true);
    assert.ok(by['4+4'].droppedMs<=by['4+3'].droppedMs+.002,
     'extra capacity must not discard more active simulation than 4+3');
+   if(trace==='30Hz-seven-tick-falsifier'){
+    assert.equal(by['4+4'].droppedMs,0,
+     'eight-tick capacity must retain the previously lost active chronology');
+    assert.ok(by['4+4'].updates>=by['4+3'].updates,
+     'retained chronology must not execute fewer Game updates');
+    assert.ok(by['4+4'].queuedMs>0,
+     'retained but unfinished ticks must remain visible as queued phase');
+   }
    if(by['4+4'].updates===by['4+3'].updates&&
       Math.abs(by['4+4'].queuedMs-by['4+3'].queuedMs)<.002&&
       Math.abs(by['4+4'].droppedMs-by['4+3'].droppedMs)<.002){
