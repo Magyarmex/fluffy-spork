@@ -6,13 +6,16 @@ process.env.NOVA_EXPLICIT_SHOT_INTENT_RESEARCH='1';
 const test=require('node:test'),assert=require('node:assert/strict');
 const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 const {DirectShotIntent}=require('../research/direct-shot-intent.cjs');
-function run({maxAge=100,age=50,clockFailure=false,releaseClockFailure=false,cancel=false,kind='touch'}={}){
+function run({maxAge=100,age=50,clockFailure=false,releaseClockFailure=false,clockFault=null,cancel=false,kind='touch'}={}){
  return withSeed(1517800,()=>{
   const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
   g.status='playing';g.paused=false;g.player.fireCd=0;
   let clock=1000,throwNow=false,shots=0;
   const owner=new DirectShotIntent(g,{window:g.__testWindow,document:g.__testWindow.document,
-   maxIntentAgeMs:maxAge,nowMs:()=>{if(throwNow)throw Error('clock unavailable');return clock;}});
+   maxIntentAgeMs:maxAge,nowMs:()=>{if(throwNow)throw Error('clock unavailable');
+    if(clock>1000&&clockFault==='bigint')return 1n;
+    if(clock>1000&&clockFault==='symbol')return Symbol('invalid clock');
+    return clock;}});
   const i=g.input,fire=g.tryFire;
   g.tryFire=function(t){const n=this.bullets.length,r=fire.apply(this,arguments);
    if(t===g.player&&this.bullets.length>n)shots++;return r;};
@@ -40,7 +43,9 @@ test('direct shot intent accepts fresh wall-clock press but rejects aged and inv
   ['zero-age expired',{maxAge:0,age:1}],
   ['clock exception',{maxAge:100,age:50,clockFailure:true}],
   ['release clock exception',{maxAge:100,age:50,releaseClockFailure:true}],
-  ['clock rewind',{maxAge:100,age:-1}]
+  ['clock rewind',{maxAge:100,age:-1}],
+  ['bigint clock',{maxAge:100,age:50,clockFault:'bigint'}],
+  ['symbol clock',{maxAge:100,age:50,clockFault:'symbol'}]
  ]){
   const out=run({...opts,kind});
   assert.equal(out.shots,0,name);
