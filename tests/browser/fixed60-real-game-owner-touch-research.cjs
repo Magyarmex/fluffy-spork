@@ -171,10 +171,15 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
       // Arming before a 65ms main-thread block is unsound: a normal
       // one-step callback can fire before the intended three-step burst.
       // The scheduler still determines whether three real updates occur.
-      if(profile.armShotOnThree&&owner&&rawGapMs>=48&&rawGapMs<=100+1e-7&&
+      let armedFour=false;
+      if((profile.armShotOnThree&&window.__novaFixedMaxSteps===3&&rawGapMs>=48||
+          profile.armShotOnFour&&window.__novaFixedMaxSteps===4&&rawGapMs>=65)&&
+       owner&&rawGapMs<=100+1e-7&&
        window.__novaFixedGame?.input?.aim?.active){
        window.__novaFixedGame.player.fireCd=0;
+       armedFour=!!profile.armShotOnFour;
        profile.armShotOnThree=false;
+        profile.armShotOnFour=false;
       }
       const at=performance.now();
       fn(ts);
@@ -184,7 +189,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
        const previous=frames.length?frames[frames.length-1].ts:null;
        frames.push({ts,intervalMs:previous===null?null:ts-previous,
         steps:current.ticks-beforeTicks,budget:current.maxSteps,
-        playerProjectileBirths:profile.births-beforeBirths,
+        armedFour,playerProjectileBirths:profile.births-beforeBirths,
         rawGapMs,lagMs:current.lagMs,droppedMs:current.droppedMs-beforeDropped,
         dropReason:current.droppedMs>beforeDropped?
          (rawGapMs>100.0000001?'long-stall':'backlog'):null,
@@ -327,6 +332,32 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    assert.equal(during.owner,held.owner,'three-step callbacks must preserve held touch owner');
    assert.equal(during.active,true,'three-step callbacks must preserve held aim');
    assert.ok(during.births>=held.births,'three-step callbacks must not undo real projectiles');
+  }
+  if(process.env.NOVA_FIXED60_HELD_FOUR_BURST==='1'){
+   assert.equal(maxSteps,4,'held four-step gate requires four-update research owner');
+   assert.equal(controlledGate,true,'held four-step gate requires controlled Chromium RAF');
+   const start=await page.evaluate(()=>window.__novaFixedResearch.frames.length);
+   // The controlled RAF already delivers an 83.33ms active callback
+   // every four frames. Do not manufacture an 80ms main-thread stall:
+   // that could turn the test into a >100ms foreground-stall fallback.
+   await page.evaluate(()=>{window.__novaFixedResearch.armShotOnFour=true;});
+   await page.waitForFunction(start=>window.__novaFixedResearch.frames
+    .slice(start).some(f=>f.steps===4&&f.budget===4&&f.armedFour&&
+     f.rawGapMs<=100+1e-7&&f.playerProjectileBirths>0),
+    start,{timeout:12000});
+   const evidence=await page.evaluate(start=>({
+    frames:window.__novaFixedResearch.frames.slice(start).map(f=>({
+     gap:f.rawGapMs,steps:f.steps,budget:f.budget,armedFour:f.armedFour,
+     births:f.playerProjectileBirths})),
+    aimActive:window.__novaFixedGame.input.aim.active,
+    aimOwner:window.__novaFixedGame.input.stickId.aim
+   }),start);
+   assert.ok(evidence.frames.some(f=>f.steps===4&&f.budget===4&&f.armedFour&&
+    f.gap<=100+1e-7&&f.births>0),
+    'held trusted touch must fire inside a genuine four-update Game callback: '+
+    JSON.stringify(evidence));
+   assert.equal(evidence.aimActive,true,'four-step catch-up must preserve held aim');
+   assert.equal(evidence.aimOwner,held.owner,'four-step catch-up must preserve pointer ownership');
   }
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   await page.waitForFunction(()=>window.__novaFixedGame?.input?.aim?.active===false,null,{timeout:5000});
