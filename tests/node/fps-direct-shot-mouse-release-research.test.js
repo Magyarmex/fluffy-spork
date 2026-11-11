@@ -40,3 +40,21 @@ test('real composed Game uses release-time mouse target despite intervening curs
   assert.deepEqual(moved,fixed,cls+' released shot should not follow a later cursor');
  }
 });
+
+test('exception during recovered Game.update restores the physical cursor and intent',()=>{
+ const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
+ const i=g.input,o=new DirectShotIntent(g,{window:g.__testWindow,document:g.__testWindow.document});
+ const ev=(type,x,y,buttons)=>({type,pointerType:'mouse',pointerId:1,
+  button:0,buttons,clientX:x,clientY:y,target:{closest:()=>null}});
+ try{
+  i.pd(ev('pointerdown',400,200,1));
+  i.pu(ev('pointerup',400,200,0));
+  i.pm(ev('pointermove',700,500,0));
+  assert.ok(o.pending);
+  o.old.update=()=>{throw Error('simulated update failure');};
+  assert.throws(()=>g.update(1/60),/simulated update failure/);
+  assert.equal(i.mouseX,700);assert.equal(i.mouseY,500);
+  assert.equal(i.__novaShotIntent,undefined);
+  assert.equal(o.pending,null);
+ }finally{o.detach();g.destroy();}
+});
