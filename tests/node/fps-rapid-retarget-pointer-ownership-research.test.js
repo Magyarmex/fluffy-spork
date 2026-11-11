@@ -24,12 +24,25 @@ function observe(mode){
   t.push(.152,'pointerup',e(11,640,200,0));
   t.push(.160,'pointerdown',e(12,600,200,1));
   t.push(.161,'pointermove',e(12,600,240,1));
+  let shots=0;
+  const fire=g.tryFire;
+  g.tryFire=function(tank){const before=this.bullets.length;
+   const result=fire.apply(this,arguments);
+   if(tank===g.player&&this.bullets.length>before)shots++;
+   return result;};
   try{
    t.consumeThrough(.165);
    const pending=owner?.pulse?.pending??owner?.pending??null;
-   return {aimOwner:g.input.stickId?.aim??null,aimActive:!!g.input.aim.active,
+   const beforeUpdate={aimOwner:g.input.stickId?.aim??null,aimActive:!!g.input.aim.active,
     aimDx:g.input.aim.dx,aimDy:g.input.aim.dy,
     pendingPointer:pending?.id??null,physicalFiring:!!g.input.firing};
+   g.player.fireCd=0;
+   g.update(1/60);
+   return {...beforeUpdate,shots,playerAngle:+g.player.angle.toFixed(6),afterUpdateOwner:g.input.stickId?.aim??null,
+    afterUpdateFiring:!!g.input.firing,postIntent:g.input.__novaShotIntent};
+  /* return {aimOwner:g.input.stickId?.aim??null,aimActive:!!g.input.aim.active,
+    aimDx:g.input.aim.dx,aimDy:g.input.aim.dy,
+    pendingPointer:pending?.id??null,physicalFiring:!!g.input.firing}; */
   }finally{if(owner)owner.detach();g.destroy();}
  });
 }
@@ -40,6 +53,10 @@ test('rapid second touch is accepted by baseline Input; pending-shot research re
  const subtick=observe('subtick'),explicit=observe('explicit'),direct=observe('direct');
  assert.equal(direct.aimOwner,12,'direct intent must release the first touch before the second press');
  assert.equal(direct.aimActive,true);
+ assert.equal(direct.shots,baseline.shots,'direct intent must not suppress the new touch shot');
+ assert.equal(direct.playerAngle,baseline.playerAngle,'direct intent must preserve the new aim bearing');
+ assert.equal(direct.afterUpdateOwner,12);
+ assert.equal(direct.postIntent,undefined);
  // Do not freeze today's failure as an acceptance criterion: a future
  // correction should be allowed to preserve pointer #12.
  for(const row of [subtick,explicit]){
