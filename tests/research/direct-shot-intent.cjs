@@ -24,7 +24,10 @@ class DirectShotIntent {
     this.releaseStamp=e=>{
       if(this.eventOriginMs!==null&&e&&Object.prototype.hasOwnProperty.call(e,'__novaOriginalAt')){
         const at=e.__novaOriginalAt;
-        if(e.__novaTimestampTrusted!==true||!Number.isFinite(at)||at<0)return NaN;
+        // The browser bridge clamps pre-start event timestamps to zero.
+        // Reject that ambiguous boundary rather than refreshing an older
+        // physical release as if it occurred when the pilot started.
+        if(e.__novaTimestampTrusted!==true||!Number.isFinite(at)||at<=0)return NaN;
         const physical=this.eventOriginMs+at*1000;
         return Number.isFinite(physical)?physical:NaN;
       }
