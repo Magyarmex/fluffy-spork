@@ -57,13 +57,24 @@ test('real Input short touch/mouse events get one shot opportunity, no held cont
   assert.equal(a.firing,false);assert.equal(a.aim,false);assert.equal(a.shotIntent,undefined);
  }
 });
-test('all 36 classes match established chronological shot intent, including Cannon fuse',()=>{
+test('all 36 classes preserve shot ownership; touch matches chronology and mouse keeps release-world semantics',()=>{
  const sample=bootGame(),classes=Object.keys(sample.__testWindow.__novaMakeRequire('')('game/classes').CLASSES);
  sample.destroy();assert.equal(classes.length,36);
  for(const cls of classes)for(const kind of ['touch','mouse']){
   const a=arm(cls,kind,'direct'),b=arm(cls,kind,'timeline');
-  assert.equal(a.shots,b.shots,cls+'/'+kind);assert.equal(a.physical,b.physical,cls+'/'+kind);
-  assert.equal(a.rng,b.rng,cls+'/'+kind);
+  assert.equal(a.shots,b.shots,cls+'/'+kind+' one-shot parity');
+  assert.equal(a.intents,1,cls+'/'+kind+' direct intent consumed once');
+  assert.equal(a.firing,false,cls+'/'+kind+' no held firing');
+  assert.equal(a.aim,false,cls+'/'+kind+' no held aim');
+  assert.equal(a.shotIntent,undefined,cls+'/'+kind+' no synthetic intent leak');
+  if(kind==='touch'){
+   assert.equal(a.physical,b.physical,cls+'/'+kind+' full touch physics parity');
+   assert.equal(a.rng,b.rng,cls+'/'+kind+' touch RNG parity');
+  }
+  // Mouse chronology intentionally diverges: the direct owner now preserves
+  // the world point visible at release, whereas the old timeline owner reads
+  // a later camera projection. Composed-game camera/fuse/projectile assertions
+  // in fps-direct-shot-mouse-release-research.test.js replace false hash parity.
  }
 });
 test('blur, pause, cancellation and hidden-tab reject stale shots',()=>{
