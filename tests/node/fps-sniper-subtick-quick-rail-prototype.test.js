@@ -35,13 +35,14 @@ test('real composed Railgun/Prism/Singularity recover one low-charge short rail'
  const observations=[];
  for(const cls of ['railgun','prism','singularity']){
   const row=run(cls),canceled=run(cls,{cancel:true}),cooling=run(cls,{cooldown:1});
-  assert.equal(row.first.length,1,cls+' must emit exactly one quick rail');
+  const barrels=cls==='prism'?2:1;
+  assert.equal(row.first.length,barrels,cls+' must emit one normal quick volley');
   assert.equal(row.first[0].full,false,cls+' must not grant full focus');
   assert.equal(row.first[0].charge,.05,cls+' minimum quick charge');
   assert.ok(row.first[0].damage>0&&row.first[0].velocity>0);
   assert.ok(row.cd>0,cls+' must pay existing cooldown');
   assert.equal(row.focus,0,cls+' must not bank focus');
-  assert.equal(row.afterSecond,1,cls+' must not duplicate the shot');
+  assert.equal(row.afterSecond,barrels,cls+' must not duplicate the volley');
   assert.equal(row.intents,1);
   assert.equal(row.aimActive,false);assert.equal(row.firing,false);
   assert.equal(canceled.first.length,0,cls+' canceled touch must not fire');
@@ -72,7 +73,8 @@ test('research patch preserves genuine held-to-released Sniper quick-rail behavi
    i.pu(e('pointerup',0,640));
    g.update(1/60);
    const rails=g.bullets.filter(b=>b.ownerId===g.player.id&&b.beam);
-   assert.equal(rails.length,1,cls+' genuine release still emits one rail');
+   assert.equal(rails.length,cls==='prism'?2:1,
+    cls+' genuine release still emits one class-specific volley');
    assert.equal(rails[0].__novaFullRail,false);
    assert.equal(owner.intents,0,'sampled hold must not create synthetic intent');
    assert.equal(g.player.__novaFocusStart||0,0);
