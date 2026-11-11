@@ -63,3 +63,33 @@ test('research falsifier: a queued resize-crossing flick cannot fire on wrong st
  assert.equal(h.input.stickId.aim,-1);
  assert.equal(h.input.firing,false);
 });
+
+test('research falsifier: active aim must not turn into movement after resize',()=>{
+ const h=harness();
+ h.setNow(1020);
+ h.capture('pointerdown',22,600,1010);
+ h.timeline.consumeThrough(.02);
+ assert.equal(h.input.stickId.aim,22,'pre-resize aim owner');
+ h.resize(1600);
+ h.capture('pointermove',22,620,1030);
+ h.timeline.consumeThrough(.04);
+ assert.equal(h.input.stickId.move,-1,'resize cannot create movement owner');
+ // Either cancel the old aim or preserve it; never manufacture another owner.
+ assert.ok(h.input.stickId.aim===22||h.input.stickId.aim===-1);
+});
+
+test('research control: unchanged canvas retains independent two-stick owners',()=>{
+ const h=harness();
+ h.setNow(1020);
+ h.capture('pointerdown',11,100,1010);
+ h.capture('pointerdown',22,600,1011);
+ h.timeline.consumeThrough(.02);
+ assert.equal(h.input.stickId.move,11);
+ assert.equal(h.input.stickId.aim,22);
+ h.capture('pointerup',22,600,1030);
+ h.capture('pointerup',11,100,1031);
+ h.timeline.consumeThrough(.04);
+ assert.equal(h.input.stickId.move,-1);
+ assert.equal(h.input.stickId.aim,-1);
+ assert.equal(h.input.firing,false);
+});
