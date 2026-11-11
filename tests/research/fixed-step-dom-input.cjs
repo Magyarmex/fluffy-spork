@@ -78,12 +78,14 @@ class ChronologicalInput {
       const origin=d.__novaCanvasOrigin;
       if(origin && d.pointerType!=='mouse' && this.input.canvas &&
          typeof this.input.canvas.getBoundingClientRect==='function'){
-        const rect=this.input.canvas.getBoundingClientRect();
-        if(rect && Number.isFinite(rect.left)&&Number.isFinite(rect.top)&&
-           rect.width===origin.width && rect.height===origin.height){
-          if(Number.isFinite(clientX))clientX+=rect.left-origin.left;
-          if(Number.isFinite(clientY))clientY+=rect.top-origin.top;
-        }
+        try{
+          const rect=this.input.canvas.getBoundingClientRect();
+          if(rect && Number.isFinite(rect.left)&&Number.isFinite(rect.top)&&
+             rect.width===origin.width && rect.height===origin.height){
+            if(Number.isFinite(clientX))clientX+=rect.left-origin.left;
+            if(Number.isFinite(clientY))clientY+=rect.top-origin.top;
+          }
+        }catch(_){/* Do not make a release fail solely on projection. */}
       }
       const evt = {type:e.kind, __novaOriginalAt:d.__novaOriginalAt,
         __novaTimestampTrusted:d.__novaTimestampTrusted,
