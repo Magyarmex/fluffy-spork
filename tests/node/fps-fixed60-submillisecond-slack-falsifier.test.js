@@ -60,13 +60,22 @@ function replay(Owner,gaps){
 test('0.1ms backlog tolerance repairs one quantized frame pattern but moves the cliff by 0.05ms',()=>{
  const reference=replay(FixedStepRafOwner,schedule(83.4));
  const slack=replay(SlackOwner,schedule(83.4));
- assert.equal(reference.ticks,315);
- assert.ok(Math.abs(reference.droppedMs-750)<1e-5);
- assert.equal(slack.ticks,360);
- assert.equal(slack.droppedMs,0);
+ // Preserve the intended no-loss behavior if a future owner fixes the cliff.
+ // Do not freeze the current 315-tick defect as a desired golden.
+ assert.ok(reference.ticks>=315&&reference.ticks<=360);
+ assert.ok(slack.ticks>=reference.ticks);
+ assert.ok(slack.droppedMs<=reference.droppedMs+1e-6);
  const shifted=replay(SlackOwner,schedule(83.45));
- assert.equal(shifted.ticks,315,'slightly different quantization still loses whole ticks');
- assert.ok(Math.abs(shifted.droppedMs-750)<1e-5);
+ if(reference.droppedMs>0){
+  assert.equal(slack.ticks,360,'tiny tolerance rescues the constructed 83.4ms case');
+  assert.equal(slack.droppedMs,0);
+  assert.ok(shifted.droppedMs>0,
+   '0.05ms extra jitter must falsify this particular workaround');
+  assert.ok(shifted.ticks<360);
+ }else{
+  assert.equal(slack.ticks,360);
+  assert.equal(shifted.ticks,360,'a fixed owner must not reintroduce lost ticks');
+ }
  console.log('FIXED60_SUBMS_TOLERANCE_FALSIFIER '+JSON.stringify({reference,slack,shifted}));
 });
 test('submillisecond tolerance preserves uniform 60Hz and long-stall safety without proving device performance',()=>{
