@@ -202,3 +202,18 @@ test('composed Game: queued resize-crossing right-stick flick cannot produce a p
   g.destroy();
  }
 });
+
+test('research: failed canvas geometry read revokes an active touch rather than retaining fire',()=>{
+ const h=harness();
+ h.setNow(1020);
+ h.capture('pointerdown',22,600,1010);
+ h.timeline.consumeThrough(.02);
+ assert.equal(h.input.stickId.aim,22);
+ h.input.canvas.getBoundingClientRect=()=>{throw Error('layout unavailable');};
+ assert.equal(h.capture('pointermove',22,620,1030),false);
+ assert.equal(h.input.stickId.aim,-1);
+ assert.equal(h.input.firing,false);
+ assert.equal(h.capture('pointermove',22,640,1031),false);
+ h.capture('pointerup',22,640,1032);
+ assert.equal(h.input.firing,false);
+});
