@@ -181,3 +181,20 @@ test('legacy directly queued touch events retain bounded same-side ownership fal
   assert.equal(timeline.quarantined,true);
  }finally{g.destroy();}
 });
+
+test('touch canvas translation does not rewrite mouse screen coordinates',()=>{
+ const g=bootGame();
+ try{
+  let now=1000,left=0;
+  g.input.canvas.getBoundingClientRect=()=>({left,top:0,width:800,height:400});
+  const timeline=new ChronologicalInput(g.input);
+  const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
+  now=1020;
+  assert.equal(bridge.capture({type:'pointermove',timeStamp:1010,
+    pointerType:'mouse',pointerId:1,clientX:600,clientY:200,
+    buttons:0,button:-1,target:{closest:()=>null}}),true);
+  assert.equal(timeline.events[0].data.__novaCanvasOrigin,null);
+  left=500;timeline.consumeThrough(.02);
+  assert.equal(g.input.mouseX,600,'mouse keeps original screen position');
+ }finally{g.destroy();}
+});
