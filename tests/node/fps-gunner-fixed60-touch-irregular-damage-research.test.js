@@ -16,10 +16,15 @@ function schedule(mode){
  // Reuse the source-verified two-second adversarial traces from #907,
  // repeated three times to preserve the six-second real-damage fixture.
  // All gaps remain strictly <100ms: active jitter, not foreground stalls.
- if(mode==='sevenTickFalsifier'||mode==='doubleLongBurst'){
+ if(['sevenTickFalsifier','doubleLongBurst','sevenTickPhaseShift','tripleLongBurst'].includes(mode)){
   const {frameTimes}=require('../research/fps-20hz-scheduler-pilot.cjs');
-  const key=mode==='sevenTickFalsifier'?'30Hz-seven-tick-falsifier':'30Hz-double-burst';
-  return Array.from({length:3},()=>frameTimes(key)).flat();
+  const key=mode==='doubleLongBurst'?'30Hz-double-burst':
+   mode==='tripleLongBurst'?'30Hz-triple-long-falsifier':'30Hz-seven-tick-falsifier';
+  const gaps=frameTimes(key);
+  // Same 60 active intervals but a six-callback circular phase shift.
+  const shifted=mode==='sevenTickPhaseShift'?
+   [...gaps.slice(6),...gaps.slice(0,6)]:gaps;
+  return Array.from({length:3},()=>shifted).flat();
  }
  if(mode==='uniform30')return Array(180).fill(1000/30);
  if(mode==='alternating20_60')return Array.from({length:90},()=>[50,1000/60]).flat();
@@ -383,9 +388,9 @@ test('seven-tick recovery budgets measure real touch-driven Gunner damage under 
  const rows=[];
  for(const [cls,reload] of [['minigun',1],['needlestorm',3]]){
   const reference=trial(1517800,cls,reload,'uniform60',12);
-  for(const mode of ['sevenTickFalsifier','doubleLongBurst']){
+  for(const mode of ['sevenTickFalsifier','doubleLongBurst','sevenTickPhaseShift','tripleLongBurst']){
    const candidates=[];
-   for(const [maxSteps,extra] of [[3,3],[4,2],[3,4],[4,3]]){
+   for(const [maxSteps,extra] of [[3,3],[4,2],[3,4],[4,3],[4,4]]){
     const result=trial(1517800,cls,reload,mode,12,'research-drop',maxSteps,extra);
     assert.equal(result.applied,reference.applied,'touch edges must remain delivered');
     assert.ok(Math.abs(result.ticks*(1000/60)+result.droppedMs+result.backlogMs-DURATION_MS)<.002,
@@ -410,6 +415,6 @@ test('seven-tick recovery budgets measure real touch-driven Gunner damage under 
    rows.push({cls,mode,referenceDamage:reference.damage,candidates});
   }
  }
- assert.equal(rows.length,4);
- console.log('GUNNER_SEVEN_TICK_ADVERSARIAL_REAL_DAMAGE '+JSON.stringify(rows));
+ assert.equal(rows.length,8);
+ console.log('GUNNER_SEVEN_EIGHT_TICK_ADVERSARIAL_REAL_DAMAGE '+JSON.stringify(rows));
 });
