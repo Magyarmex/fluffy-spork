@@ -48,6 +48,10 @@ class BrowserInputCapture {
         this.bridge.takeStaleTouchResetNotice();
     } };
     const hidden = () => { if (this.document.hidden) release(); };
+    const resized = () => {
+      if(this.active && typeof this.bridge.interruptForResize==='function')
+        this.bridge.interruptForResize();
+    };
     const spec = [
       [canvas,'pointerdown',capture],
       [win,'pointermove',capture],[win,'pointerup',capture],
@@ -55,7 +59,8 @@ class BrowserInputCapture {
       [win,'keydown',capture],[win,'keyup',capture],
       [canvas,'mousedown',native('pointerdown')],
       [win,'mouseup',native('pointerup')],
-      [win,'blur',release],[doc,'visibilitychange',hidden]
+      [win,'blur',release],[win,'resize',resized],
+      [doc,'visibilitychange',hidden]
     ];
     this.timeline.reset();
     try{input.detach()}
