@@ -76,10 +76,14 @@ test('research: real Sniper barrel origins change Battlefield cover contact afte
     'release-position rail should intersect the permanent wall');
    assert.equal(b.blocked,false,
     'later-position rail should clear the same permanent wall');
+   assert.equal(original.surviving[j],false,
+    'actual Battlefield bullet pass must stop the covered rail');
+   assert.equal(later.surviving[j],true,
+    'actual Battlefield bullet pass must preserve the clear rail');
   }
   console.log('SNIPER_BARREL_COVER_RESEARCH '+JSON.stringify({
    cls,original,later,
-   limitation:'projectiles born in composed Game; authoritative terrain ray checked separately, not a target HP or real-time movement outcome'
+   limitation:'actual composed projectile birth and Battlefield collision pass; constructed 100u displacement, no target HP or natural movement outcome'
   }));
  }
 });
