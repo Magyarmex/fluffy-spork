@@ -43,7 +43,8 @@ class DirectShotIntent {
     // replay callback must never inflate a Sniper charge.
     this.physicalStamp=e=>{
       if(this.eventOriginMs===null||!e||e.__novaTimestampTrusted!==true||
-         e.__novaPhysicalTimestampExact===false||
+         (this.requireTrustedDuration ? e.__novaPhysicalTimestampExact!==true :
+          e.__novaPhysicalTimestampExact===false)||
          !Object.prototype.hasOwnProperty.call(e,'__novaOriginalAt')||
          !Number.isFinite(e.__novaOriginalAt)||e.__novaOriginalAt<=0)return NaN;
       const at=this.eventOriginMs+e.__novaOriginalAt*1000;
