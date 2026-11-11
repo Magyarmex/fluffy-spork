@@ -78,3 +78,55 @@ test('browser chronological replay gives rapid retarget to the second pointer, n
   i.detach();g.destroy();
  }
 });
+
+test('real fixed-step browser factory consumes two short gestures once at next tick',()=>{
+ const {createFixedStepBrowserPilot}=require('../research/fixed-step-raf-owner.cjs');
+ const g=bootGame(),i=g.input,win=g.__testWindow,doc=win.document;
+ g.sfx.muted=true;g.sfx.startMusic=()=>{};i.autofire=false;
+ g.status='playing';g.paused=false;g.player.fireCd=0;
+ i.detach();
+ const w=target(),d=target(),c=Object.assign(target(),{
+  getBoundingClientRect:()=>({left:0,top:0,width:800,height:600})});
+ Object.assign(win,{addEventListener:w.addEventListener,removeEventListener:w.removeEventListener});
+ Object.assign(doc,{addEventListener:d.addEventListener,removeEventListener:d.removeEventListener});
+ i.attach(c);
+ let now=1000,callback;
+ const births=[],oldTryFire=g.tryFire;
+ g.tryFire=function(tank){
+  const before=this.bullets.length;
+  const result=oldTryFire.apply(this,arguments);
+  if(tank===g.player)births.push(...this.bullets.slice(before).map(b=>({vx:b.vx,vy:b.vy})));
+  return result;
+ };
+ const pilot=createFixedStepBrowserPilot(g,{
+  window:win,document:doc,canvas:c,
+  clock:{now:()=>now,timeOrigin:1793560000000},
+  request:fn=>(callback=fn,1),cancel:()=>{},render:()=>{},
+  shotOnlyPulseFactory:game=>new DirectShotIntent(game,{
+   window:win,document:doc,rebindDomListeners:false})
+ });
+ const send=(place,type,stamp,id,x,y,buttons)=>{
+  now=stamp;place.emit({type,timeStamp:stamp,pointerType:'touch',
+   pointerId:id,clientX:x,clientY:y,button:0,buttons,target:c,preventDefault(){}});
+ };
+ try{
+  pilot.start();
+  send(c,'pointerdown',1002,11,600,200,1);
+  send(w,'pointermove',1004,11,640,200,1);
+  send(w,'pointerup',1006,11,640,200,0);
+  send(c,'pointerdown',1008,12,600,200,1);
+  send(w,'pointermove',1010,12,600,260,1);
+  send(w,'pointerup',1012,12,600,260,0);
+  assert.equal(i.firing,false,'DOM events must remain queued until RAF simulation');
+  now=1034;callback(now);
+  assert.equal(pilot.owner.lastSteps,2,'real pilot must advance both eligible ticks');
+  assert.equal(pilot.pulse.intents,1,'latest physical gesture is consumed once');
+  assert.equal(births.length,1,'one real player projectile, not two stale shots');
+  assert.ok(births[0].vy>0&&Math.abs(births[0].vy)>Math.abs(births[0].vx),
+   'projectile follows the second downward gesture');
+  assert.equal(i.stickId.aim,-1);
+  assert.equal(i.firing,false);
+ }finally{
+  pilot.stop();i.detach();g.destroy();
+ }
+});
