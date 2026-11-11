@@ -26,11 +26,13 @@ function scenario(cls,{duration=30,delay=10,invalid=null,cancel=false,suppressed
   try{
    const down=e('pointerdown',downAt,1,600);
    if(invalid==='untrustedDown')down.__novaTimestampTrusted=false;
+   if(invalid==='skewDown')down.__novaPhysicalTimestampExact=false;
    i.pd(down);
    i.pm(e('pointermove',downAt+.001,1,640));
    const up=e(cancel?'pointercancel':'pointerup',
      invalid==='reversed'?downAt-.001:invalid==='prestart'?0:upAt,0,640);
    if(invalid==='untrustedUp')up.__novaTimestampTrusted=false;
+   if(invalid==='skewUp')up.__novaPhysicalTimestampExact=false;
    i.pu(up);
    g.update(1/60);
    const rails=g.bullets.filter(b=>b.ownerId===g.player.id&&b.beam);
@@ -63,7 +65,7 @@ test('trusted physical hold duration controls real quick-rail charge, not callba
 });
 test('invalid, reversed, canceled or stale physical events cannot earn Sniper charge',()=>{
  for(const cls of Object.keys(focusMs)){
-  for(const invalid of ['untrustedDown','untrustedUp','reversed','prestart']){
+  for(const invalid of ['untrustedDown','untrustedUp','skewDown','skewUp','reversed','prestart']){
    const row=scenario(cls,{invalid});
    assert.equal(row.first.length,0,cls+' '+invalid);
    assert.equal(row.intents,0);
