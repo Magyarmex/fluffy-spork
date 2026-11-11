@@ -7,7 +7,7 @@ const fs=require('node:fs'),path=require('node:path');
 const {bootGame,withSeed,digest,physical}=require('../research/audio-rng-causal-pilot.cjs');
 const {ChronologicalInput,FixedStepPresentation}=require('../research/fixed-step-dom-input.cjs');
 const {ShotOnlyFirePulse}=require('../research/shot-only-fire-pulse.cjs');
-const {ExplicitShotIntent,patchEngineHtml,patchDisciplines}=require('../research/explicit-shot-intent.cjs');
+const {ExplicitShotIntent,patchEngineHtml,patchController,patchDisciplines}=require('../research/explicit-shot-intent.cjs');
 const CLASSES=Object.keys(bootGame().__testWindow.__novaMakeRequire('')('game/classes').CLASSES);
 const CONTROLLERS=['carrier','overlord','warden','hivemind','broodmother','citadel','valkyrie'];
 function arm({cls='scout',kind='touch',mode='explicit',seed=1517800,hz=60,
@@ -46,6 +46,9 @@ test('research patch anchors fail closed on production changes',()=>{
  const overlay=fs.readFileSync(path.join(root,'nova-updates/disciplines-v1.7.0.js'),'utf8');
  assert.match(patchEngineHtml(html),/shotIntent && shotIntent\.fire === true/);
  assert.match(patchDisciplines(overlay),/shotIntent\.depth/);
+ const controller=fs.readFileSync(path.join(root,'nova-updates/controller-v1.3.0.js'),'utf8');
+ assert.match(patchController(controller),/shotIntent && shotIntent\.world/);
+ assert.throws(()=>patchController(controller.replace('var wx = projection.x +','var wx = 0 +')),/anchor/);
  assert.throws(()=>patchEngineHtml(html.replace('const aim = this.input.aimVec(mv);','const aim = null;')),/anchor/);
  assert.throws(()=>patchDisciplines(overlay.replace('if(t.isPlayer){\n    var a=g.input&&g.input.aim;','if(t.isPlayer){')),/anchor/);
 });
