@@ -117,6 +117,8 @@ test('translated canvas cannot steal a recovered right-stick flick',()=>{
   g.update(1/60);
   assert.equal(owner.intents,1);
   assert.equal(births,1,'one real player projectile, not just a pending intent');
+  g.player.fireCd=0;g.update(1/60);
+  assert.equal(births,1,'a recovered flick cannot repeat on a later tick');
   assert.equal(g.input.firing,false);
  }finally{if(owner)owner.detach();g.destroy();}
 });
