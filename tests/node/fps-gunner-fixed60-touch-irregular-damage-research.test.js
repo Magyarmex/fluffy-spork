@@ -331,6 +331,10 @@ test('quantized 30Hz recovery budgets cross-check real damage and touch chronolo
     for(const [maxSteps,extra] of [[3,3],[4,2]]){
      const result=trial(seed,cls,reload,mode,offset,'research-drop',maxSteps,extra);
      assert.equal(result.applied,reference.applied,'touch event count changed');
+     // A phase-reversed trace ends immediately after its long frame. Unpaid
+     // ticks may remain queued, not dropped: account for both explicitly.
+     assert.ok(Math.abs(result.ticks*(1000/60)+result.droppedMs+result.backlogMs-DURATION_MS)<0.002,
+      'wall time must equal executed, discarded and queued simulation time');
      assert.ok(Number.isFinite(result.maxInputSampleLagMs)&&result.maxInputSampleLagMs>=0,
       'missing chronological touch sampling measurement');
      assert.ok(Number.isFinite(result.maxRenderCallbackLagMs)&&result.maxRenderCallbackLagMs>=0,
