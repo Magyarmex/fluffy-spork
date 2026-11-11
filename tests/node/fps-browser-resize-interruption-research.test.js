@@ -330,3 +330,44 @@ test('research: resize notification with unchanged canvas dimensions retains tou
  h.timeline.consumeThrough(.04);
  assert.equal(h.input.firing,false);
 });
+
+test('research: BrowserInputCapture owns and detaches resize cancellation listener',()=>{
+ const {BrowserInputCapture}=require('../research/fixed-step-browser-capture.cjs');
+ function emitter(){
+  const listeners=new Map();
+  return {
+   addEventListener(type,fn){if(!listeners.has(type))listeners.set(type,new Set());listeners.get(type).add(fn);},
+   removeEventListener(type,fn){listeners.get(type)?.delete(fn);},
+   dispatch(type,event={}){for(const fn of [...(listeners.get(type)||[])])fn({type,...event});},
+   count(type){return listeners.get(type)?.size||0;}
+  };
+ }
+ let width=800,now=1000;
+ const canvas=Object.assign(emitter(),{getBoundingClientRect:()=>({left:0,top:0,width,height:400})});
+ const win=emitter(),doc=Object.assign(emitter(),{hidden:false});
+ const input={
+  canvas,stickId:{move:-1,aim:-1},move:{active:false},aim:{active:false},
+  keyboard:{},firing:false,abilityQueued:false,
+  attach(c){this.canvas=c;},detach(){},
+  pd(e){const side=e.clientX<this.canvas.getBoundingClientRect().width*.45?'move':'aim';
+   this.stickId[side]=e.pointerId;this[side].active=true;this.firing=side==='aim';},
+  pm(){},pu(){},kd(){},ku(){}
+ };
+ const timeline=new ChronologicalInput(input);
+ const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
+ const owner=new BrowserInputCapture(input,canvas,timeline,bridge,{window:win,document:doc});
+ try{
+  assert.equal(win.count('resize'),1);
+  now=1020;
+  canvas.dispatch('pointerdown',{timeStamp:1010,pointerType:'touch',pointerId:22,
+   clientX:600,clientY:200,button:0,buttons:1,target:canvas});
+  timeline.consumeThrough(.02);
+  assert.equal(input.firing,true);
+  width=1600;
+  win.dispatch('resize');
+  assert.equal(input.firing,false);
+  assert.equal(input.stickId.aim,-1);
+  assert.equal(bridge.resizeInterruptions,1);
+ }finally{owner.detach();}
+ assert.equal(win.count('resize'),0,'no resize listener leak after detach');
+});
