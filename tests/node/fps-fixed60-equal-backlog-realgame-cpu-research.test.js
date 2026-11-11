@@ -5,7 +5,7 @@
  * No production scheduler, input, weapons, or materializer changes. */
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const {run}=require('../research/fps-20hz-scheduler-pilot.cjs');
+const {run,frameTimes}=require('../research/fps-20hz-scheduler-pilot.cjs');
 const STEP_MS=1000/60;
 const DURATION_MS=2000;
 function witness(cls,seed,cadence,maxSteps,backlogExtraTicks){
@@ -31,6 +31,14 @@ function witness(cls,seed,cadence,maxSteps,backlogExtraTicks){
 }
 test('equal-backlog 3+3 and 4+2 expose real Gunner/Carrier/Hivemind CPU burst costs',()=>{
  const rows=[];
+ for(const cadence of ['30Hz-adversarial','30Hz-adversarial95',
+  '30Hz-seeded-contrast','30Hz-display-quantized']){
+  const gaps=frameTimes(cadence);
+  assert.equal(gaps.length,60,'matched 30Hz presentation callback count');
+  assert.ok(gaps.every(x=>x>0&&x<100),'only active non-stall frames');
+  assert.ok(Math.abs(gaps.reduce((a,b)=>a+b,0)-DURATION_MS)<1e-6,
+   'matched two-second presentation trace');
+ }
  for(const cadence of ['30Hz-adversarial','30Hz-adversarial95','30Hz-seeded-contrast','30Hz-display-quantized'])
  for(const cls of ['minigun','carrier','hivemind'])for(const seed of [1517800,1517802]){
   const three=witness(cls,seed,cadence,3,3);
