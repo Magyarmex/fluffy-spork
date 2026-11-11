@@ -28,7 +28,7 @@ function scenario(cls,moveAfterRelease,moveBeforeRelease=true,cameraShift=false)
    assert.equal(i.__novaShotIntent,undefined,'no leaked synthetic input');
    assert.equal(o.intents,1,'one consumed release intent');
    // Array.from creates a host-realm array; Game lives in a separate VM realm.
-   const bullets=Array.from(g.bullets,b=>({
+   const bullets=Array.from(g.bullets.filter(b=>b.ownerId===g.player.id),b=>({
     x:b.x,y:b.y,vx:b.vx,vy:b.vy,angle:b.angle,
     fuse:b.fuse,range:b.range,life:b.life,ttl:b.ttl,
     cannonFuse:b.__v17FuseDist,cannonArmed:b.__v17FuseArmed
@@ -89,7 +89,7 @@ test('native mouse chord release keeps the world target through camera motion',(
    if(shift){g.cam.x+=190;g.cam.y-=100;g.cam.zoom*=.72;}
    g.update(1/60);
    assert.equal(o.intents,1);
-   return {angle:g.player.angle,bullets:Array.from(g.bullets,b=>
+   return {angle:g.player.angle,bullets:Array.from(g.bullets.filter(b=>b.ownerId===g.player.id),b=>
     ({x:b.x,y:b.y,vx:b.vx,vy:b.vy,angle:b.angle}))};
   }finally{o.detach();g.destroy();}
  });}
