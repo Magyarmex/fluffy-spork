@@ -2,6 +2,7 @@
 // Research only: queued touch ownership must not be recomputed using a later
 // canvas location when a stale DOM event forces input quarantine.
 process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
+process.env.NOVA_EXPLICIT_SHOT_INTENT_RESEARCH='1';
 const test=require('node:test'),assert=require('node:assert/strict');
 const {bootGame}=require('../research/audio-rng-causal-pilot.cjs');
 const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
@@ -107,8 +108,15 @@ test('translated canvas cannot steal a recovered right-stick flick',()=>{
   assert.equal(g.input.move.active,false);
   assert.ok(owner.pending,'the original right-stick release remains a shot');
   assert.ok(owner.pending.aim.x>.99);
+  let births=0;const oldFire=g.tryFire;
+  g.player.fireCd=0;
+  g.tryFire=function(tank){const before=this.bullets.length;
+    const out=oldFire.apply(this,arguments);
+    if(tank===g.player)births+=this.bullets.length-before;
+    return out;};
   g.update(1/60);
   assert.equal(owner.intents,1);
+  assert.equal(births,1,'one real player projectile, not just a pending intent');
   assert.equal(g.input.firing,false);
  }finally{if(owner)owner.detach();g.destroy();}
 });
