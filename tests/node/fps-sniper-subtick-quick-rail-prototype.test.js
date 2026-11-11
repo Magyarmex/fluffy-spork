@@ -51,3 +51,30 @@ test('real composed Railgun/Prism/Singularity recover one low-charge short rail'
  console.log('SNIPER_SUBTICK_QUICK_RAIL_RESEARCH '+JSON.stringify({
   observations,caveat:'research-only exact composed Game; fixed minimum charge, no trusted duration or physical device validation'}));
 });
+
+test('research patch preserves genuine held-to-released Sniper quick-rail behavior',()=>{
+ for(const cls of ['railgun','prism','singularity'])withSeed(1517800,()=>{
+  const g=bootGame(),i=g.input;g.sfx.muted=true;i.autofire=false;
+  g.setClass(g.player,cls);g.player.fireCd=0;
+  g.status='playing';g.paused=false;
+  const owner=new DirectShotIntent(g,{window:g.__testWindow,
+   document:g.__testWindow.document});
+  const e=(type,buttons,x)=>({type,pointerType:'touch',pointerId:11,
+   button:0,buttons,clientX:x,clientY:200,target:{closest:()=>null}});
+  try{
+   i.pd(e('pointerdown',1,600));
+   i.pm(e('pointermove',1,640));
+   g.update(1/60);
+   assert.equal(g.bullets.filter(b=>b.ownerId===g.player.id&&b.beam).length,0,
+    cls+' genuine hold must not quick-fire before release');
+   assert.ok(g.player.__novaFocusStart>0,cls+' genuine hold begins focus');
+   i.pu(e('pointerup',0,640));
+   g.update(1/60);
+   const rails=g.bullets.filter(b=>b.ownerId===g.player.id&&b.beam);
+   assert.equal(rails.length,1,cls+' genuine release still emits one rail');
+   assert.equal(rails[0].__novaFullRail,false);
+   assert.equal(owner.intents,0,'sampled hold must not create synthetic intent');
+   assert.equal(g.player.__novaFocusStart||0,0);
+  }finally{owner.detach();g.destroy();}
+ });
+});
