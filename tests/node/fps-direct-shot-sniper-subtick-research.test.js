@@ -44,9 +44,18 @@ test('subtick Sniper tap cannot bank focus or manufacture a full rail on the nex
     const afterNewPress=ownRails();
     assert.ok(afterNewPress.every(b=>b.__novaFullRail!==true),
      'next fresh press cannot inherit a free fully charged rail');
+    const freshFocusStart=g.player.__novaFocusStart||0;
+    i.pu(ev('pointerup',0,640));
+    g.update(1/60);
+    const afterFreshRelease=ownRails();
+    assert.ok(afterFreshRelease.length>afterNewPress.length,
+     'genuine held-to-released Sniper control must still emit a quick rail');
+    assert.ok(afterFreshRelease.every(b=>b.__novaFullRail!==true),
+     'quick release cannot be promoted to full charge');
     return {cls,subtickRailBirths:afterTap.length,
      nextPressRailBirths:afterNewPress.length,
-     nextPressFocusStart:g.player.__novaFocusStart||0};
+     nextPressFocusStart:freshFocusStart,
+     genuineHeldReleaseRailBirths:afterFreshRelease.length};
    }finally{o.detach();g.destroy();}
   });
   observations.push(result);
