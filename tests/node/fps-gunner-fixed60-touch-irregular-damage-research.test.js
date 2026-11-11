@@ -22,6 +22,12 @@ function schedule(mode){
  // The four-frame group still totals 133.333ms (mean 30Hz), without stalls.
  if(mode==='quantized83_16')return Array.from({length:45},()=>
   [83.4,16.6,16.6,1000/7.5-83.4-16.6-16.6]).flat();
+ // A 0.05ms shift moves the backlog overflow boundary without changing
+ // total wall time, mean presentation FPS or the input event chronology.
+ if(mode==='quantized83_16_shifted')return Array.from({length:45},()=>
+  [83.45,16.6,16.6,1000/7.5-83.45-16.6-16.6]).flat();
+ if(mode==='quantized83_16_reversed')return Array.from({length:45},()=>
+  [16.6,16.6,1000/7.5-83.4-16.6-16.6,83.4]).flat();
  throw Error('unknown frame schedule');
 }
 function touchEvents(offsetMs){
@@ -309,4 +315,41 @@ test('quantized mean-30Hz RAF measures actual Gunner damage across bounded budge
  }
  assert.equal(rows.length,8);
  console.log('GUNNER_FIXED60_QUANTIZED30_REAL_DAMAGE '+JSON.stringify(rows));
+});
+
+// #799: adversarial, actual-Game comparison of two bounded recovery budgets.
+// Identical touch history, world seed and elapsed time are required; avoid
+// treating a recovered isolated schedule as general production readiness.
+test('quantized 30Hz recovery budgets cross-check real damage and touch chronology across phase and sub-ms jitter',()=>{
+ const rows=[];
+ for(const cls of ['minigun','needlestorm']){
+  const reload=cls==='minigun'?1:3;
+  for(const seed of [1517800,1517802])for(const offset of [7,12]){
+   const reference=trial(seed,cls,reload,'uniform60',offset);
+   for(const mode of ['quantized83_16','quantized83_16_shifted','quantized83_16_reversed']){
+    const candidates=[];
+    for(const [maxSteps,extra] of [[3,3],[4,2]]){
+     const result=trial(seed,cls,reload,mode,offset,'research-drop',maxSteps,extra);
+     assert.equal(result.applied,reference.applied,'touch event count changed');
+     assert.ok(result.maxInputSampleLagMs<101,'touch sampling crossed foreground-stall safety boundary');
+     assert.ok(result.maxRenderCallbackLagMs<101,'touch-to-render callback delay exceeded active-frame bound');
+     assert.ok(result.stepsByFrame.four===0||maxSteps===4,'three-step budget performed four updates');
+     if(result.droppedMs===0&&result.ticks===360){
+      assert.equal(result.damage,reference.damage,'recovered damage differs from uniform 60Hz');
+      assert.equal(result.volleys,reference.volleys,'recovered volley count differs');
+      assert.equal(result.hits,reference.hits,'recovered hit count differs');
+      assert.deepEqual(result.births,reference.births,'recovered projectile births differ');
+     }
+     candidates.push({maxSteps,extra,ticks:result.ticks,droppedMs:result.droppedMs,
+      damage:result.damage,volleys:result.volleys,
+      maxInputSampleLagMs:result.maxInputSampleLagMs,
+      maxRenderCallbackLagMs:result.maxRenderCallbackLagMs,
+      threeStepFrames:result.stepsByFrame.three,fourStepFrames:result.stepsByFrame.four});
+    }
+    rows.push({cls,seed,offset,mode,candidates});
+   }
+  }
+ }
+ assert.equal(rows.length,24);
+ console.log('GUNNER_FIXED60_QUANTIZED_BUDGET_CROSSCHECK '+JSON.stringify(rows));
 });
