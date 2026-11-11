@@ -27,6 +27,11 @@ function witness(cls,seed,cadence,maxSteps,backlogExtraTicks){
  assert.ok(result.frameCpuP50Ms<=result.frameCpuP95Ms);
  assert.ok(result.frameCpuP95Ms<=result.frameCpuP99Ms);
  assert.ok(result.frameCpuP99Ms<=result.frameCpuPeakMs);
+ if(cls==='hivemind'){
+  assert.ok(result.playerDroneCount>0,'Hivemind must actually simulate owned drones');
+  assert.ok(result.hostileTankCount>0,'Hivemind fixture must retain real rival tanks');
+  assert.ok(result.neutralShapeCount>0,'Hivemind fixture must retain real neutral ecology');
+ }
  return result;
 }
 test('equal-backlog 3+3 and 4+2 expose real Gunner/Carrier/Hivemind CPU burst costs',()=>{
@@ -57,6 +62,8 @@ test('equal-backlog 3+3 and 4+2 expose real Gunner/Carrier/Hivemind CPU burst co
    assert.ok(Number.isFinite(four.fourStepFrameCpuP95Ms),
     'four-step callbacks must have measured real composed CPU cost');
   rows.push({cls,seed,cadence,
+   world:{playerDrones:four.playerDroneCount,hostileTanks:four.hostileTankCount,
+    neutralShapes:four.neutralShapeCount},
    three:{updates:three.updates,droppedMs:three.droppedMs,
     lagMs:three.lagMs,peakSteps:three.peakSteps,
     frameCpuP95Ms:three.frameCpuP95Ms,
