@@ -8,10 +8,11 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 const {DirectShotIntent}=require('../research/direct-shot-intent.cjs');
 const focusMs={railgun:520,prism:400,singularity:650};
-function scenario(cls,{duration=30,delay=10,invalid=null,cancel=false}={}){
+function scenario(cls,{duration=30,delay=10,invalid=null,cancel=false,suppressed=false,cooldown=0}={}){
  return withSeed(1517800,()=>{
   const g=bootGame(),i=g.input;g.sfx.muted=true;i.autofire=false;
-  g.setClass(g.player,cls);g.player.fireCd=0;
+  g.setClass(g.player,cls);g.player.fireCd=cooldown;
+  if(suppressed)g.player.__novaSuppressedUntil=Number.MAX_SAFE_INTEGER;
   g.status='playing';g.paused=false;
   const downAt=.140,upAt=downAt+duration/1000;
   const owner=new DirectShotIntent(g,{window:g.__testWindow,
@@ -69,6 +70,10 @@ test('invalid, reversed, canceled or stale physical events cannot earn Sniper ch
   }
   const canceled=scenario(cls,{cancel:true});
   assert.equal(canceled.first.length,0);assert.equal(canceled.intents,0);
+  for(const options of [{suppressed:true},{cooldown:1}]){
+   const blocked=scenario(cls,options);
+   assert.equal(blocked.first.length,0,cls+' suppressed/cooling');
+  }
   const stale=scenario(cls,{delay:101});
   assert.equal(stale.first.length,0);assert.equal(stale.rejectedStale,1);
   // A long hold during a browser stall never earns an almost-full rail
