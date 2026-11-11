@@ -11,7 +11,7 @@ function once(source,needle,replacement,label){
 }
 function patchEngineHtml(html){
  let result=once(html,'const aim = this.input.aimVec(mv);',
-  'const shotIntent = this.input.__novaShotIntent;\n            const aim = shotIntent && shotIntent.aim ? shotIntent.aim : this.input.aimVec(mv);',
+  'const shotIntent = this.input.__novaShotIntent;\n            const aim = shotIntent && shotIntent.world ? (()=>{const dx=shotIntent.world.x-this.player.x,dy=shotIntent.world.y-this.player.y,len=Math.hypot(dx,dy);return len>5?{x:dx/len,y:dy/len}:null;})() : shotIntent && shotIntent.aim ? shotIntent.aim : this.input.aimVec(mv);',
   'player aim');
  result=once(result,
   'const firing = this.input.firing || (this.input.autofire && !this.input.mouseActive && aimA !== null);',
@@ -21,7 +21,7 @@ function patchEngineHtml(html){
 }
 function patchDisciplines(js){
  return once(js,'if(t.isPlayer){\n    var a=g.input&&g.input.aim;',
-  'if(t.isPlayer){\n    var shotIntent=g.input&&g.input.__novaShotIntent;\n    if(shotIntent&&Number.isFinite(shotIntent.depth))return clamp(shotIntent.depth,.08,1);\n    var a=g.input&&g.input.aim;',
+  'if(t.isPlayer){\n    var shotIntent=g.input&&g.input.__novaShotIntent;\n    if(shotIntent&&shotIntent.world)return clamp(Math.hypot(shotIntent.world.x-t.x,shotIntent.world.y-t.y)/Math.max(1,range),.08,1);\n    if(shotIntent&&Number.isFinite(shotIntent.depth))return clamp(shotIntent.depth,.08,1);\n    var a=g.input&&g.input.aim;',
   'Cannon depth');
 }
 class ExplicitShotIntent {
