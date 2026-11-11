@@ -122,4 +122,16 @@ test('shipping RAF can schedule a second update after a 22ms current first updat
  assert.equal(spike.steps,2,
   'current-frame 22ms first-update cost does not participate in existing second-update gate');
  assert.ok(r.maxSteps<=2,'existing per-callback update ceiling remains bounded');
+ const ordinary=run(body,[1000/60,1000/60,70],1);
+ assert.equal(ordinary.frames.find(f=>f.frame===3).steps,2,
+  'ordinary cheap frame must retain legal second-update recovery');
+ const guard='priorWork < 18 && earlierWork < 18';
+ assert.equal(body.split(guard).length-1,1,'source CPU gate must have one owner');
+ const currentAware=body.replace(guard,
+  guard+' && performance.now() - workStart < 18');
+ const protectedRun=run(currentAware,[1000/60,1000/60,70],1,
+  ({frame,step})=>frame===3&&step===1?22:0);
+ assert.equal(protectedRun.frames.find(f=>f.frame===3).steps,1,
+  'research-only current-work guard must reject a second update after the spike');
+ assert.ok(protectedRun.maxSteps<=2,'proposed guard remains bounded');
 });
