@@ -164,3 +164,20 @@ test('unavailable capture geometry never fabricates a stick side',()=>{
   assert.equal(timeline.events[0].data.__novaCanvasSide,null);
  }finally{g.destroy();}
 });
+
+test('legacy directly queued touch events retain bounded same-side ownership fallback',()=>{
+ const g=bootGame();
+ try{
+  let now=1000;
+  const timeline=new ChronologicalInput(g.input);
+  const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
+  for(const [at,id,x] of [[.01,11,100],[.011,12,150],[.012,22,600]])
+    timeline.push(at,'pointerdown',{pointerType:'touch',pointerId:id,
+      clientX:x,clientY:200});
+  now=5000;
+  assert.equal(bridge.capture({type:'pointermove',timeStamp:1015,
+    pointerType:'touch',pointerId:11,clientX:120,clientY:200}),false);
+  assert.deepEqual([...bridge.pendingStaleTouchIds].sort((a,b)=>a-b),[11,22]);
+  assert.equal(timeline.quarantined,true);
+ }finally{g.destroy();}
+});
