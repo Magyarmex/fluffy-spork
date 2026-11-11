@@ -26,13 +26,6 @@ function frameTimes(kind){
   const a=6.9267489,b=95.49032479,c=30.76815672;
   return [a,b,c,1000/7.5-a-b-c];
  }).flat();
- // Seeded, mean-30Hz active trace that distinguishes equal-capacity 3+3
- // and 4+2. Each four-frame group totals 133 1/3ms; all gaps stay <100ms.
- // Deterministic LCG/negative-log weights, not a claim about natural incidence.
- // Constructed active 30Hz falsifier: even seven-tick capacity cannot
- // guarantee conservation when alternating large and tiny gaps cluster.
- // Two groups each sum to 133 1/3ms, every individual gap stays <100ms.
- // This is a mathematical stress trace, NOT measured Android incidence.
  // Two successive long but active frames, then short recovery frames.
  // This 2s mean-30Hz trace distinguishes 4+3 from 3+4 and defeats a
  // tempting 4.5-tick selective-fourth-step arithmetic shortcut.
@@ -41,6 +34,10 @@ function frameTimes(kind){
   return [...Array.from({length:7},()=>cycle).flat(),2,2,2,2]
    .map(ticks=>ticks*1000/60);
  }
+ // Constructed active 30Hz falsifier: even seven-tick capacity cannot
+ // guarantee conservation when alternating large and tiny gaps cluster.
+ // Two groups each sum to 133 1/3ms, every individual gap stays <100ms.
+ // This is a mathematical stress trace, NOT measured Android incidence.
  if(kind==='30Hz-seven-tick-falsifier'){
   const cycle=[22.792522365760117,8.909842912196837,
    2.6870952012899134,98.94387285408648,
@@ -48,6 +45,9 @@ function frameTimes(kind){
    4.150790813951247,7.5705817273724465];
   return [...Array.from({length:7},()=>cycle).flat(),...cycle.slice(0,4)];
  }
+ // Seeded, mean-30Hz active trace that distinguishes equal-capacity 3+3
+ // and 4+2. Each four-frame group totals 133 1/3ms; all gaps stay <100ms.
+ // Deterministic LCG/negative-log weights, not a claim about natural incidence.
  if(kind==='30Hz-seeded-contrast'){
   let seed=7;
   const uniform=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;
