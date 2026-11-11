@@ -70,16 +70,18 @@ test('research: real Sniper barrel origins change Battlefield cover contact afte
   assert.equal(original.traces.length,later.traces.length);
   for(let j=0;j<original.traces.length;j++){
    const a=original.traces[j],b=later.traces[j];
-   assert.ok(Math.abs((b.y-a.y)-100)<2,
-    'real barrel should follow the later player position');
+   const originShift=b.y-a.y;
+   // The current pilot fires at the later position (+100). A future
+   // chronology fix may correctly retain the release origin (0). Do not
+   // freeze the known provenance gap as a desired gameplay golden.
+   assert.ok(Math.abs(originShift-100)<2||Math.abs(originShift)<2,
+    'unexpected barrel origin policy outside the two researched alternatives');
    assert.equal(a.blocked,true,
     'release-position rail should intersect the permanent wall');
-   assert.equal(b.blocked,false,
-    'later-position rail should clear the same permanent wall');
    assert.equal(original.surviving[j],false,
     'actual Battlefield bullet pass must stop the covered rail');
-   assert.equal(later.surviving[j],true,
-    'actual Battlefield bullet pass must preserve the clear rail');
+   assert.equal(later.surviving[j],!b.blocked,
+    'actual Battlefield collision must agree with the live barrel-to-wall ray');
   }
   console.log('SNIPER_BARREL_COVER_RESEARCH '+JSON.stringify({
    cls,original,later,
