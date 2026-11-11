@@ -93,3 +93,40 @@ test('real browser pilot factory composes replay-only shot owner without duplica
   i.detach();g.destroy();
  }
 });
+
+test('fatal browser render tears down replay-only shot owner and restores production input',()=>{
+ const {createFixedStepBrowserPilot}=require('../research/fixed-step-raf-owner.cjs');
+ const g=bootGame(),i=g.input,win=g.__testWindow,doc=win.document;
+ g.sfx.muted=true;i.autofire=false;
+ i.detach();const w=target(),d=target(),c=Object.assign(target(),{
+  getBoundingClientRect:()=>({left:0,top:0,width:800,height:600})});
+ Object.assign(win,{addEventListener:w.addEventListener,removeEventListener:w.removeEventListener});
+ Object.assign(doc,{addEventListener:d.addEventListener,removeEventListener:d.removeEventListener});
+ i.attach(c);
+ const original={pd:i.pd,pu:i.pu,update:g.update,destroy:g.destroy};
+ let now=1000,callback;const pilot=createFixedStepBrowserPilot(g,{
+  window:win,document:doc,canvas:c,
+  clock:{now:()=>now,timeOrigin:1793560000000},
+  request:fn=>(callback=fn,1),cancel:()=>{},
+  render:()=>{throw Error('injected single-owner render failure');},
+  shotOnlyPulseFactory:game=>new DirectShotIntent(game,{
+   window:win,document:doc,rebindDomListeners:false})
+ });
+ try{
+  pilot.start();now=1034;
+  assert.throws(()=>callback(now),/injected single-owner render failure/);
+  assert.equal(pilot.owner.started,false);
+  assert.equal(pilot.capture.active,false);
+  assert.equal(pilot.pulse.old,null,'shot owner detached on fatal render');
+  assert.equal(i.pd,original.pd);assert.equal(i.pu,original.pu);
+  assert.equal(g.update,original.update);assert.equal(g.destroy,original.destroy);
+  assert.equal(c.count('pointerdown'),1);
+  assert.equal(w.count('pointerup'),1);
+  c.emit({type:'pointerdown',pointerType:'mouse',pointerId:1,button:0,buttons:1,
+   clientX:600,clientY:200,target:c});
+  assert.equal(i.firing,true,'production input usable after fatal research failure');
+  w.emit({type:'pointerup',pointerType:'mouse',pointerId:1,button:0,buttons:0,
+   clientX:600,clientY:200,target:c});
+  assert.equal(i.firing,false);
+ }finally{pilot.stop();i.detach();g.destroy();}
+});
