@@ -207,3 +207,13 @@ test('trusted short mouse click preserves Sniper world aim and physical charge',
   assert.equal(owner.intents,1);
  }finally{owner.detach();g.destroy();}
 });
+
+test('strict physical charge cannot be enabled without bounded release freshness',()=>{
+ const g=bootGame(),win=g.__testWindow;
+ try{
+  assert.throws(()=>new DirectShotIntent(g,{window:win,document:win.document,
+   eventOriginMs:1000,requireTrustedDuration:true}),/finite release freshness/);
+  assert.throws(()=>new DirectShotIntent(g,{window:win,document:win.document,
+   maxIntentAgeMs:100,nowMs:()=>1100,requireTrustedDuration:true}),/event origin/);
+ }finally{g.destroy();}
+});
