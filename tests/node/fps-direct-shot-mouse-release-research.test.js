@@ -32,7 +32,7 @@ function scenario(cls,moveAfterRelease){
  });
 }
 test('real composed Game uses release-time mouse target despite intervening cursor move',()=>{
- for(const cls of ['scout','artillery','carrier']){
+ for(const cls of ['scout','cannon','carrier']){
   const fixed=scenario(cls,false),moved=scenario(cls,true);
   assert.ok(fixed.bullets.length>0,cls+' actual projectile birth');
   assert.deepEqual(moved,fixed,cls+' released shot should not follow a later cursor');
