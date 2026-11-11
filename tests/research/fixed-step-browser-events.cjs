@@ -51,8 +51,14 @@ class BrowserEventTimeline {
       const id=event.pointerId;
       const released=event.type==='pointerup'||event.type==='pointercancel';
       if(this.suppressedTouchIds.has(id)){
-        if(released)this.suppressedTouchIds.delete(id);
-        return false;
+        // Pointer IDs may be reused after an OS interruption without a
+        // delivered release. A new down starts a new physical sequence;
+        // moves from the interrupted sequence remain suppressed.
+        if(event.type==='pointerdown')this.suppressedTouchIds.delete(id);
+        else{
+          if(released)this.suppressedTouchIds.delete(id);
+          return false;
+        }
       }
       let size=null;
       const canvas=this.timeline.input && this.timeline.input.canvas;
