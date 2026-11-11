@@ -73,6 +73,8 @@ class DirectShotIntent {
         if(canceled){self.clear();return result;}
         if(eligible){self.pending=Object.freeze({fire:true,
           aim:mouse?null:Object.freeze({x:dx/len,y:dy/len}),
+          mouse:mouse?Object.freeze({x:Number.isFinite(e.clientX)?e.clientX:i.mouseX,
+            y:Number.isFinite(e.clientY)?e.clientY:i.mouseY}):null,
           depth:mouse?null:Math.max(.08,Math.min(1,(len-5)/55))});
           self.pendingAt=self.maxIntentAgeMs===Infinity?null:self.stamp();
           self.pendingSource=Object.freeze({type:d.type,id:d.id});
@@ -111,8 +113,13 @@ class DirectShotIntent {
          i.__novaInputPaused||i.aim.active||i.firing)return self.old.update.apply(this,args);
       if(i.__novaShotIntent)throw Error('shot intent already owned');
       i.__novaShotIntent=intent;
+      // Keep the release-time mouse target stable across a later cursor move.
+      // All current Game/overlay aim and Cannon fuse readers share these
+      // coordinates. Restore immediately so the next physical input is live.
+      const previousMouseX=i.mouseX,previousMouseY=i.mouseY;
+      if(intent.mouse){i.mouseX=intent.mouse.x;i.mouseY=intent.mouse.y;}
       try{const result=self.old.update.apply(this,args);self.intents++;return result;}
-      finally{delete i.__novaShotIntent;}
+      finally{i.mouseX=previousMouseX;i.mouseY=previousMouseY;delete i.__novaShotIntent;}
     };
     game.setPaused=function(value,...args){if(value)self.clear();return self.old.setPaused.call(this,value,...args);};
     if(typeof this.old.blurReset==='function')i.__novaBlurReset=function(...args){self.clear();return self.old.blurReset.apply(this,args);};
@@ -140,7 +147,9 @@ class DirectShotIntent {
       if(!e||e.button!==0||!self.down||self.down.type!=='mouse')return;
       const d=self.down;self.down=null;
       if(!d.sampled&&game.status==='playing'&&!game.paused&&!doc.hidden&&!i.__novaInputPaused&&i.mouseActive)
-        {self.pending=Object.freeze({fire:true,aim:null,depth:null});
+        {self.pending=Object.freeze({fire:true,aim:null,
+          mouse:Object.freeze({x:Number.isFinite(e.clientX)?e.clientX:i.mouseX,
+            y:Number.isFinite(e.clientY)?e.clientY:i.mouseY}),depth:null});
          self.pendingAt=self.maxIntentAgeMs===Infinity?null:self.stamp();
          self.pendingSource=Object.freeze({type:'mouse',id:d.id});
          self.pendingPlayer=d.player;}
