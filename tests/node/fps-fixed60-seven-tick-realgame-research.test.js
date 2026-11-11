@@ -63,10 +63,12 @@ test('real composed Gunner and live-drone Hivemind compare seven- and eight-tick
    assert.ok(by['4+4'].droppedMs<=by['4+3'].droppedMs+.002,
     'extra capacity must not discard more active simulation than 4+3');
    if(trace==='30Hz-triple-long-falsifier'){
-    assert.ok(by['4+4'].droppedMs>0,
-     'eight-tick capacity must expose its genuine clustered-frame limitation');
-    assert.ok(by['4+4'].updates<120,
+    // A current 4+4 loss is a falsifier, not a desired regression golden.
+    // Future safe owners may improve this trace without failing research.
+    if(by['4+4'].droppedMs>0)assert.ok(by['4+4'].updates<120,
      'discarded time must not masquerade as complete simulation chronology');
+    else assert.equal(by['4+4'].updates,120,
+     'a recovered trace must execute every chronological tick');
    }
    if(trace==='30Hz-seven-tick-falsifier'){
     assert.equal(by['4+4'].droppedMs,0,
