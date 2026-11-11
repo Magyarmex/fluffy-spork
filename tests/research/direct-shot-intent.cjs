@@ -4,7 +4,7 @@
  * A short aimed press+release is an intent for ONE next simulation update,
  * never a held physical right stick or a Controller drone command. */
 class DirectShotIntent {
-  constructor(game,{window:win,document:doc,maxIntentAgeMs=Infinity,nowMs=null,eventOriginMs=null,rebindDomListeners=true,requireTrustedDuration=false}={}) {
+  constructor(game,{window:win,document:doc,maxIntentAgeMs=Infinity,nowMs=null,eventOriginMs=null,rebindDomListeners=true,requireTrustedDuration=false,maxTrustedPressMs=100}={}) {
     if(!game||!game.input||!win||!doc||typeof game.update!=='function'||
        typeof game.setPaused!=='function'||typeof win.addEventListener!=='function'||
        typeof win.removeEventListener!=='function'||typeof doc.addEventListener!=='function'||
@@ -15,7 +15,9 @@ class DirectShotIntent {
       throw Error('invalid direct intent event origin');
     if(typeof rebindDomListeners!=='boolean')throw Error('invalid DOM ownership option');
     if(typeof requireTrustedDuration!=='boolean'||(requireTrustedDuration&&eventOriginMs===null))throw Error('trusted duration requires event origin');
+    if(!Number.isFinite(maxTrustedPressMs)||maxTrustedPressMs<=0)throw Error('invalid unsampled press ceiling');
     this.requireTrustedDuration=requireTrustedDuration;
+    this.maxTrustedPressMs=maxTrustedPressMs;
     this.rebindDomListeners=rebindDomListeners;
     this.game=game;this.input=game.input;this.win=win;this.doc=doc;
     this.maxIntentAgeMs=maxIntentAgeMs;this.nowMs=nowMs;this.eventOriginMs=eventOriginMs;
@@ -146,7 +148,8 @@ class DirectShotIntent {
         const releasedAt=self.physicalStamp(e);
         const durationMs=releasedAt-d.pressedAt;
         const trustedDuration=Number.isFinite(d.pressedAt)&&Number.isFinite(releasedAt)&&
-          Number.isFinite(durationMs)&&durationMs>=0;
+          Number.isFinite(durationMs)&&durationMs>=0&&
+          durationMs<=self.maxTrustedPressMs;
         if(eligible&&(!self.requireTrustedDuration||trustedDuration)){
           const shotMouse=mouse?self.captureMouse(e):null;
           self.pending=Object.freeze({fire:true,
@@ -231,7 +234,8 @@ class DirectShotIntent {
       if(Number.isFinite(e.clientY))i.mouseY=e.clientY;
       const releasedAt=self.physicalStamp(e),durationMs=releasedAt-d.pressedAt;
       const trustedDuration=Number.isFinite(d.pressedAt)&&Number.isFinite(releasedAt)&&
-        Number.isFinite(durationMs)&&durationMs>=0;
+        Number.isFinite(durationMs)&&durationMs>=0&&
+        durationMs<=self.maxTrustedPressMs;
       if(!d.sampled&&game.status==='playing'&&!game.paused&&!doc.hidden&&!i.__novaInputPaused&&i.mouseActive&&
          (!self.requireTrustedDuration||trustedDuration))
         {const shotMouse=self.captureMouse(e);
