@@ -1,5 +1,5 @@
 'use strict';
-/* #799 research-only: compare seven-tick total-capacity policies against the
+/* #799 research-only: compare six-, seven- and eight-tick capacity policies against the
  * existing six-tick controls in the actual composed Game. No production changes.
  * This reports simulation chronology and volley counts; it does NOT measure hit damage.
  */
@@ -11,7 +11,8 @@ const cases=[
  {name:'3+3',maxSteps:3,backlogExtraTicks:3},
  {name:'4+2',maxSteps:4,backlogExtraTicks:2},
  {name:'3+4',maxSteps:3,backlogExtraTicks:4},
- {name:'4+3',maxSteps:4,backlogExtraTicks:3}
+ {name:'4+3',maxSteps:4,backlogExtraTicks:3},
+ {name:'4+4',maxSteps:4,backlogExtraTicks:4}
 ];
 function check(result,policy,cls,trace){
  assert.ok(Math.abs(result.wallMs-WALL_MS)<.002,'identical wall duration');
@@ -33,7 +34,7 @@ function check(result,policy,cls,trace){
   Number.isFinite(result.fourStepFrameCpuP95Ms),
   'four-step callbacks require a CPU witness');
 }
-test('real composed Gunner and live-drone Hivemind compare 3+4 versus 4+3 on adversarial active presentation',()=>{
+test('real composed Gunner and live-drone Hivemind compare seven- and eight-tick capacity on adversarial active presentation',()=>{
  const rows=[];
  for(const trace of ['30Hz-adversarial95','30Hz-display-quantized','30Hz-seven-tick-falsifier','30Hz-double-burst']){
   const gaps=frameTimes(trace);
@@ -57,6 +58,16 @@ test('real composed Gunner and live-drone Hivemind compare 3+4 versus 4+3 on adv
    const by=Object.fromEntries(results.map(r=>[r.policy,r]));
    assert.equal(by['3+3'].peakSteps<=3,true);
    assert.equal(by['4+3'].peakSteps<=4,true);
+   assert.ok(by['4+4'].droppedMs<=by['4+3'].droppedMs+.002,
+    'extra capacity must not discard more active simulation than 4+3');
+   if(by['4+4'].updates===by['4+3'].updates&&
+      Math.abs(by['4+4'].queuedMs-by['4+3'].queuedMs)<.002&&
+      Math.abs(by['4+4'].droppedMs-by['4+3'].droppedMs)<.002){
+    assert.equal(by['4+4'].worldHash,by['4+3'].worldHash,
+     'identical four-step chronology must preserve the real physical world');
+    assert.equal(by['4+4'].volleys,by['4+3'].volleys,
+     'identical four-step chronology must preserve actual Gunner volleys');
+   }
    // If both schedules execute every chronological tick with no discarded
    // time and the same end queue, the physical world must not depend on how
    // those ticks were grouped into presentation callbacks.
@@ -72,6 +83,6 @@ test('real composed Gunner and live-drone Hivemind compare 3+4 versus 4+3 on adv
   }
  }
  assert.equal(rows.length,16);
- console.log('REAL_GAME_SEVEN_TICK_POLICY_COMPARISON '+JSON.stringify({
+ console.log('REAL_GAME_BACKLOG_CAPACITY_POLICY_COMPARISON '+JSON.stringify({
   rows,caveat:'research only; Node Canvas JS not GPU/Android; sequential CPU timing is host-dependent; volley counts are not applied damage'}));
 });
