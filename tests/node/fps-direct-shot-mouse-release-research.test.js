@@ -6,7 +6,7 @@ process.env.NOVA_EXPLICIT_SHOT_INTENT_RESEARCH='1';
 const test=require('node:test'),assert=require('node:assert/strict');
 const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 const {DirectShotIntent}=require('../research/direct-shot-intent.cjs');
-function scenario(cls,moveAfterRelease,moveBeforeRelease=true){
+function scenario(cls,moveAfterRelease,moveBeforeRelease=true,cameraShift=false){
  return withSeed(1517800,()=>{
   const g=bootGame();g.sfx.muted=true;g.input.autofire=false;g.setClass(g.player,cls);
   const i=g.input,o=new DirectShotIntent(g,{window:g.__testWindow,document:g.__testWindow.document});
@@ -18,6 +18,7 @@ function scenario(cls,moveAfterRelease,moveBeforeRelease=true){
    i.pu(ev('pointerup',400,200,0));
    assert.ok(o.pending&&o.pending.mouse,'short mouse release owns a target');
    if(moveAfterRelease)i.pm(ev('pointermove',700,500,0));
+   if(cameraShift){g.cam.x+=190;g.cam.y-=100;g.cam.zoom*=.72;}
    const live={x:i.mouseX,y:i.mouseY};
    g.update(1/60);
    assert.equal(i.mouseX,live.x,'restore later physical mouse X');
@@ -61,4 +62,13 @@ test('exception during recovered Game.update restores the physical cursor and in
   assert.equal(i.__novaShotIntent,undefined);
   assert.equal(o.pending,null);
  }finally{o.detach();g.destroy();}
+});
+
+test('release-time mouse shot retains world target when camera pans and zooms before consumption',()=>{
+ for(const cls of ['scout','cannon','carrier']){
+  const baseline=scenario(cls,false,true,false);
+  const shifted=scenario(cls,false,true,true);
+  assert.ok(baseline.bullets.length>0,cls+' fires a real projectile');
+  assert.deepEqual(shifted,baseline,cls+' camera motion must not retarget the released world point');
+ }
 });
