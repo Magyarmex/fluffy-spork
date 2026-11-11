@@ -149,7 +149,7 @@ class DirectShotIntent {
         const durationMs=releasedAt-d.pressedAt;
         const trustedDuration=Number.isFinite(d.pressedAt)&&Number.isFinite(releasedAt)&&
           Number.isFinite(durationMs)&&durationMs>=0&&
-          durationMs<=self.maxTrustedPressMs;
+          durationMs<=self.maxTrustedPressMs+1e-6;
         if(eligible&&(!self.requireTrustedDuration||trustedDuration)){
           const shotMouse=mouse?self.captureMouse(e):null;
           self.pending=Object.freeze({fire:true,
@@ -235,7 +235,7 @@ class DirectShotIntent {
       const releasedAt=self.physicalStamp(e),durationMs=releasedAt-d.pressedAt;
       const trustedDuration=Number.isFinite(d.pressedAt)&&Number.isFinite(releasedAt)&&
         Number.isFinite(durationMs)&&durationMs>=0&&
-        durationMs<=self.maxTrustedPressMs;
+        durationMs<=self.maxTrustedPressMs+1e-6;
       if(!d.sampled&&game.status==='playing'&&!game.paused&&!doc.hidden&&!i.__novaInputPaused&&i.mouseActive&&
          (!self.requireTrustedDuration||trustedDuration))
         {const shotMouse=self.captureMouse(e);
