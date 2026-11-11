@@ -104,6 +104,12 @@ class DirectShotIntent {
       const eligible=valid&&(mouse?i.firing&&i.mouseActive:
         i.stickId.aim===d.id&&i.aim.active&&Number.isFinite(len)&&len>=9);
       const result=self.old.pu.call(this,e);
+      // Pointerup is a physical cursor sample even without pointermove.
+      // Preserve it as live input after the synthetic shot is consumed.
+      if(same&&mouse&&!canceled){
+        if(Number.isFinite(e.clientX))i.mouseX=e.clientX;
+        if(Number.isFinite(e.clientY))i.mouseY=e.clientY;
+      }
       if(same){self.down=null;
         if(canceled){self.clear();return result;}
         if(eligible){const shotMouse=mouse?self.captureMouse(e):null;
@@ -182,6 +188,8 @@ class DirectShotIntent {
     this.nativeUp=e=>{
       if(!e||e.button!==0||!self.down||self.down.type!=='mouse')return;
       const d=self.down;self.down=null;
+      if(Number.isFinite(e.clientX))i.mouseX=e.clientX;
+      if(Number.isFinite(e.clientY))i.mouseY=e.clientY;
       if(!d.sampled&&game.status==='playing'&&!game.paused&&!doc.hidden&&!i.__novaInputPaused&&i.mouseActive)
         {const shotMouse=self.captureMouse(e);
          self.pending=Object.freeze({fire:true,aim:null,
