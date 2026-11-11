@@ -251,3 +251,23 @@ test('research: absent capture geometry cannot be retroactively inferred at repl
  assert.equal(h.input.firing,false);
  assert.equal(h.timeline.quarantined,true);
 });
+
+test('research: reused pointer ID after lost release can start a fresh gesture',()=>{
+ const h=harness();
+ h.setNow(1020);
+ h.capture('pointerdown',22,600,1010);
+ h.timeline.consumeThrough(.02);
+ h.resize(1600);
+ assert.equal(h.capture('pointermove',22,620,1030),false);
+ assert.equal(h.input.firing,false);
+ assert.equal(h.capture('pointermove',22,630,1031),false);
+ h.setNow(1060);
+ assert.equal(h.capture('pointerdown',22,1200,1050),true,
+  'new pointerdown is a new physical sequence even when ID is reused');
+ h.timeline.consumeThrough(.06);
+ assert.equal(h.input.stickId.aim,22);
+ assert.equal(h.input.stickId.move,-1);
+ h.capture('pointerup',22,1200,1061);
+ h.timeline.consumeThrough(.08);
+ assert.equal(h.input.firing,false);
+});
