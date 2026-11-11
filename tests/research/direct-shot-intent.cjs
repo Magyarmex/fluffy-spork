@@ -93,7 +93,7 @@ class DirectShotIntent {
       if(intent&&self.maxIntentAgeMs!==Infinity){
         const now=self.stamp(),age=now-at;
         if(!Number.isFinite(now)||!Number.isFinite(at)||!Number.isFinite(age)||
-           age < -32||age > self.maxIntentAgeMs){
+           age < 0||age > self.maxIntentAgeMs){
           self.rejectedStale++;return self.old.update.apply(this,args);
         }
       }
