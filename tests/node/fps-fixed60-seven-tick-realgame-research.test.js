@@ -19,6 +19,8 @@ function check(result,policy,cls,trace){
  assert.ok(result.updates>=0&&result.updates<=120,'60Hz tick ceiling');
  assert.ok(result.peakSteps<=policy.maxSteps,'per-frame update budget');
  assert.ok(result.lagMs>=0&&result.droppedMs>=0,'nonnegative debt');
+ assert.ok(result.peakQueuedMs<=policy.backlogExtraTicks*STEP_MS+.002,
+  'end-of-frame queued phase must respect the configured backlog bound');
  assert.ok(Math.abs(result.updates*STEP_MS+result.droppedMs+result.lagMs-WALL_MS)<.002,
   'simulation + queued + discarded must equal elapsed time');
  assert.equal(result.frameCpuSamples,frameTimes(trace).length,'all frames measured');
