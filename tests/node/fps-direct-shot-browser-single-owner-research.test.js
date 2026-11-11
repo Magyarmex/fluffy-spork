@@ -131,3 +131,38 @@ test('fatal browser render tears down replay-only shot owner and restores produc
   assert.equal(i.firing,false);
  }finally{pilot.stop();i.detach();g.destroy();}
 });
+
+test('native primary mouse chord remains chronological with replay-only shot intent',()=>{
+ const g=bootGame(),i=g.input,win=g.__testWindow,doc=win.document;
+ g.sfx.muted=true;i.autofire=false;g.status='playing';g.paused=false;
+ i.detach();const w=target(),d=target(),c=Object.assign(target(),{
+  getBoundingClientRect:()=>({left:0,top:0,width:800,height:600})});
+ Object.assign(win,{addEventListener:w.addEventListener,removeEventListener:w.removeEventListener});
+ Object.assign(doc,{addEventListener:d.addEventListener,removeEventListener:d.removeEventListener});
+ i.attach(c);
+ let now=1000;const timeline=new ChronologicalInput(i);
+ const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
+ const capture=new BrowserInputCapture(i,c,timeline,bridge,{window:win,document:doc});
+ const direct=new DirectShotIntent(g,{window:win,document:doc,rebindDomListeners:false});
+ try{
+  const send=(place,type,stamp,button,buttons)=>{now=stamp;place.emit({
+   type,timeStamp:stamp,pointerType:'mouse',pointerId:1,
+   clientX:640,clientY:220,button,buttons,target:c,preventDefault(){}
+  });};
+  send(c,'pointerdown',1010,2,2);
+  send(c,'mousedown',1011,2,2);
+  send(c,'mousedown',1012,0,3);
+  assert.equal(i.firing,false,'native primary edge must be queued');
+  timeline.consumeThrough(.013);
+  assert.equal(i.firing,true,'primary chord press replayed once');
+  send(w,'mouseup',1020,0,2);
+  assert.equal(i.firing,true,'native release remains queued');
+  timeline.consumeThrough(.021);
+  assert.ok(direct.pending,'native primary release captures a short shot');
+  g.update(1/60);
+  assert.equal(direct.intents,1);
+  assert.equal(i.firing,false);
+  assert.equal(i.__novaShotIntent,undefined);
+  g.update(1/60);assert.equal(direct.intents,1);
+ }finally{direct.detach();capture.detach();i.detach();g.destroy();}
+});
