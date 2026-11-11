@@ -198,7 +198,8 @@ class BrowserEventTimeline {
     if (!Number.isFinite(now)) throw Error('invalid browser clock');
     let stamp = Number(event.timeStamp);
     let timestampTrusted = true;
-    // Clock skew may be tolerated for ordering but not for exact Sniper hold duration.
+    // A tolerated future-clock skew can be safe for input ordering but must
+    // not masquerade as an exact physical hold duration for Sniper charge.
     let timestampExact = true;
     if (!Number.isFinite(stamp) || stamp <= 0) {
       stamp = now;
