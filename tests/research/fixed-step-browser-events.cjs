@@ -144,11 +144,13 @@ class BrowserEventTimeline {
     if(event.type.startsWith('pointer') && event.pointerType!=='mouse'){
       const canvas=this.timeline.input && this.timeline.input.canvas;
       if(canvas && typeof canvas.getBoundingClientRect==='function'){
-        const r=canvas.getBoundingClientRect();
-        if(Number.isFinite(r.left)&&Number.isFinite(r.top)&&
-           Number.isFinite(r.width)&&Number.isFinite(r.height)&&
-           r.width>0&&r.height>0)
-          canvasOrigin={left:r.left,top:r.top,width:r.width,height:r.height};
+        try{
+          const r=canvas.getBoundingClientRect();
+          if(r && Number.isFinite(r.left)&&Number.isFinite(r.top)&&
+             Number.isFinite(r.width)&&Number.isFinite(r.height)&&
+             r.width>0&&r.height>0)
+            canvasOrigin={left:r.left,top:r.top,width:r.width,height:r.height};
+        }catch(_){/* Invalid layout evidence must not invent stick ownership. */}
       }
     }
     const target = event.target;
