@@ -21,6 +21,7 @@ function run({maxAge=100,age=50,clockFailure=false,cancel=false,kind='touch'}={}
   try{
    i.pd(event('pointerdown',600,1));
    i.pm(event('pointermove',640,1));
+   throwNow=releaseClockFailure;
    i.pu(event(cancel?'pointercancel':'pointerup',640,0));
    clock+=age;throwNow=clockFailure;
    g.update(1/60);
@@ -38,6 +39,7 @@ test('direct shot intent accepts fresh wall-clock press but rejects aged and inv
   ['stale',{maxAge:100,age:101}],
   ['zero-age expired',{maxAge:0,age:1}],
   ['clock exception',{maxAge:100,age:50,clockFailure:true}],
+  ['release clock exception',{maxAge:100,age:50,releaseClockFailure:true}],
   ['clock rewind',{maxAge:100,age:-40}]
  ]){
   const out=run({...opts,kind});
