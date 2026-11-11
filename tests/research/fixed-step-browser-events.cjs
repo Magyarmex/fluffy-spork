@@ -42,6 +42,9 @@ class BrowserEventTimeline {
   }
   capture(event) {
     if (!event || !KINDS.has(event.type)) throw Error('unsupported browser input event');
+    // One DOM layout snapshot per touch event: avoid a second potentially
+    // forced layout read when storing capture-time stick coordinates.
+    let capturedCanvasOrigin=null;
     if(event.type==='blur'){
       this.activeTouchIds.clear();
       this.suppressedTouchIds.clear();
@@ -66,8 +69,12 @@ class BrowserEventTimeline {
         try{
           const rect=canvas.getBoundingClientRect();
           if(rect && Number.isFinite(rect.width)&&Number.isFinite(rect.height) &&
-             rect.width>0 && rect.height>0)
+             rect.width>0 && rect.height>0){
             size={width:rect.width,height:rect.height};
+            if(Number.isFinite(rect.left)&&Number.isFinite(rect.top))
+              capturedCanvasOrigin={left:rect.left,top:rect.top,
+                width:rect.width,height:rect.height};
+          }
         }catch(_){/* Unavailable layout is not evidence of a safe resize. */}
       }
       if(this.activeTouchIds.size &&
@@ -212,19 +219,7 @@ class BrowserEventTimeline {
     // A replayed touch must use the local canvas coordinates seen at DOM
     // capture. A later layout translation must not turn aim into movement.
     // Resizes remain a separate, deliberately unpromoted safety gate.
-    let canvasOrigin=null;
-    if(event.type.startsWith('pointer') && event.pointerType!=='mouse'){
-      const canvas=this.timeline.input && this.timeline.input.canvas;
-      if(canvas && typeof canvas.getBoundingClientRect==='function'){
-        try{
-          const r=canvas.getBoundingClientRect();
-          if(r && Number.isFinite(r.left)&&Number.isFinite(r.top)&&
-             Number.isFinite(r.width)&&Number.isFinite(r.height)&&
-             r.width>0&&r.height>0)
-            canvasOrigin={left:r.left,top:r.top,width:r.width,height:r.height};
-        }catch(_){/* Invalid layout evidence must not invent stick ownership. */}
-      }
-    }
+    const canvasOrigin=capturedCanvasOrigin;
     const target = event.target;
     const data = event.type === 'blur' ? {} : {
       __novaOriginalAt: originalAt, __novaTimestampTrusted: timestampTrusted,
