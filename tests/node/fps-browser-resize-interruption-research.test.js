@@ -36,7 +36,7 @@ function harness(){
      pointerId:id,clientX:x,clientY:200,button:0,
      buttons:type==='pointerup'?0:1,target:{closest:()=>null}});
  }
- return {input,timeline,capture,resize:w=>{width=w;},setNow:v=>{now=v;}};
+ return {input,timeline,bridge,capture,resize:w=>{width=w;},setNow:v=>{now=v;}};
 }
 
 test('research falsifier: resize cannot reclassify queued right-stick down as movement',()=>{
@@ -284,4 +284,49 @@ test('research: each touch capture reads canvas geometry only once',()=>{
  assert.equal(reads,3,'one DOM layout read per touch event');
  assert.deepEqual(h.timeline.events.map(e=>e.data.__novaCanvasOrigin.width),
   [800,800,800]);
+});
+
+test('research: window resize interrupts held aim even without a pointermove',()=>{
+ const h=harness();
+ h.setNow(1020);
+ h.capture('pointerdown',22,600,1010);
+ h.timeline.consumeThrough(.02);
+ assert.equal(h.input.firing,true);
+ h.resize(1600);
+ assert.equal(h.bridge.interruptForResize(),true);
+ assert.equal(h.input.firing,false);
+ assert.equal(h.input.stickId.aim,-1);
+ assert.equal(h.bridge.resizeInterruptions,1);
+ assert.equal(h.capture('pointermove',22,620,1030),false);
+ h.capture('pointerup',22,620,1031);
+ h.setNow(1050);
+ h.capture('pointerdown',23,1200,1040);
+ h.timeline.consumeThrough(.05);
+ assert.equal(h.input.stickId.aim,23);
+});
+
+test('research: window resize discards queued short flick before it can fire',()=>{
+ const h=harness();
+ h.setNow(1020);
+ h.capture('pointerdown',22,600,1010);
+ h.capture('pointerup',22,650,1012);
+ h.resize(1600);
+ assert.equal(h.bridge.interruptForResize(),true);
+ assert.equal(h.timeline.events.length,0);
+ assert.equal(h.input.firing,false);
+ assert.equal(h.input.stickId.move,-1);
+ assert.equal(h.input.stickId.aim,-1);
+});
+
+test('research: resize notification with unchanged canvas dimensions retains touch',()=>{
+ const h=harness();
+ h.setNow(1020);
+ h.capture('pointerdown',22,600,1010);
+ h.timeline.consumeThrough(.02);
+ assert.equal(h.bridge.interruptForResize(),false);
+ assert.equal(h.input.stickId.aim,22);
+ assert.equal(h.input.firing,true);
+ h.capture('pointerup',22,600,1030);
+ h.timeline.consumeThrough(.04);
+ assert.equal(h.input.firing,false);
 });
