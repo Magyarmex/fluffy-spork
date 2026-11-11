@@ -6,7 +6,7 @@ process.env.NOVA_EXPLICIT_SHOT_INTENT_RESEARCH='1';
 const test=require('node:test'),assert=require('node:assert/strict');
 const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 const {DirectShotIntent}=require('../research/direct-shot-intent.cjs');
-function run({maxAge=100,age=50,clockFailure=false,cancel=false,kind='touch'}={}){
+function run({maxAge=100,age=50,clockFailure=false,releaseClockFailure=false,cancel=false,kind='touch'}={}){
  return withSeed(1517800,()=>{
   const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
   g.status='playing';g.paused=false;g.player.fireCd=0;
