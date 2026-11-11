@@ -26,6 +26,25 @@ function frameTimes(kind){
   const a=6.9267489,b=95.49032479,c=30.76815672;
   return [a,b,c,1000/7.5-a-b-c];
  }).flat();
+ // Seeded, mean-30Hz active trace that distinguishes equal-capacity 3+3
+ // and 4+2. Each four-frame group totals 133 1/3ms; all gaps stay <100ms.
+ // Deterministic LCG/negative-log weights, not a claim about natural incidence.
+ if(kind==='30Hz-seeded-contrast'){
+  let seed=7;
+  const uniform=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;
+   return (seed+.5)/4294967296;};
+  const gaps=[];
+  for(let group=0;group<15;group++){
+   let values;
+   do{
+    const w=Array.from({length:4},()=>-Math.log(uniform()));
+    const sum=w.reduce((a,b)=>a+b,0);
+    values=w.map(x=>(1000/7.5)*x/sum);
+   }while(Math.max(...values)>=100);
+   gaps.push(...values);
+  }
+  return gaps;
+ }
  if(kind==='20Hz-jitter')return Array.from({length:40},(_,i)=>i%2?52:48);
  if(kind==='20Hz-bursts')return Array.from({length:40},(_,i)=>[65,35,54,46][i%4]);
  throw Error('unknown presentation cadence');
