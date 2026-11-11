@@ -47,7 +47,8 @@ test('real composed Gunner and live-drone Hivemind compare seven- and eight-tick
      backlogExtraTicks:policy.backlogExtraTicks,render:true,profileCpu:true});
     check(r,policy,cls,trace);
     return {policy:policy.name,updates:r.updates,droppedMs:r.droppedMs,
-     queuedMs:r.lagMs,volleys:r.volleys,worldHash:r.hash,
+     queuedMs:r.lagMs,peakQueuedMs:r.peakQueuedMs,
+     meanQueuedMs:r.meanQueuedMs,volleys:r.volleys,worldHash:r.hash,
      peakSteps:r.peakSteps,fourStepFrames:r.fourStepFrameSamples,
      frameCpuP95Ms:r.frameCpuP95Ms,frameCpuPeakMs:r.frameCpuPeakMs,
      fourStepCpuP95Ms:r.fourStepFrameCpuP95Ms,
@@ -67,6 +68,8 @@ test('real composed Gunner and live-drone Hivemind compare seven- and eight-tick
      'retained chronology must not execute fewer Game updates');
     assert.ok(by['4+4'].queuedMs>0,
      'retained but unfinished ticks must remain visible as queued phase');
+    assert.ok(by['4+4'].peakQueuedMs>=by['4+3'].peakQueuedMs-1e-7,
+     'more retained history must expose, not hide, the peak phase-lag cost');
    }
    if(by['4+4'].updates===by['4+3'].updates&&
       Math.abs(by['4+4'].queuedMs-by['4+3'].queuedMs)<.002&&
