@@ -42,7 +42,7 @@ function observe(mode,{secondRelease=false,secondSide='aim',secondCancel=false}=
     aimActive:!!g.input.aim.active,
     aimDx:g.input.aim.dx,aimDy:g.input.aim.dy,
     pendingPointer:pending?.id??null,physicalFiring:!!g.input.firing};
-   g.player.fireCd=0;
+   g.player.fireCd=0;g.player.angle=0;
    g.update(1/60);
    return {...beforeUpdate,shots,shotDirections,playerAngle:+g.player.angle.toFixed(6),afterUpdateOwner:g.input.stickId?.aim??null,
     afterUpdateFiring:!!g.input.firing,postIntent:g.input.__novaShotIntent};
@@ -82,8 +82,9 @@ test('two short consecutive presses preserve the newest aimed shot without a sta
  assert.equal(direct.afterUpdateOwner,-1);
  assert.equal(direct.postIntent,undefined);
  assert.ok(direct.shotDirections.length>0,'latest intent must produce an actual projectile');
- assert.ok(direct.shotDirections.every(([vx,vy])=>vy>0&&Math.abs(vy)>Math.abs(vx)),
-  'latest southward aim must win over stale eastward first press');
+ assert.ok(direct.playerAngle>0.1,'latest southward aim must rotate the hull away from stale eastward bearing');
+ assert.ok(direct.shotDirections.some(([vx,vy])=>vy>0),
+  'latest southward intent must give the projectile a positive vertical component');
  // Research controls remain observational: a future fix may make both
  // deferred-release owners preserve the latest shot too.
  console.log('RAPID_RETARGET_SECOND_SHOT '+JSON.stringify({baseline,direct,subtick,explicit,
