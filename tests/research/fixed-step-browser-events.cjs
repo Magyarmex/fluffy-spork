@@ -137,6 +137,20 @@ class BrowserEventTimeline {
       at = this.lastAt;
       this.reorderedClamps++;
     }
+    // A replayed touch must use the local canvas coordinates seen at DOM
+    // capture. A later layout translation must not turn aim into movement.
+    // Resizes remain a separate, deliberately unpromoted safety gate.
+    let canvasOrigin=null;
+    if(event.type.startsWith('pointer') && event.pointerType!=='mouse'){
+      const canvas=this.timeline.input && this.timeline.input.canvas;
+      if(canvas && typeof canvas.getBoundingClientRect==='function'){
+        const r=canvas.getBoundingClientRect();
+        if(Number.isFinite(r.left)&&Number.isFinite(r.top)&&
+           Number.isFinite(r.width)&&Number.isFinite(r.height)&&
+           r.width>0&&r.height>0)
+          canvasOrigin={left:r.left,top:r.top,width:r.width,height:r.height};
+      }
+    }
     const target = event.target;
     const data = event.type === 'blur' ? {} : {
       __novaOriginalAt: originalAt, __novaTimestampTrusted: timestampTrusted,
@@ -152,15 +166,11 @@ class BrowserEventTimeline {
       targetEditable: !!(target && target.isContentEditable),
       targetIsUI: !!(target && typeof target.closest === 'function' &&
         target.closest('[data-ui],[role="dialog"],[role="button"],[contenteditable="true"]')),
-      // Capture stick side before any later canvas relocation. This is
-      // ownership evidence for stale-event quarantine, not a live aim command.
-      __novaCanvasSide: event.type === 'pointerdown' && event.pointerType !== 'mouse' &&
-        this.timeline.input && this.timeline.input.canvas &&
-        typeof this.timeline.input.canvas.getBoundingClientRect === 'function' ?
-        (() => { const r=this.timeline.input.canvas.getBoundingClientRect();
-          return Number.isFinite(r.left)&&Number.isFinite(r.width)&&r.width>0&&
-            Number.isFinite(event.clientX) ?
-            (event.clientX-r.left<r.width*.45?'move':'aim') : null; })() : null
+      __novaCanvasOrigin:canvasOrigin,
+      // Preserve accepted stick ownership through stale-event quarantine.
+      __novaCanvasSide:event.type==='pointerdown' && canvasOrigin &&
+        Number.isFinite(event.clientX) ?
+        (event.clientX-canvasOrigin.left<canvasOrigin.width*.45?'move':'aim') : null
     };
     const accepted = this.timeline.push(at, event.type, data);
     this.lastAt = at;
