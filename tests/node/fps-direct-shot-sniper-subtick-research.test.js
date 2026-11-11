@@ -13,6 +13,7 @@ test('subtick Sniper tap cannot bank focus or manufacture a full rail on the nex
   const result=withSeed(1517800,()=>{
    const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
    g.setClass(g.player,cls);g.player.fireCd=0;
+   assert.equal(g.player.cls,cls,'composed Game must actually select the rail class');
    g.status='playing';g.paused=false;
    const i=g.input,o=new DirectShotIntent(g,{
     window:g.__testWindow,document:g.__testWindow.document});
