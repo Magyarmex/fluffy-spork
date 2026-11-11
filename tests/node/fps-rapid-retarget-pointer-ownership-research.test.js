@@ -9,7 +9,7 @@ const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
 const {SubtickFirePulse}=require('../research/subtick-fire-pulse.cjs');
 const {ExplicitShotIntent}=require('../research/explicit-shot-intent.cjs');
 const {DirectShotIntent}=require('../research/direct-shot-intent.cjs');
-function observe(mode){
+function observe(mode,{secondRelease=false}={}){
  return withSeed(1517800,()=>{
   const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
   g.status='playing';g.paused=false;
@@ -24,21 +24,23 @@ function observe(mode){
   t.push(.152,'pointerup',e(11,640,200,0));
   t.push(.160,'pointerdown',e(12,600,200,1));
   t.push(.161,'pointermove',e(12,600,240,1));
-  let shots=0;
+  if(secondRelease)t.push(.168,'pointerup',e(12,600,240,0));
+  let shots=0,shotDirections=[];
   const fire=g.tryFire;
   g.tryFire=function(tank){const before=this.bullets.length;
    const result=fire.apply(this,arguments);
-   if(tank===g.player&&this.bullets.length>before)shots++;
+   if(tank===g.player&&this.bullets.length>before){
+    shots++;shotDirections.push(...this.bullets.slice(before).map(b=>[b.vx,b.vy]));}
    return result;};
   try{
-   t.consumeThrough(.165);
+   t.consumeThrough(secondRelease?.175:.165);
    const pending=owner?.pulse?.pending??owner?.pending??null;
    const beforeUpdate={aimOwner:g.input.stickId?.aim??null,aimActive:!!g.input.aim.active,
     aimDx:g.input.aim.dx,aimDy:g.input.aim.dy,
     pendingPointer:pending?.id??null,physicalFiring:!!g.input.firing};
    g.player.fireCd=0;
    g.update(1/60);
-   return {...beforeUpdate,shots,playerAngle:+g.player.angle.toFixed(6),afterUpdateOwner:g.input.stickId?.aim??null,
+   return {...beforeUpdate,shots,shotDirections,playerAngle:+g.player.angle.toFixed(6),afterUpdateOwner:g.input.stickId?.aim??null,
     afterUpdateFiring:!!g.input.firing,postIntent:g.input.__novaShotIntent};
   }finally{if(owner)owner.detach();g.destroy();}
  });
@@ -62,4 +64,24 @@ test('rapid second touch is accepted by baseline Input; pending-shot research re
  }
  console.log('RAPID_RETARGET_OWNERSHIP '+JSON.stringify({baseline,subtick,explicit,direct,
   caveat:'constructed 8ms inter-gesture interval; real Game/Input, not physical Android'}));
+});
+
+test('two short consecutive presses preserve the newest aimed shot without a stale first-owner replay',()=>{
+ const baseline=observe('baseline',{secondRelease:true});
+ const direct=observe('direct',{secondRelease:true});
+ const subtick=observe('subtick',{secondRelease:true});
+ const explicit=observe('explicit',{secondRelease:true});
+ assert.equal(baseline.shots,0,'two sub-tick presses are missed by unmodified Input sampling');
+ assert.equal(direct.shots,1,'direct intent should preserve exactly the latest deliberate short press');
+ assert.equal(direct.pendingPointer,null,'direct intent stores no physical pending owner');
+ assert.equal(direct.aimOwner,-1,'both real touch pointers must be released before Game.update');
+ assert.equal(direct.afterUpdateOwner,-1);
+ assert.equal(direct.postIntent,undefined);
+ assert.ok(direct.shotDirections.length>0,'latest intent must produce an actual projectile');
+ assert.ok(direct.shotDirections.every(([vx,vy])=>vy>0&&Math.abs(vy)>Math.abs(vx)),
+  'latest southward aim must win over stale eastward first press');
+ // Research controls remain observational: a future fix may make both
+ // deferred-release owners preserve the latest shot too.
+ console.log('RAPID_RETARGET_SECOND_SHOT '+JSON.stringify({baseline,direct,subtick,explicit,
+  caveat:'constructed short touches; no natural-play frequency or physical Android claim'}));
 });
