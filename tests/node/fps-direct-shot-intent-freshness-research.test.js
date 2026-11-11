@@ -70,3 +70,37 @@ test('invalid freshness gate fails closed before installing any input wrappers',
   assert.throws(()=>new DirectShotIntent(g,{window:win,document:doc,maxIntentAgeMs:100}),/freshness/);
  }finally{g.destroy();}
 });
+
+test('unrelated movement cancellation cannot erase pending aimed shot; matching cancellation can',()=>{
+ function arm(cancelId){
+  return withSeed(1517800,()=>{
+   const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
+   g.status='playing';g.paused=false;g.player.fireCd=0;
+   const i=g.input,o=new DirectShotIntent(g,{window:g.__testWindow,document:g.__testWindow.document});
+   let shots=0;const fire=g.tryFire;
+   g.tryFire=function(t){const n=this.bullets.length,r=fire.apply(this,arguments);
+    if(t===g.player&&this.bullets.length>n)shots++;return r;};
+   const e=(type,id,x,buttons)=>({type,pointerType:'touch',pointerId:id,button:0,buttons,
+    clientX:x,clientY:200,target:{closest:()=>null}});
+   try{
+    i.pd(e('pointerdown',11,600,1));i.pm(e('pointermove',11,640,1));
+    i.pu(e('pointerup',11,640,0));
+    assert.ok(o.pending,'aimed press must be pending');
+    i.pd(e('pointerdown',12,100,1));
+    i.pu(e('pointercancel',cancelId,cancelId===11?640:100,0));
+    const stillPending=!!o.pending;
+    g.update(1/60);
+    return {shots,stillPending,aimOwner:i.stickId.aim,moveOwner:i.stickId.move,
+     leak:i.__novaShotIntent};
+   }finally{o.detach();g.destroy();}
+  });
+ }
+ const unrelated=arm(12),matching=arm(11);
+ assert.equal(unrelated.stillPending,true,'left-stick cancel must not revoke unrelated shot');
+ assert.equal(unrelated.shots,1);
+ assert.equal(unrelated.aimOwner,-1);assert.equal(unrelated.moveOwner,-1);
+ assert.equal(matching.stillPending,false,'late cancellation from same source revokes pending shot');
+ assert.equal(matching.shots,0);
+ assert.equal(unrelated.leak,undefined);assert.equal(matching.leak,undefined);
+ console.log('DIRECT_SHOT_CANCEL_OWNERSHIP '+JSON.stringify({unrelated,matching}));
+});
