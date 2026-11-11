@@ -13,7 +13,8 @@ function scenario(cls,moveAfterRelease){
   const ev=(type,x,y,buttons)=>({type,pointerType:'mouse',pointerId:1,
    button:0,buttons,clientX:x,clientY:y,target:{closest:()=>null}});
   try{
-   i.pd(ev('pointerdown',400,200,1));
+   i.pd(ev('pointerdown',350,180,1));
+   i.pm(ev('pointermove',400,200,1));
    i.pu(ev('pointerup',400,200,0));
    assert.ok(o.pending&&o.pending.mouse,'short mouse release owns a target');
    if(moveAfterRelease)i.pm(ev('pointermove',700,500,0));
@@ -27,7 +28,8 @@ function scenario(cls,moveAfterRelease){
     x:b.x,y:b.y,vx:b.vx,vy:b.vy,angle:b.angle,
     fuse:b.fuse,range:b.range,life:b.life,ttl:b.ttl
    }));
-   return {bullets,angle:g.player.angle,fireCd:g.player.fireCd};
+   return {bullets,angle:g.player.angle,fireCd:g.player.fireCd,
+    fuseDepth:g.player.__v17FuseDepth,fuseDist:g.player.__v17FuseDist};
   }finally{o.detach();g.destroy();}
  });
 }
