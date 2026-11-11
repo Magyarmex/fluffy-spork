@@ -12,6 +12,7 @@ const {ShotOnlyFirePulse}=require('../research/shot-only-fire-pulse.cjs');
 const STEP=1000/60;
 const uniform=Array(120).fill(STEP);
 const burst=Array.from({length:5},()=>[95,95,95,...Array(9).fill((400-285)/9)]).flat();
+const longStall=Array.from({length:5},()=>[95,120,95,...Array(9).fill((400-310)/9)]).flat();
 const pulse=[
  {at:140,type:'pointerdown',x:640,buttons:1},
  {at:141,type:'pointermove',x:680,buttons:1},
@@ -126,6 +127,10 @@ test('composed Scout short touch compares bounded shot-only pulse freshness unde
  // physical DOM edges must not create duplicate shots or retain held aim.
  const gated=[0,100,200].map(age=>run(burst,4,4,age));
  const canceled=run(burst,4,4,200,'pointercancel');
+ const stalled=run(longStall,4,4,200);
+ assert.equal(stalled.volleys,0,'>100ms foreground stall must discard stale shot');
+ assert.equal(stalled.acceptedPulseShots,0,'stall reset cannot recover old intent');
+ assert.ok(stalled.droppedMs>0,'stall must be classified as deliberate dropped time');
  assert.equal(canceled.volleys,0,'pointercancel cannot manufacture a shot');
  assert.equal(canceled.acceptedPulseShots,0,'cancelled touch cannot become shot intent');
  assert.equal(canceled.sampled.length,3,'cancel must reach real Input');
@@ -137,7 +142,7 @@ test('composed Scout short touch compares bounded shot-only pulse freshness unde
  }
  assert.equal(gated[0].acceptedPulseShots,0,'zero-age gate cannot accept old intent');
  assert.ok(gated[0].rejectedStale>=1,'expired pulse must be rejected');
- console.log('COMPOSED_SHOT_ONLY_FRESHNESS '+JSON.stringify({gated,canceled,
+ console.log('COMPOSED_SHOT_ONLY_FRESHNESS '+JSON.stringify({gated,canceled,stalled,
   caveat:'constructed timing, not measured human tap frequency; no physical Android or Canvas paint'}));
  console.log('COMPOSED_EIGHT_TICK_SHORT_TOUCH '+JSON.stringify({baseline,rows,
   caveat:'constructed active burst; real Game/Input, not Chromium touch-to-photon or natural-play frequency'}));
