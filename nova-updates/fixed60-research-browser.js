@@ -80,6 +80,14 @@ class ChronologicalInput {
       // this to mouse aiming (which has separate world-target semantics),
       // or to resizes: those need their own validated policy.
       const origin=d.__novaCanvasOrigin;
+      // Browser-captured touch without trustworthy geometry must not be
+      // reclassified using a later canvas frame. Legacy direct timeline
+      // fixtures have no capture metadata and retain their existing path.
+      if(d.pointerType!=='mouse' && e.kind.startsWith('pointer') &&
+         Object.prototype.hasOwnProperty.call(d,'__novaCanvasOrigin') && !origin){
+        this.reset({quarantine:true});
+        return;
+      }
       if(origin && d.pointerType!=='mouse' && this.input.canvas &&
          typeof this.input.canvas.getBoundingClientRect==='function'){
         let rect=null;
