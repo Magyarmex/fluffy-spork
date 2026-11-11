@@ -40,7 +40,7 @@ test('direct shot intent accepts fresh wall-clock press but rejects aged and inv
   ['zero-age expired',{maxAge:0,age:1}],
   ['clock exception',{maxAge:100,age:50,clockFailure:true}],
   ['release clock exception',{maxAge:100,age:50,releaseClockFailure:true}],
-  ['clock rewind',{maxAge:100,age:-40}]
+  ['clock rewind',{maxAge:100,age:-1}]
  ]){
   const out=run({...opts,kind});
   assert.equal(out.shots,0,name);
