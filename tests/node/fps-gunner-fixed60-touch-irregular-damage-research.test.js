@@ -362,6 +362,6 @@ test('quantized 30Hz recovery budgets cross-check real damage and touch chronolo
    }
   }
  }
- assert.equal(rows.length,24);
+ assert.equal(rows.length,32);
  console.log('GUNNER_FIXED60_QUANTIZED_BUDGET_CROSSCHECK '+JSON.stringify(rows));
 });
