@@ -235,3 +235,19 @@ test('research: unreadable geometry at replay cannot invent movement or a shot',
  assert.equal(h.input.firing,false);
  assert.equal(h.timeline.quarantined,true);
 });
+
+test('research: absent capture geometry cannot be retroactively inferred at replay',()=>{
+ const h=harness();
+ h.setNow(1020);
+ const original=h.input.canvas.getBoundingClientRect;
+ h.input.canvas.getBoundingClientRect=()=>{throw Error('capture layout unavailable');};
+ assert.equal(h.capture('pointerdown',22,600,1010),true);
+ assert.equal(h.timeline.events[0].data.__novaCanvasOrigin,null);
+ h.input.canvas.getBoundingClientRect=original;
+ h.resize(1600);
+ h.timeline.consumeThrough(.02);
+ assert.equal(h.input.stickId.move,-1);
+ assert.equal(h.input.stickId.aim,-1);
+ assert.equal(h.input.firing,false);
+ assert.equal(h.timeline.quarantined,true);
+});
