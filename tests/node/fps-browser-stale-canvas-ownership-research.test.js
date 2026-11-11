@@ -43,3 +43,39 @@ test('stale quarantine preserves both accepted stick owners across canvas reloca
   assert.equal(g.input.firing,false);
  }finally{g.destroy();}
 });
+
+test('chronological replay preserves touch stick ownership and deflection after canvas translation',()=>{
+ for(const shift of [0,250,-160]){
+  const g=bootGame();
+  try{
+   let now=1000,left=0,top=0;
+   const canvas=g.input.canvas;
+   canvas.getBoundingClientRect=()=>({left,top,width:800,height:400,right:left+800,bottom:top+400});
+   const timeline=new ChronologicalInput(g.input);
+   const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
+   const e=(type,stamp,id,x,y)=>({type,timeStamp:stamp,pointerType:'touch',
+     pointerId:id,clientX:x,clientY:y,button:0,buttons:1,
+     target:{closest:()=>null}});
+   now=1020;
+   bridge.capture(e('pointerdown',1010,11,100,200));
+   bridge.capture(e('pointerdown',1011,22,600,200));
+   bridge.capture(e('pointermove',1012,11,130,200));
+   bridge.capture(e('pointermove',1013,22,650,180));
+   left=shift;top=40;
+   timeline.consumeThrough(.02);
+   assert.equal(g.input.stickId.move,11,'movement owner at shift '+shift);
+   assert.equal(g.input.stickId.aim,22,'aim owner at shift '+shift);
+   assert.equal(g.input.move.active,true);
+   assert.equal(g.input.aim.active,true);
+   assert.ok(Math.abs(g.input.move.dx-30)<1e-6);
+   assert.ok(Math.abs(g.input.aim.dx-50)<1e-6);
+   assert.ok(Math.abs(g.input.aim.dy+20)<1e-6);
+   now=1040;bridge.capture(e('pointerup',1030,22,650,180));
+   bridge.capture(e('pointerup',1031,11,130,200));
+   timeline.consumeThrough(.04);
+   assert.equal(g.input.move.active,false);
+   assert.equal(g.input.aim.active,false);
+   assert.equal(g.input.firing,false);
+  }finally{g.destroy();}
+ }
+});
