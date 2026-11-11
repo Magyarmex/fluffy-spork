@@ -166,3 +166,39 @@ test('research: active dual-stick resize revokes both owners and suppresses old 
  assert.equal(h.input.stickId.aim,33);
  assert.equal(h.input.stickId.move,-1);
 });
+
+test('composed Game: queued resize-crossing right-stick flick cannot produce a player shot',()=>{
+ process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
+ process.env.NOVA_EXPLICIT_SHOT_INTENT_RESEARCH='1';
+ const {bootGame}=require('../research/audio-rng-causal-pilot.cjs');
+ const {DirectShotIntent}=require('../research/direct-shot-intent.cjs');
+ const g=bootGame();
+ let owner;
+ try{
+  g.sfx.muted=true;g.input.autofire=false;
+  let now=1000,width=800;
+  g.input.canvas.getBoundingClientRect=()=>({left:0,top:0,width,height:400,right:width,bottom:400});
+  const timeline=new ChronologicalInput(g.input);
+  const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
+  owner=new DirectShotIntent(g,{window:g.__testWindow,document:g.__testWindow.document,
+    rebindDomListeners:false});
+  const event=(type,stamp,x)=>({type,timeStamp:stamp,pointerType:'touch',
+    pointerId:22,clientX:x,clientY:200,button:0,
+    buttons:type==='pointerup'?0:1,target:{closest:()=>null}});
+  now=1020;
+  assert.equal(bridge.capture(event('pointerdown',1010,600)),true);
+  assert.equal(bridge.capture(event('pointerup',1012,650)),true);
+  width=1600;
+  timeline.consumeThrough(.02);
+  assert.equal(g.input.stickId.move,-1);
+  assert.equal(g.input.stickId.aim,-1);
+  assert.equal(g.input.firing,false);
+  assert.equal(owner.pending,null,'no synthetic shot after resize');
+  const before=g.bullets.length;
+  g.update(1/60);
+  assert.equal(g.bullets.length,before,'no projectile born from discarded gesture');
+ }finally{
+  if(owner)owner.detach();
+  g.destroy();
+ }
+});
