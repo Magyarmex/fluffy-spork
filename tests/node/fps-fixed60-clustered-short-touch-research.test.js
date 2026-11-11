@@ -7,7 +7,8 @@ const assert=require('node:assert/strict');
 const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
 const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs');
 const {FixedStepRafOwner}=require('../research/fixed-step-raf-owner.cjs');
-function replay(intervals,maxSteps=2,backlogExtraTicks=2){
+function replay(intervals,maxSteps=2,backlogExtraTicks=2,events=[
+  {at:40,type:'pointerdown'},{at:52,type:'pointerup'}]){
  let now=1000,callback=null,fireUpdates=0;
  const input={
   firing:false,keyboard:{},move:{active:false},aim:{active:false},
@@ -24,10 +25,6 @@ function replay(intervals,maxSteps=2,backlogExtraTicks=2){
   now:()=>now,request:fn=>(callback=fn,1),cancel:()=>{callback=null},
   render:()=>{},maxSteps,backlogExtraTicks
  });
- const events=[
-  {at:40,type:'pointerdown'},
-  {at:52,type:'pointerup'}
- ];
  let elapsed=0,nextEvent=0;
  try{
   owner.start();
@@ -42,7 +39,7 @@ function replay(intervals,maxSteps=2,backlogExtraTicks=2){
    const fn=callback;assert.equal(typeof fn,'function');
    callback=null;fn(now);
   }
-  assert.ok(Math.abs(elapsed-6000)<1e-6);
+  assert.ok(Math.abs(elapsed-intervals.reduce((a,b)=>a+b,0))<1e-6);
   assert.equal(nextEvent,events.length);
   return {fireUpdates,ticks:owner.ticks,applied:timeline.applied,
    droppedMs:+owner.droppedMs.toFixed(4),
@@ -80,4 +77,28 @@ test('bounded active-jitter recovery preserves the short pulse in this scene',()
   assert.equal(candidate.ticks,baseline.ticks);
   assert.equal(candidate.fireUpdates,baseline.fireUpdates);
  }
+});
+
+// Four-step/eight-tick capacity is not a universal input-loss cure. Three
+// consecutive 95ms *active* callbacks can still skip the chronological tick
+// that contains a 12ms press, even though both DOM edges are accepted.
+test('eight-tick active 30Hz burst can still swallow a legal short touch pulse',()=>{
+ const pulse=[{at:140,type:'pointerdown'},{at:152,type:'pointerup'}];
+ const uniform=Array(120).fill(1000/60);
+ const triple=Array.from({length:5},()=>[
+  95,95,95,...Array(9).fill((400-285)/9)]).flat();
+ assert.equal(triple.length,60);
+ assert.ok(triple.every(ms=>ms>0&&ms<100));
+ const baseline=replay(uniform,4,4,pulse);
+ const candidate=replay(triple,4,4,pulse);
+ assert.equal(baseline.applied,2);
+ assert.equal(baseline.fireUpdates,1,'60Hz must sample the 12ms legal press');
+ assert.equal(candidate.applied,2,'both DOM edges must reach the timeline');
+ assert.ok(candidate.droppedMs>=0);
+ assert.ok(candidate.fireUpdates<=baseline.fireUpdates,
+  'bounded recovery must not invent extra firing from a short pulse');
+ if(candidate.droppedMs===0)assert.equal(candidate.fireUpdates,baseline.fireUpdates,
+  'if future recovery eliminates dropped ticks it must preserve the press');
+ console.log('EIGHT_TICK_SHORT_TOUCH_LIMIT '+JSON.stringify({baseline,candidate,
+  caveat:'research owner and stub input; not actual Chromium or player damage'}));
 });
