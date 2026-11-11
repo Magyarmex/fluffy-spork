@@ -42,21 +42,32 @@ test('equal-backlog 3+3 and 4+2 expose real Gunner/Carrier CPU burst costs',()=>
   assert.ok(four.peakSteps>=three.peakSteps,
    'four-step candidate must not have less observed peak work on this trace');
   assert.ok(four.updates<=120 && three.updates<=120);
+  assert.equal(three.fourStepFrameSamples,0,'3+3 must never execute four updates');
+  assert.equal(four.fourStepFrameSamples>0,four.peakSteps===4,
+   'four-update CPU samples must correspond to actual four-update callbacks');
+  if(four.fourStepFrameSamples>0)
+   assert.ok(Number.isFinite(four.fourStepFrameCpuP95Ms),
+    'four-step callbacks must have measured real composed CPU cost');
   rows.push({cls,seed,cadence,
    three:{updates:three.updates,droppedMs:three.droppedMs,
     lagMs:three.lagMs,peakSteps:three.peakSteps,
     frameCpuP95Ms:three.frameCpuP95Ms,
     frameCpuPeakMs:three.frameCpuPeakMs,
+    threeStepSamples:three.threeStepFrameSamples,
     updateCpuP95Ms:three.frameUpdateCpuP95Ms,
     renderCpuP95Ms:three.frameRenderCpuP95Ms},
    four:{updates:four.updates,droppedMs:four.droppedMs,
     lagMs:four.lagMs,peakSteps:four.peakSteps,
     frameCpuP95Ms:four.frameCpuP95Ms,
     frameCpuPeakMs:four.frameCpuPeakMs,
+    fourStepSamples:four.fourStepFrameSamples,
+    fourStepCpuP95Ms:four.fourStepFrameCpuP95Ms,
     updateCpuP95Ms:four.frameUpdateCpuP95Ms,
     renderCpuP95Ms:four.frameRenderCpuP95Ms}});
  }
  assert.equal(rows.length,8);
+ assert.ok(rows.some(r=>r.four.fourStepSamples>0),
+  'research fixture must actually measure four-update CPU bursts');
  console.log('REAL_GAME_EQUAL_BACKLOG_CPU '+JSON.stringify({
   rows,caveat:'Node Canvas-JS only; host load varies; no absolute CPU threshold or Android claim'}));
 });
