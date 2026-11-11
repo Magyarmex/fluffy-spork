@@ -218,6 +218,35 @@ class BrowserEventTimeline {
     this.activeTouchSize = null;
     this.resizeInterruptions = 0;
   }
+  interruptForResize() {
+    // A resize can happen without another pointer event. Cancel queued or
+    // already-applied touch ownership immediately, before the next RAF.
+    const pending=Array.isArray(this.timeline.events) ?
+      this.timeline.events.slice(this.timeline.index||0) : [];
+    const queued=pending.filter(e=>e.kind.startsWith('pointer') && e.data &&
+      e.data.pointerType!=='mouse');
+    if(!this.activeTouchIds.size && !queued.length)return false;
+    const input=this.timeline.input;
+    let rect=null;
+    try{
+      if(input&&input.canvas&&typeof input.canvas.getBoundingClientRect==='function')
+        rect=input.canvas.getBoundingClientRect();
+    }catch(_){/* Unreadable layout is ambiguous; cancel conservatively. */}
+    const size=rect&&Number.isFinite(rect.width)&&Number.isFinite(rect.height)?
+      {width:rect.width,height:rect.height}:null;
+    const origins=this.activeTouchSize?[this.activeTouchSize]:queued.map(e=>e.data.__novaCanvasOrigin);
+    if(size&&origins.length&&origins.every(o=>o&&o.width===size.width&&o.height===size.height))
+      return false;
+    for(const id of this.activeTouchIds)this.suppressedTouchIds.add(id);
+    for(const e of queued)if(e.kind==='pointerdown'&&e.data.pointerId!=null)
+      this.suppressedTouchIds.add(e.data.pointerId);
+    this.activeTouchIds.clear();
+    this.activeTouchSize=null;
+    this.pendingStaleTouchIds.clear();
+    this.timeline.reset();
+    this.resizeInterruptions++;
+    return true;
+  }
   takeStaleTouchResetNotice() {
     const lost = this.pendingStaleTouchIds.size > 0;
     this.pendingStaleTouchIds.clear();
@@ -483,6 +512,10 @@ class BrowserInputCapture {
         this.bridge.takeStaleTouchResetNotice();
     } };
     const hidden = () => { if (this.document.hidden) release(); };
+    const resized = () => {
+      if(this.active && typeof this.bridge.interruptForResize==='function')
+        this.bridge.interruptForResize();
+    };
     const spec = [
       [canvas,'pointerdown',capture],
       [win,'pointermove',capture],[win,'pointerup',capture],
@@ -490,7 +523,8 @@ class BrowserInputCapture {
       [win,'keydown',capture],[win,'keyup',capture],
       [canvas,'mousedown',native('pointerdown')],
       [win,'mouseup',native('pointerup')],
-      [win,'blur',release],[doc,'visibilitychange',hidden]
+      [win,'blur',release],[win,'resize',resized],
+      [doc,'visibilitychange',hidden]
     ];
     this.timeline.reset();
     try{input.detach()}
