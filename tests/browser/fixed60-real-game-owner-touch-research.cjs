@@ -19,7 +19,7 @@ assert.ok(expectedOverlays.length>0&&new Set(expectedOverlays).size===expectedOv
  'materialized shell must declare unique canonical overlays');
 // Three-step is an opt-in test-only active-jitter policy; >100ms stalls
 // retain the original two-step safety budget.
-assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps');
+assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 steps');
 (async()=>{
  // Controlled research requires native callbacks fine enough to deliver
  // 16.67ms short gaps even on a CI host throttling ordinary RAF to 30Hz.
@@ -205,10 +205,10 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     window.__novaFixedPilot=pilot;
     // Reuse PR #888's exact-source active-only policy in the real browser.
     // This is intentionally NOT installed in production or the bundle.
-    if(window.__novaFixedMaxSteps===3){
+    if(window.__novaFixedMaxSteps>=3){
      const baseAdvance=pilot.owner.advance;
      pilot.owner.advance=function(ts){
-      this.maxSteps=Math.max(0,ts-this.lastMs)>100+1e-7?2:3;
+      this.maxSteps=Math.max(0,ts-this.lastMs)>100+1e-7?2:window.__novaFixedMaxSteps;
       return baseAdvance.call(this,ts);
      };
     }
@@ -330,6 +330,21 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
   }
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   await page.waitForFunction(()=>window.__novaFixedGame?.input?.aim?.active===false,null,{timeout:5000});
+  if(controlledGate&&maxSteps===4){
+   // A four-update catch-up after release must not resurrect the prior
+   // right-stick command or emit a player-owned ghost projectile.
+   const released=await page.evaluate(()=>({
+    start:window.__novaFixedResearch.frames.length,
+    births:window.__novaFixedResearch.births
+   }));
+   await page.waitForFunction(start=>window.__novaFixedResearch.frames
+    .slice(start).some(f=>f.steps===4&&f.rawGapMs<=100+1e-7),
+    released.start,{timeout:12000});
+   assert.equal(await page.evaluate(()=>window.__novaFixedResearch.births),released.births,
+    'four-step post-release catch-up must not ghost-fire');
+   assert.equal(await page.evaluate(()=>window.__novaFixedGame.input.aim.active),false,
+    'four-step catch-up must not reacquire released touch');
+  }
   // Opt-in research: force active (<100ms) RAF gaps in real Chromium.
   // This must exercise the actual three-update Game path, not merely allow it.
   if(process.env.NOVA_FIXED60_ACTIVE_BURST==='1'){
@@ -464,7 +479,7 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
     droppedMs:report.droppedMs,backlogDrops:report.raf.backlogDrops}));
    // The two-step control must exercise its own catch-up ceiling, while
    // the three-step candidate must demonstrate the additional update path.
-   const expectedBurst=maxSteps===3?3:2;
+   const expectedBurst=maxSteps;
    assert.ok((report.raf.stepCounts[String(expectedBurst)]||0)>0,
     'controlled Chromium presentation must exercise its configured catch-up ceiling');
    assert.ok(!Object.keys(report.raf.stepCounts).some(k=>Number(k)>maxSteps),
@@ -482,12 +497,12 @@ assert.ok([2,3].includes(maxSteps),'research Chromium only supports 2 or 3 steps
    assert.ok(Math.abs(accountedMs-report.raf.observedWallMs)<1,
     'actual RAF wall time must reconcile simulated, dropped and queued milliseconds');
   }
-  if(maxSteps===3){
+  if(maxSteps>=3){
    const frames=await page.evaluate(()=>window.__novaFixedResearch.frames.map(f=>({
     rawGapMs:f.rawGapMs,budget:f.budget,steps:f.steps
    })));
-   assert.ok(frames.every(f=>f.budget===(f.rawGapMs>100+1e-7?2:3)),
-    'three-step pilot must retain two-step budget after a foreground stall');
+   assert.ok(frames.every(f=>f.budget===(f.rawGapMs>100+1e-7?2:maxSteps)),
+    'active-only pilot must retain two-step budget after a foreground stall');
    assert.ok(frames.every(f=>f.steps<=f.budget),
     'browser pilot must not exceed its per-frame simulation budget');
   }
