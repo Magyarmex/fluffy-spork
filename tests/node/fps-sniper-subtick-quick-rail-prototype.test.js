@@ -7,10 +7,10 @@ process.env.NOVA_SNIPER_SUBTICK_QUICK_RAIL_RESEARCH='1';
 const test=require('node:test'),assert=require('node:assert/strict');
 const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 const {DirectShotIntent}=require('../research/direct-shot-intent.cjs');
-function run(cls,{cancel=false}={}){
+function run(cls,{cancel=false,cooldown=0}={}){
  return withSeed(1517800,()=>{
   const g=bootGame(),i=g.input;g.sfx.muted=true;i.autofire=false;
-  g.setClass(g.player,cls);g.player.fireCd=0;
+  g.setClass(g.player,cls);g.player.fireCd=cooldown;
   g.status='playing';g.paused=false;
   const owner=new DirectShotIntent(g,{window:g.__testWindow,
    document:g.__testWindow.document});
@@ -34,7 +34,7 @@ function run(cls,{cancel=false}={}){
 test('real composed Railgun/Prism/Singularity recover one low-charge short rail',()=>{
  const observations=[];
  for(const cls of ['railgun','prism','singularity']){
-  const row=run(cls),canceled=run(cls,{cancel:true});
+  const row=run(cls),canceled=run(cls,{cancel:true}),cooling=run(cls,{cooldown:1});
   assert.equal(row.first.length,1,cls+' must emit exactly one quick rail');
   assert.equal(row.first[0].full,false,cls+' must not grant full focus');
   assert.equal(row.first[0].charge,.05,cls+' minimum quick charge');
@@ -46,6 +46,7 @@ test('real composed Railgun/Prism/Singularity recover one low-charge short rail'
   assert.equal(row.aimActive,false);assert.equal(row.firing,false);
   assert.equal(canceled.first.length,0,cls+' canceled touch must not fire');
   assert.equal(canceled.intents,0);
+  assert.equal(cooling.first.length,0,cls+' cannot bypass weapon cooldown');
   observations.push({cls,quickCharge:row.first[0].charge,cooldown:row.cd});
  }
  console.log('SNIPER_SUBTICK_QUICK_RAIL_RESEARCH '+JSON.stringify({
