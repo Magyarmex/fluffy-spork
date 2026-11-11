@@ -80,3 +80,60 @@ test('invalid, reversed, canceled or stale physical events cannot earn Sniper ch
   }
  }
 });
+
+function target(){
+ const listeners=new Map();
+ return {
+  addEventListener(k,fn){if(!listeners.has(k))listeners.set(k,new Set());listeners.get(k).add(fn);},
+  removeEventListener(k,fn){listeners.get(k)?.delete(fn);},
+  emit(e){for(const fn of [...(listeners.get(e.type)||[])])fn(e);},
+  count(k){return listeners.get(k)?.size||0}
+ };
+}
+test('actual browser-event bridge retains both physical edges for Sniper charge',()=>{
+ const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
+ const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs');
+ const {BrowserInputCapture}=require('../research/fixed-step-browser-capture.cjs');
+ for(const cls of ['railgun','prism','singularity']){
+  const g=bootGame(),i=g.input,win=g.__testWindow,doc=win.document;
+  g.sfx.muted=true;g.sfx.startMusic=()=>{};i.autofire=false;
+  g.status='playing';g.paused=false;g.setClass(g.player,cls);
+  g.player.fireCd=0;i.detach();
+  const w=target(),d=target(),c=Object.assign(target(),{
+   getBoundingClientRect:()=>({left:0,top:0,width:800,height:600})});
+  Object.assign(win,{addEventListener:w.addEventListener,removeEventListener:w.removeEventListener});
+  Object.assign(doc,{addEventListener:d.addEventListener,removeEventListener:d.removeEventListener});
+  i.attach(c);
+  let now=1000;
+  const timeline=new ChronologicalInput(i);
+  const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
+  const capture=new BrowserInputCapture(i,c,timeline,bridge,{window:win,document:doc});
+  const direct=new DirectShotIntent(g,{window:win,document:doc,
+   rebindDomListeners:false,requireTrustedDuration:true,eventOriginMs:1000,
+   maxIntentAgeMs:100,nowMs:()=>now});
+  const send=(place,type,stamp,x,buttons)=>{
+   now=stamp;place.emit({type,timeStamp:stamp,pointerType:'touch',
+    pointerId:11,clientX:x,clientY:200,button:0,buttons,target:c,
+    preventDefault(){}});
+  };
+  try{
+   send(c,'pointerdown',1140,600,1);
+   send(w,'pointermove',1141,640,1);
+   send(w,'pointerup',1170,640,0);
+   assert.equal(i.firing,false,'capture cannot mutate input before replay');
+   timeline.consumeThrough(.180);
+   assert.ok(direct.pending,'trusted short press should survive bridge');
+   assert.ok(Math.abs(direct.pending.durationMs-30)<1e-7);
+   now=1180;g.update(1/60);
+   const rails=g.bullets.filter(b=>b.ownerId===g.player.id&&b.beam);
+   assert.equal(rails.length,cls==='prism'?2:1);
+   const expected=Math.max(.05,30/focusMs[cls]);
+   assert.ok(rails.every(b=>Math.abs(b.__novaCharge-expected)<1e-8));
+   assert.equal(direct.intents,1);
+   assert.equal(i.stickId.aim,-1);
+   assert.equal(i.firing,false);
+   assert.deepEqual([c.count('pointerdown'),w.count('pointerup')],[1,1],
+    'browser capture retains sole physical pointer ownership');
+  }finally{direct.detach();capture.detach();i.detach();g.destroy();}
+ }
+});
