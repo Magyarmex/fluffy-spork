@@ -131,3 +131,50 @@ test('redeploy rejects pending shot and releases held prior-life aim ownership',
   }finally{o.detach();g.destroy();}
  }
 });
+
+test('trusted physical DOM release age, not replay time, gates short-shot recovery',()=>{
+ function physicalAge({kind='touch',originalAt=.25,trusted=true,withOrigin=true,withMetadata=true}={}){
+  return withSeed(1517800,()=>{
+   const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
+   g.status='playing';g.paused=false;g.player.fireCd=0;
+   const clock=1300;
+   const o=new DirectShotIntent(g,{window:g.__testWindow,document:g.__testWindow.document,
+    maxIntentAgeMs:100,nowMs:()=>clock,...(withOrigin?{eventOriginMs:1000}:{})});
+   const i=g.input,fire=g.tryFire;let shots=0;
+   g.tryFire=function(t){const n=this.bullets.length,out=fire.apply(this,arguments);
+    if(t===g.player&&this.bullets.length>n)shots++;return out;};
+   const e=(type,x,buttons)=>({type,pointerType:kind,pointerId:11,button:0,buttons,
+    clientX:x,clientY:200,target:{closest:()=>null}});
+   try{
+    i.pd(e('pointerdown',600,1));i.pm(e('pointermove',640,1));
+    const up=e('pointerup',640,0);
+    if(withMetadata){up.__novaOriginalAt=originalAt;up.__novaTimestampTrusted=trusted;}
+    i.pu(up);g.update(1/60);
+    return {shots,intents:o.intents,rejected:o.rejectedStale,pending:o.pending,
+     leaked:i.__novaShotIntent,aim:i.aim.active,firing:i.firing};
+   }finally{o.detach();g.destroy();}
+  });
+ }
+ for(const kind of ['touch','mouse']){
+  const fresh=physicalAge({kind,originalAt:.25}); // physical release 1250ms, replay 1300ms
+  const stale=physicalAge({kind,originalAt:.15}); // physical release 1150ms, replay 1300ms
+  const future=physicalAge({kind,originalAt:.35});
+  const untrusted=physicalAge({kind,originalAt:.25,trusted:false});
+  const invalid=physicalAge({kind,originalAt:NaN});
+  const legacy=physicalAge({kind,originalAt:.15,withOrigin:false});
+  const direct=physicalAge({kind,withMetadata:false});
+  assert.equal(fresh.shots,1,kind+' fresh physical release fires');
+  assert.equal(stale.shots,0,kind+' stale physical release must not be refreshed at replay');
+  assert.equal(future.shots,0,kind+' future occurrence must fail closed');
+  assert.equal(untrusted.shots,0,kind+' untrusted replay metadata fails closed');
+  assert.equal(invalid.shots,0,kind+' invalid physical timestamp fails closed');
+  assert.equal(legacy.shots,1,kind+' opt-out preserves previous replay-time behavior');
+  assert.equal(direct.shots,1,kind+' direct DOM release without timeline metadata stays valid');
+  for(const rejected of [stale,future,untrusted,invalid]){
+   assert.equal(rejected.rejected,1,kind+' rejected age accounted');
+   assert.equal(rejected.pending,null,kind+' pending cleared');
+   assert.equal(rejected.leaked,undefined,kind+' no synthetic input leaked');
+   assert.equal(rejected.firing,false,kind+' physical firing remains released');
+  }
+ }
+});
