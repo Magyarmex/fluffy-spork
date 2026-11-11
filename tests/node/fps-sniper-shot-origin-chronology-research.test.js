@@ -86,3 +86,20 @@ test('research: delayed Sniper release uses later player origin; quantify proven
   }
  }
 });
+
+test('real Battlefield projectile ray can change cover side after just 2u lateral movement',()=>{
+ const g=bootGame();
+ try{
+  // Permanent wall x=[0,10], y=[-20,20]. Neither shooter position crosses
+  // the wall. This is a geometry gate, not a claim that the rail has fired.
+  g.__novaTerrain=[{id:-1,shape:'rect',x:5,y:0,w:10,h:40,
+   solid:true,destructible:false,hp:0,maxHp:0}];
+  g.__novaBattlefieldIndex=null;
+  const release=g.firstTerrainHit(-20,11.8,80,44.9,0);
+  const later=g.firstTerrainHit(-20,13.8,80,44.9,0);
+  assert.ok(release&&release.solid,
+   'release-time ray should hit permanent cover');
+  assert.equal(later,null,
+   '2u legal lateral displacement can clear the cover corner');
+ }finally{g.destroy();}
+});
