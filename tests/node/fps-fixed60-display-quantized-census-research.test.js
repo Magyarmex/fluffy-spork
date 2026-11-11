@@ -134,3 +134,39 @@ test('sub-millisecond browser-like jitter challenges display-quantized recovery'
  // Do not freeze current dropped-tick behavior as a desired golden.
  assert.ok(fourAlways>0&&fourEarly>0,'the alternatives must exercise fourth updates');
 });
+
+test('90Hz and 120Hz display slots challenge 60Hz-only recovery assumptions',()=>{
+ const reports=[];
+ for(const [refreshHz,slotsPerGroup,maxSlot] of [[90,12,8],[120,16,11]]){
+  const partitions=[];
+  for(let a=1;a<=maxSlot;a++)for(let b=1;b<=maxSlot;b++)
+   for(let c=1;c<=maxSlot;c++)for(let d=1;d<=maxSlot;d++)
+    if(a+b+c+d===slotsPerGroup)partitions.push([a,b,c,d]);
+  assert.ok(partitions.length>0);
+  let seed=0x4e4f5641;
+  const uniform=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;
+   return (seed+.5)/4294967296;};
+  const N=500;
+  let lostThree=0,lostFour=0,lostEarly=0,dropThree=0,dropFour=0,dropEarly=0;
+  let fourAlways=0,fourEarly=0;
+  for(let trial=0;trial<N;trial++){
+   const gaps=[];
+   for(let group=0;group<45;group++){
+    const slots=partitions[Math.floor(uniform()*partitions.length)];
+    for(const ticks of slots)gaps.push(ticks*1000/refreshHz);
+   }
+   assert.ok(gaps.every(x=>x>0&&x<100),'only active display gaps');
+   const a=replay(gaps,3,3),b=replay(gaps,4,2),c=replay(gaps,3,2,4);
+   lostThree+=a.droppedMs>0;lostFour+=b.droppedMs>0;
+   lostEarly+=c.droppedMs>0;
+   dropThree+=a.droppedMs;dropFour+=b.droppedMs;dropEarly+=c.droppedMs;
+   fourAlways+=b.four;fourEarly+=c.four;
+  }
+  reports.push({refreshHz,traces:N,partitions:partitions.length,
+   lossCounts:{three:lostThree,four:lostFour,earlyFourth:lostEarly},
+   meanDiscardedMs:{three:dropThree/N,four:dropFour/N,earlyFourth:dropEarly/N},
+   meanFourUpdateFrames:{alwaysFour:fourAlways/N,earlyFourth:fourEarly/N}});
+ }
+ console.log('FIXED60_MULTI_REFRESH_QUANTIZED_CENSUS '+JSON.stringify({
+  reports,caveat:'uniform synthetic 90/120Hz slot partitions, not natural device measurements'}));
+});
