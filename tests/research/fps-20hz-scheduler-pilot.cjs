@@ -79,10 +79,26 @@ function frameTimes(kind){
  if(kind==='20Hz-bursts')return Array.from({length:40},(_,i)=>[65,35,54,46][i%4]);
  throw Error('unknown presentation cadence');
 }
-function run({seed=1517800,cls='tempest',cadence='20Hz-jitter',maxSteps=4,backlogExtraTicks=2,render=false,virtualClock=false,profileCpu=false,activeOnlyThree=false}={}){
+function run({seed=1517800,cls='tempest',cadence='20Hz-jitter',maxSteps=4,backlogExtraTicks=2,render=false,virtualClock=false,profileCpu=false,activeOnlyThree=false,denseHivemind=false}={}){
  return withSeed(seed,draws=>{
   const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
   g.setClass(g.player,cls);g.input.autofire=false;
+  // Opt-in nine-hunter stress fixture: use the shipping spawnDrone owner,
+  // never manufacture drone objects or bypass the Controller update path.
+  if(denseHivemind){
+   if(cls!=='hivemind')throw Error('denseHivemind requires shipping Hivemind');
+   let owned=g.drones.filter(d=>d.ownerId===g.player.id&&!d.temp);
+   if(owned.length>9)throw Error('unexpected initial Hivemind swarm size');
+   while(owned.length<9){
+    const before=g.drones.length;
+    g.spawnDrone(g.player,owned.length);
+    if(g.drones.length!==before+1)throw Error('shipping spawnDrone did not create hunter');
+    owned=g.drones.filter(d=>d.ownerId===g.player.id&&!d.temp);
+   }
+   if(owned.length!==9||owned.some(d=>d.role!=='hunter'))
+    throw Error('dense fixture requires nine real owned hunters');
+  }
+  const initialPlayerDroneCount=g.drones.filter(d=>d.ownerId===g.player.id&&!d.temp).length;
   const timeline=new ChronologicalInput(g.input);
   const bridge=new BrowserEventTimeline(timeline,{now:()=>1000,timeOrigin:1793560000000});
   let now=1000,callback=null,volleys=0,simMs=0,renderMs=0,peakSteps=0;
@@ -149,6 +165,7 @@ function run({seed=1517800,cls='tempest',cadence='20Hz-jitter',maxSteps=4,backlo
     frameCpuPeakMs:frameCpu.length?Math.max(...frameCpu):null,
     frameUpdateCpuP95Ms:percentile(frameUpdateCpu,.95),
     frameRenderCpuP95Ms:percentile(frameRenderCpu,.95),
+    denseHivemind,initialPlayerDroneCount,
     playerDroneCount:g.drones.filter(d=>g.player&&d.ownerId===g.player.id).length,
     hostileTankCount:g.tanks.filter(t=>g.player&&t!==g.player&&t.alive).length,
     neutralShapeCount:g.shapes.length,
