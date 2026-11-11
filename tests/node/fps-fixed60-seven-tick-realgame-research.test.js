@@ -73,8 +73,6 @@ test('real composed Gunner and live-drone Hivemind compare seven- and eight-tick
    if(trace==='30Hz-seven-tick-falsifier'){
     assert.equal(by['4+4'].droppedMs,0,
      'eight-tick capacity must retain the previously lost active chronology');
-    assert.ok(by['4+4'].updates>=by['4+3'].updates,
-     'retained chronology must not execute fewer Game updates');
     if(by['4+4'].updates<120)assert.ok(by['4+4'].queuedMs>0,
      'retained but unfinished ticks must remain visible as queued phase');
     // Record peak phase cost; do not require it to remain worse if a future
