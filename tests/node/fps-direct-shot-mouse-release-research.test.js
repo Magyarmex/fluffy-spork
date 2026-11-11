@@ -24,7 +24,8 @@ function scenario(cls,moveAfterRelease,moveBeforeRelease=true){
    assert.equal(i.mouseY,live.y,'restore later physical mouse Y');
    assert.equal(i.__novaShotIntent,undefined,'no leaked synthetic input');
    assert.equal(o.intents,1,'one consumed release intent');
-   const bullets=g.bullets.map(b=>({
+   // Array.from creates a host-realm array; Game lives in a separate VM realm.
+   const bullets=Array.from(g.bullets,b=>({
     x:b.x,y:b.y,vx:b.vx,vy:b.vy,angle:b.angle,
     fuse:b.fuse,range:b.range,life:b.life,ttl:b.ttl,
     cannonFuse:b.__v17FuseDist,cannonArmed:b.__v17FuseArmed
