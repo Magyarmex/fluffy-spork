@@ -163,6 +163,12 @@ jobs:
           # relax the >100ms stall fallback or touch ownership gates.
           NOVA_FIXED60_MAX_STEPS=3 NOVA_FIXED60_EXTRA_TICKS=3 NOVA_FIXED60_CONTROLLED_GATE=1 NOVA_FIXED60_INITIAL_FINGERPRINT_FILE=/tmp/nova-fixed60-initial-world.txt NOVA_FIXED60_REPORT_FILE=/tmp/nova-fixed60-three-extra.json node tests/browser/fixed60-real-game-owner-touch-research.cjs
           NOVA_FIXED60_MAX_STEPS=4 NOVA_FIXED60_EXTRA_TICKS=2 NOVA_FIXED60_CONTROLLED_GATE=1 NOVA_FIXED60_INITIAL_FINGERPRINT_FILE=/tmp/nova-fixed60-initial-world.txt NOVA_FIXED60_REPORT_FILE=/tmp/nova-fixed60-four.json node tests/browser/fixed60-real-game-owner-touch-research.cjs
+          # Seven-tick research-only arms: browser-trusted touch, real Game
+          # updates, projectile emission and release/foreground-stall safety.
+          # Independent sequential CI observations are NOT causal CPU or
+          # responsiveness comparisons; do not promote to production here.
+          NOVA_FIXED60_MAX_STEPS=3 NOVA_FIXED60_EXTRA_TICKS=4 NOVA_FIXED60_CONTROLLED_GATE=1 NOVA_FIXED60_INITIAL_FINGERPRINT_FILE=/tmp/nova-fixed60-initial-world.txt NOVA_FIXED60_REPORT_FILE=/tmp/nova-fixed60-three-seven.json node tests/browser/fixed60-real-game-owner-touch-research.cjs
+          NOVA_FIXED60_MAX_STEPS=4 NOVA_FIXED60_EXTRA_TICKS=3 NOVA_FIXED60_CONTROLLED_GATE=1 NOVA_FIXED60_INITIAL_FINGERPRINT_FILE=/tmp/nova-fixed60-initial-world.txt NOVA_FIXED60_REPORT_FILE=/tmp/nova-fixed60-four-seven.json node tests/browser/fixed60-real-game-owner-touch-research.cjs
       - name: Preserve browser screenshots
         if: always()
         uses: actions/upload-artifact@v4
