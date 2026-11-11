@@ -72,6 +72,7 @@ class ChronologicalInput {
       const d = e.data;
       const evt = {type:e.kind, __novaOriginalAt:d.__novaOriginalAt,
         __novaTimestampTrusted:d.__novaTimestampTrusted,
+        __novaPhysicalTimestampExact:d.__novaPhysicalTimestampExact,
         __novaReplayAt:e.at, __novaSampleAt:end,
         pointerId:d.pointerId, pointerType:d.pointerType,
         clientX:d.clientX, clientY:d.clientY, buttons:d.buttons,
