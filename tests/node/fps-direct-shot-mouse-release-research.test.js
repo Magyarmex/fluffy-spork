@@ -16,6 +16,8 @@ function scenario(cls,moveAfterRelease,moveBeforeRelease=true,cameraShift=false)
    i.pd(ev('pointerdown',350,180,1));
    if(moveBeforeRelease)i.pm(ev('pointermove',400,200,1));
    i.pu(ev('pointerup',400,200,0));
+   if(!moveBeforeRelease){assert.equal(i.mouseX,400,'release-only event updates physical cursor X');
+    assert.equal(i.mouseY,200,'release-only event updates physical cursor Y');}
    assert.ok(o.pending&&o.pending.mouse,'short mouse release owns a target');
    if(moveAfterRelease)i.pm(ev('pointermove',700,500,0));
    if(cameraShift){g.cam.x+=190;g.cam.y-=100;g.cam.zoom*=.72;}
@@ -78,9 +80,11 @@ test('native mouse chord release keeps the world target through camera motion',(
   const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
   const i=g.input,o=new DirectShotIntent(g,{window:g.__testWindow,document:g.__testWindow.document});
   try{
-   i.mouseActive=true;i.mouseX=400;i.mouseY=200;
+   i.mouseActive=true;i.mouseX=350;i.mouseY=180;
    const ev={button:0,clientX:400,clientY:200};
    o.nativeDown(ev);o.nativeUp(ev);
+   assert.equal(i.mouseX,400,'native mouseup refreshes cursor X');
+   assert.equal(i.mouseY,200,'native mouseup refreshes cursor Y');
    assert.ok(o.pending&&o.pending.mouse,'native mouse release captured');
    if(shift){g.cam.x+=190;g.cam.y-=100;g.cam.zoom*=.72;}
    g.update(1/60);
