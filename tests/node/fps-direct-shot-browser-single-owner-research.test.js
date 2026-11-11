@@ -168,3 +168,30 @@ test('native primary mouse chord remains chronological with replay-only shot int
   g.update(1/60);assert.equal(direct.intents,1);
  }finally{direct.detach();capture.detach();i.detach();g.destroy();}
 });
+
+test('Game.destroy under nested RAF and direct intent does not invoke a detached wrapper',()=>{
+ const {createFixedStepBrowserPilot}=require('../research/fixed-step-raf-owner.cjs');
+ const g=bootGame(),i=g.input,win=g.__testWindow,doc=win.document;
+ i.detach();const w=target(),d=target(),c=Object.assign(target(),{
+  getBoundingClientRect:()=>({left:0,top:0,width:800,height:600})});
+ Object.assign(win,{addEventListener:w.addEventListener,removeEventListener:w.removeEventListener});
+ Object.assign(doc,{addEventListener:d.addEventListener,removeEventListener:d.removeEventListener});
+ i.attach(c);
+ let now=1000;const pilot=createFixedStepBrowserPilot(g,{
+  window:win,document:doc,canvas:c,
+  clock:{now:()=>now,timeOrigin:1793560000000},
+  request:()=>1,cancel:()=>{},render:()=>{},
+  shotOnlyPulseFactory:game=>new DirectShotIntent(game,{
+   window:win,document:doc,rebindDomListeners:false})
+ });
+ pilot.start();
+ assert.doesNotThrow(()=>g.destroy(),'nested owner teardown must reach original Game.destroy');
+ assert.equal(pilot.owner.started,false);
+ assert.equal(pilot.capture.active,false);
+ assert.equal(pilot.pulse.old,null);
+ assert.equal(c.count('pointerdown'),0);
+ assert.equal(w.count('pointerup'),0);
+ assert.equal(w.count('pointercancel'),0);
+ assert.equal(w.count('mousedown'),0);
+ assert.equal(w.count('mouseup'),0);
+});
