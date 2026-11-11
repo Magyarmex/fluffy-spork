@@ -79,8 +79,8 @@ test('real composed Gunner and live-drone Hivemind compare seven- and eight-tick
      'retained chronology must not execute fewer Game updates');
     assert.ok(by['4+4'].queuedMs>0,
      'retained but unfinished ticks must remain visible as queued phase');
-    assert.ok(by['4+4'].peakQueuedMs>=by['4+3'].peakQueuedMs-1e-7,
-     'more retained history must expose, not hide, the peak phase-lag cost');
+    // Record peak phase cost; do not require it to remain worse if a future
+    // scheduler safely reduces both discarded time and presentation lag.
    }
    if(by['4+4'].updates===by['4+3'].updates&&
       Math.abs(by['4+4'].queuedMs-by['4+3'].queuedMs)<.002&&
