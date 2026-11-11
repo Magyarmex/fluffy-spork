@@ -79,3 +79,33 @@ test('chronological replay preserves touch stick ownership and deflection after 
   }finally{g.destroy();}
  }
 });
+
+test('translated canvas cannot steal a recovered right-stick flick',()=>{
+ const {DirectShotIntent}=require('../research/direct-shot-intent.cjs');
+ const g=bootGame();
+ let owner;
+ try{
+  g.sfx.muted=true;g.input.autofire=false;
+  let now=1000,left=0;
+  g.input.canvas.getBoundingClientRect=()=>({left,top:0,width:800,height:400,right:left+800,bottom:400});
+  const timeline=new ChronologicalInput(g.input);
+  const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
+  owner=new DirectShotIntent(g,{window:g.__testWindow,document:g.__testWindow.document,
+    rebindDomListeners:false});
+  const e=(type,stamp,x)=>({type,timeStamp:stamp,pointerType:'touch',
+    pointerId:22,clientX:x,clientY:200,button:0,
+    buttons:type==='pointerup'?0:1,target:{closest:()=>null}});
+  now=1020;
+  bridge.capture(e('pointerdown',1010,600));
+  bridge.capture(e('pointerup',1012,640));
+  left=500; // Without capture-frame replay this becomes left-stick movement.
+  timeline.consumeThrough(.02);
+  assert.equal(g.input.aim.active,false);
+  assert.equal(g.input.move.active,false);
+  assert.ok(owner.pending,'the original right-stick release remains a shot');
+  assert.ok(owner.pending.aim.x>.99);
+  g.update(1/60);
+  assert.equal(owner.intents,1);
+  assert.equal(g.input.firing,false);
+ }finally{if(owner)owner.detach();g.destroy();}
+});
