@@ -29,6 +29,17 @@ function frameTimes(kind){
  // Seeded, mean-30Hz active trace that distinguishes equal-capacity 3+3
  // and 4+2. Each four-frame group totals 133 1/3ms; all gaps stay <100ms.
  // Deterministic LCG/negative-log weights, not a claim about natural incidence.
+ // Constructed active 30Hz falsifier: even seven-tick capacity cannot
+ // guarantee conservation when alternating large and tiny gaps cluster.
+ // Two groups each sum to 133 1/3ms, every individual gap stays <100ms.
+ // This is a mathematical stress trace, NOT measured Android incidence.
+ if(kind==='30Hz-seven-tick-falsifier'){
+  const cycle=[22.792522365760117,8.909842912196837,
+   2.6870952012899134,98.94387285408648,
+   88.53968203907604,33.072278752933606,
+   4.150790813951247,7.5705817273724465];
+  return [...Array.from({length:7},()=>cycle).flat(),...cycle.slice(0,4)];
+ }
  if(kind==='30Hz-seeded-contrast'){
   let seed=7;
   const uniform=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;
