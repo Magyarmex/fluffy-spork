@@ -29,11 +29,13 @@ test('single DOM pointer owner, chronological short tap, and reversible teardown
  let now=1000;const timeline=new ChronologicalInput(i);
  const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
  const capture=new BrowserInputCapture(i,c,timeline,bridge,{window:win,document:doc});
- const captured=[c.count('pointerdown'),w.count('pointerup'),w.count('pointercancel')];
+ const captured=[c.count('pointerdown'),w.count('pointerup'),w.count('pointercancel'),
+  c.count('mousedown'),w.count('mouseup')];
  const direct=new DirectShotIntent(g,{window:win,document:doc,rebindDomListeners:false,
   maxIntentAgeMs:100,nowMs:()=>now,eventOriginMs:1000});
  try{
-  assert.deepEqual([c.count('pointerdown'),w.count('pointerup'),w.count('pointercancel')],captured,
+  assert.deepEqual([c.count('pointerdown'),w.count('pointerup'),w.count('pointercancel'),
+   c.count('mousedown'),w.count('mouseup')],captured,
    'direct owner must not add pointer listeners to browser capture');
   const fire=(place,type,stamp,x,buttons)=>{now=stamp;place.emit({
    type,timeStamp:stamp,pointerType:'touch',pointerId:11,
