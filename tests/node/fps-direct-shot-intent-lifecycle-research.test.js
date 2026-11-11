@@ -26,7 +26,9 @@ function arm(cls='scout',kind='touch',mode='direct',scenario='tap',seed=1517800)
    up=event('pointerup',kind,640),cancel=event('pointercancel',kind,640);
   function apply(e){if(timeline){timeline.push((e.type==='pointerdown'?.001:e.type==='pointermove'?.002:.008),e.type,e);
    return;}if(e.type==='pointerdown')i.pd(e);else if(e.type==='pointermove')i.pm(e);else i.pu(e);}
-  apply(down);if(kind!=='mouse')apply(move);
+  // Give both research owners the same observed release-time mouse target;
+  // release-only mouse coordinates are independently covered below.
+  apply(down);apply(move);
   if(scenario==='long'){if(timeline)timeline.consumeThrough(1/60);g.update(1/60);}
   apply(scenario==='cancel'?cancel:up);
   if(timeline)timeline.consumeThrough(.01);
