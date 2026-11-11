@@ -8,7 +8,7 @@ const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
 const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs');
 const {FixedStepRafOwner}=require('../research/fixed-step-raf-owner.cjs');
 function replay(intervals,maxSteps=2,backlogExtraTicks=2,events=[
-  {at:40,type:'pointerdown'},{at:52,type:'pointerup'}]){
+  {at:40,type:'pointerdown'},{at:52,type:'pointerup'}],expectedMs=6000){
  let now=1000,callback=null,fireUpdates=0;
  const input={
   firing:false,keyboard:{},move:{active:false},aim:{active:false},
@@ -39,7 +39,7 @@ function replay(intervals,maxSteps=2,backlogExtraTicks=2,events=[
    const fn=callback;assert.equal(typeof fn,'function');
    callback=null;fn(now);
   }
-  assert.ok(Math.abs(elapsed-intervals.reduce((a,b)=>a+b,0))<1e-6);
+  assert.ok(Math.abs(elapsed-expectedMs)<1e-6,'expected experiment duration');
   assert.equal(nextEvent,events.length);
   return {fireUpdates,ticks:owner.ticks,applied:timeline.applied,
    droppedMs:+owner.droppedMs.toFixed(4),
@@ -89,8 +89,8 @@ test('eight-tick active 30Hz burst can still swallow a legal short touch pulse',
   95,95,95,...Array(9).fill((400-285)/9)]).flat();
  assert.equal(triple.length,60);
  assert.ok(triple.every(ms=>ms>0&&ms<100));
- const baseline=replay(uniform,4,4,pulse);
- const candidate=replay(triple,4,4,pulse);
+ const baseline=replay(uniform,4,4,pulse,2000);
+ const candidate=replay(triple,4,4,pulse,2000);
  assert.equal(baseline.applied,2);
  assert.equal(baseline.fireUpdates,1,'60Hz must sample the 12ms legal press');
  assert.equal(candidate.applied,2,'both DOM edges must reach the timeline');
