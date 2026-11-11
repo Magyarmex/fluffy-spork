@@ -171,11 +171,13 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
       // Arming before a 65ms main-thread block is unsound: a normal
       // one-step callback can fire before the intended three-step burst.
       // The scheduler still determines whether three real updates occur.
+      let armedFour=false;
       if((profile.armShotOnThree&&window.__novaFixedMaxSteps===3&&rawGapMs>=48||
           profile.armShotOnFour&&window.__novaFixedMaxSteps===4&&rawGapMs>=65)&&
        owner&&rawGapMs<=100+1e-7&&
        window.__novaFixedGame?.input?.aim?.active){
        window.__novaFixedGame.player.fireCd=0;
+       armedFour=!!profile.armShotOnFour;
        profile.armShotOnThree=false;
         profile.armShotOnFour=false;
       }
@@ -187,7 +189,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
        const previous=frames.length?frames[frames.length-1].ts:null;
        frames.push({ts,intervalMs:previous===null?null:ts-previous,
         steps:current.ticks-beforeTicks,budget:current.maxSteps,
-        playerProjectileBirths:profile.births-beforeBirths,
+        armedFour,playerProjectileBirths:profile.births-beforeBirths,
         rawGapMs,lagMs:current.lagMs,droppedMs:current.droppedMs-beforeDropped,
         dropReason:current.droppedMs>beforeDropped?
          (rawGapMs>100.0000001?'long-stall':'backlog'):null,
@@ -346,7 +348,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     await page.waitForFunction(before=>window.__novaFixedResearch.frames.length>before,
      before,{timeout:5000});
     witnessed=await page.evaluate(start=>window.__novaFixedResearch.frames
-     .slice(start).some(f=>f.steps===4&&f.budget===4&&f.rawGapMs<=100+1e-7&&
+     .slice(start).some(f=>f.steps===4&&f.budget===4&&f.armedFour&&f.rawGapMs<=100+1e-7&&
       f.playerProjectileBirths>0),start);
    }
    const evidence=await page.evaluate(start=>({
