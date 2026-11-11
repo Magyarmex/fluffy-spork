@@ -28,6 +28,12 @@ function schedule(mode){
   [83.45,16.6,16.6,1000/7.5-83.45-16.6-16.6]).flat();
  if(mode==='quantized83_16_reversed')return Array.from({length:45},()=>
   [16.6,16.6,1000/7.5-83.4-16.6-16.6,83.4]).flat();
+ // Deliberately adversarial mean-30Hz active pattern: both bounded budgets
+ // can discard time even though every gap is strictly below 100ms.
+ if(mode==='adversarial30')return Array.from({length:45},()=>{
+  const a=6.9267489,b=95.49032479,c=30.76815672;
+  return [a,b,c,1000/7.5-a-b-c];
+ }).flat();
  throw Error('unknown frame schedule');
 }
 function touchEvents(offsetMs){
@@ -326,7 +332,7 @@ test('quantized 30Hz recovery budgets cross-check real damage and touch chronolo
   const reload=cls==='minigun'?1:3;
   for(const seed of [1517800,1517802])for(const offset of [7,12]){
    const reference=trial(seed,cls,reload,'uniform60',offset);
-   for(const mode of ['quantized83_16','quantized83_16_shifted','quantized83_16_reversed']){
+   for(const mode of ['quantized83_16','quantized83_16_shifted','quantized83_16_reversed','adversarial30']){
     const candidates=[];
     for(const [maxSteps,extra] of [[3,3],[4,2]]){
      const result=trial(seed,cls,reload,mode,offset,'research-drop',maxSteps,extra);
