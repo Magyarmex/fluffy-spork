@@ -11,8 +11,16 @@ function once(source,needle,replacement,label){
 }
 function patchEngineHtml(html){
  let result=once(html,'const aim = this.input.aimVec(mv);',
-  'const shotIntent = this.input.__novaShotIntent;\n            const aim = shotIntent && shotIntent.world ? (()=>{const dx=shotIntent.world.x-this.player.x,dy=shotIntent.world.y-this.player.y,len=Math.hypot(dx,dy);return len>5?{x:dx/len,y:dy/len}:null;})() : shotIntent && shotIntent.aim ? shotIntent.aim : this.input.aimVec(mv);',
+  'const shotIntent = this.input.__novaShotIntent;\n            const aim = shotIntent && shotIntent.aim ? shotIntent.aim : this.input.aimVec(mv);',
   'player aim');
+ result=once(result,
+  'const wx = this.cam.x + (this.input.mouseX - rect.left - this.w / 2) / this.zoom;',
+  'const wx = shotIntent && shotIntent.world ? shotIntent.world.x : this.cam.x + (this.input.mouseX - rect.left - this.w / 2) / this.zoom;',
+  'mouse world target x');
+ result=once(result,
+  'const wy = this.cam.y + (this.input.mouseY - rect.top - this.h / 2) / this.zoom;',
+  'const wy = shotIntent && shotIntent.world ? shotIntent.world.y : this.cam.y + (this.input.mouseY - rect.top - this.h / 2) / this.zoom;',
+  'mouse world target y');
  result=once(result,
   'const firing = this.input.firing || (this.input.autofire && !this.input.mouseActive && aimA !== null);',
   'const firing = this.input.firing || !!(shotIntent && shotIntent.fire === true) || (this.input.autofire && !this.input.mouseActive && aimA !== null);',
