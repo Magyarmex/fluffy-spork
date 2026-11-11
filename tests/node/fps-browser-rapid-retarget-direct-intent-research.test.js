@@ -53,7 +53,19 @@ test('browser chronological replay gives rapid retarget to the second pointer, n
   assert.ok(Math.abs(direct.pending.aim.x)<.05,'old eastward aim must not survive');
   assert.ok(direct.pending.aim.y>.9,'new downward aim must be preserved');
   assert.equal(i.stickId.aim,-1,'no physical stick may remain captured');
+  // Assert real projectile physics, not only the transient intent object.
+  const births=[];const originalTryFire=g.tryFire;
+  g.tryFire=function(tank){
+   const before=this.bullets.length;
+   const out=originalTryFire.apply(this,arguments);
+   if(tank===g.player)births.push(...this.bullets.slice(before).map(b=>({vx:b.vx,vy:b.vy})));
+   return out;
+  };
+  g.player.fireCd=0;
   g.update(1/60);
+  assert.equal(births.length,1,'latest short gesture creates exactly one real projectile');
+  assert.ok(births[0].vy>0&&Math.abs(births[0].vy)>Math.abs(births[0].vx),
+   'real projectile must follow the newer downward aim, not stale eastward aim');
   assert.equal(direct.intents,1,'only one intended shot can be consumed');
   assert.equal(i.firing,false);
   assert.equal(i.aim.active,false);
