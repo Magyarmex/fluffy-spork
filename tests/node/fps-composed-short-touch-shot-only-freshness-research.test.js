@@ -18,7 +18,7 @@ const pulse=[
  {at:141,type:'pointermove',x:680,buttons:1},
  {at:152,type:'pointerup',x:680,buttons:0}
 ];
-function run(intervals,maxSteps,extra,pulseAgeMs=null,endKind='pointerup',expectStallReset=false){
+function run(intervals,maxSteps,extra,pulseAgeMs=null,endKind='pointerup',expectStallReset=false,releaseAt=152){
  return withSeed(1517800,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   const p=g.player;g.sfx.muted=true;g.sfx.startMusic=()=>{};
@@ -75,7 +75,7 @@ function run(intervals,maxSteps,extra,pulseAgeMs=null,endKind='pointerup',expect
    maxSteps,backlogExtraTicks:extra,
    render:()=>{rendered.push({wall:now-1000,volleys});}
   });
-  const events=pulse.map((e,i)=>i===2?{...e,type:endKind}:e);
+  const events=pulse.map((e,i)=>i===2?{...e,type:endKind,at:releaseAt}:e);
   let elapsed=0,next=0;
   try{
    owner.start();
@@ -131,6 +131,13 @@ test('composed Scout short touch compares bounded shot-only pulse freshness unde
  // These are research alternatives, not production behavior. The same
  // physical DOM edges must not create duplicate shots or retain held aim.
  const gated=[0,100,200].map(age=>run(burst,4,4,age));
+ const thirtyMs={baseline43:run(burst,4,3,null,'pointerup',false,170),
+  baseline44:run(burst,4,4,null,'pointerup',false,170),
+  gated100:run(burst,4,4,100,'pointerup',false,170),
+  gated200:run(burst,4,4,200,'pointerup',false,170)};
+ assert.equal(thirtyMs.baseline43.volleys,1,'4+3 samples a 30ms press');
+ assert.equal(thirtyMs.baseline44.volleys,0,'4+4 skips the 30ms press');
+ assert.ok(thirtyMs.gated200.volleys<=1,'bounded recovery cannot duplicate a 30ms press');
  const canceled=run(burst,4,4,200,'pointercancel');
  const stalled=run(longStall,4,4,200,'pointerup',true);
  assert.equal(stalled.volleys,0,'>100ms foreground stall must discard stale shot');
@@ -147,7 +154,7 @@ test('composed Scout short touch compares bounded shot-only pulse freshness unde
  }
  assert.equal(gated[0].acceptedPulseShots,0,'zero-age gate cannot accept old intent');
  assert.ok(gated[0].rejectedStale>=1,'expired pulse must be rejected');
- console.log('COMPOSED_SHOT_ONLY_FRESHNESS '+JSON.stringify({gated,canceled,stalled,
+ console.log('COMPOSED_SHOT_ONLY_FRESHNESS '+JSON.stringify({gated,thirtyMs,canceled,stalled,
   caveat:'constructed timing, not measured human tap frequency; no physical Android or Canvas paint'}));
  console.log('COMPOSED_EIGHT_TICK_SHORT_TOUCH '+JSON.stringify({baseline,rows,
   caveat:'constructed active burst; real Game/Input, not Chromium touch-to-photon or natural-play frequency'}));
