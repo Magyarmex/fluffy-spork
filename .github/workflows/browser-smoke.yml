@@ -169,6 +169,10 @@ jobs:
           # responsiveness comparisons; do not promote to production here.
           NOVA_FIXED60_MAX_STEPS=3 NOVA_FIXED60_EXTRA_TICKS=4 NOVA_FIXED60_CONTROLLED_GATE=1 NOVA_FIXED60_INITIAL_FINGERPRINT_FILE=/tmp/nova-fixed60-initial-world.txt NOVA_FIXED60_REPORT_FILE=/tmp/nova-fixed60-three-seven.json node tests/browser/fixed60-real-game-owner-touch-research.cjs
           NOVA_FIXED60_MAX_STEPS=4 NOVA_FIXED60_EXTRA_TICKS=3 NOVA_FIXED60_CONTROLLED_GATE=1 NOVA_FIXED60_INITIAL_FINGERPRINT_FILE=/tmp/nova-fixed60-initial-world.txt NOVA_FIXED60_REPORT_FILE=/tmp/nova-fixed60-four-seven.json node tests/browser/fixed60-real-game-owner-touch-research.cjs
+          # Eight-tick research arm: same real Chromium/Game touch and lifecycle
+          # gates, but with one more retained tick. This is a safety witness,
+          # not proof of lower latency or a production scheduler promotion.
+          NOVA_FIXED60_MAX_STEPS=4 NOVA_FIXED60_EXTRA_TICKS=4 NOVA_FIXED60_CONTROLLED_GATE=1 NOVA_FIXED60_INITIAL_FINGERPRINT_FILE=/tmp/nova-fixed60-initial-world.txt NOVA_FIXED60_REPORT_FILE=/tmp/nova-fixed60-four-eight.json node tests/browser/fixed60-real-game-owner-touch-research.cjs
       - name: Preserve browser screenshots
         if: always()
         uses: actions/upload-artifact@v4
