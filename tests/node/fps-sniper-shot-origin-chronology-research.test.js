@@ -60,24 +60,27 @@ function run(cls,offset){
 }
 test('research: delayed Sniper release uses later player origin; quantify provenance gap',()=>{
  for(const cls of ['railgun','prism','singularity']){
-  const base=run(cls,0),shifted=run(cls,120);
-  assert.equal(base.rails.length,shifted.rails.length);
-  for(let n=0;n<base.rails.length;n++){
-   const a=base.rails[n],b=shifted.rails[n];
-   assert.ok(Math.abs(a.charge-b.charge)<1e-8,
-    'physical charge must not depend on player displacement');
-   assert.equal(a.full,false);assert.equal(b.full,false);
-   assert.ok(Math.abs((b.x-a.x)-120)<2,
-    'projectile origin should expose later simulation displacement');
-   assert.ok(Math.abs(b.y-a.y)<2,
-    'lateral controlled displacement should not change barrel Y');
+  const base=run(cls,0);
+  for(const offset of [10,30,120]){
+   const shifted=run(cls,offset);
+   assert.equal(base.rails.length,shifted.rails.length);
+   for(let n=0;n<base.rails.length;n++){
+    const a=base.rails[n],b=shifted.rails[n];
+    assert.ok(Math.abs(a.charge-b.charge)<1e-8,
+     'physical charge must not depend on player displacement');
+    assert.equal(a.full,false);assert.equal(b.full,false);
+    assert.ok(Math.abs((b.x-a.x)-offset)<2,
+     'projectile origin should expose later simulation displacement');
+    assert.ok(Math.abs(b.y-a.y)<2,
+     'lateral controlled displacement should not change barrel Y');
+   }
+   console.log('SNIPER_SHOT_ORIGIN_CHRONOLOGY '+JSON.stringify({
+    cls,offset,releaseX:base.releaseX,baseUpdateX:base.updateX,
+    shiftedUpdateX:shifted.updateX,
+    originDeltaX:shifted.rails[0].x-base.rails[0].x,
+    charge:base.rails[0].charge,
+    caveat:'constructed displacement between physical release and next simulation; not natural movement, terrain or browser latency'
+   }));
   }
-  console.log('SNIPER_SHOT_ORIGIN_CHRONOLOGY '+JSON.stringify({
-   cls,releaseX:base.releaseX,baseUpdateX:base.updateX,
-   shiftedUpdateX:shifted.updateX,
-   originDeltaX:shifted.rails[0].x-base.rails[0].x,
-   charge:base.rails[0].charge,
-   caveat:'constructed displacement between physical release and next simulation; not natural movement, terrain or browser latency'
-  }));
  }
 });
