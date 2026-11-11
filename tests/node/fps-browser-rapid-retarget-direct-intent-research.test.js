@@ -103,7 +103,8 @@ test('real fixed-step browser factory consumes two short gestures once at next t
   clock:{now:()=>now,timeOrigin:1793560000000},
   request:fn=>(callback=fn,1),cancel:()=>{},render:()=>{},
   shotOnlyPulseFactory:game=>new DirectShotIntent(game,{
-   window:win,document:doc,rebindDomListeners:false})
+   window:win,document:doc,rebindDomListeners:false,
+   maxIntentAgeMs:100,nowMs:()=>now,eventOriginMs:1000})
  });
  const send=(place,type,stamp,id,x,y,buttons)=>{
   now=stamp;place.emit({type,timeStamp:stamp,pointerType:'touch',
