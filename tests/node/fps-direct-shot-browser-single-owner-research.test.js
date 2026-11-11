@@ -63,3 +63,33 @@ test('invalid DOM ownership option fails closed',()=>{
   window:g.__testWindow,document:g.__testWindow.document,rebindDomListeners:'false'
  }),/DOM ownership/);}finally{g.destroy();}
 });
+
+test('real browser pilot factory composes replay-only shot owner without duplicate DOM hooks',()=>{
+ const {createFixedStepBrowserPilot}=require('../research/fixed-step-raf-owner.cjs');
+ const g=bootGame(),i=g.input,win=g.__testWindow,doc=win.document;
+ g.sfx.muted=true;i.autofire=false;
+ i.detach();const w=target(),d=target(),c=Object.assign(target(),{
+  getBoundingClientRect:()=>({left:0,top:0,width:800,height:600})});
+ Object.assign(win,{addEventListener:w.addEventListener,removeEventListener:w.removeEventListener});
+ Object.assign(doc,{addEventListener:d.addEventListener,removeEventListener:d.removeEventListener});
+ i.attach(c);
+ const baseline=[c.count('pointerdown'),w.count('pointerup'),w.count('pointercancel')];
+ let now=1000,callback;const pilot=createFixedStepBrowserPilot(g,{
+  window:win,document:doc,canvas:c,
+  clock:{now:()=>now,timeOrigin:1793560000000},
+  request:fn=>(callback=fn,1),cancel:()=>{},render:()=>{},
+  shotOnlyPulseFactory:game=>new DirectShotIntent(game,{
+   window:win,document:doc,rebindDomListeners:false})
+ });
+ try{
+  assert.deepEqual([c.count('pointerdown'),w.count('pointerup'),w.count('pointercancel')],[1,1,1]);
+  pilot.start();
+  assert.equal(typeof callback,'function');
+  now=1034;callback(now);
+  assert.ok(pilot.owner.ticks>=1,'real pilot advances composed Game');
+ }finally{
+  pilot.stop();
+  assert.deepEqual([c.count('pointerdown'),w.count('pointerup'),w.count('pointercancel')],baseline);
+  i.detach();g.destroy();
+ }
+});
