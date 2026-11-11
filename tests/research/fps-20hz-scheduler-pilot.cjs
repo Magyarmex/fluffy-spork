@@ -9,7 +9,7 @@ const {bootGame,withSeed,digest,physical}=require('./audio-rng-causal-pilot.cjs'
 const {ChronologicalInput}=require('./fixed-step-dom-input.cjs');
 const {BrowserEventTimeline}=require('./fixed-step-browser-events.cjs');
 const {FixedStepRafOwner}=require('./fixed-step-raf-owner.cjs');
-const DURATION_MS=2000;
+const DURATION_MS=2000,STEP_MS=1000/60;
 function percentile(values,p){
  if(!values.length)return null;
  const sorted=[...values].sort((a,b)=>a-b);
@@ -102,6 +102,7 @@ function run({seed=1517800,cls='tempest',cadence='20Hz-jitter',maxSteps=4,backlo
   const timeline=new ChronologicalInput(g.input);
   const bridge=new BrowserEventTimeline(timeline,{now:()=>1000,timeOrigin:1793560000000});
   let now=1000,callback=null,volleys=0,simMs=0,renderMs=0,peakSteps=0;
+  let peakQueuedMs=0,sumQueuedMs=0,queuedOverTickFrames=0;
   const frameCpu=[],frameUpdateCpu=[],frameRenderCpu=[],frameSteps=[];
   const oldFire=g.tryFire,oldUpdate=g.update;
   g.tryFire=function(t){const n=this.bullets.length;const out=oldFire.apply(this,arguments);
@@ -142,12 +143,18 @@ function run({seed=1517800,cls='tempest',cadence='20Hz-jitter',maxSteps=4,backlo
      frameRenderCpu.push(renderMs-beforeRender);
     }else frame(now);
     peakSteps=Math.max(peakSteps,owner.lastSteps);
+    // End-of-frame queued simulation is a phase-latency warning even when
+    // no ticks were discarded. This is not touch-to-photon latency.
+    peakQueuedMs=Math.max(peakQueuedMs,owner.lagMs);
+    sumQueuedMs+=owner.lagMs;
+    if(owner.lagMs>STEP_MS+1e-7)queuedOverTickFrames++;
    }
    const wallMs=durations.reduce((a,b)=>a+b,0);
    if(Math.abs(wallMs-DURATION_MS)>1e-6)throw Error('invalid experiment duration');
    return {cadence,maxSteps,activeOnlyThree,backlogExtraTicks,seed,cls,wallMs,updates:owner.ticks,
     simAtSec:owner.simAtSec,lagMs:owner.lagMs,droppedMs:owner.droppedMs,
-    volleys,peakSteps,simMs,renderMs,
+    volleys,peakSteps,simMs,renderMs,peakQueuedMs,
+    meanQueuedMs:sumQueuedMs/durations.length,queuedOverTickFrames,
     // Real Node wall-clock measurements of this composed-Game fixture only.
     // These are NOT Chromium/Android frame-time or touch latency claims.
     frameCpuSamples:frameCpu.length,
