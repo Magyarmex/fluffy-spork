@@ -39,8 +39,13 @@ function check(result,policy,cls,trace){
 test('real composed Gunner and live-drone Hivemind compare seven- and eight-tick capacity on adversarial active presentation',()=>{
  const rows=[];
  for(const trace of ['30Hz-adversarial95','30Hz-display-quantized','30Hz-seven-tick-falsifier',
-  '30Hz-double-burst','30Hz-triple-long-falsifier']){
+  '30Hz-double-burst','30Hz-triple-long-falsifier','30Hz-seven-tick-phase-shift']){
   const gaps=frameTimes(trace);
+  if(trace==='30Hz-seven-tick-phase-shift'){
+   const original=frameTimes('30Hz-seven-tick-falsifier');
+   assert.deepEqual([...gaps].sort((a,b)=>a-b),[...original].sort((a,b)=>a-b),
+    'phase-shift comparison must contain precisely the same frame gaps');
+  }
   assert.equal(gaps.length,60);
   assert.ok(gaps.every(ms=>ms>0&&ms<100),'do not mix foreground stalls with active jitter');
   assert.ok(Math.abs(gaps.reduce((a,b)=>a+b,0)-WALL_MS)<.002);
@@ -100,7 +105,7 @@ test('real composed Gunner and live-drone Hivemind compare seven- and eight-tick
    rows.push({trace,cls,seed,results});
   }
  }
- assert.equal(rows.length,20);
+ assert.equal(rows.length,24);
  console.log('REAL_GAME_BACKLOG_CAPACITY_POLICY_COMPARISON '+JSON.stringify({
   rows,caveat:'research only; Node Canvas JS not GPU/Android; sequential CPU timing is host-dependent; volley counts are not applied damage'}));
 });
