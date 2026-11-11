@@ -9,7 +9,7 @@ const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
 const {SubtickFirePulse}=require('../research/subtick-fire-pulse.cjs');
 const {ExplicitShotIntent}=require('../research/explicit-shot-intent.cjs');
 const {DirectShotIntent}=require('../research/direct-shot-intent.cjs');
-function observe(mode,{secondRelease=false,secondSide='aim'}={}){
+function observe(mode,{secondRelease=false,secondSide='aim',secondCancel=false}={}){
  return withSeed(1517800,()=>{
   const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
   g.status='playing';g.paused=false;
@@ -27,7 +27,7 @@ function observe(mode,{secondRelease=false,secondSide='aim'}={}){
   const secondMoveY=secondSide==='move'?200:240;
   t.push(.160,'pointerdown',e(12,secondX,200,1));
   t.push(.161,'pointermove',e(12,secondMoveX,secondMoveY,1));
-  if(secondRelease)t.push(.168,'pointerup',e(12,secondMoveX,secondMoveY,0));
+  if(secondRelease)t.push(.168,secondCancel?'pointercancel':'pointerup',e(12,secondMoveX,secondMoveY,0));
   let shots=0,shotDirections=[];
   const fire=g.tryFire;
   g.tryFire=function(tank){const before=this.bullets.length;
@@ -102,4 +102,13 @@ test('unrelated movement-stick touch does not cancel an earlier legitimate short
   'first eastward aim should be preserved when only the movement stick changes');
  assert.equal(direct.postIntent,undefined);
  console.log('RAPID_RETARGET_MOVEMENT_INDEPENDENCE '+JSON.stringify({baseline,direct}));
+});
+
+test('canceled replacement touch never resurrects the earlier pending shot',()=>{
+ const direct=observe('direct',{secondRelease:true,secondCancel:true});
+ assert.equal(direct.shots,0,'cancellation of replacement touch must reject both old and new intent');
+ assert.equal(direct.aimOwner,-1);
+ assert.equal(direct.afterUpdateOwner,-1);
+ assert.equal(direct.postIntent,undefined);
+ console.log('RAPID_RETARGET_CANCEL '+JSON.stringify(direct));
 });
