@@ -23,6 +23,41 @@ class DirectShotIntent {
     this.blurResetHadOwn=Object.prototype.hasOwnProperty.call(i,'__novaBlurReset');
     this.clear=()=>{if(self.down||self.pending)self.canceled++;self.down=null;self.pending=null;self.pendingAt=null;self.pendingSource=null;self.pendingPlayer=null;};
     this.hidden=()=>{if(doc.hidden)self.clear();};
+    // Capture a physical release in world space using the rendered camera,
+    // not the target zoom. The next simulation may run after a camera pan.
+    this.captureMouse=e=>{
+      const x=Number.isFinite(e.clientX)?e.clientX:i.mouseX;
+      const y=Number.isFinite(e.clientY)?e.clientY:i.mouseY;
+      let world=null;
+      if(Number.isFinite(x)&&Number.isFinite(y)&&game.cam&&i.canvas&&
+         typeof i.canvas.getBoundingClientRect==='function'){
+        const rect=i.canvas.getBoundingClientRect();
+        const z=Number(game.cam.zoom)||Number(game.zoom)||1;
+        if(Number.isFinite(z)&&z>0&&Number.isFinite(game.cam.x)&&
+           Number.isFinite(game.cam.y)&&Number.isFinite(game.w)&&
+           Number.isFinite(game.h)&&Number.isFinite(rect.left)&&
+           Number.isFinite(rect.top)){
+          const wx=game.cam.x+(x-rect.left-game.w*.5)/z;
+          const wy=game.cam.y+(y-rect.top-game.h*.5)/z;
+          if(Number.isFinite(wx)&&Number.isFinite(wy))world=Object.freeze({x:wx,y:wy});
+        }
+      }
+      return Object.freeze({x,y,world});
+    };
+    this.resolveMouse=mouse=>{
+      if(!mouse.world||!game.cam||!i.canvas||
+         typeof i.canvas.getBoundingClientRect!=='function')return mouse;
+      const rect=i.canvas.getBoundingClientRect();
+      const z=Number(game.cam.zoom)||Number(game.zoom)||1;
+      if(!Number.isFinite(z)||z<=0||!Number.isFinite(game.cam.x)||
+         !Number.isFinite(game.cam.y)||!Number.isFinite(game.w)||
+         !Number.isFinite(game.h)||!Number.isFinite(rect.left)||
+         !Number.isFinite(rect.top))return mouse;
+      const x=rect.left+game.w*.5+(mouse.world.x-game.cam.x)*z;
+      const y=rect.top+game.h*.5+(mouse.world.y-game.cam.y)*z;
+      return Number.isFinite(x)&&Number.isFinite(y)?{x,y}:mouse;
+    };
+
     i.pd=function(e){
       // New physical intent invalidates an unconsumed old one. Never replay a
       // tap after a new stick owner has taken control.
@@ -73,8 +108,7 @@ class DirectShotIntent {
         if(canceled){self.clear();return result;}
         if(eligible){self.pending=Object.freeze({fire:true,
           aim:mouse?null:Object.freeze({x:dx/len,y:dy/len}),
-          mouse:mouse?Object.freeze({x:Number.isFinite(e.clientX)?e.clientX:i.mouseX,
-            y:Number.isFinite(e.clientY)?e.clientY:i.mouseY}):null,
+          mouse:mouse?self.captureMouse(e):null,
           depth:mouse?null:Math.max(.08,Math.min(1,(len-5)/55))});
           self.pendingAt=self.maxIntentAgeMs===Infinity?null:self.stamp();
           self.pendingSource=Object.freeze({type:d.type,id:d.id});
@@ -117,7 +151,8 @@ class DirectShotIntent {
       // All current Game/overlay aim and Cannon fuse readers share these
       // coordinates. Restore immediately so the next physical input is live.
       const previousMouseX=i.mouseX,previousMouseY=i.mouseY;
-      if(intent.mouse){i.mouseX=intent.mouse.x;i.mouseY=intent.mouse.y;}
+      if(intent.mouse){const target=self.resolveMouse(intent.mouse);
+        i.mouseX=target.x;i.mouseY=target.y;}
       try{const result=self.old.update.apply(this,args);self.intents++;return result;}
       finally{i.mouseX=previousMouseX;i.mouseY=previousMouseY;delete i.__novaShotIntent;}
     };
@@ -148,8 +183,7 @@ class DirectShotIntent {
       const d=self.down;self.down=null;
       if(!d.sampled&&game.status==='playing'&&!game.paused&&!doc.hidden&&!i.__novaInputPaused&&i.mouseActive)
         {self.pending=Object.freeze({fire:true,aim:null,
-          mouse:Object.freeze({x:Number.isFinite(e.clientX)?e.clientX:i.mouseX,
-            y:Number.isFinite(e.clientY)?e.clientY:i.mouseY}),depth:null});
+          mouse:self.captureMouse(e),depth:null});
          self.pendingAt=self.maxIntentAgeMs===Infinity?null:self.stamp();
          self.pendingSource=Object.freeze({type:'mouse',id:d.id});
          self.pendingPlayer=d.player;}
