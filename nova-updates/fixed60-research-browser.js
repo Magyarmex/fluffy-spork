@@ -204,6 +204,13 @@ class BrowserEventTimeline {
     // A stale DOM event can revoke a held touch before the next RAF sees it.
     // Retain only notification evidence, never the revoked input itself.
     this.pendingStaleTouchIds = new Set();
+    // Capture-side resize interruption protects gestures already replayed
+    // before the layout changes. Replay-side checks separately protect queued
+    // gestures whose dimensions change before their first simulation tick.
+    this.activeTouchIds = new Set();
+    this.suppressedTouchIds = new Set();
+    this.activeTouchSize = null;
+    this.resizeInterruptions = 0;
   }
   takeStaleTouchResetNotice() {
     const lost = this.pendingStaleTouchIds.size > 0;
@@ -212,6 +219,49 @@ class BrowserEventTimeline {
   }
   capture(event) {
     if (!event || !KINDS.has(event.type)) throw Error('unsupported browser input event');
+    if(event.type==='blur'){
+      this.activeTouchIds.clear();
+      this.suppressedTouchIds.clear();
+      this.activeTouchSize=null;
+    }else if(event.type.startsWith('pointer') && event.pointerType!=='mouse' &&
+             event.pointerId!=null){
+      const id=event.pointerId;
+      const released=event.type==='pointerup'||event.type==='pointercancel';
+      if(this.suppressedTouchIds.has(id)){
+        if(released)this.suppressedTouchIds.delete(id);
+        return false;
+      }
+      let size=null;
+      const canvas=this.timeline.input && this.timeline.input.canvas;
+      if(canvas && typeof canvas.getBoundingClientRect==='function'){
+        try{
+          const rect=canvas.getBoundingClientRect();
+          if(rect && Number.isFinite(rect.width)&&Number.isFinite(rect.height) &&
+             rect.width>0 && rect.height>0)
+            size={width:rect.width,height:rect.height};
+        }catch(_){/* Unavailable layout is not evidence of a safe resize. */}
+      }
+      if(this.activeTouchIds.size && this.activeTouchSize &&
+         (!size || size.width!==this.activeTouchSize.width ||
+          size.height!==this.activeTouchSize.height)){
+        for(const heldId of this.activeTouchIds)this.suppressedTouchIds.add(heldId);
+        if(!released)this.suppressedTouchIds.add(id);
+        else this.suppressedTouchIds.delete(id);
+        this.activeTouchIds.clear();
+        this.activeTouchSize=null;
+        this.pendingStaleTouchIds.clear();
+        this.timeline.reset();
+        this.resizeInterruptions++;
+        return false;
+      }
+      if(event.type==='pointerdown'){
+        if(!this.activeTouchIds.size)this.activeTouchSize=size;
+        this.activeTouchIds.add(id);
+      }else if(released){
+        this.activeTouchIds.delete(id);
+        if(!this.activeTouchIds.size)this.activeTouchSize=null;
+      }
+    }
     // A subsequent real release/blur explains the cancellation, even when
     // it arrives before the next presentation frame.
     if (event.type === 'blur') this.pendingStaleTouchIds.clear();
