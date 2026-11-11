@@ -99,7 +99,22 @@ class BrowserEventTimeline {
         if(!d || d.pointerId==null || typeof d.pointerType!=='string' ||
            d.pointerType==='mouse')continue;
         if(queued.kind==='pointerdown' && !d.targetIsUI){
-          const side=d.__novaCanvasSide;
+          let side=d.__novaCanvasSide;
+          // Preserve legacy direct-timeline callers that never passed through
+          // browser capture. Do NOT reinterpret a captured but unavailable
+          // side using later geometry: that would recreate the original bug.
+          if(side!=='move'&&side!=='aim'&&
+             !Object.prototype.hasOwnProperty.call(d,'__novaCanvasSide')){
+            const canvas=input && input.canvas;
+            if(canvas && typeof canvas.getBoundingClientRect==='function'){
+              try{
+                const r=canvas.getBoundingClientRect();
+                if(r && Number.isFinite(r.left)&&Number.isFinite(r.width)&&
+                   r.width>0&&Number.isFinite(d.clientX))
+                  side=d.clientX-r.left<r.width*.45?'move':'aim';
+              }catch(_){/* Fall back to bounded unknown-pointer tracking. */}
+            }
+          }
           if(side==='move'||side==='aim'){
             if(slots[side]==null){slots[side]=d.pointerId;held.add(d.pointerId);}
           }else if(held.size<2)held.add(d.pointerId);
