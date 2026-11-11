@@ -194,9 +194,14 @@ test('composed Game: queued resize-crossing right-stick flick cannot produce a p
   assert.equal(g.input.stickId.aim,-1);
   assert.equal(g.input.firing,false);
   assert.equal(owner.pending,null,'no synthetic shot after resize');
-  const before=g.bullets.length;
+  let playerShots=0;
+  const originalFire=g.tryFire;
+  g.tryFire=function(tank){
+    if(tank===g.player)playerShots++;
+    return originalFire.apply(this,arguments);
+  };
   g.update(1/60);
-  assert.equal(g.bullets.length,before,'no projectile born from discarded gesture');
+  assert.equal(playerShots,0,'discarded gesture cannot invoke player firing');
  }finally{
   if(owner)owner.detach();
   g.destroy();
