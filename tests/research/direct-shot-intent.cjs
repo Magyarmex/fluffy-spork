@@ -222,7 +222,11 @@ class DirectShotIntent {
     };
     if(this.rebindDomListeners&&this.canvas){this.canvas.addEventListener('mousedown',this.nativeDown);
       win.addEventListener('mouseup',this.nativeUp);}
-    this.destroyWrapper=function(...args){const destroy=self.old.destroy;self.detach();return destroy.apply(this,args);};
+    // The outer RAF owner may detach this research owner before invoking the
+    // destroy wrapper it previously captured. Keep the underlying destroy
+    // reference stable rather than reading self.old after detach cleared it.
+    const underlyingDestroy=this.old.destroy;
+    this.destroyWrapper=function(...args){self.detach();return underlyingDestroy.apply(this,args);};
     game.destroy=this.destroyWrapper;
     win.addEventListener('blur',this.clear);doc.addEventListener('visibilitychange',this.hidden);
   }
