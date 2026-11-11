@@ -26,6 +26,12 @@ function frameTimes(kind){
   const a=6.9267489,b=95.49032479,c=30.76815672;
   return [a,b,c,1000/7.5-a-b-c];
  }).flat();
+ // Counterexample to treating even 4+4 as universal chronology recovery:
+ // three consecutive 95ms active frames, followed by nine short frames.
+ // Twelve frames still total 400ms (mean 30Hz), with no >100ms stall.
+ if(kind==='30Hz-triple-long-falsifier')return Array.from({length:5},()=>[
+  95,95,95,...Array(9).fill((400-3*95)/9)
+ ]).flat();
  // Two successive long but active frames, then short recovery frames.
  // This 2s mean-30Hz trace distinguishes 4+3 from 3+4 and defeats a
  // tempting 4.5-tick selective-fourth-step arithmetic shortcut.
