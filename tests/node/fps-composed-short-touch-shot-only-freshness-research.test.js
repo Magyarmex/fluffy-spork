@@ -18,7 +18,7 @@ const pulse=[
  {at:141,type:'pointermove',x:680,buttons:1},
  {at:152,type:'pointerup',x:680,buttons:0}
 ];
-function run(intervals,maxSteps,extra,pulseAgeMs=null,endKind='pointerup'){
+function run(intervals,maxSteps,extra,pulseAgeMs=null,endKind='pointerup',expectStallReset=false){
  return withSeed(1517800,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   const p=g.player;g.sfx.muted=true;g.sfx.startMusic=()=>{};
@@ -91,8 +91,13 @@ function run(intervals,maxSteps,extra,pulseAgeMs=null,endKind='pointerup'){
    }
    assert.ok(Math.abs(elapsed-2000)<.002,'equal two-second observation');
    assert.equal(next,3,'all three DOM edges delivered');
-   assert.equal(timeline.applied,3,'all three DOM edges consumed');
-   assert.equal(sampled.length,3,'real Input saw all edges');
+   if(expectStallReset){
+    assert.ok(timeline.applied<3,'foreground stall must clear queued input');
+    assert.ok(sampled.length<3,'stale edges must not reach real Input');
+   }else{
+    assert.equal(timeline.applied,3,'all three DOM edges consumed');
+    assert.equal(sampled.length,3,'real Input saw all edges');
+   }
    assert.equal(bridge.lateClamps+bridge.reorderedClamps+bridge.staleClamps,0);
    assert.equal(g.input.firing,false,'released touch must not remain firing');
    assert.equal(g.input.aim.active,false,'released touch must not remain owned');
@@ -127,7 +132,7 @@ test('composed Scout short touch compares bounded shot-only pulse freshness unde
  // physical DOM edges must not create duplicate shots or retain held aim.
  const gated=[0,100,200].map(age=>run(burst,4,4,age));
  const canceled=run(burst,4,4,200,'pointercancel');
- const stalled=run(longStall,4,4,200);
+ const stalled=run(longStall,4,4,200,'pointerup',true);
  assert.equal(stalled.volleys,0,'>100ms foreground stall must discard stale shot');
  assert.equal(stalled.acceptedPulseShots,0,'stall reset cannot recover old intent');
  assert.ok(stalled.droppedMs>0,'stall must be classified as deliberate dropped time');
