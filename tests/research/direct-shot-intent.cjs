@@ -16,7 +16,7 @@ class DirectShotIntent {
     this.game=game;this.input=game.input;this.win=win;this.doc=doc;
     this.maxIntentAgeMs=maxIntentAgeMs;this.nowMs=nowMs;this.eventOriginMs=eventOriginMs;
     this.pendingAt=null;this.pendingSource=null;this.pendingPlayer=null;this.rejectedStale=0;
-    this.stamp=()=>{try{return this.nowMs();}catch(_){return NaN;}};
+    this.stamp=()=>{try{const v=this.nowMs();return Number.isFinite(v)?v:NaN;}catch(_){return NaN;}};
     // Research timeline events carry physical occurrence time separately from
     // their later replay tick. Never refresh a stale physical release merely
     // because the browser delivered/replayed it late. Ordinary DOM events
