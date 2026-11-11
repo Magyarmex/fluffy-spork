@@ -355,7 +355,10 @@ test('research: BrowserInputCapture owns and detaches resize cancellation listen
  };
  const timeline=new ChronologicalInput(input);
  const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
- const owner=new BrowserInputCapture(input,canvas,timeline,bridge,{window:win,document:doc});
+ const game={input,destroy(){},__novaPlayerHeldFire:true,
+  player:{__novaFocusStart:900,__novaFocus:0.7,__novaFocusAngle:1,
+   __novaFocusLast:910,__novaChargeCue:true}};
+ const owner=new BrowserInputCapture(input,canvas,timeline,bridge,{window:win,document:doc,game});
  try{
   assert.equal(win.count('resize'),1);
   now=1020;
@@ -368,6 +371,11 @@ test('research: BrowserInputCapture owns and detaches resize cancellation listen
   assert.equal(input.firing,false);
   assert.equal(input.stickId.aim,-1);
   assert.equal(bridge.resizeInterruptions,1);
+  assert.equal(game.__novaPlayerHeldFire,false,'forced release must not become a rail');
+  assert.equal(game.player.__novaFocusStart,0);
+  assert.equal(game.player.__novaFocus,0);
+  assert.equal(game.player.__novaFocusAngle,null);
+  assert.equal(game.player.__novaChargeCue,false);
  }finally{owner.detach();}
  assert.equal(win.count('resize'),0,'no resize listener leak after detach');
 });
