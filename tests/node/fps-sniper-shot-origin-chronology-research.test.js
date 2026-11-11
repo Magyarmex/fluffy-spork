@@ -101,5 +101,13 @@ test('real Battlefield projectile ray can change cover side after just 2u latera
    'release-time ray should hit permanent cover');
   assert.equal(later,null,
    '2u legal lateral displacement can clear the cover corner');
+  // A zero-radius ray is not a real beam. Test nonzero swept-disc padding
+  // as a separate geometry witness: larger rounds need larger clearance.
+  for(const [pad,delta] of [[4,10],[8,15]]){
+   assert.ok(g.firstTerrainHit(-20,11.8,80,44.9,pad),
+    'release ray with radius '+pad+' is blocked');
+   assert.equal(g.firstTerrainHit(-20,11.8+delta,80,44.9,pad),null,
+    'lateral '+delta+'u can clear padded radius '+pad+' cover');
+  }
  }finally{g.destroy();}
 });
