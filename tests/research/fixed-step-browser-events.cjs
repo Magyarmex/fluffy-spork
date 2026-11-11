@@ -89,7 +89,6 @@ class BrowserEventTimeline {
       // Reconstruct accepted stick ownership, not merely pointer existence.
       // A queued first touch may be lost before its first simulation tick;
       // a same-side second touch is ignored by shipping Input.
-      let rect=null,geometryRead=false;
       const pending=Array.isArray(this.timeline.events) ?
         this.timeline.events.slice(this.timeline.index||0) : [];
       for(const queued of pending){
@@ -100,16 +99,23 @@ class BrowserEventTimeline {
         if(!d || d.pointerId==null || typeof d.pointerType!=='string' ||
            d.pointerType==='mouse')continue;
         if(queued.kind==='pointerdown' && !d.targetIsUI){
-          if(!geometryRead){
-            geometryRead=true;
+          let side=d.__novaCanvasSide;
+          // Preserve legacy direct-timeline callers that never passed through
+          // browser capture. Do NOT reinterpret a captured but unavailable
+          // side using later geometry: that would recreate the original bug.
+          if(side!=='move'&&side!=='aim'&&
+             !Object.prototype.hasOwnProperty.call(d,'__novaCanvasSide')){
             const canvas=input && input.canvas;
-            rect=canvas && typeof canvas.getBoundingClientRect==='function' ?
-              canvas.getBoundingClientRect() : null;
+            if(canvas && typeof canvas.getBoundingClientRect==='function'){
+              try{
+                const r=canvas.getBoundingClientRect();
+                if(r && Number.isFinite(r.left)&&Number.isFinite(r.width)&&
+                   r.width>0&&Number.isFinite(d.clientX))
+                  side=d.clientX-r.left<r.width*.45?'move':'aim';
+              }catch(_){/* Fall back to bounded unknown-pointer tracking. */}
+            }
           }
-          if(rect && Number.isFinite(rect.left) &&
-             Number.isFinite(rect.width) && rect.width>0 &&
-             Number.isFinite(d.clientX)){
-            const side=d.clientX-rect.left<rect.width*.45?'move':'aim';
+          if(side==='move'||side==='aim'){
             if(slots[side]==null){slots[side]=d.pointerId;held.add(d.pointerId);}
           }else if(held.size<2)held.add(d.pointerId);
         }else if(queued.kind==='pointerup'||queued.kind==='pointercancel'){
@@ -146,6 +152,22 @@ class BrowserEventTimeline {
       at = this.lastAt;
       this.reorderedClamps++;
     }
+    // A replayed touch must use the local canvas coordinates seen at DOM
+    // capture. A later layout translation must not turn aim into movement.
+    // Resizes remain a separate, deliberately unpromoted safety gate.
+    let canvasOrigin=null;
+    if(event.type.startsWith('pointer') && event.pointerType!=='mouse'){
+      const canvas=this.timeline.input && this.timeline.input.canvas;
+      if(canvas && typeof canvas.getBoundingClientRect==='function'){
+        try{
+          const r=canvas.getBoundingClientRect();
+          if(r && Number.isFinite(r.left)&&Number.isFinite(r.top)&&
+             Number.isFinite(r.width)&&Number.isFinite(r.height)&&
+             r.width>0&&r.height>0)
+            canvasOrigin={left:r.left,top:r.top,width:r.width,height:r.height};
+        }catch(_){/* Invalid layout evidence must not invent stick ownership. */}
+      }
+    }
     const target = event.target;
     const data = event.type === 'blur' ? {} : {
       __novaOriginalAt: originalAt, __novaTimestampTrusted: timestampTrusted,
@@ -160,7 +182,12 @@ class BrowserEventTimeline {
       targetTagName: target && target.tagName,
       targetEditable: !!(target && target.isContentEditable),
       targetIsUI: !!(target && typeof target.closest === 'function' &&
-        target.closest('[data-ui],[role="dialog"],[role="button"],[contenteditable="true"]'))
+        target.closest('[data-ui],[role="dialog"],[role="button"],[contenteditable="true"]')),
+      __novaCanvasOrigin:canvasOrigin,
+      // Preserve accepted stick ownership through stale-event quarantine.
+      __novaCanvasSide:event.type==='pointerdown' && canvasOrigin &&
+        Number.isFinite(event.clientX) ?
+        (event.clientX-canvasOrigin.left<canvasOrigin.width*.45?'move':'aim') : null
     };
     const accepted = this.timeline.push(at, event.type, data);
     this.lastAt = at;
