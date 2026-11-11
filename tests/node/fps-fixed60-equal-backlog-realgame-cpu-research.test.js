@@ -31,7 +31,7 @@ function witness(cls,seed,cadence,maxSteps,backlogExtraTicks){
 }
 test('equal-backlog 3+3 and 4+2 expose real Gunner/Carrier/Hivemind CPU burst costs',()=>{
  const rows=[];
- for(const cadence of ['30Hz-adversarial','30Hz-adversarial95'])
+ for(const cadence of ['30Hz-adversarial','30Hz-adversarial95','30Hz-seeded-contrast'])
  for(const cls of ['minigun','carrier','hivemind'])for(const seed of [1517800,1517802]){
   const three=witness(cls,seed,cadence,3,3);
   const four=witness(cls,seed,cadence,4,2);
@@ -65,7 +65,7 @@ test('equal-backlog 3+3 and 4+2 expose real Gunner/Carrier/Hivemind CPU burst co
     updateCpuP95Ms:four.frameUpdateCpuP95Ms,
     renderCpuP95Ms:four.frameRenderCpuP95Ms}});
  }
- assert.equal(rows.length,12);
+ assert.equal(rows.length,18);
  assert.ok(rows.some(r=>r.four.fourStepSamples>0),
   'research fixture must actually measure four-update CPU bursts');
  console.log('REAL_GAME_EQUAL_BACKLOG_CPU '+JSON.stringify({
