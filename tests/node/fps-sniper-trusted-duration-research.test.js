@@ -217,3 +217,44 @@ test('strict physical charge cannot be enabled without bounded release freshness
    maxIntentAgeMs:100,nowMs:()=>1100,requireTrustedDuration:true}),/event origin/);
  }finally{g.destroy();}
 });
+
+test('real fixed-step browser factory consumes trusted Prism press duration once',()=>{
+ const {createFixedStepBrowserPilot}=require('../research/fixed-step-raf-owner.cjs');
+ const g=bootGame(),i=g.input,win=g.__testWindow,doc=win.document;
+ g.sfx.muted=true;g.sfx.startMusic=()=>{};i.autofire=false;
+ g.status='playing';g.paused=false;g.setClass(g.player,'prism');
+ g.player.fireCd=0;i.detach();
+ const w=target(),d=target(),c=Object.assign(target(),{
+  getBoundingClientRect:()=>({left:0,top:0,width:800,height:600})});
+ Object.assign(win,{addEventListener:w.addEventListener,removeEventListener:w.removeEventListener});
+ Object.assign(doc,{addEventListener:d.addEventListener,removeEventListener:d.removeEventListener});
+ i.attach(c);
+ let now=1000,callback;
+ const pilot=createFixedStepBrowserPilot(g,{
+  window:win,document:doc,canvas:c,
+  clock:{now:()=>now,timeOrigin:1793560000000},
+  request:fn=>(callback=fn,1),cancel:()=>{},render:()=>{},
+  shotOnlyPulseFactory:game=>new DirectShotIntent(game,{
+   window:win,document:doc,rebindDomListeners:false,
+   requireTrustedDuration:true,eventOriginMs:1000,
+   maxIntentAgeMs:100,nowMs:()=>now})
+ });
+ const send=(place,type,stamp,x,buttons)=>{
+  now=stamp;place.emit({type,timeStamp:stamp,pointerType:'touch',
+   pointerId:11,clientX:x,clientY:200,button:0,buttons,target:c,preventDefault(){}});
+ };
+ try{
+  pilot.start();
+  send(c,'pointerdown',1002,600,1);
+  send(w,'pointermove',1003,640,1);
+  send(w,'pointerup',1032,640,0);
+  assert.equal(i.firing,false,'physical events are captured until simulation');
+  now=1050;callback(now);
+  assert.equal(pilot.pulse.intents,1,'exactly one recovered physical intent');
+  const rails=g.bullets.filter(b=>b.ownerId===g.player.id&&b.beam);
+  assert.equal(rails.length,2,'one legitimate Prism twin-barrel volley');
+  assert.ok(rails.every(b=>Math.abs(b.__novaCharge-.075)<1e-8));
+  assert.equal(i.firing,false);assert.equal(i.stickId.aim,-1);
+  assert.deepEqual([c.count('pointerdown'),w.count('pointerup')],[1,1]);
+ }finally{pilot.stop();i.detach();g.destroy();}
+});
