@@ -22,9 +22,9 @@ function replay(gaps,maxSteps,backlogExtraTicks,adaptiveThresholdTicks=null){
   render(){},maxSteps,backlogExtraTicks
  });
  if(adaptiveThresholdTicks!==null){
-  // Existing cheap-prior-work research hypothesis: a fourth update is
-  // allowed only when the next callback would exceed 3+2 tick capacity.
-  // This does NOT predict the current update's CPU cost.
+  // Compare two research thresholds for spending a fourth update:
+  // five ticks (prior overflow-gated hypothesis) versus four ticks
+  // (earlier recovery). Neither predicts current Game.update CPU cost.
   const advance=owner.advance;
   owner.advance=function(ts){
    const raw=Math.max(0,ts-this.lastMs);
