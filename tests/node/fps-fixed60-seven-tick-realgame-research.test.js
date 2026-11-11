@@ -33,7 +33,7 @@ function check(result,policy,cls,trace){
   Number.isFinite(result.fourStepFrameCpuP95Ms),
   'four-step callbacks require a CPU witness');
 }
-test('real composed Gunner and dense Hivemind compare 3+4 versus 4+3 on adversarial active presentation',()=>{
+test('real composed Gunner and live-drone Hivemind compare 3+4 versus 4+3 on adversarial active presentation',()=>{
  const rows=[];
  for(const trace of ['30Hz-adversarial95','30Hz-display-quantized','30Hz-seven-tick-falsifier','30Hz-double-burst']){
   const gaps=frameTimes(trace);
