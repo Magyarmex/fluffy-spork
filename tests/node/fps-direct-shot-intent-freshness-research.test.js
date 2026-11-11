@@ -161,6 +161,7 @@ test('trusted physical DOM release age, not replay time, gates short-shot recove
   const future=physicalAge({kind,originalAt:.35});
   const untrusted=physicalAge({kind,originalAt:.25,trusted:false});
   const invalid=physicalAge({kind,originalAt:NaN});
+  const ambiguousStart=physicalAge({kind,originalAt:0});
   const legacy=physicalAge({kind,originalAt:.15,withOrigin:false});
   const direct=physicalAge({kind,withMetadata:false});
   assert.equal(fresh.shots,1,kind+' fresh physical release fires');
@@ -168,9 +169,10 @@ test('trusted physical DOM release age, not replay time, gates short-shot recove
   assert.equal(future.shots,0,kind+' future occurrence must fail closed');
   assert.equal(untrusted.shots,0,kind+' untrusted replay metadata fails closed');
   assert.equal(invalid.shots,0,kind+' invalid physical timestamp fails closed');
+  assert.equal(ambiguousStart.shots,0,kind+' ambiguous bridge-start timestamp fails closed');
   assert.equal(legacy.shots,1,kind+' opt-out preserves previous replay-time behavior');
   assert.equal(direct.shots,1,kind+' direct DOM release without timeline metadata stays valid');
-  for(const rejected of [stale,future,untrusted,invalid]){
+  for(const rejected of [stale,future,untrusted,invalid,ambiguousStart]){
    assert.equal(rejected.rejected,1,kind+' rejected age accounted');
    assert.equal(rejected.pending,null,kind+' pending cleared');
    assert.equal(rejected.leaked,undefined,kind+' no synthetic input leaked');
@@ -212,12 +214,15 @@ test('actual BrowserEventTimeline provenance rejects a late replayed release',()
    }finally{o.detach();g.destroy();}
   });
  }
- const fresh=replay(1250,true),stale=replay(1150,true),legacy=replay(1150,false);
+ const fresh=replay(1250,true),stale=replay(1150,true),legacy=replay(1150,false),
+  preStart=replay(950,true);
  assert.equal(fresh.shots,1,'50ms-old physical release is still fresh');
  assert.equal(stale.shots,0,'150ms-old physical release must not gain a new replay budget');
  assert.equal(stale.rejected,1);
+ assert.equal(preStart.shots,0,'pre-start physical release must not be refreshed at bridge start');
+ assert.equal(preStart.rejected,1);
  assert.equal(legacy.shots,1,'legacy replay-clock control demonstrates the failure mode');
- for(const out of [fresh,stale,legacy]){
+ for(const out of [fresh,stale,legacy,preStart]){
   assert.equal(out.lateClamps,0,'test does not depend on timeline clamping');
   assert.equal(out.leak,undefined,'synthetic shot state cleaned');
  }
