@@ -91,3 +91,46 @@ test('display-quantized 30Hz traces distinguish extra-backlog and fourth-update 
    adaptiveFour:earlyFourFrames/N},
   caveat:'uniform synthetic partitions, not natural incidence; zero-cost updates, not Android CPU'}));
 });
+
+test('sub-millisecond browser-like jitter challenges display-quantized recovery',()=>{
+ // Preserve each 133 1/3ms group duration while redistributing at most
+ // 0.01ms among its four frames. This isolates timestamp quantization from
+ // mean FPS, total wall time, and the underlying integer display slots.
+ let groupSeed=0x4e4f5641,noiseSeed=0x1234abcd;
+ const nextGroup=()=>{groupSeed=(Math.imul(groupSeed,1664525)+1013904223)>>>0;
+  return (groupSeed+.5)/4294967296;};
+ const nextNoise=()=>{noiseSeed=(Math.imul(noiseSeed,1664525)+1013904223)>>>0;
+  return (noiseSeed+.5)/4294967296;};
+ const N=1000;
+ let lostThree=0,lostFour=0,lostEarly=0,lostLate=0;
+ let discardedThree=0,discardedFour=0,discardedEarly=0,discardedLate=0;
+ let fourAlways=0,fourEarly=0,fourLate=0;
+ for(let trial=0;trial<N;trial++){
+  const gaps=[];
+  for(let group=0;group<45;group++){
+   const slots=GROUPS[Math.floor(nextGroup()*GROUPS.length)];
+   const base=slots.map(t=>t*STEP_MS);
+   const jitter=Array.from({length:3},()=>.02*nextNoise()-.01);
+   for(let i=0;i<3;i++)base[i]+=jitter[i];
+   base[3]-=jitter.reduce((a,b)=>a+b,0);
+   assert.ok(base.every(x=>x>0&&x<100),'jitter introduced a stall');
+   gaps.push(...base);
+  }
+  const a=replay(gaps,3,3),b=replay(gaps,4,2);
+  const c=replay(gaps,3,2,4),d=replay(gaps,3,2,5);
+  lostThree+=a.droppedMs>0;lostFour+=b.droppedMs>0;
+  lostEarly+=c.droppedMs>0;lostLate+=d.droppedMs>0;
+  discardedThree+=a.droppedMs;discardedFour+=b.droppedMs;
+  discardedEarly+=c.droppedMs;discardedLate+=d.droppedMs;
+  fourAlways+=b.four;fourEarly+=c.four;fourLate+=d.four;
+ }
+ console.log('FIXED60_DISPLAY_SUBMS_JITTER_FALSIFIER '+JSON.stringify({
+  traces:N,jitterMs:.01,lostThree,lostFour,lostEarly,lostLate,
+  meanDiscardedMs:{three:discardedThree/N,four:discardedFour/N,
+   earlyFourth:discardedEarly/N,lateFourth:discardedLate/N},
+  meanFourUpdateFrames:{alwaysFour:fourAlways/N,earlyFourth:fourEarly/N,
+   lateFourth:fourLate/N},
+  caveat:'synthetic paired-group jitter, not measured device incidence; no CPU cost model'}));
+ // Do not freeze current dropped-tick behavior as a desired golden.
+ assert.ok(fourAlways>0&&fourEarly>0,'the alternatives must exercise fourth updates');
+});
