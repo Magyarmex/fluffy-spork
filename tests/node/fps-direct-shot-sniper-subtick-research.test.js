@@ -48,8 +48,8 @@ test('subtick Sniper tap cannot bank focus or manufacture a full rail on the nex
     i.pu(ev('pointerup',0,640));
     g.update(1/60);
     const afterFreshRelease=ownRails();
-    assert.ok(afterFreshRelease.length>afterNewPress.length,
-     'genuine held-to-released Sniper control must still emit a quick rail');
+    assert.ok(afterFreshRelease.some(b=>!afterNewPress.includes(b)),
+     'genuine held-to-released Sniper control must still emit a new quick rail');
     assert.ok(afterFreshRelease.every(b=>b.__novaFullRail!==true),
      'quick release cannot be promoted to full charge');
     return {cls,subtickRailBirths:afterTap.length,
