@@ -27,12 +27,22 @@ test('shipping nine-hunter Hivemind exercises seven-tick CPU recovery without in
     assert.ok(r.peakSteps<=maxSteps,'per-frame update budget');
     assert.ok(Math.abs(r.updates*STEP_MS+r.droppedMs+r.lagMs-2000)<.002,
      'simulation, discarded and queued time must account for elapsed wall time');
+    assert.ok(Number.isFinite(r.peakQueuedMs)&&r.peakQueuedMs>=r.lagMs-1e-7,
+     'peak queued simulation phase must include final backlog');
+    assert.ok(Number.isFinite(r.meanQueuedMs)&&r.meanQueuedMs>=0&&
+     r.meanQueuedMs<=r.peakQueuedMs+1e-7,
+     'mean queued simulation phase must be bounded by peak');
+    assert.ok(Number.isInteger(r.queuedOverTickFrames)&&
+     r.queuedOverTickFrames>=0&&r.queuedOverTickFrames<=60,
+     'queued-over-one-tick frame count must be bounded');
     assert.ok(Number.isFinite(r.frameCpuP95Ms)&&Number.isFinite(r.frameCpuPeakMs),
      'real composed CPU witnesses required');
     if(maxSteps===3)assert.equal(r.fourStepFrameSamples,0);
     if(r.fourStepFrameSamples>0)assert.ok(Number.isFinite(r.fourStepFrameCpuP95Ms));
     candidates.push({maxSteps,extra,updates:r.updates,droppedMs:r.droppedMs,
-     queuedMs:r.lagMs,worldHash:r.hash,volleys:r.volleys,
+     queuedMs:r.lagMs,peakQueuedMs:r.peakQueuedMs,
+     meanQueuedMs:r.meanQueuedMs,queuedOverTickFrames:r.queuedOverTickFrames,
+     worldHash:r.hash,volleys:r.volleys,
      remainingPlayerDrones:r.playerDroneCount,
      frameCpuP95Ms:r.frameCpuP95Ms,frameCpuPeakMs:r.frameCpuPeakMs,
      fourStepFrameCpuP95Ms:r.fourStepFrameCpuP95Ms,
