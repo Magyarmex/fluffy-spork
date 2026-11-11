@@ -4,7 +4,7 @@
  * A short aimed press+release is an intent for ONE next simulation update,
  * never a held physical right stick or a Controller drone command. */
 class DirectShotIntent {
-  constructor(game,{window:win,document:doc,maxIntentAgeMs=Infinity,nowMs=null,eventOriginMs=null}={}) {
+  constructor(game,{window:win,document:doc,maxIntentAgeMs=Infinity,nowMs=null,eventOriginMs=null,rebindDomListeners=true}={}) {
     if(!game||!game.input||!win||!doc||typeof game.update!=='function'||
        typeof game.setPaused!=='function'||typeof win.addEventListener!=='function'||
        typeof win.removeEventListener!=='function'||typeof doc.addEventListener!=='function'||
@@ -13,6 +13,8 @@ class DirectShotIntent {
       throw Error('invalid direct intent freshness gate');
     if(eventOriginMs!==null&&!Number.isFinite(eventOriginMs))
       throw Error('invalid direct intent event origin');
+    if(typeof rebindDomListeners!=='boolean')throw Error('invalid DOM ownership option');
+    this.rebindDomListeners=rebindDomListeners;
     this.game=game;this.input=game.input;this.win=win;this.doc=doc;
     this.maxIntentAgeMs=maxIntentAgeMs;this.nowMs=nowMs;this.eventOriginMs=eventOriginMs;
     this.pendingAt=null;this.pendingSource=null;this.pendingPlayer=null;this.rejectedStale=0;
@@ -184,11 +186,12 @@ class DirectShotIntent {
     };
     game.setPaused=function(value,...args){if(value)self.clear();return self.old.setPaused.call(this,value,...args);};
     if(typeof this.old.blurReset==='function')i.__novaBlurReset=function(...args){self.clear();return self.old.blurReset.apply(this,args);};
-    /* Input.attach registers function objects, not property lookups. A wrapper
-     * installed after Game construction must rebind those DOM listeners or it
-     * would pass direct unit tests while missing every real pointer event. */
+    /* Standalone Input.attach registers function objects, not property lookups,
+     * so the default owner must rebind DOM listeners. When BrowserInputCapture
+     * already owns DOM, opt out: ChronologicalInput invokes wrapped pd/pu on
+     * replay, and a second physical listener would bypass the timeline. */
     this.canvas=i.canvas;
-    if(this.canvas&&typeof this.canvas.removeEventListener==='function'&&
+    if(this.rebindDomListeners&&this.canvas&&typeof this.canvas.removeEventListener==='function'&&
        typeof this.canvas.addEventListener==='function'){
       this.canvas.removeEventListener('pointerdown',this.old.pd);
       this.canvas.addEventListener('pointerdown',i.pd);
@@ -217,16 +220,20 @@ class DirectShotIntent {
          self.pendingSource=Object.freeze({type:'mouse',id:d.id});
          self.pendingPlayer=d.player;}
     };
-    if(this.canvas){this.canvas.addEventListener('mousedown',this.nativeDown);
+    if(this.rebindDomListeners&&this.canvas){this.canvas.addEventListener('mousedown',this.nativeDown);
       win.addEventListener('mouseup',this.nativeUp);}
-    this.destroyWrapper=function(...args){const destroy=self.old.destroy;self.detach();return destroy.apply(this,args);};
+    // The outer RAF owner may detach this research owner before invoking the
+    // destroy wrapper it previously captured. Keep the underlying destroy
+    // reference stable rather than reading self.old after detach cleared it.
+    const underlyingDestroy=this.old.destroy;
+    this.destroyWrapper=function(...args){self.detach();return underlyingDestroy.apply(this,args);};
     game.destroy=this.destroyWrapper;
     win.addEventListener('blur',this.clear);doc.addEventListener('visibilitychange',this.hidden);
   }
   detach(){
     if(!this.old)return;
     this.clear();const o=this.old,i=this.input,g=this.game;
-    if(this.canvas){this.canvas.removeEventListener('mousedown',this.nativeDown);
+    if(this.rebindDomListeners&&this.canvas){this.canvas.removeEventListener('mousedown',this.nativeDown);
       this.win.removeEventListener('mouseup',this.nativeUp);}
     if(this.rebound){
       this.canvas.removeEventListener('pointerdown',i.pd);
