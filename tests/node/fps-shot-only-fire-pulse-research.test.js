@@ -163,3 +163,25 @@ test('composed Game redeploy rejects a queued touch shot from the prior life',()
   }finally{p.detach();g.destroy();}
  });
 });
+
+test('trusted zero-origin browser release cannot gain a fresh shot-only pulse',()=>{
+ for(const original of [0,-.001,.008]){
+  const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
+  const t=new ChronologicalInput(g.input);
+  const p=new ShotOnlyFirePulse(g,t,{maxPulseAgeMs:100,nowMs:()=>1050,startMs:1000});
+  try{
+   const edge=(type,at,x)=>t.push(at,type,{
+    pointerType:'touch',pointerId:22,clientX:x,clientY:200,
+    __novaOriginalAt:original,__novaTimestampTrusted:true
+   });
+   edge('pointerdown',.001,600);edge('pointermove',.002,640);edge('pointerup',.008,640);
+   t.consumeThrough(.009);assert.ok(p.pulse.pending);
+   g.update(1/60);
+   const valid=original>0;
+   assert.equal(p.shots,valid?1:0,'original='+original);
+   assert.equal(p.rejectedStale,valid?0:1,'original='+original);
+   assert.equal(p.pulse.pending,null);
+   assert.equal(g.input.firing,false);assert.equal(g.input.aim.active,false);
+  }finally{p.detach();g.destroy();}
+ }
+});
