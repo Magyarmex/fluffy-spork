@@ -338,7 +338,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     births:window.__novaFixedResearch.births
    }));
    await page.waitForFunction(start=>window.__novaFixedResearch.frames
-    .slice(start).some(f=>f.steps===maxSteps&&f.rawGapMs<=100+1e-7),
+    .slice(start).some(f=>f.steps===window.__novaFixedMaxSteps&&f.rawGapMs<=100+1e-7),
     released.start,{timeout:12000});
    assert.equal(await page.evaluate(()=>window.__novaFixedResearch.births),released.births,
     'max-budget post-release catch-up must not ghost-fire');
