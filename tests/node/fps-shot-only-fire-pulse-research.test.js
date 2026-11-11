@@ -163,3 +163,53 @@ test('composed Game redeploy rejects a queued touch shot from the prior life',()
   }finally{p.detach();g.destroy();}
  });
 });
+
+test('trusted zero-origin browser release cannot gain a fresh shot-only pulse',()=>{
+ for(const original of [0,-.001,.008]){
+  const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
+  const t=new ChronologicalInput(g.input);
+  const p=new ShotOnlyFirePulse(g,t,{maxPulseAgeMs:100,nowMs:()=>1050,startMs:1000});
+  try{
+   const edge=(type,at,x)=>t.push(at,type,{
+    pointerType:'touch',pointerId:22,clientX:x,clientY:200,
+    __novaOriginalAt:original,__novaTimestampTrusted:true
+   });
+   edge('pointerdown',.001,600);edge('pointermove',.002,640);edge('pointerup',.008,640);
+   t.consumeThrough(.009);assert.ok(p.pulse.pending);
+   g.update(1/60);
+   const valid=original>0;
+   assert.equal(p.shots,valid?1:0,'original='+original);
+   assert.equal(p.rejectedStale,valid?0:1,'original='+original);
+   assert.equal(p.pulse.pending,null);
+   assert.equal(g.input.firing,false);assert.equal(g.input.aim.active,false);
+  }finally{p.detach();g.destroy();}
+ }
+});
+
+test('actual browser bridge pre-start clamping cannot revive a shot-only pulse',()=>{
+ const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs');
+ const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
+ const t=new ChronologicalInput(g.input);
+ let now=1000;const bridge=new BrowserEventTimeline(t,{now:()=>now,timeOrigin:1793560000000});
+ const p=new ShotOnlyFirePulse(g,t,{maxPulseAgeMs:100,nowMs:()=>now,startMs:1000});
+ try{
+  now=1050;
+  const send=(type,stamp,x)=>bridge.capture({
+   type,timeStamp:stamp,pointerType:'touch',pointerId:22,
+   clientX:x,clientY:200,button:0,
+   buttons:type==='pointerup'?0:1,target:{tagName:'CANVAS',closest:()=>null}
+  });
+  assert.equal(send('pointerdown',990,600),true);
+  assert.equal(send('pointermove',991,640),true);
+  assert.equal(send('pointerup',992,640),true);
+  t.consumeThrough(.01);
+  assert.ok(p.pulse.pending,'pre-start events reached chronological Input');
+  assert.equal(p.pulse.pending.event.__novaOriginalAt,0);
+  assert.equal(p.pulse.pending.event.__novaTimestampTrusted,true);
+  g.update(1/60);
+  assert.equal(p.shots,0,'ambiguous pre-start event cannot fire');
+  assert.equal(p.rejectedStale,1);
+  assert.equal(p.pulse.pending,null);
+  assert.equal(g.input.firing,false);assert.equal(g.input.aim.active,false);
+ }finally{p.detach();g.destroy();}
+});
