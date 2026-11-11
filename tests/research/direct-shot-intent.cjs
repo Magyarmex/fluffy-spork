@@ -186,9 +186,10 @@ class DirectShotIntent {
     };
     game.setPaused=function(value,...args){if(value)self.clear();return self.old.setPaused.call(this,value,...args);};
     if(typeof this.old.blurReset==='function')i.__novaBlurReset=function(...args){self.clear();return self.old.blurReset.apply(this,args);};
-    /* Input.attach registers function objects, not property lookups. A wrapper
-     * installed after Game construction must rebind those DOM listeners or it
-     * would pass direct unit tests while missing every real pointer event. */
+    /* Standalone Input.attach registers function objects, not property lookups,
+     * so the default owner must rebind DOM listeners. When BrowserInputCapture
+     * already owns DOM, opt out: ChronologicalInput invokes wrapped pd/pu on
+     * replay, and a second physical listener would bypass the timeline. */
     this.canvas=i.canvas;
     if(this.rebindDomListeners&&this.canvas&&typeof this.canvas.removeEventListener==='function'&&
        typeof this.canvas.addEventListener==='function'){
