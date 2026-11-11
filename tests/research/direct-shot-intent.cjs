@@ -4,17 +4,32 @@
  * A short aimed press+release is an intent for ONE next simulation update,
  * never a held physical right stick or a Controller drone command. */
 class DirectShotIntent {
-  constructor(game,{window:win,document:doc,maxIntentAgeMs=Infinity,nowMs=null}={}) {
+  constructor(game,{window:win,document:doc,maxIntentAgeMs=Infinity,nowMs=null,eventOriginMs=null}={}) {
     if(!game||!game.input||!win||!doc||typeof game.update!=='function'||
        typeof game.setPaused!=='function'||typeof win.addEventListener!=='function'||
        typeof win.removeEventListener!=='function'||typeof doc.addEventListener!=='function'||
        typeof doc.removeEventListener!=='function')throw Error('invalid direct shot intent owner');
     if(maxIntentAgeMs!==Infinity&&(!Number.isFinite(maxIntentAgeMs)||maxIntentAgeMs<0||typeof nowMs!=='function'))
       throw Error('invalid direct intent freshness gate');
+    if(eventOriginMs!==null&&!Number.isFinite(eventOriginMs))
+      throw Error('invalid direct intent event origin');
     this.game=game;this.input=game.input;this.win=win;this.doc=doc;
-    this.maxIntentAgeMs=maxIntentAgeMs;this.nowMs=nowMs;
+    this.maxIntentAgeMs=maxIntentAgeMs;this.nowMs=nowMs;this.eventOriginMs=eventOriginMs;
     this.pendingAt=null;this.pendingSource=null;this.pendingPlayer=null;this.rejectedStale=0;
     this.stamp=()=>{try{return this.nowMs();}catch(_){return NaN;}};
+    // Research timeline events carry physical occurrence time separately from
+    // their later replay tick. Never refresh a stale physical release merely
+    // because the browser delivered/replayed it late. Ordinary DOM events
+    // without timeline metadata retain the existing delivery-clock behavior.
+    this.releaseStamp=e=>{
+      if(this.eventOriginMs!==null&&e&&Object.prototype.hasOwnProperty.call(e,'__novaOriginalAt')){
+        const at=e.__novaOriginalAt;
+        if(e.__novaTimestampTrusted!==true||!Number.isFinite(at)||at<0)return NaN;
+        const physical=this.eventOriginMs+at*1000;
+        return Number.isFinite(physical)?physical:NaN;
+      }
+      return this.stamp();
+    };
     this.down=null;this.pending=null;this.intents=0;this.canceled=0;
     const i=this.input,self=this;
     this.old={pd:i.pd,pu:i.pu,update:game.update,setPaused:game.setPaused,
@@ -117,7 +132,7 @@ class DirectShotIntent {
           aim:mouse?null:Object.freeze({x:dx/len,y:dy/len}),
           mouse:shotMouse,world:shotMouse&&shotMouse.world,
           depth:mouse?null:Math.max(.08,Math.min(1,(len-5)/55))});
-          self.pendingAt=self.maxIntentAgeMs===Infinity?null:self.stamp();
+          self.pendingAt=self.maxIntentAgeMs===Infinity?null:self.releaseStamp(e);
           self.pendingSource=Object.freeze({type:d.type,id:d.id});
           self.pendingPlayer=d.player;}
       }else if(canceled&&self.pending&&self.pendingSource&&e&&
@@ -195,7 +210,7 @@ class DirectShotIntent {
         {const shotMouse=self.captureMouse(e);
          self.pending=Object.freeze({fire:true,aim:null,
           mouse:shotMouse,world:shotMouse.world,depth:null});
-         self.pendingAt=self.maxIntentAgeMs===Infinity?null:self.stamp();
+         self.pendingAt=self.maxIntentAgeMs===Infinity?null:self.releaseStamp(e);
          self.pendingSource=Object.freeze({type:'mouse',id:d.id});
          self.pendingPlayer=d.player;}
     };
