@@ -13,6 +13,14 @@ function schedule(mode){
  if(mode==='uniform60')return Array(360).fill(1000/60);
  if(mode==='alternating40_120')return Array.from({length:180},()=>[25,1000/120]).flat();
  if(mode==='alternating120_40')return Array.from({length:180},()=>[1000/120,25]).flat();
+ // Reuse the source-verified two-second adversarial traces from #907,
+ // repeated three times to preserve the six-second real-damage fixture.
+ // All gaps remain strictly <100ms: active jitter, not foreground stalls.
+ if(mode==='sevenTickFalsifier'||mode==='doubleLongBurst'){
+  const {frameTimes}=require('../research/fps-20hz-scheduler-pilot.cjs');
+  const key=mode==='sevenTickFalsifier'?'30Hz-seven-tick-falsifier':'30Hz-double-burst';
+  return Array.from({length:3},()=>frameTimes(key)).flat();
+ }
  if(mode==='uniform30')return Array(180).fill(1000/30);
  if(mode==='alternating20_60')return Array.from({length:90},()=>[50,1000/60]).flat();
  if(mode==='alternating60_20')return Array.from({length:90},()=>[1000/60,50]).flat();
@@ -364,4 +372,44 @@ test('quantized 30Hz recovery budgets cross-check real damage and touch chronolo
  }
  assert.equal(rows.length,32);
  console.log('GUNNER_FIXED60_QUANTIZED_BUDGET_CROSSCHECK '+JSON.stringify(rows));
+});
+
+// #799/#907: do not promote recovered tick counts alone as damage parity.
+// Replay the same six seconds of browser-shaped touch, actual projectile
+// collisions and HP loss against the adversarial seven-tick schedules.
+// This is research-only; the target is a stationary damage dummy, not a
+// natural match, and render callback is not a GPU paint measurement.
+test('seven-tick recovery budgets measure real touch-driven Gunner damage under adversarial active jitter',()=>{
+ const rows=[];
+ for(const [cls,reload] of [['minigun',1],['needlestorm',3]]){
+  const reference=trial(1517800,cls,reload,'uniform60',12);
+  for(const mode of ['sevenTickFalsifier','doubleLongBurst']){
+   const candidates=[];
+   for(const [maxSteps,extra] of [[3,3],[4,2],[3,4],[4,3]]){
+    const result=trial(1517800,cls,reload,mode,12,'research-drop',maxSteps,extra);
+    assert.equal(result.applied,reference.applied,'touch edges must remain delivered');
+    assert.ok(Math.abs(result.ticks*(1000/60)+result.droppedMs+result.backlogMs-DURATION_MS)<.002,
+     'executed + discarded + queued simulation must equal elapsed time');
+    assert.ok(result.stepsByFrame.four===0||maxSteps===4,
+     'three-update owner cannot execute four updates');
+    assert.ok(Number.isFinite(result.maxRenderCallbackLagMs),
+     'missing input-to-render callback timing');
+    if(result.droppedMs===0&&result.ticks===reference.ticks){
+     assert.equal(result.damage,reference.damage,'full chronology must preserve real hit damage');
+     assert.equal(result.volleys,reference.volleys,'full chronology must preserve volleys');
+     assert.equal(result.hits,reference.hits,'full chronology must preserve collisions');
+     assert.deepEqual(result.births,reference.births,'full chronology must preserve shot births');
+     assert.equal(result.spin,reference.spin,'full chronology must preserve Gunner spin');
+     assert.equal(result.heat,reference.heat,'full chronology must preserve Gunner heat');
+    }
+    candidates.push({maxSteps,extra,ticks:result.ticks,droppedMs:result.droppedMs,
+     queuedMs:result.backlogMs,volleys:result.volleys,hits:result.hits,
+     damage:result.damage,maxRenderCallbackLagMs:result.maxRenderCallbackLagMs,
+     fourUpdateFrames:result.stepsByFrame.four});
+   }
+   rows.push({cls,mode,referenceDamage:reference.damage,candidates});
+  }
+ }
+ assert.equal(rows.length,4);
+ console.log('GUNNER_SEVEN_TICK_ADVERSARIAL_REAL_DAMAGE '+JSON.stringify(rows));
 });
