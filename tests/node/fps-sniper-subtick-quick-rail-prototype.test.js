@@ -37,9 +37,9 @@ test('real composed Railgun/Prism/Singularity recover one low-charge short rail'
   const row=run(cls),canceled=run(cls,{cancel:true}),cooling=run(cls,{cooldown:1});
   const barrels=cls==='prism'?2:1;
   assert.equal(row.first.length,barrels,cls+' must emit one normal quick volley');
-  assert.equal(row.first[0].full,false,cls+' must not grant full focus');
-  assert.equal(row.first[0].charge,.05,cls+' minimum quick charge');
-  assert.ok(row.first[0].damage>0&&row.first[0].velocity>0);
+  assert.ok(row.first.every(b=>b.full===false),cls+' must not grant full focus');
+  assert.ok(row.first.every(b=>b.charge===.05),cls+' minimum quick charge');
+  assert.ok(row.first.every(b=>b.damage>0&&b.velocity>0));
   assert.ok(row.cd>0,cls+' must pay existing cooldown');
   assert.equal(row.focus,0,cls+' must not bank focus');
   assert.equal(row.afterSecond,barrels,cls+' must not duplicate the volley');
@@ -75,7 +75,7 @@ test('research patch preserves genuine held-to-released Sniper quick-rail behavi
    const rails=g.bullets.filter(b=>b.ownerId===g.player.id&&b.beam);
    assert.equal(rails.length,cls==='prism'?2:1,
     cls+' genuine release still emits one class-specific volley');
-   assert.equal(rails[0].__novaFullRail,false);
+   assert.ok(rails.every(b=>b.__novaFullRail===false));
    assert.equal(owner.intents,0,'sampled hold must not create synthetic intent');
    assert.equal(g.player.__novaFocusStart||0,0);
   }finally{owner.detach();g.destroy();}
