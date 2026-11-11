@@ -106,9 +106,10 @@ class DirectShotIntent {
       const result=self.old.pu.call(this,e);
       if(same){self.down=null;
         if(canceled){self.clear();return result;}
-        if(eligible){self.pending=Object.freeze({fire:true,
+        if(eligible){const shotMouse=mouse?self.captureMouse(e):null;
+          self.pending=Object.freeze({fire:true,
           aim:mouse?null:Object.freeze({x:dx/len,y:dy/len}),
-          mouse:mouse?self.captureMouse(e):null,
+          mouse:shotMouse,world:shotMouse&&shotMouse.world,
           depth:mouse?null:Math.max(.08,Math.min(1,(len-5)/55))});
           self.pendingAt=self.maxIntentAgeMs===Infinity?null:self.stamp();
           self.pendingSource=Object.freeze({type:d.type,id:d.id});
@@ -182,8 +183,9 @@ class DirectShotIntent {
       if(!e||e.button!==0||!self.down||self.down.type!=='mouse')return;
       const d=self.down;self.down=null;
       if(!d.sampled&&game.status==='playing'&&!game.paused&&!doc.hidden&&!i.__novaInputPaused&&i.mouseActive)
-        {self.pending=Object.freeze({fire:true,aim:null,
-          mouse:self.captureMouse(e),depth:null});
+        {const shotMouse=self.captureMouse(e);
+         self.pending=Object.freeze({fire:true,aim:null,
+          mouse:shotMouse,world:shotMouse.world,depth:null});
          self.pendingAt=self.maxIntentAgeMs===Infinity?null:self.stamp();
          self.pendingSource=Object.freeze({type:'mouse',id:d.id});
          self.pendingPlayer=d.player;}
