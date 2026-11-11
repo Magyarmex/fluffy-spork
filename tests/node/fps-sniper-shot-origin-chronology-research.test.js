@@ -14,6 +14,18 @@ function run(cls,offset){
   g.sfx.muted=true;i.autofire=false;
   g.setClass(g.player,cls);g.player.fireCd=0;
   g.status='playing';g.paused=false;
+  // Keep the origin experiment free of unrelated collisions, AI and ecology.
+  // We still execute the actual materialized Sniper Game.update/fireRail path.
+  Object.assign(g.player,{x:0,y:0,vx:0,vy:0,angle:0,spawnShieldT:0});
+  g.tanks=[g.player];g.tankById=new Map([[g.player.id,g.player]]);
+  g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];g.orbs=[];
+  g.__novaTerrain=[];g.__novaBattlefieldIndex=null;
+  if(g.shapeById)g.shapeById.clear();
+  if(g.hash&&g.hash.clear)g.hash.clear();
+  g.shapeTimer=Infinity;g.powerupTimer=Infinity;g.eliteTimer=Infinity;
+  g.crasherTimer=Infinity;g.aiRespawns=[];
+  g.spawnShape=()=>null;g.spawnPowerup=()=>null;
+  g.spawnAITank=()=>null;g.spawnDrone=()=>null;
   const owner=new DirectShotIntent(g,{window:g.__testWindow,
    document:g.__testWindow.document,rebindDomListeners:false,
    requireTrustedDuration:true,eventOriginMs:1000,
