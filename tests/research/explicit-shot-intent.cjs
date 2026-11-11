@@ -14,14 +14,28 @@ function patchEngineHtml(html){
   'const shotIntent = this.input.__novaShotIntent;\n            const aim = shotIntent && shotIntent.aim ? shotIntent.aim : this.input.aimVec(mv);',
   'player aim');
  result=once(result,
+  'const wx = this.cam.x + (this.input.mouseX - rect.left - this.w / 2) / this.zoom;',
+  'const wx = shotIntent && shotIntent.world ? shotIntent.world.x : this.cam.x + (this.input.mouseX - rect.left - this.w / 2) / this.zoom;',
+  'mouse world target x');
+ result=once(result,
+  'const wy = this.cam.y + (this.input.mouseY - rect.top - this.h / 2) / this.zoom;',
+  'const wy = shotIntent && shotIntent.world ? shotIntent.world.y : this.cam.y + (this.input.mouseY - rect.top - this.h / 2) / this.zoom;',
+  'mouse world target y');
+ result=once(result,
   'const firing = this.input.firing || (this.input.autofire && !this.input.mouseActive && aimA !== null);',
   'const firing = this.input.firing || !!(shotIntent && shotIntent.fire === true) || (this.input.autofire && !this.input.mouseActive && aimA !== null);',
   'player fire');
  return result;
 }
+function patchController(js){
+ return once(js,
+  'var wx = projection.x + (input.mouseX - rect.left - this.w * .5) / projection.zoom;\n              var wy = projection.y + (input.mouseY - rect.top - this.h * .5) / projection.zoom;',
+  'var shotIntent = input.__novaShotIntent;\n              var wx = shotIntent && shotIntent.world ? shotIntent.world.x : projection.x + (input.mouseX - rect.left - this.w * .5) / projection.zoom;\n              var wy = shotIntent && shotIntent.world ? shotIntent.world.y : projection.y + (input.mouseY - rect.top - this.h * .5) / projection.zoom;',
+  'Controller rendered mouse correction');
+}
 function patchDisciplines(js){
  return once(js,'if(t.isPlayer){\n    var a=g.input&&g.input.aim;',
-  'if(t.isPlayer){\n    var shotIntent=g.input&&g.input.__novaShotIntent;\n    if(shotIntent&&Number.isFinite(shotIntent.depth))return clamp(shotIntent.depth,.08,1);\n    var a=g.input&&g.input.aim;',
+  'if(t.isPlayer){\n    var shotIntent=g.input&&g.input.__novaShotIntent;\n    if(shotIntent&&shotIntent.world)return clamp(Math.hypot(shotIntent.world.x-t.x,shotIntent.world.y-t.y)/Math.max(1,range),.08,1);\n    if(shotIntent&&Number.isFinite(shotIntent.depth))return clamp(shotIntent.depth,.08,1);\n    var a=g.input&&g.input.aim;',
   'Cannon depth');
 }
 class ExplicitShotIntent {
@@ -67,4 +81,4 @@ class ExplicitShotIntent {
   this.pulse=null;
  }
 }
-module.exports={patchEngineHtml,patchDisciplines,ExplicitShotIntent};
+module.exports={patchEngineHtml,patchController,patchDisciplines,ExplicitShotIntent};
