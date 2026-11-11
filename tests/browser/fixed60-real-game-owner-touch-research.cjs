@@ -330,20 +330,20 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
   }
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   await page.waitForFunction(()=>window.__novaFixedGame?.input?.aim?.active===false,null,{timeout:5000});
-  if(controlledGate&&maxSteps===4){
-   // A four-update catch-up after release must not resurrect the prior
+  if(controlledGate&&maxSteps>=3){
+   // A max-budget catch-up after release must not resurrect the prior
    // right-stick command or emit a player-owned ghost projectile.
    const released=await page.evaluate(()=>({
     start:window.__novaFixedResearch.frames.length,
     births:window.__novaFixedResearch.births
    }));
    await page.waitForFunction(start=>window.__novaFixedResearch.frames
-    .slice(start).some(f=>f.steps===4&&f.rawGapMs<=100+1e-7),
+    .slice(start).some(f=>f.steps===window.__novaFixedMaxSteps&&f.rawGapMs<=100+1e-7),
     released.start,{timeout:12000});
    assert.equal(await page.evaluate(()=>window.__novaFixedResearch.births),released.births,
-    'four-step post-release catch-up must not ghost-fire');
+    'max-budget post-release catch-up must not ghost-fire');
    assert.equal(await page.evaluate(()=>window.__novaFixedGame.input.aim.active),false,
-    'four-step catch-up must not reacquire released touch');
+    'max-budget catch-up must not reacquire released touch');
   }
   // Opt-in research: force active (<100ms) RAF gaps in real Chromium.
   // This must exercise the actual three-update Game path, not merely allow it.
@@ -410,7 +410,8 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    return {configuredMaxSteps:window.__novaFixedMaxSteps,
     controlledGate:window.__novaControlledGate,
     initialFingerprint:window.__novaFixedResearch.initialFingerprint||null,
-    maxSteps:p.owner.maxSteps,ticks:p.owner.ticks,droppedMs:p.owner.droppedMs,
+    maxSteps:p.owner.maxSteps,backlogExtraTicks:p.owner.backlogExtraTicks,
+    ticks:p.owner.ticks,droppedMs:p.owner.droppedMs,
     raf:{frames:frames.length,intervals:values(frameIntervals),controlledLongGaps,
      nativeRafSkipped:window.__novaFixedResearch.gateSkippedNativeRafs||0,
      observedWallMs,presentationHz:frameIntervals.length>0&&
@@ -461,6 +462,8 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
   assert.equal(owners.size,1,'touch gesture must retain one DOM pointer owner');
   assert.equal(report.productionRafActive,false,'never run two RAF owners');
   assert.equal(report.configuredMaxSteps,maxSteps,'requested catch-up policy must own real Game');
+  assert.equal(report.backlogExtraTicks,controlledExtra,
+   'requested backlog capacity must reach the actual Chromium Game owner');
   assert.equal(report.controlledGate,controlledGate,'research RAF gate configuration drift');
   if(controlledGate){
    assert.equal(layoutIntercepts,1,'controlled browser must seed one Battlefield overlay');
