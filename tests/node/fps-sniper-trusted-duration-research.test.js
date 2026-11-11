@@ -249,7 +249,9 @@ test('real fixed-step browser factory consumes trusted Prism press duration once
   send(w,'pointermove',1003,640,1);
   send(w,'pointerup',1032,640,0);
   assert.equal(i.firing,false,'physical events are captured until simulation');
-  now=1050;callback(now);
+  // An 80ms presentation gap drops early ticks; both physical edges must
+  // replay before the first surviving Game.update, exercising direct recovery.
+  now=1080;callback(now);
   assert.equal(pilot.pulse.intents,1,'exactly one recovered physical intent');
   const rails=g.bullets.filter(b=>b.ownerId===g.player.id&&b.beam);
   assert.equal(rails.length,2,'one legitimate Prism twin-barrel volley');
