@@ -104,3 +104,30 @@ test('unrelated movement cancellation cannot erase pending aimed shot; matching 
  assert.equal(unrelated.leak,undefined);assert.equal(matching.leak,undefined);
  console.log('DIRECT_SHOT_CANCEL_OWNERSHIP '+JSON.stringify({unrelated,matching}));
 });
+
+test('redeploy rejects pending shot and releases held prior-life aim ownership',()=>{
+ for(const phase of ['pending','held']){
+  const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
+  const i=g.input,o=new DirectShotIntent(g,{window:g.__testWindow,document:g.__testWindow.document});
+  let shots=0;const fire=g.tryFire;
+  g.tryFire=function(t){const n=this.bullets.length,r=fire.apply(this,arguments);
+   if(t===g.player&&this.bullets.length>n)shots++;return r;};
+  const e=(type,x,buttons)=>({type,pointerType:'touch',pointerId:11,button:0,buttons,
+   clientX:x,clientY:200,target:{closest:()=>null}});
+  try{
+   i.pd(e('pointerdown',600,1));i.pm(e('pointermove',640,1));
+   if(phase==='pending')i.pu(e('pointerup',640,0));
+   const original=g.player;
+   g.spawnPlayer();assert.notEqual(g.player,original);
+   g.update(1/60);
+   assert.equal(shots,0,phase+' old-life input cannot fire the replacement');
+   assert.equal(o.intents,0,phase);
+   assert.equal(o.pending,null,phase);
+   assert.equal(o.down,null,phase);
+   assert.equal(i.stickId.aim,-1,phase);
+   assert.equal(i.aim.active,false,phase);
+   assert.equal(i.firing,false,phase);
+   assert.equal(i.__novaShotIntent,undefined,phase);
+  }finally{o.detach();g.destroy();}
+ }
+});
