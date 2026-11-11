@@ -41,15 +41,19 @@ function run(cameraAtReplay){
   return result;
  }finally{owner.detach();g.destroy();}
 }
-test('research: late chronological mouse replay projects against replay camera, not physical event camera',()=>{
+test('research: observe late mouse projection drift without freezing it as desired behavior',()=>{
  const stable=run(0),moved=run(100);
  assert.equal(stable.applied,2);assert.equal(moved.applied,2);
  assert.ok(Math.abs(stable.worldX-200)<1e-8);
- assert.ok(Math.abs(moved.worldX-300)<1e-8);
- assert.ok(Math.abs(moved.worldX-stable.worldX-100)<1e-8);
+ const drift=moved.worldX-stable.worldX;
+ // Current research implementation drifts by +100; a future correct
+ // capture-time projection should instead produce zero. Neither outcome
+ // is a desired golden until browser-trusted behavior establishes the fix.
+ assert.ok(Math.abs(drift)<1e-8||Math.abs(drift-100)<1e-8,
+  'unexpected mouse target projection outside the two researched policies');
  assert.equal(stable.durationMs,moved.durationMs);
  console.log('MOUSE_LATE_REPLAY_CAMERA_RESEARCH '+JSON.stringify({
-  stable,moved,
+  stable,moved,projectionDrift:moved.worldX-stable.worldX,
   caveat:'constructed camera mutation between DOM capture and replay; no browser-trusted frequency or player damage established'
  }));
 });
