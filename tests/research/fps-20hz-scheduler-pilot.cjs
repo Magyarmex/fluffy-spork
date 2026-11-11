@@ -20,6 +20,42 @@ function frameTimes(kind){
  if(kind==='20Hz')return Array(40).fill(50);
  if(kind==='30Hz-clustered')return Array.from({length:15},()=>[55,55,1000/15-55,1000/15-55]).flat();
  if(kind==='30Hz-adversarial')return Array.from({length:15},()=>[90,5,5,100/3]).flat();
+ // Active (<100ms) schedule that defeats both equal-backlog recovery policies
+ // in the six-second real-damage fixture. Keep exact group sum at 133 1/3ms.
+ if(kind==='30Hz-adversarial95')return Array.from({length:15},()=>{
+  const a=6.9267489,b=95.49032479,c=30.76815672;
+  return [a,b,c,1000/7.5-a-b-c];
+ }).flat();
+ // Seeded, mean-30Hz active trace that distinguishes equal-capacity 3+3
+ // and 4+2. Each four-frame group totals 133 1/3ms; all gaps stay <100ms.
+ // Deterministic LCG/negative-log weights, not a claim about natural incidence.
+ if(kind==='30Hz-seeded-contrast'){
+  let seed=7;
+  const uniform=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;
+   return (seed+.5)/4294967296;};
+  const gaps=[];
+  for(let group=0;group<15;group++){
+   let values;
+   do{
+    const w=Array.from({length:4},()=>-Math.log(uniform()));
+    const sum=w.reduce((a,b)=>a+b,0);
+    values=w.map(x=>(1000/7.5)*x/sum);
+   }while(Math.max(...values)>=100);
+   gaps.push(...values);
+  }
+  return gaps;
+ }
+ // 60Hz-display-quantized mean-30Hz trace: each group contains eight
+ // 16.667ms display slots across four delivered frames (no sub-refresh
+ // callbacks). Constructed adversarial control: 3+3 may drop one tick while
+ // 4+2 recovers it, so CPU cost and earned benefit can be measured together.
+ if(kind==='30Hz-display-quantized'){
+  const groups=[[1,2,2,3],[2,2,3,1],[2,2,3,1],[3,1,2,2],
+   [1,3,3,1],[1,2,1,4],[2,1,1,4],[1,1,3,3],
+   [4,1,2,1],[1,1,2,4],[4,1,2,1],[1,3,3,1],
+   [3,1,3,1],[1,1,1,5],[5,1,1,1]];
+  return groups.flat().map(ticks=>ticks*1000/60);
+ }
  if(kind==='20Hz-jitter')return Array.from({length:40},(_,i)=>i%2?52:48);
  if(kind==='20Hz-bursts')return Array.from({length:40},(_,i)=>[65,35,54,46][i%4]);
  throw Error('unknown presentation cadence');
@@ -83,8 +119,10 @@ function run({seed=1517800,cls='tempest',cadence='20Hz-jitter',maxSteps=4,backlo
     // Distinguish costly three-update bursts from one-update frames.
     // These are Node-host wall-clock observations, not device budgets.
     threeStepFrameSamples:frameSteps.filter(n=>n===3).length,
+    fourStepFrameSamples:frameSteps.filter(n=>n===4).length,
     oneStepFrameSamples:frameSteps.filter(n=>n===1).length,
     threeStepFrameCpuP95Ms:percentile(frameCpu.filter((_,i)=>frameSteps[i]===3),.95),
+    fourStepFrameCpuP95Ms:percentile(frameCpu.filter((_,i)=>frameSteps[i]===4),.95),
     oneStepFrameCpuP95Ms:percentile(frameCpu.filter((_,i)=>frameSteps[i]===1),.95),
     frameCpuP50Ms:percentile(frameCpu,.5),
     frameCpuP95Ms:percentile(frameCpu,.95),
@@ -92,6 +130,9 @@ function run({seed=1517800,cls='tempest',cadence='20Hz-jitter',maxSteps=4,backlo
     frameCpuPeakMs:frameCpu.length?Math.max(...frameCpu):null,
     frameUpdateCpuP95Ms:percentile(frameUpdateCpu,.95),
     frameRenderCpuP95Ms:percentile(frameRenderCpu,.95),
+    playerDroneCount:g.drones.filter(d=>g.player&&d.ownerId===g.player.id).length,
+    hostileTankCount:g.tanks.filter(t=>g.player&&t!==g.player&&t.alive).length,
+    neutralShapeCount:g.shapes.length,
     hash:digest(physical(g)),draws:draws()};
   }finally{performance.now=originalClock;owner.stop();g.destroy();}
  });
