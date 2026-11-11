@@ -13,6 +13,7 @@ function replay(releaseKind='pointerup'){
  let now=1000,callback=null;
  const states=[],events=[];
  const input={
+  canvas:{getBoundingClientRect(){return {left:0,top:0,width:800,height:600}}},
   firing:false,keyboard:{},touchSeen:true,
   move:{active:false,dx:0,dy:0},aim:{active:false,dx:0,dy:0},
   stickId:{move:-1,aim:-1},
