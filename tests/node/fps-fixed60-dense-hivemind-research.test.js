@@ -8,7 +8,7 @@ const {run,frameTimes}=require('../research/fps-20hz-scheduler-pilot.cjs');
 const STEP_MS=1000/60;
 test('shipping nine-hunter Hivemind compares seven- and eight-tick CPU recovery without inventing drones',()=>{
  const rows=[];
- for(const trace of ['30Hz-adversarial95','30Hz-double-burst','30Hz-seven-tick-falsifier']){
+ for(const trace of ['30Hz-adversarial95','30Hz-double-burst','30Hz-seven-tick-falsifier','30Hz-seven-tick-phase-shift']){
   const gaps=frameTimes(trace);
   assert.equal(gaps.length,60);
   assert.ok(gaps.every(ms=>ms>0&&ms<100),'active jitter only; no foreground stall');
@@ -69,7 +69,7 @@ test('shipping nine-hunter Hivemind compares seven- and eight-tick CPU recovery 
    rows.push({trace,seed,initialHunters:9,candidates});
   }
  }
- assert.equal(rows.length,6);
+ assert.equal(rows.length,8);
  console.log('REAL_GAME_NINE_HUNTER_BACKLOG_CAPACITY_CPU '+JSON.stringify({
   rows,caveat:'Node JS/Canvas only; sequential host CPU is not physical Android, GPU paint, or natural match FPS'}));
 });

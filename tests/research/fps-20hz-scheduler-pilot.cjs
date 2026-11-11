@@ -44,6 +44,13 @@ function frameTimes(kind){
  // guarantee conservation when alternating large and tiny gaps cluster.
  // Two groups each sum to 133 1/3ms, every individual gap stays <100ms.
  // This is a mathematical stress trace, NOT measured Android incidence.
+ // Same 60 active intervals as the seven-tick falsifier, circularly shifted
+ // by six callbacks. A phase change alone can defeat an apparent 4+4 win.
+ // Keep the entire 60-frame sequence: rotation preserves total wall time.
+ if(kind==='30Hz-seven-tick-phase-shift'){
+  const gaps=frameTimes('30Hz-seven-tick-falsifier');
+  return [...gaps.slice(6),...gaps.slice(0,6)];
+ }
  if(kind==='30Hz-seven-tick-falsifier'){
   const cycle=[22.792522365760117,8.909842912196837,
    2.6870952012899134,98.94387285408648,
