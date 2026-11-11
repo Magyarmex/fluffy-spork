@@ -9,7 +9,7 @@ const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
 const {SubtickFirePulse}=require('../research/subtick-fire-pulse.cjs');
 const {ExplicitShotIntent}=require('../research/explicit-shot-intent.cjs');
 const {DirectShotIntent}=require('../research/direct-shot-intent.cjs');
-function observe(mode,{secondRelease=false}={}){
+function observe(mode,{secondRelease=false,secondSide='aim'}={}){
  return withSeed(1517800,()=>{
   const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
   g.status='playing';g.paused=false;
@@ -22,9 +22,12 @@ function observe(mode,{secondRelease=false}={}){
   t.push(.140,'pointerdown',e(11,600,200,1));
   t.push(.141,'pointermove',e(11,640,200,1));
   t.push(.152,'pointerup',e(11,640,200,0));
-  t.push(.160,'pointerdown',e(12,600,200,1));
-  t.push(.161,'pointermove',e(12,600,240,1));
-  if(secondRelease)t.push(.168,'pointerup',e(12,600,240,0));
+  const secondX=secondSide==='move'?100:600;
+  const secondMoveX=secondSide==='move'?140:600;
+  const secondMoveY=secondSide==='move'?200:240;
+  t.push(.160,'pointerdown',e(12,secondX,200,1));
+  t.push(.161,'pointermove',e(12,secondMoveX,secondMoveY,1));
+  if(secondRelease)t.push(.168,'pointerup',e(12,secondMoveX,secondMoveY,0));
   let shots=0,shotDirections=[];
   const fire=g.tryFire;
   g.tryFire=function(tank){const before=this.bullets.length;
@@ -35,7 +38,8 @@ function observe(mode,{secondRelease=false}={}){
   try{
    t.consumeThrough(secondRelease?.175:.165);
    const pending=owner?.pulse?.pending??owner?.pending??null;
-   const beforeUpdate={aimOwner:g.input.stickId?.aim??null,aimActive:!!g.input.aim.active,
+   const beforeUpdate={aimOwner:g.input.stickId?.aim??null,moveOwner:g.input.stickId?.move??null,
+    aimActive:!!g.input.aim.active,
     aimDx:g.input.aim.dx,aimDy:g.input.aim.dy,
     pendingPointer:pending?.id??null,physicalFiring:!!g.input.firing};
    g.player.fireCd=0;
@@ -84,4 +88,18 @@ test('two short consecutive presses preserve the newest aimed shot without a sta
  // deferred-release owners preserve the latest shot too.
  console.log('RAPID_RETARGET_SECOND_SHOT '+JSON.stringify({baseline,direct,subtick,explicit,
   caveat:'constructed short touches; no natural-play frequency or physical Android claim'}));
+});
+
+test('unrelated movement-stick touch does not cancel an earlier legitimate short aimed shot',()=>{
+ const baseline=observe('baseline',{secondSide:'move'});
+ const direct=observe('direct',{secondSide:'move'});
+ assert.equal(baseline.shots,0,'unmodified input loses the short aim press');
+ assert.equal(direct.moveOwner,12,'new left-stick movement must remain owned by pointer #12');
+ assert.equal(direct.aimOwner,-1,'first right-stick touch is physically released');
+ assert.equal(direct.shots,1,'unrelated movement touch must not cancel pending shot intent');
+ assert.ok(direct.shotDirections.length>0);
+ assert.ok(direct.shotDirections.every(([vx,vy])=>vx>0&&Math.abs(vx)>Math.abs(vy)),
+  'first eastward aim should be preserved when only the movement stick changes');
+ assert.equal(direct.postIntent,undefined);
+ console.log('RAPID_RETARGET_MOVEMENT_INDEPENDENCE '+JSON.stringify({baseline,direct}));
 });
