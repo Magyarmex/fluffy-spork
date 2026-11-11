@@ -29,7 +29,7 @@ function run(cls,offset){
   const owner=new DirectShotIntent(g,{window:g.__testWindow,
    document:g.__testWindow.document,rebindDomListeners:false,
    requireTrustedDuration:true,eventOriginMs:1000,
-   maxIntentAgeMs:100,nowMs:()=>1180});
+   maxIntentAgeMs:100,nowMs:()=>1260});
   const ev=(type,at,buttons,x)=>({type,pointerType:'touch',pointerId:11,
    button:0,buttons,clientX:x,clientY:200,
    __novaOriginalAt:at,__novaTimestampTrusted:true,
@@ -40,6 +40,8 @@ function run(cls,offset){
    i.pm(ev('pointermove',.141,1,640));
    i.pu(ev('pointerup',.170,0,640));
    assert.ok(owner.pending,'physical release must preserve one shot');
+   assert.ok(Math.abs(owner.pending.durationMs-30)<1e-7,
+    'physical hold duration remains 30ms even with a 90ms delivery delay');
    // Controlled displacement isolates the later simulation-origin question.
    // No claim that teleportation represents ordinary movement or cover.
    g.player.x+=offset;
