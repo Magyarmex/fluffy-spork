@@ -158,10 +158,11 @@ class DirectShotIntent {
       // All current Game/overlay aim and Cannon fuse readers share these
       // coordinates. Restore immediately so the next physical input is live.
       const previousMouseX=i.mouseX,previousMouseY=i.mouseY;
-      if(intent.mouse){const target=self.resolveMouse(intent.mouse);
-        i.mouseX=target.x;i.mouseY=target.y;}
-      try{const result=self.old.update.apply(this,args);self.intents++;return result;}
-      finally{i.mouseX=previousMouseX;i.mouseY=previousMouseY;delete i.__novaShotIntent;}
+      try{
+        if(intent.mouse){const target=self.resolveMouse(intent.mouse);
+          i.mouseX=target.x;i.mouseY=target.y;}
+        const result=self.old.update.apply(this,args);self.intents++;return result;
+      }finally{i.mouseX=previousMouseX;i.mouseY=previousMouseY;delete i.__novaShotIntent;}
     };
     game.setPaused=function(value,...args){if(value)self.clear();return self.old.setPaused.call(this,value,...args);};
     if(typeof this.old.blurReset==='function')i.__novaBlurReset=function(...args){self.clear();return self.old.blurReset.apply(this,args);};
