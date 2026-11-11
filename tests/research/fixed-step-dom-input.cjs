@@ -70,12 +70,27 @@ class ChronologicalInput {
     while (this.index < this.events.length && this.events[this.index].at <= end + EPS) {
       const e = this.events[this.index++];
       const d = e.data;
+      let clientX=d.clientX,clientY=d.clientY;
+      // A touch captured before a pure canvas translation must retain its
+      // original local stick coordinates when replayed later. Do not apply
+      // this to mouse aiming (which has separate world-target semantics),
+      // or to resizes: those need their own validated policy.
+      const origin=d.__novaCanvasOrigin;
+      if(origin && d.pointerType!=='mouse' && this.input.canvas &&
+         typeof this.input.canvas.getBoundingClientRect==='function'){
+        const rect=this.input.canvas.getBoundingClientRect();
+        if(rect && Number.isFinite(rect.left)&&Number.isFinite(rect.top)&&
+           rect.width===origin.width && rect.height===origin.height){
+          if(Number.isFinite(clientX))clientX+=rect.left-origin.left;
+          if(Number.isFinite(clientY))clientY+=rect.top-origin.top;
+        }
+      }
       const evt = {type:e.kind, __novaOriginalAt:d.__novaOriginalAt,
         __novaTimestampTrusted:d.__novaTimestampTrusted,
         __novaPhysicalTimestampExact:d.__novaPhysicalTimestampExact,
         __novaReplayAt:e.at, __novaSampleAt:end,
         pointerId:d.pointerId, pointerType:d.pointerType,
-        clientX:d.clientX, clientY:d.clientY, buttons:d.buttons,
+        clientX, clientY, buttons:d.buttons,
         button:d.button, key:d.key, repeat:!!d.repeat,
         defaultPrevented:!!d.defaultPrevented,
         target:{tagName:d.targetTagName || '', isContentEditable:!!d.targetEditable,
