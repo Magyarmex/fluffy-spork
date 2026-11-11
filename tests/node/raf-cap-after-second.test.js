@@ -28,21 +28,23 @@ function startBody(html){
 }
 function run(body,gaps,seconds=10,workMs=0){
  let now=0,work=0,raf=null,sim=0,updates=0,draws=0,maxSteps=0,frameSteps=0;
+ const frames=[];let beforeFrameWork=0,i=0;
  const start=new Function('performance','requestAnimationFrame','render_1',
   'return ({'+body+'}).start')({now:()=>now+work},
-   fn=>{raf=fn;return 1;},{render(){draws++;maxSteps=Math.max(maxSteps,frameSteps);frameSteps=0;}});
+   fn=>{raf=fn;return 1;},{render(){draws++;frames.push({frame:i,steps:frameSteps,workMs:work-beforeFrameWork});maxSteps=Math.max(maxSteps,frameSteps);frameSteps=0;}});
  const game={paused:false,__novaDestroyed:false,mmTimer:.08,
   sfx:{startMusic(){}},update(dt){
    assert.ok(dt>=0&&dt<=1/30+1e-10,'collision step remains bounded');
-   sim+=dt;updates++;frameSteps++;work+=workMs;
+   sim+=dt;updates++;frameSteps++;
+   work+=typeof workMs==='function'?workMs({frame:i,step:frameSteps}):workMs;
   },drawMinimap(){}};
  start.call(game);
- let i=0;while(now<seconds*1000-1e-7){
+ while(now<seconds*1000-1e-7){
   now+=Math.min(gaps[i++%gaps.length],seconds*1000-now);
   const callback=raf;raf=null;assert.equal(typeof callback,'function');
-  callback(now);
+  beforeFrameWork=work;callback(now);
  }
- return {sim,updates,draws,maxSteps};
+ return {sim,updates,draws,maxSteps,frames};
 }
 const approx=(a,b)=>assert.ok(Math.abs(a-b)<1e-6,`${a} != ${b}`);
 const patterns={
@@ -105,4 +107,31 @@ test('adversarial clustered cadence may need more bounded updates to recover tim
  assert.ok(after.sim>before.sim,'extra update must advance recovered world time');
  assert.ok(after.maxSteps<=2,'no frame may exceed the existing two-step bound');
  assert.equal(after.draws,before.draws);
+});
+
+// Research-only negative control: the shipping catch-up gate reads previous
+// frame costs, not the cost of the first update in the CURRENT callback.
+// This intentionally preserves observed behavior, not an acceptance target.
+test('shipping RAF can schedule a second update after a 22ms current first update',()=>{
+ const body=startBody(patched);
+ const r=run(body,[1000/60,1000/60,70],1,({frame,step})=>
+  frame===3&&step===1?22:0);
+ const spike=r.frames.find(f=>f.frame===3);
+ assert.ok(spike,'source-executed third RAF callback must exist');
+ assert.ok(spike.workMs>=22,'first update must incur the intended CPU spike');
+ assert.equal(spike.steps,2,
+  'current-frame 22ms first-update cost does not participate in existing second-update gate');
+ assert.ok(r.maxSteps<=2,'existing per-callback update ceiling remains bounded');
+ const ordinary=run(body,[1000/60,1000/60,70],1);
+ assert.equal(ordinary.frames.find(f=>f.frame===3).steps,2,
+  'ordinary cheap frame must retain legal second-update recovery');
+ const guard='priorWork < 18 && earlierWork < 18';
+ assert.equal(body.split(guard).length-1,1,'source CPU gate must have one owner');
+ const currentAware=body.replace(guard,
+  guard+' && performance.now() - workStart < 18');
+ const protectedRun=run(currentAware,[1000/60,1000/60,70],1,
+  ({frame,step})=>frame===3&&step===1?22:0);
+ assert.equal(protectedRun.frames.find(f=>f.frame===3).steps,1,
+  'research-only current-work guard must reject a second update after the spike');
+ assert.ok(protectedRun.maxSteps<=2,'proposed guard remains bounded');
 });
