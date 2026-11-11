@@ -23,8 +23,11 @@ test('stale quarantine preserves both accepted stick owners across canvas reloca
   now=1020;
   assert.equal(bridge.capture(e('pointerdown',1010,11,100)),true);
   assert.equal(bridge.capture(e('pointerdown',1011,22,600)),true);
+  // Shipping Input ignores a second pointer on an already-owned side.
+  assert.equal(bridge.capture(e('pointerdown',1012,12,150)),true);
   assert.equal(timeline.events[0].data.__novaCanvasSide,'move');
   assert.equal(timeline.events[1].data.__novaCanvasSide,'aim');
+  assert.equal(timeline.events[2].data.__novaCanvasSide,'move');
   // Both touches were queued but not sampled. The canvas shifts before a
   // delayed old event forces quarantine; current geometry would place both
   // pointers on the move side and silently lose aim owner 22.
