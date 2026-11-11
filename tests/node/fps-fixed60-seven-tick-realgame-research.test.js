@@ -35,7 +35,7 @@ function check(result,policy,cls,trace){
 }
 test('real composed Gunner and dense Hivemind compare 3+4 versus 4+3 on adversarial active presentation',()=>{
  const rows=[];
- for(const trace of ['30Hz-adversarial95','30Hz-display-quantized']){
+ for(const trace of ['30Hz-adversarial95','30Hz-display-quantized','30Hz-seven-tick-falsifier']){
   const gaps=frameTimes(trace);
   assert.equal(gaps.length,60);
   assert.ok(gaps.every(ms=>ms>0&&ms<100),'do not mix foreground stalls with active jitter');
@@ -60,7 +60,7 @@ test('real composed Gunner and dense Hivemind compare 3+4 versus 4+3 on adversar
    rows.push({trace,cls,seed,results});
   }
  }
- assert.equal(rows.length,8);
+ assert.equal(rows.length,12);
  console.log('REAL_GAME_SEVEN_TICK_POLICY_COMPARISON '+JSON.stringify({
   rows,caveat:'research only; Node Canvas JS not GPU/Android; sequential CPU timing is host-dependent; volley counts are not applied damage'}));
 });
