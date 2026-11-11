@@ -84,8 +84,15 @@ class ChronologicalInput {
          typeof this.input.canvas.getBoundingClientRect==='function'){
         try{
           const rect=this.input.canvas.getBoundingClientRect();
-          if(rect && Number.isFinite(rect.left)&&Number.isFinite(rect.top)&&
-             rect.width===origin.width && rect.height===origin.height){
+          // A resize invalidates the captured touch coordinate frame.
+          // Never reinterpret an old aim press as movement or let a queued
+          // release manufacture a shot after the viewport changed.
+          if(!rect || !Number.isFinite(rect.width) || !Number.isFinite(rect.height) ||
+             rect.width!==origin.width || rect.height!==origin.height){
+            this.reset({quarantine:true});
+            return;
+          }
+          if(Number.isFinite(rect.left)&&Number.isFinite(rect.top)){
             if(Number.isFinite(clientX))clientX+=rect.left-origin.left;
             if(Number.isFinite(clientY))clientY+=rect.top-origin.top;
           }
