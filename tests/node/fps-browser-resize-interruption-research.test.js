@@ -271,3 +271,17 @@ test('research: reused pointer ID after lost release can start a fresh gesture',
  h.timeline.consumeThrough(.08);
  assert.equal(h.input.firing,false);
 });
+
+test('research: each touch capture reads canvas geometry only once',()=>{
+ const h=harness();
+ let reads=0;
+ const original=h.input.canvas.getBoundingClientRect;
+ h.input.canvas.getBoundingClientRect=()=>{reads++;return original();};
+ h.setNow(1020);
+ h.capture('pointerdown',22,600,1010);
+ h.capture('pointermove',22,640,1011);
+ h.capture('pointerup',22,650,1012);
+ assert.equal(reads,3,'one DOM layout read per touch event');
+ assert.deepEqual(h.timeline.events.map(e=>e.data.__novaCanvasOrigin.width),
+  [800,800,800]);
+});
