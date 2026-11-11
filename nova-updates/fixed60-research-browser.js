@@ -209,7 +209,7 @@ class BrowserEventTimeline {
       // with a valid clock origin; otherwise prefer delivery time.
       const origin = Number(this.clock.timeOrigin);
       if (Number.isFinite(origin) && origin > 1e11) stamp -= origin;
-      else { stamp = now; timestampTrusted = false; this.invalidTimestamps++; }
+      else { stamp = now; timestampTrusted = false; timestampExact = false; this.invalidTimestamps++; }
     }
     if (stamp > now + this.maxFutureMs) {
       stamp = now;
