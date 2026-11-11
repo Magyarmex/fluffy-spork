@@ -25,9 +25,9 @@ function scenario(cls,lateral){
   g.spawnAITank=()=>null;g.spawnDrone=()=>null;
   const wall={id:-1,shape:'rect',x:110,y:0,w:12,h:80,
    solid:true,destructible:false,hp:0,maxHp:0};
-  // Keep cover absent during firing setup; install it for the same
-  // authoritative Battlefield intersection query after real projectile birth.
-  g.__novaTerrain=[];g.__novaBattlefieldIndex=null;
+  // Keep the same permanent wall in the real Game from input through
+  // projectile birth and collision; do not conjure cover after firing.
+  g.__novaTerrain=[wall];g.__novaBattlefieldIndex=null;
   const owner=new DirectShotIntent(g,{window:g.__testWindow,
    document:g.__testWindow.document,rebindDomListeners:false,
    requireTrustedDuration:true,eventOriginMs:1000,
@@ -45,7 +45,6 @@ function scenario(cls,lateral){
    g.update(1/60);
    const rails=g.bullets.filter(b=>b.ownerId===g.player.id&&b.beam);
    assert.equal(rails.length,cls==='prism'?2:1);
-   g.__novaTerrain=[wall];g.__novaBattlefieldIndex=null;
    const traces=rails.map(b=>{
     const speed=Math.hypot(b.vx||0,b.vy||0);
     assert.ok(speed>0,'real rail velocity must be nonzero');
