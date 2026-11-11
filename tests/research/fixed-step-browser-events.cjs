@@ -89,7 +89,6 @@ class BrowserEventTimeline {
       // Reconstruct accepted stick ownership, not merely pointer existence.
       // A queued first touch may be lost before its first simulation tick;
       // a same-side second touch is ignored by shipping Input.
-      let rect=null,geometryRead=false;
       const pending=Array.isArray(this.timeline.events) ?
         this.timeline.events.slice(this.timeline.index||0) : [];
       for(const queued of pending){
@@ -100,16 +99,8 @@ class BrowserEventTimeline {
         if(!d || d.pointerId==null || typeof d.pointerType!=='string' ||
            d.pointerType==='mouse')continue;
         if(queued.kind==='pointerdown' && !d.targetIsUI){
-          if(!geometryRead){
-            geometryRead=true;
-            const canvas=input && input.canvas;
-            rect=canvas && typeof canvas.getBoundingClientRect==='function' ?
-              canvas.getBoundingClientRect() : null;
-          }
-          if(rect && Number.isFinite(rect.left) &&
-             Number.isFinite(rect.width) && rect.width>0 &&
-             Number.isFinite(d.clientX)){
-            const side=d.clientX-rect.left<rect.width*.45?'move':'aim';
+          const side=d.__novaCanvasSide;
+          if(side==='move'||side==='aim'){
             if(slots[side]==null){slots[side]=d.pointerId;held.add(d.pointerId);}
           }else if(held.size<2)held.add(d.pointerId);
         }else if(queued.kind==='pointerup'||queued.kind==='pointercancel'){
@@ -160,7 +151,16 @@ class BrowserEventTimeline {
       targetTagName: target && target.tagName,
       targetEditable: !!(target && target.isContentEditable),
       targetIsUI: !!(target && typeof target.closest === 'function' &&
-        target.closest('[data-ui],[role="dialog"],[role="button"],[contenteditable="true"]'))
+        target.closest('[data-ui],[role="dialog"],[role="button"],[contenteditable="true"]')),
+      // Capture stick side before any later canvas relocation. This is
+      // ownership evidence for stale-event quarantine, not a live aim command.
+      __novaCanvasSide: event.type === 'pointerdown' && event.pointerType !== 'mouse' &&
+        this.timeline.input && this.timeline.input.canvas &&
+        typeof this.timeline.input.canvas.getBoundingClientRect === 'function' ?
+        (() => { const r=this.timeline.input.canvas.getBoundingClientRect();
+          return Number.isFinite(r.left)&&Number.isFinite(r.width)&&r.width>0&&
+            Number.isFinite(event.clientX) ?
+            (event.clientX-r.left<r.width*.45?'move':'aim') : null; })() : null
     };
     const accepted = this.timeline.push(at, event.type, data);
     this.lastAt = at;
