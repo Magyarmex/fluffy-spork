@@ -73,6 +73,9 @@ function bootGame(quality = 'low') {
   for (const script of overlays) {
     let overlaySource=fs.readFileSync(path.join(root, script), 'utf8');
     if(process.env.NOVA_EXPLICIT_SHOT_INTENT_RESEARCH==='1' &&
+       script==='nova-updates/controller-v1.3.0.js')
+      overlaySource=require('./explicit-shot-intent.cjs').patchController(overlaySource);
+    if(process.env.NOVA_EXPLICIT_SHOT_INTENT_RESEARCH==='1' &&
        script==='nova-updates/disciplines-v1.7.0.js')
       overlaySource=require('./explicit-shot-intent.cjs').patchDisciplines(overlaySource);
     vm.runInContext(overlaySource, context, {filename: script, timeout: 5000});
