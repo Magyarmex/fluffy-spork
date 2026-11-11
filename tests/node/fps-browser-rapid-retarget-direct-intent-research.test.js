@@ -21,7 +21,7 @@ function target(){
 test('browser chronological replay gives rapid retarget to the second pointer, never stale first aim',()=>{
  const g=bootGame(),i=g.input,win=g.__testWindow,doc=win.document;
  g.sfx.muted=true;g.sfx.startMusic=()=>{};i.autofire=false;
- g.status='playing';g.paused=false;
+ g.status='playing';g.paused=false;g.player.angle=0;
  i.detach();
  const w=target(),d=target(),c=Object.assign(target(),{
   getBoundingClientRect:()=>({left:0,top:0,width:800,height:600})});
@@ -83,7 +83,7 @@ test('real fixed-step browser factory consumes two short gestures once at next t
  const {createFixedStepBrowserPilot}=require('../research/fixed-step-raf-owner.cjs');
  const g=bootGame(),i=g.input,win=g.__testWindow,doc=win.document;
  g.sfx.muted=true;g.sfx.startMusic=()=>{};i.autofire=false;
- g.status='playing';g.paused=false;g.player.fireCd=0;
+ g.status='playing';g.paused=false;g.player.fireCd=0;g.player.angle=0;
  i.detach();
  const w=target(),d=target(),c=Object.assign(target(),{
   getBoundingClientRect:()=>({left:0,top:0,width:800,height:600})});
