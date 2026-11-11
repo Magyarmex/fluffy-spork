@@ -36,7 +36,8 @@ function check(result,policy,cls,trace){
 }
 test('real composed Gunner and live-drone Hivemind compare seven- and eight-tick capacity on adversarial active presentation',()=>{
  const rows=[];
- for(const trace of ['30Hz-adversarial95','30Hz-display-quantized','30Hz-seven-tick-falsifier','30Hz-double-burst']){
+ for(const trace of ['30Hz-adversarial95','30Hz-display-quantized','30Hz-seven-tick-falsifier',
+  '30Hz-double-burst','30Hz-triple-long-falsifier']){
   const gaps=frameTimes(trace);
   assert.equal(gaps.length,60);
   assert.ok(gaps.every(ms=>ms>0&&ms<100),'do not mix foreground stalls with active jitter');
@@ -61,6 +62,12 @@ test('real composed Gunner and live-drone Hivemind compare seven- and eight-tick
    assert.equal(by['4+3'].peakSteps<=4,true);
    assert.ok(by['4+4'].droppedMs<=by['4+3'].droppedMs+.002,
     'extra capacity must not discard more active simulation than 4+3');
+   if(trace==='30Hz-triple-long-falsifier'){
+    assert.ok(by['4+4'].droppedMs>0,
+     'eight-tick capacity must expose its genuine clustered-frame limitation');
+    assert.ok(by['4+4'].updates<120,
+     'discarded time must not masquerade as complete simulation chronology');
+   }
    if(trace==='30Hz-seven-tick-falsifier'){
     assert.equal(by['4+4'].droppedMs,0,
      'eight-tick capacity must retain the previously lost active chronology');
@@ -93,7 +100,7 @@ test('real composed Gunner and live-drone Hivemind compare seven- and eight-tick
    rows.push({trace,cls,seed,results});
   }
  }
- assert.equal(rows.length,16);
+ assert.equal(rows.length,20);
  console.log('REAL_GAME_BACKLOG_CAPACITY_POLICY_COMPARISON '+JSON.stringify({
   rows,caveat:'research only; Node Canvas JS not GPU/Android; sequential CPU timing is host-dependent; volley counts are not applied damage'}));
 });
