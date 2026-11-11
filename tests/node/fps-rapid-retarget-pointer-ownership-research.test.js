@@ -40,9 +40,6 @@ function observe(mode){
    g.update(1/60);
    return {...beforeUpdate,shots,playerAngle:+g.player.angle.toFixed(6),afterUpdateOwner:g.input.stickId?.aim??null,
     afterUpdateFiring:!!g.input.firing,postIntent:g.input.__novaShotIntent};
-  /* return {aimOwner:g.input.stickId?.aim??null,aimActive:!!g.input.aim.active,
-    aimDx:g.input.aim.dx,aimDy:g.input.aim.dy,
-    pendingPointer:pending?.id??null,physicalFiring:!!g.input.firing}; */
   }finally{if(owner)owner.detach();g.destroy();}
  });
 }
