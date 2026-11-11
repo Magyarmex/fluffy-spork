@@ -89,8 +89,10 @@ function run({seed=1517800,cls='tempest',cadence='20Hz-jitter',maxSteps=4,backlo
     // Distinguish costly three-update bursts from one-update frames.
     // These are Node-host wall-clock observations, not device budgets.
     threeStepFrameSamples:frameSteps.filter(n=>n===3).length,
+    fourStepFrameSamples:frameSteps.filter(n=>n===4).length,
     oneStepFrameSamples:frameSteps.filter(n=>n===1).length,
     threeStepFrameCpuP95Ms:percentile(frameCpu.filter((_,i)=>frameSteps[i]===3),.95),
+    fourStepFrameCpuP95Ms:percentile(frameCpu.filter((_,i)=>frameSteps[i]===4),.95),
     oneStepFrameCpuP95Ms:percentile(frameCpu.filter((_,i)=>frameSteps[i]===1),.95),
     frameCpuP50Ms:percentile(frameCpu,.5),
     frameCpuP95Ms:percentile(frameCpu,.95),
