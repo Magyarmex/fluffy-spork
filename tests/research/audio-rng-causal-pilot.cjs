@@ -78,6 +78,9 @@ function bootGame(quality = 'low') {
     if(process.env.NOVA_EXPLICIT_SHOT_INTENT_RESEARCH==='1' &&
        script==='nova-updates/disciplines-v1.7.0.js')
       overlaySource=require('./explicit-shot-intent.cjs').patchDisciplines(overlaySource);
+    if(process.env.NOVA_SNIPER_SUBTICK_QUICK_RAIL_RESEARCH==='1' &&
+       script==='nova-updates/sniper-v1.2.0.js')
+      overlaySource=require('./sniper-subtick-quick-rail.cjs').patchSniper(overlaySource);
     vm.runInContext(overlaySource, context, {filename: script, timeout: 5000});
   }
   const requireGame = window.__novaMakeRequire('');
