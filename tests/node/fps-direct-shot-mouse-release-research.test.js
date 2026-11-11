@@ -6,10 +6,11 @@ process.env.NOVA_EXPLICIT_SHOT_INTENT_RESEARCH='1';
 const test=require('node:test'),assert=require('node:assert/strict');
 const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 const {DirectShotIntent}=require('../research/direct-shot-intent.cjs');
-function scenario(cls,moveAfterRelease,moveBeforeRelease=true,cameraShift=false){
+function scenario(cls,moveAfterRelease,moveBeforeRelease=true,cameraShift=false,viewportShift=false){
  return withSeed(1517800,()=>{
   const g=bootGame();g.sfx.muted=true;g.input.autofire=false;g.setClass(g.player,cls);
   const i=g.input,o=new DirectShotIntent(g,{window:g.__testWindow,document:g.__testWindow.document});
+  const originalRect=i.canvas.getBoundingClientRect;
   const ev=(type,x,y,buttons)=>({type,pointerType:'mouse',pointerId:1,
    button:0,buttons,clientX:x,clientY:y,target:{closest:()=>null}});
   try{
@@ -21,6 +22,15 @@ function scenario(cls,moveAfterRelease,moveBeforeRelease=true,cameraShift=false)
    assert.ok(o.pending&&o.pending.mouse,'short mouse release owns a target');
    if(moveAfterRelease)i.pm(ev('pointermove',700,500,0));
    if(cameraShift){g.cam.x+=190;g.cam.y-=100;g.cam.zoom*=.72;}
+   if(viewportShift){
+    // A browser can move the canvas (scroll/layout/viewport resize) after
+    // pointerup but before Game.update. Its captured WORLD target must remain
+    // the same even though the synthetic screen coordinate must change.
+    i.canvas.getBoundingClientRect=()=>{
+     const rect=originalRect.call(i.canvas);
+     return {...rect,left:rect.left+83,top:rect.top-47};
+    };
+   }
    const live={x:i.mouseX,y:i.mouseY};
    g.update(1/60);
    assert.equal(i.mouseX,live.x,'restore later physical mouse X');
@@ -35,7 +45,7 @@ function scenario(cls,moveAfterRelease,moveBeforeRelease=true,cameraShift=false)
    }));
    return {bullets,angle:g.player.angle,fireCd:g.player.fireCd,
     fuseDepth:g.player.__v17FuseDepth,fuseDist:g.player.__v17FuseDist};
-  }finally{o.detach();g.destroy();}
+  }finally{i.canvas.getBoundingClientRect=originalRect;o.detach();g.destroy();}
  });
 }
 test('real composed Game uses release-time mouse target despite intervening cursor move',()=>{
@@ -72,6 +82,15 @@ test('release-time mouse shot retains world target when camera pans and zooms be
   const shifted=scenario(cls,false,true,true);
   assert.ok(baseline.bullets.length>0,cls+' fires a real projectile');
   assert.deepEqual(shifted,baseline,cls+' camera motion must not retarget the released world point');
+ }
+});
+
+test('mouse release world target survives canvas viewport relocation before Game.update',()=>{
+ for(const cls of ['scout','cannon','carrier']){
+  const baseline=scenario(cls,false,true,false,false);
+  const relocated=scenario(cls,false,true,false,true);
+  assert.ok(baseline.bullets.length>0,cls+' fires in real composed Game');
+  assert.deepEqual(relocated,baseline,cls+' layout relocation must not retarget release');
  }
 });
 
