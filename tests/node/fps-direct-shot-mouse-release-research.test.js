@@ -72,3 +72,24 @@ test('release-time mouse shot retains world target when camera pans and zooms be
   assert.deepEqual(shifted,baseline,cls+' camera motion must not retarget the released world point');
  }
 });
+
+test('native mouse chord release keeps the world target through camera motion',()=>{
+ function chord(shift){return withSeed(1517800,()=>{
+  const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
+  const i=g.input,o=new DirectShotIntent(g,{window:g.__testWindow,document:g.__testWindow.document});
+  try{
+   i.mouseActive=true;i.mouseX=400;i.mouseY=200;
+   const ev={button:0,clientX:400,clientY:200};
+   o.nativeDown(ev);o.nativeUp(ev);
+   assert.ok(o.pending&&o.pending.mouse,'native mouse release captured');
+   if(shift){g.cam.x+=190;g.cam.y-=100;g.cam.zoom*=.72;}
+   g.update(1/60);
+   assert.equal(o.intents,1);
+   return {angle:g.player.angle,bullets:Array.from(g.bullets,b=>
+    ({x:b.x,y:b.y,vx:b.vx,vy:b.vy,angle:b.angle}))};
+  }finally{o.detach();g.destroy();}
+ });}
+ const baseline=chord(false),shifted=chord(true);
+ assert.ok(baseline.bullets.length>0,'native chord fires actual projectile');
+ assert.deepEqual(shifted,baseline,'native mouse release must not follow camera motion');
+});
