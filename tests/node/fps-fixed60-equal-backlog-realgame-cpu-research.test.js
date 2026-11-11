@@ -11,7 +11,7 @@ const DURATION_MS=2000;
 function witness(cls,seed,cadence,maxSteps,backlogExtraTicks){
  const result=run({cls,seed,cadence,
   maxSteps,backlogExtraTicks,render:true,profileCpu:true});
- assert.equal(result.wallMs,DURATION_MS);
+ assert.ok(Math.abs(result.wallMs-DURATION_MS)<1e-6,'matched two-second wall time');
  assert.equal(result.frameCpuSamples,60,'all 60 real composed frames rendered');
  assert.ok(result.updates>0&&result.updates<=120,'bounded 60Hz simulation');
  assert.ok(result.peakSteps<=maxSteps,'no update budget violation');
