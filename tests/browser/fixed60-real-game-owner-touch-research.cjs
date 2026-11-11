@@ -410,7 +410,8 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    return {configuredMaxSteps:window.__novaFixedMaxSteps,
     controlledGate:window.__novaControlledGate,
     initialFingerprint:window.__novaFixedResearch.initialFingerprint||null,
-    maxSteps:p.owner.maxSteps,ticks:p.owner.ticks,droppedMs:p.owner.droppedMs,
+    maxSteps:p.owner.maxSteps,backlogExtraTicks:p.owner.backlogExtraTicks,
+    ticks:p.owner.ticks,droppedMs:p.owner.droppedMs,
     raf:{frames:frames.length,intervals:values(frameIntervals),controlledLongGaps,
      nativeRafSkipped:window.__novaFixedResearch.gateSkippedNativeRafs||0,
      observedWallMs,presentationHz:frameIntervals.length>0&&
@@ -461,6 +462,8 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
   assert.equal(owners.size,1,'touch gesture must retain one DOM pointer owner');
   assert.equal(report.productionRafActive,false,'never run two RAF owners');
   assert.equal(report.configuredMaxSteps,maxSteps,'requested catch-up policy must own real Game');
+  assert.equal(report.backlogExtraTicks,controlledExtra,
+   'requested backlog capacity must reach the actual Chromium Game owner');
   assert.equal(report.controlledGate,controlledGate,'research RAF gate configuration drift');
   if(controlledGate){
    assert.equal(layoutIntercepts,1,'controlled browser must seed one Battlefield overlay');
