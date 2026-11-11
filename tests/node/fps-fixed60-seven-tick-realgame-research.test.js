@@ -57,6 +57,17 @@ test('real composed Gunner and dense Hivemind compare 3+4 versus 4+3 on adversar
    const by=Object.fromEntries(results.map(r=>[r.policy,r]));
    assert.equal(by['3+3'].peakSteps<=3,true);
    assert.equal(by['4+3'].peakSteps<=4,true);
+   // If both schedules execute every chronological tick with no discarded
+   // time and the same end queue, the physical world must not depend on how
+   // those ticks were grouped into presentation callbacks.
+   if(by['3+4'].droppedMs===0&&by['4+3'].droppedMs===0&&
+      by['3+4'].updates===by['4+3'].updates&&
+      Math.abs(by['3+4'].queuedMs-by['4+3'].queuedMs)<.002){
+    assert.equal(by['3+4'].worldHash,by['4+3'].worldHash,
+     'equal chronological updates diverged in the actual composed Game');
+    assert.equal(by['3+4'].volleys,by['4+3'].volleys,
+     'same held firing history produced different volley counts');
+   }
    rows.push({trace,cls,seed,results});
   }
  }
