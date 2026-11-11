@@ -70,7 +70,7 @@ test('invalid DOM ownership option fails closed',()=>{
 test('real browser pilot factory composes replay-only shot owner without duplicate DOM hooks',()=>{
  const {createFixedStepBrowserPilot}=require('../research/fixed-step-raf-owner.cjs');
  const g=bootGame(),i=g.input,win=g.__testWindow,doc=win.document;
- g.sfx.muted=true;i.autofire=false;
+ g.sfx.muted=true;g.sfx.startMusic=()=>{};i.autofire=false;
  i.detach();const w=target(),d=target(),c=Object.assign(target(),{
   getBoundingClientRect:()=>({left:0,top:0,width:800,height:600})});
  Object.assign(win,{addEventListener:w.addEventListener,removeEventListener:w.removeEventListener});
@@ -100,7 +100,7 @@ test('real browser pilot factory composes replay-only shot owner without duplica
 test('fatal browser render tears down replay-only shot owner and restores production input',()=>{
  const {createFixedStepBrowserPilot}=require('../research/fixed-step-raf-owner.cjs');
  const g=bootGame(),i=g.input,win=g.__testWindow,doc=win.document;
- g.sfx.muted=true;i.autofire=false;
+ g.sfx.muted=true;g.sfx.startMusic=()=>{};i.autofire=false;
  i.detach();const w=target(),d=target(),c=Object.assign(target(),{
   getBoundingClientRect:()=>({left:0,top:0,width:800,height:600})});
  Object.assign(win,{addEventListener:w.addEventListener,removeEventListener:w.removeEventListener});
@@ -136,7 +136,7 @@ test('fatal browser render tears down replay-only shot owner and restores produc
 
 test('native primary mouse chord remains chronological with replay-only shot intent',()=>{
  const g=bootGame(),i=g.input,win=g.__testWindow,doc=win.document;
- g.sfx.muted=true;i.autofire=false;g.status='playing';g.paused=false;
+ g.sfx.muted=true;g.sfx.startMusic=()=>{};i.autofire=false;g.status='playing';g.paused=false;
  i.detach();const w=target(),d=target(),c=Object.assign(target(),{
   getBoundingClientRect:()=>({left:0,top:0,width:800,height:600})});
  Object.assign(win,{addEventListener:w.addEventListener,removeEventListener:w.removeEventListener});
@@ -172,6 +172,7 @@ test('native primary mouse chord remains chronological with replay-only shot int
 test('Game.destroy under nested RAF and direct intent does not invoke a detached wrapper',()=>{
  const {createFixedStepBrowserPilot}=require('../research/fixed-step-raf-owner.cjs');
  const g=bootGame(),i=g.input,win=g.__testWindow,doc=win.document;
+ g.sfx.startMusic=()=>{};
  i.detach();const w=target(),d=target(),c=Object.assign(target(),{
   getBoundingClientRect:()=>({left:0,top:0,width:800,height:600})});
  Object.assign(win,{addEventListener:w.addEventListener,removeEventListener:w.removeEventListener});
