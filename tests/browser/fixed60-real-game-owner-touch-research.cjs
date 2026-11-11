@@ -353,7 +353,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     aimOwner:window.__novaFixedGame.input.stickId.aim
    }),start);
    assert.ok(evidence.frames.some(f=>f.steps===4&&f.budget===4&&f.armedFour&&
-    f.rawGapMs<=100+1e-7&&f.births>0),
+    f.gap<=100+1e-7&&f.births>0),
     'held trusted touch must fire inside a genuine four-update Game callback: '+
     JSON.stringify(evidence));
    assert.equal(evidence.aimActive,true,'four-step catch-up must preserve held aim');
