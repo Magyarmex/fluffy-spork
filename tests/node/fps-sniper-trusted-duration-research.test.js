@@ -175,3 +175,32 @@ test('rapid retarget keeps only the newest physical press duration and aim owner
   assert.equal(i.stickId.aim,-1);
  }finally{owner.detach();g.destroy();}
 });
+
+test('trusted short mouse click preserves Sniper world aim and physical charge',()=>{
+ const g=bootGame(),i=g.input;g.sfx.muted=true;i.autofire=false;
+ g.setClass(g.player,'railgun');g.player.fireCd=0;g.status='playing';g.paused=false;
+ const owner=new DirectShotIntent(g,{window:g.__testWindow,
+  document:g.__testWindow.document,rebindDomListeners:false,
+  requireTrustedDuration:true,eventOriginMs:1000,maxIntentAgeMs:100,
+  nowMs:()=>1180});
+ const e=(type,at,x,y,buttons)=>({type,pointerType:'mouse',pointerId:1,
+  button:0,buttons,clientX:x,clientY:y,
+  __novaOriginalAt:at,__novaTimestampTrusted:true,
+  target:{closest:()=>null}});
+ try{
+  i.pd(e('pointerdown',.140,350,180,1));
+  i.pm(e('pointermove',.141,400,200,1));
+  i.pu(e('pointerup',.170,400,200,0));
+  assert.ok(owner.pending&&owner.pending.mouse&&owner.pending.world);
+  assert.ok(Math.abs(owner.pending.durationMs-30)<1e-7);
+  i.pm(e('pointermove',.175,700,500,0));
+  const live={x:i.mouseX,y:i.mouseY};
+  g.update(1/60);
+  const rails=g.bullets.filter(b=>b.ownerId===g.player.id&&b.beam);
+  assert.equal(rails.length,1);
+  assert.ok(Math.abs(rails[0].__novaCharge-30/520)<1e-8);
+  assert.equal(rails[0].__novaFullRail,false);
+  assert.equal(i.mouseX,live.x);assert.equal(i.mouseY,live.y);
+  assert.equal(owner.intents,1);
+ }finally{owner.detach();g.destroy();}
+});
