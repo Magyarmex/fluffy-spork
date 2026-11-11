@@ -75,8 +75,16 @@ test('research falsifier: active aim must not turn into movement after resize',(
  h.capture('pointermove',22,620,1030);
  h.timeline.consumeThrough(.04);
  assert.equal(h.input.stickId.move,-1,'resize cannot create movement owner');
- // Either cancel the old aim or preserve it; never manufacture another owner.
- assert.ok(h.input.stickId.aim===22||h.input.stickId.aim===-1);
+ assert.equal(h.input.stickId.aim,-1,'old aim must be canceled');
+ assert.equal(h.input.firing,false);
+ assert.equal(h.timeline.events.length,0,'queued input discarded on resize');
+ assert.equal(h.capture('pointermove',22,625,1031),false,'old pointer stays suppressed');
+ assert.equal(h.input.firing,false);
+ h.capture('pointerup',22,625,1032);
+ h.setNow(1050);
+ h.capture('pointerdown',23,1200,1040);
+ h.timeline.consumeThrough(.05);
+ assert.equal(h.input.stickId.aim,23,'new post-resize gesture works');
 });
 
 test('research control: unchanged canvas retains independent two-stick owners',()=>{
@@ -134,4 +142,27 @@ test('research: fresh touch after resize quarantine can still aim normally',()=>
  h.capture('pointerup',23,1200,1061);
  h.timeline.consumeThrough(.08);
  assert.equal(h.input.firing,false);
+});
+
+test('research: active dual-stick resize revokes both owners and suppresses old moves',()=>{
+ const h=harness();
+ h.setNow(1020);
+ h.capture('pointerdown',11,100,1010);
+ h.capture('pointerdown',22,600,1011);
+ h.timeline.consumeThrough(.02);
+ assert.equal(h.input.stickId.move,11);
+ assert.equal(h.input.stickId.aim,22);
+ h.resize(1600);
+ assert.equal(h.capture('pointermove',11,120,1030),false);
+ assert.equal(h.input.stickId.move,-1);
+ assert.equal(h.input.stickId.aim,-1);
+ assert.equal(h.input.firing,false);
+ assert.equal(h.capture('pointermove',22,640,1031),false);
+ h.capture('pointerup',11,120,1032);
+ h.capture('pointerup',22,640,1033);
+ h.setNow(1060);
+ h.capture('pointerdown',33,1200,1050);
+ h.timeline.consumeThrough(.06);
+ assert.equal(h.input.stickId.aim,33);
+ assert.equal(h.input.stickId.move,-1);
 });
