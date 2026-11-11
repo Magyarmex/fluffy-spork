@@ -54,7 +54,13 @@ function scenario(cls,lateral){
     return {x:b.x,y:b.y,dx,dy,r:b.r,blocked:!!contact};
    });
    assert.equal(owner.intents,1);
-   return traces;
+   // Observational full engine collision pass. Do not freeze its result until
+   // the real Game establishes the wall/contact behavior on CI.
+   const projectiles=rails.slice();
+   g.updateBullets(.1);
+   g.updateBullets(.1);
+   const surviving=projectiles.map(b=>!b.dead&&g.bullets.includes(b));
+   return {traces,surviving};
   }finally{owner.detach();g.destroy();}
  });
 }
@@ -62,9 +68,9 @@ function scenario(cls,lateral){
 test('research: real Sniper barrel origins change Battlefield cover contact after delayed release',()=>{
  for(const cls of ['railgun','prism','singularity']){
   const original=scenario(cls,0),later=scenario(cls,100);
-  assert.equal(original.length,later.length);
-  for(let j=0;j<original.length;j++){
-   const a=original[j],b=later[j];
+  assert.equal(original.traces.length,later.traces.length);
+  for(let j=0;j<original.traces.length;j++){
+   const a=original.traces[j],b=later.traces[j];
    assert.ok(Math.abs((b.y-a.y)-100)<2,
     'real barrel should follow the later player position');
    assert.equal(a.blocked,true,
