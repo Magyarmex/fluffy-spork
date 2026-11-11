@@ -217,3 +217,16 @@ test('research: failed canvas geometry read revokes an active touch rather than 
  h.capture('pointerup',22,640,1032);
  assert.equal(h.input.firing,false);
 });
+
+test('research: unreadable geometry at replay cannot invent movement or a shot',()=>{
+ const h=harness();
+ h.setNow(1020);
+ h.capture('pointerdown',22,600,1010);
+ h.capture('pointerup',22,650,1012);
+ h.input.canvas.getBoundingClientRect=()=>{throw Error('detached canvas');};
+ h.timeline.consumeThrough(.02);
+ assert.equal(h.input.stickId.move,-1);
+ assert.equal(h.input.stickId.aim,-1);
+ assert.equal(h.input.firing,false);
+ assert.equal(h.timeline.quarantined,true);
+});
