@@ -22,6 +22,7 @@ function scenario(cls,{duration=30,delay=10,invalid=null,cancel=false,suppressed
   const e=(type,at,buttons,x)=>({type,pointerType:'touch',pointerId:11,
    button:0,buttons,clientX:x,clientY:200,
    __novaOriginalAt:at,__novaTimestampTrusted:true,
+   __novaPhysicalTimestampExact:true,
    target:{closest:()=>null}});
   try{
    const down=e('pointerdown',downAt,1,600);
@@ -155,6 +156,7 @@ test('rapid retarget keeps only the newest physical press duration and aim owner
  const e=(type,id,at,x,y,buttons)=>({type,pointerType:'touch',
   pointerId:id,button:0,buttons,clientX:x,clientY:y,
   __novaOriginalAt:at,__novaTimestampTrusted:true,
+   __novaPhysicalTimestampExact:true,
   target:{closest:()=>null}});
  try{
   i.pd(e('pointerdown',11,.140,600,200,1));
@@ -186,6 +188,7 @@ test('trusted short mouse click preserves Sniper world aim and physical charge',
  const e=(type,at,x,y,buttons)=>({type,pointerType:'mouse',pointerId:1,
   button:0,buttons,clientX:x,clientY:y,
   __novaOriginalAt:at,__novaTimestampTrusted:true,
+   __novaPhysicalTimestampExact:true,
   target:{closest:()=>null}});
  try{
   i.pd(e('pointerdown',.140,350,180,1));
