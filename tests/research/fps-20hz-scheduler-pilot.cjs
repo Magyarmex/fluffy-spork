@@ -130,6 +130,9 @@ function run({seed=1517800,cls='tempest',cadence='20Hz-jitter',maxSteps=4,backlo
     frameCpuPeakMs:frameCpu.length?Math.max(...frameCpu):null,
     frameUpdateCpuP95Ms:percentile(frameUpdateCpu,.95),
     frameRenderCpuP95Ms:percentile(frameRenderCpu,.95),
+    playerDroneCount:g.drones.filter(d=>g.player&&d.ownerId===g.player.id).length,
+    hostileTankCount:g.tanks.filter(t=>g.player&&t!==g.player&&t.alive).length,
+    neutralShapeCount:g.shapes.length,
     hash:digest(physical(g)),draws:draws()};
   }finally{performance.now=originalClock;owner.stop();g.destroy();}
  });
