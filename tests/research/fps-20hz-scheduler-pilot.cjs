@@ -20,6 +20,12 @@ function frameTimes(kind){
  if(kind==='20Hz')return Array(40).fill(50);
  if(kind==='30Hz-clustered')return Array.from({length:15},()=>[55,55,1000/15-55,1000/15-55]).flat();
  if(kind==='30Hz-adversarial')return Array.from({length:15},()=>[90,5,5,100/3]).flat();
+ // Active (<100ms) schedule that defeats both equal-backlog recovery policies
+ // in the six-second real-damage fixture. Keep exact group sum at 133 1/3ms.
+ if(kind==='30Hz-adversarial95')return Array.from({length:15},()=>{
+  const a=6.9267489,b=95.49032479,c=30.76815672;
+  return [a,b,c,1000/7.5-a-b-c];
+ }).flat();
  if(kind==='20Hz-jitter')return Array.from({length:40},(_,i)=>i%2?52:48);
  if(kind==='20Hz-bursts')return Array.from({length:40},(_,i)=>[65,35,54,46][i%4]);
  throw Error('unknown presentation cadence');
