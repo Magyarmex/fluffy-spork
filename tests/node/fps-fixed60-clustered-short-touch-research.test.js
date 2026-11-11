@@ -11,6 +11,7 @@ function replay(intervals,maxSteps=2,backlogExtraTicks=2,events=[
   {at:40,type:'pointerdown'},{at:52,type:'pointerup'}],expectedMs=6000){
  let now=1000,callback=null,fireUpdates=0;
  const input={
+  canvas:{getBoundingClientRect(){return {left:0,top:0,width:800,height:600}}},
   firing:false,keyboard:{},move:{active:false},aim:{active:false},
   stickId:{move:-1,aim:-1},
   pd(){this.firing=true},pm(){},pu(){this.firing=false},
