@@ -148,3 +148,19 @@ test('canvas translation cannot convert pointercancel into a recovered shot',()=
   assert.equal(g.input.firing,false);
  }finally{if(owner)owner.detach();g.destroy();}
 });
+
+test('unavailable capture geometry never fabricates a stick side',()=>{
+ const g=bootGame();
+ try{
+  let now=1000;
+  g.input.canvas.getBoundingClientRect=()=>{throw Error('layout unavailable');};
+  const timeline=new ChronologicalInput(g.input);
+  const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
+  now=1020;
+  assert.equal(bridge.capture({type:'pointerdown',timeStamp:1010,
+    pointerType:'touch',pointerId:22,clientX:600,clientY:200,
+    target:{closest:()=>null}}),true);
+  assert.equal(timeline.events[0].data.__novaCanvasOrigin,null);
+  assert.equal(timeline.events[0].data.__novaCanvasSide,null);
+ }finally{g.destroy();}
+});
