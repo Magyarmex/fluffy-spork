@@ -1,7 +1,7 @@
 'use strict';
 /* #799 research-only: compare seven-tick total-capacity policies against the
  * existing six-tick controls in the actual composed Game. No production changes.
- * This deliberately reports rather than assumes which policy preserves damage.
+ * This reports simulation chronology and volley counts; it does NOT measure hit damage.
  */
 const test=require('node:test');
 const assert=require('node:assert/strict');
