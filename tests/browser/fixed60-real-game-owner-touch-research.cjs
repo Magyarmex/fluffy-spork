@@ -337,20 +337,15 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    assert.equal(maxSteps,4,'held four-step gate requires four-update research owner');
    assert.equal(controlledGate,true,'held four-step gate requires controlled Chromium RAF');
    const start=await page.evaluate(()=>window.__novaFixedResearch.frames.length);
-   let witnessed=false;
-   for(let attempt=0;attempt<10&&!witnessed;attempt++){
-    const before=await page.evaluate(()=>window.__novaFixedResearch.frames.length);
-    await page.evaluate(()=>{
-     window.__novaFixedResearch.armShotOnFour=true;
-     const end=performance.now()+80;
-     while(performance.now()<end){}
-    });
-    await page.waitForFunction(before=>window.__novaFixedResearch.frames.length>before,
-     before,{timeout:5000});
-    witnessed=await page.evaluate(start=>window.__novaFixedResearch.frames
-     .slice(start).some(f=>f.steps===4&&f.budget===4&&f.armedFour&&f.rawGapMs<=100+1e-7&&
-      f.playerProjectileBirths>0),start);
-   }
+   // The controlled RAF already delivers an 83.33ms active callback
+   // every four frames. Do not manufacture an 80ms main-thread stall:
+   // that could turn the test into a >100ms foreground-stall fallback.
+   await page.evaluate(()=>{window.__novaFixedResearch.armShotOnFour=true;});
+   await page.waitForFunction(start=>window.__novaFixedResearch.frames
+    .slice(start).some(f=>f.steps===4&&f.budget===4&&f.armedFour&&
+     f.rawGapMs<=100+1e-7&&f.playerProjectileBirths>0),
+    start,{timeout:12000});
+   const witnessed=true;
    const evidence=await page.evaluate(start=>({
     frames:window.__novaFixedResearch.frames.slice(start).map(f=>({
      gap:f.rawGapMs,steps:f.steps,budget:f.budget,births:f.playerProjectileBirths})),
