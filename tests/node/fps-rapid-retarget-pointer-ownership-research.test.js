@@ -1,0 +1,46 @@
+'use strict';
+// #641 Research-only: rapid retargeting while a short press is pending.
+// Exercises the real 49-overlay Game/Input. No production patch.
+process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
+const test=require('node:test'),assert=require('node:assert/strict');
+const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
+const {SubtickFirePulse}=require('../research/subtick-fire-pulse.cjs');
+const {ExplicitShotIntent}=require('../research/explicit-shot-intent.cjs');
+function observe(mode){
+ return withSeed(1517800,()=>{
+  const g=bootGame();g.sfx.muted=true;g.input.autofire=false;
+  g.status='playing';g.paused=false;
+  const t=new ChronologicalInput(g.input);
+  const owner=mode==='subtick'?new SubtickFirePulse(g,t):
+    mode==='explicit'?new ExplicitShotIntent(g,t):null;
+  const e=(id,x,y,buttons)=>({pointerType:'touch',pointerId:id,button:0,buttons,
+    clientX:x,clientY:y,target:{tagName:'CANVAS',closest:()=>null}});
+  t.push(.140,'pointerdown',e(11,600,200,1));
+  t.push(.141,'pointermove',e(11,640,200,1));
+  t.push(.152,'pointerup',e(11,640,200,0));
+  t.push(.160,'pointerdown',e(12,600,200,1));
+  t.push(.161,'pointermove',e(12,600,240,1));
+  try{
+   t.consumeThrough(.165);
+   const pending=owner?.pulse?.pending??owner?.pending??null;
+   return {aimOwner:g.input.stickId?.aim??null,aimActive:!!g.input.aim.active,
+    aimDx:g.input.aim.dx,aimDy:g.input.aim.dy,
+    pendingPointer:pending?.id??null,physicalFiring:!!g.input.firing};
+  }finally{if(owner)owner.detach();g.destroy();}
+ });
+}
+test('rapid second touch is accepted by baseline Input; pending-shot research reports ownership conflict',()=>{
+ const baseline=observe('baseline');
+ assert.equal(baseline.aimOwner,12,'real Game must accept the new right-stick touch after release');
+ assert.equal(baseline.aimActive,true);
+ const subtick=observe('subtick'),explicit=observe('explicit');
+ // Do not freeze today's failure as an acceptance criterion: a future
+ // correction should be allowed to preserve pointer #12.
+ for(const row of [subtick,explicit]){
+  assert.ok(row.aimOwner===11||row.aimOwner===12||row.aimOwner===null,
+   'research owner must not invent a pointer identity');
+ }
+ console.log('RAPID_RETARGET_OWNERSHIP '+JSON.stringify({baseline,subtick,explicit,
+  caveat:'constructed 8ms inter-gesture interval; real Game/Input, not physical Android'}));
+});
