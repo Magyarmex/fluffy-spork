@@ -112,3 +112,29 @@ test('translated canvas cannot steal a recovered right-stick flick',()=>{
   assert.equal(g.input.firing,false);
  }finally{if(owner)owner.detach();g.destroy();}
 });
+
+test('canvas translation cannot convert pointercancel into a recovered shot',()=>{
+ const {DirectShotIntent}=require('../research/direct-shot-intent.cjs');
+ const g=bootGame();
+ let owner;
+ try{
+  g.sfx.muted=true;g.input.autofire=false;
+  let now=1000,left=0;
+  g.input.canvas.getBoundingClientRect=()=>({left,top:0,width:800,height:400,right:left+800,bottom:400});
+  const timeline=new ChronologicalInput(g.input);
+  const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
+  owner=new DirectShotIntent(g,{window:g.__testWindow,document:g.__testWindow.document,
+    rebindDomListeners:false});
+  const e=(type,stamp,x)=>({type,timeStamp:stamp,pointerType:'touch',
+    pointerId:22,clientX:x,clientY:200,button:0,
+    buttons:type==='pointerdown'?1:0,target:{closest:()=>null}});
+  now=1020;bridge.capture(e('pointerdown',1010,600));
+  bridge.capture(e('pointercancel',1012,640));
+  left=500;timeline.consumeThrough(.02);
+  assert.equal(owner.pending,null);
+  g.update(1/60);
+  assert.equal(owner.intents,0);
+  assert.equal(g.input.aim.active,false);
+  assert.equal(g.input.firing,false);
+ }finally{if(owner)owner.detach();g.destroy();}
+});
