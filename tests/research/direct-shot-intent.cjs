@@ -15,6 +15,7 @@ class DirectShotIntent {
       throw Error('invalid direct intent event origin');
     if(typeof rebindDomListeners!=='boolean')throw Error('invalid DOM ownership option');
     if(typeof requireTrustedDuration!=='boolean'||(requireTrustedDuration&&eventOriginMs===null))throw Error('trusted duration requires event origin');
+    if(requireTrustedDuration&&maxIntentAgeMs===Infinity)throw Error('trusted duration requires finite release freshness');
     if(!Number.isFinite(maxTrustedPressMs)||maxTrustedPressMs<=0)throw Error('invalid unsampled press ceiling');
     this.requireTrustedDuration=requireTrustedDuration;
     this.maxTrustedPressMs=maxTrustedPressMs;
