@@ -23,7 +23,9 @@ function scenario(cls,{duration=30,delay=10,invalid=null,cancel=false}={}){
    __novaOriginalAt:at,__novaTimestampTrusted:true,
    target:{closest:()=>null}});
   try{
-   i.pd(e('pointerdown',invalid==='untrustedDown'?0:downAt,1,600));
+   const down=e('pointerdown',downAt,1,600);
+   if(invalid==='untrustedDown')down.__novaTimestampTrusted=false;
+   i.pd(down);
    i.pm(e('pointermove',downAt+.001,1,640));
    const up=e(cancel?'pointercancel':'pointerup',
      invalid==='reversed'?downAt-.001:invalid==='prestart'?0:upAt,0,640);
@@ -69,5 +71,12 @@ test('invalid, reversed, canceled or stale physical events cannot earn Sniper ch
   assert.equal(canceled.first.length,0);assert.equal(canceled.intents,0);
   const stale=scenario(cls,{delay:101});
   assert.equal(stale.first.length,0);assert.equal(stale.rejectedStale,1);
+  // A long hold during a browser stall never earns an almost-full rail
+  // merely because no simulation update sampled the physical press.
+  for(const duration of [101,250,1000]){
+   const long=scenario(cls,{duration,delay:10});
+   assert.equal(long.first.length,0,cls+' unsampled '+duration+'ms');
+   assert.equal(long.intents,0);
+  }
  }
 });
