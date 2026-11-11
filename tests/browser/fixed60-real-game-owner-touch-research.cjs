@@ -208,7 +208,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     if(window.__novaFixedMaxSteps>=3){
      const baseAdvance=pilot.owner.advance;
      pilot.owner.advance=function(ts){
-      this.maxSteps=Math.max(0,ts-this.lastMs)>100+1e-7?2:3;
+      this.maxSteps=Math.max(0,ts-this.lastMs)>100+1e-7?2:window.__novaFixedMaxSteps;
       return baseAdvance.call(this,ts);
      };
     }
