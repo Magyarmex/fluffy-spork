@@ -29,8 +29,8 @@ function patchEngineHtml(html){
 }
 function patchController(js){
  return once(js,
-  'var wx = projection.x + (input.mouseX - rect.left - this.w * .5) / projection.zoom;\\n              var wy = projection.y + (input.mouseY - rect.top - this.h * .5) / projection.zoom;',
-  'var shotIntent = input.__novaShotIntent;\\n              var wx = shotIntent && shotIntent.world ? shotIntent.world.x : projection.x + (input.mouseX - rect.left - this.w * .5) / projection.zoom;\\n              var wy = shotIntent && shotIntent.world ? shotIntent.world.y : projection.y + (input.mouseY - rect.top - this.h * .5) / projection.zoom;',
+  'var wx = projection.x + (input.mouseX - rect.left - this.w * .5) / projection.zoom;\n              var wy = projection.y + (input.mouseY - rect.top - this.h * .5) / projection.zoom;',
+  'var shotIntent = input.__novaShotIntent;\n              var wx = shotIntent && shotIntent.world ? shotIntent.world.x : projection.x + (input.mouseX - rect.left - this.w * .5) / projection.zoom;\n              var wy = shotIntent && shotIntent.world ? shotIntent.world.y : projection.y + (input.mouseY - rect.top - this.h * .5) / projection.zoom;',
   'Controller rendered mouse correction');
 }
 function patchDisciplines(js){
