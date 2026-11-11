@@ -142,3 +142,34 @@ test('actual browser-event bridge retains both physical edges for Sniper charge'
   }finally{direct.detach();capture.detach();i.detach();g.destroy();}
  }
 });
+
+test('rapid retarget keeps only the newest physical press duration and aim owner',()=>{
+ const g=bootGame(),i=g.input;g.sfx.muted=true;i.autofire=false;
+ g.setClass(g.player,'prism');g.player.fireCd=0;g.status='playing';g.paused=false;
+ const owner=new DirectShotIntent(g,{window:g.__testWindow,
+  document:g.__testWindow.document,rebindDomListeners:false,
+  requireTrustedDuration:true,eventOriginMs:1000,maxIntentAgeMs:100,
+  nowMs:()=>1270});
+ const e=(type,id,at,x,y,buttons)=>({type,pointerType:'touch',
+  pointerId:id,button:0,buttons,clientX:x,clientY:y,
+  __novaOriginalAt:at,__novaTimestampTrusted:true,
+  target:{closest:()=>null}});
+ try{
+  i.pd(e('pointerdown',11,.140,600,200,1));
+  i.pm(e('pointermove',11,.141,640,200,1));
+  i.pu(e('pointerup',11,.170,640,200,0));
+  i.pd(e('pointerdown',12,.180,600,200,1));
+  i.pm(e('pointermove',12,.181,600,260,1));
+  i.pu(e('pointerup',12,.260,600,260,0));
+  assert.equal(owner.pendingSource.id,12,'new pointer owns pending shot');
+  assert.ok(Math.abs(owner.pending.durationMs-80)<1e-7);
+  assert.ok(owner.pending.aim.y>.9,'new aim direction wins');
+  g.update(1/60);
+  const rails=g.bullets.filter(b=>b.ownerId===g.player.id&&b.beam);
+  assert.equal(rails.length,2,'one Prism twin-barrel volley');
+  assert.ok(rails.every(b=>Math.abs(b.__novaCharge-.2)<1e-8),
+   'only newer 80ms physical press determines quick charge');
+  assert.equal(owner.intents,1);
+  assert.equal(i.stickId.aim,-1);
+ }finally{owner.detach();g.destroy();}
+});
