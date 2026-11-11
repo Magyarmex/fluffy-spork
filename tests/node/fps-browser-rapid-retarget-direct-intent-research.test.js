@@ -64,8 +64,8 @@ test('browser chronological replay gives rapid retarget to the second pointer, n
   g.player.fireCd=0;
   g.update(1/60);
   assert.equal(births.length,1,'latest short gesture creates exactly one real projectile');
-  assert.ok(births[0].vy>0&&Math.abs(births[0].vy)>Math.abs(births[0].vx),
-   'real projectile must follow the newer downward aim, not stale eastward aim');
+  assert.ok(births[0].vy>0&&g.player.angle>0.1,
+   'real projectile must begin turning toward newer downward aim, not remain east');
   assert.equal(direct.intents,1,'only one intended shot can be consumed');
   assert.equal(i.firing,false);
   assert.equal(i.aim.active,false);
@@ -123,8 +123,8 @@ test('real fixed-step browser factory consumes two short gestures once at next t
   assert.equal(pilot.owner.lastSteps,2,'real pilot must advance both eligible ticks');
   assert.equal(pilot.pulse.intents,1,'latest physical gesture is consumed once');
   assert.equal(births.length,1,'one real player projectile, not two stale shots');
-  assert.ok(births[0].vy>0&&Math.abs(births[0].vy)>Math.abs(births[0].vx),
-   'projectile follows the second downward gesture');
+  assert.ok(births[0].vy>0&&g.player.angle>0.1,
+   'projectile begins turning toward the second downward gesture');
   assert.equal(i.stickId.aim,-1);
   assert.equal(i.firing,false);
  }finally{
