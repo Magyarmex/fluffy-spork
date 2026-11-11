@@ -64,8 +64,9 @@ class BrowserEventTimeline {
             size={width:rect.width,height:rect.height};
         }catch(_){/* Unavailable layout is not evidence of a safe resize. */}
       }
-      if(this.activeTouchIds.size && this.activeTouchSize &&
-         (!size || size.width!==this.activeTouchSize.width ||
+      if(this.activeTouchIds.size &&
+         (!this.activeTouchSize || !size ||
+          size.width!==this.activeTouchSize.width ||
           size.height!==this.activeTouchSize.height)){
         for(const heldId of this.activeTouchIds)this.suppressedTouchIds.add(heldId);
         if(!released)this.suppressedTouchIds.add(id);
