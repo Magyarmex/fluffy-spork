@@ -17,7 +17,14 @@ function patchSniper(source){
           pl === plBefore && pl.alive && isRailTank(pl) &&
           !wasHeld && pl.fireCd <= 0 && pl.__novaFocusStart) {
         resetFocus(pl);
-        fireRail(this, pl, false, 0.05);
+        // Charge reflects the physical held duration, never the delayed
+        // simulation callback. Unknown provenance retains minimum-charge
+        // behavior only in the legacy non-strict research fixture.
+        var durationMs = releasedIntent.durationMs;
+        var quickCharge = typeof durationMs === 'number' &&
+          isFinite(durationMs) && durationMs >= 0 ?
+          railCharge(pl, durationMs, 0.05, 0.96) : 0.05;
+        fireRail(this, pl, false, quickCharge);
       }
       var heldAfter = !!(this.input && (this.input.firing || this.input.autofire));`;
  return source.replace(needle,replacement);

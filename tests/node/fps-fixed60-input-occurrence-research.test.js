@@ -107,6 +107,8 @@ test('bounded future browser skew cannot grant recovered shots extra freshness',
   s.timeline.consumeThrough(.06);
   assert.equal(s.seen.length,2);
   assert.deepEqual(s.seen.map(e=>e.__novaTimestampTrusted),[true,true]);
+  assert.deepEqual(s.seen.map(e=>e.__novaPhysicalTimestampExact),[false,true],
+    'future-skew clamp remains chronological but cannot claim exact physical duration');
   assert.ok(s.seen.every(e=>Math.abs(e.__novaOriginalAt-.05)<1e-10));
   assert.equal(s.bridge.futureSkewClamps,1);
   assert.equal(s.bridge.futureClamps,0);

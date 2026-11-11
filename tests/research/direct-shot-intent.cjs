@@ -4,7 +4,7 @@
  * A short aimed press+release is an intent for ONE next simulation update,
  * never a held physical right stick or a Controller drone command. */
 class DirectShotIntent {
-  constructor(game,{window:win,document:doc,maxIntentAgeMs=Infinity,nowMs=null,eventOriginMs=null,rebindDomListeners=true}={}) {
+  constructor(game,{window:win,document:doc,maxIntentAgeMs=Infinity,nowMs=null,eventOriginMs=null,rebindDomListeners=true,requireTrustedDuration=false,maxTrustedPressMs=100}={}) {
     if(!game||!game.input||!win||!doc||typeof game.update!=='function'||
        typeof game.setPaused!=='function'||typeof win.addEventListener!=='function'||
        typeof win.removeEventListener!=='function'||typeof doc.addEventListener!=='function'||
@@ -14,6 +14,11 @@ class DirectShotIntent {
     if(eventOriginMs!==null&&!Number.isFinite(eventOriginMs))
       throw Error('invalid direct intent event origin');
     if(typeof rebindDomListeners!=='boolean')throw Error('invalid DOM ownership option');
+    if(typeof requireTrustedDuration!=='boolean'||(requireTrustedDuration&&eventOriginMs===null))throw Error('trusted duration requires event origin');
+    if(requireTrustedDuration&&maxIntentAgeMs===Infinity)throw Error('trusted duration requires finite release freshness');
+    if(!Number.isFinite(maxTrustedPressMs)||maxTrustedPressMs<=0)throw Error('invalid unsampled press ceiling');
+    this.requireTrustedDuration=requireTrustedDuration;
+    this.maxTrustedPressMs=maxTrustedPressMs;
     this.rebindDomListeners=rebindDomListeners;
     this.game=game;this.input=game.input;this.win=win;this.doc=doc;
     this.maxIntentAgeMs=maxIntentAgeMs;this.nowMs=nowMs;this.eventOriginMs=eventOriginMs;
@@ -34,6 +39,17 @@ class DirectShotIntent {
         return Number.isFinite(physical)?physical:NaN;
       }
       return this.stamp();
+    };
+    // Both edges must come from trusted physical browser timestamps. A delayed
+    // replay callback must never inflate a Sniper charge.
+    this.physicalStamp=e=>{
+      if(this.eventOriginMs===null||!e||e.__novaTimestampTrusted!==true||
+         (this.requireTrustedDuration ? e.__novaPhysicalTimestampExact!==true :
+          e.__novaPhysicalTimestampExact===false)||
+         !Object.prototype.hasOwnProperty.call(e,'__novaOriginalAt')||
+         !Number.isFinite(e.__novaOriginalAt)||e.__novaOriginalAt<=0)return NaN;
+      const at=this.eventOriginMs+e.__novaOriginalAt*1000;
+      return Number.isFinite(at)?at:NaN;
     };
     this.down=null;this.pending=null;this.intents=0;this.canceled=0;
     const i=this.input,self=this;
@@ -87,10 +103,10 @@ class DirectShotIntent {
       if(!e||!e.pointerType||game.status!=='playing'||game.paused||doc.hidden||
          i.__novaInputPaused||e.target&&typeof e.target.closest==='function'&&e.target.closest('[data-ui]'))return result;
       if(e.pointerType==='mouse'){
-        if(e.button===0&&!prior&&i.firing&&!i.touchSeen){self.pending=null;self.pendingAt=null;self.pendingSource=null;self.pendingPlayer=null;self.down={type:'mouse',id:e.pointerId,sampled:false,player:game.player};}
+        if(e.button===0&&!prior&&i.firing&&!i.touchSeen){self.pending=null;self.pendingAt=null;self.pendingSource=null;self.pendingPlayer=null;self.down={type:'mouse',id:e.pointerId,sampled:false,player:game.player,pressedAt:self.physicalStamp(e)};}
       }else if((e.pointerType==='touch'||e.pointerType==='pen')&&
          oldAimId!==e.pointerId&&i.stickId.aim===e.pointerId&&i.aim.active){
-        self.pending=null;self.pendingAt=null;self.pendingSource=null;self.pendingPlayer=null;self.down={type:e.pointerType,id:e.pointerId,sampled:false,player:game.player};
+        self.pending=null;self.pendingAt=null;self.pendingSource=null;self.pendingPlayer=null;self.down={type:e.pointerType,id:e.pointerId,sampled:false,player:game.player,pressedAt:self.physicalStamp(e)};
       }
       return result;
     };
@@ -132,11 +148,18 @@ class DirectShotIntent {
       }
       if(same){self.down=null;
         if(canceled){self.clear();return result;}
-        if(eligible){const shotMouse=mouse?self.captureMouse(e):null;
+        const releasedAt=self.physicalStamp(e);
+        const durationMs=releasedAt-d.pressedAt;
+        const trustedDuration=Number.isFinite(d.pressedAt)&&Number.isFinite(releasedAt)&&
+          Number.isFinite(durationMs)&&durationMs>=0&&
+          durationMs<=self.maxTrustedPressMs+1e-6;
+        if(eligible&&(!self.requireTrustedDuration||trustedDuration)){
+          const shotMouse=mouse?self.captureMouse(e):null;
           self.pending=Object.freeze({fire:true,
           aim:mouse?null:Object.freeze({x:dx/len,y:dy/len}),
           mouse:shotMouse,world:shotMouse&&shotMouse.world,
-          depth:mouse?null:Math.max(.08,Math.min(1,(len-5)/55))});
+          depth:mouse?null:Math.max(.08,Math.min(1,(len-5)/55)),
+          durationMs:trustedDuration?durationMs:null});
           self.pendingAt=self.maxIntentAgeMs===Infinity?null:self.releaseStamp(e);
           self.pendingSource=Object.freeze({type:d.type,id:d.id});
           self.pendingPlayer=d.player;}
@@ -205,17 +228,23 @@ class DirectShotIntent {
      * Pointer Events pointer: no second pointerdown/up is dispatched. */
     this.nativeDown=e=>{
       if(!e||e.button!==0||i.touchSeen||game.status!=='playing'||game.paused||doc.hidden)return;
-      if(!self.down){self.pending=null;self.pendingAt=null;self.pendingSource=null;self.pendingPlayer=null;self.down={type:'mouse',id:1,sampled:false,player:game.player};}
+      if(!self.down){self.pending=null;self.pendingAt=null;self.pendingSource=null;self.pendingPlayer=null;self.down={type:'mouse',id:1,sampled:false,player:game.player,pressedAt:self.physicalStamp(e)};}
     };
     this.nativeUp=e=>{
       if(!e||e.button!==0||!self.down||self.down.type!=='mouse')return;
       const d=self.down;self.down=null;
       if(Number.isFinite(e.clientX))i.mouseX=e.clientX;
       if(Number.isFinite(e.clientY))i.mouseY=e.clientY;
-      if(!d.sampled&&game.status==='playing'&&!game.paused&&!doc.hidden&&!i.__novaInputPaused&&i.mouseActive)
+      const releasedAt=self.physicalStamp(e),durationMs=releasedAt-d.pressedAt;
+      const trustedDuration=Number.isFinite(d.pressedAt)&&Number.isFinite(releasedAt)&&
+        Number.isFinite(durationMs)&&durationMs>=0&&
+        durationMs<=self.maxTrustedPressMs+1e-6;
+      if(!d.sampled&&game.status==='playing'&&!game.paused&&!doc.hidden&&!i.__novaInputPaused&&i.mouseActive&&
+         (!self.requireTrustedDuration||trustedDuration))
         {const shotMouse=self.captureMouse(e);
          self.pending=Object.freeze({fire:true,aim:null,
-          mouse:shotMouse,world:shotMouse.world,depth:null});
+          mouse:shotMouse,world:shotMouse.world,depth:null,
+          durationMs:trustedDuration?durationMs:null});
          self.pendingAt=self.maxIntentAgeMs===Infinity?null:self.releaseStamp(e);
          self.pendingSource=Object.freeze({type:'mouse',id:d.id});
          self.pendingPlayer=d.player;}

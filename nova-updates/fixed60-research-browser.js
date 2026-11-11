@@ -76,6 +76,7 @@ class ChronologicalInput {
       const d = e.data;
       const evt = {type:e.kind, __novaOriginalAt:d.__novaOriginalAt,
         __novaTimestampTrusted:d.__novaTimestampTrusted,
+        __novaPhysicalTimestampExact:d.__novaPhysicalTimestampExact,
         __novaReplayAt:e.at, __novaSampleAt:end,
         pointerId:d.pointerId, pointerType:d.pointerType,
         clientX:d.clientX, clientY:d.clientY, buttons:d.buttons,
@@ -197,26 +198,29 @@ class BrowserEventTimeline {
     if (!Number.isFinite(now)) throw Error('invalid browser clock');
     let stamp = Number(event.timeStamp);
     let timestampTrusted = true;
+    // A tolerated future-clock skew can be safe for input ordering but must
+    // not masquerade as an exact physical hold duration for Sniper charge.
+    let timestampExact = true;
     if (!Number.isFinite(stamp) || stamp <= 0) {
       stamp = now;
-      timestampTrusted = false;
+      timestampTrusted = false;timestampExact = false;
       this.invalidTimestamps++;
     } else if (stamp > 1e11) {
       // Older WebKit browsers reported Unix-epoch milliseconds. Convert only
       // with a valid clock origin; otherwise prefer delivery time.
       const origin = Number(this.clock.timeOrigin);
       if (Number.isFinite(origin) && origin > 1e11) stamp -= origin;
-      else { stamp = now; timestampTrusted = false; this.invalidTimestamps++; }
+      else { stamp = now; timestampTrusted = false; timestampExact = false; this.invalidTimestamps++; }
     }
     if (stamp > now + this.maxFutureMs) {
       stamp = now;
-      timestampTrusted = false;
+      timestampTrusted = false;timestampExact = false;
       this.futureClamps++;
     } else if (stamp > now) {
       // A tolerated browser clock skew must not give a recovered shot
       // negative age or extra freshness budget. Preserve trusted provenance
       // only for bounded skew, but never claim the event occurred in future.
-      stamp = now;
+      stamp = now;timestampExact = false;
       this.futureSkewClamps++;
     }
     if (stamp < now - this.maxStaleMs) {
@@ -298,6 +302,7 @@ class BrowserEventTimeline {
     const target = event.target;
     const data = event.type === 'blur' ? {} : {
       __novaOriginalAt: originalAt, __novaTimestampTrusted: timestampTrusted,
+      __novaPhysicalTimestampExact: timestampExact,
       pointerId: event.pointerId, pointerType: event.pointerType,
       clientX: event.clientX, clientY: event.clientY,
       button: event.button, buttons: event.buttons,
