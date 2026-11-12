@@ -8,7 +8,7 @@ const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
 const {FixedStepRafOwner}=require('../research/fixed-step-raf-owner.cjs');
 const TICKS=360,DT=1/60;
-function encounter(cls,seed,fixed30){
+function encounter(cls,seed,fixed30,playerMoveY=0){
  return withSeed(seed,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   const p=g.player;g.sfx.muted=true;g.sfx.startMusic=()=>{};
@@ -40,9 +40,10 @@ function encounter(cls,seed,fixed30){
    }
    return nearest.apply(this,arguments);
   };
-  g.input.moveVec=()=>({x:0,y:0});
+  g.input.moveVec=()=>({x:0,y:playerMoveY});
   const initialTime=g.time;
   let updates=0,travel=0,volleys=0,hits=0,damage=0;
+  
   const births=[],contacts=[];
   const originalDrones=g.updateDrones;
   g.updateDrones=function(dt){
@@ -105,6 +106,8 @@ function encounter(cls,seed,fixed30){
     assert.equal(owner.droppedFrames,0);
    }else for(let tick=0;tick<TICKS;tick++)g.update(DT);
    assert.equal(updates,TICKS,'every real Game tick must move the target');
+   assert.ok(playerMoveY===0?Math.abs(p.y)<1e-6:p.y>5,
+    'player movement must follow the real Game owner');
    assert.ok(travel>50,'target must cross the projectile corridor');
    assert.ok(volleys>0&&hits>0&&damage>0,'real damage required');
    assert.ok(vetoes>0,'manual aim assist veto must execute');
@@ -112,7 +115,8 @@ function encounter(cls,seed,fixed30){
    assert.equal(g.shapes.length+g.drones.length+g.powerups.length,0);
    return {cls,seed,volleys,hits,damage:+damage.toFixed(5),
     births,contacts,travel:+travel.toFixed(5),
-    targetY:+target.y.toFixed(5),remainingBullets:g.bullets.length,
+    targetY:+target.y.toFixed(5),playerY:+p.y.toFixed(5),
+    remainingBullets:g.bullets.length,
     heat:+(p.__v17Heat||0).toFixed(6),
     spin:+(p.fireSpin||0).toFixed(6)};
   }finally{if(owner)owner.stop();g.destroy();}
@@ -126,7 +130,16 @@ test('fixed60 30Hz presentation preserves real moving-target Gunner HP and proje
    const recovered=encounter(cls,seed,true);
    assert.deepEqual(recovered,reference,
     cls+' seed '+seed+' moving-target contact diverged');
+   const movingReference=encounter(cls,seed,false,.025);
+   const movingFixed=encounter(cls,seed,true,.025);
+   assert.deepEqual(movingFixed,movingReference,
+    cls+' seed '+seed+' moving-player birth/contact diverged');
+   assert.ok(movingReference.births.some((b,i)=>
+    Math.abs(b[2]-reference.births[i][2])>.1),
+    'real player movement must change projectile muzzle origin');
    rows.push({cls,seed,damage:reference.damage,hits:reference.hits,
+    movingDamage:movingReference.damage,movingHits:movingReference.hits,
+    playerEndY:movingReference.playerY,
     volleys:reference.volleys,travel:reference.travel});
   }
  console.log('GUNNER_FIXED60_MOVING_TARGET_DAMAGE_PARITY '+JSON.stringify(rows));
