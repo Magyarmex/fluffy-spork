@@ -152,6 +152,10 @@ jobs:
           node tests/browser/fixed60-real-game-owner-touch-research.cjs
           NOVA_FIXED60_MAX_STEPS=3 node tests/browser/fixed60-real-game-owner-touch-research.cjs
           NOVA_FIXED60_MAX_STEPS=3 NOVA_FIXED60_ACTIVE_BURST=1 node tests/browser/fixed60-real-game-owner-touch-research.cjs
+          # Opt-in exact-source pose presenter through the same real Game/Canvas
+          # path. The existing OFF run above remains the control; no production
+          # interpolation or scheduler switch is enabled.
+          NOVA_FIXED60_MAX_STEPS=3 NOVA_FIXED60_POSE_PRESENTATION=1 node tests/browser/fixed60-real-game-owner-touch-research.cjs
           # Research-only controlled RAF delivery: run the two-step baseline
           # before the three-step candidate. Both use browser timestamps,
           # trusted touch, real Game updates, and the same 30Hz gate policy.
