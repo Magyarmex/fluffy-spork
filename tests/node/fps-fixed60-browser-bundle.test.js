@@ -18,7 +18,8 @@ test('browser research bundle is deterministic and matches exact source graph',(
   'regenerate research bundle after any source module changes');
  assert.deepEqual(MODULES,[
   'fixed-step-dom-input.cjs','fixed-step-browser-events.cjs',
-  'fixed-step-browser-capture.cjs','fixed-step-raf-owner.cjs']);
+  'fixed-step-browser-capture.cjs','fixed-step-raf-owner.cjs',
+  'fixed-step-presentation.cjs']);
 });
 
 test('browser artifact loads without CommonJS or starting a game',()=>{
@@ -31,6 +32,7 @@ test('browser artifact loads without CommonJS or starting a game',()=>{
  assert.ok(Object.isFrozen(api));
  assert.equal(typeof api.FixedStepRafOwner,'function');
  assert.equal(typeof api.createFixedStepBrowserPilot,'function');
+ assert.equal(typeof api.FixedStepPosePresentation,'function');
  assert.equal(api.STEP_MS,1000/60);
  assert.equal(requests,0,'import must never start a scheduler');
  assert.equal(sandbox.__novaFixed60Research,undefined,
