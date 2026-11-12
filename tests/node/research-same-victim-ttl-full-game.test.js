@@ -22,7 +22,7 @@ function trial(hz,reverse,fullUpdate,only=null,targetX=40,mutate=null){
   p.vx=0;p.vy=0;
   const owners=[101,102].map((id,i)=>({
    kind:'tank',id,cls:'scout',x:-1200,y:i?1000:-1000,
-   hp:100,maxHp:100,level:1,kills:0,streak:0,name:'Owner '+id,alive:true,vx:0,vy:0,spawnShieldT:0,shieldT:0
+   hp:100,maxHp:100,level:1,xp:0,score:0,kills:0,streak:0,name:'Owner '+id,alive:true,vx:0,vy:0,spawnShieldT:0,shieldT:0
   }));
   g.tanks=[p];
   g.tankById=new Map([[p.id,p]]);
@@ -64,7 +64,7 @@ function trial(hz,reverse,fullUpdate,only=null,targetX=40,mutate=null){
    if(fullUpdate)g.update(1/hz);
    else {g.updateBullets(1/hz);g.time+=1/hz;}
   }
-  return {hp:p.hp,contacts,kills,remaining:g.bullets.map(b=>b.id),
+  return {hp:p.hp,contacts,kills,ownerStats:owners.map(o=>({id:o.id,kills:o.kills,xp:o.xp,score:o.score})),remaining:g.bullets.map(b=>b.id),
    target:{x:p.x,y:p.y,alive:p.alive,shield:p.spawnShieldT,
     sweepTime:p.__novaSweepMoveTime,sweepX:p.__novaSweepPrevX},
    game:{time:g.time,status:g.status,shapeSweep:g.__novaShapeSweepActive}};
@@ -170,4 +170,8 @@ for(const hz of [30,60,120,240])for(const reverse of [false,true])
      'the second chronological contact must kill the 45-HP hull');
    assert.deepEqual(result.kills,[102],
      'the actual kill callback must credit the later physical shooter');
+   assert.equal(result.ownerStats[0].kills,0);
+   assert.equal(result.ownerStats[1].kills,1);
+   assert.ok(result.ownerStats[1].xp>0&&result.ownerStats[1].score>0,
+     'the later shooter must receive the actual kill XP and score');
   });
