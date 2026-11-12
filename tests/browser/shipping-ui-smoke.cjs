@@ -74,6 +74,23 @@ async function scenario(browser, label, options) {
     assert.equal(menu.decorative,true,label+': War Room must be visible');
     assert.equal(menu.active,false,label+': War Room must not impersonate active game');
     if(label==='mobile-320'){
+      // Validate the actual materialized overlay chain, not only the isolated
+      // Fieldcraft/Live Vector source modules: contextual controls can select
+      // the three registered Controller mechanics.
+      const controllerLessons=await page.evaluate(()=>{
+        const all=window.NOVATips?.current?.()||[];
+        return ['controller-live-vector','controller-designation-weave',
+          'controller-deep-defense-cost'].map(id=>{
+          const t=all.find(item=>item.id===id);
+          return {id,tags:t?.tags||[],count:all.filter(item=>item.id===id).length};
+        });
+      });
+      for(const lesson of controllerLessons){
+        assert.equal(lesson.count,1,label+': missing or duplicate Controller lesson '+lesson.id);
+        for(const tag of ['controller','drones','controls'])
+          assert.ok(lesson.tags.includes(tag),label+': '+lesson.id+' missing '+tag+
+            ' in actual shipping Fieldcraft registry');
+      }
       // Assert the actual shipping React lobby, not just the isolated menu
       // module: the historical Signal Flow overlay must not relabel the
       // current Living Front release or churn the footer on unrelated updates.
