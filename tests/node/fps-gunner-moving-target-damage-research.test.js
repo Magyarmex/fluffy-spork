@@ -118,10 +118,10 @@ test('matched moving-target chronology measures real rotary damage under irregul
   for(const seed of [1517800,1517802]){
    for(const offset of [.007,.012])
     for(const mode of ['native60','cluster30','alternating40_120']){
-     const row=trial(seed,cls,reload,mode,offset,12);
-     const repeat=trial(seed,cls,reload,mode,offset,12);
+     const row=trial(seed,cls,reload,mode,offset,26);
+     const repeat=trial(seed,cls,reload,mode,offset,26);
      assert.deepEqual(row,repeat,'seeded composed simulation must reproduce');
-     assert.ok(row.peakOffset>11.9&&row.travel>50,'target must actually traverse the projectile corridor');
+     assert.ok(row.peakOffset>25.9&&row.travel>50,'target must actually traverse the projectile corridor');
      rows.push(row);
     }
   }
