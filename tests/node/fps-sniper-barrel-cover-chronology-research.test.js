@@ -171,12 +171,11 @@ test('research: narrow-cover 20u Sniper displacement changes actual hostile HP c
 // this is a physical movement+trajectory test, NOT an isolated origin effect.
 // It remains research-only: no browser event delivery or natural match rate.
 test('research: one ordinary movement tick can change narrow-cover Sniper first contact',()=>{
- const still=scenario('railgun',8,12,true,false);
  const moving=scenario('railgun',8,12,true,true);
  const velocityOnly=scenario('railgun',8,12,true,true,true);
- const displacement=moving.playerY-still.playerY;
- assert.ok(Math.abs(velocityOnly.playerY-still.playerY)<1e-6,
-  'the velocity-only counterfactual must retain the original firing hull position');
+ const displacement=moving.playerY-velocityOnly.playerY;
+ assert.ok(Math.abs(velocityOnly.playerY-8)<1e-6,
+  'the velocity-only counterfactual must retain the physical release hull position');
  assert.ok(Math.abs(velocityOnly.traces[0].dy-moving.traces[0].dy)<1e-6,
   'velocity-only and real-movement shots must inherit identical projectile bearing');
  assert.equal(velocityOnly.traces[0].blocked,true,
@@ -185,8 +184,6 @@ test('research: one ordinary movement tick can change narrow-cover Sniper first 
   'inherited velocity alone must not damage the protected target');
  assert.ok(displacement>1.5&&displacement<3,
   'real 60Hz movement owner should advance a steady Railgun only a few units');
- assert.equal(still.traces[0].blocked,true,'release position must be behind narrow cover');
- assert.equal(still.targetDamage,0,'covered rail cannot damage target');
  const shotOriginShift=moving.traces[0].y-velocityOnly.traces[0].y;
  // Characterize current delayed-position firing without requiring it forever.
  // A future release-origin fix should pass with the covered/zero-HP branch.
@@ -201,6 +198,6 @@ test('research: one ordinary movement tick can change narrow-cover Sniper first 
    'release-origin rail must remain covered even when the hull moves afterward');
   assert.equal(moving.targetDamage,0,'covered release-origin rail must not damage target');
  }
- console.log('SNIPER_ONE_TICK_MOVEMENT_COVER '+JSON.stringify({still,velocityOnly,moving,displacement,shotOriginShift,
+ console.log('SNIPER_ONE_TICK_MOVEMENT_COVER '+JSON.stringify({velocityOnly,moving,displacement,shotOriginShift,
   limitation:'constructed 12u-high permanent wall and pre-existing steady velocity; real movement owner, but not a natural match or browser-trusted event'}));
 });
