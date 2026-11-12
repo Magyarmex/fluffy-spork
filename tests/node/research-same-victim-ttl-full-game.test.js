@@ -22,7 +22,7 @@ function trial(hz,reverse,fullUpdate,only=null,targetX=40,mutate=null){
   p.vx=0;p.vy=0;
   const owners=[101,102].map((id,i)=>({
    kind:'tank',id,cls:'scout',x:-1200,y:i?1000:-1000,
-   hp:100,alive:true,vx:0,vy:0,spawnShieldT:0,shieldT:0
+   hp:100,maxHp:100,level:1,xp:0,score:0,kills:0,streak:0,name:'Owner '+id,alive:true,vx:0,vy:0,spawnShieldT:0,shieldT:0
   }));
   g.tanks=[p];
   g.tankById=new Map([[p.id,p]]);
@@ -49,17 +49,36 @@ function trial(hz,reverse,fullUpdate,only=null,targetX=40,mutate=null){
   // These pre-existing fixture projectile IDs must precede the live
   // frame-start allocation ceiling; otherwise they masquerade as newborns.
   g.nextId=Math.max(g.nextId||0,1200);
-  const contacts=[];
+  const contacts=[],kills=[],frameTrace=[];
+  const originalKill=g.killTank;
+  g.killTank=function(victim,killer){
+   if(victim===p)kills.push(killer&&killer.id);
+   return originalKill.apply(this,arguments);
+  };
   const original=g.damageTank;
   g.damageTank=function(t,damage,ownerId){
    if(t===p)contacts.push({ownerId,damage});
    return original.apply(this,arguments);
   };
   for(let frame=0;frame<20&&g.bullets.some(b=>b.id===201||b.id===202);frame++){
+   if(hz===240&&frame<3)frameTrace.push({phase:'before',frame,time:g.time,
+    epoch:g.__novaShapeSweepEpoch,frameStartEpoch:g.__novaFrameStartBulletEpoch,
+    frameStartIdCeiling:g.__novaFrameStartBulletIdCeiling,
+    bullets:g.bullets.filter(b=>b.id===201||b.id===202).map(b=>({
+     id:b.id,x:b.x,ttl:b.ttl,pen:b.pen,hits:b.hits,dead:b.dead,
+     victims:(b.__novaDirectVictims&&typeof b.__novaDirectVictims.values==='function')?
+      [...b.__novaDirectVictims].map(t=>t&&t.id):null})),hp:p.hp});
    if(fullUpdate)g.update(1/hz);
    else {g.updateBullets(1/hz);g.time+=1/hz;}
+   if(hz===240&&frame<3)frameTrace.push({phase:'after',frame,time:g.time,
+    epoch:g.__novaShapeSweepEpoch,frameStartEpoch:g.__novaFrameStartBulletEpoch,
+    frameStartIdCeiling:g.__novaFrameStartBulletIdCeiling,
+    bullets:g.bullets.filter(b=>b.id===201||b.id===202).map(b=>({
+     id:b.id,x:b.x,ttl:b.ttl,pen:b.pen,hits:b.hits,dead:b.dead,
+     victims:(b.__novaDirectVictims&&typeof b.__novaDirectVictims.values==='function')?
+      [...b.__novaDirectVictims].map(t=>t&&t.id):null})),hp:p.hp});
   }
-  return {hp:p.hp,contacts,remaining:g.bullets.map(b=>b.id),
+  return {hp:p.hp,contacts,kills,frameTrace,ownerStats:owners.map(o=>({id:o.id,kills:o.kills,xp:o.xp,score:o.score})),remaining:g.bullets.map(b=>b.id),
    target:{x:p.x,y:p.y,alive:p.alive,shield:p.spawnShieldT,
     sweepTime:p.__novaSweepMoveTime,sweepX:p.__novaSweepPrevX},
    game:{time:g.time,status:g.status,shapeSweep:g.__novaShapeSweepActive}};
@@ -136,4 +155,67 @@ for(const hz of [30,60,120,240])for(const reverse of [false,true])
   });
   assert.deepEqual(result.contacts.map(c=>c.ownerId).sort(),[101,102],
    'unrelated remote bullets cannot suppress either legitimate contact');
+ });
+
+
+/* Regression for #234: the original same-victim fast path
+ * explicitly refuses lethal or defense-changing callbacks. Here two ordinary
+ * hostile rounds contact one 45-HP hull before their 5ms TTL, at distinct
+ * physical times. A correct chronological solver must credit the later
+ * shooter with the kill, independent of bullet insertion order and FPS.
+ * This preserves normal damage and kill attribution; no balance change. */
+for(const hz of [30,60,120,240])for(const reverse of [false,true])
+ for(const fullUpdate of [false,true])
+  test('RESEARCH lethal same-victim TTL chronology '+hz+
+       'Hz reverse='+reverse+' fullUpdate='+fullUpdate,()=>{
+   const result=trial(hz,reverse,fullUpdate,null,40,(_g,p,bullets)=>{
+    bullets[1].dmg=30;
+    p.hp=45;p.maxHp=45;p.regenDelay=999;
+   });
+   const expectedFirst=(40-21)/6000;
+   const expectedSecond=(89-(40+21))/6000;
+   assert.ok(expectedFirst>0&&expectedFirst<expectedSecond&&
+     expectedSecond<.005,'both contacts must physically precede expiry');
+   assert.deepEqual(result.contacts.map(c=>c.ownerId),[101,102],
+     'earlier owner 101 damages first; later owner 102 must own the kill; trace='+JSON.stringify(result.frameTrace));
+   assert.equal(result.contacts.reduce((sum,c)=>sum+c.damage,0),50,
+     'no duplicate or missing damage across the lethal transition');
+   assert.equal(result.target.alive,false,
+     'the second chronological contact must kill the 45-HP hull');
+   assert.deepEqual(result.kills,[102],
+     'the actual kill callback must credit the later physical shooter');
+   assert.equal(result.ownerStats[0].kills,0);
+   assert.equal(result.ownerStats[1].kills,1);
+   assert.ok(result.ownerStats[1].xp>0&&result.ownerStats[1].score>0,
+     'the later shooter must receive the actual kill XP and score');
+  });
+
+/* Adversarial 240Hz carry-over controls: low HP alone must never
+ * authorize a later shot that cannot physically contact before TTL,
+ * or that is stopped by permanent cover. Keep the first real hit. */
+for(const hz of [30,60,120,240])for(const reverse of [false,true])
+ test('RESEARCH lethal carry-over refuses post-TTL contact '+hz+
+      'Hz reverse='+reverse,()=>{
+  const result=trial(hz,reverse,false,null,40,(_g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[1].dmg=30;bullets[1].x=100;
+  });
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[101],
+   'later shooter cannot receive a contact beyond physical TTL');
+  assert.equal(result.target.alive,true);
+  assert.deepEqual(result.kills,[]);
+ });
+for(const hz of [30,60,120,240])for(const reverse of [false,true])
+ test('RESEARCH lethal carry-over respects permanent cover '+hz+
+      'Hz reverse='+reverse,()=>{
+  const result=trial(hz,reverse,false,null,40,(g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[1].dmg=30;
+   g.__novaTerrain=[{id:-9102,shape:'rect',x:75,y:0,w:4,h:70,
+    solid:true,destructible:false}];
+  });
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[101],
+   'right-hand shot must not bypass its earlier permanent wall');
+  assert.equal(result.target.alive,true);
+  assert.deepEqual(result.kills,[]);
  });
