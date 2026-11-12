@@ -625,12 +625,34 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
   assert.deepEqual(expectedOverlays.filter(name=>!report.runtimeScriptNames.includes(name)),[],
    'every canonical materialized overlay must load (optional dynamic scripts are allowed)');
   assert.equal(report.researchFactoryPresent,true,'opt-in fixed60 research factory must be installed');
+  if(poseEnabled){
+   const poses=await page.evaluate(()=>({
+    samples:window.__novaFixedResearch.poseFrames,
+    interpolated:window.__novaFixedPresenter.interpolated,
+    teleportSkips:window.__novaFixedPresenter.teleportSkips,
+    frames:window.__novaFixedPresenter.frames
+   }));
+   assert.ok(poses.samples.length>2,'opt-in presenter must receive actual Game renders');
+   assert.equal(poses.frames,poses.samples.length,
+    'every research draw must pass through the real pose presenter');
+   assert.ok(poses.samples.every(f=>Number.isFinite(f.renderJsMs)&&
+    f.alpha>=0&&f.alpha<=1),'presenter must report bounded interpolation and JS cost');
+   assert.ok(poses.samples.some(f=>f.drawn&&f.physical&&f.camera),
+    'real Game render must sample player and camera poses');
+   console.log('NOVA_FIXED60_CHROMIUM_POSE '+JSON.stringify({
+    samples:poses.samples.length,interpolated:poses.interpolated,
+    teleportSkips:poses.teleportSkips,
+    renderJsP95:[...poses.samples.map(f=>f.renderJsMs)].sort((a,b)=>a-b)[
+     Math.ceil(.95*poses.samples.length)-1]
+   }));
+  }
   assert.deepEqual(errors,[],'browser errors');
   assert.deepEqual(consoleErrors,[],'browser console errors');
   const teardown=await page.evaluate(()=>{
    const g=window.__novaFixedGame,p=window.__novaFixedPilot;
    const Game=window.__novaMakeRequire('')('game/engine').Game;
    p.stop();
+   window.__novaFixedPresenter?.stop();
    const stopped={started:p.owner.started,captureActive:p.capture.active,
     raf:g.raf,inputRestored:g.input.canvas===g.canvas,
     startRestored:g.start===Game.prototype.start,
