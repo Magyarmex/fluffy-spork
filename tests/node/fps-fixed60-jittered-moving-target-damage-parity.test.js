@@ -95,7 +95,7 @@ function encounter(cls,seed,fixed30,playerMoveY=0,variable30=false){
    }
    return out;
   };
-  let owner=null,callback=null,now=1000;
+  let owner=null,callback=null,now=1000,peakSteps=0;
   try{
    if(fixed30){
     const timeline=new ChronologicalInput(g.input);
@@ -111,9 +111,10 @@ function encounter(cls,seed,fixed30,playerMoveY=0,variable30=false){
     for(let frame=1;frame<=TICKS/2;frame++){
      now=1000+Math.floor((frame-1)/3)*100+[38,65,100][(frame-1)%3];
      const fn=callback;assert.equal(typeof fn,'function','RAF ownership');
-     callback=null;fn(now);
+     callback=null;fn(now);peakSteps=Math.max(peakSteps,owner.lastSteps);
     }
     assert.equal(owner.ticks,TICKS,'all fixed60 ticks must execute');
+    assert.equal(peakSteps,3,'jitter must exercise the third catch-up step');
     assert.equal(owner.droppedMs,0,'bounded jittered 30Hz must not lose time');
     assert.equal(owner.droppedFrames,0);
    }else for(let tick=0;tick<(variable30?TICKS/2:TICKS);tick++)
