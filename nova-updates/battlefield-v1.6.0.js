@@ -739,15 +739,6 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    return value;
  };
  try{out=oldEntityBullets.call(this,dt);}finally{
-   /* Restore the original stable projectile array order after the core
-    * has consumed this frame's certified chronological pair. Do not
-    * resurrect or reorder bullets when the core changed membership. */
-   if(restoreLivePairOrder&&this.bullets.length===2&&
-      this.bullets.indexOf(restoreLivePairOrder[0])>=0&&
-      this.bullets.indexOf(restoreLivePairOrder[1])>=0){
-    this.bullets[0]=restoreLivePairOrder[0];
-    this.bullets[1]=restoreLivePairOrder[1];
-   }
    if(query){if(hadOwn)hash.query=query;else delete hash.query;}
    if(oldSplashForContacts){if(hadOwnSplash)this.splashAt=oldSplashForContacts;else delete this.splashAt;}
    for(var pi=0;pi<pending.length;pi++){
@@ -3791,7 +3782,17 @@ function certifiedMultiShotCoverPriority(g,dt){
       b.shell=false;
      }if(b.splash&&this.splashAt)this.splashAt(h.x,h.y,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.dead=true;if(this.addFlash)this.addFlash(h.x,h.y,s.destructible?'#8fd4ff':'#b9c7e7',Math.min(46,14+(b.dmg||0)*.24));if(this.cam&&b.dmg>42)this.cam.shake=Math.max(this.cam.shake,.08);/* The materialized core still advances dead bullets before removing them. Freeze a terrain-killed projectile at its impact so its final trail cannot leak through cover. Breaching live shots keep their velocity above. */b.vx=0;b.vy=0;
  }
- var out;try{out=oldUpdateBullets.call(this,dt);}finally{for(var ci=0;ci<ttlChildren.length;ci++){var saved=ttlChildren[ci];saved.child.vx=saved.vx;saved.child.vy=saved.vy;}}for(var j=0;j<terrain.length;j++){var q=terrain[j];if(q.flash>0)q.flash=Math.max(0,q.flash-dt);}return out;};
+ var out;try{out=oldUpdateBullets.call(this,dt);}finally{
+  /* Restore only the two original live bullets, if both survived.
+   * This frame's physical callback order must not permanently change
+   * their presentation or later collision enumeration order. */
+  if(restoreLivePairOrder&&this.bullets.length===2&&
+     this.bullets.indexOf(restoreLivePairOrder[0])>=0&&
+     this.bullets.indexOf(restoreLivePairOrder[1])>=0){
+   this.bullets[0]=restoreLivePairOrder[0];
+   this.bullets[1]=restoreLivePairOrder[1];
+  }
+  for(var ci=0;ci<ttlChildren.length;ci++){var saved=ttlChildren[ci];saved.child.vx=saved.vx;saved.child.vy=saved.vy;}}for(var j=0;j<terrain.length;j++){var q=terrain[j];if(q.flash>0)q.flash=Math.max(0,q.flash-dt);}return out;};
 
  var splashBullet={shell:true,beam:false,vx:0,vy:0};
  var oldSplash=Game.prototype.splashAt;Game.prototype.splashAt=function(x,y,radius,frac,ownerId,knock,color,dmg){var out=oldSplash.apply(this,arguments),a=terrainCandidates(this,x,y,x,y,radius);for(var i=0;i<a.length;i++){var s=a[i];if(!s.destructible||s.hp<=0)continue;var dx=Math.max(Math.abs(x-s.x)-(s.shape==='rect'?s.w*.5:s.r),0),dy=Math.max(Math.abs(y-s.y)-(s.shape==='rect'?s.h*.5:s.r),0),dist=Math.hypot(dx,dy);if(dist>radius)continue;var fall=1-clamp(dist/Math.max(1,radius),0,1)*.55;damageCover(this,s,(dmg||0)*(frac||.4)*fall,ownerId,x,y,splashBullet);}return out;};
