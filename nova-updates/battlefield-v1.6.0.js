@@ -827,7 +827,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       Math.hypot(t.x-sx,t.y-sy)>1e-8)return false;
    if(t.spawnShieldT>0||t.shieldT>0||t.bulwarkT>0||
       t.tauntT>0||!Number.isFinite(t.hp)||
-      (!allowLethal&&t.hp<=b.dmg*2)||
+      (t.hp<=b.dmg*2&&!(allowLethal===t||(dryRun&&allowLethal===true)))||
       (typeof g.areAllies==='function'&&g.areAllies(owner,t)))return false;
    if(b.__novaDirectVictims&&b.__novaDirectVictims.has(t))continue;
    var fx=ax-t.x,fy=ay-t.y,A=dx*dx+dy*dy,
@@ -2038,7 +2038,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   /* All earlier contacts are settled and the victim still exists. Only the
    * terminal shot may cross the lethal threshold; its real damage owner
    * performs kill/XP attribution in physical contact order. */
-  isolatedTTLStationaryPiercingChain(g,second,dt,false,[],true,false,false,true);
+  isolatedTTLStationaryPiercingChain(g,second,dt,false,[],true,false,false,target);
   return true;
  }
  /* A prior-frame pen=1 hull hit can leave a still-live pen=0 round
