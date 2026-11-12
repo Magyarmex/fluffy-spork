@@ -36,6 +36,9 @@ function compare(off,on){
    poseRenderP95Ms:on.pose.renderJs.p95,
    interpolated:on.pose.interpolated,
    shiftedBulletFrames:on.pose.shiftedBulletFrames,
+   alphaBelowQuarterFrames:on.pose.alphaBelowQuarterFrames,
+   alphaSaturatedFrames:on.pose.alphaSaturatedFrames,
+   meanNominalPoseDelayMs:on.pose.meanNominalPoseDelayMs,
    teleportSkips:on.pose.teleportSkips}
  };
  return result;
