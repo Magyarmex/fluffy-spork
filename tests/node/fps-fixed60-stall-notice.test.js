@@ -615,3 +615,42 @@ test('stale reset notification is cleared only by trustworthy lifecycle evidence
     }finally{owner.stop();g.destroy()}
   }
 });
+
+test('captured same-side aim competitor cannot invent a reset notice after canvas translation',()=>{
+  const s=fixture();s.owner.start();
+  try{
+    s.frame(1017);
+    const origin={left:0,top:0,width:800,height:600};
+    // At capture both touches are on the right stick; Input would ignore
+    // pointer 22 while pointer 11 owns aim. Pointer 11 then releases.
+    for(const [at,kind,id,x] of [
+      [.020,'pointerdown',11,600],
+      [.025,'pointerdown',22,700],
+      [.030,'pointerup',11,600]
+    ])s.timeline.push(at,kind,{
+      pointerId:id,pointerType:'touch',clientX:x,clientY:200,
+      __novaCanvasSide:kind==='pointerdown'?'aim':null,
+      __novaCanvasOrigin:origin,targetIsUI:false
+    });
+    // A later translation makes x=600 look like movement and x=700
+    // look like aim if the notice uses live geometry instead.
+    s.game.canvas={getBoundingClientRect:()=>({left:300,top:0,width:800,height:600})};
+    s.frame(1137);
+    assert.equal(s.notices.length,0,'ignored competitor is not an owned stick');
+    assert.equal(s.input.stickId.aim,-1);
+    assert.equal(s.input.firing,false);
+  }finally{s.owner.stop()}
+});
+
+test('unreadable legacy canvas geometry cannot crash foreground stall recovery',()=>{
+  const s=fixture();s.owner.start();
+  try{
+    s.frame(1017);
+    s.game.canvas={getBoundingClientRect(){throw Error('layout detached')}};
+    s.down(1020,7);
+    assert.doesNotThrow(()=>s.frame(1137));
+    assert.deepEqual(s.notices,[['Touch controls reset — touch again','warn']]);
+    assert.equal(s.input.stickId.move,-1);
+    assert.equal(s.input.firing,false);
+  }finally{s.owner.stop()}
+});
