@@ -862,17 +862,16 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    * excludes certified victims; the shot MUST be restored to its pre-frame
    * position so core advances it exactly once. Do not speculate through
    * knockback, lethal damage or an already-mutated victim ledger. */
-  var partialNonExpiring=nonExpiring&&b.hits===0&&
-      ((b.pen===2&&contacts.length===2)||
-       (allowSingleLive===true&&b.pen===1&&contacts.length===1))&&
-      (!b.__novaDirectVictims||b.__novaDirectVictims.size===0);
+  var partialNonExpiring=nonExpiring&&b.pen===2&&b.hits===0&&
+      contacts.length===2&&(!b.__novaDirectVictims||b.__novaDirectVictims.size===0);
   if(partialNonExpiring&&((b.knock||0)!==0||
-     contacts.some(function(c){return c.e.hp<=b.dmg*(b.pen===2?4:2)&&
-      !(b.pen===1&&(allowLethal===c.e||(dryRun&&allowLethal===true)));})||
+     contacts.some(function(c){return c.e.hp<=b.dmg*4;})||
      (g.bullets||[]).some(function(o){
       return o&&o!==b&&!o.dead&&(o.splash||o.shell);
      })))return false;
-  if(nonExpiring ? (!partialNonExpiring&&contacts.length!==b.pen+1) :
+  if(nonExpiring ? (!partialNonExpiring&&
+      !(allowSingleLive===true&&dryRun===true&&b.pen===1&&contacts.length===1)&&
+      contacts.length!==b.pen+1) :
      contacts.length<(allowSingle?1:(b.hits>0?1:2))||contacts.length>b.pen+1||
      contacts.length>5||(contacts.length>3&&(b.pen<3||b.pen>4)))
    return false;
@@ -1976,13 +1975,13 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
     g.__novaFrameStartBulletEpoch===g.__novaShapeSweepEpoch&&
     b.id<g.__novaFrameStartBulletIdCeiling);
  }
- /* A rare same-frame, non-expiring pair can hit the same stationary hull
-  * in physical order while the core's reverse projectile traversal calls
-  * the later shot first. Certify BOTH exact first contacts before mutating.
-  * This deliberately handles only two ordinary pen=1 rounds, one shared
-  * tank contact, disjoint projectile corridors and no earlier interference.
-  * Anything more complex stays with the existing collision owners. */
- function certifiedSameVictimLivePair(g,dt){
+ /* The core traverses projectiles in reverse array order. In the
+  * exceptionally clear case of two disjoint ordinary rounds reaching the
+  * SAME stationary hull during one non-expiring frame, certify both first
+  * contact times and put the earlier shot last in the array. The core then
+  * performs both real damage callbacks, penetration and kill attribution.
+  * No speculative damage, TTL adjustment or synthetic kill is performed. */
+ function certifiedSameVictimLiveOrder(g,dt){
   if(!(dt>0&&dt<=.05)||!Number.isFinite(dt))return false;
   var bullets=g.bullets||[],tanks=g.tanks||[],
       shapes=g.shapes||[],drones=g.drones||[];
@@ -1990,8 +1989,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      tanks.length+shapes.length+drones.length>ISOLATED_RECOVERY_SCAN_CAP||
      g.__novaWallProofHadShell)return false;
   var a=bullets[0],b=bullets[1];
-  if(!a||!b||
-     !certifiedTTLFrameStart(g,a)||!certifiedTTLFrameStart(g,b)||
+  if(!a||!b||!certifiedTTLFrameStart(g,a)||
+     !certifiedTTLFrameStart(g,b)||
      a.dead||b.dead||a.shell||b.shell||a.beam||b.beam||
      a.splash||b.splash||a.__v17Cannon||b.__v17Cannon||
      a.pen!==1||b.pen!==1||(a.hits||0)!==0||(b.hits||0)!==0||
@@ -1999,14 +1998,13 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      a.ownerId===b.ownerId||(a.knock||0)!==0||(b.knock||0)!==0||
      !Number.isFinite(a.dmg)||!Number.isFinite(b.dmg)||
      !(a.dmg>0&&b.dmg>0))return false;
-  /* The full current-frame swept boxes must not intersect, even after
-   * accounting for both radii. Neither shot can intercept the other. */
   var ax=a.x+a.vx*dt,ay=a.y+a.vy*dt,
       bx=b.x+b.vx*dt,by=b.y+b.vy*dt,
       pad=a.r+b.r+2;
   if(!(Number.isFinite(ax)&&Number.isFinite(ay)&&
        Number.isFinite(bx)&&Number.isFinite(by)&&
        Number.isFinite(pad)&&pad>0))return false;
+  /* Neither shot can physically intercept the other. */
   if(Math.max(a.x,ax)+pad>=Math.min(b.x,bx)&&
      Math.min(a.x,ax)-pad<=Math.max(b.x,bx)&&
      Math.max(a.y,ay)+pad>=Math.min(b.y,by)&&
@@ -2015,39 +2013,20 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       bc=isolatedTTLStationaryPiercingChain(g,b,dt,true,[],true,true,false,true,true);
   if(!ac||!bc||ac.length!==1||bc.length!==1||
      ac[0].e!==bc[0].e)return false;
-  var target=ac[0].e;
+  var target=ac[0].e,def=target&&CLASSES[target.cls];
   if(!target||target.kind!=='tank'||!target.alive||
-     !CLASSES[target.cls])return false;
+     !def||!(def.size>0))return false;
+  var rrA=a.r+def.size+3,rrB=b.r+def.size+3;
+  /* Only reorder when the core's own endpoint checks can register BOTH
+   * certified contacts; otherwise leave swept fallback ownership intact. */
+  if((ax-target.x)*(ax-target.x)+(ay-target.y)*(ay-target.y)>=rrA*rrA||
+     (bx-target.x)*(bx-target.x)+(by-target.y)*(by-target.y)>=rrB*rrB)
+   return false;
   var at=ac[0].t*dt,bt=bc[0].t*dt;
   if(!(at>0&&bt>0&&Math.abs(at-bt)>1e-7))return false;
-  var first=at<bt?a:b,second=at<bt?b:a,
-      tx=target.x,ty=target.y,
-      bulletRefs=bullets.slice(),shapeCount=shapes.length,
-      droneCount=drones.length,tankCount=tanks.length,
-      terrain=g.__novaTerrain,terrainCount=(terrain||[]).length,
-      secondState=[second.x,second.y,second.vx,second.vy,
-       second.ttl,second.pen,second.hits,second.dmg,second.dead],
-      defenses=[target.spawnShieldT,target.shieldT,target.bulwarkT,
-       target.tauntT,target.invulnT];
+  var first=at<bt?a:b,second=at<bt?b:a;
   if(!(target.hp>first.dmg*2))return false;
-  if(!isolatedTTLStationaryPiercingChain(g,first,dt,true,[],true,false,false,false,true))
-   return false;
-  if(!target.alive||target.x!==tx||target.y!==ty||
-     bullets.length!==2||bullets[0]!==bulletRefs[0]||
-     bullets[1]!==bulletRefs[1]||
-     (g.shapes||[]).length!==shapeCount||
-     (g.drones||[]).length!==droneCount||
-     (g.tanks||[]).length!==tankCount||
-     g.tanks.indexOf(target)<0||
-     g.__novaTerrain!==terrain||(terrain||[]).length!==terrainCount||
-     secondState.some(function(v,i){return v!==[
-       second.x,second.y,second.vx,second.vy,second.ttl,
-       second.pen,second.hits,second.dmg,second.dead][i];})||
-     defenses.some(function(v,i){return v!==[
-       target.spawnShieldT,target.shieldT,target.bulwarkT,
-       target.tauntT,target.invulnT][i];})||
-     !(target.hp>0))return true;
-  isolatedTTLStationaryPiercingChain(g,second,dt,true,[],true,false,false,target,true);
+  if(bullets[1]!==first){bullets[0]=second;bullets[1]=first;}
   return true;
  }
  function certifiedSameVictimTTLPair(g,dt){
@@ -3676,9 +3655,9 @@ function certifiedMultiShotCoverPriority(g,dt){
     break;
    }
   }
- /* Settle the only certified non-expiring shared-hull pair before the
+ /* Order the only certified non-expiring shared-hull pair before the
   * core's reverse array traversal can invert physical kill ownership. */
- certifiedSameVictimLivePair(this,dt);
+ certifiedSameVictimLiveOrder(this,dt);
  /* Commit a certified same-victim pair before the sequential TTL pass. */
  if(expiring===2&&legacyExpiring&&bodyWork<=300&&
     !this.__novaWallProofHadShell){
