@@ -426,3 +426,48 @@ test('foreground RAF stall clears bridge ownership as well as real Input ownersh
   assert.equal(h.input.stickId.aim,23,'fresh touch replays on the next legal simulation tick');
  }finally{owner.stop()}
 });
+
+test('hidden-tab reset clears bridge ownership without a DOM blur',()=>{
+ const {BrowserInputCapture}=require('../research/fixed-step-browser-capture.cjs');
+ function emitter(){
+  const handlers=new Map();
+  return {
+   addEventListener(k,fn){if(!handlers.has(k))handlers.set(k,new Set());handlers.get(k).add(fn);},
+   removeEventListener(k,fn){handlers.get(k)?.delete(fn);},
+   dispatch(type,e={}){for(const fn of handlers.get(type)||[])fn({type,...e});}
+  };
+ }
+ let now=1000;
+ const canvas=Object.assign(emitter(),{
+  getBoundingClientRect:()=>({left:0,top:0,width:800,height:400})});
+ const win=emitter(),doc=Object.assign(emitter(),{hidden:false});
+ const input={canvas,stickId:{move:-1,aim:-1},move:{active:false},aim:{active:false},
+  keyboard:{},firing:false,attach(c){this.canvas=c},detach(){},
+  pd(e){this.stickId.aim=e.pointerId;this.aim.active=true;this.firing=true;},
+  pm(){},pu(){this.stickId.aim=-1;this.aim.active=false;this.firing=false},
+  kd(){},ku(){}};
+ const timeline=new ChronologicalInput(input);
+ const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
+ const owner=new BrowserInputCapture(input,canvas,timeline,bridge,{window:win,document:doc});
+ try{
+  now=1020;
+  canvas.dispatch('pointerdown',{timeStamp:1010,pointerType:'touch',
+   pointerId:22,clientX:600,clientY:200,button:0,buttons:1,target:canvas});
+  timeline.consumeThrough(.02);
+  assert.equal(input.stickId.aim,22);
+  assert.equal(bridge.activeTouchIds.has(22),true);
+  doc.hidden=true;doc.dispatch('visibilitychange');
+  assert.equal(input.stickId.aim,-1);
+  assert.equal(bridge.activeTouchIds.size,0);
+  assert.equal(bridge.activeTouchSize,null);
+  doc.hidden=false;
+  now=1040;
+  win.dispatch('pointermove',{timeStamp:1030,pointerType:'touch',
+   pointerId:22,clientX:620,clientY:200,target:canvas});
+  assert.equal(timeline.events.length,0,'old move stays suppressed');
+  canvas.dispatch('pointerdown',{timeStamp:1035,pointerType:'touch',
+   pointerId:23,clientX:600,clientY:200,button:0,buttons:1,target:canvas});
+  timeline.consumeThrough(.04);
+  assert.equal(input.stickId.aim,23,'new touch accepted after hidden reset');
+ }finally{owner.detach()}
+});
