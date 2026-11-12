@@ -8,7 +8,8 @@ const {bootGame,withSeed,digest,physical}=require('../research/audio-rng-causal-
 const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
 const {FixedStepRafOwner}=require('../research/fixed-step-raf-owner.cjs');
 const TICKS=360,DT=1/60;
-function encounter(cls,seed,fixed30,playerMoveY=0){
+function encounter(cls,seed,fixed30,playerMoveY=0,variable30=false){
+ assert.ok(!(fixed30&&variable30),'scheduler arms are exclusive');
  return withSeed(seed,draws=>{
   const g=bootGame();if(!g.player)g.redeploy();
   const p=g.player;g.sfx.muted=true;g.sfx.startMusic=()=>{};
@@ -115,8 +116,11 @@ function encounter(cls,seed,fixed30,playerMoveY=0){
     assert.equal(owner.ticks,TICKS,'all fixed60 ticks must execute');
     assert.equal(owner.droppedMs,0,'healthy 30Hz must not lose time');
     assert.equal(owner.droppedFrames,0);
-   }else for(let tick=0;tick<TICKS;tick++)g.update(DT);
-   assert.equal(updates,TICKS,'every real Game tick must move the target');
+   }else for(let tick=0;tick<(variable30?TICKS/2:TICKS);tick++)
+    g.update(variable30?1/30:DT);
+   assert.equal(updates,variable30?TICKS/2:TICKS,
+    'every real Game tick must move the target');
+   assert.ok(Math.abs(simulatedTime-6)<1e-7,'all arms must cover six seconds');
    assert.ok(playerMoveY===0?Math.abs(p.y)<1e-6:p.y>5,
     'player movement must follow the real Game owner');
    assert.ok(travel>50,'target must cross the projectile corridor');
@@ -149,8 +153,16 @@ test('fixed60 30Hz presentation preserves real moving-target Gunner HP and proje
    assert.ok(movingReference.births.some((b,i)=>
     Math.abs(b[2]-reference.births[i][2])>.1),
     'real player movement must change projectile muzzle origin');
-   rows.push({cls,seed,damage:reference.damage,hits:reference.hits,
-    movingDamage:movingReference.damage,movingHits:movingReference.hits,
+   const variable30=encounter(cls,seed,false,0,true);
+   const variableMoving30=encounter(cls,seed,false,.025,true);
+   assert.ok(variable30.travel>400&&variableMoving30.travel>400,
+    'variable30 must traverse the same moving-target corridor');
+   rows.push({cls,seed,native60Damage:reference.damage,
+    fixed30Damage:recovered.damage,variable30Damage:variable30.damage,
+    native60MovingDamage:movingReference.damage,
+    fixed30MovingDamage:movingFixed.damage,
+    variable30MovingDamage:variableMoving30.damage,
+    native60Hits:reference.hits,variable30Hits:variable30.hits,
     playerEndY:movingReference.playerY,
     volleys:reference.volleys,travel:reference.travel});
   }
