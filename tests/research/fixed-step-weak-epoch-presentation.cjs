@@ -96,4 +96,7 @@ class WeakEpochPosePresentation {
   this.active.length=0;this.records=new WeakMap();
  }
 }
-module.exports={WeakEpochPosePresentation};
+if(typeof module!=='undefined'&&module.exports)
+ module.exports={WeakEpochPosePresentation};
+if(typeof window!=='undefined')
+ window.__novaWeakEpochPosePresentation=WeakEpochPosePresentation;
