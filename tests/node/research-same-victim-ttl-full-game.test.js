@@ -22,7 +22,7 @@ function trial(hz,reverse,fullUpdate,only=null,targetX=40,mutate=null){
   p.vx=0;p.vy=0;
   const owners=[101,102].map((id,i)=>({
    kind:'tank',id,cls:'scout',x:-1200,y:i?1000:-1000,
-   hp:100,alive:true,vx:0,vy:0,spawnShieldT:0,shieldT:0
+   hp:100,maxHp:100,level:1,kills:0,streak:0,name:'Owner '+id,alive:true,vx:0,vy:0,spawnShieldT:0,shieldT:0
   }));
   g.tanks=[p];
   g.tankById=new Map([[p.id,p]]);
@@ -154,8 +154,8 @@ for(const hz of [30,60,120,240])for(const reverse of [false,true])
  for(const fullUpdate of [false,true])
   test('RESEARCH lethal same-victim TTL chronology '+hz+
        'Hz reverse='+reverse+' fullUpdate='+fullUpdate,()=>{
-   const result=trial(hz,reverse,fullUpdate,null,40,(_g,p)=>{
-    p.hp=30;p.maxHp=30;p.regenDelay=999;
+   const result=trial(hz,reverse,fullUpdate,null,40,(_g,p,bullets)=>{\n    bullets[1].dmg=30;
+    p.hp=45;p.maxHp=45;p.regenDelay=999;
    });
    const expectedFirst=(40-21)/6000;
    const expectedSecond=(89-(40+21))/6000;
@@ -163,10 +163,10 @@ for(const hz of [30,60,120,240])for(const reverse of [false,true])
      expectedSecond<.005,'both contacts must physically precede expiry');
    assert.deepEqual(result.contacts.map(c=>c.ownerId),[101,102],
      'earlier owner 101 damages first; later owner 102 must own the kill');
-   assert.equal(result.contacts.reduce((sum,c)=>sum+c.damage,0),40,
+   assert.equal(result.contacts.reduce((sum,c)=>sum+c.damage,0),50,
      'no duplicate or missing damage across the lethal transition');
    assert.equal(result.target.alive,false,
-     'the second chronological contact must kill the 30-HP hull');
+     'the second chronological contact must kill the 45-HP hull');
    assert.deepEqual(result.kills,[102],
      'the actual kill callback must credit the later physical shooter');
   });
