@@ -4,12 +4,12 @@
 // a physical-phone CPU/latency claim.
 process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
 const test=require('node:test'),assert=require('node:assert/strict');
-const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+const {bootGame,withSeed,digest,physical}=require('../research/audio-rng-causal-pilot.cjs');
 const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
 const {FixedStepRafOwner}=require('../research/fixed-step-raf-owner.cjs');
 const TICKS=360,DT=1/60;
 function encounter(cls,seed,fixed30,playerMoveY=0){
- return withSeed(seed,()=>{
+ return withSeed(seed,draws=>{
   const g=bootGame();if(!g.player)g.redeploy();
   const p=g.player;g.sfx.muted=true;g.sfx.startMusic=()=>{};
   g.setClass(p,cls);p.stats.reload=cls==='minigun'?1:3;
@@ -124,7 +124,8 @@ function encounter(cls,seed,fixed30,playerMoveY=0){
    assert.ok(vetoes>0,'manual aim assist veto must execute');
    assert.equal(g.tanks.length,2,'no respawn contamination');
    assert.equal(g.shapes.length+g.drones.length+g.powerups.length,0);
-   return {cls,seed,volleys,hits,damage:+damage.toFixed(5),
+   return {cls,seed,world:digest(physical(g)),rngDraws:draws(),
+    volleys,hits,damage:+damage.toFixed(5),
     births,contacts,travel:+travel.toFixed(5),
     targetY:+target.y.toFixed(5),playerY:+p.y.toFixed(5),
     remainingBullets:g.bullets.length,
