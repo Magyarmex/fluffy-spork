@@ -137,3 +137,29 @@ for(const hz of [30,60,120,240])for(const reverse of [false,true])
   assert.deepEqual(result.contacts.map(c=>c.ownerId).sort(),[101,102],
    'unrelated remote bullets cannot suppress either legitimate contact');
  });
+
+
+/* Research-only known-red gate for #234: the existing same-victim fast path
+ * explicitly refuses lethal or defense-changing callbacks. Here two ordinary
+ * hostile rounds contact one 30-HP hull before their 5ms TTL, at distinct
+ * physical times. A correct chronological solver must credit the later
+ * shooter with the kill, independent of bullet insertion order and FPS.
+ * This is deliberately NOT a production balance or damage change. */
+for(const hz of [30,60,120,240])for(const reverse of [false,true])
+ for(const fullUpdate of [false,true])
+  test('RESEARCH lethal same-victim TTL chronology '+hz+
+       'Hz reverse='+reverse+' fullUpdate='+fullUpdate,()=>{
+   const result=trial(hz,reverse,fullUpdate,null,40,(_g,p)=>{
+    p.hp=30;p.maxHp=30;p.regenDelay=999;
+   });
+   const expectedFirst=(40-21)/6000;
+   const expectedSecond=(89-(40+21))/6000;
+   assert.ok(expectedFirst>0&&expectedFirst<expectedSecond&&
+     expectedSecond<.005,'both contacts must physically precede expiry');
+   assert.deepEqual(result.contacts.map(c=>c.ownerId),[101,102],
+     'earlier owner 101 damages first; later owner 102 must own the kill');
+   assert.equal(result.contacts.reduce((sum,c)=>sum+c.damage,0),40,
+     'no duplicate or missing damage across the lethal transition');
+   assert.equal(result.target.alive,false,
+     'the second chronological contact must kill the 30-HP hull');
+  });
