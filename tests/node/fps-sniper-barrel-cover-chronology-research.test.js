@@ -8,14 +8,21 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 const {DirectShotIntent}=require('../research/direct-shot-intent.cjs');
 
-function scenario(cls,lateral,wallHeight=80){
+function scenario(cls,lateral,wallHeight=80,targeted=false){
  return withSeed(1517800,()=>{
   const g=bootGame(),i=g.input;
   g.sfx.muted=true;i.autofire=false;
   g.setClass(g.player,cls);g.player.fireCd=0;
   g.status='playing';g.paused=false;
   Object.assign(g.player,{x:0,y:0,vx:0,vy:0,angle:0,spawnShieldT:0});
-  g.tanks=[g.player];g.tankById=new Map([[g.player.id,g.player]]);
+  const victim=targeted?g.tanks.find(t=>t!==g.player):null;
+  if(targeted)assert.ok(victim,'real Game must provide an actual hostile tank fixture');
+  if(victim)Object.assign(victim,{cls:'scout',x:200,y:20,vx:0,vy:0,
+   hp:100000,maxHp:100000,alive:true,ai:null,spawnShieldT:0,
+   shieldT:0,bulwarkT:0,tauntT:0,cloakT:0});
+  g.tanks=victim?[g.player,victim]:[g.player];
+  g.tankById=new Map(g.tanks.map(t=>[t.id,t]));
+  const victimHp=victim?victim.hp:null;
   g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];g.orbs=[];
   if(g.shapeById)g.shapeById.clear();
   if(g.hash&&g.hash.clear)g.hash.clear();
@@ -59,7 +66,7 @@ function scenario(cls,lateral,wallHeight=80){
    g.updateBullets(.1);
    g.updateBullets(.1);
    const surviving=projectiles.map(b=>!b.dead&&g.bullets.includes(b));
-   return {traces,surviving};
+   return {traces,surviving,targetDamage:victim?Math.max(0,victimHp-victim.hp):null};
   }finally{owner.detach();g.destroy();}
  });
 }
@@ -111,4 +118,23 @@ test('research: small Sniper displacement changes real narrow-cover contact with
   console.log('SNIPER_SMALL_COVER_RESEARCH '+JSON.stringify({cls,original,later,
    limitation:'20u constructed displacement and narrow permanent wall; no natural movement, target HP or input-to-paint latency'}));
  }
+});
+
+// A real existing Scout hull beyond the same permanent wall makes the
+// consequence observable as applied HP damage, not just a surviving bullet.
+// This is still an intentionally controlled stationary-target geometry.
+test('research: narrow-cover 20u Sniper displacement changes actual hostile HP contact',()=>{
+ const original=scenario('railgun',0,12,true);
+ const later=scenario('railgun',20,12,true);
+ assert.equal(original.targetDamage,0,'the original blocked rail must not damage the target');
+ const shifted=later.traces[0].y-original.traces[0].y;
+ if(Math.abs(shifted-20)<2){
+  assert.equal(later.traces[0].blocked,false);
+  assert.ok(later.targetDamage>0,'a clear delayed rail must damage the real hostile hull');
+ }else{
+  assert.ok(Math.abs(shifted)<2,'future release-origin policy must preserve original aim provenance');
+  assert.equal(later.targetDamage,0,'a corrected release-origin rail remains behind cover');
+ }
+ console.log('SNIPER_SMALL_COVER_HP_RESEARCH '+JSON.stringify({original,later,
+  limitation:'stationary existing hostile, constructed 20u hull shift; no natural movement, browser input or player survival claim'}));
 });
