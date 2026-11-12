@@ -379,3 +379,49 @@ test('research: BrowserInputCapture owns and detaches resize cancellation listen
  }finally{owner.detach();}
  assert.equal(win.count('resize'),0,'no resize listener leak after detach');
 });
+
+test('external reset suppresses stale bridge pointer moves but accepts a fresh down',()=>{
+ const h=harness();
+ h.setNow(1020);
+ assert.equal(h.capture('pointerdown',22,600,1010),true);
+ h.timeline.consumeThrough(.02);
+ assert.equal(h.input.stickId.aim,22);
+ assert.equal(h.bridge.activeTouchIds.has(22),true);
+ h.timeline.reset();
+ h.bridge.revokeForExternalReset();
+ assert.equal(h.bridge.activeTouchIds.size,0);
+ assert.equal(h.bridge.activeTouchSize,null);
+ assert.equal(h.input.stickId.aim,-1);
+ assert.equal(h.capture('pointermove',22,620,1030),false,
+  'an old move cannot resurrect a forcibly released stick');
+ h.setNow(1050);
+ assert.equal(h.capture('pointerdown',23,600,1040),true);
+ h.timeline.consumeThrough(.05);
+ assert.equal(h.input.stickId.aim,23,'fresh physical down reacquires aim');
+});
+
+test('foreground RAF stall clears bridge ownership as well as real Input ownership',()=>{
+ const {FixedStepRafOwner}=require('../research/fixed-step-raf-owner.cjs');
+ const h=harness();
+ let now=1000;
+ const game={input:h.input,status:'playing',paused:false,
+  sfx:{startMusic(){}},update(){},start(){},destroy(){},setPaused(){}};
+ const owner=new FixedStepRafOwner(game,h.timeline,h.bridge,{
+  now:()=>now,request:()=>1,cancel:()=>{},render(){}});
+ try{
+  owner.start();
+  now=1005;h.setNow(now);
+  assert.equal(h.capture('pointerdown',22,600,1005),true);
+  now=1017;h.setNow(now);owner.frame(now);
+  assert.equal(h.input.stickId.aim,22);
+  assert.equal(h.bridge.activeTouchIds.has(22),true);
+  now=1137;h.setNow(now);owner.frame(now);
+  assert.equal(h.input.stickId.aim,-1);
+  assert.equal(h.bridge.activeTouchIds.size,0);
+  assert.equal(h.capture('pointermove',22,620,1140),false);
+  now=1150;h.setNow(now);
+  assert.equal(h.capture('pointerdown',23,600,1145),true);
+  now=1167;h.setNow(now);owner.frame(now);
+  assert.equal(h.input.stickId.aim,23);
+ }finally{owner.stop()}
+});
