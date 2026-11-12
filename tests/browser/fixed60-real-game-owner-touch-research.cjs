@@ -12,6 +12,8 @@ const controlledGate=process.env.NOVA_FIXED60_CONTROLLED_GATE==='1';
 const controlledExtra=Number(process.env.NOVA_FIXED60_EXTRA_TICKS||2);
 // Opt-in visual-only experiment. OFF retains the existing Chromium owner path.
 const poseEnabled=process.env.NOVA_FIXED60_POSE_PRESENTATION==='1';
+const weakPoseEnabled=process.env.NOVA_FIXED60_POSE_STORAGE==='weak';
+assert.ok(!weakPoseEnabled||poseEnabled,'weak pose requires opt-in presenter');
 assert.ok([2,3,4].includes(controlledExtra),'invalid research backlog');
 // Compare against the materialized shell, not a brittle hardcoded DOM count.
 const expectedOverlays=[...fs.readFileSync(path.resolve(__dirname,'../../index.html'),'utf8')
@@ -56,7 +58,9 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
   await deploy.waitFor({state:'visible',timeout:45000});
   await page.addScriptTag({path:path.resolve(__dirname,
    '../../nova-updates/fixed60-research-browser.js')});
-  await page.evaluate(({maxSteps,controlledGate,controlledExtra,poseEnabled})=>{
+  if(weakPoseEnabled)await page.addScriptTag({path:path.resolve(__dirname,
+   '../research/fixed-step-weak-epoch-presentation.cjs')});
+  await page.evaluate(({maxSteps,controlledGate,controlledExtra,poseEnabled,weakPoseEnabled})=>{
    window.__novaFixedMaxSteps=maxSteps;
    window.__novaPoseEnabled=poseEnabled;
    window.__novaControlledGate=controlledGate;
@@ -148,8 +152,10 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
      throw Error('shipping Game.start did not schedule its expected RAF');
     cancelAnimationFrame(shippingRaf);
     this.raf=null;
-    const presenter=poseEnabled?
-     new window.__novaFixed60Research.FixedStepPosePresentation(this,{enabled:true}):null;
+    const PoseClass=weakPoseEnabled?window.__novaWeakEpochPosePresentation:
+     window.__novaFixed60Research.FixedStepPosePresentation;
+    if(poseEnabled&&typeof PoseClass!=='function')throw Error('missing research pose class');
+    const presenter=poseEnabled?new PoseClass(this,{enabled:true}):null;
     window.__novaFixedPresenter=presenter;
     const pilot=window.__novaFixed60Research.createFixedStepBrowserPilot(this,{
      window,document,clock:performance,
@@ -260,7 +266,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     profile.lifecycle.push({event:'owner-start-returned',at:performance.now(),started:pilot.owner.started});
     return result;
    };
-  },{maxSteps,controlledGate,controlledExtra,poseEnabled});
+  },{maxSteps,controlledGate,controlledExtra,poseEnabled,weakPoseEnabled});
   await deploy.click();
   try{
    await page.waitForFunction(()=>window.__novaFixedGame?.status==='playing'&&
