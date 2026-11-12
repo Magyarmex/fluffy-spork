@@ -41,9 +41,8 @@ function encounter(cls,seed,fixed30,playerMoveY=0){
    return nearest.apply(this,arguments);
   };
   g.input.moveVec=()=>({x:0,y:playerMoveY});
-  const initialTime=g.time;
+  let simulatedTime=0;
   let updates=0,travel=0,volleys=0,hits=0,damage=0;
-  
   const births=[],contacts=[];
   // A previous tick's collision velocity is not permission for the next
   // tank-AI integration to move the scripted target a second time. Preserve
@@ -51,9 +50,9 @@ function encounter(cls,seed,fixed30,playerMoveY=0){
   // next real Game.update (as in the existing moving-target research).
   const originalUpdate=g.update;
   g.update=function(dt){target.vx=0;target.vy=0;
+   simulatedTime+=dt;
    const out=originalUpdate.apply(this,arguments);
-   const elapsed=this.time-initialTime;
-   const expected=26*Math.sin(2*Math.PI*(elapsed+.19)/1.37);
+   const expected=26*Math.sin(2*Math.PI*(simulatedTime+.19)/1.37);
    assert.ok(Math.abs(target.y-expected)<1e-4,
     'post-update target trajectory must match world time');
    return out;
@@ -61,8 +60,7 @@ function encounter(cls,seed,fixed30,playerMoveY=0){
   const originalDrones=g.updateDrones;
   g.updateDrones=function(dt){
    const result=originalDrones.apply(this,arguments);
-   const elapsed=this.time-initialTime;
-   const desired=26*Math.sin(2*Math.PI*(elapsed+.19)/1.37);
+   const desired=26*Math.sin(2*Math.PI*(simulatedTime+.19)/1.37);
    const dy=desired-target.y;
    target.vx=0;target.vy=dy/dt;
    this.moveTank(target,0,dy/dt,dt);
