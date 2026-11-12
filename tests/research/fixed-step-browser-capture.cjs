@@ -48,6 +48,22 @@ class BrowserInputCapture {
         this.bridge.takeStaleTouchResetNotice();
     } };
     const hidden = () => { if (this.document.hidden) release(); };
+    const resized = () => {
+      if(!this.active || typeof this.bridge.interruptForResize!=='function')return;
+      if(!this.bridge.interruptForResize())return;
+      // The shipping Sniper overlay interprets held -> released as a quick
+      // rail. A forced resize cancellation is NOT a deliberate release.
+      // Clear its focus witness before the next Game.update can fire it.
+      if(this.game){
+        this.game.__novaPlayerHeldFire=false;
+        const p=this.game.player;
+        if(p){
+          p.__novaFocusStart=0;p.__novaFocus=0;
+          p.__novaFocusAngle=null;p.__novaFocusLast=0;
+          p.__novaChargeCue=false;
+        }
+      }
+    };
     const spec = [
       [canvas,'pointerdown',capture],
       [win,'pointermove',capture],[win,'pointerup',capture],
@@ -55,7 +71,8 @@ class BrowserInputCapture {
       [win,'keydown',capture],[win,'keyup',capture],
       [canvas,'mousedown',native('pointerdown')],
       [win,'mouseup',native('pointerup')],
-      [win,'blur',release],[doc,'visibilitychange',hidden]
+      [win,'blur',release],[win,'resize',resized],
+      [doc,'visibilitychange',hidden]
     ];
     this.timeline.reset();
     try{input.detach()}

@@ -27,6 +27,42 @@ class BrowserEventTimeline {
     // A stale DOM event can revoke a held touch before the next RAF sees it.
     // Retain only notification evidence, never the revoked input itself.
     this.pendingStaleTouchIds = new Set();
+    // Capture-side resize interruption protects gestures already replayed
+    // before the layout changes. Replay-side checks separately protect queued
+    // gestures whose dimensions change before their first simulation tick.
+    this.activeTouchIds = new Set();
+    this.suppressedTouchIds = new Set();
+    this.activeTouchSize = null;
+    this.resizeInterruptions = 0;
+  }
+  interruptForResize() {
+    // A resize can happen without another pointer event. Cancel queued or
+    // already-applied touch ownership immediately, before the next RAF.
+    const pending=Array.isArray(this.timeline.events) ?
+      this.timeline.events.slice(this.timeline.index||0) : [];
+    const queued=pending.filter(e=>e.kind.startsWith('pointer') && e.data &&
+      e.data.pointerType!=='mouse');
+    if(!this.activeTouchIds.size && !queued.length)return false;
+    const input=this.timeline.input;
+    let rect=null;
+    try{
+      if(input&&input.canvas&&typeof input.canvas.getBoundingClientRect==='function')
+        rect=input.canvas.getBoundingClientRect();
+    }catch(_){/* Unreadable layout is ambiguous; cancel conservatively. */}
+    const size=rect&&Number.isFinite(rect.width)&&Number.isFinite(rect.height)?
+      {width:rect.width,height:rect.height}:null;
+    const origins=this.activeTouchSize?[this.activeTouchSize]:queued.map(e=>e.data.__novaCanvasOrigin);
+    if(size&&origins.length&&origins.every(o=>o&&o.width===size.width&&o.height===size.height))
+      return false;
+    for(const id of this.activeTouchIds)this.suppressedTouchIds.add(id);
+    for(const e of queued)if(e.kind==='pointerdown'&&e.data.pointerId!=null)
+      this.suppressedTouchIds.add(e.data.pointerId);
+    this.activeTouchIds.clear();
+    this.activeTouchSize=null;
+    this.pendingStaleTouchIds.clear();
+    this.timeline.reset();
+    this.resizeInterruptions++;
+    return true;
   }
   takeStaleTouchResetNotice() {
     const lost = this.pendingStaleTouchIds.size > 0;
@@ -35,6 +71,63 @@ class BrowserEventTimeline {
   }
   capture(event) {
     if (!event || !KINDS.has(event.type)) throw Error('unsupported browser input event');
+    // One DOM layout snapshot per touch event: avoid a second potentially
+    // forced layout read when storing capture-time stick coordinates.
+    let capturedCanvasOrigin=null;
+    if(event.type==='blur'){
+      this.activeTouchIds.clear();
+      this.suppressedTouchIds.clear();
+      this.activeTouchSize=null;
+    }else if(event.type.startsWith('pointer') && event.pointerType!=='mouse' &&
+             event.pointerId!=null){
+      const id=event.pointerId;
+      const released=event.type==='pointerup'||event.type==='pointercancel';
+      if(this.suppressedTouchIds.has(id)){
+        // Pointer IDs may be reused after an OS interruption without a
+        // delivered release. A new down starts a new physical sequence;
+        // moves from the interrupted sequence remain suppressed.
+        if(event.type==='pointerdown')this.suppressedTouchIds.delete(id);
+        else{
+          if(released)this.suppressedTouchIds.delete(id);
+          return false;
+        }
+      }
+      let size=null;
+      const canvas=this.timeline.input && this.timeline.input.canvas;
+      if(canvas && typeof canvas.getBoundingClientRect==='function'){
+        try{
+          const rect=canvas.getBoundingClientRect();
+          if(rect && Number.isFinite(rect.width)&&Number.isFinite(rect.height) &&
+             rect.width>0 && rect.height>0){
+            size={width:rect.width,height:rect.height};
+            if(Number.isFinite(rect.left)&&Number.isFinite(rect.top))
+              capturedCanvasOrigin={left:rect.left,top:rect.top,
+                width:rect.width,height:rect.height};
+          }
+        }catch(_){/* Unavailable layout is not evidence of a safe resize. */}
+      }
+      if(this.activeTouchIds.size &&
+         (!this.activeTouchSize || !size ||
+          size.width!==this.activeTouchSize.width ||
+          size.height!==this.activeTouchSize.height)){
+        for(const heldId of this.activeTouchIds)this.suppressedTouchIds.add(heldId);
+        if(!released)this.suppressedTouchIds.add(id);
+        else this.suppressedTouchIds.delete(id);
+        this.activeTouchIds.clear();
+        this.activeTouchSize=null;
+        this.pendingStaleTouchIds.clear();
+        this.timeline.reset();
+        this.resizeInterruptions++;
+        return false;
+      }
+      if(event.type==='pointerdown'){
+        if(!this.activeTouchIds.size)this.activeTouchSize=size;
+        this.activeTouchIds.add(id);
+      }else if(released){
+        this.activeTouchIds.delete(id);
+        if(!this.activeTouchIds.size)this.activeTouchSize=null;
+      }
+    }
     // A subsequent real release/blur explains the cancellation, even when
     // it arrives before the next presentation frame.
     if (event.type === 'blur') this.pendingStaleTouchIds.clear();
@@ -155,19 +248,7 @@ class BrowserEventTimeline {
     // A replayed touch must use the local canvas coordinates seen at DOM
     // capture. A later layout translation must not turn aim into movement.
     // Resizes remain a separate, deliberately unpromoted safety gate.
-    let canvasOrigin=null;
-    if(event.type.startsWith('pointer') && event.pointerType!=='mouse'){
-      const canvas=this.timeline.input && this.timeline.input.canvas;
-      if(canvas && typeof canvas.getBoundingClientRect==='function'){
-        try{
-          const r=canvas.getBoundingClientRect();
-          if(r && Number.isFinite(r.left)&&Number.isFinite(r.top)&&
-             Number.isFinite(r.width)&&Number.isFinite(r.height)&&
-             r.width>0&&r.height>0)
-            canvasOrigin={left:r.left,top:r.top,width:r.width,height:r.height};
-        }catch(_){/* Invalid layout evidence must not invent stick ownership. */}
-      }
-    }
+    const canvasOrigin=capturedCanvasOrigin;
     const target = event.target;
     const data = event.type === 'blur' ? {} : {
       __novaOriginalAt: originalAt, __novaTimestampTrusted: timestampTrusted,

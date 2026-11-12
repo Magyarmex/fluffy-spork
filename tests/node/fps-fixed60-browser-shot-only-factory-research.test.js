@@ -11,7 +11,7 @@ function target(){
   addEventListener(k,fn){if(!handlers.has(k))handlers.set(k,[]);handlers.get(k).push(fn)},
   removeEventListener(k,fn){handlers.set(k,(handlers.get(k)||[]).filter(f=>f!==fn))},
   dispatch(e){for(const fn of handlers.get(e.type)||[])fn(e)},
-  getBoundingClientRect(){return {left:0,width:800}},
+  getBoundingClientRect(){return {left:0,top:0,width:800,height:600}},
   listenerCount(){return [...handlers.values()].reduce((n,list)=>n+list.length,0)}
  };
 }

@@ -76,16 +76,29 @@ class ChronologicalInput {
       // this to mouse aiming (which has separate world-target semantics),
       // or to resizes: those need their own validated policy.
       const origin=d.__novaCanvasOrigin;
+      // Browser-captured touch without trustworthy geometry must not be
+      // reclassified using a later canvas frame. Legacy direct timeline
+      // fixtures have no capture metadata and retain their existing path.
+      if(d.pointerType!=='mouse' && e.kind.startsWith('pointer') &&
+         Object.prototype.hasOwnProperty.call(d,'__novaCanvasOrigin') && !origin){
+        this.reset({quarantine:true});
+        return;
+      }
       if(origin && d.pointerType!=='mouse' && this.input.canvas &&
          typeof this.input.canvas.getBoundingClientRect==='function'){
-        try{
-          const rect=this.input.canvas.getBoundingClientRect();
-          if(rect && Number.isFinite(rect.left)&&Number.isFinite(rect.top)&&
-             rect.width===origin.width && rect.height===origin.height){
-            if(Number.isFinite(clientX))clientX+=rect.left-origin.left;
-            if(Number.isFinite(clientY))clientY+=rect.top-origin.top;
-          }
-        }catch(_){/* Do not make a release fail solely on projection. */}
+        let rect=null;
+        try{rect=this.input.canvas.getBoundingClientRect();}
+        catch(_){/* Unreadable geometry invalidates this queued touch. */}
+        // Never swallow a reset exception and then replay the stale event.
+        // Width/height or position uncertainty invalidates old touch input.
+        if(!rect || !Number.isFinite(rect.width) || !Number.isFinite(rect.height) ||
+           !Number.isFinite(rect.left) || !Number.isFinite(rect.top) ||
+           rect.width!==origin.width || rect.height!==origin.height){
+          this.reset({quarantine:true});
+          return;
+        }
+        if(Number.isFinite(clientX))clientX+=rect.left-origin.left;
+        if(Number.isFinite(clientY))clientY+=rect.top-origin.top;
       }
       const evt = {type:e.kind, __novaOriginalAt:d.__novaOriginalAt,
         __novaTimestampTrusted:d.__novaTimestampTrusted,
