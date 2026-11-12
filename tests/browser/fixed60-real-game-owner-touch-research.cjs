@@ -193,6 +193,8 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
         rawGapMs,lagMs:current.lagMs,droppedMs:current.droppedMs-beforeDropped,
         dropReason:current.droppedMs>beforeDropped?
          (rawGapMs>100.0000001?'long-stall':'backlog'):null,
+        aimOwner:window.__novaFixedGame?.input?.stickId?.aim??-1,
+        aimActive:!!window.__novaFixedGame?.input?.aim?.active,
         callbackJsMs:performance.now()-at});
       }
       };
@@ -324,13 +326,36 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    assert.equal(shotInThree,true,
     'a real three-update callback must emit a player-owned projectile while held: '+
     JSON.stringify(heldBurstDiagnostic));
-   const during=await page.evaluate(()=>({
-    owner:window.__novaFixedGame.input.stickId.aim,
-    active:window.__novaFixedGame.input.aim.active,
-    births:window.__novaFixedResearch.births
-   }));
-   assert.equal(during.owner,held.owner,'three-step callbacks must preserve held touch owner');
-   assert.equal(during.active,true,'three-step callbacks must preserve held aim');
+   const witness=await page.evaluate(start=>({
+    during:{
+     owner:window.__novaFixedGame.input.stickId.aim,
+     active:window.__novaFixedGame.input.aim.active,
+     births:window.__novaFixedResearch.births
+    },
+    burstFrames:window.__novaFixedResearch.frames.slice(start)
+   }),heldBurstStart);
+   const {during,burstFrames}=witness;
+   // Assert ownership AT the exact successful three-step callback, not at
+   // a later Playwright observation that may follow a legitimate >100ms
+   // foreground-stall quarantine. Never waive ownership for the shot itself.
+   const shotIndex=burstFrames.findIndex(f=>f.steps===3&&f.budget===3&&
+    f.rawGapMs<=100+1e-7&&f.playerProjectileBirths>0);
+   assert.ok(shotIndex>=0,'the successful three-step shot frame must be recorded');
+   const shotFrame=burstFrames[shotIndex];
+   assert.equal(shotFrame.aimOwner,held.owner,
+    'the actual three-step shot callback must preserve held touch owner');
+   assert.equal(shotFrame.aimActive,true,
+    'the actual three-step shot callback must preserve held aim');
+   if(during.owner!==held.owner||!during.active){
+    assert.ok(burstFrames.slice(shotIndex+1).some(f=>f.dropReason==='long-stall'),
+     'held touch ownership vanished after the shot without a documented >100ms reset: '+
+      JSON.stringify({during,shotFrame,burstFrames}));
+    assert.equal(during.owner,-1,'a post-shot long stall must revoke old pointer ownership');
+    assert.equal(during.active,false,'a post-shot long stall must release held aim');
+   }else{
+    assert.equal(during.owner,held.owner);
+    assert.equal(during.active,true);
+   }
    assert.ok(during.births>=held.births,'three-step callbacks must not undo real projectiles');
   }
   if(process.env.NOVA_FIXED60_HELD_FOUR_BURST==='1'){
