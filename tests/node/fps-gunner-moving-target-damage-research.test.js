@@ -20,7 +20,8 @@ function frames(mode){
  if(mode==='alternating40_120')return Array.from({length:180},()=>[1/40,1/120]).flat();
  throw Error('unknown presentation mode');
 }
-function trial(seed,cls,reload,mode,offset,amplitude){
+function trial(seed,cls,reload,mode,offset,amplitude,motionPeriod=1.6,motionPhase=0){
+ assert.ok(motionPeriod>0&&Number.isFinite(motionPhase),'valid independent target motion');
  return withSeed(seed,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   const p=g.player;g.sfx.muted=true;g.setClass(p,cls);
@@ -111,9 +112,9 @@ function trial(seed,cls,reload,mode,offset,amplitude){
      assert.ok(dt>EPS,'input-event split must progress');
      // Normalize the physical target at the exact beginning of each step.
      // This keeps initial geometry tied to world time, not prior AI drift.
-     target.x=200;target.y=amplitude*Math.sin(2*Math.PI*now/1.6);
+     target.x=200;target.y=amplitude*Math.sin(2*Math.PI*(now+motionPhase)/motionPeriod);
      target.vx=0;target.vy=0;
-     expectedNextY=amplitude*Math.sin(2*Math.PI*next/1.6);
+     expectedNextY=amplitude*Math.sin(2*Math.PI*(next+motionPhase)/motionPeriod);
      g.input.firing=firing;
      if(firing)onTime+=dt;
      g.update(dt);updates++;
@@ -139,7 +140,7 @@ function trial(seed,cls,reload,mode,offset,amplitude){
    assert.ok(volleys>0&&hits>0&&damage>0,'real projectile damage required');
    assert.ok(hits<=volleys,'ordinary single-target rotary shots');
    assert.ok(Number.isFinite(damage)&&damage<=1000000);
-   return {seed,cls,reload,mode,offset,amplitude,updates,edges,volleys,hits,
+   return {seed,cls,reload,mode,offset,amplitude,motionPeriod,motionPhase,updates,edges,volleys,hits,
     targetMoveSteps,
     aimAssistVetoes,
     travel:+travel.toFixed(4),peakOffset:+peakOffset.toFixed(4),
@@ -173,4 +174,28 @@ test('matched moving-target chronology measures real rotary damage under irregul
  assert.ok(rows.some(row=>row.damageDelta!==0),
   'moving-target arm must change at least one real HP outcome versus stationary control');
  console.log('GUNNER_MOVING_TARGET_REAL_DAMAGE '+JSON.stringify(rows));
+});
+
+/* Independent motion-period/phase control: the original 1.6-second path shares
+ * a rational period with the 0.8-second fire cycle. A 1.37-second period
+ * and nonzero starting phase test whether real moving-target contact remains
+ * measurable without that artificial synchronization. No damage goldens. */
+test('unsynchronized target motion retains real projectile damage evidence',()=>{
+ const rows=[];
+ for(const [cls,reload] of [['minigun',1],['needlestorm',3]]){
+  for(const mode of ['native60','cluster30','alternating40_120']){
+   const moving=trial(1517800,cls,reload,mode,.007,26,1.37,.19);
+   const repeat=trial(1517800,cls,reload,mode,.007,26,1.37,.19);
+   const stationary=trial(1517800,cls,reload,mode,.007,0,1.37,.19);
+   assert.deepEqual(moving,repeat,'unsynchronized path must reproduce exactly');
+   assert.ok(moving.peakOffset>25&&moving.travel>50,'physical motion must cross corridor');
+   assert.equal(stationary.travel,0,'stationary control must not drift');
+   assert.equal(moving.onTime,stationary.onTime,'same input history');
+   assert.equal(moving.updates,stationary.updates,'same update schedule');
+   rows.push({cls,mode,movingDamage:moving.damage,stationaryDamage:stationary.damage,
+    movingHits:moving.hits,stationaryHits:stationary.hits});
+  }
+ }
+ assert.equal(rows.length,6);
+ console.log('GUNNER_UNSYNC_MOVING_TARGET_REAL_DAMAGE '+JSON.stringify(rows));
 });
