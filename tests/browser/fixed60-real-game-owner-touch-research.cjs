@@ -63,9 +63,9 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     '../research/fixed-step-presentation.cjs'),'utf8');
    assert.ok(source.includes('module.exports={FixedStepPosePresentation};'),
     'presenter export contract changed');
-   await page.addScriptTag({content:source.replace(
+   await page.addScriptTag({content:'(function(){\n'+source.replace(
     'module.exports={FixedStepPosePresentation};',
-    'window.__novaFixedPosePresentation=Object.freeze({FixedStepPosePresentation});')});
+    'window.__novaFixedPosePresentation=Object.freeze({FixedStepPosePresentation});')+'\n})();'});
   }
   await page.evaluate(({maxSteps,controlledGate,controlledExtra,poseEnabled})=>{
    window.__novaFixedMaxSteps=maxSteps;
