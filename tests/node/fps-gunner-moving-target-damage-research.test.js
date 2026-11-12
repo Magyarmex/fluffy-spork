@@ -122,7 +122,13 @@ test('matched moving-target chronology measures real rotary damage under irregul
      const repeat=trial(seed,cls,reload,mode,offset,26);
      assert.deepEqual(row,repeat,'seeded composed simulation must reproduce');
      assert.ok(row.peakOffset>25.9&&row.travel>50,'target must actually traverse the projectile corridor');
-     rows.push(row);
+     const stationary=trial(seed,cls,reload,mode,offset,0);
+     assert.equal(stationary.peakOffset,0,'stationary control cannot move');
+     assert.equal(stationary.travel,0,'stationary control cannot drift');
+     assert.equal(stationary.onTime,row.onTime,'matched physical input duty');
+     rows.push({...row,stationaryDamage:stationary.damage,
+      stationaryHits:stationary.hits,
+      damageDelta:+(row.damage-stationary.damage).toFixed(4)});
     }
   }
  }
