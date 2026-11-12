@@ -81,6 +81,18 @@ function trial(seed,cls,reload,mode,offset,amplitude){
    return result;
   };
   let now=0,updates=0,onTime=0,edges=0,travel=0,peakOffset=0,previousY=0;
+  let targetMoveSteps=0,expectedNextY=0;
+  const bulletStep=g.updateBullets;
+  g.updateBullets=function(dt){
+   // Integrate the scripted, bounded target displacement through the REAL
+   // Battlefield moveTank owner immediately before physical bullet collision.
+   // This preserves swept-body metadata instead of teleporting after combat.
+   const dy=expectedNextY-target.y;
+   target.vx=0;target.vy=dy/dt;
+   this.moveTank(target,0,dy/dt,dt);
+   targetMoveSteps++;
+   return bulletStep.apply(this,arguments);
+  };
   const initialTime=g.time;
   try{
    for(const frame of frames(mode)){
@@ -99,17 +111,18 @@ function trial(seed,cls,reload,mode,offset,amplitude){
      // This keeps initial geometry tied to world time, not prior AI drift.
      target.x=200;target.y=amplitude*Math.sin(2*Math.PI*now/1.6);
      target.vx=0;target.vy=0;
+     expectedNextY=amplitude*Math.sin(2*Math.PI*next/1.6);
      g.input.firing=firing;
      if(firing)onTime+=dt;
      g.update(dt);updates++;
-     // Externally prescribed moving target: same world-clock position in all
-     // frame schedules, with no AI/physics drift between updates. Motion is
-     // smooth and bounded, crossing the projectile corridor repeatedly.
-     const y=amplitude*Math.sin(2*Math.PI*next/1.6);
+     // The real moveTank/Battlefield owner must arrive at the same scripted
+     // endpoint; no after-collision teleport or silent geometry correction.
+     const y=expectedNextY;
+     assert.ok(Math.abs(target.y-y)<1e-4,
+      'real moving-body integration diverged from prescribed world-time path');
      travel+=Math.abs(y-previousY);
      previousY=y;
      peakOffset=Math.max(peakOffset,Math.abs(y));
-     target.x=200;target.y=y;target.vx=0;target.vy=0;
      now=next;
      if(next<end-EPS)edges++;
     }
@@ -119,11 +132,13 @@ function trial(seed,cls,reload,mode,offset,amplitude){
    assert.ok(Math.abs(onTime-3.9)<1e-7,'same exact fire duty');
    assert.equal(g.tanks.length,2,'no extra tanks');
    assert.equal(g.shapes.length+g.drones.length+g.powerups.length,0,'no ecology contamination');
+   assert.equal(targetMoveSteps,updates,'each Game update must integrate one real target movement');
    assert.ok(aimAssistVetoes>0,'manual-aim assist veto must execute in composed Game');
    assert.ok(volleys>0&&hits>0&&damage>0,'real projectile damage required');
    assert.ok(hits<=volleys,'ordinary single-target rotary shots');
    assert.ok(Number.isFinite(damage)&&damage<=1000000);
    return {seed,cls,reload,mode,offset,amplitude,updates,edges,volleys,hits,
+    targetMoveSteps,
     aimAssistVetoes,
     travel:+travel.toFixed(4),peakOffset:+peakOffset.toFixed(4),
     damage:+damage.toFixed(4),onTime:+onTime.toFixed(5),firstBirths,firstHits,
