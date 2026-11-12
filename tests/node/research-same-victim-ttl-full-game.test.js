@@ -250,3 +250,24 @@ for(const profile of [{first:.411,second:.415,label:'baseline'},
   assert.equal(result.ownerStats[1].kills,1);
   assert.ok(result.ownerStats[1].xp>0);
  });
+
+/* The live-frame ordering shortcut must not promote a shot through an
+ * earlier permanent wall. At canonical speed the left shot would otherwise
+ * reach the hull at 411ms, while the right shot remains physically open. */
+for(const hz of [60,120])for(const reverse of [false,true])
+ for(const fullUpdate of [false,true])
+ test('RESEARCH canonical-speed live pair respects permanent cover '+hz+
+      'Hz reverse='+reverse+' fullUpdate='+fullUpdate,()=>{
+  const result=trial(hz,reverse,fullUpdate,null,40,(g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   g.__novaTerrain=[{id:-9190,shape:'rect',x:18,y:0,w:2,h:70,
+    solid:true,destructible:false}];
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102],
+   'the permanent wall must absorb the earlier left-hand shot');
+  assert.equal(result.target.alive,true);
+  assert.deepEqual(result.kills,[]);
+ });
