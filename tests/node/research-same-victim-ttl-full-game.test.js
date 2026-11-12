@@ -66,7 +66,7 @@ function trial(hz,reverse,fullUpdate,only=null,targetX=40,mutate=null){
     frameStartIdCeiling:g.__novaFrameStartBulletIdCeiling,
     bullets:g.bullets.filter(b=>b.id===201||b.id===202).map(b=>({
      id:b.id,x:b.x,ttl:b.ttl,pen:b.pen,hits:b.hits,dead:b.dead,
-     victims:b.__novaDirectVictims instanceof Set?
+     victims:(b.__novaDirectVictims&&typeof b.__novaDirectVictims.values==='function')?
       [...b.__novaDirectVictims].map(t=>t&&t.id):null})),hp:p.hp});
    if(fullUpdate)g.update(1/hz);
    else {g.updateBullets(1/hz);g.time+=1/hz;}
@@ -75,7 +75,7 @@ function trial(hz,reverse,fullUpdate,only=null,targetX=40,mutate=null){
     frameStartIdCeiling:g.__novaFrameStartBulletIdCeiling,
     bullets:g.bullets.filter(b=>b.id===201||b.id===202).map(b=>({
      id:b.id,x:b.x,ttl:b.ttl,pen:b.pen,hits:b.hits,dead:b.dead,
-     victims:b.__novaDirectVictims instanceof Set?
+     victims:(b.__novaDirectVictims&&typeof b.__novaDirectVictims.values==='function')?
       [...b.__novaDirectVictims].map(t=>t&&t.id):null})),hp:p.hp});
   }
   return {hp:p.hp,contacts,kills,frameTrace,ownerStats:owners.map(o=>({id:o.id,kills:o.kills,xp:o.xp,score:o.score})),remaining:g.bullets.map(b=>b.id),
