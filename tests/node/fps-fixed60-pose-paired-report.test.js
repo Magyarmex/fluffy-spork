@@ -7,7 +7,7 @@ function report(enabled){
    renderJs:{p95:enabled?2.3:null}},
   initialFingerprint:'1234abcd:1500',configuredMaxSteps:3,
   backlogExtraTicks:2,controlledGate:true,productionRafActive:false,
-  births:5,droppedMs:0,renders:{p95:2},raf:{frames:20,callbackJs:{p95:3}},
+  births:5,droppedMs:0,updates:{p95:1.2},renders:{p95:2},raf:{frames:20,callbackJs:{p95:3}},
   touchToCanvasSubmissionMs:17};
 }
 test('paired pose report requires identical seeded world and exact owner policy',()=>{
