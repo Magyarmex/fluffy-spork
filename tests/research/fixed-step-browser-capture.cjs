@@ -18,9 +18,13 @@ class BrowserInputCapture {
     this.originalDestroy = game && game.destroy;
     this.destroyHadOwn = !!(game && Object.prototype.hasOwnProperty.call(game,'destroy'));
     this.destroyWrapper = null;
+    const revoke = () => {
+      if(typeof this.bridge.revokeForExternalReset==='function')
+        this.bridge.revokeForExternalReset();
+    };
     const capture = e => {
       if (!this.active) return;
-      if (this.document.hidden) { this.timeline.reset();
+      if (this.document.hidden) { this.timeline.reset();revoke();
         if (typeof this.bridge.takeStaleTouchResetNotice === 'function')
           this.bridge.takeStaleTouchResetNotice();
         return; }
@@ -32,7 +36,7 @@ class BrowserInputCapture {
     // do not invent an independent firing state or bypass Input's touch gate.
     const native = type => e => {
       if (!this.active || !e || e.button !== 0) return;
-      if (this.document.hidden) { this.timeline.reset();
+      if (this.document.hidden) { this.timeline.reset();revoke();
         if (typeof this.bridge.takeStaleTouchResetNotice === 'function')
           this.bridge.takeStaleTouchResetNotice();
         return; }
@@ -43,7 +47,7 @@ class BrowserInputCapture {
         sourceCapabilities:e.sourceCapabilities});
     };
     const release = () => { if (this.active) {
-      this.timeline.reset();
+      this.timeline.reset();revoke();
       if (typeof this.bridge.takeStaleTouchResetNotice === 'function')
         this.bridge.takeStaleTouchResetNotice();
     } };
