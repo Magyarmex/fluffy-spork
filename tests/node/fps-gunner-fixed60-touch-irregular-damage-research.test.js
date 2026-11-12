@@ -86,11 +86,12 @@ function trial(seed,cls,reload,mode,offsetMs,expectedTicks=360,maxSteps=2,backlo
   g.status='playing';g.paused=false;
   g.input.autofire=false;g.input.mouseActive=false;
   let now=1000,callback=null,volleys=0,hits=0,damage=0;
-  const births=[],originalFire=g.tryFire,originalDamage=g.damageTank;
+  const births=[],allBirths=[],originalFire=g.tryFire,originalDamage=g.damageTank;
   g.tryFire=function(t){
    const before=this.bullets.length,out=originalFire.apply(this,arguments);
    if(t===p&&this.bullets.length>before){
-    volleys++;if(births.length<8)births.push(+this.time.toFixed(6));
+    volleys++;allBirths.push(+this.time.toFixed(6));
+    if(births.length<8)births.push(+this.time.toFixed(6));
    }
    return out;
   };
@@ -183,7 +184,7 @@ function trial(seed,cls,reload,mode,offsetMs,expectedTicks=360,maxSteps=2,backlo
     backlogMs:+owner.lagMs.toFixed(5),droppedMs:owner.droppedMs,
     droppedFrames:owner.droppedFrames,
     applied:timeline.applied,volleys,hits,damage:+damage.toFixed(5),
-    births,stepsByFrame,maxInputSampleLagMs:Math.max(...inputLagsMs),
+    births,allBirths,stepsByFrame,maxInputSampleLagMs:Math.max(...inputLagsMs),
     meanInputSampleLagMs:+(inputLagsMs.reduce((a,b)=>a+b,0)/inputLagsMs.length).toFixed(5),
     maxRenderCallbackLagMs:Math.max(...renderCallbackLagsMs),
     meanRenderCallbackLagMs:+(renderCallbackLagsMs.reduce((a,b)=>a+b,0)/renderCallbackLagsMs.length).toFixed(5),
@@ -436,7 +437,9 @@ test('jittered three-step fixed60 preserves touch-driven Gunner hits and release
     assert.equal(jitter.damage,baseline.damage,'actual HP damage must remain equal');
     assert.equal(jitter.hits,baseline.hits,'physical contact count must remain equal');
     assert.equal(jitter.volleys,baseline.volleys,'rotary cadence must remain equal');
-    assert.deepEqual(jitter.births,baseline.births,'shot birth chronology must remain equal');
+    assert.deepEqual(jitter.births,baseline.births,'sampled shot births must remain equal');
+    assert.deepEqual(jitter.allBirths,baseline.allBirths,
+      'every shot birth must preserve its simulation timestamp');
     assert.equal(jitter.spin,baseline.spin,'rotary spin must remain equal');
     assert.equal(jitter.heat,baseline.heat,'heat must remain equal');
     rows.push({cls,seed,offset,damage:jitter.damage,
