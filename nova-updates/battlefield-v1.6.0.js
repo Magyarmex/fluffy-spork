@@ -775,7 +775,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   var previous=b.__novaDirectVictims.values().next().value;
   return !!(previous&&previous.kind==='tank'&&previous.alive&&previous.hp>0);
  }
- function isolatedTTLStationaryPiercingChain(g,b,dt,nonExpiring,localOthers,allowSingle,dryRun,ignoreCover,allowLethal){
+ function isolatedTTLStationaryPiercingChain(g,b,dt,nonExpiring,localOthers,allowSingle,dryRun,ignoreCover,allowLethal,allowSingleLive){
   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
      b.__novaBreachAtTime===g.time||
      !(dt>0)||!(b.ttl>0)||
@@ -862,8 +862,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    * excludes certified victims; the shot MUST be restored to its pre-frame
    * position so core advances it exactly once. Do not speculate through
    * knockback, lethal damage or an already-mutated victim ledger. */
-  var partialNonExpiring=nonExpiring&&b.pen===2&&b.hits===0&&
-      contacts.length===2&&(!b.__novaDirectVictims||b.__novaDirectVictims.size===0);
+  var partialNonExpiring=nonExpiring&&b.hits===0&&
+      ((b.pen===2&&contacts.length===2)||
+       (allowSingleLive===true&&b.pen===1&&contacts.length===1))&&
+      (!b.__novaDirectVictims||b.__novaDirectVictims.size===0);
   if(partialNonExpiring&&((b.knock||0)!==0||
      contacts.some(function(c){return c.e.hp<=b.dmg*4;})||
      (g.bullets||[]).some(function(o){
@@ -929,9 +931,9 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   /* The core normally initializes projectile integrity before any hits.
    * A surviving partial prefix must preserve the ORIGINAL pen=2 integrity
    * rather than let core first initialize after we consume penetration. */
+  if(dryRun)return contacts;
   if(partialNonExpiring&&typeof g.initBulletIntegrity==='function')
-   g.initBulletIntegrity(b);
-  if(dryRun)return contacts; /* immutable certificate before any callback */
+   g.initBulletIntegrity(b); /* immutable certificate before any callback */
   /* Reuse the real damage owner, never fabricate HP or kill credit. */
   var ang=Math.atan2(b.vy,b.vx),kx=Math.cos(ang)*(b.knock||0)*.006,
       ky=Math.sin(ang)*(b.knock||0)*.006;
@@ -1972,6 +1974,64 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    (Number.isSafeInteger(b.id)&&
     g.__novaFrameStartBulletEpoch===g.__novaShapeSweepEpoch&&
     b.id<g.__novaFrameStartBulletIdCeiling);
+ }
+ /* A rare same-frame, non-expiring pair can hit the same stationary hull
+  * in physical order while the core's reverse projectile traversal calls
+  * the later shot first. Certify BOTH exact first contacts before mutating.
+  * This deliberately handles only two ordinary pen=1 rounds, one tank,
+  * no other bodies, disjoint projectile corridors and no terrain contact.
+  * Anything more complex stays with the existing collision owners. */
+ function certifiedSameVictimLivePair(g,dt){
+  if(!(dt>0&&dt<=.05)||!Number.isFinite(dt))return false;
+  var bullets=g.bullets||[],tanks=g.tanks||[];
+  if(bullets.length!==2||tanks.length!==1||
+     (g.shapes||[]).length||(g.drones||[]).length||
+     g.__novaWallProofHadShell)return false;
+  var a=bullets[0],b=bullets[1],target=tanks[0];
+  if(!a||!b||!target||!target.alive||target.kind!=='tank'||
+     !CLASSES[target.cls]||
+     !certifiedTTLFrameStart(g,a)||!certifiedTTLFrameStart(g,b)||
+     a.dead||b.dead||a.shell||b.shell||a.beam||b.beam||
+     a.splash||b.splash||a.__v17Cannon||b.__v17Cannon||
+     a.pen!==1||b.pen!==1||(a.hits||0)!==0||(b.hits||0)!==0||
+     !(a.ttl>dt&&b.ttl>dt)||
+     a.ownerId===b.ownerId||(a.knock||0)!==0||(b.knock||0)!==0||
+     !Number.isFinite(a.dmg)||!Number.isFinite(b.dmg)||
+     !(a.dmg>0&&b.dmg>0))return false;
+  /* The full current-frame swept boxes must not intersect, even after
+   * accounting for both radii. Neither shot can intercept the other. */
+  var ax=a.x+a.vx*dt,ay=a.y+a.vy*dt,
+      bx=b.x+b.vx*dt,by=b.y+b.vy*dt,
+      pad=a.r+b.r+2;
+  if(!(Number.isFinite(ax)&&Number.isFinite(ay)&&
+       Number.isFinite(bx)&&Number.isFinite(by)&&
+       Number.isFinite(pad)&&pad>0))return false;
+  if(Math.max(a.x,ax)+pad>=Math.min(b.x,bx)&&
+     Math.min(a.x,ax)-pad<=Math.max(b.x,bx)&&
+     Math.max(a.y,ay)+pad>=Math.min(b.y,by)&&
+     Math.min(a.y,ay)-pad<=Math.max(b.y,by))return false;
+  var ac=isolatedTTLStationaryPiercingChain(g,a,dt,true,[],true,true,false,true,true),
+      bc=isolatedTTLStationaryPiercingChain(g,b,dt,true,[],true,true,false,true,true);
+  if(!ac||!bc||ac.length!==1||bc.length!==1||
+     ac[0].e!==target||bc[0].e!==target)return false;
+  var at=ac[0].t*dt,bt=bc[0].t*dt;
+  if(!(at>0&&bt>0&&Math.abs(at-bt)>1e-7))return false;
+  var first=at<bt?a:b,second=at<bt?b:a,
+      tx=target.x,ty=target.y,
+      bulletRefs=bullets.slice(),shapeCount=(g.shapes||[]).length,
+      droneCount=(g.drones||[]).length;
+  if(!(target.hp>first.dmg*2))return false;
+  if(!isolatedTTLStationaryPiercingChain(g,first,dt,true,[],true,false,false,false,true))
+   return false;
+  if(!target.alive||target.x!==tx||target.y!==ty||
+     bullets.length!==2||bullets[0]!==bulletRefs[0]||
+     bullets[1]!==bulletRefs[1]||
+     (g.shapes||[]).length!==shapeCount||
+     (g.drones||[]).length!==droneCount||
+     (g.tanks||[]).length!==1||g.tanks[0]!==target||
+     !(target.hp>0))return true;
+  isolatedTTLStationaryPiercingChain(g,second,dt,true,[],true,false,false,target,true);
+  return true;
  }
  function certifiedSameVictimTTLPair(g,dt){
   if(!(dt>0&&dt<=.05)||!Number.isFinite(dt))return false;
@@ -3599,6 +3659,9 @@ function certifiedMultiShotCoverPriority(g,dt){
     break;
    }
   }
+ /* Settle the only certified non-expiring shared-hull pair before the
+  * core's reverse array traversal can invert physical kill ownership. */
+ certifiedSameVictimLivePair(this,dt);
  /* Commit a certified same-victim pair before the sequential TTL pass. */
  if(expiring===2&&legacyExpiring&&bodyWork<=300&&
     !this.__novaWallProofHadShell){
