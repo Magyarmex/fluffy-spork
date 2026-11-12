@@ -8,18 +8,32 @@
 const TRACKED=['tanks','drones','shapes','bullets'];
 const MAX_STEP={tanks:96,drones:96,shapes:96,bullets:96,camera:96};
 const finite=n=>typeof n==='number'&&Number.isFinite(n);
-function snapshot(game){
- const map=new Map();
+function snapshot(game,map=new Map()){
+ // Reuse pose records in two alternating buffers. A prior tick's records
+ // must remain immutable until drawing finishes; only the inactive buffer
+ // can be cleared and repopulated. The pool never retains entity identities.
+ const pool=map.posePool||(map.posePool=[]);
+ map.clear();
+ let used=0;
+ const record=(obj,kind)=>{
+  const pose=pool[used]||(pool[used]={x:0,y:0,kind:''});
+  used++;
+  pose.x=obj.x;pose.y=obj.y;pose.kind=kind;
+  map.set(obj,pose);
+ };
  for(const kind of TRACKED){
   const arr=game[kind];if(!Array.isArray(arr))continue;
   for(const obj of arr){
    if(obj&&typeof obj==='object'&&finite(obj.x)&&finite(obj.y))
-    map.set(obj,{x:obj.x,y:obj.y,kind});
+    record(obj,kind);
   }
  }
  const cam=game.cam;
  if(cam&&typeof cam==='object'&&finite(cam.x)&&finite(cam.y))
-  map.set(cam,{x:cam.x,y:cam.y,kind:'camera'});
+  record(cam,'camera');
+ // Shrink after a large transient battle rather than retaining the peak
+ // allocation forever. The current frame's records are never truncated.
+ if(pool.length>Math.max(128,used*4))pool.length=Math.max(128,used*2);
  return map;
 }
 class FixedStepPosePresentation {
@@ -28,6 +42,7 @@ class FixedStepPosePresentation {
    throw Error('invalid fixed-step presentation game');
   this.game=game;this.enabled=enabled===true;
   this.current=snapshot(game);this.previous=this.current;
+  this.spare=new Map();this.initialBuffer=this.current;
   this.playerRef=game.player;this.status=game.status;
   this.originalUpdate=game.update;this.originalDestroy=game.destroy;
   this.updateHadOwn=Object.prototype.hasOwnProperty.call(game,'update');
@@ -39,7 +54,8 @@ class FixedStepPosePresentation {
    const out=self.originalUpdate.apply(this,args);
    if(self.active){
     const replaced=this.player!==self.playerRef||this.status!==self.status;
-    self.previous=self.current;self.current=snapshot(this);
+    self.previous=self.current;
+    self.current=snapshot(this,self.current===self.spare?self.initialBuffer:self.spare);
     if(replaced)self.previous=self.current;
     self.playerRef=this.player;self.status=this.status;
    }
@@ -93,6 +109,9 @@ class FixedStepPosePresentation {
    if(this.destroyHadOwn)g.destroy=this.originalDestroy;else delete g.destroy;
   }
   this.previous.clear();if(this.current!==this.previous)this.current.clear();
+  this.initialBuffer.clear();this.spare.clear();
+  this.initialBuffer.posePool.length=0;
+  if(this.spare.posePool)this.spare.posePool.length=0;
  }
 }
 module.exports={FixedStepPosePresentation};
