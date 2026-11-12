@@ -247,6 +247,14 @@ class BrowserEventTimeline {
     this.resizeInterruptions++;
     return true;
   }
+  revokeForExternalReset() {
+    // A lifecycle/RAF owner can reset Input without delivering a DOM blur
+    // through this bridge. Old moves must not silently re-arm the sticks.
+    for(const id of this.activeTouchIds)this.suppressedTouchIds.add(id);
+    this.activeTouchIds.clear();
+    this.activeTouchSize=null;
+    this.pendingStaleTouchIds.clear();
+  }
   takeStaleTouchResetNotice() {
     const lost = this.pendingStaleTouchIds.size > 0;
     this.pendingStaleTouchIds.clear();
@@ -482,9 +490,13 @@ class BrowserInputCapture {
     this.originalDestroy = game && game.destroy;
     this.destroyHadOwn = !!(game && Object.prototype.hasOwnProperty.call(game,'destroy'));
     this.destroyWrapper = null;
+    const revoke = () => {
+      if(typeof this.bridge.revokeForExternalReset==='function')
+        this.bridge.revokeForExternalReset();
+    };
     const capture = e => {
       if (!this.active) return;
-      if (this.document.hidden) { this.timeline.reset();
+      if (this.document.hidden) { this.timeline.reset();revoke();
         if (typeof this.bridge.takeStaleTouchResetNotice === 'function')
           this.bridge.takeStaleTouchResetNotice();
         return; }
@@ -496,7 +508,7 @@ class BrowserInputCapture {
     // do not invent an independent firing state or bypass Input's touch gate.
     const native = type => e => {
       if (!this.active || !e || e.button !== 0) return;
-      if (this.document.hidden) { this.timeline.reset();
+      if (this.document.hidden) { this.timeline.reset();revoke();
         if (typeof this.bridge.takeStaleTouchResetNotice === 'function')
           this.bridge.takeStaleTouchResetNotice();
         return; }
@@ -507,7 +519,7 @@ class BrowserInputCapture {
         sourceCapabilities:e.sourceCapabilities});
     };
     const release = () => { if (this.active) {
-      this.timeline.reset();
+      this.timeline.reset();revoke();
       if (typeof this.bridge.takeStaleTouchResetNotice === 'function')
         this.bridge.takeStaleTouchResetNotice();
     } };
@@ -729,7 +741,10 @@ class FixedStepRafOwner {
     if(!Number.isFinite(at)||at<this.lastMs-EPS)throw Error('invalid pause clock');
     if(typeof this.bridge.takeStaleTouchResetNotice==='function')
       this.bridge.takeStaleTouchResetNotice();
-    this.timeline.reset();this.lagMs=0;this.paused=paused;
+    this.timeline.reset();
+      if(typeof this.bridge.revokeForExternalReset==='function')
+        this.bridge.revokeForExternalReset();
+      this.lagMs=0;this.paused=paused;
     this._awaitingForwardFrame=true;this.lastMs=at;this.simAtSec=(at-this.bridge.startMs)/1000;
     // A new simulation epoch changes the tick grid used for safe pointermove coalescing.
     this.timeline.tickOrigin=this.simAtSec;
@@ -775,12 +790,18 @@ class FixedStepRafOwner {
       g.toast('Touch controls reset — touch again','warn');
     }
     if(g.paused){
-      if(!this.paused){this.timeline.reset();this.lagMs=0;this.paused=true;}
+      if(!this.paused){this.timeline.reset();
+      if(typeof this.bridge.revokeForExternalReset==='function')
+        this.bridge.revokeForExternalReset();
+      this.lagMs=0;this.paused=true;}
       this.simAtSec=(ts-this.bridge.startMs)/1000;
     }else if(this.paused){
       // Resume without consuming the elapsed menu/evolution time. Input must
       // be re-armed by fresh browser events, never by a stale held command.
-      this.timeline.reset();this.lagMs=0;this.paused=false;
+      this.timeline.reset();
+      if(typeof this.bridge.revokeForExternalReset==='function')
+        this.bridge.revokeForExternalReset();
+      this.lagMs=0;this.paused=false;
       this.simAtSec=(ts-this.bridge.startMs)/1000;
       this.timeline.tickOrigin=this.simAtSec;
       this.timeline.consumeThrough(this.simAtSec);
@@ -863,7 +884,10 @@ class FixedStepRafOwner {
           this.lastTouchResetNoticeMs=ts;
           g.toast('Touch controls reset — touch again','warn');
         }
-        this.timeline.reset();this.lagMs=0;
+        this.timeline.reset();
+      if(typeof this.bridge.revokeForExternalReset==='function')
+        this.bridge.revokeForExternalReset();
+      this.lagMs=0;
         this.simAtSec=(ts-this.bridge.startMs-maxMs)/1000;
         this.timeline.tickOrigin=this.simAtSec;
         this.timeline.consumeThrough(this.simAtSec);
@@ -895,7 +919,10 @@ class FixedStepRafOwner {
         this.lagMs=Math.max(0,this.lagMs-STEP_MS);
         this.lastSteps++;this.ticks++;
       }
-      if(g.paused){this.timeline.reset();this.lagMs=0;this.paused=true;}
+      if(g.paused){this.timeline.reset();
+      if(typeof this.bridge.revokeForExternalReset==='function')
+        this.bridge.revokeForExternalReset();
+      this.lagMs=0;this.paused=true;}
     }
     if(!this.started)return; // Game.destroy may run inside Game.update.
     this.alpha=Math.max(0,Math.min(1,this.lagMs/STEP_MS));
