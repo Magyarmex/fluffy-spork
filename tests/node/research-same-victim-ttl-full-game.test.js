@@ -49,7 +49,7 @@ function trial(hz,reverse,fullUpdate,only=null,targetX=40,mutate=null){
   // These pre-existing fixture projectile IDs must precede the live
   // frame-start allocation ceiling; otherwise they masquerade as newborns.
   g.nextId=Math.max(g.nextId||0,1200);
-  const contacts=[],kills=[];
+  const contacts=[],kills=[],frameTrace=[];
   const originalKill=g.killTank;
   g.killTank=function(victim,killer){
    if(victim===p)kills.push(killer&&killer.id);
@@ -61,10 +61,24 @@ function trial(hz,reverse,fullUpdate,only=null,targetX=40,mutate=null){
    return original.apply(this,arguments);
   };
   for(let frame=0;frame<20&&g.bullets.some(b=>b.id===201||b.id===202);frame++){
+   if(hz===240&&frame<3)frameTrace.push({phase:'before',frame,time:g.time,
+    epoch:g.__novaShapeSweepEpoch,frameStartEpoch:g.__novaFrameStartBulletEpoch,
+    frameStartIdCeiling:g.__novaFrameStartBulletIdCeiling,
+    bullets:g.bullets.filter(b=>b.id===201||b.id===202).map(b=>({
+     id:b.id,x:b.x,ttl:b.ttl,pen:b.pen,hits:b.hits,dead:b.dead,
+     victims:b.__novaDirectVictims instanceof Set?
+      [...b.__novaDirectVictims].map(t=>t&&t.id):null})),hp:p.hp});
    if(fullUpdate)g.update(1/hz);
    else {g.updateBullets(1/hz);g.time+=1/hz;}
+   if(hz===240&&frame<3)frameTrace.push({phase:'after',frame,time:g.time,
+    epoch:g.__novaShapeSweepEpoch,frameStartEpoch:g.__novaFrameStartBulletEpoch,
+    frameStartIdCeiling:g.__novaFrameStartBulletIdCeiling,
+    bullets:g.bullets.filter(b=>b.id===201||b.id===202).map(b=>({
+     id:b.id,x:b.x,ttl:b.ttl,pen:b.pen,hits:b.hits,dead:b.dead,
+     victims:b.__novaDirectVictims instanceof Set?
+      [...b.__novaDirectVictims].map(t=>t&&t.id):null})),hp:p.hp});
   }
-  return {hp:p.hp,contacts,kills,ownerStats:owners.map(o=>({id:o.id,kills:o.kills,xp:o.xp,score:o.score})),remaining:g.bullets.map(b=>b.id),
+  return {hp:p.hp,contacts,kills,frameTrace,ownerStats:owners.map(o=>({id:o.id,kills:o.kills,xp:o.xp,score:o.score})),remaining:g.bullets.map(b=>b.id),
    target:{x:p.x,y:p.y,alive:p.alive,shield:p.spawnShieldT,
     sweepTime:p.__novaSweepMoveTime,sweepX:p.__novaSweepPrevX},
    game:{time:g.time,status:g.status,shapeSweep:g.__novaShapeSweepActive}};
@@ -163,7 +177,7 @@ for(const hz of [30,60,120,240])for(const reverse of [false,true])
    assert.ok(expectedFirst>0&&expectedFirst<expectedSecond&&
      expectedSecond<.005,'both contacts must physically precede expiry');
    assert.deepEqual(result.contacts.map(c=>c.ownerId),[101,102],
-     'earlier owner 101 damages first; later owner 102 must own the kill');
+     'earlier owner 101 damages first; later owner 102 must own the kill; trace='+JSON.stringify(result.frameTrace));
    assert.equal(result.contacts.reduce((sum,c)=>sum+c.damage,0),50,
      'no duplicate or missing damage across the lethal transition');
    assert.equal(result.target.alive,false,
