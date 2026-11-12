@@ -119,3 +119,21 @@ test('fast legal projectiles interpolate without admitting arbitrary teleport ju
  assert.ok(pose.teleportSkips>0);
  pose.stop();
 });
+
+test('reused projectile IDs do not borrow an expired projectile visual history',()=>{
+ const g=denseGame(),pose=new FixedStepPosePresentation(g,{enabled:true});
+ const expired=g.bullets[3],id=expired.id;
+ g.update(1/60);
+ g.bullets.splice(3,1);
+ const replacement={id,x:900,y:900,vx:0,vy:0};
+ g.bullets.push(replacement);
+ g.update(1/60);
+ const physical=positions(g);
+ pose.draw(()=>{
+  assert.equal(replacement.x,904);
+  assert.equal(replacement.y,902);
+  assert.notEqual(replacement,expired);
+ },g,320,700,.5);
+ unchanged(physical);
+ pose.stop();
+});
