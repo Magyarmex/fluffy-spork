@@ -17,6 +17,11 @@ function section(source,start,next){
  return source.slice(i,j);
 }
 const functions=[
+ section(fair,'function alive(','function d2('),
+ section(fair,'function lineage(','function isController('),
+ section(fair,'function hostile(','function targetDanger('),
+ section(fair,'function targetDanger(','function saturation('),
+ section(fair,'function saturationSnapshot(','function scoreTarget('),
  section(fair,'function scoreTarget(','function chooseTarget('),
  section(fair,'function chooseTarget(','function replanDelay('),
  section(fair,'function replanDelay(','function fairTarget('),
@@ -37,10 +42,7 @@ function scenario(playerId){
   Math,Number,Map,Infinity,SATURATION_PENALTY:.18,NORMAL_REPLAN:.18,ELITE_REPLAN:.12,classes:{},
   C:{carrier:{}},clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),
   isController:t=>t.cls==='carrier',
-  alive:t=>!!t&&t.alive!==false&&t.hp>0,
-  hostile:(game,a,b)=>a.id!==b.id,
-  canPerceive:()=>true,targetDanger:()=>.5,
-  saturationSnapshot:()=>new Map(),
+  canPerceive:()=>true,
   aiPlan:t=>t.__novaLiveVectorAI,
   bestObservedTank:()=>{throw Error('legacy player-biased selector was reached');}
  };
