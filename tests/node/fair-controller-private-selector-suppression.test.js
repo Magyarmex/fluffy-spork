@@ -1,89 +1,78 @@
 'use strict';
-// Source-composed research gate: the later Fair Engagement wrapper must keep
-// the legacy Live Vector player-weighted private selector asleep.
-// This is NOT a 49-overlay Game/browser encounter or a natural-match rate.
+// Real two-overlay module composition: Fair Engagement must own the AI
+// Controller's target before Live Vector's legacy private planner runs.
+// Not a full 49-overlay Game or a natural-match incidence measurement.
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
 const root=path.resolve(__dirname,'../..');
-const fair=fs.readFileSync(path.join(root,'nova-updates/fair-engagement-v1.11.2.js'),'utf8');
-const live=fs.readFileSync(path.join(root,'nova-updates/second-body-live-vector-v1.10.7.js'),'utf8');
 const shell=fs.readFileSync(path.join(root,'index.html'),'utf8');
-function section(source,start,next){
- const i=source.indexOf(start),j=source.indexOf(next,i+start.length);
- assert.ok(i>=0&&j>i,'shipping source function boundary drift: '+start);
- return source.slice(i,j);
-}
-const functions=[
- section(fair,'function alive(','function d2('),
- section(fair,'function lineage(','function isController('),
- section(fair,'function hostile(','function targetDanger('),
- section(fair,'function targetDanger(','function saturation('),
- section(fair,'function saturationSnapshot(','function scoreTarget('),
- section(fair,'function scoreTarget(','function chooseTarget('),
- section(fair,'function chooseTarget(','function replanDelay('),
- section(fair,'function replanDelay(','function fairTarget('),
- section(fair,'function fairTarget(','function closeAimVector('),
- section(fair,'function targetFor(','function syncControllerPlans('),
- section(fair,'function syncControllerPlans(','var oldDrones=Game.prototype.updateDrones;'),
- section(live,'function planAIControllers(','function prepareAIVirtualThumbs(')
-].join('\n');
-function scenario(playerId,reverse=false){
- const owner={id:1,cls:'carrier',x:0,y:0,alive:true,hp:100,maxHp:100,
-  angle:0,ai:{targetId:-1,state:'wander',isElite:false}};
- const npc={id:2,cls:'scout',x:100,y:0,hp:100,maxHp:100,alive:true,isPlayer:playerId===2};
- const rival={id:3,cls:'scout',x:105,y:0,hp:100,maxHp:100,alive:true,isPlayer:playerId===3};
- const g={time:10,tanks:reverse?[owner,rival,npc]:[owner,npc,rival],getTank(id){return this.tanks.find(t=>t.id===id)||null;}};
- const context={
-  window:{__NOVA_LIVE_VECTOR_TEST__:{hostileDroneNear:()=>null,
-   aiVirtualStick:()=>({active:true,angle:0,power:.5})}},
-  Math,Number,Map,Infinity,SATURATION_PENALTY:.18,NORMAL_REPLAN:.18,ELITE_REPLAN:.12,classes:{},
-  C:{carrier:{}},clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),
-  isController:t=>t.cls==='carrier',
-  canPerceive:()=>true,
-  aiPlan:t=>t.__novaLiveVectorAI,
-  bestObservedTank:()=>{throw Error('legacy player-biased selector was reached');}
+const live=fs.readFileSync(path.join(root,'nova-updates/second-body-live-vector-v1.10.7.js'),'utf8');
+const fair=fs.readFileSync(path.join(root,'nova-updates/fair-engagement-v1.11.2.js'),'utf8');
+
+function boot(){
+ const modules={
+  'game/engine':function(module){
+   class Game{
+    constructor(){this.tanks=[];this.drones=[];this.time=7;this.w=800;this.h=600;
+     this.cam={zoom:1};this.input={};this.player=null;}
+    getTank(id){return this.tanks.find(t=>t.id===id)||null;}
+    updateDrones(){}
+   }
+   module.exports.Game=Game;
+  }
  };
- vm.createContext(context);
- vm.runInContext(functions,context);
- const before=context.chooseTarget(g,{},owner,owner.ai,10);
- context.syncControllerPlans(g);
- const plan=owner.__novaLiveVectorAI;
- assert.ok(plan&&plan.thinkAt>g.time,'fair outer owner must defer private planner');
- assert.equal(plan.targetId,before.id);
- assert.equal(owner.ai.targetId,before.id);
- assert.doesNotThrow(()=>context.planAIControllers(g),
-  'private player-weighted selector must remain asleep in composed update order');
- assert.equal(owner.ai.targetId,before.id);
- const result={id:before.id,
-  scoreNpc:context.scoreTarget(g,{},owner,owner.ai,npc,10,{counts:new Map()}),
-  scoreRival:context.scoreTarget(g,{},owner,owner.ai,rival,10,{counts:new Map()})};
- // The fair owner must retain a legal cached target, then invalidate it
- // immediately on spawn protection without consulting the private selector.
- g.time=10.01;context.syncControllerPlans(g);context.planAIControllers(g);
- assert.equal(owner.ai.targetId,before.id,'legal target cache must remain stable');
- before.spawnShieldT=1;g.time=10.02;
- context.syncControllerPlans(g);context.planAIControllers(g);
- assert.notEqual(owner.ai.targetId,before.id,
-  'spawn shield must immediately revoke a previously held Controller target');
- assert.ok(owner.ai.targetId>=0,'the other visible hostile remains eligible');
- return result;
+ const window={__novaModules:modules};
+ const document={addEventListener(){}};
+ const context={window,document,console:{info(){},warn(){},error(){}},
+  Math,Date,Number,Object,Array,Map,WeakMap,Set};
+ vm.runInNewContext(live,context,{filename:'second-body-live-vector-v1.10.7.js'});
+ vm.runInNewContext(fair,context,{filename:'fair-engagement-v1.11.2.js'});
+ const classes={CLASSES:{carrier:{droneLeash:650}},lineageForClass:()=>null};
+ const module={exports:{}};
+ modules['game/engine'](module,module.exports,requested=>{
+  assert.equal(requested,'./classes');return classes;
+ });
+ return {Game:module.exports.Game,window};
 }
-test('shipping overlay order places Fair Engagement outside Live Vector',()=>{
+function tank(id,x,isPlayer=false){
+ return {id,cls:id===1?'carrier':'basic',x,y:0,vx:0,vy:0,angle:0,
+  alive:true,hp:100,maxHp:100,spawnShieldT:0,isPlayer,
+  ai:id===1?{state:'hunt',targetId:-1,isElite:false}:null};
+}
+function run(playerId,reverse=false){
+ const {Game}=boot(),g=new Game();
+ const owner=tank(1,0),near=tank(2,100,playerId===2),
+  far=tank(3,105,playerId===3);
+ g.tanks=reverse?[owner,far,near]:[owner,near,far];
+ g.updateDrones(1/60);
+ const selected=owner.ai.__v1112TargetId;
+ assert.ok(selected===2||selected===3);
+ assert.equal(owner.__novaLiveVectorAI.targetId,selected,
+  'real Live Vector must consume the outer Fair Engagement target');
+ assert.equal(owner.ai.targetId,selected,
+  'temporary virtual-stick target must be restored to the fair target');
+ assert.ok(owner.__novaLiveVectorAI.thinkAt>g.time,
+  'private player-weighted planner must remain asleep');
+ g.time+=.01;g.updateDrones(1/60);
+ assert.equal(owner.ai.targetId,selected,'legal target commitment must persist');
+ g.getTank(selected).spawnShieldT=1;g.time+=.01;g.updateDrones(1/60);
+ assert.notEqual(owner.ai.targetId,selected,
+  'a shielded cached target must be revoked before the private planner');
+ assert.ok(owner.ai.targetId===2||owner.ai.targetId===3);
+ return selected;
+}
+test('materialized shell loads Fair Engagement after Live Vector before game boot',()=>{
  const a=shell.indexOf('second-body-live-vector-v1.10.7.js');
  const b=shell.indexOf('fair-engagement-v1.11.2.js');
- assert.ok(a>=0&&b>a,'Fair Engagement must load after the private Controller selector');
- assert.match(fair,/syncControllerPlans\(this\);[\s\S]*?oldDrones\.apply\(this,arguments\)/,
-  'Fair Engagement must plan before calling the inner Live Vector updateDrones');
+ const c=shell.indexOf("window.__bootModule('main')");
+ assert.ok(a>=0&&b>a&&c>b);
 });
-test('fair Controller target selection ignores human identity and suppresses legacy planner',()=>{
- const npcPlayer=scenario(2),farPlayer=scenario(3),reversed=scenario(3,true);
- assert.equal(npcPlayer.id,farPlayer.id,
-  'switching isPlayer flags must not change the fair target identity');
- assert.equal(farPlayer.id,reversed.id,
-  'reversing tank iteration must not change a non-tied fair choice');
- assert.equal(npcPlayer.scoreNpc,farPlayer.scoreNpc);
- assert.equal(npcPlayer.scoreRival,farPlayer.scoreRival);
+test('actual composed Controller wrappers ignore player identity and suppress legacy targeting',()=>{
+ assert.equal(run(2),run(3),
+  'swapping only isPlayer must not change selected target');
+ assert.equal(run(3),run(3,true),
+  'tank iteration order must not change a non-tied target');
 });
