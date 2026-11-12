@@ -144,17 +144,18 @@ for(const hz of [30,60,120,240])for(const reverse of [false,true])
  });
 
 
-/* Research-only known-red gate for #234: the existing same-victim fast path
+/* Regression for #234: the original same-victim fast path
  * explicitly refuses lethal or defense-changing callbacks. Here two ordinary
- * hostile rounds contact one 30-HP hull before their 5ms TTL, at distinct
+ * hostile rounds contact one 45-HP hull before their 5ms TTL, at distinct
  * physical times. A correct chronological solver must credit the later
  * shooter with the kill, independent of bullet insertion order and FPS.
- * This is deliberately NOT a production balance or damage change. */
+ * This preserves normal damage and kill attribution; no balance change. */
 for(const hz of [30,60,120,240])for(const reverse of [false,true])
  for(const fullUpdate of [false,true])
   test('RESEARCH lethal same-victim TTL chronology '+hz+
        'Hz reverse='+reverse+' fullUpdate='+fullUpdate,()=>{
-   const result=trial(hz,reverse,fullUpdate,null,40,(_g,p,bullets)=>{\n    bullets[1].dmg=30;
+   const result=trial(hz,reverse,fullUpdate,null,40,(_g,p,bullets)=>{
+    bullets[1].dmg=30;
     p.hp=45;p.maxHp=45;p.regenDelay=999;
    });
    const expectedFirst=(40-21)/6000;
