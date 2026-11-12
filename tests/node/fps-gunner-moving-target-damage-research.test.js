@@ -36,9 +36,12 @@ function trial(seed,cls,reload,mode,offset,amplitude){
   // Keep the exact manual eastward stick bearing in both counterfactual arms.
   // Shipping nearest-target assist otherwise tracks the oscillating Scout
   // (within its 0.22-rad cone), hiding the intended movement/miss effect.
+  let aimAssistVetoes=0;
   const nearest=g.nearestTank;
   g.nearestTank=function(x,y,radius,except){
-   if(except===p.id&&radius===480&&x===p.x&&y===p.y)return null;
+   if(except===p.id&&radius===480&&x===p.x&&y===p.y){
+    aimAssistVetoes++;return null;
+   }
    return nearest.apply(this,arguments);
   };
   g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];g.orbs=[];
@@ -116,10 +119,12 @@ function trial(seed,cls,reload,mode,offset,amplitude){
    assert.ok(Math.abs(onTime-3.9)<1e-7,'same exact fire duty');
    assert.equal(g.tanks.length,2,'no extra tanks');
    assert.equal(g.shapes.length+g.drones.length+g.powerups.length,0,'no ecology contamination');
+   assert.ok(aimAssistVetoes>0,'manual-aim assist veto must execute in composed Game');
    assert.ok(volleys>0&&hits>0&&damage>0,'real projectile damage required');
    assert.ok(hits<=volleys,'ordinary single-target rotary shots');
    assert.ok(Number.isFinite(damage)&&damage<=1000000);
    return {seed,cls,reload,mode,offset,amplitude,updates,edges,volleys,hits,
+    aimAssistVetoes,
     travel:+travel.toFixed(4),peakOffset:+peakOffset.toFixed(4),
     damage:+damage.toFixed(4),onTime:+onTime.toFixed(5),firstBirths,firstHits,
     heat:+(p.__v17Heat||0).toFixed(5),spin:+(p.fireSpin||0).toFixed(5)};
