@@ -207,7 +207,8 @@ test('unsynchronized target motion retains real projectile damage evidence',()=>
  * Actual Game movement, swept collision and applied HP remain authoritative. */
 test('unsynchronized moving-target damage reports phase sensitivity without FPS goldens',()=>{
  const rows=[];
- const phases=[.03,.19,.41,.73];
+ // Quarter-period spacing covers positive/negative extrema and crossings.
+ const phases=[.03,.3725,.715,1.0575];
  for(const [cls,reload] of [['minigun',1],['needlestorm',3]]){
   for(const phase of phases){
    const schedule=[];
