@@ -18,8 +18,8 @@ function scenario(cls,lateral,wallHeight=80,targeted=false){
   const victim=targeted?g.tanks.find(t=>t!==g.player):null;
   if(targeted)assert.ok(victim,'real Game must provide an actual hostile tank fixture');
   if(victim)Object.assign(victim,{cls:'scout',x:200,y:20,vx:0,vy:0,
-   hp:100000,maxHp:100000,alive:true,ai:null,spawnShieldT:0,
-   shieldT:0,bulwarkT:0,tauntT:0,cloakT:0});
+   hp:100000,maxHp:100000,alive:true,isPlayer:true,gene:null,perk:null,
+   spawnShieldT:0,shieldT:0,bulwarkT:0,tauntT:0,cloakT:0});
   g.tanks=victim?[g.player,victim]:[g.player];
   g.tankById=new Map(g.tanks.map(t=>[t.id,t]));
   const victimHp=victim?victim.hp:null;
