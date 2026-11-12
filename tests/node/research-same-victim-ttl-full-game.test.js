@@ -222,19 +222,22 @@ for(const hz of [30,60,120,240])for(const reverse of [false,true])
 
 /* Canonical-speed analogue of the 5ms stress case: 540u/s, 420ms TTL.
  * Contact times use the actual Scout core radius (14 + bullet 3 + hull
- * padding 3 = 20), placing two distinct shots at 411ms and 415ms.
+ * padding 3 = 20). Compare a 411/415ms baseline with a 415/419ms
+ * terminal-expiry case that crosses the 240Hz frame boundary.
  * Both contacts are before TTL, with no other bodies or terrain.
  * This checks that the short-TTL fix is not merely a 6000u/s artifact. */
-for(const hz of [30,60,120,240])for(const reverse of [false,true])
+for(const profile of [{first:.411,second:.415,label:'baseline'},
+                      {first:.415,second:.419,label:'terminal-expiry'}])
+ for(const hz of [30,60,120,240])for(const reverse of [false,true])
  for(const fullUpdate of [false,true])
- test('RESEARCH canonical-speed lethal same-victim '+hz+
+ test('RESEARCH canonical-speed lethal same-victim '+profile.label+' '+hz+
       'Hz reverse='+reverse+' fullUpdate='+fullUpdate,()=>{
   const result=trial(hz,reverse,fullUpdate,null,40,(_g,p,bullets)=>{
    p.hp=45;p.maxHp=45;p.regenDelay=999;
-   bullets[0].x=20-540*.411;
+   bullets[0].x=20-540*profile.first;
    bullets[0].vx=540;
    bullets[0].ttl=.42;
-   bullets[1].x=60+540*.415;
+   bullets[1].x=60+540*profile.second;
    bullets[1].vx=-540;
    bullets[1].ttl=.42;
    bullets[1].dmg=30;
