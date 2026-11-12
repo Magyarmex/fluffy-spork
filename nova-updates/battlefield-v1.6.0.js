@@ -1979,18 +1979,18 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
  /* A rare same-frame, non-expiring pair can hit the same stationary hull
   * in physical order while the core's reverse projectile traversal calls
   * the later shot first. Certify BOTH exact first contacts before mutating.
-  * This deliberately handles only two ordinary pen=1 rounds, one tank,
-  * no other bodies, disjoint projectile corridors and no terrain contact.
+  * This deliberately handles only two ordinary pen=1 rounds, one shared
+  * tank contact, disjoint projectile corridors and no earlier interference.
   * Anything more complex stays with the existing collision owners. */
  function certifiedSameVictimLivePair(g,dt){
   if(!(dt>0&&dt<=.05)||!Number.isFinite(dt))return false;
-  var bullets=g.bullets||[],tanks=g.tanks||[];
-  if(bullets.length!==2||tanks.length!==1||
-     (g.shapes||[]).length||(g.drones||[]).length||
+  var bullets=g.bullets||[],tanks=g.tanks||[],
+      shapes=g.shapes||[],drones=g.drones||[];
+  if(bullets.length!==2||
+     tanks.length+shapes.length+drones.length>ISOLATED_RECOVERY_SCAN_CAP||
      g.__novaWallProofHadShell)return false;
-  var a=bullets[0],b=bullets[1],target=tanks[0];
-  if(!a||!b||!target||!target.alive||target.kind!=='tank'||
-     !CLASSES[target.cls]||
+  var a=bullets[0],b=bullets[1];
+  if(!a||!b||
      !certifiedTTLFrameStart(g,a)||!certifiedTTLFrameStart(g,b)||
      a.dead||b.dead||a.shell||b.shell||a.beam||b.beam||
      a.splash||b.splash||a.__v17Cannon||b.__v17Cannon||
@@ -2014,13 +2014,16 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   var ac=isolatedTTLStationaryPiercingChain(g,a,dt,true,[],true,true,false,true,true),
       bc=isolatedTTLStationaryPiercingChain(g,b,dt,true,[],true,true,false,true,true);
   if(!ac||!bc||ac.length!==1||bc.length!==1||
-     ac[0].e!==target||bc[0].e!==target)return false;
+     ac[0].e!==bc[0].e)return false;
+  var target=ac[0].e;
+  if(!target||target.kind!=='tank'||!target.alive||
+     !CLASSES[target.cls])return false;
   var at=ac[0].t*dt,bt=bc[0].t*dt;
   if(!(at>0&&bt>0&&Math.abs(at-bt)>1e-7))return false;
   var first=at<bt?a:b,second=at<bt?b:a,
       tx=target.x,ty=target.y,
-      bulletRefs=bullets.slice(),shapeCount=(g.shapes||[]).length,
-      droneCount=(g.drones||[]).length;
+      bulletRefs=bullets.slice(),shapeCount=shapes.length,
+      droneCount=drones.length,tankCount=tanks.length;
   if(!(target.hp>first.dmg*2))return false;
   if(!isolatedTTLStationaryPiercingChain(g,first,dt,true,[],true,false,false,false,true))
    return false;
@@ -2029,7 +2032,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      bullets[1]!==bulletRefs[1]||
      (g.shapes||[]).length!==shapeCount||
      (g.drones||[]).length!==droneCount||
-     (g.tanks||[]).length!==1||g.tanks[0]!==target||
+     (g.tanks||[]).length!==tankCount||
+     g.tanks.indexOf(target)<0||
      !(target.hp>0))return true;
   isolatedTTLStationaryPiercingChain(g,second,dt,true,[],true,false,false,target,true);
   return true;
