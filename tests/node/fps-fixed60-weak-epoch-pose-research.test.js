@@ -146,3 +146,26 @@ test('weak epoch matches Map presenter when one entity appears in two collection
  assert.deepEqual(actual,expected);
  assert.deepEqual(actual.poses.map(row=>row[0]),[5,15,25]);
 });
+
+test('alias collection-kind transitions skip stale interpolation and recover',()=>{
+ const sample=Class=>{
+  const shared={x:0,y:0};
+  const g={tanks:[shared],drones:[shared],shapes:[],bullets:[],
+   status:'playing',paused:false,player:shared,
+   update(){shared.x+=10;},destroy(){}};
+  const p=new Class(g,{enabled:true}),poses=[];
+  try{
+   for(let i=0;i<4;i++){
+    g.drones=i===0||i>=2?[shared]:[];
+    g.update();
+    const actual=shared.x;
+    p.draw(game=>poses.push(game.tanks[0].x),g,1,1,.5);
+    assert.equal(shared.x,actual);
+   }
+   return {poses,interpolated:p.interpolated};
+  }finally{p.stop();}
+ };
+ const expected=sample(FixedStepPosePresentation);
+ assert.deepEqual(sample(WeakEpochPosePresentation),expected);
+ assert.deepEqual(expected.poses,[5,20,30,35]);
+});
