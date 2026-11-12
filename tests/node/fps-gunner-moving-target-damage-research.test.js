@@ -216,6 +216,7 @@ test('unsynchronized moving-target damage reports phase sensitivity without FPS 
     assert.equal(row.onTime,3.9,'identical fire duty');
     assert.ok(row.travel>50&&row.peakOffset>25,'target must cross projectile corridor');
     schedule.push({mode,damage:row.damage,hits:row.hits,volleys:row.volleys,
+     firstShotTargetY:row.firstBirths[0].targetY,
      heat:row.heat,spin:row.spin});
    }
    rows.push({cls,phase,schedule});
@@ -226,7 +227,10 @@ test('unsynchronized moving-target damage reports phase sensitivity without FPS 
   const subset=rows.filter(row=>row.cls===cls);
   assert.equal(new Set(subset.map(row=>row.phase)).size,4);
   const byMode=Object.fromEntries(['native60','cluster30','alternating40_120'].map(mode=>{
-   const damage=subset.map(row=>row.schedule.find(s=>s.mode===mode).damage);
+   const samples=subset.map(row=>row.schedule.find(s=>s.mode===mode));
+   assert.equal(new Set(samples.map(s=>s.firstShotTargetY)).size,4,
+    'phase variation must change actual target geometry at first shot');
+   const damage=samples.map(s=>s.damage);
    return [mode,{min:Math.min(...damage),max:Math.max(...damage),
     mean:+(damage.reduce((a,b)=>a+b,0)/damage.length).toFixed(4)}];
   }));
