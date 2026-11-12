@@ -25,6 +25,8 @@ test('pose comparator refuses absent visual evidence and mislabeled OFF arms',()
  const off=report(false),on=report(true);
  on.pose.interpolated=0;
  assert.throws(()=>compare(off,on),/actual interpolation/);
- on.pose.interpolated=9;off.pose.enabled=true;
+ on.pose.interpolated=9;on.pose.shiftedBulletFrames=0;
+ assert.throws(()=>compare(off,on),/projectile at an interpolated pose/);
+ on.pose.shiftedBulletFrames=4;off.pose.enabled=true;
  assert.throws(()=>compare(off,on),/OFF control/);
 });
