@@ -503,7 +503,16 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     .reduce((sum,f)=>sum+f.rawGapMs,0);
    const backlogDroppedMs=frames.filter(f=>f.dropReason==='backlog')
     .reduce((sum,f)=>sum+f.droppedMs,0);
-   return {configuredMaxSteps:window.__novaFixedMaxSteps,
+   const poses=window.__novaFixedResearch.poseFrames;
+   const poseJs=poses.map(f=>f.renderJsMs);
+   const shiftedBulletFrames=poses.filter(f=>f.bullet&&f.drawn&&
+    (Math.abs(f.drawn.bulletX-f.bullet[0])>1e-7||
+     Math.abs(f.drawn.bulletY-f.bullet[1])>1e-7)).length;
+   return {pose:{enabled:window.__novaPoseEnabled,frames:poses.length,
+    interpolated:window.__novaFixedPresenter?.interpolated??0,
+    teleportSkips:window.__novaFixedPresenter?.teleportSkips??0,
+    shiftedBulletFrames,renderJs:values(poseJs)},
+    configuredMaxSteps:window.__novaFixedMaxSteps,
     controlledGate:window.__novaControlledGate,
     initialFingerprint:window.__novaFixedResearch.initialFingerprint||null,
     maxSteps:p.owner.maxSteps,backlogExtraTicks:p.owner.backlogExtraTicks,
