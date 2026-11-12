@@ -43,10 +43,11 @@ class WeakEpochPosePresentation {
    // the same tick would erase its previous pose and lose interpolation.
    if(r&&r.tick===this.tick){r.kind=kind;return;}
    if(!r){
-    r={px:obj.x,py:obj.y,x:obj.x,y:obj.y,kind,tick:this.tick};
+    r={px:obj.x,py:obj.y,x:obj.x,y:obj.y,kind,previousKind:kind,tick:this.tick};
     this.records.set(obj,r);
    }else{
-    const contiguous=r.tick===this.tick-1&&r.kind===kind&&!reset;
+    const contiguous=r.tick===this.tick-1&&!reset;
+    r.previousKind=r.kind;
     r.px=contiguous?r.x:obj.x;r.py=contiguous?r.y:obj.y;
     r.x=obj.x;r.y=obj.y;r.kind=kind;r.tick=this.tick;
    }
@@ -68,7 +69,8 @@ class WeakEpochPosePresentation {
   try{
    for(const obj of this.active){
     const r=this.records.get(obj);
-    if(!r||r.tick!==this.tick||!finite(obj.x)||!finite(obj.y)||
+    if(!r||r.tick!==this.tick||r.previousKind!==r.kind||
+       !finite(obj.x)||!finite(obj.y)||
        obj.x!==r.x||obj.y!==r.y)continue;
     const dx=r.x-r.px,dy=r.y-r.py;
     const limit=r.kind==='bullets'&&finite(obj.vx)&&finite(obj.vy)?
