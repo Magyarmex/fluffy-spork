@@ -39,6 +39,33 @@ test('browser artifact loads without CommonJS or starting a game',()=>{
   'only the explicit browser namespace is installed');
 });
 
+test('bundled pose presenter preserves exact source draw and physics semantics',()=>{
+ const window={};
+ vm.runInNewContext(fs.readFileSync(artifact,'utf8'),{window},{timeout:1000});
+ const Browser=window.__novaFixed60Research.FixedStepPosePresentation;
+ const Source=require('../research/fixed-step-presentation.cjs').FixedStepPosePresentation;
+ function run(Presenter){
+  const bullet={x:0,y:0,vx:600,vy:0},tank={x:0,y:0};
+  const g={tanks:[tank],drones:[],shapes:[],bullets:[bullet],
+   cam:{x:0,y:0},update(){tank.x+=10;bullet.x+=10;this.cam.x+=5},
+   destroy(){}};
+  const originalUpdate=g.update,originalDestroy=g.destroy;
+  const p=new Presenter(g,{enabled:true});
+  try{
+   g.update();
+   let seen;
+   p.draw(game=>{seen={tank:game.tanks[0].x,bullet:game.bullets[0].x,
+    camera:game.cam.x}},g,320,700,.5);
+   assert.equal(tank.x,10);assert.equal(bullet.x,10);assert.equal(g.cam.x,5);
+   return {seen,interpolated:p.interpolated,skips:p.teleportSkips};
+  }finally{
+   p.stop();
+   assert.equal(g.update,originalUpdate);assert.equal(g.destroy,originalDestroy);
+  }
+ }
+ assert.deepEqual(JSON.parse(JSON.stringify(run(Browser))),run(Source));
+});
+
 test('browser owner executes exactly the same bounded steps as source owner',()=>{
  const sandbox={window:{}};
  vm.runInNewContext(fs.readFileSync(artifact,'utf8'),sandbox,{timeout:1000});
