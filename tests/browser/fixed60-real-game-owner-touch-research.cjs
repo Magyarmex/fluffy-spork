@@ -10,6 +10,8 @@ const {injectBattlefieldSeed}=require('../research/battlefield-layout-fixture.cj
 const maxSteps=Number(process.env.NOVA_FIXED60_MAX_STEPS||2);
 const controlledGate=process.env.NOVA_FIXED60_CONTROLLED_GATE==='1';
 const controlledExtra=Number(process.env.NOVA_FIXED60_EXTRA_TICKS||2);
+// Opt-in visual-only experiment. OFF retains the existing Chromium owner path.
+const poseEnabled=process.env.NOVA_FIXED60_POSE_PRESENTATION==='1';
 assert.ok([2,3,4].includes(controlledExtra),'invalid research backlog');
 // Compare against the materialized shell, not a brittle hardcoded DOM count.
 const expectedOverlays=[...fs.readFileSync(path.resolve(__dirname,'../../index.html'),'utf8')
@@ -54,8 +56,20 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
   await deploy.waitFor({state:'visible',timeout:45000});
   await page.addScriptTag({path:path.resolve(__dirname,
    '../../nova-updates/fixed60-research-browser.js')});
-  await page.evaluate(({maxSteps,controlledGate,controlledExtra})=>{
+  if(poseEnabled){
+   // Load the exact Node-tested presenter source into an isolated browser
+   // namespace; no production script, HTML or scheduler is modified.
+   const source=fs.readFileSync(path.resolve(__dirname,
+    '../research/fixed-step-presentation.cjs'),'utf8');
+   assert.ok(source.includes('module.exports={FixedStepPosePresentation};'),
+    'presenter export contract changed');
+   await page.addScriptTag({content:source.replace(
+    'module.exports={FixedStepPosePresentation};',
+    'window.__novaFixedPosePresentation=Object.freeze({FixedStepPosePresentation});')});
+  }
+  await page.evaluate(({maxSteps,controlledGate,controlledExtra,poseEnabled})=>{
    window.__novaFixedMaxSteps=maxSteps;
+   window.__novaPoseEnabled=poseEnabled;
    window.__novaControlledGate=controlledGate;
    const Game=window.__novaMakeRequire('')('game/engine').Game;
    if(controlledGate){
@@ -70,7 +84,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    }
    const renderMod=window.__novaMakeRequire('')('game/render');
    const baseStart=Game.prototype.start;
-   window.__novaFixedResearch={births:0,updates:[],renders:[],errors:[],lifecycle:[],touchEvents:[],frames:[]};
+   window.__novaFixedResearch={births:0,updates:[],renders:[],errors:[],lifecycle:[],touchEvents:[],frames:[],poseFrames:[]};
    const profile=window.__novaFixedResearch;
    const gateGaps=[250/3,50/3,50/3,50/3];
    let gateNext=null,gateIndex=0,gateToken=0;
@@ -145,6 +159,9 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
      throw Error('shipping Game.start did not schedule its expected RAF');
     cancelAnimationFrame(shippingRaf);
     this.raf=null;
+    const presenter=poseEnabled?
+     new window.__novaFixedPosePresentation.FixedStepPosePresentation(this,{enabled:true}):null;
+    window.__novaFixedPresenter=presenter;
     const pilot=window.__novaFixed60Research.createFixedStepBrowserPilot(this,{
      window,document,clock:performance,
      request:fn=>{
@@ -207,7 +224,26 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
       state.cancelled=true;cancelAnimationFrame(state.id);
       gatePending.delete(token);
      },
-     render:(g,w,h)=>renderMod.render(g,w,h),
+     render:(g,w,h,alpha)=>{
+      if(!presenter)return renderMod.render(g,w,h);
+      const player=g.player,original=player&&[player.x,player.y];
+      const camera=g.cam,originalCam=camera&&[camera.x,camera.y];
+      const at=performance.now();
+      let drawn=null;
+      try{return presenter.draw((game,width,height)=>{
+       drawn={x:game.player?.x??null,y:game.player?.y??null,
+        camX:game.cam?.x??null,camY:game.cam?.y??null};
+       return renderMod.render(game,width,height);
+      },g,w,h,alpha)}
+      finally{
+       profile.poseFrames.push({alpha,drawn,physical:original,
+        camera:originalCam,renderJsMs:performance.now()-at});
+       if(original&&player&&(player.x!==original[0]||player.y!==original[1]))
+        throw Error('pose presenter mutated live player physics');
+       if(originalCam&&camera&&(camera.x!==originalCam[0]||camera.y!==originalCam[1]))
+        throw Error('pose presenter mutated live camera physics');
+      }
+     },
      maxSteps:window.__novaFixedMaxSteps,backlogExtraTicks:controlledExtra});
     window.__novaFixedPilot=pilot;
     // Reuse PR #888's exact-source active-only policy in the real browser.
@@ -231,7 +267,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     profile.lifecycle.push({event:'owner-start-returned',at:performance.now(),started:pilot.owner.started});
     return result;
    };
-  },{maxSteps,controlledGate,controlledExtra});
+  },{maxSteps,controlledGate,controlledExtra,poseEnabled});
   await deploy.click();
   try{
    await page.waitForFunction(()=>window.__novaFixedGame?.status==='playing'&&
