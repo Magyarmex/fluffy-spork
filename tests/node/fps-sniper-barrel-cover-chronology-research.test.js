@@ -29,7 +29,7 @@ function scenario(cls,lateral,wallHeight=80,targeted=false){
    // beam around the narrow cover. Other collision/damage owners stay real.
    const nearest=g.nearestTank;
    g.nearestTank=function(x,y,radius,except){
-    if(except===g.player.id)return null;
+    if(except===g.player.id&&radius===480&&x===g.player.x&&y===g.player.y)return null;
     return nearest.apply(this,arguments);
    };
   }
