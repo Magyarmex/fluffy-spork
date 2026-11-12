@@ -134,5 +134,7 @@ test('matched moving-target chronology measures real rotary damage under irregul
  }
  assert.equal(rows.length,24);
  for(const row of rows)assert.equal(row.onTime,3.9);
+ assert.ok(rows.some(row=>row.damageDelta!==0),
+  'moving-target arm must change at least one real HP outcome versus stationary control');
  console.log('GUNNER_MOVING_TARGET_REAL_DAMAGE '+JSON.stringify(rows));
 });
