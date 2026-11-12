@@ -8,7 +8,7 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 const {DirectShotIntent}=require('../research/direct-shot-intent.cjs');
 
-function scenario(cls,lateral,wallHeight=80,targeted=false,naturalMove=false){
+function scenario(cls,lateral,wallHeight=80,targeted=false,naturalMove=false,freezeMove=false){
  return withSeed(1517800,()=>{
   const g=bootGame(),i=g.input;
   g.sfx.muted=true;i.autofire=false;
@@ -64,6 +64,12 @@ function scenario(cls,lateral,wallHeight=80,targeted=false,naturalMove=false){
     // Game.update must advance it before consuming the physical release.
     i.move.active=true;i.move.dx=0;i.move.dy=1;
     g.player.vy=g.tankSpeed(g.player);
+    if(freezeMove){
+     // Research-only counterfactual: retain the exact inherited projectile
+     // velocity but prevent hull translation on this one update.
+     const move=g.moveTank;
+     g.moveTank=function(t){if(t===g.player)return;return move.apply(this,arguments);};
+    }
    }
    g.update(1/60);
    const rails=g.bullets.filter(b=>b.ownerId===g.player.id&&b.beam);
@@ -164,7 +170,16 @@ test('research: narrow-cover 20u Sniper displacement changes actual hostile HP c
 test('research: one ordinary movement tick can change narrow-cover Sniper first contact',()=>{
  const still=scenario('railgun',8,12,true,false);
  const moving=scenario('railgun',8,12,true,true);
+ const velocityOnly=scenario('railgun',8,12,true,true,true);
  const displacement=moving.playerY-still.playerY;
+ assert.ok(Math.abs(velocityOnly.playerY-still.playerY)<1e-6,
+  'the velocity-only counterfactual must retain the original firing hull position');
+ assert.ok(Math.abs(velocityOnly.traces[0].dy-moving.traces[0].dy)<1e-6,
+  'velocity-only and real-movement shots must inherit identical projectile bearing');
+ assert.equal(velocityOnly.traces[0].blocked,true,
+  'inherited hull velocity alone must not clear the wall at the original origin');
+ assert.equal(velocityOnly.targetDamage,0,
+  'inherited velocity alone must not damage the protected target');
  assert.ok(displacement>1.5&&displacement<3,
   'real 60Hz movement owner should advance a steady Railgun only a few units');
  assert.equal(still.traces[0].blocked,true,'release position must be behind narrow cover');
@@ -172,6 +187,6 @@ test('research: one ordinary movement tick can change narrow-cover Sniper first 
  assert.equal(moving.traces[0].blocked,false,
   'a one-tick movement before firing must clear this deliberately narrow wall');
  assert.ok(moving.targetDamage>0,'the physically clear rail must damage the existing target');
- console.log('SNIPER_ONE_TICK_MOVEMENT_COVER '+JSON.stringify({still,moving,displacement,
+ console.log('SNIPER_ONE_TICK_MOVEMENT_COVER '+JSON.stringify({still,velocityOnly,moving,displacement,
   limitation:'constructed 12u-high permanent wall and pre-existing steady velocity; real movement owner, but not a natural match or browser-trusted event'}));
 });
