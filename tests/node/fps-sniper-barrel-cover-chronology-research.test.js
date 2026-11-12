@@ -56,7 +56,11 @@ function scenario(cls,lateral,wallHeight=80,targeted=false,naturalMove=false,fre
   try{
    // Natural-movement arm starts at its actual physical release position;
    // unlike the legacy constructed-shift arms, do not teleport after up.
-   if(naturalMove)g.player.y=lateral;
+   if(naturalMove){
+    g.player.y=lateral;
+    g.player.vy=g.tankSpeed(g.player);
+    i.move.active=true;i.move.dx=0;i.move.dy=1;
+   }
    i.pd(ev('pointerdown',.140,1,600));
    i.pm(ev('pointermove',.141,1,640));
    i.pu(ev('pointerup',.170,0,640));
@@ -65,8 +69,6 @@ function scenario(cls,lateral,wallHeight=80,targeted=false,naturalMove=false,fre
    if(naturalMove){
     // Model an already-moving tank, not a teleported hull: the actual
     // Game.update must advance it before consuming the physical release.
-    i.move.active=true;i.move.dx=0;i.move.dy=1;
-    g.player.vy=g.tankSpeed(g.player);
     if(freezeMove){
      // Research-only counterfactual: retain the exact inherited projectile
      // velocity but prevent hull translation on this one update.
