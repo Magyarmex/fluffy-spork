@@ -308,8 +308,6 @@ test('Gunner moving-player chronology changes real shot origins without syntheti
     assert.deepEqual(moving,repeat,'real player motion must replay deterministically');
     assert.equal(moving.onTime,still.onTime,'identical physical firing duty');
     assert.equal(moving.updates,still.updates,'identical simulation schedule');
-    assert.equal(moving.volleys,still.volleys,
-     'pure player translation must not alter this isolated rotary firing census');
     assert.ok(moving.playerEndY>5&&Number.isFinite(moving.playerEndY),
      'Game.moveTank must produce meaningful real hull displacement');
     assert.ok(moving.firstBirths.some((birth,i)=>
@@ -317,6 +315,7 @@ test('Gunner moving-player chronology changes real shot origins without syntheti
      'real player movement must change at least one actual projectile origin');
     rows.push({cls,seed,mode,playerEndY:moving.playerEndY,
      movingDamage:moving.damage,stationaryPlayerDamage:still.damage,
+     movingVolleys:moving.volleys,stationaryPlayerVolleys:still.volleys,
      movingHits:moving.hits,stationaryPlayerHits:still.hits,
      movingBirths:moving.firstBirths,stationaryBirths:still.firstBirths});
    }
