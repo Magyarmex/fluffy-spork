@@ -136,9 +136,9 @@ function registerTips(){
   var api=window.NOVATips;if(!api||typeof api.registerMany!=='function'||window.__NOVA_LIVE_VECTOR_TIPS__)return;
   window.__NOVA_LIVE_VECTOR_TIPS__=true;
   api.registerMany([
-    {id:'controller-live-vector',contexts:['gameplay','controller'],text:'Controller depth is analog: right-stick ANGLE aims the gun and swarm together; stick DEPTH changes Command Node range. Releasing recalls uncommitted drones.',reviewed:'2026-08-10'},
-    {id:'controller-designation-weave',contexts:['gameplay','controller'],text:'A cannon hit briefly DESIGNATES its target. Use that window to keep useful shots flowing while you bend the live swarm vector into better geometry.',reviewed:'2026-08-10'},
-    {id:'controller-deep-defense-cost',contexts:['gameplay','controller'],text:'Deep swarm pressure leaves fewer drones physically close enough to intercept a breach. If hostile drones reach you, pull depth inward, shoot them, dodge, or surrender pressure with a recall.',reviewed:'2026-08-10'}
+    {id:'controller-live-vector',tags:['controller','drones','controls'],text:'Controller depth is analog: right-stick ANGLE aims the gun and swarm together; stick DEPTH changes Command Node range. Releasing recalls uncommitted drones.',reviewed:'2026-08-10'},
+    {id:'controller-designation-weave',tags:['controller','drones','controls'],text:'A cannon hit briefly DESIGNATES its target. Use that window to keep useful shots flowing while you bend the live swarm vector into better geometry.',reviewed:'2026-08-10'},
+    {id:'controller-deep-defense-cost',tags:['controller','drones','controls'],text:'Deep swarm pressure leaves fewer drones physically close enough to intercept a breach. If hostile drones reach you, pull depth inward, shoot them, dodge, or surrender pressure with a recall.',reviewed:'2026-08-10'}
   ]);
 }
 
