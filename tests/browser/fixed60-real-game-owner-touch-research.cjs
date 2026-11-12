@@ -228,20 +228,24 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
       if(!presenter)return renderMod.render(g,w,h);
       const player=g.player,original=player&&[player.x,player.y];
       const camera=g.cam,originalCam=camera&&[camera.x,camera.y];
+      const bullet=g.bullets?.[0],originalBullet=bullet&&[bullet.x,bullet.y];
       const at=performance.now();
       let drawn=null;
       try{return presenter.draw((game,width,height)=>{
        drawn={x:game.player?.x??null,y:game.player?.y??null,
-        camX:game.cam?.x??null,camY:game.cam?.y??null};
+        camX:game.cam?.x??null,camY:game.cam?.y??null,
+        bulletX:bullet?.x??null,bulletY:bullet?.y??null};
        return renderMod.render(game,width,height);
       },g,w,h,alpha)}
       finally{
        profile.poseFrames.push({alpha,drawn,physical:original,
-        camera:originalCam,renderJsMs:performance.now()-at});
+        camera:originalCam,bullet:originalBullet,renderJsMs:performance.now()-at});
        if(original&&player&&(player.x!==original[0]||player.y!==original[1]))
         throw Error('pose presenter mutated live player physics');
        if(originalCam&&camera&&(camera.x!==originalCam[0]||camera.y!==originalCam[1]))
         throw Error('pose presenter mutated live camera physics');
+       if(originalBullet&&bullet&&(bullet.x!==originalBullet[0]||bullet.y!==originalBullet[1]))
+        throw Error('pose presenter mutated live projectile physics');
       }
      },
      maxSteps:window.__novaFixedMaxSteps,backlogExtraTicks:controlledExtra});
@@ -639,6 +643,10 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     f.alpha>=0&&f.alpha<=1),'presenter must report bounded interpolation and JS cost');
    assert.ok(poses.samples.some(f=>f.drawn&&f.physical&&f.camera),
     'real Game render must sample player and camera poses');
+   assert.ok(poses.samples.some(f=>f.drawn&&f.bullet),
+    'real projectile must be visible to the pose presenter');
+   assert.ok(poses.interpolated>0,
+    'pose presenter must actually interpolate at least one moving entity');
    console.log('NOVA_FIXED60_CHROMIUM_POSE '+JSON.stringify({
     samples:poses.samples.length,interpolated:poses.interpolated,
     teleportSkips:poses.teleportSkips,
