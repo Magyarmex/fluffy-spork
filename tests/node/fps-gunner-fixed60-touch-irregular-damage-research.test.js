@@ -25,6 +25,7 @@ function schedule(mode){
    [...gaps.slice(6),...gaps.slice(0,6)]:gaps;
   return Array.from({length:3},()=>shifted).flat();
  }
+ if(mode==='jitter38_27_35')return Array.from({length:60},()=>[38,27,35]).flat();
  if(mode==='uniform30')return Array(180).fill(1000/30);
  if(mode==='alternating20_60')return Array.from({length:90},()=>[50,1000/60]).flat();
  if(mode==='alternating60_20')return Array.from({length:90},()=>[1000/60,50]).flat();
@@ -416,4 +417,32 @@ test('seven-tick recovery budgets measure real touch-driven Gunner damage under 
  }
  assert.equal(rows.length,8);
  console.log('GUNNER_SEVEN_EIGHT_TICK_ADVERSARIAL_REAL_DAMAGE '+JSON.stringify(rows));
+});
+
+// #799 / #951: the three-step 38/27/35ms composed-Game parity proof
+// must also survive real chronological touch press/release histories. This
+// remains a synthetic browser-shaped event gate, not physical input latency.
+test('jittered three-step fixed60 preserves touch-driven Gunner hits and release chronology',()=>{
+ const rows=[];
+ for(const [cls,reload] of [['minigun',1],['needlestorm',3]])
+  for(const seed of [1517800,1517802])
+   for(const offset of [7,12]){
+    const baseline=trial(seed,cls,reload,'uniform60',offset,360,3,3);
+    const jitter=trial(seed,cls,reload,'jitter38_27_35',offset,360,3,3);
+    assert.equal(jitter.droppedMs,0,'ordinary jitter cannot discard active time');
+    assert.equal(jitter.droppedFrames,0);
+    assert.ok(jitter.stepsByFrame.three>0,'third catch-up step must be exercised');
+    assert.equal(jitter.applied,baseline.applied,'press/release edges must all replay');
+    assert.equal(jitter.damage,baseline.damage,'actual HP damage must remain equal');
+    assert.equal(jitter.hits,baseline.hits,'physical contact count must remain equal');
+    assert.equal(jitter.volleys,baseline.volleys,'rotary cadence must remain equal');
+    assert.deepEqual(jitter.births,baseline.births,'shot birth chronology must remain equal');
+    assert.equal(jitter.spin,baseline.spin,'rotary spin must remain equal');
+    assert.equal(jitter.heat,baseline.heat,'heat must remain equal');
+    rows.push({cls,seed,offset,damage:jitter.damage,
+      p95NotMeasured:true,maxRenderCallbackLagMs:jitter.maxRenderCallbackLagMs,
+      threeStepFrames:jitter.stepsByFrame.three});
+   }
+ assert.equal(rows.length,8);
+ console.log('GUNNER_FIXED60_JITTERED_TOUCH_PARITY '+JSON.stringify(rows));
 });
