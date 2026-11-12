@@ -23,6 +23,16 @@ function scenario(cls,lateral,wallHeight=80,targeted=false){
   g.tanks=victim?[g.player,victim]:[g.player];
   g.tankById=new Map(g.tanks.map(t=>[t.id,t]));
   const victimHp=victim?victim.hp:null;
+  if(victim){
+   // Keep a true manually aimed eastward rail: the existing target must not
+   // silently engage the shipping touch nearest-target assist and bend the
+   // beam around the narrow cover. Other collision/damage owners stay real.
+   const nearest=g.nearestTank;
+   g.nearestTank=function(x,y,radius,except){
+    if(except===g.player.id)return null;
+    return nearest.apply(this,arguments);
+   };
+  }
   g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];g.orbs=[];
   if(g.shapeById)g.shapeById.clear();
   if(g.hash&&g.hash.clear)g.hash.clear();
