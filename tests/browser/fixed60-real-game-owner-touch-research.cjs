@@ -56,17 +56,6 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
   await deploy.waitFor({state:'visible',timeout:45000});
   await page.addScriptTag({path:path.resolve(__dirname,
    '../../nova-updates/fixed60-research-browser.js')});
-  if(poseEnabled){
-   // Load the exact Node-tested presenter source into an isolated browser
-   // namespace; no production script, HTML or scheduler is modified.
-   const source=fs.readFileSync(path.resolve(__dirname,
-    '../research/fixed-step-presentation.cjs'),'utf8');
-   assert.ok(source.includes('module.exports={FixedStepPosePresentation};'),
-    'presenter export contract changed');
-   await page.addScriptTag({content:'(function(){\n'+source.replace(
-    'module.exports={FixedStepPosePresentation};',
-    'window.__novaFixedPosePresentation=Object.freeze({FixedStepPosePresentation});')+'\n})();'});
-  }
   await page.evaluate(({maxSteps,controlledGate,controlledExtra,poseEnabled})=>{
    window.__novaFixedMaxSteps=maxSteps;
    window.__novaPoseEnabled=poseEnabled;
@@ -160,7 +149,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     cancelAnimationFrame(shippingRaf);
     this.raf=null;
     const presenter=poseEnabled?
-     new window.__novaFixedPosePresentation.FixedStepPosePresentation(this,{enabled:true}):null;
+     new window.__novaFixed60Research.FixedStepPosePresentation(this,{enabled:true}):null;
     window.__novaFixedPresenter=presenter;
     const pilot=window.__novaFixed60Research.createFixedStepBrowserPilot(this,{
      window,document,clock:performance,
