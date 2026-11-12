@@ -20,7 +20,7 @@ function frames(mode){
  if(mode==='alternating40_120')return Array.from({length:180},()=>[1/40,1/120]).flat();
  throw Error('unknown presentation mode');
 }
-function trial(seed,cls,reload,mode,offset,amplitude,motionPeriod=1.6,motionPhase=0,drainSeconds=0){
+function trial(seed,cls,reload,mode,offset,amplitude,motionPeriod=1.6,motionPhase=0,drainSeconds=0,playerMoveY=0){
  assert.ok(motionPeriod>0&&Number.isFinite(motionPhase),'valid independent target motion');
  return withSeed(seed,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
@@ -56,7 +56,8 @@ function trial(seed,cls,reload,mode,offset,amplitude,motionPeriod=1.6,motionPhas
   g.status='playing';g.paused=false;p.stats.reload=reload;
   g.input.autofire=false;g.input.mouseActive=false;
   g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
-  g.input.moveVec=()=>({x:0,y:0});
+  // Genuine Game movement owner integrates this constant analog input.
+  g.input.moveVec=()=>({x:0,y:playerMoveY});
   let volleys=0,hits=0,damage=0,firstBirths=[],firstHits=[];
   const originalFire=g.tryFire,originalDamage=g.damageTank;
   g.tryFire=function(t){
@@ -162,6 +163,7 @@ function trial(seed,cls,reload,mode,offset,amplitude,motionPeriod=1.6,motionPhas
    }
    return {seed,cls,reload,mode,offset,amplitude,motionPeriod,motionPhase,updates,edges,volleys,hits,
     targetMoveSteps,
+    ...(playerMoveY?{playerMoveY,playerEndY:+p.y.toFixed(5)}:{}),
     aimAssistVetoes,
     travel:+travel.toFixed(4),peakOffset:+peakOffset.toFixed(4),
     damage:+damage.toFixed(4),
@@ -288,4 +290,37 @@ test('Gunner moving-target damage separates firing window from projectile drain'
  }
  assert.equal(rows.length,6);
  console.log('GUNNER_PROJECTILE_DRAIN_DAMAGE '+JSON.stringify(rows));
+});
+
+/* #799: move the PLAYER through the shipping Game.moveTank owner while
+ * preserving the same right-stick bearing and real moving-target collision.
+ * This is a controlled constant-analog input, not a natural evasive pilot.
+ * Compare applied HP and projectile birth positions; no FPS damage goldens. */
+test('Gunner moving-player chronology changes real shot origins without synthetic teleports',()=>{
+ const rows=[];
+ for(const [cls,reload] of [['minigun',1],['needlestorm',3]]){
+  for(const seed of [1517800,1517802]){
+   for(const mode of ['native60','cluster30','alternating40_120']){
+    const args=[seed,cls,reload,mode,.007,26,1.37,.3725,0];
+    const still=trial(...args,0);
+    const moving=trial(...args,.025);
+    const repeat=trial(...args,.025);
+    assert.deepEqual(moving,repeat,'real player motion must replay deterministically');
+    assert.equal(moving.onTime,still.onTime,'identical physical firing duty');
+    assert.equal(moving.updates,still.updates,'identical simulation schedule');
+    assert.ok(moving.playerEndY>5&&Number.isFinite(moving.playerEndY),
+     'Game.moveTank must produce meaningful real hull displacement');
+    assert.ok(moving.firstBirths.some((birth,i)=>
+     Math.abs(birth.y-still.firstBirths[i].y)>.1),
+     'real player movement must change at least one actual projectile origin');
+    rows.push({cls,seed,mode,playerEndY:moving.playerEndY,
+     movingDamage:moving.damage,stationaryPlayerDamage:still.damage,
+     movingVolleys:moving.volleys,stationaryPlayerVolleys:still.volleys,
+     movingHits:moving.hits,stationaryPlayerHits:still.hits,
+     movingBirths:moving.firstBirths,stationaryBirths:still.firstBirths});
+   }
+  }
+ }
+ assert.equal(rows.length,12);
+ console.log('GUNNER_MOVING_PLAYER_REAL_DAMAGE '+JSON.stringify(rows));
 });
