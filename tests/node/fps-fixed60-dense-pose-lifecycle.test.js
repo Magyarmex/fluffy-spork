@@ -90,3 +90,42 @@ test('reused projectile IDs do not borrow an expired projectile visual history',
  pose.stop();
 });
 
+
+test('alternating snapshots reuse pose records without aliasing the prior tick',()=>{
+ const g=denseGame(),p=new FixedStepPosePresentation(g,{enabled:true});
+ try{
+  g.update(1/60);
+  const first=p.current,prior=p.previous;
+  const priorPose=prior.get(g.tanks[0]);
+  const firstPose=first.get(g.tanks[0]);
+  assert.notEqual(priorPose,firstPose,'consecutive snapshots must not share records');
+  assert.equal(priorPose.x,10);
+  assert.equal(firstPose.x,14);
+  g.update(1/60);
+  assert.equal(p.current,prior,'third snapshot reuses inactive map');
+  assert.equal(p.current.get(g.tanks[0]),priorPose,'reuse existing pose record');
+  assert.equal(p.previous.get(g.tanks[0]),firstPose);
+  assert.equal(firstPose.x,14,'prior pose must remain immutable');
+  p.draw(game=>assert.equal(game.tanks[0].x,16),g,320,700,.5);
+  assert.equal(g.tanks[0].x,18);
+  for(let i=0;i<50;i++)g.update(1/60);
+  assert.equal(p.initialBuffer.posePool.length,621);
+  assert.equal(p.spare.posePool.length,621);
+ }finally{p.stop()}
+ assert.equal(p.initialBuffer.posePool.length,0);
+ assert.equal(p.spare.posePool.length,0);
+});
+
+test('snapshot pools shrink after dense entities disappear and do not retain removed bodies',()=>{
+ const g=denseGame(),p=new FixedStepPosePresentation(g,{enabled:true});
+ try{
+  g.update(1/60);
+  const removed=g.bullets[0];
+  g.tanks=g.tanks.slice(0,1);g.drones=[];g.shapes=[];g.bullets=[];
+  for(let i=0;i<4;i++)g.update(1/60);
+  assert.equal(p.current.size,2,'one tank and one camera');
+  assert.equal(p.current.has(removed),false);
+  assert.ok(p.initialBuffer.posePool.length<=128);
+  assert.ok(p.spare.posePool.length<=128);
+ }finally{p.stop()}
+});
