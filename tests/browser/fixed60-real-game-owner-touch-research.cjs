@@ -511,7 +511,13 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    return {pose:{enabled:window.__novaPoseEnabled,frames:poses.length,
     interpolated:window.__novaFixedPresenter?.interpolated??0,
     teleportSkips:window.__novaFixedPresenter?.teleportSkips??0,
-    shiftedBulletFrames,renderJs:values(poseJs)},
+    shiftedBulletFrames,
+    alphaBelowQuarterFrames:poses.filter(f=>f.alpha<.25).length,
+    alphaSaturatedFrames:poses.filter(f=>f.alpha>=1-1e-7).length,
+    // Geometric pose phase only: NOT measured input-to-photon latency.
+    meanNominalPoseDelayMs:poses.length?poses.reduce((sum,f)=>
+     sum+(1-f.alpha)*1000/60,0)/poses.length:null,
+    renderJs:values(poseJs)},
     configuredMaxSteps:window.__novaFixedMaxSteps,
     controlledGate:window.__novaControlledGate,
     initialFingerprint:window.__novaFixedResearch.initialFingerprint||null,
