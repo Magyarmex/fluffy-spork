@@ -160,8 +160,8 @@ test('research: narrow-cover 20u Sniper displacement changes actual hostile HP c
 // a single 60Hz step with the real tankSpeed/moveTank owner and a narrow wall.
 // It remains research-only: no browser event delivery or natural match rate.
 test('research: one ordinary movement tick can change narrow-cover Sniper first contact',()=>{
- const still=scenario('railgun',2.2,1.5,true,false);
- const moving=scenario('railgun',2.2,1.5,true,true);
+ const still=scenario('railgun',8,12,true,false);
+ const moving=scenario('railgun',8,12,true,true);
  const displacement=moving.playerY-still.playerY;
  assert.ok(displacement>1.5&&displacement<3,
   'real 60Hz movement owner should advance a steady Railgun only a few units');
@@ -171,5 +171,5 @@ test('research: one ordinary movement tick can change narrow-cover Sniper first 
   'a one-tick movement before firing must clear this deliberately narrow wall');
  assert.ok(moving.targetDamage>0,'the physically clear rail must damage the existing target');
  console.log('SNIPER_ONE_TICK_MOVEMENT_COVER '+JSON.stringify({still,moving,displacement,
-  limitation:'constructed 1.5u-high permanent wall and pre-existing steady velocity; real movement owner, but not a natural match or browser-trusted event'}));
+  limitation:'constructed 12u-high permanent wall and pre-existing steady velocity; real movement owner, but not a natural match or browser-trusted event'}));
 });
