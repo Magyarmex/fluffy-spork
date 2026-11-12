@@ -1,4 +1,6 @@
 'use strict';
+// The shared composed-Game fixture has its own audio-RNG test registration.
+process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
 const test=require('node:test'),assert=require('node:assert/strict');
 const {FixedStepPosePresentation}=require('../research/fixed-step-presentation.cjs');
 const {WeakEpochPosePresentation}=require('../research/fixed-step-weak-epoch-presentation.cjs');
