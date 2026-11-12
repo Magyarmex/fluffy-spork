@@ -867,7 +867,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
        (allowSingleLive===true&&b.pen===1&&contacts.length===1))&&
       (!b.__novaDirectVictims||b.__novaDirectVictims.size===0);
   if(partialNonExpiring&&((b.knock||0)!==0||
-     contacts.some(function(c){return c.e.hp<=b.dmg*(b.pen===2?4:2);})||
+     contacts.some(function(c){return c.e.hp<=b.dmg*(b.pen===2?4:2)&&
+      !(b.pen===1&&(allowLethal===c.e||(dryRun&&allowLethal===true)));})||
      (g.bullets||[]).some(function(o){
       return o&&o!==b&&!o.dead&&(o.splash||o.shell);
      })))return false;
