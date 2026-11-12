@@ -141,15 +141,19 @@ function trial(seed,cls,reload,mode,offset,amplitude,motionPeriod=1.6,motionPhas
    assert.ok(hits<=volleys,'ordinary single-target rotary shots');
    assert.ok(Number.isFinite(damage)&&damage<=1000000);
    const windowDamage=damage,windowHits=hits,windowBullets=g.bullets.length;
-   // Resolve already-born rounds without allowing another shot. Freeze the
-   // target at its last real position so no out-of-band teleport occurs.
+   // Resolve already-born rounds without allowing another shot. Continue
+   // the same prescribed moving-body path through the real Battlefield owner
+   // rather than freezing the Scout at an artificially favorable hit position.
    // Keep this separate from the six-second firing-window measurement.
    if(drainSeconds>0){
     assert.equal(drainSeconds,2,'bounded no-fire projectile drain');
     g.input.firing=false;g.input.aim.active=false;
     for(let i=0;i<120;i++){
-     expectedNextY=target.y;
+     const next=SECONDS+(i+1)/60;
+     expectedNextY=amplitude*Math.sin(2*Math.PI*(next+motionPhase)/motionPeriod);
      g.update(1/60);
+     assert.ok(Math.abs(target.y-expectedNextY)<1e-4,
+      'no-fire drain must preserve real moving-body trajectory');
     }
     assert.ok(Math.abs(g.time-initialTime-SECONDS-drainSeconds)<1e-5,
      'drain must advance exactly two seconds of real Game updates');
@@ -262,8 +266,8 @@ test('unsynchronized moving-target damage reports phase sensitivity without FPS 
 
 /* #799: a six-second cutoff can mislabel in-flight rounds as misses.
  * Keep the firing-window result and the no-fire tail separately measurable.
- * A stationary target during the tail isolates projectile travel from new
- * target movement, and the composed Game still owns collision and HP. */
+ * The target continues its same real moving-body path during the tail;
+ * the composed Game still owns projectile collision and applied HP. */
 test('Gunner moving-target damage separates firing window from projectile drain',()=>{
  const rows=[];
  for(const [cls,reload] of [['minigun',1],['needlestorm',3]]){
