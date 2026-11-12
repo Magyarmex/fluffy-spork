@@ -8,7 +8,7 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 const {DirectShotIntent}=require('../research/direct-shot-intent.cjs');
 
-function scenario(cls,lateral,wallHeight=80,targeted=false){
+function scenario(cls,lateral,wallHeight=80,targeted=false,naturalMove=false){
  return withSeed(1517800,()=>{
   const g=bootGame(),i=g.input;
   g.sfx.muted=true;i.autofire=false;
@@ -59,6 +59,12 @@ function scenario(cls,lateral,wallHeight=80,targeted=false){
    i.pu(ev('pointerup',.170,0,640));
    assert.ok(owner.pending,'the physical 30ms release is retained');
    g.player.y+=lateral;
+   if(naturalMove){
+    // Model an already-moving tank, not a teleported hull: the actual
+    // Game.update must advance it before consuming the physical release.
+    i.move.active=true;i.move.dx=0;i.move.dy=1;
+    g.player.vy=g.tankSpeed(g.player);
+   }
    g.update(1/60);
    const rails=g.bullets.filter(b=>b.ownerId===g.player.id&&b.beam);
    assert.equal(rails.length,cls==='prism'?2:1);
@@ -76,7 +82,7 @@ function scenario(cls,lateral,wallHeight=80,targeted=false){
    g.updateBullets(.1);
    g.updateBullets(.1);
    const surviving=projectiles.map(b=>!b.dead&&g.bullets.includes(b));
-   return {traces,surviving,targetDamage:victim?Math.max(0,victimHp-victim.hp):null};
+   return {traces,surviving,playerY:g.player.y,targetDamage:victim?Math.max(0,victimHp-victim.hp):null};
   }finally{owner.detach();g.destroy();}
  });
 }
@@ -147,4 +153,23 @@ test('research: narrow-cover 20u Sniper displacement changes actual hostile HP c
  }
  console.log('SNIPER_SMALL_COVER_HP_RESEARCH '+JSON.stringify({original,later,
   limitation:'stationary existing hostile, constructed 20u hull shift; no natural movement, browser input or player survival claim'}));
+});
+
+// A genuinely moving hull advances inside Game.update BEFORE the quick-shot
+// intent is consumed. Unlike the constructed 20u shift above, this exercises
+// a single 60Hz step with the real tankSpeed/moveTank owner and a narrow wall.
+// It remains research-only: no browser event delivery or natural match rate.
+test('research: one ordinary movement tick can change narrow-cover Sniper first contact',()=>{
+ const still=scenario('railgun',2.2,1.5,true,false);
+ const moving=scenario('railgun',2.2,1.5,true,true);
+ const displacement=moving.playerY-still.playerY;
+ assert.ok(displacement>1.5&&displacement<3,
+  'real 60Hz movement owner should advance a steady Railgun only a few units');
+ assert.equal(still.traces[0].blocked,true,'release position must be behind narrow cover');
+ assert.equal(still.targetDamage,0,'covered rail cannot damage target');
+ assert.equal(moving.traces[0].blocked,false,
+  'a one-tick movement before firing must clear this deliberately narrow wall');
+ assert.ok(moving.targetDamage>0,'the physically clear rail must damage the existing target');
+ console.log('SNIPER_ONE_TICK_MOVEMENT_COVER '+JSON.stringify({still,moving,displacement,
+  limitation:'constructed 1.5u-high permanent wall and pre-existing steady velocity; real movement owner, but not a natural match or browser-trusted event'}));
 });
