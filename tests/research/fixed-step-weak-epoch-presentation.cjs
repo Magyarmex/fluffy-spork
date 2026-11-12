@@ -38,6 +38,10 @@ class WeakEpochPosePresentation {
   const add=(obj,kind)=>{
    if(!obj||typeof obj!=='object'||!finite(obj.x)||!finite(obj.y))return;
    let r=this.records.get(obj);
+   // The original Map snapshot tracks each object identity once, even if an
+   // entity is temporarily exposed through two collections. Re-capturing in
+   // the same tick would erase its previous pose and lose interpolation.
+   if(r&&r.tick===this.tick){r.kind=kind;return;}
    if(!r){
     r={px:obj.x,py:obj.y,x:obj.x,y:obj.y,kind,tick:this.tick};
     this.records.set(obj,r);
