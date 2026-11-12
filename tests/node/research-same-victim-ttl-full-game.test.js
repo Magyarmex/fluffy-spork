@@ -10,7 +10,7 @@ const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 if(previous===undefined)delete process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL;
 else process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL=previous;
 
-function trial(hz,reverse,fullUpdate,only=null,targetX=40,mutate=null){
+function trial(hz,reverse,fullUpdate,only=null,targetX=40,mutate=null,maxFrames=20){
  return withSeed(1517802,()=>{
   const g=bootGame();
   if(!g.player)g.redeploy();
@@ -60,7 +60,7 @@ function trial(hz,reverse,fullUpdate,only=null,targetX=40,mutate=null){
    if(t===p)contacts.push({ownerId,damage});
    return original.apply(this,arguments);
   };
-  for(let frame=0;frame<20&&g.bullets.some(b=>b.id===201||b.id===202);frame++){
+  for(let frame=0;frame<maxFrames&&g.bullets.some(b=>b.id===201||b.id===202);frame++){
    if(hz===240&&frame<3)frameTrace.push({phase:'before',frame,time:g.time,
     epoch:g.__novaShapeSweepEpoch,frameStartEpoch:g.__novaFrameStartBulletEpoch,
     frameStartIdCeiling:g.__novaFrameStartBulletIdCeiling,
@@ -216,6 +216,58 @@ for(const hz of [30,60,120,240])for(const reverse of [false,true])
   });
   assert.deepEqual(result.contacts.map(c=>c.ownerId),[101],
    'right-hand shot must not bypass its earlier permanent wall');
+  assert.equal(result.target.alive,true);
+  assert.deepEqual(result.kills,[]);
+ });
+
+/* Canonical-speed analogue of the 5ms stress case: 540u/s, 420ms TTL.
+ * Contact times use the actual Scout core radius (14 + bullet 3 + hull
+ * padding 3 = 20). Compare a 411/415ms baseline with a 415/419ms
+ * terminal-expiry case that crosses the 240Hz frame boundary.
+ * Both contacts are before TTL, with no other bodies or terrain.
+ * This checks that the short-TTL fix is not merely a 6000u/s artifact. */
+for(const profile of [{first:.411,second:.415,label:'baseline'},
+                      {first:.415,second:.419,label:'terminal-expiry'}])
+ for(const hz of [30,60,120,240])for(const reverse of [false,true])
+ for(const fullUpdate of [false,true])
+ test('RESEARCH canonical-speed lethal same-victim '+profile.label+' '+hz+
+      'Hz reverse='+reverse+' fullUpdate='+fullUpdate,()=>{
+  const result=trial(hz,reverse,fullUpdate,null,40,(_g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*profile.first;
+   bullets[0].vx=540;
+   bullets[0].ttl=.42;
+   bullets[1].x=60+540*profile.second;
+   bullets[1].vx=-540;
+   bullets[1].ttl=.42;
+   bullets[1].dmg=30;
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[101,102],
+   'both canonical-speed contacts must settle chronologically');
+  assert.equal(result.target.alive,false);
+  assert.deepEqual(result.kills,[102]);
+  assert.equal(result.ownerStats[0].kills,0);
+  assert.equal(result.ownerStats[1].kills,1);
+  assert.ok(result.ownerStats[1].xp>0);
+ });
+
+/* The live-frame ordering shortcut must not promote a shot through an
+ * earlier permanent wall. At canonical speed the left shot would otherwise
+ * reach the hull at 411ms, while the right shot remains physically open. */
+for(const hz of [60,120])for(const reverse of [false,true])
+ for(const fullUpdate of [false,true])
+ test('RESEARCH canonical-speed live pair respects permanent cover '+hz+
+      'Hz reverse='+reverse+' fullUpdate='+fullUpdate,()=>{
+  const result=trial(hz,reverse,fullUpdate,null,40,(g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   g.__novaTerrain=[{id:-9190,shape:'rect',x:18,y:0,w:2,h:70,
+    solid:true,destructible:false}];
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102],
+   'the permanent wall must absorb the earlier left-hand shot');
   assert.equal(result.target.alive,true);
   assert.deepEqual(result.kills,[]);
  });

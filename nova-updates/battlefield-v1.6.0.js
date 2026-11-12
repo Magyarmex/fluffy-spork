@@ -775,7 +775,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   var previous=b.__novaDirectVictims.values().next().value;
   return !!(previous&&previous.kind==='tank'&&previous.alive&&previous.hp>0);
  }
- function isolatedTTLStationaryPiercingChain(g,b,dt,nonExpiring,localOthers,allowSingle,dryRun,ignoreCover,allowLethal){
+ function isolatedTTLStationaryPiercingChain(g,b,dt,nonExpiring,localOthers,allowSingle,dryRun,ignoreCover,allowLethal,allowSingleLive){
   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
      b.__novaBreachAtTime===g.time||
      !(dt>0)||!(b.ttl>0)||
@@ -869,7 +869,9 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      (g.bullets||[]).some(function(o){
       return o&&o!==b&&!o.dead&&(o.splash||o.shell);
      })))return false;
-  if(nonExpiring ? (!partialNonExpiring&&contacts.length!==b.pen+1) :
+  if(nonExpiring ? (!partialNonExpiring&&
+      !(allowSingleLive===true&&dryRun===true&&b.pen===1&&contacts.length===1)&&
+      contacts.length!==b.pen+1) :
      contacts.length<(allowSingle?1:(b.hits>0?1:2))||contacts.length>b.pen+1||
      contacts.length>5||(contacts.length>3&&(b.pen<3||b.pen>4)))
    return false;
@@ -1972,6 +1974,64 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    (Number.isSafeInteger(b.id)&&
     g.__novaFrameStartBulletEpoch===g.__novaShapeSweepEpoch&&
     b.id<g.__novaFrameStartBulletIdCeiling);
+ }
+ /* The core traverses projectiles in reverse array order. In the
+  * exceptionally clear case of two disjoint ordinary rounds reaching the
+  * SAME stationary hull during one non-expiring frame, certify both first
+  * contact times and put the earlier shot last in the array. The core then
+  * performs both real damage callbacks, penetration and kill attribution.
+  * No speculative damage, TTL adjustment or synthetic kill is performed. */
+ function certifiedSameVictimLiveOrder(g,dt){
+  if(!(dt>0&&dt<=.05)||!Number.isFinite(dt))return false;
+  var bullets=g.bullets||[],tanks=g.tanks||[],
+      shapes=g.shapes||[],drones=g.drones||[];
+  if(bullets.length!==2||
+     tanks.length+shapes.length+drones.length>ISOLATED_RECOVERY_SCAN_CAP||
+     g.__novaWallProofHadShell)return false;
+  var a=bullets[0],b=bullets[1];
+  if(!a||!b||!certifiedTTLFrameStart(g,a)||
+     !certifiedTTLFrameStart(g,b)||
+     a.dead||b.dead||a.shell||b.shell||a.beam||b.beam||
+     a.splash||b.splash||a.__v17Cannon||b.__v17Cannon||
+     a.pen!==1||b.pen!==1||(a.hits||0)!==0||(b.hits||0)!==0||
+     !(a.ttl>dt&&b.ttl>dt)||
+     a.ownerId===b.ownerId||(a.knock||0)!==0||(b.knock||0)!==0||
+     !Number.isFinite(a.dmg)||!Number.isFinite(b.dmg)||
+     !(a.dmg>0&&b.dmg>0))return false;
+  var ax=a.x+a.vx*dt,ay=a.y+a.vy*dt,
+      bx=b.x+b.vx*dt,by=b.y+b.vy*dt,
+      pad=a.r+b.r+2;
+  if(!(Number.isFinite(ax)&&Number.isFinite(ay)&&
+       Number.isFinite(bx)&&Number.isFinite(by)&&
+       Number.isFinite(pad)&&pad>0))return false;
+  /* Neither shot can physically intercept the other. */
+  if(Math.max(a.x,ax)+pad>=Math.min(b.x,bx)&&
+     Math.min(a.x,ax)-pad<=Math.max(b.x,bx)&&
+     Math.max(a.y,ay)+pad>=Math.min(b.y,by)&&
+     Math.min(a.y,ay)-pad<=Math.max(b.y,by))return false;
+  var ac=isolatedTTLStationaryPiercingChain(g,a,dt,true,[],true,true,false,true,true),
+      bc=isolatedTTLStationaryPiercingChain(g,b,dt,true,[],true,true,false,true,true);
+  if(!ac||!bc||ac.length!==1||bc.length!==1||
+     ac[0].e!==bc[0].e)return false;
+  var target=ac[0].e,def=target&&CLASSES[target.cls];
+  if(!target||target.kind!=='tank'||!target.alive||
+     !def||!(def.size>0))return false;
+  var rrA=a.r+def.size+3,rrB=b.r+def.size+3;
+  /* Only reorder when the core's own endpoint checks can register BOTH
+   * certified contacts; otherwise leave swept fallback ownership intact. */
+  if((ax-target.x)*(ax-target.x)+(ay-target.y)*(ay-target.y)>=rrA*rrA||
+     (bx-target.x)*(bx-target.x)+(by-target.y)*(by-target.y)>=rrB*rrB)
+   return false;
+  var at=ac[0].t*dt,bt=bc[0].t*dt;
+  if(!(at>0&&bt>0&&Math.abs(at-bt)>1e-7))return false;
+  var first=at<bt?a:b,second=at<bt?b:a;
+  if(!(target.hp>first.dmg*2))return false;
+  if(bullets[1]!==first){
+   var priorOrder=[bullets[0],bullets[1]];
+   bullets[0]=second;bullets[1]=first;
+   return priorOrder;
+  }
+  return false;
  }
  function certifiedSameVictimTTLPair(g,dt){
   if(!(dt>0&&dt<=.05)||!Number.isFinite(dt))return false;
@@ -3599,6 +3659,9 @@ function certifiedMultiShotCoverPriority(g,dt){
     break;
    }
   }
+ /* Order the only certified non-expiring shared-hull pair before the
+  * core's reverse array traversal can invert physical kill ownership. */
+ var restoreLivePairOrder=certifiedSameVictimLiveOrder(this,dt);
  /* Commit a certified same-victim pair before the sequential TTL pass. */
  if(expiring===2&&legacyExpiring&&bodyWork<=300&&
     !this.__novaWallProofHadShell){
@@ -3719,7 +3782,17 @@ function certifiedMultiShotCoverPriority(g,dt){
       b.shell=false;
      }if(b.splash&&this.splashAt)this.splashAt(h.x,h.y,b.splash,b.splashDmg||.4,b.ownerId,b.knock||0,b.color,b.dmg);b.dead=true;if(this.addFlash)this.addFlash(h.x,h.y,s.destructible?'#8fd4ff':'#b9c7e7',Math.min(46,14+(b.dmg||0)*.24));if(this.cam&&b.dmg>42)this.cam.shake=Math.max(this.cam.shake,.08);/* The materialized core still advances dead bullets before removing them. Freeze a terrain-killed projectile at its impact so its final trail cannot leak through cover. Breaching live shots keep their velocity above. */b.vx=0;b.vy=0;
  }
- var out;try{out=oldUpdateBullets.call(this,dt);}finally{for(var ci=0;ci<ttlChildren.length;ci++){var saved=ttlChildren[ci];saved.child.vx=saved.vx;saved.child.vy=saved.vy;}}for(var j=0;j<terrain.length;j++){var q=terrain[j];if(q.flash>0)q.flash=Math.max(0,q.flash-dt);}return out;};
+ var out;try{out=oldUpdateBullets.call(this,dt);}finally{
+  /* Restore only the two original live bullets, if both survived.
+   * This frame's physical callback order must not permanently change
+   * their presentation or later collision enumeration order. */
+  if(restoreLivePairOrder&&this.bullets.length===2&&
+     this.bullets.indexOf(restoreLivePairOrder[0])>=0&&
+     this.bullets.indexOf(restoreLivePairOrder[1])>=0){
+   this.bullets[0]=restoreLivePairOrder[0];
+   this.bullets[1]=restoreLivePairOrder[1];
+  }
+  for(var ci=0;ci<ttlChildren.length;ci++){var saved=ttlChildren[ci];saved.child.vx=saved.vx;saved.child.vy=saved.vy;}}for(var j=0;j<terrain.length;j++){var q=terrain[j];if(q.flash>0)q.flash=Math.max(0,q.flash-dt);}return out;};
 
  var splashBullet={shell:true,beam:false,vx:0,vy:0};
  var oldSplash=Game.prototype.splashAt;Game.prototype.splashAt=function(x,y,radius,frac,ownerId,knock,color,dmg){var out=oldSplash.apply(this,arguments),a=terrainCandidates(this,x,y,x,y,radius);for(var i=0;i<a.length;i++){var s=a[i];if(!s.destructible||s.hp<=0)continue;var dx=Math.max(Math.abs(x-s.x)-(s.shape==='rect'?s.w*.5:s.r),0),dy=Math.max(Math.abs(y-s.y)-(s.shape==='rect'?s.h*.5:s.r),0),dist=Math.hypot(dx,dy);if(dist>radius)continue;var fall=1-clamp(dist/Math.max(1,radius),0,1)*.55;damageCover(this,s,(dmg||0)*(frac||.4)*fall,ownerId,x,y,splashBullet);}return out;};
