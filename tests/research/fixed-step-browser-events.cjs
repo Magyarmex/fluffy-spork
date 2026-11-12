@@ -64,6 +64,14 @@ class BrowserEventTimeline {
     this.resizeInterruptions++;
     return true;
   }
+  revokeForExternalReset() {
+    // A lifecycle/RAF owner can reset Input without delivering a DOM blur
+    // through this bridge. Old moves must not silently re-arm the sticks.
+    for(const id of this.activeTouchIds)this.suppressedTouchIds.add(id);
+    this.activeTouchIds.clear();
+    this.activeTouchSize=null;
+    this.pendingStaleTouchIds.clear();
+  }
   takeStaleTouchResetNotice() {
     const lost = this.pendingStaleTouchIds.size > 0;
     this.pendingStaleTouchIds.clear();
