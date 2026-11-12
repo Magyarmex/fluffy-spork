@@ -137,3 +137,17 @@ test('reused projectile IDs do not borrow an expired projectile visual history',
  unchanged(physical);
  pose.stop();
 });
+
+test('respawn player identity and status transitions reset all visual history',()=>{
+ const g=denseGame(),pose=new FixedStepPosePresentation(g,{enabled:true});
+ g.update(1/60);
+ const replacement={id:'respawn',x:400,y:450,vx:0,vy:0};
+ g.tanks.push(replacement);g.player=replacement;g.status='respawning';
+ g.update(1/60);
+ const physical=positions(g);
+ pose.draw(()=>{
+  unchanged(physical);
+ },g,320,700,.5);
+ unchanged(physical);
+ pose.stop();
+});
