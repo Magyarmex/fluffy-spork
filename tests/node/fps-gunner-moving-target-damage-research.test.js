@@ -45,13 +45,17 @@ function trial(seed,cls,reload,mode,offset,amplitude){
   g.input.autofire=false;g.input.mouseActive=false;
   g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
   g.input.moveVec=()=>({x:0,y:0});
-  let volleys=0,hits=0,damage=0,firstBirths=[];
+  let volleys=0,hits=0,damage=0,firstBirths=[],firstHits=[];
   const originalFire=g.tryFire,originalDamage=g.damageTank;
   g.tryFire=function(t){
    const n=this.bullets.length,result=originalFire.apply(this,arguments);
    if(t===p&&this.bullets.length>n){
     volleys++;
-    if(firstBirths.length<5)firstBirths.push(+this.time.toFixed(6));
+    if(firstBirths.length<5){
+     const b=this.bullets[this.bullets.length-1];
+     firstBirths.push({time:+this.time.toFixed(6),targetY:+target.y.toFixed(4),
+      x:+b.x.toFixed(4),y:+b.y.toFixed(4)});
+    }
    }
    return result;
   };
@@ -60,6 +64,8 @@ function trial(seed,cls,reload,mode,offset,amplitude){
    if(t===target&&t.hp<before){
     assert.equal(arguments[2],p.id,'damage must be player-owned');
     hits++;damage+=before-t.hp;
+    if(firstHits.length<5)firstHits.push({time:+this.time.toFixed(6),
+     targetY:+target.y.toFixed(4),applied:+(before-t.hp).toFixed(4)});
    }
    return result;
   };
@@ -107,7 +113,7 @@ function trial(seed,cls,reload,mode,offset,amplitude){
    assert.ok(Number.isFinite(damage)&&damage<=1000000);
    return {seed,cls,reload,mode,offset,amplitude,updates,edges,volleys,hits,
     travel:+travel.toFixed(4),peakOffset:+peakOffset.toFixed(4),
-    damage:+damage.toFixed(4),onTime:+onTime.toFixed(5),firstBirths,
+    damage:+damage.toFixed(4),onTime:+onTime.toFixed(5),firstBirths,firstHits,
     heat:+(p.__v17Heat||0).toFixed(5),spin:+(p.fireSpin||0).toFixed(5)};
   }finally{g.destroy();}
  });
