@@ -30,12 +30,12 @@ const functions=[
  section(fair,'function syncControllerPlans(','var oldDrones=Game.prototype.updateDrones;'),
  section(live,'function planAIControllers(','function prepareAIVirtualThumbs(')
 ].join('\n');
-function scenario(playerId){
+function scenario(playerId,reverse=false){
  const owner={id:1,cls:'carrier',x:0,y:0,alive:true,hp:100,maxHp:100,
   angle:0,ai:{targetId:-1,state:'wander',isElite:false}};
  const npc={id:2,cls:'scout',x:100,y:0,hp:100,maxHp:100,alive:true,isPlayer:playerId===2};
  const rival={id:3,cls:'scout',x:105,y:0,hp:100,maxHp:100,alive:true,isPlayer:playerId===3};
- const g={time:10,tanks:[owner,npc,rival],getTank(id){return this.tanks.find(t=>t.id===id)||null;}};
+ const g={time:10,tanks:reverse?[owner,rival,npc]:[owner,npc,rival],getTank(id){return this.tanks.find(t=>t.id===id)||null;}};
  const context={
   window:{__NOVA_LIVE_VECTOR_TEST__:{hostileDroneNear:()=>null,
    aiVirtualStick:()=>({active:true,angle:0,power:.5})}},
@@ -68,9 +68,11 @@ test('shipping overlay order places Fair Engagement outside Live Vector',()=>{
   'Fair Engagement must plan before calling the inner Live Vector updateDrones');
 });
 test('fair Controller target selection ignores human identity and suppresses legacy planner',()=>{
- const npcPlayer=scenario(2),farPlayer=scenario(3);
+ const npcPlayer=scenario(2),farPlayer=scenario(3),reversed=scenario(3,true);
  assert.equal(npcPlayer.id,farPlayer.id,
   'switching isPlayer flags must not change the fair target identity');
+ assert.equal(farPlayer.id,reversed.id,
+  'reversing tank iteration must not change a non-tied fair choice');
  assert.equal(npcPlayer.scoreNpc,farPlayer.scoreNpc);
  assert.equal(npcPlayer.scoreRival,farPlayer.scoreRival);
 });
