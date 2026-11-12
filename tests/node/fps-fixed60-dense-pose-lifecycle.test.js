@@ -63,16 +63,16 @@ test('dense 620-body interpolation is visual-only across repeated ticks and clea
 test('newborn projectiles and discontinuous teleports never interpolate stale identity',()=>{
  const g=denseGame(),pose=new FixedStepPosePresentation(g,{enabled:true});
  const newborn={id:'new',x:300,y:100,vx:0,vy:0};
- g.bullets.push(newborn);
  const teleported=g.tanks[2];
  g.update(1/60);
+ g.bullets.push(newborn);
+ // The next update captures the newborn for the first time and moves a tank
+ // discontinuously; neither may be interpolated from a stale prior identity.
  teleported.x+=500;
- // The presenter snapshots only after updates. Reconcile a genuine teleport
- // through another update so its physical current state is the tracked state.
  g.update(1/60);
  const physical=positions(g);
  pose.draw(()=>{
-  assert.equal(newborn.x,302,'newborn uses its first tracked pose on this tick');
+  assert.equal(newborn.x,304,'newborn uses its first tracked pose on this tick');
   assert.equal(teleported.x,physical.find(([o])=>o===teleported)[1],
    'teleport must never be visually smeared across the map');
  },g,320,700,.5);
