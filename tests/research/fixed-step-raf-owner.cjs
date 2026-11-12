@@ -215,16 +215,28 @@ class FixedStepRafOwner {
           if(!d || typeof d.pointerType!=='string' ||
              d.pointerType==='mouse' || d.pointerId==null)continue;
           if(e.kind==='pointerdown' && !d.targetIsUI){
-            if(!geometryRead){
-              geometryRead=true;
-              const canvas=(input && input.canvas)||g.canvas;
-              rect=canvas && typeof canvas.getBoundingClientRect==='function' ?
-                canvas.getBoundingClientRect() : null;
-              hasRect=!!(rect && Number.isFinite(rect.left) &&
-                Number.isFinite(rect.width) && rect.width>0);
+            // Notice classification must use the stick side observed when
+            // the DOM event occurred. A translated canvas can make two
+            // competing aim touches look like separate move/aim owners.
+            let side=d.__novaCanvasSide;
+            // Direct-timeline legacy fixtures have no capture metadata.
+            // Only those callers may consult current canvas geometry.
+            if(side!=='move' && side!=='aim' &&
+               !Object.prototype.hasOwnProperty.call(d,'__novaCanvasSide')){
+              if(!geometryRead){
+                geometryRead=true;
+                const canvas=(input && input.canvas)||g.canvas;
+                try{
+                  rect=canvas && typeof canvas.getBoundingClientRect==='function' ?
+                    canvas.getBoundingClientRect() : null;
+                }catch(_){rect=null;}
+                hasRect=!!(rect && Number.isFinite(rect.left) &&
+                  Number.isFinite(rect.width) && rect.width>0);
+              }
+              if(hasRect && Number.isFinite(d.clientX))
+                side=d.clientX-rect.left<rect.width*.45?'move':'aim';
             }
-            if(hasRect && Number.isFinite(d.clientX)){
-              const side=d.clientX-rect.left<rect.width*.45?'move':'aim';
+            if(side==='move'||side==='aim'){
               if(slots[side]==null){
                 slots[side]=d.pointerId;stillHeld.add(d.pointerId);
               }
