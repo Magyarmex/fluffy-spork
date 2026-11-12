@@ -2023,7 +2023,12 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   var first=at<bt?a:b,second=at<bt?b:a,
       tx=target.x,ty=target.y,
       bulletRefs=bullets.slice(),shapeCount=shapes.length,
-      droneCount=drones.length,tankCount=tanks.length;
+      droneCount=drones.length,tankCount=tanks.length,
+      terrain=g.__novaTerrain,terrainCount=(terrain||[]).length,
+      secondState=[second.x,second.y,second.vx,second.vy,
+       second.ttl,second.pen,second.hits,second.dmg,second.dead],
+      defenses=[target.spawnShieldT,target.shieldT,target.bulwarkT,
+       target.tauntT,target.invulnT];
   if(!(target.hp>first.dmg*2))return false;
   if(!isolatedTTLStationaryPiercingChain(g,first,dt,true,[],true,false,false,false,true))
    return false;
@@ -2034,6 +2039,13 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      (g.drones||[]).length!==droneCount||
      (g.tanks||[]).length!==tankCount||
      g.tanks.indexOf(target)<0||
+     g.__novaTerrain!==terrain||(terrain||[]).length!==terrainCount||
+     secondState.some(function(v,i){return v!==[
+       second.x,second.y,second.vx,second.vy,second.ttl,
+       second.pen,second.hits,second.dmg,second.dead][i];})||
+     defenses.some(function(v,i){return v!==[
+       target.spawnShieldT,target.shieldT,target.bulwarkT,
+       target.tauntT,target.invulnT][i];})||
      !(target.hp>0))return true;
   isolatedTTLStationaryPiercingChain(g,second,dt,true,[],true,false,false,target,true);
   return true;
