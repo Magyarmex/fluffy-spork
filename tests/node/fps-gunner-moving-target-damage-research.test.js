@@ -20,7 +20,7 @@ function frames(mode){
  if(mode==='alternating40_120')return Array.from({length:180},()=>[1/40,1/120]).flat();
  throw Error('unknown presentation mode');
 }
-function trial(seed,cls,reload,mode,offset,amplitude,motionPeriod=1.6,motionPhase=0){
+function trial(seed,cls,reload,mode,offset,amplitude,motionPeriod=1.6,motionPhase=0,drainSeconds=0){
  assert.ok(motionPeriod>0&&Number.isFinite(motionPhase),'valid independent target motion');
  return withSeed(seed,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
@@ -140,11 +140,31 @@ function trial(seed,cls,reload,mode,offset,amplitude,motionPeriod=1.6,motionPhas
    assert.ok(volleys>0&&hits>0&&damage>0,'real projectile damage required');
    assert.ok(hits<=volleys,'ordinary single-target rotary shots');
    assert.ok(Number.isFinite(damage)&&damage<=1000000);
+   const windowDamage=damage,windowHits=hits,windowBullets=g.bullets.length;
+   // Resolve already-born rounds without allowing another shot. Freeze the
+   // target at its last real position so no out-of-band teleport occurs.
+   // Keep this separate from the six-second firing-window measurement.
+   if(drainSeconds>0){
+    assert.equal(drainSeconds,2,'bounded no-fire projectile drain');
+    g.input.firing=false;g.input.aim.active=false;
+    for(let i=0;i<120;i++){
+     expectedNextY=target.y;
+     g.update(1/60);
+    }
+    assert.ok(Math.abs(g.time-initialTime-SECONDS-drainSeconds)<1e-5,
+     'drain must advance exactly two seconds of real Game updates');
+    assert.ok(damage>=windowDamage&&hits>=windowHits,
+     'no-fire drain cannot undo applied target damage');
+   }
    return {seed,cls,reload,mode,offset,amplitude,motionPeriod,motionPhase,updates,edges,volleys,hits,
     targetMoveSteps,
     aimAssistVetoes,
     travel:+travel.toFixed(4),peakOffset:+peakOffset.toFixed(4),
-    damage:+damage.toFixed(4),onTime:+onTime.toFixed(5),firstBirths,firstHits,
+    damage:+damage.toFixed(4),
+    ...(drainSeconds?{windowDamage:+windowDamage.toFixed(4),
+     windowHits,windowBullets,drainDamage:+(damage-windowDamage).toFixed(4),
+     drainHits:hits-windowHits,remainingBullets:g.bullets.length}:{}),
+    onTime:+onTime.toFixed(5),firstBirths,firstHits,
     heat:+(p.__v17Heat||0).toFixed(5),spin:+(p.fireSpin||0).toFixed(5)};
   }finally{g.destroy();}
  });
@@ -238,4 +258,30 @@ test('unsynchronized moving-target damage reports phase sensitivity without FPS 
   console.log('GUNNER_UNSYNC_PHASE_SENSITIVITY '+JSON.stringify({cls,period:1.37,byMode}));
  }
  console.log('GUNNER_UNSYNC_PHASE_ROWS '+JSON.stringify(rows));
+});
+
+/* #799: a six-second cutoff can mislabel in-flight rounds as misses.
+ * Keep the firing-window result and the no-fire tail separately measurable.
+ * A stationary target during the tail isolates projectile travel from new
+ * target movement, and the composed Game still owns collision and HP. */
+test('Gunner moving-target damage separates firing window from projectile drain',()=>{
+ const rows=[];
+ for(const [cls,reload] of [['minigun',1],['needlestorm',3]]){
+  for(const mode of ['native60','cluster30','alternating40_120']){
+   const args=[1517802,cls,reload,mode,.007,26,1.37,.3725];
+   const before=trial(...args);
+   const after=trial(...args,2);
+   assert.equal(after.windowDamage,before.damage,'tail cannot alter recorded window HP');
+   assert.equal(after.windowHits,before.hits,'tail cannot alter recorded window hit count');
+   assert.equal(after.volleys,before.volleys,'no-fire tail must not spawn volleys');
+   assert.ok(after.drainDamage>=0&&after.drainHits>=0,'drain damage is nonnegative');
+   assert.ok(after.remainingBullets<=after.windowBullets,
+    'tail must not create additional bullets');
+   rows.push({cls,mode,windowDamage:after.windowDamage,
+    drainDamage:after.drainDamage,totalDamage:after.damage,
+    windowBullets:after.windowBullets,remainingBullets:after.remainingBullets});
+  }
+ }
+ assert.equal(rows.length,6);
+ console.log('GUNNER_PROJECTILE_DRAIN_DAMAGE '+JSON.stringify(rows));
 });
