@@ -8,7 +8,7 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 const {DirectShotIntent}=require('../research/direct-shot-intent.cjs');
 
-function scenario(cls,lateral){
+function scenario(cls,lateral,wallHeight=80){
  return withSeed(1517800,()=>{
   const g=bootGame(),i=g.input;
   g.sfx.muted=true;i.autofire=false;
@@ -23,7 +23,7 @@ function scenario(cls,lateral){
   g.crasherTimer=Infinity;g.aiRespawns=[];
   g.spawnShape=()=>null;g.spawnPowerup=()=>null;
   g.spawnAITank=()=>null;g.spawnDrone=()=>null;
-  const wall={id:-1,shape:'rect',x:110,y:0,w:12,h:80,
+  const wall={id:-1,shape:'rect',x:110,y:0,w:12,h:wallHeight,
    solid:true,destructible:false,hp:0,maxHp:0};
   // Keep the same permanent wall in the real Game from input through
   // projectile birth and collision; do not conjure cover after firing.
@@ -87,5 +87,28 @@ test('research: real Sniper barrel origins change Battlefield cover contact afte
    cls,original,later,
    limitation:'actual composed projectile birth and Battlefield collision pass; constructed 100u displacement, no target HP or natural movement outcome'
   }));
+ }
+});
+
+// A 20u translation is within plausible local combat repositioning, unlike
+// the original 100u falsifier. It is still constructed, not a witnessed
+// movement gesture or a target-HP experiment. Keep the same permanent wall
+// throughout the actual Game projectile-birth and collision chain.
+test('research: small Sniper displacement changes real narrow-cover contact without freezing delayed origin',()=>{
+ for(const cls of ['railgun','prism','singularity']){
+  const original=scenario(cls,0,12),later=scenario(cls,20,12);
+  assert.equal(original.traces.length,later.traces.length);
+  for(let j=0;j<original.traces.length;j++){
+   const a=original.traces[j],b=later.traces[j];
+   assert.equal(a.blocked,true,'the original narrow cover must physically intercept the rail');
+   assert.equal(original.surviving[j],false,'original rail must stop at the wall');
+   const delta=b.y-a.y;
+   assert.ok(Math.abs(delta-20)<2||Math.abs(delta)<2,
+    'shot origin must be either release-position or delayed-position, not arbitrary drift');
+   assert.equal(later.surviving[j],!b.blocked,
+    'the real Battlefield collision must agree with the actual delayed rail path');
+  }
+  console.log('SNIPER_SMALL_COVER_RESEARCH '+JSON.stringify({cls,original,later,
+   limitation:'20u constructed displacement and narrow permanent wall; no natural movement, target HP or input-to-paint latency'}));
  }
 });
