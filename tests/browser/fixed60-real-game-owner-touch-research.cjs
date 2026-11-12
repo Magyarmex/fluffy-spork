@@ -326,16 +326,18 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    assert.equal(shotInThree,true,
     'a real three-update callback must emit a player-owned projectile while held: '+
     JSON.stringify(heldBurstDiagnostic));
-   const during=await page.evaluate(()=>({
-    owner:window.__novaFixedGame.input.stickId.aim,
-    active:window.__novaFixedGame.input.aim.active,
-    births:window.__novaFixedResearch.births
-   }));
+   const witness=await page.evaluate(start=>({
+    during:{
+     owner:window.__novaFixedGame.input.stickId.aim,
+     active:window.__novaFixedGame.input.aim.active,
+     births:window.__novaFixedResearch.births
+    },
+    burstFrames:window.__novaFixedResearch.frames.slice(start)
+   }),heldBurstStart);
+   const {during,burstFrames}=witness;
    // Assert ownership AT the exact successful three-step callback, not at
    // a later Playwright observation that may follow a legitimate >100ms
    // foreground-stall quarantine. Never waive ownership for the shot itself.
-   const burstFrames=await page.evaluate(start=>window.__novaFixedResearch.frames.slice(start),
-    heldBurstStart);
    const shotIndex=burstFrames.findIndex(f=>f.steps===3&&f.budget===3&&
     f.rawGapMs<=100+1e-7&&f.playerProjectileBirths>0);
    assert.ok(shotIndex>=0,'the successful three-step shot frame must be recorded');
