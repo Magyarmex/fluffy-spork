@@ -158,6 +158,8 @@ test('research: narrow-cover 20u Sniper displacement changes actual hostile HP c
 // A genuinely moving hull advances inside Game.update BEFORE the quick-shot
 // intent is consumed. Unlike the constructed 20u shift above, this exercises
 // a single 60Hz step with the real tankSpeed/moveTank owner and a narrow wall.
+// Moving hull velocity also contributes 22% to projectile velocity in tryFire;
+// this is a physical movement+trajectory test, NOT an isolated origin effect.
 // It remains research-only: no browser event delivery or natural match rate.
 test('research: one ordinary movement tick can change narrow-cover Sniper first contact',()=>{
  const still=scenario('railgun',8,12,true,false);
