@@ -775,7 +775,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   var previous=b.__novaDirectVictims.values().next().value;
   return !!(previous&&previous.kind==='tank'&&previous.alive&&previous.hp>0);
  }
- function isolatedTTLStationaryPiercingChain(g,b,dt,nonExpiring,localOthers,allowSingle,dryRun,ignoreCover){
+ function isolatedTTLStationaryPiercingChain(g,b,dt,nonExpiring,localOthers,allowSingle,dryRun,ignoreCover,allowLethal){
   if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
      b.__novaBreachAtTime===g.time||
      !(dt>0)||!(b.ttl>0)||
@@ -826,7 +826,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    if(!Number.isFinite(sx)||!Number.isFinite(sy)||
       Math.hypot(t.x-sx,t.y-sy)>1e-8)return false;
    if(t.spawnShieldT>0||t.shieldT>0||t.bulwarkT>0||
-      t.tauntT>0||!Number.isFinite(t.hp)||t.hp<=b.dmg*2||
+      t.tauntT>0||!Number.isFinite(t.hp)||
+      (!allowLethal&&t.hp<=b.dmg*2)||
       (typeof g.areAllies==='function'&&g.areAllies(owner,t)))return false;
    if(b.__novaDirectVictims&&b.__novaDirectVictims.has(t))continue;
    var fx=ax-t.x,fy=ay-t.y,A=dx*dx+dy*dy,
@@ -1994,15 +1995,14 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      bo.some(function(o){return o!==a;}))return false;
   /* Existing stationary-hull/shape/drone/cover/defense proof is reused
    * in read-only mode. Exclude ONLY the mutually certified partner. */
-  var ac=isolatedTTLStationaryPiercingChain(g,a,dt,false,[],true,true),
-      bc=isolatedTTLStationaryPiercingChain(g,b,dt,false,[],true,true);
+  var ac=isolatedTTLStationaryPiercingChain(g,a,dt,false,[],true,true,false,true),
+      bc=isolatedTTLStationaryPiercingChain(g,b,dt,false,[],true,true,false,true);
   if(!ac||!bc||ac.length!==1||bc.length!==1||
      ac[0].e!==bc[0].e)return false;
   var target=ac[0].e,at=ac[0].t*a.ttl,bt=bc[0].t*b.ttl;
   var targetDef=CLASSES[target.cls];
   if(!targetDef||!(Number.isFinite(targetDef.size)&&targetDef.size>0))return false;
   if(!(at>0&&bt>0&&Math.abs(at-bt)>1e-7)||
-     !(target.hp>2*(a.dmg+b.dmg))||
      !Number.isFinite(target.x)||!Number.isFinite(target.y))return false;
   /* The full TTL swept AABBs must be disjoint even with projectile
    * radii and numerical padding. This is deliberately stronger than
@@ -2022,6 +2022,9 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       bulletRefs=bullets.slice(),bulletCount=bullets.length,
       shapeCount=(g.shapes||[]).length,
       droneCount=(g.drones||[]).length,tankCount=(g.tanks||[]).length;
+  /* First callback must be demonstrably nonlethal, including a bounded
+   * allowance for class damage modifiers. The second may legitimately kill. */
+  if(!(target.hp>first.dmg*2))return false;
   if(!isolatedTTLStationaryPiercingChain(g,first,dt,false,[],true))
    return false;
   /* A nonlethal callback must not silently move/replace the victim. */
@@ -2031,8 +2034,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      (g.shapes||[]).length!==shapeCount||
      (g.drones||[]).length!==droneCount||
      (g.tanks||[]).length!==tankCount||
-     !(target.hp>second.dmg*2))return true;
-  isolatedTTLStationaryPiercingChain(g,second,dt,false,[],true);
+     !(target.hp>0))return true;
+  /* All earlier contacts are settled and the victim still exists. Only the
+   * terminal shot may cross the lethal threshold; its real damage owner
+   * performs kill/XP attribution in physical contact order. */
+  isolatedTTLStationaryPiercingChain(g,second,dt,false,[],true,false,false,true);
   return true;
  }
  /* A prior-frame pen=1 hull hit can leave a still-live pen=0 round
