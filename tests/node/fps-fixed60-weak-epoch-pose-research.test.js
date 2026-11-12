@@ -123,3 +123,26 @@ test('weak epoch respects legal fast bullets, skips impossible teleport, and pau
   p.draw(game=>assert.equal(game.bullets[0].x,620),g,1,1,.5);
  }finally{p.stop();}
 });
+
+test('weak epoch matches Map presenter when one entity appears in two collections',()=>{
+ const sample=(Class)=>{
+  const shared={x:0,y:0,vx:60,vy:0};
+  const g={tanks:[shared],drones:[shared],shapes:[],bullets:[],
+   cam:{x:0,y:0},status:'playing',paused:false,player:shared,
+   update(){shared.x+=10;this.cam.x+=10;},destroy(){}};
+  const p=new Class(g,{enabled:true}),poses=[];
+  try{
+   for(let tick=0;tick<3;tick++){
+    g.update(1/60);
+    const original=shared.x;
+    p.draw(game=>poses.push([game.tanks[0].x,game.drones[0].x,game.cam.x]),g,1,1,.5);
+    assert.equal(shared.x,original,'render must restore physical pose');
+   }
+   return {poses,interpolated:p.interpolated,teleportSkips:p.teleportSkips};
+  }finally{p.stop();}
+ };
+ const expected=sample(FixedStepPosePresentation);
+ const actual=sample(WeakEpochPosePresentation);
+ assert.deepEqual(actual,expected);
+ assert.deepEqual(actual.poses.map(row=>row[0]),[5,15,25]);
+});
