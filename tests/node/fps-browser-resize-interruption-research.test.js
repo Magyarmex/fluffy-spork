@@ -422,6 +422,7 @@ test('foreground RAF stall clears bridge ownership as well as real Input ownersh
   now=1150;h.setNow(now);
   assert.equal(h.capture('pointerdown',23,600,1145),true);
   now=1167;h.setNow(now);owner.frame(now);
-  assert.equal(h.input.stickId.aim,23);
+  now=1184;h.setNow(now);owner.frame(now);
+  assert.equal(h.input.stickId.aim,23,'fresh touch replays on the next legal simulation tick');
  }finally{owner.stop()}
 });
