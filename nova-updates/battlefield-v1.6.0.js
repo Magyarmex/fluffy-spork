@@ -931,9 +931,9 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   /* The core normally initializes projectile integrity before any hits.
    * A surviving partial prefix must preserve the ORIGINAL pen=2 integrity
    * rather than let core first initialize after we consume penetration. */
-  if(dryRun)return contacts;
   if(partialNonExpiring&&typeof g.initBulletIntegrity==='function')
-   g.initBulletIntegrity(b); /* immutable certificate before any callback */
+   g.initBulletIntegrity(b);
+  if(dryRun)return contacts; /* immutable certificate before any callback */
   /* Reuse the real damage owner, never fabricate HP or kill credit. */
   var ang=Math.atan2(b.vy,b.vx),kx=Math.cos(ang)*(b.knock||0)*.006,
       ky=Math.sin(ang)*(b.knock||0)*.006;
