@@ -1,6 +1,8 @@
 'use strict';
 // Research-only paired Chromium reporting: same seeded playable world and
 // catch-up policy, but sequential runs are NOT a causal CPU/latency A/B.
+// The existing Game.prototype.update timer excludes the pose snapshot wrapper;
+// report RAF callback JS instead of mislabeling it as per-tick snapshot cost.
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 function compare(off,on){
@@ -25,12 +27,10 @@ function compare(off,on){
   researchOnly:true,causalPerformanceComparison:false,
   initialFingerprint:on.initialFingerprint,
   maxSteps:on.configuredMaxSteps,
-  off:{frames:off.raf.frames,updateP95Ms:off.updates.p95,
-   renderP95Ms:off.renders.p95,
+  off:{frames:off.raf.frames,renderP95Ms:off.renders.p95,
    callbackP95Ms:off.raf.callbackJs.p95,touchToCanvasMs:off.touchToCanvasSubmissionMs,
    births:off.births,droppedMs:off.droppedMs},
-  on:{frames:on.raf.frames,updateP95Ms:on.updates.p95,
-   renderP95Ms:on.renders.p95,
+  on:{frames:on.raf.frames,renderP95Ms:on.renders.p95,
    callbackP95Ms:on.raf.callbackJs.p95,touchToCanvasMs:on.touchToCanvasSubmissionMs,
    births:on.births,droppedMs:on.droppedMs,
    poseRenderP95Ms:on.pose.renderJs.p95,
