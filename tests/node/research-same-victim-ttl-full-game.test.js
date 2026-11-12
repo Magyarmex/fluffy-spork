@@ -49,7 +49,12 @@ function trial(hz,reverse,fullUpdate,only=null,targetX=40,mutate=null){
   // These pre-existing fixture projectile IDs must precede the live
   // frame-start allocation ceiling; otherwise they masquerade as newborns.
   g.nextId=Math.max(g.nextId||0,1200);
-  const contacts=[];
+  const contacts=[],kills=[];
+  const originalKill=g.killTank;
+  g.killTank=function(victim,killer){
+   if(victim===p)kills.push(killer&&killer.id);
+   return originalKill.apply(this,arguments);
+  };
   const original=g.damageTank;
   g.damageTank=function(t,damage,ownerId){
    if(t===p)contacts.push({ownerId,damage});
@@ -59,7 +64,7 @@ function trial(hz,reverse,fullUpdate,only=null,targetX=40,mutate=null){
    if(fullUpdate)g.update(1/hz);
    else {g.updateBullets(1/hz);g.time+=1/hz;}
   }
-  return {hp:p.hp,contacts,remaining:g.bullets.map(b=>b.id),
+  return {hp:p.hp,contacts,kills,remaining:g.bullets.map(b=>b.id),
    target:{x:p.x,y:p.y,alive:p.alive,shield:p.spawnShieldT,
     sweepTime:p.__novaSweepMoveTime,sweepX:p.__novaSweepPrevX},
    game:{time:g.time,status:g.status,shapeSweep:g.__novaShapeSweepActive}};
@@ -162,4 +167,6 @@ for(const hz of [30,60,120,240])for(const reverse of [false,true])
      'no duplicate or missing damage across the lethal transition');
    assert.equal(result.target.alive,false,
      'the second chronological contact must kill the 30-HP hull');
+   assert.deepEqual(result.kills,[102],
+     'the actual kill callback must credit the later physical shooter');
   });
