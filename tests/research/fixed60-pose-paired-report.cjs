@@ -18,6 +18,8 @@ function compare(off,on){
  assert.equal(off.pose.frames,0,'OFF must not run pose instrumentation');
  assert.ok(on.pose.frames>2&&on.pose.interpolated>0,
   'ON must execute actual interpolation during real Game renders');
+ assert.ok(on.pose.shiftedBulletFrames>0,
+  'ON must actually present at least one projectile at an interpolated pose');
  assert.ok(on.pose.renderJs.p95>=0&&Number.isFinite(on.pose.renderJs.p95));
  const result={
   researchOnly:true,causalPerformanceComparison:false,
