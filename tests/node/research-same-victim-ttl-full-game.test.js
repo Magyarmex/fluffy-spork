@@ -175,3 +175,33 @@ for(const hz of [30,60,120,240])for(const reverse of [false,true])
    assert.ok(result.ownerStats[1].xp>0&&result.ownerStats[1].score>0,
      'the later shooter must receive the actual kill XP and score');
   });
+
+/* Adversarial 240Hz carry-over controls: low HP alone must never
+ * authorize a later shot that cannot physically contact before TTL,
+ * or that is stopped by permanent cover. Keep the first real hit. */
+for(const hz of [30,60,120,240])for(const reverse of [false,true])
+ test('RESEARCH lethal carry-over refuses post-TTL contact '+hz+
+      'Hz reverse='+reverse,()=>{
+  const result=trial(hz,reverse,false,null,40,(_g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[1].dmg=30;bullets[1].x=100;
+  });
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[101],
+   'later shooter cannot receive a contact beyond physical TTL');
+  assert.equal(result.target.alive,true);
+  assert.deepEqual(result.kills,[]);
+ });
+for(const hz of [30,60,120,240])for(const reverse of [false,true])
+ test('RESEARCH lethal carry-over respects permanent cover '+hz+
+      'Hz reverse='+reverse,()=>{
+  const result=trial(hz,reverse,false,null,40,(g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[1].dmg=30;
+   g.__novaTerrain=[{id:-9102,shape:'rect',x:75,y:0,w:4,h:70,
+    solid:true,destructible:false}];
+  });
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[101],
+   'right-hand shot must not bypass its earlier permanent wall');
+  assert.equal(result.target.alive,true);
+  assert.deepEqual(result.kills,[]);
+ });
