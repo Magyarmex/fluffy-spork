@@ -739,6 +739,15 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    return value;
  };
  try{out=oldEntityBullets.call(this,dt);}finally{
+   /* Restore the original stable projectile array order after the core
+    * has consumed this frame's certified chronological pair. Do not
+    * resurrect or reorder bullets when the core changed membership. */
+   if(restoreLivePairOrder&&this.bullets.length===2&&
+      this.bullets.indexOf(restoreLivePairOrder[0])>=0&&
+      this.bullets.indexOf(restoreLivePairOrder[1])>=0){
+    this.bullets[0]=restoreLivePairOrder[0];
+    this.bullets[1]=restoreLivePairOrder[1];
+   }
    if(query){if(hadOwn)hash.query=query;else delete hash.query;}
    if(oldSplashForContacts){if(hadOwnSplash)this.splashAt=oldSplashForContacts;else delete this.splashAt;}
    for(var pi=0;pi<pending.length;pi++){
@@ -2026,8 +2035,12 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   if(!(at>0&&bt>0&&Math.abs(at-bt)>1e-7))return false;
   var first=at<bt?a:b,second=at<bt?b:a;
   if(!(target.hp>first.dmg*2))return false;
-  if(bullets[1]!==first){bullets[0]=second;bullets[1]=first;}
-  return true;
+  if(bullets[1]!==first){
+   var priorOrder=[bullets[0],bullets[1]];
+   bullets[0]=second;bullets[1]=first;
+   return priorOrder;
+  }
+  return false;
  }
  function certifiedSameVictimTTLPair(g,dt){
   if(!(dt>0&&dt<=.05)||!Number.isFinite(dt))return false;
@@ -3657,7 +3670,7 @@ function certifiedMultiShotCoverPriority(g,dt){
   }
  /* Order the only certified non-expiring shared-hull pair before the
   * core's reverse array traversal can invert physical kill ownership. */
- certifiedSameVictimLiveOrder(this,dt);
+ var restoreLivePairOrder=certifiedSameVictimLiveOrder(this,dt);
  /* Commit a certified same-victim pair before the sequential TTL pass. */
  if(expiring===2&&legacyExpiring&&bodyWork<=300&&
     !this.__novaWallProofHadShell){
