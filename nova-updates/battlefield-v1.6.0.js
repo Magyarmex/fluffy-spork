@@ -2070,10 +2070,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   var target=prior.__novaDirectVictims.values().next().value;
   if(!target||target.kind!=='tank'||!target.alive||
      !CLASSES[target.cls]||!(CLASSES[target.cls].size>0)||
-     !(target.hp>fresh.dmg*2))return false;
+     !(Number.isFinite(target.hp)&&target.hp>0))return false;
   var others=localSingleTTLBodyOthers(g,fresh,dt,true);
   if(!others||others.some(function(o){return o!==prior;}))return false;
-  var contacts=isolatedTTLStationaryPiercingChain(g,fresh,dt,false,[],true,true);
+  var contacts=isolatedTTLStationaryPiercingChain(g,fresh,dt,false,[],true,true,false,target);
   if(!contacts||contacts.length!==1||contacts[0].e!==target)return false;
   /* The spent shot still has physical presence until TTL expires.
    * Exclude it only if its entire remaining corridor cannot intercept
@@ -2088,7 +2088,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      Math.min(prior.x,ax)-pad<=Math.max(fresh.x,bx)&&
      Math.max(prior.y,ay)+pad>=Math.min(fresh.y,by)&&
      Math.min(prior.y,ay)-pad<=Math.max(fresh.y,by))return false;
-  return !!isolatedTTLStationaryPiercingChain(g,fresh,dt,false,[],true);
+  return !!isolatedTTLStationaryPiercingChain(g,fresh,dt,false,[],true,false,false,target);
  }
  /* One permanent wall may physically stop a competing TTL shot
   * before its hull contact. That wall cannot be breached, so the other
