@@ -57,8 +57,19 @@ function scenario(playerId,reverse=false){
  assert.doesNotThrow(()=>context.planAIControllers(g),
   'private player-weighted selector must remain asleep in composed update order');
  assert.equal(owner.ai.targetId,before.id);
- return {id:before.id,scoreNpc:context.scoreTarget(g,{},owner,owner.ai,npc,10,{counts:new Map()}),
+ const result={id:before.id,
+  scoreNpc:context.scoreTarget(g,{},owner,owner.ai,npc,10,{counts:new Map()}),
   scoreRival:context.scoreTarget(g,{},owner,owner.ai,rival,10,{counts:new Map()})};
+ // The fair owner must retain a legal cached target, then invalidate it
+ // immediately on spawn protection without consulting the private selector.
+ g.time=10.01;context.syncControllerPlans(g);context.planAIControllers(g);
+ assert.equal(owner.ai.targetId,before.id,'legal target cache must remain stable');
+ before.spawnShieldT=1;g.time=10.02;
+ context.syncControllerPlans(g);context.planAIControllers(g);
+ assert.notEqual(owner.ai.targetId,before.id,
+  'spawn shield must immediately revoke a previously held Controller target');
+ assert.ok(owner.ai.targetId>=0,'the other visible hostile remains eligible');
+ return result;
 }
 test('shipping overlay order places Fair Engagement outside Live Vector',()=>{
  const a=shell.indexOf('second-body-live-vector-v1.10.7.js');
