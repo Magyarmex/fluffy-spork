@@ -89,3 +89,33 @@ test('renderer exceptions restore every dense combat pose',()=>{
  unchanged(physical);
  pose.stop();
 });
+
+test('fast legal projectiles interpolate without admitting arbitrary teleport jumps',()=>{
+ const g=denseGame();
+ const bullet=g.bullets[0];
+ bullet.vx=8000;bullet.vy=0;
+ const baseUpdate=g.update;
+ g.update=function(dt){
+  baseUpdate.call(this,dt);
+  bullet.x+=116; // 120 units per fixed tick, above the ordinary 96u cap.
+ };
+ const pose=new FixedStepPosePresentation(g,{enabled:true});
+ const start=bullet.x;
+ g.update(1/60);
+ const physical=bullet.x;
+ pose.draw(()=>{
+  assert.equal(bullet.x,start+60,
+   'velocity-consistent fast round must receive an intermediate visual pose');
+ },g,320,700,.5);
+ assert.equal(bullet.x,physical);
+ bullet.x+=500; // A discontinuity must not be smoothed despite high velocity.
+ g.update(1/60);
+ const afterTeleport=bullet.x;
+ pose.draw(()=>{
+  assert.equal(bullet.x,afterTeleport,
+   'large discontinuity must remain unsmoothed even for fast projectiles');
+ },g,320,700,.5);
+ assert.equal(bullet.x,afterTeleport);
+ assert.ok(pose.teleportSkips>0);
+ pose.stop();
+});
