@@ -45,6 +45,19 @@ function encounter(cls,seed,fixed30,playerMoveY=0){
   let updates=0,travel=0,volleys=0,hits=0,damage=0;
   
   const births=[],contacts=[];
+  // A previous tick's collision velocity is not permission for the next
+  // tank-AI integration to move the scripted target a second time. Preserve
+  // its physical velocity for same-tick collision, then reset before the
+  // next real Game.update (as in the existing moving-target research).
+  const originalUpdate=g.update;
+  g.update=function(dt){target.vx=0;target.vy=0;
+   const out=originalUpdate.apply(this,arguments);
+   const elapsed=this.time-initialTime;
+   const expected=26*Math.sin(2*Math.PI*(elapsed+.19)/1.37);
+   assert.ok(Math.abs(target.y-expected)<1e-4,
+    'post-update target trajectory must match world time');
+   return out;
+  };
   const originalDrones=g.updateDrones;
   g.updateDrones=function(dt){
    const result=originalDrones.apply(this,arguments);
