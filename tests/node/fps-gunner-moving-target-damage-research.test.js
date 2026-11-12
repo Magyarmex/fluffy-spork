@@ -63,7 +63,7 @@ function trial(seed,cls,reload,mode,offset,amplitude){
    }
    return result;
   };
-  let now=0,updates=0,onTime=0,edges=0,travel=0,peakOffset=0;
+  let now=0,updates=0,onTime=0,edges=0,travel=0,peakOffset=0,previousY=0;
   const initialTime=g.time;
   try{
    for(const frame of frames(mode)){
@@ -78,6 +78,10 @@ function trial(seed,cls,reload,mode,offset,amplitude){
      const next=Math.min(end,boundary);
      const dt=next-now;
      assert.ok(dt>EPS,'input-event split must progress');
+     // Normalize the physical target at the exact beginning of each step.
+     // This keeps initial geometry tied to world time, not prior AI drift.
+     target.x=200;target.y=amplitude*Math.sin(2*Math.PI*now/1.6);
+     target.vx=0;target.vy=0;
      g.input.firing=firing;
      if(firing)onTime+=dt;
      g.update(dt);updates++;
@@ -85,7 +89,8 @@ function trial(seed,cls,reload,mode,offset,amplitude){
      // frame schedules, with no AI/physics drift between updates. Motion is
      // smooth and bounded, crossing the projectile corridor repeatedly.
      const y=amplitude*Math.sin(2*Math.PI*next/1.6);
-     travel+=Math.abs(y-target.y);
+     travel+=Math.abs(y-previousY);
+     previousY=y;
      peakOffset=Math.max(peakOffset,Math.abs(y));
      target.x=200;target.y=y;target.vx=0;target.vy=0;
      now=next;
