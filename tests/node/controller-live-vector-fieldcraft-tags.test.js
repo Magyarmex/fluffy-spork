@@ -39,6 +39,18 @@ test('Controller Live Vector lessons participate in real Fieldcraft controls con
  const contextual=all.filter(t=>t.tags.some(tag=>['controls','settings','ui'].includes(tag)));
  assert.ok(expected.every(id=>contextual.some(t=>t.id===id)),
   'the real Fieldcraft controls context must contain all three Controller lessons');
+ const seen=new Set();
+ for(let i=0;i<contextual.length;i++){
+  const selected=window.NOVATips.next('controller-controls-regression',
+   ['controls','settings','ui']);
+  assert.ok(selected&&contextual.some(t=>t.id===selected.id),
+   'the actual contextual shuffle bag returned an ineligible lesson');
+  seen.add(selected.id);
+ }
+ assert.equal(seen.size,contextual.length,
+  'the contextual shuffle bag must offer every eligible lesson once per cycle');
+ assert.ok(expected.every(id=>seen.has(id)),
+  'all three Controller lessons must be selectable through the real controls bag');
  assert.equal(window.NOVATips.audit().duplicateIds.length,0);
  assert.ok(listeners.some(l=>l.type==='DOMContentLoaded'),
   'DOM startup remains deferred and untouched by this registration regression');
