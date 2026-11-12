@@ -199,3 +199,38 @@ test('unsynchronized target motion retains real projectile damage evidence',()=>
  assert.equal(rows.length,6);
  console.log('GUNNER_UNSYNC_MOVING_TARGET_REAL_DAMAGE '+JSON.stringify(rows));
 });
+
+/* Phase sensitivity: the 1.37s unsynchronized path is still only one phase.
+ * Sweep four distinct starting phases at identical target amplitude and
+ * firing input, reporting per-mode ranges rather than freezing FPS goldens.
+ * This guards against drawing a broad fairness conclusion from one alignment.
+ * Actual Game movement, swept collision and applied HP remain authoritative. */
+test('unsynchronized moving-target damage reports phase sensitivity without FPS goldens',()=>{
+ const rows=[];
+ const phases=[.03,.19,.41,.73];
+ for(const [cls,reload] of [['minigun',1],['needlestorm',3]]){
+  for(const phase of phases){
+   const schedule=[];
+   for(const mode of ['native60','cluster30','alternating40_120']){
+    const row=trial(1517802,cls,reload,mode,.007,26,1.37,phase);
+    assert.equal(row.onTime,3.9,'identical fire duty');
+    assert.ok(row.travel>50&&row.peakOffset>25,'target must cross projectile corridor');
+    schedule.push({mode,damage:row.damage,hits:row.hits,volleys:row.volleys,
+     heat:row.heat,spin:row.spin});
+   }
+   rows.push({cls,phase,schedule});
+  }
+ }
+ assert.equal(rows.length,8,'both legal rotary builds across four independent phases');
+ for(const cls of ['minigun','needlestorm']){
+  const subset=rows.filter(row=>row.cls===cls);
+  assert.equal(new Set(subset.map(row=>row.phase)).size,4);
+  const byMode=Object.fromEntries(['native60','cluster30','alternating40_120'].map(mode=>{
+   const damage=subset.map(row=>row.schedule.find(s=>s.mode===mode).damage);
+   return [mode,{min:Math.min(...damage),max:Math.max(...damage),
+    mean:+(damage.reduce((a,b)=>a+b,0)/damage.length).toFixed(4)}];
+  }));
+  console.log('GUNNER_UNSYNC_PHASE_SENSITIVITY '+JSON.stringify({cls,period:1.37,byMode}));
+ }
+ console.log('GUNNER_UNSYNC_PHASE_ROWS '+JSON.stringify(rows));
+});
