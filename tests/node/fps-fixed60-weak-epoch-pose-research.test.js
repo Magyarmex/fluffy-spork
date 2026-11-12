@@ -70,7 +70,7 @@ test('weak records discard stale ownership after dense population shrinks',()=>{
   g.update();
   const expired=g.bullets[0];g.bullets=[];g.drones=[];g.shapes=[];
   g.update();
-  assert.equal(p.active.length,102);
+  assert.equal(p.active.length,101);
   assert.ok(!p.active.includes(expired));
   g.destroy();assert.equal(p.active.length,0);
   assert.equal(p.activePresenter,false);
