@@ -10,6 +10,8 @@ const {injectBattlefieldSeed}=require('../research/battlefield-layout-fixture.cj
 const maxSteps=Number(process.env.NOVA_FIXED60_MAX_STEPS||2);
 const controlledGate=process.env.NOVA_FIXED60_CONTROLLED_GATE==='1';
 const controlledExtra=Number(process.env.NOVA_FIXED60_EXTRA_TICKS||2);
+// Opt-in visual-only experiment. OFF retains the existing Chromium owner path.
+const poseEnabled=process.env.NOVA_FIXED60_POSE_PRESENTATION==='1';
 assert.ok([2,3,4].includes(controlledExtra),'invalid research backlog');
 // Compare against the materialized shell, not a brittle hardcoded DOM count.
 const expectedOverlays=[...fs.readFileSync(path.resolve(__dirname,'../../index.html'),'utf8')
@@ -54,8 +56,9 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
   await deploy.waitFor({state:'visible',timeout:45000});
   await page.addScriptTag({path:path.resolve(__dirname,
    '../../nova-updates/fixed60-research-browser.js')});
-  await page.evaluate(({maxSteps,controlledGate,controlledExtra})=>{
+  await page.evaluate(({maxSteps,controlledGate,controlledExtra,poseEnabled})=>{
    window.__novaFixedMaxSteps=maxSteps;
+   window.__novaPoseEnabled=poseEnabled;
    window.__novaControlledGate=controlledGate;
    const Game=window.__novaMakeRequire('')('game/engine').Game;
    if(controlledGate){
@@ -70,7 +73,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    }
    const renderMod=window.__novaMakeRequire('')('game/render');
    const baseStart=Game.prototype.start;
-   window.__novaFixedResearch={births:0,updates:[],renders:[],errors:[],lifecycle:[],touchEvents:[],frames:[]};
+   window.__novaFixedResearch={births:0,updates:[],renders:[],errors:[],lifecycle:[],touchEvents:[],frames:[],poseFrames:[]};
    const profile=window.__novaFixedResearch;
    const gateGaps=[250/3,50/3,50/3,50/3];
    let gateNext=null,gateIndex=0,gateToken=0;
@@ -145,6 +148,9 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
      throw Error('shipping Game.start did not schedule its expected RAF');
     cancelAnimationFrame(shippingRaf);
     this.raf=null;
+    const presenter=poseEnabled?
+     new window.__novaFixed60Research.FixedStepPosePresentation(this,{enabled:true}):null;
+    window.__novaFixedPresenter=presenter;
     const pilot=window.__novaFixed60Research.createFixedStepBrowserPilot(this,{
      window,document,clock:performance,
      request:fn=>{
@@ -207,7 +213,30 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
       state.cancelled=true;cancelAnimationFrame(state.id);
       gatePending.delete(token);
      },
-     render:(g,w,h)=>renderMod.render(g,w,h),
+     render:(g,w,h,alpha)=>{
+      if(!presenter)return renderMod.render(g,w,h);
+      const player=g.player,original=player&&[player.x,player.y];
+      const camera=g.cam,originalCam=camera&&[camera.x,camera.y];
+      const bullet=g.bullets?.[0],originalBullet=bullet&&[bullet.x,bullet.y];
+      const at=performance.now();
+      let drawn=null;
+      try{return presenter.draw((game,width,height)=>{
+       drawn={x:game.player?.x??null,y:game.player?.y??null,
+        camX:game.cam?.x??null,camY:game.cam?.y??null,
+        bulletX:bullet?.x??null,bulletY:bullet?.y??null};
+       return renderMod.render(game,width,height);
+      },g,w,h,alpha)}
+      finally{
+       profile.poseFrames.push({alpha,drawn,physical:original,
+        camera:originalCam,bullet:originalBullet,renderJsMs:performance.now()-at});
+       if(original&&player&&(player.x!==original[0]||player.y!==original[1]))
+        throw Error('pose presenter mutated live player physics');
+       if(originalCam&&camera&&(camera.x!==originalCam[0]||camera.y!==originalCam[1]))
+        throw Error('pose presenter mutated live camera physics');
+       if(originalBullet&&bullet&&(bullet.x!==originalBullet[0]||bullet.y!==originalBullet[1]))
+        throw Error('pose presenter mutated live projectile physics');
+      }
+     },
      maxSteps:window.__novaFixedMaxSteps,backlogExtraTicks:controlledExtra});
     window.__novaFixedPilot=pilot;
     // Reuse PR #888's exact-source active-only policy in the real browser.
@@ -231,7 +260,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     profile.lifecycle.push({event:'owner-start-returned',at:performance.now(),started:pilot.owner.started});
     return result;
    };
-  },{maxSteps,controlledGate,controlledExtra});
+  },{maxSteps,controlledGate,controlledExtra,poseEnabled});
   await deploy.click();
   try{
    await page.waitForFunction(()=>window.__novaFixedGame?.status==='playing'&&
@@ -463,7 +492,22 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     .reduce((sum,f)=>sum+f.rawGapMs,0);
    const backlogDroppedMs=frames.filter(f=>f.dropReason==='backlog')
     .reduce((sum,f)=>sum+f.droppedMs,0);
-   return {configuredMaxSteps:window.__novaFixedMaxSteps,
+   const poses=window.__novaFixedResearch.poseFrames;
+   const poseJs=poses.map(f=>f.renderJsMs);
+   const shiftedBulletFrames=poses.filter(f=>f.bullet&&f.drawn&&
+    (Math.abs(f.drawn.bulletX-f.bullet[0])>1e-7||
+     Math.abs(f.drawn.bulletY-f.bullet[1])>1e-7)).length;
+   return {pose:{enabled:window.__novaPoseEnabled,frames:poses.length,
+    interpolated:window.__novaFixedPresenter?.interpolated??0,
+    teleportSkips:window.__novaFixedPresenter?.teleportSkips??0,
+    shiftedBulletFrames,
+    alphaBelowQuarterFrames:poses.filter(f=>f.alpha<.25).length,
+    alphaSaturatedFrames:poses.filter(f=>f.alpha>=1-1e-7).length,
+    // Geometric pose phase only: NOT measured input-to-photon latency.
+    meanNominalPoseDelayMs:poses.length?poses.reduce((sum,f)=>
+     sum+(1-f.alpha)*1000/60,0)/poses.length:null,
+    renderJs:values(poseJs)},
+    configuredMaxSteps:window.__novaFixedMaxSteps,
     controlledGate:window.__novaControlledGate,
     initialFingerprint:window.__novaFixedResearch.initialFingerprint||null,
     maxSteps:p.owner.maxSteps,backlogExtraTicks:p.owner.backlogExtraTicks,
@@ -589,12 +633,38 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
   assert.deepEqual(expectedOverlays.filter(name=>!report.runtimeScriptNames.includes(name)),[],
    'every canonical materialized overlay must load (optional dynamic scripts are allowed)');
   assert.equal(report.researchFactoryPresent,true,'opt-in fixed60 research factory must be installed');
+  if(poseEnabled){
+   const poses=await page.evaluate(()=>({
+    samples:window.__novaFixedResearch.poseFrames,
+    interpolated:window.__novaFixedPresenter.interpolated,
+    teleportSkips:window.__novaFixedPresenter.teleportSkips,
+    frames:window.__novaFixedPresenter.frames
+   }));
+   assert.ok(poses.samples.length>2,'opt-in presenter must receive actual Game renders');
+   assert.equal(poses.frames,poses.samples.length,
+    'every research draw must pass through the real pose presenter');
+   assert.ok(poses.samples.every(f=>Number.isFinite(f.renderJsMs)&&
+    f.alpha>=0&&f.alpha<=1),'presenter must report bounded interpolation and JS cost');
+   assert.ok(poses.samples.some(f=>f.drawn&&f.physical&&f.camera),
+    'real Game render must sample player and camera poses');
+   assert.ok(poses.samples.some(f=>f.drawn&&f.bullet),
+    'real projectile must be visible to the pose presenter');
+   assert.ok(poses.interpolated>0,
+    'pose presenter must actually interpolate at least one moving entity');
+   console.log('NOVA_FIXED60_CHROMIUM_POSE '+JSON.stringify({
+    samples:poses.samples.length,interpolated:poses.interpolated,
+    teleportSkips:poses.teleportSkips,
+    renderJsP95:[...poses.samples.map(f=>f.renderJsMs)].sort((a,b)=>a-b)[
+     Math.ceil(.95*poses.samples.length)-1]
+   }));
+  }
   assert.deepEqual(errors,[],'browser errors');
   assert.deepEqual(consoleErrors,[],'browser console errors');
   const teardown=await page.evaluate(()=>{
    const g=window.__novaFixedGame,p=window.__novaFixedPilot;
    const Game=window.__novaMakeRequire('')('game/engine').Game;
    p.stop();
+   window.__novaFixedPresenter?.stop();
    const stopped={started:p.owner.started,captureActive:p.capture.active,
     raf:g.raf,inputRestored:g.input.canvas===g.canvas,
     startRestored:g.start===Game.prototype.start,

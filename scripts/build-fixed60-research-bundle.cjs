@@ -8,13 +8,14 @@ const MODULES=[
   'fixed-step-dom-input.cjs',
   'fixed-step-browser-events.cjs',
   'fixed-step-browser-capture.cjs',
-  'fixed-step-raf-owner.cjs'
+  'fixed-step-raf-owner.cjs',
+  'fixed-step-presentation.cjs'
 ];
 function buildBrowserBundle(read=name=>fs.readFileSync(path.join(ROOT,name),'utf8')){
   const entries=MODULES.map(name=>{
     const source=read(name);
     if(typeof source!=='string'||!source.trim())throw Error('empty fixed60 module: '+name);
-    // All imports must stay inside this explicitly audited four-module graph.
+    // All imports must stay inside this explicitly audited five-module graph.
     const imports=[...source.matchAll(/\brequire\s*\(\s*(['"])(.*?)\1\s*\)/g)];
     const calls=source.match(/\brequire\s*\(/g)||[];
     if(calls.length!==imports.length)
@@ -40,10 +41,12 @@ function buildBrowserBundle(read=name=>fs.readFileSync(path.join(ROOT,name),'utf
     '  return module.exports;',
     '}',
     "const api=load('fixed-step-raf-owner.cjs');",
+    "const pose=load('fixed-step-presentation.cjs');",
     "root.__novaFixed60Research=Object.freeze({",
     '  FixedStepRafOwner:api.FixedStepRafOwner,',
     '  createFixedStepBrowserPilot:api.createFixedStepBrowserPilot,',
-    '  STEP_MS:api.STEP_MS',
+    '  STEP_MS:api.STEP_MS,',
+    '  FixedStepPosePresentation:pose.FixedStepPosePresentation',
     '});',
     "})(typeof window!=='undefined'?window:globalThis);",
     ''

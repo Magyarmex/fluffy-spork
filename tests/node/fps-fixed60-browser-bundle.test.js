@@ -18,7 +18,16 @@ test('browser research bundle is deterministic and matches exact source graph',(
   'regenerate research bundle after any source module changes');
  assert.deepEqual(MODULES,[
   'fixed-step-dom-input.cjs','fixed-step-browser-events.cjs',
-  'fixed-step-browser-capture.cjs','fixed-step-raf-owner.cjs']);
+  'fixed-step-browser-capture.cjs','fixed-step-raf-owner.cjs',
+  'fixed-step-presentation.cjs']);
+});
+
+test('pose research artifact is absent from the actual shipping HTML',()=>{
+ const html=fs.readFileSync(path.resolve(__dirname,'../../index.html'),'utf8');
+ assert.doesNotMatch(html,/fixed60-research-browser\.js/,
+  'experimental scheduler/presenter must not be loaded by the playable game');
+ assert.doesNotMatch(html,/fixed-step-presentation\.cjs/,
+  'research-only pose presenter must never enter production HTML');
 });
 
 test('browser artifact loads without CommonJS or starting a game',()=>{
@@ -31,10 +40,38 @@ test('browser artifact loads without CommonJS or starting a game',()=>{
  assert.ok(Object.isFrozen(api));
  assert.equal(typeof api.FixedStepRafOwner,'function');
  assert.equal(typeof api.createFixedStepBrowserPilot,'function');
+ assert.equal(typeof api.FixedStepPosePresentation,'function');
  assert.equal(api.STEP_MS,1000/60);
  assert.equal(requests,0,'import must never start a scheduler');
  assert.equal(sandbox.__novaFixed60Research,undefined,
   'only the explicit browser namespace is installed');
+});
+
+test('bundled pose presenter preserves exact source draw and physics semantics',()=>{
+ const window={};
+ vm.runInNewContext(fs.readFileSync(artifact,'utf8'),{window},{timeout:1000});
+ const Browser=window.__novaFixed60Research.FixedStepPosePresentation;
+ const Source=require('../research/fixed-step-presentation.cjs').FixedStepPosePresentation;
+ function run(Presenter){
+  const bullet={x:0,y:0,vx:600,vy:0},tank={x:0,y:0};
+  const g={tanks:[tank],drones:[],shapes:[],bullets:[bullet],
+   cam:{x:0,y:0},update(){tank.x+=10;bullet.x+=10;this.cam.x+=5},
+   destroy(){}};
+  const originalUpdate=g.update,originalDestroy=g.destroy;
+  const p=new Presenter(g,{enabled:true});
+  try{
+   g.update();
+   let seen;
+   p.draw(game=>{seen={tank:game.tanks[0].x,bullet:game.bullets[0].x,
+    camera:game.cam.x}},g,320,700,.5);
+   assert.equal(tank.x,10);assert.equal(bullet.x,10);assert.equal(g.cam.x,5);
+   return {seen,interpolated:p.interpolated,skips:p.teleportSkips};
+  }finally{
+   p.stop();
+   assert.equal(g.update,originalUpdate);assert.equal(g.destroy,originalDestroy);
+  }
+ }
+ assert.deepEqual(JSON.parse(JSON.stringify(run(Browser))),run(Source));
 });
 
 test('browser owner executes exactly the same bounded steps as source owner',()=>{

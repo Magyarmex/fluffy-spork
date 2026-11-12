@@ -157,6 +157,10 @@ jobs:
           # trusted touch, real Game updates, and the same 30Hz gate policy.
           NOVA_FIXED60_MAX_STEPS=2 NOVA_FIXED60_CONTROLLED_GATE=1 NOVA_FIXED60_INITIAL_FINGERPRINT_FILE=/tmp/nova-fixed60-initial-world.txt NOVA_FIXED60_REPORT_FILE=/tmp/nova-fixed60-two.json node tests/browser/fixed60-real-game-owner-touch-research.cjs
           NOVA_FIXED60_MAX_STEPS=3 NOVA_FIXED60_CONTROLLED_GATE=1 NOVA_FIXED60_INITIAL_FINGERPRINT_FILE=/tmp/nova-fixed60-initial-world.txt NOVA_FIXED60_REPORT_FILE=/tmp/nova-fixed60-three.json node tests/browser/fixed60-real-game-owner-touch-research.cjs
+          # Exact-source pose presenter ON against the same seeded Chromium
+          # world and three-step RAF policy as the preceding OFF control.
+          NOVA_FIXED60_MAX_STEPS=3 NOVA_FIXED60_CONTROLLED_GATE=1 NOVA_FIXED60_POSE_PRESENTATION=1 NOVA_FIXED60_INITIAL_FINGERPRINT_FILE=/tmp/nova-fixed60-initial-world.txt NOVA_FIXED60_REPORT_FILE=/tmp/nova-fixed60-three-pose.json node tests/browser/fixed60-real-game-owner-touch-research.cjs
+          node tests/research/fixed60-pose-paired-report.cjs /tmp/nova-fixed60-three.json /tmp/nova-fixed60-three-pose.json
           node tests/research/fixed60-paired-report.cjs /tmp/nova-fixed60-two.json /tmp/nova-fixed60-three.json
           # Separate non-causal browser safety/performance witnesses for equal
           # six-tick backlog capacity. Four updates are research-only; never
