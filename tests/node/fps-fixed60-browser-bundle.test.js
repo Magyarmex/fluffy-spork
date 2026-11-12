@@ -22,6 +22,14 @@ test('browser research bundle is deterministic and matches exact source graph',(
   'fixed-step-presentation.cjs']);
 });
 
+test('pose research artifact is absent from the actual shipping HTML',()=>{
+ const html=fs.readFileSync(path.resolve(__dirname,'../../index.html'),'utf8');
+ assert.doesNotMatch(html,/fixed60-research-browser\\.js/,
+  'experimental scheduler/presenter must not be loaded by the playable game');
+ assert.doesNotMatch(html,/fixed-step-presentation\\.cjs/,
+  'research-only pose presenter must never enter production HTML');
+});
+
 test('browser artifact loads without CommonJS or starting a game',()=>{
  let requests=0;
  const window={requestAnimationFrame(){requests++}};
