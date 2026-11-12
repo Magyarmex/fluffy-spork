@@ -76,3 +76,29 @@ test('weak records discard stale ownership after dense population shrinks',()=>{
   assert.equal(p.activePresenter,false);
  }finally{p.stop();}
 });
+
+test('actual composed Game physical and RNG state match original presenter',()=>{
+ const {bootGame,withSeed,digest,physical}=require('../research/audio-rng-causal-pilot.cjs');
+ function arm(Class){return withSeed(1517800,draws=>{
+  const g=bootGame(),p=new Class(g,{enabled:true});
+  g.sfx.muted=true;g.sfx.startMusic=()=>{};
+  const render=g.__testWindow.__novaMakeRequire('')('game/render').render;
+  g.input.keyboard.right=true;
+  let changed=0;
+  try{
+   for(let i=0;i<90;i++){
+    g.update(1/60);
+    const x=g.player.x,y=g.player.y;
+    p.draw(game=>{
+     if(game.player.x!==x||game.player.y!==y)changed++;
+     render(game,game.w,game.h);
+    },g,g.w,g.h,.5);
+    assert.equal(g.player.x,x);assert.equal(g.player.y,y);
+   }
+   return {hash:digest(physical(g)),draws:draws(),changed};
+  }finally{p.stop();g.destroy();}
+ });}
+ const baseline=arm(FixedStepPosePresentation),candidate=arm(WeakEpochPosePresentation);
+ assert.deepEqual(candidate,baseline);
+ assert.ok(candidate.changed>0,'actual player must interpolate');
+});
