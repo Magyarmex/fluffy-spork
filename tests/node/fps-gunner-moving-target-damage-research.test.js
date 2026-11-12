@@ -20,7 +20,7 @@ function frames(mode){
  if(mode==='alternating40_120')return Array.from({length:180},()=>[1/40,1/120]).flat();
  throw Error('unknown presentation mode');
 }
-function trial(seed,cls,reload,mode,offset,amplitude,motionPeriod=1.6,motionPhase=0,drainSeconds=0,playerMoveY=0){
+function trial(seed,cls,reload,mode,offset,amplitude,motionPeriod=1.6,motionPhase=0,drainSeconds=0,playerMoveY=0,playerMotion='constant'){
  assert.ok(motionPeriod>0&&Number.isFinite(motionPhase),'valid independent target motion');
  return withSeed(seed,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
@@ -57,7 +57,10 @@ function trial(seed,cls,reload,mode,offset,amplitude,motionPeriod=1.6,motionPhas
   g.input.autofire=false;g.input.mouseActive=false;
   g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
   // Genuine Game movement owner integrates this constant analog input.
-  g.input.moveVec=()=>({x:0,y:playerMoveY});
+  // Reversal edges are at .4s multiples, shared boundaries of 30Hz, 60Hz
+  // and 40/120Hz presentation patterns. No hidden player-position edits.
+  g.input.moveVec=()=>({x:0,y:playerMotion==='reversal'?
+   playerMoveY*(Math.floor((now+EPS)/.4)%2===0?1:-1):playerMoveY});
   let volleys=0,hits=0,damage=0,firstBirths=[],firstHits=[];
   const originalFire=g.tryFire,originalDamage=g.damageTank;
   g.tryFire=function(t){
@@ -67,7 +70,8 @@ function trial(seed,cls,reload,mode,offset,amplitude,motionPeriod=1.6,motionPhas
     if(firstBirths.length<5){
      const b=this.bullets[this.bullets.length-1];
      firstBirths.push({time:+this.time.toFixed(6),targetY:+target.y.toFixed(4),
-      x:+b.x.toFixed(4),y:+b.y.toFixed(4)});
+      x:+b.x.toFixed(4),y:+b.y.toFixed(4),
+      vx:+b.vx.toFixed(4),vy:+b.vy.toFixed(4)});
     }
    }
    return result;
@@ -83,6 +87,7 @@ function trial(seed,cls,reload,mode,offset,amplitude,motionPeriod=1.6,motionPhas
    return result;
   };
   let now=0,updates=0,onTime=0,edges=0,travel=0,peakOffset=0,previousY=0;
+  let playerTravel=0,playerMovingTicks=0,previousPlayerY=p.y;
   let targetMoveSteps=0,expectedNextY=0;
   const droneStep=g.updateDrones;
   g.updateDrones=function(dt){
@@ -119,6 +124,9 @@ function trial(seed,cls,reload,mode,offset,amplitude,motionPeriod=1.6,motionPhas
      g.input.firing=firing;
      if(firing)onTime+=dt;
      g.update(dt);updates++;
+     playerTravel+=Math.abs(p.y-previousPlayerY);
+     previousPlayerY=p.y;
+     if(p.moving)playerMovingTicks++;
      // The real moveTank/Battlefield owner must arrive at the same scripted
      // endpoint; no after-collision teleport or silent geometry correction.
      const y=expectedNextY;
@@ -163,7 +171,8 @@ function trial(seed,cls,reload,mode,offset,amplitude,motionPeriod=1.6,motionPhas
    }
    return {seed,cls,reload,mode,offset,amplitude,motionPeriod,motionPhase,updates,edges,volleys,hits,
     targetMoveSteps,
-    ...(playerMoveY?{playerMoveY,playerEndY:+p.y.toFixed(5)}:{}),
+    ...(playerMoveY?{playerMoveY,playerMotion,playerEndY:+p.y.toFixed(5),
+     playerTravel:+playerTravel.toFixed(5),playerMovingTicks}:{}),
     aimAssistVetoes,
     travel:+travel.toFixed(4),peakOffset:+peakOffset.toFixed(4),
     damage:+damage.toFixed(4),
@@ -323,4 +332,37 @@ test('Gunner moving-player chronology changes real shot origins without syntheti
  }
  assert.equal(rows.length,12);
  console.log('GUNNER_MOVING_PLAYER_REAL_DAMAGE '+JSON.stringify(rows));
+});
+
+/* #799: the low-speed drift arm does not set pl.moving. Exercise genuine
+ * high-speed combat movement with alternating analog stick commitment,
+ * keeping the hull near the same corridor instead of driving away forever.
+ * These .4s reversals are shared frame boundaries for all tested schedules.
+ * Real Game.moveTank, shot origins, inherited velocity and HP remain owners. */
+test('Gunner high-speed reversal exercises moving-state and real shot geometry',()=>{
+ const rows=[];
+ for(const [cls,reload] of [['minigun',1],['needlestorm',3]]){
+  for(const mode of ['native60','cluster30','alternating40_120']){
+   const args=[1517802,cls,reload,mode,.007,26,1.37,.3725,0];
+   const still=trial(...args,0);
+   const strafe=trial(...args,.25,'reversal');
+   const repeat=trial(...args,.25,'reversal');
+   assert.deepEqual(strafe,repeat,'reversal motion must replay deterministically');
+   assert.equal(strafe.onTime,still.onTime,'same firing input history');
+   assert.equal(strafe.updates,still.updates,'same simulation schedule');
+   assert.ok(strafe.playerTravel>70,'player must actually traverse meaningful distance');
+   assert.ok(strafe.playerMovingTicks>0,'shipping moving-state threshold must be crossed');
+   assert.ok(Math.abs(strafe.playerEndY)<35,'reversals must remain near combat corridor');
+   assert.ok(strafe.firstBirths.some((b,i)=>
+    Math.abs(b.y-still.firstBirths[i].y)>.1),
+    'real movement must change muzzle birth geometry');
+   rows.push({cls,mode,playerTravel:strafe.playerTravel,
+    playerEndY:strafe.playerEndY,movingTicks:strafe.playerMovingTicks,
+    stationaryDamage:still.damage,strafeDamage:strafe.damage,
+    stationaryVolleys:still.volleys,strafeVolleys:strafe.volleys,
+    firstBirths:strafe.firstBirths});
+  }
+ }
+ assert.equal(rows.length,6);
+ console.log('GUNNER_HIGH_SPEED_REVERSAL_DAMAGE '+JSON.stringify(rows));
 });
