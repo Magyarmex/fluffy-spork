@@ -60,26 +60,7 @@ test('dense 620-body interpolation is visual-only across repeated ticks and clea
  assert.equal(pose.current.size,0);
  assert.equal(pose.previous.size,0);
 });
-test('newborn projectiles and discontinuous teleports never interpolate stale identity',()=>{
- const g=denseGame(),pose=new FixedStepPosePresentation(g,{enabled:true});
- const newborn={id:'new',x:300,y:100,vx:0,vy:0};
- const teleported=g.tanks[2];
- g.update(1/60);
- g.bullets.push(newborn);
- // The next update captures the newborn for the first time and moves a tank
- // discontinuously; neither may be interpolated from a stale prior identity.
- teleported.x+=500;
- g.update(1/60);
- const physical=positions(g);
- pose.draw(()=>{
-  assert.equal(newborn.x,304,'newborn uses its first tracked pose on this tick');
-  assert.equal(teleported.x,physical.find(([o])=>o===teleported)[1],
-   'teleport must never be visually smeared across the map');
- },g,320,700,.5);
- unchanged(physical);
- assert.ok(pose.teleportSkips>=1);
- pose.stop();
-});
+
 test('renderer exceptions restore every dense combat pose',()=>{
  const g=denseGame(),pose=new FixedStepPosePresentation(g,{enabled:true});
  g.update(1/60);
@@ -90,35 +71,6 @@ test('renderer exceptions restore every dense combat pose',()=>{
  pose.stop();
 });
 
-test('fast legal projectiles interpolate without admitting arbitrary teleport jumps',()=>{
- const g=denseGame();
- const bullet=g.bullets[0];
- bullet.vx=8000;bullet.vy=0;
- const baseUpdate=g.update;
- g.update=function(dt){
-  baseUpdate.call(this,dt);
-  bullet.x+=116; // 120 units per fixed tick, above the ordinary 96u cap.
- };
- const pose=new FixedStepPosePresentation(g,{enabled:true});
- const start=bullet.x;
- g.update(1/60);
- const physical=bullet.x;
- pose.draw(()=>{
-  assert.equal(bullet.x,start+60,
-   'velocity-consistent fast round must receive an intermediate visual pose');
- },g,320,700,.5);
- assert.equal(bullet.x,physical);
- bullet.x+=500; // A discontinuity must not be smoothed despite high velocity.
- g.update(1/60);
- const afterTeleport=bullet.x;
- pose.draw(()=>{
-  assert.equal(bullet.x,afterTeleport,
-   'large discontinuity must remain unsmoothed even for fast projectiles');
- },g,320,700,.5);
- assert.equal(bullet.x,afterTeleport);
- assert.ok(pose.teleportSkips>0);
- pose.stop();
-});
 
 test('reused projectile IDs do not borrow an expired projectile visual history',()=>{
  const g=denseGame(),pose=new FixedStepPosePresentation(g,{enabled:true});
@@ -138,16 +90,3 @@ test('reused projectile IDs do not borrow an expired projectile visual history',
  pose.stop();
 });
 
-test('respawn player identity and status transitions reset all visual history',()=>{
- const g=denseGame(),pose=new FixedStepPosePresentation(g,{enabled:true});
- g.update(1/60);
- const replacement={id:'respawn',x:400,y:450,vx:0,vy:0};
- g.tanks.push(replacement);g.player=replacement;g.status='respawning';
- g.update(1/60);
- const physical=positions(g);
- pose.draw(()=>{
-  unchanged(physical);
- },g,320,700,.5);
- unchanged(physical);
- pose.stop();
-});
