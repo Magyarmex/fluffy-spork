@@ -427,7 +427,8 @@ test('jittered three-step fixed60 preserves touch-driven Gunner hits and release
  const rows=[];
  for(const [cls,reload] of [['minigun',1],['needlestorm',3]])
   for(const seed of [1517800,1517802])
-   for(const offset of [7,12]){
+   // Cross a 60Hz input-sampling boundary: 7ms is in tick 1, 19ms in tick 2.
+   for(const offset of [7,19]){
     const baseline=trial(seed,cls,reload,'uniform60',offset,360,3,3);
     const jitter=trial(seed,cls,reload,'jitter38_27_35',offset,360,3,3);
     assert.equal(jitter.droppedMs,0,'ordinary jitter cannot discard active time');
