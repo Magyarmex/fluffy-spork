@@ -82,16 +82,18 @@ function trial(seed,cls,reload,mode,offset,amplitude){
   };
   let now=0,updates=0,onTime=0,edges=0,travel=0,peakOffset=0,previousY=0;
   let targetMoveSteps=0,expectedNextY=0;
-  const bulletStep=g.updateBullets;
-  g.updateBullets=function(dt){
+  const droneStep=g.updateDrones;
+  g.updateDrones=function(dt){
+   const result=droneStep.apply(this,arguments);
    // Integrate the scripted, bounded target displacement through the REAL
-   // Battlefield moveTank owner immediately before physical bullet collision.
-   // This preserves swept-body metadata instead of teleporting after combat.
+   // Battlefield moveTank owner BEFORE the Game rebuilds its spatial hash.
+   // Moving only inside updateBullets would leave the hash at the old Y and
+   // introduce false misses unrelated to firing chronology.
    const dy=expectedNextY-target.y;
    target.vx=0;target.vy=dy/dt;
    this.moveTank(target,0,dy/dt,dt);
    targetMoveSteps++;
-   return bulletStep.apply(this,arguments);
+   return result;
   };
   const initialTime=g.time;
   try{
