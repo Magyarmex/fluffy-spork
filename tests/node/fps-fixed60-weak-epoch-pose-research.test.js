@@ -102,3 +102,22 @@ test('actual composed Game physical and RNG state match original presenter',()=>
  assert.deepEqual(candidate,baseline);
  assert.ok(candidate.changed>0,'actual player must interpolate');
 });
+
+test('weak epoch respects legal fast bullets, skips impossible teleport, and pauses cleanly',()=>{
+ const bullet={x:0,y:0,vx:7200,vy:0};
+ const g={tanks:[],drones:[],shapes:[],bullets:[bullet],paused:false,
+  update(){},destroy(){}};
+ const p=new WeakEpochPosePresentation(g,{enabled:true});
+ try{
+  bullet.x=120;g.update();
+  p.draw(game=>assert.equal(game.bullets[0].x,60),g,1,1,.5);
+  assert.equal(bullet.x,120);
+  bullet.x=620;g.update();
+  p.draw(game=>assert.equal(game.bullets[0].x,620),g,1,1,.5);
+  assert.equal(p.teleportSkips,1);
+  g.paused=true;
+  p.draw(game=>assert.equal(game.bullets[0].x,620),g,1,1,.5);
+  g.paused=false;p.enabled=false;
+  p.draw(game=>assert.equal(game.bullets[0].x,620),g,1,1,.5);
+ }finally{p.stop();}
+});
