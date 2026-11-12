@@ -187,18 +187,14 @@ test('research: one ordinary movement tick can change narrow-cover Sniper first 
  assert.ok(displacement>1.5&&displacement<3,
   'real 60Hz movement owner should advance a steady Railgun only a few units');
  const shotOriginShift=moving.traces[0].y-velocityOnly.traces[0].y;
- // Characterize current delayed-position firing without requiring it forever.
- // A future release-origin fix should pass with the covered/zero-HP branch.
- if(Math.abs(shotOriginShift-displacement)<.25){
-  assert.equal(moving.traces[0].blocked,false,
-   'current moving-origin rail must clear the deliberately selected wall edge');
-  assert.ok(moving.targetDamage>0,'the physically clear rail must damage the target');
+ // Do not freeze endpoint-only chronology: a future timestamped sub-tick
+ // release could correctly fire from an INTERMEDIATE position in this tick.
+ assert.ok(shotOriginShift>=-.25&&shotOriginShift<=displacement+.25,
+  'shot origin must remain within the physically traversed release-to-tick segment');
+ if(moving.traces[0].blocked){
+  assert.equal(moving.targetDamage,0,'physically covered rail cannot damage target');
  }else{
-  assert.ok(Math.abs(shotOriginShift)<.25,
-   'the shot must originate at either the captured release position or moved hull');
-  assert.equal(moving.traces[0].blocked,true,
-   'release-origin rail must remain covered even when the hull moves afterward');
-  assert.equal(moving.targetDamage,0,'covered release-origin rail must not damage target');
+  assert.ok(moving.targetDamage>0,'physically clear rail must damage the target');
  }
  console.log('SNIPER_ONE_TICK_MOVEMENT_COVER '+JSON.stringify({velocityOnly,moving,displacement,shotOriginShift,
   limitation:'constructed 12u-high permanent wall and pre-existing steady velocity; real movement owner, but not a natural match or browser-trusted event'}));
