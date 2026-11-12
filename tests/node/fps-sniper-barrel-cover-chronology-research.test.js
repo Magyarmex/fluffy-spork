@@ -8,7 +8,7 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 const {DirectShotIntent}=require('../research/direct-shot-intent.cjs');
 
-function scenario(cls,lateral,wallHeight=80,targeted=false){
+function scenario(cls,lateral,wallHeight=80,targeted=false,naturalMove=false,freezeMove=false){
  return withSeed(1517800,()=>{
   const g=bootGame(),i=g.input;
   g.sfx.muted=true;i.autofire=false;
@@ -54,11 +54,28 @@ function scenario(cls,lateral,wallHeight=80,targeted=false){
    __novaOriginalAt:at,__novaTimestampTrusted:true,
    __novaPhysicalTimestampExact:true,target:{closest:()=>null}});
   try{
+   // Natural-movement arm starts at its actual physical release position;
+   // unlike the legacy constructed-shift arms, do not teleport after up.
+   if(naturalMove){
+    g.player.y=lateral;
+    g.player.vy=g.tankSpeed(g.player);
+    i.move.active=true;i.move.dx=0;i.move.dy=1;
+   }
    i.pd(ev('pointerdown',.140,1,600));
    i.pm(ev('pointermove',.141,1,640));
    i.pu(ev('pointerup',.170,0,640));
    assert.ok(owner.pending,'the physical 30ms release is retained');
-   g.player.y+=lateral;
+   if(!naturalMove)g.player.y+=lateral;
+   if(naturalMove){
+    // Model an already-moving tank, not a teleported hull: the actual
+    // Game.update must advance it before consuming the physical release.
+    if(freezeMove){
+     // Research-only counterfactual: retain the exact inherited projectile
+     // velocity but prevent hull translation on this one update.
+     const move=g.moveTank;
+     g.moveTank=function(t){if(t===g.player)return;return move.apply(this,arguments);};
+    }
+   }
    g.update(1/60);
    const rails=g.bullets.filter(b=>b.ownerId===g.player.id&&b.beam);
    assert.equal(rails.length,cls==='prism'?2:1);
@@ -76,7 +93,7 @@ function scenario(cls,lateral,wallHeight=80,targeted=false){
    g.updateBullets(.1);
    g.updateBullets(.1);
    const surviving=projectiles.map(b=>!b.dead&&g.bullets.includes(b));
-   return {traces,surviving,targetDamage:victim?Math.max(0,victimHp-victim.hp):null};
+   return {traces,surviving,playerY:g.player.y,targetDamage:victim?Math.max(0,victimHp-victim.hp):null};
   }finally{owner.detach();g.destroy();}
  });
 }
@@ -147,4 +164,38 @@ test('research: narrow-cover 20u Sniper displacement changes actual hostile HP c
  }
  console.log('SNIPER_SMALL_COVER_HP_RESEARCH '+JSON.stringify({original,later,
   limitation:'stationary existing hostile, constructed 20u hull shift; no natural movement, browser input or player survival claim'}));
+});
+
+// A genuinely moving hull advances inside Game.update BEFORE the quick-shot
+// intent is consumed. Unlike the constructed 20u shift above, this exercises
+// a single 60Hz step with the real tankSpeed/moveTank owner and a narrow wall.
+// Moving hull velocity also contributes 22% to projectile velocity in tryFire;
+// this is a physical movement+trajectory test, NOT an isolated origin effect.
+// It remains research-only: no browser event delivery or natural match rate.
+test('research: one ordinary movement tick can change narrow-cover Sniper first contact',()=>{
+ const moving=scenario('railgun',8,12,true,true);
+ const velocityOnly=scenario('railgun',8,12,true,true,true);
+ const displacement=moving.playerY-velocityOnly.playerY;
+ assert.ok(Math.abs(velocityOnly.playerY-8)<1e-6,
+  'the velocity-only counterfactual must retain the physical release hull position');
+ assert.ok(Math.abs(velocityOnly.traces[0].dy-moving.traces[0].dy)<1e-6,
+  'velocity-only and real-movement shots must inherit identical projectile bearing');
+ assert.equal(velocityOnly.traces[0].blocked,true,
+  'inherited hull velocity alone must not clear the wall at the original origin');
+ assert.equal(velocityOnly.targetDamage,0,
+  'inherited velocity alone must not damage the protected target');
+ assert.ok(displacement>1.5&&displacement<3,
+  'real 60Hz movement owner should advance a steady Railgun only a few units');
+ const shotOriginShift=moving.traces[0].y-velocityOnly.traces[0].y;
+ // Do not freeze endpoint-only chronology: a future timestamped sub-tick
+ // release could correctly fire from an INTERMEDIATE position in this tick.
+ assert.ok(shotOriginShift>=-.25&&shotOriginShift<=displacement+.25,
+  'shot origin must remain within the physically traversed release-to-tick segment');
+ if(moving.traces[0].blocked){
+  assert.equal(moving.targetDamage,0,'physically covered rail cannot damage target');
+ }else{
+  assert.ok(moving.targetDamage>0,'physically clear rail must damage the target');
+ }
+ console.log('SNIPER_ONE_TICK_MOVEMENT_COVER '+JSON.stringify({velocityOnly,moving,displacement,shotOriginShift,
+  limitation:'constructed 12u-high permanent wall and pre-existing steady velocity; real movement owner, but not a natural match or browser-trusted event'}));
 });
