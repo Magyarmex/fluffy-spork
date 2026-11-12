@@ -33,6 +33,14 @@ function trial(seed,cls,reload,mode,offset,amplitude){
    x:200,y:0,vx:0,vy:0,hp:1000000,maxHp:1000000,
    gene:null,perk:null,spawnShieldT:0,shieldT:0,bulwarkT:0,tauntT:0,cloakT:0});
   g.tanks=[p,target];g.tankById=new Map([[p.id,p],[target.id,target]]);
+  // Keep the exact manual eastward stick bearing in both counterfactual arms.
+  // Shipping nearest-target assist otherwise tracks the oscillating Scout
+  // (within its 0.22-rad cone), hiding the intended movement/miss effect.
+  const nearest=g.nearestTank;
+  g.nearestTank=function(x,y,radius,except){
+   if(except===p.id&&radius===480&&x===p.x&&y===p.y)return null;
+   return nearest.apply(this,arguments);
+  };
   g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];g.orbs=[];
   g.__novaTerrain=[];g.__novaBattlefieldIndex=null;
   if(g.shapeById)g.shapeById.clear();
