@@ -14,7 +14,9 @@ test('Controller Live Vector lessons participate in real Fieldcraft controls con
  const listeners=[];
  const document={
   readyState:'loading',
-  addEventListener:(type,fn)=>listeners.push({type,fn})
+  addEventListener:(type,fn)=>listeners.push({type,fn}),
+  querySelector:()=>null,
+  querySelectorAll:()=>[]
  };
  const window={__novaModules:{}};
  const context={window,document,console:{info(){},warn(){},error(){}},
