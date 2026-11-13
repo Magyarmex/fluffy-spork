@@ -19,7 +19,9 @@ function circleContact(px,py,vx,vy,cx,cy,r,until){
  if(d<=tolerance)return undefined;
  const t=c/(-b+Math.sqrt(d));
  if(!Number.isFinite(t))return undefined;
- return t>=0&&t<=until?t:null;
+ if(t<0||t>until+EPS)return null;
+ if(t>=until-EPS)return undefined;
+ return t;
 }
 function earliestOrdinaryEvent(shot,frame,world){
  if(!shot||!world||world.complete!==true||!Number.isSafeInteger(world.epoch)||!Array.isArray(world.bodies)||
