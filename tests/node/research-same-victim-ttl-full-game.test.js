@@ -290,7 +290,7 @@ for(const hz of [60,120])
    bullets[1].ttl=.42;bullets[1].dmg=30;
    bullets.push({
     kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
-    vx:0,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
     shell:false,beam:false,color:'#fff'
    });
   },Math.ceil(.42*hz)+3);
