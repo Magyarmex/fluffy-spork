@@ -38,6 +38,22 @@ function coreMethod(instrument = false) {
     {dist2:(ax,ay,bx,by)=>(ax-bx)**2+(ay-by)**2},
     {CLASSES:{scout:{size:15}}},2250);
 }
+function coreSplashMethod() {
+  const marker='    splashAt(x, y, radius, frac, ownerId, knock, color, dmg) {';
+  const at=html.indexOf(marker);
+  assert.ok(at>=0,'materialized shipping splash owner missing');
+  let pos=at+marker.length, depth=1;
+  while(depth && pos<html.length) {
+    if(html[pos]==='{') depth++;
+    else if(html[pos]==='}') depth--;
+    pos++;
+  }
+  assert.equal(depth,0);
+  const body=html.slice(at+marker.length,pos-1);
+  return new Function('types_1',
+    'return function(x,y,radius,frac,ownerId,knock,color,dmg){'+body+'}')(
+    {dist2:(ax,ay,bx,by)=>(ax-bx)**2+(ay-by)**2});
+}
 function boot(instrument = false, kind = 'tank', pen = 0, instrumentBattlefield = false) {
   class Game {
     constructor() {
@@ -221,3 +237,32 @@ for(const kind of ['tank','shape','drone']) {
     assert.equal(events[0].attribution,'direct');
   });
 }
+
+test('actual materialized splash directly damages shapes outside callback ledger',()=>{
+  const {g,target}=boot(false,'shape',1);
+  g.sfx={explode(){}};
+  g.splashAt=coreSplashMethod();
+  target.flash=0;
+  const ledger=createProjectileCallbackLedger(g); ledger.install();
+  g.splashAt(0,0,50,.5,1,0,'#fff',20);
+  assert.equal(target.hp,94);
+  const snap=ledger.snapshot();
+  assert.equal(snap.events.length,0,
+    'core splash shape HP writes do not invoke damageShape');
+  assert.equal(Object.hasOwn(snap,'complete'),false,
+    'zero callbacks must never claim whole-game damage completeness');
+});
+
+test('actual materialized splash tank callback remains unknown without shot scope',()=>{
+  const {g,target}=boot(false,'tank',1);
+  g.sfx={explode(){}};
+  g.splashAt=coreSplashMethod();
+  const ledger=createProjectileCallbackLedger(g); ledger.install();
+  g.splashAt(0,0,50,.5,1,0,'#fff',20);
+  assert.equal(target.hp,94);
+  const snap=ledger.snapshot();
+  assert.equal(snap.events.length,1);
+  assert.equal(snap.events[0].kind,'damageTank');
+  assert.equal(snap.events[0].shotId,null);
+  assert.equal(snap.events[0].attribution,'unknown');
+});
