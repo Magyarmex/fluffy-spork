@@ -92,3 +92,7 @@ test('browser-only patch preserves tank/drone/shape damage across 30–240Hz',()
       kind==='shape'?'damageShape':kind==='tank'?'damageTank':'damageDrone');
   }
 });
+
+test('research source instrumentation refuses a second patch',()=>{
+  assert.throws(()=>patchMaterializedCore(patchMaterializedCore(html)),/already installed/);
+});
