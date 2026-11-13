@@ -119,3 +119,13 @@ test('raw pen-one prevalence remains visible when strict dead witness is missing
  assert.equal(a.penOneMissingDeadInputs,1);
  assert.equal(a.penOneShotInputs,0,'unknown death state cannot be certified');
 });
+
+test('pen-one audit is injected only in research and survives natural-match serialization',()=>{
+ const fs=require('node:fs'),path=require('node:path');
+ const root=path.resolve(__dirname,'../..');
+ const natural=fs.readFileSync(path.join(root,'tests/browser/frontlines-natural-match-ab.cjs'),'utf8');
+ const shipping=fs.readFileSync(path.join(root,'index.html'),'utf8');
+ assert.match(natural,/g\.__novaProjectileDensityAudit=density\.install\(g,density\.create\(\)\)/);
+ assert.match(natural,/projectileDensityAudit:g\.__novaProjectileDensityAudit/);
+ assert.doesNotMatch(shipping,/projectile-density-audit\.js/);
+});
