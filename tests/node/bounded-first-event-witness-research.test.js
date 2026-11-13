@@ -40,3 +40,22 @@ test('seeded independent closest-approach differential',()=>{
   assert.equal(earliest(s,1/30,w).kind==='body',dist<rad,'world '+i);
  }
 });
+
+test('remote-motion clearance never misses bounded sample trajectories',()=>{
+ let seed=0x20261113;const rnd=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ for(let i=0;i<30000;i++){
+  const s=shot();s.vx=(rnd()-.5)*18000;s.vy=(rnd()-.5)*18000;
+  s.ttl=.002+rnd()*.025;
+  const w=world(),cx=(rnd()-.5)*500,cy=(rnd()-.5)*500;
+  const maxTravel=rnd()*100,r=2+rnd()*30;
+  w.bodies.push({id:3,startX:cx,startY:cy,r,maxTravel});
+  const event=earliest(s,1/30,w);
+  if(event.kind==='abstain')continue;
+  const limit=Math.min(s.ttl,1/30);
+  for(let j=0;j<=12;j++){
+   const t=limit*j/12,x=s.x+s.vx*t,y=s.y+s.vy*t;
+   assert.ok(Math.hypot(x-cx,y-cy)>r+s.r+maxTravel,
+     'unsafe moving-body clearance world '+i+' sample '+j);
+  }
+ }
+});
