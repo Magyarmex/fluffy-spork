@@ -106,3 +106,14 @@ test('pen=1 census never claims a certified hit from a necessary shot-local inpu
  assert.equal(s.penOneExpiring,0);
  assert.equal(Object.hasOwn(s,'certifiedHit'),false);
 });
+
+test('raw pen-one prevalence remains visible when strict dead witness is missing',()=>{
+ const g={bullets:[{...shot(1),kind:'bullet',ownerId:2,dead:undefined}],
+  __novaShapeSweepActive:true,__novaFrameStartBulletEpoch:1,
+  __novaShapeSweepEpoch:1,__novaFrameStartBulletIdCeiling:2};
+ const a=census.create(),sample=census.before(g,.01);
+ census.after(a,sample,g);
+ assert.equal(a.penOneRawInputs,1);
+ assert.equal(a.penOneMissingDeadInputs,1);
+ assert.equal(a.penOneShotInputs,0,'unknown death state cannot be certified');
+});
