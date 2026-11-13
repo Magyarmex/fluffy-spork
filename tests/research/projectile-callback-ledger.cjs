@@ -123,4 +123,7 @@ function createProjectileCallbackLedger(game, options = {}) {
   }
   return Object.freeze({install, uninstall, withProjectile, nextFrame, snapshot});
 }
-module.exports = {createProjectileCallbackLedger};
+if (typeof module !== 'undefined' && module.exports)
+  module.exports = {createProjectileCallbackLedger};
+if (typeof window !== 'undefined')
+  window.__novaResearchProjectileCallbackLedger = {createProjectileCallbackLedger};
