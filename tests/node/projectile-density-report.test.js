@@ -64,6 +64,9 @@ test('pen-one matrix preserves unknown historical fields and rejects partial dat
  d.penOneExpiringInputs=3;
  assert.throws(()=>check(d,'invalid'),/contradictory pen-one/);
  d.penOneExpiringInputs=1;
+ d.penOneRawInputs=13;
+ assert.throws(()=>check(d,'impossible'),/contradictory pen-one/);
+ d.penOneRawInputs=3;
  delete d.penOneUnknownKindInputs;
  assert.throws(()=>check(d,'partial'),/partial pen-one/);
 });
