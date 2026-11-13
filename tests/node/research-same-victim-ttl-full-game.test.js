@@ -643,3 +643,33 @@ for(const hz of [60,120])
   assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
    'witnessed tank displacement must veto zero-velocity clearance');
  });
+
+/* A shape can have zero terminal velocity after its neutral-instinct
+ * movement. The frame sweep origin must veto a speculative remote-shot
+ * exclusion even when ordinary velocity fields are both zero. */
+for(const hz of [60,120])
+ test('RESEARCH three-shot abstains on zero-velocity swept shape '+hz+'Hz',()=>{
+  const result=trial(hz,false,true,null,40,(g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   bullets.push({
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   });
+   const shape={kind:'shape',id:1300,x:1700,y:1700,r:12,
+    hp:100,maxHp:100,alive:true,dead:false,vx:0,vy:0};
+   g.shapes.push(shape);
+   const priorUpdate=g.updateBullets;
+   g.updateBullets=function(dt){
+    shape.__novaShapeSweepEpoch=this.__novaShapeSweepEpoch;
+    shape.__novaShapeSweepPrevX=1600;
+    shape.__novaShapeSweepPrevY=1700;
+    return priorUpdate.call(this,dt);
+   };
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
+   'witnessed shape displacement must veto zero-velocity clearance');
+ });
