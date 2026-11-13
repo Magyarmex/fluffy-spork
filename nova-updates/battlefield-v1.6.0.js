@@ -1996,6 +1996,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    if(pair.length!==2)return false;
    a=pair[0];b=pair[1];
    remote=bullets.filter(function(x){return x!==a&&x!==b;})[0];
+   /* A third projectile between the pair can run between their damage
+    * callbacks in the reverse-iteration core. A callback may create a new
+    * body or change cover, so spatial separation at frame start alone is
+    * not proof that swapping the pair leaves that middle shot untouched. */
+   if(bullets[1]===remote)return false;
    if(!remote||remote.dead||remote.pen!==0||
       !certifiedTTLFrameStart(g,remote)||
       remote.shell||remote.beam||remote.splash||remote.__v17Cannon||
