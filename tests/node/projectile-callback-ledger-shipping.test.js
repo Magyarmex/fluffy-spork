@@ -23,16 +23,22 @@ function coreMethod(instrument = false) {
   if (instrument) {
     // Research-only source instrumentation of the *extracted shipping core*.
     // This does not modify production and does not instrument Battlefield TTL.
-    const needle='this.damageTank(e, b.dmg, b.ownerId, Math.cos(ang) * (b.knock || 0) * 0.006, Math.sin(ang) * (b.knock || 0) * 0.006);';
-    assert.ok(body.includes(needle),'shipping direct-tank callback changed');
-    body=body.replace(needle,'this.__novaShotLedger.withProjectile(b, () => '+needle.slice(0,-1)+');');
+    const needles=[
+      'this.damageTank(e, b.dmg, b.ownerId, Math.cos(ang) * (b.knock || 0) * 0.006, Math.sin(ang) * (b.knock || 0) * 0.006);',
+      'this.damageShape(e, b.dmg, b.vx, b.vy);',
+      'this.damageDrone(e, b.dmg, b.ownerId);'
+    ];
+    for(const needle of needles) {
+      assert.ok(body.includes(needle),'shipping direct callback changed: '+needle);
+      body=body.replace(needle,'this.__novaShotLedger.withProjectile(b, () => '+needle.slice(0,-1)+');');
+    }
   }
   return new Function('types_1','classes_1','M',
     'return function(dt){'+body+'}')(
     {dist2:(ax,ay,bx,by)=>(ax-bx)**2+(ay-by)**2},
     {CLASSES:{scout:{size:15}}},2250);
 }
-function boot(instrument = false) {
+function boot(instrument = false, kind = 'tank') {
   class Game {
     constructor() {
       this.bullets=[];this.burstOrigins=[];this.time=1;this.__novaTerrain=[];
@@ -72,10 +78,12 @@ function boot(instrument = false) {
     ? {CLASSES:{scout:{size:15}},lineageForClass:()=>null}
     : {ARENA_HALF:2250});
   const g=new m.exports.Game();
-  const target={id:2,kind:'tank',cls:'scout',x:40,y:0,hp:100,alive:true};
+  const target={id:2,kind,cls:'scout',x:40,y:0,hp:100,alive:true,r:15,ownerId:2};
   g.tanks=[target];
   g.hash.query=(_x,_y,_r,out)=>{out.length=0;out.push(target);};
   g.damageTank=(t,d)=>{t.hp-=d;};
+  g.damageShape=(t,d)=>{t.hp-=d;};
+  g.damageDrone=(t,d)=>{t.hp-=d;};
   g.bullets=[{id:101,kind:'bullet',ownerId:1,x:0,y:0,vx:6000,vy:0,
     r:3,dmg:20,pen:0,ttl:.005,hits:0,dead:false,shell:false,beam:false}];
   return {g,target};
@@ -122,3 +130,20 @@ test('core-only instrumentation must not falsely attribute Battlefield TTL recov
   assert.equal(events[0].shotId,null);
   assert.equal(events[0].attribution,'unknown');
 });
+
+for(const kind of ['shape','drone']) {
+  test('research-instrumented shipping core labels '+kind+' projectile contact',()=>{
+    const baseline=boot(false,kind), observed=boot(true,kind);
+    const ledger=createProjectileCallbackLedger(observed.g);
+    observed.g.__novaShotLedger=ledger; ledger.install();
+    baseline.g.updateBullets(1/240);
+    observed.g.updateBullets(1/240);
+    assert.equal(observed.target.hp,baseline.target.hp);
+    assert.equal(observed.target.hp,80);
+    const events=ledger.snapshot().events;
+    assert.equal(events.length,1);
+    assert.equal(events[0].kind,kind==='shape'?'damageShape':'damageDrone');
+    assert.equal(events[0].shotId,101);
+    assert.equal(events[0].attribution,'direct');
+  });
+}
