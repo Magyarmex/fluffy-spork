@@ -356,13 +356,16 @@ test('unused explicit scopes are measured without manufacturing missed-hit claim
   const hp={id:1,hp:20};
   assert.equal(l.withProjectile({id:5},()=>{hp.hp-=3;return hp.hp;}),17);
   assert.equal(l.snapshot().unusedScopes,1);
+  assert.equal(l.snapshot().scopedCalls,1);
   assert.equal(l.snapshot().events.length,0);
   assert.equal(l.snapshot().bounded,true);
   l.withProjectile({id:6},()=>g.damageTank(hp,2));
   assert.equal(l.snapshot().unusedScopes,1);
+  assert.equal(l.snapshot().scopedCalls,2);
   assert.equal(l.snapshot().events[0].shotId,6);
   l.nextFrame();
   assert.equal(l.snapshot().unusedScopes,0);
+  assert.equal(l.snapshot().scopedCalls,0);
   assert.equal(l.snapshot().events.length,0);
 });
 
