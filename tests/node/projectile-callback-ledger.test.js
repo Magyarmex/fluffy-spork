@@ -378,3 +378,19 @@ test('scope exhaustion is tracked even when the callback throws or observation o
   assert.equal(l.snapshot().unusedScopes,1,'overflow still consumes the scope');
   assert.equal(l.snapshot().overflow,1);
 });
+
+
+test('browser research ledger loads without CommonJS and remains read-only',()=>{
+  const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+  const source=fs.readFileSync(path.resolve(__dirname,'../research/projectile-callback-ledger.cjs'),'utf8');
+  const context=vm.createContext({window:{},Number,Object,Map,TypeError,RangeError,Error});
+  new vm.Script(source).runInContext(context);
+  const factory=context.window.__novaResearchProjectileCallbackLedger?.createProjectileCallbackLedger;
+  assert.equal(typeof factory,'function');
+  const g=game(),l=factory(g);l.install();
+  const t={id:1,hp:10};
+  l.withProjectile({id:7},()=>g.damageTank(t,3));
+  assert.equal(t.hp,7);
+  assert.equal(l.snapshot().events[0].shotId,7);
+  assert.equal(l.uninstall(),true);
+});
