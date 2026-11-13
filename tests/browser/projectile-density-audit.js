@@ -52,6 +52,8 @@
   if(n>256)censored=1; // bounded observer; do not hide the censored cohort
   else if(Number.isFinite(dt)&&dt>0&&dt<=.05){
    const witnessed=g.__novaShapeSweepActive===true&&
+    Number.isSafeInteger(g.__novaFrameStartBulletEpoch)&&
+    Number.isSafeInteger(g.__novaShapeSweepEpoch)&&
     g.__novaFrameStartBulletEpoch===g.__novaShapeSweepEpoch&&
     Number.isSafeInteger(g.__novaFrameStartBulletIdCeiling);
    for(const b of bs){
