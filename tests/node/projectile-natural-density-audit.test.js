@@ -82,4 +82,7 @@ test('first-event input census counts ordinary and expiring rounds without certi
  g.bullets=[{...shot(1),pen:0,ttl:.005,ownerId:7,hits:NaN}];
  g.updateBullets(.01);
  assert.equal(a.firstEventOrdinaryShotInputs,2,'malformed hit ledger is excluded');
+ g.bullets=[{...shot(1),pen:0,ttl:.005,ownerId:7,__novaRail:true}];
+ g.updateBullets(.01);
+ assert.equal(a.firstEventOrdinaryShotInputs,2,'rail rounds are not ordinary shots');
 });
