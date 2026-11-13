@@ -294,3 +294,23 @@ test('pen=1 low-density tank TTL fallback attributes the real callback',()=>{
   assert.equal(events[0].shotId,101);
   assert.equal(events[0].kind,'damageTank');
 });
+
+test('pen=1 two-hull TTL chain attributes both real callbacks to one shot',()=>{
+  const baseline=boot(false,'tank',1), observed=boot(false,'tank',1,true);
+  const extra={id:3,kind:'tank',cls:'scout',x:45,y:0,hp:100,alive:true,r:15};
+  baseline.target.x=30; observed.target.x=30;
+  baseline.g.tanks.push({...extra}); observed.g.tanks.push({...extra});
+  baseline.g.hash.query=(_x,_y,_r,out)=>{out.length=0;out.push(...baseline.g.tanks);};
+  observed.g.hash.query=(_x,_y,_r,out)=>{out.length=0;out.push(...observed.g.tanks);};
+  const ledger=createProjectileCallbackLedger(observed.g);
+  observed.g.__novaShotLedger=ledger; ledger.install();
+  baseline.g.updateBullets(1/30);
+  observed.g.updateBullets(1/30);
+  assert.deepEqual(observed.g.tanks.map(t=>t.hp),baseline.g.tanks.map(t=>t.hp));
+  assert.deepEqual(observed.g.tanks.map(t=>t.hp),[80,80]);
+  const events=ledger.snapshot().events;
+  assert.equal(events.length,2);
+  assert.deepEqual(events.map(e=>e.shotId),[101,101]);
+  assert.deepEqual(events.map(e=>e.targetId),[2,3]);
+  assert.equal(events.every(e=>e.attribution==='direct'),true);
+});
