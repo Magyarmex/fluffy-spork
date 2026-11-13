@@ -144,3 +144,40 @@ test('explicit nested indirect callback still has its own single-event scope',()
   });
   assert.deepEqual(l.snapshot().events.map(e=>e.attribution),['direct','indirect']);
 });
+
+test('seeded nested callback stress preserves explicit attribution boundaries',()=>{
+  let seed=0x12345678;
+  function rand(){seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;
+    return (seed>>>0)/4294967296;}
+  let observed=0;
+  for(let k=0;k<1000;k++){
+    const g=game(), l=createProjectileCallbackLedger(g,{limit:24}); l.install();
+    const expected=[];
+    function action(level,shot,attribution){
+      if(level>3)return;
+      const name=['damageTank','damageShape','damageDrone'][Math.floor(rand()*3)];
+      const target={id:Math.floor(rand()*100),hp:100}, dmg=rand()*10;
+      if(shot!==null)l.withProjectile({id:shot},()=>{
+        expected.push({id:shot,attribution,kind:name});
+        g[name](target,dmg);
+        if(rand()<.2)action(level+1,null,null);
+      },attribution);
+      else {expected.push({id:null,attribution:'unknown',kind:name});
+        g[name](target,dmg);}
+    }
+    for(let j=0;j<12;j++){
+      const mode=rand();
+      action(0,mode<.3?null:j,mode>.65?'indirect':'direct');
+    }
+    const snap=l.snapshot();
+    assert.equal(snap.events.length,expected.length);
+    for(let i=0;i<expected.length;i++){
+      assert.equal(snap.events[i].shotId,expected[i].id);
+      assert.equal(snap.events[i].attribution,expected[i].attribution);
+      assert.equal(snap.events[i].kind,expected[i].kind);
+    }
+    observed+=snap.events.length;
+    l.uninstall();
+  }
+  assert.ok(observed>10000);
+});
