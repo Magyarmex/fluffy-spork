@@ -553,9 +553,15 @@ for(const hz of [60,120])
    });
    g.tanks.push({kind:'tank',id:1300,cls:'scout',x:1700,y:1700,
     hp:100,maxHp:100,alive:true,vx:0,vy:0,
-    __novaPhaseShiftEpoch:g.time,
     __novaSweepMoveTime:g.time,__novaSweepPrevX:1700,
     __novaSweepPrevY:1700});
+   const phased=g.tanks[g.tanks.length-1];
+   const priorUpdate=g.updateBullets;
+   g.updateBullets=function(dt){
+    // Emulate the real Phase Shift marker being stamped in this frame.
+    phased.__novaPhaseShiftEpoch=this.time;
+    return priorUpdate.call(this,dt);
+   };
   },Math.ceil(.42*hz)+3);
   assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
    'same-frame Phase Shift marker must veto remote-shot clearance');
