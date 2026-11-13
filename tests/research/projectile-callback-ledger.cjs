@@ -7,7 +7,7 @@ function createProjectileCallbackLedger(game, options = {}) {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100000)
     throw new RangeError('invalid event budget');
   const methods = ['damageTank', 'damageShape', 'damageDrone'];
-  const originals = new Map(), events = [];
+  const originals = new Map(), wrappers = new Map(), events = [];
   let scope = null, installed = false, overflow = 0, epoch = 0, callbackDepth = 0, unknown = 0;
   function append(kind, target, args) {
     if (events.length >= limit) { overflow++; return; }
@@ -21,18 +21,36 @@ function createProjectileCallbackLedger(game, options = {}) {
   }
   function install() {
     if (installed) return false;
-    for (const name of methods)
-      if (typeof game[name] !== 'function') throw new TypeError(name + ' missing');
+    // Preflight all methods before touching the instance. Preserve inherited
+    // prototype ownership and exact own descriptors on uninstall.
     for (const name of methods) {
-      const original = game[name];
-      originals.set(name, original);
-      game[name] = function(...args) {
-        // Capture identity before lethal callbacks mutate/remove their victim.
-        append(name, args[0], args);
-        callbackDepth++;
-        try { return original.apply(this, args); }
-        finally { callbackDepth--; }
-      };
+      if (typeof game[name] !== 'function') throw new TypeError(name + ' missing');
+      const own = Object.getOwnPropertyDescriptor(game, name);
+      if ((own && !own.configurable) || (!own && !Object.isExtensible(game)))
+        throw new TypeError(name + ' cannot be safely wrapped');
+    }
+    try {
+      for (const name of methods) {
+        const own = Object.getOwnPropertyDescriptor(game, name);
+        const original = game[name];
+        originals.set(name, own || null);
+        const wrapper = function(...args) {
+          append(name, args[0], args);
+          callbackDepth++;
+          try { return original.apply(this, args); }
+          finally { callbackDepth--; }
+        };
+        wrappers.set(name, wrapper);
+        Object.defineProperty(game, name, {configurable:true, writable:true,
+          enumerable:own ? own.enumerable : false, value:wrapper});
+      }
+    } catch (error) {
+      for (const [name, own] of originals) {
+        if (own) Object.defineProperty(game, name, own);
+        else delete game[name];
+      }
+      originals.clear(); wrappers.clear();
+      throw error;
     }
     installed = true;
     return true;
@@ -58,8 +76,15 @@ function createProjectileCallbackLedger(game, options = {}) {
   }
   function uninstall() {
     if (!installed) return false;
-    for (const [name, original] of originals) game[name] = original;
-    originals.clear(); installed = false; scope = null;
+    // Never overwrite another system's later replacement of our wrapper.
+    for (const [name, wrapper] of wrappers)
+      if (game[name] !== wrapper)
+        throw new Error(name + ' changed after ledger install');
+    for (const [name, own] of originals) {
+      if (own) Object.defineProperty(game, name, own);
+      else delete game[name];
+    }
+    originals.clear(); wrappers.clear(); installed = false; scope = null;
     return true;
   }
   return Object.freeze({install, uninstall, withProjectile, nextFrame, snapshot});
