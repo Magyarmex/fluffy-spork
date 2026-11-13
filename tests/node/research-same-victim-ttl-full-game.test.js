@@ -675,3 +675,25 @@ for(const hz of [60,120])
   assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
    'witnessed shape displacement must veto zero-velocity clearance');
  });
+
+/* The core visits bullets from the end of its array. If the remote
+ * projectile occupies the middle slot, it executes between the two local
+ * damage callbacks; either callback may spawn bodies or alter cover.
+ * Initial spatial clearance cannot prove callback independence. */
+for(const hz of [60,120])
+ test('RESEARCH three-shot abstains on interleaved remote callback slot '+hz+'Hz',()=>{
+  const result=trial(hz,false,false,null,40,(_g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   bullets.push({
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   });
+   bullets.splice(1,0,bullets.pop()); // [local 101, remote, local 102]
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
+   'interleaved remote projectile must preserve ordinary core callback order');
+ });
