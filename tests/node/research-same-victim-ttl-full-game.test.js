@@ -353,7 +353,24 @@ for(const hz of [60,120])
 
 
 /* An explicit invalid tank radius must not be replaced by the class
- * fallback through the falsy 
+ * fallback through the falsy OR operator. A genuinely missing tank
+ * radius may still use the canonical class size. */
+for(const hz of [60,120])
+ test('RESEARCH three-shot abstains on explicit zero tank radius '+hz+'Hz',()=>{
+  const result=trial(hz,false,false,null,40,(_g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;p.r=0;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   bullets.push({
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   });
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
+   'explicit zero radius must not be promoted to a valid clearance witness');
+ });
 
 /* The damage callback may spawn unrelated fire while the core iterates.
  * A newborn must not be promoted into the pre-frame three-shot proof, and
