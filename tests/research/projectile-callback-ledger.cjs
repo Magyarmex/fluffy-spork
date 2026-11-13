@@ -8,16 +8,17 @@ function createProjectileCallbackLedger(game, options = {}) {
     throw new RangeError('invalid event budget');
   const methods = ['damageTank', 'damageShape', 'damageDrone'];
   const originals = new Map(), wrappers = new Map(), events = [];
-  let scope = null, installed = false, overflow = 0, epoch = 0, callbackDepth = 0, unknown = 0;
+  let scope = null, installed = false, overflow = 0, epoch = 0, callbackDepth = 0, unknown = 0, unidentifiedTargets = 0;
   function append(kind, target, args) {
     if (events.length >= limit) { overflow++; return; }
     const id = target && Number.isSafeInteger(target.id) ? target.id : null;
+    if (id === null) unidentifiedTargets++;
     const attributed = !!scope && (scope.attribution === 'indirect' || callbackDepth === scope.baseDepth);
     if (!attributed) unknown++;
     events.push(Object.freeze({epoch, kind, targetId: id,
       shotId: attributed ? scope.shotId : null,
       attribution: attributed ? scope.attribution : 'unknown',
-      damage: Number.isFinite(args[1]) ? args[1] : null}));
+      requestedDamage: Number.isFinite(args[1]) ? args[1] : null}));
   }
   function install() {
     if (installed) return false;
@@ -67,12 +68,12 @@ function createProjectileCallbackLedger(game, options = {}) {
   }
   function nextFrame() {
     if (scope) throw new Error('cannot advance frame inside projectile callback');
-    epoch++; events.length = 0; overflow = 0; unknown = 0;
+    epoch++; events.length = 0; overflow = 0; unknown = 0; unidentifiedTargets = 0;
   }
   function snapshot() {
-    return Object.freeze({epoch, events: Object.freeze(events.slice()), overflow, unknown,
+    return Object.freeze({epoch, events: Object.freeze(events.slice()), overflow, unknown, unidentifiedTargets,
       bounded: overflow === 0,
-      allCapturedCallbacksAttributed: overflow === 0 && unknown === 0});
+      allCapturedCallbacksAttributed: overflow === 0 && unknown === 0 && unidentifiedTargets === 0});
   }
   function uninstall() {
     if (!installed) return false;
