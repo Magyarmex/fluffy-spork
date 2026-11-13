@@ -49,20 +49,20 @@ function compileUpdater(source){
   return new Function('types_1','classes_1','M','return function(dt){'+body+'}')(
     {dist2:(x,y,a,b)=>(x-a)**2+(y-b)**2},{CLASSES:{scout:{size:15}}},2250);
 }
-function fixture(source,observe){
-  const shape={kind:'shape',id:41,x:0,y:0,r:10,hp:10};
+function fixture(source,observe,kind='shape',hz=30){
+  const shape={kind,id:41,x:0,y:0,r:10,hp:10,alive:true,cls:'scout',ownerId:99};
   const bullet={kind:'bullet',id:29,ownerId:5,x:0,y:0,vx:0,vy:0,
     ttl:1,r:5,dmg:2,pen:1,hits:0,dead:false,shell:false,beam:false};
   const g={bullets:[bullet],tmp:[],hash:{query(_x,_y,_r,out){out.push(shape);}},
     initBulletIntegrity(){},cosmeticRandom(){return 1;},
     resolveBulletCollisions(){},addParticles(){},
     damageShape(t,d){t.hp-=d;return t.hp;},
-    damageTank(){throw Error('unexpected tank hit');},
-    damageDrone(){throw Error('unexpected drone hit');}};
+    damageTank(t,d){t.hp-=d;return t.hp;},
+    damageDrone(t,d){t.hp-=d;return t.hp;}};
   const ledger=observe?require('../research/projectile-callback-ledger.cjs')
     .createProjectileCallbackLedger(g):null;
   if(ledger){ledger.install();g.__novaShotLedger=ledger;}
-  compileUpdater(source).call(g,1/30);
+  compileUpdater(source).call(g,1/hz);
   const result={hp:shape.hp,pen:bullet.pen,hits:bullet.hits,dead:bullet.dead,
     ttl:bullet.ttl,bulletCount:g.bullets.length,
     events:ledger?ledger.snapshot().events:[]};
@@ -77,4 +77,18 @@ test('patched actual shipping updater preserves damage and records explicit shot
   assert.equal(observed.pen,0);
   assert.deepEqual(observed.events.map(e=>[e.shotId,e.targetId,e.kind,e.requestedDamage]),
     [[29,41,'damageShape',2]]);
+});
+
+test('browser-only patch preserves tank/drone/shape damage across 30–240Hz',()=>{
+  for(const kind of ['shape','tank','drone'])for(const hz of [30,60,120,240]){
+    const base=fixture(html,false,kind,hz);
+    const observed=fixture(patchMaterializedCore(html),true,kind,hz);
+    assert.deepEqual({...observed,events:[]},base,kind+' at '+hz+'Hz');
+    assert.equal(observed.hp,8);
+    assert.equal(observed.events.length,1);
+    assert.equal(observed.events[0].shotId,29);
+    assert.equal(observed.events[0].targetId,41);
+    assert.equal(observed.events[0].kind,
+      kind==='shape'?'damageShape':kind==='tank'?'damageTank':'damageDrone');
+  }
 });
