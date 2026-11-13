@@ -101,6 +101,13 @@ function createProjectileCallbackLedger(game, options = {}) {
       throw new Error('cannot advance frame inside damage callback');
     epoch++; events.length = 0; overflow = 0; unknown = 0; unidentifiedTargets = 0; observerErrors = 0; unusedScopes = 0; scopedCalls = 0;
   }
+  function counters() {
+    // Aggregate natural-match trials need bounded scalar telemetry without
+    // cloning every per-hit event on every simulation frame.
+    return Object.freeze({epoch, installed, eventsCaptured:events.length,
+      overflow, unknown, unidentifiedTargets, observerErrors,
+      scopedCalls, unusedScopes, bounded:overflow===0&&observerErrors===0});
+  }
   function snapshot() {
     return Object.freeze({epoch, installed, events: Object.freeze(events.slice()), overflow, unknown, unidentifiedTargets, observerErrors, scopedCalls, unusedScopes,
       bounded: overflow === 0 && observerErrors === 0,
@@ -121,7 +128,7 @@ function createProjectileCallbackLedger(game, options = {}) {
     originals.clear(); wrappers.clear(); installed = false; scope = null;
     return true;
   }
-  return Object.freeze({install, uninstall, withProjectile, nextFrame, snapshot});
+  return Object.freeze({install, uninstall, withProjectile, nextFrame, snapshot, counters});
 }
 if (typeof module !== 'undefined' && module.exports)
   module.exports = {createProjectileCallbackLedger};
