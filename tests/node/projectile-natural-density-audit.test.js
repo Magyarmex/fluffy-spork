@@ -57,3 +57,52 @@ test('counter resets are censored instead of fabricated as negative breaks',()=>
  assert.equal(a.brokenCounterResets,1);
  assert.equal(a.coverBreaks,0);
 });
+
+test('pen=1 census records witnessed canonical ordinary shots and expiry separately',()=>{
+ const b=(id,ttl=1)=>({...shot(id),kind:'bullet',ownerId:9,ttl});
+ const g={bullets:[b(1,.005),b(2,.5),{...b(3),shell:true},
+  {...b(4),hits:1},{...b(5),pen:2}],
+  __novaShapeSweepActive:true,__novaFrameStartBulletEpoch:7,
+  __novaShapeSweepEpoch:7,__novaFrameStartBulletIdCeiling:10,
+  updateBullets(){return 'untouched';}};
+ const original=JSON.stringify(g.bullets);
+ const a=census.install(g,census.create());
+ assert.equal(g.updateBullets(.01),'untouched');
+ assert.equal(JSON.stringify(g.bullets),original);
+ assert.equal(a.penOneShotInputs,2);
+ assert.equal(a.penOneExpiringInputs,1);
+ assert.equal(a.penOneFramesWithInputs,1);
+ assert.equal(a.penOneUnknownKindInputs,0);
+ assert.equal(a.penOneWithoutEpochInputs,0);
+ assert.equal(a.penOneScanCensoredFrames,0);
+});
+
+test('pen=1 census distinguishes missing kind, missing witness, newborn and overload',()=>{
+ const b=(id)=>({...shot(id),kind:'bullet',ownerId:9});
+ const g={bullets:[b(1)],__novaShapeSweepActive:true,
+  __novaFrameStartBulletEpoch:5,__novaShapeSweepEpoch:5,
+  __novaFrameStartBulletIdCeiling:4,updateBullets(){}};
+ const a=census.install(g,census.create());
+ g.bullets=[{...b(1),kind:undefined}];g.updateBullets(.01);
+ assert.equal(a.penOneUnknownKindInputs,1);
+ assert.equal(a.penOneShotInputs,0);
+ g.bullets=[b(1)];g.__novaShapeSweepActive=false;g.updateBullets(.01);
+ assert.equal(a.penOneWithoutEpochInputs,1);
+ g.__novaShapeSweepActive=true;g.bullets=[b(4)];g.updateBullets(.01);
+ assert.equal(a.penOneWithoutEpochInputs,2,'newborn is not witnessed');
+ g.bullets=[{...b(1),vx:NaN}];g.updateBullets(.01);
+ assert.equal(a.penOneShotInputs,0,'invalid velocity is excluded');
+ g.bullets=Array.from({length:257},(_,i)=>b(i));g.updateBullets(.01);
+ assert.equal(a.penOneScanCensoredFrames,1,'oversized scans are reported');
+ assert.equal(a.penOneShotInputs,0);
+});
+
+test('pen=1 census never claims a certified hit from a necessary shot-local input',()=>{
+ const g={bullets:[{...shot(1),kind:'bullet',ownerId:4}],
+  __novaShapeSweepActive:true,__novaFrameStartBulletEpoch:1,
+  __novaShapeSweepEpoch:1,__novaFrameStartBulletIdCeiling:2};
+ const s=census.before(g,.01);
+ assert.equal(s.penOne,1);
+ assert.equal(s.penOneExpiring,0);
+ assert.equal(Object.hasOwn(s,'certifiedHit'),false);
+});
