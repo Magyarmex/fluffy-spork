@@ -149,3 +149,12 @@ test('uncertified collision radius cannot understate a hitbox',()=>{
  const s=shot();s.radiusCertified=false;
  assert.equal(earliest(s,1/30,world()).reason,'invalid-input');
 });
+
+test('contact at expiry boundary is uncertain, not a proven miss',()=>{
+ const s=shot(),w=world();
+ w.bodies.push({id:2,x:51,y:0,r:18,certifiedStationary:true,
+  collisionEligible:true,radiusCertified:true,epoch:1});
+ assert.equal(earliest(s,1/30,w).reason,'uncertain-contact');
+ w.bodies[0].x=52;
+ assert.equal(earliest(s,1/30,w).kind,'expiry');
+});
