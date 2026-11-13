@@ -1,5 +1,7 @@
 'use strict';
 // Research-only, read-only earliest-event comparator. No combat writes.
+// For pen=1 this certifies ONLY the first event, never a second penetration,
+// damage callback, remaining projectile budget or continuation after impact.
 // Input must contain complete, authoritative pre-frame witnesses. A false
 // completeness assertion is NOT a substitute for real movement history.
 const EPS=1e-9;
@@ -31,7 +33,7 @@ function earliestOrdinaryEvent(shot,frame,world){
    !Array.isArray(world.walls)||!Array.isArray(world.projectiles)||
    world.bodies.length>192||world.walls.length>64||world.projectiles.length>256||
    ![shot.x,shot.y,shot.vx,shot.vy,shot.r,shot.ttl,frame].every(Number.isFinite)||
-   shot.pen!==0||shot.hits!==0||!Number.isSafeInteger(shot.ownerId)||shot.frameStartEpoch!==world.epoch||shot.radiusCertified!==true||!(shot.r>0)||!(shot.ttl>0)||!(frame>0)||frame>.05||shot.dead!==false||
+   !(shot.pen===0||shot.pen===1)||shot.hits!==0||!Number.isSafeInteger(shot.ownerId)||shot.frameStartEpoch!==world.epoch||shot.radiusCertified!==true||!(shot.r>0)||!(shot.ttl>0)||!(frame>0)||frame>.05||shot.dead!==false||
    shot.shell!==false||shot.beam!==false||shot.splash||shot.__v17Cannon||shot.__novaRail)return {kind:'abstain',reason:'invalid-input'};
  const limit=Math.min(frame,shot.ttl),candidates=[];
  function add(kind,id,t){if(t!==null&&t<=limit)candidates.push({kind,id,time:t});}
