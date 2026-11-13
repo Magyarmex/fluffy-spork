@@ -181,3 +181,18 @@ test('seeded nested callback stress preserves explicit attribution boundaries',(
   }
   assert.ok(observed>10000);
 });
+
+test('active unscoped damage cannot reset frame or uninstall observer',()=>{
+  const g=game(), old=g.damageTank;
+  let l;
+  g.damageTank=function(t,d){
+    assert.throws(()=>l.nextFrame(),/inside damage callback/);
+    assert.throws(()=>l.uninstall(),/inside damage callback/);
+    return old.call(this,t,d);
+  };
+  l=createProjectileCallbackLedger(g); l.install();
+  g.damageTank({id:2,hp:10},1);
+  assert.equal(l.snapshot().epoch,0);
+  assert.equal(l.snapshot().events.length,1);
+  assert.equal(l.uninstall(),true);
+});
