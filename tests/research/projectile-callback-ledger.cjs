@@ -16,7 +16,9 @@ function createProjectileCallbackLedger(game, options = {}) {
     const attributed = !!scope && scope.remaining > 0 && callbackDepth === scope.baseDepth;
     if (attributed) scope.remaining--;
     if (events.length >= limit) { overflow++; return; }
-    const id = target && Number.isSafeInteger(target.id) ? target.id : null;
+    // Read identity once: getters may be stateful or throw on a second read.
+    const observedId = target == null ? null : target.id;
+    const id = Number.isSafeInteger(observedId) ? observedId : null;
     if (id === null) unidentifiedTargets++;
     if (!attributed) unknown++;
     events.push(Object.freeze({epoch, kind, targetId: id,
