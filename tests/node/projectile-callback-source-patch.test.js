@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const {patchMaterializedCore, CALLS} = require('../research/projectile-callback-source-patch.cjs');
+const {patchMaterializedCore, patchBattlefieldCallbacks, CALLS} = require('../research/projectile-callback-source-patch.cjs');
 const html = fs.readFileSync(path.resolve(__dirname, '../../index.html'), 'utf8');
 test('research patch changes exactly three authoritative core callbacks, not splash or overlays',()=>{
   const patched = patchMaterializedCore(html);
@@ -95,4 +95,17 @@ test('browser-only patch preserves tank/drone/shape damage across 30–240Hz',()
 
 test('research source instrumentation refuses a second patch',()=>{
   assert.throws(()=>patchMaterializedCore(patchMaterializedCore(html)),/already installed/);
+});
+
+const battlefield = fs.readFileSync(path.resolve(__dirname,
+  '../../nova-updates/battlefield-v1.6.0.js'),'utf8');
+test('research Battlefield patch scopes exactly ten real projectile callbacks',()=>{
+  const patched=patchBattlefieldCallbacks(battlefield);
+  assert.equal((patched.match(/__novaShotLedger.withProjectile\\(b,/g)||[]).length,10);
+  assert.notEqual(patched,battlefield);
+  new vm.Script(patched,{filename:'research-patched-battlefield.js'});
+  assert.throws(()=>patchBattlefieldCallbacks(patched),/already installed/);
+  assert.throws(()=>patchBattlefieldCallbacks(battlefield.replace(
+    'g.damageTank(hit.e,b.dmg,b.ownerId,kx,ky);','/* changed */')),
+    /expected ten Battlefield projectile damage callbacks/);
 });
