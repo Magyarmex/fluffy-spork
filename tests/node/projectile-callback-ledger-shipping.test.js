@@ -164,3 +164,22 @@ for(const kind of ['tank','shape','drone']) {
     assert.equal(events[0].attribution,'direct');
   });
 }
+
+test('materialized core instrumentation fails open on invalid projectile ID',()=>{
+  const baseline=boot(false,'tank',1), observed=boot(true,'tank',1);
+  baseline.g.bullets[0].id=NaN;
+  observed.g.bullets[0].id=NaN;
+  const ledger=createProjectileCallbackLedger(observed.g);
+  observed.g.__novaShotLedger=ledger; ledger.install();
+  baseline.g.updateBullets(1/240);
+  assert.doesNotThrow(()=>observed.g.updateBullets(1/240));
+  assert.equal(observed.target.hp,baseline.target.hp);
+  assert.equal(observed.target.hp,80);
+  assert.equal(observed.g.bullets.length,baseline.g.bullets.length);
+  const snap=ledger.snapshot();
+  assert.equal(snap.events.length,1);
+  assert.equal(snap.events[0].shotId,null);
+  assert.equal(snap.events[0].attribution,'unknown');
+  assert.equal(snap.observerErrors,1);
+  assert.equal(snap.bounded,false);
+});
