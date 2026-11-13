@@ -58,7 +58,7 @@ test('pen-one matrix preserves unknown historical fields and rejects partial dat
  Object.assign(d,{penOneShotInputs:2,penOneExpiringInputs:1,
   penOneFramesWithInputs:2,penOneRawInputs:3,penOneRawExpiringInputs:1,
   penOneMissingDeadInputs:1,
-  penOneUnknownKindInputs:0,penOneWithoutEpochInputs:1,
+  penOneUnknownKindInputs:0,penOneMissingOrdinaryFlagsInputs:0,penOneWithoutEpochInputs:1,
   penOneScanCensoredFrames:0});
  assert.equal(check(d,'current'),d);
  d.penOneExpiringInputs=3;
@@ -73,6 +73,7 @@ test('pen-one natural matrix aggregates measured cohorts and censors mixed histo
  const metrics={penOneShotInputs:2,penOneExpiringInputs:1,
   penOneFramesWithInputs:1,penOneRawInputs:3,penOneRawExpiringInputs:1,
   penOneMissingDeadInputs:0,penOneUnknownKindInputs:0,
+  penOneMissingOrdinaryFlagsInputs:0,
   penOneWithoutEpochInputs:1,penOneScanCensoredFrames:0};
  try{
   for(let i=0;i<2;i++){
