@@ -12,6 +12,8 @@ function patchMaterializedCore(html) {
   const end = html.indexOf('    splashAt(x, y, radius, frac, ownerId, knock, color, dmg) {', start);
   if (start < 0 || end <= start) throw new Error('shipping core boundaries changed');
   let body = html.slice(start, end);
+  if (body.includes('__novaShotLedger.withProjectile'))
+    throw new Error('research callback patch already installed');
   for (const call of CALLS) {
     if (body.split(call).length !== 2) throw new Error('expected one core callback: ' + call);
     const guarded = '(this.__novaShotLedger ? this.__novaShotLedger.withProjectile(b, () => ' +
