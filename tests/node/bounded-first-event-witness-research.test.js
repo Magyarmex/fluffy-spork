@@ -2,37 +2,37 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {circleContact,earliestOrdinaryEvent:earliest}=require('../research/bounded-first-event-witness.cjs');
 const shot=()=>({x:0,y:0,vx:6000,vy:0,r:3,ttl:.005,dead:false,shell:false,beam:false,splash:false});
-const world=()=>({complete:true,bounds:{minX:-2230,maxX:2230,minY:-2230,maxY:2230},bodies:[],walls:[],projectiles:[]});
+const world=()=>({complete:true,epoch:1,bounds:{minX:-2230,maxX:2230,minY:-2230,maxY:2230},bodies:[],walls:[],projectiles:[]});
 for(const fps of [30,60,120,240])test('physical body before TTL at '+fps+'Hz',()=>{
- const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true});
+ const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,epoch:1});
  const event=earliest(shot(),1/fps,w);assert.equal(event.kind,'body');assert.equal(event.id,2);
  assert.ok(Math.abs(event.time-19/6000)<1e-12);
 });
-test('body beyond TTL cannot win',()=>{const w=world();w.bodies.push({id:2,x:100,y:0,r:18,certifiedStationary:true,collisionEligible:true});assert.equal(earliest(shot(),1/30,w).kind,'expiry');});
-test('permanent wall before body wins',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true});w.walls.push({id:9,time:.001,complete:true,solid:true});assert.deepEqual(earliest(shot(),1/30,w),{kind:'wall',id:9,time:.001});});
-test('wall after body cannot steal body',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true});w.walls.push({id:9,time:.004,complete:true,solid:true});assert.equal(earliest(shot(),1/30,w).kind,'body');});
-test('interception before body wins',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true});w.projectiles.push({id:9,time:.002,complete:true,hostile:true});assert.equal(earliest(shot(),1/30,w).kind,'interception');});
-test('simultaneous body contacts abstain',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true},{id:3,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true});assert.equal(earliest(shot(),1/30,w).reason,'tie');});
-test('unknown movement abstains even far away',()=>{const w=world();w.bodies.push({id:2,x:1000,y:1000,r:18,certifiedStationary:false,collisionEligible:true});assert.equal(earliest(shot(),1/30,w).reason,'body-motion');});
+test('body beyond TTL cannot win',()=>{const w=world();w.bodies.push({id:2,x:100,y:0,r:18,certifiedStationary:true,collisionEligible:true,epoch:1});assert.equal(earliest(shot(),1/30,w).kind,'expiry');});
+test('permanent wall before body wins',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,epoch:1});w.walls.push({id:9,time:.001,complete:true,solid:true});assert.deepEqual(earliest(shot(),1/30,w),{kind:'wall',id:9,time:.001});});
+test('wall after body cannot steal body',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,epoch:1});w.walls.push({id:9,time:.004,complete:true,solid:true});assert.equal(earliest(shot(),1/30,w).kind,'body');});
+test('interception before body wins',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,epoch:1});w.projectiles.push({id:9,time:.002,complete:true,hostile:true});assert.equal(earliest(shot(),1/30,w).kind,'interception');});
+test('simultaneous body contacts abstain',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,epoch:1},{id:3,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,epoch:1});assert.equal(earliest(shot(),1/30,w).reason,'tie');});
+test('unknown movement abstains even far away',()=>{const w=world();w.bodies.push({id:2,x:1000,y:1000,r:18,certifiedStationary:false,collisionEligible:true,epoch:1});assert.equal(earliest(shot(),1/30,w).reason,'body-motion');});
 test('certified remote moving body does not veto local body',()=>{
- const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true});
- w.bodies.push({id:3,startX:500,startY:300,r:18,maxTravel:50,collisionEligible:true});
+ const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,epoch:1});
+ w.bodies.push({id:3,startX:500,startY:300,r:18,maxTravel:50,collisionEligible:true,epoch:1});
  assert.equal(earliest(shot(),1/30,w).kind,'body');
 });
 test('bounded moving body near corridor abstains',()=>{
- const w=world();w.bodies.push({id:3,startX:40,startY:40,r:18,maxTravel:30,collisionEligible:true});
+ const w=world();w.bodies.push({id:3,startX:40,startY:40,r:18,maxTravel:30,collisionEligible:true,epoch:1});
  assert.equal(earliest(shot(),1/30,w).reason,'moving-body-near-corridor');
 });
 test('invalid cover/interception witness abstains',()=>{const w=world();w.walls.push({id:9,time:NaN,complete:true,solid:true});assert.equal(earliest(shot(),1/30,w).reason,'wall-witness');w.walls=[];w.projectiles.push({id:8,time:0,complete:false});assert.equal(earliest(shot(),1/30,w).reason,'interception-witness');});
-test('earlier arena exit wins',()=>{const w=world();const s=shot();s.x=2220;w.bodies.push({id:2,x:2300,y:0,r:18,certifiedStationary:true,collisionEligible:true});assert.equal(earliest(s,1/30,w).kind,'exit');});
-test('comparator never mutates game objects',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true});const s=shot(),before=JSON.stringify([s,w]);for(let i=0;i<20;i++)earliest(s,1/30,w);assert.equal(JSON.stringify([s,w]),before);});
+test('earlier arena exit wins',()=>{const w=world();const s=shot();s.x=2220;w.bodies.push({id:2,x:2300,y:0,r:18,certifiedStationary:true,collisionEligible:true,epoch:1});assert.equal(earliest(s,1/30,w).kind,'exit');});
+test('comparator never mutates game objects',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,epoch:1});const s=shot(),before=JSON.stringify([s,w]);for(let i=0;i<20;i++)earliest(s,1/30,w);assert.equal(JSON.stringify([s,w]),before);});
 test('tangent abstains rather than certifying',()=>{assert.equal(circleContact(0,21,6000,0,40,0,21,.005),undefined);});
 test('seeded independent closest-approach differential',()=>{
  let seed=0x147234;const rnd=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
  for(let i=0;i<10000;i++){
   const s=shot();s.vx=100+rnd()*9000;s.vy=(rnd()-.5)*5000;s.ttl=.001+rnd()*.02;
   const w=world(),x=(rnd()-.2)*170,y=(rnd()-.5)*90,r=8+rnd()*20;
-  w.bodies.push({id:2,x,y,r,certifiedStationary:true,collisionEligible:true});
+  w.bodies.push({id:2,x,y,r,certifiedStationary:true,collisionEligible:true,epoch:1});
   const until=Math.min(1/30,s.ttl),dx=-x,dy=-y,a=s.vx*s.vx+s.vy*s.vy;
   const t=Math.max(0,Math.min(until,-(dx*s.vx+dy*s.vy)/a));
   const dist=Math.hypot(dx+s.vx*t,dy+s.vy*t),rad=s.r+r;
@@ -48,7 +48,7 @@ test('remote-motion clearance never misses bounded sample trajectories',()=>{
   s.ttl=.002+rnd()*.025;
   const w=world(),cx=(rnd()-.5)*500,cy=(rnd()-.5)*500;
   const maxTravel=rnd()*100,r=2+rnd()*30;
-  w.bodies.push({id:3,startX:cx,startY:cy,r,maxTravel,collisionEligible:true});
+  w.bodies.push({id:3,startX:cx,startY:cy,r,maxTravel,collisionEligible:true,epoch:1});
   const event=earliest(s,1/30,w);
   if(event.kind==='abstain')continue;
   const limit=Math.min(s.ttl,1/30);
@@ -71,13 +71,13 @@ test('uncertified eligibility, solidity and hostility abstain',()=>{
 
 test('certified moving crossing resolves by relative motion',()=>{
  const w=world();w.bodies.push({id:3,startX:25,startY:20,vx:0,vy:-6000,
-   r:10,certifiedLinear:true,collisionEligible:true});
+   r:10,certifiedLinear:true,linearDt:1/30,collisionEligible:true,epoch:1});
  const e=earliest(shot(),1/30,w);
  assert.equal(e.kind,'body');assert.ok(e.time>0&&e.time<.005);
 });
 test('uncertified linear motion cannot masquerade as static',()=>{
  const w=world();w.bodies.push({id:3,startX:25,startY:20,vx:NaN,vy:-6000,
-   r:10,certifiedLinear:true,collisionEligible:true});
+   r:10,certifiedLinear:true,linearDt:1/30,collisionEligible:true,epoch:1});
  assert.equal(earliest(shot(),1/30,w).reason,'linear-witness');
 });
 test('seeded certified linear crossings match independent closest approach',()=>{
@@ -87,7 +87,7 @@ test('seeded certified linear crossings match independent closest approach',()=>
   s.ttl=.001+rnd()*.025;
   const w=world(),x=(rnd()-.5)*120,y=(rnd()-.5)*120,r=5+rnd()*20;
   const vx=(rnd()-.5)*6000,vy=(rnd()-.5)*6000;
-  w.bodies.push({id:3,startX:x,startY:y,vx,vy,r,certifiedLinear:true,collisionEligible:true});
+  w.bodies.push({id:3,startX:x,startY:y,vx,vy,r,certifiedLinear:true,linearDt:1/30,collisionEligible:true,epoch:1});
   const dx=-x,dy=-y,rvx=s.vx-vx,rvy=s.vy-vy,a=rvx*rvx+rvy*rvy;
   const until=Math.min(1/30,s.ttl);
   const t=a>0?Math.max(0,Math.min(until,-(dx*rvx+dy*rvy)/a)):0;
@@ -98,11 +98,11 @@ test('seeded certified linear crossings match independent closest approach',()=>
 });
 
 test('near tangent cannot certify expiry as the first event',()=>{
- const w=world();w.bodies.push({id:2,x:40,y:21,r:18,certifiedStationary:true,collisionEligible:true});
+ const w=world();w.bodies.push({id:2,x:40,y:21,r:18,certifiedStationary:true,collisionEligible:true,epoch:1});
  assert.equal(earliest(shot(),1/30,w).reason,'uncertain-contact');
 });
 test('finite overflowing speed cannot certify no hit',()=>{
- const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true});
+ const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,epoch:1});
  const s=shot();s.vx=1e308;
  assert.equal(earliest(s,1/30,w).reason,'uncertain-contact');
 });
@@ -112,7 +112,7 @@ test('translation and rotation preserve earliest event time',()=>{
  for(let i=0;i<10000;i++){
   const s=shot();s.x=(rnd()-.5)*150;s.y=(rnd()-.5)*150;
   s.vx=(rnd()-.5)*9000;s.vy=(rnd()-.5)*9000;s.ttl=.002+rnd()*.015;
-  const w=world();w.bodies.push({id:2,x:(rnd()-.5)*150,y:(rnd()-.5)*150,r:10+rnd()*20,certifiedStationary:true,collisionEligible:true});
+  const w=world();w.bodies.push({id:2,x:(rnd()-.5)*150,y:(rnd()-.5)*150,r:10+rnd()*20,certifiedStationary:true,collisionEligible:true,epoch:1});
   w.bounds={minX:-1e6,maxX:1e6,minY:-1e6,maxY:1e6};
   const original=earliest(s,1/30,w);
   const dx=1200,dy=-500,angle=1.1,co=Math.cos(angle),si=Math.sin(angle);
@@ -128,8 +128,16 @@ test('translation and rotation preserve earliest event time',()=>{
 });
 test('body order does not change unique first event',()=>{
  const w=world();w.bodies=[
-  {id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true},
-  {id:3,x:80,y:0,r:18,certifiedStationary:true,collisionEligible:true}];
+  {id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,epoch:1},
+  {id:3,x:80,y:0,r:18,certifiedStationary:true,collisionEligible:true,epoch:1}];
  const a=earliest(shot(),1/30,w);w.bodies.reverse();
  assert.deepEqual(earliest(shot(),1/30,w),a);
+});
+
+test('stale body epoch and linear dt cannot certify contact',()=>{
+ const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,epoch:0});
+ assert.equal(earliest(shot(),1/30,w).reason,'body-geometry');
+ w.bodies=[{id:3,startX:25,startY:20,vx:0,vy:-6000,r:10,
+   certifiedLinear:true,linearDt:1/60,collisionEligible:true,epoch:1}];
+ assert.equal(earliest(shot(),1/30,w).reason,'linear-witness');
 });
