@@ -75,7 +75,8 @@ function boot(instrument = false, kind = 'tank', pen = 0, instrumentBattlefield 
     if(instrumentBattlefield && file==='battlefield-v1.6.0.js') {
       // Research-only injection at the existing TTL recovery owner. Keep
       // the physical decision and original damage call exactly unchanged.
-      const needle='g.damageTank(best.e,b.dmg,b.ownerId,Math.cos(ang)*(b.knock||0)*.006,\\n     Math.sin(ang)*(b.knock||0)*.006);'.replace('\\n','\\n');
+      const needle=['g.damageTank(best.e,b.dmg,b.ownerId,Math.cos(ang)*(b.knock||0)*.006,',
+        '     Math.sin(ang)*(b.knock||0)*.006);'].join(String.fromCharCode(10));
       assert.ok(source.includes(needle),'Battlefield TTL callback changed');
       source=source.replace(needle,
         'g.__novaShotLedger.withProjectile(b,()=>'+needle.slice(0,-1)+');');
