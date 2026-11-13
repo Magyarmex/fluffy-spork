@@ -25,6 +25,7 @@ function boot(){
   'addParticles','addRing','addImpactDebris','splashAt','initBulletIntegrity',
   'useAbility','addFlash'])Game.prototype[name]=function(){};
  Game.prototype.resolveBulletCollisions=function(){};
+ Game.prototype.getTank=function(id){return this.tankById.get(id)||null;};
  Game.prototype.updateBullets=coreMethod();
  Game.prototype.weakenBullet=function(b,d){b.hp-=d;if(b.hp<=0)b.dead=true;};
  Game.prototype.clusterBurst=function(){};
