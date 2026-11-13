@@ -22,7 +22,7 @@ test('research patch fails closed on changed or ambiguous callback ownership',()
     assert.throws(()=>patchMaterializedCore(html.replace(call,'/* changed callback */')),
       /expected one core callback/);
     const start=html.indexOf('    updateBullets(dt) {');
-    assert.throws(()=>patchMaterializedCore(html.slice(0,start)+call+'\n'+html.slice(start)),
+    assert.throws(()=>patchMaterializedCore(html.slice(0,start+22)+call+'\n'+html.slice(start+22)),
       /expected one core callback/);
   }
   assert.throws(()=>patchMaterializedCore('not a game'),/shipping core boundaries/);
