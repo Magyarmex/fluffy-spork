@@ -394,3 +394,13 @@ test('browser research ledger loads without CommonJS and remains read-only',()=>
   assert.equal(l.snapshot().events[0].shotId,7);
   assert.equal(l.uninstall(),true);
 });
+
+
+test('snapshot explicitly distinguishes installed observer from inactive research state',()=>{
+  const g=game(),l=createProjectileCallbackLedger(g);
+  assert.equal(l.snapshot().installed,false);
+  assert.equal(l.install(),true);
+  assert.equal(l.snapshot().installed,true);
+  assert.equal(l.uninstall(),true);
+  assert.equal(l.snapshot().installed,false);
+});
