@@ -481,3 +481,30 @@ for(const kind of ['shape-zero-hp','drone-dead-flag'])
   assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
    'contradictory body state must veto speculative chronology');
  });
+
+
+/* Core tank and drone contact radii include class-specific padding.
+ * The third-shot exclusion must use those same physical hull bounds,
+ * not an optional undersized visual radius. */
+for(const kind of ['tank','drone'])
+ test('RESEARCH three-shot clearance uses core '+kind+' radius',()=>{
+  const result=trial(60,false,false,null,40,(g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   bullets.push({
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   });
+   if(kind==='tank')
+    g.tanks.push({kind:'tank',id:1300,cls:'scout',x:1615,y:1500,
+     r:1,hp:100,alive:true,dead:false,vx:0,vy:0});
+   else
+    g.drones.push({kind:'drone',id:1300,ownerId:999,x:1610,y:1500,
+     r:1,hp:100,alive:true,dead:false,vx:0,vy:0});
+  },Math.ceil(.42*60)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
+   'core collision padding must veto an under-bounded clearance proof');
+ });
