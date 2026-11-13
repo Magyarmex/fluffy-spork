@@ -98,7 +98,8 @@ function boot(instrument = false, kind = 'tank', pen = 0, instrumentBattlefield 
         'g.__novaShotLedger.withProjectile(b,()=>'+needle.slice(0,-1)+');');
       for(const call of [
         'g.damageShape(best.e,b.dmg,vx,vy);',
-        'g.damageDrone(best.e,b.dmg,b.ownerId);'
+        'g.damageDrone(best.e,b.dmg,b.ownerId);',
+        'g.damageTank(hit.e,b.dmg,b.ownerId,kx,ky);'
       ]) {
         assert.equal(source.split(call).length-1,1,
           'Battlefield TTL '+call+' callback changed');
@@ -220,8 +221,8 @@ test('materialized core instrumentation fails open on invalid projectile ID',()=
 });
 
 for(const kind of ['tank','shape']) {
-  test('research-instrumented Battlefield TTL recovery identifies '+kind+' shot at 30Hz',()=>{
-    const baseline=boot(false,kind,1), observed=boot(false,kind,1,true);
+  test('research-instrumented pen=0 Battlefield TTL recovery identifies '+kind+' shot at 30Hz',()=>{
+    const baseline=boot(false,kind,0), observed=boot(false,kind,0,true);
     const ledger=createProjectileCallbackLedger(observed.g);
     observed.g.__novaShotLedger=ledger; ledger.install();
     baseline.g.updateBullets(1/30);
@@ -278,4 +279,18 @@ test('unwitnessed drone TTL corridor abstains rather than inventing a contact',(
     'drone has no authoritative frame-start motion witness in this fixture');
   assert.equal(ledger.snapshot().events.length,0,
     'no physical callback means no projectile identity claim');
+});
+
+test('pen=1 stationary tank TTL chain attributes the real callback',()=>{
+  const baseline=boot(false,'tank',1), observed=boot(false,'tank',1,true);
+  const ledger=createProjectileCallbackLedger(observed.g);
+  observed.g.__novaShotLedger=ledger; ledger.install();
+  baseline.g.updateBullets(1/30);
+  observed.g.updateBullets(1/30);
+  assert.equal(observed.target.hp,baseline.target.hp);
+  assert.equal(observed.target.hp,80);
+  const events=ledger.snapshot().events;
+  assert.equal(events.length,1);
+  assert.equal(events[0].shotId,101);
+  assert.equal(events[0].kind,'damageTank');
 });
