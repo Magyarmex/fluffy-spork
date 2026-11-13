@@ -67,3 +67,39 @@ test('pen-one matrix preserves unknown historical fields and rejects partial dat
  delete d.penOneUnknownKindInputs;
  assert.throws(()=>check(d,'partial'),/partial pen-one/);
 });
+
+test('pen-one natural matrix aggregates measured cohorts and censors mixed historical fields',()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'nova-pen-one-'));
+ const metrics={penOneShotInputs:2,penOneExpiringInputs:1,
+  penOneFramesWithInputs:1,penOneRawInputs:3,penOneRawExpiringInputs:1,
+  penOneMissingDeadInputs:0,penOneUnknownKindInputs:0,
+  penOneWithoutEpochInputs:1,penOneScanCensoredFrames:0};
+ try{
+  for(let i=0;i<2;i++){
+   const dir=path.join(root,'nova-frontlines-natural-ab-'+i);
+   fs.mkdirSync(dir);
+   const off=arm('seed'+i,'wander'),on=arm('seed'+i,'wander');
+   Object.assign(off.projectileDensityAudit,metrics);
+   Object.assign(on.projectileDensityAudit,metrics);
+   fs.writeFileSync(path.join(dir,'frontlines-natural-match-ab.json'),
+    JSON.stringify({initialWorldIdentical:true,offReplayIdentical:true,
+     off,on,offReplay:JSON.parse(JSON.stringify(off))}));
+  }
+  const measured=collect(root,2);
+  assert.equal(measured.totals.ON.penOneMetrics.penOneShotInputs,4);
+  assert.equal(measured.totals.OFF.penOneMetrics.penOneRawInputs,6);
+  assert.equal(measured.observations[0].ON.penOneMetrics.penOneExpiringInputs,1);
+  const file=path.join(root,'nova-frontlines-natural-ab-1','frontlines-natural-match-ab.json');
+  const historical=JSON.parse(fs.readFileSync(file,'utf8'));
+  for(const key of Object.keys(metrics)){
+   delete historical.off.projectileDensityAudit[key];
+   delete historical.on.projectileDensityAudit[key];
+   delete historical.offReplay.projectileDensityAudit[key];
+  }
+  fs.writeFileSync(file,JSON.stringify(historical));
+  const mixed=collect(root,2);
+  assert.equal(mixed.totals.ON.penOneMetrics,null,'missing data must not become zero');
+  assert.equal(mixed.totals.OFF.penOneMetrics,null);
+  assert.equal(mixed.observations[1].ON.penOneMetrics,null);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
