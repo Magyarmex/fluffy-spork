@@ -25,7 +25,7 @@ function earliestOrdinaryEvent(shot,frame,world){
  if(!shot||!world||world.complete!==true||!Number.isSafeInteger(world.epoch)||!Array.isArray(world.bodies)||
    !Array.isArray(world.walls)||!Array.isArray(world.projectiles)||
    ![shot.x,shot.y,shot.vx,shot.vy,shot.r,shot.ttl,frame].every(Number.isFinite)||
-   !(shot.r>0)||!(shot.ttl>0)||!(frame>0)||frame>.05||shot.dead||
+   shot.radiusCertified!==true||!(shot.r>0)||!(shot.ttl>0)||!(frame>0)||frame>.05||shot.dead||
    shot.shell||shot.beam||shot.splash)return {kind:'abstain',reason:'invalid-input'};
  const limit=Math.min(frame,shot.ttl),candidates=[];
  function add(kind,id,t){if(t!==null&&t<=limit)candidates.push({kind,id,time:t});}
@@ -41,7 +41,7 @@ function earliestOrdinaryEvent(shot,frame,world){
    if(t!==null&&t>=0)add('exit',null,t);
  }
  for(const body of world.bodies){
-   if(!body||body.epoch!==world.epoch||body.collisionEligible!==true||!Number.isFinite(body.r)||!(body.r>0)||body.id==null)
+   if(!body||body.epoch!==world.epoch||body.radiusCertified!==true||body.collisionEligible!==true||!Number.isFinite(body.r)||!(body.r>0)||body.id==null)
      return {kind:'abstain',reason:'body-geometry'};
    if(body.certifiedLinear===true){
      if(body.linearDt!==frame||![body.startX,body.startY,body.vx,body.vy].every(Number.isFinite))
