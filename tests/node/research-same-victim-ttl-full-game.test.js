@@ -508,3 +508,29 @@ for(const kind of ['tank','drone'])
   assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
    'core collision padding must veto an under-bounded clearance proof');
  });
+
+
+/* Adversarial Live Vector witness: the drone controller can integrate
+ * __lvVX independently of vx. A remote round must not be certified
+ * interaction-free using only vx=0 and a generic 96-unit allowance.
+ * This is deliberately a RED research gate until the movement proof
+ * accounts for controller-driven motion or conservatively abstains. */
+for(const hz of [60,120])
+ test('RESEARCH three-shot abstains on unwitnessed Live Vector drone '+hz+'Hz',()=>{
+  const result=trial(hz,false,false,null,40,(g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   bullets.push({
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   });
+   g.drones.push({kind:'drone',id:1300,ownerId:999,
+    x:1700,y:1500,r:8,hp:100,alive:true,dead:false,
+    vx:0,vy:0,__lvVX:-12000,__lvVY:0});
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
+   'unwitnessed Live Vector movement must veto speculative reordering');
+ });
