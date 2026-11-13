@@ -26,6 +26,7 @@ function circleContact(px,py,vx,vy,cx,cy,r,until){
 function earliestOrdinaryEvent(shot,frame,world){
  if(!shot||!world||world.complete!==true||!Number.isSafeInteger(world.epoch)||!Array.isArray(world.bodies)||
    !Array.isArray(world.walls)||!Array.isArray(world.projectiles)||
+   world.bodies.length>192||world.walls.length>64||world.projectiles.length>256||
    ![shot.x,shot.y,shot.vx,shot.vy,shot.r,shot.ttl,frame].every(Number.isFinite)||
    shot.pen!==0||shot.hits!==0||!Number.isSafeInteger(shot.ownerId)||shot.frameStartEpoch!==world.epoch||shot.radiusCertified!==true||!(shot.r>0)||!(shot.ttl>0)||!(frame>0)||frame>.05||shot.dead||
    shot.shell||shot.beam||shot.splash)return {kind:'abstain',reason:'invalid-input'};
