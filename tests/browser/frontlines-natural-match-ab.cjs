@@ -560,6 +560,17 @@ async function arm(browser,enabled,label){
   assert.equal(off.initial.fingerprint,on.initial.fingerprint,'ON/OFF must begin from identical real world');
   assert.equal(off.initial.fingerprint,offReplay.initial.fingerprint,'same seed must reproduce initial world');
   const same=JSON.stringify(off.result)===JSON.stringify(offReplay.result);
+  if(SHOT_LEDGER_RESEARCH){
+    assert.ok(on.result.shotLedgerResearch,'instrumented ON ledger missing');
+    assert.equal(on.result.shotLedgerResearch.observerErrors,0);
+    assert.equal(on.result.shotLedgerResearch.overflow,0);
+    for(const key of ['game','projectileDensityAudit']){
+      assert.deepEqual(on.result[key],off.result[key],
+        'shot-ledger observer must preserve natural physical '+key);
+    }
+    assert.equal(off.result.shotLedgerResearch,undefined);
+    assert.equal(offReplay.result.shotLedgerResearch,undefined);
+  }
   const naturalOpportunityObserved=[off,on].every(a=>a.result.naturalBlooms>0);
   let bomberPhysicsCausal=null;
   if(AB_MODE==='bomber-physics'){
