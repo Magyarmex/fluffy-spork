@@ -633,6 +633,12 @@ for(const hz of [60,120])
     hp:100,maxHp:100,alive:true,dead:false,vx:0,vy:0,
     __novaSweepMoveTime:g.time,__novaSweepPrevX:1600,
     __novaSweepPrevY:1700});
+   const displaced=g.tanks[g.tanks.length-1];
+   const priorUpdate=g.updateBullets;
+   g.updateBullets=function(dt){
+    displaced.__novaSweepMoveTime=this.time;
+    return priorUpdate.call(this,dt);
+   };
   },Math.ceil(.42*hz)+3);
   assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
    'witnessed tank displacement must veto zero-velocity clearance');
