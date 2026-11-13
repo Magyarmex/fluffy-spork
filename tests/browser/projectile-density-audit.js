@@ -46,7 +46,7 @@
      g.__novaFrameStartBulletEpoch===g.__novaShapeSweepEpoch&&
      Number.isSafeInteger(g.__novaFrameStartBulletIdCeiling)){
    for(const b of bs){
-    if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
+    if(!b||b.kind!=='bullet'||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
        b.__novaRail||b.pen!==0||b.hits!==0||
        !Number.isSafeInteger(b.id)||b.id>=g.__novaFrameStartBulletIdCeiling||
        !Number.isSafeInteger(b.ownerId)||
