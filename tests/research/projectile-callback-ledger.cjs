@@ -68,11 +68,21 @@ function createProjectileCallbackLedger(game, options = {}) {
     if (typeof fn !== 'function') throw new TypeError('callback required');
     // Snapshot identity once: mutable or stateful getters must not switch
     // the attributed projectile between validation and ledger recording.
-    const shotId = shot == null ? null : shot.id;
-    if (!Number.isSafeInteger(shotId) || shotId < 0)
-      throw new TypeError('explicit projectile ID required');
+    // An observer must never prevent the real callback when a projectile ID
+    // is absent or its getter throws. Run unscoped and mark the frame unsafe.
+    // Temporarily suppress an outer scope so a nested invalid shot cannot
+    // borrow the parent's identity.
+    let shotId;
+    try { shotId = shot == null ? null : shot.id; }
+    catch (_) { shotId = null; }
     if (attribution !== 'direct' && attribution !== 'indirect')
       throw new TypeError('invalid attribution');
+    if (!Number.isSafeInteger(shotId) || shotId < 0) {
+      observerErrors++;
+      const prior = scope;
+      scope = null;
+      try { return fn(); } finally { scope = prior; }
+    }
     const prior = scope;
     scope = {shotId, attribution, baseDepth: callbackDepth, remaining: 1};
     try { return fn(); } finally { scope = prior; }
