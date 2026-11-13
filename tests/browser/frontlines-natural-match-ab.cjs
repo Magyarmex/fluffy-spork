@@ -7,20 +7,18 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');
 const {chromium}=require('playwright');
-const {patchMaterializedCore}=require('../research/projectile-callback-source-patch.cjs');
 const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
 const LAYOUT_INDEX=Number(process.env.NOVA_LAYOUT_INDEX??0);
 const SEED_INDEX=Number(process.env.NOVA_SEED_INDEX??0);
 const PILOT_POLICY=process.env.NOVA_PILOT_POLICY||'wander';
 const AB_MODE=process.env.NOVA_AB_MODE||'memory';
-const SHOT_LEDGER_RESEARCH=AB_MODE==='shot-ledger';
 const BOMBER_RESEARCH=process.env.NOVA_BOMBER_RESEARCH==='1';
 // Every manual-match result must disclose its legal offer policy.
 const OFFER_POLICY=process.env.NOVA_OFFER_POLICY||'defer';
 const offerPolicy=require('./frontlines-offer-policy.js').parse(OFFER_POLICY);
 if(BOMBER_RESEARCH&&(!['cover-pressure','bomber-physics'].includes(AB_MODE)||PILOT_POLICY!=='cover-pressure'))
  throw Error('Bomber research requires paired cover-pressure policy');
-if(!['memory','live-turn','cover-pressure','bomber-physics','shot-ledger'].includes(AB_MODE))throw Error('unsupported NOVA_AB_MODE');
+if(!['memory','live-turn','cover-pressure','bomber-physics'].includes(AB_MODE))throw Error('NOVA_AB_MODE must be memory, live-turn, cover-pressure, or bomber-physics');
 if(!Number.isInteger(LAYOUT_INDEX)||LAYOUT_INDEX<0||LAYOUT_INDEX>=LAYOUTS.length)
  throw Error('NOVA_LAYOUT_INDEX must be 0, 1, or 2');
 if(!Number.isInteger(SEED_INDEX)||SEED_INDEX<0||SEED_INDEX>1000)
@@ -54,20 +52,7 @@ async function arm(browser,enabled,label){
      '/* research-only causal OFF: leave newborn fragments at birth */')});
    });
   }
-  if(SHOT_LEDGER_RESEARCH&&enabled){
-    await page.route('http://127.0.0.1:8765/',async route=>{
-      const response=await route.fetch(),html=await response.text();
-      if(response.status()!==200)throw Error('shot ledger source response unavailable');
-      patchedCount++;
-      await route.fulfill({response,body:patchMaterializedCore(html)});
-    });
-  }
   await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded',timeout:45000});
-  if(SHOT_LEDGER_RESEARCH&&enabled){
-    assert.equal(patchedCount,1,'one source response must be patched');
-    await page.addScriptTag({content:fs.readFileSync(path.join(__dirname,
-      '../research/projectile-callback-ledger.cjs'),'utf8')});
-  }
   await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({state:'visible',timeout:45000});
   if(AB_MODE==='bomber-physics')assert.equal(patchedCount,enabled?0:1,
    'Causal OFF must patch exactly one shipping Disciplines script');
@@ -131,14 +116,6 @@ async function arm(browser,enabled,label){
     const density=window.__novaProjectileDensityAudit;
     if(!density)throw Error('projectile density research helper missing');
     g.__novaProjectileDensityAudit=density.install(g,density.create());
-    if(abMode==='shot-ledger'&&enabled){
-      const factory=window.__novaResearchProjectileCallbackLedger?.createProjectileCallbackLedger;
-      if(typeof factory!=='function')throw Error('shot ledger factory missing');
-      const ledger=factory(g,{limit:4096});ledger.install();
-      g.__novaShotLedger=ledger;
-      g.__novaShotLedgerTotals={frames:0,callbacks:0,scopedCalls:0,unusedScopes:0,
-        unknown:0,observerErrors:0,overflow:0};
-    }
    /* Paused rendering still runs requestAnimationFrame and may mutate shared
     * visual/game caches between independent OFF replays. Cancel the loop:
     * this is a deterministic headless simulation, not a screenshot test. */
@@ -173,7 +150,7 @@ async function arm(browser,enabled,label){
    if(g.__novaBattlefield?.name!==['CROSSFIRE','SPLIT HORIZON','FOUR GATES'][terrainIndex])throw Error('uncontrolled layout '+g.__novaBattlefield?.name);
    const ai=window.__novaMakeRequire('')('game/ai');
    if(!ai||typeof ai.updateAI!=='function')throw Error('missing composed AI');
-   if(!enabled&&abMode!=='cover-pressure'&&abMode!=='bomber-physics'&&abMode!=='shot-ledger'){
+   if(!enabled&&abMode!=='cover-pressure'&&abMode!=='bomber-physics'){
     const original=ai.updateAI;
     if(abMode==='memory'){
      // Historical experiment: suppress stale memory (live turns still ON).
@@ -397,13 +374,6 @@ async function arm(browser,enabled,label){
       // A manual simulation must resolve or censor before advancing.
       if(offer.handle(g,policy).censored)break;
       g.update(dt);
-      if(g.__novaShotLedger){
-        const s=g.__novaShotLedger.snapshot(),a=g.__novaShotLedgerTotals;
-        a.frames++;a.callbacks+=s.events.length;a.scopedCalls+=s.scopedCalls;
-        a.unusedScopes+=s.unusedScopes;a.unknown+=s.unknown;
-        a.observerErrors+=s.observerErrors;a.overflow+=s.overflow;
-        g.__novaShotLedger.nextFrame();
-      }
       g.__novaResearchFrames=(g.__novaResearchFrames||0)+1;
       if(offer.handle(g,policy).censored)break;
       if(g.__novaExperimentABMode==='bomber-physics'){
@@ -466,7 +436,6 @@ async function arm(browser,enabled,label){
      pilotAlive:!!p.alive,score:p.score,kills:p.kills,level:p.level,
      botCount:g.tanks.filter(t=>t.ai&&t.alive).length},
     projectileDensityAudit:g.__novaProjectileDensityAudit,
-    ...(g.__novaShotLedgerTotals?{shotLedgerResearch:g.__novaShotLedgerTotals}:{}),
     ...(g.__novaExperimentABMode==='bomber-physics'?{bomberPhysicsTrace:{
      firstAdvanceTime:g.__novaCausalFirstAdvanceTime??null,
      samples:g.__novaCausalTrace||[],
@@ -560,17 +529,6 @@ async function arm(browser,enabled,label){
   assert.equal(off.initial.fingerprint,on.initial.fingerprint,'ON/OFF must begin from identical real world');
   assert.equal(off.initial.fingerprint,offReplay.initial.fingerprint,'same seed must reproduce initial world');
   const same=JSON.stringify(off.result)===JSON.stringify(offReplay.result);
-  if(SHOT_LEDGER_RESEARCH){
-    assert.ok(on.result.shotLedgerResearch,'instrumented ON ledger missing');
-    assert.equal(on.result.shotLedgerResearch.observerErrors,0);
-    assert.equal(on.result.shotLedgerResearch.overflow,0);
-    for(const key of ['game','projectileDensityAudit']){
-      assert.deepEqual(on.result[key],off.result[key],
-        'shot-ledger observer must preserve natural physical '+key);
-    }
-    assert.equal(off.result.shotLedgerResearch,undefined);
-    assert.equal(offReplay.result.shotLedgerResearch,undefined);
-  }
   const naturalOpportunityObserved=[off,on].every(a=>a.result.naturalBlooms>0);
   let bomberPhysicsCausal=null;
   if(AB_MODE==='bomber-physics'){
