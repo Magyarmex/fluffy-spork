@@ -208,3 +208,33 @@ test('malformed victim getter cannot interrupt combat or claim complete observat
   assert.equal(snap.allCapturedCallbacksAttributed,false);
   assert.equal(snap.events.length,0);
 });
+
+test('observer identity failure consumes first callback scope without laundering later damage',()=>{
+  const g=game(), l=createProjectileCallbackLedger(g); l.install();
+  const bad={hp:10,get id(){throw Error('identity unavailable');}};
+  l.withProjectile({id:77},()=>{
+    assert.equal(g.damageTank(bad,2),8);
+    assert.equal(g.damageShape({id:5,hp:10},3),7);
+  });
+  const s=l.snapshot();
+  assert.equal(s.observerErrors,1);
+  assert.equal(s.events.length,1);
+  assert.equal(s.events[0].targetId,5);
+  assert.equal(s.events[0].shotId,null);
+  assert.equal(s.events[0].attribution,'unknown');
+  assert.equal(s.allCapturedCallbacksAttributed,false);
+});
+
+test('overflow consumes first callback scope even when no event can be stored',()=>{
+  const g=game(), l=createProjectileCallbackLedger(g,{limit:1}); l.install();
+  g.damageTank({id:1,hp:10},1);
+  l.withProjectile({id:88},()=>{
+    g.damageTank({id:2,hp:10},1);
+    g.damageDrone({id:3,hp:10},1);
+  });
+  const s=l.snapshot();
+  assert.equal(s.overflow,2);
+  assert.equal(s.events.length,1);
+  assert.equal(s.events[0].shotId,null);
+  assert.equal(s.bounded,false);
+});
