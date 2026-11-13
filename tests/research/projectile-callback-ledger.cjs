@@ -8,7 +8,7 @@ function createProjectileCallbackLedger(game, options = {}) {
     throw new RangeError('invalid event budget');
   const methods = ['damageTank', 'damageShape', 'damageDrone'];
   const originals = new Map(), wrappers = new Map(), events = [];
-  let scope = null, installed = false, overflow = 0, epoch = 0, callbackDepth = 0, unknown = 0, unidentifiedTargets = 0;
+  let scope = null, installed = false, overflow = 0, epoch = 0, callbackDepth = 0, unknown = 0, unidentifiedTargets = 0, observerErrors = 0;
   function append(kind, target, args) {
     if (events.length >= limit) { overflow++; return; }
     const id = target && Number.isSafeInteger(target.id) ? target.id : null;
@@ -39,7 +39,9 @@ function createProjectileCallbackLedger(game, options = {}) {
         const original = game[name];
         originals.set(name, own || null);
         const wrapper = function(...args) {
-          append(name, args[0], args);
+          // Observer failures must never prevent an actual combat callback.
+          try { append(name, args[0], args); }
+          catch (_) { observerErrors++; }
           callbackDepth++;
           try { return original.apply(this, args); }
           finally { callbackDepth--; }
@@ -72,12 +74,12 @@ function createProjectileCallbackLedger(game, options = {}) {
   function nextFrame() {
     if (scope || callbackDepth > 0)
       throw new Error('cannot advance frame inside damage callback');
-    epoch++; events.length = 0; overflow = 0; unknown = 0; unidentifiedTargets = 0;
+    epoch++; events.length = 0; overflow = 0; unknown = 0; unidentifiedTargets = 0; observerErrors = 0;
   }
   function snapshot() {
-    return Object.freeze({epoch, events: Object.freeze(events.slice()), overflow, unknown, unidentifiedTargets,
-      bounded: overflow === 0,
-      allCapturedCallbacksAttributed: overflow === 0 && unknown === 0 && unidentifiedTargets === 0});
+    return Object.freeze({epoch, events: Object.freeze(events.slice()), overflow, unknown, unidentifiedTargets, observerErrors,
+      bounded: overflow === 0 && observerErrors === 0,
+      allCapturedCallbacksAttributed: overflow === 0 && observerErrors === 0 && unknown === 0 && unidentifiedTargets === 0});
   }
   function uninstall() {
     if (!installed) return false;
