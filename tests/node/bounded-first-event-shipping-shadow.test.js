@@ -44,7 +44,7 @@ function boot(){
  return new m.exports.Game();
 }
 function shot(){return {id:101,kind:'bullet',ownerId:1,x:0,y:0,vx:6000,vy:0,
- r:3,radiusCertified:true,dmg:20,pen:0,ttl:.005,hits:0,dead:false,shell:false,beam:false};}
+ r:3,radiusCertified:true,frameStartEpoch:1,dmg:20,pen:0,ttl:.005,hits:0,dead:false,shell:false,beam:false};}
 for(const fps of [30,60,120,240])test('shipping contact agrees with read-only witness at '+fps+'Hz',()=>{
  const g=boot(),target={id:2,kind:'tank',cls:'scout',x:40,y:0,hp:100,alive:true};
  g.tanks=[target];g.hash.query=(_x,_y,_r,out)=>{out.length=0;out.push(target);};
