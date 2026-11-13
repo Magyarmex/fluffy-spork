@@ -263,12 +263,46 @@ test('projectile ID getter is sampled once before scope attribution',()=>{
   assert.equal(s.observerErrors,0);
 });
 
-test('invalid sampled projectile ID cannot establish a scope',()=>{
+test('invalid sampled projectile ID cannot establish a scope or block damage',()=>{
   const g=game(), l=createProjectileCallbackLedger(g); l.install();
   let reads=0;
-  const shot={get id(){reads++;return NaN;}};
-  assert.throws(()=>l.withProjectile(shot,()=>g.damageTank({id:1,hp:10},1)),/projectile ID/);
+  const shot={get id(){reads++;return NaN;}}, victim={id:1,hp:10};
+  assert.equal(l.withProjectile(shot,()=>g.damageTank(victim,3)),7);
   assert.equal(reads,1);
-  g.damageTank({id:1,hp:10},1);
-  assert.equal(l.snapshot().events[0].shotId,null);
+  assert.equal(victim.hp,7);
+  const s=l.snapshot();
+  assert.equal(s.events[0].shotId,null);
+  assert.equal(s.events[0].attribution,'unknown');
+  assert.equal(s.observerErrors,1);
+  assert.equal(s.bounded,false);
+});
+
+test('throwing projectile identity getter cannot interrupt damage',()=>{
+  const g=game(), l=createProjectileCallbackLedger(g); l.install();
+  const shot={get id(){throw Error('bad observer identity');}}, victim={id:9,hp:10};
+  assert.equal(l.withProjectile(shot,()=>g.damageShape(victim,4)),6);
+  const s=l.snapshot();
+  assert.equal(s.events[0].shotId,null);
+  assert.equal(s.observerErrors,1);
+  assert.equal(s.allCapturedCallbacksAttributed,false);
+});
+
+test('invalid nested projectile cannot borrow the parent shot ID',()=>{
+  const g=game(), l=createProjectileCallbackLedger(g); l.install();
+  l.withProjectile({id:11},()=>{
+    l.withProjectile({id:NaN},()=>g.damageTank({id:1,hp:10},1));
+    g.damageDrone({id:2,hp:10},1);
+  });
+  const s=l.snapshot();
+  assert.deepEqual(s.events.map(e=>e.shotId),[null,11]);
+  assert.equal(s.observerErrors,1);
+});
+
+test('invalid identity fallback preserves callback exceptions and outer scope',()=>{
+  const g=game(), l=createProjectileCallbackLedger(g); l.install();
+  assert.throws(()=>l.withProjectile({id:12},()=>
+    l.withProjectile(null,()=>{throw Error('combat failure');})),/combat failure/);
+  l.withProjectile({id:13},()=>g.damageTank({id:3,hp:10},1));
+  assert.equal(l.snapshot().events[0].shotId,13);
+  assert.equal(l.snapshot().observerErrors,1);
 });
