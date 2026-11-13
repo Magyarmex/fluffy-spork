@@ -49,13 +49,14 @@ function shot(){return {id:101,kind:'bullet',ownerId:1,x:0,y:0,vx:6000,vy:0,
 for(const fps of [30,60,120,240])test('shipping contact agrees with read-only witness at '+fps+'Hz',()=>{
  const g=boot(),target={id:2,kind:'tank',cls:'scout',x:40,y:0,hp:100,alive:true};
  g.tanks=[target];g.hash.query=(_x,_y,_r,out)=>{out.length=0;out.push(target);};
- g.damageTank=(t,d)=>{t.hp-=d;};
+ const callbacks=[];g.damageTank=(t,d)=>{callbacks.push({id:t.id,damage:d});t.hp-=d;};
  const b=shot(),world={complete:true,epoch:1,bounds:{minX:-2230,maxX:2230,minY:-2230,maxY:2230},
  bodies:[{id:2,x:40,y:0,r:18,collisionEligible:true,radiusCertified:true,certifiedStationary:true,epoch:1}],walls:[],projectiles:[]};
  const event=earliestOrdinaryEvent(b,1/fps,world);
  assert.equal(event.kind,'body');assert.ok(event.time<b.ttl);
  g.bullets=[b];g.updateBullets(1/fps);
  assert.equal(target.hp,80,'shipping engine must register physical first contact');
+ assert.deepEqual(callbacks,[{id:2,damage:20}], 'exactly one canonical damage callback');
 });
 
 for(const fps of [30,60,120,240])test('shipping TTL expiry agrees with no premature body damage at '+fps+'Hz',()=>{
@@ -69,4 +70,5 @@ for(const fps of [30,60,120,240])test('shipping TTL expiry agrees with no premat
   'at 240Hz the projectile remains live past this frame, without a body event');
  g.bullets=[b];g.updateBullets(1/fps);
  assert.equal(target.hp,100,'a target beyond the frame/TTL corridor must not receive phantom damage');
+ assert.deepEqual(callbacks,[], 'no damage callback may fire beyond the physical corridor');
 });
