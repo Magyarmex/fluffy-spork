@@ -25,7 +25,7 @@ function coreMethod(instrument = false) {
     // This does not modify production and does not instrument Battlefield TTL.
     const needle='this.damageTank(e, b.dmg, b.ownerId, Math.cos(ang) * (b.knock || 0) * 0.006, Math.sin(ang) * (b.knock || 0) * 0.006);';
     assert.ok(body.includes(needle),'shipping direct-tank callback changed');
-    body=body.replace(needle,'this.__novaShotLedger.withProjectile(b, () => '+needle+')');
+    body=body.replace(needle,'this.__novaShotLedger.withProjectile(b, () => '+needle.slice(0,-1)+');');
   }
   return new Function('types_1','classes_1','M',
     'return function(dt){'+body+'}')(
