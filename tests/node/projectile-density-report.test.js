@@ -56,7 +56,8 @@ test('pen-one matrix preserves unknown historical fields and rejects partial dat
  assert.equal(check(old,'historical'),old);
  const d=density();
  Object.assign(d,{penOneShotInputs:2,penOneExpiringInputs:1,
-  penOneFramesWithInputs:2,penOneRawInputs:3,penOneMissingDeadInputs:1,
+  penOneFramesWithInputs:2,penOneRawInputs:3,penOneRawExpiringInputs:1,
+  penOneMissingDeadInputs:1,
   penOneUnknownKindInputs:0,penOneWithoutEpochInputs:1,
   penOneScanCensoredFrames:0});
  assert.equal(check(d,'current'),d);
