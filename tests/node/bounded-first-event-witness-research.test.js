@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
 const {circleContact,earliestOrdinaryEvent:earliest}=require('../research/bounded-first-event-witness.cjs');
-const shot=()=>({x:0,y:0,vx:6000,vy:0,r:3,radiusCertified:true,ttl:.005,dead:false,shell:false,beam:false,splash:false});
+const shot=()=>({x:0,y:0,vx:6000,vy:0,r:3,radiusCertified:true,frameStartEpoch:1,ttl:.005,dead:false,shell:false,beam:false,splash:false});
 const world=()=>({complete:true,epoch:1,bounds:{minX:-2230,maxX:2230,minY:-2230,maxY:2230},bodies:[],walls:[],projectiles:[]});
 for(const fps of [30,60,120,240])test('physical body before TTL at '+fps+'Hz',()=>{
  const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,radiusCertified:true,epoch:1});
@@ -11,7 +11,7 @@ for(const fps of [30,60,120,240])test('physical body before TTL at '+fps+'Hz',()
 test('body beyond TTL cannot win',()=>{const w=world();w.bodies.push({id:2,x:100,y:0,r:18,certifiedStationary:true,collisionEligible:true,radiusCertified:true,epoch:1});assert.equal(earliest(shot(),1/30,w).kind,'expiry');});
 test('permanent wall before body wins',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,radiusCertified:true,epoch:1});w.walls.push({id:9,time:.001,complete:true,solid:true,permanent:true});assert.deepEqual(earliest(shot(),1/30,w),{kind:'wall',id:9,time:.001});});
 test('wall after body cannot steal body',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,radiusCertified:true,epoch:1});w.walls.push({id:9,time:.004,complete:true,solid:true,permanent:true});assert.equal(earliest(shot(),1/30,w).kind,'body');});
-test('interception before body wins',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,radiusCertified:true,epoch:1});w.projectiles.push({id:9,time:.002,complete:true,hostile:true});assert.equal(earliest(shot(),1/30,w).kind,'interception');});
+test('interception before body wins',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,radiusCertified:true,epoch:1});w.projectiles.push({id:9,time:.002,complete:true,hostile:true,frameStartEpoch:1});assert.equal(earliest(shot(),1/30,w).kind,'interception');});
 test('simultaneous body contacts abstain',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,radiusCertified:true,epoch:1},{id:3,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,radiusCertified:true,epoch:1});assert.equal(earliest(shot(),1/30,w).reason,'tie');});
 test('unknown movement abstains even far away',()=>{const w=world();w.bodies.push({id:2,x:1000,y:1000,r:18,certifiedStationary:false,collisionEligible:true,radiusCertified:true,epoch:1});assert.equal(earliest(shot(),1/30,w).reason,'body-motion');});
 test('certified remote moving body does not veto local body',()=>{
@@ -162,4 +162,11 @@ test('contact at expiry boundary is uncertain, not a proven miss',()=>{
 test('destructible cover cannot be certified by static wall witness',()=>{
  const w=world();w.walls.push({id:9,time:.001,complete:true,solid:true,permanent:false});
  assert.equal(earliest(shot(),1/30,w).reason,'wall-witness');
+});
+
+test('newborn projectile cannot be backdated to frame start',()=>{
+ const s=shot();s.frameStartEpoch=0;
+ assert.equal(earliest(s,1/30,world()).reason,'invalid-input');
+ const w=world();w.projectiles.push({id:9,time:.001,complete:true,hostile:true,frameStartEpoch:0});
+ assert.equal(earliest(shot(),1/30,w).reason,'interception-witness');
 });
