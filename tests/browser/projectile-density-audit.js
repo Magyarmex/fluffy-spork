@@ -47,7 +47,7 @@
      Number.isSafeInteger(g.__novaFrameStartBulletIdCeiling)){
    for(const b of bs){
     if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
-       b.pen!==0||b.hits!==0||
+       b.__novaRail||b.pen!==0||b.hits!==0||
        !Number.isSafeInteger(b.id)||b.id>=g.__novaFrameStartBulletIdCeiling||
        !Number.isSafeInteger(b.ownerId)||
        ![b.x,b.y,b.vx,b.vy,b.r,b.ttl,b.dmg].every(Number.isFinite)||
