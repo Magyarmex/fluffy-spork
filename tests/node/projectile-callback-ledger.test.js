@@ -35,7 +35,8 @@ test('budget overflow explicitly invalidates completeness', () => {
   const g=game(), l=createProjectileCallbackLedger(g,{limit:1}); l.install();
   g.damageTank({hp:10},1); g.damageTank({hp:10},1);
   const s=l.snapshot(); assert.equal(s.events.length,1);
-  assert.equal(s.overflow,1); assert.equal(s.complete,false);
+  assert.equal(s.overflow,1); assert.equal(s.bounded,false);
+  assert.equal(s.allCapturedCallbacksAttributed,false);
   assert.ok(Object.isFrozen(s.events));
 });
 test('frame epoch cannot advance during callback scope', () => {
@@ -64,11 +65,23 @@ test('nested unscoped damage cannot inherit parent shot identity', () => {
 test('each frame has independent bounded complete event ledger', () => {
   const g=game(), l=createProjectileCallbackLedger(g,{limit:1}); l.install();
   g.damageTank({hp:10},1); g.damageTank({hp:10},1);
-  assert.equal(l.snapshot().complete,false);
+  assert.equal(l.snapshot().bounded,false);
   l.nextFrame();
   assert.equal(l.snapshot().events.length,0);
   assert.equal(l.snapshot().overflow,0);
   g.damageShape({id:3,hp:10},1);
-  assert.equal(l.snapshot().complete,true);
+  assert.equal(l.snapshot().bounded,true);
+  assert.equal(l.snapshot().allCapturedCallbacksAttributed,false);
+  assert.equal(l.snapshot().unknown,1);
   assert.equal(l.snapshot().events[0].epoch,1);
+});
+
+test('fully scoped callback reports captured attribution, not whole-game completeness',()=>{
+  const g=game(), l=createProjectileCallbackLedger(g); l.install();
+  l.withProjectile({id:8},()=>g.damageTank({id:2,hp:10},3));
+  const s=l.snapshot();
+  assert.equal(s.bounded,true);
+  assert.equal(s.allCapturedCallbacksAttributed,true);
+  assert.equal(Object.hasOwn(s,'complete'),false,
+    'the ledger cannot certify terrain, direct HP writes or missed contacts');
 });
