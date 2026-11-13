@@ -8,7 +8,8 @@ function density(){
   projectileCountBuckets:{zero:1,one:0,two:0,threeToEight:1,
    nineToSixteen:1,seventeenToThirtyTwo:0,thirtyThreePlus:0},
   basicEligibleFrames:1,coverBreaks:2,coverBreaksAtThreeToEight:1,
-  coverBreaksAboveEight:1,coverBreaksBasicEligible:1,brokenCounterResets:0};
+  coverBreaksAboveEight:1,coverBreaksBasicEligible:1,brokenCounterResets:0,
+  threeShotPairFrames:1,threeShotWitnessedNonTankFrames:1};
 }
 function arm(seed,policy){
  return {metadata:{layout:'CROSSFIRE',seed,pilotPolicy:policy},
@@ -30,6 +31,8 @@ test('natural projectile matrix keeps all predeclared pairs, censors and weighte
   assert.equal(out.totals.OFF.bulletUpdateCalls,6);
   assert.equal(out.totals.ON.coverBreaks,4);
   assert.equal(out.totals.ON.basicEligibleFrames,2);
+  assert.equal(out.totals.ON.threeShotPairFrames,2);
+  assert.equal(out.totals.ON.threeShotWitnessedNonTankFrames,2);
   assert.equal(out.totals.OFF.fractionAboveEight,1/3);
   assert.equal(out.totals.ON.fractionCoverBreaksAtBasicGate,.5);
   assert.equal(out.observations.filter(x=>x.ON.endedEarly).length,2);
@@ -49,4 +52,9 @@ test('density report refuses invented, inconsistent or absent denominators',()=>
  assert.throws(()=>check(empty,'mutant'),/contradictory/);
  const invalid=density();invalid.coverBreaksBasicEligible=2;
  assert.throws(()=>check(invalid,'mutant'),/contradictory/);
+});
+
+test('three-shot witness count cannot exceed its pair denominator',()=>{
+ const d=density();d.threeShotWitnessedNonTankFrames=2;
+ assert.throws(()=>check(d,'mutant'),/contradictory/);
 });
