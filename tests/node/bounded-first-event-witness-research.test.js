@@ -106,3 +106,30 @@ test('finite overflowing speed cannot certify no hit',()=>{
  const s=shot();s.vx=1e308;
  assert.equal(earliest(s,1/30,w).reason,'uncertain-contact');
 });
+
+test('translation and rotation preserve earliest event time',()=>{
+ let seed=0x147e11;const rnd=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ for(let i=0;i<10000;i++){
+  const s=shot();s.x=(rnd()-.5)*150;s.y=(rnd()-.5)*150;
+  s.vx=(rnd()-.5)*9000;s.vy=(rnd()-.5)*9000;s.ttl=.002+rnd()*.015;
+  const w=world();w.bodies.push({id:2,x:(rnd()-.5)*150,y:(rnd()-.5)*150,r:10+rnd()*20,certifiedStationary:true,collisionEligible:true});
+  w.bounds={minX:-1e6,maxX:1e6,minY:-1e6,maxY:1e6};
+  const original=earliest(s,1/30,w);
+  const dx=1200,dy=-500,angle=1.1,co=Math.cos(angle),si=Math.sin(angle);
+  const transform=(x,y)=>[co*x-si*y+dx,si*x+co*y+dy];
+  const [sx,sy]=transform(s.x,s.y),[vx,vy]=[co*s.vx-si*s.vy,si*s.vx+co*s.vy];
+  const [bx,by]=transform(w.bodies[0].x,w.bodies[0].y);
+  const moved={...s,x:sx,y:sy,vx,vy};
+  const newWorld={...w,bodies:[{...w.bodies[0],x:bx,y:by}]};
+  const result=earliest(moved,1/30,newWorld);
+  assert.equal(result.kind,original.kind,'kind '+i);
+  if(result.time!==undefined)assert.ok(Math.abs(result.time-original.time)<1e-8,'time '+i);
+ }
+});
+test('body order does not change unique first event',()=>{
+ const w=world();w.bodies=[
+  {id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true},
+  {id:3,x:80,y:0,r:18,certifiedStationary:true,collisionEligible:true}];
+ const a=earliest(shot(),1/30,w);w.bodies.reverse();
+ assert.deepEqual(earliest(shot(),1/30,w),a);
+});
