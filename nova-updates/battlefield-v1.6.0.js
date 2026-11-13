@@ -1997,6 +1997,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    if(!remote||remote.dead||remote.pen!==0||
       !certifiedTTLFrameStart(g,remote)||
       remote.shell||remote.beam||remote.splash||remote.__v17Cannon||
+      (remote.hits!=null&&!Number.isFinite(remote.hits))||
+      (remote.knock!=null&&!Number.isFinite(remote.knock))||
       (remote.hits||0)!==0||(remote.knock||0)!==0||
       !(remote.ttl>dt)||!Number.isFinite(remote.x)||
       !Number.isFinite(remote.y)||!Number.isFinite(remote.vx)||
