@@ -22,7 +22,7 @@ function circleContact(px,py,vx,vy,cx,cy,r,until){
  return t>=0&&t<=until?t:null;
 }
 function earliestOrdinaryEvent(shot,frame,world){
- if(!shot||!world||world.complete!==true||!Array.isArray(world.bodies)||
+ if(!shot||!world||world.complete!==true||!Number.isSafeInteger(world.epoch)||!Array.isArray(world.bodies)||
    !Array.isArray(world.walls)||!Array.isArray(world.projectiles)||
    ![shot.x,shot.y,shot.vx,shot.vy,shot.r,shot.ttl,frame].every(Number.isFinite)||
    !(shot.r>0)||!(shot.ttl>0)||!(frame>0)||frame>.05||shot.dead||
@@ -41,10 +41,10 @@ function earliestOrdinaryEvent(shot,frame,world){
    if(t!==null&&t>=0)add('exit',null,t);
  }
  for(const body of world.bodies){
-   if(!body||body.collisionEligible!==true||!Number.isFinite(body.r)||!(body.r>0)||body.id==null)
+   if(!body||body.epoch!==world.epoch||body.collisionEligible!==true||!Number.isFinite(body.r)||!(body.r>0)||body.id==null)
      return {kind:'abstain',reason:'body-geometry'};
    if(body.certifiedLinear===true){
-     if(![body.startX,body.startY,body.vx,body.vy].every(Number.isFinite))
+     if(body.linearDt!==frame||![body.startX,body.startY,body.vx,body.vy].every(Number.isFinite))
        return {kind:'abstain',reason:'linear-witness'};
      const t=circleContact(shot.x,shot.y,shot.vx-body.vx,shot.vy-body.vy,
        body.startX,body.startY,shot.r+body.r,limit);
