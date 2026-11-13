@@ -50,3 +50,19 @@ test('density report refuses invented, inconsistent or absent denominators',()=>
  const invalid=density();invalid.coverBreaksBasicEligible=2;
  assert.throws(()=>check(invalid,'mutant'),/contradictory/);
 });
+
+test('pen-one matrix preserves unknown historical fields and rejects partial data',()=>{
+ const old=density();
+ assert.equal(check(old,'historical'),old);
+ const d=density();
+ Object.assign(d,{penOneShotInputs:2,penOneExpiringInputs:1,
+  penOneFramesWithInputs:2,penOneRawInputs:3,penOneMissingDeadInputs:1,
+  penOneUnknownKindInputs:0,penOneWithoutEpochInputs:1,
+  penOneScanCensoredFrames:0});
+ assert.equal(check(d,'current'),d);
+ d.penOneExpiringInputs=3;
+ assert.throws(()=>check(d,'invalid'),/contradictory pen-one/);
+ d.penOneExpiringInputs=1;
+ delete d.penOneUnknownKindInputs;
+ assert.throws(()=>check(d,'partial'),/partial pen-one/);
+});
