@@ -405,3 +405,26 @@ for(const hz of [60,120])
   assert.ok(result.remaining.some(id=>id>=1200),
    'newborn projectile identity must survive callback array churn');
  });
+
+
+/* A malformed remote projectile cannot be certified merely because NaN
+ * becomes zero through a falsy default in the legacy engine. */
+for(const field of ['hits','knock'])
+ for(const hz of [60,120])
+ test('RESEARCH three-shot abstains on nonfinite remote '+field+' '+hz+'Hz',()=>{
+  const result=trial(hz,false,false,null,40,(_g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   const remote={
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   };
+   remote[field]=NaN;
+   bullets.push(remote);
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
+   'malformed remote projectile must not certify chronological reordering');
+ });
