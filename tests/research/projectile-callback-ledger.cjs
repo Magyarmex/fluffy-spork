@@ -10,13 +10,14 @@ function createProjectileCallbackLedger(game, options = {}) {
   const originals = new Map(), wrappers = new Map(), events = [];
   let scope = null, installed = false, overflow = 0, epoch = 0, callbackDepth = 0, unknown = 0, unidentifiedTargets = 0, observerErrors = 0;
   function append(kind, target, args) {
+    // Consume the scope before any potentially throwing identity getter or
+    // budget check. A dropped/failed first callback must never transfer its
+    // shot identity to a later unrelated callback in the same closure.
+    const attributed = !!scope && scope.remaining > 0 && callbackDepth === scope.baseDepth;
+    if (attributed) scope.remaining--;
     if (events.length >= limit) { overflow++; return; }
     const id = target && Number.isSafeInteger(target.id) ? target.id : null;
     if (id === null) unidentifiedTargets++;
-    // A scope authorizes exactly one immediate damage callback. A later
-    // callback in the same closure must not inherit an unrelated shot ID.
-    const attributed = !!scope && scope.remaining > 0 && callbackDepth === scope.baseDepth;
-    if (attributed) scope.remaining--;
     if (!attributed) unknown++;
     events.push(Object.freeze({epoch, kind, targetId: id,
       shotId: attributed ? scope.shotId : null,
