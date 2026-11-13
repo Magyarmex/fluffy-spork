@@ -271,3 +271,33 @@ for(const hz of [60,120])for(const reverse of [false,true])
   assert.equal(result.target.alive,true);
   assert.deepEqual(result.kills,[]);
  });
+
+
+/* #234 follow-up, deliberately RED acceptance experiment:
+ * A spatially remote third round must not change the physical chronology of
+ * two ordinary rounds hitting the same stationary hull in one frame.
+ * Current two-shot live-order certificate abstains when bullets.length !== 2.
+ * Do not merge this research gate until the real composed Game passes. */
+for(const hz of [60,120])
+ for(const reverse of [false,true])
+ for(const fullUpdate of [false,true])
+ test('RESEARCH three-shot remote-fire shared-hull chronology '+hz+
+      'Hz reverse='+reverse+' fullUpdate='+fullUpdate,()=>{
+  const result=trial(hz,reverse,fullUpdate,null,40,(_g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   bullets.push({
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:0,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   });
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[101,102],
+   'remote nonintersecting fire must not reverse the two physical hull contacts');
+  assert.equal(result.target.alive,false);
+  assert.deepEqual(result.kills,[102]);
+  assert.equal(result.ownerStats[1].kills,1);
+  assert.ok(result.ownerStats[1].xp>0);
+ });
