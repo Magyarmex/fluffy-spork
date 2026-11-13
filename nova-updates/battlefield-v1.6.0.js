@@ -2056,7 +2056,11 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
        e.__novaPhase==='dash'||e.__novaCommitted))return false;
     /* Missing velocity is allowed for stationary shapes; malformed
      * velocity must never silently become zero via `|| 0`. */
-    var motion=Math.hypot(e.vx==null?0:e.vx,e.vy==null?0:e.vy)*dt+96;
+    /* A velocity estimate is not a witnessed movement corridor. Until
+     * movement history is certified per kind, refuse moving third-party
+     * bodies instead of granting clearance from a guessed distance. */
+    if((e.vx!=null&&e.vx!==0)||(e.vy!=null&&e.vy!==0))return false;
+    var motion=96;
     if(!(Math.max(remote.x,rx)+remote.r+er+motion<e.x||
        Math.min(remote.x,rx)-remote.r-er-motion>e.x||
        Math.max(remote.y,ry)+remote.r+er+motion<e.y||
