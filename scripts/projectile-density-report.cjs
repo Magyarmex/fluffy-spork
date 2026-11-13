@@ -9,6 +9,7 @@ const FIELDS=['bulletUpdateCalls','projectileCountSum','basicEligibleFrames',
  'coverBreaksBasicEligible','brokenCounterResets'];
 const PEN_FIELDS=['penOneShotInputs','penOneExpiringInputs','penOneFramesWithInputs',
  'penOneRawInputs','penOneRawExpiringInputs','penOneMissingDeadInputs','penOneUnknownKindInputs',
+ 'penOneMissingOrdinaryFlagsInputs',
  'penOneWithoutEpochInputs','penOneScanCensoredFrames'];
 function check(a,label){
  if(!a||a.schema!==1)throw Error(label+': missing density schema');
