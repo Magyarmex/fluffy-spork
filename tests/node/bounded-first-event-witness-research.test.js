@@ -59,3 +59,12 @@ test('remote-motion clearance never misses bounded sample trajectories',()=>{
   }
  }
 });
+
+test('uncertified eligibility, solidity and hostility abstain',()=>{
+ const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true});
+ assert.equal(earliest(shot(),1/30,w).reason,'body-geometry');
+ w.bodies=[];w.walls.push({id:9,time:.001,complete:true});
+ assert.equal(earliest(shot(),1/30,w).reason,'wall-witness');
+ w.walls=[];w.projectiles.push({id:9,time:.001,complete:true});
+ assert.equal(earliest(shot(),1/30,w).reason,'interception-witness');
+});
