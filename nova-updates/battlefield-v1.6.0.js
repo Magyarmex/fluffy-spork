@@ -2021,7 +2021,7 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    for(var ri=0;ri<entities.length;ri++){
     var e=entities[ri];if(!e||e.dead||e.alive===false||
        (e.hp!=null&&!(e.hp>0)))continue;
-    var er=e.r||(e.cls&&CLASSES[e.cls]&&CLASSES[e.cls].size);
+    var er=e.r!=null?e.r:(e.cls&&CLASSES[e.cls]&&CLASSES[e.cls].size);
     if(!(er>0)||!Number.isFinite(er)||!Number.isFinite(e.x)||
        !Number.isFinite(e.y)||
        (e.vx!=null&&!Number.isFinite(e.vx))||
