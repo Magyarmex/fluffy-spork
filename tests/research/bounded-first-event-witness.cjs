@@ -37,6 +37,14 @@ function earliestOrdinaryEvent(shot,frame,world){
  for(const body of world.bodies){
    if(!body||body.collisionEligible!==true||!Number.isFinite(body.r)||!(body.r>0)||body.id==null)
      return {kind:'abstain',reason:'body-geometry'};
+   if(body.certifiedLinear===true){
+     if(![body.startX,body.startY,body.vx,body.vy].every(Number.isFinite))
+       return {kind:'abstain',reason:'linear-witness'};
+     add('body',body.id,circleContact(shot.x,shot.y,
+       shot.vx-body.vx,shot.vy-body.vy,body.startX,body.startY,
+       shot.r+body.r,limit));
+     continue;
+   }
    if(body.certifiedStationary===true){
      if(!Number.isFinite(body.x)||!Number.isFinite(body.y))
        return {kind:'abstain',reason:'body-geometry'};
