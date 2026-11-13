@@ -49,8 +49,10 @@ const {patchMaterializedCore}=require('../research/projectile-callback-source-pa
       g.__novaShotLedger=ledger;
       let frames=0,callbacks=0,scopedCalls=0,unusedScopes=0,observerErrors=0,unknown=0,unidentifiedTargets=0;
       const frameMs=[];
-      for(let i=0;i<60&&g.status==='playing';i++){
+      for(let i=0;i<600&&g.status==='playing';i++){
+        const t0=performance.now();
         g.update(1/30);
+        frameMs.push(performance.now()-t0);
         const s=ledger.counters();
         frames++;callbacks+=s.eventsCaptured;scopedCalls+=s.scopedCalls;
         unusedScopes+=s.unusedScopes;observerErrors+=s.observerErrors;
@@ -60,8 +62,10 @@ const {patchMaterializedCore}=require('../research/projectile-callback-source-pa
       }
       delete g.__novaShotLedger;
       if(!ledger.uninstall())throw Error('failed to restore real damage methods');
-      return{frames,callbacks,scopedCalls,unusedScopes,observerErrors,status:g.status,
-        time:g.time};
+      frameMs.sort((a,b)=>a-b);
+      return{frames,callbacks,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
+        p95FrameMs:frameMs[Math.ceil(frameMs.length*.95)-1],
+        maxFrameMs:frameMs[frameMs.length-1],status:g.status,time:g.time};
     });
     assert.ok(result.frames>=1,'real composed game must advance');
     assert.equal(result.observerErrors,0,'observer must not fail in natural gameplay');
