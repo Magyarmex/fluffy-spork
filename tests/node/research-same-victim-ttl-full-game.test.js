@@ -534,3 +534,29 @@ for(const hz of [60,120])
   assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
    'unwitnessed Live Vector movement must veto speculative reordering');
  });
+
+
+/* A Phase Shift relocates without traversing the intervening chord and
+ * resets ordinary sweep coordinates. Its explicit same-frame marker must
+ * veto the third-shot side-effect certificate. */
+for(const hz of [60,120])
+ test('RESEARCH three-shot abstains after Phase Shift '+hz+'Hz',()=>{
+  const result=trial(hz,false,false,null,40,(g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   bullets.push({
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   });
+   g.tanks.push({kind:'tank',id:1300,cls:'scout',x:1700,y:1700,
+    hp:100,maxHp:100,alive:true,vx:0,vy:0,
+    __novaPhaseShiftEpoch:g.time,
+    __novaSweepMoveTime:g.time,__novaSweepPrevX:1700,
+    __novaSweepPrevY:1700});
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
+   'same-frame Phase Shift marker must veto remote-shot clearance');
+ });
