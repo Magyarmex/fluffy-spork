@@ -349,3 +349,29 @@ test('throwing method getter fails preflight without partially wrapping callback
   assert.equal(g.damageTank,original);
   assert.equal(Object.hasOwn(g,'damageTank'),true);
 });
+
+
+test('unused explicit scopes are measured without manufacturing missed-hit claims',()=>{
+  const g=game(), l=createProjectileCallbackLedger(g); l.install();
+  const hp={id:1,hp:20};
+  assert.equal(l.withProjectile({id:5},()=>{hp.hp-=3;return hp.hp;}),17);
+  assert.equal(l.snapshot().unusedScopes,1);
+  assert.equal(l.snapshot().events.length,0);
+  assert.equal(l.snapshot().bounded,true);
+  l.withProjectile({id:6},()=>g.damageTank(hp,2));
+  assert.equal(l.snapshot().unusedScopes,1);
+  assert.equal(l.snapshot().events[0].shotId,6);
+  l.nextFrame();
+  assert.equal(l.snapshot().unusedScopes,0);
+  assert.equal(l.snapshot().events.length,0);
+});
+
+test('scope exhaustion is tracked even when the callback throws or observation overflows',()=>{
+  const g=game(), l=createProjectileCallbackLedger(g,{limit:1}); l.install();
+  assert.throws(()=>l.withProjectile({id:1},()=>{throw Error('pre-hit failure');}),/pre-hit failure/);
+  assert.equal(l.snapshot().unusedScopes,1);
+  l.withProjectile({id:2},()=>g.damageTank({id:1,hp:10},1));
+  l.withProjectile({id:3},()=>g.damageTank({id:2,hp:10},1));
+  assert.equal(l.snapshot().unusedScopes,1,'overflow still consumes the scope');
+  assert.equal(l.snapshot().overflow,1);
+});
