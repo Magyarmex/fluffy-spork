@@ -62,9 +62,9 @@ function add(sum,a){
 }
 function finish(a){
  const calls=a.bulletUpdateCalls,breaks=a.coverBreaks;
- return {...a,
-  penOneMetrics:a.penOneComplete?a.penOneMetrics:null,
-  penOneComplete:undefined,
+ const {penOneComplete,...rest}=a;
+ return {...rest,
+  penOneMetrics:penOneComplete?a.penOneMetrics:null,
   fractionAboveEight:calls?a.projectileCountBuckets.nineToSixteen/calls+
    (a.projectileCountBuckets.seventeenToThirtyTwo+a.projectileCountBuckets.thirtyThreePlus)/calls:null,
   fractionBasicEligible:calls?a.basicEligibleFrames/calls:null,
