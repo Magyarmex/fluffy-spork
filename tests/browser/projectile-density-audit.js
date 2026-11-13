@@ -56,7 +56,8 @@
     Number.isFinite(e.__novaShapeSweepPrevY)&&
     e.__novaShapeSweepPrevX===e.x&&e.__novaShapeSweepPrevY===e.y&&
     (e.vx==null||e.vx===0)&&(e.vy==null||e.vy===0))&&
-   (g.drones||[]).every(e=>e&&e.kind==='drone'&&
+   (g.drones||[]).every(e=>e&&(!(e.hp>0)||
+    (e.kind==='drone'&&
     e.__novaChronoDroneEpoch===epoch&&
     Number.isFinite(e.__novaChronoDronePrevX)&&
     Number.isFinite(e.__novaChronoDronePrevY)&&
@@ -65,7 +66,7 @@
     e.__lvVX==null&&e.__lvVY==null&&
     e.__novaVX==null&&e.__novaVY==null&&
     e.__novaIdleVX==null&&e.__novaIdleVY==null&&
-    e.__novaPhase!=='dash'&&!e.__novaCommitted);
+    e.__novaPhase!=='dash'&&!e.__novaCommitted)));
   return {n,dt,eligible,broken:broken(g),pair,witness};
  }
  function after(a,s,g){
