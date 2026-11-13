@@ -28,18 +28,20 @@ function createProjectileCallbackLedger(game, options = {}) {
   }
   function install() {
     if (installed) return false;
-    // Preflight all methods before touching the instance. Preserve inherited
-    // prototype ownership and exact own descriptors on uninstall.
+    // Snapshot each method once before mutation. A stateful accessor must not
+    // validate one callback and silently wrap a different callback later.
+    const preflight = new Map();
     for (const name of methods) {
-      if (typeof game[name] !== 'function') throw new TypeError(name + ' missing');
       const own = Object.getOwnPropertyDescriptor(game, name);
       if ((own && !own.configurable) || (!own && !Object.isExtensible(game)))
         throw new TypeError(name + ' cannot be safely wrapped');
+      const original = game[name];
+      if (typeof original !== 'function') throw new TypeError(name + ' missing');
+      preflight.set(name, {own, original});
     }
     try {
       for (const name of methods) {
-        const own = Object.getOwnPropertyDescriptor(game, name);
-        const original = game[name];
+        const {own, original} = preflight.get(name);
         originals.set(name, own || null);
         const wrapper = function(...args) {
           // Observer failures must never prevent an actual combat callback.
