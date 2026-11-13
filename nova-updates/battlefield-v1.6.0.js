@@ -2021,7 +2021,12 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
     * This makes array-order changes independent of its side effects. */
    var entities=tanks.concat(shapes,drones);
    for(var ri=0;ri<entities.length;ri++){
-    var e=entities[ri];if(!e||e.dead||e.alive===false||
+    var e=entities[ri];if(!e)continue;
+    /* Core tank contact checks alive, not hp/dead. Contradictory
+     * state cannot authorize ignoring a potentially collidable hull. */
+    if(e.kind==='tank'&&e.alive!==false&&
+       (e.dead===true||(e.hp!=null&&!(e.hp>0))))return false;
+    if(e.dead||e.alive===false||
        (e.hp!=null&&!(e.hp>0)))continue;
     var er=e.r!=null?e.r:(e.cls&&CLASSES[e.cls]&&CLASSES[e.cls].size);
     if(!(er>0)||!Number.isFinite(er)||!Number.isFinite(e.x)||
