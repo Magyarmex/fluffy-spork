@@ -71,9 +71,11 @@ function finish(a){
  const {penOneComplete,...rest}=a;
  return {...rest,
   penOneMetrics:penOneComplete?a.penOneMetrics:null,
-  fractionPenOneStrictShotUpdates:penOneComplete&&a.projectileCountSum?
+  fractionPenOneStrictShotUpdates:penOneComplete&&
+   a.penOneMetrics.penOneScanCensoredFrames===0&&a.projectileCountSum?
    a.penOneMetrics.penOneShotInputs/a.projectileCountSum:null,
-  fractionPenOneRawExpiringShotUpdates:penOneComplete&&a.projectileCountSum?
+  fractionPenOneRawExpiringShotUpdates:penOneComplete&&
+   a.penOneMetrics.penOneScanCensoredFrames===0&&a.projectileCountSum?
    a.penOneMetrics.penOneRawExpiringInputs/a.projectileCountSum:null,
   fractionAboveEight:calls?a.projectileCountBuckets.nineToSixteen/calls+
    (a.projectileCountBuckets.seventeenToThirtyTwo+a.projectileCountBuckets.thirtyThreePlus)/calls:null,
