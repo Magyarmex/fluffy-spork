@@ -35,7 +35,7 @@ function earliestOrdinaryEvent(shot,frame,world){
    if(t!==null&&t>=0)add('exit',null,t);
  }
  for(const body of world.bodies){
-   if(!body||!Number.isFinite(body.r)||!(body.r>0)||body.id==null)
+   if(!body||body.collisionEligible!==true||!Number.isFinite(body.r)||!(body.r>0)||body.id==null)
      return {kind:'abstain',reason:'body-geometry'};
    if(body.certifiedStationary===true){
      if(!Number.isFinite(body.x)||!Number.isFinite(body.y))
@@ -59,12 +59,12 @@ function earliestOrdinaryEvent(shot,frame,world){
  // Terrain and interception times must be supplied by authoritative sweeps.
  // Empty arrays are valid only when world.complete certifies exhaustive scans.
  for(const wall of world.walls){
-   if(!wall||wall.complete!==true||wall.id==null||!Number.isFinite(wall.time)||wall.time<0)
+   if(!wall||wall.complete!==true||wall.solid!==true||wall.id==null||!Number.isFinite(wall.time)||wall.time<0)
      return {kind:'abstain',reason:'wall-witness'};
    add('wall',wall.id,wall.time);
  }
  for(const p of world.projectiles){
-   if(!p||p.complete!==true||p.id==null||!Number.isFinite(p.time)||p.time<0)
+   if(!p||p.complete!==true||p.hostile!==true||p.id==null||!Number.isFinite(p.time)||p.time<0)
      return {kind:'abstain',reason:'interception-witness'};
    add('interception',p.id,p.time);
  }
