@@ -13,7 +13,9 @@
    projectileCountBuckets:Object.fromEntries(names.map(k=>[k,0])),
    basicEligibleFrames:0,coverBreaks:0,coverBreaksAtThreeToEight:0,
    coverBreaksAboveEight:0,coverBreaksBasicEligible:0,
-   brokenCounterResets:0};
+   brokenCounterResets:0,
+   firstEventOrdinaryShotInputs:0,firstEventExpiringShotInputs:0,
+   firstEventFramesWithInputs:0};
  }
  function broken(g){
   const v=g&&g.__novaBattlefield&&g.__novaBattlefield.coverBroken;
@@ -36,12 +38,32 @@
     Number.isFinite(b.vx)&&Number.isFinite(b.vy)&&
     Number.isFinite(b.r)&&b.r>0&&Number.isFinite(b.dmg)&&b.dmg>0&&
     Number.isFinite(b.ttl)&&b.ttl>dt);
-  return {n,dt,eligible,broken:broken(g)};
+  /* Research upper bound for the read-only first-event witness (#962).
+   * Counts only shot-local necessary inputs. It does NOT certify any body
+   * motion, wall sweep, interception completeness or actual first event. */
+  let ordinary=0,expiring=0;
+  if(dt>0&&dt<=.05&&g.__novaShapeSweepActive===true&&
+     g.__novaFrameStartBulletEpoch===g.__novaShapeSweepEpoch&&
+     Number.isSafeInteger(g.__novaFrameStartBulletIdCeiling)){
+   for(const b of bs){
+    if(!b||b.dead||b.shell||b.beam||b.splash||b.__v17Cannon||
+       b.pen!==0||(b.hits||0)!==0||
+       !Number.isSafeInteger(b.id)||b.id>=g.__novaFrameStartBulletIdCeiling||
+       !Number.isSafeInteger(b.ownerId)||
+       ![b.x,b.y,b.vx,b.vy,b.r,b.ttl,b.dmg].every(Number.isFinite)||
+       !(b.r>0&&b.ttl>0&&b.dmg>0))continue;
+    ordinary++;if(b.ttl<=dt)expiring++;
+   }
+  }
+  return {n,dt,eligible,broken:broken(g),ordinary,expiring};
  }
  function after(a,s,g){
   a.bulletUpdateCalls++;
   if(Number.isFinite(s.dt)&&s.dt>0)a.simulatedBulletSeconds+=s.dt;
   a.projectileCountSum+=s.n;
+  a.firstEventOrdinaryShotInputs+=s.ordinary||0;
+  a.firstEventExpiringShotInputs+=s.expiring||0;
+  if(s.ordinary>0)a.firstEventFramesWithInputs++;
   a.peakProjectiles=Math.max(a.peakProjectiles,s.n);
   a.projectileCountBuckets[bucket(s.n)]++;
   if(s.eligible)a.basicEligibleFrames++;
