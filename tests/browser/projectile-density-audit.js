@@ -13,7 +13,10 @@
    projectileCountBuckets:Object.fromEntries(names.map(k=>[k,0])),
    basicEligibleFrames:0,coverBreaks:0,coverBreaksAtThreeToEight:0,
    coverBreaksAboveEight:0,coverBreaksBasicEligible:0,
-   brokenCounterResets:0};
+   brokenCounterResets:0,
+   penOneShotInputs:0,penOneExpiringInputs:0,penOneFramesWithInputs:0,
+   penOneUnknownKindInputs:0,penOneWithoutEpochInputs:0,
+   penOneScanCensoredFrames:0};
  }
  function broken(g){
   const v=g&&g.__novaBattlefield&&g.__novaBattlefield.coverBroken;
@@ -36,12 +39,48 @@
     Number.isFinite(b.vx)&&Number.isFinite(b.vy)&&
     Number.isFinite(b.r)&&b.r>0&&Number.isFinite(b.dmg)&&b.dmg>0&&
     Number.isFinite(b.ttl)&&b.ttl>dt);
-  return {n,dt,eligible,broken:broken(g)};
+  /* Read-only necessary-input census for a future pen=1 first-contact
+   * observer. Unlike the falsified pen=0/hits=0 prototype, ordinary
+   * canonical shots can satisfy this state. No hit or safety claim follows.
+   * Preserve unknown kind and missing epoch separately so zero counts are
+   * not mistaken for evidence of zero physical opportunities. */
+  let penOne=0,penOneExpiring=0,unknownKind=0,withoutEpoch=0,censored=0;
+  if(n>256)censored=1; // bounded observer; do not hide the censored cohort
+  else if(Number.isFinite(dt)&&dt>0&&dt<=.05){
+   const witnessed=g.__novaShapeSweepActive===true&&
+    g.__novaFrameStartBulletEpoch===g.__novaShapeSweepEpoch&&
+    Number.isSafeInteger(g.__novaFrameStartBulletIdCeiling);
+   for(const b of bs){
+    if(!b||b.dead!==false||b.shell===true||b.beam===true||
+       b.splash||b.__v17Cannon||b.__novaRail||b.pen!==1||
+       b.hits!==0||!Number.isSafeInteger(b.id)||
+       !Number.isSafeInteger(b.ownerId)||
+       ![b.x,b.y,b.vx,b.vy,b.r,b.ttl,b.dmg].every(Number.isFinite)||
+       !(b.r>0&&b.ttl>0&&b.dmg>0))continue;
+    if(b.kind!=='bullet'){
+     if(b.kind==null)unknownKind++;
+     continue;
+    }
+    if(!witnessed||b.id>=g.__novaFrameStartBulletIdCeiling){
+     withoutEpoch++;continue;
+    }
+    penOne++;
+    if(b.ttl<=dt)penOneExpiring++;
+   }
+  }
+  return {n,dt,eligible,broken:broken(g),penOne,penOneExpiring,
+   unknownKind,withoutEpoch,censored};
  }
  function after(a,s,g){
   a.bulletUpdateCalls++;
   if(Number.isFinite(s.dt)&&s.dt>0)a.simulatedBulletSeconds+=s.dt;
   a.projectileCountSum+=s.n;
+  a.penOneShotInputs+=s.penOne||0;
+  a.penOneExpiringInputs+=s.penOneExpiring||0;
+  if(s.penOne>0)a.penOneFramesWithInputs++;
+  a.penOneUnknownKindInputs+=s.unknownKind||0;
+  a.penOneWithoutEpochInputs+=s.withoutEpoch||0;
+  a.penOneScanCensoredFrames+=s.censored||0;
   a.peakProjectiles=Math.max(a.peakProjectiles,s.n);
   a.projectileCountBuckets[bucket(s.n)]++;
   if(s.eligible)a.basicEligibleFrames++;
