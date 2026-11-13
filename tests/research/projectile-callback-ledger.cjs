@@ -102,7 +102,7 @@ function createProjectileCallbackLedger(game, options = {}) {
     epoch++; events.length = 0; overflow = 0; unknown = 0; unidentifiedTargets = 0; observerErrors = 0; unusedScopes = 0; scopedCalls = 0;
   }
   function snapshot() {
-    return Object.freeze({epoch, events: Object.freeze(events.slice()), overflow, unknown, unidentifiedTargets, observerErrors, scopedCalls, unusedScopes,
+    return Object.freeze({epoch, installed, events: Object.freeze(events.slice()), overflow, unknown, unidentifiedTargets, observerErrors, scopedCalls, unusedScopes,
       bounded: overflow === 0 && observerErrors === 0,
       allCapturedCallbacksAttributed: overflow === 0 && observerErrors === 0 && unknown === 0 && unidentifiedTargets === 0});
   }
