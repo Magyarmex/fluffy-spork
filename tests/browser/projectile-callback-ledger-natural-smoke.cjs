@@ -25,10 +25,14 @@ const {patchMaterializedCore}=require('../research/projectile-callback-source-pa
       '../research/projectile-callback-ledger.cjs'),'utf8')});
     await page.evaluate(()=>{
       const Game=window.__novaMakeRequire('')('game/engine').Game;
-      const start=Game.prototype.start;
+      const start=Game.prototype.start,update=Game.prototype.update;
       Game.prototype.start=function(){
-        window.__novaShotResearchGame=this;
+        if(!this.__novaDecorativeWorld)window.__novaShotResearchGame=this;
         return start.apply(this,arguments);
+      };
+      Game.prototype.update=function(){
+        if(!this.__novaDecorativeWorld)window.__novaShotResearchGame=this;
+        return update.apply(this,arguments);
       };
     });
     await page.getByRole('button',{name:/DEPLOY/i}).first().click();
