@@ -183,3 +183,18 @@ test('unbounded world scans fail closed',()=>{
   certifiedStationary:true,collisionEligible:true,radiusCertified:true,epoch:1}));
  assert.equal(earliest(shot(),1/30,w).reason,'invalid-input');
 });
+
+test('wall and body at the same physical time abstain across event types',()=>{
+ const w=world(),t=19/6000;
+ w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,
+  collisionEligible:true,radiusCertified:true,epoch:1});
+ w.walls.push({id:9,time:t,complete:true,solid:true,permanent:true});
+ assert.equal(earliest(shot(),1/30,w).reason,'tie');
+});
+test('hostile interception and body at the same physical time abstain',()=>{
+ const w=world(),t=19/6000;
+ w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,
+  collisionEligible:true,radiusCertified:true,epoch:1});
+ w.projectiles.push({id:9,time:t,complete:true,hostile:true,frameStartEpoch:1});
+ assert.equal(earliest(shot(),1/30,w).reason,'tie');
+});
