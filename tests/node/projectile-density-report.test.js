@@ -88,6 +88,8 @@ test('pen-one natural matrix aggregates measured cohorts and censors mixed histo
   }
   const measured=collect(root,2);
   assert.equal(measured.totals.ON.penOneMetrics.penOneShotInputs,4);
+  assert.equal(measured.totals.ON.fractionPenOneStrictShotUpdates,4/24);
+  assert.equal(measured.totals.ON.fractionPenOneRawExpiringShotUpdates,2/24);
   assert.equal(measured.totals.OFF.penOneMetrics.penOneRawInputs,6);
   assert.equal(measured.observations[0].ON.penOneMetrics.penOneExpiringInputs,1);
   const file=path.join(root,'nova-frontlines-natural-ab-1','frontlines-natural-match-ab.json');
@@ -100,6 +102,7 @@ test('pen-one natural matrix aggregates measured cohorts and censors mixed histo
   fs.writeFileSync(file,JSON.stringify(historical));
   const mixed=collect(root,2);
   assert.equal(mixed.totals.ON.penOneMetrics,null,'missing data must not become zero');
+  assert.equal(mixed.totals.ON.fractionPenOneStrictShotUpdates,null);
   assert.equal(mixed.totals.OFF.penOneMetrics,null);
   assert.equal(mixed.observations[1].ON.penOneMetrics,null);
  }finally{fs.rmSync(root,{recursive:true,force:true});}
