@@ -2002,7 +2002,9 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
       (remote.hits!=null&&!Number.isFinite(remote.hits))||
       (remote.knock!=null&&!Number.isFinite(remote.knock))||
       (remote.hits||0)!==0||(remote.knock||0)!==0||
-      !(remote.ttl>dt)||!Number.isFinite(remote.x)||
+      !Number.isFinite(remote.dmg)||!(remote.dmg>0)||
+      !Number.isFinite(remote.ttl)||!(remote.ttl>dt)||
+      !Number.isFinite(remote.x)||
       !Number.isFinite(remote.y)||!Number.isFinite(remote.vx)||
       !Number.isFinite(remote.vy)||!Number.isFinite(remote.r)||
       !(remote.r>0))return false;
