@@ -2,6 +2,7 @@
 // Research-only browser smoke. The HTTP response is patched in this test
 // context only; neither canonical index.html nor production is modified.
 const assert=require('node:assert/strict');
+const fs=require('node:fs'),path=require('node:path');
 const {chromium}=require('playwright');
 const {patchMaterializedCore}=require('../research/projectile-callback-source-patch.cjs');
 (async()=>{
@@ -20,7 +21,8 @@ const {patchMaterializedCore}=require('../research/projectile-callback-source-pa
     });
     await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded',timeout:45000});
     assert.equal(patches,1,'exactly one shipping HTML response transformed');
-    await page.addScriptTag({url:'/tests/research/projectile-callback-ledger.cjs'});
+    await page.addScriptTag({content:fs.readFileSync(path.resolve(__dirname,
+      '../research/projectile-callback-ledger.cjs'),'utf8')});
     await page.evaluate(()=>{
       const Game=window.__novaMakeRequire('')('game/engine').Game;
       const start=Game.prototype.start;
