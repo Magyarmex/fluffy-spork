@@ -2066,18 +2066,20 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
     /* Full Game.update snapshots every pre-existing shape and drone.
      * Missing epoch/pose means a body may have been created during this
      * frame, after the remote projectile's independence was assumed. */
-    if(e.kind==='shape'&&g.__novaShapeSweepActive===true&&
+    if(e.kind==='shape'&&
+       (g.__novaShapeSweepActive!==true||
        (e.__novaShapeSweepEpoch!==g.__novaShapeSweepEpoch||
         !Number.isFinite(e.__novaShapeSweepPrevX)||
         !Number.isFinite(e.__novaShapeSweepPrevY)||
         e.__novaShapeSweepPrevX!==e.x||
-        e.__novaShapeSweepPrevY!==e.y))return false;
-    if(e.kind==='drone'&&g.__novaShapeSweepActive===true&&
+        e.__novaShapeSweepPrevY!==e.y)))return false;
+    if(e.kind==='drone'&&
+       (g.__novaShapeSweepActive!==true||
        (e.__novaChronoDroneEpoch!==g.__novaShapeSweepEpoch||
         !Number.isFinite(e.__novaChronoDronePrevX)||
         !Number.isFinite(e.__novaChronoDronePrevY)||
         e.__novaChronoDronePrevX!==e.x||
-        e.__novaChronoDronePrevY!==e.y))return false;
+        e.__novaChronoDronePrevY!==e.y)))return false;
     if(e.kind==='drone'&&(e.__lvVX!=null||e.__lvVY!=null||
        e.__novaVX!=null||e.__novaVY!=null||
        e.__novaIdleVX!=null||e.__novaIdleVY!=null||
