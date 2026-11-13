@@ -30,6 +30,12 @@ function check(a,label){
     a.penOneRawExpiringInputs>a.penOneRawInputs||
     a.penOneExpiringInputs>a.penOneRawExpiringInputs||
     a.penOneExpiringInputs>a.penOneShotInputs||
+    a.penOneFramesWithInputs>a.penOneShotInputs||
+    a.penOneFramesWithInputs+a.penOneScanCensoredFrames>a.bulletUpdateCalls||
+    a.penOneShotInputs+a.penOneMissingDeadInputs>a.penOneRawInputs||
+    a.penOneShotInputs+a.penOneUnknownKindInputs>a.penOneRawInputs||
+    a.penOneShotInputs+a.penOneMissingOrdinaryFlagsInputs>a.penOneRawInputs||
+    a.penOneShotInputs+a.penOneWithoutEpochInputs>a.penOneRawInputs||
     a.penOneFramesWithInputs>a.bulletUpdateCalls||
     a.penOneScanCensoredFrames>a.bulletUpdateCalls))
   throw Error(label+': contradictory pen-one metrics');
