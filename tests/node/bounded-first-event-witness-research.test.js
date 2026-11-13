@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
 const {circleContact,earliestOrdinaryEvent:earliest}=require('../research/bounded-first-event-witness.cjs');
-const shot=()=>({x:0,y:0,vx:6000,vy:0,r:3,radiusCertified:true,frameStartEpoch:1,ttl:.005,dead:false,shell:false,beam:false,splash:false});
+const shot=()=>({x:0,y:0,vx:6000,vy:0,r:3,radiusCertified:true,frameStartEpoch:1,ownerId:1,pen:0,hits:0,ttl:.005,dead:false,shell:false,beam:false,splash:false});
 const world=()=>({complete:true,epoch:1,bounds:{minX:-2230,maxX:2230,minY:-2230,maxY:2230},bodies:[],walls:[],projectiles:[]});
 for(const fps of [30,60,120,240])test('physical body before TTL at '+fps+'Hz',()=>{
  const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,radiusCertified:true,epoch:1});
@@ -169,4 +169,11 @@ test('newborn projectile cannot be backdated to frame start',()=>{
  assert.equal(earliest(s,1/30,world()).reason,'invalid-input');
  const w=world();w.projectiles.push({id:9,time:.001,complete:true,hostile:true,frameStartEpoch:0});
  assert.equal(earliest(shot(),1/30,w).reason,'interception-witness');
+});
+
+test('piercing, previously-hit or unknown-owner shots abstain',()=>{
+ const w=world();for(const [key,value] of [['pen',1],['hits',1],['ownerId',NaN]]){
+  const s=shot();s[key]=value;
+  assert.equal(earliest(s,1/30,w).reason,'invalid-input');
+ }
 });
