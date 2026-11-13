@@ -2052,6 +2052,18 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
     /* Live Vector drone motion is integrated through separate channels.
      * Until those channels have a trustworthy frame corridor, abstain. */
     if(e.kind==='tank'&&e.__novaPhaseShiftEpoch===g.time)return false;
+    /* A zero current velocity is not a stationary witness: terrain,
+     * knockback or ability movement may already have displaced this hull. */
+    if(e.kind==='tank'&&e.__novaSweepMoveTime===g.time&&
+       (!Number.isFinite(e.__novaSweepPrevX)||
+        !Number.isFinite(e.__novaSweepPrevY)||
+        e.__novaSweepPrevX!==e.x||e.__novaSweepPrevY!==e.y))return false;
+    if(e.kind==='shape'&&g.__novaShapeSweepActive===true&&
+       e.__novaShapeSweepEpoch===g.__novaShapeSweepEpoch&&
+       (!Number.isFinite(e.__novaShapeSweepPrevX)||
+        !Number.isFinite(e.__novaShapeSweepPrevY)||
+        e.__novaShapeSweepPrevX!==e.x||
+        e.__novaShapeSweepPrevY!==e.y))return false;
     if(e.kind==='drone'&&(e.__lvVX!=null||e.__lvVY!=null||
        e.__novaVX!=null||e.__novaVY!=null||
        e.__novaIdleVX!=null||e.__novaIdleVY!=null||
