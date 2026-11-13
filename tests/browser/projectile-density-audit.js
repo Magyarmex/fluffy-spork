@@ -16,7 +16,8 @@
    brokenCounterResets:0,
    penOneShotInputs:0,penOneExpiringInputs:0,penOneFramesWithInputs:0,
    penOneRawInputs:0,penOneRawExpiringInputs:0,penOneMissingDeadInputs:0,
-   penOneUnknownKindInputs:0,penOneWithoutEpochInputs:0,
+   penOneUnknownKindInputs:0,penOneMissingOrdinaryFlagsInputs:0,
+   penOneWithoutEpochInputs:0,
    penOneScanCensoredFrames:0};
  }
  function broken(g){
@@ -45,7 +46,8 @@
    * canonical shots can satisfy this state. No hit or safety claim follows.
    * Preserve unknown kind and missing epoch separately so zero counts are
    * not mistaken for evidence of zero physical opportunities. */
-  let penOne=0,penOneExpiring=0,unknownKind=0,withoutEpoch=0,censored=0,
+  let penOne=0,penOneExpiring=0,unknownKind=0,missingFlags=0,
+   withoutEpoch=0,censored=0,
    raw=0,rawExpiring=0,missingDead=0;
   if(n>256)censored=1; // bounded observer; do not hide the censored cohort
   else if(Number.isFinite(dt)&&dt>0&&dt<=.05){
@@ -66,6 +68,9 @@
        !Number.isFinite(b.r)||!Number.isFinite(b.ttl)||
        !Number.isFinite(b.dmg)||
        !(b.r>0&&b.ttl>0&&b.dmg>0))continue;
+    if(b.shell!==false||b.beam!==false){
+     missingFlags++;continue;
+    }
     if(b.kind!=='bullet'){
      if(b.kind==null)unknownKind++;
      continue;
@@ -78,7 +83,7 @@
    }
   }
   return {n,dt,eligible,broken:broken(g),penOne,penOneExpiring,
-   unknownKind,withoutEpoch,censored,raw,rawExpiring,missingDead};
+   unknownKind,missingFlags,withoutEpoch,censored,raw,rawExpiring,missingDead};
  }
  function after(a,s,g){
   a.bulletUpdateCalls++;
@@ -91,6 +96,7 @@
   a.penOneExpiringInputs+=s.penOneExpiring||0;
   if(s.penOne>0)a.penOneFramesWithInputs++;
   a.penOneUnknownKindInputs+=s.unknownKind||0;
+  a.penOneMissingOrdinaryFlagsInputs+=s.missingFlags||0;
   a.penOneWithoutEpochInputs+=s.withoutEpoch||0;
   a.penOneScanCensoredFrames+=s.censored||0;
   a.peakProjectiles=Math.max(a.peakProjectiles,s.n);
