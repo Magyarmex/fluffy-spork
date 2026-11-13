@@ -248,3 +248,10 @@ test('non-bullet entity cannot masquerade as a projectile',()=>{
  const s=shot();s.kind='shape';
  assert.equal(earliest(s,1/30,world()).reason,'invalid-input');
 });
+
+test('missing explicit live/ordinary flags cannot certify a projectile',()=>{
+ for(const key of ['dead','shell','beam']){
+  const s=shot();delete s[key];
+  assert.equal(earliest(s,1/30,world()).reason,'invalid-input',key);
+ }
+});
