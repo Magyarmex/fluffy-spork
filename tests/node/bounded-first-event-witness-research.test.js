@@ -26,7 +26,7 @@ test('bounded moving body near corridor abstains',()=>{
 test('invalid cover/interception witness abstains',()=>{const w=world();w.walls.push({id:9,time:NaN,complete:true,solid:true});assert.equal(earliest(shot(),1/30,w).reason,'wall-witness');w.walls=[];w.projectiles.push({id:8,time:0,complete:false});assert.equal(earliest(shot(),1/30,w).reason,'interception-witness');});
 test('earlier arena exit wins',()=>{const w=world();const s=shot();s.x=2220;w.bodies.push({id:2,x:2300,y:0,r:18,certifiedStationary:true,collisionEligible:true});assert.equal(earliest(s,1/30,w).kind,'exit');});
 test('comparator never mutates game objects',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true});const s=shot(),before=JSON.stringify([s,w]);for(let i=0;i<20;i++)earliest(s,1/30,w);assert.equal(JSON.stringify([s,w]),before);});
-test('tangent abstains rather than certifying',()=>{assert.equal(circleContact(0,21,6000,0,40,0,21,.005),null);});
+test('tangent abstains rather than certifying',()=>{assert.equal(circleContact(0,21,6000,0,40,0,21,.005),undefined);});
 test('seeded independent closest-approach differential',()=>{
  let seed=0x147234;const rnd=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
  for(let i=0;i<10000;i++){
@@ -95,4 +95,14 @@ test('seeded certified linear crossings match independent closest approach',()=>
   if(Math.abs(dist-rad)<1e-6)continue;
   assert.equal(earliest(s,1/30,w).kind==='body',dist<rad,'world '+i);
  }
+});
+
+test('near tangent cannot certify expiry as the first event',()=>{
+ const w=world();w.bodies.push({id:2,x:40,y:21,r:18,certifiedStationary:true,collisionEligible:true});
+ assert.equal(earliest(shot(),1/30,w).reason,'uncertain-contact');
+});
+test('finite overflowing speed cannot certify no hit',()=>{
+ const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true});
+ const s=shot();s.vx=1e308;
+ assert.equal(earliest(s,1/30,w).reason,'uncertain-contact');
 });
