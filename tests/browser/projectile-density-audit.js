@@ -60,7 +60,10 @@
        b.splash||b.__v17Cannon||b.__novaRail||b.pen!==1||
        b.hits!==0||!Number.isSafeInteger(b.id)||
        !Number.isSafeInteger(b.ownerId)||
-       ![b.x,b.y,b.vx,b.vy,b.r,b.ttl,b.dmg].every(Number.isFinite)||
+       !Number.isFinite(b.x)||!Number.isFinite(b.y)||
+       !Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
+       !Number.isFinite(b.r)||!Number.isFinite(b.ttl)||
+       !Number.isFinite(b.dmg)||
        !(b.r>0&&b.ttl>0&&b.dmg>0))continue;
     if(b.kind!=='bullet'){
      if(b.kind==null)unknownKind++;
