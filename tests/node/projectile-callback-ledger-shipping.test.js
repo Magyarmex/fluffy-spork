@@ -297,8 +297,9 @@ test('pen=1 low-density tank TTL fallback attributes the real callback',()=>{
 
 test('pen=1 two-hull TTL chain attributes both real callbacks to one shot',()=>{
   const baseline=boot(false,'tank',1), observed=boot(false,'tank',1,true);
-  const extra={id:3,kind:'tank',cls:'scout',x:45,y:0,hp:100,alive:true,r:15};
-  baseline.target.x=30; observed.target.x=30;
+  const extra={id:3,kind:'tank',cls:'scout',x:85,y:0,hp:100,alive:true,r:15};
+  // Distinct non-overlapping hulls, both physically reached before 12ms TTL.
+  baseline.g.bullets[0].ttl=.012; observed.g.bullets[0].ttl=.012;
   baseline.g.tanks.push({...extra}); observed.g.tanks.push({...extra});
   baseline.g.hash.query=(_x,_y,_r,out)=>{out.length=0;out.push(...baseline.g.tanks);};
   observed.g.hash.query=(_x,_y,_r,out)=>{out.length=0;out.push(...observed.g.tanks);};
