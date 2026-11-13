@@ -72,3 +72,22 @@ for(const fps of [30,60,120,240])test('shipping TTL expiry agrees with no premat
  assert.equal(target.hp,100,'a target beyond the frame/TTL corridor must not receive phantom damage');
  assert.deepEqual(callbacks,[], 'no damage callback may fire beyond the physical corridor');
 });
+
+test('240Hz live-frame no-hit becomes terminal expiry on the next frame without damage',()=>{
+ const g=boot(),target={id:2,kind:'tank',cls:'scout',x:100,y:0,hp:100,alive:true};
+ const callbacks=[];g.tanks=[target];g.hash.query=(_x,_y,_r,out)=>{out.length=0;out.push(target);};
+ g.damageTank=(t,d)=>{callbacks.push({id:t.id,damage:d});t.hp-=d;};
+ const b=shot(),dt=1/240;
+ const witness=(epoch)=>({complete:true,epoch,
+  bounds:{minX:-2230,maxX:2230,minY:-2230,maxY:2230},
+  bodies:[{id:2,x:100,y:0,r:18,collisionEligible:true,radiusCertified:true,
+   certifiedStationary:true,epoch}],walls:[],projectiles:[]});
+ assert.equal(earliestOrdinaryEvent(b,dt,witness(1)).kind,'none');
+ g.bullets=[b];g.updateBullets(dt);
+ assert.equal(target.hp,100);
+ const next={...b,frameStartEpoch:2};
+ assert.equal(earliestOrdinaryEvent(next,dt,witness(2)).kind,'expiry');
+ g.updateBullets(dt);
+ assert.equal(target.hp,100);
+ assert.deepEqual(callbacks,[],'expiry must never manufacture a later body hit');
+});
