@@ -391,6 +391,7 @@ wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.
        this.addParticles(t.x,t.y,'#b06bff',16,120,'glow');
        this.addRing(t.x,t.y,'#b06bff',40);
        this.addText(t.x,t.y-30,'PHASE SHIFT!','#c9a0ff',15);
+       t.__novaPhaseShiftEpoch=this.time;
        t.__novaSweepMoveTime=this.time;
        t.__novaSweepPrevX=t.x;t.__novaSweepPrevY=t.y;
        return;
@@ -398,6 +399,7 @@ wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.
    }
    var out=oldAbility.apply(this,arguments);
    if(phase&&(t.x!==ox||t.y!==oy)){
+     t.__novaPhaseShiftEpoch=this.time;
      t.__novaSweepMoveTime=this.time;
      t.__novaSweepPrevX=t.x;t.__novaSweepPrevY=t.y;
    }
@@ -2045,7 +2047,8 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
        !Number.isFinite(e.y)||
        (e.vx!=null&&!Number.isFinite(e.vx))||
        (e.vy!=null&&!Number.isFinite(e.vy)))return false;
-    /* Live Vector drone motion is integrated through separate channels.\n     * Until those channels have a trustworthy frame corridor, abstain. */\n    if(e.kind==='drone'&&(e.__lvVX!=null||e.__lvVY!=null))return false;\n    /* Missing velocity is allowed for stationary shapes; malformed
+    /* Live Vector drone motion is integrated through separate channels.\n     * Until those channels have a trustworthy frame corridor, abstain. */\n    if(e.kind==='tank'&&e.__novaPhaseShiftEpoch===g.time)return false;
+    if(e.kind==='drone'&&(e.__lvVX!=null||e.__lvVY!=null))return false;\n    /* Missing velocity is allowed for stationary shapes; malformed
      * velocity must never silently become zero via `|| 0`. */
     var motion=Math.hypot(e.vx==null?0:e.vx,e.vy==null?0:e.vy)*dt+96;
     if(!(Math.max(remote.x,rx)+remote.r+er+motion<e.x||
