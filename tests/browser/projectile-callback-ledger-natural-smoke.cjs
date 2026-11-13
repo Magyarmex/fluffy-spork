@@ -50,8 +50,8 @@ const {patchMaterializedCore}=require('../research/projectile-callback-source-pa
       let frames=0,callbacks=0,scopedCalls=0,unusedScopes=0,observerErrors=0;
       for(let i=0;i<60&&g.status==='playing';i++){
         g.update(1/30);
-        const s=ledger.snapshot();
-        frames++;callbacks+=s.events.length;scopedCalls+=s.scopedCalls;
+        const s=ledger.counters();
+        frames++;callbacks+=s.eventsCaptured;scopedCalls+=s.scopedCalls;
         unusedScopes+=s.unusedScopes;observerErrors+=s.observerErrors;
         if(s.overflow)throw Error('research callback buffer overflow');
         ledger.nextFrame();
