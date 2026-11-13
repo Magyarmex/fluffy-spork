@@ -70,7 +70,8 @@ function createProjectileCallbackLedger(game, options = {}) {
     try { return fn(); } finally { scope = prior; }
   }
   function nextFrame() {
-    if (scope) throw new Error('cannot advance frame inside projectile callback');
+    if (scope || callbackDepth > 0)
+      throw new Error('cannot advance frame inside damage callback');
     epoch++; events.length = 0; overflow = 0; unknown = 0; unidentifiedTargets = 0;
   }
   function snapshot() {
@@ -80,6 +81,8 @@ function createProjectileCallbackLedger(game, options = {}) {
   }
   function uninstall() {
     if (!installed) return false;
+    if (scope || callbackDepth > 0)
+      throw new Error('cannot uninstall inside damage callback');
     // Never overwrite another system's later replacement of our wrapper.
     for (const [name, wrapper] of wrappers)
       if (game[name] !== wrapper)
