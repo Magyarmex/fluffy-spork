@@ -91,3 +91,19 @@ test('240Hz live-frame no-hit becomes terminal expiry on the next frame without 
  assert.equal(target.hp,100);
  assert.deepEqual(callbacks,[],'expiry must never manufacture a later body hit');
 });
+
+test('materialized core never awards an outward frame-start tangent as damage',()=>{
+ const g=boot(),target={id:2,kind:'tank',cls:'scout',x:0,y:21,hp:100,alive:true};
+ const callbacks=[];g.tanks=[target];
+ g.hash.query=(_x,_y,_r,out)=>{out.length=0;out.push(target);};
+ g.damageTank=(t,d)=>{callbacks.push({id:t.id,damage:d});t.hp-=d;};
+ const b=shot(),w={complete:true,epoch:1,
+  bounds:{minX:-2230,maxX:2230,minY:-2230,maxY:2230},
+  bodies:[{id:2,x:0,y:21,r:18,collisionEligible:true,
+   radiusCertified:true,certifiedStationary:true,epoch:1}],
+  walls:[],projectiles:[]};
+ assert.equal(earliestOrdinaryEvent(b,1/240,w).reason,'uncertain-contact');
+ g.bullets=[b];g.updateBullets(1/240);
+ assert.equal(target.hp,100,'tangent moving away must not deal damage');
+ assert.deepEqual(callbacks,[]);
+});
