@@ -71,6 +71,27 @@ test('pen-one matrix preserves unknown historical fields and rejects partial dat
  assert.throws(()=>check(d,'partial'),/partial pen-one/);
 });
 
+test('pen-one report rejects impossible cross-cohort combinations',()=>{
+ const valid=density();
+ Object.assign(valid,{penOneShotInputs:2,penOneExpiringInputs:1,
+  penOneFramesWithInputs:1,penOneRawInputs:3,penOneRawExpiringInputs:1,
+  penOneMissingDeadInputs:0,penOneUnknownKindInputs:0,
+  penOneMissingOrdinaryFlagsInputs:0,penOneWithoutEpochInputs:0,
+  penOneScanCensoredFrames:0});
+ assert.equal(check(valid,'valid'),valid);
+ for(const patch of [
+  {penOneFramesWithInputs:3}, // one shot-update cannot occupy three frames
+  {penOneScanCensoredFrames:3}, // observed and censored frames are disjoint
+  {penOneMissingDeadInputs:2}, // strict shots and unknown-death shots are disjoint
+  {penOneUnknownKindInputs:2},
+  {penOneMissingOrdinaryFlagsInputs:2},
+  {penOneWithoutEpochInputs:2}
+ ]){
+  assert.throws(()=>check({...valid,...patch},'corrupt'),/contradictory pen-one/,
+   JSON.stringify(patch));
+ }
+});
+
 test('pen-one natural matrix aggregates measured cohorts and censors mixed historical fields',()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'nova-pen-one-'));
  const metrics={penOneShotInputs:2,penOneExpiringInputs:1,
