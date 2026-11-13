@@ -8,7 +8,7 @@ const FIELDS=['bulletUpdateCalls','projectileCountSum','basicEligibleFrames',
  'coverBreaks','coverBreaksAtThreeToEight','coverBreaksAboveEight',
  'coverBreaksBasicEligible','brokenCounterResets'];
 const PEN_FIELDS=['penOneShotInputs','penOneExpiringInputs','penOneFramesWithInputs',
- 'penOneRawInputs','penOneMissingDeadInputs','penOneUnknownKindInputs',
+ 'penOneRawInputs','penOneRawExpiringInputs','penOneMissingDeadInputs','penOneUnknownKindInputs',
  'penOneWithoutEpochInputs','penOneScanCensoredFrames'];
 function check(a,label){
  if(!a||a.schema!==1)throw Error(label+': missing density schema');
@@ -21,6 +21,8 @@ function check(a,label){
   throw Error(label+': invalid '+k);
  if(present.length&&(
     a.penOneShotInputs>a.penOneRawInputs||
+    a.penOneRawExpiringInputs>a.penOneRawInputs||
+    a.penOneExpiringInputs>a.penOneRawExpiringInputs||
     a.penOneExpiringInputs>a.penOneShotInputs||
     a.penOneFramesWithInputs>a.bulletUpdateCalls||
     a.penOneScanCensoredFrames>a.bulletUpdateCalls))
