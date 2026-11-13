@@ -64,6 +64,8 @@ test('real composed Game observer does not change ordinary projectile damage or 
   });
  }
  const baseline=arm(false),observed=arm(true);
+ assert.ok(Number.isFinite(baseline.hp)&&baseline.hp<100,
+  'control arm must demonstrate real physical Circle damage');
  assert.deepEqual({hp:observed.hp,remaining:observed.remaining},
   {hp:baseline.hp,remaining:baseline.remaining});
  assert.equal(observed.counted,1);
