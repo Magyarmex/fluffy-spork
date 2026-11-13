@@ -12,7 +12,7 @@ test('preserves damage semantics, return values and lethal attribution', () => {
   const target={id:7,hp:10}; ledger.install();
   assert.equal(ledger.withProjectile({id:11},()=>g.damageTank(target,12)), -2);
   assert.deepEqual(ledger.snapshot().events[0],{epoch:0,kind:'damageTank',targetId:7,
-    shotId:11,attribution:'direct',damage:12});
+    shotId:11,attribution:'direct',requestedDamage:12});
   ledger.uninstall(); assert.equal(g.damageTank,original);
 });
 test('unscoped callbacks remain unknown, never owner-attributed', () => {
@@ -113,4 +113,13 @@ test('non-configurable methods fail before any partial wrapping',()=>{
   const l=createProjectileCallbackLedger(g);
   assert.throws(()=>l.install(),/cannot be safely wrapped/);
   assert.equal(g.damageTank,old);
+});
+
+test('missing victim identity prevents fully attributed claims',()=>{
+  const g=game(), l=createProjectileCallbackLedger(g); l.install();
+  l.withProjectile({id:2},()=>g.damageTank({hp:10},3));
+  const s=l.snapshot();
+  assert.equal(s.events[0].targetId,null);
+  assert.equal(s.unidentifiedTargets,1);
+  assert.equal(s.allCapturedCallbacksAttributed,false);
 });
