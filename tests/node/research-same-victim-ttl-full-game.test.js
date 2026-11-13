@@ -665,8 +665,10 @@ for(const hz of [60,120])
    const priorUpdate=g.updateBullets;
    g.updateBullets=function(dt){
     shape.__novaShapeSweepEpoch=this.__novaShapeSweepEpoch;
-    shape.__novaShapeSweepPrevX=1600;
-    shape.__novaShapeSweepPrevY=1700;
+    /* A 1505,1500 start overlaps the remote bullet's real path;
+     * the 1700,1700 endpoint is >96 units away with vx=vy=0. */
+    shape.__novaShapeSweepPrevX=1505;
+    shape.__novaShapeSweepPrevY=1500;
     return priorUpdate.call(this,dt);
    };
   },Math.ceil(.42*hz)+3);
