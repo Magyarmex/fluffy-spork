@@ -71,6 +71,7 @@ test('pen=1 census records witnessed canonical ordinary shots and expiry separat
  assert.equal(JSON.stringify(g.bullets),original);
  assert.equal(a.penOneShotInputs,2);
  assert.equal(a.penOneExpiringInputs,1);
+ assert.equal(a.penOneRawExpiringInputs,1);
  assert.equal(a.penOneFramesWithInputs,1);
  assert.equal(a.penOneUnknownKindInputs,0);
  assert.equal(a.penOneWithoutEpochInputs,0);
@@ -114,6 +115,7 @@ test('raw pen-one prevalence remains visible when strict dead witness is missing
  const a=census.create(),sample=census.before(g,.01);
  census.after(a,sample,g);
  assert.equal(a.penOneRawInputs,1);
+ assert.equal(a.penOneRawExpiringInputs,0);
  assert.equal(a.penOneMissingDeadInputs,1);
  assert.equal(a.penOneShotInputs,0,'unknown death state cannot be certified');
 });
