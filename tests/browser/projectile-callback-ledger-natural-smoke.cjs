@@ -4,14 +4,20 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');
 const {chromium}=require('playwright');
-const {patchMaterializedCore}=require('../research/projectile-callback-source-patch.cjs');
+const {patchMaterializedCore,patchBattlefieldCallbacks}=require('../research/projectile-callback-source-patch.cjs');
 (async()=>{
   const browser=await chromium.launch({headless:true});
   const context=await browser.newContext({viewport:{width:900,height:700}});
   const page=await context.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(String(e.stack||e)));
-  let patches=0;
+  let patches=0,battlefieldPatches=0;
   try{
+    await page.route('**/nova-updates/battlefield-v1.6.0.js',async route=>{
+      const response=await route.fetch(),source=await response.text();
+      assert.equal(response.status(),200);
+      battlefieldPatches++;
+      await route.fulfill({response,body:patchBattlefieldCallbacks(source)});
+    });
     await page.route('http://127.0.0.1:8765/',async route=>{
       const response=await route.fetch(),html=await response.text();
       assert.equal(response.status(),200);
@@ -21,6 +27,7 @@ const {patchMaterializedCore}=require('../research/projectile-callback-source-pa
     });
     await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded',timeout:45000});
     assert.equal(patches,1,'exactly one shipping HTML response transformed');
+    assert.equal(battlefieldPatches,1,'exactly one Battlefield response transformed');
     await page.addScriptTag({content:fs.readFileSync(path.resolve(__dirname,
       '../research/projectile-callback-ledger.cjs'),'utf8')});
     await page.evaluate(()=>{
