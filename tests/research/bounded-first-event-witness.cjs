@@ -4,16 +4,22 @@
 // completeness assertion is NOT a substitute for real movement history.
 const EPS=1e-9;
 function circleContact(px,py,vx,vy,cx,cy,r,until){
- if(![px,py,vx,vy,cx,cy,r,until].every(Number.isFinite)||!(r>0)||!(until>0))return null;
+ // null = proven no contact; undefined = uncertain, never silently a miss.
+ if(![px,py,vx,vy,cx,cy,r,until].every(Number.isFinite)||!(r>0)||!(until>0))return undefined;
  const dx=px-cx,dy=py-cy,c=dx*dx+dy*dy-r*r;
- if(!Number.isFinite(c))return null;
+ if(!Number.isFinite(c))return undefined;
  if(c<=0)return 0;
  const a=vx*vx+vy*vy,b=dx*vx+dy*vy;
- if(!(a>0)||!(b<0)||!Number.isFinite(a)||!Number.isFinite(b))return null;
- const d=b*b-a*c;
- if(!(d>64*Number.EPSILON*(Math.abs(b*b)+Math.abs(a*c))))return null;
+ if(!Number.isFinite(a)||!Number.isFinite(b))return undefined;
+ if(!(a>0)||!(b<0))return null;
+ const bc=b*b,ac=a*c,d=bc-ac;
+ if(!Number.isFinite(d)||!Number.isFinite(bc)||!Number.isFinite(ac))return undefined;
+ const tolerance=64*Number.EPSILON*(Math.abs(bc)+Math.abs(ac));
+ if(d< -tolerance)return null;
+ if(d<=tolerance)return undefined;
  const t=c/(-b+Math.sqrt(d));
- return Number.isFinite(t)&&t>=0&&t<=until?t:null;
+ if(!Number.isFinite(t))return undefined;
+ return t>=0&&t<=until?t:null;
 }
 function earliestOrdinaryEvent(shot,frame,world){
  if(!shot||!world||world.complete!==true||!Array.isArray(world.bodies)||
@@ -40,15 +46,18 @@ function earliestOrdinaryEvent(shot,frame,world){
    if(body.certifiedLinear===true){
      if(![body.startX,body.startY,body.vx,body.vy].every(Number.isFinite))
        return {kind:'abstain',reason:'linear-witness'};
-     add('body',body.id,circleContact(shot.x,shot.y,
-       shot.vx-body.vx,shot.vy-body.vy,body.startX,body.startY,
-       shot.r+body.r,limit));
+     const t=circleContact(shot.x,shot.y,shot.vx-body.vx,shot.vy-body.vy,
+       body.startX,body.startY,shot.r+body.r,limit);
+     if(t===undefined)return {kind:'abstain',reason:'uncertain-contact'};
+     add('body',body.id,t);
      continue;
    }
    if(body.certifiedStationary===true){
      if(!Number.isFinite(body.x)||!Number.isFinite(body.y))
        return {kind:'abstain',reason:'body-geometry'};
-     add('body',body.id,circleContact(shot.x,shot.y,shot.vx,shot.vy,body.x,body.y,shot.r+body.r,limit));
+     const t=circleContact(shot.x,shot.y,shot.vx,shot.vy,body.x,body.y,shot.r+body.r,limit);
+     if(t===undefined)return {kind:'abstain',reason:'uncertain-contact'};
+     add('body',body.id,t);
      continue;
    }
    // A certified maximum distance from frame-start pose bounds EVERY
