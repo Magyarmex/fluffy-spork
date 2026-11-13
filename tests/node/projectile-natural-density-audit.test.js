@@ -139,3 +139,14 @@ test('pen-one census rejects unknown ordinary flags without hiding raw exposure'
  assert.equal(s.missingFlags,1);
  assert.equal(s.raw,1);
 });
+
+test('missing epochs cannot certify a pen-one shot merely because undefined equals undefined',()=>{
+ const g={bullets:[{...shot(1),kind:'bullet',ownerId:2}],
+  __novaShapeSweepActive:true,__novaFrameStartBulletIdCeiling:2};
+ const sample=census.before(g,.01);
+ assert.equal(sample.raw,1);
+ assert.equal(sample.penOne,0);
+ assert.equal(sample.withoutEpoch,1);
+ g.__novaFrameStartBulletEpoch=3;g.__novaShapeSweepEpoch=3;
+ assert.equal(census.before(g,.01).penOne,1);
+});
