@@ -84,7 +84,7 @@ test('read-only three-shot census distinguishes a pair from a witnessed non-tank
  assert.equal(a.threeShotWitnessedNonTankFrames,1,
   'inactive frame witness cannot be counted as a certificate opportunity');
  g.__novaShapeSweepActive=true;
- g.drones.push({kind:'drone',x:600,y:600,vx:0,vy:0,
+ g.drones.push({kind:'drone',x:600,y:600,hp:100,vx:0,vy:0,
   __novaChronoDroneEpoch:5,__novaChronoDronePrevX:600,
   __novaChronoDronePrevY:600,__lvVX:20});
  g.updateBullets(.01);
