@@ -91,6 +91,11 @@ test('read-only three-shot census distinguishes a pair from a witnessed non-tank
  assert.equal(a.threeShotPairFrames,4);
  assert.equal(a.threeShotWitnessedNonTankFrames,1,
   'Live Vector motion must veto the non-tank witness');
+ g.drones[0].hp=0;
+ g.updateBullets(.01);
+ assert.equal(a.threeShotPairFrames,5);
+ assert.equal(a.threeShotWitnessedNonTankFrames,2,
+  'noncollidable zero-HP drones are skipped by the real certificate');
  assert.deepEqual(g.bullets.map(b=>b.id),[1,2,3],
   'research observer never reorders or mutates projectiles');
  assert.equal(JSON.parse(initial).bullets.length,3);
