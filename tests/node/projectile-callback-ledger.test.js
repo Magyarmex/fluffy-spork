@@ -404,3 +404,26 @@ test('snapshot explicitly distinguishes installed observer from inactive researc
   assert.equal(l.uninstall(),true);
   assert.equal(l.snapshot().installed,false);
 });
+
+
+test('allocation-light counters agree with event snapshot and reset per frame',()=>{
+  const g=game(),l=createProjectileCallbackLedger(g,{limit:2});l.install();
+  l.withProjectile({id:8},()=>g.damageTank({id:1,hp:10},2));
+  l.withProjectile({id:9},()=>{});
+  g.damageShape({id:2,hp:10},1);
+  const s=l.snapshot(),c=l.counters();
+  assert.equal(c.epoch,s.epoch);
+  assert.equal(c.eventsCaptured,s.events.length);
+  for(const key of ['installed','overflow','unknown','unidentifiedTargets',
+    'observerErrors','scopedCalls','unusedScopes','bounded'])
+    assert.equal(c[key],s[key],key);
+  assert.equal(c.scopedCalls,2);
+  assert.equal(c.unusedScopes,1);
+  assert.equal(c.unknown,1);
+  assert.equal(Object.hasOwn(c,'events'),false);
+  assert.equal(Object.isFrozen(c),true);
+  l.nextFrame();
+  assert.equal(l.counters().eventsCaptured,0);
+  assert.equal(l.counters().scopedCalls,0);
+  assert.equal(l.counters().unusedScopes,0);
+});
