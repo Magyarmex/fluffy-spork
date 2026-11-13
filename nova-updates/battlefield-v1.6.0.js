@@ -2023,9 +2023,12 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
        (e.hp!=null&&!(e.hp>0)))continue;
     var er=e.r||(e.cls&&CLASSES[e.cls]&&CLASSES[e.cls].size);
     if(!Number.isFinite(er)||!Number.isFinite(e.x)||
-       !Number.isFinite(e.y)||!Number.isFinite(e.vx||0)||
-       !Number.isFinite(e.vy||0))return false;
-    var motion=Math.hypot(e.vx||0,e.vy||0)*dt+96;
+       !Number.isFinite(e.y)||
+       (e.vx!=null&&!Number.isFinite(e.vx))||
+       (e.vy!=null&&!Number.isFinite(e.vy)))return false;
+    /* Missing velocity is allowed for stationary shapes; malformed
+     * velocity must never silently become zero via `|| 0`. */
+    var motion=Math.hypot(e.vx==null?0:e.vx,e.vy==null?0:e.vy)*dt+96;
     if(!(Math.max(remote.x,rx)+remote.r+er+motion<e.x||
        Math.min(remote.x,rx)-remote.r-er-motion>e.x||
        Math.max(remote.y,ry)+remote.r+er+motion<e.y||
