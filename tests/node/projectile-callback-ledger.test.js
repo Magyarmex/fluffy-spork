@@ -306,3 +306,17 @@ test('invalid identity fallback preserves callback exceptions and outer scope',(
   assert.equal(l.snapshot().events[0].shotId,13);
   assert.equal(l.snapshot().observerErrors,1);
 });
+
+test('malformed attribution metadata never blocks combat or inherits outer identity',()=>{
+  const g=game(), l=createProjectileCallbackLedger(g); l.install();
+  const victim={id:4,hp:10};
+  l.withProjectile({id:12},()=>{
+    assert.equal(l.withProjectile({id:13},()=>g.damageTank(victim,3),'unexpected'),7);
+    g.damageDrone({id:5,hp:10},2);
+  });
+  const snap=l.snapshot();
+  assert.equal(victim.hp,7);
+  assert.deepEqual(snap.events.map(e=>e.shotId),[null,12]);
+  assert.equal(snap.observerErrors,1);
+  assert.equal(snap.bounded,false);
+});
