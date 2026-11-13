@@ -238,3 +238,8 @@ test('Cannon fuse rounds cannot masquerade as ordinary constant-velocity shots',
  const s=shot();s.__v17Cannon=true;
  assert.equal(earliest(s,1/30,world()).reason,'invalid-input');
 });
+
+test('Sniper rail identity cannot enter the ordinary first-event path',()=>{
+ const s=shot();s.__novaRail=true;
+ assert.equal(earliest(s,1/30,world()).reason,'invalid-input');
+});
