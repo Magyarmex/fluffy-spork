@@ -196,3 +196,15 @@ test('active unscoped damage cannot reset frame or uninstall observer',()=>{
   assert.equal(l.snapshot().events.length,1);
   assert.equal(l.uninstall(),true);
 });
+
+test('malformed victim getter cannot interrupt combat or claim complete observation',()=>{
+  const g=game(), l=createProjectileCallbackLedger(g); l.install();
+  const victim={hp:10,get id(){throw Error('observer-only identity failure');}};
+  assert.equal(l.withProjectile({id:1},()=>g.damageTank(victim,3)),7);
+  const snap=l.snapshot();
+  assert.equal(victim.hp,7);
+  assert.equal(snap.observerErrors,1);
+  assert.equal(snap.bounded,false);
+  assert.equal(snap.allCapturedCallbacksAttributed,false);
+  assert.equal(snap.events.length,0);
+});
