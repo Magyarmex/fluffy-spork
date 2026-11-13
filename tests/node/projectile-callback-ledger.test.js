@@ -49,3 +49,26 @@ test('failed install never partially wraps a game', () => {
   assert.throws(()=>l.install(),/damageDrone/);
   assert.equal(g.damageTank,old);
 });
+
+test('nested unscoped damage cannot inherit parent shot identity', () => {
+  const g=game(), original=g.damageTank;
+  g.damageTank=function(t,d) { const v=original.call(this,t,d);
+    this.damageDrone({id:99,hp:10},1); return v; };
+  const l=createProjectileCallbackLedger(g); l.install();
+  l.withProjectile({id:4},()=>g.damageTank({id:7,hp:10},2));
+  const e=l.snapshot().events;
+  assert.equal(e[0].shotId,4);
+  assert.equal(e[1].shotId,null);
+  assert.equal(e[1].attribution,'unknown');
+});
+test('each frame has independent bounded complete event ledger', () => {
+  const g=game(), l=createProjectileCallbackLedger(g,{limit:1}); l.install();
+  g.damageTank({hp:10},1); g.damageTank({hp:10},1);
+  assert.equal(l.snapshot().complete,false);
+  l.nextFrame();
+  assert.equal(l.snapshot().events.length,0);
+  assert.equal(l.snapshot().overflow,0);
+  g.damageShape({id:3,hp:10},1);
+  assert.equal(l.snapshot().complete,true);
+  assert.equal(l.snapshot().events[0].epoch,1);
+});
