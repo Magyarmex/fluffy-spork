@@ -93,6 +93,9 @@ test('pen-one natural matrix aggregates measured cohorts and censors mixed histo
   assert.equal(measured.totals.ON.penOneMetrics.penOneShotInputs,4);
   assert.equal(measured.totals.ON.fractionPenOneStrictShotUpdates,4/24);
   assert.equal(measured.totals.ON.fractionPenOneRawExpiringShotUpdates,2/24);
+  const censored={...measured.totals.ON,
+   penOneMetrics:{...measured.totals.ON.penOneMetrics,penOneScanCensoredFrames:1}};
+  assert.equal(require('../../scripts/projectile-density-report.cjs').finish(censored).fractionPenOneStrictShotUpdates,null);
   assert.equal(measured.totals.OFF.penOneMetrics.penOneRawInputs,6);
   assert.equal(measured.observations[0].ON.penOneMetrics.penOneExpiringInputs,1);
   const file=path.join(root,'nova-frontlines-natural-ab-1','frontlines-natural-match-ab.json');
