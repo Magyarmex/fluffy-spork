@@ -9,8 +9,8 @@ for(const fps of [30,60,120,240])test('physical body before TTL at '+fps+'Hz',()
  assert.ok(Math.abs(event.time-19/6000)<1e-12);
 });
 test('body beyond TTL cannot win',()=>{const w=world();w.bodies.push({id:2,x:100,y:0,r:18,certifiedStationary:true,collisionEligible:true,radiusCertified:true,epoch:1});assert.equal(earliest(shot(),1/30,w).kind,'expiry');});
-test('permanent wall before body wins',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,radiusCertified:true,epoch:1});w.walls.push({id:9,time:.001,complete:true,solid:true});assert.deepEqual(earliest(shot(),1/30,w),{kind:'wall',id:9,time:.001});});
-test('wall after body cannot steal body',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,radiusCertified:true,epoch:1});w.walls.push({id:9,time:.004,complete:true,solid:true});assert.equal(earliest(shot(),1/30,w).kind,'body');});
+test('permanent wall before body wins',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,radiusCertified:true,epoch:1});w.walls.push({id:9,time:.001,complete:true,solid:true,permanent:true});assert.deepEqual(earliest(shot(),1/30,w),{kind:'wall',id:9,time:.001});});
+test('wall after body cannot steal body',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,radiusCertified:true,epoch:1});w.walls.push({id:9,time:.004,complete:true,solid:true,permanent:true});assert.equal(earliest(shot(),1/30,w).kind,'body');});
 test('interception before body wins',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,radiusCertified:true,epoch:1});w.projectiles.push({id:9,time:.002,complete:true,hostile:true});assert.equal(earliest(shot(),1/30,w).kind,'interception');});
 test('simultaneous body contacts abstain',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,radiusCertified:true,epoch:1},{id:3,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,radiusCertified:true,epoch:1});assert.equal(earliest(shot(),1/30,w).reason,'tie');});
 test('unknown movement abstains even far away',()=>{const w=world();w.bodies.push({id:2,x:1000,y:1000,r:18,certifiedStationary:false,collisionEligible:true,radiusCertified:true,epoch:1});assert.equal(earliest(shot(),1/30,w).reason,'body-motion');});
@@ -23,7 +23,7 @@ test('bounded moving body near corridor abstains',()=>{
  const w=world();w.bodies.push({id:3,startX:40,startY:40,r:18,maxTravel:30,collisionEligible:true,radiusCertified:true,epoch:1});
  assert.equal(earliest(shot(),1/30,w).reason,'moving-body-near-corridor');
 });
-test('invalid cover/interception witness abstains',()=>{const w=world();w.walls.push({id:9,time:NaN,complete:true,solid:true});assert.equal(earliest(shot(),1/30,w).reason,'wall-witness');w.walls=[];w.projectiles.push({id:8,time:0,complete:false});assert.equal(earliest(shot(),1/30,w).reason,'interception-witness');});
+test('invalid cover/interception witness abstains',()=>{const w=world();w.walls.push({id:9,time:NaN,complete:true,solid:true,permanent:true});assert.equal(earliest(shot(),1/30,w).reason,'wall-witness');w.walls=[];w.projectiles.push({id:8,time:0,complete:false});assert.equal(earliest(shot(),1/30,w).reason,'interception-witness');});
 test('earlier arena exit wins',()=>{const w=world();const s=shot();s.x=2220;w.bodies.push({id:2,x:2300,y:0,r:18,certifiedStationary:true,collisionEligible:true,radiusCertified:true,epoch:1});assert.equal(earliest(s,1/30,w).kind,'exit');});
 test('comparator never mutates game objects',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,radiusCertified:true,epoch:1});const s=shot(),before=JSON.stringify([s,w]);for(let i=0;i<20;i++)earliest(s,1/30,w);assert.equal(JSON.stringify([s,w]),before);});
 test('tangent abstains rather than certifying',()=>{assert.equal(circleContact(0,21,6000,0,40,0,21,.005),undefined);});
@@ -157,4 +157,9 @@ test('contact at expiry boundary is uncertain, not a proven miss',()=>{
  assert.equal(earliest(s,1/30,w).reason,'uncertain-contact');
  w.bodies[0].x=52;
  assert.equal(earliest(s,1/30,w).kind,'expiry');
+});
+
+test('destructible cover cannot be certified by static wall witness',()=>{
+ const w=world();w.walls.push({id:9,time:.001,complete:true,solid:true,permanent:false});
+ assert.equal(earliest(shot(),1/30,w).reason,'wall-witness');
 });
