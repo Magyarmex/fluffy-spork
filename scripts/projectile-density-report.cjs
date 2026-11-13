@@ -6,7 +6,8 @@ const fs=require('node:fs'),path=require('node:path');
 const BUCKETS=['zero','one','two','threeToEight','nineToSixteen','seventeenToThirtyTwo','thirtyThreePlus'];
 const FIELDS=['bulletUpdateCalls','projectileCountSum','basicEligibleFrames',
  'coverBreaks','coverBreaksAtThreeToEight','coverBreaksAboveEight',
- 'coverBreaksBasicEligible','brokenCounterResets'];
+ 'coverBreaksBasicEligible','brokenCounterResets',
+ 'threeShotPairFrames','threeShotWitnessedNonTankFrames'];
 function check(a,label){
  if(!a||a.schema!==1)throw Error(label+': missing density schema');
  for(const k of FIELDS)if(!Number.isSafeInteger(a[k])||a[k]<0)
@@ -23,6 +24,8 @@ function check(a,label){
  }
  if(sum!==a.bulletUpdateCalls||
     a.basicEligibleFrames>a.projectileCountBuckets.threeToEight||
+    a.threeShotPairFrames>a.projectileCountBuckets.threeToEight||
+    a.threeShotWitnessedNonTankFrames>a.threeShotPairFrames||
     a.coverBreaksBasicEligible>a.coverBreaksAtThreeToEight||
     a.coverBreaksAtThreeToEight+a.coverBreaksAboveEight>a.coverBreaks)
   throw Error(label+': contradictory necessary-gate counts');
@@ -45,6 +48,8 @@ function finish(a){
   fractionAboveEight:calls?a.projectileCountBuckets.nineToSixteen/calls+
    (a.projectileCountBuckets.seventeenToThirtyTwo+a.projectileCountBuckets.thirtyThreePlus)/calls:null,
   fractionBasicEligible:calls?a.basicEligibleFrames/calls:null,
+  fractionThreeShotPair:calls?a.threeShotPairFrames/calls:null,
+  fractionThreeShotWitnessedNonTank:calls?a.threeShotWitnessedNonTankFrames/calls:null,
   fractionCoverBreaksAtBasicGate:breaks?a.coverBreaksBasicEligible/breaks:null,
   fractionCoverBreaksAboveEight:breaks?a.coverBreaksAboveEight/breaks:null};
 }
@@ -90,6 +95,7 @@ function collect(root,expected=18){
   expectedPairs:expected,observedPairs:dirs.length,totals,policies,observations,
   limitations:['Necessary gates only: no direct certificate activation or hit-correction witness',
    'Cover breaks are counted only within updateBullets; no attribution to a specific certificate',
+   'Three-shot pair and non-tank witness counts are necessary upper bounds, not actual chronology-certificate activations or tank movement proofs',
    'ON/OFF arms are matched experiments, not independent random players; OFF replay is not double-counted',
    'Scripted Scout pilots, fixed seeds and 165s maximum runs do not represent human-match frequency',
    'Trials ending in death are retained with their actual sampled time; zero-break rates are null, not zero']};
