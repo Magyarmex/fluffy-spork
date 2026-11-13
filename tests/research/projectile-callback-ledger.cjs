@@ -66,12 +66,15 @@ function createProjectileCallbackLedger(game, options = {}) {
   }
   function withProjectile(shot, fn, attribution = 'direct') {
     if (typeof fn !== 'function') throw new TypeError('callback required');
-    if (!shot || !Number.isSafeInteger(shot.id) || shot.id < 0)
+    // Snapshot identity once: mutable or stateful getters must not switch
+    // the attributed projectile between validation and ledger recording.
+    const shotId = shot == null ? null : shot.id;
+    if (!Number.isSafeInteger(shotId) || shotId < 0)
       throw new TypeError('explicit projectile ID required');
     if (attribution !== 'direct' && attribution !== 'indirect')
       throw new TypeError('invalid attribution');
     const prior = scope;
-    scope = {shotId: shot.id, attribution, baseDepth: callbackDepth, remaining: 1};
+    scope = {shotId, attribution, baseDepth: callbackDepth, remaining: 1};
     try { return fn(); } finally { scope = prior; }
   }
   function nextFrame() {
