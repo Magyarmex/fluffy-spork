@@ -14,6 +14,15 @@ test('wall after body cannot steal body',()=>{const w=world();w.bodies.push({id:
 test('interception before body wins',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true});w.projectiles.push({id:9,time:.002,complete:true});assert.equal(earliest(shot(),1/30,w).kind,'interception');});
 test('simultaneous body contacts abstain',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true},{id:3,x:40,y:0,r:18,certifiedStationary:true});assert.equal(earliest(shot(),1/30,w).reason,'tie');});
 test('unknown movement abstains even far away',()=>{const w=world();w.bodies.push({id:2,x:1000,y:1000,r:18,certifiedStationary:false});assert.equal(earliest(shot(),1/30,w).reason,'body-motion');});
+test('certified remote moving body does not veto local body',()=>{
+ const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true});
+ w.bodies.push({id:3,startX:500,startY:300,r:18,maxTravel:50});
+ assert.equal(earliest(shot(),1/30,w).kind,'body');
+});
+test('bounded moving body near corridor abstains',()=>{
+ const w=world();w.bodies.push({id:3,startX:40,startY:40,r:18,maxTravel:30});
+ assert.equal(earliest(shot(),1/30,w).reason,'moving-body-near-corridor');
+});
 test('invalid cover/interception witness abstains',()=>{const w=world();w.walls.push({id:9,time:NaN,complete:true});assert.equal(earliest(shot(),1/30,w).reason,'wall-witness');w.walls=[];w.projectiles.push({id:8,time:0,complete:false});assert.equal(earliest(shot(),1/30,w).reason,'interception-witness');});
 test('earlier arena exit wins',()=>{const w=world();const s=shot();s.x=2220;w.bodies.push({id:2,x:2300,y:0,r:18,certifiedStationary:true});assert.equal(earliest(s,1/30,w).kind,'exit');});
 test('comparator never mutates game objects',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true});const s=shot(),before=JSON.stringify([s,w]);for(let i=0;i<20;i++)earliest(s,1/30,w);assert.equal(JSON.stringify([s,w]),before);});
