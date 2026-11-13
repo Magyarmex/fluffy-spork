@@ -238,3 +238,15 @@ test('overflow consumes first callback scope even when no event can be stored',(
   assert.equal(s.events[0].shotId,null);
   assert.equal(s.bounded,false);
 });
+
+test('victim ID is sampled once even when getter changes on subsequent reads',()=>{
+  const g=game(), l=createProjectileCallbackLedger(g); l.install();
+  let reads=0;
+  const victim={hp:10,get id(){reads++;return reads===1?42:999;}};
+  l.withProjectile({id:7},()=>g.damageTank(victim,1));
+  const s=l.snapshot();
+  assert.equal(reads,1);
+  assert.equal(s.events[0].targetId,42);
+  assert.equal(s.events[0].shotId,7);
+  assert.equal(s.observerErrors,0);
+});
