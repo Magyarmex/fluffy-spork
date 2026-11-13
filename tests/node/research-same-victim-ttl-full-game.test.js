@@ -719,14 +719,15 @@ for(const kind of ['shape','drone'])
      hp:100,maxHp:100,alive:true,dead:false,vx:0,vy:0}:
     {kind:'drone',id:1300,ownerId:999,x:1700,y:1700,r:8,
      hp:100,alive:true,dead:false,vx:0,vy:0};
-   if(kind==='shape')g.shapes.push(body);
-   else g.drones.push(body);
    const priorUpdate=g.updateBullets;
    g.updateBullets=function(dt){
-    // Simulate an entity lacking a valid frame-start witness.
-    if(kind==='shape')body.__novaShapeSweepEpoch=-1;
-    else body.__novaChronoDroneEpoch=-1;
-    return priorUpdate.call(this,dt);
+    // Spawn after Game.update captured frame-start poses, then remove
+    // after this bullet pass to keep the adversarial fixture isolated.
+    const collection=kind==='shape'?this.shapes:this.drones;
+    collection.push(body);
+    try{return priorUpdate.call(this,dt);}
+    finally{const index=collection.indexOf(body);
+     if(index>=0)collection.splice(index,1);}
    };
   },Math.ceil(.42*hz)+3);
   assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
