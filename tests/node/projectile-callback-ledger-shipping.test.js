@@ -80,6 +80,15 @@ function boot(instrument = false, kind = 'tank', pen = 0, instrumentBattlefield 
       assert.ok(source.includes(needle),'Battlefield TTL callback changed');
       source=source.replace(needle,
         'g.__novaShotLedger.withProjectile(b,()=>'+needle.slice(0,-1)+');');
+      for(const call of [
+        'g.damageShape(best.e,b.dmg,vx,vy);',
+        'g.damageDrone(best.e,b.dmg,b.ownerId);'
+      ]) {
+        assert.equal(source.split(call).length-1,1,
+          'Battlefield TTL '+call+' callback changed');
+        source=source.replace(call,
+          'g.__novaShotLedger.withProjectile(b,()=>'+call.slice(0,-1)+');');
+      }
     }
     vm.runInNewContext(source,context,{filename:file});
   }
@@ -194,17 +203,21 @@ test('materialized core instrumentation fails open on invalid projectile ID',()=
   assert.equal(snap.bounded,false);
 });
 
-test('research-instrumented Battlefield TTL recovery records actual shot ID at 30Hz',()=>{
-  const baseline=boot(false,'tank',1), observed=boot(false,'tank',1,true);
-  const ledger=createProjectileCallbackLedger(observed.g);
-  observed.g.__novaShotLedger=ledger; ledger.install();
-  baseline.g.updateBullets(1/30);
-  observed.g.updateBullets(1/30);
-  assert.equal(observed.target.hp,baseline.target.hp);
-  assert.equal(observed.target.hp,80);
-  assert.equal(observed.g.bullets.length,baseline.g.bullets.length);
-  const events=ledger.snapshot().events.filter(e=>e.kind==='damageTank');
-  assert.equal(events.length,1);
-  assert.equal(events[0].shotId,101);
-  assert.equal(events[0].attribution,'direct');
-});
+for(const kind of ['tank','shape','drone']) {
+  test('research-instrumented Battlefield TTL recovery identifies '+kind+' shot at 30Hz',()=>{
+    const baseline=boot(false,kind,1), observed=boot(false,kind,1,true);
+    const ledger=createProjectileCallbackLedger(observed.g);
+    observed.g.__novaShotLedger=ledger; ledger.install();
+    baseline.g.updateBullets(1/30);
+    observed.g.updateBullets(1/30);
+    assert.equal(observed.target.hp,baseline.target.hp);
+    assert.equal(observed.target.hp,80);
+    assert.equal(observed.g.bullets.length,baseline.g.bullets.length);
+    const events=ledger.snapshot().events;
+    assert.equal(events.length,1);
+    assert.equal(events[0].kind,
+      kind==='tank'?'damageTank':kind==='shape'?'damageShape':'damageDrone');
+    assert.equal(events[0].shotId,101);
+    assert.equal(events[0].attribution,'direct');
+  });
+}
