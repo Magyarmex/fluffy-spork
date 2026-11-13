@@ -66,6 +66,10 @@ function finish(a){
  const {penOneComplete,...rest}=a;
  return {...rest,
   penOneMetrics:penOneComplete?a.penOneMetrics:null,
+  fractionPenOneStrictShotUpdates:penOneComplete&&a.projectileCountSum?
+   a.penOneMetrics.penOneShotInputs/a.projectileCountSum:null,
+  fractionPenOneRawExpiringShotUpdates:penOneComplete&&a.projectileCountSum?
+   a.penOneMetrics.penOneRawExpiringInputs/a.projectileCountSum:null,
   fractionAboveEight:calls?a.projectileCountBuckets.nineToSixteen/calls+
    (a.projectileCountBuckets.seventeenToThirtyTwo+a.projectileCountBuckets.thirtyThreePlus)/calls:null,
   fractionBasicEligible:calls?a.basicEligibleFrames/calls:null,
