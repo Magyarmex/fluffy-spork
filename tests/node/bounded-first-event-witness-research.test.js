@@ -177,3 +177,9 @@ test('piercing, previously-hit or unknown-owner shots abstain',()=>{
   assert.equal(earliest(s,1/30,w).reason,'invalid-input');
  }
 });
+
+test('unbounded world scans fail closed',()=>{
+ const w=world();w.bodies=Array.from({length:193},(_,i)=>({id:i+1,x:1000,y:1000,r:10,
+  certifiedStationary:true,collisionEligible:true,radiusCertified:true,epoch:1}));
+ assert.equal(earliest(shot(),1/30,w).reason,'invalid-input');
+});
