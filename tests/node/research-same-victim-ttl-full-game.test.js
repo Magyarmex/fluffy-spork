@@ -350,3 +350,7 @@ for(const hz of [60,120])
   assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
    'nonfinite velocity must prevent a speculative chronological reorder');
  });
+
+
+/* An explicit invalid tank radius must not be replaced by the class
+ * fallback through the falsy 
