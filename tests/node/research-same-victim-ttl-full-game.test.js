@@ -697,3 +697,38 @@ for(const hz of [60,120])
   assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
    'interleaved remote projectile must preserve ordinary core callback order');
  });
+
+/* Full update snapshots pre-existing shapes/drones at the frame boundary.
+ * A body without that same-frame witness could have been born during
+ * movement or a callback; its endpoint is not a certified swept corridor. */
+for(const kind of ['shape','drone'])
+ for(const hz of [60,120])
+ test('RESEARCH three-shot abstains on missing '+kind+' frame witness '+hz+'Hz',()=>{
+  const result=trial(hz,false,true,null,40,(g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   bullets.push({
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   });
+   const body=kind==='shape'?
+    {kind:'shape',id:1300,x:1700,y:1700,r:12,
+     hp:100,maxHp:100,alive:true,dead:false,vx:0,vy:0}:
+    {kind:'drone',id:1300,ownerId:999,x:1700,y:1700,r:8,
+     hp:100,alive:true,dead:false,vx:0,vy:0};
+   if(kind==='shape')g.shapes.push(body);
+   else g.drones.push(body);
+   const priorUpdate=g.updateBullets;
+   g.updateBullets=function(dt){
+    // Simulate an entity lacking a valid frame-start witness.
+    if(kind==='shape')body.__novaShapeSweepEpoch=-1;
+    else body.__novaChronoDroneEpoch=-1;
+    return priorUpdate.call(this,dt);
+   };
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
+   'missing frame-start body witness must veto remote-shot certificate');
+ });
