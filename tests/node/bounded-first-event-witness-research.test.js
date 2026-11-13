@@ -68,3 +68,31 @@ test('uncertified eligibility, solidity and hostility abstain',()=>{
  w.walls=[];w.projectiles.push({id:9,time:.001,complete:true});
  assert.equal(earliest(shot(),1/30,w).reason,'interception-witness');
 });
+
+test('certified moving crossing resolves by relative motion',()=>{
+ const w=world();w.bodies.push({id:3,startX:25,startY:20,vx:0,vy:-6000,
+   r:10,certifiedLinear:true,collisionEligible:true});
+ const e=earliest(shot(),1/30,w);
+ assert.equal(e.kind,'body');assert.ok(e.time>0&&e.time<.005);
+});
+test('uncertified linear motion cannot masquerade as static',()=>{
+ const w=world();w.bodies.push({id:3,startX:25,startY:20,vx:NaN,vy:-6000,
+   r:10,certifiedLinear:true,collisionEligible:true});
+ assert.equal(earliest(shot(),1/30,w).reason,'linear-witness');
+});
+test('seeded certified linear crossings match independent closest approach',()=>{
+ let seed=0x2026147;const rnd=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ for(let i=0;i<15000;i++){
+  const s=shot();s.vx=(rnd()-.5)*12000;s.vy=(rnd()-.5)*12000;
+  s.ttl=.001+rnd()*.025;
+  const w=world(),x=(rnd()-.5)*120,y=(rnd()-.5)*120,r=5+rnd()*20;
+  const vx=(rnd()-.5)*6000,vy=(rnd()-.5)*6000;
+  w.bodies.push({id:3,startX:x,startY:y,vx,vy,r,certifiedLinear:true,collisionEligible:true});
+  const dx=-x,dy=-y,rvx=s.vx-vx,rvy=s.vy-vy,a=rvx*rvx+rvy*rvy;
+  const until=Math.min(1/30,s.ttl);
+  const t=a>0?Math.max(0,Math.min(until,-(dx*rvx+dy*rvy)/a)):0;
+  const dist=Math.hypot(dx+rvx*t,dy+rvy*t),rad=s.r+r;
+  if(Math.abs(dist-rad)<1e-6)continue;
+  assert.equal(earliest(s,1/30,w).kind==='body',dist<rad,'world '+i);
+ }
+});
