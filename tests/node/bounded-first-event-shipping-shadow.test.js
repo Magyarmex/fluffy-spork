@@ -62,7 +62,7 @@ for(const fps of [30,60,120,240])test('shipping contact agrees with read-only wi
 for(const fps of [30,60,120,240])test('shipping TTL expiry agrees with no premature body damage at '+fps+'Hz',()=>{
  const g=boot(),target={id:2,kind:'tank',cls:'scout',x:100,y:0,hp:100,alive:true};
  g.tanks=[target];g.hash.query=(_x,_y,_r,out)=>{out.length=0;out.push(target);};
- g.damageTank=(t,d)=>{t.hp-=d;};
+ const callbacks=[];g.damageTank=(t,d)=>{callbacks.push({id:t.id,damage:d});t.hp-=d;};
  const b=shot(),world={complete:true,epoch:1,bounds:{minX:-2230,maxX:2230,minY:-2230,maxY:2230},
   bodies:[{id:2,x:100,y:0,r:18,collisionEligible:true,radiusCertified:true,certifiedStationary:true,epoch:1}],walls:[],projectiles:[]};
  const event=earliestOrdinaryEvent(b,1/fps,world);
