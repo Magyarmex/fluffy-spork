@@ -33,3 +33,48 @@ test('patched materialized core inline JavaScript remains syntactically valid',(
   assert.ok(blocks.length>0);
   for(const block of blocks)new vm.Script(block[1],{filename:'research-patched-index.html'});
 });
+
+
+function compileUpdater(source){
+  const marker='    updateBullets(dt) {',at=source.indexOf(marker);
+  assert.ok(at>=0);
+  let pos=at+marker.length,depth=1;
+  while(depth&&pos<source.length){
+    if(source[pos]==='{')depth++;
+    else if(source[pos]==='}')depth--;
+    pos++;
+  }
+  assert.equal(depth,0);
+  const body=source.slice(at+marker.length,pos-1);
+  return new Function('types_1','classes_1','M','return function(dt){'+body+'}')(
+    {dist2:(x,y,a,b)=>(x-a)**2+(y-b)**2},{CLASSES:{scout:{size:15}}},2250);
+}
+function fixture(source,observe){
+  const shape={kind:'shape',id:41,x:0,y:0,r:10,hp:10};
+  const bullet={kind:'bullet',id:29,ownerId:5,x:0,y:0,vx:0,vy:0,
+    ttl:1,r:5,dmg:2,pen:1,hits:0,dead:false,shell:false,beam:false};
+  const g={bullets:[bullet],tmp:[],hash:{query(_x,_y,_r,out){out.push(shape);}},
+    initBulletIntegrity(){},cosmeticRandom(){return 1;},
+    resolveBulletCollisions(){},addParticles(){},
+    damageShape(t,d){t.hp-=d;return t.hp;},
+    damageTank(){throw Error('unexpected tank hit');},
+    damageDrone(){throw Error('unexpected drone hit');}};
+  const ledger=observe?require('../research/projectile-callback-ledger.cjs')
+    .createProjectileCallbackLedger(g):null;
+  if(ledger){ledger.install();g.__novaShotLedger=ledger;}
+  compileUpdater(source).call(g,1/30);
+  const result={hp:shape.hp,pen:bullet.pen,hits:bullet.hits,dead:bullet.dead,
+    ttl:bullet.ttl,bulletCount:g.bullets.length,
+    events:ledger?ledger.snapshot().events:[]};
+  if(ledger)ledger.uninstall();
+  return result;
+}
+test('patched actual shipping updater preserves damage and records explicit shot ID',()=>{
+  const baseline=fixture(html,false);
+  const observed=fixture(patchMaterializedCore(html),true);
+  assert.deepEqual({...observed,events:[]},baseline);
+  assert.equal(observed.hp,8);
+  assert.equal(observed.pen,0);
+  assert.deepEqual(observed.events.map(e=>[e.shotId,e.targetId,e.kind,e.requestedDamage]),
+    [[29,41,'damageShape',2]]);
+});
