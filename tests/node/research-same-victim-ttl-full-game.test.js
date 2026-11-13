@@ -301,3 +301,28 @@ for(const hz of [60,120])
   assert.equal(result.ownerStats[1].kills,1);
   assert.ok(result.ownerStats[1].xp>0);
  });
+
+
+/* Fail-closed safety: a malformed third-party body radius cannot be
+ * interpreted as zero clearance when certifying a remote third projectile.
+ * Preserve ordinary core enumeration instead of granting a chronology proof
+ * based on invalid geometry. This does not claim correct chronology when
+ * the witness is malformed; it protects against a false certificate. */
+for(const hz of [60,120])
+ test('RESEARCH three-shot abstains on invalid body radius '+hz+'Hz',()=>{
+  const result=trial(hz,false,false,null,40,(g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   bullets.push({
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   });
+   g.shapes.push({kind:'shape',id:1300,x:1700,y:1700,r:-5,
+    hp:100,maxHp:100,alive:true,dead:false,vx:0,vy:0});
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
+   'invalid body geometry must abstain rather than certify a reorder');
+ });
