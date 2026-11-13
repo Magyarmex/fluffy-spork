@@ -35,9 +35,26 @@ function earliestOrdinaryEvent(shot,frame,world){
    if(t!==null&&t>=0)add('exit',null,t);
  }
  for(const body of world.bodies){
-   if(!body||body.certifiedStationary!==true||![body.x,body.y,body.r].every(Number.isFinite)||
-     !(body.r>0)||body.id==null)return {kind:'abstain',reason:'body-motion'};
-   add('body',body.id,circleContact(shot.x,shot.y,shot.vx,shot.vy,body.x,body.y,shot.r+body.r,limit));
+   if(!body||!Number.isFinite(body.r)||!(body.r>0)||body.id==null)
+     return {kind:'abstain',reason:'body-geometry'};
+   if(body.certifiedStationary===true){
+     if(!Number.isFinite(body.x)||!Number.isFinite(body.y))
+       return {kind:'abstain',reason:'body-geometry'};
+     add('body',body.id,circleContact(shot.x,shot.y,shot.vx,shot.vy,body.x,body.y,shot.r+body.r,limit));
+     continue;
+   }
+   // A certified maximum distance from frame-start pose bounds EVERY
+   // possible path, not merely the final displacement. This can prove a
+   // remote moving body irrelevant without pretending to know its path.
+   if(![body.startX,body.startY,body.maxTravel].every(Number.isFinite)||body.maxTravel<0)
+     return {kind:'abstain',reason:'body-motion'};
+   const dx=shot.x-body.startX,dy=shot.y-body.startY;
+   const a=shot.vx*shot.vx+shot.vy*shot.vy;
+   if(!Number.isFinite(a))return {kind:'abstain',reason:'shot-motion'};
+   const t=a>0?Math.max(0,Math.min(limit,-(dx*shot.vx+dy*shot.vy)/a)):0;
+   const distance=Math.hypot(dx+shot.vx*t,dy+shot.vy*t);
+   if(!Number.isFinite(distance)||distance<=shot.r+body.r+body.maxTravel+1e-9)
+     return {kind:'abstain',reason:'moving-body-near-corridor'};
  }
  // Terrain and interception times must be supplied by authoritative sweeps.
  // Empty arrays are valid only when world.complete certifies exhaustive scans.
