@@ -642,8 +642,14 @@ async function arm(browser,enabled,label){
   console.log('NOVA_FRONTLINES_NATURAL_MATCH_AB '+JSON.stringify({initialWorldIdentical:true,offReplayIdentical:same,
    naturalOpportunityObserved,abMode:AB_MODE,offerPolicy:OFFER_POLICY,verifiedLiveStart,
    config:{layout:LAYOUT,seed:SEED_ID,pilotPolicy:PILOT_POLICY},
-   off:{time:off.result.game.time,status:off.result.game.status,blooms:off.result.naturalBlooms,publicBloomCommands:off.result.publicBloomCommandSamples,frontline:off.result.frontline?.counts,contestGateAudit:Object.fromEntries(Object.entries(off.result.contestGateAudit).filter(([k])=>k!=='coLocationExamples'))},
-   on:{time:on.result.game.time,status:on.result.game.status,blooms:on.result.naturalBlooms,publicBloomCommands:on.result.publicBloomCommandSamples,frontline:on.result.frontline?.counts,contestGateAudit:Object.fromEntries(Object.entries(on.result.contestGateAudit).filter(([k])=>k!=='coLocationExamples'))}}));
+   off:{firstEventInputs:{ordinary:off.result.projectileDensityAudit.firstEventOrdinaryShotInputs,
+     expiring:off.result.projectileDensityAudit.firstEventExpiringShotInputs,
+     frames:off.result.projectileDensityAudit.firstEventFramesWithInputs},
+     time:off.result.game.time,status:off.result.game.status,blooms:off.result.naturalBlooms,publicBloomCommands:off.result.publicBloomCommandSamples,frontline:off.result.frontline?.counts,contestGateAudit:Object.fromEntries(Object.entries(off.result.contestGateAudit).filter(([k])=>k!=='coLocationExamples'))},
+   on:{firstEventInputs:{ordinary:on.result.projectileDensityAudit.firstEventOrdinaryShotInputs,
+     expiring:on.result.projectileDensityAudit.firstEventExpiringShotInputs,
+     frames:on.result.projectileDensityAudit.firstEventFramesWithInputs},
+     time:on.result.game.time,status:on.result.game.status,blooms:on.result.naturalBlooms,publicBloomCommands:on.result.publicBloomCommandSamples,frontline:on.result.frontline?.counts,contestGateAudit:Object.fromEntries(Object.entries(on.result.contestGateAudit).filter(([k])=>k!=='coLocationExamples'))}}));
   if(!same)throw Error('same-arm full-match replay diverged; cannot claim controlled A/B');
   // No natural announcement is valid negative/censored research evidence,
   // not a CI failure to hide by selecting a friendlier seed.
