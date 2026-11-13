@@ -2071,10 +2071,9 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   var first=at<bt?a:b,second=at<bt?b:a;
   if(!(target.hp>first.dmg*2))return false;
   if(bullets.indexOf(first)<bullets.indexOf(second)){
-   var priorOrder=bullets.slice(),fi=bullets.indexOf(first),
-       si=bullets.indexOf(second);
+   var fi=bullets.indexOf(first),si=bullets.indexOf(second);
    bullets[fi]=second;bullets[si]=first;
-   return priorOrder;
+   return {first:first,second:second};
   }
   return false;
  }
@@ -3831,10 +3830,15 @@ function certifiedMultiShotCoverPriority(g,dt){
   /* Restore only the two original live bullets, if both survived.
    * This frame's physical callback order must not permanently change
    * their presentation or later collision enumeration order. */
-  if(restoreLivePairOrder&&this.bullets.length===restoreLivePairOrder.length&&
-     restoreLivePairOrder.every(function(b){return this.bullets.indexOf(b)>=0;},this)){
-   for(var orderIndex=0;orderIndex<restoreLivePairOrder.length;orderIndex++)
-    this.bullets[orderIndex]=restoreLivePairOrder[orderIndex];
+  if(restoreLivePairOrder){
+   var liveFirst=this.bullets.indexOf(restoreLivePairOrder.first),
+       liveSecond=this.bullets.indexOf(restoreLivePairOrder.second);
+   /* Revert only the surviving pair's relative order, even if another
+    * legitimate callback removed or appended an unrelated projectile. */
+   if(liveFirst>=0&&liveSecond>=0&&liveFirst>liveSecond){
+    this.bullets[liveFirst]=restoreLivePairOrder.second;
+    this.bullets[liveSecond]=restoreLivePairOrder.first;
+   }
   }
   for(var ci=0;ci<ttlChildren.length;ci++){var saved=ttlChildren[ci];saved.child.vx=saved.vx;saved.child.vy=saved.vy;}}for(var j=0;j<terrain.length;j++){var q=terrain[j];if(q.flash>0)q.flash=Math.max(0,q.flash-dt);}return out;};
 
