@@ -57,3 +57,26 @@ test('counter resets are censored instead of fabricated as negative breaks',()=>
  assert.equal(a.brokenCounterResets,1);
  assert.equal(a.coverBreaks,0);
 });
+
+test('first-event input census counts ordinary and expiring rounds without certifying hits',()=>{
+ const g={bullets:[{...shot(1),pen:0,ttl:.005,ownerId:7},
+  {...shot(2),pen:0,ttl:.5,ownerId:7},
+  {...shot(3),pen:0,ttl:.005,ownerId:7,shell:true},
+  {...shot(4),pen:0,ttl:.005,ownerId:7,hits:1},
+  {...shot(5),pen:0,ttl:.005,ownerId:7}],
+  __novaShapeSweepActive:true,__novaFrameStartBulletEpoch:3,
+  __novaShapeSweepEpoch:3,__novaFrameStartBulletIdCeiling:5,
+  updateBullets(){}};
+ const a=census.install(g,census.create());
+ const before=JSON.stringify(g.bullets);
+ g.updateBullets(.01);
+ assert.equal(JSON.stringify(g.bullets),before,'observer must never change shots');
+ assert.equal(a.firstEventOrdinaryShotInputs,2);
+ assert.equal(a.firstEventExpiringShotInputs,1);
+ assert.equal(a.firstEventFramesWithInputs,1);
+ g.__novaFrameStartBulletEpoch=2;g.updateBullets(.01);
+ assert.equal(a.firstEventOrdinaryShotInputs,2,'stale frame witness adds no candidates');
+ g.__novaFrameStartBulletEpoch=3;g.bullets=[{...shot(9),pen:0,ttl:.005,ownerId:7}];
+ g.updateBullets(.01);
+ assert.equal(a.firstEventOrdinaryShotInputs,2,'newborn ID is excluded');
+});
