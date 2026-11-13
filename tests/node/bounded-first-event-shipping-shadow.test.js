@@ -65,7 +65,8 @@ for(const fps of [30,60,120,240])test('shipping TTL expiry agrees with no premat
  const b=shot(),world={complete:true,epoch:1,bounds:{minX:-2230,maxX:2230,minY:-2230,maxY:2230},
   bodies:[{id:2,x:100,y:0,r:18,collisionEligible:true,radiusCertified:true,certifiedStationary:true,epoch:1}],walls:[],projectiles:[]};
  const event=earliestOrdinaryEvent(b,1/fps,world);
- assert.equal(event.kind,'expiry');
+ assert.equal(event.kind,1/fps>=b.ttl?'expiry':'none',
+  'at 240Hz the projectile remains live past this frame, without a body event');
  g.bullets=[b];g.updateBullets(1/fps);
- assert.equal(target.hp,100,'a target beyond TTL must not receive phantom damage');
+ assert.equal(target.hp,100,'a target beyond the frame/TTL corridor must not receive phantom damage');
 });
