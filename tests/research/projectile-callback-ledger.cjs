@@ -75,9 +75,10 @@ function createProjectileCallbackLedger(game, options = {}) {
     let shotId;
     try { shotId = shot == null ? null : shot.id; }
     catch (_) { shotId = null; }
-    if (attribution !== 'direct' && attribution !== 'indirect')
-      throw new TypeError('invalid attribution');
-    if (!Number.isSafeInteger(shotId) || shotId < 0) {
+    // Malformed research metadata must be treated like an invalid ID: the
+    // underlying combat callback still runs, but its attribution is unknown.
+    const validAttribution = attribution === 'direct' || attribution === 'indirect';
+    if (!validAttribution || !Number.isSafeInteger(shotId) || shotId < 0) {
       observerErrors++;
       const prior = scope;
       scope = null;
