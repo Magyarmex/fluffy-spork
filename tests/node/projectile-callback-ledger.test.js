@@ -123,3 +123,24 @@ test('missing victim identity prevents fully attributed claims',()=>{
   assert.equal(s.unidentifiedTargets,1);
   assert.equal(s.allCapturedCallbacksAttributed,false);
 });
+
+test('one explicit scope cannot misattribute a second unrelated callback',()=>{
+  const g=game(), l=createProjectileCallbackLedger(g); l.install();
+  l.withProjectile({id:17},()=>{
+    g.damageTank({id:2,hp:10},1);
+    g.damageDrone({id:3,hp:10},1);
+  });
+  const e=l.snapshot().events;
+  assert.equal(e[0].shotId,17);
+  assert.equal(e[1].shotId,null);
+  assert.equal(e[1].attribution,'unknown');
+  assert.equal(l.snapshot().allCapturedCallbacksAttributed,false);
+});
+test('explicit nested indirect callback still has its own single-event scope',()=>{
+  const g=game(), l=createProjectileCallbackLedger(g); l.install();
+  l.withProjectile({id:4},()=>{
+    g.damageTank({id:1,hp:10},1);
+    l.withProjectile({id:4},()=>g.damageDrone({id:2,hp:10},1),'indirect');
+  });
+  assert.deepEqual(l.snapshot().events.map(e=>e.attribution),['direct','indirect']);
+});
