@@ -78,7 +78,7 @@ function earliestOrdinaryEvent(shot,frame,world){
  // Terrain and interception times must be supplied by authoritative sweeps.
  // Empty arrays are valid only when world.complete certifies exhaustive scans.
  for(const wall of world.walls){
-   if(!wall||wall.complete!==true||wall.solid!==true||wall.id==null||!Number.isFinite(wall.time)||wall.time<0)
+   if(!wall||wall.complete!==true||wall.solid!==true||wall.permanent!==true||wall.id==null||!Number.isFinite(wall.time)||wall.time<0)
      return {kind:'abstain',reason:'wall-witness'};
    add('wall',wall.id,wall.time);
  }
