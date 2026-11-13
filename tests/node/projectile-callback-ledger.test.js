@@ -320,3 +320,32 @@ test('malformed attribution metadata never blocks combat or inherits outer ident
   assert.equal(snap.observerErrors,1);
   assert.equal(snap.bounded,false);
 });
+
+
+test('install samples stateful method getter once and wraps the validated callback',()=>{
+  const g=game();
+  const first=function(t,d){t.hp-=d;return 'first';};
+  const second=function(t,d){t.hp-=d*10;return 'second';};
+  let reads=0;
+  Object.defineProperty(g,'damageTank',{configurable:true,enumerable:true,
+    get(){reads++;return reads===1?first:second;}});
+  const l=createProjectileCallbackLedger(g);
+  assert.equal(l.install(),true);
+  assert.equal(reads,1,'preflight and wrapping must share one method snapshot');
+  const target={id:7,hp:20};
+  assert.equal(l.withProjectile({id:3},()=>g.damageTank(target,2)),'first');
+  assert.equal(target.hp,18);
+  assert.equal(l.snapshot().events[0].shotId,3);
+  assert.equal(l.uninstall(),true);
+  assert.equal(Object.getOwnPropertyDescriptor(g,'damageTank').get instanceof Function,true);
+});
+
+test('throwing method getter fails preflight without partially wrapping callbacks',()=>{
+  const g=game(), original=g.damageTank;
+  Object.defineProperty(g,'damageShape',{configurable:true,
+    get(){throw Error('unavailable callback');}});
+  const l=createProjectileCallbackLedger(g);
+  assert.throws(()=>l.install(),/unavailable callback/);
+  assert.equal(g.damageTank,original);
+  assert.equal(Object.hasOwn(g,'damageTank'),true);
+});
