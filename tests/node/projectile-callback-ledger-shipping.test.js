@@ -115,7 +115,11 @@ function boot(instrument = false, kind = 'tank', pen = 0, instrumentBattlefield 
     : {ARENA_HALF:2250});
   const g=new m.exports.Game();
   const target={id:2,kind,cls:'scout',x:40,y:0,hp:100,alive:true,r:15,ownerId:2};
-  g.tanks=[target];
+  // Preserve real entity membership; Battlefield iterates tanks, shapes and
+  // drones separately, unlike the core's shared spatial query.
+  g.tanks=kind==='tank'?[target]:[];
+  g.shapes=kind==='shape'?[target]:[];
+  g.drones=kind==='drone'?[target]:[];
   g.hash.query=(_x,_y,_r,out)=>{out.length=0;out.push(target);};
   g.damageTank=(t,d)=>{t.hp-=d;};
   g.damageShape=(t,d)=>{t.hp-=d;};
