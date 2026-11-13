@@ -27,7 +27,7 @@ function earliestOrdinaryEvent(shot,frame,world){
  if(!shot||!world||world.complete!==true||!Number.isSafeInteger(world.epoch)||!Array.isArray(world.bodies)||
    !Array.isArray(world.walls)||!Array.isArray(world.projectiles)||
    ![shot.x,shot.y,shot.vx,shot.vy,shot.r,shot.ttl,frame].every(Number.isFinite)||
-   shot.frameStartEpoch!==world.epoch||shot.radiusCertified!==true||!(shot.r>0)||!(shot.ttl>0)||!(frame>0)||frame>.05||shot.dead||
+   shot.pen!==0||shot.hits!==0||!Number.isSafeInteger(shot.ownerId)||shot.frameStartEpoch!==world.epoch||shot.radiusCertified!==true||!(shot.r>0)||!(shot.ttl>0)||!(frame>0)||frame>.05||shot.dead||
    shot.shell||shot.beam||shot.splash)return {kind:'abstain',reason:'invalid-input'};
  const limit=Math.min(frame,shot.ttl),candidates=[];
  function add(kind,id,t){if(t!==null&&t<=limit)candidates.push({kind,id,time:t});}
