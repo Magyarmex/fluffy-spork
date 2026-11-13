@@ -85,3 +85,32 @@ test('fully scoped callback reports captured attribution, not whole-game complet
   assert.equal(Object.hasOwn(s,'complete'),false,
     'the ledger cannot certify terrain, direct HP writes or missed contacts');
 });
+
+test('install and uninstall restore inherited prototype methods exactly',()=>{
+  class Game {damageTank(t,d){t.hp-=d;} damageShape(t,d){t.hp-=d;}
+    damageDrone(t,d){t.hp-=d;}}
+  const g=new Game(), l=createProjectileCallbackLedger(g);
+  assert.equal(Object.hasOwn(g,'damageTank'),false);
+  l.install(); assert.equal(Object.hasOwn(g,'damageTank'),true);
+  l.uninstall(); assert.equal(Object.hasOwn(g,'damageTank'),false);
+  assert.equal(g.damageTank,Game.prototype.damageTank);
+});
+test('own descriptor and enumerable flags survive installation',()=>{
+  const g=game(), original=Object.getOwnPropertyDescriptor(g,'damageTank');
+  const l=createProjectileCallbackLedger(g);
+  l.install(); l.uninstall();
+  assert.deepEqual(Object.getOwnPropertyDescriptor(g,'damageTank'),original);
+});
+test('external callback replacement cannot be clobbered by uninstall',()=>{
+  const g=game(), l=createProjectileCallbackLedger(g); l.install();
+  const replacement=function(){return 'external';};g.damageTank=replacement;
+  assert.throws(()=>l.uninstall(),/changed after ledger install/);
+  assert.equal(g.damageTank,replacement);
+});
+test('non-configurable methods fail before any partial wrapping',()=>{
+  const g=game(), old=g.damageTank;
+  Object.defineProperty(g,'damageDrone',{value:g.damageDrone,configurable:false});
+  const l=createProjectileCallbackLedger(g);
+  assert.throws(()=>l.install(),/cannot be safely wrapped/);
+  assert.equal(g.damageTank,old);
+});
