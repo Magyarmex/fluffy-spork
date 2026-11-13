@@ -233,3 +233,8 @@ test('clear initial overlap is a real first event while clear separation remains
  assert.equal(circleContact(0,20,6000,0,0,0,21,.005),0);
  assert.equal(circleContact(0,22,6000,0,0,0,21,.005),null);
 });
+
+test('Cannon fuse rounds cannot masquerade as ordinary constant-velocity shots',()=>{
+ const s=shot();s.__v17Cannon=true;
+ assert.equal(earliest(s,1/30,world()).reason,'invalid-input');
+});
