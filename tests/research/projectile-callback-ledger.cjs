@@ -13,7 +13,10 @@ function createProjectileCallbackLedger(game, options = {}) {
     if (events.length >= limit) { overflow++; return; }
     const id = target && Number.isSafeInteger(target.id) ? target.id : null;
     if (id === null) unidentifiedTargets++;
-    const attributed = !!scope && (scope.attribution === 'indirect' || callbackDepth === scope.baseDepth);
+    // A scope authorizes exactly one immediate damage callback. A later
+    // callback in the same closure must not inherit an unrelated shot ID.
+    const attributed = !!scope && scope.remaining > 0 && callbackDepth === scope.baseDepth;
+    if (attributed) scope.remaining--;
     if (!attributed) unknown++;
     events.push(Object.freeze({epoch, kind, targetId: id,
       shotId: attributed ? scope.shotId : null,
@@ -63,7 +66,7 @@ function createProjectileCallbackLedger(game, options = {}) {
     if (attribution !== 'direct' && attribution !== 'indirect')
       throw new TypeError('invalid attribution');
     const prior = scope;
-    scope = {shotId: shot.id, attribution, baseDepth: callbackDepth};
+    scope = {shotId: shot.id, attribution, baseDepth: callbackDepth, remaining: 1};
     try { return fn(); } finally { scope = prior; }
   }
   function nextFrame() {
