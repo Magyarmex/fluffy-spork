@@ -6,9 +6,12 @@ const EPS=1e-9;
 function circleContact(px,py,vx,vy,cx,cy,r,until){
  // null = proven no contact; undefined = uncertain, never silently a miss.
  if(![px,py,vx,vy,cx,cy,r,until].every(Number.isFinite)||!(r>0)||!(until>0))return undefined;
- const dx=px-cx,dy=py-cy,c=dx*dx+dy*dy-r*r;
- if(!Number.isFinite(c))return undefined;
- if(c<=0)return 0;
+ const dx=px-cx,dy=py-cy,dist2=dx*dx+dy*dy,rad2=r*r,c=dist2-rad2;
+ if(!Number.isFinite(c)||!Number.isFinite(dist2)||!Number.isFinite(rad2))return undefined;
+ // A boundary touch at frame start is not a certified penetrating hit.
+ // Roundoff may put an exact tangent microscopically inside or outside.
+ if(Math.abs(c)<=64*Number.EPSILON*(dist2+rad2))return undefined;
+ if(c<0)return 0;
  const a=vx*vx+vy*vy,b=dx*vx+dy*vy;
  if(!Number.isFinite(a)||!Number.isFinite(b))return undefined;
  if(!(a>0)||!(b<0))return null;
