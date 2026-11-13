@@ -221,3 +221,15 @@ test('uncertain nearby mover cannot be ignored even when local body contact is e
   collisionEligible:true,radiusCertified:true,epoch:1});
  assert.equal(earliest(shot(),1/30,w).reason,'moving-body-near-corridor');
 });
+
+test('frame-start exact tangency is uncertain rather than a certified hit',()=>{
+ assert.equal(circleContact(0,21,6000,0,0,0,21,.005),undefined);
+ assert.equal(circleContact(0,21,0,6000,0,0,21,.005),undefined);
+ const w=world();w.bodies.push({id:2,x:0,y:21,r:18,
+  certifiedStationary:true,collisionEligible:true,radiusCertified:true,epoch:1});
+ assert.equal(earliest(shot(),1/30,w).reason,'uncertain-contact');
+});
+test('clear initial overlap is a real first event while clear separation remains a miss',()=>{
+ assert.equal(circleContact(0,20,6000,0,0,0,21,.005),0);
+ assert.equal(circleContact(0,22,6000,0,0,0,21,.005),null);
+});
