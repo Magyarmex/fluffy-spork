@@ -428,3 +428,30 @@ for(const field of ['hits','knock'])
   assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
    'malformed remote projectile must not certify chronological reordering');
  });
+
+
+/* The core still regards an alive tank as a collision body even if its
+ * hp/dead bookkeeping is contradictory. Never skip such a hull while
+ * certifying that the unrelated third projectile has no side effects. */
+for(const state of ['zero-hp','dead-flag','nan-hp'])
+ test('RESEARCH three-shot abstains on contradictory tank '+state,()=>{
+  const result=trial(60,false,false,null,40,(g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   bullets.push({
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   });
+   const t={kind:'tank',id:1300,cls:'scout',x:1700,y:1700,
+    hp:100,maxHp:100,alive:true,dead:false,vx:0,vy:0};
+   if(state==='zero-hp')t.hp=0;
+   if(state==='dead-flag')t.dead=true;
+   if(state==='nan-hp')t.hp=NaN;
+   g.tanks.push(t);
+  },Math.ceil(.42*60)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
+   'contradictory live tank must veto speculative chronology');
+ });
