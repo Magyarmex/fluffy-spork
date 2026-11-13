@@ -21,7 +21,12 @@ function check(a,label){
  for(const k of present)if(!Number.isSafeInteger(a[k])||a[k]<0)
   throw Error(label+': invalid '+k);
  if(present.length&&(
+    a.penOneRawInputs>a.projectileCountSum||
     a.penOneShotInputs>a.penOneRawInputs||
+    a.penOneMissingDeadInputs>a.penOneRawInputs||
+    a.penOneUnknownKindInputs>a.penOneRawInputs||
+    a.penOneMissingOrdinaryFlagsInputs>a.penOneRawInputs||
+    a.penOneWithoutEpochInputs>a.penOneRawInputs||
     a.penOneRawExpiringInputs>a.penOneRawInputs||
     a.penOneExpiringInputs>a.penOneRawExpiringInputs||
     a.penOneExpiringInputs>a.penOneShotInputs||
