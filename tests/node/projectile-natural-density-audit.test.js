@@ -2,7 +2,7 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const census=require('../browser/projectile-density-audit.js');
-function shot(id){return {id,x:0,y:0,vx:500,vy:0,r:3,dmg:12,ttl:1,pen:1,hits:0,dead:false};}
+function shot(id){return {id,kind:'bullet',x:0,y:0,vx:500,vy:0,r:3,dmg:12,ttl:1,pen:1,hits:0,dead:false};}
 test('read-only census records necessary 3..8-shot gates and physical cover-break context',()=>{
  const g={bullets:[shot(1),shot(2),shot(3)],__novaBattlefield:{coverBroken:0},
   __novaShapeSweepActive:true,__novaFrameStartBulletEpoch:4,__novaShapeSweepEpoch:4,
@@ -85,4 +85,7 @@ test('first-event input census counts ordinary and expiring rounds without certi
  g.bullets=[{...shot(1),pen:0,ttl:.005,ownerId:7,__novaRail:true}];
  g.updateBullets(.01);
  assert.equal(a.firstEventOrdinaryShotInputs,2,'rail rounds are not ordinary shots');
+ g.bullets=[{...shot(1),kind:'shape',pen:0,ttl:.005,ownerId:7}];
+ g.updateBullets(.01);
+ assert.equal(a.firstEventOrdinaryShotInputs,2,'non-bullet kinds are excluded');
 });
