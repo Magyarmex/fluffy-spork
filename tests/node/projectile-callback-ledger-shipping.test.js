@@ -219,7 +219,7 @@ test('materialized core instrumentation fails open on invalid projectile ID',()=
   assert.equal(snap.bounded,false);
 });
 
-for(const kind of ['tank','shape','drone']) {
+for(const kind of ['tank','shape']) {
   test('research-instrumented Battlefield TTL recovery identifies '+kind+' shot at 30Hz',()=>{
     const baseline=boot(false,kind,1), observed=boot(false,kind,1,true);
     const ledger=createProjectileCallbackLedger(observed.g);
@@ -265,4 +265,17 @@ test('actual materialized splash tank callback remains unknown without shot scop
   assert.equal(snap.events[0].kind,'damageTank');
   assert.equal(snap.events[0].shotId,null);
   assert.equal(snap.events[0].attribution,'unknown');
+});
+
+test('unwitnessed drone TTL corridor abstains rather than inventing a contact',()=>{
+  const baseline=boot(false,'drone',1), observed=boot(false,'drone',1,true);
+  const ledger=createProjectileCallbackLedger(observed.g);
+  observed.g.__novaShotLedger=ledger; ledger.install();
+  baseline.g.updateBullets(1/30);
+  observed.g.updateBullets(1/30);
+  assert.equal(observed.target.hp,baseline.target.hp);
+  assert.equal(observed.target.hp,100,
+    'drone has no authoritative frame-start motion witness in this fixture');
+  assert.equal(ledger.snapshot().events.length,0,
+    'no physical callback means no projectile identity claim');
 });
