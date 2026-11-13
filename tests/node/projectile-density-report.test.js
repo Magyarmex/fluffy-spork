@@ -58,3 +58,17 @@ test('three-shot witness count cannot exceed its pair denominator',()=>{
  const d=density();d.threeShotWitnessedNonTankFrames=2;
  assert.throws(()=>check(d,'mutant'),/contradictory/);
 });
+
+test('legacy density records preserve unknown three-shot exposure',()=>{
+ const d=density();
+ delete d.threeShotPairFrames;
+ delete d.threeShotWitnessedNonTankFrames;
+ assert.equal(check(d,'legacy'),d);
+ const {finish}=require('../../scripts/projectile-density-report.cjs');
+ assert.equal(finish({...d,threeShotPairFrames:null,
+  threeShotWitnessedNonTankFrames:null}).fractionThreeShotPair,null);
+ const incomplete=density();
+ delete incomplete.threeShotPairFrames;
+ assert.throws(()=>check(incomplete,'partial'),/contradictory/,
+  'a witness count without its denominator is invalid');
+});
