@@ -33,7 +33,7 @@ function patchBattlefieldCallbacks(source) {
   if (typeof source !== 'string') throw new TypeError('Battlefield source required');
   if (source.includes('__novaShotLedger.withProjectile'))
     throw new Error('Battlefield research callback patch already installed');
-  const re = /\\b(?:g|this)\\.damage(?:Tank|Shape|Drone)\\s*\\(/g;
+  const re = /NaN
   const matches = [...source.matchAll(re)];
   if (matches.length !== 10)
     throw new Error('expected ten Battlefield projectile damage callbacks, found ' + matches.length);
