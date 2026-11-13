@@ -198,3 +198,26 @@ test('hostile interception and body at the same physical time abstain',()=>{
  w.projectiles.push({id:9,time:t,complete:true,hostile:true,frameStartEpoch:1});
  assert.equal(earliest(shot(),1/30,w).reason,'tie');
 });
+
+test('certified remote movement cannot change an earlier local first event',()=>{
+ let seed=0x147962;const rnd=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
+ for(let i=0;i<10000;i++){
+  const s=shot(),w=world();
+  const targetX=25+rnd()*25,targetY=(rnd()-.5)*10;
+  w.bodies.push({id:2,x:targetX,y:targetY,r:18,certifiedStationary:true,
+   collisionEligible:true,radiusCertified:true,epoch:1});
+  const baseline=earliest(s,1/30,w);
+  assert.equal(baseline.kind,'body','baseline '+i);
+  const startX=200+rnd()*1500,startY=100+rnd()*1500,maxTravel=rnd()*40;
+  w.bodies.push({id:3,startX,startY,maxTravel,r:18,collisionEligible:true,
+   radiusCertified:true,epoch:1});
+  assert.deepEqual(earliest(s,1/30,w),baseline,'remote exclusion changed first event '+i);
+ }
+});
+test('uncertain nearby mover cannot be ignored even when local body contact is earlier',()=>{
+ const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,
+  collisionEligible:true,radiusCertified:true,epoch:1});
+ w.bodies.push({id:3,startX:25,startY:25,maxTravel:10,r:18,
+  collisionEligible:true,radiusCertified:true,epoch:1});
+ assert.equal(earliest(shot(),1/30,w).reason,'moving-body-near-corridor');
+});
