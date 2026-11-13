@@ -472,6 +472,10 @@ async function arm(browser,enabled,label){
    assert.ok(density.bulletUpdateCalls>0,'real composed projectile owner must be sampled');
    assert.equal(Object.values(density.projectileCountBuckets).reduce((a,b)=>a+b,0),density.bulletUpdateCalls);
    assert.ok(density.basicEligibleFrames<=density.projectileCountBuckets.threeToEight);
+   assert.ok(density.firstEventExpiringShotInputs<=density.firstEventOrdinaryShotInputs,
+    'expiring inputs are a subset of ordinary first-event inputs');
+   assert.ok(density.firstEventFramesWithInputs<=density.bulletUpdateCalls,
+    'candidate frame count cannot exceed observed bullet updates');
    assert.ok(density.coverBreaksBasicEligible<=density.coverBreaksAtThreeToEight);
    assert.ok(density.coverBreaksAtThreeToEight+density.coverBreaksAboveEight<=density.coverBreaks);
   if(BOMBER_RESEARCH){
