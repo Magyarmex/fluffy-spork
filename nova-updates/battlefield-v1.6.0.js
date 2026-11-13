@@ -2034,7 +2034,13 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
      if(!(e.hp>0))continue;
      if(e.dead===true||e.alive===false)return false;
     }else return false;
-    var er=e.r!=null?e.r:(e.cls&&CLASSES[e.cls]&&CLASSES[e.cls].size);
+    /* Core tank/drone collision radii include class padding; an
+     * optional tank r field is not authoritative for body contacts. */
+    if(e.kind==='tank'&&e.r!=null&&
+       (!(e.r>0)||!Number.isFinite(e.r)))return false;
+    var er=e.kind==='tank'?
+       (CLASSES[e.cls]&&CLASSES[e.cls].size+3):
+       e.kind==='drone'?e.r+1:e.r;
     if(!(er>0)||!Number.isFinite(er)||!Number.isFinite(e.x)||
        !Number.isFinite(e.y)||
        (e.vx!=null&&!Number.isFinite(e.vx))||
