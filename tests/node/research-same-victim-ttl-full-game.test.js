@@ -738,3 +738,33 @@ for(const kind of ['shape','drone'])
   assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
    'missing frame-start body witness must veto remote-shot certificate');
  });
+
+
+/* A body with zero terminal velocity is not proof of no movement when the
+ * composed Game's frame-start sweep was never activated. An absent witness
+ * must veto the remote third-shot ordering certificate, even if the body's
+ * endpoint is far outside the guessed 96-unit clearance margin. */
+for(const kind of ['shape','drone'])
+ for(const hz of [60,120])
+ test('RESEARCH three-shot abstains on inactive '+kind+' sweep '+hz+'Hz',()=>{
+  const result=trial(hz,false,false,null,40,(g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   bullets.push({
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   });
+   g.__novaShapeSweepActive=false;
+   if(kind==='shape')
+    g.shapes.push({kind:'shape',id:1300,x:1700,y:1700,r:12,
+     hp:100,maxHp:100,alive:true,dead:false,vx:0,vy:0});
+   else
+    g.drones.push({kind:'drone',id:1300,ownerId:999,x:1700,y:1700,
+     r:8,hp:100,alive:true,dead:false,vx:0,vy:0});
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
+   'inactive sweep must not certify a remote projectile harmless');
+ });
