@@ -8,7 +8,7 @@ function createProjectileCallbackLedger(game, options = {}) {
     throw new RangeError('invalid event budget');
   const methods = ['damageTank', 'damageShape', 'damageDrone'];
   const originals = new Map(), wrappers = new Map(), events = [];
-  let scope = null, installed = false, overflow = 0, epoch = 0, callbackDepth = 0, unknown = 0, unidentifiedTargets = 0, observerErrors = 0;
+  let scope = null, installed = false, overflow = 0, epoch = 0, callbackDepth = 0, unknown = 0, unidentifiedTargets = 0, observerErrors = 0, unusedScopes = 0;
   function append(kind, target, args) {
     // Consume the scope before any potentially throwing identity getter or
     // budget check. A dropped/failed first callback must never transfer its
@@ -88,15 +88,20 @@ function createProjectileCallbackLedger(game, options = {}) {
     }
     const prior = scope;
     scope = {shotId, attribution, baseDepth: callbackDepth, remaining: 1};
-    try { return fn(); } finally { scope = prior; }
+    try { return fn(); } finally {
+      // A scope with no captured callback is evidence of an unobserved path,
+      // NOT evidence of a missed hit. Keep it separate from callback errors.
+      if (scope.remaining > 0) unusedScopes++;
+      scope = prior;
+    }
   }
   function nextFrame() {
     if (scope || callbackDepth > 0)
       throw new Error('cannot advance frame inside damage callback');
-    epoch++; events.length = 0; overflow = 0; unknown = 0; unidentifiedTargets = 0; observerErrors = 0;
+    epoch++; events.length = 0; overflow = 0; unknown = 0; unidentifiedTargets = 0; observerErrors = 0; unusedScopes = 0;
   }
   function snapshot() {
-    return Object.freeze({epoch, events: Object.freeze(events.slice()), overflow, unknown, unidentifiedTargets, observerErrors,
+    return Object.freeze({epoch, events: Object.freeze(events.slice()), overflow, unknown, unidentifiedTargets, observerErrors, unusedScopes,
       bounded: overflow === 0 && observerErrors === 0,
       allCapturedCallbacksAttributed: overflow === 0 && observerErrors === 0 && unknown === 0 && unidentifiedTargets === 0});
   }
