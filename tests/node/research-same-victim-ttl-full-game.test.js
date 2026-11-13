@@ -354,3 +354,37 @@ for(const hz of [60,120])
 
 /* An explicit invalid tank radius must not be replaced by the class
  * fallback through the falsy 
+
+/* The damage callback may spawn unrelated fire while the core iterates.
+ * A newborn must not be promoted into the pre-frame three-shot proof, and
+ * restoring the original pair's identity order must not overwrite it. */
+for(const hz of [60,120])
+ for(const reverse of [false,true])
+ test('RESEARCH two-shot callback birth preserves owner and newborn '+hz+
+      'Hz reverse='+reverse,()=>{
+  const result=trial(hz,reverse,false,null,40,(g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   const oldDamage=g.damageTank;
+   let born=false;
+   g.damageTank=function(){
+    if(!born){
+     born=true;
+     this.bullets.push({
+      kind:'bullet',id:this.nextId++,ownerId:103,x:1500,y:1500,
+      vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+      shell:false,beam:false,color:'#fff'
+     });
+    }
+    return oldDamage.apply(this,arguments);
+   };
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[101,102],
+   'callback-born remote fire cannot change certified physical hit order');
+  assert.deepEqual(result.kills,[102]);
+  assert.equal(result.ownerStats[1].kills,1);
+  assert.ok(result.remaining.some(id=>id>=1200),
+   'newborn projectile identity must survive callback array churn');
+ });
