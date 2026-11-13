@@ -38,7 +38,7 @@ function coreMethod(instrument = false) {
     {dist2:(ax,ay,bx,by)=>(ax-bx)**2+(ay-by)**2},
     {CLASSES:{scout:{size:15}}},2250);
 }
-function boot(instrument = false, kind = 'tank') {
+function boot(instrument = false, kind = 'tank', pen = 0) {
   class Game {
     constructor() {
       this.bullets=[];this.burstOrigins=[];this.time=1;this.__novaTerrain=[];
@@ -85,7 +85,7 @@ function boot(instrument = false, kind = 'tank') {
   g.damageShape=(t,d)=>{t.hp-=d;};
   g.damageDrone=(t,d)=>{t.hp-=d;};
   g.bullets=[{id:101,kind:'bullet',ownerId:1,x:0,y:0,vx:6000,vy:0,
-    r:3,dmg:20,pen:0,ttl:.005,hits:0,dead:false,shell:false,beam:false}];
+    r:3,dmg:20,pen,ttl:.005,hits:0,dead:false,shell:false,beam:false}];
   return {g,target};
 }
 for(const fps of [30,60,120,240]) {
@@ -143,6 +143,23 @@ for(const kind of ['shape','drone']) {
     const events=ledger.snapshot().events;
     assert.equal(events.length,1);
     assert.equal(events[0].kind,kind==='shape'?'damageShape':'damageDrone');
+    assert.equal(events[0].shotId,101);
+    assert.equal(events[0].attribution,'direct');
+  });
+}
+
+for(const kind of ['tank','shape','drone']) {
+  test('canonical pen=1 shipping core: scoped first callback parity for '+kind,()=>{
+    const baseline=boot(false,kind,1), observed=boot(true,kind,1);
+    const ledger=createProjectileCallbackLedger(observed.g);
+    observed.g.__novaShotLedger=ledger; ledger.install();
+    baseline.g.updateBullets(1/240);
+    observed.g.updateBullets(1/240);
+    assert.equal(observed.target.hp,baseline.target.hp);
+    assert.equal(observed.target.hp,80);
+    assert.equal(observed.g.bullets.length,baseline.g.bullets.length);
+    const events=ledger.snapshot().events;
+    assert.equal(events.length,1);
     assert.equal(events[0].shotId,101);
     assert.equal(events[0].attribution,'direct');
   });
