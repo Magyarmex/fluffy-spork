@@ -281,7 +281,7 @@ test('unwitnessed drone TTL corridor abstains rather than inventing a contact',(
     'no physical callback means no projectile identity claim');
 });
 
-test('pen=1 stationary tank TTL chain attributes the real callback',()=>{
+test('pen=1 low-density tank TTL fallback attributes the real callback',()=>{
   const baseline=boot(false,'tank',1), observed=boot(false,'tank',1,true);
   const ledger=createProjectileCallbackLedger(observed.g);
   observed.g.__novaShotLedger=ledger; ledger.install();
