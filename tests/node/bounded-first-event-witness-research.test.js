@@ -8,6 +8,23 @@ for(const fps of [30,60,120,240])test('physical body before TTL at '+fps+'Hz',()
  const event=earliest(shot(),1/fps,w);assert.equal(event.kind,'body');assert.equal(event.id,2);
  assert.ok(Math.abs(event.time-19/6000)<1e-12);
 });
+test('pen-one first event is ordered without claiming its continuation',()=>{
+ const w=world();w.bodies.push(
+  {id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,radiusCertified:true,epoch:1},
+  {id:3,x:60,y:0,r:18,certifiedStationary:true,collisionEligible:true,radiusCertified:true,epoch:1});
+ const s=shot();s.pen=1;
+ const before=JSON.stringify([s,w]);
+ const first=earliest(s,1/30,w);
+ assert.equal(first.kind,'body');assert.equal(first.id,2);
+ assert.ok(Math.abs(first.time-19/6000)<1e-12);
+ assert.equal(Object.hasOwn(first,'secondContact'),false,
+  'the first-event comparator cannot certify subsequent piercing contacts');
+ assert.equal(JSON.stringify([s,w]),before,'pen-one witness must remain read-only');
+ w.walls.push({id:9,time:.001,complete:true,solid:true,permanent:true});
+ assert.equal(earliest(s,1/30,w).kind,'wall','earlier wall still wins');
+ w.walls=[];w.bodies[0].x=100;w.bodies[1].x=120;
+ assert.equal(earliest(s,1/30,w).kind,'expiry','later bodies cannot outrun TTL');
+});
 test('body beyond TTL cannot win',()=>{const w=world();w.bodies.push({id:2,x:100,y:0,r:18,certifiedStationary:true,collisionEligible:true,radiusCertified:true,epoch:1});assert.equal(earliest(shot(),1/30,w).kind,'expiry');});
 test('permanent wall before body wins',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,radiusCertified:true,epoch:1});w.walls.push({id:9,time:.001,complete:true,solid:true,permanent:true});assert.deepEqual(earliest(shot(),1/30,w),{kind:'wall',id:9,time:.001});});
 test('wall after body cannot steal body',()=>{const w=world();w.bodies.push({id:2,x:40,y:0,r:18,certifiedStationary:true,collisionEligible:true,radiusCertified:true,epoch:1});w.walls.push({id:9,time:.004,complete:true,solid:true,permanent:true});assert.equal(earliest(shot(),1/30,w).kind,'body');});
@@ -172,7 +189,7 @@ test('newborn projectile cannot be backdated to frame start',()=>{
 });
 
 test('piercing, previously-hit or unknown-owner shots abstain',()=>{
- const w=world();for(const [key,value] of [['pen',1],['hits',1],['ownerId',NaN]]){
+ const w=world();for(const [key,value] of [['pen',2],['hits',1],['ownerId',NaN]]){
   const s=shot();s[key]=value;
   assert.equal(earliest(s,1/30,w).reason,'invalid-input');
  }
