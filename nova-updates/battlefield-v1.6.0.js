@@ -2047,11 +2047,14 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
        !Number.isFinite(e.y)||
        (e.vx!=null&&!Number.isFinite(e.vx))||
        (e.vy!=null&&!Number.isFinite(e.vy)))return false;
-    /* Live Vector drone motion is integrated through separate channels.\n     * Until those channels have a trustworthy frame corridor, abstain. */\n    if(e.kind==='tank'&&e.__novaPhaseShiftEpoch===g.time)return false;
+    /* Live Vector drone motion is integrated through separate channels.
+     * Until those channels have a trustworthy frame corridor, abstain. */
+    if(e.kind==='tank'&&e.__novaPhaseShiftEpoch===g.time)return false;
     if(e.kind==='drone'&&(e.__lvVX!=null||e.__lvVY!=null||
        e.__novaVX!=null||e.__novaVY!=null||
        e.__novaIdleVX!=null||e.__novaIdleVY!=null||
-       e.__novaPhase==='dash'||e.__novaCommitted))return false;\n    /* Missing velocity is allowed for stationary shapes; malformed
+       e.__novaPhase==='dash'||e.__novaCommitted))return false;
+    /* Missing velocity is allowed for stationary shapes; malformed
      * velocity must never silently become zero via `|| 0`. */
     var motion=Math.hypot(e.vx==null?0:e.vx,e.vy==null?0:e.vy)*dt+96;
     if(!(Math.max(remote.x,rx)+remote.r+er+motion<e.x||
