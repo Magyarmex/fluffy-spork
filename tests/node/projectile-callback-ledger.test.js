@@ -250,3 +250,25 @@ test('victim ID is sampled once even when getter changes on subsequent reads',()
   assert.equal(s.events[0].shotId,7);
   assert.equal(s.observerErrors,0);
 });
+
+test('projectile ID getter is sampled once before scope attribution',()=>{
+  const g=game(), l=createProjectileCallbackLedger(g); l.install();
+  let reads=0;
+  const shot={get id(){reads++;return reads===1?73:999;}};
+  l.withProjectile(shot,()=>g.damageTank({id:5,hp:10},2));
+  const s=l.snapshot();
+  assert.equal(reads,1);
+  assert.equal(s.events[0].shotId,73);
+  assert.equal(s.events[0].attribution,'direct');
+  assert.equal(s.observerErrors,0);
+});
+
+test('invalid sampled projectile ID cannot establish a scope',()=>{
+  const g=game(), l=createProjectileCallbackLedger(g); l.install();
+  let reads=0;
+  const shot={get id(){reads++;return NaN;}};
+  assert.throws(()=>l.withProjectile(shot,()=>g.damageTank({id:1,hp:10},1)),/projectile ID/);
+  assert.equal(reads,1);
+  g.damageTank({id:1,hp:10},1);
+  assert.equal(l.snapshot().events[0].shotId,null);
+});
