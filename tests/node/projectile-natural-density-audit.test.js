@@ -2,7 +2,7 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const census=require('../browser/projectile-density-audit.js');
-function shot(id){return {id,x:0,y:0,vx:500,vy:0,r:3,dmg:12,ttl:1,pen:1,hits:0,dead:false};}
+function shot(id){return {id,x:0,y:0,vx:500,vy:0,r:3,dmg:12,ttl:1,pen:1,hits:0,dead:false,shell:false,beam:false};}
 test('read-only census records necessary 3..8-shot gates and physical cover-break context',()=>{
  const g={bullets:[shot(1),shot(2),shot(3)],__novaBattlefield:{coverBroken:0},
   __novaShapeSweepActive:true,__novaFrameStartBulletEpoch:4,__novaShapeSweepEpoch:4,
@@ -128,4 +128,14 @@ test('pen-one audit is injected only in research and survives natural-match seri
  assert.match(natural,/g\.__novaProjectileDensityAudit=density\.install\(g,density\.create\(\)\)/);
  assert.match(natural,/projectileDensityAudit:g\.__novaProjectileDensityAudit/);
  assert.doesNotMatch(shipping,/projectile-density-audit\.js/);
+});
+
+test('pen-one census rejects unknown ordinary flags without hiding raw exposure',()=>{
+ const g={bullets:[{...shot(1),kind:'bullet',ownerId:2,shell:undefined}],
+  __novaShapeSweepActive:true,__novaFrameStartBulletEpoch:1,
+  __novaShapeSweepEpoch:1,__novaFrameStartBulletIdCeiling:2};
+ const s=census.before(g,.01);
+ assert.equal(s.penOne,0);
+ assert.equal(s.missingFlags,1);
+ assert.equal(s.raw,1);
 });
