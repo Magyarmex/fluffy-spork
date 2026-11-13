@@ -9,7 +9,7 @@ const vm = require('node:vm');
 const {createProjectileCallbackLedger} = require('../research/projectile-callback-ledger.cjs');
 const root = path.resolve(__dirname, '../..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-function coreMethod() {
+function coreMethod(instrument = false) {
   const marker='    updateBullets(dt) {', at=html.indexOf(marker);
   assert.ok(at>=0,'materialized shipping updater missing');
   let pos=at+marker.length, depth=1;
@@ -19,12 +19,20 @@ function coreMethod() {
     pos++;
   }
   assert.equal(depth,0);
+  let body=html.slice(at+marker.length,pos-1);
+  if (instrument) {
+    // Research-only source instrumentation of the *extracted shipping core*.
+    // This does not modify production and does not instrument Battlefield TTL.
+    const needle='this.damageTank(e, b.dmg, b.ownerId, Math.cos(ang) * (b.knock || 0) * 0.006, Math.sin(ang) * (b.knock || 0) * 0.006);';
+    assert.ok(body.includes(needle),'shipping direct-tank callback changed');
+    body=body.replace(needle,'this.__novaShotLedger.withProjectile(b, () => '+needle+')');
+  }
   return new Function('types_1','classes_1','M',
-    'return function(dt){'+html.slice(at+marker.length,pos-1)+'}')(
+    'return function(dt){'+body+'}')(
     {dist2:(ax,ay,bx,by)=>(ax-bx)**2+(ay-by)**2},
     {CLASSES:{scout:{size:15}}},2250);
 }
-function boot() {
+function boot(instrument = false) {
   class Game {
     constructor() {
       this.bullets=[];this.burstOrigins=[];this.time=1;this.__novaTerrain=[];
@@ -39,7 +47,7 @@ function boot() {
     'splashAt','initBulletIntegrity','useAbility','addFlash'])
     Game.prototype[name]=function(){};
   Game.prototype.resolveBulletCollisions=function(){};
-  Game.prototype.updateBullets=coreMethod();
+  Game.prototype.updateBullets=coreMethod(instrument);
   Game.prototype.weakenBullet=function(b,damage){b.hp-=damage;if(b.hp<=0)b.dead=true;};
   Game.prototype.clusterBurst=function(b){this.burstOrigins.push(b.id);};
   Game.prototype.randSpawnPos=()=>({x:1500,y:1500});
@@ -90,3 +98,27 @@ for(const fps of [30,60,120,240]) {
     ledger.uninstall();
   });
 }
+
+test('research-instrumented materialized core captures exact shot ID at 240Hz',()=>{
+  const baseline=boot(), observed=boot(true);
+  const ledger=createProjectileCallbackLedger(observed.g);
+  observed.g.__novaShotLedger=ledger; ledger.install();
+  baseline.g.updateBullets(1/240);
+  observed.g.updateBullets(1/240);
+  assert.equal(observed.target.hp,baseline.target.hp);
+  assert.equal(observed.g.bullets.length,baseline.g.bullets.length);
+  const events=ledger.snapshot().events.filter(e=>e.kind==='damageTank');
+  assert.equal(events.length,1);
+  assert.equal(events[0].shotId,101);
+  assert.equal(events[0].attribution,'direct');
+  assert.equal(ledger.snapshot().allCapturedCallbacksAttributed,true);
+});
+test('core-only instrumentation must not falsely attribute Battlefield TTL recovery',()=>{
+  const observed=boot(true), ledger=createProjectileCallbackLedger(observed.g);
+  observed.g.__novaShotLedger=ledger; ledger.install();
+  observed.g.updateBullets(1/30);
+  const events=ledger.snapshot().events.filter(e=>e.kind==='damageTank');
+  assert.equal(events.length,1);
+  assert.equal(events[0].shotId,null);
+  assert.equal(events[0].attribution,'unknown');
+});
