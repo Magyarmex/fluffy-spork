@@ -609,8 +609,13 @@ for(const field of ['dmg','ttl'])
    remote[field]=value;
    bullets.push(remote);
   },Math.ceil(.42*60)+3);
-  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
-   'malformed remote damage/lifetime must veto speculative ordering');
+  /* A zero/negative-infinite TTL remote is removed by the core before
+   * the local pair's contact frame. The remaining valid TWO-shot path
+   * may then correctly restore chronological [101,102] order. */
+  const remoteExpired=field==='ttl'&&(value===0||value===-Infinity);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),
+   remoteExpired?[101,102]:[102,101],
+   'malformed remote must abstain while present; a removed remote must not disable the valid two-shot correction');
  });
 
 /* Current vx=0 does not establish a stationary tank. The existing
