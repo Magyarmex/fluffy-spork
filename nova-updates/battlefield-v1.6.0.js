@@ -2022,12 +2022,18 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
    var entities=tanks.concat(shapes,drones);
    for(var ri=0;ri<entities.length;ri++){
     var e=entities[ri];if(!e)continue;
-    /* Core tank contact checks alive, not hp/dead. Contradictory
-     * state cannot authorize ignoring a potentially collidable hull. */
-    if(e.kind==='tank'&&e.alive!==false&&
-       (e.dead===true||(e.hp!=null&&!(e.hp>0))))return false;
-    if(e.dead||e.alive===false||
-       (e.hp!=null&&!(e.hp>0)))continue;
+    /* Match core collision eligibility by kind. A contradictory dead/HP
+     * flag cannot make a still-collidable body disappear from the proof. */
+    if(e.kind==='tank'){
+     if(e.alive===false)continue;
+     if(e.dead===true||(e.hp!=null&&!(e.hp>0)))return false;
+    }else if(e.kind==='shape'){
+     if(e.dead===true||e.alive===false||
+        (e.hp!=null&&!(e.hp>0)))return false;
+    }else if(e.kind==='drone'){
+     if(!(e.hp>0))continue;
+     if(e.dead===true||e.alive===false)return false;
+    }else return false;
     var er=e.r!=null?e.r:(e.cls&&CLASSES[e.cls]&&CLASSES[e.cls].size);
     if(!(er>0)||!Number.isFinite(er)||!Number.isFinite(e.x)||
        !Number.isFinite(e.y)||
