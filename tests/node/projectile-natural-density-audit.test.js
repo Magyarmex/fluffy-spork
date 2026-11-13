@@ -79,4 +79,7 @@ test('first-event input census counts ordinary and expiring rounds without certi
  g.__novaFrameStartBulletEpoch=3;g.bullets=[{...shot(9),pen:0,ttl:.005,ownerId:7}];
  g.updateBullets(.01);
  assert.equal(a.firstEventOrdinaryShotInputs,2,'newborn ID is excluded');
+ g.bullets=[{...shot(1),pen:0,ttl:.005,ownerId:7,hits:NaN}];
+ g.updateBullets(.01);
+ assert.equal(a.firstEventOrdinaryShotInputs,2,'malformed hit ledger is excluded');
 });
