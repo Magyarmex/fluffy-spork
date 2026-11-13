@@ -53,7 +53,8 @@ const {patchMaterializedCore}=require('../research/projectile-callback-source-pa
         g.update(1/30);
         const s=ledger.counters();
         frames++;callbacks+=s.eventsCaptured;scopedCalls+=s.scopedCalls;
-        unusedScopes+=s.unusedScopes;observerErrors+=s.observerErrors;\n        unknown+=s.unknown;unidentifiedTargets+=s.unidentifiedTargets;
+        unusedScopes+=s.unusedScopes;observerErrors+=s.observerErrors;
+        unknown+=s.unknown;unidentifiedTargets+=s.unidentifiedTargets;
         if(s.overflow)throw Error('research callback buffer overflow');
         ledger.nextFrame();
       }
@@ -64,7 +65,8 @@ const {patchMaterializedCore}=require('../research/projectile-callback-source-pa
     });
     assert.ok(result.frames>=1,'real composed game must advance');
     assert.equal(result.observerErrors,0,'observer must not fail in natural gameplay');
-    assert.ok(Number.isFinite(result.time));\n    assert.ok(Number.isFinite(result.p95FrameMs),'browser frame-time sample required');
+    assert.ok(Number.isFinite(result.time));
+    assert.ok(Number.isFinite(result.p95FrameMs),'browser frame-time sample required');
     assert.deepEqual(errors,[],'no browser runtime exceptions');
     console.log(JSON.stringify({research:'shot-ledger-browser-smoke',...result}));
   }finally{
