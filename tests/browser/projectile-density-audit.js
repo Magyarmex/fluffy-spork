@@ -15,7 +15,7 @@
    coverBreaksAboveEight:0,coverBreaksBasicEligible:0,
    brokenCounterResets:0,
    penOneShotInputs:0,penOneExpiringInputs:0,penOneFramesWithInputs:0,
-   penOneRawInputs:0,penOneMissingDeadInputs:0,
+   penOneRawInputs:0,penOneRawExpiringInputs:0,penOneMissingDeadInputs:0,
    penOneUnknownKindInputs:0,penOneWithoutEpochInputs:0,
    penOneScanCensoredFrames:0};
  }
@@ -46,7 +46,7 @@
    * Preserve unknown kind and missing epoch separately so zero counts are
    * not mistaken for evidence of zero physical opportunities. */
   let penOne=0,penOneExpiring=0,unknownKind=0,withoutEpoch=0,censored=0,
-   raw=0,missingDead=0;
+   raw=0,rawExpiring=0,missingDead=0;
   if(n>256)censored=1; // bounded observer; do not hide the censored cohort
   else if(Number.isFinite(dt)&&dt>0&&dt<=.05){
    const witnessed=g.__novaShapeSweepActive===true&&
@@ -54,7 +54,8 @@
     Number.isSafeInteger(g.__novaFrameStartBulletIdCeiling);
    for(const b of bs){
     if(b&&b.pen===1&&b.hits===0&&Number.isFinite(b.ttl)&&b.ttl>0){
-     raw++;if(b.dead==null)missingDead++;
+     raw++;if(b.ttl<=dt)rawExpiring++;
+     if(b.dead==null)missingDead++;
     }
     if(!b||b.dead!==false||b.shell===true||b.beam===true||
        b.splash||b.__v17Cannon||b.__novaRail||b.pen!==1||
@@ -77,7 +78,7 @@
    }
   }
   return {n,dt,eligible,broken:broken(g),penOne,penOneExpiring,
-   unknownKind,withoutEpoch,censored,raw,missingDead};
+   unknownKind,withoutEpoch,censored,raw,rawExpiring,missingDead};
  }
  function after(a,s,g){
   a.bulletUpdateCalls++;
@@ -85,6 +86,7 @@
   a.projectileCountSum+=s.n;
   a.penOneShotInputs+=s.penOne||0;
   a.penOneRawInputs+=s.raw||0;
+  a.penOneRawExpiringInputs+=s.rawExpiring||0;
   a.penOneMissingDeadInputs+=s.missingDead||0;
   a.penOneExpiringInputs+=s.penOneExpiring||0;
   if(s.penOne>0)a.penOneFramesWithInputs++;
