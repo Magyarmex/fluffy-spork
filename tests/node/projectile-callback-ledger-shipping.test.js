@@ -38,7 +38,7 @@ function coreMethod(instrument = false) {
     {dist2:(ax,ay,bx,by)=>(ax-bx)**2+(ay-by)**2},
     {CLASSES:{scout:{size:15}}},2250);
 }
-function boot(instrument = false, kind = 'tank', pen = 0) {
+function boot(instrument = false, kind = 'tank', pen = 0, instrumentBattlefield = false) {
   class Game {
     constructor() {
       this.bullets=[];this.burstOrigins=[];this.time=1;this.__novaTerrain=[];
@@ -70,9 +70,18 @@ function boot(instrument = false, kind = 'tank', pen = 0) {
   for(const file of ['sniper-v1.2.0.js','polish-v1.3.1.js',
     'battlefield-v1.6.0.js','apex-disciplines-v1.7.1.js',
     'performance-v1.7.5.js','performance-v1.7.8.js',
-    'precision-contact-v1.8.3.js'])
-    vm.runInNewContext(fs.readFileSync(path.join(root,'nova-updates',file),'utf8'),
-      context,{filename:file});
+    'precision-contact-v1.8.3.js']) {
+    let source=fs.readFileSync(path.join(root,'nova-updates',file),'utf8');
+    if(instrumentBattlefield && file==='battlefield-v1.6.0.js') {
+      // Research-only injection at the existing TTL recovery owner. Keep
+      // the physical decision and original damage call exactly unchanged.
+      const needle='g.damageTank(best.e,b.dmg,b.ownerId,Math.cos(ang)*(b.knock||0)*.006,\\n     Math.sin(ang)*(b.knock||0)*.006);'.replace('\\n','\\n');
+      assert.ok(source.includes(needle),'Battlefield TTL callback changed');
+      source=source.replace(needle,
+        'g.__novaShotLedger.withProjectile(b,()=>'+needle.slice(0,-1)+');');
+    }
+    vm.runInNewContext(source,context,{filename:file});
+  }
   const m={exports:{}};
   modules['game/engine'](m,m.exports,spec=>spec.includes('classes')
     ? {CLASSES:{scout:{size:15}},lineageForClass:()=>null}
@@ -182,4 +191,19 @@ test('materialized core instrumentation fails open on invalid projectile ID',()=
   assert.equal(snap.events[0].attribution,'unknown');
   assert.equal(snap.observerErrors,1);
   assert.equal(snap.bounded,false);
+});
+
+test('research-instrumented Battlefield TTL recovery records actual shot ID at 30Hz',()=>{
+  const baseline=boot(false,'tank',1), observed=boot(false,'tank',1,true);
+  const ledger=createProjectileCallbackLedger(observed.g);
+  observed.g.__novaShotLedger=ledger; ledger.install();
+  baseline.g.updateBullets(1/30);
+  observed.g.updateBullets(1/30);
+  assert.equal(observed.target.hp,baseline.target.hp);
+  assert.equal(observed.target.hp,80);
+  assert.equal(observed.g.bullets.length,baseline.g.bullets.length);
+  const events=ledger.snapshot().events.filter(e=>e.kind==='damageTank');
+  assert.equal(events.length,1);
+  assert.equal(events[0].shotId,101);
+  assert.equal(events[0].attribution,'direct');
 });
