@@ -234,7 +234,7 @@ test('route candidate nodes use full physical body clearance, not a discounted s
     const nodes=T.obstacleNodes(g,-400,0,400,0,pad);
     assert.ok(nodes.length>0,'candidate nodes must exist for a wall detour');
     assert.ok(pads.length>0,'candidate nodes must be checked for physical safety');
-    assert.ok(pads.every(p=>p>=radius),'every candidate must preserve at least full collision radius: '+JSON.stringify(pads));
+    assert.ok(pads.every(p=>p>=Math.max(radius,pad*.72)),'every candidate must preserve at least full collision radius: '+JSON.stringify(pads));
     for(const node of nodes)assert.equal(original(node.x,node.y,radius),true);
   }
 });
