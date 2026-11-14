@@ -65,6 +65,7 @@ function compare(off,on){
 function compareTriple(offA,offB,on){
  assert.equal(offA.pose?.enabled,false,'first A/A control must use the native presenter');
  assert.equal(offB.pose?.enabled,false,'second A/A control must use the native presenter');
+ assert.equal(offB.pose?.frames,0,'second A/A control must not run pose presentation');
  assert.equal(on.pose?.enabled,true,'B candidate must use the opt-in presenter');
  for(const [label,arm] of [['OFF-A',offA],['OFF-B',offB],['ON',on]]){
   assert.equal(arm.initialFingerprint,offA.initialFingerprint,
