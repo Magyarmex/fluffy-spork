@@ -55,6 +55,16 @@ test('authoritative birth ceiling distinguishes newborn events without proving a
   assert.equal(result.certifiedMissedHits,null);
   assert.equal(result.abstentionReason,'incomplete-pre-frame-evidence');
 });
+test('contradictory birth and pre-existing witnesses fail closed',()=>{
+  assert.throws(()=>auditShotEvidence([
+    {frame:1,shotId:1,kind:'damageTank',bornThisFrame:true,
+      preShot:pre,preTarget:target}
+  ]),/contradictory/);
+  assert.throws(()=>auditShotEvidence([
+    {frame:1,shotId:1,kind:'projectileInterception',otherShotId:2,
+      preShot:pre,preOtherShot:pre,otherBornThisFrame:true}
+  ]),/contradictory/);
+});
 test('boundedness is lost on event or pre-frame overflow',()=>{
   for(const options of [{truncated:1},{preFrameOverflow:1}]){
     const result=auditShotEvidence([],options);
