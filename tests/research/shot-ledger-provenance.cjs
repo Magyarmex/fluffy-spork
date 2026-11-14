@@ -1,10 +1,11 @@
 'use strict';
 // Research-only provenance audit. A pre-update endpoint is NOT a swept
 // collision witness. Never classify a missed hit without competing geometry.
-function auditShotEvidence(events,{truncated=0,preFrameOverflow=0,preFrameShotUnidentified=0,preFrameTargetUnidentified=0}={}){
+function auditShotEvidence(events,{truncated=0,preFrameOverflow=0,observerErrors=0,preFrameShotUnidentified=0,preFrameTargetUnidentified=0}={}){
   if(!Array.isArray(events))throw new TypeError('events array required');
   if(!Number.isSafeInteger(truncated)||truncated<0||
      !Number.isSafeInteger(preFrameOverflow)||preFrameOverflow<0||
+     !Number.isSafeInteger(observerErrors)||observerErrors<0||
      !Number.isSafeInteger(preFrameShotUnidentified)||preFrameShotUnidentified<0||
      !Number.isSafeInteger(preFrameTargetUnidentified)||preFrameTargetUnidentified<0)
     throw new RangeError('invalid evidence truncation counters');
@@ -109,7 +110,7 @@ function auditShotEvidence(events,{truncated=0,preFrameOverflow=0,preFrameShotUn
     else throw new TypeError('unknown shot event kind: '+String(e.kind));
     shots.set(e.shotId,existing);
   }
-  const bounded=truncated===0&&preFrameOverflow===0;
+  const bounded=truncated===0&&preFrameOverflow===0&&observerErrors===0;
   return {
     bounded,eventCount:events.length,shotCount:shots.size,
     preStatePresent,preStateMissing,provenNewbornEvents,
