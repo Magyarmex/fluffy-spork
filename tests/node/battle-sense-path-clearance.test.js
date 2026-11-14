@@ -41,3 +41,15 @@ test('path-clearance veto does not alter the same projectile-driven dodge in ope
   };
   assert.equal(h.saferSide(g,bot,1,0),1);
 });
+
+test('contested pickup travel uses the complete cached route without a second planner search',()=>{
+ const h=hooks(),t={...bot},p={x:400,y:0},calls=[];
+ const g={hasLineOfSight:()=>false,
+  novaBattlefieldWaypoint:(x,y,gx,gy,pad,seed)=>{calls.push(['waypoint',pad,seed]);return{x:100,y:100};},
+  novaRouteLength:(x,y,gx,gy,pad,seed,wp)=>{calls.push(['length',pad,seed]);return 650;}};
+ assert.equal(h.routeDistance(g,t,p,null,{CLASSES:{guard:{size:15}}}),650);
+ assert.deepEqual(calls,[['waypoint',23,t.id],['length',23,t.id]]);
+ delete g.novaRouteLength;
+ assert.ok(h.routeDistance(g,t,p,null,{CLASSES:{guard:{size:15}}})<650,
+  'without the composed route owner, retain the previous first-corner fallback');
+});
