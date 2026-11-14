@@ -119,7 +119,27 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
       // Bounded event provenance enables later shot-ID joins without retaining
       // a full unbounded combat log or claiming event time is first contact.
       const eventSamples=[],MAX_EVENT_SAMPLES=256;
-      let eventSamplesTruncated=0;
+      let eventSamplesTruncated=0,preFrameShotOverflow=0;
+      // Snapshot actual projectile state BEFORE the authoritative update.
+      // Only join by exact shot ID; absent/over-budget evidence stays null.
+      // No collision inference is made from these endpoint snapshots.
+      const MAX_PRE_FRAME_SHOTS=4096;
+      const snapshotPreFrameShots=()=>{
+        const map=new Map();
+        for(const shot of g.bullets){
+          if(map.size>=MAX_PRE_FRAME_SHOTS){preFrameShotOverflow++;return null;}
+          if(!Number.isSafeInteger(shot.id)||shot.id<0||map.has(shot.id)){
+            preFrameShotOverflow++;return null;
+          }
+          map.set(shot.id,{
+            x:shot.x,y:shot.y,vx:shot.vx,vy:shot.vy,
+            ttl:shot.ttl,dead:!!shot.dead,hp:shot.hp,
+            pen:shot.pen,hits:shot.hits,r:shot.r,
+            ownerId:shot.ownerId,dmg:shot.dmg
+          });
+        }
+        return map;
+      };
       const fingerprint=()=>{
         const state=JSON.stringify({
           time:g.time,rng:paired?window.__novaShotSeedState():null,
@@ -162,6 +182,7 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
       physicalTrace.push({frame:0,hash:initialHash});foldFrame(initialHash);
       const updateMs=[];
       for(let i=0;i<600&&g.status==='playing';i++){
+        const preFrameShots=observe?snapshotPreFrameShots():null;
         const t0=performance.now();
         const rand=Math.random,now=Date.now;
         if(paired){Math.random=window.__novaShotSeeded;Date.now=()=>Math.round(g.time*1000);}
@@ -176,7 +197,10 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
             if(eventSamples.length>=MAX_EVENT_SAMPLES){eventSamplesTruncated++;continue;}
             eventSamples.push({frame:i+1,kind:e.kind,shotId:e.shotId,
               targetId:e.targetId,otherShotId:e.otherShotId??null,
-              source:e.source??null,reason:e.reason??null,timing:e.timing??null});
+              source:e.source??null,reason:e.reason??null,timing:e.timing??null,
+              preShot:preFrameShots?.get(e.shotId)??null,
+              preOtherShot:Number.isSafeInteger(e.otherShotId)?
+                (preFrameShots?.get(e.otherShotId)??null):null});
           }
         }
         const s=observe?ledger.counters():{
@@ -201,7 +225,7 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
         if(!ledger.uninstall())throw Error('failed to restore real damage methods');}
       updateMs.sort((a,b)=>a-b);
       return{arm:paired?(observe?'on':'off'):'smoke',preSortTankIds,layout:g.__novaBattlefield?.name??null,frames,physicalTrace,
-        fullFrameDigest:(digestA>>>0).toString(16)+':'+(digestB>>>0).toString(16),eventSamples,eventSamplesTruncated,callbacks,attributedCallbacks:callbacks-unknown,coreAttributed,battlefieldAttributed,coverAttributed,retirements,ttlRetirements,boundsRetirements,ambiguousRetirements,rawPenOneZeroHitTtl,coreInterceptions,sniperInterceptions,battlefieldTtlInterceptions,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
+        fullFrameDigest:(digestA>>>0).toString(16)+':'+(digestB>>>0).toString(16),eventSamples,eventSamplesTruncated,preFrameShotOverflow,callbacks,attributedCallbacks:callbacks-unknown,coreAttributed,battlefieldAttributed,coverAttributed,retirements,ttlRetirements,boundsRetirements,ambiguousRetirements,rawPenOneZeroHitTtl,coreInterceptions,sniperInterceptions,battlefieldTtlInterceptions,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
         p95UpdateMs:updateMs[Math.ceil(updateMs.length*.95)-1],
         maxUpdateMs:updateMs[updateMs.length-1],status:g.status,time:g.time};
     },{observe:OBSERVE,paired:!!PAIRED_ARM});
@@ -215,6 +239,16 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
       'every-frame physical digest must be present');
     assert.ok(result.eventSamples.length<=256&&result.eventSamplesTruncated>=0,
       'bounded shot provenance sample');
+    assert.equal(result.preFrameShotOverflow,0,
+      'pre-frame projectile snapshot must not silently lose identity');
+    assert.ok(result.eventSamples.every(e=>
+      e.preShot===null||(Number.isFinite(e.preShot.x)&&
+      Number.isFinite(e.preShot.y)&&Number.isFinite(e.preShot.ttl))),
+      'pre-frame shot evidence must be finite or explicitly absent');
+    assert.ok(result.eventSamples.every(e=>
+      e.otherShotId===null||e.preOtherShot===null||
+      (Number.isFinite(e.preOtherShot.x)&&Number.isFinite(e.preOtherShot.y))),
+      'second interception projectile must be exact-ID joined or absent');
     assert.ok(result.eventSamples.every(e=>Number.isSafeInteger(e.frame)&&
       e.frame>=1&&e.frame<=result.frames&&typeof e.kind==='string'),
       'shot provenance events must have real frame epochs');
