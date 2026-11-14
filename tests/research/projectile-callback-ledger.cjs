@@ -100,6 +100,26 @@ function createProjectileCallbackLedger(game, options = {}) {
       scope = prior;
     }
   }
+  // Terrain has a separate HP owner and does not call damageTank/Shape/Drone.
+  // This records an actual cover write, not a predicted first-contact time.
+  function recordCoverDamage(shot, cover, beforeHp, afterHp) {
+    try {
+      const shotId = shot == null ? null : shot.id;
+      const coverId = cover == null ? null : cover.id;
+      if (!Number.isSafeInteger(shotId) || shotId < 0 ||
+          !Number.isSafeInteger(coverId) ||
+          !Number.isFinite(beforeHp) || !Number.isFinite(afterHp) ||
+          afterHp > beforeHp) {
+        observerErrors++; return false;
+      }
+      if (events.length >= limit) { overflow++; return false; }
+      events.push(Object.freeze({epoch, kind:'coverDamage', targetId:coverId,
+        shotId, attribution:'direct', source:'battlefield',
+        requestedDamage:null, effectiveDamage:Math.max(0,beforeHp-afterHp),
+        timing:'unknown'}));
+      return true;
+    } catch (_) { observerErrors++; return false; }
+  }
   function nextFrame() {
     if (scope || callbackDepth > 0)
       throw new Error('cannot advance frame inside damage callback');
@@ -132,7 +152,7 @@ function createProjectileCallbackLedger(game, options = {}) {
     originals.clear(); wrappers.clear(); installed = false; scope = null;
     return true;
   }
-  return Object.freeze({install, uninstall, withProjectile, nextFrame, snapshot, counters});
+  return Object.freeze({install, uninstall, withProjectile, recordCoverDamage, nextFrame, snapshot, counters});
 }
 if (typeof module !== 'undefined' && module.exports)
   module.exports = {createProjectileCallbackLedger};
