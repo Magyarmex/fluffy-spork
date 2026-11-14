@@ -524,4 +524,8 @@ test('interception witness records actual core pair without inventing contact ti
   assert.equal(l.recordProjectileInterception({id:31},{id:31},10,15),false);
   assert.equal(l.counters().observerErrors,1);
   l.nextFrame();assert.equal(l.counters().coreInterceptions,0);
+  assert.equal(l.recordProjectileInterception({id:41,hp:3},{id:42,hp:4},10,15,'sniper'),true);
+  assert.equal(l.counters().sniperInterceptions,1);
+  assert.equal(l.counters().damageCallbacksCaptured,0);
+  assert.equal(l.snapshot().events[0].source,'sniper');
 });
