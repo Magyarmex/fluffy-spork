@@ -324,7 +324,7 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
       'pre-frame shot evidence must be finite or explicitly absent');
     assert.ok(result.eventSamples.every(e=>
       e.contactSeconds===null||(e.kind==='projectileInterception'&&
-        e.source==='battlefield-ttl'&&e.timing==='certified-frame-seconds'&&
+        e.source==='battlefield-ttl'&&e.timing==='certified-bullet-step-seconds'&&
         Number.isFinite(e.contactSeconds)&&e.contactSeconds>0&&e.contactSeconds<=.05)),
       'only certified mutual-TTL interceptions may carry frame contact seconds');
     assert.ok(result.eventSamples.every(e=>
