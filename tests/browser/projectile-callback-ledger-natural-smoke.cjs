@@ -147,7 +147,7 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
           unidentifiedTargets:0,coreAttributed:0,battlefieldAttributed:0,
           coverAttributed:0,overflow:false
         };
-        frames++;if(frames%30===0)physicalTrace.push({frame:frames,hash:fingerprint()});
+        frames++;if(frames%10===0)physicalTrace.push({frame:frames,hash:fingerprint()});
         callbacks+=s.damageCallbacksCaptured;retirements+=s.retiredAttributed;ttlRetirements+=s.ttlRetirements;boundsRetirements+=s.boundsRetirements;ambiguousRetirements+=s.ambiguousRetirements;rawPenOneZeroHitTtl+=s.rawPenOneZeroHitTtl;coreInterceptions+=s.coreInterceptions;sniperInterceptions+=s.sniperInterceptions;battlefieldTtlInterceptions+=s.battlefieldTtlInterceptions;scopedCalls+=s.scopedCalls;
         unusedScopes+=s.unusedScopes;observerErrors+=s.observerErrors;
         unknown+=s.unknown;unidentifiedTargets+=s.unidentifiedTargets;
@@ -163,9 +163,9 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
         maxUpdateMs:updateMs[updateMs.length-1],status:g.status,time:g.time};
     },{observe:OBSERVE,paired:!!PAIRED_ARM});
     assert.ok(result.frames>=1,'real composed game must advance');
-    assert.equal(result.physicalTrace.length,1+Math.floor(result.frames/30),
+    assert.equal(result.physicalTrace.length,1+Math.floor(result.frames/10),
       'initial and one-second physical fingerprints must be captured');
-    assert.ok(result.physicalTrace.every((sample,i)=>sample.frame===i*30&&
+    assert.ok(result.physicalTrace.every((sample,i)=>sample.frame===i*10&&
       /^[0-9a-f]+:[0-9a-f]+$/.test(sample.hash)),
       'fingerprints must have monotonic frame epochs and bounded hash shape');
     assert.ok(Number.isSafeInteger(result.retirements)&&result.retirements>=0,
