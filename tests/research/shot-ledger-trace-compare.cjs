@@ -16,6 +16,10 @@ function comparePhysicalTraces(off,on){
   // Even identical initial fingerprints do not authorize comparing different
   // seeded input histories. Require explicit seed agreement when supplied.
   assert.equal(off.seed,on.seed,'paired trials must use the same declared seed');
+  assert.equal(off.layoutIndex,on.layoutIndex,
+    'paired trials must use the same declared Battlefield layout index');
+  assert.equal(off.layout,on.layout,
+    'paired trials must resolve to the same Battlefield layout');
   assert.equal(off.physicalTrace[0].hash,on.physicalTrace[0].hash,
     'OFF/ON worlds differ at frame zero; refuse causal attribution');
   const digestProvided=off.fullFrameDigest!==undefined||on.fullFrameDigest!==undefined;
