@@ -503,3 +503,27 @@ test('research browser smoke compiles before expensive Chromium setup',()=>{
     '../browser/projectile-callback-ledger-natural-smoke.cjs'),'utf8');
   new vm.Script(script,{filename:'projectile-callback-ledger-natural-smoke.cjs'});
 });
+
+test('shipping Sniper contact fraction is segment-relative and geometry-invariant',()=>{
+  const marker='function firstProjectileContactTime(a, b, rr) {';
+  const start=sniper.indexOf(marker),end=sniper.indexOf('  function burstShellAtContact(',start);
+  assert.ok(start>=0&&end>start,'authoritative Sniper sweep owner');
+  const fn=new Function('clamp','return ('+sniper.slice(start,end).trim()+')')(
+    (v,lo,hi)=>Math.max(lo,Math.min(hi,v)));
+  const a={px:-10,py:0,x:10,y:0},b={px:10,py:0,x:-10,y:0};
+  const t=fn(a,b,4);
+  assert.ok(Math.abs(t-.4)<1e-12,'fraction is of the swept segment, not seconds');
+  const angle=1.1,c=Math.cos(angle),s=Math.sin(angle);
+  const transform=p=>{
+    const out={};
+    for(const [x,y] of [['px','py'],['x','y']]){
+      out[x]=p[x]*c-p[y]*s+37;
+      out[y]=p[x]*s+p[y]*c-12;
+    }
+    return out;
+  };
+  assert.ok(Math.abs(fn(transform(a),transform(b),4)-t)<1e-12,
+    'translation and rotation cannot change contact fraction');
+  assert.ok(patchSniperInterception(sniper).includes(
+    "method.call(ledger,a,b,ah,bh,'sniper',firstTime)"));
+});
