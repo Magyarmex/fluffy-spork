@@ -54,14 +54,14 @@ const {patchMaterializedCore,patchMaterializedRetirement,patchBattlefieldCallbac
       const ledger=factory(g,{limit:4096});
       ledger.install();
       g.__novaShotLedger=ledger;
-      let frames=0,callbacks=0,scopedCalls=0,unusedScopes=0,observerErrors=0,unknown=0,unidentifiedTargets=0,coreAttributed=0,battlefieldAttributed=0,coverAttributed=0,retirements=0;
+      let frames=0,callbacks=0,scopedCalls=0,unusedScopes=0,observerErrors=0,unknown=0,unidentifiedTargets=0,coreAttributed=0,battlefieldAttributed=0,coverAttributed=0,retirements=0,ttlRetirements=0,boundsRetirements=0,ambiguousRetirements=0;
       const updateMs=[];
       for(let i=0;i<600&&g.status==='playing';i++){
         const t0=performance.now();
         g.update(1/30);
         updateMs.push(performance.now()-t0);
         const s=ledger.counters();
-        frames++;callbacks+=s.damageCallbacksCaptured;retirements+=s.retiredAttributed;scopedCalls+=s.scopedCalls;
+        frames++;callbacks+=s.damageCallbacksCaptured;retirements+=s.retiredAttributed;ttlRetirements+=s.ttlRetirements;boundsRetirements+=s.boundsRetirements;ambiguousRetirements+=s.ambiguousRetirements;scopedCalls+=s.scopedCalls;
         unusedScopes+=s.unusedScopes;observerErrors+=s.observerErrors;
         unknown+=s.unknown;unidentifiedTargets+=s.unidentifiedTargets;
         coreAttributed+=s.coreAttributed;battlefieldAttributed+=s.battlefieldAttributed;coverAttributed+=s.coverAttributed;
@@ -71,13 +71,16 @@ const {patchMaterializedCore,patchMaterializedRetirement,patchBattlefieldCallbac
       delete g.__novaShotLedger;
       if(!ledger.uninstall())throw Error('failed to restore real damage methods');
       updateMs.sort((a,b)=>a-b);
-      return{frames,callbacks,attributedCallbacks:callbacks-unknown,coreAttributed,battlefieldAttributed,coverAttributed,retirements,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
+      return{frames,callbacks,attributedCallbacks:callbacks-unknown,coreAttributed,battlefieldAttributed,coverAttributed,retirements,ttlRetirements,boundsRetirements,ambiguousRetirements,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
         p95UpdateMs:updateMs[Math.ceil(updateMs.length*.95)-1],
         maxUpdateMs:updateMs[updateMs.length-1],status:g.status,time:g.time};
     });
     assert.ok(result.frames>=1,'real composed game must advance');
     assert.ok(Number.isSafeInteger(result.retirements)&&result.retirements>=0,
       'core retirement witness must report bounded nonnegative count');
+    assert.equal(result.retirements,
+      result.ttlRetirements+result.boundsRetirements+result.ambiguousRetirements,
+      'every witnessed retirement must have exactly one terminal reason');
     assert.equal(result.observerErrors,0,'observer must not fail in natural gameplay');
     assert.ok(result.attributedCallbacks>=0&&result.attributedCallbacks<=result.callbacks,
       'attributed callback count must be bounded by actual captured callbacks');
