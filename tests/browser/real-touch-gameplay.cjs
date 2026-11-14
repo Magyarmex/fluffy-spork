@@ -77,18 +77,7 @@ async function run(browser,label,viewport){
    const types=window.__novaMakeRequire('')('game/types');
    g.gainXP(g.player,types.xpForLevel(g.player.level));
   });
-  // A spent-out tray retains its last React collapsed/open state when the
-  // next point arrives. Both UPGRADE READY and an already-open stat tray
-  // are legitimate; the actual contract is a real earned point, visible
-  // upgrade access, and unobstructed joystick landing positions.
-  await page.waitForFunction(()=>{
-   const g=window.__novaTouchGame;
-   if(!(g?.statPoints>0))return false;
-   const chip=[...document.querySelectorAll('button')].some(b=>
-    b.textContent?.includes('UPGRADE READY')&&b.getBoundingClientRect().width>0);
-   const stat=document.querySelector('[data-nova-upgrade-tray] .stat-btn');
-   return chip||!!(stat&&stat.getBoundingClientRect().width>0);
-  },null,{timeout:10000});
+  await upgradeChip.waitFor({state:'visible',timeout:10000});
   assert.ok((await stickClear()).every(v=>v.canvas),label+': next earned point also preserves first-touch clearance');
   // Regression #617: the read-only leaderboard must not capture the right
   // joystick. Keep it visible through real two-finger movement and firing.
