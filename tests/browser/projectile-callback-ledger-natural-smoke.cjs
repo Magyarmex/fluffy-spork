@@ -102,6 +102,9 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
       g.setPaused(true);
       if(g.raf){cancelAnimationFrame(g.raf);g.raf=0;}
       const ledger=factory(g,{limit:4096});
+      // Disclose the native tank ordering before the deterministic test sort.
+      // Otherwise sorting could conceal a different browser startup world.
+      const preSortTankIds=paired?g.tanks.map(t=>t.id):null;
       if(paired)g.tanks.sort((a,b)=>Number(a.id)-Number(b.id));
       if(observe){ledger.install();g.__novaShotLedger=ledger;}
       let frames=0,callbacks=0,scopedCalls=0,unusedScopes=0,observerErrors=0,unknown=0,unidentifiedTargets=0,coreAttributed=0,battlefieldAttributed=0,coverAttributed=0,retirements=0,ttlRetirements=0,boundsRetirements=0,ambiguousRetirements=0,rawPenOneZeroHitTtl=0,coreInterceptions=0,sniperInterceptions=0,battlefieldTtlInterceptions=0;
@@ -158,7 +161,7 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
       if(observe){delete g.__novaShotLedger;
         if(!ledger.uninstall())throw Error('failed to restore real damage methods');}
       updateMs.sort((a,b)=>a-b);
-      return{arm:paired?(observe?'on':'off'):'smoke',frames,physicalTrace,callbacks,attributedCallbacks:callbacks-unknown,coreAttributed,battlefieldAttributed,coverAttributed,retirements,ttlRetirements,boundsRetirements,ambiguousRetirements,rawPenOneZeroHitTtl,coreInterceptions,sniperInterceptions,battlefieldTtlInterceptions,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
+      return{arm:paired?(observe?'on':'off'):'smoke',preSortTankIds,frames,physicalTrace,callbacks,attributedCallbacks:callbacks-unknown,coreAttributed,battlefieldAttributed,coverAttributed,retirements,ttlRetirements,boundsRetirements,ambiguousRetirements,rawPenOneZeroHitTtl,coreInterceptions,sniperInterceptions,battlefieldTtlInterceptions,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
         p95UpdateMs:updateMs[Math.ceil(updateMs.length*.95)-1],
         maxUpdateMs:updateMs[updateMs.length-1],status:g.status,time:g.time};
     },{observe:OBSERVE,paired:!!PAIRED_ARM});
