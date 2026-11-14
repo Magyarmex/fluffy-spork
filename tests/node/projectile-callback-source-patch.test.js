@@ -126,7 +126,7 @@ test('terminal core retirement witness preserves actual projectile removal and t
   assert.notEqual(patched,html);
   assert.throws(()=>patchMaterializedRetirement(patched),/already installed/);
   assert.throws(()=>patchMaterializedRetirement('not a game'),/shipping core boundaries/);
-  const scripts=[...patched.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)];
+  const scripts=[...patched.matchAll(/<script>([\s\S]*?)<\/script>/g)];
   for(const script of scripts)new vm.Script(script[1],{filename:'retirement-research-index.html'});
   for(const mode of ['ttl','bounds','both','already-dead']){
     const run=(source,observed)=>{
@@ -216,7 +216,7 @@ test('Battlefield observer refuses argument drift even when ten callback sites r
     'g.damageTank(victim,b.dmg,b.ownerId,0,1)'
   ]){
     const changed=battlefield.replace(original,altered);
-    assert.equal([...changed.matchAll(/\\b(?:g|this)\\.damage(?:Tank|Shape|Drone)\\s*\\(/g)].length,10);
+    assert.equal([...changed.matchAll(/\b(?:g|this)\.damage(?:Tank|Shape|Drone)\s*\(/g)].length,10);
     assert.throws(()=>patchBattlefieldCallbacks(changed),/callback signature drift/);
   }
 });
