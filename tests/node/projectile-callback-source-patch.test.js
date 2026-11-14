@@ -249,6 +249,12 @@ test('cover witness observes actual HP after mutation and never interrupts comba
       const splash={hp:17,id:7};
       assert.equal(run(game,splash,2,1,{shell:true,beam:false,vx:0,vy:0}),15);
       assert.equal(seen.length,1,'synthetic splash proxy without shot ID must abstain');
+      let shotReads=0;
+      const statefulShot=Object.defineProperty({},'id',{get(){shotReads++;return 77;}});
+      const statefulCover={hp:17,id:7};
+      assert.equal(run(game,statefulCover,2,1,statefulShot),15);
+      assert.equal(shotReads,0,'source guard must not read projectile ID before the ledger');
+      assert.equal(seen.length,2);
     }
   }
 });
