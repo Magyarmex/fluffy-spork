@@ -50,5 +50,9 @@ for(const seed of seeds){
       sniperInterceptions:on.sniperInterceptions,battlefieldTtlInterceptions:on.battlefieldTtlInterceptions},
     p95DifferenceMs:on.p95UpdateMs-off.p95UpdateMs});
 }
+assert.ok(trials.every(t=>t.on.retirements>0),
+  'each seeded game must exercise actual projectile retirement');
+assert.ok(trials.some(t=>t.on.attributedCallbacks>0),
+  'paired campaign must witness real shot-attributed damage, not vacuous parity');
 console.log(JSON.stringify({research:'shot-ledger-paired-physical-parity',trials,
   caveat:'Sequential Chromium CPU samples are not a real-device frame-pacing or isolated observer-cost measurement'}));
