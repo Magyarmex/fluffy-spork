@@ -17,7 +17,7 @@ function patchMaterializedCore(html) {
   for (const call of CALLS) {
     if (body.split(call).length !== 2) throw new Error('expected one core callback: ' + call);
     const guarded = '(this.__novaShotLedger ? this.__novaShotLedger.withProjectile(b, () => ' +
-      call.slice(0, -1) + ') : ' + call.slice(0, -1) + ');';
+      call.slice(0, -1) + ", 'direct', 'core') : " + call.slice(0, -1) + ');';
     body = body.replace(call, guarded);
   }
   return html.slice(0, start) + body + html.slice(end);
@@ -57,7 +57,7 @@ function patchBattlefieldCallbacks(source) {
     const call = source.slice(start,end);
     const receiver = call.startsWith('this.') ? 'this' : 'g';
     const guarded = '(' + receiver + '.__novaShotLedger ? ' +
-      receiver + '.__novaShotLedger.withProjectile(b,()=>'+call+') : '+call+')';
+      receiver + ".__novaShotLedger.withProjectile(b,()=>"+call+",'direct','battlefield') : "+call+')';
     out = out.slice(0,start) + guarded + out.slice(end);
   }
   return out;
