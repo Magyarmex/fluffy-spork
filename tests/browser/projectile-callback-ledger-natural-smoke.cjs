@@ -131,18 +131,21 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
           preFrameShotOverflow++;return null;
         }
         for(const shot of g.bullets){
-          if(!Number.isSafeInteger(shot.id)||shot.id<0){
+          // Snapshot identity once: a stateful getter must not switch IDs
+          // between validation and insertion into the witness map.
+          const id=shot.id;
+          if(!Number.isSafeInteger(id)||id<0){
             preFrameShotUnidentified++;continue;
           }
-          if(ambiguous.has(shot.id)){
+          if(ambiguous.has(id)){
             preFrameShotUnidentified++;continue;
           }
-          if(map.has(shot.id)){
+          if(map.has(id)){
             // Never select an arbitrary projectile when IDs collide.
-            map.delete(shot.id);ambiguous.add(shot.id);
+            map.delete(id);ambiguous.add(id);
             preFrameShotUnidentified++;continue;
           }
-          map.set(shot.id,{
+          map.set(id,{
             x:shot.x,y:shot.y,vx:shot.vx,vy:shot.vy,
             ttl:shot.ttl,dead:!!shot.dead,hp:shot.hp,
             pen:shot.pen,hits:shot.hits,r:shot.r,
@@ -163,18 +166,19 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
           if(collection.length>4096){preFrameShotOverflow++;return null;}
           const map=new Map(),ambiguous=new Set();
           for(const target of collection){
-            if(!Number.isSafeInteger(target.id)){
+            const id=target.id;
+            if(!Number.isSafeInteger(id)){
               preFrameTargetUnidentified++;continue;
             }
-            if(ambiguous.has(target.id)){
+            if(ambiguous.has(id)){
               preFrameTargetUnidentified++;continue;
             }
-            if(map.has(target.id)){
+            if(map.has(id)){
               // Duplicate identity makes BOTH targets unjoinable.
-              map.delete(target.id);ambiguous.add(target.id);
+              map.delete(id);ambiguous.add(id);
               preFrameTargetUnidentified++;continue;
             }
-            map.set(target.id,{
+            map.set(id,{
               x:target.x,y:target.y,r:target.r??null,
               w:target.w??null,h:target.h??null,
               shape:target.shape??null,
