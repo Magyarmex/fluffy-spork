@@ -37,6 +37,10 @@ for(const seed of seeds){
     seed+' OFF/OFF native tank order differed before test normalization');
   assert.deepEqual(off.preSortTankIds,on.preSortTankIds,
     seed+' OFF/ON native tank order differed before test normalization');
+  assert.ok(typeof off.layout==='string'&&off.layout.length>0,
+    seed+' must expose the real Battlefield layout');
+  assert.equal(off.layout,offRepeat.layout,seed+' OFF/OFF layout mismatch');
+  assert.equal(off.layout,on.layout,seed+' OFF/ON layout mismatch');
   const initialHash=off.physicalTrace[0].hash;
   assert.ok(!initialWorlds.has(initialHash),
     seed+' did not produce a distinct initial world; multi-seed coverage is illusory');
@@ -54,7 +58,7 @@ for(const seed of seeds){
   const damageIds=ids(e=>['damageTank','damageShape','damageDrone'].includes(e.kind));
   const retirementIds=ids(e=>e.kind==='projectileRetirement');
   const overlappingDamageRetirements=[...damageIds].filter(id=>retirementIds.has(id)).length;
-  trials.push({seed,control,comparison,
+  trials.push({seed,layout:off.layout,control,comparison,
     provenance:{sampled:events.length,truncated:on.eventSamplesTruncated,
       damageShotIds:damageIds.size,retiredShotIds:retirementIds.size,
       damageAndRetirementShotIds:overlappingDamageRetirements},
