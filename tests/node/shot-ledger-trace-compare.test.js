@@ -31,3 +31,13 @@ test('shot ledger parity rejects different declared seeds even if hashes match',
  assert.throws(()=>comparePhysicalTraces(a,b),/same declared seed/);
  assert.equal(comparePhysicalTraces(a,{...b,seed:a.seed}).firstDivergence,null);
 });
+
+test('shot ledger parity detects transient divergence despite matching ten-frame samples',()=>{
+ const a={...mk(['a:b','c:d','e:f']),fullFrameDigest:'abcd:1234'};
+ const b={...mk(['a:b','c:d','e:f']),fullFrameDigest:'abcd:5678'};
+ const r=comparePhysicalTraces(a,b);
+ assert.equal(r.firstDivergence,null);
+ assert.equal(r.fullFrameDigestMatched,false);
+ assert.equal(comparePhysicalTraces(a,{...b,fullFrameDigest:a.fullFrameDigest}).fullFrameDigestMatched,true);
+ assert.throws(()=>comparePhysicalTraces(a,mk(['a:b','c:d','e:f'])),/ON full-frame digest/);
+});
