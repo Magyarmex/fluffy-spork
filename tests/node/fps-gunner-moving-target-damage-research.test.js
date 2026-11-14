@@ -391,8 +391,8 @@ test('61Hz rotary cliff is measured against real moving-target HP, not just voll
      'moving target must cross the shot corridor');
     assert.equal(stationary.onTime,moving.onTime,'matched stationary firing duty');
     assert.equal(stationary.travel,0,'stationary control must remain still');
-    assert.equal(moving.windowDamage+moving.drainDamage,moving.damage,
-     'post-fire projectile drain must reconcile actual applied HP');
+    assert.ok(Math.abs(moving.windowDamage+moving.drainDamage-moving.damage)<.00011,
+     'rounded firing-window and drain HP must reconcile actual applied HP');
     assert.ok(moving.damage>0&&stationary.damage>0,
      'both arms must produce real player-owned target damage');
     arms[mode]={volleys:moving.volleys,windowDamage:moving.windowDamage,
