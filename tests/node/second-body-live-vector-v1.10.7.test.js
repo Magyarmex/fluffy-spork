@@ -172,3 +172,8 @@ test('shipping Live Vector stylus activation cannot double-fire from a pen compa
     preventDefault() { swallowed++; }, stopImmediatePropagation() { swallowed++; } });
   assert.equal(swallowed, 2, 'pen follow-up click is not an independent mouse click');
 });
+
+test('Controller command routing checks the drone body radius before requesting a terrain waypoint',()=>{
+  assert.match(source,/!g\.hasLineOfSight\(d\.x,d\.y,x,y,Math\.max\(2,d\.r\|\|8\)\)&&g\.novaBattlefieldWaypoint/);
+  assert.doesNotMatch(source,/Math\.max\(2,\(d\.r\|\|8\)\*\.45\)/);
+});
