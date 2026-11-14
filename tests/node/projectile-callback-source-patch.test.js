@@ -128,7 +128,7 @@ test('ten Battlefield guards call real damage exactly once with or without ledge
     const call=battlefield.slice(match.index,end);
     const receiver=call.startsWith('this.')?'this':'g';
     const wrapped='('+receiver+'.__novaShotLedger ? '+
-      receiver+'.__novaShotLedger.withProjectile(b,()=>'+call+') : '+call+')';
+      receiver+".__novaShotLedger.withProjectile(b,()=>"+call+",'direct','battlefield') : "+call+')';
     assert.ok(patched.includes(wrapped),'missing guard: '+call);
     for(const enabled of [false,true]){
       const seen={damage:0,scope:0};
