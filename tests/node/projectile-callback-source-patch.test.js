@@ -470,10 +470,14 @@ test('mutual-TTL witness preserves two-shot weakening with valid or broken obser
   // The synthetic owner uses the same authoritative mutation and lexical
   // variables; actual Battlefield source identity is checked separately.
   const original=new Function('return ('+synthetic+')')();
-  const observedSource=synthetic.replace(marker,marker+
-    "\\n  try { const ledger=g.__novaShotLedger;const method=ledger?.recordProjectileInterception;"+
-    "if(typeof method==='function')method.call(ledger,a,b,ah,bh,'battlefield-ttl');"+
-    "} catch (_) { /* observation cannot interrupt combat */ }");
+  const transformed=patchBattlefieldMutualInterception(battlefield);
+  const at=transformed.indexOf(marker);
+  assert.ok(at>=0);
+  const next=transformed.indexOf('  var mx=(reach[0].ex+',at);
+  assert.ok(next>at);
+  const actualWitness=transformed.slice(at+marker.length,next);
+  assert.match(actualWitness,/recordProjectileInterception/);
+  const observedSource=synthetic.replace(marker,marker+actualWitness);
   const observed=new Function('return ('+observedSource+')')();
   for(const mode of ['valid','missing','throwing-ledger','throwing-method','throwing-callback']){
     const make=()=>({weakenBullet(shot,dmg){shot.hp-=dmg;if(shot.hp<=0)shot.dead=true;}});
