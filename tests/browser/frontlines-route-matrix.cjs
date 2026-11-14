@@ -239,6 +239,10 @@ const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
    }finally{await page.close();}
   }
   assert.deepEqual(reports.map(r=>r.layout),LAYOUTS);
+  const occluded=reports.flatMap(r=>r.trials.filter(t=>t.blocked&&t.routeProbe));
+  assert.ok(occluded.length>0,'route matrix did not exercise a terrain-occluded case');
+  assert.ok(occluded.some(t=>t.routeProbe.returnedWaypoint),
+   'all terrain-occluded composed route probes returned no waypoint');
   console.log('NOVA_FRONTLINES_ROUTE_MATRIX_MICROTRIAL '+JSON.stringify(reports));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e.stack||e);process.exitCode=1;});
