@@ -529,3 +529,22 @@ test('interception witness records actual core pair without inventing contact ti
   assert.equal(l.counters().damageCallbacksCaptured,0);
   assert.equal(l.snapshot().events[0].source,'sniper');
 });
+
+test('Battlefield mutual-TTL interception has independent bounded accounting',()=>{
+  const l=createProjectileCallbackLedger(game(),{limit:2});
+  assert.equal(l.recordProjectileInterception(
+    {id:51,hp:-3},{id:52,hp:3},8,11,'battlefield-ttl'),true);
+  const e=l.snapshot().events[0];
+  assert.equal(e.source,'battlefield-ttl');
+  assert.equal(e.kind,'projectileInterception');
+  assert.equal(e.timing,'unknown');
+  assert.equal(l.counters().battlefieldTtlInterceptions,1);
+  assert.equal(l.counters().coreInterceptions,0);
+  assert.equal(l.counters().sniperInterceptions,0);
+  assert.equal(l.counters().damageCallbacksCaptured,0);
+  assert.equal(l.recordProjectileInterception(
+    {id:51,hp:2},{id:52,hp:1},8,11,'made-up-owner'),false);
+  assert.equal(l.counters().observerErrors,1);
+  l.nextFrame();
+  assert.equal(l.counters().battlefieldTtlInterceptions,0);
+});
