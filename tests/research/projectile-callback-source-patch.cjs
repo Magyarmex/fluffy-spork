@@ -6,6 +6,17 @@ const CALLS = Object.freeze([
   'this.damageTank(e, b.dmg, b.ownerId, Math.cos(ang) * (b.knock || 0) * 0.006, Math.sin(ang) * (b.knock || 0) * 0.006);',
   'this.damageDrone(e, b.dmg, b.ownerId);'
 ]);
+function guardedShotCall(call, receiver, source) {
+  // An observer is not combat authority. Invoke the real callback exactly
+  // once even if a malformed callable observer throws, ignores, or replays it.
+  const pre='(()=>{let ledger,method;try{ledger='+receiver+'.__novaShotLedger;method=ledger?.withProjectile;}catch(_){}';
+  const once='(()=>{let called=false,ok=false,result,error;const invoke=()=>{' +
+    'if(called){if(!ok)throw error;return result;}called=true;' +
+    'try{result='+call+';ok=true;return result;}catch(e){error=e;throw e;}};' +
+    "try{method.call(ledger,b,()=>invoke(),'direct','"+source+"');}catch(_){}" +
+    'if(!called)return invoke();if(!ok)throw error;return result;})()';
+  return pre+"return typeof method==='function' ? "+once+' : '+call+';})()';
+}
 function patchMaterializedCore(html) {
   if (typeof html !== 'string') throw new TypeError('materialized HTML required');
   const start = html.indexOf('    updateBullets(dt) {');
@@ -59,8 +70,7 @@ function patchBattlefieldCallbacks(source) {
   for (const {start,end} of spans.reverse()) {
     const call = source.slice(start,end);
     const receiver = call.startsWith('this.') ? 'this' : 'g';
-    const guarded = '(()=>{let ledger,method;try{ledger='+receiver+'.__novaShotLedger;method=ledger?.withProjectile;}catch(_){}' +
-      "return typeof method==='function' ? method.call(ledger,b,()=>"+call+",'direct','battlefield') : "+call+';})()';
+    const guarded = guardedShotCall(call,receiver,'battlefield');
     out = out.slice(0,start) + guarded + out.slice(end);
   }
   return out;
@@ -80,4 +90,4 @@ function patchBattlefieldCover(source) {
     '}catch(_){/* research observation must not interrupt cover damage */}';
   return source.replace(target,target+witness);
 }
-module.exports = {patchMaterializedCore, patchBattlefieldCallbacks, patchBattlefieldCover, CALLS};
+module.exports = {patchMaterializedCore, patchBattlefieldCallbacks, patchBattlefieldCover, guardedShotCall, CALLS};
