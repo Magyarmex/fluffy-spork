@@ -24,6 +24,8 @@ function auditShotEvidence(events,{truncated=0,preFrameOverflow=0,preFrameShotUn
       missingPreStates:0,missingPairedStates:0
     };
     existing.lastFrame=e.frame;
+    if(e.bornThisFrame===true&&e.preShot)
+      throw new TypeError('contradictory frame-start birth witness');
     if(e.preShot&&Number.isFinite(e.preShot.x)&&
        Number.isFinite(e.preShot.y)&&Number.isFinite(e.preShot.ttl))
       preStatePresent++;
@@ -49,6 +51,8 @@ function auditShotEvidence(events,{truncated=0,preFrameOverflow=0,preFrameShotUn
         missingPreStates:0,missingPairedStates:0
       };
       peer.lastFrame=e.frame;
+      if(e.otherBornThisFrame===true&&e.preOtherShot)
+        throw new TypeError('contradictory interception peer birth witness');
       peer.interceptions++;
       // The second projectile is an equal participant, not just metadata
       // on the first projectile's event.
