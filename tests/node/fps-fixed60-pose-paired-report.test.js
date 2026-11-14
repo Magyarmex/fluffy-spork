@@ -2,13 +2,13 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {compare}=require('../research/fixed60-pose-paired-report.cjs');
 function report(enabled){
- return {pose:{enabled,frames:enabled?20:0,interpolated:enabled?9:0,
+ return {pose:{enabled,frames:enabled?60:0,interpolated:enabled?9:0,
    shiftedBulletFrames:enabled?4:0,teleportSkips:0,
    renderJs:{p95:enabled?2.3:null}},
   initialFingerprint:'1234abcd:1500',configuredMaxSteps:3,
   backlogExtraTicks:2,controlledGate:true,productionRafActive:false,
   births:5,ticks:120,droppedMs:0,updates:{p95:1.2},renders:{p95:2},
-  raf:{frames:20,observedWallMs:2000,simulatedMs:2000,remainingLagMs:0,
+  raf:{frames:60,observedWallMs:2000,simulatedMs:2000,remainingLagMs:0,
    callbackJs:{p95:3}},
   touchToCanvasSubmissionMs:17};
 }
