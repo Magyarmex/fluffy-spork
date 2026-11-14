@@ -10,6 +10,9 @@ const {injectBattlefieldSeed}=require('../research/battlefield-layout-fixture.cj
 const maxSteps=Number(process.env.NOVA_FIXED60_MAX_STEPS||2);
 const controlledGate=process.env.NOVA_FIXED60_CONTROLLED_GATE==='1';
 const controlledExtra=Number(process.env.NOVA_FIXED60_EXTRA_TICKS||2);
+const presentationHz=Number(process.env.NOVA_FIXED60_PRESENTATION_HZ||30);
+assert.ok([30,90].includes(presentationHz),'only the existing 30Hz gate and new 90Hz presentation gate are supported');
+assert.ok(presentationHz===30||controlledGate,'90Hz presentation requires controlled Chromium callbacks');
 // Opt-in visual-only experiment. OFF retains the existing Chromium owner path.
 const poseEnabled=process.env.NOVA_FIXED60_POSE_PRESENTATION==='1';
 const weakPoseEnabled=process.env.NOVA_FIXED60_POSE_STORAGE==='weak';
@@ -60,7 +63,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    '../../nova-updates/fixed60-research-browser.js')});
   if(weakPoseEnabled)await page.addScriptTag({path:path.resolve(__dirname,
    '../research/fixed-step-weak-epoch-presentation.cjs')});
-  await page.evaluate(({maxSteps,controlledGate,controlledExtra,poseEnabled,weakPoseEnabled})=>{
+  await page.evaluate(({maxSteps,controlledGate,controlledExtra,poseEnabled,weakPoseEnabled,presentationHz})=>{
    window.__novaFixedMaxSteps=maxSteps;
    window.__novaPoseEnabled=poseEnabled;
    window.__novaControlledGate=controlledGate;
@@ -79,7 +82,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    const baseStart=Game.prototype.start;
    window.__novaFixedResearch={births:0,updates:[],renders:[],errors:[],lifecycle:[],touchEvents:[],frames:[],poseFrames:[]};
    const profile=window.__novaFixedResearch;
-   const gateGaps=[250/3,50/3,50/3,50/3];
+   const gateGaps=presentationHz===90?[1000/90]:[250/3,50/3,50/3,50/3];
    let gateNext=null,gateIndex=0,gateToken=0;
    const gatePending=new Map();
    profile.pendingGateRequests=()=>gatePending.size;
@@ -170,7 +173,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
          profile.gateSkippedNativeRafs=(profile.gateSkippedNativeRafs||0)+1;
          state.id=requestAnimationFrame(deliver);return;
         }
-        gateNext+=gateGaps[gateIndex++%4];
+        gateNext+=gateGaps[gateIndex++%gateGaps.length];
        }
        gatePending.delete(token);
       // Measure real RAF callback spacing and per-callback fixed-step work.
@@ -266,7 +269,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     profile.lifecycle.push({event:'owner-start-returned',at:performance.now(),started:pilot.owner.started});
     return result;
    };
-  },{maxSteps,controlledGate,controlledExtra,poseEnabled,weakPoseEnabled});
+  },{maxSteps,controlledGate,controlledExtra,poseEnabled,weakPoseEnabled,presentationHz});
   await deploy.click();
   try{
    await page.waitForFunction(()=>window.__novaFixedGame?.status==='playing'&&
@@ -421,7 +424,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
   }
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   await page.waitForFunction(()=>window.__novaFixedGame?.input?.aim?.active===false,null,{timeout:5000});
-  if(controlledGate&&maxSteps>=3){
+  if(controlledGate&&maxSteps>=3&&presentationHz===30){
    // A max-budget catch-up after release must not resurrect the prior
    // right-stick command or emit a player-owned ghost projectile.
    const released=await page.evaluate(()=>({
@@ -484,10 +487,17 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    const observedWallMs=frames.length&&Number.isFinite(ownerStartMs)?
     frames[frames.length-1].ts-ownerStartMs:0;
    const controlledLongGaps=frames.filter(f=>f.rawGapMs>=70&&f.rawGapMs<=100).length;
+   const activeIntervals=frameIntervals.filter(ms=>ms<=100+1e-7);
+   const activePresentationHz=activeIntervals.length?
+    activeIntervals.length*1000/activeIntervals.reduce((sum,ms)=>sum+ms,0):null;
    const callbackCosts=frames.map(f=>f.callbackJsMs);
    const backlogSamples=frames.map(f=>f.lagMs);
-   const stepCounts={};
-   for(const f of frames)stepCounts[f.steps]=(stepCounts[f.steps]||0)+1;
+   const stepCounts={},activeStepCounts={};
+   for(const f of frames){
+    stepCounts[f.steps]=(stepCounts[f.steps]||0)+1;
+    if(f.rawGapMs<=100+1e-7)
+     activeStepCounts[f.steps]=(activeStepCounts[f.steps]||0)+1;
+   }
    const droppedFrameCount=frames.filter(f=>f.droppedMs>0).length;
    const longStallDrops=frames.filter(f=>f.dropReason==='long-stall').length;
    const backlogDrops=frames.filter(f=>f.dropReason==='backlog').length;
@@ -514,6 +524,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
      sum+(1-f.alpha)*1000/60,0)/poses.length:null,
     renderJs:values(poseJs)},
     configuredMaxSteps:window.__novaFixedMaxSteps,
+    presentationTargetHz:presentationHz,
     controlledGate:window.__novaControlledGate,
     initialFingerprint:window.__novaFixedResearch.initialFingerprint||null,
     maxSteps:p.owner.maxSteps,backlogExtraTicks:p.owner.backlogExtraTicks,
@@ -526,7 +537,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
      simulatedMs:p.owner.ticks*1000/60,
      remainingLagMs:p.owner.lagMs,
      callbackJs:values(callbackCosts),backlogMs:values(backlogSamples),
-     stepCounts,droppedFrameCount,
+     stepCounts,activeStepCounts,activePresentationHz,droppedFrameCount,
      longStallDrops,backlogDrops,attributedDroppedMs,
      longStallDroppedMs,longStallWallMs,backlogDroppedMs,
      maxIntervalMs:frameIntervals.length?Math.max(...frameIntervals):null},
@@ -586,17 +597,30 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     frames:report.raf.frames,intervals:report.raf.intervals,
     longGaps:report.raf.controlledLongGaps,stepCounts:report.raf.stepCounts,
     droppedMs:report.droppedMs,backlogDrops:report.raf.backlogDrops}));
-   // The two-step control must exercise its own catch-up ceiling, while
-   // the three-step candidate must demonstrate the additional update path.
-   const expectedBurst=maxSteps;
-   assert.ok((report.raf.stepCounts[String(expectedBurst)]||0)>0,
-    'controlled Chromium presentation must exercise its configured catch-up ceiling');
-   assert.ok(!Object.keys(report.raf.stepCounts).some(k=>Number(k)>maxSteps),
-    'controlled browser must never exceed the configured update ceiling');
-   assert.ok(report.raf.intervals.p95>=45,
-    'controlled RAF must actually delay browser callbacks');
-   assert.ok(report.raf.controlledLongGaps>=3,
-    'controlled RAF must deliver multiple real 70–100ms active gaps');
+   if(presentationHz===90){
+    assert.ok(report.raf.activePresentationHz>=80&&report.raf.activePresentationHz<=100,
+     'controlled Chromium must sustain near-90Hz callbacks outside the deliberate foreground stall: '+JSON.stringify(report.raf));
+    assert.ok(report.raf.intervals.p95<15,
+     '90Hz callback p95 must remain below 15ms');
+    assert.ok((report.raf.activeStepCounts['0']||0)>0,
+     '90Hz rendering must include frames without a new 60Hz simulation tick');
+    assert.ok((report.raf.activeStepCounts['1']||0)>0,
+     '90Hz rendering must also include authoritative single-tick frames');
+    assert.ok(!Object.keys(report.raf.activeStepCounts).some(k=>Number(k)>1),
+     'ordinary 90Hz presentation must never require multi-tick catch-up');
+   }else{
+    // The existing 30Hz gate must exercise its catch-up ceiling and the
+    // active-only burst path; this remains a separate experiment.
+    const expectedBurst=maxSteps;
+    assert.ok((report.raf.stepCounts[String(expectedBurst)]||0)>0,
+     'controlled Chromium presentation must exercise its configured catch-up ceiling');
+    assert.ok(!Object.keys(report.raf.stepCounts).some(k=>Number(k)>maxSteps),
+     'controlled browser must never exceed the configured update ceiling');
+    assert.ok(report.raf.intervals.p95>=45,
+     'controlled RAF must actually delay browser callbacks');
+    assert.ok(report.raf.controlledLongGaps>=3,
+     'controlled RAF must deliver multiple real 70–100ms active gaps');
+   }
    assert.ok(report.raf.observedWallMs>0&&
     Number.isFinite(report.raf.presentationHz)&&report.raf.presentationHz>0&&
     Number.isFinite(report.raf.simulatedMs),
