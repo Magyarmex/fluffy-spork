@@ -80,6 +80,7 @@ function run(seed,cls,reload,presentationHz){
     });
     owner.start();
    }
+   g.input.mouseActive=false;
    g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
    g.input.firing=true;g.input.autofire=false;
    if(owner){
