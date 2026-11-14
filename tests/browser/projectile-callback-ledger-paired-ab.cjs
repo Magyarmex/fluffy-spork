@@ -46,10 +46,12 @@ for(const seed of seeds){
     seed+' did not produce a distinct initial world; multi-seed coverage is illusory');
   initialWorlds.add(initialHash);
   const control=comparePhysicalTraces(off,offRepeat);
-  assert.ok(control.complete&&!control.firstDivergence,
+  assert.ok(control.complete&&!control.firstDivergence&&control.fullFrameDigestMatched===true,
     seed+' OFF/OFF A/A control failed; OFF/ON causal inference is invalid');
   const comparison=comparePhysicalTraces(off,on);
   assert.ok(comparison.complete,seed+' arms must complete the same number of frames');
+  assert.equal(comparison.fullFrameDigestMatched,true,
+    seed+' observer changed an intermediate physical frame even if samples converged');
   assert.equal(comparison.firstDivergence,null,
     seed+' read-only observer changed physical state or trial was not deterministic');
   const events=on.eventSamples;
