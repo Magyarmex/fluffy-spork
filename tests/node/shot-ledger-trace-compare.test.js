@@ -24,3 +24,10 @@ test('shot ledger physical parity discloses incomplete run durations',()=>{
  const r=comparePhysicalTraces(mk(['a:b','c:d','e:f']),mk(['a:b','c:d'],10));
  assert.equal(r.complete,false);assert.equal(r.comparedSamples,2);
 });
+
+test('shot ledger parity rejects different declared seeds even if hashes match',()=>{
+ const a={...mk(['a:b','c:d','e:f']),seed:'0x1d4a3f21'};
+ const b={...mk(['a:b','c:d','e:f']),seed:'0x6c8e9cf5'};
+ assert.throws(()=>comparePhysicalTraces(a,b),/same declared seed/);
+ assert.equal(comparePhysicalTraces(a,{...b,seed:a.seed}).firstDivergence,null);
+});
