@@ -480,10 +480,13 @@ test('cover witness counters reset independently of core and Battlefield attribu
 
 test('retirement witness distinguishes observed terminal transition from missed-hit inference',()=>{
   const l=createProjectileCallbackLedger(game(),{limit:2});
-  assert.equal(l.recordProjectileRetirement({id:19},'ttl'),true);
+  assert.equal(l.recordProjectileRetirement({id:19,hits:0,pen:1},'ttl'),true);
   assert.equal(l.recordProjectileRetirement({id:20},'bounds'),true);
   assert.equal(l.counters().retiredAttributed,2);
   assert.equal(l.counters().ttlRetirements,1);
+  assert.equal(l.snapshot().events[0].priorHits,0);
+  assert.equal(l.snapshot().events[0].remainingPen,1);
+  assert.equal(l.snapshot().events[1].priorHits,null);
   assert.equal(l.counters().boundsRetirements,1);
   assert.equal(l.counters().ambiguousRetirements,0);
   assert.equal(l.counters().damageCallbacksCaptured,0);
