@@ -132,7 +132,7 @@ test('terminal core retirement witness preserves actual projectile removal and t
     const run=(source,observed)=>{
       const bullet={id:311,ownerId:1,x:mode==='bounds'||mode==='both'?2235:0,
         y:0,vx:0,vy:0,ttl:mode==='ttl'||mode==='both'?0.001:1,
-        r:2,dmg:3,pen:0,hits:0,dead:mode==='already-dead',shell:false,beam:false};
+        r:2,dmg:3,pen:1,hits:0,dead:mode==='already-dead',shell:false,beam:false};
       const g={bullets:[bullet],initBulletIntegrity(){},cosmeticRandom(){return 1;},
         resolveBulletCollisions(){},hash:{query(){throw Error('live projectile not expected');}},
         damageTank(){},damageShape(){},damageDrone(){}};
@@ -154,6 +154,8 @@ test('terminal core retirement witness preserves actual projectile removal and t
       assert.equal(event.kind,'projectileRetirement');
       assert.equal(event.reason,mode==='both'?'ttl-or-bounds':mode);
       assert.equal(event.timing,'upper-bound');
+      assert.equal(event.priorHits,0);
+      assert.equal(event.remainingPen,1);
     }
   }
 });
