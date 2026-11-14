@@ -69,6 +69,15 @@ test('oversized projectile frame is explicitly unbounded, never silently sampled
   assert.equal(a.shots,null);
   assert.equal(a.preFrameShotOverflow,1);
 });
+test('duplicate IDs within one victim collection cannot select an arbitrary target',()=>{
+  const g=world();
+  g.tanks.push({id:8,x:999,y:999,hp:1});
+  const a=sample(g);
+  assert.equal(a.targets.damageTank.has(8),false);
+  assert.equal(a.targets.damageShape.get(8).x,50,
+    'a collision in tanks must not poison independent shapes');
+  assert.equal(a.preFrameTargetUnidentified,1);
+});
 test('unidentified target cannot poison valid target snapshots',()=>{
   const g=world();
   g.tanks.push({id:'unidentified',x:1,y:1,hp:1});
