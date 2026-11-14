@@ -34,6 +34,8 @@ function compare(off,on){
   for(const [name,value] of Object.entries({wallMs,simulatedMs,queuedMs,droppedMs}))
    assert.ok(Number.isFinite(value)&&value>=0,'invalid '+name+' exposure');
   assert.ok(wallMs>0,'missing observed RAF wall time');
+  assert.ok(Math.abs(simulatedMs-ticks*1000/60)<1e-6,
+   'simulated milliseconds disagree with authoritative tick count');
   const errorMs=simulatedMs+queuedMs+droppedMs-wallMs;
   assert.ok(Math.abs(errorMs)<1,'RAF time accounting is inconsistent');
   return {ticks,wallMs,simulatedMs,queuedMs,droppedMs,
