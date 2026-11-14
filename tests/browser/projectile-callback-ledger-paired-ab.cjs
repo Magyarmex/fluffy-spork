@@ -68,6 +68,7 @@ for(const {seed,layoutIndex,layout} of trialsPlan){
   const events=on.eventSamples;
   const evidence=auditShotEvidence(events,{
     truncated:on.eventSamplesTruncated,preFrameOverflow:on.preFrameShotOverflow,
+    observerErrors:on.observerErrors,
     preFrameShotUnidentified:on.preFrameShotUnidentified,
     preFrameTargetUnidentified:on.preFrameTargetUnidentified
   });
