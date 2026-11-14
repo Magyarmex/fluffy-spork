@@ -40,6 +40,8 @@ function auditShotEvidence(events,{truncated=0,preFrameOverflow=0,preFrameShotUn
       missingPreStates:0,missingPairedStates:0
     };
     existing.lastFrame=e.frame;
+    if(e.bornThisFrame===true&&existing.firstFrame<e.frame)
+      throw new TypeError('contradictory projectile birth after earlier event');
     if(e.bornThisFrame===true&&e.preShot)
       throw new TypeError('contradictory frame-start birth witness');
     if(e.preShot&&Number.isFinite(e.preShot.x)&&
@@ -67,6 +69,8 @@ function auditShotEvidence(events,{truncated=0,preFrameOverflow=0,preFrameShotUn
         missingPreStates:0,missingPairedStates:0
       };
       peer.lastFrame=e.frame;
+      if(e.otherBornThisFrame===true&&peer.firstFrame<e.frame)
+        throw new TypeError('contradictory interception peer birth after earlier event');
       if(e.otherBornThisFrame===true&&e.preOtherShot)
         throw new TypeError('contradictory interception peer birth witness');
       peer.interceptions++;
