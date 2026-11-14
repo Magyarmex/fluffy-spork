@@ -29,9 +29,7 @@ function patchMaterializedCore(html) {
     if (body.split(call).length !== 2) throw new Error('expected one core callback: ' + call);
     // Only observer property access is guarded. Never catch the real callback:
     // doing so could run damage twice or swallow a legitimate combat error.
-    const guarded = '(()=>{let ledger,method;try{ledger=this.__novaShotLedger;method=ledger?.withProjectile;}catch(_){}' +
-      'return typeof method===\'function\' ? method.call(ledger,b,()=>'+call.slice(0,-1)+
-      ",'direct','core') : "+call.slice(0,-1)+';})();';
+    const guarded = guardedShotCall(call.slice(0,-1),'this','core')+';';
     body = body.replace(call, guarded);
   }
   return html.slice(0, start) + body + html.slice(end);
