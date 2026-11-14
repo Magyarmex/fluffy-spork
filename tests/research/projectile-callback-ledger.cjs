@@ -8,7 +8,7 @@ function createProjectileCallbackLedger(game, options = {}) {
     throw new RangeError('invalid event budget');
   const methods = ['damageTank', 'damageShape', 'damageDrone'];
   const originals = new Map(), wrappers = new Map(), events = [];
-  let scope = null, installed = false, overflow = 0, epoch = 0, callbackDepth = 0, unknown = 0, unidentifiedTargets = 0, observerErrors = 0, unusedScopes = 0, scopedCalls = 0, coreAttributed = 0, battlefieldAttributed = 0, coverAttributed = 0, retiredAttributed = 0, ttlRetirements = 0, boundsRetirements = 0, ambiguousRetirements = 0, rawPenOneZeroHitTtl = 0, coreInterceptions = 0, sniperInterceptions = 0;
+  let scope = null, installed = false, overflow = 0, epoch = 0, callbackDepth = 0, unknown = 0, unidentifiedTargets = 0, observerErrors = 0, unusedScopes = 0, scopedCalls = 0, coreAttributed = 0, battlefieldAttributed = 0, coverAttributed = 0, retiredAttributed = 0, ttlRetirements = 0, boundsRetirements = 0, ambiguousRetirements = 0, rawPenOneZeroHitTtl = 0, coreInterceptions = 0, sniperInterceptions = 0, battlefieldTtlInterceptions = 0;
   function append(kind, target, args) {
     // Consume the scope before any potentially throwing identity getter or
     // budget check. A dropped/failed first callback must never transfer its
@@ -160,7 +160,7 @@ function createProjectileCallbackLedger(game, options = {}) {
           !Number.isSafeInteger(idB) || idB < 0 || idA === idB ||
           !Number.isFinite(beforeA) || !Number.isFinite(beforeB) ||
           !Number.isFinite(afterA) || !Number.isFinite(afterB) ||
-          (source !== 'core' && source !== 'sniper')) {
+          (source !== 'core' && source !== 'sniper' && source !== 'battlefield-ttl')) {
         observerErrors++; return false;
       }
       if (events.length >= limit) { overflow++; return false; }
@@ -170,25 +170,26 @@ function createProjectileCallbackLedger(game, options = {}) {
         beforeHpA:beforeA, beforeHpB:beforeB,
         afterHpA:afterA, afterHpB:afterB, timing:'unknown'}));
       if (source === 'core') coreInterceptions++;
-      else sniperInterceptions++;
+      else if (source === 'sniper') sniperInterceptions++;
+      else battlefieldTtlInterceptions++;
       return true;
     } catch (_) { observerErrors++; return false; }
   }
   function nextFrame() {
     if (scope || callbackDepth > 0)
       throw new Error('cannot advance frame inside damage callback');
-    epoch++; events.length = 0; overflow = 0; unknown = 0; unidentifiedTargets = 0; observerErrors = 0; unusedScopes = 0; scopedCalls = 0; coreAttributed = 0; battlefieldAttributed = 0; coverAttributed = 0; retiredAttributed = 0; ttlRetirements = 0; boundsRetirements = 0; ambiguousRetirements = 0; rawPenOneZeroHitTtl = 0; coreInterceptions = 0; sniperInterceptions = 0;
+    epoch++; events.length = 0; overflow = 0; unknown = 0; unidentifiedTargets = 0; observerErrors = 0; unusedScopes = 0; scopedCalls = 0; coreAttributed = 0; battlefieldAttributed = 0; coverAttributed = 0; retiredAttributed = 0; ttlRetirements = 0; boundsRetirements = 0; ambiguousRetirements = 0; rawPenOneZeroHitTtl = 0; coreInterceptions = 0; sniperInterceptions = 0; battlefieldTtlInterceptions = 0;
   }
   function counters() {
     // Aggregate natural-match trials need bounded scalar telemetry without
     // cloning every per-hit event on every simulation frame.
     return Object.freeze({epoch, installed, eventsCaptured:events.length,
-      damageCallbacksCaptured:events.length-coverAttributed-retiredAttributed-coreInterceptions-sniperInterceptions,
+      damageCallbacksCaptured:events.length-coverAttributed-retiredAttributed-coreInterceptions-sniperInterceptions-battlefieldTtlInterceptions,
       overflow, unknown, unidentifiedTargets, observerErrors,
-      scopedCalls, unusedScopes, coreAttributed, battlefieldAttributed, coverAttributed, retiredAttributed, ttlRetirements, boundsRetirements, ambiguousRetirements, rawPenOneZeroHitTtl, coreInterceptions, sniperInterceptions, bounded:overflow===0&&observerErrors===0});
+      scopedCalls, unusedScopes, coreAttributed, battlefieldAttributed, coverAttributed, retiredAttributed, ttlRetirements, boundsRetirements, ambiguousRetirements, rawPenOneZeroHitTtl, coreInterceptions, sniperInterceptions, battlefieldTtlInterceptions, bounded:overflow===0&&observerErrors===0});
   }
   function snapshot() {
-    return Object.freeze({epoch, installed, events: Object.freeze(events.slice()), overflow, unknown, unidentifiedTargets, observerErrors, scopedCalls, unusedScopes, coreAttributed, battlefieldAttributed, coverAttributed, retiredAttributed, ttlRetirements, boundsRetirements, ambiguousRetirements, rawPenOneZeroHitTtl, coreInterceptions, sniperInterceptions,
+    return Object.freeze({epoch, installed, events: Object.freeze(events.slice()), overflow, unknown, unidentifiedTargets, observerErrors, scopedCalls, unusedScopes, coreAttributed, battlefieldAttributed, coverAttributed, retiredAttributed, ttlRetirements, boundsRetirements, ambiguousRetirements, rawPenOneZeroHitTtl, coreInterceptions, sniperInterceptions, battlefieldTtlInterceptions,
       bounded: overflow === 0 && observerErrors === 0,
       allCapturedCallbacksAttributed: overflow === 0 && observerErrors === 0 && unknown === 0 && unidentifiedTargets === 0});
   }
