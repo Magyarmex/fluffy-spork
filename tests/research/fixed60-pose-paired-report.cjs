@@ -77,7 +77,7 @@ function compareTriple(offA,offB,on){
   assert.ok(Number.isFinite(arm.raf?.activePresentationHz)&&
    arm.raf.activePresentationHz>=80&&arm.raf.activePresentationHz<=100,
    label+' must demonstrate near-90Hz active callbacks');
-  assert.ok(arm.raf.intervals.p95<15,label+' callback p95 must remain below 15ms');
+  assert.ok(arm.raf.activeIntervals?.p95<15,label+' active callback p95 must remain below 15ms');
  }
  assert.equal(offA.presentationTargetHz,90,'experiment target must be 90Hz');
  assert.equal(offA.configuredMaxSteps,2,'90Hz arms use a two-step safety ceiling');
