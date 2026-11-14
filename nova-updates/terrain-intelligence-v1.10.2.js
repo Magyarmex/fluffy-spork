@@ -136,7 +136,7 @@ function laneOffset(g,x,y,wp,pad,seed){
 function cachedRouteLength(g,x,y,gx,gy,pad,seed,wp){
  if(!g||!wp||!Number.isFinite(wp.x)||!Number.isFinite(wp.y))return null;
  var map=g.__v1102Routes,c=map&&map[cacheKey(seed,pad)];
- if(!c||!c.points||!Number.isInteger(c.index)||c.index<0||
+ if(!c||!c.points||Number.isFinite(c.until)&&Number(g.time||0)>c.until||!Number.isInteger(c.index)||c.index<0||
     c.index>=c.points.length||c.gx!==gx||c.gy!==gy)return null;
  var first=c.points[c.index],last=c.points[c.points.length-1];
  if(!first||!last||!Number.isFinite(first.x)||!Number.isFinite(first.y)||
