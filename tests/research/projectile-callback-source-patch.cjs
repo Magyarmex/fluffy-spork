@@ -50,9 +50,9 @@ function patchSniperInterception(source) {
   if (source.split(weakening).length !== 2 || source.split(anchor).length !== 2 ||
       source.indexOf(weakening) >= source.indexOf(anchor))
     throw new Error('shipping Sniper interception chronology owner changed');
-  const witness='\\n          try { const ledger=this.__novaShotLedger;\\n' +
-    '            const method=ledger?.recordProjectileInterception;\\n' +
-    "            if(typeof method==='function')method.call(ledger,a,b,ah,bh,'sniper',firstTime);\\n" +
+  const witness='\n          try { const ledger=this.__novaShotLedger;\n' +
+    '            const method=ledger?.recordProjectileInterception;\n' +
+    "            if(typeof method==='function')method.call(ledger,a,b,ah,bh,'sniper',firstTime);\n" +
     '          } catch (_) { /* research observation cannot interrupt combat */ }';
   return source.replace(anchor,anchor+witness);
 }
