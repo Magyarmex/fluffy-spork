@@ -123,11 +123,18 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
       const fingerprint=()=>{
         const state=JSON.stringify({
           time:g.time,rng:paired?window.__novaShotSeedState():null,
-          player:g.player&&[g.player.id,g.player.x,g.player.y,g.player.hp,g.player.score,g.player.kills,g.player.level,g.player.alive],
-          tanks:g.tanks.map(t=>[t.id,t.x,t.y,t.hp,t.alive,t.cls]),
+          player:g.player&&[g.player.id,g.player.x,g.player.y,g.player.vx,g.player.vy,
+            g.player.angle,g.player.hp,g.player.xp,g.player.score,g.player.kills,
+            g.player.level,g.player.alive,g.player.fireCd,g.player.fireSpin,
+            g.player.abilityCd,g.player.spawnShieldT,g.player.stats?.reload],
+          tanks:g.tanks.map(t=>[t.id,t.x,t.y,t.vx,t.vy,t.angle,t.hp,
+            t.alive,t.cls,t.fireCd,t.fireSpin,t.abilityCd,t.overheatT,
+            t.spawnShieldT,t.ai?.targetId]),
           shapes:g.shapes.map(t=>[t.id,t.x,t.y,t.hp,t.type]),
-          drones:g.drones.map(t=>[t.id,t.x,t.y,t.hp,t.ownerId]),
-          bullets:g.bullets.map(t=>[t.id,t.x,t.y,t.ttl,t.dead,t.ownerId,t.pen,t.hits]),
+          drones:g.drones.map(t=>[t.id,t.x,t.y,t.hp,t.ownerId,
+            t.angle,t.state,t.targetId,t.attackCd]),
+          bullets:g.bullets.map(t=>[t.id,t.x,t.y,t.vx,t.vy,t.ttl,
+            t.dead,t.ownerId,t.pen,t.hits,t.hp,t.dmg,t.r,t.shell,t.beam]),
           terrain:(g.__novaTerrain||[]).map(t=>[t.id,t.hp,t.solid,t.destructible]),
           powerups:(g.powerups||[]).map(t=>[t.id,t.x,t.y,t.type]),
           orbs:(g.orbs||[]).map(t=>[t.id,t.x,t.y,t.value])
