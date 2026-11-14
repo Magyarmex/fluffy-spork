@@ -61,13 +61,40 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
       ledger.install();
       g.__novaShotLedger=ledger;
       let frames=0,callbacks=0,scopedCalls=0,unusedScopes=0,observerErrors=0,unknown=0,unidentifiedTargets=0,coreAttributed=0,battlefieldAttributed=0,coverAttributed=0,retirements=0,ttlRetirements=0,boundsRetirements=0,ambiguousRetirements=0,rawPenOneZeroHitTtl=0,coreInterceptions=0,sniperInterceptions=0,battlefieldTtlInterceptions=0;
+      // Read-only physical fingerprints: these make a later paired OFF/ON
+      // comparison falsifiable without mistaking observer counts for hits.
+      // Keep complete ordered state, including RNG-independent combat owners;
+      // no gameplay state is modified by this witness.
+      const physicalTrace=[];
+      const fingerprint=()=>{
+        const state=JSON.stringify({
+          time:g.time,
+          player:g.player&&[g.player.id,g.player.x,g.player.y,g.player.hp,g.player.score,g.player.kills,g.player.level,g.player.alive],
+          tanks:g.tanks.map(t=>[t.id,t.x,t.y,t.hp,t.alive,t.cls]),
+          shapes:g.shapes.map(t=>[t.id,t.x,t.y,t.hp,t.type]),
+          drones:g.drones.map(t=>[t.id,t.x,t.y,t.hp,t.ownerId]),
+          bullets:g.bullets.map(t=>[t.id,t.x,t.y,t.ttl,t.dead,t.ownerId,t.pen,t.hits]),
+          terrain:(g.__novaTerrain||[]).map(t=>[t.id,t.hp,t.solid,t.destructible]),
+          powerups:(g.powerups||[]).map(t=>[t.id,t.x,t.y,t.type]),
+          orbs:(g.orbs||[]).map(t=>[t.id,t.x,t.y,t.value])
+        });
+        let h1=2166136261,h2=0x9e3779b9;
+        for(let j=0;j<state.length;j++){
+          const c=state.charCodeAt(j);
+          h1=Math.imul(h1^c,16777619);
+          h2=Math.imul(h2^c,2246822519);
+        }
+        return (h1>>>0).toString(16)+':'+(h2>>>0).toString(16);
+      };
+      physicalTrace.push({frame:0,hash:fingerprint()});
       const updateMs=[];
       for(let i=0;i<600&&g.status==='playing';i++){
         const t0=performance.now();
         g.update(1/30);
         updateMs.push(performance.now()-t0);
         const s=ledger.counters();
-        frames++;callbacks+=s.damageCallbacksCaptured;retirements+=s.retiredAttributed;ttlRetirements+=s.ttlRetirements;boundsRetirements+=s.boundsRetirements;ambiguousRetirements+=s.ambiguousRetirements;rawPenOneZeroHitTtl+=s.rawPenOneZeroHitTtl;coreInterceptions+=s.coreInterceptions;sniperInterceptions+=s.sniperInterceptions;battlefieldTtlInterceptions+=s.battlefieldTtlInterceptions;scopedCalls+=s.scopedCalls;
+        frames++;if(frames%30===0)physicalTrace.push({frame:frames,hash:fingerprint()});
+        callbacks+=s.damageCallbacksCaptured;retirements+=s.retiredAttributed;ttlRetirements+=s.ttlRetirements;boundsRetirements+=s.boundsRetirements;ambiguousRetirements+=s.ambiguousRetirements;rawPenOneZeroHitTtl+=s.rawPenOneZeroHitTtl;coreInterceptions+=s.coreInterceptions;sniperInterceptions+=s.sniperInterceptions;battlefieldTtlInterceptions+=s.battlefieldTtlInterceptions;scopedCalls+=s.scopedCalls;
         unusedScopes+=s.unusedScopes;observerErrors+=s.observerErrors;
         unknown+=s.unknown;unidentifiedTargets+=s.unidentifiedTargets;
         coreAttributed+=s.coreAttributed;battlefieldAttributed+=s.battlefieldAttributed;coverAttributed+=s.coverAttributed;
@@ -77,11 +104,16 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
       delete g.__novaShotLedger;
       if(!ledger.uninstall())throw Error('failed to restore real damage methods');
       updateMs.sort((a,b)=>a-b);
-      return{frames,callbacks,attributedCallbacks:callbacks-unknown,coreAttributed,battlefieldAttributed,coverAttributed,retirements,ttlRetirements,boundsRetirements,ambiguousRetirements,rawPenOneZeroHitTtl,coreInterceptions,sniperInterceptions,battlefieldTtlInterceptions,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
+      return{frames,physicalTrace,callbacks,attributedCallbacks:callbacks-unknown,coreAttributed,battlefieldAttributed,coverAttributed,retirements,ttlRetirements,boundsRetirements,ambiguousRetirements,rawPenOneZeroHitTtl,coreInterceptions,sniperInterceptions,battlefieldTtlInterceptions,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
         p95UpdateMs:updateMs[Math.ceil(updateMs.length*.95)-1],
         maxUpdateMs:updateMs[updateMs.length-1],status:g.status,time:g.time};
     });
     assert.ok(result.frames>=1,'real composed game must advance');
+    assert.equal(result.physicalTrace.length,1+Math.floor(result.frames/30),
+      'initial and one-second physical fingerprints must be captured');
+    assert.ok(result.physicalTrace.every((sample,i)=>sample.frame===i*30&&
+      /^[0-9a-f]+:[0-9a-f]+$/.test(sample.hash)),
+      'fingerprints must have monotonic frame epochs and bounded hash shape');
     assert.ok(Number.isSafeInteger(result.retirements)&&result.retirements>=0,
       'core retirement witness must report bounded nonnegative count');
     assert.ok(Number.isSafeInteger(result.sniperInterceptions)&&result.sniperInterceptions>=0,
