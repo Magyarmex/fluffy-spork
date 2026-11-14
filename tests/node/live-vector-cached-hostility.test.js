@@ -180,3 +180,22 @@ test('shipping Live Vector + Fair Engagement releases when all targets become pr
  assert.equal(w.owner.__novaLiveVectorAI.targetId,-1);
  assert.equal(w.owner.__novaLiveVectorAI.active,false);
 });
+
+test('Controller AI does not prefer a slightly farther player over a closer hostile bot',()=>{
+ const w=boot();
+ // The historical 0.88 player-distance multiplier would incorrectly select
+ // the 130u player over the 125u bot. Selection must be identity-neutral.
+ w.enemy.x=130;w.enemy.isPlayer=true;
+ w.other.x=125;w.other.isPlayer=false;
+ assert.equal(w.win.__testLiveVectorBestObserved(w.g,w.owner,null),w.other);
+});
+test('Controller AI still selects a player when genuinely closer',()=>{
+ const w=boot();w.enemy.x=115;w.enemy.isPlayer=true;
+ w.other.x=130;w.other.isPlayer=false;
+ assert.equal(w.win.__testLiveVectorBestObserved(w.g,w.owner,null),w.enemy);
+});
+test('Controller AI preserves a legitimate committed player target',()=>{
+ const w=boot();w.enemy.x=200;w.enemy.isPlayer=true;
+ w.other.x=120;
+ assert.equal(w.win.__testLiveVectorBestObserved(w.g,w.owner,w.enemy),w.enemy);
+});
