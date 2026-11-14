@@ -177,6 +177,20 @@ test('ten Battlefield guards call real damage exactly once with or without ledge
         .apply(game,Object.values({...vars,g:game}));
       assert.equal(malformed,17);
       assert.equal(seen.damage,2);
+      // Callable observer failures cannot suppress, replay, or replace combat.
+      for(const malformedMethod of [
+        ()=>{throw Error('observer before');},
+        (_shot,fn)=>{fn();throw Error('observer after');},
+        ()=>99,
+        (_shot,fn)=>{fn();fn();}
+      ]){
+        game.__novaShotLedger={withProjectile:malformedMethod};
+        const before=seen.damage;
+        const value=new Function(...Object.keys(vars),'return '+wrapped+';')
+          .apply(game,Object.values({...vars,g:game}));
+        assert.equal(value,17);
+        assert.equal(seen.damage,before+1,'real damage must run once');
+      }
       // A valid observer is sampled once and receives its original receiver.
       let ledgerReads=0,methodReads=0;
       const validLedger={get withProjectile(){methodReads++;return function(shot,fn){
