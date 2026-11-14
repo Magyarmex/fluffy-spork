@@ -254,6 +254,10 @@ test('research Sniper patch observes the actual shipping swept interception owne
   const patched=patchSniperInterception(sniper);
   assert.notEqual(patched,sniper);
   assert.equal((patched.match(/recordProjectileInterception/g)||[]).length,1);
+  assert.ok(patched.includes("method.call(ledger,a,b,ah,bh,'sniper',firstTime)"));
+  assert.ok(patched.indexOf('var firstTime = firstProjectileContactTime(a, b, rr);') <
+    patched.indexOf("method.call(ledger,a,b,ah,bh,'sniper',firstTime)"),
+    'witness must use actual computed swept-contact fraction');
   new vm.Script(patched,{filename:'research-patched-sniper.js'});
   assert.throws(()=>patchSniperInterception(patched),/already installed/);
   assert.throws(()=>patchSniperInterception(sniper.replace(
