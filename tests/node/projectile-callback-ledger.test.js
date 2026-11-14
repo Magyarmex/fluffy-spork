@@ -427,3 +427,25 @@ test('allocation-light counters agree with event snapshot and reset per frame',(
   assert.equal(l.counters().scopedCalls,0);
   assert.equal(l.counters().unusedScopes,0);
 });
+
+test('explicit source tags distinguish core and Battlefield callbacks without changing combat',()=>{
+  const game={damageTank(t,d){t.hp-=d;return t.hp;},
+    damageShape(t,d){t.hp-=d;return t.hp;},
+    damageDrone(t,d){t.hp-=d;return t.hp;}};
+  const ledger=createProjectileCallbackLedger(game);
+  ledger.install();
+  const a={id:1,hp:20},b={id:2,hp:20},c={id:3,hp:20};
+  assert.equal(ledger.withProjectile({id:101},()=>game.damageTank(a,3),'direct','core'),17);
+  assert.equal(ledger.withProjectile({id:102},()=>game.damageShape(b,4),'direct','battlefield'),16);
+  assert.equal(ledger.withProjectile({id:103},()=>game.damageDrone(c,5)),15);
+  assert.deepEqual(ledger.snapshot().events.map(e=>e.source),['core','battlefield',undefined]);
+  assert.equal(ledger.counters().coreAttributed,1);
+  assert.equal(ledger.counters().battlefieldAttributed,1);
+  assert.equal(ledger.withProjectile({id:104},()=>game.damageTank(a,1),'direct','invented'),16);
+  assert.equal(ledger.snapshot().events.at(-1).shotId,null);
+  assert.equal(ledger.snapshot().observerErrors,1);
+  ledger.nextFrame();
+  assert.equal(ledger.counters().coreAttributed,0);
+  assert.equal(ledger.counters().battlefieldAttributed,0);
+  ledger.uninstall();
+});
