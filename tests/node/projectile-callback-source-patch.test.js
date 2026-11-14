@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const {patchMaterializedCore, patchBattlefieldCallbacks, patchBattlefieldCover, CALLS} = require('../research/projectile-callback-source-patch.cjs');
+const {patchMaterializedCore, patchBattlefieldCallbacks, patchBattlefieldCover, guardedShotCall, CALLS} = require('../research/projectile-callback-source-patch.cjs');
 const html = fs.readFileSync(path.resolve(__dirname, '../../index.html'), 'utf8');
 test('research patch changes exactly three authoritative core callbacks, not splash or overlays',()=>{
   const patched = patchMaterializedCore(html);
@@ -147,8 +147,7 @@ test('ten Battlefield guards call real damage exactly once with or without ledge
     assert.ok(end>match.index);
     const call=battlefield.slice(match.index,end);
     const receiver=call.startsWith('this.')?'this':'g';
-    const wrapped='(()=>{let ledger,method;try{ledger='+receiver+'.__novaShotLedger;method=ledger?.withProjectile;}catch(_){}' +
-      "return typeof method==='function' ? method.call(ledger,b,()=>"+call+",'direct','battlefield') : "+call+';})()';
+    const wrapped=guardedShotCall(call,receiver,'battlefield');
     assert.ok(patched.includes(wrapped),'missing guard: '+call);
     for(const enabled of [false,true]){
       const seen={damage:0,scope:0};
