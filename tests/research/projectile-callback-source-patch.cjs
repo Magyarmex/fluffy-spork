@@ -41,6 +41,22 @@ function patchMaterializedCore(html) {
  * closed on source drift; never infer projectile IDs from owner IDs.
  * Does not instrument cover HP, interception, splash or expiry.
  */
+// These are the ten actual shipping Battlefield damage owners, not merely a
+// count of calls. A renamed/reordered argument can change attribution while
+// preserving the count, so the research transform must refuse source drift.
+const BATTLEFIELD_CALL_SIGNATURES = Object.freeze([
+  'this.damageShape(e,b.dmg,b.vx,b.vy)',
+  'this.damageTank(e,b.dmg,b.ownerId,Math.cos(ang)*(b.knock||0)*.006,Math.sin(ang)*(b.knock||0)*.006)',
+  'this.damageDrone(e,b.dmg,b.ownerId)',
+  'g.damageTank(hit.e,b.dmg,b.ownerId,kx,ky)',
+  'g.damageTank(best.e,b.dmg,b.ownerId,Math.cos(ang)*(b.knock||0)*.006,Math.sin(ang)*(b.knock||0)*.006)',
+  'g.damageShape(best.e,b.dmg,vx,vy)',
+  'g.damageDrone(best.e,b.dmg,b.ownerId)',
+  'g.damageShape(hit.e,b.dmg,b.vx,b.vy)',
+  'g.damageTank(victim,b.dmg,b.ownerId,0,0)',
+  'g.damageShape(victim,b.dmg,b.vx,b.vy)'
+]);
+function normalizedCall(s) { return s.replace(/\\s+/g, ''); }
 function patchBattlefieldCallbacks(source) {
   if (typeof source !== 'string') throw new TypeError('Battlefield source required');
   if (source.includes('let ledger,method;try{ledger='))
@@ -62,6 +78,9 @@ function patchBattlefieldCallbacks(source) {
         throw new Error('unsupported Battlefield callback argument syntax');
     }
     if (end < 0) throw new Error('unbalanced Battlefield damage callback');
+    const actual = normalizedCall(source.slice(match.index,end));
+    const expected = normalizedCall(BATTLEFIELD_CALL_SIGNATURES[matches.indexOf(match)]);
+    if (actual !== expected) throw new Error('Battlefield callback signature drift at '+match.index);
     return {start:match.index,end};
   });
   let out = source;
