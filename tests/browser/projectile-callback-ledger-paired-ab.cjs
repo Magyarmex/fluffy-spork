@@ -28,8 +28,13 @@ function arm(mode,seed){
 // observer effects with legitimate world-layout differences.
 const seeds=['0x1d4a3f21','0x6c8e9cf5'];
 const trials=[];
+const initialWorlds=new Set();
 for(const seed of seeds){
   const off=arm('off',seed),offRepeat=arm('off',seed),on=arm('on',seed);
+  const initialHash=off.physicalTrace[0].hash;
+  assert.ok(!initialWorlds.has(initialHash),
+    seed+' did not produce a distinct initial world; multi-seed coverage is illusory');
+  initialWorlds.add(initialHash);
   const control=comparePhysicalTraces(off,offRepeat);
   assert.ok(control.complete&&!control.firstDivergence,
     seed+' OFF/OFF A/A control failed; OFF/ON causal inference is invalid');
