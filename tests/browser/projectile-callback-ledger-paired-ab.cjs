@@ -80,6 +80,8 @@ for(const {seed,layoutIndex,layout} of trialsPlan){
   trials.push({seed,layout:off.layout,nativeOrderMatched,control,comparison,
     provenance:{sampled:events.length,truncated:on.eventSamplesTruncated,
       preStatePresent:evidence.preStatePresent,preStateMissing:evidence.preStateMissing,
+      provenNewbornEvents:evidence.provenNewbornEvents,
+      unexplainedMissingPreState:evidence.unexplainedMissingPreState,
       targetStatePresent:evidence.targetStatePresent,targetStateMissing:evidence.targetStateMissing,
       preFrameShotUnidentified:evidence.preFrameShotUnidentified,
       preFrameTargetUnidentified:evidence.preFrameTargetUnidentified,
