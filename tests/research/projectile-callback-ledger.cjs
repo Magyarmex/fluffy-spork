@@ -174,7 +174,7 @@ function createProjectileCallbackLedger(game, options = {}) {
         attribution:'direct', source, requestedDamage:null,
         beforeHpA:beforeA, beforeHpB:beforeB,
         afterHpA:afterA, afterHpB:afterB,
-        timing:contactSeconds !== null ? 'certified-frame-seconds' :
+        timing:contactSeconds !== null ? 'certified-bullet-step-seconds' :
           contactFraction !== null ? 'normalized-sweep-fraction' : 'unknown',
         ...(contactFraction === null ? {} : {contactFraction}),
         ...(contactSeconds === null ? {} : {contactSeconds})}));
