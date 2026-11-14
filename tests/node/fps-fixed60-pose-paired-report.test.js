@@ -62,7 +62,7 @@ function report90(enabled){
  r.raf.activePresentationHz=90;r.raf.activeIntervals={p95:11.2,n:59};
  r.raf.intervals={p95:11.2,n:59};
  r.blankRaf={frames:160,hz:90,p95:11.2,supports90Hz:true};
- r.rafHostCapable=true;
+ r.rafHostCapable=true;r.chromiumGpuVsyncDisabled=false;
  return r;
 }
 test('90Hz OFF/OFF/ON report requires three matched materialized worlds and bounded callback cadence',()=>{
@@ -99,4 +99,11 @@ test('90Hz paired report marks a host-limited blank RAF control inconclusive, ne
  assert.equal(out.inconclusive,true);
  assert.equal(out.gameRaf.ON.activePresentationHz,41.2);
  assert.equal(out.blankRaf['OFF-A'].supports90Hz,false);
+});
+
+
+test('90Hz A/A/B rejects different Chromium GPU-vsync launch flags',()=>{
+ const offA=report90(false),offB=report90(false),on=report90(true);
+ on.chromiumGpuVsyncDisabled=true;
+ assert.throws(()=>compareTriple(offA,offB,on),/same Chromium GPU-vsync launch flag/);
 });

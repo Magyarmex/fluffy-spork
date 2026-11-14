@@ -74,6 +74,8 @@ function compareTriple(offA,offB,on){
   for(const key of ['configuredMaxSteps','backlogExtraTicks','controlledGate','presentationTargetHz'])
    assert.equal(arm[key],offA[key],label+' '+key+' must match');
   assert.equal(arm.controlledGate,true,label+' must use controlled Chromium callbacks');
+  assert.equal(arm.chromiumGpuVsyncDisabled,offA.chromiumGpuVsyncDisabled,
+   label+' must use the same Chromium GPU-vsync launch flag');
   assert.equal(arm.productionRafActive,false,label+' must not leave the production RAF active');
   assert.ok(arm.births>0,label+' must emit a real player projectile');
   assert.ok(arm.raf?.frames>2&&Number.isFinite(arm.raf?.activePresentationHz),
@@ -101,7 +103,7 @@ function compareTriple(offA,offB,on){
    droppedMs:arm.droppedMs,ticks:arm.ticks}]));
   return {researchOnly:true,causalPerformanceComparison:false,
    status:'inconclusive-host-raf-capability',gatePassed:false,inconclusive:true,
-   targetPresentationHz:90,
+   targetPresentationHz:90,chromiumGpuVsyncDisabled:offA.chromiumGpuVsyncDisabled,
    reason:'The same-process blank-page control using the exact 90Hz RAF gate could not sustain 80–100Hz with p95 below 15ms; this Chromium runner cannot validate the composed-Game 90Hz gate.',
    blankRaf,gameRaf};
  }
@@ -114,7 +116,8 @@ function compareTriple(offA,offB,on){
  const paired=compare(offA,on);
  return {...paired,researchOnly:true,causalPerformanceComparison:false,
   status:'90hz-browser-gate-passed',gatePassed:true,inconclusive:false,
-  targetPresentationHz:90,
+  targetPresentationHz:90,chromiumGpuVsyncDisabled:offA.chromiumGpuVsyncDisabled,
+  blankRaf:Object.fromEntries(arms.map(([label,arm])=>[label,arm.blankRaf])),
   offRepeat:{ticks:offB.ticks,wallMs:offB.raf.observedWallMs,
    simulatedMs:offB.raf.simulatedMs,activePresentationHz:offB.raf.activePresentationHz,
    callbackP95Ms:offB.raf.callbackJs.p95,renderP95Ms:offB.renders.p95,
