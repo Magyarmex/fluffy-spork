@@ -150,7 +150,7 @@ function createProjectileCallbackLedger(game, options = {}) {
   }
   // Core endpoint pair interception occurs after projectile movement.
   // This witnesses real weakening, not the first physical interception time.
-  function recordProjectileInterception(a, b, beforeA, beforeB, source = 'core', contactFraction = null) {
+  function recordProjectileInterception(a, b, beforeA, beforeB, source = 'core', contactFraction = null, contactSeconds = null) {
     try {
       const idA = a == null ? null : a.id;
       const idB = b == null ? null : b.id;
@@ -163,7 +163,9 @@ function createProjectileCallbackLedger(game, options = {}) {
           afterA > beforeA || afterB > beforeB ||
           (source !== 'core' && source !== 'sniper' && source !== 'battlefield-ttl') ||
           (contactFraction !== null && (source !== 'sniper' ||
-            !Number.isFinite(contactFraction) || contactFraction < 0 || contactFraction > 1))) {
+            !Number.isFinite(contactFraction) || contactFraction < 0 || contactFraction > 1)) ||
+          (contactSeconds !== null && (source !== 'battlefield-ttl' ||
+            !Number.isFinite(contactSeconds) || contactSeconds <= 0 || contactSeconds > .05))) {
         observerErrors++; return false;
       }
       if (events.length >= limit) { overflow++; return false; }
@@ -172,8 +174,10 @@ function createProjectileCallbackLedger(game, options = {}) {
         attribution:'direct', source, requestedDamage:null,
         beforeHpA:beforeA, beforeHpB:beforeB,
         afterHpA:afterA, afterHpB:afterB,
-        timing:contactFraction === null ? 'unknown' : 'normalized-sweep-fraction',
-        ...(contactFraction === null ? {} : {contactFraction})}));
+        timing:contactSeconds !== null ? 'certified-frame-seconds' :
+          contactFraction !== null ? 'normalized-sweep-fraction' : 'unknown',
+        ...(contactFraction === null ? {} : {contactFraction}),
+        ...(contactSeconds === null ? {} : {contactSeconds})}));
       if (source === 'core') coreInterceptions++;
       else if (source === 'sniper') sniperInterceptions++;
       else battlefieldTtlInterceptions++;
