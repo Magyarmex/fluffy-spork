@@ -66,4 +66,18 @@ function patchBattlefieldCallbacks(source) {
   return out;
 }
 
-module.exports = {patchMaterializedCore, patchBattlefieldCallbacks, CALLS};
+/** Record actual cover HP writes after the authoritative mutation. This is
+ * not a first-contact timestamp; it cannot classify terrain chronology. */
+function patchBattlefieldCover(source) {
+  if (typeof source !== 'string') throw new TypeError('Battlefield source required');
+  const target = 'var oldHp=s.hp;s.hp-=dmg*mult;';
+  if (source.includes('__novaShotLedger.recordCoverDamage'))
+    throw new Error('research cover patch already installed');
+  if (source.split(target).length !== 2)
+    throw new Error('expected one authoritative cover HP write');
+  const witness = 'try{var ledger=g.__novaShotLedger;var method=ledger?.recordCoverDamage;' +
+    'if(typeof method===\\'function\\')method.call(ledger,bullet,s,oldHp,s.hp);' +
+    '}catch(_){/* research observation must not interrupt cover damage */}';
+  return source.replace(target,target+witness);
+}
+module.exports = {patchMaterializedCore, patchBattlefieldCallbacks, patchBattlefieldCover, CALLS};
