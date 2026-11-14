@@ -150,7 +150,7 @@ function createProjectileCallbackLedger(game, options = {}) {
   }
   // Core endpoint pair interception occurs after projectile movement.
   // This witnesses real weakening, not the first physical interception time.
-  function recordProjectileInterception(a, b, beforeA, beforeB, source = 'core') {
+  function recordProjectileInterception(a, b, beforeA, beforeB, source = 'core', contactFraction = null) {
     try {
       const idA = a == null ? null : a.id;
       const idB = b == null ? null : b.id;
@@ -161,7 +161,9 @@ function createProjectileCallbackLedger(game, options = {}) {
           !Number.isFinite(beforeA) || !Number.isFinite(beforeB) ||
           !Number.isFinite(afterA) || !Number.isFinite(afterB) ||
           afterA > beforeA || afterB > beforeB ||
-          (source !== 'core' && source !== 'sniper' && source !== 'battlefield-ttl')) {
+          (source !== 'core' && source !== 'sniper' && source !== 'battlefield-ttl') ||
+          (contactFraction !== null && (source !== 'sniper' ||
+            !Number.isFinite(contactFraction) || contactFraction < 0 || contactFraction > 1))) {
         observerErrors++; return false;
       }
       if (events.length >= limit) { overflow++; return false; }
@@ -169,7 +171,9 @@ function createProjectileCallbackLedger(game, options = {}) {
         targetId:null, shotId:idA, otherShotId:idB,
         attribution:'direct', source, requestedDamage:null,
         beforeHpA:beforeA, beforeHpB:beforeB,
-        afterHpA:afterA, afterHpB:afterB, timing:'unknown'}));
+        afterHpA:afterA, afterHpB:afterB,
+        timing:contactFraction === null ? 'unknown' : 'normalized-sweep-fraction',
+        ...(contactFraction === null ? {} : {contactFraction})}));
       if (source === 'core') coreInterceptions++;
       else if (source === 'sniper') sniperInterceptions++;
       else battlefieldTtlInterceptions++;
