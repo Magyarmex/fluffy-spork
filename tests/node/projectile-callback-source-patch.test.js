@@ -15,7 +15,7 @@ test('research patch changes exactly three authoritative core callbacks, not spl
   assert.equal(patched.slice(0,start),html.slice(0,start));
   const patchedEnd=patched.indexOf('    splashAt(x, y, radius, frac, ownerId, knock, color, dmg) {',start);
   assert.equal(patched.slice(patchedEnd),html.slice(end));
-  for(const call of CALLS)assert.ok(patched.includes(' : '+call.slice(0,-1)+');'));
+  for(const call of CALLS)assert.ok(patched.includes(' : '+call.slice(0,-1)+';})();'));
 });
 test('research patch fails closed on changed or ambiguous callback ownership',()=>{
   for(const call of CALLS){
@@ -136,8 +136,8 @@ test('ten Battlefield guards call real damage exactly once with or without ledge
     assert.ok(end>match.index);
     const call=battlefield.slice(match.index,end);
     const receiver=call.startsWith('this.')?'this':'g';
-    const wrapped='(typeof '+receiver+".__novaShotLedger?.withProjectile === 'function' ? "+
-      receiver+".__novaShotLedger.withProjectile(b,()=>"+call+",'direct','battlefield') : "+call+')';
+    const wrapped='(()=>{let ledger,method;try{ledger='+receiver+'.__novaShotLedger;method=ledger?.withProjectile;}catch(_){}' +
+      "return typeof method==='function' ? method.call(ledger,b,()=>"+call+",'direct','battlefield') : "+call+';})()';
     assert.ok(patched.includes(wrapped),'missing guard: '+call);
     for(const enabled of [false,true]){
       const seen={damage:0,scope:0};
@@ -163,6 +163,20 @@ test('ten Battlefield guards call real damage exactly once with or without ledge
         .apply(game,Object.values({...vars,g:game}));
       assert.equal(malformed,17);
       assert.equal(seen.damage,2);
+      // Both a throwing ledger getter and a throwing method getter must
+      // fall back exactly once, without changing the combat callback.
+      for(const throwing of [
+        Object.defineProperty({},'__novaShotLedger',{get(){throw Error('ledger getter');}}),
+        {__novaShotLedger:Object.defineProperty({},'withProjectile',{get(){throw Error('method getter');}})}
+      ]){
+        const receiverGame=Object.assign(Object.create(Object.getPrototypeOf(game)),game);
+        Object.defineProperty(receiverGame,'__novaShotLedger',Object.getOwnPropertyDescriptor(throwing,'__novaShotLedger'));
+        const vars2={...vars,g:receiverGame};
+        const returned=new Function(...Object.keys(vars2),'return '+wrapped+';')
+          .apply(receiverGame,Object.values(vars2));
+        assert.equal(returned,17);
+        assert.equal(seen.damage++,seen.damage-1);
+      }
     }
   }
 });
