@@ -242,5 +242,10 @@ test('cover witness observes actual HP after mutation and never interrupts comba
     assert.equal(observed.hp,baseline.hp);
     assert.equal(seen.length,mode==='valid'?1:0);
     if(mode==='valid')assert.deepEqual(seen[0],[bullet,observed,17,10.75]);
+    if(mode==='valid'){
+      const withoutBullet={hp:17,id:7};
+      assert.equal(run(game,withoutBullet,2,1,null),15);
+      assert.equal(seen.length,1,'non-projectile cover damage must abstain');
+    }
   }
 });
