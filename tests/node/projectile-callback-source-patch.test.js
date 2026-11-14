@@ -249,8 +249,8 @@ test('actual core endpoint interception witness preserves both projectile outcom
     'observer exception must not change either projectile outcome');
 });
 
+const sniper=fs.readFileSync(path.resolve(__dirname,'../../nova-updates/sniper-v1.2.0.js'),'utf8');
 test('research Sniper patch observes the actual shipping swept interception owner',()=>{
-  const sniper=fs.readFileSync(path.resolve(__dirname,'../../nova-updates/sniper-v1.2.0.js'),'utf8');
   const patched=patchSniperInterception(sniper);
   assert.notEqual(patched,sniper);
   assert.equal((patched.match(/recordProjectileInterception/g)||[]).length,1);
@@ -263,7 +263,7 @@ test('research Sniper patch observes the actual shipping swept interception owne
   assert.throws(()=>patchSniperInterception(sniper.replace(
     'this.weakenBullet(a, bh); this.weakenBullet(b, ah);',
     'this.weakenBullet(a, bh); this.weakenBullet(b, 0);')),
-    /shipping Sniper interception owner changed/);
+    /shipping Sniper interception chronology owner changed/);
 });
 
 const battlefield = fs.readFileSync(path.resolve(__dirname,
