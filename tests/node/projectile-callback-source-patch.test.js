@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const {patchMaterializedCore, patchBattlefieldCallbacks, CALLS} = require('../research/projectile-callback-source-patch.cjs');
+const {patchMaterializedCore, patchBattlefieldCallbacks, patchBattlefieldCover, CALLS} = require('../research/projectile-callback-source-patch.cjs');
 const html = fs.readFileSync(path.resolve(__dirname, '../../index.html'), 'utf8');
 test('research patch changes exactly three authoritative core callbacks, not splash or overlays',()=>{
   const patched = patchMaterializedCore(html);
@@ -213,5 +213,34 @@ test('ten Battlefield guards call real damage exactly once with or without ledge
         assert.equal(seen.damage,before+1);
       }
     }
+  }
+});
+
+test('cover research witness compiles and preserves the authoritative HP write',()=>{
+  const patched=patchBattlefieldCover(battlefield);
+  new vm.Script(patched,{filename:'research-cover-battlefield.js'});
+  assert.equal(patched.split('var oldHp=s.hp;s.hp-=dmg*mult;').length,2);
+  assert.equal((patched.match(/recordCoverDamage/g)||[]).length,1);
+  assert.throws(()=>patchBattlefieldCover(patched),/already installed/);
+  assert.throws(()=>patchBattlefieldCover('function nope(){}'),/expected one authoritative cover HP write/);
+});
+test('cover witness observes actual HP after mutation and never interrupts combat',()=>{
+  const target='var oldHp=s.hp;s.hp-=dmg*mult;';
+  const synthetic='function damageCover(g,s,dmg,mult,bullet){'+target+'return s.hp;}';
+  const patched=patchBattlefieldCover(synthetic);
+  const run=new Function('return ('+patched+')')();
+  const original=new Function('return ('+synthetic+')')();
+  for(const mode of ['valid','missing','throwing-ledger','throwing-method','throwing-callback']){
+    const observed={hp:17,id:7},baseline={hp:17,id:7};
+    const bullet={id:23},seen=[];
+    const game={};
+    if(mode==='valid')game.__novaShotLedger={recordCoverDamage(...args){seen.push(args);}};
+    if(mode==='throwing-ledger')Object.defineProperty(game,'__novaShotLedger',{get(){throw Error('ledger');}});
+    if(mode==='throwing-method')game.__novaShotLedger=Object.defineProperty({},'recordCoverDamage',{get(){throw Error('method');}});
+    if(mode==='throwing-callback')game.__novaShotLedger={recordCoverDamage(){throw Error('observer');}};
+    assert.equal(run(game,observed,5,1.25,bullet),original({},baseline,5,1.25,bullet));
+    assert.equal(observed.hp,baseline.hp);
+    assert.equal(seen.length,mode==='valid'?1:0);
+    if(mode==='valid')assert.deepEqual(seen[0],[bullet,observed,17,10.75]);
   }
 });
