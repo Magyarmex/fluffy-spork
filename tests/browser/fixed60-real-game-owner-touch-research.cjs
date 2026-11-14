@@ -7,6 +7,7 @@ const path=require('node:path');
 const fs=require('node:fs');
 const {chromium}=require('playwright');
 const {injectBattlefieldSeed}=require('../research/battlefield-layout-fixture.cjs');
+const {summarizeRaf}=require('../research/fixed60-raf-capability.cjs');
 const maxSteps=Number(process.env.NOVA_FIXED60_MAX_STEPS||2);
 const controlledGate=process.env.NOVA_FIXED60_CONTROLLED_GATE==='1';
 const controlledExtra=Number(process.env.NOVA_FIXED60_EXTRA_TICKS||2);
@@ -57,30 +58,37 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
   const page=await context.newPage();
   page.on('pageerror',e=>errors.push(String(e.stack||e)));
   page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text())});
-  // Measure an empty document in this exact Chromium process before loading
-  // the composed Game. If even blank RAF cannot meet the 90Hz gate, the host
-  // is incapable of validating the Game cadence and the result is inconclusive.
-  await page.goto('about:blank');
-  const blankRaf=await page.evaluate(async durationMs=>{
-   const intervals=[];let previous=null;const started=performance.now();
-   await new Promise(resolve=>{
-    const tick=ts=>{
-     if(previous!==null)intervals.push(ts-previous);
-     previous=ts;
-     if(ts-started>=durationMs)resolve();else requestAnimationFrame(tick);
+  // Measure the exact controlled 90Hz RAF gate on an empty document in this
+  // same Chromium process before loading the composed Game. Also retain raw
+  // native RAF so a 60/120Hz host is not confused with Game workload.
+  let blankRaf=null;
+  if(presentationHz===90){
+   await page.goto('about:blank');
+   const rawBlankRaf=await page.evaluate(async durationMs=>{
+    const measure=async controlled=>{
+     const intervals=[];let previous=null,gateNext=null;
+     const started=performance.now();
+     await new Promise(resolve=>{
+      const tick=ts=>{
+       if(controlled){
+        if(gateNext===null)gateNext=ts;
+        if(ts+0.2<gateNext){requestAnimationFrame(tick);return;}
+        gateNext+=1000/90;
+       }
+       if(previous!==null)intervals.push(ts-previous);
+       previous=ts;
+       if(ts-started>=durationMs)resolve();else requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+     });
+     return {intervals,measuredMs:performance.now()-started};
     };
-    requestAnimationFrame(tick);
-   });
-   const sorted=intervals.slice(3).sort((a,b)=>a-b);
-   const total=sorted.reduce((sum,value)=>sum+value,0);
-   const p95=sorted.length?sorted[Math.ceil(.95*sorted.length)-1]:null;
-   const median=sorted.length?sorted[Math.floor((sorted.length-1)/2)]:null;
-   const hz=sorted.length&&total>0?sorted.length*1000/total:null;
-   return {frames:intervals.length,measuredMs:performance.now()-started,
-    hz,p95,median,min:sorted.length?sorted[0]:null,
-    max:sorted.length?sorted[sorted.length-1]:null,
-    supports90Hz:Number.isFinite(hz)&&hz>=80&&hz<=100&&p95<15};
-  },2200);
+    return {native:await measure(false),controlled90Hz:await measure(true)};
+   },1600);
+   blankRaf={...summarizeRaf(rawBlankRaf.controlled90Hz.intervals,
+    rawBlankRaf.controlled90Hz.measuredMs),
+    nativeRaf:summarizeRaf(rawBlankRaf.native.intervals,rawBlankRaf.native.measuredMs)};
+  }
   await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded',timeout:45000});
   const deploy=page.getByRole('button',{name:/DEPLOY/i}).first();
   await deploy.waitFor({state:'visible',timeout:45000});
@@ -584,9 +592,9 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     researchFactoryPresent:typeof window.__novaFixed60Research?.createFixedStepBrowserPilot==='function'};
   });
   report.blankRaf=blankRaf;
-  report.rafHostCapable=blankRaf.supports90Hz;
+  report.rafHostCapable=blankRaf?.supports90Hz??null;
   report.chromiumGpuVsyncDisabled=process.env.NOVA_FIXED60_DISABLE_GPU_VSYNC==='1';
-  console.log('NOVA_FIXED60_BLANK_RAF_CONTROL '+JSON.stringify(report.blankRaf));
+  if(blankRaf)console.log('NOVA_FIXED60_BLANK_RAF_CONTROL '+JSON.stringify(report.blankRaf));
   if(process.env.NOVA_FIXED60_REPORT_FILE){
    // Save exact browser observations for a separate, explicitly non-causal
    // paired comparison. Never manufacture matched wall time from tick count.
@@ -628,7 +636,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     longGaps:report.raf.controlledLongGaps,stepCounts:report.raf.stepCounts,
     droppedMs:report.droppedMs,backlogDrops:report.raf.backlogDrops}));
    if(presentationHz===90){
-    if(blankRaf.supports90Hz){
+    if(blankRaf?.supports90Hz){
      assert.ok(report.raf.activePresentationHz>=80&&report.raf.activePresentationHz<=100,
       'blank RAF host is capable, so composed Game must sustain near-90Hz callbacks outside the deliberate foreground stall: '+JSON.stringify(report.raf));
      assert.ok(report.raf.intervals.p95<15,

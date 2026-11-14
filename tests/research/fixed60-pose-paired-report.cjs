@@ -82,6 +82,9 @@ function compareTriple(offA,offB,on){
    label+' must report active composed-Game callback intervals');
   assert.ok(arm.blankRaf&&Number.isFinite(arm.blankRaf.hz)&&
    Number.isFinite(arm.blankRaf.p95),label+' must include the same-process blank RAF control');
+  const measuredCapability=arm.blankRaf.hz>=80&&arm.blankRaf.hz<=100&&arm.blankRaf.p95<15;
+  assert.equal(arm.blankRaf.supports90Hz,measuredCapability,
+   label+' blank RAF capability flag must reflect the controlled-gate measurements');
   assert.equal(arm.rafHostCapable,arm.blankRaf.supports90Hz,
    label+' host-capability flag must match the blank RAF control');
  }
@@ -99,7 +102,7 @@ function compareTriple(offA,offB,on){
   return {researchOnly:true,causalPerformanceComparison:false,
    status:'inconclusive-host-raf-capability',gatePassed:false,inconclusive:true,
    targetPresentationHz:90,
-   reason:'The same-process blank-page RAF control could not sustain 80–100Hz with p95 below 15ms; this Chromium runner cannot validate the composed-Game 90Hz gate.',
+   reason:'The same-process blank-page control using the exact 90Hz RAF gate could not sustain 80–100Hz with p95 below 15ms; this Chromium runner cannot validate the composed-Game 90Hz gate.',
    blankRaf,gameRaf};
  }
  for(const [label,arm] of arms){

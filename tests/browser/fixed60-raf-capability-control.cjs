@@ -5,6 +5,7 @@
 // + blank-page experiment; failure is reported as an inconclusive host, never
 // as a 90Hz Game pass.
 const {chromium}=require('playwright');
+const {summarizeRaf}=require('../research/fixed60-raf-capability.cjs');
 const modes=[
  {name:'default',extraArgs:[]},
  {name:'gpu-vsync',extraArgs:['--disable-gpu-vsync']}
@@ -14,29 +15,36 @@ async function measure(mode){
   '--disable-dev-shm-usage','--no-sandbox','--disable-frame-rate-limit',...mode.extraArgs
  ]});
  try{
-  const page=await browser.newPage();
-  await page.goto('about:blank');
-  const sample=await page.evaluate(async durationMs=>{
-   const intervals=[];let previous=null;const started=performance.now();
-   await new Promise(resolve=>{
-    const tick=ts=>{
-     if(previous!==null)intervals.push(ts-previous);
-     previous=ts;
-     if(ts-started>=durationMs)resolve();else requestAnimationFrame(tick);
+  const context=await browser.newContext({viewport:{width:320,height:700},
+   deviceScaleFactor:2,isMobile:true,hasTouch:true,serviceWorkers:'block'});
+  try{
+   const page=await context.newPage();
+   await page.goto('about:blank');
+   const raw=await page.evaluate(async durationMs=>{
+    const measure=async controlled=>{
+     const intervals=[];let previous=null,gateNext=null;
+     const started=performance.now();
+     await new Promise(resolve=>{
+      const tick=ts=>{
+       if(controlled){
+        if(gateNext===null)gateNext=ts;
+        if(ts+0.2<gateNext){requestAnimationFrame(tick);return;}
+        gateNext+=1000/90;
+       }
+       if(previous!==null)intervals.push(ts-previous);
+       previous=ts;
+       if(ts-started>=durationMs)resolve();else requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+     });
+     return {intervals,measuredMs:performance.now()-started};
     };
-    requestAnimationFrame(tick);
-   });
-   const sorted=intervals.slice(3).sort((a,b)=>a-b);
-   const total=sorted.reduce((sum,value)=>sum+value,0);
-   const p95=sorted.length?sorted[Math.ceil(.95*sorted.length)-1]:null;
-   const median=sorted.length?sorted[Math.floor((sorted.length-1)/2)]:null;
-   const hz=sorted.length&&total>0?sorted.length*1000/total:null;
-   return {frames:intervals.length,measuredMs:performance.now()-started,
-    hz,p95,median,min:sorted.length?sorted[0]:null,
-    max:sorted.length?sorted[sorted.length-1]:null,
-    supports90Hz:Number.isFinite(hz)&&hz>=80&&hz<=100&&p95<15};
-  },2200);
-  return {mode:mode.name,...sample};
+    return {native:await measure(false),controlled90Hz:await measure(true)};
+   },1600);
+   const nativeRaf=summarizeRaf(raw.native.intervals,raw.native.measuredMs);
+   const blankRaf=summarizeRaf(raw.controlled90Hz.intervals,raw.controlled90Hz.measuredMs);
+   return {mode:mode.name,nativeRaf,blankRaf,supports90Hz:blankRaf.supports90Hz};
+  }finally{await context.close();}
  }finally{await browser.close();}
 }
 (async()=>{
