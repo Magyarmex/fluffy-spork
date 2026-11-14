@@ -85,7 +85,7 @@ const BATTLEFIELD_CALL_SIGNATURES = Object.freeze([
   'g.damageTank(victim,b.dmg,b.ownerId,0,0)',
   'g.damageShape(victim,b.dmg,b.vx,b.vy)'
 ]);
-function normalizedCall(s) { return s.replace(/\\s+/g, ''); }
+function normalizedCall(s) { return s.replace(/\s+/g, ''); }
 function patchBattlefieldCallbacks(source) {
   if (typeof source !== 'string') throw new TypeError('Battlefield source required');
   if (source.includes('let ledger,method;try{ledger='))
