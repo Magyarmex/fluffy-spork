@@ -93,3 +93,18 @@ test('full multi-leg pickup route prevents a false contested shield chase',()=>{
  assert.equal(h.chooseResource(g,bot),null,
   'the verified longer route should not pull the rival into a lost pickup race');
 });
+
+test('an unreachable pickup behind solid terrain is not a strategic target',()=>{
+ const {c,Game}=load(),g=new Game(),bot=T(1,0,0),
+  rivals=[T(2,100,100),T(3,-100,100)],pickup={id:11,type:'shield',x:300,y:0};
+ bot.hp=50;g.tanks=[bot,...rivals];g.powerups=[pickup];
+ g.hasLineOfSight=(ax,ay,bx,by)=>!(bx===pickup.x&&by===pickup.y);
+ g.novaBattlefieldWaypoint=()=>null;
+ const h=c.window.__NOVA_BATTLE_SENSE_TEST__;
+ assert.equal(h.routeDistance(g,bot,pickup),Infinity);
+ assert.equal(h.chooseResource(g,bot),null,
+  'a blocked destination without a route must not lure a bot through a wall');
+ g.novaBattlefieldWaypoint=()=>({x:150,y:30});
+ assert.equal(h.chooseResource(g,bot).id,pickup.id,
+  'the same valuable pickup becomes eligible once a physical approach exists');
+});
