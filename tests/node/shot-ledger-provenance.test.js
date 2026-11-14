@@ -162,7 +162,7 @@ test('boundedness is lost on event or pre-frame overflow',()=>{
   for(const options of [{truncated:1},{preFrameOverflow:1},{observerErrors:1}]){
     const result=auditShotEvidence([],options);
     assert.equal(result.bounded,false);
-    assert.equal(result.abstentionReason,'truncated-evidence');
+    assert.equal(result.abstentionReason,options.observerErrors?'observer-failure':'truncated-evidence');
   }
   assert.throws(()=>auditShotEvidence([],{truncated:-1}),/truncation/);
   assert.throws(()=>auditShotEvidence([],{observerErrors:-1}),/truncation/);
