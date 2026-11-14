@@ -62,6 +62,13 @@ test('unidentified projectile does not poison independent exact shot IDs',()=>{
   assert.equal(a.shots.get(6).x,10);
   assert.equal(a.preFrameShotUnidentified,1);
 });
+test('oversized projectile frame is explicitly unbounded, never silently sampled',()=>{
+  const g=world();
+  g.bullets=Array.from({length:4097},(_,i)=>({...g.bullets[0],id:i}));
+  const a=sample(g);
+  assert.equal(a.shots,null);
+  assert.equal(a.preFrameShotOverflow,1);
+});
 test('unidentified target cannot poison valid target snapshots',()=>{
   const g=world();
   g.tanks.push({id:'unidentified',x:1,y:1,hp:1});
