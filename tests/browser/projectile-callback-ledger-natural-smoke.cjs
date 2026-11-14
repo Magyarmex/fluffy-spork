@@ -55,11 +55,11 @@ const {patchMaterializedCore,patchBattlefieldCallbacks}=require('../research/pro
       ledger.install();
       g.__novaShotLedger=ledger;
       let frames=0,callbacks=0,scopedCalls=0,unusedScopes=0,observerErrors=0,unknown=0,unidentifiedTargets=0,coreAttributed=0,battlefieldAttributed=0;
-      const frameMs=[];
+      const updateMs=[];
       for(let i=0;i<600&&g.status==='playing';i++){
         const t0=performance.now();
         g.update(1/30);
-        frameMs.push(performance.now()-t0);
+        updateMs.push(performance.now()-t0);
         const s=ledger.counters();
         frames++;callbacks+=s.eventsCaptured;scopedCalls+=s.scopedCalls;
         unusedScopes+=s.unusedScopes;observerErrors+=s.observerErrors;
@@ -70,10 +70,10 @@ const {patchMaterializedCore,patchBattlefieldCallbacks}=require('../research/pro
       }
       delete g.__novaShotLedger;
       if(!ledger.uninstall())throw Error('failed to restore real damage methods');
-      frameMs.sort((a,b)=>a-b);
+      updateMs.sort((a,b)=>a-b);
       return{frames,callbacks,attributedCallbacks:callbacks-unknown,coreAttributed,battlefieldAttributed,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
-        p95FrameMs:frameMs[Math.ceil(frameMs.length*.95)-1],
-        maxFrameMs:frameMs[frameMs.length-1],status:g.status,time:g.time};
+        p95UpdateMs:updateMs[Math.ceil(updateMs.length*.95)-1],
+        maxUpdateMs:updateMs[updateMs.length-1],status:g.status,time:g.time};
     });
     assert.ok(result.frames>=1,'real composed game must advance');
     assert.equal(result.observerErrors,0,'observer must not fail in natural gameplay');
@@ -82,7 +82,7 @@ const {patchMaterializedCore,patchBattlefieldCallbacks}=require('../research/pro
     assert.ok(result.coreAttributed+result.battlefieldAttributed<=result.attributedCallbacks,
       'origin-specific counts cannot exceed attributed callbacks');
     assert.ok(Number.isFinite(result.time));
-    assert.ok(Number.isFinite(result.p95FrameMs),'browser frame-time sample required');
+    assert.ok(Number.isFinite(result.p95UpdateMs),'browser Game.update CPU sample required');
     assert.deepEqual(errors,[],'no browser runtime exceptions');
     console.log(JSON.stringify({research:'shot-ledger-browser-smoke',...result}));
   }finally{
