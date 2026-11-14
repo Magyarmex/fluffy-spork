@@ -120,7 +120,8 @@ function auditShotEvidence(events,{truncated=0,preFrameOverflow=0,observerErrors
     // Missing endpoints may mean births during the update; do not guess.
     // Even complete endpoints cannot certify swept contact or its priority.
     certifiedMissedHits:null,missedHitClassification:'not-evaluated',
-    abstentionReason:!bounded?'truncated-evidence':
+    abstentionReason:observerErrors>0?'observer-failure':
+      !bounded?'truncated-evidence':
       preStateMissing||pairedInterceptionMissing||targetStateMissing||
       preFrameShotUnidentified||preFrameTargetUnidentified?
       'incomplete-pre-frame-evidence':
