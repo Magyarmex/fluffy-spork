@@ -577,3 +577,19 @@ test('Sniper swept contact fraction is bounded and never presented as an absolut
   assert.equal(l.recordProjectileInterception({id:87,hp:1},{id:88,hp:2},4,5,'core',.25),false);
   assert.equal(l.counters().observerErrors,5);
 });
+
+test('certified Battlefield mutual-TTL contact uses frame seconds, never Sniper fractions',()=>{
+  const l=createProjectileCallbackLedger(game());
+  assert.equal(l.recordProjectileInterception({id:91,hp:2},{id:92,hp:3},5,6,
+    'battlefield-ttl',null,.008),true);
+  const e=l.snapshot().events[0];
+  assert.equal(e.timing,'certified-frame-seconds');
+  assert.equal(e.contactSeconds,.008);
+  assert.equal(Object.hasOwn(e,'contactFraction'),false);
+  for(const time of [-1,0,.051,NaN,Infinity])
+    assert.equal(l.recordProjectileInterception({id:93,hp:2},{id:94,hp:3},5,6,
+      'battlefield-ttl',null,time),false);
+  assert.equal(l.recordProjectileInterception({id:95,hp:2},{id:96,hp:3},5,6,
+    'sniper',null,.008),false);
+  assert.equal(l.counters().observerErrors,6);
+});
