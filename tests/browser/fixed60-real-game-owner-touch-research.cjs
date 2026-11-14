@@ -65,6 +65,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    '../research/fixed-step-weak-epoch-presentation.cjs')});
   await page.evaluate(({maxSteps,controlledGate,controlledExtra,poseEnabled,weakPoseEnabled,presentationHz})=>{
    window.__novaFixedMaxSteps=maxSteps;
+   window.__novaFixedPresentationHz=presentationHz;
    window.__novaPoseEnabled=poseEnabled;
    window.__novaControlledGate=controlledGate;
    const Game=window.__novaMakeRequire('')('game/engine').Game;
@@ -524,7 +525,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
      sum+(1-f.alpha)*1000/60,0)/poses.length:null,
     renderJs:values(poseJs)},
     configuredMaxSteps:window.__novaFixedMaxSteps,
-    presentationTargetHz:presentationHz,
+    presentationTargetHz:window.__novaFixedPresentationHz,
     controlledGate:window.__novaControlledGate,
     initialFingerprint:window.__novaFixedResearch.initialFingerprint||null,
     maxSteps:p.owner.maxSteps,backlogExtraTicks:p.owner.backlogExtraTicks,
