@@ -90,6 +90,8 @@ for(const {seed,layoutIndex,layout} of trialsPlan){
       preFrameTargetUnidentified:evidence.preFrameTargetUnidentified,
       pairedInterceptionPresent:evidence.pairedInterceptionPresent,
       pairedInterceptionMissing:evidence.pairedInterceptionMissing,
+      provenNewbornPeerEvents:evidence.provenNewbornPeerEvents,
+      unexplainedMissingPeerStates:evidence.unexplainedMissingPeerStates,
       abstentionReason:evidence.abstentionReason,
       damageShotIds:damageIds.size,retiredShotIds:retirementIds.size,
       damageAndRetirementShotIds:overlappingDamageRetirements},
