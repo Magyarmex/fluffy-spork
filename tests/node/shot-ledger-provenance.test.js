@@ -35,11 +35,25 @@ test('newborn, absent or unknown pre-state is an abstention, not a missed hit',(
       preShot:pre,preOtherShot:null}
   ]);
   assert.equal(result.preStateMissing,1);
+  assert.equal(result.provenNewbornEvents,0);
+  assert.equal(result.unexplainedMissingPreState,1);
   assert.equal(result.pairedInterceptionMissing,1);
   assert.equal(result.shotCount,3,'unobserved peer still has exact identity');
   assert.equal(result.shots.find(s=>s.shotId===9).missingPreStates,1);
   assert.equal(result.abstentionReason,'incomplete-pre-frame-evidence');
   assert.equal(result.certifiedMissedHits,null);
+});
+test('authoritative birth ceiling distinguishes newborn events without proving a miss',()=>{
+  const result=auditShotEvidence([
+    {frame:1,shotId:42,kind:'damageShape',preShot:null,
+      bornThisFrame:true,preTarget:{x:0,y:0,hp:10}},
+    {frame:2,shotId:43,kind:'projectileRetirement',preShot:null,
+      bornThisFrame:false}
+  ]);
+  assert.equal(result.provenNewbornEvents,1);
+  assert.equal(result.unexplainedMissingPreState,1);
+  assert.equal(result.certifiedMissedHits,null);
+  assert.equal(result.abstentionReason,'incomplete-pre-frame-evidence');
 });
 test('boundedness is lost on event or pre-frame overflow',()=>{
   for(const options of [{truncated:1},{preFrameOverflow:1}]){
