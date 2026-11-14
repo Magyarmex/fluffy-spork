@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const {patchMaterializedCore, patchMaterializedRetirement, patchBattlefieldCallbacks, patchBattlefieldCover, guardedShotCall, CALLS} = require('../research/projectile-callback-source-patch.cjs');
+const {patchMaterializedCore, patchMaterializedRetirement, patchMaterializedInterception, patchBattlefieldCallbacks, patchBattlefieldCover, guardedShotCall, CALLS} = require('../research/projectile-callback-source-patch.cjs');
 const html = fs.readFileSync(path.resolve(__dirname, '../../index.html'), 'utf8');
 test('research patch changes exactly three authoritative core callbacks, not splash or overlays',()=>{
   const patched = patchMaterializedCore(html);
@@ -208,6 +208,43 @@ test('terminal shell retirement is witnessed even if burst marks the shot dead',
   assert.equal(ledger.snapshot().events[0].shotId,52);
   assert.equal(ledger.snapshot().events[0].reason,'ttl');
   ledger.uninstall();
+});
+
+test('actual core endpoint interception witness preserves both projectile outcomes',()=>{
+  const patched=patchMaterializedInterception(html);
+  assert.throws(()=>patchMaterializedInterception(patched),/already installed/);
+  assert.throws(()=>patchMaterializedInterception('not a game'),/interception boundaries/);
+  const compile=source=>{
+    const marker='    resolveBulletCollisions() {',at=source.indexOf(marker);
+    assert.ok(at>=0);let i=at+marker.length,depth=1;
+    while(depth&&i<source.length){if(source[i]==='{')depth++;
+      else if(source[i]==='}')depth--;i++;}
+    assert.equal(depth,0);
+    return new Function('types_1','return function(){'+source.slice(at+marker.length,i-1)+'}')
+      ({dist2:(x,y,a,b)=>(x-a)**2+(y-b)**2});
+  };
+  const run=(source,mode)=>{
+    const a={id:71,ownerId:1,x:0,y:0,r:4,hp:10,dead:false,vx:20,vy:0,color:'#fff',shell:false};
+    const b={id:72,ownerId:2,x:0,y:0,r:4,hp:15,dead:false,vx:-20,vy:0,color:'#fff',shell:false};
+    const g={bullets:[b,a],initBulletIntegrity(){},
+      weakenBullet(shot,absorbed){shot.hp-=absorbed;if(shot.hp<=0)shot.dead=true;},
+      addImpactDebris(){},addRing(){},cosmeticRandom(){return 1;},clusterBurst(){}};
+    const {createProjectileCallbackLedger}=require('../research/projectile-callback-ledger.cjs');
+    const ledger=mode==='valid'?createProjectileCallbackLedger(g):null;
+    if(ledger)g.__novaShotLedger=ledger;
+    if(mode==='throwing')g.__novaShotLedger={recordProjectileInterception(){throw Error('observer');}};
+    compile(source).call(g);
+    return {aHp:a.hp,bHp:b.hp,aDead:a.dead,bDead:b.dead,
+      events:ledger?ledger.snapshot().events:[]};
+  };
+  const baseline=run(html,'missing'),observed=run(patched,'valid');
+  assert.deepEqual({...observed,events:[]},baseline);
+  assert.equal(observed.events.length,1);
+  assert.equal(observed.events[0].shotId,71);
+  assert.equal(observed.events[0].otherShotId,72);
+  assert.equal(observed.events[0].timing,'unknown');
+  assert.deepEqual(run(patched,'throwing'),baseline,
+    'observer exception must not change either projectile outcome');
 });
 
 const battlefield = fs.readFileSync(path.resolve(__dirname,
