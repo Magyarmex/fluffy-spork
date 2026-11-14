@@ -223,8 +223,18 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
       physicalTrace.push({frame:0,hash:initialHash});foldFrame(initialHash);
       const updateMs=[];
       for(let i=0;i<600&&g.status==='playing';i++){
-        const preFrameShots=observe?snapshotPreFrameShots():null;
-        const preFrameTargets=observe?snapshotPreFrameTargets():null;
+        let preFrameShots=null,preFrameTargets=null;
+        if(observe){
+          // A research witness must never prevent the actual Game.update.
+          // Mark the whole pre-frame sample incomplete on accessor failure.
+          try{
+            preFrameShots=snapshotPreFrameShots();
+            preFrameTargets=snapshotPreFrameTargets();
+          }catch(_){
+            preFrameShotOverflow++;
+            preFrameShots=null;preFrameTargets=null;
+          }
+        }
         const t0=performance.now();
         const rand=Math.random,now=Date.now;
         if(paired){Math.random=window.__novaShotSeeded;Date.now=()=>Math.round(g.time*1000);}
