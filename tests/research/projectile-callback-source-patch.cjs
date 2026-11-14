@@ -72,7 +72,7 @@ function patchMaterializedRetirement(html) {
     '                if (wasAlive) {\n' +
     '                    try { const ledger = this.__novaShotLedger;\n' +
     '                        const method = ledger?.recordProjectileRetirement;\n' +
-    "                        if (typeof method === 'function') method.call(ledger,b,b.ttl<=0 ? (b.x < -M+20 || b.x > M-20 || b.y < -M+20 || b.y > M-20 ? 'ttl-or-bounds' : 'ttl') : 'bounds');\n" +
+    "                        if (typeof method === 'function') method.call(ledger,b,retirementReason);\n" +
     '                    } catch (_) { /* observation never blocks retirement */ }\n' +
     '                }\n            }\n        }\n        this.resolveBulletCollisions();';
   body=body.replace(original,guarded);
@@ -84,7 +84,9 @@ function patchMaterializedRetirement(html) {
   body=body.replace(first,'            const b = this.bullets[i];\n            const wasAlive = !b.dead;\n            this.initBulletIntegrity(b);');
   const beforeBurst='                if (b.shell)\n                    this.clusterBurst(b);\n                const wasAlive = !b.dead;';
   if(body.split(beforeBurst).length!==2)throw new Error('core shell retirement owner changed');
-  body=body.replace(beforeBurst,'                const eligibleAtTerminal = wasAlive && !b.dead;\n                if (b.shell)\n                    this.clusterBurst(b);');
+  body=body.replace(beforeBurst,'                const eligibleAtTerminal = wasAlive && !b.dead;\n' +
+    "                const retirementReason = b.ttl<=0 ? (b.x < -M+20 || b.x > M-20 || b.y < -M+20 || b.y > M-20 ? 'ttl-or-bounds' : 'ttl') : 'bounds';\n" +
+    '                if (b.shell)\n                    this.clusterBurst(b);');
   body=body.replace('                if (wasAlive) {','                if (eligibleAtTerminal) {');
   return html.slice(0,start)+body+html.slice(end);
 }
