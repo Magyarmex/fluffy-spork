@@ -561,3 +561,19 @@ test('interception witness abstains on impossible HP growth without fabricating 
   assert.equal(l.counters().observerErrors,2);
   assert.equal(l.counters().bounded,false);
 });
+
+test('Sniper swept contact fraction is bounded and never presented as an absolute time',()=>{
+  const l=createProjectileCallbackLedger(game());
+  assert.equal(l.recordProjectileInterception({id:81,hp:1},{id:82,hp:2},4,5,'sniper',.375),true);
+  const e=l.snapshot().events[0];
+  assert.equal(e.timing,'normalized-sweep-fraction');
+  assert.equal(e.contactFraction,.375);
+  assert.equal(e.source,'sniper');
+  assert.equal(l.recordProjectileInterception({id:83,hp:1},{id:84,hp:2},4,5,'sniper',null),true);
+  assert.equal(l.snapshot().events[1].timing,'unknown');
+  assert.equal(Object.hasOwn(l.snapshot().events[1],'contactFraction'),false);
+  for(const fraction of [-.01,1.01,NaN,Infinity])
+    assert.equal(l.recordProjectileInterception({id:85,hp:1},{id:86,hp:2},4,5,'sniper',fraction),false);
+  assert.equal(l.recordProjectileInterception({id:87,hp:1},{id:88,hp:2},4,5,'core',.25),false);
+  assert.equal(l.counters().observerErrors,5);
+});
