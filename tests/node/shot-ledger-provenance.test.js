@@ -16,6 +16,7 @@ test('joins exact shot IDs across damage, interception and retirement without in
   assert.equal(result.shotCount,2);
   assert.equal(result.preStatePresent,4);
   assert.equal(result.pairedInterceptionPresent,1);
+  assert.equal(result.shots[1].interceptions,1,'peer projectile is a participant');
   assert.deepEqual(result.shots[0],{
     shotId:11,firstFrame:1,lastFrame:3,damageEvents:1,coverEvents:0,
     interceptions:1,retirements:1,missingPreStates:0,missingPairedStates:0
@@ -32,6 +33,8 @@ test('newborn, absent or unknown pre-state is an abstention, not a missed hit',(
   ]);
   assert.equal(result.preStateMissing,1);
   assert.equal(result.pairedInterceptionMissing,1);
+  assert.equal(result.shotCount,3,'unobserved peer still has exact identity');
+  assert.equal(result.shots.find(s=>s.shotId===9).missingPreStates,1);
   assert.equal(result.abstentionReason,'incomplete-pre-frame-evidence');
   assert.equal(result.certifiedMissedHits,0);
 });
