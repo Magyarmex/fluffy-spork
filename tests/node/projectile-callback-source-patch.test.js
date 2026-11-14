@@ -243,6 +243,8 @@ test('actual core endpoint interception witness preserves both projectile outcom
   assert.equal(observed.events[0].shotId,71);
   assert.equal(observed.events[0].otherShotId,72);
   assert.equal(observed.events[0].timing,'unknown');
+  assert.equal(observed.events[0].afterHpA,-5);
+  assert.equal(observed.events[0].afterHpB,5);
   assert.deepEqual(run(patched,'throwing'),baseline,
     'observer exception must not change either projectile outcome');
 });
