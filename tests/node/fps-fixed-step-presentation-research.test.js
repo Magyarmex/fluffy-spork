@@ -59,9 +59,18 @@ test('90Hz interpolated camera and hull poses reduce repeated frames without alt
  assert.equal(fast.hash,normal.hash,'visual interpolation cannot alter physical state');
  assert.equal(fast.draws,normal.draws,'visual interpolation cannot alter RNG');
  assert.ok(fast.interpolated>0,'90Hz should interpolate real moving poses');
- const repeats=rows=>rows.slice(1).filter((r,i)=>Math.abs(r.camX-rows[i].camX)<1e-9).length;
- assert.ok(repeats(fast.rendered)<repeats(base.rendered),
+ const repeated=(rows,key)=>rows.slice(1).filter((r,i)=>
+  Math.abs(r[key]-rows[i][key])<1e-9).length;
+ assert.ok(repeated(fast.rendered,'camX')<repeated(base.rendered,'camX'),
   '90Hz camera interpolation must reduce repeated poses, not just preserve hashes');
+ assert.ok(repeated(base.rendered,'x')>0,
+  '90Hz baseline must actually exhibit repeated player hull positions');
+ assert.ok(repeated(fast.rendered,'x')<repeated(base.rendered,'x'),
+  '90Hz must smooth the player hull itself, not merely the camera');
+ assert.ok(fast.rendered.some((pose,i)=>i>1&&
+  Math.abs(pose.x-base.rendered[i].x)>1e-5),
+  '90Hz hull interpolation must visibly differ from non-interpolated rendering');
+ assert.equal(fast.violations,0,'render must restore authoritative hull positions');
 });
 test('tick-boundary alpha zero draws previous pose, never moves backward mid-frame',()=>{
  const g={tanks:[{x:0,y:0}],drones:[],shapes:[],cam:{x:0,y:0},
