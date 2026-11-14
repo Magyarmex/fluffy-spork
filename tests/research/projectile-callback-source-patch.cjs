@@ -62,7 +62,7 @@ function patchSniperInterception(source) {
  * post-weakening pair; never treat it as a callback or a missed hit. */
 function patchBattlefieldMutualInterception(source) {
   if (typeof source !== 'string') throw new TypeError('Battlefield source required');
-  if (source.includes("method.call(ledger,a,b,ah,bh,'battlefield-ttl')"))
+  if (source.includes("method.call(ledger,a,b,ah,bh,'battlefield-ttl',null,t)"))
     throw new Error('research mutual-TTL interception patch already installed');
   const start=source.indexOf(' function certifiedMutualTTLInterception(g,dt){');
   const end=source.indexOf(' var oldUpdateBullets=Game.prototype.updateBullets;',start);
@@ -73,7 +73,7 @@ function patchBattlefieldMutualInterception(source) {
     throw new Error('shipping mutual-TTL weakening owner changed');
   const witness="\n  try { const ledger=g.__novaShotLedger;"+
     "const method=ledger?.recordProjectileInterception;"+
-    "if(typeof method==='function')method.call(ledger,a,b,ah,bh,'battlefield-ttl');"+
+    "if(typeof method==='function')method.call(ledger,a,b,ah,bh,'battlefield-ttl',null,t);"+
     "} catch (_) { /* research observation cannot interrupt combat */ }";
   return source.slice(0,start)+body.replace(owner,owner+witness)+source.slice(end);
 }
