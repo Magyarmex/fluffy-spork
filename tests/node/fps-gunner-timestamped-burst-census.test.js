@@ -91,13 +91,13 @@ test('legal rotary builds: held and phase-controlled timestamped bursts at 30/60
 test('intermediate simulation rates expose rotary cadence quantization',()=>{
  const rows=[];
  for(const [cls,reload] of [['minigun',1],['needlestorm',3]])
-  for(const hz of [40,45,48,50,55,75,90]){
+  for(const hz of [40,45,48,50,55,59,61,67,68,75,90]){
    const a=run(1517800,cls,reload,hz,'held');
    const b=run(1517802,cls,reload,hz,'held');
    assert.deepEqual(a,b,'controlled no-target chronology must be seed-invariant');
    rows.push({cls,reload,hz,volleys:a.volleys,spinMean:a.spinMean,
     spinFinal:a.spinFinal,firstShots:a.firstShots});
   }
- assert.equal(rows.length,14);
+ assert.equal(rows.length,22);
  console.log('GUNNER_INTERMEDIATE_FPS_CENSUS '+JSON.stringify(rows));
 });
