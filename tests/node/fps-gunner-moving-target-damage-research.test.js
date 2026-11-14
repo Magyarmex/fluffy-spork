@@ -16,6 +16,7 @@ const EPS=1e-9;
 const SECONDS=6;
 function frames(mode){
  if(mode==='native60')return Array.from({length:360},()=>1/60);
+ if(mode==='native61')return Array.from({length:366},()=>1/61);
  if(mode==='cluster30')return Array.from({length:180},()=>1/30);
  if(mode==='alternating40_120')return Array.from({length:180},()=>[1/40,1/120]).flat();
  throw Error('unknown presentation mode');
@@ -365,4 +366,45 @@ test('Gunner high-speed reversal exercises moving-state and real shot geometry',
  }
  assert.equal(rows.length,6);
  console.log('GUNNER_HIGH_SPEED_REVERSAL_DAMAGE '+JSON.stringify(rows));
+});
+
+
+/* #799: 60->61Hz is the smallest observed nonmonotonic rotary cliff.
+ * Unlike the no-target census, this uses authoritative moving-body collisions,
+ * exact shared wall-clock firing edges and applied target HP. Do not freeze
+ * the current disparity as an acceptance golden for a future fix. */
+test('61Hz rotary cliff is measured against real moving-target HP, not just volleys',()=>{
+ const rows=[];
+ for(const [cls,reload] of [['minigun',1],['needlestorm',3]]){
+  for(const seed of [1517800,1517802]){
+   const arms={};
+   for(const mode of ['native60','native61']){
+    const args=[seed,cls,reload,mode,.007,26,1.37,.3725];
+    const moving=trial(...args,2);
+    const repeat=trial(...args,2);
+    const stationary=trial(seed,cls,reload,mode,.007,0,1.37,.3725,2);
+    assert.deepEqual(moving,repeat,'61Hz real collision replay must reproduce');
+    assert.equal(moving.onTime,3.9,'same exact wall-clock firing duty');
+    assert.equal(moving.targetMoveSteps,moving.updates+120,
+     'six-second firing window and two-second no-fire drain must each move the real target');
+    assert.ok(moving.peakOffset>25&&moving.travel>50,
+     'moving target must cross the shot corridor');
+    assert.equal(stationary.onTime,moving.onTime,'matched stationary firing duty');
+    assert.equal(stationary.travel,0,'stationary control must remain still');
+    assert.ok(Math.abs(moving.windowDamage+moving.drainDamage-moving.damage)<.00011,
+     'rounded firing-window and drain HP must reconcile actual applied HP');
+    assert.ok(moving.damage>0&&stationary.damage>0,
+     'both arms must produce real player-owned target damage');
+    arms[mode]={volleys:moving.volleys,windowDamage:moving.windowDamage,
+     drainDamage:moving.drainDamage,totalDamage:moving.damage,
+     hits:moving.hits,stationaryDamage:stationary.damage,
+     firstBirths:moving.firstBirths,firstHits:moving.firstHits};
+   }
+   rows.push({cls,reload,seed,arms,
+    damageDelta61Minus60:+(arms.native61.totalDamage-arms.native60.totalDamage).toFixed(4),
+    volleyDelta61Minus60:arms.native61.volleys-arms.native60.volleys});
+  }
+ }
+ assert.equal(rows.length,4);
+ console.log('GUNNER_60_61_REAL_MOVING_TARGET_HP '+JSON.stringify(rows));
 });
