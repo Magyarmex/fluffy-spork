@@ -88,7 +88,8 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
       'shipping Sniper interception events are separately counted');
     assert.ok(Number.isSafeInteger(result.coreInterceptions)&&result.coreInterceptions>=0,
       'core endpoint interception events are separately counted');
-    assert.ok(Number.isSafeInteger(result.battlefieldTtlInterceptions)&&result.battlefieldTtlInterceptions>=0,\n      'certified Battlefield mutual-TTL interceptions must be separately counted');\n    assert.ok(result.rawPenOneZeroHitTtl<=result.ttlRetirements,
+    assert.ok(Number.isSafeInteger(result.battlefieldTtlInterceptions)&&result.battlefieldTtlInterceptions>=0,
+      'certified Battlefield mutual-TTL interceptions must be separately counted');\n    assert.ok(result.rawPenOneZeroHitTtl<=result.ttlRetirements,
       'raw pen-one zero-hit retirements are a TTL subset, not missed-hit evidence');
     assert.equal(result.retirements,
       result.ttlRetirements+result.boundsRetirements+result.ambiguousRetirements,
