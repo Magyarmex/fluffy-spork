@@ -72,7 +72,7 @@ function boot(observed){
     :{ARENA_HALF:2250});
   return new m.exports.Game();
 }
-function run(hz,mode){
+function run(hz,mode,variant='eligible'){
   const g=boot(mode==='observed'||mode==='throwing');
   const shot=(id,owner,x,vx,hp)=>({
     id,kind:'bullet',ownerId:owner,x,y:0,vx,vy:0,r:3,
@@ -85,6 +85,11 @@ function run(hz,mode){
   g.__novaFrameStartBulletIdCeiling=4;
   g.tankById.set(1,{id:1,team:1});
   g.tankById.set(2,{id:2,team:2});
+  if(variant==='allied')g.tankById.get(2).team=1;
+  if(variant==='newborn')g.__novaFrameStartBulletIdCeiling=2;
+  if(variant==='earlier-wall')g.__novaTerrain=[
+    {shape:'rect',x:-12,y:0,w:3,h:50,solid:true,destructible:false}];
+
   let ledger=null;
   if(mode==='observed'){
     ledger=createProjectileCallbackLedger(g);
@@ -112,6 +117,17 @@ for(const hz of [30,60,120,240]){
     assert.deepEqual([observed.events[0].shotId,observed.events[0].otherShotId],[1,2]);
     assert.equal(observed.counters.battlefieldTtlInterceptions,1);
     assert.equal(observed.counters.damageCallbacksCaptured,0);
+    assert.equal(observed.counters.observerErrors,0);
+  });
+}
+
+for(const variant of ['allied','newborn','earlier-wall']){
+  test('composed mutual-TTL observer abstains on uncertified '+variant+' context',()=>{
+    const baseline=run(30,'baseline',variant);
+    const observed=run(30,'observed',variant);
+    assert.deepEqual(observed.state,baseline.state);
+    assert.equal(observed.events.length,0);
+    assert.equal(observed.counters.battlefieldTtlInterceptions,0);
     assert.equal(observed.counters.observerErrors,0);
   });
 }
