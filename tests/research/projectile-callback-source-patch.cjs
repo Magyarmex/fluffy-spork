@@ -35,6 +35,30 @@ function patchMaterializedCore(html) {
   return html.slice(0, start) + body + html.slice(end);
 }
 
+/** Research-only core terminal retirement witness. The authoritative core
+ * checks TTL and arena bounds before collision resolution. Record only a
+ * previously live projectile's transition to dead, after the real mutation;
+ * this is frame-end evidence, not an exact impact timestamp or missed hit. */
+function patchMaterializedRetirement(html) {
+  if (typeof html !== 'string') throw new TypeError('materialized HTML required');
+  const start=html.indexOf('    updateBullets(dt) {');
+  const end=html.indexOf('    splashAt(x, y, radius, frac, ownerId, knock, color, dmg) {',start);
+  if(start<0||end<=start)throw new Error('shipping core boundaries changed');
+  let body=html.slice(start,end);
+  const original='                b.dead = true;\\n            }\\n        }\\n        this.resolveBulletCollisions();'.replace(/\\n/g,'\\n');
+  if(body.includes('recordProjectileRetirement'))throw new Error('research retirement patch already installed');
+  if(body.split(original).length!==2)throw new Error('core terminal retirement owner changed');
+  const guarded='                const wasAlive = !b.dead;\\n                b.dead = true;\\n' +
+    '                if (wasAlive) {\\n' +
+    '                    try { const ledger = this.__novaShotLedger;\\n' +
+    '                        const method = ledger?.recordProjectileRetirement;\\n' +
+    "                        if (typeof method === 'function') method.call(ledger,b,b.ttl<=0 ? (b.x < -M+20 || b.x > M-20 || b.y < -M+20 || b.y > M-20 ? 'ttl-or-bounds' : 'ttl') : 'bounds');\\n" +
+    '                    } catch (_) { /* observation never blocks retirement */ }\\n' +
+    '                }\\n            }\\n        }\\n        this.resolveBulletCollisions();';
+  body=body.replace(original,guarded);
+  return html.slice(0,start)+body+html.slice(end);
+}
+
 /**
  * Research-only Battlefield response transform. All ten known direct
  * projectile damage calls have a lexical bullet named b in scope. Fail
@@ -107,4 +131,4 @@ function patchBattlefieldCover(source) {
     '}catch(_){/* research observation must not interrupt cover damage */}';
   return source.replace(target,target+witness);
 }
-module.exports = {patchMaterializedCore, patchBattlefieldCallbacks, patchBattlefieldCover, guardedShotCall, CALLS};
+module.exports = {patchMaterializedCore, patchMaterializedRetirement, patchBattlefieldCallbacks, patchBattlefieldCover, guardedShotCall, CALLS};
