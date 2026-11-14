@@ -199,7 +199,7 @@ test('terminal shell retirement is witnessed even if burst marks the shot dead',
   const {createProjectileCallbackLedger}=require('../research/projectile-callback-ledger.cjs');
   const g={bullets:[{id:52,x:0,y:0,vx:0,vy:0,ttl:0.001,r:2,dead:false,
     shell:true,beam:false}],initBulletIntegrity(){},cosmeticRandom(){return 1;},
-    clusterBurst(b){b.dead=true;},resolveBulletCollisions(){},
+    clusterBurst(b){b.dead=true;b.x=3000;b.ttl=1;},resolveBulletCollisions(){},
     damageTank(){},damageShape(){},damageDrone(){}};
   const ledger=createProjectileCallbackLedger(g);ledger.install();g.__novaShotLedger=ledger;
   compileUpdater(patched).call(g,1/30);
