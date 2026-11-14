@@ -55,7 +55,7 @@ function trial(seed,cls,reload,rates){
 
 test('Gunner 60/61, 30/60 and low-FPS transitions reveal warm/cold spin history in real Game',()=>{
  const rows=[];
- for(const [cls,reload] of [['minigun',1],['needlestorm',3]]){
+ for(const [cls,reload] of [['minigun',1],['minigun',2],['needlestorm',3]]){
   for(const rates of [[60,61],[61,60],[60,30],[30,60],[60,60],[61,61],
    [36,37],[37,36],[35,36],[36,35]]){
    const a=trial(1517800,cls,reload,rates);
@@ -65,6 +65,6 @@ test('Gunner 60/61, 30/60 and low-FPS transitions reveal warm/cold spin history 
    rows.push(a);
   }
  }
- assert.equal(rows.length,20);
+ assert.equal(rows.length,30);
  console.log('GUNNER_WARM_COLD_FPS_HYSTERESIS '+JSON.stringify(rows));
 });
