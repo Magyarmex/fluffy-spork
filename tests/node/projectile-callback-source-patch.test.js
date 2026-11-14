@@ -88,6 +88,7 @@ test('browser-only patch preserves tank/drone/shape damage across 30–240Hz',()
     assert.equal(observed.events.length,1);
     assert.equal(observed.events[0].shotId,29);
     assert.equal(observed.events[0].targetId,41);
+    assert.equal(observed.events[0].source,'core');
     assert.equal(observed.events[0].kind,
       kind==='shape'?'damageShape':kind==='tank'?'damageTank':'damageDrone');
   }
