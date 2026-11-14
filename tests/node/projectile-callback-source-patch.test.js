@@ -470,7 +470,7 @@ test('Battlefield mutual-TTL research witness patches only the certified real ow
 
 test('mutual-TTL witness preserves two-shot weakening with valid or broken observers',()=>{
   const marker='  g.weakenBullet(a,bh);g.weakenBullet(b,ah);';
-  const synthetic='function mutual(g,a,b){var ah=a.hp,bh=b.hp;'+marker+'return [a.hp,b.hp];}';
+  const synthetic='function mutual(g,a,b){var ah=a.hp,bh=b.hp,t=.008;'+marker+'return [a.hp,b.hp];}';
   // The synthetic owner uses the same authoritative mutation and lexical
   // variables; actual Battlefield source identity is checked separately.
   const original=new Function('return ('+synthetic+')')();
@@ -494,7 +494,7 @@ test('mutual-TTL witness preserves two-shot weakening with valid or broken obser
     assert.deepEqual(observed(g,a,b),original(baseline,aa,bb));
     assert.deepEqual([a,b],[aa,bb]);
     assert.equal(events.length,mode==='valid'?1:0);
-    if(mode==='valid')assert.deepEqual(events[0],[a,b,12,9,'battlefield-ttl']);
+    if(mode==='valid')assert.deepEqual(events[0],[a,b,12,9,'battlefield-ttl',null,.008]);
   }
 });
 
