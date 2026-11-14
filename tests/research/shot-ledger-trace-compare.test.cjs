@@ -24,3 +24,12 @@ test('different run durations are disclosed, not silently treated as complete',(
  const r=comparePhysicalTraces(mk(['a:b','c:d','e:f']),mk(['a:b','c:d'],10));
  assert.equal(r.complete,false);assert.equal(r.comparedSamples,2);
 });
+
+test('same-seed worlds from different Battlefield layouts cannot be compared',()=>{
+ const base={...mk(['a:b','c:d','e:f']),seed:'0x12345678',layoutIndex:0,layout:'CROSSFIRE'};
+ assert.throws(()=>comparePhysicalTraces(base,{...base,layoutIndex:1,layout:'SPLIT HORIZON'}),
+   /layout index/);
+ assert.throws(()=>comparePhysicalTraces(base,{...base,layout:'SPLIT HORIZON'}),
+   /Battlefield layout/);
+ assert.equal(comparePhysicalTraces(base,{...base}).complete,true);
+});
