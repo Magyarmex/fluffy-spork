@@ -260,6 +260,7 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
             eventSamples.push({frame:i+1,kind:e.kind,shotId:e.shotId,
               targetId:e.targetId,otherShotId:e.otherShotId??null,
               source:e.source??null,reason:e.reason??null,timing:e.timing??null,
+              contactFraction:e.contactFraction??null,
               preShot:preFrameShots?.get(e.shotId)??null,
               // Battlefield's real Game.update records the monotonic
               // frame-start ID ceiling. A larger ID proves a new birth;
@@ -320,6 +321,11 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
       e.preShot===null||(Number.isFinite(e.preShot.x)&&
       Number.isFinite(e.preShot.y)&&Number.isFinite(e.preShot.ttl))),
       'pre-frame shot evidence must be finite or explicitly absent');
+    assert.ok(result.eventSamples.every(e=>
+      e.contactFraction===null||(e.kind==='projectileInterception'&&
+        e.source==='sniper'&&e.timing==='normalized-sweep-fraction'&&
+        Number.isFinite(e.contactFraction)&&e.contactFraction>=0&&e.contactFraction<=1)),
+      'only real Sniper swept contacts may carry normalized contact fractions');
     assert.ok(result.eventSamples.every(e=>
       e.otherShotId===null||e.preOtherShot===null||
       (Number.isFinite(e.preOtherShot.x)&&Number.isFinite(e.preOtherShot.y))),
