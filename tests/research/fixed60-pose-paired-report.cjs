@@ -64,10 +64,11 @@ function compare(off,on){
 }
 if(require.main===module){
  try{
-  assert.equal(process.argv.length,4,
-   'usage: node fixed60-pose-paired-report.cjs off.json on.json');
-  const [off,on]=process.argv.slice(2).map(file=>JSON.parse(fs.readFileSync(file,'utf8')));
-  console.log('NOVA_FIXED60_POSE_PAIRED_CHROMIUM '+JSON.stringify(compare(off,on)));
+  assert.ok(process.argv.length===4||process.argv.length===5,
+   'usage: node fixed60-pose-paired-report.cjs off.json on.json OR off-a.json off-b.json on.json');
+  const arms=process.argv.slice(2).map(file=>JSON.parse(fs.readFileSync(file,'utf8')));
+  const result=arms.length===3?compareTriple(arms[0],arms[1],arms[2]):compare(arms[0],arms[1]);
+  console.log('NOVA_FIXED60_POSE_PAIRED_CHROMIUM '+JSON.stringify(result));
  }catch(error){console.error(error.stack||error);process.exitCode=1;}
 }
-module.exports={compare};
+module.exports={compare,compareTriple};
