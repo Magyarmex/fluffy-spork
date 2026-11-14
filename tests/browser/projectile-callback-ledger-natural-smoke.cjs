@@ -261,6 +261,7 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
               targetId:e.targetId,otherShotId:e.otherShotId??null,
               source:e.source??null,reason:e.reason??null,timing:e.timing??null,
               contactFraction:e.contactFraction??null,
+              contactSeconds:e.contactSeconds??null,
               preShot:preFrameShots?.get(e.shotId)??null,
               // Battlefield's real Game.update records the monotonic
               // frame-start ID ceiling. A larger ID proves a new birth;
@@ -321,6 +322,11 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
       e.preShot===null||(Number.isFinite(e.preShot.x)&&
       Number.isFinite(e.preShot.y)&&Number.isFinite(e.preShot.ttl))),
       'pre-frame shot evidence must be finite or explicitly absent');
+    assert.ok(result.eventSamples.every(e=>
+      e.contactSeconds===null||(e.kind==='projectileInterception'&&
+        e.source==='battlefield-ttl'&&e.timing==='certified-frame-seconds'&&
+        Number.isFinite(e.contactSeconds)&&e.contactSeconds>0&&e.contactSeconds<=.05)),
+      'only certified mutual-TTL interceptions may carry frame contact seconds');
     assert.ok(result.eventSamples.every(e=>
       e.contactFraction===null||(e.kind==='projectileInterception'&&
         e.source==='sniper'&&e.timing==='normalized-sweep-fraction'&&
