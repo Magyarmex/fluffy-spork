@@ -77,7 +77,8 @@ function auditShotEvidence(events,{truncated=0,preFrameOverflow=0,preFrameShotUn
       // The second projectile is an equal participant, not just metadata
       // on the first projectile's event.
       if(e.preOtherShot&&Number.isFinite(e.preOtherShot.x)&&
-         Number.isFinite(e.preOtherShot.y))pairedInterceptionPresent++;
+         Number.isFinite(e.preOtherShot.y)&&Number.isFinite(e.preOtherShot.ttl))
+        pairedInterceptionPresent++;
       else{pairedInterceptionMissing++;existing.missingPairedStates++;
         peer.missingPreStates++;
         if(e.otherBornThisFrame===true)provenNewbornPeerEvents++;
