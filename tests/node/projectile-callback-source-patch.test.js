@@ -180,6 +180,20 @@ test('retirement observation is fail-open under malformed getters and callbacks'
   }
 });
 
+test('pre-terminal external death is not misclassified as TTL retirement',()=>{
+  const patched=patchMaterializedRetirement(html);
+  const {createProjectileCallbackLedger}=require('../research/projectile-callback-ledger.cjs');
+  const g={bullets:[{id:61,x:0,y:0,vx:0,vy:0,ttl:0.001,r:2,dead:false,
+    shell:false,beam:false}],initBulletIntegrity(b){b.dead=true;},cosmeticRandom(){return 1;},
+    resolveBulletCollisions(){},damageTank(){},damageShape(){},damageDrone(){}};
+  const ledger=createProjectileCallbackLedger(g);ledger.install();g.__novaShotLedger=ledger;
+  compileUpdater(patched).call(g,1/30);
+  assert.equal(g.bullets.length,0);
+  assert.equal(ledger.counters().retiredAttributed,0,
+    'already-dead at terminal check is not evidence of a TTL-caused death');
+  ledger.uninstall();
+});
+
 test('terminal shell retirement is witnessed even if burst marks the shot dead',()=>{
   const patched=patchMaterializedRetirement(html);
   const {createProjectileCallbackLedger}=require('../research/projectile-callback-ledger.cjs');
