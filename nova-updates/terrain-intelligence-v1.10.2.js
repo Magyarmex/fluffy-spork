@@ -56,11 +56,12 @@ function visible(g,ax,ay,bx,by,pad){return !g.hasLineOfSight||g.hasLineOfSight(a
  * or drone radius+5 vs radius. Route geometry must use the body radius; perception
  * keeps its smaller independent margin so observation fairness does not change. */
 function routeVisible(g,ax,ay,bx,by,pad){return !g.hasLineOfSight||g.hasLineOfSight(ax,ay,bx,by,Math.max(2,(pad||8)-5));}
+function routeSafe(g,x,y,pad){return !g.isTerrainSafe||g.isTerrainSafe(x,y,Math.max(2,(pad||8)-5));}
 function seedSide(seed){var n=Math.abs(Number(seed)||0);return (n%2)?1:-1;}
 function segDistanceSq(ax,ay,bx,by,px,py){var dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy;if(l2<1e-8)return d2(ax,ay,px,py);var t=((px-ax)*dx+(py-ay)*dy)/l2;t=clamp(t,0,1);return d2(px,py,ax+dx*t,ay+dy*t);}
 function solidRadius(s){return s.shape==='circle'?(s.r||0):Math.hypot((s.w||0)*.5,(s.h||0)*.5);}
 function solidRouteScore(s,ax,ay,bx,by){return segDistanceSq(ax,ay,bx,by,s.x,s.y)-solidRadius(s)*solidRadius(s)*.65;}
-function addNode(out,g,x,y,pad,solidId){if(out.length>=MAX_NODES||!safe(g,x,y,pad))return;for(var i=0;i<out.length;i++)if(d2(x,y,out[i].x,out[i].y)<18*18)return;out.push({x:x,y:y,solidId:solidId});}
+function addNode(out,g,x,y,pad,solidId){if(out.length>=MAX_NODES||!routeSafe(g,x,y,pad))return;for(var i=0;i<out.length;i++)if(d2(x,y,out[i].x,out[i].y)<18*18)return;out.push({x:x,y:y,solidId:solidId});}
 function obstacleNodes(g,ax,ay,bx,by,pad){
   var terrain=g.__novaTerrain||[],ranked=[],corridor=Math.max(230,Math.min(660,dist(ax,ay,bx,by)*.34+120));
   for(var i=0;i<terrain.length;i++){
@@ -126,7 +127,7 @@ function invalidateRoute(g,seed,pad){if(g&&g.__v1102Routes)delete g.__v1102Route
 function laneOffset(g,x,y,wp,pad,seed){
   if((pad||99)>18||!wp)return wp;var lane=((Math.abs(Number(seed)||0)%3)-1)*Math.min(8,(pad||8)*.48);if(!lane)return wp;
   var dx=wp.x-x,dy=wp.y-y,m=Math.hypot(dx,dy)||1,px=-dy/m,py=dx/m,cx=wp.x+px*lane,cy=wp.y+py*lane;
-  return safe(g,cx,cy,pad)&&routeVisible(g,x,y,cx,cy,pad)?{x:cx,y:cy,solidId:wp.solidId,lane:lane}:wp;
+  return routeSafe(g,cx,cy,pad)&&routeVisible(g,x,y,cx,cy,pad)?{x:cx,y:cy,solidId:wp.solidId,lane:lane}:wp;
 }
 function cachedWaypoint(g,x,y,gx,gy,pad,seed,oldWaypoint){
   pad=Math.max(5,pad||10);var now=g.time||0,key=cacheKey(seed,pad),map=g.__v1102Routes||(g.__v1102Routes=Object.create(null)),c=map[key],goalTol=Math.max(68,pad*4.5);
