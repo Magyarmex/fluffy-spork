@@ -89,6 +89,9 @@ test('malformed observer falls back to unmodified core damage across simulation 
     const base=fixture(html,false,'shape',hz);
     for(const mode of ['malformed','throwing-ledger','throwing-method']){
       const malformed=fixture(patchMaterializedCore(html),mode,'shape',hz);
+      // The installed passive damage observer can still record an unknown-origin
+      // callback even when the explicit shot scope is unavailable. Compare
+      // physical outcomes independently of that legitimate observation.
       assert.deepEqual({...malformed,events:[]},base,mode+' at '+hz+'Hz');
       assert.ok(malformed.events.every(event=>event.shotId===null),
         'unavailable observer must never manufacture projectile attribution');
