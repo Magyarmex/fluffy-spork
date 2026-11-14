@@ -50,7 +50,7 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
         };
         const spawn=Game.prototype.spawnPlayer,spawnAI=Game.prototype.spawnAITank;
         Game.prototype.spawnPlayer=function(){
-          if(this.__novaTerrain)return spawn.apply(this,arguments);
+          if(this.__novaTerrain||this.__novaDecorativeWorld)return spawn.apply(this,arguments);
           const rand=Math.random,now=Date.now;let first=true;
           this.__novaInitRandomRestore=rand;this.__novaInitSpawnCount=0;
           Date.now=()=>0;
@@ -74,7 +74,7 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
       }
       Game.prototype.start=function(){
         if(!this.__novaDecorativeWorld)window.__novaShotResearchGame=this;
-        if(!paired)return start.apply(this,arguments);
+        if(!paired||this.__novaDecorativeWorld)return start.apply(this,arguments);
         this.paused=true;
         const rand=Math.random,now=Date.now;
         Math.random=window.__novaShotSeeded;Date.now=()=>0;
