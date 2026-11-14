@@ -76,7 +76,7 @@ function patchBattlefieldCover(source) {
   if (source.split(target).length !== 2)
     throw new Error('expected one authoritative cover HP write');
   const witness = 'try{var ledger=g.__novaShotLedger;var method=ledger?.recordCoverDamage;' +
-    "if(bullet!=null&&typeof method==='function')method.call(ledger,bullet,s,oldHp,s.hp);" +
+    "if(bullet!=null&&Number.isSafeInteger(bullet.id)&&bullet.id>=0&&typeof method==='function')method.call(ledger,bullet,s,oldHp,s.hp);" +
     '}catch(_){/* research observation must not interrupt cover damage */}';
   return source.replace(target,target+witness);
 }
