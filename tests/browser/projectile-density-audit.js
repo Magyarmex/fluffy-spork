@@ -13,7 +13,8 @@
    projectileCountBuckets:Object.fromEntries(names.map(k=>[k,0])),
    basicEligibleFrames:0,coverBreaks:0,coverBreaksAtThreeToEight:0,
    coverBreaksAboveEight:0,coverBreaksBasicEligible:0,
-   brokenCounterResets:0};
+   brokenCounterResets:0,threeShotPairFrames:0,
+   threeShotWitnessedNonTankFrames:0};
  }
  function broken(g){
   const v=g&&g.__novaBattlefield&&g.__novaBattlefield.coverBroken;
@@ -36,7 +37,37 @@
     Number.isFinite(b.vx)&&Number.isFinite(b.vy)&&
     Number.isFinite(b.r)&&b.r>0&&Number.isFinite(b.dmg)&&b.dmg>0&&
     Number.isFinite(b.ttl)&&b.ttl>dt);
-  return {n,dt,eligible,broken:broken(g)};
+  /* Research-only upper bound for the remote-third-shot candidate.
+   * Two ordinary penetrating shots plus one ordinary nonpenetrating shot
+   * are necessary, not sufficient, for the actual chronology certificate.
+   * Count the rarer non-tank frame witness separately to measure whether
+   * its conservative movement gate makes this feature practically inert. */
+  const pair=n===3&&dt>0&&dt<=.05&&
+   bs.filter(b=>b&&!b.dead&&b.pen===1).length===2&&
+   bs.filter(b=>b&&!b.dead&&b.pen===0).length===1&&
+   bs.every(b=>b&&Number.isFinite(b.x)&&Number.isFinite(b.y)&&
+    Number.isFinite(b.vx)&&Number.isFinite(b.vy)&&
+    Number.isFinite(b.r)&&b.r>0&&Number.isFinite(b.ttl)&&b.ttl>dt);
+  const epoch=g.__novaShapeSweepEpoch;
+  const witness=pair&&g.__novaShapeSweepActive===true&&
+   (g.shapes||[]).every(e=>e&&e.kind==='shape'&&
+    e.__novaShapeSweepEpoch===epoch&&
+    Number.isFinite(e.__novaShapeSweepPrevX)&&
+    Number.isFinite(e.__novaShapeSweepPrevY)&&
+    e.__novaShapeSweepPrevX===e.x&&e.__novaShapeSweepPrevY===e.y&&
+    (e.vx==null||e.vx===0)&&(e.vy==null||e.vy===0))&&
+   (g.drones||[]).every(e=>e&&(!(e.hp>0)||
+    (e.kind==='drone'&&
+    e.__novaChronoDroneEpoch===epoch&&
+    Number.isFinite(e.__novaChronoDronePrevX)&&
+    Number.isFinite(e.__novaChronoDronePrevY)&&
+    e.__novaChronoDronePrevX===e.x&&e.__novaChronoDronePrevY===e.y&&
+    (e.vx==null||e.vx===0)&&(e.vy==null||e.vy===0)&&
+    e.__lvVX==null&&e.__lvVY==null&&
+    e.__novaVX==null&&e.__novaVY==null&&
+    e.__novaIdleVX==null&&e.__novaIdleVY==null&&
+    e.__novaPhase!=='dash'&&!e.__novaCommitted)));
+  return {n,dt,eligible,broken:broken(g),pair,witness};
  }
  function after(a,s,g){
   a.bulletUpdateCalls++;
@@ -45,6 +76,8 @@
   a.peakProjectiles=Math.max(a.peakProjectiles,s.n);
   a.projectileCountBuckets[bucket(s.n)]++;
   if(s.eligible)a.basicEligibleFrames++;
+  if(s.pair)a.threeShotPairFrames++;
+  if(s.witness)a.threeShotWitnessedNonTankFrames++;
   const end=broken(g);
   if(end===null||s.broken===null)return;
   if(end<s.broken){a.brokenCounterResets++;return;}

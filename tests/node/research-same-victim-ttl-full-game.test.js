@@ -271,3 +271,500 @@ for(const hz of [60,120])for(const reverse of [false,true])
   assert.equal(result.target.alive,true);
   assert.deepEqual(result.kills,[]);
  });
+
+
+/* #234 follow-up, deliberately RED acceptance experiment:
+ * A spatially remote third round must not change the physical chronology of
+ * two ordinary rounds hitting the same stationary hull in one frame.
+ * Current two-shot live-order certificate abstains when bullets.length !== 2.
+ * Do not merge this research gate until the real composed Game passes. */
+for(const hz of [60,120])
+ for(const reverse of [false,true])
+ for(const fullUpdate of [false,true])
+ test('RESEARCH three-shot remote-fire shared-hull chronology '+hz+
+      'Hz reverse='+reverse+' fullUpdate='+fullUpdate,()=>{
+  const result=trial(hz,reverse,fullUpdate,null,40,(_g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   bullets.push({
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   });
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[101,102],
+   'remote nonintersecting fire must not reverse the two physical hull contacts');
+  assert.equal(result.target.alive,false);
+  assert.deepEqual(result.kills,[102]);
+  assert.equal(result.ownerStats[1].kills,1);
+  assert.ok(result.ownerStats[1].xp>0);
+ });
+
+
+/* Fail-closed safety: a malformed third-party body radius cannot be
+ * interpreted as zero clearance when certifying a remote third projectile.
+ * Preserve ordinary core enumeration instead of granting a chronology proof
+ * based on invalid geometry. This does not claim correct chronology when
+ * the witness is malformed; it protects against a false certificate. */
+for(const hz of [60,120])
+ test('RESEARCH three-shot abstains on invalid body radius '+hz+'Hz',()=>{
+  const result=trial(hz,false,false,null,40,(g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   bullets.push({
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   });
+   g.shapes.push({kind:'shape',id:1300,x:1700,y:1700,r:-5,
+    hp:100,maxHp:100,alive:true,dead:false,vx:0,vy:0});
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
+   'invalid body geometry must abstain rather than certify a reorder');
+ });
+
+
+/* A present-but-nonfinite velocity must never become a zero-speed
+ * clearance witness. NaN is falsy in JS, so e.vx||0 is unsafe here.
+ * This asserts conservative abstention, not correctness of malformed
+ * world-state physics. */
+for(const hz of [60,120])
+ test('RESEARCH three-shot abstains on nonfinite body velocity '+hz+'Hz',()=>{
+  const result=trial(hz,false,false,null,40,(g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   bullets.push({
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   });
+   g.shapes.push({kind:'shape',id:1300,x:1700,y:1700,r:5,
+    hp:100,maxHp:100,alive:true,dead:false,vx:NaN,vy:0});
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
+   'nonfinite velocity must prevent a speculative chronological reorder');
+ });
+
+
+/* An explicit invalid tank radius must not be replaced by the class
+ * fallback through the falsy OR operator. A genuinely missing tank
+ * radius may still use the canonical class size. */
+for(const hz of [60,120])
+ test('RESEARCH three-shot abstains on explicit zero tank radius '+hz+'Hz',()=>{
+  const result=trial(hz,false,false,null,40,(_g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;p.r=0;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   bullets.push({
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   });
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
+   'explicit zero radius must not be promoted to a valid clearance witness');
+ });
+
+/* The damage callback may spawn unrelated fire while the core iterates.
+ * A newborn must not be promoted into the pre-frame three-shot proof, and
+ * restoring the original pair's identity order must not overwrite it. */
+for(const hz of [60,120])
+ for(const reverse of [false,true])
+ test('RESEARCH two-shot callback birth preserves owner and newborn '+hz+
+      'Hz reverse='+reverse,()=>{
+  const result=trial(hz,reverse,false,null,40,(g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   const oldDamage=g.damageTank;
+   let born=false;
+   g.damageTank=function(){
+    if(!born){
+     born=true;
+     this.bullets.push({
+      kind:'bullet',id:this.nextId++,ownerId:103,x:1500,y:1500,
+      vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+      shell:false,beam:false,color:'#fff'
+     });
+    }
+    return oldDamage.apply(this,arguments);
+   };
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[101,102],
+   'callback-born remote fire cannot change certified physical hit order');
+  assert.deepEqual(result.kills,[102]);
+  assert.equal(result.ownerStats[1].kills,1);
+  assert.ok(result.remaining.some(id=>id>=1200),
+   'newborn projectile identity must survive callback array churn');
+ });
+
+
+/* A malformed remote projectile cannot be certified merely because NaN
+ * becomes zero through a falsy default in the legacy engine. */
+for(const field of ['hits','knock'])
+ for(const hz of [60,120])
+ test('RESEARCH three-shot abstains on nonfinite remote '+field+' '+hz+'Hz',()=>{
+  const result=trial(hz,false,false,null,40,(_g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   const remote={
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   };
+   remote[field]=NaN;
+   bullets.push(remote);
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
+   'malformed remote projectile must not certify chronological reordering');
+ });
+
+
+/* The core still regards an alive tank as a collision body even if its
+ * hp/dead bookkeeping is contradictory. Never skip such a hull while
+ * certifying that the unrelated third projectile has no side effects. */
+for(const state of ['zero-hp','dead-flag','nan-hp'])
+ test('RESEARCH three-shot abstains on contradictory tank '+state,()=>{
+  const result=trial(60,false,false,null,40,(g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   bullets.push({
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   });
+   const t={kind:'tank',id:1300,cls:'scout',x:1700,y:1700,
+    hp:100,maxHp:100,alive:true,dead:false,vx:0,vy:0};
+   if(state==='zero-hp')t.hp=0;
+   if(state==='dead-flag')t.dead=true;
+   if(state==='nan-hp')t.hp=NaN;
+   g.tanks.push(t);
+  },Math.ceil(.42*60)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
+   'contradictory live tank must veto speculative chronology');
+ });
+
+
+/* Shape and drone core contact predicates differ from tank predicates.
+ * Contradictory bookkeeping must not hide a still-collidable body. */
+for(const kind of ['shape-zero-hp','drone-dead-flag'])
+ test('RESEARCH three-shot abstains on contradictory '+kind,()=>{
+  const result=trial(60,false,false,null,40,(g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   bullets.push({
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   });
+   if(kind==='shape-zero-hp')
+    g.shapes.push({kind:'shape',id:1300,x:1700,y:1700,r:12,
+     hp:0,alive:true,dead:false,vx:0,vy:0});
+   else
+    g.drones.push({kind:'drone',id:1300,ownerId:999,x:1700,y:1700,
+     r:8,hp:100,alive:true,dead:true,vx:0,vy:0});
+  },Math.ceil(.42*60)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
+   'contradictory body state must veto speculative chronology');
+ });
+
+
+/* Core tank and drone contact radii include class-specific padding.
+ * The third-shot exclusion must use those same physical hull bounds,
+ * not an optional undersized visual radius. */
+for(const kind of ['tank','drone'])
+ test('RESEARCH three-shot clearance uses core '+kind+' radius',()=>{
+  const result=trial(60,false,false,null,40,(g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   bullets.push({
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   });
+   if(kind==='tank')
+    g.tanks.push({kind:'tank',id:1300,cls:'scout',x:1615,y:1500,
+     r:1,hp:100,alive:true,dead:false,vx:0,vy:0});
+   else
+    g.drones.push({kind:'drone',id:1300,ownerId:999,x:1610,y:1500,
+     r:1,hp:100,alive:true,dead:false,vx:0,vy:0});
+  },Math.ceil(.42*60)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
+   'core collision padding must veto an under-bounded clearance proof');
+ });
+
+
+/* Adversarial Live Vector witness: the drone controller can integrate
+ * __lvVX independently of vx. A remote round must not be certified
+ * interaction-free using only vx=0 and a generic 96-unit allowance.
+ * This is deliberately a RED research gate until the movement proof
+ * accounts for controller-driven motion or conservatively abstains. */
+for(const channel of ['__lvVX','__novaVX','__novaIdleVX'])
+ for(const hz of [60,120])
+ test('RESEARCH three-shot abstains on unwitnessed drone '+channel+' '+hz+'Hz',()=>{
+  const result=trial(hz,false,false,null,40,(g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   bullets.push({
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   });
+   g.drones.push({kind:'drone',id:1300,ownerId:999,
+    x:1700,y:1500,r:8,hp:100,alive:true,dead:false,
+    vx:0,vy:0,[channel]:-12000});
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
+   'unwitnessed Live Vector movement must veto speculative reordering');
+ });
+
+
+/* A Phase Shift relocates without traversing the intervening chord and
+ * resets ordinary sweep coordinates. Its explicit same-frame marker must
+ * veto the third-shot side-effect certificate. */
+for(const hz of [60,120])
+ test('RESEARCH three-shot abstains after Phase Shift '+hz+'Hz',()=>{
+  const result=trial(hz,false,false,null,40,(g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   bullets.push({
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   });
+   g.tanks.push({kind:'tank',id:1300,cls:'scout',x:1700,y:1700,
+    hp:100,maxHp:100,alive:true,vx:0,vy:0,
+    __novaSweepMoveTime:g.time,__novaSweepPrevX:1700,
+    __novaSweepPrevY:1700});
+   const phased=g.tanks[g.tanks.length-1];
+   const priorUpdate=g.updateBullets;
+   g.updateBullets=function(dt){
+    // Emulate the real Phase Shift marker being stamped in this frame.
+    phased.__novaPhaseShiftEpoch=this.time;
+    return priorUpdate.call(this,dt);
+   };
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
+   'same-frame Phase Shift marker must veto remote-shot clearance');
+ });
+
+/* A moving shape can cross the remote shot's path during this frame.
+ * Velocity times dt plus a guessed margin is not proof of its swept
+ * trajectory; the research certificate must abstain on moving bodies. */
+for(const hz of [60,120])
+ test('RESEARCH three-shot abstains on moving remote shape '+hz+'Hz',()=>{
+  const result=trial(hz,false,false,null,40,(g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   bullets.push({
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   });
+   g.shapes.push({kind:'shape',id:1300,x:1700,y:1700,r:12,
+    hp:100,maxHp:100,alive:true,dead:false,vx:-20,vy:0});
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
+   'moving shape without a verified corridor must veto the reorder');
+ });
+
+/* A remote projectile with malformed damage or lifetime must not authorize
+ * chronological reordering of the two unrelated local hull contacts.
+ * These are abstention tests, not claims about malformed projectile physics. */
+for(const field of ['dmg','ttl'])
+ for(const value of [NaN,Infinity,-Infinity,0])
+ test('RESEARCH three-shot abstains on malformed remote '+field+'='+value,()=>{
+  const result=trial(60,false,false,null,40,(_g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   const remote={
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   };
+   remote[field]=value;
+   bullets.push(remote);
+  },Math.ceil(.42*60)+3);
+  /* A zero/negative-infinite TTL remote is removed by the core before
+   * the local pair's contact frame. The remaining valid TWO-shot path
+   * may then correctly restore chronological [101,102] order. */
+  const remoteExpired=field==='ttl'&&(value===0||value===-Infinity);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),
+   remoteExpired?[101,102]:[102,101],
+   'malformed remote must abstain while present; a removed remote must not disable the valid two-shot correction');
+ });
+
+/* Current vx=0 does not establish a stationary tank. The existing
+ * same-frame sweep origin is stronger evidence of actual displacement.
+ * Preserve the core's original order rather than certify an unrelated
+ * projectile harmless on the basis of a zero terminal velocity. */
+for(const hz of [60,120])
+ test('RESEARCH three-shot abstains on zero-velocity displaced tank '+hz+'Hz',()=>{
+  const result=trial(hz,false,false,null,40,(g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   bullets.push({
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   });
+   g.tanks.push({kind:'tank',id:1300,cls:'scout',x:1700,y:1700,
+    hp:100,maxHp:100,alive:true,dead:false,vx:0,vy:0,
+    __novaSweepMoveTime:g.time,__novaSweepPrevX:1600,
+    __novaSweepPrevY:1700});
+   const displaced=g.tanks[g.tanks.length-1];
+   const priorUpdate=g.updateBullets;
+   g.updateBullets=function(dt){
+    displaced.__novaSweepMoveTime=this.time;
+    return priorUpdate.call(this,dt);
+   };
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
+   'witnessed tank displacement must veto zero-velocity clearance');
+ });
+
+/* A shape can have zero terminal velocity after its neutral-instinct
+ * movement. The frame sweep origin must veto a speculative remote-shot
+ * exclusion even when ordinary velocity fields are both zero. */
+for(const hz of [60,120])
+ test('RESEARCH three-shot abstains on zero-velocity swept shape '+hz+'Hz',()=>{
+  const result=trial(hz,false,true,null,40,(g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   bullets.push({
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   });
+   const shape={kind:'shape',id:1300,x:1700,y:1700,r:12,
+    hp:100,maxHp:100,alive:true,dead:false,vx:0,vy:0};
+   g.shapes.push(shape);
+   const priorUpdate=g.updateBullets;
+   g.updateBullets=function(dt){
+    shape.__novaShapeSweepEpoch=this.__novaShapeSweepEpoch;
+    /* A 1505,1500 start overlaps the remote bullet's real path;
+     * the 1700,1700 endpoint is >96 units away with vx=vy=0. */
+    shape.__novaShapeSweepPrevX=1505;
+    shape.__novaShapeSweepPrevY=1500;
+    return priorUpdate.call(this,dt);
+   };
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
+   'witnessed shape displacement must veto zero-velocity clearance');
+ });
+
+/* The core visits bullets from the end of its array. If the remote
+ * projectile occupies the middle slot, it executes between the two local
+ * damage callbacks; either callback may spawn bodies or alter cover.
+ * Initial spatial clearance cannot prove callback independence. */
+for(const hz of [60,120])
+ test('RESEARCH three-shot abstains on interleaved remote callback slot '+hz+'Hz',()=>{
+  const result=trial(hz,false,false,null,40,(_g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   bullets.push({
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   });
+   bullets.splice(1,0,bullets.pop()); // [local 101, remote, local 102]
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
+   'interleaved remote projectile must preserve ordinary core callback order');
+ });
+
+/* Full update snapshots pre-existing shapes/drones at the frame boundary.
+ * A body without that same-frame witness could have been born during
+ * movement or a callback; its endpoint is not a certified swept corridor. */
+for(const kind of ['shape','drone'])
+ for(const hz of [60,120])
+ test('RESEARCH three-shot abstains on missing '+kind+' frame witness '+hz+'Hz',()=>{
+  const result=trial(hz,false,true,null,40,(g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   bullets.push({
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   });
+   const body=kind==='shape'?
+    {kind:'shape',id:1300,x:1700,y:1700,r:12,
+     hp:100,maxHp:100,alive:true,dead:false,vx:0,vy:0}:
+    {kind:'drone',id:1300,ownerId:999,x:1700,y:1700,r:8,
+     hp:100,alive:true,dead:false,vx:0,vy:0};
+   const priorUpdate=g.updateBullets;
+   g.updateBullets=function(dt){
+    // Spawn after Game.update captured frame-start poses, then remove
+    // after this bullet pass to keep the adversarial fixture isolated.
+    const collection=kind==='shape'?this.shapes:this.drones;
+    collection.push(body);
+    try{return priorUpdate.call(this,dt);}
+    finally{const index=collection.indexOf(body);
+     if(index>=0)collection.splice(index,1);}
+   };
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
+   'missing frame-start body witness must veto remote-shot certificate');
+ });
+
+
+/* A body with zero terminal velocity is not proof of no movement when the
+ * composed Game's frame-start sweep was never activated. An absent witness
+ * must veto the remote third-shot ordering certificate, even if the body's
+ * endpoint is far outside the guessed 96-unit clearance margin. */
+for(const kind of ['shape','drone'])
+ for(const hz of [60,120])
+ test('RESEARCH three-shot abstains on inactive '+kind+' sweep '+hz+'Hz',()=>{
+  const result=trial(hz,false,false,null,40,(g,p,bullets)=>{
+   p.hp=45;p.maxHp=45;p.regenDelay=999;
+   bullets[0].x=20-540*.411;bullets[0].vx=540;bullets[0].ttl=.42;
+   bullets[1].x=60+540*.415;bullets[1].vx=-540;
+   bullets[1].ttl=.42;bullets[1].dmg=30;
+   bullets.push({
+    kind:'bullet',id:1100,ownerId:103,x:1500,y:1500,
+    vx:540,vy:0,r:3,dmg:5,ttl:1,pen:0,hits:0,dead:false,
+    shell:false,beam:false,color:'#fff'
+   });
+   g.__novaShapeSweepActive=false;
+   if(kind==='shape')
+    g.shapes.push({kind:'shape',id:1300,x:1700,y:1700,r:12,
+     hp:100,maxHp:100,alive:true,dead:false,vx:0,vy:0});
+   else
+    g.drones.push({kind:'drone',id:1300,ownerId:999,x:1700,y:1700,
+     r:8,hp:100,alive:true,dead:false,vx:0,vy:0});
+  },Math.ceil(.42*hz)+3);
+  assert.deepEqual(result.contacts.map(c=>c.ownerId),[102,101],
+   'inactive sweep must not certify a remote projectile harmless');
+ });
