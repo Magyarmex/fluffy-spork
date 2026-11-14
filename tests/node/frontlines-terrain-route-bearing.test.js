@@ -19,13 +19,13 @@ function scene(){
 }
 test('remembered public BLOOM follows a terrain waypoint instead of steering through cover',()=>{
  const {T,t,g}=scene();
- const calls=[];g.hasLineOfSight=()=>false;
+ const calls=[],losPads=[];g.hasLineOfSight=(x,y,tx,ty,pad)=>{losPads.push(pad);return false;};
  g.novaBattlefieldWaypoint=(x,y,tx,ty,r,id)=>{calls.push({x,y,tx,ty,r,id});return{x:t.x+60,y:t.y-120};};
  const b=T.publicEcoBias(g,t,{},{});
  assert.equal(b.mode,'memory');assert.ok(b.weight>.04);
  assert.ok(b.x>0&&b.y<0,'the first reachable approach is southeast-to-north, not directly toward the blocked pocket');
  assert.equal(calls.length,1,'one canonical route lookup per opportunity, not an extra global scan');
- assert.equal(calls[0].id,t.id);
+ assert.equal(calls[0].id,t.id);assert.equal(losPads[0],18);assert.equal(calls[0].r,23);
 });
 test('live public BLOOM also respects the terrain waypoint',()=>{
  const {T,t,st,g}=scene();t.x=-1130; // genuinely outside sector 5; arrival handoff must not cancel approach

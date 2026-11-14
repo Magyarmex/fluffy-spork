@@ -158,3 +158,30 @@ test('canonical Quake AI breach fire uses its intended structural impact multipl
    'Quake breach fire must receive the same canonical structural specialization as its design');
  assert.equal(t.ai.targetId,7,'breaching must not expose hidden target coordinates');
 });
+
+test('AI tank movement delegates to the composed waypoint owner',()=>{
+  const {Game}=loadCombinedArms(),g=new Game(),t=tank(7,'twin',{x:-200,y:0,ai:{}});
+  g.block={id:-1,shape:'rect',x:0,y:0,w:80,h:120,destructible:false};
+  let calls=0,args=null,probePads=[];
+  g.firstTerrainHit=(x,y,ax,ay,pad)=>{probePads.push(pad);return{solid:g.block,hit:{x:0,y:0,nx:-1,ny:0,t:.5}};};
+  g.novaBattlefieldWaypoint=(...a)=>{calls++;args=a;return{x:-150,y:100};};
+  g.moveTank(t,100,0,.016);
+  assert.equal(calls,1,'Terrain Intelligence must be able to replace the one-corner waypoint owner');
+  assert.equal(probePads[0],17,'movement probes must use the twin tank body radius');
+  assert.equal(args[4],22,'twin movement keeps the radius-plus-five route margin');
+  assert.equal(args[5],t.id);
+});
+
+test('active Controller drones delegate route choice and test their physical radius',()=>{
+  const {Game}=loadCombinedArms(),g=new Game(),owner=tank(1,'carrier',{__novaSwarm:{active:true,nodeX:220,nodeY:0}});
+  const d={id:9,ownerId:owner.id,x:-100,y:0,r:8,hp:20,__novaTarget:{x:220,y:0},__novaVX:0,__novaVY:0};
+  g.tanks=[owner];g.drones=[d];g.block={id:-1,shape:'rect',x:0,y:0,w:80,h:120,destructible:false};
+  const pads=[];g.hasLineOfSight=(ax,ay,bx,by,pad)=>{pads.push(pad);return false;};
+  let calls=0,args=null;
+  g.novaBattlefieldWaypoint=(...a)=>{calls++;args=a;return{x:-40,y:100};};
+  g.updateDrones(.1);
+  assert.equal(calls,1,'active drone movement must use the composed route owner');
+  assert.equal(pads[0],8,'drone visibility must use its actual body radius');
+  assert.equal(args[4],13,'drone route pad is radius plus the five-unit safety margin');
+  assert.equal(args[5],d.id);
+});

@@ -27,7 +27,7 @@
   if(typeof g.hasLineOfSight==='function'&&
      !g.hasLineOfSight(p.x,p.y,center.x,center.y,18)&&
      typeof g.novaBattlefieldWaypoint==='function'){
-   const wp=g.novaBattlefieldWaypoint(p.x,p.y,center.x,center.y,18,p.id);
+   const wp=g.novaBattlefieldWaypoint(p.x,p.y,center.x,center.y,23,p.id);
    if(!wp||!Number.isFinite(wp.x)||!Number.isFinite(wp.y))return null;
    if(Math.hypot(wp.x-p.x,wp.y-p.y)>4)target=wp;
   }

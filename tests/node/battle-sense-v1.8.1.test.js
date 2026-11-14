@@ -1,6 +1,6 @@
 const test=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 function load(){
- const CLASSES={marksman:{bullet:{reload:1}},cannon:{bullet:{reload:.95}},twin:{bullet:{reload:.26}},guard:{bullet:{reload:.5}}};
+ const CLASSES={marksman:{bullet:{reload:1}},cannon:{bullet:{reload:.95}},twin:{bullet:{reload:.26}},guard:{size:18,bullet:{reload:.5}}};
  const classes={CLASSES,lineageForClass:id=>id==='marksman'?'sniper':id==='cannon'?'cannon':id==='guard'?'guardian':'gunner'};
  function Game(){this.time=10;this.tanks=[];this.bullets=[];this.powerups=[];this.status='playing';this.applied=[];this.los=true;}
  Game.prototype.tryFire=function(t){this.bullets.push({ownerId:t.id,x:t.x,y:t.y,vx:400,vy:0});};Game.prototype.updatePowerups=function(){};Game.prototype.applyPowerup=function(t,type){this.applied.push([t.id,type]);};Game.prototype.moveTank=function(){};Game.prototype.hasLineOfSight=function(){return this.los;};Game.prototype.getTank=function(id){return this.tanks.find(t=>t.id===id)||null;};
@@ -48,3 +48,13 @@ test('safer-side dodge is vetoed when its lower-risk candidate is inside solid t
 test('terrain safety does not alter a projectile-driven sidestep when the selected lane is traversable',()=>{const {c,Game}=load(),g=new Game(),h=c.window.__NOVA_BATTLE_SENSE_TEST__,bot=T(7,'guard',0,0);g.bullets=[{ownerId:9,x:110,y:-40,vx:0,vy:-600}];g.isTerrainSafe=()=>true;assert.equal(h.saferSide(g,bot,1,0),1);});
 test('resource race accounts for a real local terrain detour on the evaluating tank path',()=>{const {c,Game}=load(),g=new Game(),h=c.window.__NOVA_BATTLE_SENSE_TEST__,bot=T(1,'guard',0,0),rival=T(2,'twin',180,0),pickup={id:4,type:'shield',x:300,y:0};g.tanks=[bot,rival];g.hasLineOfSight=(ax,ay,bx,by)=>!(ax===0&&ay===0&&bx===300&&by===0);g.novaBattlefieldWaypoint=(x,y,gx,gy)=>x===0&&y===0&&gx===300&&gy===0?{x:0,y:240}:null;const direct=h.resourceContest(g,bot,pickup,300),routedDist=h.routeDistance(g,bot,pickup,300),routed=h.resourceContest(g,bot,pickup,routedDist);assert.ok(routedDist>600,`expected meaningful detour distance, got ${routedDist}`);assert.ok(routed>direct+.15,`terrain detour should make a clear-path rival more threatening: ${direct} -> ${routed}`);});
 test('route-aware contest estimation preserves straight-line behavior when the pickup path is clear',()=>{const {c,Game}=load(),g=new Game(),h=c.window.__NOVA_BATTLE_SENSE_TEST__,bot=T(1,'guard',0,0),pickup={id:4,type:'shield',x:300,y:0};let calls=0;g.novaBattlefieldWaypoint=()=>{calls++;return{x:0,y:500};};assert.equal(h.routeDistance(g,bot,pickup,300),300);assert.equal(calls,0,'clear pickup paths should not invoke terrain routing');});
+
+test('resource route estimates use the class collision radius and route margin',()=>{
+  const {c,Game,classes}=load(),g=new Game(),bot=T(1,'guard',0,0),pickup={x:300,y:0};
+  const losPads=[],routePads=[];
+  g.hasLineOfSight=(ax,ay,bx,by,pad)=>{losPads.push(pad);return false;};
+  g.novaBattlefieldWaypoint=(x,y,gx,gy,pad,id)=>{routePads.push({pad,id});return{x:0,y:240};};
+  c.window.__NOVA_BATTLE_SENSE_TEST__.routeDistance(g,bot,pickup,300,classes);
+  assert.deepEqual(losPads,[classes.CLASSES.guard.size+3]);
+  assert.deepEqual(routePads,[{pad:classes.CLASSES.guard.size+8,id:bot.id}]);
+});

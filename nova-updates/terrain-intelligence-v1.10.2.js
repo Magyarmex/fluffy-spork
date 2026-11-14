@@ -52,11 +52,16 @@ function isController(t){return !!(t&&CONTROLLER_IDS[t.cls]);}
 function lineage(classes,t){try{return t?classes.lineageForClass(t.cls):null;}catch(_){return null;}}
 function safe(g,x,y,pad){return !g.isTerrainSafe||g.isTerrainSafe(x,y,Math.max(3,(pad||8)*.72));}
 function visible(g,ax,ay,bx,by,pad){return !g.hasLineOfSight||g.hasLineOfSight(ax,ay,bx,by,Math.max(2,(pad||8)*.34));}
+/* Movement callers pass collision radius plus five units: tank size+8 vs size+3,
+ * or drone radius+5 vs radius. Route geometry must use the body radius; perception
+ * keeps its smaller independent margin so observation fairness does not change. */
+function routeVisible(g,ax,ay,bx,by,pad){return !g.hasLineOfSight||g.hasLineOfSight(ax,ay,bx,by,Math.max(2,(pad||8)-5));}
+function routeSafe(g,x,y,pad){return !g.isTerrainSafe||g.isTerrainSafe(x,y,Math.max(3,(pad||8)*.72,(pad||8)-5));}
 function seedSide(seed){var n=Math.abs(Number(seed)||0);return (n%2)?1:-1;}
 function segDistanceSq(ax,ay,bx,by,px,py){var dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy;if(l2<1e-8)return d2(ax,ay,px,py);var t=((px-ax)*dx+(py-ay)*dy)/l2;t=clamp(t,0,1);return d2(px,py,ax+dx*t,ay+dy*t);}
 function solidRadius(s){return s.shape==='circle'?(s.r||0):Math.hypot((s.w||0)*.5,(s.h||0)*.5);}
 function solidRouteScore(s,ax,ay,bx,by){return segDistanceSq(ax,ay,bx,by,s.x,s.y)-solidRadius(s)*solidRadius(s)*.65;}
-function addNode(out,g,x,y,pad,solidId){if(out.length>=MAX_NODES||!safe(g,x,y,pad))return;for(var i=0;i<out.length;i++)if(d2(x,y,out[i].x,out[i].y)<18*18)return;out.push({x:x,y:y,solidId:solidId});}
+function addNode(out,g,x,y,pad,solidId){if(out.length>=MAX_NODES||!routeSafe(g,x,y,pad))return;for(var i=0;i<out.length;i++)if(d2(x,y,out[i].x,out[i].y)<18*18)return;out.push({x:x,y:y,solidId:solidId});}
 function obstacleNodes(g,ax,ay,bx,by,pad){
   var terrain=g.__novaTerrain||[],ranked=[],corridor=Math.max(230,Math.min(660,dist(ax,ay,bx,by)*.34+120));
   for(var i=0;i<terrain.length;i++){
@@ -90,7 +95,7 @@ function tacticalFactor(g,node,ctx,pad){
   return .94+Math.min(.05,err*.04);
 }
 function planVisibilityRoute(g,ax,ay,bx,by,pad,seed,ctx){
-  pad=Math.max(5,pad||10);if(visible(g,ax,ay,bx,by,pad))return [];
+  pad=Math.max(5,pad||10);if(routeVisible(g,ax,ay,bx,by,pad))return [];
   var mids=obstacleNodes(g,ax,ay,bx,by,pad),nodes=[{x:ax,y:ay,start:true},{x:bx,y:by,goal:true}];
   for(var i=0;i<mids.length&&nodes.length<MAX_NODES;i++)nodes.push(mids[i]);
   var n=nodes.length,gScore=new Array(n),fScore=new Array(n),came=new Array(n),open=[],closed=new Array(n),side=seedSide(seed),dx=bx-ax,dy=by-ay;
@@ -105,7 +110,7 @@ function planVisibilityRoute(g,ax,ay,bx,by,pad,seed,ctx){
       if(j===cur||closed[j])continue;var nn=nodes[j];
       var edge=dist(cn.x,cn.y,nn.x,nn.y);if(edge<8)continue;
       if(cur!==0&&j!==1&&edge>760)continue;
-      checks++;if(!visible(g,cn.x,cn.y,nn.x,nn.y,pad))continue;
+      checks++;if(!routeVisible(g,cn.x,cn.y,nn.x,nn.y,pad))continue;
       var cross=dx*(nn.y-ay)-dy*(nn.x-ax),tie=(cross===0?0:(cross>0?1:-1)===side?-2.5:2.5);
       var cost=edge*tacticalFactor(g,nn,ctx,pad)+tie,ng=gScore[cur]+Math.max(1,cost);
       if(ng+1e-6<gScore[j]){gScore[j]=ng;came[j]=cur;fScore[j]=ng+dist(nn.x,nn.y,bx,by)*.91;if(open.indexOf(j)<0)open.push(j);}
@@ -114,7 +119,7 @@ function planVisibilityRoute(g,ax,ay,bx,by,pad,seed,ctx){
   if(came[1]<0)return null;
   var rev=[],at=1,guard=0;while(at>0&&guard++<n+2){rev.push(nodes[at]);at=came[at];if(at<0)return null;}rev.reverse();
   var pulled=[],cx=ax,cy=ay,index=0;
-  while(index<rev.length){var best=index;for(var k=rev.length-1;k>index;k--){if(visible(g,cx,cy,rev[k].x,rev[k].y,pad)){best=k;break;}}var p=rev[best];pulled.push({x:p.x,y:p.y,solidId:p.solidId});cx=p.x;cy=p.y;index=best+1;}
+  while(index<rev.length){var best=index;for(var k=rev.length-1;k>index;k--){if(routeVisible(g,cx,cy,rev[k].x,rev[k].y,pad)){best=k;break;}}var p=rev[best];pulled.push({x:p.x,y:p.y,solidId:p.solidId});cx=p.x;cy=p.y;index=best+1;}
   return pulled;
 }
 function cacheKey(seed,pad){return String(seed==null?'x':seed)+':'+Math.round((pad||8)/4);}
@@ -122,7 +127,7 @@ function invalidateRoute(g,seed,pad){if(g&&g.__v1102Routes)delete g.__v1102Route
 function laneOffset(g,x,y,wp,pad,seed){
   if((pad||99)>18||!wp)return wp;var lane=((Math.abs(Number(seed)||0)%3)-1)*Math.min(8,(pad||8)*.48);if(!lane)return wp;
   var dx=wp.x-x,dy=wp.y-y,m=Math.hypot(dx,dy)||1,px=-dy/m,py=dx/m,cx=wp.x+px*lane,cy=wp.y+py*lane;
-  return safe(g,cx,cy,pad)&&visible(g,x,y,cx,cy,pad)?{x:cx,y:cy,solidId:wp.solidId,lane:lane}:wp;
+  return routeSafe(g,cx,cy,pad)&&routeVisible(g,x,y,cx,cy,pad)?{x:cx,y:cy,solidId:wp.solidId,lane:lane}:wp;
 }
 function cachedWaypoint(g,x,y,gx,gy,pad,seed,oldWaypoint){
   pad=Math.max(5,pad||10);var now=g.time||0,key=cacheKey(seed,pad),map=g.__v1102Routes||(g.__v1102Routes=Object.create(null)),c=map[key],goalTol=Math.max(68,pad*4.5);
@@ -133,14 +138,14 @@ function cachedWaypoint(g,x,y,gx,gy,pad,seed,oldWaypoint){
     else{
       if(now>=(c.validateAt||0)){
         c.validateAt=now+.11;
-        for(var k=c.points.length-1;k>c.index;k--){if(visible(g,x,y,c.points[k].x,c.points[k].y,pad)){c.index=k;break;}}
-        if(!visible(g,x,y,c.points[c.index].x,c.points[c.index].y,pad)){delete map[key];c=null;}
+        for(var k=c.points.length-1;k>c.index;k--){if(routeVisible(g,x,y,c.points[k].x,c.points[k].y,pad)){c.index=k;break;}}
+        if(!routeVisible(g,x,y,c.points[c.index].x,c.points[c.index].y,pad)){delete map[key];c=null;}
       }
       if(c){window.__NOVA_TERRAIN_INTELLIGENCE__.cacheHits++;return laneOffset(g,x,y,c.points[c.index],pad,seed);}
     }
   }
   var cheap=oldWaypoint?oldWaypoint.call(g,x,y,gx,gy,pad,seed):null;
-  if(cheap&&visible(g,cheap.x,cheap.y,gx,gy,pad))return cheap;
+  if(cheap&&routeVisible(g,cheap.x,cheap.y,gx,gy,pad))return cheap;
   var ctx=g.__v1102RouteContext||null,route=planVisibilityRoute(g,x,y,gx,gy,pad,seed,ctx);
   if(route&&route.length){c=map[key]={gx:gx,gy:gy,points:route,index:0,until:now+((pad<=18)?ROUTE_TTL_DRONE:ROUTE_TTL_TANK),validateAt:now+.11};window.__NOVA_TERRAIN_INTELLIGENCE__.plans++;return laneOffset(g,x,y,route[0],pad,seed);}
   return cheap;
@@ -168,7 +173,7 @@ function sampleStuck(g,obj,vx,vy,pad,seed,state){
   var now=g.time||0,sp=Math.hypot(vx||0,vy||0);state=state||(obj.__v1102Nav||(obj.__v1102Nav={}));if(sp<16){state.sampleAt=now;state.x=obj.x;state.y=obj.y;state.stuck=Math.max(0,(state.stuck||0)-1);return state;}
   if(state.sampleAt==null){state.sampleAt=now;state.x=obj.x;state.y=obj.y;return state;}
   var elapsed=now-state.sampleAt;if(elapsed<.30)return state;
-  var moved=dist(state.x,state.y,obj.x,obj.y),wanted=sp*elapsed,ux=vx/sp,uy=vy/sp,hit=g.firstTerrainHit?g.firstTerrainHit(obj.x,obj.y,obj.x+ux*Math.max(70,pad*3),obj.y+uy*Math.max(70,pad*3),pad*.58):null;
+  var moved=dist(state.x,state.y,obj.x,obj.y),wanted=sp*elapsed,ux=vx/sp,uy=vy/sp,hit=g.firstTerrainHit?g.firstTerrainHit(obj.x,obj.y,obj.x+ux*Math.max(70,pad*3),obj.y+uy*Math.max(70,pad*3),Math.max(2,pad-5)):null;
   if(moved<Math.max(3.5,wanted*.11)&&(hit||obj.__v172Routing))state.stuck=(state.stuck||0)+1;else state.stuck=Math.max(0,(state.stuck||0)-1);
   state.sampleAt=now;state.x=obj.x;state.y=obj.y;
   if(state.stuck>=2&&now>=(state.escapeCooldown||0)){
@@ -205,7 +210,7 @@ function idleControllerGoal(d){
 }
 function blockedDroneStep(g,ax,ay,bx,by,pad){
   if(!safe(g,bx,by,pad))return true;
-  if(g.firstTerrainHit&&g.firstTerrainHit(ax,ay,bx,by,Math.max(3,(pad||8)*.58)))return true;
+  if(g.firstTerrainHit&&g.firstTerrainHit(ax,ay,bx,by,Math.max(2,(pad||8)-5)))return true;
   return false;
 }
 function idleRouteStep(g,pre,goal,step,pad,seed){
@@ -275,7 +280,7 @@ wrap('game/engine',function(engine,require){
         var e=applyEscape(st,intent.x,intent.y);if(d.__novaSpotter){d.__novaScoutVX=e.x;d.__novaScoutVY=e.y;}else{d.__novaVX=e.x;d.__novaVY=e.y;}}
       if(d.__novaSpotter&&sp>28&&now>=(d.__v1102SpotterPlanAt||0)){
         d.__v1102SpotterPlanAt=now+.125+((Math.abs(d.id||0)%3)*.014);var ux=intent.x/sp,uy=intent.y/sp,gx=d.x+ux*360,gy=d.y+uy*360;
-        if(this.hasLineOfSight&&!this.hasLineOfSight(d.x,d.y,gx,gy,Math.max(2,pad*.35))){
+        if(this.hasLineOfSight&&!this.hasLineOfSight(d.x,d.y,gx,gy,Math.max(2,pad-5))){
           var wp=this.novaBattlefieldWaypoint(d.x,d.y,gx,gy,pad,d.id);if(wp){var dx=wp.x-d.x,dy=wp.y-d.y,m=Math.hypot(dx,dy)||1,speed=Math.max(180,sp);d.__novaScoutVX=(d.__novaScoutVX||0)*.34+dx/m*speed*.66;d.__novaScoutVY=(d.__novaScoutVY||0)*.34+dy/m*speed*.66;d.__v172Routing=true;window.__NOVA_TERRAIN_INTELLIGENCE__.spotterReroutes++;}
         }
       }

@@ -37,7 +37,7 @@ test('bounded planner chains waypoints through serial walls instead of solving o
   const route=T.planVisibilityRoute(g,-330,0,430,0,18,7,null);
   assert.ok(route && route.length>=2,JSON.stringify(route));
   let x=-330,y=0;
-  for(const p of route){assert.equal(g.hasLineOfSight(x,y,p.x,p.y,6.2),true,`blocked leg ${x},${y} -> ${p.x},${p.y}`);x=p.x;y=p.y;}
+  for(const p of route){assert.equal(g.hasLineOfSight(x,y,p.x,p.y,13),true,`blocked leg ${x},${y} -> ${p.x},${p.y}`);x=p.x;y=p.y;}
   assert.ok(route.length<=T.limits.maxNodes);
 });
 
@@ -51,7 +51,7 @@ test('planner escapes a U-shaped pocket with a multi-leg route',()=>{
   const route=T.planVisibilityRoute(g,0,60,0,-360,16,4,null);
   assert.ok(route && route.length>=3,JSON.stringify(route));
   let x=0,y=60;
-  for(const p of route){assert.equal(g.hasLineOfSight(x,y,p.x,p.y,5.5),true);x=p.x;y=p.y;}
+  for(const p of route){assert.equal(g.hasLineOfSight(x,y,p.x,p.y,11),true);x=p.x;y=p.y;}
 });
 
 test('planner stays cheap when the destination is already visible',()=>{
@@ -158,4 +158,83 @@ test('idle Controller terrain correction remains scoped away from active command
   assert.match(source,/po&&po\.alive&&isController\(po\)&&po\.__novaSwarm&&!po\.__novaSwarm\.active/);
   assert.match(source,/pd\.__novaPhase==='dash'\|\|pd\.__novaPhase==='windup'/);
   assert.match(source,/if\(before\[d\.id\]&&owner\.__novaSwarm&&!owner\.__novaSwarm\.active\)\{\s*var rerouted=preserveIdleDroneTerrain/);
+});
+
+test('narrow gates are routed around using the tank and drone collision radii, while passable gates stay direct',()=>{
+  const T=boot();
+  function gate(gap){
+    const half=gap/2;
+    return [
+      {id:1,x:0,y:-(half+120),w:40,h:240,solid:true},
+      {id:2,x:0,y:(half+120),w:40,h:240,solid:true}
+    ];
+  }
+  function assertClear(g,route,startX,startY,radius){
+    assert.ok(route&&route.length>=2,JSON.stringify(route));
+    let x=startX,y=startY;
+    for(const p of route){
+      assert.equal(g.hasLineOfSight(x,y,p.x,p.y,radius),true,'blocked leg '+x+','+y+' -> '+p.x+','+p.y);
+      assert.equal(g.isTerrainSafe(p.x,p.y,radius),true,'unsafe waypoint '+p.x+','+p.y);
+      x=p.x;y=p.y;
+    }
+  }
+  const tank=game(gate(28)),tankRoute=T.planVisibilityRoute(tank,-400,0,400,0,23,7,null);
+  assert.equal(tank.hasLineOfSight(-400,0,400,0,18),false,'28px opening is narrower than a 36px tank body');
+  assertClear(tank,tankRoute,-400,0,18);
+  const tankOpen=game(gate(40));
+  assert.equal(tankOpen.hasLineOfSight(-400,0,400,0,18),true);
+  assert.deepEqual(Array.from(T.planVisibilityRoute(tankOpen,-400,0,400,0,23,7,null)),[]);
+  const drone=game(gate(12)),droneRoute=T.planVisibilityRoute(drone,-400,0,400,0,13,9,null);
+  assert.equal(drone.hasLineOfSight(-400,0,400,0,8),false,'12px opening is narrower than a 16px drone body');
+  assertClear(drone,droneRoute,-400,0,8);
+  const droneOpen=game(gate(20));
+  assert.equal(droneOpen.hasLineOfSight(-400,0,400,0,8),true);
+  assert.deepEqual(Array.from(T.planVisibilityRoute(droneOpen,-400,0,400,0,13,9,null)),[]);
+  for(const size of [14,15,16,17]){
+    const radius=size+3,pad=size+8;
+    const tight=game(gate(radius*2-1));
+    assert.ok(T.planVisibilityRoute(tight,-400,0,400,0,pad,size,null)?.length>=2,'class size '+size+' must not enter an undersized gate');
+    const passable=game(gate(radius*2+2));
+    assert.deepEqual(Array.from(T.planVisibilityRoute(passable,-400,0,400,0,pad,size,null)),[],'class size '+size+' should retain a physically passable gate');
+  }
+  const droneTight=game(gate(15));
+  assert.ok(T.planVisibilityRoute(droneTight,-400,0,400,0,13,11,null)?.length>=2);
+  const dronePassable=game(gate(18));
+  assert.deepEqual(Array.from(T.planVisibilityRoute(dronePassable,-400,0,400,0,13,11,null)),[]);
+});
+
+test('exact-perpendicular approach routes around a long wall with physical clearance',()=>{
+  const T=boot(),g=game([{id:1,x:0,y:0,w:70,h:420,solid:true}]);
+  const route=T.planVisibilityRoute(g,-400,0,400,0,23,17,null);
+  assert.ok(route&&route.length>=2,JSON.stringify(route));
+  let x=-400,y=0;
+  for(const p of route){
+    assert.equal(g.hasLineOfSight(x,y,p.x,p.y,18),true,'blocked perpendicular leg '+x+','+y+' -> '+p.x+','+p.y);
+    assert.equal(g.isTerrainSafe(p.x,p.y,18),true);
+    x=p.x;y=p.y;
+  }
+});
+
+
+test('idle-drone step sweep uses the actual drone radius for segment collision',()=>{
+  const T=boot(),g=game([]);
+  const pads=[];
+  g.firstTerrainHit=(ax,ay,bx,by,pad)=>{pads.push(pad);return null;};
+  assert.equal(T.blockedDroneStep(g,-100,0,100,0,13),false);
+  assert.deepEqual(pads,[8]);
+});
+
+
+test('route candidate nodes use full physical body clearance, not a discounted safety pad',()=>{
+  const T=boot();
+  for(const [pad,radius] of [[23,18],[13,8]]){
+    const g=game([{id:77,x:0,y:0,w:70,h:180,solid:true}]);
+    const original=g.isTerrainSafe.bind(g),pads=[];
+    g.isTerrainSafe=(x,y,p)=>{pads.push(p);return original(x,y,p);};
+    const nodes=T.obstacleNodes(g,-400,0,400,0,pad);
+    assert.ok(nodes.length>0,'candidate nodes must exist for a wall detour');
+    assert.ok(pads.length>0,'candidate nodes must be checked for physical safety');
+    assert.ok(pads.every(p=>p>=Math.max(radius,pad*.72)),'every candidate must preserve at least full collision radius: '+JSON.stringify(pads));
+    for(const node of nodes)assert.equal(original(node.x,node.y,radius),true);
+  }
 });

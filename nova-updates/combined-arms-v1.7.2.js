@@ -49,8 +49,8 @@ function world(g,x,y,out){var z=(g.cam&&g.cam.zoom)||1,p=out||{};p.x=(x-g.cam.x)
 function classSize(C,t){return ((t&&C[t.cls]&&C[t.cls].size)||15);}
 function solidPointSafe(g,x,y,pad){return !g.isTerrainSafe||g.isTerrainSafe(x,y,pad||8);}
 function candidateScore(g,x,y,gx,gy,pad,cx,cy,side,tie){
-  if(!solidPointSafe(g,cx,cy,pad*.55))return Infinity;
-  if(g.hasLineOfSight&&!g.hasLineOfSight(x,y,cx,cy,Math.max(1,pad*.28)))return Infinity;
+  if(!solidPointSafe(g,cx,cy,Math.max(2,pad-5)))return Infinity;
+  if(g.hasLineOfSight&&!g.hasLineOfSight(x,y,cx,cy,Math.max(2,pad-5)))return Infinity;
   var score=Math.sqrt(d2(x,y,cx,cy))+Math.sqrt(d2(cx,cy,gx,gy));if(side===tie)score-=3;return score;
 }
 
@@ -59,8 +59,8 @@ function candidateScore(g,x,y,gx,gy,pad,cx,cy,side,tie){
 function chooseWaypoint(g,x,y,gx,gy,pad,seed){
   pad=Math.max(5,pad||12);
   if(!g.firstTerrainHit)return null;
-  if(g.hasLineOfSight&&g.hasLineOfSight(x,y,gx,gy,Math.max(2,pad*.35)))return null;
-  var fh=g.firstTerrainHit(x,y,gx,gy,Math.max(2,pad*.45));
+  if(g.hasLineOfSight&&g.hasLineOfSight(x,y,gx,gy,Math.max(2,pad-5)))return null;
+  var fh=g.firstTerrainHit(x,y,gx,gy,Math.max(2,pad-5));
   if(!fh||!fh.solid)return null;
   var s=fh.solid,extra=pad+14,tie=((seed||0)&1)?1:-1,bx=0,by=0,bs=0,bestScore=Infinity,score;
   if(s.shape==='circle'){
@@ -191,13 +191,13 @@ wrap('game/engine',function(engine,require){
       var sp=Math.hypot(vx||0,vy||0);
       if(sp>18){
         var now=this.time||0,pad=classSize(C,t)+8,look=clamp(55+sp*.46,72,170),ux=vx/sp,uy=vy/sp,ax=t.x+ux*look,ay=t.y+uy*look;
-        var probe=this.firstTerrainHit(t.x,t.y,ax,ay,pad*.62),wp=t.ai.__v172Waypoint;
+        var probe=this.firstTerrainHit(t.x,t.y,ax,ay,Math.max(2,pad-5)),wp=t.ai.__v172Waypoint;
         if(wp&&now>(t.ai.__v172WaypointUntil||0))wp=null;
         if(wp&&d2(t.x,t.y,wp.x,wp.y)<34*34)wp=null;
         if(probe&&!wp){
           var gx=ax+ux*look,gy=ay+uy*look;
           if(t.ai.__v172LastSeenAt!=null&&now-t.ai.__v172LastSeenAt<2.4){gx=t.ai.__v172LastSeenX;gy=t.ai.__v172LastSeenY;}
-          wp=chooseWaypoint(this,t.x,t.y,gx,gy,pad,t.id);
+          wp=this.novaBattlefieldWaypoint?this.novaBattlefieldWaypoint(t.x,t.y,gx,gy,pad,t.id):chooseWaypoint(this,t.x,t.y,gx,gy,pad,t.id);
           if(wp){t.ai.__v172Waypoint=wp;t.ai.__v172WaypointUntil=now+.95;}
         }
         if(wp){
@@ -240,9 +240,9 @@ wrap('game/engine',function(engine,require){
       if(gx==null&&owner.__novaSwarm.active){gx=owner.__novaSwarm.nodeX;gy=owner.__novaSwarm.nodeY;}
       if(gx==null){gx=owner.x;gy=owner.y;}
       var pad=(d.r||8)+5;
-      if(this.hasLineOfSight&&this.hasLineOfSight(d.x,d.y,gx,gy,Math.max(2,pad*.35))){d.__v172Waypoint=null;continue;}
+      if(this.hasLineOfSight&&this.hasLineOfSight(d.x,d.y,gx,gy,Math.max(2,pad-5))){d.__v172Waypoint=null;continue;}
       var wp=d.__v172Waypoint;
-      if(!wp||this.time>(d.__v172WaypointUntil||0)||d2(d.x,d.y,wp.x,wp.y)<24*24){wp=chooseWaypoint(this,d.x,d.y,gx,gy,pad,d.id);d.__v172Waypoint=wp;d.__v172WaypointUntil=this.time+.72;}
+      if(!wp||this.time>(d.__v172WaypointUntil||0)||d2(d.x,d.y,wp.x,wp.y)<24*24){wp=this.novaBattlefieldWaypoint?this.novaBattlefieldWaypoint(d.x,d.y,gx,gy,pad,d.id):chooseWaypoint(this,d.x,d.y,gx,gy,pad,d.id);d.__v172Waypoint=wp;d.__v172WaypointUntil=this.time+.72;}
       if(!wp)continue;
       var qx=wp.x-d.x,qy=wp.y-d.y,ql=Math.hypot(qx,qy)||1;qx/=ql;qy/=ql;var speed=Math.max(80,Math.hypot(d.__novaVX||0,d.__novaVY||0));
       d.__novaVX=(d.__novaVX||0)*.42+qx*speed*.58;d.__novaVY=(d.__novaVY||0)*.42+qy*speed*.58;
