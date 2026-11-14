@@ -65,6 +65,7 @@ for(const {seed,layoutIndex,layout} of trialsPlan){
   const events=on.eventSamples;
   const evidence=auditShotEvidence(events,{
     truncated:on.eventSamplesTruncated,preFrameOverflow:on.preFrameShotOverflow,
+    preFrameShotUnidentified:on.preFrameShotUnidentified,
     preFrameTargetUnidentified:on.preFrameTargetUnidentified
   });
   assert.equal(evidence.bounded,true,
@@ -80,6 +81,7 @@ for(const {seed,layoutIndex,layout} of trialsPlan){
     provenance:{sampled:events.length,truncated:on.eventSamplesTruncated,
       preStatePresent:evidence.preStatePresent,preStateMissing:evidence.preStateMissing,
       targetStatePresent:evidence.targetStatePresent,targetStateMissing:evidence.targetStateMissing,
+      preFrameShotUnidentified:evidence.preFrameShotUnidentified,
       preFrameTargetUnidentified:evidence.preFrameTargetUnidentified,
       pairedInterceptionPresent:evidence.pairedInterceptionPresent,
       pairedInterceptionMissing:evidence.pairedInterceptionMissing,
