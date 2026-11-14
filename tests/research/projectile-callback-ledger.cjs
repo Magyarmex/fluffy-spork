@@ -1,0 +1,225 @@
+'use strict';
+// Research-only synchronous callback ledger. No combat writes. Attribution
+// requires explicit projectile scope; owner ID alone never proves causality.
+function createProjectileCallbackLedger(game, options = {}) {
+  if (!game || typeof game !== 'object') throw new TypeError('game required');
+  const limit = options.limit === undefined ? 2048 : options.limit;
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100000)
+    throw new RangeError('invalid event budget');
+  const methods = ['damageTank', 'damageShape', 'damageDrone'];
+  const originals = new Map(), wrappers = new Map(), events = [];
+  let scope = null, installed = false, overflow = 0, epoch = 0, callbackDepth = 0, unknown = 0, unidentifiedTargets = 0, observerErrors = 0, unusedScopes = 0, scopedCalls = 0, coreAttributed = 0, battlefieldAttributed = 0, coverAttributed = 0, retiredAttributed = 0, ttlRetirements = 0, boundsRetirements = 0, ambiguousRetirements = 0, rawPenOneZeroHitTtl = 0, coreInterceptions = 0, sniperInterceptions = 0, battlefieldTtlInterceptions = 0;
+  function append(kind, target, args) {
+    // Consume the scope before any potentially throwing identity getter or
+    // budget check. A dropped/failed first callback must never transfer its
+    // shot identity to a later unrelated callback in the same closure.
+    const attributed = !!scope && scope.remaining > 0 && callbackDepth === scope.baseDepth;
+    if (attributed) scope.remaining--;
+    if (events.length >= limit) { overflow++; return; }
+    // Read identity once: getters may be stateful or throw on a second read.
+    const observedId = target == null ? null : target.id;
+    const id = Number.isSafeInteger(observedId) ? observedId : null;
+    if (id === null) unidentifiedTargets++;
+    if (!attributed) unknown++;
+    else if (scope.source === 'core') coreAttributed++;
+    else if (scope.source === 'battlefield') battlefieldAttributed++;
+    events.push(Object.freeze({epoch, kind, targetId: id,
+      shotId: attributed ? scope.shotId : null,
+      attribution: attributed ? scope.attribution : 'unknown',
+      ...(attributed && scope.source ? {source:scope.source} : {}),
+      requestedDamage: Number.isFinite(args[1]) ? args[1] : null}));
+  }
+  function install() {
+    if (installed) return false;
+    // Snapshot each method once before mutation. A stateful accessor must not
+    // validate one callback and silently wrap a different callback later.
+    const preflight = new Map();
+    for (const name of methods) {
+      const own = Object.getOwnPropertyDescriptor(game, name);
+      if ((own && !own.configurable) || (!own && !Object.isExtensible(game)))
+        throw new TypeError(name + ' cannot be safely wrapped');
+      const original = game[name];
+      if (typeof original !== 'function') throw new TypeError(name + ' missing');
+      preflight.set(name, {own, original});
+    }
+    try {
+      for (const name of methods) {
+        const {own, original} = preflight.get(name);
+        originals.set(name, own || null);
+        const wrapper = function(...args) {
+          // Observer failures must never prevent an actual combat callback.
+          try { append(name, args[0], args); }
+          catch (_) { observerErrors++; }
+          callbackDepth++;
+          try { return original.apply(this, args); }
+          finally { callbackDepth--; }
+        };
+        wrappers.set(name, wrapper);
+        Object.defineProperty(game, name, {configurable:true, writable:true,
+          enumerable:own ? own.enumerable : false, value:wrapper});
+      }
+    } catch (error) {
+      for (const [name, own] of originals) {
+        if (own) Object.defineProperty(game, name, own);
+        else delete game[name];
+      }
+      originals.clear(); wrappers.clear();
+      throw error;
+    }
+    installed = true;
+    return true;
+  }
+  function withProjectile(shot, fn, attribution = 'direct', source = null) {
+    if (typeof fn !== 'function') throw new TypeError('callback required');
+    // Snapshot identity once: mutable or stateful getters must not switch
+    // the attributed projectile between validation and ledger recording.
+    // An observer must never prevent the real callback when a projectile ID
+    // is absent or its getter throws. Run unscoped and mark the frame unsafe.
+    // Temporarily suppress an outer scope so a nested invalid shot cannot
+    // borrow the parent's identity.
+    let shotId;
+    try { shotId = shot == null ? null : shot.id; }
+    catch (_) { shotId = null; }
+    // Malformed research metadata must be treated like an invalid ID: the
+    // underlying combat callback still runs, but its attribution is unknown.
+    const validAttribution = attribution === 'direct' || attribution === 'indirect';
+    const validSource = source === null || source === 'core' || source === 'battlefield';
+    if (!validAttribution || !validSource || !Number.isSafeInteger(shotId) || shotId < 0) {
+      observerErrors++;
+      const prior = scope;
+      scope = null;
+      try { return fn(); } finally { scope = prior; }
+    }
+    const prior = scope;
+    scopedCalls++;
+    scope = {shotId, attribution, source, baseDepth: callbackDepth, remaining: 1};
+    try { return fn(); } finally {
+      // A scope with no captured callback is evidence of an unobserved path,
+      // NOT evidence of a missed hit. Keep it separate from callback errors.
+      if (scope.remaining > 0) unusedScopes++;
+      scope = prior;
+    }
+  }
+  // Terrain has a separate HP owner and does not call damageTank/Shape/Drone.
+  // This records an actual cover write, not a predicted first-contact time.
+  function recordCoverDamage(shot, cover, beforeHp, afterHp) {
+    try {
+      const shotId = shot == null ? null : shot.id;
+      const coverId = cover == null ? null : cover.id;
+      if (!Number.isSafeInteger(shotId) || shotId < 0 ||
+          !Number.isSafeInteger(coverId) ||
+          !Number.isFinite(beforeHp) || !Number.isFinite(afterHp) ||
+          afterHp > beforeHp) {
+        observerErrors++; return false;
+      }
+      if (events.length >= limit) { overflow++; return false; }
+      events.push(Object.freeze({epoch, kind:'coverDamage', targetId:coverId,
+        shotId, attribution:'direct', source:'battlefield',
+        requestedDamage:null, effectiveDamage:Math.min(Math.max(0,beforeHp),Math.max(0,beforeHp-afterHp)),
+        timing:'unknown'}));
+      coverAttributed++;
+      return true;
+    } catch (_) { observerErrors++; return false; }
+  }
+  // A terminal core TTL/bounds transition is an observed retirement, not
+  // proof of a missed contact. The frame-end check supplies only an upper
+  // bound on when the projectile stopped being eligible for contact.
+  function recordProjectileRetirement(shot, reason) {
+    try {
+      const shotId = shot == null ? null : shot.id;
+      const rawHits = shot == null ? null : shot.hits;
+      const rawPen = shot == null ? null : shot.pen;
+      if (!Number.isSafeInteger(shotId) || shotId < 0 ||
+          (reason !== 'ttl' && reason !== 'bounds' && reason !== 'ttl-or-bounds')) {
+        observerErrors++; return false;
+      }
+      if (events.length >= limit) { overflow++; return false; }
+      events.push(Object.freeze({epoch, kind:'projectileRetirement',
+        targetId:null, shotId, attribution:'direct', source:'core',
+        requestedDamage:null, reason, timing:'upper-bound',
+        priorHits:Number.isSafeInteger(rawHits)&&rawHits>=0?rawHits:null,
+        remainingPen:Number.isSafeInteger(rawPen)?rawPen:null}));
+      retiredAttributed++;
+      if (reason === 'ttl') { ttlRetirements++;
+        if (rawPen === 1 && rawHits === 0) rawPenOneZeroHitTtl++;
+      }
+      else if (reason === 'bounds') boundsRetirements++;
+      else ambiguousRetirements++;
+      return true;
+    } catch (_) { observerErrors++; return false; }
+  }
+  // Core endpoint pair interception occurs after projectile movement.
+  // This witnesses real weakening, not the first physical interception time.
+  function recordProjectileInterception(a, b, beforeA, beforeB, source = 'core', contactFraction = null, contactSeconds = null) {
+    try {
+      const idA = a == null ? null : a.id;
+      const idB = b == null ? null : b.id;
+      const afterA = a == null ? null : a.hp;
+      const afterB = b == null ? null : b.hp;
+      if (!Number.isSafeInteger(idA) || idA < 0 ||
+          !Number.isSafeInteger(idB) || idB < 0 || idA === idB ||
+          !Number.isFinite(beforeA) || !Number.isFinite(beforeB) ||
+          !Number.isFinite(afterA) || !Number.isFinite(afterB) ||
+          afterA > beforeA || afterB > beforeB ||
+          (source !== 'core' && source !== 'sniper' && source !== 'battlefield-ttl') ||
+          (contactFraction !== null && (source !== 'sniper' ||
+            !Number.isFinite(contactFraction) || contactFraction < 0 || contactFraction > 1)) ||
+          (contactSeconds !== null && (source !== 'battlefield-ttl' ||
+            !Number.isFinite(contactSeconds) || contactSeconds <= 0 || contactSeconds > .05))) {
+        observerErrors++; return false;
+      }
+      if (events.length >= limit) { overflow++; return false; }
+      events.push(Object.freeze({epoch, kind:'projectileInterception',
+        targetId:null, shotId:idA, otherShotId:idB,
+        attribution:'direct', source, requestedDamage:null,
+        beforeHpA:beforeA, beforeHpB:beforeB,
+        afterHpA:afterA, afterHpB:afterB,
+        timing:contactSeconds !== null ? 'certified-bullet-step-seconds' :
+          contactFraction !== null ? 'normalized-sweep-fraction' : 'unknown',
+        ...(contactFraction === null ? {} : {contactFraction}),
+        ...(contactSeconds === null ? {} : {contactSeconds})}));
+      if (source === 'core') coreInterceptions++;
+      else if (source === 'sniper') sniperInterceptions++;
+      else battlefieldTtlInterceptions++;
+      return true;
+    } catch (_) { observerErrors++; return false; }
+  }
+  function nextFrame() {
+    if (scope || callbackDepth > 0)
+      throw new Error('cannot advance frame inside damage callback');
+    epoch++; events.length = 0; overflow = 0; unknown = 0; unidentifiedTargets = 0; observerErrors = 0; unusedScopes = 0; scopedCalls = 0; coreAttributed = 0; battlefieldAttributed = 0; coverAttributed = 0; retiredAttributed = 0; ttlRetirements = 0; boundsRetirements = 0; ambiguousRetirements = 0; rawPenOneZeroHitTtl = 0; coreInterceptions = 0; sniperInterceptions = 0; battlefieldTtlInterceptions = 0;
+  }
+  function counters() {
+    // Aggregate natural-match trials need bounded scalar telemetry without
+    // cloning every per-hit event on every simulation frame.
+    return Object.freeze({epoch, installed, eventsCaptured:events.length,
+      damageCallbacksCaptured:events.length-coverAttributed-retiredAttributed-coreInterceptions-sniperInterceptions-battlefieldTtlInterceptions,
+      overflow, unknown, unidentifiedTargets, observerErrors,
+      scopedCalls, unusedScopes, coreAttributed, battlefieldAttributed, coverAttributed, retiredAttributed, ttlRetirements, boundsRetirements, ambiguousRetirements, rawPenOneZeroHitTtl, coreInterceptions, sniperInterceptions, battlefieldTtlInterceptions, bounded:overflow===0&&observerErrors===0});
+  }
+  function snapshot() {
+    return Object.freeze({epoch, installed, events: Object.freeze(events.slice()), overflow, unknown, unidentifiedTargets, observerErrors, scopedCalls, unusedScopes, coreAttributed, battlefieldAttributed, coverAttributed, retiredAttributed, ttlRetirements, boundsRetirements, ambiguousRetirements, rawPenOneZeroHitTtl, coreInterceptions, sniperInterceptions, battlefieldTtlInterceptions,
+      bounded: overflow === 0 && observerErrors === 0,
+      allCapturedCallbacksAttributed: overflow === 0 && observerErrors === 0 && unknown === 0 && unidentifiedTargets === 0});
+  }
+  function uninstall() {
+    if (!installed) return false;
+    if (scope || callbackDepth > 0)
+      throw new Error('cannot uninstall inside damage callback');
+    // Never overwrite another system's later replacement of our wrapper.
+    for (const [name, wrapper] of wrappers)
+      if (game[name] !== wrapper)
+        throw new Error(name + ' changed after ledger install');
+    for (const [name, own] of originals) {
+      if (own) Object.defineProperty(game, name, own);
+      else delete game[name];
+    }
+    originals.clear(); wrappers.clear(); installed = false; scope = null;
+    return true;
+  }
+  return Object.freeze({install, uninstall, withProjectile, recordCoverDamage, recordProjectileRetirement, recordProjectileInterception, nextFrame, snapshot, counters});
+}
+if (typeof module !== 'undefined' && module.exports)
+  module.exports = {createProjectileCallbackLedger};
+if (typeof window !== 'undefined')
+  window.__novaResearchProjectileCallbackLedger = {createProjectileCallbackLedger};

@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const {createProjectileCallbackLedger}=require('../research/projectile-callback-ledger.cjs');
 const root = path.resolve(__dirname, '../..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)]
@@ -30,7 +31,7 @@ function canvas() {
   c.getContext = () => ctx;
   return c;
 }
-function runGame(hz, controller, klass, mouseButton) {
+function runGame(hz, controller, klass, mouseButton, observe = false) {
   const errors = [];
   const store = new Map();
   const document = {hidden: false, visibilityState: 'visible',
@@ -69,6 +70,8 @@ function runGame(hz, controller, klass, mouseButton) {
   const requireGame = window.__novaMakeRequire('');
   const Game = requireGame('game/engine').Game;
   const game = new Game(canvas(), canvas(), {hud: noop, event: noop}, 'low');
+  const ledger=observe?createProjectileCallbackLedger(game,{limit:2048}):null;
+  if(ledger)ledger.install();
   let launched = 0;
   const actualTryFire = game.tryFire;
   game.tryFire = function(t) {
@@ -97,7 +100,14 @@ function runGame(hz, controller, klass, mouseButton) {
     game.input.firing = true;
     game.input.keyboard.right = true;
   }
-  for (let i = 0; i < 2 * hz; i++) game.update(1 / hz);
+  for (let i = 0; i < 2 * hz; i++) {
+    game.update(1 / hz);
+    if(ledger){
+      const snap=ledger.snapshot();
+      assert.equal(snap.observerErrors,0,'observer must not fail on real game callbacks');
+      ledger.nextFrame();
+    }
+  }
   requireGame('game/render').render(game, game.w, game.h);
   assert.ok(Math.abs(game.time - 2) < 1e-6, 'simulation advances exactly two seconds');
   assert.equal(game.status, 'playing', 'the playable game remains live');
@@ -123,6 +133,8 @@ function runGame(hz, controller, klass, mouseButton) {
   }
   const unexpected = errors.filter(s => !s.includes('React hooks unavailable; interaction patch not installed'));
   assert.deepEqual(unexpected, [], 'no unexpected runtime console errors');
+  if(ledger)assert.equal(ledger.uninstall(),true,
+    'observer must restore final composed damage methods');
 }
 test('shipping HTML contains the actual inline game and its overlay chain', () => {
   assert.ok(inline, 'canonical game module exists');
@@ -148,3 +160,8 @@ for (const hz of [30, 60, 120, 240]) {
       () => runGame(hz, false, null, button));
   }
 }
+
+test('full materialized game: research callback observer survives twin combat at 30Hz',()=>
+  runGame(30,false,'twin',null,true));
+test('full materialized game: research callback observer survives Warden at 120Hz',()=>
+  runGame(120,true,null,null,true));
