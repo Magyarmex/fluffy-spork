@@ -385,8 +385,8 @@ test('61Hz rotary cliff is measured against real moving-target HP, not just voll
     const stationary=trial(seed,cls,reload,mode,.007,0,1.37,.3725,2);
     assert.deepEqual(moving,repeat,'61Hz real collision replay must reproduce');
     assert.equal(moving.onTime,3.9,'same exact wall-clock firing duty');
-    assert.equal(moving.targetMoveSteps,moving.updates,
-     'each frame must use the authoritative moving-target owner');
+    assert.equal(moving.targetMoveSteps,moving.updates+120,
+     'six-second firing window and two-second no-fire drain must each move the real target');
     assert.ok(moving.peakOffset>25&&moving.travel>50,
      'moving target must cross the shot corridor');
     assert.equal(stationary.onTime,moving.onTime,'matched stationary firing duty');
