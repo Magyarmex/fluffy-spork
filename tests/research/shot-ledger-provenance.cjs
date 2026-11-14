@@ -17,6 +17,21 @@ function auditShotEvidence(events,{truncated=0,preFrameOverflow=0,preFrameShotUn
     if(!e||!Number.isSafeInteger(e.frame)||e.frame<1||
        e.frame<lastFrame||!Number.isSafeInteger(e.shotId)||e.shotId<0)
       throw new TypeError('invalid or out-of-order shot event');
+    // Chronology units are not interchangeable. A Sniper fraction of a
+    // swept segment is NOT a frame timestamp; only the certified mutual-TTL
+    // owner supplies bullet-step seconds. Reject mismatched metadata before
+    // a future comparator can accidentally order incomparable events.
+    const hasFraction=e.contactFraction!=null,hasSeconds=e.contactSeconds!=null;
+    if((hasFraction&&hasSeconds)||
+       (hasFraction&&(e.kind!=='projectileInterception'||e.source!=='sniper'||
+         e.timing!=='normalized-sweep-fraction'||
+         !Number.isFinite(e.contactFraction)||e.contactFraction<0||e.contactFraction>1))||
+       (hasSeconds&&(e.kind!=='projectileInterception'||e.source!=='battlefield-ttl'||
+         e.timing!=='certified-bullet-step-seconds'||
+         !Number.isFinite(e.contactSeconds)||e.contactSeconds<=0||e.contactSeconds>.05))||
+       (e.timing==='normalized-sweep-fraction'&&!hasFraction)||
+       (e.timing==='certified-bullet-step-seconds'&&!hasSeconds))
+      throw new TypeError('invalid or incomparable interception timing witness');
     lastFrame=e.frame;
     const existing=shots.get(e.shotId)||{
       shotId:e.shotId,firstFrame:e.frame,lastFrame:e.frame,
