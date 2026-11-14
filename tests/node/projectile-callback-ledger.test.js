@@ -477,3 +477,22 @@ test('cover witness counters reset independently of core and Battlefield attribu
   assert.equal(l.counters().coverAttributed,0);
   assert.equal(l.counters().eventsCaptured,0);
 });
+
+test('retirement witness distinguishes observed terminal transition from missed-hit inference',()=>{
+  const l=createProjectileCallbackLedger(game(),{limit:2});
+  assert.equal(l.recordProjectileRetirement({id:19},'ttl'),true);
+  assert.equal(l.recordProjectileRetirement({id:20},'bounds'),true);
+  assert.equal(l.counters().retiredAttributed,2);
+  assert.deepEqual(l.snapshot().events.map(e=>[e.shotId,e.reason,e.timing]),
+    [[19,'ttl','upper-bound'],[20,'bounds','upper-bound']]);
+  assert.equal(l.recordProjectileRetirement({id:21},'ttl'),false);
+  assert.equal(l.counters().overflow,1);
+  assert.equal(l.snapshot().bounded,false);
+  l.nextFrame();
+  assert.equal(l.counters().retiredAttributed,0);
+  assert.equal(l.recordProjectileRetirement({id:22},'ttl-or-bounds'),true);
+  assert.equal(l.snapshot().events[0].reason,'ttl-or-bounds');
+  assert.equal(l.recordProjectileRetirement({id:23},'guessed-hit'),false);
+  assert.equal(l.recordProjectileRetirement({},'ttl'),false);
+  assert.equal(l.counters().observerErrors,2);
+});
