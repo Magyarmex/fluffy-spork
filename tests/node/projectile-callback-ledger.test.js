@@ -548,3 +548,16 @@ test('Battlefield mutual-TTL interception has independent bounded accounting',()
   l.nextFrame();
   assert.equal(l.counters().battlefieldTtlInterceptions,0);
 });
+
+test('interception witness abstains on impossible HP growth without fabricating contact',()=>{
+  const l=createProjectileCallbackLedger(game());
+  assert.equal(l.recordProjectileInterception(
+    {id:61,hp:11},{id:62,hp:4},10,5,'battlefield-ttl'),false);
+  assert.equal(l.recordProjectileInterception(
+    {id:61,hp:9},{id:62,hp:6},10,5,'sniper'),false);
+  assert.equal(l.counters().eventsCaptured,0);
+  assert.equal(l.counters().battlefieldTtlInterceptions,0);
+  assert.equal(l.counters().sniperInterceptions,0);
+  assert.equal(l.counters().observerErrors,2);
+  assert.equal(l.counters().bounded,false);
+});
