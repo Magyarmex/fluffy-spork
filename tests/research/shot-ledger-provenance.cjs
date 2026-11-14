@@ -1,10 +1,11 @@
 'use strict';
 // Research-only provenance audit. A pre-update endpoint is NOT a swept
 // collision witness. Never classify a missed hit without competing geometry.
-function auditShotEvidence(events,{truncated=0,preFrameOverflow=0,preFrameTargetUnidentified=0}={}){
+function auditShotEvidence(events,{truncated=0,preFrameOverflow=0,preFrameShotUnidentified=0,preFrameTargetUnidentified=0}={}){
   if(!Array.isArray(events))throw new TypeError('events array required');
   if(!Number.isSafeInteger(truncated)||truncated<0||
      !Number.isSafeInteger(preFrameOverflow)||preFrameOverflow<0||
+     !Number.isSafeInteger(preFrameShotUnidentified)||preFrameShotUnidentified<0||
      !Number.isSafeInteger(preFrameTargetUnidentified)||preFrameTargetUnidentified<0)
     throw new RangeError('invalid evidence truncation counters');
   const shots=new Map();
@@ -61,7 +62,7 @@ function auditShotEvidence(events,{truncated=0,preFrameOverflow=0,preFrameTarget
   return {
     bounded,eventCount:events.length,shotCount:shots.size,
     preStatePresent,preStateMissing,targetStatePresent,targetStateMissing,
-    preFrameTargetUnidentified,pairedInterceptionPresent,
+    preFrameShotUnidentified,preFrameTargetUnidentified,pairedInterceptionPresent,
     pairedInterceptionMissing,
     // Missing endpoints may mean births during the update; do not guess.
     // Even complete endpoints cannot certify swept contact or its priority.
