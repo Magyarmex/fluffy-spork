@@ -133,6 +133,16 @@ test('same-frame pre-frame evidence cannot later be reclassified as a birth',()=
       bornThisFrame:true,preTarget:target}
   ];
   assert.throws(()=>auditShotEvidence(peerThenPrimary),/contradictory projectile birth/);
+  assert.throws(()=>auditShotEvidence([
+    {frame:1,shotId:90,kind:'projectileRetirement',preShot:null,bornThisFrame:true},
+    {frame:1,shotId:90,kind:'damageTank',preShot:pre,preTarget:target}
+  ]),/contradictory projectile pre-frame witness/);
+  assert.throws(()=>auditShotEvidence([
+    {frame:1,shotId:91,kind:'projectileInterception',otherShotId:92,
+      preShot:pre,preOtherShot:null,otherBornThisFrame:true},
+    {frame:1,shotId:93,kind:'projectileInterception',otherShotId:92,
+      preShot:pre,preOtherShot:pre}
+  ]),/contradictory interception peer pre-frame witness/);
   // Repeated legitimate newborn events within one frame remain accepted.
   const newborn=[
     {frame:1,shotId:80,kind:'projectileRetirement',preShot:null,bornThisFrame:true},
