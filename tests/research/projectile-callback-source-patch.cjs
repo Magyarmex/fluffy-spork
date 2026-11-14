@@ -35,6 +35,23 @@ function patchMaterializedCore(html) {
   return html.slice(0, start) + body + html.slice(end);
 }
 
+/** The shipping Sniper overlay replaces the core projectile-pair resolver.
+ * This is the actual natural-match swept interception owner. Observe only
+ * after both real weakenBullet calls; timing remains unknown. */
+function patchSniperInterception(source) {
+  if (typeof source !== 'string') throw new TypeError('Sniper source required');
+  if (source.includes('recordProjectileInterception'))
+    throw new Error('research Sniper interception patch already installed');
+  const owner='          this.weakenBullet(a, bh); this.weakenBullet(b, ah);';
+  if (source.split(owner).length !== 2)
+    throw new Error('shipping Sniper interception owner changed');
+  const witness='\n          try { const ledger=this.__novaShotLedger;\n' +
+    '            const method=ledger?.recordProjectileInterception;\n' +
+    "            if(typeof method==='function')method.call(ledger,a,b,ah,bh,'sniper');\n" +
+    '          } catch (_) { /* research observation cannot interrupt combat */ }';
+  return source.replace(owner,owner+witness);
+}
+
 /** Research-only witness at the real core endpoint interception owner.
  * The pair has already been weakened before observation. This is NOT an
  * authoritative continuous first-contact time or a new combat solver. */
@@ -163,4 +180,4 @@ function patchBattlefieldCover(source) {
     '}catch(_){/* research observation must not interrupt cover damage */}';
   return source.replace(target,target+witness);
 }
-module.exports = {patchMaterializedCore, patchMaterializedRetirement, patchMaterializedInterception, patchBattlefieldCallbacks, patchBattlefieldCover, guardedShotCall, CALLS};
+module.exports = {patchSniperInterception, patchMaterializedCore, patchMaterializedRetirement, patchMaterializedInterception, patchBattlefieldCallbacks, patchBattlefieldCover, guardedShotCall, CALLS};
