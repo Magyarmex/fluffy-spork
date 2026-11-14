@@ -2,7 +2,7 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {comparePhysicalTraces}=require('../research/shot-ledger-trace-compare.cjs');
-const mk=(hashes,frames=60)=>({frames,physicalTrace:hashes.map((hash,i)=>({frame:i*30,hash}))});
+const mk=(hashes,frames=20)=>({frames,physicalTrace:hashes.map((hash,i)=>({frame:i*10,hash}))});
 test('shot ledger physical parity accepts identical traces',()=>{
  const r=comparePhysicalTraces(mk(['a:b','c:d','e:f']),mk(['a:b','c:d','e:f']));
  assert.equal(r.initialStateMatched,true);assert.equal(r.firstDivergence,null);
@@ -10,7 +10,7 @@ test('shot ledger physical parity accepts identical traces',()=>{
 });
 test('shot ledger physical parity identifies first divergence without inferring missed hits',()=>{
  const r=comparePhysicalTraces(mk(['a:b','c:d','e:f']),mk(['a:b','f:a','e:f']));
- assert.deepEqual(r.firstDivergence,{frame:30,off:'c:d',on:'f:a'});
+ assert.deepEqual(r.firstDivergence,{frame:10,off:'c:d',on:'f:a'});
 });
 test('shot ledger physical parity refuses different initial worlds',()=>{
  assert.throws(()=>comparePhysicalTraces(mk(['a:b','c:d','e:f']),mk(['0:1','c:d','e:f'])),/frame zero/);
@@ -21,6 +21,6 @@ test('shot ledger physical parity refuses missing samples and wrong frame epochs
  assert.throws(()=>comparePhysicalTraces({...a,physicalTrace:[{frame:1,hash:'a:b'},...a.physicalTrace.slice(1)]},a),/epoch/);
 });
 test('shot ledger physical parity discloses incomplete run durations',()=>{
- const r=comparePhysicalTraces(mk(['a:b','c:d','e:f']),mk(['a:b','c:d'],30));
+ const r=comparePhysicalTraces(mk(['a:b','c:d','e:f']),mk(['a:b','c:d'],10));
  assert.equal(r.complete,false);assert.equal(r.comparedSamples,2);
 });
