@@ -7,6 +7,12 @@ const {chromium}=require('playwright');
 const PAIRED_ARM=process.env.NOVA_SHOT_LEDGER_ARM||'';
 if(!['','off','on'].includes(PAIRED_ARM))throw Error('NOVA_SHOT_LEDGER_ARM must be off or on');
 const OBSERVE=PAIRED_ARM!=='off';
+// Different fixed seeds expose different battlefield interactions while keeping
+// every OFF/OFF/ON arm for a given seed directly comparable.
+const SEED_TEXT=process.env.NOVA_SHOT_LEDGER_SEED||'0x1d4a3f21';
+if(!/^0x[0-9a-f]{8}$/i.test(SEED_TEXT))throw Error('NOVA_SHOT_LEDGER_SEED must be eight hex digits with 0x prefix');
+const TRIAL_SEED=Number(SEED_TEXT)>>>0;
+if(TRIAL_SEED===0)throw Error('zero xorshift seed cannot advance');
 const {patchBattlefieldMutualInterception,patchSniperInterception,patchMaterializedCore,patchMaterializedRetirement,patchMaterializedInterception,patchBattlefieldCallbacks,patchBattlefieldCover}=require('../research/projectile-callback-source-patch.cjs');
 (async()=>{
   const browser=await chromium.launch({headless:true});
@@ -39,11 +45,11 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
     assert.equal(sniperPatches,OBSERVE?1:0,'Sniper transformation count');
     await page.addScriptTag({content:fs.readFileSync(path.resolve(__dirname,
       '../research/projectile-callback-ledger.cjs'),'utf8')});
-    await page.evaluate(({paired})=>{
+    await page.evaluate(({paired,seed})=>{
       const Game=window.__novaMakeRequire('')('game/engine').Game;
       const start=Game.prototype.start,update=Game.prototype.update;
       if(paired){
-        let state=0x1d4a3f21;
+        let state=seed>>>0;
         const seeded=()=>{
           state^=state<<13;state^=state>>>17;state^=state<<5;
           return (state>>>0)/4294967296;
@@ -85,7 +91,7 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
         if(!this.__novaDecorativeWorld)window.__novaShotResearchGame=this;
         return update.apply(this,arguments);
       };
-    },{paired:!!PAIRED_ARM});
+    },{paired:!!PAIRED_ARM,seed:TRIAL_SEED});
     await page.getByRole('button',{name:/DEPLOY/i}).first().click();
     await page.waitForFunction(()=>window.__novaShotResearchGame?.status==='playing',
       {timeout:30000});
@@ -183,7 +189,7 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
     assert.ok(Number.isFinite(result.time));
     assert.ok(Number.isFinite(result.p95UpdateMs),'browser Game.update CPU sample required');
     assert.deepEqual(errors,[],'no browser runtime exceptions');
-    console.log(JSON.stringify({research:'shot-ledger-browser-smoke',...result}));
+    console.log(JSON.stringify({research:'shot-ledger-browser-smoke',seed:PAIRED_ARM?SEED_TEXT.toLowerCase():null,...result}));
   }finally{
     await context.close();
     await browser.close();
