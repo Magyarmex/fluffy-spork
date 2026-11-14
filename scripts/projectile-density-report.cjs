@@ -7,10 +7,38 @@ const BUCKETS=['zero','one','two','threeToEight','nineToSixteen','seventeenToThi
 const FIELDS=['bulletUpdateCalls','projectileCountSum','basicEligibleFrames',
  'coverBreaks','coverBreaksAtThreeToEight','coverBreaksAboveEight',
  'coverBreaksBasicEligible','brokenCounterResets'];
+const PEN_FIELDS=['penOneShotInputs','penOneExpiringInputs','penOneFramesWithInputs',
+ 'penOneRawInputs','penOneRawExpiringInputs','penOneMissingDeadInputs','penOneUnknownKindInputs',
+ 'penOneMissingOrdinaryFlagsInputs',
+ 'penOneWithoutEpochInputs','penOneScanCensoredFrames'];
 function check(a,label){
  if(!a||a.schema!==1)throw Error(label+': missing density schema');
  for(const k of FIELDS)if(!Number.isSafeInteger(a[k])||a[k]<0)
   throw Error(label+': invalid '+k);
+ const present=PEN_FIELDS.filter(k=>Object.hasOwn(a,k));
+ if(present.length&&present.length!==PEN_FIELDS.length)
+  throw Error(label+': partial pen-one metrics; missing is unknown, not zero');
+ for(const k of present)if(!Number.isSafeInteger(a[k])||a[k]<0)
+  throw Error(label+': invalid '+k);
+ if(present.length&&(
+    a.penOneRawInputs>a.projectileCountSum||
+    a.penOneShotInputs>a.penOneRawInputs||
+    a.penOneMissingDeadInputs>a.penOneRawInputs||
+    a.penOneUnknownKindInputs>a.penOneRawInputs||
+    a.penOneMissingOrdinaryFlagsInputs>a.penOneRawInputs||
+    a.penOneWithoutEpochInputs>a.penOneRawInputs||
+    a.penOneRawExpiringInputs>a.penOneRawInputs||
+    a.penOneExpiringInputs>a.penOneRawExpiringInputs||
+    a.penOneExpiringInputs>a.penOneShotInputs||
+    a.penOneFramesWithInputs>a.penOneShotInputs||
+    a.penOneFramesWithInputs+a.penOneScanCensoredFrames>a.bulletUpdateCalls||
+    a.penOneShotInputs+a.penOneMissingDeadInputs>a.penOneRawInputs||
+    a.penOneShotInputs+a.penOneUnknownKindInputs>a.penOneRawInputs||
+    a.penOneShotInputs+a.penOneMissingOrdinaryFlagsInputs>a.penOneRawInputs||
+    a.penOneShotInputs+a.penOneWithoutEpochInputs>a.penOneRawInputs||
+    a.penOneFramesWithInputs>a.bulletUpdateCalls||
+    a.penOneScanCensoredFrames>a.bulletUpdateCalls))
+  throw Error(label+': contradictory pen-one metrics');
  if(!Number.isFinite(a.simulatedBulletSeconds)||a.simulatedBulletSeconds<0)
   throw Error(label+': invalid simulated time');
  if(!Number.isSafeInteger(a.peakProjectiles)||a.peakProjectiles<0)
@@ -31,9 +59,14 @@ function check(a,label){
 function empty(){
  return {...Object.fromEntries(FIELDS.map(k=>[k,0])),
   simulatedBulletSeconds:0,peakProjectiles:0,
-  projectileCountBuckets:Object.fromEntries(BUCKETS.map(k=>[k,0]))};
+  projectileCountBuckets:Object.fromEntries(BUCKETS.map(k=>[k,0])),
+  penOneMetrics:Object.fromEntries(PEN_FIELDS.map(k=>[k,0])),
+  penOneComplete:true};
 }
 function add(sum,a){
+ if(PEN_FIELDS.every(k=>Object.hasOwn(a,k))){
+  for(const k of PEN_FIELDS)sum.penOneMetrics[k]+=a[k];
+ }else sum.penOneComplete=false;
  for(const k of FIELDS)sum[k]+=a[k];
  sum.simulatedBulletSeconds+=a.simulatedBulletSeconds;
  sum.peakProjectiles=Math.max(sum.peakProjectiles,a.peakProjectiles);
@@ -41,7 +74,15 @@ function add(sum,a){
 }
 function finish(a){
  const calls=a.bulletUpdateCalls,breaks=a.coverBreaks;
- return {...a,
+ const {penOneComplete,...rest}=a;
+ return {...rest,
+  penOneMetrics:penOneComplete?a.penOneMetrics:null,
+  fractionPenOneStrictShotUpdates:penOneComplete&&
+   a.penOneMetrics.penOneScanCensoredFrames===0&&a.projectileCountSum?
+   a.penOneMetrics.penOneShotInputs/a.projectileCountSum:null,
+  fractionPenOneRawExpiringShotUpdates:penOneComplete&&
+   a.penOneMetrics.penOneScanCensoredFrames===0&&a.projectileCountSum?
+   a.penOneMetrics.penOneRawExpiringInputs/a.projectileCountSum:null,
   fractionAboveEight:calls?a.projectileCountBuckets.nineToSixteen/calls+
    (a.projectileCountBuckets.seventeenToThirtyTwo+a.projectileCountBuckets.thirtyThreePlus)/calls:null,
   fractionBasicEligible:calls?a.basicEligibleFrames/calls:null,
@@ -79,6 +120,8 @@ function collect(root,expected=18){
     peakProjectiles:a.peakProjectiles,basicEligibleFrames:a.basicEligibleFrames,
     coverBreaks:a.coverBreaks,coverBreaksBasicEligible:a.coverBreaksBasicEligible,
     coverBreaksAboveEight:a.coverBreaksAboveEight,
+    penOneMetrics:PEN_FIELDS.every(k=>Object.hasOwn(a,k))?
+     Object.fromEntries(PEN_FIELDS.map(k=>[k,a[k]])):null,
     endedEarly:s?.game?.status==='dead'};
   }
   observations.push(row);
@@ -92,7 +135,8 @@ function collect(root,expected=18){
    'Cover breaks are counted only within updateBullets; no attribution to a specific certificate',
    'ON/OFF arms are matched experiments, not independent random players; OFF replay is not double-counted',
    'Scripted Scout pilots, fixed seeds and 165s maximum runs do not represent human-match frequency',
-   'Trials ending in death are retained with their actual sampled time; zero-break rates are null, not zero']};
+   'Trials ending in death are retained with their actual sampled time; zero-break rates are null, not zero',
+   'Pen-one counts are necessary shot-local inputs, not certified contacts; missing historical fields remain null']};
 }
 if(require.main===module){
  try{
