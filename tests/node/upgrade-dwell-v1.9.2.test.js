@@ -284,3 +284,56 @@ test('desktop remains automatic after dwell without an extra click', () => {
   const { inner } = render(React.createElement(UpgradeTray, props));
   assert.equal(inner.props.sticksActive, false);
 });
+
+test('spending the final touch upgrade re-arms chip before a fast re-earned point', () => {
+  const { React, timers, render, getOptIn } = boot(true);
+  function UpgradeTray() {}
+  let spent=0;
+  const props={sticksActive:false,hud:{statPoints:1},onUpgrade(){spent++;}};
+  render(React.createElement(UpgradeTray,props));
+  timers[0].fn();
+  let {root}=render(React.createElement(UpgradeTray,props));
+  root.props.onClickCapture();
+  assert.equal(getOptIn(),true);
+  let {inner}=render(React.createElement(UpgradeTray,props));
+  assert.equal(inner.props.sticksActive,false);
+  // No intervening render at zero points: React can batch the spend and
+  // subsequent XP award. The original points<=0 effect never gets a turn.
+  inner.props.onUpgrade('maxHp');
+  assert.equal(spent,1,'real upgrade callback must still run once');
+  assert.equal(getOptIn(),false,'last spend must synchronously revoke opt-in');
+  ({inner}=render(React.createElement(UpgradeTray,props)));
+  assert.equal(inner.props.sticksActive,true,'new point must require a fresh touch opt-in');
+});
+
+test('a capped final-point upgrade does not unexpectedly close the touch tray', () => {
+  const { React, timers, render, getOptIn } = boot(true);
+  function UpgradeTray() {}
+  let attempts=0;
+  const props={sticksActive:false,hud:{statPoints:1,stats:{damage:8}},
+    onUpgrade(){attempts++;}};
+  render(React.createElement(UpgradeTray,props));
+  timers[0].fn();
+  let {root}=render(React.createElement(UpgradeTray,props));
+  root.props.onClickCapture();
+  let {inner}=render(React.createElement(UpgradeTray,props));
+  inner.props.onUpgrade('damage');
+  assert.equal(attempts,1);
+  assert.equal(getOptIn(),true,'rejected capped upgrade leaves deliberate tray open');
+  ({inner}=render(React.createElement(UpgradeTray,props)));
+  assert.equal(inner.props.sticksActive,false);
+});
+
+test('spending one of multiple points keeps the touch tray open', () => {
+  const { React, timers, render, getOptIn } = boot(true);
+  function UpgradeTray() {}
+  const props={sticksActive:false,hud:{statPoints:2,stats:{damage:2}},
+    onUpgrade(){return 'spent';}};
+  render(React.createElement(UpgradeTray,props));
+  timers[0].fn();
+  let {root}=render(React.createElement(UpgradeTray,props));
+  root.props.onClickCapture();
+  let {inner}=render(React.createElement(UpgradeTray,props));
+  assert.equal(inner.props.onUpgrade('damage'),'spent','callback return is preserved');
+  assert.equal(getOptIn(),true);
+});
