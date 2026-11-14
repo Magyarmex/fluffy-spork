@@ -12,6 +12,7 @@ function auditShotEvidence(events,{truncated=0,preFrameOverflow=0,preFrameShotUn
   // A projectile witnessed at frame start cannot be born later in that frame.
   // Keep this internal: it is an evidence invariant, not a gameplay counter.
   const preFrameWitnessIds=new Set();
+  const newbornIds=new Set();
   let lastFrame=0,preStatePresent=0,preStateMissing=0,
       pairedInterceptionPresent=0,pairedInterceptionMissing=0,
       provenNewbornPeerEvents=0,unexplainedMissingPeerStates=0,
@@ -47,6 +48,9 @@ function auditShotEvidence(events,{truncated=0,preFrameOverflow=0,preFrameShotUn
       throw new TypeError('contradictory projectile birth after earlier event');
     if(e.bornThisFrame===true&&e.preShot)
       throw new TypeError('contradictory frame-start birth witness');
+    if(e.preShot&&newbornIds.has(e.shotId))
+      throw new TypeError('contradictory projectile pre-frame witness after birth');
+    if(e.bornThisFrame===true)newbornIds.add(e.shotId);
     if(e.preShot)preFrameWitnessIds.add(e.shotId);
     if(e.preShot&&Number.isFinite(e.preShot.x)&&
        Number.isFinite(e.preShot.y)&&Number.isFinite(e.preShot.ttl))
@@ -77,6 +81,9 @@ function auditShotEvidence(events,{truncated=0,preFrameOverflow=0,preFrameShotUn
         throw new TypeError('contradictory interception peer birth after earlier event');
       if(e.otherBornThisFrame===true&&e.preOtherShot)
         throw new TypeError('contradictory interception peer birth witness');
+      if(e.preOtherShot&&newbornIds.has(e.otherShotId))
+        throw new TypeError('contradictory interception peer pre-frame witness after birth');
+      if(e.otherBornThisFrame===true)newbornIds.add(e.otherShotId);
       if(e.preOtherShot)preFrameWitnessIds.add(e.otherShotId);
       peer.interceptions++;
       // The second projectile is an equal participant, not just metadata
