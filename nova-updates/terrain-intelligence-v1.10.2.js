@@ -56,7 +56,7 @@ function visible(g,ax,ay,bx,by,pad){return !g.hasLineOfSight||g.hasLineOfSight(a
  * or drone radius+5 vs radius. Route geometry must use the body radius; perception
  * keeps its smaller independent margin so observation fairness does not change. */
 function routeVisible(g,ax,ay,bx,by,pad){return !g.hasLineOfSight||g.hasLineOfSight(ax,ay,bx,by,Math.max(2,(pad||8)-5));}
-function routeSafe(g,x,y,pad){return !g.isTerrainSafe||g.isTerrainSafe(x,y,Math.max(2,(pad||8)-5));}
+function routeSafe(g,x,y,pad){return !g.isTerrainSafe||g.isTerrainSafe(x,y,Math.max(3,(pad||8)*.72,(pad||8)-5));}
 function seedSide(seed){var n=Math.abs(Number(seed)||0);return (n%2)?1:-1;}
 function segDistanceSq(ax,ay,bx,by,px,py){var dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy;if(l2<1e-8)return d2(ax,ay,px,py);var t=((px-ax)*dx+(py-ay)*dy)/l2;t=clamp(t,0,1);return d2(px,py,ax+dx*t,ay+dy*t);}
 function solidRadius(s){return s.shape==='circle'?(s.r||0):Math.hypot((s.w||0)*.5,(s.h||0)*.5);}
