@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const {patchSniperInterception, patchMaterializedCore, patchMaterializedRetirement, patchMaterializedInterception, patchBattlefieldCallbacks, patchBattlefieldCover, guardedShotCall, CALLS} = require('../research/projectile-callback-source-patch.cjs');
+const {patchBattlefieldMutualInterception, patchSniperInterception, patchMaterializedCore, patchMaterializedRetirement, patchMaterializedInterception, patchBattlefieldCallbacks, patchBattlefieldCover, guardedShotCall, CALLS} = require('../research/projectile-callback-source-patch.cjs');
 const html = fs.readFileSync(path.resolve(__dirname, '../../index.html'), 'utf8');
 test('research patch changes exactly three authoritative core callbacks, not splash or overlays',()=>{
   const patched = patchMaterializedCore(html);
@@ -444,4 +444,48 @@ test('cover witness cannot suppress damage when a real shot ID getter throws',()
   assert.equal(ledger.snapshot().events.length,0);
   assert.equal(ledger.snapshot().observerErrors,1);
   assert.equal(ledger.snapshot().bounded,false);
+});
+
+test('Battlefield mutual-TTL research witness patches only the certified real owner',()=>{
+  const patched=patchBattlefieldMutualInterception(battlefield);
+  assert.notEqual(patched,battlefield);
+  assert.equal((patched.match(/'battlefield-ttl'/g)||[]).length,1);
+  new vm.Script(patched,{filename:'research-mutual-ttl-battlefield.js'});
+  assert.throws(()=>patchBattlefieldMutualInterception(patched),/already installed/);
+  assert.throws(()=>patchBattlefieldMutualInterception('not a battlefield'),/boundaries changed/);
+  assert.throws(()=>patchBattlefieldMutualInterception(battlefield.replace(
+    'g.weakenBullet(a,bh);g.weakenBullet(b,ah);',
+    'g.weakenBullet(a,bh);g.weakenBullet(b,0);')),/weakening owner changed/);
+  const begin=battlefield.indexOf(' function certifiedMutualTTLInterception(g,dt){');
+  const end=battlefield.indexOf(' var oldUpdateBullets=Game.prototype.updateBullets;',begin);
+  assert.ok(begin>=0&&end>begin);
+  assert.equal(patched.slice(0,begin),battlefield.slice(0,begin));
+  assert.equal(patched.slice(patched.indexOf(' var oldUpdateBullets=Game.prototype.updateBullets;',begin)),
+    battlefield.slice(end));
+});
+
+test('mutual-TTL witness preserves two-shot weakening with valid or broken observers',()=>{
+  const marker='  g.weakenBullet(a,bh);g.weakenBullet(b,ah);';
+  const synthetic='function mutual(g,a,b){var ah=a.hp,bh=b.hp;'+marker+'return [a.hp,b.hp];}';
+  // The synthetic owner uses the same authoritative mutation and lexical
+  // variables; actual Battlefield source identity is checked separately.
+  const original=new Function('return ('+synthetic+')')();
+  const observedSource=synthetic.replace(marker,marker+
+    "\\n  try { const ledger=g.__novaShotLedger;const method=ledger?.recordProjectileInterception;"+
+    "if(typeof method==='function')method.call(ledger,a,b,ah,bh,'battlefield-ttl');"+
+    "} catch (_) { /* observation cannot interrupt combat */ }");
+  const observed=new Function('return ('+observedSource+')')();
+  for(const mode of ['valid','missing','throwing-ledger','throwing-method','throwing-callback']){
+    const make=()=>({weakenBullet(shot,dmg){shot.hp-=dmg;if(shot.hp<=0)shot.dead=true;}});
+    const baseline=make(),g=make(),a={id:71,hp:12,dead:false},b={id:72,hp:9,dead:false};
+    const aa={...a},bb={...b},events=[];
+    if(mode==='valid')g.__novaShotLedger={recordProjectileInterception(...args){events.push(args);}};
+    if(mode==='throwing-ledger')Object.defineProperty(g,'__novaShotLedger',{get(){throw Error('ledger');}});
+    if(mode==='throwing-method')g.__novaShotLedger=Object.defineProperty({},'recordProjectileInterception',{get(){throw Error('method');}});
+    if(mode==='throwing-callback')g.__novaShotLedger={recordProjectileInterception(){throw Error('observer');}};
+    assert.deepEqual(observed(g,a,b),original(baseline,aa,bb));
+    assert.deepEqual([a,b],[aa,bb]);
+    assert.equal(events.length,mode==='valid'?1:0);
+    if(mode==='valid')assert.deepEqual(events[0],[a,b,12,9,'battlefield-ttl']);
+  }
 });
