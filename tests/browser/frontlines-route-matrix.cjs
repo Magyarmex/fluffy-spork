@@ -179,7 +179,7 @@ const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
        * This checks collision geometry, not enemy sensing or route optimality. */
       let routeProbe=null;
       if(approach.blocked){
-       const def=window.__novaMakeRequire('')('./classes').CLASSES[e.cls],
+       const def=window.__novaMakeRequire('')('game/classes').CLASSES[e.cls],
         size=Number(def&&def.size)>0?Number(def.size):15,
         radius=size+3,pad=size+8;
        g.__v1102Routes=Object.create(null);g.__v1102RouteContext=null;
