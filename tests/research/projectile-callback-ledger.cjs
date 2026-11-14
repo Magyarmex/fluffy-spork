@@ -127,6 +127,8 @@ function createProjectileCallbackLedger(game, options = {}) {
   function recordProjectileRetirement(shot, reason) {
     try {
       const shotId = shot == null ? null : shot.id;
+      const rawHits = shot == null ? null : shot.hits;
+      const rawPen = shot == null ? null : shot.pen;
       if (!Number.isSafeInteger(shotId) || shotId < 0 ||
           (reason !== 'ttl' && reason !== 'bounds' && reason !== 'ttl-or-bounds')) {
         observerErrors++; return false;
@@ -134,7 +136,9 @@ function createProjectileCallbackLedger(game, options = {}) {
       if (events.length >= limit) { overflow++; return false; }
       events.push(Object.freeze({epoch, kind:'projectileRetirement',
         targetId:null, shotId, attribution:'direct', source:'core',
-        requestedDamage:null, reason, timing:'upper-bound'}));
+        requestedDamage:null, reason, timing:'upper-bound',
+        priorHits:Number.isSafeInteger(rawHits)&&rawHits>=0?rawHits:null,
+        remainingPen:Number.isSafeInteger(rawPen)?rawPen:null}));
       retiredAttributed++;
       if (reason === 'ttl') ttlRetirements++;
       else if (reason === 'bounds') boundsRetirements++;
