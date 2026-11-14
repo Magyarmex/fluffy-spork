@@ -89,7 +89,9 @@ test('malformed observer falls back to unmodified core damage across simulation 
     const base=fixture(html,false,'shape',hz);
     for(const mode of ['malformed','throwing-ledger','throwing-method']){
       const malformed=fixture(patchMaterializedCore(html),mode,'shape',hz);
-      assert.deepEqual(malformed,base,mode+' at '+hz+'Hz');
+      assert.deepEqual({...malformed,events:[]},base,mode+' at '+hz+'Hz');
+      assert.ok(malformed.events.every(event=>event.shotId===null),
+        'unavailable observer must never manufacture projectile attribution');
     }
   }
 });
