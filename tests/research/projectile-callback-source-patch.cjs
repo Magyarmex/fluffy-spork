@@ -42,14 +42,19 @@ function patchSniperInterception(source) {
   if (typeof source !== 'string') throw new TypeError('Sniper source required');
   if (source.includes('recordProjectileInterception'))
     throw new Error('research Sniper interception patch already installed');
-  const owner='          this.weakenBullet(a, bh); this.weakenBullet(b, ah);';
-  if (source.split(owner).length !== 2)
-    throw new Error('shipping Sniper interception owner changed');
-  const witness='\n          try { const ledger=this.__novaShotLedger;\n' +
-    '            const method=ledger?.recordProjectileInterception;\n' +
-    "            if(typeof method==='function')method.call(ledger,a,b,ah,bh,'sniper');\n" +
+  // The shipping resolver computes this actual swept-contact fraction after
+  // both weakening calls. It is normalized to [0,1] over the projectile
+  // segment, NOT an absolute frame timestamp or a global first-event proof.
+  const weakening='          this.weakenBullet(a, bh); this.weakenBullet(b, ah);';
+  const anchor='          var firstTime = firstProjectileContactTime(a, b, rr);';
+  if (source.split(weakening).length !== 2 || source.split(anchor).length !== 2 ||
+      source.indexOf(weakening) >= source.indexOf(anchor))
+    throw new Error('shipping Sniper interception chronology owner changed');
+  const witness='\\n          try { const ledger=this.__novaShotLedger;\\n' +
+    '            const method=ledger?.recordProjectileInterception;\\n' +
+    "            if(typeof method==='function')method.call(ledger,a,b,ah,bh,'sniper',firstTime);\\n" +
     '          } catch (_) { /* research observation cannot interrupt combat */ }';
-  return source.replace(owner,owner+witness);
+  return source.replace(anchor,anchor+witness);
 }
 
 /** Battlefield's certified mutual-TTL interception runs BEFORE the core
