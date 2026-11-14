@@ -134,6 +134,19 @@ test('research Battlefield patch scopes exactly ten real projectile callbacks',(
     /expected ten Battlefield projectile damage callbacks/);
 });
 
+test('Battlefield observer refuses argument drift even when ten callback sites remain',()=>{
+  const original='g.damageTank(victim,b.dmg,b.ownerId,0,0)';
+  assert.equal(battlefield.split(original).length,2);
+  for(const altered of [
+    'g.damageTank(victim,b.dmg*2,b.ownerId,0,0)',
+    'g.damageTank(victim,b.dmg,0,0,b.ownerId)',
+    'g.damageTank(victim,b.dmg,b.ownerId,0,1)'
+  ]){
+    const changed=battlefield.replace(original,altered);
+    assert.equal([...changed.matchAll(/\\b(?:g|this)\\.damage(?:Tank|Shape|Drone)\\s*\\(/g)].length,10);
+    assert.throws(()=>patchBattlefieldCallbacks(changed),/callback signature drift/);
+  }
+});
 test('ten Battlefield guards call real damage exactly once with or without ledger',()=>{
   const patched=patchBattlefieldCallbacks(battlefield);
   const pattern=/\b(?:g|this)\.damage(?:Tank|Shape|Drone)\s*\(/g;
