@@ -40,7 +40,10 @@ test('paired pose report refuses missing or contradictory RAF exposure',()=>{
  const off=report(false),on=report(true);
  on.ticks=undefined;
  assert.throws(()=>compare(off,on),/authoritative tick count/);
- on.ticks=120;on.raf.observedWallMs=2200;
+ on.ticks=120;on.raf.simulatedMs=1980;on.raf.remainingLagMs=20;
+ assert.throws(()=>compare(off,on),/authoritative tick count/);
+ on.raf.simulatedMs=2000;on.raf.remainingLagMs=0;
+ on.raf.observedWallMs=2200;
  assert.throws(()=>compare(off,on),/time accounting is inconsistent/);
  on.raf.observedWallMs=2000;
  // Sequential arms may have different valid exposure; disclose it instead
