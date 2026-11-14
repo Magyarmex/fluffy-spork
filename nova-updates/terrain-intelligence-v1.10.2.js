@@ -129,6 +129,26 @@ function laneOffset(g,x,y,wp,pad,seed){
   var dx=wp.x-x,dy=wp.y-y,m=Math.hypot(dx,dy)||1,px=-dy/m,py=dx/m,cx=wp.x+px*lane,cy=wp.y+py*lane;
   return routeSafe(g,cx,cy,pad)&&routeVisible(g,x,y,cx,cy,pad)?{x:cx,y:cy,solidId:wp.solidId,lane:lane}:wp;
 }
+/* Read-only strategic distance from the route JUST resolved by the composed
+ * waypoint owner. Never plan again here, never advance a movement cache,
+ * and never use a cached route for a different (even nearby) goal.
+ * null means the caller must use its existing conservative fallback. */
+function cachedRouteLength(g,x,y,gx,gy,pad,seed,wp){
+ if(!g||!wp||!Number.isFinite(wp.x)||!Number.isFinite(wp.y))return null;
+ var map=g.__v1102Routes,c=map&&map[cacheKey(seed,pad)];
+ if(!c||!c.points||!Number.isInteger(c.index)||c.index<0||
+    c.index>=c.points.length||c.gx!==gx||c.gy!==gy)return null;
+ var first=c.points[c.index],last=c.points[c.points.length-1];
+ if(!first||!last||!Number.isFinite(first.x)||!Number.isFinite(first.y)||
+    Math.hypot(first.x-wp.x,first.y-wp.y)>1e-5||
+    Math.hypot(last.x-gx,last.y-gy)>1e-5)return null;
+ var total=Math.hypot(wp.x-x,wp.y-y),from=wp;
+ for(var i=c.index+1;i<c.points.length;i++){
+  var p=c.points[i];if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.y))return null;
+  total+=Math.hypot(p.x-from.x,p.y-from.y);from=p;
+ }
+ return Number.isFinite(total)?total:null;
+}
 function cachedWaypoint(g,x,y,gx,gy,pad,seed,oldWaypoint){
   pad=Math.max(5,pad||10);var now=g.time||0,key=cacheKey(seed,pad),map=g.__v1102Routes||(g.__v1102Routes=Object.create(null)),c=map[key],goalTol=Math.max(68,pad*4.5);
   if(c&&(now>c.until||d2(c.gx,c.gy,gx,gy)>goalTol*goalTol)){delete map[key];c=null;}
@@ -239,6 +259,7 @@ wrap('game/engine',function(engine,require){
     if(ctx&&ctx.forceGoal&&ctx.target){gx=ctx.target.x;gy=ctx.target.y;}
     return cachedWaypoint(this,x,y,gx,gy,pad,seed,oldWaypoint);
   };
+  Game.prototype.novaRouteLength=function(x,y,gx,gy,pad,seed,wp){return cachedRouteLength(this,x,y,gx,gy,pad,seed,wp);};
   Game.prototype.novaInvalidateRoute=function(seed,pad){invalidateRoute(this,seed,pad);};
 
   var oldMove=Game.prototype.moveTank;
@@ -315,7 +336,7 @@ wrap('game/engine',function(engine,require){
 });
 
 window.__NOVA_TERRAIN_INTELLIGENCE_TEST__={
-  obstacleNodes:obstacleNodes,planVisibilityRoute:planVisibilityRoute,seedSide:seedSide,segDistanceSq:segDistanceSq,
+  obstacleNodes:obstacleNodes,planVisibilityRoute:planVisibilityRoute,cachedRouteLength:cachedRouteLength,seedSide:seedSide,segDistanceSq:segDistanceSq,
   controllerSenses:controllerSenses,observedPoint:observedPoint,tangentEscape:tangentEscape,applyEscape:applyEscape,
   idleControllerGoal:idleControllerGoal,blockedDroneStep:blockedDroneStep,idleRouteStep:idleRouteStep,preserveIdleDroneTerrain:preserveIdleDroneTerrain,
   isControllerId:function(id){return !!CONTROLLER_IDS[id];},limits:{maxObstacles:MAX_OBSTACLES,maxNodes:MAX_NODES}
