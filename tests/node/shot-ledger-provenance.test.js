@@ -126,6 +126,11 @@ test('same-frame pre-frame evidence cannot later be reclassified as a birth',()=
       preShot:pre,preOtherShot:null,otherBornThisFrame:true}
   ];
   assert.throws(()=>auditShotEvidence(earlierPeer),/contradictory interception peer birth/);
+  assert.throws(()=>auditShotEvidence([
+    {frame:1,shotId:65,kind:'damageShape',preShot:pre,preTarget:target},
+    {frame:1,shotId:66,kind:'projectileInterception',otherShotId:65,
+      preShot:pre,preOtherShot:null,otherBornThisFrame:true}
+  ]),/contradictory interception peer birth/);
   const peerThenPrimary=[
     {frame:1,shotId:70,kind:'projectileInterception',otherShotId:71,
       preShot:pre,preOtherShot:pre},
