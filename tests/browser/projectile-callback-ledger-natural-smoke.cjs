@@ -334,7 +334,8 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
       'only real Sniper swept contacts may carry normalized contact fractions');
     assert.ok(result.eventSamples.every(e=>
       e.otherShotId===null||e.preOtherShot===null||
-      (Number.isFinite(e.preOtherShot.x)&&Number.isFinite(e.preOtherShot.y))),
+      (Number.isFinite(e.preOtherShot.x)&&Number.isFinite(e.preOtherShot.y)&&
+       Number.isFinite(e.preOtherShot.ttl))),
       'second interception projectile must be exact-ID joined or absent');
     assert.ok(result.eventSamples.every(e=>
       e.preTarget===null||(Number.isFinite(e.preTarget.x)&&
