@@ -45,7 +45,7 @@ function run(cls,seed,presentationHz){
    return result;
   };
   try{
-   if(presentationHz===30){
+   if(presentationHz!==60){
     const timeline=new ChronologicalInput(g.input);
     const bridge={timeline,startMs:1000};
     owner=new FixedStepRafOwner(g,timeline,bridge,{
@@ -56,9 +56,9 @@ function run(cls,seed,presentationHz){
    }
    g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
    g.input.firing=true;g.input.autofire=false;
-   if(presentationHz===30){
-    for(let frame=1;frame<=TICKS/2;frame++){
-     now=1000+frame*1000/30;
+   if(presentationHz!==60){
+    for(let frame=1;frame<=TICKS*presentationHz/60;frame++){
+     now=1000+frame*1000/presentationHz;
      const next=callback;
      assert.equal(typeof next,'function','fixed60 must retain RAF ownership');
      callback=null;next(now);
@@ -78,14 +78,17 @@ function run(cls,seed,presentationHz){
  });
 }
 
-test('fixed60 30Hz presentation preserves seven Gunner class outcomes and RNG',()=>{
+test('fixed60 30Hz and 61Hz presentation preserve seven Gunner class outcomes and RNG',()=>{
  for(const cls of CLASSES){
   for(const seed of [1517800,1517802]){
    const reference=run(cls,seed,60);
-   const fixed30=run(cls,seed,30);
    assert.ok(reference.volleys>0,cls+' must fire in the fixture');
-   assert.deepEqual(fixed30,reference,
-    cls+' at seed '+seed+' diverged from the actual 60Hz Game');
+   for(const presentationHz of [30,61]){
+    const fixed=run(cls,seed,presentationHz);
+    assert.deepEqual(fixed,reference,
+     cls+' at presentation '+presentationHz+'Hz seed '+seed+
+     ' diverged from actual native 60Hz Game');
+   }
   }
  }
 });
