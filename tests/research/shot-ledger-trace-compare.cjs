@@ -18,6 +18,13 @@ function comparePhysicalTraces(off,on){
   assert.equal(off.seed,on.seed,'paired trials must use the same declared seed');
   assert.equal(off.physicalTrace[0].hash,on.physicalTrace[0].hash,
     'OFF/ON worlds differ at frame zero; refuse causal attribution');
+  const digestProvided=off.fullFrameDigest!==undefined||on.fullFrameDigest!==undefined;
+  if(digestProvided){
+    assert.match(off.fullFrameDigest,/^[0-9a-f]+:[0-9a-f]+$/,'OFF full-frame digest');
+    assert.match(on.fullFrameDigest,/^[0-9a-f]+:[0-9a-f]+$/,'ON full-frame digest');
+  }
+  const fullFrameDigestMatched=digestProvided?
+    off.fullFrameDigest===on.fullFrameDigest:null;
   const common=Math.min(off.physicalTrace.length,on.physicalTrace.length);
   let firstDivergence=null;
   for(let i=1;i<common;i++){
@@ -25,6 +32,7 @@ function comparePhysicalTraces(off,on){
     if(a.hash!==b.hash){firstDivergence={frame:a.frame,off:a.hash,on:b.hash};break;}
   }
   return {initialStateMatched:true,comparedSamples:common,
+    fullFrameDigestMatched,
     firstDivergence,identicalThroughComparedFrames:firstDivergence===null,
     complete:off.frames===on.frames,offFrames:off.frames,onFrames:on.frames};
 }
@@ -40,5 +48,5 @@ if(require.main===module){
   };
   const result=comparePhysicalTraces(parse(process.argv[2]),parse(process.argv[3]));
   console.log(JSON.stringify(result));
-  if(!result.complete||!result.identicalThroughComparedFrames)process.exitCode=1;
+  if(!result.complete||!result.identicalThroughComparedFrames||result.fullFrameDigestMatched===false)process.exitCode=1;
 }
