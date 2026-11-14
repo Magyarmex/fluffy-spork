@@ -13,6 +13,9 @@ function comparePhysicalTraces(off,on){
       assert.match(s.hash,/^[0-9a-f]+:[0-9a-f]+$/,name+' physical hash');
     });
   }
+  // Even identical initial fingerprints do not authorize comparing different
+  // seeded input histories. Require explicit seed agreement when supplied.
+  assert.equal(off.seed,on.seed,'paired trials must use the same declared seed');
   assert.equal(off.physicalTrace[0].hash,on.physicalTrace[0].hash,
     'OFF/ON worlds differ at frame zero; refuse causal attribution');
   const common=Math.min(off.physicalTrace.length,on.physicalTrace.length);
