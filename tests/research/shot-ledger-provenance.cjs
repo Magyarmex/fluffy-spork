@@ -13,6 +13,7 @@ function auditShotEvidence(events,{truncated=0,preFrameOverflow=0,preFrameShotUn
   // Keep this internal: it is an evidence invariant, not a gameplay counter.
   const preFrameWitnessIds=new Set();
   const newbornIds=new Set();
+  let witnessFrame=0;
   let lastFrame=0,preStatePresent=0,preStateMissing=0,
       pairedInterceptionPresent=0,pairedInterceptionMissing=0,
       provenNewbornPeerEvents=0,unexplainedMissingPeerStates=0,
@@ -22,6 +23,11 @@ function auditShotEvidence(events,{truncated=0,preFrameOverflow=0,preFrameShotUn
     if(!e||!Number.isSafeInteger(e.frame)||e.frame<1||
        e.frame<lastFrame||!Number.isSafeInteger(e.shotId)||e.shotId<0)
       throw new TypeError('invalid or out-of-order shot event');
+    if(e.frame!==witnessFrame){
+      preFrameWitnessIds.clear();
+      newbornIds.clear();
+      witnessFrame=e.frame;
+    }
     // Chronology units are not interchangeable. A Sniper fraction of a
     // swept segment is NOT a frame timestamp; only the certified mutual-TTL
     // owner supplies bullet-step seconds. Reject mismatched metadata before
