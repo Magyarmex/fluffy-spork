@@ -55,6 +55,26 @@ test('authoritative birth ceiling distinguishes newborn events without proving a
   assert.equal(result.certifiedMissedHits,null);
   assert.equal(result.abstentionReason,'incomplete-pre-frame-evidence');
 });
+test('missing interception peers distinguish certified births from unexplained identity gaps',()=>{
+  const events=[
+    {frame:1,shotId:10,kind:'projectileInterception',otherShotId:11,
+      preShot:pre,preOtherShot:null,otherBornThisFrame:true},
+    {frame:2,shotId:12,kind:'projectileInterception',otherShotId:13,
+      preShot:pre,preOtherShot:null,otherBornThisFrame:false}
+  ];
+  const result=auditShotEvidence(events);
+  assert.equal(result.pairedInterceptionMissing,2);
+  assert.equal(result.provenNewbornPeerEvents,1);
+  assert.equal(result.unexplainedMissingPeerStates,1);
+  assert.equal(result.provenNewbornPeerEvents+result.unexplainedMissingPeerStates,
+    result.pairedInterceptionMissing);
+  assert.equal(result.abstentionReason,'incomplete-pre-frame-evidence');
+  assert.equal(result.certifiedMissedHits,null);
+  const bornOnly=auditShotEvidence(events.slice(0,1));
+  assert.equal(bornOnly.provenNewbornPeerEvents,1);
+  assert.equal(bornOnly.unexplainedMissingPeerStates,0);
+  assert.equal(bornOnly.certifiedMissedHits,null);
+});
 test('contradictory birth and pre-existing witnesses fail closed',()=>{
   assert.throws(()=>auditShotEvidence([
     {frame:1,shotId:1,kind:'damageTank',bornThisFrame:true,
