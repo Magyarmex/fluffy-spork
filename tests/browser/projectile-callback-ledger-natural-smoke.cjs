@@ -113,6 +113,10 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
       // Keep complete ordered state, including RNG-independent combat owners;
       // no gameplay state is modified by this witness.
       const physicalTrace=[];
+      // Bounded event provenance enables later shot-ID joins without retaining
+      // a full unbounded combat log or claiming event time is first contact.
+      const eventSamples=[],MAX_EVENT_SAMPLES=256;
+      let eventSamplesTruncated=0;
       const fingerprint=()=>{
         const state=JSON.stringify({
           time:g.time,rng:paired?window.__novaShotSeedState():null,
@@ -142,6 +146,14 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
         try{g.update(1/30);}
         finally{if(paired){Math.random=rand;Date.now=now;}}
         updateMs.push(performance.now()-t0);
+        if(observe){
+          for(const e of ledger.snapshot().events){
+            if(eventSamples.length>=MAX_EVENT_SAMPLES){eventSamplesTruncated++;continue;}
+            eventSamples.push({frame:i+1,kind:e.kind,shotId:e.shotId,
+              targetId:e.targetId,otherShotId:e.otherShotId??null,
+              source:e.source??null,reason:e.reason??null,timing:e.timing??null});
+          }
+        }
         const s=observe?ledger.counters():{
           damageCallbacksCaptured:0,retiredAttributed:0,ttlRetirements:0,
           boundsRetirements:0,ambiguousRetirements:0,rawPenOneZeroHitTtl:0,
@@ -161,7 +173,7 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
       if(observe){delete g.__novaShotLedger;
         if(!ledger.uninstall())throw Error('failed to restore real damage methods');}
       updateMs.sort((a,b)=>a-b);
-      return{arm:paired?(observe?'on':'off'):'smoke',preSortTankIds,frames,physicalTrace,callbacks,attributedCallbacks:callbacks-unknown,coreAttributed,battlefieldAttributed,coverAttributed,retirements,ttlRetirements,boundsRetirements,ambiguousRetirements,rawPenOneZeroHitTtl,coreInterceptions,sniperInterceptions,battlefieldTtlInterceptions,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
+      return{arm:paired?(observe?'on':'off'):'smoke',preSortTankIds,frames,physicalTrace,eventSamples,eventSamplesTruncated,callbacks,attributedCallbacks:callbacks-unknown,coreAttributed,battlefieldAttributed,coverAttributed,retirements,ttlRetirements,boundsRetirements,ambiguousRetirements,rawPenOneZeroHitTtl,coreInterceptions,sniperInterceptions,battlefieldTtlInterceptions,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
         p95UpdateMs:updateMs[Math.ceil(updateMs.length*.95)-1],
         maxUpdateMs:updateMs[updateMs.length-1],status:g.status,time:g.time};
     },{observe:OBSERVE,paired:!!PAIRED_ARM});
@@ -171,6 +183,11 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
     assert.ok(result.physicalTrace.every((sample,i)=>sample.frame===i*10&&
       /^[0-9a-f]+:[0-9a-f]+$/.test(sample.hash)),
       'fingerprints must have monotonic frame epochs and bounded hash shape');
+    assert.ok(result.eventSamples.length<=256&&result.eventSamplesTruncated>=0,
+      'bounded shot provenance sample');
+    assert.ok(result.eventSamples.every(e=>Number.isSafeInteger(e.frame)&&
+      e.frame>=1&&e.frame<=result.frames&&typeof e.kind==='string'),
+      'shot provenance events must have real frame epochs');
     assert.ok(Number.isSafeInteger(result.retirements)&&result.retirements>=0,
       'core retirement witness must report bounded nonnegative count');
     assert.ok(Number.isSafeInteger(result.sniperInterceptions)&&result.sniperInterceptions>=0,
