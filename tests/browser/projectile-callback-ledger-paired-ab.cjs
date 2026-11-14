@@ -98,7 +98,10 @@ for(const {seed,layoutIndex,layout} of trialsPlan){
     on:{frames:on.frames,p95UpdateMs:on.p95UpdateMs,maxUpdateMs:on.maxUpdateMs,
       attributedCallbacks:on.attributedCallbacks,retirements:on.retirements,
       sniperInterceptions:on.sniperInterceptions,battlefieldTtlInterceptions:on.battlefieldTtlInterceptions},
-    p95DifferenceMs:on.p95UpdateMs-off.p95UpdateMs});
+    p95DifferenceMs:on.p95UpdateMs-off.p95UpdateMs,
+    p95OffDriftMs:offRepeat.p95UpdateMs-off.p95UpdateMs,
+    p95BracketMidpointDifferenceMs:on.p95UpdateMs-
+      (off.p95UpdateMs+offRepeat.p95UpdateMs)/2});
 }
 assert.ok(trials.every(t=>t.on.retirements>0),
   'each seeded game must exercise actual projectile retirement');
