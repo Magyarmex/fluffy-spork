@@ -4,14 +4,19 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');
 const {chromium}=require('playwright');
-const {patchMaterializedCore,patchMaterializedRetirement,patchMaterializedInterception,patchBattlefieldCallbacks,patchBattlefieldCover}=require('../research/projectile-callback-source-patch.cjs');
+const {patchSniperInterception,patchMaterializedCore,patchMaterializedRetirement,patchMaterializedInterception,patchBattlefieldCallbacks,patchBattlefieldCover}=require('../research/projectile-callback-source-patch.cjs');
 (async()=>{
   const browser=await chromium.launch({headless:true});
   const context=await browser.newContext({viewport:{width:900,height:700}});
   const page=await context.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(String(e.stack||e)));
-  let patches=0,battlefieldPatches=0;
+  let patches=0,battlefieldPatches=0,sniperPatches=0;
   try{
+    await page.route('**/nova-updates/sniper-v1.2.0.js',async route=>{
+      const response=await route.fetch(),source=await response.text();
+      assert.equal(response.status(),200);sniperPatches++;
+      await route.fulfill({response,body:patchSniperInterception(source)});
+    });
     await page.route('**/nova-updates/battlefield-v1.6.0.js',async route=>{
       const response=await route.fetch(),source=await response.text();
       assert.equal(response.status(),200);
@@ -28,6 +33,7 @@ const {patchMaterializedCore,patchMaterializedRetirement,patchMaterializedInterc
     await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded',timeout:45000});
     assert.equal(patches,1,'exactly one shipping HTML response transformed');
     assert.equal(battlefieldPatches,1,'exactly one Battlefield response transformed');
+    assert.equal(sniperPatches,1,'exactly one shipping Sniper response transformed');
     await page.addScriptTag({content:fs.readFileSync(path.resolve(__dirname,
       '../research/projectile-callback-ledger.cjs'),'utf8')});
     await page.evaluate(()=>{
@@ -54,14 +60,14 @@ const {patchMaterializedCore,patchMaterializedRetirement,patchMaterializedInterc
       const ledger=factory(g,{limit:4096});
       ledger.install();
       g.__novaShotLedger=ledger;
-      let frames=0,callbacks=0,scopedCalls=0,unusedScopes=0,observerErrors=0,unknown=0,unidentifiedTargets=0,coreAttributed=0,battlefieldAttributed=0,coverAttributed=0,retirements=0,ttlRetirements=0,boundsRetirements=0,ambiguousRetirements=0,rawPenOneZeroHitTtl=0,coreInterceptions=0;
+      let frames=0,callbacks=0,scopedCalls=0,unusedScopes=0,observerErrors=0,unknown=0,unidentifiedTargets=0,coreAttributed=0,battlefieldAttributed=0,coverAttributed=0,retirements=0,ttlRetirements=0,boundsRetirements=0,ambiguousRetirements=0,rawPenOneZeroHitTtl=0,coreInterceptions=0,sniperInterceptions=0;
       const updateMs=[];
       for(let i=0;i<600&&g.status==='playing';i++){
         const t0=performance.now();
         g.update(1/30);
         updateMs.push(performance.now()-t0);
         const s=ledger.counters();
-        frames++;callbacks+=s.damageCallbacksCaptured;retirements+=s.retiredAttributed;ttlRetirements+=s.ttlRetirements;boundsRetirements+=s.boundsRetirements;ambiguousRetirements+=s.ambiguousRetirements;rawPenOneZeroHitTtl+=s.rawPenOneZeroHitTtl;coreInterceptions+=s.coreInterceptions;scopedCalls+=s.scopedCalls;
+        frames++;callbacks+=s.damageCallbacksCaptured;retirements+=s.retiredAttributed;ttlRetirements+=s.ttlRetirements;boundsRetirements+=s.boundsRetirements;ambiguousRetirements+=s.ambiguousRetirements;rawPenOneZeroHitTtl+=s.rawPenOneZeroHitTtl;coreInterceptions+=s.coreInterceptions;sniperInterceptions+=s.sniperInterceptions;scopedCalls+=s.scopedCalls;
         unusedScopes+=s.unusedScopes;observerErrors+=s.observerErrors;
         unknown+=s.unknown;unidentifiedTargets+=s.unidentifiedTargets;
         coreAttributed+=s.coreAttributed;battlefieldAttributed+=s.battlefieldAttributed;coverAttributed+=s.coverAttributed;
@@ -71,13 +77,15 @@ const {patchMaterializedCore,patchMaterializedRetirement,patchMaterializedInterc
       delete g.__novaShotLedger;
       if(!ledger.uninstall())throw Error('failed to restore real damage methods');
       updateMs.sort((a,b)=>a-b);
-      return{frames,callbacks,attributedCallbacks:callbacks-unknown,coreAttributed,battlefieldAttributed,coverAttributed,retirements,ttlRetirements,boundsRetirements,ambiguousRetirements,rawPenOneZeroHitTtl,coreInterceptions,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
+      return{frames,callbacks,attributedCallbacks:callbacks-unknown,coreAttributed,battlefieldAttributed,coverAttributed,retirements,ttlRetirements,boundsRetirements,ambiguousRetirements,rawPenOneZeroHitTtl,coreInterceptions,sniperInterceptions,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
         p95UpdateMs:updateMs[Math.ceil(updateMs.length*.95)-1],
         maxUpdateMs:updateMs[updateMs.length-1],status:g.status,time:g.time};
     });
     assert.ok(result.frames>=1,'real composed game must advance');
     assert.ok(Number.isSafeInteger(result.retirements)&&result.retirements>=0,
       'core retirement witness must report bounded nonnegative count');
+    assert.ok(Number.isSafeInteger(result.sniperInterceptions)&&result.sniperInterceptions>=0,
+      'shipping Sniper interception events are separately counted');
     assert.ok(Number.isSafeInteger(result.coreInterceptions)&&result.coreInterceptions>=0,
       'core endpoint interception events are separately counted');
     assert.ok(result.rawPenOneZeroHitTtl<=result.ttlRetirements,
