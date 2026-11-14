@@ -62,6 +62,7 @@ function fixture(source,observe,kind='shape',hz=30){
   const ledger=observe?require('../research/projectile-callback-ledger.cjs')
     .createProjectileCallbackLedger(g):null;
   if(ledger){ledger.install();g.__novaShotLedger=ledger;}
+  if(observe==='malformed')g.__novaShotLedger={};
   compileUpdater(source).call(g,1/hz);
   const result={hp:shape.hp,pen:bullet.pen,hits:bullet.hits,dead:bullet.dead,
     ttl:bullet.ttl,bulletCount:g.bullets.length,
@@ -79,6 +80,13 @@ test('patched actual shipping updater preserves damage and records explicit shot
     [[29,41,'damageShape',2]]);
 });
 
+test('malformed observer falls back to unmodified core damage across simulation rates',()=>{
+  for(const hz of [30,60,120,240]){
+    const base=fixture(html,false,'shape',hz);
+    const malformed=fixture(patchMaterializedCore(html),'malformed','shape',hz);
+    assert.deepEqual(malformed,base);
+  }
+});
 test('browser-only patch preserves tank/drone/shape damage across 30–240Hz',()=>{
   for(const kind of ['shape','tank','drone'])for(const hz of [30,60,120,240]){
     const base=fixture(html,false,kind,hz);
