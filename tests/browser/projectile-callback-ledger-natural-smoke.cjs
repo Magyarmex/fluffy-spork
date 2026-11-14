@@ -148,6 +148,9 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
         updateMs.push(performance.now()-t0);
         if(observe){
           for(const e of ledger.snapshot().events){
+            // Unknown-origin damage has scalar counters but cannot support a
+            // shot-ID join; reserve the bounded sample for attributable events.
+            if(!Number.isSafeInteger(e.shotId))continue;
             if(eventSamples.length>=MAX_EVENT_SAMPLES){eventSamplesTruncated++;continue;}
             eventSamples.push({frame:i+1,kind:e.kind,shotId:e.shotId,
               targetId:e.targetId,otherShotId:e.otherShotId??null,
