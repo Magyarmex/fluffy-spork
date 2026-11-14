@@ -31,6 +31,12 @@ const trials=[];
 const initialWorlds=new Set();
 for(const seed of seeds){
   const off=arm('off',seed),offRepeat=arm('off',seed),on=arm('on',seed);
+  assert.ok(Array.isArray(off.preSortTankIds)&&off.preSortTankIds.length>0,
+    seed+' must expose native startup tank order');
+  assert.deepEqual(off.preSortTankIds,offRepeat.preSortTankIds,
+    seed+' OFF/OFF native tank order differed before test normalization');
+  assert.deepEqual(off.preSortTankIds,on.preSortTankIds,
+    seed+' OFF/ON native tank order differed before test normalization');
   const initialHash=off.physicalTrace[0].hash;
   assert.ok(!initialWorlds.has(initialHash),
     seed+' did not produce a distinct initial world; multi-seed coverage is illusory');
