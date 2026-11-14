@@ -3,18 +3,21 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {auditShotEvidence}=require('../research/shot-ledger-provenance.cjs');
 const pre={x:0,y:1,ttl:0.3};
+const target={x:3,y:4,hp:90};
 test('joins exact shot IDs across damage, interception and retirement without inventing misses',()=>{
   const events=[
-    {frame:1,shotId:11,kind:'damageTank',preShot:pre},
+    {frame:1,shotId:11,kind:'damageTank',preShot:pre,preTarget:target},
     {frame:2,shotId:11,kind:'projectileInterception',otherShotId:12,
       preShot:pre,preOtherShot:{x:3,y:4}},
     {frame:3,shotId:11,kind:'projectileRetirement',preShot:pre},
-    {frame:3,shotId:12,kind:'coverDamage',preShot:pre}
+    {frame:3,shotId:12,kind:'coverDamage',preShot:pre,preTarget:target}
   ];
   const result=auditShotEvidence(events);
   assert.equal(result.bounded,true);
   assert.equal(result.shotCount,2);
   assert.equal(result.preStatePresent,4);
+  assert.equal(result.targetStatePresent,2);
+  assert.equal(result.targetStateMissing,0);
   assert.equal(result.pairedInterceptionPresent,1);
   assert.equal(result.shots[1].interceptions,1,'peer projectile is a participant');
   assert.deepEqual(result.shots[0],{
