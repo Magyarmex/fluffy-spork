@@ -85,6 +85,25 @@ test('contradictory birth and pre-existing witnesses fail closed',()=>{
       preShot:pre,preOtherShot:pre,otherBornThisFrame:true}
   ]),/contradictory/);
 });
+test('a projectile observed in an earlier frame cannot be born again later',()=>{
+  assert.throws(()=>auditShotEvidence([
+    {frame:1,shotId:20,kind:'projectileRetirement',preShot:pre},
+    {frame:2,shotId:20,kind:'damageTank',bornThisFrame:true,preShot:null,preTarget:target}
+  ]),/contradictory projectile birth/);
+  assert.throws(()=>auditShotEvidence([
+    {frame:1,shotId:30,kind:'projectileRetirement',preShot:pre},
+    {frame:2,shotId:31,kind:'projectileInterception',otherShotId:30,
+      preShot:pre,preOtherShot:null,otherBornThisFrame:true}
+  ]),/contradictory interception peer birth/);
+  // Two callbacks in the same frame can legitimately share a newborn identity.
+  const valid=auditShotEvidence([
+    {frame:1,shotId:40,kind:'damageTank',bornThisFrame:true,preShot:null,preTarget:target},
+    {frame:1,shotId:41,kind:'projectileInterception',otherShotId:40,
+      preShot:pre,preOtherShot:null,otherBornThisFrame:true}
+  ]);
+  assert.equal(valid.certifiedMissedHits,null);
+  assert.equal(valid.provenNewbornPeerEvents,1);
+});
 test('boundedness is lost on event or pre-frame overflow',()=>{
   for(const options of [{truncated:1},{preFrameOverflow:1}]){
     const result=auditShotEvidence([],options);
