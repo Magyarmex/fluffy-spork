@@ -483,6 +483,9 @@ test('retirement witness distinguishes observed terminal transition from missed-
   assert.equal(l.recordProjectileRetirement({id:19},'ttl'),true);
   assert.equal(l.recordProjectileRetirement({id:20},'bounds'),true);
   assert.equal(l.counters().retiredAttributed,2);
+  assert.equal(l.counters().ttlRetirements,1);
+  assert.equal(l.counters().boundsRetirements,1);
+  assert.equal(l.counters().ambiguousRetirements,0);
   assert.equal(l.counters().damageCallbacksCaptured,0);
   assert.equal(l.counters().eventsCaptured,2);
   assert.deepEqual(l.snapshot().events.map(e=>[e.shotId,e.reason,e.timing]),
@@ -492,8 +495,11 @@ test('retirement witness distinguishes observed terminal transition from missed-
   assert.equal(l.snapshot().bounded,false);
   l.nextFrame();
   assert.equal(l.counters().retiredAttributed,0);
+  assert.equal(l.counters().ttlRetirements,0);
+  assert.equal(l.counters().boundsRetirements,0);
   assert.equal(l.recordProjectileRetirement({id:22},'ttl-or-bounds'),true);
   assert.equal(l.snapshot().events[0].reason,'ttl-or-bounds');
+  assert.equal(l.counters().ambiguousRetirements,1);
   assert.equal(l.recordProjectileRetirement({id:23},'guessed-hit'),false);
   assert.equal(l.recordProjectileRetirement({},'ttl'),false);
   assert.equal(l.counters().observerErrors,2);
