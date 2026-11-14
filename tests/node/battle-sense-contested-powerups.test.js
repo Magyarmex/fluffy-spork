@@ -79,3 +79,17 @@ test('falls back to the original distance model when speed data is unavailable',
   g.tanks=[bot,rival];g.tankSpeed=null;
   assert.ok(c.window.__NOVA_BATTLE_SENSE_TEST__.resourceContest(g,bot,pickup,300)>0.3,'missing speed information must preserve the prior safe contention behavior');
 });
+
+test('full multi-leg pickup route prevents a false contested shield chase',()=>{
+ const {c,Game}=load(),g=new Game(),bot=T(1,0,0),rival=T(2,80,0),
+  pickup={id:9,type:'shield',x:300,y:0};
+ bot.hp=50;g.tanks=[bot,rival];g.powerups=[pickup];
+ g.hasLineOfSight=(ax,ay,bx,by)=>!(ax===bot.x&&ay===bot.y&&bx===pickup.x&&by===pickup.y);
+ g.novaBattlefieldWaypoint=()=>({x:150,y:30});
+ const h=c.window.__NOVA_BATTLE_SENSE_TEST__;
+ assert.equal(h.chooseResource(g,bot).id,pickup.id,
+  'first-corner approximation alone would make the shield appear contestable');
+ g.novaRouteLength=()=>650;
+ assert.equal(h.chooseResource(g,bot),null,
+  'the verified longer route should not pull the rival into a lost pickup race');
+});
