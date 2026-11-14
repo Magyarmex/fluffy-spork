@@ -169,6 +169,29 @@ test('ten Battlefield guards call real damage exactly once with or without ledge
         .apply(game,Object.values({...vars,g:game}));
       assert.equal(malformed,17);
       assert.equal(seen.damage,2);
+      // A valid observer is sampled once and receives its original receiver.
+      let ledgerReads=0,methodReads=0;
+      const validLedger={get withProjectile(){methodReads++;return function(shot,fn){
+        assert.equal(this,validLedger);assert.equal(shot.id,101);return fn();
+      };}};
+      const sampled=Object.assign({},game);
+      Object.defineProperty(sampled,'__novaShotLedger',{get(){ledgerReads++;return validLedger;}});
+      const varsSampled={...vars,g:sampled};
+      assert.equal(new Function(...Object.keys(varsSampled),'return '+wrapped+';')
+        .apply(sampled,Object.values(varsSampled)),17);
+      assert.equal(ledgerReads,1);
+      assert.equal(methodReads,1);
+      // Combat exceptions must propagate once, never be caught and replayed.
+      let throws=0;
+      const exploding=Object.assign({},game,{
+        damageTank(){throws++;throw Error('real damage failure');},
+        damageShape(){throws++;throw Error('real damage failure');},
+        damageDrone(){throws++;throw Error('real damage failure');}
+      });
+      const varsExploding={...vars,g:exploding};
+      assert.throws(()=>new Function(...Object.keys(varsExploding),'return '+wrapped+';')
+        .apply(exploding,Object.values(varsExploding)),/real damage failure/);
+      assert.equal(throws,1);
       // Both a throwing ledger getter and a throwing method getter must
       // fall back exactly once, without changing the combat callback.
       for(const throwing of [
