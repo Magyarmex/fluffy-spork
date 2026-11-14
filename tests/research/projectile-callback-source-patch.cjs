@@ -52,6 +52,27 @@ function patchSniperInterception(source) {
   return source.replace(owner,owner+witness);
 }
 
+/** Battlefield's certified mutual-TTL interception runs BEFORE the core
+ * updater and independently of Sniper's swept resolver. Witness the real
+ * post-weakening pair; never treat it as a callback or a missed hit. */
+function patchBattlefieldMutualInterception(source) {
+  if (typeof source !== 'string') throw new TypeError('Battlefield source required');
+  if (source.includes("method.call(ledger,a,b,ah,bh,'battlefield-ttl')"))
+    throw new Error('research mutual-TTL interception patch already installed');
+  const start=source.indexOf(' function certifiedMutualTTLInterception(g,dt){');
+  const end=source.indexOf(' var oldUpdateBullets=Game.prototype.updateBullets;',start);
+  if(start<0||end<=start)throw new Error('shipping mutual-TTL owner boundaries changed');
+  const owner='  g.weakenBullet(a,bh);g.weakenBullet(b,ah);';
+  const body=source.slice(start,end);
+  if(body.split(owner).length!==2)
+    throw new Error('shipping mutual-TTL weakening owner changed');
+  const witness="\n  try { const ledger=g.__novaShotLedger;"+
+    "const method=ledger?.recordProjectileInterception;"+
+    "if(typeof method==='function')method.call(ledger,a,b,ah,bh,'battlefield-ttl');"+
+    "} catch (_) { /* research observation cannot interrupt combat */ }";
+  return source.slice(0,start)+body.replace(owner,owner+witness)+source.slice(end);
+}
+
 /** Research-only witness at the real core endpoint interception owner.
  * The pair has already been weakened before observation. This is NOT an
  * authoritative continuous first-contact time or a new combat solver. */
@@ -180,4 +201,4 @@ function patchBattlefieldCover(source) {
     '}catch(_){/* research observation must not interrupt cover damage */}';
   return source.replace(target,target+witness);
 }
-module.exports = {patchSniperInterception, patchMaterializedCore, patchMaterializedRetirement, patchMaterializedInterception, patchBattlefieldCallbacks, patchBattlefieldCover, guardedShotCall, CALLS};
+module.exports = {patchBattlefieldMutualInterception, patchSniperInterception, patchMaterializedCore, patchMaterializedRetirement, patchMaterializedInterception, patchBattlefieldCallbacks, patchBattlefieldCover, guardedShotCall, CALLS};
