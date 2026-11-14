@@ -109,3 +109,44 @@ test('research Battlefield patch scopes exactly ten real projectile callbacks',(
     'g.damageTank(hit.e,b.dmg,b.ownerId,kx,ky);','/* changed */')),
     /expected ten Battlefield projectile damage callbacks/);
 });
+
+test('ten Battlefield guards call real damage exactly once with or without ledger',()=>{
+  const patched=patchBattlefieldCallbacks(battlefield);
+  const pattern=/\\b(?:g|this)\\.damage(?:Tank|Shape|Drone)\\s*\\(/g;
+  const originals=[...battlefield.matchAll(pattern)];
+  assert.equal(originals.length,10);
+  // The transform adds one guarded and one fallback call per original.
+  const guarded=[...patched.matchAll(/\\b(?:g|this)\\.__novaShotLedger\\s*\\?/g)];
+  assert.equal(guarded.length,10);
+  for(const match of originals){
+    let depth=0,end=-1;
+    for(let i=match.index+match[0].length-1;i<battlefield.length;i++){
+      if(battlefield[i]==='(')depth++;
+      else if(battlefield[i]===')'&&--depth===0){end=i+1;break;}
+    }
+    assert.ok(end>match.index);
+    const call=battlefield.slice(match.index,end);
+    const receiver=call.startsWith('this.')?'this':'g';
+    const wrapped='('+receiver+'.__novaShotLedger ? '+
+      receiver+'.__novaShotLedger.withProjectile(b,()=>'+call+') : '+call+')';
+    assert.ok(patched.includes(wrapped),'missing guard: '+call);
+    for(const enabled of [false,true]){
+      const seen={damage:0,scope:0};
+      const game={
+        damageTank(){seen.damage++;return 17;},
+        damageShape(){seen.damage++;return 17;},
+        damageDrone(){seen.damage++;return 17;}
+      };
+      if(enabled)game.__novaShotLedger={withProjectile(shot,fn){
+        seen.scope++;assert.equal(shot.id,101);return fn();
+      }};
+      const vars={g:game,b:{id:101,dmg:20,ownerId:1,knock:2,vx:3,vy:4},
+        e:{},best:{e:{}},hit:{e:{}},victim:{},kx:0,ky:0,ang:0,vx:3,vy:4};
+      const result=new Function(...Object.keys(vars),'return '+wrapped+';')
+        .apply(game,Object.values(vars));
+      assert.equal(result,17);
+      assert.equal(seen.damage,1);
+      assert.equal(seen.scope,enabled?1:0);
+    }
+  }
+});
