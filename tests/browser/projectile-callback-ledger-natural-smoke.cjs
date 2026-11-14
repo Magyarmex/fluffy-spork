@@ -54,7 +54,7 @@ const {patchMaterializedCore,patchBattlefieldCallbacks}=require('../research/pro
       const ledger=factory(g,{limit:4096});
       ledger.install();
       g.__novaShotLedger=ledger;
-      let frames=0,callbacks=0,scopedCalls=0,unusedScopes=0,observerErrors=0,unknown=0,unidentifiedTargets=0;
+      let frames=0,callbacks=0,scopedCalls=0,unusedScopes=0,observerErrors=0,unknown=0,unidentifiedTargets=0,coreAttributed=0,battlefieldAttributed=0;
       const frameMs=[];
       for(let i=0;i<600&&g.status==='playing';i++){
         const t0=performance.now();
@@ -64,13 +64,14 @@ const {patchMaterializedCore,patchBattlefieldCallbacks}=require('../research/pro
         frames++;callbacks+=s.eventsCaptured;scopedCalls+=s.scopedCalls;
         unusedScopes+=s.unusedScopes;observerErrors+=s.observerErrors;
         unknown+=s.unknown;unidentifiedTargets+=s.unidentifiedTargets;
+        coreAttributed+=s.coreAttributed;battlefieldAttributed+=s.battlefieldAttributed;
         if(s.overflow)throw Error('research callback buffer overflow');
         ledger.nextFrame();
       }
       delete g.__novaShotLedger;
       if(!ledger.uninstall())throw Error('failed to restore real damage methods');
       frameMs.sort((a,b)=>a-b);
-      return{frames,callbacks,attributedCallbacks:callbacks-unknown,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
+      return{frames,callbacks,attributedCallbacks:callbacks-unknown,coreAttributed,battlefieldAttributed,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
         p95FrameMs:frameMs[Math.ceil(frameMs.length*.95)-1],
         maxFrameMs:frameMs[frameMs.length-1],status:g.status,time:g.time};
     });
@@ -78,6 +79,8 @@ const {patchMaterializedCore,patchBattlefieldCallbacks}=require('../research/pro
     assert.equal(result.observerErrors,0,'observer must not fail in natural gameplay');
     assert.ok(result.attributedCallbacks>=0&&result.attributedCallbacks<=result.callbacks,
       'attributed callback count must be bounded by actual captured callbacks');
+    assert.ok(result.coreAttributed+result.battlefieldAttributed<=result.attributedCallbacks,
+      'origin-specific counts cannot exceed attributed callbacks');
     assert.ok(Number.isFinite(result.time));
     assert.ok(Number.isFinite(result.p95FrameMs),'browser frame-time sample required');
     assert.deepEqual(errors,[],'no browser runtime exceptions');
