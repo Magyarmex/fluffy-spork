@@ -11,7 +11,8 @@ const SECONDS=8;
 const POLICIES={
  held:()=>true,
  '1s-on-250ms-off':t=>(t%1.25)<1,
- '400ms-on-400ms-off':t=>(t%0.8)<0.4
+ '400ms-on-400ms-off':t=>(t%0.8)<0.4,
+ '400ms-on-400ms-off-phase200ms':t=>((t+0.2)%0.8)<0.4
 };
 function run(seed,cls,reload,hz,policy){
  return withSeed(seed,()=>{
@@ -56,7 +57,8 @@ function run(seed,cls,reload,hz,policy){
    assert.ok(shots.every((t,i)=>i===0||t>=shots[i-1]),'shot chronology');
    return {cls,reload,hz,policy,volleys:shots.length,
     firstShots:shots.slice(0,8),lastShots:shots.slice(-4),
-    activeTicks,spinMean:+(spinSum/(SECONDS*hz)).toFixed(6),
+    activeTicks,activeSeconds:+(activeTicks/hz).toFixed(6),
+    volleysPerActiveSecond:+(shots.length/(activeTicks/hz)).toFixed(6),spinMean:+(spinSum/(SECONDS*hz)).toFixed(6),
     spinPeak:+spinPeak.toFixed(6),spinFinal:+(p.fireSpin||0).toFixed(6),
     heatMean:+(heatSum/(SECONDS*hz)).toFixed(6),
     heatPeak:+heatPeak.toFixed(6),heatFinal:+(p.__v17Heat||0).toFixed(6)};
@@ -64,7 +66,7 @@ function run(seed,cls,reload,hz,policy){
  });
 }
 
-test('legal rotary builds: held and timestamped bursts at 30/60/120Hz',()=>{
+test('legal rotary builds: held and phase-controlled timestamped bursts at 30/60/120Hz',()=>{
  const rows=[];
  for(const [cls,reload] of [['minigun',1],['needlestorm',3]])
   for(const policy of Object.keys(POLICIES))
@@ -73,6 +75,8 @@ test('legal rotary builds: held and timestamped bursts at 30/60/120Hz',()=>{
     const b=run(1517802,cls,reload,hz,policy);
     assert.deepEqual(a,b,'no-target firing must be independent of seed');
     assert.ok(a.volleys>0,'weapon must fire');
+    if(policy.startsWith('400ms-on-400ms-off'))
+     assert.equal(a.activeSeconds,4,'phase-controlled bursts must preserve equal firing time');
     rows.push(a);
    }
  // The known held-fire cliffs are diagnostics, not acceptance goldens.
