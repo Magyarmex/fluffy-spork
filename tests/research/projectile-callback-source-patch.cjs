@@ -12,7 +12,7 @@ function patchMaterializedCore(html) {
   const end = html.indexOf('    splashAt(x, y, radius, frac, ownerId, knock, color, dmg) {', start);
   if (start < 0 || end <= start) throw new Error('shipping core boundaries changed');
   let body = html.slice(start, end);
-  if (body.includes('__novaShotLedger.withProjectile'))
+  if (body.includes('let ledger,method;try{ledger=this.__novaShotLedger'))
     throw new Error('research callback patch already installed');
   for (const call of CALLS) {
     if (body.split(call).length !== 2) throw new Error('expected one core callback: ' + call);
@@ -34,7 +34,7 @@ function patchMaterializedCore(html) {
  */
 function patchBattlefieldCallbacks(source) {
   if (typeof source !== 'string') throw new TypeError('Battlefield source required');
-  if (source.includes('__novaShotLedger.withProjectile'))
+  if (source.includes('let ledger,method;try{ledger='))
     throw new Error('Battlefield research callback patch already installed');
   const re = /\b(?:g|this)\.damage(?:Tank|Shape|Drone)\s*\(/g;
   const matches = [...source.matchAll(re)];
