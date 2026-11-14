@@ -1,14 +1,16 @@
 'use strict';
 // Research-only provenance audit. A pre-update endpoint is NOT a swept
 // collision witness. Never classify a missed hit without competing geometry.
-function auditShotEvidence(events,{truncated=0,preFrameOverflow=0}={}){
+function auditShotEvidence(events,{truncated=0,preFrameOverflow=0,preFrameTargetUnidentified=0}={}){
   if(!Array.isArray(events))throw new TypeError('events array required');
   if(!Number.isSafeInteger(truncated)||truncated<0||
-     !Number.isSafeInteger(preFrameOverflow)||preFrameOverflow<0)
+     !Number.isSafeInteger(preFrameOverflow)||preFrameOverflow<0||
+     !Number.isSafeInteger(preFrameTargetUnidentified)||preFrameTargetUnidentified<0)
     throw new RangeError('invalid evidence truncation counters');
   const shots=new Map();
   let lastFrame=0,preStatePresent=0,preStateMissing=0,
-      pairedInterceptionPresent=0,pairedInterceptionMissing=0;
+      pairedInterceptionPresent=0,pairedInterceptionMissing=0,
+      targetStatePresent=0,targetStateMissing=0;
   for(const e of events){
     if(!e||!Number.isSafeInteger(e.frame)||e.frame<1||
        e.frame<lastFrame||!Number.isSafeInteger(e.shotId)||e.shotId<0)
@@ -24,6 +26,12 @@ function auditShotEvidence(events,{truncated=0,preFrameOverflow=0}={}){
        Number.isFinite(e.preShot.y)&&Number.isFinite(e.preShot.ttl))
       preStatePresent++;
     else{preStateMissing++;existing.missingPreStates++;}
+    if(['damageTank','damageShape','damageDrone','coverDamage'].includes(e.kind)){
+      if(e.preTarget&&Number.isFinite(e.preTarget.x)&&
+         Number.isFinite(e.preTarget.y)&&Number.isFinite(e.preTarget.hp))
+        targetStatePresent++;
+      else targetStateMissing++;
+    }
     if(e.kind==='projectileRetirement')existing.retirements++;
     else if(e.kind==='projectileInterception'){
       existing.interceptions++;
@@ -52,13 +60,15 @@ function auditShotEvidence(events,{truncated=0,preFrameOverflow=0}={}){
   const bounded=truncated===0&&preFrameOverflow===0;
   return {
     bounded,eventCount:events.length,shotCount:shots.size,
-    preStatePresent,preStateMissing,pairedInterceptionPresent,
+    preStatePresent,preStateMissing,targetStatePresent,targetStateMissing,
+    preFrameTargetUnidentified,pairedInterceptionPresent,
     pairedInterceptionMissing,
     // Missing endpoints may mean births during the update; do not guess.
     // Even complete endpoints cannot certify swept contact or its priority.
     certifiedMissedHits:0,missedHitClassification:'not-evaluated',
     abstentionReason:!bounded?'truncated-evidence':
-      preStateMissing||pairedInterceptionMissing?'incomplete-pre-frame-evidence':
+      preStateMissing||pairedInterceptionMissing||targetStateMissing?
+      'incomplete-pre-frame-evidence':
       'no-authoritative-competing-contact-geometry',
     shots:[...shots.values()].map(s=>Object.freeze({...s}))
   };
