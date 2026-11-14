@@ -186,7 +186,7 @@ const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
        const wp=g.novaBattlefieldWaypoint(spot.x,spot.y,center.x,center.y,pad,e.id),
         cache=Object.values(g.__v1102Routes||{}).find(c=>c&&c.points&&c.points.length),
         points=cache?cache.points:[wp].filter(Boolean);
-       let from=spot,clear=true,failedLeg=-1;
+       let from=spot,clear=true,failedLeg=-1,fullRouteCost=0;
        for(let k=0;k<points.length;k++){
         const q=points[k];
         if(!Number.isFinite(q.x)||!Number.isFinite(q.y)||
@@ -194,9 +194,19 @@ const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
          g.hasLineOfSight&&!g.hasLineOfSight(from.x,from.y,q.x,q.y,radius)){
          clear=false;failedLeg=k;break;
         }
+        fullRouteCost+=Math.hypot(q.x-from.x,q.y-from.y);
         from=q;
        }
+       const complete=!!cache&&points.length>0&&
+        Math.hypot(from.x-center.x,from.y-center.y)<.001;
+       const firstCornerCost=wp?Math.hypot(wp.x-spot.x,wp.y-spot.y)+
+        Math.hypot(center.x-wp.x,center.y-wp.y):null;
+       if(complete&&clear&&fullRouteCost+1e-6<firstCornerCost)
+        throw Error('full route shorter than first-corner lower bound');
        routeProbe={radius,pad,returnedWaypoint:!!wp,plannedLegs:points.length,
+        complete,firstCornerCost:firstCornerCost==null?null:+firstCornerCost.toFixed(2),
+        fullRouteCost:complete&&clear?+fullRouteCost.toFixed(2):null,
+        undercount:complete&&clear?+(fullRouteCost-firstCornerCost).toFixed(2):null,
         clear,failedLeg,first:wp&&{x:+wp.x.toFixed(1),y:+wp.y.toFixed(1)}};
        if(wp&&!clear)throw Error('physical route leg violates collision clearance: '+
         JSON.stringify({layout,approach:approach.label,routeProbe}));
