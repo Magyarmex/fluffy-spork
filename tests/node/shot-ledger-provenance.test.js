@@ -8,7 +8,7 @@ test('joins exact shot IDs across damage, interception and retirement without in
   const events=[
     {frame:1,shotId:11,kind:'damageTank',preShot:pre,preTarget:target},
     {frame:2,shotId:11,kind:'projectileInterception',otherShotId:12,
-      preShot:pre,preOtherShot:{x:3,y:4}},
+      preShot:pre,preOtherShot:{x:3,y:4,ttl:.2}},
     {frame:3,shotId:11,kind:'projectileRetirement',preShot:pre},
     {frame:3,shotId:12,kind:'coverDamage',preShot:pre,preTarget:target}
   ];
@@ -27,6 +27,15 @@ test('joins exact shot IDs across damage, interception and retirement without in
   assert.equal(result.certifiedMissedHits,null);
   assert.equal(result.missedHitClassification,'not-evaluated');
   assert.equal(result.abstentionReason,'no-authoritative-competing-contact-geometry');
+});
+test('interception peer endpoints without TTL remain incomplete evidence',()=>{
+  const result=auditShotEvidence([{frame:1,shotId:1,
+    kind:'projectileInterception',otherShotId:2,preShot:pre,
+    preOtherShot:{x:3,y:4}}]);
+  assert.equal(result.pairedInterceptionPresent,0);
+  assert.equal(result.pairedInterceptionMissing,1);
+  assert.equal(result.unexplainedMissingPeerStates,1);
+  assert.equal(result.certifiedMissedHits,null);
 });
 test('newborn, absent or unknown pre-state is an abstention, not a missed hit',()=>{
   const result=auditShotEvidence([
