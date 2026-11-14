@@ -140,6 +140,31 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
         }
         return map;
       };
+      // Keep target snapshots in their real collection. Tank, shape,
+      // drone and cover IDs may overlap; never resolve by ID alone.
+      const snapshotPreFrameTargets=()=>{
+        const owners={
+          damageTank:g.tanks,damageShape:g.shapes,
+          damageDrone:g.drones,coverDamage:g.__novaTerrain||[]
+        };
+        const maps={};
+        for(const [kind,collection] of Object.entries(owners)){
+          if(collection.length>4096){preFrameShotOverflow++;return null;}
+          const map=new Map();
+          for(const target of collection){
+            if(!Number.isSafeInteger(target.id)||map.has(target.id)){
+              preFrameShotOverflow++;return null;
+            }
+            map.set(target.id,{
+              x:target.x,y:target.y,r:target.r??null,
+              hp:target.hp,alive:target.alive??null,
+              solid:target.solid??null
+            });
+          }
+          maps[kind]=map;
+        }
+        return maps;
+      };
       const fingerprint=()=>{
         const state=JSON.stringify({
           time:g.time,rng:paired?window.__novaShotSeedState():null,
@@ -183,6 +208,7 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
       const updateMs=[];
       for(let i=0;i<600&&g.status==='playing';i++){
         const preFrameShots=observe?snapshotPreFrameShots():null;
+        const preFrameTargets=observe?snapshotPreFrameTargets():null;
         const t0=performance.now();
         const rand=Math.random,now=Date.now;
         if(paired){Math.random=window.__novaShotSeeded;Date.now=()=>Math.round(g.time*1000);}
@@ -200,7 +226,9 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
               source:e.source??null,reason:e.reason??null,timing:e.timing??null,
               preShot:preFrameShots?.get(e.shotId)??null,
               preOtherShot:Number.isSafeInteger(e.otherShotId)?
-                (preFrameShots?.get(e.otherShotId)??null):null});
+                (preFrameShots?.get(e.otherShotId)??null):null,
+              preTarget:Number.isSafeInteger(e.targetId)?
+                (preFrameTargets?.[e.kind]?.get(e.targetId)??null):null});
           }
         }
         const s=observe?ledger.counters():{
@@ -249,6 +277,10 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
       e.otherShotId===null||e.preOtherShot===null||
       (Number.isFinite(e.preOtherShot.x)&&Number.isFinite(e.preOtherShot.y))),
       'second interception projectile must be exact-ID joined or absent');
+    assert.ok(result.eventSamples.every(e=>
+      e.preTarget===null||(Number.isFinite(e.preTarget.x)&&
+      Number.isFinite(e.preTarget.y)&&Number.isFinite(e.preTarget.hp))),
+      'pre-frame victim/cover evidence must be valid or explicitly absent');
     assert.ok(result.eventSamples.every(e=>Number.isSafeInteger(e.frame)&&
       e.frame>=1&&e.frame<=result.frames&&typeof e.kind==='string'),
       'shot provenance events must have real frame epochs');
