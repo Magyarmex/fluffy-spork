@@ -1,6 +1,6 @@
 const test=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 function load(){
- const CLASSES={marksman:{bullet:{reload:1}},cannon:{bullet:{reload:.95}},twin:{bullet:{reload:.26}},guard:{bullet:{reload:.5}}};
+ const CLASSES={marksman:{bullet:{reload:1}},cannon:{bullet:{reload:.95}},twin:{bullet:{reload:.26}},guard:{size:18,bullet:{reload:.5}}};
  const classes={CLASSES,lineageForClass:id=>id==='marksman'?'sniper':id==='cannon'?'cannon':id==='guard'?'guardian':'gunner'};
  function Game(){this.time=10;this.tanks=[];this.bullets=[];this.powerups=[];this.status='playing';this.applied=[];this.los=true;}
  Game.prototype.tryFire=function(t){this.bullets.push({ownerId:t.id,x:t.x,y:t.y,vx:400,vy:0});};Game.prototype.updatePowerups=function(){};Game.prototype.applyPowerup=function(t,type){this.applied.push([t.id,type]);};Game.prototype.moveTank=function(){};Game.prototype.hasLineOfSight=function(){return this.los;};Game.prototype.getTank=function(id){return this.tanks.find(t=>t.id===id)||null;};
