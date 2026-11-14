@@ -152,7 +152,7 @@ test('same-frame pre-frame evidence cannot later be reclassified as a birth',()=
   assert.equal(auditShotEvidence(newborn).provenNewbornPeerEvents,1);
   // A shot born in frame 1 can correctly appear in the frame-2 pre-state.
   const nextFrame=auditShotEvidence([
-    {frame:1,shotId:100,kind:'projectileRetirement',preShot:null,bornThisFrame:true},
+    {frame:1,shotId:100,kind:'damageShape',preShot:null,bornThisFrame:true,preTarget:target},
     {frame:2,shotId:100,kind:'damageTank',preShot:pre,preTarget:target}
   ]);
   assert.equal(nextFrame.preStatePresent,1);
