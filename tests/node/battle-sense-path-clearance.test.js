@@ -48,7 +48,12 @@ test('contested pickup travel uses the complete cached route without a second pl
   novaBattlefieldWaypoint:(x,y,gx,gy,pad,seed)=>{calls.push(['waypoint',pad,seed]);return{x:100,y:100};},
   novaRouteLength:(x,y,gx,gy,pad,seed,wp)=>{calls.push(['length',pad,seed]);return 650;}};
  assert.equal(h.routeDistance(g,t,p,null,{CLASSES:{guard:{size:15}}}),650);
- assert.deepEqual(calls,[['waypoint',23,t.id],['length',23,t.id]]);
+ g.novaRouteLength=()=>50;
+ const conservative=h.routeDistance(g,t,p,null,{CLASSES:{guard:{size:15}}});
+ assert.ok(conservative>300&&conservative<650,
+  'a corrupt shorter-than-first-corner cost cannot create a teleport shortcut');
+ g.novaRouteLength=()=>650;
+ assert.deepEqual(calls,[['waypoint',23,t.id],['length',23,t.id],['waypoint',23,t.id]]);
  delete g.novaRouteLength;
  assert.ok(h.routeDistance(g,t,p,null,{CLASSES:{guard:{size:15}}})<650,
   'without the composed route owner, retain the previous first-corner fallback');
