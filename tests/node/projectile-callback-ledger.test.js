@@ -578,7 +578,7 @@ test('Sniper swept contact fraction is bounded and never presented as an absolut
   assert.equal(l.counters().observerErrors,5);
 });
 
-test('certified Battlefield mutual-TTL contact uses frame seconds, never Sniper fractions',()=>{
+test('certified Battlefield mutual-TTL contact uses bullet-step seconds, never Sniper fractions',()=>{
   const l=createProjectileCallbackLedger(game());
   assert.equal(l.recordProjectileInterception({id:91,hp:2},{id:92,hp:3},5,6,
     'battlefield-ttl',null,.008),true);
