@@ -24,7 +24,7 @@ test('joins exact shot IDs across damage, interception and retirement without in
     shotId:11,firstFrame:1,lastFrame:3,damageEvents:1,coverEvents:0,
     interceptions:1,retirements:1,missingPreStates:0,missingPairedStates:0
   });
-  assert.equal(result.certifiedMissedHits,0);
+  assert.equal(result.certifiedMissedHits,null);
   assert.equal(result.missedHitClassification,'not-evaluated');
   assert.equal(result.abstentionReason,'no-authoritative-competing-contact-geometry');
 });
@@ -39,7 +39,7 @@ test('newborn, absent or unknown pre-state is an abstention, not a missed hit',(
   assert.equal(result.shotCount,3,'unobserved peer still has exact identity');
   assert.equal(result.shots.find(s=>s.shotId===9).missingPreStates,1);
   assert.equal(result.abstentionReason,'incomplete-pre-frame-evidence');
-  assert.equal(result.certifiedMissedHits,0);
+  assert.equal(result.certifiedMissedHits,null);
 });
 test('boundedness is lost on event or pre-frame overflow',()=>{
   for(const options of [{truncated:1},{preFrameOverflow:1}]){
