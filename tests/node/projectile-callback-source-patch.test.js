@@ -178,6 +178,22 @@ test('retirement observation is fail-open under malformed getters and callbacks'
   }
 });
 
+test('terminal shell retirement is witnessed even if burst marks the shot dead',()=>{
+  const patched=patchMaterializedRetirement(html);
+  const {createProjectileCallbackLedger}=require('../research/projectile-callback-ledger.cjs');
+  const g={bullets:[{id:52,x:0,y:0,vx:0,vy:0,ttl:0.001,r:2,dead:false,
+    shell:true,beam:false}],initBulletIntegrity(){},cosmeticRandom(){return 1;},
+    clusterBurst(b){b.dead=true;},resolveBulletCollisions(){},
+    damageTank(){},damageShape(){},damageDrone(){}};
+  const ledger=createProjectileCallbackLedger(g);ledger.install();g.__novaShotLedger=ledger;
+  compileUpdater(patched).call(g,1/30);
+  assert.equal(g.bullets.length,0);
+  assert.equal(ledger.snapshot().events.length,1);
+  assert.equal(ledger.snapshot().events[0].shotId,52);
+  assert.equal(ledger.snapshot().events[0].reason,'ttl');
+  ledger.uninstall();
+});
+
 const battlefield = fs.readFileSync(path.resolve(__dirname,
   '../../nova-updates/battlefield-v1.6.0.js'),'utf8');
 test('research Battlefield patch scopes exactly ten real projectile callbacks',()=>{
