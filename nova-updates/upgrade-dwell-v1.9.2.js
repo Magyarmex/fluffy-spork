@@ -39,7 +39,21 @@ function DwellUpgradeTray(props){
   },[inputActive,points]);
   // A newly earned point must not place an expanded panel over the FIRST touch.
   // The player can deliberately open the chip; movement re-arms this guard.
-  var nextProps=Object.assign({},props,{sticksActive:inputActive||holdCollapsed||(compactTouch&&!touchOptIn)});
+  // React may batch the last stat spend with a fresh XP award, never
+  // rendering points=0. Reset the compact-touch opt-in at the actual spend
+  // boundary instead of relying solely on the later points<=0 effect.
+  var originalUpgrade=props&&props.onUpgrade;
+  var guardedUpgrade=typeof originalUpgrade==='function'?function(){
+    var key=arguments[0],stats=props&&props.hud&&props.hud.stats;
+    var atCap=stats&&Number(stats[key])>=8; // same eight legal bars as UpgradeTray
+    var result=originalUpgrade.apply(this,arguments);
+    if(points<=1&&!atCap)setTouchOptIn(false);
+    return result;
+  }:originalUpgrade;
+  var nextProps=Object.assign({},props,{
+    sticksActive:inputActive||holdCollapsed||(compactTouch&&!touchOptIn),
+    onUpgrade:guardedUpgrade
+  });
   return originalCreateElement('div',{
     'data-nova-upgrade-tray':true,
     style:{display:'contents'},
