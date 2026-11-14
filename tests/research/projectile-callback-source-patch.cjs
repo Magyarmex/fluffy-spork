@@ -56,11 +56,16 @@ function patchMaterializedRetirement(html) {
     '                    } catch (_) { /* observation never blocks retirement */ }\n' +
     '                }\n            }\n        }\n        this.resolveBulletCollisions();';
   body=body.replace(original,guarded);
-  // Shell burst can itself mark the projectile dead. Sample liveness before
-  // the original burst, not between burst and the terminal dead assignment.
-  const afterBurst='                if (b.shell)\n                    this.clusterBurst(b);\n                const wasAlive = !b.dead;';
-  if(body.split(afterBurst).length!==2)throw new Error('core shell retirement owner changed');
-  body=body.replace(afterBurst,'                const wasAlive = !b.dead;\n                if (b.shell)\n                    this.clusterBurst(b);');
+  // Frame-start liveness excludes already-intercepted shots. A second
+  // terminal check excludes shots killed during the core advance; shell
+  // bursts happen afterward and cannot erase a witnessed TTL transition.
+  const first='            const b = this.bullets[i];\n            this.initBulletIntegrity(b);';
+  if(body.split(first).length!==2)throw new Error('core frame-start bullet owner changed');
+  body=body.replace(first,'            const b = this.bullets[i];\n            const wasAlive = !b.dead;\n            this.initBulletIntegrity(b);');
+  const beforeBurst='                if (b.shell)\n                    this.clusterBurst(b);\n                const wasAlive = !b.dead;';
+  if(body.split(beforeBurst).length!==2)throw new Error('core shell retirement owner changed');
+  body=body.replace(beforeBurst,'                const eligibleAtTerminal = wasAlive && !b.dead;\n                if (b.shell)\n                    this.clusterBurst(b);');
+  body=body.replace('                if (wasAlive) {','                if (eligibleAtTerminal) {');
   return html.slice(0,start)+body+html.slice(end);
 }
 
