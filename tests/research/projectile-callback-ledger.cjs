@@ -154,16 +154,20 @@ function createProjectileCallbackLedger(game, options = {}) {
     try {
       const idA = a == null ? null : a.id;
       const idB = b == null ? null : b.id;
+      const afterA = a == null ? null : a.hp;
+      const afterB = b == null ? null : b.hp;
       if (!Number.isSafeInteger(idA) || idA < 0 ||
           !Number.isSafeInteger(idB) || idB < 0 || idA === idB ||
-          !Number.isFinite(beforeA) || !Number.isFinite(beforeB)) {
+          !Number.isFinite(beforeA) || !Number.isFinite(beforeB) ||
+          !Number.isFinite(afterA) || !Number.isFinite(afterB)) {
         observerErrors++; return false;
       }
       if (events.length >= limit) { overflow++; return false; }
       events.push(Object.freeze({epoch, kind:'projectileInterception',
         targetId:null, shotId:idA, otherShotId:idB,
         attribution:'direct', source:'core', requestedDamage:null,
-        beforeHpA:beforeA, beforeHpB:beforeB, timing:'unknown'}));
+        beforeHpA:beforeA, beforeHpB:beforeB,
+        afterHpA:afterA, afterHpB:afterB, timing:'unknown'}));
       coreInterceptions++;
       return true;
     } catch (_) { observerErrors++; return false; }
