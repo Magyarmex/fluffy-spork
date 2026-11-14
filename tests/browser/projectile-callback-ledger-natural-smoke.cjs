@@ -161,11 +161,17 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
         const maps={};
         for(const [kind,collection] of Object.entries(owners)){
           if(collection.length>4096){preFrameShotOverflow++;return null;}
-          const map=new Map();
+          const map=new Map(),ambiguous=new Set();
           for(const target of collection){
-            if(!Number.isSafeInteger(target.id)||map.has(target.id)){
-              // Unidentifiable or duplicated collection IDs cannot support
-              // an exact target join; retain the remaining valid evidence.
+            if(!Number.isSafeInteger(target.id)){
+              preFrameTargetUnidentified++;continue;
+            }
+            if(ambiguous.has(target.id)){
+              preFrameTargetUnidentified++;continue;
+            }
+            if(map.has(target.id)){
+              // Duplicate identity makes BOTH targets unjoinable.
+              map.delete(target.id);ambiguous.add(target.id);
               preFrameTargetUnidentified++;continue;
             }
             map.set(target.id,{
