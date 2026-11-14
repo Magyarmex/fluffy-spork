@@ -251,6 +251,11 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
               targetId:e.targetId,otherShotId:e.otherShotId??null,
               source:e.source??null,reason:e.reason??null,timing:e.timing??null,
               preShot:preFrameShots?.get(e.shotId)??null,
+              // Battlefield's real Game.update records the monotonic
+              // frame-start ID ceiling. A larger ID proves a new birth;
+              // smaller IDs without snapshots remain unexplained.
+              bornThisFrame:Number.isSafeInteger(g.__novaFrameStartBulletIdCeiling)&&
+                e.shotId>=g.__novaFrameStartBulletIdCeiling,
               preOtherShot:Number.isSafeInteger(e.otherShotId)?
                 (preFrameShots?.get(e.otherShotId)??null):null,
               preTarget:Number.isSafeInteger(e.targetId)?
