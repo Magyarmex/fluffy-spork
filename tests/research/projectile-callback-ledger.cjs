@@ -8,7 +8,7 @@ function createProjectileCallbackLedger(game, options = {}) {
     throw new RangeError('invalid event budget');
   const methods = ['damageTank', 'damageShape', 'damageDrone'];
   const originals = new Map(), wrappers = new Map(), events = [];
-  let scope = null, installed = false, overflow = 0, epoch = 0, callbackDepth = 0, unknown = 0, unidentifiedTargets = 0, observerErrors = 0, unusedScopes = 0, scopedCalls = 0;
+  let scope = null, installed = false, overflow = 0, epoch = 0, callbackDepth = 0, unknown = 0, unidentifiedTargets = 0, observerErrors = 0, unusedScopes = 0, scopedCalls = 0, coreAttributed = 0, battlefieldAttributed = 0;
   function append(kind, target, args) {
     // Consume the scope before any potentially throwing identity getter or
     // budget check. A dropped/failed first callback must never transfer its
@@ -21,9 +21,12 @@ function createProjectileCallbackLedger(game, options = {}) {
     const id = Number.isSafeInteger(observedId) ? observedId : null;
     if (id === null) unidentifiedTargets++;
     if (!attributed) unknown++;
+    else if (scope.source === 'core') coreAttributed++;
+    else if (scope.source === 'battlefield') battlefieldAttributed++;
     events.push(Object.freeze({epoch, kind, targetId: id,
       shotId: attributed ? scope.shotId : null,
       attribution: attributed ? scope.attribution : 'unknown',
+      ...(attributed && scope.source ? {source:scope.source} : {}),
       requestedDamage: Number.isFinite(args[1]) ? args[1] : null}));
   }
   function install() {
@@ -66,7 +69,7 @@ function createProjectileCallbackLedger(game, options = {}) {
     installed = true;
     return true;
   }
-  function withProjectile(shot, fn, attribution = 'direct') {
+  function withProjectile(shot, fn, attribution = 'direct', source = null) {
     if (typeof fn !== 'function') throw new TypeError('callback required');
     // Snapshot identity once: mutable or stateful getters must not switch
     // the attributed projectile between validation and ledger recording.
@@ -80,7 +83,8 @@ function createProjectileCallbackLedger(game, options = {}) {
     // Malformed research metadata must be treated like an invalid ID: the
     // underlying combat callback still runs, but its attribution is unknown.
     const validAttribution = attribution === 'direct' || attribution === 'indirect';
-    if (!validAttribution || !Number.isSafeInteger(shotId) || shotId < 0) {
+    const validSource = source === null || source === 'core' || source === 'battlefield';
+    if (!validAttribution || !validSource || !Number.isSafeInteger(shotId) || shotId < 0) {
       observerErrors++;
       const prior = scope;
       scope = null;
@@ -88,7 +92,7 @@ function createProjectileCallbackLedger(game, options = {}) {
     }
     const prior = scope;
     scopedCalls++;
-    scope = {shotId, attribution, baseDepth: callbackDepth, remaining: 1};
+    scope = {shotId, attribution, source, baseDepth: callbackDepth, remaining: 1};
     try { return fn(); } finally {
       // A scope with no captured callback is evidence of an unobserved path,
       // NOT evidence of a missed hit. Keep it separate from callback errors.
@@ -99,17 +103,17 @@ function createProjectileCallbackLedger(game, options = {}) {
   function nextFrame() {
     if (scope || callbackDepth > 0)
       throw new Error('cannot advance frame inside damage callback');
-    epoch++; events.length = 0; overflow = 0; unknown = 0; unidentifiedTargets = 0; observerErrors = 0; unusedScopes = 0; scopedCalls = 0;
+    epoch++; events.length = 0; overflow = 0; unknown = 0; unidentifiedTargets = 0; observerErrors = 0; unusedScopes = 0; scopedCalls = 0; coreAttributed = 0; battlefieldAttributed = 0;
   }
   function counters() {
     // Aggregate natural-match trials need bounded scalar telemetry without
     // cloning every per-hit event on every simulation frame.
     return Object.freeze({epoch, installed, eventsCaptured:events.length,
       overflow, unknown, unidentifiedTargets, observerErrors,
-      scopedCalls, unusedScopes, bounded:overflow===0&&observerErrors===0});
+      scopedCalls, unusedScopes, coreAttributed, battlefieldAttributed, bounded:overflow===0&&observerErrors===0});
   }
   function snapshot() {
-    return Object.freeze({epoch, installed, events: Object.freeze(events.slice()), overflow, unknown, unidentifiedTargets, observerErrors, scopedCalls, unusedScopes,
+    return Object.freeze({epoch, installed, events: Object.freeze(events.slice()), overflow, unknown, unidentifiedTargets, observerErrors, scopedCalls, unusedScopes, coreAttributed, battlefieldAttributed,
       bounded: overflow === 0 && observerErrors === 0,
       allCapturedCallbacksAttributed: overflow === 0 && observerErrors === 0 && unknown === 0 && unidentifiedTargets === 0});
   }
