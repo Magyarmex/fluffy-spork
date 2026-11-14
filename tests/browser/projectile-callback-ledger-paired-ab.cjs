@@ -6,6 +6,7 @@ const assert=require('node:assert/strict');
 const path=require('node:path');
 const {spawnSync}=require('node:child_process');
 const {comparePhysicalTraces}=require('../research/shot-ledger-trace-compare.cjs');
+const {auditShotEvidence}=require('../research/shot-ledger-provenance.cjs');
 function arm(mode,seed,layoutIndex){
   const result=spawnSync(process.execPath,
     [path.join(__dirname,'projectile-callback-ledger-natural-smoke.cjs')],{
@@ -62,6 +63,13 @@ for(const {seed,layoutIndex,layout} of trialsPlan){
   assert.equal(comparison.firstDivergence,null,
     seed+' read-only observer changed physical state or trial was not deterministic');
   const events=on.eventSamples;
+  const evidence=auditShotEvidence(events,{
+    truncated:on.eventSamplesTruncated,preFrameOverflow:on.preFrameShotOverflow
+  });
+  assert.equal(evidence.bounded,true,
+    seed+' cannot interpret truncated shot provenance');
+  assert.equal(evidence.missedHitClassification,'not-evaluated',
+    'endpoint snapshots cannot certify missed contacts');
   const ids=kind=>new Set(events.filter(e=>kind(e)&&Number.isSafeInteger(e.shotId))
     .map(e=>e.shotId));
   const damageIds=ids(e=>['damageTank','damageShape','damageDrone'].includes(e.kind));
@@ -69,6 +77,10 @@ for(const {seed,layoutIndex,layout} of trialsPlan){
   const overlappingDamageRetirements=[...damageIds].filter(id=>retirementIds.has(id)).length;
   trials.push({seed,layout:off.layout,nativeOrderMatched,control,comparison,
     provenance:{sampled:events.length,truncated:on.eventSamplesTruncated,
+      preStatePresent:evidence.preStatePresent,preStateMissing:evidence.preStateMissing,
+      pairedInterceptionPresent:evidence.pairedInterceptionPresent,
+      pairedInterceptionMissing:evidence.pairedInterceptionMissing,
+      abstentionReason:evidence.abstentionReason,
       damageShotIds:damageIds.size,retiredShotIds:retirementIds.size,
       damageAndRetirementShotIds:overlappingDamageRetirements},
     off:{frames:off.frames,p95UpdateMs:off.p95UpdateMs,maxUpdateMs:off.maxUpdateMs},
