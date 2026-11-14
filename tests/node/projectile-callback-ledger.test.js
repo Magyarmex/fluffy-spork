@@ -583,7 +583,7 @@ test('certified Battlefield mutual-TTL contact uses frame seconds, never Sniper 
   assert.equal(l.recordProjectileInterception({id:91,hp:2},{id:92,hp:3},5,6,
     'battlefield-ttl',null,.008),true);
   const e=l.snapshot().events[0];
-  assert.equal(e.timing,'certified-frame-seconds');
+  assert.equal(e.timing,'certified-bullet-step-seconds');
   assert.equal(e.contactSeconds,.008);
   assert.equal(Object.hasOwn(e,'contactFraction'),false);
   for(const time of [-1,0,.051,NaN,Infinity])
