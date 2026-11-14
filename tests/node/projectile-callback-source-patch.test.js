@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const {patchMaterializedCore, patchBattlefieldCallbacks, patchBattlefieldCover, guardedShotCall, CALLS} = require('../research/projectile-callback-source-patch.cjs');
+const {patchMaterializedCore, patchMaterializedRetirement, patchBattlefieldCallbacks, patchBattlefieldCover, guardedShotCall, CALLS} = require('../research/projectile-callback-source-patch.cjs');
 const html = fs.readFileSync(path.resolve(__dirname, '../../index.html'), 'utf8');
 test('research patch changes exactly three authoritative core callbacks, not splash or overlays',()=>{
   const patched = patchMaterializedCore(html);
@@ -119,6 +119,43 @@ test('browser-only patch preserves tank/drone/shape damage across 30–240Hz',()
 
 test('research source instrumentation refuses a second patch',()=>{
   assert.throws(()=>patchMaterializedCore(patchMaterializedCore(html)),/already installed/);
+});
+
+test('terminal core retirement witness preserves actual projectile removal and timing uncertainty',()=>{
+  const patched=patchMaterializedRetirement(html);
+  assert.notEqual(patched,html);
+  assert.throws(()=>patchMaterializedRetirement(patched),/already installed/);
+  assert.throws(()=>patchMaterializedRetirement('not a game'),/shipping core boundaries/);
+  const scripts=[...patched.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)];
+  for(const script of scripts)new vm.Script(script[1],{filename:'retirement-research-index.html'});
+  for(const mode of ['ttl','bounds','both','already-dead']){
+    const run=(source,observed)=>{
+      const bullet={id:311,ownerId:1,x:mode==='bounds'||mode==='both'?2235:0,
+        y:0,vx:0,vy:0,ttl:mode==='ttl'||mode==='both'?0.001:1,
+        r:2,dmg:3,pen:0,hits:0,dead:mode==='already-dead',shell:false,beam:false};
+      const g={bullets:[bullet],initBulletIntegrity(){},cosmeticRandom(){return 1;},
+        resolveBulletCollisions(){},hash:{query(){throw Error('live projectile not expected');}},
+        damageTank(){},damageShape(){},damageDrone(){}};
+      let ledger=null;
+      if(observed){ledger=require('../research/projectile-callback-ledger.cjs')
+        .createProjectileCallbackLedger(g);ledger.install();g.__novaShotLedger=ledger;}
+      compileUpdater(source).call(g,1/30);
+      const result={count:g.bullets.length,dead:bullet.dead,ttl:bullet.ttl,x:bullet.x,
+        events:ledger?ledger.snapshot().events:[]};
+      if(ledger)ledger.uninstall();
+      return result;
+    };
+    const base=run(html,false),actual=run(patched,true);
+    assert.deepEqual({...actual,events:[]},base,mode);
+    assert.equal(actual.events.length,mode==='already-dead'?0:1,mode);
+    if(actual.events.length){
+      const event=actual.events[0];
+      assert.equal(event.shotId,311);
+      assert.equal(event.kind,'projectileRetirement');
+      assert.equal(event.reason,mode==='both'?'ttl-or-bounds':mode);
+      assert.equal(event.timing,'upper-bound');
+    }
+  }
 });
 
 const battlefield = fs.readFileSync(path.resolve(__dirname,
