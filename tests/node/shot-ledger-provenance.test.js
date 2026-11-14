@@ -95,3 +95,26 @@ test('unidentified pre-frame entities force abstention even with complete event 
   assert.equal(auditShotEvidence(events).abstentionReason,
     'no-authoritative-competing-contact-geometry');
 });
+
+test('provenance keeps Sniper fractions separate from certified bullet-step seconds',()=>{
+  const sniper={frame:1,shotId:101,otherShotId:102,
+    kind:'projectileInterception',source:'sniper',
+    timing:'normalized-sweep-fraction',contactFraction:.375,preShot:pre};
+  const ttl={frame:2,shotId:103,otherShotId:104,
+    kind:'projectileInterception',source:'battlefield-ttl',
+    timing:'certified-bullet-step-seconds',contactSeconds:.008,preShot:pre};
+  const ok=auditShotEvidence([sniper,ttl]);
+  assert.equal(ok.eventCount,2);
+  assert.equal(ok.certifiedMissedHits,null);
+  for(const invalid of [
+    {...sniper,contactSeconds:.008},
+    {...sniper,contactFraction:1.1},
+    {...sniper,contactFraction:null},
+    {...sniper,source:'core'},
+    {...ttl,contactSeconds:0},
+    {...ttl,contactSeconds:.06},
+    {...ttl,contactSeconds:null},
+    {...ttl,source:'sniper'},
+    {...ttl,timing:'normalized-sweep-fraction'}
+  ])assert.throws(()=>auditShotEvidence([invalid]),/timing witness/);
+});
