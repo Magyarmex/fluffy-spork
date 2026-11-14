@@ -493,3 +493,9 @@ test('mutual-TTL witness preserves two-shot weakening with valid or broken obser
     if(mode==='valid')assert.deepEqual(events[0],[a,b,12,9,'battlefield-ttl']);
   }
 });
+
+test('research browser smoke compiles before expensive Chromium setup',()=>{
+  const script=fs.readFileSync(path.resolve(__dirname,
+    '../browser/projectile-callback-ledger-natural-smoke.cjs'),'utf8');
+  new vm.Script(script,{filename:'projectile-callback-ledger-natural-smoke.cjs'});
+});
