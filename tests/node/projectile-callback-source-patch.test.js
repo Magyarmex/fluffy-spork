@@ -138,8 +138,9 @@ test('ten Battlefield guards call real damage exactly once with or without ledge
         damageShape(){seen.damage++;return 17;},
         damageDrone(){seen.damage++;return 17;}
       };
-      if(enabled)game.__novaShotLedger={withProjectile(shot,fn){
-        seen.scope++;assert.equal(shot.id,101);return fn();
+      if(enabled)game.__novaShotLedger={withProjectile(shot,fn,attribution,source){
+        seen.scope++;assert.equal(shot.id,101);
+        assert.equal(attribution,'direct');assert.equal(source,'battlefield');return fn();
       }};
       const vars={g:game,b:{id:101,dmg:20,ownerId:1,knock:2,vx:3,vy:4},
         e:{},best:{e:{}},hit:{e:{}},victim:{},kx:0,ky:0,ang:0,vx:3,vy:4};
