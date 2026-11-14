@@ -159,6 +159,9 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
             }
             map.set(target.id,{
               x:target.x,y:target.y,r:target.r??null,
+              w:target.w??null,h:target.h??null,
+              shape:target.shape??null,
+              vx:target.vx??null,vy:target.vy??null,
               hp:target.hp,alive:target.alive??null,
               solid:target.solid??null
             });
