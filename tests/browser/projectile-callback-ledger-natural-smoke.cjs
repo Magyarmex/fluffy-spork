@@ -4,7 +4,7 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');
 const {chromium}=require('playwright');
-const {patchMaterializedCore,patchBattlefieldCallbacks}=require('../research/projectile-callback-source-patch.cjs');
+const {patchMaterializedCore,patchBattlefieldCallbacks,patchBattlefieldCover}=require('../research/projectile-callback-source-patch.cjs');
 (async()=>{
   const browser=await chromium.launch({headless:true});
   const context=await browser.newContext({viewport:{width:900,height:700}});
@@ -16,7 +16,7 @@ const {patchMaterializedCore,patchBattlefieldCallbacks}=require('../research/pro
       const response=await route.fetch(),source=await response.text();
       assert.equal(response.status(),200);
       battlefieldPatches++;
-      await route.fulfill({response,body:patchBattlefieldCallbacks(source)});
+      await route.fulfill({response,body:patchBattlefieldCover(patchBattlefieldCallbacks(source))});
     });
     await page.route('http://127.0.0.1:8765/',async route=>{
       const response=await route.fetch(),html=await response.text();
@@ -54,7 +54,7 @@ const {patchMaterializedCore,patchBattlefieldCallbacks}=require('../research/pro
       const ledger=factory(g,{limit:4096});
       ledger.install();
       g.__novaShotLedger=ledger;
-      let frames=0,callbacks=0,scopedCalls=0,unusedScopes=0,observerErrors=0,unknown=0,unidentifiedTargets=0,coreAttributed=0,battlefieldAttributed=0;
+      let frames=0,callbacks=0,scopedCalls=0,unusedScopes=0,observerErrors=0,unknown=0,unidentifiedTargets=0,coreAttributed=0,battlefieldAttributed=0,coverAttributed=0;
       const updateMs=[];
       for(let i=0;i<600&&g.status==='playing';i++){
         const t0=performance.now();
@@ -64,14 +64,14 @@ const {patchMaterializedCore,patchBattlefieldCallbacks}=require('../research/pro
         frames++;callbacks+=s.eventsCaptured;scopedCalls+=s.scopedCalls;
         unusedScopes+=s.unusedScopes;observerErrors+=s.observerErrors;
         unknown+=s.unknown;unidentifiedTargets+=s.unidentifiedTargets;
-        coreAttributed+=s.coreAttributed;battlefieldAttributed+=s.battlefieldAttributed;
+        coreAttributed+=s.coreAttributed;battlefieldAttributed+=s.battlefieldAttributed;coverAttributed+=s.coverAttributed;
         if(s.overflow)throw Error('research callback buffer overflow');
         ledger.nextFrame();
       }
       delete g.__novaShotLedger;
       if(!ledger.uninstall())throw Error('failed to restore real damage methods');
       updateMs.sort((a,b)=>a-b);
-      return{frames,callbacks,attributedCallbacks:callbacks-unknown,coreAttributed,battlefieldAttributed,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
+      return{frames,callbacks,attributedCallbacks:callbacks-unknown,coreAttributed,battlefieldAttributed,coverAttributed,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
         p95UpdateMs:updateMs[Math.ceil(updateMs.length*.95)-1],
         maxUpdateMs:updateMs[updateMs.length-1],status:g.status,time:g.time};
     });
@@ -79,7 +79,7 @@ const {patchMaterializedCore,patchBattlefieldCallbacks}=require('../research/pro
     assert.equal(result.observerErrors,0,'observer must not fail in natural gameplay');
     assert.ok(result.attributedCallbacks>=0&&result.attributedCallbacks<=result.callbacks,
       'attributed callback count must be bounded by actual captured callbacks');
-    assert.ok(result.coreAttributed+result.battlefieldAttributed<=result.attributedCallbacks,
+    assert.ok(result.coreAttributed+result.battlefieldAttributed+result.coverAttributed<=result.attributedCallbacks,
       'origin-specific counts cannot exceed attributed callbacks');
     assert.ok(Number.isFinite(result.time));
     assert.ok(Number.isFinite(result.p95UpdateMs),'browser Game.update CPU sample required');
