@@ -545,7 +545,8 @@ function routeCost(g,t,x,y,direct,bearing,classes){
  var leg=Math.hypot(wp.x-t.x,wp.y-t.y);
  if(!(leg>1))return Infinity;
  if(bearing){bearing.x=(wp.x-t.x)/leg;bearing.y=(wp.y-t.y)/leg;}
- return leg+Math.hypot(x-wp.x,y-wp.y);
+ var full=g.novaRouteLength&&g.novaRouteLength(t.x,t.y,x,y,size+8,t.id,wp);
+ return Number.isFinite(full)&&full>=leg?full:leg+Math.hypot(x-wp.x,y-wp.y);
 }
 /* Ecology AI may react to a held combat target only while that target is
  * actually within the same gameplay viewport as the player, or relayed by
