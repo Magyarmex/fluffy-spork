@@ -190,6 +190,17 @@ test('narrow gates are routed around using the tank and drone collision radii, w
   const droneOpen=game(gate(20));
   assert.equal(droneOpen.hasLineOfSight(-400,0,400,0,8),true);
   assert.deepEqual(Array.from(T.planVisibilityRoute(droneOpen,-400,0,400,0,13,9,null)),[]);
+  for(const size of [14,15,16,17]){
+    const radius=size+3,pad=size+8;
+    const tight=game(gate(radius*2-1));
+    assert.ok(T.planVisibilityRoute(tight,-400,0,400,0,pad,size,null)?.length>=2,'class size '+size+' must not enter an undersized gate');
+    const passable=game(gate(radius*2+2));
+    assert.deepEqual(Array.from(T.planVisibilityRoute(passable,-400,0,400,0,pad,size,null)),[],'class size '+size+' should retain a physically passable gate');
+  }
+  const droneTight=game(gate(15));
+  assert.ok(T.planVisibilityRoute(droneTight,-400,0,400,0,13,11,null)?.length>=2);
+  const dronePassable=game(gate(18));
+  assert.deepEqual(Array.from(T.planVisibilityRoute(dronePassable,-400,0,400,0,13,11,null)),[]);
 });
 
 test('exact-perpendicular approach routes around a long wall with physical clearance',()=>{
@@ -202,4 +213,13 @@ test('exact-perpendicular approach routes around a long wall with physical clear
     assert.equal(g.isTerrainSafe(p.x,p.y,18),true);
     x=p.x;y=p.y;
   }
+});
+
+
+test('idle-drone step sweep uses the actual drone radius for segment collision',()=>{
+  const T=boot(),g=game([]);
+  const pads=[];
+  g.firstTerrainHit=(ax,ay,bx,by,pad)=>{pads.push(pad);return null;};
+  assert.equal(T.blockedDroneStep(g,-100,0,100,0,13),false);
+  assert.deepEqual(pads,[8]);
 });
