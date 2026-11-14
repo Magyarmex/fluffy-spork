@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
-const {compare}=require('../research/fixed60-pose-paired-report.cjs');
+const {compare,compareTriple}=require('../research/fixed60-pose-paired-report.cjs');
 function report(enabled){
  return {pose:{enabled,frames:enabled?60:0,interpolated:enabled?9:0,
    shiftedBulletFrames:enabled?4:0,teleportSkips:0,
@@ -54,4 +54,56 @@ test('paired pose report refuses missing or contradictory RAF exposure',()=>{
  assert.equal(result.off.exposure.ticks,120);
  assert.equal(result.on.exposure.ticks,119);
  assert.equal(result.causalPerformanceComparison,false);
+});
+
+function report90(enabled){
+ const r=report(enabled);
+ r.configuredMaxSteps=2;r.backlogExtraTicks=2;r.presentationTargetHz=90;
+ r.raf.activePresentationHz=90;r.raf.activeIntervals={p95:11.2,n:59};
+ r.raf.intervals={p95:11.2,n:59};
+ r.blankRaf={frames:160,hz:90,p95:11.2,supports90Hz:true};
+ r.rafHostCapable=true;r.chromiumGpuVsyncDisabled=false;
+ return r;
+}
+test('90Hz OFF/OFF/ON report requires three matched materialized worlds and bounded callback cadence',()=>{
+ const offA=report90(false),offB=report90(false),on=report90(true);
+ const out=compareTriple(offA,offB,on);
+ assert.equal(out.targetPresentationHz,90);
+ assert.deepEqual(out.activePresentationHz,{offA:90,offB:90,on:90});
+ assert.equal(out.offRepeat.ticks,120);
+ assert.equal(out.offRepeat.births,5);
+ assert.equal(offA.pose.frames,0);
+ assert.equal(out.on.interpolated,9);
+ assert.equal(out.causalPerformanceComparison,false);
+ offB.initialFingerprint='deadbeef:1500';
+ assert.throws(()=>compareTriple(offA,offB,on),/same seeded materialized Game/);
+ offB.initialFingerprint=offA.initialFingerprint;
+ on.raf.activePresentationHz=72;
+ assert.throws(()=>compareTriple(offA,offB,on),/near-90Hz active callbacks/);
+ on.raf.activePresentationHz=90;on.raf.activeIntervals.p95=16;
+ assert.throws(()=>compareTriple(offA,offB,on),/active callback p95/);
+});
+
+
+test('90Hz paired report marks a host-limited blank RAF control inconclusive, never passed',()=>{
+ const offA=report90(false),offB=report90(false),on=report90(true);
+ for(const arm of [offA,offB,on]){
+  arm.blankRaf={frames:70,hz:41.2,p95:24.3,supports90Hz:false};
+  arm.rafHostCapable=false;
+  arm.raf.activePresentationHz=41.2;
+  arm.raf.activeIntervals={p95:24.3,n:59};
+ }
+ const out=compareTriple(offA,offB,on);
+ assert.equal(out.status,'inconclusive-host-raf-capability');
+ assert.equal(out.gatePassed,false);
+ assert.equal(out.inconclusive,true);
+ assert.equal(out.gameRaf.ON.activePresentationHz,41.2);
+ assert.equal(out.blankRaf['OFF-A'].supports90Hz,false);
+});
+
+
+test('90Hz A/A/B rejects different Chromium GPU-vsync launch flags',()=>{
+ const offA=report90(false),offB=report90(false),on=report90(true);
+ on.chromiumGpuVsyncDisabled=true;
+ assert.throws(()=>compareTriple(offA,offB,on),/same Chromium GPU-vsync launch flag/);
 });

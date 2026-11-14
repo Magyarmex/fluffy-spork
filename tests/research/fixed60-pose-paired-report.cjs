@@ -62,12 +62,76 @@ function compare(off,on){
  };
  return result;
 }
+function compareTriple(offA,offB,on){
+ assert.equal(offA.pose?.enabled,false,'first A/A control must use the native presenter');
+ assert.equal(offB.pose?.enabled,false,'second A/A control must use the native presenter');
+ assert.equal(offB.pose?.frames,0,'second A/A control must not run pose presentation');
+ assert.equal(on.pose?.enabled,true,'B candidate must use the opt-in presenter');
+ const arms=[['OFF-A',offA],['OFF-B',offB],['ON',on]];
+ for(const [label,arm] of arms){
+  assert.equal(arm.initialFingerprint,offA.initialFingerprint,
+   label+' must start from the same seeded materialized Game');
+  for(const key of ['configuredMaxSteps','backlogExtraTicks','controlledGate','presentationTargetHz'])
+   assert.equal(arm[key],offA[key],label+' '+key+' must match');
+  assert.equal(arm.controlledGate,true,label+' must use controlled Chromium callbacks');
+  assert.equal(arm.chromiumGpuVsyncDisabled,offA.chromiumGpuVsyncDisabled,
+   label+' must use the same Chromium GPU-vsync launch flag');
+  assert.equal(arm.productionRafActive,false,label+' must not leave the production RAF active');
+  assert.ok(arm.births>0,label+' must emit a real player projectile');
+  assert.ok(arm.raf?.frames>2&&Number.isFinite(arm.raf?.activePresentationHz),
+   label+' must report actual composed-Game callbacks');
+  assert.ok(arm.raf.activeIntervals?.n>0&&Number.isFinite(arm.raf.activeIntervals?.p95),
+   label+' must report active composed-Game callback intervals');
+  assert.ok(arm.blankRaf&&Number.isFinite(arm.blankRaf.hz)&&
+   Number.isFinite(arm.blankRaf.p95),label+' must include the same-process blank RAF control');
+  const measuredCapability=arm.blankRaf.hz>=80&&arm.blankRaf.hz<=100&&arm.blankRaf.p95<15;
+  assert.equal(arm.blankRaf.supports90Hz,measuredCapability,
+   label+' blank RAF capability flag must reflect the controlled-gate measurements');
+  assert.equal(arm.rafHostCapable,arm.blankRaf.supports90Hz,
+   label+' host-capability flag must match the blank RAF control');
+ }
+ assert.equal(offA.presentationTargetHz,90,'experiment target must be 90Hz');
+ assert.equal(offA.configuredMaxSteps,2,'90Hz arms use a two-step safety ceiling');
+ assert.equal(offA.backlogExtraTicks,2,'90Hz arms use the bounded two-tick backlog');
+ const hostCapability=new Set(arms.map(([,arm])=>arm.blankRaf.supports90Hz));
+ assert.equal(hostCapability.size,1,'all matched arms must agree on blank-page RAF host capability');
+ if(!offA.blankRaf.supports90Hz){
+  const blankRaf=Object.fromEntries(arms.map(([label,arm])=>[label,arm.blankRaf]));
+  const gameRaf=Object.fromEntries(arms.map(([label,arm])=>[label,{
+   activePresentationHz:arm.raf.activePresentationHz,
+   activeIntervals:arm.raf.activeIntervals,frames:arm.raf.frames,
+   droppedMs:arm.droppedMs,ticks:arm.ticks}]));
+  return {researchOnly:true,causalPerformanceComparison:false,
+   status:'inconclusive-host-raf-capability',gatePassed:false,inconclusive:true,
+   targetPresentationHz:90,chromiumGpuVsyncDisabled:offA.chromiumGpuVsyncDisabled,
+   reason:'The same-process blank-page control using the exact 90Hz RAF gate could not sustain 80–100Hz with p95 below 15ms; this Chromium runner cannot validate the composed-Game 90Hz gate.',
+   blankRaf,gameRaf};
+ }
+ for(const [label,arm] of arms){
+  assert.ok(arm.raf.activePresentationHz>=80&&arm.raf.activePresentationHz<=100,
+   label+' must demonstrate near-90Hz active callbacks when the blank-page host control passes');
+  assert.ok(arm.raf.activeIntervals.p95<15,
+   label+' active callback p95 must remain below 15ms when the blank-page host control passes');
+ }
+ const paired=compare(offA,on);
+ return {...paired,researchOnly:true,causalPerformanceComparison:false,
+  status:'90hz-browser-gate-passed',gatePassed:true,inconclusive:false,
+  targetPresentationHz:90,chromiumGpuVsyncDisabled:offA.chromiumGpuVsyncDisabled,
+  blankRaf:Object.fromEntries(arms.map(([label,arm])=>[label,arm.blankRaf])),
+  offRepeat:{ticks:offB.ticks,wallMs:offB.raf.observedWallMs,
+   simulatedMs:offB.raf.simulatedMs,activePresentationHz:offB.raf.activePresentationHz,
+   callbackP95Ms:offB.raf.callbackJs.p95,renderP95Ms:offB.renders.p95,
+   touchToCanvasMs:offB.touchToCanvasSubmissionMs,births:offB.births},
+  activePresentationHz:{offA:offA.raf.activePresentationHz,
+   offB:offB.raf.activePresentationHz,on:on.raf.activePresentationHz}};
+}
 if(require.main===module){
  try{
-  assert.equal(process.argv.length,4,
-   'usage: node fixed60-pose-paired-report.cjs off.json on.json');
-  const [off,on]=process.argv.slice(2).map(file=>JSON.parse(fs.readFileSync(file,'utf8')));
-  console.log('NOVA_FIXED60_POSE_PAIRED_CHROMIUM '+JSON.stringify(compare(off,on)));
+  assert.ok(process.argv.length===4||process.argv.length===5,
+   'usage: node fixed60-pose-paired-report.cjs off.json on.json OR off-a.json off-b.json on.json');
+  const arms=process.argv.slice(2).map(file=>JSON.parse(fs.readFileSync(file,'utf8')));
+  const result=arms.length===3?compareTriple(arms[0],arms[1],arms[2]):compare(arms[0],arms[1]);
+  console.log('NOVA_FIXED60_POSE_PAIRED_CHROMIUM '+JSON.stringify(result));
  }catch(error){console.error(error.stack||error);process.exitCode=1;}
 }
-module.exports={compare};
+module.exports={compare,compareTriple};
