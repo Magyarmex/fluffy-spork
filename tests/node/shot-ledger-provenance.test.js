@@ -81,3 +81,17 @@ test('rejects invalid chronology, identities and unrecognized kinds',()=>{
     otherShotId:1}]),/peer/);
   assert.throws(()=>auditShotEvidence([{frame:1,shotId:1,kind:'imaginary'}]),/unknown/);
 });
+
+test('unidentified pre-frame entities force abstention even with complete event endpoints',()=>{
+  const events=[{frame:1,shotId:11,kind:'damageTank',preShot:pre,preTarget:target}];
+  for(const options of [{preFrameShotUnidentified:1},{preFrameTargetUnidentified:1},
+    {preFrameShotUnidentified:2,preFrameTargetUnidentified:3}]){
+    const result=auditShotEvidence(events,options);
+    assert.equal(result.bounded,true,'identity loss is not a buffer overflow');
+    assert.equal(result.abstentionReason,'incomplete-pre-frame-evidence');
+    assert.equal(result.certifiedMissedHits,null);
+    assert.equal(result.missedHitClassification,'not-evaluated');
+  }
+  assert.equal(auditShotEvidence(events).abstentionReason,
+    'no-authoritative-competing-contact-geometry');
+});
