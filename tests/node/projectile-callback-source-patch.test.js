@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const {patchMaterializedCore, patchMaterializedRetirement, patchMaterializedInterception, patchBattlefieldCallbacks, patchBattlefieldCover, guardedShotCall, CALLS} = require('../research/projectile-callback-source-patch.cjs');
+const {patchSniperInterception, patchMaterializedCore, patchMaterializedRetirement, patchMaterializedInterception, patchBattlefieldCallbacks, patchBattlefieldCover, guardedShotCall, CALLS} = require('../research/projectile-callback-source-patch.cjs');
 const html = fs.readFileSync(path.resolve(__dirname, '../../index.html'), 'utf8');
 test('research patch changes exactly three authoritative core callbacks, not splash or overlays',()=>{
   const patched = patchMaterializedCore(html);
@@ -247,6 +247,19 @@ test('actual core endpoint interception witness preserves both projectile outcom
   assert.equal(observed.events[0].afterHpB,5);
   assert.deepEqual(run(patched,'throwing'),baseline,
     'observer exception must not change either projectile outcome');
+});
+
+test('research Sniper patch observes the actual shipping swept interception owner',()=>{
+  const sniper=fs.readFileSync(path.resolve(__dirname,'../../nova-updates/sniper-v1.2.0.js'),'utf8');
+  const patched=patchSniperInterception(sniper);
+  assert.notEqual(patched,sniper);
+  assert.equal((patched.match(/recordProjectileInterception/g)||[]).length,1);
+  new vm.Script(patched,{filename:'research-patched-sniper.js'});
+  assert.throws(()=>patchSniperInterception(patched),/already installed/);
+  assert.throws(()=>patchSniperInterception(sniper.replace(
+    'this.weakenBullet(a, bh); this.weakenBullet(b, ah);',
+    'this.weakenBullet(a, bh); this.weakenBullet(b, 0);')),
+    /shipping Sniper interception owner changed/);
 });
 
 const battlefield = fs.readFileSync(path.resolve(__dirname,
