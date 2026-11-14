@@ -258,3 +258,19 @@ test('cover witness observes actual HP after mutation and never interrupts comba
     }
   }
 });
+
+test('cover witness cannot suppress damage when a real shot ID getter throws',()=>{
+  const {createProjectileCallbackLedger}=require('../research/projectile-callback-ledger.cjs');
+  const source='function damageCover(g,s,dmg,mult,bullet){var oldHp=s.hp;s.hp-=dmg*mult;return s.hp;}';
+  const run=new Function('return ('+patchBattlefieldCover(source)+')')();
+  const game={damageTank(){},damageShape(){},damageDrone(){}};
+  const ledger=createProjectileCallbackLedger(game);
+  game.__novaShotLedger=ledger;
+  const shot=Object.defineProperty({},'id',{get(){throw Error('shot identity');}});
+  const cover={id:-1000,hp:20};
+  assert.equal(run(game,cover,7,1,shot),13);
+  assert.equal(cover.hp,13);
+  assert.equal(ledger.snapshot().events.length,0);
+  assert.equal(ledger.snapshot().observerErrors,1);
+  assert.equal(ledger.snapshot().bounded,false);
+});
