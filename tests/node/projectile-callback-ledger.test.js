@@ -483,6 +483,8 @@ test('retirement witness distinguishes observed terminal transition from missed-
   assert.equal(l.recordProjectileRetirement({id:19},'ttl'),true);
   assert.equal(l.recordProjectileRetirement({id:20},'bounds'),true);
   assert.equal(l.counters().retiredAttributed,2);
+  assert.equal(l.counters().damageCallbacksCaptured,0);
+  assert.equal(l.counters().eventsCaptured,2);
   assert.deepEqual(l.snapshot().events.map(e=>[e.shotId,e.reason,e.timing]),
     [[19,'ttl','upper-bound'],[20,'bounds','upper-bound']]);
   assert.equal(l.recordProjectileRetirement({id:21},'ttl'),false);
