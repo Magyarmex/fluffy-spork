@@ -64,7 +64,8 @@ for(const {seed,layoutIndex,layout} of trialsPlan){
     seed+' read-only observer changed physical state or trial was not deterministic');
   const events=on.eventSamples;
   const evidence=auditShotEvidence(events,{
-    truncated:on.eventSamplesTruncated,preFrameOverflow:on.preFrameShotOverflow
+    truncated:on.eventSamplesTruncated,preFrameOverflow:on.preFrameShotOverflow,
+    preFrameTargetUnidentified:on.preFrameTargetUnidentified
   });
   assert.equal(evidence.bounded,true,
     seed+' cannot interpret truncated shot provenance');
@@ -78,6 +79,8 @@ for(const {seed,layoutIndex,layout} of trialsPlan){
   trials.push({seed,layout:off.layout,nativeOrderMatched,control,comparison,
     provenance:{sampled:events.length,truncated:on.eventSamplesTruncated,
       preStatePresent:evidence.preStatePresent,preStateMissing:evidence.preStateMissing,
+      targetStatePresent:evidence.targetStatePresent,targetStateMissing:evidence.targetStateMissing,
+      preFrameTargetUnidentified:evidence.preFrameTargetUnidentified,
       pairedInterceptionPresent:evidence.pairedInterceptionPresent,
       pairedInterceptionMissing:evidence.pairedInterceptionMissing,
       abstentionReason:evidence.abstentionReason,
