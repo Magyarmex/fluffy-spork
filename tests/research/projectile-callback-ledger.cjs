@@ -148,6 +148,7 @@ function createProjectileCallbackLedger(game, options = {}) {
     // Aggregate natural-match trials need bounded scalar telemetry without
     // cloning every per-hit event on every simulation frame.
     return Object.freeze({epoch, installed, eventsCaptured:events.length,
+      damageCallbacksCaptured:events.length-coverAttributed-retiredAttributed,
       overflow, unknown, unidentifiedTargets, observerErrors,
       scopedCalls, unusedScopes, coreAttributed, battlefieldAttributed, coverAttributed, retiredAttributed, bounded:overflow===0&&observerErrors===0});
   }
