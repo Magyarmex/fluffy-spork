@@ -4,7 +4,7 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');
 const {chromium}=require('playwright');
-const {patchMaterializedCore,patchBattlefieldCallbacks,patchBattlefieldCover}=require('../research/projectile-callback-source-patch.cjs');
+const {patchMaterializedCore,patchMaterializedRetirement,patchBattlefieldCallbacks,patchBattlefieldCover}=require('../research/projectile-callback-source-patch.cjs');
 (async()=>{
   const browser=await chromium.launch({headless:true});
   const context=await browser.newContext({viewport:{width:900,height:700}});
@@ -21,7 +21,7 @@ const {patchMaterializedCore,patchBattlefieldCallbacks,patchBattlefieldCover}=re
     await page.route('http://127.0.0.1:8765/',async route=>{
       const response=await route.fetch(),html=await response.text();
       assert.equal(response.status(),200);
-      const patched=patchMaterializedCore(html);
+      const patched=patchMaterializedRetirement(patchMaterializedCore(html));
       patches++;
       await route.fulfill({response,body:patched});
     });
@@ -54,14 +54,14 @@ const {patchMaterializedCore,patchBattlefieldCallbacks,patchBattlefieldCover}=re
       const ledger=factory(g,{limit:4096});
       ledger.install();
       g.__novaShotLedger=ledger;
-      let frames=0,callbacks=0,scopedCalls=0,unusedScopes=0,observerErrors=0,unknown=0,unidentifiedTargets=0,coreAttributed=0,battlefieldAttributed=0,coverAttributed=0;
+      let frames=0,callbacks=0,scopedCalls=0,unusedScopes=0,observerErrors=0,unknown=0,unidentifiedTargets=0,coreAttributed=0,battlefieldAttributed=0,coverAttributed=0,retirements=0;
       const updateMs=[];
       for(let i=0;i<600&&g.status==='playing';i++){
         const t0=performance.now();
         g.update(1/30);
         updateMs.push(performance.now()-t0);
         const s=ledger.counters();
-        frames++;callbacks+=s.eventsCaptured;scopedCalls+=s.scopedCalls;
+        frames++;callbacks+=s.eventsCaptured-s.retiredAttributed;retirements+=s.retiredAttributed;scopedCalls+=s.scopedCalls;
         unusedScopes+=s.unusedScopes;observerErrors+=s.observerErrors;
         unknown+=s.unknown;unidentifiedTargets+=s.unidentifiedTargets;
         coreAttributed+=s.coreAttributed;battlefieldAttributed+=s.battlefieldAttributed;coverAttributed+=s.coverAttributed;
@@ -71,11 +71,13 @@ const {patchMaterializedCore,patchBattlefieldCallbacks,patchBattlefieldCover}=re
       delete g.__novaShotLedger;
       if(!ledger.uninstall())throw Error('failed to restore real damage methods');
       updateMs.sort((a,b)=>a-b);
-      return{frames,callbacks,attributedCallbacks:callbacks-unknown,coreAttributed,battlefieldAttributed,coverAttributed,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
+      return{frames,callbacks,attributedCallbacks:callbacks-unknown,coreAttributed,battlefieldAttributed,coverAttributed,retirements,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
         p95UpdateMs:updateMs[Math.ceil(updateMs.length*.95)-1],
         maxUpdateMs:updateMs[updateMs.length-1],status:g.status,time:g.time};
     });
     assert.ok(result.frames>=1,'real composed game must advance');
+    assert.ok(Number.isSafeInteger(result.retirements)&&result.retirements>=0,
+      'core retirement witness must report bounded nonnegative count');
     assert.equal(result.observerErrors,0,'observer must not fail in natural gameplay');
     assert.ok(result.attributedCallbacks>=0&&result.attributedCallbacks<=result.callbacks,
       'attributed callback count must be bounded by actual captured callbacks');
