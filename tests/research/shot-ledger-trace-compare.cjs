@@ -7,9 +7,9 @@ function comparePhysicalTraces(off,on){
     assert.ok(run&&typeof run==='object',name+' result required');
     assert.ok(Number.isSafeInteger(run.frames)&&run.frames>0,name+' frames required');
     assert.ok(Array.isArray(run.physicalTrace)&&run.physicalTrace.length>=2,name+' trace required');
-    assert.equal(run.physicalTrace.length,1+Math.floor(run.frames/30),name+' trace cadence');
+    assert.equal(run.physicalTrace.length,1+Math.floor(run.frames/10),name+' trace cadence');
     run.physicalTrace.forEach((s,i)=>{
-      assert.equal(s.frame,i*30,name+' frame epoch');
+      assert.equal(s.frame,i*10,name+' frame epoch');
       assert.match(s.hash,/^[0-9a-f]+:[0-9a-f]+$/,name+' physical hash');
     });
   }
