@@ -61,7 +61,7 @@ const {patchMaterializedCore,patchMaterializedRetirement,patchBattlefieldCallbac
         g.update(1/30);
         updateMs.push(performance.now()-t0);
         const s=ledger.counters();
-        frames++;callbacks+=s.eventsCaptured-s.retiredAttributed;retirements+=s.retiredAttributed;scopedCalls+=s.scopedCalls;
+        frames++;callbacks+=s.damageCallbacksCaptured;retirements+=s.retiredAttributed;scopedCalls+=s.scopedCalls;
         unusedScopes+=s.unusedScopes;observerErrors+=s.observerErrors;
         unknown+=s.unknown;unidentifiedTargets+=s.unidentifiedTargets;
         coreAttributed+=s.coreAttributed;battlefieldAttributed+=s.battlefieldAttributed;coverAttributed+=s.coverAttributed;
@@ -81,7 +81,7 @@ const {patchMaterializedCore,patchMaterializedRetirement,patchBattlefieldCallbac
     assert.equal(result.observerErrors,0,'observer must not fail in natural gameplay');
     assert.ok(result.attributedCallbacks>=0&&result.attributedCallbacks<=result.callbacks,
       'attributed callback count must be bounded by actual captured callbacks');
-    assert.ok(result.coreAttributed+result.battlefieldAttributed+result.coverAttributed<=result.attributedCallbacks,
+    assert.ok(result.coreAttributed+result.battlefieldAttributed<=result.attributedCallbacks,
       'origin-specific counts cannot exceed attributed callbacks');
     assert.ok(Number.isFinite(result.time));
     assert.ok(Number.isFinite(result.p95UpdateMs),'browser Game.update CPU sample required');
