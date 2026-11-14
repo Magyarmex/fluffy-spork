@@ -176,7 +176,7 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
       if(observe){delete g.__novaShotLedger;
         if(!ledger.uninstall())throw Error('failed to restore real damage methods');}
       updateMs.sort((a,b)=>a-b);
-      return{arm:paired?(observe?'on':'off'):'smoke',preSortTankIds,frames,physicalTrace,eventSamples,eventSamplesTruncated,callbacks,attributedCallbacks:callbacks-unknown,coreAttributed,battlefieldAttributed,coverAttributed,retirements,ttlRetirements,boundsRetirements,ambiguousRetirements,rawPenOneZeroHitTtl,coreInterceptions,sniperInterceptions,battlefieldTtlInterceptions,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
+      return{arm:paired?(observe?'on':'off'):'smoke',preSortTankIds,layout:g.__novaBattlefield?.name??null,frames,physicalTrace,eventSamples,eventSamplesTruncated,callbacks,attributedCallbacks:callbacks-unknown,coreAttributed,battlefieldAttributed,coverAttributed,retirements,ttlRetirements,boundsRetirements,ambiguousRetirements,rawPenOneZeroHitTtl,coreInterceptions,sniperInterceptions,battlefieldTtlInterceptions,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
         p95UpdateMs:updateMs[Math.ceil(updateMs.length*.95)-1],
         maxUpdateMs:updateMs[updateMs.length-1],status:g.status,time:g.time};
     },{observe:OBSERVE,paired:!!PAIRED_ARM});
