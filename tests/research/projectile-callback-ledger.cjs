@@ -115,7 +115,7 @@ function createProjectileCallbackLedger(game, options = {}) {
       if (events.length >= limit) { overflow++; return false; }
       events.push(Object.freeze({epoch, kind:'coverDamage', targetId:coverId,
         shotId, attribution:'direct', source:'battlefield',
-        requestedDamage:null, effectiveDamage:Math.max(0,beforeHp-afterHp),
+        requestedDamage:null, effectiveDamage:Math.min(Math.max(0,beforeHp),Math.max(0,beforeHp-afterHp)),
         timing:'unknown'}));
       return true;
     } catch (_) { observerErrors++; return false; }
