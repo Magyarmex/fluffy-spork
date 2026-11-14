@@ -258,6 +258,9 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
                 e.shotId>=g.__novaFrameStartBulletIdCeiling,
               preOtherShot:Number.isSafeInteger(e.otherShotId)?
                 (preFrameShots?.get(e.otherShotId)??null):null,
+              otherBornThisFrame:Number.isSafeInteger(e.otherShotId)&&
+                Number.isSafeInteger(g.__novaFrameStartBulletIdCeiling)&&
+                e.otherShotId>=g.__novaFrameStartBulletIdCeiling,
               preTarget:Number.isSafeInteger(e.targetId)?
                 (preFrameTargets?.[e.kind]?.get(e.targetId)??null):null});
           }
