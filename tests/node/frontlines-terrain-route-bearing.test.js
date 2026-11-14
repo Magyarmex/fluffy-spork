@@ -98,3 +98,34 @@ test('locally visible neutral farm also follows a route to its aggregate center'
  assert.equal(b.mode,'local');assert.ok(b.weight>.04);
  assert.ok(b.x<0&&b.y>0,'local farm centroid must not undo Battlefield routing');
 });
+
+test('public route scoring uses the complete cached distance without changing its first steering bearing',()=>{
+ const {T,t,g}=scene(),goal={x:200,y:-900},bearing={};
+ g.hasLineOfSight=()=>false;
+ let lookups=0,priced=0;
+ g.novaBattlefieldWaypoint=()=>{lookups++;return{x:t.x+80,y:t.y-60};};
+ g.novaRouteLength=(x,y,gx,gy,pad,seed,wp)=>{
+  priced++;
+  assert.equal(seed,t.id);assert.equal(pad,23);
+  assert.equal(wp.x,t.x+80);assert.equal(wp.y,t.y-60);
+  return 1400;
+ };
+ const cost=T.routeCost(g,t,goal.x,goal.y,null,bearing,{CLASSES:{guard:{size:15}}});
+ assert.equal(cost,1400);
+ assert.ok(bearing.x>0&&bearing.y<0,'full cost must not turn the hull away from its first safe waypoint');
+ assert.equal(lookups,1,'pricing must not re-run the planner');
+ assert.equal(priced,1);
+});
+test('public BLOOM threshold rejects a long cached detour that first-corner scoring would accept',()=>{
+ const {T,t,st,g}=scene();
+ st.bloomMemory=null;t.x=-1130;
+ st.signal={type:'BLOOM',sector:5,x:-560,y:-560,started:105,until:110};
+ g.hasLineOfSight=()=>false;
+ g.novaBattlefieldWaypoint=()=>({x:t.x+160,y:t.y+100});
+ g.novaRouteLength=()=>1130;
+ const rejected=T.publicEcoBias(g,t,{},{});
+ assert.equal(rejected.mode,'none','full detour exceeds the public-signal acceptance budget');
+ g.novaRouteLength=()=>1000;
+ const accepted=T.publicEcoBias(g,t,{},{});
+ assert.equal(accepted.mode,'signal','shorter verified path should preserve the public opportunity');
+});
