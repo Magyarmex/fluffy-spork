@@ -65,6 +65,10 @@ function fixture(source,observe,kind='shape',hz=30){
   if(observe==='malformed')g.__novaShotLedger={};
   if(observe==='throwing-ledger')Object.defineProperty(g,'__novaShotLedger',{
     configurable:true,get(){throw Error('research ledger getter');}});
+  if(observe==='throwing-callable-before')g.__novaShotLedger={withProjectile(){throw Error('observer before');}};
+  if(observe==='throwing-callable-after')g.__novaShotLedger={withProjectile(_shot,fn){fn();throw Error('observer after');}};
+  if(observe==='ignoring-callable')g.__novaShotLedger={withProjectile(){return 99;}};
+  if(observe==='twice-callable')g.__novaShotLedger={withProjectile(_shot,fn){fn();fn();}};
   if(observe==='throwing-method')g.__novaShotLedger=Object.defineProperty({},
     'withProjectile',{get(){throw Error('research method getter');}});
   compileUpdater(source).call(g,1/hz);
@@ -87,7 +91,7 @@ test('patched actual shipping updater preserves damage and records explicit shot
 test('malformed observer falls back to unmodified core damage across simulation rates',()=>{
   for(const hz of [30,60,120,240]){
     const base=fixture(html,false,'shape',hz);
-    for(const mode of ['malformed','throwing-ledger','throwing-method']){
+    for(const mode of ['malformed','throwing-ledger','throwing-method','throwing-callable-before','throwing-callable-after','ignoring-callable','twice-callable']){
       const malformed=fixture(patchMaterializedCore(html),mode,'shape',hz);
       // The installed passive damage observer can still record an unknown-origin
       // callback even when the explicit shot scope is unavailable. Compare
