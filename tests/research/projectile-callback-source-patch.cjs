@@ -71,7 +71,7 @@ function patchBattlefieldCallbacks(source) {
 function patchBattlefieldCover(source) {
   if (typeof source !== 'string') throw new TypeError('Battlefield source required');
   const target = 'var oldHp=s.hp;s.hp-=dmg*mult;';
-  if (source.includes('__novaShotLedger.recordCoverDamage'))
+  if (source.includes('method.call(ledger,bullet,s,oldHp,s.hp)'))
     throw new Error('research cover patch already installed');
   if (source.split(target).length !== 2)
     throw new Error('expected one authoritative cover HP write');
