@@ -16,8 +16,11 @@ function patchMaterializedCore(html) {
     throw new Error('research callback patch already installed');
   for (const call of CALLS) {
     if (body.split(call).length !== 2) throw new Error('expected one core callback: ' + call);
-    const guarded = '(typeof this.__novaShotLedger?.withProjectile === \'function\' ? this.__novaShotLedger.withProjectile(b, () => ' +
-      call.slice(0, -1) + ", 'direct', 'core') : " + call.slice(0, -1) + ');';
+    // Only observer property access is guarded. Never catch the real callback:
+    // doing so could run damage twice or swallow a legitimate combat error.
+    const guarded = '(()=>{let ledger,method;try{ledger=this.__novaShotLedger;method=ledger?.withProjectile;}catch(_){}' +
+      'return typeof method===\'function\' ? method.call(ledger,b,()=>'+call.slice(0,-1)+
+      ",'direct','core') : "+call.slice(0,-1)+';})();';
     body = body.replace(call, guarded);
   }
   return html.slice(0, start) + body + html.slice(end);
@@ -56,8 +59,8 @@ function patchBattlefieldCallbacks(source) {
   for (const {start,end} of spans.reverse()) {
     const call = source.slice(start,end);
     const receiver = call.startsWith('this.') ? 'this' : 'g';
-    const guarded = '(typeof ' + receiver + '.__novaShotLedger?.withProjectile === \'function\' ? ' +
-      receiver + ".__novaShotLedger.withProjectile(b,()=>"+call+",'direct','battlefield') : "+call+')';
+    const guarded = '(()=>{let ledger,method;try{ledger='+receiver+'.__novaShotLedger;method=ledger?.withProjectile;}catch(_){}' +
+      "return typeof method==='function' ? method.call(ledger,b,()=>"+call+",'direct','battlefield') : "+call+';})()';
     out = out.slice(0,start) + guarded + out.slice(end);
   }
   return out;
