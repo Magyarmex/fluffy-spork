@@ -48,7 +48,16 @@ for(const seed of seeds){
   assert.ok(comparison.complete,seed+' arms must complete the same number of frames');
   assert.equal(comparison.firstDivergence,null,
     seed+' read-only observer changed physical state or trial was not deterministic');
+  const events=on.eventSamples;
+  const ids=kind=>new Set(events.filter(e=>kind(e)&&Number.isSafeInteger(e.shotId))
+    .map(e=>e.shotId));
+  const damageIds=ids(e=>['damageTank','damageShape','damageDrone'].includes(e.kind));
+  const retirementIds=ids(e=>e.kind==='projectileRetirement');
+  const overlappingDamageRetirements=[...damageIds].filter(id=>retirementIds.has(id)).length;
   trials.push({seed,control,comparison,
+    provenance:{sampled:events.length,truncated:on.eventSamplesTruncated,
+      damageShotIds:damageIds.size,retiredShotIds:retirementIds.size,
+      damageAndRetirementShotIds:overlappingDamageRetirements},
     off:{frames:off.frames,p95UpdateMs:off.p95UpdateMs,maxUpdateMs:off.maxUpdateMs},
     offRepeat:{frames:offRepeat.frames,p95UpdateMs:offRepeat.p95UpdateMs},
     on:{frames:on.frames,p95UpdateMs:on.p95UpdateMs,maxUpdateMs:on.maxUpdateMs,
