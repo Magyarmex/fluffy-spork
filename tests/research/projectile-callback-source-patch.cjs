@@ -35,6 +35,26 @@ function patchMaterializedCore(html) {
   return html.slice(0, start) + body + html.slice(end);
 }
 
+/** Research-only witness at the real core endpoint interception owner.
+ * The pair has already been weakened before observation. This is NOT an
+ * authoritative continuous first-contact time or a new combat solver. */
+function patchMaterializedInterception(html) {
+  if (typeof html !== 'string') throw new TypeError('materialized HTML required');
+  const start=html.indexOf('    resolveBulletCollisions() {');
+  const end=html.indexOf('    updateBullets(dt) {',start);
+  if(start<0||end<=start)throw new Error('shipping interception boundaries changed');
+  let body=html.slice(start,end);
+  if(body.includes('recordProjectileInterception'))throw new Error('research interception patch already installed');
+  const owner='                this.weakenBullet(a, bh);\n                this.weakenBullet(b, ah);';
+  if(body.split(owner).length!==2)throw new Error('core endpoint interception owner changed');
+  const witness='\n                try { const ledger = this.__novaShotLedger;\n' +
+    '                    const method = ledger?.recordProjectileInterception;\n' +
+    '                    if (typeof method === \'function\') method.call(ledger,a,b,ah,bh);\n' +
+    '                } catch (_) { /* research observation cannot interrupt combat */ }';
+  body=body.replace(owner,owner+witness);
+  return html.slice(0,start)+body+html.slice(end);
+}
+
 /** Research-only core terminal retirement witness. The authoritative core
  * checks TTL and arena bounds before collision resolution. Record only a
  * previously live projectile's transition to dead, after the real mutation;
@@ -141,4 +161,4 @@ function patchBattlefieldCover(source) {
     '}catch(_){/* research observation must not interrupt cover damage */}';
   return source.replace(target,target+witness);
 }
-module.exports = {patchMaterializedCore, patchMaterializedRetirement, patchBattlefieldCallbacks, patchBattlefieldCover, guardedShotCall, CALLS};
+module.exports = {patchMaterializedCore, patchMaterializedRetirement, patchMaterializedInterception, patchBattlefieldCallbacks, patchBattlefieldCover, guardedShotCall, CALLS};
