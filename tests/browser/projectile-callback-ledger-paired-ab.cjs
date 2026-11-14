@@ -37,7 +37,10 @@ const trialsPlan=[
 const trials=[];
 const initialWorlds=new Set();
 for(const {seed,layoutIndex,layout} of trialsPlan){
-  const off=arm('off',seed,layoutIndex),offRepeat=arm('off',seed,layoutIndex),on=arm('on',seed,layoutIndex);
+  // Bracket the instrumented arm between two independent OFF controls so a
+  // simple monotonic browser warm-up/drift cannot masquerade as observer cost.
+  // These are still sequential CPU samples, not a calibrated overhead study.
+  const off=arm('off',seed,layoutIndex),on=arm('on',seed,layoutIndex),offRepeat=arm('off',seed,layoutIndex);
   assert.ok(Array.isArray(off.preSortTankIds)&&off.preSortTankIds.length>0,
     seed+' must expose native startup tank order');
   // The canonical natural-match harness documents asynchronous bot-array
