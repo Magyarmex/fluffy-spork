@@ -62,6 +62,36 @@ function compare(off,on){
  };
  return result;
 }
+function compareTriple(offA,offB,on){
+ assert.equal(offA.pose?.enabled,false,'first A/A control must use the native presenter');
+ assert.equal(offB.pose?.enabled,false,'second A/A control must use the native presenter');
+ assert.equal(on.pose?.enabled,true,'B candidate must use the opt-in presenter');
+ for(const [label,arm] of [['OFF-A',offA],['OFF-B',offB],['ON',on]]){
+  assert.equal(arm.initialFingerprint,offA.initialFingerprint,
+   label+' must start from the same seeded materialized Game');
+  for(const key of ['configuredMaxSteps','backlogExtraTicks','controlledGate','presentationTargetHz'])
+   assert.equal(arm[key],offA[key],label+' '+key+' must match');
+  assert.equal(arm.controlledGate,true,label+' must use controlled Chromium callbacks');
+  assert.equal(arm.productionRafActive,false,label+' must not leave the production RAF active');
+  assert.ok(arm.births>0,label+' must emit a real player projectile');
+  assert.ok(Number.isFinite(arm.raf?.activePresentationHz)&&
+   arm.raf.activePresentationHz>=80&&arm.raf.activePresentationHz<=100,
+   label+' must demonstrate near-90Hz active callbacks');
+  assert.ok(arm.raf.intervals.p95<15,label+' callback p95 must remain below 15ms');
+ }
+ assert.equal(offA.presentationTargetHz,90,'experiment target must be 90Hz');
+ assert.equal(offA.configuredMaxSteps,2,'90Hz arms use a two-step safety ceiling');
+ assert.equal(offA.backlogExtraTicks,2,'90Hz arms use the bounded two-tick backlog');
+ const paired=compare(offA,on);
+ return {...paired,researchOnly:true,causalPerformanceComparison:false,
+  targetPresentationHz:90,
+  offRepeat:{ticks:offB.ticks,wallMs:offB.raf.observedWallMs,
+   simulatedMs:offB.raf.simulatedMs,activePresentationHz:offB.raf.activePresentationHz,
+   callbackP95Ms:offB.raf.callbackJs.p95,renderP95Ms:offB.renders.p95,
+   touchToCanvasMs:offB.touchToCanvasSubmissionMs,births:offB.births},
+  activePresentationHz:{offA:offA.raf.activePresentationHz,
+   offB:offB.raf.activePresentationHz,on:on.raf.activePresentationHz}};
+}
 if(require.main===module){
  try{
   assert.ok(process.argv.length===4||process.argv.length===5,
