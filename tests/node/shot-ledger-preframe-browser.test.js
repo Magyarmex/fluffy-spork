@@ -62,6 +62,23 @@ test('unidentified projectile does not poison independent exact shot IDs',()=>{
   assert.equal(a.shots.get(6).x,10);
   assert.equal(a.preFrameShotUnidentified,1);
 });
+test('stateful identity getters are sampled once and cannot switch the joined ID',()=>{
+  const g=world();
+  let shotReads=0,targetReads=0;
+  Object.defineProperty(g.bullets[0],'id',{
+    get(){shotReads++;return shotReads===1?5:999;}
+  });
+  Object.defineProperty(g.tanks[0],'id',{
+    get(){targetReads++;return targetReads===1?8:999;}
+  });
+  const a=sample(g);
+  assert.equal(shotReads,1);
+  assert.equal(targetReads,1);
+  assert.ok(a.shots.has(5));
+  assert.ok(!a.shots.has(999));
+  assert.ok(a.targets.damageTank.has(8));
+  assert.ok(!a.targets.damageTank.has(999));
+});
 test('oversized projectile frame is explicitly unbounded, never silently sampled',()=>{
   const g=world();
   g.bullets=Array.from({length:4097},(_,i)=>({...g.bullets[0],id:i}));
