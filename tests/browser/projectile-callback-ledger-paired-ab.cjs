@@ -22,10 +22,16 @@ function arm(mode){
   assert.equal(data.observerErrors,0,'observer errors in '+mode);
   return data;
 }
-const off=arm('off'),on=arm('on');
+const off=arm('off'),offRepeat=arm('off'),on=arm('on');
+// A/A control is mandatory: otherwise an OFF/ON divergence could simply be
+// a nondeterministic game setup, asynchronous spawn, or browser-side clock.
+const control=comparePhysicalTraces(off,offRepeat);
+assert.ok(control.complete&&!control.firstDivergence,
+  'OFF/OFF A/A control failed; OFF/ON causal inference is invalid');
 const comparison=comparePhysicalTraces(off,on);
 const report={research:'shot-ledger-paired-physical-parity',
-  comparison,off:{frames:off.frames,p95UpdateMs:off.p95UpdateMs,maxUpdateMs:off.maxUpdateMs},
+  control,comparison,off:{frames:off.frames,p95UpdateMs:off.p95UpdateMs,maxUpdateMs:off.maxUpdateMs},
+  offRepeat:{frames:offRepeat.frames,p95UpdateMs:offRepeat.p95UpdateMs},
   on:{frames:on.frames,p95UpdateMs:on.p95UpdateMs,maxUpdateMs:on.maxUpdateMs,
     attributedCallbacks:on.attributedCallbacks,retirements:on.retirements,
     sniperInterceptions:on.sniperInterceptions,battlefieldTtlInterceptions:on.battlefieldTtlInterceptions},
