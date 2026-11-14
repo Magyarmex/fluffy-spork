@@ -538,7 +538,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
      simulatedMs:p.owner.ticks*1000/60,
      remainingLagMs:p.owner.lagMs,
      callbackJs:values(callbackCosts),backlogMs:values(backlogSamples),
-     stepCounts,activeStepCounts,activePresentationHz,droppedFrameCount,
+     stepCounts,activeStepCounts,activeIntervals:values(activeIntervals),activePresentationHz,droppedFrameCount,
      longStallDrops,backlogDrops,attributedDroppedMs,
      longStallDroppedMs,longStallWallMs,backlogDroppedMs,
      maxIntervalMs:frameIntervals.length?Math.max(...frameIntervals):null},
