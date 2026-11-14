@@ -137,7 +137,19 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
         }
         return (h1>>>0).toString(16)+':'+(h2>>>0).toString(16);
       };
-      physicalTrace.push({frame:0,hash:fingerprint()});
+      // Fold every frame into an order-sensitive digest. Ten-frame samples
+      // locate broad divergence; the digest catches transient differences
+      // that later converge before the next sampled epoch.
+      let digestA=2166136261,digestB=0x9e3779b9;
+      const foldFrame=hash=>{
+        for(let j=0;j<hash.length;j++){
+          const c=hash.charCodeAt(j);
+          digestA=Math.imul(digestA^c,16777619);
+          digestB=Math.imul(digestB^c,2246822519);
+        }
+      };
+      const initialHash=fingerprint();
+      physicalTrace.push({frame:0,hash:initialHash});foldFrame(initialHash);
       const updateMs=[];
       for(let i=0;i<600&&g.status==='playing';i++){
         const t0=performance.now();
@@ -165,7 +177,9 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
           unidentifiedTargets:0,coreAttributed:0,battlefieldAttributed:0,
           coverAttributed:0,overflow:false
         };
-        frames++;if(frames%10===0)physicalTrace.push({frame:frames,hash:fingerprint()});
+        frames++;
+        const frameHash=fingerprint();foldFrame(frameHash);
+        if(frames%10===0)physicalTrace.push({frame:frames,hash:frameHash});
         callbacks+=s.damageCallbacksCaptured;retirements+=s.retiredAttributed;ttlRetirements+=s.ttlRetirements;boundsRetirements+=s.boundsRetirements;ambiguousRetirements+=s.ambiguousRetirements;rawPenOneZeroHitTtl+=s.rawPenOneZeroHitTtl;coreInterceptions+=s.coreInterceptions;sniperInterceptions+=s.sniperInterceptions;battlefieldTtlInterceptions+=s.battlefieldTtlInterceptions;scopedCalls+=s.scopedCalls;
         unusedScopes+=s.unusedScopes;observerErrors+=s.observerErrors;
         unknown+=s.unknown;unidentifiedTargets+=s.unidentifiedTargets;
@@ -176,7 +190,8 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
       if(observe){delete g.__novaShotLedger;
         if(!ledger.uninstall())throw Error('failed to restore real damage methods');}
       updateMs.sort((a,b)=>a-b);
-      return{arm:paired?(observe?'on':'off'):'smoke',preSortTankIds,layout:g.__novaBattlefield?.name??null,frames,physicalTrace,eventSamples,eventSamplesTruncated,callbacks,attributedCallbacks:callbacks-unknown,coreAttributed,battlefieldAttributed,coverAttributed,retirements,ttlRetirements,boundsRetirements,ambiguousRetirements,rawPenOneZeroHitTtl,coreInterceptions,sniperInterceptions,battlefieldTtlInterceptions,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
+      return{arm:paired?(observe?'on':'off'):'smoke',preSortTankIds,layout:g.__novaBattlefield?.name??null,frames,physicalTrace,
+        fullFrameDigest:(digestA>>>0).toString(16)+':'+(digestB>>>0).toString(16),eventSamples,eventSamplesTruncated,callbacks,attributedCallbacks:callbacks-unknown,coreAttributed,battlefieldAttributed,coverAttributed,retirements,ttlRetirements,boundsRetirements,ambiguousRetirements,rawPenOneZeroHitTtl,coreInterceptions,sniperInterceptions,battlefieldTtlInterceptions,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
         p95UpdateMs:updateMs[Math.ceil(updateMs.length*.95)-1],
         maxUpdateMs:updateMs[updateMs.length-1],status:g.status,time:g.time};
     },{observe:OBSERVE,paired:!!PAIRED_ARM});
@@ -186,6 +201,8 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
     assert.ok(result.physicalTrace.every((sample,i)=>sample.frame===i*10&&
       /^[0-9a-f]+:[0-9a-f]+$/.test(sample.hash)),
       'fingerprints must have monotonic frame epochs and bounded hash shape');
+    assert.match(result.fullFrameDigest,/^[0-9a-f]+:[0-9a-f]+$/,
+      'every-frame physical digest must be present');
     assert.ok(result.eventSamples.length<=256&&result.eventSamplesTruncated>=0,
       'bounded shot provenance sample');
     assert.ok(result.eventSamples.every(e=>Number.isSafeInteger(e.frame)&&
