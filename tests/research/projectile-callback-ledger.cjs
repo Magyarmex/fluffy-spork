@@ -160,6 +160,7 @@ function createProjectileCallbackLedger(game, options = {}) {
           !Number.isSafeInteger(idB) || idB < 0 || idA === idB ||
           !Number.isFinite(beforeA) || !Number.isFinite(beforeB) ||
           !Number.isFinite(afterA) || !Number.isFinite(afterB) ||
+          afterA > beforeA || afterB > beforeB ||
           (source !== 'core' && source !== 'sniper' && source !== 'battlefield-ttl')) {
         observerErrors++; return false;
       }
