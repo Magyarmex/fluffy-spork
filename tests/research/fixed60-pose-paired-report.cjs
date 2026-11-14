@@ -23,14 +23,33 @@ function compare(off,on){
  assert.ok(on.pose.shiftedBulletFrames>0,
   'ON must actually present at least one projectile at an interpolated pose');
  assert.ok(on.pose.renderJs.p95>=0&&Number.isFinite(on.pose.renderJs.p95));
+ // Sequential browser arms can advance different amounts of simulated time.
+ // Report the exposure explicitly; matching seed and policy is not matching
+ // tick chronology, so never present these P95 values as a causal speedup.
+ const exposure=arm=>{
+  const ticks=arm.ticks,wallMs=arm.raf?.observedWallMs,
+   simulatedMs=arm.raf?.simulatedMs,queuedMs=arm.raf?.remainingLagMs,
+   droppedMs=arm.droppedMs;
+  assert.ok(Number.isInteger(ticks)&&ticks>0,'missing authoritative tick count');
+  for(const [name,value] of Object.entries({wallMs,simulatedMs,queuedMs,droppedMs}))
+   assert.ok(Number.isFinite(value)&&value>=0,'invalid '+name+' exposure');
+  assert.ok(wallMs>0,'missing observed RAF wall time');
+  assert.ok(Math.abs(simulatedMs-ticks*1000/60)<1e-6,
+   'simulated milliseconds disagree with authoritative tick count');
+  const errorMs=simulatedMs+queuedMs+droppedMs-wallMs;
+  assert.ok(Math.abs(errorMs)<1,'RAF time accounting is inconsistent');
+  return {ticks,wallMs,simulatedMs,queuedMs,droppedMs,
+   conservationErrorMs:+errorMs.toFixed(5)};
+ };
+ const offExposure=exposure(off),onExposure=exposure(on);
  const result={
   researchOnly:true,causalPerformanceComparison:false,
   initialFingerprint:on.initialFingerprint,
   maxSteps:on.configuredMaxSteps,
-  off:{frames:off.raf.frames,renderP95Ms:off.renders.p95,
+  off:{frames:off.raf.frames,exposure:offExposure,renderP95Ms:off.renders.p95,
    callbackP95Ms:off.raf.callbackJs.p95,touchToCanvasMs:off.touchToCanvasSubmissionMs,
    births:off.births,droppedMs:off.droppedMs},
-  on:{frames:on.raf.frames,renderP95Ms:on.renders.p95,
+  on:{frames:on.raf.frames,exposure:onExposure,renderP95Ms:on.renders.p95,
    callbackP95Ms:on.raf.callbackJs.p95,touchToCanvasMs:on.touchToCanvasSubmissionMs,
    births:on.births,droppedMs:on.droppedMs,
    poseRenderP95Ms:on.pose.renderJs.p95,
