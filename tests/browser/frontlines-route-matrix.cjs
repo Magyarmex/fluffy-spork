@@ -173,6 +173,45 @@ const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
       for(const approach of approaches){
        ({spot,center,sector}=approach);
        memo={sector,announcedAt:100,until:124,initialValue:500};
+      /* The post-#974 shipping owner must produce physically traversable
+       * route legs, not merely a plausible first corner. Probe independently
+       * of the A/B movement trial and clear the probe's route cache afterward.
+       * This checks collision geometry, not enemy sensing or route optimality. */
+      let routeProbe=null;
+      if(approach.blocked){
+       const def=window.__novaMakeRequire('')('game/classes').CLASSES[e.cls],
+        size=Number(def&&def.size)>0?Number(def.size):15,
+        radius=size+3,pad=size+8;
+       g.__v1102Routes=Object.create(null);g.__v1102RouteContext=null;
+       const wp=g.novaBattlefieldWaypoint(spot.x,spot.y,center.x,center.y,pad,e.id),
+        cache=Object.values(g.__v1102Routes||{}).find(c=>c&&c.points&&c.points.length),
+        points=cache?cache.points:[wp].filter(Boolean);
+       let from=spot,clear=true,failedLeg=-1,fullRouteCost=0;
+       for(let k=0;k<points.length;k++){
+        const q=points[k];
+        if(!Number.isFinite(q.x)||!Number.isFinite(q.y)||
+         g.isTerrainSafe&&!g.isTerrainSafe(q.x,q.y,radius)||
+         g.hasLineOfSight&&!g.hasLineOfSight(from.x,from.y,q.x,q.y,radius)){
+         clear=false;failedLeg=k;break;
+        }
+        fullRouteCost+=Math.hypot(q.x-from.x,q.y-from.y);
+        from=q;
+       }
+       const complete=!!cache&&points.length>0&&
+        Math.hypot(from.x-center.x,from.y-center.y)<.001;
+       const firstCornerCost=wp?Math.hypot(wp.x-spot.x,wp.y-spot.y)+
+        Math.hypot(center.x-wp.x,center.y-wp.y):null;
+       if(complete&&clear&&fullRouteCost+1e-6<firstCornerCost)
+        throw Error('full route shorter than first-corner lower bound');
+       routeProbe={radius,pad,returnedWaypoint:!!wp,plannedLegs:points.length,
+        complete,firstCornerCost:firstCornerCost==null?null:+firstCornerCost.toFixed(2),
+        fullRouteCost:complete&&clear?+fullRouteCost.toFixed(2):null,
+        undercount:complete&&clear?+(fullRouteCost-firstCornerCost).toFixed(2):null,
+        clear,failedLeg,first:wp&&{x:+wp.x.toFixed(1),y:+wp.y.toFixed(1)}};
+       if(wp&&!clear)throw Error('physical route leg violates collision clearance: '+
+        JSON.stringify({layout,approach:approach.label,routeProbe}));
+       g.__v1102Routes=Object.create(null);g.__v1102RouteContext=null;
+      }
       const off=run(false),on=run(true),onFirst=run(true),offSecond=run(false);
       const equal=(a,b)=>a.mode===b.mode&&a.committed===b.committed&&
        a.entered===b.entered&&a.insideAtEnd===b.insideAtEnd&&
@@ -189,7 +228,7 @@ const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
       if(!equal(offLong,offLongSecond)||!equal(onLong,onLongFirst))
        throw Error('eight-step A/B has an execution-order confound: '+JSON.stringify({layout,offLong,onLong,onLongFirst,offLongSecond}));
       trials.push({label:approach.label,blocked:approach.blocked,sector,
-       approachDistance:Math.round(spot.d),off,on,
+       approachDistance:Math.round(spot.d),routeProbe,off,on,
        deltaProgress:+(on.progress-off.progress).toFixed(3),orderInvariant:true,
        eightStep:{off:offLong,on:onLong,deltaProgress:+(onLong.progress-offLong.progress).toFixed(3),orderInvariant:true}});
       }
@@ -210,6 +249,10 @@ const LAYOUTS=['CROSSFIRE','SPLIT HORIZON','FOUR GATES'];
    }finally{await page.close();}
   }
   assert.deepEqual(reports.map(r=>r.layout),LAYOUTS);
+  const occluded=reports.flatMap(r=>r.trials.filter(t=>t.blocked&&t.routeProbe));
+  assert.ok(occluded.length>0,'route matrix did not exercise a terrain-occluded case');
+  assert.ok(occluded.some(t=>t.routeProbe.returnedWaypoint),
+   'all terrain-occluded composed route probes returned no waypoint');
   console.log('NOVA_FRONTLINES_ROUTE_MATRIX_MICROTRIAL '+JSON.stringify(reports));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e.stack||e);process.exitCode=1;});
