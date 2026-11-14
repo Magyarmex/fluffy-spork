@@ -31,11 +31,11 @@ function run(seed,hz,enabled){return withSeed(seed,draws=>{
    rendered,violations,interpolated:presentation.interpolated};
  }finally{owner.stop();presentation.stop();g.destroy()}
 });}
-test('opt-in presentation is simulation- and RNG-pure across 30/60/120/240Hz',()=>{
+test('opt-in presentation is simulation- and RNG-pure across 30/60/90/120/240Hz',()=>{
  for(const seed of [1517800,1517802,1517810]){
   const baseline=run(seed,60,false);
-  for(const hz of [30,60,120,240]){
-   const result=run(seed,hz,hz>=120);
+  for(const hz of [30,60,90,120,240]){
+   const result=run(seed,hz,hz>=90);
    assert.equal(result.ticks,120);assert.equal(result.violations,0);
    assert.equal(result.hash,baseline.hash,`${hz}Hz physical mismatch`);
    assert.equal(result.draws,baseline.draws,`${hz}Hz RNG mismatch`);
@@ -52,6 +52,16 @@ test('120Hz interpolates between consecutive 60Hz poses, while 60Hz is unmodifie
  const repeats=rows=>rows.slice(1).filter((r,i)=>Math.abs(r.camX-rows[i].camX)<1e-9).length;
  assert.ok(repeats(fast.rendered)<repeats(base.rendered),
   `camera interpolation did not reduce repeated positions: ${repeats(fast.rendered)} vs ${repeats(base.rendered)}`);
+});
+test('90Hz interpolated camera and hull poses reduce repeated frames without altering the Game',()=>{
+ const fast=run(1517800,90,true),base=run(1517800,90,false),normal=run(1517800,60,false);
+ assert.equal(fast.ticks,120,'90Hz presentation must execute exactly 120 fixed ticks');
+ assert.equal(fast.hash,normal.hash,'visual interpolation cannot alter physical state');
+ assert.equal(fast.draws,normal.draws,'visual interpolation cannot alter RNG');
+ assert.ok(fast.interpolated>0,'90Hz should interpolate real moving poses');
+ const repeats=rows=>rows.slice(1).filter((r,i)=>Math.abs(r.camX-rows[i].camX)<1e-9).length;
+ assert.ok(repeats(fast.rendered)<repeats(base.rendered),
+  '90Hz camera interpolation must reduce repeated poses, not just preserve hashes');
 });
 test('tick-boundary alpha zero draws previous pose, never moves backward mid-frame',()=>{
  const g={tanks:[{x:0,y:0}],drones:[],shapes:[],cam:{x:0,y:0},
