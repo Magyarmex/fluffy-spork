@@ -24,6 +24,16 @@ function run(seed,cls,reload,presentationHz){
    spawnShieldT:0,shieldT:0,bulwarkT:0,tauntT:0,cloakT:0});
   g.cam.x=0;g.cam.y=0;g.cam.zoom=1;g.zoom=1;g.w=800;g.h=600;
   g.tanks=[p,target];g.tankById=new Map([[p.id,p],[target.id,target]]);
+  // Keep manual eastward aim; nearest-target assist would follow the moving
+  // Scout inside its cone and hide misses caused by actual shot geometry.
+  let aimAssistVetoes=0;
+  const nearest=g.nearestTank;
+  g.nearestTank=function(x,y,radius,except){
+   if(except===p.id&&radius===480&&x===p.x&&y===p.y){
+    aimAssistVetoes++;return null;
+   }
+   return nearest.apply(this,arguments);
+  };
   g.shapes=[];g.drones=[];g.powerups=[];g.bullets=[];g.orbs=[];
   g.__novaTerrain=[];g.__novaBattlefieldIndex=null;
   if(g.shapeById)g.shapeById.clear();
@@ -87,8 +97,9 @@ function run(seed,cls,reload,presentationHz){
    assert.equal(g.tanks.length,2,'no AI respawn');
    assert.equal(g.shapes.length+g.drones.length+g.powerups.length,0,'no ecology');
    assert.ok(volleys>0&&hits>0&&damage>0,'real projectile damage required');
+   assert.ok(aimAssistVetoes>0,'manual-aim veto must run in actual Game');
    assert.ok(Math.abs(g.time-4)<1e-5,'same simulated time');
-   return {volleys,hits,damage:+damage.toFixed(5),
+   return {volleys,hits,aimAssistVetoes,damage:+damage.toFixed(5),
     targetHp:+target.hp.toFixed(5),targetY:+target.y.toFixed(5),
     hash:digest(physical(g)),draws:draws(),
     heat:p.__v17Heat||0,spin:p.fireSpin||0,fireCd:p.fireCd};
