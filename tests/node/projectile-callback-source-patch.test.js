@@ -158,6 +158,26 @@ test('terminal core retirement witness preserves actual projectile removal and t
   }
 });
 
+test('retirement observation is fail-open under malformed getters and callbacks',()=>{
+  const patched=patchMaterializedRetirement(html);
+  for(const mode of ['missing','throwing-ledger','throwing-method','throwing-callback','malformed']){
+    const bullet={id:47,x:0,y:0,vx:0,vy:0,ttl:0.001,r:2,dead:false,
+      beam:false,shell:false};
+    const g={bullets:[bullet],initBulletIntegrity(){},cosmeticRandom(){return 1;},
+      resolveBulletCollisions(){},damageTank(){},damageShape(){},damageDrone(){}};
+    if(mode==='throwing-ledger')Object.defineProperty(g,'__novaShotLedger',{
+      get(){throw Error('observer getter');}});
+    if(mode==='throwing-method')g.__novaShotLedger=Object.defineProperty({},
+      'recordProjectileRetirement',{get(){throw Error('method getter');}});
+    if(mode==='throwing-callback')g.__novaShotLedger={
+      recordProjectileRetirement(){throw Error('observer callback');}};
+    if(mode==='malformed')g.__novaShotLedger={recordProjectileRetirement:17};
+    assert.doesNotThrow(()=>compileUpdater(patched).call(g,1/30),mode);
+    assert.equal(bullet.dead,true,mode);
+    assert.equal(g.bullets.length,0,mode);
+  }
+});
+
 const battlefield = fs.readFileSync(path.resolve(__dirname,
   '../../nova-updates/battlefield-v1.6.0.js'),'utf8');
 test('research Battlefield patch scopes exactly ten real projectile callbacks',()=>{
