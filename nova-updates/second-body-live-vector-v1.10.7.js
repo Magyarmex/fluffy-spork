@@ -273,7 +273,7 @@ wrap('game/engine',function(engine,require){
       if(d.__novaChronoCommandRawEpoch===g.__novaShapeSweepEpoch)
         d.__novaChronoCommandInvalidEpoch=g.__novaShapeSweepEpoch;
     }
-    if(g.hasLineOfSight&&!g.hasLineOfSight(d.x,d.y,x,y,Math.max(2,(d.r||8)*.45))&&g.novaBattlefieldWaypoint){
+    if(g.hasLineOfSight&&!g.hasLineOfSight(d.x,d.y,x,y,Math.max(2,d.r||8))&&g.novaBattlefieldWaypoint){
       var wp=g.novaBattlefieldWaypoint(d.x,d.y,x,y,(d.r||8)+5,d.id);if(wp){x=wp.x;y=wp.y;}
     }
     var dx=x-d.x,dy=y-d.y,m=Math.hypot(dx,dy)||1,ux=dx/m,uy=dy/m,k=1-Math.exp(-7*Math.max(0,dt));
