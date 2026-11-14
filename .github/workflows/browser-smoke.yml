@@ -22,6 +22,7 @@ on:
       - 'index.html'
       - 'tests/browser/**'
       - 'tests/research/controller-command-natural-census.cjs'
+      - 'tests/research/fixed60-pose-paired-report.cjs'
       - 'tests/node/redeploy-paired-real-pilot.test.js'
       - 'scripts/redeploy-common-safe-report.cjs'
       - 'tests/node/redeploy-common-safe-report.test.js'
@@ -165,6 +166,13 @@ jobs:
           # seeded OFF arm. No production scheduler or presenter switch.
           NOVA_FIXED60_MAX_STEPS=3 NOVA_FIXED60_CONTROLLED_GATE=1 NOVA_FIXED60_POSE_PRESENTATION=1 NOVA_FIXED60_POSE_STORAGE=weak NOVA_FIXED60_INITIAL_FINGERPRINT_FILE=/tmp/nova-fixed60-initial-world.txt NOVA_FIXED60_REPORT_FILE=/tmp/nova-fixed60-three-weak-pose.json node tests/browser/fixed60-real-game-owner-touch-research.cjs
           node tests/research/fixed60-pose-paired-report.cjs /tmp/nova-fixed60-three.json /tmp/nova-fixed60-three-weak-pose.json
+          # Controlled 90Hz Chromium presentation: OFF/OFF/ON with the same
+          # seeded materialized Game. The fixed60 simulation remains 60Hz;
+          # the browser must render both zero-tick and one-tick callbacks.
+          NOVA_FIXED60_PRESENTATION_HZ=90 NOVA_FIXED60_MAX_STEPS=2 NOVA_FIXED60_EXTRA_TICKS=2 NOVA_FIXED60_CONTROLLED_GATE=1 NOVA_FIXED60_INITIAL_FINGERPRINT_FILE=/tmp/nova-fixed60-90-initial-world.txt NOVA_FIXED60_REPORT_FILE=/tmp/nova-fixed60-90-off-a.json node tests/browser/fixed60-real-game-owner-touch-research.cjs
+          NOVA_FIXED60_PRESENTATION_HZ=90 NOVA_FIXED60_MAX_STEPS=2 NOVA_FIXED60_EXTRA_TICKS=2 NOVA_FIXED60_CONTROLLED_GATE=1 NOVA_FIXED60_INITIAL_FINGERPRINT_FILE=/tmp/nova-fixed60-90-initial-world.txt NOVA_FIXED60_REPORT_FILE=/tmp/nova-fixed60-90-off-b.json node tests/browser/fixed60-real-game-owner-touch-research.cjs
+          NOVA_FIXED60_PRESENTATION_HZ=90 NOVA_FIXED60_MAX_STEPS=2 NOVA_FIXED60_EXTRA_TICKS=2 NOVA_FIXED60_CONTROLLED_GATE=1 NOVA_FIXED60_POSE_PRESENTATION=1 NOVA_FIXED60_INITIAL_FINGERPRINT_FILE=/tmp/nova-fixed60-90-initial-world.txt NOVA_FIXED60_REPORT_FILE=/tmp/nova-fixed60-90-on.json node tests/browser/fixed60-real-game-owner-touch-research.cjs
+          node tests/research/fixed60-pose-paired-report.cjs /tmp/nova-fixed60-90-off-a.json /tmp/nova-fixed60-90-off-b.json /tmp/nova-fixed60-90-on.json
           node tests/research/fixed60-paired-report.cjs /tmp/nova-fixed60-two.json /tmp/nova-fixed60-three.json
           # Separate non-causal browser safety/performance witnesses for equal
           # six-tick backlog capacity. Four updates are research-only; never
