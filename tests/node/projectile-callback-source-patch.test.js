@@ -527,3 +527,29 @@ test('shipping Sniper contact fraction is segment-relative and geometry-invarian
   assert.ok(patchSniperInterception(sniper).includes(
     "method.call(ledger,a,b,ah,bh,'sniper',firstTime)"));
 });
+
+test('Sniper swept timing witness preserves weakening with valid or broken observers',()=>{
+  const patched=patchSniperInterception(sniper);
+  const anchor='          var firstTime = firstProjectileContactTime(a, b, rr);';
+  const at=patched.indexOf(anchor),end=patched.indexOf('          if ((a.dead && a.shell',at);
+  assert.ok(at>=0&&end>at);
+  const witness=patched.slice(at+anchor.length,end);
+  assert.match(witness,/recordProjectileInterception/);
+  const source='return function(g,a,b){var ah=a.hp,bh=b.hp,rr=4;'+
+    'g.weakenBullet(a,bh);g.weakenBullet(b,ah);var firstTime=.375;';
+  const baseline=new Function(source+'return [a.hp,b.hp];}')();
+  const observed=new Function(source+witness+'return [a.hp,b.hp];}')();
+  for(const mode of ['valid','missing','throwing-ledger','throwing-method','throwing-observer']){
+    const make=()=>({weakenBullet(shot,dmg){shot.hp-=dmg;if(shot.hp<=0)shot.dead=true;}});
+    const g=make(),base=make(),a={id:71,hp:12,dead:false},b={id:72,hp:9,dead:false};
+    const aa={...a},bb={...b},events=[];
+    if(mode==='valid')g.__novaShotLedger={recordProjectileInterception(...args){events.push(args);}};
+    if(mode==='throwing-ledger')Object.defineProperty(g,'__novaShotLedger',{get(){throw Error('ledger');}});
+    if(mode==='throwing-method')g.__novaShotLedger=Object.defineProperty({},'recordProjectileInterception',{get(){throw Error('method');}});
+    if(mode==='throwing-observer')g.__novaShotLedger={recordProjectileInterception(){throw Error('observer');}};
+    assert.deepEqual(observed.call(g,g,a,b),baseline.call(base,base,aa,bb));
+    assert.deepEqual([a,b],[aa,bb]);
+    assert.equal(events.length,mode==='valid'?1:0);
+    if(mode==='valid')assert.deepEqual(events[0],[a,b,12,9,'sniper',.375]);
+  }
+});
