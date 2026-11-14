@@ -11,7 +11,8 @@ function auditShotEvidence(events,{truncated=0,preFrameOverflow=0,preFrameShotUn
   const shots=new Map();
   let lastFrame=0,preStatePresent=0,preStateMissing=0,
       pairedInterceptionPresent=0,pairedInterceptionMissing=0,
-      targetStatePresent=0,targetStateMissing=0;
+      targetStatePresent=0,targetStateMissing=0,
+      provenNewbornEvents=0,unexplainedMissingPreState=0;
   for(const e of events){
     if(!e||!Number.isSafeInteger(e.frame)||e.frame<1||
        e.frame<lastFrame||!Number.isSafeInteger(e.shotId)||e.shotId<0)
@@ -26,7 +27,11 @@ function auditShotEvidence(events,{truncated=0,preFrameOverflow=0,preFrameShotUn
     if(e.preShot&&Number.isFinite(e.preShot.x)&&
        Number.isFinite(e.preShot.y)&&Number.isFinite(e.preShot.ttl))
       preStatePresent++;
-    else{preStateMissing++;existing.missingPreStates++;}
+    else{
+      preStateMissing++;existing.missingPreStates++;
+      if(e.bornThisFrame===true)provenNewbornEvents++;
+      else unexplainedMissingPreState++;
+    }
     if(['damageTank','damageShape','damageDrone','coverDamage'].includes(e.kind)){
       if(e.preTarget&&Number.isFinite(e.preTarget.x)&&
          Number.isFinite(e.preTarget.y)&&Number.isFinite(e.preTarget.hp))
@@ -61,7 +66,8 @@ function auditShotEvidence(events,{truncated=0,preFrameOverflow=0,preFrameShotUn
   const bounded=truncated===0&&preFrameOverflow===0;
   return {
     bounded,eventCount:events.length,shotCount:shots.size,
-    preStatePresent,preStateMissing,targetStatePresent,targetStateMissing,
+    preStatePresent,preStateMissing,provenNewbornEvents,
+    unexplainedMissingPreState,targetStatePresent,targetStateMissing,
     preFrameShotUnidentified,preFrameTargetUnidentified,pairedInterceptionPresent,
     pairedInterceptionMissing,
     // Missing endpoints may mean births during the update; do not guess.
