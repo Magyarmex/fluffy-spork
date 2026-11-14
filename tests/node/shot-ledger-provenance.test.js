@@ -150,6 +150,13 @@ test('same-frame pre-frame evidence cannot later be reclassified as a birth',()=
       preShot:pre,preOtherShot:null,otherBornThisFrame:true}
   ];
   assert.equal(auditShotEvidence(newborn).provenNewbornPeerEvents,1);
+  // A shot born in frame 1 can correctly appear in the frame-2 pre-state.
+  const nextFrame=auditShotEvidence([
+    {frame:1,shotId:100,kind:'projectileRetirement',preShot:null,bornThisFrame:true},
+    {frame:2,shotId:100,kind:'damageTank',preShot:pre,preTarget:target}
+  ]);
+  assert.equal(nextFrame.preStatePresent,1);
+  assert.equal(nextFrame.provenNewbornEvents,1);
 });
 test('boundedness is lost on event or pre-frame overflow',()=>{
   for(const options of [{truncated:1},{preFrameOverflow:1}]){
