@@ -415,7 +415,7 @@ test('allocation-light counters agree with event snapshot and reset per frame',(
   assert.equal(c.epoch,s.epoch);
   assert.equal(c.eventsCaptured,s.events.length);
   for(const key of ['installed','overflow','unknown','unidentifiedTargets',
-    'observerErrors','scopedCalls','unusedScopes','bounded'])
+    'observerErrors','scopedCalls','unusedScopes','coverAttributed','bounded'])
     assert.equal(c[key],s[key],key);
   assert.equal(c.scopedCalls,2);
   assert.equal(c.unusedScopes,1);
@@ -459,9 +459,21 @@ test('cover HP witness caps overkill and does not claim first-contact timing',()
   assert.equal(e.targetId,-1001);
   assert.equal(e.effectiveDamage,7,'overkill cannot count more than remaining cover HP');
   assert.equal(e.timing,'unknown');
+  assert.equal(l.counters().coverAttributed,1);
   assert.equal(l.recordCoverDamage({id:14},{id:-1002},10,6),true);
   assert.equal(l.snapshot().events[1].effectiveDamage,4);
   assert.equal(l.recordCoverDamage({id:15},{id:-1003},10,11),false);
   assert.equal(l.snapshot().observerErrors,1);
   assert.equal(l.snapshot().bounded,false);
+});
+
+test('cover witness counters reset independently of core and Battlefield attribution',()=>{
+  const l=createProjectileCallbackLedger(game());
+  l.recordCoverDamage({id:1},{id:-1000},10,8);
+  assert.equal(l.counters().coverAttributed,1);
+  assert.equal(l.counters().coreAttributed,0);
+  assert.equal(l.counters().battlefieldAttributed,0);
+  l.nextFrame();
+  assert.equal(l.counters().coverAttributed,0);
+  assert.equal(l.counters().eventsCaptured,0);
 });
