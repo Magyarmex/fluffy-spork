@@ -199,3 +199,13 @@ test('Controller AI preserves a legitimate committed player target',()=>{
  w.other.x=120;
  assert.equal(w.win.__testLiveVectorBestObserved(w.g,w.owner,w.enemy),w.enemy);
 });
+
+test('shipping Live Vector + Fair Engagement chooses the closer bot without player bias',()=>{
+ const w=bootShippingComposition();
+ w.owner.ai.targetId=-1;w.owner.ai.__v1112TargetId=-1;
+ w.enemy.x=130;w.enemy.isPlayer=true;
+ w.other.x=125;w.other.isPlayer=false;
+ w.g.updateDrones(1/60);
+ assert.equal(w.owner.__novaLiveVectorAI.targetId,w.other.id);
+ assert.equal(w.owner.ai.__v1112TargetId,w.other.id);
+});
