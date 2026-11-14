@@ -113,6 +113,34 @@ test('a projectile observed in an earlier frame cannot be born again later',()=>
   assert.equal(valid.certifiedMissedHits,null);
   assert.equal(valid.provenNewbornPeerEvents,1);
 });
+test('same-frame pre-frame evidence cannot later be reclassified as a birth',()=>{
+  const earlierPrimary=[
+    {frame:1,shotId:50,kind:'damageTank',preShot:pre,preTarget:target},
+    {frame:1,shotId:50,kind:'projectileRetirement',preShot:null,bornThisFrame:true}
+  ];
+  assert.throws(()=>auditShotEvidence(earlierPrimary),/contradictory projectile birth/);
+  const earlierPeer=[
+    {frame:1,shotId:60,kind:'projectileInterception',otherShotId:61,
+      preShot:pre,preOtherShot:pre},
+    {frame:1,shotId:62,kind:'projectileInterception',otherShotId:61,
+      preShot:pre,preOtherShot:null,otherBornThisFrame:true}
+  ];
+  assert.throws(()=>auditShotEvidence(earlierPeer),/contradictory interception peer birth/);
+  const peerThenPrimary=[
+    {frame:1,shotId:70,kind:'projectileInterception',otherShotId:71,
+      preShot:pre,preOtherShot:pre},
+    {frame:1,shotId:71,kind:'damageShape',preShot:null,
+      bornThisFrame:true,preTarget:target}
+  ];
+  assert.throws(()=>auditShotEvidence(peerThenPrimary),/contradictory projectile birth/);
+  // Repeated legitimate newborn events within one frame remain accepted.
+  const newborn=[
+    {frame:1,shotId:80,kind:'projectileRetirement',preShot:null,bornThisFrame:true},
+    {frame:1,shotId:81,kind:'projectileInterception',otherShotId:80,
+      preShot:pre,preOtherShot:null,otherBornThisFrame:true}
+  ];
+  assert.equal(auditShotEvidence(newborn).provenNewbornPeerEvents,1);
+});
 test('boundedness is lost on event or pre-frame overflow',()=>{
   for(const options of [{truncated:1},{preFrameOverflow:1}]){
     const result=auditShotEvidence([],options);
