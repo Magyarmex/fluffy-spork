@@ -4,6 +4,9 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');
 const {chromium}=require('playwright');
+const PAIRED_ARM=process.env.NOVA_SHOT_LEDGER_ARM||'';
+if(!['','off','on'].includes(PAIRED_ARM))throw Error('NOVA_SHOT_LEDGER_ARM must be off or on');
+const OBSERVE=PAIRED_ARM!=='off';
 const {patchBattlefieldMutualInterception,patchSniperInterception,patchMaterializedCore,patchMaterializedRetirement,patchMaterializedInterception,patchBattlefieldCallbacks,patchBattlefieldCover}=require('../research/projectile-callback-source-patch.cjs');
 (async()=>{
   const browser=await chromium.launch({headless:true});
@@ -12,18 +15,18 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
   page.on('pageerror',e=>errors.push(String(e.stack||e)));
   let patches=0,battlefieldPatches=0,sniperPatches=0;
   try{
-    await page.route('**/nova-updates/sniper-v1.2.0.js',async route=>{
+    if(OBSERVE)await page.route('**/nova-updates/sniper-v1.2.0.js',async route=>{
       const response=await route.fetch(),source=await response.text();
       assert.equal(response.status(),200);sniperPatches++;
       await route.fulfill({response,body:patchSniperInterception(source)});
     });
-    await page.route('**/nova-updates/battlefield-v1.6.0.js',async route=>{
+    if(OBSERVE)await page.route('**/nova-updates/battlefield-v1.6.0.js',async route=>{
       const response=await route.fetch(),source=await response.text();
       assert.equal(response.status(),200);
       battlefieldPatches++;
       await route.fulfill({response,body:patchBattlefieldMutualInterception(patchBattlefieldCover(patchBattlefieldCallbacks(source)))});
     });
-    await page.route('http://127.0.0.1:8765/',async route=>{
+    if(OBSERVE)await page.route('http://127.0.0.1:8765/',async route=>{
       const response=await route.fetch(),html=await response.text();
       assert.equal(response.status(),200);
       const patched=patchMaterializedInterception(patchMaterializedRetirement(patchMaterializedCore(html)));
@@ -31,35 +34,70 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
       await route.fulfill({response,body:patched});
     });
     await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded',timeout:45000});
-    assert.equal(patches,1,'exactly one shipping HTML response transformed');
-    assert.equal(battlefieldPatches,1,'exactly one Battlefield response transformed');
-    assert.equal(sniperPatches,1,'exactly one shipping Sniper response transformed');
+    assert.equal(patches,OBSERVE?1:0,'shipping HTML transformation count');
+    assert.equal(battlefieldPatches,OBSERVE?1:0,'Battlefield transformation count');
+    assert.equal(sniperPatches,OBSERVE?1:0,'Sniper transformation count');
     await page.addScriptTag({content:fs.readFileSync(path.resolve(__dirname,
       '../research/projectile-callback-ledger.cjs'),'utf8')});
-    await page.evaluate(()=>{
+    await page.evaluate(({paired})=>{
       const Game=window.__novaMakeRequire('')('game/engine').Game;
       const start=Game.prototype.start,update=Game.prototype.update;
+      if(paired){
+        let state=0x1d4a3f21;
+        const seeded=()=>{
+          state^=state<<13;state^=state>>>17;state^=state<<5;
+          return (state>>>0)/4294967296;
+        };
+        const spawn=Game.prototype.spawnPlayer,spawnAI=Game.prototype.spawnAITank;
+        Game.prototype.spawnPlayer=function(){
+          if(this.__novaTerrain)return spawn.apply(this,arguments);
+          const rand=Math.random,now=Date.now;let first=true;
+          this.__novaInitRandomRestore=rand;this.__novaInitSpawnCount=0;
+          Date.now=()=>0;
+          Math.random=()=>first?(first=false,0):seeded();
+          try{return spawn.apply(this,arguments);}
+          finally{Date.now=now;Math.random=seeded;}
+        };
+        Game.prototype.spawnAITank=function(){
+          const result=spawnAI.apply(this,arguments);
+          if(this.__novaInitRandomRestore){
+            this.__novaInitSpawnCount++;
+            if(this.__novaInitSpawnCount>=8){
+              Math.random=this.__novaInitRandomRestore;
+              delete this.__novaInitRandomRestore;delete this.__novaInitSpawnCount;
+            }
+          }
+          return result;
+        };
+        window.__novaShotSeeded=seeded;
+        window.__novaShotSeedState=()=>state>>>0;
+      }
       Game.prototype.start=function(){
         if(!this.__novaDecorativeWorld)window.__novaShotResearchGame=this;
-        return start.apply(this,arguments);
+        if(!paired)return start.apply(this,arguments);
+        this.paused=true;
+        const rand=Math.random,now=Date.now;
+        Math.random=window.__novaShotSeeded;Date.now=()=>0;
+        try{return start.apply(this,arguments);}
+        finally{Math.random=rand;Date.now=now;}
       };
       Game.prototype.update=function(){
         if(!this.__novaDecorativeWorld)window.__novaShotResearchGame=this;
         return update.apply(this,arguments);
       };
-    });
+    },{paired:!!PAIRED_ARM});
     await page.getByRole('button',{name:/DEPLOY/i}).first().click();
     await page.waitForFunction(()=>window.__novaShotResearchGame?.status==='playing',
       {timeout:30000});
-    const result=await page.evaluate(()=>{
+    const result=await page.evaluate(({observe,paired})=>{
       const g=window.__novaShotResearchGame;
       const factory=window.__novaResearchProjectileCallbackLedger?.createProjectileCallbackLedger;
       if(typeof factory!=='function')throw Error('browser ledger missing');
       g.setPaused(true);
       if(g.raf){cancelAnimationFrame(g.raf);g.raf=0;}
       const ledger=factory(g,{limit:4096});
-      ledger.install();
-      g.__novaShotLedger=ledger;
+      if(paired)g.tanks.sort((a,b)=>Number(a.id)-Number(b.id));
+      if(observe){ledger.install();g.__novaShotLedger=ledger;}
       let frames=0,callbacks=0,scopedCalls=0,unusedScopes=0,observerErrors=0,unknown=0,unidentifiedTargets=0,coreAttributed=0,battlefieldAttributed=0,coverAttributed=0,retirements=0,ttlRetirements=0,boundsRetirements=0,ambiguousRetirements=0,rawPenOneZeroHitTtl=0,coreInterceptions=0,sniperInterceptions=0,battlefieldTtlInterceptions=0;
       // Read-only physical fingerprints: these make a later paired OFF/ON
       // comparison falsifiable without mistaking observer counts for hits.
@@ -68,7 +106,7 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
       const physicalTrace=[];
       const fingerprint=()=>{
         const state=JSON.stringify({
-          time:g.time,
+          time:g.time,rng:paired?window.__novaShotSeedState():null,
           player:g.player&&[g.player.id,g.player.x,g.player.y,g.player.hp,g.player.score,g.player.kills,g.player.level,g.player.alive],
           tanks:g.tanks.map(t=>[t.id,t.x,t.y,t.hp,t.alive,t.cls]),
           shapes:g.shapes.map(t=>[t.id,t.x,t.y,t.hp,t.type]),
@@ -90,24 +128,34 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
       const updateMs=[];
       for(let i=0;i<600&&g.status==='playing';i++){
         const t0=performance.now();
-        g.update(1/30);
+        const rand=Math.random,now=Date.now;
+        if(paired){Math.random=window.__novaShotSeeded;Date.now=()=>Math.round(g.time*1000);}
+        try{g.update(1/30);}
+        finally{if(paired){Math.random=rand;Date.now=now;}}
         updateMs.push(performance.now()-t0);
-        const s=ledger.counters();
+        const s=observe?ledger.counters():{
+          damageCallbacksCaptured:0,retiredAttributed:0,ttlRetirements:0,
+          boundsRetirements:0,ambiguousRetirements:0,rawPenOneZeroHitTtl:0,
+          coreInterceptions:0,sniperInterceptions:0,battlefieldTtlInterceptions:0,
+          scopedCalls:0,unusedScopes:0,observerErrors:0,unknown:0,
+          unidentifiedTargets:0,coreAttributed:0,battlefieldAttributed:0,
+          coverAttributed:0,overflow:false
+        };
         frames++;if(frames%30===0)physicalTrace.push({frame:frames,hash:fingerprint()});
         callbacks+=s.damageCallbacksCaptured;retirements+=s.retiredAttributed;ttlRetirements+=s.ttlRetirements;boundsRetirements+=s.boundsRetirements;ambiguousRetirements+=s.ambiguousRetirements;rawPenOneZeroHitTtl+=s.rawPenOneZeroHitTtl;coreInterceptions+=s.coreInterceptions;sniperInterceptions+=s.sniperInterceptions;battlefieldTtlInterceptions+=s.battlefieldTtlInterceptions;scopedCalls+=s.scopedCalls;
         unusedScopes+=s.unusedScopes;observerErrors+=s.observerErrors;
         unknown+=s.unknown;unidentifiedTargets+=s.unidentifiedTargets;
         coreAttributed+=s.coreAttributed;battlefieldAttributed+=s.battlefieldAttributed;coverAttributed+=s.coverAttributed;
         if(s.overflow)throw Error('research callback buffer overflow');
-        ledger.nextFrame();
+        if(observe)ledger.nextFrame();
       }
-      delete g.__novaShotLedger;
-      if(!ledger.uninstall())throw Error('failed to restore real damage methods');
+      if(observe){delete g.__novaShotLedger;
+        if(!ledger.uninstall())throw Error('failed to restore real damage methods');}
       updateMs.sort((a,b)=>a-b);
-      return{frames,physicalTrace,callbacks,attributedCallbacks:callbacks-unknown,coreAttributed,battlefieldAttributed,coverAttributed,retirements,ttlRetirements,boundsRetirements,ambiguousRetirements,rawPenOneZeroHitTtl,coreInterceptions,sniperInterceptions,battlefieldTtlInterceptions,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
+      return{arm:paired?(observe?'on':'off'):'smoke',frames,physicalTrace,callbacks,attributedCallbacks:callbacks-unknown,coreAttributed,battlefieldAttributed,coverAttributed,retirements,ttlRetirements,boundsRetirements,ambiguousRetirements,rawPenOneZeroHitTtl,coreInterceptions,sniperInterceptions,battlefieldTtlInterceptions,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
         p95UpdateMs:updateMs[Math.ceil(updateMs.length*.95)-1],
         maxUpdateMs:updateMs[updateMs.length-1],status:g.status,time:g.time};
-    });
+    },{observe:OBSERVE,paired:!!PAIRED_ARM});
     assert.ok(result.frames>=1,'real composed game must advance');
     assert.equal(result.physicalTrace.length,1+Math.floor(result.frames/30),
       'initial and one-second physical fingerprints must be captured');
