@@ -8,7 +8,7 @@ function createProjectileCallbackLedger(game, options = {}) {
     throw new RangeError('invalid event budget');
   const methods = ['damageTank', 'damageShape', 'damageDrone'];
   const originals = new Map(), wrappers = new Map(), events = [];
-  let scope = null, installed = false, overflow = 0, epoch = 0, callbackDepth = 0, unknown = 0, unidentifiedTargets = 0, observerErrors = 0, unusedScopes = 0, scopedCalls = 0, coreAttributed = 0, battlefieldAttributed = 0, coverAttributed = 0, retiredAttributed = 0, ttlRetirements = 0, boundsRetirements = 0, ambiguousRetirements = 0;
+  let scope = null, installed = false, overflow = 0, epoch = 0, callbackDepth = 0, unknown = 0, unidentifiedTargets = 0, observerErrors = 0, unusedScopes = 0, scopedCalls = 0, coreAttributed = 0, battlefieldAttributed = 0, coverAttributed = 0, retiredAttributed = 0, ttlRetirements = 0, boundsRetirements = 0, ambiguousRetirements = 0, rawPenOneZeroHitTtl = 0;
   function append(kind, target, args) {
     // Consume the scope before any potentially throwing identity getter or
     // budget check. A dropped/failed first callback must never transfer its
@@ -140,7 +140,9 @@ function createProjectileCallbackLedger(game, options = {}) {
         priorHits:Number.isSafeInteger(rawHits)&&rawHits>=0?rawHits:null,
         remainingPen:Number.isSafeInteger(rawPen)?rawPen:null}));
       retiredAttributed++;
-      if (reason === 'ttl') ttlRetirements++;
+      if (reason === 'ttl') { ttlRetirements++;
+        if (rawPen === 1 && rawHits === 0) rawPenOneZeroHitTtl++;
+      }
       else if (reason === 'bounds') boundsRetirements++;
       else ambiguousRetirements++;
       return true;
@@ -149,7 +151,7 @@ function createProjectileCallbackLedger(game, options = {}) {
   function nextFrame() {
     if (scope || callbackDepth > 0)
       throw new Error('cannot advance frame inside damage callback');
-    epoch++; events.length = 0; overflow = 0; unknown = 0; unidentifiedTargets = 0; observerErrors = 0; unusedScopes = 0; scopedCalls = 0; coreAttributed = 0; battlefieldAttributed = 0; coverAttributed = 0; retiredAttributed = 0; ttlRetirements = 0; boundsRetirements = 0; ambiguousRetirements = 0;
+    epoch++; events.length = 0; overflow = 0; unknown = 0; unidentifiedTargets = 0; observerErrors = 0; unusedScopes = 0; scopedCalls = 0; coreAttributed = 0; battlefieldAttributed = 0; coverAttributed = 0; retiredAttributed = 0; ttlRetirements = 0; boundsRetirements = 0; ambiguousRetirements = 0; rawPenOneZeroHitTtl = 0;
   }
   function counters() {
     // Aggregate natural-match trials need bounded scalar telemetry without
@@ -157,10 +159,10 @@ function createProjectileCallbackLedger(game, options = {}) {
     return Object.freeze({epoch, installed, eventsCaptured:events.length,
       damageCallbacksCaptured:events.length-coverAttributed-retiredAttributed,
       overflow, unknown, unidentifiedTargets, observerErrors,
-      scopedCalls, unusedScopes, coreAttributed, battlefieldAttributed, coverAttributed, retiredAttributed, ttlRetirements, boundsRetirements, ambiguousRetirements, bounded:overflow===0&&observerErrors===0});
+      scopedCalls, unusedScopes, coreAttributed, battlefieldAttributed, coverAttributed, retiredAttributed, ttlRetirements, boundsRetirements, ambiguousRetirements, rawPenOneZeroHitTtl, bounded:overflow===0&&observerErrors===0});
   }
   function snapshot() {
-    return Object.freeze({epoch, installed, events: Object.freeze(events.slice()), overflow, unknown, unidentifiedTargets, observerErrors, scopedCalls, unusedScopes, coreAttributed, battlefieldAttributed, coverAttributed, retiredAttributed, ttlRetirements, boundsRetirements, ambiguousRetirements,
+    return Object.freeze({epoch, installed, events: Object.freeze(events.slice()), overflow, unknown, unidentifiedTargets, observerErrors, scopedCalls, unusedScopes, coreAttributed, battlefieldAttributed, coverAttributed, retiredAttributed, ttlRetirements, boundsRetirements, ambiguousRetirements, rawPenOneZeroHitTtl,
       bounded: overflow === 0 && observerErrors === 0,
       allCapturedCallbacksAttributed: overflow === 0 && observerErrors === 0 && unknown === 0 && unidentifiedTargets === 0});
   }
