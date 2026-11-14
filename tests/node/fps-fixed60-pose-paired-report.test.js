@@ -70,7 +70,7 @@ test('90Hz OFF/OFF/ON report requires three matched materialized worlds and boun
  assert.deepEqual(out.activePresentationHz,{offA:90,offB:90,on:90});
  assert.equal(out.offRepeat.ticks,120);
  assert.equal(out.offRepeat.births,5);
- assert.equal(out.off.interpolated,0);
+ assert.equal(out.off.frames,0);
  assert.equal(out.on.interpolated,9);
  assert.equal(out.causalPerformanceComparison,false);
  offB.initialFingerprint='deadbeef:1500';
