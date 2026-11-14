@@ -112,11 +112,11 @@ test('research Battlefield patch scopes exactly ten real projectile callbacks',(
 
 test('ten Battlefield guards call real damage exactly once with or without ledger',()=>{
   const patched=patchBattlefieldCallbacks(battlefield);
-  const pattern=/\\b(?:g|this)\\.damage(?:Tank|Shape|Drone)\\s*\\(/g;
+  const pattern=/\b(?:g|this)\.damage(?:Tank|Shape|Drone)\s*\(/g;
   const originals=[...battlefield.matchAll(pattern)];
   assert.equal(originals.length,10);
   // The transform adds one guarded and one fallback call per original.
-  const guarded=[...patched.matchAll(/\\b(?:g|this)\\.__novaShotLedger\\s*\\?/g)];
+  const guarded=[...patched.matchAll(/\b(?:g|this)\.__novaShotLedger\s*\?/g)];
   assert.equal(guarded.length,10);
   for(const match of originals){
     let depth=0,end=-1;
