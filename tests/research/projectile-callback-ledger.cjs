@@ -8,7 +8,7 @@ function createProjectileCallbackLedger(game, options = {}) {
     throw new RangeError('invalid event budget');
   const methods = ['damageTank', 'damageShape', 'damageDrone'];
   const originals = new Map(), wrappers = new Map(), events = [];
-  let scope = null, installed = false, overflow = 0, epoch = 0, callbackDepth = 0, unknown = 0, unidentifiedTargets = 0, observerErrors = 0, unusedScopes = 0, scopedCalls = 0, coreAttributed = 0, battlefieldAttributed = 0, coverAttributed = 0;
+  let scope = null, installed = false, overflow = 0, epoch = 0, callbackDepth = 0, unknown = 0, unidentifiedTargets = 0, observerErrors = 0, unusedScopes = 0, scopedCalls = 0, coreAttributed = 0, battlefieldAttributed = 0, coverAttributed = 0, retiredAttributed = 0;
   function append(kind, target, args) {
     // Consume the scope before any potentially throwing identity getter or
     // budget check. A dropped/failed first callback must never transfer its
@@ -121,20 +121,38 @@ function createProjectileCallbackLedger(game, options = {}) {
       return true;
     } catch (_) { observerErrors++; return false; }
   }
+  // A terminal core TTL/bounds transition is an observed retirement, not
+  // proof of a missed contact. The frame-end check supplies only an upper
+  // bound on when the projectile stopped being eligible for contact.
+  function recordProjectileRetirement(shot, reason) {
+    try {
+      const shotId = shot == null ? null : shot.id;
+      if (!Number.isSafeInteger(shotId) || shotId < 0 ||
+          !['ttl','bounds','ttl-or-bounds'].includes(reason)) {
+        observerErrors++; return false;
+      }
+      if (events.length >= limit) { overflow++; return false; }
+      events.push(Object.freeze({epoch, kind:'projectileRetirement',
+        targetId:null, shotId, attribution:'direct', source:'core',
+        requestedDamage:null, reason, timing:'upper-bound'}));
+      retiredAttributed++;
+      return true;
+    } catch (_) { observerErrors++; return false; }
+  }
   function nextFrame() {
     if (scope || callbackDepth > 0)
       throw new Error('cannot advance frame inside damage callback');
-    epoch++; events.length = 0; overflow = 0; unknown = 0; unidentifiedTargets = 0; observerErrors = 0; unusedScopes = 0; scopedCalls = 0; coreAttributed = 0; battlefieldAttributed = 0; coverAttributed = 0;
+    epoch++; events.length = 0; overflow = 0; unknown = 0; unidentifiedTargets = 0; observerErrors = 0; unusedScopes = 0; scopedCalls = 0; coreAttributed = 0; battlefieldAttributed = 0; coverAttributed = 0; retiredAttributed = 0;
   }
   function counters() {
     // Aggregate natural-match trials need bounded scalar telemetry without
     // cloning every per-hit event on every simulation frame.
     return Object.freeze({epoch, installed, eventsCaptured:events.length,
       overflow, unknown, unidentifiedTargets, observerErrors,
-      scopedCalls, unusedScopes, coreAttributed, battlefieldAttributed, coverAttributed, bounded:overflow===0&&observerErrors===0});
+      scopedCalls, unusedScopes, coreAttributed, battlefieldAttributed, coverAttributed, retiredAttributed, bounded:overflow===0&&observerErrors===0});
   }
   function snapshot() {
-    return Object.freeze({epoch, installed, events: Object.freeze(events.slice()), overflow, unknown, unidentifiedTargets, observerErrors, scopedCalls, unusedScopes, coreAttributed, battlefieldAttributed, coverAttributed,
+    return Object.freeze({epoch, installed, events: Object.freeze(events.slice()), overflow, unknown, unidentifiedTargets, observerErrors, scopedCalls, unusedScopes, coreAttributed, battlefieldAttributed, coverAttributed, retiredAttributed,
       bounded: overflow === 0 && observerErrors === 0,
       allCapturedCallbacksAttributed: overflow === 0 && observerErrors === 0 && unknown === 0 && unidentifiedTargets === 0});
   }
@@ -153,7 +171,7 @@ function createProjectileCallbackLedger(game, options = {}) {
     originals.clear(); wrappers.clear(); installed = false; scope = null;
     return true;
   }
-  return Object.freeze({install, uninstall, withProjectile, recordCoverDamage, nextFrame, snapshot, counters});
+  return Object.freeze({install, uninstall, withProjectile, recordCoverDamage, recordProjectileRetirement, nextFrame, snapshot, counters});
 }
 if (typeof module !== 'undefined' && module.exports)
   module.exports = {createProjectileCallbackLedger};
