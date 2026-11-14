@@ -61,6 +61,8 @@ function report90(enabled){
  r.configuredMaxSteps=2;r.backlogExtraTicks=2;r.presentationTargetHz=90;
  r.raf.activePresentationHz=90;r.raf.activeIntervals={p95:11.2,n:59};
  r.raf.intervals={p95:11.2,n:59};
+ r.blankRaf={frames:160,hz:90,p95:11.2,supports90Hz:true};
+ r.rafHostCapable=true;
  return r;
 }
 test('90Hz OFF/OFF/ON report requires three matched materialized worlds and bounded callback cadence',()=>{
@@ -80,4 +82,21 @@ test('90Hz OFF/OFF/ON report requires three matched materialized worlds and boun
  assert.throws(()=>compareTriple(offA,offB,on),/near-90Hz active callbacks/);
  on.raf.activePresentationHz=90;on.raf.activeIntervals.p95=16;
  assert.throws(()=>compareTriple(offA,offB,on),/active callback p95/);
+});
+
+
+test('90Hz paired report marks a host-limited blank RAF control inconclusive, never passed',()=>{
+ const offA=report90(false),offB=report90(false),on=report90(true);
+ for(const arm of [offA,offB,on]){
+  arm.blankRaf={frames:70,hz:41.2,p95:24.3,supports90Hz:false};
+  arm.rafHostCapable=false;
+  arm.raf.activePresentationHz=41.2;
+  arm.raf.activeIntervals={p95:24.3,n:59};
+ }
+ const out=compareTriple(offA,offB,on);
+ assert.equal(out.status,'inconclusive-host-raf-capability');
+ assert.equal(out.gatePassed,false);
+ assert.equal(out.inconclusive,true);
+ assert.equal(out.gameRaf.ON.activePresentationHz,41.2);
+ assert.equal(out.blankRaf['OFF-A'].supports90Hz,false);
 });

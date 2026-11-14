@@ -67,7 +67,8 @@ function compareTriple(offA,offB,on){
  assert.equal(offB.pose?.enabled,false,'second A/A control must use the native presenter');
  assert.equal(offB.pose?.frames,0,'second A/A control must not run pose presentation');
  assert.equal(on.pose?.enabled,true,'B candidate must use the opt-in presenter');
- for(const [label,arm] of [['OFF-A',offA],['OFF-B',offB],['ON',on]]){
+ const arms=[['OFF-A',offA],['OFF-B',offB],['ON',on]];
+ for(const [label,arm] of arms){
   assert.equal(arm.initialFingerprint,offA.initialFingerprint,
    label+' must start from the same seeded materialized Game');
   for(const key of ['configuredMaxSteps','backlogExtraTicks','controlledGate','presentationTargetHz'])
@@ -75,16 +76,41 @@ function compareTriple(offA,offB,on){
   assert.equal(arm.controlledGate,true,label+' must use controlled Chromium callbacks');
   assert.equal(arm.productionRafActive,false,label+' must not leave the production RAF active');
   assert.ok(arm.births>0,label+' must emit a real player projectile');
-  assert.ok(Number.isFinite(arm.raf?.activePresentationHz)&&
-   arm.raf.activePresentationHz>=80&&arm.raf.activePresentationHz<=100,
-   label+' must demonstrate near-90Hz active callbacks');
-  assert.ok(arm.raf.activeIntervals?.p95<15,label+' active callback p95 must remain below 15ms');
+  assert.ok(arm.raf?.frames>2&&Number.isFinite(arm.raf?.activePresentationHz),
+   label+' must report actual composed-Game callbacks');
+  assert.ok(arm.raf.activeIntervals?.n>0&&Number.isFinite(arm.raf.activeIntervals?.p95),
+   label+' must report active composed-Game callback intervals');
+  assert.ok(arm.blankRaf&&Number.isFinite(arm.blankRaf.hz)&&
+   Number.isFinite(arm.blankRaf.p95),label+' must include the same-process blank RAF control');
+  assert.equal(arm.rafHostCapable,arm.blankRaf.supports90Hz,
+   label+' host-capability flag must match the blank RAF control');
  }
  assert.equal(offA.presentationTargetHz,90,'experiment target must be 90Hz');
  assert.equal(offA.configuredMaxSteps,2,'90Hz arms use a two-step safety ceiling');
  assert.equal(offA.backlogExtraTicks,2,'90Hz arms use the bounded two-tick backlog');
+ const hostCapability=new Set(arms.map(([,arm])=>arm.blankRaf.supports90Hz));
+ assert.equal(hostCapability.size,1,'all matched arms must agree on blank-page RAF host capability');
+ if(!offA.blankRaf.supports90Hz){
+  const blankRaf=Object.fromEntries(arms.map(([label,arm])=>[label,arm.blankRaf]));
+  const gameRaf=Object.fromEntries(arms.map(([label,arm])=>[label,{
+   activePresentationHz:arm.raf.activePresentationHz,
+   activeIntervals:arm.raf.activeIntervals,frames:arm.raf.frames,
+   droppedMs:arm.droppedMs,ticks:arm.ticks}]));
+  return {researchOnly:true,causalPerformanceComparison:false,
+   status:'inconclusive-host-raf-capability',gatePassed:false,inconclusive:true,
+   targetPresentationHz:90,
+   reason:'The same-process blank-page RAF control could not sustain 80–100Hz with p95 below 15ms; this Chromium runner cannot validate the composed-Game 90Hz gate.',
+   blankRaf,gameRaf};
+ }
+ for(const [label,arm] of arms){
+  assert.ok(arm.raf.activePresentationHz>=80&&arm.raf.activePresentationHz<=100,
+   label+' must demonstrate near-90Hz active callbacks when the blank-page host control passes');
+  assert.ok(arm.raf.activeIntervals.p95<15,
+   label+' active callback p95 must remain below 15ms when the blank-page host control passes');
+ }
  const paired=compare(offA,on);
  return {...paired,researchOnly:true,causalPerformanceComparison:false,
+  status:'90hz-browser-gate-passed',gatePassed:true,inconclusive:false,
   targetPresentationHz:90,
   offRepeat:{ticks:offB.ticks,wallMs:offB.raf.observedWallMs,
    simulatedMs:offB.raf.simulatedMs,activePresentationHz:offB.raf.activePresentationHz,

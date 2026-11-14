@@ -149,6 +149,16 @@ jobs:
           node tests/browser/redeploy-front-choice.cjs
           node tests/browser/fieldcraft-class-counterplay.cjs
           node tests/browser/fieldcraft-rng-browser.cjs
+          # Calibrate the browser host before interpreting the experimental 90Hz Game gate.
+          # Prefer the ordinary no-vsync-limit mode; use --disable-gpu-vsync only
+          # when its blank-page control is the only one that meets the 90Hz gate.
+          RAF_CONTROL=$(node tests/browser/fixed60-raf-capability-control.cjs)
+          echo "$RAF_CONTROL"
+          if [[ "$RAF_CONTROL" == *'"selectedMode":"gpu-vsync"'* ]]; then
+            export NOVA_FIXED60_DISABLE_GPU_VSYNC=1
+          else
+            export NOVA_FIXED60_DISABLE_GPU_VSYNC=0
+          fi
           # Run experimental fixed60 owner last: do not mask shipping smoke failures.
           node tests/browser/fixed60-real-game-owner-touch-research.cjs
           NOVA_FIXED60_MAX_STEPS=3 node tests/browser/fixed60-real-game-owner-touch-research.cjs

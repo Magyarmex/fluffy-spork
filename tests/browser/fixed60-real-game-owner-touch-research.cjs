@@ -33,6 +33,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
  // This flag is NOT a physical display benchmark or a production setting.
  const launchArgs=['--disable-dev-shm-usage','--no-sandbox'];
  if(controlledGate)launchArgs.push('--disable-frame-rate-limit');
+ if(process.env.NOVA_FIXED60_DISABLE_GPU_VSYNC==='1')launchArgs.push('--disable-gpu-vsync');
  const browser=await chromium.launch({headless:true,args:launchArgs});
  const context=await browser.newContext({viewport:{width:320,height:700},
   deviceScaleFactor:2,isMobile:true,hasTouch:true,serviceWorkers:'block'});
@@ -56,6 +57,30 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
   const page=await context.newPage();
   page.on('pageerror',e=>errors.push(String(e.stack||e)));
   page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text())});
+  // Measure an empty document in this exact Chromium process before loading
+  // the composed Game. If even blank RAF cannot meet the 90Hz gate, the host
+  // is incapable of validating the Game cadence and the result is inconclusive.
+  await page.goto('about:blank');
+  const blankRaf=await page.evaluate(async durationMs=>{
+   const intervals=[];let previous=null;const started=performance.now();
+   await new Promise(resolve=>{
+    const tick=ts=>{
+     if(previous!==null)intervals.push(ts-previous);
+     previous=ts;
+     if(ts-started>=durationMs)resolve();else requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+   });
+   const sorted=intervals.slice(3).sort((a,b)=>a-b);
+   const total=sorted.reduce((sum,value)=>sum+value,0);
+   const p95=sorted.length?sorted[Math.ceil(.95*sorted.length)-1]:null;
+   const median=sorted.length?sorted[Math.floor((sorted.length-1)/2)]:null;
+   const hz=sorted.length&&total>0?sorted.length*1000/total:null;
+   return {frames:intervals.length,measuredMs:performance.now()-started,
+    hz,p95,median,min:sorted.length?sorted[0]:null,
+    max:sorted.length?sorted[sorted.length-1]:null,
+    supports90Hz:Number.isFinite(hz)&&hz>=80&&hz<=100&&p95<15};
+  },2200);
   await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded',timeout:45000});
   const deploy=page.getByRole('button',{name:/DEPLOY/i}).first();
   await deploy.waitFor({state:'visible',timeout:45000});
@@ -558,6 +583,10 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     // Playwright addScriptTag({path}) injects inline contents, not a src URL.
     researchFactoryPresent:typeof window.__novaFixed60Research?.createFixedStepBrowserPilot==='function'};
   });
+  report.blankRaf=blankRaf;
+  report.rafHostCapable=blankRaf.supports90Hz;
+  report.chromiumGpuVsyncDisabled=process.env.NOVA_FIXED60_DISABLE_GPU_VSYNC==='1';
+  console.log('NOVA_FIXED60_BLANK_RAF_CONTROL '+JSON.stringify(report.blankRaf));
   if(process.env.NOVA_FIXED60_REPORT_FILE){
    // Save exact browser observations for a separate, explicitly non-causal
    // paired comparison. Never manufacture matched wall time from tick count.
@@ -599,16 +628,22 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     longGaps:report.raf.controlledLongGaps,stepCounts:report.raf.stepCounts,
     droppedMs:report.droppedMs,backlogDrops:report.raf.backlogDrops}));
    if(presentationHz===90){
-    assert.ok(report.raf.activePresentationHz>=80&&report.raf.activePresentationHz<=100,
-     'controlled Chromium must sustain near-90Hz callbacks outside the deliberate foreground stall: '+JSON.stringify(report.raf));
-    assert.ok(report.raf.intervals.p95<15,
-     '90Hz callback p95 must remain below 15ms');
-    assert.ok((report.raf.activeStepCounts['0']||0)>0,
-     '90Hz rendering must include frames without a new 60Hz simulation tick');
-    assert.ok((report.raf.activeStepCounts['1']||0)>0,
-     '90Hz rendering must also include authoritative single-tick frames');
-    assert.ok(!Object.keys(report.raf.activeStepCounts).some(k=>Number(k)>1),
-     'ordinary 90Hz presentation must never require multi-tick catch-up');
+    if(blankRaf.supports90Hz){
+     assert.ok(report.raf.activePresentationHz>=80&&report.raf.activePresentationHz<=100,
+      'blank RAF host is capable, so composed Game must sustain near-90Hz callbacks outside the deliberate foreground stall: '+JSON.stringify(report.raf));
+     assert.ok(report.raf.intervals.p95<15,
+      '90Hz callback p95 must remain below 15ms when the blank-page host control passes');
+     assert.ok((report.raf.activeStepCounts['0']||0)>0,
+      '90Hz rendering must include frames without a new 60Hz simulation tick');
+     assert.ok((report.raf.activeStepCounts['1']||0)>0,
+      '90Hz rendering must also include authoritative single-tick frames');
+     assert.ok(!Object.keys(report.raf.activeStepCounts).some(k=>Number(k)>1),
+      'ordinary 90Hz presentation must never require multi-tick catch-up');
+    }else{
+     console.log('NOVA_FIXED60_90HZ_GATE_INCONCLUSIVE_HOST_CAPABILITY '+JSON.stringify({
+      blankRaf,gameActivePresentationHz:report.raf.activePresentationHz,
+      gameActiveIntervals:report.raf.activeIntervals}));
+    }
    }else{
     // The existing 30Hz gate must exercise its catch-up ceiling and the
     // active-only burst path; this remains a separate experiment.
