@@ -118,8 +118,8 @@ test('public route scoring uses the complete cached distance without changing it
 });
 test('public BLOOM threshold rejects a long cached detour that first-corner scoring would accept',()=>{
  const {T,t,st,g}=scene();
- st.bloomMemory=null;
- st.signal={type:'BLOOM',sector:5,x:t.x+930,y:t.y-60,started:105,until:110};
+ st.bloomMemory=null;t.x=-1130;
+ st.signal={type:'BLOOM',sector:5,x:-560,y:-560,started:105,until:110};
  g.hasLineOfSight=()=>false;
  g.novaBattlefieldWaypoint=()=>({x:t.x+160,y:t.y+100});
  g.novaRouteLength=()=>1130;
