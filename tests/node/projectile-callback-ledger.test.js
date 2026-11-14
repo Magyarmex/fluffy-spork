@@ -449,3 +449,19 @@ test('explicit source tags distinguish core and Battlefield callbacks without ch
   assert.equal(ledger.counters().battlefieldAttributed,0);
   ledger.uninstall();
 });
+
+test('cover HP witness caps overkill and does not claim first-contact timing',()=>{
+  const g=game(),l=createProjectileCallbackLedger(g);
+  assert.equal(l.recordCoverDamage({id:13},{id:-1001},7,-9),true);
+  const e=l.snapshot().events[0];
+  assert.equal(e.kind,'coverDamage');
+  assert.equal(e.shotId,13);
+  assert.equal(e.targetId,-1001);
+  assert.equal(e.effectiveDamage,7,'overkill cannot count more than remaining cover HP');
+  assert.equal(e.timing,'unknown');
+  assert.equal(l.recordCoverDamage({id:14},{id:-1002},10,6),true);
+  assert.equal(l.snapshot().events[1].effectiveDamage,4);
+  assert.equal(l.recordCoverDamage({id:15},{id:-1003},10,11),false);
+  assert.equal(l.snapshot().observerErrors,1);
+  assert.equal(l.snapshot().bounded,false);
+});
