@@ -6,10 +6,10 @@ const assert=require('node:assert/strict');
 const path=require('node:path');
 const {spawnSync}=require('node:child_process');
 const {comparePhysicalTraces}=require('../research/shot-ledger-trace-compare.cjs');
-function arm(mode,seed){
+function arm(mode,seed,layoutIndex){
   const result=spawnSync(process.execPath,
     [path.join(__dirname,'projectile-callback-ledger-natural-smoke.cjs')],{
-      env:{...process.env,NOVA_SHOT_LEDGER_ARM:mode,NOVA_SHOT_LEDGER_SEED:seed},
+      env:{...process.env,NOVA_SHOT_LEDGER_ARM:mode,NOVA_SHOT_LEDGER_SEED:seed,NOVA_SHOT_LEDGER_LAYOUT_INDEX:String(layoutIndex)},
       encoding:'utf8',timeout:180000,maxBuffer:8*1024*1024
     });
   if(result.error)throw result.error;
@@ -20,17 +20,23 @@ function arm(mode,seed){
   const data=JSON.parse(line);
   assert.equal(data.arm,mode,'browser arm identity');
   assert.equal(data.seed,seed,'browser seed identity');
+  assert.equal(data.layoutIndex,layoutIndex,'browser layout identity');
   assert.equal(data.observerErrors,0,'observer errors in '+mode);
   return data;
 }
-// Two distinct deterministic worlds, each with its own independent A/A gate.
+// Three distinct deterministic worlds, one per canonical Battlefield layout,
+// each with its own independent A/A gate.
 // A seed is never compared with a different seed: doing so would conflate
 // observer effects with legitimate world-layout differences.
-const seeds=['0x1d4a3f21','0x6c8e9cf5'];
+const trialsPlan=[
+  {seed:'0x1d4a3f21',layoutIndex:0,layout:'CROSSFIRE'},
+  {seed:'0x6c8e9cf5',layoutIndex:1,layout:'SPLIT HORIZON'},
+  {seed:'0x27b4e8a3',layoutIndex:2,layout:'FOUR GATES'}
+];
 const trials=[];
 const initialWorlds=new Set();
-for(const seed of seeds){
-  const off=arm('off',seed),offRepeat=arm('off',seed),on=arm('on',seed);
+for(const {seed,layoutIndex,layout} of trialsPlan){
+  const off=arm('off',seed,layoutIndex),offRepeat=arm('off',seed,layoutIndex),on=arm('on',seed,layoutIndex);
   assert.ok(Array.isArray(off.preSortTankIds)&&off.preSortTankIds.length>0,
     seed+' must expose native startup tank order');
   // The canonical natural-match harness documents asynchronous bot-array
@@ -39,8 +45,7 @@ for(const seed of seeds){
   // A/A replays that normalize to the same complete physical state.
   const nativeOrderMatched=JSON.stringify(off.preSortTankIds)===JSON.stringify(offRepeat.preSortTankIds)&&
     JSON.stringify(off.preSortTankIds)===JSON.stringify(on.preSortTankIds);
-  assert.ok(typeof off.layout==='string'&&off.layout.length>0,
-    seed+' must expose the real Battlefield layout');
+  assert.equal(off.layout,layout,seed+' did not load its predeclared shipping Battlefield layout');
   assert.equal(off.layout,offRepeat.layout,seed+' OFF/OFF layout mismatch');
   assert.equal(off.layout,on.layout,seed+' OFF/ON layout mismatch');
   const initialHash=off.physicalTrace[0].hash;
