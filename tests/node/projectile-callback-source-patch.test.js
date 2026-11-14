@@ -246,6 +246,9 @@ test('cover witness observes actual HP after mutation and never interrupts comba
       const withoutBullet={hp:17,id:7};
       assert.equal(run(game,withoutBullet,2,1,null),15);
       assert.equal(seen.length,1,'non-projectile cover damage must abstain');
+      const splash={hp:17,id:7};
+      assert.equal(run(game,splash,2,1,{shell:true,beam:false,vx:0,vy:0}),15);
+      assert.equal(seen.length,1,'synthetic splash proxy without shot ID must abstain');
     }
   }
 });
