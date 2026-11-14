@@ -44,8 +44,10 @@ function DwellUpgradeTray(props){
   // boundary instead of relying solely on the later points<=0 effect.
   var originalUpgrade=props&&props.onUpgrade;
   var guardedUpgrade=typeof originalUpgrade==='function'?function(){
+    var key=arguments[0],stats=props&&props.hud&&props.hud.stats;
+    var atCap=stats&&Number(stats[key])>=8; // same eight legal bars as UpgradeTray
     var result=originalUpgrade.apply(this,arguments);
-    if(points<=1)setTouchOptIn(false);
+    if(points<=1&&!atCap)setTouchOptIn(false);
     return result;
   }:originalUpgrade;
   var nextProps=Object.assign({},props,{
