@@ -76,7 +76,7 @@ function run(hz,mode){
   const g=boot(mode==='observed'||mode==='throwing');
   const shot=(id,owner,x,vx,hp)=>({
     id,kind:'bullet',ownerId:owner,x,y:0,vx,vy:0,r:3,
-    hp,maxHp:hp,baseDmg:8,dmg:8,ttl:.005,pen:0,hits:0,
+    hp,maxHp:hp,baseDmg:8,dmg:8,ttl:.003,pen:0,hits:0,
     shell:false,beam:false,dead:false
   });
   const a=shot(1,1,-20,6000,1),b=shot(2,2,20,-6000,1);
