@@ -172,10 +172,11 @@ test('ten Battlefield guards call real damage exactly once with or without ledge
         const receiverGame=Object.assign(Object.create(Object.getPrototypeOf(game)),game);
         Object.defineProperty(receiverGame,'__novaShotLedger',Object.getOwnPropertyDescriptor(throwing,'__novaShotLedger'));
         const vars2={...vars,g:receiverGame};
+        const before=seen.damage;
         const returned=new Function(...Object.keys(vars2),'return '+wrapped+';')
           .apply(receiverGame,Object.values(vars2));
         assert.equal(returned,17);
-        assert.equal(seen.damage++,seen.damage-1);
+        assert.equal(seen.damage,before+1);
       }
     }
   }
