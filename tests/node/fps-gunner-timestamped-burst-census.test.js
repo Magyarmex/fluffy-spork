@@ -83,3 +83,21 @@ test('legal rotary builds: held and phase-controlled timestamped bursts at 30/60
  // A fix should update these observations rather than freeze bad behavior.
  console.log('GUNNER_TIMESTAMPED_BURST_CENSUS '+JSON.stringify(rows));
 });
+
+/* The rotary cold-spin trap can be nonmonotonic between 30 and 60Hz:
+ * a higher simulation rate is not guaranteed to fire more often. Sample
+ * intermediate rates in the actual Game before drawing a monotonicity claim.
+ * This is not a device FPS test or a desired balance golden. */
+test('intermediate simulation rates expose rotary cadence quantization',()=>{
+ const rows=[];
+ for(const [cls,reload] of [['minigun',1],['needlestorm',3]])
+  for(const hz of [40,45,48,50,55,75,90]){
+   const a=run(1517800,cls,reload,hz,'held');
+   const b=run(1517802,cls,reload,hz,'held');
+   assert.deepEqual(a,b,'controlled no-target chronology must be seed-invariant');
+   rows.push({cls,reload,hz,volleys:a.volleys,spinMean:a.spinMean,
+    spinFinal:a.spinFinal,firstShots:a.firstShots});
+  }
+ assert.equal(rows.length,14);
+ console.log('GUNNER_INTERMEDIATE_FPS_CENSUS '+JSON.stringify(rows));
+});
