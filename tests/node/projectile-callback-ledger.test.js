@@ -509,3 +509,18 @@ test('retirement witness distinguishes observed terminal transition from missed-
   assert.equal(l.recordProjectileRetirement({},'ttl'),false);
   assert.equal(l.counters().observerErrors,2);
 });
+
+test('interception witness records actual core pair without inventing contact time',()=>{
+  const l=createProjectileCallbackLedger(game(),{limit:2});
+  assert.equal(l.recordProjectileInterception({id:31},{id:32},10,15),true);
+  const e=l.snapshot().events[0];
+  assert.equal(e.kind,'projectileInterception');
+  assert.equal(e.shotId,31);assert.equal(e.otherShotId,32);
+  assert.equal(e.beforeHpA,10);assert.equal(e.beforeHpB,15);
+  assert.equal(e.timing,'unknown');
+  assert.equal(l.counters().coreInterceptions,1);
+  assert.equal(l.counters().damageCallbacksCaptured,0);
+  assert.equal(l.recordProjectileInterception({id:31},{id:31},10,15),false);
+  assert.equal(l.counters().observerErrors,1);
+  l.nextFrame();assert.equal(l.counters().coreInterceptions,0);
+});
