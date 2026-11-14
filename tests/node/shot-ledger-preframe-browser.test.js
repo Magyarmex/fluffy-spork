@@ -25,7 +25,7 @@ function world(){
     tanks:[{id:8,x:30,y:40,r:15,hp:100,alive:true}],
     shapes:[{id:8,x:50,y:60,r:12,hp:30,alive:true}],
     drones:[{id:3,x:70,y:80,r:5,hp:20,alive:true}],
-    __novaTerrain:[{id:8,x:90,y:100,hp:80,solid:true}]
+    __novaTerrain:[{id:-1000,x:90,y:100,w:64,h:24,shape:'rect',hp:80,solid:true}]
   };
 }
 test('browser pre-frame producer preserves exact shot identity and immutable values',()=>{
@@ -40,7 +40,9 @@ test('same target ID in different real collections cannot be misattributed',()=>
   const a=sample(world());
   assert.equal(a.targets.damageTank.get(8).x,30);
   assert.equal(a.targets.damageShape.get(8).x,50);
-  assert.equal(a.targets.coverDamage.get(8).x,90);
+  assert.equal(a.targets.coverDamage.get(-1000).x,90);
+  assert.equal(a.targets.coverDamage.get(-1000).w,64);
+  assert.equal(a.targets.coverDamage.get(-1000).shape,'rect');
   assert.equal(a.targets.damageDrone.get(3).x,70);
 });
 test('malformed or duplicate shot identity invalidates frame rather than guessing',()=>{
