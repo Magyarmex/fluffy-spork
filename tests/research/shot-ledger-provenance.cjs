@@ -78,7 +78,8 @@ function auditShotEvidence(events,{truncated=0,preFrameOverflow=0,preFrameShotUn
     // Even complete endpoints cannot certify swept contact or its priority.
     certifiedMissedHits:null,missedHitClassification:'not-evaluated',
     abstentionReason:!bounded?'truncated-evidence':
-      preStateMissing||pairedInterceptionMissing||targetStateMissing?
+      preStateMissing||pairedInterceptionMissing||targetStateMissing||
+      preFrameShotUnidentified||preFrameTargetUnidentified?
       'incomplete-pre-frame-evidence':
       'no-authoritative-competing-contact-geometry',
     shots:[...shots.values()].map(s=>Object.freeze({...s}))
