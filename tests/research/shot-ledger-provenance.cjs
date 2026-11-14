@@ -29,9 +29,20 @@ function auditShotEvidence(events,{truncated=0,preFrameOverflow=0}={}){
       existing.interceptions++;
       if(!Number.isSafeInteger(e.otherShotId)||e.otherShotId<0||
          e.otherShotId===e.shotId)throw new TypeError('invalid interception peer');
+      const peer=shots.get(e.otherShotId)||{
+        shotId:e.otherShotId,firstFrame:e.frame,lastFrame:e.frame,
+        damageEvents:0,coverEvents:0,interceptions:0,retirements:0,
+        missingPreStates:0,missingPairedStates:0
+      };
+      peer.lastFrame=e.frame;
+      peer.interceptions++;
+      // The second projectile is an equal participant, not just metadata
+      // on the first projectile's event.
       if(e.preOtherShot&&Number.isFinite(e.preOtherShot.x)&&
          Number.isFinite(e.preOtherShot.y))pairedInterceptionPresent++;
-      else{pairedInterceptionMissing++;existing.missingPairedStates++;}
+      else{pairedInterceptionMissing++;existing.missingPairedStates++;
+        peer.missingPreStates++;}
+      shots.set(e.otherShotId,peer);
     }else if(e.kind==='coverDamage')existing.coverEvents++;
     else if(['damageTank','damageShape','damageDrone'].includes(e.kind))
       existing.damageEvents++;
