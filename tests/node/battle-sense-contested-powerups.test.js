@@ -126,3 +126,14 @@ test('long terrain detour reduces intrinsic pickup value even without rival cont
   assert.equal(h.chooseResource(g,bot).id,pickup.id,
     'opening a direct lane restores the original reachable-heal choice');
 });
+
+test('critical healing remains attractive despite a long but traversable detour',()=>{
+  const {c,Game}=load(),g=new Game(),bot=T(1,0,0),
+    pickup={id:22,type:'heal',x:300,y:0};
+  bot.hp=20;g.tanks=[bot];g.powerups=[pickup];
+  g.hasLineOfSight=(ax,ay,bx,by)=>!(ax===bot.x&&ay===bot.y&&bx===pickup.x&&by===pickup.y);
+  g.novaBattlefieldWaypoint=()=>({x:150,y:40});
+  g.novaRouteLength=()=>1000;
+  assert.equal(c.window.__NOVA_BATTLE_SENSE_TEST__.chooseResource(g,bot).id,pickup.id,
+    'survival urgency must still outweigh a long reachable detour when critically injured');
+});
