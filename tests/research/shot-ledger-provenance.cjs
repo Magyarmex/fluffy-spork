@@ -11,6 +11,7 @@ function auditShotEvidence(events,{truncated=0,preFrameOverflow=0,preFrameShotUn
   const shots=new Map();
   let lastFrame=0,preStatePresent=0,preStateMissing=0,
       pairedInterceptionPresent=0,pairedInterceptionMissing=0,
+      provenNewbornPeerEvents=0,unexplainedMissingPeerStates=0,
       targetStatePresent=0,targetStateMissing=0,
       provenNewbornEvents=0,unexplainedMissingPreState=0;
   for(const e of events){
@@ -74,7 +75,10 @@ function auditShotEvidence(events,{truncated=0,preFrameOverflow=0,preFrameShotUn
       if(e.preOtherShot&&Number.isFinite(e.preOtherShot.x)&&
          Number.isFinite(e.preOtherShot.y))pairedInterceptionPresent++;
       else{pairedInterceptionMissing++;existing.missingPairedStates++;
-        peer.missingPreStates++;}
+        peer.missingPreStates++;
+        if(e.otherBornThisFrame===true)provenNewbornPeerEvents++;
+        else unexplainedMissingPeerStates++;
+      }
       shots.set(e.otherShotId,peer);
     }else if(e.kind==='coverDamage')existing.coverEvents++;
     else if(['damageTank','damageShape','damageDrone'].includes(e.kind))
@@ -88,7 +92,7 @@ function auditShotEvidence(events,{truncated=0,preFrameOverflow=0,preFrameShotUn
     preStatePresent,preStateMissing,provenNewbornEvents,
     unexplainedMissingPreState,targetStatePresent,targetStateMissing,
     preFrameShotUnidentified,preFrameTargetUnidentified,pairedInterceptionPresent,
-    pairedInterceptionMissing,
+    pairedInterceptionMissing,provenNewbornPeerEvents,unexplainedMissingPeerStates,
     // Missing endpoints may mean births during the update; do not guess.
     // Even complete endpoints cannot certify swept contact or its priority.
     certifiedMissedHits:null,missedHitClassification:'not-evaluated',
