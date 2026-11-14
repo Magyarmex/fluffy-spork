@@ -1,0 +1,304 @@
+'use strict';
+// RESEARCH ONLY. Exact materialized Game.start() owner; never loaded by the game.
+// Test a narrowly bounded <100ms active-jitter policy without changing shipping.
+const test=require('node:test'),assert=require('node:assert/strict');
+const fs=require('node:fs'),path=require('node:path');
+const html=fs.readFileSync(path.resolve(__dirname,'../../index.html'),'utf8');
+function body(){
+ const a=html.indexOf('    start() {',html.indexOf('window.__defineModule("game/engine"'));
+ const b=html.indexOf('    destroy() {',a);
+ assert.ok(a>=0&&b>a,'actual materialized Game.start');
+ return html.slice(a,b).trim();
+}
+const shipping=body();
+const oldGate='elapsed <= 1 / 12';
+const oldCap='carry = Math.min(1 / 30, carry);';
+assert.equal(shipping.split(oldGate).length-1,1,'shipping CPU/catch-up gate owner');
+assert.equal(shipping.split(oldCap).length-1,1,'shipping final carry cap owner');
+const pilot=shipping.replace(oldGate,'elapsed <= 0.1')
+ .replace(oldCap,'carry = Math.min(elapsed <= 0.1 ? 2 / 30 : 1 / 30, carry);');
+function run(startBody,gaps,seconds=10,workMs=0,pauseWindow=null){
+ let now=0,work=0,raf=null,sim=0,updates=0,draws=0,frameSteps=0,maxSteps=0,firstFrameSteps=null;
+ const start=new Function('performance','requestAnimationFrame','render_1',
+  'return ({'+startBody+'}).start')({now:()=>now+work},
+  fn=>{raf=fn;return 1;},{render(){if(firstFrameSteps===null)firstFrameSteps=frameSteps;draws++;maxSteps=Math.max(maxSteps,frameSteps);frameSteps=0;}});
+ const game={paused:false,__novaDestroyed:false,mmTimer:0,
+  sfx:{startMusic(){}},update(dt){
+   assert.ok(dt>=0&&dt<=1/30+1e-9,'collision dt bounded');
+   sim+=dt;updates++;frameSteps++;work+=workMs;
+  },drawMinimap(){}};
+ start.call(game);
+ let i=0;
+ while(now<seconds*1000-1e-7){
+  now+=Math.min(gaps[i++%gaps.length],seconds*1000-now);
+  game.paused=!!(pauseWindow&&now>=pauseWindow[0]&&now<pauseWindow[1]);
+  const cb=raf;raf=null;assert.equal(typeof cb,'function');cb(now);
+ }
+ assert.ok(sim<=seconds+1e-7,'no future time');
+ assert.ok(maxSteps<=2,'no more than two simulation updates per render');
+ return {sim,updates,draws,maxSteps,firstFrameSteps};
+}
+const worst=[20.91151399025735,10.023170844306332,19.252641284801797,
+ 99.18706951738324,89.60306031033099,2.794867239606748,
+ 6.619622334380946,18.274721145599262];
+const harsh=[85,40,5,1000/7.5-130];
+test('opt-in active-jitter pilot recovers a falsifying sub-100ms schedule',()=>{
+ const before=run(shipping,worst),after=run(pilot,worst);
+ assert.ok(before.sim<7,'reproduce shipping deficit');
+ assert.ok(after.sim>9.9,'pilot substantially recovers active time');
+ assert.equal(after.draws,before.draws);
+ assert.ok(after.updates>=before.updates,'account for extra CPU work');
+});
+test('pilot preserves uniform presentation and established 120ms stall policy',()=>{
+ for(const gaps of [[1000/60],[1000/30],[50],[120,1000/60,1000/60,1000/60]]){
+  const before=run(shipping,gaps),after=run(pilot,gaps);
+  assert.ok(Math.abs(after.sim-before.sim)<1e-6,'do not replay stall time');
+  assert.equal(after.updates,before.updates);
+  assert.equal(after.draws,before.draws);
+ }
+});
+test('harsh clustered 30Hz improves without changing update count',()=>{
+ const before=run(shipping,harsh),after=run(pilot,harsh);
+ assert.ok(after.sim>before.sim+1,'recover lost active time');
+ assert.equal(after.updates,before.updates);
+});
+test('current-frame CPU spikes can still double-update; both policies remain bounded',()=>{
+ // The existing gate observes the PREVIOUS two frames, not the current
+ // first update. A 22ms first update may therefore be followed by another
+ // update when earlier frames were cheap. Preserve this measured risk rather
+ // than falsely claiming that the CPU gate forbids all double updates.
+ for(const gaps of [worst,harsh]){
+  const before=run(shipping,gaps,10,22),after=run(pilot,gaps,10,22);
+  assert.ok(before.maxSteps<=2&&after.maxSteps<=2);
+  assert.ok(after.sim>=before.sim-1e-7);
+  assert.ok(after.updates>=after.draws,'at least one update per presentation');
+ }
+});
+test('seeded mixed schedules retain bounded work and never lose more simulated time',()=>{
+ let state=0x6a09e667;
+ for(let i=0;i<160;i++){
+  const gaps=[];
+  for(let j=0;j<8;j++){
+   state^=state<<13;state^=state>>>17;state^=state<<5;
+   gaps.push(1+(state>>>0)%150);
+  }
+  const total=gaps.reduce((a,b)=>a+b,0);
+  const normalized=gaps.map(v=>v*(8000/30)/total);
+  for(const workMs of [0,22]){
+   const before=run(shipping,normalized,2,workMs);
+   const after=run(pilot,normalized,2,workMs);
+   assert.ok(after.sim>=before.sim-1e-7,'no additional time loss');
+   assert.equal(after.draws,before.draws);
+  }
+ }
+});
+
+test('three consecutive 99ms frames falsify complete recovery with a 2/30 carry cap',()=>{
+ // Nine frames span 300ms (mean 30Hz); the first three arrive at 99ms.
+ // Two updates per frame cannot repay the third long frame without retaining
+ // more than 66.67ms of debt or deliberately dropping time. This pilot drops.
+ const gaps=[99,99,99,.5,.5,.5,.5,.5,.5];
+ const before=run(shipping,gaps),after=run(pilot,gaps);
+ assert.ok(after.sim>before.sim+3,'pilot still improves the old scheduler');
+ assert.ok(after.sim<9.5,'the pilot is NOT a complete chronology solution');
+ assert.ok(after.maxSteps<=2,'preserve bounded update budget');
+ assert.equal(after.draws,before.draws);
+});
+
+// A separate opt-in guard experiment. The shipping and active-jitter pilot
+// both check only the previous two frames' CPU work. The first update in the
+// current frame may be expensive; the next update must be evaluated against
+// that cost before any production change can claim a bounded frame budget.
+test('current-update CPU gate prevents a second expensive step on the first frame',()=>{
+ const oldCpuGate='priorWork < 18 && earlierWork < 18';
+ assert.equal(pilot.split(oldCpuGate).length-1,1,'unique existing CPU gate');
+ const guarded=pilot.replace(oldCpuGate,
+  oldCpuGate+' && performance.now() - workStart < 18');
+ for(const gaps of [[70],[99,99,99,.5,.5,.5,.5,.5,.5]]){
+  const unguarded=run(pilot,gaps,1,22);
+  const safe=run(guarded,gaps,1,22);
+  assert.equal(unguarded.firstFrameSteps,2,
+   'existing prior-frame-only guard permits a second expensive first-frame step');
+  assert.equal(safe.firstFrameSteps,1,
+   'current-work-aware guard prevents that second update');
+  assert.ok(safe.maxSteps<=2&&unguarded.maxSteps<=2);
+  assert.equal(safe.draws,unguarded.draws);
+  assert.ok(safe.sim<=unguarded.sim+1e-7,
+   'lower current-frame CPU work may trade off simulation progress');
+ }
+});
+
+// The proposed 100ms gate is a sharp policy boundary. Explicitly preserve
+// its intended side of the threshold; do not accidentally repay suspended
+// time when floating-point RAF timestamps land just above the boundary.
+test('active-jitter eligibility has a bounded 100ms timestamp boundary',()=>{
+ for(const [gap,expected] of [[99.9,2],[100,2],[100.1,1],[120,1]]){
+  const observed=run(pilot,[gap],1,0);
+  assert.equal(observed.firstFrameSteps,expected,
+   'first-frame update count for '+gap+'ms presentation gap');
+  assert.ok(observed.maxSteps<=2);
+ }
+ const current=run(shipping,[99.9],1,0);
+ assert.equal(current.firstFrameSteps,1,
+  'shipping 83.33ms gate must not be mistaken for pilot 100ms gate');
+});
+
+// Guard cost must be explicit: no-op work should leave the pilot's simulated
+// chronology unchanged, while expensive work is allowed to sacrifice some
+// catch-up in exchange for avoiding two costly updates in the same frame.
+test('current-work-aware guard is neutral on cheap frames',()=>{
+ const oldCpuGate='priorWork < 18 && earlierWork < 18';
+ const guarded=pilot.replace(oldCpuGate,
+  oldCpuGate+' && performance.now() - workStart < 18');
+ for(const gaps of [[1000/60],[1000/30],[50],harsh,worst,
+  [99,99,99,.5,.5,.5,.5,.5,.5]]){
+  const baseline=run(pilot,gaps,3,0),candidate=run(guarded,gaps,3,0);
+  assert.deepEqual(candidate,baseline,
+   'current CPU guard must not change cheap-frame chronology');
+ }
+});
+
+// A first-update-only check is necessary but not sufficient for a strict
+// per-frame CPU budget: a second 17ms update can take a 17ms first update to
+// 34ms. This is a deliberately preserved negative result, not a release gate.
+test('current-work guard does not guarantee total frame CPU below 18ms',()=>{
+ const oldCpuGate='priorWork < 18 && earlierWork < 18';
+ const guarded=pilot.replace(oldCpuGate,
+  oldCpuGate+' && performance.now() - workStart < 18');
+ const observed=run(guarded,[70],1,17);
+ assert.equal(observed.firstFrameSteps,2,
+  '17ms first update is still eligible for a second update');
+ assert.ok(observed.firstFrameSteps*17>18,
+  'two individually affordable updates can exceed the total frame budget');
+});
+
+// Pause/evolution must discard simulation carry rather than replaying it on
+// resume. This checks the RAF owner only, not UI input release semantics.
+test('active-jitter pilot discards paused-frame debt on resume',()=>{
+ const gaps=[50],pauseWindow=[1000,2000];
+ const before=run(shipping,gaps,3,0,pauseWindow);
+ const after=run(pilot,gaps,3,0,pauseWindow);
+ assert.ok(Math.abs(after.sim-before.sim)<1e-6,
+  'pilot must not recover simulated time from a paused second');
+ assert.ok(after.sim>1.9&&after.sim<2.1,
+  'three wall seconds with one paused second should advance about two');
+ assert.equal(after.draws,before.draws);
+ assert.ok(after.maxSteps<=2);
+});
+
+// Falsifier: the 100ms active/stall classification is discontinuous. A 0.1ms
+// change in a sustained frame interval can nearly halve simulated game time.
+// This test documents a reason NOT to promote the pilot without redesign.
+test('100ms eligibility boundary produces a large sustained chronology cliff',()=>{
+ const eligible=run(pilot,[100],10,0);
+ const ineligible=run(pilot,[100.1],10,0);
+ assert.ok(eligible.sim>6.6&&eligible.sim<6.8,
+  'exactly 100ms remains eligible for the second bounded update');
+ assert.ok(ineligible.sim>3.2&&ineligible.sim<3.5,
+  '100.1ms is classified as a stall and loses most active time');
+ assert.ok(eligible.sim>ineligible.sim*1.9,
+  'tiny presentation change creates an unacceptable ~2x timebase cliff');
+ assert.ok(eligible.maxSteps<=2&&ineligible.maxSteps<=2);
+});
+
+// Synthetic input-provenance counterexample, NOT a real touch test. The RAF
+// receives the latest input snapshot before replaying earlier elapsed time.
+// Without timestamped event history, extra catch-up steps can apply a press
+// to simulation time that predates the physical event.
+test('catch-up steps can consume a later input state before its event time',()=>{
+ function firstFrame(body){
+  let now=0,raf=null,sim=0,updates=[];
+  const start=new Function('performance','requestAnimationFrame','render_1',
+   'return ({'+body+'}).start')({now:()=>now},
+   fn=>{raf=fn;return 1;},{render(){}});
+  const game={paused:false,__novaDestroyed:false,mmTimer:0,
+   sfx:{startMusic(){}},firing:false,
+   update(dt){sim+=dt;updates.push({sim,firing:this.firing});},
+   drawMinimap(){}};
+  start.call(game);
+  // A physical press arrives at 90ms, before the first RAF at 99ms.
+  // The update owner sees the current held state, not its event timestamp.
+  now=90;game.firing=true;
+  now=99;const cb=raf;raf=null;cb(now);
+  return updates;
+ }
+ const baseline=firstFrame(shipping),candidate=firstFrame(pilot);
+ assert.equal(baseline.length,1);
+ assert.equal(candidate.length,2);
+ assert.ok(candidate.every(u=>u.firing&&u.sim<.09),
+  'pilot applies a 90ms press during two earlier simulation slices');
+ assert.ok(baseline.every(u=>u.firing&&u.sim<.09),
+  'the underlying sampling limitation also exists in shipping');
+});
+
+// Existing production has the same structural problem at its 1/12s gate.
+// Document the shipped limitation independently of the proposed 100ms pilot.
+test('shipping 83.33ms second-step boundary has a near-twofold timebase cliff',()=>{
+ const eligible=run(shipping,[83.333],10,0);
+ const ineligible=run(shipping,[83.334],10,0);
+ assert.ok(eligible.sim>7.9&&eligible.sim<8.2);
+ assert.ok(ineligible.sim>3.9&&ineligible.sim<4.2);
+ assert.ok(eligible.sim>ineligible.sim*1.9,
+  'a 0.001ms RAF interval change nearly halves shipped simulation progress');
+ assert.ok(eligible.maxSteps<=2&&ineligible.maxSteps<=2);
+});
+
+// Research-only loss ledger: instrument the exact extracted shipping RAF after
+// its second-update decision. Distinguish sub-100ms active jitter from longer
+// suspension-like gaps. Do not mistake intentionally discarded stall debt for
+// an active-game fairness regression, or vice versa.
+test('exact shipping RAF accounts for active-jitter loss separately from stalls',()=>{
+ const marker='carry = Math.min(1 / 30, carry);';
+ assert.equal(shipping.split(marker).length-1,1,'unique shipping carry clamp');
+ const instrumented=shipping.replace(marker,
+  'const __novaBeforeClamp = carry;\n            '+marker+
+  '\n            const __novaDiscarded = Math.max(0, __novaBeforeClamp - carry);'+
+  '\n            if (this.paused) this.__novaResearchPauseLoss += __novaDiscarded;'+
+  '\n            else if (elapsed <= 0.1) this.__novaResearchActiveLoss += __novaDiscarded;'+
+  '\n            else this.__novaResearchStallLoss += __novaDiscarded;'+
+  '\n            if (this.paused) this.__novaResearchPauseLoss += dt + carry;'+
+  '\n            this.__novaResearchCarry = this.paused ? 0 : carry;');
+ function ledger(gaps,seconds=10,pauseWindow=null,workMs=0,renderWorkMs=0){
+  let now=0,work=0,raf=null,sim=0,updates=0;
+  const start=new Function('performance','requestAnimationFrame','render_1',
+   'return ({'+instrumented+'}).start')({now:()=>now+work},
+   fn=>{raf=fn;return 1;},{render(){work+=renderWorkMs;}});
+  const g={paused:false,__novaDestroyed:false,mmTimer:0,
+   __novaResearchActiveLoss:0,__novaResearchStallLoss:0,__novaResearchPauseLoss:0,__novaResearchCarry:0,
+   sfx:{startMusic(){}},update(dt){sim+=dt;updates++;work+=workMs;},drawMinimap(){}};
+  start.call(g);
+  let i=0;
+  while(now<seconds*1000-1e-7){
+   now+=Math.min(gaps[i++%gaps.length],seconds*1000-now);
+   g.paused=!!(pauseWindow&&now>=pauseWindow[0]&&now<pauseWindow[1]);
+   const cb=raf;raf=null;assert.equal(typeof cb,'function');cb(now);
+  }
+  return {sim,updates,active:g.__novaResearchActiveLoss,
+   stall:g.__novaResearchStallLoss,paused:g.__novaResearchPauseLoss,carry:g.__novaResearchCarry};
+ }
+ const uniform=ledger([1000/30]);
+ const active=ledger([85,40,5,1000/7.5-130]);
+ const stalled=ledger([120,1000/60,1000/60,1000/60]);
+ const paused=ledger([50],10,[1000,2000]);
+ const cpuConstrained=ledger([85,40,5,1000/7.5-130],10,null,22);
+ const renderConstrained=ledger([85,40,5,1000/7.5-130],10,null,0,22);
+ assert.ok(uniform.active<1e-7&&uniform.stall<1e-7,
+  'uniform 30Hz should not discard active or stall debt');
+ assert.ok(active.active>0.1&&active.stall<1e-7,
+  'clustered sub-100ms presentation discards genuinely active game time');
+ assert.ok(paused.paused>0.9&&paused.active<1e-7&&paused.stall<1e-7,
+  'intentional paused time must not masquerade as active jitter loss');
+ assert.ok(cpuConstrained.active>active.active+0.4&&cpuConstrained.stall<1e-7,
+  'the prior-work gate can increase lost active time without a browser stall');
+ assert.ok(renderConstrained.active>active.active+0.4&&renderConstrained.stall<1e-7,
+  'expensive previous renders also suppress second simulation updates');
+ assert.equal(renderConstrained.updates,cpuConstrained.updates,
+  'the gate measures combined previous-frame work, not only update cost');
+ assert.ok(stalled.stall>0.1,
+  '120ms gaps are separately classified as suspension-like discards');
+ for(const [label,s] of [['uniform',uniform],['active',active],['stalled',stalled],['paused',paused],['cpuConstrained',cpuConstrained],['renderConstrained',renderConstrained]]){
+  assert.ok(Math.abs(10-s.sim-s.carry-s.active-s.stall-s.paused)<1e-5,
+   label+' must conserve wall time across updates, retained carry and discard');
+ }
+ console.log('RAF_SHIPPING_LOSS_LEDGER '+JSON.stringify({uniform,active,stalled,paused,cpuConstrained,renderConstrained}));
+});
