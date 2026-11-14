@@ -223,3 +223,18 @@ test('idle-drone step sweep uses the actual drone radius for segment collision',
   assert.equal(T.blockedDroneStep(g,-100,0,100,0,13),false);
   assert.deepEqual(pads,[8]);
 });
+
+
+test('route candidate nodes use full physical body clearance, not a discounted safety pad',()=>{
+  const T=boot();
+  for(const [pad,radius] of [[23,18],[13,8]]){
+    const g=game([{id:77,x:0,y:0,w:70,h:180,solid:true}]);
+    const original=g.isTerrainSafe.bind(g),pads=[];
+    g.isTerrainSafe=(x,y,p)=>{pads.push(p);return original(x,y,p);};
+    const nodes=T.obstacleNodes(g,-400,0,400,0,pad);
+    assert.ok(nodes.length>0,'candidate nodes must exist for a wall detour');
+    assert.ok(pads.length>0,'candidate nodes must be checked for physical safety');
+    assert.ok(pads.every(p=>p===radius),'every candidate must use full collision radius: '+JSON.stringify(pads));
+    for(const node of nodes)assert.equal(original(node.x,node.y,radius),true);
+  }
+});
