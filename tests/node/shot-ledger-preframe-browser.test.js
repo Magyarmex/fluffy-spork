@@ -13,10 +13,10 @@ const end=browserSource.indexOf('      const fingerprint=()=>{',start);
 assert.ok(start>=0&&end>start,'pre-frame producer must exist');
 const producer=browserSource.slice(start,end);
 function sample(g){
-  return new Function('g',`let preFrameShotOverflow=0,preFrameTargetUnidentified=0;
+  return new Function('g',`let preFrameShotOverflow=0,preFrameShotUnidentified=0,preFrameTargetUnidentified=0;
     ${producer}
     return {shots:snapshotPreFrameShots(),targets:snapshotPreFrameTargets(),
-      preFrameShotOverflow,preFrameTargetUnidentified};`)(g);
+      preFrameShotOverflow,preFrameShotUnidentified,preFrameTargetUnidentified};`)(g);
 }
 function world(){
   return {
@@ -49,8 +49,18 @@ test('malformed or duplicate shot identity invalidates frame rather than guessin
   const g=world();
   g.bullets.push({...g.bullets[0]});
   const a=sample(g);
-  assert.equal(a.shots,null);
-  assert.equal(a.preFrameShotOverflow,1);
+  assert.equal(a.shots.has(5),false,'ambiguous shot must not be joined');
+  assert.equal(a.preFrameShotUnidentified,1);
+  assert.equal(a.preFrameShotOverflow,0);
+});
+test('unidentified projectile does not poison independent exact shot IDs',()=>{
+  const g=world();
+  g.bullets.push({...g.bullets[0],id:null});
+  g.bullets.push({...g.bullets[0],id:6});
+  const a=sample(g);
+  assert.equal(a.shots.get(5).x,10);
+  assert.equal(a.shots.get(6).x,10);
+  assert.equal(a.preFrameShotUnidentified,1);
 });
 test('unidentified target cannot poison valid target snapshots',()=>{
   const g=world();
