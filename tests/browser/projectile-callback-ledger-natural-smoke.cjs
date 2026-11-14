@@ -119,7 +119,7 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
       // Bounded event provenance enables later shot-ID joins without retaining
       // a full unbounded combat log or claiming event time is first contact.
       const eventSamples=[],MAX_EVENT_SAMPLES=256;
-      let eventSamplesTruncated=0,preFrameShotOverflow=0;
+      let eventSamplesTruncated=0,preFrameShotOverflow=0,preFrameTargetUnidentified=0;
       // Snapshot actual projectile state BEFORE the authoritative update.
       // Only join by exact shot ID; absent/over-budget evidence stays null.
       // No collision inference is made from these endpoint snapshots.
@@ -153,7 +153,9 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
           const map=new Map();
           for(const target of collection){
             if(!Number.isSafeInteger(target.id)||map.has(target.id)){
-              preFrameShotOverflow++;return null;
+              // Unidentifiable or duplicated collection IDs cannot support
+              // an exact target join; retain the remaining valid evidence.
+              preFrameTargetUnidentified++;continue;
             }
             map.set(target.id,{
               x:target.x,y:target.y,r:target.r??null,
@@ -253,7 +255,7 @@ const {patchBattlefieldMutualInterception,patchSniperInterception,patchMateriali
         if(!ledger.uninstall())throw Error('failed to restore real damage methods');}
       updateMs.sort((a,b)=>a-b);
       return{arm:paired?(observe?'on':'off'):'smoke',preSortTankIds,layout:g.__novaBattlefield?.name??null,frames,physicalTrace,
-        fullFrameDigest:(digestA>>>0).toString(16)+':'+(digestB>>>0).toString(16),eventSamples,eventSamplesTruncated,preFrameShotOverflow,callbacks,attributedCallbacks:callbacks-unknown,coreAttributed,battlefieldAttributed,coverAttributed,retirements,ttlRetirements,boundsRetirements,ambiguousRetirements,rawPenOneZeroHitTtl,coreInterceptions,sniperInterceptions,battlefieldTtlInterceptions,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
+        fullFrameDigest:(digestA>>>0).toString(16)+':'+(digestB>>>0).toString(16),eventSamples,eventSamplesTruncated,preFrameShotOverflow,preFrameTargetUnidentified,callbacks,attributedCallbacks:callbacks-unknown,coreAttributed,battlefieldAttributed,coverAttributed,retirements,ttlRetirements,boundsRetirements,ambiguousRetirements,rawPenOneZeroHitTtl,coreInterceptions,sniperInterceptions,battlefieldTtlInterceptions,scopedCalls,unusedScopes,observerErrors,unknown,unidentifiedTargets,
         p95UpdateMs:updateMs[Math.ceil(updateMs.length*.95)-1],
         maxUpdateMs:updateMs[updateMs.length-1],status:g.status,time:g.time};
     },{observe:OBSERVE,paired:!!PAIRED_ARM});
