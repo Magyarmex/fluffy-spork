@@ -125,3 +125,26 @@ test('critical heal movement preserves the selected goal despite a short-horizon
   // This is a source-executed continuity regression, not proof of
   // natural-match pickup acquisition or physical-device performance.
 });
+
+test('research census: two-heal candidate order across 120 deterministic tank seeds', () => {
+  const outcomes = Object.create(null);
+  for (let seed = 1; seed <= 120; seed++) {
+    const picks = [];
+    for (const order of [[0,1],[1,0]]) {
+      const {g,tank,classes,hooks,pickups} = makeScene(order);
+      tank.id = seed;
+      const selected = hooks.chooseResource(g,tank,classes);
+      assert.ok(selected && pickups.some(p => p.id === selected.id),
+        'every controlled seed must select an eligible heal');
+      picks.push(selected.id);
+    }
+    const key = picks.join('/');
+    outcomes[key] = (outcomes[key] || 0) + 1;
+  }
+  const changed = Object.entries(outcomes)
+    .filter(([key]) => key.split('/')[0] !== key.split('/')[1])
+    .reduce((sum,[,count]) => sum+count,0);
+  // Observational only: do NOT freeze candidate-order bias as a passing golden.
+  // The intended future property is stable selection under order reversal.
+  console.log('PICKUP_ORDER_SEED_CENSUS '+JSON.stringify({seeds:120,changed,outcomes}));
+});
