@@ -250,3 +250,21 @@ test('one early speed spike cannot inflate a three-interval witnessed race',()=>
   'certified speed must be bounded by the slowest sustained interval, not the impulse peak');
  assert.ok(witness.fast>=baseline*1.049);
 });
+
+test('rolling witness can relearn sustained acceleration after three slower intervals',()=>{
+ const {h,classes}=boot(),self=tank(1,0),rival=tank(2,100);
+ self.ai={};
+ const g={time:0,tanks:[self,rival],hasLineOfSight:()=>true,
+  tankSpeed:t=>{if(t===rival)throw Error('private rival speed read');return 124;}};
+ const p={id:'heal',type:'heal',x:400,y:0};
+ h.resourceContest(g,self,p,400,classes);
+ for(let i=1;i<=6;i++){
+  g.time=i*.2;rival.x+=124*(i<=3?1.05:1.45)*.2;
+  h.resourceContest(g,self,p,400,classes);
+ }
+ const w=self.ai.__v181RivalSpeedWitness['2'];
+ assert.equal(w.confirmed,3,'witness retains exactly the last three qualifying intervals');
+ assert.equal(w.samples.length,3,'speed history remains bounded');
+ assert.ok(w.fast>124*1.44&&w.fast<124*1.46,
+  'later sustained visible acceleration must replace the older slower samples');
+});
