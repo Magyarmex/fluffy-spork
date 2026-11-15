@@ -112,3 +112,11 @@ test('phase-capable tank keeps visible bullet danger because blink breaks travel
   classes.CLASSES.guard.ability='stampede';
   assert.equal(choose(g,tank),near,'bounded speed boosts are covered by conservative speed ceiling');
 });
+
+test('large existing knockback velocity disables unsafe remote expiry discount',()=>{
+  const {g,tank,near,far,choose}=fixture();
+  g.bullets=[{id:100,ownerId:999,x:600,y:0,vx:0,vy:0,ttl:.25}];
+  assert.equal(choose(g,tank),near);
+  tank.vx=4000;tank.vy=0;
+  assert.equal(choose(g,tank),far,'very high inherited velocity can invalidate a walking-speed lower bound');
+});
