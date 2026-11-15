@@ -107,3 +107,42 @@ test('deterministic moving-bullet differential agrees with analytic lane exit',(
  assert.equal(checked,3000);
  assert.ok(discounted>200,'exercise meaningful certified exits');
 });
+
+test('shipping class movement multipliers do not exceed the conservative evolution ceiling',()=>{
+  const html=fs.readFileSync(path.join(__dirname,'../../index.html'),'utf8');
+  const values=[...html.matchAll(/moveMult:\s*([0-9.]+)/g)].map(m=>Number(m[1]));
+  assert.ok(values.length>=36,'expected the full materialized class roster');
+  assert.ok(Math.max(...values)<=1.18,
+    'a faster class requires revisiting the remote-pickup earliest-arrival ceiling');
+});
+
+
+test('canonical Phase Shift descendants and ancestors bypass public lane-exit bound',()=>{
+  const html=fs.readFileSync(path.join(__dirname,'../../index.html'),'utf8');
+  const marker='window.__defineModule("game/classes", function (module, exports, require) {';
+  const start=html.indexOf(marker),end=html.indexOf('\n});',start);
+  assert.ok(start>=0&&end>start,'materialized canonical class registry exists');
+  const mod={exports:{}};
+  new Function('module','exports','require',html.slice(start+marker.length,end))(
+    mod,mod.exports,()=>{throw Error('unexpected class-module dependency');});
+  const registry=mod.exports.CLASSES;
+  const phaseClasses=Object.entries(registry).filter(([,def])=>def.ability==='phase');
+  assert.ok(phaseClasses.length>=1,'expected canonical Phase Shift lineage');
+  const affected=new Set();
+  for(const [id] of phaseClasses){
+    let current=id;
+    while(current){
+      assert.ok(registry[current],'phase lineage parent must exist: '+current);
+      affected.add(current);
+      current=registry[current].parent;
+    }
+  }
+  for(const id of affected){
+    const {g,tank,classes,far,choose}=fixture();
+    tank.cls=id;classes.CLASSES[id]=registry[id];
+    g.bullets=[{id:110,ownerId:999,x:600,y:0,vx:0,vy:0,ttl:.25}];
+    assert.equal(choose(g,tank),far,
+      id+' may phase now or after evolution, invalidating walking-only ETA');
+  }
+});
+
