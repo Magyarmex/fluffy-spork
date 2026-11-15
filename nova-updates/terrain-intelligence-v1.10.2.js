@@ -14,7 +14,7 @@ var CONTROLLER_IDS={carrier:1,overlord:1,warden:1,hivemind:1,broodmother:1,citad
 
 window.__NOVA_VERSION=VERSION;
 window.__NOVA_TERRAIN_INTELLIGENCE__={
-  version:VERSION,codename:CODENAME,plans:0,cacheHits:0,stuckRecoveries:0,spotterReroutes:0,idleDroneReroutes:0,idleDroneReplans:0,
+  version:VERSION,codename:CODENAME,plans:0,cacheHits:0,strategicPlans:0,stuckRecoveries:0,spotterReroutes:0,idleDroneReroutes:0,idleDroneReplans:0,
   guarantees:{hiddenTracking:false,teleportRecovery:false,dashSteering:false,globalNavmesh:false}
 };
 window.__NOVA_TERRAIN_INTELLIGENCE_RELEASE__={
@@ -172,6 +172,42 @@ function cachedNearbyRouteLength(g,x,y,gx,gy,pad,seed,wp){
  }
  return null;
 }
+/* Independent, bounded strategic contender cost. Never touches the live
+ * movement route cache. A cached path is revalidated at physical clearance
+ * before reuse; null means budget unavailable, Infinity means uncertified. */
+function strategicScratchCost(g,x,y,gx,gy,pad,seed,goalId){
+ if(!g||!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(gx)||!Number.isFinite(gy))return Infinity;
+ pad=Math.max(5,pad||10);
+ if(routeVisible(g,x,y,gx,gy,pad))return dist(x,y,gx,gy);
+ var now=Number(g.time)||0,key=cacheKey(seed,pad),map=g.__v1102StrategicRoutes||(g.__v1102StrategicRoutes=Object.create(null));
+ var state=map[key];
+ if(!state||now<state.windowStart||now-state.windowStart>=.75)
+   state=map[key]={windowStart:now,plans:0,entry:null};
+ var e=state.entry,goalKey=String(goalId)+':'+gx+':'+gy;
+ if(e&&(e.goalKey!==goalKey||now>e.until||dist(x,y,e.ax,e.ay)>60))e=null;
+ if(e){
+   var fromX=x,fromY=y,valid=true;
+   for(var i=0;i<e.points.length;i++){
+     var q=e.points[i];
+     if(!q||!routeSafe(g,q.x,q.y,pad)||!routeVisible(g,fromX,fromY,q.x,q.y,pad)){valid=false;break;}
+     fromX=q.x;fromY=q.y;
+   }
+   if(!valid)e=null;
+ }
+ if(!e){
+   if(state.plans>=1)return null;
+   state.plans++;
+   var route=planVisibilityRoute(g,x,y,gx,gy,pad,seed,null);
+   if(!route)return Infinity;
+   e={goalKey:goalKey,ax:x,ay:y,until:now+.75,points:route.length?route:[{x:gx,y:gy}]};
+   state.entry=e;
+   if(window.__NOVA_TERRAIN_INTELLIGENCE__)window.__NOVA_TERRAIN_INTELLIGENCE__.strategicPlans++;
+   var keys=Object.keys(map);if(keys.length>64)delete map[keys[0]];
+ }
+ var total=0,px=x,py=y;
+ for(var j=0;j<e.points.length;j++){var p=e.points[j];total+=dist(px,py,p.x,p.y);px=p.x;py=p.y;}
+ return Number.isFinite(total)?total:Infinity;
+}
 function cachedWaypoint(g,x,y,gx,gy,pad,seed,oldWaypoint){
   pad=Math.max(5,pad||10);var now=g.time||0,key=cacheKey(seed,pad),map=g.__v1102Routes||(g.__v1102Routes=Object.create(null)),c=map[key],goalTol=Math.max(68,pad*4.5);
   if(c&&(now>c.until||d2(c.gx,c.gy,gx,gy)>goalTol*goalTol)){delete map[key];c=null;}
@@ -284,6 +320,7 @@ wrap('game/engine',function(engine,require){
   };
   Game.prototype.novaRouteLength=function(x,y,gx,gy,pad,seed,wp){return cachedRouteLength(this,x,y,gx,gy,pad,seed,wp);};
   Game.prototype.novaNearbyRouteLength=function(x,y,gx,gy,pad,seed,wp){return cachedNearbyRouteLength(this,x,y,gx,gy,pad,seed,wp);};
+   Game.prototype.novaStrategicRouteCost=function(x,y,gx,gy,pad,seed,goalId){return strategicScratchCost(this,x,y,gx,gy,pad,seed,goalId);};
   Game.prototype.novaInvalidateRoute=function(seed,pad){invalidateRoute(this,seed,pad);};
 
   var oldMove=Game.prototype.moveTank;
@@ -374,7 +411,7 @@ wrap('game/engine',function(engine,require){
 });
 
 window.__NOVA_TERRAIN_INTELLIGENCE_TEST__={
-  obstacleNodes:obstacleNodes,planVisibilityRoute:planVisibilityRoute,cachedRouteLength:cachedRouteLength,cachedNearbyRouteLength:cachedNearbyRouteLength,seedSide:seedSide,segDistanceSq:segDistanceSq,
+  obstacleNodes:obstacleNodes,planVisibilityRoute:planVisibilityRoute,cachedRouteLength:cachedRouteLength,cachedNearbyRouteLength:cachedNearbyRouteLength,strategicScratchCost:strategicScratchCost,seedSide:seedSide,segDistanceSq:segDistanceSq,
   controllerSenses:controllerSenses,observedPoint:observedPoint,tangentEscape:tangentEscape,applyEscape:applyEscape,
   idleControllerGoal:idleControllerGoal,blockedDroneStep:blockedDroneStep,idleRouteStep:idleRouteStep,preserveIdleDroneTerrain:preserveIdleDroneTerrain,
   isControllerId:function(id){return !!CONTROLLER_IDS[id];},limits:{maxObstacles:MAX_OBSTACLES,maxNodes:MAX_NODES}
