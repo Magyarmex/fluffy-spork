@@ -268,3 +268,20 @@ test('rolling witness can relearn sustained acceleration after three slower inte
  assert.ok(w.fast>124*1.44&&w.fast<124*1.46,
   'later sustained visible acceleration must replace the older slower samples');
 });
+
+test('one slow witness interval does not erase two sustained fast intervals',()=>{
+ const {h,classes}=boot(),self=tank(1,0),rival=tank(2,100);
+ self.ai={};
+ const g={time:0,tanks:[self,rival],hasLineOfSight:()=>true,
+  tankSpeed:t=>{if(t===rival)throw Error('private rival speed read');return 124;}};
+ const p={id:'heal',type:'heal',x:400,y:0};
+ h.resourceContest(g,self,p,400,classes);
+ for(const [i,mult] of [1.45,1.05,1.45].entries()){
+  g.time=(i+1)*.2;rival.x+=124*mult*.2;
+  h.resourceContest(g,self,p,400,classes);
+ }
+ const w=self.ai.__v181RivalSpeedWitness['2'];
+ assert.equal(w.confirmed,3);
+ assert.ok(w.fast>124*1.44&&w.fast<124*1.46,
+  'median should preserve two matching fast windows despite one slower interval');
+});
