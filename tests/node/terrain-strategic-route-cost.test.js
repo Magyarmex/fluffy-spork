@@ -209,3 +209,22 @@ test('strategic planner telemetry counts failed attempts and excludes budget-onl
  assert.equal(h.strategicScratchCost(g,-200,0,200,0,23,7,'other'),Infinity);
  assert.equal(stats.strategicPlans,2,'next-window failed search is counted once');
 });
+
+
+test('aggregate scratch budget survives 120 rotating identities and cache evictions',()=>{
+ const w={__novaModules:{}};
+ vm.runInNewContext(fs.readFileSync(path.join(root,'nova-updates/terrain-intelligence-v1.10.2.js'),'utf8'),
+  {window:w,console:{info(){},error(){}},Math,Number,Object,Array});
+ const h=w.__NOVA_TERRAIN_INTELLIGENCE_TEST__,stats=w.__NOVA_TERRAIN_INTELLIGENCE__;
+ const g={time:10,__novaTerrain:[],hasLineOfSight:()=>false,isTerrainSafe:()=>true};
+ for(let round=0;round<3;round++)for(let seed=1;seed<=120;seed++)
+  h.strategicScratchCost(g,-200,0,200,0,23,seed,'unreachable');
+ assert.equal(stats.strategicPlans,64,
+  'cache eviction must not reset the shared per-window CPU search budget');
+ assert.ok(Object.keys(g.__v1102StrategicRoutes).length<=64);
+ g.time=10.8;
+ for(let seed=1;seed<=120;seed++)
+  h.strategicScratchCost(g,-200,0,200,0,23,seed,'unreachable');
+ assert.equal(stats.strategicPlans,128,
+  'a new window may admit at most one additional global batch of 64 plans');
+});
