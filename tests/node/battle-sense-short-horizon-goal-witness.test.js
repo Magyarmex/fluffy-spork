@@ -148,3 +148,42 @@ test('research census: two-heal candidate order across 120 deterministic tank se
   // The intended future property is stable selection under order reversal.
   console.log('PICKUP_ORDER_SEED_CENSUS '+JSON.stringify({seeds:120,changed,outcomes}));
 });
+
+test('research upper bound: independent goal-keyed route snapshots preserve contender order', () => {
+  let plans=0,unstable=0;
+  for (let seed=1;seed<=120;seed++) {
+    const {g,tank,pickups,terrain} = makeScene([0,1]);
+    tank.id=seed;
+    const snapshots=new Map();
+    function independentCost(p) {
+      const key=String(seed)+':'+p.id;
+      if(snapshots.has(key))return snapshots.get(key);
+      plans++;
+      const path=terrain.planVisibilityRoute(g,tank.x,tank.y,p.x,p.y,23,seed,null);
+      if(!path)return Infinity;
+      let cost=0,x=tank.x,y=tank.y;
+      for(const node of path){cost+=Math.hypot(node.x-x,node.y-y);x=node.x;y=node.y;}
+      snapshots.set(key,cost);
+      return cost;
+    }
+    const choices=[];
+    for(const order of [[0,1],[1,0]]) {
+      let choice=null,best=Infinity;
+      for(let tick=0;tick<8;tick++) {
+        choice=null;best=Infinity;
+        for(const index of order) {
+          const cost=independentCost(pickups[index]);
+          if(cost<best){best=cost;choice=pickups[index].id;}
+        }
+      }
+      choices.push(choice);
+    }
+    if(choices[0]!==choices[1])unstable++;
+    assert.ok(Number.isFinite(best),'both fixture goals must remain physically reachable');
+  }
+  // This is a stationary source-planner upper bound. Moving tanks require
+  // position/terrain invalidation and real browser/Android CPU acceptance.
+  console.log('PICKUP_GOAL_SNAPSHOT_RESEARCH '+JSON.stringify({seeds:120,ticksPerOrder:8,plans,unstable}));
+  assert.equal(unstable,0,'independent certified costs must not depend on pickup array order');
+  assert.equal(plans,240,'stationary goal-keyed snapshots plan each goal once per seed');
+});
