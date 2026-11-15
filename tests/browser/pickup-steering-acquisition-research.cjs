@@ -53,7 +53,7 @@ const fs=require('node:fs');
     g.player.x=2200;g.player.y=2200;
     for(const o of other){if(o.t!==g.player){o.t.alive=false;o.t.hp=0;}}
     g.shapes=[];g.bullets=[];g.hash=null;
-    for(const arm of ['direct','three-walls','lower-only','lower-only-even-seed','lower-only-goal-hint','two-heals-lower-first','two-heals-upper-first','two-heals-lower-first-isolated-plans','two-heals-lower-first-budgeted-plans']){
+    for(const arm of ['direct','three-walls','lower-only','lower-only-even-seed','lower-only-goal-hint','two-heals-lower-first','two-heals-upper-first','two-heals-lower-first-isolated-plans','two-heals-lower-first-budgeted-plans','two-heals-lower-first-even-seed','two-heals-upper-first-even-seed','two-heals-lower-first-even-seed-isolated-plans','two-heals-lower-first-even-seed-budgeted-plans']){
      const active=arm==='direct'?[]:walls;
      g.__novaTerrain=active;
      g.hasLineOfSight=(ax,ay,bx,by,pad=0)=>!active.some(w=>segment(ax,ay,bx,by,w,pad));
@@ -65,7 +65,7 @@ const fs=require('node:fs');
      };
      for(const k of Object.keys(bot))if(!(k in baseline))delete bot[k];
      Object.assign(bot,baseline);bot.ai={...baseAI};
-     bot.id=arm==='lower-only-even-seed'?700008:700007;bot.cls='guard';bot.x=-340;bot.y=0;bot.hp=10;bot.maxHp=100;bot.alive=true;
+     bot.id=arm.includes('even-seed')?700008:700007;bot.cls='guard';bot.x=-340;bot.y=0;bot.hp=10;bot.maxHp=100;bot.alive=true;
      // Booted AI hulls can have random IDs and applied stats. Normalize both
      // before every arm so separate Chromium jobs compare the same Guard.
      bot.level=1;bot.tier=0;bot.angle=0;bot.fireCd=0;bot.fireSpin=0;
@@ -84,8 +84,8 @@ const fs=require('node:fs');
      bot.ai.__v181BiasW=0;bot.ai.__v181Mode='none';bot.ai.__v181ResourceId=null;
      const upper={id:'upper',type:'heal',x:340,y:40},lower={id:'lower',type:'heal',x:340,y:-40};
      g.powerups=(arm==='lower-only'||arm==='lower-only-even-seed'||arm==='lower-only-goal-hint')?[lower]:
-      (arm==='two-heals-lower-first'||arm==='two-heals-lower-first-isolated-plans'||arm==='two-heals-lower-first-budgeted-plans')?[lower,upper]:
-      arm==='two-heals-upper-first'?[upper,lower]:[upper];
+      arm.startsWith('two-heals-lower-first')?[lower,upper]:
+      arm.startsWith('two-heals-upper-first')?[upper,lower]:[upper];
      const initialIds=g.powerups.map(p=>p.id),initialCount=g.powerups.length;
      g.time=10;g.__v1102Routes=Object.create(null);g.__v1102RouteContext=null;
      // Isolate each candidate's exact full route before the live AI trial.
@@ -103,17 +103,17 @@ const fs=require('node:fs');
      // candidate. This intentionally spends more planner work; it is NOT a
      // proposed production strategy or a performance-neutral comparison.
      let nextBudgetedAt=-Infinity;
-     g.novaBattlefieldWaypoint=(arm==='two-heals-lower-first-isolated-plans'||arm==='two-heals-lower-first-budgeted-plans')?
+     g.novaBattlefieldWaypoint=(arm.includes('isolated-plans')||arm.includes('budgeted-plans'))?
       function(x,y,gx,gy,pad,seed){
        if(g.powerups.some(p=>p.x===gx&&p.y===gy)){
         const key=String(seed==null?'x':seed)+':'+Math.round((pad||8)/4);
         const cached=g.__v1102Routes&&g.__v1102Routes[key];
         if(cached&&(cached.gx!==gx||cached.gy!==gy)){
          const isOtherPickup=g.powerups.some(p=>p.x===cached.gx&&p.y===cached.gy);
-         if(arm==='two-heals-lower-first-isolated-plans'||
+         if(arm.includes('isolated-plans')||
             (isOtherPickup&&g.time>=nextBudgetedAt)){
           delete g.__v1102Routes[key];
-          if(arm==='two-heals-lower-first-budgeted-plans')nextBudgetedAt=g.time+1.0;
+          if(arm.includes('budgeted-plans'))nextBudgetedAt=g.time+1.0;
          }
         }
        }
@@ -210,7 +210,7 @@ const fs=require('node:fs');
    return logs;
   });
   if(errors.length)throw Error('browser errors: '+JSON.stringify(errors));
-  if(result.length!==9||result.some(r=>!r.trace.length))throw Error('empty composed-game witness');
+  if(result.length!==13||result.some(r=>!r.trace.length))throw Error('empty composed-game witness');
   fs.writeFileSync('pickup-steering-results.json',JSON.stringify({head:process.env.GITHUB_SHA||null,arms:result},null,2)+'\n');
   console.log('PICKUP_STEERING_WITNESS '+JSON.stringify(result));
   for(const arm of result){
@@ -238,11 +238,22 @@ const fs=require('node:fs');
   const budgeted=result.find(r=>r.arm==='two-heals-lower-first-budgeted-plans');
   if(!lowerFirst||!upperFirst||!isolated||!budgeted)
    throw Error('missing controlled candidate-order arms');
+  const lowerFirstEven=result.find(r=>r.arm==='two-heals-lower-first-even-seed');
+  const upperFirstEven=result.find(r=>r.arm==='two-heals-upper-first-even-seed');
+  const isolatedEven=result.find(r=>r.arm==='two-heals-lower-first-even-seed-isolated-plans');
+  const budgetedEven=result.find(r=>r.arm==='two-heals-lower-first-even-seed-budgeted-plans');
+  if(!lowerFirstEven||!upperFirstEven||!isolatedEven||!budgetedEven)
+   throw Error('missing even-seed candidate-order arms');
   console.log('PICKUP_ORDER_DIAGNOSTIC '+JSON.stringify({
    lowerFirst:lowerFirst.selectedResource,upperFirst:upperFirst.selectedResource,
    isolated:isolated.selectedResource,budgeted:budgeted.selectedResource,
    exactCosts:lowerFirst.isolatedCosts,
    choiceFlipped:lowerFirst.selectedResource!==upperFirst.selectedResource,
+   evenSeed:{lowerFirst:lowerFirstEven.selectedResource,upperFirst:upperFirstEven.selectedResource,
+    isolated:isolatedEven.selectedResource,budgeted:budgetedEven.selectedResource,
+    choiceFlipped:lowerFirstEven.selectedResource!==upperFirstEven.selectedResource,
+    routePlans:{lowerFirst:lowerFirstEven.routePlansDelta,upperFirst:upperFirstEven.routePlansDelta,
+     isolated:isolatedEven.routePlansDelta,budgeted:budgetedEven.routePlansDelta}},
    routePlans:{lowerFirst:lowerFirst.routePlansDelta,upperFirst:upperFirst.routePlansDelta,
     isolated:isolated.routePlansDelta,budgeted:budgeted.routePlansDelta}
   }));
