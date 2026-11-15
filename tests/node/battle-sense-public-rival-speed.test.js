@@ -133,6 +133,9 @@ test('witnesses are bounded, identity-scoped and reject unseen prior positions',
  g.time=20.75;h.resourceContest(g,self,p,500,classes);
  assert.equal(self.ai.__v181RivalSpeedWitness['19'].target,replacement,'recycled id cannot reuse prior witness');
  assert.equal(self.ai.__v181RivalSpeedWitness['19'].confirmed,0);
+ assert.doesNotThrow(()=>JSON.stringify(self),'witness identity must not create a serialization cycle');
+ assert.equal(Object.hasOwn(self.ai.__v181RivalSpeedWitness['19'],'target'),true);
+ assert.equal(JSON.stringify(self).includes('target'),false,'identity must not leak into persisted state');
 });
 
 test('witnessed movement inference is stable at 30 and 60 Hz observation schedules',()=>{
