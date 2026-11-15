@@ -83,3 +83,29 @@ test('two critical heals and an unwinnable shield preserve live route ownership 
     assert.equal(g.__v1102StrategicBudget.plans,2,'both heal contenders are independently evaluated');
   }
 });
+
+test('critical heal and competitive shield use bounded scratch routes without corrupting live movement',()=>{
+ for(const shieldFirst of [false,true]){
+  const {g,tank,classes,hooks,terrain}=makeScene([0]);
+  const heal={id:'heal',type:'heal',x:340,y:-40};
+  const shield={id:'shield',type:'shield',x:-50,y:40};
+  g.powerups=shieldFirst?[shield,heal]:[heal,shield];
+  // Both opponents are locally visible, so the shield has legitimate
+  // pressure value rather than being an artificially weak candidate.
+  const enemies=[{id:80,x:-350,y:-100,alive:true},
+   {id:81,x:-350,y:100,alive:true}];
+  g.tanks=[tank,...enemies];
+  g.__novaFairVisibleTanks=g.tanks;
+  const selected=hooks.chooseResource(g,tank,classes);
+  assert.ok(selected&&['heal','shield'].includes(selected.id),
+   'the mixed pair must yield an eligible strategic pickup');
+  assert.equal(terrain.plans,0,
+   'neither occluded mixed contender may mutate the live movement route');
+  assert.equal(Object.keys(g.__v1102Routes||{}).length,0,
+   'both candidate orders preserve live route ownership');
+  assert.ok(g.__v1102StrategicBudget.plans<=2,
+   'critical mixed-resource planning remains bounded at two searches');
+  assert.ok(g.__v1102StrategicBudget.plans>=1,
+   'the fixture must exercise strategic route evaluation');
+ }
+});
