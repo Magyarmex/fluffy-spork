@@ -206,8 +206,8 @@ test('relay-only offscreen rival cannot provide a movement-speed witness',()=>{
   'relay-only information cannot certify exact movement');
  win.__NOVA_FAIR_ENGAGEMENT__.inGameplayViewport=()=>true;
  h.resourceContest(g,self,p,400,classes);
- g.time=1;rival.x=244;h.resourceContest(g,self,p,400,classes);
- g.time=1.2;rival.x=280;h.resourceContest(g,self,p,400,classes);
+ g.time=.8;rival.x=244;h.resourceContest(g,self,p,400,classes);
+ g.time=1;rival.x=280;h.resourceContest(g,self,p,400,classes);
  assert.ok(self.ai.__v181RivalSpeedWitness['2'].confirmed>=2,
   'directly visible movement may be learned after relay-only observations');
 });
