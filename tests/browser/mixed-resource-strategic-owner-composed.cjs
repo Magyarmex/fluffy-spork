@@ -39,9 +39,9 @@ const {chromium}=require('playwright');
     g.tanks=[bot,...enemies];g.__novaFairVisibleTanks=g.tanks;
     g.bullets=[];
     // Force occlusion for pickup paths only; the two local opponents remain visible.
-    g.hasLineOfSight=(ax,ay,bx,by)=>bx<0&&bx!==-50;
+    g.hasLineOfSight=(ax,ay,bx,by)=>bx<0&&bx!==-65;
     const heal={id:'heal',type:'heal',x:340,y:-40};
-    const shield={id:'shield',type:'shield',x:-50,y:40};
+    const shield={id:'shield',type:'shield',x:-65,y:40};
     for(const order of ['heal-first','shield-first']){
      g.powerups=order==='heal-first'?[heal,shield]:[shield,heal];
      const sentinel={gx:900,gy:900,at:10};
