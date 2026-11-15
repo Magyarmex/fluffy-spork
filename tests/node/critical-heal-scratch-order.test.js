@@ -188,6 +188,7 @@ test('research: global scratch budget fairness across update orders and subseque
     const currentBudget=g.__v1102StrategicBudget;
     const after=currentBudget?.plans||0;
     const plansSpent=currentBudget===priorBudget?after-before:after;
+    assert.ok(plansSpent>=0&&plansSpent<=2,'each bot must spend zero to two scratch plans per window');
     first.push({id:bot.id,choice,plansSpent,atCap:after>=64});
    }
    const firstPlans=g.__v1102StrategicBudget?.plans||0;
@@ -204,6 +205,7 @@ test('research: global scratch budget fairness across update orders and subseque
     const currentBudget=g.__v1102StrategicBudget;
     const after=currentBudget?.plans||0;
     const plansSpent=currentBudget===priorBudget?after-before:after;
+    assert.ok(plansSpent>=0&&plansSpent<=2,'each bot must spend zero to two scratch plans per window');
     second.push({id:bot.id,choice,plansSpent,atCap:after>=64});
    }
    const secondPlans=g.__v1102StrategicBudget?.plans||0;
@@ -218,6 +220,7 @@ test('research: global scratch budget fairness across update orders and subseque
     const currentBudget=g.__v1102StrategicBudget;
     const after=currentBudget?.plans||0;
     const plansSpent=currentBudget===priorBudget?after-before:after;
+    assert.ok(plansSpent>=0&&plansSpent<=2,'each bot must spend zero to two scratch plans per window');
     third.push({id:bot.id,choice,plansSpent,atCap:after>=64});
    }
    const thirdPlans=g.__v1102StrategicBudget?.plans||0;
