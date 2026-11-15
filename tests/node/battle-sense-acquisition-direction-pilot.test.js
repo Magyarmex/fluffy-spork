@@ -43,6 +43,9 @@ function arm(hz,direction,policy){
    for(let frame=0;frame<Math.round(8*hz);frame++){
     g.time=frame*dt;
     if(frame%Math.round(hz/5)===0){
+     const fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT__;
+     g.__novaFairVisibleTanks=(!fair||fair.inGameplayViewport(g,bot,rival))
+      ?[bot,rival]:[bot];
      // The only policy difference is whether this observer may retain
      // legitimate witnessed movement across strategic decisions.
      if(policy==='class')delete bot.ai.__v181RivalSpeedWitness;
