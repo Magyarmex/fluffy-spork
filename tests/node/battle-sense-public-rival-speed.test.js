@@ -90,17 +90,17 @@ test('seeded pickup decisions ignore rival private upgrades across 1200 public s
 });
 
 test('observer learns sustained visible running without private stats or teleport leaps',()=>{
- const {h,classes}=boot(),self=tank(1,0),rival=tank(2,100);
+ const {h,classes}=boot(),self=tank(1,0),rival=tank(2,55);
  const g={time:0,tanks:[self,rival],hasLineOfSight:()=>true,
   tankSpeed:t=>{if(t===rival)throw Error('private rival speed read');return 124;}};
  self.ai={};const p={id:5,type:'heal',x:400,y:0};
  const baseline=h.resourceContest(g,self,p,400,classes);
- rival.stats.speed=8;g.time=.25;rival.x=145;
+ rival.stats.speed=8;g.time=.25;rival.x=100;
  h.resourceContest(g,self,p,400,classes);
  assert.equal(self.ai.__v181RivalSpeedWitness['2'].confirmed,1,'first visible sample cannot certify upgraded running');
- g.time=.5;rival.x=190;
+ g.time=.5;rival.x=145;
  h.resourceContest(g,self,p,400,classes);
- g.time=.75;rival.x=235;
+ g.time=.75;rival.x=190;
  const learned=h.resourceContest(g,self,p,400,classes);
  const learnedWitness=self.ai.__v181RivalSpeedWitness;
  self.ai={};const classOnly=h.resourceContest(g,self,p,400,classes);
