@@ -124,8 +124,10 @@ test('critical-heal scratch planning is goal-keyed, bounded and never evicts mov
  assert.equal(h.strategicScratchCost(g,-200,0,200,-40,23,7,'lower'),null,
   'newly blocked route legs must invalidate cached strategic pricing without a second plan in the same window');
  g.hasLineOfSight=originalSight;
- assert.equal(h.strategicScratchCost(g,-200,0,200,40,23,7,'upper'),null,
-  'second independent plan must respect one-plan-per-window budget');
+ const second=h.strategicScratchCost(g,-200,0,200,40,23,7,'upper');
+ assert.ok(Number.isFinite(second),'second distinct heal can receive one independent plan');
+ assert.equal(h.strategicScratchCost(g,-200,0,200,60,23,7,'third'),null,
+  'third independent plan must respect two-plans-per-window budget');
  assert.equal(h.strategicScratchCost(g,-130,0,200,-40,23,7,'lower'),null,
   'moving more than 60 units must not reuse an anchored route or exceed the scratch budget');
  g.time=10.8;
@@ -187,7 +189,7 @@ test('scratch route cost respects representative class clearances without certif
    'a physically blocked direct line must never receive a straight-line price');
   if(Number.isFinite(cost)){
    const entries=Object.values(g.__v1102StrategicRoutes||{});
-   assert.ok(entries.some(e=>e.entry&&e.entry.points.length>1),
+   assert.ok(entries.some(e=>Object.values(e.entries||{}).some(route=>route.points.length>1)),
     'a finite occluded route must have verified intermediate waypoints');
   }
  }
@@ -203,11 +205,13 @@ test('strategic planner telemetry counts failed attempts and excludes budget-onl
  assert.equal(stats.strategicPlans,0);
  assert.equal(h.strategicScratchCost(g,-200,0,200,0,23,7,'unreachable'),Infinity);
  assert.equal(stats.strategicPlans,1,'failed search still consumed planner work');
- assert.equal(h.strategicScratchCost(g,-200,0,200,0,23,7,'other'),null);
- assert.equal(stats.strategicPlans,1,'budget refusal does not run another search');
+ assert.equal(h.strategicScratchCost(g,-200,0,200,0,23,7,'other'),Infinity);
+ assert.equal(stats.strategicPlans,2,'second independent goal consumes the second allowed plan');
+ assert.equal(h.strategicScratchCost(g,-200,0,200,0,23,7,'third'),null);
+ assert.equal(stats.strategicPlans,2,'budget refusal does not run another search');
  g.time=10.8;
  assert.equal(h.strategicScratchCost(g,-200,0,200,0,23,7,'other'),Infinity);
- assert.equal(stats.strategicPlans,2,'next-window failed search is counted once');
+ assert.equal(stats.strategicPlans,3,'next-window failed search is counted once');
 });
 
 
