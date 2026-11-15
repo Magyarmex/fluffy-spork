@@ -57,3 +57,16 @@ test('allies, invisible rivals and unknown class mobility remain bounded',()=>{
  const value=h.resourceContest(g,self,p,300,classes);
  assert.ok(Number.isFinite(value)&&value>=0&&value<=.55);
 });
+
+test('two public heal choices are invariant to unseen rival upgrades',()=>{
+ const {h,classes}=boot(),self=tank(1,0),rival=tank(2,120);
+ self.hp=20;
+ const near={id:'near',type:'heal',x:300,y:0},far={id:'far',type:'heal',x:-480,y:0};
+ const g={tanks:[self,rival],powerups:[near,far],bullets:[],hasLineOfSight:()=>true,
+  tankSpeed:t=>{if(t===rival)throw Error('private rival speed read');return 124;}};
+ const initial=h.chooseResource(g,self,classes);
+ assert.equal(initial?.id,'near');
+ rival.stats.speed=8;rival.perk='speed';rival.hasteT=20;
+ assert.equal(h.chooseResource(g,self,classes)?.id,'near',
+  'unseen speed upgrades cannot flip the selected public healing pickup');
+});
