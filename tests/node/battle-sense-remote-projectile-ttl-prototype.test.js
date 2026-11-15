@@ -72,3 +72,12 @@ test('shell retains burst danger even when its ordinary TTL is shorter than trav
   g.bullets[0].shell=false;
   assert.equal(choose(g,tank),near,'ordinary projectile expires without burst');
 });
+
+test('short-lived moving bullet is ignored only for remote pickup utility',()=>{
+  const {g,tank,near,far,choose}=fixture();
+  const bullet={id:96,ownerId:999,x:400,y:0,vx:600,vy:0,ttl:.25};
+  g.bullets=[bullet];
+  assert.equal(choose(g,tank),near,'short-lived incoming round expires before remote acquisition');
+  bullet.ttl=1;
+  assert.equal(choose(g,tank),far,'long-lived incoming round retains predictive danger');
+});
