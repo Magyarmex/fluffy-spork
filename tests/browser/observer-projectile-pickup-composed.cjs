@@ -83,14 +83,16 @@ const {chromium}=require('playwright');
    g.powerups=[near,{id:'safe',type:'heal',x:600,y:220}];
    Object.assign(bot,{x:0,y:0,vx:0,vy:0,hasteT:0,perk:null,gene:null,
     stats:{...bot.stats,speed:0}});
-   for(const policy of ['single','continuous']){
+   for(const policy of ['single-departing','continuous-departing','continuous-incoming']){
     for(let step=0;step<=20;step++){
      const elapsed=step*.1;
-     const births=policy==='single'?[0]:Array.from(
+     const births=policy.startsWith('single')?[0]:Array.from(
       {length:Math.floor((elapsed+1e-9)/cadence)+1},(_,i)=>i*cadence);
      g.bullets=births.map((birth,i)=>({
-      id:100000+i,ownerId:999,x:birthX+speed*(elapsed-birth),y:0,
-      vx:speed,vy:0,ttl:10
+      id:100000+i,ownerId:999,
+      x:(policy==='continuous-incoming'?800:birthX)+
+       (policy==='continuous-incoming'?-speed:speed)*(elapsed-birth),y:0,
+      vx:policy==='continuous-incoming'?-speed:speed,vy:0,ttl:10
      })).filter(b=>b.x<1600);
      const arrival=Math.max(0,Math.hypot(near.x-bot.x,near.y-bot.y)-50)/
       (124*1.18*(1+.045*8)*1.45*1.9*1.14*1.10);
@@ -115,7 +117,7 @@ const {chromium}=require('playwright');
    try{
     g.__novaTerrain=[];g.hash=null;g.shapes=[];
     g.player.x=2200;g.player.y=2200;
-    for(const policy of ['single','continuous']){
+    for(const policy of ['single-departing','continuous-departing','continuous-incoming']){
      Object.assign(bot,state);
      bot.ai={...ai};
      Object.assign(bot,{id:700007,cls:'guard',x:0,y:0,vx:0,vy:0,
@@ -135,11 +137,13 @@ const {chromium}=require('playwright');
      for(let i=0;i<480;i++){
       const elapsed=i*dt;
       g.time=20+elapsed;
-      const births=policy==='single'?[0]:Array.from(
+      const births=policy.startsWith('single')?[0]:Array.from(
        {length:Math.floor((elapsed+1e-9)/cadence)+1},(_,j)=>j*cadence);
       g.bullets=births.map((birth,j)=>({
-       id:200000+j,ownerId:999,x:birthX+speed*(elapsed-birth),y:0,
-       vx:speed,vy:0,ttl:10
+       id:200000+j,ownerId:999,
+       x:(policy==='continuous-incoming'?800:birthX)+
+        (policy==='continuous-incoming'?-speed:speed)*(elapsed-birth),y:0,
+       vx:policy==='continuous-incoming'?-speed:speed,vy:0,ttl:10
       })).filter(b=>b.x<1600);
       aiOwner.updateAI(bot,g,dt);
       if(bot.ai.__v181Mode==='resource')resourceFrames++;
