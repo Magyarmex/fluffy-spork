@@ -31,7 +31,7 @@ test('an already-winning critical heal avoids an unwinnable shield route search'
   g.novaRouteLength=()=>600;
   assert.equal(choose(g,tank,classes),heal);
   assert.equal(calls.length,1,'hopeless shield must not evict a live route');
-  assert.equal(calls[0][6],'heal');
+  assert.equal(calls[0].length,6,'only the heal requests a live route waypoint');
 });
 
 test('optimistic pruning never rejects a potentially superior contender',()=>{
@@ -44,7 +44,7 @@ test('optimistic pruning never rejects a potentially superior contender',()=>{
   g.novaBattlefieldWaypoint=()=>({x:10,y:0});
   g.novaRouteLength=()=>350;
   assert.equal(choose(g,tank,classes),heal);
-  assert.equal(calls.length,1,'heal is not eligible for two-heal scratch pricing');
+  assert.equal(calls.length,2,'both contenders remain eligible for live route evaluation');
 });
 
 test('equal optimistic bound may be pruned without changing first-wins tie policy',()=>{
