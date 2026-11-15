@@ -19,10 +19,10 @@ const {chromium}=require('playwright');
    const h=window.__NOVA_BATTLE_SENSE_TEST__,classes=window.__novaMakeRequire('')('game/classes');
    const bot=g.tanks.find(t=>t?.ai&&!t.isPlayer);
    if(!h?.resourceContest||!bot||!classes.CLASSES.guard)throw Error('missing composed source');
-   const saved={tanks:g.tanks,visible:g.__novaFairVisibleTanks,los:g.hasLineOfSight,speed:g.tankSpeed};
+   const saved={tanks:g.tanks,visible:g.__novaFairVisibleTanks,powerups:g.powerups,los:g.hasLineOfSight,speed:g.tankSpeed};
    const original={...bot};let privateCalls=0;
    try{
-    Object.assign(bot,{id:700001,cls:'guard',x:0,y:0,alive:true,stats:{...bot.stats,speed:0}});
+    Object.assign(bot,{id:700001,cls:'guard',x:0,y:0,alive:true,hp:20,maxHp:100,stats:{...bot.stats,speed:0}});
     const rival={id:700002,cls:'guard',x:150,y:0,alive:true,stats:{speed:0},vx:0,vy:0};
     const pickup={id:'heal',type:'heal',x:300,y:0};
     g.tanks=[bot,rival];g.__novaFairVisibleTanks=g.tanks;g.hasLineOfSight=()=>true;
@@ -31,13 +31,16 @@ const {chromium}=require('playwright');
     rival.stats.speed=8;rival.perk='speed';rival.hasteT=10;
     const hiddenChanged=h.resourceContest(g,bot,pickup,300,classes);
     if(Math.abs(baseline-hiddenChanged)>1e-10||privateCalls)throw Error('hidden stat changed pickup contest');
+    g.powerups=[pickup,{id:'far',type:'heal',x:-480,y:0}];
+    const choice=window.__NOVA_BATTLE_SENSE_TEST__.chooseResource(g,bot,classes)?.id;
+    if(choice!=='heal')throw Error('hidden speed changed healing choice: '+choice);
     rival.cls='scout';
     const classChanged=h.resourceContest(g,bot,pickup,300,classes);
     if(!(classChanged>baseline))throw Error('public class mobility not respected');
     return {baseline,hiddenChanged,classChanged,privateCalls};
    }finally{
     Object.assign(bot,original);g.tanks=saved.tanks;g.__novaFairVisibleTanks=saved.visible;
-    g.hasLineOfSight=saved.los;g.tankSpeed=saved.speed;
+    g.powerups=saved.powerups;g.hasLineOfSight=saved.los;g.tankSpeed=saved.speed;
    }
   });
   if(errors.length)throw Error('page errors '+JSON.stringify(errors));
