@@ -199,7 +199,13 @@ function strategicScratchCost(g,x,y,gx,gy,pad,seed,goalId){
    state.plans++;
    var route=planVisibilityRoute(g,x,y,gx,gy,pad,seed,null);
    if(!route)return Infinity;
-   e={goalKey:goalKey,ax:x,ay:y,until:now+.75,points:route.length?route:[{x:gx,y:gy}]};
+   var points=route.length?route:[{x:gx,y:gy}],cx=x,cy=y;
+   for(var ri=0;ri<points.length;ri++){
+     var node=points[ri];
+     if(!node||!routeSafe(g,node.x,node.y,pad)||!routeVisible(g,cx,cy,node.x,node.y,pad))return Infinity;
+     cx=node.x;cy=node.y;
+   }
+   e={goalKey:goalKey,ax:x,ay:y,until:now+.75,points:points};
    state.entry=e;
    if(window.__NOVA_TERRAIN_INTELLIGENCE__)window.__NOVA_TERRAIN_INTELLIGENCE__.strategicPlans++;
    var keys=Object.keys(map);if(keys.length>64)delete map[keys[0]];
