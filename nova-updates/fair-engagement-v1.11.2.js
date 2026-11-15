@@ -44,6 +44,12 @@ function viewportContains(observer,target,e){
   return !!observer&&!!target&&observer.id!==target.id&&alive(target)&&
     Math.abs(target.x-observer.x)<=e.x&&Math.abs(target.y-observer.y)<=e.y;
 }
+/* Shared point-only viewport contract for projectiles: bullet and tank IDs occupy different namespaces, so a tank-identity predicate must not decide projectile visibility. */
+function inGameplayWorldPoint(g,observer,x,y){
+ if(!g||!observer||!Number.isFinite(x)||!Number.isFinite(y))return false;
+ var e=viewportHalfExtents(g);
+ return Math.abs(x-observer.x)<=e.x&&Math.abs(y-observer.y)<=e.y;
+}
 function inGameplayViewport(g,observer,target){
   if(!g||!observer||!target||observer.id===target.id||!alive(target))return false;
   return viewportContains(observer,target,viewportHalfExtents(g));
@@ -182,7 +188,7 @@ function prepareClosePlayerAim(g){
 window.__NOVA_VERSION=VERSION;
 window.__NOVA_FAIR_ENGAGEMENT__={
   version:VERSION,codename:CODENAME,date:'2026-08-30',closeNodeRescues:0,targetReplans:0,
-  inGameplayViewport:inGameplayViewport,gameplayViewportFilter:gameplayViewportFilter,
+  inGameplayViewport:inGameplayViewport,inGameplayWorldPoint:inGameplayWorldPoint,gameplayViewportFilter:gameplayViewportFilter,
   contract:{gameplayViewportParity:true,adaptiveWidthHeight:true,adaptiveRotation:true,adaptiveZoom:true,globalMinimapRadar:false,spotterRelayException:true,playerPriorityBonus:false,saturationIsSoft:true,closeHeldAimRemainsCommand:true,releaseStillRecalls:true}
 };
 window.__NOVA_FAIR_ENGAGEMENT_TEST__={
