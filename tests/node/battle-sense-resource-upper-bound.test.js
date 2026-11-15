@@ -27,15 +27,16 @@ test('an already-winning critical heal avoids an unwinnable shield route search'
   g.powerups=[heal,shield];
   let losChecks=0;
   g.hasLineOfSight=()=>{losChecks++;return false;};
-  const calls=[];
+  const calls=[];let liveCalls=0;
   g.novaStrategicRouteCost=(...args)=>{calls.push(args);return 250;};
-  g.novaBattlefieldWaypoint=(...args)=>{calls.push(args);return {x:10,y:0};};
+  g.novaBattlefieldWaypoint=(...args)=>{liveCalls++;return {x:10,y:0};};
   g.novaRouteLength=()=>600;
   assert.equal(choose(g,tank,classes),heal);
   assert.equal(calls.length,1,'hopeless shield must not evict a live route');
   assert.equal(stats.prunedRoutes,1,'record actual skipped strategic work');
-  assert.equal(losChecks,3,'one occlusion probe per candidate plus the selected route check');
-  assert.equal(calls[0].length,6,'only the heal requests a live route waypoint');
+  assert.equal(losChecks,2,'one occlusion probe per candidate; scratch pricing needs no live waypoint check');
+  assert.equal(calls[0].length,7,'only the heal requests goal-keyed scratch pricing');
+  assert.equal(liveCalls,0,'critical mixed pricing must never mutate the live movement route');
 });
 
 test('optimistic pruning never rejects a potentially superior contender',()=>{
