@@ -174,3 +174,23 @@ test('single impulse cannot certify sustained running; class evolution resets wi
  assert.equal(self.ai.__v181RivalSpeedWitness['2'].confirmed,0,
   'visible class evolution must reset the old mobility witness');
 });
+
+test('observer sampling does not starve at 20–120 Hz and legal AI think cadences',()=>{
+ const {h,classes}=boot();
+ for(const fps of [20,30,40,60,90,120])for(const think of [.16,.178,.196,.214,.232]){
+  const self=tank(1,0),rival=tank(2,100);self.ai={};
+  const g={time:0,tanks:[self,rival],hasLineOfSight:()=>true,tankSpeed:()=>124};
+  const p={id:'heal',type:'heal',x:400,y:0};
+  h.resourceContest(g,self,p,400,classes);
+  let next=0;
+  for(let frame=1;frame<=fps*4;frame++){
+   const time=frame/fps;
+   if(time+1e-9<next)continue;
+   next=time+think;g.time=time;rival.x=100+180*time;
+   h.resourceContest(g,self,p,400,classes);
+  }
+  const w=self.ai.__v181RivalSpeedWitness['2'];
+  assert.ok(w?.confirmed>=2,
+   'valid sustained movement must be witnessed at '+fps+' Hz and think '+think);
+ }
+});
