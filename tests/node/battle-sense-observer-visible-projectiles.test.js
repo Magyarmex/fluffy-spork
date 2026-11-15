@@ -96,3 +96,12 @@ test('offscreen approaching round cannot influence a public heal before entering
   assert.equal(window.__NOVA_FAIR_ENGAGEMENT__.inGameplayWorldPoint(g,tank,400,0),true);
   assert.equal(choose(g,tank,classes),far,'visible approaching round retains predictive lane danger');
 });
+
+test('local combat flank dodge still reacts to nearby observed projectile',()=>{
+  const {g,tank,window}=scene();
+  const saferSide=window.__NOVA_BATTLE_SENSE_TEST__.saferSide;
+  assert.equal(saferSide(g,tank,1,0),0,'no projectile means no lane bias');
+  g.bullets=[{id:123,ownerId:999,x:110,y:115,vx:0,vy:0,ttl:1}];
+  assert.equal(saferSide(g,tank,1,0),-1,
+    'resource-only observer gating must not disable immediate combat flank dodge');
+});
