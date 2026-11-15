@@ -102,6 +102,7 @@ const {chromium}=require('playwright');
        return originals.waypoint.call(this,x,y,gx,gy,pad,seed);
       }:originals.waypoint;
      let state=0x6d2b79f5;Math.random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return(state>>>0)/4294967296;};
+     const plansBefore=window.__NOVA_TERRAIN_INTELLIGENCE__?.plans||0;
      const trace=[],dt=1/60,steps=720;
      let invalidPositions=0,invalidSegments=0,resourceFrames=0,acquiredAt=null,firstChosen=null,acquiredId=null;
      const decisionTransitions=[];let priorMode=null,priorResource=null,minimumGoalDistance=Infinity;
@@ -140,6 +141,7 @@ const {chromium}=require('playwright');
       acquired:g.powerups.length<initialCount,acquiredAt,invalidPositions,invalidSegments,
       resourceFrames,decisionTransitions,minimumGoalDistance:+minimumGoalDistance.toFixed(3),final:{x:bot.x,y:bot.y,hp:bot.hp},
       routePlans:window.__NOVA_TERRAIN_INTELLIGENCE__?.plans,
+      routePlansDelta:(window.__NOVA_TERRAIN_INTELLIGENCE__?.plans||0)-plansBefore,
       trace});
     }
    }finally{
