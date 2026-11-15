@@ -39,7 +39,7 @@ test('real composed moveTank supplies public rival movement witnesses at 30/60 H
     if(frame%(hz/5)===0)contest();
    }
    const w=bot.ai.__v181RivalSpeedWitness?.[String(rival.id)];
-   assert.ok(w?.confirmed>=2,'must witness repeated actual movement');
+   assert.ok(w?.confirmed>=3,'must witness three actual movement intervals');
    assert.ok(rival.x>200,'rival must physically move');
    assert.doesNotThrow(()=>JSON.stringify(bot),'witnesses must not corrupt persistence');
    return {hz,confirmed:w.confirmed,x:+rival.x.toFixed(3)};
