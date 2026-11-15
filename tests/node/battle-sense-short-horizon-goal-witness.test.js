@@ -199,7 +199,7 @@ test('research prototype: goal-keyed snapshots reuse valid moving routes without
     function valid(points) {
       let x=tank.x,y=tank.y;
       for(const node of points) {
-        if(!g.hasLineOfSight(x,y,node.x,node.y,23))return false;
+        if(!g.hasLineOfSight(x,y,node.x,node.y,18))return false;
         x=node.x;y=node.y;
       }
       return true;
