@@ -2,6 +2,7 @@
 // Research-only composed-game acquisition witness for issue #979.
 // The synthetic walls are controlled fixtures; results are NOT natural-match incidence.
 const {chromium}=require('playwright');
+const fs=require('node:fs');
 (async()=>{
  const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
  try{
@@ -210,6 +211,7 @@ const {chromium}=require('playwright');
   });
   if(errors.length)throw Error('browser errors: '+JSON.stringify(errors));
   if(result.length!==9||result.some(r=>!r.trace.length))throw Error('empty composed-game witness');
+  fs.writeFileSync('pickup-steering-results.json',JSON.stringify({head:process.env.GITHUB_SHA||null,arms:result},null,2)+'\n');
   console.log('PICKUP_STEERING_WITNESS '+JSON.stringify(result));
   for(const arm of result){
    if(!arm.acquired||arm.acquiredAt==null||arm.acquiredAt>12)
