@@ -88,3 +88,23 @@ test('seeded pickup decisions ignore rival private upgrades across 1200 public s
   assert.equal(second,first,'private rival speed altered public scene '+i);
  }
 });
+
+test('observer learns sustained visible running without private stats or teleport leaps',()=>{
+ const {h,classes}=boot(),self=tank(1,0),rival=tank(2,100);
+ const g={time:0,tanks:[self,rival],hasLineOfSight:()=>true,
+  tankSpeed:t=>{if(t===rival)throw Error('private rival speed read');return 124;}};
+ self.ai={};const p={id:5,type:'heal',x:400,y:0};
+ const baseline=h.resourceContest(g,self,p,400,classes);
+ rival.stats.speed=8;g.time=.25;rival.x=145;
+ assert.equal(h.resourceContest(g,self,p,400,classes),baseline,'one observed sample is insufficient');
+ g.time=.5;rival.x=190;
+ const learned=h.resourceContest(g,self,p,400,classes);
+ assert.ok(learned>baseline,'two witnessed fast samples should increase contest pressure');
+ g.time=.75;rival.x=700;
+ h.resourceContest(g,self,p,400,classes);
+ g.time=1;rival.x=745;
+ assert.ok(Number.isFinite(h.resourceContest(g,self,p,400,classes)),'teleport cannot poison speed estimate');
+ g.time=3;rival.x=750;
+ const stale=h.resourceContest(g,self,p,400,classes);
+ assert.ok(Number.isFinite(stale),'stale witness resets safely');
+});
