@@ -218,6 +218,9 @@ test('research: global scratch budget fairness across update orders and subseque
     firstChosen:first.length-firstDeferred.length,
     secondChosen:second.filter(item=>item.choice).length,
     thirdChosen:third.filter(item=>item.choice).length,
+    firstPlanSpends:first.map(item=>item.plansSpent),
+    secondPlanSpends:second.map(item=>item.plansSpent),
+    thirdPlanSpends:third.map(item=>item.plansSpent),
     firstDeferred,secondDeferred:second.filter(item=>!item.choice).map(item=>item.id),
     thirdDeferred:third.filter(item=>!item.choice).map(item=>item.id),
     livePlannerCalls:stats.plans});
