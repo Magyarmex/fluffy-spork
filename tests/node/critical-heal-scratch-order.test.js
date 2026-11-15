@@ -129,3 +129,20 @@ test('research: pre-existing movement routes may influence first-contender prici
  console.log('SCRATCH_PREWARMED_ROUTE_ORDER_RESEARCH '+JSON.stringify({seeds:120,choices:chosen,flips}));
  // Observational falsifier: do not freeze a possibly biased outcome as golden.
 });
+
+test('critical two-heal pricing preserves a prewarmed movement route and does not create one when absent',()=>{
+ for(const order of [[0,1],[1,0]]){
+  for(const prewarm of [false,true]){
+   const {g,tank,classes,hooks}=makeScene(order);
+   if(prewarm){
+    const wp=g.novaBattlefieldWaypoint(tank.x,tank.y,340,0,23,tank.id);
+    assert.ok(wp,'a real unrelated movement route must exist before scoring');
+   }
+   const before=JSON.stringify(g.__v1102Routes||{});
+   const selected=hooks.chooseResource(g,tank,classes);
+   assert.ok(selected,'the critical Guard must retain a healing choice');
+   assert.equal(JSON.stringify(g.__v1102Routes||{}),before,
+    'strategic evaluation must not replace, advance or create a live movement route');
+  }
+ }
+});
