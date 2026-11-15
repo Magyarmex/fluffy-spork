@@ -128,3 +128,12 @@ test('shipping class movement multipliers do not exceed the conservative evoluti
   assert.ok(Math.max(...values)<=1.18,
     'a faster class requires revisiting the remote-pickup earliest-arrival ceiling');
 });
+
+test('non-heal resources retain existing visible projectile risk while the prototype is heal-scoped',()=>{
+  const {g,tank,choose}=fixture();
+  g.powerups=[{id:'shield-near',type:'shield',x:350,y:0},{id:'shield-far',type:'shield',x:380,y:0}];
+  assert.equal(choose(g,tank).id,'shield-near','baseline should prefer closer shield');
+  g.bullets=[{id:105,ownerId:999,x:350,y:0,vx:0,vy:0,ttl:.1}];
+  assert.equal(choose(g,tank).id,'shield-far',
+    'short-lived projectile filtering must not silently change non-heal resource decisions');
+});
