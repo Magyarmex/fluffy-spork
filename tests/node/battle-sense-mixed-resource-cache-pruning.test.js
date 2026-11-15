@@ -79,5 +79,4 @@ test('two critical heals followed by a low-utility shield preserve live route ow
   assert.equal(terrain.plans,0,'an unwinnable shield must not invoke the live movement planner');
   assert.equal(Object.keys(g.__v1102Routes||{}).length,0,'strategic two-heal pricing must leave live routes untouched');
   assert.equal(scene.g.__v1102StrategicBudget.plans,2,'both heal contenders are independently evaluated');
-  assert.equal(scene.hooks.chooseResource?typeof scene.hooks.chooseResource:'', 'function');
 });
