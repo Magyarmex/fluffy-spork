@@ -52,18 +52,20 @@ const {chromium}=require('playwright');
      ['wide-special',1600,900,1,[special],false,'far'],
      ['research-single-shot-offlane',1600,900,1,[minigunTrain[0]],false,null],
      ['research-minigun-stream',1600,900,1,minigunTrain,false,null],
+     ['research-minigun-stream-nearby',1600,900,1,minigunTrain,false,null],
      ['zoom-out-visible',900,700,.7,[bullet],false,'far'],
      ['zoom-in-unseen',900,700,1.2,[bullet],false,'near'],
      ['wide-terrain-hidden',1600,900,1,[bullet],true,'near']
     ]){
      g.w=w;g.h=h;g.cam.zoom=zoom;g.bullets=bullets;
+     bot.x=label==='research-minigun-stream-nearby'?450:0;bot.y=0;
      // Only the observational volley arm compares a same-distance off-lane heal.
      const safeHeal={id:'safe',type:'heal',x:600,y:220};
      g.powerups=label.startsWith('research-')?[near,safeHeal]:[near,far];
      g.hasLineOfSight=occluded?(ax,ay,bx,by)=>!(ax===bot.x&&ay===bot.y&&bx===bullet.x&&by===bullet.y):()=>true;
      const observed=fair.inGameplayWorldPoint(g,bot,bullet.x,bullet.y);
      const selected=choose(g,bot,classes)?.id||null;
-     const diagnostic=label.startsWith('research-')?{bulletCount:bullets.length,bulletSpeed:gunSpeed,baselineRisk:window.__NOVA_BATTLE_SENSE_TEST__.laneRisk(g,near.x,near.y,bot.id,bot),projectedRisk:window.__NOVA_BATTLE_SENSE_TEST__.laneRisk(g,near.x,near.y,bot.id,bot,.8),offLaneRisk:window.__NOVA_BATTLE_SENSE_TEST__.laneRisk(g,safeHeal.x,safeHeal.y,bot.id,bot)}:null;
+     const diagnostic=label.startsWith('research-')?{observerX:bot.x,bulletCount:bullets.length,bulletSpeed:gunSpeed,baselineRisk:window.__NOVA_BATTLE_SENSE_TEST__.laneRisk(g,near.x,near.y,bot.id,bot),projectedRisk:window.__NOVA_BATTLE_SENSE_TEST__.laneRisk(g,near.x,near.y,bot.id,bot,.8),offLaneRisk:window.__NOVA_BATTLE_SENSE_TEST__.laneRisk(g,safeHeal.x,safeHeal.y,bot.id,bot)}:null;
      results.push({label,w,h,zoom,observed,selected,expected,...(diagnostic||{})});
      if(expected!==null&&selected!==expected)throw Error('wrong composed-game pickup choice: '+JSON.stringify(results.at(-1)));
      if(label.includes('unseen')&&observed)throw Error('fixture bullet unexpectedly visible: '+label);
@@ -78,7 +80,7 @@ const {chromium}=require('playwright');
    return results;
   });
   if(errors.length)throw Error('browser errors: '+JSON.stringify(errors));
-  if(report.length!==12)throw Error('missing composed-game acceptance or research arms');
+  if(report.length!==13)throw Error('missing composed-game acceptance or research arms');
   console.log('OBSERVER_PROJECTILE_COMPOSED_GAME '+JSON.stringify(report));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
