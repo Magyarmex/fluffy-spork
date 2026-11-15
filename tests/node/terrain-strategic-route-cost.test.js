@@ -214,6 +214,8 @@ test('strategic planner telemetry counts failed attempts and excludes budget-onl
  assert.equal(stats.strategicPlans,2,'second independent goal consumes the second allowed plan');
  assert.equal(h.strategicScratchCost(g,-200,0,200,0,23,7,'third'),null);
  assert.equal(stats.strategicPlans,2,'budget refusal does not run another search');
+ assert.equal(stats.strategicLocalDeferrals,1,'third goal is denied by the per-tank limit');
+ assert.equal(stats.strategicGlobalDeferrals,0,'local refusal must not masquerade as global saturation');
  g.time=10.8;
  assert.equal(h.strategicScratchCost(g,-200,0,200,0,23,7,'other'),Infinity);
  assert.equal(stats.strategicPlans,3,'next-window failed search is counted once');
@@ -230,6 +232,7 @@ test('aggregate scratch budget survives 120 rotating identities and cache evicti
   h.strategicScratchCost(g,-200,0,200,0,23,seed,'unreachable');
  assert.equal(stats.strategicPlans,64,
   'cache eviction must not reset the shared per-window CPU search budget');
+ assert.ok(stats.strategicGlobalDeferrals>0,'global exhaustion must be measurable separately');
  assert.ok(Object.keys(g.__v1102StrategicRoutes).length<=64);
  g.time=10.8;
  for(let seed=1;seed<=120;seed++)
