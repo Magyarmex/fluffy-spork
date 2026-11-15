@@ -23,7 +23,7 @@ const {chromium}=require('playwright');
    const original={...bot};let privateCalls=0;
    try{
     Object.assign(bot,{id:700001,cls:'guard',x:0,y:0,alive:true,hp:20,maxHp:100,stats:{...bot.stats,speed:0}});
-    const rival={id:700002,cls:'guard',x:150,y:0,alive:true,stats:{speed:0},vx:0,vy:0};
+    const rival={id:700002,cls:'guard',x:120,y:0,alive:true,stats:{speed:0},vx:0,vy:0};
     const pickup={id:'heal',type:'heal',x:300,y:0};
     g.tanks=[bot,rival];g.__novaFairVisibleTanks=g.tanks;g.hasLineOfSight=()=>true;
     g.tankSpeed=t=>{if(t===rival){privateCalls++;throw Error('hidden rival tankSpeed called');}return saved.speed.call(g,t);};
