@@ -149,6 +149,29 @@ function cachedRouteLength(g,x,y,gx,gy,pad,seed,wp){
  }
  return Number.isFinite(total)?total:null;
 }
+/* Certify a nearby strategic goal using the existing cached route without
+ * weakening novaRouteLength's exact-goal contract or invoking a second search.
+ * Each candidate is a physically clear prefix of the old route plus a
+ * collision-clear final leg to the requested goal. If none exists, fail closed. */
+function cachedNearbyRouteLength(g,x,y,gx,gy,pad,seed,wp){
+ if(!g||!wp)return null;
+ var map=g.__v1102Routes,c=map&&map[cacheKey(seed,pad)],tol=Math.max(68,(pad||8)*4.5);
+ if(!c||!c.points||c.gx===gx&&c.gy===gy||
+    d2(c.gx,c.gy,gx,gy)>tol*tol||!routeSafe(g,gx,gy,pad))return null;
+ if(!Number.isFinite(cachedRouteLength(g,x,y,c.gx,c.gy,pad,seed,wp)))return null;
+ var total=0,from={x:x,y:y};
+ for(var i=c.index;i<c.points.length;i++){
+  var p=c.points[i];
+  if(!p||!routeSafe(g,p.x,p.y,pad)||!routeVisible(g,from.x,from.y,p.x,p.y,pad))return null;
+  total+=dist(from.x,from.y,p.x,p.y);
+  /* The earliest reachable exit is shortest among this route's prefixes.
+   * Do not require later cached legs after a safe exit has been found. */
+  if(routeVisible(g,p.x,p.y,gx,gy,pad))
+   return total+dist(p.x,p.y,gx,gy);
+  from=p;
+ }
+ return null;
+}
 function cachedWaypoint(g,x,y,gx,gy,pad,seed,oldWaypoint){
   pad=Math.max(5,pad||10);var now=g.time||0,key=cacheKey(seed,pad),map=g.__v1102Routes||(g.__v1102Routes=Object.create(null)),c=map[key],goalTol=Math.max(68,pad*4.5);
   if(c&&(now>c.until||d2(c.gx,c.gy,gx,gy)>goalTol*goalTol)){delete map[key];c=null;}
@@ -260,6 +283,7 @@ wrap('game/engine',function(engine,require){
     return cachedWaypoint(this,x,y,gx,gy,pad,seed,oldWaypoint);
   };
   Game.prototype.novaRouteLength=function(x,y,gx,gy,pad,seed,wp){return cachedRouteLength(this,x,y,gx,gy,pad,seed,wp);};
+  Game.prototype.novaNearbyRouteLength=function(x,y,gx,gy,pad,seed,wp){return cachedNearbyRouteLength(this,x,y,gx,gy,pad,seed,wp);};
   Game.prototype.novaInvalidateRoute=function(seed,pad){invalidateRoute(this,seed,pad);};
 
   var oldMove=Game.prototype.moveTank;
@@ -336,7 +360,7 @@ wrap('game/engine',function(engine,require){
 });
 
 window.__NOVA_TERRAIN_INTELLIGENCE_TEST__={
-  obstacleNodes:obstacleNodes,planVisibilityRoute:planVisibilityRoute,cachedRouteLength:cachedRouteLength,seedSide:seedSide,segDistanceSq:segDistanceSq,
+  obstacleNodes:obstacleNodes,planVisibilityRoute:planVisibilityRoute,cachedRouteLength:cachedRouteLength,cachedNearbyRouteLength:cachedNearbyRouteLength,seedSide:seedSide,segDistanceSq:segDistanceSq,
   controllerSenses:controllerSenses,observedPoint:observedPoint,tangentEscape:tangentEscape,applyEscape:applyEscape,
   idleControllerGoal:idleControllerGoal,blockedDroneStep:blockedDroneStep,idleRouteStep:idleRouteStep,preserveIdleDroneTerrain:preserveIdleDroneTerrain,
   isControllerId:function(id){return !!CONTROLLER_IDS[id];},limits:{maxObstacles:MAX_OBSTACLES,maxNodes:MAX_NODES}

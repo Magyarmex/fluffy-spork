@@ -144,3 +144,26 @@ test('public opportunity cannot treat a blocked second leg as a complete route',
  assert.ok(Number.isFinite(T.routeCost(g,t,goal.x,goal.y)),
   'a physically clear final leg still permits the cheap local corner');
 });
+
+
+test('public route can reuse a physically certified nearby goal without replanning',()=>{
+ const {T,t,g}=scene(),goal={x:200,y:-900},bearing={};
+ const wp={x:t.x+80,y:t.y-60};let plans=0,nearby=0;
+ g.hasLineOfSight=(ax,ay)=>ax!==t.x||ay!==t.y;
+ g.novaBattlefieldWaypoint=()=>{plans++;return wp;};
+ g.novaRouteLength=()=>null;
+ g.novaNearbyRouteLength=(x,y,gx,gy,pad,seed,actualWp)=>{
+  nearby++;
+  assert.equal(pad,23);assert.equal(seed,t.id);
+  assert.equal(actualWp,wp);
+  return 1250;
+ };
+ assert.equal(T.routeCost(g,t,goal.x,goal.y,null,bearing,{CLASSES:{guard:{size:15}}}),1250);
+ assert.equal(plans,1,'certification must not trigger a second path search');
+ assert.equal(nearby,1);
+ assert.ok(bearing.x>0&&bearing.y<0,'the certified cost cannot replace the first steering waypoint');
+ g.novaNearbyRouteLength=()=>null;
+ g.hasLineOfSight=()=>false;
+ assert.equal(T.routeCost(g,t,goal.x,goal.y,null,bearing,{CLASSES:{guard:{size:15}}}),Infinity,
+  'without a certified route, a blocked second leg remains unreachable');
+});

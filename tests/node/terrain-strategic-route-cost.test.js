@@ -71,3 +71,31 @@ test('actual Terrain Intelligence owner prices a five-leg three-wall detour',()=
  assert.ok(full-first>80,'the complete route should expose a meaningful first-corner undercount');
  assert.ok(Math.abs(full-1106.366)<.01);
 });
+
+
+test('nearby strategic route reuse certifies physical prefixes without changing exact-goal pricing',()=>{
+ const h=terrain(),{g,wp,route}=scene(),before=JSON.stringify(g.__v1102Routes);
+ const goal={x:100,y:40},args=[g,0,0,goal.x,goal.y,23,7,wp];
+ assert.equal(h.cachedRouteLength(...args),null,
+  'exact-goal route pricing must not accept another cached destination');
+ const certified=h.cachedNearbyRouteLength(...args);
+ assert.ok(Number.isFinite(certified)&&certified>=Math.hypot(goal.x,goal.y),
+  'a clear prefix plus a clear final leg certifies reachable nearby terrain');
+ assert.equal(JSON.stringify(g.__v1102Routes),before,
+  'strategic nearby pricing must not mutate the movement route');
+ assert.equal(route.index,0);
+ g.hasLineOfSight=(ax,ay,bx,by)=>!(ax===wp.x&&ay===wp.y&&bx===50&&by===30);
+ assert.ok(Number.isFinite(h.cachedNearbyRouteLength(...args)),
+  'an unused later cached leg cannot invalidate an earlier safe exit');
+ g.hasLineOfSight=(ax,ay,bx,by)=>!(bx===goal.x&&by===goal.y);
+ assert.equal(h.cachedNearbyRouteLength(...args),null,
+  'all final legs blocked means no physically certified nearby route');
+ delete g.hasLineOfSight;
+ assert.equal(h.cachedNearbyRouteLength(g,0,0,250,0,23,7,wp),null,
+  'distant goals must never borrow another goal route');
+ assert.equal(h.cachedNearbyRouteLength(g,0,0,100,0,23,7,wp),null,
+  'exact goals retain the existing exact-goal route API');
+ g.time=12;
+ assert.equal(h.cachedNearbyRouteLength(...args),null,
+  'expired cached routes cannot certify nearby goals');
+});
