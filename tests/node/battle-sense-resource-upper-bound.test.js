@@ -42,7 +42,7 @@ test('optimistic pruning never rejects a potentially superior contender',()=>{
   g.powerups=[shield,heal];
   const calls=[];
   g.novaStrategicRouteCost=(...args)=>{calls.push(args);return args[6]==='shield'?200:350;};
-  g.novaBattlefieldWaypoint=()=>({x:10,y:0});
+  g.novaBattlefieldWaypoint=(...args)=>{calls.push(args);return {x:10,y:0};};
   g.novaRouteLength=()=>350;
   assert.equal(choose(g,tank,classes),heal);
   assert.equal(calls.length,2,'both contenders remain eligible for live route evaluation');
