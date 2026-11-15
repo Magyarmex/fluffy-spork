@@ -77,7 +77,7 @@ function makeScene(order) {
   g.tanks = [tank];
   g.bullets = [];
   return { g, tank, classes, hooks: w.__NOVA_BATTLE_SENSE_TEST__,
-    terrain: w.__NOVA_TERRAIN_INTELLIGENCE_TEST__, pickups };
+    terrain: w.__NOVA_TERRAIN_INTELLIGENCE_TEST__, stats:w.__NOVA_TERRAIN_INTELLIGENCE__, pickups };
 }
 
 
@@ -148,7 +148,7 @@ test('critical two-heal pricing preserves a prewarmed movement route and does no
 });
 
 test('research: 120 simultaneous critical two-heal bots expose fallback planning pressure',()=>{
- const {g,classes,hooks}=makeScene([0,1]);
+ const {g,classes,hooks,stats}=makeScene([0,1]);
  const bots=Array.from({length:120},(_,i)=>({
   id:i+1,cls:'guard',x:-340,y:0,hp:10,maxHp:100,alive:true,ai:{}
  }));
@@ -161,8 +161,9 @@ test('research: 120 simultaneous critical two-heal bots expose fallback planning
  const scratchPlans=Object.values(stats).reduce((sum,state)=>sum+state.plans,0);
  console.log('TWO_HEAL_MANY_BOT_PLANNING_RESEARCH '+JSON.stringify({
   bots:bots.length,globalScratchPlans:budget.plans,
-  cachedScratchPlans:scratchPlans,liveRoutes
+  cachedScratchPlans:scratchPlans,liveRoutes,livePlannerCalls:stats.plans
  }));
  assert.ok(budget.plans<=64,'global scratch search budget must remain bounded');
- assert.equal(liveRoutes,0,'fallback pricing must not leave movement routes behind');
+ assert.equal(liveRoutes,0,'critical strategic pricing must not leave movement routes behind');
+ assert.equal(stats.plans,0,'exhausting the global scratch budget must not trigger unbounded live planner work');
 });
