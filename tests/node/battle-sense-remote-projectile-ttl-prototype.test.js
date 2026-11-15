@@ -81,3 +81,14 @@ test('short-lived moving bullet is ignored only for remote pickup utility',()=>{
   bullet.ttl=1;
   assert.equal(choose(g,tank),far,'long-lived incoming round retains predictive danger');
 });
+
+test('special expiry-effect projectiles remain conservative even at distant pickups',()=>{
+  const {g,tank,near,far,choose}=fixture();
+  const bullet={id:97,ownerId:999,x:600,y:0,vx:0,vy:0,ttl:.25};
+  for(const flag of ['shell','splash','beam','__v17Cannon']){
+    g.bullets=[{...bullet,[flag]:true}];
+    assert.equal(choose(g,tank),far,flag+' should retain danger without a proven inert expiry contract');
+  }
+  g.bullets=[bullet];
+  assert.equal(choose(g,tank),near,'plain ordinary projectile is filtered when expiry precedes arrival');
+});
