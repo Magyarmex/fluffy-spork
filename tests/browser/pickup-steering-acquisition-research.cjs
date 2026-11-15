@@ -69,7 +69,18 @@ const {chromium}=require('playwright');
      g.powerups=arm==='two-heals-lower-first'?[lower,upper]:
       arm==='two-heals-upper-first'?[upper,lower]:[upper];
      const initialIds=g.powerups.map(p=>p.id),initialCount=g.powerups.length;
-     g.__v1102Routes=Object.create(null);g.__v1102RouteContext=null;
+     g.time=10;g.__v1102Routes=Object.create(null);g.__v1102RouteContext=null;
+     // Isolate each candidate's exact full route before the live AI trial.
+     // Research shadow calls must never donate their cache to live movement.
+     const isolatedCosts={};
+     for(const p of [lower,upper]){
+      g.__v1102Routes=Object.create(null);
+      const pad=(Number(C[bot.cls]?.size)||15)+8,
+       wp=g.novaBattlefieldWaypoint(bot.x,bot.y,p.x,p.y,pad,bot.id),
+       cost=wp&&g.novaRouteLength(bot.x,bot.y,p.x,p.y,pad,bot.id,wp);
+      isolatedCosts[p.id]=Number.isFinite(cost)?+cost.toFixed(3):null;
+     }
+     g.__v1102Routes=Object.create(null);
      let state=0x6d2b79f5;Math.random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return(state>>>0)/4294967296;};
      const trace=[],dt=1/60,steps=720;
      let invalidPositions=0,invalidSegments=0,resourceFrames=0,acquiredAt=null,firstChosen=null,acquiredId=null;
@@ -99,7 +110,7 @@ const {chromium}=require('playwright');
       }
       if(g.powerups.length<initialCount)break;
      }
-     logs.push({arm,selectedResource:firstChosen,acquiredId,
+     logs.push({arm,isolatedCosts,selectedResource:firstChosen,acquiredId,
       acquired:g.powerups.length<initialCount,acquiredAt,invalidPositions,invalidSegments,
       resourceFrames,final:{x:bot.x,y:bot.y,hp:bot.hp},
       routePlans:window.__NOVA_TERRAIN_INTELLIGENCE__?.plans,
