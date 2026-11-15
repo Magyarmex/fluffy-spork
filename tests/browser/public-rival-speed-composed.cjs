@@ -42,8 +42,9 @@ const {chromium}=require('playwright');
     h.resourceContest(g,bot,{x:500,y:0},500,classes);
     g.time=.25;rival.x=165;h.resourceContest(g,bot,{x:500,y:0},500,classes);
     if(bot.ai.__v181RivalSpeedWitness['700002'].confirmed!==1)throw Error('first motion witness was not recorded');
-    g.time=.5;rival.x=210;const witnessed=h.resourceContest(g,bot,{x:500,y:0},500,classes);
-    if(bot.ai.__v181RivalSpeedWitness['700002'].confirmed<2)throw Error('repeated public movement was not learned');
+    g.time=.5;rival.x=210;h.resourceContest(g,bot,{x:500,y:0},500,classes);
+    g.time=.75;rival.x=255;const witnessed=h.resourceContest(g,bot,{x:500,y:0},500,classes);
+    if(bot.ai.__v181RivalSpeedWitness['700002'].confirmed<3)throw Error('three sustained visible intervals were not learned');
     const witnessedState=bot.ai.__v181RivalSpeedWitness;delete bot.ai.__v181RivalSpeedWitness;
     const classOnly=h.resourceContest(g,bot,{x:500,y:0},500,classes);
     bot.ai.__v181RivalSpeedWitness=witnessedState;
@@ -51,7 +52,7 @@ const {chromium}=require('playwright');
     delete bot.ai.__v181RivalSpeedWitness;
     // Simulate a legitimate relay-only contact: present in fair tactical contacts
     // but beyond this observer's actual gameplay viewport.
-    for(const [at,x] of [[.75,2000],[.95,2036],[1.15,2072]]){
+    for(const [at,x] of [[.95,2000],[1.15,2036],[1.35,2072]]){
      g.time=at;rival.x=x;h.resourceContest(g,bot,{x:500,y:0},500,classes);
     }
     if(bot.ai.__v181RivalSpeedWitness)throw Error('offscreen relay leaked movement speed');
