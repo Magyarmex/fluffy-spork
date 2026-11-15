@@ -141,7 +141,7 @@ test('non-heal resources retain existing visible projectile risk while the proto
 test('every canonical Phase Shift class bypasses the walking-only arrival bound',()=>{
   const html=fs.readFileSync(path.join(__dirname,'../../index.html'),'utf8');
   const marker='window.__defineModule("game/classes", function (module, exports, require) {';
-  const start=html.indexOf(marker),end=html.indexOf('\\n});',start);
+  const start=html.indexOf(marker),end=html.indexOf('\n});',start);
   assert.ok(start>=0&&end>start,'materialized canonical class registry exists');
   const mod={exports:{}};
   new Function('module','exports','require',html.slice(start+marker.length,end))(
