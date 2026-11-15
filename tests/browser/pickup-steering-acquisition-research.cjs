@@ -26,16 +26,22 @@ const {chromium}=require('playwright');
     {id:91002,x:0,y:35,w:60,h:330,solid:true},
     {id:91003,x:130,y:-35,w:60,h:330,solid:true}
    ];
-   const segment=(ax,ay,bx,by,w,pad)=>{
+   const hitRect=(ax,ay,bx,by,w,pad)=>{
     const minX=w.x-w.w/2-pad,maxX=w.x+w.w/2+pad,
      minY=w.y-w.h/2-pad,maxY=w.y+w.h/2+pad,dx=bx-ax,dy=by-ay;
-    let lo=0,hi=1;
-    for(const [p,q] of [[-dx,ax-minX],[dx,maxX-ax],[-dy,ay-minY],[dy,maxY-ay]]){
-     if(Math.abs(p)<1e-9){if(q<0)return false;}
-     else{const t=q/p;if(p<0)lo=Math.max(lo,t);else hi=Math.min(hi,t);if(lo>hi)return false;}
+    let lo=0,hi=1,nx=0,ny=0;
+    for(const [p,q,fx,fy] of [[-dx,ax-minX,-1,0],[dx,maxX-ax,1,0],
+      [-dy,ay-minY,0,-1],[dy,maxY-ay,0,1]]){
+     if(Math.abs(p)<1e-9){if(q<0)return null;}
+     else{const t=q/p;
+      if(p<0){if(t>lo){lo=t;nx=fx;ny=fy;}}
+      else hi=Math.min(hi,t);
+      if(lo>hi)return null;
+     }
     }
-    return true;
+    return{t:lo,x:ax+dx*lo,y:ay+dy*lo,nx,ny};
    };
+   const segment=(ax,ay,bx,by,w,pad)=>!!hitRect(ax,ay,bx,by,w,pad);
    const originals={los:g.hasLineOfSight,safe:g.isTerrainSafe,hit:g.firstTerrainHit,
     terrain:g.__novaTerrain,shapes:g.shapes,bullets:g.bullets,powerups:g.powerups,
     hash:g.hash,time:g.time,playerX:g.player.x,playerY:g.player.y};
@@ -52,8 +58,9 @@ const {chromium}=require('playwright');
      g.hasLineOfSight=(ax,ay,bx,by,pad=0)=>!active.some(w=>segment(ax,ay,bx,by,w,pad));
      g.isTerrainSafe=(x,y,pad=0)=>!active.some(w=>Math.abs(x-w.x)<=w.w/2+pad&&Math.abs(y-w.y)<=w.h/2+pad);
      g.firstTerrainHit=(ax,ay,bx,by,pad=0)=>{
-      const w=active.find(w=>segment(ax,ay,bx,by,w,pad));
-      return w?{solid:w,hit:{x:w.x,y:w.y,nx:-1,ny:0}}:null;
+      const hits=active.map(w=>({w,hit:hitRect(ax,ay,bx,by,w,pad)}))
+       .filter(h=>h.hit).sort((a,b)=>a.hit.t-b.hit.t);
+      return hits.length?{solid:hits[0].w,hit:hits[0].hit}:null;
      };
      for(const k of Object.keys(bot))if(!(k in baseline))delete bot[k];
      Object.assign(bot,baseline);bot.ai={...baseAI};
