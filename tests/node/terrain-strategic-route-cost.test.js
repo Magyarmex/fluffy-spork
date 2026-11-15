@@ -84,6 +84,9 @@ test('nearby strategic route reuse certifies physical prefixes without changing 
  assert.equal(JSON.stringify(g.__v1102Routes),before,
   'strategic nearby pricing must not mutate the movement route');
  assert.equal(route.index,0);
+ g.hasLineOfSight=(ax,ay,bx,by)=>!(ax===wp.x&&ay===wp.y&&bx===50&&by===30);
+ assert.ok(Number.isFinite(h.cachedNearbyRouteLength(...args)),
+  'an unused later cached leg cannot invalidate an earlier safe exit');
  g.hasLineOfSight=(ax,ay,bx,by)=>!(bx===goal.x&&by===goal.y);
  assert.equal(h.cachedNearbyRouteLength(...args),null,
   'all final legs blocked means no physically certified nearby route');
