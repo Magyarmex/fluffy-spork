@@ -21,17 +21,21 @@ test('real composed moveTank supplies public rival movement witnesses at 30/60 H
     vx:0,vy:0,spawnShieldT:0,shieldT:0});
    const originalSpeed=g.tankSpeed,originalLOS=g.hasLineOfSight;
    g.hasLineOfSight=()=>true;
-   g.tankSpeed=t=>{
-    if(t===rival)throw Error('private rival speed queried');
-    return originalSpeed.call(g,t);
-   };
    const p={id:'heal',type:'heal',x:400,y:0};
-   g.time=0;h.resourceContest(g,bot,p,400,classes);
+   const contest=()=>{
+    g.tankSpeed=t=>{
+     if(t===rival)throw Error('private rival speed queried during AI contest');
+     return originalSpeed.call(g,t);
+    };
+    try{return h.resourceContest(g,bot,p,400,classes);}
+    finally{g.tankSpeed=originalSpeed;}
+   };
+   g.time=0;contest();
    const dt=1/hz;
    for(let frame=1;frame<=hz;frame++){
     g.time=frame*dt;
     g.moveTank(rival,180,0,dt);
-    if(frame%(hz/5)===0)h.resourceContest(g,bot,p,400,classes);
+    if(frame%(hz/5)===0)contest();
    }
    const w=bot.ai.__v181RivalSpeedWitness?.[String(rival.id)];
    assert.ok(w?.confirmed>=2,'must witness repeated actual movement');
