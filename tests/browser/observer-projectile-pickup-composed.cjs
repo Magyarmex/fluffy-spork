@@ -37,8 +37,8 @@ const {chromium}=require('playwright');
     g.powerups=[near,far];
     const bullet={id:bot.id,ownerId:999,x:600,y:20,vx:0,vy:0,ttl:1};
     const departing={...bullet,vx:500,ttl:10};
-    const slow={...bullet,vx:50,ttl:10};
-    const special={...departing,shell:true};
+    const slow={...bullet,y:0,vx:50,ttl:10};
+    const special={...departing,y:0,shell:true};
     for(const [label,w,h,zoom,bullets,occluded,expected] of [
      ['portrait-baseline',320,480,1,[],false,'near'],
      ['portrait-unseen',320,480,1,[bullet],false,'near'],
