@@ -124,6 +124,7 @@ const fs=require('node:fs');
      const routeCertSummary={exact:0,nearby:0,fallback:0,unverified:0,failures:[]};
      const selectedWaypoint=g.novaBattlefieldWaypoint;
      let goalHintOverrides=0;
+     const routePlanCosts=[];
      g.novaBattlefieldWaypoint=function(x,y,gx,gy,pad,seed){
       let routeGx=gx,routeGy=gy;
       // Research-only intervention: when the Guard is actively pursuing its
@@ -133,7 +134,11 @@ const fs=require('node:fs');
          (gx!==lower.x||gy!==lower.y)){
        routeGx=lower.x;routeGy=lower.y;goalHintOverrides++;
       }
+      const plansBeforeCall=window.__NOVA_TERRAIN_INTELLIGENCE__?.plans||0;
+      const routeStart=performance.now();
       const wp=selectedWaypoint.call(this,x,y,routeGx,routeGy,pad,seed);
+      if((window.__NOVA_TERRAIN_INTELLIGENCE__?.plans||0)>plansBeforeCall)
+       routePlanCosts.push(performance.now()-routeStart);
       if(seed===bot.id&&g.powerups.some(p=>p.x===gx&&p.y===gy)){
        const full=wp&&g.novaRouteLength?.(x,y,gx,gy,pad,seed,wp);
        const near=wp&&g.novaNearbyRouteLength?.(x,y,gx,gy,pad,seed,wp);
@@ -189,7 +194,10 @@ const fs=require('node:fs');
      const sortedCosts=aiUpdateCosts.slice().sort((a,b)=>a-b);
      const aiUpdateMsP95=sortedCosts[Math.floor((sortedCosts.length-1)*.95)]||0;
      const aiUpdateMsMean=aiUpdateCosts.reduce((a,b)=>a+b,0)/Math.max(1,aiUpdateCosts.length);
-     logs.push({arm,isolatedCosts,aiUpdateMsP95:+aiUpdateMsP95.toFixed(4),
+     const sortedRouteCosts=routePlanCosts.slice().sort((a,b)=>a-b);
+     const routePlanMsP95=sortedRouteCosts[Math.floor((sortedRouteCosts.length-1)*.95)]||0;
+     logs.push({arm,isolatedCosts,routePlanMsP95:+routePlanMsP95.toFixed(4),
+      routePlanMsMax:+(sortedRouteCosts.at(-1)||0).toFixed(4),aiUpdateMsP95:+aiUpdateMsP95.toFixed(4),
       aiUpdateMsMean:+aiUpdateMsMean.toFixed(4),selectedResource:firstChosen,acquiredId,
       acquired:g.powerups.length<initialCount,acquiredAt,invalidPositions,invalidSegments,
       resourceFrames,decisionTransitions,routeCertSummary,minimumGoalDistance:+minimumGoalDistance.toFixed(3),final:{x:bot.x,y:bot.y,hp:bot.hp},
