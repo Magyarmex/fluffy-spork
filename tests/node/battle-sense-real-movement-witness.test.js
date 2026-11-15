@@ -83,6 +83,7 @@ test('real composed movement impulse cannot masquerade as sustained rival upgrad
    }
    const w=bot.ai.__v181RivalSpeedWitness?.[String(rival.id)];
    assert.ok(w,'impulse must be observed without private reads');
+   console.log('COMPOSED_RIVAL_IMPULSE_WITNESS '+JSON.stringify({hz,confirmed:w.confirmed,fast:w.fast,x:rival.x,vx:rival.vx}));
    assert.ok(w.confirmed<3,'short impulse plus ordinary running must not certify upgraded speed at '+hz+'Hz');
   }finally{g.destroy();}
  });
