@@ -194,10 +194,19 @@ test('research: global scratch budget fairness across update orders and subseque
    const secondPlans=g.__v1102StrategicBudget?.plans||0;
    assert.ok(secondPlans<=64,'the following window must retain the same global budget');
    assert.equal(Object.keys(g.__v1102Routes||{}).length,0);
-   observations.push({count,reverse,firstPlans,secondPlans,
+   g.time+=.76;
+   const third=[];
+   for(const bot of order)
+    third.push({id:bot.id,choice:hooks.chooseResource(g,bot,classes)?.id||null});
+   const thirdPlans=g.__v1102StrategicBudget?.plans||0;
+   assert.ok(thirdPlans<=64,'the third window must retain the same global budget');
+   assert.equal(Object.keys(g.__v1102Routes||{}).length,0);
+   observations.push({count,reverse,firstPlans,secondPlans,thirdPlans,
     firstChosen:first.length-firstDeferred.length,
     secondChosen:second.filter(item=>item.choice).length,
+    thirdChosen:third.filter(item=>item.choice).length,
     firstDeferred,secondDeferred:second.filter(item=>!item.choice).map(item=>item.id),
+    thirdDeferred:third.filter(item=>!item.choice).map(item=>item.id),
     livePlannerCalls:stats.plans});
   }
  }
