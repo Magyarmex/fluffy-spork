@@ -96,13 +96,18 @@ test('critical heal and competitive shield use bounded scratch routes without co
    {id:81,x:-350,y:100,alive:true}];
   g.tanks=[tank,...enemies];
   g.__novaFairVisibleTanks=g.tanks;
+  const sentinel={gx:900,gy:900,at:10};
+  g.__v1102Routes=Object.create(null);
+  g.__v1102Routes['7:6']=sentinel;
   const selected=hooks.chooseResource(g,tank,classes);
   assert.ok(selected&&['heal','shield'].includes(selected.id),
    'the mixed pair must yield an eligible strategic pickup');
   assert.equal(terrain.plans,0,
    'neither occluded mixed contender may mutate the live movement route');
-  assert.equal(Object.keys(g.__v1102Routes||{}).length,0,
-   'both candidate orders preserve live route ownership');
+  assert.equal(Object.keys(g.__v1102Routes||{}).length,1,
+   'strategic pricing must not add a competing live movement route');
+  assert.strictEqual(g.__v1102Routes['7:6'],sentinel,
+   'an unrelated prewarmed movement route must survive both candidates');
   assert.ok(g.__v1102StrategicBudget.plans<=2,
    'critical mixed-resource planning remains bounded at two searches');
   assert.ok(g.__v1102StrategicBudget.plans>=1,
