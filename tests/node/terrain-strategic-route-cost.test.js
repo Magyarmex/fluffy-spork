@@ -121,18 +121,23 @@ test('critical-heal scratch planning is goal-keyed, bounded and never evicts mov
  assert.equal(h.strategicScratchCost(g,-200,0,200,-40,23,7,'lower'),lower);
  const originalSight=g.hasLineOfSight;
  g.hasLineOfSight=()=>false;
- assert.equal(h.strategicScratchCost(g,-200,0,200,-40,23,7,'lower'),null,
-  'newly blocked route legs must invalidate cached strategic pricing without a second plan in the same window');
+ assert.equal(h.strategicScratchCost(g,-200,0,200,-40,23,7,'lower'),Infinity,
+  'newly blocked route legs must invalidate the cached path; one bounded replan may fail closed');
  g.hasLineOfSight=originalSight;
- const second=h.strategicScratchCost(g,-200,0,200,40,23,7,'upper');
- assert.ok(Number.isFinite(second),'second distinct heal can receive one independent plan');
+ assert.equal(h.strategicScratchCost(g,-200,0,200,40,23,7,'upper'),null,
+  'the two-plan budget also counts a failed route revalidation attempt');
+ g.time=10.8;
+ const upper=h.strategicScratchCost(g,-200,0,200,40,23,7,'upper');
+ assert.ok(Number.isFinite(upper),'a fresh window can certify the second healing goal');
+ assert.ok(Number.isFinite(h.strategicScratchCost(g,-200,0,200,-40,23,7,'lower')),
+  'two distinct heal goals can be independently certified in one window');
  assert.equal(h.strategicScratchCost(g,-200,0,200,60,23,7,'third'),null,
   'third independent plan must respect two-plans-per-window budget');
  assert.equal(h.strategicScratchCost(g,-70,0,200,-40,23,7,'lower'),null,
   'moving more than 110 units must not reuse an anchored route or exceed the scratch budget');
- g.time=10.8;
- const upper=h.strategicScratchCost(g,-200,0,200,40,23,7,'upper');
- assert.ok(Number.isFinite(upper)&&upper>Math.hypot(400,40));
+ g.time=11.6;
+ const upperAgain=h.strategicScratchCost(g,-200,0,200,40,23,7,'upper');
+ assert.ok(Number.isFinite(upperAgain)&&upperAgain>Math.hypot(400,40));
  assert.equal(JSON.stringify(g.__v1102Routes),before,
   'strategic contender planning must not mutate the live movement cache');
  walls.length=0;
