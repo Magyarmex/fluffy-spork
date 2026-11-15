@@ -167,3 +167,41 @@ test('research: 120 simultaneous critical two-heal bots expose fallback planning
  assert.equal(liveRoutes,0,'critical strategic pricing must not leave movement routes behind');
  assert.equal(stats.plans,0,'exhausting the global scratch budget must not trigger unbounded live planner work');
 });
+
+
+test('research: global scratch budget fairness across update orders and subsequent windows',()=>{
+ const observations=[];
+ for(const count of [32,33,48,64]){
+  for(const reverse of [false,true]){
+   const {g,classes,hooks,stats}=makeScene([0,1]);
+   const bots=Array.from({length:count},(_,i)=>({
+    id:i+1,cls:'guard',x:-340,y:0,hp:10,maxHp:100,alive:true,ai:{}
+   }));
+   g.tanks=bots;
+   g.__novaFairVisibleTanks=[];
+   const order=reverse?[...bots].reverse():bots;
+   const first=[];
+   for(const bot of order)first.push({id:bot.id,choice:hooks.chooseResource(g,bot,classes)?.id||null});
+   const firstPlans=g.__v1102StrategicBudget?.plans||0;
+   const firstDeferred=first.filter(item=>!item.choice).map(item=>item.id);
+   assert.ok(firstPlans<=64,'a crowded tick must never exceed the shared scratch budget');
+   assert.equal(Object.keys(g.__v1102Routes||{}).length,0,
+    'deferred strategic decisions must not fall back to live movement planning');
+   g.time+=.76;
+   const second=[];
+   for(const bot of [...order].reverse())
+    second.push({id:bot.id,choice:hooks.chooseResource(g,bot,classes)?.id||null});
+   const secondPlans=g.__v1102StrategicBudget?.plans||0;
+   assert.ok(secondPlans<=64,'the following window must retain the same global budget');
+   assert.equal(Object.keys(g.__v1102Routes||{}).length,0);
+   observations.push({count,reverse,firstPlans,secondPlans,
+    firstChosen:first.length-firstDeferred.length,
+    secondChosen:second.filter(item=>item.choice).length,
+    firstDeferred,secondDeferred:second.filter(item=>!item.choice).map(item=>item.id),
+    livePlannerCalls:stats.plans});
+  }
+ }
+ console.log('TWO_HEAL_GLOBAL_BUDGET_FAIRNESS_RESEARCH '+JSON.stringify(observations));
+ // This is an observational test: a scheduling-order disparity is evidence
+ // for a future bounded fairness policy, not permission to weaken the CPU cap.
+});
