@@ -14,7 +14,7 @@ var CONTROLLER_IDS={carrier:1,overlord:1,warden:1,hivemind:1,broodmother:1,citad
 
 window.__NOVA_VERSION=VERSION;
 window.__NOVA_TERRAIN_INTELLIGENCE__={
-  version:VERSION,codename:CODENAME,plans:0,cacheHits:0,strategicPlans:0,stuckRecoveries:0,spotterReroutes:0,idleDroneReroutes:0,idleDroneReplans:0,
+  version:VERSION,codename:CODENAME,plans:0,cacheHits:0,strategicPlans:0,strategicLocalDeferrals:0,strategicGlobalDeferrals:0,stuckRecoveries:0,spotterReroutes:0,idleDroneReroutes:0,idleDroneReplans:0,
   guarantees:{hiddenTracking:false,teleportRecovery:false,dashSteering:false,globalNavmesh:false}
 };
 window.__NOVA_TERRAIN_INTELLIGENCE_RELEASE__={
@@ -205,7 +205,8 @@ function strategicScratchCost(g,x,y,gx,gy,pad,seed,goalId){
    if(!valid)e=null;
  }
  if(!e){
-   if(state.plans>=2||budget.plans>=64)return null;
+   if(state.plans>=2){window.__NOVA_TERRAIN_INTELLIGENCE__.strategicLocalDeferrals++;return null;}
+   if(budget.plans>=64){window.__NOVA_TERRAIN_INTELLIGENCE__.strategicGlobalDeferrals++;return null;}
    state.plans++;budget.plans++;
    /* Count attempts, including failed plans: these still consume CPU. */
    if(window.__NOVA_TERRAIN_INTELLIGENCE__)window.__NOVA_TERRAIN_INTELLIGENCE__.strategicPlans++;
