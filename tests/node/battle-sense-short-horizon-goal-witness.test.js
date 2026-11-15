@@ -187,3 +187,49 @@ test('research upper bound: independent goal-keyed route snapshots preserve cont
   assert.equal(unstable,0,'independent certified costs must not depend on pickup array order');
   assert.equal(plans,240,'stationary goal-keyed snapshots plan each goal once per seed');
 });
+
+test('research prototype: goal-keyed snapshots reuse valid moving routes without touching movement cache', () => {
+  const {g,tank,pickups,terrain} = makeScene([0,1]);
+  tank.id=2;
+  const originalMovementCache=JSON.stringify(g.__v1102Routes||{});
+  const snapshots=new Map();
+  let plans=0,now=10;
+  function certifiedCost(p) {
+    const key=p.id,prior=snapshots.get(key);
+    function valid(points) {
+      let x=tank.x,y=tank.y;
+      for(const node of points) {
+        if(!g.hasLineOfSight(x,y,node.x,node.y,23))return false;
+        x=node.x;y=node.y;
+      }
+      return true;
+    }
+    let points=prior?.points;
+    if(!prior||now>prior.until||Math.hypot(tank.x-prior.x,tank.y-prior.y)>60||!valid(points)) {
+      const route=terrain.planVisibilityRoute(g,tank.x,tank.y,p.x,p.y,23,tank.id,null);
+      if(!route)return Infinity;
+      points=route.length?route:[{x:p.x,y:p.y}];
+      snapshots.set(key,{x:tank.x,y:tank.y,until:now+.75,points});
+      plans++;
+    }
+    let x=tank.x,y=tank.y,total=0;
+    for(const node of points) {
+      total+=Math.hypot(node.x-x,node.y-y);
+      x=node.x;y=node.y;
+    }
+    return total;
+  }
+  for(const x of [-340,-330,-320,-310]) {
+    tank.x=x;now+=.1;
+    const costs=pickups.map(certifiedCost);
+    assert.ok(costs.every(Number.isFinite),'both cached goal paths must stay certified');
+    assert.ok(costs[1]<costs[0],'upper heal remains the shorter route in this fixture');
+  }
+  assert.equal(plans,2,'four moving scoring ticks should reuse one route per goal');
+  tank.x=-240;now+=.1;
+  pickups.forEach(certifiedCost);
+  assert.equal(plans,4,'large movement must refresh both independent goal snapshots');
+  assert.equal(JSON.stringify(g.__v1102Routes||{}),originalMovementCache,
+    'research strategic snapshots must not evict or modify the live movement cache');
+  console.log('PICKUP_MOVING_SNAPSHOT_PROTOTYPE '+JSON.stringify({plans,goals:2,positions:5}));
+});
