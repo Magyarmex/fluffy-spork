@@ -290,7 +290,7 @@ test('witnessed rival running can change an actual two-heal choice at identical 
  const {h,classes}=boot(),self=tank(1,0),rival=tank(2,-8);
  self.hp=20;self.ai={};
  const a={id:'near',type:'heal',x:400,y:0};
- const b={id:'safe',type:'heal',x:-500,y:0};
+ const b={id:'safe',type:'heal',x:-540,y:0};
  const g={time:0,tanks:[self,rival],powerups:[a,b],bullets:[],
   hasLineOfSight:()=>true,tankSpeed:t=>{
    if(t===rival)throw Error('private rival speed read');return 124;
