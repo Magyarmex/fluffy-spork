@@ -1,6 +1,6 @@
 'use strict';
-// Research witness for #994: visible but short-lived bullets can bias remote pickup decisions.
-// Prototype acceptance: remote ordinary bullets expire before earliest plausible arrival; local bullets remain dangerous.
+// Research witness for #994: observed ordinary projectile motion can prove a remote lane is clear before modeled arrival.
+// This variant uses public position/velocity, not private remaining TTL; local combat risk remains unchanged.
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
