@@ -17,11 +17,11 @@ function setup(){
     {window,Math,Number,Object,Array,console:{info(){},error(){}}});
   const tank={id:7,cls:'guard',x:0,y:0,hp:10,maxHp:100,alive:true,ai:{}};
   const g={tanks:[tank],bullets:[],powerups:[],hasLineOfSight:()=>false};
-  return {tank,g,classes,choose:window.__NOVA_BATTLE_SENSE_TEST__.chooseResource};
+  return {tank,g,classes,choose:window.__NOVA_BATTLE_SENSE_TEST__.chooseResource,stats:window.__NOVA_BATTLE_SENSE__};
 }
 
 test('an already-winning critical heal avoids an unwinnable shield route search',()=>{
-  const {tank,g,classes,choose}=setup();
+  const {tank,g,classes,choose,stats}=setup();
   const heal={id:'heal',type:'heal',x:200,y:0};
   const shield={id:'shield',type:'shield',x:450,y:0};
   g.powerups=[heal,shield];
@@ -31,6 +31,7 @@ test('an already-winning critical heal avoids an unwinnable shield route search'
   g.novaRouteLength=()=>600;
   assert.equal(choose(g,tank,classes),heal);
   assert.equal(calls.length,1,'hopeless shield must not evict a live route');
+  assert.equal(stats.prunedRoutes,1,'record actual skipped strategic work');
   assert.equal(calls[0].length,6,'only the heal requests a live route waypoint');
 });
 
