@@ -100,7 +100,10 @@ test('observer learns sustained visible running without private stats or telepor
  assert.equal(self.ai.__v181RivalSpeedWitness['2'].confirmed,1,'first visible sample cannot certify upgraded running');
  g.time=.5;rival.x=190;
  const learned=h.resourceContest(g,self,p,400,classes);
- assert.ok(learned>baseline,'two witnessed fast samples should increase contest pressure');
+ const learnedWitness=self.ai.__v181RivalSpeedWitness;
+ self.ai={};const classOnly=h.resourceContest(g,self,p,400,classes);
+ self.ai={__v181RivalSpeedWitness:learnedWitness};
+ assert.ok(learned>classOnly,'witnessed running should increase pressure at identical rival position');
  g.time=.75;rival.x=700;
  h.resourceContest(g,self,p,400,classes);
  g.time=1;rival.x=745;
