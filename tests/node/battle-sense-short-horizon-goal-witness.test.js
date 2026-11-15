@@ -105,14 +105,16 @@ test('actual Combined Arms movement requests a short-horizon route after strateg
     'the actual strategic wrapper must choose resource mode');
   assert.ok(calls.length > 0,
     'blocked first 170 units must invoke the composed movement route owner');
-  assert.equal(calls[0].seed,tank.id);
-  assert.equal(calls[0].pad,23,
+  const movementCall = calls.find(c => Math.hypot(c.gx-selectedGoal.x,c.gy-selectedGoal.y)>103.5);
+  assert.ok(movementCall, 'the composed movement wrapper must request its own local goal');
+  assert.equal(movementCall.seed,tank.id);
+  assert.equal(movementCall.pad,23,
     'movement must retain the Guard physical route clearance');
-  assert.ok(Math.abs(Math.hypot(calls[0].gx-before.x,calls[0].gy-before.y)-340) < 1e-6,
+  assert.ok(Math.abs(Math.hypot(movementCall.gx-before.x,movementCall.gy-before.y)-340) < 1e-6,
     'the actual Battle Sense blended direction still receives a 2×170u movement horizon');
-  assert.ok(calls[0].gx < selectedGoal.x-100,
+  assert.ok(movementCall.gx < selectedGoal.x-100,
     'the local steering goal is materially short of the selected heal');
-  assert.ok(Math.hypot(calls[0].gx-selectedGoal.x,calls[0].gy-selectedGoal.y)>103.5,
+  assert.ok(Math.hypot(movementCall.gx-selectedGoal.x,movementCall.gy-selectedGoal.y)>103.5,
     'the requested local steering goal differs materially from the selected heal');
   assert.ok(Number.isFinite(tank.x) && Number.isFinite(tank.y));
   // This is a source-executed *goal divergence witness*, not evidence of
