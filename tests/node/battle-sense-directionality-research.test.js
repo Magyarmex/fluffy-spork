@@ -20,15 +20,15 @@ test('composed pickup contest reports toward/away witnessed-speed ambiguity at 3
     g.tanks=[observer,rival];g.__novaFairVisibleTanks=g.tanks;
     g.__novaTerrain=[];g.__novaBattlefieldIndex=null;
     if(g.hash?.clear)g.hash.clear();
-    Object.assign(observer,{cls:'guard',x:0,y:0,alive:true,hp:20,maxHp:100});
+    Object.assign(observer,{cls:'guard',x:1000,y:1000,alive:true,hp:20,maxHp:100});
     observer.ai={};
-    Object.assign(rival,{cls:'guard',x:direction===1?-80:280,y:120,
+    Object.assign(rival,{cls:'guard',x:direction===1?920:1280,y:1120,
      vx:0,vy:0,alive:true,spawnShieldT:0,shieldT:0,stampedeT:0,
      hasteT:0,perk:'speed',stats:{...rival.stats,speed:8}});
     g.hasLineOfSight=()=>true;
     const originalSpeed=g.tankSpeed;
     const realSpeed=originalSpeed.call(g,rival);
-    const p={id:'heal',type:'heal',x:400,y:120};
+    const p={id:'heal',type:'heal',x:1400,y:1120};
     const contest=()=>{
      g.tankSpeed=t=>{
       if(t===rival)throw Error('private rival speed read');
@@ -48,7 +48,7 @@ test('composed pickup contest reports toward/away witnessed-speed ambiguity at 3
     assert.ok(witness?.confirmed>=3,'composed running should be observed');
     // Normalize the final public snapshot. The two histories differ only in
     // approach direction, while final rival position and class match.
-    rival.x=100;rival.y=120;
+    rival.x=1100;rival.y=1120;
     const witnessed=contest();
     const memory=observer.ai;observer.ai={};
     const classOnly=contest();observer.ai=memory;
