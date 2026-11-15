@@ -35,12 +35,16 @@ const {chromium}=require('playwright');
     // Public pickup coordinates are allowed outside the observer viewport.
     const near={id:'near',type:'heal',x:600,y:0},far={id:'far',type:'heal',x:620,y:0};
     g.powerups=[near,far];
-    const bullet={id:bot.id,ownerId:999,x:600,y:20,vx:0,vy:0,ttl:1};
+    const bullet={id:bot.id,ownerId:999,x:600,y:20,vx:0,vy:0,ttl:10};
+    const shortBullet={...bullet,ttl:.25};
+    const shortShell={...shortBullet,shell:true};
     for(const [label,w,h,zoom,bullets,occluded,expected] of [
      ['portrait-baseline',320,480,1,[],false,'near'],
      ['portrait-unseen',320,480,1,[bullet],false,'near'],
      ['landscape-unseen',480,320,1,[bullet],false,'near'],
      ['wide-visible',1600,900,1,[bullet],false,'far'],
+     ['wide-short-expiring',1600,900,1,[shortBullet],false,'near'],
+     ['wide-short-shell',1600,900,1,[shortShell],false,'far'],
      ['zoom-out-visible',900,700,.7,[bullet],false,'far'],
      ['zoom-in-unseen',900,700,1.2,[bullet],false,'near'],
      ['wide-terrain-hidden',1600,900,1,[bullet],true,'near']
@@ -63,7 +67,7 @@ const {chromium}=require('playwright');
    return results;
   });
   if(errors.length)throw Error('browser errors: '+JSON.stringify(errors));
-  if(report.length!==7)throw Error('missing composed-game acceptance arms');
+  if(report.length!==9)throw Error('missing composed-game acceptance arms');
   console.log('OBSERVER_PROJECTILE_COMPOSED_GAME '+JSON.stringify(report));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
