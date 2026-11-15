@@ -78,3 +78,32 @@ test('no bullets add no movement-speed work',()=>{
  assert.equal(choose(g,tank),near);
  assert.equal(calls,0);
 });
+
+test('deterministic moving-bullet differential agrees with analytic lane exit',()=>{
+ const {g,tank,laneRisk}=fixture();
+ let seed=20261115;
+ const rand=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+ let checked=0,discounted=0;
+ for(let i=0;i<3000;i++){
+   const angle=rand()*Math.PI*2,speed=30+rand()*1200;
+   const dx=(rand()-.5)*400,dy=(rand()-.5)*400;
+   const vx=Math.cos(angle)*speed,vy=Math.sin(angle)*speed;
+   const arrival=.3+rand()*3;
+   g.bullets=[{id:100+i,ownerId:999,x:600+dx,y:dy,vx,vy,ttl:10}];
+   const original=laneRisk(g,600,0,tank.id,null);
+   const actual=laneRisk(g,600,0,tank.id,null,arrival);
+   const a=vx*vx+vy*vy,b=2*(dx*vx+dy*vy),c=dx*dx+dy*dy-150*150;
+   const disc=b*b-4*a*c;
+   const exit=disc>=0?(-b+Math.sqrt(disc))/(2*a):-Infinity;
+   const shouldSkip=disc>=0&&exit>=0&&exit<arrival;
+   if(shouldSkip){
+     assert.equal(actual,0,'certified departed projectile must not penalize remote lane');
+     assert.ok(Math.hypot(dx+vx*arrival,dy+vy*arrival)>150-1e-7,
+       'constant-velocity bullet cannot occupy lane at arrival');
+     discounted++;
+   }else assert.equal(actual,original,'uncertified trajectory must preserve baseline risk');
+   checked++;
+ }
+ assert.equal(checked,3000);
+ assert.ok(discounted>200,'exercise meaningful certified exits');
+});
