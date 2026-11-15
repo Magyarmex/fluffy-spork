@@ -20,7 +20,7 @@ function boot(){
  const cache={};
  function req(k){if(cache[k])return cache[k].exports;const m={exports:{}};cache[k]=m;mods[k](m,m.exports,id=>id==='./classes'?req('game/classes'):null);return m.exports;}
  req('game/engine');req('game/ai');
- return {h:win.__NOVA_BATTLE_SENSE_TEST__,classes};
+ return {h:win.__NOVA_BATTLE_SENSE_TEST__,classes,win};
 }
 function tank(id,x,cls='guard',upgrade=0){
  return {id,x,y:0,cls,alive:true,hp:100,maxHp:100,stats:{speed:upgrade},vx:0,vy:0};
@@ -193,4 +193,21 @@ test('observer sampling does not starve at 20–120 Hz and legal AI think cadenc
   assert.ok(w?.confirmed>=2,
    'valid sustained movement must be witnessed at '+fps+' Hz and think '+think);
  }
+});
+
+test('relay-only offscreen rival cannot provide a movement-speed witness',()=>{
+ const {h,classes,win}=boot(),self=tank(1,0),rival=tank(2,100);self.ai={};
+ const g={time:0,tanks:[self,rival],hasLineOfSight:()=>true,tankSpeed:()=>124};
+ const p={id:'heal',type:'heal',x:400,y:0};
+ win.__NOVA_FAIR_ENGAGEMENT__={inGameplayViewport:()=>false};
+ h.resourceContest(g,self,p,400,classes);
+ for(let i=1;i<=3;i++){g.time=i*.2;rival.x=100+36*i;h.resourceContest(g,self,p,400,classes);}
+ assert.equal(self.ai.__v181RivalSpeedWitness,undefined,
+  'relay-only information cannot certify exact movement');
+ win.__NOVA_FAIR_ENGAGEMENT__.inGameplayViewport=()=>true;
+ h.resourceContest(g,self,p,400,classes);
+ g.time=1;rival.x=244;h.resourceContest(g,self,p,400,classes);
+ g.time=1.2;rival.x=280;h.resourceContest(g,self,p,400,classes);
+ assert.ok(self.ai.__v181RivalSpeedWitness['2'].confirmed>=2,
+  'directly visible movement may be learned after relay-only observations');
 });
