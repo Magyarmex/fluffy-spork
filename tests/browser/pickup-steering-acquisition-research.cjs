@@ -154,7 +154,9 @@ const fs=require('node:fs');
       return wp;
      };
      let state=0x6d2b79f5;Math.random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return(state>>>0)/4294967296;};
-     const plansBefore=window.__NOVA_TERRAIN_INTELLIGENCE__?.plans||0;
+     const plansBefore=window.__NOVA_TERRAIN_INTELLIGENCE__?.plans||0,
+      strategicBefore=window.__NOVA_TERRAIN_INTELLIGENCE__?.strategicPlans||0,
+      routeGoalOccupancy={selected:0,otherHeal:0,unrelated:0,empty:0};
      const trace=[],aiUpdateCosts=[],dt=1/60,steps=720;
      let invalidPositions=0,invalidSegments=0,resourceFrames=0,acquiredAt=null,firstChosen=null,acquiredId=null;
      const decisionTransitions=[];let priorMode=null,priorResource=null,minimumGoalDistance=Infinity;
@@ -169,6 +171,13 @@ const fs=require('node:fs');
        priorMode=bot.ai.__v181Mode;priorResource=bot.ai.__v181ResourceId;
       }
       minimumGoalDistance=Math.min(minimumGoalDistance,...g.powerups.map(p=>Math.hypot(p.x-bot.x,p.y-bot.y)));
+      const routeKey=String(bot.id)+':'+Math.round(((Number(C[bot.cls]?.size)||15)+8)/4),
+       cachedGoal=g.__v1102Routes?.[routeKey],
+       selectedHeal=g.powerups.find(p=>p.id===bot.ai.__v181ResourceId);
+      if(!cachedGoal)routeGoalOccupancy.empty++;
+      else if(selectedHeal&&cachedGoal.gx===selectedHeal.x&&cachedGoal.gy===selectedHeal.y)routeGoalOccupancy.selected++;
+      else if(g.powerups.some(p=>p.x===cachedGoal.gx&&p.y===cachedGoal.gy))routeGoalOccupancy.otherHeal++;
+      else routeGoalOccupancy.unrelated++;
       if(bot.ai.__v181Mode==='resource'){
        resourceFrames++;
        if(firstChosen==null)firstChosen=bot.ai.__v181ResourceId;
@@ -203,6 +212,8 @@ const fs=require('node:fs');
       resourceFrames,decisionTransitions,routeCertSummary,minimumGoalDistance:+minimumGoalDistance.toFixed(3),final:{x:bot.x,y:bot.y,hp:bot.hp},
       routePlans:window.__NOVA_TERRAIN_INTELLIGENCE__?.plans,
       routePlansDelta:(window.__NOVA_TERRAIN_INTELLIGENCE__?.plans||0)-plansBefore,
+      strategicPlansDelta:(window.__NOVA_TERRAIN_INTELLIGENCE__?.strategicPlans||0)-strategicBefore,
+      routeGoalOccupancy,
       goalHintOverrides,
       trace});
     }
