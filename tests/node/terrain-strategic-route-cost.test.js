@@ -228,3 +228,27 @@ test('aggregate scratch budget survives 120 rotating identities and cache evicti
  assert.equal(stats.strategicPlans,128,
   'a new window may admit at most one additional global batch of 64 plans');
 });
+
+
+test('critical resource movement cannot reuse another nearby heal goal cache',()=>{
+ function Game(){}
+ Game.prototype.novaBattlefieldWaypoint=()=>null;
+ const mods={'game/engine':m=>m.exports={Game}},w={__novaModules:mods};
+ vm.runInNewContext(fs.readFileSync(path.join(root,'nova-updates/terrain-intelligence-v1.10.2.js'),'utf8'),
+  {window:w,console:{info(){},error(){}},Math,Number,Object,Array});
+ const m={exports:{}};mods['game/engine'](m,m.exports,()=>({CLASSES:{}}));
+ const g=new m.exports.Game();g.time=10;
+ g.hasLineOfSight=()=>true;g.isTerrainSafe=()=>true;
+ const oldRoute=()=>({gx:200,gy:-40,points:[{x:0,y:150},{x:200,y:-40}],
+  index:0,until:11,validateAt:11});
+ g.__v1102Routes={'7:6':oldRoute()};
+ const normal=g.novaBattlefieldWaypoint(-200,0,200,40,23,7);
+ assert.ok(normal&&normal.y===150,
+  'ordinary nearby goal reuse must remain intact for movement performance');
+ g.__v1102Routes={'7:6':oldRoute()};
+ g.__v1102RouteContext={forceGoal:true,lineage:'resource',target:{x:200,y:40}};
+ const committed=g.novaBattlefieldWaypoint(-200,0,200,40,23,7);
+ assert.equal(committed,null,'a committed heal must not inherit the other heal waypoint');
+ assert.equal(g.__v1102Routes['7:6'],undefined,
+  'the wrong-goal movement cache must be evicted before routing');
+});
