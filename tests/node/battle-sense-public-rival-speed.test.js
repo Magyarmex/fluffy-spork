@@ -112,3 +112,25 @@ test('observer learns sustained visible running without private stats or telepor
  const stale=h.resourceContest(g,self,p,400,classes);
  assert.ok(Number.isFinite(stale),'stale witness resets safely');
 });
+
+test('witnesses are bounded, identity-scoped and reject unseen prior positions',()=>{
+ const {h,classes}=boot(),self=tank(1,0);self.ai={};
+ const g={time:0,tanks:[self],hasLineOfSight:()=>true,tankSpeed:()=>124};
+ const p={id:'heal',type:'heal',x:500,y:0};
+ for(let id=2;id<=18;id++){
+  const rival=tank(id,100);g.tanks=[self,rival];g.time=id;
+  h.resourceContest(g,self,p,500,classes);
+ }
+ assert.ok(Object.keys(self.ai.__v181RivalSpeedWitness).length<=12,'witness storage must remain bounded');
+ const rival=tank(19,100);g.tanks=[self,rival];g.time=20;
+ h.resourceContest(g,self,p,500,classes);
+ g.time=20.25;rival.x=145;h.resourceContest(g,self,p,500,classes);
+ assert.equal(self.ai.__v181RivalSpeedWitness['19'].confirmed,1);
+ g.hasLineOfSight=(ax,ay,bx)=>bx!==100;
+ g.time=20.5;rival.x=190;h.resourceContest(g,self,p,500,classes);
+ assert.equal(self.ai.__v181RivalSpeedWitness['19'].confirmed,0,'old unseen sample must not count');
+ const replacement=tank(19,190);g.tanks=[self,replacement];g.hasLineOfSight=()=>true;
+ g.time=20.75;h.resourceContest(g,self,p,500,classes);
+ assert.equal(self.ai.__v181RivalSpeedWitness['19'].target,replacement,'recycled id cannot reuse prior witness');
+ assert.equal(self.ai.__v181RivalSpeedWitness['19'].confirmed,0);
+});
