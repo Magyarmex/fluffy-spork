@@ -226,7 +226,10 @@ function strategicScratchCost(g,x,y,gx,gy,pad,seed,goalId){
 }
 function cachedWaypoint(g,x,y,gx,gy,pad,seed,oldWaypoint){
   pad=Math.max(5,pad||10);var now=g.time||0,key=cacheKey(seed,pad),map=g.__v1102Routes||(g.__v1102Routes=Object.create(null)),c=map[key],goalTol=Math.max(68,pad*4.5);
-  if(c&&(now>c.until||d2(c.gx,c.gy,gx,gy)>goalTol*goalTol)){delete map[key];c=null;}
+  /* A committed critical-heal goal must not borrow a different pickup's
+   * nearby route merely because both pickups lie inside the tolerance. */
+  var ctx=g.__v1102RouteContext,exactHeal=!!(ctx&&ctx.forceGoal&&ctx.lineage==='resource');
+  if(c&&(now>c.until||d2(c.gx,c.gy,gx,gy)>(exactHeal?1e-6:goalTol*goalTol))){delete map[key];c=null;}
   if(c&&c.points&&c.index<c.points.length){
     while(c.index<c.points.length&&d2(x,y,c.points[c.index].x,c.points[c.index].y)<Math.pow(20+pad*.65,2))c.index++;
     if(c.index>=c.points.length){delete map[key];c=null;}
