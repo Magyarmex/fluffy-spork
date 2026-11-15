@@ -291,6 +291,19 @@ wrap('game/engine',function(engine,require){
     if(!t||t.isPlayer||!t.ai)return oldMove.apply(this,arguments);
     var now=this.time||0,pad=((C[t.cls]&&C[t.cls].size)||15)+8,sp=Math.hypot(vx||0,vy||0),obs=observedPoint(this,t,classes,now),ln=lineage(classes,t),ctx=null;
     if(obs&&(ln==='sniper'||ln==='cannon'||ln==='controller'))ctx={tank:t,lineage:ln,target:obs,preferred:preferredRange(this,t,classes),forceGoal:ln==='controller'&&obs.source==='drone'};
+    /* A critically injured bot that has already chosen a public heal must
+     * route toward that exact goal, not a new short-horizon point that evicts
+     * its certified strategic path. Never override observed combat targets,
+     * ordinary farming, missing pickups or anti-stuck escape authority. */
+    if(!obs&&!ctx&&t.ai.__v181Mode==='resource'&&t.ai.__v181BiasW>=1&&
+       t.hp/Math.max(1,t.maxHp||1)<.38&&!(t.ai.__v1102Nav&&t.ai.__v1102Nav.escapeUntil>now)){
+      var ps=this.powerups||[],resourceId=t.ai.__v181ResourceId;
+      for(var pi=0;pi<ps.length;pi++){
+        var p=ps[pi];if(!p||p.id!==resourceId||p.type!=='heal'||
+          !Number.isFinite(p.x)||!Number.isFinite(p.y)||dist(t.x,t.y,p.x,p.y)>760)continue;
+        ctx={tank:t,lineage:'resource',target:{x:p.x,y:p.y},forceGoal:true};break;
+      }
+    }
     var st=sampleStuck(this,t,vx,vy,pad,t.id,t.ai.__v1102Nav||(t.ai.__v1102Nav={}));
     if(st.escapeUntil>now&&sp>1){var e=applyEscape(st,vx,vy);vx=e.x;vy=e.y;}
     var prev=this.__v1102RouteContext;this.__v1102RouteContext=ctx;
