@@ -136,3 +136,14 @@ test('scratch direct-path fast path rejects physically unsafe goal endpoints',()
  assert.equal(h.strategicScratchCost(g,0,0,100,0,23,7,'unsafe'),Infinity);
  assert.equal(Object.keys(g.__v1102Routes||{}).length,0);
 });
+
+
+test('failed strategic scratch plans cannot grow per-tank cache without bound',()=>{
+ const h=terrain();
+ const g={time:10,__novaTerrain:[],hasLineOfSight:()=>false,isTerrainSafe:()=>true};
+ for(let seed=1;seed<=120;seed++){
+  h.strategicScratchCost(g,-200,0,200,0,23,seed,'unreachable');
+  assert.ok(Object.keys(g.__v1102StrategicRoutes).length<=64,
+   'failed or uncertified plans must obey the same memory cap as successful plans');
+ }
+});
