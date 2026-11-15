@@ -48,6 +48,13 @@ const {chromium}=require('playwright');
     const classOnly=h.resourceContest(g,bot,{x:500,y:0},500,classes);
     bot.ai.__v181RivalSpeedWitness=witnessedState;
     if(!(witnessed>classOnly))throw Error('witnessed movement did not improve identical-position race estimate');
+    delete bot.ai.__v181RivalSpeedWitness;
+    // Simulate a legitimate relay-only contact: present in fair tactical contacts
+    // but beyond this observer's actual gameplay viewport.
+    for(const [at,x] of [[.75,600],[.95,636],[1.15,672]]){
+     g.time=at;rival.x=x;h.resourceContest(g,bot,{x:500,y:0},500,classes);
+    }
+    if(bot.ai.__v181RivalSpeedWitness)throw Error('offscreen relay leaked movement speed');
     if(privateCalls)throw Error('motion inference accessed private speed');
     return {baseline,hiddenChanged,classChanged,privateCalls};
    }finally{
