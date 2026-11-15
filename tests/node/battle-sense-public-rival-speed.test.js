@@ -99,14 +99,16 @@ test('observer learns sustained visible running without private stats or telepor
  h.resourceContest(g,self,p,400,classes);
  assert.equal(self.ai.__v181RivalSpeedWitness['2'].confirmed,1,'first visible sample cannot certify upgraded running');
  g.time=.5;rival.x=190;
+ h.resourceContest(g,self,p,400,classes);
+ g.time=.75;rival.x=235;
  const learned=h.resourceContest(g,self,p,400,classes);
  const learnedWitness=self.ai.__v181RivalSpeedWitness;
  self.ai={};const classOnly=h.resourceContest(g,self,p,400,classes);
  self.ai={__v181RivalSpeedWitness:learnedWitness};
  assert.ok(learned>classOnly,'witnessed running should increase pressure at identical rival position');
- g.time=.75;rival.x=700;
+ g.time=1;rival.x=700;
  h.resourceContest(g,self,p,400,classes);
- g.time=1;rival.x=745;
+ g.time=1.25;rival.x=745;
  assert.ok(Number.isFinite(h.resourceContest(g,self,p,400,classes)),'teleport cannot poison speed estimate');
  g.time=3;rival.x=750;
  const stale=h.resourceContest(g,self,p,400,classes);
@@ -152,7 +154,7 @@ test('witnessed movement inference is stable at 30 and 60 Hz observation schedul
   }
   const learned=h.resourceContest(g,self,p,400,classes);
   const witness=self.ai.__v181RivalSpeedWitness['2'];
-  assert.ok(witness.confirmed>=2,'running should be witnessed at '+fps+' Hz');
+  assert.ok(witness.confirmed>=3,'sustained running should be witnessed at '+fps+' Hz');
   scores.push(learned);
  }
  assert.ok(Math.abs(scores[0]-scores[1])<1e-10,'same visible trajectory must give same contest pressure');
@@ -190,7 +192,7 @@ test('observer sampling does not starve at 20–120 Hz and legal AI think cadenc
    h.resourceContest(g,self,p,400,classes);
   }
   const w=self.ai.__v181RivalSpeedWitness['2'];
-  assert.ok(w?.confirmed>=2,
+  assert.ok(w?.confirmed>=3,
    'valid sustained movement must be witnessed at '+fps+' Hz and think '+think);
  }
 });
@@ -224,6 +226,7 @@ test('relay-only offscreen rival cannot provide a movement-speed witness',()=>{
  h.resourceContest(g,self,p,400,classes);
  g.time=.8;rival.x=244;h.resourceContest(g,self,p,400,classes);
  g.time=1;rival.x=280;h.resourceContest(g,self,p,400,classes);
- assert.ok(self.ai.__v181RivalSpeedWitness['2'].confirmed>=2,
+ g.time=1.2;rival.x=316;h.resourceContest(g,self,p,400,classes);
+ assert.ok(self.ai.__v181RivalSpeedWitness['2'].confirmed>=3,
   'directly visible movement may be learned after relay-only observations');
 });
