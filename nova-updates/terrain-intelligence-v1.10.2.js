@@ -194,7 +194,7 @@ function strategicScratchCost(g,x,y,gx,gy,pad,seed,goalId){
    var keys=Object.keys(map);if(keys.length>64)delete map[keys[0]];
  }
  var goalKey=String(goalId)+':'+gx+':'+gy,e=state.entries[goalKey];
- if(e&&(now>e.until||dist(x,y,e.ax,e.ay)>60))e=null;
+ if(e&&(now>e.until||dist(x,y,e.ax,e.ay)>110))e=null;
  if(e){
    var fromX=x,fromY=y,valid=true;
    for(var i=0;i<e.points.length;i++){
