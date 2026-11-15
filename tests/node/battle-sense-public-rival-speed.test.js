@@ -135,7 +135,7 @@ test('witnesses are bounded, identity-scoped and reject unseen prior positions',
  assert.equal(self.ai.__v181RivalSpeedWitness['19'].confirmed,0);
  assert.doesNotThrow(()=>JSON.stringify(self),'witness identity must not create a serialization cycle');
  assert.equal(Object.hasOwn(self.ai.__v181RivalSpeedWitness['19'],'target'),true);
- assert.equal(JSON.stringify(self).includes('target'),false,'identity must not leak into persisted state');
+ assert.equal(JSON.stringify(self).includes('__v181RivalSpeedWitness'),false,'ephemeral observations must not enter persisted AI state');
 });
 
 test('witnessed movement inference is stable at 30 and 60 Hz observation schedules',()=>{
