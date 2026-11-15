@@ -146,3 +146,13 @@ test('canonical Phase Shift descendants and ancestors bypass public lane-exit bo
   }
 });
 
+
+test('departing round does not hide another persistent projectile in the same heal lane',()=>{
+ const {g,tank,far,choose}=fixture();
+ g.bullets=[
+   {id:301,ownerId:999,x:600,y:0,vx:500,vy:0,ttl:10},
+   {id:302,ownerId:998,x:600,y:0,vx:0,vy:0,ttl:10}
+ ];
+ assert.equal(choose(g,tank),far,
+   'each observed projectile must be priced independently; persistent danger remains');
+});
