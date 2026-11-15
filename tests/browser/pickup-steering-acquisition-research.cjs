@@ -46,7 +46,7 @@ const {chromium}=require('playwright');
     g.player.x=2200;g.player.y=2200;
     for(const o of other){if(o.t!==g.player){o.t.alive=false;o.t.hp=0;}}
     g.shapes=[];g.bullets=[];g.hash=null;
-    for(const arm of ['direct','three-walls','two-heals-lower-first','two-heals-upper-first']){
+    for(const arm of ['direct','three-walls','lower-only','two-heals-lower-first','two-heals-upper-first']){
      const active=arm==='direct'?[]:walls;
      g.__novaTerrain=active;
      g.hasLineOfSight=(ax,ay,bx,by,pad=0)=>!active.some(w=>segment(ax,ay,bx,by,w,pad));
@@ -66,7 +66,8 @@ const {chromium}=require('playwright');
      bot.ai.__v1102Nav=null;bot.ai.__v181BiasX=0;bot.ai.__v181BiasY=0;
      bot.ai.__v181BiasW=0;bot.ai.__v181Mode='none';bot.ai.__v181ResourceId=null;
      const upper={id:'upper',type:'heal',x:340,y:40},lower={id:'lower',type:'heal',x:340,y:-40};
-     g.powerups=arm==='two-heals-lower-first'?[lower,upper]:
+     g.powerups=arm==='lower-only'?[lower]:
+      arm==='two-heals-lower-first'?[lower,upper]:
       arm==='two-heals-upper-first'?[upper,lower]:[upper];
      const initialIds=g.powerups.map(p=>p.id),initialCount=g.powerups.length;
      g.time=10;g.__v1102Routes=Object.create(null);g.__v1102RouteContext=null;
@@ -128,7 +129,7 @@ const {chromium}=require('playwright');
    return logs;
   });
   if(errors.length)throw Error('browser errors: '+JSON.stringify(errors));
-  if(result.length!==4||result.some(r=>!r.trace.length))throw Error('empty composed-game witness');
+  if(result.length!==5||result.some(r=>!r.trace.length))throw Error('empty composed-game witness');
   console.log('PICKUP_STEERING_WITNESS '+JSON.stringify(result));
   for(const arm of result){
    if(!arm.acquired||arm.acquiredAt==null||arm.acquiredAt>12)
@@ -140,9 +141,9 @@ const {chromium}=require('playwright');
   }
   if(result[1].acquiredAt<=result[0].acquiredAt)
    throw Error('three-wall fixture did not exercise a real travel detour');
-  if(result[2].selectedResource!==result[3].selectedResource||
-     result[2].acquiredId!==result[3].acquiredId)
+  if(result[3].selectedResource!==result[4].selectedResource||
+     result[3].acquiredId!==result[4].acquiredId)
    throw Error('reversed nearby-heal order changed selected or acquired goal: '+
-    JSON.stringify([result[2],result[3]]));
+    JSON.stringify([result[3],result[4]]));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
