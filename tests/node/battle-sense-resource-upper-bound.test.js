@@ -25,6 +25,8 @@ test('an already-winning critical heal avoids an unwinnable shield route search'
   const heal={id:'heal',type:'heal',x:200,y:0};
   const shield={id:'shield',type:'shield',x:450,y:0};
   g.powerups=[heal,shield];
+  let losChecks=0;
+  g.hasLineOfSight=()=>{losChecks++;return false;};
   const calls=[];
   g.novaStrategicRouteCost=(...args)=>{calls.push(args);return 250;};
   g.novaBattlefieldWaypoint=(...args)=>{calls.push(args);return {x:10,y:0};};
@@ -32,6 +34,7 @@ test('an already-winning critical heal avoids an unwinnable shield route search'
   assert.equal(choose(g,tank,classes),heal);
   assert.equal(calls.length,1,'hopeless shield must not evict a live route');
   assert.equal(stats.prunedRoutes,1,'record actual skipped strategic work');
+  assert.equal(losChecks,3,'one occlusion probe per candidate plus the selected route check');
   assert.equal(calls[0].length,6,'only the heal requests a live route waypoint');
 });
 
