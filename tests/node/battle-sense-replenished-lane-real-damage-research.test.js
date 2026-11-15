@@ -14,7 +14,8 @@ function run(seed,policy){
   g.setClass(p,'minigun');
   g.setClass(bot,'guard');
   Object.assign(p,{x:800,y:0,vx:0,vy:0,angle:Math.PI,
-   hp:1000000,maxHp:1000000,spawnShieldT:0,droneRespawnT:Infinity});
+   hp:1000000,maxHp:1000000,spawnShieldT:0,droneRespawnT:Infinity,
+   fireCd:0,fireSpin:0});
   Object.assign(bot,{x:0,y:0,vx:0,vy:0,hp:20,maxHp:100,
    spawnShieldT:0,shieldT:0,alive:true,isPlayer:false});
   p.stats.reload=4;
