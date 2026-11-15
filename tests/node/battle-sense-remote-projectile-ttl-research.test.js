@@ -52,3 +52,14 @@ test('research control: offscreen bullet cannot bias remote heal selection',()=>
   assert.equal(visible(g,tank,600,0),false);
   assert.equal(choose(g,tank),near);
 });
+
+test('research control: a short-lived observed bullet remains meaningful at a nearby heal',()=>{
+  const {g,tank,choose,visible}=fixture();
+  g.powerups=[{id:'near',type:'heal',x:60,y:0},{id:'far',type:'heal',x:80,y:0}];
+  assert.equal(choose(g,tank).id,'near');
+  const bullet={id:92,ownerId:999,x:60,y:0,vx:0,vy:0,ttl:.25};
+  g.bullets=[bullet];
+  assert.equal(visible(g,tank,bullet.x,bullet.y),true);
+  assert.equal(choose(g,tank).id,'far',
+    'a broad TTL-only filter would wrongly remove legitimate immediate pickup danger');
+});
