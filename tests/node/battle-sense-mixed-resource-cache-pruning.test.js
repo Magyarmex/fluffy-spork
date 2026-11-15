@@ -70,13 +70,16 @@ function makeScene(order) {
 }
 
 
-test('two critical heals followed by a low-utility shield preserve live route ownership',()=>{
-  const scene=makeScene([0,1]);
-  const {g,tank,classes,hooks,terrain}=scene;
-  g.powerups.push({id:'shield',type:'shield',x:340,y:0});
-  const selected=hooks.chooseResource(g,tank,classes);
-  assert.ok(selected && selected.type==='heal','the critical heal remains preferred');
-  assert.equal(terrain.plans,0,'an unwinnable shield must not invoke the live movement planner');
-  assert.equal(Object.keys(g.__v1102Routes||{}).length,0,'strategic two-heal pricing must leave live routes untouched');
-  assert.equal(scene.g.__v1102StrategicBudget.plans,2,'both heal contenders are independently evaluated');
+test('two critical heals and an unwinnable shield preserve live route ownership in both orders',()=>{
+  for(const shieldFirst of [false,true]){
+    const scene=makeScene([0,1]);
+    const {g,tank,classes,hooks,terrain}=scene;
+    const shield={id:'shield',type:'shield',x:340,y:0};
+    if(shieldFirst)g.powerups.unshift(shield);else g.powerups.push(shield);
+    const selected=hooks.chooseResource(g,tank,classes);
+    assert.ok(selected && selected.type==='heal','the critical heal remains preferred');
+    assert.equal(terrain.plans,0,'unwinnable shield must not invoke the live movement planner');
+    assert.equal(Object.keys(g.__v1102Routes||{}).length,0,'strategic pricing must leave live routes untouched');
+    assert.equal(g.__v1102StrategicBudget.plans,2,'both heal contenders are independently evaluated');
+  }
 });
