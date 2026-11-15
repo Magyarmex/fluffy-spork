@@ -57,3 +57,31 @@ test('equal optimistic bound may be pruned without changing first-wins tie polic
   assert.equal(choose(g,tank,classes),first);
   assert.equal(plans,1,'identical candidate cannot beat the existing winner');
 });
+
+test('nearby shield remains eligible when it can beat a distant heal',()=>{
+  const {tank,g,classes,choose}=setup();
+  tank.hp=34;
+  const heal={id:'heal',type:'heal',x:730,y:0};
+  const shield={id:'shield',type:'shield',x:25,y:0};
+  g.powerups=[heal,shield];
+  let plans=0;
+  g.novaBattlefieldWaypoint=()=>{plans++;return {x:10,y:0};};
+  g.novaRouteLength=(x,y,gx)=>gx>100?740:30;
+  assert.equal(choose(g,tank,classes),shield);
+  assert.equal(plans,2,'a potentially superior shield must not be pruned');
+});
+
+test('pruning a hopeless candidate preserves the existing movement-route cache',()=>{
+  const {tank,g,classes,choose}=setup();
+  const heal={id:'heal',type:'heal',x:200,y:0};
+  const shield={id:'shield',type:'shield',x:700,y:0};
+  g.powerups=[heal,shield];
+  const liveRoute={goalId:'combat-target',waypoints:[{x:20,y:30}]};
+  g.liveRoute=liveRoute;
+  let probes=0;
+  g.novaBattlefieldWaypoint=()=>{probes++;return {x:10,y:0};};
+  g.novaRouteLength=()=>250;
+  assert.equal(choose(g,tank,classes),heal);
+  assert.equal(probes,1);
+  assert.equal(g.liveRoute,liveRoute);
+});
