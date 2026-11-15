@@ -94,10 +94,13 @@ const {chromium}=require('playwright');
      })).filter(b=>b.x<1600);
      const arrival=Math.max(0,Math.hypot(near.x-bot.x,near.y-bot.y)-50)/
       (124*1.18*(1+.045*8)*1.45*1.9*1.14*1.10);
+     const baselineRisk=window.__NOVA_BATTLE_SENSE_TEST__.laneRisk(
+      g,near.x,near.y,bot.id,bot);
+     const projectedRisk=window.__NOVA_BATTLE_SENSE_TEST__.laneRisk(
+      g,near.x,near.y,bot.id,bot,arrival);
      samples.push({policy,elapsed:Number(elapsed.toFixed(2)),
       active:g.bullets.length,selected:choose(g,bot,classes)?.id||null,
-      nearRisk:window.__NOVA_BATTLE_SENSE_TEST__.laneRisk(
-       g,near.x,near.y,bot.id,bot,arrival)});
+      baselineRisk,projectedRisk,discount:baselineRisk-projectedRisk});
     }
    }
    results.push({label:'research-replenishment-time-series',
