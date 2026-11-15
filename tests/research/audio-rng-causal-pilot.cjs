@@ -167,7 +167,7 @@ if (!process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL) test('canonical audio noise-buff
    erased=arm(seed,hz,'erased');
   assert.equal(off.initial,enabled.initial);
   assert.equal(off.initial,erased.initial);
-  const expectedSharedDraws=process.env.NOVA_AUDIO_RNG_PATCHED==='1'?0:22050;
+  const expectedSharedDraws=0; // Canonical shipping Sfx.ensure now uses a local seeded noise stream.
   assert.equal(enabled.interventionDraws,expectedSharedDraws);
   assert.equal(erased.interventionDraws,expectedSharedDraws);
   assert.equal(off.interventionDraws,0);
@@ -175,7 +175,7 @@ if (!process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL) test('canonical audio noise-buff
   const erasedFirst=firstDifference(enabled,erased);
   results.push({seed,hz,off,enabled,erased,audioFirst,erasedFirst});
  }
- const summary={contract:'research-only causal intervention: Sfx.ensure at fixed post-boot point; erase audio waveform after burning same RNG; all subsequent SFX muted; not a real-device sound test',
+ const summary={contract:'research-only causal intervention: Sfx.ensure at fixed post-boot point; canonical noise generation must not consume gameplay RNG; all subsequent SFX muted; not a real-device sound test',
   independentSeeds:seeds.length,frameRates:[30,60],seconds:5,
   scenarios:results.length,
   audioGameplayDivergences:results.filter(r=>r.audioFirst!==null).length,
@@ -195,11 +195,8 @@ if (!process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL) test('canonical audio noise-buff
  }));
  assert.equal(summary.erasedGameplayDivergences,0,
   'audio waveform contents unexpectedly influence physical state');
- if(process.env.NOVA_AUDIO_RNG_PATCHED==='1')
-  assert.equal(summary.audioGameplayDivergences,0,
-   'audio noise RNG still perturbs gameplay after isolation');
- else assert.ok(summary.audioGameplayDivergences>0,
-   'baseline audio RNG leak unexpectedly absent');
+ assert.equal(summary.audioGameplayDivergences,0,
+  'canonical audio initialization must not perturb gameplay RNG');
 });
 
 // Shared real-game fixture for the independent overlay-audio causal pilot.
