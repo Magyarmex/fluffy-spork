@@ -146,15 +146,24 @@ test('every canonical Phase Shift class bypasses the walking-only arrival bound'
   const mod={exports:{}};
   new Function('module','exports','require',html.slice(start+marker.length,end))(
     mod,mod.exports,()=>{throw Error('unexpected class-module dependency');});
-  const phaseClasses=Object.entries(mod.exports.CLASSES)
-    .filter(([,def])=>def.ability==='phase');
+  const registry=mod.exports.CLASSES;
+  const phaseClasses=Object.entries(registry).filter(([,def])=>def.ability==='phase');
   assert.ok(phaseClasses.length>=1,'expected canonical Phase Shift lineage');
-  for(const [id,def] of phaseClasses){
+  const affected=new Set();
+  for(const [id] of phaseClasses){
+    let current=id;
+    while(current){
+      assert.ok(registry[current],'phase lineage parent must exist: '+current);
+      affected.add(current);
+      current=registry[current].parent;
+    }
+  }
+  for(const id of affected){
     const {g,tank,classes,far,choose}=fixture();
-    tank.cls=id;classes.CLASSES[id]=def;
+    tank.cls=id;classes.CLASSES[id]=registry[id];
     g.bullets=[{id:110,ownerId:999,x:600,y:0,vx:0,vy:0,ttl:.25}];
     assert.equal(choose(g,tank),far,
-      id+' must retain visible danger because its blink invalidates walking ETA');
+      id+' may phase now or after evolution, invalidating walking-only ETA');
   }
 });
 
