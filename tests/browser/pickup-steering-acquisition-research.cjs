@@ -140,13 +140,15 @@ const {chromium}=require('playwright');
      };
      let state=0x6d2b79f5;Math.random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return(state>>>0)/4294967296;};
      const plansBefore=window.__NOVA_TERRAIN_INTELLIGENCE__?.plans||0;
-     const trace=[],dt=1/60,steps=720;
+     const trace=[],aiUpdateCosts=[],dt=1/60,steps=720;
      let invalidPositions=0,invalidSegments=0,resourceFrames=0,acquiredAt=null,firstChosen=null,acquiredId=null;
      const decisionTransitions=[];let priorMode=null,priorResource=null,minimumGoalDistance=Infinity;
      for(let i=0;i<steps;i++){
       g.time=10+i*dt;
       const px=bot.x,py=bot.y;
+      const aiStart=performance.now();
       ai.updateAI(bot,g,dt);
+      aiUpdateCosts.push(performance.now()-aiStart);
       if(bot.ai.__v181Mode!==priorMode||bot.ai.__v181ResourceId!==priorResource){
        decisionTransitions.push({t:+(i*dt).toFixed(3),mode:bot.ai.__v181Mode,resourceId:bot.ai.__v181ResourceId??null,x:+bot.x.toFixed(2),y:+bot.y.toFixed(2)});
        priorMode=bot.ai.__v181Mode;priorResource=bot.ai.__v181ResourceId;
@@ -174,7 +176,11 @@ const {chromium}=require('playwright');
       }
       if(g.powerups.length<initialCount)break;
      }
-     logs.push({arm,isolatedCosts,selectedResource:firstChosen,acquiredId,
+     const sortedCosts=aiUpdateCosts.slice().sort((a,b)=>a-b);
+     const aiUpdateMsP95=sortedCosts[Math.floor((sortedCosts.length-1)*.95)]||0;
+     const aiUpdateMsMean=aiUpdateCosts.reduce((a,b)=>a+b,0)/Math.max(1,aiUpdateCosts.length);
+     logs.push({arm,isolatedCosts,aiUpdateMsP95:+aiUpdateMsP95.toFixed(4),
+      aiUpdateMsMean:+aiUpdateMsMean.toFixed(4),selectedResource:firstChosen,acquiredId,
       acquired:g.powerups.length<initialCount,acquiredAt,invalidPositions,invalidSegments,
       resourceFrames,decisionTransitions,routeCertSummary,minimumGoalDistance:+minimumGoalDistance.toFixed(3),final:{x:bot.x,y:bot.y,hp:bot.hp},
       routePlans:window.__NOVA_TERRAIN_INTELLIGENCE__?.plans,
