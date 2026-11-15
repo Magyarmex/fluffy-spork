@@ -52,7 +52,7 @@ const {chromium}=require('playwright');
     g.player.x=2200;g.player.y=2200;
     for(const o of other){if(o.t!==g.player){o.t.alive=false;o.t.hp=0;}}
     g.shapes=[];g.bullets=[];g.hash=null;
-    for(const arm of ['direct','three-walls','lower-only','lower-only-even-seed','two-heals-lower-first','two-heals-upper-first','two-heals-lower-first-isolated-plans','two-heals-lower-first-budgeted-plans']){
+    for(const arm of ['direct','three-walls','lower-only','lower-only-even-seed','lower-only-goal-hint','two-heals-lower-first','two-heals-upper-first','two-heals-lower-first-isolated-plans','two-heals-lower-first-budgeted-plans']){
      const active=arm==='direct'?[]:walls;
      g.__novaTerrain=active;
      g.hasLineOfSight=(ax,ay,bx,by,pad=0)=>!active.some(w=>segment(ax,ay,bx,by,w,pad));
@@ -82,7 +82,7 @@ const {chromium}=require('playwright');
      bot.ai.__v1102Nav=null;bot.ai.__v181BiasX=0;bot.ai.__v181BiasY=0;
      bot.ai.__v181BiasW=0;bot.ai.__v181Mode='none';bot.ai.__v181ResourceId=null;
      const upper={id:'upper',type:'heal',x:340,y:40},lower={id:'lower',type:'heal',x:340,y:-40};
-     g.powerups=(arm==='lower-only'||arm==='lower-only-even-seed')?[lower]:
+     g.powerups=(arm==='lower-only'||arm==='lower-only-even-seed'||arm==='lower-only-goal-hint')?[lower]:
       (arm==='two-heals-lower-first'||arm==='two-heals-lower-first-isolated-plans'||arm==='two-heals-lower-first-budgeted-plans')?[lower,upper]:
       arm==='two-heals-upper-first'?[upper,lower]:[upper];
      const initialIds=g.powerups.map(p=>p.id),initialCount=g.powerups.length;
@@ -122,8 +122,17 @@ const {chromium}=require('playwright');
      // it runs; never issue an additional waypoint plan or change its result.
      const routeCertSummary={exact:0,nearby:0,fallback:0,unverified:0,failures:[]};
      const selectedWaypoint=g.novaBattlefieldWaypoint;
+     let goalHintOverrides=0;
      g.novaBattlefieldWaypoint=function(x,y,gx,gy,pad,seed){
-      const wp=selectedWaypoint.call(this,x,y,gx,gy,pad,seed);
+      let routeGx=gx,routeGy=gy;
+      // Research-only intervention: when the Guard is actively pursuing its
+      // sole heal, replace the local steering horizon with that same goal.
+      // This tests goal ownership; it is NOT a production movement change.
+      if(arm==='lower-only-goal-hint'&&seed===bot.id&&bot.ai.__v181Mode==='resource'&&
+         (gx!==lower.x||gy!==lower.y)){
+       routeGx=lower.x;routeGy=lower.y;goalHintOverrides++;
+      }
+      const wp=selectedWaypoint.call(this,x,y,routeGx,routeGy,pad,seed);
       if(seed===bot.id&&g.powerups.some(p=>p.x===gx&&p.y===gy)){
        const full=wp&&g.novaRouteLength?.(x,y,gx,gy,pad,seed,wp);
        const near=wp&&g.novaNearbyRouteLength?.(x,y,gx,gy,pad,seed,wp);
@@ -185,6 +194,7 @@ const {chromium}=require('playwright');
       resourceFrames,decisionTransitions,routeCertSummary,minimumGoalDistance:+minimumGoalDistance.toFixed(3),final:{x:bot.x,y:bot.y,hp:bot.hp},
       routePlans:window.__NOVA_TERRAIN_INTELLIGENCE__?.plans,
       routePlansDelta:(window.__NOVA_TERRAIN_INTELLIGENCE__?.plans||0)-plansBefore,
+      goalHintOverrides,
       trace});
     }
    }finally{
@@ -199,7 +209,7 @@ const {chromium}=require('playwright');
    return logs;
   });
   if(errors.length)throw Error('browser errors: '+JSON.stringify(errors));
-  if(result.length!==8||result.some(r=>!r.trace.length))throw Error('empty composed-game witness');
+  if(result.length!==9||result.some(r=>!r.trace.length))throw Error('empty composed-game witness');
   console.log('PICKUP_STEERING_WITNESS '+JSON.stringify(result));
   for(const arm of result){
    if(!arm.acquired||arm.acquiredAt==null||arm.acquiredAt>12)
