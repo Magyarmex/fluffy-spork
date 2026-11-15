@@ -71,7 +71,27 @@ const {chromium}=require('playwright');
     if(bot.ai.__v181RivalSpeedWitness?.['700002']?.confirmed!==0)
      throw Error('off-viewport prior sample incorrectly certified movement');
     if(privateCalls)throw Error('motion inference accessed private speed');
-    return {baseline,hiddenChanged,classChanged,privateCalls};
+    // The actual materialized Battle Sense must let witnessed running change
+    // a two-heal choice while the same final visible scene without a witness
+    // still favors the nearer pickup.
+    delete bot.ai.__v181RivalSpeedWitness;
+    rival.cls='guard';rival.x=-8;g.time=3;g.cam.zoom=1;
+    const near={id:'near',type:'heal',x:400,y:0};
+    const safe={id:'safe',type:'heal',x:-500,y:0};
+    g.powerups=[near,safe];bot.hp=20;bot.maxHp=100;
+    h.resourceContest(g,bot,near,400,classes);
+    for(let i=1;i<=3;i++){
+     g.time=3+i*.2;rival.x=-8+180*i*.2;
+     h.resourceContest(g,bot,near,400,classes);
+    }
+    const witnessedChoice=h.chooseResource(g,bot,classes)?.id;
+    const witnessMemory=bot.ai.__v181RivalSpeedWitness;
+    delete bot.ai.__v181RivalSpeedWitness;
+    const classOnlyChoice=h.chooseResource(g,bot,classes)?.id;
+    bot.ai.__v181RivalSpeedWitness=witnessMemory;
+    if(classOnlyChoice!=='near'||witnessedChoice!=='safe')
+     throw Error('composed witnessed race choice mismatch: '+classOnlyChoice+'/'+witnessedChoice);
+    return {baseline,hiddenChanged,classChanged,privateCalls,classOnlyChoice,witnessedChoice};
    }finally{
     Object.assign(bot,original);g.tanks=saved.tanks;g.__novaFairVisibleTanks=saved.visible;
     g.powerups=saved.powerups;g.hasLineOfSight=saved.los;g.tankSpeed=saved.speed;g.time=saved.time;g.cam.zoom=saved.zoom;
