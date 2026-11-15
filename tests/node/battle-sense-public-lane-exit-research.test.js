@@ -35,6 +35,9 @@ test('observed ordinary moving bullet exits distant heal lane before modeled arr
  const {g,tank,near,far,choose}=fixture();
  g.bullets=[{id:91,ownerId:999,x:600,y:0,vx:500,vy:0,ttl:10}];
  assert.equal(choose(g,tank),near,'moving-away ordinary bullet cannot still occupy remote heal lane');
+ g.bullets[0].ttl=.25;
+ assert.equal(choose(g,tank),near,'same visible trajectory must not depend on private remaining TTL');
+ g.bullets[0].ttl=10;
  g.bullets[0].vx=50;
  assert.equal(choose(g,tank),far,'slow-moving round can remain near the heal at arrival');
  g.bullets[0].vx=0;
