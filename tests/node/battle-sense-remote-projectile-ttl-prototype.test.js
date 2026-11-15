@@ -157,3 +157,15 @@ test('every canonical Phase Shift class bypasses the walking-only arrival bound'
       id+' must retain visible danger because its blink invalidates walking ETA');
   }
 });
+
+test('nonfinite movement state cannot certify remote projectile expiry',()=>{
+  const {g,tank,near,far,choose}=fixture();
+  g.bullets=[{id:111,ownerId:999,x:600,y:0,vx:0,vy:0,ttl:.25}];
+  assert.equal(choose(g,tank),near);
+  tank.vx=NaN;
+  assert.equal(choose(g,tank),far,'unknown velocity must fail open');
+  tank.vx=0;tank.vy=Infinity;
+  assert.equal(choose(g,tank),far,'unbounded velocity must fail open');
+  tank.vy=0;tank.stats={speed:NaN};
+  assert.equal(choose(g,tank),far,'unknown speed upgrades must fail open');
+});
