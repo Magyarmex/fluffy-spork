@@ -104,3 +104,28 @@ test('critical two-heal strategic choice is invariant to pickup array order acro
   assert.equal(flips,0,'independent contender pricing must not depend on pickup array order');
   assert.ok(planned>0,'the regression must exercise the scratch planner rather than a no-op path');
 });
+
+
+test('research: pre-existing movement routes may influence first-contender pricing',()=>{
+ let flips=0,chosen=0;
+ for(let seed=1;seed<=120;seed++){
+  const outcomes=[];
+  for(const order of [[0,1],[1,0]]){
+   const {g,tank,classes,hooks}=makeScene(order);
+   tank.id=seed;
+   const warm=g.novaBattlefieldWaypoint(tank.x,tank.y,340,0,23,seed);
+   assert.ok(warm,'the fixture must prime a real movement route');
+   let selected=null;
+   for(let tick=0;tick<8;tick++){
+    g.time=10+tick*.18;
+    selected=hooks.chooseResource(g,tank,classes);
+   }
+   assert.ok(selected,'a critical Guard must still choose a heal');
+   outcomes.push(selected.id);
+   chosen++;
+  }
+  if(outcomes[0]!==outcomes[1])flips++;
+ }
+ console.log('SCRATCH_PREWARMED_ROUTE_ORDER_RESEARCH '+JSON.stringify({seeds:120,choices:chosen,flips}));
+ // Observational falsifier: do not freeze a possibly biased outcome as golden.
+});
