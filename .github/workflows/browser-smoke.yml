@@ -133,6 +133,7 @@ jobs:
           node tests/browser/hybrid-button-handoff.cjs
           node tests/browser/hybrid-game-input-handoff.cjs
           node tests/browser/shipping-ui-smoke.cjs
+          node tests/browser/observer-projectile-pickup-composed.cjs
           node tests/browser/tactical-frontlines-memory.cjs
           node tests/browser/frontlines-early-warning.cjs
           node tests/browser/frontlines-bloom-compass.cjs
