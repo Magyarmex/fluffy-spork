@@ -46,8 +46,8 @@ const {chromium}=require('playwright');
     g.player.x=2200;g.player.y=2200;
     for(const o of other){if(o.t!==g.player){o.t.alive=false;o.t.hp=0;}}
     g.shapes=[];g.bullets=[];g.hash=null;
-    for(const arm of ['direct','three-walls']){
-     const active=arm==='three-walls'?walls:[];
+    for(const arm of ['direct','three-walls','two-heals-lower-first','two-heals-upper-first']){
+     const active=arm==='direct'?[]:walls;
      g.__novaTerrain=active;
      g.hasLineOfSight=(ax,ay,bx,by,pad=0)=>!active.some(w=>segment(ax,ay,bx,by,w,pad));
      g.isTerrainSafe=(x,y,pad=0)=>!active.some(w=>Math.abs(x-w.x)<=w.w/2+pad&&Math.abs(y-w.y)<=w.h/2+pad);
@@ -62,21 +62,30 @@ const {chromium}=require('playwright');
      bot.ai.state='wander';bot.ai.targetId=-1;bot.ai.thinkT=0;
      bot.ai.wanderA=0;bot.ai.wanderT=0;bot.ai.__v181Think=0;
      bot.ai.__v172LastSeenAt=null;bot.ai.__v172LastSeenId=-1;
-     g.powerups=[{id:'witness-heal',type:'heal',x:340,y:40}];
+     const upper={id:'upper',type:'heal',x:340,y:40},lower={id:'lower',type:'heal',x:340,y:-40};
+     g.powerups=arm==='two-heals-lower-first'?[lower,upper]:
+      arm==='two-heals-upper-first'?[upper,lower]:[upper];
+     const initialIds=g.powerups.map(p=>p.id),initialCount=g.powerups.length;
      g.__v1102Routes=Object.create(null);g.__v1102RouteContext=null;
      let state=0x6d2b79f5;Math.random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return(state>>>0)/4294967296;};
      const trace=[],dt=1/60,steps=720;
-     let invalidPositions=0,invalidSegments=0,resourceFrames=0,acquiredAt=null;
+     let invalidPositions=0,invalidSegments=0,resourceFrames=0,acquiredAt=null,firstChosen=null,acquiredId=null;
      for(let i=0;i<steps;i++){
       g.time=10+i*dt;
       const px=bot.x,py=bot.y;
       ai.updateAI(bot,g,dt);
-      if(bot.ai.__v181Mode==='resource')resourceFrames++;
+      if(bot.ai.__v181Mode==='resource'){
+       resourceFrames++;
+       if(firstChosen==null)firstChosen=bot.ai.__v181ResourceId;
+      }
       const radius=(Number(C[bot.cls]?.size)||15)+3;
       if(!g.isTerrainSafe(bot.x,bot.y,radius-.5))invalidPositions++;
       if(active.some(w=>segment(px,py,bot.x,bot.y,w,radius-.5)))invalidSegments++;
       g.updatePowerups(dt);
-      if(!g.powerups.length&&acquiredAt==null)acquiredAt=+(i*dt).toFixed(3);
+      if(g.powerups.length<initialCount&&acquiredAt==null){
+       acquiredAt=+(i*dt).toFixed(3);
+       acquiredId=initialIds.find(id=>!g.powerups.some(p=>p.id===id));
+      }
       if(i%30===0||!g.powerups.length){
        const cache=g.__v1102Routes||{},entry=Object.entries(cache).find(([k])=>k.startsWith(String(bot.id)+':')),
         route=entry&&entry[1];
@@ -85,10 +94,10 @@ const {chromium}=require('playwright');
         wp:bot.ai.__v172Waypoint?{x:+bot.ai.__v172Waypoint.x.toFixed(1),y:+bot.ai.__v172Waypoint.y.toFixed(1)}:null,
         stuck:bot.ai.__v1102Nav?.stuck||0,healRemaining:g.powerups.length});
       }
-      if(!g.powerups.length)break;
+      if(g.powerups.length<initialCount)break;
      }
-     logs.push({arm,selectedResource:bot.ai.__v181ResourceId,
-      acquired:g.powerups.length===0,acquiredAt,invalidPositions,invalidSegments,
+     logs.push({arm,selectedResource:firstChosen,acquiredId,
+      acquired:g.powerups.length<initialCount,acquiredAt,invalidPositions,invalidSegments,
       resourceFrames,final:{x:bot.x,y:bot.y,hp:bot.hp},
       routePlans:window.__NOVA_TERRAIN_INTELLIGENCE__?.plans,
       trace});
@@ -105,7 +114,7 @@ const {chromium}=require('playwright');
    return logs;
   });
   if(errors.length)throw Error('browser errors: '+JSON.stringify(errors));
-  if(result.length!==2||result.some(r=>!r.trace.length))throw Error('empty composed-game witness');
+  if(result.length!==4||result.some(r=>!r.trace.length))throw Error('empty composed-game witness');
   console.log('PICKUP_STEERING_WITNESS '+JSON.stringify(result));
   for(const arm of result){
    if(!arm.acquired||arm.acquiredAt==null||arm.acquiredAt>12)
@@ -117,5 +126,9 @@ const {chromium}=require('playwright');
   }
   if(result[1].acquiredAt<=result[0].acquiredAt)
    throw Error('three-wall fixture did not exercise a real travel detour');
+  if(result[2].selectedResource!==result[3].selectedResource||
+     result[2].acquiredId!==result[3].acquiredId)
+   throw Error('reversed nearby-heal order changed selected or acquired goal: '+
+    JSON.stringify([result[2],result[3]]));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
