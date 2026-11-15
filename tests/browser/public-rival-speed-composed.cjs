@@ -19,7 +19,7 @@ const {chromium}=require('playwright');
    const h=window.__NOVA_BATTLE_SENSE_TEST__,classes=window.__novaMakeRequire('')('game/classes');
    const bot=g.tanks.find(t=>t?.ai&&!t.isPlayer);
    if(!h?.resourceContest||!bot||!classes.CLASSES.guard)throw Error('missing composed source');
-   const saved={tanks:g.tanks,visible:g.__novaFairVisibleTanks,powerups:g.powerups,los:g.hasLineOfSight,speed:g.tankSpeed};
+   const saved={tanks:g.tanks,visible:g.__novaFairVisibleTanks,powerups:g.powerups,los:g.hasLineOfSight,speed:g.tankSpeed,time:g.time};
    const original={...bot};let privateCalls=0;
    try{
     Object.assign(bot,{id:700001,cls:'guard',x:0,y:0,alive:true,hp:20,maxHp:100,hasteT:0,stampedeT:0,perk:null,gene:null,stats:{...bot.stats,speed:0}});
@@ -37,10 +37,18 @@ const {chromium}=require('playwright');
     rival.cls='scout';
     const classChanged=h.resourceContest(g,bot,pickup,300,classes);
     if(!(classChanged>baseline))throw Error('public class mobility not respected');
+    rival.cls='guard';rival.x=120;g.time=0;
+    delete bot.ai.__v181RivalSpeedWitness;
+    h.resourceContest(g,bot,{x:500,y:0},500,classes);
+    g.time=.25;rival.x=165;h.resourceContest(g,bot,{x:500,y:0},500,classes);
+    if(bot.ai.__v181RivalSpeedWitness['700002'].confirmed!==1)throw Error('first motion witness was not recorded');
+    g.time=.5;rival.x=210;h.resourceContest(g,bot,{x:500,y:0},500,classes);
+    if(bot.ai.__v181RivalSpeedWitness['700002'].confirmed<2)throw Error('repeated public movement was not learned');
+    if(privateCalls)throw Error('motion inference accessed private speed');
     return {baseline,hiddenChanged,classChanged,privateCalls};
    }finally{
     Object.assign(bot,original);g.tanks=saved.tanks;g.__novaFairVisibleTanks=saved.visible;
-    g.powerups=saved.powerups;g.hasLineOfSight=saved.los;g.tankSpeed=saved.speed;
+    g.powerups=saved.powerups;g.hasLineOfSight=saved.los;g.tankSpeed=saved.speed;g.time=saved.time;
    }
   });
   if(errors.length)throw Error('page errors '+JSON.stringify(errors));
