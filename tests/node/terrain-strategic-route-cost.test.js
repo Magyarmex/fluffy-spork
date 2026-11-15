@@ -99,3 +99,34 @@ test('nearby strategic route reuse certifies physical prefixes without changing 
  assert.equal(h.cachedNearbyRouteLength(...args),null,
   'expired cached routes cannot certify nearby goals');
 });
+
+test('critical-heal scratch planning is goal-keyed, bounded and never evicts movement routes',()=>{
+ const h=terrain(),walls=[{id:1,x:0,y:0,w:60,h:200,solid:true}];
+ function hit(ax,ay,bx,by,r,p){
+  const dx=bx-ax,dy=by-ay,minX=r.x-r.w/2-p,maxX=r.x+r.w/2+p,
+   minY=r.y-r.h/2-p,maxY=r.y+r.h/2+p;
+  let lo=0,hi=1;
+  for(const [P,Q] of [[-dx,ax-minX],[dx,maxX-ax],[-dy,ay-minY],[dy,maxY-ay]]){
+   if(Math.abs(P)<1e-9){if(Q<0)return false;}
+   else{const z=Q/P;if(P<0)lo=Math.max(lo,z);else hi=Math.min(hi,z);if(lo>hi)return false;}
+  }
+  return true;
+ }
+ const g={time:10,__novaTerrain:walls,__v1102Routes:{'7:6':{gx:99,gy:99,points:[{x:99,y:99}],index:0,until:11}}};
+ g.hasLineOfSight=(ax,ay,bx,by,p=0)=>!walls.some(w=>hit(ax,ay,bx,by,w,p));
+ g.isTerrainSafe=(x,y,p=0)=>!walls.some(w=>Math.abs(x-w.x)<=w.w/2+p&&Math.abs(y-w.y)<=w.h/2+p);
+ const before=JSON.stringify(g.__v1102Routes);
+ const lower=h.strategicScratchCost(g,-200,0,200,-40,23,7,'lower');
+ assert.ok(Number.isFinite(lower)&&lower>Math.hypot(400,40));
+ assert.equal(h.strategicScratchCost(g,-200,0,200,-40,23,7,'lower'),lower);
+ assert.equal(h.strategicScratchCost(g,-200,0,200,40,23,7,'upper'),null,
+  'second independent plan must respect one-plan-per-window budget');
+ g.time=10.8;
+ const upper=h.strategicScratchCost(g,-200,0,200,40,23,7,'upper');
+ assert.ok(Number.isFinite(upper)&&upper>Math.hypot(400,40));
+ assert.equal(JSON.stringify(g.__v1102Routes),before,
+  'strategic contender planning must not mutate the live movement cache');
+ walls.length=0;
+ assert.equal(h.strategicScratchCost(g,-200,0,200,40,23,7,'upper'),Math.hypot(400,40),
+  'destroyed cover must permit the newly clear direct route');
+});
