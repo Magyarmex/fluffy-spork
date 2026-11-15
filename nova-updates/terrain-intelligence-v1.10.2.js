@@ -202,6 +202,8 @@ function strategicScratchCost(g,x,y,gx,gy,pad,seed,goalId){
  if(!e){
    if(state.plans>=1)return null;
    state.plans++;
+   /* Count attempts, including failed plans: these still consume CPU. */
+   if(window.__NOVA_TERRAIN_INTELLIGENCE__)window.__NOVA_TERRAIN_INTELLIGENCE__.strategicPlans++;
    var route=planVisibilityRoute(g,x,y,gx,gy,pad,seed,null);
    if(!route)return Infinity;
    var points=route.length?route:[{x:gx,y:gy}],cx=x,cy=y;
@@ -212,7 +214,6 @@ function strategicScratchCost(g,x,y,gx,gy,pad,seed,goalId){
    }
    e={goalKey:goalKey,ax:x,ay:y,until:now+.75,points:points};
    state.entry=e;
-   if(window.__NOVA_TERRAIN_INTELLIGENCE__)window.__NOVA_TERRAIN_INTELLIGENCE__.strategicPlans++;
  }
  var total=0,px=x,py=y;
  for(var j=0;j<e.points.length;j++){var p=e.points[j];total+=dist(px,py,p.x,p.y);px=p.x;py=p.y;}
