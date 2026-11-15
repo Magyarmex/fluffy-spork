@@ -146,3 +146,23 @@ test('critical two-heal pricing preserves a prewarmed movement route and does no
   }
  }
 });
+
+test('research: 120 simultaneous critical two-heal bots expose fallback planning pressure',()=>{
+ const {g,classes,hooks}=makeScene([0,1]);
+ const bots=Array.from({length:120},(_,i)=>({
+  id:i+1,cls:'guard',x:-340,y:0,hp:10,maxHp:100,alive:true,ai:{}
+ }));
+ g.tanks=bots;
+ g.__novaFairVisibleTanks=[];
+ for(const bot of bots)hooks.chooseResource(g,bot,classes);
+ const budget=g.__v1102StrategicBudget||{plans:0};
+ const liveRoutes=Object.keys(g.__v1102Routes||{}).length;
+ const stats=g.__v1102StrategicRoutes||{};
+ const scratchPlans=Object.values(stats).reduce((sum,state)=>sum+state.plans,0);
+ console.log('TWO_HEAL_MANY_BOT_PLANNING_RESEARCH '+JSON.stringify({
+  bots:bots.length,globalScratchPlans:budget.plans,
+  cachedScratchPlans:scratchPlans,liveRoutes
+ }));
+ assert.ok(budget.plans<=64,'global scratch search budget must remain bounded');
+ assert.equal(liveRoutes,0,'fallback pricing must not leave movement routes behind');
+});
