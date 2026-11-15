@@ -230,3 +230,22 @@ test('research: global scratch budget fairness across update orders and subseque
  // This is an observational test: a scheduling-order disparity is evidence
  // for a future bounded fairness policy, not permission to weaken the CPU cap.
 });
+
+
+test('research: mixed shield and two-heal evaluation may still own a live movement route',()=>{
+ const results=[];
+ for(const shieldIndex of [0,1,2]){
+  const {g,tank,classes,hooks}=makeScene([0,1]);
+  const shield={id:'shield-contender',type:'shield',x:340,y:0};
+  g.powerups.splice(shieldIndex,0,shield);
+  const selected=hooks.chooseResource(g,tank,classes);
+  const liveRoutes=Object.values(g.__v1102Routes||{}).map(route=>({
+   gx:route.gx,gy:route.gy
+  }));
+  results.push({shieldIndex,selected:selected?.id||null,liveRoutes,
+   scratchPlans:g.__v1102StrategicBudget?.plans||0});
+ }
+ console.log('MIXED_RESOURCE_LIVE_ROUTE_RESEARCH '+JSON.stringify(results));
+ // The two-heal isolation contract does not cover non-heal candidates.
+ // Record any live-cache contamination before proposing a wider policy.
+});
