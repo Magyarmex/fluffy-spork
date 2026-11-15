@@ -119,6 +119,11 @@ test('critical-heal scratch planning is goal-keyed, bounded and never evicts mov
  const lower=h.strategicScratchCost(g,-200,0,200,-40,23,7,'lower');
  assert.ok(Number.isFinite(lower)&&lower>Math.hypot(400,40));
  assert.equal(h.strategicScratchCost(g,-200,0,200,-40,23,7,'lower'),lower);
+ const originalSight=g.hasLineOfSight;
+ g.hasLineOfSight=()=>false;
+ assert.equal(h.strategicScratchCost(g,-200,0,200,-40,23,7,'lower'),null,
+  'newly blocked route legs must invalidate cached strategic pricing without a second plan in the same window');
+ g.hasLineOfSight=originalSight;
  assert.equal(h.strategicScratchCost(g,-200,0,200,40,23,7,'upper'),null,
   'second independent plan must respect one-plan-per-window budget');
  g.time=10.8;
