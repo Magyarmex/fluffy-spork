@@ -77,7 +77,7 @@ const {chromium}=require('playwright');
     delete bot.ai.__v181RivalSpeedWitness;
     rival.cls='guard';rival.x=-8;g.time=3;g.cam.zoom=1;
     const near={id:'near',type:'heal',x:400,y:0};
-    const safe={id:'safe',type:'heal',x:-500,y:0};
+    const safe={id:'safe',type:'heal',x:-540,y:0};
     g.powerups=[near,safe];bot.hp=20;bot.maxHp=100;
     h.resourceContest(g,bot,near,400,classes);
     for(let i=1;i<=3;i++){
