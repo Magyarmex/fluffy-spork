@@ -157,3 +157,20 @@ test('witnessed movement inference is stable at 30 and 60 Hz observation schedul
  }
  assert.ok(Math.abs(scores[0]-scores[1])<1e-10,'same visible trajectory must give same contest pressure');
 });
+
+test('single impulse cannot certify sustained running; class evolution resets witness',()=>{
+ const {h,classes}=boot(),self=tank(1,0),rival=tank(2,100);self.ai={};
+ const g={time:0,tanks:[self,rival],hasLineOfSight:()=>true,tankSpeed:()=>124};
+ const p={id:'heal',type:'heal',x:400,y:0};
+ h.resourceContest(g,self,p,400,classes);
+ g.time=.2;rival.x=136;h.resourceContest(g,self,p,400,classes);
+ assert.equal(self.ai.__v181RivalSpeedWitness['2'].confirmed,1);
+ g.time=.4;rival.x=136;h.resourceContest(g,self,p,400,classes);
+ assert.equal(self.ai.__v181RivalSpeedWitness['2'].confirmed,0,
+  'one knockback-like displacement must not count as sustained speed');
+ g.time=.6;rival.x=172;h.resourceContest(g,self,p,400,classes);
+ assert.equal(self.ai.__v181RivalSpeedWitness['2'].confirmed,1);
+ rival.cls='scout';g.time=.8;rival.x=208;h.resourceContest(g,self,p,400,classes);
+ assert.equal(self.ai.__v181RivalSpeedWitness['2'].confirmed,0,
+  'visible class evolution must reset the old mobility witness');
+});
