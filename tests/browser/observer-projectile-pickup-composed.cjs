@@ -50,15 +50,16 @@ const {chromium}=require('playwright');
      ['wide-departing',1600,900,1,[departing],false,'near'],
      ['wide-slow',1600,900,1,[slow],false,'far'],
      ['wide-special',1600,900,1,[special],false,'far'],
+     ['zoom-out-visible',900,700,.7,[bullet],false,'far'],
+     ['zoom-in-unseen',900,700,1.2,[bullet],false,'near'],
+     ['wide-terrain-hidden',1600,900,1,[bullet],true,'near'],
      ['research-single-shot-offlane',1600,900,1,[minigunTrain[0]],false,null],
      ['research-minigun-stream',1600,900,1,minigunTrain,false,null],
      ['research-minigun-stream-nearby',1600,900,1,minigunTrain,false,null],
-     ['zoom-out-visible',900,700,.7,[bullet],false,'far'],
-     ['zoom-in-unseen',900,700,1.2,[bullet],false,'near'],
-     ['wide-terrain-hidden',1600,900,1,[bullet],true,'near']
     ]){
      g.w=w;g.h=h;g.cam.zoom=zoom;g.bullets=bullets;
      bot.x=label==='research-minigun-stream-nearby'?450:0;bot.y=0;
+     if(label.startsWith('research-')){bot.vx=0;bot.vy=0;bot.hasteT=0;bot.perk=null;bot.gene=null;bot.stats={...bot.stats,speed:0};}
      // Only the observational volley arm compares a same-distance off-lane heal.
      const safeHeal={id:'safe',type:'heal',x:600,y:220};
      g.powerups=label.startsWith('research-')?[near,safeHeal]:[near,far];
