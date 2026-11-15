@@ -64,7 +64,12 @@ const {chromium}=require('playwright');
      };
      for(const k of Object.keys(bot))if(!(k in baseline))delete bot[k];
      Object.assign(bot,baseline);bot.ai={...baseAI};
-     bot.cls='guard';bot.x=-340;bot.y=0;bot.hp=10;bot.maxHp=100;bot.alive=true;
+     bot.id=700007;bot.cls='guard';bot.x=-340;bot.y=0;bot.hp=10;bot.maxHp=100;bot.alive=true;
+     // Booted AI hulls can have random IDs and applied stats. Normalize both
+     // before every arm so separate Chromium jobs compare the same Guard.
+     bot.level=1;bot.tier=0;bot.angle=0;bot.fireCd=0;bot.fireSpin=0;
+     bot.abilityCd=0;bot.shieldT=0;bot.tripleT=0;bot.hasteT=0;
+     bot.stats={damage:0,reload:0,bulletspeed:0,penetration:0,maxhp:0,regen:0,speed:0,body:0};
      bot.isPlayer=false;bot.vx=0;bot.vy=0;bot.spawnShieldT=0;
      bot.ai.state='wander';bot.ai.targetId=-1;bot.ai.thinkT=0;
      bot.ai.wanderA=0;bot.ai.wanderT=0;bot.ai.__v181Think=0;
