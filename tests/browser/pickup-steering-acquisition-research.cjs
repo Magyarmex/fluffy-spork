@@ -230,10 +230,19 @@ const {chromium}=require('playwright');
   // The current AI can prefer the first cached nearby heal even when a second
   // has a shorter independent full route. Expose this as research evidence;
   // do not freeze that suboptimal choice as a passing gameplay golden.
+  const lowerFirst=result.find(r=>r.arm==='two-heals-lower-first');
+  const upperFirst=result.find(r=>r.arm==='two-heals-upper-first');
+  const isolated=result.find(r=>r.arm==='two-heals-lower-first-isolated-plans');
+  const budgeted=result.find(r=>r.arm==='two-heals-lower-first-budgeted-plans');
+  if(!lowerFirst||!upperFirst||!isolated||!budgeted)
+   throw Error('missing controlled candidate-order arms');
   console.log('PICKUP_ORDER_DIAGNOSTIC '+JSON.stringify({
-   lowerFirst:result[3].selectedResource,upperFirst:result[4].selectedResource,
-   exactCosts:result[3].isolatedCosts,
-   choiceFlipped:result[3].selectedResource!==result[4].selectedResource
+   lowerFirst:lowerFirst.selectedResource,upperFirst:upperFirst.selectedResource,
+   isolated:isolated.selectedResource,budgeted:budgeted.selectedResource,
+   exactCosts:lowerFirst.isolatedCosts,
+   choiceFlipped:lowerFirst.selectedResource!==upperFirst.selectedResource,
+   routePlans:{lowerFirst:lowerFirst.routePlansDelta,upperFirst:upperFirst.routePlansDelta,
+    isolated:isolated.routePlansDelta,budgeted:budgeted.routePlansDelta}
   }));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
