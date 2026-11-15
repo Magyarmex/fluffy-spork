@@ -140,7 +140,7 @@ test('canonical Phase Shift descendants and ancestors bypass public lane-exit bo
   for(const id of affected){
     const {g,tank,classes,far,choose}=fixture();
     tank.cls=id;classes.CLASSES[id]=registry[id];
-    g.bullets=[{id:110,ownerId:999,x:600,y:0,vx:0,vy:0,ttl:.25}];
+    g.bullets=[{id:110,ownerId:999,x:600,y:0,vx:500,vy:0,ttl:10}];
     assert.equal(choose(g,tank),far,
       id+' may phase now or after evolution, invalidating walking-only ETA');
   }
