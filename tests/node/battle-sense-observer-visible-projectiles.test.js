@@ -56,3 +56,16 @@ test('a viewport-visible but terrain-hidden projectile cannot poison distant pic
   assert.equal(window.__NOVA_FAIR_ENGAGEMENT__.inGameplayWorldPoint(g,tank,bullet.x,bullet.y),true);
   assert.equal(choose(g,tank,classes),near,'terrain-hidden projectile is not observed by the evaluating tank');
 });
+
+test('irrelevant bullets do not trigger observer terrain visibility probes',()=>{
+  const {g,tank,window}=scene();
+  g.w=1600;
+  g.bullets=Array.from({length:120},(_,id)=>({
+    id:id+100,ownerId:999,x:2000+id*10,y:1500,vx:0,vy:0,ttl:1
+  }));
+  let probes=0;
+  g.hasLineOfSight=()=>{probes++;return true;};
+  const risk=window.__NOVA_BATTLE_SENSE_TEST__.laneRisk(g,600,0,tank.id,tank);
+  assert.equal(risk,0);
+  assert.equal(probes,0,'far bullets must not incur collision checks in resource scoring');
+});
