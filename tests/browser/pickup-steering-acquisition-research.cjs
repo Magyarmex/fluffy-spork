@@ -66,10 +66,17 @@ const {chromium}=require('playwright');
      g.__v1102Routes=Object.create(null);g.__v1102RouteContext=null;
      let state=0x6d2b79f5;Math.random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return(state>>>0)/4294967296;};
      const trace=[],dt=1/60,steps=720;
+     let invalidPositions=0,invalidSegments=0,resourceFrames=0,acquiredAt=null;
      for(let i=0;i<steps;i++){
       g.time=10+i*dt;
+      const px=bot.x,py=bot.y;
       ai.updateAI(bot,g,dt);
+      if(bot.ai.__v181Mode==='resource')resourceFrames++;
+      const radius=(Number(C[bot.cls]?.size)||15)+3;
+      if(!g.isTerrainSafe(bot.x,bot.y,radius-.5))invalidPositions++;
+      if(active.some(w=>segment(px,py,bot.x,bot.y,w,radius-.5)))invalidSegments++;
       g.updatePowerups(dt);
+      if(!g.powerups.length&&acquiredAt==null)acquiredAt=+(i*dt).toFixed(3);
       if(i%30===0||!g.powerups.length){
        const cache=g.__v1102Routes||{},entry=Object.entries(cache).find(([k])=>k.startsWith(String(bot.id)+':')),
         route=entry&&entry[1];
@@ -81,7 +88,8 @@ const {chromium}=require('playwright');
       if(!g.powerups.length)break;
      }
      logs.push({arm,selectedResource:bot.ai.__v181ResourceId,
-      acquired:g.powerups.length===0,final:{x:bot.x,y:bot.y,hp:bot.hp},
+      acquired:g.powerups.length===0,acquiredAt,invalidPositions,invalidSegments,
+      resourceFrames,final:{x:bot.x,y:bot.y,hp:bot.hp},
       routePlans:window.__NOVA_TERRAIN_INTELLIGENCE__?.plans,
       trace});
     }
@@ -97,7 +105,17 @@ const {chromium}=require('playwright');
    return logs;
   });
   if(errors.length)throw Error('browser errors: '+JSON.stringify(errors));
-  if(!result.length||result.some(r=>!r.trace.length))throw Error('empty composed-game witness');
+  if(result.length!==2||result.some(r=>!r.trace.length))throw Error('empty composed-game witness');
   console.log('PICKUP_STEERING_WITNESS '+JSON.stringify(result));
+  for(const arm of result){
+   if(!arm.acquired||arm.acquiredAt==null||arm.acquiredAt>12)
+    throw Error('composed-game heal not acquired within 12s: '+JSON.stringify(arm));
+   if(arm.invalidPositions||arm.invalidSegments)
+    throw Error('physical route violated wall clearance: '+JSON.stringify(arm));
+   if(arm.resourceFrames<100)
+    throw Error('AI did not maintain meaningful resource pursuit: '+JSON.stringify(arm));
+  }
+  if(result[1].acquiredAt<=result[0].acquiredAt)
+   throw Error('three-wall fixture did not exercise a real travel detour');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
