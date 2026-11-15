@@ -25,7 +25,7 @@ const {chromium}=require('playwright');
    if(!bot||typeof choose!=='function'||typeof fair?.inGameplayWorldPoint!=='function')
     throw Error('missing composed Game, Battle Sense or Fair Engagement');
    const originals={w:g.w,h:g.h,cam:g.cam,los:g.hasLineOfSight,bullets:g.bullets,
-    powerups:g.powerups,tanks:g.tanks,visibleTanks:g.__novaFairVisibleTanks,strategic:g.novaStrategicRouteCost};
+    powerups:g.powerups,tanks:g.tanks,visibleTanks:g.__novaFairVisibleTanks};
    const state={...bot},ai={...bot.ai};
    const results=[];
    try{
@@ -34,7 +34,7 @@ const {chromium}=require('playwright');
     g.hasLineOfSight=()=>true;
     // Public pickup coordinates are allowed outside the observer viewport.
     const near={id:'near',type:'heal',x:600,y:0},far={id:'far',type:'heal',x:620,y:0};
-    g.powerups=[near,far];g.novaStrategicRouteCost=undefined;
+    g.powerups=[near,far];
     const bullet={id:bot.id,ownerId:999,x:600,y:20,vx:0,vy:0,ttl:1};
     for(const [label,w,h,zoom,bullets,occluded,expected] of [
      ['portrait-baseline',320,480,1,[],false,'near'],
@@ -58,7 +58,7 @@ const {chromium}=require('playwright');
     Object.assign(bot,state);bot.ai=ai;
     Object.assign(g,{w:originals.w,h:originals.h,cam:originals.cam,
      hasLineOfSight:originals.los,bullets:originals.bullets,powerups:originals.powerups,
-     tanks:originals.tanks,__novaFairVisibleTanks:originals.visibleTanks,novaStrategicRouteCost:originals.strategic});
+     tanks:originals.tanks,__novaFairVisibleTanks:originals.visibleTanks});
    }
    return results;
   });
