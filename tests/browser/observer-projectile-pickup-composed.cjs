@@ -56,10 +56,13 @@ const {chromium}=require('playwright');
      ['wide-terrain-hidden',1600,900,1,[bullet],true,'near']
     ]){
      g.w=w;g.h=h;g.cam.zoom=zoom;g.bullets=bullets;
+     // Only the observational volley arm compares a same-distance off-lane heal.
+     const safeHeal={id:'safe',type:'heal',x:600,y:220};
+     g.powerups=label==='research-minigun-stream'?[near,safeHeal]:[near,far];
      g.hasLineOfSight=occluded?(ax,ay,bx,by)=>!(ax===bot.x&&ay===bot.y&&bx===bullet.x&&by===bullet.y):()=>true;
      const observed=fair.inGameplayWorldPoint(g,bot,bullet.x,bullet.y);
      const selected=choose(g,bot,classes)?.id||null;
-     const diagnostic=label==='research-minigun-stream'?{bulletCount:bullets.length,bulletSpeed:gunSpeed,baselineRisk:window.__NOVA_BATTLE_SENSE_TEST__.laneRisk(g,near.x,near.y,bot.id,bot),projectedRisk:window.__NOVA_BATTLE_SENSE_TEST__.laneRisk(g,near.x,near.y,bot.id,bot,.8)}:null;
+     const diagnostic=label==='research-minigun-stream'?{bulletCount:bullets.length,bulletSpeed:gunSpeed,baselineRisk:window.__NOVA_BATTLE_SENSE_TEST__.laneRisk(g,near.x,near.y,bot.id,bot),projectedRisk:window.__NOVA_BATTLE_SENSE_TEST__.laneRisk(g,near.x,near.y,bot.id,bot,.8),offLaneRisk:window.__NOVA_BATTLE_SENSE_TEST__.laneRisk(g,safeHeal.x,safeHeal.y,bot.id,bot)}:null;
      results.push({label,w,h,zoom,observed,selected,expected,...(diagnostic||{})});
      if(expected!==null&&selected!==expected)throw Error('wrong composed-game pickup choice: '+JSON.stringify(results.at(-1)));
      if(label.includes('unseen')&&observed)throw Error('fixture bullet unexpectedly visible: '+label);
