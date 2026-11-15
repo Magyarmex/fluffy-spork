@@ -84,3 +84,15 @@ test('world-point projectile predicate matches canonical viewport geometry acros
     }
   }
 });
+
+test('offscreen approaching round cannot influence a public heal before entering the gameplay viewport',()=>{
+  const {g,tank,classes,window}=scene();
+  const choose=window.__NOVA_BATTLE_SENSE_TEST__.chooseResource;
+  const near=g.powerups[0],far=g.powerups[1];
+  g.bullets=[{id:123,ownerId:999,x:400,y:0,vx:600,vy:0,ttl:1}];
+  assert.equal(window.__NOVA_FAIR_ENGAGEMENT__.inGameplayWorldPoint(g,tank,400,0),false);
+  assert.equal(choose(g,tank,classes),near,'unseen approaching round must not influence remote pickup valuation');
+  g.w=1000;
+  assert.equal(window.__NOVA_FAIR_ENGAGEMENT__.inGameplayWorldPoint(g,tank,400,0),true);
+  assert.equal(choose(g,tank,classes),far,'visible approaching round retains predictive lane danger');
+});
