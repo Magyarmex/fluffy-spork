@@ -74,6 +74,34 @@ const {chromium}=require('playwright');
      if(label.includes('unseen')&&observed)throw Error('fixture bullet unexpectedly visible: '+label);
      if((label==='wide-visible'||label==='zoom-out-visible')&&!observed)throw Error('fixture bullet unexpectedly offscreen');
     }
+   // Research-only time series: the same public Minigun projectile grammar,
+   // with either one departing round or a shooter that continues replacing it.
+   // This exercises the actual composed Battle Sense choice every 0.1s.
+   // Bullets are analytically placed; this is NOT a real damage/collision trial.
+   const cadence=.15, speed=gunSpeed, birthX=600, samples=[];
+   g.w=1600;g.h=900;g.cam.zoom=1;g.hasLineOfSight=()=>true;
+   g.powerups=[near,{id:'safe',type:'heal',x:600,y:220}];
+   Object.assign(bot,{x:0,y:0,vx:0,vy:0,hasteT:0,perk:null,gene:null,
+    stats:{...bot.stats,speed:0}});
+   for(const policy of ['single','continuous']){
+    for(let step=0;step<=20;step++){
+     const elapsed=step*.1;
+     const births=policy==='single'?[0]:Array.from(
+      {length:Math.floor((elapsed+1e-9)/cadence)+1},(_,i)=>i*cadence);
+     g.bullets=births.map((birth,i)=>({
+      id:100000+i,ownerId:999,x:birthX+speed*(elapsed-birth),y:0,
+      vx:speed,vy:0,ttl:10
+     })).filter(b=>b.x<1600);
+     const arrival=Math.max(0,Math.hypot(near.x-bot.x,near.y-bot.y)-50)/
+      (124*1.18*(1+.045*8)*1.45*1.9*1.14*1.10);
+     samples.push({policy,elapsed:Number(elapsed.toFixed(2)),
+      active:g.bullets.length,selected:choose(g,bot,classes)?.id||null,
+      nearRisk:window.__NOVA_BATTLE_SENSE_TEST__.laneRisk(
+       g,near.x,near.y,bot.id,bot,arrival)});
+    }
+   }
+   results.push({label:'research-replenishment-time-series',
+    syntheticProjectileMotion:true,realDamageOrCollision:false,samples});
    }finally{
     Object.assign(bot,state);bot.ai=ai;
     Object.assign(g,{w:originals.w,h:originals.h,cam:originals.cam,
@@ -83,7 +111,7 @@ const {chromium}=require('playwright');
    return results;
   });
   if(errors.length)throw Error('browser errors: '+JSON.stringify(errors));
-  if(report.length!==14)throw Error('missing composed-game acceptance or research arms');
+  if(report.length!==15)throw Error('missing composed-game acceptance or research arms');
   console.log('OBSERVER_PROJECTILE_COMPOSED_GAME '+JSON.stringify(report));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
