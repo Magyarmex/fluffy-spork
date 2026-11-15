@@ -121,16 +121,23 @@ test('critical-heal scratch planning is goal-keyed, bounded and never evicts mov
  assert.equal(h.strategicScratchCost(g,-200,0,200,-40,23,7,'lower'),lower);
  const originalSight=g.hasLineOfSight;
  g.hasLineOfSight=()=>false;
- assert.equal(h.strategicScratchCost(g,-200,0,200,-40,23,7,'lower'),null,
-  'newly blocked route legs must invalidate cached strategic pricing without a second plan in the same window');
+ assert.equal(h.strategicScratchCost(g,-200,0,200,-40,23,7,'lower'),Infinity,
+  'newly blocked route legs must invalidate the cached path; one bounded replan may fail closed');
  g.hasLineOfSight=originalSight;
  assert.equal(h.strategicScratchCost(g,-200,0,200,40,23,7,'upper'),null,
-  'second independent plan must respect one-plan-per-window budget');
- assert.equal(h.strategicScratchCost(g,-130,0,200,-40,23,7,'lower'),null,
-  'moving more than 60 units must not reuse an anchored route or exceed the scratch budget');
+  'the two-plan budget also counts a failed route revalidation attempt');
  g.time=10.8;
  const upper=h.strategicScratchCost(g,-200,0,200,40,23,7,'upper');
- assert.ok(Number.isFinite(upper)&&upper>Math.hypot(400,40));
+ assert.ok(Number.isFinite(upper),'a fresh window can certify the second healing goal');
+ assert.ok(Number.isFinite(h.strategicScratchCost(g,-200,0,200,-40,23,7,'lower')),
+  'two distinct heal goals can be independently certified in one window');
+ assert.equal(h.strategicScratchCost(g,-200,0,200,60,23,7,'third'),null,
+  'third independent plan must respect two-plans-per-window budget');
+ assert.equal(h.strategicScratchCost(g,-70,0,200,-40,23,7,'lower'),null,
+  'moving more than 110 units must not reuse an anchored route or exceed the scratch budget');
+ g.time=11.6;
+ const upperAgain=h.strategicScratchCost(g,-200,0,200,40,23,7,'upper');
+ assert.ok(Number.isFinite(upperAgain)&&upperAgain>Math.hypot(400,40));
  assert.equal(JSON.stringify(g.__v1102Routes),before,
   'strategic contender planning must not mutate the live movement cache');
  walls.length=0;
@@ -187,7 +194,7 @@ test('scratch route cost respects representative class clearances without certif
    'a physically blocked direct line must never receive a straight-line price');
   if(Number.isFinite(cost)){
    const entries=Object.values(g.__v1102StrategicRoutes||{});
-   assert.ok(entries.some(e=>e.entry&&e.entry.points.length>1),
+   assert.ok(entries.some(e=>Object.values(e.entries||{}).some(route=>route.points.length>1)),
     'a finite occluded route must have verified intermediate waypoints');
   }
  }
@@ -203,11 +210,15 @@ test('strategic planner telemetry counts failed attempts and excludes budget-onl
  assert.equal(stats.strategicPlans,0);
  assert.equal(h.strategicScratchCost(g,-200,0,200,0,23,7,'unreachable'),Infinity);
  assert.equal(stats.strategicPlans,1,'failed search still consumed planner work');
- assert.equal(h.strategicScratchCost(g,-200,0,200,0,23,7,'other'),null);
- assert.equal(stats.strategicPlans,1,'budget refusal does not run another search');
+ assert.equal(h.strategicScratchCost(g,-200,0,200,0,23,7,'other'),Infinity);
+ assert.equal(stats.strategicPlans,2,'second independent goal consumes the second allowed plan');
+ assert.equal(h.strategicScratchCost(g,-200,0,200,0,23,7,'third'),null);
+ assert.equal(stats.strategicPlans,2,'budget refusal does not run another search');
+ assert.equal(stats.strategicLocalDeferrals,1,'third goal is denied by the per-tank limit');
+ assert.equal(stats.strategicGlobalDeferrals,0,'local refusal must not masquerade as global saturation');
  g.time=10.8;
  assert.equal(h.strategicScratchCost(g,-200,0,200,0,23,7,'other'),Infinity);
- assert.equal(stats.strategicPlans,2,'next-window failed search is counted once');
+ assert.equal(stats.strategicPlans,3,'next-window failed search is counted once');
 });
 
 
@@ -221,6 +232,7 @@ test('aggregate scratch budget survives 120 rotating identities and cache evicti
   h.strategicScratchCost(g,-200,0,200,0,23,seed,'unreachable');
  assert.equal(stats.strategicPlans,64,
   'cache eviction must not reset the shared per-window CPU search budget');
+ assert.ok(stats.strategicGlobalDeferrals>0,'global exhaustion must be measurable separately');
  assert.ok(Object.keys(g.__v1102StrategicRoutes).length<=64);
  g.time=10.8;
  for(let seed=1;seed<=120;seed++)

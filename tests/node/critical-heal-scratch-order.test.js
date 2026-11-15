@@ -77,7 +77,7 @@ function makeScene(order) {
   g.tanks = [tank];
   g.bullets = [];
   return { g, tank, classes, hooks: w.__NOVA_BATTLE_SENSE_TEST__,
-    terrain: w.__NOVA_TERRAIN_INTELLIGENCE_TEST__, pickups };
+    terrain: w.__NOVA_TERRAIN_INTELLIGENCE_TEST__, stats:w.__NOVA_TERRAIN_INTELLIGENCE__, pickups };
 }
 
 
@@ -128,4 +128,136 @@ test('research: pre-existing movement routes may influence first-contender prici
  }
  console.log('SCRATCH_PREWARMED_ROUTE_ORDER_RESEARCH '+JSON.stringify({seeds:120,choices:chosen,flips}));
  // Observational falsifier: do not freeze a possibly biased outcome as golden.
+});
+
+test('critical two-heal pricing preserves a prewarmed movement route and does not create one when absent',()=>{
+ for(const order of [[0,1],[1,0]]){
+  for(const prewarm of [false,true]){
+   const {g,tank,classes,hooks}=makeScene(order);
+   if(prewarm){
+    const wp=g.novaBattlefieldWaypoint(tank.x,tank.y,340,0,23,tank.id);
+    assert.ok(wp,'a real unrelated movement route must exist before scoring');
+   }
+   const before=JSON.stringify(g.__v1102Routes||{});
+   const selected=hooks.chooseResource(g,tank,classes);
+   assert.ok(selected,'the critical Guard must retain a healing choice');
+   assert.equal(JSON.stringify(g.__v1102Routes||{}),before,
+    'strategic evaluation must not replace, advance or create a live movement route');
+  }
+ }
+});
+
+test('research: 120 simultaneous critical two-heal bots expose fallback planning pressure',()=>{
+ const {g,classes,hooks,stats}=makeScene([0,1]);
+ const bots=Array.from({length:120},(_,i)=>({
+  id:i+1,cls:'guard',x:-340,y:0,hp:10,maxHp:100,alive:true,ai:{}
+ }));
+ g.tanks=bots;
+ g.__novaFairVisibleTanks=[];
+ for(const bot of bots)hooks.chooseResource(g,bot,classes);
+ const budget=g.__v1102StrategicBudget||{plans:0};
+ const liveRoutes=Object.keys(g.__v1102Routes||{}).length;
+ const strategicStates=g.__v1102StrategicRoutes||{};
+ const scratchPlans=Object.values(strategicStates).reduce((sum,state)=>sum+state.plans,0);
+ console.log('TWO_HEAL_MANY_BOT_PLANNING_RESEARCH '+JSON.stringify({
+  bots:bots.length,globalScratchPlans:budget.plans,
+  cachedScratchPlans:scratchPlans,liveRoutes,livePlannerCalls:stats.plans
+ }));
+ assert.ok(budget.plans<=64,'global scratch search budget must remain bounded');
+ assert.equal(liveRoutes,0,'critical strategic pricing must not leave movement routes behind');
+ assert.equal(stats.plans,0,'exhausting the global scratch budget must not trigger unbounded live planner work');
+});
+
+
+test('research: global scratch budget fairness across update orders and subsequent windows',()=>{
+ const observations=[];
+ for(const count of [32,33,48,64]){
+  for(const reverse of [false,true]){
+   const {g,classes,hooks,stats}=makeScene([0,1]);
+   const bots=Array.from({length:count},(_,i)=>({
+    id:i+1,cls:'guard',x:-340,y:0,hp:10,maxHp:100,alive:true,ai:{}
+   }));
+   g.tanks=bots;
+   g.__novaFairVisibleTanks=[];
+   const order=reverse?[...bots].reverse():bots;
+   const first=[];
+   for(const bot of order){
+    const priorBudget=g.__v1102StrategicBudget;
+    const before=priorBudget?.plans||0;
+    const choice=hooks.chooseResource(g,bot,classes)?.id||null;
+    const currentBudget=g.__v1102StrategicBudget;
+    const after=currentBudget?.plans||0;
+    const plansSpent=currentBudget===priorBudget?after-before:after;
+    assert.ok(plansSpent>=0&&plansSpent<=2,'each bot must spend zero to two scratch plans per window');
+    first.push({id:bot.id,choice,plansSpent,atCap:after>=64});
+   }
+   const firstPlans=g.__v1102StrategicBudget?.plans||0;
+   const firstDeferred=first.filter(item=>!item.choice).map(item=>item.id);
+   assert.ok(firstPlans<=64,'a crowded tick must never exceed the shared scratch budget');
+   assert.equal(Object.keys(g.__v1102Routes||{}).length,0,
+    'deferred strategic decisions must not fall back to live movement planning');
+   g.time+=.76;
+   const second=[];
+   for(const bot of [...order].reverse()){
+    const priorBudget=g.__v1102StrategicBudget;
+    const before=priorBudget?.plans||0;
+    const choice=hooks.chooseResource(g,bot,classes)?.id||null;
+    const currentBudget=g.__v1102StrategicBudget;
+    const after=currentBudget?.plans||0;
+    const plansSpent=currentBudget===priorBudget?after-before:after;
+    assert.ok(plansSpent>=0&&plansSpent<=2,'each bot must spend zero to two scratch plans per window');
+    second.push({id:bot.id,choice,plansSpent,atCap:after>=64});
+   }
+   const secondPlans=g.__v1102StrategicBudget?.plans||0;
+   assert.ok(secondPlans<=64,'the following window must retain the same global budget');
+   assert.equal(Object.keys(g.__v1102Routes||{}).length,0);
+   g.time+=.76;
+   const third=[];
+   for(const bot of order){
+    const priorBudget=g.__v1102StrategicBudget;
+    const before=priorBudget?.plans||0;
+    const choice=hooks.chooseResource(g,bot,classes)?.id||null;
+    const currentBudget=g.__v1102StrategicBudget;
+    const after=currentBudget?.plans||0;
+    const plansSpent=currentBudget===priorBudget?after-before:after;
+    assert.ok(plansSpent>=0&&plansSpent<=2,'each bot must spend zero to two scratch plans per window');
+    third.push({id:bot.id,choice,plansSpent,atCap:after>=64});
+   }
+   const thirdPlans=g.__v1102StrategicBudget?.plans||0;
+   assert.ok(thirdPlans<=64,'the third window must retain the same global budget');
+   assert.equal(Object.keys(g.__v1102Routes||{}).length,0);
+   observations.push({count,reverse,firstPlans,secondPlans,thirdPlans,
+    firstChosen:first.length-firstDeferred.length,
+    secondChosen:second.filter(item=>item.choice).length,
+    thirdChosen:third.filter(item=>item.choice).length,
+    firstPlanSpends:first.map(item=>item.plansSpent),
+    secondPlanSpends:second.map(item=>item.plansSpent),
+    thirdPlanSpends:third.map(item=>item.plansSpent),
+    firstDeferred,secondDeferred:second.filter(item=>!item.choice).map(item=>item.id),
+    thirdDeferred:third.filter(item=>!item.choice).map(item=>item.id),
+    livePlannerCalls:stats.plans});
+  }
+ }
+ console.log('TWO_HEAL_GLOBAL_BUDGET_FAIRNESS_RESEARCH '+JSON.stringify(observations));
+ // This is an observational test: a scheduling-order disparity is evidence
+ // for a future bounded fairness policy, not permission to weaken the CPU cap.
+});
+
+
+test('research: mixed shield and two-heal evaluation may still own a live movement route',()=>{
+ const results=[];
+ for(const shieldIndex of [0,1,2]){
+  const {g,tank,classes,hooks}=makeScene([0,1]);
+  const shield={id:'shield-contender',type:'shield',x:340,y:0};
+  g.powerups.splice(shieldIndex,0,shield);
+  const selected=hooks.chooseResource(g,tank,classes);
+  const liveRoutes=Object.values(g.__v1102Routes||{}).map(route=>({
+   gx:route.gx,gy:route.gy
+  }));
+  results.push({shieldIndex,selected:selected?.id||null,liveRoutes,
+   scratchPlans:g.__v1102StrategicBudget?.plans||0});
+ }
+ console.log('MIXED_RESOURCE_LIVE_ROUTE_RESEARCH '+JSON.stringify(results));
+ // The two-heal isolation contract does not cover non-heal candidates.
+ // Record any live-cache contamination before proposing a wider policy.
 });

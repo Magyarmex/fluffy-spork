@@ -14,7 +14,7 @@ var CONTROLLER_IDS={carrier:1,overlord:1,warden:1,hivemind:1,broodmother:1,citad
 
 window.__NOVA_VERSION=VERSION;
 window.__NOVA_TERRAIN_INTELLIGENCE__={
-  version:VERSION,codename:CODENAME,plans:0,cacheHits:0,strategicPlans:0,stuckRecoveries:0,spotterReroutes:0,idleDroneReroutes:0,idleDroneReplans:0,
+  version:VERSION,codename:CODENAME,plans:0,cacheHits:0,strategicPlans:0,strategicLocalDeferrals:0,strategicGlobalDeferrals:0,stuckRecoveries:0,spotterReroutes:0,idleDroneReroutes:0,idleDroneReplans:0,
   guarantees:{hiddenTracking:false,teleportRecovery:false,dashSteering:false,globalNavmesh:false}
 };
 window.__NOVA_TERRAIN_INTELLIGENCE_RELEASE__={
@@ -189,12 +189,12 @@ function strategicScratchCost(g,x,y,gx,gy,pad,seed,goalId){
    budget=g.__v1102StrategicBudget={windowStart:now,plans:0};
  var state=map[key];
  if(!state||now<state.windowStart||now-state.windowStart>=.75){
-   state=map[key]={windowStart:now,plans:0,entry:null};
+   state=map[key]={windowStart:now,plans:0,entries:Object.create(null)};
    /* Failed or uncertified plans must also count toward the cache cap. */
    var keys=Object.keys(map);if(keys.length>64)delete map[keys[0]];
  }
- var e=state.entry,goalKey=String(goalId)+':'+gx+':'+gy;
- if(e&&(e.goalKey!==goalKey||now>e.until||dist(x,y,e.ax,e.ay)>60))e=null;
+ var goalKey=String(goalId)+':'+gx+':'+gy,e=state.entries[goalKey];
+ if(e&&(now>e.until||dist(x,y,e.ax,e.ay)>110))e=null;
  if(e){
    var fromX=x,fromY=y,valid=true;
    for(var i=0;i<e.points.length;i++){
@@ -205,7 +205,8 @@ function strategicScratchCost(g,x,y,gx,gy,pad,seed,goalId){
    if(!valid)e=null;
  }
  if(!e){
-   if(state.plans>=1||budget.plans>=64)return null;
+   if(state.plans>=2){window.__NOVA_TERRAIN_INTELLIGENCE__.strategicLocalDeferrals++;return null;}
+   if(budget.plans>=64){window.__NOVA_TERRAIN_INTELLIGENCE__.strategicGlobalDeferrals++;return null;}
    state.plans++;budget.plans++;
    /* Count attempts, including failed plans: these still consume CPU. */
    if(window.__NOVA_TERRAIN_INTELLIGENCE__)window.__NOVA_TERRAIN_INTELLIGENCE__.strategicPlans++;
@@ -218,7 +219,7 @@ function strategicScratchCost(g,x,y,gx,gy,pad,seed,goalId){
      cx=node.x;cy=node.y;
    }
    e={goalKey:goalKey,ax:x,ay:y,until:now+.75,points:points};
-   state.entry=e;
+   state.entries[goalKey]=e;
  }
  var total=0,px=x,py=y;
  for(var j=0;j<e.points.length;j++){var p=e.points[j];total+=dist(px,py,p.x,p.y);px=p.x;py=p.y;}

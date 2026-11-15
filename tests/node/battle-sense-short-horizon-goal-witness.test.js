@@ -85,8 +85,11 @@ test('critical heal movement preserves the selected goal despite a short-horizon
   const chosen = hooks.chooseResource(g,tank,classes);
   assert.ok(chosen && pickups.some(p => p.id === chosen.id),
     'fixture must select a real eligible heal before steering');
-  const strategic = g.__v1102Routes && g.__v1102Routes['7:6'];
-  assert.ok(strategic, 'strategic selection must exercise the actual composed terrain owner');
+  const strategic = g.__v1102StrategicRoutes && g.__v1102StrategicRoutes['7:6'];
+  assert.ok(strategic && Object.keys(strategic.entries||{}).length===2,
+    'both healing contenders must be independently certified by the composed terrain owner');
+  assert.equal(Object.keys(g.__v1102Routes||{}).length,0,
+    'strategic selection must not preempt the live movement-route cache');
   const selectedGoal = {x:chosen.x,y:chosen.y};
   const calls = [];
   const original = g.novaBattlefieldWaypoint;
