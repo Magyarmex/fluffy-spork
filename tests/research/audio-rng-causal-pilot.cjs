@@ -97,9 +97,10 @@ function bootGame(quality = 'low') {
 
 /* Research only. Force the canonical Sfx.ensure noise-buffer initialization
  * at the SAME point after a matched physical Game boot. Three arms isolate
- * its 22,050 shared random draws from the audio buffer's visual analogue:
- * the sound waveform data itself. All arms then mute audio for identical
- * gameplay/input; no audio implementation or production code is changed.
+ * its noise-buffer generation from gameplay's shared RNG. The canonical
+ * local noise stream must preserve a non-silent waveform without consuming
+ * any shared random draws. All arms then mute audio for identical gameplay;
+ * no audio implementation or production code is changed.
  */
 class FakeAudioContext {
  constructor(){this.sampleRate=44100;this.currentTime=0;this.state='running';this.destination={};}
@@ -137,6 +138,7 @@ function arm(seed,hz,mode){
    const data=g.sfx.noiseBuf.getChannelData(0);
    audioSamples=data.length;
    assert.equal(audioSamples,22050,'canonical 0.5s at 44.1kHz');
+   assert.ok(data.some(sample=>sample!==0),'audio RNG isolation must not silence the noise buffer');
    if(mode==='erased')data.fill(0);
   }
   // No audio output is permitted in any arm after the intervention.
