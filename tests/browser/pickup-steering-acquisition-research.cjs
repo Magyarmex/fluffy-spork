@@ -156,6 +156,8 @@ const fs=require('node:fs');
      let state=0x6d2b79f5;Math.random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return(state>>>0)/4294967296;};
      const plansBefore=window.__NOVA_TERRAIN_INTELLIGENCE__?.plans||0,
       strategicBefore=window.__NOVA_TERRAIN_INTELLIGENCE__?.strategicPlans||0,
+      localDeferralsBefore=window.__NOVA_TERRAIN_INTELLIGENCE__?.strategicLocalDeferrals||0,
+      globalDeferralsBefore=window.__NOVA_TERRAIN_INTELLIGENCE__?.strategicGlobalDeferrals||0,
       routeGoalOccupancy={selected:0,otherHeal:0,unrelated:0,empty:0};
      const trace=[],aiUpdateCosts=[],dt=1/60,steps=720;
      let invalidPositions=0,invalidSegments=0,resourceFrames=0,acquiredAt=null,firstChosen=null,acquiredId=null;
@@ -213,6 +215,8 @@ const fs=require('node:fs');
       routePlans:window.__NOVA_TERRAIN_INTELLIGENCE__?.plans,
       routePlansDelta:(window.__NOVA_TERRAIN_INTELLIGENCE__?.plans||0)-plansBefore,
       strategicPlansDelta:(window.__NOVA_TERRAIN_INTELLIGENCE__?.strategicPlans||0)-strategicBefore,
+      strategicLocalDeferralsDelta:(window.__NOVA_TERRAIN_INTELLIGENCE__?.strategicLocalDeferrals||0)-localDeferralsBefore,
+      strategicGlobalDeferralsDelta:(window.__NOVA_TERRAIN_INTELLIGENCE__?.strategicGlobalDeferrals||0)-globalDeferralsBefore,
       routeGoalOccupancy,
       goalHintOverrides,
       trace});
