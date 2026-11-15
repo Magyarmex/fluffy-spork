@@ -134,3 +134,23 @@ test('witnesses are bounded, identity-scoped and reject unseen prior positions',
  assert.equal(self.ai.__v181RivalSpeedWitness['19'].target,replacement,'recycled id cannot reuse prior witness');
  assert.equal(self.ai.__v181RivalSpeedWitness['19'].confirmed,0);
 });
+
+test('witnessed movement inference is stable at 30 and 60 Hz observation schedules',()=>{
+ const {h,classes}=boot(),scores=[];
+ for(const fps of [30,60]){
+  const self=tank(1,0),rival=tank(2,100);self.ai={};
+  const g={time:0,tanks:[self,rival],hasLineOfSight:()=>true,tankSpeed:()=>124};
+  const p={id:'heal',type:'heal',x:400,y:0};
+  h.resourceContest(g,self,p,400,classes);
+  for(let frame=1;frame<=fps;frame++){
+   if(frame%(fps/5)!==0)continue;
+   g.time=frame/fps;rival.x=100+180*g.time;
+   h.resourceContest(g,self,p,400,classes);
+  }
+  const learned=h.resourceContest(g,self,p,400,classes);
+  const witness=self.ai.__v181RivalSpeedWitness['2'];
+  assert.ok(witness.confirmed>=2,'running should be witnessed at '+fps+' Hz');
+  scores.push(learned);
+ }
+ assert.ok(Math.abs(scores[0]-scores[1])<1e-10,'same visible trajectory must give same contest pressure');
+});
