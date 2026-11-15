@@ -105,6 +105,64 @@ const {chromium}=require('playwright');
    }
    results.push({label:'research-replenishment-time-series',
     syntheticProjectileMotion:true,realDamageOrCollision:false,samples});
+   // Real composed AI movement/pickup owner under analytically replenished
+   // bullets. Observational only: the synthetic rounds do not inflict damage.
+   // A later paired experiment must include the real projectile collision owner.
+   const aiOwner=window.__novaMakeRequire('')('game/ai');
+   const movement=[];
+   const oldTerrain=g.__novaTerrain,oldHash=g.hash,oldShapes=g.shapes;
+   const oldTime=g.time,oldPlayerX=g.player.x,oldPlayerY=g.player.y;
+   try{
+    g.__novaTerrain=[];g.hash=null;g.shapes=[];
+    g.player.x=2200;g.player.y=2200;
+    for(const policy of ['single','continuous']){
+     Object.assign(bot,state);
+     bot.ai={...ai};
+     Object.assign(bot,{id:700007,cls:'guard',x:0,y:0,vx:0,vy:0,
+      hp:20,maxHp:100,alive:true,isPlayer:false,level:1,tier:0,
+      hasteT:0,shieldT:0,spawnShieldT:0,fireCd:0,abilityCd:0,
+      stats:{damage:0,reload:0,bulletspeed:0,penetration:0,maxhp:0,
+       regen:0,speed:0,body:0}});
+     bot.ai.state='wander';bot.ai.targetId=-1;bot.ai.thinkT=0;
+     bot.ai.__v181Think=0;bot.ai.__v181Mode='none';
+     bot.ai.__v181ResourceId=null;
+     g.powerups=[{id:'near',type:'heal',x:600,y:0},
+      {id:'safe',type:'heal',x:600,y:220}];
+     g.__v1102Routes=Object.create(null);
+     g.__v1102StrategicRoutes=Object.create(null);
+     let acquired=null,damageNotSimulated=true,resourceFrames=0;
+     const trace=[],dt=1/60;
+     for(let i=0;i<480;i++){
+      const elapsed=i*dt;
+      g.time=20+elapsed;
+      const births=policy==='single'?[0]:Array.from(
+       {length:Math.floor((elapsed+1e-9)/cadence)+1},(_,j)=>j*cadence);
+      g.bullets=births.map((birth,j)=>({
+       id:200000+j,ownerId:999,x:birthX+speed*(elapsed-birth),y:0,
+       vx:speed,vy:0,ttl:10
+      })).filter(b=>b.x<1600);
+      aiOwner.updateAI(bot,g,dt);
+      if(bot.ai.__v181Mode==='resource')resourceFrames++;
+      g.updatePowerups(dt);
+      if(i%60===0)trace.push({t:Number(elapsed.toFixed(2)),
+       x:Number(bot.x.toFixed(2)),y:Number(bot.y.toFixed(2)),
+       hp:bot.hp,mode:bot.ai.__v181Mode,
+       goal:bot.ai.__v181ResourceId||null});
+      if(g.powerups.length<2){
+       acquired={time:Number(elapsed.toFixed(3)),
+        id:g.powerups.some(p=>p.id==='near')?'safe':'near'};
+       break;
+      }
+     }
+     movement.push({policy,acquired,resourceFrames,
+      damageNotSimulated,trace});
+    }
+   }finally{
+    g.__novaTerrain=oldTerrain;g.hash=oldHash;g.shapes=oldShapes;
+    g.time=oldTime;g.player.x=oldPlayerX;g.player.y=oldPlayerY;
+   }
+   results.push({label:'research-replenishment-real-ai-movement',
+    syntheticProjectileMotion:true,realDamageOrCollision:false,movement});
    }finally{
     Object.assign(bot,state);bot.ai=ai;
     Object.assign(g,{w:originals.w,h:originals.h,cam:originals.cam,
@@ -114,7 +172,7 @@ const {chromium}=require('playwright');
    return results;
   });
   if(errors.length)throw Error('browser errors: '+JSON.stringify(errors));
-  if(report.length!==15)throw Error('missing composed-game acceptance or research arms');
+  if(report.length!==16)throw Error('missing composed-game acceptance or research arms');
   console.log('OBSERVER_PROJECTILE_COMPOSED_GAME '+JSON.stringify(report));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
