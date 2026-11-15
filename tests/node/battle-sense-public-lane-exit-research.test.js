@@ -47,7 +47,7 @@ test('approaching ordinary bullet can cross and leave lane before remote arrival
 });
 test('shell and other special trajectories retain conservative danger',()=>{
  const {g,tank,far,choose}=fixture();
- for(const flag of ['shell','splash','beam','__v17Cannon']){
+ for(const flag of ['shell','splash','beam','__v17Cannon','__novaRail','__novaSniperLineage']){
    g.bullets=[{id:93,ownerId:999,x:600,y:0,vx:500,vy:0,ttl:10,[flag]:true}];
    assert.equal(choose(g,tank),far,flag+' remains dangerous');
  }
