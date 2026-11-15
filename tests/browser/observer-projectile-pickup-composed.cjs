@@ -35,7 +35,7 @@ const {chromium}=require('playwright');
     // Public pickup coordinates are allowed outside the observer viewport.
     const near={id:'near',type:'heal',x:600,y:0},far={id:'far',type:'heal',x:620,y:0};
     g.powerups=[near,far];g.novaStrategicRouteCost=undefined;
-    const bullet={id:bot.id,ownerId:999,x:600,y:0,vx:0,vy:0,ttl:1};
+    const bullet={id:bot.id,ownerId:999,x:600,y:20,vx:0,vy:0,ttl:1};
     for(const [label,w,h,bullets,occluded,expected] of [
      ['portrait-baseline',320,480,[],false,'near'],
      ['portrait-unseen',320,480,[bullet],false,'near'],
