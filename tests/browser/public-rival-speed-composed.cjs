@@ -42,8 +42,12 @@ const {chromium}=require('playwright');
     h.resourceContest(g,bot,{x:500,y:0},500,classes);
     g.time=.25;rival.x=165;h.resourceContest(g,bot,{x:500,y:0},500,classes);
     if(bot.ai.__v181RivalSpeedWitness['700002'].confirmed!==1)throw Error('first motion witness was not recorded');
-    g.time=.5;rival.x=210;h.resourceContest(g,bot,{x:500,y:0},500,classes);
+    g.time=.5;rival.x=210;const witnessed=h.resourceContest(g,bot,{x:500,y:0},500,classes);
     if(bot.ai.__v181RivalSpeedWitness['700002'].confirmed<2)throw Error('repeated public movement was not learned');
+    const witnessedState=bot.ai.__v181RivalSpeedWitness;delete bot.ai.__v181RivalSpeedWitness;
+    const classOnly=h.resourceContest(g,bot,{x:500,y:0},500,classes);
+    bot.ai.__v181RivalSpeedWitness=witnessedState;
+    if(!(witnessed>classOnly))throw Error('witnessed movement did not improve identical-position race estimate');
     if(privateCalls)throw Error('motion inference accessed private speed');
     return {baseline,hiddenChanged,classChanged,privateCalls};
    }finally{
