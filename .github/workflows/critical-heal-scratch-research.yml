@@ -2,6 +2,7 @@ name: NOVA Scratch Route 13-Arm Acceptance
 on:
   pull_request:
     paths:
+      - 'nova-updates/combined-arms-v1.7.2.js'
       - 'nova-updates/battle-sense-v1.8.1.js'
       - 'nova-updates/terrain-intelligence-v1.10.2.js'
       - 'tests/node/critical-heal-scratch-order.test.js'

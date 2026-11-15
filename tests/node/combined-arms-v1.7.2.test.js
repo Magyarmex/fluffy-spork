@@ -185,3 +185,35 @@ test('active Controller drones delegate route choice and test their physical rad
   assert.equal(args[4],13,'drone route pad is radius plus the five-unit safety margin');
   assert.equal(args[5],d.id);
 });
+
+test('AI drops a stale corner behind its intended clear forward lane',()=>{
+ const {Game}=loadCombinedArms(),g=new Game(),t=tank(7,'guard',{
+  x:100,y:210,ai:{__v172Waypoint:{x:68,y:238},__v172WaypointUntil:11}
+ });
+ g.firstTerrainHit=()=>null;
+ g.moveTank(t,100,-50,.1);
+ assert.equal(t.ai.__v172Waypoint,null,
+  'an already passed corner must not keep pulling the tank backward');
+ assert.ok(t.vx>80&&t.vy<0,
+  'unobstructed intended movement should recover promptly after the corner');
+});
+
+test('AI clears a reached corner from persistent waypoint state',()=>{
+ const {Game}=loadCombinedArms(),g=new Game(),t=tank(7,'guard',{
+  x:60,y:225,ai:{__v172Waypoint:{x:68,y:238},__v172WaypointUntil:11}
+ });
+ g.firstTerrainHit=()=>null;
+ g.moveTank(t,100,0,.1);
+ assert.equal(t.ai.__v172Waypoint,null,
+  'a reached corner must not be resurrected from stored AI state next frame');
+});
+
+test('AI retains a waypoint when forward terrain still blocks movement',()=>{
+ const {Game}=loadCombinedArms(),g=new Game(),wp={x:68,y:238},t=tank(7,'guard',{
+  x:100,y:210,ai:{__v172Waypoint:wp,__v172WaypointUntil:11}
+ });
+ g.firstTerrainHit=()=>({solid:{id:1},hit:{x:110,y:210,nx:-1,ny:0}});
+ g.moveTank(t,100,-50,.1);
+ assert.equal(t.ai.__v172Waypoint,wp,
+  'do not discard a needed detour merely because the corner is behind the current aim');
+});
