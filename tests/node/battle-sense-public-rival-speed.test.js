@@ -285,3 +285,26 @@ test('one slow witness interval does not erase two sustained fast intervals',()=
  assert.ok(w.fast>124*1.44&&w.fast<124*1.46,
   'median should preserve two matching fast windows despite one slower interval');
 });
+
+test('witnessed rival running can change an actual two-heal choice at identical visible positions',()=>{
+ const {h,classes}=boot(),self=tank(1,0),rival=tank(2,-8);
+ self.hp=20;self.ai={};
+ const a={id:'near',type:'heal',x:400,y:0};
+ const b={id:'safe',type:'heal',x:-500,y:0};
+ const g={time:0,tanks:[self,rival],powerups:[a,b],bullets:[],
+  hasLineOfSight:()=>true,tankSpeed:t=>{
+   if(t===rival)throw Error('private rival speed read');return 124;
+  }};
+ h.resourceContest(g,self,a,400,classes);
+ for(let i=1;i<=3;i++){
+  g.time=i*.2;rival.x=-8+180*g.time;
+  h.resourceContest(g,self,a,400,classes);
+ }
+ assert.ok(self.ai.__v181RivalSpeedWitness['2'].confirmed>=3);
+ const witnessed=h.chooseResource(g,self,classes)?.id;
+ const saved=self.ai;self.ai={};
+ const classOnly=h.chooseResource(g,self,classes)?.id;
+ self.ai=saved;
+ assert.equal(classOnly,'near','public class baseline favors the nearer heal');
+ assert.equal(witnessed,'safe','witnessed fast rival can justify an alternate uncontested heal');
+});
