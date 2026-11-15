@@ -26,7 +26,7 @@ function fixture(){
   const classes={CLASSES:{guard:{size:15,moveMult:.92}}};
   const g={w:1600,h:480,cam:{zoom:1},tanks:[tank],bullets:[],powerups:[near,far],
     hasLineOfSight:()=>true,tankSpeed:()=>114.08};
-  return {g,tank,near,far,choose:(game,bot)=>window.__NOVA_BATTLE_SENSE_TEST__.chooseResource(game,bot,classes),
+  return {g,tank,near,far,classes,laneRisk:window.__NOVA_BATTLE_SENSE_TEST__.laneRisk,choose:(game,bot)=>window.__NOVA_BATTLE_SENSE_TEST__.chooseResource(game,bot,classes),
     visible:window.__NOVA_FAIR_ENGAGEMENT__.inGameplayWorldPoint};
 }
 
@@ -91,4 +91,15 @@ test('special expiry-effect projectiles remain conservative even at distant pick
   }
   g.bullets=[bullet];
   assert.equal(choose(g,tank),near,'plain ordinary projectile is filtered when expiry precedes arrival');
+});
+
+test('unknown speed contract fails open and local tactical risk is unchanged',()=>{
+  const {g,tank,classes,near,far,choose,laneRisk}=fixture();
+  const bullet={id:98,ownerId:999,x:600,y:0,vx:0,vy:0,ttl:.25};
+  g.bullets=[bullet];
+  assert.ok(laneRisk(g,600,0,tank.id,tank)>0,'local risk does not use travel-time filtering');
+  classes.CLASSES.guard.moveMult=undefined;
+  assert.equal(choose(g,tank),far,'unknown class speed must preserve existing visible threat');
+  classes.CLASSES.guard.moveMult=.92;
+  assert.equal(choose(g,tank),near,'certified conservative travel bound permits the remote expiry filter');
 });
