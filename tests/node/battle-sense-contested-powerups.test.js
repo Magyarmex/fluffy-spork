@@ -137,3 +137,28 @@ test('critical healing remains attractive despite a long but traversable detour'
   assert.equal(c.window.__NOVA_BATTLE_SENSE_TEST__.chooseResource(g,bot).id,pickup.id,
     'survival urgency must still outweigh a long reachable detour when critically injured');
 });
+
+test('first corner alone cannot justify a pickup when a second solid wall blocks the remainder',()=>{
+  const {c,Game}=load(),g=new Game(),bot=T(1,0,0),
+    pickup={id:31,type:'heal',x:300,y:0},corner={x:120,y:65};
+  bot.hp=20;g.tanks=[bot];g.powerups=[pickup];
+  g.novaBattlefieldWaypoint=()=>corner;
+  g.hasLineOfSight=(ax,ay,bx,by)=>{
+    if(bx===pickup.x&&by===pickup.y)return false;
+    return true;
+  };
+  const h=c.window.__NOVA_BATTLE_SENSE_TEST__;
+  assert.equal(h.routeDistance(g,bot,pickup),Infinity,
+    'a cheap first corner does not prove that the remaining walls are traversable');
+  assert.equal(h.chooseResource(g,bot),null,
+    'even a critical heal cannot attract AI along a route with no verified second leg');
+  g.novaRouteLength=()=>540;
+  assert.equal(h.routeDistance(g,bot,pickup),540,
+    'a verified complete multi-leg route remains eligible even when the first corner cannot see the goal');
+  assert.equal(h.chooseResource(g,bot).id,pickup.id,
+    'critical healing must remain possible through a verified complete detour');
+  g.novaRouteLength=()=>null;
+  g.hasLineOfSight=(ax,ay,bx,by)=>ax===corner.x&&ay===corner.y;
+  assert.ok(Number.isFinite(h.routeDistance(g,bot,pickup)),
+    'a physically clear final leg retains the cheap-corner fallback');
+});
