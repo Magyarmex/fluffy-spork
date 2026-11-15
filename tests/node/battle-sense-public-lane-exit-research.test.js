@@ -1,0 +1,80 @@
+'use strict';
+// Research witness for #994: visible but short-lived bullets can bias remote pickup decisions.
+// Prototype acceptance: remote ordinary bullets expire before earliest plausible arrival; local bullets remain dangerous.
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const vm=require('node:vm');
+
+function fixture(){
+  function Game(){}
+  Game.prototype.tryFire=function(){};
+  Game.prototype.moveTank=function(){};
+  Game.prototype.updatePowerups=function(){};
+  const modules={
+    'game/engine':m=>{m.exports={Game};},
+    'game/ai':m=>{m.exports={updateAI(){}};}
+  };
+  const window={__novaModules:modules};
+  const context={window,Math,Number,Object,Array,Map,console:{info(){},error(){}}};
+  for(const file of ['battle-sense-v1.8.1.js','fair-engagement-v1.11.2.js'])
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../../nova-updates',file),'utf8'),context,{filename:file});
+  const tank={id:7,cls:'guard',x:0,y:0,hp:20,maxHp:100,alive:true,ai:{}};
+  const near={id:'near',type:'heal',x:600,y:0};
+  const far={id:'far',type:'heal',x:620,y:0};
+  const classes={CLASSES:{guard:{size:15,moveMult:.92}}};
+  const g={w:1600,h:480,cam:{zoom:1},tanks:[tank],bullets:[],powerups:[near,far],
+    hasLineOfSight:()=>true,tankSpeed:()=>114.08};
+  return {g,tank,near,far,classes,laneRisk:window.__NOVA_BATTLE_SENSE_TEST__.laneRisk,choose:(game,bot)=>window.__NOVA_BATTLE_SENSE_TEST__.chooseResource(game,bot,classes),
+    visible:window.__NOVA_FAIR_ENGAGEMENT__.inGameplayWorldPoint};
+}
+
+
+test('observed ordinary moving bullet exits distant heal lane before modeled arrival',()=>{
+ const {g,tank,near,far,choose}=fixture();
+ g.bullets=[{id:91,ownerId:999,x:600,y:0,vx:500,vy:0,ttl:10}];
+ assert.equal(choose(g,tank),near,'moving-away ordinary bullet cannot still occupy remote heal lane');
+ g.bullets[0].vx=50;
+ assert.equal(choose(g,tank),far,'slow-moving round can remain near the heal at arrival');
+ g.bullets[0].vx=0;
+ assert.equal(choose(g,tank),far,'stationary danger has no certified lane-exit time');
+});
+test('approaching ordinary bullet can cross and leave lane before remote arrival',()=>{
+ const {g,tank,near,choose}=fixture();
+ g.bullets=[{id:92,ownerId:999,x:400,y:0,vx:600,vy:0,ttl:10}];
+ assert.equal(choose(g,tank),near);
+});
+test('shell and other special trajectories retain conservative danger',()=>{
+ const {g,tank,far,choose}=fixture();
+ for(const flag of ['shell','splash','beam','__v17Cannon']){
+   g.bullets=[{id:93,ownerId:999,x:600,y:0,vx:500,vy:0,ttl:10,[flag]:true}];
+   assert.equal(choose(g,tank),far,flag+' remains dangerous');
+ }
+});
+test('short-lived stationary bullet is not secretly dismissed by TTL knowledge',()=>{
+ const {g,tank,far,choose}=fixture();
+ g.bullets=[{id:94,ownerId:999,x:600,y:0,vx:0,vy:0,ttl:.25}];
+ assert.equal(choose(g,tank),far,'public geometry alone cannot infer stationary projectile expiry');
+});
+test('Phase Shift and its playable ancestors do not use walking-only arrival proof',()=>{
+ const {g,tank,classes,far,choose}=fixture();
+ g.bullets=[{id:95,ownerId:999,x:600,y:0,vx:500,vy:0,ttl:10}];
+ for(const id of ['scout','marksman','ghost']){
+   tank.cls=id;classes.CLASSES[id]={size:15,moveMult:1,ability:id==='ghost'?'phase':null};
+   assert.equal(choose(g,tank),far,id+' may teleport after evolution');
+ }
+});
+test('non-heal resource choices retain existing visible danger scoring',()=>{
+ const {g,tank,choose}=fixture();
+ g.powerups=[{id:'shield-near',type:'shield',x:350,y:0},{id:'shield-far',type:'shield',x:380,y:0}];
+ assert.equal(choose(g,tank).id,'shield-near');
+ g.bullets=[{id:96,ownerId:999,x:350,y:0,vx:500,vy:0,ttl:10}];
+ assert.equal(choose(g,tank).id,'shield-far');
+});
+test('no bullets add no movement-speed work',()=>{
+ const {g,tank,near,choose}=fixture();
+ let calls=0;g.tankSpeed=()=>{calls++;return 114.08;};
+ assert.equal(choose(g,tank),near);
+ assert.equal(calls,0);
+});
