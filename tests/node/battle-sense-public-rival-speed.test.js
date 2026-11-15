@@ -126,7 +126,7 @@ test('witnesses are bounded, identity-scoped and reject unseen prior positions',
  h.resourceContest(g,self,p,500,classes);
  g.time=20.25;rival.x=145;h.resourceContest(g,self,p,500,classes);
  assert.equal(self.ai.__v181RivalSpeedWitness['19'].confirmed,1);
- g.hasLineOfSight=(ax,ay,bx)=>bx!==100;
+ g.hasLineOfSight=(ax,ay,bx)=>bx!==145;
  g.time=20.5;rival.x=190;h.resourceContest(g,self,p,500,classes);
  assert.equal(self.ai.__v181RivalSpeedWitness['19'].confirmed,0,'old unseen sample must not count');
  const replacement=tank(19,190);g.tanks=[self,replacement];g.hasLineOfSight=()=>true;
