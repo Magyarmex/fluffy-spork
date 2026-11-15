@@ -39,6 +39,9 @@ const {chromium}=require('playwright');
     const departing={...bullet,vx:500,ttl:10};
     const slow={...bullet,y:0,vx:50,ttl:10};
     const special={...departing,y:0,shell:true};
+    // Research-only negative control: legal Minigun-class stream. Do not freeze its choice as desirable.
+    const gunSpeed=classes.CLASSES.minigun.bullet.speed;
+    const minigunTrain=[0,.15,.30].map((age,i)=>({...bullet,id:9000+i,x:600+gunSpeed*age,y:0,vx:gunSpeed,vy:0,ttl:10}));
     for(const [label,w,h,zoom,bullets,occluded,expected] of [
      ['portrait-baseline',320,480,1,[],false,'near'],
      ['portrait-unseen',320,480,1,[bullet],false,'near'],
@@ -47,6 +50,7 @@ const {chromium}=require('playwright');
      ['wide-departing',1600,900,1,[departing],false,'near'],
      ['wide-slow',1600,900,1,[slow],false,'far'],
      ['wide-special',1600,900,1,[special],false,'far'],
+     ['research-minigun-stream',1600,900,1,minigunTrain,false,null],
      ['zoom-out-visible',900,700,.7,[bullet],false,'far'],
      ['zoom-in-unseen',900,700,1.2,[bullet],false,'near'],
      ['wide-terrain-hidden',1600,900,1,[bullet],true,'near']
@@ -56,7 +60,7 @@ const {chromium}=require('playwright');
      const observed=fair.inGameplayWorldPoint(g,bot,bullet.x,bullet.y);
      const selected=choose(g,bot,classes)?.id||null;
      results.push({label,w,h,zoom,observed,selected,expected});
-     if(selected!==expected)throw Error('wrong composed-game pickup choice: '+JSON.stringify(results.at(-1)));
+     if(expected!==null&&selected!==expected)throw Error('wrong composed-game pickup choice: '+JSON.stringify(results.at(-1)));
      if(label.includes('unseen')&&observed)throw Error('fixture bullet unexpectedly visible: '+label);
      if((label==='wide-visible'||label==='zoom-out-visible')&&!observed)throw Error('fixture bullet unexpectedly offscreen');
     }
@@ -69,7 +73,7 @@ const {chromium}=require('playwright');
    return results;
   });
   if(errors.length)throw Error('browser errors: '+JSON.stringify(errors));
-  if(report.length!==10)throw Error('missing composed-game acceptance arms');
+  if(report.length!==11)throw Error('missing composed-game acceptance or research arms');
   console.log('OBSERVER_PROJECTILE_COMPOSED_GAME '+JSON.stringify(report));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
