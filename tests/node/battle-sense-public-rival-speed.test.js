@@ -207,7 +207,7 @@ test('previously off-viewport position cannot certify a speed witness after re-e
  h.resourceContest(g,self,p,400,classes);
  g.time=.2;rival.x=136;h.resourceContest(g,self,p,400,classes);
  assert.equal(self.ai.__v181RivalSpeedWitness['2'].confirmed,1);
- minVisible=120;g.time=.4;rival.x=172;
+ minVisible=150;g.time=.4;rival.x=172;
  h.resourceContest(g,self,p,400,classes);
  assert.equal(self.ai.__v181RivalSpeedWitness['2'].confirmed,0,
   'prior offscreen endpoint must invalidate consecutive speed evidence');
