@@ -62,6 +62,9 @@ const {chromium}=require('playwright');
      bot.ai.state='wander';bot.ai.targetId=-1;bot.ai.thinkT=0;
      bot.ai.wanderA=0;bot.ai.wanderT=0;bot.ai.__v181Think=0;
      bot.ai.__v172LastSeenAt=null;bot.ai.__v172LastSeenId=-1;
+     bot.ai.__v172Waypoint=null;bot.ai.__v172WaypointUntil=0;
+     bot.ai.__v1102Nav=null;bot.ai.__v181BiasX=0;bot.ai.__v181BiasY=0;
+     bot.ai.__v181BiasW=0;bot.ai.__v181Mode='none';bot.ai.__v181ResourceId=null;
      const upper={id:'upper',type:'heal',x:340,y:40},lower={id:'lower',type:'heal',x:340,y:-40};
      g.powerups=arm==='two-heals-lower-first'?[lower,upper]:
       arm==='two-heals-upper-first'?[upper,lower]:[upper];
