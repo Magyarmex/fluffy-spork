@@ -35,7 +35,7 @@ test('real composed moveTank supplies public rival movement witnesses at 30/60 H
    const dt=1/hz;
    for(let frame=1;frame<=hz;frame++){
     g.time=frame*dt;
-    g.moveTank(rival,180,0,dt);
+    g.moveTank(rival,170,0,dt);
     if(frame%(hz/5)===0)contest();
    }
    const w=bot.ai.__v181RivalSpeedWitness?.[String(rival.id)];
