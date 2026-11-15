@@ -2,6 +2,10 @@ name: NOVA Critical Heal Route Continuity
 on:
   pull_request:
     paths:
+      - 'nova-updates/terrain-intelligence-v1.10.2.js'
+      - 'nova-updates/battle-sense-v1.8.1.js'
+      - 'nova-updates/combined-arms-v1.7.2.js'
+      - 'index.html'
       - 'tests/browser/critical-heal-route-continuity.cjs'
       - '.github/workflows/critical-heal-route-continuity.yml'
   workflow_dispatch:
