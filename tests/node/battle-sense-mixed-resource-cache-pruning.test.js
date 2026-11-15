@@ -88,7 +88,7 @@ test('critical heal and competitive shield use bounded scratch routes without co
  for(const shieldFirst of [false,true]){
   const {g,tank,classes,hooks,terrain}=makeScene([0]);
   const heal={id:'heal',type:'heal',x:340,y:-40};
-  const shield={id:'shield',type:'shield',x:-50,y:40};
+  const shield={id:'shield',type:'shield',x:-65,y:40};
   g.powerups=shieldFirst?[shield,heal]:[heal,shield];
   // Both opponents are locally visible, so the shield has legitimate
   // pressure value rather than being an artificially weak candidate.
