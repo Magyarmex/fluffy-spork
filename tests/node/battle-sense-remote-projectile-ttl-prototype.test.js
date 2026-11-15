@@ -169,3 +169,11 @@ test('nonfinite movement state cannot certify remote projectile expiry',()=>{
   tank.vy=0;tank.stats={speed:NaN};
   assert.equal(choose(g,tank),far,'unknown speed upgrades must fail open');
 });
+
+test('empty projectile field does not invoke the experimental speed bound',()=>{
+  const {g,tank,near,choose}=fixture();
+  let calls=0;
+  g.tankSpeed=()=>{calls++;return 114.08;};
+  assert.equal(choose(g,tank),near);
+  assert.equal(calls,0,'no bullets means no projectile arrival-speed work');
+});
