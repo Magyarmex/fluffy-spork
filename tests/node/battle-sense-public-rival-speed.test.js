@@ -123,7 +123,7 @@ test('witnesses are bounded, identity-scoped and reject unseen prior positions',
   const rival=tank(id,100);g.tanks=[self,rival];g.time=id;
   h.resourceContest(g,self,p,500,classes);
  }
- assert.ok(Object.keys(self.ai.__v181RivalSpeedWitness).length<=12,'witness storage must remain bounded');
+ assert.ok(Object.keys(self.ai.__v181RivalSpeedWitness).length<=13,'witness storage must remain bounded to the 13 possible rivals');
  const rival=tank(19,100);g.tanks=[self,rival];g.time=20;
  h.resourceContest(g,self,p,500,classes);
  g.time=20.25;rival.x=145;h.resourceContest(g,self,p,500,classes);
@@ -340,4 +340,24 @@ test('one high-speed impulse still cannot certify a haste-speed rival',()=>{
  assert.equal(w.confirmed,3);
  assert.ok(w.fast<124*1.06,
   'median must reject one high impulse despite the broader legal-speed ceiling');
+});
+
+test('full 14-tank arena retains speed witnesses for all 13 visible rivals',()=>{
+ const {h,classes}=boot(),self=tank(1,0);self.ai={};
+ const rivals=Array.from({length:13},(_,i)=>tank(i+2,90+i*8));
+ const g={time:0,tanks:[self,...rivals],hasLineOfSight:()=>true,
+  tankSpeed:t=>{if(t!==self)throw Error('private rival speed read');return 124;}};
+ const p={id:'heal',type:'heal',x:600,y:0};
+ h.resourceContest(g,self,p,600,classes);
+ for(let i=1;i<=3;i++){
+  g.time=i*.2;
+  for(const rival of rivals)rival.x+=36;
+  h.resourceContest(g,self,p,600,classes);
+ }
+ const witnesses=self.ai.__v181RivalSpeedWitness;
+ assert.equal(Object.keys(witnesses).length,13,
+  '14-tank cap permits 13 rivals; a 12-entry cache evicts every rival in a fixed iteration');
+ for(const rival of rivals)
+  assert.ok(witnesses[String(rival.id)]?.confirmed>=3,
+   'each continuously observed rival must learn without round-robin eviction: '+rival.id);
 });
