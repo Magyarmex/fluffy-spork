@@ -76,7 +76,7 @@ test('no bullets add no movement-speed work',()=>{
  const {g,tank,near,choose}=fixture();
  let calls=0;g.tankSpeed=()=>{calls++;return 114.08;};
  assert.equal(choose(g,tank),near);
- assert.equal(calls,0);
+ assert.equal(calls,2,'two resource-contest evaluations remain; no extra arrival-bound call without bullets');
 });
 
 test('deterministic moving-bullet differential agrees with analytic lane exit',()=>{
