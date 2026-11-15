@@ -18,7 +18,8 @@ test('real composed moveTank supplies public rival movement witnesses at 30/60 H
    if(g.hash?.clear)g.hash.clear();
    Object.assign(bot,{cls:'guard',x:0,y:0,alive:true});
    bot.ai={};Object.assign(rival,{cls:'guard',x:100,y:0,alive:true,
-    vx:0,vy:0,spawnShieldT:0,shieldT:0});
+    vx:0,vy:0,spawnShieldT:0,shieldT:0,perk:'speed',
+    stats:{...rival.stats,speed:8}});
    const originalSpeed=g.tankSpeed,originalLOS=g.hasLineOfSight;
    g.hasLineOfSight=()=>true;
    const p={id:'heal',type:'heal',x:400,y:0};
