@@ -130,3 +130,9 @@ test('critical-heal scratch planning is goal-keyed, bounded and never evicts mov
  assert.equal(h.strategicScratchCost(g,-200,0,200,40,23,7,'upper'),Math.hypot(400,40),
   'destroyed cover must permit the newly clear direct route');
 });
+
+test('scratch direct-path fast path rejects physically unsafe goal endpoints',()=>{
+ const h=terrain(),g={time:10,hasLineOfSight:()=>true,isTerrainSafe:()=>false};
+ assert.equal(h.strategicScratchCost(g,0,0,100,0,23,7,'unsafe'),Infinity);
+ assert.equal(Object.keys(g.__v1102Routes||{}).length,0);
+});
