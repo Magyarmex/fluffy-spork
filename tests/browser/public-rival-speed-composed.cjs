@@ -22,7 +22,7 @@ const {chromium}=require('playwright');
    const saved={tanks:g.tanks,visible:g.__novaFairVisibleTanks,powerups:g.powerups,los:g.hasLineOfSight,speed:g.tankSpeed};
    const original={...bot};let privateCalls=0;
    try{
-    Object.assign(bot,{id:700001,cls:'guard',x:0,y:0,alive:true,hp:20,maxHp:100,stats:{...bot.stats,speed:0}});
+    Object.assign(bot,{id:700001,cls:'guard',x:0,y:0,alive:true,hp:20,maxHp:100,hasteT:0,stampedeT:0,perk:null,gene:null,stats:{...bot.stats,speed:0}});
     const rival={id:700002,cls:'guard',x:120,y:0,alive:true,stats:{speed:0},vx:0,vy:0};
     const pickup={id:'heal',type:'heal',x:300,y:0};
     g.tanks=[bot,rival];g.__novaFairVisibleTanks=g.tanks;g.hasLineOfSight=()=>true;
