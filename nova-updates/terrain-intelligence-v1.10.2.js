@@ -182,6 +182,11 @@ function strategicScratchCost(g,x,y,gx,gy,pad,seed,goalId){
  if(!routeSafe(g,gx,gy,pad))return Infinity;
  if(routeVisible(g,x,y,gx,gy,pad))return dist(x,y,gx,gy);
  var now=Number(g.time)||0,key=cacheKey(seed,pad),map=g.__v1102StrategicRoutes||(g.__v1102StrategicRoutes=Object.create(null));
+ /* The per-key LRU cap bounds memory, not CPU: 65 rotating identities could
+  * evict each other's one-plan budgets. Bound total searches per window too. */
+ var budget=g.__v1102StrategicBudget;
+ if(!budget||now<budget.windowStart||now-budget.windowStart>=.75)
+   budget=g.__v1102StrategicBudget={windowStart:now,plans:0};
  var state=map[key];
  if(!state||now<state.windowStart||now-state.windowStart>=.75){
    state=map[key]={windowStart:now,plans:0,entry:null};
@@ -200,8 +205,8 @@ function strategicScratchCost(g,x,y,gx,gy,pad,seed,goalId){
    if(!valid)e=null;
  }
  if(!e){
-   if(state.plans>=1)return null;
-   state.plans++;
+   if(state.plans>=1||budget.plans>=64)return null;
+   state.plans++;budget.plans++;
    /* Count attempts, including failed plans: these still consume CPU. */
    if(window.__NOVA_TERRAIN_INTELLIGENCE__)window.__NOVA_TERRAIN_INTELLIGENCE__.strategicPlans++;
    var route=planVisibilityRoute(g,x,y,gx,gy,pad,seed,null);
