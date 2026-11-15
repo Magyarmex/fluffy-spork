@@ -308,3 +308,36 @@ test('witnessed rival running can change an actual two-heal choice at identical 
  assert.equal(classOnly,'near','public class baseline favors the nearer heal');
  assert.equal(witnessed,'safe','witnessed fast rival can justify an alternate uncontested heal');
 });
+
+test('three witnessed legal haste-speed intervals can exceed the old 1.65x ceiling',()=>{
+ const {h,classes}=boot(),self=tank(1,0),rival=tank(2,100);
+ self.ai={};
+ const g={time:0,tanks:[self,rival],hasLineOfSight:()=>true,
+  tankSpeed:t=>{if(t===rival)throw Error('private rival speed read');return 124;}};
+ const p={id:'heal',type:'heal',x:500,y:0};
+ h.resourceContest(g,self,p,500,classes);
+ for(let i=1;i<=3;i++){
+  g.time=i*.2;rival.x=100+124*2.2*g.time;
+  h.resourceContest(g,self,p,500,classes);
+ }
+ const w=self.ai.__v181RivalSpeedWitness['2'];
+ assert.equal(w.confirmed,3);
+ assert.ok(w.fast>124*2.19&&w.fast<124*2.21,
+  'sustained publicly witnessed speed must not be hidden by an overly low impulse ceiling');
+});
+test('one high-speed impulse still cannot certify a haste-speed rival',()=>{
+ const {h,classes}=boot(),self=tank(1,0),rival=tank(2,100);
+ self.ai={};
+ const g={time:0,tanks:[self,rival],hasLineOfSight:()=>true,
+  tankSpeed:t=>{if(t===rival)throw Error('private rival speed read');return 124;}};
+ const p={id:'heal',type:'heal',x:500,y:0};
+ h.resourceContest(g,self,p,500,classes);
+ for(const [i,mult] of [2.2,1.05,1.05].entries()){
+  g.time=(i+1)*.2;rival.x+=124*mult*.2;
+  h.resourceContest(g,self,p,500,classes);
+ }
+ const w=self.ai.__v181RivalSpeedWitness['2'];
+ assert.equal(w.confirmed,3);
+ assert.ok(w.fast<124*1.06,
+  'median must reject one high impulse despite the broader legal-speed ceiling');
+});
