@@ -1,0 +1,32 @@
+name: NOVA Pickup Steering Research
+on:
+  pull_request:
+    paths:
+      - 'tests/browser/pickup-steering-acquisition-research.cjs'
+      - '.github/workflows/pickup-steering-research.yml'
+  workflow_dispatch:
+jobs:
+  acquisition:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --no-audit --no-fund --no-package-lock
+      - run: npm install --no-save --no-audit --no-fund --no-package-lock playwright@1.56.1
+      - run: npx playwright install chromium
+      - name: Serve exact checked-out materialized game
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/nova-pickup-http.log 2>&1 &
+      - name: Run source-composed AI acquisition diagnostic
+        run: node tests/browser/pickup-steering-acquisition-research.cjs
+      - name: Preserve structured acquisition trace
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pickup-steering-trace
+          path: pickup-steering-results.json
+          if-no-files-found: ignore
+          retention-days: 14
