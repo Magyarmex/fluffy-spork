@@ -547,7 +547,7 @@ function routeCost(g,t,x,y,direct,bearing,classes){
  if(bearing){bearing.x=(wp.x-t.x)/leg;bearing.y=(wp.y-t.y)/leg;}
  var firstCorner=leg+Math.hypot(x-wp.x,y-wp.y);
  var full=g.novaRouteLength&&g.novaRouteLength(t.x,t.y,x,y,size+8,t.id,wp);
- return Number.isFinite(full)&&full+1e-6>=firstCorner?full:firstCorner;
+ if(Number.isFinite(full)&&full+1e-6>=firstCorner)return full;/* A cheap first corner is not a verified path past later walls. */if(g.hasLineOfSight&&!g.hasLineOfSight(wp.x,wp.y,x,y,size+3))return Infinity;return firstCorner;
 }
 /* Ecology AI may react to a held combat target only while that target is
  * actually within the same gameplay viewport as the player, or relayed by

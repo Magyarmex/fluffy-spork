@@ -49,12 +49,15 @@ test('contested pickup travel uses the complete cached route without a second pl
   novaRouteLength:(x,y,gx,gy,pad,seed,wp)=>{calls.push(['length',pad,seed]);return 650;}};
  assert.equal(h.routeDistance(g,t,p,null,{CLASSES:{guard:{size:15}}}),650);
  g.novaRouteLength=()=>50;
- const conservative=h.routeDistance(g,t,p,null,{CLASSES:{guard:{size:15}}});
- assert.ok(conservative>300&&conservative<650,
-  'a corrupt shorter-than-first-corner cost cannot create a teleport shortcut');
+ assert.equal(h.routeDistance(g,t,p,null,{CLASSES:{guard:{size:15}}}),Infinity,
+  'a corrupt shorter-than-first-corner cost cannot certify a blocked final leg');
  g.novaRouteLength=()=>650;
  assert.deepEqual(calls,[['waypoint',23,t.id],['length',23,t.id],['waypoint',23,t.id]]);
  delete g.novaRouteLength;
- assert.ok(h.routeDistance(g,t,p,null,{CLASSES:{guard:{size:15}}})<650,
-  'without the composed route owner, retain the previous first-corner fallback');
+ assert.equal(h.routeDistance(g,t,p,null,{CLASSES:{guard:{size:15}}}),Infinity,
+  'without a verified full route, the blocked final leg must fail closed');
+ g.hasLineOfSight=(ax,ay)=>ax===100&&ay===100;
+ const clear=h.routeDistance(g,t,p,null,{CLASSES:{guard:{size:15}}});
+ assert.ok(clear>400&&clear<650,
+  'a physically clear final leg retains the cheap-corner fallback');
 });

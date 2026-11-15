@@ -19,7 +19,7 @@ function scene(){
 }
 test('remembered public BLOOM follows a terrain waypoint instead of steering through cover',()=>{
  const {T,t,g}=scene();
- const calls=[],losPads=[];g.hasLineOfSight=(x,y,tx,ty,pad)=>{losPads.push(pad);return false;};
+ const calls=[],losPads=[];g.hasLineOfSight=(x,y,tx,ty,pad)=>{losPads.push(pad);return x!==t.x||y!==t.y;};
  g.novaBattlefieldWaypoint=(x,y,tx,ty,r,id)=>{calls.push({x,y,tx,ty,r,id});return{x:t.x+60,y:t.y-120};};
  const b=T.publicEcoBias(g,t,{},{});
  assert.equal(b.mode,'memory');assert.ok(b.weight>.04);
@@ -31,7 +31,7 @@ test('live public BLOOM also respects the terrain waypoint',()=>{
  const {T,t,st,g}=scene();t.x=-1130; // genuinely outside sector 5; arrival handoff must not cancel approach
  assert.notEqual(T.sectorIndex(t.x,t.y),5);
  st.signal={type:'BLOOM',sector:5,x:-560,y:-560,started:105,until:110};
- g.hasLineOfSight=()=>false;
+ g.hasLineOfSight=(x,y)=>x!==t.x||y!==t.y;
  g.novaBattlefieldWaypoint=()=>({x:t.x-80,y:t.y+50});
  const b=T.publicEcoBias(g,t,{},{});
  assert.equal(b.mode,'signal');assert.ok(b.x<0&&b.y>0,'route around the wall rather than toward the target through it');
@@ -56,7 +56,7 @@ test('invalid or zero-length waypoint cannot produce NaN or a wall-facing steeri
  }
 });
 test('blocked memory route cannot reveal hidden sector state or bypass low-health retreat',()=>{
- const {T,g,t,st}=scene();g.hasLineOfSight=()=>false;
+ const {T,g,t,st}=scene();g.hasLineOfSight=(x,y)=>x!==t.x||y!==t.y;
  g.novaBattlefieldWaypoint=()=>({x:t.x+50,y:t.y-100});
  const a=T.publicEcoBias(g,t,{},{});
  st.sectors[5].value=99999;st.sectors[5].maturity=1;st.sectors[5].pressure=100;
@@ -80,7 +80,7 @@ test('shipping AI movement wrapper actually follows a routed public opportunity 
   queryScratch:[],queryScratch2:[],sectors:Array.from({length:16},()=>({value:0,maturity:0,pressure:0})),stats:{aiRotations:0}};
  const recorded=[],originalMove=(_t,x,y)=>recorded.push({x,y});
  const g={time:106,w:800,h:600,cam:{zoom:1},shapes:[],bullets:[],tanks:[t],__lfState:st,
-  hasLineOfSight:()=>false,novaBattlefieldWaypoint:()=>({x:t.x+60,y:t.y-120}),moveTank:originalMove};
+  hasLineOfSight:(x,y)=>x!==t.x||y!==t.y,novaBattlefieldWaypoint:()=>({x:t.x+60,y:t.y-120}),moveTank:originalMove};
  aiModule.exports.updateAI(t,g,.3);
  assert.equal(recorded.length,1);assert.ok(recorded[0].y<0,'actual engine movement must turn toward reachable waypoint');
  assert.equal(g.moveTank,originalMove,'the temporary wrapper cannot hijack later movement');
@@ -92,7 +92,7 @@ test('locally visible neutral farm also follows a route to its aggregate center'
  g.shapes=[[-560,-540],[-540,-560],[-580,-560],[-560,-580]].map(([x,y],id)=>({
   id:id+10,x,y,kind:'shape',type:'pentagon',hp:100
  }));
- g.hasLineOfSight=(_ax,_ay,bx,by)=>!(bx===-560&&by===-560);
+ g.hasLineOfSight=(ax,ay,bx,by)=>!(ax===t.x&&ay===t.y&&bx===-560&&by===-560);
  g.novaBattlefieldWaypoint=()=>({x:t.x-60,y:t.y+100});
  const b=T.publicEcoBias(g,t,{pentagon:{xp:100}},{});
  assert.equal(b.mode,'local');assert.ok(b.weight>.04);
@@ -128,4 +128,19 @@ test('public BLOOM threshold rejects a long cached detour that first-corner scor
  g.novaRouteLength=()=>1000;
  const accepted=T.publicEcoBias(g,t,{},{});
  assert.equal(accepted.mode,'signal','shorter verified path should preserve the public opportunity');
+});
+
+test('public opportunity cannot treat a blocked second leg as a complete route',()=>{
+ const {T,t,g}=scene(),goal={x:200,y:-900},corner={x:-760,y:-960};
+ g.novaBattlefieldWaypoint=()=>corner;
+ g.hasLineOfSight=(ax,ay,bx,by)=>!(ax===corner.x&&ay===corner.y||ax===t.x&&ay===t.y);
+ assert.equal(T.routeCost(g,t,goal.x,goal.y),Infinity,
+  'a first-corner fallback is not enough when a later wall blocks the public opportunity');
+ g.novaRouteLength=()=>1300;
+ assert.equal(T.routeCost(g,t,goal.x,goal.y),1300,
+  'a complete verified multi-leg path remains available');
+ g.novaRouteLength=()=>null;
+ g.hasLineOfSight=(ax,ay)=>ax===corner.x&&ay===corner.y;
+ assert.ok(Number.isFinite(T.routeCost(g,t,goal.x,goal.y)),
+  'a physically clear final leg still permits the cheap local corner');
 });

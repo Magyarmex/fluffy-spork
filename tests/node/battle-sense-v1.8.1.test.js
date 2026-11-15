@@ -52,9 +52,9 @@ test('route-aware contest estimation preserves straight-line behavior when the p
 test('resource route estimates use the class collision radius and route margin',()=>{
   const {c,Game,classes}=load(),g=new Game(),bot=T(1,'guard',0,0),pickup={x:300,y:0};
   const losPads=[],routePads=[];
-  g.hasLineOfSight=(ax,ay,bx,by,pad)=>{losPads.push(pad);return false;};
+  g.hasLineOfSight=(ax,ay,bx,by,pad)=>{losPads.push(pad);return ay===240;};
   g.novaBattlefieldWaypoint=(x,y,gx,gy,pad,id)=>{routePads.push({pad,id});return{x:0,y:240};};
   c.window.__NOVA_BATTLE_SENSE_TEST__.routeDistance(g,bot,pickup,300,classes);
-  assert.deepEqual(losPads,[classes.CLASSES.guard.size+3]);
+  assert.deepEqual(losPads,[classes.CLASSES.guard.size+3,classes.CLASSES.guard.size+3]);
   assert.deepEqual(routePads,[{pad:classes.CLASSES.guard.size+8,id:bot.id}]);
 });
