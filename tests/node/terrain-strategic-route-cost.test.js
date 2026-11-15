@@ -147,3 +147,13 @@ test('failed strategic scratch plans cannot grow per-tank cache without bound',(
    'failed or uncertified plans must obey the same memory cap as successful plans');
  }
 });
+
+
+test('scratch pricing fails closed without physical collision APIs',()=>{
+ const h=terrain();
+ for(const g of [{time:10,isTerrainSafe:()=>true},{time:10,hasLineOfSight:()=>true}]){
+  assert.equal(h.strategicScratchCost(g,0,0,100,0,23,7,'heal'),Infinity);
+  assert.equal(g.__v1102StrategicRoutes,undefined,
+   'no uncertified scratch route may enter the cache');
+ }
+});
