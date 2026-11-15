@@ -90,3 +90,45 @@ test('real composed movement impulse cannot masquerade as sustained rival upgrad
   }finally{g.destroy();}
  });
 });
+
+test('composed legal speed upgrades plus haste are learned at 30/60 Hz without private reads',()=>{
+ for(const hz of [30,60])withSeed(1517800,()=>{
+  const g=bootGame();if(!g.player)g.redeploy();
+  try{
+   const rival=g.player,bot=g.tanks.find(t=>t!==rival&&t.ai);
+   assert.ok(bot);
+   const classes=g.__testWindow.__novaMakeRequire('')('game/classes');
+   const h=g.__testWindow.__NOVA_BATTLE_SENSE_TEST__;
+   g.tanks=[bot,rival];g.__novaFairVisibleTanks=g.tanks;
+   g.__novaTerrain=[];g.__novaBattlefieldIndex=null;
+   if(g.hash?.clear)g.hash.clear();
+   Object.assign(bot,{cls:'guard',x:0,y:0,alive:true});bot.ai={};
+   Object.assign(rival,{cls:'guard',x:100,y:0,alive:true,vx:0,vy:0,
+    spawnShieldT:0,shieldT:0,stampedeT:0,hasteT:10,perk:'speed',gene:null,
+    stats:{...rival.stats,speed:8}});
+   g.hasLineOfSight=()=>true;
+   const base=124*classes.CLASSES.guard.moveMult;
+   const speed=g.tankSpeed(rival);
+   assert.ok(speed/base>2.2&&speed/base<2.3,'legal composed speed must exercise the expanded ceiling');
+   const originalSpeed=g.tankSpeed;
+   const p={id:'heal',type:'heal',x:650,y:0};
+   const contest=()=>{
+    g.tankSpeed=t=>{
+     if(t===rival)throw Error('private rival speed queried');
+     return originalSpeed.call(g,t);
+    };
+    try{return h.resourceContest(g,bot,p,650,classes);}
+    finally{g.tankSpeed=originalSpeed;}
+   };
+   g.time=0;contest();
+   const dt=1/hz;
+   for(let frame=1;frame<=hz;frame++){
+    g.time=frame*dt;g.moveTank(rival,speed,0,dt);
+    if(frame%(hz/5)===0)contest();
+   }
+   const w=bot.ai.__v181RivalSpeedWitness?.[String(rival.id)];
+   assert.ok(w?.confirmed>=3,'legal sustained haste must be witnessed at '+hz+'Hz');
+   assert.ok(w.fast/base>2.0,'visible legal fast build must not remain at class-only baseline');
+  }finally{g.destroy();}
+ });
+});
