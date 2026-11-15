@@ -23,14 +23,14 @@ function arm(hz,direction,policy){
     alive:true,hp:20,maxHp:100,spawnShieldT:0,shieldT:0,
     perk:null,hasteT:0,stats:{...bot.stats,speed:0}});
    bot.ai={};
-   Object.assign(rival,{cls:'guard',x:direction===1?920:1280,y:1120,
+   Object.assign(rival,{cls:'guard',x:direction===1?1120:1280,y:1120,
     vx:0,vy:0,alive:true,hp:20,maxHp:100,
     spawnShieldT:0,shieldT:0,stampedeT:0,hasteT:0,
-    perk:'speed',stats:{...rival.stats,speed:8}});
+    perk:null,stats:{...rival.stats,speed:4}});
    g.hasLineOfSight=()=>true;
    g.status='playing';
    const near={id:99001,kind:'powerup',type:'heal',x:1400,y:1120,ttl:20,born:0};
-   const safe={id:99002,kind:'powerup',type:'heal',x:460,y:1000,ttl:20,born:0};
+   const safe={id:99002,kind:'powerup',type:'heal',x:350,y:1000,ttl:20,born:0};
    g.powerups=[near,safe];const arrivals=[];
    const originalApply=g.applyPowerup,originalSpeed=g.tankSpeed;
    g.applyPowerup=function(t,type){arrivals.push({who:t===bot?'bot':'rival',
