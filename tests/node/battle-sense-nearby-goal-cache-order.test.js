@@ -79,7 +79,10 @@ test('two occluded nearby pickup goals expose actual route-cache goal ownership'
       assert.ok(direct <= 760, 'candidate must be eligible for Battle Sense');
     }
     const firstCost = hooks.routeDistance(g, tank, g.powerups[0], null, classes);
+    const plansAfterFirst = scene.terrain.plans;
     const secondCost = hooks.routeDistance(g, tank, g.powerups[1], null, classes);
+    assert.equal(scene.terrain.plans, plansAfterFirst,
+      'nearby goal certification must not run another visibility planner');
     assert.ok(Number.isFinite(firstCost), 'first physically reachable goal needs a route');
     assert.ok(Number.isFinite(secondCost), 'nearby second goal must not be falsely rejected by an unrelated cached goal');
     const chosen = hooks.chooseResource(g, tank, classes);
@@ -95,4 +98,6 @@ test('two occluded nearby pickup goals expose actual route-cache goal ownership'
   // and a bounded fix are established.
   assert.equal(a.chosen, b.chosen,
     'pickup iteration order must not decide which nearby goal obtains a valid route');
+  assert.equal(a.chosen, 'upper',
+    'the shorter reachable upper route should win regardless of pickup order');
 });
