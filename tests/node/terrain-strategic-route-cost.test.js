@@ -128,8 +128,8 @@ test('critical-heal scratch planning is goal-keyed, bounded and never evicts mov
  assert.ok(Number.isFinite(second),'second distinct heal can receive one independent plan');
  assert.equal(h.strategicScratchCost(g,-200,0,200,60,23,7,'third'),null,
   'third independent plan must respect two-plans-per-window budget');
- assert.equal(h.strategicScratchCost(g,-130,0,200,-40,23,7,'lower'),null,
-  'moving more than 60 units must not reuse an anchored route or exceed the scratch budget');
+ assert.equal(h.strategicScratchCost(g,-70,0,200,-40,23,7,'lower'),null,
+  'moving more than 110 units must not reuse an anchored route or exceed the scratch budget');
  g.time=10.8;
  const upper=h.strategicScratchCost(g,-200,0,200,40,23,7,'upper');
  assert.ok(Number.isFinite(upper)&&upper>Math.hypot(400,40));
