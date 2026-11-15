@@ -69,3 +69,18 @@ test('irrelevant bullets do not trigger observer terrain visibility probes',()=>
   assert.equal(risk,0);
   assert.equal(probes,0,'far bullets must not incur collision checks in resource scoring');
 });
+
+test('world-point projectile predicate matches canonical viewport geometry across zoom and orientation',()=>{
+  const {g,tank,window}=scene();
+  const fair=window.__NOVA_FAIR_ENGAGEMENT__;
+  for(const [w,h] of [[320,480],[480,320],[900,700]]){
+    for(const zoom of [.65,1,1.8]){
+      g.w=w;g.h=h;g.cam.zoom=zoom;
+      for(const [x,y] of [[0,0],[w/(2*zoom)-1,0],[w/(2*zoom)+1,0],[0,h/(2*zoom)+1]]){
+        const target={id:999,alive:true,hp:1,x,y};
+        assert.equal(fair.inGameplayWorldPoint(g,tank,x,y),
+          fair.inGameplayViewport(g,tank,target),'world point disagrees with live Fair Engagement viewport');
+      }
+    }
+  }
+});
