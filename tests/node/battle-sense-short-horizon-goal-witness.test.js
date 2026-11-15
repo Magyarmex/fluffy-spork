@@ -108,8 +108,10 @@ test('actual Combined Arms movement requests a short-horizon route after strateg
   assert.equal(calls[0].seed,tank.id);
   assert.equal(calls[0].pad,23,
     'movement must retain the Guard physical route clearance');
-  assert.ok(Math.abs(calls[0].gx-(before.x+340)) < 1e-6);
-  assert.ok(Math.abs(calls[0].gy-before.y) < 1e-6);
+  assert.ok(Math.abs(Math.hypot(calls[0].gx-before.x,calls[0].gy-before.y)-340) < 1e-6,
+    'the actual Battle Sense blended direction still receives a 2×170u movement horizon');
+  assert.ok(calls[0].gx < selectedGoal.x-100,
+    'the local steering goal is materially short of the selected heal');
   assert.ok(Math.hypot(calls[0].gx-selectedGoal.x,calls[0].gy-selectedGoal.y)>103.5,
     'the requested local steering goal differs materially from the selected heal');
   assert.ok(Number.isFinite(tank.x) && Number.isFinite(tank.y));
