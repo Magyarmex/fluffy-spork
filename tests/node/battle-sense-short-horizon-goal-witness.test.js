@@ -80,7 +80,7 @@ function makeScene(order) {
     terrain: w.__NOVA_TERRAIN_INTELLIGENCE__, pickups };
 }
 
-test('actual Combined Arms movement requests a short-horizon route after strategic heal selection', () => {
+test('critical heal movement preserves the selected goal despite a short-horizon steering request', () => {
   const {g,tank,classes,hooks,pickups} = makeScene([0,1]);
   const chosen = hooks.chooseResource(g,tank,classes);
   assert.ok(chosen && pickups.some(p => p.id === chosen.id),
@@ -91,7 +91,7 @@ test('actual Combined Arms movement requests a short-horizon route after strateg
   const calls = [];
   const original = g.novaBattlefieldWaypoint;
   g.novaBattlefieldWaypoint = function (x,y,gx,gy,pad,seed) {
-    calls.push({x,y,gx,gy,pad,seed});
+    calls.push({x,y,gx,gy,pad,seed,routeContext:this.__v1102RouteContext&&{forceGoal:this.__v1102RouteContext.forceGoal,lineage:this.__v1102RouteContext.lineage,target:this.__v1102RouteContext.target}});
     return original.call(this,x,y,gx,gy,pad,seed);
   };
   const before = {x:tank.x,y:tank.y};
@@ -107,6 +107,11 @@ test('actual Combined Arms movement requests a short-horizon route after strateg
     'blocked first 170 units must invoke the composed movement route owner');
   const movementCall = calls.find(c => Math.hypot(c.gx-selectedGoal.x,c.gy-selectedGoal.y)>103.5);
   assert.ok(movementCall, 'the composed movement wrapper must request its own local goal');
+  assert.equal(movementCall.routeContext?.forceGoal,true,
+    'critical healing must carry an explicit composed movement goal');
+  assert.equal(movementCall.routeContext?.lineage,'resource');
+  assert.equal(movementCall.routeContext?.target?.x,selectedGoal.x);
+  assert.equal(movementCall.routeContext?.target?.y,selectedGoal.y);
   assert.equal(movementCall.seed,tank.id);
   assert.equal(movementCall.pad,23,
     'movement must retain the Guard physical route clearance');
@@ -117,6 +122,6 @@ test('actual Combined Arms movement requests a short-horizon route after strateg
   assert.ok(Math.hypot(movementCall.gx-selectedGoal.x,movementCall.gy-selectedGoal.y)>103.5,
     'the requested local steering goal differs materially from the selected heal');
   assert.ok(Number.isFinite(tank.x) && Number.isFinite(tank.y));
-  // This is a source-executed *goal divergence witness*, not evidence of
-  // oscillation, missed healing or a natural-match navigation failure.
+  // This is a source-executed continuity regression, not proof of
+  // natural-match pickup acquisition or physical-device performance.
 });
