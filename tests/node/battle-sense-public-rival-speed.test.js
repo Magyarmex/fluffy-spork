@@ -230,3 +230,23 @@ test('relay-only offscreen rival cannot provide a movement-speed witness',()=>{
  assert.ok(self.ai.__v181RivalSpeedWitness['2'].confirmed>=3,
   'directly visible movement may be learned after relay-only observations');
 });
+
+test('one early speed spike cannot inflate a three-interval witnessed race',()=>{
+ const {h,classes}=boot(),self=tank(1,0),rival=tank(2,100);
+ self.ai={};
+ const g={time:0,tanks:[self,rival],hasLineOfSight:()=>true,
+  tankSpeed:t=>{if(t===rival)throw Error('private rival speed read');return 124;}};
+ const p={id:'heal',type:'heal',x:400,y:0};
+ h.resourceContest(g,self,p,400,classes);
+ const baseline=124;
+ for(const [i,mult] of [1.64,1.05,1.05].entries()){
+  g.time=(i+1)*.2;
+  rival.x+=baseline*mult*.2;
+  h.resourceContest(g,self,p,400,classes);
+ }
+ const witness=self.ai.__v181RivalSpeedWitness['2'];
+ assert.equal(witness.confirmed,3,'all three intervals must count');
+ assert.ok(witness.fast<=baseline*1.051,
+  'certified speed must be bounded by the slowest sustained interval, not the impulse peak');
+ assert.ok(witness.fast>=baseline*1.049);
+});
