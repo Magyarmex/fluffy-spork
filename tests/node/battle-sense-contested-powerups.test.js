@@ -98,7 +98,7 @@ test('an unreachable pickup behind solid terrain is not a strategic target',()=>
  const {c,Game}=load(),g=new Game(),bot=T(1,0,0),
   rivals=[T(2,100,100),T(3,-100,100)],pickup={id:11,type:'shield',x:300,y:0};
  bot.hp=50;g.tanks=[bot,...rivals];g.powerups=[pickup];
- g.hasLineOfSight=(ax,ay,bx,by)=>!(bx===pickup.x&&by===pickup.y);
+ g.hasLineOfSight=(ax,ay,bx,by)=>!(ax===bot.x&&ay===bot.y&&bx===pickup.x&&by===pickup.y);
  g.novaBattlefieldWaypoint=()=>null;
  const h=c.window.__NOVA_BATTLE_SENSE_TEST__;
  assert.equal(h.routeDistance(g,bot,pickup),Infinity);
