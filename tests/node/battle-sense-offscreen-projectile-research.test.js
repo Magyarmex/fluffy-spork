@@ -39,4 +39,7 @@ test('research: unseen distant projectile currently changes AI public-pickup sel
   g.bullets=[bullet];
   assert.equal(choose(g,tank,classes),far,
     'current Battle Sense observes an offscreen projectile near the closer pickup');
+  g.w=1600;
+  assert.equal(fair.inGameplayViewport(g,tank,bullet),true,'wide view legitimately exposes the projectile');
+  assert.equal(choose(g,tank,classes),far,'visible projectile risk should remain meaningful');
 });
