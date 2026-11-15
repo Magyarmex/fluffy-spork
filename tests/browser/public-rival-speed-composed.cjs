@@ -51,7 +51,7 @@ const {chromium}=require('playwright');
     delete bot.ai.__v181RivalSpeedWitness;
     // Simulate a legitimate relay-only contact: present in fair tactical contacts
     // but beyond this observer's actual gameplay viewport.
-    for(const [at,x] of [[.75,600],[.95,636],[1.15,672]]){
+    for(const [at,x] of [[.75,2000],[.95,2036],[1.15,2072]]){
      g.time=at;rival.x=x;h.resourceContest(g,bot,{x:500,y:0},500,classes);
     }
     if(bot.ai.__v181RivalSpeedWitness)throw Error('offscreen relay leaked movement speed');
