@@ -195,6 +195,22 @@ test('observer sampling does not starve at 20–120 Hz and legal AI think cadenc
  }
 });
 
+test('previously off-viewport position cannot certify a speed witness after re-entry',()=>{
+ const {h,classes,win}=boot(),self=tank(1,0),rival=tank(2,100);self.ai={};
+ const g={time:0,tanks:[self,rival],hasLineOfSight:()=>true,tankSpeed:()=>124};
+ const p={id:'heal',type:'heal',x:400,y:0};
+ let minVisible=0;
+ win.__NOVA_FAIR_ENGAGEMENT__={inGameplayViewport:()=>true,
+  inGameplayWorldPoint:(_g,_observer,x)=>x>=minVisible};
+ h.resourceContest(g,self,p,400,classes);
+ g.time=.2;rival.x=136;h.resourceContest(g,self,p,400,classes);
+ assert.equal(self.ai.__v181RivalSpeedWitness['2'].confirmed,1);
+ minVisible=120;g.time=.4;rival.x=172;
+ h.resourceContest(g,self,p,400,classes);
+ assert.equal(self.ai.__v181RivalSpeedWitness['2'].confirmed,0,
+  'prior offscreen endpoint must invalidate consecutive speed evidence');
+});
+
 test('relay-only offscreen rival cannot provide a movement-speed witness',()=>{
  const {h,classes,win}=boot(),self=tank(1,0),rival=tank(2,100);self.ai={};
  const g={time:0,tanks:[self,rival],hasLineOfSight:()=>true,tankSpeed:()=>124};
