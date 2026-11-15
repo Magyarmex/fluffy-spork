@@ -70,3 +70,21 @@ test('two public heal choices are invariant to unseen rival upgrades',()=>{
  assert.equal(h.chooseResource(g,self,classes)?.id,'near',
   'unseen speed upgrades cannot flip the selected public healing pickup');
 });
+
+test('seeded pickup decisions ignore rival private upgrades across 1200 public scenes',()=>{
+ const {h,classes}=boot();let seed=1517800;
+ const rnd=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+ for(let i=0;i<1200;i++){
+  const self=tank(1,0),rival=tank(2,(rnd()-.5)*900);
+  rival.y=(rnd()-.5)*900;self.hp=10+rnd()*75;
+  const g={tanks:[self,rival],powerups:[],bullets:[],hasLineOfSight:()=>true,
+   tankSpeed:t=>{if(t===rival)throw Error('hidden rival speed read in scene '+i);return 100+rnd()*0;}};
+  for(let j=0;j<2;j++)g.powerups.push({
+   id:j,type:rnd()<.5?'heal':'shield',x:(rnd()-.5)*1200,y:(rnd()-.5)*1200
+  });
+  const first=h.chooseResource(g,self,classes)?.id??null;
+  rival.stats.speed=8;rival.perk='speed';rival.hasteT=10;
+  const second=h.chooseResource(g,self,classes)?.id??null;
+  assert.equal(second,first,'private rival speed altered public scene '+i);
+ }
+});
