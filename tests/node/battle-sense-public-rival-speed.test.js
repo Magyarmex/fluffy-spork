@@ -78,7 +78,7 @@ test('seeded pickup decisions ignore rival private upgrades across 1200 public s
   const self=tank(1,0),rival=tank(2,(rnd()-.5)*900);
   rival.y=(rnd()-.5)*900;self.hp=10+rnd()*75;
   const g={tanks:[self,rival],powerups:[],bullets:[],hasLineOfSight:()=>true,
-   tankSpeed:t=>{if(t===rival)throw Error('hidden rival speed read in scene '+i);return 100+rnd()*0;}};
+   tankSpeed:t=>{if(t===rival)throw Error('hidden rival speed read in scene '+i);return 100;}};
   for(let j=0;j<2;j++)g.powerups.push({
    id:j,type:rnd()<.5?'heal':'shield',x:(rnd()-.5)*1200,y:(rnd()-.5)*1200
   });
