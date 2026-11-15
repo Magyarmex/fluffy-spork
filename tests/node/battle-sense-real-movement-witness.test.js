@@ -62,11 +62,13 @@ test('real composed movement impulse cannot masquerade as sustained rival upgrad
    if(g.hash?.clear)g.hash.clear();
    Object.assign(bot,{cls:'guard',x:0,y:0,alive:true});bot.ai={};
    Object.assign(rival,{cls:'guard',x:100,y:0,alive:true,
-    vx:324,vy:0,spawnShieldT:0,shieldT:0,perk:null,hasteT:0,
+    vx:0,vy:0,spawnShieldT:0,shieldT:0,perk:null,hasteT:0,
     stats:{...rival.stats,speed:0}});
    g.hasLineOfSight=()=>true;
    const p={id:'heal',type:'heal',x:400,y:0};
    const originalSpeed=g.tankSpeed;
+   const legalGuardSpeed=originalSpeed.call(g,rival);
+   rival.vx=legalGuardSpeed+200;
    const contest=()=>{
     g.tankSpeed=t=>{
      if(t===rival)throw Error('private rival speed queried');
@@ -78,7 +80,7 @@ test('real composed movement impulse cannot masquerade as sustained rival upgrad
    g.time=0;contest();
    const dt=1/hz;
    for(let frame=1;frame<=Math.round(hz*.8);frame++){
-    g.time=frame*dt;g.moveTank(rival,124,0,dt);
+    g.time=frame*dt;g.moveTank(rival,legalGuardSpeed,0,dt);
     if(frame%Math.round(hz*.2)===0)contest();
    }
    const w=bot.ai.__v181RivalSpeedWitness?.[String(rival.id)];
