@@ -156,3 +156,15 @@ test('departing round does not hide another persistent projectile in the same he
  assert.equal(choose(g,tank),far,
    'each observed projectile must be priced independently; persistent danger remains');
 });
+
+test('unbounded current movement and invalid speed state preserve observed lane danger',()=>{
+ const {g,tank,near,far,choose}=fixture();
+ g.bullets=[{id:303,ownerId:999,x:600,y:0,vx:500,vy:0,ttl:10}];
+ assert.equal(choose(g,tank),near);
+ tank.vx=4000;
+ assert.equal(choose(g,tank),far,'very high inherited velocity invalidates remote arrival proof');
+ tank.vx=NaN;
+ assert.equal(choose(g,tank),far,'nonfinite movement must fail open');
+ tank.vx=0;tank.stats={speed:NaN};
+ assert.equal(choose(g,tank),far,'unknown speed upgrade must fail open');
+});
