@@ -78,9 +78,13 @@ test('two occluded nearby pickup goals expose actual route-cache goal ownership'
       const direct = Math.hypot(pickup.x-tank.x, pickup.y-tank.y);
       assert.ok(direct <= 760, 'candidate must be eligible for Battle Sense');
     }
+    const firstCost = hooks.routeDistance(g, tank, g.powerups[0], null, classes);
+    const secondCost = hooks.routeDistance(g, tank, g.powerups[1], null, classes);
+    assert.ok(Number.isFinite(firstCost), 'first physically reachable goal needs a route');
+    assert.ok(Number.isFinite(secondCost), 'nearby second goal must not be falsely rejected by an unrelated cached goal');
     const chosen = hooks.chooseResource(g, tank, classes);
-    assert.ok(chosen === null || pickups.some(p => p.id === chosen.id),
-      'choice must be one of the real pickups or an explicit rejection');
+    assert.ok(chosen && pickups.some(p => p.id === chosen.id),
+      'a critical heal behind traversable cover must remain a live strategic choice');
     assert.ok(scene.terrain.plans > 0,
       'the test must actually invoke the composed Terrain Intelligence planner');
     scene.chosen = chosen && chosen.id;
