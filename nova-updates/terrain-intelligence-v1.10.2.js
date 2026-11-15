@@ -159,16 +159,18 @@ function cachedNearbyRouteLength(g,x,y,gx,gy,pad,seed,wp){
  if(!c||!c.points||c.gx===gx&&c.gy===gy||
     d2(c.gx,c.gy,gx,gy)>tol*tol||!routeSafe(g,gx,gy,pad))return null;
  if(!Number.isFinite(cachedRouteLength(g,x,y,c.gx,c.gy,pad,seed,wp)))return null;
- var total=0,from={x:x,y:y},best=Infinity;
+ var total=0,from={x:x,y:y};
  for(var i=c.index;i<c.points.length;i++){
   var p=c.points[i];
   if(!p||!routeSafe(g,p.x,p.y,pad)||!routeVisible(g,from.x,from.y,p.x,p.y,pad))return null;
   total+=dist(from.x,from.y,p.x,p.y);
+  /* The earliest reachable exit is shortest among this route's prefixes.
+   * Do not require later cached legs after a safe exit has been found. */
   if(routeVisible(g,p.x,p.y,gx,gy,pad))
-   best=Math.min(best,total+dist(p.x,p.y,gx,gy));
+   return total+dist(p.x,p.y,gx,gy);
   from=p;
  }
- return Number.isFinite(best)?best:null;
+ return null;
 }
 function cachedWaypoint(g,x,y,gx,gy,pad,seed,oldWaypoint){
   pad=Math.max(5,pad||10);var now=g.time||0,key=cacheKey(seed,pad),map=g.__v1102Routes||(g.__v1102Routes=Object.create(null)),c=map[key],goalTol=Math.max(68,pad*4.5);
