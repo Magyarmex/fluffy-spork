@@ -44,3 +44,15 @@ test('offscreen projectile cannot alter AI pickup selection but visible projecti
   assert.equal(fair.inGameplayWorldPoint(g,tank,bullet.x,bullet.y),true,'wide view exposes the bullet even if its ID matches the tank');
   assert.equal(choose(g,tank,classes),far,'visible projectile risk should remain meaningful');
 });
+
+test('a viewport-visible but terrain-hidden projectile cannot poison distant pickup utility',()=>{
+  const {g,tank,classes,window}=scene();
+  g.w=1600;
+  const choose=window.__NOVA_BATTLE_SENSE_TEST__.chooseResource;
+  const near=g.powerups[0];
+  const bullet={id:91,ownerId:999,x:600,y:20,vx:0,vy:0,ttl:1};
+  g.bullets=[bullet];
+  g.hasLineOfSight=(ax,ay,bx,by)=>!(ax===tank.x&&ay===tank.y&&bx===bullet.x&&by===bullet.y);
+  assert.equal(window.__NOVA_FAIR_ENGAGEMENT__.inGameplayWorldPoint(g,tank,bullet.x,bullet.y),true);
+  assert.equal(choose(g,tank,classes),near,'terrain-hidden projectile is not observed by the evaluating tank');
+});
