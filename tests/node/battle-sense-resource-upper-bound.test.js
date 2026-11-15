@@ -89,3 +89,37 @@ test('pruning a hopeless candidate preserves the existing movement-route cache',
   assert.equal(probes,1);
   assert.equal(g.liveRoute,liveRoute);
 });
+
+test('seeded resource mixes preserve the exhaustive winner under certified detour costs',()=>{
+  const types=['heal','shield','nuke','triple','haste'];
+  let state=20261115;
+  const rand=()=>{state=(Math.imul(state,1664525)+1013904223)>>>0;return state/4294967296;};
+  let pruned=0;
+  for(let scene=0;scene<240;scene++){
+    const {tank,g,classes,choose,stats}=setup();
+    tank.hp=5+Math.floor(rand()*95);
+    const count=1+Math.floor(rand()*8);
+    g.powerups=Array.from({length:count},(_,id)=>({
+      id,type:types[Math.floor(rand()*types.length)],x:20+rand()*720,y:0
+    }));
+    g.novaBattlefieldWaypoint=()=>({x:0,y:0});
+    g.novaRouteLength=(x,y,gx,gy)=>Math.hypot(gx-x,gy-y)*1.2;
+    g.novaStrategicRouteCost=(x,y,gx,gy)=>Math.hypot(gx-x,gy-y)*1.2;
+    const hp=tank.hp/tank.maxHp;
+    let best=-99,winner=null;
+    for(const p of g.powerups){
+      const direct=Math.hypot(p.x-tank.x,p.y-tank.y);
+      const value=p.type==='heal'?(1-hp)*2.5:
+        p.type==='shield'?.65+(1-hp)*.45:
+        p.type==='nuke'?.45:
+        p.type==='triple'?.62+(hp>.45?.25:0):
+        .55+(hp>.4?.25:0);
+      const score=value-direct*1.2/900-.28;
+      if(score>best){best=score;winner=p;}
+    }
+    const expected=best>.42?winner:null;
+    assert.equal(choose(g,tank,classes),expected,'winner differs in seeded scene '+scene);
+    pruned+=stats.prunedRoutes;
+  }
+  assert.ok(pruned>0,'seeded cases must exercise pruning, not only the original path');
+});
