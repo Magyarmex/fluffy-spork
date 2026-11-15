@@ -179,7 +179,7 @@ test('research upper bound: independent goal-keyed route snapshots preserve cont
       choices.push(choice);
     }
     if(choices[0]!==choices[1])unstable++;
-    assert.ok(Number.isFinite(best),'both fixture goals must remain physically reachable');
+    assert.ok(choices.every(Boolean),'both candidate orders must select a reachable heal');
   }
   // This is a stationary source-planner upper bound. Moving tanks require
   // position/terrain invalidation and real browser/Android CPU acceptance.
