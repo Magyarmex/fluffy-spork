@@ -182,10 +182,13 @@ test('research: global scratch budget fairness across update orders and subseque
    const order=reverse?[...bots].reverse():bots;
    const first=[];
    for(const bot of order){
-    const before=g.__v1102StrategicBudget?.plans||0;
+    const priorBudget=g.__v1102StrategicBudget;
+    const before=priorBudget?.plans||0;
     const choice=hooks.chooseResource(g,bot,classes)?.id||null;
-    const after=g.__v1102StrategicBudget?.plans||0;
-    first.push({id:bot.id,choice,plansSpent:after-before,atCap:after>=64});
+    const currentBudget=g.__v1102StrategicBudget;
+    const after=currentBudget?.plans||0;
+    const plansSpent=currentBudget===priorBudget?after-before:after;
+    first.push({id:bot.id,choice,plansSpent,atCap:after>=64});
    }
    const firstPlans=g.__v1102StrategicBudget?.plans||0;
    const firstDeferred=first.filter(item=>!item.choice).map(item=>item.id);
@@ -195,10 +198,13 @@ test('research: global scratch budget fairness across update orders and subseque
    g.time+=.76;
    const second=[];
    for(const bot of [...order].reverse()){
-    const before=g.__v1102StrategicBudget?.plans||0;
+    const priorBudget=g.__v1102StrategicBudget;
+    const before=priorBudget?.plans||0;
     const choice=hooks.chooseResource(g,bot,classes)?.id||null;
-    const after=g.__v1102StrategicBudget?.plans||0;
-    second.push({id:bot.id,choice,plansSpent:after-before,atCap:after>=64});
+    const currentBudget=g.__v1102StrategicBudget;
+    const after=currentBudget?.plans||0;
+    const plansSpent=currentBudget===priorBudget?after-before:after;
+    second.push({id:bot.id,choice,plansSpent,atCap:after>=64});
    }
    const secondPlans=g.__v1102StrategicBudget?.plans||0;
    assert.ok(secondPlans<=64,'the following window must retain the same global budget');
@@ -206,10 +212,13 @@ test('research: global scratch budget fairness across update orders and subseque
    g.time+=.76;
    const third=[];
    for(const bot of order){
-    const before=g.__v1102StrategicBudget?.plans||0;
+    const priorBudget=g.__v1102StrategicBudget;
+    const before=priorBudget?.plans||0;
     const choice=hooks.chooseResource(g,bot,classes)?.id||null;
-    const after=g.__v1102StrategicBudget?.plans||0;
-    third.push({id:bot.id,choice,plansSpent:after-before,atCap:after>=64});
+    const currentBudget=g.__v1102StrategicBudget;
+    const after=currentBudget?.plans||0;
+    const plansSpent=currentBudget===priorBudget?after-before:after;
+    third.push({id:bot.id,choice,plansSpent,atCap:after>=64});
    }
    const thirdPlans=g.__v1102StrategicBudget?.plans||0;
    assert.ok(thirdPlans<=64,'the third window must retain the same global budget');
