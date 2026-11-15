@@ -52,7 +52,7 @@ const {chromium}=require('playwright');
     g.player.x=2200;g.player.y=2200;
     for(const o of other){if(o.t!==g.player){o.t.alive=false;o.t.hp=0;}}
     g.shapes=[];g.bullets=[];g.hash=null;
-    for(const arm of ['direct','three-walls','lower-only','two-heals-lower-first','two-heals-upper-first','two-heals-lower-first-isolated-plans']){
+    for(const arm of ['direct','three-walls','lower-only','two-heals-lower-first','two-heals-upper-first','two-heals-lower-first-isolated-plans','two-heals-lower-first-budgeted-plans']){
      const active=arm==='direct'?[]:walls;
      g.__novaTerrain=active;
      g.hasLineOfSight=(ax,ay,bx,by,pad=0)=>!active.some(w=>segment(ax,ay,bx,by,w,pad));
@@ -74,7 +74,7 @@ const {chromium}=require('playwright');
      bot.ai.__v181BiasW=0;bot.ai.__v181Mode='none';bot.ai.__v181ResourceId=null;
      const upper={id:'upper',type:'heal',x:340,y:40},lower={id:'lower',type:'heal',x:340,y:-40};
      g.powerups=arm==='lower-only'?[lower]:
-      (arm==='two-heals-lower-first'||arm==='two-heals-lower-first-isolated-plans')?[lower,upper]:
+      (arm==='two-heals-lower-first'||arm==='two-heals-lower-first-isolated-plans'||arm==='two-heals-lower-first-budgeted-plans')?[lower,upper]:
       arm==='two-heals-upper-first'?[upper,lower]:[upper];
      const initialIds=g.powerups.map(p=>p.id),initialCount=g.powerups.length;
      g.time=10;g.__v1102Routes=Object.create(null);g.__v1102RouteContext=null;
@@ -92,12 +92,20 @@ const {chromium}=require('playwright');
      // Research-only upper bound: force independent plans for each exact heal
      // candidate. This intentionally spends more planner work; it is NOT a
      // proposed production strategy or a performance-neutral comparison.
-     g.novaBattlefieldWaypoint=arm==='two-heals-lower-first-isolated-plans'?
+     let nextBudgetedAt=-Infinity;
+     g.novaBattlefieldWaypoint=(arm==='two-heals-lower-first-isolated-plans'||arm==='two-heals-lower-first-budgeted-plans')?
       function(x,y,gx,gy,pad,seed){
        if(g.powerups.some(p=>p.x===gx&&p.y===gy)){
         const key=String(seed==null?'x':seed)+':'+Math.round((pad||8)/4);
         const cached=g.__v1102Routes&&g.__v1102Routes[key];
-        if(cached&&(cached.gx!==gx||cached.gy!==gy))delete g.__v1102Routes[key];
+        if(cached&&(cached.gx!==gx||cached.gy!==gy)){
+         const isOtherPickup=g.powerups.some(p=>p.x===cached.gx&&p.y===cached.gy);
+         if(arm==='two-heals-lower-first-isolated-plans'||
+            (isOtherPickup&&g.time>=nextBudgetedAt)){
+          delete g.__v1102Routes[key];
+          if(arm==='two-heals-lower-first-budgeted-plans')nextBudgetedAt=g.time+1.0;
+         }
+        }
        }
        return originals.waypoint.call(this,x,y,gx,gy,pad,seed);
       }:originals.waypoint;
@@ -156,7 +164,7 @@ const {chromium}=require('playwright');
    return logs;
   });
   if(errors.length)throw Error('browser errors: '+JSON.stringify(errors));
-  if(result.length!==6||result.some(r=>!r.trace.length))throw Error('empty composed-game witness');
+  if(result.length!==7||result.some(r=>!r.trace.length))throw Error('empty composed-game witness');
   console.log('PICKUP_STEERING_WITNESS '+JSON.stringify(result));
   for(const arm of result){
    if(!arm.acquired||arm.acquiredAt==null||arm.acquiredAt>12)
