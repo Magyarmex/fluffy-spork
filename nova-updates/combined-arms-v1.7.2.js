@@ -192,8 +192,14 @@ wrap('game/engine',function(engine,require){
       if(sp>18){
         var now=this.time||0,pad=classSize(C,t)+8,look=clamp(55+sp*.46,72,170),ux=vx/sp,uy=vy/sp,ax=t.x+ux*look,ay=t.y+uy*look;
         var probe=this.firstTerrainHit(t.x,t.y,ax,ay,Math.max(2,pad-5)),wp=t.ai.__v172Waypoint;
-        if(wp&&now>(t.ai.__v172WaypointUntil||0))wp=null;
-        if(wp&&d2(t.x,t.y,wp.x,wp.y)<34*34)wp=null;
+        if(wp&&now>(t.ai.__v172WaypointUntil||0)){wp=null;t.ai.__v172Waypoint=null;}
+        if(wp&&d2(t.x,t.y,wp.x,wp.y)<34*34){wp=null;t.ai.__v172Waypoint=null;}
+        /* A previously useful corner can fall behind the hull once the next
+         * lane opens. Do not keep steering back to it when the intended
+         * forward step is already physically clear. */
+        if(wp&&!probe&&(wp.x-t.x)*ux+(wp.y-t.y)*uy < -12){
+          wp=null;t.ai.__v172Waypoint=null;
+        }
         if(probe&&!wp){
           var gx=ax+ux*look,gy=ay+uy*look;
           if(t.ai.__v172LastSeenAt!=null&&now-t.ai.__v172LastSeenAt<2.4){gx=t.ai.__v172LastSeenX;gy=t.ai.__v172LastSeenY;}
