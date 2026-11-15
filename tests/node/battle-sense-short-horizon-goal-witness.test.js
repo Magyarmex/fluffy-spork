@@ -77,7 +77,7 @@ function makeScene(order) {
   g.tanks = [tank];
   g.bullets = [];
   return { g, tank, classes, hooks: w.__NOVA_BATTLE_SENSE_TEST__,
-    terrain: w.__NOVA_TERRAIN_INTELLIGENCE__, pickups };
+    terrain: w.__NOVA_TERRAIN_INTELLIGENCE_TEST__, pickups };
 }
 
 test('critical heal movement preserves the selected goal despite a short-horizon steering request', () => {
