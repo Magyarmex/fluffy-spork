@@ -157,8 +157,8 @@ test('research: 120 simultaneous critical two-heal bots expose fallback planning
  for(const bot of bots)hooks.chooseResource(g,bot,classes);
  const budget=g.__v1102StrategicBudget||{plans:0};
  const liveRoutes=Object.keys(g.__v1102Routes||{}).length;
- const stats=g.__v1102StrategicRoutes||{};
- const scratchPlans=Object.values(stats).reduce((sum,state)=>sum+state.plans,0);
+ const strategicStates=g.__v1102StrategicRoutes||{};
+ const scratchPlans=Object.values(strategicStates).reduce((sum,state)=>sum+state.plans,0);
  console.log('TWO_HEAL_MANY_BOT_PLANNING_RESEARCH '+JSON.stringify({
   bots:bots.length,globalScratchPlans:budget.plans,
   cachedScratchPlans:scratchPlans,liveRoutes,livePlannerCalls:stats.plans
