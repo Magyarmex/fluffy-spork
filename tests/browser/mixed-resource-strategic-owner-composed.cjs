@@ -58,6 +58,8 @@ const {chromium}=require('playwright');
      if(!intact||liveCalls!==0)throw Error('live route polluted: '+JSON.stringify(out.at(-1)));
      if(!selected||calls.length<1||calls.length>2)
       throw Error('invalid bounded mixed strategic evaluation: '+JSON.stringify(out.at(-1)));
+     if(order==='shield-first'&&!calls.some(c=>c.goal==='shield'))
+      throw Error('shield-first fixture did not price the competitive shield');
     }
    }finally{
     Object.assign(bot,saved);bot.ai=savedAi;
