@@ -164,3 +164,31 @@ test('scratch pricing fails closed without physical collision APIs',()=>{
    'no uncertified scratch route may enter the cache');
  }
 });
+
+
+test('scratch route cost respects representative class clearances without certifying wall crossings',()=>{
+ const h=terrain(),wall={id:1,x:0,y:0,w:60,h:200,solid:true};
+ function hit(ax,ay,bx,by,pad){
+  const minX=wall.x-wall.w/2-pad,maxX=wall.x+wall.w/2+pad;
+  const minY=wall.y-wall.h/2-pad,maxY=wall.y+wall.h/2+pad;
+  const dx=bx-ax,dy=by-ay;let lo=0,hi=1;
+  for(const [p,q] of [[-dx,ax-minX],[dx,maxX-ax],[-dy,ay-minY],[dy,maxY-ay]]){
+   if(Math.abs(p)<1e-9){if(q<0)return false;}
+   else{const t=q/p;if(p<0)lo=Math.max(lo,t);else hi=Math.min(hi,t);if(lo>hi)return false;}
+  }
+  return true;
+ }
+ for(const pad of [16,23,31,42,52]){
+  const g={time:10,__novaTerrain:[wall],
+   hasLineOfSight:(ax,ay,bx,by,r=0)=>!hit(ax,ay,bx,by,r),
+   isTerrainSafe:(x,y,r=0)=>Math.abs(x-wall.x)>wall.w/2+r||Math.abs(y-wall.y)>wall.h/2+r};
+  const cost=h.strategicScratchCost(g,-250,0,250,0,pad,7,'heal');
+  assert.ok(cost===Infinity||Number.isFinite(cost)&&cost>500,
+   'a physically blocked direct line must never receive a straight-line price');
+  if(Number.isFinite(cost)){
+   const entries=Object.values(g.__v1102StrategicRoutes||{});
+   assert.ok(entries.some(e=>e.entry&&e.entry.points.length>1),
+    'a finite occluded route must have verified intermediate waypoints');
+  }
+ }
+});
