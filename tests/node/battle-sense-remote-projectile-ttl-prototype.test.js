@@ -103,3 +103,12 @@ test('unknown speed contract fails open and local tactical risk is unchanged',()
   classes.CLASSES.guard.moveMult=.92;
   assert.equal(choose(g,tank),near,'certified conservative travel bound permits the remote expiry filter');
 });
+
+test('phase-capable tank keeps visible bullet danger because blink breaks travel-time bound',()=>{
+  const {g,tank,classes,near,far,choose}=fixture();
+  g.bullets=[{id:99,ownerId:999,x:600,y:0,vx:0,vy:0,ttl:.25}];
+  classes.CLASSES.guard.ability='phase';
+  assert.equal(choose(g,tank),far,'a 420-unit phase blink invalidates ordinary walking arrival time');
+  classes.CLASSES.guard.ability='stampede';
+  assert.equal(choose(g,tank),near,'bounded speed boosts are covered by conservative speed ceiling');
+});
