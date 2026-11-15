@@ -129,3 +129,18 @@ test('public BLOOM threshold rejects a long cached detour that first-corner scor
  const accepted=T.publicEcoBias(g,t,{},{});
  assert.equal(accepted.mode,'signal','shorter verified path should preserve the public opportunity');
 });
+
+test('public opportunity cannot treat a blocked second leg as a complete route',()=>{
+ const {T,t,g}=scene(),goal={x:200,y:-900},corner={x:-760,y:-960};
+ g.novaBattlefieldWaypoint=()=>corner;
+ g.hasLineOfSight=(ax,ay,bx,by)=>!(ax===corner.x&&ay===corner.y||ax===t.x&&ay===t.y);
+ assert.equal(T.routeCost(g,t,goal.x,goal.y),Infinity,
+  'a first-corner fallback is not enough when a later wall blocks the public opportunity');
+ g.novaRouteLength=()=>1300;
+ assert.equal(T.routeCost(g,t,goal.x,goal.y),1300,
+  'a complete verified multi-leg path remains available');
+ g.novaRouteLength=()=>null;
+ g.hasLineOfSight=(ax,ay)=>ax===corner.x&&ay===corner.y;
+ assert.ok(Number.isFinite(T.routeCost(g,t,goal.x,goal.y)),
+  'a physically clear final leg still permits the cheap local corner');
+});
