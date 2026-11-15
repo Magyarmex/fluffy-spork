@@ -92,10 +92,16 @@ const {chromium}=require('playwright');
      let state=0x6d2b79f5;Math.random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return(state>>>0)/4294967296;};
      const trace=[],dt=1/60,steps=720;
      let invalidPositions=0,invalidSegments=0,resourceFrames=0,acquiredAt=null,firstChosen=null,acquiredId=null;
+     const decisionTransitions=[];let priorMode=null,priorResource=null,minimumGoalDistance=Infinity;
      for(let i=0;i<steps;i++){
       g.time=10+i*dt;
       const px=bot.x,py=bot.y;
       ai.updateAI(bot,g,dt);
+      if(bot.ai.__v181Mode!==priorMode||bot.ai.__v181ResourceId!==priorResource){
+       decisionTransitions.push({t:+(i*dt).toFixed(3),mode:bot.ai.__v181Mode,resourceId:bot.ai.__v181ResourceId??null,x:+bot.x.toFixed(2),y:+bot.y.toFixed(2)});
+       priorMode=bot.ai.__v181Mode;priorResource=bot.ai.__v181ResourceId;
+      }
+      minimumGoalDistance=Math.min(minimumGoalDistance,...g.powerups.map(p=>Math.hypot(p.x-bot.x,p.y-bot.y)));
       if(bot.ai.__v181Mode==='resource'){
        resourceFrames++;
        if(firstChosen==null)firstChosen=bot.ai.__v181ResourceId;
@@ -120,7 +126,7 @@ const {chromium}=require('playwright');
      }
      logs.push({arm,isolatedCosts,selectedResource:firstChosen,acquiredId,
       acquired:g.powerups.length<initialCount,acquiredAt,invalidPositions,invalidSegments,
-      resourceFrames,final:{x:bot.x,y:bot.y,hp:bot.hp},
+      resourceFrames,decisionTransitions,minimumGoalDistance:+minimumGoalDistance.toFixed(3),final:{x:bot.x,y:bot.y,hp:bot.hp},
       routePlans:window.__NOVA_TERRAIN_INTELLIGENCE__?.plans,
       trace});
     }
