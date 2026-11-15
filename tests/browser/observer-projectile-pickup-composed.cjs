@@ -55,10 +55,11 @@ const {chromium}=require('playwright');
      ['wide-terrain-hidden',1600,900,1,[bullet],true,'near'],
      ['research-single-shot-offlane',1600,900,1,[minigunTrain[0]],false,null],
      ['research-minigun-stream',1600,900,1,minigunTrain,false,null],
+     ['research-minigun-stream-prethreshold',1600,900,1,minigunTrain,false,null],
      ['research-minigun-stream-nearby',1600,900,1,minigunTrain,false,null],
     ]){
      g.w=w;g.h=h;g.cam.zoom=zoom;g.bullets=bullets;
-     bot.x=label==='research-minigun-stream-nearby'?450:0;bot.y=0;
+     bot.x=label==='research-minigun-stream-nearby'?336:label==='research-minigun-stream-prethreshold'?334:0;bot.y=0;
      if(label.startsWith('research-')){bot.vx=0;bot.vy=0;bot.hasteT=0;bot.perk=null;bot.gene=null;bot.stats={...bot.stats,speed:0};}
      // Only the observational volley arm compares a same-distance off-lane heal.
      const safeHeal={id:'safe',type:'heal',x:600,y:220};
@@ -82,7 +83,7 @@ const {chromium}=require('playwright');
    return results;
   });
   if(errors.length)throw Error('browser errors: '+JSON.stringify(errors));
-  if(report.length!==13)throw Error('missing composed-game acceptance or research arms');
+  if(report.length!==14)throw Error('missing composed-game acceptance or research arms');
   console.log('OBSERVER_PROJECTILE_COMPOSED_GAME '+JSON.stringify(report));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
