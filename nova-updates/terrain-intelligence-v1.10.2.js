@@ -178,6 +178,7 @@ function cachedNearbyRouteLength(g,x,y,gx,gy,pad,seed,wp){
 function strategicScratchCost(g,x,y,gx,gy,pad,seed,goalId){
  if(!g||!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(gx)||!Number.isFinite(gy))return Infinity;
  pad=Math.max(5,pad||10);
+ if(!routeSafe(g,gx,gy,pad))return Infinity;
  if(routeVisible(g,x,y,gx,gy,pad))return dist(x,y,gx,gy);
  var now=Number(g.time)||0,key=cacheKey(seed,pad),map=g.__v1102StrategicRoutes||(g.__v1102StrategicRoutes=Object.create(null));
  var state=map[key];
