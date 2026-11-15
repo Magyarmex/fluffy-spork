@@ -103,7 +103,7 @@ test('hidden sector value never affects tactical turn eligibility or heading',()
 });
 
 test('tactical commitment uses the first reachable Battlefield waypoint, not a wall-facing vector',()=>{
- const s=scene();s.g.hasLineOfSight=()=>false;
+ const s=scene();s.g.hasLineOfSight=(x,y)=>x!==s.t.x||y!==s.t.y;
  s.g.novaBattlefieldWaypoint=()=>({x:s.t.x+150,y:s.t.y-40});
  const m=s.tick();
  assert.ok(m.x>0&&m.y<0,'committed AI follows the reachable waypoint even when the public center lies northeast');
