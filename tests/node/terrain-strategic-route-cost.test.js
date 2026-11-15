@@ -192,3 +192,20 @@ test('scratch route cost respects representative class clearances without certif
   }
  }
 });
+
+
+test('strategic planner telemetry counts failed attempts and excludes budget-only lookups',()=>{
+ const w={__novaModules:{}};
+ vm.runInNewContext(fs.readFileSync(path.join(root,'nova-updates/terrain-intelligence-v1.10.2.js'),'utf8'),
+  {window:w,console:{info(){},error(){}},Math,Number,Object,Array});
+ const h=w.__NOVA_TERRAIN_INTELLIGENCE_TEST__,stats=w.__NOVA_TERRAIN_INTELLIGENCE__;
+ const g={time:10,__novaTerrain:[],hasLineOfSight:()=>false,isTerrainSafe:()=>true};
+ assert.equal(stats.strategicPlans,0);
+ assert.equal(h.strategicScratchCost(g,-200,0,200,0,23,7,'unreachable'),Infinity);
+ assert.equal(stats.strategicPlans,1,'failed search still consumed planner work');
+ assert.equal(h.strategicScratchCost(g,-200,0,200,0,23,7,'other'),null);
+ assert.equal(stats.strategicPlans,1,'budget refusal does not run another search');
+ g.time=10.8;
+ assert.equal(h.strategicScratchCost(g,-200,0,200,0,23,7,'other'),Infinity);
+ assert.equal(stats.strategicPlans,2,'next-window failed search is counted once');
+});
