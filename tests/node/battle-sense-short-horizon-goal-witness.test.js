@@ -21,7 +21,7 @@ function makeScene(order) {
   const modules = {
     'game/engine': m => { m.exports = { Game }; },
     'game/classes': m => { m.exports = classes; },
-    'game/ai': m => { m.exports = { updateAI() {} }; }
+    'game/ai': m => { m.exports = { updateAI(t,g,dt) { g.moveTank(t,300,0,dt); } }; }
   };
   const w = { __novaModules: modules };
   const context = { window: w, Math, Number, Object, Array,
@@ -32,6 +32,9 @@ function makeScene(order) {
   const m = { exports: {} };
   modules['game/engine'](m, m.exports, () => classes);
   const g = new m.exports.Game();
+  const aiModule = {exports:{}};
+  modules['game/ai'](aiModule, aiModule.exports, id => classes);
+  g.__novaAiModule = aiModule.exports;
   g.time = 10;
   const walls = [
     { id: 1, x: -130, y: -35, w: 60, h: 330, solid: true },
@@ -92,7 +95,14 @@ test('actual Combined Arms movement requests a short-horizon route after strateg
     return original.call(this,x,y,gx,gy,pad,seed);
   };
   const before = {x:tank.x,y:tank.y};
-  g.moveTank(tank,300,0,1/60);
+  g.status = 'playing';
+  // The real Battle Sense wrapper computes resource mode and intercepts the
+  // original AI's movement request before Combined Arms and Terrain act.
+  const ai = g.__novaAiModule;
+  assert.ok(ai && typeof ai.updateAI === 'function');
+  ai.updateAI(tank,g,1/60);
+  assert.equal(tank.ai.__v181Mode,'resource',
+    'the actual strategic wrapper must choose resource mode');
   assert.ok(calls.length > 0,
     'blocked first 170 units must invoke the composed movement route owner');
   assert.equal(calls[0].seed,tank.id);
