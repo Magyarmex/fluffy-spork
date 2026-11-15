@@ -123,3 +123,16 @@ test('seeded resource mixes preserve the exhaustive winner under certified detou
   }
   assert.ok(pruned>0,'seeded cases must exercise pruning, not only the original path');
 });
+
+test('a low-value shield listed before any heal cannot consume the live route cache',()=>{
+  const {tank,g,classes,choose,stats}=setup();
+  const shield={id:'shield',type:'shield',x:700,y:0};
+  const heal={id:'heal',type:'heal',x:200,y:0};
+  g.powerups=[shield,heal];
+  let probes=0;
+  g.novaBattlefieldWaypoint=()=>{probes++;return {x:10,y:0};};
+  g.novaRouteLength=()=>250;
+  assert.equal(choose(g,tank,classes),heal);
+  assert.equal(probes,1,'unwinnable shield is rejected before planning, even when first');
+  assert.equal(stats.prunedRoutes,1);
+});
