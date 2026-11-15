@@ -176,7 +176,8 @@ function cachedNearbyRouteLength(g,x,y,gx,gy,pad,seed,wp){
  * movement route cache. A cached path is revalidated at physical clearance
  * before reuse; null means budget unavailable, Infinity means uncertified. */
 function strategicScratchCost(g,x,y,gx,gy,pad,seed,goalId){
- if(!g||!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(gx)||!Number.isFinite(gy))return Infinity;
+ if(!g||!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(gx)||!Number.isFinite(gy)||
+    typeof g.hasLineOfSight!=='function'||typeof g.isTerrainSafe!=='function')return Infinity;
  pad=Math.max(5,pad||10);
  if(!routeSafe(g,gx,gy,pad))return Infinity;
  if(routeVisible(g,x,y,gx,gy,pad))return dist(x,y,gx,gy);
