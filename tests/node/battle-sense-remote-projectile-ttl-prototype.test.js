@@ -123,7 +123,7 @@ test('large existing knockback velocity disables unsafe remote expiry discount',
 
 test('shipping class movement multipliers do not exceed the conservative evolution ceiling',()=>{
   const html=fs.readFileSync(path.join(__dirname,'../../index.html'),'utf8');
-  const values=[...html.matchAll(/moveMult:\\s*([0-9.]+)/g)].map(m=>Number(m[1]));
+  const values=[...html.matchAll(/moveMult:\s*([0-9.]+)/g)].map(m=>Number(m[1]));
   assert.ok(values.length>=36,'expected the full materialized class roster');
   assert.ok(Math.max(...values)<=1.18,
     'a faster class requires revisiting the remote-pickup earliest-arrival ceiling');
