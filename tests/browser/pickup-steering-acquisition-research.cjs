@@ -44,7 +44,7 @@ const fs=require('node:fs');
    };
    const segment=(ax,ay,bx,by,w,pad)=>!!hitRect(ax,ay,bx,by,w,pad);
    const originals={los:g.hasLineOfSight,safe:g.isTerrainSafe,hit:g.firstTerrainHit,
-    terrain:g.__novaTerrain,shapes:g.shapes,bullets:g.bullets,powerups:g.powerups,waypoint:g.novaBattlefieldWaypoint,
+    terrain:g.__novaTerrain,shapes:g.shapes,bullets:g.bullets,powerups:g.powerups,waypoint:g.novaBattlefieldWaypoint,strategic:g.novaStrategicRouteCost,
     hash:g.hash,time:g.time,playerX:g.player.x,playerY:g.player.y};
    const other=g.tanks.filter(t=>t!==bot).map(t=>({t,alive:t.alive,hp:t.hp}));
    const baseline={...bot},baseAI={...bot.ai};
@@ -124,7 +124,18 @@ const fs=require('node:fs');
      const routeCertSummary={exact:0,nearby:0,fallback:0,unverified:0,failures:[]};
      const selectedWaypoint=g.novaBattlefieldWaypoint;
      let goalHintOverrides=0;
-     const routePlanCosts=[];
+     const routePlanCosts=[],strategicPlanCosts=[];
+     g.novaStrategicRouteCost=originals.strategic;
+     if(typeof originals.strategic==='function'){
+      g.novaStrategicRouteCost=function(...args){
+       const before=window.__NOVA_TERRAIN_INTELLIGENCE__?.strategicPlans||0;
+       const started=performance.now();
+       const value=originals.strategic.apply(this,args);
+       if((window.__NOVA_TERRAIN_INTELLIGENCE__?.strategicPlans||0)>before)
+        strategicPlanCosts.push(performance.now()-started);
+       return value;
+      };
+     }
      g.novaBattlefieldWaypoint=function(x,y,gx,gy,pad,seed){
       let routeGx=gx,routeGy=gy;
       // Research-only intervention: when the Guard is actively pursuing its
@@ -207,8 +218,14 @@ const fs=require('node:fs');
      const aiUpdateMsMean=aiUpdateCosts.reduce((a,b)=>a+b,0)/Math.max(1,aiUpdateCosts.length);
      const sortedRouteCosts=routePlanCosts.slice().sort((a,b)=>a-b);
      const routePlanMsP95=sortedRouteCosts[Math.floor((sortedRouteCosts.length-1)*.95)]||0;
+     const sortedStrategicCosts=strategicPlanCosts.slice().sort((a,b)=>a-b);
+     const strategicPlanMsP95=sortedStrategicCosts[Math.floor((sortedStrategicCosts.length-1)*.95)]||0;
      logs.push({arm,isolatedCosts,routePlanMsP95:+routePlanMsP95.toFixed(4),
-      routePlanMsMax:+(sortedRouteCosts.at(-1)||0).toFixed(4),aiUpdateMsP95:+aiUpdateMsP95.toFixed(4),
+      routePlanMsMax:+(sortedRouteCosts.at(-1)||0).toFixed(4),
+      routePlanMsTotal:+routePlanCosts.reduce((a,b)=>a+b,0).toFixed(4),
+      strategicPlanMsP95:+strategicPlanMsP95.toFixed(4),
+      strategicPlanMsTotal:+strategicPlanCosts.reduce((a,b)=>a+b,0).toFixed(4),
+      aiUpdateMsP95:+aiUpdateMsP95.toFixed(4),
       aiUpdateMsMean:+aiUpdateMsMean.toFixed(4),selectedResource:firstChosen,acquiredId,
       acquired:g.powerups.length<initialCount,acquiredAt,invalidPositions,invalidSegments,
       resourceFrames,decisionTransitions,routeCertSummary,minimumGoalDistance:+minimumGoalDistance.toFixed(3),final:{x:bot.x,y:bot.y,hp:bot.hp},
@@ -226,7 +243,7 @@ const fs=require('node:fs');
     g.isTerrainSafe=originals.safe;g.firstTerrainHit=originals.hit;
     g.__novaTerrain=originals.terrain;g.shapes=originals.shapes;
     g.bullets=originals.bullets;g.powerups=originals.powerups;
-    g.hash=originals.hash;g.time=originals.time;g.novaBattlefieldWaypoint=originals.waypoint;
+    g.hash=originals.hash;g.time=originals.time;g.novaBattlefieldWaypoint=originals.waypoint;g.novaStrategicRouteCost=originals.strategic;
     g.player.x=originals.playerX;g.player.y=originals.playerY;
     for(const o of other){o.t.alive=o.alive;o.t.hp=o.hp;}
    }
