@@ -71,3 +71,11 @@ test('observed combat and active anti-stuck escape preempt critical-heal route h
     assert.equal(wp.x,100,'active recovery must preempt resource goal');
   }
 });
+
+test('temporary resource route context restores even if movement throws',()=>{
+  const {g,tank}=scene();
+  g.novaBattlefieldWaypoint=()=>{throw Error('waypoint-failure');};
+  assert.throws(()=>g.moveTank(tank,100,0,1/60),/waypoint-failure/);
+  assert.equal(g.__v1102RouteContext,undefined,
+    'a failed movement call must not leak resource steering to another tank');
+});
