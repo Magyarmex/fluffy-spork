@@ -118,6 +118,26 @@ const {chromium}=require('playwright');
        }
        return originals.waypoint.call(this,x,y,gx,gy,pad,seed);
       }:originals.waypoint;
+     // Passive certification census: observe the real strategic lookup after
+     // it runs; never issue an additional waypoint plan or change its result.
+     const routeCertSummary={exact:0,nearby:0,fallback:0,unverified:0,failures:[]};
+     const selectedWaypoint=g.novaBattlefieldWaypoint;
+     g.novaBattlefieldWaypoint=function(x,y,gx,gy,pad,seed){
+      const wp=selectedWaypoint.call(this,x,y,gx,gy,pad,seed);
+      if(seed===bot.id&&g.powerups.some(p=>p.x===gx&&p.y===gy)){
+       const full=wp&&g.novaRouteLength?.(x,y,gx,gy,pad,seed,wp);
+       const near=wp&&g.novaNearbyRouteLength?.(x,y,gx,gy,pad,seed,wp);
+       const clear=wp&&g.hasLineOfSight?.(wp.x,wp.y,gx,gy,Math.max(2,pad-5));
+       const type=Number.isFinite(full)?'exact':Number.isFinite(near)?'nearby':clear?'fallback':'unverified';
+       routeCertSummary[type]++;
+       if(type==='unverified'&&routeCertSummary.failures.length<12){
+        const cache=g.__v1102Routes?.[String(seed)+':'+Math.round(pad/4)];
+        routeCertSummary.failures.push({t:+g.time.toFixed(3),goal:{x:gx,y:gy},
+         wp:wp?{x:wp.x,y:wp.y}:null,cacheGoal:cache?{x:cache.gx,y:cache.gy}:null});
+       }
+      }
+      return wp;
+     };
      let state=0x6d2b79f5;Math.random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return(state>>>0)/4294967296;};
      const plansBefore=window.__NOVA_TERRAIN_INTELLIGENCE__?.plans||0;
      const trace=[],dt=1/60,steps=720;
@@ -156,7 +176,7 @@ const {chromium}=require('playwright');
      }
      logs.push({arm,isolatedCosts,selectedResource:firstChosen,acquiredId,
       acquired:g.powerups.length<initialCount,acquiredAt,invalidPositions,invalidSegments,
-      resourceFrames,decisionTransitions,minimumGoalDistance:+minimumGoalDistance.toFixed(3),final:{x:bot.x,y:bot.y,hp:bot.hp},
+      resourceFrames,decisionTransitions,routeCertSummary,minimumGoalDistance:+minimumGoalDistance.toFixed(3),final:{x:bot.x,y:bot.y,hp:bot.hp},
       routePlans:window.__NOVA_TERRAIN_INTELLIGENCE__?.plans,
       routePlansDelta:(window.__NOVA_TERRAIN_INTELLIGENCE__?.plans||0)-plansBefore,
       trace});
