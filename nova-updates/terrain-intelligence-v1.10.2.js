@@ -182,8 +182,11 @@ function strategicScratchCost(g,x,y,gx,gy,pad,seed,goalId){
  if(routeVisible(g,x,y,gx,gy,pad))return dist(x,y,gx,gy);
  var now=Number(g.time)||0,key=cacheKey(seed,pad),map=g.__v1102StrategicRoutes||(g.__v1102StrategicRoutes=Object.create(null));
  var state=map[key];
- if(!state||now<state.windowStart||now-state.windowStart>=.75)
+ if(!state||now<state.windowStart||now-state.windowStart>=.75){
    state=map[key]={windowStart:now,plans:0,entry:null};
+   /* Failed or uncertified plans must also count toward the cache cap. */
+   var keys=Object.keys(map);if(keys.length>64)delete map[keys[0]];
+ }
  var e=state.entry,goalKey=String(goalId)+':'+gx+':'+gy;
  if(e&&(e.goalKey!==goalKey||now>e.until||dist(x,y,e.ax,e.ay)>60))e=null;
  if(e){
@@ -209,7 +212,6 @@ function strategicScratchCost(g,x,y,gx,gy,pad,seed,goalId){
    e={goalKey:goalKey,ax:x,ay:y,until:now+.75,points:points};
    state.entry=e;
    if(window.__NOVA_TERRAIN_INTELLIGENCE__)window.__NOVA_TERRAIN_INTELLIGENCE__.strategicPlans++;
-   var keys=Object.keys(map);if(keys.length>64)delete map[keys[0]];
  }
  var total=0,px=x,py=y;
  for(var j=0;j<e.points.length;j++){var p=e.points[j];total+=dist(px,py,p.x,p.y);px=p.x;py=p.y;}
