@@ -99,3 +99,156 @@ test('nearby strategic route reuse certifies physical prefixes without changing 
  assert.equal(h.cachedNearbyRouteLength(...args),null,
   'expired cached routes cannot certify nearby goals');
 });
+
+test('critical-heal scratch planning is goal-keyed, bounded and never evicts movement routes',()=>{
+ const h=terrain(),walls=[{id:1,x:0,y:0,w:60,h:200,solid:true}];
+ function hit(ax,ay,bx,by,r,p){
+  const dx=bx-ax,dy=by-ay,minX=r.x-r.w/2-p,maxX=r.x+r.w/2+p,
+   minY=r.y-r.h/2-p,maxY=r.y+r.h/2+p;
+  let lo=0,hi=1;
+  for(const [P,Q] of [[-dx,ax-minX],[dx,maxX-ax],[-dy,ay-minY],[dy,maxY-ay]]){
+   if(Math.abs(P)<1e-9){if(Q<0)return false;}
+   else{const z=Q/P;if(P<0)lo=Math.max(lo,z);else hi=Math.min(hi,z);if(lo>hi)return false;}
+  }
+  return true;
+ }
+ const g={time:10,__novaTerrain:walls,__v1102Routes:{'7:6':{gx:99,gy:99,points:[{x:99,y:99}],index:0,until:11}}};
+ g.hasLineOfSight=(ax,ay,bx,by,p=0)=>!walls.some(w=>hit(ax,ay,bx,by,w,p));
+ g.isTerrainSafe=(x,y,p=0)=>!walls.some(w=>Math.abs(x-w.x)<=w.w/2+p&&Math.abs(y-w.y)<=w.h/2+p);
+ const before=JSON.stringify(g.__v1102Routes);
+ const lower=h.strategicScratchCost(g,-200,0,200,-40,23,7,'lower');
+ assert.ok(Number.isFinite(lower)&&lower>Math.hypot(400,40));
+ assert.equal(h.strategicScratchCost(g,-200,0,200,-40,23,7,'lower'),lower);
+ const originalSight=g.hasLineOfSight;
+ g.hasLineOfSight=()=>false;
+ assert.equal(h.strategicScratchCost(g,-200,0,200,-40,23,7,'lower'),null,
+  'newly blocked route legs must invalidate cached strategic pricing without a second plan in the same window');
+ g.hasLineOfSight=originalSight;
+ assert.equal(h.strategicScratchCost(g,-200,0,200,40,23,7,'upper'),null,
+  'second independent plan must respect one-plan-per-window budget');
+ assert.equal(h.strategicScratchCost(g,-130,0,200,-40,23,7,'lower'),null,
+  'moving more than 60 units must not reuse an anchored route or exceed the scratch budget');
+ g.time=10.8;
+ const upper=h.strategicScratchCost(g,-200,0,200,40,23,7,'upper');
+ assert.ok(Number.isFinite(upper)&&upper>Math.hypot(400,40));
+ assert.equal(JSON.stringify(g.__v1102Routes),before,
+  'strategic contender planning must not mutate the live movement cache');
+ walls.length=0;
+ assert.equal(h.strategicScratchCost(g,-200,0,200,40,23,7,'upper'),Math.hypot(400,40),
+  'destroyed cover must permit the newly clear direct route');
+});
+
+test('scratch direct-path fast path rejects physically unsafe goal endpoints',()=>{
+ const h=terrain(),g={time:10,hasLineOfSight:()=>true,isTerrainSafe:()=>false};
+ assert.equal(h.strategicScratchCost(g,0,0,100,0,23,7,'unsafe'),Infinity);
+ assert.equal(Object.keys(g.__v1102Routes||{}).length,0);
+});
+
+
+test('failed strategic scratch plans cannot grow per-tank cache without bound',()=>{
+ const h=terrain();
+ const g={time:10,__novaTerrain:[],hasLineOfSight:()=>false,isTerrainSafe:()=>true};
+ for(let seed=1;seed<=120;seed++){
+  h.strategicScratchCost(g,-200,0,200,0,23,seed,'unreachable');
+  assert.ok(Object.keys(g.__v1102StrategicRoutes).length<=64,
+   'failed or uncertified plans must obey the same memory cap as successful plans');
+ }
+});
+
+
+test('scratch pricing fails closed without physical collision APIs',()=>{
+ const h=terrain();
+ for(const g of [{time:10,isTerrainSafe:()=>true},{time:10,hasLineOfSight:()=>true}]){
+  assert.equal(h.strategicScratchCost(g,0,0,100,0,23,7,'heal'),Infinity);
+  assert.equal(g.__v1102StrategicRoutes,undefined,
+   'no uncertified scratch route may enter the cache');
+ }
+});
+
+
+test('scratch route cost respects representative class clearances without certifying wall crossings',()=>{
+ const h=terrain(),wall={id:1,x:0,y:0,w:60,h:200,solid:true};
+ function hit(ax,ay,bx,by,pad){
+  const minX=wall.x-wall.w/2-pad,maxX=wall.x+wall.w/2+pad;
+  const minY=wall.y-wall.h/2-pad,maxY=wall.y+wall.h/2+pad;
+  const dx=bx-ax,dy=by-ay;let lo=0,hi=1;
+  for(const [p,q] of [[-dx,ax-minX],[dx,maxX-ax],[-dy,ay-minY],[dy,maxY-ay]]){
+   if(Math.abs(p)<1e-9){if(q<0)return false;}
+   else{const t=q/p;if(p<0)lo=Math.max(lo,t);else hi=Math.min(hi,t);if(lo>hi)return false;}
+  }
+  return true;
+ }
+ for(const pad of [16,23,31,42,52]){
+  const g={time:10,__novaTerrain:[wall],
+   hasLineOfSight:(ax,ay,bx,by,r=0)=>!hit(ax,ay,bx,by,r),
+   isTerrainSafe:(x,y,r=0)=>Math.abs(x-wall.x)>wall.w/2+r||Math.abs(y-wall.y)>wall.h/2+r};
+  const cost=h.strategicScratchCost(g,-250,0,250,0,pad,7,'heal');
+  assert.ok(cost===Infinity||Number.isFinite(cost)&&cost>500,
+   'a physically blocked direct line must never receive a straight-line price');
+  if(Number.isFinite(cost)){
+   const entries=Object.values(g.__v1102StrategicRoutes||{});
+   assert.ok(entries.some(e=>e.entry&&e.entry.points.length>1),
+    'a finite occluded route must have verified intermediate waypoints');
+  }
+ }
+});
+
+
+test('strategic planner telemetry counts failed attempts and excludes budget-only lookups',()=>{
+ const w={__novaModules:{}};
+ vm.runInNewContext(fs.readFileSync(path.join(root,'nova-updates/terrain-intelligence-v1.10.2.js'),'utf8'),
+  {window:w,console:{info(){},error(){}},Math,Number,Object,Array});
+ const h=w.__NOVA_TERRAIN_INTELLIGENCE_TEST__,stats=w.__NOVA_TERRAIN_INTELLIGENCE__;
+ const g={time:10,__novaTerrain:[],hasLineOfSight:()=>false,isTerrainSafe:()=>true};
+ assert.equal(stats.strategicPlans,0);
+ assert.equal(h.strategicScratchCost(g,-200,0,200,0,23,7,'unreachable'),Infinity);
+ assert.equal(stats.strategicPlans,1,'failed search still consumed planner work');
+ assert.equal(h.strategicScratchCost(g,-200,0,200,0,23,7,'other'),null);
+ assert.equal(stats.strategicPlans,1,'budget refusal does not run another search');
+ g.time=10.8;
+ assert.equal(h.strategicScratchCost(g,-200,0,200,0,23,7,'other'),Infinity);
+ assert.equal(stats.strategicPlans,2,'next-window failed search is counted once');
+});
+
+
+test('aggregate scratch budget survives 120 rotating identities and cache evictions',()=>{
+ const w={__novaModules:{}};
+ vm.runInNewContext(fs.readFileSync(path.join(root,'nova-updates/terrain-intelligence-v1.10.2.js'),'utf8'),
+  {window:w,console:{info(){},error(){}},Math,Number,Object,Array});
+ const h=w.__NOVA_TERRAIN_INTELLIGENCE_TEST__,stats=w.__NOVA_TERRAIN_INTELLIGENCE__;
+ const g={time:10,__novaTerrain:[],hasLineOfSight:()=>false,isTerrainSafe:()=>true};
+ for(let round=0;round<3;round++)for(let seed=1;seed<=120;seed++)
+  h.strategicScratchCost(g,-200,0,200,0,23,seed,'unreachable');
+ assert.equal(stats.strategicPlans,64,
+  'cache eviction must not reset the shared per-window CPU search budget');
+ assert.ok(Object.keys(g.__v1102StrategicRoutes).length<=64);
+ g.time=10.8;
+ for(let seed=1;seed<=120;seed++)
+  h.strategicScratchCost(g,-200,0,200,0,23,seed,'unreachable');
+ assert.equal(stats.strategicPlans,128,
+  'a new window may admit at most one additional global batch of 64 plans');
+});
+
+
+test('critical resource movement cannot reuse another nearby heal goal cache',()=>{
+ function Game(){}
+ Game.prototype.novaBattlefieldWaypoint=()=>null;
+ const mods={'game/engine':m=>m.exports={Game}},w={__novaModules:mods};
+ vm.runInNewContext(fs.readFileSync(path.join(root,'nova-updates/terrain-intelligence-v1.10.2.js'),'utf8'),
+  {window:w,console:{info(){},error(){}},Math,Number,Object,Array});
+ const m={exports:{}};mods['game/engine'](m,m.exports,()=>({CLASSES:{}}));
+ const g=new m.exports.Game();g.time=10;
+ g.hasLineOfSight=()=>true;g.isTerrainSafe=()=>true;
+ const oldRoute=()=>({gx:200,gy:-40,points:[{x:0,y:150},{x:200,y:-40}],
+  index:0,until:11,validateAt:11});
+ g.__v1102Routes={'7:6':oldRoute()};
+ const normal=g.novaBattlefieldWaypoint(-200,0,200,40,23,7);
+ assert.ok(normal&&normal.y===150,
+  'ordinary nearby goal reuse must remain intact for movement performance');
+ g.__v1102Routes={'7:6':oldRoute()};
+ g.__v1102RouteContext={forceGoal:true,lineage:'resource',target:{x:200,y:40}};
+ const committed=g.novaBattlefieldWaypoint(-200,0,200,40,23,7);
+ assert.equal(committed,null,'a committed heal must not inherit the other heal waypoint');
+ assert.equal(g.__v1102Routes['7:6'],undefined,
+  'the wrong-goal movement cache must be evicted before routing');
+});
