@@ -34,8 +34,8 @@ const {chromium}=require('playwright');
     Object.assign(bot,{id:700007,cls:'guard',x:-340,y:0,
      hp:10,maxHp:100,alive:true,stats:{...bot.stats,speed:0}});
     bot.ai={...savedAi};
-    const enemies=[{id:80,x:-350,y:-100,alive:true},
-     {id:81,x:-350,y:100,alive:true}];
+    const enemies=[{id:80,cls:'guard',x:-350,y:-100,alive:true,stats:{speed:0}},
+     {id:81,cls:'guard',x:-350,y:100,alive:true,stats:{speed:0}}];
     g.tanks=[bot,...enemies];g.__novaFairVisibleTanks=g.tanks;
     g.bullets=[];
     // Force occlusion for pickup paths only; the two local opponents remain visible.
@@ -45,14 +45,14 @@ const {chromium}=require('playwright');
     for(const order of ['heal-first','shield-first']){
      g.powerups=order==='heal-first'?[heal,shield]:[shield,heal];
      const sentinel={gx:900,gy:900,at:10};
-     g.__v1102Routes=Object.create(null);g.__v1102Routes['7:6']=sentinel;
+     g.__v1102Routes=Object.create(null);g.__v1102Routes['700007:6']=sentinel;
      const calls=[];let liveCalls=0;
      g.novaStrategicRouteCost=(x,y,gx,gy,pad,id,goal)=>{
       calls.push({goal,gx,gy});return Math.hypot(gx-x,gy-y)+40;
      };
      g.novaBattlefieldWaypoint=()=>{liveCalls++;return null;};
      const selected=choose(g,bot,classes)?.id||null;
-     const intact=g.__v1102Routes['7:6']===sentinel&&
+     const intact=g.__v1102Routes['700007:6']===sentinel&&
       Object.keys(g.__v1102Routes).length===1;
      out.push({order,selected,calls,liveCalls,intact});
      if(!intact||liveCalls!==0)throw Error('live route polluted: '+JSON.stringify(out.at(-1)));
