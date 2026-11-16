@@ -150,6 +150,25 @@ function cachedRouteLength(g,x,y,gx,gy,pad,seed,wp){
  }
  return Number.isFinite(total)?total:null;
 }
+/* Strategic pricing may inspect a certified exact-goal movement route without
+ * asking the waypoint owner to advance, replace or invalidate its cursor.
+ * Fail closed if any remaining physical leg is no longer traversable. */
+function readOnlyExactRouteLength(g,x,y,gx,gy,pad,seed){
+ var map=g&&g.__v1102Routes,c=map&&map[cacheKey(seed,pad)];
+ if(!c||!Array.isArray(c.points)||!Number.isInteger(c.index)||c.index<0||
+    c.index>=c.points.length||c.gx!==gx||c.gy!==gy||
+    Number(g.time||0)>c.until||!routeSafe(g,gx,gy,pad))return null;
+ var total=0,px=x,py=y;
+ for(var i=c.index;i<c.points.length;i++){
+  var p=c.points[i];
+  if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.y)||
+     !routeSafe(g,p.x,p.y,pad)||!routeVisible(g,px,py,p.x,p.y,pad))return null;
+  total+=dist(px,py,p.x,p.y);px=p.x;py=p.y;
+ }
+ if(!routeVisible(g,px,py,gx,gy,pad))return null;
+ total+=dist(px,py,gx,gy);
+ return Number.isFinite(total)?total:null;
+}
 /* Certify a nearby strategic goal using the existing cached route without
  * weakening novaRouteLength's exact-goal contract or invoking a second search.
  * Each candidate is a physically clear prefix of the old route plus a
@@ -343,6 +362,7 @@ wrap('game/engine',function(engine,require){
     if(ctx&&ctx.forceGoal&&ctx.target){gx=ctx.target.x;gy=ctx.target.y;}
     return cachedWaypoint(this,x,y,gx,gy,pad,seed,oldWaypoint);
   };
+  Game.prototype.novaReadOnlyExactRouteLength=function(x,y,gx,gy,pad,seed){return readOnlyExactRouteLength(this,x,y,gx,gy,pad,seed);};
   Game.prototype.novaRouteLength=function(x,y,gx,gy,pad,seed,wp){return cachedRouteLength(this,x,y,gx,gy,pad,seed,wp);};
   Game.prototype.novaNearbyRouteLength=function(x,y,gx,gy,pad,seed,wp){return cachedNearbyRouteLength(this,x,y,gx,gy,pad,seed,wp);};
    Game.prototype.novaStrategicRouteCost=function(x,y,gx,gy,pad,seed,goalId){return strategicScratchCost(this,x,y,gx,gy,pad,seed,goalId);};
