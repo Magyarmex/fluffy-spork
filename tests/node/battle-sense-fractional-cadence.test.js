@@ -52,3 +52,31 @@ test('Battle Sense strategic cadence remains bounded at irregular frame interval
     assert.ok(times.length>=54&&times.length<=58,`dt=${dt} plans=${times.length}`);
   }
 });
+
+test('Battle Sense prices a certified exact-goal route without asking movement owner to advance',()=>{
+ const Game=function(){};
+ const modules={'game/engine':m=>{m.exports={Game};}};
+ const window={__novaModules:modules};
+ vm.runInNewContext(source,{window,console});
+ const classes={CLASSES:{guard:{size:16}}};
+ const tank={id:7,cls:'guard',x:0,y:0};
+ const heal={id:17,type:'heal',x:100,y:0};
+ let waypoints=0,readCalls=0;
+ const g={
+  hasLineOfSight:()=>false,
+  novaReadOnlyExactRouteLength(x,y,gx,gy,pad,seed){
+   readCalls++;
+   assert.equal(pad,24);
+   assert.equal(seed,7);
+   return 180;
+  },
+  novaBattlefieldWaypoint(){waypoints++;return{x:0,y:60};},
+  novaRouteLength:()=>200
+ };
+ assert.equal(window.__NOVA_BATTLE_SENSE_TEST__.routeDistance(g,tank,heal,100,classes),180);
+ assert.equal(readCalls,1);
+ assert.equal(waypoints,0,'strategic pricing must not mutate the certified waypoint owner');
+ g.novaReadOnlyExactRouteLength=()=>null;
+ assert.equal(window.__NOVA_BATTLE_SENSE_TEST__.routeDistance(g,tank,heal,100,classes),200);
+ assert.equal(waypoints,1,'a cache miss retains existing initial route-seeding behavior');
+});
