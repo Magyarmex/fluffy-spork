@@ -199,8 +199,12 @@ wrap('game/engine',function(engine,require){
             resourceGoal=resourceCtx&&resourceCtx.lineage==='resource'&&resourceCtx.forceGoal&&resourceCtx.target,
             resourceKey=resourceGoal?resourceGoal.x+':'+resourceGoal.y:null,
             previousResourceKey=t.ai.__v172WaypointResourceGoal;
-        if(wp&&(resourceKey!==previousResourceKey)&&(resourceGoal||previousResourceKey!=null)){
+        var routeKey=String(t.id)+':'+Math.round(pad/4),
+            activeResourceRoute=resourceGoal&&this.__v1102Routes&&this.__v1102Routes[routeKey];
+        if(wp&&((resourceKey!==previousResourceKey&&(resourceGoal||previousResourceKey!=null))||
+          (resourceGoal&&t.ai.__v172WaypointRouteRef&&activeResourceRoute!==t.ai.__v172WaypointRouteRef))){
           wp=null;t.ai.__v172Waypoint=null;t.ai.__v172WaypointResourceGoal=null;
+          t.ai.__v172WaypointRouteRef=null;
         }
         if(wp&&now>(t.ai.__v172WaypointUntil||0)){wp=null;t.ai.__v172Waypoint=null;}
         if(wp&&d2(t.x,t.y,wp.x,wp.y)<34*34){wp=null;t.ai.__v172Waypoint=null;}
@@ -214,7 +218,7 @@ wrap('game/engine',function(engine,require){
           var gx=ax+ux*look,gy=ay+uy*look;
           if(t.ai.__v172LastSeenAt!=null&&now-t.ai.__v172LastSeenAt<2.4){gx=t.ai.__v172LastSeenX;gy=t.ai.__v172LastSeenY;}
           wp=this.novaBattlefieldWaypoint?this.novaBattlefieldWaypoint(t.x,t.y,gx,gy,pad,t.id):chooseWaypoint(this,t.x,t.y,gx,gy,pad,t.id);
-          if(wp){t.ai.__v172Waypoint=wp;t.ai.__v172WaypointUntil=now+.95;t.ai.__v172WaypointResourceGoal=resourceKey;}
+          if(wp){t.ai.__v172Waypoint=wp;t.ai.__v172WaypointUntil=now+.95;t.ai.__v172WaypointResourceGoal=resourceKey;t.ai.__v172WaypointRouteRef=resourceGoal&&this.__v1102Routes&&this.__v1102Routes[routeKey]||null;}
         }
         if(wp){
           /* A certified critical-heal detour must steer toward its actual next
