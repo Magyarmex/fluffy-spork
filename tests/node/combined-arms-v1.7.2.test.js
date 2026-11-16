@@ -270,7 +270,7 @@ test('certified corner authority does not leak to combat, mismatched goals or un
 });
 
 
-test('research: a stale local corner can outrank a changed critical-heal route goal',()=>{
+test('a changed critical-heal goal invalidates the old local corner before steering',()=>{
  const {Game}=loadCombinedArms(),g=new Game();
  const t=tank(8,'guard',{x:0,y:0,ai:{
   __v172Waypoint:{x:0,y:100},__v172WaypointUntil:11
@@ -280,8 +280,6 @@ test('research: a stale local corner can outrank a changed critical-heal route g
  g.novaBattlefieldWaypoint=()=>{calls++;return{x:100,y:-100};};
  g.__v1102RouteContext={lineage:'resource',forceGoal:true,target:{x:200,y:-100}};
  g.moveTank(t,100,0,.1);
- assert.equal(calls,0,'existing local waypoint prevents consulting the changed certified goal');
- assert.ok(t.vy>0,'tank still steers north toward old corner while the new heal lies south');
- // Research characterization, not an acceptance criterion: a future fix should
- // bind local corners to their route goal and reverse these expectations.
+ assert.equal(calls,1,'changed heal goal must request a new certified corner');
+ assert.ok(t.vy<0,'tank must steer south toward the new heal instead of its old northward corner');
 });
