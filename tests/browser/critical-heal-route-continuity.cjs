@@ -159,7 +159,7 @@ const {chromium}=require('playwright');
       ai.updateAI(bot,g,dt);
       aiUpdateCosts.push(performance.now()-aiStart);
       if(bot.ai.__v181Mode!==priorMode||bot.ai.__v181ResourceId!==priorResource){
-       decisionTransitions.push({t:+(i*dt).toFixed(3),mode:bot.ai.__v181Mode,resourceId:bot.ai.__v181ResourceId??null,x:+bot.x.toFixed(2),y:+bot.y.toFixed(2)});
+       decisionTransitions.push({t:+(i*dt).toFixed(3),mode:bot.ai.__v181Mode,resourceId:bot.ai.__v181ResourceId??null,x:+bot.x.toFixed(2),y:+bot.y.toFixed(2),lastResourceAt:bot.ai.__v181ResourceAt??null,bullets:g.bullets.length});
        priorMode=bot.ai.__v181Mode;priorResource=bot.ai.__v181ResourceId;
       }
       minimumGoalDistance=Math.min(minimumGoalDistance,...g.powerups.map(p=>Math.hypot(p.x-bot.x,p.y-bot.y)));
