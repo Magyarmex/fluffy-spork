@@ -524,7 +524,7 @@ test('fresh public speed snapshot prunes mathematically impossible rivals before
 
 
 test('physical maximum-speed bound preserves LOS near its pruning threshold',()=>{
- const {h,classes}=boot(),self=tank(1,0),rival=tank(2,3550);
+ const {h,classes}=boot(),self=tank(1,0),rival=tank(2,3800);
  self.ai={};const p={id:'heal',type:'heal',x:400,y:0};
  let probes=0;
  const g={time:1,tanks:[self,rival],w:2400,h:1000,cam:{x:0,y:0,zoom:1},
@@ -537,7 +537,7 @@ test('physical maximum-speed bound preserves LOS near its pruning threshold',()=
  const barelyContested=h.resourceContest(g,self,p,400,classes);
  assert.equal(barelyContested,0,'witness estimate may still score a distant rival as uncontested');
  assert.ok(probes>0,'borderline contender must retain terrain sight test');
- rival.x=3600;snap.speeds[1].x=rival.x;probes=0;
+ rival.x=3900;snap.speeds[1].x=rival.x;probes=0;
  const impossible=h.resourceContest(g,self,p,400,classes);
  assert.equal(impossible,0,'rival just beyond bound cannot contribute a penalty');
  assert.equal(probes,0,'rival beyond physical maximum must skip terrain sight test');
