@@ -504,7 +504,7 @@ test('decorative War Room planning does not allocate rival speed snapshots',()=>
 
 
 test('fresh public speed snapshot prunes mathematically impossible rivals before terrain probes',()=>{
- const {h,classes}=boot(),self=tank(1,0),far=tank(2,900),near=tank(3,220);
+ const {h,classes}=boot(),self=tank(1,0),far=tank(2,4000),near=tank(3,220);
  self.ai={};const p={id:'heal',type:'heal',x:300,y:0};
  const g={time:1,tanks:[self,far,near],w:800,h:600,cam:{x:0,y:0,zoom:1},hasLineOfSight:()=>true,
   tankSpeed:t=>{if(t!==self)throw Error('private rival speed read');return 124;}};
@@ -523,8 +523,8 @@ test('fresh public speed snapshot prunes mathematically impossible rivals before
 });
 
 
-test('public maximum-speed bound preserves the exact contested threshold',()=>{
- const {h,classes}=boot(),self=tank(1,0),rival=tank(2,1158);
+test('physical maximum-speed bound preserves LOS near its pruning threshold',()=>{
+ const {h,classes}=boot(),self=tank(1,0),rival=tank(2,3550);
  self.ai={};const p={id:'heal',type:'heal',x:400,y:0};
  let probes=0;
  const g={time:1,tanks:[self,rival],w:2400,h:1000,cam:{x:0,y:0,zoom:1},
@@ -535,12 +535,12 @@ test('public maximum-speed bound preserves the exact contested threshold',()=>{
   rivals:g.tanks,speeds:[null,{target:rival,id:rival.id,cls:rival.cls,x:rival.x,y:rival.y,speed:124*2.3}]};
  Object.defineProperty(self.ai,'__v181RivalSpeedSnapshot',{configurable:true,value:snap});
  const barelyContested=h.resourceContest(g,self,p,400,classes);
- assert.ok(barelyContested>0,'rival just inside maximum-speed arrival boundary must count');
+ assert.equal(barelyContested,0,'witness estimate may still score a distant rival as uncontested');
  assert.ok(probes>0,'borderline contender must retain terrain sight test');
- rival.x=1160;snap.speeds[1].x=rival.x;probes=0;
+ rival.x=3600;snap.speeds[1].x=rival.x;probes=0;
  const impossible=h.resourceContest(g,self,p,400,classes);
  assert.equal(impossible,0,'rival just beyond bound cannot contribute a penalty');
- assert.equal(probes,0,'impossible rival must skip terrain sight test');
+ assert.equal(probes,0,'rival beyond physical maximum must skip terrain sight test');
 });
 
 
