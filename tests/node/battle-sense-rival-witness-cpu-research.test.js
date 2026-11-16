@@ -110,3 +110,43 @@ test('composed 13-rival pickup contest reports steady-state witness overhead',()
  });
  console.log('COMPOSED_RIVAL_WITNESS_CPU_RESEARCH '+JSON.stringify(report));
 });
+
+test('composed planning snapshot reports repeated contest CPU savings without a timing gate',()=>{
+ const report=withSeed(1517800,()=>{
+  const g=bootGame();if(!g.player)g.redeploy();
+  try{
+   const bot=g.tanks.find(t=>t?.ai&&!t.isPlayer);
+   assert.ok(bot,'requires composed AI');
+   const ai=g.__testWindow.__novaMakeRequire('')('game/ai');
+   const classes=g.__testWindow.__novaMakeRequire('')('game/classes');
+   const h=g.__testWindow.__NOVA_BATTLE_SENSE_TEST__;
+   Object.assign(bot,{id:99000,cls:'guard',x:1000,y:1000,hp:20,maxHp:100,alive:true});
+   bot.ai={};
+   const rivals=Array.from({length:13},(_,i)=>({id:99001+i,cls:'guard',x:1030+i*10,y:1010,alive:true}));
+   g.tanks=[bot,...rivals];g.__novaFairVisibleTanks=g.tanks;
+   g.hasLineOfSight=()=>true;g.powerups=[];g.time=10;g.status='playing';
+   ai.updateAI(bot,g,.2);
+   const snap=bot.ai.__v181RivalSpeedSnapshot;
+   assert.ok(snap?.speeds.some(s=>s?.target===rivals[0]),'composed AI must create a valid snapshot');
+   const p={id:'heal',type:'heal',x:1450,y:1000};
+   const N=3000;
+   function measure(cached){
+    if(cached)bot.ai.__v181RivalSpeedSnapshot=snap;
+    else delete bot.ai.__v181RivalSpeedSnapshot;
+    const t0=performance.now();let checksum=0;
+    for(let i=0;i<N;i++)checksum+=h.resourceContest(g,bot,p,450,classes);
+    assert.ok(Number.isFinite(checksum));return (performance.now()-t0)/N*1000;
+   }
+   measure(false);measure(true);
+   const uncached=[],cached=[];
+   for(let k=0;k<5;k++){
+    if(k%2){cached.push(measure(true));uncached.push(measure(false));}
+    else{uncached.push(measure(false));cached.push(measure(true));}
+   }
+   return {rivals:13,iterationsPerArm:N,uncachedMedianUs:+median(uncached).toFixed(3),
+    cachedMedianUs:+median(cached).toFixed(3),
+    ratio:+(median(cached)/Math.max(1e-9,median(uncached))).toFixed(3)};
+  }finally{g.destroy();}
+ });
+ console.log('COMPOSED_RIVAL_SNAPSHOT_CPU_RESEARCH '+JSON.stringify(report));
+});
