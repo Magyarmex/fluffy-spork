@@ -256,3 +256,13 @@ test('subpixel wall-boundary jitter does not consume a blocked next corridor',()
  assert.ok(wp);
  assert.equal(route.index,0,'nearby corner must not be skipped before the next corridor opens');
 });
+
+
+test('subpixel boundary guard does not slow normal clear-corridor corner advancement',()=>{
+ const T=boot(),g=game([]);g.time=10;
+ const route={gx:340,gy:-40,points:[{x:65,y:-235},{x:195,y:-235}],index:0,until:11,validateAt:11};
+ g.__v1102Routes={'8:6':route};
+ const wp=T.cachedWaypoint(g,80.98,-205,340,-40,24,8,null);
+ assert.ok(wp);
+ assert.equal(route.index,1,'clear next corridor should retain the existing fast corner skip');
+});
