@@ -213,7 +213,7 @@ wrap('game/engine',function(engine,require){
            * ordinary combat, roaming and anti-stuck escape keep priority. */
           var ctx=this.__v1102RouteContext,cache=this.__v1102Routes&&this.__v1102Routes[String(t.id)+':'+Math.round(pad/4)],certifiedHeal=!!(ctx&&ctx.lineage==='resource'&&ctx.forceGoal&&cache&&cache.points&&cache.points.length&&cache.gx===ctx.target.x&&cache.gy===ctx.target.y&&this.isTerrainSafe&&!this.isTerrainSafe(t.x,t.y,Math.max(2,pad-5)));
           var corner=certifiedHeal&&cache.points[cache.index];
-          if(corner&&Number.isFinite(corner.x)&&Number.isFinite(corner.y)&&this.isTerrainSafe(corner.x,corner.y,Math.max(2,pad-5)))wp=corner;
+          if(corner&&Number.isFinite(corner.x)&&Number.isFinite(corner.y)&&this.isTerrainSafe(corner.x,corner.y,Math.max(2,pad-5))&&(!this.hasLineOfSight||this.hasLineOfSight(t.x,t.y,corner.x,corner.y,Math.max(2,pad-5-.001))))wp=corner;
           var qx=wp.x-t.x,qy=wp.y-t.y,ql=Math.hypot(qx,qy)||1;qx/=ql;qy/=ql;
           var blend=certifiedHeal?1:probe?.82:.58,sx=ux*(1-blend)+qx*blend,sy=uy*(1-blend)+qy*blend,nl=Math.hypot(sx,sy)||1,snx=sx/nl,sny=sy/nl;
           vx=snx*sp;vy=sny*sp;t.ai.__v172Routing=true;t.ai.wanderA=Math.atan2(sny,snx);
