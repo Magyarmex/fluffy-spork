@@ -57,7 +57,8 @@ function arm(hz,direction,policy,safeLayout='west'){
     // Event-driven, bounded diagnostic: distinguish inference from AI choice and steering.
     // Capture only meaningful transitions plus a low-rate heartbeat, not every frame.
     const confirmed=witness?.confirmed||0,mode=bot.ai.__v181Mode??null,resource=bot.ai.__v181ResourceId??null;
-    const safeEligible=Math.hypot(safe.x-bot.x,safe.y-bot.y)<=760;\n    const nearEligible=Math.hypot(near.x-bot.x,near.y-bot.y)<=760;
+    const safeEligible=Math.hypot(safe.x-bot.x,safe.y-bot.y)<=760;
+    const nearEligible=Math.hypot(near.x-bot.x,near.y-bot.y)<=760;
     if(trace.length<80&&(confirmed!==previousConfirmed||mode!==previousMode||resource!==previousResource||safeEligible!==previousSafeEligible||nearEligible!==previousNearEligible||frame%Math.max(1,Math.round(hz/2))===0)){
      trace.push({at:+g.time.toFixed(3),confirmed,fast:+(witness?.fast||0).toFixed(2),mode,resource,
       botX:+bot.x.toFixed(1),botY:+bot.y.toFixed(1),rivalX:+rival.x.toFixed(1),
