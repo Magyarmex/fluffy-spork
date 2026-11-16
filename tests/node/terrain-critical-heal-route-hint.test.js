@@ -79,3 +79,35 @@ test('temporary resource route context restores even if movement throws',()=>{
   assert.equal(g.__v1102RouteContext,undefined,
     'a failed movement call must not leak resource steering to another tank');
 });
+
+test('recent quiet critical-heal intent survives one transient scoring gap, then expires',()=>{
+  const {g,tank}=scene();
+  tank.ai.__v181Mode='none';
+  tank.ai.__v181BiasW=0;
+  tank.ai.__v181ResourceAt=9.5;
+  const before=JSON.stringify(g.powerups);
+  const wp=g.moveTank(tank,100,0,1/60);
+  assert.deepEqual({x:wp.x,y:wp.y},{x:340,y:-40});
+  assert.equal(JSON.stringify(g.powerups),before);
+  assert.equal(g.__v1102RouteContext,undefined);
+  g.time=10.3;
+  const expired=g.moveTank(tank,100,0,1/60);
+  assert.deepEqual({x:expired.x,y:expired.y},{x:100,y:0},
+    'expired intent must return control to ordinary steering');
+});
+test('transient healing continuity yields immediately to projectile, pickup loss and recovery',()=>{
+  for(const kind of ['projectile','pickup-removed','shield','escape','healthy','future']){
+    const {g,tank}=scene();
+    tank.ai.__v181Mode='none';
+    tank.ai.__v181BiasW=0;
+    tank.ai.__v181ResourceAt=9.7;
+    if(kind==='projectile')g.bullets=[{id:1,x:5000,y:5000}];
+    if(kind==='pickup-removed')g.powerups=[];
+    if(kind==='shield')g.powerups[0].type='shield';
+    if(kind==='escape')tank.ai.__v1102Nav={escapeUntil:11,escapeX:0,escapeY:1};
+    if(kind==='healthy')tank.hp=70;
+    if(kind==='future')tank.ai.__v181ResourceAt=10.5;
+    const wp=g.moveTank(tank,100,0,1/60);
+    assert.deepEqual({x:wp.x,y:wp.y},{x:100,y:0},kind);
+  }
+});
