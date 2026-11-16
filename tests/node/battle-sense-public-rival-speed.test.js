@@ -20,7 +20,7 @@ function boot(){
  const cache={};
  function req(k){if(cache[k])return cache[k].exports;const m={exports:{}};cache[k]=m;mods[k](m,m.exports,id=>id==='./classes'?req('game/classes'):null);return m.exports;}
  req('game/engine');req('game/ai');
- return {h:win.__NOVA_BATTLE_SENSE_TEST__,classes,win};
+ return {h:win.__NOVA_BATTLE_SENSE_TEST__,classes,win,updateAI:req('game/ai').updateAI};
 }
 function tank(id,x,cls='guard',upgrade=0){
  return {id,x,y:0,cls,alive:true,hp:100,maxHp:100,stats:{speed:upgrade},vx:0,vy:0};
@@ -284,6 +284,26 @@ test('one slow witness interval does not erase two sustained fast intervals',()=
  assert.equal(w.confirmed,3);
  assert.ok(w.fast>124*1.44&&w.fast<124*1.46,
   'median should preserve two matching fast windows despite one slower interval');
+});
+
+test('planning observes visible rivals before any pickup exists',()=>{
+ const {h,classes,updateAI}=boot(),self=tank(1,0),rival=tank(2,100);
+ self.ai={};const g={time:0,tanks:[self,rival],powerups:[],bullets:[],
+  hasLineOfSight:()=>true,tankSpeed:t=>{if(t===rival)throw Error('private rival speed read');return 124;}};
+ for(let i=0;i<=4;i++){
+  g.time=i*.2;rival.x=100+180*g.time;
+  updateAI(self,g,.2);
+ }
+ const w=self.ai.__v181RivalSpeedWitness?.['2'];
+ assert.ok(w?.confirmed>=3,'visible rival motion must be learned without a pickup');
+ assert.ok(w.fast>175&&w.fast<185,'witness must learn the public 180-unit/s displacement');
+ const p={id:'heal',type:'heal',x:400,y:0};
+ const witnessed=h.resourceContest(g,self,p,400,classes);
+ const saved=self.ai;self.ai={};
+ const classOnly=h.resourceContest(g,self,p,400,classes);
+ self.ai=saved;
+ assert.ok(witnessed>classOnly,
+  'a newly spawned pickup should use motion already witnessed during ordinary combat');
 });
 
 test('one sub-baseline visible slowdown retains two fast windows without certifying a lone impulse',()=>{
