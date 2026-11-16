@@ -222,7 +222,7 @@ test('certified critical-heal corner owns movement when short collision probe mi
  const {Game}=loadCombinedArms();
  function run(certified){
   const g=new Game(),t=tank(8,'guard',{ai:{targetId:-1}});
-  g.block=null;g.__v1102RouteContext={lineage:'resource',forceGoal:true,target:{x:340,y:-40}};
+  g.block=null;g.isTerrainSafe=()=>!certified;g.__v1102RouteContext={lineage:'resource',forceGoal:true,target:{x:340,y:-40}};
   if(certified)g.__v1102Routes={'8:6':{gx:340,gy:-40,points:[{x:0,y:100}]}};
   t.ai.__v172Waypoint={x:0,y:100};t.ai.__v172WaypointUntil=11;
   g.moveTank(t,100,0,.1);
