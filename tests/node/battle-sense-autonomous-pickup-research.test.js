@@ -4,7 +4,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 
-function arm(hz,direction,policy,safeLayout='west',carry=false){
+function arm(hz,direction,safeLayout='west'){
  return withSeed(1517800,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   try{
@@ -44,12 +44,7 @@ function arm(hz,direction,policy,safeLayout='west',carry=false){
     const fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT__;
     g.__novaFairVisibleTanks=(!fair||fair.inGameplayViewport(g,bot,rival))
      ?[bot,rival]:[bot];
-    if(policy==='class')delete bot.ai.__v181RivalSpeedWitness;
-    const thinkBefore=bot.ai.__v181Think||0;
     ai.updateAI(bot,g,dt); // Actual overlaid AI steering, not a scripted bot vector.
-    // Research-only intervention: retain the fractional timer overshoot after
-    // the shipping AI's real plan, without modifying any production module.
-    if(carry&&thinkBefore-dt<=0)bot.ai.__v181Think+=thinkBefore-dt;
     const witness=bot.ai.__v181RivalSpeedWitness?.[String(rival.id)];
     if(witness){maxConfirmed=Math.max(maxConfirmed,witness.confirmed||0);
      maxFast=Math.max(maxFast,witness.fast||0);}
@@ -83,7 +78,7 @@ function arm(hz,direction,policy,safeLayout='west',carry=false){
     g.updatePowerups(dt);
     if(arrivals.some(a=>a.who==='bot'))break;
    }
-   return {hz,direction,policy,safeLayout,carry,firstChoice,changes,firstNearAt,firstSafeAt,
+   return {hz,direction,safeLayout,firstChoice,changes,firstNearAt,firstSafeAt,
     maxConfirmed,maxFast:+maxFast.toFixed(3),
     botPickup:arrivals.find(a=>a.who==='bot')||null,
     rivalPickup:arrivals.find(a=>a.who==='rival')||null,
@@ -91,27 +86,17 @@ function arm(hz,direction,policy,safeLayout='west',carry=false){
   }finally{g.destroy();}
  });
 }
-test('paired composed autonomous AI pickup steering and equal-distance safe-heal geometry at 30/60 Hz',()=>{
+// Current Battle Sense already carries fractional planning time, and now
+// samples rival movement before pickup scoring. The old research-only carry
+// intervention and class-only reset-after-update were no longer valid controls.
+test('composed autonomous witnessed-rival pickup steering at 30/60 Hz',()=>{
  const results=[];
  for(const hz of [30,60])for(const direction of [-1,1])
   for(const safeLayout of ['west','south'])
-   for(const policy of ['class','witness'])results.push(arm(hz,direction,policy,safeLayout));
- assert.equal(results.length,16);
+   results.push(arm(hz,direction,safeLayout));
+ assert.equal(results.length,8);
  assert.ok(results.every(r=>Number.isFinite(r.botX)&&Number.isFinite(r.botY)));
- // Keep per-arm diagnostics on separate lines; CI log viewers may truncate a
- // single large JSON line when sixteen arms include event traces.
  for(const result of results)console.log('COMPOSED_RIVAL_AUTONOMOUS_PICKUP_ARM '+JSON.stringify(result));
  console.log('COMPOSED_RIVAL_AUTONOMOUS_PICKUP_RESEARCH '+JSON.stringify(results.map(({trace,...summary})=>summary)));
- // Diagnostic only: combat, terrain and actual player input are not modeled.
-});
-
-// Falsify the hypothesis that losing fractional AI-think overshoot creates the
-// 30Hz west-fallback miss. These are interventions, not shipping-policy tests.
-test('research: fractional think-carry at 30/60Hz in approaching-rival pickup race',()=>{
- const results=[];
- for(const hz of [30,60])for(const safeLayout of ['west','south'])
-  results.push(arm(hz,1,'witness',safeLayout,true));
- assert.equal(results.length,4);
- for(const r of results)console.log('COMPOSED_RIVAL_THINK_CARRY_ARM '+JSON.stringify(r));
- console.log('COMPOSED_RIVAL_THINK_CARRY_RESEARCH '+JSON.stringify(results.map(({trace,...summary})=>summary)));
+ // This is still scripted rival motion, not a natural combat survival trial.
 });
