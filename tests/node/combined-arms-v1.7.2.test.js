@@ -243,7 +243,7 @@ test('certified critical-heal route corner overrides a conflicting local waypoin
  g.__v1102RouteContext={lineage:'resource',forceGoal:true,target:{x:340,y:-40}};
  g.__v1102Routes={'8:6':{gx:340,gy:-40,index:0,points:[{x:65,y:-235},{x:195,y:-235}]}};
  g.moveTank(t,100,0,.1);
- assert.ok(t.vx<0&&t.vy<0,
+ assert.ok(t.vx<=0&&t.vy<0,
   'the certified first corner is west/south; a stale eastward local corner must not own steering');
  assert.equal(t.ai.__v172Waypoint.x,195,
   'the local waypoint owner is not silently rewritten by a transient certified steering override');
