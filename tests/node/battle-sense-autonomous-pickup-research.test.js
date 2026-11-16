@@ -81,6 +81,8 @@ function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8){
     // sqrt(2) times its legal speed and masquerade as a witnessed upgrade.
     const desiredLength=Math.hypot(desiredX,desiredY)||1;
     g.moveTank(rival,desiredX/desiredLength*rivalSpeed,desiredY/desiredLength*rivalSpeed,dt);
+    assert.ok(Math.hypot(rival.vx||0,rival.vy||0)<=rivalSpeed+1e-5,
+     'scripted rival cannot exceed its legal tankSpeed by moving diagonally');
     g.updatePowerups(dt);
     if(arrivals.some(a=>a.who==='bot'))break;
    }
