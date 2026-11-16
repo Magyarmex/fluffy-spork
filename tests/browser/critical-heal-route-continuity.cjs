@@ -207,7 +207,7 @@ const {chromium}=require('playwright');
      const sortedCosts=aiUpdateCosts.slice().sort((a,b)=>a-b);
      const aiUpdateMsP95=sortedCosts[Math.floor((sortedCosts.length-1)*.95)]||0;
      const aiUpdateMsMean=aiUpdateCosts.reduce((a,b)=>a+b,0)/Math.max(1,aiUpdateCosts.length);
-     logs.push({arm,isolatedCosts,aiUpdateMsP95:+aiUpdateMsP95.toFixed(4),
+     logs.push({arm,guardSize:C[bot.cls]?.size??null,routePad:(Number(C[bot.cls]?.size)||15)+8,isolatedCosts,aiUpdateMsP95:+aiUpdateMsP95.toFixed(4),
       aiUpdateMsMean:+aiUpdateMsMean.toFixed(4),selectedResource:firstChosen,acquiredId,
       acquired:g.powerups.length<initialCount,acquiredAt,invalidPositions,invalidSegments,
       resourceFrames,decisionTransitions,routeCertSummary,minimumGoalDistance:+minimumGoalDistance.toFixed(3),final:{x:bot.x,y:bot.y,hp:bot.hp},
