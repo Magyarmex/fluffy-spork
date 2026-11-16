@@ -38,7 +38,7 @@ function arm(hz,direction,policy,safeLayout='west'){
    };
    const rivalSpeed=g.tankSpeed(rival),dt=1/hz;
    let firstChoice=null,changes=0,prevChoice=null,maxConfirmed=0,maxFast=0,firstSafeAt=null,firstNearAt=null;
-   const trace=[];let previousConfirmed=0,previousMode=null,previousResource=null;
+   const trace=[];let previousConfirmed=0,previousMode=null,previousResource=null,previousSafeEligible=true,previousNearEligible=true;
    for(let frame=0;frame<Math.round(12*hz);frame++){
     g.time=frame*dt;
     const fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT__;
@@ -57,15 +57,18 @@ function arm(hz,direction,policy,safeLayout='west'){
     // Event-driven, bounded diagnostic: distinguish inference from AI choice and steering.
     // Capture only meaningful transitions plus a low-rate heartbeat, not every frame.
     const confirmed=witness?.confirmed||0,mode=bot.ai.__v181Mode??null,resource=bot.ai.__v181ResourceId??null;
-    if(trace.length<80&&(confirmed!==previousConfirmed||mode!==previousMode||resource!==previousResource||frame%Math.max(1,Math.round(hz/2))===0)){
+    const safeEligible=Math.hypot(safe.x-bot.x,safe.y-bot.y)<=760;\n    const nearEligible=Math.hypot(near.x-bot.x,near.y-bot.y)<=760;
+    if(trace.length<80&&(confirmed!==previousConfirmed||mode!==previousMode||resource!==previousResource||safeEligible!==previousSafeEligible||nearEligible!==previousNearEligible||frame%Math.max(1,Math.round(hz/2))===0)){
      trace.push({at:+g.time.toFixed(3),confirmed,fast:+(witness?.fast||0).toFixed(2),mode,resource,
       botX:+bot.x.toFixed(1),botY:+bot.y.toFixed(1),rivalX:+rival.x.toFixed(1),
       safeDist:+Math.hypot(safe.x-bot.x,safe.y-bot.y).toFixed(1),
       nearDist:+Math.hypot(near.x-bot.x,near.y-bot.y).toFixed(1),
+      safeEligible,nearEligible,
       nextThink:+(bot.ai.__v181Think||0).toFixed(3),
       powerups:g.powerups.map(p=>p.id)});
     }
     previousConfirmed=confirmed;previousMode=mode;previousResource=resource;
+    previousSafeEligible=safeEligible;previousNearEligible=nearEligible;
     prevChoice=choice;
     const desiredX=g.time<.7?direction:Math.sign(near.x-rival.x);
     const desiredY=g.time<.7?0:Math.sign(near.y-rival.y);
