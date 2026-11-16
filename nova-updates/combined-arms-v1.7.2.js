@@ -211,7 +211,7 @@ wrap('game/engine',function(engine,require){
            * route corner, not a stale short-horizon waypoint. Restrict this
            * override to the already-established near-wall heal authority;
            * ordinary combat, roaming and anti-stuck escape keep priority. */
-          var ctx=this.__v1102RouteContext,cache=this.__v1102Routes&&this.__v1102Routes[String(t.id)+':'+Math.round(pad/4)],certifiedHeal=!!(ctx&&ctx.lineage==='resource'&&ctx.forceGoal&&cache&&cache.points&&cache.points.length&&cache.gx===ctx.target.x&&cache.gy===ctx.target.y&&this.isTerrainSafe&&!this.isTerrainSafe(t.x,t.y,Math.max(2,pad-3)));
+          var ctx=this.__v1102RouteContext,cache=this.__v1102Routes&&this.__v1102Routes[String(t.id)+':'+Math.round(pad/4)],certifiedHeal=!!(ctx&&ctx.lineage==='resource'&&ctx.forceGoal&&cache&&cache.points&&cache.points.length&&cache.gx===ctx.target.x&&cache.gy===ctx.target.y&&this.isTerrainSafe&&!this.isTerrainSafe(t.x,t.y,Math.max(2,pad-5)));
           var corner=certifiedHeal&&cache.points[cache.index];
           if(corner&&Number.isFinite(corner.x)&&Number.isFinite(corner.y)&&d2(wp.x,wp.y,corner.x,corner.y)>60*60&&this.isTerrainSafe(corner.x,corner.y,Math.max(2,pad-5))&&(!this.hasLineOfSight||this.hasLineOfSight(t.x,t.y,corner.x,corner.y,Math.max(2,pad-5-.001))))wp=corner;
           var qx=wp.x-t.x,qy=wp.y-t.y,ql=Math.hypot(qx,qy)||1;qx/=ql;qy/=ql;
