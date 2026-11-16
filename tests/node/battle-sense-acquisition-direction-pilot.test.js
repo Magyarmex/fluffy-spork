@@ -7,7 +7,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 
-function arm(hz,direction,policy){
+function arm(hz,direction,policy,speedStat=8,commitSeconds=.7){
  return withSeed(1517800,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   try{
@@ -26,7 +26,7 @@ function arm(hz,direction,policy){
    Object.assign(rival,{cls:'guard',x:direction===1?1120:1280,y:1120,
     vx:0,vy:0,alive:true,hp:20,maxHp:100,
     spawnShieldT:0,shieldT:0,stampedeT:0,hasteT:0,
-    perk:null,gene:null,stats:{...rival.stats,speed:8}});
+    perk:null,gene:null,stats:{...rival.stats,speed:speedStat}});
    g.hasLineOfSight=()=>true;
    g.status='playing';
    const near={id:99001,kind:'powerup',type:'heal',x:1400,y:1120,ttl:20,born:0};
@@ -64,13 +64,13 @@ function arm(hz,direction,policy){
      const dx=selected.x-bot.x,dy=selected.y-bot.y,m=Math.hypot(dx,dy)||1;
      g.moveTank(bot,dx/m*botSpeed,dy/m*botSpeed,dt);
     }else g.moveTank(bot,0,0,dt);
-    const desiredX=g.time<.7?direction:Math.sign(near.x-rival.x);
-    const desiredY=g.time<.7?0:Math.sign(near.y-rival.y);
+    const desiredX=g.time<commitSeconds?direction:Math.sign(near.x-rival.x);
+    const desiredY=g.time<commitSeconds?0:Math.sign(near.y-rival.y);
     g.moveTank(rival,desiredX*rivalSpeed,desiredY*rivalSpeed,dt);
     g.updatePowerups(dt);
     if(arrivals.some(a=>a.who==='bot'))break;
    }
-   return {hz,direction,policy,firstChoice,changes,
+   return {hz,direction,policy,speedStat,commitSeconds,firstChoice,changes,
     botPickup:arrivals.find(a=>a.who==='bot')||null,
     rivalPickup:arrivals.find(a=>a.who==='rival')||null,
     finalBot:{x:+bot.x.toFixed(1),y:+bot.y.toFixed(1)}};
@@ -81,8 +81,17 @@ function arm(hz,direction,policy){
 test('paired composed movement and pickup arbitration research at 30/60 Hz',()=>{
  const results=[];
  for(const hz of [30,60])for(const direction of [-1,1])
-  for(const policy of ['class','witness'])results.push(arm(hz,direction,policy));
- assert.equal(results.length,8);
+  for(const speedStat of [0,8])for(const commitSeconds of [.7,1.5])
+   for(const policy of ['class','witness'])results.push(arm(hz,direction,policy,speedStat,commitSeconds));
+ assert.equal(results.length,32);
+ // Negative control: if the rival has no private speed upgrade, both policies
+ // should see the same class-speed race (apart from measured movement noise).
+ for(const hz of [30,60])for(const direction of [-1,1])for(const commitSeconds of [.7,1.5]){
+  const pair=results.filter(r=>r.hz===hz&&r.direction===direction&&r.speedStat===0&&r.commitSeconds===commitSeconds);
+  assert.equal(pair.length,2);
+  assert.deepEqual(pair[0].botPickup,pair[1].botPickup,
+   'unupgraded rival should not create a false witnessed-speed pickup advantage');
+ }
  assert.ok(results.every(r=>Number.isFinite(r.finalBot.x)&&Number.isFinite(r.finalBot.y)));
  console.log('COMPOSED_RIVAL_PICKUP_RACE_RESEARCH '+JSON.stringify(results));
  // This is a diagnostic, not a success golden. Acceptance requires comparing
