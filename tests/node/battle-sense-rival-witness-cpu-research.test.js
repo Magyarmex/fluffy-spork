@@ -128,6 +128,8 @@ test('composed planning snapshot reports repeated contest CPU savings without a 
    ai.updateAI(bot,g,.2);
    const snap=bot.ai.__v181RivalSpeedSnapshot;
    assert.ok(snap?.speeds.some(s=>s?.target===rivals[0]),'composed AI must create a valid snapshot');
+   /* Benchmark the instant after strategic planning, before the old movement owner runs. */
+   bot.x=snap.ownerX;bot.y=snap.ownerY;
    const p={id:'heal',type:'heal',x:1450,y:1000};
    const N=3000;
    function measure(cached){
