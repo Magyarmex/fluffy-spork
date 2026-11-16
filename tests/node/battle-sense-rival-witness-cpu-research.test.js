@@ -277,6 +277,7 @@ test('composed real-terrain LOS stress reports bounded-contest CPU versus no-pru
    assert.ok(bot&&typeof g.hasLineOfSight==='function');
    Object.assign(bot,{id:99000,cls:'guard',x:1000,y:1000,hp:20,maxHp:100,alive:true,stats:{...bot.stats,speed:0}});
    bot.ai={};g.time=10;
+   g.tankSpeed=t=>{if(t!==bot)throw Error('private rival speed read');return 124;};
    const rivals=Array.from({length:13},(_,i)=>({id:99001+i,cls:'guard',x:650+i*3,y:1000,
     alive:true,stats:{speed:0},vx:0,vy:0}));
    g.tanks=[bot,...rivals];g.__novaFairVisibleTanks=g.tanks;
