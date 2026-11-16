@@ -236,7 +236,19 @@ function cachedWaypoint(g,x,y,gx,gy,pad,seed,oldWaypoint){
     /* A hull exactly on a wall's inclusive clearance boundary must first escape its near corner; otherwise retain the original fast proximity skip. */
     var boundary=!routeSafe(g,x,y,pad);
     while(c.index<c.points.length&&d2(x,y,c.points[c.index].x,c.points[c.index].y)<Math.pow(20+pad*.65,2)){
-      var next=c.points[c.index+1];if(boundary&&next&&!routeVisible(g,x,y,next.x,next.y,pad))break;c.index++;
+      var next=c.points[c.index+1],blockedNext=next&&!routeVisible(g,x,y,next.x,next.y,pad);
+      if(boundary&&blockedNext)break;
+      /* Critical healing: do not skip into a blocked corridor when its
+       * motion points mostly into the wall rather than along its tangent.
+       * A strong tangential approach may slide around the same wall safely. */
+      if(exactHeal&&blockedNext&&g.firstTerrainHit){
+        var hit=g.firstTerrainHit(x,y,next.x,next.y,Math.max(2,pad-5)),h=hit&&hit.hit;
+        if(h&&Number.isFinite(h.nx)&&Number.isFinite(h.ny)){
+          var dx=next.x-x,dy=next.y-y;
+          if(Math.abs(dx*h.ny-dy*h.nx)<Math.abs(dx*h.nx+dy*h.ny)*.5)break;
+        }
+      }
+      c.index++;
     }
     if(c.index>=c.points.length){delete map[key];c=null;}
     else{
