@@ -36,7 +36,7 @@ test('composed rival pruning scene matrix reports costs and preserves contest sc
     // Only a genuinely visible, in-viewport rival gets a public speed
     // certificate. An occluded rival must take the uncached visibility path.
     const speeds=contacts.map(q=>q===bot||!realLos(bot.x,bot.y,q.x,q.y,3)
-     ?null:{target:q,id:q.id,cls:q.cls,x:q.x,y:q.y,speed:124});
+     ?null:{target:q,id:q.id,cls:q.cls,x:q.x,y:q.y,speed:(Number(classes.CLASSES[q.cls]?.moveMult)>0?124*classes.CLASSES[q.cls].moveMult:g.tankSpeed(bot))});
     const cam=g.cam,snapshot={at:g.time,owner:bot,tanks:contacts,
      ownerX:bot.x,ownerY:bot.y,viewW:g.w,viewH:g.h,camera:cam,
      camX:cam&&cam.x,camY:cam&&cam.y,camZoom:cam&&cam.zoom,
