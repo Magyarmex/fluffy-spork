@@ -126,6 +126,11 @@ test('research: read-only exact-goal pricing preserves live route owner and fail
  assert.equal(JSON.stringify(cache),before,'pricing must not change index, expiry or cache contents');
  assert.equal(g.__v1102Routes[key],cache,'pricing must not replace route owner');
  assert.equal(g.novaReadOnlyExactRouteLength(x,y,gx+1,gy,pad,seed),null,'different goal is not certified');
+ assert.equal(g.novaReadOnlyExactRouteLength(x,y,gx,gy,pad,seed+1),null,'another tank cannot borrow the route');
+ const originalIndex=cache.index;
+ cache.index=cache.points.length;
+ assert.equal(g.novaReadOnlyExactRouteLength(x,y,gx,gy,pad,seed),null,'exhausted cursor cannot certify a path');
+ cache.index=originalIndex;
  assert.equal(JSON.stringify(cache),before,'mismatched goal must not evict route');
  cache.until=g.time-.01;
  assert.equal(g.novaReadOnlyExactRouteLength(x,y,gx,gy,pad,seed),null,'expired certificate cannot price');
