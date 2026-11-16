@@ -149,7 +149,7 @@ const {chromium}=require('playwright');
      };
      let state=0x6d2b79f5;Math.random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return(state>>>0)/4294967296;};
      const plansBefore=window.__NOVA_TERRAIN_INTELLIGENCE__?.plans||0;
-     const trace=[],aiUpdateCosts=[],dt=1/60,steps=720,motionSamples=[];
+     const trace=[],aiUpdateCosts=[],dt=1/60,steps=720,motionSamples=[],ownerTransitions=[];let previousOwnerSignature=null;
      g.moveTank=function(t,vx,vy,dd){
       const near=t===bot&&(arm==='lower-only-even-seed'||arm==='three-walls')&&
        (Math.abs(t.x+179)<2||Math.abs(t.x+49)<2||Math.abs(t.x-81)<2);
@@ -172,6 +172,27 @@ const {chromium}=require('playwright');
       const aiStart=performance.now();
       ai.updateAI(bot,g,dt);
       aiUpdateCosts.push(performance.now()-aiStart);
+      // Passive ownership witness: observe only transitions after the real
+      // composed AI update; never invoke the route planner for diagnostics.
+      if(arm==='three-walls'||arm==='lower-only-even-seed'){
+       const pad=(Number(C[bot.cls]?.size)||15)+8;
+       const key=String(bot.id)+':'+Math.round(pad/4);
+       const route=g.__v1102Routes?.[key],nav=bot.ai.__v1102Nav||{};
+       const corner=route?.points?.[route.index],local=bot.ai.__v172Waypoint;
+       const owner={mode:bot.ai.__v181Mode,resource:bot.ai.__v181ResourceId??null,
+        routeGoal:route?[route.gx,route.gy]:null,routeIndex:route?.index??null,
+        routeCorner:corner?[corner.x,corner.y]:null,
+        localCorner:local?[local.x,local.y]:null,
+        localExpiry:local?+(bot.ai.__v172WaypointUntil-g.time).toFixed(3):null,
+        escape:nav.escapeUntil>g.time,stuck:nav.stuck||0};
+       // Exclude volatile expiry countdown from transition identity.
+       const signature=JSON.stringify({...owner,localExpiry:null});
+       if(signature!==previousOwnerSignature){
+        if(ownerTransitions.length<240)ownerTransitions.push({t:+(i*dt).toFixed(3),
+         x:+bot.x.toFixed(2),y:+bot.y.toFixed(2),...owner});
+        previousOwnerSignature=signature;
+       }
+      }
       if(bot.ai.__v181Mode!==priorMode||bot.ai.__v181ResourceId!==priorResource){
        let shadowRoute=null;
        if(priorMode==='resource'&&bot.ai.__v181Mode==='none'&&g.powerups.length){
@@ -227,7 +248,7 @@ const {chromium}=require('playwright');
       resourceFrames,decisionTransitions,routeCertSummary,minimumGoalDistance:+minimumGoalDistance.toFixed(3),final:{x:bot.x,y:bot.y,hp:bot.hp},
       routePlans:window.__NOVA_TERRAIN_INTELLIGENCE__?.plans,
       routePlansDelta:(window.__NOVA_TERRAIN_INTELLIGENCE__?.plans||0)-plansBefore,
-      goalHintOverrides,motionSamples,
+      goalHintOverrides,motionSamples,ownerTransitions,
       trace});
     }
    }finally{
