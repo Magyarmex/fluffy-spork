@@ -542,3 +542,25 @@ test('public maximum-speed bound preserves the exact contested threshold',()=>{
  assert.equal(impossible,0,'rival just beyond bound cannot contribute a penalty');
  assert.equal(probes,0,'impossible rival must skip terrain sight test');
 });
+
+
+test('seeded maximum-speed pruning preserves all legal witnessed contest penalties',()=>{
+ const {h,classes}=boot(),self=tank(1,0),rival=tank(2,0);
+ self.ai={};let seed=1517800;
+ const rnd=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+ const g={time:1,tanks:[self,rival],w:3200,h:2000,cam:{x:0,y:0,zoom:1},
+  hasLineOfSight:()=>true,tankSpeed:t=>{if(t!==self)throw Error('private rival speed read');return 124;}};
+ const snap={at:1,owner:self,tanks:g.tanks,ownerX:0,ownerY:0,viewW:g.w,viewH:g.h,
+  camera:g.cam,camX:0,camY:0,camZoom:1,rivals:g.tanks,speeds:[null,null]};
+ Object.defineProperty(self.ai,'__v181RivalSpeedSnapshot',{configurable:true,value:snap});
+ for(let i=0;i<1500;i++){
+  const d=rnd()*760,qd=rnd()*1600,speed=124*(1+1.3*rnd());
+  const p={id:'heal',type:'heal',x:d,y:0};
+  rival.x=d+qd;
+  snap.speeds[1]={target:rival,id:rival.id,cls:rival.cls,x:rival.x,y:rival.y,speed};
+  const lead=d-qd/speed*124;
+  const expected=Math.max(0,Math.min(.55,(lead-70)/300));
+  const actual=h.resourceContest(g,self,p,d,classes);
+  assert.ok(Math.abs(actual-expected)<1e-10,'incorrect public contest bound at seeded case '+i);
+ }
+});
