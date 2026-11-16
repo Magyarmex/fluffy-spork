@@ -143,6 +143,7 @@ test('lone critical heal prices an occluded route without moving the live route 
  const {tank,g,classes,choose}=setup();
  const heal={id:'only-heal',type:'heal',x:340,y:-40};
  g.powerups=[heal];
+ g.__v1102Routes={'7:6':{gx:heal.x,gy:heal.y,index:0,points:[{x:20,y:20}]}};
  let scratch=0,live=0;
  g.novaStrategicRouteCost=(...args)=>{scratch++;assert.equal(args[6],heal.id);return 500;};
  g.novaBattlefieldWaypoint=()=>{live++;throw Error('strategic scoring must not advance movement cursor');};
