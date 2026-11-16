@@ -122,6 +122,7 @@ const {chromium}=require('playwright');
      // it runs; never issue an additional waypoint plan or change its result.
      const routeCertSummary={exact:0,nearby:0,fallback:0,unverified:0,failures:[]};
      const selectedWaypoint=g.novaBattlefieldWaypoint;
+     const routeCallTrace=[];
      let goalHintOverrides=0;
      g.novaBattlefieldWaypoint=function(x,y,gx,gy,pad,seed){
       let routeGx=gx,routeGy=gy;
@@ -132,7 +133,18 @@ const {chromium}=require('playwright');
          (gx!==lower.x||gy!==lower.y)){
        routeGx=lower.x;routeGy=lower.y;goalHintOverrides++;
       }
+      const traceKey=String(seed)+':'+Math.round(pad/4),
+       beforeRoute=g.__v1102Routes?.[traceKey],beforeIndex=beforeRoute?.index??null;
       const wp=selectedWaypoint.call(this,x,y,routeGx,routeGy,pad,seed);
+      if(arm==='lower-only-even-seed'&&seed===bot.id&&Math.abs(x-81)<2&&routeCallTrace.length<100){
+       const afterRoute=g.__v1102Routes?.[traceKey];
+       routeCallTrace.push({t:+(g.time-10).toFixed(3),x:+x.toFixed(2),y:+y.toFixed(2),
+        requested:[+gx.toFixed(2),+gy.toFixed(2)],preIndex:beforeIndex,
+        postIndex:afterRoute?.index??null,replaced:!!beforeRoute&&beforeRoute!==afterRoute,
+        preGoal:beforeRoute?[beforeRoute.gx,beforeRoute.gy]:null,
+        postGoal:afterRoute?[afterRoute.gx,afterRoute.gy]:null,
+        waypoint:wp?[+wp.x.toFixed(2),+wp.y.toFixed(2)]:null});
+      }
       if(seed===bot.id&&g.powerups.some(p=>p.x===gx&&p.y===gy)){
        const full=wp&&g.novaRouteLength?.(x,y,gx,gy,pad,seed,wp);
        const near=wp&&g.novaNearbyRouteLength?.(x,y,gx,gy,pad,seed,wp);
@@ -248,7 +260,7 @@ const {chromium}=require('playwright');
       resourceFrames,decisionTransitions,routeCertSummary,minimumGoalDistance:+minimumGoalDistance.toFixed(3),final:{x:bot.x,y:bot.y,hp:bot.hp},
       routePlans:window.__NOVA_TERRAIN_INTELLIGENCE__?.plans,
       routePlansDelta:(window.__NOVA_TERRAIN_INTELLIGENCE__?.plans||0)-plansBefore,
-      goalHintOverrides,motionSamples,ownerTransitions,
+      goalHintOverrides,motionSamples,ownerTransitions,routeCallTrace,
       trace});
     }
    }finally{
