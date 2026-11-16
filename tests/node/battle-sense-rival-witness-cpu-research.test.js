@@ -223,3 +223,45 @@ test('composed advancing-time AI planning reports zero/one/two-heal CPU cost',()
  });
  console.log('COMPOSED_RIVAL_WHOLE_PLANNING_CPU_RESEARCH '+JSON.stringify(report));
 });
+
+
+test('composed rival contest bound saves terrain probes without changing pressure',()=>{
+ withSeed(1517800,()=>{
+  const g=bootGame();if(!g.player)g.redeploy();
+  try{
+   const bot=g.tanks.find(t=>t?.ai&&!t.isPlayer);
+   assert.ok(bot);
+   const classes=g.__testWindow.__novaMakeRequire('')('game/classes');
+   const h=g.__testWindow.__NOVA_BATTLE_SENSE_TEST__;
+   Object.assign(bot,{id:99000,cls:'guard',x:1000,y:1000,hp:20,maxHp:100,alive:true,stats:{...bot.stats,speed:0}});
+   bot.ai={};
+   const rivals=Array.from({length:13},(_,i)=>({
+    id:99001+i,cls:'guard',x:i===12?1250:700+i*12,y:1000,
+    alive:true,stats:{speed:0},vx:0,vy:0
+   }));
+   g.tanks=[bot,...rivals];g.__novaFairVisibleTanks=g.tanks;
+   g.time=10;const p={id:'heal',type:'heal',x:1300,y:1000};
+   const originalSpeed=g.tankSpeed;
+   g.tankSpeed=t=>{if(t!==bot)throw Error('private rival speed read');return originalSpeed.call(g,t);};
+   let probes=0;
+   g.hasLineOfSight=(ax,ay,bx,by)=>{
+    if(bx===p.x&&by===p.y&&rivals.some(r=>r.x===ax&&r.y===ay))probes++;
+    return true;
+   };
+   const plain=h.resourceContest(g,bot,p,300,classes),plainProbes=probes;
+   const speeds=g.tanks.map(q=>({target:q,id:q.id,cls:q.cls,x:q.x,y:q.y,speed:124}));
+   const cam=g.cam;
+   Object.defineProperty(bot.ai,'__v181RivalSpeedSnapshot',{configurable:true,value:{
+    at:g.time,owner:bot,tanks:g.tanks,ownerX:bot.x,ownerY:bot.y,
+    viewW:g.w,viewH:g.h,camera:cam,camX:cam&&cam.x,camY:cam&&cam.y,
+    camZoom:cam&&cam.zoom,rivals:g.tanks,speeds
+   }});
+   probes=0;
+   const bounded=h.resourceContest(g,bot,p,300,classes),boundedProbes=probes;
+   assert.ok(plain>0,'nearby rival must make the heal genuinely contested');
+   assert.equal(bounded,plain,'the conservative bound must preserve actual composed scoring');
+   assert.ok(boundedProbes<plainProbes,'impossible rivals should skip expensive pickup LOS');
+   console.log('COMPOSED_RIVAL_BOUND_PROBES '+JSON.stringify({plainProbes,boundedProbes,saved:plainProbes-boundedProbes}));
+  }finally{g.destroy();}
+ });
+});
