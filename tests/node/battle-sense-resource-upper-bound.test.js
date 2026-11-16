@@ -151,3 +151,17 @@ test('lone critical heal prices an occluded route without moving the live route 
  assert.equal(scratch,1);
  assert.equal(live,0);
 });
+
+
+test('first lone-heal evaluation can seed the movement route before scratch isolation',()=>{
+ const {tank,g,classes,choose}=setup();
+ const heal={id:'only-heal',type:'heal',x:340,y:-40};
+ g.powerups=[heal];
+ let live=0,scratch=0;
+ g.novaBattlefieldWaypoint=()=>{live++;return{x:40,y:40};};
+ g.novaRouteLength=()=>500;
+ g.novaStrategicRouteCost=()=>{scratch++;return 500;};
+ assert.equal(choose(g,tank,classes),heal);
+ assert.equal(live,1,'first strategic evaluation seeds an otherwise empty movement route');
+ assert.equal(scratch,0,'no duplicate scratch plan is needed before a live route exists');
+});
