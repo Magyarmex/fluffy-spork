@@ -96,3 +96,17 @@ test('Guard-size route accepts exact tangent without crossing wall interior',()=
  const badLength=bad&&inside.novaRouteLength(82,y,...goal,pad,seed,bad);
  assert.ok(!Number.isFinite(badLength),'do not certify a start inside the full clearance envelope');
 });
+
+test('nearby corner is not skipped when the following leg still crosses a wall',()=>{
+ const g=setup(),seed=700008,pad=24,key='700008:6',x=-179,y=-215;
+ const points=[{x:-195,y:-235},{x:195,y:-235},{x:340,y:-40}];
+ assert.ok(distForTest(x,y,points[0].x,points[0].y)<20+pad*.65,'fixture is inside proximity threshold');
+ assert.ok(!clear(x,y,points[1].x,points[1].y,pad-5-.001),'next waypoint is blocked');
+ g.__v1102Routes=Object.create(null);
+ g.__v1102Routes[key]={gx:340,gy:-40,points,index:0,until:g.time+1,validateAt:0};
+ const before=g.__v1102Routes[key],wp=g.novaBattlefieldWaypoint(x,y,340,-40,pad,seed);
+ assert.equal(g.__v1102Routes[key],before,'do not discard a valid cached route because of premature skip');
+ assert.equal(before.index,0,'the near corner must remain active');
+ assert.deepEqual({x:wp.x,y:wp.y},{x:-195,y:-235});
+});
+function distForTest(ax,ay,bx,by){return Math.hypot(bx-ax,by-ay);}
