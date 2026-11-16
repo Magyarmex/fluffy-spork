@@ -76,7 +76,11 @@ function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8){
     prevChoice=choice;
     const desiredX=g.time<.7?direction:Math.sign(near.x-rival.x);
     const desiredY=g.time<.7?0:Math.sign(near.y-rival.y);
-    g.moveTank(rival,desiredX*rivalSpeed,desiredY*rivalSpeed,dt);
+    // The real movement owner accepts velocity components, not a normalized stick.
+    // Normalize diagonal scripted pursuit so a baseline rival cannot move at
+    // sqrt(2) times its legal speed and masquerade as a witnessed upgrade.
+    const desiredLength=Math.hypot(desiredX,desiredY)||1;
+    g.moveTank(rival,desiredX/desiredLength*rivalSpeed,desiredY/desiredLength*rivalSpeed,dt);
     g.updatePowerups(dt);
     if(arrivals.some(a=>a.who==='bot'))break;
    }
