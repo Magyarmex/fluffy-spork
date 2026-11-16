@@ -207,7 +207,8 @@ wrap('game/engine',function(engine,require){
           if(wp){t.ai.__v172Waypoint=wp;t.ai.__v172WaypointUntil=now+.95;}
         }
         if(wp){
-          var qx=wp.x-t.x,qy=wp.y-t.y,ql=Math.hypot(qx,qy)||1;qx/=ql;qy/=ql;var blend=probe?.82:.58,sx=ux*(1-blend)+qx*blend,sy=uy*(1-blend)+qy*blend,nl=Math.hypot(sx,sy)||1,snx=sx/nl,sny=sy/nl;
+          var qx=wp.x-t.x,qy=wp.y-t.y,ql=Math.hypot(qx,qy)||1;qx/=ql;qy/=ql;/* A critically injured tank pursuing an exact certified heal must clear a blocking wall before blending back toward the heal. Partial direct-goal steering can pin it against the wall despite a valid corner. Combat and ordinary roaming retain their original blend. */
+          var exactHeal=!!(probe&&this.__v1102RouteContext&&this.__v1102RouteContext.lineage==='resource'&&this.__v1102RouteContext.forceGoal),blend=exactHeal?1:probe?.82:.58,sx=ux*(1-blend)+qx*blend,sy=uy*(1-blend)+qy*blend,nl=Math.hypot(sx,sy)||1,snx=sx/nl,sny=sy/nl;
           vx=snx*sp;vy=sny*sp;t.ai.__v172Routing=true;t.ai.wanderA=Math.atan2(sny,snx);
         }else t.ai.__v172Routing=false;
       }
