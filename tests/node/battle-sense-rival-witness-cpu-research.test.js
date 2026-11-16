@@ -74,8 +74,32 @@ test('composed 13-rival pickup contest reports steady-state witness overhead',()
    // microbench above excludes the actual sample-update path; this companion
    // measures that path without treating CI timing as a device performance gate.
    const movingN=600,movingOff=[],movingOn=[];
+   function resetMovingArm(on){
+    // Paired arms must begin at the same time and rival positions. Previously
+    // each arm inherited the previous arm's final positions and game time,
+    // so the measured witness/class-only ratio mixed CPU with scene drift.
+    g.time=0;
+    for(let i=0;i<rivals.length;i++){rivals[i].x=1020+i*12;rivals[i].y=1010;}
+    if(on){
+     bot.ai=witnessAI;
+     // Rebuild a legal three-interval history outside the timed section,
+     // rather than fabricating a speed certificate or timing its setup.
+     delete witnessAI.__v181RivalSpeedWitness;
+     h.resourceContest(g,bot,p,450,classes);
+     for(let step=1;step<=3;step++){
+      g.time=step*.2;
+      for(const rival of rivals)rival.x+=32;
+      h.resourceContest(g,bot,p,450,classes);
+     }
+     assert.ok(rivals.every(r=>witnessAI.__v181RivalSpeedWitness[String(r.id)]?.confirmed===3));
+    }else{
+     bot.ai=null;g.time=.6;
+     for(const rival of rivals)rival.x+=96;
+    }
+    assert.ok(Math.abs(g.time-.6)<1e-9);
+   }
    function sampleMoving(on){
-    bot.ai=on?witnessAI:null;
+    resetMovingArm(on);
     const t0=performance.now();let checksum=0;
     for(let i=0;i<movingN;i++){
      g.time+=.2;
