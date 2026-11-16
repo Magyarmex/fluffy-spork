@@ -627,3 +627,23 @@ test('floating-point boundary never drops a tiny positive public contest penalty
  assert.equal(h.resourceContest(g,self,p,400,classes),expected,
   'the conservative float margin must preserve a small but positive score');
 });
+
+
+test('unknown public class must not be pruned using observer speed as a fabricated maximum',()=>{
+ const {h,classes}=boot(),self=tank(1,0),rival=tank(2,900);
+ self.ai={};rival.cls='unknown';
+ const p={id:'heal',type:'heal',x:300,y:0};
+ const cam={x:0,y:0,zoom:1};let pickupProbes=0;
+ const g={time:1,tanks:[self,rival],w:800,h:600,cam,
+  tankSpeed:t=>{if(t!==self)throw Error('private rival speed read');return 124;},
+  hasLineOfSight:(x,y,px,py)=>{if(x===rival.x&&px===p.x&&py===p.y)pickupProbes++;return true;}};
+ const speeds=g.tanks.map(q=>({target:q,id:q.id,cls:q.cls,x:q.x,y:q.y,speed:124}));
+ Object.defineProperty(self.ai,'__v181RivalSpeedSnapshot',{configurable:true,value:{
+  at:g.time,owner:self,tanks:g.tanks,rivals:g.tanks,speeds,
+  ownerX:self.x,ownerY:self.y,viewW:g.w,viewH:g.h,
+  camera:cam,camX:cam.x,camY:cam.y,camZoom:cam.zoom
+ }});
+ assert.ok(Number.isFinite(h.resourceContest(g,self,p,300,classes)));
+ assert.ok(pickupProbes>0,
+  'unknown class has no certified maximum speed; retain terrain probe and conservative fallback');
+});
