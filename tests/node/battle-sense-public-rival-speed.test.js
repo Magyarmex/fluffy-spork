@@ -456,7 +456,9 @@ test('planning-tick rival snapshot is ephemeral, identity-bound and reused acros
  g.time=.2;
  const expired=h.resourceContest(g,self,p,400,classes);
  assert.equal(expired,first,'next-tick contest must not use stale snapshot');
- g.time=0;rival.cls='scout';
+ g.time=0;rival.id=3;
+ assert.ok(Number.isFinite(h.resourceContest(g,self,p,400,classes)),'recycled tank identity must invalidate speed certificate');
+ rival.id=2;rival.cls='scout';
  assert.ok(Number.isFinite(h.resourceContest(g,self,p,400,classes)),'class change must invalidate speed certificate');
  g.areAllies=()=>true;
  assert.equal(h.resourceContest(g,self,p,400,classes),0,'same-tick allegiance change must remain fair');
