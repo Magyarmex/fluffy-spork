@@ -437,3 +437,25 @@ test('full 14-tank arena retains speed witnesses for all 13 visible rivals',()=>
   assert.ok(witnesses[String(rival.id)]?.confirmed>=3,
    'each continuously observed rival must learn without round-robin eviction: '+rival.id);
 });
+
+test('planning-tick rival snapshot is ephemeral, identity-bound and reused across pickup contests',()=>{
+ const {h,classes,updateAI}=boot(),self=tank(1,0),rival=tank(2,100);
+ self.ai={};self.hp=20;
+ const g={time:0,tanks:[self,rival],powerups:[],bullets:[],hasLineOfSight:()=>true,tankSpeed:()=>124};
+ updateAI(self,g,.2);
+ const snap=self.ai.__v181RivalSpeedSnapshot;
+ assert.ok(snap&&snap.speeds[1]?.target===rival,'planning should sample the visible rival independently of pickups');
+ assert.equal(Object.keys(self.ai).includes('__v181RivalSpeedSnapshot'),false,'snapshot must never be serialized');
+ assert.doesNotThrow(()=>JSON.stringify(self));
+ const p={id:'heal',type:'heal',x:400,y:0};
+ const first=h.resourceContest(g,self,p,400,classes);
+ const original=snap.speeds[1].speed;
+ snap.speeds[1].speed=original*1.5;
+ const cached=h.resourceContest(g,self,p,400,classes);
+ assert.ok(cached>=first,'same-tick contest should reuse witnessed public speed');
+ g.time=.2;
+ const expired=h.resourceContest(g,self,p,400,classes);
+ assert.equal(expired,first,'next-tick contest must not use stale snapshot');
+ g.time=0;g.tanks=[self,tank(2,100)];
+ assert.equal(h.resourceContest(g,self,p,400,classes),first,'replacement roster must invalidate cached identity');
+});
