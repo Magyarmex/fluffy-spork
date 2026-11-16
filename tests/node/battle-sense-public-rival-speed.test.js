@@ -463,3 +463,20 @@ test('planning-tick rival snapshot is ephemeral, identity-bound and reused acros
  self.x=0;g.tanks=[self,tank(2,100)];
  assert.equal(h.resourceContest(g,self,p,400,classes),first,'replacement roster must invalidate cached identity');
 });
+
+test('planning snapshot removes redundant rival visibility probes across pickup contests',()=>{
+ const {h,classes,updateAI}=boot(),self=tank(1,0),rival=tank(2,120);
+ self.ai={};self.hp=20;let probes=0;
+ const g={time:0,tanks:[self,rival],powerups:[],bullets:[],
+  hasLineOfSight:()=>{probes++;return true;},tankSpeed:()=>124};
+ updateAI(self,g,.2);
+ const p={id:'heal',type:'heal',x:400,y:0};
+ probes=0;
+ const cached=h.resourceContest(g,self,p,400,classes);
+ const cachedProbes=probes;
+ delete self.ai.__v181RivalSpeedSnapshot;
+ probes=0;
+ const uncached=h.resourceContest(g,self,p,400,classes);
+ assert.equal(cached,uncached,'optimization cannot change a same-scene contest');
+ assert.ok(cachedProbes<probes,'certified visible rival should not need a second LOS probe per pickup');
+});
