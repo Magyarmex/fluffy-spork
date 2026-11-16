@@ -564,3 +564,18 @@ test('seeded maximum-speed pruning preserves all legal witnessed contest penalti
   assert.ok(Math.abs(actual-expected)<1e-10,'incorrect public contest bound at seeded case '+i);
  }
 });
+
+
+test('snapshot without witnessed rival cannot suppress future movement learning',()=>{
+ const {h,classes}=boot(),self=tank(1,0),rival=tank(2,900);
+ self.ai={};const p={id:'heal',type:'heal',x:300,y:0};
+ const g={time:1,tanks:[self,rival],w:2400,h:1000,cam:{x:0,y:0,zoom:1},
+  hasLineOfSight:()=>true,tankSpeed:t=>{if(t!==self)throw Error('private rival speed read');return 124;}};
+ Object.defineProperty(self.ai,'__v181RivalSpeedSnapshot',{configurable:true,value:{
+  at:1,owner:self,tanks:g.tanks,ownerX:0,ownerY:0,viewW:g.w,viewH:g.h,
+  camera:g.cam,camX:0,camY:0,camZoom:1,rivals:g.tanks,speeds:[null,null]
+ }});
+ assert.equal(h.resourceContest(g,self,p,300,classes),0);
+ assert.equal(self.ai.__v181RivalSpeedWitness['2'].at,1,
+  'a newly visible rival missing from snapshot still seeds its public movement witness');
+});
