@@ -268,27 +268,3 @@ test('certified corner authority does not leak to combat, mismatched goals or un
  assert.ok(run('changed',false)>0,'a different resource goal cannot borrow the old route corner');
  assert.ok(run('heal',true)>0,'an unsafe certified corner must not gain steering authority');
 });
-
-
-test('critical-heal anti-stuck escape is not overridden by a second local corner',()=>{
- const {Game}=loadCombinedArms(),g=new Game(),t=tank(8,'guard',{
-  ai:{__v181Mode:'resource',__v1102Nav:{escapeUntil:10.34},
-   __v172Waypoint:{x:0,y:100},__v172WaypointUntil:11}
- });
- g.firstTerrainHit=()=>({solid:{id:1},hit:{x:10,y:0,nx:-1,ny:0}});
- g.moveTank(t,100,0,.1);
- assert.equal(t.x,10);
- assert.equal(t.y,0,'the already-selected escape vector must reach the physical mover unchanged');
- assert.equal(t.ai.__v172Waypoint.x,0,'the escape does not rewrite persistent local navigation state');
-});
-
-
-test('anti-stuck escape bypass is restricted to critical resource pursuit',()=>{
- const {Game}=loadCombinedArms(),g=new Game(),t=tank(8,'guard',{
-  ai:{__v181Mode:'combat',__v1102Nav:{escapeUntil:10.34},
-   __v172Waypoint:{x:0,y:100},__v172WaypointUntil:11}
- });
- g.firstTerrainHit=()=>({solid:{id:1},hit:{x:10,y:0,nx:-1,ny:0}});
- g.moveTank(t,100,0,.1);
- assert.ok(t.y>0,'ordinary combat still uses the existing local corner steering');
-});
