@@ -70,6 +70,27 @@ test('composed 13-rival pickup contest reports steady-state witness overhead',()
     if(k%2){choiceOn.push(sampleChoice(true));choiceOff.push(sampleChoice(false));}
     else{choiceOff.push(sampleChoice(false));choiceOn.push(sampleChoice(true));}
    }
+   // Advance public time and positions between observations. The frozen-time
+   // microbench above excludes the actual sample-update path; this companion
+   // measures that path without treating CI timing as a device performance gate.
+   const movingN=600,movingOff=[],movingOn=[];
+   function sampleMoving(on){
+    bot.ai=on?witnessAI:null;
+    const t0=performance.now();let checksum=0;
+    for(let i=0;i<movingN;i++){
+     g.time+=.2;
+     for(const rival of rivals)rival.x+=30;
+     checksum+=h.resourceContest(g,bot,p,450,classes);
+    }
+    const us=(performance.now()-t0)/movingN*1000;
+    assert.ok(Number.isFinite(us)&&Number.isFinite(checksum));
+    return us;
+   }
+   sampleMoving(false);sampleMoving(true);
+   for(let k=0;k<4;k++){
+    if(k%2){movingOn.push(sampleMoving(true));movingOff.push(sampleMoving(false));}
+    else{movingOff.push(sampleMoving(false));movingOn.push(sampleMoving(true));}
+   }
    bot.ai=witnessAI;
    assert.equal(privateCalls,0);
    return {rivals:13,iterationsPerArm:N,rounds:6,
@@ -80,6 +101,10 @@ test('composed 13-rival pickup contest reports steady-state witness overhead',()
     twoHealClassOnlyMedianUs:+median(choiceOff).toFixed(4),
     twoHealWitnessMedianUs:+median(choiceOn).toFixed(4),
     twoHealRatio:+(median(choiceOn)/Math.max(1e-9,median(choiceOff))).toFixed(3),
+    movingTimeIterationsPerArm:movingN,
+    movingTimeClassOnlyMedianUs:+median(movingOff).toFixed(4),
+    movingTimeWitnessMedianUs:+median(movingOn).toFixed(4),
+    movingTimeRatio:+(median(movingOn)/Math.max(1e-9,median(movingOff))).toFixed(3),
     privateCalls};
   }finally{g.destroy();}
  });
