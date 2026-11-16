@@ -53,12 +53,33 @@ test('composed 13-rival pickup contest reports steady-state witness overhead',()
     if(k%2){on.push(sample(true));off.push(sample(false));}
     else{off.push(sample(false));on.push(sample(true));}
    }
+   // More representative paired two-heal strategic selection, including both
+   // candidate scans and their shared public rival contacts. Still CI CPU only.
+   g.powerups=[p,{id:'safe',type:'heal',x:350,y:1000}];
+   const CHOICE_N=1200;
+   function sampleChoice(on){
+    bot.ai=on?witnessAI:null;
+    const t0=performance.now();let checksum=0;
+    for(let i=0;i<CHOICE_N;i++)checksum+=(h.chooseResource(g,bot,classes)?.id==='safe'?1:0);
+    const us=(performance.now()-t0)/CHOICE_N*1000;
+    assert.ok(Number.isFinite(us)&&Number.isFinite(checksum));return us;
+   }
+   sampleChoice(false);sampleChoice(true);
+   const choiceOff=[],choiceOn=[];
+   for(let k=0;k<4;k++){
+    if(k%2){choiceOn.push(sampleChoice(true));choiceOff.push(sampleChoice(false));}
+    else{choiceOff.push(sampleChoice(false));choiceOn.push(sampleChoice(true));}
+   }
    bot.ai=witnessAI;
    assert.equal(privateCalls,0);
    return {rivals:13,iterationsPerArm:N,rounds:6,
     classOnlyMedianUs:+median(off).toFixed(4),
     witnessMedianUs:+median(on).toFixed(4),
     ratio:+(median(on)/Math.max(1e-9,median(off))).toFixed(3),
+    twoHealChoiceIterations:CHOICE_N,
+    twoHealClassOnlyMedianUs:+median(choiceOff).toFixed(4),
+    twoHealWitnessMedianUs:+median(choiceOn).toFixed(4),
+    twoHealRatio:+(median(choiceOn)/Math.max(1e-9,median(choiceOff))).toFixed(3),
     privateCalls};
   }finally{g.destroy();}
  });
