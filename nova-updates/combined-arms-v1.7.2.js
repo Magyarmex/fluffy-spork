@@ -207,8 +207,15 @@ wrap('game/engine',function(engine,require){
           if(wp){t.ai.__v172Waypoint=wp;t.ai.__v172WaypointUntil=now+.95;}
         }
         if(wp){
-          var qx=wp.x-t.x,qy=wp.y-t.y,ql=Math.hypot(qx,qy)||1;qx/=ql;qy/=ql;/* For an exact critical heal, a certified cached route corner owns steering even when the short forward collision probe misses the wall. Do not override combat, roaming, or uncertified fallback corners. */
-          var ctx=this.__v1102RouteContext,cache=this.__v1102Routes&&this.__v1102Routes[String(t.id)+':'+Math.round(pad/4)],certifiedHeal=!!(ctx&&ctx.lineage==='resource'&&ctx.forceGoal&&cache&&cache.points&&cache.points.length&&cache.gx===ctx.target.x&&cache.gy===ctx.target.y&&this.isTerrainSafe&&!this.isTerrainSafe(t.x,t.y,Math.max(2,pad-5))),blend=certifiedHeal?1:probe?.82:.58,sx=ux*(1-blend)+qx*blend,sy=uy*(1-blend)+qy*blend,nl=Math.hypot(sx,sy)||1,snx=sx/nl,sny=sy/nl;
+          /* A certified critical-heal detour must steer toward its actual next
+           * route corner, not a stale short-horizon waypoint. Restrict this
+           * override to the already-established near-wall heal authority;
+           * ordinary combat, roaming and anti-stuck escape keep priority. */
+          var ctx=this.__v1102RouteContext,cache=this.__v1102Routes&&this.__v1102Routes[String(t.id)+':'+Math.round(pad/4)],certifiedHeal=!!(ctx&&ctx.lineage==='resource'&&ctx.forceGoal&&cache&&cache.points&&cache.points.length&&cache.gx===ctx.target.x&&cache.gy===ctx.target.y&&this.isTerrainSafe&&!this.isTerrainSafe(t.x,t.y,Math.max(2,pad-5)));
+          var corner=certifiedHeal&&cache.points[cache.index];
+          if(corner&&Number.isFinite(corner.x)&&Number.isFinite(corner.y)&&this.isTerrainSafe(corner.x,corner.y,Math.max(2,pad-5)))wp=corner;
+          var qx=wp.x-t.x,qy=wp.y-t.y,ql=Math.hypot(qx,qy)||1;qx/=ql;qy/=ql;
+          var blend=certifiedHeal?1:probe?.82:.58,sx=ux*(1-blend)+qx*blend,sy=uy*(1-blend)+qy*blend,nl=Math.hypot(sx,sy)||1,snx=sx/nl,sny=sy/nl;
           vx=snx*sp;vy=sny*sp;t.ai.__v172Routing=true;t.ai.wanderA=Math.atan2(sny,snx);
         }else t.ai.__v172Routing=false;
       }
