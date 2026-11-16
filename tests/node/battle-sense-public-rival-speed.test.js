@@ -622,7 +622,7 @@ test('floating-point boundary never drops a tiny positive public contest penalty
   camera:g.cam,camX:0,camY:0,camZoom:1,rivals:g.tanks,
   speeds:[null,{target:rival,id:rival.id,cls:rival.cls,x:rival.x,y:rival.y,speed:124*2.3}]
  }});
- const expected=Math.max(0,(400-(rival.x-400)/(124*2.3)*124-70)/300);
+ const expected=Math.max(0,(((400/124)-(rival.x-400)/(124*2.3))*124-70)/300);
  assert.ok(expected>0,'fixture must be just inside the positive-penalty boundary');
  assert.equal(h.resourceContest(g,self,p,400,classes),expected,
   'the conservative float margin must preserve a small but positive score');
