@@ -485,3 +485,13 @@ test('planning snapshot removes redundant rival visibility probes across pickup 
  assert.equal(cached,uncached,'optimization cannot change a same-scene contest');
  assert.ok(cachedProbes<probes,'certified visible rival should not need a second LOS probe per pickup');
 });
+
+test('decorative War Room planning does not allocate rival speed snapshots',()=>{
+ const {updateAI}=boot(),self=tank(1,0),rival=tank(2,100);
+ self.ai={};
+ const g={time:0,tanks:[self,rival],powerups:[],bullets:[],__novaDecorativeWorld:true,
+  hasLineOfSight:()=>true,tankSpeed:()=>124};
+ updateAI(self,g,.2);
+ assert.equal(self.ai.__v181RivalSpeedSnapshot,undefined);
+ assert.equal(self.ai.__v181RivalSpeedWitness,undefined);
+});
