@@ -238,3 +238,25 @@ test('route candidate nodes use full physical body clearance, not a discounted s
     for(const node of nodes)assert.equal(original(node.x,node.y,radius),true);
   }
 });
+
+
+test('critical-heal near-corner skip distinguishes wall slide from wall drive',()=>{
+ const T=boot();
+ const walls=[
+  {id:1,x:-130,y:-35,w:60,h:330,solid:true},
+  {id:2,x:0,y:35,w:60,h:330,solid:true},
+  {id:3,x:130,y:-35,w:60,h:330,solid:true}
+ ];
+ function trial(x,y,points,expected){
+  const g=game(walls);g.time=10;
+  g.__v1102RouteContext={lineage:'resource',forceGoal:true,target:{x:340,y:-40}};
+  g.__v1102Routes={'8:6':{gx:340,gy:-40,points,index:0,until:11,validateAt:11}};
+  g.firstTerrainHit=()=>({solid:walls[0],hit:{nx:-1,ny:0}});
+  assert.ok(Math.hypot(x-points[0].x,y-points[0].y)<35.6);
+  assert.equal(g.hasLineOfSight(x,y,points[1].x,points[1].y,19),false);
+  assert.ok(T.cachedWaypoint(g,x,y,340,-40,24,8,null));
+  assert.equal(g.__v1102Routes['8:6'].index,expected);
+ }
+ trial(-179.18,146.05,[{x:-195,y:165},{x:-65,y:235}],1);
+ trial(80.98,-208.88,[{x:65,y:-235},{x:195,y:-235}],0);
+});
