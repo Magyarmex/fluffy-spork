@@ -47,3 +47,16 @@ test('research: Terrain Intelligence can certify the reachable corner route',()=
  const len=g.novaRouteLength(81,-200,340,-40,23,700008,wp);
  assert.ok(Number.isFinite(len)&&len>0,'reachable 3-wall corner should have certified complete route; waypoint='+JSON.stringify(wp)+' length='+len);
 });
+
+test('research: probe near-wall waypoint certification over the actual failed approach',()=>{
+ const probes=[];
+ for(const y of [-205,-201,-200,-199.306,-198.761,-195,-190,-180,-160]){
+  const g=setup(),x=81;
+  const wp=g.novaBattlefieldWaypoint(x,y,340,-40,23,700008);
+  const len=wp&&g.novaRouteLength(x,y,340,-40,23,700008,wp);
+  const flags=g.__novaTerrain.map(w=>({id:w.id,solid:w.solid,destructible:w.destructible??null,hp:w.hp??null}));
+  probes.push({x,y,wp:wp?{x:wp.x,y:wp.y}:null,len:Number.isFinite(len)?+len.toFixed(3):null,flags});
+ }
+ console.log('EVEN_SEED_APPROACH_PROBE '+JSON.stringify(probes));
+ assert.equal(probes.length,9);
+});
