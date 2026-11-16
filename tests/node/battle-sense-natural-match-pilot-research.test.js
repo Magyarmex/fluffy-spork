@@ -104,8 +104,18 @@ function contestedArm(seed,hz,classOnly,speedStat){
     return update.call(this,dt);
    };
    const start=g.time;
-   for(let i=0;i<Math.round(8*hz)&&g.status==='playing'&&g.player.alive;i++)
+   for(let i=0;i<Math.round(8*hz)&&g.status==='playing'&&g.player.alive;i++){
+    // The ecology's sector grid requires finite entity coordinates. Report
+    // the first invalid entity rather than obscuring a fixture failure as an
+    // unrelated sectorTick crash. Do not sanitize or alter live simulation.
+    for(const [kind,entities] of [['tank',g.tanks],['shape',g.shapes]])
+     for(const entity of entities||[])
+      if(entity&&entity.hp>0&&(!Number.isFinite(entity.x)||!Number.isFinite(entity.y)))
+       assert.fail('nonfinite '+kind+' before tick '+i+': '+JSON.stringify({
+        id:entity.id,cls:entity.cls,type:entity.type,x:entity.x,y:entity.y,
+        vx:entity.vx,vy:entity.vy,ai:entity.ai&&Object.keys(entity.ai).slice(0,15)}));
     g.update(1/hz);
+   }
    const perf=typeof g.novaPerfSnapshot==='function'?g.novaPerfSnapshot():{};
    return {seed,hz,classOnly,speedStat,initial,
     elapsed:+(g.time-start).toFixed(3),arrivals,
