@@ -248,3 +248,23 @@ test('certified critical-heal route corner overrides a conflicting local waypoin
  assert.equal(t.ai.__v172Waypoint.x,195,
   'the local waypoint owner is not silently rewritten by a transient certified steering override');
 });
+
+
+test('certified corner authority does not leak to combat, mismatched goals or unsafe corners',()=>{
+ const {Game}=loadCombinedArms();
+ function run(mode,unsafe){
+  const g=new Game(),t=tank(8,'guard',{
+   x:81,y:-205,ai:{__v172Waypoint:{x:195,y:-235},__v172WaypointUntil:11}
+  });
+  g.firstTerrainHit=()=>({solid:{id:91003},hit:{x:100,y:-205,nx:-1,ny:0}});
+  g.isTerrainSafe=(x,y)=>x!==81&&!(unsafe&&x===65);
+  g.__v1102RouteContext=mode==='combat'?{lineage:'combat',forceGoal:true,target:{x:340,y:-40}}:
+   {lineage:'resource',forceGoal:true,target:{x:mode==='changed'?330:340,y:-40}};
+  g.__v1102Routes={'8:6':{gx:340,gy:-40,index:0,points:[{x:65,y:-235}]}};
+  g.moveTank(t,100,0,.1);
+  return t.vx;
+ }
+ assert.ok(run('combat',false)>0,'combat keeps its local waypoint owner');
+ assert.ok(run('changed',false)>0,'a different resource goal cannot borrow the old route corner');
+ assert.ok(run('heal',true)>0,'an unsafe certified corner must not gain steering authority');
+});
