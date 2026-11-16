@@ -114,3 +114,24 @@ test('only a clearance-boundary hull retains its near escape corner',()=>{
  assert.notEqual(clearSide.g.__v1102Routes['700008:6'],clearSide.cached,
   'physically clear approach keeps the pre-existing fast skip/replan behavior');
 });
+
+test('research: read-only exact-goal pricing preserves live route owner and fails closed',()=>{
+ const g=setup(),pad=24,seed=700008,x=81,y=-208,gx=340,gy=-40;
+ const wp=g.novaBattlefieldWaypoint(x,y,gx,gy,pad,seed);
+ const key='700008:6',cache=g.__v1102Routes[key];
+ assert.ok(cache&&cache.points.length>=2,'must seed a multi-corner route');
+ const before=JSON.stringify(cache),plans=g.__researchTerrain&&g.__researchTerrain.planVisibilityRoute;
+ const length=g.novaReadOnlyExactRouteLength(x,y,gx,gy,pad,seed);
+ assert.ok(Number.isFinite(length)&&length>300,'certify full physical path');
+ assert.equal(JSON.stringify(cache),before,'pricing must not change index, expiry or cache contents');
+ assert.equal(g.__v1102Routes[key],cache,'pricing must not replace route owner');
+ assert.equal(g.novaReadOnlyExactRouteLength(x,y,gx+1,gy,pad,seed),null,'different goal is not certified');
+ assert.equal(JSON.stringify(cache),before,'mismatched goal must not evict route');
+ cache.until=g.time-.01;
+ assert.equal(g.novaReadOnlyExactRouteLength(x,y,gx,gy,pad,seed),null,'expired certificate cannot price');
+ cache.until=g.time+1;
+ const original=g.hasLineOfSight;
+ g.hasLineOfSight=()=>false;
+ assert.equal(g.novaReadOnlyExactRouteLength(x,y,gx,gy,pad,seed),null,'newly blocked leg must fail closed');
+ g.hasLineOfSight=original;
+});
