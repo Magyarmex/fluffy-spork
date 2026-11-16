@@ -456,6 +456,10 @@ test('planning-tick rival snapshot is ephemeral, identity-bound and reused acros
  g.time=.2;
  const expired=h.resourceContest(g,self,p,400,classes);
  assert.equal(expired,first,'next-tick contest must not use stale snapshot');
- g.time=0;g.tanks=[self,tank(2,100)];
+ g.time=0;g.cam={x:0,y:0,zoom:1};
+ assert.equal(h.resourceContest(g,self,p,400,classes),first,'new camera must invalidate cached visibility');
+ g.cam=undefined;self.x=1;
+ assert.ok(Number.isFinite(h.resourceContest(g,self,p,400,classes)),'observer movement must invalidate cached visibility');
+ self.x=0;g.tanks=[self,tank(2,100)];
  assert.equal(h.resourceContest(g,self,p,400,classes),first,'replacement roster must invalidate cached identity');
 });
