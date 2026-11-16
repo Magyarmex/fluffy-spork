@@ -4,7 +4,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 
-function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8){
+function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8,rivalY=1120){
  return withSeed(1517800,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   try{
@@ -19,7 +19,7 @@ function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8){
     alive:true,hp:20,maxHp:100,spawnShieldT:0,shieldT:0,
     perk:null,gene:null,hasteT:0,stats:{...bot.stats,speed:0}});
    bot.ai.__v181Think=0;bot.ai.__v181BiasW=0;bot.ai.__v181ResourceId=null;
-   Object.assign(rival,{cls:'guard',x:direction===1?1120:1280,y:1120,
+   Object.assign(rival,{cls:'guard',x:direction===1?1120:1280,y:rivalY,
     vx:0,vy:0,alive:true,hp:20,maxHp:100,
     spawnShieldT:0,shieldT:0,stampedeT:0,hasteT:0,
     perk:null,gene:null,stats:{...rival.stats,speed:speedStat}});
@@ -86,7 +86,7 @@ function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8){
     g.updatePowerups(dt);
     if(arrivals.some(a=>a.who==='bot'))break;
    }
-   return {hz,direction,safeLayout,classOnly,speedStat,firstChoice,changes,firstNearAt,firstSafeAt,
+   return {hz,direction,safeLayout,classOnly,speedStat,rivalY,firstChoice,changes,firstNearAt,firstSafeAt,
     maxConfirmed,maxFast:+maxFast.toFixed(3),
     botPickup:arrivals.find(a=>a.who==='bot')||null,
     rivalPickup:arrivals.find(a=>a.who==='rival')||null,
@@ -104,6 +104,13 @@ test('composed autonomous witnessed-rival pickup steering at 30/60 Hz',()=>{
    for(const classOnly of [true,false])
     results.push(arm(hz,direction,safeLayout,classOnly,speedStat));
  assert.equal(results.length,32);
+ // The main 32 arms are straight-line (rival y equals near-heal y).
+ // Explicitly exercise the diagonal command that exposed the latent harness
+ // overspeed risk, at both frame rates and without a private speed upgrade.
+ const diagonal=[arm(30,1,'west',false,0,1080),arm(60,1,'west',false,0,1080)];
+ assert.ok(diagonal.every(r=>r.maxFast<=124*1.001),
+  'diagonal baseline movement must never certify an illegal speed upgrade');
+ console.log('COMPOSED_RIVAL_DIAGONAL_NEGATIVE_CONTROLS '+JSON.stringify(diagonal.map(({trace,...summary})=>summary)));
  assert.ok(results.every(r=>Number.isFinite(r.botX)&&Number.isFinite(r.botY)));
  assert.ok(results.filter(r=>r.classOnly).every(r=>r.maxConfirmed===0),
   'class-only controls must not accumulate sustained speed evidence');
