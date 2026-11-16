@@ -76,6 +76,10 @@ test('composed AI learns visible rival motion before any powerup spawns at 30/60
    const w=bot.ai.__v181RivalSpeedWitness?.[String(rival.id)];
    assert.ok(w?.confirmed>=3,'composed AI must observe movement without any pickup at '+hz+' Hz');
    assert.ok(w.fast>160,'visible fast movement must survive until pickup spawn');
+   const snapshot=bot.ai.__v181RivalSpeedSnapshot;
+   assert.equal(snapshot?.owner,bot,'composed observer must own its planning snapshot');
+   assert.ok(snapshot.speeds.some(s=>s?.target===rival),'composed snapshot must include visible rival');
+   assert.equal(JSON.stringify(bot.ai).includes('__v181RivalSpeedSnapshot'),false,'snapshot must remain ephemeral');
   }finally{g.destroy();}
  });
 });
