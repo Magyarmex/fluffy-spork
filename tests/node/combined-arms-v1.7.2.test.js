@@ -217,3 +217,18 @@ test('AI retains a waypoint when forward terrain still blocks movement',()=>{
  assert.equal(t.ai.__v172Waypoint,wp,
   'do not discard a needed detour merely because the corner is behind the current aim');
 });
+
+test('certified critical-heal corner owns movement when short collision probe misses',()=>{
+ const {Game}=loadCombinedArms();
+ function run(certified){
+  const g=new Game(),t=tank(8,'guard',{ai:{targetId:-1}});
+  g.block=null;g.__v1102RouteContext={lineage:'resource',forceGoal:true,target:{x:340,y:-40}};
+  if(certified)g.__v1102Routes={'8:6':{gx:340,gy:-40,points:[{x:0,y:100}]}};
+  t.ai.__v172Waypoint={x:0,y:100};t.ai.__v172WaypointUntil=11;
+  g.moveTank(t,100,0,.1);
+  return {x:t.x,y:t.y};
+ }
+ const certified=run(true),uncertified=run(false);
+ assert.ok(Math.abs(certified.x)<1e-8&&certified.y>9.9,'certified corner must dominate');
+ assert.ok(uncertified.x>1&&uncertified.y>1,'uncertified fallback retains existing blend');
+});
