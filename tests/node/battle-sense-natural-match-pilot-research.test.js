@@ -82,7 +82,15 @@ function contestedArm(seed,hz,classOnly,speedStat){
     hp:20,maxHp:100,alive:true,spawnShieldT:0,shieldT:0,
     hasteT:0,stampedeT:0,perk:null,gene:null,tier:1,stats:{...rival.stats,speed:speedStat}});
    Object.assign(g.player,{x:1000,y:1800,vx:0,vy:0,spawnShieldT:0});
-   observer.ai={};rival.ai={};
+   // Preserve the canonical autonomous AI's movement, aim and cadence
+   // fields. Replacing ai with {} leaves wanderA undefined, feeds NaN to
+   // moveTank, and crashes Living Front's sector accounting on the next tick.
+   // Only force a fresh legitimate decision from each existing AI owner.
+   assert.ok(observer.ai&&rival.ai,'requires initialized canonical AI state');
+   observer.ai.thinkT=0;rival.ai.thinkT=0;
+   observer.ai.__v181Think=0;rival.ai.__v181Think=0;
+   observer.ai.state='wander';rival.ai.state='wander';
+   observer.ai.targetId=-1;rival.ai.targetId=-1;
    g.hasLineOfSight=()=>true;
    g.status='playing';
    g.powerups=[
