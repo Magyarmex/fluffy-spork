@@ -157,8 +157,10 @@ test('composed planning snapshot reports repeated contest CPU savings without a 
    }
    const offChoice=[],onChoice=[];
    choice(false);choice(true);
-   for(let k=0;k<4;k++){
-    const off=choice(false),on=choice(true);
+   for(let k=0;k<6;k++){
+    /* Alternate order: the cached arm must not always inherit the second measurement's JIT/thermal state. */
+    const first=choice(k%2===1),second=choice(k%2===0);
+    const off=k%2===1?second:first,on=k%2===1?first:second;
     assert.equal(off.checksum,on.checksum,'snapshot cannot change the selected healing pickup');
     offChoice.push(off.us);onChoice.push(on.us);
    }
