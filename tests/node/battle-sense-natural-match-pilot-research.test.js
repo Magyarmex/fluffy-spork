@@ -18,17 +18,16 @@ function arm(seed,hz,classOnly){
     arrivals.push({ai:!!t?.ai,type,at:+g.time.toFixed(3)});
     return apply.apply(this,arguments);
    };
-   if(classOnly){
-    // Intervention only: erase speed observations before every simulation
-    // update. The same public class speeds, world, AI, combat and inputs run.
-    // A single frame cannot accumulate the three required witness intervals.
-    const update=g.update;
-    g.update=function(dt){
-     for(const t of this.tanks||[])if(t?.ai&&t.ai.__v181RivalSpeedWitness)
-      delete t.ai.__v181RivalSpeedWitness;
-     return update.call(this,dt);
-    };
-   }
+   // Apply the same wrapper and roster scan to both arms so the timing
+   // comparison does not charge only the class-only control for test overhead.
+   // In that arm, erase observer speed histories before each frame; one frame
+   // cannot accumulate the three required witnessed intervals.
+   const update=g.update;
+   g.update=function(dt){
+    for(const t of this.tanks||[])if(t?.ai&&classOnly&&t.ai.__v181RivalSpeedWitness)
+     delete t.ai.__v181RivalSpeedWitness;
+    return update.call(this,dt);
+   };
    const result=playPublicPrelude(g,hz,10,g.__testFair);
    const perf=typeof g.novaPerfSnapshot==='function'?g.novaPerfSnapshot():{};
    return {seed,hz,classOnly,initial,elapsed:result.elapsed,
