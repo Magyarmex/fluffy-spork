@@ -96,3 +96,21 @@ test('Guard-size route accepts exact tangent without crossing wall interior',()=
  const badLength=bad&&inside.novaRouteLength(82,y,...goal,pad,seed,bad);
  assert.ok(!Number.isFinite(badLength),'do not certify a start inside the full clearance envelope');
 });
+
+test('only a clearance-boundary hull retains its near escape corner',()=>{
+ function probe(x){
+  const g=setup(),pad=24,seed=700008,key='700008:6',y=-208;
+  const points=[{x:65,y:-235},{x:195,y:-235},{x:340,y:-40}];
+  const cached={gx:340,gy:-40,points,index:0,until:g.time+1,validateAt:0};
+  g.__v1102Routes=Object.create(null);g.__v1102Routes[key]=cached;
+  const wp=g.novaBattlefieldWaypoint(x,y,340,-40,pad,seed);
+  return {g,cached,wp};
+ }
+ const boundary=probe(81);
+ assert.equal(boundary.g.__v1102Routes['700008:6'],boundary.cached);
+ assert.equal(boundary.cached.index,0,'on-boundary hull must retain its escape corner');
+ assert.equal(boundary.wp.x,65);
+ const clearSide=probe(80.5);
+ assert.notEqual(clearSide.g.__v1102Routes['700008:6'],clearSide.cached,
+  'physically clear approach keeps the pre-existing fast skip/replan behavior');
+});
