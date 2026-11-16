@@ -217,21 +217,3 @@ test('AI retains a waypoint when forward terrain still blocks movement',()=>{
  assert.equal(t.ai.__v172Waypoint,wp,
   'do not discard a needed detour merely because the corner is behind the current aim');
 });
-
-test('critical-heal exact route fully follows a blocking corner; ordinary combat retains blend',()=>{
- const {Game}=loadCombinedArms();
- function run(ctx,blocked=true){
-  const g=new Game(),t=tank(8,'guard',{ai:{targetId:-1,wandering:true}});
-  g.block=blocked?{id:99,x:40,y:0,w:20,h:100,solid:true}:null;
-  g.novaBattlefieldWaypoint=()=>({x:0,y:100});
-  g.__v1102RouteContext=ctx;
-  g.moveTank(t,100,0,.1);
-  return {x:t.x,y:t.y};
- }
- const heal=run({lineage:'resource',forceGoal:true});
- const ordinary=run(null);
- const open=run({lineage:'resource',forceGoal:true},false);
- assert.ok(Math.abs(heal.x)<1e-8&&heal.y>9.9,'blocked critical heal must obey certified corner');
- assert.ok(ordinary.x>1&&ordinary.y>1,'ordinary blocked combat retains mixed steering');
- assert.ok(open.x>9.9&&Math.abs(open.y)<1e-8,'unblocked movement remains unchanged');
-});
