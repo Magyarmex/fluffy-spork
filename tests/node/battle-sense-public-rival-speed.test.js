@@ -334,6 +334,22 @@ test('one sub-baseline visible slowdown retains two fast windows without certify
   'one high impulse and two slow intervals cannot certify upgraded speed');
 });
 
+test('near-stationary collision jitter breaks speed evidence instead of preserving two fast samples',()=>{
+ const {h,classes}=boot(),self=tank(1,0),rival=tank(2,100);
+ self.ai={};
+ const g={time:0,tanks:[self,rival],hasLineOfSight:()=>true,
+  tankSpeed:t=>{if(t===rival)throw Error('private rival speed read');return 124;}};
+ const p={id:'heal',type:'heal',x:400,y:0};
+ h.resourceContest(g,self,p,400,classes);
+ for(const [i,mult] of [1.5,.01,1.48].entries()){
+  g.time=(i+1)*.2;rival.x+=124*mult*.2;
+  h.resourceContest(g,self,p,400,classes);
+ }
+ const w=self.ai.__v181RivalSpeedWitness['2'];
+ assert.equal(w.confirmed,1,'near-stop must clear old fast evidence');
+ assert.equal(w.samples.length,1,'only the post-jitter sample may survive');
+});
+
 test('witnessed rival running can change an actual two-heal choice at identical visible positions',()=>{
  const {h,classes}=boot(),self=tank(1,0),rival=tank(2,-8);
  self.hp=20;self.ai={};
