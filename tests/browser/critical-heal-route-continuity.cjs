@@ -151,7 +151,7 @@ const {chromium}=require('playwright');
      const plansBefore=window.__NOVA_TERRAIN_INTELLIGENCE__?.plans||0;
      const trace=[],aiUpdateCosts=[],dt=1/60,steps=720,motionSamples=[];
      g.moveTank=function(t,vx,vy,dd){
-      const near=t===bot&&arm==='lower-only-even-seed'&&
+      const near=t===bot&&(arm==='lower-only-even-seed'||arm==='three-walls')&&
        (Math.abs(t.x+179)<2||Math.abs(t.x+49)<2||Math.abs(t.x-81)<2);
       const before=near?{t:+g.time.toFixed(3),x:+t.x.toFixed(2),y:+t.y.toFixed(2),requestedX:+vx.toFixed(2),requestedY:+vy.toFixed(2),preVX:+(t.vx||0).toFixed(2),preVY:+(t.vy||0).toFixed(2),mode:t.ai.__v181Mode}:null;
       const out=originals.move.apply(this,arguments);
