@@ -98,6 +98,10 @@ test('composed autonomous witnessed-rival pickup steering at 30/60 Hz',()=>{
    results.push(arm(hz,direction,safeLayout,classOnly));
  assert.equal(results.length,16);
  assert.ok(results.every(r=>Number.isFinite(r.botX)&&Number.isFinite(r.botY)));
+ assert.ok(results.filter(r=>r.classOnly).every(r=>r.maxConfirmed===0),
+  'class-only controls must not accumulate sustained speed evidence');
+ assert.ok(results.filter(r=>!r.classOnly).every(r=>r.maxConfirmed>=3),
+  'witnessed controls must actually acquire three public movement samples');
  for(const result of results)console.log('COMPOSED_RIVAL_AUTONOMOUS_PICKUP_ARM '+JSON.stringify(result));
  console.log('COMPOSED_RIVAL_AUTONOMOUS_PICKUP_RESEARCH '+JSON.stringify(results.map(({trace,...summary})=>summary)));
  // This is still scripted rival motion, not a natural combat survival trial.
