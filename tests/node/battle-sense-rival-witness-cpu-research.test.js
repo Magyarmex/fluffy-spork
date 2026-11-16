@@ -338,3 +338,23 @@ test('composed real-terrain LOS stress reports bounded-contest CPU versus no-pru
  });
  console.log('COMPOSED_RIVAL_BOUND_CPU_RESEARCH '+JSON.stringify(report));
 });
+
+
+test('shipping physical speed ceiling covers all legal multipliers used by pruning',()=>{
+ withSeed(1517800,()=>{
+  const g=bootGame();if(!g.player)g.redeploy();
+  try{
+   const load=g.__testWindow.__novaMakeRequire('');
+   const classes=load('game/classes'),types=load('game/types');
+   assert.equal(types.MAX_LEVEL,45,'review public maximum-speed bound when level cap changes');
+   const t=g.player;
+   Object.assign(t,{cls:'aegis',stats:{...t.stats,speed:types.MAX_LEVEL},
+    hasteT:10,stampedeT:10,perk:'speed',gene:null,__v171FlowUntil:g.time+1});
+   const publicBase=124*classes.CLASSES.aegis.moveMult;
+   const physicalCeiling=publicBase*((1+0.045*45)*1.45*1.9*1.14*1.10);
+   const actual=g.tankSpeed(t);
+   assert.ok(Number.isFinite(actual)&&actual<=physicalCeiling+1e-7,
+    'all composed shipping speed owners must fit the public pruning ceiling');
+  }finally{g.destroy();}
+ });
+});
