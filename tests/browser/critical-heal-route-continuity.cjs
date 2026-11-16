@@ -166,7 +166,12 @@ const {chromium}=require('playwright');
         shadow.__v1102StrategicRoutes=Object.create(null);shadow.__v1102StrategicBudget=null;
         const swp=shadow.novaBattlefieldWaypoint(bot.x,bot.y,p.x,p.y,pad,bot.id);
         const slen=swp&&shadow.novaRouteLength(bot.x,bot.y,p.x,p.y,pad,bot.id,swp);
-        shadowRoute={wp:swp?{x:swp.x,y:swp.y}:null,len:Number.isFinite(slen)?slen:null};
+        shadowRoute={wp:swp?{x:swp.x,y:swp.y}:null,len:Number.isFinite(slen)?slen:null,terrainCount:(shadow.__novaTerrain||[]).length,context:shadow.__v1102RouteContext};
+        if(arm==='lower-only-even-seed'){
+         const nodes=[[bot.x,bot.y],[66,-234],[194,-234],[p.x,p.y]];
+         shadowRoute.legs=nodes.slice(1).map((n,i)=>g.hasLineOfSight(...nodes[i],...n,18));
+         shadowRoute.safe=nodes.slice(1,-1).map(n=>g.isTerrainSafe(...n,23*.72));
+        }
        }
        decisionTransitions.push({t:+(i*dt).toFixed(3),mode:bot.ai.__v181Mode,resourceId:bot.ai.__v181ResourceId??null,x:+bot.x.toFixed(2),y:+bot.y.toFixed(2),lastResourceAt:bot.ai.__v181ResourceAt??null,bullets:g.bullets.length,shadowRoute});
        priorMode=bot.ai.__v181Mode;priorResource=bot.ai.__v181ResourceId;
