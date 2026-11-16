@@ -448,7 +448,7 @@ wrap('game/engine',function(engine,require){
 });
 
 window.__NOVA_TERRAIN_INTELLIGENCE_TEST__={
-  obstacleNodes:obstacleNodes,planVisibilityRoute:planVisibilityRoute,cachedRouteLength:cachedRouteLength,cachedNearbyRouteLength:cachedNearbyRouteLength,strategicScratchCost:strategicScratchCost,seedSide:seedSide,segDistanceSq:segDistanceSq,
+  obstacleNodes:obstacleNodes,planVisibilityRoute:planVisibilityRoute,cachedWaypoint:cachedWaypoint,cachedRouteLength:cachedRouteLength,cachedNearbyRouteLength:cachedNearbyRouteLength,strategicScratchCost:strategicScratchCost,seedSide:seedSide,segDistanceSq:segDistanceSq,
   controllerSenses:controllerSenses,observedPoint:observedPoint,tangentEscape:tangentEscape,applyEscape:applyEscape,
   idleControllerGoal:idleControllerGoal,blockedDroneStep:blockedDroneStep,idleRouteStep:idleRouteStep,preserveIdleDroneTerrain:preserveIdleDroneTerrain,
   isControllerId:function(id){return !!CONTROLLER_IDS[id];},limits:{maxObstacles:MAX_OBSTACLES,maxNodes:MAX_NODES}
