@@ -248,7 +248,7 @@ test('subpixel wall-boundary jitter does not consume a blocked next corridor',()
  g.__v1102Routes={'8:6':route};
  const x=80.98,y=-205,pad=24;
  assert.equal(g.isTerrainSafe(x,y,19),true,'hull is just outside nominal clearance');
- assert.equal(g.isTerrainSafe(x,y,19.1),false,'0.1-unit clearance band includes the boundary');
+ assert.equal(g.isTerrainSafe(x,y,19.03),false,'0.03-unit clearance band includes measured 0.02-unit jitter');
  assert.equal(g.hasLineOfSight(x,y,route.points[1].x,route.points[1].y,19),false,
   'the next corridor is physically blocked even though the current corner is nearby');
  assert.ok(Math.hypot(x-route.points[0].x,y-route.points[0].y)<20+pad*.65);
