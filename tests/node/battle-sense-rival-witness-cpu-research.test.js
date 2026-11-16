@@ -174,3 +174,52 @@ test('composed planning snapshot reports repeated contest CPU savings without a 
  });
  console.log('COMPOSED_RIVAL_SNAPSHOT_CPU_RESEARCH '+JSON.stringify(report));
 });
+
+
+/* Whole-planning research: includes the once-per-tick witness/snapshot creation
+ * that frozen-time contest benchmarks omit. No physical-device performance claim. */
+test('composed advancing-time AI planning reports zero/one/two-heal CPU cost',()=>{
+ const report=withSeed(1517800,()=>{
+  const g=bootGame();if(!g.player)g.redeploy();
+  try{
+   const ai=g.__testWindow.__novaMakeRequire('')('game/ai');
+   const bot=g.tanks.find(t=>t?.ai&&!t.isPlayer);
+   assert.ok(bot&&typeof ai.updateAI==='function');
+   Object.assign(bot,{id:99000,cls:'guard',x:1000,y:1000,hp:20,maxHp:100,alive:true,vx:0,vy:0});
+   bot.ai={};g.tanks=[bot,...Array.from({length:13},(_,i)=>({
+    id:99001+i,cls:'guard',x:1050+i*10,y:1010,alive:true,
+    hp:100,maxHp:100,vx:0,vy:0,stats:{speed:0}
+   }))];
+   g.__novaFairVisibleTanks=g.tanks;g.hasLineOfSight=()=>true;
+   g.status='playing';g.bullets=[];
+   const heals=[{id:99090,type:'heal',x:1450,y:1000},
+    {id:99091,type:'heal',x:350,y:1000}];
+   const N=240,rounds=5,arms=[0,1,2],results={0:[],1:[],2:[]};
+   function run(count){
+    g.powerups=heals.slice(0,count);bot.ai={};
+    for(let i=0;i<12;i++){
+     g.time+=.2;bot.x=1000;bot.y=1000;bot.vx=0;bot.vy=0;
+     ai.updateAI(bot,g,.2);
+    }
+    const start=performance.now();
+    for(let i=0;i<N;i++){
+     g.time+=.2;bot.x=1000;bot.y=1000;bot.vx=0;bot.vy=0;
+     for(let j=1;j<g.tanks.length;j++)
+      g.tanks[j].x=1050+(j-1)*10+Math.sin(i*.3+j)*12;
+     ai.updateAI(bot,g,.2);
+    }
+    return (performance.now()-start)/N*1000;
+   }
+   for(let k=0;k<rounds;k++){
+    const order=k%2?[2,1,0]:arms;
+    for(const count of order)results[count].push(run(count));
+   }
+   return {rivals:13,iterationsPerArm:N,rounds,
+    noPickupMedianUs:+median(results[0]).toFixed(3),
+    oneHealMedianUs:+median(results[1]).toFixed(3),
+    twoHealMedianUs:+median(results[2]).toFixed(3),
+    caveat:'CI-runner full AI planning with scripted public positions; not natural-match or Android frame time'};
+  }finally{g.destroy();}
+ });
+ console.log('COMPOSED_RIVAL_WHOLE_PLANNING_CPU_RESEARCH '+JSON.stringify(report));
+});
