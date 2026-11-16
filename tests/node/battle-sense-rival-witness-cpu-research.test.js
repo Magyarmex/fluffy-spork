@@ -79,7 +79,7 @@ test('composed 13-rival pickup contest reports steady-state witness overhead',()
     const t0=performance.now();let checksum=0;
     for(let i=0;i<movingN;i++){
      g.time+=.2;
-     for(const rival of rivals)rival.x+=30;
+     for(const rival of rivals)rival.x+=(i%8<4?30:-30);
      checksum+=h.resourceContest(g,bot,p,450,classes);
     }
     const us=(performance.now()-t0)/movingN*1000;
