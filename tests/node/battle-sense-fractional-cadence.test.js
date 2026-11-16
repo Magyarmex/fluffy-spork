@@ -64,6 +64,7 @@ test('Battle Sense prices a certified exact-goal route without asking movement o
  let waypoints=0,readCalls=0;
  const g={
   hasLineOfSight:()=>false,
+  isTerrainSafe:()=>false,
   novaReadOnlyExactRouteLength(x,y,gx,gy,pad,seed){
    readCalls++;
    assert.equal(pad,24);
@@ -76,7 +77,11 @@ test('Battle Sense prices a certified exact-goal route without asking movement o
  assert.equal(window.__NOVA_BATTLE_SENSE_TEST__.routeDistance(g,tank,heal,100,classes),180);
  assert.equal(readCalls,1);
  assert.equal(waypoints,0,'strategic pricing must not mutate the certified waypoint owner');
+ g.isTerrainSafe=()=>true;
+ assert.equal(window.__NOVA_BATTLE_SENSE_TEST__.routeDistance(g,tank,heal,100,classes),200);
+ assert.equal(waypoints,1,'clear-space scoring preserves the existing route owner behavior');
+ g.isTerrainSafe=()=>false;
  g.novaReadOnlyExactRouteLength=()=>null;
  assert.equal(window.__NOVA_BATTLE_SENSE_TEST__.routeDistance(g,tank,heal,100,classes),200);
- assert.equal(waypoints,1,'a cache miss retains existing initial route-seeding behavior');
+ assert.equal(waypoints,2,'a boundary cache miss retains existing route-seeding behavior');
 });
