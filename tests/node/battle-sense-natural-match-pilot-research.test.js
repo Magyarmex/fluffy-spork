@@ -15,7 +15,7 @@ function arm(seed,hz,classOnly){
     t.id,t.cls,+t.x.toFixed(3),+t.y.toFixed(3),t.hp,t.alive]));
    const arrivals=[],apply=g.applyPowerup;
    g.applyPowerup=function(t,type){
-    arrivals.push({ai:!!t.ai,type,at:+g.time.toFixed(3)});
+    arrivals.push({ai:!!t?.ai,type,at:+g.time.toFixed(3)});
     return apply.apply(this,arguments);
    };
    if(classOnly){
