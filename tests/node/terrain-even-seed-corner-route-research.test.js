@@ -34,6 +34,7 @@ function setup(){
  const g=new m.exports.Game();
  g.__novaTerrain=walls;g.time=15.55;g.hasLineOfSight=clear;
  g.isTerrainSafe=(x,y,pad=0)=>!walls.some(w=>Math.abs(x-w.x)<=w.w/2+pad&&Math.abs(y-w.y)<=w.h/2+pad);
+ g.__researchTerrain=w.__NOVA_TERRAIN_INTELLIGENCE_TEST__;
  return g;
 }
 test('research: physical route exists around the even-seed third-wall corner',()=>{
@@ -55,7 +56,9 @@ test('research: probe near-wall waypoint certification over the actual failed ap
   const wp=g.novaBattlefieldWaypoint(x,y,340,-40,23,700008);
   const len=wp&&g.novaRouteLength(x,y,340,-40,23,700008,wp);
   const flags=g.__novaTerrain.map(w=>({id:w.id,solid:w.solid,destructible:w.destructible??null,hp:w.hp??null}));
-  probes.push({x,y,wp:wp?{x:wp.x,y:wp.y}:null,len:Number.isFinite(len)?+len.toFixed(3):null,flags});
+  const nodes=g.__researchTerrain.obstacleNodes(g,x,y,340,-40,23);
+  const direct=g.__researchTerrain.planVisibilityRoute(g,x,y,340,-40,23,700008,null);
+  probes.push({x,y,wp:wp?{x:wp.x,y:wp.y}:null,len:Number.isFinite(len)?+len.toFixed(3):null,nodes:nodes.length,direct:direct?direct.map(p=>({x:p.x,y:p.y})):null,flags});
  }
  console.log('EVEN_SEED_APPROACH_PROBE '+JSON.stringify(probes));
  assert.equal(probes.length,9);
