@@ -225,7 +225,8 @@ test('certified critical-heal corner owns movement when short collision probe mi
   g.block=null;g.isTerrainSafe=(x,y)=>!certified||(x!==0||y!==0);g.__v1102RouteContext={lineage:'resource',forceGoal:true,target:{x:340,y:-40}};
   if(certified)g.__v1102Routes={'8:6':{gx:340,gy:-40,index:0,points:[{x:0,y:100}]}};
   t.ai.__v172Waypoint={x:0,y:100};t.ai.__v172WaypointUntil=11;
-  if(certified){t.ai.__v172WaypointResourceGoal='340:-40';t.ai.__v172WaypointRouteRef=g.__v1102Routes['8:6'];}
+  t.ai.__v172WaypointResourceGoal='340:-40';
+  t.ai.__v172WaypointRouteRef=certified?g.__v1102Routes['8:6']:null;
   g.moveTank(t,100,0,.1);
   return {x:t.x,y:t.y};
  }
