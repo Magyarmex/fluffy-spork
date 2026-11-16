@@ -137,3 +137,16 @@ test('a low-value shield listed before any heal cannot consume the live route ca
   assert.equal(probes,1,'unwinnable shield is rejected before planning, even when first');
   assert.equal(stats.prunedRoutes,1);
 });
+
+
+test('lone critical heal prices an occluded route without moving the live route cursor',()=>{
+ const {tank,g,classes,choose}=setup();
+ const heal={id:'only-heal',type:'heal',x:340,y:-40};
+ g.powerups=[heal];
+ let scratch=0,live=0;
+ g.novaStrategicRouteCost=(...args)=>{scratch++;assert.equal(args[6],heal.id);return 500;};
+ g.novaBattlefieldWaypoint=()=>{live++;throw Error('strategic scoring must not advance movement cursor');};
+ assert.equal(choose(g,tank,classes),heal);
+ assert.equal(scratch,1);
+ assert.equal(live,0);
+});
