@@ -234,7 +234,7 @@ function cachedWaypoint(g,x,y,gx,gy,pad,seed,oldWaypoint){
   if(c&&(now>c.until||d2(c.gx,c.gy,gx,gy)>(exactHeal?1e-6:goalTol*goalTol))){delete map[key];c=null;}
   if(c&&c.points&&c.index<c.points.length){
     /* A hull exactly on a wall's inclusive clearance boundary must first escape its near corner; otherwise retain the original fast proximity skip. */
-    var boundary=!routeSafe(g,x,y,pad+.1);
+    var boundary=!routeSafe(g,x,y,pad+.03);
     while(c.index<c.points.length&&d2(x,y,c.points[c.index].x,c.points[c.index].y)<Math.pow(20+pad*.65,2)){
       var next=c.points[c.index+1];if(boundary&&next&&!routeVisible(g,x,y,next.x,next.y,pad))break;c.index++;
     }
