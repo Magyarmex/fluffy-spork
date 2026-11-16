@@ -145,9 +145,29 @@ test('composed planning snapshot reports repeated contest CPU savings without a 
     if(k%2){cached.push(measure(true));uncached.push(measure(false));}
     else{uncached.push(measure(false));cached.push(measure(true));}
    }
+   /* Two-heal selection measures actual repeated contender work, but still excludes snapshot creation and natural combat. */
+   g.powerups=[p,{id:'safe',type:'heal',x:350,y:1000}];
+   const CHOICE_N=1000;
+   function choice(cached){
+    if(cached)bot.ai.__v181RivalSpeedSnapshot=snap;
+    else delete bot.ai.__v181RivalSpeedSnapshot;
+    const t0=performance.now();let checksum=0;
+    for(let i=0;i<CHOICE_N;i++)checksum+=(h.chooseResource(g,bot,classes)?.id==='safe'?1:0);
+    assert.ok(Number.isFinite(checksum));return {us:(performance.now()-t0)/CHOICE_N*1000,checksum};
+   }
+   const offChoice=[],onChoice=[];
+   choice(false);choice(true);
+   for(let k=0;k<4;k++){
+    const off=choice(false),on=choice(true);
+    assert.equal(off.checksum,on.checksum,'snapshot cannot change the selected healing pickup');
+    offChoice.push(off.us);onChoice.push(on.us);
+   }
    return {rivals:13,iterationsPerArm:N,uncachedMedianUs:+median(uncached).toFixed(3),
     cachedMedianUs:+median(cached).toFixed(3),
-    ratio:+(median(cached)/Math.max(1e-9,median(uncached))).toFixed(3)};
+    ratio:+(median(cached)/Math.max(1e-9,median(uncached))).toFixed(3),
+    twoHealIterations:CHOICE_N,twoHealUncachedMedianUs:+median(offChoice).toFixed(3),
+    twoHealCachedMedianUs:+median(onChoice).toFixed(3),
+    twoHealRatio:+(median(onChoice)/Math.max(1e-9,median(offChoice))).toFixed(3)};
   }finally{g.destroy();}
  });
  console.log('COMPOSED_RIVAL_SNAPSHOT_CPU_RESEARCH '+JSON.stringify(report));
