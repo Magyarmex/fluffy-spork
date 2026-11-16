@@ -452,7 +452,11 @@ test('planning-tick rival snapshot is ephemeral, identity-bound and reused acros
  const original=snap.speeds[1].speed;
  snap.speeds[1].speed=original*1.5;
  const cached=h.resourceContest(g,self,p,400,classes);
- assert.ok(cached>=first,'same-tick contest should reuse witnessed public speed');
+ assert.ok(cached>first,'same-tick contest should reuse witnessed public speed');
+ /* Fair Engagement viewport extents depend on live g.w/g.h, even if camera and game time stay unchanged. A resize must invalidate the cached visibility certificate. */
+ g.w=900;g.h=700;
+ assert.equal(h.resourceContest(g,self,p,400,classes),first,'same-tick viewport resize must invalidate cached rival visibility');
+ g.w=undefined;g.h=undefined;
  g.time=.2;
  const expired=h.resourceContest(g,self,p,400,classes);
  assert.equal(expired,first,'next-tick contest must not use stale snapshot');
