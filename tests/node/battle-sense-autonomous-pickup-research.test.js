@@ -57,6 +57,9 @@ function arm(hz,direction,policy){
     if(trace.length<80&&(confirmed!==previousConfirmed||mode!==previousMode||resource!==previousResource||frame%Math.max(1,Math.round(hz/2))===0)){
      trace.push({at:+g.time.toFixed(3),confirmed,fast:+(witness?.fast||0).toFixed(2),mode,resource,
       botX:+bot.x.toFixed(1),botY:+bot.y.toFixed(1),rivalX:+rival.x.toFixed(1),
+      safeDist:+Math.hypot(safe.x-bot.x,safe.y-bot.y).toFixed(1),
+      nearDist:+Math.hypot(near.x-bot.x,near.y-bot.y).toFixed(1),
+      nextThink:+(bot.ai.__v181Think||0).toFixed(3),
       powerups:g.powerups.map(p=>p.id)});
     }
     previousConfirmed=confirmed;previousMode=mode;previousResource=resource;
