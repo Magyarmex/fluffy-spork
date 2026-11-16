@@ -88,6 +88,9 @@ test('paired composed autonomous AI pickup steering and equal-distance safe-heal
    for(const policy of ['class','witness'])results.push(arm(hz,direction,policy,safeLayout));
  assert.equal(results.length,16);
  assert.ok(results.every(r=>Number.isFinite(r.botX)&&Number.isFinite(r.botY)));
- console.log('COMPOSED_RIVAL_AUTONOMOUS_PICKUP_RESEARCH '+JSON.stringify(results));
+ // Keep per-arm diagnostics on separate lines; CI log viewers may truncate a
+ // single large JSON line when sixteen arms include event traces.
+ for(const result of results)console.log('COMPOSED_RIVAL_AUTONOMOUS_PICKUP_ARM '+JSON.stringify(result));
+ console.log('COMPOSED_RIVAL_AUTONOMOUS_PICKUP_RESEARCH '+JSON.stringify(results.map(({trace,...summary})=>summary)));
  // Diagnostic only: combat, terrain and actual player input are not modeled.
 });
