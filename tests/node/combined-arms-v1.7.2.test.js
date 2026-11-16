@@ -232,3 +232,19 @@ test('certified critical-heal corner owns movement when short collision probe mi
  assert.ok(Math.abs(certified.x)<1e-8&&certified.y>9.9,'certified corner must dominate');
  assert.ok(uncertified.x>1&&uncertified.y>1,'uncertified fallback retains existing blend');
 });
+
+
+test('certified critical-heal route corner overrides a conflicting local waypoint at the wall',()=>{
+ const {Game}=loadCombinedArms(),g=new Game(),t=tank(8,'guard',{
+  x:81,y:-205,ai:{targetId:-1,__v172Waypoint:{x:195,y:-235},__v172WaypointUntil:11}
+ });
+ g.firstTerrainHit=()=>({solid:{id:91003},hit:{x:100,y:-205,nx:-1,ny:0}});
+ g.isTerrainSafe=(x,y)=>x!==81;
+ g.__v1102RouteContext={lineage:'resource',forceGoal:true,target:{x:340,y:-40}};
+ g.__v1102Routes={'8:6':{gx:340,gy:-40,index:0,points:[{x:65,y:-235},{x:195,y:-235}]}};
+ g.moveTank(t,100,0,.1);
+ assert.ok(t.vx<0&&t.vy<0,
+  'the certified first corner is west/south; a stale eastward local corner must not own steering');
+ assert.equal(t.ai.__v172Waypoint.x,195,
+  'the local waypoint owner is not silently rewritten by a transient certified steering override');
+});
