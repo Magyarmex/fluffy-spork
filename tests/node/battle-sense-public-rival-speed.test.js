@@ -287,11 +287,11 @@ test('one slow witness interval does not erase two sustained fast intervals',()=
 });
 
 test('planning observes visible rivals before any pickup exists',()=>{
- const {h,classes,updateAI}=boot(),self=tank(1,0),rival=tank(2,100);
+ const {h,classes,updateAI}=boot(),self=tank(1,0),rival=tank(2,-100);
  self.ai={};const g={time:0,tanks:[self,rival],powerups:[],bullets:[],
   hasLineOfSight:()=>true,tankSpeed:t=>{if(t===rival)throw Error('private rival speed read');return 124;}};
  for(let i=0;i<=4;i++){
-  g.time=i*.2;rival.x=100+180*g.time;
+  g.time=i*.2;rival.x=-100+180*g.time;
   updateAI(self,g,.2);
  }
  const w=self.ai.__v181RivalSpeedWitness?.['2'];
