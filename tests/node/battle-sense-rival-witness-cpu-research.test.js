@@ -122,7 +122,7 @@ test('composed planning snapshot reports repeated contest CPU savings without a 
    const h=g.__testWindow.__NOVA_BATTLE_SENSE_TEST__;
    Object.assign(bot,{id:99000,cls:'guard',x:1000,y:1000,hp:20,maxHp:100,alive:true});
    bot.ai={};
-   const rivals=Array.from({length:13},(_,i)=>({id:99001+i,cls:'guard',x:1030+i*10,y:1010,alive:true}));
+   const rivals=Array.from({length:13},(_,i)=>({id:99001+i,cls:'guard',x:1030+i*10,y:1010,alive:true,hp:100,maxHp:100,vx:0,vy:0,angle:0,stats:{speed:0}}));
    g.tanks=[bot,...rivals];g.__novaFairVisibleTanks=g.tanks;
    g.hasLineOfSight=()=>true;g.powerups=[];g.time=10;g.status='playing';
    ai.updateAI(bot,g,.2);
