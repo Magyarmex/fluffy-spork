@@ -157,7 +157,7 @@ function readOnlyExactRouteLength(g,x,y,gx,gy,pad,seed){
  var map=g&&g.__v1102Routes,c=map&&map[cacheKey(seed,pad)];
  if(!c||!Array.isArray(c.points)||!Number.isInteger(c.index)||c.index<0||
     c.index>=c.points.length||c.gx!==gx||c.gy!==gy||
-    Number(g.time||0)>c.until||!routeSafe(g,gx,gy,pad))return null;
+    !Number.isFinite(c.until)||Number(g.time||0)>c.until||!routeSafe(g,gx,gy,pad))return null;
  var total=0,px=x,py=y;
  for(var i=c.index;i<c.points.length;i++){
   var p=c.points[i];
