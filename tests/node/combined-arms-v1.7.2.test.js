@@ -283,3 +283,22 @@ test('a changed critical-heal goal invalidates the old local corner before steer
  assert.equal(calls,1,'changed heal goal must request a new certified corner');
  assert.ok(t.vy<0,'tank must steer south toward the new heal instead of its old northward corner');
 });
+
+
+test('critical-heal local detour remains stable for the same goal and yields to combat',()=>{
+ const {Game}=loadCombinedArms(),g=new Game(),t=tank(8,'guard',{x:0,y:0,ai:{}});
+ let calls=0;
+ g.firstTerrainHit=()=>({solid:{id:1},hit:{x:40,y:0,nx:-1,ny:0}});
+ g.novaBattlefieldWaypoint=()=>{calls++;return{x:0,y:100};};
+ g.__v1102RouteContext={lineage:'resource',forceGoal:true,target:{x:200,y:100}};
+ g.moveTank(t,100,0,.016);
+ assert.equal(calls,1);
+ assert.equal(t.ai.__v172WaypointResourceGoal,'200:100');
+ g.moveTank(t,100,0,.016);
+ assert.equal(calls,1,'unchanged goal should not trigger a second route query');
+ g.__v1102RouteContext={lineage:'sniper',target:{x:300,y:0}};
+ g.novaBattlefieldWaypoint=()=>{calls++;return{x:100,y:-100};};
+ g.moveTank(t,100,0,.016);
+ assert.equal(calls,2,'combat context must not inherit an old resource corner');
+ assert.ok(t.vy<0,'combat should follow its new detour rather than the healing corner');
+});
