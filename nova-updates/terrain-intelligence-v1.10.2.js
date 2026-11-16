@@ -352,7 +352,13 @@ wrap('game/engine',function(engine,require){
      * route toward that exact goal, not a new short-horizon point that evicts
      * its certified strategic path. Never override observed combat targets,
      * ordinary farming, missing pickups or anti-stuck escape authority. */
-    if(!obs&&!ctx&&t.ai.__v181Mode==='resource'&&t.ai.__v181BiasW>=1&&
+    /* Experimental bounded continuity: a momentary route-cost miss must not
+     * discard a recently confirmed critical heal route in a quiet battlefield.
+     * Live combat, projectile presence, escape and expired pickups still cancel. */
+    var recentQuietHeal=t.ai.__v181Mode==='none'&&Number.isFinite(t.ai.__v181ResourceAt)&&
+      now>=t.ai.__v181ResourceAt&&now-t.ai.__v181ResourceAt<=.72&&
+      !(this.bullets&&this.bullets.length);
+    if(!obs&&!ctx&&((t.ai.__v181Mode==='resource'&&t.ai.__v181BiasW>=1)||recentQuietHeal)&&
        t.hp/Math.max(1,t.maxHp||1)<.38&&!(t.ai.__v1102Nav&&t.ai.__v1102Nav.escapeUntil>now)){
       var ps=this.powerups||[],resourceId=t.ai.__v181ResourceId;
       for(var pi=0;pi<ps.length;pi++){
