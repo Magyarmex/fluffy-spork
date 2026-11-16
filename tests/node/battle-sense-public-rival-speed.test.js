@@ -286,6 +286,18 @@ test('one slow witness interval does not erase two sustained fast intervals',()=
   'median should preserve two matching fast windows despite one slower interval');
 });
 
+test('decorative War Room AI does not build combat speed witnesses',()=>{
+ const {updateAI}=boot(),self=tank(1,0),rival=tank(2,100);
+ self.ai={};
+ const g={time:0,tanks:[self,rival],powerups:[],bullets:[],
+  __novaDecorativeWorld:true,hasLineOfSight:()=>true,tankSpeed:()=>124};
+ for(let i=0;i<=5;i++){
+  g.time=i*.2;rival.x=100+180*g.time;updateAI(self,g,.2);
+ }
+ assert.equal(self.ai.__v181RivalSpeedWitness,undefined,
+  'decorative lobby battles must not pay for persistent player-match speed inference');
+});
+
 test('planning observes visible rivals before any pickup exists',()=>{
  const {h,classes,updateAI}=boot(),self=tank(1,0),rival=tank(2,-100);
  self.ai={};const g={time:0,tanks:[self,rival],powerups:[],bullets:[],
