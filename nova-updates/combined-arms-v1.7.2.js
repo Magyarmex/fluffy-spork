@@ -187,12 +187,6 @@ wrap('game/engine',function(engine,require){
 
   var oldMove=Game.prototype.moveTank;
   Game.prototype.moveTank=function(t,vx,vy,dt){
-    /* Terrain Intelligence's brief anti-stuck escape is already a deliberate
-     * collision-aware steering owner. Do not route that escape through another
-     * local waypoint, which can immediately steer it back into the same wall. */
-    if(t&&!t.isPlayer&&t.ai&&t.ai.__v181Mode==='resource'&&
-       t.ai.__v1102Nav&&t.ai.__v1102Nav.escapeUntil>(this.time||0))
-      return oldMove.call(this,t,vx,vy,dt);
     if(t&&!t.isPlayer&&t.ai&&this.firstTerrainHit){
       var sp=Math.hypot(vx||0,vy||0);
       if(sp>18){
