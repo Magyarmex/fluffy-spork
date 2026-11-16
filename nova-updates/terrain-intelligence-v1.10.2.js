@@ -233,7 +233,10 @@ function cachedWaypoint(g,x,y,gx,gy,pad,seed,oldWaypoint){
   var ctx=g.__v1102RouteContext,exactHeal=!!(ctx&&ctx.forceGoal&&ctx.lineage==='resource');
   if(c&&(now>c.until||d2(c.gx,c.gy,gx,gy)>(exactHeal?1e-6:goalTol*goalTol))){delete map[key];c=null;}
   if(c&&c.points&&c.index<c.points.length){
-    while(c.index<c.points.length&&d2(x,y,c.points[c.index].x,c.points[c.index].y)<Math.pow(20+pad*.65,2))c.index++;
+    /* Being near a corner does not mean the next leg is clear. Do not skip a necessary wall-escape waypoint until the following waypoint is actually visible at body clearance. */
+    while(c.index<c.points.length&&d2(x,y,c.points[c.index].x,c.points[c.index].y)<Math.pow(20+pad*.65,2)){
+      var next=c.points[c.index+1];if(next&&!routeVisible(g,x,y,next.x,next.y,pad))break;c.index++;
+    }
     if(c.index>=c.points.length){delete map[key];c=null;}
     else{
       if(now>=(c.validateAt||0)){
