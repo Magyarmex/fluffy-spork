@@ -108,6 +108,8 @@ test('composed autonomous witnessed-rival pickup steering at 30/60 Hz',()=>{
  // Explicitly exercise the diagonal command that exposed the latent harness
  // overspeed risk, at both frame rates and without a private speed upgrade.
  const diagonal=[arm(30,1,'west',false,0,1080),arm(60,1,'west',false,0,1080)];
+ assert.ok(diagonal.every(r=>r.maxConfirmed>=3),
+  'diagonal controls must acquire three real visible movement observations');
  assert.ok(diagonal.every(r=>r.maxFast<=124*1.001),
   'diagonal baseline movement must never certify an illegal speed upgrade');
  console.log('COMPOSED_RIVAL_DIAGONAL_NEGATIVE_CONTROLS '+JSON.stringify(diagonal.map(({trace,...summary})=>summary)));
