@@ -134,13 +134,13 @@ const {chromium}=require('playwright');
        routeGx=lower.x;routeGy=lower.y;goalHintOverrides++;
       }
       const traceKey=String(seed)+':'+Math.round(pad/4),
-       beforeRoute=g.__v1102Routes?.[traceKey],beforeIndex=beforeRoute?.index??null;
+       beforeRoute=g.__v1102Routes?.[traceKey],beforeIndex=beforeRoute?.index??null,beforeValidate=beforeRoute?.validateAt??null;
       const wp=selectedWaypoint.call(this,x,y,routeGx,routeGy,pad,seed);
       if(arm==='lower-only-even-seed'&&seed===bot.id&&Math.abs(x-81)<2&&routeCallTrace.length<100){
        const afterRoute=g.__v1102Routes?.[traceKey];
        routeCallTrace.push({t:+(g.time-10).toFixed(3),x:+x.toFixed(2),y:+y.toFixed(2),
         requested:[Number.isFinite(gx)?+gx.toFixed(2):null,Number.isFinite(gy)?+gy.toFixed(2):null],preIndex:beforeIndex,
-        postIndex:afterRoute?.index??null,replaced:!!beforeRoute&&beforeRoute!==afterRoute,
+        postIndex:afterRoute?.index??null,preValidate:beforeValidate,postValidate:afterRoute?.validateAt??null,replaced:!!beforeRoute&&beforeRoute!==afterRoute,
         preGoal:beforeRoute?[beforeRoute.gx,beforeRoute.gy]:null,
         postGoal:afterRoute?[afterRoute.gx,afterRoute.gy]:null,
         waypoint:wp?[+wp.x.toFixed(2),+wp.y.toFixed(2)]:null});
