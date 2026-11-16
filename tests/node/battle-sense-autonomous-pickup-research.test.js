@@ -4,7 +4,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 
-function arm(hz,direction,safeLayout='west'){
+function arm(hz,direction,safeLayout='west',classOnly=false){
  return withSeed(1517800,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   try{
@@ -44,6 +44,8 @@ function arm(hz,direction,safeLayout='west'){
     const fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT__;
     g.__novaFairVisibleTanks=(!fair||fair.inGameplayViewport(g,bot,rival))
      ?[bot,rival]:[bot];
+    /* Class-only control forgets motion history before every planning tick, without changing public class speed, navigation, pickups or combat code. */
+    if(classOnly)delete bot.ai.__v181RivalSpeedWitness;
     ai.updateAI(bot,g,dt); // Actual overlaid AI steering, not a scripted bot vector.
     const witness=bot.ai.__v181RivalSpeedWitness?.[String(rival.id)];
     if(witness){maxConfirmed=Math.max(maxConfirmed,witness.confirmed||0);
@@ -78,7 +80,7 @@ function arm(hz,direction,safeLayout='west'){
     g.updatePowerups(dt);
     if(arrivals.some(a=>a.who==='bot'))break;
    }
-   return {hz,direction,safeLayout,firstChoice,changes,firstNearAt,firstSafeAt,
+   return {hz,direction,safeLayout,classOnly,firstChoice,changes,firstNearAt,firstSafeAt,
     maxConfirmed,maxFast:+maxFast.toFixed(3),
     botPickup:arrivals.find(a=>a.who==='bot')||null,
     rivalPickup:arrivals.find(a=>a.who==='rival')||null,
@@ -92,9 +94,9 @@ function arm(hz,direction,safeLayout='west'){
 test('composed autonomous witnessed-rival pickup steering at 30/60 Hz',()=>{
  const results=[];
  for(const hz of [30,60])for(const direction of [-1,1])
-  for(const safeLayout of ['west','south'])
-   results.push(arm(hz,direction,safeLayout));
- assert.equal(results.length,8);
+  for(const safeLayout of ['west','south'])for(const classOnly of [true,false])
+   results.push(arm(hz,direction,safeLayout,classOnly));
+ assert.equal(results.length,16);
  assert.ok(results.every(r=>Number.isFinite(r.botX)&&Number.isFinite(r.botY)));
  for(const result of results)console.log('COMPOSED_RIVAL_AUTONOMOUS_PICKUP_ARM '+JSON.stringify(result));
  console.log('COMPOSED_RIVAL_AUTONOMOUS_PICKUP_RESEARCH '+JSON.stringify(results.map(({trace,...summary})=>summary)));
