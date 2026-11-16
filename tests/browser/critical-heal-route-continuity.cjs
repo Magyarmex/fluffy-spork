@@ -175,7 +175,7 @@ const {chromium}=require('playwright');
        }
        // Snapshot the actual terrain flags and live route owners before the
        // shadow probe can affect shared counters. This is diagnostic only.
-       const liveTerrain=active.map(w=>({id:w.id,solid:w.solid,destructible:w.destructible??null,hp:w.hp??null}));
+       const liveTerrain={fixtureIsLive:g.__novaTerrain===active,fixture:active.map(w=>({id:w.id,solid:w.solid,destructible:w.destructible??null,hp:w.hp??null})),actual:(g.__novaTerrain||[]).map(w=>({id:w.id,x:w.x,y:w.y,w:w.w,h:w.h,solid:w.solid,destructible:w.destructible??null,hp:w.hp??null}))};
        const liveRoute=Object.entries(g.__v1102Routes||{}).filter(([k])=>k.startsWith(String(bot.id)+':')).map(([key,r])=>({key,goal:r?{x:r.gx,y:r.gy}:null,waypoints:r?.waypoints?.length??null}));
        const navOwner={goal:bot.ai.__v1102Nav?.goal??null,wp:bot.ai.__v172Waypoint?{x:bot.ai.__v172Waypoint.x,y:bot.ai.__v172Waypoint.y}:null};
        decisionTransitions.push({t:+(i*dt).toFixed(3),mode:bot.ai.__v181Mode,resourceId:bot.ai.__v181ResourceId??null,x:+bot.x.toFixed(2),y:+bot.y.toFixed(2),lastResourceAt:bot.ai.__v181ResourceAt??null,bullets:g.bullets.length,liveTerrain,liveRoute,navOwner,shadowRoute});
