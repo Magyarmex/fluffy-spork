@@ -1,0 +1,66 @@
+'use strict';
+// Research-only composed Battle Sense CPU probe. Not a physical Android benchmark,
+// not a stable performance golden, and never a gameplay balancing assertion.
+const test=require('node:test'),assert=require('node:assert/strict');
+const {performance}=require('node:perf_hooks');
+const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+
+function median(a){const s=[...a].sort((x,y)=>x-y);return s[Math.floor(s.length/2)];}
+test('composed 13-rival pickup contest reports steady-state witness overhead',()=>{
+ const report=withSeed(1517800,()=>{
+  const g=bootGame();if(!g.player)g.redeploy();
+  try{
+   const bot=g.tanks.find(t=>t?.ai&&!t.isPlayer);
+   assert.ok(bot,'requires real composed Game AI');
+   const classes=g.__testWindow.__novaMakeRequire('')('game/classes');
+   const h=g.__testWindow.__NOVA_BATTLE_SENSE_TEST__;
+   const originalSpeed=g.tankSpeed;
+   Object.assign(bot,{id:99000,cls:'guard',x:1000,y:1000,hp:20,maxHp:100,alive:true,
+    stats:{...bot.stats,speed:0}});
+   bot.ai={};
+   const rivals=Array.from({length:13},(_,i)=>({id:99001+i,cls:'guard',
+    x:1020+i*12,y:1010,alive:true,stats:{speed:8},vx:0,vy:0}));
+   g.tanks=[bot,...rivals];g.__novaFairVisibleTanks=g.tanks;
+   g.hasLineOfSight=()=>true;
+   const p={id:'heal',type:'heal',x:1450,y:1000};
+   let privateCalls=0;
+   g.tankSpeed=t=>{if(t!==bot){privateCalls++;throw Error('private rival speed read');}
+    return originalSpeed.call(g,t);};
+   // Establish all thirteen legitimate witnessed speed histories before timing.
+   g.time=0;h.resourceContest(g,bot,p,450,classes);
+   for(let i=1;i<=3;i++){
+    g.time=i*.2;for(const rival of rivals)rival.x+=32;
+    h.resourceContest(g,bot,p,450,classes);
+   }
+   const witnesses=bot.ai.__v181RivalSpeedWitness;
+   assert.equal(Object.keys(witnesses||{}).length,13);
+   assert.ok(rivals.every(r=>witnesses[String(r.id)].confirmed===3));
+   const witnessAI=bot.ai;
+   const N=4000;
+   function sample(on){
+    bot.ai=on?witnessAI:null;
+    const t0=performance.now();
+    let sum=0;
+    for(let i=0;i<N;i++)sum+=h.resourceContest(g,bot,p,450,classes);
+    const ms=performance.now()-t0;
+    assert.ok(Number.isFinite(sum)&&Number.isFinite(ms));
+    return ms/N*1000; // microseconds per contest, on this CI runner only
+   }
+   // Warm both paths and alternate order to reduce one-sided JIT/thermal bias.
+   sample(false);sample(true);
+   const off=[],on=[];
+   for(let k=0;k<6;k++){
+    if(k%2){on.push(sample(true));off.push(sample(false));}
+    else{off.push(sample(false));on.push(sample(true));}
+   }
+   bot.ai=witnessAI;
+   assert.equal(privateCalls,0);
+   return {rivals:13,iterationsPerArm:N,rounds:6,
+    classOnlyMedianUs:+median(off).toFixed(4),
+    witnessMedianUs:+median(on).toFixed(4),
+    ratio:+(median(on)/Math.max(1e-9,median(off))).toFixed(3),
+    privateCalls};
+  }finally{g.destroy();}
+ });
+ console.log('COMPOSED_RIVAL_WITNESS_CPU_RESEARCH '+JSON.stringify(report));
+});
