@@ -521,3 +521,24 @@ test('fresh public speed snapshot prunes mathematically impossible rivals before
  assert.equal(farProbes,0,'unreachable-by-time rival must not require a pickup terrain probe');
  assert.ok(nearProbes>0,'a potentially competitive rival still requires terrain verification');
 });
+
+
+test('public maximum-speed bound preserves the exact contested threshold',()=>{
+ const {h,classes}=boot(),self=tank(1,0),rival=tank(2,1158);
+ self.ai={};const p={id:'heal',type:'heal',x:400,y:0};
+ let probes=0;
+ const g={time:1,tanks:[self,rival],w:2400,h:1000,cam:{x:0,y:0,zoom:1},
+  hasLineOfSight:()=>{probes++;return true;},
+  tankSpeed:t=>{if(t!==self)throw Error('private rival speed read');return 124;}};
+ const snap={at:g.time,owner:self,tanks:g.tanks,ownerX:self.x,ownerY:self.y,
+  viewW:g.w,viewH:g.h,camera:g.cam,camX:g.cam.x,camY:g.cam.y,camZoom:g.cam.zoom,
+  rivals:g.tanks,speeds:[null,{target:rival,id:rival.id,cls:rival.cls,x:rival.x,y:rival.y,speed:124*2.3}]};
+ Object.defineProperty(self.ai,'__v181RivalSpeedSnapshot',{configurable:true,value:snap});
+ const barelyContested=h.resourceContest(g,self,p,400,classes);
+ assert.ok(barelyContested>0,'rival just inside maximum-speed arrival boundary must count');
+ assert.ok(probes>0,'borderline contender must retain terrain sight test');
+ rival.x=1160;snap.speeds[1].x=rival.x;probes=0;
+ const impossible=h.resourceContest(g,self,p,400,classes);
+ assert.equal(impossible,0,'rival just beyond bound cannot contribute a penalty');
+ assert.equal(probes,0,'impossible rival must skip terrain sight test');
+});
