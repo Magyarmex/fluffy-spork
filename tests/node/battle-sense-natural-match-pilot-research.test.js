@@ -77,10 +77,10 @@ function contestedArm(seed,hz,classOnly,speedStat){
    if(g.hash?.clear)g.hash.clear();
    Object.assign(observer,{cls:'guard',x:1000,y:1000,vx:0,vy:0,
     hp:20,maxHp:100,alive:true,spawnShieldT:0,shieldT:0,
-    hasteT:0,stats:{...observer.stats,speed:0}});
+    hasteT:0,stampedeT:0,perk:null,gene:null,tier:1,stats:{...observer.stats,speed:0}});
    Object.assign(rival,{cls:'guard',x:1280,y:1120,vx:0,vy:0,
     hp:20,maxHp:100,alive:true,spawnShieldT:0,shieldT:0,
-    hasteT:0,stats:{...rival.stats,speed:speedStat}});
+    hasteT:0,stampedeT:0,perk:null,gene:null,tier:1,stats:{...rival.stats,speed:speedStat}});
    Object.assign(g.player,{x:1000,y:1800,vx:0,vy:0,spawnShieldT:0});
    observer.ai={};rival.ai={};
    g.hasLineOfSight=()=>true;
