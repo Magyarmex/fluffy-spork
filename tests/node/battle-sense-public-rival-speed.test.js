@@ -286,6 +286,34 @@ test('one slow witness interval does not erase two sustained fast intervals',()=
   'median should preserve two matching fast windows despite one slower interval');
 });
 
+test('one sub-baseline visible slowdown retains two fast windows without certifying a lone impulse',()=>{
+ const {h,classes}=boot(),self=tank(1,0),rival=tank(2,100);
+ self.ai={};
+ const g={time:0,tanks:[self,rival],hasLineOfSight:()=>true,
+  tankSpeed:t=>{if(t===rival)throw Error('private rival speed read');return 124;}};
+ const p={id:'heal',type:'heal',x:400,y:0};
+ h.resourceContest(g,self,p,400,classes);
+ for(const [i,mult] of [1.50,.95,1.48].entries()){
+  g.time=(i+1)*.2;rival.x+=124*mult*.2;
+  h.resourceContest(g,self,p,400,classes);
+ }
+ const w=self.ai.__v181RivalSpeedWitness['2'];
+ assert.equal(w.confirmed,3,'a nonzero slower visible interval remains in the rolling window');
+ assert.ok(w.fast>124*1.47&&w.fast<124*1.49,
+  'two sustained fast observations survive one short slowdown');
+ assert.equal(w.samples.length,3,'bounded witness history remains three intervals');
+ self.ai={};rival.x=100;g.time=2;
+ h.resourceContest(g,self,p,400,classes);
+ for(const [i,mult] of [2.2,.95,.95].entries()){
+  g.time=2+(i+1)*.2;rival.x+=124*mult*.2;
+  h.resourceContest(g,self,p,400,classes);
+ }
+ const isolated=self.ai.__v181RivalSpeedWitness['2'];
+ assert.equal(isolated.confirmed,3);
+ assert.ok(isolated.fast<=124*1.001,
+  'one high impulse and two slow intervals cannot certify upgraded speed');
+});
+
 test('witnessed rival running can change an actual two-heal choice at identical visible positions',()=>{
  const {h,classes}=boot(),self=tank(1,0),rival=tank(2,-8);
  self.hp=20;self.ai={};
