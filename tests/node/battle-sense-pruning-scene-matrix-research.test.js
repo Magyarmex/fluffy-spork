@@ -61,6 +61,8 @@ test('composed rival pruning scene matrix reports costs and preserves contest sc
       const control=k%2===1?second:first,cached=k%2===1?first:second;
       assert.ok(Math.abs(control.score-cached.score)<1e-9,
        scene.name+' pickup '+p.id+' must preserve contest score');
+      assert.ok(cached.probes<=control.probes+1e-9,
+       scene.name+' pickup '+p.id+' cache/pruning cannot add terrain LOS probes');
       arms.control.push(control);arms.cached.push(cached);
      }
      out.push({scene:scene.name,pickup:p.id,contacts:contacts.length-1,
