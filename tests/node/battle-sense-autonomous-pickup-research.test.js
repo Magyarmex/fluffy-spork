@@ -4,7 +4,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 
-function arm(hz,direction,policy){
+function arm(hz,direction,policy,safeLayout='west'){
  return withSeed(1517800,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   try{
@@ -25,7 +25,10 @@ function arm(hz,direction,policy){
     perk:null,gene:null,stats:{...rival.stats,speed:8}});
    g.hasLineOfSight=()=>true;g.status='playing';
    const near={id:99001,kind:'powerup',type:'heal',x:1400,y:1120,ttl:20,born:0};
-   const safe={id:99002,kind:'powerup',type:'heal',x:350,y:1000,ttl:20,born:0};
+   // Equal initial 650-unit distance, different angle relative to the near-heal chase.
+   // South stays inside the 760-unit consideration radius longer than west.
+   const safe={id:99002,kind:'powerup',type:'heal',
+    x:safeLayout==='south'?1000:350,y:safeLayout==='south'?350:1000,ttl:20,born:0};
    g.powerups=[near,safe];
    const arrivals=[],originalApply=g.applyPowerup;
    g.applyPowerup=function(t,type){
@@ -70,7 +73,7 @@ function arm(hz,direction,policy){
     g.updatePowerups(dt);
     if(arrivals.some(a=>a.who==='bot'))break;
    }
-   return {hz,direction,policy,firstChoice,changes,firstNearAt,firstSafeAt,
+   return {hz,direction,policy,safeLayout,firstChoice,changes,firstNearAt,firstSafeAt,
     maxConfirmed,maxFast:+maxFast.toFixed(3),
     botPickup:arrivals.find(a=>a.who==='bot')||null,
     rivalPickup:arrivals.find(a=>a.who==='rival')||null,
@@ -78,11 +81,12 @@ function arm(hz,direction,policy){
   }finally{g.destroy();}
  });
 }
-test('paired composed autonomous AI pickup steering research at 30/60 Hz',()=>{
+test('paired composed autonomous AI pickup steering and equal-distance safe-heal geometry at 30/60 Hz',()=>{
  const results=[];
  for(const hz of [30,60])for(const direction of [-1,1])
-  for(const policy of ['class','witness'])results.push(arm(hz,direction,policy));
- assert.equal(results.length,8);
+  for(const safeLayout of ['west','south'])
+   for(const policy of ['class','witness'])results.push(arm(hz,direction,policy,safeLayout));
+ assert.equal(results.length,16);
  assert.ok(results.every(r=>Number.isFinite(r.botX)&&Number.isFinite(r.botY)));
  console.log('COMPOSED_RIVAL_AUTONOMOUS_PICKUP_RESEARCH '+JSON.stringify(results));
  // Diagnostic only: combat, terrain and actual player input are not modeled.
