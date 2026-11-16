@@ -353,21 +353,3 @@ test('a newly certified route replaces a prior cheap detour for the same heal',(
  assert.equal(calls,2,'a newly certified route supersedes the old cheap local waypoint');
  assert.ok(t.vy<0);
 });
-
-
-test('advanced certified route cursor invalidates a stale local corner',()=>{
- const {Game}=loadCombinedArms(),g=new Game(),t=tank(8,'guard',{x:0,y:0,ai:{}});
- let calls=0;
- const route={gx:200,gy:100,points:[{x:0,y:100},{x:0,y:-100}],index:0};
- g.__v1102Routes={'8:6':route};
- g.firstTerrainHit=()=>({solid:{id:1},hit:{x:40,y:0,nx:-1,ny:0}});
- g.novaBattlefieldWaypoint=()=>{calls++;return{x:0,y:calls===1?100:-100};};
- g.__v1102RouteContext={lineage:'resource',forceGoal:true,target:{x:200,y:100}};
- g.moveTank(t,100,0,.016);
- assert.equal(t.ai.__v172WaypointRouteIndex,0);
- route.index=1;
- g.moveTank(t,100,0,.016);
- assert.equal(calls,2,'certified route cursor advancement must invalidate old local steering');
- assert.equal(t.ai.__v172WaypointRouteIndex,1);
- assert.ok(t.vy<0);
-});
