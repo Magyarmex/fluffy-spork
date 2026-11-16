@@ -63,3 +63,19 @@ test('research: probe near-wall waypoint certification over the actual failed ap
  console.log('EVEN_SEED_APPROACH_PROBE '+JSON.stringify(probes));
  assert.equal(probes.length,9);
 });
+
+test('research: physical Guard padding boundary versus route-visibility clearance',()=>{
+ const out=[];
+ for(const pad of [23,24]){
+  for(const x of [80,80.5,80.99,81,81.01,82]){
+   const g=setup(),y=-198.76061291335517;
+   const wp=g.novaBattlefieldWaypoint(x,y,340,-40,pad,700008);
+   const len=wp&&g.novaRouteLength(x,y,340,-40,pad,700008,wp);
+   const mids=g.__researchTerrain.obstacleNodes(g,x,y,340,-40,pad);
+   const graph=g.__researchTerrain.planVisibilityRoute(g,x,y,340,-40,pad,700008,null);
+   out.push({pad,x,firstLeg:clear(x,y,130-30-(pad+11),-35-165-(pad+11),pad-5),nodes:mids.length,graph:graph?graph.length:null,wp:wp?{x:wp.x,y:wp.y}:null,len:Number.isFinite(len)?+len.toFixed(3):null});
+  }
+ }
+ console.log('EVEN_SEED_CLEARANCE_BOUNDARY '+JSON.stringify(out));
+ assert.equal(out.length,12);
+});
