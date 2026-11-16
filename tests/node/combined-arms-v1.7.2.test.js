@@ -268,3 +268,21 @@ test('certified corner authority does not leak to combat, mismatched goals or un
  assert.ok(run('changed',false)>0,'a different resource goal cannot borrow the old route corner');
  assert.ok(run('heal',true)>0,'an unsafe certified corner must not gain steering authority');
 });
+
+
+test('critical-heal certified corner survives small wall-clearance jitter but not open space',()=>{
+ const {Game}=loadCombinedArms();
+ function trial(x){
+  const g=new Game(),t=tank(8,'guard',{
+   x,y:210,ai:{__v172Waypoint:{x:65,y:235},__v172WaypointUntil:11}
+  });
+  g.firstTerrainHit=()=>({solid:{id:1},hit:{x:-30,y:210,nx:-1,ny:0}});
+  g.isTerrainSafe=(px,py,pad)=>!(pad>=21&&px>=-51&&px<=-49);
+  g.__v1102RouteContext={lineage:'resource',forceGoal:true,target:{x:340,y:40}};
+  g.__v1102Routes={'8:6':{gx:340,gy:40,index:0,points:[{x:-65,y:235}]}};
+  g.moveTank(t,100,0,.1);
+  return t.vx;
+ }
+ assert.ok(trial(-50.5)<0,'a 1.5-unit safe-side jitter must not restore the blocked eastward corner');
+ assert.ok(trial(-53)>0,'the special authority must stop outside the bounded wall band');
+});
