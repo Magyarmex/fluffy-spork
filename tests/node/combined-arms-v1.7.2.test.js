@@ -217,3 +217,143 @@ test('AI retains a waypoint when forward terrain still blocks movement',()=>{
  assert.equal(t.ai.__v172Waypoint,wp,
   'do not discard a needed detour merely because the corner is behind the current aim');
 });
+
+test('certified critical-heal corner owns movement when short collision probe misses',()=>{
+ const {Game}=loadCombinedArms();
+ function run(certified){
+  const g=new Game(),t=tank(8,'guard',{ai:{targetId:-1}});
+  g.block=null;g.isTerrainSafe=(x,y)=>!certified||(x!==0||y!==0);g.__v1102RouteContext={lineage:'resource',forceGoal:true,target:{x:340,y:-40}};
+  if(certified)g.__v1102Routes={'8:6':{gx:340,gy:-40,index:0,points:[{x:0,y:100}]}};
+  t.ai.__v172Waypoint={x:0,y:100};t.ai.__v172WaypointUntil=11;
+  t.ai.__v172WaypointResourceGoal='340:-40';
+  t.ai.__v172WaypointRouteRef=certified?g.__v1102Routes['8:6']:null;
+  g.moveTank(t,100,0,.1);
+  return {x:t.x,y:t.y};
+ }
+ const certified=run(true),uncertified=run(false);
+ assert.ok(Math.abs(certified.x)<1e-8&&certified.y>9.9,'certified corner must dominate');
+ assert.ok(uncertified.x>1&&uncertified.y>1,'uncertified fallback retains existing blend');
+});
+
+
+test('certified critical-heal route corner overrides a conflicting local waypoint at the wall',()=>{
+ const {Game}=loadCombinedArms(),g=new Game(),t=tank(8,'guard',{
+  x:81,y:-205,ai:{targetId:-1,__v172Waypoint:{x:195,y:-235},__v172WaypointUntil:11}
+ });
+ g.firstTerrainHit=()=>({solid:{id:91003},hit:{x:100,y:-205,nx:-1,ny:0}});
+ g.isTerrainSafe=(x,y)=>x!==81;
+ g.__v1102RouteContext={lineage:'resource',forceGoal:true,target:{x:340,y:-40}};
+ g.__v1102Routes={'8:6':{gx:340,gy:-40,index:0,points:[{x:65,y:-235},{x:195,y:-235}]}};
+ t.ai.__v172WaypointResourceGoal='340:-40';
+ t.ai.__v172WaypointRouteRef=g.__v1102Routes['8:6'];
+ g.moveTank(t,100,0,.1);
+ assert.ok(t.vx<=0&&t.vy<0,
+  'the certified first corner is west/south; a stale eastward local corner must not own steering');
+ assert.equal(t.ai.__v172Waypoint.x,195,
+  'the local waypoint owner is not silently rewritten by a transient certified steering override');
+});
+
+
+test('certified corner authority does not leak to combat, mismatched goals or unsafe corners',()=>{
+ const {Game}=loadCombinedArms();
+ function run(mode,unsafe){
+  const g=new Game(),t=tank(8,'guard',{
+   x:81,y:-205,ai:{__v172Waypoint:{x:195,y:-235},__v172WaypointUntil:11}
+  });
+  g.firstTerrainHit=()=>({solid:{id:91003},hit:{x:100,y:-205,nx:-1,ny:0}});
+  g.isTerrainSafe=(x,y)=>x!==81&&!(unsafe&&x===65);
+  g.__v1102RouteContext=mode==='combat'?{lineage:'combat',forceGoal:true,target:{x:340,y:-40}}:
+   {lineage:'resource',forceGoal:true,target:{x:mode==='changed'?330:340,y:-40}};
+  g.__v1102Routes={'8:6':{gx:340,gy:-40,index:0,points:[{x:65,y:-235}]}};
+  g.moveTank(t,100,0,.1);
+  return t.vx;
+ }
+ assert.ok(run('combat',false)>0,'combat keeps its local waypoint owner');
+ assert.ok(run('changed',false)>0,'a different resource goal cannot borrow the old route corner');
+ assert.ok(run('heal',true)>0,'an unsafe certified corner must not gain steering authority');
+});
+
+
+test('a changed critical-heal goal invalidates the old local corner before steering',()=>{
+ const {Game}=loadCombinedArms(),g=new Game();
+ const t=tank(8,'guard',{x:0,y:0,ai:{
+  __v172Waypoint:{x:0,y:100},__v172WaypointUntil:11
+ }});
+ let calls=0;
+ g.firstTerrainHit=()=>({solid:{id:1},hit:{x:40,y:0,nx:-1,ny:0}});
+ g.novaBattlefieldWaypoint=()=>{calls++;return{x:100,y:-100};};
+ g.__v1102RouteContext={lineage:'resource',forceGoal:true,target:{x:200,y:-100}};
+ g.moveTank(t,100,0,.1);
+ assert.equal(calls,1,'changed heal goal must request a new certified corner');
+ assert.ok(t.vy<0,'tank must steer south toward the new heal instead of its old northward corner');
+});
+
+
+test('critical-heal local detour remains stable for the same goal and yields to combat',()=>{
+ const {Game}=loadCombinedArms(),g=new Game(),t=tank(8,'guard',{x:0,y:0,ai:{}});
+ let calls=0;
+ g.firstTerrainHit=()=>({solid:{id:1},hit:{x:40,y:0,nx:-1,ny:0}});
+ g.novaBattlefieldWaypoint=()=>{calls++;return{x:0,y:100};};
+ g.__v1102RouteContext={lineage:'resource',forceGoal:true,target:{x:200,y:100}};
+ g.moveTank(t,100,0,.016);
+ assert.equal(calls,1);
+ assert.equal(t.ai.__v172WaypointResourceGoal,'200:100');
+ g.moveTank(t,100,0,.016);
+ assert.equal(calls,1,'unchanged goal should not trigger a second route query');
+ g.__v1102RouteContext={lineage:'sniper',target:{x:300,y:0}};
+ g.novaBattlefieldWaypoint=()=>{calls++;return{x:100,y:-100};};
+ g.moveTank(t,100,0,.016);
+ assert.equal(calls,2,'combat context must not inherit an old resource corner');
+ assert.ok(t.vy<0,'combat should follow its new detour rather than the healing corner');
+});
+
+
+test('switching between two public heals does not reuse the previous detour',()=>{
+ const {Game}=loadCombinedArms(),g=new Game(),t=tank(8,'guard',{x:0,y:0,ai:{}});
+ let calls=0;
+ g.firstTerrainHit=()=>({solid:{id:1},hit:{x:40,y:0,nx:-1,ny:0}});
+ g.novaBattlefieldWaypoint=()=>{calls++;return{x:0,y:100};};
+ g.__v1102RouteContext={lineage:'resource',forceGoal:true,target:{x:200,y:100}};
+ g.moveTank(t,100,0,.016);
+ assert.equal(t.ai.__v172WaypointResourceGoal,'200:100');
+ g.__v1102RouteContext={lineage:'resource',forceGoal:true,target:{x:200,y:-100}};
+ g.novaBattlefieldWaypoint=()=>{calls++;return{x:0,y:-100};};
+ g.moveTank(t,100,0,.016);
+ assert.equal(calls,2,'new heal must get a fresh detour even within the old waypoint lifetime');
+ assert.equal(t.ai.__v172WaypointResourceGoal,'200:-100');
+ assert.ok(t.vy<0,'steering must follow the newly selected healing side');
+});
+
+
+test('same heal replans its local corner when certified route cache is replaced',()=>{
+ const {Game}=loadCombinedArms(),g=new Game(),t=tank(8,'guard',{x:0,y:0,ai:{}});
+ let calls=0;
+ const first={gx:200,gy:100,points:[{x:0,y:100}],index:0};
+ g.__v1102Routes={'8:6':first};
+ g.firstTerrainHit=()=>({solid:{id:1},hit:{x:40,y:0,nx:-1,ny:0}});
+ g.novaBattlefieldWaypoint=()=>{calls++;return{x:0,y:calls===1?100:-100};};
+ g.__v1102RouteContext={lineage:'resource',forceGoal:true,target:{x:200,y:100}};
+ g.moveTank(t,100,0,.016);
+ assert.equal(calls,1);
+ assert.equal(t.ai.__v172WaypointRouteRef,first);
+ g.__v1102Routes['8:6']={gx:200,gy:100,points:[{x:0,y:-100}],index:0};
+ g.moveTank(t,100,0,.016);
+ assert.equal(calls,2,'replaced route must invalidate a retained local corner even for the same heal');
+ assert.ok(t.vy<0,'movement must follow the newly certified corridor');
+});
+
+
+test('a newly certified route replaces a prior cheap detour for the same heal',()=>{
+ const {Game}=loadCombinedArms(),g=new Game(),t=tank(8,'guard',{x:0,y:0,ai:{}});
+ let calls=0;
+ g.firstTerrainHit=()=>({solid:{id:1},hit:{x:40,y:0,nx:-1,ny:0}});
+ g.novaBattlefieldWaypoint=()=>{calls++;return{x:0,y:calls===1?100:-100};};
+ g.__v1102RouteContext={lineage:'resource',forceGoal:true,target:{x:200,y:100}};
+ g.moveTank(t,100,0,.016);
+ assert.equal(calls,1);
+ assert.equal(t.ai.__v172WaypointRouteRef,null);
+ g.__v1102Routes={'8:6':{gx:200,gy:100,points:[{x:0,y:-100}],index:0}};
+ g.moveTank(t,100,0,.016);
+ assert.equal(calls,2,'a newly certified route supersedes the old cheap local waypoint');
+ assert.ok(t.vy<0);
+});

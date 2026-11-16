@@ -192,6 +192,20 @@ wrap('game/engine',function(engine,require){
       if(sp>18){
         var now=this.time||0,pad=classSize(C,t)+8,look=clamp(55+sp*.46,72,170),ux=vx/sp,uy=vy/sp,ax=t.x+ux*look,ay=t.y+uy*look;
         var probe=this.firstTerrainHit(t.x,t.y,ax,ay,Math.max(2,pad-5)),wp=t.ai.__v172Waypoint;
+        /* Local detours cannot outlive a changed authoritative healing goal.
+         * Retain the same corner for the same goal; never inherit it from a
+         * different goal or carry it back into ordinary combat movement. */
+        var resourceCtx=this.__v1102RouteContext,
+            resourceGoal=resourceCtx&&resourceCtx.lineage==='resource'&&resourceCtx.forceGoal&&resourceCtx.target,
+            resourceKey=resourceGoal?resourceGoal.x+':'+resourceGoal.y:null,
+            previousResourceKey=t.ai.__v172WaypointResourceGoal;
+        var routeKey=String(t.id)+':'+Math.round(pad/4),
+            activeResourceRoute=resourceGoal&&this.__v1102Routes&&this.__v1102Routes[routeKey];
+        if(wp&&((resourceKey!==previousResourceKey&&(resourceGoal||previousResourceKey!=null))||
+          (resourceGoal&&previousResourceKey===resourceKey&&(activeResourceRoute||null)!==(t.ai.__v172WaypointRouteRef||null)))){
+          wp=null;t.ai.__v172Waypoint=null;t.ai.__v172WaypointResourceGoal=null;
+          t.ai.__v172WaypointRouteRef=null;
+        }
         if(wp&&now>(t.ai.__v172WaypointUntil||0)){wp=null;t.ai.__v172Waypoint=null;}
         if(wp&&d2(t.x,t.y,wp.x,wp.y)<34*34){wp=null;t.ai.__v172Waypoint=null;}
         /* A previously useful corner can fall behind the hull once the next
@@ -204,10 +218,18 @@ wrap('game/engine',function(engine,require){
           var gx=ax+ux*look,gy=ay+uy*look;
           if(t.ai.__v172LastSeenAt!=null&&now-t.ai.__v172LastSeenAt<2.4){gx=t.ai.__v172LastSeenX;gy=t.ai.__v172LastSeenY;}
           wp=this.novaBattlefieldWaypoint?this.novaBattlefieldWaypoint(t.x,t.y,gx,gy,pad,t.id):chooseWaypoint(this,t.x,t.y,gx,gy,pad,t.id);
-          if(wp){t.ai.__v172Waypoint=wp;t.ai.__v172WaypointUntil=now+.95;}
+          if(wp){t.ai.__v172Waypoint=wp;t.ai.__v172WaypointUntil=now+.95;t.ai.__v172WaypointResourceGoal=resourceKey;t.ai.__v172WaypointRouteRef=resourceGoal&&this.__v1102Routes&&this.__v1102Routes[routeKey]||null;}
         }
         if(wp){
-          var qx=wp.x-t.x,qy=wp.y-t.y,ql=Math.hypot(qx,qy)||1;qx/=ql;qy/=ql;var blend=probe?.82:.58,sx=ux*(1-blend)+qx*blend,sy=uy*(1-blend)+qy*blend,nl=Math.hypot(sx,sy)||1,snx=sx/nl,sny=sy/nl;
+          /* A certified critical-heal detour must steer toward its actual next
+           * route corner, not a stale short-horizon waypoint. Restrict this
+           * override to the already-established near-wall heal authority;
+           * ordinary combat, roaming and anti-stuck escape keep priority. */
+          var ctx=this.__v1102RouteContext,cache=this.__v1102Routes&&this.__v1102Routes[String(t.id)+':'+Math.round(pad/4)],certifiedHeal=!!(ctx&&ctx.lineage==='resource'&&ctx.forceGoal&&cache&&cache.points&&cache.points.length&&cache.gx===ctx.target.x&&cache.gy===ctx.target.y&&this.isTerrainSafe&&!this.isTerrainSafe(t.x,t.y,Math.max(2,pad-5)));
+          var corner=certifiedHeal&&cache.points[cache.index];
+          if(corner&&Number.isFinite(corner.x)&&Number.isFinite(corner.y)&&d2(wp.x,wp.y,corner.x,corner.y)>60*60&&this.isTerrainSafe(corner.x,corner.y,Math.max(2,pad-5))&&(!this.hasLineOfSight||this.hasLineOfSight(t.x,t.y,corner.x,corner.y,Math.max(2,pad-5-.001))))wp=corner;
+          var qx=wp.x-t.x,qy=wp.y-t.y,ql=Math.hypot(qx,qy)||1;qx/=ql;qy/=ql;
+          var blend=certifiedHeal?1:probe?.82:.58,sx=ux*(1-blend)+qx*blend,sy=uy*(1-blend)+qy*blend,nl=Math.hypot(sx,sy)||1,snx=sx/nl,sny=sy/nl;
           vx=snx*sp;vy=sny*sp;t.ai.__v172Routing=true;t.ai.wanderA=Math.atan2(sny,snx);
         }else t.ai.__v172Routing=false;
       }

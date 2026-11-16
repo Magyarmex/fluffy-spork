@@ -55,7 +55,8 @@ function visible(g,ax,ay,bx,by,pad){return !g.hasLineOfSight||g.hasLineOfSight(a
 /* Movement callers pass collision radius plus five units: tank size+8 vs size+3,
  * or drone radius+5 vs radius. Route geometry must use the body radius; perception
  * keeps its smaller independent margin so observation fairness does not change. */
-function routeVisible(g,ax,ay,bx,by,pad){return !g.hasLineOfSight||g.hasLineOfSight(ax,ay,bx,by,Math.max(2,(pad||8)-5));}
+/* An exact tangent at the hull clearance boundary is traversable, not a wall penetration. The LOS rectangle uses inclusive boundaries, so a 0.001-unit tolerance prevents a legal tank parked at x=wallMin-radius from losing every escape edge. This does not permit a measurable reduction in collision clearance. */
+function routeVisible(g,ax,ay,bx,by,pad){return !g.hasLineOfSight||g.hasLineOfSight(ax,ay,bx,by,Math.max(2,(pad||8)-5-.001));}
 function routeSafe(g,x,y,pad){return !g.isTerrainSafe||g.isTerrainSafe(x,y,Math.max(3,(pad||8)*.72,(pad||8)-5));}
 function seedSide(seed){var n=Math.abs(Number(seed)||0);return (n%2)?1:-1;}
 function segDistanceSq(ax,ay,bx,by,px,py){var dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy;if(l2<1e-8)return d2(ax,ay,px,py);var t=((px-ax)*dx+(py-ay)*dy)/l2;t=clamp(t,0,1);return d2(px,py,ax+dx*t,ay+dy*t);}
@@ -149,6 +150,25 @@ function cachedRouteLength(g,x,y,gx,gy,pad,seed,wp){
  }
  return Number.isFinite(total)?total:null;
 }
+/* Strategic pricing may inspect a certified exact-goal movement route without
+ * asking the waypoint owner to advance, replace or invalidate its cursor.
+ * Fail closed if any remaining physical leg is no longer traversable. */
+function readOnlyExactRouteLength(g,x,y,gx,gy,pad,seed){
+ var map=g&&g.__v1102Routes,c=map&&map[cacheKey(seed,pad)];
+ if(!c||!Array.isArray(c.points)||!Number.isInteger(c.index)||c.index<0||
+    c.index>=c.points.length||c.gx!==gx||c.gy!==gy||
+    !Number.isFinite(c.until)||Number(g.time||0)>c.until||!routeSafe(g,gx,gy,pad))return null;
+ var total=0,px=x,py=y;
+ for(var i=c.index;i<c.points.length;i++){
+  var p=c.points[i];
+  if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.y)||
+     !routeSafe(g,p.x,p.y,pad)||!routeVisible(g,px,py,p.x,p.y,pad))return null;
+  total+=dist(px,py,p.x,p.y);px=p.x;py=p.y;
+ }
+ if(!routeVisible(g,px,py,gx,gy,pad))return null;
+ total+=dist(px,py,gx,gy);
+ return Number.isFinite(total)?total:null;
+}
 /* Certify a nearby strategic goal using the existing cached route without
  * weakening novaRouteLength's exact-goal contract or invoking a second search.
  * Each candidate is a physically clear prefix of the old route plus a
@@ -232,7 +252,11 @@ function cachedWaypoint(g,x,y,gx,gy,pad,seed,oldWaypoint){
   var ctx=g.__v1102RouteContext,exactHeal=!!(ctx&&ctx.forceGoal&&ctx.lineage==='resource');
   if(c&&(now>c.until||d2(c.gx,c.gy,gx,gy)>(exactHeal?1e-6:goalTol*goalTol))){delete map[key];c=null;}
   if(c&&c.points&&c.index<c.points.length){
-    while(c.index<c.points.length&&d2(x,y,c.points[c.index].x,c.points[c.index].y)<Math.pow(20+pad*.65,2))c.index++;
+    /* A hull exactly on a wall's inclusive clearance boundary must first escape its near corner; otherwise retain the original fast proximity skip. */
+    var boundary=!routeSafe(g,x,y,pad);
+    while(c.index<c.points.length&&d2(x,y,c.points[c.index].x,c.points[c.index].y)<Math.pow(20+pad*.65,2)){
+      var next=c.points[c.index+1];if(boundary&&next&&!routeVisible(g,x,y,next.x,next.y,pad))break;c.index++;
+    }
     if(c.index>=c.points.length){delete map[key];c=null;}
     else{
       if(now>=(c.validateAt||0)){
@@ -338,6 +362,7 @@ wrap('game/engine',function(engine,require){
     if(ctx&&ctx.forceGoal&&ctx.target){gx=ctx.target.x;gy=ctx.target.y;}
     return cachedWaypoint(this,x,y,gx,gy,pad,seed,oldWaypoint);
   };
+  Game.prototype.novaReadOnlyExactRouteLength=function(x,y,gx,gy,pad,seed){return readOnlyExactRouteLength(this,x,y,gx,gy,pad,seed);};
   Game.prototype.novaRouteLength=function(x,y,gx,gy,pad,seed,wp){return cachedRouteLength(this,x,y,gx,gy,pad,seed,wp);};
   Game.prototype.novaNearbyRouteLength=function(x,y,gx,gy,pad,seed,wp){return cachedNearbyRouteLength(this,x,y,gx,gy,pad,seed,wp);};
    Game.prototype.novaStrategicRouteCost=function(x,y,gx,gy,pad,seed,goalId){return strategicScratchCost(this,x,y,gx,gy,pad,seed,goalId);};
