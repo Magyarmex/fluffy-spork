@@ -137,3 +137,31 @@ test('a low-value shield listed before any heal cannot consume the live route ca
   assert.equal(probes,1,'unwinnable shield is rejected before planning, even when first');
   assert.equal(stats.prunedRoutes,1);
 });
+
+test('a sole critical heal recovers only through bounded independent certified scratch',()=>{
+  for(const cost of [420,null,Infinity]){
+    const {tank,g,classes,choose}=setup();
+    const heal={id:'heal',type:'heal',x:300,y:0};
+    g.powerups=[heal];
+    const live={goal:'unrelated-combat',points:[{x:20,y:40}]};
+    g.liveRoute=live;
+    let liveCalls=0,scratchCalls=0;
+    g.novaBattlefieldWaypoint=()=>{liveCalls++;return{x:0,y:0};};
+    g.novaRouteLength=()=>null;
+    g.novaNearbyRouteLength=()=>null;
+    g.novaStrategicRouteCost=()=>{scratchCalls++;return cost;};
+    assert.equal(choose(g,tank,classes),Number.isFinite(cost)?heal:null);
+    assert.equal(liveCalls,1,'existing live-route attempt remains bounded');
+    assert.equal(scratchCalls,1,'one independent fallback, never an unbounded retry');
+    assert.equal(g.liveRoute,live,'scratch cannot overwrite the unrelated live route');
+  }
+});
+test('single-heal recovery is not an excuse to replan for healthy tanks',()=>{
+  const {tank,g,classes,choose}=setup();
+  tank.hp=80;
+  g.powerups=[{id:'heal',type:'heal',x:300,y:0}];
+  g.novaBattlefieldWaypoint=()=>null;
+  let scratch=0;g.novaStrategicRouteCost=()=>{scratch++;return 200;};
+  assert.equal(choose(g,tank,classes),null);
+  assert.equal(scratch,0);
+});
