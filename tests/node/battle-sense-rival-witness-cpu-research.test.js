@@ -265,3 +265,51 @@ test('composed rival contest bound saves terrain probes without changing pressur
   }finally{g.destroy();}
  });
 });
+
+
+test('composed real-terrain LOS stress reports bounded-contest CPU versus no-prune control',()=>{
+ const report=withSeed(1517800,()=>{
+  const g=bootGame();if(!g.player)g.redeploy();
+  try{
+   const bot=g.tanks.find(t=>t?.ai&&!t.isPlayer);
+   const classes=g.__testWindow.__novaMakeRequire('')('game/classes');
+   const h=g.__testWindow.__NOVA_BATTLE_SENSE_TEST__;
+   assert.ok(bot&&typeof g.hasLineOfSight==='function');
+   Object.assign(bot,{id:99000,cls:'guard',x:1000,y:1000,hp:20,maxHp:100,alive:true,stats:{...bot.stats,speed:0}});
+   bot.ai={};g.time=10;
+   const rivals=Array.from({length:13},(_,i)=>({id:99001+i,cls:'guard',x:650+i*3,y:1000,
+    alive:true,stats:{speed:0},vx:0,vy:0}));
+   g.tanks=[bot,...rivals];g.__novaFairVisibleTanks=g.tanks;
+   const p={id:'heal',type:'heal',x:1300,y:1000};
+   const cam=g.cam;
+   const snap={at:g.time,owner:bot,tanks:g.tanks,ownerX:bot.x,ownerY:bot.y,
+    viewW:g.w,viewH:g.h,camera:cam,camX:cam&&cam.x,camY:cam&&cam.y,
+    camZoom:cam&&cam.zoom,rivals:g.tanks,speeds:g.tanks.map(q=>({
+     target:q,id:q.id,cls:q.cls,x:q.x,y:q.y,speed:124
+    }))};
+   Object.defineProperty(bot.ai,'__v181RivalSpeedSnapshot',{configurable:true,value:snap});
+   const N=800,arms={bounded:[],control:[]};
+   function measure(bounded){
+    /* The control is intentionally an invalid >cap speed snapshot. It takes
+       the same identity-valid path but disables the safe prune; not a legal
+       rival-speed model and never used for a gameplay acceptance claim. */
+    for(let i=1;i<snap.speeds.length;i++)snap.speeds[i].speed=bounded?124:124*2.3+1;
+    let checksum=0;const t0=performance.now();
+    for(let i=0;i<N;i++)checksum+=h.resourceContest(g,bot,p,300,classes);
+    assert.ok(Number.isFinite(checksum));return {us:(performance.now()-t0)/N*1000,checksum};
+   }
+   measure(false);measure(true);
+   for(let k=0;k<6;k++){
+    const first=measure(k%2===0),second=measure(k%2!==0);
+    const bounded=k%2===0?first:second,control=k%2===0?second:first;
+    assert.equal(bounded.checksum,control.checksum,'both far-rival arms must produce identical contest pressure');
+    arms.bounded.push(bounded.us);arms.control.push(control.us);
+   }
+   return {iterationsPerArm:N,rounds:6,rivals:13,
+    boundedMedianUs:+median(arms.bounded).toFixed(3),
+    noPruneControlMedianUs:+median(arms.control).toFixed(3),
+    caveat:'Real composed terrain LOS, artificial far-visible geometry and invalid >cap speed control; not natural match or Android timing'};
+  }finally{g.destroy();}
+ });
+ console.log('COMPOSED_RIVAL_BOUND_CPU_RESEARCH '+JSON.stringify(report));
+});
