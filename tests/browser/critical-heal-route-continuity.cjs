@@ -44,7 +44,7 @@ const {chromium}=require('playwright');
    const segment=(ax,ay,bx,by,w,pad)=>!!hitRect(ax,ay,bx,by,w,pad);
    const originals={los:g.hasLineOfSight,safe:g.isTerrainSafe,hit:g.firstTerrainHit,
     terrain:g.__novaTerrain,shapes:g.shapes,bullets:g.bullets,powerups:g.powerups,waypoint:g.novaBattlefieldWaypoint,
-    hash:g.hash,time:g.time,playerX:g.player.x,playerY:g.player.y};
+    hash:g.hash,time:g.time,move:g.moveTank,playerX:g.player.x,playerY:g.player.y};
    const other=g.tanks.filter(t=>t!==bot).map(t=>({t,alive:t.alive,hp:t.hp}));
    const baseline={...bot},baseAI={...bot.ai};
    const originalRandom=Math.random,logs=[];
@@ -149,7 +149,21 @@ const {chromium}=require('playwright');
      };
      let state=0x6d2b79f5;Math.random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return(state>>>0)/4294967296;};
      const plansBefore=window.__NOVA_TERRAIN_INTELLIGENCE__?.plans||0;
-     const trace=[],aiUpdateCosts=[],dt=1/60,steps=720;
+     const trace=[],aiUpdateCosts=[],dt=1/60,steps=720,motionSamples=[];
+     g.moveTank=function(t,vx,vy,dd){
+      const near=t===bot&&arm==='lower-only-even-seed'&&
+       (Math.abs(t.x+179)<2||Math.abs(t.x+49)<2||Math.abs(t.x-81)<2);
+      const before=near?{t:+g.time.toFixed(3),x:+t.x.toFixed(2),y:+t.y.toFixed(2),requestedX:+vx.toFixed(2),requestedY:+vy.toFixed(2),preVX:+(t.vx||0).toFixed(2),preVY:+(t.vy||0).toFixed(2),mode:t.ai.__v181Mode}:null;
+      const out=originals.move.apply(this,arguments);
+      if(before&&motionSamples.length<90&&Math.round(g.time*60)%12===0){
+       before.postX=+t.x.toFixed(2);before.postY=+t.y.toFixed(2);
+       before.postVX=+(t.vx||0).toFixed(2);before.postVY=+(t.vy||0).toFixed(2);
+       before.corner=t.ai.__v172Waypoint?{x:t.ai.__v172Waypoint.x,y:t.ai.__v172Waypoint.y}:null;
+       before.bump=t.__novaTerrainBump?{x:t.__novaTerrainBump.x,y:t.__novaTerrainBump.y}:null;
+       motionSamples.push(before);
+      }
+      return out;
+     };
      let invalidPositions=0,invalidSegments=0,resourceFrames=0,acquiredAt=null,firstChosen=null,acquiredId=null;
      const decisionTransitions=[];let priorMode=null,priorResource=null,minimumGoalDistance=Infinity;
      for(let i=0;i<steps;i++){
@@ -213,7 +227,7 @@ const {chromium}=require('playwright');
       resourceFrames,decisionTransitions,routeCertSummary,minimumGoalDistance:+minimumGoalDistance.toFixed(3),final:{x:bot.x,y:bot.y,hp:bot.hp},
       routePlans:window.__NOVA_TERRAIN_INTELLIGENCE__?.plans,
       routePlansDelta:(window.__NOVA_TERRAIN_INTELLIGENCE__?.plans||0)-plansBefore,
-      goalHintOverrides,
+      goalHintOverrides,motionSamples,
       trace});
     }
    }finally{
@@ -221,7 +235,7 @@ const {chromium}=require('playwright');
     g.isTerrainSafe=originals.safe;g.firstTerrainHit=originals.hit;
     g.__novaTerrain=originals.terrain;g.shapes=originals.shapes;
     g.bullets=originals.bullets;g.powerups=originals.powerups;
-    g.hash=originals.hash;g.time=originals.time;g.novaBattlefieldWaypoint=originals.waypoint;
+    g.hash=originals.hash;g.time=originals.time;g.moveTank=originals.move;g.novaBattlefieldWaypoint=originals.waypoint;
     g.player.x=originals.playerX;g.player.y=originals.playerY;
     for(const o of other){o.t.alive=o.alive;o.t.hp=o.hp;}
    }
