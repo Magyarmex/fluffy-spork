@@ -30,7 +30,11 @@ function arm(seed,hz,classOnly){
     };
    }
    const result=playPublicPrelude(g,hz,10,g.__testFair);
+   const perf=typeof g.novaPerfSnapshot==='function'?g.novaPerfSnapshot():{};
    return {seed,hz,classOnly,initial,elapsed:result.elapsed,
+    updateMs:+Number(perf.updateMs||0).toFixed(3),
+    updatePeakMs:+Number(perf.updatePeakMs||0).toFixed(3),
+    terrainQueries:Number(perf.terrainQueries||0),
     playerHp:result.hpAfter,playerDeath:result.naturalDeath,
     playerScore:result.scoreEarned,neutralXP:result.neutralXPEarned,
     changedEnemies:result.changedEnemies,changedShapes:result.changedShapes,
