@@ -139,7 +139,7 @@ const {chromium}=require('playwright');
       if(arm==='lower-only-even-seed'&&seed===bot.id&&Math.abs(x-81)<2&&routeCallTrace.length<100){
        const afterRoute=g.__v1102Routes?.[traceKey];
        routeCallTrace.push({t:+(g.time-10).toFixed(3),x:+x.toFixed(2),y:+y.toFixed(2),
-        requested:[+gx.toFixed(2),+gy.toFixed(2)],preIndex:beforeIndex,
+        requested:[Number.isFinite(gx)?+gx.toFixed(2):null,Number.isFinite(gy)?+gy.toFixed(2):null],preIndex:beforeIndex,
         postIndex:afterRoute?.index??null,replaced:!!beforeRoute&&beforeRoute!==afterRoute,
         preGoal:beforeRoute?[beforeRoute.gx,beforeRoute.gy]:null,
         postGoal:afterRoute?[afterRoute.gx,afterRoute.gy]:null,
