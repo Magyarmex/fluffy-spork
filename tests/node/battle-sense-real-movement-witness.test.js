@@ -49,6 +49,37 @@ test('real composed moveTank supplies public rival movement witnesses at 30/60 H
  console.log('COMPOSED_RIVAL_MOTION_WITNESS '+JSON.stringify(reports));
 });
 
+test('composed AI learns visible rival motion before any powerup spawns at 30/60 Hz',()=>{
+ for(const hz of [30,60])withSeed(1517800,()=>{
+  const g=bootGame();if(!g.player)g.redeploy();
+  try{
+   const rival=g.player,bot=g.tanks.find(t=>t!==rival&&t.ai);
+   assert.ok(bot&&bot.ai,'requires live composed AI');
+   const ai=g.__testWindow.__novaMakeRequire('')('game/ai');
+   assert.equal(typeof ai.updateAI,'function');
+   g.tanks=[bot,rival];g.__novaFairVisibleTanks=g.tanks;
+   g.__novaTerrain=[];g.__novaBattlefieldIndex=null;
+   if(g.hash?.clear)g.hash.clear();
+   Object.assign(bot,{cls:'guard',x:0,y:0,alive:true,hp:100,maxHp:100,
+    vx:0,vy:0,spawnShieldT:0,stats:{...bot.stats,speed:0}});
+   bot.ai={};
+   Object.assign(rival,{cls:'guard',x:100,y:0,alive:true,
+    vx:0,vy:0,spawnShieldT:0,hasteT:0,perk:'speed',
+    stats:{...rival.stats,speed:8}});
+   g.powerups=[];g.hasLineOfSight=()=>true;g.status='playing';
+   const dt=1/hz;
+   for(let frame=0;frame<=hz;frame++){
+    g.time=frame*dt;
+    ai.updateAI(bot,g,dt);
+    g.moveTank(rival,180,0,dt);
+   }
+   const w=bot.ai.__v181RivalSpeedWitness?.[String(rival.id)];
+   assert.ok(w?.confirmed>=3,'composed AI must observe movement without any pickup at '+hz+' Hz');
+   assert.ok(w.fast>160,'visible fast movement must survive until pickup spawn');
+  }finally{g.destroy();}
+ });
+});
+
 test('real composed movement impulse cannot masquerade as sustained rival upgrades',()=>{
  for(const hz of [30,60])withSeed(1517800,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
