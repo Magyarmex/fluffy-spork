@@ -202,7 +202,7 @@ wrap('game/engine',function(engine,require){
         var routeKey=String(t.id)+':'+Math.round(pad/4),
             activeResourceRoute=resourceGoal&&this.__v1102Routes&&this.__v1102Routes[routeKey];
         if(wp&&((resourceKey!==previousResourceKey&&(resourceGoal||previousResourceKey!=null))||
-          (resourceGoal&&t.ai.__v172WaypointRouteRef&&activeResourceRoute!==t.ai.__v172WaypointRouteRef))){
+          (resourceGoal&&previousResourceKey===resourceKey&&(activeResourceRoute||null)!==(t.ai.__v172WaypointRouteRef||null)))){
           wp=null;t.ai.__v172Waypoint=null;t.ai.__v172WaypointResourceGoal=null;
           t.ai.__v172WaypointRouteRef=null;
         }
