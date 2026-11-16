@@ -238,3 +238,21 @@ test('route candidate nodes use full physical body clearance, not a discounted s
     for(const node of nodes)assert.equal(original(node.x,node.y,radius),true);
   }
 });
+
+
+test('subpixel wall-boundary jitter does not consume a blocked next corridor',()=>{
+ const T=boot();
+ const wall={id:9,x:140,y:-150,w:80,h:160,solid:true};
+ const g=game([wall]);g.time=10;
+ const route={gx:340,gy:-40,points:[{x:65,y:-235},{x:195,y:-235}],index:0,until:11,validateAt:11};
+ g.__v1102Routes={'8:6':route};
+ const x=80.98,y=-205,pad=24;
+ assert.equal(g.isTerrainSafe(x,y,19),true,'hull is just outside nominal clearance');
+ assert.equal(g.isTerrainSafe(x,y,19.1),false,'0.1-unit clearance band includes the boundary');
+ assert.equal(g.hasLineOfSight(x,y,route.points[1].x,route.points[1].y,19),false,
+  'the next corridor is physically blocked even though the current corner is nearby');
+ assert.ok(Math.hypot(x-route.points[0].x,y-route.points[0].y)<20+pad*.65);
+ const wp=T.cachedWaypoint(g,x,y,340,-40,pad,8,null);
+ assert.ok(wp);
+ assert.equal(route.index,0,'nearby corner must not be skipped before the next corridor opens');
+});
