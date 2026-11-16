@@ -337,3 +337,19 @@ test('same heal replans its local corner when certified route cache is replaced'
  assert.equal(calls,2,'replaced route must invalidate a retained local corner even for the same heal');
  assert.ok(t.vy<0,'movement must follow the newly certified corridor');
 });
+
+
+test('a newly certified route replaces a prior cheap detour for the same heal',()=>{
+ const {Game}=loadCombinedArms(),g=new Game(),t=tank(8,'guard',{x:0,y:0,ai:{}});
+ let calls=0;
+ g.firstTerrainHit=()=>({solid:{id:1},hit:{x:40,y:0,nx:-1,ny:0}});
+ g.novaBattlefieldWaypoint=()=>{calls++;return{x:0,y:calls===1?100:-100};};
+ g.__v1102RouteContext={lineage:'resource',forceGoal:true,target:{x:200,y:100}};
+ g.moveTank(t,100,0,.016);
+ assert.equal(calls,1);
+ assert.equal(t.ai.__v172WaypointRouteRef,null);
+ g.__v1102Routes={'8:6':{gx:200,gy:100,points:[{x:0,y:-100}],index:0}};
+ g.moveTank(t,100,0,.016);
+ assert.equal(calls,2,'a newly certified route supersedes the old cheap local waypoint');
+ assert.ok(t.vy<0);
+});
