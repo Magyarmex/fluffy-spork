@@ -79,3 +79,20 @@ test('research: physical Guard padding boundary versus route-visibility clearanc
  console.log('EVEN_SEED_CLEARANCE_BOUNDARY '+JSON.stringify(out));
  assert.equal(out.length,12);
 });
+
+test('Guard-size route accepts exact tangent without crossing wall interior',()=>{
+ const g=setup(),pad=24,goal=[340,-40],seed=700008,y=-198.76061291335517;
+ const wp=g.novaBattlefieldWaypoint(81,y,...goal,pad,seed);
+ const length=wp&&g.novaRouteLength(81,y,...goal,pad,seed,wp);
+ assert.ok(Number.isFinite(length)&&length>300,'legal tangent should retain a certified detour');
+ const direct=g.__researchTerrain.planVisibilityRoute(g,81,y,...goal,pad,seed,null);
+ assert.ok(direct&&direct.length>=3,'full route must exist, not just a first-corner guess');
+ let from=[81,y];
+ for(const node of direct){
+  assert.ok(clear(...from,node.x,node.y,18.999),'route may touch but must not penetrate expanded obstacle');
+  from=[node.x,node.y];
+ }
+ const inside=setup(),bad=inside.novaBattlefieldWaypoint(82,y,...goal,pad,seed);
+ const badLength=bad&&inside.novaRouteLength(82,y,...goal,pad,seed,bad);
+ assert.ok(!Number.isFinite(badLength),'do not certify a start inside the full clearance envelope');
+});
