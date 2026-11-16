@@ -4,7 +4,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 
-function arm(hz,direction,safeLayout='west',classOnly=false){
+function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8){
  return withSeed(1517800,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   try{
@@ -22,7 +22,7 @@ function arm(hz,direction,safeLayout='west',classOnly=false){
    Object.assign(rival,{cls:'guard',x:direction===1?1120:1280,y:1120,
     vx:0,vy:0,alive:true,hp:20,maxHp:100,
     spawnShieldT:0,shieldT:0,stampedeT:0,hasteT:0,
-    perk:null,gene:null,stats:{...rival.stats,speed:8}});
+    perk:null,gene:null,stats:{...rival.stats,speed:speedStat}});
    g.hasLineOfSight=()=>true;g.status='playing';
    const near={id:99001,kind:'powerup',type:'heal',x:1400,y:1120,ttl:20,born:0};
    // Equal initial 650-unit distance, different angle relative to the near-heal chase.
@@ -80,7 +80,7 @@ function arm(hz,direction,safeLayout='west',classOnly=false){
     g.updatePowerups(dt);
     if(arrivals.some(a=>a.who==='bot'))break;
    }
-   return {hz,direction,safeLayout,classOnly,firstChoice,changes,firstNearAt,firstSafeAt,
+   return {hz,direction,safeLayout,classOnly,speedStat,firstChoice,changes,firstNearAt,firstSafeAt,
     maxConfirmed,maxFast:+maxFast.toFixed(3),
     botPickup:arrivals.find(a=>a.who==='bot')||null,
     rivalPickup:arrivals.find(a=>a.who==='rival')||null,
@@ -94,15 +94,24 @@ function arm(hz,direction,safeLayout='west',classOnly=false){
 test('composed autonomous witnessed-rival pickup steering at 30/60 Hz',()=>{
  const results=[];
  for(const hz of [30,60])for(const direction of [-1,1])
-  for(const safeLayout of ['west','south'])for(const classOnly of [true,false])
-   results.push(arm(hz,direction,safeLayout,classOnly));
- assert.equal(results.length,16);
+  for(const safeLayout of ['west','south'])for(const speedStat of [0,8])
+   for(const classOnly of [true,false])
+    results.push(arm(hz,direction,safeLayout,classOnly,speedStat));
+ assert.equal(results.length,32);
  assert.ok(results.every(r=>Number.isFinite(r.botX)&&Number.isFinite(r.botY)));
  assert.ok(results.filter(r=>r.classOnly).every(r=>r.maxConfirmed===0),
   'class-only controls must not accumulate sustained speed evidence');
  assert.ok(results.filter(r=>!r.classOnly).every(r=>r.maxConfirmed>=3),
   'witnessed controls must actually acquire three public movement samples');
  for(const result of results)console.log('COMPOSED_RIVAL_AUTONOMOUS_PICKUP_ARM '+JSON.stringify(result));
+ const negativeControls=[];
+ for(const r of results.filter(x=>x.speedStat===0&&x.classOnly)){
+  const witnessed=results.find(x=>x.speedStat===0&&!x.classOnly&&x.hz===r.hz&&x.direction===r.direction&&x.safeLayout===r.safeLayout);
+  negativeControls.push({hz:r.hz,direction:r.direction,safeLayout:r.safeLayout,
+   classOnlyPickup:r.botPickup?.time??null,witnessedPickup:witnessed.botPickup?.time??null,
+   classOnlyFirstChoice:r.firstChoice,witnessedFirstChoice:witnessed.firstChoice});
+ }
+ console.log('COMPOSED_RIVAL_BASE_SPEED_NEGATIVE_CONTROLS '+JSON.stringify(negativeControls));
  console.log('COMPOSED_RIVAL_AUTONOMOUS_PICKUP_RESEARCH '+JSON.stringify(results.map(({trace,...summary})=>summary)));
  // This is still scripted rival motion, not a natural combat survival trial.
 });
