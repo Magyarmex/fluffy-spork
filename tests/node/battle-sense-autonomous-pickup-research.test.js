@@ -34,7 +34,7 @@ function arm(hz,direction,policy){
     return originalApply.apply(this,arguments);
    };
    const rivalSpeed=g.tankSpeed(rival),dt=1/hz;
-   let firstChoice=null,changes=0,prevChoice=null;
+   let firstChoice=null,changes=0,prevChoice=null,maxConfirmed=0,maxFast=0,firstSafeAt=null,firstNearAt=null;
    for(let frame=0;frame<Math.round(12*hz);frame++){
     g.time=frame*dt;
     const fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT__;
@@ -42,7 +42,12 @@ function arm(hz,direction,policy){
      ?[bot,rival]:[bot];
     if(policy==='class')delete bot.ai.__v181RivalSpeedWitness;
     ai.updateAI(bot,g,dt); // Actual overlaid AI steering, not a scripted bot vector.
-    const choice=bot.ai.__v181ResourceId??null;
+    const witness=bot.ai.__v181RivalSpeedWitness?.[String(rival.id)];
+    if(witness){maxConfirmed=Math.max(maxConfirmed,witness.confirmed||0);
+     maxFast=Math.max(maxFast,witness.fast||0);}
+    const choice=bot.ai.__v181Mode==='resource'?(bot.ai.__v181ResourceId??null):null;
+    if(choice===99002&&firstSafeAt===null)firstSafeAt=+g.time.toFixed(3);
+    if(choice===99001&&firstNearAt===null)firstNearAt=+g.time.toFixed(3);
     if(firstChoice===null&&choice!==null)firstChoice=choice;
     if(prevChoice!==null&&choice!==prevChoice)changes++;
     prevChoice=choice;
@@ -52,7 +57,8 @@ function arm(hz,direction,policy){
     g.updatePowerups(dt);
     if(arrivals.some(a=>a.who==='bot'))break;
    }
-   return {hz,direction,policy,firstChoice,changes,
+   return {hz,direction,policy,firstChoice,changes,firstNearAt,firstSafeAt,
+    maxConfirmed,maxFast:+maxFast.toFixed(3),
     botPickup:arrivals.find(a=>a.who==='bot')||null,
     rivalPickup:arrivals.find(a=>a.who==='rival')||null,
     botX:+bot.x.toFixed(1),botY:+bot.y.toFixed(1)};
