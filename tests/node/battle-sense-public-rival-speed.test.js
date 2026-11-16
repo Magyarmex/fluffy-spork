@@ -595,3 +595,18 @@ test('contest bound preserves geometric fallback for exotic subunit class speed'
  assert.equal(h.resourceContest(g,self,p,400,classes),.55,
   'subunit rival speed uses existing geometric contest fallback, not time pruning');
 });
+
+
+test('malformed witnessed speed preserves geometric fallback instead of unsafe pruning',()=>{
+ const {h,classes}=boot(),self=tank(1,0),rival=tank(2,700);
+ self.ai={};const p={id:'heal',type:'heal',x:400,y:0};
+ const g={time:1,tanks:[self,rival],w:2000,h:1000,cam:{x:0,y:0,zoom:1},
+  hasLineOfSight:()=>true,tankSpeed:t=>{if(t!==self)throw Error('private rival speed read');return 400;}};
+ Object.defineProperty(self.ai,'__v181RivalSpeedSnapshot',{configurable:true,value:{
+  at:1,owner:self,tanks:g.tanks,ownerX:0,ownerY:0,viewW:g.w,viewH:g.h,
+  camera:g.cam,camX:0,camY:0,camZoom:1,rivals:g.tanks,
+  speeds:[null,{target:rival,id:rival.id,cls:rival.cls,x:rival.x,y:rival.y,speed:NaN}]
+ }});
+ const score=h.resourceContest(g,self,p,400,classes);
+ assert.ok(Math.abs(score-.1)<1e-10,'invalid snapshot speed must retain original geometric lead');
+});
