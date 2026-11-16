@@ -35,6 +35,7 @@ function arm(hz,direction,policy){
    };
    const rivalSpeed=g.tankSpeed(rival),dt=1/hz;
    let firstChoice=null,changes=0,prevChoice=null,maxConfirmed=0,maxFast=0,firstSafeAt=null,firstNearAt=null;
+   const trace=[];let previousConfirmed=0,previousMode=null,previousResource=null;
    for(let frame=0;frame<Math.round(12*hz);frame++){
     g.time=frame*dt;
     const fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT__;
@@ -50,6 +51,15 @@ function arm(hz,direction,policy){
     if(choice===99001&&firstNearAt===null)firstNearAt=+g.time.toFixed(3);
     if(firstChoice===null&&choice!==null)firstChoice=choice;
     if(prevChoice!==null&&choice!==prevChoice)changes++;
+    // Event-driven, bounded diagnostic: distinguish inference from AI choice and steering.
+    // Capture only meaningful transitions plus a low-rate heartbeat, not every frame.
+    const confirmed=witness?.confirmed||0,mode=bot.ai.__v181Mode??null,resource=bot.ai.__v181ResourceId??null;
+    if(trace.length<80&&(confirmed!==previousConfirmed||mode!==previousMode||resource!==previousResource||frame%Math.max(1,Math.round(hz/2))===0)){
+     trace.push({at:+g.time.toFixed(3),confirmed,fast:+(witness?.fast||0).toFixed(2),mode,resource,
+      botX:+bot.x.toFixed(1),botY:+bot.y.toFixed(1),rivalX:+rival.x.toFixed(1),
+      powerups:g.powerups.map(p=>p.id)});
+    }
+    previousConfirmed=confirmed;previousMode=mode;previousResource=resource;
     prevChoice=choice;
     const desiredX=g.time<.7?direction:Math.sign(near.x-rival.x);
     const desiredY=g.time<.7?0:Math.sign(near.y-rival.y);
@@ -61,7 +71,7 @@ function arm(hz,direction,policy){
     maxConfirmed,maxFast:+maxFast.toFixed(3),
     botPickup:arrivals.find(a=>a.who==='bot')||null,
     rivalPickup:arrivals.find(a=>a.who==='rival')||null,
-    botX:+bot.x.toFixed(1),botY:+bot.y.toFixed(1)};
+    botX:+bot.x.toFixed(1),botY:+bot.y.toFixed(1),trace};
   }finally{g.destroy();}
  });
 }
