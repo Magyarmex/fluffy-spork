@@ -44,7 +44,7 @@ const {chromium}=require('playwright');
    const segment=(ax,ay,bx,by,w,pad)=>!!hitRect(ax,ay,bx,by,w,pad);
    const originals={los:g.hasLineOfSight,safe:g.isTerrainSafe,hit:g.firstTerrainHit,
     terrain:g.__novaTerrain,shapes:g.shapes,bullets:g.bullets,powerups:g.powerups,waypoint:g.novaBattlefieldWaypoint,
-    hash:g.hash,time:g.time,move:g.moveTank,playerX:g.player.x,playerY:g.player.y};
+    hash:g.hash,time:g.time,move:g.moveTank,readOnly:g.novaReadOnlyExactRouteLength,playerX:g.player.x,playerY:g.player.y};
    const other=g.tanks.filter(t=>t!==bot).map(t=>({t,alive:t.alive,hp:t.hp}));
    const baseline={...bot},baseAI={...bot.ai};
    const originalRandom=Math.random,logs=[];
@@ -159,6 +159,13 @@ const {chromium}=require('playwright');
       }
       return wp;
      };
+     const readOnlyPricing={calls:0,certificates:0};
+     if(typeof originals.readOnly==='function')g.novaReadOnlyExactRouteLength=function(...args){
+      readOnlyPricing.calls++;
+      const cost=originals.readOnly.apply(this,args);
+      if(Number.isFinite(cost))readOnlyPricing.certificates++;
+      return cost;
+     };
      let state=0x6d2b79f5;Math.random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return(state>>>0)/4294967296;};
      const plansBefore=window.__NOVA_TERRAIN_INTELLIGENCE__?.plans||0;
      const trace=[],aiUpdateCosts=[],dt=1/60,steps=720,motionSamples=[],ownerTransitions=[];let previousOwnerSignature=null;
@@ -257,7 +264,7 @@ const {chromium}=require('playwright');
      logs.push({arm,guardSize:C[bot.cls]?.size??null,routePad:(Number(C[bot.cls]?.size)||15)+8,isolatedCosts,aiUpdateMsP95:+aiUpdateMsP95.toFixed(4),
       aiUpdateMsMean:+aiUpdateMsMean.toFixed(4),selectedResource:firstChosen,acquiredId,
       acquired:g.powerups.length<initialCount,acquiredAt,invalidPositions,invalidSegments,
-      resourceFrames,decisionTransitions,routeCertSummary,minimumGoalDistance:+minimumGoalDistance.toFixed(3),final:{x:bot.x,y:bot.y,hp:bot.hp},
+      resourceFrames,decisionTransitions,routeCertSummary,readOnlyPricing,minimumGoalDistance:+minimumGoalDistance.toFixed(3),final:{x:bot.x,y:bot.y,hp:bot.hp},
       routePlans:window.__NOVA_TERRAIN_INTELLIGENCE__?.plans,
       routePlansDelta:(window.__NOVA_TERRAIN_INTELLIGENCE__?.plans||0)-plansBefore,
       goalHintOverrides,motionSamples,ownerTransitions,routeCallTrace,
@@ -268,7 +275,7 @@ const {chromium}=require('playwright');
     g.isTerrainSafe=originals.safe;g.firstTerrainHit=originals.hit;
     g.__novaTerrain=originals.terrain;g.shapes=originals.shapes;
     g.bullets=originals.bullets;g.powerups=originals.powerups;
-    g.hash=originals.hash;g.time=originals.time;g.moveTank=originals.move;g.novaBattlefieldWaypoint=originals.waypoint;
+    g.hash=originals.hash;g.time=originals.time;g.moveTank=originals.move;g.novaBattlefieldWaypoint=originals.waypoint;g.novaReadOnlyExactRouteLength=originals.readOnly;
     g.player.x=originals.playerX;g.player.y=originals.playerY;
     for(const o of other){o.t.alive=o.alive;o.t.hp=o.hp;}
    }
