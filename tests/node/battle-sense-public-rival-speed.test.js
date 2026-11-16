@@ -501,3 +501,23 @@ test('decorative War Room planning does not allocate rival speed snapshots',()=>
  assert.equal(self.ai.__v181RivalSpeedSnapshot,undefined);
  assert.equal(self.ai.__v181RivalSpeedWitness,undefined);
 });
+
+
+test('fresh public speed snapshot prunes mathematically impossible rivals before terrain probes',()=>{
+ const {h,classes}=boot(),self=tank(1,0),far=tank(2,900),near=tank(3,220);
+ self.ai={};const p={id:'heal',type:'heal',x:300,y:0};
+ const g={time:1,tanks:[self,far,near],w:800,h:600,cam:{x:0,y:0,zoom:1},hasLineOfSight:()=>true,
+  tankSpeed:t=>{if(t!==self)throw Error('private rival speed read');return 124;}};
+ const scoreWithoutSnapshot=h.resourceContest(g,self,p,300,classes);
+ let farProbes=0,nearProbes=0;
+ g.hasLineOfSight=(x,y)=>{if(x===far.x)farProbes++;if(x===near.x)nearProbes++;return true;};
+ const speeds=g.tanks.map(q=>({target:q,id:q.id,cls:q.cls,x:q.x,y:q.y,speed:124}));
+ Object.defineProperty(self.ai,'__v181RivalSpeedSnapshot',{configurable:true,value:{
+  at:g.time,owner:self,tanks:g.tanks,ownerX:self.x,ownerY:self.y,viewW:g.w,viewH:g.h,
+  camera:g.cam,camX:g.cam.x,camY:g.cam.y,camZoom:g.cam.zoom,rivals:g.tanks,speeds
+ }});
+ const scoreWithSnapshot=h.resourceContest(g,self,p,300,classes);
+ assert.equal(scoreWithSnapshot,scoreWithoutSnapshot,'pruning cannot alter contest penalty');
+ assert.equal(farProbes,0,'unreachable-by-time rival must not require a pickup terrain probe');
+ assert.ok(nearProbes>0,'a potentially competitive rival still requires terrain verification');
+});
