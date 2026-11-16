@@ -159,7 +159,16 @@ const {chromium}=require('playwright');
       ai.updateAI(bot,g,dt);
       aiUpdateCosts.push(performance.now()-aiStart);
       if(bot.ai.__v181Mode!==priorMode||bot.ai.__v181ResourceId!==priorResource){
-       decisionTransitions.push({t:+(i*dt).toFixed(3),mode:bot.ai.__v181Mode,resourceId:bot.ai.__v181ResourceId??null,x:+bot.x.toFixed(2),y:+bot.y.toFixed(2),lastResourceAt:bot.ai.__v181ResourceAt??null,bullets:g.bullets.length});
+       let shadowRoute=null;
+       if(priorMode==='resource'&&bot.ai.__v181Mode==='none'&&g.powerups.length){
+        const p=g.powerups[0],shadow=Object.create(g),pad=(Number(C[bot.cls]?.size)||15)+8;
+        shadow.__v1102Routes=Object.create(null);shadow.__v1102RouteContext=null;
+        shadow.__v1102StrategicRoutes=Object.create(null);shadow.__v1102StrategicBudget=null;
+        const swp=shadow.novaBattlefieldWaypoint(bot.x,bot.y,p.x,p.y,pad,bot.id);
+        const slen=swp&&shadow.novaRouteLength(bot.x,bot.y,p.x,p.y,pad,bot.id,swp);
+        shadowRoute={wp:swp?{x:swp.x,y:swp.y}:null,len:Number.isFinite(slen)?slen:null};
+       }
+       decisionTransitions.push({t:+(i*dt).toFixed(3),mode:bot.ai.__v181Mode,resourceId:bot.ai.__v181ResourceId??null,x:+bot.x.toFixed(2),y:+bot.y.toFixed(2),lastResourceAt:bot.ai.__v181ResourceAt??null,bullets:g.bullets.length,shadowRoute});
        priorMode=bot.ai.__v181Mode;priorResource=bot.ai.__v181ResourceId;
       }
       minimumGoalDistance=Math.min(minimumGoalDistance,...g.powerups.map(p=>Math.hypot(p.x-bot.x,p.y-bot.y)));
