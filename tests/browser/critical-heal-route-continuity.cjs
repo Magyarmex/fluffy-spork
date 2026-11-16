@@ -174,7 +174,7 @@ const {chromium}=require('playwright');
       aiUpdateCosts.push(performance.now()-aiStart);
       // Passive ownership witness: observe only transitions after the real
       // composed AI update; never invoke the route planner for diagnostics.
-      if(arm==='three-walls'||arm==='lower-only-even-seed'){
+      if(arm!=='direct'){
        const pad=(Number(C[bot.cls]?.size)||15)+8;
        const key=String(bot.id)+':'+Math.round(pad/4);
        const route=g.__v1102Routes?.[key],nav=bot.ai.__v1102Nav||{};
