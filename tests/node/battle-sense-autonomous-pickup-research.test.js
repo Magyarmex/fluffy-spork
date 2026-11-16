@@ -109,6 +109,8 @@ test('composed autonomous witnessed-rival pickup steering at 30/60 Hz',()=>{
   'class-only controls must not accumulate sustained speed evidence');
  assert.ok(results.filter(r=>!r.classOnly).every(r=>r.maxConfirmed>=3),
   'witnessed controls must actually acquire three public movement samples');
+ assert.ok(results.filter(r=>!r.classOnly&&r.speedStat===0).every(r=>r.maxFast<=124*1.001),
+  'baseline-speed negative controls must not fabricate a witnessed upgrade');
  for(const result of results)console.log('COMPOSED_RIVAL_AUTONOMOUS_PICKUP_ARM '+JSON.stringify(result));
  const negativeControls=[];
  for(const r of results.filter(x=>x.speedStat===0&&x.classOnly)){
