@@ -62,7 +62,10 @@ test('natural composed match pilot compares class-only and witnessed-speed AI',(
 // Opportunity-conditioned pilot: the unconditioned 10s world produced zero
 // pickups in all four paired arms. Keep actual Game.update, AI movement,
 // projectile combat, neutral ecology and powerup arbitration; seed only the
-// initial open-field geometry and two legitimate heal pickups. No scripted
+// initial open-field geometry and two legitimate heal pickups.
+// The rival is ~311 units from the near heal: public-class scoring can
+// prefer that heal, whereas sustained observed speed can favor the safe heal.
+// A distant player reduces unrelated player-specific aggro in this paired test. No scripted
 // winner or manual tank steering. This is still NOT natural-match prevalence.
 function contestedArm(seed,hz,classOnly,speedStat){
  return withSeed(seed,()=>{
@@ -78,10 +81,10 @@ function contestedArm(seed,hz,classOnly,speedStat){
    Object.assign(observer,{cls:'guard',x:1000,y:1000,vx:0,vy:0,
     hp:20,maxHp:100,alive:true,spawnShieldT:0,shieldT:0,
     hasteT:0,stampedeT:0,perk:null,gene:null,tier:1,stats:{...observer.stats,speed:0}});
-   Object.assign(rival,{cls:'guard',x:1280,y:1120,vx:0,vy:0,
+   Object.assign(rival,{cls:'guard',x:1180,y:1340,vx:0,vy:0,
     hp:20,maxHp:100,alive:true,spawnShieldT:0,shieldT:0,
     hasteT:0,stampedeT:0,perk:null,gene:null,tier:1,stats:{...rival.stats,speed:speedStat}});
-   Object.assign(g.player,{x:1000,y:1800,vx:0,vy:0,spawnShieldT:0});
+   Object.assign(g.player,{x:1900,y:1900,vx:0,vy:0,spawnShieldT:0});
    // Preserve the canonical autonomous AI's movement, aim and cadence
    // fields. Replacing ai with {} leaves wanderA undefined, feeds NaN to
    // moveTank, and crashes Living Front's sector accounting on the next tick.
@@ -112,6 +115,7 @@ function contestedArm(seed,hz,classOnly,speedStat){
     return update.call(this,dt);
    };
    const start=g.time;
+   let maxConfirmed=0,maxFast=0,firstChoice=null,firstSafeAt=null;
    for(let i=0;i<Math.round(8*hz)&&g.status==='playing'&&g.player.alive;i++){
     // The ecology's sector grid requires finite entity coordinates. Report
     // the first invalid entity rather than obscuring a fixture failure as an
@@ -123,9 +127,16 @@ function contestedArm(seed,hz,classOnly,speedStat){
         id:entity.id,cls:entity.cls,type:entity.type,x:entity.x,y:entity.y,
         vx:entity.vx,vy:entity.vy,ai:entity.ai&&Object.keys(entity.ai).slice(0,15)}));
     g.update(1/hz);
+    const witness=observer.ai.__v181RivalSpeedWitness?.[String(rival.id)];
+    maxConfirmed=Math.max(maxConfirmed,witness?.confirmed||0);
+    maxFast=Math.max(maxFast,witness?.fast||0);
+    const choice=observer.ai.__v181Mode==='resource'?observer.ai.__v181ResourceId:null;
+    if(firstChoice===null&&choice!=null)firstChoice=choice;
+    if(firstSafeAt===null&&choice===99092)firstSafeAt=+(g.time-start).toFixed(3);
    }
    const perf=typeof g.novaPerfSnapshot==='function'?g.novaPerfSnapshot():{};
-   return {seed,hz,classOnly,speedStat,initial,
+   return {seed,hz,classOnly,speedStat,initial,maxConfirmed,
+    maxFast:+maxFast.toFixed(3),firstChoice,firstSafeAt,
     elapsed:+(g.time-start).toFixed(3),arrivals,
     observerHp:+observer.hp.toFixed(2),rivalHp:+rival.hp.toFixed(2),
     observerX:+observer.x.toFixed(2),observerY:+observer.y.toFixed(2),
