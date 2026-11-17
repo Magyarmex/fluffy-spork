@@ -67,7 +67,7 @@ test('natural composed match pilot compares class-only and witnessed-speed AI',(
 // prefer that heal, whereas sustained observed speed can favor the safe heal.
 // A distant player reduces unrelated player-specific aggro in this paired test. No scripted
 // winner or manual tank steering. This is still NOT natural-match prevalence.
-function contestedArm(seed,hz,classOnly,speedStat){
+function contestedArm(seed,hz,classOnly,speedStat,safeDistance=650){
  return withSeed(seed,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   try{
@@ -109,10 +109,13 @@ function contestedArm(seed,hz,classOnly,speedStat){
    observer.ai.targetId=-1;rival.ai.targetId=-1;
    g.hasLineOfSight=()=>true;
    g.status='playing';
+   const safeX=1000-safeDistance;
    g.powerups=[
     {id:99091,kind:'powerup',type:'heal',x:1400,y:1120,ttl:20,born:g.time},
-    {id:99092,kind:'powerup',type:'heal',x:350,y:1000,ttl:20,born:g.time}
+    {id:99092,kind:'powerup',type:'heal',x:safeX,y:1000,ttl:20,born:g.time}
    ];
+   assert.ok(Math.abs(Math.hypot(safeX-observer.x,1000-observer.y)-safeDistance)<1e-9,
+    'horizon research must preserve exact spawn-time straight-line distance');
    const initial=JSON.stringify(g.tanks.map(t=>[t.id,t.cls,t.x,t.y,t.hp,t.stats.speed]));
    const arrivals=[],apply=g.applyPowerup;
    g.applyPowerup=function(t,type){
@@ -143,7 +146,7 @@ function contestedArm(seed,hz,classOnly,speedStat){
         vx:entity.vx,vy:entity.vy,ai:entity.ai&&Object.keys(entity.ai).slice(0,15)}));
     // Pre-update position/HP are closer to the AI planning inputs than
     // the post-update sample, which includes movement, regen and arbitration.
-    const preUpdateSafeDist=Math.hypot(350-observer.x,1000-observer.y);
+    const preUpdateSafeDist=Math.hypot(safeX-observer.x,1000-observer.y);
     const preUpdateHp=observer.hp,preUpdateMaxHp=observer.maxHp;
     g.update(1/hz);
     minObserverHp=Math.min(minObserverHp,observer.hp);
@@ -163,12 +166,12 @@ function contestedArm(seed,hz,classOnly,speedStat){
     // that could mutate route caches or change the autonomous policy.
     const think=Number(observer.ai.__v181Think);
     const planTick=Number.isFinite(think)&&think>previousThink+1/hz*.5;
-    const safeEligible=Math.hypot(350-observer.x,1000-observer.y)<=760;
+    const safeEligible=Math.hypot(safeX-observer.x,1000-observer.y)<=760;
     if(planTrace.length<48&&(i===0||choice!==previousChoice||maxConfirmed!==previousConfirmed||safeEligible!==previousSafeEligible||planTick&&g.time-start<=2.2)){
      planTrace.push({at:+(g.time-start).toFixed(3),choice,
       confirmed:witness?.confirmed||0,fast:+(witness?.fast||0).toFixed(2),
       nearDist:+Math.hypot(1400-observer.x,1120-observer.y).toFixed(2),
-      safeDist:+Math.hypot(350-observer.x,1000-observer.y).toFixed(2),
+      safeDist:+Math.hypot(safeX-observer.x,1000-observer.y).toFixed(2),
       // This open-field fixture has no occlusion. Optimistic heal utility
       // excludes route, projectile and rival-contest penalties, so it is an
       // upper bound, not a second call into the stateful resource planner.
@@ -178,14 +181,14 @@ function contestedArm(seed,hz,classOnly,speedStat){
       preUpdateSafeOptimisticScore:+(2.5*(1-Math.max(0,Math.min(1,
        preUpdateHp/Math.max(1,preUpdateMaxHp))))-preUpdateSafeDist/900).toFixed(3),
       safeOptimisticScore:+(2.5*(1-Math.max(0,Math.min(1,observer.hp/Math.max(1,observer.maxHp))))-
-       Math.hypot(350-observer.x,1000-observer.y)/900).toFixed(3),
+       Math.hypot(safeX-observer.x,1000-observer.y)/900).toFixed(3),
       hp:+observer.hp.toFixed(2),mode:observer.ai.__v181Mode||null,
       planTick});
     }
     previousChoice=choice;previousConfirmed=maxConfirmed;previousThink=think;previousSafeEligible=safeEligible;
    }
    const perf=typeof g.novaPerfSnapshot==='function'?g.novaPerfSnapshot():{};
-   return {seed,hz,classOnly,speedStat,initial,maxConfirmed,
+   return {seed,hz,classOnly,speedStat,safeDistance,initial,maxConfirmed,
     maxFast:+maxFast.toFixed(3),firstChoice,firstSafeAt,planTrace,
     elapsed:+(g.time-start).toFixed(3),arrivals,
     observerHp:+observer.hp.toFixed(2),rivalHp:+rival.hp.toFixed(2),
@@ -213,4 +216,33 @@ test('opportunity-conditioned autonomous composed heal pilot reports real pickup
  }
  console.log('COMPOSED_RIVAL_AUTONOMOUS_CONTESTED_HEAL_PILOT '+JSON.stringify(results));
  assert.equal(results.length,4);
+});
+
+// Controlled boundary probe: vary only the safe heal's initial distance.
+// These are opportunity-conditioned full Game.update arms, not an assertion
+// that extending the horizon is good. The actual AI and Terrain owners retain
+// their canonical 760-unit limits and their normal bounded reaction timing.
+test('full-game critical-heal horizon boundary research at 759/761/850 units',()=>{
+ const rows=[];
+ for(const hz of [30,60])for(const safeDistance of [759,761,850]){
+  const baseline=contestedArm(1517800,hz,true,8,safeDistance);
+  const witnessed=contestedArm(1517800,hz,false,8,safeDistance);
+  assert.equal(baseline.initial,witnessed.initial,
+   'paired horizon arms must share identical initial tank geometry');
+  for(const arm of [baseline,witnessed]){
+   assert.equal(arm.safeDistance,safeDistance);
+   assert.ok(Number.isFinite(arm.observerX)&&Number.isFinite(arm.observerY));
+   assert.ok(arm.firstObserverHealAt===null||arm.firstObserverHealAt>=0);
+   assert.ok(arm.observerDeathAt===null||arm.observerDeathAt>=0);
+  }
+  rows.push({hz,safeDistance,classOnly:{firstChoice:baseline.firstChoice,
+   firstSafeAt:baseline.firstSafeAt,firstObserverHealAt:baseline.firstObserverHealAt,
+   observerDeathAt:baseline.observerDeathAt,observerHp:baseline.observerHp},
+   witnessed:{firstChoice:witnessed.firstChoice,firstSafeAt:witnessed.firstSafeAt,
+   firstObserverHealAt:witnessed.firstObserverHealAt,observerDeathAt:witnessed.observerDeathAt,
+   observerHp:witnessed.observerHp,maxConfirmed:witnessed.maxConfirmed,
+   maxFast:witnessed.maxFast}});
+ }
+ console.log('COMPOSED_RIVAL_CRITICAL_HEAL_HORIZON_BOUNDARY '+JSON.stringify(rows));
+ assert.equal(rows.length,6);
 });
