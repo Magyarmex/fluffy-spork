@@ -34,6 +34,37 @@ test('probe rolls back if improvement is too small and waits 30 seconds before r
  drive(p,7500,15000,slow);assert.equal(g.dpr,1.5);
  drive(p,38000,42000,slow);assert.equal(g.dpr,1,'a later fresh sustained problem can be probed');
 });
+test('research probe accepts fewer slow gaps even when P95 is unchanged',()=>{
+ const baseline={frameSamples:120,fps:40,frameP95Ms:33.34,frameOver25Pct:50,
+  updateP95Ms:7,renderP95Ms:8,simulationPacePct:95};
+ const improved={...baseline,fps:48,frameOver25Pct:25};
+ const g=game(),p=createAdaptiveDprPilot(g);
+ drive(p,0,1000,baseline);
+ assert.equal(p.state.phase,'probing');
+ drive(p,1500,7000,improved);
+ assert.equal(p.state.phase,'low','a real reduction in slow-frame share should count');
+ assert.equal(g.dpr,1);
+ p.stop();assert.equal(g.dpr,1.5);
+});
+test('distribution-only acceptance fails closed for weak, absent or pace-degrading evidence',()=>{
+ const baseline={frameSamples:120,fps:40,frameP95Ms:33.34,frameOver25Pct:50,
+  updateP95Ms:7,renderP95Ms:8,simulationPacePct:95};
+ const arms=[
+  {...baseline,fps:48,frameOver25Pct:42},
+  {...baseline,fps:43,frameOver25Pct:25},
+  {...baseline,fps:48,frameOver25Pct:25,simulationPacePct:90},
+  {...baseline,fps:48,frameOver25Pct:undefined},
+  {...baseline,fps:48,frameOver25Pct:-1},
+  {...baseline,fps:48,frameOver25Pct:101},
+ ];
+ for(const arm of arms){
+  const g=game(),p=createAdaptiveDprPilot(g);
+  drive(p,0,1000,baseline);drive(p,1500,7000,arm);
+  assert.equal(p.state.phase,'baseline',JSON.stringify(arm));
+  assert.equal(g.dpr,1.5);
+  p.stop();
+ }
+});
 test('accepted low DPR restores only after sustained spare capacity and cannot oscillate',()=>{
  const g=game(),p=createAdaptiveDprPilot(g);accept(p);
  drive(p,7500,16000,fast);assert.equal(g.dpr,1,'not enough time since reduction');

@@ -108,10 +108,18 @@ function createAdaptiveDprPilot(game, options={}) {
       if(now-trialStart<Math.max(6000,cleanWindowMs)||p.frameSamples<110)
         return result('probing');
       const gain=p.fps-baseline.fps,frameGain=baseline.frameP95Ms-p.frameP95Ms;
+      // A percentile can remain identical when the share of 30Hz-like gaps
+      // falls substantially. Accept that alternative only with BOTH windows'
+      // real 120-frame distribution telemetry, never with inferred fractions.
+      const validShare=v=>Number.isFinite(v)&&v>=0&&v<=100;
+      const slowShareGain=validShare(baseline.frameOver25Pct)&&
+        validShare(p.frameOver25Pct)?
+        baseline.frameOver25Pct-p.frameOver25Pct:-Infinity;
       // A faster renderer is not a win if the world advances less per wall second.
       // Require explicit simulation-pace evidence, not just FPS and update cost.
       const pacePreserved=p.simulationPacePct>=baseline.simulationPacePct-2;
-      if(gain>=5&&frameGain>=3&&p.updateP95Ms<=baseline.updateP95Ms+5&&pacePreserved){
+      if(gain>=5&&(frameGain>=3||slowShareGain>=15)&&
+         p.updateP95Ms<=baseline.updateP95Ms+5&&pacePreserved){
         phase='low';baseline=null;trialStart=null;resetStreaks();
         return result('probe-accepted');
       }
@@ -126,7 +134,7 @@ function createAdaptiveDprPilot(game, options={}) {
       if(slowSince===null)slowSince=now;
       if(now-slowSince>=1000&&now-lastTransition>=8000){
         baseline={fps:p.fps,frameP95Ms:p.frameP95Ms,updateP95Ms:p.updateP95Ms,
-          simulationPacePct:p.simulationPacePct};
+          frameOver25Pct:p.frameOver25Pct,simulationPacePct:p.simulationPacePct};
         trialStart=now;phase='probing';apply(floor,now);
         return result('probe-started',true);
       }
