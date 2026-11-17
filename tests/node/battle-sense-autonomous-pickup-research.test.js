@@ -65,7 +65,8 @@ function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8,rivalY=1
     /* Class-only control forgets motion history before every planning tick, without changing public class speed, navigation, pickups or combat code. */
     ai.updateAI(bot,g,dt); // Actual overlaid AI steering, not a scripted bot vector.
     const witness=bot.ai.__v181RivalSpeedWitness?.[String(rival.id)];
-    if(witness){maxConfirmed=Math.max(maxConfirmed,witness.confirmed||0);
+    // Pre-spawn observation is shared setup, not class-only policy evidence.
+    if(witness&&!classOnly){maxConfirmed=Math.max(maxConfirmed,witness.confirmed||0);
      maxFast=Math.max(maxFast,witness.fast||0);}
     const choice=bot.ai.__v181Mode==='resource'?(bot.ai.__v181ResourceId??null):null;
     if(choice===99002&&firstSafeAt===null)firstSafeAt=+g.time.toFixed(3);
