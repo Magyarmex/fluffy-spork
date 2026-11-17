@@ -52,3 +52,12 @@ test('birth-witnessed projectile remains threatening when owner relation is unkn
  g.bullets=[];g.tryFire(ally);
  assert.equal(helper.saferSide(g,observer,1,0),-1);
 });
+
+test('neutral or non-hostile is not affirmative proof of alliance',()=>{
+ const {g,observer,ally,helper}=scene();
+ delete observer.teamId;delete ally.teamId;
+ delete g.areAllies;g.areHostile=()=>false;
+ g.tryFire(ally);
+ assert.equal(helper.saferSide(g,observer,1,0),-1,
+  'neutral classification must not suppress potentially harmful fire');
+});
