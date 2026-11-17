@@ -68,3 +68,18 @@ test('allies, covered rivals and unknown classes remain conservative',()=>{
  rival.privateSpeed=900;
  assert.equal(h.resourceContest(g,self,pickup,300,classes),first);
 });
+
+test('hidden rival speed cannot flip the actual two-heal resource decision',()=>{
+ const {g,h,self,rival}=scene();
+ self.hp=40;
+ const contested={id:11,type:'heal',x:300,y:0};
+ const safer={id:12,type:'heal',x:0,y:600};
+ g.powerups=[contested,safer];
+ rival.privateSpeed=100;
+ const slow=h.chooseResource(g,self,{CLASSES:{scout:{size:15,moveMult:1}}});
+ rival.privateSpeed=1000;
+ const fast=h.chooseResource(g,self,{CLASSES:{scout:{size:15,moveMult:1}}});
+ assert.ok(slow&&fast,'both evaluations should find a worthwhile heal');
+ assert.equal(fast.id,slow.id,'a hidden speed upgrade cannot change the selected pickup');
+ assert.equal(slow.id,11,'public class baseline still permits the tactically valuable closer heal');
+});
