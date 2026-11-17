@@ -96,7 +96,7 @@ test('frame-gap distribution distinguishes 25% and 50% slow frames despite ident
   const a=menu.indexOf('function snapshot()'),b=menu.indexOf('function fillDebug()',a);
   const win={__NOVA_PERF_LAST__:p,innerWidth:320,innerHeight:700,devicePixelRatio:2};
   const nav={onLine:true,maxTouchPoints:2,userAgent:'test'};
-  vm.runInNewContext(menu.slice(a,b)+'\\nwindow.__snap=snapshot;',{
+  vm.runInNewContext(menu.slice(a,b)+'\nwindow.__snap=snapshot;',{
    window:win,navigator:nav,VERSION:'1.7.8',CODENAME:'Signal Flow',updaterState:()=> 'CURRENT'
   });
   const copied=win.__snap();
