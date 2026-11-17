@@ -51,7 +51,7 @@ function run(seed,hz,mode){
  });
 }
 test('ordinary projectile glow suppression is physically and RNG transparent in composed Game',()=>{
- for(const hz of [30,60])for(const seed of [1517800,1517802]){
+ for(const hz of [30,60,120])for(const seed of [1517800,1517802]){
   const baseline=run(seed,hz,'baseline');
   const instrumented=run(seed,hz,'instrument');
   const suppressed=run(seed,hz,'suppress');
