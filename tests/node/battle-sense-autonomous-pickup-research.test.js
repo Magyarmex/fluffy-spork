@@ -4,7 +4,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 
-function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8,rivalY=1120){
+function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8,rivalY=1120,preObserve=false){
  return withSeed(1517800,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   try{
@@ -29,7 +29,7 @@ function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8,rivalY=1
    // South stays inside the 760-unit consideration radius longer than west.
    const safe={id:99002,kind:'powerup',type:'heal',
     x:safeLayout==='south'?1000:350,y:safeLayout==='south'?350:1000,ttl:20,born:0};
-   g.powerups=[near,safe];
+   g.powerups=preObserve?[]:[near,safe];
    const arrivals=[],originalApply=g.applyPowerup;
    g.applyPowerup=function(t,type){
     arrivals.push({who:t===bot?'bot':'rival',type,time:+g.time.toFixed(3),
@@ -41,6 +41,9 @@ function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8,rivalY=1
    const trace=[];let previousConfirmed=0,previousMode=null,previousResource=null,previousSafeEligible=true,previousNearEligible=true,previousThink=Infinity;
    for(let frame=0;frame<Math.round(12*hz);frame++){
     g.time=frame*dt;
+    // Let real public rival movement be witnessed before a delayed pickup spawn.
+    // This tests observation timing without granting hidden speed or steering the bot.
+    if(preObserve&&frame===hz)g.powerups=[near,safe];
     const fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT__;
     g.__novaFairVisibleTanks=(!fair||fair.inGameplayViewport(g,bot,rival))
      ?[bot,rival]:[bot];
@@ -86,7 +89,7 @@ function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8,rivalY=1
     g.updatePowerups(dt);
     if(arrivals.some(a=>a.who==='bot'))break;
    }
-   return {hz,direction,safeLayout,classOnly,speedStat,rivalY,firstChoice,changes,firstNearAt,firstSafeAt,
+   return {hz,direction,safeLayout,classOnly,speedStat,rivalY,preObserve,firstChoice,changes,firstNearAt,firstSafeAt,
     maxConfirmed,maxFast:+maxFast.toFixed(3),
     botPickup:arrivals.find(a=>a.who==='bot')||null,
     rivalPickup:arrivals.find(a=>a.who==='rival')||null,
@@ -131,4 +134,19 @@ test('composed autonomous witnessed-rival pickup steering at 30/60 Hz',()=>{
  console.log('COMPOSED_RIVAL_BASE_SPEED_NEGATIVE_CONTROLS '+JSON.stringify(negativeControls));
  console.log('COMPOSED_RIVAL_AUTONOMOUS_PICKUP_RESEARCH '+JSON.stringify(results.map(({trace,...summary})=>summary)));
  // This is still scripted rival motion, not a natural combat survival trial.
+});
+
+test('pre-observation versus simultaneous heal spawn: autonomous matched pairs',()=>{
+ const results=[];
+ for(const hz of [30,60])for(const preObserve of [false,true])
+  for(const classOnly of [true,false])
+   results.push(arm(hz,1,'west',classOnly,8,1120,preObserve));
+ assert.equal(results.length,8);
+ assert.ok(results.filter(r=>!r.classOnly).every(r=>r.maxConfirmed>=3),
+  'witnessed policy must obtain legitimate public movement samples in both spawn schedules');
+ assert.ok(results.filter(r=>r.classOnly).every(r=>r.maxConfirmed===0),
+  'class-only controls cannot retain movement witnesses');
+ for(const r of results)assert.ok(Number.isFinite(r.botX)&&Number.isFinite(r.botY));
+ console.log('COMPOSED_RIVAL_PREOBSERVATION_RESEARCH '+JSON.stringify(results.map(({trace,...summary})=>summary)));
+ // Exploratory: do not assert a win before paired gameplay outcomes support it.
 });
