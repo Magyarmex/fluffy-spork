@@ -155,6 +155,12 @@ function threatVector(g,C,t,out){
       tc=Math.min(tc,b.ttl);
     }
     var cx=rx+(b.vx||0)*tc,cy=ry+(b.vy||0)*tc,cd=Math.hypot(cx,cy);if(cd>safe*1.75)continue;
+    /* An unseen round cannot give the AI a preemptive dodge, even when its
+     * predicted path would later cross the hull. Observe the present bullet,
+     * not a future position or a private shooter target. */
+    var fair=window.__NOVA_FAIR_ENGAGEMENT__;
+    if(fair&&typeof fair.inGameplayWorldPoint==='function'&&
+       !fair.inGameplayWorldPoint(g,t,b.x,b.y))continue;
     if(g.hasLineOfSight&&!g.hasLineOfSight(b.x,b.y,t.x,t.y,3))continue;
     var w=(1-clamp(cd/(safe*1.75),0,1))*(1-clamp(tc/.82,0,1));
     var l=Math.hypot(cx,cy);
