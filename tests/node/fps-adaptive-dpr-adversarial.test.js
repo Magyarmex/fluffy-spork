@@ -264,3 +264,25 @@ test('settings revision callback failure during stop cannot overwrite player pix
  assert.equal(game.dpr,1);
  assert.deepEqual([game.canvas.width,game.canvas.height],[320,568]);
 });
+
+// A low-quality player who selected 80% clarity begins at DPR 1.2, not 1.5.
+// Research rollback must restore that chosen baseline, never overwrite it.
+test('80% low-quality clarity probe restores the selected 1.2 DPR',()=>{
+ const game={quality:'low',status:'playing',paused:false,dpr:1.2,w:320,h:568,
+  canvas:{width:384,height:682,clientWidth:320,clientHeight:568}};
+ const pilot=createAdaptiveDprPilot(game);
+ step(pilot,0,1000,slow);
+ assert.equal(pilot.state.phase,'probing');
+ assert.equal(game.dpr,1);
+ assert.deepEqual([game.canvas.width,game.canvas.height],[320,568]);
+ const good={...better,fps:55,frameP95Ms:22};
+ step(pilot,1500,7000,good);
+ assert.equal(pilot.state.phase,'low');
+ let last;
+ for(let t=7500;t<=15500;t+=500)last=pilot.sample(t,null);
+ assert.equal(last.kind,'low-no-evidence-rollback');
+ assert.equal(game.dpr,1.2);
+ assert.deepEqual([game.canvas.width,game.canvas.height],[384,682]);
+ assert.equal(pilot.stop(),true);
+ assert.equal(game.dpr,1.2);
+});
