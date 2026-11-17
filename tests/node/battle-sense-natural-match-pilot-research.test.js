@@ -237,11 +237,14 @@ test('full-game critical-heal horizon boundary research at 759/761/850 units',()
   }
   rows.push({hz,safeDistance,classOnly:{firstChoice:baseline.firstChoice,
    firstSafeAt:baseline.firstSafeAt,firstObserverHealAt:baseline.firstObserverHealAt,
-   observerDeathAt:baseline.observerDeathAt,observerHp:baseline.observerHp},
+   observerDeathAt:baseline.observerDeathAt,observerHp:baseline.observerHp,
+   firstPlan:baseline.planTrace[0]||null,
+   lastEligiblePlan:baseline.planTrace.filter(p=>p.preUpdateSafeEligible&&p.planTick).at(-1)||null},
    witnessed:{firstChoice:witnessed.firstChoice,firstSafeAt:witnessed.firstSafeAt,
    firstObserverHealAt:witnessed.firstObserverHealAt,observerDeathAt:witnessed.observerDeathAt,
    observerHp:witnessed.observerHp,maxConfirmed:witnessed.maxConfirmed,
-   maxFast:witnessed.maxFast}});
+   maxFast:witnessed.maxFast,firstPlan:witnessed.planTrace[0]||null,
+   lastEligiblePlan:witnessed.planTrace.filter(p=>p.preUpdateSafeEligible&&p.planTick).at(-1)||null}});
  }
  console.log('COMPOSED_RIVAL_CRITICAL_HEAL_HORIZON_BOUNDARY '+JSON.stringify(rows));
  assert.equal(rows.length,6);
