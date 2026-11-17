@@ -42,3 +42,26 @@ test('a one-unit horizon crossing flips a low-health tank from a safer heal to a
  assert.equal(h.chooseResource(g,bot,classes)?.id,'safe',
   'at exactly 760 units the safe heal wins under otherwise unchanged public geometry');
 });
+
+
+test('resource score threshold and hard horizon are distinct limits on healing',()=>{
+ const {h,classes}=harness();
+ const bot={id:1,cls:'guard',x:0,y:0,alive:true,hp:50,maxHp:100,stats:{speed:0},ai:{}};
+ const heal={id:'heal',type:'heal',x:760,y:0};
+ const g={tanks:[bot],powerups:[heal],bullets:[],time:1,hasLineOfSight:()=>true,tankSpeed:()=>114.08};
+ assert.equal(h.chooseResource(g,bot,classes),null,
+  'at half health, a heal inside the 760 horizon can still fail the utility threshold');
+ heal.x=740;
+ assert.equal(h.chooseResource(g,bot,classes)?.id,'heal',
+  'the same heal becomes worthwhile without crossing the hard 760 horizon');
+ bot.hp=20;heal.x=760;
+ assert.equal(h.chooseResource(g,bot,classes)?.id,'heal',
+  'critical health makes a distant in-horizon heal worthwhile');
+ heal.x=850;
+ assert.equal(h.chooseResource(g,bot,classes),null,
+  'even a high-value critical heal is rejected outside the hard horizon');
+ // Source-derived optimistic ceiling for an unoccluded heal is
+ // 900 * (2.5 * (1 - hpFraction) - 0.42), before detours or contest.
+ assert.ok(900*(2.5*(1-.2)-.42)>850,
+  '850-unit critical heal is mathematically viable under scoring but clipped by horizon');
+});
