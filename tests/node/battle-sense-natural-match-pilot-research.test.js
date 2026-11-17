@@ -252,7 +252,7 @@ test('full-game critical-heal horizon boundary research at 759/761/850 units',()
  assert.equal(rows.length,6);
 });
 
-// Mechanistic falsifier: put the rival 200u from the contested heal so the
+// Mechanistic falsifier: put the rival ~200u from the contested heal so the
 // class-only public-speed contest penalty is already strong enough for the
 // 759u safe heal to win on the first ordinary AI plan. At 761u that same
 // candidate is excluded before scoring. The rival uses fully autonomous
@@ -260,8 +260,8 @@ test('full-game critical-heal horizon boundary research at 759/761/850 units',()
 test('full-game heal horizon cutoff can change initial choice against a credible contender',()=>{
  const rows=[];
  for(const hz of [30,60])for(const safeDistance of [759,761]){
-  const classOnly=contestedArm(1517800,hz,true,0,safeDistance,{x:1400,y:920});
-  const witnessed=contestedArm(1517800,hz,false,0,safeDistance,{x:1400,y:920});
+  const classOnly=contestedArm(1517800,hz,true,0,safeDistance,{x:1390,y:920});
+  const witnessed=contestedArm(1517800,hz,false,0,safeDistance,{x:1390,y:920});
   assert.equal(classOnly.initial,witnessed.initial,
    'same public initial tank geometry across policies');
   for(const arm of [classOnly,witnessed]){
