@@ -195,8 +195,15 @@ function timingPercentile(r,q){
   return sorted[Math.max(0,Math.ceil(sorted.length*q)-1)];
 }
 function timingWindow(p){
-  var r=p.presentationTimes,n=r&&r.count||0,total=0,over50=0;
-  for(var i=0;i<n;i++){var v=r.values[i];total+=v;if(v>50)over50++;}
+  /* Distribution diagnostics, not dropped-frame counters: ordinary 30Hz jitter
+   * can legitimately put about half its gaps above the 30Hz threshold. */
+  var r=p.presentationTimes,n=r&&r.count||0,total=0,over25=0,over33=0,over50=0;
+  for(var i=0;i<n;i++){
+    var v=r.values[i];total+=v;
+    if(v>25)over25++;
+    if(v>1000/30)over33++;
+    if(v>50)over50++;
+  }
   var sim=p.simulationTimes,steps=p.simulationSteps,simTotal=0,stepTotal=0;
   var aligned=n>=5&&sim&&steps&&sim.count===n&&steps.count===n;
   if(aligned)for(var j=0;j<n;j++){
@@ -206,6 +213,8 @@ function timingWindow(p){
   return {frameSamples:n,
     fps:n>=5&&mean>0?+(1000/mean).toFixed(1):null,
     frameP95Ms:n>=5?+timingPercentile(r,.95).toFixed(2):null,
+    frameOver25Pct:n>=5?+(over25*100/n).toFixed(1):null,
+    frameOver33Pct:n>=5?+(over33*100/n).toFixed(1):null,
     frameOver50Pct:n>=5?+(over50*100/n).toFixed(1):null,
     simulationHz:aligned&&total>0?+(stepTotal*1000/total).toFixed(1):null,
     simulationPacePct:aligned&&total>0?+(simTotal*100/total).toFixed(1):null,
