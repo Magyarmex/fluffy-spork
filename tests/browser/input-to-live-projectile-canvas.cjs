@@ -6,6 +6,7 @@ const assert=require('node:assert/strict');
 const {chromium}=require('playwright');
 const renderScale=process.env.NOVA_TOUCH_RENDER_SCALE?Number(process.env.NOVA_TOUCH_RENDER_SCALE):100;
 const midGestureDpr=process.env.NOVA_TOUCH_MID_GESTURE_DPR==='1';
+const lowQuality=process.env.NOVA_TOUCH_LOW_QUALITY==='1';
 assert.ok([65,80,100].includes(renderScale),'only the certified 65%, candidate 80%, and default 100% clarity arms are supported');
 
 (async()=>{
@@ -15,6 +16,9 @@ assert.ok([65,80,100].includes(renderScale),'only the certified 65%, candidate 8
  if(renderScale!==100)await context.addInitScript(scale=>{
   localStorage.setItem('novatanks_pilot_settings_v1',JSON.stringify({renderScale:scale}));
  },renderScale);
+ if(lowQuality)await context.addInitScript(()=>{
+  localStorage.setItem('novatanks_quality','low');
+ });
  const page=await context.newPage(),errors=[];
  page.on('pageerror',e=>errors.push(String(e.stack||e)));
  try{
@@ -110,9 +114,14 @@ assert.ok([65,80,100].includes(renderScale),'only the certified 65%, candidate 8
   const clarity=await page.evaluate(()=>{
    const g=window.__novaBirthGame;
    return {stored:JSON.parse(localStorage.getItem('novatanks_pilot_settings_v1')||'{}').renderScale,
-    dpr:g.dpr,deviceDpr:window.devicePixelRatio,quality:g.quality,
+    dpr:g.dpr,deviceDpr:window.devicePixelRatio,quality:g.quality,particlePool:g.parts?.length,
     css:[g.w,g.h],backing:[g.canvas.width,g.canvas.height]};
   });
+  if(lowQuality){
+   assert.equal(clarity.quality,'low','low-quality touch arm must use low renderer');
+   assert.equal(clarity.particlePool,200,
+    'low-quality arm must construct the real 200-particle pool, not mutate a high-quality game');
+  }
   assert.ok(Number.isFinite(clarity.dpr)&&clarity.dpr>=1,'active Game must have legal DPR');
   const expectedBase=Math.max(1,Math.min(clarity.deviceDpr,clarity.quality==='high'?2:1.5));
   const expectedDpr=Math.max(1,expectedBase*renderScale/100);
@@ -265,7 +274,7 @@ assert.ok([65,80,100].includes(renderScale),'only the certified 65%, candidate 8
   },null,{timeout:5000});
   assert.deepEqual(errors,[],'the real game must not throw');
   console.log('NOVA_TOUCH_TO_PROJECTILE_BIRTH '+JSON.stringify({
-   viewport:'320x700',trusted:true,renderScale,midGestureDpr,dpr:clarity.dpr,
+   viewport:'320x700',trusted:true,renderScale,midGestureDpr,lowQuality,dpr:clarity.dpr,
    css:clarity.css,backing:clarity.backing,
    deliveryToBirthMs:Math.round(delay*1000)/1000,
    deliveryToSimulationMs:Math.round(inputToSample*1000)/1000,
