@@ -129,6 +129,7 @@ function contestedArm(seed,hz,classOnly,speedStat){
    };
    const start=g.time;
    let maxConfirmed=0,maxFast=0,firstChoice=null,firstSafeAt=null;
+   const planTrace=[];let previousChoice,previousConfirmed=-1,previousThink=Infinity;
    for(let i=0;i<Math.round(8*hz)&&g.status==='playing'&&g.player.alive;i++){
     // The ecology's sector grid requires finite entity coordinates. Report
     // the first invalid entity rather than obscuring a fixture failure as an
@@ -146,10 +147,23 @@ function contestedArm(seed,hz,classOnly,speedStat){
     const choice=observer.ai.__v181Mode==='resource'?observer.ai.__v181ResourceId:null;
     if(firstChoice===null&&choice!=null)firstChoice=choice;
     if(firstSafeAt===null&&choice===99092)firstSafeAt=+(g.time-start).toFixed(3);
+    // Sample real post-update decisions, not a second chooseResource call
+    // that could mutate route caches or change the autonomous policy.
+    const think=Number(observer.ai.__v181Think);
+    const planTick=Number.isFinite(think)&&think>previousThink+1/hz*.5;
+    if(planTrace.length<48&&(i===0||choice!==previousChoice||maxConfirmed!==previousConfirmed||planTick&&g.time-start<=2.2)){
+     planTrace.push({at:+(g.time-start).toFixed(3),choice,
+      confirmed:witness?.confirmed||0,fast:+(witness?.fast||0).toFixed(2),
+      nearDist:+Math.hypot(1400-observer.x,1120-observer.y).toFixed(2),
+      safeDist:+Math.hypot(350-observer.x,1000-observer.y).toFixed(2),
+      hp:+observer.hp.toFixed(2),mode:observer.ai.__v181Mode||null,
+      planTick});
+    }
+    previousChoice=choice;previousConfirmed=maxConfirmed;previousThink=think;
    }
    const perf=typeof g.novaPerfSnapshot==='function'?g.novaPerfSnapshot():{};
    return {seed,hz,classOnly,speedStat,initial,maxConfirmed,
-    maxFast:+maxFast.toFixed(3),firstChoice,firstSafeAt,
+    maxFast:+maxFast.toFixed(3),firstChoice,firstSafeAt,planTrace,
     elapsed:+(g.time-start).toFixed(3),arrivals,
     observerHp:+observer.hp.toFixed(2),rivalHp:+rival.hp.toFixed(2),
     observerX:+observer.x.toFixed(2),observerY:+observer.y.toFixed(2),
