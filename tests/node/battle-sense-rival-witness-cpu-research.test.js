@@ -149,6 +149,8 @@ test('composed planning snapshot reports repeated contest CPU savings without a 
    bot.ai={...bot.ai};
    const rivals=Array.from({length:13},(_,i)=>({id:99001+i,cls:'guard',x:1030+i*10,y:1010,alive:true,hp:100,maxHp:100,vx:0,vy:0,angle:0,stats:{speed:0}}));
    g.tanks=[bot,...rivals];g.__novaFairVisibleTanks=g.tanks;
+   assert.ok(g.tankById instanceof Map);
+   g.tankById.clear();for(const tank of g.tanks)g.tankById.set(tank.id,tank);
    g.hasLineOfSight=()=>true;g.powerups=[];g.time=10;g.status='playing';
    ai.updateAI(bot,g,.2);
    const snap=bot.ai.__v181RivalSpeedSnapshot;
@@ -216,6 +218,8 @@ test('composed advancing-time AI planning reports zero/one/two-heal CPU cost',()
     hp:100,maxHp:100,vx:0,vy:0,stats:{speed:0}
    }))];
    g.__novaFairVisibleTanks=g.tanks;g.hasLineOfSight=()=>true;
+   assert.ok(g.tankById instanceof Map);
+   g.tankById.clear();for(const tank of g.tanks)g.tankById.set(tank.id,tank);
    g.status='playing';g.bullets=[];
    const heals=[{id:99090,type:'heal',x:1450,y:1000},
     {id:99091,type:'heal',x:350,y:1000}];
