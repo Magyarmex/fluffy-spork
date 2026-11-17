@@ -53,9 +53,11 @@ function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8,rivalY=1
      confirmedAtSpawn=prior?.confirmed||0;
      fastAtSpawn=+(prior?.fast||0).toFixed(3);
      const safeDist=Math.hypot(safe.x-bot.x,safe.y-bot.y);
-     spawnSnapshot={botX:+bot.x.toFixed(2),botY:+bot.y.toFixed(2),
-      rivalX:+rival.x.toFixed(2),rivalY:+rival.y.toFixed(2),
-      safeDist:+safeDist.toFixed(2),nearDist:+Math.hypot(near.x-bot.x,near.y-bot.y).toFixed(2),
+     // Preserve exact floating-point geometry for causal equality, rather
+     // than rounding away a small but tactically decisive eligibility shift.
+     spawnSnapshot={botX:bot.x,botY:bot.y,
+      rivalX:rival.x,rivalY:rival.y,
+      safeDist,nearDist:Math.hypot(near.x-bot.x,near.y-bot.y),
       safeEligible:safeDist<=760};
      g.powerups=[near,safe];
     }
