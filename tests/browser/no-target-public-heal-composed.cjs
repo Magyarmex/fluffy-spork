@@ -38,7 +38,8 @@ const {chromium}=require('playwright');
      {id:990092,type:'heal',x:-120,y:0}
     ];
     g.bullets=[];g.w=1000;g.h=800;
-    g.hasLineOfSight=()=>true;g.tankSpeed=()=>200;
+    g.hasLineOfSight=()=>true;
+    g.tankSpeed=t=>{if(t!==bot)throw Error('private rival speed read');return 200;};
     ai.updateAI(bot,g,1/60);
     const result={target:bot.ai.__v1112TargetId,
      mode:bot.ai.__v181Mode,pickup:bot.ai.__v181ResourceId,
