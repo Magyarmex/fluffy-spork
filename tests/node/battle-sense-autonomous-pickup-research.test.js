@@ -41,8 +41,13 @@ function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8,rivalY=1
    const trace=[];let previousConfirmed=0,previousMode=null,previousResource=null,previousSafeEligible=true,previousNearEligible=true,previousThink=Infinity;
    for(let frame=0;frame<Math.round(12*hz);frame++){
     g.time=frame*dt;
+    // In the delayed-spawn causal pair, run an identical observation prelude
+    // for both policies, then remove only the class-only policy's witness at
+    // spawn. This prevents different pre-spawn combat steering from changing
+    // tank geometry and masquerading as an information advantage.
+    if(classOnly&&(!preObserve||frame>=hz))delete bot.ai.__v181RivalSpeedWitness;
     // Let real public rival movement be witnessed before a delayed pickup spawn.
-    // This tests observation timing without granting hidden speed or steering the bot.
+    // This tests prior observation without granting hidden speed; both arms share the same prelude.
     if(preObserve&&frame===hz){
      const prior=bot.ai.__v181RivalSpeedWitness?.[String(rival.id)];
      confirmedAtSpawn=prior?.confirmed||0;
@@ -58,7 +63,6 @@ function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8,rivalY=1
     g.__novaFairVisibleTanks=(!fair||fair.inGameplayViewport(g,bot,rival))
      ?[bot,rival]:[bot];
     /* Class-only control forgets motion history before every planning tick, without changing public class speed, navigation, pickups or combat code. */
-    if(classOnly)delete bot.ai.__v181RivalSpeedWitness;
     ai.updateAI(bot,g,dt); // Actual overlaid AI steering, not a scripted bot vector.
     const witness=bot.ai.__v181RivalSpeedWitness?.[String(rival.id)];
     if(witness){maxConfirmed=Math.max(maxConfirmed,witness.confirmed||0);
