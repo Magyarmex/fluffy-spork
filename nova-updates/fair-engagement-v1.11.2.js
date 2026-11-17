@@ -235,8 +235,8 @@ wrap('game/ai',function(ai,require){
     /* Battle Sense may reason about other actually perceived opponents without
      * exposing them to legacy target selection. Build this only on its bounded
      * tactical planning tick; the old AI still sees exactly [self, target]. */
-    /* A visible spawn-shielded rival cannot be attacked, but may still race for a public pickup. Preserve tactical contacts on the bounded Battle Sense tick even when no combat target is eligible. */
-    if(window.__NOVA_BATTLE_SENSE__&&(Number(a.__v181Think)||0)<=dt){
+    /* A visible spawn-shielded rival cannot be attacked, but may still race for a public pickup. Preserve tactical contacts on the bounded Battle Sense tick when public pickups exist even without a combat target; avoid extra no-target scans in empty arenas. */
+    if(window.__NOVA_BATTLE_SENSE__&&(target||(g.powerups&&g.powerups.length))&&(Number(a.__v181Think)||0)<=dt){
       var contacts=[t];
       for(var ci=0;ci<all.length;ci++){
         var cq=all[ci];
