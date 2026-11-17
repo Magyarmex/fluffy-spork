@@ -157,6 +157,9 @@ test('full shipping Game exposes timing fields without changing game state',()=>
   assert.ok(p.frameSamples>=5);
   assert.ok(p.fps>0);
   assert.equal(typeof p.renderP95Ms,'number');
+  assert.equal(typeof p.frameOver25Pct,'number');
+  assert.equal(typeof p.frameOver33Pct,'number');
+  assert.ok(p.frameOver25Pct>=p.frameOver33Pct);
   assert.deepEqual([g.time,g.player.x,g.player.y,g.player.hp,g.bullets.length],before,
    'read-only rendering telemetry cannot mutate simulation');
  });
