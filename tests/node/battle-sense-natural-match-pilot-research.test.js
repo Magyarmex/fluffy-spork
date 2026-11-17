@@ -129,6 +129,7 @@ function contestedArm(seed,hz,classOnly,speedStat){
    };
    const start=g.time;
    let maxConfirmed=0,maxFast=0,firstChoice=null,firstSafeAt=null;
+   let observerDeathAt=null,minObserverHp=observer.hp,firstObserverHealAt=null;
    const planTrace=[];let previousChoice,previousConfirmed=-1,previousThink=Infinity;
    for(let i=0;i<Math.round(8*hz)&&g.status==='playing'&&g.player.alive;i++){
     // The ecology's sector grid requires finite entity coordinates. Report
@@ -141,6 +142,13 @@ function contestedArm(seed,hz,classOnly,speedStat){
         id:entity.id,cls:entity.cls,type:entity.type,x:entity.x,y:entity.y,
         vx:entity.vx,vy:entity.vy,ai:entity.ai&&Object.keys(entity.ai).slice(0,15)}));
     g.update(1/hz);
+    minObserverHp=Math.min(minObserverHp,observer.hp);
+    if(observerDeathAt===null&&(!observer.alive||observer.hp<=0))
+     observerDeathAt=+(g.time-start).toFixed(3);
+    if(firstObserverHealAt===null){
+     const firstHeal=arrivals.find(a=>a.who==='observer'&&a.type==='heal');
+     if(firstHeal)firstObserverHealAt=+(firstHeal.at-start).toFixed(3);
+    }
     const witness=observer.ai.__v181RivalSpeedWitness?.[String(rival.id)];
     maxConfirmed=Math.max(maxConfirmed,witness?.confirmed||0);
     maxFast=Math.max(maxFast,witness?.fast||0);
@@ -166,6 +174,8 @@ function contestedArm(seed,hz,classOnly,speedStat){
     maxFast:+maxFast.toFixed(3),firstChoice,firstSafeAt,planTrace,
     elapsed:+(g.time-start).toFixed(3),arrivals,
     observerHp:+observer.hp.toFixed(2),rivalHp:+rival.hp.toFixed(2),
+    observerAlive:!!observer.alive,observerDeathAt,firstObserverHealAt,
+    minObserverHp:+minObserverHp.toFixed(2),
     observerX:+observer.x.toFixed(2),observerY:+observer.y.toFixed(2),
     remainingHeals:g.powerups.filter(p=>p.type==='heal').length,
     updateMs:+Number(perf.updateMs||0).toFixed(3)};
@@ -180,7 +190,10 @@ test('opportunity-conditioned autonomous composed heal pilot reports real pickup
   const witnessed=contestedArm(1517800,hz,false,speedStat);
   assert.equal(baseline.initial,witnessed.initial,
    'paired autonomous arms must start from identical tank geometry and public stats');
-  assert.ok([baseline,witnessed].every(a=>Number.isFinite(a.observerX)&&Number.isFinite(a.observerHp)));
+  assert.ok([baseline,witnessed].every(a=>Number.isFinite(a.observerX)&&Number.isFinite(a.observerHp)
+   &&Number.isFinite(a.minObserverHp)
+   &&(a.observerDeathAt===null||Number.isFinite(a.observerDeathAt))
+   &&(a.firstObserverHealAt===null||Number.isFinite(a.firstObserverHealAt))));
   results.push({hz,speedStat,classOnly:baseline,witnessed});
  }
  console.log('COMPOSED_RIVAL_AUTONOMOUS_CONTESTED_HEAL_PILOT '+JSON.stringify(results));
