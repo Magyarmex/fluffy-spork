@@ -116,6 +116,12 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' }}
         timeout-minutes: 3
         run: node tests/browser/render-clarity-aa-b-research.cjs
+      # One-off branch-only research: exercise the already-existing browser
+      # causal trail A/A/B, without adding cost to ordinary PRs or main.
+      - name: Research-only projectile trail causal browser A/A/B
+        if: ${{ github.event_name == 'pull_request' && github.head_ref == 'research/projectile-trail-browser-causal-20261117' }}
+        timeout-minutes: 3
+        run: NOVA_TRAIL_CAUSAL=1 node tests/browser/render-clarity-aa-b-research.cjs
       - name: Run real React + Chromium smoke
         run: |
           node tests/browser/real-touch-gameplay.cjs
