@@ -195,6 +195,8 @@ function timingPercentile(r,q){
   return sorted[Math.max(0,Math.ceil(sorted.length*q)-1)];
 }
 function timingWindow(p){
+  /* Distribution diagnostics, not dropped-frame counters: ordinary 30Hz jitter
+   * can legitimately put about half its gaps above the 30Hz threshold. */
   var r=p.presentationTimes,n=r&&r.count||0,total=0,over25=0,over33=0,over50=0;
   for(var i=0;i<n;i++){
     var v=r.values[i];total+=v;
