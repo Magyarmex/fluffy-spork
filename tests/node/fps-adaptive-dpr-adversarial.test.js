@@ -291,7 +291,11 @@ test('65% low-quality clarity at the DPR floor cannot be blurred further',()=>{
  const game={quality:'low',status:'playing',paused:false,dpr:1,w:320,h:568,
   canvas:{width:320,height:568,clientWidth:320,clientHeight:568}};
  const pilot=createAdaptiveDprPilot(game);
- const outcome=step(pilot,0,10000,slow);
+ let outcome;
+ for(let t=0;t<=10000;t+=500){
+  outcome=pilot.sample(t,slow);
+  assert.equal(game.dpr,1,'DPR floor must hold at every sample, not only after rollback');
+ }
  assert.equal(outcome.kind,'slow');
  assert.equal(pilot.state.phase,'baseline');
  assert.equal(game.dpr,1);
