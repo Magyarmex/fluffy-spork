@@ -12,6 +12,8 @@ function scene(){
  const window={__novaModules:modules};
  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../../nova-updates/battle-sense-v1.8.1.js'),'utf8'),
   {window,Math,Number,Object,Array,Map,WeakMap,console:{info(){},error(){}}});
+ const engine={exports:{}};
+ modules['game/engine'](engine,engine.exports,()=>{throw Error('unexpected engine import');});
  const observer={id:1,teamId:7,x:0,y:0,alive:true,ai:{}};
  const ally={id:2,teamId:7,x:110,y:0,alive:true,ai:{}};
  const enemy={id:3,teamId:9,x:110,y:0,alive:true,ai:{}};
