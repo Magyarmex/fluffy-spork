@@ -21,6 +21,7 @@ function run(seed,hz,mode){
    g.setClass(g.player,'tempest');
    g.input.autofire=false;g.input.firing=true;
    g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
+   if(mode!=='baseline') {
    g.updateBullets=function(...args){
     insideBullets=true;
     try{return originalBullets.apply(this,args);}
@@ -60,7 +61,7 @@ test('ordinary projectile glow suppression is physically and RNG transparent in 
   assert.equal(baseline.hash,instrumented.hash,'A/A instrumentation must be inert');
   assert.equal(baseline.draws,instrumented.draws,'A/A must not consume RNG');
   assert.equal(suppressed.suppressed,suppressed.ordinaryTrailCalls);
-  assert.equal(suppressed.ordinaryTrailCalls,baseline.ordinaryTrailCalls);
+  assert.equal(suppressed.ordinaryTrailCalls,instrumented.ordinaryTrailCalls);
   assert.equal(suppressed.cosmeticState,baseline.cosmeticState,
    'suppression must preserve dedicated cosmetic RNG state');
   assert.equal(suppressed.draws,baseline.draws,
@@ -68,7 +69,7 @@ test('ordinary projectile glow suppression is physically and RNG transparent in 
   assert.equal(suppressed.hash,baseline.hash,
    'cosmetic-only suppression must not change physical gameplay');
   console.log('PROJECTILE_TRAIL_CAUSAL '+JSON.stringify({
-   seed,hz,ordinaryTrailCalls:baseline.ordinaryTrailCalls,
+   seed,hz,ordinaryTrailCalls:instrumented.ordinaryTrailCalls,
    suppressed:suppressed.suppressed,
    baselineParticles:baseline.activeParticles,
    suppressedParticles:suppressed.activeParticles,
