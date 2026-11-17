@@ -310,3 +310,21 @@ test('allied spawn-protected pickup runners do not create hostile contest penalt
  assert.equal(self.ai.__v181ResourceId,91,
   'allied pickup runners must not be scored as hostile contenders');
 });
+
+test('no-target public pickup contacts retain bounded planning cadence',()=>{
+ const {g,ai,self,target,duelist}=scene();
+ target.spawnShieldT=2;duelist.spawnShieldT=2;
+ g.powerups=[{id:99,type:'heal',x:-200,y:0}];
+ let current,builds=0;
+ Object.defineProperty(g,'__novaFairVisibleTanks',{configurable:true,
+  get(){return current;},
+  set(value){if(Array.isArray(value))builds++;current=value;}});
+ for(let frame=0;frame<60;frame++){
+  g.time+=1/60;
+  ai.updateAI(self,g,1/60);
+ }
+ assert.ok(builds>=4&&builds<=10,
+  'no-target pickup contacts should be rebuilt at planning cadence, not every frame: '+builds);
+ assert.equal(current,undefined);
+ assert.equal(g.tanks.length,3);
+});
