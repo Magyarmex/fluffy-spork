@@ -54,7 +54,8 @@ test('AI cannot dodge unseen or terrain-occluded bullets at 280px portrait or wi
  assert.equal(run(fixed,{bulletX:145,vx:-600,width:280}).dodgeT,0);
  assert.ok(run(fixed,{bulletX:145,vx:-600,width:1200}).dodgeT>0);
  assert.equal(run(fixed,{bulletX:100,vx:-600,los:false}).dodgeT,0);
- assert.equal(run(fixed,{bulletX:100,vx:-600,bulletY:310}).dodgeT,0);
+ assert.equal(run(fixed,{bulletX:100,vx:-600,bulletY:100}).dodgeT,0);
+ assert.equal(run(fixed,{bulletX:100,vx:-600,bulletY:100}).losCalls,0,'wide-miss incoming lane must not probe terrain');
  assert.equal(run(fixed,{bulletX:100,vx:-600}).draws,1);
  assert.equal(run(fixed,{bulletX:145,vx:-600,width:280}).draws,0);
  assert.equal(run(fixed,{bulletX:145,vx:-600,width:280}).losCalls,0,'offscreen rounds must not incur terrain probes');
