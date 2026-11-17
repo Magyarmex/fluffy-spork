@@ -32,7 +32,7 @@ const {chromium}=require('playwright');
    const botState={...bot},brain=bot.ai,results=[];
    try{
     Object.assign(bot,{x:0,y:0,hp:20,maxHp:100,alive:true,isPlayer:false,level:10});
-    g.tanks=[bot];g.player=null;g.w=280;g.h=600;
+    g.tanks=[bot];g.player={id:900003,x:9000,y:9000,level:1,alive:true};g.w=280;g.h=600;
     g.nearestShape=()=>null;g.nearestTank=()=>null;
     g.moveTank=()=>{};
     for(const [name,x,vx,los] of [
