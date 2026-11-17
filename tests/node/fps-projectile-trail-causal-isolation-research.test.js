@@ -42,7 +42,7 @@ function run(seed,hz,mode){
    };
    for(let i=0;i<hz*2;i++)g.update(1/hz);
    return {seed,hz,mode,hash:digest(physical(g)),draws:draws(),
-    ordinaryTrailCalls,suppressed,allCalls,activeParticles:
+    ordinaryTrailCalls,suppressed,allCalls,cosmeticState:g.__novaCosmeticRngState,activeParticles:
       (g.parts||[]).filter(p=>p && p.active).length};
   }finally{
    g.addParticles=originalParticles;g.updateBullets=originalBullets;
@@ -61,7 +61,7 @@ test('ordinary projectile glow suppression is physically and RNG transparent in 
   assert.equal(baseline.draws,instrumented.draws,'A/A must not consume RNG');
   assert.equal(suppressed.suppressed,suppressed.ordinaryTrailCalls);
   assert.equal(suppressed.ordinaryTrailCalls,baseline.ordinaryTrailCalls);
-  assert.equal(suppressed.draws,baseline.draws,
+  assert.equal(suppressed.cosmeticState,baseline.cosmeticState,\n   'suppression must preserve dedicated cosmetic RNG state');\n  assert.equal(suppressed.draws,baseline.draws,
    'omitted glow must preserve the cosmetic RNG sequence');
   assert.equal(suppressed.hash,baseline.hash,
    'cosmetic-only suppression must not change physical gameplay');
