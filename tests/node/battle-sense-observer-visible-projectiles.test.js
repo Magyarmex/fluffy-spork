@@ -105,3 +105,33 @@ test('local combat flank dodge still reacts to nearby observed projectile',()=>{
   assert.equal(saferSide(g,tank,1,0),-1,
     'resource-only observer gating must not disable immediate combat flank dodge');
 });
+
+test('offscreen flank-lane projectile cannot steer Battle Sense while visible equivalent can',()=>{
+  const {g,tank,window}=scene();
+  const fair=window.__NOVA_FAIR_ENGAGEMENT__;
+  const saferSide=window.__NOVA_BATTLE_SENSE_TEST__.saferSide;
+  const bullet={id:321,ownerId:999,x:110,y:115,vx:0,vy:0,ttl:1};
+  g.bullets=[bullet];
+  g.w=160;g.h=160;
+  assert.equal(fair.inGameplayWorldPoint(g,tank,bullet.x,bullet.y),false);
+  assert.equal(saferSide(g,tank,1,0),0,
+    'unseen projectile at a distant steering probe must not cause an omniscient dodge');
+  g.w=320;g.h=480;
+  assert.equal(fair.inGameplayWorldPoint(g,tank,bullet.x,bullet.y),true);
+  assert.equal(saferSide(g,tank,1,0),-1,
+    'the same observed projectile must retain local dodge counterplay');
+});
+
+test('terrain-hidden flank projectile cannot steer even when inside the viewport',()=>{
+  const {g,tank,window}=scene();
+  const saferSide=window.__NOVA_BATTLE_SENSE_TEST__.saferSide;
+  const bullet={id:322,ownerId:999,x:110,y:115,vx:0,vy:0,ttl:1};
+  g.bullets=[bullet];
+  g.hasLineOfSight=(ax,ay,bx,by)=>!(ax===tank.x&&ay===tank.y&&
+    bx===bullet.x&&by===bullet.y);
+  assert.equal(saferSide(g,tank,1,0),0,
+    'solid cover must hide the projectile from the observing AI');
+  g.hasLineOfSight=()=>true;
+  assert.equal(saferSide(g,tank,1,0),-1,
+    'removing cover restores a legitimately visible dodge cue');
+});
