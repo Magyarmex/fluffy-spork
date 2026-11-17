@@ -4,7 +4,13 @@
 // observer's actual gameplay viewport. This preserves fair reaction timing.
 const test=require('node:test');
 const assert=require('node:assert/strict');
+// The reusable boot fixture also contains a standalone causal test. Its explicit
+// opt-out prevents importing that unrelated test into this worker process.
+const previousAudioPilot=process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL;
+process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
 const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+if(previousAudioPilot===undefined)delete process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL;
+else process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL=previousAudioPilot;
 
 test('composed Predator threat perception respects mobile viewport and terrain cover',()=>{
   for(const seed of [1517800,1517802]){
