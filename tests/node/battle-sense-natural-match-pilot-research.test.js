@@ -231,6 +231,8 @@ test('full-game critical-heal horizon boundary research at 759/761/850 units',()
    'paired horizon arms must share identical initial tank geometry');
   for(const arm of [baseline,witnessed]){
    assert.equal(arm.safeDistance,safeDistance);
+   assert.equal(arm.planTrace[0]?.preUpdateSafeEligible,safeDistance<=760,
+    'initial AI planning eligibility must actually straddle the 760u cutoff');
    assert.ok(Number.isFinite(arm.observerX)&&Number.isFinite(arm.observerY));
    assert.ok(arm.firstObserverHealAt===null||arm.firstObserverHealAt>=0);
    assert.ok(arm.observerDeathAt===null||arm.observerDeathAt>=0);
@@ -264,6 +266,8 @@ test('full-game heal horizon cutoff can change initial choice against a credible
    'same public initial tank geometry across policies');
   for(const arm of [classOnly,witnessed]){
    assert.equal(arm.safeDistance,safeDistance);
+   assert.equal(arm.planTrace[0]?.preUpdateSafeEligible,safeDistance<=760,
+    'credible-contender arms must straddle the actual first-plan horizon');
    assert.ok(Number.isFinite(arm.observerX)&&Number.isFinite(arm.observerHp));
   }
   rows.push({hz,safeDistance,classOnly:{firstChoice:classOnly.firstChoice,
