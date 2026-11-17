@@ -235,6 +235,7 @@ test('offscreen AI shot observers are rejected before terrain raycasts',()=>{
 test('spawn-protected visible pickup rivals remain tactical contacts without a combat target',()=>{
  const {g,ai,self,target,duelist}=scene();
  target.spawnShieldT=2;duelist.spawnShieldT=2;
+ g.powerups=[{id:99,type:'heal',x:-200,y:0}];
  let snapshot=null;
  Object.defineProperty(g,'__novaFairVisibleTanks',{configurable:true,
   get(){return undefined;},
@@ -252,6 +253,7 @@ test('spawn-protected visible pickup rivals remain tactical contacts without a c
 test('no-target pickup contacts never grant offscreen radar',()=>{
  const {g,ai,self,target,duelist}=scene({width:180});
  target.spawnShieldT=2;duelist.spawnShieldT=2;
+ g.powerups=[{id:99,type:'heal',x:-200,y:0}];
  let snapshot=null;
  Object.defineProperty(g,'__novaFairVisibleTanks',{configurable:true,
   get(){return undefined;},
@@ -279,4 +281,17 @@ test('no-target AI accounts for a visible spawn-shielded healing competitor',()=
  assert.equal(self.ai.__v181ResourceId,92,
   'visible protected rival can still win contested heal; choose nearby safe heal');
  assert.deepEqual(Array.from(g.__legacyVisibleIds),[1]);
+});
+
+test('no-target empty arena does not create unnecessary tactical contacts',()=>{
+ const {g,ai,self,target,duelist}=scene();
+ target.spawnShieldT=2;duelist.spawnShieldT=2;
+ g.powerups=[];
+ let builds=0;
+ Object.defineProperty(g,'__novaFairVisibleTanks',{configurable:true,
+  get(){return undefined;},
+  set(value){if(Array.isArray(value))builds++;}});
+ ai.updateAI(self,g,1/60);
+ assert.equal(self.ai.__v1112TargetId,-1);
+ assert.equal(builds,0,'no combat target or pickup means no extra full-roster scan');
 });
