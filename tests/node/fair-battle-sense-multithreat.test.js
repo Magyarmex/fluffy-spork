@@ -295,3 +295,18 @@ test('no-target empty arena does not create unnecessary tactical contacts',()=>{
  assert.equal(self.ai.__v1112TargetId,-1);
  assert.equal(builds,0,'no combat target or pickup means no extra full-roster scan');
 });
+
+test('allied spawn-protected pickup runners do not create hostile contest penalties',()=>{
+ const {g,ai,self,target,duelist}=scene();
+ self.team='blue';target.team='blue';duelist.team='blue';
+ self.hp=20;target.x=-200;
+ target.spawnShieldT=2;duelist.spawnShieldT=2;
+ g.powerups=[
+  {id:91,type:'heal',x:-200,y:0},
+  {id:92,type:'heal',x:-420,y:0}
+ ];
+ ai.updateAI(self,g,1/60);
+ assert.equal(self.ai.__v1112TargetId,-1);
+ assert.equal(self.ai.__v181ResourceId,91,
+  'allied pickup runners must not be scored as hostile contenders');
+});
