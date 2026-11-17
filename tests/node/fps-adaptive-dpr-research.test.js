@@ -54,6 +54,8 @@ test('distribution-only acceptance fails closed for weak, absent or pace-degradi
   {...baseline,fps:43,frameOver25Pct:25},
   {...baseline,fps:48,frameOver25Pct:25,simulationPacePct:90},
   {...baseline,fps:48,frameOver25Pct:undefined},
+  {...baseline,fps:48,frameOver25Pct:-1},
+  {...baseline,fps:48,frameOver25Pct:101},
  ];
  for(const arm of arms){
   const g=game(),p=createAdaptiveDprPilot(g);
