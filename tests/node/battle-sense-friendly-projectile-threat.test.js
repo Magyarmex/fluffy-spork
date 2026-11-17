@@ -61,3 +61,15 @@ test('neutral or non-hostile is not affirmative proof of alliance',()=>{
  assert.equal(helper.saferSide(g,observer,1,0),-1,
   'neutral classification must not suppress potentially harmful fire');
 });
+
+test('birth-witnessed allied fire does not divert a critical healing pickup',()=>{
+ const {g,observer,ally,enemy,helper}=scene();
+ observer.hp=20;observer.maxHp=100;observer.cls='guard';
+ g.w=1600;g.h=900;g.powerups=[{id:'near',type:'heal',x:600,y:0},{id:'far',type:'heal',x:620,y:0}];
+ const classes={CLASSES:{guard:{size:15}}};
+ assert.equal(helper.chooseResource(g,observer,classes).id,'near');
+ g.tryFire(ally);Object.assign(g.bullets[0],{x:600,y:0,vx:0,vy:0});
+ assert.equal(helper.chooseResource(g,observer,classes).id,'near','known harmless allied lane should not divert heal');
+ g.bullets=[];g.tryFire(enemy);Object.assign(g.bullets[0],{x:600,y:0,vx:0,vy:0});
+ assert.equal(helper.chooseResource(g,observer,classes).id,'far','hostile visible lane should still change heal choice');
+});
