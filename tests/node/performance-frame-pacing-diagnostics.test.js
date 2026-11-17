@@ -101,7 +101,7 @@ test('frame-gap distribution distinguishes 25% and 50% slow frames despite ident
   });
   const copied=win.__snap();
   assert.equal(copied['FRAMES >25MS'],arm.over+'%');
-  assert.equal(copied['FRAMES >33MS'],arm.over+'%');
+  assert.equal(copied['FRAMES >33.3MS'],arm.over+'%');
  }
 });
 test('frame-gap distribution resets with paused and suspended game epochs',()=>{
