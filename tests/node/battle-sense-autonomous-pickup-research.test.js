@@ -160,6 +160,23 @@ test('pre-observation versus simultaneous heal spawn: autonomous matched pairs',
   'pre-observed class-only controls must have no movement certification at spawn');
  assert.ok(results.filter(r=>r.classOnly).every(r=>r.maxConfirmed===0),
   'class-only controls cannot retain movement witnesses');
+ // Both delayed-spawn policies must reach the same physical world state before
+ // the pickups exist. Otherwise any apparent benefit could come from different
+ // starting geometry rather than legitimate prior observation of rival speed.
+ for(const hz of [30,60]){
+  const baseline=results.find(r=>r.hz===hz&&r.preObserve&&r.classOnly);
+  const witnessed=results.find(r=>r.hz===hz&&r.preObserve&&!r.classOnly);
+  assert.deepEqual(witnessed.spawnSnapshot,baseline.spawnSnapshot,
+   'pre-observation controls must share exact spawn-time tank/pickup geometry');
+  assert.equal(baseline.confirmedAtSpawn,0);
+  assert.ok(witnessed.confirmedAtSpawn>=3&&witnessed.fastAtSpawn>124);
+  console.log('COMPOSED_RIVAL_MATCHED_SPAWN_CAUSAL_PAIR '+JSON.stringify({hz,
+   spawnSnapshot:witnessed.spawnSnapshot,
+   classOnly:{firstChoice:baseline.firstChoice,firstSafeAt:baseline.firstSafeAt,
+    botPickup:baseline.botPickup,firstNearAt:baseline.firstNearAt},
+   witnessed:{firstChoice:witnessed.firstChoice,firstSafeAt:witnessed.firstSafeAt,
+    botPickup:witnessed.botPickup,firstNearAt:witnessed.firstNearAt}}));
+ }
  for(const r of results)assert.ok(Number.isFinite(r.botX)&&Number.isFinite(r.botY));
  console.log('COMPOSED_RIVAL_PREOBSERVATION_RESEARCH '+JSON.stringify(results.map(({trace,...summary})=>summary)));
  // Exploratory: do not assert a win before paired gameplay outcomes support it.
