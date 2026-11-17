@@ -68,7 +68,13 @@ function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8,rivalY=1
       rivalX:rival.x,rivalY:rival.y,
       safeDist,nearDist:Math.hypot(near.x-bot.x,near.y-bot.y),
       safeEligible:safeDist<=760,
-      nextThink:bot.ai.__v181Think,mode:bot.ai.__v181Mode??null};
+      nextThink:bot.ai.__v181Think,mode:bot.ai.__v181Mode??null,
+      // Direct AI steering does not advance the whole projectile simulation.
+      // Record any retained bullets and their read-only lane-risk effect so
+      // the scripted fixture cannot silently masquerade as full Game.update.
+      bulletCount:g.bullets.length,
+      nearLaneRisk:g.__testWindow.__NOVA_BATTLE_SENSE_TEST__.laneRisk(g,near.x,near.y,bot.id,bot),
+      safeLaneRisk:g.__testWindow.__NOVA_BATTLE_SENSE_TEST__.laneRisk(g,safe.x,safe.y,bot.id,bot)};
      g.powerups=[near,safe];
      // Research intervention: only the timing of the first pickup-aware
      // strategic plan changes; no tank position, speed or pickup is edited.
