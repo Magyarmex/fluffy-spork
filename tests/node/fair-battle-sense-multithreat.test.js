@@ -231,3 +231,119 @@ test('offscreen AI shot observers are rejected before terrain raycasts',()=>{
   'only the in-viewport witness should need an expensive terrain visibility ray');
  assert.ok(remote.every(t=>t.ai.__v181ObservedShotId===undefined));
 });
+
+test('spawn-protected visible pickup rivals remain tactical contacts without a combat target',()=>{
+ const {g,ai,self,target,duelist}=scene();
+ target.spawnShieldT=2;duelist.spawnShieldT=2;
+ g.powerups=[{id:99,type:'heal',x:-200,y:0}];
+ let snapshot=null;
+ Object.defineProperty(g,'__novaFairVisibleTanks',{configurable:true,
+  get(){return undefined;},
+  set(value){if(Array.isArray(value))snapshot=value.map(q=>q.id);}});
+ ai.updateAI(self,g,1/60);
+ assert.equal(self.ai.__v1112TargetId,-1,
+  'spawn shields must still prohibit selecting a combat target');
+ assert.deepEqual(Array.from(snapshot),[1,2,3],
+  'public pickup rivals remain visible even when they cannot be attacked');
+ assert.deepEqual(Array.from(g.__legacyVisibleIds),[1],
+  'legacy combat AI must not receive additional targets');
+ assert.equal(g.tanks.length,3,'world roster must be restored');
+});
+
+test('no-target pickup contacts never grant offscreen radar',()=>{
+ const {g,ai,self,target,duelist}=scene({width:180});
+ target.spawnShieldT=2;duelist.spawnShieldT=2;
+ g.powerups=[{id:99,type:'heal',x:-200,y:0}];
+ let snapshot=null;
+ Object.defineProperty(g,'__novaFairVisibleTanks',{configurable:true,
+  get(){return undefined;},
+  set(value){if(Array.isArray(value))snapshot=value.map(q=>q.id);}});
+ ai.updateAI(self,g,1/60);
+ assert.equal(self.ai.__v1112TargetId,-1);
+ assert.deepEqual(Array.from(snapshot),[1],
+  'no offscreen rival may enter the public tactical-contact snapshot');
+ assert.deepEqual(Array.from(g.__legacyVisibleIds),[1]);
+});
+
+test('no-target AI accounts for a visible spawn-shielded healing competitor',()=>{
+ const {g,ai,self,target,duelist}=scene();
+ self.hp=20;
+ target.x=-200;target.spawnShieldT=2;
+ duelist.spawnShieldT=2;
+ let privateReads=0;
+ g.tankSpeed=q=>{if(q!==self){privateReads++;throw Error('private rival speed read');}return 200;};
+ g.powerups=[
+  {id:91,type:'heal',x:-200,y:0},
+  {id:92,type:'heal',x:-420,y:0}
+ ];
+ ai.updateAI(self,g,1/60);
+ assert.equal(self.ai.__v1112TargetId,-1,
+  'protected rivals must not become attack targets');
+ assert.equal(self.ai.__v181Mode,'resource');
+ assert.equal(privateReads,0,'no private rival movement stats may be queried');
+ assert.equal(self.ai.__v181ResourceId,92,
+  'visible protected rival can still win contested heal; choose nearby safe heal');
+ assert.deepEqual(Array.from(g.__legacyVisibleIds),[1]);
+});
+
+test('no-target empty arena does not create unnecessary tactical contacts',()=>{
+ const {g,ai,self,target,duelist}=scene();
+ target.spawnShieldT=2;duelist.spawnShieldT=2;
+ g.powerups=[];
+ let builds=0;
+ Object.defineProperty(g,'__novaFairVisibleTanks',{configurable:true,
+  get(){return undefined;},
+  set(value){if(Array.isArray(value))builds++;}});
+ ai.updateAI(self,g,1/60);
+ assert.equal(self.ai.__v1112TargetId,-1);
+ assert.equal(builds,0,'no combat target or pickup means no extra full-roster scan');
+});
+
+test('allied spawn-protected pickup runners do not create hostile contest penalties',()=>{
+ const {g,ai,self,target,duelist}=scene();
+ self.team='blue';target.team='blue';duelist.team='blue';
+ self.hp=20;target.x=-200;
+ target.spawnShieldT=2;duelist.spawnShieldT=2;
+ g.powerups=[
+  {id:91,type:'heal',x:-200,y:0},
+  {id:92,type:'heal',x:-420,y:0}
+ ];
+ ai.updateAI(self,g,1/60);
+ assert.equal(self.ai.__v1112TargetId,-1);
+ assert.equal(self.ai.__v181ResourceId,91,
+  'allied pickup runners must not be scored as hostile contenders');
+});
+
+test('no-target public pickup contacts retain bounded planning cadence',()=>{
+ const {g,ai,self,target,duelist}=scene();
+ target.spawnShieldT=2;duelist.spawnShieldT=2;
+ g.powerups=[{id:99,type:'heal',x:-200,y:0}];
+ let current,builds=0;
+ Object.defineProperty(g,'__novaFairVisibleTanks',{configurable:true,
+  get(){return current;},
+  set(value){if(Array.isArray(value))builds++;current=value;}});
+ for(let frame=0;frame<60;frame++){
+  g.time+=1/60;
+  ai.updateAI(self,g,1/60);
+ }
+ assert.ok(builds>=4&&builds<=10,
+  'no-target pickup contacts should be rebuilt at planning cadence, not every frame: '+builds);
+ assert.equal(current,undefined);
+ assert.equal(g.tanks.length,3);
+});
+
+test('no-target contest uses public class speed without private rival stats',()=>{
+ const {Game,win}=boot(),g=new Game();
+ const self=tank(1,'twin',0,0),rival=tank(2,'fast',150,0);
+ g.tanks=[self,rival];g.__novaFairVisibleTanks=[self,rival];
+ g.__novaFairVisibleTanks.__novaNoCombatTarget=true;
+ g.tankSpeed=q=>{assert.equal(q,self,'private rival speed must not be queried');return 200;};
+ const classes={CLASSES:{fast:{size:15,moveMult:1.5},
+  slow:{size:15,moveMult:.5}}};
+ const hooks=win.__NOVA_BATTLE_SENSE_TEST__,pickup={x:300,y:0};
+ const fast=hooks.resourceContest(g,self,pickup,300,classes);
+ rival.cls='slow';
+ const slow=hooks.resourceContest(g,self,pickup,300,classes);
+ assert.ok(fast>slow,'publicly faster classes should contest more strongly');
+ assert.equal(slow,0,'slow public class cannot win this distant race');
+});
