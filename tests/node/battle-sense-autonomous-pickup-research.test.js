@@ -13,6 +13,15 @@ function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8,rivalY=1
    const ai=g.__testWindow.__novaMakeRequire('')('game/ai');
    assert.equal(typeof ai.updateAI,'function');
    g.tanks=[bot,rival];g.__novaFairVisibleTanks=g.tanks;
+   // The actual engine also resolves targets through tankById. A reduced
+   // research roster must not leave removed tanks available as ghost targets.
+   assert.ok(g.tankById instanceof Map,'requires canonical tank ID registry');
+   g.tankById.clear();
+   for(const tank of g.tanks){
+    assert.ok(tank?.id!=null&&!g.tankById.has(tank.id),'unique research tank ID');
+    g.tankById.set(tank.id,tank);
+   }
+   assert.equal(g.tankById.size,2);
    g.__novaTerrain=[];g.__novaBattlefieldIndex=null;
    if(g.hash?.clear)g.hash.clear();
    Object.assign(bot,{cls:'guard',x:1000,y:1000,vx:0,vy:0,angle:0,
