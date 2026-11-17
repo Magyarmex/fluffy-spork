@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 
 function load(){
-  const classes={CLASSES:{guard:{bullet:{reload:.5}}},lineageForClass:()=> 'guardian'};
+  const classes={CLASSES:{guard:{bullet:{reload:.5},moveMult:1},slow:{bullet:{reload:.5},moveMult:.65},fast:{bullet:{reload:.5},moveMult:2}},lineageForClass:()=> 'guardian'};
   function Game(){this.time=10;this.tanks=[];this.bullets=[];this.powerups=[];this.status='playing';}
   Game.prototype.tryFire=function(){};
   Game.prototype.updatePowerups=function(){};
@@ -52,18 +52,18 @@ test('small equal-speed rival leads do not create false contention',()=>{
   assert.equal(c.window.__NOVA_BATTLE_SENSE_TEST__.resourceContest(g,bot,pickup,300),0,'a rival only 50 units closer at the same speed should not change the plan');
 });
 
-test('closer but much slower rival does not create a fake winning race',()=>{
+test('closer but publicly slower class need not create a fake winning race',()=>{
   const {c,Game}=load(),g=new Game(),bot=T(1,0,0,360),rival=T(2,140,0,120),pickup={id:7,type:'triple',x:300,y:0};
-  g.tanks=[bot,rival];
+  rival.cls='slow';g.tanks=[bot,rival];
   const h=c.window.__NOVA_BATTLE_SENSE_TEST__;
-  assert.equal(h.resourceContest(g,bot,pickup,300),0,'distance alone must not penalize a bot that will arrive first');
+  assert.equal(h.resourceContest(g,bot,pickup,300),0,'a publicly slow class need not win against a fast observer');
 });
 
-test('faster rival can create contention without a huge raw distance lead',()=>{
+test('publicly faster rival class can create contention without a huge raw distance lead',()=>{
   const {c,Game}=load(),g=new Game(),bot=T(1,0,0,180),rival=T(2,70,0,420),pickup={id:7,type:'triple',x:300,y:0};
-  g.tanks=[bot,rival];
+  rival.cls='fast';g.tanks=[bot,rival];
   const penalty=c.window.__NOVA_BATTLE_SENSE_TEST__.resourceContest(g,bot,pickup,300);
-  assert.ok(penalty>0.15,`arrival-time advantage should matter even when the raw distance lead is modest, got ${penalty}`);
+  assert.ok(penalty>0.15,`public class arrival-time advantage should matter, got ${penalty}`);
 });
 
 test('rival behind cover does not poison an otherwise reachable pickup',()=>{
