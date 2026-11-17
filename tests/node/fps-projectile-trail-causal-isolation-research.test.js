@@ -35,7 +35,7 @@ function run(seed,hz,mode){
      suppressed++;
      // Shipping's one-particle glow draws angle, velocity, life and size.
      // A/A and A/B total-draw assertions below must detect any mismatch.
-     for(let i=0;i<4;i++)Math.random();
+     for(let i=0;i<4;i++)g.cosmeticRandom();
      return;
     }
     return originalParticles.apply(this,args);
@@ -43,7 +43,7 @@ function run(seed,hz,mode){
    for(let i=0;i<hz*2;i++)g.update(1/hz);
    return {seed,hz,mode,hash:digest(physical(g)),draws:draws(),
     ordinaryTrailCalls,suppressed,allCalls,activeParticles:
-      (g.particles||[]).filter(p=>p && p.life>0).length};
+      (g.parts||[]).filter(p=>p && p.active).length};
   }finally{
    g.addParticles=originalParticles;g.updateBullets=originalBullets;
    g.destroy();
