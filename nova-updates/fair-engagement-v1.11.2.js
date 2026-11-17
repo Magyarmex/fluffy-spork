@@ -238,6 +238,8 @@ wrap('game/ai',function(ai,require){
     /* A visible spawn-shielded rival cannot be attacked, but may still race for a public pickup. Preserve tactical contacts on the bounded Battle Sense tick when public pickups exist even without a combat target; avoid extra no-target scans in empty arenas. */
     if(window.__NOVA_BATTLE_SENSE__&&(target||(g.powerups&&g.powerups.length))&&(Number(a.__v181Think)||0)<=dt){
       var contacts=[t];
+      /* The no-combat-target pickup lane has no right to inspect rival private speed. */
+      if(!target)contacts.__novaNoCombatTarget=true;
       for(var ci=0;ci<all.length;ci++){
         var cq=all[ci];
         if(cq&&cq.id!==t.id&&alive(cq)&&canPerceive(g,classes,t,cq))
