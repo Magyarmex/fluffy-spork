@@ -4,7 +4,13 @@
 // or behind solid cover. This is a fairness invariant, not an aim-assist buff.
 const test=require('node:test');
 const assert=require('node:assert/strict');
+// The reusable boot fixture also contains a standalone causal test. Its explicit
+// opt-out prevents importing that unrelated test into this worker process.
+const previousAudioPilot=process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL;
+process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
 const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+if(previousAudioPilot===undefined)delete process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL;
+else process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL=previousAudioPilot;
 
 test('composed Battle Sense flank respects observer viewport and cover',()=>{
   for(const seed of [1517800,1517802]){
