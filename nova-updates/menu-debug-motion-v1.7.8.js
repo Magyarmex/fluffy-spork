@@ -63,7 +63,7 @@ function snapshot(){var st=window.__NOVA_UPDATE_STATUS||{},ready=window.__NOVA_U
   * is uploaded: COPY DIAGNOSTICS is explicitly initiated by the player. */
  'FRAME P95':perf.frameP95Ms==null?'n/a':perf.frameP95Ms+' ms',
  'FRAMES >25MS':perf.frameOver25Pct==null?'n/a':perf.frameOver25Pct+'%',
- 'FRAMES >33MS':perf.frameOver33Pct==null?'n/a':perf.frameOver33Pct+'%',
+ 'FRAMES >33.3MS':perf.frameOver33Pct==null?'n/a':perf.frameOver33Pct+'%',
  'FRAMES >50MS':perf.frameOver50Pct==null?'n/a':perf.frameOver50Pct+'%',
  'SIMULATION P95':perf.updateP95Ms==null?'n/a':perf.updateP95Ms+' ms',
  'RENDER P95':perf.renderP95Ms==null?'n/a':perf.renderP95Ms+' ms',
