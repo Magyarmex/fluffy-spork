@@ -114,11 +114,14 @@ assert.ok([65,80,100].includes(renderScale),'only the certified 65%, candidate 8
   const clarity=await page.evaluate(()=>{
    const g=window.__novaBirthGame;
    return {stored:JSON.parse(localStorage.getItem('novatanks_pilot_settings_v1')||'{}').renderScale,
-    dpr:g.dpr,deviceDpr:window.devicePixelRatio,quality:g.quality,
+    dpr:g.dpr,deviceDpr:window.devicePixelRatio,quality:g.quality,particlePool:g.parts?.length,
     css:[g.w,g.h],backing:[g.canvas.width,g.canvas.height]};
   });
-  if(lowQuality)assert.equal(clarity.quality,'low',
-   'low-quality touch arm must exercise the real low-quality renderer');
+  if(lowQuality){
+   assert.equal(clarity.quality,'low','low-quality touch arm must use low renderer');
+   assert.equal(clarity.particlePool,200,
+    'low-quality arm must construct the real 200-particle pool, not mutate a high-quality game');
+  }
   assert.ok(Number.isFinite(clarity.dpr)&&clarity.dpr>=1,'active Game must have legal DPR');
   const expectedBase=Math.max(1,Math.min(clarity.deviceDpr,clarity.quality==='high'?2:1.5));
   const expectedDpr=Math.max(1,expectedBase*renderScale/100);
