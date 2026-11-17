@@ -79,3 +79,15 @@ test('temporary resource route context restores even if movement throws',()=>{
   assert.equal(g.__v1102RouteContext,undefined,
     'a failed movement call must not leak resource steering to another tank');
 });
+
+
+test('critical-heal movement goal has its own 760-unit eligibility boundary',()=>{
+ const {g,tank}=scene();
+ g.powerups[0].x=760;g.powerups[0].y=0;
+ let wp=g.moveTank(tank,100,0,1/60);
+ assert.equal(wp.x,760,'in-horizon selected heal receives exact-goal route ownership');
+ g.powerups[0].x=761;
+ wp=g.moveTank(tank,100,0,1/60);
+ assert.equal(wp.x,100,
+  'outside-horizon heal loses the movement-route hint even if Battle Sense were extended');
+});
