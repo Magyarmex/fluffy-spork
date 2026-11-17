@@ -168,7 +168,7 @@ function contestedArm(seed,hz,classOnly,speedStat){
       // excludes route, projectile and rival-contest penalties, so it is an
       // upper bound, not a second call into the stateful resource planner.
       safeEligible:Math.hypot(350-observer.x,1000-observer.y)<=760,
-      safeOptimisticScore:+(2.5*(1-observer.hp/Math.max(1,observer.maxHp))-
+      safeOptimisticScore:+(2.5*(1-Math.max(0,Math.min(1,observer.hp/Math.max(1,observer.maxHp))))-
        Math.hypot(350-observer.x,1000-observer.y)/900).toFixed(3),
       hp:+observer.hp.toFixed(2),mode:observer.ai.__v181Mode||null,
       planTick});
