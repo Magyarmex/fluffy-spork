@@ -60,7 +60,7 @@ function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8,rivalY=1
     if(prevChoice!==null&&choice!==prevChoice)changes++;
     // Event-driven, bounded diagnostic: distinguish inference from AI choice and steering.
     // Capture only meaningful transitions plus a low-rate heartbeat, not every frame.
-    const confirmed=witness?.confirmed||0,mode=bot.ai.__v181Mode??null,resource=bot.ai.__v181ResourceId??null;
+    const confirmed=witness?.confirmed||0,mode=bot.ai.__v181Mode??null,resource=mode==='resource'?(bot.ai.__v181ResourceId??null):null;
     const currentThink=bot.ai.__v181Think||0;
     const planTick=frame===0||currentThink>previousThink+dt*.5;
     const safeEligible=Math.hypot(safe.x-bot.x,safe.y-bot.y)<=760;
