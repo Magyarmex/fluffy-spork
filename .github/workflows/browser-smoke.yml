@@ -116,6 +116,13 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' }}
         timeout-minutes: 3
         run: node tests/browser/render-clarity-aa-b-research.cjs
+      # One-off branch-only research: compare 65/80/100% clarity in balanced
+      # real composed-game Chromium phases, with measured-window Commit/Paint.
+      # No gameplay or shipping resolution policy changes.
+      - name: Research-only balanced clarity midpoint with CDP trace
+        if: ${{ github.event_name == 'pull_request' && github.head_ref == 'research/clarity-midpoint-commit-trace-20261117' }}
+        timeout-minutes: 7
+        run: NOVA_CLARITY_MIDPOINT=1 NOVA_CLARITY_TRACE=1 node tests/browser/render-clarity-aa-b-research.cjs
       - name: Run real React + Chromium smoke
         run: |
           node tests/browser/real-touch-gameplay.cjs
