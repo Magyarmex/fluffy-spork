@@ -73,3 +73,11 @@ test('birth-witnessed allied fire does not divert a critical healing pickup',()=
  g.bullets=[];g.tryFire(enemy);Object.assign(g.bullets[0],{x:600,y:0,vx:0,vy:0});
  assert.equal(helper.chooseResource(g,observer,classes).id,'far','hostile visible lane should still change heal choice');
 });
+
+test('irrelevant projectile fields do not trigger owner lookups',()=>{
+ const {g,observer,helper}=scene();
+ g.bullets=Array.from({length:240},(_,i)=>({id:500+i,ownerId:2,x:2000+i*2,y:1500,vx:0,vy:0,ttl:1}));
+ let lookups=0;g.getTank=()=>{lookups++;return null;};
+ assert.equal(helper.laneRisk(g,110,115,observer.id,observer),0);
+ assert.equal(lookups,0,'only a geometrically plausible projectile may incur an owner lookup');
+});
