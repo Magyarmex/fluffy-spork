@@ -278,10 +278,14 @@ test('full-game heal horizon cutoff can change initial choice against a credible
   rows.push({hz,safeDistance,classOnly:{firstChoice:classOnly.firstChoice,
    firstSafeAt:classOnly.firstSafeAt,firstObserverHealAt:classOnly.firstObserverHealAt,
    observerDeathAt:classOnly.observerDeathAt,observerHp:classOnly.observerHp,
-   firstPlan:classOnly.planTrace[0]||null},
+   firstPlan:classOnly.planTrace[0]||null,
+   decisions:classOnly.planTrace.filter(p=>p.choice!==null).map(p=>({at:p.at,choice:p.choice,
+    safeEligible:p.preUpdateSafeEligible,nearDist:p.nearDist,safeDist:p.safeDist}))},
    witnessed:{firstChoice:witnessed.firstChoice,firstSafeAt:witnessed.firstSafeAt,
    firstObserverHealAt:witnessed.firstObserverHealAt,observerDeathAt:witnessed.observerDeathAt,
-   observerHp:witnessed.observerHp,firstPlan:witnessed.planTrace[0]||null}});
+   observerHp:witnessed.observerHp,firstPlan:witnessed.planTrace[0]||null,
+   decisions:witnessed.planTrace.filter(p=>p.choice!==null).map(p=>({at:p.at,choice:p.choice,
+    safeEligible:p.preUpdateSafeEligible,nearDist:p.nearDist,safeDist:p.safeDist}))}});
  }
  console.log('COMPOSED_RIVAL_CREDIBLE_CONTEST_HORIZON '+JSON.stringify(rows));
  assert.equal(rows.length,4);
