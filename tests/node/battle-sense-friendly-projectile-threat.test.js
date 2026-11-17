@@ -1,0 +1,54 @@
+'use strict';
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const vm=require('node:vm');
+function scene(){
+ function Game(){this.bullets=[];this.tanks=[];this.time=2;this.w=320;this.h=480;this.cam={zoom:1};}
+ Game.prototype.tryFire=function(t){this.bullets.push({id:100+this.bullets.length,ownerId:t.id,x:110,y:115,vx:0,vy:0,ttl:1});};
+ Game.prototype.updatePowerups=function(){};
+ const modules={'game/engine':m=>{m.exports={Game};},'game/ai':m=>{m.exports={updateAI(){}};}};
+ const window={__novaModules:modules};
+ vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../../nova-updates/battle-sense-v1.8.1.js'),'utf8'),
+  {window,Math,Number,Object,Array,Map,WeakMap,console:{info(){},error(){}}});
+ const observer={id:1,teamId:7,x:0,y:0,alive:true,ai:{}};
+ const ally={id:2,teamId:7,x:110,y:0,alive:true,ai:{}};
+ const enemy={id:3,teamId:9,x:110,y:0,alive:true,ai:{}};
+ const g=new Game();g.tanks=[observer,ally,enemy];
+ g.getTank=id=>g.tanks.find(t=>t.id===id)||null;
+ g.areAllies=(a,b)=>a.teamId!=null&&b.teamId!=null&&a.teamId===b.teamId;
+ g.hasLineOfSight=()=>true;
+ return {g,observer,ally,enemy,helper:window.__NOVA_BATTLE_SENSE_TEST__};
+}
+test('birth-witnessed ordinary allied projectile does not cause flank dodge',()=>{
+ const {g,observer,ally,enemy,helper}=scene();
+ assert.equal(helper.saferSide(g,observer,1,0),0);
+ g.tryFire(ally);
+ assert.equal(helper.saferSide(g,observer,1,0),0,'allied ordinary fire is not a threat');
+ g.bullets=[];
+ g.tryFire(enemy);
+ assert.equal(helper.saferSide(g,observer,1,0),-1,'hostile fire remains a threat');
+});
+test('unknown, dead and recycled shooter identities remain conservative',()=>{
+ const {g,observer,ally,helper}=scene();
+ g.bullets=[{id:200,ownerId:2,x:110,y:115,vx:0,vy:0,ttl:1}];
+ assert.equal(helper.saferSide(g,observer,1,0),-1,'unwitnessed owner must not be trusted');
+ g.bullets=[];g.tryFire(ally);ally.alive=false;
+ assert.equal(helper.saferSide(g,observer,1,0),-1,'dead shooter must not grant immunity');
+ ally.alive=true;g.tanks=[observer,{...ally}];
+ assert.equal(helper.saferSide(g,observer,1,0),-1,'recycled owner ID must not grant immunity');
+});
+test('special projectile hazards remain conservative even from allies',()=>{
+ const {g,observer,ally,helper}=scene();
+ for(const key of ['shell','splash','beam']){
+  g.bullets=[];g.tryFire(ally);g.bullets[0][key]=key==='splash'?60:true;
+  assert.equal(helper.saferSide(g,observer,1,0),-1,key+' may have nonlocal effects');
+ }
+});
+test('birth-witnessed projectile remains threatening when owner relation is unknown',()=>{
+ const {g,observer,ally,helper}=scene();
+ delete observer.teamId;delete ally.teamId;
+ g.bullets=[];g.tryFire(ally);
+ assert.equal(helper.saferSide(g,observer,1,0),-1);
+});
