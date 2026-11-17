@@ -164,6 +164,12 @@ function contestedArm(seed,hz,classOnly,speedStat){
       confirmed:witness?.confirmed||0,fast:+(witness?.fast||0).toFixed(2),
       nearDist:+Math.hypot(1400-observer.x,1120-observer.y).toFixed(2),
       safeDist:+Math.hypot(350-observer.x,1000-observer.y).toFixed(2),
+      // This open-field fixture has no occlusion. Optimistic heal utility
+      // excludes route, projectile and rival-contest penalties, so it is an
+      // upper bound, not a second call into the stateful resource planner.
+      safeEligible:Math.hypot(350-observer.x,1000-observer.y)<=760,
+      safeOptimisticScore:+(2.5*(1-observer.hp/Math.max(1,observer.maxHp))-
+       Math.hypot(350-observer.x,1000-observer.y)/900).toFixed(3),
       hp:+observer.hp.toFixed(2),mode:observer.ai.__v181Mode||null,
       planTick});
     }
