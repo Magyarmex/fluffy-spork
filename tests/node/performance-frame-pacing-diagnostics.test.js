@@ -79,6 +79,44 @@ test('slow frames and expensive simulation are visible in copied diagnostics',()
  assert.equal(s['FRAMES >50MS'],'10%');
  assert.match(s['TIMING SAMPLES'],/last game window/);
 });
+test('frame-gap distribution distinguishes 25% and 50% slow frames despite identical P95',()=>{
+ const arms=[{slow:30,expectedFps:48,over:25},{slow:60,expectedFps:40,over:50}];
+ for(const arm of arms){
+  const t=telemetry(),g={status:'playing',paused:false};
+  t.recordPresentation(g,0);
+  // Exact 120-sample rolling window, same 33.34ms tail in both arms.
+  for(let i=0;i<120;i++)sample(t,g,i<arm.slow?33.34:16.67);
+  const p=t.timingWindow(t.perfState(g));
+  assert.equal(p.frameSamples,120);
+  assert.equal(p.frameP95Ms,33.34);
+  assert.ok(Math.abs(p.fps-arm.expectedFps)<.2,JSON.stringify(p));
+  assert.equal(p.frameOver25Pct,arm.over);
+  assert.equal(p.frameOver33Pct,arm.over);
+  assert.equal(p.frameOver50Pct,0);
+  const a=menu.indexOf('function snapshot()'),b=menu.indexOf('function fillDebug()',a);
+  const win={__NOVA_PERF_LAST__:p,innerWidth:320,innerHeight:700,devicePixelRatio:2};
+  const nav={onLine:true,maxTouchPoints:2,userAgent:'test'};
+  vm.runInNewContext(menu.slice(a,b)+'\\nwindow.__snap=snapshot;',{
+   window:win,navigator:nav,VERSION:'1.7.8',CODENAME:'Signal Flow',updaterState:()=> 'CURRENT'
+  });
+  const copied=win.__snap();
+  assert.equal(copied['FRAMES >25MS'],arm.over+'%');
+  assert.equal(copied['FRAMES >33MS'],arm.over+'%');
+ }
+});
+test('frame-gap distribution resets with paused and suspended game epochs',()=>{
+ const t=telemetry(),g={status:'playing',paused:false};
+ t.recordPresentation(g,0);
+ for(let i=0;i<12;i++)sample(t,g,40);
+ assert.equal(t.timingWindow(t.perfState(g)).frameOver33Pct,100);
+ g.paused=true;sample(t,g,40);
+ assert.equal(t.timingWindow(t.perfState(g)).frameOver33Pct,null);
+ g.paused=false;t.recordPresentation(g,t.clock.now);
+ for(let i=0;i<8;i++)sample(t,g,16.67);
+ assert.equal(t.timingWindow(t.perfState(g)).frameOver33Pct,0);
+ sample(t,g,300);
+ assert.equal(t.timingWindow(t.perfState(g)).frameOver25Pct,null);
+});
 test('decorative War Room cannot overwrite the last playable-match sample',()=>{
  const t=telemetry(),real={status:'playing',paused:false},decorative={__novaDecorativeWorld:true,status:'playing'};
  t.recordPresentation(real,0);
