@@ -61,7 +61,9 @@ test('ordinary projectile glow suppression is physically and RNG transparent in 
   assert.equal(baseline.draws,instrumented.draws,'A/A must not consume RNG');
   assert.equal(suppressed.suppressed,suppressed.ordinaryTrailCalls);
   assert.equal(suppressed.ordinaryTrailCalls,baseline.ordinaryTrailCalls);
-  assert.equal(suppressed.cosmeticState,baseline.cosmeticState,\n   'suppression must preserve dedicated cosmetic RNG state');\n  assert.equal(suppressed.draws,baseline.draws,
+  assert.equal(suppressed.cosmeticState,baseline.cosmeticState,
+   'suppression must preserve dedicated cosmetic RNG state');
+  assert.equal(suppressed.draws,baseline.draws,
    'omitted glow must preserve the cosmetic RNG sequence');
   assert.equal(suppressed.hash,baseline.hash,
    'cosmetic-only suppression must not change physical gameplay');
