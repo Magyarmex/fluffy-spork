@@ -130,7 +130,7 @@ function contestedArm(seed,hz,classOnly,speedStat){
    const start=g.time;
    let maxConfirmed=0,maxFast=0,firstChoice=null,firstSafeAt=null;
    let observerDeathAt=null,minObserverHp=observer.hp,firstObserverHealAt=null;
-   const planTrace=[];let previousChoice,previousConfirmed=-1,previousThink=Infinity;
+   const planTrace=[];let previousChoice,previousConfirmed=-1,previousThink=Infinity,previousSafeEligible=true;
    for(let i=0;i<Math.round(8*hz)&&g.status==='playing'&&g.player.alive;i++){
     // The ecology's sector grid requires finite entity coordinates. Report
     // the first invalid entity rather than obscuring a fixture failure as an
@@ -159,7 +159,8 @@ function contestedArm(seed,hz,classOnly,speedStat){
     // that could mutate route caches or change the autonomous policy.
     const think=Number(observer.ai.__v181Think);
     const planTick=Number.isFinite(think)&&think>previousThink+1/hz*.5;
-    if(planTrace.length<48&&(i===0||choice!==previousChoice||maxConfirmed!==previousConfirmed||planTick&&g.time-start<=2.2)){
+    const safeEligible=Math.hypot(350-observer.x,1000-observer.y)<=760;
+    if(planTrace.length<48&&(i===0||choice!==previousChoice||maxConfirmed!==previousConfirmed||safeEligible!==previousSafeEligible||planTick&&g.time-start<=2.2)){
      planTrace.push({at:+(g.time-start).toFixed(3),choice,
       confirmed:witness?.confirmed||0,fast:+(witness?.fast||0).toFixed(2),
       nearDist:+Math.hypot(1400-observer.x,1120-observer.y).toFixed(2),
@@ -167,13 +168,13 @@ function contestedArm(seed,hz,classOnly,speedStat){
       // This open-field fixture has no occlusion. Optimistic heal utility
       // excludes route, projectile and rival-contest penalties, so it is an
       // upper bound, not a second call into the stateful resource planner.
-      safeEligible:Math.hypot(350-observer.x,1000-observer.y)<=760,
+      safeEligible,
       safeOptimisticScore:+(2.5*(1-Math.max(0,Math.min(1,observer.hp/Math.max(1,observer.maxHp))))-
        Math.hypot(350-observer.x,1000-observer.y)/900).toFixed(3),
       hp:+observer.hp.toFixed(2),mode:observer.ai.__v181Mode||null,
       planTick});
     }
-    previousChoice=choice;previousConfirmed=maxConfirmed;previousThink=think;
+    previousChoice=choice;previousConfirmed=maxConfirmed;previousThink=think;previousSafeEligible=safeEligible;
    }
    const perf=typeof g.novaPerfSnapshot==='function'?g.novaPerfSnapshot():{};
    return {seed,hz,classOnly,speedStat,initial,maxConfirmed,
