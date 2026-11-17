@@ -67,7 +67,7 @@ test('natural composed match pilot compares class-only and witnessed-speed AI',(
 // prefer that heal, whereas sustained observed speed can favor the safe heal.
 // A distant player reduces unrelated player-specific aggro in this paired test. No scripted
 // winner or manual tank steering. This is still NOT natural-match prevalence.
-function contestedArm(seed,hz,classOnly,speedStat,safeDistance=650){
+function contestedArm(seed,hz,classOnly,speedStat,safeDistance=650,rivalStart={x:1180,y:1340}){
  return withSeed(seed,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   try{
@@ -94,7 +94,7 @@ function contestedArm(seed,hz,classOnly,speedStat,safeDistance=650){
    Object.assign(observer,{cls:'guard',x:1000,y:1000,vx:0,vy:0,
     hp:20,maxHp:100,alive:true,spawnShieldT:0,shieldT:0,
     hasteT:0,stampedeT:0,perk:null,gene:null,tier:1,stats:{...observer.stats,speed:0}});
-   Object.assign(rival,{cls:'guard',x:1180,y:1340,vx:0,vy:0,
+   Object.assign(rival,{cls:'guard',x:rivalStart.x,y:rivalStart.y,vx:0,vy:0,
     hp:20,maxHp:100,alive:true,spawnShieldT:0,shieldT:0,
     hasteT:0,stampedeT:0,perk:null,gene:null,tier:1,stats:{...rival.stats,speed:speedStat}});
    Object.assign(g.player,{x:1900,y:1900,vx:0,vy:0,spawnShieldT:0});
@@ -248,4 +248,32 @@ test('full-game critical-heal horizon boundary research at 759/761/850 units',()
  }
  console.log('COMPOSED_RIVAL_CRITICAL_HEAL_HORIZON_BOUNDARY '+JSON.stringify(rows));
  assert.equal(rows.length,6);
+});
+
+// Mechanistic falsifier: put the rival 200u from the contested heal so the
+// class-only public-speed contest penalty is already strong enough for the
+// 759u safe heal to win on the first ordinary AI plan. At 761u that same
+// candidate is excluded before scoring. The rival uses fully autonomous
+// steering and real pickup arbitration; no scripted winner or instant plan.
+test('full-game heal horizon cutoff can change initial choice against a credible contender',()=>{
+ const rows=[];
+ for(const hz of [30,60])for(const safeDistance of [759,761]){
+  const classOnly=contestedArm(1517800,hz,true,0,safeDistance,{x:1400,y:920});
+  const witnessed=contestedArm(1517800,hz,false,0,safeDistance,{x:1400,y:920});
+  assert.equal(classOnly.initial,witnessed.initial,
+   'same public initial tank geometry across policies');
+  for(const arm of [classOnly,witnessed]){
+   assert.equal(arm.safeDistance,safeDistance);
+   assert.ok(Number.isFinite(arm.observerX)&&Number.isFinite(arm.observerHp));
+  }
+  rows.push({hz,safeDistance,classOnly:{firstChoice:classOnly.firstChoice,
+   firstSafeAt:classOnly.firstSafeAt,firstObserverHealAt:classOnly.firstObserverHealAt,
+   observerDeathAt:classOnly.observerDeathAt,observerHp:classOnly.observerHp,
+   firstPlan:classOnly.planTrace[0]||null},
+   witnessed:{firstChoice:witnessed.firstChoice,firstSafeAt:witnessed.firstSafeAt,
+   firstObserverHealAt:witnessed.firstObserverHealAt,observerDeathAt:witnessed.observerDeathAt,
+   observerHp:witnessed.observerHp,firstPlan:witnessed.planTrace[0]||null}});
+ }
+ console.log('COMPOSED_RIVAL_CREDIBLE_CONTEST_HORIZON '+JSON.stringify(rows));
+ assert.equal(rows.length,4);
 });
