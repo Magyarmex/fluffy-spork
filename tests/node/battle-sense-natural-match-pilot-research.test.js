@@ -75,7 +75,19 @@ function contestedArm(seed,hz,classOnly,speedStat){
    assert.ok(bots.length>=2,'requires two real autonomous opponents');
    const [observer,rival]=bots;
    g.tanks=[g.player,observer,rival];
-   g.__novaFairVisibleTanks=g.tanks;
+   // Keep the composed game's ID lookup in sync with its reduced research
+   // roster. A stale owner in tankById can otherwise affect damage, drones,
+   // target selection and attribution even though that tank was removed.
+   assert.ok(g.tankById instanceof Map,'requires canonical tank ID registry');
+   g.tankById.clear();
+   for(const tank of g.tanks){
+    assert.ok(tank&&tank.id!=null,'research tank must have an ID');
+    assert.ok(!g.tankById.has(tank.id),'research roster IDs must be unique');
+    g.tankById.set(tank.id,tank);
+   }
+   assert.equal(g.tankById.size,g.tanks.length);
+   // Do not seed Fair Engagement's contact cache from the test harness.
+   // The real Game.update must establish visible contacts itself.
    g.__novaTerrain=[];g.__novaBattlefieldIndex=null;
    if(g.hash?.clear)g.hash.clear();
    Object.assign(observer,{cls:'guard',x:1000,y:1000,vx:0,vy:0,
