@@ -88,6 +88,7 @@ function contestedArm(seed,hz,classOnly,speedStat){
    assert.equal(g.tankById.size,g.tanks.length);
    // Do not seed Fair Engagement's contact cache from the test harness.
    // The real Game.update must establish visible contacts itself.
+   delete g.__novaFairVisibleTanks;
    g.__novaTerrain=[];g.__novaBattlefieldIndex=null;
    if(g.hash?.clear)g.hash.clear();
    Object.assign(observer,{cls:'guard',x:1000,y:1000,vx:0,vy:0,
