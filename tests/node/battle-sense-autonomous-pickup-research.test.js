@@ -4,7 +4,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 
-function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8,rivalY=1120,preObserve=false){
+function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8,rivalY=1120,preObserve=false,forcePlanAtSpawn=false){
  return withSeed(1517800,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   try{
@@ -61,6 +61,9 @@ function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8,rivalY=1
       safeEligible:safeDist<=760,
       nextThink:bot.ai.__v181Think,mode:bot.ai.__v181Mode??null};
      g.powerups=[near,safe];
+     // Research intervention: only the timing of the first pickup-aware
+     // strategic plan changes; no tank position, speed or pickup is edited.
+     if(forcePlanAtSpawn)bot.ai.__v181Think=0;
     }
     const fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT__;
     g.__novaFairVisibleTanks=(!fair||fair.inGameplayViewport(g,bot,rival))
@@ -107,7 +110,7 @@ function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8,rivalY=1
     g.updatePowerups(dt);
     if(arrivals.some(a=>a.who==='bot'))break;
    }
-   return {hz,direction,safeLayout,classOnly,speedStat,rivalY,preObserve,confirmedAtSpawn,fastAtSpawn,spawnSnapshot,firstChoice,changes,firstNearAt,firstSafeAt,
+   return {hz,direction,safeLayout,classOnly,speedStat,rivalY,preObserve,forcePlanAtSpawn,confirmedAtSpawn,fastAtSpawn,spawnSnapshot,firstChoice,changes,firstNearAt,firstSafeAt,
     maxConfirmed,maxFast:+maxFast.toFixed(3),
     botPickup:arrivals.find(a=>a.who==='bot')||null,
     rivalPickup:arrivals.find(a=>a.who==='rival')||null,
@@ -192,4 +195,26 @@ test('pre-observation versus simultaneous heal spawn: autonomous matched pairs',
  for(const r of results)assert.ok(Number.isFinite(r.botX)&&Number.isFinite(r.botY));
  console.log('COMPOSED_RIVAL_PREOBSERVATION_RESEARCH '+JSON.stringify(results.map(({trace,...summary})=>summary)));
  // Exploratory: do not assert a win before paired gameplay outcomes support it.
+});
+
+// Research-only timing intervention: does an immediate pickup-aware plan at
+// the same legitimate spawn geometry rescue a safer-heal decision? This is
+// not a proposed gameplay cadence change and does not simulate human fun.
+test('matched delayed-spawn heal choice isolates first planning-tick latency',()=>{
+ const results=[];
+ for(const hz of [30,60])for(const forcePlanAtSpawn of [false,true])
+  for(const classOnly of [true,false])
+   results.push(arm(hz,1,'west',classOnly,8,1120,true,forcePlanAtSpawn));
+ for(const hz of [30,60]){
+  const group=results.filter(r=>r.hz===hz);
+  for(const r of group){
+   assert.deepEqual(r.spawnSnapshot,group[0].spawnSnapshot,
+    'planning-tick intervention must not alter spawn geometry or prior AI timer');
+   assert.ok(Number.isFinite(r.botX)&&Number.isFinite(r.botY));
+  }
+  assert.ok(group.filter(r=>!r.classOnly).every(r=>r.confirmedAtSpawn>=3&&r.fastAtSpawn>124));
+  assert.ok(group.filter(r=>r.classOnly).every(r=>r.confirmedAtSpawn===0));
+ }
+ console.log('COMPOSED_RIVAL_SPAWN_PLAN_LATENCY_RESEARCH '+JSON.stringify(results.map(({trace,...summary})=>summary)));
+ // Report negative outcomes too. Do not assert an acquisition advantage.
 });
