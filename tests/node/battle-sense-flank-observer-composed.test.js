@@ -30,6 +30,17 @@ test('composed Battle Sense flank respects observer viewport and cover',()=>{
         g.hasLineOfSight=(ax,ay,bx,by)=>
           !(ax===t.x&&ay===t.y&&bx===t.x+110&&by===t.y+115);
         assert.equal(side(g,t,1,0),0,'terrain-hidden threat cannot alter steering');
+        // Realistic narrow mobile viewport: a fast projectile can be outside
+        // the player's screen while its extrapolated path crosses a flank probe.
+        g.hasLineOfSight=()=>true;
+        g.bullets=[{id:999997,ownerId:999998,kind:'bullet',
+          x:t.x+240,y:t.y+115,vx:-600,vy:0,ttl:1,dead:false}];
+        g.w=280;g.h=568;
+        assert.equal(fair.inGameplayWorldPoint(g,t,t.x+240,t.y+115),false);
+        assert.equal(side(g,t,1,0),0,'offscreen approaching fire cannot trigger predictive dodge');
+        g.w=800;
+        assert.equal(fair.inGameplayWorldPoint(g,t,t.x+240,t.y+115),true);
+        assert.equal(side(g,t,1,0),-1,'visible approaching fire can trigger predictive dodge');
       }finally{
         g.hasLineOfSight=oldLos;g.isTerrainSafe=oldSafe;g.destroy();
       }
