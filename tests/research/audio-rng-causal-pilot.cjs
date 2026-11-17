@@ -97,9 +97,10 @@ function bootGame(quality = 'low') {
 
 /* Research only. Force the canonical Sfx.ensure noise-buffer initialization
  * at the SAME point after a matched physical Game boot. Three arms isolate
- * its 22,050 shared random draws from the audio buffer's visual analogue:
- * the sound waveform data itself. All arms then mute audio for identical
- * gameplay/input; no audio implementation or production code is changed.
+ * its noise-buffer generation from gameplay's shared RNG. The canonical
+ * local noise stream must preserve a non-silent waveform without consuming
+ * any shared random draws. All arms then mute audio for identical gameplay;
+ * no audio implementation or production code is changed.
  */
 class FakeAudioContext {
  constructor(){this.sampleRate=44100;this.currentTime=0;this.state='running';this.destination={};}
@@ -137,6 +138,7 @@ function arm(seed,hz,mode){
    const data=g.sfx.noiseBuf.getChannelData(0);
    audioSamples=data.length;
    assert.equal(audioSamples,22050,'canonical 0.5s at 44.1kHz');
+   assert.ok(data.some(sample=>sample!==0),'audio RNG isolation must not silence the noise buffer');
    if(mode==='erased')data.fill(0);
   }
   // No audio output is permitted in any arm after the intervention.
@@ -167,7 +169,7 @@ if (!process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL) test('canonical audio noise-buff
    erased=arm(seed,hz,'erased');
   assert.equal(off.initial,enabled.initial);
   assert.equal(off.initial,erased.initial);
-  const expectedSharedDraws=process.env.NOVA_AUDIO_RNG_PATCHED==='1'?0:22050;
+  const expectedSharedDraws=0; // Canonical shipping Sfx.ensure now uses a local seeded noise stream.
   assert.equal(enabled.interventionDraws,expectedSharedDraws);
   assert.equal(erased.interventionDraws,expectedSharedDraws);
   assert.equal(off.interventionDraws,0);
@@ -175,7 +177,7 @@ if (!process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL) test('canonical audio noise-buff
   const erasedFirst=firstDifference(enabled,erased);
   results.push({seed,hz,off,enabled,erased,audioFirst,erasedFirst});
  }
- const summary={contract:'research-only causal intervention: Sfx.ensure at fixed post-boot point; erase audio waveform after burning same RNG; all subsequent SFX muted; not a real-device sound test',
+ const summary={contract:'research-only causal intervention: Sfx.ensure at fixed post-boot point; canonical noise generation must not consume gameplay RNG; all subsequent SFX muted; not a real-device sound test',
   independentSeeds:seeds.length,frameRates:[30,60],seconds:5,
   scenarios:results.length,
   audioGameplayDivergences:results.filter(r=>r.audioFirst!==null).length,
@@ -195,11 +197,8 @@ if (!process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL) test('canonical audio noise-buff
  }));
  assert.equal(summary.erasedGameplayDivergences,0,
   'audio waveform contents unexpectedly influence physical state');
- if(process.env.NOVA_AUDIO_RNG_PATCHED==='1')
-  assert.equal(summary.audioGameplayDivergences,0,
-   'audio noise RNG still perturbs gameplay after isolation');
- else assert.ok(summary.audioGameplayDivergences>0,
-   'baseline audio RNG leak unexpectedly absent');
+ assert.equal(summary.audioGameplayDivergences,0,
+  'canonical audio initialization must not perturb gameplay RNG');
 });
 
 // Shared real-game fixture for the independent overlay-audio causal pilot.
