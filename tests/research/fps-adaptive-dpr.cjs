@@ -111,8 +111,9 @@ function createAdaptiveDprPilot(game, options={}) {
       // A percentile can remain identical when the share of 30Hz-like gaps
       // falls substantially. Accept that alternative only with BOTH windows'
       // real 120-frame distribution telemetry, never with inferred fractions.
-      const slowShareGain=Number.isFinite(baseline.frameOver25Pct)&&
-        Number.isFinite(p.frameOver25Pct)?
+      const validShare=v=>Number.isFinite(v)&&v>=0&&v<=100;
+      const slowShareGain=validShare(baseline.frameOver25Pct)&&
+        validShare(p.frameOver25Pct)?
         baseline.frameOver25Pct-p.frameOver25Pct:-Infinity;
       // A faster renderer is not a win if the world advances less per wall second.
       // Require explicit simulation-pace evidence, not just FPS and update cost.
