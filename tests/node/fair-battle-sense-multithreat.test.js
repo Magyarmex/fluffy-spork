@@ -331,3 +331,19 @@ test('no-target public pickup contacts retain bounded planning cadence',()=>{
  assert.equal(current,undefined);
  assert.equal(g.tanks.length,3);
 });
+
+test('no-target contest uses public class speed without private rival stats',()=>{
+ const {Game,win}=boot(),g=new Game();
+ const self=tank(1,'twin',0,0),rival=tank(2,'fast',150,0);
+ g.tanks=[self,rival];g.__novaFairVisibleTanks=[self,rival];
+ g.__novaFairVisibleTanks.__novaNoCombatTarget=true;
+ g.tankSpeed=q=>{assert.equal(q,self,'private rival speed must not be queried');return 200;};
+ const classes={CLASSES:{fast:{size:15,moveMult:1.5},
+  slow:{size:15,moveMult:.5}}};
+ const hooks=win.__NOVA_BATTLE_SENSE_TEST__,pickup={x:300,y:0};
+ const fast=hooks.resourceContest(g,self,pickup,300,classes);
+ rival.cls='slow';
+ const slow=hooks.resourceContest(g,self,pickup,300,classes);
+ assert.ok(fast>slow,'publicly faster classes should contest more strongly');
+ assert.equal(slow,0,'slow public class cannot win this distant race');
+});
