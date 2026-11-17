@@ -141,6 +141,10 @@ function contestedArm(seed,hz,classOnly,speedStat){
        assert.fail('nonfinite '+kind+' before tick '+i+': '+JSON.stringify({
         id:entity.id,cls:entity.cls,type:entity.type,x:entity.x,y:entity.y,
         vx:entity.vx,vy:entity.vy,ai:entity.ai&&Object.keys(entity.ai).slice(0,15)}));
+    // Pre-update position/HP are closer to the AI planning inputs than
+    // the post-update sample, which includes movement, regen and arbitration.
+    const preUpdateSafeDist=Math.hypot(350-observer.x,1000-observer.y);
+    const preUpdateHp=observer.hp;
     g.update(1/hz);
     minObserverHp=Math.min(minObserverHp,observer.hp);
     if(observerDeathAt===null&&(!observer.alive||observer.hp<=0))
@@ -169,6 +173,10 @@ function contestedArm(seed,hz,classOnly,speedStat){
       // excludes route, projectile and rival-contest penalties, so it is an
       // upper bound, not a second call into the stateful resource planner.
       safeEligible,
+      preUpdateSafeDist:+preUpdateSafeDist.toFixed(2),
+      preUpdateSafeEligible:preUpdateSafeDist<=760,
+      preUpdateSafeOptimisticScore:+(2.5*(1-Math.max(0,Math.min(1,
+       preUpdateHp/Math.max(1,observer.maxHp))))-preUpdateSafeDist/900).toFixed(3),
       safeOptimisticScore:+(2.5*(1-Math.max(0,Math.min(1,observer.hp/Math.max(1,observer.maxHp))))-
        Math.hypot(350-observer.x,1000-observer.y)/900).toFixed(3),
       hp:+observer.hp.toFixed(2),mode:observer.ai.__v181Mode||null,
