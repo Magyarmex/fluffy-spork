@@ -6,6 +6,7 @@ const assert=require('node:assert/strict');
 const {chromium}=require('playwright');
 const renderScale=process.env.NOVA_TOUCH_RENDER_SCALE?Number(process.env.NOVA_TOUCH_RENDER_SCALE):100;
 const midGestureDpr=process.env.NOVA_TOUCH_MID_GESTURE_DPR==='1';
+const lowQuality=process.env.NOVA_TOUCH_LOW_QUALITY==='1';
 assert.ok([65,80,100].includes(renderScale),'only the certified 65%, candidate 80%, and default 100% clarity arms are supported');
 
 (async()=>{
@@ -107,6 +108,7 @@ assert.ok([65,80,100].includes(renderScale),'only the certified 65%, candidate 8
   await canvas.waitFor({state:'visible',timeout:30000});
   await page.waitForFunction(()=>window.__novaBirthGame?.status==='playing',null,{timeout:20000});
   await page.locator('.nv-loading').waitFor({state:'hidden',timeout:20000});
+  if(lowQuality)await page.evaluate(()=>{const g=window.__novaBirthGame;g.quality='low';g.resize();});
   const clarity=await page.evaluate(()=>{
    const g=window.__novaBirthGame;
    return {stored:JSON.parse(localStorage.getItem('novatanks_pilot_settings_v1')||'{}').renderScale,
@@ -265,7 +267,7 @@ assert.ok([65,80,100].includes(renderScale),'only the certified 65%, candidate 8
   },null,{timeout:5000});
   assert.deepEqual(errors,[],'the real game must not throw');
   console.log('NOVA_TOUCH_TO_PROJECTILE_BIRTH '+JSON.stringify({
-   viewport:'320x700',trusted:true,renderScale,midGestureDpr,dpr:clarity.dpr,
+   viewport:'320x700',trusted:true,renderScale,midGestureDpr,lowQuality,dpr:clarity.dpr,
    css:clarity.css,backing:clarity.backing,
    deliveryToBirthMs:Math.round(delay*1000)/1000,
    deliveryToSimulationMs:Math.round(inputToSample*1000)/1000,
