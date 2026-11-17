@@ -115,6 +115,8 @@ assert.ok([65,80,100].includes(renderScale),'only the certified 65%, candidate 8
     dpr:g.dpr,deviceDpr:window.devicePixelRatio,quality:g.quality,
     css:[g.w,g.h],backing:[g.canvas.width,g.canvas.height]};
   });
+  if(lowQuality)assert.equal(clarity.quality,'low',
+   'low-quality touch arm must exercise the real low-quality renderer');
   assert.ok(Number.isFinite(clarity.dpr)&&clarity.dpr>=1,'active Game must have legal DPR');
   const expectedBase=Math.max(1,Math.min(clarity.deviceDpr,clarity.quality==='high'?2:1.5));
   const expectedDpr=Math.max(1,expectedBase*renderScale/100);
