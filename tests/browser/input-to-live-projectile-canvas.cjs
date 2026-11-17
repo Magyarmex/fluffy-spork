@@ -16,6 +16,9 @@ assert.ok([65,80,100].includes(renderScale),'only the certified 65%, candidate 8
  if(renderScale!==100)await context.addInitScript(scale=>{
   localStorage.setItem('novatanks_pilot_settings_v1',JSON.stringify({renderScale:scale}));
  },renderScale);
+ if(lowQuality)await context.addInitScript(()=>{
+  localStorage.setItem('novatanks_quality','low');
+ });
  const page=await context.newPage(),errors=[];
  page.on('pageerror',e=>errors.push(String(e.stack||e)));
  try{
@@ -108,7 +111,6 @@ assert.ok([65,80,100].includes(renderScale),'only the certified 65%, candidate 8
   await canvas.waitFor({state:'visible',timeout:30000});
   await page.waitForFunction(()=>window.__novaBirthGame?.status==='playing',null,{timeout:20000});
   await page.locator('.nv-loading').waitFor({state:'hidden',timeout:20000});
-  if(lowQuality)await page.evaluate(()=>{const g=window.__novaBirthGame;g.quality='low';g.resize();});
   const clarity=await page.evaluate(()=>{
    const g=window.__novaBirthGame;
    return {stored:JSON.parse(localStorage.getItem('novatanks_pilot_settings_v1')||'{}').renderScale,
