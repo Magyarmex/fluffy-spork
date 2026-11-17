@@ -270,6 +270,8 @@ test('no-target AI accounts for a visible spawn-shielded healing competitor',()=
  self.hp=20;
  target.x=-200;target.spawnShieldT=2;
  duelist.spawnShieldT=2;
+ let privateReads=0;
+ g.tankSpeed=q=>{if(q!==self){privateReads++;throw Error('private rival speed read');}return 200;};
  g.powerups=[
   {id:91,type:'heal',x:-200,y:0},
   {id:92,type:'heal',x:-420,y:0}
@@ -278,6 +280,7 @@ test('no-target AI accounts for a visible spawn-shielded healing competitor',()=
  assert.equal(self.ai.__v1112TargetId,-1,
   'protected rivals must not become attack targets');
  assert.equal(self.ai.__v181Mode,'resource');
+ assert.equal(privateReads,0,'no private rival movement stats may be queried');
  assert.equal(self.ai.__v181ResourceId,92,
   'visible protected rival can still win contested heal; choose nearby safe heal');
  assert.deepEqual(Array.from(g.__legacyVisibleIds),[1]);
