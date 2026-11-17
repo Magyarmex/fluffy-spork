@@ -243,7 +243,7 @@ test('spawn-protected visible pickup rivals remain tactical contacts without a c
  ai.updateAI(self,g,1/60);
  assert.equal(self.ai.__v1112TargetId,-1,
   'spawn shields must still prohibit selecting a combat target');
- assert.deepEqual(snapshot,[1,2,3],
+ assert.deepEqual(Array.from(snapshot),[1,2,3],
   'public pickup rivals remain visible even when they cannot be attacked');
  assert.deepEqual(Array.from(g.__legacyVisibleIds),[1],
   'legacy combat AI must not receive additional targets');
@@ -260,7 +260,7 @@ test('no-target pickup contacts never grant offscreen radar',()=>{
   set(value){if(Array.isArray(value))snapshot=value.map(q=>q.id);}});
  ai.updateAI(self,g,1/60);
  assert.equal(self.ai.__v1112TargetId,-1);
- assert.deepEqual(snapshot,[1],
+ assert.deepEqual(Array.from(snapshot),[1],
   'no offscreen rival may enter the public tactical-contact snapshot');
  assert.deepEqual(Array.from(g.__legacyVisibleIds),[1]);
 });
