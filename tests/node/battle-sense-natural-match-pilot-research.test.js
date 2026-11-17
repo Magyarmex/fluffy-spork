@@ -98,6 +98,8 @@ function contestedArm(seed,hz,classOnly,speedStat,safeDistance=650,rivalStart={x
     hp:20,maxHp:100,alive:true,spawnShieldT:0,shieldT:0,
     hasteT:0,stampedeT:0,perk:null,gene:null,tier:1,stats:{...rival.stats,speed:speedStat}});
    Object.assign(g.player,{x:1900,y:1900,vx:0,vy:0,spawnShieldT:0});
+   const rivalInitiallyVisible=!!g.__testFair?.inGameplayViewport(g,observer,rival);
+   const observerViewport=g.__testFair?.viewportHalfExtents(g);
    // Preserve the canonical autonomous AI's movement, aim and cadence
    // fields. Replacing ai with {} leaves wanderA undefined, feeds NaN to
    // moveTank, and crashes Living Front's sector accounting on the next tick.
@@ -188,7 +190,8 @@ function contestedArm(seed,hz,classOnly,speedStat,safeDistance=650,rivalStart={x
     previousChoice=choice;previousConfirmed=maxConfirmed;previousThink=think;previousSafeEligible=safeEligible;
    }
    const perf=typeof g.novaPerfSnapshot==='function'?g.novaPerfSnapshot():{};
-   return {seed,hz,classOnly,speedStat,safeDistance,initial,maxConfirmed,
+   return {seed,hz,classOnly,speedStat,safeDistance,rivalInitiallyVisible,
+    observerViewport,initial,maxConfirmed,
     maxFast:+maxFast.toFixed(3),firstChoice,firstSafeAt,planTrace,
     elapsed:+(g.time-start).toFixed(3),arrivals,
     observerHp:+observer.hp.toFixed(2),rivalHp:+rival.hp.toFixed(2),
@@ -266,6 +269,8 @@ test('full-game heal horizon cutoff can change initial choice against a credible
    'same public initial tank geometry across policies');
   for(const arm of [classOnly,witnessed]){
    assert.equal(arm.safeDistance,safeDistance);
+   assert.equal(arm.rivalInitiallyVisible,true,
+    'credible rival must be within the actual observer gameplay viewport');
    assert.equal(arm.planTrace[0]?.preUpdateSafeEligible,safeDistance<=760,
     'credible-contender arms must straddle the actual first-plan horizon');
    assert.ok(Number.isFinite(arm.observerX)&&Number.isFinite(arm.observerHp));
