@@ -6,15 +6,15 @@ const assert=require('node:assert/strict');
 const {chromium}=require('playwright');
 const renderScale=process.env.NOVA_TOUCH_RENDER_SCALE?Number(process.env.NOVA_TOUCH_RENDER_SCALE):100;
 const midGestureDpr=process.env.NOVA_TOUCH_MID_GESTURE_DPR==='1';
-assert.ok([65,100].includes(renderScale),'only the certified 65% and default 100% clarity arms are supported');
+assert.ok([65,80,100].includes(renderScale),'only the certified 65%, candidate 80%, and default 100% clarity arms are supported');
 
 (async()=>{
  const browser=await chromium.launch({headless:true,args:['--disable-dev-shm-usage','--no-sandbox']});
  const context=await browser.newContext({viewport:{width:320,height:700},
   deviceScaleFactor:2,isMobile:true,hasTouch:true});
- if(renderScale===65)await context.addInitScript(()=>{
-  localStorage.setItem('novatanks_pilot_settings_v1',JSON.stringify({renderScale:65}));
- });
+ if(renderScale!==100)await context.addInitScript(scale=>{
+  localStorage.setItem('novatanks_pilot_settings_v1',JSON.stringify({renderScale:scale}));
+ },renderScale);
  const page=await context.newPage(),errors=[];
  page.on('pageerror',e=>errors.push(String(e.stack||e)));
  try{
@@ -120,9 +120,9 @@ assert.ok([65,100].includes(renderScale),'only the certified 65% and default 100
    'shipping clarity owner must apply the exact selected backing scale');
   assert.deepEqual(clarity.backing,clarity.css.map(v=>Math.max(1,Math.round(v*clarity.dpr))),
    'the actual Canvas backing must match the Game DPR');
-  if(renderScale===65){
-   assert.equal(clarity.stored,65,'opt-in clarity setting must reach the shipping Game');
-   assert.ok(clarity.dpr<=1.5,'65% research arm must reduce backing resolution');
+  if(renderScale!==100){
+   assert.equal(clarity.stored,renderScale,'opt-in clarity setting must reach the shipping Game');
+   assert.ok(clarity.dpr<expectedBase,'reduced clarity arm must lower backing resolution');
   }
   await page.evaluate(()=>{
    const g=window.__novaBirthGame;
