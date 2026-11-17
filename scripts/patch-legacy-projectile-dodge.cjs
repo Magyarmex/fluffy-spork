@@ -15,7 +15,9 @@ const before=[
 '            continue;',
 '        const sp = Math.hypot(b.vx, b.vy) || 1;',
 '        const dot = (dx * b.vx + dy * b.vy) / sp;',
-'        if (dot > 0) {'
+'        if (dot > 0) {',
+'            const perp = d2 - dot * dot;',
+'            if (perp < 95 * 95) {'
 ].join('\n');
 const after=[
 '        if (b.ownerId === t.id)',
@@ -25,17 +27,19 @@ const after=[
 '        const d2 = dx * dx + dy * dy;',
 '        if (d2 > 150 * 150)',
 '            continue;',
-'        // React only to a currently visible projectile with an unobstructed lane.',
-'        const fair = window.__NOVA_FAIR_ENGAGEMENT__;',
-'        if (fair && typeof fair.inGameplayWorldPoint === "function" &&',
-'            !fair.inGameplayWorldPoint(g, t, b.x, b.y))',
-'            continue;',
-'        if (g.hasLineOfSight && !g.hasLineOfSight(t.x, t.y, b.x, b.y, 3))',
-'            continue;',
 '        const sp = Math.hypot(b.vx, b.vy) || 1;',
 '        const dot = (dx * b.vx + dy * b.vy) / sp;',
 '        // dx points from tank to projectile: a negative dot means approaching.',
-'        if (dot < 0) {'
+'        if (dot < 0) {',
+'            const perp = d2 - dot * dot;',
+'            if (perp < 95 * 95) {',
+'                // Probe visibility only for an actually approaching close-pass lane.',
+'                const fair = window.__NOVA_FAIR_ENGAGEMENT__;',
+'                if (fair && typeof fair.inGameplayWorldPoint === "function" &&',
+'                    !fair.inGameplayWorldPoint(g, t, b.x, b.y))',
+'                    continue;',
+'                if (g.hasLineOfSight && !g.hasLineOfSight(t.x, t.y, b.x, b.y, 3))',
+'                    continue;'
 ].join('\n');
 function count(s,needle){return s.split(needle).length-1;}
 function patchLegacyProjectileDodge(html){
