@@ -58,7 +58,8 @@ function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8,rivalY=1
      spawnSnapshot={botX:bot.x,botY:bot.y,
       rivalX:rival.x,rivalY:rival.y,
       safeDist,nearDist:Math.hypot(near.x-bot.x,near.y-bot.y),
-      safeEligible:safeDist<=760};
+      safeEligible:safeDist<=760,
+      nextThink:bot.ai.__v181Think,mode:bot.ai.__v181Mode??null};
      g.powerups=[near,safe];
     }
     const fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT__;
@@ -179,6 +180,10 @@ test('pre-observation versus simultaneous heal spawn: autonomous matched pairs',
   assert.ok(witnessed.confirmedAtSpawn>=3&&witnessed.fastAtSpawn>124);
   console.log('COMPOSED_RIVAL_MATCHED_SPAWN_CAUSAL_PAIR '+JSON.stringify({hz,
    spawnSnapshot:witnessed.spawnSnapshot,
+   // Only the near-spawn decision window is needed to distinguish a late
+   // planning tick from a rival-speed scoring problem.
+   classOnlyEarlyTrace:baseline.trace.filter(p=>p.at>=.9&&p.at<=2.2).slice(0,18),
+   witnessedEarlyTrace:witnessed.trace.filter(p=>p.at>=.9&&p.at<=2.2).slice(0,18),
    classOnly:{firstChoice:baseline.firstChoice,firstSafeAt:baseline.firstSafeAt,
     botPickup:baseline.botPickup,firstNearAt:baseline.firstNearAt},
    witnessed:{firstChoice:witnessed.firstChoice,firstSafeAt:witnessed.firstSafeAt,
