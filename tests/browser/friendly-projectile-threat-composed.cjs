@@ -31,7 +31,7 @@ const {chromium}=require('playwright');
    try{
     Object.assign(observer,{x:0,y:0,alive:true,teamId:7});
     Object.assign(shooter,{x:80,y:115,angle:0,alive:true,teamId:7,
-     cls:'basic',gene:null,perk:null,tripleT:0,supercharge:false,fireCd:0,overheatT:0,spawnShieldT:0});
+     cls:'scout',gene:null,perk:null,tripleT:0,supercharge:false,fireCd:0,overheatT:0,spawnShieldT:0});
     g.w=320;g.h=480;g.cam={...(g.cam||{}),zoom:1};
     g.hasLineOfSight=()=>true;
     g.areAllies=(x,y)=>x.teamId!=null&&y.teamId!=null&&x.teamId===y.teamId;
