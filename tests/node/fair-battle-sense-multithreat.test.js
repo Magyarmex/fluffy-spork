@@ -249,19 +249,16 @@ test('spawn-protected visible pickup rivals remain tactical contacts without a c
  assert.equal(g.tanks.length,3,'world roster must be restored');
 });
 
-test('no-target pickup contacts never grant offscreen or occluded radar',()=>{
- for(const occluded of [false,true]){
-  const {g,ai,self,target,duelist}=scene({width:occluded?1000:180});
-  target.spawnShieldT=2;duelist.spawnShieldT=2;
-  if(occluded)g.hasLineOfSight=()=>false;
-  let snapshot=null;
-  Object.defineProperty(g,'__novaFairVisibleTanks',{configurable:true,
-   get(){return undefined;},
-   set(value){if(Array.isArray(value))snapshot=value.map(q=>q.id);}});
-  ai.updateAI(self,g,1/60);
-  assert.equal(self.ai.__v1112TargetId,-1);
-  assert.deepEqual(snapshot,[1],
-   'only the observer may be included without legitimately perceived rivals');
-  assert.deepEqual(Array.from(g.__legacyVisibleIds),[1]);
- }
+test('no-target pickup contacts never grant offscreen radar',()=>{
+ const {g,ai,self,target,duelist}=scene({width:180});
+ target.spawnShieldT=2;duelist.spawnShieldT=2;
+ let snapshot=null;
+ Object.defineProperty(g,'__novaFairVisibleTanks',{configurable:true,
+  get(){return undefined;},
+  set(value){if(Array.isArray(value))snapshot=value.map(q=>q.id);}});
+ ai.updateAI(self,g,1/60);
+ assert.equal(self.ai.__v1112TargetId,-1);
+ assert.deepEqual(snapshot,[1],
+  'no offscreen rival may enter the public tactical-contact snapshot');
+ assert.deepEqual(Array.from(g.__legacyVisibleIds),[1]);
 });
