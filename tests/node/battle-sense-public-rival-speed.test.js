@@ -83,3 +83,12 @@ test('hidden rival speed cannot flip the actual two-heal resource decision',()=>
  assert.equal(fast.id,slow.id,'a hidden speed upgrade cannot change the selected pickup');
  assert.equal(slow.id,11,'public class baseline still permits the tactically valuable closer heal');
 });
+
+test('combat-target pickup scoring never calls the private rival speed accessor',()=>{
+ const {g,h,self,rival,pickup}=scene();
+ g.tankSpeed=t=>{
+  if(t===rival)throw new Error('private rival speed accessed');
+  return 200;
+ };
+ assert.doesNotThrow(()=>h.resourceContest(g,self,pickup,300,{CLASSES:{scout:{size:15,moveMult:1}}}));
+});
