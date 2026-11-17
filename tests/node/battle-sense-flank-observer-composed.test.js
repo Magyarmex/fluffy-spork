@@ -1,0 +1,55 @@
+'use strict';
+// Real 49-overlay Game composition: the local Battle Sense flank steering
+// must not react to projectiles hidden outside the observer's actual viewport
+// or behind solid cover. This is a fairness invariant, not an aim-assist buff.
+const test=require('node:test');
+const assert=require('node:assert/strict');
+// The reusable boot fixture also contains a standalone causal test. Its explicit
+// opt-out prevents importing that unrelated test into this worker process.
+const previousAudioPilot=process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL;
+process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
+const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+if(previousAudioPilot===undefined)delete process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL;
+else process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL=previousAudioPilot;
+
+test('composed Battle Sense flank respects observer viewport and cover',()=>{
+  for(const seed of [1517800,1517802]){
+    withSeed(seed,()=>{
+      const g=bootGame();
+      const oldLos=g.hasLineOfSight,oldSafe=g.isTerrainSafe;
+      try{
+        const t=g.player,side=g.__testWindow.__NOVA_BATTLE_SENSE_TEST__.saferSide;
+        const fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT__;
+        assert.equal(typeof side,'function');
+        assert.equal(typeof fair.inGameplayWorldPoint,'function');
+        g.cam.zoom=1;
+        g.bullets=[{id:999999,ownerId:999998,kind:'bullet',
+          x:t.x+110,y:t.y+115,vx:0,vy:0,ttl:1,dead:false}];
+        g.hasLineOfSight=()=>true;
+        g.isTerrainSafe=()=>true;
+        g.w=160;g.h=160;
+        assert.equal(fair.inGameplayWorldPoint(g,t,t.x+110,t.y+115),false);
+        assert.equal(side(g,t,1,0),0,'offscreen threat cannot alter steering');
+        g.w=320;g.h=480;
+        assert.equal(fair.inGameplayWorldPoint(g,t,t.x+110,t.y+115),true);
+        assert.equal(side(g,t,1,0),-1,'observed threat retains dodge');
+        g.hasLineOfSight=(ax,ay,bx,by)=>
+          !(ax===t.x&&ay===t.y&&bx===t.x+110&&by===t.y+115);
+        assert.equal(side(g,t,1,0),0,'terrain-hidden threat cannot alter steering');
+        // Realistic narrow mobile viewport: a fast projectile can be outside
+        // the player's screen while its extrapolated path crosses a flank probe.
+        g.hasLineOfSight=()=>true;
+        g.bullets=[{id:999997,ownerId:999998,kind:'bullet',
+          x:t.x+240,y:t.y+115,vx:-600,vy:0,ttl:1,dead:false}];
+        g.w=280;g.h=568;
+        assert.equal(fair.inGameplayWorldPoint(g,t,t.x+240,t.y+115),false);
+        assert.equal(side(g,t,1,0),0,'offscreen approaching fire cannot trigger predictive dodge');
+        g.w=800;
+        assert.equal(fair.inGameplayWorldPoint(g,t,t.x+240,t.y+115),true);
+        assert.equal(side(g,t,1,0),-1,'visible approaching fire can trigger predictive dodge');
+      }finally{
+        g.hasLineOfSight=oldLos;g.isTerrainSafe=oldSafe;g.destroy();
+      }
+    });
+  }
+});
