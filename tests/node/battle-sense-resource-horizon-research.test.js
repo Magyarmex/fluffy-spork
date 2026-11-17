@@ -28,3 +28,17 @@ test('critical heal beyond the 760-unit horizon is not considered even if it is 
  bot.x=1110;
  assert.equal(h.chooseResource(g,bot,classes)?.id,'safe','the same heal is considered just inside the horizon');
 });
+
+test('a one-unit horizon crossing flips a low-health tank from a safer heal to a rival-contested heal',()=>{
+ const {h,classes}=harness();
+ const bot={id:1,cls:'guard',x:1111,y:1000,alive:true,hp:20,maxHp:100,stats:{speed:0},ai:{}};
+ const rival={id:2,cls:'guard',x:1390,y:1120,alive:true,hp:100,maxHp:100,stats:{speed:0},vx:0,vy:0};
+ const contested={id:'contested',type:'heal',x:1400,y:1120};
+ const safe={id:'safe',type:'heal',x:350,y:1000};
+ const g={tanks:[bot,rival],powerups:[contested,safe],bullets:[],time:1,hasLineOfSight:()=>true,tankSpeed:()=>114.08};
+ assert.equal(h.chooseResource(g,bot,classes)?.id,'contested',
+  'the safe heal at 761 units cannot compete, despite a rival already occupying the near heal');
+ bot.x=1110;
+ assert.equal(h.chooseResource(g,bot,classes)?.id,'safe',
+  'at exactly 760 units the safe heal wins under otherwise unchanged public geometry');
+});
