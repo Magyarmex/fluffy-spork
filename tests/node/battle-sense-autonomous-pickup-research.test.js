@@ -37,13 +37,18 @@ function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8,rivalY=1
     return originalApply.apply(this,arguments);
    };
    const rivalSpeed=g.tankSpeed(rival),dt=1/hz;
-   let firstChoice=null,changes=0,prevChoice=null,maxConfirmed=0,maxFast=0,firstSafeAt=null,firstNearAt=null;
+   let firstChoice=null,changes=0,prevChoice=null,maxConfirmed=0,maxFast=0,firstSafeAt=null,firstNearAt=null,confirmedAtSpawn=null,fastAtSpawn=null;
    const trace=[];let previousConfirmed=0,previousMode=null,previousResource=null,previousSafeEligible=true,previousNearEligible=true,previousThink=Infinity;
    for(let frame=0;frame<Math.round(12*hz);frame++){
     g.time=frame*dt;
     // Let real public rival movement be witnessed before a delayed pickup spawn.
     // This tests observation timing without granting hidden speed or steering the bot.
-    if(preObserve&&frame===hz)g.powerups=[near,safe];
+    if(preObserve&&frame===hz){
+     const prior=bot.ai.__v181RivalSpeedWitness?.[String(rival.id)];
+     confirmedAtSpawn=prior?.confirmed||0;
+     fastAtSpawn=+(prior?.fast||0).toFixed(3);
+     g.powerups=[near,safe];
+    }
     const fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT__;
     g.__novaFairVisibleTanks=(!fair||fair.inGameplayViewport(g,bot,rival))
      ?[bot,rival]:[bot];
@@ -89,7 +94,7 @@ function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8,rivalY=1
     g.updatePowerups(dt);
     if(arrivals.some(a=>a.who==='bot'))break;
    }
-   return {hz,direction,safeLayout,classOnly,speedStat,rivalY,preObserve,firstChoice,changes,firstNearAt,firstSafeAt,
+   return {hz,direction,safeLayout,classOnly,speedStat,rivalY,preObserve,confirmedAtSpawn,fastAtSpawn,firstChoice,changes,firstNearAt,firstSafeAt,
     maxConfirmed,maxFast:+maxFast.toFixed(3),
     botPickup:arrivals.find(a=>a.who==='bot')||null,
     rivalPickup:arrivals.find(a=>a.who==='rival')||null,
@@ -144,6 +149,10 @@ test('pre-observation versus simultaneous heal spawn: autonomous matched pairs',
  assert.equal(results.length,8);
  assert.ok(results.filter(r=>!r.classOnly).every(r=>r.maxConfirmed>=3),
   'witnessed policy must obtain legitimate public movement samples in both spawn schedules');
+ assert.ok(results.filter(r=>r.preObserve&&!r.classOnly).every(r=>r.confirmedAtSpawn>=3&&r.fastAtSpawn>124),
+  'pre-observed fast rivals must have certified public acceleration before the heal spawn');
+ assert.ok(results.filter(r=>r.preObserve&&r.classOnly).every(r=>r.confirmedAtSpawn===0),
+  'pre-observed class-only controls must have no movement certification at spawn');
  assert.ok(results.filter(r=>r.classOnly).every(r=>r.maxConfirmed===0),
   'class-only controls cannot retain movement witnesses');
  for(const r of results)assert.ok(Number.isFinite(r.botX)&&Number.isFinite(r.botY));
