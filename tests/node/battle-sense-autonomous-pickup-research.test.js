@@ -37,7 +37,7 @@ function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8,rivalY=1
     return originalApply.apply(this,arguments);
    };
    const rivalSpeed=g.tankSpeed(rival),dt=1/hz;
-   let firstChoice=null,changes=0,prevChoice=null,maxConfirmed=0,maxFast=0,firstSafeAt=null,firstNearAt=null,confirmedAtSpawn=null,fastAtSpawn=null;
+   let firstChoice=null,changes=0,prevChoice=null,maxConfirmed=0,maxFast=0,firstSafeAt=null,firstNearAt=null,confirmedAtSpawn=null,fastAtSpawn=null,spawnSnapshot=null;
    const trace=[];let previousConfirmed=0,previousMode=null,previousResource=null,previousSafeEligible=true,previousNearEligible=true,previousThink=Infinity;
    for(let frame=0;frame<Math.round(12*hz);frame++){
     g.time=frame*dt;
@@ -47,6 +47,11 @@ function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8,rivalY=1
      const prior=bot.ai.__v181RivalSpeedWitness?.[String(rival.id)];
      confirmedAtSpawn=prior?.confirmed||0;
      fastAtSpawn=+(prior?.fast||0).toFixed(3);
+     const safeDist=Math.hypot(safe.x-bot.x,safe.y-bot.y);
+     spawnSnapshot={botX:+bot.x.toFixed(2),botY:+bot.y.toFixed(2),
+      rivalX:+rival.x.toFixed(2),rivalY:+rival.y.toFixed(2),
+      safeDist:+safeDist.toFixed(2),nearDist:+Math.hypot(near.x-bot.x,near.y-bot.y).toFixed(2),
+      safeEligible:safeDist<=760};
      g.powerups=[near,safe];
     }
     const fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT__;
@@ -94,7 +99,7 @@ function arm(hz,direction,safeLayout='west',classOnly=false,speedStat=8,rivalY=1
     g.updatePowerups(dt);
     if(arrivals.some(a=>a.who==='bot'))break;
    }
-   return {hz,direction,safeLayout,classOnly,speedStat,rivalY,preObserve,confirmedAtSpawn,fastAtSpawn,firstChoice,changes,firstNearAt,firstSafeAt,
+   return {hz,direction,safeLayout,classOnly,speedStat,rivalY,preObserve,confirmedAtSpawn,fastAtSpawn,spawnSnapshot,firstChoice,changes,firstNearAt,firstSafeAt,
     maxConfirmed,maxFast:+maxFast.toFixed(3),
     botPickup:arrivals.find(a=>a.who==='bot')||null,
     rivalPickup:arrivals.find(a=>a.who==='rival')||null,
