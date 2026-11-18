@@ -157,3 +157,31 @@ test('actual Hardlight render paints an allied AI drone core friendly green', ()
   assert.ok(fills.includes('#aef8c6'), 'allied AI drone core must be friendly green');
   assert.ok(!fills.includes('#ff9aa7'), 'no hostile-red core in this allied-only scene');
 });
+
+test('drone core and IFF relation remain equivalent across 648 allegiance configurations', () => {
+  const { window } = boot();
+  const iffSource = fs.readFileSync(path.join(__dirname,
+    '../../nova-updates/drone-allegiance-glow-v1.7.6.js'), 'utf8');
+  vm.runInNewContext(iffSource, { window, console: { info() {}, error() {} }, Math });
+  const relation = window.__NOVA_DRONE_IFF_TEST__.relation;
+  const accent = window.__NOVA_VISUAL_OVERHAUL_TEST__.droneAccentColor;
+  let checked = 0;
+  for (const id of [1, 2, 3])
+    for (const alive of [true, false])
+      for (const field of [null, 'teamId', 'team', 'factionId', 'faction', 'side'])
+        for (const same of [false, true])
+          for (const allied of [null, true, false])
+            for (const hostile of [null, true, false]) {
+              const player = { id: 1, alive: true }, owner = { id, alive };
+              if (field) { player[field] = 'blue'; owner[field] = same ? 'blue' : 'red'; }
+              const g = { player, tankById: new Map([[id, owner]]) };
+              if (allied !== null) g.areAllies = () => allied;
+              if (hostile !== null) g.areHostile = () => hostile;
+              const drone = { ownerId: id }, side = relation(g, drone);
+              assert.equal(accent(g, drone, owner),
+                side > 0 ? '#aef8c6' : side < 0 ? '#ff9aa7' : '#d8e9f4',
+                'IFF mismatch for ' + JSON.stringify({ id, alive, field, same, allied, hostile }));
+              checked++;
+            }
+  assert.equal(checked, 648);
+});
