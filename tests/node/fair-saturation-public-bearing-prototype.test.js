@@ -309,7 +309,9 @@ test('natural composed worlds report public-bearing sensitivity without changing
             }
           }
         }
-        return { ...result, hash: digest(physical(g)),
+        return { ...result,
+          battlefieldQueries: Number(g.__novaPerf?.battlefieldQueries || 0),
+          hash: digest(physical(g)),
           privateHash: digest((g.tanks || []).map(t => t && t.ai ?
             [t.id, t.ai.state, t.ai.__v180Posture, t.ai.__v1112TargetId,
              t.ai.__v1105TargetId, t.ai.__v180TargetId, t.ai.targetId,
@@ -333,7 +335,8 @@ test('natural composed worlds report public-bearing sensitivity without changing
       changedSelections: observed.changedSelections,
       shotChangedSelections: observed.shotChangedSelections,
       publicBearingContacts: observed.publicBearingContacts,
-      publicShotContacts: observed.publicShotContacts });
+      publicShotContacts: observed.publicShotContacts,
+      extraBattlefieldQueries: observed.battlefieldQueries - control.battlefieldQueries });
   }
   console.log('NOVA_PUBLIC_BEARING_SATURATION_CENSUS ' + JSON.stringify(rows));
 });
