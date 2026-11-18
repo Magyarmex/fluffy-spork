@@ -107,8 +107,8 @@ function run(seed,cls,reload,presentationHz){
   }finally{if(owner)owner.stop();g.destroy();}
  });
 }
-test('fixed60 30/61/90/120Hz presentation preserves moving-target HP and full physical state',()=>{
- for(const [cls,reload] of [['minigun',1],['needlestorm',3]])
+test('fixed60 30/61/90/120Hz presentation preserves Gunner moving-target HP and full physical state',()=>{
+ for(const [cls,reload] of [['minigun',1],['needlestorm',3],['tempest',0],['tempest',8]])
   for(const seed of [1517800,1517802]){
    const native=run(seed,cls,reload,60);
    for(const hz of [30,61,90,120]){
