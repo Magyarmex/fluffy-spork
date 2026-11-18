@@ -53,6 +53,7 @@ const { chromium } = require('playwright');
           Object.assign(observer, { x: 0, y: 0, hp: 100, maxHp: 100, alive: true, spawnShieldT: 0, cls: 'basic', tier: 1 });
           observer.ai = { ...saved[0].ai, state: 'hunt', targetId: -1,
             __v1112TargetId: -1, __v1105TargetId: -1, __v180TargetId: -1,
+            __v180LastAttacker: -1, __v180HitAt: -99,
             __v1112NextThink: 0 };
           a.ai = { ...saved[1].ai, state: 'wander', targetId: -1,
             __v1112TargetId: -1, __v1105TargetId: -1, __v180TargetId: -1 };
