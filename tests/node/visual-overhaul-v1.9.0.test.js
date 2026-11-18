@@ -97,3 +97,31 @@ test('drone material allegiance agrees with IFF for player, allied AI, hostile A
   assert.match(source, /col=droneAccentColor\(g,d,owner\)/,
     'the live drawing path must use the tested relation');
 });
+
+test('Hardlight drone core agrees with the loaded canonical IFF relation', () => {
+  const { window } = boot();
+  const iffSource = fs.readFileSync(path.join(__dirname,
+    '../../nova-updates/drone-allegiance-glow-v1.7.6.js'), 'utf8');
+  vm.runInNewContext(iffSource, { window, console: { info() {}, error() {} }, Math },
+    { filename: 'drone-allegiance-glow-v1.7.6.js' });
+  const relation = window.__NOVA_DRONE_IFF_TEST__.relation;
+  const accent = window.__NOVA_VISUAL_OVERHAUL_TEST__.droneAccentColor;
+  const player = { id: 1, alive: true, teamId: 'blue' };
+  const owners = [player, { id: 2, alive: true, teamId: 'blue' },
+    { id: 3, alive: true, teamId: 'red' }];
+  const g = { player, tankById: new Map(owners.map(o => [o.id, o])),
+    areAllies: (a, b) => a.teamId === b.teamId,
+    areHostile: (a, b) => a.teamId !== b.teamId };
+  for (const ownerId of [1, 2, 3, 99]) {
+    const d = { ownerId };
+    const owner = g.tankById.get(ownerId);
+    const iff = relation(g, d);
+    const color = accent(g, d, owner);
+    assert.equal(color, iff > 0 ? '#aef8c6' : iff < 0 ? '#ff9aa7' : '#d8e9f4',
+      'decorative core must agree with IFF relation for owner ' + ownerId);
+  }
+  const neutral = { ...g, areAllies: () => false, areHostile: () => false };
+  const d = { ownerId: 2 };
+  assert.equal(relation(neutral, d), 0);
+  assert.equal(accent(neutral, d, g.tankById.get(2)), '#d8e9f4');
+});
