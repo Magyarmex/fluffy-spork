@@ -97,9 +97,9 @@ function recordVisibleHit(T,g,observer,shooter,target,C=classes){
     !hostile(g,shooter,target)||
     !T.canPerceive(g,C,observer,shooter)||
     !T.canPerceive(g,C,observer,target))return false;
- if(typeof g.hasLineOfSight==='function'&&
-    (!g.hasLineOfSight(observer.x,observer.y,shooter.x,shooter.y,2)||
-     !g.hasLineOfSight(observer.x,observer.y,target.x,target.y,2)))return false;
+ if(typeof g.hasLineOfSight!=='function'||
+    !g.hasLineOfSight(observer.x,observer.y,shooter.x,shooter.y,2)||
+    !g.hasLineOfSight(observer.x,observer.y,target.x,target.y,2))return false;
  const at=Number(g.time);
  if(!Number.isFinite(at))return false;
  const prior=hitWitnesses.get(observer)||[];
@@ -184,7 +184,7 @@ function world() {
   const hidden = tank(2, 2000, 2000, 1);
   hidden.ai.state = 'hunt';
   const g = { tanks: [observer, a, b, hidden], w: 900, h: 700,
-    cam: { zoom: 1 }, time: 10 };
+    cam: { zoom: 1 }, time: 10, hasLineOfSight: () => true };
   return { g, observer, a, b, hidden };
 }
 test('public base score exactly matches shipping before private saturation', () => {
@@ -405,6 +405,13 @@ test('event-time confirmed hits retain victim identity after movement',()=>{
  hidden.ai.__v1112TargetId=b.id;
  assert.equal(confirmedHitCount(g,observer,a),1,
   'offscreen private intent cannot change an observed hit');
+});
+test('confirmed hit witness fails closed without terrain sight owner',()=>{
+ const T=boot(),{g,observer,a}=world();
+ const shooter=tank(3,0,100,1);g.tanks.push(shooter);
+ delete g.hasLineOfSight;
+ assert.equal(recordVisibleHit(T,g,observer,shooter,a),false);
+ assert.equal(confirmedHitCount(g,observer,a),0);
 });
 test('confirmed hit witness requires public event-time sight and real hostility',()=>{
  const T=boot(),{g,observer,a}=world();
