@@ -1,6 +1,7 @@
 'use strict';
 // Research-only #1025: compare hidden-slot saturation with public turret-bearing
 // evidence. This is NOT a production AI replacement or a natural-match verdict.
+process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL = '1';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
