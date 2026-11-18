@@ -74,3 +74,114 @@ test('screen gradients are cached rather than allocated every frame', () => {
   assert.equal((source.match(/createRadialGradient/g) || []).length, 1);
   assert.match(source, /quality==='low'\?720:480/);
 });
+
+test('drone material allegiance agrees with IFF for player, allied AI, hostile AI and neutral owners', () => {
+  const { window } = boot();
+  const accent = window.__NOVA_VISUAL_OVERHAUL_TEST__.droneAccentColor;
+  const player = { id: 1, alive: true, teamId: 'blue' };
+  const ally = { id: 2, alive: true, teamId: 'blue', isPlayer: false };
+  const hostile = { id: 3, alive: true, teamId: 'red', isPlayer: false };
+  const game = { player, areAllies: (a, b) => a.teamId === b.teamId,
+    areHostile: (a, b) => a.teamId !== b.teamId };
+  assert.equal(accent(game, { ownerId: 1 }, player), '#aef8c6');
+  assert.equal(accent(game, { ownerId: 1 }, { ...player, alive: false }), '#aef8c6',
+    'IFF preserves player ownership before resolving live owner state');
+  assert.equal(accent(game, { ownerId: 2 }, ally), '#aef8c6',
+    'friendly AI drones must not show a hostile-red decorative core');
+  assert.equal(accent(game, { ownerId: 3 }, hostile), '#ff9aa7');
+  assert.equal(accent(game, { ownerId: 99 }, null), '#d8e9f4');
+  assert.equal(accent(game, { ownerId: 2 }, { ...ally, alive: false }), '#d8e9f4');
+  assert.equal(accent({ player, areHostile: () => false }, { ownerId: 2 }, ally), '#d8e9f4',
+    'non-hostile relation hook without positive ally evidence stays neutral');
+  assert.equal(accent({ player }, { ownerId: 2 }, ally), '#aef8c6',
+    'team metadata fallback agrees with IFF');
+  assert.equal(accent({ player }, { ownerId: 3 }, hostile), '#ff9aa7');
+  assert.match(source, /col=droneAccentColor\(g,d,owner\)/,
+    'the live drawing path must use the tested relation');
+});
+
+test('Hardlight drone core agrees with the loaded canonical IFF relation', () => {
+  const { window } = boot();
+  const iffSource = fs.readFileSync(path.join(__dirname,
+    '../../nova-updates/drone-allegiance-glow-v1.7.6.js'), 'utf8');
+  vm.runInNewContext(iffSource, { window, console: { info() {}, error() {} }, Math },
+    { filename: 'drone-allegiance-glow-v1.7.6.js' });
+  const relation = window.__NOVA_DRONE_IFF_TEST__.relation;
+  const accent = window.__NOVA_VISUAL_OVERHAUL_TEST__.droneAccentColor;
+  const player = { id: 1, alive: true, teamId: 'blue' };
+  const owners = [player, { id: 2, alive: true, teamId: 'blue' },
+    { id: 3, alive: true, teamId: 'red' }];
+  const g = { player, tankById: new Map(owners.map(o => [o.id, o])),
+    areAllies: (a, b) => a.teamId === b.teamId,
+    areHostile: (a, b) => a.teamId !== b.teamId };
+  for (const ownerId of [1, 2, 3, 99]) {
+    const d = { ownerId };
+    const owner = g.tankById.get(ownerId);
+    const iff = relation(g, d);
+    const color = accent(g, d, owner);
+    assert.equal(color, iff > 0 ? '#aef8c6' : iff < 0 ? '#ff9aa7' : '#d8e9f4',
+      'decorative core must agree with IFF relation for owner ' + ownerId);
+  }
+  const neutral = { ...g, areAllies: () => false, areHostile: () => false };
+  const d = { ownerId: 2 };
+  assert.equal(relation(neutral, d), 0);
+  assert.equal(accent(neutral, d, g.tankById.get(2)), '#d8e9f4');
+});
+
+test('actual Hardlight render paints an allied AI drone core friendly green', () => {
+  const { modules } = boot();
+  const fills = [];
+  const ctx = new Proxy({ fillStyle: '#000', globalAlpha: 1 }, {
+    get(target, key) {
+      if (key === 'fill') return () => fills.push(target.fillStyle);
+      if (key in target) return target[key];
+      return () => {};
+    },
+    set(target, key, value) { target[key] = value; return true; }
+  });
+  const m = { exports: {} };
+  modules['game/render'](m, m.exports, id => {
+    if (id === './classes') return { CLASSES: {}, lineageForClass() { return null; } };
+    if (id === './types') return { SHAPE_DEFS: {} };
+    throw new Error('unexpected require ' + id);
+  });
+  const player = { id: 1, alive: true, teamId: 'blue', x: 0, y: 0 };
+  const ally = { id: 2, alive: true, teamId: 'blue', x: 0, y: 0, angle: 0 };
+  const g = { player, tanks: [], shapes: [], powerups: [], drones: [
+    { ownerId: 2, hp: 10, x: 0, y: 0, r: 7, vx: 0, vy: 0 }
+  ], tankById: new Map([[1, player], [2, ally]]),
+    areAllies: (a, b) => a.teamId === b.teamId,
+    areHostile: (a, b) => a.teamId !== b.teamId,
+    cam: { x: 0, y: 0, zoom: 1 }, quality: 'low', dpr: 1, ctx };
+  m.exports.render(g, 320, 240);
+  assert.ok(fills.includes('#aef8c6'), 'allied AI drone core must be friendly green');
+  assert.ok(!fills.includes('#ff9aa7'), 'no hostile-red core in this allied-only scene');
+});
+
+test('drone core and IFF relation remain equivalent across 648 allegiance configurations', () => {
+  const { window } = boot();
+  const iffSource = fs.readFileSync(path.join(__dirname,
+    '../../nova-updates/drone-allegiance-glow-v1.7.6.js'), 'utf8');
+  vm.runInNewContext(iffSource, { window, console: { info() {}, error() {} }, Math });
+  const relation = window.__NOVA_DRONE_IFF_TEST__.relation;
+  const accent = window.__NOVA_VISUAL_OVERHAUL_TEST__.droneAccentColor;
+  let checked = 0;
+  for (const id of [1, 2, 3])
+    for (const alive of [true, false])
+      for (const field of [null, 'teamId', 'team', 'factionId', 'faction', 'side'])
+        for (const same of [false, true])
+          for (const allied of [null, true, false])
+            for (const hostile of [null, true, false]) {
+              const player = { id: 1, alive: true }, owner = { id, alive };
+              if (field) { player[field] = 'blue'; owner[field] = same ? 'blue' : 'red'; }
+              const g = { player, tankById: new Map([[id, owner]]) };
+              if (allied !== null) g.areAllies = () => allied;
+              if (hostile !== null) g.areHostile = () => hostile;
+              const drone = { ownerId: id }, side = relation(g, drone);
+              assert.equal(accent(g, drone, owner),
+                side > 0 ? '#aef8c6' : side < 0 ? '#ff9aa7' : '#d8e9f4',
+                'IFF mismatch for ' + JSON.stringify({ id, alive, field, same, allied, hostile }));
+              checked++;
+            }
+  assert.equal(checked, 648);
+});
