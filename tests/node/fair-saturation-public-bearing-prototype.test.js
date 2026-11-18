@@ -595,6 +595,7 @@ test('natural composed worlds report public-bearing sensitivity without changing
         physicalDamageEvents: 0, potentialHitWitnessPairs: 0,
         maxPotentialHitWitnessPairs: 0 };
       const originalDamage=g.damageTank;
+      const hadOwnDamage=Object.prototype.hasOwnProperty.call(g,'damageTank');
       if(observe)g.damageTank=function(victim,amount,srcId,...rest){
         const hp=Number(victim&&victim.hp);
         const out=originalDamage.call(this,victim,amount,srcId,...rest);
@@ -673,7 +674,11 @@ test('natural composed worlds report public-bearing sensitivity without changing
              t.ai.__v1112NextThink, t.ai.__v181ObservedShotId,
              t.ai.__v181ObservedShotAt] : null)),
           draws: draws() };
-      } finally { if(observe)g.damageTank=originalDamage;g.destroy(); }
+      } finally {
+        if(observe){if(hadOwnDamage)g.damageTank=originalDamage;
+          else delete g.damageTank;}
+        g.destroy();
+      }
     });
   }
   const rows = [];
