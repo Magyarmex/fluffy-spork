@@ -157,7 +157,10 @@ jobs:
           # Run experimental fixed60 owner last: do not mask shipping smoke failures.
           node tests/browser/fixed60-real-game-owner-touch-research.cjs
           NOVA_FIXED60_MAX_STEPS=3 node tests/browser/fixed60-real-game-owner-touch-research.cjs
-          NOVA_FIXED60_MAX_STEPS=3 NOVA_FIXED60_ACTIVE_BURST=1 node tests/browser/fixed60-real-game-owner-touch-research.cjs
+          # Use a real controlled 50ms RAF callback for the held-three-tick
+          # projectile witness. Synthetic 65ms main-thread blocks can exceed
+          # the >100ms foreground-stall quarantine and revoke touch ownership.
+          NOVA_FIXED60_MAX_STEPS=3 NOVA_FIXED60_ACTIVE_BURST=1 NOVA_FIXED60_CONTROLLED_GATE=1 node tests/browser/fixed60-real-game-owner-touch-research.cjs
           # Research-only controlled RAF delivery: run the two-step baseline
           # before the three-step candidate. Both use browser timestamps,
           # trusted touch, real Game updates, and the same 30Hz gate policy.
