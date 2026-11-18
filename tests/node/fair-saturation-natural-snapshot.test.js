@@ -5,7 +5,7 @@ process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const {bootGame,withSeed,digest,physical}=require('../research/audio-rng-causal-pilot.cjs');
-const SEEDS=[1517800,1517802,1517810],TICKS=240,SAMPLE_EVERY=12;
+const SEEDS=[1517800,1517802,1517810],TICKS=720,SAMPLE_EVERY=6;
 function privateTarget(a){
  return a.__v1112TargetId>=0?a.__v1112TargetId:
   a.__v1105TargetId>=0?a.__v1105TargetId:
