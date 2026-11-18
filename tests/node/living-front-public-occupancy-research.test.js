@@ -109,6 +109,23 @@ test('opaque cover rejects viewport-only crowd and bounds LOS calls',()=>{
  assert.equal(publicBloomScore(w.g,w.observer,w.signal).crowd,3);
  assert.equal(calls,6);
 });
+test('public occupancy misses distant converging rivals before arrival',()=>{
+ const T=boot(),w=world(T);
+ for(let i=0;i<3;i++){
+  const q=w.hidden[i];
+  q.x=w.signal.x-300+i*8;q.y=w.signal.y;
+  q.ai={__lfEcoKey:'BLOOM:6',__lfEcoWeight:.25};
+ }
+ const candidate=publicBloomScore(w.g,w.observer,w.signal);
+ assert.equal(candidate.crowd,0,
+  'nearby approach assignments are not physically at the objective yet');
+ assert.equal(candidate.accepted,true);
+ const shipping=T.publicEcoBias(w.g,w.observer,{},{});
+ assert.equal(shipping.mode,'none',
+  'private-intent coordination suppresses convergence earlier');
+ // This is a NEGATIVE CONTROL: the public occupancy proposal cannot
+ // preserve early anti-dogpile coordination on its own.
+});
 test('public occupancy is an imperfect proxy: a visible passerby can veto',()=>{
  const T=boot(),w=world(T);
  for(let i=0;i<3;i++){
