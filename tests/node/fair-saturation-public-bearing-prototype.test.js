@@ -303,7 +303,7 @@ test('natural composed worlds report public-bearing sensitivity without changing
       const result = { observerSamples: 0, multiVisible: 0,
         changedSelections: 0, shotChangedSelections: 0,
         publicBearingContacts: 0, publicShotContacts: 0, selected: 0,
-        publicLineOfSightCalls: 0 };
+        publicChoiceLOSCalls: 0, publicDiagnosticLOSCalls: 0 };
       try {
         g.status = 'playing';
         g.paused = false;
@@ -323,9 +323,11 @@ test('natural composed worlds report public-bearing sensitivity without changing
             // counter does not necessarily include these direct terrain calls.
             // Restore the exact original method before the next game update.
             const originalLOS = g.hasLineOfSight;
+            let queryPhase = 'choice';
             if (typeof originalLOS === 'function') {
               g.hasLineOfSight = function (...args) {
-                result.publicLineOfSightCalls++;
+                if (queryPhase === 'choice') result.publicChoiceLOSCalls++;
+                else result.publicDiagnosticLOSCalls++;
                 return originalLOS.apply(this, args);
               };
             }
@@ -338,6 +340,7 @@ test('natural composed worlds report public-bearing sensitivity without changing
                 if (shotProposed && shipping.id !== shotProposed.id)
                   result.shotChangedSelections++;
               }
+              queryPhase = 'diagnostic';
               for (const target of visible) {
                 result.publicBearingContacts += bearingCount(T, g, observer, target, C);
                 result.publicShotContacts += witnessedShotCount(T, g, observer, target, C);
@@ -369,7 +372,7 @@ test('natural composed worlds report public-bearing sensitivity without changing
       'research changed private AI state');
     assert.ok(observed.observerSamples > 0, 'must inspect live AI observers');
     if (observed.publicBearingContacts > 0 || observed.publicShotContacts > 0)
-      assert.ok(observed.publicLineOfSightCalls > 0,
+      assert.ok(observed.publicChoiceLOSCalls + observed.publicDiagnosticLOSCalls > 0,
         'public pressure was observed but no direct terrain queries were counted');
     rows.push({ seed, observerSamples: observed.observerSamples,
       multiVisible: observed.multiVisible, selected: observed.selected,
@@ -377,7 +380,8 @@ test('natural composed worlds report public-bearing sensitivity without changing
       shotChangedSelections: observed.shotChangedSelections,
       publicBearingContacts: observed.publicBearingContacts,
       publicShotContacts: observed.publicShotContacts,
-      publicLineOfSightCalls: observed.publicLineOfSightCalls,
+      publicChoiceLOSCalls: observed.publicChoiceLOSCalls,
+      publicDiagnosticLOSCalls: observed.publicDiagnosticLOSCalls,
       extraTerrainQueries: observed.terrainQueries - control.terrainQueries });
   }
   console.log('NOVA_PUBLIC_BEARING_SATURATION_CENSUS ' + JSON.stringify(rows));
