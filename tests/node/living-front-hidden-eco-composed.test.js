@@ -53,8 +53,10 @@ test('composed Living Front strategy changes a public BLOOM decision on hidden i
       });
       for (const q of hidden) q.ai.__lfEcoKey = 'BLOOM:' + sector;
       const counterfactual = sample();
-      assert.equal(counterfactual.mode, 'none',
+      assert.notEqual(counterfactual.mode, 'signal',
         'offscreen private commitments alone vetoed the same public opportunity');
+      assert.notEqual(counterfactual.key, 'BLOOM:' + sector,
+        'public BLOOM must no longer own the strategic decision');
       assert.equal(JSON.stringify({
         positions: g.tanks.map(t => [t.id, t.x, t.y, t.hp]),
         signal: g.__lfState.signal
