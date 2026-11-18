@@ -163,7 +163,8 @@ function publicChoice(T, g, observer, C = classes, mode = 'bearing') {
         allied(g, observer, target)) continue;
     const base = basePublicScore(T, g, C, observer, target);
     if (!Number.isFinite(base)) continue;
-    const score = base - (mode === 'shot' ?
+    const score = base - (mode === 'hit' ?
+      confirmedHitCount(g, observer, target) : mode === 'shot' ?
       witnessedShotCount(T, g, observer, target, C) :
       bearingCount(T, g, observer, target, C)) * T.saturationPenalty;
     if (score > bestScore) { bestScore = score; best = target; }
@@ -360,6 +361,20 @@ test('public witnessed fire can redirect a real target score without private int
   shooter.ai.__v1112TargetId = b.id;
   assert.equal(publicChoice(T, g, observer, classes, 'shot')?.id, b.id,
     'changing private target slot must not undo public evidence');
+});
+test('confirmed public hit changes real target score without private intent',()=>{
+ const T=boot(),{g,observer,a,b,hidden}=world();
+ hidden.ai.state='wander';
+ a.hp=85;
+ const shooter=tank(3,0,100,1);
+ g.tanks.push(shooter);
+ assert.equal(publicChoice(T,g,observer,classes,'hit')?.id,a.id);
+ assert.equal(recordVisibleHit(T,g,observer,shooter,a),true);
+ assert.equal(publicChoice(T,g,observer,classes,'hit')?.id,b.id,
+  'a confirmed third-party hit should reduce another observer\'s dogpile');
+ hidden.ai.__v1112TargetId=b.id;
+ assert.equal(publicChoice(T,g,observer,classes,'hit')?.id,b.id,
+  'private offscreen assignment cannot affect hit-based score');
 });
 test('event-time confirmed hits retain victim identity after movement',()=>{
  const T=boot(),{g,observer,a,b,hidden}=world();
