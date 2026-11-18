@@ -99,3 +99,16 @@ test('hostile plausible shots do not pay the recycled-owner lookup cost',()=>{
   'known allied fire is ignored only after live identity verification');
  assert.equal(lookups,1,'one plausible allied shot requires exactly one identity lookup');
 });
+
+test('13-bot-style dense volley resolves only plausible allied birth owners',()=>{
+ const {g,observer,ally,enemy,helper}=scene();
+ for(let i=0;i<200;i++)g.tryFire(i%2?ally:enemy);
+ let lookups=0;
+ const lookup=g.getTank;
+ g.getTank=id=>{lookups++;return lookup(id);};
+ const risk=helper.laneRisk(g,110,115,observer.id,observer);
+ assert.ok(Math.abs(risk-120)<1e-8,
+  '100 hostile stationary rounds must retain their full threat score');
+ assert.equal(lookups,100,
+  '100 allied rounds need identity checks; 100 hostile rounds must not');
+});
