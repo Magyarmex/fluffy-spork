@@ -9,6 +9,7 @@ const {chromium}=require('playwright');
 const {injectBattlefieldSeed}=require('../research/battlefield-layout-fixture.cjs');
 const maxSteps=Number(process.env.NOVA_FIXED60_MAX_STEPS||2);
 const controlledGate=process.env.NOVA_FIXED60_CONTROLLED_GATE==='1';
+const activeBurst=process.env.NOVA_FIXED60_ACTIVE_BURST==='1';
 const controlledExtra=Number(process.env.NOVA_FIXED60_EXTRA_TICKS||2);
 // Opt-in visual-only experiment. OFF retains the existing Chromium owner path.
 const poseEnabled=process.env.NOVA_FIXED60_POSE_PRESENTATION==='1';
@@ -60,7 +61,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    '../../nova-updates/fixed60-research-browser.js')});
   if(weakPoseEnabled)await page.addScriptTag({path:path.resolve(__dirname,
    '../research/fixed-step-weak-epoch-presentation.cjs')});
-  await page.evaluate(({maxSteps,controlledGate,controlledExtra,poseEnabled,weakPoseEnabled})=>{
+  await page.evaluate(({maxSteps,controlledGate,controlledExtra,poseEnabled,weakPoseEnabled,activeBurst})=>{
    window.__novaFixedMaxSteps=maxSteps;
    window.__novaPoseEnabled=poseEnabled;
    window.__novaControlledGate=controlledGate;
@@ -79,7 +80,12 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    const baseStart=Game.prototype.start;
    window.__novaFixedResearch={births:0,updates:[],renders:[],errors:[],lifecycle:[],touchEvents:[],frames:[],poseFrames:[]};
    const profile=window.__novaFixedResearch;
-   const gateGaps=[250/3,50/3,50/3,50/3];
+   // For the held-three-shot gate, use a real controlled 50ms RAF gap
+   // instead of repeatedly blocking the main thread and accidentally
+   // triggering the >100ms touch quarantine. Other research arms retain
+   // their original 30Hz gate schedule.
+   const gateGaps=controlledGate&&activeBurst?[50,50/3,50/3,50/3]:
+    [250/3,50/3,50/3,50/3];
    let gateNext=null,gateIndex=0,gateToken=0;
    const gatePending=new Map();
    profile.pendingGateRequests=()=>gatePending.size;
@@ -266,7 +272,8 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     profile.lifecycle.push({event:'owner-start-returned',at:performance.now(),started:pilot.owner.started});
     return result;
    };
-  },{maxSteps,controlledGate,controlledExtra,poseEnabled,weakPoseEnabled});
+  },{maxSteps,controlledGate,controlledExtra,poseEnabled,weakPoseEnabled,
+   activeBurst});
   await deploy.click();
   try{
    await page.waitForFunction(()=>window.__novaFixedGame?.status==='playing'&&
@@ -335,13 +342,13 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    let shotInThree=false;
    for(let attempt=0;attempt<8&&!shotInThree;attempt++){
     const beforeFrame=await page.evaluate(()=>window.__novaFixedResearch.frames.length);
-    await page.evaluate(()=>{
-     // The RAF wrapper arms the ready shot at the burst boundary, not
-     // during this blocked task (which could precede a one-step RAF).
+    await page.evaluate(controlled=>{
+     // Arm at the next real RAF boundary. The controlled research arm
+     // delivers an actual 50ms callback; do not manufacture foreground
+     // stalls that can legitimately revoke touch ownership.
      window.__novaFixedResearch.armShotOnThree=true;
-     const end=performance.now()+65;
-     while(performance.now()<end){}
-    });
+     if(!controlled){const end=performance.now()+65;while(performance.now()<end){}}
+    },controlledGate);
     await page.waitForFunction(before=>window.__novaFixedResearch.frames.length>before,
      beforeFrame,{timeout:5000});
     shotInThree=await page.evaluate(start=>window.__novaFixedResearch.frames
@@ -442,14 +449,22 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    assert.equal(maxSteps,3,'active burst requires three-step research owner');
    const releasedBurstStart=await page.evaluate(()=>window.__novaFixedResearch.frames.length);
    const birthsAtRelease=await page.evaluate(()=>window.__novaFixedResearch.births);
-   for(let attempt=0;attempt<8;attempt++){
-    const before=await page.evaluate(()=>window.__novaFixedResearch.frames.length);
-    await page.evaluate(()=>{
-     const end=performance.now()+65;
-     while(performance.now()<end){} // intentional research-only foreground work
-    });
-    await page.waitForFunction(before=>window.__novaFixedResearch.frames.length>before,
-     before,{timeout:5000});
+   if(controlledGate){
+    // The same controlled real-RAF schedule must produce multiple genuine
+    // three-update callbacks after release, without forced main-thread stalls.
+    await page.waitForFunction(start=>window.__novaFixedResearch.frames
+     .slice(start).filter(f=>f.steps===3&&f.rawGapMs<=100+1e-7&&f.budget===3)
+     .length>=3,releasedBurstStart,{timeout:12000});
+   }else{
+    for(let attempt=0;attempt<8;attempt++){
+     const before=await page.evaluate(()=>window.__novaFixedResearch.frames.length);
+     await page.evaluate(()=>{
+      const end=performance.now()+65;
+      while(performance.now()<end){} // uncontrolled research-only jitter
+     });
+     await page.waitForFunction(before=>window.__novaFixedResearch.frames.length>before,
+      before,{timeout:5000});
+    }
    }
    const bursts=await page.evaluate(start=>window.__novaFixedResearch.frames
     .slice(start).filter(f=>f.steps===3&&f.rawGapMs<=100+1e-7&&f.budget===3)
@@ -595,8 +610,13 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     'controlled browser must never exceed the configured update ceiling');
    assert.ok(report.raf.intervals.p95>=45,
     'controlled RAF must actually delay browser callbacks');
-   assert.ok(report.raf.controlledLongGaps>=3,
-    'controlled RAF must deliver multiple real 70–100ms active gaps');
+   if(activeBurst){
+    assert.ok(report.raf.stepCounts['3']>=3,
+     'held-three controlled RAF must deliver multiple genuine three-update callbacks');
+   }else{
+    assert.ok(report.raf.controlledLongGaps>=3,
+     'controlled RAF must deliver multiple real 70–100ms active gaps');
+   }
    assert.ok(report.raf.observedWallMs>0&&
     Number.isFinite(report.raf.presentationHz)&&report.raf.presentationHz>0&&
     Number.isFinite(report.raf.simulatedMs),
