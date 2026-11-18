@@ -60,7 +60,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    '../../nova-updates/fixed60-research-browser.js')});
   if(weakPoseEnabled)await page.addScriptTag({path:path.resolve(__dirname,
    '../research/fixed-step-weak-epoch-presentation.cjs')});
-  await page.evaluate(({maxSteps,controlledGate,controlledExtra,poseEnabled,weakPoseEnabled})=>{
+  await page.evaluate(({maxSteps,controlledGate,controlledExtra,poseEnabled,weakPoseEnabled,activeBurst})=>{
    window.__novaFixedMaxSteps=maxSteps;
    window.__novaPoseEnabled=poseEnabled;
    window.__novaControlledGate=controlledGate;
@@ -79,7 +79,12 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    const baseStart=Game.prototype.start;
    window.__novaFixedResearch={births:0,updates:[],renders:[],errors:[],lifecycle:[],touchEvents:[],frames:[],poseFrames:[]};
    const profile=window.__novaFixedResearch;
-   const gateGaps=[250/3,50/3,50/3,50/3];
+   // For the held-three-shot gate, use a real controlled 50ms RAF gap
+   // instead of repeatedly blocking the main thread and accidentally
+   // triggering the >100ms touch quarantine. Other research arms retain
+   // their original 30Hz gate schedule.
+   const gateGaps=controlledGate&&activeBurst?[50,50/3,50/3,50/3]:
+    [250/3,50/3,50/3,50/3];
    let gateNext=null,gateIndex=0,gateToken=0;
    const gatePending=new Map();
    profile.pendingGateRequests=()=>gatePending.size;
@@ -266,7 +271,8 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     profile.lifecycle.push({event:'owner-start-returned',at:performance.now(),started:pilot.owner.started});
     return result;
    };
-  },{maxSteps,controlledGate,controlledExtra,poseEnabled,weakPoseEnabled});
+  },{maxSteps,controlledGate,controlledExtra,poseEnabled,weakPoseEnabled,
+   activeBurst:process.env.NOVA_FIXED60_ACTIVE_BURST==='1'});
   await deploy.click();
   try{
    await page.waitForFunction(()=>window.__novaFixedGame?.status==='playing'&&
@@ -335,13 +341,13 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    let shotInThree=false;
    for(let attempt=0;attempt<8&&!shotInThree;attempt++){
     const beforeFrame=await page.evaluate(()=>window.__novaFixedResearch.frames.length);
-    await page.evaluate(()=>{
-     // The RAF wrapper arms the ready shot at the burst boundary, not
-     // during this blocked task (which could precede a one-step RAF).
+    await page.evaluate(controlled=>{
+     // Arm at the next real RAF boundary. The controlled research arm
+     // delivers an actual 50ms callback; do not manufacture foreground
+     // stalls that can legitimately revoke touch ownership.
      window.__novaFixedResearch.armShotOnThree=true;
-     const end=performance.now()+65;
-     while(performance.now()<end){}
-    });
+     if(!controlled){const end=performance.now()+65;while(performance.now()<end){}}
+    },controlledGate);
     await page.waitForFunction(before=>window.__novaFixedResearch.frames.length>before,
      beforeFrame,{timeout:5000});
     shotInThree=await page.evaluate(start=>window.__novaFixedResearch.frames
