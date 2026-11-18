@@ -410,6 +410,24 @@ test('confirmed hit witness supports multiple attackers without recycled IDs',()
  assert.equal(confirmedHitCount(g,observer,a),0,
   'despawned shooter cannot remain a phantom attacker');
 });
+test('bounded hit memory evicts oldest unrefreshed identity',()=>{
+ const T=boot(),{g,observer,a}=world();
+ const shooters=Array.from({length:14},(_,i)=>tank(100+i,0,80+i*5,1));
+ g.tanks.push(...shooters);
+ for(const shooter of shooters.slice(0,13))
+  assert.equal(recordVisibleHit(T,g,observer,shooter,a),true);
+ assert.equal(hitWitnesses.get(observer).length,13);
+ g.time+=.1;
+ assert.equal(recordVisibleHit(T,g,observer,shooters[0],a),true);
+ g.time+=.1;
+ assert.equal(recordVisibleHit(T,g,observer,shooters[13],a),true);
+ const kept=hitWitnesses.get(observer);
+ assert.equal(kept.length,13);
+ assert.ok(kept.some(e=>e.shooter===shooters[0]),
+  'recently refreshed evidence must not be evicted');
+ assert.ok(!kept.some(e=>e.shooter===shooters[1]),
+  'oldest unrefreshed witness should leave first');
+});
 test('confirmed-hit prototype can be fed by actual composed Game damage',()=>{
  const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
  withSeed(1517800,()=>{
