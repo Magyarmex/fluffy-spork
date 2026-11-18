@@ -74,3 +74,26 @@ test('screen gradients are cached rather than allocated every frame', () => {
   assert.equal((source.match(/createRadialGradient/g) || []).length, 1);
   assert.match(source, /quality==='low'\?720:480/);
 });
+
+test('drone material allegiance agrees with IFF for player, allied AI, hostile AI and neutral owners', () => {
+  const { window } = boot();
+  const accent = window.__NOVA_VISUAL_OVERHAUL_TEST__.droneAccentColor;
+  const player = { id: 1, alive: true, teamId: 'blue' };
+  const ally = { id: 2, alive: true, teamId: 'blue', isPlayer: false };
+  const hostile = { id: 3, alive: true, teamId: 'red', isPlayer: false };
+  const game = { player, areAllies: (a, b) => a.teamId === b.teamId,
+    areHostile: (a, b) => a.teamId !== b.teamId };
+  assert.equal(accent(game, { ownerId: 1 }, player), '#aef8c6');
+  assert.equal(accent(game, { ownerId: 2 }, ally), '#aef8c6',
+    'friendly AI drones must not show a hostile-red decorative core');
+  assert.equal(accent(game, { ownerId: 3 }, hostile), '#ff9aa7');
+  assert.equal(accent(game, { ownerId: 99 }, null), '#d8e9f4');
+  assert.equal(accent(game, { ownerId: 2 }, { ...ally, alive: false }), '#d8e9f4');
+  assert.equal(accent({ player, areHostile: () => false }, { ownerId: 2 }, ally), '#d8e9f4',
+    'non-hostile relation hook without positive ally evidence stays neutral');
+  assert.equal(accent({ player }, { ownerId: 2 }, ally), '#aef8c6',
+    'team metadata fallback agrees with IFF');
+  assert.equal(accent({ player }, { ownerId: 3 }, hostile), '#ff9aa7');
+  assert.match(source, /col=droneAccentColor\\(g,d,owner\\)/,
+    'the live drawing path must use the tested relation');
+});
