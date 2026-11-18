@@ -49,6 +49,8 @@ const { chromium } = require('playwright');
           throw Error('invalid hidden/visible perception controls');
         const arms = [];
         for (const id of [a.id, b.id]) {
+          g.bullets = []; g.powerups = [];
+          Object.assign(observer, { x: 0, y: 0, hp: 100, maxHp: 100, alive: true, spawnShieldT: 0 });
           observer.ai = { ...saved[0].ai, state: 'hunt', targetId: -1,
             __v1112TargetId: -1, __v1105TargetId: -1, __v180TargetId: -1,
             __v1112NextThink: 0 };
