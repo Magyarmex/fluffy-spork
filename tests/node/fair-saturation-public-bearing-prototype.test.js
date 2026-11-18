@@ -287,6 +287,23 @@ test('unfired public bearing can redirect target choice, unlike shot-only eviden
     'bearing candidate must recover when the unfired turret turns away');
 });
 
+test('latest-shot bearing can misattribute pressure after target movement', () => {
+  const T = boot(), { g, observer, a, b } = world();
+  const shooter = tank(3, 0, 100, 1);
+  g.tanks.push(shooter);
+  observer.ai.__v181ObservedShotId = shooter.id;
+  observer.ai.__v181ObservedShotAt = g.time - 0.2;
+  observer.ai.__v181ObservedShotAngle = Math.atan2(-100, 100);
+  assert.equal(witnessedShotCount(T, g, observer, a), 1);
+  assert.equal(witnessedShotCount(T, g, observer, b), 0);
+  // No second shot occurs. The target swaps positions after the witnessed
+  // event, so the same stored angle now falsely credits the other target.
+  a.x = 250; a.y = 250;
+  b.x = 100; b.y = 0;
+  assert.equal(witnessedShotCount(T, g, observer, b), 1,
+    'negative control: latest-shot angle lacks shot-time target geometry');
+});
+
 test('public witnessed fire can redirect a real target score without private intent', () => {
   const T = boot(), { g, observer, a, b, hidden } = world();
   hidden.ai.state = 'wander';
