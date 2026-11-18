@@ -65,3 +65,13 @@ test('shipping composition loads Fieldcraft before canonical game boot',()=>{
  // This file also owns actual terrain-safe spawn randomness; do not replace it.
  assert.match(source,/Math\.random/);
 });
+
+test('live Fieldcraft registry teaches cover as firing denial, not AI invisibility', () => {
+ const {tips}=load();
+ const entry=tips.current().find(t=>t.id==='cover-last-seen-ai');
+ assert.ok(entry,'stable cover advice must be present in the active shuffle pool');
+ assert.match(entry.text,/cover blocks enemy shots, not awareness/i);
+ assert.match(entry.text,/inside its gameplay view/i);
+ assert.doesNotMatch(entry.text,/line of sight denies AI a live target/i);
+ assert.deepEqual(Array.from(entry.tags),['battlefield','combat','ai']);
+});
