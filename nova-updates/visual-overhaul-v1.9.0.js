@@ -142,8 +142,11 @@ function drawTankMaterial(g,ctx,t,classes,w,h){
 }
 
 function drawShapeFacets(g,ctx,s,types,w,h){
-  if(!s||s.hp<=0||!terrainVisible(g,s.x,s.y,2)||!terrainClear(g,s.x,s.y,(s.r||12)+4))return;
+  if(!s||s.hp<=0)return;
+  /* Screen-space culling is cheaper than terrain LoS. Preserve the same
+   * visibility and clearance tests for every shape that can be drawn. */
   var z=(g.cam&&g.cam.zoom)||1,r=(s.r||12)*z,px=(s.x-g.cam.x)*z+w*.5,py=(s.y-g.cam.y)*z+h*.5;if(!onScreen(px,py,r+10,w,h))return;
+  if(!terrainVisible(g,s.x,s.y,2)||!terrainClear(g,s.x,s.y,(s.r||12)+4))return;
   var sides=s.type==='triangle'?3:s.type==='square'?4:s.type==='pentagon'?5:s.type==='hexagon'?6:6,col=types.SHAPE_DEFS&&types.SHAPE_DEFS[s.type]?types.SHAPE_DEFS[s.type].color:'#9ee7ff';
   var rot=(s.rot||0)+(g.time||0)*.06;
   ctx.save();ctx.translate(px,py);ctx.globalAlpha=.36;ctx.strokeStyle='rgba(240,249,255,.72)';ctx.lineWidth=Math.max(.65,z*.7);ctx.beginPath();for(var i=0;i<sides;i++){var a=rot+i/sides*TAU,x=Math.cos(a)*r*.48,y=Math.sin(a)*r*.48;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}ctx.closePath();ctx.stroke();
