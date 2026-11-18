@@ -607,8 +607,8 @@ test('natural composed worlds report public-bearing sensitivity without changing
             for(const observer of this.tanks||[]){
               if(!observer||!observer.ai||observer===shooter||
                  observer===victim||!alive(observer))continue;
-              if(T.canPerceive(this,C,observer,shooter)&&
-                 T.canPerceive(this,C,observer,victim))possible++;
+              if(T.inGameplayViewport(this,observer,shooter)&&
+                 T.inGameplayViewport(this,observer,victim))possible++;
             }
             result.potentialHitWitnessPairs+=possible;
             result.maxPotentialHitWitnessPairs=Math.max(
