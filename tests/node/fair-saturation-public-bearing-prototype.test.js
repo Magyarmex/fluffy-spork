@@ -168,6 +168,21 @@ test('public-bearing prototype is invariant to offscreen private target assignme
   assert.notEqual(shippingFirst, shippingSecond,
     'fixture must remain sensitive to shipping private-slot scoring');
 });
+test('public choices never read other bots private target slots', () => {
+  const T = boot(), { g, observer, hidden } = world();
+  const forbidden = new Set(['__v1112TargetId', '__v1105TargetId',
+    '__v180TargetId', 'targetId', '__lfEcoKey']);
+  for (const q of g.tanks) {
+    if (q.id === observer.id || !q.ai) continue;
+    q.ai = new Proxy(q.ai, { get(target, key, receiver) {
+      if (forbidden.has(key)) throw new Error('private AI slot read: ' + key);
+      return Reflect.get(target, key, receiver);
+    } });
+  }
+  assert.ok(publicChoice(T, g, observer));
+  assert.ok(publicChoice(T, g, observer, classes, 'shot'));
+  assert.equal(hidden.ai.state, 'hunt');
+});
 test('visible allied bearing is public evidence, not hidden target ID', () => {
   const T = boot(), { g, observer, a, b, hidden } = world();
   hidden.ai.state = 'wander';
