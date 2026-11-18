@@ -84,6 +84,8 @@ test('drone material allegiance agrees with IFF for player, allied AI, hostile A
   const game = { player, areAllies: (a, b) => a.teamId === b.teamId,
     areHostile: (a, b) => a.teamId !== b.teamId };
   assert.equal(accent(game, { ownerId: 1 }, player), '#aef8c6');
+  assert.equal(accent(game, { ownerId: 1 }, { ...player, alive: false }), '#aef8c6',
+    'IFF preserves player ownership before resolving live owner state');
   assert.equal(accent(game, { ownerId: 2 }, ally), '#aef8c6',
     'friendly AI drones must not show a hostile-red decorative core');
   assert.equal(accent(game, { ownerId: 3 }, hostile), '#ff9aa7');
