@@ -12,21 +12,29 @@ function privateTarget(a){
   a.__v180TargetId>=0?a.__v180TargetId:a.targetId;
 }
 function active(a){return a.state==='hunt'||['pressure','flank','route'].includes(a.__v180Posture);}
+function alive(t){return !!t&&t.alive!==false&&(t.hp==null||t.hp>0);}
+function hostile(g,a,b){
+ if(!a||!b||a.id===b.id)return false;
+ if(typeof g.areAllies==='function'&&g.areAllies(a,b))return false;
+ if(typeof g.areHostile==='function')return !!g.areHostile(a,b);
+ for(const k of ['teamId','team','factionId','faction','side'])
+  if(a[k]!=null&&b[k]!=null)return a[k]!==b[k];
+ return true;
+}
 function sample(g,classes,T,counters){
  const tanks=g.tanks||[];
  for(const observer of tanks){
-  if(!observer||observer.alive===false||!observer.ai||observer.isPlayer)continue;
+  if(!alive(observer)||!observer.ai||observer.isPlayer)continue;
   counters.observerSamples++;
-  const visible=tanks.filter(q=>q&&q.id!==observer.id&&q.alive!==false&&
-   !(q.spawnShieldT>0)&&T.canPerceive(g,classes,observer,q)&&
-   (!g.areAllies||!g.areAllies(observer,q)));
+  const visible=tanks.filter(q=>alive(q)&&hostile(g,observer,q)&&
+   !(q.spawnShieldT>0)&&T.canPerceive(g,classes,observer,q));
   if(visible.length<2)continue;
   counters.multiVisibleSamples++;
   const ids=new Set(visible.map(t=>t.id));
   const baseline=T.chooseTarget(g,classes,observer,observer.ai,g.time);
   if(!baseline)continue;
   const eligible=tanks.filter(hidden=>{
-   if(!hidden||hidden.id===observer.id||hidden.alive===false||!hidden.ai||
+   if(!alive(hidden)||hidden.id===observer.id||!hidden.ai||
       T.canPerceive(g,classes,observer,hidden))return false;
    counters.offscreenAiSamples++;
    if(!active(hidden.ai))return false;
