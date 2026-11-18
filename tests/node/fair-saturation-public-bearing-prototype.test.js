@@ -55,13 +55,15 @@ function bearingCount(T, g, observer, target, C = classes) {
     const dx = target.x - q.x, dy = target.y - q.y;
     if (dx * dx + dy * dy > 500 * 500 || dx * dx + dy * dy < 1) continue;
     if (!Number.isFinite(q.angle)) continue;
-    // A hull visible in the camera rectangle may still be behind solid cover.
+    const delta = Math.atan2(Math.sin(Math.atan2(dy, dx) - q.angle),
+      Math.cos(Math.atan2(dy, dx) - q.angle));
+    if (Math.abs(delta) > 0.32) continue;
+    // Cheap angle/distance gates precede both potentially costly terrain
+    // queries; only plausible public attack bearings ask about solid cover.
     if (typeof g.hasLineOfSight === 'function' &&
         (!g.hasLineOfSight(observer.x, observer.y, q.x, q.y, 18) ||
          !g.hasLineOfSight(q.x, q.y, target.x, target.y, 18))) continue;
-    const delta = Math.atan2(Math.sin(Math.atan2(dy, dx) - q.angle),
-      Math.cos(Math.atan2(dy, dx) - q.angle));
-    if (Math.abs(delta) <= 0.32) count++;
+    count++;
   }
   return count;
 }
