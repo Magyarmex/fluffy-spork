@@ -48,6 +48,8 @@ function choose(T, w) { return T.publicEcoBias(w.g, w.observer, {}, {}); }
 
 test('unseen private BLOOM commitments alone can veto a legal public rotation', () => {
   const T = boot(), w = encounter('BLOOM', 0);
+  assert.equal(T.sectorIndex(w.signal.x, w.signal.y), w.signal.sector,
+    'public signal must identify its actual physical sector');
   assert.notEqual(T.sectorIndex(w.observer.x, w.observer.y), w.signal.sector,
     'observer must not already occupy the public opportunity sector');
   for (const bot of w.hidden) {
