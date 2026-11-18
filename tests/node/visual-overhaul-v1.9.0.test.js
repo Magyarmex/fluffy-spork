@@ -125,3 +125,33 @@ test('Hardlight drone core agrees with the loaded canonical IFF relation', () =>
   assert.equal(relation(neutral, d), 0);
   assert.equal(accent(neutral, d, g.tankById.get(2)), '#d8e9f4');
 });
+
+test('actual Hardlight render paints an allied AI drone core friendly green', () => {
+  const { modules } = boot();
+  const fills = [];
+  const ctx = new Proxy({ fillStyle: '#000', globalAlpha: 1 }, {
+    get(target, key) {
+      if (key === 'fill') return () => fills.push(target.fillStyle);
+      if (key in target) return target[key];
+      return () => {};
+    },
+    set(target, key, value) { target[key] = value; return true; }
+  });
+  const m = { exports: {} };
+  modules['game/render'](m, m.exports, id => {
+    if (id === './classes') return { CLASSES: {}, lineageForClass() { return null; } };
+    if (id === './types') return { SHAPE_DEFS: {} };
+    throw new Error('unexpected require ' + id);
+  });
+  const player = { id: 1, alive: true, teamId: 'blue', x: 0, y: 0 };
+  const ally = { id: 2, alive: true, teamId: 'blue', x: 0, y: 0, angle: 0 };
+  const g = { player, tanks: [], shapes: [], powerups: [], drones: [
+    { ownerId: 2, hp: 10, x: 0, y: 0, r: 7, vx: 0, vy: 0 }
+  ], tankById: new Map([[1, player], [2, ally]]),
+    areAllies: (a, b) => a.teamId === b.teamId,
+    areHostile: (a, b) => a.teamId !== b.teamId,
+    cam: { x: 0, y: 0, zoom: 1 }, quality: 'low', dpr: 1, ctx };
+  m.exports.render(g, 320, 240);
+  assert.ok(fills.includes('#aef8c6'), 'allied AI drone core must be friendly green');
+  assert.ok(!fills.includes('#ff9aa7'), 'no hostile-red core in this allied-only scene');
+});
