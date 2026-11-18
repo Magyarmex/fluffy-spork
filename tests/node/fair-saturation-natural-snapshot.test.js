@@ -29,6 +29,12 @@ function sample(g,classes,T,counters){
    hidden.alive!==false&&hidden.ai&&!T.canPerceive(g,classes,observer,hidden)&&
    active(hidden.ai)&&ids.has(privateTarget(hidden.ai)));
   if(!eligible.length)continue;
+  // The physical digest omits AI private slots; independently certify that
+  // this counterfactual never leaves altered intent in the live world.
+  const slotFields=['__v1112TargetId','__v1105TargetId','__v180TargetId','targetId'];
+  const slotSnapshot=()=>JSON.stringify(tanks.map(q=>q&&q.ai?
+   [q.id,...slotFields.map(k=>[Object.prototype.hasOwnProperty.call(q.ai,k),q.ai[k]])]:null));
+  const beforeSlots=slotSnapshot();
   counters.jointCandidateSamples++;
   for(const hidden of eligible){
    counters.hiddenAssignmentsToVisible++;
@@ -56,6 +62,7 @@ function sample(g,classes,T,counters){
     if(owned)a[key]=value;else delete a[key];
    }
   }
+  assert.equal(slotSnapshot(),beforeSlots,'diagnostic left mutated AI target slots');
  }
 }
 function run(seed,observe){return withSeed(seed,draws=>{
