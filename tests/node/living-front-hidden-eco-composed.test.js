@@ -17,7 +17,7 @@ test('composed Living Front strategy changes a public BLOOM decision on hidden i
       const bots = g.tanks.filter(t => t && t.ai && !t.isPlayer);
       assert.ok(bots.length >= 4, 'need canonical observer and three hidden bots');
       const [observer, ...hidden] = bots.slice(0, 4);
-      const sector = T.sectorIndex(-100, -400);
+      const sector = T.sectorIndex(100, -400);
       assert.notEqual(T.sectorIndex(-400, -400), sector,
         'public signal must be outside observer sector');
       Object.assign(observer, { x: -400, y: -400, hp: 100,
@@ -37,7 +37,7 @@ test('composed Living Front strategy changes a public BLOOM decision on hidden i
       g.paused = false;
       g.__lfState = g.__lfState || {};
       g.__lfState.directorEnabled = true;
-      g.__lfState.signal = { type: 'BLOOM', sector, x: -100, y: -400,
+      g.__lfState.signal = { type: 'BLOOM', sector, x: 100, y: -400,
         started: 9, until: 20 };
       g.__lfState.queryScratch = g.__lfState.queryScratch || [];
       g.__lfState.queryScratch2 = g.__lfState.queryScratch2 || [];
