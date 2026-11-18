@@ -105,9 +105,9 @@ function recordVisibleHit(T,g,observer,shooter,target,C=classes){
  const prior=hitWitnesses.get(observer)||[];
  const valid=prior.filter(e=>at>=e.at&&at-e.at<=1.25&&
   alive(e.shooter)&&alive(e.target));
- const existing=valid.find(e=>e.shooter===shooter&&e.target===target);
- if(existing)existing.at=at;
- else valid.push({shooter,target,at});
+ const oldIndex=valid.findIndex(e=>e.shooter===shooter&&e.target===target);
+ if(oldIndex>=0)valid.splice(oldIndex,1);
+ valid.push({shooter,target,at}); // recency order for bounded eviction
  if(valid.length>13)valid.splice(0,valid.length-13);
  hitWitnesses.set(observer,valid);
  return true;
