@@ -118,6 +118,7 @@ function confirmedHitCount(g,observer,target){
  let count=0;
  for(const e of hitWitnesses.get(observer)||[]){
   if(e.target!==target||now<e.at||now-e.at>1.25||
+     !(g.tanks||[]).includes(e.shooter)||
      !alive(e.shooter)||!alive(e.target)||
      !hostile(g,e.shooter,e.target))continue;
   count++;
@@ -405,6 +406,9 @@ test('confirmed hit witness supports multiple attackers without recycled IDs',()
  g.tanks.push(recycled);
  assert.equal(confirmedHitCount(g,observer,a),1,
   'recycled numeric shooter ID cannot inherit an old observed hit');
+ g.tanks=g.tanks.filter(t=>t!==two);
+ assert.equal(confirmedHitCount(g,observer,a),0,
+  'despawned shooter cannot remain a phantom attacker');
 });
 test('confirmed-hit prototype can be fed by actual composed Game damage',()=>{
  const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
