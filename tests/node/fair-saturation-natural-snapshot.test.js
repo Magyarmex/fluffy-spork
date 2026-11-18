@@ -25,9 +25,16 @@ function sample(g,classes,T,counters){
   const ids=new Set(visible.map(t=>t.id));
   const baseline=T.chooseTarget(g,classes,observer,observer.ai,g.time);
   if(!baseline)continue;
-  const eligible=tanks.filter(hidden=>hidden&&hidden.id!==observer.id&&
-   hidden.alive!==false&&hidden.ai&&!T.canPerceive(g,classes,observer,hidden)&&
-   active(hidden.ai)&&ids.has(privateTarget(hidden.ai)));
+  const eligible=tanks.filter(hidden=>{
+   if(!hidden||hidden.id===observer.id||hidden.alive===false||!hidden.ai||
+      T.canPerceive(g,classes,observer,hidden))return false;
+   counters.offscreenAiSamples++;
+   if(!active(hidden.ai))return false;
+   counters.offscreenActiveSamples++;
+   if(privateTarget(hidden.ai)<0)return false;
+   counters.offscreenAssignedSamples++;
+   return ids.has(privateTarget(hidden.ai));
+  });
   if(!eligible.length)continue;
   // The physical digest omits AI private slots; independently certify that
   // this counterfactual never leaves altered intent in the live world.
@@ -69,14 +76,17 @@ function run(seed,observe){return withSeed(seed,draws=>{
  const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
  const T=g.__testFair,C=g.__testWindow.__novaMakeRequire('')('game/classes');
  assert.ok(T&&typeof T.chooseTarget==='function'&&typeof T.canPerceive==='function');
- const counters={observerSamples:0,multiVisibleSamples:0,hiddenAssignmentsToVisible:0,changedChoices:0,jointCandidateSamples:0,jointChangedChoices:0};
+ const counters={observerSamples:0,multiVisibleSamples:0,hiddenAssignmentsToVisible:0,offscreenAiSamples:0,offscreenActiveSamples:0,offscreenAssignedSamples:0,changedChoices:0,jointCandidateSamples:0,jointChangedChoices:0};
  try{
   g.status='playing';g.paused=false;
   for(let tick=1;tick<=TICKS;tick++){
    g.update(1/60);
    if(observe&&tick%SAMPLE_EVERY===0)sample(g,C,T,counters);
   }
-  return {hash:digest(physical(g)),draws:draws(),counters};
+  return {hash:digest(physical(g)),privateHash:digest((g.tanks||[]).map(t=>t?.ai?
+   [t.id,t.ai.state,t.ai.__v180Posture,t.ai.__v1112TargetId,
+    t.ai.__v1105TargetId,t.ai.__v180TargetId,t.ai.targetId,
+    t.ai.__v1112NextThink]:null)),draws:draws(),counters};
  }finally{g.destroy();}
 });}
 test('natural composed AI snapshots measure hidden target-slot sensitivity without changing world',()=>{
@@ -85,6 +95,7 @@ test('natural composed AI snapshots measure hidden target-slot sensitivity witho
   const control=run(seed,false),observed=run(seed,true);
   assert.equal(observed.hash,control.hash,'diagnostic changed physical world');
   assert.equal(observed.draws,control.draws,'diagnostic consumed gameplay RNG');
+  assert.equal(observed.privateHash,control.privateHash,'diagnostic changed private AI state');
   assert.ok(observed.counters.observerSamples>0,'must sample actual AI observers');
   rows.push({seed,...observed.counters});
  }
