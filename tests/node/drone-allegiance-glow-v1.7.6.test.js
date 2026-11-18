@@ -64,3 +64,36 @@ test('IFF marker CSS-pixel stroke stays readable at zoomed-out mobile camera sca
       'hostile allegiance still uses a diamond');
   }
 });
+
+test('hostile drone IFF never reveals an in-camera drone behind solid cover',()=>{
+  const h=loadLayer();
+  const player={id:1,alive:true,x:0,y:0,teamId:'blue'};
+  const ally={id:2,alive:true,teamId:'blue'};
+  const hostile={id:3,alive:true,teamId:'red'};
+  const g=game(h.ctx,[player,ally,hostile],[
+    {ownerId:2,x:-20,y:0,hp:10,role:'escort'},
+    {ownerId:3,x:20,y:0,hp:10,role:'hunter'}
+  ],player);
+  g.areAllies=(a,b)=>a.teamId===b.teamId;
+  g.areHostile=(a,b)=>a.teamId!==b.teamId;
+  const traces=[];
+  g.hasLineOfSight=(ax,ay,bx,by,pad)=>{traces.push({ax,ay,bx,by,pad});return false;};
+  h.render.render(g,200,120);
+  assert.deepEqual(h.draws.map(d=>d.color),['#4da8ff','#4da8ff'],
+    'known allied drone remains identifiable; hidden hostile drone must not leak');
+  assert.equal(h.strokes.length,1,'hidden hostile diamond must also be absent');
+  assert.equal(traces.length,1,'only hostile on-screen drones need a terrain visibility trace');
+  assert.equal(traces[0].bx,20);
+  assert.equal(traces[0].pad,2);
+});
+test('hostile IFF still draws with clear sight and without optional terrain hook',()=>{
+  for(const los of [undefined,()=>true]){
+    const h=loadLayer(),player={id:1,alive:true,x:0,y:0};
+    const g=game(h.ctx,[player,{id:2,alive:true}],
+      [{ownerId:2,x:15,y:0,hp:10,role:'hunter'}],player);
+    if(los)g.hasLineOfSight=los;
+    h.render.render(g,200,120);
+    assert.deepEqual(h.draws.map(d=>d.color),['#ff4d62','#ff4d62']);
+    assert.equal(h.strokes.length,1);
+  }
+});
