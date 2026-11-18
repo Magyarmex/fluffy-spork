@@ -302,7 +302,8 @@ test('natural composed worlds report public-bearing sensitivity without changing
       const C = g.__testWindow.__novaMakeRequire('')('game/classes');
       const result = { observerSamples: 0, multiVisible: 0,
         changedSelections: 0, shotChangedSelections: 0,
-        publicBearingContacts: 0, publicShotContacts: 0, selected: 0 };
+        publicBearingContacts: 0, publicShotContacts: 0, selected: 0,
+        publicLineOfSightCalls: 0 };
       try {
         g.status = 'playing';
         g.paused = false;
@@ -318,17 +319,31 @@ test('natural composed worlds report public-bearing sensitivity without changing
             if (visible.length < 2) continue;
             result.multiVisible++;
             const shipping = T.chooseTarget(g, C, observer, observer.ai, g.time);
-            const proposed = publicChoice(T, g, observer, C);
-            const shotProposed = publicChoice(T, g, observer, C, 'shot');
-            if (shipping && proposed) {
-              result.selected++;
-              if (shipping.id !== proposed.id) result.changedSelections++;
-              if (shotProposed && shipping.id !== shotProposed.id)
-                result.shotChangedSelections++;
+            // Instrument candidate-only LOS work. The game's existing perf
+            // counter does not necessarily include these direct terrain calls.
+            // Restore the exact original method before the next game update.
+            const originalLOS = g.hasLineOfSight;
+            if (typeof originalLOS === 'function') {
+              g.hasLineOfSight = function (...args) {
+                result.publicLineOfSightCalls++;
+                return originalLOS.apply(this, args);
+              };
             }
-            for (const target of visible) {
-              result.publicBearingContacts += bearingCount(T, g, observer, target, C);
-              result.publicShotContacts += witnessedShotCount(T, g, observer, target, C);
+            try {
+              const proposed = publicChoice(T, g, observer, C);
+              const shotProposed = publicChoice(T, g, observer, C, 'shot');
+              if (shipping && proposed) {
+                result.selected++;
+                if (shipping.id !== proposed.id) result.changedSelections++;
+                if (shotProposed && shipping.id !== shotProposed.id)
+                  result.shotChangedSelections++;
+              }
+              for (const target of visible) {
+                result.publicBearingContacts += bearingCount(T, g, observer, target, C);
+                result.publicShotContacts += witnessedShotCount(T, g, observer, target, C);
+              }
+            } finally {
+              g.hasLineOfSight = originalLOS;
             }
           }
         }
@@ -359,6 +374,7 @@ test('natural composed worlds report public-bearing sensitivity without changing
       shotChangedSelections: observed.shotChangedSelections,
       publicBearingContacts: observed.publicBearingContacts,
       publicShotContacts: observed.publicShotContacts,
+      publicLineOfSightCalls: observed.publicLineOfSightCalls,
       extraBattlefieldQueries: observed.battlefieldQueries - control.battlefieldQueries });
   }
   console.log('NOVA_PUBLIC_BEARING_SATURATION_CENSUS ' + JSON.stringify(rows));
