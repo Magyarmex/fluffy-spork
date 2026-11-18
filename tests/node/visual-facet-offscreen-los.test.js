@@ -59,4 +59,16 @@ test('Hardlight Foundry culls offscreen neutral, pickup and drone accents before
     'visible neutral, pickup and hostile drone must retain terrain LoS checks');
   assert.ok(clearanceCalls >= 3,
     'visible accents must retain physical cover clearance');
+  // Preserve the renderer's original 24px screen margin: do not turn a
+  // cheap early-out into aggressive edge clipping.
+  game.shapes = [
+    { x: 444, y: 0, r: 10, hp: 1, type: 'circle' },
+    { x: 445, y: 0, r: 10, hp: 1, type: 'circle' }
+  ];
+  game.powerups = [];
+  game.drones = [];
+  losCalls = 0;
+  renderModule.exports.render(game, 800, 600);
+  assert.equal(losCalls, 1,
+    'near-edge shape retains the original onScreen margin; farther shape is culled');
 });
