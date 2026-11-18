@@ -55,7 +55,7 @@ const { chromium } = require('playwright');
           hidden.ai = { ...saved[3].ai, state: 'hunt', targetId: id,
             __v1112TargetId: id, __v1105TargetId: id, __v180TargetId: id };
           const direct = T.chooseTarget(g, C, observer, observer.ai, g.time)?.id;
-          ai.updateAI(observer, g, 0);
+          ai.updateAI(observer, g, 1/60);
           const composed = observer.ai.__v1112TargetId;
           if (composed !== direct) throw Error('composed AI disagrees with Fair Engagement direct choice: '+JSON.stringify({direct,composed}));
           arms.push({ hiddenPrivateTarget: id, direct, composed });
