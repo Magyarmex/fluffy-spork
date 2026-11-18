@@ -33,10 +33,10 @@ const { chromium } = require('playwright');
         w: g.w, h: g.h, time: g.time, player: g.player };
       const saved = [observer, a, b, hidden].map(t => ({ tank: t, state: { ...t }, ai: t.ai }));
       try {
-        Object.assign(observer, { x: 0, y: 0, hp: 100, maxHp: 100, alive: true, spawnShieldT: 0 });
-        Object.assign(a, { x: 120, y: 0, hp: 100, maxHp: 100, alive: true, spawnShieldT: 0 });
-        Object.assign(b, { x: -120, y: 0, hp: 100, maxHp: 100, alive: true, spawnShieldT: 0 });
-        Object.assign(hidden, { x: 2000, y: 2000, hp: 100, maxHp: 100, alive: true, spawnShieldT: 0 });
+        Object.assign(observer, { x: 0, y: 0, hp: 100, maxHp: 100, alive: true, spawnShieldT: 0, cls: 'basic', tier: 1 });
+        Object.assign(a, { x: 120, y: 0, hp: 100, maxHp: 100, alive: true, spawnShieldT: 0, cls: 'basic', tier: 1 });
+        Object.assign(b, { x: -120, y: 0, hp: 100, maxHp: 100, alive: true, spawnShieldT: 0, cls: 'basic', tier: 1 });
+        Object.assign(hidden, { x: 2000, y: 2000, hp: 100, maxHp: 100, alive: true, spawnShieldT: 0, cls: 'basic', tier: 1 });
         // Keep the actual Game hostility authority. This is a default FFA fixture.
         if (typeof g.areAllies === 'function' && (g.areAllies(observer, a) || g.areAllies(observer, b)))
           throw Error('selected bots are allied; cannot use FFA fixture');
@@ -50,7 +50,7 @@ const { chromium } = require('playwright');
         const arms = [];
         for (const id of [a.id, b.id]) {
           g.bullets = []; g.powerups = [];
-          Object.assign(observer, { x: 0, y: 0, hp: 100, maxHp: 100, alive: true, spawnShieldT: 0 });
+          Object.assign(observer, { x: 0, y: 0, hp: 100, maxHp: 100, alive: true, spawnShieldT: 0, cls: 'basic', tier: 1 });
           observer.ai = { ...saved[0].ai, state: 'hunt', targetId: -1,
             __v1112TargetId: -1, __v1105TargetId: -1, __v180TargetId: -1,
             __v1112NextThink: 0 };
