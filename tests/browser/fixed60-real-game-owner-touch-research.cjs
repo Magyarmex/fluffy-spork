@@ -190,8 +190,12 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
       // one-step callback can fire before the intended three-step burst.
       // The scheduler still determines whether three real updates occur.
       let armedFour=false;
-      if((profile.armShotOnThree&&window.__novaFixedMaxSteps===3&&rawGapMs>=48||
-          profile.armShotOnFour&&window.__novaFixedMaxSteps===4&&rawGapMs>=65)&&
+      // A three-step callback can have a 40ms raw gap plus ~10ms of valid
+      // carried lag. Arm against the scheduler's total due work, not a
+      // guessed raw-gap threshold that misses real three-step callbacks.
+      const dueMs=owner?owner.lagMs+rawGapMs:0;
+      if((profile.armShotOnThree&&window.__novaFixedMaxSteps===3&&dueMs>=50-1e-3||
+          profile.armShotOnFour&&window.__novaFixedMaxSteps===4&&dueMs>=1000/15-1e-3)&&
        owner&&rawGapMs<=100+1e-7&&
        window.__novaFixedGame?.input?.aim?.active){
        window.__novaFixedGame.player.fireCd=0;
