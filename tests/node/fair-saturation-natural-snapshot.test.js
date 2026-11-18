@@ -114,3 +114,61 @@ test('natural composed AI snapshots measure hidden target-slot sensitivity witho
  }
  console.log('NOVA_FAIR_SATURATION_NATURAL_SNAPSHOT '+JSON.stringify(rows));
 });
+
+
+test('composed AI can naturally acquire a target hidden from another observer',()=>{
+ withSeed(1517800,()=>{
+  const g=bootGame();
+  try{
+   const T=g.__testFair,win=g.__testWindow;
+   const C=win.__novaMakeRequire('')('game/classes');
+   const ai=win.__novaMakeRequire('')('game/ai');
+   const bots=g.tanks.filter(t=>t&&t.ai&&!t.isPlayer);
+   assert.ok(bots.length>=4,'need four canonical AI tanks');
+   const [observer,a,b,hidden]=bots;
+   const place=(t,x,state)=>{
+    Object.assign(t,{x,y:0,hp:100,maxHp:100,alive:true,
+     spawnShieldT:0,cls:'twin',tier:1});
+    t.ai={...t.ai,state,__v180Posture:state==='hunt'?'pressure':'hold',
+     targetId:-1,__v180TargetId:-1,__v1105TargetId:-1,
+     __v1112TargetId:-1,__v1112NextThink:0,
+     __v180LastAttacker:-1,__v180HitAt:-99};
+   };
+   place(observer,0,'hunt');place(a,80,'wander');
+   place(b,-130,'wander');place(hidden,450,'hunt');
+   if(g.player){g.player.x=-2000;g.player.y=-2000;}
+   g.tanks=[observer,a,b,hidden,...(g.player?[g.player]:[])];
+   g.tankById=new Map(g.tanks.map(t=>[t.id,t]));
+   g.w=800;g.h=600;g.cam.zoom=1;g.time=10;
+   g.status='playing';g.paused=false;
+   assert.equal(T.canPerceive(g,C,observer,hidden),false,
+    'assigning bot must be outside observer viewport');
+   assert.equal(T.canPerceive(g,C,hidden,a),true,
+    'assigning bot must legitimately see its target');
+   assert.equal(T.canPerceive(g,C,hidden,observer),false,
+    'assigning bot must not see observer');
+   assert.equal(T.canPerceive(g,C,observer,a),true);
+   assert.equal(T.canPerceive(g,C,observer,b),true);
+   const before=win.__NOVA_FAIR_ENGAGEMENT__.targetReplans;
+   ai.updateAI(hidden,g,1/60);
+   assert.equal(hidden.ai.__v1112TargetId,a.id,
+    'real Fair Engagement wrapper must acquire the only visible opponent');
+   assert.ok(win.__NOVA_FAIR_ENGAGEMENT__.targetReplans>before,
+    'real composed AI must execute its Fair Engagement replan');
+   const assigned=T.chooseTarget(g,C,observer,observer.ai,g.time)?.id;
+   const keys=['__v1112TargetId','__v1105TargetId','__v180TargetId','targetId'];
+   const saved=keys.map(k=>[k,hidden.ai[k]]);
+   let cleared;
+   try{
+    for(const k of keys)hidden.ai[k]=-1;
+    cleared=T.chooseTarget(g,C,observer,observer.ai,g.time)?.id;
+   }finally{for(const [k,v] of saved)hidden.ai[k]=v;}
+   assert.ok([a.id,b.id].includes(assigned)&&[a.id,b.id].includes(cleared),
+    'both arms must select legal visible candidates');
+   console.log('NOVA_FAIR_SATURATION_REACHABLE_HIDDEN_INTENT '+JSON.stringify({
+    assigned,cleared,leakObserved:assigned!==cleared,
+    observerToHidden:450,hiddenToAssigned:370,
+    naturallyAssignedTarget:hidden.ai.__v1112TargetId}));
+  }finally{g.destroy();}
+ });
+});
