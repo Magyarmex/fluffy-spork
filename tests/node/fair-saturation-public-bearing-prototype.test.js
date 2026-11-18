@@ -362,6 +362,20 @@ test('public witnessed fire can redirect a real target score without private int
   assert.equal(publicChoice(T, g, observer, classes, 'shot')?.id, b.id,
     'changing private target slot must not undo public evidence');
 });
+test('unfired aim and shot-memory alone cannot create confirmed-hit pressure',()=>{
+ const T=boot(),{g,observer,a,hidden}=world();
+ hidden.ai.state='wander';a.hp=85;
+ const shooter=tank(3,0,100,1,Math.atan2(-100,100));
+ g.tanks.push(shooter);
+ const before=publicChoice(T,g,observer,classes,'hit')?.id;
+ observer.ai.__v181ObservedShotId=shooter.id;
+ observer.ai.__v181ObservedShotAt=g.time-.2;
+ observer.ai.__v181ObservedShotAngle=shooter.angle;
+ assert.equal(publicChoice(T,g,observer,classes,'hit')?.id,before,
+  'aim and an unconfirmed shot cannot impersonate a damage event');
+ shooter.angle=Math.PI;
+ assert.equal(publicChoice(T,g,observer,classes,'hit')?.id,before);
+});
 test('confirmed public hit changes real target score without private intent',()=>{
  const T=boot(),{g,observer,a,b,hidden}=world();
  hidden.ai.state='wander';
