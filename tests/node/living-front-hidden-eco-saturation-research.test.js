@@ -31,7 +31,7 @@ function encounter(type, hiddenCount) {
   const signal = { type, sector, from: 1, to: sector,
     x: 100, y: -400, started: 9, until: 20 };
   const key = type + ':' + sector;
-  const hidden = Array.from({ length: 3 }, (_, i) => ({
+  const hidden = Array.from({ length: 4 }, (_, i) => ({
     id: 20 + i, x: 2000 + i * 30, y: 2000,
     hp: 100, maxHp: 100, alive: true,
     ai: { __lfEcoKey: i < hiddenCount ? key : 'none',
@@ -80,6 +80,23 @@ test('unseen private MIGRATION commitments can suppress a public signal', () => 
   assert.equal(crowded.weight, 0);
 });
 
+
+
+test('unseen private commitments can also veto a publicly announced Rogue Star', () => {
+  const T = boot(), w = encounter('ROGUE STAR', 0);
+  const star = { id: 77, kind: 'shape', type: 'star',
+    x: 100, y: -400, hp: 100, alive: true };
+  w.signal.starId = star.id;
+  w.g.shapes = [star];
+  w.g.getShape = id => id === star.id ? star : null;
+  const open = choose(T, w);
+  assert.equal(open.mode, 'signal');
+  assert.equal(open.key, 'ROGUE STAR:77');
+  for (const bot of w.hidden) bot.ai.__lfEcoKey = 'ROGUE STAR:77';
+  const crowded = choose(T, w);
+  assert.notEqual(crowded.mode, 'signal',
+    'unseen private commitments must reproduce the public Star veto');
+});
 
 test('remembered public BLOOM can also be vetoed by unseen private commitments', () => {
   const T = boot(), w = encounter('BLOOM', 0);
