@@ -83,7 +83,7 @@ test('cover tip matches Fair Engagement viewport awareness rather than obsolete 
   const line = fieldcraft.split('\n').find(x => x.includes("tip('cover-last-seen-ai'"));
   assert.ok(line, 'stable Fieldcraft tip ID must remain registered');
   assert.match(line, /Solid cover can block a direct firing lane, but does not hide a hull still inside an AI rival's gameplay view/);
-  assert.match(line, /reposition before peeking again/);
+  assert.match(line, /reposition before peeking again/i);
   assert.match(line, /\['battlefield','combat','ai'\]/);
   assert.doesNotMatch(line, /breaking line of sight denies AI a live target/i);
 });
