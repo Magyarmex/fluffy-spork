@@ -168,8 +168,10 @@ function drawPowerHousing(g,ctx,p,w,h){
 /* Keep the decorative drone nose/core consistent with the authoritative IFF
  * halo's player-relative team relation, including allied AI owners. */
 function droneAccentColor(g,d,owner){
-  var p=g&&g.player;if(!p||!owner||owner.alive===false)return '#d8e9f4';
-  if(d.ownerId===p.id||(typeof g.areAllies==='function'&&g.areAllies(p,owner)))return '#aef8c6';
+  var p=g&&g.player;if(!p||!d)return '#d8e9f4';
+  if(d.ownerId===p.id)return '#aef8c6';
+  if(!owner||owner.alive===false)return '#d8e9f4';
+  if(typeof g.areAllies==='function'&&g.areAllies(p,owner))return '#aef8c6';
   if(typeof g.areHostile==='function')return g.areHostile(p,owner)?'#ff9aa7':'#d8e9f4';
   var keys=['teamId','team','factionId','faction','side'];
   for(var i=0;i<keys.length;i++){var k=keys[i];if(p[k]!=null&&owner[k]!=null)return p[k]===owner[k]?'#aef8c6':'#ff9aa7';}
