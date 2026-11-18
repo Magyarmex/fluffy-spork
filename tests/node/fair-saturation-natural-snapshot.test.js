@@ -25,10 +25,12 @@ function sample(g,classes,T,counters){
   const ids=new Set(visible.map(t=>t.id));
   const baseline=T.chooseTarget(g,classes,observer,observer.ai,g.time);
   if(!baseline)continue;
-  for(const hidden of tanks){
-   if(!hidden||hidden.id===observer.id||hidden.alive===false||!hidden.ai||
-      T.canPerceive(g,classes,observer,hidden)||!active(hidden.ai)||
-      !ids.has(privateTarget(hidden.ai)))continue;
+  const eligible=tanks.filter(hidden=>hidden&&hidden.id!==observer.id&&
+   hidden.alive!==false&&hidden.ai&&!T.canPerceive(g,classes,observer,hidden)&&
+   active(hidden.ai)&&ids.has(privateTarget(hidden.ai)));
+  if(!eligible.length)continue;
+  counters.jointCandidateSamples++;
+  for(const hidden of eligible){
    counters.hiddenAssignmentsToVisible++;
    const a=hidden.ai,fields=['__v1112TargetId','__v1105TargetId','__v180TargetId','targetId'];
    const saved=fields.map(k=>[k,Object.prototype.hasOwnProperty.call(a,k),a[k]]);
@@ -40,13 +42,27 @@ function sample(g,classes,T,counters){
     for(const [key,owned,value] of saved){if(owned)a[key]=value;else delete a[key];}
    }
   }
+  // Two small hidden penalties can jointly change a choice even when
+  // removing either one alone cannot. Count that interaction separately.
+  const fields=['__v1112TargetId','__v1105TargetId','__v180TargetId','targetId'];
+  const saved=eligible.map(hidden=>({a:hidden.ai,slots:fields.map(k=>
+   [k,Object.prototype.hasOwnProperty.call(hidden.ai,k),hidden.ai[k]])}));
+  try{
+   for(const {a} of saved)for(const key of fields)a[key]=-1;
+   if(T.chooseTarget(g,classes,observer,observer.ai,g.time)?.id!==baseline.id)
+    counters.jointChangedChoices++;
+  }finally{
+   for(const {a,slots} of saved)for(const [key,owned,value] of slots){
+    if(owned)a[key]=value;else delete a[key];
+   }
+  }
  }
 }
 function run(seed,observe){return withSeed(seed,draws=>{
  const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
  const T=g.__testFair,C=g.__testWindow.__novaMakeRequire('')('game/classes');
  assert.ok(T&&typeof T.chooseTarget==='function'&&typeof T.canPerceive==='function');
- const counters={observerSamples:0,multiVisibleSamples:0,hiddenAssignmentsToVisible:0,changedChoices:0};
+ const counters={observerSamples:0,multiVisibleSamples:0,hiddenAssignmentsToVisible:0,changedChoices:0,jointCandidateSamples:0,jointChangedChoices:0};
  try{
   g.status='playing';g.paused=false;
   for(let tick=1;tick<=TICKS;tick++){
