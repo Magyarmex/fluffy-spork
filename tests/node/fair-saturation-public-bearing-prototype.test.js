@@ -837,12 +837,13 @@ test('composed Iron Will reflection credits a non-firing tank as damage source',
   try{
    g.sfx.muted=true;
    g.setClass(guard,'fortress');
+   g.setClass(attacker,'scout');
    Object.assign(guard,{x:0,y:0,vx:0,vy:0,angle:0,
     hp:1000,maxHp:1000,alive:true,spawnShieldT:0,shieldT:0,
     invulnT:0,bulwarkT:0,tauntT:2,__v17PerfectGuardUntil:-1});
    Object.assign(attacker,{x:120,y:0,vx:0,vy:0,angle:Math.PI,
     hp:1000,maxHp:1000,alive:true,spawnShieldT:0,shieldT:0,
-    invulnT:0,bulwarkT:0,tauntT:0});
+    invulnT:0,bulwarkT:0,tauntT:0,gene:null,perk:null});
    g.tanks=[guard,attacker];
    g.tankById=new Map(g.tanks.map(t=>[t.id,t]));
    g.bullets=[];g.drones=[];g.__novaTerrain=[];g.__novaBattlefieldIndex=null;
