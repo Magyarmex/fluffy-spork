@@ -56,7 +56,25 @@ function bearingCount(T, g, observer, target, C = classes) {
   }
   return count;
 }
-function publicChoice(T, g, observer, C = classes) {
+// Battle Sense currently remembers only the latest witnessed shooter, so this
+// can certify at most one public attacker; it is not a multi-attacker census.
+function witnessedShotCount(T, g, observer, target, C = classes) {
+  const a = observer.ai || {};
+  const at = Number(a.__v181ObservedShotAt);
+  if (!Number.isFinite(at) || g.time - at < 0 || g.time - at > 1.25) return 0;
+  const shooter = g.tanks.find(q => q && q.id === a.__v181ObservedShotId);
+  if (!shooter || !alive(shooter) || shooter.id === observer.id ||
+      shooter.id === target.id || !allied(g, observer, shooter) ||
+      !T.canPerceive(g, C, observer, shooter)) return 0;
+  const angle = Number(a.__v181ObservedShotAngle);
+  if (!Number.isFinite(angle)) return 0;
+  const toward = Math.atan2(target.y - shooter.y, target.x - shooter.x);
+  if (Math.cos(angle - toward) < Math.cos(0.32)) return 0;
+  if (typeof g.hasLineOfSight === 'function' &&
+      !g.hasLineOfSight(shooter.x, shooter.y, target.x, target.y, 18)) return 0;
+  return 1;
+}
+function publicChoice(T, g, observer, C = classes, mode = 'bearing') {
   let best = null, bestScore = -Infinity;
   for (const target of g.tanks) {
     if (!target || target.id === observer.id || !alive(target) ||
@@ -66,7 +84,8 @@ function publicChoice(T, g, observer, C = classes) {
     // Recover the unchanged score before private-slot saturation and apply the
     // alternative public penalty. This is an observational score experiment.
     const score = shipping + privateCount(g, observer, target) * T.saturationPenalty -
-      bearingCount(T, g, observer, target, C) * T.saturationPenalty;
+      (mode === 'shot' ? witnessedShotCount(T, g, observer, target, C) :
+       bearingCount(T, g, observer, target, C)) * T.saturationPenalty;
     if (score > bestScore) { bestScore = score; best = target; }
   }
   return best;
@@ -137,6 +156,24 @@ test('public bearing cannot see through cover between observer, shooter or targe
   g.hasLineOfSight = () => true;
   assert.equal(bearingCount(T, g, observer, a), 1);
 });
+test('latest witnessed shot is bounded, public and cannot imply multiple attackers', () => {
+  const T = boot(), { g, observer, a, b } = world();
+  const shooter = tank(3, 0, 100, 1);
+  g.tanks.push(shooter);
+  observer.ai.__v181ObservedShotId = shooter.id;
+  observer.ai.__v181ObservedShotAt = g.time - 0.2;
+  observer.ai.__v181ObservedShotAngle = Math.atan2(-100, 100);
+  assert.equal(witnessedShotCount(T, g, observer, a), 1);
+  assert.equal(witnessedShotCount(T, g, observer, b), 0);
+  shooter.ai.__v1112TargetId = b.id;
+  assert.equal(witnessedShotCount(T, g, observer, a), 1,
+    'witness must not consume private shooter target slots');
+  observer.ai.__v181ObservedShotAt = g.time - 1.3;
+  assert.equal(witnessedShotCount(T, g, observer, a), 0);
+  observer.ai.__v181ObservedShotAt = g.time - 0.2;
+  shooter.team = 2;
+  assert.equal(witnessedShotCount(T, g, observer, a), 0);
+});
 test('natural composed worlds report public-bearing sensitivity without changing gameplay', () => {
   const { bootGame, withSeed, digest, physical } =
     require('../research/audio-rng-causal-pilot.cjs');
@@ -149,7 +186,8 @@ test('natural composed worlds report public-bearing sensitivity without changing
       const T = g.__testFair;
       const C = g.__testWindow.__novaMakeRequire('')('game/classes');
       const result = { observerSamples: 0, multiVisible: 0,
-        changedSelections: 0, publicBearingContacts: 0, selected: 0 };
+        changedSelections: 0, shotChangedSelections: 0,
+        publicBearingContacts: 0, publicShotContacts: 0, selected: 0 };
       try {
         g.status = 'playing';
         g.paused = false;
@@ -166,12 +204,16 @@ test('natural composed worlds report public-bearing sensitivity without changing
             result.multiVisible++;
             const shipping = T.chooseTarget(g, C, observer, observer.ai, g.time);
             const proposed = publicChoice(T, g, observer, C);
+            const shotProposed = publicChoice(T, g, observer, C, 'shot');
             if (shipping && proposed) {
               result.selected++;
               if (shipping.id !== proposed.id) result.changedSelections++;
+              if (shotProposed && shipping.id !== shotProposed.id)
+                result.shotChangedSelections++;
             }
             for (const target of visible)
               result.publicBearingContacts += bearingCount(T, g, observer, target, C);
+              result.publicShotContacts += witnessedShotCount(T, g, observer, target, C);
           }
         }
         return { ...result, hash: digest(physical(g)), draws: draws() };
@@ -188,7 +230,9 @@ test('natural composed worlds report public-bearing sensitivity without changing
     rows.push({ seed, observerSamples: observed.observerSamples,
       multiVisible: observed.multiVisible, selected: observed.selected,
       changedSelections: observed.changedSelections,
-      publicBearingContacts: observed.publicBearingContacts });
+      shotChangedSelections: observed.shotChangedSelections,
+      publicBearingContacts: observed.publicBearingContacts,
+      publicShotContacts: observed.publicShotContacts });
   }
   console.log('NOVA_PUBLIC_BEARING_SATURATION_CENSUS ' + JSON.stringify(rows));
 });
