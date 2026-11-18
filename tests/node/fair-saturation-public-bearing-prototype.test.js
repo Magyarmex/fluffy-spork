@@ -158,6 +158,26 @@ test('public base score exactly matches shipping before private saturation', () 
     }
   }
 });
+test('public score reconstruction preserves all five lineage danger bands and own commitments', () => {
+  const T = boot(), { g, observer, a, hidden } = world();
+  const C = { lineageForClass(id) { return id; } };
+  for (const lineage of ['gunner', 'sniper', 'cannon', 'controller', 'guardian', 'unknown']) {
+    for (const tier of [0, 1, 3, 4]) {
+      for (const hp of [20, 65, 100]) {
+        a.cls = lineage; a.tier = tier; a.hp = hp;
+        observer.ai.__v1112TargetId = a.id;
+        observer.ai.__v180LastAttacker = a.id;
+        observer.ai.__v180HitAt = g.time - 0.4;
+        hidden.ai.__v1112TargetId = a.id;
+        const shipping = T.scoreTarget(g, C, observer, observer.ai, a, g.time);
+        const recovered = shipping + privateCount(g, observer, a) * T.saturationPenalty;
+        const publicScore = basePublicScore(T, g, C, observer, a);
+        assert.ok(Math.abs(recovered - publicScore) < 1e-12,
+          'source parity drift: ' + lineage + ' tier=' + tier + ' hp=' + hp);
+      }
+    }
+  }
+});
 test('public-bearing prototype is invariant to offscreen private target assignments', () => {
   const T = boot(), { g, observer, a, b, hidden } = world();
   hidden.ai.__v1112TargetId = a.id;
