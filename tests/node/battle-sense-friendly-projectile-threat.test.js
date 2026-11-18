@@ -43,8 +43,8 @@ test('unknown, dead and recycled shooter identities remain conservative',()=>{
 });
 test('special projectile hazards remain conservative even from allies',()=>{
  const {g,observer,ally,helper}=scene();
- for(const key of ['shell','splash','beam']){
-  g.bullets=[];g.tryFire(ally);g.bullets[0][key]=key==='splash'?60:true;
+ for(const key of ['shell','splash','beam','kind']){
+  g.bullets=[];g.tryFire(ally);g.bullets[0][key]=key==='splash'?60:key==='kind'?'mine':true;
   assert.equal(helper.saferSide(g,observer,1,0),-1,key+' may have nonlocal effects');
  }
 });
