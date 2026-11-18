@@ -450,3 +450,27 @@ test('jittered three-step fixed60 preserves touch-driven Gunner hits and release
  assert.equal(rows.length,8);
  console.log('GUNNER_FIXED60_JITTERED_TOUCH_PARITY '+JSON.stringify(rows));
 });
+
+// #648: Tempest's real 30Hz cadence deficit warrants a touch-owned target-HP
+// gate, not just continuous-fire volley parity. These are actual composed
+// projectile births/hits; the fixed60 owner remains research-only.
+test('Tempest touch bursts preserve actual target HP, heat and release chronology at 30Hz presentation',()=>{
+ for(const reload of [0,8])for(const offset of [7,19]){
+  const reference=trial(1517800,'tempest',reload,'uniform60',offset);
+  assert.ok(reference.volleys>0&&reference.hits>0&&reference.damage>0,
+   'Tempest must actually hit the target under trusted touch chronology');
+  for(const mode of ['uniform30','alternating20_60']){
+   const observed=trial(1517800,'tempest',reload,mode,offset);
+   assert.equal(observed.ticks,reference.ticks,'all canonical updates must execute');
+   assert.equal(observed.droppedMs,0,'healthy 30Hz must not discard simulation time');
+   assert.equal(observed.applied,reference.applied,'all touch edges must apply');
+   assert.equal(observed.volleys,reference.volleys,'Tempest volley chronology changed');
+   assert.equal(observed.hits,reference.hits,'Tempest first-contact hit count changed');
+   assert.equal(observed.damage,reference.damage,'actual Tempest target damage changed');
+   assert.deepEqual(observed.allBirths,reference.allBirths,
+    'Tempest projectile birth timestamps changed with presentation');
+   assert.equal(observed.heat,reference.heat,'Tempest redline heat changed');
+   assert.equal(observed.spin,reference.spin,'Tempest barrel spin changed');
+  }
+ }
+});
