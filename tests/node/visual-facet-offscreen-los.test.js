@@ -39,7 +39,7 @@ test('Hardlight Foundry culls offscreen neutral, pickup and drone accents before
     tanks: [], __novaTerrain: [],
     tankById: new Map([[8, { id: 8, isPlayer: false, angle: 0 }]]),
     drones: Array.from({ length: 13 }, (_, i) => ({ ownerId: 8, hp: 1, x: 1700 + i * 10, y: 1800, r: 7 })),
-    powerups: Array.from({ length: 6 }, (_, i) => ({ id: i + 1, type: 'heal', x: 1900 + i * 10, y: 1800, ttl: 10 })), 
+    powerups: Array.from({ length: 6 }, (_, i) => ({ id: i + 1, type: 'heal', x: 1900 + i * 10, y: 1800, ttl: 10 })),
     __v190FinishCache: { w: 800, h: 600, dpr: 1, quality: 'low', canvas: {} },
     hasLineOfSight() { losCalls++; return true; },
     isTerrainSafe() { clearanceCalls++; return true; },
@@ -50,7 +50,6 @@ test('Hardlight Foundry culls offscreen neutral, pickup and drone accents before
   renderModule.exports.render(game, 800, 600);
   assert.equal(losCalls, 0,
     'offscreen neutral, pickup and drone accents must not invoke terrain LoS');
-  const offscreenClearance = clearanceCalls;
   game.shapes.push({ x: 0, y: 0, r: 10, hp: 1, type: 'circle' });
   game.powerups.push({ id: 77, type: 'heal', x: 10, y: 10, ttl: 10 });
   game.drones.push({ ownerId: 8, hp: 1, x: 20, y: 20, r: 7 });
@@ -60,5 +59,4 @@ test('Hardlight Foundry culls offscreen neutral, pickup and drone accents before
     'visible neutral, pickup and hostile drone must retain terrain LoS checks');
   assert.ok(clearanceCalls >= 3,
     'visible accents must retain physical cover clearance');
-  assert.ok(offscreenClearance >= 0);
 });
