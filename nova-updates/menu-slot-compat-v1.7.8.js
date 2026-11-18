@@ -44,7 +44,7 @@ var BASE_TIPS=[
  tip('cover-partial-blast',"Hard cover can fully occlude a blast, but exposing part of your hull around an edge can still take partial blast damage.",['battlefield','combat']),
  tip('cover-penetration',"A penetrating round only carries through destructible cover when that impact actually breaks the barricade and the projectile still has integrity left.",['battlefield','combat']),
  tip('cover-breach-route',"Destroying a barricade is a route change, not just damage: a breach permanently turns that blocker into non-blocking rubble for the rest of the run.",['battlefield','combat']),
- tip('cover-last-seen-ai',"Breaking line of sight denies AI a live target. It may investigate your last legitimately seen position, so relocate instead of waiting behind the same corner.",['battlefield','combat','ai']),
+ tip('cover-last-seen-ai',"Hard cover blocks enemy shots, not awareness of a hull inside its gameplay view. Deny the firing lane, then reposition before peeking again.",['battlefield','combat','ai']),
  tip('cover-cannon-ai',"Cannon AI can deliberately shell destructible cover that blocks a recent legitimate contact. Do not treat a damaged barricade as permanent safety.",['battlefield','combat','ai']),
  tip('cover-observer-relay',"A wall can break a sniper reconnaissance chain without killing the Observer: remote contact requires clear terrain sight.",['battlefield','sniper','combat']),
  tip('cover-layouts',"Crossfire, Split Horizon, and Four Gates are mirrored layouts. Learn the repeatable lanes and crossings; spawn side should not change the geometry problem.",['battlefield','general']),
