@@ -94,6 +94,6 @@ test('drone material allegiance agrees with IFF for player, allied AI, hostile A
   assert.equal(accent({ player }, { ownerId: 2 }, ally), '#aef8c6',
     'team metadata fallback agrees with IFF');
   assert.equal(accent({ player }, { ownerId: 3 }, hostile), '#ff9aa7');
-  assert.match(source, /col=droneAccentColor\\(g,d,owner\\)/,
+  assert.match(source, /col=droneAccentColor\(g,d,owner\)/,
     'the live drawing path must use the tested relation');
 });
