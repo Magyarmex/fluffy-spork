@@ -46,6 +46,10 @@ function bearingCount(T, g, observer, target, C = classes) {
     const dx = target.x - q.x, dy = target.y - q.y;
     if (dx * dx + dy * dy > 500 * 500 || dx * dx + dy * dy < 1) continue;
     if (!Number.isFinite(q.angle)) continue;
+    // A hull visible in the camera rectangle may still be behind solid cover.
+    if (typeof g.hasLineOfSight === 'function' &&
+        (!g.hasLineOfSight(observer.x, observer.y, q.x, q.y, 18) ||
+         !g.hasLineOfSight(q.x, q.y, target.x, target.y, 18))) continue;
     const delta = Math.atan2(Math.sin(Math.atan2(dy, dx) - q.angle),
       Math.cos(Math.atan2(dy, dx) - q.angle));
     if (Math.abs(delta) <= 0.32) count++;
@@ -120,6 +124,19 @@ test('bearing prototype excludes non-allies, dead hulls, and non-finite angles',
   assert.equal(bearingCount(T, g, observer, a), 0);
 });
 
+test('public bearing cannot see through cover between observer, shooter or target', () => {
+  const T = boot(), { g, observer, a } = world();
+  const witness = tank(3, 0, 100, 1, Math.atan2(-100, 100));
+  g.tanks.push(witness);
+  g.hasLineOfSight = (x1, y1, x2, y2) => !(x1 === observer.x &&
+    y1 === observer.y && x2 === witness.x && y2 === witness.y);
+  assert.equal(bearingCount(T, g, observer, a), 0, 'hidden hull is not evidence');
+  g.hasLineOfSight = (x1, y1, x2, y2) => !(x1 === witness.x &&
+    y1 === witness.y && x2 === a.x && y2 === a.y);
+  assert.equal(bearingCount(T, g, observer, a), 0, 'blocked shot lane is not evidence');
+  g.hasLineOfSight = () => true;
+  assert.equal(bearingCount(T, g, observer, a), 1);
+});
 test('natural composed worlds report public-bearing sensitivity without changing gameplay', () => {
   const { bootGame, withSeed, digest, physical } =
     require('../research/audio-rng-causal-pilot.cjs');
