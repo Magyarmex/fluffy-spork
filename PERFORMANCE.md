@@ -66,6 +66,8 @@ None of these changes lowers simulation frequency, removes effects, lowers resol
 
 From a live game session, `window.__NOVA_PERF_LAST__` contains a compact rolling snapshot. With direct access to the current `Game` instance, `NovaPerf.snapshot(game)` returns the full counters.
 
+**Current timing boundary:** `renderMs` and `renderP95Ms` measure the inner `game/render` wrapper installed by Frame Budget v1.7.5. Later visual overlays (including IFF halos, contact sparks, Hardlight Foundry finish passes and Signal Discipline cues) draw outside that timer. These numbers are **not end-to-end Canvas/render CPU costs** and should not alone certify a render-bound or render-safe adaptive-resolution decision. Frame-gap distributions still describe presentation cadence; use a final exported-render clock or browser trace to measure the complete drawing chain. See #669 and the source-executed timing-boundary regression.
+
 Useful fields:
 
 - `updateMs` / `renderMs`: exponential moving averages
