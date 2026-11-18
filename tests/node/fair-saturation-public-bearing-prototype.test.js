@@ -23,6 +23,15 @@ function allied(g, a, b) {
   }
   return false; // No evidence of alliance: do not assume cooperation.
 }
+function hostile(g, a, b) {
+  if (!a || !b || a.id === b.id) return false;
+  if (typeof g.areAllies === 'function' && g.areAllies(a, b)) return false;
+  if (typeof g.areHostile === 'function') return !!g.areHostile(a, b);
+  for (const key of ['teamId', 'team', 'factionId', 'faction', 'side']) {
+    if (a[key] != null && b[key] != null) return a[key] !== b[key];
+  }
+  return true; // Free-for-all: every distinct tank can be a third-party attacker.
+}
 function assigned(a) {
   return a.__v1112TargetId >= 0 ? a.__v1112TargetId :
     a.__v1105TargetId >= 0 ? a.__v1105TargetId :
@@ -35,14 +44,14 @@ function privateCount(g, observer, target) {
   return g.tanks.filter(q => q && q.id !== observer.id && q.ai && alive(q) &&
     active(q.ai) && assigned(q.ai) === target.id).length;
 }
-// Prototype: only allied, directly visible hulls physically pointing toward a
+// Prototype: only directly visible, target-hostile hulls pointing toward a
 // visible target. A bearing is a weak public signal, NOT proof of an attack.
 // No private AI slot or other tank's speed/upgrade data is read here.
 function bearingCount(T, g, observer, target, C = classes) {
   let count = 0;
   for (const q of g.tanks) {
     if (!q || q.id === observer.id || q.id === target.id || !alive(q) ||
-        !allied(g, observer, q) || !T.canPerceive(g, C, observer, q)) continue;
+        !hostile(g, q, target) || !T.canPerceive(g, C, observer, q)) continue;
     const dx = target.x - q.x, dy = target.y - q.y;
     if (dx * dx + dy * dy > 500 * 500 || dx * dx + dy * dy < 1) continue;
     if (!Number.isFinite(q.angle)) continue;
@@ -64,7 +73,7 @@ function witnessedShotCount(T, g, observer, target, C = classes) {
   if (!Number.isFinite(at) || g.time - at < 0 || g.time - at > 1.25) return 0;
   const shooter = g.tanks.find(q => q && q.id === a.__v181ObservedShotId);
   if (!shooter || !alive(shooter) || shooter.id === observer.id ||
-      shooter.id === target.id || !allied(g, observer, shooter) ||
+      shooter.id === target.id || !hostile(g, shooter, target) ||
       !T.canPerceive(g, C, observer, shooter)) return 0;
   const angle = Number(a.__v181ObservedShotAngle);
   if (!Number.isFinite(angle)) return 0;
@@ -132,7 +141,7 @@ test('visible allied bearing is public evidence, not hidden target ID', () => {
   assert.equal(bearingCount(T, g, observer, a), 0,
     'offscreen hull direction is not observer evidence');
 });
-test('bearing prototype excludes non-allies, dead hulls, and non-finite angles', () => {
+test('bearing prototype excludes target allies, dead hulls, and non-finite angles', () => {
   const T = boot(), { g, observer, a } = world();
   const witness = tank(3, 0, 100, 2, Math.atan2(-100, 100));
   g.tanks.push(witness);
@@ -143,6 +152,15 @@ test('bearing prototype excludes non-allies, dead hulls, and non-finite angles',
   assert.equal(bearingCount(T, g, observer, a), 0);
 });
 
+test('free-for-all third-party attack bearings remain observable without team metadata', () => {
+  const T = boot(), { g, observer, a } = world();
+  for (const t of g.tanks) delete t.team;
+  const witness = tank(3, 0, 100, 3, Math.atan2(-100, 100));
+  delete witness.team;
+  g.tanks.push(witness);
+  assert.equal(bearingCount(T, g, observer, a), 1,
+    'free-for-all pressure must not disappear when team IDs are absent');
+});
 test('public bearing cannot see through cover between observer, shooter or target', () => {
   const T = boot(), { g, observer, a } = world();
   const witness = tank(3, 0, 100, 1, Math.atan2(-100, 100));
