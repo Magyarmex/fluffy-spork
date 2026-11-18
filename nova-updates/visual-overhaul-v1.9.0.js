@@ -142,8 +142,11 @@ function drawTankMaterial(g,ctx,t,classes,w,h){
 }
 
 function drawShapeFacets(g,ctx,s,types,w,h){
-  if(!s||s.hp<=0||!terrainVisible(g,s.x,s.y,2)||!terrainClear(g,s.x,s.y,(s.r||12)+4))return;
+  if(!s||s.hp<=0)return;
+  /* Screen-space culling is cheaper than terrain LoS. Preserve the same
+   * visibility and clearance tests for every shape that can be drawn. */
   var z=(g.cam&&g.cam.zoom)||1,r=(s.r||12)*z,px=(s.x-g.cam.x)*z+w*.5,py=(s.y-g.cam.y)*z+h*.5;if(!onScreen(px,py,r+10,w,h))return;
+  if(!terrainVisible(g,s.x,s.y,2)||!terrainClear(g,s.x,s.y,(s.r||12)+4))return;
   var sides=s.type==='triangle'?3:s.type==='square'?4:s.type==='pentagon'?5:s.type==='hexagon'?6:6,col=types.SHAPE_DEFS&&types.SHAPE_DEFS[s.type]?types.SHAPE_DEFS[s.type].color:'#9ee7ff';
   var rot=(s.rot||0)+(g.time||0)*.06;
   ctx.save();ctx.translate(px,py);ctx.globalAlpha=.36;ctx.strokeStyle='rgba(240,249,255,.72)';ctx.lineWidth=Math.max(.65,z*.7);ctx.beginPath();for(var i=0;i<sides;i++){var a=rot+i/sides*TAU,x=Math.cos(a)*r*.48,y=Math.sin(a)*r*.48;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}ctx.closePath();ctx.stroke();
@@ -153,8 +156,9 @@ function drawShapeFacets(g,ctx,s,types,w,h){
 }
 
 function drawPowerHousing(g,ctx,p,w,h){
-  if(!p||!terrainVisible(g,p.x,p.y,3)||!terrainClear(g,p.x,p.y,20))return;
+  if(!p)return;
   var z=(g.cam&&g.cam.zoom)||1,px=(p.x-g.cam.x)*z+w*.5,py=(p.y-g.cam.y)*z+h*.5+Math.sin((g.time||0)*3+p.id)*4*z;if(!onScreen(px,py,34,w,h))return;
+  if(!terrainVisible(g,p.x,p.y,3)||!terrainClear(g,p.x,p.y,20))return;
   var col=(g.powerColors&&g.powerColors[p.type])||'#9ee7ff',r=23*z,ang=(g.time||0)*.52+(p.id||0);
   ctx.save();ctx.translate(px,py);ctx.globalAlpha=p.ttl<4?(Math.sin((g.time||0)*12)>0?.70:.18):.62;ctx.strokeStyle=col;ctx.lineWidth=Math.max(.8,z);ctx.setLineDash([Math.max(3,5*z),Math.max(3,6*z)]);ctx.beginPath();ctx.arc(0,0,r,-.4,TAU-.7);ctx.stroke();ctx.setLineDash([]);
   ctx.globalAlpha*=.82;ctx.fillStyle='rgba(235,250,255,.86)';ctx.beginPath();ctx.arc(Math.cos(ang)*r,Math.sin(ang)*r,Math.max(1.1,1.65*z),0,TAU);ctx.fill();
@@ -162,8 +166,9 @@ function drawPowerHousing(g,ctx,p,w,h){
 }
 
 function drawDroneChassis(g,ctx,d,w,h){
-  if(!d||d.hp<=0)return;var owner=g.tankById&&g.tankById.get(d.ownerId);if(!owner)return;if(!owner.isPlayer&&!terrainVisible(g,d.x,d.y,2))return;if(!terrainClear(g,d.x,d.y,(d.r||7)+3))return;
+  if(!d||d.hp<=0)return;var owner=g.tankById&&g.tankById.get(d.ownerId);if(!owner)return;
   var z=(g.cam&&g.cam.zoom)||1,r=(d.r||7)*z,px=(d.x-g.cam.x)*z+w*.5,py=(d.y-g.cam.y)*z+h*.5;if(!onScreen(px,py,r+8,w,h))return;
+  if(!owner.isPlayer&&!terrainVisible(g,d.x,d.y,2))return;if(!terrainClear(g,d.x,d.y,(d.r||7)+3))return;
   var vx=d.vx||0,vy=d.vy||0,a=Math.hypot(vx,vy)>8?Math.atan2(vy,vx):(owner.angle||0),col=owner.isPlayer?'#aef8c6':'#ff9aa7';
   ctx.save();ctx.translate(px,py);ctx.rotate(a);ctx.globalAlpha=.5;ctx.strokeStyle='rgba(231,248,255,.70)';ctx.lineWidth=Math.max(.6,z*.65);ctx.beginPath();ctx.moveTo(r*.58,0);ctx.lineTo(-r*.18,-r*.32);ctx.lineTo(-r*.18,r*.32);ctx.closePath();ctx.stroke();ctx.globalAlpha=.42;ctx.fillStyle=col;ctx.beginPath();ctx.arc(-r*.05,0,Math.max(.9,r*.16),0,TAU);ctx.fill();ctx.restore();
 }
