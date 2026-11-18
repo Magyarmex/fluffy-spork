@@ -165,11 +165,22 @@ function drawPowerHousing(g,ctx,p,w,h){
   ctx.globalAlpha=.32;ctx.strokeStyle='rgba(220,242,255,.72)';ctx.strokeRect(-10*z,-10*z,20*z,20*z);ctx.restore();
 }
 
+/* Keep the decorative drone nose/core consistent with the authoritative IFF
+ * halo's player-relative team relation, including allied AI owners. */
+function droneAccentColor(g,d,owner){
+  var p=g&&g.player;if(!p||!owner||owner.alive===false)return '#d8e9f4';
+  if(d.ownerId===p.id||(typeof g.areAllies==='function'&&g.areAllies(p,owner)))return '#aef8c6';
+  if(typeof g.areHostile==='function')return g.areHostile(p,owner)?'#ff9aa7':'#d8e9f4';
+  var keys=['teamId','team','factionId','faction','side'];
+  for(var i=0;i<keys.length;i++){var k=keys[i];if(p[k]!=null&&owner[k]!=null)return p[k]===owner[k]?'#aef8c6':'#ff9aa7';}
+  return '#ff9aa7';
+}
+
 function drawDroneChassis(g,ctx,d,w,h){
   if(!d||d.hp<=0)return;var owner=g.tankById&&g.tankById.get(d.ownerId);if(!owner)return;
   var z=(g.cam&&g.cam.zoom)||1,r=(d.r||7)*z,px=(d.x-g.cam.x)*z+w*.5,py=(d.y-g.cam.y)*z+h*.5;if(!onScreen(px,py,r+8,w,h))return;
   if(!owner.isPlayer&&!terrainVisible(g,d.x,d.y,2))return;if(!terrainClear(g,d.x,d.y,(d.r||7)+3))return;
-  var vx=d.vx||0,vy=d.vy||0,a=Math.hypot(vx,vy)>8?Math.atan2(vy,vx):(owner.angle||0),col=owner.isPlayer?'#aef8c6':'#ff9aa7';
+  var vx=d.vx||0,vy=d.vy||0,a=Math.hypot(vx,vy)>8?Math.atan2(vy,vx):(owner.angle||0),col=droneAccentColor(g,d,owner);
   ctx.save();ctx.translate(px,py);ctx.rotate(a);ctx.globalAlpha=.5;ctx.strokeStyle='rgba(231,248,255,.70)';ctx.lineWidth=Math.max(.6,z*.65);ctx.beginPath();ctx.moveTo(r*.58,0);ctx.lineTo(-r*.18,-r*.32);ctx.lineTo(-r*.18,r*.32);ctx.closePath();ctx.stroke();ctx.globalAlpha=.42;ctx.fillStyle=col;ctx.beginPath();ctx.arc(-r*.05,0,Math.max(.9,r*.16),0,TAU);ctx.fill();ctx.restore();
 }
 
@@ -199,6 +210,6 @@ wrap('game/render',function(render,require){
   patched.__novaHardlightFoundry=true;render.render=patched;
 });
 
-window.__NOVA_VISUAL_OVERHAUL_TEST__={hash2:hash2,terrainVisible:terrainVisible,terrainClear:terrainClear,version:VERSION};
+window.__NOVA_VISUAL_OVERHAUL_TEST__={hash2:hash2,terrainVisible:terrainVisible,terrainClear:terrainClear,droneAccentColor:droneAccentColor,version:VERSION};
 console.info('[NOVA TANKS] v'+VERSION+' '+CODENAME+' visual overhaul online');
 })();
