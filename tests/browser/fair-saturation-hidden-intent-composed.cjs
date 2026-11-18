@@ -60,11 +60,12 @@ const { chromium } = require('playwright');
           if (composed !== direct) throw Error('composed AI disagrees with Fair Engagement direct choice: '+JSON.stringify({direct,composed}));
           arms.push({ hiddenPrivateTarget: id, direct, composed });
         }
-        if (arms[0].composed === arms[1].composed)
-          throw Error('expected existing hidden-private-target sensitivity: '+JSON.stringify(arms));
         if (![a.id, b.id].includes(arms[0].composed) || ![a.id, b.id].includes(arms[1].composed))
           throw Error('chosen target outside visible alternatives: '+JSON.stringify(arms));
-        return { arms, hiddenDistance: Math.hypot(hidden.x-observer.x,hidden.y-observer.y),
+        /* Diagnostic, not a regression that enshrines the known information leak.
+         * A future fair fix should make leakObserved false without breaking CI. */
+        return { arms, leakObserved: arms[0].composed !== arms[1].composed,
+          hiddenDistance: Math.hypot(hidden.x-observer.x,hidden.y-observer.y),
           observerViewport: [g.w, g.h], originalTankCount: original.tanks.length,
           shippingAI: !!ai.updateAI.__novaFairEngagement };
       } finally {
