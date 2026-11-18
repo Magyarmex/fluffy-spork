@@ -62,10 +62,15 @@ const { chromium } = require('playwright');
           hidden.ai = { ...saved[3].ai, state: 'hunt', targetId: -1,
             __v1112TargetId: id, __v1105TargetId: -1, __v180TargetId: -1 };
           const direct = T.chooseTarget(g, C, observer, observer.ai, g.time)?.id;
+          // Later overlays wrap updateAI and need not preserve its function marker.
+          // Verify the actual Fair Engagement wrapper executed via its replan counter.
+          const beforeReplans = window.__NOVA_FAIR_ENGAGEMENT__.targetReplans;
           ai.updateAI(observer, g, 1/60);
           const composed = observer.ai.__v1112TargetId;
+          const fairReplans = window.__NOVA_FAIR_ENGAGEMENT__.targetReplans - beforeReplans;
+          if (fairReplans !== 1) throw Error('composed AI did not execute one Fair Engagement replan: '+fairReplans);
           if (composed !== direct) throw Error('composed AI disagrees with Fair Engagement direct choice: '+JSON.stringify({direct,composed}));
-          arms.push({ hiddenPrivateTarget: id, direct, composed });
+          arms.push({ hiddenPrivateTarget: id, direct, composed, fairReplans });
         }
         if (![a.id, b.id].includes(arms[0].composed) || ![a.id, b.id].includes(arms[1].composed))
           throw Error('chosen target outside visible alternatives: '+JSON.stringify(arms));
