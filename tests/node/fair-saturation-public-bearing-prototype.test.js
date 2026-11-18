@@ -604,7 +604,10 @@ test('natural composed worlds report public-bearing sensitivity without changing
         publicBearingContacts: 0, publicShotContacts: 0, selected: 0,
         publicChoiceLOSCalls: 0, publicDiagnosticLOSCalls: 0,
         physicalDamageEvents: 0, potentialHitWitnessPairs: 0,
-        maxPotentialHitWitnessPairs: 0 };
+        maxPotentialHitWitnessPairs: 0,
+        acceptedHitWitnessPairs: 0, hitWitnessLOSCalls: 0,
+        hitChangedSelections: 0, hitHumanSelections: 0,
+        shippingHumanSelections: 0, publicHitContacts: 0 };
       const originalDamage=g.damageTank;
       const hadOwnDamage=Object.prototype.hasOwnProperty.call(g,'damageTank');
       if(observe)g.damageTank=function(victim,amount,srcId,...rest){
@@ -614,14 +617,32 @@ test('natural composed worlds report public-bearing sensitivity without changing
           result.physicalDamageEvents++;
           const shooter=(this.tanks||[]).find(t=>t&&t.id===srcId);
           if(shooter&&shooter!==victim){
-            let possible=0;
-            for(const observer of this.tanks||[]){
-              if(!observer||!observer.ai||observer===shooter||
-                 observer===victim||!alive(observer))continue;
-              if(T.inGameplayViewport(this,observer,shooter)&&
-                 T.inGameplayViewport(this,observer,victim))possible++;
+            let possible=0,accepted=0;
+            // The cheap two-hull viewport gate precedes expensive terrain
+            // checks. Count direct LOS calls rather than guessing from the
+            // engine's unrelated cumulative performance counter.
+            const originalLOS=this.hasLineOfSight;
+            const hadOwnLOS=Object.prototype.hasOwnProperty.call(this,'hasLineOfSight');
+            if(typeof originalLOS==='function')
+              this.hasLineOfSight=function(...args){
+                result.hitWitnessLOSCalls++;
+                return originalLOS.apply(this,args);
+              };
+            try{
+              for(const observer of this.tanks||[]){
+                if(!observer||!observer.ai||observer===shooter||
+                   observer===victim||!alive(observer))continue;
+                if(!T.inGameplayViewport(this,observer,shooter)||
+                   !T.inGameplayViewport(this,observer,victim))continue;
+                possible++;
+                if(recordVisibleHit(T,this,observer,shooter,victim,C))accepted++;
+              }
+            }finally{
+              if(hadOwnLOS)this.hasLineOfSight=originalLOS;
+              else delete this.hasLineOfSight;
             }
             result.potentialHitWitnessPairs+=possible;
+            result.acceptedHitWitnessPairs+=accepted;
             result.maxPotentialHitWitnessPairs=Math.max(
              result.maxPotentialHitWitnessPairs,possible);
           }
@@ -659,16 +680,22 @@ test('natural composed worlds report public-bearing sensitivity without changing
             try {
               const proposed = publicChoice(T, g, observer, C);
               const shotProposed = publicChoice(T, g, observer, C, 'shot');
+              const hitProposed = publicChoice(T, g, observer, C, 'hit');
               if (shipping && proposed) {
                 result.selected++;
                 if (shipping.id !== proposed.id) result.changedSelections++;
                 if (shotProposed && shipping.id !== shotProposed.id)
                   result.shotChangedSelections++;
+                if(hitProposed && shipping.id !== hitProposed.id)
+                  result.hitChangedSelections++;
+                if(shipping.isPlayer)result.shippingHumanSelections++;
+                if(hitProposed&&hitProposed.isPlayer)result.hitHumanSelections++;
               }
               queryPhase = 'diagnostic';
               for (const target of visible) {
                 result.publicBearingContacts += bearingCount(T, g, observer, target, C);
                 result.publicShotContacts += witnessedShotCount(T, g, observer, target, C);
+                result.publicHitContacts += confirmedHitCount(g, observer, target);
               }
             } finally {
               if (hadOwnLOS) g.hasLineOfSight = originalLOS;
@@ -701,6 +728,10 @@ test('natural composed worlds report public-bearing sensitivity without changing
     assert.equal(observed.privateHash, control.privateHash,
       'research changed private AI state');
     assert.ok(observed.observerSamples > 0, 'must inspect live AI observers');
+    assert.ok(observed.acceptedHitWitnessPairs <= observed.potentialHitWitnessPairs,
+      'physical evidence cannot exceed eligible public observer pairs');
+    assert.ok(observed.hitWitnessLOSCalls <= 2 * observed.potentialHitWitnessPairs,
+      'bounded event-time witness must use at most two LOS checks per pair');
     if (observed.publicBearingContacts > 0 || observed.publicShotContacts > 0)
       assert.ok(observed.publicChoiceLOSCalls + observed.publicDiagnosticLOSCalls > 0,
         'public pressure was observed but no direct terrain queries were counted');
@@ -708,6 +739,10 @@ test('natural composed worlds report public-bearing sensitivity without changing
       multiVisible: observed.multiVisible, selected: observed.selected,
       changedSelections: observed.changedSelections,
       shotChangedSelections: observed.shotChangedSelections,
+      hitChangedSelections: observed.hitChangedSelections,
+      hitHumanSelections: observed.hitHumanSelections,
+      shippingHumanSelections: observed.shippingHumanSelections,
+      publicHitContacts: observed.publicHitContacts,
       publicBearingContacts: observed.publicBearingContacts,
       publicShotContacts: observed.publicShotContacts,
       publicChoiceLOSCalls: observed.publicChoiceLOSCalls,
@@ -715,6 +750,8 @@ test('natural composed worlds report public-bearing sensitivity without changing
       extraTerrainQueries: observed.terrainQueries - control.terrainQueries,
       physicalDamageEvents: observed.physicalDamageEvents,
       potentialHitWitnessPairs: observed.potentialHitWitnessPairs,
+      acceptedHitWitnessPairs: observed.acceptedHitWitnessPairs,
+      hitWitnessLOSCalls: observed.hitWitnessLOSCalls,
       maxPotentialHitWitnessPairs: observed.maxPotentialHitWitnessPairs });
   }
   console.log('NOVA_PUBLIC_BEARING_SATURATION_CENSUS ' + JSON.stringify(rows));
