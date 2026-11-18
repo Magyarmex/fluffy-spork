@@ -309,7 +309,13 @@ test('natural composed worlds report public-bearing sensitivity without changing
             }
           }
         }
-        return { ...result, hash: digest(physical(g)), draws: draws() };
+        return { ...result, hash: digest(physical(g)),
+          privateHash: digest((g.tanks || []).map(t => t && t.ai ?
+            [t.id, t.ai.state, t.ai.__v180Posture, t.ai.__v1112TargetId,
+             t.ai.__v1105TargetId, t.ai.__v180TargetId, t.ai.targetId,
+             t.ai.__v1112NextThink, t.ai.__v181ObservedShotId,
+             t.ai.__v181ObservedShotAt] : null)),
+          draws: draws() };
       } finally { g.destroy(); }
     });
   }
@@ -319,6 +325,8 @@ test('natural composed worlds report public-bearing sensitivity without changing
     const observed = run(seed, true);
     assert.equal(observed.hash, control.hash, 'research changed physical state');
     assert.equal(observed.draws, control.draws, 'research consumed gameplay RNG');
+    assert.equal(observed.privateHash, control.privateHash,
+      'research changed private AI state');
     assert.ok(observed.observerSamples > 0, 'must inspect live AI observers');
     rows.push({ seed, observerSamples: observed.observerSamples,
       multiVisible: observed.multiVisible, selected: observed.selected,
