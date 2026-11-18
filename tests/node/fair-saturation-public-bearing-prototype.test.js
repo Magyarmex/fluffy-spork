@@ -112,6 +112,7 @@ function recordVisibleHit(T,g,observer,shooter,target,C=classes){
  hitWitnesses.set(observer,valid);
  return true;
 }
+function clearHitWitness(observer){hitWitnesses.delete(observer);}
 function confirmedHitCount(g,observer,target){
  const now=Number(g.time);
  if(!Number.isFinite(now))return 0;
@@ -438,6 +439,17 @@ test('confirmed hit witness supports multiple attackers without recycled IDs',()
  g.tanks=g.tanks.filter(t=>t!==two);
  assert.equal(confirmedHitCount(g,observer,a),0,
   'despawned shooter cannot remain a phantom attacker');
+});
+test('explicit life reset invalidates old hit evidence',()=>{
+ const T=boot(),{g,observer,a}=world();
+ const shooter=tank(3,0,100,1);g.tanks.push(shooter);
+ assert.equal(recordVisibleHit(T,g,observer,shooter,a),true);
+ assert.equal(confirmedHitCount(g,observer,a),1);
+ // A production implementation must attach this clear to the canonical
+ // tank-life transition. Game time alone cannot identify every restart.
+ clearHitWitness(observer);
+ g.time=10.2;
+ assert.equal(confirmedHitCount(g,observer,a),0);
 });
 test('bounded hit memory evicts oldest unrefreshed identity',()=>{
  const T=boot(),{g,observer,a}=world();
