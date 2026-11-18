@@ -304,6 +304,67 @@ test('public witnessed fire can redirect a real target score without private int
   assert.equal(publicChoice(T, g, observer, classes, 'shot')?.id, b.id,
     'changing private target slot must not undo public evidence');
 });
+test('real composed AI acquisition cannot leak hidden intent into public candidate', () => {
+  const { bootGame, withSeed } = require('../research/audio-rng-causal-pilot.cjs');
+  withSeed(1517800, () => {
+    const g = bootGame();
+    try {
+      const T = g.__testFair, win = g.__testWindow;
+      const C = win.__novaMakeRequire('')('game/classes');
+      const ai = win.__novaMakeRequire('')('game/ai');
+      const bots = g.tanks.filter(t => t && t.ai && !t.isPlayer);
+      assert.ok(bots.length >= 4);
+      const [observer, a, b, hidden] = bots;
+      function place(t, x, state) {
+        Object.assign(t, { x, y: 0, hp: 100, maxHp: 100, alive: true,
+          spawnShieldT: 0, cls: 'twin', tier: 1 });
+        t.ai = { ...t.ai, state,
+          __v180Posture: state === 'hunt' ? 'pressure' : 'hold',
+          targetId: -1, __v180TargetId: -1, __v1105TargetId: -1,
+          __v1112TargetId: -1, __v1112NextThink: 0,
+          __v180LastAttacker: -1, __v180HitAt: -99 };
+      }
+      place(observer, 0, 'hunt');
+      place(a, 80, 'wander');
+      place(b, -130, 'wander');
+      place(hidden, 450, 'hunt');
+      if (g.player) { g.player.x = -2000; g.player.y = -2000; }
+      g.tanks = [observer, a, b, hidden, ...(g.player ? [g.player] : [])];
+      g.tankById = new Map(g.tanks.map(t => [t.id, t]));
+      g.w = 800; g.h = 600; g.cam.zoom = 1; g.time = 10;
+      g.status = 'playing'; g.paused = false;
+      assert.equal(T.canPerceive(g, C, observer, hidden), false);
+      assert.equal(T.canPerceive(g, C, hidden, a), true);
+      ai.updateAI(hidden, g, 1 / 60);
+      assert.equal(hidden.ai.__v1112TargetId, a.id,
+        'real AI must acquire the visible target through shipping wrapper');
+      assert.equal(T.canPerceive(g, C, observer, hidden), false);
+      const publicBefore = publicChoice(T, g, observer, C)?.id;
+      const shotBefore = publicChoice(T, g, observer, C, 'shot')?.id;
+      const shippingBefore = T.chooseTarget(g, C, observer, observer.ai, g.time)?.id;
+      const keys = ['__v1112TargetId', '__v1105TargetId', '__v180TargetId', 'targetId'];
+      const saved = keys.map(k => [k, hidden.ai[k]]);
+      let publicAfter, shotAfter, shippingAfter;
+      try {
+        for (const key of keys) hidden.ai[key] = -1;
+        publicAfter = publicChoice(T, g, observer, C)?.id;
+        shotAfter = publicChoice(T, g, observer, C, 'shot')?.id;
+        shippingAfter = T.chooseTarget(g, C, observer, observer.ai, g.time)?.id;
+      } finally {
+        for (const [key, value] of saved) hidden.ai[key] = value;
+      }
+      assert.equal(publicBefore, publicAfter,
+        'public bearing candidate must ignore naturally acquired hidden intent');
+      assert.equal(shotBefore, shotAfter,
+        'public witnessed-shot candidate must ignore naturally acquired hidden intent');
+      assert.ok([a.id, b.id].includes(publicBefore));
+      console.log('NOVA_PUBLIC_SATURATION_COMPOSED_HIDDEN_ACQUISITION ' +
+        JSON.stringify({ shippingBefore, shippingAfter, publicBefore, publicAfter,
+          shotBefore, shotAfter }));
+    } finally { g.destroy(); }
+  });
+});
+
 test('natural composed worlds report public-bearing sensitivity without changing gameplay', () => {
   const { bootGame, withSeed, digest, physical } =
     require('../research/audio-rng-causal-pilot.cjs');
