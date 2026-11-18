@@ -37,11 +37,11 @@ function privateCount(g, observer, target) {
 // Prototype: only allied, directly visible hulls physically pointing toward a
 // visible target. A bearing is a weak public signal, NOT proof of an attack.
 // No private AI slot or other tank's speed/upgrade data is read here.
-function bearingCount(T, g, observer, target) {
+function bearingCount(T, g, observer, target, C = classes) {
   let count = 0;
   for (const q of g.tanks) {
     if (!q || q.id === observer.id || q.id === target.id || !alive(q) ||
-        !allied(g, observer, q) || !T.canPerceive(g, classes, observer, q)) continue;
+        !allied(g, observer, q) || !T.canPerceive(g, C, observer, q)) continue;
     const dx = target.x - q.x, dy = target.y - q.y;
     if (dx * dx + dy * dy > 500 * 500 || dx * dx + dy * dy < 1) continue;
     if (!Number.isFinite(q.angle)) continue;
@@ -51,17 +51,17 @@ function bearingCount(T, g, observer, target) {
   }
   return count;
 }
-function publicChoice(T, g, observer) {
+function publicChoice(T, g, observer, C = classes) {
   let best = null, bestScore = -Infinity;
   for (const target of g.tanks) {
     if (!target || target.id === observer.id || !alive(target) ||
         allied(g, observer, target)) continue;
-    const shipping = T.scoreTarget(g, classes, observer, observer.ai, target, g.time);
+    const shipping = T.scoreTarget(g, C, observer, observer.ai, target, g.time);
     if (!Number.isFinite(shipping)) continue;
     // Recover the unchanged score before private-slot saturation and apply the
     // alternative public penalty. This is an observational score experiment.
     const score = shipping + privateCount(g, observer, target) * T.saturationPenalty -
-      bearingCount(T, g, observer, target) * T.saturationPenalty;
+      bearingCount(T, g, observer, target, C) * T.saturationPenalty;
     if (score > bestScore) { bestScore = score; best = target; }
   }
   return best;
@@ -117,4 +117,60 @@ test('bearing prototype excludes non-allies, dead hulls, and non-finite angles',
   assert.equal(bearingCount(T, g, observer, a), 0);
   witness.alive = true; witness.angle = NaN;
   assert.equal(bearingCount(T, g, observer, a), 0);
+});
+
+test('natural composed worlds report public-bearing sensitivity without changing gameplay', () => {
+  const { bootGame, withSeed, digest, physical } =
+    require('../research/audio-rng-causal-pilot.cjs');
+  const seeds = [1517800, 1517802, 1517810];
+  function run(seed, observe) {
+    return withSeed(seed, draws => {
+      const g = bootGame();
+      g.sfx.muted = true;
+      g.sfx.startMusic = () => {};
+      const T = g.__testFair;
+      const C = g.__testWindow.__novaMakeRequire('')('game/classes');
+      const result = { observerSamples: 0, multiVisible: 0,
+        changedSelections: 0, publicBearingContacts: 0, selected: 0 };
+      try {
+        g.status = 'playing';
+        g.paused = false;
+        for (let tick = 1; tick <= 720; tick++) {
+          g.update(1 / 60);
+          if (!observe || tick % 12 || g.status !== 'playing') continue;
+          for (const observer of g.tanks) {
+            if (!observer || !observer.ai || observer.isPlayer || !alive(observer)) continue;
+            result.observerSamples++;
+            const visible = g.tanks.filter(q => q && q.id !== observer.id &&
+              alive(q) && !allied(g, observer, q) &&
+              T.canPerceive(g, C, observer, q) && !(q.spawnShieldT > 0));
+            if (visible.length < 2) continue;
+            result.multiVisible++;
+            const shipping = T.chooseTarget(g, C, observer, observer.ai, g.time);
+            const proposed = publicChoice(T, g, observer, C);
+            if (shipping && proposed) {
+              result.selected++;
+              if (shipping.id !== proposed.id) result.changedSelections++;
+            }
+            for (const target of visible)
+              result.publicBearingContacts += bearingCount(T, g, observer, target, C);
+          }
+        }
+        return { ...result, hash: digest(physical(g)), draws: draws() };
+      } finally { g.destroy(); }
+    });
+  }
+  const rows = [];
+  for (const seed of seeds) {
+    const control = run(seed, false);
+    const observed = run(seed, true);
+    assert.equal(observed.hash, control.hash, 'research changed physical state');
+    assert.equal(observed.draws, control.draws, 'research consumed gameplay RNG');
+    assert.ok(observed.observerSamples > 0, 'must inspect live AI observers');
+    rows.push({ seed, observerSamples: observed.observerSamples,
+      multiVisible: observed.multiVisible, selected: observed.selected,
+      changedSelections: observed.changedSelections,
+      publicBearingContacts: observed.publicBearingContacts });
+  }
+  console.log('NOVA_PUBLIC_BEARING_SATURATION_CENSUS ' + JSON.stringify(rows));
 });
