@@ -272,6 +272,21 @@ test('latest witnessed shot is bounded, public and cannot imply multiple attacke
   shooter.team = 2;
   assert.equal(witnessedShotCount(T, g, observer, a), 0);
 });
+test('unfired public bearing can redirect target choice, unlike shot-only evidence', () => {
+  const T = boot(), { g, observer, a, b, hidden } = world();
+  hidden.ai.state = 'wander';
+  a.hp = 85; // Public vulnerability wins without third-party pressure.
+  const witness = tank(3, 0, 100, 1, Math.atan2(-100, 100));
+  g.tanks.push(witness);
+  assert.equal(publicChoice(T, g, observer, classes, 'bearing')?.id, b.id,
+    'bearing-only candidate reacts to a turret that has not fired');
+  assert.equal(publicChoice(T, g, observer, classes, 'shot')?.id, a.id,
+    'shot-only candidate must not invent a witnessed firing event');
+  witness.angle = Math.PI; // Public aim moves away; no private AI slot changed.
+  assert.equal(publicChoice(T, g, observer, classes, 'bearing')?.id, a.id,
+    'bearing candidate must recover when the unfired turret turns away');
+});
+
 test('public witnessed fire can redirect a real target score without private intent', () => {
   const T = boot(), { g, observer, a, b, hidden } = world();
   hidden.ai.state = 'wander';
