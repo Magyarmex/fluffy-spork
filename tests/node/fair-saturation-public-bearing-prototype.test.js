@@ -211,9 +211,10 @@ test('natural composed worlds report public-bearing sensitivity without changing
               if (shotProposed && shipping.id !== shotProposed.id)
                 result.shotChangedSelections++;
             }
-            for (const target of visible)
+            for (const target of visible) {
               result.publicBearingContacts += bearingCount(T, g, observer, target, C);
               result.publicShotContacts += witnessedShotCount(T, g, observer, target, C);
+            }
           }
         }
         return { ...result, hash: digest(physical(g)), draws: draws() };
