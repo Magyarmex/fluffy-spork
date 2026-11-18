@@ -83,18 +83,47 @@ function witnessedShotCount(T, g, observer, target, C = classes) {
       !g.hasLineOfSight(shooter.x, shooter.y, target.x, target.y, 18)) return 0;
   return 1;
 }
+// Exact non-saturation terms from shipping scoreTarget. Unlike subtracting a
+// private count after calling scoreTarget, this candidate NEVER reads another
+// AI's private target slots. The source-parity regression below detects drift.
+function basePublicScore(T, g, C, observer, target) {
+  if (!alive(target) || !hostile(g, observer, target) || target.spawnShieldT > 0 ||
+      !T.canPerceive(g, C, observer, target)) return -Infinity;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const dist = Math.hypot(target.x - observer.x, target.y - observer.y);
+  const near = 1 / (1 + dist / 720);
+  const hp = clamp(Number(target.hp) /
+    Math.max(1, Number(target.maxHp) || Number(target.hp) || 1), 0, 1);
+  const ln = C && typeof C.lineageForClass === 'function' ?
+    C.lineageForClass(target.cls) : null;
+  let danger = .45;
+  if (ln === 'sniper') danger = .78;
+  else if (ln === 'cannon') danger = .72;
+  else if (ln === 'controller') danger = .68;
+  else if (ln === 'guardian') danger = .64;
+  else if (ln === 'gunner') danger = .62;
+  if (target.tier >= 3) danger += .12;
+  danger = clamp(danger, 0, 1);
+  let score = near * 1.16 + (1 - hp) * .48 + danger * .30;
+  const a = observer.ai;
+  if (a && a.__v1112TargetId === target.id) score += .16;
+  if (a && a.__v180LastAttacker === target.id &&
+      g.time - Number(a.__v180HitAt || -99) < 2.2) score += .34;
+  const seed = Math.sin((observer.id || 1) * 17.17 +
+    (target.id || 1) * 31.73) * 43758.5453;
+  score += (seed - Math.floor(seed) - .5) * .04;
+  return score;
+}
 function publicChoice(T, g, observer, C = classes, mode = 'bearing') {
   let best = null, bestScore = -Infinity;
   for (const target of g.tanks) {
     if (!target || target.id === observer.id || !alive(target) ||
         allied(g, observer, target)) continue;
-    const shipping = T.scoreTarget(g, C, observer, observer.ai, target, g.time);
-    if (!Number.isFinite(shipping)) continue;
-    // Recover the unchanged score before private-slot saturation and apply the
-    // alternative public penalty. This is an observational score experiment.
-    const score = shipping + privateCount(g, observer, target) * T.saturationPenalty -
-      (mode === 'shot' ? witnessedShotCount(T, g, observer, target, C) :
-       bearingCount(T, g, observer, target, C)) * T.saturationPenalty;
+    const base = basePublicScore(T, g, C, observer, target);
+    if (!Number.isFinite(base)) continue;
+    const score = base - (mode === 'shot' ?
+      witnessedShotCount(T, g, observer, target, C) :
+      bearingCount(T, g, observer, target, C)) * T.saturationPenalty;
     if (score > bestScore) { bestScore = score; best = target; }
   }
   return best;
@@ -114,6 +143,19 @@ function world() {
     cam: { zoom: 1 }, time: 10 };
   return { g, observer, a, b, hidden };
 }
+test('public base score exactly matches shipping before private saturation', () => {
+  const T = boot(), { g, observer, a, b, hidden } = world();
+  for (const target of [a, b]) {
+    for (const id of [a.id, b.id, -1]) {
+      hidden.ai.__v1112TargetId = id;
+      const raw = T.scoreTarget(g, classes, observer, observer.ai, target, g.time);
+      const recovered = raw + privateCount(g, observer, target) * T.saturationPenalty;
+      const publicScore = basePublicScore(T, g, classes, observer, target);
+      assert.ok(Math.abs(recovered - publicScore) < 1e-12,
+        'base score diverged from materialized scoreTarget');
+    }
+  }
+});
 test('public-bearing prototype is invariant to offscreen private target assignments', () => {
   const T = boot(), { g, observer, a, b, hidden } = world();
   hidden.ai.__v1112TargetId = a.id;
