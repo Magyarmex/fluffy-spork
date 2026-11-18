@@ -31,6 +31,9 @@ function publicOccupancy(g,observer,x,y,radius=140){
    !(q.hp>0)||!Number.isFinite(q.x)||!Number.isFinite(q.y))continue;
   if(Math.abs(q.x-observer.x)>hx||Math.abs(q.y-observer.y)>hy)continue;
   if(Math.hypot(q.x-x,q.y-y)>radius)continue;
+  // Viewport alone does not establish physical sight through cover.
+  if(typeof g.hasLineOfSight==='function'&&
+   !g.hasLineOfSight(observer.x,observer.y,q.x,q.y,2))continue;
   count++;
   if(count===4)break;
  }
@@ -91,6 +94,20 @@ test('viewport boundary and goal radius both limit physical crowd evidence',()=>
  q.x=w.observer.x+100;q.y=w.signal.y;
  assert.equal(publicBloomScore(w.g,w.observer,w.signal).crowd,0,
   'visible passerby far from the objective is not objective crowd');
+});
+test('opaque cover rejects viewport-only crowd and bounds LOS calls',()=>{
+ const T=boot(),w=world(T);
+ for(let i=0;i<3;i++){
+  w.hidden[i].x=w.signal.x-65+i*10;
+  w.hidden[i].y=w.signal.y;
+ }
+ let calls=0;
+ w.g.hasLineOfSight=()=>{calls++;return false;};
+ assert.equal(publicBloomScore(w.g,w.observer,w.signal).crowd,0);
+ assert.equal(calls,3,'only viewport-and-goal candidates need terrain checks');
+ w.g.hasLineOfSight=()=>{calls++;return true;};
+ assert.equal(publicBloomScore(w.g,w.observer,w.signal).crowd,3);
+ assert.equal(calls,6);
 });
 test('public occupancy is an imperfect proxy: a visible passerby can veto',()=>{
  const T=boot(),w=world(T);
