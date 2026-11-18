@@ -100,6 +100,26 @@ test('remembered public BLOOM can also be vetoed by unseen private commitments',
   assert.equal(choose(T, w).mode, 'none');
 });
 
+
+test('local visible farming also depends on unseen private eco assignments', () => {
+  const T = boot(), w = encounter('BLOOM', 0);
+  w.g.__lfState.signal = null;
+  w.g.shapes = Array.from({ length: 4 }, (_, i) => ({
+    id: 100 + i, kind: 'shape', type: 'pentagon',
+    x: -250 + i * 8, y: -400, hp: 100, alive: true
+  }));
+  const defs = { pentagon: { xp: 100 } };
+  const sample = () => T.publicEcoBias(w.g, w.observer, defs, {});
+  const open = sample();
+  assert.equal(open.mode, 'local');
+  assert.equal(open.key, 'LOCAL:' + T.sectorIndex(-238, -400));
+  for (const bot of w.hidden) bot.ai.__lfEcoKey = open.key;
+  const crowded = sample();
+  assert.equal(crowded.mode, 'none',
+    'offscreen private farming intent alone must reproduce the local veto');
+  assert.equal(crowded.weight, 0);
+});
+
 test('dead and sub-threshold distant intents do not create false saturation', () => {
   const T = boot(), w = encounter('BLOOM', 3);
   for (const bot of w.hidden) bot.alive = false;
