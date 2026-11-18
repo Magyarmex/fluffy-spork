@@ -414,6 +414,10 @@ test('confirmed hit witness requires public event-time sight and real hostility'
  assert.equal(recordVisibleHit(T,g,observer,shooter,a),false);
  assert.equal(confirmedHitCount(g,observer,a),0);
  g.hasLineOfSight=()=>true;
+ shooter.x=2000;shooter.y=2000;
+ assert.equal(recordVisibleHit(T,g,observer,shooter,a),false,
+  'offscreen shooter must not create event-time witness');
+ shooter.x=0;shooter.y=100;
  shooter.team=a.team;
  assert.equal(recordVisibleHit(T,g,observer,shooter,a),false);
  shooter.team=observer.team;
