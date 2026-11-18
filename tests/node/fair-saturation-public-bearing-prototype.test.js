@@ -399,6 +399,7 @@ test('natural composed worlds report public-bearing sensitivity without changing
             // counter does not necessarily include these direct terrain calls.
             // Restore the exact original method before the next game update.
             const originalLOS = g.hasLineOfSight;
+            const hadOwnLOS = Object.prototype.hasOwnProperty.call(g, 'hasLineOfSight');
             let queryPhase = 'choice';
             if (typeof originalLOS === 'function') {
               g.hasLineOfSight = function (...args) {
@@ -422,7 +423,8 @@ test('natural composed worlds report public-bearing sensitivity without changing
                 result.publicShotContacts += witnessedShotCount(T, g, observer, target, C);
               }
             } finally {
-              g.hasLineOfSight = originalLOS;
+              if (hadOwnLOS) g.hasLineOfSight = originalLOS;
+              else delete g.hasLineOfSight;
             }
           }
         }
