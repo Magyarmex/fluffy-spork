@@ -821,3 +821,45 @@ test('real composed projectile first-contact can create observer-owned confirmed
   }finally{g.destroy();}
  });
 });
+
+
+// Source-attribution negative control: Iron Will's actual reflected damage
+// credits the Guardian's tank id even though the Guardian never fired.
+// A public confirmed-hit witness MUST NOT infer a visible firing hull from
+// damageTank's srcId alone. This test observes production composition; it
+// does not enable the research target-selection proposal.
+test('composed Iron Will reflection credits a non-firing tank as damage source',()=>{
+ const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+ withSeed(1517800,()=>{
+  const g=bootGame();if(!g.player)g.redeploy();
+  const guard=g.player,attacker=g.tanks.find(t=>t&&t!==guard);
+  assert.ok(guard&&attacker,'composed Game must provide two tanks');
+  try{
+   g.sfx.muted=true;
+   g.setClass(guard,'fortress');
+   Object.assign(guard,{x:0,y:0,vx:0,vy:0,angle:0,
+    hp:1000,maxHp:1000,alive:true,spawnShieldT:0,shieldT:0,
+    invulnT:0,bulwarkT:0,tauntT:2,__v17PerfectGuardUntil:-1});
+   Object.assign(attacker,{x:120,y:0,vx:0,vy:0,angle:Math.PI,
+    hp:1000,maxHp:1000,alive:true,spawnShieldT:0,shieldT:0,
+    invulnT:0,bulwarkT:0,tauntT:0});
+   g.tanks=[guard,attacker];
+   g.tankById=new Map(g.tanks.map(t=>[t.id,t]));
+   g.bullets=[];g.drones=[];g.__novaTerrain=[];g.__novaBattlefieldIndex=null;
+   g.time=10;
+   const original=g.damageTank,observed=[];
+   g.damageTank=function(target,amount,sourceId,...rest){
+    const before=target.hp,reflecting=!!this.__v17ReflectingIronWill;
+    const result=original.call(this,target,amount,sourceId,...rest);
+    if(target.hp<before)observed.push({victim:target.id,sourceId,reflecting});
+    return result;
+   };
+   g.damageTank(guard,20,attacker.id);
+   assert.equal(g.bullets.length,0,'Guardian must not emit a projectile');
+   assert.ok(observed.some(e=>e.victim===attacker.id&&
+    e.sourceId===guard.id&&e.reflecting),
+    'actual reflected HP loss must credit non-firing Guardian owner');
+   assert.ok(attacker.hp<1000,'reflection must physically damage attacker');
+  }finally{g.destroy();}
+ });
+});
