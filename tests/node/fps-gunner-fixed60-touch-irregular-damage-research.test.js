@@ -492,6 +492,16 @@ test('Tempest adversarial 30Hz three/four-step budgets account for actual touch-
      'research-drop',maxSteps,extra);
     assert.equal(observed.applied,reference.applied,
      'catch-up policy cannot lose chronological touch edges');
+    if(mode==='quantized83_16'){
+     assert.equal(observed.ticks,reference.ticks,
+      'healthy quantized 30Hz must recover all Tempest simulation ticks');
+     assert.equal(observed.droppedMs,0,
+      'healthy quantized 30Hz must not discard combat time');
+     if(maxSteps===3)assert.ok(observed.stepsByFrame.three>0,
+      'three-step catch-up path must actually execute');
+     else assert.ok(observed.stepsByFrame.four>0,
+      'four-step catch-up path must actually execute');
+    }
     assert.ok(Math.abs(observed.ticks*(1000/60)+observed.droppedMs+
      observed.backlogMs-DURATION_MS)<.002,
      'elapsed time must equal executed, discarded and queued time');
