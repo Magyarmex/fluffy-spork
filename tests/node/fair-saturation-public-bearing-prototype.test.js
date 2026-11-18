@@ -85,6 +85,45 @@ function witnessedShotCount(T, g, observer, target, C = classes) {
       !g.hasLineOfSight(shooter.x, shooter.y, target.x, target.y, 18)) return 0;
   return 1;
 }
+// Third RESEARCH alternative: an observer-owned, event-time confirmed-hit
+// witness. Unlike a turret bearing or stale shot angle, the victim identity
+// is fixed when physical damage occurs. No private target slot is consulted.
+// This does not claim every hit is visible, or that late evidence can replace
+// early anti-dogpile coordination in natural matches.
+const hitWitnesses=new WeakMap();
+function recordVisibleHit(T,g,observer,shooter,target,C=classes){
+ if(!observer||!shooter||!target||observer===shooter||observer===target||
+    !alive(observer)||!alive(shooter)||!alive(target)||
+    !hostile(g,shooter,target)||
+    !T.canPerceive(g,C,observer,shooter)||
+    !T.canPerceive(g,C,observer,target))return false;
+ if(typeof g.hasLineOfSight==='function'&&
+    (!g.hasLineOfSight(observer.x,observer.y,shooter.x,shooter.y,2)||
+     !g.hasLineOfSight(observer.x,observer.y,target.x,target.y,2)))return false;
+ const at=Number(g.time);
+ if(!Number.isFinite(at))return false;
+ const prior=hitWitnesses.get(observer)||[];
+ const valid=prior.filter(e=>at>=e.at&&at-e.at<=1.25&&
+  alive(e.shooter)&&alive(e.target));
+ const existing=valid.find(e=>e.shooter===shooter&&e.target===target);
+ if(existing)existing.at=at;
+ else valid.push({shooter,target,at});
+ if(valid.length>13)valid.splice(0,valid.length-13);
+ hitWitnesses.set(observer,valid);
+ return true;
+}
+function confirmedHitCount(g,observer,target){
+ const now=Number(g.time);
+ if(!Number.isFinite(now))return 0;
+ let count=0;
+ for(const e of hitWitnesses.get(observer)||[]){
+  if(e.target!==target||now<e.at||now-e.at>1.25||
+     !alive(e.shooter)||!alive(e.target)||
+     !hostile(g,e.shooter,e.target))continue;
+  count++;
+ }
+ return Math.min(4,count);
+}
 // Exact non-saturation terms from shipping scoreTarget. Unlike subtracting a
 // private count after calling scoreTarget, this candidate NEVER reads another
 // AI's private target slots. The source-parity regression below detects drift.
@@ -320,6 +359,52 @@ test('public witnessed fire can redirect a real target score without private int
   shooter.ai.__v1112TargetId = b.id;
   assert.equal(publicChoice(T, g, observer, classes, 'shot')?.id, b.id,
     'changing private target slot must not undo public evidence');
+});
+test('event-time confirmed hits retain victim identity after movement',()=>{
+ const T=boot(),{g,observer,a,b,hidden}=world();
+ const shooter=tank(3,0,100,1);
+ g.tanks.push(shooter);
+ assert.equal(recordVisibleHit(T,g,observer,shooter,a),true);
+ assert.equal(confirmedHitCount(g,observer,a),1);
+ assert.equal(confirmedHitCount(g,observer,b),0);
+ a.x=250;a.y=250;b.x=100;b.y=0;
+ assert.equal(confirmedHitCount(g,observer,a),1,
+  'moving another tank into the old shot lane cannot steal hit credit');
+ assert.equal(confirmedHitCount(g,observer,b),0);
+ hidden.ai.__v1112TargetId=b.id;
+ assert.equal(confirmedHitCount(g,observer,a),1,
+  'offscreen private intent cannot change an observed hit');
+});
+test('confirmed hit witness requires public event-time sight and real hostility',()=>{
+ const T=boot(),{g,observer,a}=world();
+ const shooter=tank(3,0,100,1);
+ g.tanks.push(shooter);
+ g.hasLineOfSight=()=>false;
+ assert.equal(recordVisibleHit(T,g,observer,shooter,a),false);
+ assert.equal(confirmedHitCount(g,observer,a),0);
+ g.hasLineOfSight=()=>true;
+ shooter.team=a.team;
+ assert.equal(recordVisibleHit(T,g,observer,shooter,a),false);
+ shooter.team=observer.team;
+ assert.equal(recordVisibleHit(T,g,observer,shooter,a),true);
+ assert.equal(confirmedHitCount(g,observer,a),1);
+ g.time+=1.26;
+ assert.equal(confirmedHitCount(g,observer,a),0);
+});
+test('confirmed hit witness supports multiple attackers without recycled IDs',()=>{
+ const T=boot(),{g,observer,a}=world();
+ const one=tank(3,0,100,1),two=tank(4,0,-100,1);
+ g.tanks.push(one,two);
+ assert.equal(recordVisibleHit(T,g,observer,one,a),true);
+ assert.equal(recordVisibleHit(T,g,observer,two,a),true);
+ assert.equal(confirmedHitCount(g,observer,a),2);
+ assert.equal(recordVisibleHit(T,g,observer,one,a),true);
+ assert.equal(confirmedHitCount(g,observer,a),2,'repeat hits do not multiply attackers');
+ one.alive=false;
+ const recycled=tank(one.id,0,100,1);
+ g.tanks.push(recycled);
+ assert.equal(confirmedHitCount(g,observer,a),1,
+  'recycled numeric shooter ID cannot inherit an old observed hit');
 });
 test('real composed AI acquisition cannot leak hidden intent into public candidate', () => {
   const { bootGame, withSeed } = require('../research/audio-rng-causal-pilot.cjs');
