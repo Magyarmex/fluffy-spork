@@ -171,7 +171,8 @@ test('cached target choice ignores teammate assignments but responds to hostile 
   const a = tank(10, 180, 0, { team: 'red' });
   const b = tank(11, -180, 0, { team: 'red' });
   const supposedAttacker = tank(4, 0, 150, {
-    team: 'red', ai: { state: 'hunt', __v1112TargetId: 10, targetId: 10 }
+    team: 'red', spawnShieldT: 2,
+    ai: { state: 'hunt', __v1112TargetId: 10, targetId: 10 }
   });
   g.tanks = [observer, a, b, supposedAttacker];
   assert.equal(T.chooseTarget(g, C, observer, observer.ai, g.time)?.id, 10,
