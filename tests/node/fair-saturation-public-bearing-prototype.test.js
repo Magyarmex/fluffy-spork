@@ -192,6 +192,23 @@ test('latest witnessed shot is bounded, public and cannot imply multiple attacke
   shooter.team = 2;
   assert.equal(witnessedShotCount(T, g, observer, a), 0);
 });
+test('public witnessed fire can redirect a real target score without private intent', () => {
+  const T = boot(), { g, observer, a, b, hidden } = world();
+  hidden.ai.state = 'wander';
+  a.hp = 85; // Modest public vulnerability makes a preferable before evidence.
+  const shooter = tank(3, 0, 100, 1, Math.atan2(-100, 100));
+  g.tanks.push(shooter);
+  const before = publicChoice(T, g, observer, classes, 'shot')?.id;
+  observer.ai.__v181ObservedShotId = shooter.id;
+  observer.ai.__v181ObservedShotAt = g.time - 0.2;
+  observer.ai.__v181ObservedShotAngle = shooter.angle;
+  const after = publicChoice(T, g, observer, classes, 'shot')?.id;
+  assert.equal(before, a.id, 'vulnerable target should initially win');
+  assert.equal(after, b.id, 'witnessed third-party pressure should redirect choice');
+  shooter.ai.__v1112TargetId = b.id;
+  assert.equal(publicChoice(T, g, observer, classes, 'shot')?.id, b.id,
+    'changing private target slot must not undo public evidence');
+});
 test('natural composed worlds report public-bearing sensitivity without changing gameplay', () => {
   const { bootGame, withSeed, digest, physical } =
     require('../research/audio-rng-causal-pilot.cjs');
