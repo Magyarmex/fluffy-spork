@@ -137,6 +137,32 @@ test('soft saturation spreads equal fights without forbidding gangs', () => {
   assert.ok(Number.isFinite(humanScore), 'saturation is a penalty, not a ban: a gang target remains selectable');
 });
 
+
+test('target saturation counts hostile pressure, never a teammate stale target slot', () => {
+  const { window } = boot();
+  const T = window.__NOVA_FAIR_ENGAGEMENT_TEST__;
+  const C = classes(), g = game(1200, 600, 1);
+  const observer = tank(1, 0, 0, { team: 'blue' });
+  const target = tank(2, 180, 0, { team: 'red' });
+  const alternative = tank(3, 180, 0, { team: 'red' });
+  const allyOfTarget = tank(4, 160, 10, {
+    team: 'red', ai: { state: 'hunt', targetId: 2, __v1112TargetId: 2 }
+  });
+  g.tanks = [observer, target, alternative, allyOfTarget];
+  const baseline = T.scoreTarget(g, C, observer, observer.ai, target, g.time);
+  assert.equal(T.saturation(g, target.id, observer.id), 0,
+    'same-team intent is not a hostile attacker even if the stale slot names its teammate');
+  assert.equal(T.scoreTarget(g, C, observer, observer.ai, target, g.time), baseline);
+  allyOfTarget.team = 'green';
+  assert.equal(T.saturation(g, target.id, observer.id), 1,
+    'a third-party hostile pressure assignment remains a soft saturation signal');
+  assert.ok(T.scoreTarget(g, C, observer, observer.ai, target, g.time) < baseline);
+  allyOfTarget.ai.state = 'idle';
+  assert.equal(T.saturation(g, target.id, observer.id), 0,
+    'inactive assignments do not count as committed pressure');
+  assert.equal(T.scoreTarget(g, C, observer, observer.ai, target, g.time), baseline);
+});
+
 test('legacy AI chain receives only the fairly selected perceived rival', () => {
   const { load } = boot();
   const ai = load('game/ai');
