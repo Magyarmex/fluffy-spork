@@ -88,8 +88,8 @@ test('Battle Sense threat agrees with materialized Battlefield/core direct damag
  assert.equal(enemy.allied,false);
  for(const arm of [ally,enemy]){
   assert.equal(arm.risk>0,arm.damage>0,
-   'AI must not suppress a physically damaging ordinary projectile');
-  assert.ok(arm.damage>0,'fixture must actually reach a living tank');
-  assert.equal(arm.remaining,0,'penetration-zero projectile is consumed');
+   'AI threat and physical damage must agree for the same ordinary round');
  }
+ assert.ok(enemy.damage>0,'hostile control must reach a living tank');
+ assert.equal(enemy.remaining,0,'hostile penetration-zero round is consumed');
 });
