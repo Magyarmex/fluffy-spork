@@ -86,6 +86,8 @@ test('unseen private commitments can also veto a publicly announced Rogue Star',
   const T = boot(), w = encounter('ROGUE STAR', 0);
   const star = { id: 77, kind: 'shape', type: 'star',
     x: 100, y: -400, hp: 100, alive: true };
+  delete w.signal.sector;
+  delete w.signal.to;
   w.signal.starId = star.id;
   w.g.shapes = [star];
   w.g.getShape = id => id === star.id ? star : null;
