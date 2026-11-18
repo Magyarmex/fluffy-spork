@@ -80,6 +80,26 @@ test('unseen private MIGRATION commitments can suppress a public signal', () => 
   assert.equal(crowded.weight, 0);
 });
 
+
+test('remembered public BLOOM can also be vetoed by unseen private commitments', () => {
+  const T = boot(), w = encounter('BLOOM', 0);
+  w.g.__lfState.signal = null;
+  w.g.__lfState.bloomMemory = { sector: 6, announcedAt: 9, until: 33 };
+  const open = choose(T, w);
+  assert.equal(open.mode, 'memory');
+  assert.equal(open.key, 'BLOOM:6');
+  for (const bot of w.hidden.slice(0, 2)) bot.ai.__lfEcoKey = 'BLOOM:6';
+  const crowded = choose(T, w);
+  assert.equal(crowded.mode, 'none');
+  assert.equal(crowded.weight, 0);
+  // A future or expired announcement cannot create a memory decision.
+  w.g.__lfState.bloomMemory.announcedAt = 11;
+  assert.equal(choose(T, w).mode, 'none');
+  w.g.__lfState.bloomMemory.announcedAt = 9;
+  w.g.__lfState.bloomMemory.until = 9;
+  assert.equal(choose(T, w).mode, 'none');
+});
+
 test('dead and sub-threshold distant intents do not create false saturation', () => {
   const T = boot(), w = encounter('BLOOM', 3);
   for (const bot of w.hidden) bot.alive = false;
