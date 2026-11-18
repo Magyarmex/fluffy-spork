@@ -363,6 +363,17 @@ test('public witnessed fire can redirect a real target score without private int
   assert.equal(publicChoice(T, g, observer, classes, 'shot')?.id, b.id,
     'changing private target slot must not undo public evidence');
 });
+test('negative control: human hit can redirect AI toward the human',()=>{
+ const T=boot(),{g,observer,a,b,hidden}=world();
+ hidden.ai.state='wander';
+ a.hp=85;b.team=3;b.isPlayer=true;b.ai=null;
+ assert.equal(publicChoice(T,g,observer,classes,'hit')?.id,a.id);
+ assert.equal(recordVisibleHit(T,g,observer,b,a),true);
+ assert.equal(publicChoice(T,g,observer,classes,'hit')?.id,b.id,
+  'unfiltered player hits can perversely amplify human-target pressure');
+ // This is a design BLOCKER, not a desired golden. Shipping private
+ // saturation only counts AI commitments; do not promote this candidate.
+});
 test('unfired aim and shot-memory alone cannot create confirmed-hit pressure',()=>{
  const T=boot(),{g,observer,a,hidden}=world();
  hidden.ai.state='wander';a.hp=85;
