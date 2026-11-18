@@ -97,3 +97,21 @@ test('hostile IFF still draws with clear sight and without optional terrain hook
     assert.equal(h.strokes.length,1);
   }
 });
+
+test('hostile IFF visibility traces are bounded by camera culling in dense scenes',()=>{
+  const h=loadLayer(),player={id:1,alive:true,x:0,y:0,teamId:'blue'};
+  const hostile={id:2,alive:true,teamId:'red'};
+  const drones=Array.from({length:120},(_,i)=>({
+    ownerId:2,x:5000+i*10,y:5000,hp:10,role:'hunter'
+  }));
+  drones.push({ownerId:2,x:15,y:0,hp:10,role:'hunter'});
+  const g=game(h.ctx,[player,hostile],drones,player);
+  g.areAllies=(a,b)=>a.teamId===b.teamId;
+  g.areHostile=(a,b)=>a.teamId!==b.teamId;
+  let traces=0;
+  g.hasLineOfSight=()=>{traces++;return true;};
+  h.render.render(g,320,240);
+  assert.equal(traces,1,'120 offscreen hostile drones must not trigger LoS');
+  assert.equal(h.draws.length,2,'only the single visible hostile receives IFF');
+  assert.equal(h.strokes.length,1);
+});
