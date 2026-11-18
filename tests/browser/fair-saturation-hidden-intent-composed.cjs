@@ -43,6 +43,10 @@ const { chromium } = require('playwright');
         g.tanks = [observer, a, b, hidden];
         g.powerups = []; g.bullets = []; g.w = 1000; g.h = 700; g.time = 10;
         const C = window.__novaMakeRequire('')('game/classes');
+        if (T.canPerceive(g, C, observer, hidden) ||
+            !T.canPerceive(g, C, observer, a) ||
+            !T.canPerceive(g, C, observer, b))
+          throw Error('invalid hidden/visible perception controls');
         const arms = [];
         for (const id of [a.id, b.id]) {
           observer.ai = { ...saved[0].ai, state: 'hunt', targetId: -1,
@@ -52,8 +56,8 @@ const { chromium } = require('playwright');
             __v1112TargetId: -1, __v1105TargetId: -1, __v180TargetId: -1 };
           b.ai = { ...saved[2].ai, state: 'wander', targetId: -1,
             __v1112TargetId: -1, __v1105TargetId: -1, __v180TargetId: -1 };
-          hidden.ai = { ...saved[3].ai, state: 'hunt', targetId: id,
-            __v1112TargetId: id, __v1105TargetId: id, __v180TargetId: id };
+          hidden.ai = { ...saved[3].ai, state: 'hunt', targetId: -1,
+            __v1112TargetId: id, __v1105TargetId: -1, __v180TargetId: -1 };
           const direct = T.chooseTarget(g, C, observer, observer.ai, g.time)?.id;
           ai.updateAI(observer, g, 1/60);
           const composed = observer.ai.__v1112TargetId;
