@@ -352,7 +352,10 @@ test('real composed AI acquisition cannot leak hidden intent into public candida
       g.status = 'playing'; g.paused = false;
       assert.equal(T.canPerceive(g, C, observer, hidden), false);
       assert.equal(T.canPerceive(g, C, hidden, a), true);
+      const replansBefore = win.__NOVA_FAIR_ENGAGEMENT__.targetReplans;
       ai.updateAI(hidden, g, 1 / 60);
+      assert.ok(win.__NOVA_FAIR_ENGAGEMENT__.targetReplans > replansBefore,
+        'composed Fair Engagement replan wrapper must actually execute');
       assert.equal(hidden.ai.__v1112TargetId, a.id,
         'real AI must acquire the visible target through shipping wrapper');
       assert.equal(T.canPerceive(g, C, observer, hidden), false);
