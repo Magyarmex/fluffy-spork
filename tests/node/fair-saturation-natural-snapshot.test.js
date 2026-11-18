@@ -84,14 +84,18 @@ function run(seed,observe){return withSeed(seed,draws=>{
  const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
  const T=g.__testFair,C=g.__testWindow.__novaMakeRequire('')('game/classes');
  assert.ok(T&&typeof T.chooseTarget==='function'&&typeof T.canPerceive==='function');
- const counters={observerSamples:0,multiVisibleSamples:0,hiddenAssignmentsToVisible:0,offscreenAiSamples:0,offscreenActiveSamples:0,offscreenAssignedSamples:0,changedChoices:0,jointCandidateSamples:0,jointChangedChoices:0};
+ const counters={activeTicks:0,observerSamples:0,multiVisibleSamples:0,hiddenAssignmentsToVisible:0,offscreenAiSamples:0,offscreenActiveSamples:0,offscreenAssignedSamples:0,changedChoices:0,jointCandidateSamples:0,jointChangedChoices:0};
  try{
   g.status='playing';g.paused=false;
   for(let tick=1;tick<=TICKS;tick++){
    g.update(1/60);
-   if(observe&&tick%SAMPLE_EVERY===0)sample(g,C,T,counters);
+   if(g.status==='playing'){
+    counters.activeTicks++;
+    if(observe&&tick%SAMPLE_EVERY===0)sample(g,C,T,counters);
+   }
   }
-  return {hash:digest(physical(g)),privateHash:digest((g.tanks||[]).map(t=>t?.ai?
+  return {finalStatus:g.status,playerAlive:!!g.player?.alive,
+   hash:digest(physical(g)),privateHash:digest((g.tanks||[]).map(t=>t?.ai?
    [t.id,t.ai.state,t.ai.__v180Posture,t.ai.__v1112TargetId,
     t.ai.__v1105TargetId,t.ai.__v180TargetId,t.ai.targetId,
     t.ai.__v1112NextThink]:null)),draws:draws(),counters};
@@ -105,7 +109,8 @@ test('natural composed AI snapshots measure hidden target-slot sensitivity witho
   assert.equal(observed.draws,control.draws,'diagnostic consumed gameplay RNG');
   assert.equal(observed.privateHash,control.privateHash,'diagnostic changed private AI state');
   assert.ok(observed.counters.observerSamples>0,'must sample actual AI observers');
-  rows.push({seed,...observed.counters});
+  rows.push({seed,finalStatus:observed.finalStatus,
+   playerAlive:observed.playerAlive,...observed.counters});
  }
  console.log('NOVA_FAIR_SATURATION_NATURAL_SNAPSHOT '+JSON.stringify(rows));
 });
