@@ -79,7 +79,7 @@ const { chromium } = require('playwright');
         return { arms, leakObserved: arms[0].composed !== arms[1].composed,
           hiddenDistance: Math.hypot(hidden.x-observer.x,hidden.y-observer.y),
           observerViewport: [g.w, g.h], originalTankCount: original.tanks.length,
-          shippingAI: !!ai.updateAI.__novaFairEngagement };
+          fairWrapperVerified: arms.every(arm => arm.fairReplans === 1) };
       } finally {
         for (const { tank, state, ai: originalAI } of saved) {
           Object.assign(tank, state); tank.ai = originalAI;
