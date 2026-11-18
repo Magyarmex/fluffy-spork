@@ -232,7 +232,8 @@ test('bearing prototype excludes target allies, dead hulls, and non-finite angle
 });
 
 test('free-for-all third-party attack bearings remain observable without team metadata', () => {
-  const T = boot(), { g, observer, a } = world();
+  const T = boot(), { g, observer, a, b } = world();
+  b.angle = Math.PI; // Prevent the other visible opponent from also aiming at a.
   for (const t of g.tanks) delete t.team;
   const witness = tank(3, 0, 100, 3, Math.atan2(-100, 100));
   delete witness.team;
