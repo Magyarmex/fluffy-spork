@@ -23,12 +23,28 @@ function coreBullets(){
   {dist2:(ax,ay,bx,by)=>(ax-bx)**2+(ay-by)**2},
   {CLASSES:{guard:{size:15}}},2250);
 }
+function coreDamage(){
+ const marker='    damageTank(t, dmg, srcId, kx = 0, ky = 0) {';
+ const start=html.indexOf(marker);
+ assert.ok(start>=0,'materialized core damage owner missing');
+ let end=start+marker.length,depth=1;
+ while(depth&&end<html.length){
+  if(html[end]==='{')depth++;
+  else if(html[end]==='}')depth--;
+  end++;
+ }
+ assert.equal(depth,0,'materialized damage owner braces changed');
+ return new Function('classes_1','types_1',
+  'return function(t,dmg,srcId,kx=0,ky=0){'+html.slice(start+marker.length,end-1)+'}')(
+  {CLASSES:{guard:{size:15,aura:0,color:'#fff'}}},
+  {rnd:()=>0});
+}
 function boot(){
  class Game{
   constructor(){
    this.time=1;this.bullets=[];this.tmp=[];this.__novaTerrain=[];
    this.tanks=[];this.shapes=[];this.drones=[];
-   this.cam={shake:0,zoom:1};this.w=800;this.h=600;this.sfx={};
+   this.cam={shake:0,zoom:1};this.w=800;this.h=600;this.sfx={hit(){},hurt(){}};this.cosmeticRandom=()=>1;
    this.player={id:999,x:1000,y:1000,alive:true};
    this.hash={query:(_x,_y,_r,out)=>{
     out.length=0;out.push(...this.tanks);
@@ -43,7 +59,7 @@ function boot(){
  Game.prototype.randSpawnPos=()=>({x:1500,y:1500});
  Game.prototype.resolveBulletCollisions=function(){};
  Game.prototype.getTank=function(id){return this.tanks.find(t=>t.id===id)||null;};
- Game.prototype.damageTank=function(t,dmg){t.hp-=dmg;};
+ Game.prototype.damageTank=coreDamage();
  Game.prototype.updateBullets=coreBullets();
  class Sfx{resume(){}}
  const modules={
