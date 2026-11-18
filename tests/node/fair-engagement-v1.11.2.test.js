@@ -163,6 +163,24 @@ test('target saturation counts hostile pressure, never a teammate stale target s
   assert.equal(T.scoreTarget(g, C, observer, observer.ai, target, g.time), baseline);
 });
 
+
+test('cached target choice ignores teammate assignments but responds to hostile pressure', () => {
+  const { window } = boot(), T = window.__NOVA_FAIR_ENGAGEMENT_TEST__;
+  const C = classes(), g = game(1200, 700, 1);
+  const observer = tank(1, 0, 0, { team: 'blue' });
+  const a = tank(10, 180, 0, { team: 'red' });
+  const b = tank(11, -180, 0, { team: 'red' });
+  const supposedAttacker = tank(4, 0, 150, {
+    team: 'red', ai: { state: 'hunt', __v1112TargetId: 10, targetId: 10 }
+  });
+  g.tanks = [observer, a, b, supposedAttacker];
+  assert.equal(T.chooseTarget(g, C, observer, observer.ai, g.time)?.id, 10,
+    'an allied assignment cannot suppress the otherwise preferred target');
+  supposedAttacker.team = 'green';
+  assert.equal(T.chooseTarget(g, C, observer, observer.ai, g.time)?.id, 11,
+    'a hostile commitment retains the soft anti-dogpile effect');
+});
+
 test('legacy AI chain receives only the fairly selected perceived rival', () => {
   const { load } = boot();
   const ai = load('game/ai');
