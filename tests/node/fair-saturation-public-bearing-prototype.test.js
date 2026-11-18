@@ -406,6 +406,39 @@ test('confirmed hit witness supports multiple attackers without recycled IDs',()
  assert.equal(confirmedHitCount(g,observer,a),1,
   'recycled numeric shooter ID cannot inherit an old observed hit');
 });
+test('confirmed-hit prototype can be fed by actual composed Game damage',()=>{
+ const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+ withSeed(1517800,()=>{
+  const g=bootGame();
+  try{
+   const T=g.__testFair;
+   const C=g.__testWindow.__novaMakeRequire('')('game/classes');
+   const [observer,shooter,victim]=g.tanks.filter(t=>t&&t.ai&&!t.isPlayer);
+   assert.ok(observer&&shooter&&victim);
+   for(const [t,x,y] of [[observer,0,0],[shooter,0,100],[victim,100,0]])
+    Object.assign(t,{x,y,hp:100,maxHp:100,alive:true,
+     spawnShieldT:0,shieldT:0,bulwarkT:0,cloakT:0,tauntT:0,invulnT:0});
+   g.tanks=[observer,shooter,victim];
+   g.tankById=new Map(g.tanks.map(t=>[t.id,t]));
+   g.w=800;g.h=600;g.cam.zoom=1;g.time=10;
+   g.status='playing';g.paused=false;
+   // Isolate the event visibility gate from unrelated map geometry. This
+   // is a real composed damage owner, not a physical projectile-hit claim.
+   g.hasLineOfSight=()=>true;
+   const before=victim.hp;
+   const original=g.damageTank;
+   g.damageTank=function(target,amount,ownerId,...rest){
+    const result=original.call(this,target,amount,ownerId,...rest);
+    if(target.hp<before&&ownerId===shooter.id)
+     recordVisibleHit(T,this,observer,shooter,target,C);
+    return result;
+   };
+   g.damageTank(victim,20,shooter.id,0,0);
+   assert.ok(victim.hp<before,'real damage owner must lower target HP');
+   assert.equal(confirmedHitCount(g,observer,victim),1);
+  }finally{g.destroy();}
+ });
+});
 test('real composed AI acquisition cannot leak hidden intent into public candidate', () => {
   const { bootGame, withSeed } = require('../research/audio-rng-causal-pilot.cjs');
   withSeed(1517800, () => {
