@@ -56,6 +56,11 @@ function boot(){
   'initBulletIntegrity','addRing','addFlash','addImpactDebris',
   'damageShape','damageDrone','weakenBullet','clusterBurst','updatePowerups'])
   Game.prototype[name]=function(){};
+ Game.prototype.tryFire=function(t){
+  this.bullets.push({kind:'bullet',id:3,ownerId:t.id,x:110,y:115,
+   vx:0,vy:0,r:4,dmg:20,ttl:1,pen:0,hits:0,
+   dead:false,shell:false,beam:false,splash:0});
+ };
  Game.prototype.randSpawnPos=()=>({x:1500,y:1500});
  Game.prototype.resolveBulletCollisions=function(){};
  Game.prototype.getTank=function(id){return this.tanks.find(t=>t.id===id)||null;};
@@ -91,9 +96,7 @@ function witness(allied){
  g.tanks=[shooter,victim];
  g.areAllies=(a,b)=>a.teamId===b.teamId;
  g.hasLineOfSight=()=>true;
- g.bullets=[{kind:'bullet',id:3,ownerId:1,x:110,y:115,
-  vx:0,vy:0,r:4,dmg:20,ttl:1,pen:0,hits:0,
-  dead:false,shell:false,beam:false,splash:0}];
+ g.tryFire(shooter);
  const risk=helper.laneRisk(g,110,115,victim.id,victim);
  g.updateBullets(1/60);
  return {allied:g.areAllies(shooter,victim),risk,
