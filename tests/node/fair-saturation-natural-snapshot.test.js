@@ -151,6 +151,8 @@ test('composed AI can naturally acquire a target hidden from another observer',(
    assert.equal(T.canPerceive(g,C,observer,b),true);
    const before=win.__NOVA_FAIR_ENGAGEMENT__.targetReplans;
    ai.updateAI(hidden,g,1/60);
+   assert.equal(T.canPerceive(g,C,observer,hidden),false,
+    'assigning bot must remain hidden after its real AI update');
    assert.equal(hidden.ai.__v1112TargetId,a.id,
     'real Fair Engagement wrapper must acquire the only visible opponent');
    assert.ok(win.__NOVA_FAIR_ENGAGEMENT__.targetReplans>before,
@@ -167,7 +169,8 @@ test('composed AI can naturally acquire a target hidden from another observer',(
     'both arms must select legal visible candidates');
    console.log('NOVA_FAIR_SATURATION_REACHABLE_HIDDEN_INTENT '+JSON.stringify({
     assigned,cleared,leakObserved:assigned!==cleared,
-    observerToHidden:450,hiddenToAssigned:370,
+    observerToHidden:Math.hypot(hidden.x-observer.x,hidden.y-observer.y),
+    hiddenToAssigned:Math.hypot(hidden.x-a.x,hidden.y-a.y),
     naturallyAssignedTarget:hidden.ai.__v1112TargetId}));
   }finally{g.destroy();}
  });
