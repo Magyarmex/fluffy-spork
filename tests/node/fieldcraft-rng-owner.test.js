@@ -70,8 +70,8 @@ test('live Fieldcraft registry teaches cover as firing denial, not AI invisibili
  const {tips}=load();
  const entry=tips.current().find(t=>t.id==='cover-last-seen-ai');
  assert.ok(entry,'stable cover advice must be present in the active shuffle pool');
- assert.match(entry.text,/cover blocks enemy shots, not awareness/i);
- assert.match(entry.text,/inside its gameplay view/i);
+ assert.match(entry.text,/cover can block a direct firing lane, but does not hide/i);
+ assert.match(entry.text,/inside an AI rival's gameplay view/i);
  assert.doesNotMatch(entry.text,/line of sight denies AI a live target/i);
  assert.deepEqual(Array.from(entry.tags),['battlefield','combat','ai']);
 });
