@@ -109,6 +109,21 @@ test('opaque cover rejects viewport-only crowd and bounds LOS calls',()=>{
  assert.equal(publicBloomScore(w.g,w.observer,w.signal).crowd,3);
  assert.equal(calls,6);
 });
+test('13-bot crowded scene caps public crowd and terrain-query work',()=>{
+ const T=boot(),w=world(T);
+ w.hidden=[];
+ for(let i=0;i<12;i++){
+  w.hidden.push({id:20+i,x:w.signal.x-65+i%4*5,
+   y:w.signal.y+Math.floor(i/4)*5,hp:100,maxHp:100,alive:true,
+   ai:new Proxy({}, {get(){throw Error('private intent leaked');}})});
+ }
+ w.g.tanks=[w.observer,...w.hidden];
+ let queries=0;
+ w.g.hasLineOfSight=()=>{queries++;return true;};
+ assert.equal(publicBloomScore(w.g,w.observer,w.signal).crowd,4);
+ assert.equal(queries,4,
+  'bounded crowd count must stop scanning terrain after saturation cap');
+});
 test('public occupancy misses distant converging rivals before arrival',()=>{
  const T=boot(),w=world(T);
  for(let i=0;i<3;i++){
