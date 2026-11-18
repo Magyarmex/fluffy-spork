@@ -521,7 +521,31 @@ test('natural composed worlds report public-bearing sensitivity without changing
       const result = { observerSamples: 0, multiVisible: 0,
         changedSelections: 0, shotChangedSelections: 0,
         publicBearingContacts: 0, publicShotContacts: 0, selected: 0,
-        publicChoiceLOSCalls: 0, publicDiagnosticLOSCalls: 0 };
+        publicChoiceLOSCalls: 0, publicDiagnosticLOSCalls: 0,
+        physicalDamageEvents: 0, potentialHitWitnessPairs: 0,
+        maxPotentialHitWitnessPairs: 0 };
+      const originalDamage=g.damageTank;
+      if(observe)g.damageTank=function(victim,amount,srcId,...rest){
+        const hp=Number(victim&&victim.hp);
+        const out=originalDamage.call(this,victim,amount,srcId,...rest);
+        if(Number.isFinite(hp)&&victim&&victim.hp<hp){
+          result.physicalDamageEvents++;
+          const shooter=(this.tanks||[]).find(t=>t&&t.id===srcId);
+          if(shooter&&shooter!==victim){
+            let possible=0;
+            for(const observer of this.tanks||[]){
+              if(!observer||!observer.ai||observer===shooter||
+                 observer===victim||!alive(observer))continue;
+              if(T.canPerceive(this,C,observer,shooter)&&
+                 T.canPerceive(this,C,observer,victim))possible++;
+            }
+            result.potentialHitWitnessPairs+=possible;
+            result.maxPotentialHitWitnessPairs=Math.max(
+             result.maxPotentialHitWitnessPairs,possible);
+          }
+        }
+        return out;
+      };
       try {
         g.status = 'playing';
         g.paused = false;
@@ -579,7 +603,7 @@ test('natural composed worlds report public-bearing sensitivity without changing
              t.ai.__v1112NextThink, t.ai.__v181ObservedShotId,
              t.ai.__v181ObservedShotAt] : null)),
           draws: draws() };
-      } finally { g.destroy(); }
+      } finally { if(observe)g.damageTank=originalDamage;g.destroy(); }
     });
   }
   const rows = [];
@@ -602,7 +626,10 @@ test('natural composed worlds report public-bearing sensitivity without changing
       publicShotContacts: observed.publicShotContacts,
       publicChoiceLOSCalls: observed.publicChoiceLOSCalls,
       publicDiagnosticLOSCalls: observed.publicDiagnosticLOSCalls,
-      extraTerrainQueries: observed.terrainQueries - control.terrainQueries });
+      extraTerrainQueries: observed.terrainQueries - control.terrainQueries,
+      physicalDamageEvents: observed.physicalDamageEvents,
+      potentialHitWitnessPairs: observed.potentialHitWitnessPairs,
+      maxPotentialHitWitnessPairs: observed.maxPotentialHitWitnessPairs });
   }
   console.log('NOVA_PUBLIC_BEARING_SATURATION_CENSUS ' + JSON.stringify(rows));
 });
