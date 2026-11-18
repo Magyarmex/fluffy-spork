@@ -474,3 +474,65 @@ test('Tempest touch bursts preserve actual target HP, heat and release chronolog
   }
  }
 });
+
+
+// #648: Tempest needs the same real-hit, browser-shaped 3-vs-4 update budget
+// evidence as Minigun/Needle Storm. Do not infer safe rollout from shot counts
+// alone: track HP, first contacts, heat, touch edges and unsimulated time.
+// Research-only opt-in RAF; no production owner is changed.
+test('Tempest adversarial 30Hz three/four-step budgets account for actual touch-driven damage',()=>{
+ const rows=[];
+ for(const reload of [0,8])for(const offset of [7,19]){
+  const reference=trial(1517800,'tempest',reload,'uniform60',offset);
+  assert.ok(reference.hits>0&&reference.damage>0,
+   'control must include actual projectile collisions');
+  for(const mode of ['quantized83_16','sevenTickFalsifier','tripleLongBurst']){
+   for(const [maxSteps,extra] of [[3,3],[4,2]]){
+    const observed=trial(1517800,'tempest',reload,mode,offset,
+     'research-drop',maxSteps,extra);
+    assert.equal(observed.applied,reference.applied,
+     'catch-up policy cannot lose chronological touch edges');
+    if(mode==='quantized83_16'){
+     assert.equal(observed.ticks,reference.ticks,
+      'healthy quantized 30Hz must recover all Tempest simulation ticks');
+     assert.equal(observed.droppedMs,0,
+      'healthy quantized 30Hz must not discard combat time');
+     if(maxSteps===3)assert.ok(observed.stepsByFrame.three>0,
+      'three-step catch-up path must actually execute');
+     else assert.ok(observed.stepsByFrame.four>0,
+      'four-step catch-up path must actually execute');
+    }
+    assert.ok(Math.abs(observed.ticks*(1000/60)+observed.droppedMs+
+     observed.backlogMs-DURATION_MS)<.002,
+     'elapsed time must equal executed, discarded and queued time');
+    assert.ok(observed.stepsByFrame.four===0||maxSteps===4,
+     'three-step budget cannot silently perform four updates');
+    assert.ok(Number.isFinite(observed.maxInputSampleLagMs)&&
+     Number.isFinite(observed.maxRenderCallbackLagMs),
+     'touch sampling and callback lag must be measured');
+    if(observed.droppedMs===0&&observed.ticks===reference.ticks){
+     assert.equal(observed.volleys,reference.volleys,
+      'fully recovered Tempest volley count must preserve 60Hz cadence');
+     assert.equal(observed.hits,reference.hits,
+      'fully recovered Tempest projectile contacts must match');
+     assert.equal(observed.damage,reference.damage,
+      'fully recovered Tempest target HP damage must match');
+     assert.deepEqual(observed.allBirths,reference.allBirths,
+      'fully recovered Tempest shot timestamps must match');
+     assert.equal(observed.heat,reference.heat,
+      'fully recovered Tempest redline heat must match');
+     assert.equal(observed.spin,reference.spin,
+      'fully recovered Tempest barrel spin must match');
+    }
+    rows.push({reload,offset,mode,maxSteps,extra,
+     ticks:observed.ticks,droppedMs:observed.droppedMs,
+     backlogMs:observed.backlogMs,volleys:observed.volleys,
+     hits:observed.hits,damage:observed.damage,
+     maxInputSampleLagMs:observed.maxInputSampleLagMs,
+     maxRenderCallbackLagMs:observed.maxRenderCallbackLagMs});
+   }
+  }
+ }
+ assert.equal(rows.length,24);
+ console.log('TEMPEST_THREE_FOUR_STEP_TOUCH_DAMAGE '+JSON.stringify(rows));
+});
