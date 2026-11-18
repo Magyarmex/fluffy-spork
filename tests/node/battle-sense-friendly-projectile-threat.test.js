@@ -83,3 +83,19 @@ test('irrelevant projectile fields do not trigger owner lookups',()=>{
  assert.equal(helper.laneRisk(g,110,115,observer.id,observer),0);
  assert.equal(lookups,0,'only a geometrically plausible projectile may incur an owner lookup');
 });
+
+test('hostile plausible shots do not pay the recycled-owner lookup cost',()=>{
+ const {g,observer,ally,enemy,helper}=scene();
+ let lookups=0;
+ const lookup=g.getTank;
+ g.getTank=id=>{lookups++;return lookup(id);};
+ g.tryFire(enemy);
+ assert.ok(helper.laneRisk(g,110,115,observer.id,observer)>0,
+  'hostile ordinary fire remains dangerous');
+ assert.equal(lookups,0,'hostile fire needs no live owner identity verification');
+ g.bullets=[];
+ g.tryFire(ally);
+ assert.equal(helper.laneRisk(g,110,115,observer.id,observer),0,
+  'known allied fire is ignored only after live identity verification');
+ assert.equal(lookups,1,'one plausible allied shot requires exactly one identity lookup');
+});
