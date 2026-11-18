@@ -719,3 +719,68 @@ test('natural composed worlds report public-bearing sensitivity without changing
   }
   console.log('NOVA_PUBLIC_BEARING_SATURATION_CENSUS ' + JSON.stringify(rows));
 });
+
+test('real composed projectile first-contact can create observer-owned confirmed-hit evidence',()=>{
+ const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+ withSeed(1517800,()=>{
+  const g=bootGame();if(!g.player)g.redeploy();
+  const T=g.__testFair,C=g.__testWindow.__novaMakeRequire('')('game/classes');
+  const shooter=g.player;
+  const [observer,victim]=g.tanks.filter(t=>t&&t.ai&&!t.isPlayer);
+  assert.ok(shooter&&observer&&victim);
+  try{
+   g.sfx.muted=true;g.sfx.startMusic=()=>{};
+   g.setClass(shooter,'twin');
+   for(const [t,x,y] of [[shooter,0,0],[observer,0,90],[victim,180,0]])
+    Object.assign(t,{x,y,vx:0,vy:0,hp:1000,maxHp:1000,alive:true,
+     spawnShieldT:0,shieldT:0,bulwarkT:0,cloakT:0,tauntT:0,invulnT:0});
+   shooter.angle=0;shooter.fireCd=0;shooter.droneRespawnT=Infinity;
+   // Keep non-shooters stationary; projectile collision and damage remain
+   // owned by the actual 49-overlay Game.update path.
+   observer.isPlayer=true;victim.isPlayer=true;
+   g.tanks=[shooter,observer,victim];
+   g.tankById=new Map(g.tanks.map(t=>[t.id,t]));
+   g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];g.orbs=[];
+   g.__novaTerrain=[];g.__novaBattlefieldIndex=null;
+   if(g.shapeById)g.shapeById.clear();
+   if(g.hash&&g.hash.clear)g.hash.clear();
+   g.shapeTimer=Infinity;g.powerupTimer=Infinity;g.eliteTimer=Infinity;
+   g.crasherTimer=Infinity;g.aiRespawns=[];
+   g.spawnShape=()=>null;g.spawnPowerup=()=>null;
+   g.spawnAITank=()=>null;g.spawnDrone=()=>null;
+   g.w=800;g.h=600;g.cam.zoom=1;
+   g.status='playing';g.paused=false;
+   g.input.autofire=false;g.input.mouseActive=false;
+   g.input.moveVec=()=>({x:0,y:0});
+   g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
+   const originalFire=g.tryFire,originalDamage=g.damageTank;
+   let births=0,contacts=0,recorded=0,otherDamage=0;
+   g.tryFire=function(t){
+    const n=this.bullets.length,out=originalFire.apply(this,arguments);
+    if(t===shooter&&this.bullets.length>n)births+=this.bullets.length-n;
+    return out;
+   };
+   g.damageTank=function(target,amount,ownerId,...rest){
+    const hp=target.hp;
+    const out=originalDamage.call(this,target,amount,ownerId,...rest);
+    if(target===victim&&target.hp<hp){
+     contacts++;
+     assert.equal(ownerId,shooter.id,'physical projectile must retain shooter ownership');
+     if(recordVisibleHit(T,this,observer,shooter,target,C))recorded++;
+    }else if(target!==victim&&target.hp<hp)otherDamage++;
+    return out;
+   };
+   g.input.firing=true;
+   for(let tick=0;tick<90&&contacts===0;tick++){
+    g.update(1/60);
+    if(tick===0)g.input.firing=false;
+   }
+   assert.ok(births>0,'real player input must create a projectile');
+   assert.ok(contacts>0,'projectile must reach the victim through Game.update');
+   assert.equal(otherDamage,0,'fixture must not injure the observer');
+   assert.ok(recorded>0,'visible projectile contact must record public evidence');
+   assert.equal(confirmedHitCount(g,observer,victim),1);
+   assert.ok(victim.hp<1000,'physical first contact must lower HP');
+  }finally{g.destroy();}
+ });
+});
