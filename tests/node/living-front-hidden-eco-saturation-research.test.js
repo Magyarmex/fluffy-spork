@@ -23,13 +23,17 @@ function boot() {
   return window.__NOVA_LIVING_FRONT_TEST__;
 }
 
-function encounter(type, hiddenCount) {
+function encounter(T, type, hiddenCount) {
   const observer = { id: 1, x: -400, y: -400, cls: 'twin',
     hp: 100, maxHp: 100, alive: true,
     ai: { __v1112TargetId: -1, isElite: false } };
   const sector = 6;
-  const signal = { type, sector, from: 1, to: sector,
-    x: 100, y: -400, started: 9, until: 20 };
+  const destination = T.sectorCenter(sector);
+  const origin = T.sectorCenter(5);
+  const signal = { type, sector, from: 5, to: sector,
+    x: type === 'MIGRATION' ? (origin.x + destination.x) / 2 : destination.x,
+    y: type === 'MIGRATION' ? (origin.y + destination.y) / 2 : destination.y,
+    started: 9, until: 20 };
   const key = type + ':' + sector;
   const hidden = Array.from({ length: 4 }, (_, i) => ({
     id: 20 + i, x: 2000 + i * 30, y: 2000,
@@ -47,7 +51,7 @@ function encounter(type, hiddenCount) {
 function choose(T, w) { return T.publicEcoBias(w.g, w.observer, {}, {}); }
 
 test('unseen private BLOOM commitments alone can veto a legal public rotation', () => {
-  const T = boot(), w = encounter('BLOOM', 0);
+  const T = boot(), w = encounter(T, 'BLOOM', 0);
   assert.equal(T.sectorIndex(w.signal.x, w.signal.y), w.signal.sector,
     'public signal must identify its actual physical sector');
   assert.notEqual(T.sectorIndex(w.observer.x, w.observer.y), w.signal.sector,
@@ -65,12 +69,12 @@ test('unseen private BLOOM commitments alone can veto a legal public rotation', 
   assert.equal(privatelyCrowded.mode, 'none',
     'the current shipping code must reproduce the hidden-intent decision veto');
   assert.equal(privatelyCrowded.weight, 0);
-  assert.equal(w.signal.x, 100, 'public signal did not move');
+  assert.equal(w.signal.x, T.sectorCenter(6).x, 'public signal did not move');
   assert.equal(w.observer.x, -400, 'observer did not move');
 });
 
 test('unseen private MIGRATION commitments can suppress a public signal', () => {
-  const T = boot(), w = encounter('MIGRATION', 0);
+  const T = boot(), w = encounter(T, 'MIGRATION', 0);
   const open = choose(T, w);
   assert.equal(open.mode, 'signal');
   assert.equal(open.key, 'MIGRATION:6');
@@ -83,9 +87,11 @@ test('unseen private MIGRATION commitments can suppress a public signal', () => 
 
 
 test('unseen private commitments can also veto a publicly announced Rogue Star', () => {
-  const T = boot(), w = encounter('ROGUE STAR', 0);
+  const T = boot(), w = encounter(T, 'ROGUE STAR', 0);
   const star = { id: 77, kind: 'shape', type: 'star',
     x: 100, y: -400, hp: 100, alive: true };
+  w.signal.x = star.x;
+  w.signal.y = star.y;
   delete w.signal.sector;
   delete w.signal.to;
   w.signal.starId = star.id;
@@ -101,8 +107,9 @@ test('unseen private commitments can also veto a publicly announced Rogue Star',
 });
 
 test('remembered public BLOOM can also be vetoed by unseen private commitments', () => {
-  const T = boot(), w = encounter('BLOOM', 0);
+  const T = boot(), w = encounter(T, 'BLOOM', 0);
   w.g.__lfState.signal = null;
+  w.observer.x = -50; // Outside sector 6, close enough to pursue remembered center.
   w.g.__lfState.bloomMemory = { sector: 6, announcedAt: 9, until: 33 };
   const open = choose(T, w);
   assert.equal(open.mode, 'memory');
@@ -121,7 +128,7 @@ test('remembered public BLOOM can also be vetoed by unseen private commitments',
 
 
 test('local visible farming also depends on unseen private eco assignments', () => {
-  const T = boot(), w = encounter('BLOOM', 0);
+  const T = boot(), w = encounter(T, 'BLOOM', 0);
   w.g.__lfState.signal = null;
   w.g.shapes = Array.from({ length: 4 }, (_, i) => ({
     id: 100 + i, kind: 'shape', type: 'pentagon',
@@ -140,7 +147,7 @@ test('local visible farming also depends on unseen private eco assignments', () 
 });
 
 test('dead and sub-threshold distant intents do not create false saturation', () => {
-  const T = boot(), w = encounter('BLOOM', 3);
+  const T = boot(), w = encounter(T, 'BLOOM', 3);
   for (const bot of w.hidden) bot.alive = false;
   assert.equal(choose(T, w).mode, 'signal');
   for (const bot of w.hidden) {
