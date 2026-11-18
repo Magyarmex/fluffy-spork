@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-test('Hardlight Foundry culls offscreen shapes before terrain LoS work', () => {
+test('Hardlight Foundry culls offscreen neutral, pickup and drone accents before terrain LoS', () => {
   const modules = {
     'game/render': module => {
       module.exports = { render() {} };
@@ -36,7 +36,10 @@ test('Hardlight Foundry culls offscreen shapes before terrain LoS work', () => {
   const game = {
     ctx, dpr: 1, quality: 'low', time: 1,
     cam: { x: 0, y: 0, zoom: 1 }, player: { x: 0, y: 0, alive: true },
-    tanks: [], drones: [], powerups: [], __novaTerrain: [],
+    tanks: [], __novaTerrain: [],
+    tankById: new Map([[8, { id: 8, isPlayer: false, angle: 0 }]]),
+    drones: Array.from({ length: 13 }, (_, i) => ({ ownerId: 8, hp: 1, x: 1700 + i * 10, y: 1800, r: 7 })),
+    powerups: Array.from({ length: 6 }, (_, i) => ({ id: i + 1, type: 'heal', x: 1900 + i * 10, y: 1800, ttl: 10 })), 
     __v190FinishCache: { w: 800, h: 600, dpr: 1, quality: 'low', canvas: {} },
     hasLineOfSight() { losCalls++; return true; },
     isTerrainSafe() { clearanceCalls++; return true; },
@@ -46,14 +49,16 @@ test('Hardlight Foundry culls offscreen shapes before terrain LoS work', () => {
   };
   renderModule.exports.render(game, 800, 600);
   assert.equal(losCalls, 0,
-    'offscreen shapes must not invoke terrain line-of-sight');
+    'offscreen neutral, pickup and drone accents must not invoke terrain LoS');
   const offscreenClearance = clearanceCalls;
   game.shapes.push({ x: 0, y: 0, r: 10, hp: 1, type: 'circle' });
+  game.powerups.push({ id: 77, type: 'heal', x: 10, y: 10, ttl: 10 });
+  game.drones.push({ ownerId: 8, hp: 1, x: 20, y: 20, r: 7 });
   losCalls = 0; clearanceCalls = 0;
   renderModule.exports.render(game, 800, 600);
-  assert.equal(losCalls, 1,
-    'visible shape must retain its terrain visibility check');
-  assert.ok(clearanceCalls >= 1,
-    'visible shape must retain physical cover clearance');
+  assert.equal(losCalls, 3,
+    'visible neutral, pickup and hostile drone must retain terrain LoS checks');
+  assert.ok(clearanceCalls >= 3,
+    'visible accents must retain physical cover clearance');
   assert.ok(offscreenClearance >= 0);
 });
