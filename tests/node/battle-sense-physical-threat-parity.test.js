@@ -71,7 +71,8 @@ function boot(){
  const window={__novaModules:modules};
  const context={window,console:{info(){},warn(){},error(){}},
   Math,Map,Set,Date,WeakMap,performance:{now:()=>0}};
- for(const file of ['battlefield-v1.6.0.js','battle-sense-v1.8.1.js'])
+ for(const file of ['battlefield-v1.6.0.js','battle-sense-v1.8.1.js',
+  'fair-engagement-v1.11.2.js'])
   vm.runInNewContext(fs.readFileSync(path.join(root,'nova-updates',file),'utf8'),
    context,{filename:file});
  const module={exports:{}};
