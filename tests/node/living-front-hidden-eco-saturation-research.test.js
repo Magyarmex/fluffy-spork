@@ -27,9 +27,9 @@ function encounter(type, hiddenCount) {
   const observer = { id: 1, x: -400, y: -400, cls: 'twin',
     hp: 100, maxHp: 100, alive: true,
     ai: { __v1112TargetId: -1, isElite: false } };
-  const sector = 15;
+  const sector = 6;
   const signal = { type, sector, from: 1, to: sector,
-    x: -100, y: -400, started: 9, until: 20 };
+    x: 100, y: -400, started: 9, until: 20 };
   const key = type + ':' + sector;
   const hidden = Array.from({ length: 3 }, (_, i) => ({
     id: 20 + i, x: 2000 + i * 30, y: 2000,
@@ -56,14 +56,14 @@ test('unseen private BLOOM commitments alone can veto a legal public rotation', 
   }
   const open = choose(T, w);
   assert.equal(open.mode, 'signal');
-  assert.equal(open.key, 'BLOOM:15');
+  assert.equal(open.key, 'BLOOM:6');
   assert.ok(open.weight > .1);
-  for (const bot of w.hidden) bot.ai.__lfEcoKey = 'BLOOM:15';
+  for (const bot of w.hidden) bot.ai.__lfEcoKey = 'BLOOM:6';
   const privatelyCrowded = choose(T, w);
   assert.equal(privatelyCrowded.mode, 'none',
     'the current shipping code must reproduce the hidden-intent decision veto');
   assert.equal(privatelyCrowded.weight, 0);
-  assert.equal(w.signal.x, -100, 'public signal did not move');
+  assert.equal(w.signal.x, 100, 'public signal did not move');
   assert.equal(w.observer.x, -400, 'observer did not move');
 });
 
@@ -71,8 +71,8 @@ test('unseen private MIGRATION commitments can suppress a public signal', () => 
   const T = boot(), w = encounter('MIGRATION', 0);
   const open = choose(T, w);
   assert.equal(open.mode, 'signal');
-  assert.equal(open.key, 'MIGRATION:15');
-  for (const bot of w.hidden.slice(0, 2)) bot.ai.__lfEcoKey = 'MIGRATION:15';
+  assert.equal(open.key, 'MIGRATION:6');
+  for (const bot of w.hidden.slice(0, 2)) bot.ai.__lfEcoKey = 'MIGRATION:6';
   const crowded = choose(T, w);
   assert.equal(crowded.mode, 'none');
   assert.equal(crowded.weight, 0);
