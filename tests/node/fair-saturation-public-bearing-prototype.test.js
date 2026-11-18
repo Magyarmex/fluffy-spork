@@ -368,6 +368,9 @@ test('natural composed worlds report public-bearing sensitivity without changing
     assert.equal(observed.privateHash, control.privateHash,
       'research changed private AI state');
     assert.ok(observed.observerSamples > 0, 'must inspect live AI observers');
+    if (observed.publicBearingContacts > 0 || observed.publicShotContacts > 0)
+      assert.ok(observed.publicLineOfSightCalls > 0,
+        'public pressure was observed but no direct terrain queries were counted');
     rows.push({ seed, observerSamples: observed.observerSamples,
       multiVisible: observed.multiVisible, selected: observed.selected,
       changedSelections: observed.changedSelections,
