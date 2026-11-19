@@ -110,3 +110,22 @@ test('missing or invalid release evidence fails closed',()=>{
   assert.throws(()=>summarize(fixture(2),candidate));
  }
 });
+
+test('mixed touch owners, post-release gestures and incomplete gestures fail closed',()=>{
+ const mutations=[
+  r=>{r.touchInput.events[2].pointerId=99;},
+  r=>{r.touchInput.events[0].type='pointermove';},
+  r=>{r.touchInput.events[1].type='pointerdown';},
+  r=>{r.touchInput.events.push({...r.touchInput.events[2],
+   type:'pointermove',relativeWallMs:101});},
+  r=>{r.touchInput.events.push({...r.touchInput.events[2],
+   type:'pointerdown',relativeWallMs:101});},
+  r=>{r.touchInput.events[2].type='pointercancel';},
+  r=>{r.touchInput.events[1].pointerId=99;}
+ ];
+ for(const mutate of mutations){
+  const candidate=copy(fixture(3));
+  mutate(candidate);
+  assert.throws(()=>summarize(fixture(2),candidate));
+ }
+});
