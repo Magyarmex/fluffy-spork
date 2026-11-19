@@ -103,3 +103,31 @@ test('foreground stall discards queued input rather than mislabeling it pending'
  assert.equal(r.discardedCount,1);
  assert.ok(r.droppedMs>0);
 });
+
+
+test('skipped-time telemetry separates press and release without inventing sampled gameplay',()=>{
+ const intervals=Array(8).fill(50);
+ const events=[{atMs:130,kind:'keydown',key:'w'},
+   {atMs:131,kind:'keyup',key:'w'}];
+ for(const maxSteps of [2,3]){
+  const result=replayInputDelivery(intervals,events,{maxSteps});
+  const actual={keydown:0,keyup:0};
+  for(const edge of result.events){
+   if(edge.appliedDuringSkip)actual[edge.kind]++;
+  }
+  assert.deepEqual(result.skippedEdgeCounts,actual,
+   'skipped-edge counters must be derived from actual handler delivery');
+  assert.equal(actual.keydown+actual.keyup,result.appliedDuringSkippedTime);
+  assert.equal(result.deliveredCount+result.unappliedCount,events.length);
+  assert.equal(result.queuedCount+result.discardedCount,result.unappliedCount);
+  if(maxSteps===2){
+   assert.ok(result.droppedMs>0);
+   assert.deepEqual(result.skippedEdgeCounts,{keydown:1,keyup:1},
+    'both short-pulse edges must be classified as skipped, not simulated');
+  }
+  if(maxSteps===3){
+   assert.equal(result.droppedMs,0);
+   assert.deepEqual(result.skippedEdgeCounts,{keydown:0,keyup:0});
+  }
+ }
+});
