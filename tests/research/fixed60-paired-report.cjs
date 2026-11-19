@@ -24,6 +24,40 @@ function summarize(control,candidate){
   assert.ok(r.longStallWallMs<r.observedWallMs,
    `${label}: no measured active observation window`);
   assert.ok(r.frames>=5&&r.observedWallMs>0,`${label}: insufficient browser evidence`);
+  assert.ok(Array.isArray(report.touchInput?.events)&&report.touchInput.events.length>=2,
+   `${label}: missing trusted touch chronology`);
+  assert.ok(Number.isFinite(report.touchInput.firstTouchWallMs),
+   `${label}: missing first trusted touch wall time`);
+  assert.ok(Number.isFinite(report.touchInput.firstTouchOwnerPhaseMs)&&
+   report.touchInput.firstTouchOwnerPhaseMs>=0,
+   `${label}: missing first-touch simulation-owner phase`);
+  assert.equal(report.touchInput.events[0].relativeWallMs,0,
+   `${label}: first touch must be relative epoch`);
+  for(let i=0;i<report.touchInput.events.length;i++){
+   const e=report.touchInput.events[i];
+   assert.ok(['pointerdown','pointermove','pointerup','pointercancel'].includes(e.type),
+    `${label}: invalid touch event type`);
+   assert.ok(Number.isInteger(e.pointerId)&&Number.isFinite(e.relativeWallMs)&&
+    Number.isFinite(e.x)&&Number.isFinite(e.y)&&e.relativeWallMs>=0&&
+    Number.isInteger(e.nominalOwnerTick)&&e.nominalOwnerTick>=0,
+    `${label}: invalid touch event timestamp/identity/position`);
+   if(i)assert.ok(e.relativeWallMs>=report.touchInput.events[i-1].relativeWallMs,
+    `${label}: touch events not chronological`);
+  }
+  assert.ok(Number.isFinite(report.releaseTelemetry?.releaseWallMs),
+   `${label}: missing trusted release time`);
+  assert.equal(report.releaseTelemetry.volleyEventsAfterRelease,0,
+   `${label}: player fired after trusted release`);
+  const firstRelease=report.touchInput.events.find(e=>e.type==='pointerup');
+  assert.ok(firstRelease,`${label}: no trusted pointer release`);
+  assert.ok(Math.abs(report.releaseTelemetry.releaseWallMs-
+   report.touchInput.firstTouchWallMs-firstRelease.relativeWallMs)<.01,
+   `${label}: release telemetry does not match trusted event chronology`);
+  assert.ok(Number.isInteger(report.releaseTelemetry.volleyEventsBeforeRelease)&&
+   report.releaseTelemetry.volleyEventsBeforeRelease>0&&
+   Number.isFinite(report.releaseTelemetry.lastPreReleaseBirthAgeMs)&&
+   report.releaseTelemetry.lastPreReleaseBirthAgeMs>=0,
+   `${label}: no certified pre-release firing event`);
   assert.ok(Math.abs(r.observedWallMs-r.simulatedMs-report.droppedMs-r.remainingLagMs)<1,
    `${label}: wall time does not reconcile`);
   assert.ok(Math.abs(report.droppedMs-r.longStallDroppedMs-r.backlogDroppedMs)<1e-4,
@@ -33,6 +67,27 @@ function summarize(control,candidate){
  }
  assert.equal(control.initialFingerprint,candidate.initialFingerprint,
   'browser arms did not begin from identical world');
+ // The same seeded world is necessary but not sufficient: compare the
+ // browser-delivered touch event identities and relative delivery times.
+ const touchSignature=report=>report.touchInput.events.map(e=>
+  e.type+':'+e.pointerId);
+ const controlSignature=touchSignature(control),candidateSignature=touchSignature(candidate);
+ const sameTouchSequence=JSON.stringify(controlSignature)===JSON.stringify(candidateSignature);
+ const touchTimingDeltasMs=sameTouchSequence?control.touchInput.events.map((e,i)=>
+  candidate.touchInput.events[i].relativeWallMs-e.relativeWallMs):[];
+ const maxAbsTouchTimingDeltaMs=sameTouchSequence?
+  Math.max(0,...touchTimingDeltasMs.map(Math.abs)):null;
+ // Nominal owner ticks are a stronger diagnostic than a loose wall-time
+ // threshold. They are NOT a guarantee of equal consumed simulation ticks
+ // under backlog, pause, or long-stall recovery.
+ const sameNominalInputTicks=sameTouchSequence&&control.touchInput.events.every((e,i)=>
+  e.nominalOwnerTick===candidate.touchInput.events[i].nominalOwnerTick);
+ const firstTouchOwnerPhaseDeltaMs=candidate.touchInput.firstTouchOwnerPhaseMs-
+  control.touchInput.firstTouchOwnerPhaseMs;
+ const maxTouchPositionDeltaPx=sameTouchSequence?Math.max(0,
+  ...control.touchInput.events.map((e,i)=>Math.hypot(
+   e.x-candidate.touchInput.events[i].x,
+   e.y-candidate.touchInput.events[i].y))):null;
  const arm=(report)=>{
   const r=report.raf;
   return {steps:report.configuredMaxSteps,wallMs:r.observedWallMs,
@@ -48,6 +103,9 @@ function summarize(control,candidate){
    longStallLossMsPerSecond:1000*r.longStallDroppedMs/r.observedWallMs,
    queuedMs:r.remainingLagMs,
    touchToProjectileBirthMs:report.touchToProjectileBirthMs,
+   volleyEventsBeforeRelease:report.releaseTelemetry.volleyEventsBeforeRelease,
+   volleyEventsAfterRelease:report.releaseTelemetry.volleyEventsAfterRelease,
+   lastPreReleaseBirthAgeMs:report.releaseTelemetry.lastPreReleaseBirthAgeMs,
    touchToCanvasSubmissionMs:report.touchToCanvasSubmissionMs,
    callbackP95Ms:r.callbackJs.p95,
    updateP95Ms:report.updates.p95,renderP95Ms:report.renders.p95};
@@ -56,8 +114,16 @@ function summarize(control,candidate){
  const durationRatio=Math.max(a.wallMs,b.wallMs)/Math.min(a.wallMs,b.wallMs);
  return {initialFingerprint:control.initialFingerprint,control:a,candidate:b,
   durationRatio,matchedObservationDuration:durationRatio<=1.05,
+  sameTouchSequence,sameNominalInputTicks,maxAbsTouchTimingDeltaMs,maxTouchPositionDeltaPx,
+  firstTouchOwnerPhaseDeltaMs,
+  matchedTouchPhase:Math.abs(firstTouchOwnerPhaseDeltaMs)<=20,
+  matchedTouchTiming:sameTouchSequence&&maxAbsTouchTimingDeltaMs<=20,
+  matchedTouchGeometry:sameTouchSequence&&maxTouchPositionDeltaPx<=1,
+  comparableTouchDelivery:sameTouchSequence&&maxAbsTouchTimingDeltaMs<=20&&
+   maxTouchPositionDeltaPx<=1&&Math.abs(firstTouchOwnerPhaseDeltaMs)<=20&&
+   sameNominalInputTicks,
   causalClaimAllowed:false,
-  interpretation:'Descriptive browser observations only: even matched durations do not establish equal input histories or device CPU/latency safety.'};
+  interpretation:'Descriptive browser observations only: even matched event sequences and delivery times do not establish equal combat trajectories, input-to-photon latency or device CPU safety.'};
 }
 if(require.main===module){
  assert.equal(process.argv.length,4,'usage: node fixed60-paired-report.cjs two.json three.json');
