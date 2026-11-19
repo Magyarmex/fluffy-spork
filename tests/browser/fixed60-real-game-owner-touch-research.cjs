@@ -647,6 +647,12 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    'applied touch evidence must have monotonic simulation-consumption boundaries');
   assert.equal(applied[0].pointerId,applied.at(-1).pointerId,
    'actual release must reach the original input owner');
+  assert.equal(applied[0].aimOwnerAfter,applied[0].pointerId,
+   'applied touch-down must actually acquire the aim owner');
+  assert.equal(applied[0].aimActiveAfter,true);
+  assert.equal(applied.at(-1).aimOwnerAfter,-1,
+   'applied touch release must relinquish the aim owner');
+  assert.equal(applied.at(-1).aimActiveAfter,false);
   if(process.env.NOVA_FIXED60_REPORT_FILE){
    // Save exact browser observations for a separate, explicitly non-causal
    // paired comparison. Never manufacture matched wall time from tick count.
