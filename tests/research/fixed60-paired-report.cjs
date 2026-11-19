@@ -28,6 +28,9 @@ function summarize(control,candidate){
    `${label}: missing trusted touch chronology`);
   assert.ok(Number.isFinite(report.touchInput.firstTouchWallMs),
    `${label}: missing first trusted touch wall time`);
+  assert.ok(Number.isFinite(report.touchInput.firstTouchOwnerPhaseMs)&&
+   report.touchInput.firstTouchOwnerPhaseMs>=0,
+   `${label}: missing first-touch simulation-owner phase`);
   assert.equal(report.touchInput.events[0].relativeWallMs,0,
    `${label}: first touch must be relative epoch`);
   for(let i=0;i<report.touchInput.events.length;i++){
@@ -65,6 +68,8 @@ function summarize(control,candidate){
   candidate.touchInput.events[i].relativeWallMs-e.relativeWallMs):[];
  const maxAbsTouchTimingDeltaMs=sameTouchSequence?
   Math.max(0,...touchTimingDeltasMs.map(Math.abs)):null;
+ const firstTouchOwnerPhaseDeltaMs=candidate.touchInput.firstTouchOwnerPhaseMs-
+  control.touchInput.firstTouchOwnerPhaseMs;
  const maxTouchPositionDeltaPx=sameTouchSequence?Math.max(0,
   ...control.touchInput.events.map((e,i)=>Math.hypot(
    e.x-candidate.touchInput.events[i].x,
@@ -96,10 +101,12 @@ function summarize(control,candidate){
  return {initialFingerprint:control.initialFingerprint,control:a,candidate:b,
   durationRatio,matchedObservationDuration:durationRatio<=1.05,
   sameTouchSequence,maxAbsTouchTimingDeltaMs,maxTouchPositionDeltaPx,
+  firstTouchOwnerPhaseDeltaMs,
+  matchedTouchPhase:Math.abs(firstTouchOwnerPhaseDeltaMs)<=20,
   matchedTouchTiming:sameTouchSequence&&maxAbsTouchTimingDeltaMs<=20,
   matchedTouchGeometry:sameTouchSequence&&maxTouchPositionDeltaPx<=1,
   comparableTouchDelivery:sameTouchSequence&&maxAbsTouchTimingDeltaMs<=20&&
-   maxTouchPositionDeltaPx<=1,
+   maxTouchPositionDeltaPx<=1&&Math.abs(firstTouchOwnerPhaseDeltaMs)<=20,
   causalClaimAllowed:false,
   interpretation:'Descriptive browser observations only: even matched event sequences and delivery times do not establish equal combat trajectories, input-to-photon latency or device CPU safety.'};
 }
