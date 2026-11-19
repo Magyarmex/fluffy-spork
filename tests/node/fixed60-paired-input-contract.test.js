@@ -101,6 +101,8 @@ test('missing or invalid release evidence fails closed',()=>{
   r=>{r.touchInput.events[2].relativeWallMs=10;},
   r=>{r.releaseTelemetry.volleyEventsAfterRelease=1;},
   r=>{r.releaseTelemetry.releaseWallMs=null;},
+  r=>{r.releaseTelemetry.releaseWallMs+=5;},
+  r=>{r.releaseTelemetry.volleyEventsBeforeRelease=0;},
   r=>{r.touchInput.events[2].type='pointermove';}
  ]){
   const candidate=copy(fixture(3));
