@@ -48,8 +48,16 @@ function summarize(control,candidate){
    `${label}: missing trusted release time`);
   assert.equal(report.releaseTelemetry.volleyEventsAfterRelease,0,
    `${label}: player fired after trusted release`);
-  assert.ok(report.touchInput.events.some(e=>e.type==='pointerup'),
-   `${label}: no trusted pointer release`);
+  const firstRelease=report.touchInput.events.find(e=>e.type==='pointerup');
+  assert.ok(firstRelease,`${label}: no trusted pointer release`);
+  assert.ok(Math.abs(report.releaseTelemetry.releaseWallMs-
+   report.touchInput.firstTouchWallMs-firstRelease.relativeWallMs)<.01,
+   `${label}: release telemetry does not match trusted event chronology`);
+  assert.ok(Number.isInteger(report.releaseTelemetry.volleyEventsBeforeRelease)&&
+   report.releaseTelemetry.volleyEventsBeforeRelease>0&&
+   Number.isFinite(report.releaseTelemetry.lastPreReleaseBirthAgeMs)&&
+   report.releaseTelemetry.lastPreReleaseBirthAgeMs>=0,
+   `${label}: no certified pre-release firing event`);
   assert.ok(Math.abs(r.observedWallMs-r.simulatedMs-report.droppedMs-r.remainingLagMs)<1,
    `${label}: wall time does not reconcile`);
   assert.ok(Math.abs(report.droppedMs-r.longStallDroppedMs-r.backlogDroppedMs)<1e-4,
