@@ -44,6 +44,20 @@ function summarize(control,candidate){
    if(i)assert.ok(e.relativeWallMs>=report.touchInput.events[i-1].relativeWallMs,
     `${label}: touch events not chronological`);
   }
+  // A paired run must contain one complete, uninterrupted trusted touch.
+  // Merely finding any pointerup permits a second pointer or post-release
+  // gesture to contaminate the projectile/latency witness.
+  const touchEvents=report.touchInput.events;
+  assert.equal(touchEvents[0].type,'pointerdown',
+   `${label}: touch chronology must begin with pointerdown`);
+  const ownerId=touchEvents[0].pointerId;
+  assert.ok(touchEvents.slice(1,-1).every(e=>
+   e.type==='pointermove'&&e.pointerId===ownerId),
+   `${label}: touch must retain one owner until release`);
+  assert.equal(touchEvents.at(-1).type,'pointerup',
+   `${label}: touch chronology must end with pointerup`);
+  assert.equal(touchEvents.at(-1).pointerId,ownerId,
+   `${label}: release must belong to original touch owner`);
   assert.ok(Number.isFinite(report.releaseTelemetry?.releaseWallMs),
    `${label}: missing trusted release time`);
   assert.equal(report.releaseTelemetry.volleyEventsAfterRelease,0,
