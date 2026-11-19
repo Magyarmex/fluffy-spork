@@ -504,6 +504,15 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    const births=window.__novaFixedResearch.volleyBirthWallMs;
    const afterRelease=release?births.filter(at=>at>release.wallMs):[];
    const lastBefore=release?births.filter(at=>at<=release.wallMs).at(-1):null;
+   // Browser-owned input chronology, not a claim of identical player actions.
+   // Normalize to the first trusted touch: absolute performance.now() epochs
+   // are incomparable across independent Chromium launches.
+   const trustedTouches=window.__novaFixedResearch.touchEvents.filter(e=>e.trusted);
+   const firstTouchWallMs=trustedTouches[0]?.wallMs??null;
+   const touchInput={events:trustedTouches.map(e=>({
+    type:e.type,pointerId:e.pointerId,
+    relativeWallMs:e.wallMs-firstTouchWallMs
+   })),firstTouchWallMs};
    const releaseTelemetry={releaseWallMs:release?.wallMs??null,
     volleyEventsBeforeRelease:release?births.length-afterRelease.length:0,
     volleyEventsAfterRelease:afterRelease.length,
@@ -565,7 +574,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     updates:values(window.__novaFixedResearch.updates),
     renders:values(window.__novaFixedResearch.renders),
     births:window.__novaFixedResearch.births,
-    releaseTelemetry,
+    releaseTelemetry,touchInput,
     touchToProjectileBirthMs:window.__novaFixedResearch.firstProjectileBirthAt==null||
      window.__novaFixedResearch.firstAimMoveAt==null?null:
      window.__novaFixedResearch.firstProjectileBirthAt-window.__novaFixedResearch.firstAimMoveAt,
