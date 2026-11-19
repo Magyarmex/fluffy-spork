@@ -11,6 +11,8 @@ on:
       - 'tests/node/living-front-hidden-eco-saturation-research.test.js'
       - 'tests/node/living-front-hidden-eco-composed.test.js'
       - 'tests/node/fps-fixed60-gunner-target-parity.test.js'
+      - 'tests/node/fps-fixed60-clustered-short-touch-research.test.js'
+      - 'tests/node/fps-composed-eight-tick-short-touch-research.test.js'
       - 'tests/node/fps-gunner-fixed60-touch-irregular-damage-research.test.js'
       - '.github/workflows/browser-smoke.yml'
       - 'scripts/patch-star-minimap.cjs'
@@ -24,6 +26,8 @@ on:
   pull_request:
     paths:
       - 'tests/node/fps-fixed60-jittered-moving-target-damage-parity.test.js'
+      - 'tests/node/fps-fixed60-clustered-short-touch-research.test.js'
+      - 'tests/node/fps-composed-eight-tick-short-touch-research.test.js'
       - 'tests/node/fps-tempest-shot-state-trace-research.test.js'
       - 'tests/node/fps-tempest-fixed60-jitter-parity.test.js'
       - 'nova-updates/**'

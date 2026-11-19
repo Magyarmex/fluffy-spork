@@ -15,11 +15,11 @@ const pulse=[
  {at:141,type:'pointermove',x:680,buttons:1},
  {at:152,type:'pointerup',x:680,buttons:0}
 ];
-function run(intervals,maxSteps,extra){
+function run(intervals,maxSteps,extra,{classId='scout',events=pulse}={}){
  return withSeed(1517800,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   const p=g.player;g.sfx.muted=true;g.sfx.startMusic=()=>{};
-  g.setClass(p,'scout');p.fireCd=0;
+  g.setClass(p,classId);p.fireCd=0;
   Object.assign(p,{x:0,y:0,vx:0,vy:0,angle:0,spawnShieldT:0,droneRespawnT:Infinity});
   g.cam.x=0;g.cam.y=0;g.cam.zoom=1;g.zoom=1;g.w=800;g.h=600;
   const target=g.tanks.find(t=>t!==p);
@@ -59,8 +59,10 @@ function run(intervals,maxSteps,extra){
   for(const kind of ['pd','pm','pu']){
    const old=g.input[kind];
    g.input[kind]=function(e){
-    sampled.push({type:e.type,at:e.__novaOriginalAt,sample:e.__novaSampleAt});
-    return old.apply(this,arguments);
+    const result=old.apply(this,arguments);
+    sampled.push({type:e.type,at:e.__novaOriginalAt,sample:e.__novaSampleAt,
+     firing:!!this.firing,aim:!!this.aim.active,owner:this.stickId.aim});
+    return result;
    };
   }
   const owner=new FixedStepRafOwner(g,timeline,bridge,{
@@ -73,8 +75,8 @@ function run(intervals,maxSteps,extra){
    owner.start();
    for(const dt of intervals){
     elapsed+=dt;now=1000+elapsed;
-    while(next<pulse.length&&pulse[next].at<=elapsed+1e-6){
-     const e=pulse[next++];
+    while(next<events.length&&events[next].at<=elapsed+1e-6){
+     const e=events[next++];
      assert.equal(bridge.capture({type:e.type,timeStamp:1000+e.at,
       pointerId:11,pointerType:'touch',clientX:e.x,clientY:300,
       button:0,buttons:e.buttons,target:{tagName:'CANVAS',closest:()=>null}}),true);
@@ -82,19 +84,20 @@ function run(intervals,maxSteps,extra){
     const cb=callback;callback=null;assert.equal(typeof cb,'function');cb(now);
    }
    assert.ok(Math.abs(elapsed-2000)<.002,'equal two-second observation');
-   assert.equal(next,3,'all three DOM edges delivered');
-   assert.equal(timeline.applied,3,'all three DOM edges consumed');
-   assert.equal(sampled.length,3,'real Input saw all edges');
+   assert.equal(next,events.length,'all DOM edges delivered');
+   assert.equal(timeline.applied,events.length,'all DOM edges consumed');
+   assert.equal(sampled.length,events.length,'real Input saw all edges');
    assert.equal(bridge.lateClamps+bridge.reorderedClamps+bridge.staleClamps,0);
    assert.equal(g.input.firing,false,'released touch must not remain firing');
    assert.equal(g.input.aim.active,false,'released touch must not remain owned');
    assert.ok(Math.abs(owner.ticks*STEP+owner.droppedMs+owner.lagMs-2000)<.002,
     'executed, dropped and queued time must account for wall time');
-   assert.ok(volleys<=1,'single 12ms press must not generate multiple volleys');
+   assert.ok(volleys<=1,'single short press must not generate multiple volleys');
    return {ticks:owner.ticks,droppedMs:+owner.droppedMs.toFixed(4),
     queuedMs:+owner.lagMs.toFixed(4),volleys,hits,damage:+damage.toFixed(5),
+    heat:+(p.__v17Heat||0).toFixed(6),fireCd:+p.fireCd.toFixed(6),
     births,firstRenderCallbackMs:rendered.find(x=>x.volleys>0)?.wall??null,
-    sampled:sampled.map(e=>({type:e.type,at:e.at,sample:e.sample}))};
+    sampled:sampled.map(e=>({...e}))};
   }finally{owner.stop();g.destroy();}
  });
 }
@@ -115,4 +118,95 @@ test('composed Scout short touch is compared against 4+3 and 4+4 under triple-ac
  }
  console.log('COMPOSED_EIGHT_TICK_SHORT_TOUCH '+JSON.stringify({baseline,rows,
   caveat:'constructed active burst; real Game/Input, not Chromium touch-to-photon or natural-play frequency'}));
+});
+
+
+test('composed Tempest 20ms press has no ghost volley and matches when skipped time is recovered',()=>{
+ const events=[
+  {at:170,type:'pointerdown',x:640,buttons:1},
+  {at:171,type:'pointermove',x:680,buttons:1},
+  {at:190,type:'pointerup',x:680,buttons:0}
+ ];
+ const opts={classId:'tempest',events};
+ const baseline=run(uniform,4,4,opts);
+ assert.equal(baseline.droppedMs,0);
+ assert.equal(baseline.volleys,1,
+  'native60 must create a real Tempest projectile during a 20ms press');
+ assert.equal(baseline.sampled.length,3);
+ const rows=[];
+ for(const [steps,extra] of [[4,3],[4,4]]){
+  const candidate=run(burst,steps,extra,opts);
+  assert.deepEqual(run(burst,steps,extra,opts),candidate,
+   'the full 49-overlay Tempest replay must be deterministic');
+  assert.ok(candidate.volleys<=baseline.volleys,
+   'clustered scheduling must never invent a post-release volley');
+  if(candidate.droppedMs===0&&candidate.ticks===baseline.ticks){
+   assert.equal(candidate.volleys,baseline.volleys,
+    'full tick recovery must preserve the real Tempest shot');
+   assert.deepEqual(candidate.births,baseline.births,
+    'recovered projectile creation must preserve simulated chronology');
+  }
+  rows.push({steps,extra,...candidate});
+ }
+ console.log('COMPOSED_TEMPEST_20MS_TOUCH '+JSON.stringify({baseline,rows,
+  caveat:'source-executed Game/Input with stub render, not Chromium/Canvas pixels or device'}));
+});
+
+
+test('composed Tempest 20ms touch separates mean30 dropped ticks from recovered input',()=>{
+ const mean30=Array.from({length:15},()=>[
+  55,55,1000/15-55,1000/15-55]).flat();
+ const events=[
+  {at:170,type:'pointerdown',x:640,buttons:1},
+  {at:172,type:'pointermove',x:680,buttons:1},
+  {at:190,type:'pointerup',x:680,buttons:0}
+ ];
+ const opts={classId:'tempest',events};
+ const native=run(uniform,2,2,opts);
+ const constrained=run(mean30,2,2,opts);
+ const recovery2=run(mean30,2,4,opts);
+ const recovery3=run(mean30,3,2,opts);
+ assert.equal(native.volleys,1,'native60 must fire a real Tempest projectile');
+ assert.equal(native.droppedMs,0);
+ for(const candidate of [constrained,recovery2,recovery3]){
+  assert.equal(candidate.sampled.length,3,'all DOM edges reach real Input');
+  assert.ok(candidate.volleys<=native.volleys,'no ghost or duplicate shot');
+  assert.equal(candidate.sampled.at(-1).type,'pointerup');
+  assert.equal(candidate.sampled.at(-1).firing,false,'release must clear firing');
+  assert.equal(candidate.sampled.at(-1).aim,false,'release must clear aim');
+  assert.equal(candidate.sampled.at(-1).owner,-1,'release must clear pointer owner');
+ }
+ for(const candidate of [recovery2,recovery3]){
+  assert.equal(candidate.droppedMs,0,'recovery must preserve all simulation time');
+  assert.equal(candidate.volleys,native.volleys,
+   'recovered Game must retain the legitimate short Tempest shot');
+  assert.deepEqual(candidate.births,native.births,
+   'full recovery must preserve projectile birth chronology');
+  assert.equal(candidate.heat,native.heat,'recovered Tempest heat must match');
+  assert.equal(candidate.fireCd,native.fireCd,'recovered cooldown must match');
+  assert.equal(candidate.damage,native.damage,'recovered target damage must match');
+ }
+ if(constrained.droppedMs===0)assert.equal(constrained.volleys,native.volleys);
+ console.log('COMPOSED_TEMPEST_MEAN30_20MS '+JSON.stringify({
+  native,constrained,recovery2,recovery3,
+  caveat:'materialized Game and touch handlers, stub render and scripted RAF, not Chromium/device'
+ }));
+});
+
+
+test('composed Tempest centered touch cannot masquerade as a recovered shot',()=>{
+ const mean30=Array.from({length:15},()=>[
+  55,55,1000/15-55,1000/15-55]).flat();
+ const events=[
+  {at:170,type:'pointerdown',x:640,buttons:1},
+  {at:190,type:'pointerup',x:640,buttons:0}
+ ];
+ for(const [intervals,steps,extra] of [
+  [uniform,2,2],[mean30,2,2],[mean30,2,4],[mean30,3,2]]){
+  const result=run(intervals,steps,extra,{classId:'tempest',events});
+  assert.equal(result.volleys,0,
+   'a right-stick touch without deflection must never fire');
+  assert.deepEqual(result.births,[]);
+  assert.equal(result.sampled.length,2);
+ }
 });
