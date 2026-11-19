@@ -78,7 +78,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    }
    const renderMod=window.__novaMakeRequire('')('game/render');
    const baseStart=Game.prototype.start;
-   window.__novaFixedResearch={births:0,birthWallMs:[],updates:[],renders:[],errors:[],lifecycle:[],touchEvents:[],frames:[],poseFrames:[]};
+   window.__novaFixedResearch={births:0,volleyBirthWallMs:[],updates:[],renders:[],errors:[],lifecycle:[],touchEvents:[],frames:[],poseFrames:[]};
    const profile=window.__novaFixedResearch;
    // For the held-three-shot gate, use a real controlled 50ms RAF gap
    // instead of repeatedly blocking the main thread and accidentally
@@ -139,7 +139,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     const before=this.bullets.length,out=baseFire.call(this,t,...args);
     if(this===window.__novaFixedGame&&t===this.player&&this.bullets.length>before){
      profile.births+=this.bullets.length-before;
-     profile.birthWallMs.push(performance.now());
+     profile.volleyBirthWallMs.push(performance.now());
      if(profile.firstProjectileBirthAt==null)
       profile.firstProjectileBirthAt=performance.now();
     }
@@ -500,12 +500,12 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     return {n:s.length,p95:s.length?s[Math.ceil(.95*s.length)-1]:null};};
    const frames=window.__novaFixedResearch.frames;
    const release=window.__novaFixedResearch.touchEvents.find(e=>e.type==='pointerup'&&e.trusted);
-   const births=window.__novaFixedResearch.birthWallMs;
+   const births=window.__novaFixedResearch.volleyBirthWallMs;
    const afterRelease=release?births.filter(at=>at>release.wallMs):[];
    const lastBefore=release?births.filter(at=>at<=release.wallMs).at(-1):null;
    const releaseTelemetry={releaseWallMs:release?.wallMs??null,
-    birthsBeforeRelease:release?births.length-afterRelease.length:0,
-    birthsAfterRelease:afterRelease.length,
+    volleyEventsBeforeRelease:release?births.length-afterRelease.length:0,
+    volleyEventsAfterRelease:afterRelease.length,
     firstLateBirthMs:afterRelease.length?afterRelease[0]-release.wallMs:null,
     lastPreReleaseBirthAgeMs:lastBefore==null?null:release.wallMs-lastBefore};
    const frameIntervals=frames.map(f=>f.intervalMs).filter(Number.isFinite);
@@ -591,10 +591,10 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
   assert.equal(report.aimActive,false,'release must clear aim');
   assert.ok(Number.isFinite(report.releaseTelemetry.releaseWallMs),
    'trusted touch release must have a browser wall-clock timestamp');
-  assert.ok(Number.isInteger(report.releaseTelemetry.birthsAfterRelease)&&
-   report.releaseTelemetry.birthsAfterRelease>=0,
-   'post-release birth count must be a nonnegative measured integer');
-  if(report.releaseTelemetry.birthsAfterRelease>0)
+  assert.ok(Number.isInteger(report.releaseTelemetry.volleyEventsAfterRelease)&&
+   report.releaseTelemetry.volleyEventsAfterRelease>=0,
+   'post-release volley-event count must be a nonnegative measured integer');
+  if(report.releaseTelemetry.volleyEventsAfterRelease>0)
    assert.ok(report.releaseTelemetry.firstLateBirthMs>0,
     'late-birth interval must be measured from DOM release delivery');
   const touches=await page.evaluate(()=>window.__novaFixedResearch.touchEvents.slice());
