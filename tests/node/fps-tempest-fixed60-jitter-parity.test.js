@@ -92,7 +92,7 @@ test('opt-in fixed60 preserves Tempest chronology under equal-mean adversarial R
  }
 });
 
-function runTouch(seed,intervals){
+function runTouch(seed,intervals,releaseKind='pointerup'){
  return withSeed(seed,draws=>{
   const g=bootGame(),p=g.player;g.sfx.muted=true;
   g.setClass(p,'tempest');g.tanks=[p];g.tankById=new Map([[p.id,p]]);
@@ -106,9 +106,9 @@ function runTouch(seed,intervals){
    now:()=>now,request:fn=>{callback=fn;return 1;},
    cancel:()=>{callback=null},render:()=>{},maxSteps:2
   });
-  const edges=[[250,'pointerdown'],[260,'pointermove'],[1750,'pointerup'],
-   [2250,'pointerdown'],[2260,'pointermove'],[4250,'pointerup'],
-   [5000,'pointerdown'],[5010,'pointermove'],[7750,'pointerup']];
+  const edges=[[250,'pointerdown'],[260,'pointermove'],[1750,releaseKind],
+   [2250,'pointerdown'],[2260,'pointermove'],[4250,releaseKind],
+   [5000,'pointerdown'],[5010,'pointermove'],[7750,releaseKind]];
   let index=0,volleys=0;const shotTimes=[],original=g.tryFire;
   g.tryFire=function(t){
    const before=this.bullets.length,result=original.apply(this,arguments);
@@ -132,6 +132,9 @@ function runTouch(seed,intervals){
     callback=null;next(now);
    }
    assertNoTarget(g);
+   assert.equal(g.input.firing,false,'released/cancelled touch must clear held fire');
+   assert.equal(g.input.aim.active,false,'released/cancelled touch must clear aim ownership');
+   assert.equal(g.input.stickId.aim,-1,'released/cancelled aim pointer must be unowned');
    return {volleys,shotTimes,hash:digest(physical(g)),draws:draws(),
     ticks:owner.ticks,dropped:owner.droppedFrames,applied:timeline.applied,
     weapon:{fireCd:p.fireCd,heat:p.__v17Heat,stability:p.__v17Stability,
@@ -145,10 +148,26 @@ test('fixed60 preserves touch press/release shot chronology across adversarial R
  const baseline=runTouch(1517800,native);
  assert.equal(baseline.applied,9);
  assert.ok(baseline.volleys>0,'touch input must actually fire');
+ // A matching final state alone can hide a projectile emitted after release.
+ // Assert that every actual Tempest volley belongs to a held-touch interval.
+ // The input fixture timestamps are milliseconds from the same simulation epoch.
+ const heldWindows=[[0.250,1.750],[2.250,4.250],[5.000,7.750]];
+ const assertReleaseSafety=(result,context)=>{
+  for(const at of result.shotTimes){
+   assert.ok(heldWindows.some(([down,up])=>at>=down-1e-7&&at<up-1e-7),
+    context+' emitted a Tempest volley outside held touch: '+at);
+  }
+  assert.ok(result.shotTimes.some(at=>at>=5&&at<7.75),
+   context+' must exercise the final touch interval');
+ };
+ assert.throws(()=>assertReleaseSafety({shotTimes:[1.9]},'negative control'),
+  /outside held touch/, 'release gate must reject a synthetic late volley');
+ assertReleaseSafety(baseline,'native60');
  assert.equal(baseline.ticks,480);assert.equal(baseline.dropped,0);
  for(const [name,pattern] of Object.entries(patterns))
   for(const phase of [0,1,2]){
    const observed=runTouch(1517800,schedule(pattern,phase));
+   assertReleaseSafety(observed,name+' phase='+phase);
    assert.deepEqual(observed,baseline,
     'touch chronology changed for '+name+' phase='+phase);
   }
@@ -172,4 +191,18 @@ test('bursty equal-mean RAF exposes hidden backlog despite zero dropped time',()
   'no droppedMs does not imply the simulation caught up');
  assert.deepEqual(four,baseline,
   'four-step research control must recover the full canonical 60Hz state');
+});
+
+// A mobile OS may cancel a touch rather than deliver a normal pointerup.
+// The composed Game must never keep firing or change its physical timeline.
+test('Tempest touch cancellation matches release under bounded RAF jitter',()=>{
+ const native=Array(480).fill(2),seed=1517800;
+ const released=runTouch(seed,native,'pointerup');
+ const cancelled=runTouch(seed,native,'pointercancel');
+ assert.ok(cancelled.volleys>0,'cancel fixture must exercise real projectiles');
+ assert.deepEqual(cancelled,released,'pointercancel changed native60 firing');
+ for(const [name,pattern] of Object.entries(patterns)){
+  const observed=runTouch(seed,schedule(pattern,0),'pointercancel');
+  assert.deepEqual(observed,released,'cancel jitter parity failed: '+name);
+ }
 });

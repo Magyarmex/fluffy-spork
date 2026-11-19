@@ -25,6 +25,7 @@ on:
     paths:
       - 'tests/node/fps-fixed60-jittered-moving-target-damage-parity.test.js'
       - 'tests/node/fps-tempest-shot-state-trace-research.test.js'
+      - 'tests/node/fps-tempest-fixed60-jitter-parity.test.js'
       - 'nova-updates/**'
       - 'index.html'
       - 'tests/browser/**'
