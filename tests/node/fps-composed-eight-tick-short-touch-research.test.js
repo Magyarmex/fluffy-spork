@@ -59,8 +59,10 @@ function run(intervals,maxSteps,extra,{classId='scout',events=pulse}={}){
   for(const kind of ['pd','pm','pu']){
    const old=g.input[kind];
    g.input[kind]=function(e){
-    sampled.push({type:e.type,at:e.__novaOriginalAt,sample:e.__novaSampleAt});
-    return old.apply(this,arguments);
+    const result=old.apply(this,arguments);
+    sampled.push({type:e.type,at:e.__novaOriginalAt,sample:e.__novaSampleAt,
+     firing:!!this.firing,aim:!!this.aim.active,owner:this.stickId.aim});
+    return result;
    };
   }
   const owner=new FixedStepRafOwner(g,timeline,bridge,{
@@ -95,7 +97,7 @@ function run(intervals,maxSteps,extra,{classId='scout',events=pulse}={}){
     queuedMs:+owner.lagMs.toFixed(4),volleys,hits,damage:+damage.toFixed(5),
     heat:+(p.__v17Heat||0).toFixed(6),fireCd:+p.fireCd.toFixed(6),
     births,firstRenderCallbackMs:rendered.find(x=>x.volleys>0)?.wall??null,
-    sampled:sampled.map(e=>({type:e.type,at:e.at,sample:e.sample}))};
+    sampled:sampled.map(e=>({...e}))};
   }finally{owner.stop();g.destroy();}
  });
 }
@@ -170,6 +172,9 @@ test('composed Tempest 20ms touch separates mean30 dropped ticks from recovered 
   assert.equal(candidate.sampled.length,3,'all DOM edges reach real Input');
   assert.ok(candidate.volleys<=native.volleys,'no ghost or duplicate shot');
   assert.equal(candidate.sampled.at(-1).type,'pointerup');
+  assert.equal(candidate.sampled.at(-1).firing,false,'release must clear firing');
+  assert.equal(candidate.sampled.at(-1).aim,false,'release must clear aim');
+  assert.equal(candidate.sampled.at(-1).owner,-1,'release must clear pointer owner');
  }
  for(const candidate of [recovery2,recovery3]){
   assert.equal(candidate.droppedMs,0,'recovery must preserve all simulation time');
