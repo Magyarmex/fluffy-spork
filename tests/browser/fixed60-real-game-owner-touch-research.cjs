@@ -259,9 +259,10 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     // Record the real Input handler's simulation-consumption boundary.
     // Browser delivery and nominal owner ticks alone do not prove when
     // a queued touch actually reached Game input. Research-only witness.
+    const inputHandlers=this.input,handlerRestores=[];
     for(const [method,type] of [['pd','pointerdown'],['pm','pointermove'],['pu','pointerup']]){
-     const original=this.input[method];
-     this.input[method]=function(event){
+     const original=inputHandlers[method];
+     const wrapped=function(event){
       if(event?.pointerType==='touch'&&Number.isFinite(event.__novaSampleAt)){
        profile.appliedTouchEvents.push({
         type:event.type||type,pointerId:event.pointerId,
@@ -273,7 +274,19 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
       }
       return original.call(this,event);
      };
+     inputHandlers[method]=wrapped;
+     handlerRestores.push([method,original,wrapped]);
     }
+    // Restore instrumented methods on normal, fatal or lifecycle stop.
+    const stopWithCapture=pilot.owner.stop.bind(pilot.owner);
+    pilot.owner.stop=function(...args){
+     try{return stopWithCapture(...args)}
+     finally{
+      for(const [method,original,wrapped] of handlerRestores)
+       if(inputHandlers[method]===wrapped)inputHandlers[method]=original;
+      profile.inputHandlersRestored=true;
+     }
+    };
     window.__novaFixedPilot=pilot;
     // Reuse PR #888's exact-source active-only policy in the real browser.
     // This is intentionally NOT installed in production or the bundle.
