@@ -146,15 +146,27 @@ test('local visible farming ignores unseen private eco assignments', () => {
   assert.equal(crowded.weight, open.weight);
 });
 
-test('dead and sub-threshold distant intents do not create false saturation', () => {
-  const T = boot(), w = encounter(T, 'BLOOM', 3);
-  for (const bot of w.hidden) bot.alive = false;
-  assert.equal(choose(T, w).mode, 'signal');
+test('dead, shielded and terrain-occluded nearby bots do not create false occupancy', () => {
+  const T = boot(), w = encounter(T, 'BLOOM', 4);
+  w.g.w = 2400;
+  w.g.h = 1600;
+  const c = T.sectorCenter(6);
+  for (const bot of w.hidden) {
+    bot.x = c.x;
+    bot.y = c.y;
+    bot.alive = false;
+  }
+  assert.equal(choose(T, w).mode, 'signal', 'dead bots do not crowd');
   for (const bot of w.hidden) {
     bot.alive = true;
-    bot.ai.__lfEcoWeight = 0.05;
+    bot.spawnShieldT = 1;
   }
-  assert.equal(choose(T, w).mode, 'signal');
+  assert.equal(choose(T, w).mode, 'signal', 'shielded bots do not crowd');
+  for (const bot of w.hidden) bot.spawnShieldT = 0;
+  w.g.hasLineOfSight = () => false;
+  assert.equal(choose(T, w).mode, 'signal', 'terrain-occluded bots do not crowd');
+  w.g.hasLineOfSight = () => true;
+  assert.equal(choose(T, w).mode, 'none', 'unshielded visible bodies do crowd');
 });
 
 test('the materialized shipping shell includes the Living Front strategy owner', () => {
