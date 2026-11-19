@@ -1,7 +1,6 @@
 'use strict';
-// Research-only #1029: prove that the *shipping* Living Front ecology
-// planner can change a public opportunity decision solely because distant
-// bots change private strategic intent. Do not change gameplay in this test.
+// Regression #1029: private ecology intent must not alter witnessed strategic
+// occupancy; public signals and locally visible farming remain actionable.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -50,7 +49,7 @@ function encounter(T, type, hiddenCount) {
 }
 function choose(T, w) { return T.publicEcoBias(w.g, w.observer, {}, {}); }
 
-test('unseen private BLOOM commitments alone can veto a legal public rotation', () => {
+test('unseen private BLOOM commitments cannot veto a legal public rotation', () => {
   const T = boot(), w = encounter(T, 'BLOOM', 0);
   assert.equal(T.sectorIndex(w.signal.x, w.signal.y), w.signal.sector,
     'public signal must identify its actual physical sector');
@@ -66,27 +65,27 @@ test('unseen private BLOOM commitments alone can veto a legal public rotation', 
   assert.ok(open.weight > .1);
   for (const bot of w.hidden) bot.ai.__lfEcoKey = 'BLOOM:6';
   const privatelyCrowded = choose(T, w);
-  assert.equal(privatelyCrowded.mode, 'none',
-    'the current shipping code must reproduce the hidden-intent decision veto');
-  assert.equal(privatelyCrowded.weight, 0);
+  assert.equal(privatelyCrowded.mode, open.mode,
+    'offscreen private commitments must not veto a public rotation');
+  assert.equal(privatelyCrowded.weight, open.weight);
   assert.equal(w.signal.x, T.sectorCenter(6).x, 'public signal did not move');
   assert.equal(w.observer.x, -400, 'observer did not move');
 });
 
-test('unseen private MIGRATION commitments can suppress a public signal', () => {
+test('unseen private MIGRATION commitments cannot suppress a public signal', () => {
   const T = boot(), w = encounter(T, 'MIGRATION', 0);
   const open = choose(T, w);
   assert.equal(open.mode, 'signal');
   assert.equal(open.key, 'MIGRATION:6');
   for (const bot of w.hidden.slice(0, 2)) bot.ai.__lfEcoKey = 'MIGRATION:6';
   const crowded = choose(T, w);
-  assert.equal(crowded.mode, 'none');
-  assert.equal(crowded.weight, 0);
+  assert.equal(crowded.mode, open.mode);
+  assert.equal(crowded.weight, open.weight);
 });
 
 
 
-test('unseen private commitments can also veto a publicly announced Rogue Star', () => {
+test('unseen private commitments cannot veto a publicly announced Rogue Star', () => {
   const T = boot(), w = encounter(T, 'ROGUE STAR', 0);
   const star = { id: 77, kind: 'shape', type: 'star',
     x: 100, y: -400, hp: 100, alive: true };
@@ -102,11 +101,12 @@ test('unseen private commitments can also veto a publicly announced Rogue Star',
   assert.equal(open.key, 'ROGUE STAR:77');
   for (const bot of w.hidden) bot.ai.__lfEcoKey = 'ROGUE STAR:77';
   const crowded = choose(T, w);
-  assert.notEqual(crowded.mode, 'signal',
-    'unseen private commitments must reproduce the public Star veto');
+  assert.equal(crowded.mode, 'signal',
+    'unseen private commitments must not veto the public Star');
+  assert.equal(crowded.weight, open.weight);
 });
 
-test('remembered public BLOOM can also be vetoed by unseen private commitments', () => {
+test('remembered public BLOOM cannot be vetoed by unseen private commitments', () => {
   const T = boot(), w = encounter(T, 'BLOOM', 0);
   w.g.__lfState.signal = null;
   w.observer.x = -50; // Outside sector 6, close enough to pursue remembered center.
@@ -116,8 +116,8 @@ test('remembered public BLOOM can also be vetoed by unseen private commitments',
   assert.equal(open.key, 'BLOOM:6');
   for (const bot of w.hidden.slice(0, 2)) bot.ai.__lfEcoKey = 'BLOOM:6';
   const crowded = choose(T, w);
-  assert.equal(crowded.mode, 'none');
-  assert.equal(crowded.weight, 0);
+  assert.equal(crowded.mode, open.mode);
+  assert.equal(crowded.weight, open.weight);
   // A future or expired announcement cannot create a memory decision.
   w.g.__lfState.bloomMemory.announcedAt = 11;
   assert.equal(choose(T, w).mode, 'none');
@@ -127,7 +127,7 @@ test('remembered public BLOOM can also be vetoed by unseen private commitments',
 });
 
 
-test('local visible farming also depends on unseen private eco assignments', () => {
+test('local visible farming ignores unseen private eco assignments', () => {
   const T = boot(), w = encounter(T, 'BLOOM', 0);
   w.g.__lfState.signal = null;
   w.g.shapes = Array.from({ length: 4 }, (_, i) => ({
@@ -141,9 +141,9 @@ test('local visible farming also depends on unseen private eco assignments', () 
   assert.equal(open.key, 'LOCAL:' + T.sectorIndex(-238, -400));
   for (const bot of w.hidden) bot.ai.__lfEcoKey = open.key;
   const crowded = sample();
-  assert.equal(crowded.mode, 'none',
-    'offscreen private farming intent alone must reproduce the local veto');
-  assert.equal(crowded.weight, 0);
+  assert.equal(crowded.mode, 'local',
+    'offscreen private farming intent must not veto visible local farming');
+  assert.equal(crowded.weight, open.weight);
 });
 
 test('dead and sub-threshold distant intents do not create false saturation', () => {
@@ -160,4 +160,28 @@ test('dead and sub-threshold distant intents do not create false saturation', ()
 test('the materialized shipping shell includes the Living Front strategy owner', () => {
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   assert.ok(html.includes('nova-updates/living-front-director-v1.12.0.js'));
+});
+
+test('visible physical crowding, not private assignment, can deter a public rotation', () => {
+  const T = boot(), w = encounter(T, 'BLOOM', 0);
+  w.g.w = 2400;
+  w.g.h = 1600;
+  const baseline = choose(T, w);
+  assert.equal(baseline.mode, 'signal');
+  const c = T.sectorCenter(6);
+  for (const bot of w.hidden) {
+    bot.x = c.x + 20;
+    bot.y = c.y + 20;
+    bot.ai.__lfEcoKey = 'none';
+    bot.ai.__lfEcoWeight = 0;
+  }
+  const crowded = choose(T, w);
+  assert.equal(crowded.mode, 'none',
+    'visible physical occupancy may deter the same public destination');
+  for (const bot of w.hidden) {
+    bot.ai.__lfEcoKey = 'BLOOM:6';
+    bot.ai.__lfEcoWeight = .99;
+  }
+  assert.equal(choose(T, w).mode, crowded.mode,
+    'private assignment must not change a witnessed crowding decision');
 });
