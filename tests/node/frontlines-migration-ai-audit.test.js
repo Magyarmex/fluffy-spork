@@ -57,10 +57,10 @@ test('blocked terrain and long routes are reported without manufacturing arrival
  assert.equal(blocked.mode,'none');assert.equal(st.stats.migrationAiRouteBlocked,1);
  assert.equal(st.stats.migrationAiSamples,2);
 });
-test('crowding veto is measured without changing canonical saturation behavior',()=>{
+test('public migration audit counts only witnessed physical crowding',()=>{
  const {T,g,t,st}=scene();
- for(let i=0;i<2;i++)g.tanks.push({id:10+i,hp:100,alive:true,ai:{
-  __lfEcoKey:'MIGRATION:6',__lfEcoWeight:.3}});
+ for(let i=0;i<2;i++)g.tanks.push({id:10+i,x:0,y:-562.5,
+  hp:100,alive:true,ai:{__lfEcoKey:'none',__lfEcoWeight:0}});
  const b=T.publicEcoBias(g,t,{},{});
  assert.equal(b.mode,'none');
  assert.equal(st.stats.migrationAiScoreVeto,1);
