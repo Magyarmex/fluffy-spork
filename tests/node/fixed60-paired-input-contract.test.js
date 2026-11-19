@@ -12,9 +12,9 @@ function fixture(steps=2){
   droppedMs:0,ticks:12,updates:{p95:1},renders:{p95:2},
   touchToProjectileBirthMs:10,touchToCanvasSubmissionMs:12,
   touchInput:{firstTouchWallMs:100,firstTouchOwnerPhaseMs:80,events:[
-   {type:'pointerdown',pointerId:42,x:100,y:200,relativeWallMs:0},
-   {type:'pointermove',pointerId:42,x:120,y:220,relativeWallMs:20},
-   {type:'pointerup',pointerId:42,x:120,y:220,relativeWallMs:100}
+   {type:'pointerdown',pointerId:42,x:100,y:200,relativeWallMs:0,nominalOwnerTick:4},
+   {type:'pointermove',pointerId:42,x:120,y:220,relativeWallMs:20,nominalOwnerTick:6},
+   {type:'pointerup',pointerId:42,x:120,y:220,relativeWallMs:100,nominalOwnerTick:10}
   ]},
   releaseTelemetry:{releaseWallMs:200,volleyEventsBeforeRelease:3,
    volleyEventsAfterRelease:0,lastPreReleaseBirthAgeMs:12},
@@ -35,6 +35,7 @@ test('matched seeded browser inputs remain descriptive, never causal',()=>{
  assert.equal(result.comparableTouchDelivery,true);
  assert.equal(result.firstTouchOwnerPhaseDeltaMs,0);
  assert.equal(result.matchedTouchPhase,true);
+ assert.equal(result.sameNominalInputTicks,true);
  assert.equal(result.causalClaimAllowed,false);
  assert.equal(result.control.volleyEventsAfterRelease,0);
  assert.equal(result.candidate.lastPreReleaseBirthAgeMs,12);
@@ -71,6 +72,17 @@ test('identical gestures at different owner phases are not comparable',()=>{
  assert.equal(result.matchedTouchGeometry,true);
  assert.equal(result.firstTouchOwnerPhaseDeltaMs,40);
  assert.equal(result.matchedTouchPhase,false);
+ assert.equal(result.comparableTouchDelivery,false);
+});
+
+test('same gestures delivered in different nominal owner ticks are flagged',()=>{
+ const candidate=fixture(3);
+ candidate.touchInput.events[1].nominalOwnerTick++;
+ const result=summarize(fixture(2),candidate);
+ assert.equal(result.sameTouchSequence,true);
+ assert.equal(result.matchedTouchTiming,true);
+ assert.equal(result.matchedTouchGeometry,true);
+ assert.equal(result.sameNominalInputTicks,false);
  assert.equal(result.comparableTouchDelivery,false);
 });
 
