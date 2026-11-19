@@ -134,7 +134,8 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     // This records Canvas command emission, not compositor or screen photons.
     const originalArc=ctx&&ctx.arc,originalFill=ctx&&ctx.fill;
     let pendingBulletCore=false;
-    if(typeof originalArc==='function'&&typeof originalFill==='function'){
+    if(profile.firstProjectileDrawCommandAt==null&&
+       typeof originalArc==='function'&&typeof originalFill==='function'){
      ctx.arc=function(x,y,r,...rest){
       pendingBulletCore=false;
       if(profile.firstProjectileBirthAt!=null&&
