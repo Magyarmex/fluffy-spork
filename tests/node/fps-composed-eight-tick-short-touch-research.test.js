@@ -246,9 +246,18 @@ test('Tempest short-touch target-distance census records real HP contacts',()=>{
   const native=run(uniform,2,2,opts);
   const lost=run(mean30,2,2,opts);
   const recovered=run(mean30,3,2,opts);
+  const recoveredBacklog=run(mean30,2,4,opts);
   assert.equal(native.volleys,1,'native60 short pulse must fire');
   assert.equal(recovered.volleys,1,'fully recovered pulse must fire');
   assert.equal(recovered.droppedMs,0);
+  assert.equal(recoveredBacklog.droppedMs,0);
+  assert.equal(recoveredBacklog.volleys,native.volleys);
+  assert.equal(recoveredBacklog.damage,native.damage);
+  assert.equal(recoveredBacklog.hits,native.hits);
+  assert.deepEqual(recoveredBacklog.contacts,native.contacts);
+  assert.deepEqual(recoveredBacklog.birthVectors,native.birthVectors);
+  assert.deepEqual(recovered.contacts,native.contacts);
+  assert.deepEqual(recovered.birthVectors,native.birthVectors);
   assert.equal(recovered.damage,native.damage,
    'recovered input must preserve actual target HP change');
   assert.equal(recovered.hits,native.hits);
@@ -267,6 +276,8 @@ test('Tempest short-touch target-distance census records real HP contacts',()=>{
   rows.push({targetX,targetY,nativeHits:native.hits,nativeDamage:native.damage,
    lostHits:lost.hits,lostDamage:lost.damage,
    recoveredHits:recovered.hits,recoveredDamage:recovered.damage,
+   backlogRecoveredHits:recoveredBacklog.hits,
+   backlogRecoveredDamage:recoveredBacklog.damage,
    nativeBirthVectors:native.birthVectors,nativeContacts:native.contacts});
  }
  console.log('TEMPEST_20MS_REAL_HP_DISTANCE_CENSUS '+JSON.stringify(rows));
