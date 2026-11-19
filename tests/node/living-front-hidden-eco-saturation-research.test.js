@@ -146,7 +146,7 @@ test('local visible farming ignores unseen private eco assignments', () => {
   assert.equal(crowded.weight, open.weight);
 });
 
-test('dead, shielded and terrain-occluded nearby bots do not create false occupancy', () => {
+test('dead and shielded bots do not crowd, but public hulls behind cover do', () => {
   const T = boot(), w = encounter(T, 'BLOOM', 4);
   w.g.w = 2400;
   w.g.h = 1600;
@@ -164,9 +164,10 @@ test('dead, shielded and terrain-occluded nearby bots do not create false occupa
   assert.equal(choose(T, w).mode, 'signal', 'shielded bots do not crowd');
   for (const bot of w.hidden) bot.spawnShieldT = 0;
   w.g.hasLineOfSight = () => false;
-  assert.equal(choose(T, w).mode, 'signal', 'terrain-occluded bots do not crowd');
+  assert.equal(choose(T, w).mode, 'none',
+    'on-viewport hulls remain public minimap contacts behind cover');
   w.g.hasLineOfSight = () => true;
-  assert.equal(choose(T, w).mode, 'none', 'unshielded visible bodies do crowd');
+  assert.equal(choose(T, w).mode, 'none', 'unshielded visible bodies crowd');
 });
 
 test('the materialized shipping shell includes the Living Front strategy owner', () => {
