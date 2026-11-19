@@ -513,7 +513,9 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    const touchInput={events:trustedTouches.map(e=>({
     type:e.type,pointerId:e.pointerId,x:e.x,y:e.y,
     relativeWallMs:e.wallMs-firstTouchWallMs
-   })),firstTouchWallMs};
+   })),firstTouchWallMs,
+    firstTouchOwnerPhaseMs:firstTouchWallMs==null?null:
+     firstTouchWallMs-window.__novaFixedResearch.ownerStartMs};
    const releaseTelemetry={releaseWallMs:release?.wallMs??null,
     volleyEventsBeforeRelease:release?births.length-afterRelease.length:0,
     volleyEventsAfterRelease:afterRelease.length,
