@@ -282,3 +282,33 @@ test('Tempest short-touch target-distance census records real HP contacts',()=>{
  }
  console.log('TEMPEST_20MS_REAL_HP_DISTANCE_CENSUS '+JSON.stringify(rows));
 });
+
+
+test('Tempest aligned-target HP recovery holds across neighboring 20ms touch phases',()=>{
+ const mean30=Array.from({length:15},()=>[55,55,1000/15-55,1000/15-55]).flat();
+ for(const pressAt of [163,170,177,184]){
+  const events=[
+   {at:pressAt,type:'pointerdown',x:640,buttons:1},
+   {at:pressAt+2,type:'pointermove',x:680,buttons:1},
+   {at:pressAt+20,type:'pointerup',x:680,buttons:0}
+  ];
+  const opts={classId:'tempest',events,targetX:100,targetY:-25,manualAim:true};
+  const native=run(uniform,2,2,opts);
+  assert.equal(native.volleys,1,'native60 must sample the legitimate press');
+  assert.ok(native.hits>0&&native.damage>0,
+   'phase '+pressAt+' must produce real player-owned HP damage');
+  for(const [steps,extra] of [[2,4],[3,2]]){
+   const recovered=run(mean30,steps,extra,opts);
+   assert.equal(recovered.droppedMs,0,'research recovery must retain all ticks');
+   assert.equal(recovered.volleys,native.volleys,
+    'phase '+pressAt+' must not lose or duplicate the projectile');
+   assert.deepEqual(recovered.birthVectors,native.birthVectors,
+    'phase '+pressAt+' must retain projectile origin and velocity');
+   assert.deepEqual(recovered.contacts,native.contacts,
+    'phase '+pressAt+' must retain actual target HP contact chronology');
+   assert.equal(recovered.damage,native.damage);
+   assert.equal(recovered.sampled.at(-1).owner,-1,
+    'release must clear touch ownership');
+  }
+ }
+});
