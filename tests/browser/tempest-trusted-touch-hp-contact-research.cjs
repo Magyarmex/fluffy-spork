@@ -59,7 +59,7 @@ const {chromium}=require('playwright');
    if(!target)throw Error('no real AI target available');
    Object.assign(target,{cls:'scout',isPlayer:true,alive:true,x:75,y:-43,
     vx:0,vy:0,hp:100000,maxHp:100000,spawnShieldT:0,shieldT:0,
-    bulwarkT:0,tauntT:0,cloakT:0,r:26});
+    bulwarkT:0,tauntT:0,cloakT:0,r:16});
    window.__novaTempestHpTarget=target;
    window.__novaTempestHp.targetReady=true;
    window.__novaTempestHp.targetAt={x:target.x,y:target.y,at:performance.now()};
