@@ -217,3 +217,23 @@ test('ecology planner never reads another bot private assignment, even if visibl
   assert.equal(choose(T, w).mode, 'none',
     'visible occupancy is sufficient without reading hidden strategy');
 });
+
+test('outside-sector default viewport cannot witness even a crowded BLOOM center', () => {
+  const T = boot(), w = encounter(T, 'BLOOM', 0);
+  const c = T.sectorCenter(6);
+  w.observer.x = -20;
+  w.observer.y = c.y;
+  assert.notEqual(T.sectorIndex(w.observer.x, w.observer.y), 6);
+  const baseline = choose(T, w);
+  assert.equal(baseline.mode, 'signal');
+  for (const bot of w.hidden) {
+    bot.x = c.x;
+    bot.y = c.y;
+  }
+  assert.ok(Math.abs(c.x - w.observer.x) > w.g.w / 2,
+    'a sector center is not visible from just outside its 1125-unit-wide sector');
+  const crowded = choose(T, w);
+  assert.equal(crowded.mode, baseline.mode,
+    'occupancy cannot prevent an unseen central dogpile before arrival');
+  assert.equal(crowded.weight, baseline.weight);
+});
