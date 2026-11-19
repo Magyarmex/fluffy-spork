@@ -312,3 +312,50 @@ test('Tempest aligned-target HP recovery holds across neighboring 20ms touch pha
   }
  }
 });
+
+
+test('composed Tempest six-tick policies expose real HP contact recovery under a triple-active burst',()=>{
+ // A source-executed Game/Input counterpart to the capacity-matched stub
+ // owner witness. No browser, device or production scheduler policy changes.
+ const intervals=Array.from({length:5},()=>[
+  95,95,95,...Array(9).fill((400-285)/9)]).flat();
+ const events=[
+  {at:140,type:'pointerdown',x:640,buttons:1},
+  {at:142,type:'pointermove',x:680,buttons:1},
+  {at:160,type:'pointerup',x:680,buttons:0}
+ ];
+ const opts={classId:'tempest',events,targetX:100,targetY:-25,manualAim:true};
+ const native=run(Array(120).fill(STEP),4,2,opts);
+ assert.equal(native.volleys,1,'native60 must fire the legal Tempest pulse');
+ assert.ok(native.hits>0&&native.damage>0,
+  'native60 must produce actual HP contact, not only a projectile');
+ const rows=[];
+ for(const [steps,extra] of [[2,4],[3,3],[4,2]]){
+  const actual=run(intervals,steps,extra,opts);
+  assert.equal(actual.sampled.length,3,'all three touch edges must reach real Input');
+  assert.equal(actual.sampled.at(-1).owner,-1,'release must clear aim ownership');
+  assert.equal(actual.sampled.at(-1).firing,false,'release must stop firing');
+  assert.ok(actual.volleys<=native.volleys,
+   'the catch-up owner must not invent an extra Tempest volley');
+  if(actual.droppedMs===0){
+   assert.deepEqual(actual.birthVectors,native.birthVectors,
+    'complete tick recovery must preserve projectile birth chronology');
+   assert.deepEqual(actual.contacts,native.contacts,
+    'complete tick recovery must preserve actual HP contact chronology');
+  }
+  if(steps>=3){
+   assert.equal(actual.volleys,native.volleys,
+    'the selected six-tick catch-up arm must retain this short pulse');
+   assert.ok(actual.hits>0&&actual.damage>0,
+    'the retained Tempest pulse must make real HP contact');
+   assert.equal(actual.damage,native.damage,
+    'the retained shot must preserve its damage without claiming Game.time parity');
+  }
+  rows.push({steps,extra,volleys:actual.volleys,hits:actual.hits,
+   damage:actual.damage,droppedMs:actual.droppedMs,contacts:actual.contacts});
+ }
+ console.log('COMPOSED_TEMPEST_SIX_TICK_HP '+JSON.stringify({
+  native:{volleys:native.volleys,hits:native.hits,damage:native.damage,
+   contacts:native.contacts},rows,
+  caveat:'real 49-overlay Game and HP, stub renderer and scripted RAF; not Chromium/device'}));
+});
