@@ -536,3 +536,46 @@ test('Tempest adversarial 30Hz three/four-step budgets account for actual touch-
  assert.equal(rows.length,24);
  console.log('TEMPEST_THREE_FOUR_STEP_TOUCH_DAMAGE '+JSON.stringify(rows));
 });
+
+
+// #648: reload 4->5 crosses a 30Hz post-redline cooldown threshold in the
+// isolated composed Game. Guard actual target HP and touch chronology on both
+// sides of that legal upgrade, without freezing any balance count as golden.
+test('Tempest reload 4/5 threshold retains real-hit parity when 30Hz jitter fully recovers',()=>{
+ const rows=[];
+ for(const reload of [4,5]){
+  const reference=trial(1517800,'tempest',reload,'uniform60',7);
+  assert.ok(reference.hits>0&&reference.damage>0,
+   'each legal reload control must physically hit the target');
+  for(const mode of ['quantized83_16','sevenTickFalsifier']){
+   for(const [maxSteps,extra] of [[3,3],[4,2]]){
+    const observed=trial(1517800,'tempest',reload,mode,7,
+     'research-drop',maxSteps,extra);
+    assert.equal(observed.applied,reference.applied,
+     'catch-up cannot lose the same touch history');
+    assert.ok(Math.abs(observed.ticks*(1000/60)+observed.droppedMs+
+     observed.backlogMs-DURATION_MS)<.002,
+     'executed, dropped and queued time must account for wall time');
+    assert.ok(observed.hits>0&&observed.damage>0,
+     'both sides of the upgrade threshold must physically hit');
+    if(mode==='quantized83_16'){
+     assert.equal(observed.droppedMs,0);
+     assert.equal(observed.ticks,reference.ticks);
+     assert.equal(observed.volleys,reference.volleys);
+     assert.equal(observed.hits,reference.hits);
+     assert.equal(observed.damage,reference.damage);
+     assert.deepEqual(observed.allBirths,reference.allBirths,
+      'fully recovered projectile chronology must match native 60Hz');
+     assert.equal(observed.heat,reference.heat);
+     assert.equal(observed.spin,reference.spin);
+    }
+    rows.push({reload,mode,maxSteps,ticks:observed.ticks,
+     droppedMs:observed.droppedMs,volleys:observed.volleys,
+     hits:observed.hits,damage:observed.damage,
+     referenceVolleys:reference.volleys,referenceDamage:reference.damage});
+   }
+  }
+ }
+ assert.equal(rows.length,8);
+ console.log('TEMPEST_RELOAD45_REAL_HIT_JITTER '+JSON.stringify(rows));
+});
