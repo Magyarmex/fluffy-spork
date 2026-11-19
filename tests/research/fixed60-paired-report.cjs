@@ -35,7 +35,8 @@ function summarize(control,candidate){
    assert.ok(['pointerdown','pointermove','pointerup','pointercancel'].includes(e.type),
     `${label}: invalid touch event type`);
    assert.ok(Number.isInteger(e.pointerId)&&Number.isFinite(e.relativeWallMs)&&
-    e.relativeWallMs>=0,`${label}: invalid touch event timestamp/identity`);
+    Number.isFinite(e.x)&&Number.isFinite(e.y)&&e.relativeWallMs>=0,
+    `${label}: invalid touch event timestamp/identity/position`);
    if(i)assert.ok(e.relativeWallMs>=report.touchInput.events[i-1].relativeWallMs,
     `${label}: touch events not chronological`);
   }
@@ -64,6 +65,10 @@ function summarize(control,candidate){
   candidate.touchInput.events[i].relativeWallMs-e.relativeWallMs):[];
  const maxAbsTouchTimingDeltaMs=sameTouchSequence?
   Math.max(0,...touchTimingDeltasMs.map(Math.abs)):null;
+ const maxTouchPositionDeltaPx=sameTouchSequence?Math.max(0,
+  ...control.touchInput.events.map((e,i)=>Math.hypot(
+   e.x-candidate.touchInput.events[i].x,
+   e.y-candidate.touchInput.events[i].y))):null;
  const arm=(report)=>{
   const r=report.raf;
   return {steps:report.configuredMaxSteps,wallMs:r.observedWallMs,
@@ -90,8 +95,11 @@ function summarize(control,candidate){
  const durationRatio=Math.max(a.wallMs,b.wallMs)/Math.min(a.wallMs,b.wallMs);
  return {initialFingerprint:control.initialFingerprint,control:a,candidate:b,
   durationRatio,matchedObservationDuration:durationRatio<=1.05,
-  sameTouchSequence,maxAbsTouchTimingDeltaMs,
+  sameTouchSequence,maxAbsTouchTimingDeltaMs,maxTouchPositionDeltaPx,
   matchedTouchTiming:sameTouchSequence&&maxAbsTouchTimingDeltaMs<=20,
+  matchedTouchGeometry:sameTouchSequence&&maxTouchPositionDeltaPx<=1,
+  comparableTouchDelivery:sameTouchSequence&&maxAbsTouchTimingDeltaMs<=20&&
+   maxTouchPositionDeltaPx<=1,
   causalClaimAllowed:false,
   interpretation:'Descriptive browser observations only: even matched event sequences and delivery times do not establish equal combat trajectories, input-to-photon latency or device CPU safety.'};
 }
