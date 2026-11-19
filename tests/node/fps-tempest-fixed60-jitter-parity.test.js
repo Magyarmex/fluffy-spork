@@ -92,7 +92,7 @@ test('opt-in fixed60 preserves Tempest chronology under equal-mean adversarial R
  }
 });
 
-function runTouch(seed,intervals){
+function runTouch(seed,intervals,releaseKind='pointerup'){
  return withSeed(seed,draws=>{
   const g=bootGame(),p=g.player;g.sfx.muted=true;
   g.setClass(p,'tempest');g.tanks=[p];g.tankById=new Map([[p.id,p]]);
@@ -106,9 +106,9 @@ function runTouch(seed,intervals){
    now:()=>now,request:fn=>{callback=fn;return 1;},
    cancel:()=>{callback=null},render:()=>{},maxSteps:2
   });
-  const edges=[[250,'pointerdown'],[260,'pointermove'],[1750,'pointerup'],
-   [2250,'pointerdown'],[2260,'pointermove'],[4250,'pointerup'],
-   [5000,'pointerdown'],[5010,'pointermove'],[7750,'pointerup']];
+  const edges=[[250,'pointerdown'],[260,'pointermove'],[1750,releaseKind],
+   [2250,'pointerdown'],[2260,'pointermove'],[4250,releaseKind],
+   [5000,'pointerdown'],[5010,'pointermove'],[7750,releaseKind]];
   let index=0,volleys=0;const shotTimes=[],original=g.tryFire;
   g.tryFire=function(t){
    const before=this.bullets.length,result=original.apply(this,arguments);
@@ -188,4 +188,18 @@ test('bursty equal-mean RAF exposes hidden backlog despite zero dropped time',()
   'no droppedMs does not imply the simulation caught up');
  assert.deepEqual(four,baseline,
   'four-step research control must recover the full canonical 60Hz state');
+});
+
+// A mobile OS may cancel a touch rather than deliver a normal pointerup.
+// The composed Game must never keep firing or change its physical timeline.
+test('Tempest touch cancellation matches release under bounded RAF jitter',()=>{
+ const native=Array(480).fill(2),seed=1517800;
+ const released=runTouch(seed,native,'pointerup');
+ const cancelled=runTouch(seed,native,'pointercancel');
+ assert.ok(cancelled.volleys>0,'cancel fixture must exercise real projectiles');
+ assert.deepEqual(cancelled,released,'pointercancel changed native60 firing');
+ for(const [name,pattern] of Object.entries(patterns)){
+  const observed=runTouch(seed,schedule(pattern,0),'pointercancel');
+  assert.deepEqual(observed,released,'cancel jitter parity failed: '+name);
+ }
 });
