@@ -26,11 +26,11 @@ function run(seed,reload,hz){
   const shots=[],original=g.tryFire;
   g.tryFire=function(t){
    const before=this.bullets.length;
-   const pre={heat:t.__v17Heat||0,cd:t.fireCd||0,stability:t.__v17Stability??1};
+   const pre={heat:t.__v17Heat||0,cd:t.fireCd||0,stability:t.__v17Stability??1,spin:t.fireSpin||0};
    const ret=original.apply(this,arguments);
    if(t===p&&this.bullets.length>before){
     const heat=p.__v17Heat||0,stability=p.__v17Stability??1;
-    shots.push({time:this.time,pre,heat,stability,cd:p.fireCd,
+    shots.push({time:this.time,pre,heat,stability,spin:p.fireSpin||0,cd:p.fireCd,
      apex:p.__v171ApexMeter,boost:band(heat)>.58&&stability>.52,
      redline:heat>.90,projectiles:this.bullets.length-before});
    }
@@ -46,6 +46,8 @@ function run(seed,reload,hz){
     assert.ok(Number.isFinite(s.time)&&Number.isFinite(s.cd)&&s.cd>0);
     assert.ok(s.heat>=0&&s.heat<=1.18+1e-9);
     assert.ok(s.stability>=0&&s.stability<=1+1e-9);
+    assert.ok(s.spin>=0&&s.spin<=1+1e-9);
+    assert.ok(s.spin>=s.pre.spin-1e-9,'a firing event must not reduce rotary spin');
     assert.ok(s.projectiles>=1);
     assert.ok(Math.abs(s.apex-band(s.heat))<1e-9,
      'Apex meter must use post-Gunner shot heat');
@@ -57,7 +59,8 @@ function run(seed,reload,hz){
     first:shots.slice(0,6).map(s=>({
      time:+s.time.toFixed(5),preHeat:+s.pre.heat.toFixed(5),
      heat:+s.heat.toFixed(5),cd:+s.cd.toFixed(5),
-     stability:+s.stability.toFixed(5),boost:s.boost,redline:s.redline
+     stability:+s.stability.toFixed(5),preSpin:+s.pre.spin.toFixed(5),
+     spin:+s.spin.toFixed(5),boost:s.boost,redline:s.redline
     })),
     finalHeat:+(p.__v17Heat||0).toFixed(5),
     finalCd:+(p.fireCd||0).toFixed(5)};
