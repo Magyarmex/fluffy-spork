@@ -779,6 +779,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    const stopped={started:p.owner.started,captureActive:p.capture.active,
     raf:g.raf,inputRestored:g.input.canvas===g.canvas,
     startRestored:g.start===Game.prototype.start,
+    inputHandlersRestored:!!window.__novaFixedResearch.inputHandlersRestored,
     destroyRestored:g.destroy===Game.prototype.destroy,
     pauseRestored:g.setPaused===Game.prototype.setPaused};
    g.destroy();
@@ -788,7 +789,8 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
   });
   assert.deepEqual(teardown,{
    started:false,captureActive:false,raf:null,inputRestored:true,
-   startRestored:true,destroyRestored:true,pauseRestored:true,
+   startRestored:true,inputHandlersRestored:true,
+   destroyRestored:true,pauseRestored:true,
    destroyed:true,musicTimer:null,pendingGateRequests:0
   },'pilot teardown must restore native controls and release Game/audio/RAF ownership');
   console.log('NOVA_FIXED60_CHROMIUM_OWNER_TOUCH '+JSON.stringify(report));
