@@ -17,6 +17,7 @@ function createPublicApproachWitness(options={}) {
     for(const [id,r] of records)
       if(now<r.time||now-r.time>maxDt*2)records.delete(id);
     let approaching=0;
+    const seenIds=new Set();
     for(const q of contacts||[]){
       if(!q||q===observer||q.id==null||q.alive===false||!(q.hp>0)||
          q.spawnShieldT>0||!Number.isFinite(q.x)||!Number.isFinite(q.y)||
@@ -25,10 +26,11 @@ function createPublicApproachWitness(options={}) {
         continue;
       }
       const id=String(q.id),dist=Math.hypot(q.x-goal.x,q.y-goal.y);
+      seenIds.add(id);
       if(dist>range){records.delete(id);continue;}
       const prior=records.get(id);
       let streak=0;
-      if(prior&&prior.ref===q){
+      if(prior&&prior.ref===q&&prior.goalX===goal.x&&prior.goalY===goal.y){
         const dt=now-prior.time,move=Math.hypot(q.x-prior.x,q.y-prior.y),
           progress=prior.dist-dist;
         if(dt>=minDt&&dt<=maxDt&&move>=4&&move<=maxSpeed*dt+10&&
@@ -37,10 +39,14 @@ function createPublicApproachWitness(options={}) {
       }
       // A confirmed witness needs repeated consecutive visible progress.
       records.delete(id);
-      records.set(id,{ref:q,x:q.x,y:q.y,dist,time:now,streak});
+      records.set(id,{ref:q,x:q.x,y:q.y,dist,time:now,streak,
+        goalX:goal.x,goalY:goal.y});
       if(streak>=required)approaching++;
       while(records.size>cap)records.delete(records.keys().next().value);
     }
+    // A contact omitted from a later viewport sample is not continuously
+    // witnessed; it must not be resurrected with an inferred offscreen path.
+    for(const id of records.keys())if(!seenIds.has(id))records.delete(id);
     return Math.min(approaching,4);
   }
   return {sample};
