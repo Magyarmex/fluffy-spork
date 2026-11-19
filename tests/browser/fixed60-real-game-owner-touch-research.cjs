@@ -92,7 +92,8 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    for(const type of ['pointerdown','pointermove','pointerup','pointercancel'])
     document.addEventListener(type,e=>{
      if(e.pointerType==='touch'){
-      profile.touchEvents.push({type,trusted:e.isTrusted,pointerId:e.pointerId,wallMs:performance.now()});
+      profile.touchEvents.push({type,trusted:e.isTrusted,pointerId:e.pointerId,
+       x:e.clientX,y:e.clientY,wallMs:performance.now()});
       if(type==='pointermove'&&profile.firstAimMoveAt==null&&
        profile.aimOrigin&&e.pointerId===profile.aimOrigin.id&&
        Math.hypot(e.clientX-profile.aimOrigin.x,
@@ -510,7 +511,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    const trustedTouches=window.__novaFixedResearch.touchEvents.filter(e=>e.trusted);
    const firstTouchWallMs=trustedTouches[0]?.wallMs??null;
    const touchInput={events:trustedTouches.map(e=>({
-    type:e.type,pointerId:e.pointerId,
+    type:e.type,pointerId:e.pointerId,x:e.x,y:e.y,
     relativeWallMs:e.wallMs-firstTouchWallMs
    })),firstTouchWallMs};
    const releaseTelemetry={releaseWallMs:release?.wallMs??null,
