@@ -129,6 +129,12 @@ const {chromium}=require('playwright');
    'physical HP contact cannot predate projectile birth');
   const release=report.events.find(e=>e.type==='pointerup'||e.type==='pointercancel');
   assert.ok(release&&release.trusted,'release must be a trusted browser event');
+  assert.equal(deflect.pointerId,press.pointerId,
+   'firing deflection must belong to the pressed touch');
+  assert.equal(release.pointerId,press.pointerId,
+   'release must belong to the same touch that fired');
+  assert.ok(deflect.at<=release.at,
+   'touch release must not predate firing deflection');
   assert.ok(report.births.every(b=>b.at<=release.at),
    'no new Tempest projectile may be born after touch release');
   assert.equal(report.aimActive,false);
