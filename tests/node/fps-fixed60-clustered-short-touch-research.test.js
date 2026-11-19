@@ -168,3 +168,37 @@ test('20ms touch phase sweep separates skipped-tick loss from intrinsic sampling
   caveat:'stub input owner; not composed Game projectiles or device latency'
  }));
 });
+
+
+test('capacity-matched six-tick owners preserve a legal 20ms pulse under a triple-active burst',()=>{
+ // A constructed 2s schedule with no >100ms foreground stall. Every arm
+ // retains six ticks of total capacity, but has a different per-RAF work cap.
+ // This is an exact-source owner/Input witness, NOT a device CPU ranking.
+ const intervals=Array.from({length:5},()=>[
+  95,95,95,...Array(9).fill((400-285)/9)]).flat();
+ const pulse=[{at:140,type:'pointerdown'},{at:160,type:'pointerup'}];
+ const native=replay(Array(120).fill(1000/60),4,2,pulse,2000);
+ assert.equal(native.fireUpdates,1,
+  'native60 must sample the intentional 20ms touch');
+ const rows=[];
+ for(const [steps,extra] of [[2,4],[3,3],[4,2]]){
+  const actual=replay(intervals,steps,extra,pulse,2000);
+  assert.equal(actual.applied,2,'both legal touch edges must reach Input');
+  assert.equal(actual.late+actual.reordered+actual.stale,0,
+   'no timestamp repair may confound this phase');
+  assert.ok(actual.fireUpdates<=native.fireUpdates,
+   'catch-up must not invent a second firing sample');
+  if(actual.droppedMs===0)assert.equal(actual.fireUpdates,native.fireUpdates,
+   'complete tick recovery must preserve the native firing sample');
+  rows.push({steps,extra,...actual});
+ }
+ assert.equal(rows[1].fireUpdates,native.fireUpdates,
+  'three-step six-tick owner should retain this witnessed pulse');
+ assert.equal(rows[2].fireUpdates,native.fireUpdates,
+  'four-step six-tick owner should retain this witnessed pulse');
+ assert.ok(rows[2].droppedMs<=rows[1].droppedMs+1e-4 &&
+  rows[1].droppedMs<=rows[0].droppedMs+1e-4,
+  'the constructed burst should expose the bounded catch-up tradeoff');
+ console.log('FIXED60_SIX_TICK_CAPACITY_MATCH '+JSON.stringify({native,rows,
+  caveat:'source-executed owner with stub firing, not composed Game, Chromium, CPU or target HP'}));
+});
