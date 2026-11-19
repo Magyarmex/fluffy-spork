@@ -110,9 +110,10 @@ const {chromium}=require('playwright');
   assert.ok(press&&deflect&&press.at<=deflect.at,
    'trusted touch press must precede the firing deflection');
   assert.ok(report.targetReady&&report.targetAt,'target must be preplaced before any projectile');
+  assert.ok(report.births.some(b=>b.ownerId===report.playerId),
+   'trusted deflection must create a real player-owned projectile');
   assert.ok(report.targetAt.at<report.births[0].at,
    'target geometry must precede the measured projectile, not follow its trajectory');
-  assert.ok(report.births.some(b=>b.ownerId===report.playerId));
   assert.ok(report.hits.some(h=>h.sourceId===report.playerId&&h.damage>0),
    'real composed Tempest projectile must reduce aligned target HP');
   assert.ok(report.births.every(b=>b.at>=deflect.at),
