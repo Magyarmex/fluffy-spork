@@ -86,13 +86,10 @@ test('same gestures delivered in different nominal owner ticks are flagged',()=>
  assert.equal(result.comparableTouchDelivery,false);
 });
 
-test('different pointer histories cannot be compared by index',()=>{
+test('different pointer histories fail closed before comparison',()=>{
  const candidate=fixture(3);
  candidate.touchInput.events[1].pointerId=99;
- const result=summarize(fixture(2),candidate);
- assert.equal(result.sameTouchSequence,false);
- assert.equal(result.maxAbsTouchTimingDeltaMs,null);
- assert.equal(result.matchedTouchTiming,false);
+ assert.throws(()=>summarize(fixture(2),candidate),/retain one owner/);
 });
 
 test('missing or invalid release evidence fails closed',()=>{
