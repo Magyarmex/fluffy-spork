@@ -145,10 +145,24 @@ test('fixed60 preserves touch press/release shot chronology across adversarial R
  const baseline=runTouch(1517800,native);
  assert.equal(baseline.applied,9);
  assert.ok(baseline.volleys>0,'touch input must actually fire');
+ // A matching final state alone can hide a projectile emitted after release.
+ // Assert that every actual Tempest volley belongs to a held-touch interval.
+ // The input fixture timestamps are milliseconds from the same simulation epoch.
+ const heldWindows=[[0.250,1.750],[2.250,4.250],[5.000,7.750]];
+ const assertReleaseSafety=(result,context)=>{
+  for(const at of result.shotTimes){
+   assert.ok(heldWindows.some(([down,up])=>at>=down-1e-7&&at<up-1e-7),
+    context+' emitted a Tempest volley outside held touch: '+at);
+  }
+  assert.ok(result.shotTimes.some(at=>at>=5&&at<7.75),
+   context+' must exercise the final touch interval');
+ };
+ assertReleaseSafety(baseline,'native60');
  assert.equal(baseline.ticks,480);assert.equal(baseline.dropped,0);
  for(const [name,pattern] of Object.entries(patterns))
   for(const phase of [0,1,2]){
    const observed=runTouch(1517800,schedule(pattern,phase));
+   assertReleaseSafety(observed,name+' phase='+phase);
    assert.deepEqual(observed,baseline,
     'touch chronology changed for '+name+' phase='+phase);
   }
