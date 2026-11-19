@@ -95,8 +95,10 @@ const {chromium}=require('playwright');
   await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[
    {...origin,x:origin.x+35,y:origin.y-20}]});
   await page.waitForFunction(()=>window.__novaTempestHp.births.length>0,null,{timeout:12000});
-  await page.waitForFunction(()=>window.__novaTempestHp.hits.length>0,null,{timeout:12000});
+  // Release as soon as the first actual shot is witnessed; the target must
+  // still take damage from an already-existing projectile, not held autofire.
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  await page.waitForFunction(()=>window.__novaTempestHp.hits.length>0,null,{timeout:12000});
   await page.waitForFunction(()=>{const i=window.__novaTempestHpGame?.input;
    return i&&!i.aim.active&&!i.firing&&i.stickId.aim===-1;},null,{timeout:5000});
   const report=await page.evaluate(()=>({
