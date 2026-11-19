@@ -62,7 +62,9 @@ function run(intervals,maxSteps,extra,{classId='scout',events=pulse,targetX=200,
   };
   g.damageTank=function(t){
    const hp=t.hp,out=originalDamage.apply(this,arguments);
-   if(t===target&&t.hp<hp){hits++;damage+=hp-t.hp;
+   if(t===target&&t.hp<hp){
+    assert.equal(arguments[2],p.id,'target HP must fall from a player-owned projectile');
+    hits++;damage+=hp-t.hp;
     contacts.push({time:+this.time.toFixed(6),delta:+(hp-t.hp).toFixed(5)});
    }
    return out;
@@ -250,6 +252,16 @@ test('Tempest short-touch target-distance census records real HP contacts',()=>{
   assert.equal(recovered.damage,native.damage,
    'recovered input must preserve actual target HP change');
   assert.equal(recovered.hits,native.hits);
+  if(targetX===100&&targetY===-25){
+   assert.ok(native.hits>=1&&native.damage>0,
+    'aligned unshielded tank must take actual short-touch projectile damage');
+   assert.equal(lost.hits,0,'dropped short press must not hit the target');
+   assert.equal(lost.damage,0);
+  }
+  if(targetX===200&&targetY===120){
+   assert.equal(native.hits,0,'off-lane tank is a negative contact control');
+   assert.equal(native.damage,0);
+  }
   assert.ok(lost.damage<=native.damage+1e-5,
    'a dropped shot must not cause more damage than the native reference');
   rows.push({targetX,targetY,nativeHits:native.hits,nativeDamage:native.damage,
