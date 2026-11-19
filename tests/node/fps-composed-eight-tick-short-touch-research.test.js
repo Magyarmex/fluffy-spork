@@ -92,7 +92,7 @@ function run(intervals,maxSteps,extra,{classId='scout',events=pulse}={}){
    assert.equal(g.input.aim.active,false,'released touch must not remain owned');
    assert.ok(Math.abs(owner.ticks*STEP+owner.droppedMs+owner.lagMs-2000)<.002,
     'executed, dropped and queued time must account for wall time');
-   assert.ok(volleys<=1,'single 12ms press must not generate multiple volleys');
+   assert.ok(volleys<=1,'single short press must not generate multiple volleys');
    return {ticks:owner.ticks,droppedMs:+owner.droppedMs.toFixed(4),
     queuedMs:+owner.lagMs.toFixed(4),volleys,hits,damage:+damage.toFixed(5),
     heat:+(p.__v17Heat||0).toFixed(6),fireCd:+p.fireCd.toFixed(6),
@@ -149,7 +149,7 @@ test('composed Tempest 20ms press has no ghost volley and matches when skipped t
   rows.push({steps,extra,...candidate});
  }
  console.log('COMPOSED_TEMPEST_20MS_TOUCH '+JSON.stringify({baseline,rows,
-  caveat:'source-executed Game/Input/Canvas fixture, not Chromium or physical device'}));
+  caveat:'source-executed Game/Input with stub render, not Chromium/Canvas pixels or device'}));
 });
 
 
@@ -189,7 +189,7 @@ test('composed Tempest 20ms touch separates mean30 dropped ticks from recovered 
  if(constrained.droppedMs===0)assert.equal(constrained.volleys,native.volleys);
  console.log('COMPOSED_TEMPEST_MEAN30_20MS '+JSON.stringify({
   native,constrained,recovery2,recovery3,
-  caveat:'real materialized Game and touch handlers, scripted RAF not Chromium/device'
+  caveat:'materialized Game and touch handlers, stub render and scripted RAF, not Chromium/device'
  }));
 });
 
